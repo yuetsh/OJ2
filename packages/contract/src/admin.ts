@@ -487,3 +487,102 @@ export const acTrendSchema = z.object({
 
 export const generateFlowchartRequestSchema = z.object({ python: z.string().min(1).max(64 * 1024) })
 export const generateFlowchartResponseSchema = z.object({ flowchart: z.string() })
+
+// ---------------------------------------------------------------- 题目管理
+
+export const adminProblemListItemSchema = z.object({
+  id: z.number().int(),
+  _id: z.string(),
+  title: z.string(),
+  createdBy: sampleUserSchema,
+  visible: z.boolean(),
+  createTime: z.string(),
+  difficulty: z.string(),
+  tags: z.array(z.string()),
+  hasAstRules: z.boolean(),
+  allowFlowchart: z.boolean(),
+  showFlowchart: z.boolean(),
+  topReaction: z.string().nullable(),
+})
+
+export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema)
+
+/** 后台题目详情：包含 oj 侧永不下发的 answers / testCase* / astRules */
+export const adminProblemSchema = z.object({
+  id: z.number().int(),
+  _id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  inputDescription: z.string(),
+  outputDescription: z.string(),
+  samples: z.array(z.record(z.string(), z.unknown())),
+  testCaseId: z.string(),
+  testCaseScore: z.array(z.record(z.string(), z.unknown())),
+  hint: z.string().nullable(),
+  languages: z.array(z.string()),
+  template: z.record(z.string(), z.string()),
+  createTime: z.string(),
+  lastUpdateTime: z.string(),
+  timeLimit: z.number().int(),
+  memoryLimit: z.number().int(),
+  visible: z.boolean(),
+  difficulty: z.string(),
+  source: z.string().nullable(),
+  submissionNumber: z.number().int(),
+  acceptedNumber: z.number().int(),
+  statisticInfo: z.record(z.string(), z.unknown()),
+  shareSubmission: z.boolean(),
+  contestId: z.number().int().nullable(),
+  createdBy: sampleUserSchema,
+  isPublic: z.boolean(),
+  tags: z.array(z.string()),
+  allowFlowchart: z.boolean(),
+  showFlowchart: z.boolean(),
+  mermaidCode: z.string().nullable(),
+  flowchartHint: z.string().nullable(),
+  astRules: z.unknown(),
+  answers: z.array(z.record(z.string(), z.unknown())),
+  prompt: z.string().nullable(),
+  sqlConfig: z.record(z.string(), z.unknown()).nullable(),
+  sqlDisplay: z.record(z.string(), z.unknown()).nullable(),
+})
+
+export const createProblemRequestSchema = z.object({
+  _id: z.string().trim().min(1).max(32),
+  title: z.string().trim().min(1).max(1024),
+  description: z.string(),
+  inputDescription: z.string(),
+  outputDescription: z.string(),
+  samples: z.array(z.record(z.string(), z.unknown())),
+  testCaseId: z.string().regex(/^[a-zA-Z0-9]+$/).max(32),
+  testCaseScore: z.array(z.record(z.string(), z.unknown())),
+  timeLimit: z.number().int().min(1).max(1000 * 60),
+  memoryLimit: z.number().int().min(1).max(1024),
+  languages: z.array(z.string()).min(1),
+  template: z.record(z.string(), z.string()),
+  visible: z.boolean(),
+  difficulty: z.enum(["Low", "Mid", "High"]),
+  tags: z.array(z.string().max(32)).min(1),
+  hint: z.string().nullable().default(null),
+  source: z.string().max(256).nullable().default(null),
+  prompt: z.string().nullable().default(null),
+  answers: z.array(z.record(z.string(), z.unknown())).default([]),
+  shareSubmission: z.boolean(),
+  allowFlowchart: z.boolean().default(false),
+  showFlowchart: z.boolean().default(false),
+  mermaidCode: z.string().nullable().default(null),
+  flowchartHint: z.string().nullable().default(null),
+  astRules: z.unknown().default(null),
+  sqlConfig: z.record(z.string(), z.unknown()).nullable().default(null),
+})
+
+export const updateProblemRequestSchema = createProblemRequestSchema
+
+export const makeProblemPublicRequestSchema = z.object({
+  displayId: z.string().trim().min(1).max(32),
+})
+
+export const addContestProblemRequestSchema = z.object({
+  problemId: z.number().int().positive(),
+  displayId: z.string().trim().min(1).max(32),
+})

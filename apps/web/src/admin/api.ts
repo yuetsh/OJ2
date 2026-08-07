@@ -38,21 +38,13 @@ export async function getProblemList(
   contestID?: string,
   tagId?: number,
 ) {
-  const endpoint = !!contestID ? "admin/contest/problem" : "admin/problem"
-  const res = await http.get<{ results: AdminProblem[]; total: number }>(
-    endpoint,
-    {
-      params: {
-        paging: true,
-        offset,
-        limit,
-        keyword,
-        author,
-        contest_id: contestID,
-        tag_id: tagId,
-      },
-    },
-  )
+  const endpoint = contestID
+    ? `admin/contests/${contestID}/problems`
+    : "admin/problems"
+  const res = await legacyResponse<{
+    results: AdminProblem[]
+    total: number
+  }>(api2.get(endpoint, { params: { offset, limit, keyword, author, tagId } }))
   return {
     results: res.data.results.map(toProblemListItem),
     total: res.data.total,
@@ -60,15 +52,21 @@ export async function getProblemList(
 }
 
 export function deleteProblem(id: number) {
-  return http.delete("admin/problem", { params: { id } })
+  return api2.delete(`admin/problems/${id}`)
 }
 
+// 比赛题与公开题共用一条删除路由，比赛由后端从题目推导
 export function deleteContestProblem(id: number) {
-  return http.delete("admin/contest/problem", { params: { id } })
+  return api2.delete(`admin/problems/${id}`)
 }
 
 export function editProblem(problem: AdminProblem | BlankProblem) {
-  return http.put("admin/problem", problem)
+  return legacyResponse(
+    api2.put(
+      `admin/problems/${(problem as AdminProblem).id}`,
+      toProblemBody(problem),
+    ),
+  )
 }
 
 export function toggleProblemVisible(problemID: number) {
@@ -80,15 +78,20 @@ export function generateFlowchartFromPythonCode(python: string) {
 }
 
 export function editContestProblem(problem: AdminProblem | BlankProblem) {
-  return http.put("admin/contest/problem", problem)
+  return legacyResponse(
+    api2.put(
+      `admin/problems/${(problem as AdminProblem).id}`,
+      toProblemBody(problem),
+    ),
+  )
 }
 
 export function getProblem(id: string | number) {
-  return http.get<AdminProblem>("admin/problem", { params: { id } })
+  return legacyResponse<AdminProblem>(api2.get(`admin/problems/${id}`))
 }
 
 export function getContestProblem(id: number) {
-  return http.get("admin/contest/problem", { params: { id } })
+  return legacyResponse<AdminProblem>(api2.get(`admin/problems/${id}`))
 }
 
 // 标签管理
@@ -239,12 +242,49 @@ export function generateSQLTestcase(data: {
   return http.post<{ sql: string }>("admin/sql_test_case_ai_gen", data)
 }
 
+/** 组件里的题目对象是 snake_case，出站转成新后端要的 camelCase */
+function toProblemBody(problem: AdminProblem | BlankProblem) {
+  const p = problem as Record<string, any>
+  return {
+    _id: p._id,
+    title: p.title,
+    description: p.description,
+    inputDescription: p.input_description ?? "",
+    outputDescription: p.output_description ?? "",
+    samples: p.samples ?? [],
+    testCaseId: p.test_case_id,
+    testCaseScore: p.test_case_score ?? [],
+    timeLimit: p.time_limit,
+    memoryLimit: p.memory_limit,
+    languages: p.languages ?? [],
+    template: p.template ?? {},
+    visible: p.visible,
+    difficulty: p.difficulty,
+    tags: p.tags ?? [],
+    hint: p.hint ?? null,
+    source: p.source ?? null,
+    prompt: p.prompt ?? null,
+    answers: p.answers ?? [],
+    shareSubmission: p.share_submission ?? false,
+    allowFlowchart: p.allow_flowchart ?? false,
+    showFlowchart: p.show_flowchart ?? false,
+    mermaidCode: p.mermaid_code ?? null,
+    flowchartHint: p.flowchart_hint ?? null,
+    astRules: p.ast_rules ?? null,
+    sqlConfig: p.sql_config ?? null,
+  }
+}
+
 export function createProblem(problem: BlankProblem) {
-  return http.post("admin/problem", problem)
+  return legacyResponse(api2.post("admin/problems", toProblemBody(problem)))
 }
 
 export function createContestProblem(problem: BlankProblem) {
-  return http.post("admin/contest/problem", problem)
+  // contest_id 由 detail.vue 在提交前写进 problem 对象
+  const contestID = (problem as Record<string, any>).contest_id
+  return legacyResponse(
+    api2.post(`admin/contests/${contestID}/problems`, toProblemBody(problem)),
+  )
 }
 
 /** 组件里的比赛对象是 snake_case，出站转成新后端要的 camelCase */
@@ -289,11 +329,12 @@ export function addProblemForContest(
   problemID: number,
   displayID: string,
 ) {
-  return http.post("admin/contest/add_problem_from_public", {
-    contest_id: contestID,
-    problem_id: problemID,
-    display_id: displayID,
-  })
+  return legacyResponse(
+    api2.post(`admin/contests/${contestID}/problems/from-public`, {
+      problemId: problemID,
+      displayId: displayID,
+    }),
+  )
 }
 
 export function getWebsite() {
@@ -451,10 +492,9 @@ export function deleteExercise(id: number) {
 
 // 将竞赛题目转为公开题目
 export function makeProblemPublic(id: number, display_id: string) {
-  return http.post("admin/contest_problem/make_public", {
-    id,
-    display_id,
-  })
+  return legacyResponse(
+    api2.post(`admin/problems/${id}/make-public`, { displayId: display_id }),
+  )
 }
 
 // 比赛辅助检查
