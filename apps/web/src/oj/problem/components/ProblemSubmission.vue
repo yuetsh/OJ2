@@ -1,0 +1,343 @@
+<script lang="ts" setup>
+import { NButton, NFlex, NTooltip } from "naive-ui"
+import { Icon } from "@iconify/vue"
+import { getSubmissions, getRankOfProblem } from "oj/api"
+import Pagination from "shared/components/Pagination.vue"
+import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
+import { useUserStore } from "shared/store/user"
+import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
+import { parseTime } from "utils/functions"
+import { renderTableTitle } from "utils/renders"
+import type { Submission } from "utils/types"
+import SubmissionDetail from "oj/submission/detail.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
+
+const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
+const { isDesktop } = useBreakpoints()
+
+// 弹框状态管理
+const [codePanelVisible, toggleCodePanel] = useToggle(false)
+const submissionID = ref("")
+const problemID = ref("")
+
+// 显示代码弹框
+function showCodePanel(id: string, problem: string) {
+  submissionID.value = id
+  problemID.value = problem
+  toggleCodePanel(true)
+}
+
+const columns: DataTableColumn<Submission>[] = [
+  {
+    title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
+    key: "create_time",
+    width: 200,
+    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+  },
+  {
+    title: renderTableTitle("编号", "fluent-emoji-flat:input-numbers"),
+    key: "id",
+    minWidth: 160,
+    render: (row) => {
+      if (!row.show_link)
+        return h(NFlex, { align: "center" }, () => [
+          h("span", row.id.slice(0, 12)),
+          h(
+            NTooltip,
+            {},
+            {
+              trigger: () =>
+                h(NButton, { text: true }, () =>
+                  h(Icon, { icon: "catppuccin:lock" }),
+                ),
+              default: () =>
+                "这道题在你已经加入的题单中，只有在题单中完成此题，代码才可见。",
+            },
+          ),
+        ])
+      return h(
+        NButton,
+        {
+          text: true,
+          type: "info",
+          onClick: () => {
+            showCodePanel(row.id, (route.params.problemID as string) ?? "")
+          },
+        },
+        () => row.id.slice(0, 12),
+      )
+    },
+  },
+  {
+    title: renderTableTitle("状态", "streamline-emojis:panda-face"),
+    key: "status",
+    width: 140,
+    render: (row) => h(SubmissionResultTag, { result: row.result }),
+  },
+  {
+    title: renderTableTitle("语言", "streamline-ultimate-color:earth-pin-2"),
+    key: "language",
+    width: 100,
+    render: (row) => LANGUAGE_SHOW_VALUE[row.language],
+  },
+]
+
+const class_name = ref("")
+const rank = ref(-1)
+const class_ac_count = ref(0)
+const all_ac_count = ref(0)
+const loading = ref(false)
+
+const submissions = ref<Submission[]>([])
+const total = ref(0)
+const query = reactive({
+  limit: 10,
+  page: 1,
+})
+
+// 错误分布统计
+const statusDistribution = computed(() => {
+  if (!submissions.value.length) return []
+  const counts = new Map<number, number>()
+  for (const s of submissions.value) {
+    counts.set(s.result, (counts.get(s.result) || 0) + 1)
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([result, count]) => ({
+      result,
+      name: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.name || "未知",
+      type: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.type || "info",
+      count,
+    }))
+})
+
+const errorMsg = computed(() => {
+  if (!userStore.isAuthed) return "请先登录"
+  else if (!userStore.showSubmissions) return "提交列表已被管理员关闭"
+  else return ""
+})
+
+async function listSubmissions() {
+  const offset = query.limit * (query.page - 1)
+  const res = await getSubmissions({
+    ...query,
+    myself: "1",
+    offset,
+    problem_id: (route.params.problemID as string) ?? "",
+    contest_id: (route.params.contestID as string) ?? "",
+  })
+  submissions.value = res.data.results
+  total.value = res.data.total
+}
+
+async function getRankOfThisProblem() {
+  loading.value = true
+  const res = await getRankOfProblem((route.params.problemID as string) ?? "")
+  loading.value = false
+
+  class_name.value = res.data.class_name
+  rank.value = res.data.rank
+  class_ac_count.value = res.data.class_ac_count
+  all_ac_count.value = res.data.all_ac_count
+}
+
+onMounted(() => {
+  listSubmissions()
+  if (route.name === "problem") {
+    getRankOfThisProblem()
+  }
+})
+watch(query, listSubmissions)
+</script>
+<template>
+  <n-alert
+    class="tip"
+    type="error"
+    v-if="!userStore.showSubmissions || !userStore.isAuthed"
+    :title="errorMsg"
+  />
+
+  <template v-if="!loading && route.name === 'problem' && userStore.isAuthed">
+    <template v-if="class_name">
+      <n-alert class="tip" type="success" :show-icon="false" v-if="rank !== -1">
+        <template #header>
+          <n-flex align="center">
+            <span>
+              本道题你在班上排名第 <b>{{ rank }}</b
+              >，你们班共有 <b>{{ class_ac_count }}</b> 人答案正确
+            </span>
+            <n-button
+              secondary
+              v-if="userStore.showSubmissions"
+              @click="
+                router.push({
+                  name: 'submissions',
+                  query: {
+                    problem: route.params.problemID,
+                    result: '0',
+                    page: 1,
+                    limit: 10,
+                    username: 'ks' + class_name,
+                  },
+                })
+              "
+            >
+              查看
+            </n-button>
+          </n-flex>
+        </template>
+      </n-alert>
+      <n-alert
+        class="tip"
+        type="error"
+        :show-icon="false"
+        v-if="rank === -1 && class_ac_count > 0"
+      >
+        <template #header>
+          <n-flex align="center">
+            <span>
+              本道题你还没有解决，你们班共有
+              <b>{{ class_ac_count }}</b> 人答案正确
+            </span>
+            <n-button
+              v-if="userStore.showSubmissions"
+              secondary
+              @click="
+                router.push({
+                  name: 'submissions',
+                  query: {
+                    problem: route.params.problemID,
+                    result: '0',
+                    page: 1,
+                    limit: 10,
+                    username: 'ks' + class_name,
+                  },
+                })
+              "
+            >
+              查看
+            </n-button>
+          </n-flex>
+        </template>
+      </n-alert>
+    </template>
+    <template v-else>
+      <n-alert class="tip" type="success" :show-icon="false" v-if="rank !== -1">
+        <template #header>
+          <n-flex align="center">
+            <span>
+              本道题你在全服排名第 <b>{{ rank }}</b
+              >，全服共有 <b>{{ all_ac_count }}</b> 人答案正确
+            </span>
+            <n-button
+              secondary
+              v-if="userStore.showSubmissions"
+              @click="
+                router.push({
+                  name: 'submissions',
+                  query: {
+                    problem: route.params.problemID,
+                    result: '0',
+                    page: 1,
+                    limit: 10,
+                  },
+                })
+              "
+            >
+              查看
+            </n-button>
+          </n-flex>
+        </template>
+      </n-alert>
+      <n-alert
+        class="tip"
+        type="error"
+        :show-icon="false"
+        v-if="rank === -1 && all_ac_count > 0"
+      >
+        <template #header>
+          <n-flex align="center">
+            <span>
+              本道题你还没有解决，全服共有 <b>{{ all_ac_count }}</b> 人答案正确
+            </span>
+            <n-button
+              v-if="userStore.showSubmissions"
+              secondary
+              @click="
+                router.push({
+                  name: 'submissions',
+                  query: {
+                    problem: route.params.problemID,
+                    result: '0',
+                    page: 1,
+                    limit: 10,
+                  },
+                })
+              "
+            >
+              查看
+            </n-button>
+          </n-flex>
+        </template>
+      </n-alert>
+    </template>
+  </template>
+
+  <template v-if="userStore.showSubmissions && userStore.isAuthed">
+    <!-- 错误分布统计 -->
+    <n-flex
+      v-if="statusDistribution.length"
+      class="tip"
+      align="center"
+      :wrap="true"
+    >
+      <span style="font-weight: bold; font-size: 13px">我的提交统计：</span>
+      <n-tag
+        v-for="item in statusDistribution"
+        :key="item.result"
+        :type="item.type as any"
+        size="small"
+        round
+      >
+        {{ item.name }} × {{ item.count }}
+      </n-tag>
+    </n-flex>
+
+    <n-data-table
+      v-if="submissions.length > 0"
+      striped
+      :columns="columns"
+      :data="submissions"
+    />
+    <Pagination
+      :total="total"
+      v-model:limit="query.limit"
+      v-model:page="query.page"
+    />
+  </template>
+
+  <!-- 代码详情弹框 -->
+  <n-modal
+    v-model:show="codePanelVisible"
+    preset="card"
+    :style="{ maxWidth: isDesktop && '70vw', maxHeight: '80vh' }"
+    :content-style="{ overflow: 'auto' }"
+    title="代码详情"
+  >
+    <SubmissionDetail
+      :problemID="problemID"
+      :submissionID="submissionID"
+      hideList
+      @copied="toggleCodePanel(false)"
+    />
+  </n-modal>
+</template>
+
+<style scoped>
+.tip {
+  margin-bottom: 16px;
+}
+</style>

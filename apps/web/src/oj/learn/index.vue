@@ -1,0 +1,255 @@
+<template>
+  <div class="learn-container">
+    <!-- 桌面端布局 -->
+    <n-grid
+      :cols="5"
+      :x-gap="16"
+      v-if="tutorial.id && isDesktop"
+      class="learn-grid"
+    >
+      <n-gi :span="1" class="learn-col">
+        <n-card title="教程目录" :bordered="false" size="small">
+          <n-list hoverable clickable>
+            <n-list-item
+              v-for="(item, index) in titles"
+              :key="item.id"
+              @click="goToLesson(index + 1)"
+            >
+              <n-text
+                :type="step === index + 1 ? 'primary' : undefined"
+                :strong="step === index + 1"
+              >
+                {{ index + 1 }}. {{ item.title }}
+              </n-text>
+            </n-list-item>
+          </n-list>
+        </n-card>
+      </n-gi>
+
+      <n-gi :span="tutorial.code ? 2 : 4" class="learn-col">
+        <n-card
+          :title="`第 ${step} 课：${titles[step - 1]?.title}`"
+          :bordered="false"
+          size="small"
+        >
+          <template v-for="(seg, i) in segments" :key="i">
+            <MdPreview
+              v-if="seg.type === 'md'"
+              preview-theme="vuepress"
+              :theme="isDark ? 'dark' : 'light'"
+              :model-value="seg.content"
+            />
+            <ExerciseWidget
+              v-else
+              :exercise="seg.exercise"
+              :lang="tutorial.type"
+            />
+          </template>
+        </n-card>
+      </n-gi>
+
+      <n-gi :span="2" v-if="tutorial.code" class="learn-col learn-col--code">
+        <n-card
+          title="示例代码"
+          :bordered="false"
+          size="small"
+          class="code-card"
+          content-style="height: calc(100% - 44px); padding: 0;"
+        >
+          <CodeEditor
+            :language="editorLanguage"
+            v-model="tutorial.code"
+            height="100%"
+          />
+        </n-card>
+      </n-gi>
+    </n-grid>
+
+    <!-- 手机端布局 -->
+    <template v-if="tutorial.id && !isDesktop">
+      <n-tabs type="line" animated v-model:value="activeTab">
+        <n-tab-pane name="catalog" tab="目录">
+          <n-list hoverable clickable>
+            <n-list-item
+              v-for="(item, index) in titles"
+              :key="item.id"
+              @click="goToLesson(index + 1)"
+            >
+              <n-text
+                :type="step === index + 1 ? 'primary' : undefined"
+                :strong="step === index + 1"
+              >
+                {{ index + 1 }}. {{ item.title }}
+              </n-text>
+            </n-list-item>
+          </n-list>
+        </n-tab-pane>
+
+        <n-tab-pane name="content" :tab="`第 ${step} 课`">
+          <template v-for="(seg, i) in segments" :key="i">
+            <MdPreview
+              v-if="seg.type === 'md'"
+              preview-theme="vuepress"
+              :theme="isDark ? 'dark' : 'light'"
+              :model-value="seg.content"
+            />
+            <ExerciseWidget
+              v-else
+              :exercise="seg.exercise"
+              :lang="tutorial.type"
+            />
+          </template>
+        </n-tab-pane>
+
+        <n-tab-pane name="code" tab="示例代码" v-if="tutorial.code">
+          <CodeEditor :language="editorLanguage" v-model="tutorial.code" />
+        </n-tab-pane>
+      </n-tabs>
+
+      <n-divider style="margin: 12px 0" />
+
+      <n-flex align="center" justify="space-between">
+        <n-button
+          secondary
+          type="primary"
+          :disabled="isFirstLesson"
+          @click="goToPrevLesson"
+        >
+          ← 上一课
+        </n-button>
+        <n-text>{{ step }} / {{ titles.length }}</n-text>
+        <n-button
+          secondary
+          type="primary"
+          :disabled="isLastLesson"
+          @click="goToNextLesson"
+        >
+          下一课 →
+        </n-button>
+      </n-flex>
+    </template>
+
+    <n-empty
+      v-if="isEmpty"
+      description="该教程还没有公开"
+      style="margin-top: 80px"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { MdPreview } from "md-editor-v3"
+import "md-editor-v3/lib/preview.css"
+import type { Tutorial, Exercise, LANGUAGE } from "utils/types"
+import { getTutorial, getTutorials, getExercises } from "../api"
+import { parseExercises } from "./composables/useExerciseParse"
+import { useBreakpoints } from "shared/composables/breakpoints"
+import { useLearnProgress } from "shared/composables/learnProgress"
+
+const ExerciseWidget = defineAsyncComponent(
+  () => import("./components/ExerciseWidget.vue"),
+)
+const CodeEditor = defineAsyncComponent(
+  () => import("shared/components/CodeEditor.vue"),
+)
+
+const isDark = useDark()
+const route = useRoute()
+const router = useRouter()
+const { isDesktop } = useBreakpoints()
+const { learnStep } = useLearnProgress()
+
+const step = computed(() => {
+  const value = route.params.step as string | undefined
+  if (!value) return 1
+  return parseInt(value)
+})
+
+const type = computed<"python" | "c">(() =>
+  route.params.type === "c" ? "c" : "python",
+)
+
+const tutorial = ref<Partial<Tutorial>>({
+  id: 0,
+  title: "",
+  content: "",
+  code: "",
+})
+
+const editorLanguage = computed<LANGUAGE>(() =>
+  tutorial.value.type === "c" ? "C" : "Python3",
+)
+const titles = ref<{ id: number; title: string }[]>([])
+const exercises = ref<Exercise[]>([])
+const activeTab = ref("content")
+const isEmpty = ref(false)
+
+const segments = computed(() =>
+  parseExercises(tutorial.value.content ?? "", exercises.value),
+)
+
+const isFirstLesson = computed(() => step.value === 1)
+const isLastLesson = computed(() => step.value === titles.value.length)
+
+function goToLesson(lessonNumber: number) {
+  activeTab.value = "content"
+  router.push(
+    `/learn/${type.value}/${lessonNumber.toString().padStart(2, "0")}`,
+  )
+}
+function goToPrevLesson() {
+  if (step.value > 1) goToLesson(step.value - 1)
+}
+function goToNextLesson() {
+  if (step.value < titles.value.length) goToLesson(step.value + 1)
+}
+
+async function init() {
+  const res1 = await getTutorials(type.value)
+  titles.value = res1.data
+  isEmpty.value = titles.value.length === 0
+  if (isEmpty.value) return
+  const id = titles.value[step.value - 1].id
+  const [res2, exs] = await Promise.allSettled([
+    getTutorial(id),
+    getExercises(id),
+  ])
+  if (res2.status === "fulfilled") tutorial.value = res2.value.data
+  exercises.value = exs.status === "fulfilled" ? exs.value : []
+  learnStep.value[type.value] = step.value
+}
+
+watch(
+  () => [route.params.type, route.params.step],
+  async () => {
+    if (route.name === "learn") init()
+  },
+  { immediate: true },
+)
+</script>
+
+<style scoped>
+/* 桌面端固定高度，让目录/内容/代码三栏各自内部滚动；移动端不限高，交给页面整体滚动 */
+@media (min-width: 769px) {
+  .learn-container {
+    height: calc(100vh - 138px);
+  }
+}
+
+.learn-grid {
+  height: 100%;
+}
+
+.learn-col {
+  overflow-y: auto;
+  height: 100%;
+}
+
+.learn-col--code {
+  overflow-y: hidden;
+}
+
+.code-card {
+  height: 100%;
+}
+</style>

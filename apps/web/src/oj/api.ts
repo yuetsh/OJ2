@@ -1,0 +1,435 @@
+import http from "utils/http"
+import { filterResult } from "oj/transforms"
+import type {
+  Exercise,
+  Problem,
+  ReactionKey,
+  ReactionState,
+  Submission,
+  SubmissionListPayload,
+  SubmitCodePayload,
+} from "utils/types"
+
+export function getWebsiteConfig() {
+  return http.get("website")
+}
+
+export async function getProblemList(
+  offset = 0,
+  limit = 10,
+  searchParams: any = {},
+) {
+  const res = await http.get<{ results: Problem[]; total: number }>("problem", {
+    params: { paging: true, offset, limit, ...searchParams },
+  })
+  return {
+    results: res.data.results.map(filterResult),
+    total: res.data.total,
+  }
+}
+
+export function getAuthors(all = false) {
+  return http.get("problem/author", {
+    params: {
+      all: all ? "1" : "0",
+    },
+  })
+}
+
+export function getRandomProblemID() {
+  return http.get("pickone")
+}
+
+export function getProblem(problemID: string, contestID: string) {
+  const endpoint = !!contestID ? "contest/problem" : "problem"
+  return http.get(endpoint, {
+    params: {
+      problem_id: problemID,
+      contest_id: contestID,
+    },
+  })
+}
+
+export function getProblemBeatRate(problemID: number) {
+  return http.get("problem/beat_count", { params: { problem_id: problemID } })
+}
+
+export function getSubmission(id: string) {
+  return http.get<Submission>("submission", {
+    params: { id },
+  })
+}
+
+export function submitCode(data: SubmitCodePayload) {
+  return http.post("submission", data)
+}
+
+export function formatCode(data: { code: string; language: string }) {
+  return http.post<{ code: string }>("format_code", data)
+}
+
+export function getSubmissions(params: Partial<SubmissionListPayload>) {
+  const endpoint = !!params.contest_id ? "contest_submissions" : "submissions"
+  return http.get(endpoint, { params })
+}
+
+export function getRankOfProblem(problem_id: string) {
+  return http.get("user_problem_rank", { params: { problem_id: problem_id } })
+}
+
+export function getTodaySubmissionCount(language?: string) {
+  return http.get("submissions/today_count", { params: { language } })
+}
+
+export function adminRejudge(id: string) {
+  return http.get("admin/submission/rejudge", {
+    params: { id },
+  })
+}
+
+export function getSubmissionStatistics(
+  duration: { start?: string; end: string },
+  problemID?: string,
+  username?: string,
+) {
+  return http.get("admin/submission/statistics", {
+    params: {
+      ...duration,
+      problem_id: problemID,
+      username,
+    },
+  })
+}
+
+export function getRank(
+  offset: number,
+  limit: number,
+  n: number,
+  username?: string,
+) {
+  return http.get("user_rank", {
+    params: { offset, limit, rule: "acm", username, n },
+  })
+}
+
+export function getActivityRank(start: string) {
+  return http.get("user_activity_rank", {
+    params: { start },
+  })
+}
+
+export function getClassRank(grade?: number | null) {
+  return http.get("class_rank", {
+    params: { grade },
+  })
+}
+
+export function getUserClassRank(
+  scope?: "all" | "window",
+  offset?: number,
+  limit?: number,
+) {
+  return http.get("user_class_rank", { params: { scope, offset, limit } })
+}
+
+export function getClassPK(
+  classNames: string[],
+  startTime?: string,
+  endTime?: string,
+) {
+  const payload: any = {
+    class_name: classNames,
+  }
+  if (startTime) {
+    payload.start_time = startTime
+  }
+  if (endTime) {
+    payload.end_time = endTime
+  }
+  return http.post("class_pk", payload)
+}
+
+export function getContestList(query: {
+  offset: number
+  limit: number
+  keyword: string
+  status: string
+  tag: string
+}) {
+  return http.get("contests", { params: query })
+}
+
+export function getContest(id: string) {
+  return http.get("contest", { params: { id } })
+}
+
+export function getContestAccess(id: string) {
+  return http.get("contest/access", { params: { contest_id: id } })
+}
+
+export function checkContestPassword(contestID: string, password: string) {
+  return http.post("contest/password", {
+    contest_id: contestID,
+    password,
+  })
+}
+
+export async function getContestProblems(contestID: string) {
+  const res = await http.get<Problem[]>("contest/problem", {
+    params: { contest_id: contestID },
+  })
+  return res.data.map(filterResult)
+}
+
+export function getContestRank(
+  contestID: string,
+  query: { limit: number; offset: number },
+) {
+  return http.get("contest_rank", {
+    params: {
+      contest_id: contestID,
+      ...query,
+    },
+  })
+}
+
+export function uploadAvatar(file: File) {
+  const form = new window.FormData()
+  form.append("image", file)
+  return http.post("upload_avatar", form, {
+    headers: { "content-type": "multipart/form-data" },
+  })
+}
+
+export function updateProfile(data: { real_name: string; mood: string }) {
+  return http.put("profile", data)
+}
+
+export function getAnnouncementList(offset = 0, limit = 10) {
+  return http.get("announcement", { params: { limit, offset } })
+}
+
+export function getAnnouncement(id: number) {
+  return http.get("announcement", { params: { id } })
+}
+
+export function createMessage(data: {
+  recipient: number
+  message: string
+  submission: string
+}) {
+  return http.post("message", data)
+}
+
+export function getMessageList(offset = 0, limit = 10) {
+  return http.get("message", { params: { limit, offset } })
+}
+
+export function getReaction(problemID: number) {
+  return http.get<ReactionState>("reaction", {
+    params: { problem_id: problemID },
+  })
+}
+
+export function setReaction(problemID: number, type: ReactionKey) {
+  return http.post<ReactionState>("reaction", {
+    problem_id: problemID,
+    type,
+  })
+}
+
+// TODO: 这个API有问题
+export function refreshUserProblemDisplayIds() {
+  return http.get("profile/fresh_display_id")
+}
+
+export function getMetrics(userid: number) {
+  return http.get("metrics", { params: { userid } })
+}
+
+export function getTutorial(id: number) {
+  return http.get("tutorial", { params: { id } })
+}
+
+export function getTutorials(type: "python" | "c") {
+  return http.get("tutorials", { params: { type } })
+}
+
+export function getAIDetailData(start: string, end: string, username?: string) {
+  return http.get("ai/detail", { params: { start, end, username } })
+}
+
+export function getAIDurationData(
+  end: string,
+  duration: string,
+  username?: string,
+) {
+  return http.get("ai/duration", { params: { end, duration, username } })
+}
+
+export function getAIHeatmapData(username?: string) {
+  return http.get("ai/heatmap", { params: username ? { username } : {} })
+}
+
+export function getAILoginSummary() {
+  return http.get("ai/login_summary")
+}
+
+export function getAIPinnedReport() {
+  return http.get("ai/pinned")
+}
+
+// ==================== 相似题目推荐 ====================
+
+export function getSimilarProblems(problemId: string) {
+  return http.get("problem/similar", { params: { problem_id: problemId } })
+}
+
+export interface YearlyACData {
+  year: number
+  total: number
+  accepted: number
+  ac_rate: number
+}
+
+export function getProblemYearlyAC(problemId: string) {
+  return http.get<YearlyACData[]>("problem/yearly_ac", {
+    params: { problem_id: problemId },
+  })
+}
+
+// ==================== 流程图相关API ====================
+
+export function submitFlowchart(data: {
+  problem_id: number
+  mermaid_code: string
+  flowchart_data: any // 这个是压缩之后的，元数据太长了
+}) {
+  return http.post("flowchart/submission", data)
+}
+
+export function getFlowchartSubmission(id: string) {
+  return http.get("flowchart/submission", {
+    params: { id },
+  })
+}
+
+export function getFlowchartSubmissions(params: {
+  username?: string
+  problem_id?: string
+  myself?: string
+  offset?: number
+  limit?: number
+  today?: string
+  grade?: string
+}) {
+  return http.get("flowchart/submissions", { params })
+}
+
+export function getFlowchartStatistics(
+  duration: { start?: string; end: string },
+  problemID?: string,
+  username?: string,
+) {
+  return http.get("admin/flowchart/statistics", {
+    params: {
+      ...duration,
+      problem_id: problemID,
+      username,
+    },
+  })
+}
+
+export function retryFlowchartSubmission(submissionId: string) {
+  return http.post("flowchart/submission/retry", {
+    submission_id: submissionId,
+  })
+}
+
+export function getCurrentProblemFlowchartSubmission(problemId: number) {
+  return http.get("flowchart/submission/current", {
+    params: { problem_id: problemId },
+  })
+}
+
+export function getFlowchartSubmissionDetail(problemId: number, page = 0) {
+  return http.get("flowchart/submission/detail", {
+    params: { problem_id: problemId, page },
+  })
+}
+
+// ==================== 题单相关API ====================
+
+export function getProblemSetList(
+  offset = 0,
+  limit = 10,
+  keyword = "",
+  difficulty = "",
+  status = "",
+) {
+  return http.get("problemset", {
+    params: {
+      offset,
+      limit,
+      keyword,
+      difficulty,
+      status,
+    },
+  })
+}
+
+export function getProblemSetDetail(id: number) {
+  return http.get(`problemset/${id}`)
+}
+
+export function getProblemSetProblems(problemSetId: number) {
+  return http.get(`problemset/${problemSetId}/problems`)
+}
+
+export function joinProblemSet(problemSetId: number) {
+  return http.post("problemset/progress", {
+    problemset_id: problemSetId,
+  })
+}
+
+export function updateProblemSetProgress(
+  problemSetId: number,
+  problemId: number,
+  submissionId: string,
+) {
+  return http.put("problemset/progress", {
+    problemset_id: problemSetId,
+    problem_id: problemId,
+    submission_id: submissionId,
+  })
+}
+
+// 获取用户徽章列表
+export function getUserBadges(username?: string) {
+  return http.get("user/badges", { params: username ? { username } : {} })
+}
+
+// 获取题单徽章列表
+export function getProblemSetBadges(problemSetId: number) {
+  return http.get(`problemset/${problemSetId}/badges`)
+}
+
+// 获取题单用户进度列表
+export function getProblemSetUserProgress(
+  problemSetId: number,
+  params?: {
+    limit?: number
+    offset?: number
+    class_name?: string
+    completion_status?: "" | "completed" | "in_progress" | "not_started"
+  },
+) {
+  return http.get(`problemset/${problemSetId}/users_progress`, { params })
+}
+
+export async function getExercises(tutorialId: number): Promise<Exercise[]> {
+  const res = await http.get<Exercise[]>("exercises", {
+    params: { tutorial_id: tutorialId },
+  })
+  return res.data
+}

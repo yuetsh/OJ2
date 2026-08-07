@@ -6,6 +6,9 @@ build/
 .env
 .env.*
 !.env.example
+!apps/web/.env.production
+!apps/web/.env.staging
+!apps/web/.env.test
 
 .DS_Store
 .vscode/

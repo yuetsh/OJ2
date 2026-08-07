@@ -1,0 +1,28 @@
+<script lang="ts" setup>
+import type { ProblemFiltered } from "utils/types"
+import { Icon } from "@iconify/vue"
+
+defineProps<{
+  problem: ProblemFiltered
+}>()
+</script>
+<template>
+  <n-flex align="center">
+    <span>{{ problem.title }}</span>
+    <Icon
+      v-if="problem.allow_flowchart"
+      width="18"
+      icon="vscode-icons:file-type-drawio"
+    />
+    <Icon
+      v-else-if="problem.show_flowchart"
+      width="18"
+      icon="vscode-icons:file-type-graphql"
+    />
+    <Icon
+      v-if="problem.has_ast_rules"
+      width="18"
+      icon="vscode-icons:file-type-light-todo"
+    />
+  </n-flex>
+</template>

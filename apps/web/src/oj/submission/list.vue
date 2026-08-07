@@ -1,0 +1,573 @@
+<script setup lang="ts">
+import { NButton } from "naive-ui"
+import { useRouteQuery } from "@vueuse/router"
+import {
+  adminRejudge,
+  getFlowchartSubmissions,
+  getSubmissions,
+  getTodaySubmissionCount,
+  retryFlowchartSubmission,
+} from "oj/api"
+import { parseTime } from "utils/functions"
+import type {
+  FlowchartSubmissionListItem,
+  LANGUAGE,
+  SubmissionListItem,
+} from "utils/types"
+import Pagination from "shared/components/Pagination.vue"
+import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
+import { usePagination } from "shared/composables/pagination"
+import { useUserStore } from "shared/store/user"
+import { LANGUAGE_SHOW_VALUE } from "utils/constants"
+import { renderTableTitle } from "utils/renders"
+import ButtonWithSearch from "./components/ButtonWithSearch.vue"
+import StatisticsPanel from "shared/components/StatisticsPanel.vue"
+import FlowchartStatisticsPanel from "shared/components/FlowchartStatisticsPanel.vue"
+import SubmissionLink from "./components/SubmissionLink.vue"
+import SubmissionDetail from "./detail.vue"
+import Grade from "./components/Grade.vue"
+import FlowchartLink from "./components/FlowchartLink.vue"
+import FlowchartScoreDetail from "./components/FlowchartScoreDetail.vue"
+
+interface SubmissionQuery {
+  username: string
+  result: string
+  myself: "0" | "1"
+  problem: string
+  language: LANGUAGE | ""
+  today: "0" | "1"
+}
+
+const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+const message = useMessage()
+
+const { isMobile, isDesktop } = useBreakpoints()
+
+const submissions = ref<SubmissionListItem[]>([])
+const flowcharts = ref<FlowchartSubmissionListItem[]>([])
+const total = ref(0)
+const todayCount = ref(0)
+
+// 使用分页 composable
+const { query, clearQuery } = usePagination<SubmissionQuery>({
+  username: useRouteQuery("username", "").value,
+  result: useRouteQuery("result", "").value,
+  myself: useRouteQuery("myself", "0").value,
+  problem: useRouteQuery("problem", "").value,
+  language: useRouteQuery("language", "").value,
+  today: "0",
+})
+const submissionID = ref("")
+const problemDisplayID = ref("")
+const [statisticPanel, toggleStatisticPanel] = useToggle(false)
+
+const [codePanel, toggleCodePanel] = useToggle(false)
+const [scoreDetailPanel, toggleScoreDetailPanel] = useToggle(false)
+const selectedFlowchartId = ref("")
+const selectedFlowchart = computed(() => {
+  return flowcharts.value.find((f) => f.id === selectedFlowchartId.value)
+})
+
+const resultOptions: SelectOption[] = [
+  { label: "全部", value: "" },
+  { label: "答案正确", value: "0" },
+  { label: "语法未通过", value: "10" },
+  { label: "答案错误", value: "-1" },
+  { label: "编译失败", value: "-2" },
+  { label: "运行时错误", value: "4" },
+]
+
+const gradeOptions: SelectOption[] = [
+  { label: "全部", value: "" },
+  { label: "S级", value: "S" },
+  { label: "A级", value: "A" },
+  { label: "B级", value: "B" },
+  { label: "C级", value: "C" },
+]
+
+const languageOptions: SelectOption[] = [
+  { label: "流程图", value: "Flowchart" },
+  { label: "全部语言", value: "" },
+  { label: "Python", value: "Python3" },
+  { label: "C语言", value: "C" },
+  { label: "C++", value: "C++" },
+]
+async function listSubmissions() {
+  if (query.page < 1) query.page = 1
+  const offset = query.limit * (query.page - 1)
+  if (query.language === "Flowchart") {
+    const res = await getFlowchartSubmissions({
+      username: query.username,
+      problem_id: query.problem,
+      myself: query.myself,
+      offset,
+      limit: query.limit,
+      today: query.today,
+      grade: query.result,
+    })
+    total.value = res.data.total
+    flowcharts.value = res.data.results
+  } else {
+    const res = await getSubmissions({
+      ...query,
+      offset,
+      problem_id: query.problem,
+      contest_id: (route.params.contestID as string) ?? "",
+      language: query.language,
+      today: query.today,
+    })
+    submissions.value = res.data.results
+    total.value = res.data.total
+  }
+}
+
+async function getTodayCount() {
+  const res = await getTodaySubmissionCount(query.language)
+  todayCount.value = res.data
+}
+
+onMounted(() => {
+  listSubmissions()
+  if (route.name === "submissions") {
+    getTodayCount()
+  }
+})
+
+function search(username: string, problem: string) {
+  query.username = username
+  query.problem = problem
+}
+
+function clear() {
+  clearQuery()
+}
+
+async function rejudge(submissionID: string) {
+  await adminRejudge(submissionID)
+  message.success("重新判分成功")
+  listSubmissions()
+}
+
+async function retryFlowchart(submissionId: string) {
+  await retryFlowchartSubmission(submissionId)
+  message.success("重新评分已提交")
+  listSubmissions()
+}
+
+function problemClicked(row: SubmissionListItem | FlowchartSubmissionListItem) {
+  if (route.name === "contest submissions") {
+    const path = router.resolve({
+      name: "contest problem",
+      params: {
+        problemID: row.problem,
+      },
+    })
+    window.open(path.href, "_blank")
+  } else {
+    window.open("/problem/" + row.problem, "_blank")
+  }
+}
+
+function showCodePanel(id: string, problem: string) {
+  toggleCodePanel(true)
+  submissionID.value = id
+  problemDisplayID.value = problem
+}
+
+function showScoreDetail(id: string) {
+  selectedFlowchartId.value = id
+  toggleScoreDetailPanel(true)
+}
+
+function getGradeType(grade?: string) {
+  if (!grade) return "default"
+  if (grade === "S") return "primary"
+  if (grade === "A") return "info"
+  if (grade === "B") return "warning"
+  return "error"
+}
+
+// 监听用户名和题号变化（防抖）
+watchDebounced(() => [query.username, query.problem], listSubmissions, {
+  debounce: 500,
+  maxWait: 1000,
+})
+
+// 监听其他查询条件变化
+watch(
+  () => [
+    query.page,
+    query.limit,
+    query.myself,
+    query.result,
+    query.language,
+    query.today,
+  ],
+  listSubmissions,
+)
+
+// 切换语言时重置过滤条件，刷新今日提交数
+watch(
+  () => query.language,
+  () => {
+    query.result = ""
+    if (route.name === "submissions") getTodayCount()
+  },
+)
+
+// 登录状态变化后刷新提交列表，更新提交编号列的可点击状态
+watch(
+  () => userStore.isAuthed,
+  () => {
+    listSubmissions()
+    if (route.name === "submissions") getTodayCount()
+  },
+)
+
+const columns = computed(() => {
+  const res: DataTableColumn<SubmissionListItem>[] = [
+    {
+      title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
+      key: "create_time",
+      minWidth: 200,
+      render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    },
+    {
+      title: renderTableTitle("提交编号", "fluent-emoji-flat:input-numbers"),
+      key: "id",
+      minWidth: 200,
+      render: (row) =>
+        h(SubmissionLink, {
+          submission: row,
+          onShowCode: () => showCodePanel(row.id, row.problem),
+        }),
+    },
+    {
+      title: renderTableTitle("状态", "streamline-emojis:panda-face"),
+      key: "status",
+      minWidth: 140,
+      render: (row) => h(SubmissionResultTag, { result: row.result }),
+    },
+    {
+      title: renderTableTitle("题目", "streamline-emojis:blossom"),
+      key: "problem",
+      minWidth: 300,
+      render: (row) =>
+        h(
+          ButtonWithSearch,
+          {
+            type: "题目",
+            onClick: () => problemClicked(row),
+            onSearch: () => (query.problem = row.problem),
+          },
+          () => `${row.problem} ${row.problem_title}`,
+        ),
+    },
+    {
+      title: renderTableTitle("语言", "streamline-ultimate-color:earth-pin-2"),
+      key: "language",
+      minWidth: 120,
+      render: (row) => LANGUAGE_SHOW_VALUE[row.language],
+    },
+    {
+      title: renderTableTitle(
+        "用户",
+        "streamline-emojis:smiling-face-with-sunglasses",
+      ),
+      key: "username",
+      minWidth: 200,
+      render: (row) =>
+        h(
+          ButtonWithSearch,
+          {
+            type: "用户",
+            username: row.username,
+            onClick: () => window.open("/user?name=" + row.username, "_blank"),
+            onSearch: () => (query.username = row.username),
+            onFilterClass: (classname: string) => (query.username = classname),
+          },
+          () => row.username,
+        ),
+    },
+  ]
+  if (!route.params.contestID && userStore.isTeacherOrAbove) {
+    res.push({
+      title: renderTableTitle("选项", "streamline-emojis:wrench"),
+      key: "rejudge",
+      render: (row) =>
+        h(
+          NButton,
+          {
+            quaternary: true,
+            size: "small",
+            type: "primary",
+            onClick: () => rejudge(row.id),
+          },
+          () => "重新判题",
+        ),
+    })
+  }
+  return res
+})
+
+const flowchartColumns = computed(() => {
+  const res: DataTableColumn<FlowchartSubmissionListItem>[] = [
+    {
+      title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
+      key: "create_time",
+      render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    },
+    {
+      title: renderTableTitle("提交编号", "fluent-emoji-flat:input-numbers"),
+      key: "id",
+      render: (row) =>
+        h(FlowchartLink, {
+          flowchart: row,
+          onShowDetail: (id: string) => showScoreDetail(id),
+        }),
+    },
+    {
+      title: renderTableTitle("题目", "streamline-emojis:blossom"),
+      key: "problem_title",
+      render: (row) =>
+        h(
+          ButtonWithSearch,
+          {
+            type: "题目",
+            onClick: () => problemClicked(row),
+            onSearch: () => (query.problem = row.problem),
+          },
+          () => `${row.problem} ${row.problem_title}`,
+        ),
+    },
+    {
+      title: renderTableTitle(
+        "评分",
+        "streamline-ultimate-color:analytics-bars-3d",
+      ),
+      key: "ai_score",
+      render: (row) => h(Grade, { score: row.ai_score, grade: row.ai_grade }),
+    },
+    {
+      title: renderTableTitle(
+        "用户",
+        "streamline-emojis:smiling-face-with-sunglasses",
+      ),
+      key: "username",
+      minWidth: 200,
+      render: (row) =>
+        h(
+          ButtonWithSearch,
+          {
+            type: "用户",
+            username: row.username,
+            onClick: () => window.open("/user?name=" + row.username, "_blank"),
+            onSearch: () => (query.username = row.username),
+            onFilterClass: (classname: string) => (query.username = classname),
+          },
+          () => row.username,
+        ),
+    },
+  ]
+  if (!route.params.contestID && userStore.isTeacherOrAbove) {
+    res.push({
+      title: renderTableTitle("选项", "streamline-emojis:wrench"),
+      key: "retry",
+      render: (row) =>
+        h(
+          NButton,
+          {
+            quaternary: true,
+            size: "small",
+            type: "primary",
+            onClick: () => retryFlowchart(row.id),
+          },
+          () => "重新判题",
+        ),
+    })
+  }
+  return res
+})
+</script>
+<template>
+  <n-flex vertical size="large">
+    <n-space>
+      <n-form :show-feedback="false" inline label-placement="left">
+        <n-form-item v-if="isDesktop && userStore.isAuthed" label="只看自己">
+          <n-switch
+            v-model:value="query.myself"
+            checked-value="1"
+            unchecked-value="0"
+          />
+        </n-form-item>
+        <n-form-item label="语言" v-if="route.name !== 'contest submissions'">
+          <n-select
+            class="select"
+            v-model:value="query.language"
+            :options="languageOptions"
+          />
+        </n-form-item>
+        <n-form-item :label="query.language === 'Flowchart' ? '等级' : '状态'">
+          <n-select
+            class="select"
+            v-model:value="query.result"
+            :options="
+              query.language === 'Flowchart' ? gradeOptions : resultOptions
+            "
+          />
+        </n-form-item>
+      </n-form>
+      <n-form :show-feedback="false" inline label-placement="left">
+        <n-form-item>
+          <n-input
+            :disabled="query.myself === '1'"
+            style="width: 140px"
+            clearable
+            v-model:value="query.username"
+            placeholder="用户"
+          />
+        </n-form-item>
+        <n-form-item>
+          <n-input
+            style="width: 120px"
+            clearable
+            v-model:value="query.problem"
+            placeholder="题号"
+          />
+        </n-form-item>
+      </n-form>
+      <n-form :show-feedback="false" inline label-placement="left">
+        <n-form-item v-if="isMobile && userStore.isAuthed" label="只看自己">
+          <n-switch
+            v-model:value="query.myself"
+            checked-value="1"
+            unchecked-value="0"
+          />
+        </n-form-item>
+        <n-form-item>
+          <n-button @click="search(query.username, query.problem)">
+            搜索
+          </n-button>
+        </n-form-item>
+        <n-form-item>
+          <n-button @click="clear" quaternary>重置</n-button>
+        </n-form-item>
+        <n-form-item
+          v-if="userStore.isTeacherOrAbove && route.name === 'submissions'"
+        >
+          <n-button
+            quaternary
+            type="warning"
+            @click="toggleStatisticPanel(true)"
+          >
+            数据统计
+          </n-button>
+        </n-form-item>
+      </n-form>
+      <n-tag
+        v-if="todayCount > 0"
+        checkable
+        :checked="query.today === '1'"
+        type="success"
+        size="large"
+        @update:checked="(v: boolean) => (query.today = v ? '1' : '0')"
+      >
+        <n-gradient-text v-if="query.today !== '1'" type="success">
+          今日提交数：{{ todayCount }}
+        </n-gradient-text>
+        <template v-else>今日提交数：{{ todayCount }}</template>
+      </n-tag>
+    </n-space>
+    <n-data-table
+      v-if="query.language === 'Flowchart'"
+      :bordered="false"
+      :columns="flowchartColumns"
+      :data="flowcharts"
+    />
+    <n-data-table
+      v-else
+      :bordered="false"
+      :columns="columns"
+      :data="submissions"
+    />
+  </n-flex>
+  <Pagination
+    :total="total"
+    v-model:limit="query.limit"
+    v-model:page="query.page"
+  />
+  <n-modal
+    v-if="userStore.isTeacherOrAbove"
+    v-model:show="statisticPanel"
+    preset="card"
+    :style="{ maxWidth: isDesktop && '800px', maxHeight: '80vh' }"
+    :content-style="{ overflow: 'auto' }"
+    :title="
+      query.language === 'Flowchart' ? '流程图提交的统计' : '提交记录的统计'
+    "
+  >
+    <FlowchartStatisticsPanel
+      v-if="query.language === 'Flowchart'"
+      :problem="query.problem"
+      :username="query.username"
+    />
+    <StatisticsPanel
+      v-else
+      :problem="query.problem"
+      :username="query.username"
+    />
+  </n-modal>
+  <n-modal
+    v-model:show="codePanel"
+    preset="card"
+    :style="{ maxWidth: isDesktop && '70vw', maxHeight: '80vh' }"
+    :content-style="{ overflow: 'auto' }"
+    title="代码详情"
+  >
+    <SubmissionDetail
+      :problemID="problemDisplayID"
+      :submissionID="submissionID"
+      hideList
+      @copied="toggleCodePanel(false)"
+    />
+  </n-modal>
+  <n-modal
+    v-model:show="scoreDetailPanel"
+    preset="card"
+    :style="{ maxWidth: isDesktop && '1000px', maxHeight: '80vh' }"
+    :content-style="{ overflow: 'auto' }"
+  >
+    <template #header>
+      <n-flex align="center">
+        <n-text>流程图评分详情</n-text>
+        <n-text
+          v-if="selectedFlowchart"
+          :type="getGradeType(selectedFlowchart.ai_grade)"
+        >
+          {{ selectedFlowchart.ai_score }}分 {{ selectedFlowchart.ai_grade }}级
+        </n-text>
+      </n-flex>
+    </template>
+    <FlowchartScoreDetail :submissionId="selectedFlowchartId" />
+  </n-modal>
+</template>
+<style scoped>
+.select {
+  width: 120px;
+}
+
+.code {
+  font-size: 20px;
+  overflow: auto;
+}
+
+.flowchart-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+</style>

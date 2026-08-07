@@ -1,0 +1,237 @@
+<script setup lang="ts">
+import { Icon } from "@iconify/vue"
+import { useThemeVars } from "naive-ui"
+import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
+import {
+  getCSRFToken,
+  submissionMemoryFormat,
+  submissionTimeFormat,
+} from "utils/functions"
+import type { Submission } from "utils/types"
+import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
+import { useProblemStore } from "oj/store/problem"
+import { consumeJSONEventStream } from "utils/stream"
+import { MdPreview } from "md-editor-v3"
+import "md-editor-v3/lib/preview.css"
+import { useDark } from "@vueuse/core"
+
+const props = defineProps<{
+  submission?: Submission
+}>()
+
+const isDark = useDark()
+const problemStore = useProblemStore()
+const theme = useThemeVars()
+
+// AI 提示状态
+const hintContent = ref("")
+const hintLoading = ref(false)
+const hintError = ref("")
+
+// 错误信息格式化
+const msg = computed(() => {
+  if (!props.submission) return ""
+
+  let msg = ""
+  const result = props.submission.result
+
+  // 编译错误或运行时错误时给出提示；
+  // SQL 题的运行错误多半是"查询题里写了增删改"这类被判题拒绝的语句，err_info 已说明原因，不套这句
+  if (
+    (result === SubmissionStatus.compile_error ||
+      result === SubmissionStatus.runtime_error) &&
+    props.submission.language !== "SQL"
+  ) {
+    msg += "请仔细检查，看看代码的格式是不是写错了！\n\n"
+  }
+
+  if (
+    result !== SubmissionStatus.ast_check_failed &&
+    props.submission.statistic_info?.err_info
+  ) {
+    msg += props.submission.statistic_info.err_info
+  }
+
+  return msg
+})
+
+// 是否显示AI提示区域
+const showAIHint = computed(() => {
+  if (!props.submission) return false
+  return (
+    problemStore.failCount >= 3 &&
+    props.submission.result !== SubmissionStatus.accepted &&
+    props.submission.result !== SubmissionStatus.ast_check_failed &&
+    props.submission.result !== SubmissionStatus.pending &&
+    props.submission.result !== SubmissionStatus.judging &&
+    props.submission.result !== SubmissionStatus.submitting
+  )
+})
+
+async function fetchHint(submissionId: string) {
+  hintLoading.value = true
+  hintContent.value = ""
+  hintError.value = ""
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+
+    const csrfToken = getCSRFToken()
+    if (csrfToken) {
+      headers["X-CSRFToken"] = csrfToken
+    }
+
+    const response = await fetch("/api/ai/hint", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ submission_id: submissionId }),
+    })
+
+    await consumeJSONEventStream(response, {
+      onMessage: (data: {
+        type: string
+        content?: string
+        message?: string
+      }) => {
+        if (data.type === "delta" && data.content) {
+          hintContent.value += data.content
+        } else if (data.type === "error") {
+          hintError.value = data.message || "AI 提示生成失败"
+        }
+      },
+    })
+  } catch (e: any) {
+    hintError.value = e.message || "请求失败"
+  } finally {
+    hintLoading.value = false
+  }
+}
+
+// 测试用例表格数据（只在部分通过时显示）
+const infoTable = computed(() => {
+  if (!props.submission?.info?.data?.length) return []
+
+  const result = props.submission.result
+  // AC、编译错误、运行时错误不显示测试用例表格
+  if (
+    result === SubmissionStatus.accepted ||
+    result === SubmissionStatus.ast_check_failed ||
+    result === SubmissionStatus.compile_error ||
+    result === SubmissionStatus.runtime_error
+  ) {
+    return []
+  }
+
+  const data = props.submission.info.data
+  // 只有存在失败的测试用例时才显示
+  return data.some((item) => item.result === 0) ? data : []
+})
+
+// 测试用例表格列配置
+const columns: DataTableColumn<Submission["info"]["data"][number]>[] = [
+  { title: "测试用例", key: "test_case" },
+  {
+    title: "测试状态",
+    key: "result",
+    render: (row) => h(SubmissionResultTag, { result: row.result }),
+  },
+  {
+    title: "占用内存",
+    key: "memory",
+    render: (row) => submissionMemoryFormat(row.memory),
+  },
+  {
+    title: "执行耗时",
+    key: "real_time",
+    render: (row) => submissionTimeFormat(row.real_time),
+  },
+  { title: "信号", key: "signal" },
+]
+</script>
+
+<template>
+  <div v-if="submission">
+    <n-alert
+      :type="JUDGE_STATUS[submission.result]['type']"
+      :title="JUDGE_STATUS[submission.result]['title']"
+      class="mb-3"
+    />
+    <n-flex
+      vertical
+      v-if="
+        msg ||
+        infoTable.length ||
+        submission.statistic_info?.ast_results?.length
+      "
+    >
+      <n-card v-if="submission.statistic_info?.ast_results?.length" embedded>
+        <n-flex vertical :size="8">
+          <n-flex
+            v-for="(rule, i) in submission.statistic_info.ast_results"
+            :key="i"
+            align="center"
+            :size="6"
+          >
+            <n-icon
+              :color="rule.passed ? theme.successColor : theme.errorColor"
+            >
+              <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
+            </n-icon>
+            <span>{{ rule.description }}</span>
+          </n-flex>
+        </n-flex>
+      </n-card>
+      <n-card v-if="msg" embedded class="msg">{{ msg }}</n-card>
+      <n-data-table
+        v-if="infoTable.length"
+        striped
+        :data="infoTable"
+        :columns="columns"
+      />
+    </n-flex>
+
+    <!-- AI 提示区域 -->
+    <template v-if="showAIHint">
+      <n-card size="small" style="margin-top: 12px; max-width: 480px">
+        <n-alert
+          v-if="hintError"
+          type="error"
+          :title="hintError"
+          class="mb-3"
+        />
+        <n-button
+          v-if="!hintContent && !hintLoading"
+          type="primary"
+          @click="fetchHint(submission.id)"
+        >
+          让 AI 分析我的代码
+        </n-button>
+        <n-spin v-else-if="hintLoading && !hintContent" size="small" />
+        <MdPreview
+          v-if="hintContent"
+          :model-value="hintContent"
+          preview-theme="vuepress"
+          :theme="isDark ? 'dark' : 'light'"
+        />
+      </n-card>
+    </template>
+  </div>
+</template>
+
+<style scoped>
+.msg {
+  white-space: pre;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: bold;
+}
+</style>

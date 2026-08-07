@@ -1,0 +1,600 @@
+import http from "utils/http"
+import { toProblemListItem } from "admin/transforms"
+import type {
+  AdminProblem,
+  AdminTag,
+  Announcement,
+  AnnouncementEdit,
+  BlankContest,
+  BlankProblem,
+  Contest,
+  Exercise,
+  ExerciseType,
+  Server,
+  SQLDisplay,
+  TestcaseUploadedReturns,
+  Tutorial,
+  User,
+  WebsiteConfig,
+} from "utils/types"
+
+export function getBaseInfo() {
+  return http.get("admin/dashboard_info")
+}
+
+export function randomUser10(classroom: string) {
+  return http.get("admin/random_user", { params: { classroom } })
+}
+
+export async function getProblemList(
+  offset = 0,
+  limit = 10,
+  keyword: string,
+  author?: string,
+  contestID?: string,
+  tagId?: number,
+) {
+  const endpoint = !!contestID ? "admin/contest/problem" : "admin/problem"
+  const res = await http.get<{ results: AdminProblem[]; total: number }>(
+    endpoint,
+    {
+      params: {
+        paging: true,
+        offset,
+        limit,
+        keyword,
+        author,
+        contest_id: contestID,
+        tag_id: tagId,
+      },
+    },
+  )
+  return {
+    results: res.data.results.map(toProblemListItem),
+    total: res.data.total,
+  }
+}
+
+export function deleteProblem(id: number) {
+  return http.delete("admin/problem", { params: { id } })
+}
+
+export function deleteContestProblem(id: number) {
+  return http.delete("admin/contest/problem", { params: { id } })
+}
+
+export function editProblem(problem: AdminProblem | BlankProblem) {
+  return http.put("admin/problem", problem)
+}
+
+export function toggleProblemVisible(problemID: number) {
+  return http.put("admin/problem/visible", { id: problemID })
+}
+
+export function generateFlowchartFromPythonCode(python: string) {
+  return http.post("admin/problem/flowchart", { python })
+}
+
+export function editContestProblem(problem: AdminProblem | BlankProblem) {
+  return http.put("admin/contest/problem", problem)
+}
+
+export function getProblem(id: string | number) {
+  return http.get<AdminProblem>("admin/problem", { params: { id } })
+}
+
+export function getContestProblem(id: number) {
+  return http.get("admin/contest/problem", { params: { id } })
+}
+
+// 标签管理
+export function getTagAdminList(keyword = "") {
+  return http.get<AdminTag[]>("admin/problem/tag", { params: { keyword } })
+}
+
+export function renameTag(id: number, name: string) {
+  return http.put<{
+    merged: boolean
+    id: number
+    name: string
+    affected_count: number
+  }>("admin/problem/tag", { id, name })
+}
+
+export function deleteTag(id: number) {
+  return http.delete("admin/problem/tag", { params: { id } })
+}
+
+export function batchTagProblems(
+  problemIds: number[],
+  tagNames: string[],
+  action: "add" | "remove",
+) {
+  return http.post<{ problem_count: number; tag_count: number }>(
+    "admin/problem/batch_tag",
+    { problem_ids: problemIds, tag_names: tagNames, action },
+  )
+}
+
+// 用户列表
+export function getUserList(
+  offset = 0,
+  limit = 10,
+  type = "",
+  keyword: string,
+  orderBy = "",
+) {
+  return http.get("admin/user", {
+    params: { paging: true, offset, limit, keyword, type, order_by: orderBy },
+  })
+}
+
+// 编辑用户
+export function editUser(user: User) {
+  return http.put("admin/user", user)
+}
+
+// 重置用户密码
+export function resetPassword(userID: number) {
+  return http.post("admin/reset_password", { id: userID })
+}
+
+// 导入用户
+export function importUsers(users: string[][]) {
+  return http.post("admin/user", { users })
+}
+
+// 批量删除用户
+export function deleteUsers(userIDs: number[]) {
+  return http.delete("admin/user", { params: { id: userIDs.join(",") } })
+}
+
+export function getContestList(offset = 0, limit = 10, keyword: string) {
+  return http.get("admin/contest", {
+    params: { paging: true, offset, limit, keyword },
+  })
+}
+
+// 上传图片
+export async function uploadImage(file: File): Promise<string> {
+  const form = new window.FormData()
+  form.append("image", file)
+  // 该端点不走 { error, data } 信封，直接返回上传结果
+  const res = (await http.post("admin/upload_image", form, {
+    headers: { "content-type": "multipart/form-data" },
+  })) as unknown as { success: boolean; file_path: string; msg: "Success" }
+  return res.success ? res.file_path : ""
+}
+
+// 上传测试用例；SQL 题的压缩包是 1.sql..N.sql（每个文件一个测试点的建表+数据脚本）
+export function uploadTestcases(file: File, options: { sql?: boolean } = {}) {
+  const form = new window.FormData()
+  form.append("file", file)
+  if (options.sql) {
+    form.append("sql", "1")
+  }
+  return http.post<TestcaseUploadedReturns>("admin/test_case", form, {
+    headers: { "content-type": "multipart/form-data" },
+  })
+}
+
+// SQL 题测试点预览：后端跑一遍初始化脚本+标准答案，返回数据表和期望结果展示数据
+export function previewSQLTestcase(data: {
+  init_sql: string
+  ref_sql: string
+  mode: "query" | "modify"
+}) {
+  return http.post<SQLDisplay>("admin/sql_test_case_preview", data)
+}
+
+// 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
+export function getSQLTestcaseScripts(problemId: number) {
+  return http.get<{ name: string; content: string }[]>(
+    "admin/sql_test_case_scripts",
+    { params: { problem_id: problemId } },
+  )
+}
+
+// AI 根据标准答案生成一个 SQL 测试点初始化脚本
+export function generateSQLTestcase(data: {
+  ref_sql: string
+  mode: "query" | "modify"
+}) {
+  return http.post<{ sql: string }>("admin/sql_test_case_ai_gen", data)
+}
+
+export function createProblem(problem: BlankProblem) {
+  return http.post("admin/problem", problem)
+}
+
+export function createContestProblem(problem: BlankProblem) {
+  return http.post("admin/contest/problem", problem)
+}
+
+export function createContest(contest: BlankContest) {
+  return http.post("admin/contest", contest)
+}
+
+export function editContest(contest: Contest | BlankContest) {
+  return http.put("admin/contest", contest)
+}
+
+export function cloneContest(contest_id: number) {
+  return http.post("admin/contest/clone", { contest_id })
+}
+
+export function getContest(id: string) {
+  return http.get<Contest & { password: string }>("admin/contest", {
+    params: { id },
+  })
+}
+
+export function addProblemForContest(
+  contestID: string,
+  problemID: number,
+  displayID: string,
+) {
+  return http.post("admin/contest/add_problem_from_public", {
+    contest_id: contestID,
+    problem_id: problemID,
+    display_id: displayID,
+  })
+}
+
+export function getWebsite() {
+  return http.get<WebsiteConfig>("admin/website")
+}
+
+export function editWebsite(data: WebsiteConfig) {
+  return http.post("admin/website", data)
+}
+
+export function listInvalidTestcases() {
+  return http.get("admin/prune_test_case")
+}
+
+export function pruneInvalidTestcases(id?: string) {
+  return http.delete("admin/prune_test_case", { params: { id } })
+}
+
+export function getJudgeServer() {
+  return http.get<{ token: string; servers: Server[] }>("admin/judge_server")
+}
+
+export function deleteJudgeServer(hostname: string) {
+  return http.delete("admin/judge_server", { params: { hostname } })
+}
+
+export function getAnnouncementList(offset = 0, limit = 10) {
+  return http.get("admin/announcement", {
+    params: { paging: true, offset, limit },
+  })
+}
+
+export function getAnnouncement(id: number) {
+  return http.get<Announcement>("admin/announcement", { params: { id } })
+}
+
+export function deleteAnnouncement(id: number) {
+  return http.delete("admin/announcement", { params: { id } })
+}
+
+export function editAnnouncement(announcement: AnnouncementEdit) {
+  return http.put("admin/announcement", announcement)
+}
+
+export function createAnnouncement(announcement: AnnouncementEdit) {
+  return http.post("admin/announcement", announcement)
+}
+
+export async function getTutorialList() {
+  const res = await http.get<Tutorial[]>("admin/tutorial")
+  return res.data
+}
+
+export async function getTutorial(id: number) {
+  const res = await http.get<Tutorial>("admin/tutorial", { params: { id } })
+  return res.data
+}
+
+export async function createTutorial(data: Partial<Tutorial>) {
+  const res = await http.post<Tutorial>("admin/tutorial", data)
+  return res.data
+}
+
+export async function updateTutorial(data: Partial<Tutorial>) {
+  const res = await http.put("admin/tutorial", data)
+  return res.data
+}
+
+export function deleteTutorial(id: number) {
+  return http.delete("admin/tutorial", { params: { id } })
+}
+
+export function setTutorialVisibility(id: number, is_public: boolean) {
+  return http.put("admin/tutorial/visibility", { id, is_public })
+}
+
+export async function getAdminExercises(tutorialId: number) {
+  const res = await http.get<Exercise[]>("admin/exercise", {
+    params: { tutorial_id: tutorialId },
+  })
+  return res.data
+}
+
+export async function createExercise(data: {
+  tutorial_id: number
+  type: ExerciseType
+  data: object
+  order: number
+}) {
+  const res = await http.post<Exercise>("admin/exercise", data)
+  return res.data
+}
+
+export async function updateExercise(data: {
+  id: number
+  type: ExerciseType
+  data: object
+  order: number
+}) {
+  const res = await http.put("admin/exercise", data)
+  return res.data as Exercise
+}
+
+export function deleteExercise(id: number) {
+  return http.delete("admin/exercise", { params: { id } })
+}
+
+// 将竞赛题目转为公开题目
+export function makeProblemPublic(id: number, display_id: string) {
+  return http.post("admin/contest_problem/make_public", {
+    id,
+    display_id,
+  })
+}
+
+// 比赛辅助检查
+export function getACMHelperList(contest_id: number) {
+  return http.get("admin/contest/acm_helper", {
+    params: { contest_id },
+  })
+}
+
+export function updateACMHelperChecked(
+  contest_id: number,
+  rank_id: number,
+  problem_id: string,
+  checked: boolean,
+) {
+  return http.put("admin/contest/acm_helper", {
+    contest_id,
+    rank_id,
+    problem_id,
+    checked,
+  })
+}
+
+// 题单管理 API
+export function getProblemSetList(
+  offset = 0,
+  limit = 10,
+  keyword = "",
+  difficulty = "",
+  status = "",
+) {
+  return http.get("admin/problemset", {
+    params: {
+      offset,
+      limit,
+      keyword,
+      difficulty,
+      status,
+    },
+  })
+}
+
+export function getProblemSetDetail(id: number) {
+  return http.get(`admin/problemset/${id}`)
+}
+
+export function createProblemSet(data: {
+  title: string
+  description: string
+  difficulty: string
+  status: string
+  end_time?: Date | null
+}) {
+  return http.post("admin/problemset", data)
+}
+
+export function editProblemSet(data: {
+  id: number
+  title?: string
+  description?: string
+  difficulty?: string
+  status?: string
+  end_time?: Date | null
+  visible?: boolean
+}) {
+  return http.put("admin/problemset", data)
+}
+
+export function deleteProblemSet(id: number) {
+  return http.delete("admin/problemset", { params: { id } })
+}
+
+export function toggleProblemSetVisible(id: number) {
+  return http.put("admin/problemset/visible", { id })
+}
+
+export function updateProblemSetStatus(id: number, status: string) {
+  return http.put("admin/problemset/status", { id, status })
+}
+
+// 题单题目管理 API
+export function getProblemSetProblems(problemSetId: number) {
+  return http.get(`admin/problemset/${problemSetId}/problems`)
+}
+
+export function addProblemToSet(
+  problemSetId: number,
+  data: {
+    problem_id: string
+    order?: number
+    is_required?: boolean
+    score?: number
+    hint?: string
+  },
+) {
+  return http.post(`admin/problemset/${problemSetId}/problems`, data)
+}
+
+export function editProblemInSet(
+  problemSetId: number,
+  problemSetProblemId: number,
+  data: {
+    order?: number
+    is_required?: boolean
+    score?: number
+    hint?: string
+  },
+) {
+  return http.put(
+    `admin/problemset/${problemSetId}/problems/${problemSetProblemId}`,
+    data,
+  )
+}
+
+export function removeProblemFromSet(
+  problemSetId: number,
+  problemSetProblemId: number,
+) {
+  return http.delete(
+    `admin/problemset/${problemSetId}/problems/${problemSetProblemId}`,
+  )
+}
+
+// 题单奖章管理 API
+export function getProblemSetBadges(problemSetId: number) {
+  return http.get(`admin/problemset/${problemSetId}/badges`)
+}
+
+export function createProblemSetBadge(
+  problemSetId: number,
+  data: {
+    name: string
+    description: string
+    icon: string
+    condition_type: string
+    condition_value: number
+    level?: number
+  },
+) {
+  return http.post(`admin/problemset/${problemSetId}/badges`, data)
+}
+
+export function editProblemSetBadge(
+  problemSetId: number,
+  badgeId: number,
+  data: {
+    name?: string
+    description?: string
+    icon?: string
+    condition_type?: string
+    condition_value?: number
+    level?: number
+  },
+) {
+  return http.put(`admin/problemset/${problemSetId}/badges/${badgeId}`, data)
+}
+
+export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
+  return http.delete(`admin/problemset/${problemSetId}/badges/${badgeId}`)
+}
+
+// 题单进度管理 API
+export function getProblemSetProgress(problemSetId: number) {
+  return http.get(`admin/problemset/${problemSetId}/progress`)
+}
+
+export function removeUserFromProblemSet(problemSetId: number, userId: number) {
+  return http.delete(`admin/problemset/${problemSetId}/progress/${userId}`)
+}
+
+// 学生卡点分析
+export function getStuckProblems() {
+  return http.get("admin/problem/stuck")
+}
+
+export function getTopACTrend(params: {
+  since_year: number
+  until_year: number
+  min_per_year: number
+}) {
+  return http.get("admin/problem/top_ac_trend", { params })
+}
+
+// AI 学习分析报告
+export function getAIReportList(offset = 0, limit = 10, username = "") {
+  return http.get("admin/ai/reports", {
+    params: { paging: true, offset, limit, username: username || undefined },
+  })
+}
+
+export function getAIReportDetail(id: number) {
+  return http.get("admin/ai/reports", { params: { id } })
+}
+
+export function pinAIReport(id: number) {
+  return http.post("admin/ai/reports", { id })
+}
+
+export function getPinnedAIReports() {
+  return http.get("admin/ai/reports", { params: { pinned_only: "true" } })
+}
+
+// ==================== 成就 ====================
+
+export interface AdminAchievement {
+  id: number
+  name: string
+  description: string
+  icon: string
+  rarity: string
+  hidden: boolean
+  metric: string
+  metric_name: string
+  operator: "gte" | "lte"
+  threshold: number
+  visible: boolean
+  unlock_count: number
+  order: number
+  create_time: string
+}
+
+export interface MetricOption {
+  key: string
+  name: string
+  help_text: string
+}
+
+export function getAdminAchievements() {
+  return http.get<AdminAchievement[]>("admin/achievement")
+}
+
+export function getMetricOptions() {
+  return http.get<MetricOption[]>("admin/achievement/metrics")
+}
+
+export function createAchievement(data: Partial<AdminAchievement>) {
+  return http.post<AdminAchievement>("admin/achievement", data)
+}
+
+export function updateAchievement(data: Partial<AdminAchievement>) {
+  return http.put<AdminAchievement>("admin/achievement", data)
+}
+
+export function deleteAchievement(id: number) {
+  return http.delete("admin/achievement", { params: { id } })
+}

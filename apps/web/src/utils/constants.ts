@@ -1,0 +1,370 @@
+import type { AchievementRarity, SUBMISSION_RESULT, ReactionKey } from "./types"
+
+export enum SubmissionStatus {
+  compile_error = -2,
+  wrong_answer = -1,
+  accepted = 0,
+  time_limit_exceeded = 1 | 2,
+  memory_limit_exceeded = 3,
+  runtime_error = 4,
+  system_error = 5,
+  pending = 6,
+  judging = 7,
+  partial_accepted = 8,
+  submitting = 9,
+  ast_check_failed = 10,
+}
+
+export enum ContestStatus {
+  initial = "2", // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位
+  not_started = "1",
+  underway = "0",
+  finished = "-1",
+}
+
+export enum ContestType {
+  public = "Public",
+  private = "Password Protected",
+}
+
+export const JUDGE_STATUS: {
+  [key in SUBMISSION_RESULT]: {
+    name: string
+    title: string
+    type: "error" | "success" | "warning" | "info"
+  }
+} = {
+  "-2": {
+    name: "编译失败",
+    title: "编译失败",
+    type: "warning",
+  },
+  "-1": {
+    name: "答案错误",
+    title: "答案错误",
+    type: "error",
+  },
+  "0": {
+    name: "答案正确",
+    title: "答案正确",
+    type: "success",
+  },
+  "1": {
+    name: "运行超时",
+    title: "运行超时",
+    type: "error",
+  },
+  "2": {
+    name: "运行超时",
+    title: "运行超时",
+    type: "error",
+  },
+  "3": {
+    name: "内存超限",
+    title: "内存超限",
+    type: "error",
+  },
+  "4": {
+    name: "运行时错误",
+    title: "运行时错误",
+    type: "warning",
+  },
+  "5": {
+    name: "系统错误",
+    title: "系统错误",
+    type: "error",
+  },
+  "6": {
+    name: "等待评分",
+    title: "等待评分",
+    type: "warning",
+  },
+  "7": {
+    name: "正在评分",
+    title: "正在评分",
+    type: "warning",
+  },
+  "8": {
+    name: "部分正确",
+    title: "部分正确",
+    type: "warning",
+  },
+  "9": {
+    name: "正在提交",
+    title: "正在提交",
+    type: "info",
+  },
+  "10": {
+    name: "语法未通过",
+    title: "答案正确，但语法未通过",
+    type: "success",
+  },
+}
+
+export const CONTEST_STATUS: {
+  [key in ContestStatus]: {
+    name: string
+    type: "error" | "success" | "warning"
+  }
+} = {
+  // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位
+  "2": {
+    name: "未开始",
+    type: "warning",
+  },
+  "1": {
+    name: "未开始",
+    type: "warning",
+  },
+  "0": {
+    name: "进行中",
+    type: "success",
+  },
+  "-1": {
+    name: "已结束",
+    type: "error",
+  },
+}
+
+export const CONTEST_TYPE = {
+  PUBLIC: "Public",
+  PRIVATE: "Password Protected",
+}
+
+export const USER_TYPE = {
+  REGULAR_USER: "Regular User",
+  STUDENT_ADMIN: "Student Admin",
+  TEACHER_ADMIN: "Teacher Admin",
+  SUPER_ADMIN: "Super Admin",
+}
+
+export const PROBLEM_PERMISSION = {
+  NONE: "None",
+  OWN: "Own",
+  ALL: "All",
+}
+
+export const STORAGE_KEY = {
+  AUTHED: "authed",
+  LANGUAGE: "problemLanguage",
+  LEARN_CURRENT_STEP: "learnStep",
+  ADMIN_PROBLEM: "adminProblem",
+  ADMIN_PROBLEM_TAGS: "adminProblemTags",
+  DEMO_MODE: "demoMode",
+}
+
+export const DIFFICULTY = {
+  Low: "简单",
+  Mid: "中等",
+  High: "困难",
+}
+
+const cSource =
+  "#include<stdio.h>\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
+const cppSource =
+  "#include<iostream>\r\n\r\nusing namespace std;\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
+const pythonSource = ""
+const javaSource =
+  'public class Main {\r\n    public static void main(String[] args) {\r\n        System.out.println("黄岩一职");\r\n    }\r\n}'
+
+export const SOURCES = {
+  C: cSource,
+  "C++": cppSource,
+  Java: javaSource,
+  Python3: pythonSource,
+  Python2: "",
+  JavaScript: "",
+  Golang: "",
+  Flowchart: "",
+  SQL: "",
+} as const
+
+export const LANGUAGE_ID = {
+  C: 50,
+  "C++": 54,
+  Java: 62,
+  Python3: 71,
+  Python2: 0,
+  JavaScript: 0,
+  Golang: 0,
+  Flowchart: 0,
+  SQL: 0,
+} as const
+
+export const LANGUAGE_FORMAT_VALUE = {
+  C: "c",
+  "C++": "cpp",
+  Java: "java",
+  Python2: "python",
+  Python3: "python",
+  JavaScript: "javascript",
+  Golang: "go",
+  Flowchart: "flowchart",
+  SQL: "sql",
+} as const
+
+export const LANGUAGE_SHOW_VALUE = {
+  Flowchart: "流程图",
+  C: "C语言",
+  "C++": "C++",
+  Java: "Java",
+  Python2: "Python",
+  Python3: "Python",
+  JavaScript: "JS",
+  Golang: "Go",
+  SQL: "SQL",
+} as const
+
+export const ICON_SET = {
+  Flowchart: "vscode-icons:file-type-drawio",
+  Python2: "devicon:python",
+  Python3: "devicon:python",
+  C: "devicon:c",
+  "C++": "devicon:cplusplus",
+  Java: "devicon:java",
+  JavaScript: "devicon:javascript",
+  Golang: "devicon:go",
+  SQL: "devicon:sqlite",
+} as const
+
+const cTemplate = `//TEMPLATE BEGIN
+#include <stdio.h>
+
+int main() {
+    printf("黄岩一职");
+    return 0;
+}
+//TEMPLATE END`
+
+const cppTemplate = `//TEMPLATE BEGIN
+#include <iostream>
+
+int main() {
+    return 0;
+}
+//TEMPLATE END`
+
+const blankTemplate = `//PREPEND BEGIN
+//PREPEND END
+
+//TEMPLATE BEGIN
+//TEMPLATE END
+
+//APPEND BEGIN
+//APPEND END`
+
+export const CODE_TEMPLATES = {
+  C: cTemplate,
+  "C++": cppTemplate,
+  Python2: blankTemplate,
+  Python3: blankTemplate,
+  Java: blankTemplate,
+  JavaScript: blankTemplate,
+  Golang: blankTemplate,
+  Flowchart: blankTemplate,
+  SQL: blankTemplate,
+} as const
+
+export enum ScreenMode {
+  both = "双栏",
+  code = "自测",
+  problem = "题目",
+}
+
+export enum ChartType {
+  Rank,
+  Activity,
+}
+
+// 成就稀有度
+export const RARITY_LABEL: Record<AchievementRarity, string> = {
+  bronze: "青铜",
+  silver: "白银",
+  gold: "黄金",
+  platinum: "白金",
+}
+
+// 边框、色块用的原色：饱和度够高，明暗底上都醒目。
+// 青铜往红偏（色相 23），黄金往纯黄推（色相 47），中间隔开两档亮度，
+// 不然两个都落在橙棕区，扫一眼分不出来
+export const RARITY_COLOR: Record<AchievementRarity, string> = {
+  bronze: "#c2703d",
+  silver: "#9fa6b2",
+  gold: "#f2c012",
+  platinum: "#7dd3fc",
+}
+
+// 文字要另配一套。上面那组是照深色底调的，搬到白底上白金只有 1.7:1、
+// 黄金 2.2:1，12px 的稀有度标签根本看不清。取色见 useRarityColor
+export const RARITY_TEXT_COLOR: Record<
+  "dark" | "light",
+  Record<AchievementRarity, string>
+> = {
+  dark: {
+    bronze: "#e08d63",
+    silver: "#b6bcc7",
+    gold: "#f2c012",
+    platinum: "#7dd3fc",
+  },
+  light: {
+    bronze: "#a13d1e",
+    silver: "#6b7280",
+    gold: "#8f6f00",
+    platinum: "#0369a1",
+  },
+}
+
+// 时间范围配置
+export const DURATION_OPTIONS = [
+  { label: "本节课内", value: "hours:1" },
+  { label: "两节课内", value: "hours:2" },
+  { label: "一天内", value: "days:1" },
+  { label: "一周内", value: "weeks:1" },
+  { label: "一个月内", value: "months:1" },
+  { label: "两个月内", value: "months:2" },
+  { label: "半年内", value: "months:6" },
+  { label: "一年内", value: "years:1" },
+] as const
+
+// 班级号的位数范围。学生用户名形如 ks<班级号><姓名>，班级号还要跟
+// 网站配置里的班级列表对得上。
+// 后端 OnlineJudge/utils/shortcuts.py 的 CLASS_NAME_MIN/MAX_DIGITS
+// 是同一条规则的另一份，改这里必须同时改那边。
+export const CLASS_NAME_MIN_DIGITS = 3
+export const CLASS_NAME_MAX_DIGITS = 4
+
+/** 合法班级号：3~4 位纯数字 */
+export const CLASS_NAME_RE = new RegExp(
+  `^\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}$`,
+)
+
+/** 用户名开头的 ks<班级号>，用于从用户名里认出班级 */
+export const USERNAME_CLASS_RE = new RegExp(
+  `^ks\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}`,
+)
+
+/** 班级号作为数字时的上下界，给 n-input-number 用 */
+export const CLASS_NAME_MIN_VALUE = 10 ** (CLASS_NAME_MIN_DIGITS - 1)
+export const CLASS_NAME_MAX_VALUE = 10 ** CLASS_NAME_MAX_DIGITS - 1
+
+export const REACTIONS: {
+  key: ReactionKey
+  label: string
+  icon: string
+}[] = [
+  {
+    key: "too_easy",
+    label: "太简单",
+    icon: "fluent-emoji:smiling-face-with-sunglasses",
+  },
+  { key: "too_hard", label: "太难了", icon: "fluent-emoji:exploding-head" },
+  {
+    key: "confusing",
+    label: "没看懂",
+    icon: "fluent-emoji:face-with-spiral-eyes",
+  },
+  { key: "buggy", label: "题目有错", icon: "fluent-emoji:bug" },
+  { key: "learned", label: "学到了", icon: "fluent-emoji:light-bulb" },
+  { key: "interesting", label: "有意思", icon: "fluent-emoji:star-struck" },
+  { key: "want_explain", label: "想听讲解", icon: "fluent-emoji:books" },
+]

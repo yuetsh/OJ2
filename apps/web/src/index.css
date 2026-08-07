@@ -1,0 +1,29 @@
+body {
+  height: 100vh;
+}
+
+.md-editor-dark {
+  --md-bk-color: var(--n-body-color) !important;
+}
+
+.md-editor-dark div.vuepress-theme {
+  --md-theme-color: var(--n-text-color) !important;
+}
+
+.oj-mermaid-surface {
+  box-sizing: border-box;
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 8px;
+}
+
+.oj-mermaid-surface > svg {
+  max-width: 100%;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
