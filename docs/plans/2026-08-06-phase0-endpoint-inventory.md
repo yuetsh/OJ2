@@ -13,8 +13,21 @@
 - **不修改 `OnlineJudge/` 和 `ojnext/` 任何文件。** 两个旧仓库全程冻结，回滚路径依赖于此。阶段 0 的"砍"是决策层面的，产物是清单不是 diff。
 - **不写测试。** 项目既定策略（根 `CLAUDE.md`：Do not write new tests）。本计划用"跑脚本核对输出数字"替代测试环节。
 - **本机无 PostgreSQL / Redis / Docker。** 任何需要数据库连接的操作只能在服务器上做。
-- 后端端点 ground truth：**122 个（oj 74 / admin 48）**，其中 **16 个**已由人工标注 `# DEPRECATED: 前端未调用`。任何提取脚本的输出必须与这两个数字吻合，不吻合就是脚本有 bug。
-- 前端调用路径基线：**78 条**（用字面量 `get("...")` 形式统计，未含模板字符串，实际应 ≥ 78）。
+- 后端端点 ground truth：**127 个（oj 77 / admin 50）**，其中 **17 个**已由人工标注 `# DEPRECATED: 前端未调用`。任何提取脚本的输出必须与这两个数字吻合，不吻合就是脚本有 bug。
+
+  > **这两个数字不是提取脚本自己产出的**，否则自检就退化成"脚本必须复现自己的 bug"——本计划初稿写的 122 / 74 / 48 / 16 正是这么来的，脚本漏抓了 `tutorial/urls/tutorial.py` 与 `utils/urls.py` 两个文件共 5 个端点，ground truth 跟着一起错。
+  >
+  > 独立核验方式（不经过任何提取脚本）：
+  >
+  > ```bash
+  > cd /home/xuyue/Projects/OJ/OnlineJudge
+  > cat */urls/*.py utils/urls.py | grep -c "path("   # → 127
+  > ```
+  >
+  > oj/admin 的拆分靠与 `OnlineJudge/oj/urls.py` 的 include 清单逐条对齐核验：该文件共 26 条 `include(...)`，挂载前缀 `api/` 的归 oj、`api/admin/` 的归 admin，把每条 include 指向的文件的 `path(` 计数按前缀分别累加 → oj 77、admin 50。注意其中两条不符合"`<app>/urls/{oj,admin}.py`"的命名惯例：`tutorial.urls.tutorial`（目录里但文件名不叫 oj）与 `utils.urls`（模块文件，没有 `urls/` 目录）。**提取器必须以 `oj/urls.py` 为唯一入口，不得按文件名白名单猜。**
+
+- 前端调用路径基线：**148 条 `method + path` / 104 条不同路径**（含模板字符串，`${...}` 归一化为 `:param`）。计划初稿写的 78 是只数字面量、不含模板串和泛型 `get<T>(...)` 的旧口径，已作废。
+- 反向对账基线：前端调用路径全部能在后端端点全集里找到对应，**orphan 应为 0**。非 0 说明提取器又漏了 urls 文件，或前端有调用死路径的代码。
 - 工作目录统一为 `OJ2/docs/spikes/`，脚本用绝对路径接收 `OnlineJudge` / `ojnext` 位置。
 
 ---
@@ -52,10 +65,11 @@
   }
   ```
 
-实现中踩过的三个坑，改脚本时别踩回去：
+实现中踩过的四个坑，改脚本时别踩回去：
 1. 18 处 `path(` 参数换行写，按行扫会漏 → 用括号深度扫描找完整片段。
 2. 行尾注释在 `.as_view()` 的右括号之后，切片到第一个 `)` 会截断 → 片段要延伸到该行行尾。
 3. 注释可能出现在 `path(` 后、字符串后、逗号后任意位置 → 匹配前先 `replace(/#[^\n]*/g, "")` 剥掉，判 `DEPRECATED` 时仍用原文。
+4. **不要按文件名白名单（`oj.py` / `admin.py`）扫 `<app>/urls/` 目录。** 初版这么写，静默漏掉 5 个端点（其中 4 个前端在用）：`tutorial/urls/tutorial.py` 文件名不在白名单里，`utils/urls.py` 根本没有 `urls/` 目录、被 `statSync` 的 catch 直接吞掉。改为解析 `OnlineJudge/oj/urls.py` 的 26 条 `include(...)`，`side` 与路径前缀直接取挂载前缀，`app` 取 Python 模块名首段（不能用目录层数推，`utils.urls` 只有两段）。
 
 - [ ] **Step 1: 确认脚本输出与 ground truth 一致**
 
@@ -64,10 +78,11 @@ cd /home/xuyue/Projects/OJ/OJ2/docs/spikes
 bun run extract-endpoints.ts /home/xuyue/Projects/OJ/OnlineJudge
 ```
 
-预期输出，两个数字必须完全一致：
+预期输出，三个数字必须完全一致：
 ```
-后端端点合计 122  (oj 74 / admin 48)
-其中已标 DEPRECATED: 16
+挂载点 26 个（来自 oj/urls.py 的 include）
+后端端点合计 127  (oj 77 / admin 50)
+其中已标 DEPRECATED: 17
 → endpoints-backend.json
 ```
 
@@ -161,7 +176,7 @@ cd /home/xuyue/Projects/OJ/OJ2/docs/spikes
 bun run extract-frontend-calls.ts /home/xuyue/Projects/OJ/ojnext
 ```
 
-预期：去重后条数 **≥ 78**（78 是只数字面量的基线，加上模板串应当更多）。若明显低于 78，说明正则漏了写法，检查 `src/utils/http.ts` 里 http 客户端的实际调用形式再修。
+预期：`前端调用点 154 处，去重后 148 条`（148 是 `method + path` 去重；只按 path 去重是 104 条）。若明显低于此数，说明正则漏了写法，检查 `src/utils/http.ts` 里 http 客户端的实际调用形式再修 —— 泛型 `get<T>("x")` 是重灾区，不吃泛型会漏掉三分之一。
 
 - [ ] **Step 3: 抽查 3 条结果**
 
@@ -197,6 +212,8 @@ git commit -m "chore(阶段0): 前端 API 调用提取器"
 后端 `pattern` 与前端 `path` 无法直接字符串相等：后端是 `/api/problem/`，前端是 `problem`；后端有 `<int:pk>` 之类占位符，前端归一化成了 `:param`。所以要各自降到一个可比的 key。
 
 - [ ] **Step 1: 写对账脚本**
+
+> 下面是初稿。**以仓库里的 `docs/spikes/reconcile.ts` 为准**，它比初稿多两处必要修正：`key()` 不能剥掉 `admin/` 段（初稿的 `(admin\/)?` 分组会把全部 admin 端点误判成 REVIEW），以及新增了反向对账（前端调用了但后端查无此端点）。
 
 ```typescript
 #!/usr/bin/env bun
@@ -260,7 +277,7 @@ cd /home/xuyue/Projects/OJ/OJ2/docs/spikes
 bun run reconcile.ts
 ```
 
-预期：三态之和等于 122。REVIEW 数量若超过 40，说明 `key()` 归一化不够，多半是后端 `pattern` 里还有没处理的占位符写法 —— 先抽查几个 REVIEW 行确认是真需人工判还是归一化没做对。
+预期：`KEEP 104 / CUT 17 / REVIEW 6  合计 127`，且**不出现** `⚠ 前端调用无对应后端端点` 这行反向对账告警。REVIEW 数量若超过 40，说明 `key()` 归一化不够，多半是后端 `pattern` 里还有没处理的占位符写法 —— 先抽查几个 REVIEW 行确认是真需人工判还是归一化没做对。反向告警若非 0，先查提取器是不是又漏了 urls 文件，再考虑是不是前端留了死调用。
 
 - [ ] **Step 3: 抽查归一化质量**
 

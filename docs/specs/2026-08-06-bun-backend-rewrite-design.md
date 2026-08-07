@@ -9,7 +9,7 @@
 
 | 仓库 | 角色 | 栈 | 规模 |
 |---|---|---|---|
-| `OnlineJudge/` | 后端 REST API + WebSocket | Django 6 + DRF + PostgreSQL + Redis + Dramatiq | 17k 行 Python，26 model，118 migration，122 端点 |
+| `OnlineJudge/` | 后端 REST API + WebSocket | Django 6 + DRF + PostgreSQL + Redis + Dramatiq | 17k 行 Python，26 model，118 migration，127 端点 |
 | `ojnext/` | 前端 SPA | Vue 3 + TypeScript + Vite + Naive UI + Pinia | 37k 行，217 文件 |
 
 重写的驱动力有三条，均为交付性诉求，非兴趣驱动：
@@ -50,13 +50,16 @@
 
 | 项 | 数值 |
 |---|---|
-| 后端端点合计 | 122（`oj` 74 + `admin` 48） |
-| 其中已由人工标注 `# DEPRECATED: 前端未调用` | 16 |
-| 前端实际调用的路径 | 78 |
-| **疑似无人调用** | **约 35%** |
+| 后端端点合计 | 127（`oj` 77 + `admin` 50） |
+| 其中已由人工标注 `# DEPRECATED: 前端未调用` | 17 |
+| 前端实际调用的路径 | 148 条 `method + path`／104 条不同路径 |
+| **疑似无人调用** | **23 个，18%** |
 | 空 app | `course/`、`comment/`（均 0 行） |
 | 全站不用的分支 | OI 赛制（所有比赛均为 ACM） |
 | Python 生态锁定 | 仅 2 处：`jieba`（`flowchart/views/admin.py` 单文件）、`tree-sitter`（`ast_checker/`，177 行） |
+
+> 更正（2026-08-06 阶段 0 重跑后）：本表原写「端点合计 122（oj 74 / admin 48）、DEPRECATED 16、前端调用 78、疑似无人调用约 35%」，四项全错。前三项来自一版漏抓了 `tutorial/urls/tutorial.py` 与 `utils/urls.py` 的提取脚本（共漏 5 个端点，其中 4 个前端在用）与一版只数字面量、不含模板串的前端统计；「约 35%」是从 `(122−78)/122` 推出来的，两个输入都错。现表为 `docs/spikes/` 三个脚本重跑的实测值，独立核验：`cd OnlineJudge && cat */urls/*.py utils/urls.py | grep -c "path("` → 127。
+> **减法空间只有 18%，不是三分之一。** 后续阶段按 18% 排期。
 
 前端网络层集中度高，改动面小：
 
@@ -131,7 +134,7 @@ Projects/OJ/
 
 ## 7. 已验证的技术假设
 
-两处高风险假设已在 Bun 1.3.11 上实测通过，spike 代码见 `docs/spikes/`。
+三处高风险假设已在 Bun 1.3.11 上实测通过，spike 代码见 `docs/spikes/`。依赖清单与 lockfile 已随 spike 源码入库（`docs/spikes/package.json`、`bun.lock`），`cd docs/spikes && bun install` 后三个脚本均可直接重跑。
 
 ### 7.1 Django 密码哈希兼容（`docs/spikes/pbkdf2-spike.ts`）
 
@@ -197,7 +200,20 @@ C 与 Python 两套 grammar 均正常。`.wasm` 文件随 npm 包分发（`tree-
 jieba.loadDict(Buffer.from("两个整数 9999\n"))
 ```
 
-**采用方案**：新后端用 `@node-rs/jieba`，`CUSTOM_WORDS` 列表在启动时拼成一份词典缓冲区一次性 `loadDict`，替代原来的逐词 `add_word` 循环。
+**采用方案**：新后端用 `@node-rs/jieba`。
+
+**衍生约束**：`loadDict` 语义已实测确认为**累加**（连续两次 `loadDict` 后先后加入的词都仍然成词），不是整份替换；但它每次调用都要重新解析并合并一遍词典，单条调用的固定开销远大于词条本身。实测 200 个自定义词：
+
+```
+逐条 loadDict : 39.4 ms
+一次性 loadDict:  0.98 ms   （40 倍）
+```
+
+因此给后续阶段的实现者：
+
+1. `CUSTOM_WORDS` 必须在**启动时**拼成一份完整的词典缓冲区，**一次性** `loadDict`，不得把 Python 那边的 `for w in CUSTOM_WORDS: jieba.add_word(w)` 逐词循环直译成逐条 `loadDict`。
+2. 缓冲区格式与 Python jieba 用户词典一致：每行 `"词 词频"`，词频沿用现有的 `9999`。
+3. 不要在请求路径上调 `loadDict`。词表变更走重建缓冲区 + 重启（或重建整个 `Jieba` 实例）。
 
 ## 8. 数据层策略
 
@@ -233,11 +249,11 @@ jieba.loadDict(Buffer.from("两个整数 9999\n"))
 
 | 阶段 | 内容 | 出口标准 |
 |---|---|---|
-| **0 减法与探路** | 对照 78 个前端实际调用筛查 122 个后端端点，砍掉无人调用者；删除 `course`/`comment` 空壳与 OI 分支；验证 `@node-rs/jieba` | 产出端点清单，长度比 122 少约三分之一 |
+| **0 减法与探路** | 对照 104 条前端实际调用路径筛查 127 个后端端点，砍掉无人调用者；删除 `course`/`comment` 空壳与 OI 分支；验证 `@node-rs/jieba` | 产出端点清单，REVIEW 归零、每个端点有 KEEP/CUT 裁决（机器初判：可砍 17 个，疑似无人调用 23 个 = 18%） |
 | **1 骨架** | 建仓、Bun workspaces、`drizzle-kit pull` 拿 26 张表并剪除 `django_*`、拷贝 ojnext 进 `apps/web` | `bun dev` 可启动，能从真实库读出一道题 |
 | **2 判题竖线**（关键） | 最小 auth + 读题 + 提交 → BullMQ → JudgeServer → Bun WS 推回前端；前端仅改对应几个 api 函数 | 一名学生能登录、看题、提交、看到实时判题结果 |
-| **3 铺开** | 74 个 `oj` 端点逐个搬运，搬一个换一个前端 api 函数 | 用户侧全部功能运行在新后端上 |
-| **4 后台** | 48 个 `admin` 端点，约占全程 40% 工作量 | 后台可用 |
+| **3 铺开** | 77 个 `oj` 端点逐个搬运，搬一个换一个前端 api 函数 | 用户侧全部功能运行在新后端上 |
+| **4 后台** | 50 个 `admin` 端点，约占全程 40% 工作量 | 后台可用 |
 | **5 切换演练** | `docker/` 三套 compose；单二进制镜像；用生产库快照完整演练 | 演练 30 分钟内完成，回滚路径已验证 |
 
 **阶段顺序的理由**：
