@@ -1,6 +1,8 @@
-import { and, count, eq, isNull, ne, notInArray, sql } from "drizzle-orm"
+import { and, count, countDistinct, eq, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm"
 
 import { db, schema } from "../db"
+import { publishAchievementNotification } from "../events"
+import { findMetric } from "./achievement-metrics"
 import { isAccepted, JudgeStatus } from "../judge/status"
 import { objectValue } from "../routes/helpers"
 
@@ -157,4 +159,106 @@ export async function updateAchievementsForProblemSet(userId: number) {
   await db.update(schema.userStat).set({ metrics, updateTime: new Date().toISOString() })
     .where(eq(schema.userStat.userId, userId))
   return [...first, ...(await unlockAchievements(userId, metrics, true))]
+}
+
+/**
+ * 参赛场次。旧后端 `ContestJoined` 只实现了 recompute、不走 on_submission
+ * （比赛提交在 build_ctx 就被跳过了），所以它只在 rescan 时刷新。这里保持同样口径：
+ * 去重数一遍该用户有过提交的比赛数。
+ *
+ * 注意：迁移过来时新后端**整个漏掉了这个指标**，配在 contest_joined 上的成就
+ * 会永远解锁不了。补上。
+ */
+async function contestJoinedCount(userId: number) {
+  const [row] = await db
+    .select({ value: countDistinct(schema.submission.contestId) })
+    .from(schema.submission)
+    .where(and(eq(schema.submission.userId, userId), isNotNull(schema.submission.contestId)))
+  return row?.value ?? 0
+}
+
+/**
+ * 新建成就、调低阈值、或从下架改成上架之后，把已达标的存量用户补发一遍。
+ *
+ * 判定平时只在判题结算时发生，后台改了配置不会自动补发，必须显式扫。
+ * 对齐旧 `rescan_achievement`：只处理 visible 的成就，逐个用户 unlock，
+ * 且标记 backfilled=true —— 这是补发不是刚挣到的，前端据此只显示「已获得」
+ * 而不显示日期，否则一次补发会给几百人盖同一个时间戳，把「最近获得」板块冲垮。
+ */
+export async function rescanAchievement(achievementId: number) {
+  const [achievement] = await db.select().from(schema.achievement)
+    .where(and(eq(schema.achievement.id, achievementId), eq(schema.achievement.visible, true))).limit(1)
+  if (!achievement) return { scanned: 0, unlocked: 0 }
+
+  const metric = findMetric(achievement.metric)
+  if (!metric) return { scanned: 0, unlocked: 0 }
+
+  // contest_joined 不由判题结算维护，扫之前先把它刷新一遍，否则永远读到旧值（或没有值）
+  if (achievement.metric === "contest_joined") await refreshContestJoinedForAll()
+
+  const already = new Set(
+    (await db.select({ userId: schema.userAchievement.userId }).from(schema.userAchievement)
+      .where(eq(schema.userAchievement.achievementId, achievement.id))).map((row) => row.userId),
+  )
+
+  const stats = await db.select({ userId: schema.userStat.userId, metrics: schema.userStat.metrics })
+    .from(schema.userStat)
+  let unlocked = 0
+  for (const stat of stats) {
+    if (already.has(stat.userId)) continue
+    const value = objectValue(stat.metrics)[achievement.metric]
+    if (typeof value !== "number") continue
+    const hit = achievement.operator === "gte"
+      ? value >= achievement.threshold
+      : value <= achievement.threshold
+    if (!hit) continue
+    const inserted = await db.insert(schema.userAchievement).values({
+      userId: stat.userId,
+      achievementId: achievement.id,
+      unlockTime: new Date().toISOString(),
+      backfilled: true,
+      notified: false,
+    }).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] })
+      .returning({ id: schema.userAchievement.id })
+    if (inserted.length === 0) continue
+    unlocked += 1
+    await db.update(schema.achievement)
+      .set({ unlockCount: sql`${schema.achievement.unlockCount} + 1` })
+      .where(eq(schema.achievement.id, achievement.id))
+    await publishAchievementNotification(stat.userId, [{
+      id: achievement.id,
+      name: achievement.name,
+      description: achievement.description,
+      icon: achievement.icon,
+      rarity: achievement.rarity,
+      kind: "achievement",
+    }])
+  }
+  return { scanned: stats.length, unlocked }
+}
+
+/** 把所有有过比赛提交的用户的 contest_joined 重算一遍，供 rescan 前置调用 */
+async function refreshContestJoinedForAll() {
+  const rows = await db
+    .selectDistinct({ userId: schema.submission.userId })
+    .from(schema.submission)
+    .where(isNotNull(schema.submission.contestId))
+  for (const { userId } of rows) {
+    const value = await contestJoinedCount(userId)
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.userStat).values({
+        userId,
+        metrics: {},
+        updateTime: new Date().toISOString(),
+      }).onConflictDoNothing({ target: schema.userStat.userId })
+      const [stat] = await tx.select().from(schema.userStat)
+        .where(eq(schema.userStat.userId, userId)).for("update").limit(1)
+      if (!stat) return
+      const merged = objectValue(stat.metrics)
+      merged.contest_joined = value
+      await tx.update(schema.userStat)
+        .set({ metrics: merged, updateTime: new Date().toISOString() })
+        .where(eq(schema.userStat.id, stat.id))
+    })
+  }
 }

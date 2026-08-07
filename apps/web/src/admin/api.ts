@@ -126,29 +126,53 @@ export function getUserList(
   keyword: string,
   orderBy = "",
 ) {
-  return http.get("admin/user", {
-    params: { paging: true, offset, limit, keyword, type, order_by: orderBy },
-  })
+  return legacyResponse(
+    api2.get("admin/users", {
+      // 旧接口的 order_by 只有 "-last_login" 一个取值
+      params: {
+        offset,
+        limit,
+        keyword,
+        type,
+        orderBy: orderBy === "-last_login" ? "-lastLogin" : orderBy,
+      },
+    }),
+  )
 }
 
 // 编辑用户
 export function editUser(user: User) {
-  return http.put("admin/user", user)
+  return legacyResponse(
+    api2.put(`admin/users/${user.id}`, {
+      username: user.username,
+      email: user.email,
+      adminType: user.admin_type,
+      problemPermission: user.problem_permission,
+      realName: user.real_name ?? null,
+      isDisabled: user.is_disabled,
+      openApi: user.open_api,
+      password: user.password ?? "",
+    }),
+  )
 }
 
-// 重置用户密码
-export function resetPassword(userID: number) {
-  return http.post("admin/reset_password", { id: userID })
+// 重置用户密码。调用方直接用 res.data 当密码字符串（旧后端返回的就是裸字符串），
+// 新后端返回 { password }，在这里解包，组件不动
+export async function resetPassword(userID: number) {
+  const res = await api2.post<{ password: string }>(
+    `admin/users/${userID}/reset-password`,
+  )
+  return { error: res.error, data: res.data.password }
 }
 
 // 导入用户
 export function importUsers(users: string[][]) {
-  return http.post("admin/user", { users })
+  return api2.post("admin/users", { users })
 }
 
 // 批量删除用户
 export function deleteUsers(userIDs: number[]) {
-  return http.delete("admin/user", { params: { id: userIDs.join(",") } })
+  return api2.delete("admin/users", { data: { ids: userIDs } })
 }
 
 export function getContestList(offset = 0, limit = 10, keyword: string) {
@@ -622,22 +646,42 @@ export interface MetricOption {
   help_text: string
 }
 
+/** 组件里的成就对象是 snake_case，出站转成新后端要的 camelCase */
+function toAchievementBody(data: Partial<AdminAchievement>) {
+  return {
+    name: data.name,
+    description: data.description,
+    icon: data.icon,
+    rarity: data.rarity,
+    hidden: data.hidden ?? false,
+    metric: data.metric,
+    operator: data.operator,
+    threshold: data.threshold,
+    visible: data.visible ?? true,
+    order: data.order ?? 0,
+  }
+}
+
 export function getAdminAchievements() {
-  return http.get<AdminAchievement[]>("admin/achievement")
+  return legacyResponse<AdminAchievement[]>(api2.get("admin/achievements"))
 }
 
 export function getMetricOptions() {
-  return http.get<MetricOption[]>("admin/achievement/metrics")
+  return legacyResponse<MetricOption[]>(api2.get("admin/achievement-metrics"))
 }
 
 export function createAchievement(data: Partial<AdminAchievement>) {
-  return http.post<AdminAchievement>("admin/achievement", data)
+  return legacyResponse<AdminAchievement>(
+    api2.post("admin/achievements", toAchievementBody(data)),
+  )
 }
 
 export function updateAchievement(data: Partial<AdminAchievement>) {
-  return http.put<AdminAchievement>("admin/achievement", data)
+  return legacyResponse<AdminAchievement>(
+    api2.put(`admin/achievements/${data.id}`, toAchievementBody(data)),
+  )
 }
 
 export function deleteAchievement(id: number) {
-  return http.delete("admin/achievement", { params: { id } })
+  return api2.delete(`admin/achievements/${id}`)
 }

@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { achievementRaritySchema } from "./achievement"
 import { paginatedSchema, sampleUserSchema } from "./common"
 
 /**
@@ -131,3 +132,96 @@ export const adminAiReportSchema = z.object({
 
 export const adminAiReportListSchema = paginatedSchema(adminAiReportListItemSchema)
 export const toggleAiReportPinResponseSchema = z.object({ isPinned: z.boolean() })
+
+// ---------------------------------------------------------------- 成就
+
+// rarity 复用 achievement.ts 里已有的定义，不重复声明 —— 两份枚举迟早会长歪
+export const achievementOperatorSchema = z.enum(["gte", "lte"])
+
+export const achievementMetricSchema = z.object({
+  key: z.string(),
+  name: z.string(),
+  helpText: z.string(),
+})
+
+export const adminAchievementSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string(),
+  rarity: achievementRaritySchema,
+  hidden: z.boolean(),
+  metric: z.string(),
+  metricName: z.string(),
+  operator: achievementOperatorSchema,
+  threshold: z.number().int(),
+  visible: z.boolean(),
+  // 后台列表必须显示：阈值配错时学生永远拿不到也永远不会来问，这个计数器是唯一的仪表盘
+  unlockCount: z.number().int(),
+  order: z.number().int(),
+  createTime: z.string().nullable(),
+})
+
+export const createAchievementRequestSchema = z.object({
+  name: z.string().trim().min(1).max(64),
+  description: z.string().trim().min(1),
+  icon: z.string().trim().min(1),
+  rarity: achievementRaritySchema,
+  hidden: z.boolean().default(false),
+  metric: z.string().min(1),
+  operator: achievementOperatorSchema,
+  threshold: z.number().int(),
+  visible: z.boolean().default(true),
+  order: z.number().int().default(0),
+})
+
+export const updateAchievementRequestSchema = createAchievementRequestSchema
+
+// ---------------------------------------------------------------- 用户管理
+
+export const adminUserSchema = z.object({
+  id: z.number().int(),
+  username: z.string(),
+  email: z.string().nullable(),
+  adminType: z.string(),
+  problemPermission: z.string(),
+  realName: z.string().nullable(),
+  createTime: z.string().nullable(),
+  lastLogin: z.string().nullable(),
+  openApi: z.boolean(),
+  isDisabled: z.boolean(),
+  // 明文密码。是有意保留的运营需求：老师要能查学生的密码。
+  // 只在超管专属的这一个接口下发，别往任何其它地方复制。
+  rawPassword: z.string().nullable(),
+  className: z.string().nullable(),
+})
+
+export const adminUserListSchema = paginatedSchema(adminUserSchema)
+
+export const updateUserRequestSchema = z.object({
+  username: z.string().trim().min(1).max(32),
+  email: z.email().max(64),
+  adminType: z.enum(["Regular User", "Student Admin", "Teacher Admin", "Super Admin"]),
+  problemPermission: z.enum(["None", "Own", "All"]),
+  realName: z.string().max(32).nullable().default(null),
+  isDisabled: z.boolean(),
+  openApi: z.boolean(),
+  // 空串表示不改密码，与旧 EditUserSerializer 的 allow_blank 一致
+  password: z.string().max(128).default(""),
+})
+
+/** 导入用户：每行 [用户名, 密码, 邮箱, 真名]，与前端粘贴的 Excel 列序一致 */
+export const importUsersRequestSchema = z.object({
+  users: z.array(z.tuple([
+    z.string().trim().min(1).max(32),
+    z.string().min(1),
+    z.string(),
+    z.string(),
+  ])).min(1),
+})
+
+export const deleteUsersRequestSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1),
+})
+
+export const resetPasswordResponseSchema = z.object({ password: z.string() })
