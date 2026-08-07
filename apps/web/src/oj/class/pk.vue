@@ -176,12 +176,12 @@ async function analyzeWithAI() {
   if (csrfToken) headers["X-CSRFToken"] = csrfToken
 
   try {
-    const response = await fetch("/api/ai/class_pk", {
+    const response = await fetch("/api2/ai/class-pk-analysis", {
       method: "POST",
       headers,
       body: JSON.stringify({
         comparisons: comparisons.value,
-        time_range_label: timeRangeLabel,
+        timeRangeLabel,
       }),
       signal: controller.signal,
     })

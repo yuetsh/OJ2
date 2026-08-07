@@ -5,6 +5,7 @@ import {
 } from "@oj2/contract"
 import api2 from "utils/api2"
 import http from "utils/http"
+import type { ApiResponse } from "utils/http"
 import { filterResult } from "oj/transforms"
 import type {
   Exercise,
@@ -17,20 +18,88 @@ import type {
   WebsiteConfig,
 } from "utils/types"
 
+function snakeKey(key: string) {
+  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+}
+
+function toLegacy<T>(value: unknown): T {
+  if (Array.isArray(value)) return value.map((item) => toLegacy(item)) as T
+  if (!value || typeof value !== "object") return value as T
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [snakeKey(key), toLegacy(item)]),
+  ) as T
+}
+
+async function legacyResponse<T>(request: Promise<ApiResponse<unknown>>): Promise<ApiResponse<T>> {
+  const response = await request
+  return { error: response.error, data: toLegacy<T>(response.data) }
+}
+
+function listProblem(value: any): Problem {
+  return {
+    id: value.id,
+    _id: value._id,
+    title: value.title,
+    difficulty: value.difficulty,
+    submission_number: value.submissionNumber,
+    accepted_number: value.acceptedNumber,
+    created_by: toLegacy(value.createdBy),
+    tags: value.tags,
+    contest: value.contestId,
+    allow_flowchart: value.allowFlowchart,
+    show_flowchart: value.showFlowchart,
+    has_ast_rules: value.hasAstRules,
+    my_status: value.myStatus,
+  } as Problem
+}
+
+function detailProblem(value: unknown): Problem {
+  const problem = problemDetailSchema.parse(value)
+  return {
+    id: problem.id,
+    _id: problem._id,
+    title: problem.title,
+    description: problem.description,
+    input_description: problem.inputDescription,
+    output_description: problem.outputDescription,
+    samples: problem.samples,
+    hint: problem.hint ?? "",
+    languages: problem.languages,
+    template: problem.template,
+    create_time: problem.createTime,
+    last_update_time: problem.lastUpdateTime,
+    time_limit: problem.timeLimit,
+    memory_limit: problem.memoryLimit,
+    difficulty: problem.difficulty,
+    source: problem.source ?? "",
+    prompt: problem.prompt ?? "",
+    answers: [],
+    submission_number: problem.submissionNumber,
+    accepted_number: problem.acceptedNumber,
+    statistic_info: problem.statisticInfo,
+    share_submission: problem.shareSubmission,
+    contest: problem.contestId,
+    tags: problem.tags,
+    created_by: {
+      id: problem.createdBy.id,
+      username: problem.createdBy.username,
+      real_name: problem.createdBy.realName,
+    },
+    my_status: problem.myStatus,
+    my_failed_count: problem.myFailedCount,
+    visible: true,
+    allow_flowchart: problem.allowFlowchart,
+    show_flowchart: problem.showFlowchart,
+    mermaid_code: problem.mermaidCode ?? undefined,
+    flowchart_data: problem.flowchartData ?? undefined,
+    flowchart_hint: problem.flowchartHint ?? undefined,
+    sql_config: problem.sqlConfig as Problem["sql_config"],
+    sql_display: problem.sqlDisplay as Problem["sql_display"],
+  } as Problem
+}
+
 export function getWebsiteConfig() {
-  return Promise.resolve({
-    error: null,
-    data: {
-      website_base_url: "",
-      website_name: "判题狗",
-      website_name_shortcut: "判题狗",
-      website_footer: "",
-      submission_list_show_all: true,
-      allow_register: false,
-      class_list: [],
-      enable_maxkb: false,
-    } as WebsiteConfig,
-  })
+  return legacyResponse<WebsiteConfig>(api2.get("site"))
 }
 
 export async function getProblemList(
@@ -38,91 +107,39 @@ export async function getProblemList(
   limit = 10,
   searchParams: any = {},
 ) {
-  const res = await http.get<{ results: Problem[]; total: number }>("problem", {
+  const res = await api2.get<{ results: any[]; total: number }>("problems", {
     params: { paging: true, offset, limit, ...searchParams },
   })
   return {
-    results: res.data.results.map(filterResult),
+    results: res.data.results.map(listProblem).map(filterResult),
     total: res.data.total,
   }
 }
 
 export function getAuthors(all = false) {
-  return http.get("problem/author", {
+  return legacyResponse(api2.get("problem-authors", {
     params: {
       all: all ? "1" : "0",
     },
-  })
+  }))
 }
 
 export function getRandomProblemID() {
-  return http.get("pickone")
+  return api2.get("problems/random")
 }
 
-export function getProblem(problemID: string, contestID: string) {
-  if (!contestID) return getPhase2Problem(problemID)
-  const endpoint = !!contestID ? "contest/problem" : "problem"
-  return http.get(endpoint, {
-    params: {
-      problem_id: problemID,
-      contest_id: contestID,
-    },
-  })
-}
-
-async function getPhase2Problem(problemID: string) {
+export async function getProblem(problemID: string, contestID: string) {
+  const endpoint = contestID
+    ? `contests/${encodeURIComponent(contestID)}/problems/${encodeURIComponent(problemID)}`
+    : `problems/${encodeURIComponent(problemID)}`
   const response = await api2.get<unknown>(
-    `problems/${encodeURIComponent(problemID)}`,
+    endpoint,
   )
-  const problem = problemDetailSchema.parse(response.data)
-  return {
-    error: null,
-    data: {
-      id: problem.id,
-      _id: problem._id,
-      title: problem.title,
-      description: problem.description,
-      input_description: problem.inputDescription,
-      output_description: problem.outputDescription,
-      samples: problem.samples,
-      hint: problem.hint ?? "",
-      languages: problem.languages,
-      template: problem.template,
-      create_time: problem.createTime,
-      last_update_time: problem.lastUpdateTime,
-      time_limit: problem.timeLimit,
-      memory_limit: problem.memoryLimit,
-      difficulty: problem.difficulty,
-      source: problem.source ?? "",
-      prompt: problem.prompt ?? "",
-      answers: [],
-      submission_number: problem.submissionNumber,
-      accepted_number: problem.acceptedNumber,
-      statistic_info: problem.statisticInfo,
-      share_submission: problem.shareSubmission,
-      contest: problem.contestId,
-      tags: problem.tags,
-      created_by: {
-        id: problem.createdBy.id,
-        username: problem.createdBy.username,
-        real_name: problem.createdBy.realName,
-      },
-      my_status: problem.myStatus,
-      my_failed_count: problem.myFailedCount,
-      visible: true,
-      allow_flowchart: problem.allowFlowchart,
-      show_flowchart: problem.showFlowchart,
-      mermaid_code: problem.mermaidCode,
-      flowchart_data: problem.flowchartData,
-      flowchart_hint: problem.flowchartHint,
-      sql_config: problem.sqlConfig,
-      sql_display: problem.sqlDisplay,
-    } as Problem,
-  }
+  return { error: null, data: detailProblem(response.data) }
 }
 
 export function getProblemBeatRate(problemID: number) {
-  return http.get("problem/beat_count", { params: { problem_id: problemID } })
+  return api2.get(`problems/${problemID}/beat-count`)
 }
 
 export async function getSubmission(id: string) {
@@ -167,21 +184,37 @@ export async function submitCode(data: SubmitCodePayload) {
 }
 
 export function formatCode(data: { code: string; language: string }) {
-  // 格式化端点在 Phase 3 迁移；Phase 2 保留原代码继续提交。
-  return Promise.resolve({ error: null, data: { code: data.code } })
+  const languages: Record<string, string> = {
+    Python3: "python",
+    C: "c",
+    "C++": "cpp",
+    SQL: "sql",
+  }
+  return api2.post("code/format", {
+    code: data.code,
+    language: languages[data.language] ?? data.language.toLowerCase(),
+  })
 }
 
 export function getSubmissions(params: Partial<SubmissionListPayload>) {
-  const endpoint = !!params.contest_id ? "contest_submissions" : "submissions"
-  return http.get(endpoint, { params })
+  const endpoint = params.contest_id
+    ? `contests/${encodeURIComponent(params.contest_id)}/submissions`
+    : "submissions"
+  return legacyResponse(api2.get(endpoint, { params: {
+    ...params,
+    problemId: params.problem_id,
+    contest_id: undefined,
+    problem_id: undefined,
+    page: undefined,
+  } }))
 }
 
 export function getRankOfProblem(problem_id: string) {
-  return http.get("user_problem_rank", { params: { problem_id: problem_id } })
+  return legacyResponse(api2.get(`problems/${encodeURIComponent(problem_id)}/rank`))
 }
 
 export function getTodaySubmissionCount(language?: string) {
-  return http.get("submissions/today_count", { params: { language } })
+  return api2.get("submissions/today-count", { params: { language } })
 }
 
 export function adminRejudge(id: string) {
@@ -210,21 +243,21 @@ export function getRank(
   n: number,
   username?: string,
 ) {
-  return http.get("user_rank", {
-    params: { offset, limit, rule: "acm", username, n },
-  })
+  return legacyResponse(api2.get("rankings/users", {
+    params: { offset, limit, username, top: n },
+  }))
 }
 
 export function getActivityRank(start: string) {
-  return http.get("user_activity_rank", {
+  return api2.get("rankings/activity", {
     params: { start },
   })
 }
 
 export function getClassRank(grade?: number | null) {
-  return http.get("class_rank", {
+  return legacyResponse(api2.get("rankings/classes", {
     params: { grade },
-  })
+  }))
 }
 
 export function getUserClassRank(
@@ -232,7 +265,7 @@ export function getUserClassRank(
   offset?: number,
   limit?: number,
 ) {
-  return http.get("user_class_rank", { params: { scope, offset, limit } })
+  return legacyResponse(api2.get("me/class-rank", { params: { scope, offset, limit } }))
 }
 
 export function getClassPK(
@@ -241,15 +274,15 @@ export function getClassPK(
   endTime?: string,
 ) {
   const payload: any = {
-    class_name: classNames,
+    classNames,
   }
   if (startTime) {
-    payload.start_time = startTime
+    payload.startTime = startTime
   }
   if (endTime) {
-    payload.end_time = endTime
+    payload.endTime = endTime
   }
-  return http.post("class_pk", payload)
+  return legacyResponse(api2.post("classes/comparison", payload))
 }
 
 export function getContestList(query: {
@@ -259,61 +292,64 @@ export function getContestList(query: {
   status: string
   tag: string
 }) {
-  return http.get("contests", { params: query })
+  return legacyResponse(api2.get("contests", { params: query }))
 }
 
 export function getContest(id: string) {
-  return http.get("contest", { params: { id } })
+  return legacyResponse(api2.get(`contests/${encodeURIComponent(id)}`))
 }
 
 export function getContestAccess(id: string) {
-  return http.get("contest/access", { params: { contest_id: id } })
+  return api2.get(`contests/${encodeURIComponent(id)}/access`)
 }
 
 export function checkContestPassword(contestID: string, password: string) {
-  return http.post("contest/password", {
-    contest_id: contestID,
-    password,
-  })
+  return api2.post(`contests/${encodeURIComponent(contestID)}/access`, { password })
 }
 
 export async function getContestProblems(contestID: string) {
-  const res = await http.get<Problem[]>("contest/problem", {
-    params: { contest_id: contestID },
-  })
-  return res.data.map(filterResult)
+  const res = await api2.get<any[]>(`contests/${encodeURIComponent(contestID)}/problems`)
+  return res.data.map(listProblem).map(filterResult)
 }
 
 export function getContestRank(
   contestID: string,
   query: { limit: number; offset: number },
 ) {
-  return http.get("contest_rank", {
-    params: {
-      contest_id: contestID,
-      ...query,
-    },
-  })
+  return legacyResponse<any>(api2.get(`contests/${encodeURIComponent(contestID)}/rank`, { params: query }))
+    .then((response) => ({
+      ...response,
+      data: {
+        ...response.data,
+        results: response.data.results.map((item: any) => ({
+          ...item,
+          contest: item.contest_id,
+        })),
+      },
+    }))
 }
 
 export function uploadAvatar(file: File) {
   const form = new window.FormData()
   form.append("image", file)
-  return http.post("upload_avatar", form, {
+  return api2.post("me/avatar", form, {
     headers: { "content-type": "multipart/form-data" },
   })
 }
 
 export function updateProfile(data: { real_name: string; mood: string }) {
-  return http.put("profile", data)
+  return legacyResponse(api2.put("me/profile", {
+    realName: data.real_name,
+    mood: data.mood,
+  }))
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return http.get("announcement", { params: { limit, offset } })
+  return legacyResponse(api2.get("announcements", { params: { limit, offset } }))
 }
 
 export function getAnnouncement(id: number) {
-  return http.get("announcement", { params: { id } })
+  return legacyResponse(api2.get(`announcements/${id}`))
 }
 
 export function createMessage(data: {
@@ -321,45 +357,54 @@ export function createMessage(data: {
   message: string
   submission: string
 }) {
-  return http.post("message", data)
+  return api2.post("messages", {
+    recipientId: data.recipient,
+    message: data.message,
+    submissionId: data.submission,
+  })
 }
 
 export function getMessageList(offset = 0, limit = 10) {
-  return http.get("message", { params: { limit, offset } })
+  return legacyResponse(api2.get("messages", { params: { limit, offset } }))
 }
 
 export function getReaction(problemID: number) {
-  return http.get<ReactionState>("reaction", {
-    params: { problem_id: problemID },
-  })
+  return api2.get<ReactionState>(`problems/${problemID}/reaction`)
 }
 
 export function setReaction(problemID: number, type: ReactionKey) {
-  return http.post<ReactionState>("reaction", {
-    problem_id: problemID,
-    type,
-  })
+  return api2.post<ReactionState>(`problems/${problemID}/reaction`, { type })
 }
 
 // TODO: 这个API有问题
 export function refreshUserProblemDisplayIds() {
-  return http.get("profile/fresh_display_id")
+  return api2.post("me/problem-display-ids/refresh")
 }
 
 export function getMetrics(userid: number) {
-  return http.get("metrics", { params: { userid } })
+  return api2.get(`users/${userid}/metrics`)
 }
 
 export function getTutorial(id: number) {
-  return http.get("tutorial", { params: { id } })
+  return legacyResponse(api2.get(`tutorials/${id}`))
 }
 
 export function getTutorials(type: "python" | "c") {
-  return http.get("tutorials", { params: { type } })
+  return api2.get("tutorials", { params: { type } })
 }
 
 export function getAIDetailData(start: string, end: string, username?: string) {
-  return http.get("ai/detail", { params: { start, end, username } })
+  return legacyResponse<any>(api2.get("ai/detail", { params: { start, end, username } }))
+    .then((response) => ({
+      ...response,
+      data: {
+        ...response.data,
+        flowcharts: response.data.flowcharts?.map((item: any) => ({
+          ...item,
+          problem__id: item.problem_id,
+        })) ?? [],
+      },
+    }))
 }
 
 export function getAIDurationData(
@@ -367,25 +412,26 @@ export function getAIDurationData(
   duration: string,
   username?: string,
 ) {
-  return http.get("ai/duration", { params: { end, duration, username } })
+  return legacyResponse(api2.get("ai/duration", { params: { end, duration, username } }))
 }
 
 export function getAIHeatmapData(username?: string) {
-  return http.get("ai/heatmap", { params: username ? { username } : {} })
+  return api2.get("ai/heatmap", { params: username ? { username } : {} })
 }
 
 export function getAILoginSummary() {
-  return http.get("ai/login_summary")
+  return legacyResponse(api2.get("ai/login-summary"))
 }
 
 export function getAIPinnedReport() {
-  return http.get("ai/pinned")
+  return legacyResponse(api2.get("ai/pinned"))
 }
 
 // ==================== 相似题目推荐 ====================
 
 export function getSimilarProblems(problemId: string) {
-  return http.get("problem/similar", { params: { problem_id: problemId } })
+  return api2.get<any[]>(`problems/${encodeURIComponent(problemId)}/similar`)
+    .then((response) => ({ ...response, data: response.data.map(listProblem).map(filterResult) }))
 }
 
 export interface YearlyACData {
@@ -396,9 +442,7 @@ export interface YearlyACData {
 }
 
 export function getProblemYearlyAC(problemId: string) {
-  return http.get<YearlyACData[]>("problem/yearly_ac", {
-    params: { problem_id: problemId },
-  })
+  return legacyResponse<YearlyACData[]>(api2.get(`problems/${encodeURIComponent(problemId)}/yearly-ac`))
 }
 
 // ==================== 流程图相关API ====================
@@ -408,13 +452,25 @@ export function submitFlowchart(data: {
   mermaid_code: string
   flowchart_data: any // 这个是压缩之后的，元数据太长了
 }) {
-  return http.post("flowchart/submission", data)
+  return legacyResponse(api2.post("flowcharts", {
+    problemId: data.problem_id,
+    mermaidCode: data.mermaid_code,
+    flowchartData: data.flowchart_data,
+  }))
 }
 
-export function getFlowchartSubmission(id: string) {
-  return http.get("flowchart/submission", {
-    params: { id },
-  })
+function legacyFlowchart(value: unknown) {
+  const item = toLegacy<any>(value)
+  return {
+    ...item,
+    user: item.user_id ?? 0,
+    problem: item.problem_id,
+  }
+}
+
+export async function getFlowchartSubmission(id: string) {
+  const response = await api2.get(`flowcharts/${encodeURIComponent(id)}`)
+  return { ...response, data: legacyFlowchart(response.data) }
 }
 
 export function getFlowchartSubmissions(params: {
@@ -426,7 +482,11 @@ export function getFlowchartSubmissions(params: {
   today?: string
   grade?: string
 }) {
-  return http.get("flowchart/submissions", { params })
+  return legacyResponse<any>(api2.get("flowcharts", { params: {
+    ...params,
+    problemId: params.problem_id,
+    problem_id: undefined,
+  } }))
 }
 
 export function getFlowchartStatistics(
@@ -444,21 +504,22 @@ export function getFlowchartStatistics(
 }
 
 export function retryFlowchartSubmission(submissionId: string) {
-  return http.post("flowchart/submission/retry", {
-    submission_id: submissionId,
-  })
+  return legacyResponse(api2.post(`flowcharts/${encodeURIComponent(submissionId)}/retry`))
 }
 
 export function getCurrentProblemFlowchartSubmission(problemId: number) {
-  return http.get("flowchart/submission/current", {
-    params: { problem_id: problemId },
-  })
+  return api2.get(`problems/${problemId}/flowchart/current`)
 }
 
-export function getFlowchartSubmissionDetail(problemId: number, page = 0) {
-  return http.get("flowchart/submission/detail", {
-    params: { problem_id: problemId, page },
-  })
+export async function getFlowchartSubmissionDetail(problemId: number, page = 0) {
+  const response = await api2.get<any>(`problems/${problemId}/flowchart/history`, { params: { page } })
+  return {
+    ...response,
+    data: {
+      ...response.data,
+      submission: response.data.submission ? legacyFlowchart(response.data.submission) : null,
+    },
+  }
 }
 
 // ==================== 题单相关API ====================
@@ -470,7 +531,7 @@ export function getProblemSetList(
   difficulty = "",
   status = "",
 ) {
-  return http.get("problemset", {
+  return legacyResponse<any>(api2.get("problem-sets", {
     params: {
       offset,
       limit,
@@ -478,21 +539,54 @@ export function getProblemSetList(
       difficulty,
       status,
     },
-  })
+  })).then(mapProblemSetResponse)
 }
 
 export function getProblemSetDetail(id: number) {
-  return http.get(`problemset/${id}`)
+  return legacyResponse<any>(api2.get(`problem-sets/${id}`)).then((response) => ({
+    ...response,
+    data: legacyProblemSet(response.data),
+  }))
 }
 
-export function getProblemSetProblems(problemSetId: number) {
-  return http.get(`problemset/${problemSetId}/problems`)
+function legacyBadge(value: any) {
+  return { ...value, problemset: value.problemset_id }
+}
+
+function legacyProblemSet(value: any) {
+  return {
+    ...value,
+    badges: value.badges?.map(legacyBadge),
+  }
+}
+
+function mapProblemSetResponse(response: ApiResponse<any>) {
+  return {
+    ...response,
+    data: {
+      ...response.data,
+      results: response.data.results.map(legacyProblemSet),
+    },
+  }
+}
+
+export async function getProblemSetProblems(problemSetId: number) {
+  const response = await legacyResponse<any[]>(api2.get(`problem-sets/${problemSetId}/problems`))
+  return {
+    ...response,
+    data: response.data.map((item) => ({
+      ...item,
+      problemset: item.problemset_id,
+      problem: {
+        ...item.problem,
+        contest: item.problem.contest_id,
+      },
+    })),
+  }
 }
 
 export function joinProblemSet(problemSetId: number) {
-  return http.post("problemset/progress", {
-    problemset_id: problemSetId,
-  })
+  return api2.post("problem-set-progress", { problemSetId })
 }
 
 export function updateProblemSetProgress(
@@ -500,21 +594,33 @@ export function updateProblemSetProgress(
   problemId: number,
   submissionId: string,
 ) {
-  return http.put("problemset/progress", {
-    problemset_id: problemSetId,
-    problem_id: problemId,
-    submission_id: submissionId,
+  return legacyResponse(api2.put("problem-set-progress", {
+    problemSetId,
+    problemId,
+    submissionId,
   })
+  )
 }
 
 // 获取用户徽章列表
-export function getUserBadges(username?: string) {
-  return http.get("user/badges", { params: username ? { username } : {} })
+export async function getUserBadges(username?: string) {
+  const response = await legacyResponse<any[]>(api2.get(
+    `users/${encodeURIComponent(username ?? "me")}/badges`,
+  ))
+  return {
+    ...response,
+    data: response.data.map((item) => ({
+      ...item,
+      user: item.user_id,
+      badge: legacyBadge(item.badge),
+    })),
+  }
 }
 
 // 获取题单徽章列表
-export function getProblemSetBadges(problemSetId: number) {
-  return http.get(`problemset/${problemSetId}/badges`)
+export async function getProblemSetBadges(problemSetId: number) {
+  const response = await legacyResponse<any[]>(api2.get(`problem-sets/${problemSetId}/badges`))
+  return { ...response, data: response.data.map(legacyBadge) }
 }
 
 // 获取题单用户进度列表
@@ -527,12 +633,17 @@ export function getProblemSetUserProgress(
     completion_status?: "" | "completed" | "in_progress" | "not_started"
   },
 ) {
-  return http.get(`problemset/${problemSetId}/users_progress`, { params })
+  return legacyResponse(api2.get(`problem-sets/${problemSetId}/user-progress`, {
+    params: {
+      limit: params?.limit,
+      offset: params?.offset,
+      className: params?.class_name,
+      completionStatus: params?.completion_status,
+    },
+  }))
 }
 
 export async function getExercises(tutorialId: number): Promise<Exercise[]> {
-  const res = await http.get<Exercise[]>("exercises", {
-    params: { tutorial_id: tutorialId },
-  })
+  const res = await api2.get<Exercise[]>(`tutorials/${tutorialId}/exercises`)
   return res.data
 }

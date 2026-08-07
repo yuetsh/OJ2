@@ -448,8 +448,10 @@ export interface FlowchartEvaluationUpdate extends WebSocketMessage {
  */
 class FlowchartWebSocket extends BaseWebSocket<FlowchartEvaluationUpdate> {
   constructor() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({
-      path: "flowchart", // 使用专门的 flowchart WebSocket 路径
+      path: "flowchart",
+      url: `${protocol}//${window.location.host}/ws2/submissions`,
     })
   }
 

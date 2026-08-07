@@ -13,6 +13,8 @@ const SESSION_PREFIX = "session:"
 interface StoredSession {
   userId: number
   createdAt: string
+  previousLogin: string | null
+  contestPasswords: Record<string, string>
 }
 
 export interface AuthUser {
@@ -22,17 +24,24 @@ export interface AuthUser {
   adminType: string
   problemPermission: string
   isDisabled: boolean
+  className: string | null
 }
 
 function sessionKey(token: string) {
   return `${SESSION_PREFIX}${token}`
 }
 
-export async function createSession(c: Context, userId: number) {
+export async function createSession(
+  c: Context,
+  userId: number,
+  previousLogin: string | null = null,
+) {
   const token = randomBytes(32).toString("base64url")
   const value: StoredSession = {
     userId,
     createdAt: new Date().toISOString(),
+    previousLogin,
+    contestPasswords: {},
   }
   await redis.set(
     sessionKey(token),
@@ -87,6 +96,7 @@ async function getUserByToken(token: string | undefined): Promise<AuthUser | nul
       adminType: schema.user.adminType,
       problemPermission: schema.user.problemPermission,
       isDisabled: schema.user.isDisabled,
+      className: schema.user.className,
     })
     .from(schema.user)
     .where(eq(schema.user.id, session.userId))
@@ -107,4 +117,42 @@ export function getSessionUser(c: Context) {
 
 export function getRequestSessionUser(request: Request) {
   return getUserByToken(readCookie(request, config.sessionCookie))
+}
+
+async function getStoredSession(c: Context) {
+  const token = getCookie(c, config.sessionCookie)
+  if (!token) return null
+  const raw = await redis.get(sessionKey(token))
+  if (!raw) return null
+  try {
+    const value = JSON.parse(raw) as StoredSession
+    value.contestPasswords ??= {}
+    value.previousLogin ??= null
+    return { token, value }
+  } catch {
+    return null
+  }
+}
+
+export async function setContestPassword(c: Context, contestId: number, password: string) {
+  const session = await getStoredSession(c)
+  if (!session) return false
+  session.value.contestPasswords[String(contestId)] = password
+  await redis.set(
+    sessionKey(session.token),
+    JSON.stringify(session.value),
+    "EX",
+    config.sessionTtlSeconds,
+  )
+  return true
+}
+
+export async function getContestPassword(c: Context, contestId: number) {
+  const session = await getStoredSession(c)
+  return session?.value.contestPasswords[String(contestId)] ?? null
+}
+
+export async function getPreviousLogin(c: Context) {
+  const session = await getStoredSession(c)
+  return session?.value.previousLogin ?? null
 }

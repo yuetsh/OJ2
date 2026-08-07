@@ -4,6 +4,8 @@ import { and, eq, inArray } from "drizzle-orm"
 
 import { config } from "../config"
 import { db, schema } from "../db"
+import { publishAchievementNotification } from "../events"
+import { updateAchievementsForSubmission } from "../services/achievements"
 import { checkAst, type AstRule } from "./ast"
 import { publishSubmissionUpdate } from "./events"
 import type { JudgeJobData } from "./job"
@@ -99,6 +101,8 @@ async function persistResult(
   result: JudgeStatusValue,
   info: unknown,
   statisticInfo: Record<string, unknown>,
+  contestId: number | null,
+  submissionCreateTime: string,
 ) {
   return db.transaction(async (tx) => {
     const [currentSubmission] = await tx
@@ -158,7 +162,8 @@ async function persistResult(
       .where(eq(schema.problem.id, problemId))
 
     const acmStatus = objectValue(profile.acmProblemsStatus)
-    const problems = objectValue(acmStatus.problems)
+    const statusKey = contestId === null ? "problems" : "contest_problems"
+    const problems = objectValue(acmStatus[statusKey])
     const previous = objectValue(problems[String(problemId)])
     const previousStatus = previous.status
     const wasAccepted =
@@ -177,17 +182,97 @@ async function persistResult(
         _id: displayId,
       }
     }
-    acmStatus.problems = problems
+    acmStatus[statusKey] = problems
 
     await tx
       .update(schema.userProfile)
       .set({
-        submissionNumber: profile.submissionNumber + 1,
+        submissionNumber:
+          profile.submissionNumber + (contestId === null ? 1 : 0),
         acceptedNumber:
-          profile.acceptedNumber + (acceptedNow && !wasAccepted ? 1 : 0),
+          profile.acceptedNumber +
+          (contestId === null && acceptedNow && !wasAccepted ? 1 : 0),
         acmProblemsStatus: acmStatus,
       })
       .where(eq(schema.userProfile.id, profile.id))
+
+    if (contestId !== null) {
+      const [contest] = await tx
+        .select({ startTime: schema.contest.startTime })
+        .from(schema.contest)
+        .where(eq(schema.contest.id, contestId))
+        .for("update")
+      if (!contest) throw new Error("Contest disappeared during judging")
+
+      await tx
+        .insert(schema.acmContestRank)
+        .values({
+          contestId,
+          userId,
+          submissionNumber: 0,
+          acceptedNumber: 0,
+          totalTime: 0,
+          submissionInfo: {},
+        })
+        .onConflictDoNothing({
+          target: [schema.acmContestRank.contestId, schema.acmContestRank.userId],
+        })
+
+      const [rank] = await tx
+        .select()
+        .from(schema.acmContestRank)
+        .where(
+          and(
+            eq(schema.acmContestRank.contestId, contestId),
+            eq(schema.acmContestRank.userId, userId),
+          ),
+        )
+        .for("update")
+      if (!rank) throw new Error("Contest rank could not be created")
+
+      const rankInfo = objectValue(rank.submissionInfo)
+      const previousInfo = objectValue(rankInfo[String(problemId)])
+      const alreadyAccepted = previousInfo.is_ac === true
+      if (!alreadyAccepted) {
+        const errorNumber =
+          typeof previousInfo.error_number === "number"
+            ? previousInfo.error_number
+            : 0
+        const nextInfo: Record<string, unknown> = {
+          is_ac: acceptedNow,
+          ac_time: 0,
+          error_number:
+            errorNumber +
+            (!acceptedNow && result !== JudgeStatus.COMPILE_ERROR ? 1 : 0),
+          is_first_ac: false,
+        }
+        let totalTime = rank.totalTime
+        let acceptedNumber = rank.acceptedNumber
+        if (acceptedNow) {
+          const acTime = Math.max(
+            0,
+            Math.floor(
+              (Date.parse(submissionCreateTime) - Date.parse(contest.startTime)) /
+                1000,
+            ),
+          )
+          nextInfo.ac_time = acTime
+          nextInfo.is_first_ac = problem.acceptedNumber === 0
+          acceptedNumber += 1
+          totalTime += acTime + errorNumber * 20 * 60
+        }
+        rankInfo[String(problemId)] = nextInfo
+        await tx
+          .update(schema.acmContestRank)
+          .set({
+            submissionNumber: rank.submissionNumber + 1,
+            acceptedNumber,
+            totalTime,
+            submissionInfo: rankInfo,
+          })
+          .where(eq(schema.acmContestRank.id, rank.id))
+      }
+    }
 
     return true
   })
@@ -329,8 +414,24 @@ export async function judgeSubmission(job: JudgeJobData) {
       result,
       info,
       statisticInfo,
+      row.submission.contestId,
+      row.submission.createTime,
     )
     if (!saved) return
+
+    try {
+      const unlocked = await updateAchievementsForSubmission(row.submission.id)
+      await publishAchievementNotification(row.submission.userId, unlocked.map((achievement) => ({
+        id: achievement.id,
+        name: achievement.name,
+        description: achievement.description,
+        icon: achievement.icon,
+        rarity: achievement.rarity,
+        kind: "achievement",
+      })))
+    } catch (error) {
+      console.error(`Failed to update achievements for ${row.submission.id}`, error)
+    }
 
     await publishSubmissionUpdate(row.submission.userId, {
       type: "submission_update",

@@ -95,7 +95,7 @@ async function analyzeSingleClassWithAI() {
   if (csrfToken) headers["X-CSRFToken"] = csrfToken
 
   try {
-    const response = await fetch("/api/ai/class_single", {
+    const response = await fetch("/api2/ai/class-analysis", {
       method: "POST",
       headers,
       body: JSON.stringify({ comparison: classDetailData.value }),

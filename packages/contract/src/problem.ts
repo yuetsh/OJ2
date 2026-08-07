@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { paginatedSchema, sampleUserSchema } from "./common"
+
 /** 题目列表项。字段取自 problem 表，只含列表页需要的列。 */
 export const problemSummarySchema = z.object({
   id: z.number().int(),
@@ -58,3 +60,39 @@ export const problemDetailSchema = z.object({
 })
 
 export type ProblemDetail = z.infer<typeof problemDetailSchema>
+
+export const problemListItemSchema = z.object({
+  id: z.number().int(),
+  _id: z.string(),
+  title: z.string(),
+  submissionNumber: z.number().int(),
+  acceptedNumber: z.number().int(),
+  difficulty: z.string(),
+  createdBy: sampleUserSchema,
+  tags: z.array(z.string()),
+  contestId: z.number().int().nullable(),
+  allowFlowchart: z.boolean(),
+  showFlowchart: z.boolean(),
+  hasAstRules: z.boolean(),
+  myStatus: z.number().int().nullable(),
+})
+
+export const problemListSchema = paginatedSchema(problemListItemSchema)
+
+export const tagSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  problemCount: z.number().int().nonnegative(),
+})
+
+export const problemAuthorSchema = z.object({
+  username: z.string(),
+  problemCount: z.number().int().nonnegative(),
+})
+
+export const yearlyAcSchema = z.object({
+  year: z.number().int(),
+  total: z.number().int().nonnegative(),
+  accepted: z.number().int().nonnegative(),
+  acRate: z.number(),
+})

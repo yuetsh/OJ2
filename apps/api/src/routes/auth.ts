@@ -11,6 +11,7 @@ import { createSession, destroySession } from "../auth/session"
 import { verifyPassword } from "../auth/password"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
+import { getUserProfileById } from "../services/profile"
 
 export const authRoutes = new Hono<AppEnv>()
 
@@ -48,7 +49,7 @@ authRoutes.post("/auth/login", async (c) => {
     })
   }
   await db.update(schema.user).set(update).where(eq(schema.user.id, user.id))
-  await createSession(c, user.id)
+  await createSession(c, user.id, user.lastLogin)
 
   return success(c, { ok: true })
 })
@@ -62,49 +63,7 @@ authRoutes.get("/me", optionalAuth, async (c) => {
   const authUser = c.get("user")
   if (!authUser) return success(c, null)
 
-  const [row] = await db
-    .select({
-      profile: schema.userProfile,
-      user: schema.user,
-    })
-    .from(schema.userProfile)
-    .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-    .where(
-      and(
-        eq(schema.user.id, authUser.id),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
-    .limit(1)
-
-  if (!row) return failure(c, 404, "profile-not-found", "User profile does not exist")
-
-  const data = userProfileSchema.parse({
-    id: row.profile.id,
-    user: sessionUserSchema.parse({
-      id: row.user.id,
-      username: row.user.username,
-      email: row.user.email,
-      adminType: row.user.adminType,
-      problemPermission: row.user.problemPermission,
-      createTime: row.user.createTime,
-      lastLogin: row.user.lastLogin,
-      openApi: row.user.openApi,
-      isDisabled: row.user.isDisabled,
-      className: row.user.className,
-    }),
-    realName: row.profile.realName,
-    acmProblemsStatus: row.profile.acmProblemsStatus,
-    avatar: row.profile.avatar,
-    blog: row.profile.blog,
-    mood: row.profile.mood,
-    github: row.profile.github,
-    school: row.profile.school,
-    major: row.profile.major,
-    language: row.profile.language,
-    acceptedNumber: row.profile.acceptedNumber,
-    submissionNumber: row.profile.submissionNumber,
-  })
-
+  const data = await getUserProfileById(authUser.id, true)
+  if (!data) return failure(c, 404, "profile-not-found", "User profile does not exist")
   return success(c, data)
 })

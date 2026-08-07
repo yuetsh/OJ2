@@ -83,10 +83,10 @@ async function fetchHint(submissionId: string) {
       headers["X-CSRFToken"] = csrfToken
     }
 
-    const response = await fetch("/api/ai/hint", {
+    const response = await fetch("/api2/ai/hint", {
       method: "POST",
       headers,
-      body: JSON.stringify({ submission_id: submissionId }),
+      body: JSON.stringify({ submissionId }),
     })
 
     await consumeJSONEventStream(response, {

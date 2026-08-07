@@ -7,4 +7,11 @@ export const config = {
   judgeServerUrl: process.env.JUDGE_SERVER_URL ?? "http://localhost:8081",
   judgeServerToken: process.env.JUDGE_SERVER_TOKEN ?? "oj2-dev-token",
   judgeConcurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2),
+  avatarDirectory: process.env.AVATAR_DIRECTORY ?? "data/avatar",
+  avatarUriPrefix: process.env.AVATAR_URI_PREFIX ?? "/public/avatar",
+  aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",
+  aiKey: process.env.AI_KEY ?? "",
+  aiModel: process.env.AI_MODEL ?? "deepseek-v4-flash",
+  ruffPath: process.env.RUFF_PATH ?? "ruff",
+  clangFormatPath: process.env.CLANG_FORMAT_PATH ?? "clang-format",
 }

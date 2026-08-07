@@ -1,6 +1,5 @@
 import { userProfileSchema } from "@oj2/contract"
 import api2 from "utils/api2"
-import http from "utils/http"
 import type { ApiResponse } from "utils/http"
 import type { Profile, Tag } from "utils/types"
 
@@ -13,7 +12,7 @@ export function signup(data: {
   email: string
   password: string
 }) {
-  return http.post("register", data)
+  return api2.post("users", data)
 }
 
 export function logout() {
@@ -23,9 +22,9 @@ export function logout() {
 export async function getProfile(
   username: string = "",
 ): Promise<ApiResponse<Profile | null>> {
-  if (username) return http.get<Profile>("profile", { params: { username } })
-
-  const response = await api2.get<unknown>("me")
+  const response = await api2.get<unknown>(
+    username ? `profiles/${encodeURIComponent(username)}` : "me",
+  )
   if (response.data === null) return { error: null, data: null }
   const profile = userProfileSchema.parse(response.data)
   return {
@@ -61,13 +60,13 @@ export async function getProfile(
 }
 
 export function getProblemTagList() {
-  return http.get<Tag[]>("problem/tags")
+  return api2.get<Array<Tag & { problemCount: number }>>("problem-tags")
 }
 
 export function getHitokoto() {
-  return http.get("hitokoto")
+  return api2.get("quotes/random")
 }
 
 export function getClassUsernames(classroom: string) {
-  return http.get("class_usernames", { params: { classroom: classroom } })
+  return api2.get(`classes/${encodeURIComponent(classroom)}/usernames`)
 }

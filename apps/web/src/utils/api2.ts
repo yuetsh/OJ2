@@ -15,12 +15,28 @@ interface Api2Client {
     data?: unknown,
     config?: AxiosRequestConfig,
   ): Promise<ApiResponse<T>>
+  put<T>(
+    url: string,
+    data?: unknown,
+    config?: AxiosRequestConfig,
+  ): Promise<ApiResponse<T>>
   delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>>
 }
 
 const instance = axios.create({
   baseURL: "/api2",
   withCredentials: true,
+})
+
+instance.interceptors.request.use((config) => {
+  if (config.params) {
+    config.params = Object.fromEntries(
+      Object.entries(config.params).filter(
+        ([, value]) => value !== "" && value !== null && value !== undefined,
+      ),
+    )
+  }
+  return config
 })
 
 instance.interceptors.response.use(

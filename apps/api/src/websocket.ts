@@ -1,4 +1,4 @@
-import { submissionUpdateSchema } from "@oj2/contract"
+import { flowchartUpdateSchema, submissionUpdateSchema } from "@oj2/contract"
 import { and, eq } from "drizzle-orm"
 
 import { db, schema } from "./db"
@@ -9,6 +9,7 @@ import {
 } from "./judge/events"
 import { JudgeStatus } from "./judge/status"
 import { createSubscriberRedis } from "./redis"
+import { parseUserEvent, userEventChannel, userEventTopic } from "./events"
 
 export interface SubmissionSocketData {
   userId: number
@@ -25,12 +26,14 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
   return {
     open(ws) {
       ws.subscribe(userSubmissionTopic(ws.data.userId))
+      ws.subscribe(userEventTopic(ws.data.userId))
     },
     message(ws, message) {
       void handleMessage(ws, String(message))
     },
     close(ws) {
       ws.unsubscribe(userSubmissionTopic(ws.data.userId))
+      ws.unsubscribe(userEventTopic(ws.data.userId))
     },
   }
 }
@@ -87,7 +90,21 @@ async function handleMessage(
     .limit(1)
 
   if (!submission) {
-    ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
+    const [flowchart] = await db
+      .select({ id: schema.flowchartSubmission.id, status: schema.flowchartSubmission.status, score: schema.flowchartSubmission.aiScore, grade: schema.flowchartSubmission.aiGrade })
+      .from(schema.flowchartSubmission)
+      .where(and(eq(schema.flowchartSubmission.id, message.submission_id), eq(schema.flowchartSubmission.userId, ws.data.userId)))
+      .limit(1)
+    if (!flowchart) {
+      ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
+      return
+    }
+    const replay = flowchart.status === 2
+      ? { type: "flowchart_evaluation_completed", submission_id: flowchart.id, score: flowchart.score ?? undefined, grade: flowchart.grade ?? undefined }
+      : flowchart.status === 3
+        ? { type: "flowchart_evaluation_failed", submission_id: flowchart.id, error: "Evaluation failed" }
+        : { type: "flowchart_evaluation_update", submission_id: flowchart.id }
+    ws.send(JSON.stringify(flowchartUpdateSchema.parse(replay)))
     return
   }
 
@@ -118,6 +135,22 @@ export async function bridgeSubmissionEvents(
 ) {
   const subscriber = createSubscriberRedis()
   subscriber.on("message", (channel, raw) => {
+    if (channel === userEventChannel) {
+      const event = parseUserEvent(raw)
+      if (!event) return
+      void (async () => {
+        const [activeUser] = await db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(and(eq(schema.user.id, event.userId), eq(schema.user.isDisabled, false)))
+          .limit(1)
+        if (!activeUser) return
+        server.publish(userEventTopic(event.userId), JSON.stringify(event.data))
+      })().catch((error) => {
+        console.error("Failed to bridge user event", error)
+      })
+      return
+    }
     if (channel !== submissionUpdateChannel) return
     const event = parseSubmissionEvent(raw)
     if (!event) return
@@ -144,6 +177,6 @@ export async function bridgeSubmissionEvents(
   subscriber.on("error", (error) => {
     console.error("Submission event subscriber error", error)
   })
-  await subscriber.subscribe(submissionUpdateChannel)
+  await subscriber.subscribe(submissionUpdateChannel, userEventChannel)
   return subscriber
 }
