@@ -6,6 +6,16 @@
 #
 # PostgreSQL 固定 16，与生产版本（16.10）一致 —— 别图新换 17/18，
 # 开发环境用了生产不支持的特性，要到切换那天才炸。
+#
+# 判题机 token 必须自己生成，仓库里不留默认值。第一次起服务前：
+#
+#   TOKEN=$(openssl rand -hex 32)
+#   echo "OJ2_JUDGE_TOKEN=$TOKEN"    >> docker/.env   # docker compose 读这里
+#   echo "JUDGE_SERVER_TOKEN=$TOKEN" >> .env          # 后端读这里，两边必须一致
+#
+# 两个变量名不同但值必须相同：TOKEN 是判题机镜像认的名字，JUDGE_SERVER_TOKEN 是后端认的名字。
+# 忘了设 OJ2_JUDGE_TOKEN 的话 docker compose 会直接报错退出；忘了设 JUDGE_SERVER_TOKEN
+# 的话后端会随机生成一个并在启动日志里告警，判题机心跳会被 403 挡掉。
 
 services:
   postgres:
@@ -63,7 +73,9 @@ services:
     environment:
       SERVICE_URL: http://oj2-judge:8080
       BACKEND_URL: http://host.docker.internal:3000/api/judge-server/heartbeat
-      TOKEN: ${OJ2_JUDGE_TOKEN:-oj2-dev-token}
+      # 没有默认值是故意的：写死在仓库里的弱 token 等于没有 token。
+      # 未设置时 docker compose 直接报错，不会静默起一个人人可连的判题机。
+      TOKEN: ${OJ2_JUDGE_TOKEN:?请先设置 OJ2_JUDGE_TOKEN，见本文件顶部注释}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: 512m
