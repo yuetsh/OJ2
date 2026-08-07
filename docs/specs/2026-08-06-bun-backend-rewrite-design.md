@@ -51,6 +51,7 @@
 | 项 | 数值 |
 |---|---|
 | 后端端点合计 | 122（`oj` 74 + `admin` 48） |
+| 其中已由人工标注 `# DEPRECATED: 前端未调用` | 16 |
 | 前端实际调用的路径 | 78 |
 | **疑似无人调用** | **约 35%** |
 | 空 app | `course/`、`comment/`（均 0 行） |
@@ -124,7 +125,9 @@ Projects/OJ/
 
 **选 Hono 而非 Elysia。** Elysia 类型推导更强、benchmark 更快，但生态小且绑定 Bun。本项目负载为机房数十名学生，框架性能不构成瓶颈；Hono 的生态成熟度、`@hono/zod-validator`、以及可将类型直接传递给前端的 `hc` RPC 客户端更有价值。
 
-**会话用 Redis opaque token 而非 JWT。** 现有 `account/views/oj.py:214` 实现了"查看并踢出其他登录会话"，JWT 无法即时失效。Redis 已在架构内，不应为追新引入 JWT 的撤销难题。
+**会话用 Redis opaque token 而非 JWT。** 理由是账号封禁需即时生效：`User.is_disabled` 一旦置位必须立刻踢人下线，JWT 做不到，得额外维护黑名单——那等于把 Redis 又加回来，白绕一圈。Redis 本就在架构内，直接用 opaque token 最省。
+
+> 更正（2026-08-06 盘点时发现）：本条最初的理由写的是"现有 `account/views/oj.py:214` 实现了查看并踢出其他登录会话"。核实后该功能实际是死的——`/api/sessions` 前端从不调用，`User.session_keys` 字段只写不读（`account/middleware.py:30` 每请求追加，无人读取）。结论不变，理由已换成上面成立的那条。新后端不要复刻 `session_keys`。
 
 ## 7. 已验证的技术假设
 
@@ -186,6 +189,13 @@ C 与 Python 两套 grammar 均正常。`.wasm` 文件随 npm 包分发（`tree-
 - **118 个 Django migration 的历史全部丢弃**，从当前 schema 快照重新开始迁移序列。
 - 剪除 Django 框架自带表：`django_migrations`、`django_content_type`、`django_session`、`auth_permission` 等。
 - 业务表结构保持不变，实现零数据迁移。
+
+### 8.1 不要复刻的现有行为
+
+盘点中发现的、明确不应带进新后端的实现：
+
+- **`SessionRecordMiddleware`（`account/middleware.py:22-33`）**：每个已登录请求都写一遍 session（user_agent / ip / last_activity），遇到新 session key 还额外触发一次 `request.user.save()` —— 即每请求一次数据库写。这是"Django 太慢"的实际来源之一。新后端的会话信息留在 Redis，不落库。
+- **`User.session_keys`**：只写不读的死字段，随 `/api/sessions` 端点一并砍掉。
 
 ## 9. 判题链路
 

@@ -14,3 +14,4 @@ build/
 # spike 的依赖不入库，spike 源码入库
 docs/spikes/node_modules/
 docs/spikes/bun.lock
+docs/spikes/*.json
