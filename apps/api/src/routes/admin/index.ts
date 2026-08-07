@@ -7,6 +7,7 @@ import { adminAiRoutes } from "./ai"
 import { adminConfRoutes } from "./conf"
 import { adminContestRoutes } from "./contest"
 import { adminProblemSetRoutes } from "./problemset"
+import { adminTagRoutes } from "./tag"
 import { adminAnnouncementRoutes } from "./announcement"
 import { adminTutorialRoutes } from "./tutorial"
 
@@ -26,5 +27,6 @@ adminRoutes.route("/", adminAiRoutes)
 adminRoutes.route("/", adminConfRoutes)
 adminRoutes.route("/", adminContestRoutes)
 adminRoutes.route("/", adminProblemSetRoutes)
+adminRoutes.route("/", adminTagRoutes)
 adminRoutes.route("/", adminAnnouncementRoutes)
 adminRoutes.route("/", adminTutorialRoutes)

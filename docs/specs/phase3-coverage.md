@@ -147,3 +147,34 @@
 
 1. 本报告的对照关系带人工判断成分，若某条对应有异议，以实际业务行为为准。
 2. `utils/download.ts` 仍指向旧后端的 `/api/admin`（blob 下载），只被 admin 侧两个页面用，随阶段 4 一起切。
+
+---
+
+## 阶段 5 切换必做项（阶段 4 施工时发现，记在这里以免忘）
+
+**导入数据后必须重置全部序列。** 本地库是按显式 id 从生产导入的，
+`problem_tag_id_seq` 停在 6 而表里 max(id)=87，于是第一次新建标签就撞
+`duplicate key value violates unique constraint "problem_tag_pkey"`（500）。
+
+生产切换若沿用同一个库则不受影响（序列本来就是对的）；但只要有任何一步是
+「导出 → 导入到新库」，就必须补这一句：
+
+```sql
+do $$
+declare r record; mx bigint;
+begin
+  for r in
+    select split_part(pg_get_serial_sequence(quote_ident(t.table_name), c.column_name), '.', 2) as seqname,
+           t.table_name, c.column_name
+    from information_schema.tables t
+    join information_schema.columns c on c.table_name = t.table_name
+    join pg_sequences s on s.sequencename = split_part(pg_get_serial_sequence(quote_ident(t.table_name), c.column_name), '.', 2)
+    where t.table_schema = 'public'
+  loop
+    execute format('select coalesce(max(%I),0) from %I', r.column_name, r.table_name) into mx;
+    execute format('select setval(%L, greatest(%s, 1))', r.seqname, mx);
+  end loop;
+end $$;
+```
+
+症状很隐蔽：读全部正常，只有**写**才炸，而且是导入后第一次写才炸。

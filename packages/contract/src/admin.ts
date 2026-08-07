@@ -433,3 +433,57 @@ export const adminProblemSetProgressSchema = z.object({
   totalProblemsCount: z.number().int(),
   totalScore: z.number().int(),
 })
+
+// ---------------------------------------------------------------- 标签与题目分析
+
+export const adminTagSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  problemCount: z.number().int(),
+})
+
+export const renameTagRequestSchema = z.object({ name: z.string().trim().min(1).max(64) })
+
+export const renameTagResponseSchema = z.object({
+  /** 改名撞上已有标签时视为合并：题目关系转移过去、原标签删除 */
+  merged: z.boolean(),
+  id: z.number().int(),
+  name: z.string(),
+  affectedCount: z.number().int(),
+})
+
+export const batchProblemTagRequestSchema = z.object({
+  problemIds: z.array(z.number().int().positive()).min(1),
+  tagNames: z.array(z.string()).min(1),
+  action: z.enum(["add", "remove"]),
+})
+
+export const batchProblemTagResponseSchema = z.object({
+  problemCount: z.number().int(),
+  tagCount: z.number().int(),
+})
+
+export const stuckProblemSchema = z.object({
+  problemId: z.string(),
+  problemTitle: z.string(),
+  total: z.number().int(),
+  failed: z.number().int(),
+  failedUsers: z.number().int(),
+  acRate: z.number(),
+})
+
+export const acTrendYearSchema = z.object({
+  year: z.number().int(),
+  total: z.number().int(),
+  accepted: z.number().int(),
+  acRate: z.number(),
+})
+
+export const acTrendSchema = z.object({
+  problemId: z.string(),
+  problemTitle: z.string(),
+  yearly: z.array(acTrendYearSchema),
+})
+
+export const generateFlowchartRequestSchema = z.object({ python: z.string().min(1).max(64 * 1024) })
+export const generateFlowchartResponseSchema = z.object({ flowchart: z.string() })

@@ -72,11 +72,11 @@ export function editProblem(problem: AdminProblem | BlankProblem) {
 }
 
 export function toggleProblemVisible(problemID: number) {
-  return http.put("admin/problem/visible", { id: problemID })
+  return legacyResponse(api2.put(`admin/problems/${problemID}/visibility`))
 }
 
 export function generateFlowchartFromPythonCode(python: string) {
-  return http.post("admin/problem/flowchart", { python })
+  return legacyResponse(api2.post("admin/problems/flowchart", { python }))
 }
 
 export function editContestProblem(problem: AdminProblem | BlankProblem) {
@@ -93,20 +93,22 @@ export function getContestProblem(id: number) {
 
 // 标签管理
 export function getTagAdminList(keyword = "") {
-  return http.get<AdminTag[]>("admin/problem/tag", { params: { keyword } })
+  return legacyResponse<AdminTag[]>(
+    api2.get("admin/problem-tags", { params: { keyword } }),
+  )
 }
 
 export function renameTag(id: number, name: string) {
-  return http.put<{
+  return legacyResponse<{
     merged: boolean
     id: number
     name: string
     affected_count: number
-  }>("admin/problem/tag", { id, name })
+  }>(api2.put(`admin/problem-tags/${id}`, { name }))
 }
 
 export function deleteTag(id: number) {
-  return http.delete("admin/problem/tag", { params: { id } })
+  return api2.delete(`admin/problem-tags/${id}`)
 }
 
 export function batchTagProblems(
@@ -114,9 +116,12 @@ export function batchTagProblems(
   tagNames: string[],
   action: "add" | "remove",
 ) {
-  return http.post<{ problem_count: number; tag_count: number }>(
-    "admin/problem/batch_tag",
-    { problem_ids: problemIds, tag_names: tagNames, action },
+  return legacyResponse<{ problem_count: number; tag_count: number }>(
+    api2.post("admin/problems/batch-tag", {
+      problemIds,
+      tagNames,
+      action,
+    }),
   )
 }
 
@@ -670,7 +675,7 @@ export function removeUserFromProblemSet(problemSetId: number, userId: number) {
 
 // 学生卡点分析
 export function getStuckProblems() {
-  return http.get("admin/problem/stuck")
+  return legacyResponse(api2.get("admin/problems/stuck"))
 }
 
 export function getTopACTrend(params: {
@@ -678,7 +683,15 @@ export function getTopACTrend(params: {
   until_year: number
   min_per_year: number
 }) {
-  return http.get("admin/problem/top_ac_trend", { params })
+  return legacyResponse(
+    api2.get("admin/problems/ac-trend", {
+      params: {
+        sinceYear: params.since_year,
+        untilYear: params.until_year,
+        minPerYear: params.min_per_year,
+      },
+    }),
+  )
 }
 
 // AI 学习分析报告
