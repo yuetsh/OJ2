@@ -1,5 +1,11 @@
 import axios, { type AxiosRequestConfig } from "axios"
+import { createDiscreteApi } from "naive-ui"
+import { useAuthModalStore } from "shared/store/authModal"
+import { STORAGE_KEY } from "./constants"
 import type { ApiResponse } from "./http"
+import storage from "./storage"
+
+const { message: toast } = createDiscreteApi(["message"])
 
 interface Api2Error {
   error?: {
@@ -51,6 +57,16 @@ instance.interceptors.response.use(
         : code === "account-disabled"
           ? "Your account has been disabled"
           : message
+
+    // 与 utils/http.ts 的拦截器保持一致：这两种错误全站都是同样的处理，
+    // 不放在这里的话每个调用点都得自己 catch，漏一个就是「点了没反应」。
+    if (code === "login-required") {
+      storage.remove(STORAGE_KEY.AUTHED)
+      useAuthModalStore().openLoginModal()
+    } else if (code === "permission-denied") {
+      toast.error(legacyMessage || "权限不足")
+    }
+
     return Promise.reject({ error: code, data: legacyMessage })
   },
 )
