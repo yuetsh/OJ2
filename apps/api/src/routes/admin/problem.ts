@@ -6,6 +6,7 @@ import {
   createProblemRequestSchema,
   makeProblemPublicRequestSchema,
   updateProblemRequestSchema,
+  sqlTestCaseScriptSchema,
   uploadTestCaseResponseSchema,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
@@ -16,7 +17,7 @@ import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { contestStatus } from "../../services/contest"
-import { packTestCaseZip, processTestCaseZip, TestCaseError } from "../../services/test-case"
+import { packTestCaseZip, processTestCaseZip, readInfo, readSqlScripts, TestCaseError } from "../../services/test-case"
 import { objectValue, queryInteger, sampleUser, stringArray } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
@@ -567,5 +568,29 @@ adminProblemRoutes.get("/problems/:id/test-cases", requireProblemPermission, asy
   } catch (error) {
     if (error instanceof TestCaseError) return failure(c, 404, "test-case-not-found", error.message)
     throw error
+  }
+})
+
+/**
+ * 回显 SQL 题已上传的测试点脚本内容。只读磁盘上的 N.sql，不需要 SQL 引擎 ——
+ * 同组的 sql-preview / sql-ai-gen 要跑 SQLite 生成展示数据，新后端还没有那条链路，
+ * 那两个仍在旧后端上。
+ */
+adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, async (c) => {
+  const [problem] = await db.select().from(schema.problem)
+    .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 }))).limit(1)
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exists")
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exists")
+  }
+  const info = await readInfo(problem.testCaseId)
+  if (!info) return failure(c, 404, "test-case-info-unreadable", "测试点信息读取失败")
+  if (!info.sql) return failure(c, 409, "not-sql-test-case", "该题的测试点不是 SQL 类型")
+  try {
+    const scripts = await readSqlScripts(problem.testCaseId)
+    return success(c, scripts.map((script) => sqlTestCaseScriptSchema.parse(script)))
+  } catch (error) {
+    console.error("Failed to read SQL test case scripts", error)
+    return failure(c, 500, "test-case-error", "测试点脚本读取失败")
   }
 })

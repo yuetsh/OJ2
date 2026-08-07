@@ -228,9 +228,8 @@ export function previewSQLTestcase(data: {
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
 export function getSQLTestcaseScripts(problemId: number) {
-  return http.get<{ name: string; content: string }[]>(
-    "admin/sql_test_case_scripts",
-    { params: { problem_id: problemId } },
+  return legacyResponse<{ name: string; content: string }[]>(
+    api2.get(`admin/problems/${problemId}/sql-scripts`),
   )
 }
 

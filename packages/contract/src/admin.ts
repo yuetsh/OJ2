@@ -603,3 +603,8 @@ export const uploadTestCaseResponseSchema = z.object({
   id: z.string(),
   info: z.array(testCaseEntrySchema),
 })
+
+export const sqlTestCaseScriptSchema = z.object({
+  name: z.string(),
+  content: z.string(),
+})
