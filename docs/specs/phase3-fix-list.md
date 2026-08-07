@@ -4,7 +4,7 @@
 来源：`phase3-review-authz.md`（权限边界）+ `phase3-review-leakage.md`（数据泄露）
 受审代码：commit `8c00cdc`，oj 侧 65 个端点
 
-> ## 状态：已全部修复并复评通过（2026-08-07 收口）
+> ## 状态：Critical / Important 已修复并复评通过；7 条 Minor 已于 2026-08-07 全部处理（见文末）
 >
 > 修复提交：`b4b61af` / `8237909` / `b7adf29` / `f548aef`
 > 复评报告：`phase3-review-rereview.md` —— 8 条（F1-F6 + 收尾的 F4b、F5b）**全部 ADDRESSED**，
@@ -141,10 +141,27 @@
 
 ---
 
-## Minor（共 7 条）
+## Minor（共 7 条）—— 2026-08-07 已全部处理
 
-详见两份原始报告，未在此展开。合并去重后主要为：命名不一致、错误信息过于具体、
-若干处可维护性问题。**不阻塞，但建议在 admin 侧开工前一并清掉**，避免同样的模式被复制 45 次。
+在 admin 侧开工前清掉，避免同样的模式被复制 42 次。逐条结论：
+
+| 编号 | 内容 | 处理 |
+|---|---|---|
+| authz M1 | `isAdminRole` 从白名单退化为黑名单 | **改回白名单**（`ADMIN_ROLES` / `TEACHER_ROLES` 显式列举，对齐 `account/models.py:65-73`）。实测四种已知角色行为不变，而虚构的新角色「助教」现在默认**不是**管理员——黑名单写法下它会默认拿到管理员权限 |
+| authz M2 | 比赛权限判断没有中间件兜底 | **新增 `requireContestAccess(checkType, paramName)` 中间件**（`services/contest.ts`），把「取比赛 → 404 → 鉴权 → 401/403」收进路由注册行。手工调用点从 5 处降到 2 处：`GET /contests/:id/access` 是**报告**权限而非强制（不能 403），`POST /submissions` 的比赛 id 来自请求体、中间件跑时 body 还没解析，两处都就地写了说明 |
+| authz M3 | `blog` / `github` 从 URLField 降级为自由字符串 | **加回 URL 校验**（只放行 `http(s)://`，空串表示清空）。实测 `javascript:alert(1)` 与 `not a url` 均 400，`https://example.com/x` 与空串 200 |
+| authz M4 | `GET /dev/problems` 仍在线且无鉴权 | **已删除**（连同 `dev-problems.vue`、路由项、`problemSummarySchema`），实测 404 |
+| 文档纠错 | `phase3-coverage.md` 把 `PUT submissions/:id` 写成「判题结果写回」 | **已改正**为「提交分享开关」，并注明判题结果写回走内部 worker 不经 HTTP |
+| leakage M-1 | 站内信内嵌的 submission 多出 `info` / `ip` 两个空键 | **新增 `embeddedSubmissionSchema`**（`omit` 掉 `info`/`ip`/`contestId`），不再复用 `submissionDetailSchema` 传空值——形状对上了，将来有人把空值改成真值也不会变成泄露。实测三个键均已消失 |
+| leakage M-2 | `problem-sets/:id/user-progress` 返回学生 `realName` | **无需改动**：F2 的 `sampleUser()` 默认关闭开关已经覆盖此处，现在返回 `null`，与旧后端 `UsernameSerializer()` 一致。报告提的「别把教师端功能删掉」的顾虑不成立——旧后端本来就不给 |
+| leakage M-3 | `tutorials/:id/exercises` 下发练习答案 | **不改**：旧后端逐字相同（`ExerciseSerializer` 整个 `data` jsonb 出去，且无 `@login_required`）。这是教程练习「答案下发到浏览器、客户端比对」的既有设计，属遗留设计债，不是本次重写引入的回归。要改得连判题方式一起改，不在迁移范围内 |
+
+### 顺带修掉的一个真回归（评审未覆盖）
+
+`GET /api/messages` 内嵌的 submission 原本给的是 `problemId`（数字主键），而旧后端
+`SubmissionSafeModelSerializer` 的 `problem` 是 `SlugRelatedField(slug_field="_id")`，
+即**展示用题号**。`oj/user/message.vue:20` 拿它拼 `/problem/<题号>` 链接，迁移后拼出的是
+`/problem/undefined`，题号那一栏也是空的。已改为下发 `problem`（展示题号），实测返回 `"1004"`。
 
 ---
 

@@ -18,7 +18,7 @@
 >    这两条 `utils/http.ts` 一直有，api2 从建包起就漏了，导致此前已迁移的所有端点
 >    在鉴权失败时都是「点了没反应」。新加的两个教师专属端点会放大这个问题，故一并补。
 >
-> 未做：两份评审里的 7 条 Minor 仍未清（见 `phase3-fix-list.md`）。
+> 补记：两份评审里的 7 条 Minor 也已全部处理，逐条结论见 `phase3-fix-list.md` 文末。
 
 ## 结论
 
@@ -120,7 +120,7 @@
 | 新路由 | 说明 |
 |---|---|
 | `POST submissions` | 旧后端提交走 `POST /api/submission`，与 `GET submission` 同路径不同动词，拆开后成独立条目 |
-| `PUT submissions/:id` | 判题结果写回 |
+| `PUT submissions/:id` | **提交分享开关**（对齐旧 `SubmissionAPI.put` + `ShareSubmissionSerializer`）。判题结果写回走内部 worker，不经 HTTP —— 早先这里写成「判题结果写回」，会让人误以为存在一个需要判题机凭据的写入端点 |
 | `POST achievements/pending/read` | 成就已读标记 |
 | `GET problems/:id/flowchart/history` | 流程图历史 |
 | ~~`GET dev/problems`~~ | 阶段 1 的临时验证端点，**已删除**（连同 `dev-problems.vue`、路由与 `problemSummarySchema`） |
