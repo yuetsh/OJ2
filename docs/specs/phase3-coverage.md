@@ -1,18 +1,45 @@
 # 阶段 3 覆盖率对账
 
-日期：2026-08-07
+日期：2026-08-07（首次对账）／2026-08-07 补记（阶段 3 收口）
 基准：`docs/specs/endpoint-inventory.md` 的 110 条 KEEP 端点
-对象：`apps/api/src/routes/*.ts` 的 79 个路由 handler（含未提交工作树）
+对象：`apps/api/src/routes/*.ts` 的路由 handler
+
+> ## 状态：阶段 3 出口标准已达成
+>
+> 出口标准（设计文档第 11 节）是「用户侧全部功能运行在新后端上」。达成判据：
+> `apps/web` 里 `oj/` 与 `shared/` 两个目录**已无任何指向旧 Django 的运行时调用**，
+> 残留的 `utils/http` 引用全是 `import type { ApiResponse }` 这一个类型。
+> 仍走旧后端的只剩 `admin/api.ts`（85 处）与 `utils/download.ts`，入口都在后台管理界面，属阶段 4。
+>
+> 收口时补做的三件事：
+> 1. 补齐 3 条被用户侧页面调用的 admin 端点（重判 / 提交统计 / 流程图统计），见下表；
+> 2. 删除阶段 1 的临时验证物（`GET dev/problems`、`dev-problems.vue`、路由项、`problemSummarySchema`）；
+> 3. 给 `utils/api2.ts` 补上 `login-required` 弹登录框、`permission-denied` 弹提示 ——
+>    这两条 `utils/http.ts` 一直有，api2 从建包起就漏了，导致此前已迁移的所有端点
+>    在鉴权失败时都是「点了没反应」。新加的两个教师专属端点会放大这个问题，故一并补。
+>
+> 未做：两份评审里的 7 条 Minor 仍未清（见 `phase3-fix-list.md`）。
 
 ## 结论
 
 | | 旧端点 KEEP | 新后端已实现 | 缺口 |
 |---|---|---|---|
 | **oj 侧** | 65 | 65（另有 4 条新增） | **0** |
-| **admin 侧** | 45 | **0** | **45** |
-| 合计 | 110 | 65 | 45 |
+| **admin 侧** | 45 | **3** | **42** |
+| 合计 | 110 | 68 | 42 |
 
-**oj 侧已全部覆盖，admin 侧一条未做。** 这与设计文档第 11 节的阶段划分一致 —— admin 本就排在阶段 4。
+**oj 侧已全部覆盖。** admin 侧原计划整块推到阶段 4，但其中 3 条被用户侧页面直接调用，
+不做完阶段 3 的出口标准（用户侧全部功能跑在新后端上）就不成立，因此在本阶段一并补上：
+
+| 旧端点 | 新路由 | 调用它的用户侧页面 |
+|---|---|---|
+| `GET admin/submission/rejudge` | `POST submissions/:id/rejudge` | `oj/submission/list.vue` 的重判按钮 |
+| `GET admin/submission/statistics` | `GET submissions/statistics` | `StatisticsPanel.vue`（提交列表页 + 题目页） |
+| `GET admin/flowchart/statistics` | `GET flowcharts/statistics` | `FlowchartStatisticsPanel.vue`（提交列表页） |
+
+这三条虽然挂在旧后端的 admin 路由下，权限也确实是 `teacher_admin_required` /
+`super_admin_required`，但入口在用户侧页面里 —— **「admin 路由」和「admin 页面」不是一回事**，
+按 URL 前缀切阶段会漏掉它们。剩下 42 条的入口都在后台管理界面，留给阶段 4。
 
 > 对账方法说明：阶段 0 已定案 API 重新设计，新旧路径不同名（如旧 `/api/problem` → 新 `/api/problems`、
 > 旧 `/api/pickone` → 新 `/api/problems/random`），**无法按字符串自动匹配**。本表由人工按语义逐条比对，
@@ -96,9 +123,9 @@
 | `PUT submissions/:id` | 判题结果写回 |
 | `POST achievements/pending/read` | 成就已读标记 |
 | `GET problems/:id/flowchart/history` | 流程图历史 |
-| `GET dev/problems` | **阶段 1 的临时验证端点，应删除** |
+| ~~`GET dev/problems`~~ | 阶段 1 的临时验证端点，**已删除**（连同 `dev-problems.vue`、路由与 `problemSummarySchema`） |
 
-## admin 侧缺口（45 条，按 app）
+## admin 侧缺口（42 条，按 app）
 
 | app | 条数 |
 |---|---|
@@ -109,15 +136,14 @@
 | tutorial | 3 |
 | account | 2 |
 | achievement | 2 |
-| submission | 2 |
 | ai | 1 |
 | announcement | 1 |
-| flowchart | 1 |
 | utils | 1 |
 
 `problem` 与 `problemset` 两块占了 24 条，超过 admin 缺口的一半 —— 排期时应作为主体。
+（`submission` 原 2 条、`flowchart` 原 1 条已在本阶段做完，见上方表格。）
 
 ## 待处理项
 
-1. **`GET dev/problems` 是阶段 1 的临时验证端点**，与 `apps/web` 里的临时验证页 `dev-problems.vue` 配套，两者都应在本阶段收尾时删除。
-2. 本报告的对照关系带人工判断成分，若某条对应有异议，以实际业务行为为准。
+1. 本报告的对照关系带人工判断成分，若某条对应有异议，以实际业务行为为准。
+2. `utils/download.ts` 仍指向旧后端的 `/api/admin`（blob 下载），只被 admin 侧两个页面用，随阶段 4 一起切。

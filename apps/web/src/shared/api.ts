@@ -45,7 +45,8 @@ export async function getProfile(
         class_name: profile.user.className,
       },
       real_name: profile.realName ?? "",
-      acm_problems_status: profile.acmProblemsStatus as Profile["acm_problems_status"],
+      acm_problems_status:
+        profile.acmProblemsStatus as Profile["acm_problems_status"],
       avatar: profile.avatar,
       blog: profile.blog as null,
       mood: profile.mood ?? "",

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
-import {
-  formatCode,
-  submitCode,
-  updateProblemSetProgress,
-} from "oj/api"
+import { formatCode, submitCode, updateProblemSetProgress } from "oj/api"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useFireworks } from "oj/problem/composables/useFireworks"

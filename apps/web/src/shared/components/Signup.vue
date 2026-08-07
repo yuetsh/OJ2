@@ -64,7 +64,6 @@ function submit() {
     }
   })
 }
-
 </script>
 
 <template>
