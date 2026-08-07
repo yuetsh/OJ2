@@ -1,0 +1,44 @@
+# 本机开发用的依赖服务。判题沙箱单独放，因为它要挂载测试用例目录。
+#
+# 起：  docker compose -f docker/compose.dev.yml up -d
+# 停：  docker compose -f docker/compose.dev.yml down
+# 清空：docker compose -f docker/compose.dev.yml down -v   ← 会删掉库里的数据
+#
+# PostgreSQL 固定 16，与生产版本（16.10）一致 —— 别图新换 17/18，
+# 开发环境用了生产不支持的特性，要到切换那天才炸。
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: oj2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: onlinejudge
+      POSTGRES_USER: onlinejudge
+      POSTGRES_PASSWORD: onlinejudge
+    ports:
+      - "5433:5432" # 5433 避开可能存在的本机 5432
+    volumes:
+      - oj2-pgdata:/var/lib/postgresql/data
+      # 首次启动时自动灌入生产库结构（仅结构，无数据）
+      - ../docs/specs/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onlinejudge -d onlinejudge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: oj2-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379" # 6380 避开可能存在的本机 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  oj2-pgdata:
