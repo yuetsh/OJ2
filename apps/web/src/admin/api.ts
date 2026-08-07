@@ -1,4 +1,6 @@
 import http from "utils/http"
+import api2 from "utils/api2"
+import { legacyResponse } from "utils/legacy"
 import { toProblemListItem } from "admin/transforms"
 import type {
   AdminProblem,
@@ -266,25 +268,29 @@ export function deleteJudgeServer(hostname: string) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return http.get("admin/announcement", {
-    params: { paging: true, offset, limit },
-  })
+  return legacyResponse(
+    api2.get("admin/announcements", {
+      params: { offset, limit },
+    }),
+  )
 }
 
 export function getAnnouncement(id: number) {
-  return http.get<Announcement>("admin/announcement", { params: { id } })
+  return legacyResponse<Announcement>(api2.get(`admin/announcements/${id}`))
 }
 
 export function deleteAnnouncement(id: number) {
-  return http.delete("admin/announcement", { params: { id } })
+  return api2.delete(`admin/announcements/${id}`)
 }
 
 export function editAnnouncement(announcement: AnnouncementEdit) {
-  return http.put("admin/announcement", announcement)
+  const { id, ...body } = announcement
+  return legacyResponse(api2.put(`admin/announcements/${id}`, body))
 }
 
 export function createAnnouncement(announcement: AnnouncementEdit) {
-  return http.post("admin/announcement", announcement)
+  const { id: _id, ...body } = announcement
+  return legacyResponse(api2.post("admin/announcements", body))
 }
 
 export async function getTutorialList() {

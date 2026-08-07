@@ -6,6 +6,7 @@ import {
   type SubmissionStatistics,
 } from "@oj2/contract"
 import api2 from "utils/api2"
+import { legacyResponse, toLegacy } from "utils/legacy"
 import type { ApiResponse } from "utils/http"
 import { filterResult } from "oj/transforms"
 import type {
@@ -18,25 +19,6 @@ import type {
   SubmitCodePayload,
   WebsiteConfig,
 } from "utils/types"
-
-function snakeKey(key: string) {
-  return key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
-}
-
-function toLegacy<T>(value: unknown): T {
-  if (Array.isArray(value)) return value.map((item) => toLegacy(item)) as T
-  if (!value || typeof value !== "object") return value as T
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [snakeKey(key), toLegacy(item)]),
-  ) as T
-}
-
-async function legacyResponse<T>(
-  request: Promise<ApiResponse<unknown>>,
-): Promise<ApiResponse<T>> {
-  const response = await request
-  return { error: response.error, data: toLegacy<T>(response.data) }
-}
 
 function listProblem(value: any): Problem {
   return {

@@ -3,6 +3,7 @@ import { basename, resolve } from "node:path"
 
 import { getRequestSessionUser } from "./auth/session"
 import { config } from "./config"
+import { adminRoutes } from "./routes/admin"
 import { authRoutes } from "./routes/auth"
 import { accountRoutes } from "./routes/account"
 import { judgeServerRoutes } from "./routes/judge-server"
@@ -38,6 +39,7 @@ app.route("/api", flowchartRoutes)
 app.route("/api", problemRoutes)
 app.route("/api", submissionRoutes)
 app.route("/api", judgeServerRoutes)
+app.route("/api/admin", adminRoutes)
 
 app.onError((error, c) => {
 	console.error(error)
