@@ -1,4 +1,3 @@
-import http from "utils/http"
 import api2 from "utils/api2"
 import { legacyResponse } from "utils/legacy"
 import { toProblemListItem } from "admin/transforms"
@@ -223,7 +222,13 @@ export function previewSQLTestcase(data: {
   ref_sql: string
   mode: "query" | "modify"
 }) {
-  return http.post<SQLDisplay>("admin/sql_test_case_preview", data)
+  return legacyResponse<SQLDisplay>(
+    api2.post("admin/sql-test-cases/preview", {
+      initSql: data.init_sql,
+      refSql: data.ref_sql,
+      mode: data.mode,
+    }),
+  )
 }
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
@@ -238,7 +243,12 @@ export function generateSQLTestcase(data: {
   ref_sql: string
   mode: "query" | "modify"
 }) {
-  return http.post<{ sql: string }>("admin/sql_test_case_ai_gen", data)
+  return legacyResponse<{ sql: string }>(
+    api2.post("admin/sql-test-cases/generate", {
+      refSql: data.ref_sql,
+      mode: data.mode,
+    }),
+  )
 }
 
 /** 组件里的题目对象是 snake_case，出站转成新后端要的 camelCase */

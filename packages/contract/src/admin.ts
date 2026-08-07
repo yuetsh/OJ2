@@ -608,3 +608,16 @@ export const sqlTestCaseScriptSchema = z.object({
   name: z.string(),
   content: z.string(),
 })
+
+export const sqlPreviewRequestSchema = z.object({
+  initSql: z.string().min(1).max(1024 * 1024),
+  refSql: z.string().min(1).max(1024 * 1024),
+  mode: z.enum(["query", "modify"]),
+})
+
+export const generateSqlTestCaseRequestSchema = z.object({
+  refSql: z.string().min(1).max(64 * 1024),
+  mode: z.enum(["query", "modify"]),
+})
+
+export const generateSqlTestCaseResponseSchema = z.object({ sql: z.string() })

@@ -6,6 +6,9 @@ import {
   createProblemRequestSchema,
   makeProblemPublicRequestSchema,
   updateProblemRequestSchema,
+  generateSqlTestCaseRequestSchema,
+  generateSqlTestCaseResponseSchema,
+  sqlPreviewRequestSchema,
   sqlTestCaseScriptSchema,
   uploadTestCaseResponseSchema,
 } from "@oj2/contract"
@@ -16,8 +19,13 @@ import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
+import { buildSqlDisplay } from "../../judge/sql"
+import { completeChat } from "../../services/ai"
 import { contestStatus } from "../../services/contest"
 import { packTestCaseZip, processTestCaseZip, readInfo, readSqlScripts, TestCaseError } from "../../services/test-case"
+import { config } from "../../config"
+import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
 import { objectValue, queryInteger, sampleUser, stringArray } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
@@ -123,13 +131,7 @@ async function serialize(row: ProblemRow) {
   })
 }
 
-/**
- * 非 SQL 题的公共校验，对齐旧 `ProblemBase.common_checks` 的 else 分支。
- *
- * SQL 分支在这里**只做前置校验、不生成 sqlDisplay** —— 生成需要跑 SQLite，
- * 而新后端还没有 SQL 判题链路（旧 judge/sql_runner.py 378 行无对应实现）。
- * 因此新建 SQL 题会被拒绝，编辑 SQL 题则保留原有 sqlDisplay 不动，不会把已有数据弄坏。
- */
+/** 公共校验，对齐旧 `ProblemBase.common_checks` */
 function commonChecks(data: {
   languages: string[]
   inputDescription: string
@@ -153,8 +155,38 @@ function commonChecks(data: {
   return { sql: false }
 }
 
-const SQL_NOT_SUPPORTED =
-  "新后端尚未实现 SQL 判题链路（题目页展示数据需要跑 SQLite 生成），暂不能新建 SQL 题。已有 SQL 题可以正常编辑，其展示数据保持不变。"
+/**
+ * SQL 题保存时生成题目页展示数据（数据表 + 期望结果）。
+ * 对齐旧 `problem/utils.py:generate_sql_display`：取**测试点 1** 的初始化脚本 + 标准答案跑一遍。
+ * 失败一律拦下不让保存 —— 展示数据直接决定学生看到的表结构与期望结果，宁可不保存也不能存错的。
+ */
+async function generateSqlDisplay(
+  testCaseId: string,
+  answers: Record<string, unknown>[],
+  sqlConfig: Record<string, unknown>,
+): Promise<{ error: string } | { display: unknown }> {
+  const info = await readInfo(testCaseId)
+  if (!info) return { error: "测试点信息读取失败，请重新上传测试点" }
+  if (!info.sql) return { error: "测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包" }
+  const keys = Object.keys(info.test_cases ?? {}).sort((a, b) => Number(a) - Number(b))
+  if (keys.length === 0) return { error: "题目没有任何测试点" }
+  const inputName = info.test_cases![keys[0]!]?.input_name
+  if (!inputName) return { error: "测试点信息损坏，请重新上传测试点" }
+  let initSql: string
+  try {
+    initSql = await readFile(resolve(config.testCaseDirectory, testCaseId, inputName), "utf8")
+  } catch {
+    return { error: `测试点脚本 ${inputName} 读取失败` }
+  }
+  const refSql = answers.find(
+    (item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim(),
+  )?.code
+  if (typeof refSql !== "string") return { error: "题目缺少 SQL 标准答案" }
+  const mode = sqlConfig.mode === "modify" ? "modify" as const : "query" as const
+  const outcome = await buildSqlDisplay(initSql, refSql, mode)
+  if (!outcome.ok) return { error: `SQL 展示数据生成失败: ${outcome.message}` }
+  return { display: outcome.value }
+}
 
 function problemValues(data: ReturnType<typeof createProblemRequestSchema.parse>, isSql: boolean) {
   return {
@@ -257,7 +289,12 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
   }
   const checked = commonChecks(parsed.data)
   if ("error" in checked) return failure(c, 400, "invalid-problem", checked.error)
-  if (checked.sql) return failure(c, 501, "sql-not-supported", SQL_NOT_SUPPORTED)
+  let sqlDisplay: unknown = null
+  if (checked.sql) {
+    const built = await generateSqlDisplay(parsed.data.testCaseId, parsed.data.answers, parsed.data.sqlConfig!)
+    if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
+    sqlDisplay = built.display
+  }
 
   const [duplicate] = await db.select({ id: schema.problem.id }).from(schema.problem)
     .where(and(eq(schema.problem.displayId, parsed.data._id), isNull(schema.problem.contestId))).limit(1)
@@ -266,7 +303,7 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
   const now = new Date().toISOString()
   const created = await db.transaction(async (tx) => {
     const [row] = await tx.insert(schema.problem).values({
-      ...problemValues(parsed.data, false),
+      ...problemValues(parsed.data, checked.sql),
       contestId: null,
       createdById: c.get("user")!.id,
       createTime: now,
@@ -275,7 +312,7 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
       acceptedNumber: 0,
       statisticInfo: {},
       isPublic: false,
-      sqlDisplay: null,
+      sqlDisplay,
     }).returning()
     await setTags(tx as unknown as typeof db, row!.id, parsed.data.tags)
     return row!
@@ -308,12 +345,19 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
     )).limit(1)
   if (duplicate) return failure(c, 409, "display-id-exists", "Display ID already exists")
 
+  // SQL 题每次保存都重算展示数据：测试点或标准答案可能刚改过，留着旧的就会和判题结果对不上
+  let sqlDisplay: unknown = null
+  if (checked.sql) {
+    const built = await generateSqlDisplay(parsed.data.testCaseId, parsed.data.answers, parsed.data.sqlConfig!)
+    if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
+    sqlDisplay = built.display
+  }
+
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx.update(schema.problem).set({
       ...problemValues(parsed.data, checked.sql),
+      sqlDisplay,
       lastUpdateTime: new Date().toISOString(),
-      // SQL 题的 sqlDisplay 原样保留：重新生成需要跑 SQLite，新后端还没有那条链路。
-      // 不动它比生成一个错的更安全 —— 它直接决定题目页给学生看的表结构与期望结果。
     }).where(eq(schema.problem.id, id)).returning()
     await setTags(tx as unknown as typeof db, id, parsed.data.tags)
     return row!
@@ -411,7 +455,12 @@ adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermissio
   }
   const checked = commonChecks(parsed.data)
   if ("error" in checked) return failure(c, 400, "invalid-problem", checked.error)
-  if (checked.sql) return failure(c, 501, "sql-not-supported", SQL_NOT_SUPPORTED)
+  let sqlDisplay: unknown = null
+  if (checked.sql) {
+    const built = await generateSqlDisplay(parsed.data.testCaseId, parsed.data.answers, parsed.data.sqlConfig!)
+    if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
+    sqlDisplay = built.display
+  }
 
   const [duplicate] = await db.select({ id: schema.problem.id }).from(schema.problem)
     .where(and(eq(schema.problem.displayId, parsed.data._id), eq(schema.problem.contestId, contestId))).limit(1)
@@ -420,7 +469,7 @@ adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermissio
   const now = new Date().toISOString()
   const created = await db.transaction(async (tx) => {
     const [row] = await tx.insert(schema.problem).values({
-      ...problemValues(parsed.data, false),
+      ...problemValues(parsed.data, checked.sql),
       contestId,
       createdById: user.id,
       createTime: now,
@@ -592,5 +641,39 @@ adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, as
   } catch (error) {
     console.error("Failed to read SQL test case scripts", error)
     return failure(c, 500, "test-case-error", "测试点脚本读取失败")
+  }
+})
+
+/** SQL 题测试点预览：跑一遍初始化脚本 + 标准答案，返回题目页要展示的数据表与期望结果 */
+adminProblemRoutes.post("/sql-test-cases/preview", requireProblemPermission, async (c) => {
+  const parsed = sqlPreviewRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "参数错误")
+  }
+  const outcome = await buildSqlDisplay(parsed.data.initSql, parsed.data.refSql, parsed.data.mode)
+  if (!outcome.ok) return failure(c, 400, "sql-preview-failed", outcome.message)
+  return success(c, outcome.value)
+})
+
+/** AI 按标准答案倒推表结构、生成一份自洽的初始化脚本 */
+adminProblemRoutes.post("/sql-test-cases/generate", requireProblemPermission, async (c) => {
+  const parsed = generateSqlTestCaseRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "参数错误")
+  }
+  try {
+    const sql = await completeChat(
+      `你是一个 SQL 出题助手。用户会给你一道 SQL 题的标准答案（查询题的
+SELECT 语句，或增删改题的 UPDATE/DELETE/INSERT 语句）和题型。
+请你推断出该标准答案所需要的表结构，生成一份自洽的 SQLite 兼容初始化脚本，
+包含 CREATE TABLE 和若干条 INSERT 语句，插入的数据要足够让标准答案跑出有意义的结果
+（比如查询题要有能被筛选出来和被过滤掉的行；增删改题要有能被改动和不受影响的行）。
+请只返回 SQL 脚本本身，连 \`\`\` 都不需要，不要任何解释文字。`,
+      `题型：${parsed.data.mode}\n标准答案：\n${parsed.data.refSql}`,
+    )
+    return success(c, generateSqlTestCaseResponseSchema.parse({ sql }))
+  } catch (error) {
+    console.error("SQL test case generation failed", error)
+    return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")
   }
 })

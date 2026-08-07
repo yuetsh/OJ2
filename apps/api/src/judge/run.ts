@@ -16,12 +16,18 @@ import {
   type JudgeStatusValue,
 } from "./status"
 import { parseProblemTemplate } from "./template"
+import { runSqlCase } from "./sql"
+import { readInfo } from "../services/test-case"
+import { readFile } from "node:fs/promises"
+import { resolve as resolvePath } from "node:path"
 
 interface JudgeCase {
   cpu_time: number
   memory: number
   result: number
   test_case: string
+  /** SQL 判题会带上中文原因，沙箱判题没有这个字段 */
+  error_message?: string | null
   [key: string]: unknown
 }
 
@@ -350,13 +356,17 @@ export async function judgeSubmission(job: JudgeJobData) {
       ? `${template.prepend}\n${row.submission.code}\n${template.append}`
       : row.submission.code
 
-    const response = await requestJudge(
-      row.submission.language,
-      source,
-      row.problem.timeLimit,
-      row.problem.memoryLimit,
-      row.problem.testCaseId,
-    )
+    // SQL 题不经判题沙箱：沙箱是给编译型/脚本型语言用的，SQL 判的是结果集，
+    // 走 judge/sql 的 WASM 引擎（在独立子进程里跑，见那边的说明）。
+    const response = row.submission.language === "SQL"
+      ? await judgeSqlSubmission(row.problem, row.submission.code)
+      : await requestJudge(
+          row.submission.language,
+          source,
+          row.problem.timeLimit,
+          row.problem.memoryLimit,
+          row.problem.testCaseId,
+        )
 
     let result: JudgeStatusValue
     let info: unknown = {}
@@ -386,6 +396,13 @@ export async function judgeSubmission(job: JudgeJobData) {
         memory_cost: Math.max(0, ...cases.map((item) => Number(item.memory) || 0)),
         score: 0,
       }
+      // SQL 判题给出的中文提示（只读拒绝/超时/内存/无结果集）只存在测试点的
+      // error_message 里，而前端只读 statistic_info.err_info。把首个失败测试点的
+      // 提示提上来，否则学生只看到一个 WA 却不知道原因。对齐旧 sql_dispatcher。
+      const failedMessage = cases.find(
+        (item) => item.result !== JudgeStatus.ACCEPTED && item.error_message,
+      )?.error_message
+      if (typeof failedMessage === "string") statisticInfo.err_info = failedMessage
 
       if (result === JudgeStatus.ACCEPTED) {
         const rules = astRulesForLanguage(
@@ -453,4 +470,77 @@ export async function judgeSubmission(job: JudgeJobData) {
     console.error(`Failed to judge submission ${row.submission.id}`, error)
     await markSystemError(row.submission.id, row.submission.userId, error)
   }
+}
+
+
+/**
+ * SQL 题判题：逐个测试点用各自的初始化脚本跑一遍，产出与沙箱同构的结果结构，
+ * 好让上面的状态聚合、统计、排名、WebSocket 推送逻辑完全复用。
+ * 对齐旧 `judge/sql_dispatcher.py`。
+ */
+async function judgeSqlSubmission(
+  problem: typeof schema.problem.$inferSelect,
+  studentSql: string,
+): Promise<JudgeResponse> {
+  const sqlConfig = objectValue(problem.sqlConfig)
+  const mode = sqlConfig.mode
+  if (mode !== "query" && mode !== "modify") {
+    throw new Error("题目缺少 SQL 配置（题型）")
+  }
+  const answers = Array.isArray(problem.answers) ? problem.answers : []
+  const refSql = answers
+    .map((item) => objectValue(item))
+    .find((item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim())?.code
+  if (typeof refSql !== "string") throw new Error("题目缺少 SQL 标准答案")
+
+  const info = await readInfo(problem.testCaseId)
+  if (!info) throw new Error("测试点信息读取失败")
+  if (!info.sql) throw new Error("测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包")
+
+  // 按 "1","2",… 的数字序遍历，保证测试点顺序稳定
+  const keys = Object.keys(info.test_cases ?? {}).sort((a, b) => Number(a) - Number(b))
+  if (keys.length === 0) throw new Error("题目没有任何测试点")
+
+  const cases: JudgeCase[] = []
+  for (const [index, key] of keys.entries()) {
+    const inputName = info.test_cases![key]!.input_name
+    const initSql = await readFile(
+      resolvePath(config.testCaseDirectory, problem.testCaseId, inputName),
+      "utf8",
+    ).catch(() => { throw new Error(`测试点脚本 ${inputName} 读取失败`) })
+
+    const outcome = await runSqlCase({
+      kind: "judge",
+      initSql,
+      refSql,
+      studentSql,
+      mode,
+      orderSensitive: sqlConfig.order_sensitive === true,
+      timeLimitMs: problem.timeLimit,
+      memoryLimitMb: problem.memoryLimit,
+    })
+    if (!outcome.ok) {
+      // 初始化/标准答案执行失败属出题配置问题，整题 SYSTEM_ERROR
+      if (outcome.result === JudgeStatus.SYSTEM_ERROR) throw new Error(outcome.message)
+      // 子进程被杀（超时/内存）也走这里，按学生错误记成一个测试点
+      cases.push({
+        test_case: String(index + 1),
+        result: outcome.result,
+        cpu_time: 0,
+        real_time: 0,
+        memory: 0,
+        error_message: outcome.message,
+      } as unknown as JudgeCase)
+      break
+    }
+    const value = outcome.value
+    value.test_case = String(index + 1)
+    // 语法错误与数据无关，首个测试点即可确认，整题按编译错误处理
+    // （ACM 不罚时，前端展示 err_info）
+    if (index === 0 && value.result === JudgeStatus.COMPILE_ERROR) {
+      return { err: "CompileError", data: value.error_message }
+    }
+    cases.push(value as unknown as JudgeCase)
+  }
+  return { err: null, data: cases }
 }

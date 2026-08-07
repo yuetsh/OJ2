@@ -178,3 +178,41 @@ end $$;
 ```
 
 症状很隐蔽：读全部正常，只有**写**才炸，而且是导入后第一次写才炸。
+
+---
+
+## SQL 判题链路（阶段 2 补课，2026-08-07）
+
+阶段 4 做题目管理时才发现：新后端**完全没有 SQL 判题**。旧后端有
+`judge/sql_runner.py`（378 行）+ `sql_dispatcher.py`（113 行），走的是与沙箱完全
+不同的路径（跑 SQLite 比结果集）。阶段 2 纵切时只打通了沙箱那条线，漏了这条。
+
+### 防护为什么换了实现
+
+旧实现靠 Python sqlite3 的三件套。`bun:sqlite` 一个都没有，实测：
+
+| | 结论 |
+|---|---|
+| `setAuthorizer` / `setProgressHandler` / `setLimit` | 均无 |
+| `PRAGMA max_page_count` | 有效 |
+| `Worker.terminate()` 能否停掉跑飞的查询 | **不能** —— 递归 CTE 死循环卡死整个 worker，只能从外面杀进程 |
+| `node:sqlite` | 该 Bun 版本不可用 |
+
+因此改成「WASM 引擎（sql.js）+ 独立子进程」，逐条替代：
+
+| 旧防护 | 新做法 | 实测 |
+|---|---|---|
+| authorizer 禁 ATTACH | WASM 无宿主文件系统绑定，**结构上**够不到 | `attach '/etc/passwd'` → `unable to open database` |
+| authorizer 白名单让查询题只读 | `PRAGMA query_only=1` | 查询题里 INSERT → 运行错误并说明 |
+| progress_handler 墙钟超时 | 子进程外部 SIGKILL | 递归 CTE 死循环 → CPU 超时 |
+| `setlimit(LIMIT_LENGTH)` | 子进程 `ulimit -d` | `hex(zeroblob(2e8))` → 内存超限 |
+
+ATTACH 这条比旧实现**更强**：旧的靠 authorizer 拦，新的是够不到。
+
+### 两个踩过的坑
+
+1. **`ulimit` 必须用 `-d` 不能用 `-v`。** `-v` 限虚拟地址空间，而 JS 引擎预留巨量地址；
+   实测 `-v` 之下 Bun 退出时有概率 panic（SIGILL），结果早已写出但进程异常终止，
+   父进程读到空串误判成超时 —— 6 次里坏 2 次，时好时坏。换 `-d`（实际提交内存，
+   Linux 4.7 起也覆盖匿名 mmap）后 12/12 稳定。
+2. 子进程写完结果**直接 SIGKILL 自己**，不走 `process.exit()` —— 后者仍有一段清理会撞限额。
