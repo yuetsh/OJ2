@@ -8,10 +8,10 @@ import {
   problemDetailSchema,
   problemListItemSchema,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lte, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth } from "../auth/middleware"
 import { setContestPassword } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
@@ -22,10 +22,12 @@ import {
   contestStatus,
   findVisibleContest,
   isContestAdmin,
+  requireContestAccess,
+  type ContestEnv,
 } from "../services/contest"
 import { objectValue, publicTemplates, queryInteger, sampleUser, stringArray } from "./helpers"
 
-export const contestRoutes = new Hono<AppEnv>()
+export const contestRoutes = new Hono<ContestEnv>()
 
 async function creator(id: number) {
   const [row] = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
@@ -110,11 +112,8 @@ async function contestProblemTags(problemIds: number[]) {
   return map
 }
 
-contestRoutes.get("/contests/:id/problems", optionalAuth, async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const access = await canAccessContest(c, contest, "problems")
-  if (!access.ok) return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
+contestRoutes.get("/contests/:id/problems", optionalAuth, requireContestAccess("problems"), async (c) => {
+  const contest = c.get("contest")!
   const rows = await db.select({ problem: schema.problem, user: schema.user, realName: schema.userProfile.realName })
     .from(schema.problem).innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
@@ -138,11 +137,8 @@ contestRoutes.get("/contests/:id/problems", optionalAuth, async (c) => {
   })))
 })
 
-contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const access = await canAccessContest(c, contest, "problems")
-  if (!access.ok) return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
+contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireContestAccess("problems"), async (c) => {
+  const contest = c.get("contest")!
   const [row] = await db.select({ problem: schema.problem, user: schema.user, realName: schema.userProfile.realName })
     .from(schema.problem).innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
@@ -187,11 +183,8 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, async (c) =
   }))
 })
 
-contestRoutes.get("/contests/:id/rank", optionalAuth, async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const access = await canAccessContest(c, contest, "ranks")
-  if (!access.ok) return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
+contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("ranks"), async (c) => {
+  const contest = c.get("contest")!
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const where = and(eq(schema.acmContestRank.contestId, contest.id), inArray(schema.user.adminType, ["Regular User", "Student Admin"]), eq(schema.user.isDisabled, false))

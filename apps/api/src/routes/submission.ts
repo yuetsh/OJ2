@@ -14,7 +14,7 @@ import {
 import { and, count, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth } from "../auth/middleware"
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
@@ -26,6 +26,8 @@ import {
   findVisibleContest,
   ipAllowed,
   isContestAdmin,
+  requireContestAccess,
+  type ContestEnv,
 } from "../services/contest"
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
@@ -40,7 +42,7 @@ import {
   todayStart,
 } from "./helpers"
 
-export const submissionRoutes = new Hono<AppEnv>()
+export const submissionRoutes = new Hono<ContestEnv>()
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -68,6 +70,8 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
   }
   let contestId: number | null = null
   if (parsed.data.contestId) {
+    // 这里用不了 requireContestAccess 中间件：比赛 id 来自请求体，
+    // 中间件跑的时候 body 还没解析。全仓只有这一处仍是手工调用，改动时留意别漏掉鉴权。
     const contest = await findVisibleContest(parsed.data.contestId)
     if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
     const access = await canAccessContest(c, contest, "problems")
@@ -462,11 +466,8 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   }))
 })
 
-submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("contestId"), 0, { min: 1 }))
-  if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const access = await canAccessContest(c, contest, "submissions")
-  if (!access.ok) return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
+submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireContestAccess("submissions", "contestId"), async (c) => {
+  const contest = c.get("contest")!
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const filters = [eq(schema.submission.contestId, contest.id)]
