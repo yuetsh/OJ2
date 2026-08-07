@@ -23,7 +23,7 @@ import {
   findVisibleContest,
   isContestAdmin,
 } from "../services/contest"
-import { objectValue, publicTemplates, queryInteger, stringArray } from "./helpers"
+import { objectValue, publicTemplates, queryInteger, sampleUser, stringArray } from "./helpers"
 
 export const contestRoutes = new Hono<AppEnv>()
 
@@ -31,7 +31,7 @@ async function creator(id: number) {
   const [row] = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
     .from(schema.user).leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(eq(schema.user.id, id)).limit(1)
-  return row ?? { id, username: "", realName: null }
+  return sampleUser(row ?? { id, username: "" }, row?.realName)
 }
 
 async function serializeContest(contest: typeof schema.contest.$inferSelect, includeNow = false) {
@@ -128,7 +128,7 @@ contestRoutes.get("/contests/:id/problems", optionalAuth, async (c) => {
     submissionNumber: allowed ? problem.submissionNumber : 0,
     acceptedNumber: allowed ? problem.acceptedNumber : 0,
     difficulty: allowed ? problem.difficulty : "",
-    createdBy: { id: user.id, username: user.username, realName },
+    createdBy: sampleUser(user, realName),
     tags: tags.get(problem.id) ?? [],
     contestId: contest.id,
     allowFlowchart: problem.allowFlowchart,
@@ -174,7 +174,7 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, async (c) =
     shareSubmission: row.problem.shareSubmission,
     contestId: contest.id,
     tags: tags.get(row.problem.id) ?? [],
-    createdBy: { id: row.user.id, username: row.user.username, realName: row.realName },
+    createdBy: sampleUser(row.user, row.realName),
     myStatus: null,
     myFailedCount: 0,
     allowFlowchart: row.problem.allowFlowchart,
@@ -206,7 +206,9 @@ contestRoutes.get("/contests/:id/rank", optionalAuth, async (c) => {
   return success(c, contestRankSchema.parse({
     results: rows.map(({ rank, user, realName }) => contestRankItemSchema.parse({
       id: rank.id,
-      user: { id: user.id, username: user.username, realName: admin ? realName : null },
+      // 唯一显式打开真名的地方，对齐旧后端 contest/serializers.py:84
+      // `UsernameSerializer(obj.user, need_real_name=self.is_contest_admin)`
+      user: sampleUser(user, realName, { includeRealName: admin }),
       submissionNumber: rank.submissionNumber,
       acceptedNumber: rank.acceptedNumber,
       totalTime: rank.totalTime,

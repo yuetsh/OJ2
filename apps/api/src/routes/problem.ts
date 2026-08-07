@@ -28,7 +28,7 @@ import { optionalAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { objectValue as toObject, queryInteger } from "./helpers"
+import { objectValue as toObject, queryInteger, sampleUser } from "./helpers"
 
 export const problemRoutes = new Hono<AppEnv>()
 
@@ -83,7 +83,7 @@ function listItem(
 		submissionNumber: row.problem.submissionNumber,
 		acceptedNumber: row.problem.acceptedNumber,
 		difficulty: row.problem.difficulty,
-		createdBy: { id: row.user.id, username: row.user.username, realName: row.realName },
+		createdBy: sampleUser(row.user, row.realName),
 		tags: tags.get(row.problem.id) ?? [],
 		contestId: row.problem.contestId,
 		allowFlowchart: row.problem.allowFlowchart,
@@ -327,11 +327,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 		shareSubmission: row.problem.shareSubmission,
 		contestId: row.problem.contestId,
 		tags: tagRows.map((tag) => tag.name),
-		createdBy: {
-			id: row.creatorId,
-			username: row.creatorUsername,
-			realName: null,
-		},
+		createdBy: sampleUser({ id: row.creatorId, username: row.creatorUsername }, null),
 		myStatus,
 		myFailedCount,
 		allowFlowchart: row.problem.allowFlowchart,

@@ -35,7 +35,7 @@ import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { getUserProfileById } from "../services/profile"
-import { objectValue, queryInteger } from "./helpers"
+import { objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const accountRoutes = new Hono<AppEnv>()
 
@@ -99,6 +99,10 @@ accountRoutes.post("/users", async (c) => {
 })
 
 accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
+  // 对齐旧后端 account/views/oj.py 的 UserProfileAPI.get 首行：
+  // `if not user.is_authenticated: return self.success()` —— 匿名一律返回空，
+  // 否则用户名可经 /rankings/users 公开枚举，进而无 cookie 批量收集全校学生的邮箱与最后登录时间。
+  if (!c.get("user")) return success(c, null)
   const [target] = await db.select({ id: schema.user.id }).from(schema.user)
     .where(and(sql`lower(${schema.user.username}) = lower(${c.req.param("username")})`, eq(schema.user.isDisabled, false))).limit(1)
   if (!target) return failure(c, 404, "user-not-found", "User does not exist")
@@ -165,7 +169,7 @@ accountRoutes.get("/rankings/users", async (c) => {
     .limit(top > 0 ? Math.min(top, 250) : limit).offset(top > 0 ? 0 : offset)
   const results = rows.map(({ profile, user }) => rankProfileSchema.parse({
     id: profile.id,
-    user: { id: user.id, username: user.username, realName: profile.realName },
+    user: sampleUser(user, profile.realName),
     acceptedNumber: profile.acceptedNumber,
     submissionNumber: profile.submissionNumber,
     mood: profile.mood,

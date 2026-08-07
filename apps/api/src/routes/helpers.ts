@@ -1,4 +1,28 @@
+import { sampleUserSchema, type SampleUser } from "@oj2/contract"
+
 import type { AuthUser } from "../auth/session"
+
+/**
+ * 用户对象的序列化层，对齐旧后端 `utils/api/_serializers.py` 的 `UsernameSerializer`。
+ *
+ * 旧后端把「是否下发真名」做成 `need_real_name` 开关，**默认关闭**，全仓 11 处调用里只有
+ * 比赛榜单一处显式打开。这里保持同一约定：`realName` 默认不下发，需要的地方显式传
+ * `{ includeRealName: true }`。
+ *
+ * 所有下发用户对象的地方都必须走这个函数，不要再手写 `{ id, username, realName }` ——
+ * 手写的话下次新增端点必然重犯「学生真名无条件下发」。
+ */
+export function sampleUser(
+  source: { id: number; username: string },
+  realName: string | null | undefined,
+  options: { includeRealName?: boolean } = {},
+): SampleUser {
+  return sampleUserSchema.parse({
+    id: source.id,
+    username: source.username,
+    realName: options.includeRealName === true ? (realName ?? null) : null,
+  })
+}
 
 export function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -24,10 +48,9 @@ export function queryInteger(
   return parsed
 }
 
-export function isRegularUser(user: AuthUser | null | undefined) {
-  return user?.adminType === "Regular User"
-}
-
+// 注意：不要再加 isRegularUser(user) 这类「是普通用户才受限」的判断 ——
+// 匿名用户 user 为 null 时它返回 false，守卫会整体短路，匿名的权限反而大于登录学生。
+// 需要「非管理员即受限」时一律用 !isAdminRole(user)。
 export function isAdminRole(user: AuthUser | null | undefined) {
   return Boolean(user && user.adminType !== "Regular User")
 }

@@ -19,7 +19,7 @@ import { requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { isSuperAdmin, objectValue, queryInteger } from "./helpers"
+import { isSuperAdmin, objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const contentRoutes = new Hono<AppEnv>()
 
@@ -40,7 +40,7 @@ contentRoutes.get("/announcements", async (c) => {
       title: announcement.title,
       tag: announcement.tag,
       top: announcement.top,
-      createdBy: { id: user.id, username: user.username, realName },
+      createdBy: sampleUser(user, realName),
       createTime: announcement.createTime,
       lastUpdateTime: announcement.lastUpdateTime,
     })),
@@ -61,7 +61,7 @@ contentRoutes.get("/announcements/:id", async (c) => {
     tag: row.announcement.tag,
     content: row.announcement.content,
     top: row.announcement.top,
-    createdBy: { id: row.user.id, username: row.user.username, realName: row.realName },
+    createdBy: sampleUser(row.user, row.realName),
     createTime: row.announcement.createTime,
     lastUpdateTime: row.announcement.lastUpdateTime,
   }))
@@ -82,7 +82,7 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
   return success(c, messageListSchema.parse({
     results: rows.map(({ message, sender, realName, submission }) => messageSchema.parse({
       id: message.id,
-      sender: { id: sender.id, username: sender.username, realName },
+      sender: sampleUser(sender, realName),
       createTime: message.createTime,
       message: message.message,
       submission: submissionDetailSchema.parse({
@@ -193,7 +193,7 @@ contentRoutes.get("/tutorials/:id", async (c) => {
     isPublic: row.tutorial.isPublic,
     order: row.tutorial.order,
     type: row.tutorial.type,
-    createdBy: { id: row.user.id, username: row.user.username, realName: row.realName },
+    createdBy: sampleUser(row.user, row.realName),
     createdAt: row.tutorial.createdAt,
     updatedAt: row.tutorial.updatedAt,
   }))

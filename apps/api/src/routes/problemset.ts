@@ -33,7 +33,7 @@ import { publishAchievementNotification } from "../events"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { updateAchievementsForProblemSet } from "../services/achievements"
-import { isTeacherOrAbove, objectValue, queryInteger } from "./helpers"
+import { isTeacherOrAbove, objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
@@ -59,7 +59,7 @@ async function problemSetCreator(id: number) {
   const [row] = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
     .from(schema.user).leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(eq(schema.user.id, id)).limit(1)
-  return row ?? { id, username: "", realName: null }
+  return sampleUser(row ?? { id, username: "" }, row?.realName)
 }
 
 function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earned?: boolean) {
@@ -166,7 +166,7 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
       submissionNumber: problem.submissionNumber,
       acceptedNumber: problem.acceptedNumber,
       difficulty: problem.difficulty,
-      createdBy: { id: user.id, username: user.username, realName },
+      createdBy: sampleUser(user, realName),
       tags: tags.get(problem.id) ?? [],
       contestId: problem.contestId,
       allowFlowchart: problem.allowFlowchart,
@@ -395,7 +395,7 @@ problemsetRoutes.get("/problem-sets/:id/user-progress", requireAuth, async (c) =
   const results = rows.map(({ progress, user: progressUser, realName }) => problemSetProgressSchema.parse({
     id: progress.id,
     problemsetId: progress.problemsetId,
-    user: { id: progressUser.id, username: progressUser.username, realName },
+    user: sampleUser(progressUser, realName),
     joinTime: progress.joinTime,
     completeTime: progress.completeTime,
     isCompleted: progress.isCompleted,
