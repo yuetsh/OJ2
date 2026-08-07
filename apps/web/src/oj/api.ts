@@ -1,3 +1,9 @@
+import {
+  createSubmissionResponseSchema,
+  problemDetailSchema,
+  submissionDetailSchema,
+} from "@oj2/contract"
+import api2 from "utils/api2"
 import http from "utils/http"
 import { filterResult } from "oj/transforms"
 import type {
@@ -8,10 +14,23 @@ import type {
   Submission,
   SubmissionListPayload,
   SubmitCodePayload,
+  WebsiteConfig,
 } from "utils/types"
 
 export function getWebsiteConfig() {
-  return http.get("website")
+  return Promise.resolve({
+    error: null,
+    data: {
+      website_base_url: "",
+      website_name: "判题狗",
+      website_name_shortcut: "判题狗",
+      website_footer: "",
+      submission_list_show_all: true,
+      allow_register: false,
+      class_list: [],
+      enable_maxkb: false,
+    } as WebsiteConfig,
+  })
 }
 
 export async function getProblemList(
@@ -41,6 +60,7 @@ export function getRandomProblemID() {
 }
 
 export function getProblem(problemID: string, contestID: string) {
+  if (!contestID) return getPhase2Problem(problemID)
   const endpoint = !!contestID ? "contest/problem" : "problem"
   return http.get(endpoint, {
     params: {
@@ -50,22 +70,105 @@ export function getProblem(problemID: string, contestID: string) {
   })
 }
 
+async function getPhase2Problem(problemID: string) {
+  const response = await api2.get<unknown>(
+    `problems/${encodeURIComponent(problemID)}`,
+  )
+  const problem = problemDetailSchema.parse(response.data)
+  return {
+    error: null,
+    data: {
+      id: problem.id,
+      _id: problem._id,
+      title: problem.title,
+      description: problem.description,
+      input_description: problem.inputDescription,
+      output_description: problem.outputDescription,
+      samples: problem.samples,
+      hint: problem.hint ?? "",
+      languages: problem.languages,
+      template: problem.template,
+      create_time: problem.createTime,
+      last_update_time: problem.lastUpdateTime,
+      time_limit: problem.timeLimit,
+      memory_limit: problem.memoryLimit,
+      difficulty: problem.difficulty,
+      source: problem.source ?? "",
+      prompt: problem.prompt ?? "",
+      answers: [],
+      submission_number: problem.submissionNumber,
+      accepted_number: problem.acceptedNumber,
+      statistic_info: problem.statisticInfo,
+      share_submission: problem.shareSubmission,
+      contest: problem.contestId,
+      tags: problem.tags,
+      created_by: {
+        id: problem.createdBy.id,
+        username: problem.createdBy.username,
+        real_name: problem.createdBy.realName,
+      },
+      my_status: problem.myStatus,
+      my_failed_count: problem.myFailedCount,
+      visible: true,
+      allow_flowchart: problem.allowFlowchart,
+      show_flowchart: problem.showFlowchart,
+      mermaid_code: problem.mermaidCode,
+      flowchart_data: problem.flowchartData,
+      flowchart_hint: problem.flowchartHint,
+      sql_config: problem.sqlConfig,
+      sql_display: problem.sqlDisplay,
+    } as Problem,
+  }
+}
+
 export function getProblemBeatRate(problemID: number) {
   return http.get("problem/beat_count", { params: { problem_id: problemID } })
 }
 
-export function getSubmission(id: string) {
-  return http.get<Submission>("submission", {
-    params: { id },
-  })
+export async function getSubmission(id: string) {
+  const response = await api2.get<unknown>(
+    `submissions/${encodeURIComponent(id)}`,
+  )
+  const submission = submissionDetailSchema.parse(response.data)
+  return {
+    error: null,
+    data: {
+      id: submission.id,
+      create_time: submission.createTime,
+      user_id: submission.userId,
+      username: submission.username,
+      code: submission.code,
+      result: submission.result,
+      info: submission.info,
+      language: submission.language,
+      shared: submission.shared,
+      show_link: submission.showLink,
+      statistic_info: submission.statisticInfo,
+      ip: submission.ip,
+      contest: submission.contestId,
+      problem: submission.problemId,
+      can_unshare: submission.canUnshare,
+    } as Submission,
+  }
 }
 
-export function submitCode(data: SubmitCodePayload) {
-  return http.post("submission", data)
+export async function submitCode(data: SubmitCodePayload) {
+  const response = await api2.post<unknown>("submissions", {
+    problemId: data.problem_id,
+    language: data.language,
+    code: data.code,
+    contestId: data.contest_id,
+  })
+  const created = createSubmissionResponseSchema.parse(response.data)
+  return {
+    error: null,
+    data: { submission_id: created.submissionId },
+  }
 }
 
 export function formatCode(data: { code: string; language: string }) {
-  return http.post<{ code: string }>("format_code", data)
+  // 格式化端点在 Phase 3 迁移；Phase 2 保留原代码继续提交。
+  return Promise.resolve({ error: null, data: { code: data.code } })
 }
 
 export function getSubmissions(params: Partial<SubmissionListPayload>) {

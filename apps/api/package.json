@@ -4,14 +4,25 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
+    "dev": "bun run --parallel dev:http dev:worker",
+    "dev:http": "bun --watch src/index.ts",
+    "dev:worker": "bun --watch src/worker.ts",
+    "start": "bun src/index.ts",
+    "worker": "bun src/worker.ts",
+    "seed:dev": "bun src/scripts/seed-dev.ts",
+    "typecheck": "tsc --noEmit",
     "db:pull": "drizzle-kit pull"
   },
   "dependencies": {
     "@oj2/contract": "workspace:*",
+    "bullmq": "^6.0.9",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.0.0",
+    "ioredis": "^6.0.0",
     "postgres": "^3.4.0",
+    "tree-sitter-c": "^0.24.1",
+    "tree-sitter-python": "^0.25.0",
+    "web-tree-sitter": "^0.26.11",
     "zod": "^4.0.0"
   },
   "devDependencies": {

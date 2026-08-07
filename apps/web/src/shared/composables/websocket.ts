@@ -20,6 +20,8 @@ export interface WebSocketMessage {
 export interface WebSocketConfig {
   /** WebSocket 路径（如 '/ws/submission/'） */
   path: string
+  /** 完整 URL；提供后覆盖 PUBLIC_WS_URL + path */
+  url?: string
   /** 最大重连次数，默认 5 */
   maxReconnectAttempts?: number
   /** 重连延迟（毫秒），默认 1000 */
@@ -59,7 +61,8 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   public status: Ref<ConnectionStatus> = ref<ConnectionStatus>("disconnected")
 
   constructor(config: WebSocketConfig) {
-    this.url = `${import.meta.env.PUBLIC_WS_URL}/${config.path}/`
+    this.url =
+      config.url ?? `${import.meta.env.PUBLIC_WS_URL}/${config.path}/`
 
     this.maxReconnectAttempts = config.maxReconnectAttempts ?? 5
     this.reconnectDelay = config.reconnectDelay ?? 1000
@@ -300,9 +303,13 @@ export interface SubmissionUpdate extends WebSocketMessage {
  * 提交 WebSocket 连接管理类
  */
 class SubmissionWebSocket extends BaseWebSocket<SubmissionUpdate> {
+  private pendingSubmissionId = ""
+
   constructor() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({
       path: "submission",
+      url: `${protocol}//${window.location.host}/ws2/submissions`,
     })
   }
 
@@ -310,12 +317,24 @@ class SubmissionWebSocket extends BaseWebSocket<SubmissionUpdate> {
    * 订阅特定提交的更新
    */
   subscribe(submissionId: string) {
+    this.pendingSubmissionId = submissionId
     const success = this.send({
       type: "subscribe",
       submission_id: submissionId,
     })
-    if (!success) {
-      console.error("[WebSocket] 订阅失败: 连接未就绪")
+    if (success) this.pendingSubmissionId = ""
+  }
+
+  protected onConnected() {
+    if (!this.pendingSubmissionId) return
+    const submissionId = this.pendingSubmissionId
+    if (
+      this.send({
+        type: "subscribe",
+        submission_id: submissionId,
+      })
+    ) {
+      this.pendingSubmissionId = ""
     }
   }
 }

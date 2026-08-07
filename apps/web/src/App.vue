@@ -3,8 +3,6 @@ import { darkTheme, dateZhCN, zhCN } from "naive-ui"
 import "normalize.css"
 import "./index.css"
 import { useConfigStore } from "shared/store/config"
-import { useConfigUpdate } from "shared/composables/configUpdate"
-import { useMaxKB } from "shared/composables/maxkb"
 import { useUserStore } from "shared/store/user"
 
 const isDark = useDark()
@@ -17,9 +15,7 @@ onMounted(() => {
   userStore.getMyProfile()
 })
 
-// 使用配置更新和 MaxKB 功能
-useConfigUpdate()
-useMaxKB()
+// 配置推送和 MaxKB 仍属于 Phase 3；在它们迁入前不连接旧 WebSocket。
 
 // 延迟加载 highlight.js，避免阻塞首屏
 const hljsInstance = ref<any>(null)

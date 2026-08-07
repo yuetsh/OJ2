@@ -4,9 +4,11 @@
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "dev": "bun run --filter '*' dev",
-    "dev:api": "bun run --filter '@oj2/api' dev",
+    "dev": "bun run --parallel dev:api dev:worker dev:web",
+    "dev:api": "bun run --filter '@oj2/api' dev:http",
+    "dev:worker": "bun run --filter '@oj2/api' dev:worker",
     "dev:web": "bun run --filter '@oj2/web' dev",
+    "seed:dev": "bun run --filter '@oj2/api' seed:dev",
     "db:up": "docker compose -f docker/compose.dev.yml up -d",
     "db:down": "docker compose -f docker/compose.dev.yml down"
   },

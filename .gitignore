@@ -20,5 +20,9 @@ build/
 docs/spikes/node_modules/
 docs/spikes/endpoints-*.json
 
+# 本地判题验收数据来自生产测试点，只读挂载，不进入版本库
+data/test_case/
+data/judge_server/
+
 # 生产题目样本只用于本地验收，不进入 git
 *.csv

@@ -171,6 +171,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path: string) => path.replace(/^\/api2/, "/api"),
         },
+        "/ws2": {
+          target: "ws://localhost:3000",
+          ws: true,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/ws2/, "/ws"),
+        },
         "/api": proxyConfig,
         "/public": proxyConfig,
         "/ws": wsProxyConfig,

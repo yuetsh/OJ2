@@ -3,7 +3,6 @@ import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
 import {
   formatCode,
-  getReaction,
   submitCode,
   updateProblemSetProgress,
 } from "oj/api"
@@ -72,18 +71,6 @@ const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
   controls: true,
   immediate: false,
 })
-
-// ==================== AC后显示评论框 ====================
-const { start: showCommentPanelDelayed } = useTimeoutFn(
-  async () => {
-    const res = await getReaction(problem.value!.id)
-    if (res.data.mine === null) {
-      commentPanel.value = true
-    }
-  },
-  1500,
-  { immediate: false },
-)
 
 const { start: goToProblemSetDelayed } = useTimeoutFn(
   () => {
@@ -215,11 +202,6 @@ watch(
 
     // 3. 放烟花
     celebrate()
-
-    // 4. 显示评价框
-    if (!contestID && !problemSetId) {
-      showCommentPanelDelayed()
-    }
 
     if (problemSetId) {
       // 延迟回到题单页面

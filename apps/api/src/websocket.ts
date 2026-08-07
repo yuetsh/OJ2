@@ -1,0 +1,149 @@
+import { submissionUpdateSchema } from "@oj2/contract"
+import { and, eq } from "drizzle-orm"
+
+import { db, schema } from "./db"
+import {
+  parseSubmissionEvent,
+  submissionUpdateChannel,
+  userSubmissionTopic,
+} from "./judge/events"
+import { JudgeStatus } from "./judge/status"
+import { createSubscriberRedis } from "./redis"
+
+export interface SubmissionSocketData {
+  userId: number
+  username: string
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSocketData> {
+  return {
+    open(ws) {
+      ws.subscribe(userSubmissionTopic(ws.data.userId))
+    },
+    message(ws, message) {
+      void handleMessage(ws, String(message))
+    },
+    close(ws) {
+      ws.unsubscribe(userSubmissionTopic(ws.data.userId))
+    },
+  }
+}
+
+async function handleMessage(
+  ws: Bun.ServerWebSocket<SubmissionSocketData>,
+  raw: string,
+) {
+  const [activeUser] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(
+      and(
+        eq(schema.user.id, ws.data.userId),
+        eq(schema.user.isDisabled, false),
+      ),
+    )
+    .limit(1)
+  if (!activeUser) {
+    ws.close(1008, "Account disabled")
+    return
+  }
+
+  let message: { type?: unknown; timestamp?: unknown; submission_id?: unknown }
+  try {
+    message = JSON.parse(raw) as typeof message
+  } catch {
+    ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }))
+    return
+  }
+
+  if (message.type === "ping") {
+    ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
+    return
+  }
+  if (message.type !== "subscribe" || typeof message.submission_id !== "string") {
+    ws.send(JSON.stringify({ type: "error", message: "Invalid message" }))
+    return
+  }
+
+  const [submission] = await db
+    .select({
+      id: schema.submission.id,
+      result: schema.submission.result,
+      statisticInfo: schema.submission.statisticInfo,
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.id, message.submission_id),
+        eq(schema.submission.userId, ws.data.userId),
+      ),
+    )
+    .limit(1)
+
+  if (!submission) {
+    ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
+    return
+  }
+
+  const statistics = objectValue(submission.statisticInfo)
+  const status =
+    submission.result === JudgeStatus.PENDING
+      ? "pending"
+      : submission.result === JudgeStatus.JUDGING
+        ? "judging"
+        : submission.result === JudgeStatus.SYSTEM_ERROR
+          ? "error"
+          : "finished"
+  const parsed = submissionUpdateSchema.safeParse({
+    type: "submission_update",
+    submission_id: submission.id,
+    result: submission.result,
+    status,
+    time_cost: statistics.time_cost,
+    memory_cost: statistics.memory_cost,
+    score: statistics.score,
+    err_info: statistics.err_info,
+  })
+  if (parsed.success) ws.send(JSON.stringify(parsed.data))
+}
+
+export async function bridgeSubmissionEvents(
+  server: Bun.Server<SubmissionSocketData>,
+) {
+  const subscriber = createSubscriberRedis()
+  subscriber.on("message", (channel, raw) => {
+    if (channel !== submissionUpdateChannel) return
+    const event = parseSubmissionEvent(raw)
+    if (!event) return
+    void (async () => {
+      const [activeUser] = await db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(
+          and(
+            eq(schema.user.id, event.userId),
+            eq(schema.user.isDisabled, false),
+          ),
+        )
+        .limit(1)
+      if (!activeUser) return
+      server.publish(
+        userSubmissionTopic(event.userId),
+        JSON.stringify(event.data),
+      )
+    })().catch((error) => {
+      console.error("Failed to bridge submission event", error)
+    })
+  })
+  subscriber.on("error", (error) => {
+    console.error("Submission event subscriber error", error)
+  })
+  await subscriber.subscribe(submissionUpdateChannel)
+  return subscriber
+}

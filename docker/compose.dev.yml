@@ -40,5 +40,33 @@ services:
       timeout: 3s
       retries: 10
 
+  judge:
+    image: registry.cn-hongkong.aliyuncs.com/oj-image/judge:1.6.1
+    container_name: oj2-judge
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - SETPCAP
+      - MKNOD
+      - NET_BIND_SERVICE
+      - SYS_CHROOT
+      - SETFCAP
+      - FSETID
+    tmpfs:
+      - /tmp
+    ports:
+      - "8081:8080"
+    volumes:
+      - ../data/test_case:/test_case:ro
+      - ../data/judge_server/log:/log
+      - ../data/judge_server/run:/judger
+    environment:
+      SERVICE_URL: http://oj2-judge:8080
+      BACKEND_URL: http://host.docker.internal:3000/api/judge-server/heartbeat
+      TOKEN: ${OJ2_JUDGE_TOKEN:-oj2-dev-token}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
 volumes:
   oj2-pgdata:

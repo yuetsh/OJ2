@@ -4,12 +4,10 @@ import { storeToRefs } from "pinia"
 import { useAuthModalStore } from "../store/authModal"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
-import { useLoginSummaryStore } from "../store/loginSummary"
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
 const authStore = useAuthModalStore()
-const loginSummaryStore = useLoginSummaryStore()
 
 const {
   loginModalOpen,
@@ -68,7 +66,6 @@ async function submit() {
       if (!msg.value) {
         authStore.closeLoginModal()
         await userStore.getMyProfile()
-        loginSummaryStore.open()
       }
     }
   })
