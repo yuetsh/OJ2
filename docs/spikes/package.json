@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@node-rs/jieba": "^2.0.1",
+    "tree-sitter-c": "^0.24.1",
+    "tree-sitter-python": "^0.25.0",
+    "web-tree-sitter": "^0.26.11"
+  }
+}

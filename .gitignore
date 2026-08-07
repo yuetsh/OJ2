@@ -11,7 +11,8 @@ build/
 .vscode/
 .idea/
 
-# spike 的依赖不入库，spike 源码入库
+# spike 的依赖不入库，spike 源码与依赖清单入库
+# 只排除脚本产物（endpoints-*.json），package.json / bun.lock 必须入库，
+# 否则 spike 换台机器就跑不起来（曾漏掉三个 tree-sitter 依赖，ast-spike.ts 直接报错）
 docs/spikes/node_modules/
-docs/spikes/bun.lock
-docs/spikes/*.json
+docs/spikes/endpoints-*.json
