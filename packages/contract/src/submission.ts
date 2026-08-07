@@ -75,6 +75,38 @@ export const submissionListSchema = paginatedSchema(submissionListItemSchema)
 
 export const shareSubmissionRequestSchema = z.object({ shared: z.boolean() })
 
+/**
+ * 未完成学生。`realName` 是从用户名里剥掉 `ks<班级号>` 前缀后剩下的那一段，
+ * 不是 user.real_name 列 —— 与 F2「真名默认不下发」不冲突：这里只有教师能看到，
+ * 且教师面板的用途正是点名谁没做。
+ */
+export const unacceptedStudentSchema = z.object({
+  username: z.string(),
+  realName: z.string(),
+})
+
+export const submissionStatisticsUserSchema = z.object({
+  username: z.string(),
+  className: z.string().nullable(),
+  submissionCount: z.number().int(),
+  acceptedCount: z.number().int(),
+  // 百分比数值，不带 %。旧后端返回 "85.5%" 字符串，展示格式化交给前端。
+  correctRate: z.number(),
+  submissionItems: z.array(
+    z.object({ id: z.string(), result: judgeStatusSchema }),
+  ),
+})
+
+export const submissionStatisticsSchema = z.object({
+  submissionCount: z.number().int(),
+  acceptedCount: z.number().int(),
+  correctRate: z.number(),
+  personCount: z.number().int(),
+  personRate: z.number(),
+  data: z.array(submissionStatisticsUserSchema),
+  dataUnaccepted: z.array(unacceptedStudentSchema),
+})
+
 export const formatCodeRequestSchema = z.object({
   code: z.string().max(1024 * 1024),
   language: z.enum(["python", "c", "cpp", "sql"]),
@@ -88,3 +120,8 @@ export type CreateSubmissionRequest = z.infer<
 >
 export type SubmissionDetail = z.infer<typeof submissionDetailSchema>
 export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
+export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
+export type SubmissionStatisticsUser = z.infer<
+  typeof submissionStatisticsUserSchema
+>
+export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>

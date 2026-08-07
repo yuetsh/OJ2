@@ -9,6 +9,7 @@ import {
   submissionDetailSchema,
   submissionListItemSchema,
   submissionListSchema,
+  submissionStatisticsSchema,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -29,7 +30,15 @@ import {
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
-import { isAdminRole, queryInteger, todayStart } from "./helpers"
+import {
+  isAdminRole,
+  isSuperAdmin,
+  isTeacherOrAbove,
+  queryInteger,
+  rounded,
+  stripClassPrefix,
+  todayStart,
+} from "./helpers"
 
 export const submissionRoutes = new Hono<AppEnv>()
 
@@ -155,6 +164,196 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
   const [row] = await db.select({ value: count() }).from(schema.submission)
     .where(and(isNull(schema.submission.contestId), sql`${schema.submission.createTime} >= ${todayStart()}`))
   return success(c, row?.value ?? 0)
+})
+
+const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
+
+/**
+ * 统计接口共用的时间窗解析。旧后端 `end` 必填、`start` 可选（不给就是「全部时段」）。
+ */
+function statisticsRange(c: { req: { query(name: string): string | undefined } }) {
+  const end = c.req.query("end")?.trim()
+  if (!end) return null
+  const start = c.req.query("start")?.trim()
+  return { start: start || null, end }
+}
+
+/**
+ * 按题号（展示用的 _id）定位公开题目。找不到时统计接口要报错而不是退化成「全部题目」，
+ * 否则教师打错一个字就会看到全站数据还以为是本题的。
+ */
+async function findPublicProblemByDisplayId(displayId: string) {
+  const [row] = await db
+    .select({ id: schema.problem.id })
+    .from(schema.problem)
+    .where(
+      and(
+        sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+        isNull(schema.problem.contestId),
+        eq(schema.problem.visible, true),
+      ),
+    )
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * 用户名模糊匹配到的在册学生，用来算「班级人数」和「谁没做」。
+ * 只算未禁用的普通用户 —— 教师和管理员不该出现在完成度分母里。
+ */
+async function matchedStudents(username: string) {
+  return db
+    .select({ username: schema.user.username, className: schema.user.className })
+    .from(schema.user)
+    .where(
+      and(
+        ilike(schema.user.username, `%${username}%`),
+        eq(schema.user.isDisabled, false),
+        eq(schema.user.adminType, "Regular User"),
+      ),
+    )
+}
+
+submissionRoutes.get("/submissions/statistics", requireAuth, async (c) => {
+  if (!isTeacherOrAbove(c.get("user"))) {
+    return failure(c, 403, "permission-denied", "Teacher permission required")
+  }
+  const range = statisticsRange(c)
+  if (!range) return failure(c, 400, "invalid-request", "end is required")
+
+  const filters = [
+    isNull(schema.submission.contestId),
+    sql`${schema.submission.createTime} <= ${range.end}`,
+  ]
+  if (range.start) filters.push(sql`${schema.submission.createTime} >= ${range.start}`)
+
+  const displayId = c.req.query("problemId")?.trim()
+  if (displayId) {
+    const problem = await findPublicProblemByDisplayId(displayId)
+    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+    filters.push(eq(schema.submission.problemId, problem.id))
+  }
+
+  const username = c.req.query("username")?.trim()
+  if (username) filters.push(ilike(schema.submission.username, `%${username}%`))
+  const where = and(...filters)
+
+  const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
+
+  const [[totals], perUser, rosterRows, items] = await Promise.all([
+    db
+      .select({ total: count(), accepted: acceptedFilter.mapWith(Number) })
+      .from(schema.submission)
+      .where(where),
+    db
+      .select({
+        username: schema.submission.username,
+        submissionCount: count(),
+        acceptedCount: acceptedFilter.mapWith(Number),
+      })
+      .from(schema.submission)
+      .where(where)
+      .groupBy(schema.submission.username)
+      .orderBy(desc(count())),
+    // 只有指定了用户名才有「班级人数」这个概念；不指定时分母无意义，旧后端也返回 0
+    username ? matchedStudents(username) : Promise.resolve([]),
+    db
+      .select({
+        username: schema.submission.username,
+        id: schema.submission.id,
+        result: schema.submission.result,
+      })
+      .from(schema.submission)
+      .where(where)
+      .orderBy(desc(schema.submission.createTime)),
+  ])
+
+  const submissionCount = totals?.total ?? 0
+  const acceptedCount = totals?.accepted ?? 0
+
+  const itemsByUser = new Map<string, { id: string; result: number }[]>()
+  for (const item of items) {
+    const bucket = itemsByUser.get(item.username)
+    if (bucket) bucket.push({ id: item.id, result: item.result })
+    else itemsByUser.set(item.username, [{ id: item.id, result: item.result }])
+  }
+
+  const submittedUsernames = new Set(perUser.map((row) => row.username))
+  const classNames = new Map<string, string | null>()
+  if (submittedUsernames.size) {
+    const rows = await db
+      .select({ username: schema.user.username, className: schema.user.className })
+      .from(schema.user)
+      .where(inArray(schema.user.username, [...submittedUsernames]))
+    for (const row of rows) classNames.set(row.username, row.className)
+  }
+
+  // 只列出有正确提交的人。做了但一次没对的学生落在「未完成」那一栏
+  const data = perUser
+    .filter((row) => row.acceptedCount > 0)
+    .map((row) => ({
+      username: row.username,
+      className: classNames.get(row.username) ?? null,
+      submissionCount: row.submissionCount,
+      acceptedCount: row.acceptedCount,
+      correctRate: rounded((row.acceptedCount / row.submissionCount) * 100),
+      submissionItems: itemsByUser.get(row.username) ?? [],
+    }))
+
+  const dataUnaccepted = rosterRows
+    .filter((row) => !submittedUsernames.has(row.username))
+    .map((row) => ({
+      username: row.username,
+      realName: stripClassPrefix(row.username, row.className),
+    }))
+
+  // 顺序照搬旧后端：先用原始 person_count 算完成度，再修正 person_count。
+  // 修正是为了兜住「学生已删号但提交记录还在」——那时完成人数会大于花名册人数。
+  let personCount = rosterRows.length
+  let personRate = 0
+  if (personCount) {
+    personRate = Math.min(100, rounded((data.length / personCount) * 100))
+    if (personCount < data.length) personCount = data.length
+  }
+
+  return success(
+    c,
+    submissionStatisticsSchema.parse({
+      submissionCount,
+      acceptedCount,
+      correctRate: submissionCount ? rounded((acceptedCount / submissionCount) * 100) : 0,
+      personCount,
+      personRate,
+      data,
+      dataUnaccepted,
+    }),
+  )
+})
+
+submissionRoutes.post("/submissions/:id/rejudge", requireAuth, async (c) => {
+  if (!isSuperAdmin(c.get("user"))) {
+    return failure(c, 403, "permission-denied", "Super admin permission required")
+  }
+  const [row] = await db
+    .select({ id: schema.submission.id, problemId: schema.submission.problemId })
+    .from(schema.submission)
+    .where(and(eq(schema.submission.id, c.req.param("id")), isNull(schema.submission.contestId)))
+    .limit(1)
+  if (!row) return failure(c, 404, "submission-not-found", "Submission does not exist")
+
+  await db
+    .update(schema.submission)
+    .set({ statisticInfo: {}, result: JudgeStatus.PENDING })
+    .where(eq(schema.submission.id, row.id))
+
+  // jobId 必须带时间戳。队列保留最近 100 个已完成任务，沿用 submissionId 做 jobId 的话
+  // BullMQ 会认为这个任务已经存在，重判静默变成空操作。与 flowcharts/:id/retry 同一处理。
+  await judgeQueue.add(
+    "judge",
+    { submissionId: row.id, problemId: row.problemId },
+    { jobId: `${row.id}:rejudge:${Date.now()}` },
+  )
+  return success(c, null)
 })
 
 submissionRoutes.post("/code/format", requireAuth, async (c) => {

@@ -21,37 +21,37 @@
   </n-flex>
 
   <n-empty
-    v-if="data.total_count === 0"
+    v-if="data.totalCount === 0"
     description="暂无数据"
     style="margin: 40px 0"
   />
 
-  <template v-if="data.total_count > 0">
+  <template v-if="data.totalCount > 0">
     <n-divider style="margin: 16px 0" />
     <n-flex justify="space-around">
       <div class="stat-item">
         <n-text>总提交</n-text>
         <n-gradient-text type="info" font-size="28">
-          {{ data.total_count }}
+          {{ data.totalCount }}
         </n-gradient-text>
       </div>
       <div class="stat-item">
         <n-text>平均分</n-text>
         <n-gradient-text type="primary" font-size="28">
-          {{ data.avg_score }}
+          {{ data.avgScore }}
         </n-gradient-text>
       </div>
-      <template v-if="data.person_count > 0">
+      <template v-if="data.personCount > 0">
         <div class="stat-item">
           <n-text>完成人数</n-text>
           <n-gradient-text type="error" font-size="28">
-            {{ data.completed_count }}
+            {{ data.completedCount }}
           </n-gradient-text>
         </div>
         <div class="stat-item">
           <n-text>班级人数</n-text>
           <n-gradient-text type="warning" font-size="28">
-            {{ data.person_count }}
+            {{ data.personCount }}
           </n-gradient-text>
         </div>
         <div class="stat-item">
@@ -76,7 +76,7 @@
             </n-card>
           </n-gi>
           <!-- 3. Completion doughnut -->
-          <n-gi v-if="data.person_count > 0">
+          <n-gi v-if="data.personCount > 0">
             <n-card title="班级完成度">
               <div class="chart-container">
                 <Doughnut
@@ -95,7 +95,7 @@
             </n-card>
           </n-gi>
           <!-- 4. Criteria bar chart (only when class exists, pairs with radar) -->
-          <n-gi v-if="data.person_count > 0 && hasRadarData">
+          <n-gi v-if="data.personCount > 0 && hasRadarData">
             <n-card title="各维度平均得分">
               <div class="chart-container">
                 <Bar :data="criteriaBarChartData" :options="barOptions" />
@@ -103,7 +103,7 @@
             </n-card>
           </n-gi>
           <!-- 4. Word cloud -->
-          <n-gi :span="2" v-if="data.word_frequencies.length > 0">
+          <n-gi :span="2" v-if="data.wordFrequencies.length > 0">
             <n-card title="常见问题高频词">
               <div class="wordcloud-container">
                 <canvas ref="wordcloudCanvas"></canvas>
@@ -114,7 +114,7 @@
       </n-tab-pane>
 
       <n-tab-pane
-        v-if="data.data_unaccepted.length > 0"
+        v-if="data.dataUnaccepted.length > 0"
         name="unaccepted"
         :tab="`未完成（${visibleUnaccepted.length}）`"
       >
@@ -148,9 +148,9 @@
               style="font-size: 20px"
               @close="hideStudent(item.username)"
             >
-              {{ item.real_name }}
+              {{ item.realName }}
             </n-tag>
-            <span v-else style="font-size: 24px">{{ item.real_name }}</span>
+            <span v-else style="font-size: 24px">{{ item.realName }}</span>
           </template>
         </n-flex>
       </n-tab-pane>
@@ -160,6 +160,7 @@
 
 <script setup lang="ts">
 import { formatISO, sub, type Duration } from "date-fns"
+import type { FlowchartStatistics } from "@oj2/contract"
 import { getFlowchartStatistics } from "oj/api"
 import { DURATION_OPTIONS } from "utils/constants"
 import { Doughnut, Radar, Bar } from "vue-chartjs"
@@ -216,26 +217,15 @@ const query = reactive({
   duration: durationOptions[0].value,
 })
 
-interface StatisticsData {
-  total_count: number
-  avg_score: number
-  grade_distribution: Record<string, number>
-  criteria_averages: Record<string, { avg: number; max: number }>
-  person_count: number
-  completed_count: number
-  word_frequencies: { word: string; count: number }[]
-  data_unaccepted: { username: string; real_name: string }[]
-}
-
-const data = reactive<StatisticsData>({
-  total_count: 0,
-  avg_score: 0,
-  grade_distribution: {},
-  criteria_averages: {},
-  person_count: 0,
-  completed_count: 0,
-  word_frequencies: [],
-  data_unaccepted: [],
+const data = reactive<FlowchartStatistics>({
+  totalCount: 0,
+  avgScore: 0,
+  gradeDistribution: {},
+  criteriaAverages: {},
+  personCount: 0,
+  completedCount: 0,
+  wordFrequencies: [],
+  dataUnaccepted: [],
 })
 
 const wordcloudCanvas = useTemplateRef<HTMLCanvasElement>("wordcloudCanvas")
@@ -274,7 +264,7 @@ function showAll() {
 
 const visibleUnaccepted = computed(() => {
   const now = Date.now()
-  return data.data_unaccepted.filter((item) => {
+  return data.dataUnaccepted.filter((item) => {
     const exp = hiddenStudents.value[item.username]
     return !exp || exp <= now
   })
@@ -282,14 +272,14 @@ const visibleUnaccepted = computed(() => {
 
 const hiddenCount = computed(() => {
   const now = Date.now()
-  return data.data_unaccepted.filter((item) => {
+  return data.dataUnaccepted.filter((item) => {
     const exp = hiddenStudents.value[item.username]
     return !!exp && exp > now
   }).length
 })
 
 const adjustedPersonCount = computed(() =>
-  Math.max(0, data.person_count - hiddenCount.value),
+  Math.max(0, data.personCount - hiddenCount.value),
 )
 
 onMounted(() => {
@@ -305,7 +295,7 @@ const completionRate = computed(() => {
   if (adjustedPersonCount.value <= 0) return "0%"
   const rate = Math.min(
     100,
-    (data.completed_count / adjustedPersonCount.value) * 100,
+    (data.completedCount / adjustedPersonCount.value) * 100,
   )
   return `${Math.round(rate * 100) / 100}%`
 })
@@ -319,10 +309,8 @@ const GRADE_COLORS: Record<string, { bg: string; border: string }> = {
 
 const gradeChartData = computed(() => {
   const grades = ["S", "A", "B", "C"]
-  const counts = grades.map((g) => data.grade_distribution[g] || 0)
-  const labels = grades.map(
-    (g) => `${g}级 (${data.grade_distribution[g] || 0})`,
-  )
+  const counts = grades.map((g) => data.gradeDistribution[g] || 0)
+  const labels = grades.map((g) => `${g}级 (${data.gradeDistribution[g] || 0})`)
   return {
     labels,
     datasets: [
@@ -339,13 +327,13 @@ const gradeChartData = computed(() => {
 const completionChartData = computed(() => {
   const uncompleted = Math.max(
     0,
-    adjustedPersonCount.value - data.completed_count,
+    adjustedPersonCount.value - data.completedCount,
   )
   return {
     labels: ["已完成", "未完成"],
     datasets: [
       {
-        data: [data.completed_count, uncompleted],
+        data: [data.completedCount, uncompleted],
         backgroundColor: ["rgba(106, 176, 76, 0.6)", "rgba(255, 159, 64, 0.6)"],
         borderColor: ["rgba(106, 176, 76, 1)", "rgba(255, 159, 64, 1)"],
         borderWidth: 2,
@@ -379,13 +367,13 @@ const doughnutOptions = {
 const CRITERIA_ORDER = ["逻辑正确性", "完整性", "规范性", "清晰度"]
 
 const hasRadarData = computed(() =>
-  CRITERIA_ORDER.some((k) => k in data.criteria_averages),
+  CRITERIA_ORDER.some((k) => k in data.criteriaAverages),
 )
 
 const radarChartData = computed(() => {
   const labels = CRITERIA_ORDER
   const values = CRITERIA_ORDER.map((k) => {
-    const item = data.criteria_averages[k]
+    const item = data.criteriaAverages[k]
     if (!item) return 0
     return Math.round((item.avg / item.max) * 100)
   })
@@ -420,7 +408,7 @@ const radarOptions = {
       callbacks: {
         label(context: any) {
           const key = CRITERIA_ORDER[context.dataIndex]
-          const item = data.criteria_averages[key]
+          const item = data.criteriaAverages[key]
           if (!item) return ""
           return `${key}: ${item.avg}/${item.max} (${context.parsed.r}%)`
         },
@@ -430,13 +418,13 @@ const radarOptions = {
 }
 
 const criteriaBarChartData = computed(() => {
-  const labels = CRITERIA_ORDER.filter((k) => k in data.criteria_averages)
+  const labels = CRITERIA_ORDER.filter((k) => k in data.criteriaAverages)
   return {
     labels,
     datasets: [
       {
         label: "平均得分",
-        data: labels.map((k) => data.criteria_averages[k]?.avg ?? 0),
+        data: labels.map((k) => data.criteriaAverages[k]?.avg ?? 0),
         backgroundColor: labels.map(
           (_, i) => GRADE_COLORS[["S", "A", "B", "C"][i]].bg,
         ),
@@ -461,7 +449,7 @@ const barOptions = {
       callbacks: {
         label(context: any) {
           const key = context.label
-          const item = data.criteria_averages[key]
+          const item = data.criteriaAverages[key]
           if (!item) return ""
           return `${item.avg} / ${item.max}`
         },
@@ -484,14 +472,14 @@ const WORD_COLORS = [
 ]
 
 function renderWordCloud() {
-  if (!wordcloudCanvas.value || data.word_frequencies.length === 0) return
+  if (!wordcloudCanvas.value || data.wordFrequencies.length === 0) return
 
   if (wordcloudChart) {
     wordcloudChart.destroy()
     wordcloudChart = null
   }
 
-  const words = data.word_frequencies
+  const words = data.wordFrequencies
   const maxCount = Math.max(...words.map((w) => w.count))
 
   wordcloudChart = new ChartJS(wordcloudCanvas.value, {

@@ -46,9 +46,9 @@
       </div>
       <div class="stat-item">
         <n-text>正确率</n-text>
-        <n-gradient-text type="warning" font-size="28">{{
-          count.rate
-        }}</n-gradient-text>
+        <n-gradient-text type="warning" font-size="28"
+          >{{ count.rate }}%</n-gradient-text
+        >
       </div>
       <template v-if="person.count > 0">
         <div class="stat-item">
@@ -140,9 +140,9 @@
               style="font-size: 20px"
               @close="hideStudent(item.username)"
             >
-              {{ item.real_name }}
+              {{ item.realName }}
             </n-tag>
-            <span v-else style="font-size: 24px">{{ item.real_name }}</span>
+            <span v-else style="font-size: 24px">{{ item.realName }}</span>
           </template>
         </n-flex>
       </n-tab-pane>
@@ -158,7 +158,7 @@ import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
 import { NButton, NFlex, NText, type DataTableRowKey } from "naive-ui"
 import { JUDGE_STATUS } from "utils/constants"
-import type { SUBMISSION_RESULT } from "utils/types"
+import type { SubmissionStatisticsUser, UnacceptedStudent } from "@oj2/contract"
 
 // 注册 Chart.js 组件
 ChartJS.register(ArcElement, Title, Tooltip, Legend)
@@ -182,12 +182,12 @@ function openSubmission(id: string) {
   window.open(`/submission/${id}`, "_blank", "noopener")
 }
 
-const columns: DataTableColumn<UserStatistic>[] = [
+const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
   {
     type: "expand",
     renderExpand: (row) => {
       return h(NFlex, { size: "small", wrap: true }, () =>
-        row.submission_items.map((item) =>
+        row.submissionItems.map((item) =>
           h(
             NButton,
             {
@@ -207,9 +207,14 @@ const columns: DataTableColumn<UserStatistic>[] = [
     },
   },
   { title: "用户", key: "username" },
-  { title: "提交数", key: "submission_count" },
-  { title: "已解决", key: "accepted_count" },
-  { title: "正确率", key: "correct_rate" },
+  { title: "提交数", key: "submissionCount" },
+  { title: "已解决", key: "acceptedCount" },
+  // 新后端返回的是数值，百分号在这里补 —— 旧后端直接返回 "85.5%" 字符串
+  {
+    title: "正确率",
+    key: "correctRate",
+    render: (row) => `${row.correctRate}%`,
+  },
 ]
 
 const query = reactive({
@@ -230,24 +235,8 @@ const person = reactive({
 const route = useRoute()
 const router = useRouter()
 
-interface UserStatistic {
-  username: string
-  submission_count: number
-  accepted_count: number
-  correct_rate: string
-  submission_items: Array<{
-    id: string
-    result: SUBMISSION_RESULT
-  }>
-}
-
-interface UnacceptedItem {
-  username: string
-  real_name: string
-}
-
-const list = ref<UserStatistic[]>([])
-const listUnaccepted = ref<UnacceptedItem[]>([])
+const list = ref<SubmissionStatisticsUser[]>([])
+const listUnaccepted = ref<UnacceptedStudent[]>([])
 const expandedRowKeys = ref<DataTableRowKey[]>([])
 
 const HIDE_DURATION = 2 * 60 * 60 * 1000
@@ -432,16 +421,16 @@ async function handleStatistics() {
     query.problem,
     query.username,
   )
-  count.total = res.data.submission_count
-  count.accepted = res.data.accepted_count
-  count.rate = res.data.correct_rate
+  count.total = res.data.submissionCount
+  count.accepted = res.data.acceptedCount
+  count.rate = res.data.correctRate
   list.value = res.data.data
-  listUnaccepted.value = res.data.data_unaccepted
-  person.count = res.data.person_count
-  person.rate = res.data.person_rate
+  listUnaccepted.value = res.data.dataUnaccepted
+  person.count = res.data.personCount
+  person.rate = res.data.personRate
 }
 
-function rowKey(row: UserStatistic): DataTableRowKey {
+function rowKey(row: SubmissionStatisticsUser): DataTableRowKey {
   return row.username
 }
 
@@ -449,7 +438,7 @@ function updateExpandedRowKeys(keys: DataTableRowKey[]) {
   expandedRowKeys.value = keys.slice(-1)
 }
 
-function rowProps(row: UserStatistic) {
+function rowProps(row: SubmissionStatisticsUser) {
   return {
     style: "cursor: pointer;",
     onClick: () => {

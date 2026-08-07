@@ -5,6 +5,7 @@ import { Hono } from "hono"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { getWebsiteOptions } from "../services/options"
+import { stripClassPrefix } from "./helpers"
 
 export const siteRoutes = new Hono()
 
@@ -43,5 +44,6 @@ siteRoutes.get("/classes/:className/usernames", async (c) => {
     .from(schema.user)
     .where(eq(schema.user.className, className))
     .orderBy(desc(schema.user.createTime), asc(schema.user.id))
-  return success(c, rows.map(({ username }) => username.replace(`ks${className}`, "")))
+  // 用 stripClassPrefix 而不是 replace：replace 会把中间的匹配也删掉，前缀对不上时截出乱码
+  return success(c, rows.map(({ username }) => stripClassPrefix(username, className)))
 })

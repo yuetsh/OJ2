@@ -7,9 +7,10 @@ import {
   flowchartDetailSchema,
   flowchartListItemSchema,
   flowchartListSchema,
+  flowchartStatisticsSchema,
   flowchartSubmissionSchema,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, ilike, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike, isNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
@@ -17,7 +18,16 @@ import { config } from "../config"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { flowchartQueue } from "../queue"
-import { isAdminRole, objectValue, queryInteger, todayStart } from "./helpers"
+import { buildWordFrequencies } from "../services/word-frequency"
+import {
+  isAdminRole,
+  isTeacherOrAbove,
+  objectValue,
+  queryInteger,
+  rounded,
+  stripClassPrefix,
+  todayStart,
+} from "./helpers"
 
 export const flowchartRoutes = new Hono<AppEnv>()
 
@@ -124,6 +134,137 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
       showLink: canView(user, flowchart, problem),
     })),
     total: totalRows[0]?.value ?? 0,
+  }))
+})
+
+const FLOWCHART_COMPLETED = 2
+
+flowchartRoutes.get("/flowcharts/statistics", requireAuth, async (c) => {
+  if (!isTeacherOrAbove(c.get("user"))) {
+    return failure(c, 403, "permission-denied", "Teacher permission required")
+  }
+  const end = c.req.query("end")?.trim()
+  if (!end) return failure(c, 400, "invalid-request", "end is required")
+  const start = c.req.query("start")?.trim()
+
+  const filters = [
+    eq(schema.flowchartSubmission.status, FLOWCHART_COMPLETED),
+    sql`${schema.flowchartSubmission.createTime} <= ${end}`,
+  ]
+  if (start) filters.push(sql`${schema.flowchartSubmission.createTime} >= ${start}`)
+
+  const displayId = c.req.query("problemId")?.trim()
+  if (displayId) {
+    const [problem] = await db
+      .select({ id: schema.problem.id })
+      .from(schema.problem)
+      .where(and(
+        sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+        isNull(schema.problem.contestId),
+        eq(schema.problem.visible, true),
+      ))
+      .limit(1)
+    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+    filters.push(eq(schema.flowchartSubmission.problemId, problem.id))
+  }
+
+  const username = c.req.query("username")?.trim()
+  if (username) filters.push(ilike(schema.user.username, `%${username}%`))
+
+  // 只有指定了用户名才谈得上「班级人数」，不指定时分母无意义
+  const roster = username
+    ? await db
+        .select({ username: schema.user.username, className: schema.user.className })
+        .from(schema.user)
+        .where(and(
+          ilike(schema.user.username, `%${username}%`),
+          eq(schema.user.isDisabled, false),
+          eq(schema.user.adminType, "Regular User"),
+        ))
+    : []
+
+  const rows = await db
+    .select({
+      username: schema.user.username,
+      score: schema.flowchartSubmission.aiScore,
+      grade: schema.flowchartSubmission.aiGrade,
+      criteria: schema.flowchartSubmission.aiCriteriaDetails,
+      feedback: schema.flowchartSubmission.aiFeedback,
+      suggestions: schema.flowchartSubmission.aiSuggestions,
+    })
+    .from(schema.flowchartSubmission)
+    .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
+    .where(and(...filters))
+
+  const empty = {
+    totalCount: 0,
+    avgScore: 0,
+    gradeDistribution: {},
+    criteriaAverages: {},
+    personCount: roster.length,
+    completedCount: 0,
+    wordFrequencies: [],
+    dataUnaccepted: [],
+  }
+  if (rows.length === 0) return success(c, flowchartStatisticsSchema.parse(empty))
+
+  const gradeDistribution: Record<string, number> = {}
+  const criteriaTotals = new Map<string, { sum: number; count: number; max: number }>()
+  const texts: string[] = []
+  const submitted = new Set<string>()
+  let scoreSum = 0
+  let scoreCount = 0
+
+  for (const row of rows) {
+    submitted.add(row.username)
+    // 旧后端用 values_list("ai_grade") 分组，null 也会成为一个桶；这里保持同样的口径
+    const grade = row.grade ?? ""
+    gradeDistribution[grade] = (gradeDistribution[grade] ?? 0) + 1
+    if (row.score !== null) {
+      scoreSum += row.score
+      scoreCount += 1
+    }
+    for (const [key, value] of Object.entries(objectValue(row.criteria))) {
+      const detail = objectValue(value)
+      if (typeof detail.score !== "number") continue
+      const bucket = criteriaTotals.get(key)
+      if (bucket) {
+        bucket.sum += detail.score
+        bucket.count += 1
+      } else {
+        // max 取第一次见到的那条，与旧后端 `if key not in criteria_max` 一致
+        criteriaTotals.set(key, {
+          sum: detail.score,
+          count: 1,
+          max: typeof detail.max === "number" ? detail.max : 100,
+        })
+      }
+      if (typeof detail.comment === "string" && detail.comment) texts.push(detail.comment)
+    }
+    if (row.feedback) texts.push(row.feedback)
+    if (row.suggestions) texts.push(row.suggestions)
+  }
+
+  const criteriaAverages: Record<string, { avg: number; max: number }> = {}
+  for (const [key, bucket] of criteriaTotals) {
+    criteriaAverages[key] = { avg: rounded(bucket.sum / bucket.count, 1), max: bucket.max }
+  }
+
+  return success(c, flowchartStatisticsSchema.parse({
+    totalCount: rows.length,
+    // 分母是有分数的条数，不是总条数 —— 对齐 Django 的 Avg()，它跳过 NULL
+    avgScore: scoreCount ? rounded(scoreSum / scoreCount, 1) : 0,
+    gradeDistribution,
+    criteriaAverages,
+    personCount: roster.length,
+    completedCount: submitted.size,
+    wordFrequencies: buildWordFrequencies(texts),
+    dataUnaccepted: roster
+      .filter((row) => !submitted.has(row.username))
+      .map((row) => ({
+        username: row.username,
+        realName: stripClassPrefix(row.username, row.className),
+      })),
   }))
 })
 

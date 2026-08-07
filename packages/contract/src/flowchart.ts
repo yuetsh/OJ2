@@ -53,6 +53,25 @@ export const createFlowchartResponseSchema = z.object({ submissionId: z.string()
 export const flowchartCurrentSchema = z.object({ count: z.number().int(), score: z.number(), grade: z.string() })
 export const flowchartDetailSchema = z.object({ submission: flowchartSubmissionSchema.nullable(), count: z.number().int() })
 
+export const flowchartStatisticsSchema = z.object({
+  totalCount: z.number().int(),
+  avgScore: z.number(),
+  gradeDistribution: z.record(z.string(), z.number().int()),
+  criteriaAverages: z.record(
+    z.string(),
+    z.object({ avg: z.number(), max: z.number() }),
+  ),
+  personCount: z.number().int(),
+  completedCount: z.number().int(),
+  wordFrequencies: z.array(
+    z.object({ word: z.string(), count: z.number().int() }),
+  ),
+  // 与提交统计共用「未完成学生」的形状，见 submission.ts 的 unacceptedStudentSchema
+  dataUnaccepted: z.array(
+    z.object({ username: z.string(), realName: z.string() }),
+  ),
+})
+
 export const flowchartUpdateSchema = z.object({
   type: z.enum([
     "flowchart_evaluation_completed",
@@ -69,3 +88,4 @@ export const flowchartUpdateSchema = z.object({
 })
 
 export type FlowchartUpdate = z.infer<typeof flowchartUpdateSchema>
+export type FlowchartStatistics = z.infer<typeof flowchartStatisticsSchema>

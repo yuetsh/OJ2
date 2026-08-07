@@ -24,6 +24,22 @@ export function sampleUser(
   })
 }
 
+/**
+ * 去掉用户名里的 `ks<班级号>` 前缀，得到学生本人那一段：`ks251张三` + `251` → `张三`。
+ * 对齐旧后端 `utils/shortcuts.py:52` 的 `strip_class_prefix`。
+ *
+ * 用 startsWith + slice 而不是 replace：replace 会删掉字符串中间的匹配，
+ * 前缀对不上时从中间截出乱码。前缀不匹配就原样返回。
+ */
+export function stripClassPrefix(
+  username: string,
+  className: string | null | undefined,
+) {
+  if (!className) return username
+  const prefix = `ks${className}`
+  return username.startsWith(prefix) ? username.slice(prefix.length) : username
+}
+
 export function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
