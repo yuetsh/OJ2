@@ -166,6 +166,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
+        "/api2": {
+          target: "http://localhost:3000",
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/api2/, "/api"),
+        },
         "/api": proxyConfig,
         "/public": proxyConfig,
         "/ws": wsProxyConfig,
