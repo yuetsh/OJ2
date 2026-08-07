@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import { paginatedSchema, sampleUserSchema } from "./common"
-import { submissionDetailSchema } from "./submission"
+import { embeddedSubmissionSchema } from "./submission"
 
 export const announcementSchema = z.object({
   id: z.number().int(),
@@ -21,7 +21,7 @@ export const messageSchema = z.object({
   sender: sampleUserSchema,
   createTime: z.string(),
   message: z.string(),
-  submission: submissionDetailSchema,
+  submission: embeddedSubmissionSchema,
 })
 
 export const messageListSchema = paginatedSchema(messageSchema)

@@ -8,7 +8,7 @@ import {
   reactionKeySchema,
   reactionStateSchema,
   setReactionRequestSchema,
-  submissionDetailSchema,
+  embeddedSubmissionSchema,
   tutorialSchema,
   tutorialSummarySchema,
 } from "@oj2/contract"
@@ -73,32 +73,33 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.message).where(eq(schema.message.recipientId, user.id)),
-    db.select({ message: schema.message, sender: schema.user, realName: schema.userProfile.realName, submission: schema.submission })
+    db.select({ message: schema.message, sender: schema.user, realName: schema.userProfile.realName, submission: schema.submission, displayId: schema.problem.displayId })
       .from(schema.message).innerJoin(schema.user, eq(schema.message.senderId, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .innerJoin(schema.submission, eq(schema.message.submissionId, schema.submission.id))
+      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
       .where(eq(schema.message.recipientId, user.id)).orderBy(desc(schema.message.createTime)).limit(limit).offset(offset),
   ])
   return success(c, messageListSchema.parse({
-    results: rows.map(({ message, sender, realName, submission }) => messageSchema.parse({
+    results: rows.map(({ message, sender, realName, submission, displayId }) => messageSchema.parse({
       id: message.id,
       sender: sampleUser(sender, realName),
       createTime: message.createTime,
       message: message.message,
-      submission: submissionDetailSchema.parse({
+      submission: embeddedSubmissionSchema.parse({
         id: submission.id,
         createTime: submission.createTime,
         userId: submission.userId,
         username: submission.username,
         code: submission.code,
         result: submission.result,
-        info: {},
+        // info / ip / contestId 三个字段不在 embeddedSubmissionSchema 里，故不传 ——
+        // 对齐旧后端 SubmissionSafeModelSerializer 的 exclude，这三个键不出现在响应中
         language: submission.language,
         shared: submission.shared,
         statisticInfo: objectValue(submission.statisticInfo),
-        ip: null,
-        contestId: submission.contestId,
-        problemId: submission.problemId,
+        // 展示用题号而非数字主键，站内信页面拿它拼 /problem/<题号>
+        problem: displayId,
         showLink: true,
         canUnshare: false,
       }),
