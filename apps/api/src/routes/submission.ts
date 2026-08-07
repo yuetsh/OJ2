@@ -209,7 +209,9 @@ async function submissionDetail(id: string, user: AuthUser) {
     shared: row.submission.shared,
     statisticInfo: objectValue(row.submission.statisticInfo),
     ip: full ? row.submission.ip : null,
-    contestId: row.submission.contestId,
+    // contest 也在旧后端的排除名单里（exclude 的三个字段是 info / contest / ip），
+    // 首轮修复只处理了 info 与 ip，这里补齐。
+    contestId: full ? row.submission.contestId : null,
     problemId: row.submission.problemId,
     showLink: true,
     canUnshare: canViewSubmission(user, row.submission, row.problem, row.contest, false),

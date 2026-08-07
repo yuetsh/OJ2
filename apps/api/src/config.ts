@@ -1,4 +1,32 @@
 import { randomBytes } from "node:crypto"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+
+/**
+ * Bun 只自动加载「当前工作目录」下的 .env。而本应用的启动方式（`bun run --filter '@oj2/api' dev`）
+ * 会把 cwd 切到 apps/api/，于是仓库根的 .env 读不到 —— 而 .env.example 恰恰教人写在根目录。
+ * 这里显式补读仓库根的 .env，让文档指引真正生效，且不管从哪个目录启动都一致。
+ *
+ * 只填充尚未设置的键：真实环境变量与 cwd 下的 .env 优先级更高，不被覆盖。
+ */
+function loadRepoRootEnv() {
+  try {
+    const text = readFileSync(resolve(import.meta.dir, "../../../.env"), "utf8")
+    for (const line of text.split("\n")) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith("#")) continue
+      const eq = trimmed.indexOf("=")
+      if (eq <= 0) continue
+      const key = trimmed.slice(0, eq).trim()
+      if (process.env[key] !== undefined) continue
+      process.env[key] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "")
+    }
+  } catch {
+    // 根目录没有 .env 是正常情况（例如生产用真实环境变量注入），静默跳过
+  }
+}
+
+loadRepoRootEnv()
 
 /**
  * 判题机 token。对齐旧后端 `options/options.py:93`：
