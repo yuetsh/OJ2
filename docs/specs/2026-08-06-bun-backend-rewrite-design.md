@@ -179,9 +179,25 @@ C 与 Python 两套 grammar 均正常。`.wasm` 文件随 npm 包分发（`tree-
 
 未选原生 NAPI 绑定：性能更高但需 node-gyp 现场编译，Bun 支持稳定性较差。1.1ms 解析耗时在判题流程中可忽略（沙箱启动本身即数十毫秒），选 WASM 图部署简单。
 
-### 7.3 待验证（不构成方案级风险）
+### 7.3 `@node-rs/jieba` 替代 Python jieba（`docs/spikes/jieba-spike.ts`）
 
-`@node-rs/jieba` 在 Bun 下的可用性。仅影响 `flowchart/views/admin.py` 单个文件；即便不可用亦可用纯 JS 分词兜底。放入阶段 0 验证。
+对照 `flowchart/views/admin.py:65,191` 的两处用法——`jieba.add_word(w, freq=9999)` 加自定义词、`jieba.cut(text)` 切词——在 Bun 1.3.11 下验证 `@node-rs/jieba@2.0.1`（NAPI 绑定）：
+
+```
+默认切词: 输入 / 两个 / 整数 / 并 / 输出 / 它们 / 的 / 和
+加词后  : 输入 / 两个整数 / 并 / 输出 / 它们 / 的 / 和
+1000 次切词耗时: 2 ms
+```
+
+**结论**：通过。NAPI 二进制在 Bun 下正常加载，`cut` 结果符合预期，1000 次切词仅 2ms，性能远超需求（该功能是后台统计页的低频查询）。
+
+**与 brief 预期的一个出入**：`@node-rs/jieba@2.0.1` 的公开 API 里没有 `insertWord`/`addWord` 方法，`.d.ts` 未导出对应接口。改用 `Jieba.loadDict(buffer)` 加载一份自定义词条缓冲区达到同等效果，格式与 Python jieba 用户词典一致（`"词 词频"` 按行排列）：
+
+```typescript
+jieba.loadDict(Buffer.from("两个整数 9999\n"))
+```
+
+**采用方案**：新后端用 `@node-rs/jieba`，`CUSTOM_WORDS` 列表在启动时拼成一份词典缓冲区一次性 `loadDict`，替代原来的逐词 `add_word` 循环。
 
 ## 8. 数据层策略
 
