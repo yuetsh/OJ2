@@ -383,7 +383,7 @@ export const problem = pgTable("problem", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	acceptedNumber: bigint("accepted_number", { mode: "number" }).default(0).notNull(),
 	createdById: integer("created_by_id").notNull(),
-	id: text("_id").notNull(),
+	displayId: text("_id").notNull(),
 	statisticInfo: jsonb("statistic_info").default({}).notNull(),
 	contestId: integer("contest_id"),
 	isPublic: boolean("is_public").default(false).notNull(),
@@ -399,7 +399,7 @@ export const problem = pgTable("problem", {
 	sqlConfig: jsonb("sql_config"),
 	sqlDisplay: jsonb("sql_display"),
 }, (table) => [
-	index("problem__id_919b1d80").using("btree", table.id.asc().nullsLast().op("text_ops")),
+	index("problem__id_919b1d80").using("btree", table.displayId.asc().nullsLast().op("text_ops")),
 	index("problem_contest_id_328e013a").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
 	index("problem_contest_visible_idx").using("btree", table.contestId.asc().nullsLast().op("bool_ops"), table.visible.asc().nullsLast().op("int4_ops")),
 	index("problem_created_by_id_cb362143").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
@@ -414,7 +414,7 @@ export const problem = pgTable("problem", {
 			foreignColumns: [user.id],
 			name: "problem_created_by_id_cb362143_fk_user_id"
 		}),
-	unique("unique_problem_id_contest").on(table.id, table.contestId),
+	unique("unique_problem_id_contest").on(table.displayId, table.contestId),
 ]);
 
 export const problemTags = pgTable("problem_tags", {
