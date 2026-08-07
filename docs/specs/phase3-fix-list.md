@@ -4,6 +4,22 @@
 来源：`phase3-review-authz.md`（权限边界）+ `phase3-review-leakage.md`（数据泄露）
 受审代码：commit `8c00cdc`，oj 侧 65 个端点
 
+> ## 状态：已全部修复并复评通过（2026-08-07 收口）
+>
+> 修复提交：`b4b61af` / `8237909` / `b7adf29` / `f548aef`
+> 复评报告：`phase3-review-rereview.md` —— 8 条（F1-F6 + 收尾的 F4b、F5b）**全部 ADDRESSED**，
+> 修复 diff 内无新引入破坏。
+>
+> 复评补上了控制方没验充分的一条：**F4b 的 `contestId`**。控制方当时用的提交本就不属于比赛，
+> `contestId` 天然为 null，运行时证据不成立。复评真造了一条比赛提交（`contestId=7`、`ip` 有值），
+> 确认数据库存的是真值、而 API 返回给提交者本人的是 `info:{}` / `ip:null` / `contestId:null`。
+>
+> 复评另核实：`sampleUser()` 是真正的默认关闭开关（覆盖全部 14 个下发点，含本清单未列的
+> rankings 与题目列表/详情）；`isRegularUser` 全仓确实只有一个调用点；`.env` 加载器的优先级
+> 正确（真实环境变量 > cwd 的 .env > 仓库根 .env），畸形行不崩、缺文件静默跳过；限流参数
+> `fill_rate=0.03` 与旧后端 `options/options.py` 逐值吻合，且拦截位置与
+> `submission/views/oj.py` 一致（比赛权限校验之后、取题目之前）。
+
 ## 合并说明
 
 两份评审独立进行、互不知情，却各自命中了同两条问题（`/profiles/:username` 匿名可读、
