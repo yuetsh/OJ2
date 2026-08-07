@@ -1,0 +1,20 @@
+{
+  "name": "@oj2/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "db:pull": "drizzle-kit pull"
+  },
+  "dependencies": {
+    "@oj2/contract": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.0.0",
+    "postgres": "^3.4.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.10"
+  }
+}

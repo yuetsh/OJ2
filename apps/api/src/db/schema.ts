@@ -1,0 +1,652 @@
+// 本文件由 `drizzle-kit pull` 从本地库自动生成，drizzle.config.ts 的 tablesFilter
+// (["!django_*", "!auth_*"]) 已生效：34 张表中的 7 张 Django 框架表
+// (auth_group、auth_group_permissions、auth_permission、django_content_type、
+// django_dramatiq_task、django_migrations、django_session) 均未生成 pgTable 定义，
+// 剩余 27 张业务表原样保留。
+//
+// 手工剪枝：tablesFilter 只过滤了 pgTable，未过滤这些框架表的 id 序列，遗留了
+// 5 个孤儿 pgSequence 导出（authGroupIdSeq、authGroupPermissionsIdSeq、
+// authPermissionIdSeq、djangoContentTypeIdSeq、djangoMigrationsIdSeq）——
+// 它们不被任何剩余表引用，留着只会在未来 `drizzle-kit generate` 时生成多余的
+// `CREATE SEQUENCE` 迁移，因此手工删除。
+import { pgTable, index, foreignKey, bigint, text, jsonb, timestamp, integer, boolean, serial, doublePrecision, varchar, unique, uniqueIndex } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
+
+export const aiAnalysis = pgTable("ai_analysis", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "ai_analysis_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	provider: text().notNull(),
+	data: jsonb().notNull(),
+	systemPrompt: text("system_prompt").notNull(),
+	userPrompt: text("user_prompt").notNull(),
+	analysis: text().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	userId: integer("user_id").notNull(),
+	model: text().notNull(),
+	isPinned: boolean("is_pinned").notNull(),
+}, (table) => [
+	index("ai_analysis_user_id_3aa23011").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "ai_analysis_user_id_3aa23011_fk_user_id"
+		}),
+]);
+
+export const announcement = pgTable("announcement", {
+	id: serial().primaryKey().notNull(),
+	title: text().notNull(),
+	content: text().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }).notNull(),
+	visible: boolean().notNull(),
+	createdById: integer("created_by_id").notNull(),
+	tag: text().notNull(),
+	top: boolean().notNull(),
+}, (table) => [
+	index("announcement_created_by_id_359ccf50").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
+	index("announcement_list_idx").using("btree", table.visible.asc().nullsLast().op("bool_ops"), table.top.desc().nullsFirst().op("bool_ops"), table.createTime.desc().nullsFirst().op("bool_ops")),
+	foreignKey({
+			columns: [table.createdById],
+			foreignColumns: [user.id],
+			name: "announcement_created_by_id_359ccf50_fk_user_id"
+		}),
+]);
+
+export const achievement = pgTable("achievement", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "achievement_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	name: text().notNull(),
+	description: text().notNull(),
+	icon: text().notNull(),
+	rarity: text().notNull(),
+	hidden: boolean().default(false).notNull(),
+	metric: text().notNull(),
+	operator: text().notNull(),
+	threshold: integer().notNull(),
+	visible: boolean().default(true).notNull(),
+	unlockCount: integer("unlock_count").default(0).notNull(),
+	order: integer().default(0).notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+});
+
+export const contest = pgTable("contest", {
+	id: serial().primaryKey().notNull(),
+	title: text().notNull(),
+	description: text().notNull(),
+	password: text(),
+	startTime: timestamp("start_time", { withTimezone: true, mode: 'string' }).notNull(),
+	endTime: timestamp("end_time", { withTimezone: true, mode: 'string' }).notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }).notNull(),
+	visible: boolean().notNull(),
+	createdById: integer("created_by_id").notNull(),
+	allowedIpRanges: jsonb("allowed_ip_ranges").notNull(),
+	tag: text().notNull(),
+}, (table) => [
+	index("contest_created_by_id_a763ca7e").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.createdById],
+			foreignColumns: [user.id],
+			name: "contest_created_by_id_a763ca7e_fk_user_id"
+		}),
+]);
+
+export const contestAnnouncement = pgTable("contest_announcement", {
+	id: serial().primaryKey().notNull(),
+	title: text().notNull(),
+	content: text().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	contestId: integer("contest_id").notNull(),
+	createdById: integer("created_by_id").notNull(),
+	visible: boolean().notNull(),
+}, (table) => [
+	index("contest_announcement_contest_id_a8cb419f").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
+	index("contest_announcement_created_by_id_469a14ce").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.contestId],
+			foreignColumns: [contest.id],
+			name: "contest_announcement_contest_id_a8cb419f_fk_contest_id"
+		}),
+	foreignKey({
+			columns: [table.createdById],
+			foreignColumns: [user.id],
+			name: "contest_announcement_created_by_id_469a14ce_fk_user_id"
+		}),
+]);
+
+export const flowchartSubmission = pgTable("flowchart_submission", {
+	id: text().primaryKey().notNull(),
+	mermaidCode: text("mermaid_code").notNull(),
+	flowchartData: jsonb("flowchart_data").notNull(),
+	status: integer().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	aiScore: doublePrecision("ai_score"),
+	aiGrade: varchar("ai_grade", { length: 10 }),
+	aiFeedback: text("ai_feedback"),
+	aiSuggestions: text("ai_suggestions"),
+	aiCriteriaDetails: jsonb("ai_criteria_details").notNull(),
+	aiProvider: varchar("ai_provider", { length: 50 }).notNull(),
+	aiModel: varchar("ai_model", { length: 50 }).notNull(),
+	processingTime: doublePrecision("processing_time"),
+	evaluationTime: timestamp("evaluation_time", { withTimezone: true, mode: 'string' }),
+	problemId: integer("problem_id").notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("flowchart_problem_time_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.createTime.asc().nullsLast().op("int4_ops")),
+	index("flowchart_status_idx").using("btree", table.status.asc().nullsLast().op("int4_ops")),
+	index("flowchart_submission_id_0dbfc4f9_like").using("btree", table.id.asc().nullsLast().op("text_pattern_ops")),
+	index("flowchart_submission_problem_id_8551edbf").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	index("flowchart_submission_user_id_225c83e8").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	index("flowchart_user_time_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.createTime.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.problemId],
+			foreignColumns: [problem.id],
+			name: "flowchart_submission_problem_id_8551edbf_fk_problem_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "flowchart_submission_user_id_225c83e8_fk_user_id"
+		}),
+]);
+
+export const message = pgTable("message", {
+	id: integer().primaryKey().generatedByDefaultAsIdentity({ name: "message_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
+	message: text().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	recipientId: integer("recipient_id").notNull(),
+	senderId: integer("sender_id").notNull(),
+	submissionId: text("submission_id").notNull(),
+}, (table) => [
+	index("message_recipient_id_2aa5dd76").using("btree", table.recipientId.asc().nullsLast().op("int4_ops")),
+	index("message_recipient_time_idx").using("btree", table.recipientId.asc().nullsLast().op("timestamptz_ops"), table.createTime.asc().nullsLast().op("int4_ops")),
+	index("message_sender_id_a2a2e825").using("btree", table.senderId.asc().nullsLast().op("int4_ops")),
+	index("message_submission_id_2fdf8a47").using("btree", table.submissionId.asc().nullsLast().op("text_ops")),
+	index("message_submission_id_2fdf8a47_like").using("btree", table.submissionId.asc().nullsLast().op("text_pattern_ops")),
+	foreignKey({
+			columns: [table.recipientId],
+			foreignColumns: [user.id],
+			name: "message_recipient_id_2aa5dd76_fk_user_id"
+		}),
+	foreignKey({
+			columns: [table.senderId],
+			foreignColumns: [user.id],
+			name: "message_sender_id_a2a2e825_fk_user_id"
+		}),
+	foreignKey({
+			columns: [table.submissionId],
+			foreignColumns: [submission.id],
+			name: "message_submission_id_2fdf8a47_fk_submission_id"
+		}),
+]);
+
+export const judgeServer = pgTable("judge_server", {
+	id: serial().primaryKey().notNull(),
+	hostname: text().notNull(),
+	ip: text(),
+	judgerVersion: text("judger_version").notNull(),
+	cpuCore: integer("cpu_core").notNull(),
+	memoryUsage: doublePrecision("memory_usage").notNull(),
+	cpuUsage: doublePrecision("cpu_usage").notNull(),
+	lastHeartbeat: timestamp("last_heartbeat", { withTimezone: true, mode: 'string' }).notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	taskNumber: integer("task_number").notNull(),
+	serviceUrl: text("service_url"),
+	isDisabled: boolean("is_disabled").notNull(),
+});
+
+export const exercise = pgTable("exercise", {
+	id: integer().primaryKey().generatedByDefaultAsIdentity({ name: "exercise_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
+	type: varchar({ length: 16 }).notNull(),
+	data: jsonb().notNull(),
+	order: integer().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).notNull(),
+	tutorialId: integer("tutorial_id").notNull(),
+}, (table) => [
+	index("exercise_tutorial_id_6fd04055").using("btree", table.tutorialId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.tutorialId],
+			foreignColumns: [tutorial.id],
+			name: "exercise_tutorial_id_6fd04055_fk_tutorial_id"
+		}),
+]);
+
+export const optionsSysoptions = pgTable("options_sysoptions", {
+	id: serial().primaryKey().notNull(),
+	key: text().notNull(),
+	value: jsonb().notNull(),
+}, (table) => [
+	unique("options_sysoptions_key_key").on(table.key),
+]);
+
+export const problemset = pgTable("problemset", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	title: text().notNull(),
+	description: text().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }).notNull(),
+	visible: boolean().notNull(),
+	difficulty: text().notNull(),
+	status: text().notNull(),
+	createdById: integer("created_by_id").notNull(),
+	endTime: timestamp("end_time", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("problemset_created_by_id_01b5197f").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.createdById],
+			foreignColumns: [user.id],
+			name: "problemset_created_by_id_01b5197f_fk_user_id"
+		}),
+]);
+
+export const problemsetProblem = pgTable("problemset_problem", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_problem_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	order: integer().notNull(),
+	isRequired: boolean("is_required").notNull(),
+	score: integer().notNull(),
+	hint: text(),
+	problemId: integer("problem_id").notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
+}, (table) => [
+	index("problemset_problem_problem_id_fff2d686").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	index("problemset_problem_problemset_id_350d17fb").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
+	foreignKey({
+			columns: [table.problemId],
+			foreignColumns: [problem.id],
+			name: "problemset_problem_problem_id_fff2d686_fk_problem_id"
+		}),
+	foreignKey({
+			columns: [table.problemsetId],
+			foreignColumns: [problemset.id],
+			name: "problemset_problem_problemset_id_350d17fb_fk_problemset_id"
+		}),
+	unique("unique_problemset_problem").on(table.problemId, table.problemsetId),
+]);
+
+export const problemsetProgress = pgTable("problemset_progress", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_progress_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	joinTime: timestamp("join_time", { withTimezone: true, mode: 'string' }).notNull(),
+	completeTime: timestamp("complete_time", { withTimezone: true, mode: 'string' }),
+	isCompleted: boolean("is_completed").notNull(),
+	progressPercentage: doublePrecision("progress_percentage").notNull(),
+	completedProblemsCount: integer("completed_problems_count").notNull(),
+	totalProblemsCount: integer("total_problems_count").notNull(),
+	totalScore: integer("total_score").notNull(),
+	progressDetail: jsonb("progress_detail").notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("problemset_progress_problemset_id_20a9632e").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
+	index("problemset_progress_user_id_c8041a80").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.problemsetId],
+			foreignColumns: [problemset.id],
+			name: "problemset_progress_problemset_id_20a9632e_fk_problemset_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "problemset_progress_user_id_c8041a80_fk_user_id"
+		}),
+	unique("unique_problemset_progress_user").on(table.problemsetId, table.userId),
+]);
+
+export const problemsetSubmission = pgTable("problemset_submission", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_submission_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	problemId: integer("problem_id").notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
+	submissionId: text("submission_id").notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("problemset__problem_1f39fa_idx").using("btree", table.problemsetId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
+	index("problemset__problem_22f053_idx").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops"), table.problemId.asc().nullsLast().op("int8_ops")),
+	index("problemset__user_id_2f1501_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	index("problemset_submission_problem_id_5629b105").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	index("problemset_submission_problemset_id_85290e17").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
+	index("problemset_submission_submission_id_78e2b807").using("btree", table.submissionId.asc().nullsLast().op("text_ops")),
+	index("problemset_submission_submission_id_78e2b807_like").using("btree", table.submissionId.asc().nullsLast().op("text_pattern_ops")),
+	index("problemset_submission_user_id_915fc9c6").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.problemId],
+			foreignColumns: [problem.id],
+			name: "problemset_submission_problem_id_5629b105_fk_problem_id"
+		}),
+	foreignKey({
+			columns: [table.problemsetId],
+			foreignColumns: [problemset.id],
+			name: "problemset_submission_problemset_id_85290e17_fk_problemset_id"
+		}),
+	foreignKey({
+			columns: [table.submissionId],
+			foreignColumns: [submission.id],
+			name: "problemset_submission_submission_id_78e2b807_fk_submission_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "problemset_submission_user_id_915fc9c6_fk_user_id"
+		}),
+]);
+
+export const reaction = pgTable("reaction", {
+	id: integer().primaryKey().generatedByDefaultAsIdentity({ name: "reaction_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
+	type: varchar({ length: 20 }).notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	problemId: integer("problem_id").notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("reaction_problem_id_a7f3b9f3").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	index("reaction_problem_type_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.type.asc().nullsLast().op("int4_ops")),
+	index("reaction_user_id_cfa7f469").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.problemId],
+			foreignColumns: [problem.id],
+			name: "reaction_problem_id_a7f3b9f3_fk_problem_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "reaction_user_id_cfa7f469_fk_user_id"
+		}),
+	unique("reaction_problem_user_unique").on(table.problemId, table.userId),
+]);
+
+export const problem = pgTable("problem", {
+	id: serial().primaryKey().notNull(),
+	title: text().notNull(),
+	description: text().notNull(),
+	inputDescription: text("input_description").notNull(),
+	outputDescription: text("output_description").notNull(),
+	samples: jsonb().notNull(),
+	testCaseId: text("test_case_id").notNull(),
+	testCaseScore: jsonb("test_case_score").notNull(),
+	hint: text(),
+	languages: jsonb().notNull(),
+	template: jsonb().notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }),
+	timeLimit: integer("time_limit").notNull(),
+	memoryLimit: integer("memory_limit").notNull(),
+	visible: boolean().default(true).notNull(),
+	difficulty: text().notNull(),
+	source: text(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	submissionNumber: bigint("submission_number", { mode: "number" }).default(0).notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	acceptedNumber: bigint("accepted_number", { mode: "number" }).default(0).notNull(),
+	createdById: integer("created_by_id").notNull(),
+	id: text("_id").notNull(),
+	statisticInfo: jsonb("statistic_info").default({}).notNull(),
+	contestId: integer("contest_id"),
+	isPublic: boolean("is_public").default(false).notNull(),
+	shareSubmission: boolean("share_submission").default(false).notNull(),
+	prompt: text(),
+	answers: jsonb(),
+	allowFlowchart: boolean("allow_flowchart").default(false).notNull(),
+	flowchartData: jsonb("flowchart_data").default({}).notNull(),
+	flowchartHint: text("flowchart_hint"),
+	mermaidCode: text("mermaid_code"),
+	showFlowchart: boolean("show_flowchart").default(false).notNull(),
+	astRules: jsonb("ast_rules"),
+	sqlConfig: jsonb("sql_config"),
+	sqlDisplay: jsonb("sql_display"),
+}, (table) => [
+	index("problem__id_919b1d80").using("btree", table.id.asc().nullsLast().op("text_ops")),
+	index("problem_contest_id_328e013a").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
+	index("problem_contest_visible_idx").using("btree", table.contestId.asc().nullsLast().op("bool_ops"), table.visible.asc().nullsLast().op("int4_ops")),
+	index("problem_created_by_id_cb362143").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
+	index("problem_visible_idx").using("btree", table.visible.asc().nullsLast().op("bool_ops")),
+	foreignKey({
+			columns: [table.contestId],
+			foreignColumns: [contest.id],
+			name: "problem_contest_id_328e013a_fk_contest_id"
+		}),
+	foreignKey({
+			columns: [table.createdById],
+			foreignColumns: [user.id],
+			name: "problem_created_by_id_cb362143_fk_user_id"
+		}),
+	unique("unique_problem_id_contest").on(table.id, table.contestId),
+]);
+
+export const problemTags = pgTable("problem_tags", {
+	id: serial().primaryKey().notNull(),
+	problemId: integer("problem_id").notNull(),
+	problemtagId: integer("problemtag_id").notNull(),
+}, (table) => [
+	index("problem_tags_problem_id_866ecb8d").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	index("problem_tags_problemtag_id_72d20571").using("btree", table.problemtagId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.problemId],
+			foreignColumns: [problem.id],
+			name: "problem_tags_problem_id_866ecb8d_fk_problem_id"
+		}),
+	foreignKey({
+			columns: [table.problemtagId],
+			foreignColumns: [problemTag.id],
+			name: "problem_tags_problemtag_id_72d20571_fk_problem_tag_id"
+		}),
+	unique("problem_tags_problem_id_problemtag_id_318459d1_uniq").on(table.problemId, table.problemtagId),
+]);
+
+export const problemTag = pgTable("problem_tag", {
+	id: serial().primaryKey().notNull(),
+	name: text().notNull(),
+}, (table) => [
+	uniqueIndex("problem_tag_name_ci_unique").using("btree", sql`lower(name)`),
+]);
+
+export const submission = pgTable("submission", {
+	id: text().primaryKey().notNull(),
+	contestId: integer("contest_id"),
+	problemId: integer("problem_id").notNull(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
+	userId: integer("user_id").notNull(),
+	code: text().notNull(),
+	result: integer().default(6).notNull(),
+	info: jsonb().default({}).notNull(),
+	language: text().notNull(),
+	shared: boolean().default(false).notNull(),
+	statisticInfo: jsonb("statistic_info").default({}).notNull(),
+	username: text().notNull(),
+	ip: text(),
+}, (table) => [
+	index("contest_create_time_idx").using("btree", table.contestId.asc().nullsLast().op("timestamptz_ops"), table.createTime.desc().nullsFirst().op("int4_ops")),
+	index("problem_user_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
+	index("submission_contest_id_775716d5").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
+	index("submission_problem_id_76847b55").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	index("submission_result_37e2f67a").using("btree", table.result.asc().nullsLast().op("int4_ops")),
+	index("submission_user_id_3779a8c1").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	index("user_create_time_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.createTime.asc().nullsLast().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.contestId],
+			foreignColumns: [contest.id],
+			name: "submission_contest_id_775716d5_fk_contest_id"
+		}),
+	foreignKey({
+			columns: [table.problemId],
+			foreignColumns: [problem.id],
+			name: "submission_problem_id_76847b55_fk_problem_id"
+		}),
+]);
+
+export const tutorial = pgTable("tutorial", {
+	id: integer().primaryKey().generatedByDefaultAsIdentity({ name: "tutorial_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
+	title: varchar({ length: 128 }).notNull(),
+	content: text().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).notNull(),
+	isPublic: boolean("is_public").notNull(),
+	order: integer().notNull(),
+	createdById: integer("created_by_id").notNull(),
+	code: text(),
+	type: varchar({ length: 10 }).notNull(),
+}, (table) => [
+	index("tutorial_created_by_id_07973cab").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.createdById],
+			foreignColumns: [user.id],
+			name: "tutorial_created_by_id_07973cab_fk_user_id"
+		}),
+]);
+
+export const userStat = pgTable("user_stat", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_stat_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	metrics: jsonb().default({}).notNull(),
+	updateTime: timestamp("update_time", { withTimezone: true, mode: 'string' }).notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "user_stat_user_id_73337fc0_fk_user_id"
+		}),
+	unique("user_stat_user_id_key").on(table.userId),
+]);
+
+export const userAchievement = pgTable("user_achievement", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_achievement_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	unlockTime: timestamp("unlock_time", { withTimezone: true, mode: 'string' }).notNull(),
+	backfilled: boolean().default(false).notNull(),
+	notified: boolean().default(false).notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	achievementId: bigint("achievement_id", { mode: "number" }).notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("user_achievement_achievement_id_29db600d").using("btree", table.achievementId.asc().nullsLast().op("int8_ops")),
+	index("user_achievement_user_id_b8ec7d6a").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	index("user_achv_notified_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.notified.asc().nullsLast().op("bool_ops")),
+	index("user_achv_time_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.unlockTime.desc().nullsFirst().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.achievementId],
+			foreignColumns: [achievement.id],
+			name: "user_achievement_achievement_id_29db600d_fk_achievement_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "user_achievement_user_id_b8ec7d6a_fk_user_id"
+		}),
+	unique("unique_user_achievement").on(table.achievementId, table.userId),
+]);
+
+export const userBadge = pgTable("user_badge", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_badge_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	earnedTime: timestamp("earned_time", { withTimezone: true, mode: 'string' }).notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	badgeId: bigint("badge_id", { mode: "number" }).notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("user_badge_badge_id_92a983e9").using("btree", table.badgeId.asc().nullsLast().op("int8_ops")),
+	index("user_badge_user_id_a286d718").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.badgeId],
+			foreignColumns: [problemsetBadge.id],
+			name: "user_badge_badge_id_92a983e9_fk_problemset_badge_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "user_badge_user_id_a286d718_fk_user_id"
+		}),
+	unique("unique_user_badge").on(table.badgeId, table.userId),
+]);
+
+export const userProfile = pgTable("user_profile", {
+	id: serial().primaryKey().notNull(),
+	acmProblemsStatus: jsonb("acm_problems_status").default({}).notNull(),
+	avatar: text().notNull(),
+	blog: varchar({ length: 200 }),
+	mood: text(),
+	acceptedNumber: integer("accepted_number").default(0).notNull(),
+	submissionNumber: integer("submission_number").default(0).notNull(),
+	github: text(),
+	school: text(),
+	major: text(),
+	userId: integer("user_id").notNull(),
+	realName: text("real_name"),
+	language: text(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "user_profile_user_id_8fdce8e2_fk_user_id"
+		}),
+	unique("user_profile_user_id_key").on(table.userId),
+]);
+
+export const acmContestRank = pgTable("acm_contest_rank", {
+	id: serial().primaryKey().notNull(),
+	submissionNumber: integer("submission_number").default(0).notNull(),
+	acceptedNumber: integer("accepted_number").default(0).notNull(),
+	totalTime: integer("total_time").default(0).notNull(),
+	submissionInfo: jsonb("submission_info").default({}).notNull(),
+	contestId: integer("contest_id").notNull(),
+	userId: integer("user_id").notNull(),
+}, (table) => [
+	index("acm_contest_rank_contest_id_21030ccd").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
+	index("acm_contest_rank_user_id_40391ab2").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	index("acm_rank_contest_user_idx").using("btree", table.contestId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
+	index("acm_rank_order_idx").using("btree", table.contestId.asc().nullsLast().op("int4_ops"), table.acceptedNumber.asc().nullsLast().op("int4_ops"), table.totalTime.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.contestId],
+			foreignColumns: [contest.id],
+			name: "acm_contest_rank_contest_id_21030ccd_fk_contest_id"
+		}),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "acm_contest_rank_user_id_40391ab2_fk_user_id"
+		}),
+	unique("unique_acm_rank_user_contest").on(table.contestId, table.userId),
+]);
+
+export const user = pgTable("user", {
+	id: serial().primaryKey().notNull(),
+	password: varchar({ length: 128 }).notNull(),
+	lastLogin: timestamp("last_login", { withTimezone: true, mode: 'string' }),
+	username: text().notNull(),
+	email: text(),
+	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }),
+	adminType: text("admin_type").notNull(),
+	authToken: text("auth_token"),
+	openApi: boolean("open_api").default(false).notNull(),
+	openApiAppkey: text("open_api_appkey"),
+	isDisabled: boolean("is_disabled").default(false).notNull(),
+	problemPermission: text("problem_permission").notNull(),
+	sessionKeys: jsonb("session_keys").default([]).notNull(),
+	rawPassword: varchar("raw_password", { length: 20 }),
+	className: text("class_name"),
+}, (table) => [
+	unique("user_username_key").on(table.username),
+]);
+
+export const problemsetBadge = pgTable("problemset_badge", {
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_badge_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	name: text().notNull(),
+	description: text().notNull(),
+	icon: text().notNull(),
+	conditionType: text("condition_type").notNull(),
+	conditionValue: integer("condition_value").notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
+}, (table) => [
+	index("problemset_badge_problemset_id_6cb6c74f").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
+	foreignKey({
+			columns: [table.problemsetId],
+			foreignColumns: [problemset.id],
+			name: "problemset_badge_problemset_id_6cb6c74f_fk_problemset_id"
+		}),
+]);
