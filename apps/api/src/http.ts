@@ -6,7 +6,7 @@ export function success<T>(c: Context, data: T, status = 200) {
 
 export function failure(
   c: Context,
-  status: 400 | 401 | 403 | 404 | 409 | 500 | 502,
+  status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 502,
   code: string,
   message: string,
 ) {

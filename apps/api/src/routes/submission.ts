@@ -28,7 +28,8 @@ import {
 } from "../services/contest"
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
-import { isAdminRole, isRegularUser, queryInteger, todayStart } from "./helpers"
+import { consumeToken } from "../services/throttling"
+import { isAdminRole, queryInteger, todayStart } from "./helpers"
 
 export const submissionRoutes = new Hono<AppEnv>()
 
@@ -67,6 +68,13 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
       return failure(c, 403, "ip-not-allowed", "Your IP is not allowed in this contest")
     }
     contestId = contest.id
+  }
+
+  // 限流，位置与旧后端 submission/views/oj.py 的 SubmissionAPI.post 一致：
+  // 比赛权限校验之后、取题目之前，按用户 id 消耗一个令牌。判题沙箱是有限资源。
+  const throttle = await consumeToken("user", String(c.get("user")!.id))
+  if (!throttle.allowed) {
+    return failure(c, 429, "too-many-submissions", `Please wait ${Math.floor(throttle.wait)} seconds`)
   }
 
   const [problem] = await db
@@ -184,7 +192,11 @@ async function submissionDetail(id: string, user: AuthUser) {
     .leftJoin(schema.contest, eq(schema.submission.contestId, schema.contest.id))
     .where(eq(schema.submission.id, id)).limit(1)
   if (!row || !canViewSubmission(user, row.submission, row.problem, row.contest)) return null
-  const full = isAdminRole(user) || row.submission.userId === user.id
+  // info（含每个测试点的 test_case 编号与 output_md5）与 ip 只给管理员，对齐旧后端：
+  // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
+  // SubmissionSafeModelSerializer(exclude=("info", "contest", "ip")) 之间二选一，
+  // 把关的是角色，不是「是不是自己的提交」。
+  const full = isAdminRole(user)
   return submissionDetailSchema.parse({
     id: row.submission.id,
     createTime: row.submission.createTime,
@@ -208,7 +220,9 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const user = c.get("user")
-  if (!(await getBooleanOption("submission_list_show_all", true)) && isRegularUser(user)) {
+  // 「非管理员即受限」，不能写成「是普通用户才受限」——
+  // 后者对匿名用户（user 为 null）会短路，匿名反而能看到全部提交，权限大于登录学生。
+  if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
     return success(c, submissionListSchema.parse({ results: [], total: 0 }))
   }
   const filters = [isNull(schema.submission.contestId)]
