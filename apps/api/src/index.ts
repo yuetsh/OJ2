@@ -68,12 +68,13 @@ const server = Bun.serve<SubmissionSocketData>({
 			}
 			return new Response("Not found", { status: 404 })
 		}
-		if (url.pathname === "/ws/submissions") {
+		if (url.pathname === "/ws/submissions" || url.pathname === "/ws/config") {
 			const user = await getRequestSessionUser(request)
 			if (!user) return new Response("Unauthorized", { status: 401 })
+			const kind = url.pathname === "/ws/config" ? "config" : "submissions"
 			if (
 				bunServer.upgrade(request, {
-					data: { userId: user.id, username: user.username },
+					data: { userId: user.id, username: user.username, kind },
 				})
 			) {
 				return undefined

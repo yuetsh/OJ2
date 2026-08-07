@@ -21,11 +21,13 @@ import type {
 } from "utils/types"
 
 export function getBaseInfo() {
-  return http.get("admin/dashboard_info")
+  return legacyResponse(api2.get("admin/dashboard"))
 }
 
 export function randomUser10(classroom: string) {
-  return http.get("admin/random_user", { params: { classroom } })
+  return legacyResponse(
+    api2.get("admin/random-usernames", { params: { classroom } }),
+  )
 }
 
 export async function getProblemList(
@@ -185,11 +187,14 @@ export function getContestList(offset = 0, limit = 10, keyword: string) {
 export async function uploadImage(file: File): Promise<string> {
   const form = new window.FormData()
   form.append("image", file)
-  // 该端点不走 { error, data } 信封，直接返回上传结果
-  const res = (await http.post("admin/upload_image", form, {
+  const res = await api2.post<{
+    success: boolean
+    filePath: string
+    msg: string
+  }>("admin/upload-image", form, {
     headers: { "content-type": "multipart/form-data" },
-  })) as unknown as { success: boolean; file_path: string; msg: "Success" }
-  return res.success ? res.file_path : ""
+  })
+  return res.data.success ? res.data.filePath : ""
 }
 
 // 上传测试用例；SQL 题的压缩包是 1.sql..N.sql（每个文件一个测试点的建表+数据脚本）
@@ -268,27 +273,38 @@ export function addProblemForContest(
 }
 
 export function getWebsite() {
-  return http.get<WebsiteConfig>("admin/website")
+  return legacyResponse<WebsiteConfig>(api2.get("admin/website"))
 }
 
 export function editWebsite(data: WebsiteConfig) {
-  return http.post("admin/website", data)
+  return api2.post("admin/website", {
+    websiteBaseUrl: data.website_base_url,
+    websiteName: data.website_name,
+    websiteNameShortcut: data.website_name_shortcut,
+    websiteFooter: data.website_footer,
+    allowRegister: data.allow_register,
+    submissionListShowAll: data.submission_list_show_all,
+    classList: data.class_list,
+    enableMaxkb: data.enable_maxkb,
+  })
 }
 
 export function listInvalidTestcases() {
-  return http.get("admin/prune_test_case")
+  return legacyResponse(api2.get("admin/orphan-test-cases"))
 }
 
 export function pruneInvalidTestcases(id?: string) {
-  return http.delete("admin/prune_test_case", { params: { id } })
+  return api2.delete("admin/orphan-test-cases", { params: { id } })
 }
 
 export function getJudgeServer() {
-  return http.get<{ token: string; servers: Server[] }>("admin/judge_server")
+  return legacyResponse<{ token: string; servers: Server[] }>(
+    api2.get("admin/judge-servers"),
+  )
 }
 
 export function deleteJudgeServer(hostname: string) {
-  return http.delete("admin/judge_server", { params: { hostname } })
+  return api2.delete(`admin/judge-servers/${encodeURIComponent(hostname)}`)
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {

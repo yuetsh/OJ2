@@ -225,3 +225,58 @@ export const deleteUsersRequestSchema = z.object({
 })
 
 export const resetPasswordResponseSchema = z.object({ password: z.string() })
+
+// ---------------------------------------------------------------- 站点配置 / 运维
+
+export const updateWebsiteConfigRequestSchema = z.object({
+  websiteBaseUrl: z.string().max(256),
+  websiteName: z.string().trim().min(1).max(64),
+  websiteNameShortcut: z.string().trim().min(1).max(32),
+  websiteFooter: z.string().max(1024 * 64),
+  allowRegister: z.boolean(),
+  submissionListShowAll: z.boolean(),
+  classList: z.array(z.string()),
+  enableMaxkb: z.boolean(),
+})
+
+export const judgeServerSchema = z.object({
+  id: z.number().int(),
+  hostname: z.string(),
+  ip: z.string().nullable(),
+  judgerVersion: z.string(),
+  cpuCore: z.number().int(),
+  memoryUsage: z.number(),
+  cpuUsage: z.number(),
+  lastHeartbeat: z.string(),
+  createTime: z.string(),
+  taskNumber: z.number().int(),
+  serviceUrl: z.string().nullable(),
+  isDisabled: z.boolean(),
+  /** 心跳在 6 秒内才算在线，与 dashboard 的判活口径一致 */
+  status: z.enum(["normal", "abnormal"]),
+})
+
+export const judgeServerListSchema = z.object({
+  token: z.string(),
+  servers: z.array(judgeServerSchema),
+})
+
+export const updateJudgeServerRequestSchema = z.object({ isDisabled: z.boolean() })
+
+export const orphanTestCaseSchema = z.object({
+  id: z.string(),
+  createTime: z.number(),
+})
+
+export const dashboardInfoSchema = z.object({
+  userCount: z.number().int(),
+  recentContestCount: z.number().int(),
+  todaySubmissionCount: z.number().int(),
+  judgeServerCount: z.number().int(),
+})
+
+export const uploadImageResponseSchema = z.object({
+  success: z.boolean(),
+  msg: z.string(),
+  filePath: z.string(),
+})

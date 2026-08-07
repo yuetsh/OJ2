@@ -4,6 +4,7 @@ import type { AppEnv } from "../../auth/middleware"
 import { adminAccountRoutes } from "./account"
 import { adminAchievementRoutes } from "./achievement"
 import { adminAiRoutes } from "./ai"
+import { adminConfRoutes } from "./conf"
 import { adminAnnouncementRoutes } from "./announcement"
 import { adminTutorialRoutes } from "./tutorial"
 
@@ -20,5 +21,6 @@ export const adminRoutes = new Hono<AppEnv>()
 adminRoutes.route("/", adminAccountRoutes)
 adminRoutes.route("/", adminAchievementRoutes)
 adminRoutes.route("/", adminAiRoutes)
+adminRoutes.route("/", adminConfRoutes)
 adminRoutes.route("/", adminAnnouncementRoutes)
 adminRoutes.route("/", adminTutorialRoutes)

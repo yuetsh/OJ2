@@ -9,11 +9,13 @@ import {
 } from "./judge/events"
 import { JudgeStatus } from "./judge/status"
 import { createSubscriberRedis } from "./redis"
-import { parseUserEvent, userEventChannel, userEventTopic } from "./events"
+import { configTopic, configUpdateChannel, parseUserEvent, userEventChannel, userEventTopic } from "./events"
 
 export interface SubmissionSocketData {
   userId: number
   username: string
+  /** 同一个 Bun.serve 只能挂一个 websocket handler，用它区分两条通道 */
+  kind: "submissions" | "config"
 }
 
 function objectValue(value: unknown): Record<string, unknown> {
@@ -25,6 +27,10 @@ function objectValue(value: unknown): Record<string, unknown> {
 export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSocketData> {
   return {
     open(ws) {
+      if (ws.data.kind === "config") {
+        ws.subscribe(configTopic)
+        return
+      }
       ws.subscribe(userSubmissionTopic(ws.data.userId))
       ws.subscribe(userEventTopic(ws.data.userId))
     },
@@ -32,6 +38,10 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       void handleMessage(ws, String(message))
     },
     close(ws) {
+      if (ws.data.kind === "config") {
+        ws.unsubscribe(configTopic)
+        return
+      }
       ws.unsubscribe(userSubmissionTopic(ws.data.userId))
       ws.unsubscribe(userEventTopic(ws.data.userId))
     },
@@ -135,6 +145,11 @@ export async function bridgeSubmissionEvents(
 ) {
   const subscriber = createSubscriberRedis()
   subscriber.on("message", (channel, raw) => {
+    if (channel === configUpdateChannel) {
+      // 配置广播不校验用户：内容就是站点公开配置本身，且所有连着的人都该收到
+      server.publish(configTopic, raw)
+      return
+    }
     if (channel === userEventChannel) {
       const event = parseUserEvent(raw)
       if (!event) return
@@ -177,6 +192,6 @@ export async function bridgeSubmissionEvents(
   subscriber.on("error", (error) => {
     console.error("Submission event subscriber error", error)
   })
-  await subscriber.subscribe(submissionUpdateChannel, userEventChannel)
+  await subscriber.subscribe(submissionUpdateChannel, userEventChannel, configUpdateChannel)
   return subscriber
 }

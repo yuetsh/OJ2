@@ -517,8 +517,10 @@ export interface ConfigUpdate extends WebSocketMessage {
  */
 class ConfigWebSocket extends BaseWebSocket<ConfigUpdate> {
   constructor() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({
       path: "config",
+      url: `${protocol}//${window.location.host}/ws2/config`,
     })
   }
 

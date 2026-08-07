@@ -55,6 +55,10 @@ export const config = {
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2),
   avatarDirectory: process.env.AVATAR_DIRECTORY ?? "data/avatar",
+  // 判题沙箱把这个目录挂成只读的 /test_case，两边必须指同一处
+  testCaseDirectory: process.env.TEST_CASE_DIRECTORY ?? "data/test_case",
+  uploadDirectory: process.env.UPLOAD_DIRECTORY ?? "data/upload",
+  uploadUriPrefix: process.env.UPLOAD_URI_PREFIX ?? "/public/upload",
   avatarUriPrefix: process.env.AVATAR_URI_PREFIX ?? "/public/avatar",
   aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",
   aiKey: process.env.AI_KEY ?? "",

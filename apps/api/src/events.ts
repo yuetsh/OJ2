@@ -4,6 +4,18 @@ import { redis } from "./redis"
 
 export const userEventChannel = "user:events"
 
+/**
+ * 站点配置变更广播。旧后端的 `utils/websocket.push_config_update`：
+ * 超管改了配置，所有开着页面的人立刻生效，不必刷新。
+ * 这是全站广播，不分用户，所以是一个固定 topic 而不是 per-user。
+ */
+export const configUpdateChannel = "config:updates"
+export const configTopic = "events:config"
+
+export async function publishConfigUpdate(key: string, value: unknown) {
+  await redis.publish(configUpdateChannel, JSON.stringify({ type: "config_update", key, value }))
+}
+
 interface UserEvent {
   userId: number
   data: FlowchartUpdate | Record<string, unknown>
