@@ -1,9 +1,16 @@
-# 端点清单（机器初判）
+# 端点清单（已裁决）
 
-生成时间：2026-08-06
-合计 127 个端点 —— KEEP 104、CUT 17、REVIEW 6
+生成时间：2026-08-06　　裁决时间：2026-08-06
+合计 127 个端点 —— KEEP 110、CUT 17、REVIEW 0
 
-> REVIEW 项需人工裁决，裁决后把本行的 REVIEW 改成 KEEP 或 CUT，并在末列写明理由。
+**裁决结果：新后端需实现 110 个端点，砍掉 17 个（占 13%）。**
+
+裁决说明：机器初判的 6 条 REVIEW 全部判为 KEEP。其中 5 条是下述提取盲点造成的假阴性
+（前端确实在调用，只是提取脚本抓不到）；`/api/judge_server_heartbeat/` 不经前端，是判题机
+向后端注册心跳的接口，新架构判题沙箱镜像原样复用，必须保留。
+
+> ⚠️ 本文件已完成人工裁决，**不要再运行 `docs/spikes/reconcile.ts`** —— 它会重新生成本文件，
+> 把上面的裁决结果和末列理由全部冲掉。若确需重跑（例如后端 urls 有变动），先备份本文件。
 
 > 已知盲点 1：`ojnext/src/oj/api.ts` 第 45、73 行用变量动态传路径（形如 `http.get(endpoint)`），提取脚本的正则匹配不到这类调用。因此对应的后端端点会被本表判成“前端无调用”，但实际可能仍在使用 —— 例如 `/api/contest_submissions`（`getSubmissions` 里 `endpoint` 变量的另一分支）。
 
@@ -138,9 +145,9 @@
 | KEEP | tutorial | admin | `/api/admin/tutorial/visibility` | TutorialVisibilityAPI.as_view | 是 | 否 | |
 | KEEP | tutorial | admin | `/api/admin/exercise` | ExerciseAdminAPI.as_view | 是 | 否 | |
 | KEEP | utils | admin | `/api/admin/upload_image` | SimditorImageUploadAPIView.as_view | 是 | 否 | |
-| REVIEW | ai | oj | `/api/ai/analysis` | AIAnalysisAPI.as_view | 否 | 否 | |
-| REVIEW | ai | oj | `/api/ai/hint` | AIHintAPI.as_view | 否 | 否 | |
-| REVIEW | ai | oj | `/api/ai/class_pk` | ClassPKAnalysisAPI.as_view | 否 | 否 | |
-| REVIEW | ai | oj | `/api/ai/class_single` | SingleClassAnalysisAPI.as_view | 否 | 否 | |
-| REVIEW | conf | oj | `/api/judge_server_heartbeat/` | JudgeServerHeartbeatAPI.as_view | 否 | 否 | |
-| REVIEW | submission | oj | `/api/contest_submissions` | ContestSubmissionListAPI.as_view | 否 | 否 | |
+| KEEP | ai | oj | `/api/ai/analysis` | AIAnalysisAPI.as_view | 否 | 否 | 盲点 2：走原生 `fetch`（`src/oj/store/ai.ts:107`），实际在用 |
+| KEEP | ai | oj | `/api/ai/hint` | AIHintAPI.as_view | 否 | 否 | 盲点 2：走原生 `fetch`（`src/oj/problem/components/SubmissionResult.vue:86`），实际在用 |
+| KEEP | ai | oj | `/api/ai/class_pk` | ClassPKAnalysisAPI.as_view | 否 | 否 | 盲点 2：走原生 `fetch`（`src/oj/class/pk.vue:179`），实际在用 |
+| KEEP | ai | oj | `/api/ai/class_single` | SingleClassAnalysisAPI.as_view | 否 | 否 | 盲点 2：走原生 `fetch`（`src/oj/rank/list.vue:98`），实际在用 |
+| KEEP | conf | oj | `/api/judge_server_heartbeat/` | JudgeServerHeartbeatAPI.as_view | 否 | 否 | 非前端调用：判题机向后端注册心跳。新架构判题沙箱镜像原样复用，此接口必须保留 |
+| KEEP | submission | oj | `/api/contest_submissions` | ContestSubmissionListAPI.as_view | 否 | 否 | 盲点 1：`getSubmissions` 里 `endpoint` 变量的比赛分支（`src/oj/api.ts:73`），实际在用 |
