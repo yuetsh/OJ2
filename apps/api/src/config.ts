@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { isAbsolute, resolve } from "node:path"
 
 /**
  * Bun 只自动加载「当前工作目录」下的 .env。而本应用的启动方式（`bun run --filter '@oj2/api' dev`）
@@ -34,6 +34,18 @@ loadRepoRootEnv()
  * env 缺失时生成随机值 fail-safe —— 宁可判题机连不上（启动时有明显告警），
  * 也不要在仓库里写死一个人人都知道的弱默认值。
  */
+/**
+ * 相对路径一律按**仓库根**解析，而不是进程 cwd。
+ *
+ * 起服务的方式（`bun run --filter '@oj2/api' dev`）会把 cwd 切到 apps/api/，
+ * 于是 "data/test_case" 落在 apps/api/data/ 下 —— 而 docker/compose.dev.yml 把
+ * 仓库根的 data/test_case 挂进判题沙箱。两边不是同一个目录，新传的测试点判题时
+ * 会「找不到测试数据」，而且只在真正判题时才暴露。
+ */
+function repoPath(value: string) {
+  return isAbsolute(value) ? value : resolve(import.meta.dir, "../../..", value)
+}
+
 function judgeServerToken() {
   const fromEnv = process.env.JUDGE_SERVER_TOKEN
   if (fromEnv) return fromEnv
@@ -54,10 +66,10 @@ export const config = {
   judgeServerUrl: process.env.JUDGE_SERVER_URL ?? "http://localhost:8081",
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2),
-  avatarDirectory: process.env.AVATAR_DIRECTORY ?? "data/avatar",
+  avatarDirectory: repoPath(process.env.AVATAR_DIRECTORY ?? "data/avatar"),
   // 判题沙箱把这个目录挂成只读的 /test_case，两边必须指同一处
-  testCaseDirectory: process.env.TEST_CASE_DIRECTORY ?? "data/test_case",
-  uploadDirectory: process.env.UPLOAD_DIRECTORY ?? "data/upload",
+  testCaseDirectory: repoPath(process.env.TEST_CASE_DIRECTORY ?? "data/test_case"),
+  uploadDirectory: repoPath(process.env.UPLOAD_DIRECTORY ?? "data/upload"),
   uploadUriPrefix: process.env.UPLOAD_URI_PREFIX ?? "/public/upload",
   avatarUriPrefix: process.env.AVATAR_URI_PREFIX ?? "/public/avatar",
   aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",

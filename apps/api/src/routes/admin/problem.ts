@@ -6,6 +6,7 @@ import {
   createProblemRequestSchema,
   makeProblemPublicRequestSchema,
   updateProblemRequestSchema,
+  uploadTestCaseResponseSchema,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -15,6 +16,7 @@ import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { contestStatus } from "../../services/contest"
+import { packTestCaseZip, processTestCaseZip, TestCaseError } from "../../services/test-case"
 import { objectValue, queryInteger, sampleUser, stringArray } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
@@ -525,4 +527,45 @@ adminProblemRoutes.post("/contests/:contestId/problems/from-public", requireProb
     return copy!
   })
   return success(c, await serialize(created), 201)
+})
+
+// ---------------------------------------------------------------- 测试用例
+
+adminProblemRoutes.post("/test-cases", requireProblemPermission, async (c) => {
+  const form = await c.req.formData().catch(() => null)
+  const file = form?.get("file")
+  if (!(file instanceof File)) return failure(c, 400, "invalid-request", "Upload failed")
+  const sql = ["1", "true", "True"].includes(String(form?.get("sql") ?? ""))
+  try {
+    const result = await processTestCaseZip(new Uint8Array(await file.arrayBuffer()), { sql })
+    return success(c, uploadTestCaseResponseSchema.parse({
+      id: result.testCaseId,
+      info: result.info,
+    }), 201)
+  } catch (error) {
+    if (error instanceof TestCaseError) return failure(c, 400, "invalid-test-case", error.message)
+    console.error("Failed to process test case zip", error)
+    return failure(c, 500, "test-case-error", "测试点处理失败")
+  }
+})
+
+adminProblemRoutes.get("/problems/:id/test-cases", requireProblemPermission, async (c) => {
+  const [problem] = await db.select().from(schema.problem)
+    .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 }))).limit(1)
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exists")
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exists")
+  }
+  try {
+    const archive = await packTestCaseZip(problem.testCaseId)
+    return new Response(archive, {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename=problem_${problem.id}_test_cases.zip`,
+      },
+    })
+  } catch (error) {
+    if (error instanceof TestCaseError) return failure(c, 404, "test-case-not-found", error.message)
+    throw error
+  }
 })

@@ -212,7 +212,7 @@ export function uploadTestcases(file: File, options: { sql?: boolean } = {}) {
   if (options.sql) {
     form.append("sql", "1")
   }
-  return http.post<TestcaseUploadedReturns>("admin/test_case", form, {
+  return api2.post<TestcaseUploadedReturns>("admin/test-cases", form, {
     headers: { "content-type": "multipart/form-data" },
   })
 }

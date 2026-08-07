@@ -43,7 +43,7 @@ async function handleDeleteProblem() {
 }
 
 function downloads() {
-  download("test_case?problem_id=" + props.problemID)
+  download(`problems/${props.problemID}/test-cases`)
 }
 
 function goEdit() {

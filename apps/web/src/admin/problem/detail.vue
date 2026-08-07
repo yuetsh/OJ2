@@ -313,7 +313,7 @@ async function handleUploadTestcases({ file }: UploadCustomRequestOptions) {
 }
 
 function downloadTestcases() {
-  download("test_case?problem_id=" + problem.value.id)
+  download(`problems/${problem.value.id}/test-cases`)
 }
 
 // Mermaid 渲染事件处理

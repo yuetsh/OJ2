@@ -18,6 +18,7 @@
     "@oj2/contract": "workspace:*",
     "bullmq": "^6.0.9",
     "drizzle-orm": "^0.45.2",
+    "fflate": "^0.8.3",
     "hono": "^4.0.0",
     "ioredis": "^6.0.0",
     "postgres": "^3.4.0",

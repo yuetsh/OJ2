@@ -586,3 +586,20 @@ export const addContestProblemRequestSchema = z.object({
   problemId: z.number().int().positive(),
   displayId: z.string().trim().min(1).max(32),
 })
+
+export const testCaseEntrySchema = z.object({
+  stripped_output_md5: z.string(),
+  input_size: z.number().int(),
+  output_size: z.number().int(),
+  input_name: z.string(),
+  output_name: z.string(),
+})
+
+/**
+ * 测试点上传的返回。字段名保持 snake_case —— 它会被原样存进 problem.test_case_score
+ * 和落盘的 info 文件，而判题沙箱读的就是这套键名，改成 camelCase 会判不了题。
+ */
+export const uploadTestCaseResponseSchema = z.object({
+  id: z.string(),
+  info: z.array(testCaseEntrySchema),
+})
