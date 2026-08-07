@@ -16,3 +16,6 @@ build/
 # 否则 spike 换台机器就跑不起来（曾漏掉三个 tree-sitter 依赖，ast-spike.ts 直接报错）
 docs/spikes/node_modules/
 docs/spikes/endpoints-*.json
+
+# 生产题目样本只用于本地验收，不进入 git
+*.csv
