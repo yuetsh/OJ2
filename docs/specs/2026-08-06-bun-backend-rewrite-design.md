@@ -154,6 +154,21 @@ argon2id  : true 耗时 88 ms
 1. 登录必须使用 `node:crypto` 的**异步** `pbkdf2`（走 libuv 线程池），不得使用 `pbkdf2Sync`。
 2. 验证成功后立即将该用户哈希升级为 argon2id（`Bun.password`），一学期后存量自然清空。
 
+#### 7.1.1 `raw_password` 明文列保留（已决策）
+
+生产库 `user` 表有一列 `raw_password character varying(20)`（`docs/specs/schema.sql:939`），存学生明文密码。
+
+**决策：保留。** 这是有意的运维需求——学生忘记密码是高频事件，教师需要能直接查到并告知，走"重置密码"流程在机房环境里成本过高。新后端照样维护这一列。
+
+**对本节结论的影响，须如实记录：** 既然明文与哈希同表共存，第 2 条的 argon2id 升级**不构成对"数据库泄露"这一威胁的防护**——拿到库的人不需要破哈希。该升级实际只解决两件事：
+
+- 摆脱 pbkdf2 每次登录 95ms 的 CPU 开销（argon2id 88ms 但只在升级那一次，之后走更快路径）
+- 不再依赖 Django 特定的哈希格式，新后端自成一体
+
+不要在任何地方把它描述成"提升了密码安全性"。真实的安全边界由 `raw_password` 决定，不由哈希算法决定。
+
+**若日后想在不改变教师查密码这一工作流的前提下收紧**（本次未采纳，仅备查）：把 `raw_password` 改为用一把存在环境变量/密钥文件里、**不在数据库内**的密钥做可逆加密。教师查询走应用层解密，体验不变；而一份裸的数据库备份泄露时不再直接暴露明文。改动量约为一个加解密工具函数 + 一次存量数据迁移。
+
 ### 7.2 tree-sitter 迁移（`docs/spikes/ast-spike.ts`）
 
 复刻 `ast_checker/mappings/c.py` 的映射表，在 Bun 中用 `web-tree-sitter` 解析 C 代码：
@@ -227,7 +242,9 @@ jieba.loadDict(Buffer.from("两个整数 9999\n"))
 盘点中发现的、明确不应带进新后端的实现：
 
 - **`SessionRecordMiddleware`（`account/middleware.py:22-33`）**：每个已登录请求都写一遍 session（user_agent / ip / last_activity），遇到新 session key 还额外触发一次 `request.user.save()` —— 即每请求一次数据库写。这是"Django 太慢"的实际来源之一。新后端的会话信息留在 Redis，不落库。
-- **`User.session_keys`**：只写不读的死字段，随 `/api/sessions` 端点一并砍掉。
+- **`User.session_keys`**：只写不读的死字段，随 `/api/sessions` 端点一并砍掉。（已由 `schema.sql:938` 确认该列存在。）
+
+反过来，**必须复刻**的一项：`user.raw_password`（`schema.sql:939`）保留，见 7.1.1。
 
 ## 9. 判题链路
 
