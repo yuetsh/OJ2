@@ -3,7 +3,6 @@ import {
 	problemDetailSchema,
 	problemListItemSchema,
 	problemListSchema,
-	problemSummarySchema,
 	tagSchema,
 	yearlyAcSchema,
 } from "@oj2/contract"
@@ -226,25 +225,6 @@ problemRoutes.get("/problems/:displayId/yearly-ac", async (c) => {
 	}).from(schema.submission).where(and(eq(schema.submission.problemId, problem.id), isNull(schema.submission.contestId), notInArray(schema.submission.result, [6, 7])))
 		.groupBy(year).orderBy(year)
 	return success(c, rows.map((row) => yearlyAcSchema.parse({ ...row, acRate: row.total > 0 ? Math.round(row.accepted / row.total * 10_000) / 100 : 0 })))
-})
-
-problemRoutes.get("/dev/problems", async (c) => {
-	const rows = await db
-		.select({
-			id: schema.problem.id,
-			_id: schema.problem.displayId,
-			title: schema.problem.title,
-			difficulty: schema.problem.difficulty,
-			submissionNumber: schema.problem.submissionNumber,
-			acceptedNumber: schema.problem.acceptedNumber,
-		})
-		.from(schema.problem)
-		.where(and(eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
-		.orderBy(desc(schema.problem.id))
-		.limit(20)
-
-	const data = rows.map((row) => problemSummarySchema.parse(row))
-	return success(c, data)
 })
 
 problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {

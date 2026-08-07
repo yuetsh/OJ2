@@ -5,7 +5,6 @@ export const ojs: RouteRecordRaw = {
   component: () => import("shared/layout/default.vue"),
   children: [
     { path: "", component: () => import("oj/problem/list.vue") },
-    { path: "dev-problems", component: () => import("oj/dev-problems.vue") },
     {
       path: "problem/:problemID",
       component: () => import("oj/problem/detail.vue"),
