@@ -293,38 +293,58 @@ export function createAnnouncement(announcement: AnnouncementEdit) {
   return legacyResponse(api2.post("admin/announcements", body))
 }
 
+/** 组件里的 Tutorial 仍是 snake_case，出站时转成新后端要的 camelCase */
+function toTutorialBody(data: Partial<Tutorial>) {
+  return {
+    title: data.title,
+    content: data.content,
+    code: data.code ?? null,
+    isPublic: data.is_public ?? false,
+    order: data.order ?? 0,
+    type: data.type,
+  }
+}
+
 export async function getTutorialList() {
-  const res = await http.get<Tutorial[]>("admin/tutorial")
+  const res = await legacyResponse<{ [key: string]: Tutorial[] }>(
+    api2.get("admin/tutorials"),
+  )
   return res.data
 }
 
 export async function getTutorial(id: number) {
-  const res = await http.get<Tutorial>("admin/tutorial", { params: { id } })
+  const res = await legacyResponse<Tutorial>(api2.get(`admin/tutorials/${id}`))
   return res.data
 }
 
 export async function createTutorial(data: Partial<Tutorial>) {
-  const res = await http.post<Tutorial>("admin/tutorial", data)
+  const res = await legacyResponse<Tutorial>(
+    api2.post("admin/tutorials", toTutorialBody(data)),
+  )
   return res.data
 }
 
 export async function updateTutorial(data: Partial<Tutorial>) {
-  const res = await http.put("admin/tutorial", data)
+  const res = await legacyResponse<Tutorial>(
+    api2.put(`admin/tutorials/${data.id}`, toTutorialBody(data)),
+  )
   return res.data
 }
 
 export function deleteTutorial(id: number) {
-  return http.delete("admin/tutorial", { params: { id } })
+  return api2.delete(`admin/tutorials/${id}`)
 }
 
 export function setTutorialVisibility(id: number, is_public: boolean) {
-  return http.put("admin/tutorial/visibility", { id, is_public })
+  return legacyResponse(
+    api2.put(`admin/tutorials/${id}/visibility`, { isPublic: is_public }),
+  )
 }
 
 export async function getAdminExercises(tutorialId: number) {
-  const res = await http.get<Exercise[]>("admin/exercise", {
-    params: { tutorial_id: tutorialId },
-  })
+  const res = await legacyResponse<Exercise[]>(
+    api2.get(`admin/tutorials/${tutorialId}/exercises`),
+  )
   return res.data
 }
 
@@ -334,7 +354,14 @@ export async function createExercise(data: {
   data: object
   order: number
 }) {
-  const res = await http.post<Exercise>("admin/exercise", data)
+  const res = await legacyResponse<Exercise>(
+    api2.post("admin/exercises", {
+      tutorialId: data.tutorial_id,
+      type: data.type,
+      data: data.data,
+      order: data.order,
+    }),
+  )
   return res.data
 }
 
@@ -344,12 +371,18 @@ export async function updateExercise(data: {
   data: object
   order: number
 }) {
-  const res = await http.put("admin/exercise", data)
-  return res.data as Exercise
+  const res = await legacyResponse<Exercise>(
+    api2.put(`admin/exercises/${data.id}`, {
+      type: data.type,
+      data: data.data,
+      order: data.order,
+    }),
+  )
+  return res.data
 }
 
 export function deleteExercise(id: number) {
-  return http.delete("admin/exercise", { params: { id } })
+  return api2.delete(`admin/exercises/${id}`)
 }
 
 // 将竞赛题目转为公开题目
@@ -543,21 +576,25 @@ export function getTopACTrend(params: {
 
 // AI 学习分析报告
 export function getAIReportList(offset = 0, limit = 10, username = "") {
-  return http.get("admin/ai/reports", {
-    params: { paging: true, offset, limit, username: username || undefined },
-  })
+  return legacyResponse(
+    api2.get("admin/ai/reports", {
+      params: { offset, limit, username: username || undefined },
+    }),
+  )
 }
 
 export function getAIReportDetail(id: number) {
-  return http.get("admin/ai/reports", { params: { id } })
+  return legacyResponse(api2.get(`admin/ai/reports/${id}`))
 }
 
 export function pinAIReport(id: number) {
-  return http.post("admin/ai/reports", { id })
+  return legacyResponse(api2.post(`admin/ai/reports/${id}/pin`))
 }
 
 export function getPinnedAIReports() {
-  return http.get("admin/ai/reports", { params: { pinned_only: "true" } })
+  return legacyResponse(
+    api2.get("admin/ai/reports", { params: { pinnedOnly: "true" } }),
+  )
 }
 
 // ==================== 成就 ====================

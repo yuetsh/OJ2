@@ -1,7 +1,9 @@
 import { Hono } from "hono"
 
 import type { AppEnv } from "../../auth/middleware"
+import { adminAiRoutes } from "./ai"
 import { adminAnnouncementRoutes } from "./announcement"
+import { adminTutorialRoutes } from "./tutorial"
 
 /**
  * 后台路由总入口，挂在 `/api/admin` 下。
@@ -13,4 +15,6 @@ import { adminAnnouncementRoutes } from "./announcement"
  */
 export const adminRoutes = new Hono<AppEnv>()
 
+adminRoutes.route("/", adminAiRoutes)
 adminRoutes.route("/", adminAnnouncementRoutes)
+adminRoutes.route("/", adminTutorialRoutes)
