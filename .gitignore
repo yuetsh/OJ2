@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+*.log
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+.vscode/
+.idea/
+
+# spike 的依赖不入库，spike 源码入库
+docs/spikes/node_modules/
+docs/spikes/bun.lock
