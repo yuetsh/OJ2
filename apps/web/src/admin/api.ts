@@ -178,9 +178,9 @@ export function deleteUsers(userIDs: number[]) {
 }
 
 export function getContestList(offset = 0, limit = 10, keyword: string) {
-  return http.get("admin/contest", {
-    params: { paging: true, offset, limit, keyword },
-  })
+  return legacyResponse(
+    api2.get("admin/contests", { params: { offset, limit, keyword } }),
+  )
 }
 
 // 上传图片
@@ -242,22 +242,41 @@ export function createContestProblem(problem: BlankProblem) {
   return http.post("admin/contest/problem", problem)
 }
 
+/** 组件里的比赛对象是 snake_case，出站转成新后端要的 camelCase */
+function toContestBody(contest: Contest | BlankContest) {
+  return {
+    title: contest.title,
+    description: contest.description,
+    tag: contest.tag,
+    startTime: contest.start_time,
+    endTime: contest.end_time,
+    password: contest.password || null,
+    visible: contest.visible,
+    allowedIpRanges: contest.allowed_ip_ranges ?? [],
+  }
+}
+
 export function createContest(contest: BlankContest) {
-  return http.post("admin/contest", contest)
+  return legacyResponse(api2.post("admin/contests", toContestBody(contest)))
 }
 
 export function editContest(contest: Contest | BlankContest) {
-  return http.put("admin/contest", contest)
+  return legacyResponse(
+    api2.put(
+      `admin/contests/${(contest as Contest).id}`,
+      toContestBody(contest),
+    ),
+  )
 }
 
 export function cloneContest(contest_id: number) {
-  return http.post("admin/contest/clone", { contest_id })
+  return legacyResponse(api2.post(`admin/contests/${contest_id}/clone`))
 }
 
 export function getContest(id: string) {
-  return http.get<Contest & { password: string }>("admin/contest", {
-    params: { id },
-  })
+  return legacyResponse<Contest & { password: string }>(
+    api2.get(`admin/contests/${id}`),
+  )
 }
 
 export function addProblemForContest(
@@ -435,9 +454,7 @@ export function makeProblemPublic(id: number, display_id: string) {
 
 // 比赛辅助检查
 export function getACMHelperList(contest_id: number) {
-  return http.get("admin/contest/acm_helper", {
-    params: { contest_id },
-  })
+  return legacyResponse(api2.get(`admin/contests/${contest_id}/acm-helper`))
 }
 
 export function updateACMHelperChecked(
@@ -446,10 +463,9 @@ export function updateACMHelperChecked(
   problem_id: string,
   checked: boolean,
 ) {
-  return http.put("admin/contest/acm_helper", {
-    contest_id,
-    rank_id,
-    problem_id,
+  return api2.put(`admin/contests/${contest_id}/acm-helper`, {
+    rankId: rank_id,
+    problemId: problem_id,
     checked,
   })
 }

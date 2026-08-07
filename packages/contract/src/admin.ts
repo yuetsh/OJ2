@@ -280,3 +280,55 @@ export const uploadImageResponseSchema = z.object({
   msg: z.string(),
   filePath: z.string(),
 })
+
+// ---------------------------------------------------------------- 比赛管理
+
+export const adminContestSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  description: z.string(),
+  tag: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  createTime: z.string(),
+  lastUpdateTime: z.string(),
+  // 后台要能看到自己设的密码（用来告诉学生），oj 侧的 contestSchema 则永远不含它
+  password: z.string().nullable(),
+  visible: z.boolean(),
+  allowedIpRanges: z.array(z.string()),
+  createdBy: sampleUserSchema,
+  status: z.enum(["1", "0", "-1"]),
+  contestType: z.enum(["Public", "Password Protected"]),
+})
+
+export const adminContestListSchema = paginatedSchema(adminContestSchema)
+
+export const createContestRequestSchema = z.object({
+  title: z.string().trim().min(1).max(128),
+  description: z.string(),
+  tag: z.string().max(64),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1),
+  // 空串等同于「不设密码」，与旧 CreateConetestSeriaizer 的 allow_blank 一致
+  password: z.string().max(32).nullable().default(null),
+  visible: z.boolean(),
+  allowedIpRanges: z.array(z.string().max(32)).default([]),
+})
+
+export const updateContestRequestSchema = createContestRequestSchema
+
+export const acmHelperItemSchema = z.object({
+  id: z.number().int(),
+  username: z.string(),
+  realName: z.string().nullable(),
+  problemId: z.string(),
+  problemDisplayId: z.string(),
+  acInfo: z.record(z.string(), z.unknown()),
+  checked: z.boolean(),
+})
+
+export const updateAcmHelperRequestSchema = z.object({
+  rankId: z.number().int().positive(),
+  problemId: z.string().min(1),
+  checked: z.boolean(),
+})
