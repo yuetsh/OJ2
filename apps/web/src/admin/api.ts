@@ -478,19 +478,34 @@ export function getProblemSetList(
   difficulty = "",
   status = "",
 ) {
-  return http.get("admin/problemset", {
-    params: {
-      offset,
-      limit,
-      keyword,
-      difficulty,
-      status,
-    },
-  })
+  return legacyResponse(
+    api2.get("admin/problem-sets", {
+      params: { offset, limit, keyword, difficulty, status },
+    }),
+  )
 }
 
 export function getProblemSetDetail(id: number) {
-  return http.get(`admin/problemset/${id}`)
+  return legacyResponse(api2.get(`admin/problem-sets/${id}`))
+}
+
+/** 组件传的是 snake_case，出站转成新后端要的 camelCase */
+function toProblemSetBody(data: {
+  title?: string
+  description?: string
+  difficulty?: string
+  status?: string
+  end_time?: Date | null
+  visible?: boolean
+}) {
+  return {
+    title: data.title,
+    description: data.description ?? "",
+    difficulty: data.difficulty ?? "Easy",
+    status: data.status ?? "active",
+    endTime: data.end_time ? new Date(data.end_time).toISOString() : null,
+    visible: data.visible ?? true,
+  }
 }
 
 export function createProblemSet(data: {
@@ -500,7 +515,7 @@ export function createProblemSet(data: {
   status: string
   end_time?: Date | null
 }) {
-  return http.post("admin/problemset", data)
+  return legacyResponse(api2.post("admin/problem-sets", toProblemSetBody(data)))
 }
 
 export function editProblemSet(data: {
@@ -512,24 +527,26 @@ export function editProblemSet(data: {
   end_time?: Date | null
   visible?: boolean
 }) {
-  return http.put("admin/problemset", data)
+  return legacyResponse(
+    api2.put(`admin/problem-sets/${data.id}`, toProblemSetBody(data)),
+  )
 }
 
 export function deleteProblemSet(id: number) {
-  return http.delete("admin/problemset", { params: { id } })
+  return api2.delete(`admin/problem-sets/${id}`)
 }
 
 export function toggleProblemSetVisible(id: number) {
-  return http.put("admin/problemset/visible", { id })
+  return legacyResponse(api2.put(`admin/problem-sets/${id}/visibility`))
 }
 
 export function updateProblemSetStatus(id: number, status: string) {
-  return http.put("admin/problemset/status", { id, status })
+  return legacyResponse(api2.put(`admin/problem-sets/${id}/status`, { status }))
 }
 
 // 题单题目管理 API
 export function getProblemSetProblems(problemSetId: number) {
-  return http.get(`admin/problemset/${problemSetId}/problems`)
+  return legacyResponse(api2.get(`admin/problem-sets/${problemSetId}/problems`))
 }
 
 export function addProblemToSet(
@@ -542,7 +559,13 @@ export function addProblemToSet(
     hint?: string
   },
 ) {
-  return http.post(`admin/problemset/${problemSetId}/problems`, data)
+  return api2.post(`admin/problem-sets/${problemSetId}/problems`, {
+    problemId: data.problem_id,
+    order: data.order ?? 0,
+    isRequired: data.is_required ?? true,
+    score: data.score ?? 0,
+    hint: data.hint ?? "",
+  })
 }
 
 export function editProblemInSet(
@@ -555,9 +578,14 @@ export function editProblemInSet(
     hint?: string
   },
 ) {
-  return http.put(
-    `admin/problemset/${problemSetId}/problems/${problemSetProblemId}`,
-    data,
+  return api2.put(
+    `admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`,
+    {
+      order: data.order,
+      isRequired: data.is_required,
+      score: data.score,
+      hint: data.hint,
+    },
   )
 }
 
@@ -565,14 +593,30 @@ export function removeProblemFromSet(
   problemSetId: number,
   problemSetProblemId: number,
 ) {
-  return http.delete(
-    `admin/problemset/${problemSetId}/problems/${problemSetProblemId}`,
+  return api2.delete(
+    `admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`,
   )
 }
 
 // 题单奖章管理 API
 export function getProblemSetBadges(problemSetId: number) {
-  return http.get(`admin/problemset/${problemSetId}/badges`)
+  return legacyResponse(api2.get(`admin/problem-sets/${problemSetId}/badges`))
+}
+
+function toBadgeBody(data: {
+  name?: string
+  description?: string
+  icon?: string
+  condition_type?: string
+  condition_value?: number
+}) {
+  return {
+    name: data.name,
+    description: data.description ?? "",
+    icon: data.icon ?? "",
+    conditionType: data.condition_type,
+    conditionValue: data.condition_value ?? 0,
+  }
 }
 
 export function createProblemSetBadge(
@@ -586,7 +630,9 @@ export function createProblemSetBadge(
     level?: number
   },
 ) {
-  return http.post(`admin/problemset/${problemSetId}/badges`, data)
+  return legacyResponse(
+    api2.post(`admin/problem-sets/${problemSetId}/badges`, toBadgeBody(data)),
+  )
 }
 
 export function editProblemSetBadge(
@@ -601,20 +647,25 @@ export function editProblemSetBadge(
     level?: number
   },
 ) {
-  return http.put(`admin/problemset/${problemSetId}/badges/${badgeId}`, data)
+  return legacyResponse(
+    api2.put(
+      `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
+      toBadgeBody(data),
+    ),
+  )
 }
 
 export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
-  return http.delete(`admin/problemset/${problemSetId}/badges/${badgeId}`)
+  return api2.delete(`admin/problem-sets/${problemSetId}/badges/${badgeId}`)
 }
 
 // 题单进度管理 API
 export function getProblemSetProgress(problemSetId: number) {
-  return http.get(`admin/problemset/${problemSetId}/progress`)
+  return legacyResponse(api2.get(`admin/problem-sets/${problemSetId}/progress`))
 }
 
 export function removeUserFromProblemSet(problemSetId: number, userId: number) {
-  return http.delete(`admin/problemset/${problemSetId}/progress/${userId}`)
+  return api2.delete(`admin/problem-sets/${problemSetId}/progress/${userId}`)
 }
 
 // 学生卡点分析
