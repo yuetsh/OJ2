@@ -151,3 +151,40 @@
 | KEEP | ai | oj | `/api/ai/class_single` | SingleClassAnalysisAPI.as_view | 否 | 否 | 盲点 2：走原生 `fetch`（`src/oj/rank/list.vue:98`），实际在用 |
 | KEEP | conf | oj | `/api/judge_server_heartbeat/` | JudgeServerHeartbeatAPI.as_view | 否 | 否 | 非前端调用：判题机向后端注册心跳。新架构判题沙箱镜像原样复用，此接口必须保留 |
 | KEEP | submission | oj | `/api/contest_submissions` | ContestSubmissionListAPI.as_view | 否 | 否 | 盲点 1：`getSubmissions` 里 `endpoint` 变量的比赛分支（`src/oj/api.ts:73`），实际在用 |
+
+---
+
+## 交付核对（2026-08-08，阶段 5 之后）
+
+把这张表里的 **110 条 KEEP 逐条对到新后端**，确认没有「当初判了要搬、后来忘了」的。
+
+**结果：110/110 全部有对应实现，零缺口。**
+
+核对方法：把旧路径和新后端注册的 167 条路由都做词元化（去掉 `/api`、`admin`、
+参数段，snake/kebab 拆开，单复数归一）后求交集。87 条自动匹配上，剩下 23 条
+（API 是重新设计过的，路径本来就对不上）逐条人工落实，见下表。
+
+> 方法的局限：词元匹配只能提示「这两条像是同一个」，不能证明**行为**一致。
+> 行为一致性靠的是阶段 3/4 的两轮独立评审和阶段 5 的实跑演练，不是这张表。
+
+### 非显然的改名对照
+
+`problemset` → `problem-sets` 这类一眼能猜到的没列。下面这些是**猜不到、
+日后排查时会卡住人**的：
+
+| 旧（Django） | 新（Bun） |
+|---|---|
+| `POST /api/register` | `POST /api/users` |
+| `GET /api/logout` | `DELETE /api/auth/session` |
+| `GET /api/hitokoto` | `GET /api/quotes/random` |
+| `GET /api/pickone` | `GET /api/problems/random` |
+| `GET /api/user_activity_rank` | `GET /api/rankings/activity` |
+| `GET /api/profile/fresh_display_id` | `POST /api/me/problem-display-ids/refresh` |
+| `GET /api/flowchart/submission/detail` | `GET /api/flowcharts/:id` |
+| `POST /api/reaction` | `POST /api/problems/:id/reaction` |
+| `PUT /api/admin/problemset/visible` | `PUT /api/admin/problem-sets/:id/visibility` |
+| `GET /api/judge_server_heartbeat/` | `POST /api/judge-server/heartbeat` |
+
+最后一条尤其要注意：**判题沙箱镜像是原样复用的**，它靠 compose 里的
+`BACKEND_URL` 找后端，三套 compose 都已改成新路径。改动这条要同步改 compose，
+否则判题机会静默离线。
