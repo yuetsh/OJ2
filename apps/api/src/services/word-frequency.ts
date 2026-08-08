@@ -1,5 +1,6 @@
-import { Jieba } from "@node-rs/jieba"
-import { dict } from "@node-rs/jieba/dict"
+// 不直接 import @node-rs/jieba：它的运行时平台探测和 __dirname 词典加载
+// 在 `bun build --compile` 之后都失效，原因见 vendor/jieba.ts
+import { withBuiltinDict, type JiebaInstance } from "../vendor/jieba"
 
 /**
  * 流程图评语词云的分词。对齐旧后端 `flowchart/views/admin.py` 的
@@ -35,11 +36,11 @@ const CUSTOM_WORDS = [
  * 词典加载有一次性开销（约 100ms），放在模块级会拖慢 API 冷启动，
  * 而词云只有教师偶尔点一次。改成首次调用时才建。
  */
-let instance: Jieba | null = null
+let instance: JiebaInstance | null = null
 
 function jieba() {
   if (instance) return instance
-  const built = Jieba.withDict(dict)
+  const built = withBuiltinDict()
   // 对应旧后端的 jieba.add_word(w, freq=9999)。
   // @node-rs/jieba@2 没有导出 insertWord/addWord，改用用户词典缓冲区，格式为「词 词频」。
   built.loadDict(

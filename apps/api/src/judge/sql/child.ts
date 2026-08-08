@@ -6,7 +6,11 @@
  * 父进程见 `./index.ts`。
  *
  * 协议：stdin 读一段 JSON 作业，stdout 写一段 JSON 结果；
- * 阶段标记写 stderr，父进程在超时杀掉本进程后据此判断卡在哪一阶段。
+ * 阶段标记写 stderr，父进程据此收紧兜底时限、并判断超时该算谁的。
+ *
+ * 这个文件**不是**独立入口，而是由 `src/main.ts` 的 `sql-child` 子命令调用。
+ * 原因：`bun build --compile` 之后磁盘上没有 child.ts 可以让父进程去 spawn，
+ * 只能让二进制自己按 argv 分发到这里。
  */
 
 import { writeSync } from "node:fs"
@@ -60,7 +64,8 @@ function finish(payload: unknown): never {
   throw new Error("unreachable")
 }
 
-async function main() {
+/** 子进程入口。由 `src/main.ts` 的 `sql-child` 子命令调用，不在导入时自动执行 */
+export async function runSqlChild() {
   const raw = await new Response(Bun.stdin.stream()).text()
   const job = JSON.parse(raw) as SqlJob
   try {
@@ -93,5 +98,3 @@ async function main() {
     })
   }
 }
-
-await main()

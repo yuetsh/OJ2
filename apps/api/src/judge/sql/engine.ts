@@ -33,6 +33,7 @@
  */
 
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js"
+import sqlWasmPath from "sql.js/dist/sql-wasm.wasm" with { type: "file" }
 import { readFileSync } from "node:fs"
 
 import { JudgeStatus, type JudgeStatusValue } from "../status"
@@ -56,7 +57,9 @@ let cached: SqlJsStatic | null = null
 
 export async function sqlEngine() {
   if (cached) return cached
-  const binary = readFileSync(require.resolve("sql.js/dist/sql-wasm.wasm"))
+  // 内嵌成资源而非运行时 require.resolve —— 后者在 `bun build --compile` 之后
+  // 只有在仓库目录里才碰巧能解析出来，换个目录就 Cannot find module。见 vendor/jieba.ts
+  const binary = readFileSync(sqlWasmPath)
   // @types/sql.js 把 wasmBinary 标成 ArrayBuffer，实际 emscripten 接受 TypedArray；
   // 这里传 Uint8Array 是运行时正确的写法，类型上断言掉
   cached = await initSqlJs({ wasmBinary: binary as unknown as ArrayBuffer })

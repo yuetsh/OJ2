@@ -1,5 +1,4 @@
-import { resolve } from "node:path"
-
+import { selfCommand } from "../../runtime"
 import { JudgeStatus, type JudgeStatusValue } from "../status"
 import { DISPLAY_BUDGET_MS, trustedBudgetMs, type CaseResult } from "./engine"
 import type { SqlJob } from "./child"
@@ -33,6 +32,24 @@ import type { SqlJob } from "./child"
  * 卡在 student 才是学生超时（TLE）。
  */
 
+/**
+ * 递归闸的标记环境变量。
+ *
+ * ## 为什么必须有这道闸
+ *
+ * 这里 spawn 的是**进程自己**（`process.execPath` + 子命令）。正常情况下入口的
+ * argv 分发会把它引到 `runSqlChild()`，跑完就退出。但只要分发这一环出问题 ——
+ * 子命令改了名没同步、compose 里 command 写错、有人拿别的入口编了个二进制 ——
+ * 「起自己」就变成「把整个程序再跑一遍」，而那一遍又会 spawn 一个自己，指数增长。
+ *
+ * 这不是假想：开发阶段用一个没有 argv 分发的临时入口编了个二进制，一跑就是
+ * 递归 fork 105MB 的进程，几秒内触发 global OOM，内核把开发机的终端杀了。
+ * 同样的错误发生在服务器上就是判题机连同数据库一起被拖死。
+ *
+ * 闸的逻辑很简单：父进程 spawn 时打上这个标记，带标记的进程一律拒绝再 spawn。
+ * 递归最多一层就停在一条明确的 SYSTEM_ERROR 上，而不是吃光机器。
+ */
+const CHILD_MARKER = "OJ2_SQL_CHILD"
 /** 子进程数据段上限（KB）。低于 512MB Bun 自己起不来 */
 const CHILD_DATA_LIMIT_KB = 512 * 1024
 /** 进程启动 + WASM 初始化 + JSON 收发的余量 */
@@ -70,11 +87,28 @@ const PHASE_FAILURE: Record<string, SqlJobFailure> = {
 }
 
 async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<T>> {
-  const entry = resolve(import.meta.dir, "child.ts")
-  // 经 sh 起是为了用 ulimit —— Bun.spawn 没有直接设 rlimit 的接口
+  // 递归闸。子进程里绝不允许再 spawn 子进程 —— 见文件头「为什么必须有这道闸」。
+  if (process.env[CHILD_MARKER]) {
+    return {
+      ok: false,
+      result: JudgeStatus.SYSTEM_ERROR,
+      message: "SQL 判题子进程试图再起子进程，已阻断（入口子命令分发可能不正确）",
+    }
+  }
+
+  // 起的是「自己」：开发时是 bun + main.ts，编译后就是二进制自身，见 runtime.ts。
+  // 不能写死 child.ts 的路径 —— 单二进制里那个文件根本不存在。
+  const self = selfCommand("sql-child")
+  // 经 sh 起是为了用 ulimit —— Bun.spawn 没有直接设 rlimit 的接口。
+  // "$@" 原样透传，免得路径里有空格时被词法拆开。
   const child = Bun.spawn(
-    ["sh", "-c", `ulimit -d ${CHILD_DATA_LIMIT_KB}; exec "$0" run "$1"`, process.execPath, entry],
-    { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+    ["sh", "-c", `ulimit -d ${CHILD_DATA_LIMIT_KB}; exec "$@"`, "sh", ...self],
+    {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, [CHILD_MARKER]: "1" },
+    },
   )
   child.stdin.write(JSON.stringify(job))
   await child.stdin.end()

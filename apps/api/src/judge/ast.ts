@@ -1,4 +1,10 @@
 import { Language, Parser, type Node } from "web-tree-sitter"
+// 语法 wasm 内嵌成资源。原来是 `Bun.resolveSync(pkg + "/" + name, import.meta.dir)`，
+// 编译成单二进制后 import.meta.dir 是 /$bunfs/root，解析不到 node_modules。见 vendor/jieba.ts
+import cWasmPath from "tree-sitter-c/tree-sitter-c.wasm" with { type: "file" }
+import pythonWasmPath from "tree-sitter-python/tree-sitter-python.wasm" with { type: "file" }
+// web-tree-sitter 自己的运行时 wasm，Parser.init() 要用
+import treeSitterWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" }
 
 export interface AstRule {
   engine?: string
@@ -66,16 +72,15 @@ const languages = new Map<string, Language>()
 
 async function loadLanguage(language: string) {
   if (!(language in mappings)) return null
-  if (!initPromise) initPromise = Parser.init()
+  // locateFile 指到内嵌的 tree-sitter.wasm：emscripten 默认按脚本所在目录找，
+  // 单二进制里那个目录是 /$bunfs/root，它自己找不着
+  if (!initPromise) initPromise = Parser.init({ locateFile: () => treeSitterWasmPath })
   await initPromise
 
   const cached = languages.get(language)
   if (cached) return cached
 
-  const packageName = language === "C" ? "tree-sitter-c" : "tree-sitter-python"
-  const wasmName = language === "C" ? "tree-sitter-c.wasm" : "tree-sitter-python.wasm"
-  const wasmPath = Bun.resolveSync(`${packageName}/${wasmName}`, import.meta.dir)
-  const loaded = await Language.load(wasmPath)
+  const loaded = await Language.load(language === "C" ? cWasmPath : pythonWasmPath)
   languages.set(language, loaded)
   return loaded
 }

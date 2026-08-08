@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "bun run --parallel dev:http dev:worker",
-    "dev:http": "bun --watch src/index.ts",
-    "dev:worker": "bun --watch src/worker.ts",
-    "start": "bun src/index.ts",
-    "worker": "bun src/worker.ts",
+    "dev:http": "bun --watch src/main.ts serve",
+    "dev:worker": "bun --watch src/main.ts worker",
+    "start": "bun src/main.ts serve",
+    "worker": "bun src/main.ts worker",
+    "build": "bun build --compile --target=bun-linux-x64 src/main.ts --outfile ../../dist/oj2-api",
     "seed:dev": "bun src/scripts/seed-dev.ts",
     "typecheck": "tsc --noEmit",
     "db:pull": "drizzle-kit pull"

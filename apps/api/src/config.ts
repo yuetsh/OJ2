@@ -2,16 +2,22 @@ import { randomBytes } from "node:crypto"
 import { readFileSync } from "node:fs"
 import { isAbsolute, resolve } from "node:path"
 
+import { isCompiled, pathBase } from "./runtime"
+
 /**
  * Bun 只自动加载「当前工作目录」下的 .env。而本应用的启动方式（`bun run --filter '@oj2/api' dev`）
  * 会把 cwd 切到 apps/api/，于是仓库根的 .env 读不到 —— 而 .env.example 恰恰教人写在根目录。
  * 这里显式补读仓库根的 .env，让文档指引真正生效，且不管从哪个目录启动都一致。
  *
  * 只填充尚未设置的键：真实环境变量与 cwd 下的 .env 优先级更高，不被覆盖。
+ *
+ * 编译成单二进制后不做这件事：生产靠 compose 注入环境变量，而 `import.meta.dir` 在
+ * 二进制里是 `/$bunfs/root`，往上三级会去读 `/.env` —— 读到什么都是意外。
  */
 function loadRepoRootEnv() {
+  if (isCompiled) return
   try {
-    const text = readFileSync(resolve(import.meta.dir, "../../../.env"), "utf8")
+    const text = readFileSync(resolve(pathBase, ".env"), "utf8")
     for (const line of text.split("\n")) {
       const trimmed = line.trim()
       if (!trimmed || trimmed.startsWith("#")) continue
@@ -35,15 +41,12 @@ loadRepoRootEnv()
  * 也不要在仓库里写死一个人人都知道的弱默认值。
  */
 /**
- * 相对路径一律按**仓库根**解析，而不是进程 cwd。
+ * 相对路径按 `pathBase` 解析（开发时是仓库根，编译后是 cwd），基准的取舍见 runtime.ts。
  *
- * 起服务的方式（`bun run --filter '@oj2/api' dev`）会把 cwd 切到 apps/api/，
- * 于是 "data/test_case" 落在 apps/api/data/ 下 —— 而 docker/compose.dev.yml 把
- * 仓库根的 data/test_case 挂进判题沙箱。两边不是同一个目录，新传的测试点判题时
- * 会「找不到测试数据」，而且只在真正判题时才暴露。
+ * 生产环境**应当**用绝对路径的环境变量把这些目录显式指定掉，相对路径只是开发便利。
  */
 function repoPath(value: string) {
-  return isAbsolute(value) ? value : resolve(import.meta.dir, "../../..", value)
+  return isAbsolute(value) ? value : resolve(pathBase, value)
 }
 
 function judgeServerToken() {
