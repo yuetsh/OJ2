@@ -163,18 +163,55 @@ function leadingKeyword(statement: PreparedStatement) {
 }
 
 /**
+ * 让题目的 `memoryLimit` 对学生真正生效的记账器。
+ *
+ * 旧实现用 `setlimit(SQLITE_LIMIT_LENGTH, memoryLimit)` 把单值长度贴着题目内存限。
+ * sql.js 的 wasm **没导出** `sqlite3_limit`（已核对导出表），复刻不了，于是改成
+ * 取行时按字节记账：单值超限、或整个结果集累计超限，都按 MLE 拒掉。
+ *
+ * 不这么做的话题目写 64MB 也没意义：唯一的硬顶是子进程那个固定 512MB 的
+ * `ulimit -d`（见 index.ts），64MB 的题学生实际能吃到 8 倍。
+ * `max_page_count` 管的是库文件页数，管不住「一个 SELECT 拼出一个巨大的值」。
+ */
+class ByteBudget {
+  private used = 0
+
+  constructor(private readonly maxBytes: number) {}
+
+  charge(row: unknown[]) {
+    for (const value of row) {
+      const bytes =
+        value instanceof Uint8Array
+          ? value.byteLength
+          : typeof value === "string"
+            ? Buffer.byteLength(value)
+            : 8 // 数字和 NULL 按定长算，撑不出内存
+      if (bytes > this.maxBytes) {
+        throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, "单个数据值超出内存限制")
+      }
+      this.used += bytes
+      if (this.used > this.maxBytes) {
+        throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, "查询结果超出内存限制")
+      }
+    }
+  }
+}
+
+/**
  * 逐条执行，返回最后一条产生结果集的语句的 (列数, 行)；无结果集返回 null。
  *
  * 用 sql.js 的 iterateStatements（底层是 sqlite3_prepare_v2 逐条推进），
  * 比旧实现手写的分号切分更准 —— 字符串和注释里的分号天然不会误切。
  *
  * `guard` 在每条语句 step 之前调用，用来拦学生的 PRAGMA 并重放限制。
+ * `budget` 只在跑学生 SQL 时传，受信脚本不记账。
  */
 function executeStatements(
   db: Database,
   script: string,
   deadline: number,
   guard?: (statement: PreparedStatement) => void,
+  budget?: ByteBudget,
 ): ResultSet | null {
   let last: ResultSet | null = null
   for (const statement of iterate(db, script)) {
@@ -185,7 +222,9 @@ function executeStatements(
       if (names.length > 0) {
         const rows: string[] = []
         while (statement.step()) {
-          rows.push(canonicalRow(statement.get()))
+          const row = statement.get()
+          budget?.charge(row)
+          rows.push(canonicalRow(row))
           if (rows.length > ROW_LIMIT) {
             throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, `查询结果超过 ${ROW_LIMIT} 行`)
           }
@@ -202,14 +241,17 @@ function executeStatements(
 }
 
 /** dump 所有用户表：{表名: 列数 + 已排序的行}，表状态天然无序 */
-function dumpTables(db: Database) {
+function dumpTables(db: Database, budget?: ByteBudget) {
   const names = queryColumn(db, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
   const state: Record<string, { columns: number; rows: string[] }> = {}
   for (const table of names) {
     const quoted = String(table).replaceAll('"', '""')
     const result = db.exec(`SELECT * FROM "${quoted}"`)
     const first = result[0]
-    const rows = (first?.values ?? []).map((row) => canonicalRow(row as unknown[]))
+    const rows = (first?.values ?? []).map((row) => {
+      budget?.charge(row as unknown[])
+      return canonicalRow(row as unknown[])
+    })
     if (rows.length > ROW_LIMIT) {
       throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, `表 ${table} 超过 ${ROW_LIMIT} 行`)
     }
@@ -257,6 +299,8 @@ function runStudent(
 ) {
   // 查询题只读：PRAGMA query_only 是 SQLite 原生开关，替代旧实现的 authorizer 白名单
   if (mode === "query") db.run("PRAGMA query_only=1")
+  // 把题目的 memoryLimit 变成学生看得见的约束，替代旧实现的 setlimit(LIMIT_LENGTH)
+  const budget = new ByteBudget(Math.max(Math.trunc(memoryLimitMb), 1) * 1024 * 1024)
   try {
     const last = executeStatements(db, script, deadline, (statement) => {
       // query_only 自己就是个 PRAGMA，不拦 PRAGMA 的话学生一句 `PRAGMA query_only=0`
@@ -268,9 +312,9 @@ function runStudent(
       // 兜底：万一漏掉某种改设置的写法，限制在每条语句前都重放一遍
       applyLimits(db, memoryLimitMb)
       if (mode === "query") db.run("PRAGMA query_only=1")
-    })
+    }, budget)
     if (mode === "query") return last
-    return dumpTables(db)
+    return dumpTables(db, budget)
   } catch (error) {
     if (error instanceof SqlCaseError) throw error
     const message = String((error as Error).message)
