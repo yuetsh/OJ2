@@ -44,6 +44,8 @@ const refSQL = computed(
     "",
 )
 
+/** 已有脚本读取失败时的提示。空白编辑器和「本来就没测试点」长得一样，必须区分开 */
+const loadError = ref("")
 const isPreviewing = ref(false)
 const isUploading = ref(false)
 const isGenerating = ref(false)
@@ -79,7 +81,20 @@ onMounted(async () => {
     if (res.data.length) {
       scripts.value = res.data.map((f) => ({ ...blankEntry(), sql: f.content }))
     }
-  } catch {}
+  } catch (err: any) {
+    // 新题、以及旧格式（非 SQL）测试点，后端回 404/409，保持空白就是对的，不该报错。
+    // 但**其它**失败必须说出来：读不出来时编辑器长得和「这题本来就没测试点」一模一样，
+    // 教师看不出区别，会以为要自己重新填。保存本身是安全的（后端读不到测试点信息会拒绝
+    // 整个保存），所以这里只提示、不阻塞。
+    const code = err?.error
+    if (code && code !== "problem-not-found" && code !== "not-sql-test-case") {
+      // 后端那句话（如"测试点信息读取失败"）只说了现象，教师需要的是「下面是空的、别存」
+      const detail = err?.data ? `（${err.data}）` : ""
+      loadError.value =
+        `已有测试点脚本没能读出来${detail}。下方是空白模板，不是本题真实的测试点 —— ` +
+        `直接保存不会丢数据（后端会拒绝），但也不会生效。请先排查测试点文件，或重新上传。`
+    }
+  }
 })
 
 function add() {
@@ -194,6 +209,14 @@ async function upload() {
       style="margin-bottom: 8px"
     >
       还没有填写 SQL 标准答案，请先在上方"本题参考答案"中填写，再来编写测试点
+    </n-alert>
+    <n-alert
+      v-if="loadError"
+      type="error"
+      :show-icon="false"
+      style="margin-bottom: 8px"
+    >
+      {{ loadError }}
     </n-alert>
     <n-flex align="center" wrap>
       <n-button :disabled="isPreviewing || isGenerating" @click="reset">
