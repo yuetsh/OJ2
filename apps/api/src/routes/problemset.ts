@@ -27,13 +27,13 @@ import {
 } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { updateAchievementsForProblemSet } from "../services/achievements"
-import { isTeacherOrAbove, objectValue, queryInteger, sampleUser } from "./helpers"
+import { objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
@@ -362,9 +362,7 @@ problemsetRoutes.get("/problem-sets/:id/badges", async (c) => {
   return success(c, badges.map((badge) => badgeData(badge)))
 })
 
-problemsetRoutes.get("/problem-sets/:id/user-progress", requireAuth, async (c) => {
-  const user = c.get("user")!
-  if (!isTeacherOrAbove(user)) return failure(c, 403, "permission-denied", "Permission denied")
+problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
   const [problemSet] = await db.select({ id: schema.problemset.id }).from(schema.problemset).where(and(
     eq(schema.problemset.id, id), eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft"),

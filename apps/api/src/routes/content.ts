@@ -15,11 +15,11 @@ import {
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { requireAuth, type AppEnv } from "../auth/middleware"
+import { requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { isSuperAdmin, objectValue, queryInteger, sampleUser } from "./helpers"
+import { objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const contentRoutes = new Hono<AppEnv>()
 
@@ -108,9 +108,8 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
   }))
 })
 
-contentRoutes.post("/messages", requireAuth, async (c) => {
+contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
   const user = c.get("user")!
-  if (!isSuperAdmin(user)) return failure(c, 403, "permission-denied", "Permission denied")
   const parsed = createMessageRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return failure(c, 400, "invalid-request", "Invalid message payload")
   if (parsed.data.recipientId === user.id) return failure(c, 400, "invalid-recipient", "Can not send a message to yourself")
