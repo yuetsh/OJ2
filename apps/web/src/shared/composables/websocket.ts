@@ -308,7 +308,7 @@ class SubmissionWebSocket extends BaseWebSocket<SubmissionUpdate> {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({
       path: "submission",
-      url: `${protocol}//${window.location.host}/ws2/submissions`,
+      url: `${protocol}//${window.location.host}/ws/submissions`,
     })
   }
 
@@ -450,7 +450,7 @@ class FlowchartWebSocket extends BaseWebSocket<FlowchartEvaluationUpdate> {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({
       path: "flowchart",
-      url: `${protocol}//${window.location.host}/ws2/submissions`,
+      url: `${protocol}//${window.location.host}/ws/submissions`,
     })
   }
 
@@ -520,7 +520,7 @@ class ConfigWebSocket extends BaseWebSocket<ConfigUpdate> {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({
       path: "config",
-      url: `${protocol}//${window.location.host}/ws2/config`,
+      url: `${protocol}//${window.location.host}/ws/config`,
     })
   }
 

@@ -1,0 +1,29 @@
+# 构建上下文是仓库根，这里把不该进去的挡掉。
+#
+# data/ 尤其重要：测试用例和上传文件可以有几十 GB，而且 judge_server/run 下
+# 是判题沙箱以别的 uid 建的目录，docker 连 stat 都做不了，不排除的话构建直接失败。
+
+data/
+dist/
+
+node_modules/
+**/node_modules/
+
+.git/
+.github/
+
+# 本地产物与缓存
+**/dist/
+**/.vite/
+**/*.log
+
+# 密钥绝不进镜像层
+.env
+.env.*
+docker/.env
+docker/.env.*
+!.env.example
+!docker/.env.example
+
+# 前端 dist 由构建阶段自己生成，本地那份不要带进去污染
+apps/web/dist/

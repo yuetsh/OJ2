@@ -1,0 +1,111 @@
+# 机房。**这里没有数据库** —— 连的是服务器那台的 5445（见 compose.debian.yml）。
+#
+#   docker compose -f docker/compose.school.yml --env-file docker/.env.school up -d --build
+#
+# 两个站点共用一个库，但各有各的 Redis、判题沙箱和后端。这意味着：
+#
+# - 判题队列是每站独立的（BullMQ 在本地 Redis 上），学生在哪边提交就在哪边判，
+#   和旧后端的 Dramatiq 拓扑一致；
+# - WebSocket 推送也走本地 Redis pub/sub，所以只推得到连在**本站**的学生。
+#   旧后端的 Channels 也是这样，不是回归；
+# - **切换那天两边都要切。** 只切一边的话，另一边的旧后端仍在读写同一个库，
+#   而库结构已经按新后端迁过了。
+
+services:
+  oj-redis:
+    image: redis:7-alpine
+    container_name: oj-redis
+    restart: always
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  oj-judge:
+    image: registry.cn-hongkong.aliyuncs.com/oj-image/judge:1.6.1
+    container_name: oj-judge
+    restart: always
+    read_only: true
+    cap_drop:
+      - SETPCAP
+      - MKNOD
+      - NET_BIND_SERVICE
+      - SYS_CHROOT
+      - SETFCAP
+      - FSETID
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./data/backend/test_case:/test_case:ro
+      - ./data/judge_server/log:/log
+      - ./data/judge_server/run:/judger
+    environment:
+      SERVICE_URL: http://oj-judge:8080
+      BACKEND_URL: http://oj-api:3000/api/judge-server/heartbeat
+      TOKEN: ${OJ2_JUDGE_TOKEN:?请在 env 文件里设置 OJ2_JUDGE_TOKEN}
+    # 机房机器内存宽裕，判题给足
+    mem_limit: 2g
+
+  oj-api:
+    build: &build
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: api
+    image: oj2-api:latest
+    container_name: oj-api
+    restart: always
+    depends_on:
+      oj-redis:
+        condition: service_healthy
+    volumes:
+      - ./data/backend:/data
+    environment: &api-env
+      # 库在服务器上，走公网。DB_HOST 默认值就是服务器地址，换机器改 env 文件
+      DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@${DB_HOST:-150.158.29.156}:${DB_PORT:-5445}/onlinejudge
+      REDIS_URL: redis://oj-redis:6379
+      JUDGE_SERVER_URL: http://oj-judge:8080
+      JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-4}
+      AI_KEY: ${AI_KEY:-}
+      # 机房走 http 直连 IP，没有 TLS。带 Secure 的 Cookie 浏览器不会回传，
+      # 学生会「登录成功但立刻又是未登录」。这里必须是 false。
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    healthcheck:
+      test: ["CMD", "oj2-api", "healthcheck"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    mem_limit: 4g
+
+  oj-worker:
+    build: *build
+    image: oj2-api:latest
+    container_name: oj-worker
+    restart: always
+    depends_on:
+      - oj-api
+    volumes:
+      - ./data/backend:/data
+    environment: *api-env
+    command: ["oj2-api", "worker"]
+    mem_limit: 2g
+
+  oj-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: web
+    image: oj2-web:latest
+    container_name: oj-web
+    restart: always
+    depends_on:
+      - oj-api
+    volumes:
+      - ./data/backend/log:/data/log
+    ports:
+      - "81:8000"
+    mem_limit: 256m

@@ -30,7 +30,7 @@ interface Api2Client {
 }
 
 const instance = axios.create({
-  baseURL: "/api2",
+  baseURL: "/api",
   withCredentials: true,
 })
 

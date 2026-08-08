@@ -1,0 +1,131 @@
+# 服务器（xuyue.cc）。数据库在这里，机房那套连的就是这里的 5445。
+#
+#   docker compose -f docker/compose.debian.yml --env-file docker/.env up -d --build
+#
+# 构建上下文是仓库根，所以 build.context 写 ..（相对本文件）。
+#
+# 和旧的 docker-compose.debian.yml 的对应关系：
+#   oj-backend（supervisord 跑 caddy+gunicorn+dramatiq）→ 拆成 oj-web + oj-api + oj-worker
+#   端口、数据目录、判题机配置全部保持不变，这样回滚只是换回旧 compose。
+
+services:
+  oj-postgres:
+    image: postgres:16-alpine
+    container_name: oj-postgres
+    restart: always
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: onlinejudge
+      POSTGRES_USER: onlinejudge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 docker/.env 里设置 POSTGRES_PASSWORD}
+    # 机房那套要连这个端口，必须对外暴露
+    ports:
+      - "5445:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onlinejudge -d onlinejudge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  oj-redis:
+    image: redis:7-alpine
+    container_name: oj-redis
+    restart: always
+    volumes:
+      - ./data/redis:/data
+    ports:
+      - "5446:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  oj-judge:
+    image: registry.cn-hongkong.aliyuncs.com/oj-image/judge:1.6.1
+    container_name: oj-judge
+    restart: always
+    read_only: true
+    cap_drop:
+      - SETPCAP
+      - MKNOD
+      - NET_BIND_SERVICE
+      - SYS_CHROOT
+      - SETFCAP
+      - FSETID
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./data/backend/test_case:/test_case:ro
+      - ./data/judge_server/log:/log
+      - ./data/judge_server/run:/judger
+    environment:
+      SERVICE_URL: http://oj-judge:8080
+      # 心跳路径跟着新后端改了：judge_server_heartbeat/ → judge-server/heartbeat
+      BACKEND_URL: http://oj-api:3000/api/judge-server/heartbeat
+      TOKEN: ${OJ2_JUDGE_TOKEN:?请在 docker/.env 里设置 OJ2_JUDGE_TOKEN}
+    mem_limit: 512m
+
+  oj-api:
+    build: &build
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: api
+    image: oj2-api:latest
+    container_name: oj-api
+    restart: always
+    depends_on:
+      oj-postgres:
+        condition: service_healthy
+      oj-redis:
+        condition: service_healthy
+    volumes:
+      - ./data/backend:/data
+    environment: &api-env
+      DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@oj-postgres:5432/onlinejudge
+      REDIS_URL: redis://oj-redis:6379
+      JUDGE_SERVER_URL: http://oj-judge:8080
+      JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      AI_KEY: ${AI_KEY:-}
+      # 走 NPM 终止 TLS，浏览器侧是 https，Cookie 必须带 Secure
+      COOKIE_SECURE: "true"
+    healthcheck:
+      test: ["CMD", "oj2-api", "healthcheck"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    mem_limit: 512m
+
+  oj-worker:
+    build: *build
+    image: oj2-api:latest
+    container_name: oj-worker
+    restart: always
+    depends_on:
+      - oj-api
+    volumes:
+      - ./data/backend:/data
+    environment: *api-env
+    # 同一个镜像，换个子命令就是判题消费者
+    command: ["oj2-api", "worker"]
+    mem_limit: 512m
+
+  oj-web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: web
+    image: oj2-web:latest
+    container_name: oj-web
+    restart: always
+    depends_on:
+      - oj-api
+    volumes:
+      # Caddy 只往这里写访问日志，静态资源在镜像里
+      - ./data/backend/log:/data/log
+    ports:
+      - "0.0.0.0:8080:8000"
+    mem_limit: 256m

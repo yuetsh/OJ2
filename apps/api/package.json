@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@node-rs/jieba": "^2.0.1",
+    "@node-rs/jieba-linux-x64-gnu": "2.0.1",
     "@oj2/contract": "workspace:*",
     "bullmq": "^6.0.9",
     "drizzle-orm": "^0.45.2",

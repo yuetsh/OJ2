@@ -24,7 +24,13 @@
  * 用 `isCompiled` 判断也来不及，dev 一样会撞上上面那个报错。
  *
  * 平台写死 linux-x64-gnu：部署目标是 debian 基底的容器，本机开发也是 x64 glibc。
- * 换基底镜像或 CPU 架构必须同步改这里，否则编译能过、启动就崩。
+ * 换基底镜像或 CPU 架构必须**同时**改两处 —— 这里的 import，和 apps/api/package.json
+ * 里 `@node-rs/jieba-linux-x64-gnu` 那条依赖。
+ *
+ * 那条依赖为什么要显式写：它本是 `@node-rs/jieba` 的 optionalDependency，本机装出来的
+ * node_modules 是扁平的，靠提升就能解析到，所以本地构建一直是好的。但容器里 bun 用
+ * isolated 布局（包都在 `node_modules/.bun/` 下），提升不到，`bun build` 直接报
+ * `Could not resolve`。代码既然真的直接 import 它，就该是直接依赖。
  */
 
 import { isCompiled } from "../runtime"
