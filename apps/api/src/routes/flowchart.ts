@@ -13,7 +13,7 @@ import {
 import { and, asc, count, desc, eq, ilike, isNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { requireAuth, type AppEnv } from "../auth/middleware"
+import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
@@ -21,7 +21,6 @@ import { flowchartQueue } from "../queue"
 import { buildWordFrequencies } from "../services/word-frequency"
 import {
   isAdminRole,
-  isTeacherOrAbove,
   objectValue,
   queryInteger,
   rounded,
@@ -139,10 +138,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
 
 const FLOWCHART_COMPLETED = 2
 
-flowchartRoutes.get("/flowcharts/statistics", requireAuth, async (c) => {
-  if (!isTeacherOrAbove(c.get("user"))) {
-    return failure(c, 403, "permission-denied", "Teacher permission required")
-  }
+flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const end = c.req.query("end")?.trim()
   if (!end) return failure(c, 400, "invalid-request", "end is required")
   const start = c.req.query("start")?.trim()

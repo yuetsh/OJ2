@@ -74,18 +74,26 @@ function readCookie(request: Request, name: string) {
   return undefined
 }
 
-async function getUserByToken(token: string | undefined): Promise<AuthUser | null> {
-  if (!token) return null
+/**
+ * 会话解析结果。之所以不只返回 `AuthUser | null`：拿不到用户有两种原因，
+ * 而它们对应完全不同的前端行为 —— 未登录该弹登录框，已禁用该说「账号已禁用」。
+ */
+export type SessionResult =
+  | { user: AuthUser; reason?: undefined }
+  | { user: null; reason: "anonymous" | "disabled" }
+
+async function getUserByToken(token: string | undefined): Promise<SessionResult> {
+  if (!token) return { user: null, reason: "anonymous" }
 
   const raw = await redis.get(sessionKey(token))
-  if (!raw) return null
+  if (!raw) return { user: null, reason: "anonymous" }
 
   let session: StoredSession
   try {
     session = JSON.parse(raw) as StoredSession
   } catch {
     await redis.del(sessionKey(token))
-    return null
+    return { user: null, reason: "anonymous" }
   }
 
   const [user] = await db
@@ -102,21 +110,35 @@ async function getUserByToken(token: string | undefined): Promise<AuthUser | nul
     .where(eq(schema.user.id, session.userId))
     .limit(1)
 
-  if (!user || user.isDisabled) {
+  if (!user) {
     await redis.del(sessionKey(token))
-    return null
+    return { user: null, reason: "anonymous" }
+  }
+
+  if (user.isDisabled) {
+    // 会话照删（禁用要立即生效），但要把「是被禁用」这件事告诉调用方。
+    // 都返回 null 的话，中途被禁用的学生看到的是 401 login-required，
+    // 前端据此弹登录框，登进去又被弹 —— 死循环，而且看不出发生了什么。
+    await redis.del(sessionKey(token))
+    return { user: null, reason: "disabled" }
   }
 
   await redis.expire(sessionKey(token), config.sessionTtlSeconds)
-  return user
+  return { user }
 }
 
-export function getSessionUser(c: Context) {
+/** 要区分「未登录」和「已被禁用」的用这个 —— 目前只有鉴权中间件需要 */
+export function resolveSession(c: Context) {
   return getUserByToken(getCookie(c, config.sessionCookie))
 }
 
-export function getRequestSessionUser(request: Request) {
-  return getUserByToken(readCookie(request, config.sessionCookie))
+/** 只关心「是谁」的调用方用这个 */
+export async function getSessionUser(c: Context) {
+  return (await resolveSession(c)).user
+}
+
+export async function getRequestSessionUser(request: Request) {
+  return (await getUserByToken(readCookie(request, config.sessionCookie))).user
 }
 
 async function getStoredSession(c: Context) {

@@ -14,7 +14,12 @@ import {
 import { and, count, desc, eq, ilike, inArray, isNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireAuth } from "../auth/middleware"
+import {
+  optionalAuth,
+  requireAuth,
+  requireSuperAdmin,
+  requireTeacher,
+} from "../auth/middleware"
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
@@ -34,8 +39,6 @@ import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
 import {
   isAdminRole,
-  isSuperAdmin,
-  isTeacherOrAbove,
   queryInteger,
   rounded,
   stripClassPrefix,
@@ -218,10 +221,7 @@ async function matchedStudents(username: string) {
     )
 }
 
-submissionRoutes.get("/submissions/statistics", requireAuth, async (c) => {
-  if (!isTeacherOrAbove(c.get("user"))) {
-    return failure(c, 403, "permission-denied", "Teacher permission required")
-  }
+submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   const range = statisticsRange(c)
   if (!range) return failure(c, 400, "invalid-request", "end is required")
 
@@ -334,10 +334,7 @@ submissionRoutes.get("/submissions/statistics", requireAuth, async (c) => {
   )
 })
 
-submissionRoutes.post("/submissions/:id/rejudge", requireAuth, async (c) => {
-  if (!isSuperAdmin(c.get("user"))) {
-    return failure(c, 403, "permission-denied", "Super admin permission required")
-  }
+submissionRoutes.post("/submissions/:id/rejudge", requireSuperAdmin, async (c) => {
   const [row] = await db
     .select({ id: schema.submission.id, problemId: schema.submission.problemId })
     .from(schema.submission)

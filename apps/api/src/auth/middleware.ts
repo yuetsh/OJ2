@@ -1,7 +1,7 @@
-import type { MiddlewareHandler } from "hono"
+import type { Context, MiddlewareHandler } from "hono"
 
 import { failure } from "../http"
-import { getSessionUser, type AuthUser } from "./session"
+import { getSessionUser, resolveSession, type AuthUser } from "./session"
 
 export interface AppEnv {
   Variables: {
@@ -14,12 +14,26 @@ export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next()
 }
 
+/**
+ * 拿不到用户时该报哪个错。
+ *
+ * 「账号被禁用」必须和「没登录」分开报：前端拦截器见到 `login-required` 会弹登录框，
+ * 于是一个上课上到一半被禁用的学生会陷入「弹登录框 → 登进去 → 又被弹」的死循环，
+ * 而且完全看不出发生了什么。旧后端报的是「账号已禁用」，这里对齐。
+ *
+ * 用 403 而不是 401：凭证是有效的，是这个账号不让用了，和 login 接口对禁用账号
+ * 的回法（403 `account-disabled`）也一致。
+ */
+function denied(c: Context, reason: "anonymous" | "disabled") {
+  return reason === "disabled"
+    ? failure(c, 403, "account-disabled", "账号已被禁用，请联系老师")
+    : failure(c, 401, "login-required", "请先登录")
+}
+
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const user = await getSessionUser(c)
-  if (!user) {
-    return failure(c, 401, "login-required", "Authentication required")
-  }
-  c.set("user", user)
+  const session = await resolveSession(c)
+  if (!session.user) return denied(c, session.reason)
+  c.set("user", session.user)
   await next()
 }
 
@@ -28,19 +42,16 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
  *
  * 未登录一律 401 `login-required`、登录但角色不够一律 403 `permission-denied`，
  * 与旧 `BasePermissionDecorator._permission_error` 的两分支一致 —— 前端 `utils/api2.ts`
- * 的拦截器就是按这两个 code 分别弹登录框和弹提示的。
- *
- * 「账号已禁用」这一支不需要单独处理：`getSessionUser` 对禁用用户直接返回 null，
- * 于是落到 401，比旧后端先认证再报 403 更早拦一步。
+ * 的拦截器就是按这两个 code 分别弹登录框和弹提示的。禁用账号走第三个码，见 denied()。
  */
 function requireRole(
   allowed: (user: AuthUser) => boolean,
 ): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const user = await getSessionUser(c)
-    if (!user) return failure(c, 401, "login-required", "请先登录")
-    if (!allowed(user)) return failure(c, 403, "permission-denied", "权限不足")
-    c.set("user", user)
+    const session = await resolveSession(c)
+    if (!session.user) return denied(c, session.reason)
+    if (!allowed(session.user)) return failure(c, 403, "permission-denied", "权限不足")
+    c.set("user", session.user)
     await next()
   }
 }

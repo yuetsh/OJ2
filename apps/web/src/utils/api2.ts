@@ -63,6 +63,12 @@ instance.interceptors.response.use(
     if (code === "login-required") {
       storage.remove(STORAGE_KEY.AUTHED)
       useAuthModalStore().openLoginModal()
+    } else if (code === "account-disabled") {
+      // 这里**不能**弹登录框：账号已经被禁用，登进去还是会被拒，
+      // 学生会陷入「弹框 → 登录 → 又弹框」的死循环，且看不出发生了什么。
+      // 清掉登录态并明确告知，会话在中途被禁用时也走这一支。
+      storage.remove(STORAGE_KEY.AUTHED)
+      toast.error(legacyMessage || "账号已被禁用，请联系老师")
     } else if (code === "permission-denied") {
       toast.error(legacyMessage || "权限不足")
     }

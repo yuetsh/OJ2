@@ -478,7 +478,9 @@ adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermissio
       acceptedNumber: 0,
       statisticInfo: {},
       isPublic: false,
-      sqlDisplay: null,
+      // 上面 generateSqlDisplay 已经把展示数据算好了，之前这里写死 null，
+      // 结果比赛里的 SQL 题打开后看不到示例数据表和期望结果（公开题那两条路径都是对的）
+      sqlDisplay,
     }).returning()
     await setTags(tx as unknown as typeof db, row!.id, parsed.data.tags)
     return row!
@@ -547,11 +549,14 @@ adminProblemRoutes.post("/contests/:contestId/problems/from-public", requireProb
   const [contest] = await db.select().from(schema.contest).where(eq(schema.contest.id, contestId)).limit(1)
   const [problem] = await db.select().from(schema.problem)
     .where(eq(schema.problem.id, parsed.data.problemId)).limit(1)
-  if (!contest || !problem) return failure(c, 404, "not-found", "Contest or Problem does not exist")
   const user = c.get("user")!
-  if (user.adminType !== "Super Admin" && contest.createdById !== user.id) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
-  }
+  // 「比赛不存在」和「比赛存在但不是你的」必须回同一个码。分开报的话，带一个已知有效的
+  // problemId 就能靠错误码差异枚举出哪些 contestId 真实存在。全仓其余跨租户路径都是
+  // 统一码（contest 系列一律 contest-not-found），这里对齐。
+  const denyContest =
+    !contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)
+  if (denyContest) return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   // 源题必须是**公开题**，且要么已可见、要么是自己的。旧后端只按 id 取，不校验任何东西 ——
   // 于是能把别人比赛里的题（或别人尚未公开的草稿）拖进自己比赛，进而读到 answers。
   if (problem.contestId !== null) {
