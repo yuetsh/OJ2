@@ -21,6 +21,16 @@
 >
 > Minor 四条未修：M1 已按「有意偏离」保留，M2/M3/M4 留待阶段 5。
 
+> **更正（2026-08-08）：本报告有一处对旧后端的判断是错的。**
+>
+> 文末对照表原写「`DashboardInfoAPI` / `RandomUsernameAPI` 旧后端任何人可读，
+> 含班级用户名枚举」。**不成立** —— 这两条都挂在 `/api/admin/` 下，而
+> `account/middleware.py:36` 的 `AdminRoleRequiredMiddleware` 在中间件层就要求
+> 登录且 `is_admin_role()`。「无装饰器」是真的，「任何人可读」不是。
+>
+> 差别很大：真实缺口只是「任何管理员可读，而非仅超管」。查旧后端的权限时，
+> 别只看装饰器，那个中间件是所有 `/api/admin/` 的地板。
+
 ## 结论速览
 
 | 级别 | 数量 | 条目 |
@@ -394,7 +404,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireAuth, async (c) => {
 | `/announcements*`（5 条） | requireSuperAdmin | `announcement/views/admin.py:13,23,40,57` | 一致 |
 | `/tutorials*` `/exercises*`（10 条） | requireSuperAdmin | `tutorial/views/admin.py:17,27,44,62,70,90,106,119,127` | 一致 |
 | `/achievements*` `/achievement-metrics`（6 条） | requireSuperAdmin | `achievement/views/admin.py:10,21,43,72,82` | 一致 |
-| `/website` `/judge-servers*` `/orphan-test-cases*` `/dashboard` `/random-usernames`（9 条） | requireSuperAdmin | `conf/views.py:49,66,76,84,148,162`；`DashboardInfoAPI`(187) 与 `RandomUsernameAPI`(216) 旧后端**无装饰器** | 一致或**收紧**（后两条旧后端任何人可读，含班级用户名枚举） |
+| `/website` `/judge-servers*` `/orphan-test-cases*` `/dashboard` `/random-usernames`（9 条） | requireSuperAdmin | `conf/views.py:49,66,76,84,148,162`；`DashboardInfoAPI`(187) 与 `RandomUsernameAPI`(216) 旧后端**无装饰器** | **收紧**（后两条旧后端任何管理员可读，不限超管） |
 | `/contests*`（5 条） | requireTeacher | `contest/views/admin.py:33,53,78,267` `@teacher_admin_required` | 一致 |
 | `/contests/:id/acm-helper`（2 条） | requireTeacher | `contest/views/admin.py:167,200` | 一致 |
 | `/problem-sets*`（15 条） | requireTeacher | `problemset/views/admin.py` 全部 `@teacher_admin_required` | 一致 |
