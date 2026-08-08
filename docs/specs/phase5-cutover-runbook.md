@@ -63,6 +63,35 @@ pg_dumpall 备份带 30 条 `setval`，而且直接查生产快照里所有序�
 | **判题机心跳** | 判题容器自行注册成功（新路径 `/api/judge-server/heartbeat`） |
 | **完整判题** | 提交 Python A+B → **AC，1.2 秒**，两个测试点全过 |
 
+### WebSocket 实时推送（经 Caddy）
+
+学生盯着「判题中…」变成结果就靠这条路，而它经过 Caddy 的 `handle /ws/*`，
+是配置最容易写错、又只在生产才暴露的一段。单独验过：
+
+```
+WS 经 Caddy upgrade: 已连接
+收到 2 条推送，301ms
+  → {"type":"submission_update","result":7,"status":"judging"}
+  → {"type":"submission_update","result":0,"status":"finished","time_cost":4,...}
+```
+
+### 机房那套（`compose.school.yml`）
+
+这套配置和服务器那套差别不小（没有 postgres、连远程库、端口 81、
+`COOKIE_SECURE=false`），单独跑过一遍：留下 `oj-postgres` 当「远程库」，
+其余容器换成 school 栈，`DB_HOST` 指向宿主机 IP。
+
+| 检查项 | 结果 |
+|---|---|
+| 连上「远程」库 | oj-api healthy，日志零错误 |
+| 首页 / 题目列表 | 200，数据来自远程库 |
+| 登录 | 200 |
+| **Cookie 没带 Secure** | ✓ —— 带了的话机房（http 直连 IP）会「登录成功又立刻变未登录」 |
+| WS + 完整判题 | 连接成功，300ms 内 judging → finished，AC |
+
+也就是说机房用的是**本地 Redis + 本地判题沙箱 + 远程库**，判题不跨公网，
+只有数据库查询走公网。
+
 ---
 
 ## 三、切换前检查清单（停机窗口之前做完）
