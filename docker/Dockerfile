@@ -21,8 +21,12 @@ WORKDIR /build
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 ENV BUN_CONFIG_REGISTRY=${NPM_REGISTRY}
 
-# 先只拷 manifest，依赖没变时这一层能命中缓存
-COPY package.json bun.lock ./
+# 先只拷 manifest，依赖没变时这一层能命中缓存。
+# bunfig.toml 必须一起拷：它设了 linker = "hoisted"，漏掉的话容器里会用默认的
+# isolated 布局（包都在 node_modules/.bun/ 下），于是本地靠"提升"才解析得到的包
+# 在容器里一律 Could not resolve —— 而本地构建始终是好的，只有镜像构建才炸。
+# 真正的修法是把直接 import 的包声明成直接依赖（已做），这里让两边布局一致是第二道保险。
+COPY package.json bun.lock bunfig.toml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/contract/package.json packages/contract/

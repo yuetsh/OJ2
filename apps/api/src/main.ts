@@ -47,6 +47,6 @@ switch (command) {
     }
   }
   default:
-    console.error(`未知子命令：${command}\n可用：serve | worker | sql-child`)
+    console.error(`未知子命令：${command}\n可用：serve | worker | healthcheck | sql-child`)
     process.exit(2)
 }
