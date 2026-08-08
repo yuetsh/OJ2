@@ -14,10 +14,22 @@
  * | 旧防护 | 新做法 |
  * |---|---|
  * | authorizer 禁 ATTACH（防读写服务器任意 SQLite 文件） | WASM 没有宿主文件系统绑定，ATTACH **结构上**够不到宿主，只能碰随进程消失的虚拟 FS |
- * | authorizer 白名单让查询题只读 | `PRAGMA query_only=1`，SQLite 原生只读开关 |
- * | progress_handler 墙钟超时 | 子进程外部 SIGKILL（OS 级，比指令计数更硬）+ 语句间 deadline 检查 |
- * | setlimit(LIMIT_LENGTH) 防单值撑爆内存 | 子进程 `ulimit -v`，触顶时 WASM 抛可捕获错误 |
- * | max_page_count | 原样保留 |
+ * | authorizer 白名单让查询题只读 | `PRAGMA query_only=1` **加上逐语句拒绝学生的 PRAGMA**，见 runStudent |
+ * | progress_handler 墙钟超时 | 语句**之间**查 deadline + 子进程外部 SIGKILL 兜底，见下 |
+ * | setlimit(LIMIT_LENGTH) 防单值撑爆内存 | 子进程 `ulimit -d`，触顶时 WASM 抛可捕获错误 |
+ * | max_page_count | 保留，且每条学生语句前重放一遍（否则学生能自己调大） |
+ *
+ * 两处必须知道的削弱：
+ *
+ * 1. **只有 query_only 是不够的。** 它自己就是个 PRAGMA，学生一句 `PRAGMA query_only=0`
+ *    就能关掉它 —— 旧实现的 authorizer 把 SQLITE_PRAGMA 一律拒了，所以没这个洞。
+ *    这里靠 runStudent 的逐语句守卫补上：学生 SQL 里的 PRAGMA 一律拒绝。
+ * 2. **超时粒度是「一条语句」。** deadline 只在语句之间查，单条语句（递归 CTE、
+ *    大 CROSS JOIN）一旦进了 step() 就没法从 JS 里打断。stock sql.js 的 wasm 没导出
+ *    sqlite3_progress_handler / sqlite3_interrupt / sqlite3_set_authorizer / sqlite3_limit
+ *    （已核对导出表，别再去找了），要用就得自己编 wasm。所以真正的硬上限是父进程的
+ *    SIGKILL：`./index.ts` 收到 `@phase:student` 标记后会把兜底时限收到「题目时限 + 2s」，
+ *    跑飞的学生语句最多多占这么久，而不是整个作业预算。
  */
 
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js"
@@ -98,13 +110,53 @@ interface ResultSet {
   rows: string[]
 }
 
-function newDatabase(SQL: SqlJsStatic, memoryLimitMb: number) {
-  const db = new SQL.Database()
+/** 引擎侧的资源限制。学生的每条语句前都要重放一遍，见 runStudent */
+function applyLimits(db: Database, memoryLimitMb: number) {
   const limit = Math.max(Math.trunc(memoryLimitMb), 1)
-  db.run("PRAGMA page_size=4096")
   // 4096B/页 × 256 页/MB，超限报 "database or disk is full"
   db.run(`PRAGMA max_page_count=${limit * 256}`)
+}
+
+function newDatabase(SQL: SqlJsStatic, memoryLimitMb: number) {
+  const db = new SQL.Database()
+  db.run("PRAGMA page_size=4096")
+  applyLimits(db, memoryLimitMb)
   return db
+}
+
+/** sql.js 的 iterateStatements 没进 @types/sql.js，这里补上类型 */
+interface PreparedStatement {
+  step(): boolean
+  get(): unknown[]
+  getColumnNames(): string[]
+  getSQL(): string
+  getNormalizedSQL(): string
+  free(): void
+}
+
+function iterate(db: Database, script: string): Iterable<PreparedStatement> {
+  return (db as unknown as {
+    iterateStatements(sql: string): Iterable<PreparedStatement>
+  }).iterateStatements(script)
+}
+
+/**
+ * 取语句的首关键字。优先用 sqlite3_normalized_sql —— 归一化由 SQLite 自己做，
+ * 注释、大小写、空白都已抹平（`/*x*​/ pragma  Query_Only = 0` → `PRAGMA query_only=?`），
+ * 比在原文上自己做词法猜测可靠得多。
+ */
+function leadingKeyword(statement: PreparedStatement) {
+  let text = ""
+  try {
+    text = statement.getNormalizedSQL() ?? ""
+  } catch {
+    text = ""
+  }
+  // 万一这个 build 没开 SQLITE_ENABLE_NORMALIZE，退回到原文剥注释
+  if (!text) {
+    text = statement.getSQL().replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ")
+  }
+  return text.trimStart().split(/[\s(;]/, 1)[0]?.toUpperCase() ?? ""
 }
 
 /**
@@ -112,22 +164,20 @@ function newDatabase(SQL: SqlJsStatic, memoryLimitMb: number) {
  *
  * 用 sql.js 的 iterateStatements（底层是 sqlite3_prepare_v2 逐条推进），
  * 比旧实现手写的分号切分更准 —— 字符串和注释里的分号天然不会误切。
+ *
+ * `guard` 在每条语句 step 之前调用，用来拦学生的 PRAGMA 并重放限制。
  */
-function executeStatements(db: Database, script: string, deadline: number): ResultSet | null {
+function executeStatements(
+  db: Database,
+  script: string,
+  deadline: number,
+  guard?: (statement: PreparedStatement) => void,
+): ResultSet | null {
   let last: ResultSet | null = null
-  for (const statement of (db as unknown as {
-    iterateStatements(sql: string): Iterable<{
-      step(): boolean
-      get(): unknown[]
-      getColumnNames(): string[]
-      free(): void
-    }>
-  }).iterateStatements(script)) {
-    if (Date.now() > deadline) {
-      statement.free()
-      throw new Error("interrupted")
-    }
+  for (const statement of iterate(db, script)) {
     try {
+      if (Date.now() > deadline) throw new Error("interrupted")
+      guard?.(statement)
       const names = statement.getColumnNames()
       if (names.length > 0) {
         const rows: string[] = []
@@ -195,11 +245,27 @@ function executeTrusted(db: Database, script: string, deadline: number, prefix: 
 }
 
 /** 带防护执行学生 SQL，异常映射为学生级 JudgeStatus */
-function runStudent(db: Database, script: string, mode: string, deadline: number) {
+function runStudent(
+  db: Database,
+  script: string,
+  mode: string,
+  deadline: number,
+  memoryLimitMb: number,
+) {
   // 查询题只读：PRAGMA query_only 是 SQLite 原生开关，替代旧实现的 authorizer 白名单
   if (mode === "query") db.run("PRAGMA query_only=1")
   try {
-    const last = executeStatements(db, script, deadline)
+    const last = executeStatements(db, script, deadline, (statement) => {
+      // query_only 自己就是个 PRAGMA，不拦 PRAGMA 的话学生一句 `PRAGMA query_only=0`
+      // 就把只读关掉了。旧实现的 authorizer 把 SQLITE_PRAGMA 一律拒掉，这里对齐它。
+      // 教学场景下学生也没有用 PRAGMA 的正当需求，两种题型一律拒。
+      if (leadingKeyword(statement) === "PRAGMA") {
+        throw new SqlCaseError(JudgeStatus.RUNTIME_ERROR, "禁止使用 PRAGMA 语句")
+      }
+      // 兜底：万一漏掉某种改设置的写法，限制在每条语句前都重放一遍
+      applyLimits(db, memoryLimitMb)
+      if (mode === "query") db.run("PRAGMA query_only=1")
+    })
     if (mode === "query") return last
     return dumpTables(db)
   } catch (error) {
@@ -250,7 +316,20 @@ export interface RunCaseOptions {
   orderSensitive: boolean
   timeLimitMs: number
   memoryLimitMb: number
+  /** 阶段回调，子进程据此写 stderr 标记，父进程据此收紧兜底 SIGKILL 时限 */
+  onPhase?: (phase: "prepare" | "student") => void
 }
+
+/**
+ * 受信脚本（初始化 + 标准答案）**合计**的墙钟预算。
+ * 父进程按同一口径算兜底时限，两边必须用这一个函数，别各写各的。
+ */
+export function trustedBudgetMs(timeLimitMs: number) {
+  return Math.max(timeLimitMs * 5, 10_000)
+}
+
+/** 题目页展示数据的墙钟预算 */
+export const DISPLAY_BUDGET_MS = 10_000
 
 export interface CaseResult {
   test_case: string
@@ -276,14 +355,17 @@ export async function runCase(
   options: RunCaseOptions,
 ): Promise<CaseResult> {
   const SQL = await sqlEngine()
-  // 受信脚本的运行上限放宽，避免出题数据较大时误报；仍防子进程永久阻塞
-  const trustedLimitMs = Math.max(options.timeLimitMs * 5, 10_000)
+  options.onPhase?.("prepare")
+  // 受信脚本的运行上限放宽，避免出题数据较大时误报；仍防子进程永久阻塞。
+  // 三段受信执行（两次初始化 + 一次标准答案）共用同一个 deadline，
+  // 这样"受信阶段总耗时"有确定上限，父进程才能算出匹配的兜底时限。
+  const trustedDeadline = Date.now() + trustedBudgetMs(options.timeLimitMs)
 
   let expected: unknown
   const refDb = newDatabase(SQL, options.memoryLimitMb)
   try {
-    executeTrusted(refDb, initSql, Date.now() + trustedLimitMs, "初始化脚本执行失败")
-    const last = executeTrusted(refDb, refSql, Date.now() + trustedLimitMs, "标准答案执行失败")
+    executeTrusted(refDb, initSql, trustedDeadline, "初始化脚本执行失败")
+    const last = executeTrusted(refDb, refSql, trustedDeadline, "标准答案执行失败")
     if (options.mode === "query") {
       expected = last
     } else {
@@ -317,10 +399,17 @@ export async function runCase(
   let actual: unknown
   let elapsed = 0
   try {
-    executeTrusted(studentDb, initSql, Date.now() + trustedLimitMs, "初始化脚本执行失败")
+    executeTrusted(studentDb, initSql, trustedDeadline, "初始化脚本执行失败")
+    options.onPhase?.("student")
     const start = Date.now()
     try {
-      actual = runStudent(studentDb, studentSql, options.mode, start + options.timeLimitMs)
+      actual = runStudent(
+        studentDb,
+        studentSql,
+        options.mode,
+        start + options.timeLimitMs,
+        options.memoryLimitMb,
+      )
     } catch (error) {
       elapsed = Date.now() - start
       const failure = error as SqlCaseError
@@ -399,7 +488,7 @@ export async function buildDisplay(
 ) {
   const SQL = await sqlEngine()
   const db = newDatabase(SQL, memoryLimitMb)
-  const deadline = Date.now() + 10_000
+  const deadline = Date.now() + DISPLAY_BUDGET_MS
   try {
     executeTrusted(db, initSql, deadline, "初始化脚本执行失败")
     const tables = dumpDisplayTables(db)
@@ -407,11 +496,7 @@ export async function buildDisplay(
     if (mode === "query") {
       let expected: unknown = null
       try {
-        for (const statement of (db as unknown as {
-          iterateStatements(sql: string): Iterable<{
-            step(): boolean; get(): unknown[]; getColumnNames(): string[]; free(): void
-          }>
-        }).iterateStatements(refSql)) {
+        for (const statement of iterate(db, refSql)) {
           try {
             const names = statement.getColumnNames()
             if (names.length === 0) { while (statement.step()) { /* 无结果集 */ } ; continue }
@@ -443,7 +528,7 @@ export async function buildDisplay(
     }
 
     const before = dumpTables(db)
-    executeTrusted(db, refSql, Date.now() + 10_000, "标准答案执行失败")
+    executeTrusted(db, refSql, deadline, "标准答案执行失败")
     const after = dumpTables(db)
     const changed = new Set<string>()
     for (const name of new Set([...Object.keys(before), ...Object.keys(after)])) {

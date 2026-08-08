@@ -189,7 +189,11 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
       title: original.contest.title,
       description: original.contest.description,
       tag: original.contest.tag,
-      password: original.contest.password,
+      // 不复制原比赛的密码。两个理由：一是克隆出来是一场新比赛、时间也是新的，
+      // 沿用旧密码意味着拿着旧密码的学生直接能进；二是本接口不校验归属
+      // （旧后端也不校验，教师可以拿别人的比赛做模板），复制过来就等于把别人的
+      // 比赛密码原样回传给调用者。克隆者自己重新设一个。
+      password: null,
       // 克隆出来的一律不可见：时间是拍脑袋定的 10 分钟后，直接开放会让学生看到一场没准备好的赛
       visible: false,
       allowedIpRanges: original.contest.allowedIpRanges,

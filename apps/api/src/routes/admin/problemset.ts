@@ -366,14 +366,20 @@ adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher
   const row = await loadOwned(c, c.get("user")!)
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
   const badgeId = queryInteger(c.req.param("badgeId"), 0, { min: 1 })
-  const deleted = await db.transaction(async (tx) => {
-    await tx.delete(schema.userBadge).where(eq(schema.userBadge.badgeId, badgeId))
-    return tx.delete(schema.problemsetBadge).where(and(
+  // 必须先确认这枚奖章确实属于本题单，再动 user_badge。
+  // 早先的写法把 userBadge 的清理放在归属校验之前、且只按 badgeId 不限定题单，
+  // 于是「自己的题单 id + 别人的奖章 id」会真删掉别人的获奖记录，
+  // 然后因为 problemset_badge 删了 0 行而返回 404 —— 事务已经 COMMIT，数据没了却报「不存在」。
+  const [badge] = await db.select({ id: schema.problemsetBadge.id }).from(schema.problemsetBadge)
+    .where(and(
       eq(schema.problemsetBadge.id, badgeId),
       eq(schema.problemsetBadge.problemsetId, row.id),
-    )).returning({ id: schema.problemsetBadge.id })
+    )).limit(1)
+  if (!badge) return failure(c, 404, "badge-not-found", "奖章不存在")
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.userBadge).where(eq(schema.userBadge.badgeId, badge.id))
+    await tx.delete(schema.problemsetBadge).where(eq(schema.problemsetBadge.id, badge.id))
   })
-  if (deleted.length === 0) return failure(c, 404, "badge-not-found", "奖章不存在")
   return success(c, null)
 })
 

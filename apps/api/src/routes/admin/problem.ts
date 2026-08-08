@@ -495,6 +495,12 @@ adminProblemRoutes.post("/problems/:id/make-public", requireProblemPermission, a
 
   const [problem] = await db.select().from(schema.problem).where(eq(schema.problem.id, id)).limit(1)
   if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  // 归属校验不能少：这个接口会把整道题（含 answers 标准答案）复制出来并回传，
+  // 没有它，任何有出题权的人拿别人比赛题的 id 就能把题面和答案整份拿走。
+  // 旧后端同样缺这个校验，但它只 `return self.success()` 不带数据，泄露面比这里小。
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  }
   if (!problem.contestId || problem.isPublic) {
     return failure(c, 409, "already-public", "Already be a public problem")
   }
@@ -545,6 +551,14 @@ adminProblemRoutes.post("/contests/:contestId/problems/from-public", requireProb
   const user = c.get("user")!
   if (user.adminType !== "Super Admin" && contest.createdById !== user.id) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
+  }
+  // 源题必须是**公开题**，且要么已可见、要么是自己的。旧后端只按 id 取，不校验任何东西 ——
+  // 于是能把别人比赛里的题（或别人尚未公开的草稿）拖进自己比赛，进而读到 answers。
+  if (problem.contestId !== null) {
+    return failure(c, 400, "not-a-public-problem", "只能从公开题库添加题目")
+  }
+  if (!problem.visible && !(await canEdit(user, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   if (contestStatus(contest) === "-1") return failure(c, 409, "contest-ended", "Contest has ended")
 

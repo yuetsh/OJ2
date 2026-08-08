@@ -187,7 +187,11 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
 
 // ---------------------------------------------------------------- 卡点题目 / AC 趋势
 
-adminTagRoutes.get("/problems/stuck", requireTeacher, async (c) => {
+// 路径特意不放在 /problems 下：Hono 按**注册顺序**匹配（不是静态优先），
+// 而 problem.ts 的 `GET /problems/:id` 先注册，会把 `/problems/stuck` 整个吃掉 ——
+// 这两个 handler 曾经从未执行过，生效的还是那边的 requireProblemPermission 而非这里的
+// requireTeacher，而且完全没有报错。换个前缀，结构上就不可能再被遮蔽。
+adminTagRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
   const failedFilter = sql`filter (where ${inArray(schema.submission.result, FAILED)})`
   const rows = await db.select({
     displayId: schema.problem.displayId,
@@ -212,7 +216,7 @@ adminTagRoutes.get("/problems/stuck", requireTeacher, async (c) => {
   })))
 })
 
-adminTagRoutes.get("/problems/ac-trend", requireTeacher, async (c) => {
+adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
   const currentYear = new Date().getFullYear()
   // 参数按旧后端的口径夹逼：越界一律回落到默认值，不报错
   let sinceYear = queryInteger(c.req.query("sinceYear"), 2023)

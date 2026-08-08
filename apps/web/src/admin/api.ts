@@ -724,7 +724,7 @@ export function removeUserFromProblemSet(problemSetId: number, userId: number) {
 
 // 学生卡点分析
 export function getStuckProblems() {
-  return legacyResponse(api2.get("admin/problems/stuck"))
+  return legacyResponse(api2.get("admin/problem-analytics/stuck"))
 }
 
 export function getTopACTrend(params: {
@@ -733,7 +733,7 @@ export function getTopACTrend(params: {
   min_per_year: number
 }) {
   return legacyResponse(
-    api2.get("admin/problems/ac-trend", {
+    api2.get("admin/problem-analytics/ac-trend", {
       params: {
         sinceYear: params.since_year,
         untilYear: params.until_year,

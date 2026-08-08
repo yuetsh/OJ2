@@ -14,7 +14,7 @@ import { resolve } from "node:path"
 import { count, desc, eq, gte, ilike, not, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
+import { requireAdmin, requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { config } from "../../config"
 import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
@@ -202,8 +202,12 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024
  * Simditor 富文本编辑器的图片上传。响应形状是编辑器约定的
  * `{success, msg, filePath}`，不是本项目的 `{data}` 信封 —— 但外面仍然包一层 data，
  * 由前端 api 层解包，这样它和其它接口共用同一个错误处理拦截器。
+ *
+ * 守卫用 requireAdmin 而不是 requireSuperAdmin：题面和比赛描述的富文本编辑器都调它
+ * （admin/problem/detail.vue、admin/contest/detail.vue），收成超管专属会让教师和
+ * 学生管理员插图直接 403。旧后端这里是**零装饰器**（匿名可传），那太松，取中间档。
  */
-adminConfRoutes.post("/upload-image", requireSuperAdmin, async (c) => {
+adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
   const form = await c.req.formData().catch(() => null)
   const image = form?.get("image")
   if (!(image instanceof File)) {

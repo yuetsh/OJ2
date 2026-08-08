@@ -27,8 +27,16 @@ export type SqlJob =
     }
   | { kind: "display"; initSql: string; refSql: string; mode: "query" | "modify" }
 
+/**
+ * 写阶段标记。必须用 writeSync：父进程正是靠这个标记决定「多久之后 SIGKILL」
+ * 以及「超时算谁的」，走异步 stderr 的话标记可能还在缓冲里就被杀掉了。
+ */
 function markPhase(phase: string) {
-  process.stderr.write(`@phase:${phase}\n`)
+  const bytes = new TextEncoder().encode(`@phase:${phase}\n`)
+  let written = 0
+  while (written < bytes.length) {
+    written += writeSync(2, bytes, written, bytes.length - written)
+  }
 }
 
 /**
@@ -61,12 +69,13 @@ async function main() {
       const display = await buildDisplay(job.initSql, job.refSql, job.mode)
       finish({ ok: true, display })
     }
-    markPhase("judge")
+    // 阶段由 runCase 内部回调标记：prepare（受信脚本）→ student（学生 SQL）
     const result = await runCase(job.initSql, job.refSql, job.studentSql, {
       mode: job.mode,
       orderSensitive: job.orderSensitive,
       timeLimitMs: job.timeLimitMs,
       memoryLimitMb: job.memoryLimitMb,
+      onPhase: markPhase,
     })
     finish({ ok: true, case: result })
   } catch (error) {
