@@ -258,7 +258,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireAuth, async (c) => {
     criteriaAverages,
     personCount: roster.length,
     completedCount: submitted.size,
-    wordFrequencies: buildWordFrequencies(texts),
+    wordFrequencies: await buildWordFrequencies(texts),
     dataUnaccepted: roster
       .filter((row) => !submitted.has(row.username))
       .map((row) => ({

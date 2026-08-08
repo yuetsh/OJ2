@@ -36,23 +36,26 @@ const CUSTOM_WORDS = [
  * 词典加载有一次性开销（约 100ms），放在模块级会拖慢 API 冷启动，
  * 而词云只有教师偶尔点一次。改成首次调用时才建。
  */
-let instance: JiebaInstance | null = null
+let instance: Promise<JiebaInstance> | null = null
 
 function jieba() {
+  // 缓存 Promise 而不是结果：并发进来两个请求也只会建一次词典
   if (instance) return instance
-  const built = withBuiltinDict()
-  // 对应旧后端的 jieba.add_word(w, freq=9999)。
-  // @node-rs/jieba@2 没有导出 insertWord/addWord，改用用户词典缓冲区，格式为「词 词频」。
-  built.loadDict(
-    Buffer.from(CUSTOM_WORDS.map((word) => `${word} 9999`).join("\n") + "\n"),
-  )
-  instance = built
-  return built
+  instance = (async () => {
+    const built = await withBuiltinDict()
+    // 对应旧后端的 jieba.add_word(w, freq=9999)。
+    // @node-rs/jieba@2 没有导出 insertWord/addWord，改用用户词典缓冲区，格式为「词 词频」。
+    built.loadDict(
+      Buffer.from(CUSTOM_WORDS.map((word) => `${word} 9999`).join("\n") + "\n"),
+    )
+    return built
+  })()
+  return instance
 }
 
-export function buildWordFrequencies(texts: string[], topN = 80) {
+export async function buildWordFrequencies(texts: string[], topN = 80) {
   const counter = new Map<string, number>()
-  const cutter = jieba()
+  const cutter = await jieba()
   for (const raw of texts) {
     const text = raw.replaceAll("【重点】", "")
     for (const token of cutter.cut(text)) {
