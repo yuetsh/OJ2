@@ -152,6 +152,14 @@
 
 ## 阶段 5 切换必做项（阶段 4 施工时发现，记在这里以免忘）
 
+> **2026-08-08 更正：这条不是「切换必做项」，降级为「手工造库时的注意事项」。**
+>
+> 阶段 5 演练时实测了真实的 pg_dumpall 备份：里面带 30 条 `setval`，
+> 并且把生产快照里所有序列和 `max(id)` 逐个对过，**错位 0 个**。
+> 下面这个现象只出现在我手工按显式 id 导入、又没补 setval 的本地库上，
+> 对正常的备份/恢复不成立。切换当天不用管序列。详见
+> [phase5-cutover-runbook.md](phase5-cutover-runbook.md)。
+
 **导入数据后必须重置全部序列。** 本地库是按显式 id 从生产导入的，
 `problem_tag_id_seq` 停在 6 而表里 max(id)=87，于是第一次新建标签就撞
 `duplicate key value violates unique constraint "problem_tag_pkey"`（500）。

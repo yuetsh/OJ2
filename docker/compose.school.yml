@@ -17,7 +17,7 @@ services:
     container_name: oj-redis
     restart: always
     volumes:
-      - ./data/redis:/data
+      - ../data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -39,9 +39,9 @@ services:
     tmpfs:
       - /tmp
     volumes:
-      - ./data/backend/test_case:/test_case:ro
-      - ./data/judge_server/log:/log
-      - ./data/judge_server/run:/judger
+      - ../data/backend/test_case:/test_case:ro
+      - ../data/judge_server/log:/log
+      - ../data/judge_server/run:/judger
     environment:
       SERVICE_URL: http://oj-judge:8080
       BACKEND_URL: http://oj-api:3000/api/judge-server/heartbeat
@@ -61,7 +61,7 @@ services:
       oj-redis:
         condition: service_healthy
     volumes:
-      - ./data/backend:/data
+      - ../data/backend:/data
     environment: &api-env
       # 库在服务器上，走公网。DB_HOST 默认值就是服务器地址，换机器改 env 文件
       DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@${DB_HOST:-150.158.29.156}:${DB_PORT:-5445}/onlinejudge
@@ -89,7 +89,7 @@ services:
     depends_on:
       - oj-api
     volumes:
-      - ./data/backend:/data
+      - ../data/backend:/data
     environment: *api-env
     command: ["oj2-api", "worker"]
     mem_limit: 2g
@@ -105,7 +105,7 @@ services:
     depends_on:
       - oj-api
     volumes:
-      - ./data/backend/log:/data/log
+      - ../data/backend/log:/data/log
     ports:
       - "81:8000"
     mem_limit: 256m

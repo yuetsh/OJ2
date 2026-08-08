@@ -14,7 +14,7 @@ services:
     container_name: oj-postgres
     restart: always
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ../data/postgres:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: onlinejudge
       POSTGRES_USER: onlinejudge
@@ -33,7 +33,7 @@ services:
     container_name: oj-redis
     restart: always
     volumes:
-      - ./data/redis:/data
+      - ../data/redis:/data
     ports:
       - "5446:6379"
     healthcheck:
@@ -57,9 +57,9 @@ services:
     tmpfs:
       - /tmp
     volumes:
-      - ./data/backend/test_case:/test_case:ro
-      - ./data/judge_server/log:/log
-      - ./data/judge_server/run:/judger
+      - ../data/backend/test_case:/test_case:ro
+      - ../data/judge_server/log:/log
+      - ../data/judge_server/run:/judger
     environment:
       SERVICE_URL: http://oj-judge:8080
       # 心跳路径跟着新后端改了：judge_server_heartbeat/ → judge-server/heartbeat
@@ -81,7 +81,7 @@ services:
       oj-redis:
         condition: service_healthy
     volumes:
-      - ./data/backend:/data
+      - ../data/backend:/data
     environment: &api-env
       DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@oj-postgres:5432/onlinejudge
       REDIS_URL: redis://oj-redis:6379
@@ -107,7 +107,7 @@ services:
     depends_on:
       - oj-api
     volumes:
-      - ./data/backend:/data
+      - ../data/backend:/data
     environment: *api-env
     # 同一个镜像，换个子命令就是判题消费者
     command: ["oj2-api", "worker"]
@@ -125,7 +125,7 @@ services:
       - oj-api
     volumes:
       # Caddy 只往这里写访问日志，静态资源在镜像里
-      - ./data/backend/log:/data/log
+      - ../data/backend/log:/data/log
     ports:
       - "0.0.0.0:8080:8000"
     mem_limit: 256m
