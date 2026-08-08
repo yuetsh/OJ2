@@ -35,8 +35,9 @@ bun run dev            # api(3000) + worker + web(5173) 一起起
 常用检查：
 
 ```bash
-bunx tsc --noEmit -p apps/api      # 后端类型检查
-cd apps/web && bun run build       # 前端构建（vite 不做类型检查，构建即验证）
+bunx tsc --noEmit -p apps/api                 # 后端类型检查
+bun run --filter '@oj2/api' check:routes      # 路由遮蔽检查，加完路由跑一下
+cd apps/web && bun run build                  # 前端构建（vite 不做类型检查，构建即验证）
 ```
 
 **不要写测试** —— 沿用上一代的项目约定。验证靠实跑：起服务、打接口、看结果。
@@ -68,6 +69,15 @@ dev 直接起不来。
 没有 child.ts 可以 spawn）。所以**入口必须有 argv 分发**，否则「起自己」变成
 「把整个程序再跑一遍」→ 指数级 fork。这不是假想，开发时炸过一次开发机。
 `OJ2_SQL_CHILD` 那道递归闸不要删。
+
+### 加路由要防遮蔽
+
+**Hono 按注册顺序匹配，不是静态优先**（实测确认过，别凭直觉）。`/problems/:id`
+注册在 `/problems/random` 前面的话，后者永远进不去 —— 而且不报错、不警告，
+只是静默走进前一条的 handler。阶段 4 真实发生过一次，两个教师用的分析端点被吃掉，
+一直到评审才发现。
+
+加完路由跑 `bun run --filter '@oj2/api' check:routes`。
 
 ### 判题状态码要三处同步
 
