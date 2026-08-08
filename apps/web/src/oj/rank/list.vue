@@ -95,7 +95,7 @@ async function analyzeSingleClassWithAI() {
   if (csrfToken) headers["X-CSRFToken"] = csrfToken
 
   try {
-    const response = await fetch("/api2/ai/class-analysis", {
+    const response = await fetch("/api/ai/class-analysis", {
       method: "POST",
       headers,
       body: JSON.stringify({ comparison: classDetailData.value }),
@@ -158,9 +158,9 @@ interface ClassComparison {
   q3_ac: number
   iqr: number
   std_dev: number
-  top_10_avg: number
-  middle_80_avg: number
-  bottom_10_avg: number
+  top10_avg: number
+  middle80_avg: number
+  bottom10_avg: number
   excellent_rate: number
   pass_rate: number
   active_rate: number
@@ -719,17 +719,17 @@ watch(
           </n-descriptions-item>
           <n-descriptions-item label="前10%均值">
             <span style="color: #cf1322; font-weight: 600">{{
-              classDetailData.top_10_avg.toFixed(2)
+              classDetailData.top10_avg.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="中间80%均值">
             <span style="color: #389e0d; font-weight: 600">{{
-              classDetailData.middle_80_avg.toFixed(2)
+              classDetailData.middle80_avg.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="后10%均值">
             <span style="color: #096dd9; font-weight: 500">{{
-              classDetailData.bottom_10_avg.toFixed(2)
+              classDetailData.bottom10_avg.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="人数">

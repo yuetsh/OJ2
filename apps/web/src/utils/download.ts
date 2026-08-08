@@ -1,9 +1,9 @@
 import axios from "axios"
 
-// 指向新后端的 /api2/admin。响应是 zip 二进制，不走 { error, data } 信封，
+// 指向新后端的 /api/admin。响应是 zip 二进制，不走 { error, data } 信封，
 // 所以不能复用 utils/api2 的拦截器（它会把 response.data.data 取出来）。
 const http = axios.create({
-  baseURL: "/api2/admin",
+  baseURL: "/api/admin",
   responseType: "blob",
   withCredentials: true,
 })

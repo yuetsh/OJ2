@@ -20,9 +20,14 @@ build/
 docs/spikes/node_modules/
 docs/spikes/endpoints-*.json
 
-# 本地判题验收数据来自生产测试点，只读挂载，不进入版本库
-data/test_case/
-data/judge_server/
+# data/ 整个目录都是运行时数据，一律不进版本库。
+#
+# 必须写成整目录：原来只忽略了 test_case/ 和 judge_server/，而
+# docker/compose.*.yml 会在这里生成 data/postgres/（**整个数据库**，含
+# raw_password 明文列）、data/redis/、data/backend/（学生上传的文件）。
+# 阶段 5 演练时 `git add -A` 差一点就把生产库快照提交上去，只因为 postgres
+# 容器用的是别的 uid、目录读不了才失败。别再收窄这条。
+data/
 
 # 生产题目样本只用于本地验收，不进入 git
 *.csv

@@ -57,9 +57,9 @@ interface ClassComparison {
   q3_ac: number
   iqr: number
   std_dev: number
-  top_10_avg: number
-  middle_80_avg: number
-  bottom_10_avg: number
+  top10_avg: number
+  middle80_avg: number
+  bottom10_avg: number
   excellent_rate: number
   pass_rate: number
   active_rate: number
@@ -68,7 +68,7 @@ interface ClassComparison {
   recent_total_ac?: number
   recent_avg_ac?: number
   recent_median_ac?: number
-  recent_top_10_avg?: number
+  recent_top10_avg?: number
   recent_active_count?: number
 }
 
@@ -176,7 +176,7 @@ async function analyzeWithAI() {
   if (csrfToken) headers["X-CSRFToken"] = csrfToken
 
   try {
-    const response = await fetch("/api2/ai/class-pk-analysis", {
+    const response = await fetch("/api/ai/class-pk-analysis", {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -382,7 +382,7 @@ const top10AvgChartData = computed(() => {
   const datasets = [
     {
       label: "前10%平均",
-      data: comparisons.value.map((c) => c.top_10_avg),
+      data: comparisons.value.map((c) => c.top10_avg),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -400,7 +400,7 @@ const bottom10AvgChartData = computed(() => {
   const datasets = [
     {
       label: "后10%平均",
-      data: comparisons.value.map((c) => c.bottom_10_avg),
+      data: comparisons.value.map((c) => c.bottom10_avg),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -418,7 +418,7 @@ const middle80AvgChartData = computed(() => {
   const datasets = [
     {
       label: "中间80%均值",
-      data: comparisons.value.map((c) => c.middle_80_avg),
+      data: comparisons.value.map((c) => c.middle80_avg),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -640,35 +640,35 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
   },
   {
     title: "前10%均值",
-    key: "top_10_avg",
+    key: "top10_avg",
     width: 100,
     render: (row) =>
       h(
         "span",
         { style: { color: "#cf1322", fontWeight: "600" } },
-        row.top_10_avg.toFixed(2),
+        row.top10_avg.toFixed(2),
       ),
   },
   {
     title: "中间80%均值",
-    key: "middle_80_avg",
+    key: "middle80_avg",
     width: 110,
     render: (row) =>
       h(
         "span",
         { style: { color: "#389e0d", fontWeight: "600" } },
-        row.middle_80_avg.toFixed(2),
+        row.middle80_avg.toFixed(2),
       ),
   },
   {
     title: "后10%均值",
-    key: "bottom_10_avg",
+    key: "bottom10_avg",
     width: 100,
     render: (row) =>
       h(
         "span",
         { style: { color: "#096dd9", fontWeight: "500" } },
-        row.bottom_10_avg.toFixed(2),
+        row.bottom10_avg.toFixed(2),
       ),
   },
   {
@@ -956,17 +956,17 @@ const radarChartOptions = {
                 <!-- 分层统计 -->
                 <n-descriptions-item label="前10%均值">
                   <span style="color: #cf1322; font-weight: 600">{{
-                    classData.top_10_avg.toFixed(2)
+                    classData.top10_avg.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
                 <n-descriptions-item label="中间80%均值">
                   <span style="color: #389e0d; font-weight: 600">{{
-                    classData.middle_80_avg.toFixed(2)
+                    classData.middle80_avg.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
                 <n-descriptions-item label="后10%均值">
                   <span style="color: #096dd9; font-weight: 500">{{
-                    classData.bottom_10_avg.toFixed(2)
+                    classData.bottom10_avg.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
 
@@ -1049,7 +1049,7 @@ const radarChartOptions = {
                   </n-descriptions-item>
                   <n-descriptions-item label="时间段前10名平均">
                     <span style="color: #ff4d4f; font-weight: 600">{{
-                      classData.recent_top_10_avg?.toFixed(2)
+                      classData.recent_top10_avg?.toFixed(2)
                     }}</span>
                   </n-descriptions-item>
                   <n-descriptions-item label="活跃学生数" :span="2">

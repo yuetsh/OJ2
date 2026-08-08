@@ -104,7 +104,7 @@ export const useAIStore = defineStore("ai", () => {
     }
 
     try {
-      const response = await fetch("/api2/ai/analysis", {
+      const response = await fetch("/api/ai/analysis", {
         method: "POST",
         headers,
         body: JSON.stringify({
