@@ -236,17 +236,28 @@ JUDGE_STATE_DIR=/root/OJDeploy/data/judge_server_oj2
 
 ### 2. 起
 
-有脚本，从**本机**跑（没有 git remote 时靠 rsync 推代码）：
+有脚本，**在服务器上**跑：
 
 ```bash
-docker/deploy.sh              # 推代码 → 自检 → 构建 → 起栈 → 冒烟
-SERVER=root@1.2.3.4 docker/deploy.sh
+cd /root/OJDeploy/OJ2
+docker/deploy.sh              # 自检 → 构建 → 起栈 → 冒烟
+docker/deploy.sh --check      # 只自检，只读，不动任何容器
+docker/deploy.sh --no-build   # 只改了 env / compose 时跳过构建
 ```
 
-它默认**不推 `docker/.env`**（本机那份和服务器那份不是一回事，覆盖掉是静默故障），
-要同步时显式加 `--env`。起栈前有两道守卫，正是今天在服务器上撞到的那两种：
-`DATA_DIR` 没生效（卷指向 `OJ2/data`）、`DB_HOST` 没生效（`DATABASE_URL` 还指着
-试跑形态下并不存在的 `oj-postgres`）—— 命中任一条就中止，不会起一个看着正常的坏栈。
+代码怎么上到服务器不归它管（rsync 或以后的 `git pull`，命令在脚本头部注释里）。
+
+起栈前有五道自检，前两道正是这次在服务器上真撞到的：
+
+| 自检 | 拦什么 |
+|---|---|
+| compose 版本 | `depends_on.required` 要 ≥ 2.20，老版本解析就会失败 |
+| `DATA_DIR` | 卷指向 `OJ2/data` → 中止（空数据，静默） |
+| `DB_HOST` | `DATABASE_URL` 还指着 `oj-postgres` → 中止（试跑形态下它不存在） |
+| `JUDGE_STATE_DIR` | 没设的话新旧两个判题机共用运行目录 |
+| 旧栈 | `oj-postgres` / `oj-redis` 得还活着，新栈连的就是它们 |
+
+起完等 `oj-api` healthy，再跑四条冒烟；题目数是 0 也中止 —— 那意味着连错库了。
 
 手动等价于：
 
