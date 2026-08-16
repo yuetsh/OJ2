@@ -163,10 +163,14 @@ accountRoutes.get("/rankings/users", async (c) => {
   )
   const [totalRow] = await db.select({ value: count() }).from(schema.userProfile)
     .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id)).where(where)
-  const rows = await db.select({ profile: schema.userProfile, user: schema.user }).from(schema.userProfile)
+  // top 只是「榜单取前 N 名」的上限，分页仍要在这 N 条之内生效：
+  // 否则 top=100 时每页都返回同样的 100 条，而 total 又是全量人数，翻页翻不动
+  const total = top > 0 ? Math.min(totalRow?.value ?? 0, top) : (totalRow?.value ?? 0)
+  const pageLimit = top > 0 ? Math.max(0, Math.min(limit, top - offset)) : limit
+  const rows = pageLimit === 0 ? [] : await db.select({ profile: schema.userProfile, user: schema.user }).from(schema.userProfile)
     .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id)).where(where)
     .orderBy(desc(schema.userProfile.acceptedNumber), asc(schema.userProfile.submissionNumber))
-    .limit(top > 0 ? Math.min(top, 250) : limit).offset(top > 0 ? 0 : offset)
+    .limit(pageLimit).offset(offset)
   const results = rows.map(({ profile, user }) => rankProfileSchema.parse({
     id: profile.id,
     user: sampleUser(user, profile.realName),
@@ -174,7 +178,7 @@ accountRoutes.get("/rankings/users", async (c) => {
     submissionNumber: profile.submissionNumber,
     mood: profile.mood,
   }))
-  return success(c, userRankSchema.parse({ results, total: totalRow?.value ?? 0 }))
+  return success(c, userRankSchema.parse({ results, total }))
 })
 
 accountRoutes.get("/rankings/activity", async (c) => {
