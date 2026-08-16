@@ -15,6 +15,11 @@
 #
 # 前提：docker/.env 已经填好（内容见 docs/specs/phase5-cutover-runbook.md 第三节）。
 
+# `sh docker/deploy.sh` 会用 dash 跑（Debian 的 /bin/sh 就是 dash），而下面那行
+# 的 pipefail 是 bash 专有的，一上来就报 `Illegal option -o pipefail`。
+# 这行必须在 set 之前，且只能用 dash 也认的语法。
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
