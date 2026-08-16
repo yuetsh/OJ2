@@ -7,14 +7,35 @@
 # 和旧的 docker-compose.debian.yml 的对应关系：
 #   oj-backend（supervisord 跑 caddy+gunicorn+dramatiq）→ 拆成 oj-web + oj-api + oj-worker
 #   端口、数据目录、判题机配置全部保持不变，这样回滚只是换回旧 compose。
+#
+# ## 两种形态
+#
+# **自带数据**（演练用的就是这个）：postgres 和 redis 也由本文件起，要显式加 profile。
+#
+#   docker compose -f docker/compose.debian.yml --env-file docker/.env --profile local-data up -d
+#
+# **只换前后端**（默认，上线用这个）：旧栈的 postgres / redis 容器继续跑，
+# 这里只起 api / worker / web / judge，
+# 通过 env 指过去。切换当天数据库进程根本不重启，库和文件都不用挪位置。
+#
+#   docker compose -f docker/compose.debian.yml --env-file docker/.env up -d
+#
+# 后者要在 env 里设 `DB_HOST` / `REDIS_HOST` / `DATA_DIR`，见 `.env.example` 末尾。
+#
+# ⚠️ `DATA_DIR` 默认值 `../data` 解析出来是 **`OJ2/data`**，不是部署目录的 `data/`。
+# 旧栈用的是 `<部署目录>/data/`，两者不是一个地方 —— 直接用默认值切过去，postgres 会在
+# 空目录上初始化一个全新的空库，测试点和题面图片也全都不在。**用旧数据就必须设 `DATA_DIR`。**
 
 services:
   oj-postgres:
     image: postgres:16-alpine
     container_name: oj-postgres
     restart: always
+    # 只在「自带数据」形态下启动。用旧栈的库时不启动它 —— 否则 5445 端口会和
+    # 旧的 postgres 撞，而且两个进程开同一个数据目录本来也起不来。
+    profiles: ["local-data"]
     volumes:
-      - ../data/postgres:/var/lib/postgresql/data
+      - ${DATA_DIR:-../data}/postgres:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: onlinejudge
       POSTGRES_USER: onlinejudge
@@ -32,8 +53,12 @@ services:
     image: redis:7-alpine
     container_name: oj-redis
     restart: always
+    # 同上：旧栈的 redis 也发布了 5446，两个一起跑会撞端口。
+    # redis 里没有非丢不可的东西（会话、判题队列），用旧的那个也无所谓 ——
+    # 旧后端已经停了，新后端独占它，剩下的 Django / dramatiq 残留键前缀不同，互不干扰。
+    profiles: ["local-data"]
     volumes:
-      - ../data/redis:/data
+      - ${DATA_DIR:-../data}/redis:/data
     ports:
       - "5446:6379"
     healthcheck:
@@ -57,9 +82,9 @@ services:
     tmpfs:
       - /tmp
     volumes:
-      - ../data/backend/test_case:/test_case:ro
-      - ../data/judge_server/log:/log
-      - ../data/judge_server/run:/judger
+      - ${DATA_DIR:-../data}/backend/test_case:/test_case:ro
+      - ${DATA_DIR:-../data}/judge_server/log:/log
+      - ${DATA_DIR:-../data}/judge_server/run:/judger
     environment:
       SERVICE_URL: http://oj-judge:8080
       # 心跳路径跟着新后端改了：judge_server_heartbeat/ → judge-server/heartbeat
@@ -76,15 +101,25 @@ services:
     container_name: oj-api
     restart: always
     depends_on:
+      # required: false —— 「只换前后端」时这两个服务不在启动集合里（profile 未启用），
+      # 严格的 depends_on 会让整个 project 直接判定 invalid（实测过，不是猜的）。
+      # 代价：自带数据形态下 postgres 起不来时，compose 只警告不中止，oj-api 照样起，
+      # 然后自己 crash 循环。看 `docker compose ps`，oj-api 会是 unhealthy。
       oj-postgres:
         condition: service_healthy
+        required: false
       oj-redis:
         condition: service_healthy
+        required: false
+    # 用旧栈的库时，库在宿主机上（旧 postgres 发布了 5445），走 host-gateway 过去，
+    # 不出本机、不走公网。DB_HOST 填 host.docker.internal 即可。
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ../data/backend:/data
+      - ${DATA_DIR:-../data}/backend:/data
     environment: &api-env
-      DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@oj-postgres:5432/onlinejudge
-      REDIS_URL: redis://oj-redis:6379
+      DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@${DB_HOST:-oj-postgres}:${DB_PORT:-5432}/onlinejudge
+      REDIS_URL: redis://${REDIS_HOST:-oj-redis}:${REDIS_PORT:-6379}
       JUDGE_SERVER_URL: http://oj-judge:8080
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
@@ -106,8 +141,10 @@ services:
     restart: always
     depends_on:
       - oj-api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - ../data/backend:/data
+      - ${DATA_DIR:-../data}/backend:/data
     environment: *api-env
     # 同一个镜像，换个子命令就是判题消费者
     command: ["oj2-api", "worker"]
@@ -125,7 +162,7 @@ services:
       - oj-api
     volumes:
       # Caddy 只往这里写访问日志，静态资源在镜像里
-      - ../data/backend/log:/data/log
+      - ${DATA_DIR:-../data}/backend/log:/data/log
     ports:
       - "0.0.0.0:8080:8000"
     mem_limit: 256m

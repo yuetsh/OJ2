@@ -113,4 +113,14 @@ Drizzle schema 是从生产库 `drizzle-kit pull` 出来的，**不写迁移**�
 **机房那套没有 postgres，连的是服务器的库。** 两个站点共用一个数据库，
 但各有各的 Redis 和判题沙箱 —— 所以上线那天**两边必须一起切**。
 
+`compose.debian.yml` 有两种形态，靠 env 切换：
+
+- **只换前后端**（上线用这个）：设 `DATA_DIR` / `DB_HOST` / `REDIS_HOST`，
+  沿用旧栈已经在跑的 postgres 和 redis，只起 api / worker / web / judge。
+- **自带数据**（本机、演练）：不设那几个变量，起栈时加 `--profile local-data`。
+
+⚠️ `DATA_DIR` 默认值 `../data` 是 **`OJ2/data`**，不是部署目录的 `data/`。
+沿用旧数据却忘了设它，会静默起一套空数据（空库、没测试点、图片 404），
+而且**不报错** —— 这是切换当天唯一会静默走歪的地方。
+
 细节和演练结果都在 `docs/specs/phase5-cutover-runbook.md`。

@@ -94,59 +94,211 @@ WS 经 Caddy upgrade: 已连接
 
 ---
 
-## 三、切换前检查清单（停机窗口之前做完）
+## 三、切换前准备（停机窗口之前做完）
 
-- [ ] **先把镜像构建好**：`docker compose -f docker/compose.debian.yml build`
-      首次约 5 分钟。别在停机窗口里构建。
-- [ ] 填好 `docker/.env`（照 `docker/.env.example`）。
-      `POSTGRES_PASSWORD` 必须**和生产库现有的口令一致** —— 库是原地不动的，
-      不是新建的，密码改不了。
-- [ ] `OJ2_JUDGE_TOKEN` 可以换新的（判题机和后端读同一个变量，一起换即可）。
-- [ ] `AI_KEY` 服务器和机房是两个不同的 key，别填串。
-- [ ] 机房那份 env 里 `COOKIE_SECURE=false`（http 直连 IP，带 Secure 的 Cookie
-      浏览器不回传，表现是「登录成功但立刻又变未登录」）。
-- [ ] 做一次 `pg_dumpall` 备份（不是为了迁移，是为了兜底）。
-- [ ] 确认 `data/backend/` 下 `test_case`、`public/upload`、`public/avatar` 都在。
+### ⚠️ 演练没暴露的一个坑：两套 compose 的数据目录不是同一个地方
 
-## 四、切换步骤
+演练时是把生产 dump 恢复进 `OJ2/data/postgres` 的（见第九节），所以这件事被盖住了。
+真实部署目录 `/root/OJDeploy` 的实际情况：
 
-**两个站点都要切。** 机房那套连的是服务器的库，只切一边的话，另一边的旧后端
-还在读写同一个库。
+| | 旧栈（`docker-compose.yml`） | 新栈默认值 |
+|---|---|---|
+| 库 | `/root/OJDeploy/data/postgres` | `/root/OJDeploy/OJ2/data/postgres` |
+| 测试点 / 上传 / 头像 | `/root/OJDeploy/data/backend/` | `/root/OJDeploy/OJ2/data/backend/` |
 
-服务器（xuyue.cc）：
+新 compose 在 `OJ2/docker/` 下，`../data` 解析到的是 `OJ2/data`。**照默认值切过去，
+postgres 会在一个空目录上初始化一个全新的空库** —— 站点能起来，但没有用户、没有题、
+判题全挂、题面图片 404。旧数据完好无损（回滚正常），但当天会白吓一场。
+
+因此 `compose.debian.yml` / `compose.school.yml` 加了 `DATA_DIR` 等三组变量，
+**下面的流程按「只换前后端」形态写**：旧栈的 postgres / redis 容器继续跑，
+新栈只起 api / worker / web / judge。数据库进程根本不重启，库和文件一个字节都不用挪。
+
+### 已经做掉的（2026-08-16）
+
+- **`docker/.env.school` 已写好**（`.gitignore` 排除，不进版本库）：判题 token 新生成一条、
+  `JUDGE_CONCURRENCY=4`、`DB_HOST=150.158.29.156`、`DB_PORT=5445`、`COOKIE_SECURE=false`。
+  `docker compose config` 验过插值正确。**还差两个值**，见下面第 1 步。
+- **构建复验通过。** 演练之后又改过两次前端（`/api2` 前缀漏改 5 处、接回配置推送与
+  MaxKB），在本机重新构建：`oj2-web` 75MB 构建通过、单起容器首页 200；`oj2-api`
+  完全命中缓存，说明后端源码在演练之后没动过。
+  这只证明「还能构建出来」—— 镜像不走镜像仓库，是各站点本地构建的，
+  **服务器和机房当地各自还要 build 一次**。
+- **「只换前后端」形态本机实跑验过。** 用 `docs/specs/schema.sql` 起了一个发布在宿主机
+  5445 的 postgres 冒充旧栈，新栈按下面的 env 起来：4 个容器（没有 postgres / redis）、
+  `oj-api` healthy、首页与 `/api/site` `/api/problems` 200、未登录进后台 401。
+  读写两个方向都验了 —— 那个库的 `pg_stat_activity` 里有一条来自 172.17.0.1 的
+  `postgres.js` 连接，`judge_server` 表里也出现了新判题机写进去的心跳行。
+
+### 1. 填两份 env（各站一份，都不进版本库）
+
+服务器 `docker/.env`（照 `docker/.env.example` 拷一份再填）：
+
+| 变量 | 填什么 |
+|---|---|
+| `POSTGRES_PASSWORD` | **生产库现有的口令**。库是原地不动的、不是新建的，这个值改不了（旧 compose 里是 `onlinejudge`） |
+| `DATA_DIR` | `/root/OJDeploy/data` —— **旧数据目录的绝对路径**。不填就是上面那个空数据坑 |
+| `DB_HOST` / `DB_PORT` | `host.docker.internal` / `5445` —— 旧 postgres 已经把 5445 发布在宿主机上，走 host-gateway 过去，不出本机 |
+| `REDIS_HOST` / `REDIS_PORT` | `host.docker.internal` / `5446` —— 同理，旧 redis 发布的是 5446 |
+| `OJ2_JUDGE_TOKEN` | 可以换新的，`openssl rand -hex 32`；后端和判题机读同一个变量，一起换即可 |
+| `JUDGE_CONCURRENCY` | 服务器 `2` |
+| `AI_KEY` | 服务器那把 DeepSeek key |
+
+机房 `docker/.env.school`：已写好，只差三个 ——
+
+| 变量 | 填什么 |
+|---|---|
+| `POSTGRES_PASSWORD` | 同上，**和服务器那份一模一样**（连的是同一个库） |
+| `DATA_DIR` | 机房那台的旧数据目录绝对路径。**机房也有测试点和上传文件**，同样不能用默认值 |
+| `AI_KEY` | 机房那把，**和服务器不是同一把，别填串** |
+
+漏填 `POSTGRES_PASSWORD` 不会静默起一个坏服务：compose 里写的是 `${POSTGRES_PASSWORD:?}`，
+没填直接报错退出。**但 `DATA_DIR` 漏填不会报错**，它有默认值 —— 这条只能靠人盯。
+
+> 想让新栈自带 postgres / redis（本机开发、或将来旧栈彻底拆掉）：不设 `DB_HOST`
+> `REDIS_HOST` `DATA_DIR`，起栈时加 `--profile local-data` 即可。
+
+### 2. 先把镜像构建好（**别在停机窗口里干这件事**）
+
+服务器：
 
 ```bash
-cd <部署目录>
-docker compose -f docker-compose.debian.yml down     # 停旧栈，约 11s
-docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env up -d
+docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env build
 ```
 
 机房：
 
 ```bash
-docker compose -f docker-compose.school.yml down
-docker compose -f OJ2/docker/compose.school.yml --env-file OJ2/docker/.env.school up -d
+docker compose -f OJ2/docker/compose.school.yml --env-file OJ2/docker/.env.school build
 ```
 
-端口没变（服务器 8080，机房 81），前面的 Nginx Proxy Manager 不用动。
+首次约 5 分钟，依赖下载占大头。构建完确认两个镜像都在：
 
-## 五、切换后验证（照着点一遍）
+```bash
+docker images | grep oj2-
+# oj2-api   latest   487MB
+# oj2-web   latest    75MB
+```
+
+### 3. 兜底备份
+
+```bash
+docker exec oj-postgres pg_dumpall -U onlinejudge > ~/oj-before-cutover-$(date +%F).sql
+```
+
+**不是为了迁移**（不需要 DDL、不需要迁数据），是为了出事有退路。真要用它重建，
+先读第七节第 1 条 —— 这份备份会把角色口令覆盖回备份当时的值。
+
+### 4. 确认 `DATA_DIR` 指对了
+
+```bash
+ls /root/OJDeploy/data/backend/test_case \
+   /root/OJDeploy/data/backend/public/upload \
+   /root/OJDeploy/data/backend/public/avatar
+```
+
+判题测试点、题面图片、头像都在这三个目录里。**这个路径必须和 env 里的 `DATA_DIR` 一致。**
+再用 compose 自己确认一遍解析结果，别靠脑补：
+
+```bash
+docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env config | grep source:
+# 每一条都应该在 /root/OJDeploy/data 下，出现 OJ2/data 就是 DATA_DIR 没生效
+```
+
+### 5. 出发前对一遍
+
+- [ ] 两份 env 都填完了，两边的 `POSTGRES_PASSWORD` 一致
+- [ ] **两边的 `DATA_DIR` 都指向旧数据目录**，`config | grep source:` 核对过
+- [ ] 两边镜像都构建完了
+- [ ] 备份做了
+- [ ] 端口没变（服务器 8080、机房 81），前面的 Nginx Proxy Manager 不用动
+
+## 四、切换步骤（当天，两边一起切）
+
+**两个站点必须同一天切。** 机房那套连的是服务器的库，只切一边的话，另一边的旧后端
+还在读写同一个库。
+
+服务器（`/root/OJDeploy`）：
+
+```bash
+cd /root/OJDeploy
+
+# 只停应用，postgres / redis 留着继续跑 —— 新栈接着用它们
+docker compose -f docker-compose.yml stop oj-backend oj-judge
+docker compose -f docker-compose.yml ps        # 确认 oj-postgres / oj-redis 还在 Up
+
+docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env up -d
+docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env ps
+# 应该正好 4 个：oj-api / oj-worker / oj-web / oj-judge，等 oj-api 变 healthy
+```
+
+旧判题机必须一起停：它和新判题机会争同一个 `data/judge_server/run`。
+旧 backend 也必须停：8080 端口要交给 `oj-web`。
+
+机房：
+
+```bash
+cd <机房部署目录>
+docker compose -f docker-compose.yml stop oj-backend oj-judge
+docker compose -f OJ2/docker/compose.school.yml --env-file OJ2/docker/.env.school up -d
+docker compose -f OJ2/docker/compose.school.yml --env-file OJ2/docker/.env.school ps
+```
+
+（机房本来就没有 postgres；它的 redis 是新栈自带的，和旧 redis 不冲突 ——
+旧的那个没往宿主机发布端口。）
+
+起不来先看这两条日志，绝大多数问题在里面直说了：
+
+```bash
+docker logs oj-api --tail 50      # 连不上库、token 不对都在这里
+docker logs oj-judge --tail 20    # 判题机注册不上看这条
+```
+
+## 五、切换后验证
+
+先用命令快速过一遍（服务器 8080，机房 81）：
+
+```bash
+BASE=http://localhost:8080
+curl -s -o /dev/null -w '首页          %{http_code}\n' $BASE/
+curl -s -o /dev/null -w '站点配置      %{http_code}\n' $BASE/api/site
+curl -s -o /dev/null -w '题目列表      %{http_code}\n' $BASE/api/problems
+curl -s -o /dev/null -w '未登录进后台  %{http_code}\n' $BASE/api/admin/dashboard   # 期望 401
+```
+
+前三条 200、第四条 401 才算过。两个失败模式各有各的症状，别搞混：
+
+- **题目列表 `"total":0`** → 连错库了（`DB_HOST` 没设，或误加了 `--profile local-data`
+  起了个自带的空 postgres）。立刻停下来查，别往下走。
+- **库是对的，但判题全错、题面图片 404** → `DATA_DIR` 指错了，挂上去一堆空目录。
+
+然后照着点一遍 —— 下面这几步是命令测不到的：
 
 1. 打开首页，能看到题目列表
 2. 用一个学生账号登录，看得到自己的提交历史
 3. 提交一道题，**看判题结果是否实时刷出来**（这一步同时验证了 WebSocket）
-4. 后台 → 判题机列表，确认判题机在线
+4. 后台 → 判题机列表，确认判题机在线（心跳走 `/api/judge-server/heartbeat`）
 5. 后台 → 题目列表能翻页
 6. 题面里带图片的题，图片能显示（`/public/upload/*`）
+
+机房那边额外确认一条：**登录之后刷新页面还是登录态**。如果「登录成功又立刻变未登录」，
+就是 `COOKIE_SECURE` 没设成 false。
 
 ## 六、回滚
 
 ```bash
-docker compose -f OJ2/docker/compose.debian.yml down
-docker compose -f docker-compose.debian.yml up -d
+cd /root/OJDeploy
+docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env down
+docker compose -f docker-compose.yml start oj-backend oj-judge
 ```
 
-约 20 秒。**不需要恢复数据库，不需要动任何文件。**
+机房同理，换成 `compose.school.yml`。
+
+约 20 秒，比演练时还快一点 —— **postgres / redis 全程没停过**，回滚只是把旧的
+backend 和判题机再 start 起来。**不需要恢复数据库，不需要动任何文件。**
+
+这也是「只换前后端」形态的主要好处：切换和回滚都不碰数据库进程，
+库出问题的可能性从流程里被整个拿掉了。
 
 ---
 
