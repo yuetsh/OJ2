@@ -22,6 +22,10 @@
 #
 # 后者要在 env 里设 `DB_HOST` / `REDIS_HOST` / `DATA_DIR`，见 `.env.example` 末尾。
 #
+# **并行试跑**（新站挂在 oj2.xuyue.cc、旧站原样不动）是「只换前后端」再加两个变量：
+# `WEB_PORT`（8080 被旧 backend 占着）和 `JUDGE_STATE_DIR`（两个判题机不能共用运行目录）。
+# 这种形态下旧栈一个容器都不用停。见手册第四节。
+#
 # ⚠️ `DATA_DIR` 默认值 `../data` 解析出来是 **`OJ2/data`**，不是部署目录的 `data/`。
 # 旧栈用的是 `<部署目录>/data/`，两者不是一个地方 —— 直接用默认值切过去，postgres 会在
 # 空目录上初始化一个全新的空库，测试点和题面图片也全都不在。**用旧数据就必须设 `DATA_DIR`。**
@@ -83,8 +87,11 @@ services:
       - /tmp
     volumes:
       - ${DATA_DIR:-../data}/backend/test_case:/test_case:ro
-      - ${DATA_DIR:-../data}/judge_server/log:/log
-      - ${DATA_DIR:-../data}/judge_server/run:/judger
+      # 判题机的运行状态目录。默认跟着 DATA_DIR 走，和旧栈是同一份 ——
+      # 一次性切换时无所谓（旧判题机已经停了），但**并行试跑时必须单独设 JUDGE_STATE_DIR**，
+      # 否则新旧两个 judger 同时往一个 run/log 目录里写。
+      - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/log:/log
+      - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/run:/judger
     environment:
       SERVICE_URL: http://oj-judge:8080
       # 心跳路径跟着新后端改了：judge_server_heartbeat/ → judge-server/heartbeat
@@ -164,5 +171,6 @@ services:
       # Caddy 只往这里写访问日志，静态资源在镜像里
       - ${DATA_DIR:-../data}/backend/log:/data/log
     ports:
-      - "0.0.0.0:8080:8000"
+      # 并行试跑（oj2.xuyue.cc）时换一个端口，8080 还被旧 backend 占着。
+      - "0.0.0.0:${WEB_PORT:-8080}:8000"
     mem_limit: 256m

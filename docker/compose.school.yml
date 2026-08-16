@@ -44,8 +44,9 @@ services:
       - /tmp
     volumes:
       - ${DATA_DIR:-../data}/backend/test_case:/test_case:ro
-      - ${DATA_DIR:-../data}/judge_server/log:/log
-      - ${DATA_DIR:-../data}/judge_server/run:/judger
+      # 并行试跑时必须单独设 JUDGE_STATE_DIR，否则新旧两个 judger 共用一个运行目录
+      - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/log:/log
+      - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/run:/judger
     environment:
       SERVICE_URL: http://oj-judge:8080
       BACKEND_URL: http://oj-api:3000/api/judge-server/heartbeat
@@ -111,5 +112,6 @@ services:
     volumes:
       - ${DATA_DIR:-../data}/backend/log:/data/log
     ports:
-      - "81:8000"
+      # 并行试跑时换一个端口，81 还被旧 backend 占着
+      - "${WEB_PORT:-81}:8000"
     mem_limit: 256m

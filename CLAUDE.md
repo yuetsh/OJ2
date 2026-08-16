@@ -118,6 +118,9 @@ Drizzle schema 是从生产库 `drizzle-kit pull` 出来的，**不写迁移**�
 - **只换前后端**（上线用这个）：设 `DATA_DIR` / `DB_HOST` / `REDIS_HOST`，
   沿用旧栈已经在跑的 postgres 和 redis，只起 api / worker / web / judge。
 - **自带数据**（本机、演练）：不设那几个变量，起栈时加 `--profile local-data`。
+- **并行试跑**（上线前先挂 `oj2.xuyue.cc` 跑几天）：在「只换前后端」基础上再加
+  `WEB_PORT`（8080 被旧 backend 占着）和 `JUDGE_STATE_DIR`（两个判题机不能共用运行目录）。
+  这种形态下旧栈一个容器都不用停，正式切换退化成改一行 NPM 上游。
 
 ⚠️ `DATA_DIR` 默认值 `../data` 是 **`OJ2/data`**，不是部署目录的 `data/`。
 沿用旧数据却忘了设它，会静默起一套空数据（空库、没测试点、图片 404），

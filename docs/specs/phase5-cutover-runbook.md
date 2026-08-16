@@ -98,7 +98,7 @@ WS 经 Caddy upgrade: 已连接
 
 ### ⚠️ 演练没暴露的一个坑：两套 compose 的数据目录不是同一个地方
 
-演练时是把生产 dump 恢复进 `OJ2/data/postgres` 的（见第九节），所以这件事被盖住了。
+演练时是把生产 dump 恢复进 `OJ2/data/postgres` 的（见第十节），所以这件事被盖住了。
 真实部署目录 `/root/OJDeploy` 的实际情况：
 
 | | 旧栈（`docker-compose.yml`） | 新栈默认值 |
@@ -187,7 +187,7 @@ docker exec oj-postgres pg_dumpall -U onlinejudge > ~/oj-before-cutover-$(date +
 ```
 
 **不是为了迁移**（不需要 DDL、不需要迁数据），是为了出事有退路。真要用它重建，
-先读第七节第 1 条 —— 这份备份会把角色口令覆盖回备份当时的值。
+先读第八节第 1 条 —— 这份备份会把角色口令覆盖回备份当时的值。
 
 ### 4. 确认 `DATA_DIR` 指对了
 
@@ -211,12 +211,93 @@ docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env confi
 - [ ] **两边的 `DATA_DIR` 都指向旧数据目录**，`config | grep source:` 核对过
 - [ ] 两边镜像都构建完了
 - [ ] 备份做了
-- [ ] 端口没变（服务器 8080、机房 81），前面的 Nginx Proxy Manager 不用动
+- [ ] 决定好走哪条路：先并行试跑（第四节，推荐），还是直接切（第五节）
 
-## 四、切换步骤（当天，两边一起切）
+## 四、并行试跑（oj2.xuyue.cc）
+
+正式切换之前，先让新栈挂在一个独立域名上跑几天，**旧站原样不动、一个容器都不用停**。
+
+这是双跑 —— 设计文档原本明确否掉过（「不双跑不灰度」）。改主意的理由是：
+「只换前后端」形态下新栈本来就不碰数据库进程，双跑的增量风险只剩「两个后端同时写同一个库」
+这一条；而换来的是**正式切换退化成改一行 NPM 上游**，反而比停机切换更稳。
+代价见下面「试跑期间要知道的」，不是零。
+
+### 1. env 比「只换前后端」多两个
+
+```
+WEB_PORT=8090
+JUDGE_STATE_DIR=/root/OJDeploy/data/judge_server_oj2
+```
+
+`WEB_PORT` 是因为 8080 还被旧 backend 占着。`JUDGE_STATE_DIR` 是因为**两个判题机不能
+共用运行目录** —— 不设的话新旧两个 judger 会同时往 `data/judge_server/{run,log}` 里写。
+
+`test_case` 和 `public/upload` 仍然共享，**那是故意的**：测试点和题面图片两边必须看到同一份。
+
+### 2. 起
+
+```bash
+mkdir -p /root/OJDeploy/data/judge_server_oj2/log /root/OJDeploy/data/judge_server_oj2/run
+cd /root/OJDeploy
+docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env up -d
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8090/     # 期望 200
+```
+
+旧站这时候完全没受影响，8080 上照常服务。
+
+### 3. NPM 加一台 proxy host
+
+| 项 | 值 |
+|---|---|
+| Domain | `oj2.xuyue.cc`（先把 DNS 解析加上） |
+| Forward | `<宿主机 IP>` : `8090` |
+| **Websockets Support** | **必须打开** |
+| SSL | 签一张证书，`COOKIE_SECURE=true` 依赖 https |
+| client_max_body_size | `200M`，和 Caddyfile 里的 `200MiB` 对齐（上传测试用例压缩包） |
+
+WebSocket 那个开关是双跑最容易漏的一格：漏了的话页面一切正常，唯独学生盯着的
+「判题中…」永远不动 —— 而这恰恰是最不容易在自测里发现的一条，因为刷新一下结果就出来了。
+
+### 4. 试跑期间要知道的
+
+- **两边登录态不互通**。旧站是 Django session，新站是 Redis opaque token。
+  学生到 oj2 要重新登录一次，这不是 bug。
+- **同一个库，双写**。结构完全兼容不会写坏，但提交、统计、成就都是**真实数据**，
+  不是沙盒。别拿它做破坏性试验。
+- 后台判题机列表会出现**两台**（新旧各自心跳），正常。
+- 比赛排名等缓存两边各存各的 Redis，可能短暂不一致。
+  **试跑期间不要在 oj2 上办正式比赛。**
+
+### 5. 试跑要盯的是这些
+
+都是只有真实数据 + 真实浏览器才暴露的：
+
+- 机房那种 **Chrome < 94** 打开正常（`mermaid-legacy` 这条 fallback 只在老浏览器上生效）
+- 带图片的题面（`/public/upload/*` 走的是反代，不是 Caddy 直接读盘）
+- AI 分析的 **SSE 流式输出**经过 NPM 之后还是不是逐块下发（这一层最容易被缓冲住）
+- WebSocket 在 NPM 后面长时间挂着稳不稳（超时断连会不会自动重连）
+- 后台**上传测试用例压缩包**这条 200MB 的路
+- 老师日常用的后台：出题、建比赛、题单
+
+## 五、正式切换
 
 **两个站点必须同一天切。** 机房那套连的是服务器的库，只切一边的话，另一边的旧后端
 还在读写同一个库。
+
+### 试跑过了 —— 那就只是改一行上游
+
+新栈已经在 8090 上跑着、验过了，切换不需要重启任何容器：
+
+1. NPM 里把 `xuyue.cc` 那台 proxy host 的上游从 `8080` 改成 `8090`（**Websockets Support 同样要开**）
+2. 看一眼首页和一次提交，正常
+3. 确认没问题之后再停旧栈：`docker compose -f docker-compose.yml stop oj-backend oj-judge`
+
+**停机时间约等于零**，回滚就是把 NPM 那一行改回 `8080` —— 旧栈这时候都还没停。
+这正是设计文档最初写的那个回滚故事：「改一行上游」。
+
+`oj2.xuyue.cc` 可以留着，它和 `xuyue.cc` 指向同一个新栈，没有坏处。
+
+### 没试跑、直接切 —— 走下面这套
 
 服务器（`/root/OJDeploy`）：
 
@@ -254,7 +335,9 @@ docker logs oj-api --tail 50      # 连不上库、token 不对都在这里
 docker logs oj-judge --tail 20    # 判题机注册不上看这条
 ```
 
-## 五、切换后验证
+## 六、切换后验证
+
+这一节试跑刚起来时也照着跑一遍，只是端口换成试跑用的（`WEB_PORT`，例如 8090）。
 
 先用命令快速过一遍（服务器 8080，机房 81）：
 
@@ -284,7 +367,12 @@ curl -s -o /dev/null -w '未登录进后台  %{http_code}\n' $BASE/api/admin/das
 机房那边额外确认一条：**登录之后刷新页面还是登录态**。如果「登录成功又立刻变未登录」，
 就是 `COOKIE_SECURE` 没设成 false。
 
-## 六、回滚
+## 七、回滚
+
+**试跑之后切的**（推荐路径）：NPM 里把 `xuyue.cc` 的上游从 `8090` 改回 `8080`。
+旧栈这时候还跑着，**秒级生效，什么都不用停不用起**。等确认稳定了再决定何时收掉新栈。
+
+**直接切的**：
 
 ```bash
 cd /root/OJDeploy
@@ -302,7 +390,7 @@ backend 和判题机再 start 起来。**不需要恢复数据库，不需要动
 
 ---
 
-## 七、演练中踩到的坑（写下来是因为它们只在容器里出现）
+## 八、演练中踩到的坑（写下来是因为它们只在容器里出现）
 
 ### 1. pg_dumpall 备份会覆盖数据库口令 ⚠️
 
@@ -350,7 +438,7 @@ ERROR: database "onlinejudge" is being accessed by other users
 
 ---
 
-## 八、镜像体积（没达到设计文档的预期，说明原因）
+## 九、镜像体积（没达到设计文档的预期，说明原因）
 
 | 镜像 | 体积 |
 |---|---|
@@ -376,7 +464,7 @@ clang-format，再加整个 Python 运行时和 Django 依赖，所以新镜像�
 
 ---
 
-## 九、演练产生的临时数据（已清理）
+## 十、演练产生的临时数据（已清理）
 
 演练在 `OJ2/data/postgres` 下留下了**一份完整的生产数据副本**，其中包含 1710 名
 学生的 `raw_password` 明文列。演练结束后已删除该目录。
