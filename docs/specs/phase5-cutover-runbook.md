@@ -236,11 +236,25 @@ JUDGE_STATE_DIR=/root/OJDeploy/data/judge_server_oj2
 
 ### 2. 起
 
+有脚本，从**本机**跑（没有 git remote 时靠 rsync 推代码）：
+
+```bash
+docker/deploy.sh              # 推代码 → 自检 → 构建 → 起栈 → 冒烟
+SERVER=root@1.2.3.4 docker/deploy.sh
+```
+
+它默认**不推 `docker/.env`**（本机那份和服务器那份不是一回事，覆盖掉是静默故障），
+要同步时显式加 `--env`。起栈前有两道守卫，正是今天在服务器上撞到的那两种：
+`DATA_DIR` 没生效（卷指向 `OJ2/data`）、`DB_HOST` 没生效（`DATABASE_URL` 还指着
+试跑形态下并不存在的 `oj-postgres`）—— 命中任一条就中止，不会起一个看着正常的坏栈。
+
+手动等价于：
+
 ```bash
 mkdir -p /root/OJDeploy/data/judge_server_oj2/log /root/OJDeploy/data/judge_server_oj2/run
 cd /root/OJDeploy
 docker compose -f OJ2/docker/compose.debian.yml --env-file OJ2/docker/.env up -d
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8090/     # 期望 200
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8180/     # 期望 200
 ```
 
 旧站这时候完全没受影响，8080 上照常服务。
@@ -427,7 +441,7 @@ ERROR: database "onlinejudge" is being accessed by other users
 演练时因为目标库本来是空的，数据照样灌进去了 —— 那是运气。目标库有数据的话，
 接下来就是满屏主键冲突。灾难恢复流程：**先停 oj-api / oj-worker，再恢复。**
 
-### 3. 「本地能过、容器里过不了」的三个坑（构建期）
+### 3. 「本地能过、容器里过不了」的四个坑（构建期）
 
 都已修好并写进 Dockerfile 的注释，这里只留索引：
 
@@ -435,6 +449,11 @@ ERROR: database "onlinejudge" is being accessed by other users
 - `mermaid@9.4.3`（机房老 Chrome 的 legacy 依赖）从容器里连 npmjs 稳定失败 → 换 npmmirror + 重试
 - 容器里 bun 用 isolated 布局、本地是扁平的，靠「提升」解析的包在容器里一律找不到
   → 把真正直接 import 的 4 个包补成直接依赖
+- **`apt-get update` 在服务器上卡死**（2026-08-16 试跑时撞上，本机构建从来没事）
+  → 换清华源。两个细节：trixie 的源是 deb822 格式、在
+  `/etc/apt/sources.list.d/debian.sources`（老的 `sources.list` 在这个基底里是空文件）；
+  **只能换主机名、必须保持 http** —— ca-certificates 正是这一步要装的，
+  换成 https 会在没有根证书的情况下证书校验失败。`ARG APT_MIRROR` 可覆盖。
 
 ---
 

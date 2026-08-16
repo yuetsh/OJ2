@@ -53,9 +53,27 @@ FROM debian:trixie-slim AS api
 ENV NODE_ENV=production
 
 # clang-format 给 C 代码格式化用，对应旧镜像 apt 装的那个。
-# ca-certificates 给 AI 接口的 https 出站用。
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates clang-format \
+#
+# **不装 ca-certificates。** AI 接口那条 https 出站不需要它 —— Bun 和 Node 一样
+# 内嵌了一份根证书，走自己那份，不读系统的 `/etc/ssl/certs`。实测：把探针二进制
+# 丢进裸 debian:trixie-slim（没有 ca-certificates）请求 api.deepseek.com，
+# 握手正常、返回 401（没带 key），和装了的镜像行为一致。
+# 哪天镜像里加了用 OpenSSL 做 TLS 的东西（curl、wget 之类），这条要重新考虑。
+#
+# apt 走国内镜像源，理由和上面的 npm 源一样：deb.debian.org 从服务器上
+# `apt-get update` 会卡死（不是慢，是挂住不返回）。
+#
+# 两个坑：
+# 1. trixie 的源是 deb822 格式，在 `/etc/apt/sources.list.d/debian.sources`，
+#    不是老的 `/etc/apt/sources.list`（那个文件在这个基底里是空的）。
+# 2. **必须保持 http，不能换成 https** —— 镜像里没有根证书（见上），
+#    https 源会直接证书校验失败。
+#
+# 只替换主机名：清华同时提供 /debian 和 /debian-security，路径不用动。
+ARG APT_MIRROR=mirrors.tuna.tsinghua.edu.cn
+RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends clang-format \
   && rm -rf /var/lib/apt/lists/*
 
 # ruff 给 Python 代码格式化用。旧后端是 pip 装的 ruff==0.15.12，这里取同版本的
