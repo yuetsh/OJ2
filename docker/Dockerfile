@@ -91,6 +91,7 @@ COPY --from=builder /build/oj2-api /usr/local/bin/oj2-api
 # 少一次几十 GB 的 mv，就少一个在停机窗口里出错的机会。
 WORKDIR /data
 ENV TEST_CASE_DIRECTORY=/data/test_case \
+    HITOKOTO_DIRECTORY=/data/hitokoto \
     UPLOAD_DIRECTORY=/data/public/upload \
     AVATAR_DIRECTORY=/data/public/avatar \
     PORT=3000

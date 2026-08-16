@@ -1,8 +1,20 @@
 # CLAUDE.md
 
 OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScript，前后端同仓。
-上一代在 `../OnlineJudge/`（Django）和 `../ojnext/`（Vue SPA），**两者都已冻结，
-是回滚路径，任何情况下都不要改。**
+上一代在 `../OnlineJudge/`（Django）和 `../ojnext/`（Vue SPA），**两者都是回滚路径，
+默认冻结。**
+
+冻结的目的是「回滚那天旧站能原样起来、和新站看到同一份数据」，不是「一个字节都不许动」。
+所以红线是**外部可观测的东西**：
+
+- **不许动**：接口路径与响应结构、数据库 schema、磁盘上的数据布局、密码哈希格式、
+  依赖版本。这些一动，回滚就不再是「把上游切回去」那么简单。
+- **可以动**：纯内部实现的小修（缓存放哪、日志、注释），前提是签名、异常、
+  返回结构逐一对齐不变，且 `uv run ruff check` 通过。改完在 commit message 里
+  写清楚为什么值得破例。
+
+已发生的破例：`utils/cache.py` 的 `JsonDataLoader` 把一言数据集塞 Redis，每次请求
+都要把 323KB 的 pickle 拉过网络再反序列化，改成了进程内缓存。响应结构没动。
 
 设计文档：`docs/specs/2026-08-06-bun-backend-rewrite-design.md`
 切换手册：`docs/specs/phase5-cutover-runbook.md` ← 上线当天照这份走

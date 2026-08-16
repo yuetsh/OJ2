@@ -83,6 +83,9 @@ export const config = {
   // 判题沙箱把这个目录挂成只读的 /test_case，两边必须指同一处
   testCaseDirectory: repoPath(process.env.TEST_CASE_DIRECTORY ?? "data/test_case"),
   uploadDirectory: repoPath(process.env.UPLOAD_DIRECTORY ?? "data/upload"),
+  // 一言数据集（hitokoto.cn 官方导出），和旧后端读同一份：容器里是 /data/hitokoto。
+  // 本机 dev 默认路径下没有这份数据，读不到就回落到内置的几条，不影响启动。
+  hitokotoDirectory: repoPath(process.env.HITOKOTO_DIRECTORY ?? "data/hitokoto"),
   uploadUriPrefix: process.env.UPLOAD_URI_PREFIX ?? "/public/upload",
   avatarUriPrefix: process.env.AVATAR_URI_PREFIX ?? "/public/avatar",
   aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",
