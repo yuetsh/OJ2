@@ -66,6 +66,16 @@ export const config = {
   sessionCookie: "oj2_session",
   sessionTtlSeconds: Number(process.env.SESSION_TTL_SECONDS ?? 7 * 24 * 60 * 60),
   secureCookies: process.env.COOKIE_SECURE === "true",
+  // 登录成功时把 Django 的 pbkdf2 哈希升级成 argon2id 写回库。
+  //
+  // **默认关闭，这是一道单向门。** Django 存 argon2 的格式是
+  // `argon2$argon2id$v=19$…`，而 Bun 写出来的是 `$argon2id$v=19$…`（少了算法标签），
+  // 旧后端按 `$` 切第一段拿到空串、认不出这个哈希 —— 而且旧后端连 argon2-cffi
+  // 都没装，格式对了也验不了。**只要在新站登录过一次，这个账号就回不去旧站。**
+  //
+  // 所以并行试跑期间必须关着，一次性切换后的回滚窗口内也该关着。
+  // 等确定不会再回滚了，再设 PASSWORD_HASH_UPGRADE=true。
+  passwordHashUpgrade: process.env.PASSWORD_HASH_UPGRADE === "true",
   judgeServerUrl: process.env.JUDGE_SERVER_URL ?? "http://localhost:8081",
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2),

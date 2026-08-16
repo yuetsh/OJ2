@@ -7,6 +7,7 @@ import { and, eq, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, type AppEnv } from "../auth/middleware"
+import { config } from "../config"
 import { createSession, destroySession } from "../auth/session"
 import { verifyPassword } from "../auth/password"
 import { db, schema } from "../db"
@@ -43,7 +44,9 @@ authRoutes.post("/auth/login", async (c) => {
 
   const now = new Date().toISOString()
   const update: { lastLogin: string; password?: string } = { lastLogin: now }
-  if (password.needsUpgrade) {
+  // 见 config.passwordHashUpgrade 的注释：升级成 argon2 之后旧后端就验不了这个账号了，
+  // 是一道单向门。默认关闭，回滚窗口内不要打开。
+  if (password.needsUpgrade && config.passwordHashUpgrade) {
     update.password = await Bun.password.hash(parsed.data.password, {
       algorithm: "argon2id",
     })

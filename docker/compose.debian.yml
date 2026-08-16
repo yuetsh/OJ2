@@ -131,6 +131,10 @@ services:
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       AI_KEY: ${AI_KEY:-}
+      # 登录时把 Django 的 pbkdf2 哈希升级成 argon2 写回库。**默认关闭**：
+      # 升级过的账号旧后端再也验不了，是一道单向门，回滚窗口内打开会锁死学生。
+      # 详见 apps/api/src/config.ts 里 passwordHashUpgrade 的注释。
+      PASSWORD_HASH_UPGRADE: ${PASSWORD_HASH_UPGRADE:-}
       # 走 NPM 终止 TLS，浏览器侧是 https，Cookie 必须带 Secure
       COOKIE_SECURE: "true"
     healthcheck:
