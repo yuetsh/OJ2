@@ -44,6 +44,16 @@ pg_dumpall 备份带 30 条 `setval`，而且直接查生产快照里所有序�
 > 未实测的部分：本机没有构建旧后端的 Django 镜像，所以「起旧栈」这一步本身没跑过。
 > 但旧栈在服务器上一直是跑着的，它的镜像和 compose 都没动过。
 
+> **⚠️ 2026-08-16 补：上面这句「零差异」只成立在表结构层面，不成立在语义层面。**
+>
+> 新后端原本会在登录成功时把 Django 的 pbkdf2 哈希升级成 argon2id 写回 `user.password`。
+> 升级过的账号**旧后端再也验不了**（格式不同，而且旧后端连 argon2-cffi 都没装），
+> 于是「登录过新站的学生，回滚之后登不上旧站」—— 一道结构比对发现不了的单向门。
+> 试跑第一天就撞上了，现象是旧站登录失败 + WS 连不上（Channels 认 session）。
+>
+> 已改成 `PASSWORD_HASH_UPGRADE` 控制、**默认关闭**。
+> **回滚窗口内不要打开它**，确定不会再回滚了再说。
+
 ---
 
 ## 二、演练验证了什么
@@ -287,6 +297,9 @@ WebSocket 那个开关是双跑最容易漏的一格：漏了的话页面一切�
 
 - **两边登录态不互通**。旧站是 Django session，新站是 Redis opaque token。
   学生到 oj2 要重新登录一次，这不是 bug。
+- **`PASSWORD_HASH_UPGRADE` 必须关着**（默认就是关的，别手贱打开）。打开的话，
+  在 oj2 登录过的账号会被改成 argon2 哈希，**回旧站就登不上了** ——
+  试跑第一天真撞过，现象是旧站登录失败 + WS 连不上。修复见下面的「万一已经改坏了」。
 - **同一个库，双写**。结构完全兼容不会写坏，但提交、统计、成就都是**真实数据**，
   不是沙盒。别拿它做破坏性试验。
 - 后台判题机列表会出现**两台**（新旧各自心跳），正常。
@@ -412,6 +425,40 @@ backend 和判题机再 start 起来。**不需要恢复数据库，不需要动
 
 这也是「只换前后端」形态的主要好处：切换和回滚都不碰数据库进程，
 库出问题的可能性从流程里被整个拿掉了。
+
+### ⚠️ 回滚成立的前提：`PASSWORD_HASH_UPGRADE` 关着
+
+「不动任何数据」只在这个前提下成立。打开它的话，新站登录过的账号密码哈希会被换成
+argon2，旧后端验不了 —— 回滚之后那些学生登不上。**默认是关的，回滚窗口内别打开。**
+
+### 万一已经改坏了
+
+先看范围（`$argon2` 开头的就是被改过的）：
+
+```bash
+docker exec oj-postgres psql -U onlinejudge -d onlinejudge -c \
+  "select id, username, raw_password is not null as 有明文 from \"user\" where password like '\$argon2%'"
+```
+
+用**旧后端自己**改回 pbkdf2 —— `raw_password` 那个明文列（老师查学生密码用的）
+正好派上用场：
+
+```bash
+docker exec -i <旧 backend 容器> python manage.py shell <<'PYEOF'
+from django.contrib.auth.hashers import make_password
+from account.models import User
+for u in User.objects.filter(password__startswith='$argon2'):
+    if u.raw_password:
+        u.password = make_password(u.raw_password)
+        u.save(update_fields=['password'])
+        print('已修复', u.username)
+    else:
+        print('没有明文密码，需要手动改:', u.username)
+PYEOF
+```
+
+没有 `raw_password` 的（多半是超管账号）用 `python manage.py changepassword <用户名>`。
+改回 pbkdf2 之后两边都认：新后端本来就支持 Django 的 pbkdf2。
 
 ---
 
