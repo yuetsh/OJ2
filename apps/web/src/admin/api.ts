@@ -2,11 +2,13 @@ import api2 from "utils/api2"
 import { toProblemListItem } from "admin/transforms"
 import type {
   AcTrend,
+  AdminProblemSetProgress,
   BatchProblemTagResponse,
   GenerateSqlTestCaseResponse,
   RenameTagResponse,
   SqlTestCaseScript,
   AcmHelperItem,
+  SubmissionInfo,
   AdminAiReport,
   AdminAiReportList,
   StuckProblem,
@@ -36,7 +38,6 @@ import type {
   ProblemSetBadge,
   ProblemSetList,
   ProblemSetProblem,
-  ProblemSetProgressList,
   TutorialListItem,
 } from "utils/types"
 
@@ -476,7 +477,11 @@ export function makeProblemPublic(id: number, displayId: string) {
 
 // 比赛辅助检查
 export function getACMHelperList(contestId: number) {
-  return api2.get<AcmHelperItem[]>(`admin/contests/${contestId}/acm-helper`)
+  // acInfo 在契约里是 Record<string, unknown>（acm_contest_rank 的 JSONB 原文），
+  // 组件侧按 SubmissionInfo 读，收窄放在这里
+  return api2.get<
+    Array<Omit<AcmHelperItem, "acInfo"> & { acInfo: SubmissionInfo }>
+  >(`admin/contests/${contestId}/acm-helper`)
 }
 
 export function updateACMHelperChecked(
@@ -652,8 +657,9 @@ export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
 }
 
 // 题单进度管理 API
+// 注意：返回的是裸数组，不是分页信封 —— 和 oj 侧的 /user-progress 不同
 export function getProblemSetProgress(problemSetId: number) {
-  return api2.get<ProblemSetProgressList>(
+  return api2.get<AdminProblemSetProgress[]>(
     `admin/problem-sets/${problemSetId}/progress`,
   )
 }

@@ -39,7 +39,7 @@ const rules: FormRules = {
 }
 
 async function submit() {
-  loginRef.value!.validate(async (errors: FormRules | undefined) => {
+  loginRef.value!.validate(async (errors?: unknown) => {
     if (!errors) {
       try {
         authStore.clearLoginError()

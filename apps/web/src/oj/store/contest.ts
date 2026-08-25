@@ -2,7 +2,7 @@ import { formatISO, getTime, parseISO } from "date-fns"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
 import { duration } from "utils/functions"
-import type { Contest, Problem } from "utils/types"
+import type { OjContest, ProblemFiltered } from "utils/types"
 import {
   checkContestPassword,
   getContest,
@@ -13,8 +13,8 @@ import {
 export const useContestStore = defineStore("contest", () => {
   const userStore = useUserStore()
   const [access, toggleAccess] = useToggle(false)
-  const contest = ref<Contest | null>(null)
-  const problems = ref<Problem[]>([])
+  const contest = ref<OjContest | null>(null)
+  const problems = ref<ProblemFiltered[]>([])
   const now = ref(0)
 
   let timer = 0
@@ -59,7 +59,8 @@ export const useContestStore = defineStore("contest", () => {
     problems.value = []
     const res = await getContest(contestID)
     contest.value = res.data
-    now.value = getTime(parseISO(res.data.now))
+    // now 是学生侧比赛专有的服务器时间，用来对齐倒计时
+    now.value = getTime(parseISO(res.data.now ?? res.data.createTime))
     if (contestStatus.value !== ContestStatus.finished) {
       timer = setInterval(() => {
         now.value = now.value + 1000

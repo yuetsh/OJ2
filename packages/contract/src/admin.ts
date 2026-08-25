@@ -656,3 +656,4 @@ export type RenameTagResponse = z.infer<typeof renameTagResponseSchema>
 export type BatchProblemTagResponse = z.infer<typeof batchProblemTagResponseSchema>
 export type SqlTestCaseScript = z.infer<typeof sqlTestCaseScriptSchema>
 export type GenerateSqlTestCaseResponse = z.infer<typeof generateSqlTestCaseResponseSchema>
+export type AdminProblemSetProgress = z.infer<typeof adminProblemSetProgressSchema>

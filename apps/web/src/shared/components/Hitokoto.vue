@@ -9,8 +9,15 @@ const hitokoto = reactive({
 async function receive() {
   try {
     const res = await getHitokoto()
-    hitokoto.sentence = res.data.hitokoto
-    hitokoto.from = res.data.from
+    // 契约是 string | Record —— 一言数据集不在仓库里，形状留了余地
+    const quote = res.data
+    if (typeof quote === "string") {
+      hitokoto.sentence = quote
+      hitokoto.from = ""
+    } else {
+      hitokoto.sentence = String(quote.hitokoto ?? "")
+      hitokoto.from = String(quote.from ?? "")
+    }
   } catch (error) {
     hitokoto.sentence = "获取一言失败，请点击重试"
     hitokoto.from = "DEV"

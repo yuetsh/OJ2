@@ -1,4 +1,4 @@
-import axios, { type AxiosRequestConfig } from "axios"
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios"
 import { createDiscreteApi } from "naive-ui"
 import { useAuthModalStore } from "shared/store/authModal"
 import { STORAGE_KEY } from "./constants"
@@ -52,7 +52,14 @@ instance.interceptors.request.use((config) => {
 })
 
 instance.interceptors.response.use(
-  (response) => Promise.resolve({ error: null, data: response.data.data }),
+  // 这里**故意**不返回 AxiosResponse：把 { data } 信封剥掉，让调用方直接拿到
+  // ApiResponse。类型上和 axios 的拦截器签名对不上（它期望原样返回响应），
+  // 文件末尾的 `as unknown as Api2Client` 就是为了把这个真实形状交出去。
+  ((response: AxiosResponse) =>
+    Promise.resolve({
+      error: null,
+      data: response.data.data,
+    })) as unknown as (response: AxiosResponse) => AxiosResponse,
   (error) => {
     const payload = error.response?.data as Api2Error | undefined
     const code = payload?.error?.code ?? "network-error"

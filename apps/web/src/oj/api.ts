@@ -1,12 +1,15 @@
 import {
   type AiAnalysisRecord,
   type Contest as OjContest,
+  type ContestAccess,
   type ContestList,
   type ActivityRankItem,
+  type FormatCodeResponse,
+  type Metrics,
+  type TutorialSummary,
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
-  type ContestRank,
   type UserRank,
   type ProblemRank,
   type CreateSubmissionResponse,
@@ -38,6 +41,7 @@ import api2 from "utils/api2"
 import { filterResult } from "oj/transforms"
 import type {
   Announcement,
+  ContestRank,
   Profile,
   Message,
   SubmissionListItem,
@@ -84,10 +88,6 @@ export function getAuthors(all = false) {
   })
 }
 
-export function getRandomProblemID() {
-  return api2.get("problems/random")
-}
-
 export async function getProblem(problemID: string, contestID: string) {
   const endpoint = contestID
     ? `contests/${encodeURIComponent(contestID)}/problems/${encodeURIComponent(problemID)}`
@@ -96,8 +96,9 @@ export async function getProblem(problemID: string, contestID: string) {
   return { error: null, data: detailProblem(response.data) }
 }
 
+// 未登录返回 "0"，登录后返回百分比字符串
 export function getProblemBeatRate(problemID: number) {
-  return api2.get(`problems/${problemID}/beat-count`)
+  return api2.get<string>(`problems/${problemID}/beat-count`)
 }
 
 export async function getSubmission(id: string) {
@@ -121,7 +122,7 @@ export function formatCode(data: { code: string; language: string }) {
     "C++": "cpp",
     SQL: "sql",
   }
-  return api2.post("code/format", {
+  return api2.post<FormatCodeResponse>("code/format", {
     code: data.code,
     language: languages[data.language] ?? data.language.toLowerCase(),
   })
@@ -148,7 +149,9 @@ export function getTodaySubmissionCount(language?: string) {
 }
 
 export function adminRejudge(id: string) {
-  return api2.post(`submissions/${encodeURIComponent(id)}/rejudge`)
+  return api2.post<{ ok: boolean }>(
+    `submissions/${encodeURIComponent(id)}/rejudge`,
+  )
 }
 
 export function getSubmissionStatistics(
@@ -219,13 +222,17 @@ export function getContest(id: string) {
 }
 
 export function getContestAccess(id: string) {
-  return api2.get(`contests/${encodeURIComponent(id)}/access`)
+  return api2.get<ContestAccess>(`contests/${encodeURIComponent(id)}/access`)
 }
 
+// 注意和 GET /access 不一样：这个返回裸 true，密码错是 403 走 catch
 export function checkContestPassword(contestID: string, password: string) {
-  return api2.post(`contests/${encodeURIComponent(contestID)}/access`, {
-    password,
-  })
+  return api2.post<boolean>(
+    `contests/${encodeURIComponent(contestID)}/access`,
+    {
+      password,
+    },
+  )
 }
 
 export async function getContestProblems(contestID: string) {
@@ -239,7 +246,9 @@ export function getContestRank(
   contestID: string,
   query: { limit: number; offset: number },
 ) {
-  return api2.get<ContestRank>(
+  // submissionInfo 在契约里是 Record<string, unknown>（JSONB 原文），
+  // 前端在这里收窄成 SubmissionInfo，见 utils/types 的 ContestRank
+  return api2.get<{ results: ContestRank[]; total: number }>(
     `contests/${encodeURIComponent(contestID)}/rank`,
     { params: query },
   )
@@ -300,7 +309,7 @@ export function refreshUserProblemDisplayIds() {
 }
 
 export function getMetrics(userid: number) {
-  return api2.get(`users/${userid}/metrics`)
+  return api2.get<Metrics>(`users/${userid}/metrics`)
 }
 
 export function getTutorial(id: number) {
@@ -308,7 +317,7 @@ export function getTutorial(id: number) {
 }
 
 export function getTutorials(type: "python" | "c") {
-  return api2.get("tutorials", { params: { type } })
+  return api2.get<TutorialSummary[]>("tutorials", { params: { type } })
 }
 
 export function getAIDetailData(start: string, end: string, username?: string) {

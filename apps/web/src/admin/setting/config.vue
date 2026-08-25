@@ -6,7 +6,7 @@ import {
   CLASS_NAME_RE,
 } from "utils/constants"
 import { parseTime } from "utils/functions"
-import type { Server } from "utils/types"
+import type { OrphanTestCase, Server, WebsiteConfig } from "utils/types"
 import { useConfigStore } from "shared/store/config"
 import { useConfigWebSocket } from "shared/composables/websocket"
 import {
@@ -98,8 +98,8 @@ const serverColumns: DataTableColumn<Server>[] = [
     width: 100,
   },
   { title: "IP", key: "ip", width: 140 },
-  { title: "判题机版本", key: "judger_version", width: 100 },
-  { title: "服务器 URL", key: "service_url", width: 200 },
+  { title: "判题机版本", key: "judgerVersion", width: 100 },
+  { title: "服务器 URL", key: "serviceUrl", width: 200 },
   {
     title: "上一次心跳",
     key: "last_heartbeat",
@@ -114,14 +114,14 @@ const serverColumns: DataTableColumn<Server>[] = [
   },
 ]
 
-const testcases = ref<Testcase[]>([])
+const testcases = ref<OrphanTestCase[]>([])
 const token = ref("")
 const servers = ref<Server[]>([])
 const abnormalServers = computed(() =>
   servers.value.filter((item) => item.status === "abnormal"),
 )
 
-const websiteConfig = reactive({
+const websiteConfig = reactive<WebsiteConfig>({
   websiteBaseUrl: import.meta.env.PUBLIC_OJ_URL,
   websiteName: "判题狗",
   websiteNameShortcut: "判题狗",

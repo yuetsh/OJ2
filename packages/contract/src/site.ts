@@ -17,3 +17,4 @@ export const quoteSchema = z.union([
 ])
 
 export type WebsiteConfig = z.infer<typeof websiteConfigSchema>
+export type Quote = z.infer<typeof quoteSchema>

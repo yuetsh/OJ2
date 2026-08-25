@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { NFlex, NTag } from "naive-ui"
 import { useRouteQuery } from "@vueuse/router"
-import { getProblemList, getRandomProblemID } from "oj/api"
+import { getProblemList } from "oj/api"
 import { getTagColor } from "utils/functions"
 import type { ProblemFiltered } from "utils/types"
 import { getProblemTagList } from "shared/api"
@@ -100,11 +100,6 @@ function chooseTag(tag: Tag) {
     }
     return t
   })
-}
-
-async function getRandom() {
-  const res = await getRandomProblemID()
-  router.push("/problem/" + res.data)
 }
 
 // 监听搜索关键词变化（防抖）
@@ -263,9 +258,6 @@ function rowProps(row: ProblemFiltered) {
           <n-form-item>
             <n-button @click="clearQuery" quaternary>重置</n-button>
           </n-form-item>
-          <!-- <n-form-item>
-              <n-button @click="getRandom" quaternary>随机</n-button>
-            </n-form-item> -->
           <n-form-item>
             <n-button
               @click="toggleShowTag()"

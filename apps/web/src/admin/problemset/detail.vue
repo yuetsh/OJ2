@@ -4,7 +4,7 @@ import type {
   ProblemSet,
   ProblemSetProblem,
   ProblemSetBadge,
-  ProblemSetProgress,
+  AdminProblemSetProgress,
 } from "utils/types"
 import {
   getProblemSetDetail,
@@ -37,7 +37,7 @@ const problemSetId = computed(() => Number(route.params.problemSetId))
 const problemSet = ref<ProblemSet | null>(null)
 const problems = ref<ProblemSetProblem[]>([])
 const badges = ref<ProblemSetBadge[]>([])
-const progress = ref<ProblemSetProgress[]>([])
+const progress = ref<AdminProblemSetProgress[]>([])
 
 // 模态框状态
 const showAddProblemModal = ref(false)

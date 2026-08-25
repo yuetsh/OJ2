@@ -47,7 +47,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onUnmounted, nextTick, computed, watch } from "vue"
+import { ref, onUnmounted, nextTick, computed } from "vue"
 import { getNodeTypeConfig } from "./useNodeStyles"
 import NodeHandles from "./NodeHandles.vue"
 import NodeActions from "./NodeActions.vue"

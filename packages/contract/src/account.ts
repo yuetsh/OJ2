@@ -51,3 +51,4 @@ export type ProblemRank = z.infer<typeof problemRankSchema>
 export type RankProfile = z.infer<typeof rankProfileSchema>
 export type UserRank = z.infer<typeof userRankSchema>
 export type ActivityRankItem = z.infer<typeof activityRankItemSchema>
+export type Metrics = z.infer<typeof metricsSchema>

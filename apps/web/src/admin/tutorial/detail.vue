@@ -10,7 +10,6 @@ interface Props {
 }
 
 const route = useRoute()
-const router = useRouter()
 const message = useMessage()
 const props = defineProps<Props>()
 

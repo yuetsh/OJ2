@@ -400,11 +400,6 @@ export function trickOrTreat() {
           return
         }
 
-        // 获取点击位置相对于视口的位置
-        const rect = target.getBoundingClientRect()
-        const clickX = e.clientX - rect.left - rect.width / 2
-        const clickY = e.clientY - rect.top - rect.height / 2
-
         // 计算飞出方向（随机方向）
         const angle = Math.random() * Math.PI * 2
         const distance = 1000 + Math.random() * 500

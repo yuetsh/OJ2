@@ -1,4 +1,4 @@
-import { userProfileSchema } from "@oj2/contract"
+import { userProfileSchema, type Quote } from "@oj2/contract"
 import api2 from "utils/api2"
 import type { ApiResponse } from "utils/api2"
 import type { Profile, Tag } from "utils/types"
@@ -38,9 +38,11 @@ export function getProblemTagList() {
 }
 
 export function getHitokoto() {
-  return api2.get("quotes/random")
+  return api2.get<Quote>("quotes/random")
 }
 
 export function getClassUsernames(classroom: string) {
-  return api2.get(`classes/${encodeURIComponent(classroom)}/usernames`)
+  return api2.get<string[]>(
+    `classes/${encodeURIComponent(classroom)}/usernames`,
+  )
 }

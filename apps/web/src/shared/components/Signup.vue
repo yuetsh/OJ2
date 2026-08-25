@@ -37,7 +37,7 @@ function goLogin() {
 }
 
 function submit() {
-  signupRef.value!.validate(async (errors: FormRules | undefined) => {
+  signupRef.value!.validate(async (errors?: unknown) => {
     if (!errors) {
       try {
         authStore.clearSignupError()

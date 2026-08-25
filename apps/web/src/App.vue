@@ -28,7 +28,9 @@ const hljsInstance = ref<any>(null)
 const loadHighlightJS = async () => {
   if (hljsInstance.value) return hljsInstance.value
 
-  const [hljs, c, cpp, python, java, javascript, go, sql] = await Promise.all([
+  // 逐个取 .default，不要在 Promise.all 后面 map —— 那样元组会塌成
+  // (HLJSApi | LanguageFn)[]，每个元素都变成联合类型，hljs 上就找不到方法了
+  const [core, c, cpp, python, java, javascript, go, sql] = await Promise.all([
     import("highlight.js/lib/core"),
     import("highlight.js/lib/languages/c"),
     import("highlight.js/lib/languages/cpp"),
@@ -37,15 +39,16 @@ const loadHighlightJS = async () => {
     import("highlight.js/lib/languages/javascript"),
     import("highlight.js/lib/languages/go"),
     import("highlight.js/lib/languages/sql"),
-  ]).then((modules) => modules.map((m) => m.default))
+  ])
+  const hljs = core.default
 
-  hljs.registerLanguage("c", c)
-  hljs.registerLanguage("python", python)
-  hljs.registerLanguage("cpp", cpp)
-  hljs.registerLanguage("java", java)
-  hljs.registerLanguage("javascript", javascript)
-  hljs.registerLanguage("go", go)
-  hljs.registerLanguage("sql", sql)
+  hljs.registerLanguage("c", c.default)
+  hljs.registerLanguage("python", python.default)
+  hljs.registerLanguage("cpp", cpp.default)
+  hljs.registerLanguage("java", java.default)
+  hljs.registerLanguage("javascript", javascript.default)
+  hljs.registerLanguage("go", go.default)
+  hljs.registerLanguage("sql", sql.default)
 
   hljsInstance.value = hljs
   return hljs

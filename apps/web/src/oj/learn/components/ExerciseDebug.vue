@@ -88,7 +88,7 @@ function reset() {
 
     <n-space vertical :size="6">
       <div
-        v-for="(line, idx) in data.lines"
+        v-for="(_line, idx) in data.lines"
         :key="idx"
         :style="lineStyle(idx)"
         @click="toggle(idx)"

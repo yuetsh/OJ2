@@ -99,17 +99,6 @@ const streakData = computed(() => {
   let weekCount = 0
   let monthCount = 0
 
-  // 检查今天是否有做题
-  const todayData = sortedData.find((item) => {
-    const itemDate = new Date(item.timestamp)
-    return (
-      itemDate.getFullYear() === today.getFullYear() &&
-      itemDate.getMonth() === today.getMonth() &&
-      itemDate.getDate() === today.getDate()
-    )
-  })
-  const hasToday = todayData && todayData.value > 0
-
   // 遍历数据计算连续天数
   for (const item of sortedData) {
     if (item.value > 0) {

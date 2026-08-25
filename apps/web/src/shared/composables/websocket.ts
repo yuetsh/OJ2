@@ -258,14 +258,14 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   /**
    * 断开连接钩子（子类可重写）
    */
-  protected onDisconnected(event: CloseEvent) {
+  protected onDisconnected(_event: CloseEvent) {
     // 子类实现
   }
 
   /**
    * 错误钩子（子类可重写）
    */
-  protected onError(error: Event) {
+  protected onError(_error: Event) {
     // 子类实现
   }
 

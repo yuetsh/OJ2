@@ -64,7 +64,9 @@ async function init() {
   try {
     const res = await getProfile(route.query.name as string)
     profile.value = res.data
-    const acm = res.data!.acmProblemsStatus.problems || {}
+    // 用户不存在时后端返回 null，后面的统计全都无从算起
+    if (!res.data) return
+    const acm = res.data.acmProblemsStatus.problems || {}
     const ac: string[] = []
     Object.keys(acm).forEach((id) => {
       if (acm[id]["status"] === 0) {
@@ -74,8 +76,8 @@ async function init() {
     ac.sort()
     problems.value = ac
 
-    if (profile.value.submissionNumber > 0) {
-      const metricsRes = await getMetrics(profile.value.user.id)
+    if (res.data.submissionNumber > 0) {
+      const metricsRes = await getMetrics(res.data.user.id)
       firstSubmissionAt.value = parseTime(metricsRes.data.first)
       latestSubmissionAt.value = parseTime(metricsRes.data.latest)
       toLatestAt.value = durationToDays(

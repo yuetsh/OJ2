@@ -436,6 +436,7 @@ export type {
   AdminUserList,
   AcmHelperItem,
   AdminContestList,
+  AdminProblemSetProgress,
   AdminAiReport,
   AdminAiReportListItem,
   AdminAiReportList,

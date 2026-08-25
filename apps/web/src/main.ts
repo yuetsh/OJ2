@@ -26,7 +26,7 @@ import { useUserStore } from "./shared/store/user"
 
 const authStore = useAuthModalStore()
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   // 检查是否需要认证
   if (to.matched.some((record) => record.meta.requiresAuth)) {
     if (!storage.get(STORAGE_KEY.AUTHED)) {

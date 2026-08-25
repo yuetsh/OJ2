@@ -145,3 +145,4 @@ export type SubmissionListItem = z.infer<typeof submissionListItemSchema>
 export type SubmissionList = z.infer<typeof submissionListSchema>
 export type EmbeddedSubmission = z.infer<typeof embeddedSubmissionSchema>
 export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>
+export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>

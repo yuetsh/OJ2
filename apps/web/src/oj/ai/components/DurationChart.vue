@@ -60,10 +60,6 @@ const title = computed(() => {
 const data = computed<ChartData<"bar" | "line">>(() => {
   return {
     labels: aiStore.durationData.map((duration) => {
-      let prefix = "周"
-      if (duration.unit === "months") {
-        prefix = "月"
-      }
       return [
         parseTime(duration.start, "M月D日"),
         parseTime(duration.end, "M月D日"),

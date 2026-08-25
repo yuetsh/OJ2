@@ -32,8 +32,10 @@ const { height = "calc(100vh - 133px)" } = defineProps<Props>()
 const { addEdges, removeNodes, removeEdges } = useVueFlow()
 
 // 节点和边的响应式数据
-const nodes = ref<Node[]>([])
-const edges = ref<Edge[]>([])
+// 显式标注成 Ref<Node[]>，不走 ref<T>() 的 UnwrapRef 推导 —— vue-flow 的
+// Node/Edge 嵌套很深，让 TS 去调和两种形态会直接撞上「实例化层级过深」
+const nodes = ref([]) as Ref<Node[]>
+const edges = ref([]) as Ref<Edge[]>
 
 // 历史记录管理
 const { canUndo, canRedo, saveState, undo, redo } = useHistory()

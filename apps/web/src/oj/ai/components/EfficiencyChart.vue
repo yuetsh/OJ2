@@ -9,7 +9,7 @@
   </n-card>
 </template>
 <script setup lang="ts">
-import type { ChartData, ChartOptions, TooltipItem } from "chart.js"
+import type { ChartData, TooltipItem } from "chart.js"
 import { Chart } from "vue-chartjs"
 import {
   Chart as ChartJS,

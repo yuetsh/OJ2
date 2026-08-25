@@ -427,7 +427,7 @@ function typeTagType(type: ExerciseType) {
           <n-form-item label="选项（勾选所有正确答案）">
             <n-space vertical style="width: 100%">
               <n-flex
-                v-for="(opt, i) in mcqOptions"
+                v-for="(_opt, i) in mcqOptions"
                 :key="i"
                 align="center"
                 :size="8"

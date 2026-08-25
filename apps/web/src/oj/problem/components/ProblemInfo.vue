@@ -3,6 +3,7 @@ import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { DIFFICULTY, JUDGE_STATUS } from "utils/constants"
+import type { SUBMISSION_RESULT } from "utils/types"
 import { getACRateNumber, getTagColor, parseTime } from "utils/functions"
 import { Pie } from "vue-chartjs"
 import {
@@ -30,19 +31,19 @@ const beatRate = ref("0")
 const yearlyACData = ref<YearlyACData[]>([])
 
 const data = computed(() => {
-  const status = problem.value!.statisticInfo
-  const labels = []
-  for (let i in status) {
-    if (status[i] !== 0) {
-      // @ts-ignore
-      labels.push(JUDGE_STATUS[i]["name"])
+  // statisticInfo 是 { 判题状态码: 次数 } 的 JSONB，契约里是 Record<string, unknown>
+  const status = problem.value!.statisticInfo as Record<string, number>
+  const labels: string[] = []
+  const values: number[] = []
+  for (const code in status) {
+    if (status[code] !== 0) {
+      labels.push(JUDGE_STATUS[Number(code) as SUBMISSION_RESULT].name)
+      values.push(status[code]!)
     }
   }
   return {
     labels,
-    datasets: [
-      { data: Object.values(status), hoverOffset: 5, borderRadius: 10 },
-    ],
+    datasets: [{ data: values, hoverOffset: 5, borderRadius: 10 }],
   }
 })
 
