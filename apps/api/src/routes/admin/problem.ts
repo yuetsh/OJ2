@@ -26,6 +26,7 @@ import { packTestCaseZip, processTestCaseZip, readInfo, readSqlScripts, TestCase
 import { config } from "../../config"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
+import { getTopReactions } from "../../services/reaction"
 import { objectValue, queryInteger, sampleUser, stringArray } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
@@ -252,6 +253,8 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where).orderBy(desc(schema.problem.createTime)).limit(limit).offset(offset),
   ])
+  // 只有公开题列表下发最高票评价，比赛题列表不下发 —— 与旧后端一致
+  const topReactions = await getTopReactions(rows.map(({ problem }) => problem.id))
   return success(c, adminProblemListSchema.parse({
     results: await Promise.all(rows.map(async ({ problem, user: creator, realName }) =>
       adminProblemListItemSchema.parse({
@@ -266,7 +269,7 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
         hasAstRules: problem.astRules !== null,
         allowFlowchart: problem.allowFlowchart,
         showFlowchart: problem.showFlowchart,
-        topReaction: null,
+        topReaction: topReactions.get(problem.id) ?? null,
       }))),
     total: totalRow[0]?.value ?? 0,
   }))

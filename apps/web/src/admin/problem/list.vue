@@ -137,7 +137,7 @@ const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
   },
   {
     title: "反馈",
-    key: "top_reaction",
+    key: "topReaction",
     width: 60,
     render: (row) => {
       const top = row.topReaction
