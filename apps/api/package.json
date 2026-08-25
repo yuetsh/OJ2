@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@types/sql.js": "^1.4.11",
-    "drizzle-kit": "^0.31.10"
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^7.0.2"
   }
 }
