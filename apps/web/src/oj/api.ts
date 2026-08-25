@@ -164,15 +164,12 @@ export function getSubmissionStatistics(
   })
 }
 
-export function getRank(
-  offset: number,
-  limit: number,
-  n: number,
-  username?: string,
-) {
-  return api2.get<UserRank>("rankings/users", {
-    params: { offset, limit, username, top: n },
-  })
+/**
+ * 全服榜单。上限（100 名）由服务端定，调用方只管翻页 ——
+ * 「全服 Top10」就是这个榜的第一页，取 limit=10 即可，不需要另一个上限参数。
+ */
+export function getRank(offset: number, limit: number) {
+  return api2.get<UserRank>("rankings/users", { params: { offset, limit } })
 }
 
 export function getActivityRank(start: string) {

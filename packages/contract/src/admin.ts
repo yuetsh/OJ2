@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { achievementRaritySchema } from "./achievement"
+import { rankProfileSchema } from "./account"
 import { paginatedSchema, sampleUserSchema } from "./common"
 import { problemDifficultySchema } from "./problem"
 
@@ -268,6 +269,15 @@ export const orphanTestCaseSchema = z.object({
   id: z.string(),
   createTime: z.number(),
 })
+
+/**
+ * 后台的用户排名列表。行的形状与 oj 侧榜单相同，但**没有 100 名的上限**：
+ * 这里不是榜单，是老师按班级前缀翻全班学生的管理视图，要能一直翻到底。
+ *
+ * 独立成一条端点而不是给公开榜单加个「不限量」开关：那个开关一旦存在，
+ * 匿名请求就能拉走全校学生名单和个性签名。
+ */
+export const adminUserRankSchema = paginatedSchema(rankProfileSchema)
 
 export const dashboardInfoSchema = z.object({
   userCount: z.number().int(),
@@ -644,6 +654,7 @@ export type JudgeServer = z.infer<typeof judgeServerSchema>
 export type DashboardInfo = z.infer<typeof dashboardInfoSchema>
 export type JudgeServerList = z.infer<typeof judgeServerListSchema>
 export type OrphanTestCase = z.infer<typeof orphanTestCaseSchema>
+export type AdminUserRank = z.infer<typeof adminUserRankSchema>
 
 export type AdminAiReportListItem = z.infer<typeof adminAiReportListItemSchema>
 export type AdminAiReport = z.infer<typeof adminAiReportSchema>

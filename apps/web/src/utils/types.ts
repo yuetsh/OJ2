@@ -380,6 +380,9 @@ export type { SessionUser } from "@oj2/contract"
 
 export type Rank = RankProfile
 
+/** 榜单里「我」的位置：比 Rank 多一个全服名次 */
+export type { MyRank } from "@oj2/contract"
+
 export type {
   ClassComparison,
   ClassRankItem,

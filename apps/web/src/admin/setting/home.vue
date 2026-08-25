@@ -2,12 +2,11 @@
 import { h, onMounted, reactive, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { NButton } from "naive-ui"
-import { getRank } from "oj/api"
 import Pagination from "shared/components/Pagination.vue"
 import { useUserStore } from "shared/store/user"
 import { getACRate } from "utils/functions"
 import type { Rank } from "utils/types"
-import { getBaseInfo, randomUser10 } from "../api"
+import { getAdminUserRank, getBaseInfo, randomUser10 } from "../api"
 
 const userCount = ref(0)
 const submissionCount = ref(0)
@@ -72,7 +71,7 @@ onMounted(async () => {
 
 async function listRanks() {
   const offset = (query.page - 1) * query.limit
-  const res = await getRank(offset, query.limit, 0, query.classroom)
+  const res = await getAdminUserRank(offset, query.limit, query.classroom)
   data.value = res.data.results
   total.value = res.data.total
 }

@@ -19,11 +19,6 @@ import {
 } from "../api"
 import { useUserStore } from "shared/store/user"
 
-interface Testcase {
-  id: string
-  create_time: string
-}
-
 const message = useMessage()
 const configStore = useConfigStore()
 const userStore = useUserStore()
@@ -41,7 +36,7 @@ watch(
   { immediate: true },
 )
 
-const testcaseColumns: DataTableColumn<Testcase>[] = [
+const testcaseColumns: DataTableColumn<OrphanTestCase>[] = [
   { title: "测试用例 ID", key: "id" },
   {
     title: "选项",
@@ -102,13 +97,13 @@ const serverColumns: DataTableColumn<Server>[] = [
   { title: "服务器 URL", key: "serviceUrl", width: 200 },
   {
     title: "上一次心跳",
-    key: "last_heartbeat",
+    key: "lastHeartbeat",
     render: (row) => parseTime(row.lastHeartbeat, "YYYY-MM-DD HH:mm:ss"),
     width: 120,
   },
   {
     title: "创建时间",
-    key: "create_time",
+    key: "createTime",
     render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
     width: 120,
   },

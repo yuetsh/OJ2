@@ -3,6 +3,7 @@ import type {
   ClassComparison,
   ClassRankItem as ClassRank,
   ClassUserRank,
+  MyRank,
   Rank,
 } from "utils/types"
 import { formatISO, sub, type Duration } from "date-fns"
@@ -40,6 +41,10 @@ const userStore = useUserStore()
 const { isDesktop } = useBreakpoints()
 const data = ref<Rank[]>([])
 const total = ref(0)
+/** 我的全服名次；未登录、教师/超管不入榜时为 null */
+const me = ref<MyRank | null>(null)
+/** 我在前 100 名之外 —— 榜上高亮不到我，另起一行显示 */
+const meOffBoard = computed(() => !!me.value && me.value.rank > total.value)
 const query = reactive({
   limit: 10,
   page: 1,
@@ -145,10 +150,20 @@ async function analyzeSingleClassWithAI() {
 
 async function init() {
   const offset = (query.page - 1) * query.limit
-  const res = await getRank(offset, query.limit, 100)
+  const res = await getRank(offset, query.limit)
   data.value = res.data.results
   total.value = res.data.total
+  me.value = res.data.me
   return res.data.results
+}
+
+function isMe(row: Rank) {
+  return !!me.value && row.user.id === me.value.user.id
+}
+
+// 高亮我那一行。用 id 比对而不是用户名：用户名会重名到大小写差异上，id 不会
+function rowClassName(row: Rank) {
+  return isMe(row) ? "me-row" : ""
 }
 
 const columns: DataTableColumn<Rank>[] = [
@@ -178,6 +193,9 @@ const columns: DataTableColumn<Rank>[] = [
           },
           () => row.user.username,
         ),
+        isMe(row)
+          ? h(Icon, { width: 20, icon: "fluent-emoji:person-raising-hand" })
+          : null,
         h(
           NButton,
           {
@@ -201,7 +219,7 @@ const columns: DataTableColumn<Rank>[] = [
   },
   {
     title: renderTableTitle("已解决", "streamline-emojis:raised-fist-1"),
-    key: "accepted_number",
+    key: "acceptedNumber",
     width: 120,
     align: "center",
   },
@@ -210,7 +228,7 @@ const columns: DataTableColumn<Rank>[] = [
       "提交数",
       "streamline-ultimate-color:space-rocket-earth",
     ),
-    key: "submission_number",
+    key: "submissionNumber",
     width: 120,
     align: "center",
   },
@@ -247,8 +265,9 @@ async function listActivity() {
   }))
 }
 
+// 「全服 Top10」就是同一个榜的第一页 —— 上限由服务端定，这里只要前 10 条
 async function listRank() {
-  const res = await getRank(0, 10, 10)
+  const res = await getRank(0, 10)
   rankChart.value = res.data.results
 }
 
@@ -509,13 +528,29 @@ watch(
     </n-grid>
     <n-card>
       <template #header>全服 Top100</template>
-      <n-data-table :data="data" :columns="columns" />
+      <n-data-table
+        :data="data"
+        :columns="columns"
+        :row-class-name="rowClassName"
+      />
       <template #footer>
-        <Pagination
-          :total="total"
-          v-model:page="query.page"
-          v-model:limit="query.limit"
-        />
+        <n-flex align="center" justify="space-between" :wrap="false">
+          <!-- 前 100 名之外的学生榜上找不到自己，这里单独给一行 -->
+          <n-tag v-if="meOffBoard" type="info" round :bordered="false">
+            <template #icon>
+              <Icon width="18" icon="fluent-emoji:person-raising-hand" />
+            </template>
+            我的排名：第 {{ me!.rank }} 名 · 已解决 {{ me!.acceptedNumber }} ·
+            提交 {{ me!.submissionNumber }} · 正确率
+            {{ getACRate(me!.acceptedNumber, me!.submissionNumber) }}
+          </n-tag>
+          <span v-else />
+          <Pagination
+            :total="total"
+            v-model:page="query.page"
+            v-model:limit="query.limit"
+          />
+        </n-flex>
       </template>
     </n-card>
     <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
@@ -800,6 +835,10 @@ watch(
 </template>
 
 <style scoped>
+:deep(.me-row > td) {
+  background-color: rgba(24, 160, 88, 0.12) !important;
+}
+
 .stat-total-ac :deep(.n-statistic-value),
 .stat-total-ac :deep(.n-statistic-value__content),
 .stat-total-ac :deep(.n-number-animation),

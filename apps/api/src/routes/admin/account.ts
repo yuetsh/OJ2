@@ -1,8 +1,10 @@
 import {
   adminUserListSchema,
+  adminUserRankSchema,
   adminUserSchema,
   deleteUsersRequestSchema,
   importUsersRequestSchema,
+  rankProfileSchema,
   resetPasswordResponseSchema,
   updateUserRequestSchema,
 } from "@oj2/contract"
@@ -13,7 +15,7 @@ import { Hono } from "hono"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
-import { queryInteger } from "../helpers"
+import { queryInteger, sampleUser } from "../helpers"
 
 export const adminAccountRoutes = new Hono<AppEnv>()
 
@@ -78,6 +80,51 @@ function selectUser(id: number) {
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(eq(schema.user.id, id)).limit(1)
 }
+
+/**
+ * 后台的用户排名：老师按班级前缀翻学生，**不设 100 名上限**。
+ *
+ * 这份逻辑原来是公开榜单 `/rankings/users` 的 `top=0` 分支，搬过来是因为那意味着
+ * 任何匿名请求都能 `?top=0&limit=250` 翻走全校学生名单和个性签名 ——
+ * 而 `/profiles/:username` 恰恰为了收紧枚举面才做了「匿名一律返回空」。
+ *
+ * 排序口径与公开榜单一致（见 routes/account.ts 的 leaderboardOrder）：
+ * AC 降序 → 提交数升序 → id 升序，第三档保证翻页稳定。
+ */
+adminAccountRoutes.get("/rankings/users", requireSuperAdmin, async (c) => {
+  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+  const keyword = c.req.query("keyword")?.trim()
+  const where = and(
+    inArray(schema.user.adminType, ["Regular User", "Student Admin"]),
+    eq(schema.user.isDisabled, false),
+    keyword ? ilike(schema.user.username, `%${keyword}%`) : undefined,
+  )
+
+  const [totalRows, rows] = await Promise.all([
+    db.select({ value: count() }).from(schema.userProfile)
+      .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id)).where(where),
+    db.select({ profile: schema.userProfile, user: schema.user }).from(schema.userProfile)
+      .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id)).where(where)
+      .orderBy(
+        desc(schema.userProfile.acceptedNumber),
+        asc(schema.userProfile.submissionNumber),
+        asc(schema.user.id),
+      )
+      .limit(limit).offset(offset),
+  ])
+
+  return success(c, adminUserRankSchema.parse({
+    results: rows.map(({ profile, user }) => rankProfileSchema.parse({
+      id: profile.id,
+      user: sampleUser(user, profile.realName),
+      acceptedNumber: profile.acceptedNumber,
+      submissionNumber: profile.submissionNumber,
+      mood: profile.mood,
+    })),
+    total: totalRows[0]?.value ?? 0,
+  }))
+})
 
 adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })

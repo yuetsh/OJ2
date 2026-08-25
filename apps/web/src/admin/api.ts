@@ -139,6 +139,13 @@ export function batchTagProblems(
   })
 }
 
+// 用户排名（后台版，无 100 名上限；公开榜单是 oj/api.ts 的 getRank）
+export function getAdminUserRank(offset: number, limit: number, keyword: string) {
+  return api2.get<AdminUserRank>("admin/rankings/users", {
+    params: { offset, limit, keyword },
+  })
+}
+
 // 用户列表
 export function getUserList(
   offset = 0,
@@ -707,6 +714,7 @@ export function getPinnedAIReports() {
 import type {
   AdminAchievement,
   AchievementMetric as MetricOption,
+  AdminUserRank,
 } from "@oj2/contract"
 export type { AdminAchievement, MetricOption }
 
