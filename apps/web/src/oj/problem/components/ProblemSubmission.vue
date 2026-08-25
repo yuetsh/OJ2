@@ -8,7 +8,7 @@ import { useUserStore } from "shared/store/user"
 import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
 import { renderTableTitle } from "utils/renders"
-import type { Submission } from "utils/types"
+import type { SubmissionListItem } from "utils/types"
 import SubmissionDetail from "oj/submission/detail.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 
@@ -29,19 +29,19 @@ function showCodePanel(id: string, problem: string) {
   toggleCodePanel(true)
 }
 
-const columns: DataTableColumn<Submission>[] = [
+const columns: DataTableColumn<SubmissionListItem>[] = [
   {
     title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
     key: "create_time",
     width: 200,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: renderTableTitle("编号", "fluent-emoji-flat:input-numbers"),
     key: "id",
     minWidth: 160,
     render: (row) => {
-      if (!row.show_link)
+      if (!row.showLink)
         return h(NFlex, { align: "center" }, () => [
           h("span", row.id.slice(0, 12)),
           h(
@@ -90,7 +90,7 @@ const class_ac_count = ref(0)
 const all_ac_count = ref(0)
 const loading = ref(false)
 
-const submissions = ref<Submission[]>([])
+const submissions = ref<SubmissionListItem[]>([])
 const total = ref(0)
 const query = reactive({
   limit: 10,
@@ -126,8 +126,8 @@ async function listSubmissions() {
     ...query,
     myself: "1",
     offset,
-    problem_id: (route.params.problemID as string) ?? "",
-    contest_id: (route.params.contestID as string) ?? "",
+    problemId: (route.params.problemID as string) ?? "",
+    contestId: (route.params.contestID as string) ?? "",
   })
   submissions.value = res.data.results
   total.value = res.data.total
@@ -138,10 +138,10 @@ async function getRankOfThisProblem() {
   const res = await getRankOfProblem((route.params.problemID as string) ?? "")
   loading.value = false
 
-  class_name.value = res.data.class_name
+  class_name.value = res.data.className
   rank.value = res.data.rank
-  class_ac_count.value = res.data.class_ac_count
-  all_ac_count.value = res.data.all_ac_count
+  class_ac_count.value = res.data.classAcCount
+  all_ac_count.value = res.data.allAcCount
 }
 
 onMounted(() => {

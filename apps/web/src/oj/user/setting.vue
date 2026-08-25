@@ -30,7 +30,7 @@ async function upload({ file }: UploadCustomRequestOptions) {
 async function saveProfile() {
   try {
     await updateProfile({
-      real_name: userStore.profile?.real_name ?? "",
+      realName: userStore.profile?.realName ?? "",
       mood: userStore.profile?.mood ?? "",
     })
     message.success("更改成功")
@@ -55,7 +55,7 @@ async function saveProfile() {
         </n-upload>
       </n-form-item>
       <!-- <n-form-item label="真名">
-        <n-input v-model:value="userStore.profile.real_name" />
+        <n-input v-model:value="userStore.profile.realName" />
       </n-form-item> -->
       <n-form-item label="个性签名">
         <n-input v-model:value="userStore.profile.mood" />

@@ -15,7 +15,7 @@
         <n-text strong>{{ badge.badge.name }}</n-text>
         <n-tag type="info"> 获得条件：{{ getConditionText() }} </n-tag>
         <n-text depth="3">
-          获得时间：{{ parseTime(badge.earned_time, "YYYY-MM-DD HH:mm:ss") }}
+          获得时间：{{ parseTime(badge.earnedTime, "YYYY-MM-DD HH:mm:ss") }}
         </n-text>
       </n-flex>
     </n-card>
@@ -38,15 +38,15 @@ function handleImageError(event: Event) {
 }
 
 function getConditionText() {
-  const { condition_type, condition_value } = props.badge.badge
+  const { conditionType, conditionValue } = props.badge.badge
 
-  switch (condition_type) {
+  switch (conditionType) {
     case "all_problems":
       return "完成所有题目"
     case "problem_count":
-      return `完成 ${condition_value} 道题目`
+      return `完成 ${conditionValue} 道题目`
     case "score":
-      return `获得 ${condition_value} 分`
+      return `获得 ${conditionValue} 分`
     default:
       return "未知条件"
   }

@@ -83,6 +83,7 @@ const data = computed(() => {
 // 根据等级返回对应的颜色
 function getGradeColor(grade: Grade): string {
   const colors: { [key in Grade]: string } = {
+    "": "#C9CDD4", // 无评级：后端在没有可用数据时下发空串
     S: "#FF6384",
     A: "#FFCE56",
     B: "#36A2EB",

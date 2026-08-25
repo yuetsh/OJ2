@@ -44,6 +44,7 @@ const aiStore = useAIStore()
 
 const gradeOrder = ["C", "B", "A", "S"] as const
 const gradeColors: Record<Grade, string> = {
+  "": "#C9CDD4", // 无评级：后端在没有可用数据时下发空串
   C: "#95F204",
   B: "#36A2EB",
   A: "#FFCE56",
@@ -74,7 +75,7 @@ const progressData = computed(() => {
   let totalProblems = 0 // 累计题目总数
 
   return aiStore.durationData.map((duration) => {
-    const problemCount = duration.problem_count || 0
+    const problemCount = duration.problemCount || 0
     cumulativeCount += problemCount
 
     // 计算本期等级的权重值

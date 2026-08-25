@@ -32,8 +32,8 @@ const { problem } = storeToRefs(problemStore)
 const problemSetId = computed(() => route.params.problemSetId)
 
 // SQL 题：隐藏输入/输出/例子，改为渲染数据表与期望结果
-const isSQL = computed(() => !!problem.value?.sql_config)
-const sqlDisplay = computed(() => problem.value?.sql_display ?? null)
+const isSQL = computed(() => !!problem.value?.sqlConfig)
+const sqlDisplay = computed(() => problem.value?.sqlDisplay ?? null)
 const sqlExpectedQuery = computed(() => {
   const exp = sqlDisplay.value?.expected
   return exp && "columns" in exp ? exp : null
@@ -71,7 +71,7 @@ watch(
 
 // AC 或失败次数 >= 3 时加载推荐
 watch(
-  () => [problem.value?._id, problem.value?.my_status, problemStore.failCount],
+  () => [problem.value?._id, problem.value?.myStatus, problemStore.failCount],
   ([, status, failCount]) => {
     if (status === 0 || (failCount as number) >= 3) {
       loadSimilarProblems()
@@ -82,9 +82,9 @@ watch(
 
 const hasTriedButNotPassed = computed(() => {
   return (
-    problem.value?.my_status !== undefined &&
-    problem.value?.my_status !== null &&
-    problem.value?.my_status !== 0
+    problem.value?.myStatus !== undefined &&
+    problem.value?.myStatus !== null &&
+    problem.value?.myStatus !== 0
   )
 })
 
@@ -177,8 +177,8 @@ function ruleTagType(engine: string): "error" | "success" | "info" {
 }
 
 const astRulesForDisplay = computed(() => {
-  if (!problem.value?.ast_rules) return []
-  return Object.entries(problem.value.ast_rules).filter(
+  if (!problem.value?.astRules) return []
+  return Object.entries(problem.value.astRules).filter(
     ([, rules]) => rules.length > 0,
   )
 })
@@ -249,7 +249,7 @@ function type(status: ProblemStatus) {
       <!-- 已通过 -->
       <n-alert
         class="status-alert"
-        v-if="problem.my_status === 0"
+        v-if="problem.myStatus === 0"
         type="success"
         title="🎉 本 题 已 经 被 你 解 决 啦"
       >
@@ -291,7 +291,7 @@ function type(status: ProblemStatus) {
       </p>
       <MdPreview
         preview-theme="vuepress"
-        :model-value="problem.input_description"
+        :model-value="problem.inputDescription"
         :theme="isDark ? 'dark' : 'light'"
       />
 
@@ -303,7 +303,7 @@ function type(status: ProblemStatus) {
       </p>
       <MdPreview
         preview-theme="vuepress"
-        :model-value="problem.output_description"
+        :model-value="problem.outputDescription"
         :theme="isDark ? 'dark' : 'light'"
       />
     </template>
@@ -338,7 +338,7 @@ function type(status: ProblemStatus) {
           :total-rows="sqlExpectedQuery.total_rows"
           :truncated="sqlExpectedQuery.truncated"
         />
-        <p v-if="!problem.sql_config?.order_sensitive" class="sqlNote">
+        <p v-if="!problem.sqlConfig?.order_sensitive" class="sqlNote">
           结果顺序不限
         </p>
       </template>

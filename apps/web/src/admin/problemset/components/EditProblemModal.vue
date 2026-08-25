@@ -46,7 +46,7 @@ watch(
   (newProblem) => {
     if (newProblem) {
       editProblemOrder.value = newProblem.order
-      editProblemRequired.value = newProblem.is_required
+      editProblemRequired.value = newProblem.isRequired
       editProblemScore.value = newProblem.score
       editProblemHint.value = newProblem.hint || ""
     }

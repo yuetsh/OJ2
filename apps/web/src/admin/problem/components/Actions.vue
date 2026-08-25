@@ -34,7 +34,7 @@ async function handleDeleteProblem() {
     message.success("删除成功")
     emit("updated")
   } catch (err: any) {
-    if (err.data === "Can't delete the problem as it has submissions") {
+    if (err.error === "problem-has-submissions") {
       message.error("这道题有提交之后，就不能被删除")
     } else {
       message.error("删除失败")
@@ -82,9 +82,9 @@ async function handleMakePublic() {
     showMakePublicModal.value = false
     emit("updated") // 刷新列表
   } catch (err: any) {
-    if (err.data === "Duplicate display ID") {
+    if (err.error === "display-id-exists") {
       message.error("该题目编号已存在，请使用其他编号")
-    } else if (err.data === "Already be a public problem") {
+    } else if (err.error === "already-public") {
       message.error("该题目已经是公开题目")
     } else {
       message.error("转换失败：" + (err.data || "未知错误"))

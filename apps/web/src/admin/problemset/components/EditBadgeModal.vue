@@ -58,7 +58,7 @@ function handleConfirm() {
 
   // 只有非"完成所有题目"时才添加条件值
   if (editBadgeConditionType.value !== "all_problems") {
-    data.condition_value = editBadgeConditionValue.value
+    data.conditionValue = editBadgeConditionValue.value
   }
 
   emit("confirm", data)
@@ -76,8 +76,8 @@ watch(
       editBadgeName.value = newBadge.name
       editBadgeDescription.value = newBadge.description
       editBadgeIcon.value = newBadge.icon
-      editBadgeConditionType.value = newBadge.condition_type
-      editBadgeConditionValue.value = newBadge.condition_value
+      editBadgeConditionType.value = newBadge.conditionType
+      editBadgeConditionValue.value = newBadge.conditionValue
     }
   },
   { immediate: true },

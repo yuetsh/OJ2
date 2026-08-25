@@ -89,3 +89,10 @@ export const flowchartUpdateSchema = z.object({
 
 export type FlowchartUpdate = z.infer<typeof flowchartUpdateSchema>
 export type FlowchartStatistics = z.infer<typeof flowchartStatisticsSchema>
+export type FlowchartSubmission = z.infer<typeof flowchartSubmissionSchema>
+export type FlowchartListItem = z.infer<typeof flowchartListItemSchema>
+export type FlowchartList = z.infer<typeof flowchartListSchema>
+export type FlowchartCurrent = z.infer<typeof flowchartCurrentSchema>
+export type FlowchartDetail = z.infer<typeof flowchartDetailSchema>
+export type CreateFlowchartResponse = z.infer<typeof createFlowchartResponseSchema>
+export type CreateFlowchartRequest = z.infer<typeof createFlowchartRequestSchema>

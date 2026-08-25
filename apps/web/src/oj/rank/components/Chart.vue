@@ -31,7 +31,7 @@ const data = computed(() => {
   const datasets: any[] = [
     {
       label: props.type === ChartType.Rank ? "已解决" : "做题数",
-      data: props.rankData.map((rank) => rank.accepted_number),
+      data: props.rankData.map((rank) => rank.acceptedNumber),
       backgroundColor: [
         "rgba(255, 99, 132, 0.2)",
         "rgba(255, 159, 64, 0.2)",
@@ -87,7 +87,7 @@ const data = computed(() => {
   if (props.type === ChartType.Rank) {
     datasets.push({
       label: "总提交数",
-      data: props.rankData.map((rank) => rank.submission_number),
+      data: props.rankData.map((rank) => rank.submissionNumber),
       hidden: true,
     })
   }

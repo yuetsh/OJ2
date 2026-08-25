@@ -1,16 +1,22 @@
 import type { AchievementRarity, SUBMISSION_RESULT, ReactionKey } from "./types"
 
+// 与后端 judge/status.ts 的 JudgeStatus 逐条对齐（submitting 除外，见下）。
+// 注意：原来 time_limit_exceeded 写成 `1 | 2`，TS 按位或算成 3，和
+// memory_limit_exceeded 撞了同一个值 —— 后端这两个是分开的两个码。
 export enum SubmissionStatus {
   compile_error = -2,
   wrong_answer = -1,
   accepted = 0,
-  time_limit_exceeded = 1 | 2,
+  cpu_time_limit_exceeded = 1,
+  real_time_limit_exceeded = 2,
   memory_limit_exceeded = 3,
   runtime_error = 4,
   system_error = 5,
   pending = 6,
   judging = 7,
   partial_accepted = 8,
+  // 前端自造的伪状态：点了提交、还没拿到判题结果时本地先填 9。
+  // 后端永远不会下发它，所以契约的 judgeStatusSchema 里没有。
   submitting = 9,
   ast_check_failed = 10,
 }
@@ -157,7 +163,7 @@ export const DIFFICULTY = {
   Low: "简单",
   Mid: "中等",
   High: "困难",
-}
+} as const
 
 const cSource =
   "#include<stdio.h>\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"

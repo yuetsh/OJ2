@@ -33,33 +33,31 @@ const hasAnalysis = computed(() => !!loginSummaryStore.analysis)
           <n-gi>
             <n-statistic
               label="新增题目"
-              :value="loginSummaryStore.summary?.new_problem_count ?? 0"
+              :value="loginSummaryStore.summary?.newProblemCount ?? 0"
             />
           </n-gi>
           <n-gi>
             <n-statistic
               label="提交次数"
-              :value="loginSummaryStore.summary?.submission_count ?? 0"
+              :value="loginSummaryStore.summary?.submissionCount ?? 0"
             />
           </n-gi>
           <n-gi>
             <n-statistic
               label="AC 次数"
-              :value="loginSummaryStore.summary?.accepted_count ?? 0"
+              :value="loginSummaryStore.summary?.acceptedCount ?? 0"
             />
           </n-gi>
           <n-gi>
             <n-statistic
               label="AC 题目数"
-              :value="loginSummaryStore.summary?.solved_count ?? 0"
+              :value="loginSummaryStore.summary?.solvedCount ?? 0"
             />
           </n-gi>
           <n-gi>
             <n-statistic
               label="流程图提交"
-              :value="
-                loginSummaryStore.summary?.flowchart_submission_count ?? 0
-              "
+              :value="loginSummaryStore.summary?.flowchartSubmissionCount ?? 0"
             />
           </n-gi>
         </n-grid>

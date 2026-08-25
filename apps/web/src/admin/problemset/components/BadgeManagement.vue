@@ -48,16 +48,16 @@ defineEmits<Emits>()
               problem_count: '完成指定数量题目',
               score: '达到指定分数',
             }
-            return typeMap[row.condition_type] || row.condition_type
+            return typeMap[row.conditionType] || row.conditionType
           },
         },
         {
           title: '条件值',
           key: 'condition_value',
           render: (row) => {
-            return row.condition_type === 'all_problems'
+            return row.conditionType === 'all_problems'
               ? '-'
-              : row.condition_value
+              : row.conditionValue
           },
         },
         { title: '描述', key: 'description' },

@@ -14,6 +14,7 @@ defineProps<{
 function gradeType(grade: Grade) {
   return (
     {
+      "": "default",
       S: "success",
       A: "info",
       B: "warning",

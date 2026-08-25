@@ -84,15 +84,10 @@ accountRoutes.post("/users", async (c) => {
       userId: created.id,
       acmProblemsStatus: {},
       avatar: `${config.avatarUriPrefix}/default.png`,
-      blog: null,
       mood: null,
       acceptedNumber: 0,
       submissionNumber: 0,
-      github: null,
-      school: null,
-      major: null,
       realName: null,
-      language: null,
     })
   })
   return success(c, { ok: true }, 201)

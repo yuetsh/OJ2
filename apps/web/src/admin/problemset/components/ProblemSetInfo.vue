@@ -16,7 +16,7 @@ defineProps<Props>()
         {{ problemSet.description }}
       </n-descriptions-item>
       <n-descriptions-item label="创建者">
-        {{ problemSet.created_by.username }}
+        {{ problemSet.createdBy.username }}
       </n-descriptions-item>
       <n-descriptions-item label="难度">
         <n-tag
@@ -60,10 +60,10 @@ defineProps<Props>()
         {{ problemSet.visible ? "是" : "否" }}
       </n-descriptions-item>
       <n-descriptions-item label="题目数量">
-        {{ problemSet.problems_count }}
+        {{ problemSet.problemsCount }}
       </n-descriptions-item>
       <n-descriptions-item label="创建时间">
-        {{ parseTime(problemSet.create_time, "YYYY-MM-DD HH:mm:ss") }}
+        {{ parseTime(problemSet.createTime, "YYYY-MM-DD HH:mm:ss") }}
       </n-descriptions-item>
     </n-descriptions>
   </n-card>

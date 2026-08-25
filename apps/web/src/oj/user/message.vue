@@ -8,7 +8,7 @@
       <n-flex size="large" vertical>
         <n-flex align="center">
           <div>发送时间</div>
-          <div>{{ parseTime(item.create_time, "YYYY年M月D日 HH:mm:ss") }}</div>
+          <div>{{ parseTime(item.createTime, "YYYY年M月D日 HH:mm:ss") }}</div>
           <div>发送者</div>
           <div>{{ item.sender.username }}</div>
         </n-flex>

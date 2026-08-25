@@ -77,10 +77,10 @@ function copyToCat() {
 }
 
 function copyToProblem() {
-  const { code, language, contest } = submission.value!
+  const { code, language, contestId } = submission.value!
   // 编辑器的 storageKey 用 display id（problem._id），等于 props.problemID，
   // 而非 submission.problem（内部数字 id）
-  const contestIDForKey = contest || null
+  const contestIDForKey = contestId || null
   const storageKey = `problem_${props.problemID}_contest_${contestIDForKey}_lang_${language}`
   storage.set(storageKey, code)
   // 设置语言 + 代码：localStorage 覆盖全新挂载的编辑器，
@@ -89,10 +89,10 @@ function copyToProblem() {
   codeStore.setCode(code)
 
   const problemSetId = (route.params.problemSetId as string) ?? ""
-  if (contest) {
+  if (contestId) {
     router.push({
       name: "contest problem",
-      params: { contestID: String(contest), problemID: props.problemID },
+      params: { contestID: String(contestId), problemID: props.problemID },
     })
   } else if (problemSetId) {
     router.push({
@@ -121,7 +121,7 @@ onMounted(init)
         :title="JUDGE_STATUS[submission.result]['title']"
       >
         <n-flex>
-          <span>提交时间：{{ parseTime(submission.create_time) }}</span>
+          <span>提交时间：{{ parseTime(submission.createTime) }}</span>
           <span>编程语言：{{ LANGUAGE_SHOW_VALUE[submission.language] }}</span>
           <span>用户：{{ submission.username }}</span>
         </n-flex>

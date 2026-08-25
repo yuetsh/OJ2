@@ -2,10 +2,16 @@ import axios, { type AxiosRequestConfig } from "axios"
 import { createDiscreteApi } from "naive-ui"
 import { useAuthModalStore } from "shared/store/authModal"
 import { STORAGE_KEY } from "./constants"
-import type { ApiResponse } from "./http"
 import storage from "./storage"
 
 const { message: toast } = createDiscreteApi(["message"])
+
+// 后端统一返回 { error, data } 信封；拦截器剥掉 axios 外层后，
+// 调用方拿到的就是这个信封，data 才是真正的业务数据。
+export interface ApiResponse<T = any> {
+  error: string | null
+  data: T
+}
 
 interface Api2Error {
   error?: {
@@ -51,15 +57,10 @@ instance.interceptors.response.use(
     const payload = error.response?.data as Api2Error | undefined
     const code = payload?.error?.code ?? "network-error"
     const message = payload?.error?.message ?? "Request failed"
-    const legacyMessage =
-      code === "invalid-credentials"
-        ? "Invalid username or password"
-        : code === "account-disabled"
-          ? "Your account has been disabled"
-          : message
 
-    // 与 utils/http.ts 的拦截器保持一致：这两种错误全站都是同样的处理，
-    // 不放在这里的话每个调用点都得自己 catch，漏一个就是「点了没反应」。
+    // 这几种错误全站都是同样的处理，不放在这里的话每个调用点都得自己 catch，
+    // 漏一个就是「点了没反应」。需要分支处理的调用方一律判 `err.error` 里的
+    // 错误码，**不要**去 match `err.data` 的文案 —— 文案是后端可以随时改的。
     if (code === "login-required") {
       storage.remove(STORAGE_KEY.AUTHED)
       useAuthModalStore().openLoginModal()
@@ -68,12 +69,12 @@ instance.interceptors.response.use(
       // 学生会陷入「弹框 → 登录 → 又弹框」的死循环，且看不出发生了什么。
       // 清掉登录态并明确告知，会话在中途被禁用时也走这一支。
       storage.remove(STORAGE_KEY.AUTHED)
-      toast.error(legacyMessage || "账号已被禁用，请联系老师")
+      toast.error("账号已被禁用，请联系老师")
     } else if (code === "permission-denied") {
-      toast.error(legacyMessage || "权限不足")
+      toast.error(message || "权限不足")
     }
 
-    return Promise.reject({ error: code, data: legacyMessage })
+    return Promise.reject({ error: code, data: message })
   },
 )
 

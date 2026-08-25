@@ -98,3 +98,12 @@ export const userBadgeSchema = z.object({
   earnedTime: z.string(),
   problemset: z.object({ id: z.number().int(), title: z.string() }),
 })
+
+export type ProblemSet = z.infer<typeof problemSetSchema>
+export type ProblemSetList = z.infer<typeof problemSetListSchema>
+export type ProblemSetBadge = z.infer<typeof problemSetBadgeSchema>
+export type ProblemSetProblem = z.infer<typeof problemSetProblemSchema>
+export type ProblemSetProgress = z.infer<typeof problemSetProgressSchema>
+export type ProblemSetProgressList = z.infer<typeof problemSetProgressListSchema>
+export type UserBadge = z.infer<typeof userBadgeSchema>
+export type CompletedProblem = z.infer<typeof completedProblemSchema>

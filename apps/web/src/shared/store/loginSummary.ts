@@ -1,14 +1,7 @@
+import type { LoginSummary as ContractLoginSummary } from "@oj2/contract"
 import { getAILoginSummary } from "oj/api"
 
-interface LoginSummary {
-  start: string
-  end: string
-  new_problem_count: number
-  submission_count: number
-  accepted_count: number
-  solved_count: number
-  flowchart_submission_count: number
-}
+type LoginSummary = ContractLoginSummary["summary"]
 
 export const useLoginSummaryStore = defineStore("loginSummary", () => {
   const show = ref(false)
@@ -22,11 +15,11 @@ export const useLoginSummaryStore = defineStore("loginSummary", () => {
       return false
     }
     const values = [
-      nextSummary.new_problem_count,
-      nextSummary.submission_count,
-      nextSummary.accepted_count,
-      nextSummary.solved_count,
-      nextSummary.flowchart_submission_count,
+      nextSummary.newProblemCount,
+      nextSummary.submissionCount,
+      nextSummary.acceptedCount,
+      nextSummary.solvedCount,
+      nextSummary.flowchartSubmissionCount,
     ]
     const zeroCount = values.filter((value) => value === 0).length
     return zeroCount < Math.floor(values.length / 2) + 1
@@ -40,7 +33,7 @@ export const useLoginSummaryStore = defineStore("loginSummary", () => {
       const res = await getAILoginSummary()
       summary.value = res.data.summary
       analysis.value = res.data.analysis || ""
-      analysisError.value = res.data.analysis_error || ""
+      analysisError.value = res.data.analysisError || ""
     } catch (err) {
       analysisError.value = "获取登录统计失败，请稍后再试"
     } finally {

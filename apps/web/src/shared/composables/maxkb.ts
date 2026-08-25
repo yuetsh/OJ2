@@ -38,9 +38,9 @@ export function useMaxKB() {
   )
 
   const loadMaxKBScript = () => {
-    const { enable_maxkb } = configStore.config
+    const { enableMaxkb } = configStore.config
 
-    if (!enable_maxkb) {
+    if (!enableMaxkb) {
       return
     }
 
@@ -113,7 +113,7 @@ export function useMaxKB() {
   })
 
   watch(
-    () => configStore.config.enable_maxkb,
+    () => configStore.config.enableMaxkb,
     (enabled) => {
       if (enabled) {
         loadMaxKBScript()

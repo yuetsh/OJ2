@@ -35,7 +35,8 @@ function getDifficultyTag(difficulty: string) {
 function getProgressPercentage() {
   if (!props.problemSet) return 0
   return Math.round(
-    (props.problemSet.completed_count / props.problemSet.problems_count) * 100,
+    ((props.problemSet.completedCount ?? 0) / props.problemSet.problemsCount) *
+      100,
   )
 }
 
@@ -78,7 +79,7 @@ function handleJoin() {
         <n-flex align="center" v-if="isJoined">
           <n-text strong>完成进度</n-text>
           <n-text>
-            {{ problemSet.completed_count }} / {{ problemSet.problems_count }}
+            {{ problemSet.completedCount }} / {{ problemSet.problemsCount }}
           </n-text>
         </n-flex>
         <n-progress

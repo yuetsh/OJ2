@@ -28,8 +28,10 @@
   </div>
 </template>
 <script setup lang="ts">
+import type { Grade } from "utils/types"
 const props = defineProps<{
-  grade: "S" | "A" | "B" | "C"
+  // 空串是「无评级」，四张图都不渲染 —— 后端没有可用数据时会下发它
+  grade: Grade
 }>()
 </script>
 <style scoped>

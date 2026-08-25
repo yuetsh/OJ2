@@ -47,9 +47,9 @@ const msg = computed(() => {
 
   if (
     result !== SubmissionStatus.ast_check_failed &&
-    props.submission.statistic_info?.err_info
+    props.submission.statisticInfo?.err_info
   ) {
-    msg += props.submission.statistic_info.err_info
+    msg += props.submission.statisticInfo.err_info
   }
 
   return msg
@@ -161,15 +161,13 @@ const columns: DataTableColumn<Submission["info"]["data"][number]>[] = [
     <n-flex
       vertical
       v-if="
-        msg ||
-        infoTable.length ||
-        submission.statistic_info?.ast_results?.length
+        msg || infoTable.length || submission.statisticInfo?.ast_results?.length
       "
     >
-      <n-card v-if="submission.statistic_info?.ast_results?.length" embedded>
+      <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
         <n-flex vertical :size="8">
           <n-flex
-            v-for="(rule, i) in submission.statistic_info.ast_results"
+            v-for="(rule, i) in submission.statisticInfo.ast_results"
             :key="i"
             align="center"
             :size="6"

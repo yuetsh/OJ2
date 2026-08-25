@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ClassComparison } from "utils/types"
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
 import { getClassPK } from "oj/api"
@@ -45,32 +46,6 @@ const configStore = useConfigStore()
 const { isTeacherOrAbove } = useUserStore()
 const message = useMessage()
 const { isDesktop } = useBreakpoints()
-
-interface ClassComparison {
-  class_name: string
-  user_count: number
-  total_ac: number
-  total_submission: number
-  avg_ac: number
-  median_ac: number
-  q1_ac: number
-  q3_ac: number
-  iqr: number
-  std_dev: number
-  top10_avg: number
-  middle80_avg: number
-  bottom10_avg: number
-  excellent_rate: number
-  pass_rate: number
-  active_rate: number
-  ac_rate: number
-  composite_score: number
-  recent_total_ac?: number
-  recent_avg_ac?: number
-  recent_median_ac?: number
-  recent_top10_avg?: number
-  recent_active_count?: number
-}
 
 const selectedClasses = ref<string[]>([])
 const comparisons = ref<ClassComparison[]>([])
@@ -129,7 +104,7 @@ function getTimeRange(): {
 
 const classOptions = computed(() => {
   return (
-    configStore.config?.class_list.map((item) => ({
+    configStore.config?.classList.map((item) => ({
       label: `${item.slice(0, 2)}计算机${item.slice(2)}班`,
       value: item,
     })) ?? []
@@ -148,7 +123,7 @@ async function compare() {
 
     const res = await getClassPK(selectedClasses.value, startTime, endTime)
     comparisons.value = res.data.comparisons
-    hasTimeRange.value = res.data.has_time_range || false
+    hasTimeRange.value = res.data.hasTimeRange || false
   } catch (error) {
     message.error("获取数据失败")
   } finally {
@@ -252,11 +227,11 @@ function getClassColor(index: number) {
 const compositeScoreChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "综合分",
-      data: comparisons.value.map((c) => c.composite_score),
+      data: comparisons.value.map((c) => c.compositeScore),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -270,11 +245,11 @@ const compositeScoreChartData = computed(() => {
 const totalAcChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "总AC数",
-      data: comparisons.value.map((c) => c.total_ac),
+      data: comparisons.value.map((c) => c.totalAc),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -288,11 +263,11 @@ const totalAcChartData = computed(() => {
 const avgAcChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "平均AC数",
-      data: comparisons.value.map((c) => c.avg_ac),
+      data: comparisons.value.map((c) => c.avgAc),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -306,11 +281,11 @@ const avgAcChartData = computed(() => {
 const medianAcChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "中位数AC数",
-      data: comparisons.value.map((c) => c.median_ac),
+      data: comparisons.value.map((c) => c.medianAc),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -324,11 +299,11 @@ const medianAcChartData = computed(() => {
 const excellentRateChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "优秀率",
-      data: comparisons.value.map((c) => c.excellent_rate),
+      data: comparisons.value.map((c) => c.excellentRate),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -342,11 +317,11 @@ const excellentRateChartData = computed(() => {
 const passRateChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "及格率",
-      data: comparisons.value.map((c) => c.pass_rate),
+      data: comparisons.value.map((c) => c.passRate),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -360,11 +335,11 @@ const passRateChartData = computed(() => {
 const activeRateChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "参与度",
-      data: comparisons.value.map((c) => c.active_rate),
+      data: comparisons.value.map((c) => c.activeRate),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -378,11 +353,11 @@ const activeRateChartData = computed(() => {
 const top10AvgChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "前10%平均",
-      data: comparisons.value.map((c) => c.top10_avg),
+      data: comparisons.value.map((c) => c.top10Avg),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -396,11 +371,11 @@ const top10AvgChartData = computed(() => {
 const bottom10AvgChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "后10%平均",
-      data: comparisons.value.map((c) => c.bottom10_avg),
+      data: comparisons.value.map((c) => c.bottom10Avg),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -414,11 +389,11 @@ const bottom10AvgChartData = computed(() => {
 const middle80AvgChartData = computed(() => {
   if (comparisons.value.length === 0) return null
 
-  const labels = comparisons.value.map((c) => c.class_name)
+  const labels = comparisons.value.map((c) => c.className)
   const datasets = [
     {
       label: "中间80%均值",
-      data: comparisons.value.map((c) => c.middle80_avg),
+      data: comparisons.value.map((c) => c.middle80Avg),
       backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
       borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
       borderWidth: 2,
@@ -449,18 +424,18 @@ const radarChartData = computed(() => {
 
   // 计算每个指标的最大最小值
   const maxValues = [
-    Math.max(...comparisons.value.map((c) => c.total_ac)),
-    Math.max(...comparisons.value.map((c) => c.avg_ac)),
-    Math.max(...comparisons.value.map((c) => c.median_ac)),
+    Math.max(...comparisons.value.map((c) => c.totalAc)),
+    Math.max(...comparisons.value.map((c) => c.avgAc)),
+    Math.max(...comparisons.value.map((c) => c.medianAc)),
     100, // 优秀率最大值
     100, // 及格率最大值
     100, // 参与度最大值
   ]
 
   const minValues = [
-    Math.min(...comparisons.value.map((c) => c.total_ac)),
-    Math.min(...comparisons.value.map((c) => c.avg_ac)),
-    Math.min(...comparisons.value.map((c) => c.median_ac)),
+    Math.min(...comparisons.value.map((c) => c.totalAc)),
+    Math.min(...comparisons.value.map((c) => c.avgAc)),
+    Math.min(...comparisons.value.map((c) => c.medianAc)),
     0,
     0,
     0,
@@ -469,22 +444,22 @@ const radarChartData = computed(() => {
   const datasets = comparisons.value.map((c, index) => {
     const color = getClassColor(index)
     const rawData = [
-      c.total_ac,
-      c.avg_ac,
-      c.median_ac,
-      c.excellent_rate,
-      c.pass_rate,
-      c.active_rate,
+      c.totalAc,
+      c.avgAc,
+      c.medianAc,
+      c.excellentRate,
+      c.passRate,
+      c.activeRate,
     ]
     return {
-      label: c.class_name,
+      label: c.className,
       data: [
-        normalize(c.total_ac, maxValues[0], minValues[0]),
-        normalize(c.avg_ac, maxValues[1], minValues[1]),
-        normalize(c.median_ac, maxValues[2], minValues[2]),
-        c.excellent_rate,
-        c.pass_rate,
-        c.active_rate,
+        normalize(c.totalAc, maxValues[0], minValues[0]),
+        normalize(c.avgAc, maxValues[1], minValues[1]),
+        normalize(c.medianAc, maxValues[2], minValues[2]),
+        c.excellentRate,
+        c.passRate,
+        c.activeRate,
       ],
       rawData,
       backgroundColor: color.bg,
@@ -584,14 +559,14 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
             fontSize: "15px",
           },
         },
-        row.composite_score.toFixed(1),
+        row.compositeScore.toFixed(1),
       ),
   },
   {
     title: "班级",
     key: "class_name",
     render: (row) =>
-      `${row.class_name.slice(0, 2)}计算机${row.class_name.slice(2)}班`,
+      `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
     width: 160,
   },
   {
@@ -602,7 +577,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#1890ff", fontWeight: "600" } },
-        row.user_count,
+        row.userCount,
       ),
   },
   {
@@ -613,7 +588,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#ff4d4f", fontWeight: "600" } },
-        row.total_ac,
+        row.totalAc,
       ),
   },
   {
@@ -624,7 +599,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#52c41a", fontWeight: "600" } },
-        row.avg_ac.toFixed(2),
+        row.avgAc.toFixed(2),
       ),
   },
   {
@@ -635,7 +610,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#fa8c16", fontWeight: "600" } },
-        row.median_ac.toFixed(2),
+        row.medianAc.toFixed(2),
       ),
   },
   {
@@ -646,7 +621,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#cf1322", fontWeight: "600" } },
-        row.top10_avg.toFixed(2),
+        row.top10Avg.toFixed(2),
       ),
   },
   {
@@ -657,7 +632,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#389e0d", fontWeight: "600" } },
-        row.middle80_avg.toFixed(2),
+        row.middle80Avg.toFixed(2),
       ),
   },
   {
@@ -668,7 +643,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#096dd9", fontWeight: "500" } },
-        row.bottom10_avg.toFixed(2),
+        row.bottom10Avg.toFixed(2),
       ),
   },
   {
@@ -679,7 +654,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#faad14", fontWeight: "600" } },
-        row.excellent_rate.toFixed(1) + "%",
+        row.excellentRate.toFixed(1) + "%",
       ),
   },
   {
@@ -690,7 +665,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#52c41a", fontWeight: "600" } },
-        row.pass_rate.toFixed(1) + "%",
+        row.passRate.toFixed(1) + "%",
       ),
   },
   {
@@ -701,7 +676,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
       h(
         "span",
         { style: { color: "#1890ff", fontWeight: "600" } },
-        row.active_rate.toFixed(1) + "%",
+        row.activeRate.toFixed(1) + "%",
       ),
   },
 ]
@@ -827,11 +802,11 @@ const radarChartOptions = {
       <n-grid v-if="comparisons.length > 0" :cols="2" :x-gap="16" :y-gap="16">
         <n-gi
           v-for="(classData, index) in comparisons"
-          :key="classData.class_name"
+          :key="classData.className"
           :span="isDesktop ? 1 : 2"
         >
           <n-card
-            :title="`${classData.class_name.slice(0, 2)}计算机${classData.class_name.slice(2)}班`"
+            :title="`${classData.className.slice(0, 2)}计算机${classData.className.slice(2)}班`"
             :bordered="true"
             hoverable
             :style="{
@@ -842,7 +817,7 @@ const radarChartOptions = {
               <n-tag :type="getRankColor(index).type" size="large">
                 #{{ getRankColor(index).text }}
                 <span style="margin-left: 6px; font-size: 12px; opacity: 0.85">
-                  {{ classData.composite_score }} 分
+                  {{ classData.compositeScore }} 分
                 </span>
               </n-tag>
             </template>
@@ -854,7 +829,7 @@ const radarChartOptions = {
                 <n-gi>
                   <n-statistic
                     label="总AC数"
-                    :value="classData.total_ac"
+                    :value="classData.totalAc"
                     size="large"
                     class="stat-total-ac"
                   >
@@ -866,7 +841,7 @@ const radarChartOptions = {
                 <n-gi>
                   <n-statistic
                     label="平均AC数"
-                    :value="classData.avg_ac.toFixed(2)"
+                    :value="classData.avgAc.toFixed(2)"
                     size="large"
                     class="stat-avg-ac"
                   >
@@ -881,7 +856,7 @@ const radarChartOptions = {
                 <n-gi>
                   <n-statistic
                     label="中位数AC数"
-                    :value="classData.median_ac.toFixed(2)"
+                    :value="classData.medianAc.toFixed(2)"
                     size="large"
                     class="stat-median-ac"
                   >
@@ -896,7 +871,7 @@ const radarChartOptions = {
                 <n-gi>
                   <n-statistic
                     label="总提交数"
-                    :value="classData.total_submission"
+                    :value="classData.totalSubmission"
                     size="large"
                     class="stat-total-submission"
                   >
@@ -911,7 +886,7 @@ const radarChartOptions = {
                 <n-gi>
                   <n-statistic
                     label="AC率"
-                    :value="classData.ac_rate.toFixed(1) + '%'"
+                    :value="classData.acRate.toFixed(1) + '%'"
                     size="large"
                     class="stat-ac-rate"
                   >
@@ -934,12 +909,12 @@ const radarChartOptions = {
                 <!-- 分位数统计 -->
                 <n-descriptions-item label="第一四分位数(Q1)">
                   <span style="color: #9254de; font-weight: 500">{{
-                    classData.q1_ac.toFixed(2)
+                    classData.q1Ac.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
                 <n-descriptions-item label="第三四分位数(Q3)">
                   <span style="color: #f759ab; font-weight: 500">{{
-                    classData.q3_ac.toFixed(2)
+                    classData.q3Ac.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
                 <n-descriptions-item label="四分位距(IQR)">
@@ -949,31 +924,31 @@ const radarChartOptions = {
                 </n-descriptions-item>
                 <n-descriptions-item label="标准差">
                   <span style="color: #fa8c16; font-weight: 500">{{
-                    classData.std_dev.toFixed(2)
+                    classData.stdDev.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
 
                 <!-- 分层统计 -->
                 <n-descriptions-item label="前10%均值">
                   <span style="color: #cf1322; font-weight: 600">{{
-                    classData.top10_avg.toFixed(2)
+                    classData.top10Avg.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
                 <n-descriptions-item label="中间80%均值">
                   <span style="color: #389e0d; font-weight: 600">{{
-                    classData.middle80_avg.toFixed(2)
+                    classData.middle80Avg.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
                 <n-descriptions-item label="后10%均值">
                   <span style="color: #096dd9; font-weight: 500">{{
-                    classData.bottom10_avg.toFixed(2)
+                    classData.bottom10Avg.toFixed(2)
                   }}</span>
                 </n-descriptions-item>
 
                 <!-- 人数 -->
                 <n-descriptions-item label="人数">
                   <span style="color: #1890ff; font-weight: 600">{{
-                    classData.user_count
+                    classData.userCount
                   }}</span>
                 </n-descriptions-item>
               </n-descriptions>
@@ -988,34 +963,34 @@ const radarChartOptions = {
                 <n-space vertical :size="10">
                   <n-progress
                     type="line"
-                    :percentage="classData.excellent_rate"
+                    :percentage="classData.excellentRate"
                     :show-indicator="true"
                     :border-radius="4"
                   >
                     <template #default>
-                      优秀率: {{ classData.excellent_rate.toFixed(1) }}%
+                      优秀率: {{ classData.excellentRate.toFixed(1) }}%
                     </template>
                   </n-progress>
                   <n-progress
                     type="line"
-                    :percentage="classData.pass_rate"
+                    :percentage="classData.passRate"
                     :show-indicator="true"
                     :border-radius="4"
                     status="success"
                   >
                     <template #default>
-                      及格率: {{ classData.pass_rate.toFixed(1) }}%
+                      及格率: {{ classData.passRate.toFixed(1) }}%
                     </template>
                   </n-progress>
                   <n-progress
                     type="line"
-                    :percentage="classData.active_rate"
+                    :percentage="classData.activeRate"
                     :show-indicator="true"
                     :border-radius="4"
                     status="info"
                   >
                     <template #default>
-                      参与度: {{ classData.active_rate.toFixed(1) }}%
+                      参与度: {{ classData.activeRate.toFixed(1) }}%
                     </template>
                   </n-progress>
                 </n-space>
@@ -1023,7 +998,7 @@ const radarChartOptions = {
 
               <!-- 时间段统计（如果有） -->
               <template
-                v-if="hasTimeRange && classData.recent_total_ac !== undefined"
+                v-if="hasTimeRange && classData.recentTotalAc !== undefined"
               >
                 <n-descriptions
                   bordered
@@ -1034,27 +1009,27 @@ const radarChartOptions = {
                 >
                   <n-descriptions-item label="时间段总AC">
                     <span style="color: #ff7875; font-weight: 600">{{
-                      classData.recent_total_ac
+                      classData.recentTotalAc
                     }}</span>
                   </n-descriptions-item>
                   <n-descriptions-item label="时间段平均AC">
                     <span style="color: #73d13d; font-weight: 600">{{
-                      classData.recent_avg_ac?.toFixed(2)
+                      classData.recentAvgAc?.toFixed(2)
                     }}</span>
                   </n-descriptions-item>
                   <n-descriptions-item label="时间段中位数AC">
                     <span style="color: #ffc53d; font-weight: 600">{{
-                      classData.recent_median_ac?.toFixed(2)
+                      classData.recentMedianAc?.toFixed(2)
                     }}</span>
                   </n-descriptions-item>
                   <n-descriptions-item label="时间段前10名平均">
                     <span style="color: #ff4d4f; font-weight: 600">{{
-                      classData.recent_top10_avg?.toFixed(2)
+                      classData.recentTop10Avg?.toFixed(2)
                     }}</span>
                   </n-descriptions-item>
                   <n-descriptions-item label="活跃学生数" :span="2">
                     <span style="color: #1890ff; font-weight: 600">{{
-                      classData.recent_active_count
+                      classData.recentActiveCount
                     }}</span>
                   </n-descriptions-item>
                 </n-descriptions>

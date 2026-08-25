@@ -2,6 +2,12 @@ import { z } from "zod"
 
 import { paginatedSchema, sampleUserSchema } from "./common"
 
+/**
+ * 题目难度。生产库 956 道题只有这三个值（旧 Django 的 Problem.difficulty choices
+ * 也是这三个），前端的 DIFFICULTY 映射表按它建 —— 写成 z.string() 的话
+ * 多出来的值会静默渲染成 undefined。
+ */
+export const problemDifficultySchema = z.enum(["Low", "Mid", "High"])
 export const problemDetailSchema = z.object({
   id: z.number().int(),
   _id: z.string(),
@@ -22,7 +28,7 @@ export const problemDetailSchema = z.object({
   lastUpdateTime: z.string().nullable(),
   timeLimit: z.number().int(),
   memoryLimit: z.number().int(),
-  difficulty: z.string(),
+  difficulty: problemDifficultySchema,
   source: z.string().nullable(),
   prompt: z.string().nullable(),
   submissionNumber: z.number().int(),
@@ -55,7 +61,7 @@ export const problemListItemSchema = z.object({
   title: z.string(),
   submissionNumber: z.number().int(),
   acceptedNumber: z.number().int(),
-  difficulty: z.string(),
+  difficulty: problemDifficultySchema,
   createdBy: sampleUserSchema,
   tags: z.array(z.string()),
   contestId: z.number().int().nullable(),
@@ -84,3 +90,10 @@ export const yearlyAcSchema = z.object({
   accepted: z.number().int().nonnegative(),
   acRate: z.number(),
 })
+
+export type ProblemDifficulty = z.infer<typeof problemDifficultySchema>
+export type ProblemListItem = z.infer<typeof problemListItemSchema>
+export type ProblemList = z.infer<typeof problemListSchema>
+export type Tag = z.infer<typeof tagSchema>
+export type ProblemAuthor = z.infer<typeof problemAuthorSchema>
+export type YearlyAc = z.infer<typeof yearlyAcSchema>

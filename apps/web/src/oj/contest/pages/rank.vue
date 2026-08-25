@@ -87,7 +87,7 @@ const columns = ref<DataTableColumn<ContestRank>[]>([
     key: "total_time",
     width: 120,
     align: "center",
-    render: (row) => secondsToDuration(row.total_time),
+    render: (row) => secondsToDuration(row.totalTime),
   },
 ])
 
@@ -129,8 +129,8 @@ async function addColumns() {
             () => problem.title,
           ),
         render: (row) => {
-          if (row.submission_info[problem.id]) {
-            const status = row.submission_info[problem.id]
+          if (row.submissionInfo[problem.id]) {
+            const status = row.submissionInfo[problem.id]
             let acTime
             let errorNumber
             if (status.is_ac) {
@@ -162,8 +162,8 @@ async function addColumns() {
         cellProps: (row) => {
           let backgroundColor = ""
           let color = theme.value.textColorBase
-          if (row.submission_info[problem.id]) {
-            const status = row.submission_info[problem.id]
+          if (row.submissionInfo[problem.id]) {
+            const status = row.submissionInfo[problem.id]
             if (status.is_first_ac) {
               backgroundColor = theme.value.primaryColor
               color = theme.value.baseColor

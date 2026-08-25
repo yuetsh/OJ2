@@ -140,3 +140,8 @@ export type SubmissionStatisticsUser = z.infer<
   typeof submissionStatisticsUserSchema
 >
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
+
+export type SubmissionListItem = z.infer<typeof submissionListItemSchema>
+export type SubmissionList = z.infer<typeof submissionListSchema>
+export type EmbeddedSubmission = z.infer<typeof embeddedSubmissionSchema>
+export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>

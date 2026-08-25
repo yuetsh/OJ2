@@ -11,13 +11,7 @@ import {
 } from "utils/constants"
 import download from "utils/download"
 import { unique } from "utils/functions"
-import type {
-  BlankProblem,
-  LANGUAGE,
-  SQLConfig,
-  Tag,
-  Testcase,
-} from "utils/types"
+import type { BlankProblem, LANGUAGE, Tag, Testcase } from "utils/types"
 import {
   createContestProblem,
   createProblem,
@@ -62,13 +56,13 @@ const problem = useLocalStorage<BlankProblem>(STORAGE_KEY.ADMIN_PROBLEM, {
   _id: "",
   title: "",
   description: "",
-  input_description: "",
-  output_description: "",
-  time_limit: 1000,
-  memory_limit: 64,
-  difficulty: "Low" as "Low" | "Mid" | "High",
+  inputDescription: "",
+  outputDescription: "",
+  timeLimit: 1000,
+  memoryLimit: 64,
+  difficulty: "Low",
   visible: false,
-  share_submission: false,
+  shareSubmission: false,
   tags: [],
   languages: ["Python3", "C"] as LANGUAGE[],
   template: {} as { [key in LANGUAGE]?: string },
@@ -77,20 +71,20 @@ const problem = useLocalStorage<BlankProblem>(STORAGE_KEY.ADMIN_PROBLEM, {
     { input: "", output: "" },
     { input: "", output: "" },
   ],
-  test_case_id: "",
-  test_case_score: [] as Testcase[],
+  testCaseId: "",
+  testCaseScore: [] as Testcase[],
   hint: "",
   source: "",
   prompt: "",
   answers: [] as { language: LANGUAGE; code: string }[],
-  contest_id: "",
-  allow_flowchart: false,
-  mermaid_code: "",
-  flowchart_data: {},
-  flowchart_hint: "",
-  show_flowchart: false,
-  ast_rules: null as { [key: string]: any[] } | null,
-  sql_config: null as SQLConfig | null,
+  contestId: null,
+  allowFlowchart: false,
+  showFlowchart: false,
+  mermaidCode: "",
+  flowchartHint: "",
+  astRules: null,
+  sqlConfig: null,
+  sqlDisplay: null,
 })
 
 // 从服务器来的tag列表
@@ -189,19 +183,19 @@ watch(
         return
       }
       needTemplate.value = false
-      if (!problem.value.sql_config) {
-        problem.value.sql_config = { mode: "query", order_sensitive: false }
+      if (!problem.value.sqlConfig) {
+        problem.value.sqlConfig = { mode: "query", order_sensitive: false }
       }
       currentActiveAnswer.value = "SQL"
       // 代码规则检查基于 Python/C 的 AST 解析，对 SQL 没有意义，清空避免脏数据
-      if (problem.value.ast_rules) {
-        problem.value.ast_rules = null
+      if (problem.value.astRules) {
+        problem.value.astRules = null
       }
       // 流程图依赖 Python 答案生成，对 SQL 没有意义
-      problem.value.allow_flowchart = false
-      problem.value.show_flowchart = false
-    } else if (problem.value.sql_config) {
-      problem.value.sql_config = null
+      problem.value.allowFlowchart = false
+      problem.value.showFlowchart = false
+    } else if (problem.value.sqlConfig) {
+      problem.value.sqlConfig = null
     }
   },
   { immediate: true },
@@ -219,32 +213,31 @@ async function getProblemDetail() {
     problem.value._id = data._id
     problem.value.title = data.title
     problem.value.description = data.description
-    problem.value.input_description = data.input_description
-    problem.value.output_description = data.output_description
-    problem.value.time_limit = data.time_limit
-    problem.value.memory_limit = data.memory_limit
-    problem.value.memory_limit = data.memory_limit
+    problem.value.inputDescription = data.inputDescription
+    problem.value.outputDescription = data.outputDescription
+    problem.value.timeLimit = data.timeLimit
+    problem.value.memoryLimit = data.memoryLimit
+    problem.value.memoryLimit = data.memoryLimit
     problem.value.difficulty = data.difficulty
     problem.value.visible = data.visible
-    problem.value.share_submission = data.share_submission
+    problem.value.shareSubmission = data.shareSubmission
     problem.value.tags = normalizeTagNames(data.tags)
     problem.value.languages = data.languages
     problem.value.template = data.template
     problem.value.samples = data.samples
     problem.value.samples = data.samples
-    problem.value.test_case_id = data.test_case_id
-    problem.value.test_case_score = data.test_case_score
-    problem.value.hint = data.hint
+    problem.value.testCaseId = data.testCaseId
+    problem.value.testCaseScore = data.testCaseScore
+    problem.value.hint = data.hint ?? ""
     problem.value.source = data.source
     problem.value.prompt = data.prompt
     // 流程图相关字段
-    problem.value.allow_flowchart = data.allow_flowchart
-    problem.value.show_flowchart = data.show_flowchart
-    problem.value.mermaid_code = data.mermaid_code ?? ""
-    problem.value.flowchart_hint = data.flowchart_hint ?? ""
-    problem.value.flowchart_data = data.flowchart_data
-    problem.value.ast_rules = data.ast_rules ?? null
-    problem.value.sql_config = data.sql_config ?? null
+    problem.value.allowFlowchart = data.allowFlowchart
+    problem.value.showFlowchart = data.showFlowchart
+    problem.value.mermaidCode = data.mermaidCode ?? ""
+    problem.value.flowchartHint = data.flowchartHint ?? ""
+    problem.value.astRules = data.astRules ?? null
+    problem.value.sqlConfig = data.sqlConfig ?? null
     if (data.answers && data.answers.length) {
       problem.value.answers = data.answers
     } else {
@@ -253,8 +246,8 @@ async function getProblemDetail() {
         code: "",
       }))
     }
-    if (problem.value.contest_id) {
-      problem.value.contest_id = problem.value.contest_id
+    if (problem.value.contestId) {
+      problem.value.contestId = problem.value.contestId
     }
 
     // 下面是用来显示的：
@@ -305,8 +298,8 @@ async function handleUploadTestcases({ file }: UploadCustomRequestOptions) {
     for (let file of testcases) {
       file.score = (100 / testcases.length).toFixed(0)
     }
-    problem.value.test_case_score = testcases
-    problem.value.test_case_id = res.data.id
+    problem.value.testCaseScore = testcases
+    problem.value.testCaseId = res.data.id
   } catch (err) {
     message.error("上传测试用例失败")
   }
@@ -338,7 +331,7 @@ async function validateProblem() {
   else if (
     !problem.value.description ||
     (!isSQLProblem.value &&
-      (!problem.value.input_description || !problem.value.output_description))
+      (!problem.value.inputDescription || !problem.value.outputDescription))
   ) {
     message.error("题目或输入或输出没有填写")
     hasErrors = true
@@ -359,7 +352,7 @@ async function validateProblem() {
     hasErrors = true
   }
   // 测试用例
-  else if (problem.value.test_case_score.length === 0) {
+  else if (problem.value.testCaseScore.length === 0) {
     message.error("测试用例没有上传")
     hasErrors = true
   } else if (problem.value.languages.length === 0) {
@@ -367,7 +360,7 @@ async function validateProblem() {
     hasErrors = true
   }
   // SQL 题验证
-  else if (isSQLProblem.value && !problem.value.sql_config?.mode) {
+  else if (isSQLProblem.value && !problem.value.sqlConfig?.mode) {
     message.error("SQL 题需要选择题型（查询题/增删改题）")
     hasErrors = true
   } else if (
@@ -380,11 +373,8 @@ async function validateProblem() {
     hasErrors = true
   }
   // 流程图验证
-  else if (problem.value.show_flowchart || problem.value.allow_flowchart) {
-    if (
-      !problem.value.mermaid_code ||
-      problem.value.mermaid_code.trim() === ""
-    ) {
+  else if (problem.value.showFlowchart || problem.value.allowFlowchart) {
+    if (!problem.value.mermaidCode || problem.value.mermaidCode.trim() === "") {
       message.error("启用了流程图功能，但流程图代码为空")
       hasErrors = true
     } else if (!mermaidRenderSuccess.value) {
@@ -449,7 +439,7 @@ async function submit() {
     route.name === "admin contest problem create" ||
     route.name === "admin contest problem edit"
   ) {
-    problem.value.contest_id = props.contestID
+    problem.value.contestId = Number(props.contestID)
   }
   try {
     await api!(problem.value)
@@ -474,7 +464,7 @@ async function submit() {
       })
     }
   } catch (err: any) {
-    if (err.data === "Display ID already exists") {
+    if (err.error === "display-id-exists") {
       message.error("显示编号重复了，请换一个显示编号")
     } else {
       message.error(err.data)
@@ -503,7 +493,7 @@ async function generateMermaid() {
   )
   isAIGenerating.value = false
   message.warning("如果渲染不成功，请复制到外部 AI 网站检查语法")
-  problem.value.mermaid_code = res.data.flowchart
+  problem.value.mermaidCode = res.data.flowchart
 }
 
 const showGeneratorModal = ref(false)
@@ -512,8 +502,8 @@ function handleTestcasesGenerated(
   testCaseId: string,
   testCaseScore: Testcase[],
 ) {
-  problem.value.test_case_id = testCaseId
-  problem.value.test_case_score = testCaseScore
+  problem.value.testCaseId = testCaseId
+  problem.value.testCaseScore = testCaseScore
   showGeneratorModal.value = false
 }
 
@@ -593,12 +583,12 @@ watch(
   />
   <TextEditor
     v-if="ready && !isSQLProblem"
-    v-model:value="problem.input_description"
+    v-model:value="problem.inputDescription"
     title="输入的描述"
   />
   <TextEditor
     v-if="ready && !isSQLProblem"
-    v-model:value="problem.output_description"
+    v-model:value="problem.outputDescription"
     title="输出的描述"
   />
   <template v-if="!isSQLProblem">
@@ -686,12 +676,12 @@ watch(
   </n-form>
 
   <n-form
-    v-if="isSQLProblem && problem.sql_config"
+    v-if="isSQLProblem && problem.sqlConfig"
     inline
     label-placement="left"
   >
     <n-form-item label="SQL 题型">
-      <n-radio-group v-model:value="problem.sql_config.mode">
+      <n-radio-group v-model:value="problem.sqlConfig.mode">
         <n-radio-button value="query">查询题（比对查询结果）</n-radio-button>
         <n-radio-button value="modify">
           增删改题（比对执行后的表数据）
@@ -699,7 +689,7 @@ watch(
       </n-radio-group>
     </n-form-item>
     <n-form-item label="严格比对行顺序">
-      <n-switch v-model:value="problem.sql_config.order_sensitive" />
+      <n-switch v-model:value="problem.sqlConfig.order_sensitive" />
       <n-text depth="3" style="margin-left: 12px">
         题目要求 ORDER BY 时开启；关闭则按无序集合比对
       </n-text>
@@ -766,7 +756,7 @@ watch(
   <n-grid v-if="!isSQLProblem" :cols="2">
     <n-gi :span="1">
       <AstRulesEditor
-        v-model="problem.ast_rules!"
+        v-model="problem.astRules!"
         :languages="problem.languages"
       />
     </n-gi>
@@ -802,22 +792,22 @@ watch(
   <SQLTestcaseEditor
     v-if="isSQLProblem"
     :answers="problem.answers"
-    :mode="problem.sql_config?.mode ?? 'query'"
+    :mode="problem.sqlConfig?.mode ?? 'query'"
     :problem-id="problem.id"
     @uploaded="handleTestcasesGenerated"
   />
 
   <n-alert
     class="box"
-    v-if="problem.test_case_score.length"
+    v-if="problem.testCaseScore.length"
     :show-icon="false"
     type="info"
   >
     <template #header>
       <n-flex align="center">
         <div>
-          测试组编号 {{ problem.test_case_id.slice(0, 12) }} 共有
-          {{ problem.test_case_score.length }}
+          测试组编号 {{ problem.testCaseId.slice(0, 12) }} 共有
+          {{ problem.testCaseScore.length }}
           条测试用例
         </div>
         <n-button
@@ -870,23 +860,23 @@ watch(
         </n-button>
       </n-form-item>
       <n-form-item label="允许提交流程图">
-        <n-switch v-model:value="problem.allow_flowchart" />
+        <n-switch v-model:value="problem.allowFlowchart" />
       </n-form-item>
       <n-form-item label="显示标准流程图">
-        <n-switch v-model:value="problem.show_flowchart" />
+        <n-switch v-model:value="problem.showFlowchart" />
       </n-form-item>
     </n-form>
 
     <n-form>
       <n-form-item>
         <MermaidEditor
-          v-model="problem.mermaid_code"
+          v-model="problem.mermaidCode"
           @render-success="onMermaidRenderSuccess"
         />
       </n-form-item>
       <n-form-item label="流程图提示信息（选填）">
         <n-input
-          v-model:value="problem.flowchart_hint"
+          v-model:value="problem.flowchartHint"
           placeholder="请输入流程图相关的提示信息，帮助学生理解题目要求"
         />
       </n-form-item>

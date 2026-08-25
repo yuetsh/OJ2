@@ -113,20 +113,20 @@ const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
     width: 80,
     render: (row) =>
       h(NFlex, { size: 4, align: "center" }, () => [
-        row.allow_flowchart
+        row.allowFlowchart
           ? h(Icon, {
               width: 18,
               icon: "vscode-icons:file-type-drawio",
               title: "绘图",
             })
-          : row.show_flowchart
+          : row.showFlowchart
             ? h(Icon, {
                 width: 18,
                 icon: "vscode-icons:file-type-graphql",
                 title: "流程图",
               })
             : null,
-        row.has_ast_rules
+        row.hasAstRules
           ? h(Icon, {
               width: 18,
               icon: "vscode-icons:file-type-light-todo",
@@ -140,7 +140,7 @@ const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
     key: "top_reaction",
     width: 60,
     render: (row) => {
-      const top = row.top_reaction
+      const top = row.topReaction
       if (!top) return null
       const reaction = REACTIONS.find((it) => it.key === top.type)
       if (!reaction) return null
@@ -155,7 +155,7 @@ const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
     title: "创建时间",
     key: "create_time",
     width: 200,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "可见",

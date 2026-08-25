@@ -56,13 +56,13 @@ const columns: DataTableColumn<Contest>[] = [
     title: "创建者",
     key: "created_by",
     width: 120,
-    render: (row) => row.created_by.username,
+    render: (row) => row.createdBy.username,
   },
   {
     title: "创建时间",
     key: "create_time",
     width: 160,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm"),
   },
   {
     title: "可见",

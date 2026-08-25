@@ -278,7 +278,7 @@ function handleMenuSelect(key: string) {
     <n-flex align="center">
       <n-flex align="center" class="title" @click="goHome">
         <Icon icon="streamline-emojis:dog" :height="30"></Icon>
-        <div>{{ configStore.config?.website_name }}</div>
+        <div>{{ configStore.config?.websiteName }}</div>
         <div v-if="showEnvVersion">({{ envVersion }})</div>
       </n-flex>
       <div>
@@ -331,7 +331,7 @@ function handleMenuSelect(key: string) {
           </n-button>
           <n-button
             tertiary
-            v-if="configStore.config?.allow_register"
+            v-if="configStore.config?.allowRegister"
             @click="authStore.openSignupModal()"
           >
             注册

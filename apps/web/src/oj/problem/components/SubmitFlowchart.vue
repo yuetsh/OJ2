@@ -135,16 +135,16 @@ async function submitFlowchartData() {
 
   try {
     const response = await submitFlowchart({
-      problem_id: problem.value!.id,
-      mermaid_code: mermaidCode,
-      flowchart_data: {
+      problemId: problem.value!.id,
+      mermaidCode,
+      flowchartData: {
         compressed: true,
         data: compressed,
       },
     })
 
     // 获取提交ID并订阅更新
-    const submissionId = response.data.submission_id
+    const submissionId = response.data.submissionId
 
     if (submissionId) {
       subscribeToSubmission(submissionId)
@@ -183,18 +183,34 @@ async function getSubmission(submissionPage = 0) {
   )
   submissionCount.value = data.count
   const submission = data.submission
-  myFlowchartZippedStr.value = submission.flowchart_data.data
-  myMermaidCode.value = submission.mermaid_code || ""
+  // 翻到没有提交的页时后端返回 null（契约里 submission 是 nullable）——
+  // 原来的 any 让这里看起来非空，真翻到那一页会直接抛
+  if (!submission) {
+    myFlowchartZippedStr.value = ""
+    myMermaidCode.value = ""
+    modalRating.value = { score: 0, grade: "" }
+    evaluation.value = {
+      score: 0,
+      grade: "",
+      feedback: "",
+      suggestions: "",
+      criteria_details: {},
+    }
+    return
+  }
+  myFlowchartZippedStr.value = String(submission.flowchartData.data ?? "")
+  myMermaidCode.value = submission.mermaidCode || ""
   modalRating.value = {
-    score: submission.ai_score,
-    grade: submission.ai_grade,
+    score: submission.aiScore ?? 0,
+    grade: (submission.aiGrade ?? "") as Rating["grade"],
   }
   evaluation.value = {
-    score: submission.ai_score,
-    grade: submission.ai_grade,
-    feedback: submission.ai_feedback,
-    suggestions: submission.ai_suggestions,
-    criteria_details: submission.ai_criteria_details,
+    score: submission.aiScore ?? 0,
+    grade: (submission.aiGrade ?? "") as Rating["grade"],
+    feedback: submission.aiFeedback ?? "",
+    suggestions: submission.aiSuggestions ?? "",
+    criteria_details:
+      submission.aiCriteriaDetails as Evaluation["criteria_details"],
   }
 }
 

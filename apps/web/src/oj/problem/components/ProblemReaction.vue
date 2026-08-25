@@ -80,7 +80,7 @@ const wheelItems = REACTIONS.map((item, index) => ({
   style: getWheelItemStyle(index),
 }))
 
-const solved = computed(() => problem.value?.my_status === 0)
+const solved = computed(() => problem.value?.myStatus === 0)
 const locked = computed(() => mine.value !== null)
 const canInteract = computed(
   () =>

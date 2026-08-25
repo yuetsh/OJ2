@@ -5,7 +5,7 @@
       <n-card title="流程图预览">
         <template #header-extra>
           <n-button
-            v-if="!renderError && submission?.mermaid_code"
+            v-if="!renderError && submission?.mermaidCode"
             quaternary
             size="small"
             @click="showLargeImage = true"
@@ -42,12 +42,12 @@
     <n-gi :span="2">
       <!-- AI反馈 -->
       <n-card
-        v-if="submission.ai_feedback"
+        v-if="submission.aiFeedback"
         size="small"
         title="AI反馈"
         style="margin-bottom: 16px"
       >
-        <n-text>{{ submission.ai_feedback }}</n-text>
+        <n-text>{{ submission.aiFeedback }}</n-text>
       </n-card>
 
       <!-- 改进建议 -->
@@ -69,15 +69,12 @@
 
       <!-- 详细评分 -->
       <n-card
-        v-if="
-          submission.ai_criteria_details &&
-          Object.keys(submission.ai_criteria_details).length > 0
-        "
+        v-if="Object.keys(criteriaDetails).length > 0"
         size="small"
         title="详细评分"
       >
         <div
-          v-for="(detail, key) in submission.ai_criteria_details"
+          v-for="(detail, key) in criteriaDetails"
           :key="key"
           style="margin-bottom: 12px"
         >
@@ -121,11 +118,38 @@ const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 const { renderError, renderFlowchart } = useMermaid()
 
 const submission = ref<FlowchartSubmission | null>(null)
+
+/**
+ * 评分项明细。契约里是 `Record<string, unknown>` —— 内容是 AI 模型原样吐出的 JSON，
+ * 后端不校验形状，所以这里只能按约定断言，字段缺失时用 0 / 空串兜底。
+ */
+const criteriaDetails = computed<
+  Record<string, { score: number; max: number; comment: string }>
+>(() => {
+  const raw = submission.value?.aiCriteriaDetails ?? {}
+  return Object.fromEntries(
+    Object.entries(raw).map(([key, value]) => {
+      const item = (value ?? {}) as Partial<{
+        score: number
+        max: number
+        comment: string
+      }>
+      return [
+        key,
+        {
+          score: item.score ?? 0,
+          max: item.max ?? 0,
+          comment: item.comment ?? "",
+        },
+      ]
+    }),
+  )
+})
 const loading = ref(false)
 const rendering = ref(false)
 const showLargeImage = ref(false)
 const suggestionLines = computed(() =>
-  splitSuggestionLines(submission.value?.ai_suggestions),
+  splitSuggestionLines(submission.value?.aiSuggestions),
 )
 
 function splitSuggestionLines(suggestions?: string | null) {
@@ -154,12 +178,12 @@ async function loadSubmission() {
     submission.value = res.data
 
     // 渲染流程图
-    if (submission.value?.mermaid_code) {
+    if (submission.value?.mermaidCode) {
       rendering.value = true
       await nextTick()
       await renderFlowchart(
         mermaidContainer.value,
-        submission.value.mermaid_code,
+        submission.value.mermaidCode,
       )
       rendering.value = false
     }

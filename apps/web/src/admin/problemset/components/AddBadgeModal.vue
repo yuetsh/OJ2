@@ -54,7 +54,7 @@ function handleConfirm() {
 
   // 只有非"完成所有题目"时才添加条件值
   if (newBadgeConditionType.value !== "all_problems") {
-    data.condition_value = newBadgeConditionValue.value
+    data.conditionValue = newBadgeConditionValue.value
   }
 
   emit("confirm", data)

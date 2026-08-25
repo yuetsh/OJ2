@@ -30,7 +30,7 @@ const beatRate = ref("0")
 const yearlyACData = ref<YearlyACData[]>([])
 
 const data = computed(() => {
-  const status = problem.value!.statistic_info
+  const status = problem.value!.statisticInfo
   const labels = []
   for (let i in status) {
     if (status[i] !== 0) {
@@ -50,14 +50,14 @@ const numbers = computed(() => {
   return [
     {
       icon: "streamline-ultimate-color:checklist",
-      title: problem.value?.submission_number ?? 0,
+      title: problem.value?.submissionNumber ?? 0,
       content: "总提交",
       int: true,
       suffix: "",
     },
     {
       icon: "streamline-emojis:woman-raising-hand-2",
-      title: problem.value?.accepted_number ?? 0,
+      title: problem.value?.acceptedNumber ?? 0,
       content: "通过数",
       int: true,
       suffix: "",
@@ -65,8 +65,8 @@ const numbers = computed(() => {
     {
       icon: "fluent-emoji:chart-increasing",
       title: getACRateNumber(
-        problem.value?.accepted_number ?? 0,
-        problem.value?.submission_number ?? 0,
+        problem.value?.acceptedNumber ?? 0,
+        problem.value?.submissionNumber ?? 0,
       ),
       content: "通过率",
       int: false,
@@ -115,10 +115,10 @@ onMounted(() => {
       {{ problem._id }}
     </n-descriptions-item>
     <n-descriptions-item label="出题人">
-      {{ problem.created_by.username }}
+      {{ problem.createdBy.username }}
     </n-descriptions-item>
     <n-descriptions-item label="创建时间">
-      {{ parseTime(problem.create_time) }}
+      {{ parseTime(problem.createTime) }}
     </n-descriptions-item>
     <n-descriptions-item label="难度">
       <n-tag :type="getTagColor(problem.difficulty)">
@@ -150,7 +150,7 @@ onMounted(() => {
       </n-card>
     </n-gi>
   </n-grid>
-  <div class="pie" v-if="problem && problem.submission_number > 0">
+  <div class="pie" v-if="problem && problem.submissionNumber > 0">
     <Pie :data="data" :options="options" />
   </div>
   <ProblemYearlyChart :data="yearlyACData" />

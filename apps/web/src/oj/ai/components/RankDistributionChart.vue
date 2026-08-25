@@ -38,8 +38,8 @@ const rankDistribution = computed(() => {
   }))
 
   aiStore.detailsData.solved.forEach((item) => {
-    const rank = item.period_rank
-    const acCount = item.period_ac_count
+    const rank = item.periodRank
+    const acCount = item.periodAcCount
 
     if (rank && acCount && acCount > 0) {
       const percentile = (rank / acCount) * 100
@@ -52,7 +52,7 @@ const rankDistribution = computed(() => {
       if (rangeIndex !== -1) {
         distribution[rangeIndex].count++
         distribution[rangeIndex].problems.push(
-          `${item.problem.display_id}: ${item.problem.title}`,
+          `${item.problem.displayId}: ${item.problem.title}`,
         )
       }
     }

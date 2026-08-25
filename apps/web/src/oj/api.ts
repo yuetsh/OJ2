@@ -1,15 +1,46 @@
 import {
-  createSubmissionResponseSchema,
+  type AiAnalysisRecord,
+  type Contest as OjContest,
+  type ContestList,
+  type ActivityRankItem,
+  type ClassComparisonResponse,
+  type ClassRankItem,
+  type ClassUserRank,
+  type ContestRank,
+  type UserRank,
+  type ProblemRank,
+  type CreateSubmissionResponse,
+  type ProblemAuthor,
+  type ProblemListItem,
+  type YearlyAc,
+  type ProblemList,
+  type CreateFlowchartResponse,
+  type FlowchartCurrent,
+  type FlowchartDetail,
+  type FlowchartList,
+  type FlowchartSubmission,
+  type AiDetail,
+  type DurationData,
+  type HeatmapItem,
+  type LoginSummary,
+  type ProblemSet,
+  type ProblemSetBadge,
+  type ProblemSetList,
+  type ProblemSetProblem,
+  type ProblemSetProgressList,
+  type UserBadge,
   problemDetailSchema,
   submissionDetailSchema,
   type FlowchartStatistics,
   type SubmissionStatistics,
 } from "@oj2/contract"
 import api2 from "utils/api2"
-import { legacyResponse, toLegacy } from "utils/legacy"
-import type { ApiResponse } from "utils/http"
 import { filterResult } from "oj/transforms"
 import type {
+  Announcement,
+  Profile,
+  Message,
+  SubmissionListItem,
   Exercise,
   Problem,
   ReactionKey,
@@ -18,97 +49,39 @@ import type {
   SubmissionListPayload,
   SubmitCodePayload,
   WebsiteConfig,
+  Tutorial,
 } from "utils/types"
 
-function listProblem(value: any): Problem {
-  return {
-    id: value.id,
-    _id: value._id,
-    title: value.title,
-    difficulty: value.difficulty,
-    submission_number: value.submissionNumber,
-    accepted_number: value.acceptedNumber,
-    created_by: toLegacy(value.createdBy),
-    tags: value.tags,
-    contest: value.contestId,
-    allow_flowchart: value.allowFlowchart,
-    show_flowchart: value.showFlowchart,
-    has_ast_rules: value.hasAstRules,
-    my_status: value.myStatus,
-  } as Problem
-}
-
+/**
+ * 题目详情。走契约的 zod 解析，形状即契约 —— 之前这里手抄了一份 camel→snake 的
+ * 键名映射，抄漏一个字段就是静默 undefined。
+ */
 function detailProblem(value: unknown): Problem {
-  const problem = problemDetailSchema.parse(value)
-  return {
-    id: problem.id,
-    _id: problem._id,
-    title: problem.title,
-    description: problem.description,
-    input_description: problem.inputDescription,
-    output_description: problem.outputDescription,
-    samples: problem.samples,
-    hint: problem.hint ?? "",
-    languages: problem.languages,
-    template: problem.template,
-    create_time: problem.createTime,
-    last_update_time: problem.lastUpdateTime,
-    time_limit: problem.timeLimit,
-    memory_limit: problem.memoryLimit,
-    difficulty: problem.difficulty,
-    source: problem.source ?? "",
-    prompt: problem.prompt ?? "",
-    answers: [],
-    submission_number: problem.submissionNumber,
-    accepted_number: problem.acceptedNumber,
-    statistic_info: problem.statisticInfo,
-    share_submission: problem.shareSubmission,
-    contest: problem.contestId,
-    tags: problem.tags,
-    created_by: {
-      id: problem.createdBy.id,
-      username: problem.createdBy.username,
-      real_name: problem.createdBy.realName,
-    },
-    my_status: problem.myStatus,
-    my_failed_count: problem.myFailedCount,
-    visible: true,
-    allow_flowchart: problem.allowFlowchart,
-    show_flowchart: problem.showFlowchart,
-    mermaid_code: problem.mermaidCode ?? undefined,
-    flowchart_data: problem.flowchartData ?? undefined,
-    flowchart_hint: problem.flowchartHint ?? undefined,
-    sql_config: problem.sqlConfig as Problem["sql_config"],
-    sql_display: problem.sqlDisplay as Problem["sql_display"],
-  } as Problem
+  return problemDetailSchema.parse(value) as Problem
 }
 
 export function getWebsiteConfig() {
-  return legacyResponse<WebsiteConfig>(api2.get("site"))
+  return api2.get<WebsiteConfig>("site")
 }
 
 export async function getProblemList(
   offset = 0,
   limit = 10,
-  searchParams: any = {},
+  searchParams: Record<string, unknown> = {},
 ) {
-  const res = await api2.get<{ results: any[]; total: number }>("problems", {
+  const res = await api2.get<ProblemList>("problems", {
     params: { paging: true, offset, limit, ...searchParams },
   })
   return {
-    results: res.data.results.map(listProblem).map(filterResult),
+    results: res.data.results.map(filterResult),
     total: res.data.total,
   }
 }
 
 export function getAuthors(all = false) {
-  return legacyResponse(
-    api2.get("problem-authors", {
-      params: {
-        all: all ? "1" : "0",
-      },
-    }),
-  )
+  return api2.get<ProblemAuthor[]>("problem-authors", {
+    params: { all: all ? "1" : "0" },
+  })
 }
 
 export function getRandomProblemID() {
@@ -131,41 +104,14 @@ export async function getSubmission(id: string) {
   const response = await api2.get<unknown>(
     `submissions/${encodeURIComponent(id)}`,
   )
-  const submission = submissionDetailSchema.parse(response.data)
   return {
     error: null,
-    data: {
-      id: submission.id,
-      create_time: submission.createTime,
-      user_id: submission.userId,
-      username: submission.username,
-      code: submission.code,
-      result: submission.result,
-      info: submission.info,
-      language: submission.language,
-      shared: submission.shared,
-      show_link: submission.showLink,
-      statistic_info: submission.statisticInfo,
-      ip: submission.ip,
-      contest: submission.contestId,
-      problem: submission.problemId,
-      can_unshare: submission.canUnshare,
-    } as Submission,
+    data: submissionDetailSchema.parse(response.data) as Submission,
   }
 }
 
-export async function submitCode(data: SubmitCodePayload) {
-  const response = await api2.post<unknown>("submissions", {
-    problemId: data.problem_id,
-    language: data.language,
-    code: data.code,
-    contestId: data.contest_id,
-  })
-  const created = createSubmissionResponseSchema.parse(response.data)
-  return {
-    error: null,
-    data: { submission_id: created.submissionId },
-  }
+export function submitCode(data: SubmitCodePayload) {
+  return api2.post<CreateSubmissionResponse>("submissions", data)
 }
 
 export function formatCode(data: { code: string; language: string }) {
@@ -182,30 +128,23 @@ export function formatCode(data: { code: string; language: string }) {
 }
 
 export function getSubmissions(params: Partial<SubmissionListPayload>) {
-  const endpoint = params.contest_id
-    ? `contests/${encodeURIComponent(params.contest_id)}/submissions`
+  const endpoint = params.contestId
+    ? `contests/${encodeURIComponent(params.contestId)}/submissions`
     : "submissions"
-  return legacyResponse(
-    api2.get(endpoint, {
-      params: {
-        ...params,
-        problemId: params.problem_id,
-        contest_id: undefined,
-        problem_id: undefined,
-        page: undefined,
-      },
-    }),
-  )
+  // 契约里 language 是 z.string()（语言是配置项，随时可能加，收紧成枚举会让
+  // 新加的语言在后端 parse 时直接抛），前端在这一处收窄成 LANGUAGE
+  return api2.get<{ results: SubmissionListItem[]; total: number }>(endpoint, {
+    // contestId 走的是路径，page 只有前端分页器用
+    params: { ...params, contestId: undefined, page: undefined },
+  })
 }
 
-export function getRankOfProblem(problem_id: string) {
-  return legacyResponse(
-    api2.get(`problems/${encodeURIComponent(problem_id)}/rank`),
-  )
+export function getRankOfProblem(problemId: string) {
+  return api2.get<ProblemRank>(`problems/${encodeURIComponent(problemId)}/rank`)
 }
 
 export function getTodaySubmissionCount(language?: string) {
-  return api2.get("submissions/today-count", { params: { language } })
+  return api2.get<number>("submissions/today-count", { params: { language } })
 }
 
 export function adminRejudge(id: string) {
@@ -228,25 +167,19 @@ export function getRank(
   n: number,
   username?: string,
 ) {
-  return legacyResponse(
-    api2.get("rankings/users", {
-      params: { offset, limit, username, top: n },
-    }),
-  )
+  return api2.get<UserRank>("rankings/users", {
+    params: { offset, limit, username, top: n },
+  })
 }
 
 export function getActivityRank(start: string) {
-  return api2.get("rankings/activity", {
+  return api2.get<ActivityRankItem[]>("rankings/activity", {
     params: { start },
   })
 }
 
 export function getClassRank(grade?: number | null) {
-  return legacyResponse(
-    api2.get("rankings/classes", {
-      params: { grade },
-    }),
-  )
+  return api2.get<ClassRankItem[]>("rankings/classes", { params: { grade } })
 }
 
 export function getUserClassRank(
@@ -254,9 +187,9 @@ export function getUserClassRank(
   offset?: number,
   limit?: number,
 ) {
-  return legacyResponse(
-    api2.get("me/class-rank", { params: { scope, offset, limit } }),
-  )
+  return api2.get<ClassUserRank>("me/class-rank", {
+    params: { scope, offset, limit },
+  })
 }
 
 export function getClassPK(
@@ -264,16 +197,11 @@ export function getClassPK(
   startTime?: string,
   endTime?: string,
 ) {
-  const payload: any = {
+  return api2.post<ClassComparisonResponse>("classes/comparison", {
     classNames,
-  }
-  if (startTime) {
-    payload.startTime = startTime
-  }
-  if (endTime) {
-    payload.endTime = endTime
-  }
-  return legacyResponse(api2.post("classes/comparison", payload))
+    ...(startTime ? { startTime } : {}),
+    ...(endTime ? { endTime } : {}),
+  })
 }
 
 export function getContestList(query: {
@@ -283,11 +211,11 @@ export function getContestList(query: {
   status: string
   tag: string
 }) {
-  return legacyResponse(api2.get("contests", { params: query }))
+  return api2.get<ContestList>("contests", { params: query })
 }
 
 export function getContest(id: string) {
-  return legacyResponse(api2.get(`contests/${encodeURIComponent(id)}`))
+  return api2.get<OjContest>(`contests/${encodeURIComponent(id)}`)
 }
 
 export function getContestAccess(id: string) {
@@ -301,30 +229,20 @@ export function checkContestPassword(contestID: string, password: string) {
 }
 
 export async function getContestProblems(contestID: string) {
-  const res = await api2.get<any[]>(
+  const res = await api2.get<ProblemListItem[]>(
     `contests/${encodeURIComponent(contestID)}/problems`,
   )
-  return res.data.map(listProblem).map(filterResult)
+  return res.data.map(filterResult)
 }
 
 export function getContestRank(
   contestID: string,
   query: { limit: number; offset: number },
 ) {
-  return legacyResponse<any>(
-    api2.get(`contests/${encodeURIComponent(contestID)}/rank`, {
-      params: query,
-    }),
-  ).then((response) => ({
-    ...response,
-    data: {
-      ...response.data,
-      results: response.data.results.map((item: any) => ({
-        ...item,
-        contest: item.contest_id,
-      })),
-    },
-  }))
+  return api2.get<ContestRank>(
+    `contests/${encodeURIComponent(contestID)}/rank`,
+    { params: query },
+  )
 }
 
 export function uploadAvatar(file: File) {
@@ -335,23 +253,18 @@ export function uploadAvatar(file: File) {
   })
 }
 
-export function updateProfile(data: { real_name: string; mood: string }) {
-  return legacyResponse(
-    api2.put("me/profile", {
-      realName: data.real_name,
-      mood: data.mood,
-    }),
-  )
+export function updateProfile(data: { realName: string; mood: string }) {
+  return api2.put<Profile>("me/profile", data)
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return legacyResponse(
-    api2.get("announcements", { params: { limit, offset } }),
-  )
+  return api2.get<{ results: Announcement[]; total: number }>("announcements", {
+    params: { limit, offset },
+  })
 }
 
 export function getAnnouncement(id: number) {
-  return legacyResponse(api2.get(`announcements/${id}`))
+  return api2.get<Announcement>(`announcements/${id}`)
 }
 
 export function createMessage(data: {
@@ -367,7 +280,10 @@ export function createMessage(data: {
 }
 
 export function getMessageList(offset = 0, limit = 10) {
-  return legacyResponse(api2.get("messages", { params: { limit, offset } }))
+  // language 的收窄同 getSubmissions，见那里的说明
+  return api2.get<{ results: Message[]; total: number }>("messages", {
+    params: { limit, offset },
+  })
 }
 
 export function getReaction(problemID: number) {
@@ -388,7 +304,7 @@ export function getMetrics(userid: number) {
 }
 
 export function getTutorial(id: number) {
-  return legacyResponse(api2.get(`tutorials/${id}`))
+  return api2.get<Tutorial>(`tutorials/${id}`)
 }
 
 export function getTutorials(type: "python" | "c") {
@@ -396,19 +312,7 @@ export function getTutorials(type: "python" | "c") {
 }
 
 export function getAIDetailData(start: string, end: string, username?: string) {
-  return legacyResponse<any>(
-    api2.get("ai/detail", { params: { start, end, username } }),
-  ).then((response) => ({
-    ...response,
-    data: {
-      ...response.data,
-      flowcharts:
-        response.data.flowcharts?.map((item: any) => ({
-          ...item,
-          problem__id: item.problem_id,
-        })) ?? [],
-    },
-  }))
+  return api2.get<AiDetail>("ai/detail", { params: { start, end, username } })
 }
 
 export function getAIDurationData(
@@ -416,95 +320,68 @@ export function getAIDurationData(
   duration: string,
   username?: string,
 ) {
-  return legacyResponse(
-    api2.get("ai/duration", { params: { end, duration, username } }),
-  )
+  return api2.get<DurationData[]>("ai/duration", {
+    params: { end, duration, username },
+  })
 }
 
 export function getAIHeatmapData(username?: string) {
-  return api2.get("ai/heatmap", { params: username ? { username } : {} })
+  return api2.get<HeatmapItem[]>("ai/heatmap", {
+    params: username ? { username } : {},
+  })
 }
 
 export function getAILoginSummary() {
-  return legacyResponse(api2.get("ai/login-summary"))
+  return api2.get<LoginSummary>("ai/login-summary")
 }
 
 export function getAIPinnedReport() {
-  return legacyResponse(api2.get("ai/pinned"))
+  return api2.get<AiAnalysisRecord | null>("ai/pinned")
 }
 
 // ==================== 相似题目推荐 ====================
 
 export function getSimilarProblems(problemId: string) {
   return api2
-    .get<any[]>(`problems/${encodeURIComponent(problemId)}/similar`)
+    .get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
     .then((response) => ({
       ...response,
-      data: response.data.map(listProblem).map(filterResult),
+      data: response.data.map(filterResult),
     }))
 }
 
-export interface YearlyACData {
-  year: number
-  total: number
-  accepted: number
-  ac_rate: number
-}
+export type { YearlyAc as YearlyACData } from "@oj2/contract"
 
 export function getProblemYearlyAC(problemId: string) {
-  return legacyResponse<YearlyACData[]>(
-    api2.get(`problems/${encodeURIComponent(problemId)}/yearly-ac`),
+  return api2.get<YearlyAc[]>(
+    `problems/${encodeURIComponent(problemId)}/yearly-ac`,
   )
 }
 
 // ==================== 流程图相关API ====================
 
 export function submitFlowchart(data: {
-  problem_id: number
-  mermaid_code: string
-  flowchart_data: any // 这个是压缩之后的，元数据太长了
+  problemId: number
+  mermaidCode: string
+  flowchartData: Record<string, unknown> // 压缩之后的，元数据太长了
 }) {
-  return legacyResponse(
-    api2.post("flowcharts", {
-      problemId: data.problem_id,
-      mermaidCode: data.mermaid_code,
-      flowchartData: data.flowchart_data,
-    }),
-  )
+  return api2.post<CreateFlowchartResponse>("flowcharts", data)
 }
 
-function legacyFlowchart(value: unknown) {
-  const item = toLegacy<any>(value)
-  return {
-    ...item,
-    user: item.user_id ?? 0,
-    problem: item.problem_id,
-  }
-}
-
-export async function getFlowchartSubmission(id: string) {
-  const response = await api2.get(`flowcharts/${encodeURIComponent(id)}`)
-  return { ...response, data: legacyFlowchart(response.data) }
+export function getFlowchartSubmission(id: string) {
+  return api2.get<FlowchartSubmission>(`flowcharts/${encodeURIComponent(id)}`)
 }
 
 export function getFlowchartSubmissions(params: {
   username?: string
-  problem_id?: string
+  problemId?: string
   myself?: string
   offset?: number
   limit?: number
   today?: string
   grade?: string
 }) {
-  return legacyResponse<any>(
-    api2.get("flowcharts", {
-      params: {
-        ...params,
-        problemId: params.problem_id,
-        problem_id: undefined,
-      },
-    }),
-  )
+  return api2.get<FlowchartList>("flowcharts", { params })
 }
 
 export function getFlowchartStatistics(
@@ -518,32 +395,19 @@ export function getFlowchartStatistics(
 }
 
 export function retryFlowchartSubmission(submissionId: string) {
-  return legacyResponse(
-    api2.post(`flowcharts/${encodeURIComponent(submissionId)}/retry`),
+  return api2.post<{ status: string }>(
+    `flowcharts/${encodeURIComponent(submissionId)}/retry`,
   )
 }
 
 export function getCurrentProblemFlowchartSubmission(problemId: number) {
-  return api2.get(`problems/${problemId}/flowchart/current`)
+  return api2.get<FlowchartCurrent>(`problems/${problemId}/flowchart/current`)
 }
 
-export async function getFlowchartSubmissionDetail(
-  problemId: number,
-  page = 0,
-) {
-  const response = await api2.get<any>(
-    `problems/${problemId}/flowchart/history`,
-    { params: { page } },
-  )
-  return {
-    ...response,
-    data: {
-      ...response.data,
-      submission: response.data.submission
-        ? legacyFlowchart(response.data.submission)
-        : null,
-    },
-  }
+export function getFlowchartSubmissionDetail(problemId: number, page = 0) {
+  return api2.get<FlowchartDetail>(`problems/${problemId}/flowchart/history`, {
+    params: { page },
+  })
 }
 
 // ==================== 题单相关API ====================
@@ -555,64 +419,17 @@ export function getProblemSetList(
   difficulty = "",
   status = "",
 ) {
-  return legacyResponse<any>(
-    api2.get("problem-sets", {
-      params: {
-        offset,
-        limit,
-        keyword,
-        difficulty,
-        status,
-      },
-    }),
-  ).then(mapProblemSetResponse)
+  return api2.get<ProblemSetList>("problem-sets", {
+    params: { offset, limit, keyword, difficulty, status },
+  })
 }
 
 export function getProblemSetDetail(id: number) {
-  return legacyResponse<any>(api2.get(`problem-sets/${id}`)).then(
-    (response) => ({
-      ...response,
-      data: legacyProblemSet(response.data),
-    }),
-  )
+  return api2.get<ProblemSet>(`problem-sets/${id}`)
 }
 
-function legacyBadge(value: any) {
-  return { ...value, problemset: value.problemset_id }
-}
-
-function legacyProblemSet(value: any) {
-  return {
-    ...value,
-    badges: value.badges?.map(legacyBadge),
-  }
-}
-
-function mapProblemSetResponse(response: ApiResponse<any>) {
-  return {
-    ...response,
-    data: {
-      ...response.data,
-      results: response.data.results.map(legacyProblemSet),
-    },
-  }
-}
-
-export async function getProblemSetProblems(problemSetId: number) {
-  const response = await legacyResponse<any[]>(
-    api2.get(`problem-sets/${problemSetId}/problems`),
-  )
-  return {
-    ...response,
-    data: response.data.map((item) => ({
-      ...item,
-      problemset: item.problemset_id,
-      problem: {
-        ...item.problem,
-        contest: item.problem.contest_id,
-      },
-    })),
-  }
+export function getProblemSetProblems(problemSetId: number) {
+  return api2.get<ProblemSetProblem[]>(`problem-sets/${problemSetId}/problems`)
 }
 
 export function joinProblemSet(problemSetId: number) {
@@ -624,57 +441,35 @@ export function updateProblemSetProgress(
   problemId: number,
   submissionId: string,
 ) {
-  return legacyResponse(
-    api2.put("problem-set-progress", {
-      problemSetId,
-      problemId,
-      submissionId,
-    }),
+  return api2.put("problem-set-progress", {
+    problemSetId,
+    problemId,
+    submissionId,
+  })
+}
+
+export function getUserBadges(username?: string) {
+  return api2.get<UserBadge[]>(
+    `users/${encodeURIComponent(username ?? "me")}/badges`,
   )
 }
 
-// 获取用户徽章列表
-export async function getUserBadges(username?: string) {
-  const response = await legacyResponse<any[]>(
-    api2.get(`users/${encodeURIComponent(username ?? "me")}/badges`),
-  )
-  return {
-    ...response,
-    data: response.data.map((item) => ({
-      ...item,
-      user: item.user_id,
-      badge: legacyBadge(item.badge),
-    })),
-  }
+export function getProblemSetBadges(problemSetId: number) {
+  return api2.get<ProblemSetBadge[]>(`problem-sets/${problemSetId}/badges`)
 }
 
-// 获取题单徽章列表
-export async function getProblemSetBadges(problemSetId: number) {
-  const response = await legacyResponse<any[]>(
-    api2.get(`problem-sets/${problemSetId}/badges`),
-  )
-  return { ...response, data: response.data.map(legacyBadge) }
-}
-
-// 获取题单用户进度列表
 export function getProblemSetUserProgress(
   problemSetId: number,
   params?: {
     limit?: number
     offset?: number
-    class_name?: string
-    completion_status?: "" | "completed" | "in_progress" | "not_started"
+    className?: string
+    completionStatus?: "" | "completed" | "in_progress" | "not_started"
   },
 ) {
-  return legacyResponse(
-    api2.get(`problem-sets/${problemSetId}/user-progress`, {
-      params: {
-        limit: params?.limit,
-        offset: params?.offset,
-        className: params?.class_name,
-        completionStatus: params?.completion_status,
-      },
-    }),
+  return api2.get<ProblemSetProgressList>(
+    `problem-sets/${problemSetId}/user-progress`,
+    { params },
   )
 }
 

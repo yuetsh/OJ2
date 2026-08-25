@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import type {
+  ClassComparison,
+  ClassRankItem as ClassRank,
+  ClassUserRank,
+  Rank,
+} from "utils/types"
 import { formatISO, sub, type Duration } from "date-fns"
 import { NButton, NFlex } from "naive-ui"
 import {
@@ -10,7 +16,6 @@ import {
 } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { getACRate, getCSRFToken } from "utils/functions"
-import type { Rank } from "utils/types"
 import Pagination from "shared/components/Pagination.vue"
 import { ChartType } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
@@ -39,6 +44,7 @@ const query = reactive({
   limit: 10,
   page: 1,
 })
+const message = useMessage()
 const rankChart = ref<Rank[]>([])
 const activityChart = ref<Rank[]>([])
 const duration = ref("months:1")
@@ -46,7 +52,7 @@ const classData = ref<ClassRank[]>([])
 const classQuery = reactive({
   grade: gradeOptions[0].value,
 })
-const myClassData = ref<UserRank[]>([])
+const myClassData = ref<ClassUserRank["ranks"]>([])
 const myRank = ref(-1)
 const myClassName = ref("")
 const myClassScope = ref<"window" | "all">("window")
@@ -137,44 +143,6 @@ async function analyzeSingleClassWithAI() {
   }
 }
 
-interface ClassRank {
-  rank: number
-  class_name: string
-  user_count: number
-  total_ac: number
-  total_submission: number
-  avg_ac: number
-  ac_rate: number
-}
-
-interface ClassComparison {
-  class_name: string
-  user_count: number
-  total_ac: number
-  total_submission: number
-  avg_ac: number
-  median_ac: number
-  q1_ac: number
-  q3_ac: number
-  iqr: number
-  std_dev: number
-  top10_avg: number
-  middle80_avg: number
-  bottom10_avg: number
-  excellent_rate: number
-  pass_rate: number
-  active_rate: number
-  ac_rate: number
-  composite_score: number
-}
-
-interface UserRank {
-  rank: number
-  username: string
-  accepted_number: number
-  submission_number: number
-}
-
 async function init() {
   const offset = (query.page - 1) * query.limit
   const res = await getRank(offset, query.limit, 100)
@@ -251,7 +219,7 @@ const columns: DataTableColumn<Rank>[] = [
     key: "rate",
     width: 120,
     align: "center",
-    render: (row) => getACRate(row.accepted_number, row.submission_number),
+    render: (row) => getACRate(row.acceptedNumber, row.submissionNumber),
   },
 ]
 
@@ -269,15 +237,14 @@ async function listActivity() {
   const current = Date.now()
   const start = formatISO(sub(current, subOptions.value))
   const res = await getActivityRank(start)
-  activityChart.value = res.data.map(
-    (d: { username: string; count: number }) => ({
-      user: {
-        username: d.username,
-      },
-      accepted_number: d.count,
-      submission_number: 0,
-    }),
-  )
+  // 活动榜只有「用户名 + 做题数」，塞进榜单图表复用的 Rank 形状里
+  activityChart.value = res.data.map((d, index) => ({
+    id: index,
+    user: { id: index, username: d.username, realName: null },
+    acceptedNumber: d.count,
+    submissionNumber: 0,
+    mood: null,
+  }))
 }
 
 async function listRank() {
@@ -321,7 +288,7 @@ const classColumns: DataTableColumn<ClassRank>[] = [
     title: "班级",
     key: "class_name",
     render: (row) =>
-      `${row.class_name.slice(0, 2)}计算机${row.class_name.slice(2)}班`,
+      `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
     minWidth: 120,
     titleAlign: "center",
     align: "center",
@@ -360,7 +327,7 @@ const classColumns: DataTableColumn<ClassRank>[] = [
     width: 90,
     titleAlign: "center",
     align: "center",
-    render: (row) => `${row.ac_rate}%`,
+    render: (row) => `${row.acRate}%`,
   },
   {
     title: "详情",
@@ -374,14 +341,14 @@ const classColumns: DataTableColumn<ClassRank>[] = [
         {
           text: true,
           type: "info",
-          onClick: () => loadClassDetail(row.class_name),
+          onClick: () => loadClassDetail(row.className),
         },
         () => "查看",
       ),
   },
 ]
 
-const myClassColumns: DataTableColumn<UserRank>[] = [
+const myClassColumns: DataTableColumn<ClassUserRank["ranks"][number]>[] = [
   {
     title: "排名",
     key: "rank",
@@ -448,7 +415,7 @@ async function listClassRank() {
   if (!userStore.user) {
     await userStore.getMyProfile()
   }
-  const className = userStore.user?.class_name
+  const className = userStore.user?.className
   if (className) {
     classQuery.grade = parseInt(className.slice(0, 2))
   }
@@ -464,8 +431,8 @@ async function listMyClassRank() {
         : 0
     const limit = myClassScope.value === "all" ? myClassQuery.limit : undefined
     const res = await getUserClassRank(myClassScope.value, offset, limit)
-    myRank.value = res.data.my_rank
-    myClassName.value = res.data.class_name
+    myRank.value = res.data.myRank
+    myClassName.value = res.data.className
     myClassData.value = res.data.ranks
     myClassTotal.value = res.data.total ?? res.data.ranks.length
     if (myClassScope.value === "window") {
@@ -610,7 +577,7 @@ watch(
     preset="card"
     :title="
       classDetailData
-        ? `${classDetailData.class_name.slice(0, 2)}计算机${classDetailData.class_name.slice(2)}班`
+        ? `${classDetailData.className.slice(0, 2)}计算机${classDetailData.className.slice(2)}班`
         : '班级详情'
     "
     :style="{ width: '700px', maxWidth: '95vw' }"
@@ -621,7 +588,7 @@ watch(
           <n-gi>
             <n-statistic
               label="总AC数"
-              :value="classDetailData.total_ac"
+              :value="classDetailData.totalAc"
               size="large"
               class="stat-total-ac"
             >
@@ -633,7 +600,7 @@ watch(
           <n-gi>
             <n-statistic
               label="平均AC数"
-              :value="classDetailData.avg_ac.toFixed(2)"
+              :value="classDetailData.avgAc.toFixed(2)"
               size="large"
               class="stat-avg-ac"
             >
@@ -648,7 +615,7 @@ watch(
           <n-gi>
             <n-statistic
               label="中位数AC数"
-              :value="classDetailData.median_ac.toFixed(2)"
+              :value="classDetailData.medianAc.toFixed(2)"
               size="large"
               class="stat-median-ac"
             >
@@ -663,7 +630,7 @@ watch(
           <n-gi>
             <n-statistic
               label="总提交数"
-              :value="classDetailData.total_submission"
+              :value="classDetailData.totalSubmission"
               size="large"
               class="stat-total-submission"
             >
@@ -678,7 +645,7 @@ watch(
           <n-gi>
             <n-statistic
               label="AC率"
-              :value="classDetailData.ac_rate.toFixed(1) + '%'"
+              :value="classDetailData.acRate.toFixed(1) + '%'"
               size="large"
               class="stat-ac-rate"
             >
@@ -699,12 +666,12 @@ watch(
         >
           <n-descriptions-item label="第一四分位数(Q1)">
             <span style="color: #9254de; font-weight: 500">{{
-              classDetailData.q1_ac.toFixed(2)
+              classDetailData.q1Ac.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="第三四分位数(Q3)">
             <span style="color: #f759ab; font-weight: 500">{{
-              classDetailData.q3_ac.toFixed(2)
+              classDetailData.q3Ac.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="四分位距(IQR)">
@@ -714,27 +681,27 @@ watch(
           </n-descriptions-item>
           <n-descriptions-item label="标准差">
             <span style="color: #fa8c16; font-weight: 500">{{
-              classDetailData.std_dev.toFixed(2)
+              classDetailData.stdDev.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="前10%均值">
             <span style="color: #cf1322; font-weight: 600">{{
-              classDetailData.top10_avg.toFixed(2)
+              classDetailData.top10Avg.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="中间80%均值">
             <span style="color: #389e0d; font-weight: 600">{{
-              classDetailData.middle80_avg.toFixed(2)
+              classDetailData.middle80Avg.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="后10%均值">
             <span style="color: #096dd9; font-weight: 500">{{
-              classDetailData.bottom10_avg.toFixed(2)
+              classDetailData.bottom10Avg.toFixed(2)
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="人数">
             <span style="color: #1890ff; font-weight: 600">{{
-              classDetailData.user_count
+              classDetailData.userCount
             }}</span>
           </n-descriptions-item>
         </n-descriptions>
@@ -743,35 +710,35 @@ watch(
           <n-space vertical :size="10">
             <n-progress
               type="line"
-              :percentage="classDetailData.excellent_rate"
+              :percentage="classDetailData.excellentRate"
               :show-indicator="true"
               :border-radius="4"
             >
               <template #default
                 >优秀率:
-                {{ classDetailData.excellent_rate.toFixed(1) }}%</template
+                {{ classDetailData.excellentRate.toFixed(1) }}%</template
               >
             </n-progress>
             <n-progress
               type="line"
-              :percentage="classDetailData.pass_rate"
+              :percentage="classDetailData.passRate"
               :show-indicator="true"
               :border-radius="4"
               status="success"
             >
               <template #default
-                >及格率: {{ classDetailData.pass_rate.toFixed(1) }}%</template
+                >及格率: {{ classDetailData.passRate.toFixed(1) }}%</template
               >
             </n-progress>
             <n-progress
               type="line"
-              :percentage="classDetailData.active_rate"
+              :percentage="classDetailData.activeRate"
               :show-indicator="true"
               :border-radius="4"
               status="info"
             >
               <template #default
-                >参与度: {{ classDetailData.active_rate.toFixed(1) }}%</template
+                >参与度: {{ classDetailData.activeRate.toFixed(1) }}%</template
               >
             </n-progress>
           </n-space>
@@ -784,7 +751,7 @@ watch(
           style="margin-top: 12px"
         >
           <n-tag type="success" size="large">
-            综合分: {{ classDetailData.composite_score.toFixed(1) }}
+            综合分: {{ classDetailData.compositeScore.toFixed(1) }}
           </n-tag>
           <n-button
             type="info"

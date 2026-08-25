@@ -35,7 +35,7 @@ const chartData = computed(() => ({
   datasets: [
     {
       label: "AC 率",
-      data: props.data.map((d) => d.ac_rate),
+      data: props.data.map((d) => d.acRate),
       fill: true,
       tension: 0.3,
       backgroundColor: "rgba(99, 179, 237, 0.2)",
@@ -58,7 +58,7 @@ const chartOptions = computed(() => ({
       callbacks: {
         label: (context: any) => {
           const d = props.data[context.dataIndex]
-          return [`AC 率: ${d.ac_rate}%`, `通过: ${d.accepted} / ${d.total}`]
+          return [`AC 率: ${d.acRate}%`, `通过: ${d.accepted} / ${d.total}`]
         },
       },
     },

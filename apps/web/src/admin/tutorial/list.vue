@@ -1,18 +1,18 @@
 <script setup lang="ts">
 import { NSwitch } from "naive-ui"
 import { parseTime } from "utils/functions"
-import type { Tutorial } from "utils/types"
+import type { TutorialListItem } from "utils/types"
 import { getTutorialList, setTutorialVisibility } from "../api"
 import Actions from "./components/Actions.vue"
 
-const tutorials = ref<{ [key: string]: Tutorial[] }>({
+const tutorials = ref<{ [key: string]: TutorialListItem[] }>({
   python: [],
   c: [],
 })
 const message = useMessage()
 const activeTab = ref("python")
 
-const columns: DataTableColumn<Tutorial>[] = [
+const columns: DataTableColumn<TutorialListItem>[] = [
   {
     title: "顺序",
     key: "order",
@@ -21,29 +21,29 @@ const columns: DataTableColumn<Tutorial>[] = [
   { title: "标题", key: "title", minWidth: 200 },
   {
     title: "作者",
-    key: "created_by",
-    render: (row) => row.created_by?.username,
+    key: "createdBy",
+    render: (row) => row.createdBy?.username,
     width: 80,
   },
   {
     title: "创建时间",
-    key: "created_at",
+    key: "createdAt",
     width: 180,
-    render: (row) => parseTime(row.created_at!, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createdAt!, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "更新时间",
-    key: "updated_at",
+    key: "updatedAt",
     width: 180,
-    render: (row) => parseTime(row.updated_at!, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.updatedAt!, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "可见",
-    key: "is_public",
+    key: "isPublic",
     width: 100,
     render: (row) =>
       h(NSwitch, {
-        value: row.is_public,
+        value: row.isPublic,
         size: "small",
         rubberBand: false,
         onUpdateValue: () => toggleVisible(row),
@@ -58,14 +58,14 @@ const columns: DataTableColumn<Tutorial>[] = [
   },
 ]
 
-async function toggleVisible(tutorial: Tutorial) {
-  tutorial.is_public = !tutorial.is_public
+async function toggleVisible(tutorial: TutorialListItem) {
+  tutorial.isPublic = !tutorial.isPublic
   try {
-    await setTutorialVisibility(tutorial.id, tutorial.is_public)
+    await setTutorialVisibility(tutorial.id, tutorial.isPublic)
     message.success("更新成功")
   } catch (err: any) {
     message.error(err.data)
-    tutorial.is_public = !tutorial.is_public
+    tutorial.isPublic = !tutorial.isPublic
   }
 }
 

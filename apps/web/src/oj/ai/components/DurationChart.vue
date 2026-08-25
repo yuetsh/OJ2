@@ -73,14 +73,14 @@ const data = computed<ChartData<"bar" | "line">>(() => {
       {
         type: "bar",
         label: "完成题目数",
-        data: aiStore.durationData.map((duration) => duration.problem_count),
+        data: aiStore.durationData.map((duration) => duration.problemCount),
         yAxisID: "y",
         order: 2,
       },
       {
         type: "bar",
         label: "总提交次数",
-        data: aiStore.durationData.map((duration) => duration.submission_count),
+        data: aiStore.durationData.map((duration) => duration.submissionCount),
         yAxisID: "y",
         order: 2,
       },

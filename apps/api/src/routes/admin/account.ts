@@ -227,7 +227,6 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
       acmProblemsStatus: {},
       submissionNumber: 0,
       acceptedNumber: 0,
-      totalScore: 0,
     })))
     return users.length
   })

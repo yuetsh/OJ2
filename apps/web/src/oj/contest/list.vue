@@ -3,7 +3,7 @@ import { useRouteQuery } from "@vueuse/router"
 import { NTag } from "naive-ui"
 import { getContestList } from "oj/api"
 import { duration, parseTime } from "utils/functions"
-import type { Contest } from "utils/types"
+import type { OjContest } from "utils/types"
 import ContestTitle from "shared/components/ContestTitle.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { useAuthModalStore } from "shared/store/authModal"
@@ -29,7 +29,7 @@ const { query, clearQuery } = usePagination<ContestQuery>({
   tag: useRouteQuery("tag", "").value,
 })
 
-const data = ref<Contest[]>([])
+const data = ref<OjContest[]>([])
 const total = ref(0)
 
 const options: SelectOption[] = [
@@ -46,7 +46,7 @@ const tags: SelectOption[] = [
   { label: "期末", value: "期末" },
 ]
 
-const columns: DataTableColumn<Contest>[] = [
+const columns: DataTableColumn<OjContest>[] = [
   {
     title: renderTableTitle("状态", "streamline-emojis:collision"),
     key: "status",
@@ -74,13 +74,13 @@ const columns: DataTableColumn<Contest>[] = [
     title: renderTableTitle("开始时间", "fluent-emoji-flat:eleven-thirty"),
     key: "start_time",
     width: 180,
-    render: (row) => parseTime(row.start_time),
+    render: (row) => parseTime(row.startTime),
   },
   {
     title: renderTableTitle("比赛时长", "streamline-emojis:fishing-pole"),
     key: "duration",
     width: 180,
-    render: (row) => duration(row.start_time, row.end_time),
+    render: (row) => duration(row.startTime, row.endTime),
   },
 ]
 
@@ -116,11 +116,11 @@ watchDebounced(() => query.keyword, listContests, {
 // 监听其他查询条件变化
 watch(() => [query.page, query.limit, query.status, query.tag], listContests)
 
-function rowProps(row: Contest) {
+function rowProps(row: OjContest) {
   return {
     style: "cursor: pointer",
     onClick() {
-      if (!userStore.isAuthed && row.contest_type === ContestType.private) {
+      if (!userStore.isAuthed && row.contestType === ContestType.private) {
         authStore.openLoginModal()
       } else {
         router.push("/contest/" + row.id)

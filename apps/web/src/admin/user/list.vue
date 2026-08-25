@@ -66,28 +66,29 @@ const columns: DataTableColumn<User>[] = [
     title: "密码",
     key: "raw_password",
     width: 100,
-    render: (row) => h(TextCopy, () => row.raw_password),
+    render: (row) => h(TextCopy, () => row.rawPassword),
   },
   {
     title: "创建时间",
     key: "create_time",
     width: 200,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) =>
+      row.createTime ? parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss") : "",
   },
   {
     title: "上次登录",
     key: "last_login",
     width: 200,
     render: (row) =>
-      row.last_login
-        ? parseTime(row.last_login, "YYYY-MM-DD HH:mm:ss")
+      row.lastLogin
+        ? parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss")
         : "从未登录",
   },
   {
     title: "真名",
     key: "real_name",
     width: 100,
-    render: (row) => h(TextCopy, () => row.real_name),
+    render: (row) => h(TextCopy, () => row.realName),
   },
   { title: "邮箱", key: "email", width: 200 },
   {
@@ -145,8 +146,8 @@ async function onResetPassword(user: User) {
   const res = await resetPassword(user.id)
   message.success(`【${user.username}】的密码已重置成【${res.data}】`)
   users.value = users.value.map((it) => {
-    if (it.id === user.id && user.admin_type === USER_TYPE.REGULAR_USER) {
-      it.raw_password = res.data
+    if (it.id === user.id && user.adminType === USER_TYPE.REGULAR_USER) {
+      it.rawPassword = res.data
     }
     return it
   })
@@ -155,7 +156,7 @@ async function onResetPassword(user: User) {
 async function onUserBanned(user: User) {
   users.value = users.value.map((it) => {
     if (it.id === user.id) {
-      it.is_disabled = user.is_disabled
+      it.isDisabled = user.isDisabled
     }
     return it
   })
@@ -166,14 +167,16 @@ function createNewUser() {
   userEditing.value = {
     id: 0,
     username: "",
-    real_name: "",
+    realName: "",
     email: "",
-    admin_type: "Student Admin",
-    problem_permission: "None",
-    create_time: new Date(),
-    last_login: new Date(),
-    open_api: false,
-    is_disabled: false,
+    adminType: "Student Admin",
+    problemPermission: "None",
+    createTime: null,
+    lastLogin: null,
+    openApi: false,
+    isDisabled: false,
+    rawPassword: null,
+    className: null,
     password: "",
   }
   password.value = ""
@@ -204,8 +207,8 @@ async function handleEditUser() {
         [
           userEditing.value.username,
           password.value,
-          userEditing.value.email,
-          userEditing.value.real_name,
+          userEditing.value.email ?? "",
+          userEditing.value.realName ?? "",
         ],
       ]
       await importUsers(newUser)
@@ -303,16 +306,16 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
           <n-input v-model:value="userEditing.username" />
         </n-form-item-gi>
         <n-form-item-gi :span="1" label="真名">
-          <n-input v-model:value="userEditing.real_name" />
+          <n-input v-model:value="userEditing.realName" />
         </n-form-item-gi>
         <n-form-item-gi v-if="!create" :span="1" label="班级">
-          <n-input v-model:value="userEditing.class_name" />
+          <n-input v-model:value="userEditing.className" />
         </n-form-item-gi>
         <n-form-item-gi :span="1" label="邮箱">
           <n-input v-model:value="userEditing.email" />
         </n-form-item-gi>
         <n-form-item-gi v-if="!create" :span="1" label="类型">
-          <n-select v-model:value="userEditing.admin_type" :options="options" />
+          <n-select v-model:value="userEditing.adminType" :options="options" />
         </n-form-item-gi>
         <n-form-item-gi
           :span="1"
@@ -324,20 +327,20 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
         <n-form-item-gi
           v-if="
             !create &&
-            (userEditing.admin_type === USER_TYPE.STUDENT_ADMIN ||
-              userEditing.admin_type === USER_TYPE.TEACHER_ADMIN)
+            (userEditing.adminType === USER_TYPE.STUDENT_ADMIN ||
+              userEditing.adminType === USER_TYPE.TEACHER_ADMIN)
           "
           :span="1"
           label="出题权限"
         >
           <n-select
-            v-model:value="userEditing.problem_permission"
+            v-model:value="userEditing.problemPermission"
             :options="problemPermissionOptions"
           />
         </n-form-item-gi>
 
         <n-form-item-gi v-if="!create" :span="1" label="是否封禁">
-          <n-switch v-model:value="userEditing.is_disabled">封号</n-switch>
+          <n-switch v-model:value="userEditing.isDisabled">封号</n-switch>
         </n-form-item-gi>
       </n-grid>
       <n-flex justify="end">

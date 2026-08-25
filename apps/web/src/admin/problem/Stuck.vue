@@ -1,36 +1,28 @@
 <script setup lang="ts">
 import { getStuckProblems } from "admin/api"
-
-interface StuckProblem {
-  problem_id: string
-  problem_title: string
-  total: number
-  failed: number
-  failed_users: number
-  ac_rate: number
-}
+import type { StuckProblem } from "utils/types"
 
 const loading = ref(true)
 const data = ref<StuckProblem[]>([])
 
 const columns: DataTableColumn<StuckProblem>[] = [
-  { title: "题目 ID", key: "problem_id", width: 100 },
-  { title: "题目名称", key: "problem_title", minWidth: 200 },
+  { title: "题目 ID", key: "problemId", width: 100 },
+  { title: "题目名称", key: "problemTitle", minWidth: 200 },
   { title: "总提交", key: "total", width: 100, sorter: "default" },
   { title: "失败次数", key: "failed", width: 100, sorter: "default" },
   {
     title: "卡住学生数",
-    key: "failed_users",
+    key: "failedUsers",
     width: 120,
     sorter: "default",
     defaultSortOrder: "descend",
   },
   {
     title: "AC 率",
-    key: "ac_rate",
+    key: "acRate",
     width: 100,
     sorter: "default",
-    render: (row) => `${row.ac_rate}%`,
+    render: (row) => `${row.acRate}%`,
   },
 ]
 

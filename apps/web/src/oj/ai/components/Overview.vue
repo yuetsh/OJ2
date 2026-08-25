@@ -8,9 +8,9 @@
     <span>你一共解决 </span>
     <b class="charming"> {{ aiStore.detailsData.solved.length }} </b>
     <span> 道题</span>
-    <span v-if="aiStore.detailsData.contest_count > 0">
+    <span v-if="aiStore.detailsData.contestCount > 0">
       ，并且参加
-      <b class="charming"> {{ aiStore.detailsData.contest_count }} </b>
+      <b class="charming"> {{ aiStore.detailsData.contestCount }} </b>
       次比赛
     </span>
     <span>，综合评价给到</span>
@@ -49,6 +49,7 @@ const durationLabel = computed(() => {
 
 const greeting = computed(() => {
   return {
+    "": "还没有足够的数据来评级",
     S: "要不试试高难度题目？",
     A: "你很棒，继续保持！",
     B: "请再接再厉！",

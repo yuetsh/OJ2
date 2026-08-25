@@ -25,7 +25,7 @@ const chineseAnnotations: Record<string, ChineseCompletion[]> = {
 
 // SQL 题：当前题目的表名和字段名补全，数据来自 sql_display
 function sqlSchemaCompletions(): Completion[] {
-  const tables = useProblemStore().problem?.sql_display?.tables ?? []
+  const tables = useProblemStore().problem?.sqlDisplay?.tables ?? []
   return tables.flatMap((table) => [
     {
       label: table.name,

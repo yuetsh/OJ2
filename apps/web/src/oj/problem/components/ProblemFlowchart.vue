@@ -11,13 +11,13 @@ const { renderError, renderFlowchart } = useMermaid()
 const renderProblemFlowchart = async () => {
   await renderFlowchart(
     mermaidContainer.value,
-    problem.value?.mermaid_code ?? "",
+    problem.value?.mermaidCode ?? "",
   )
 }
 
 onMounted(renderProblemFlowchart)
 
-watch(() => problem.value?.mermaid_code, renderProblemFlowchart)
+watch(() => problem.value?.mermaidCode, renderProblemFlowchart)
 </script>
 
 <template>

@@ -1,45 +1,47 @@
-import { ContestStatus, ContestType, LANGUAGE_SHOW_VALUE } from "./constants"
+import { LANGUAGE_SHOW_VALUE } from "./constants"
+import type {
+  AdminProblem as ContractAdminProblem,
+  SubmissionDetail,
+  SubmissionListItem as ContractSubmissionListItem,
+  AdminContest,
+  AdminUser,
+  RankProfile,
+  SessionUser,
+  UserProfile,
+  EmbeddedSubmission as ContractEmbeddedSubmission,
+  Grade,
+  ProblemDetail,
+  ProblemDifficulty,
+} from "@oj2/contract"
 
-export interface Profile {
-  id: number
-  user: User
-  real_name: string
-  acm_problems_status: {
-    problems: {
-      [key: string]: {
-        _id: string
-        status: number
-      }
-    }
+/**
+ * 个人主页数据。`acmProblemsStatus` 的**内容**保持 snake_case ——
+ * 它是 user_profile.acm_problems_status 的 JSONB 原文，回滚时旧后端还要读。
+ */
+export type Profile = Omit<UserProfile, "user" | "acmProblemsStatus"> & {
+  user: SessionUser
+  acmProblemsStatus: AcmProblemsStatus
+}
+
+export interface AcmProblemsStatus {
+  problems?: {
+    [key: string]: { _id: string; status: number }
   }
-  avatar: string
-  blog: null
-  mood: string
-  github: string
-  school: string
-  major: string
-  language: string
-  accepted_number: number
-  submission_number: number
+  contest_problems?: {
+    [key: string]: { [key: string]: { _id: string; status: number } }
+  }
 }
 
 export type UserAdminType =
   "Regular User" | "Student Admin" | "Teacher Admin" | "Super Admin"
 
-export interface User {
-  id: number
-  username: string
-  real_name: string
-  email: string
-  admin_type: UserAdminType
-  problem_permission: string
-  create_time: Date
-  last_login: Date
-  open_api: boolean
-  is_disabled: boolean
+/**
+ * 后台用户管理里的用户。`rawPassword` 是明文密码，只有超管专属接口下发 ——
+ * 老师要能查学生密码，见契约 adminUserSchema 的注释。
+ */
+export type User = AdminUser & {
+  // 编辑表单里临时填的新密码，不在响应里
   password?: string
-  raw_password?: string
-  class_name?: string | null
 }
 
 export type LANGUAGE =
@@ -95,7 +97,7 @@ export type ProblemStatus = "passed" | "failed" | "not_test"
 interface SampleUser {
   id: number
   username: string
-  real_name: string | null
+  realName: string | null
 }
 
 export interface Tag {
@@ -103,11 +105,13 @@ export interface Tag {
   name: string
 }
 
-export interface AdminTag {
-  id: number
-  name: string
-  problem_count: number
-}
+export type {
+  AdminTag,
+  RenameTagResponse,
+  BatchProblemTagResponse,
+  SqlTestCaseScript,
+  GenerateSqlTestCaseResponse,
+} from "@oj2/contract"
 
 export interface TestcaseUploadedReturns {
   id: string
@@ -120,88 +124,89 @@ export interface Testcase {
   score: string
 }
 
-export interface Problem {
-  _id: string
-  id: number
-  tags: string[]
-  created_by: SampleUser
+/**
+ * 题目详情。以契约的 ProblemDetail 为准，只在这里补两处前端自己的窄化：
+ * - `languages` / `template` 的键窄化成 LANGUAGE，组件按语言查模板要靠它
+ * - `astRules` / `sqlConfig` / `sqlDisplay` 契约里是 Record<string, unknown>，
+ *   这里给出组件实际读的形状
+ */
+export type Problem = Omit<
+  ProblemDetail,
+  "languages" | "template" | "sqlConfig" | "sqlDisplay"
+> & {
+  languages: LANGUAGE[]
   template: { [key in LANGUAGE]?: string }
-  title: string
-  description: string
-  input_description: string
-  output_description: string
-  samples: {
-    input: string
-    output: string
-  }[]
-  hint: string
-  languages: Array<LANGUAGE>
-  create_time: Date
-  last_update_time: null
-  time_limit: number
-  memory_limit: number
-  difficulty: "Low" | "Mid" | "High"
-  source: string
-  prompt: string
-  answers: { language: LANGUAGE; code: string }[]
-  submission_number: number
-  accepted_number: number
-  statistic_info: { [key: string]: number }
-  share_submission: boolean
-  contest: number
-  my_status: number
-  my_failed_count?: number
-  visible: boolean
-
-  // 流程图相关字段
-  allow_flowchart: boolean
-  mermaid_code?: string
-  flowchart_data?: Record<string, any>
-  flowchart_hint?: string
-  show_flowchart?: boolean
-  ast_rules?: {
-    [key: string]: {
-      engine: string
-      target?: string
-      min?: number
-      max?: number
-      message: string
-    }[]
-  } | null
-  has_ast_rules?: boolean
-
-  // SQL 题配置（非 SQL 题为 null）
-  sql_config?: SQLConfig | null
-
-  // SQL 题展示数据（后端保存题目时自动生成）
-  sql_display?: SQLDisplay | null
+  sqlConfig?: SQLConfig | null
+  sqlDisplay?: SQLDisplay | null
+  astRules?: AstRules | null
+  hasAstRules?: boolean
+  visible?: boolean
+  answers?: { language: LANGUAGE; code: string }[]
 }
 
-export type AdminProblem = Problem &
-  AlterProblem & {
-    // 后台题目列表接口附带的最高票评价，比赛题目列表不返回
-    top_reaction?: { type: ReactionKey; count: number } | null
-  }
+export type AstRules = {
+  [key: string]: {
+    engine: string
+    target?: string
+    min?: number
+    max?: number
+    message: string
+  }[]
+}
 
-interface AlterProblem {
-  test_case_id: string
-  test_case_score: Testcase[]
-  contest_id?: string
+export type {
+  ProblemDetail,
+  ProblemListItem,
+  AdminProblemListItem,
+  AdminProblemList,
+} from "@oj2/contract"
+
+/** 后台题目详情：比 oj 侧多 answers / testCase* / astRules */
+export type AdminProblem = Omit<
+  ContractAdminProblem,
+  | "languages"
+  | "template"
+  | "testCaseScore"
+  | "sqlConfig"
+  | "sqlDisplay"
+  | "samples"
+  | "answers"
+  | "astRules"
+> & {
+  languages: LANGUAGE[]
+  template: { [key in LANGUAGE]?: string }
+  // 测试点条目的键名由判题沙箱定，保持 snake_case
+  testCaseScore: Testcase[]
+  samples: { input: string; output: string }[]
+  answers: { language: LANGUAGE; code: string }[]
+  sqlConfig?: SQLConfig | null
+  sqlDisplay?: SQLDisplay | null
+  astRules?: AstRules | null
 }
 
 type ExcludeKeys =
   | "id"
-  | "created_by"
-  | "create_time"
-  | "last_update_time"
-  | "my_status"
-  | "contest"
-  | "statistic_info"
-  | "accepted_number"
-  | "submission_number"
+  | "createdBy"
+  | "createTime"
+  | "lastUpdateTime"
+  | "statisticInfo"
+  | "acceptedNumber"
+  | "submissionNumber"
+  | "isPublic"
+  | "contestId"
 
-export type BlankProblem = Omit<Problem, ExcludeKeys> &
-  AlterProblem & { id?: number }
+export type BlankProblem = Omit<
+  AdminProblem,
+  ExcludeKeys | "hint" | "mermaidCode"
+> & {
+  id?: number
+  // 新建比赛题时由 detail.vue 在提交前写进来
+  contestId?: number | null
+  // 表单里恒为字符串：初值 ""，从服务器载入时归一化。
+  // v-model 要的是 lvalue，模板里没法 ?? 兜底，所以在类型上就收掉 null
+  hint: string
+  mermaidCode: string
+}
 
 export interface ProblemFiltered {
   _id: string
@@ -213,9 +218,9 @@ export interface ProblemFiltered {
   rate: string
   status: "not_test" | "passed" | "failed"
   author: string
-  allow_flowchart: boolean
-  show_flowchart: boolean
-  has_ast_rules: boolean
+  allowFlowchart: boolean
+  showFlowchart: boolean
+  hasAstRules: boolean
 }
 
 export interface AdminProblemFiltered {
@@ -224,112 +229,35 @@ export interface AdminProblemFiltered {
   title: string
   visible: boolean
   username: string
-  create_time: string
-  difficulty: "Low" | "Mid" | "High"
+  createTime: string
+  difficulty: ProblemDifficulty
   tags: string[]
-  has_ast_rules: boolean
-  allow_flowchart: boolean
-  show_flowchart: boolean
+  hasAstRules: boolean
+  allowFlowchart: boolean
+  showFlowchart: boolean
   // 比赛题目列表接口不返回这个字段
-  top_reaction?: { type: ReactionKey; count: number } | null
+  topReaction?: { type: ReactionKey; count: number } | null
 }
 
 // 题单相关类型
-export interface ProblemSet {
-  id: number
-  title: string
-  description: string
-  created_by: SampleUser
-  create_time: Date
-  difficulty: "Easy" | "Medium" | "Hard"
-  status: "active" | "archived" | "draft"
-  end_time: Date | null
-  visible: boolean
-  problems_count: number
-  completed_count: number
-  user_progress: {
-    is_joined: boolean
-    progress_percentage: number
-    completed_count: number
-    total_count: number
-    is_completed: boolean
-  }
-}
+export type {
+  ProblemSet,
+  ProblemSetList,
+  ProblemSetBadge,
+  ProblemSetProblem,
+  ProblemSetProgress,
+  ProblemSetProgressList,
+  UserBadge,
+} from "@oj2/contract"
 
-export interface ProblemSetList {
-  id: number
-  title: string
-  description: string
-  created_by: SampleUser
-  create_time: Date
-  difficulty: "Easy" | "Medium" | "Hard"
-  status: "active" | "archived" | "draft"
-  end_time: Date | null
-  problems_count: number
-  visible: boolean
-  user_progress: {
-    is_joined: boolean
-    progress_percentage: number
-    completed_count: number
-    total_count: number
-    is_completed: boolean
-  }
-  badges: ProblemSetBadge[]
-}
-
-export interface ProblemSetProblem {
-  id: number
-  problemset: number
-  problem: Problem
-  order: number
-  is_required: boolean
-  score: number
-  hint: string
-  is_completed: boolean
-}
-
-export interface ProblemSetBadge {
-  id: number
-  problemset: number
-  name: string
-  description: string
-  icon: string
-  condition_type: "all_problems" | "problem_count" | "score"
-  condition_value: number
-  is_earned?: boolean
-}
-
-export interface UserBadge {
-  id: number
-  user: number
-  badge: ProblemSetBadge
-  earned_time: Date
-}
-
-export interface CompletedProblem {
-  id: number
-  _id: string
-  title: string
-}
-
-export interface ProblemSetProgress {
-  id: number
-  problemset: ProblemSetList
-  user: SampleUser
-  join_time: Date
-  completed_problems_count: number
-  total_problems_count: number
-  progress_percentage: number
-  is_completed: boolean
-  completed_problems: CompletedProblem[]
-}
+export type { CompletedProblem } from "@oj2/contract"
 
 export interface CreateProblemSetData {
   title: string
   description: string
   difficulty: "Easy" | "Medium" | "Hard"
   status: "active" | "archived" | "draft"
-  end_time?: Date | null
+  endTime?: Date | null
 }
 
 export interface EditProblemSetData {
@@ -338,7 +266,7 @@ export interface EditProblemSetData {
   description?: string
   difficulty?: "Easy" | "Medium" | "Hard"
   status?: "active" | "archived" | "draft"
-  end_time?: Date | null
+  endTime?: Date | null
   visible?: boolean
 }
 
@@ -348,10 +276,10 @@ export interface Code {
 }
 
 export interface SubmitCodePayload {
-  problem_id: number
+  problemId: number
   language: LANGUAGE
   code: string
-  contest_id?: number
+  contestId?: number
 }
 
 // ==================== 流程图相关类型 ====================
@@ -363,47 +291,17 @@ export const FlowchartSubmissionStatus = {
   FAILED: 3, // 评分失败
 } as const
 
-export interface FlowchartSubmission {
-  id: string
-  user: number
-  problem: number
-  mermaid_code: string
-  flowchart_data: Record<string, any>
-  status: number
-  create_time: string
-  ai_score?: number
-  ai_grade?: string
-  ai_feedback?: string
-  ai_suggestions?: string
-  ai_criteria_details: Record<string, any>
-  ai_provider?: string
-  ai_model?: string
-  processing_time?: number
-  evaluation_time?: string
-}
+export type {
+  FlowchartSubmission,
+  FlowchartListItem as FlowchartSubmissionListItem,
+} from "@oj2/contract"
 
-// 列表接口返回的字段（包含 username 和 problem_title）
-export interface FlowchartSubmissionListItem {
-  id: string
-  create_time: string
-  evaluation_time: string
-  ai_score: number
-  ai_grade: Grade
-  ai_model: string
-  ai_provider: string
-  processing_time: number
-  status: number
-  username: string
-  problem_title: string
-  problem: string
-  show_link: boolean
-}
-export interface SubmitFlowchartPayload {
-  problem_id: number
-  mermaid_code: string
-  flowchart_data?: Record<string, any>
-}
+export type { CreateFlowchartRequest as SubmitFlowchartPayload } from "@oj2/contract"
 
+/**
+ * 判题机原始输出。契约里是 `info: z.unknown()` —— 后端不校验沙箱产物，
+ * 这些键名是沙箱定的，**保持 snake_case**，不要跟着响应字段一起改名。
+ */
 interface Info {
   err: string | null
   data: {
@@ -420,53 +318,57 @@ interface Info {
   }[]
 }
 
-export interface Submission {
-  id: string
-  create_time: Date
-  user_id: number
-  username: string
-  code: string
-  result: SUBMISSION_RESULT
-  info: Info
-  language: LANGUAGE
-  shared: boolean
-  show_link: boolean
-  statistic_info: {
-    score?: number
-    err_info?: string
-    time_cost?: number
-    memory_cost?: number
-    ast_results?: Array<{ description: string; passed: boolean }>
-  }
-  ip: string
-  contest: number
-  problem: number // 不是 display_id
-  can_unshare: boolean
+/**
+ * 判题产出的统计。**键名保持 snake_case** —— 这是 submission.statistic_info
+ * JSONB 的原文，判题机写进去、回滚时旧后端还要读，不能跟着响应字段一起改名。
+ */
+export interface StatisticInfo {
+  score?: number
+  err_info?: string
+  time_cost?: number
+  memory_cost?: number
+  ast_results?: Array<{ description: string; passed: boolean }>
 }
 
-export interface SubmissionListItem {
-  id: string
-  problem: string
-  problem_title: string
-  show_link: boolean
-  create_time: string
-  user_id: number
-  username: string
-  result: SUBMISSION_RESULT
+/**
+ * 提交详情。以契约的 SubmissionDetail 为准，只窄化两处 unknown：
+ * `info` 是判题沙箱原始输出，`statisticInfo` 是判题写的 JSONB —— 两者内部都是 snake。
+ */
+export type Submission = Omit<
+  SubmissionDetail,
+  "info" | "statisticInfo" | "language" | "result"
+> & {
+  info: Info
+  statisticInfo: StatisticInfo
   language: LANGUAGE
-  shared: boolean
-  statistic_info: {
-    time_cost: number
-    memory_cost: number
-  }
+  // 比契约多一个 9：点了提交、还没拿到结果时前端本地先填这个伪状态，
+  // 见 constants.ts 的 SubmissionStatus.submitting
+  result: SUBMISSION_RESULT
+}
+
+/** 站内信里嵌的提交：problem 是展示题号而非数字 id，且不含 info / ip / contestId */
+export type EmbeddedSubmission = Omit<
+  ContractEmbeddedSubmission,
+  "statisticInfo" | "language"
+> & {
+  statisticInfo: StatisticInfo
+  language: LANGUAGE
+}
+
+export type SubmissionListItem = Omit<
+  ContractSubmissionListItem,
+  "statisticInfo" | "language"
+> & {
+  statisticInfo: StatisticInfo
+  language: LANGUAGE
 }
 
 export interface SubmissionListPayload {
   myself?: "1" | "0"
   result?: string
   username?: string
-  contest_id?: string
-  problem_id?: string
+  contestId?: string
+  problemId?: string
   language: LANGUAGE | ""
   today?: "1" | "0"
   page: number
@@ -474,59 +376,37 @@ export interface SubmissionListPayload {
   offset: number
 }
 
-export interface Rank {
-  id: number
-  user: SampleUser
-  acm_problems_status: {
-    problems: {
-      [key: string]: {
-        _id: string
-        status: number
-      }
-    }
-    contest_problems?: {
-      [key: string]: {
-        [key: string]: {
-          _id: string
-          status: number
-        }
-      }
-    }
-  }
-  real_name: null | string
-  avatar: string
-  blog: null
-  mood: null | string
-  github: null
-  school: null | string
-  major: null | string
-  language: null | string
-  accepted_number: number
-  submission_number: number
-}
+export type { SessionUser } from "@oj2/contract"
 
-export interface Contest extends BlankContest {
-  id: number
-  created_by: SampleUser
-  status: ContestStatus
-  contest_type: ContestType
-  create_time: string
-  now: string
-  last_update_time: string
-}
+export type Rank = RankProfile
 
-export interface BlankContest {
-  title: string
-  description: string
-  tag: string
-  start_time: string
-  end_time: string
-  password: string
-  visible: boolean
-  allowed_ip_ranges: { value: string }[]
-}
+export type {
+  ClassComparison,
+  ClassRankItem,
+  ClassUserRank,
+} from "@oj2/contract"
 
-interface SubmissionInfo {
+/** 后台比赛。oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生） */
+export type Contest = AdminContest
+
+/** 学生侧的比赛：不含 password / visible / allowedIpRanges */
+export type { Contest as OjContest } from "@oj2/contract"
+
+export type BlankContest = Omit<
+  AdminContest,
+  | "id"
+  | "createdBy"
+  | "createTime"
+  | "lastUpdateTime"
+  | "status"
+  | "contestType"
+>
+
+/**
+ * acm_contest_rank.submission_info 的 JSONB 内容。**键名保持 snake_case** ——
+ * 判题写进去、回滚时旧后端还要读，不能跟着响应字段一起改名。
+ */
+export interface SubmissionInfo {
   is_ac: boolean
   ac_time: number
   is_first_ac: boolean
@@ -534,42 +414,34 @@ interface SubmissionInfo {
   checked?: boolean
 }
 
-export interface ContestRank {
-  id: number
-  user: SampleUser
-  submission_number: number
-  accepted_number: number
-  total_time: number
-  submission_info: { [key: string]: SubmissionInfo }
-  contest: number
+/**
+ * 榜单行。`submissionInfo` 的**内容**仍是 snake_case —— 它是 acm_contest_rank
+ * 表的 JSONB 原文，回滚时旧后端还要读，见 SubmissionInfo。
+ */
+export type ContestRank = Omit<
+  import("@oj2/contract").ContestRankItem,
+  "submissionInfo"
+> & {
+  submissionInfo: { [key: string]: SubmissionInfo }
 }
 
-export interface WebsiteConfig {
-  website_base_url: string
-  website_name: string
-  website_name_shortcut: string
-  website_footer: string
-  allow_register: boolean
-  submission_list_show_all: boolean
-  class_list: string[] & never[]
-  enable_maxkb: boolean
-}
+export type { WebsiteConfig } from "@oj2/contract"
 
-export interface Server {
-  id: number
-  status: "abnormal" | "normal"
-  hostname: string
-  ip: string
-  judger_version: string
-  cpu_core: number
-  memory_usage: number
-  cpu_usage: number
-  last_heartbeat: Date
-  create_time: Date
-  task_number: number
-  service_url: string
-  is_disabled: boolean
-}
+export type {
+  JudgeServer as Server,
+  JudgeServerList,
+  DashboardInfo,
+  OrphanTestCase,
+  AdminUser,
+  AdminUserList,
+  AcmHelperItem,
+  AdminContestList,
+  AdminAiReport,
+  AdminAiReportListItem,
+  AdminAiReportList,
+  StuckProblem,
+  AcTrend,
+} from "@oj2/contract"
 
 export interface AnnouncementEdit {
   id: number
@@ -581,16 +453,20 @@ export interface AnnouncementEdit {
 }
 
 export interface Announcement extends AnnouncementEdit {
-  created_by: SampleUser
-  create_time: Date
-  last_update_time: Date
+  createdBy: SampleUser
+  createTime: string
+  lastUpdateTime: string
 }
 
+/** 列表不下发正文：公告是 8MB 上限的富文本，列表页只显示标题 */
+export type AnnouncementListItem = Omit<Announcement, "content">
+
 export interface Message {
-  sender: User
-  create_time: Date
+  id: number
+  sender: SampleUser
+  createTime: string
   message: string
-  submission: Submission
+  submission: EmbeddedSubmission
 }
 
 export interface CreateMessage {
@@ -621,13 +497,16 @@ export interface Tutorial {
   title: string
   content: string
   code: string
-  is_public: boolean
+  isPublic: boolean
   order: number
   type: "python" | "c"
-  created_by?: User
-  updated_at?: Date
-  created_at?: Date
+  createdBy?: User
+  updatedAt?: string
+  createdAt?: string
 }
+
+/** 后台教程列表不下发正文：教程正文是整篇 markdown，列表只排序和切换可见性 */
+export type TutorialListItem = Omit<Tutorial, "content">
 
 export interface ExerciseMcqData {
   question: string
@@ -689,102 +568,33 @@ export interface Exercise {
   order: number
 }
 
-export interface DurationData {
-  unit: string
-  index: number
-  start: string
-  end: string
-  grade: Grade
-  problem_count: number
-  submission_count: number
-}
+export type {
+  DurationData,
+  FlowchartSummary,
+  SolvedProblem,
+  AiDetail as DetailsData,
+} from "@oj2/contract"
 
-export interface SolvedProblem {
-  problem: {
-    title: string
-    display_id: string
-    contest_title: string
-    contest_id: number
-  }
-  ac_time: string
-  rank: number
-  ac_count: number
-  grade: Grade
-  period_rank: number
-  period_ac_count: number
-  difficulty: string
-}
-
-export interface FlowchartSummary {
-  problem__id: string
-  problem_title: string
-  submission_count: number
-  best_score: number
-  best_grade: string
-  latest_submission_time: string
-  avg_score: number
-}
-
-export interface DetailsData {
-  start: string
-  end: string
-  grade: Grade
-  class_name: string
-  tags: { [key: string]: number }
-  difficulty: { [key: string]: number }
-  contest_count: number
-  solved: SolvedProblem[]
-  flowcharts: FlowchartSummary[]
-}
-
-export type Grade = "S" | "A" | "B" | "C"
+// 评级。空串是「无评级」，后端在没有可用数据时真会下发，见契约 gradeSchema
+export type { Grade, ProblemDifficulty }
 
 // ==================== 成就相关类型 ====================
 
-export type AchievementRarity = "bronze" | "silver" | "gold" | "platinum"
+import type { AchievementNotification, PendingAchievement } from "@oj2/contract"
 
-export interface Achievement {
-  id: number
-  name: string
-  description: string
-  icon: string
-  rarity: AchievementRarity
-  hidden: boolean
-  // 隐藏成就未解锁时，后端已做掩码处理，以下四个字段为 null
-  metric: string | null
-  operator: "gte" | "lte" | null
-  threshold: number | null
-  unlocked: boolean
-  unlock_time: string | null
-  backfilled: boolean
-  progress: number | null
-  unlock_rate: number
-}
+export type {
+  Achievement,
+  AchievementList,
+  AchievementRarity,
+  AchievementRarityStat,
+  AchievementSummary,
+  AchievementNotification,
+  PendingAchievement,
+} from "@oj2/contract"
 
-export interface AchievementRarityStat {
-  rarity: AchievementRarity
-  label: string
-  total: number
-  unlocked: number
-}
-
-export interface PendingAchievement {
-  id: number
-  name: string
-  description: string
-  icon: string
-  rarity: AchievementRarity
-  // 弹窗队列里混着两种东西：全站成就和题单奖章。它们的 id 来自两张不同的表，
-  // 数值会重叠，所以去重和标记已读都必须带上 kind 一起判断。
-  // pending 接口只返回成就，不带这个字段，缺省按 achievement 处理。
-  kind?: "achievement" | "badge"
-}
-
-export interface AchievementSummary {
-  username: string
-  total: number
-  unlocked: number
-  percent: number
-  rarity: AchievementRarityStat[]
-  recent: PendingAchievement[]
-}
+/**
+ * 弹窗队列里的条目。`/achievements/pending` 拉来的没有 kind，
+ * WebSocket 推来的有 —— 两个来源会汇进同一个队列。
+ */
+export type QueuedAchievement = PendingAchievement &
+  Partial<Pick<AchievementNotification, "kind">>

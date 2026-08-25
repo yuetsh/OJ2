@@ -15,16 +15,14 @@ const formData = ref<CreateProblemSetData & Partial<EditProblemSetData>>({
   difficulty: "Easy",
   status: "draft",
   visible: false,
-  end_time: null,
+  endTime: null,
 })
 
 const endTimeTimestamp = computed({
   get: () =>
-    formData.value.end_time
-      ? new Date(formData.value.end_time).getTime()
-      : null,
+    formData.value.endTime ? new Date(formData.value.endTime).getTime() : null,
   set: (val: number | null) => {
-    formData.value.end_time = val ? new Date(val) : null
+    formData.value.endTime = val ? new Date(val) : null
   },
 })
 
@@ -55,7 +53,7 @@ async function loadProblemSetDetail() {
       difficulty: data.difficulty,
       status: data.status,
       visible: data.visible,
-      end_time: data.end_time ? new Date(data.end_time) : null,
+      endTime: data.endTime ? new Date(data.endTime) : null,
     }
   } catch (err: any) {
     message.error("加载题单详情失败：" + (err.data || "未知错误"))

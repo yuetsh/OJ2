@@ -74,7 +74,7 @@ const columns: DataTableColumn<AdminAchievement>[] = [
     width: 90,
     render: (row) => RARITY_LABEL[row.rarity] ?? row.rarity,
   },
-  { title: "指标", key: "metric_name" },
+  { title: "指标", key: "metricName" },
   {
     title: "条件",
     key: "threshold",
@@ -93,7 +93,7 @@ const columns: DataTableColumn<AdminAchievement>[] = [
     width: 70,
     render: (row) => (row.visible ? "是" : "否"),
   },
-  { title: "已解锁人数", key: "unlock_count", width: 110 },
+  { title: "已解锁人数", key: "unlockCount", width: 110 },
   {
     title: "操作",
     key: "actions",

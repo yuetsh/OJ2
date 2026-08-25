@@ -1,32 +1,53 @@
 import api2 from "utils/api2"
-import { legacyResponse } from "utils/legacy"
 import { toProblemListItem } from "admin/transforms"
 import type {
+  AcTrend,
+  BatchProblemTagResponse,
+  GenerateSqlTestCaseResponse,
+  RenameTagResponse,
+  SqlTestCaseScript,
+  AcmHelperItem,
+  AdminAiReport,
+  AdminAiReportList,
+  StuckProblem,
+  AdminContestList,
+  AdminUser,
+  AdminUserList,
+  DashboardInfo,
+  JudgeServerList,
+  OrphanTestCase,
   AdminProblem,
+  AdminProblemList,
   AdminTag,
   Announcement,
   AnnouncementEdit,
+  AnnouncementListItem,
   BlankContest,
   BlankProblem,
   Contest,
   Exercise,
   ExerciseType,
-  Server,
   SQLDisplay,
   TestcaseUploadedReturns,
   Tutorial,
   User,
   WebsiteConfig,
+  ProblemSet,
+  ProblemSetBadge,
+  ProblemSetList,
+  ProblemSetProblem,
+  ProblemSetProgressList,
+  TutorialListItem,
 } from "utils/types"
 
 export function getBaseInfo() {
-  return legacyResponse(api2.get("admin/dashboard"))
+  return api2.get<DashboardInfo>("admin/dashboard")
 }
 
 export function randomUser10(classroom: string) {
-  return legacyResponse(
-    api2.get("admin/random-usernames", { params: { classroom } }),
-  )
+  return api2.get<string[]>("admin/random-usernames", {
+    params: { classroom },
+  })
 }
 
 export async function getProblemList(
@@ -40,10 +61,9 @@ export async function getProblemList(
   const endpoint = contestID
     ? `admin/contests/${contestID}/problems`
     : "admin/problems"
-  const res = await legacyResponse<{
-    results: AdminProblem[]
-    total: number
-  }>(api2.get(endpoint, { params: { offset, limit, keyword, author, tagId } }))
+  const res = await api2.get<AdminProblemList>(endpoint, {
+    params: { offset, limit, keyword, author, tagId },
+  })
   return {
     results: res.data.results.map(toProblemListItem),
     total: res.data.total,
@@ -60,53 +80,46 @@ export function deleteContestProblem(id: number) {
 }
 
 export function editProblem(problem: AdminProblem | BlankProblem) {
-  return legacyResponse(
-    api2.put(
-      `admin/problems/${(problem as AdminProblem).id}`,
-      toProblemBody(problem),
-    ),
+  return api2.put<AdminProblem>(
+    `admin/problems/${(problem as AdminProblem).id}`,
+    toProblemBody(problem),
   )
 }
 
 export function toggleProblemVisible(problemID: number) {
-  return legacyResponse(api2.put(`admin/problems/${problemID}/visibility`))
+  return api2.put<{ visible: boolean }>(
+    `admin/problems/${problemID}/visibility`,
+  )
 }
 
 export function generateFlowchartFromPythonCode(python: string) {
-  return legacyResponse(api2.post("admin/problems/flowchart", { python }))
+  return api2.post<{ flowchart: string }>("admin/problems/flowchart", {
+    python,
+  })
 }
 
 export function editContestProblem(problem: AdminProblem | BlankProblem) {
-  return legacyResponse(
-    api2.put(
-      `admin/problems/${(problem as AdminProblem).id}`,
-      toProblemBody(problem),
-    ),
+  return api2.put<AdminProblem>(
+    `admin/problems/${(problem as AdminProblem).id}`,
+    toProblemBody(problem),
   )
 }
 
 export function getProblem(id: string | number) {
-  return legacyResponse<AdminProblem>(api2.get(`admin/problems/${id}`))
+  return api2.get<AdminProblem>(`admin/problems/${id}`)
 }
 
 export function getContestProblem(id: number) {
-  return legacyResponse<AdminProblem>(api2.get(`admin/problems/${id}`))
+  return api2.get<AdminProblem>(`admin/problems/${id}`)
 }
 
 // 标签管理
 export function getTagAdminList(keyword = "") {
-  return legacyResponse<AdminTag[]>(
-    api2.get("admin/problem-tags", { params: { keyword } }),
-  )
+  return api2.get<AdminTag[]>("admin/problem-tags", { params: { keyword } })
 }
 
 export function renameTag(id: number, name: string) {
-  return legacyResponse<{
-    merged: boolean
-    id: number
-    name: string
-    affected_count: number
-  }>(api2.put(`admin/problem-tags/${id}`, { name }))
+  return api2.put<RenameTagResponse>(`admin/problem-tags/${id}`, { name })
 }
 
 export function deleteTag(id: number) {
@@ -118,13 +131,11 @@ export function batchTagProblems(
   tagNames: string[],
   action: "add" | "remove",
 ) {
-  return legacyResponse<{ problem_count: number; tag_count: number }>(
-    api2.post("admin/problems/batch-tag", {
-      problemIds,
-      tagNames,
-      action,
-    }),
-  )
+  return api2.post<BatchProblemTagResponse>("admin/problems/batch-tag", {
+    problemIds,
+    tagNames,
+    action,
+  })
 }
 
 // 用户列表
@@ -135,34 +146,30 @@ export function getUserList(
   keyword: string,
   orderBy = "",
 ) {
-  return legacyResponse(
-    api2.get("admin/users", {
-      // 旧接口的 order_by 只有 "-last_login" 一个取值
-      params: {
-        offset,
-        limit,
-        keyword,
-        type,
-        orderBy: orderBy === "-last_login" ? "-lastLogin" : orderBy,
-      },
-    }),
-  )
+  return api2.get<AdminUserList>("admin/users", {
+    // 旧接口的 order_by 只有 "-last_login" 一个取值
+    params: {
+      offset,
+      limit,
+      keyword,
+      type,
+      orderBy: orderBy === "-last_login" ? "-lastLogin" : orderBy,
+    },
+  })
 }
 
 // 编辑用户
 export function editUser(user: User) {
-  return legacyResponse(
-    api2.put(`admin/users/${user.id}`, {
-      username: user.username,
-      email: user.email,
-      adminType: user.admin_type,
-      problemPermission: user.problem_permission,
-      realName: user.real_name ?? null,
-      isDisabled: user.is_disabled,
-      openApi: user.open_api,
-      password: user.password ?? "",
-    }),
-  )
+  return api2.put<AdminUser>(`admin/users/${user.id}`, {
+    username: user.username,
+    email: user.email,
+    adminType: user.adminType,
+    problemPermission: user.problemPermission,
+    realName: user.realName ?? null,
+    isDisabled: user.isDisabled,
+    openApi: user.openApi,
+    password: user.password ?? "",
+  })
 }
 
 // 重置用户密码。调用方直接用 res.data 当密码字符串（旧后端返回的就是裸字符串），
@@ -185,9 +192,9 @@ export function deleteUsers(userIDs: number[]) {
 }
 
 export function getContestList(offset = 0, limit = 10, keyword: string) {
-  return legacyResponse(
-    api2.get("admin/contests", { params: { offset, limit, keyword } }),
-  )
+  return api2.get<AdminContestList>("admin/contests", {
+    params: { offset, limit, keyword },
+  })
 }
 
 // 上传图片
@@ -218,53 +225,45 @@ export function uploadTestcases(file: File, options: { sql?: boolean } = {}) {
 
 // SQL 题测试点预览：后端跑一遍初始化脚本+标准答案，返回数据表和期望结果展示数据
 export function previewSQLTestcase(data: {
-  init_sql: string
-  ref_sql: string
+  initSql: string
+  refSql: string
   mode: "query" | "modify"
 }) {
-  return legacyResponse<SQLDisplay>(
-    api2.post("admin/sql-test-cases/preview", {
-      initSql: data.init_sql,
-      refSql: data.ref_sql,
-      mode: data.mode,
-    }),
-  )
+  return api2.post<SQLDisplay>("admin/sql-test-cases/preview", data)
 }
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
 export function getSQLTestcaseScripts(problemId: number) {
-  return legacyResponse<{ name: string; content: string }[]>(
-    api2.get(`admin/problems/${problemId}/sql-scripts`),
+  return api2.get<SqlTestCaseScript[]>(
+    `admin/problems/${problemId}/sql-scripts`,
   )
 }
 
 // AI 根据标准答案生成一个 SQL 测试点初始化脚本
 export function generateSQLTestcase(data: {
-  ref_sql: string
+  refSql: string
   mode: "query" | "modify"
 }) {
-  return legacyResponse<{ sql: string }>(
-    api2.post("admin/sql-test-cases/generate", {
-      refSql: data.ref_sql,
-      mode: data.mode,
-    }),
+  return api2.post<GenerateSqlTestCaseResponse>(
+    "admin/sql-test-cases/generate",
+    data,
   )
 }
 
-/** 组件里的题目对象是 snake_case，出站转成新后端要的 camelCase */
+/** 出站补默认值。字段名两边已经一致，不再做键名转换 */
 function toProblemBody(problem: AdminProblem | BlankProblem) {
-  const p = problem as Record<string, any>
+  const p = problem as Partial<AdminProblem>
   return {
     _id: p._id,
     title: p.title,
     description: p.description,
-    inputDescription: p.input_description ?? "",
-    outputDescription: p.output_description ?? "",
+    inputDescription: p.inputDescription ?? "",
+    outputDescription: p.outputDescription ?? "",
     samples: p.samples ?? [],
-    testCaseId: p.test_case_id,
-    testCaseScore: p.test_case_score ?? [],
-    timeLimit: p.time_limit,
-    memoryLimit: p.memory_limit,
+    testCaseId: p.testCaseId,
+    testCaseScore: p.testCaseScore ?? [],
+    timeLimit: p.timeLimit,
+    memoryLimit: p.memoryLimit,
     languages: p.languages ?? [],
     template: p.template ?? {},
     visible: p.visible,
@@ -274,25 +273,25 @@ function toProblemBody(problem: AdminProblem | BlankProblem) {
     source: p.source ?? null,
     prompt: p.prompt ?? null,
     answers: p.answers ?? [],
-    shareSubmission: p.share_submission ?? false,
-    allowFlowchart: p.allow_flowchart ?? false,
-    showFlowchart: p.show_flowchart ?? false,
-    mermaidCode: p.mermaid_code ?? null,
-    flowchartHint: p.flowchart_hint ?? null,
-    astRules: p.ast_rules ?? null,
-    sqlConfig: p.sql_config ?? null,
+    shareSubmission: p.shareSubmission ?? false,
+    allowFlowchart: p.allowFlowchart ?? false,
+    showFlowchart: p.showFlowchart ?? false,
+    mermaidCode: p.mermaidCode ?? null,
+    flowchartHint: p.flowchartHint ?? null,
+    astRules: p.astRules ?? null,
+    sqlConfig: p.sqlConfig ?? null,
   }
 }
 
 export function createProblem(problem: BlankProblem) {
-  return legacyResponse(api2.post("admin/problems", toProblemBody(problem)))
+  return api2.post<AdminProblem>("admin/problems", toProblemBody(problem))
 }
 
 export function createContestProblem(problem: BlankProblem) {
-  // contest_id 由 detail.vue 在提交前写进 problem 对象
-  const contestID = (problem as Record<string, any>).contest_id
-  return legacyResponse(
-    api2.post(`admin/contests/${contestID}/problems`, toProblemBody(problem)),
+  // contestId 由 detail.vue 在提交前写进 problem 对象
+  return api2.post<AdminProblem>(
+    `admin/contests/${problem.contestId}/problems`,
+    toProblemBody(problem),
   )
 }
 
@@ -302,35 +301,31 @@ function toContestBody(contest: Contest | BlankContest) {
     title: contest.title,
     description: contest.description,
     tag: contest.tag,
-    startTime: contest.start_time,
-    endTime: contest.end_time,
+    startTime: contest.startTime,
+    endTime: contest.endTime,
     password: contest.password || null,
     visible: contest.visible,
-    allowedIpRanges: contest.allowed_ip_ranges ?? [],
+    allowedIpRanges: contest.allowedIpRanges ?? [],
   }
 }
 
 export function createContest(contest: BlankContest) {
-  return legacyResponse(api2.post("admin/contests", toContestBody(contest)))
+  return api2.post<Contest>("admin/contests", toContestBody(contest))
 }
 
 export function editContest(contest: Contest | BlankContest) {
-  return legacyResponse(
-    api2.put(
-      `admin/contests/${(contest as Contest).id}`,
-      toContestBody(contest),
-    ),
+  return api2.put<Contest>(
+    `admin/contests/${(contest as Contest).id}`,
+    toContestBody(contest),
   )
 }
 
-export function cloneContest(contest_id: number) {
-  return legacyResponse(api2.post(`admin/contests/${contest_id}/clone`))
+export function cloneContest(contestId: number) {
+  return api2.post<Contest>(`admin/contests/${contestId}/clone`)
 }
 
 export function getContest(id: string) {
-  return legacyResponse<Contest & { password: string }>(
-    api2.get(`admin/contests/${id}`),
-  )
+  return api2.get<Contest>(`admin/contests/${id}`)
 }
 
 export function addProblemForContest(
@@ -338,33 +333,22 @@ export function addProblemForContest(
   problemID: number,
   displayID: string,
 ) {
-  return legacyResponse(
-    api2.post(`admin/contests/${contestID}/problems/from-public`, {
-      problemId: problemID,
-      displayId: displayID,
-    }),
+  return api2.post<AdminProblem>(
+    `admin/contests/${contestID}/problems/from-public`,
+    { problemId: problemID, displayId: displayID },
   )
 }
 
 export function getWebsite() {
-  return legacyResponse<WebsiteConfig>(api2.get("admin/website"))
+  return api2.get<WebsiteConfig>("admin/website")
 }
 
 export function editWebsite(data: WebsiteConfig) {
-  return api2.post("admin/website", {
-    websiteBaseUrl: data.website_base_url,
-    websiteName: data.website_name,
-    websiteNameShortcut: data.website_name_shortcut,
-    websiteFooter: data.website_footer,
-    allowRegister: data.allow_register,
-    submissionListShowAll: data.submission_list_show_all,
-    classList: data.class_list,
-    enableMaxkb: data.enable_maxkb,
-  })
+  return api2.post<WebsiteConfig>("admin/website", data)
 }
 
 export function listInvalidTestcases() {
-  return legacyResponse(api2.get("admin/orphan-test-cases"))
+  return api2.get<OrphanTestCase[]>("admin/orphan-test-cases")
 }
 
 export function pruneInvalidTestcases(id?: string) {
@@ -372,9 +356,7 @@ export function pruneInvalidTestcases(id?: string) {
 }
 
 export function getJudgeServer() {
-  return legacyResponse<{ token: string; servers: Server[] }>(
-    api2.get("admin/judge-servers"),
-  )
+  return api2.get<JudgeServerList>("admin/judge-servers")
 }
 
 export function deleteJudgeServer(hostname: string) {
@@ -382,15 +364,14 @@ export function deleteJudgeServer(hostname: string) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return legacyResponse(
-    api2.get("admin/announcements", {
-      params: { offset, limit },
-    }),
+  return api2.get<{ results: AnnouncementListItem[]; total: number }>(
+    "admin/announcements",
+    { params: { offset, limit } },
   )
 }
 
 export function getAnnouncement(id: number) {
-  return legacyResponse<Announcement>(api2.get(`admin/announcements/${id}`))
+  return api2.get<Announcement>(`admin/announcements/${id}`)
 }
 
 export function deleteAnnouncement(id: number) {
@@ -399,48 +380,46 @@ export function deleteAnnouncement(id: number) {
 
 export function editAnnouncement(announcement: AnnouncementEdit) {
   const { id, ...body } = announcement
-  return legacyResponse(api2.put(`admin/announcements/${id}`, body))
+  return api2.put<Announcement>(`admin/announcements/${id}`, body)
 }
 
 export function createAnnouncement(announcement: AnnouncementEdit) {
   const { id: _id, ...body } = announcement
-  return legacyResponse(api2.post("admin/announcements", body))
-}
-
-/** 组件里的 Tutorial 仍是 snake_case，出站时转成新后端要的 camelCase */
-function toTutorialBody(data: Partial<Tutorial>) {
-  return {
-    title: data.title,
-    content: data.content,
-    code: data.code ?? null,
-    isPublic: data.is_public ?? false,
-    order: data.order ?? 0,
-    type: data.type,
-  }
+  return api2.post<Announcement>("admin/announcements", body)
 }
 
 export async function getTutorialList() {
-  const res = await legacyResponse<{ [key: string]: Tutorial[] }>(
-    api2.get("admin/tutorials"),
+  const res = await api2.get<{ [key: string]: TutorialListItem[] }>(
+    "admin/tutorials",
   )
   return res.data
 }
 
 export async function getTutorial(id: number) {
-  const res = await legacyResponse<Tutorial>(api2.get(`admin/tutorials/${id}`))
+  const res = await api2.get<Tutorial>(`admin/tutorials/${id}`)
   return res.data
 }
 
+function toTutorialBody(data: Partial<Tutorial>) {
+  return {
+    title: data.title,
+    content: data.content,
+    code: data.code ?? null,
+    isPublic: data.isPublic ?? false,
+    order: data.order ?? 0,
+    type: data.type,
+  }
+}
+
 export async function createTutorial(data: Partial<Tutorial>) {
-  const res = await legacyResponse<Tutorial>(
-    api2.post("admin/tutorials", toTutorialBody(data)),
-  )
+  const res = await api2.post<Tutorial>("admin/tutorials", toTutorialBody(data))
   return res.data
 }
 
 export async function updateTutorial(data: Partial<Tutorial>) {
-  const res = await legacyResponse<Tutorial>(
-    api2.put(`admin/tutorials/${data.id}`, toTutorialBody(data)),
+  const res = await api2.put<Tutorial>(
+    `admin/tutorials/${data.id}`,
+    toTutorialBody(data),
   )
   return res.data
 }
@@ -449,33 +428,24 @@ export function deleteTutorial(id: number) {
   return api2.delete(`admin/tutorials/${id}`)
 }
 
-export function setTutorialVisibility(id: number, is_public: boolean) {
-  return legacyResponse(
-    api2.put(`admin/tutorials/${id}/visibility`, { isPublic: is_public }),
-  )
+export function setTutorialVisibility(id: number, isPublic: boolean) {
+  return api2.put<Tutorial>(`admin/tutorials/${id}/visibility`, { isPublic })
 }
 
 export async function getAdminExercises(tutorialId: number) {
-  const res = await legacyResponse<Exercise[]>(
-    api2.get(`admin/tutorials/${tutorialId}/exercises`),
+  const res = await api2.get<Exercise[]>(
+    `admin/tutorials/${tutorialId}/exercises`,
   )
   return res.data
 }
 
 export async function createExercise(data: {
-  tutorial_id: number
+  tutorialId: number
   type: ExerciseType
   data: object
   order: number
 }) {
-  const res = await legacyResponse<Exercise>(
-    api2.post("admin/exercises", {
-      tutorialId: data.tutorial_id,
-      type: data.type,
-      data: data.data,
-      order: data.order,
-    }),
-  )
+  const res = await api2.post<Exercise>("admin/exercises", data)
   return res.data
 }
 
@@ -485,13 +455,11 @@ export async function updateExercise(data: {
   data: object
   order: number
 }) {
-  const res = await legacyResponse<Exercise>(
-    api2.put(`admin/exercises/${data.id}`, {
-      type: data.type,
-      data: data.data,
-      order: data.order,
-    }),
-  )
+  const res = await api2.put<Exercise>(`admin/exercises/${data.id}`, {
+    type: data.type,
+    data: data.data,
+    order: data.order,
+  })
   return res.data
 }
 
@@ -500,15 +468,15 @@ export function deleteExercise(id: number) {
 }
 
 // 将竞赛题目转为公开题目
-export function makeProblemPublic(id: number, display_id: string) {
-  return legacyResponse(
-    api2.post(`admin/problems/${id}/make-public`, { displayId: display_id }),
-  )
+export function makeProblemPublic(id: number, displayId: string) {
+  return api2.post<AdminProblem>(`admin/problems/${id}/make-public`, {
+    displayId,
+  })
 }
 
 // 比赛辅助检查
-export function getACMHelperList(contest_id: number) {
-  return legacyResponse(api2.get(`admin/contests/${contest_id}/acm-helper`))
+export function getACMHelperList(contestId: number) {
+  return api2.get<AcmHelperItem[]>(`admin/contests/${contestId}/acm-helper`)
 }
 
 export function updateACMHelperChecked(
@@ -532,57 +500,44 @@ export function getProblemSetList(
   difficulty = "",
   status = "",
 ) {
-  return legacyResponse(
-    api2.get("admin/problem-sets", {
-      params: { offset, limit, keyword, difficulty, status },
-    }),
-  )
+  return api2.get<ProblemSetList>("admin/problem-sets", {
+    params: { offset, limit, keyword, difficulty, status },
+  })
 }
 
 export function getProblemSetDetail(id: number) {
-  return legacyResponse(api2.get(`admin/problem-sets/${id}`))
+  return api2.get<ProblemSet>(`admin/problem-sets/${id}`)
 }
 
-/** 组件传的是 snake_case，出站转成新后端要的 camelCase */
-function toProblemSetBody(data: {
+interface ProblemSetBody {
   title?: string
   description?: string
-  difficulty?: string
-  status?: string
-  end_time?: Date | null
+  difficulty?: ProblemSet["difficulty"]
+  status?: ProblemSet["status"]
+  // 表单里是 Date，出站要 ISO 串
+  endTime?: Date | null
   visible?: boolean
-}) {
+}
+
+function toProblemSetBody(data: ProblemSetBody) {
   return {
     title: data.title,
     description: data.description ?? "",
     difficulty: data.difficulty ?? "Easy",
     status: data.status ?? "active",
-    endTime: data.end_time ? new Date(data.end_time).toISOString() : null,
+    endTime: data.endTime ? new Date(data.endTime).toISOString() : null,
     visible: data.visible ?? true,
   }
 }
 
-export function createProblemSet(data: {
-  title: string
-  description: string
-  difficulty: string
-  status: string
-  end_time?: Date | null
-}) {
-  return legacyResponse(api2.post("admin/problem-sets", toProblemSetBody(data)))
+export function createProblemSet(data: ProblemSetBody) {
+  return api2.post<ProblemSet>("admin/problem-sets", toProblemSetBody(data))
 }
 
-export function editProblemSet(data: {
-  id: number
-  title?: string
-  description?: string
-  difficulty?: string
-  status?: string
-  end_time?: Date | null
-  visible?: boolean
-}) {
-  return legacyResponse(
-    api2.put(`admin/problem-sets/${data.id}`, toProblemSetBody(data)),
+export function editProblemSet(data: ProblemSetBody & { id: number }) {
+  return api2.put<ProblemSet>(
+    `admin/problem-sets/${data.id}`,
+    toProblemSetBody(data),
   )
 }
 
@@ -591,32 +546,34 @@ export function deleteProblemSet(id: number) {
 }
 
 export function toggleProblemSetVisible(id: number) {
-  return legacyResponse(api2.put(`admin/problem-sets/${id}/visibility`))
+  return api2.put<ProblemSet>(`admin/problem-sets/${id}/visibility`)
 }
 
 export function updateProblemSetStatus(id: number, status: string) {
-  return legacyResponse(api2.put(`admin/problem-sets/${id}/status`, { status }))
+  return api2.put<ProblemSet>(`admin/problem-sets/${id}/status`, { status })
 }
 
 // 题单题目管理 API
 export function getProblemSetProblems(problemSetId: number) {
-  return legacyResponse(api2.get(`admin/problem-sets/${problemSetId}/problems`))
+  return api2.get<ProblemSetProblem[]>(
+    `admin/problem-sets/${problemSetId}/problems`,
+  )
 }
 
 export function addProblemToSet(
   problemSetId: number,
   data: {
-    problem_id: string
+    problemId: string
     order?: number
-    is_required?: boolean
+    isRequired?: boolean
     score?: number
     hint?: string
   },
 ) {
   return api2.post(`admin/problem-sets/${problemSetId}/problems`, {
-    problemId: data.problem_id,
+    problemId: data.problemId,
     order: data.order ?? 0,
-    isRequired: data.is_required ?? true,
+    isRequired: data.isRequired ?? true,
     score: data.score ?? 0,
     hint: data.hint ?? "",
   })
@@ -627,19 +584,14 @@ export function editProblemInSet(
   problemSetProblemId: number,
   data: {
     order?: number
-    is_required?: boolean
+    isRequired?: boolean
     score?: number
     hint?: string
   },
 ) {
   return api2.put(
     `admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`,
-    {
-      order: data.order,
-      isRequired: data.is_required,
-      score: data.score,
-      hint: data.hint,
-    },
+    data,
   )
 }
 
@@ -654,58 +606,44 @@ export function removeProblemFromSet(
 
 // 题单奖章管理 API
 export function getProblemSetBadges(problemSetId: number) {
-  return legacyResponse(api2.get(`admin/problem-sets/${problemSetId}/badges`))
+  return api2.get<ProblemSetBadge[]>(
+    `admin/problem-sets/${problemSetId}/badges`,
+  )
 }
 
-function toBadgeBody(data: {
+interface BadgeBody {
   name?: string
   description?: string
   icon?: string
-  condition_type?: string
-  condition_value?: number
-}) {
+  conditionType?: ProblemSetBadge["conditionType"]
+  conditionValue?: number
+}
+
+function toBadgeBody(data: BadgeBody) {
   return {
     name: data.name,
     description: data.description ?? "",
     icon: data.icon ?? "",
-    conditionType: data.condition_type,
-    conditionValue: data.condition_value ?? 0,
+    conditionType: data.conditionType,
+    conditionValue: data.conditionValue ?? 0,
   }
 }
 
-export function createProblemSetBadge(
-  problemSetId: number,
-  data: {
-    name: string
-    description: string
-    icon: string
-    condition_type: string
-    condition_value: number
-    level?: number
-  },
-) {
-  return legacyResponse(
-    api2.post(`admin/problem-sets/${problemSetId}/badges`, toBadgeBody(data)),
+export function createProblemSetBadge(problemSetId: number, data: BadgeBody) {
+  return api2.post<ProblemSetBadge>(
+    `admin/problem-sets/${problemSetId}/badges`,
+    toBadgeBody(data),
   )
 }
 
 export function editProblemSetBadge(
   problemSetId: number,
   badgeId: number,
-  data: {
-    name?: string
-    description?: string
-    icon?: string
-    condition_type?: string
-    condition_value?: number
-    level?: number
-  },
+  data: BadgeBody,
 ) {
-  return legacyResponse(
-    api2.put(
-      `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
-      toBadgeBody(data),
-    ),
+  return api2.put<ProblemSetBadge>(
+    `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
+    toBadgeBody(data),
   )
 }
 
@@ -715,7 +653,9 @@ export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
 
 // 题单进度管理 API
 export function getProblemSetProgress(problemSetId: number) {
-  return legacyResponse(api2.get(`admin/problem-sets/${problemSetId}/progress`))
+  return api2.get<ProblemSetProgressList>(
+    `admin/problem-sets/${problemSetId}/progress`,
+  )
 }
 
 export function removeUserFromProblemSet(problemSetId: number, userId: number) {
@@ -724,74 +664,46 @@ export function removeUserFromProblemSet(problemSetId: number, userId: number) {
 
 // 学生卡点分析
 export function getStuckProblems() {
-  return legacyResponse(api2.get("admin/problem-analytics/stuck"))
+  return api2.get<StuckProblem[]>("admin/problem-analytics/stuck")
 }
 
 export function getTopACTrend(params: {
-  since_year: number
-  until_year: number
-  min_per_year: number
+  sinceYear: number
+  untilYear: number
+  minPerYear: number
 }) {
-  return legacyResponse(
-    api2.get("admin/problem-analytics/ac-trend", {
-      params: {
-        sinceYear: params.since_year,
-        untilYear: params.until_year,
-        minPerYear: params.min_per_year,
-      },
-    }),
-  )
+  return api2.get<AcTrend[]>("admin/problem-analytics/ac-trend", { params })
 }
 
 // AI 学习分析报告
 export function getAIReportList(offset = 0, limit = 10, username = "") {
-  return legacyResponse(
-    api2.get("admin/ai/reports", {
-      params: { offset, limit, username: username || undefined },
-    }),
-  )
+  return api2.get<AdminAiReportList>("admin/ai/reports", {
+    params: { offset, limit, username: username || undefined },
+  })
 }
 
 export function getAIReportDetail(id: number) {
-  return legacyResponse(api2.get(`admin/ai/reports/${id}`))
+  return api2.get<AdminAiReport>(`admin/ai/reports/${id}`)
 }
 
 export function pinAIReport(id: number) {
-  return legacyResponse(api2.post(`admin/ai/reports/${id}/pin`))
+  return api2.post<{ isPinned: boolean }>(`admin/ai/reports/${id}/pin`)
 }
 
 export function getPinnedAIReports() {
-  return legacyResponse(
-    api2.get("admin/ai/reports", { params: { pinnedOnly: "true" } }),
-  )
+  return api2.get<AdminAiReportList>("admin/ai/reports", {
+    params: { pinnedOnly: "true" },
+  })
 }
 
 // ==================== 成就 ====================
 
-export interface AdminAchievement {
-  id: number
-  name: string
-  description: string
-  icon: string
-  rarity: string
-  hidden: boolean
-  metric: string
-  metric_name: string
-  operator: "gte" | "lte"
-  threshold: number
-  visible: boolean
-  unlock_count: number
-  order: number
-  create_time: string
-}
+import type {
+  AdminAchievement,
+  AchievementMetric as MetricOption,
+} from "@oj2/contract"
+export type { AdminAchievement, MetricOption }
 
-export interface MetricOption {
-  key: string
-  name: string
-  help_text: string
-}
-
-/** 组件里的成就对象是 snake_case，出站转成新后端要的 camelCase */
 function toAchievementBody(data: Partial<AdminAchievement>) {
   return {
     name: data.name,
@@ -808,22 +720,24 @@ function toAchievementBody(data: Partial<AdminAchievement>) {
 }
 
 export function getAdminAchievements() {
-  return legacyResponse<AdminAchievement[]>(api2.get("admin/achievements"))
+  return api2.get<AdminAchievement[]>("admin/achievements")
 }
 
 export function getMetricOptions() {
-  return legacyResponse<MetricOption[]>(api2.get("admin/achievement-metrics"))
+  return api2.get<MetricOption[]>("admin/achievement-metrics")
 }
 
 export function createAchievement(data: Partial<AdminAchievement>) {
-  return legacyResponse<AdminAchievement>(
-    api2.post("admin/achievements", toAchievementBody(data)),
+  return api2.post<AdminAchievement>(
+    "admin/achievements",
+    toAchievementBody(data),
   )
 }
 
 export function updateAchievement(data: Partial<AdminAchievement>) {
-  return legacyResponse<AdminAchievement>(
-    api2.put(`admin/achievements/${data.id}`, toAchievementBody(data)),
+  return api2.put<AdminAchievement>(
+    `admin/achievements/${data.id}`,
+    toAchievementBody(data),
   )
 }
 

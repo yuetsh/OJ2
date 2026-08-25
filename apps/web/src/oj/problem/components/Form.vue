@@ -185,8 +185,8 @@ const goSubmissions = () => {
 }
 
 const goEdit = () => {
-  const url = problem.value!.contest
-    ? `/admin/contest/${problem.value!.contest}/problem/edit/${problem.value!.id}`
+  const url = problem.value!.contestId
+    ? `/admin/contest/${problem.value!.contestId}/problem/edit/${problem.value!.id}`
     : `/admin/problem/edit/${problem.value!.id}`
   window.open(router.resolve(url).href, "_blank")
 }

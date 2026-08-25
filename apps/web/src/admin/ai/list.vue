@@ -49,10 +49,10 @@
             detail.username
           }}</n-descriptions-item>
           <n-descriptions-item label="班级">{{
-            detail.class_name || "-"
+            detail.className || "-"
           }}</n-descriptions-item>
           <n-descriptions-item label="时间" :span="2">{{
-            parseTime(detail.create_time, "YYYY-MM-DD HH:mm:ss")
+            parseTime(detail.createTime, "YYYY-MM-DD HH:mm:ss")
           }}</n-descriptions-item>
         </n-descriptions>
         <n-scrollbar style="max-height: 60vh; margin-top: 12px">
@@ -75,19 +75,10 @@ import {
   getPinnedAIReports,
 } from "../api"
 import { NButton, NTag } from "naive-ui"
+import type { AdminAiReport, AdminAiReportListItem } from "utils/types"
 
-interface ReportItem {
-  id: number
-  create_time: string
-  username: string
-  analysis_excerpt: string
-  is_pinned: boolean
-}
-
-interface ReportDetail extends ReportItem {
-  analysis: string
-  class_name: string | null
-}
+type ReportItem = AdminAiReportListItem
+type ReportDetail = AdminAiReport
 
 const reports = ref<ReportItem[]>([])
 const total = ref(0)
@@ -105,29 +96,25 @@ const columns: DataTableColumn<ReportItem>[] = [
     key: "username",
     width: 150,
     render: (row) =>
-      h(
-        "span",
-        { style: row.is_pinned ? "font-weight:600" : "" },
-        row.username,
-      ),
+      h("span", { style: row.isPinned ? "font-weight:600" : "" }, row.username),
   },
   {
     title: "AI 分析内容",
     key: "analysis_excerpt",
-    render: (row) => row.analysis_excerpt || "-",
+    render: (row) => row.analysisExcerpt || "-",
   },
   {
     title: "生成时间",
     key: "create_time",
     width: 200,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "PIN 状态",
     key: "is_pinned",
     width: 100,
     render: (row) =>
-      row.is_pinned
+      row.isPinned
         ? h(NTag, { type: "warning", size: "small" }, () => "已锁定")
         : null,
   },
@@ -146,10 +133,10 @@ const columns: DataTableColumn<ReportItem>[] = [
           NButton,
           {
             size: "small",
-            type: row.is_pinned ? "error" : "default",
+            type: row.isPinned ? "error" : "default",
             onClick: () => togglePin(row),
           },
-          () => (row.is_pinned ? "取消 PIN" : "PIN"),
+          () => (row.isPinned ? "取消 PIN" : "PIN"),
         ),
       ]),
   },
@@ -157,7 +144,7 @@ const columns: DataTableColumn<ReportItem>[] = [
 
 async function loadPinnedReports() {
   const res = await getPinnedAIReports()
-  pinnedReports.value = res.data
+  pinnedReports.value = res.data.results
 }
 
 async function togglePin(row: ReportItem) {

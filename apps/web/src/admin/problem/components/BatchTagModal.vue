@@ -60,7 +60,7 @@ async function submit() {
   )
   const verb = props.action === "add" ? "添加" : "移除"
   message.success(
-    `已为 ${res.data.problem_count} 道题${verb} ${res.data.tag_count} 个标签`,
+    `已为 ${res.data.problemCount} 道题${verb} ${res.data.tagCount} 个标签`,
   )
   close()
   emit("done")
@@ -96,7 +96,7 @@ watch(
           :checked="selectedSet.has(tag.name)"
           @update:checked="toggleTag(tag.name)"
         >
-          {{ tag.name }}（{{ tag.problem_count }}）
+          {{ tag.name }}（{{ tag.problemCount }}）
         </n-tag>
       </n-flex>
       <n-dynamic-tags v-if="action === 'add'" v-model:value="newTags" />

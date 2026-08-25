@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { ContestType } from "utils/constants"
-import type { Contest } from "utils/types"
+import type { Contest, OjContest } from "utils/types"
 
 interface Props {
-  contest: Contest
+  contest: Contest | OjContest
   size?: "small"
 }
 
 const props = defineProps<Props>()
 
 const isPrivate = computed(
-  () => props.contest.contest_type === ContestType.private,
+  () => props.contest.contestType === ContestType.private,
 )
 </script>
 

@@ -22,7 +22,7 @@ const isClassLogin = computed(() => Boolean(form.value.class))
 const classList = computed<SelectOption[]>(() => {
   const defaults = [{ label: "没有我所在的班级", value: "" }]
   const configs =
-    configStore.config?.class_list.map((item) => ({
+    configStore.config?.classList.map((item) => ({
       label: `${item.slice(0, 2)}计算机${item.slice(2)}班`,
       value: `ks${item}`,
     })) ?? []
@@ -53,9 +53,10 @@ async function submit() {
         }
         await login(merged)
       } catch (err: any) {
-        if (err.data === "Your account has been disabled") {
+        // 判错误码而不是错误文案：文案在后端，改一个字这里就静默掉进「无法登录」
+        if (err.error === "account-disabled") {
           authStore.setLoginError("此账号已被封禁")
-        } else if (err.data === "Invalid username or password") {
+        } else if (err.error === "invalid-credentials") {
           authStore.setLoginError("用户名或密码不正确")
         } else {
           authStore.setLoginError("无法登录")
@@ -177,12 +178,12 @@ onMounted(() => {
             :loading="isLoading"
             @click="submit"
             :style="{
-              flex: configStore.config?.allow_register ? '0 0 auto' : '1',
+              flex: configStore.config?.allowRegister ? '0 0 auto' : '1',
             }"
           >
             登录
           </n-button>
-          <n-button v-if="configStore.config?.allow_register" @click="goSignup">
+          <n-button v-if="configStore.config?.allowRegister" @click="goSignup">
             没有账号？立即注册
           </n-button>
         </n-flex>

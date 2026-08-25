@@ -16,9 +16,9 @@ function goto() {
 </script>
 
 <template>
-  {{ rank.accepted_number }} /
+  {{ rank.acceptedNumber }} /
   <n-button text type="primary" @click="goto">
-    {{ rank.submission_number }}
+    {{ rank.submissionNumber }}
   </n-button>
 </template>
 

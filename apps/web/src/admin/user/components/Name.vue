@@ -9,30 +9,30 @@ interface Props {
 }
 const props = defineProps<Props>()
 const isNotRegularUser = computed(
-  () => props.user.admin_type !== USER_TYPE.REGULAR_USER,
+  () => props.user.adminType !== USER_TYPE.REGULAR_USER,
 )
 </script>
 <template>
   <n-flex align="center">
-    <n-tag v-if="props.user.is_disabled" type="error" size="small">
+    <n-tag v-if="props.user.isDisabled" type="error" size="small">
       封号中
     </n-tag>
     <n-tag
       v-if="isNotRegularUser"
-      :type="getUserRole(props.user.admin_type).type"
+      :type="getUserRole(props.user.adminType).type"
       size="small"
     >
-      {{ getUserRole(props.user.admin_type).label }}
+      {{ getUserRole(props.user.adminType).label }}
     </n-tag>
     <n-tag
       size="small"
       v-if="
-        props.user.admin_type === USER_TYPE.STUDENT_ADMIN ||
-        props.user.admin_type === USER_TYPE.TEACHER_ADMIN
+        props.user.adminType === USER_TYPE.STUDENT_ADMIN ||
+        props.user.adminType === USER_TYPE.TEACHER_ADMIN
       "
     >
       {{
-        props.user.problem_permission === PROBLEM_PERMISSION.ALL
+        props.user.problemPermission === PROBLEM_PERMISSION.ALL
           ? "全部"
           : "仅自己"
       }}

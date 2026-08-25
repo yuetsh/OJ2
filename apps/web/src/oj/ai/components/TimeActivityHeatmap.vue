@@ -50,7 +50,7 @@ const activityMatrix = computed(() => {
 
   // 统计数据
   aiStore.detailsData.solved.forEach((item) => {
-    const date = new Date(item.ac_time)
+    const date = new Date(item.acTime)
     const weekday = date.getDay() // 0-6，0是周日
     const hour = date.getHours() // 0-23
 

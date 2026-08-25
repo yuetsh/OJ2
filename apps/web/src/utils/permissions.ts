@@ -23,11 +23,11 @@ export function usePermissions() {
 
     canManageAllProblems: computed(
       () =>
-        userStore.user?.problem_permission === "All" || userStore.isSuperAdmin,
+        userStore.user?.problemPermission === "All" || userStore.isSuperAdmin,
     ),
     canManageOwnProblems: computed(
       () =>
-        userStore.user?.problem_permission === "Own" && !userStore.isSuperAdmin,
+        userStore.user?.problemPermission === "Own" && !userStore.isSuperAdmin,
     ),
 
     getUserPermissionLevel: computed(() => {
@@ -39,7 +39,7 @@ export function usePermissions() {
 
     getProblemPermissionLevel: computed(() => {
       if (!userStore.user) return "无权限"
-      switch (userStore.user.problem_permission) {
+      switch (userStore.user.problemPermission) {
         case "All":
           return "管理所有题目"
         case "Own":

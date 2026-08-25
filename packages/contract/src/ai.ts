@@ -1,11 +1,17 @@
 import { z } from "zod"
 
+/**
+ * 评级。`grade()` 返回 S/A/B/C，`averageGrade()` 在没有可用数据时返回空串 ——
+ * 空串是真会下发的值，别把它从这里去掉，前端要按「无评级」处理。
+ */
+export const gradeSchema = z.enum(["S", "A", "B", "C", ""])
+
 export const durationDataSchema = z.object({
   unit: z.string(),
   index: z.number().int(),
   start: z.string(),
   end: z.string(),
-  grade: z.string(),
+  grade: gradeSchema,
   problemCount: z.number().int(),
   submissionCount: z.number().int(),
 })
@@ -20,7 +26,7 @@ export const solvedProblemSchema = z.object({
   acTime: z.string(),
   rank: z.number().int().nullable(),
   acCount: z.number().int(),
-  grade: z.string(),
+  grade: gradeSchema,
   periodRank: z.number().int().nullable(),
   periodAcCount: z.number().int(),
   difficulty: z.string(),
@@ -43,7 +49,7 @@ export const aiDetailSchema = z.object({
   end: z.string(),
   solved: z.array(solvedProblemSchema),
   flowcharts: z.array(flowchartSummarySchema),
-  grade: z.string(),
+  grade: gradeSchema,
   tags: z.record(z.string(), z.number().int()),
   difficulty: z.record(z.string(), z.number().int()),
   contestCount: z.number().int(),
@@ -94,3 +100,12 @@ export const loginSummarySchema = z.object({
   analysis: z.string(),
   analysisError: z.string().optional(),
 })
+
+export type Grade = z.infer<typeof gradeSchema>
+export type DurationData = z.infer<typeof durationDataSchema>
+export type SolvedProblem = z.infer<typeof solvedProblemSchema>
+export type FlowchartSummary = z.infer<typeof flowchartSummarySchema>
+export type AiDetail = z.infer<typeof aiDetailSchema>
+export type HeatmapItem = z.infer<typeof heatmapItemSchema>
+export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>
+export type LoginSummary = z.infer<typeof loginSummarySchema>

@@ -48,9 +48,9 @@ function submit() {
           password: form.value.password,
         })
       } catch (err: any) {
-        if (err.data === "Username already exists") {
+        if (err.error === "username-exists") {
           authStore.setSignupError("用户名已存在")
-        } else if (err.data === "Email already exists") {
+        } else if (err.error === "email-exists") {
           authStore.setSignupError("邮箱已存在")
         } else {
           authStore.setSignupError("无法注册")

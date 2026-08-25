@@ -34,7 +34,7 @@ defineEmits<Emits>()
           title: '必做',
           key: 'is_required',
           width: 80,
-          render: (row) => (row.is_required ? '是' : '否'),
+          render: (row) => (row.isRequired ? '是' : '否'),
         },
         { title: '分数', key: 'score', width: 80 },
         { title: '提示', key: 'hint', minWidth: 200 },

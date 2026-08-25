@@ -7,24 +7,9 @@ import type {
   Achievement,
   AchievementRarity,
   AchievementSummary,
+  UserBadge,
 } from "utils/types"
 import AchievementCard from "./components/AchievementCard.vue"
-
-interface UserBadge {
-  id: number
-  earned_time: string
-  badge: {
-    id: number
-    name: string
-    description: string
-    icon: string
-  }
-  // 奖章来自哪个题单，接口在 UserBadgeSerializer 里带出来
-  problemset: {
-    id: number
-    title: string
-  } | null
-}
 
 const route = useRoute()
 const name = computed(() => (route.query.name as string) || undefined)
@@ -72,7 +57,7 @@ async function load() {
     // http 客户端返回 ApiResponse<T>，真实载荷在 .data 里
     achievements.value = list.data.achievements
     summary.value = sum.data
-    badges.value = (badgeRes.data ?? []) as UserBadge[]
+    badges.value = badgeRes.data ?? []
   } finally {
     loading.value = false
   }

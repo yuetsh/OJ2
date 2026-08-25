@@ -94,7 +94,7 @@ const serverColumns: DataTableColumn<Server>[] = [
   {
     title: "内存占用",
     key: "memory_usage",
-    render: (row) => row.memory_usage + "%",
+    render: (row) => row.memoryUsage + "%",
     width: 100,
   },
   { title: "IP", key: "ip", width: 140 },
@@ -103,13 +103,13 @@ const serverColumns: DataTableColumn<Server>[] = [
   {
     title: "上一次心跳",
     key: "last_heartbeat",
-    render: (row) => parseTime(row.last_heartbeat, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.lastHeartbeat, "YYYY-MM-DD HH:mm:ss"),
     width: 120,
   },
   {
     title: "创建时间",
     key: "create_time",
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
     width: 120,
   },
 ]
@@ -122,32 +122,32 @@ const abnormalServers = computed(() =>
 )
 
 const websiteConfig = reactive({
-  website_base_url: import.meta.env.PUBLIC_OJ_URL,
-  website_name: "判题狗",
-  website_name_shortcut: "判题狗",
-  website_footer: "所有权归属于徐越，感谢青岛大学开源 OJ 系统，感谢开源社区",
-  allow_register: true,
-  submission_list_show_all: true,
-  class_list: [],
-  enable_maxkb: true,
+  websiteBaseUrl: import.meta.env.PUBLIC_OJ_URL,
+  websiteName: "判题狗",
+  websiteNameShortcut: "判题狗",
+  websiteFooter: "所有权归属于徐越，感谢青岛大学开源 OJ 系统，感谢开源社区",
+  allowRegister: true,
+  submissionListShowAll: true,
+  classList: [],
+  enableMaxkb: true,
 })
 
 async function getWebsiteConfig() {
   const res = await getWebsite()
-  websiteConfig.website_base_url = res.data.website_base_url
-  websiteConfig.website_name = res.data.website_name
-  websiteConfig.website_name_shortcut = res.data.website_name_shortcut
-  websiteConfig.website_footer = res.data.website_footer
-  websiteConfig.allow_register = res.data.allow_register
-  websiteConfig.submission_list_show_all = res.data.submission_list_show_all
-  websiteConfig.class_list = res.data.class_list
-  websiteConfig.enable_maxkb = res.data.enable_maxkb
+  websiteConfig.websiteBaseUrl = res.data.websiteBaseUrl
+  websiteConfig.websiteName = res.data.websiteName
+  websiteConfig.websiteNameShortcut = res.data.websiteNameShortcut
+  websiteConfig.websiteFooter = res.data.websiteFooter
+  websiteConfig.allowRegister = res.data.allowRegister
+  websiteConfig.submissionListShowAll = res.data.submissionListShowAll
+  websiteConfig.classList = res.data.classList
+  websiteConfig.enableMaxkb = res.data.enableMaxkb
 }
 
 async function saveWebsiteConfig() {
   // 班级号要和用户名里 ks 后面那段对得上，位数不对登录页会查不到该班学生。
   // 后端 CreateEditWebsiteConfigSerializer 也会拦，这里先报更明确的错
-  const invalid = websiteConfig.class_list.filter((c) => !CLASS_NAME_RE.test(c))
+  const invalid = websiteConfig.classList.filter((c) => !CLASS_NAME_RE.test(c))
   if (invalid.length) {
     message.error(
       `班级号 ${invalid.join("、")} 必须是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字`,
@@ -165,11 +165,8 @@ async function saveWebsiteConfig() {
   configStore.getConfig()
 
   // 通过 WebSocket 广播配置变化，实现实时切换
-  updateConfig("enable_maxkb", websiteConfig.enable_maxkb)
-  updateConfig(
-    "submission_list_show_all",
-    websiteConfig.submission_list_show_all,
-  )
+  updateConfig("enable_maxkb", websiteConfig.enableMaxkb)
+  updateConfig("submission_list_show_all", websiteConfig.submissionListShowAll)
 }
 
 async function deleteTestcase(id?: string) {
@@ -222,19 +219,19 @@ onMounted(() => {
     </template>
     <n-form inline label-placement="left">
       <n-form-item label="网站 URL">
-        <n-input class="url" v-model:value="websiteConfig.website_base_url" />
+        <n-input class="url" v-model:value="websiteConfig.websiteBaseUrl" />
       </n-form-item>
       <n-form-item label="网站名">
-        <n-input v-model:value="websiteConfig.website_name" />
+        <n-input v-model:value="websiteConfig.websiteName" />
       </n-form-item>
       <n-form-item label="网站简称">
-        <n-input v-model:value="websiteConfig.website_name_shortcut" />
+        <n-input v-model:value="websiteConfig.websiteNameShortcut" />
       </n-form-item>
     </n-form>
     <n-form label-placement="left">
       <n-form-item label="班级列表">
         <n-flex vertical size="small">
-          <n-dynamic-tags v-model:value="websiteConfig.class_list" />
+          <n-dynamic-tags v-model:value="websiteConfig.classList" />
           <n-text depth="3" style="font-size: 12px">
             填 {{ CLASS_NAME_MIN_DIGITS }}~{{ CLASS_NAME_MAX_DIGITS }}
             位数字，如 251、2510，要和用户名里 ks 后面那段一致
@@ -245,15 +242,15 @@ onMounted(() => {
     <n-flex align="center">
       <n-flex align="center">
         <span>是否允许注册</span>
-        <n-switch v-model:value="websiteConfig.allow_register" />
+        <n-switch v-model:value="websiteConfig.allowRegister" />
       </n-flex>
       <n-flex align="center">
         <span>显示所有提交</span>
-        <n-switch v-model:value="websiteConfig.submission_list_show_all" />
+        <n-switch v-model:value="websiteConfig.submissionListShowAll" />
       </n-flex>
       <n-flex align="center">
         <span>启用AI小助手</span>
-        <n-switch v-model:value="websiteConfig.enable_maxkb" />
+        <n-switch v-model:value="websiteConfig.enableMaxkb" />
       </n-flex>
     </n-flex>
   </n-card>

@@ -64,7 +64,7 @@ async function init() {
   try {
     const res = await getProfile(route.query.name as string)
     profile.value = res.data
-    const acm = res.data.acm_problems_status.problems || {}
+    const acm = res.data!.acmProblemsStatus.problems || {}
     const ac: string[] = []
     Object.keys(acm).forEach((id) => {
       if (acm[id]["status"] === 0) {
@@ -74,7 +74,7 @@ async function init() {
     ac.sort()
     problems.value = ac
 
-    if (profile.value.submission_number > 0) {
+    if (profile.value.submissionNumber > 0) {
       const metricsRes = await getMetrics(profile.value.user.id)
       firstSubmissionAt.value = parseTime(metricsRes.data.first)
       latestSubmissionAt.value = parseTime(metricsRes.data.latest)
@@ -130,13 +130,13 @@ const metrics = computed(() => {
     },
     {
       icon: "fluent-emoji:candy",
-      title: profile.value?.accepted_number ?? 0,
+      title: profile.value?.acceptedNumber ?? 0,
       content: "已解决的题目数量",
       animate: true,
     },
     {
       icon: "fluent-emoji:thinking-face",
-      title: profile.value?.submission_number ?? 0,
+      title: profile.value?.submissionNumber ?? 0,
       content: "总提交数量",
       animate: true,
     },
@@ -186,7 +186,7 @@ onMounted(() => {
   </n-flex>
 
   <n-grid
-    v-if="profile && profile.submission_number > 0"
+    v-if="profile && profile.submissionNumber > 0"
     class="wrapper"
     :cols="isDesktop ? 2 : 1"
     :x-gap="10"

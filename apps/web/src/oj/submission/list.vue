@@ -9,6 +9,7 @@ import {
   retryFlowchartSubmission,
 } from "oj/api"
 import { parseTime } from "utils/functions"
+import type { Grade as GradeValue } from "utils/types"
 import type {
   FlowchartSubmissionListItem,
   LANGUAGE,
@@ -101,7 +102,7 @@ async function listSubmissions() {
   if (query.language === "Flowchart") {
     const res = await getFlowchartSubmissions({
       username: query.username,
-      problem_id: query.problem,
+      problemId: query.problem,
       myself: query.myself,
       offset,
       limit: query.limit,
@@ -114,8 +115,8 @@ async function listSubmissions() {
     const res = await getSubmissions({
       ...query,
       offset,
-      problem_id: query.problem,
-      contest_id: (route.params.contestID as string) ?? "",
+      problemId: query.problem,
+      contestId: (route.params.contestID as string) ?? "",
       language: query.language,
       today: query.today,
     })
@@ -233,7 +234,7 @@ const columns = computed(() => {
       title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
       key: "create_time",
       minWidth: 200,
-      render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+      render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
     },
     {
       title: renderTableTitle("提交编号", "fluent-emoji-flat:input-numbers"),
@@ -263,7 +264,7 @@ const columns = computed(() => {
             onClick: () => problemClicked(row),
             onSearch: () => (query.problem = row.problem),
           },
-          () => `${row.problem} ${row.problem_title}`,
+          () => `${row.problem} ${row.problemTitle}`,
         ),
     },
     {
@@ -318,7 +319,7 @@ const flowchartColumns = computed(() => {
     {
       title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
       key: "create_time",
-      render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+      render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
     },
     {
       title: renderTableTitle("提交编号", "fluent-emoji-flat:input-numbers"),
@@ -340,7 +341,7 @@ const flowchartColumns = computed(() => {
             onClick: () => problemClicked(row),
             onSearch: () => (query.problem = row.problem),
           },
-          () => `${row.problem} ${row.problem_title}`,
+          () => `${row.problem} ${row.problemTitle}`,
         ),
     },
     {
@@ -349,7 +350,11 @@ const flowchartColumns = computed(() => {
         "streamline-ultimate-color:analytics-bars-3d",
       ),
       key: "ai_score",
-      render: (row) => h(Grade, { score: row.ai_score, grade: row.ai_grade }),
+      render: (row) =>
+        h(Grade, {
+          score: row.aiScore ?? 0,
+          grade: (row.aiGrade ?? "") as GradeValue,
+        }),
     },
     {
       title: renderTableTitle(
@@ -545,9 +550,9 @@ const flowchartColumns = computed(() => {
         <n-text>流程图评分详情</n-text>
         <n-text
           v-if="selectedFlowchart"
-          :type="getGradeType(selectedFlowchart.ai_grade)"
+          :type="getGradeType(selectedFlowchart.aiGrade ?? '')"
         >
-          {{ selectedFlowchart.ai_score }}分 {{ selectedFlowchart.ai_grade }}级
+          {{ selectedFlowchart.aiScore }}分 {{ selectedFlowchart.aiGrade }}级
         </n-text>
       </n-flex>
     </template>

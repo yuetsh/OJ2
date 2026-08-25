@@ -55,7 +55,7 @@ const { isMobile, isDesktop } = useBreakpoints()
 
 const tabOptions = computed(() => {
   const options: string[] = ["content"]
-  if (problem.value?.show_flowchart) {
+  if (problem.value?.showFlowchart) {
     options.push("flowchart")
   }
 
@@ -113,7 +113,7 @@ async function init() {
     problem.value = res.data
   } catch (err: any) {
     problem.value = null
-    if (err.data === "Contest has not started yet.") {
+    if (err.error === "contest-not-started") {
       errMsg.value = "比赛还没有开始"
     }
   }
@@ -159,7 +159,7 @@ watch(
               <ProblemContent />
             </n-tab-pane>
             <n-tab-pane
-              v-if="problem.show_flowchart && problem.mermaid_code"
+              v-if="problem.showFlowchart && problem.mermaidCode"
               name="flowchart"
               tab="流程图表"
             >
@@ -211,7 +211,7 @@ watch(
             <ProblemContent />
           </n-tab-pane>
           <n-tab-pane
-            v-if="problem.show_flowchart && problem.mermaid_code"
+            v-if="problem.showFlowchart && problem.mermaidCode"
             name="flowchart"
             tab="流程图表"
           >
@@ -251,7 +251,7 @@ watch(
       <n-tab-pane name="content" tab="描述">
         <ProblemContent />
       </n-tab-pane>
-      <n-tab-pane v-if="problem.show_flowchart" name="flowchart" tab="流程">
+      <n-tab-pane v-if="problem.showFlowchart" name="flowchart" tab="流程">
         <ProblemFlowchart />
       </n-tab-pane>
       <n-tab-pane name="editor" tab="代码">

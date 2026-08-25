@@ -19,7 +19,7 @@ const tutorial = reactive<Tutorial>({
   title: "",
   content: "",
   code: "",
-  is_public: false,
+  isPublic: false,
   order: 0,
   type: "python", // 默认选择 Python
 })
@@ -39,7 +39,7 @@ async function init() {
   tutorial.title = data.title
   tutorial.content = data.content
   tutorial.code = data.code || ""
-  tutorial.is_public = data.is_public
+  tutorial.isPublic = data.isPublic
   tutorial.order = data.order
   tutorial.type = data.type || "python"
 }
@@ -55,7 +55,7 @@ async function submit() {
         title: tutorial.title,
         content: tutorial.content,
         code: tutorial.code,
-        is_public: tutorial.is_public,
+        isPublic: tutorial.isPublic,
         order: tutorial.order,
         type: tutorial.type,
       })
@@ -94,7 +94,7 @@ onMounted(init)
       />
     </n-form-item>
     <n-form-item label="可见">
-      <n-switch v-model:value="tutorial.is_public" />
+      <n-switch v-model:value="tutorial.isPublic" />
     </n-form-item>
     <n-form-item>
       <n-button type="primary" @click="submit">保存</n-button>

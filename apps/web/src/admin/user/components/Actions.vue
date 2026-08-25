@@ -14,7 +14,7 @@ const emit = defineEmits<{
 }>()
 
 async function banUser() {
-  props.user.is_disabled = !props.user.is_disabled
+  props.user.isDisabled = !props.user.isDisabled
   await editUser(props.user)
   emit("userBanned", props.user)
 }
@@ -40,10 +40,10 @@ async function banUser() {
     <n-button
       size="small"
       secondary
-      :type="props.user.is_disabled ? 'info' : 'error'"
+      :type="props.user.isDisabled ? 'info' : 'error'"
       @click="banUser"
     >
-      {{ props.user.is_disabled ? "解封" : "封号" }}
+      {{ props.user.isDisabled ? "解封" : "封号" }}
     </n-button>
     <n-popconfirm @positive-click="$emit('deleteUser', [props.user.id])">
       <template #trigger>

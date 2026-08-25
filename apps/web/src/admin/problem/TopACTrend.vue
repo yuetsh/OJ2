@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AcTrend } from "utils/types"
 import { Line } from "vue-chartjs"
 import {
   Chart as ChartJS,
@@ -22,18 +23,7 @@ ChartJS.register(
   Tooltip,
 )
 
-interface YearlyEntry {
-  year: number
-  total: number
-  accepted: number
-  ac_rate: number
-}
-
-interface ProblemTrend {
-  problem_id: string
-  problem_title: string
-  yearly: YearlyEntry[]
-}
+type ProblemTrend = AcTrend
 
 const currentYear = new Date().getFullYear()
 const yearOptions = Array.from({ length: currentYear - 2022 + 1 }, (_, i) => ({
@@ -79,7 +69,7 @@ function getChartData(problem: ProblemTrend) {
     datasets: [
       {
         label: "AC 率",
-        data: problem.yearly.map((y) => y.ac_rate),
+        data: problem.yearly.map((y) => y.acRate),
         fill: true,
         tension: 0.3,
         backgroundColor: "rgba(99, 179, 237, 0.2)",
@@ -98,14 +88,14 @@ function getChartOptions(problem: ProblemTrend) {
     plugins: {
       title: {
         display: true,
-        text: `${problem.problem_id} · ${problem.problem_title}`,
+        text: `${problem.problemId} · ${problem.problemTitle}`,
         font: { size: 14 },
       },
       tooltip: {
         callbacks: {
           label: (ctx: any) => {
             const entry = problem.yearly[ctx.dataIndex]
-            return `AC 率: ${entry.ac_rate}% (${entry.accepted}/${entry.total})`
+            return `AC 率: ${entry.acRate}% (${entry.accepted}/${entry.total})`
           },
         },
       },
@@ -127,9 +117,9 @@ async function fetchData() {
   loading.value = true
   try {
     const res = await getTopACTrend({
-      since_year: sinceYear.value,
-      until_year: untilYear.value,
-      min_per_year: minPerYear.value,
+      sinceYear: sinceYear.value,
+      untilYear: untilYear.value,
+      minPerYear: minPerYear.value,
     })
     data.value = res.data
   } finally {
@@ -174,7 +164,7 @@ onMounted(fetchData)
       暂无数据
     </div>
     <div v-else class="grid">
-      <div v-for="problem in data" :key="problem.problem_id" class="chart-card">
+      <div v-for="problem in data" :key="problem.problemId" class="chart-card">
         <Line
           :data="getChartData(problem)"
           :options="getChartOptions(problem)"

@@ -78,7 +78,7 @@ const chartData = computed(() => {
   // 收集所有AC事件并按时间排序
   const events: AcEvent[] = []
   topUsers.forEach((rank, userIndex) => {
-    Object.entries(rank.submission_info).forEach(([problemId, info]) => {
+    Object.entries(rank.submissionInfo).forEach(([problemId, info]) => {
       if (info.is_ac) {
         events.push({ time: info.ac_time, userIndex, problemId })
       }
@@ -100,7 +100,7 @@ const chartData = computed(() => {
   // 用于记录每个用户每道题的错误次数
   const userErrors: Map<string, number>[] = topUsers.map(() => new Map())
   topUsers.forEach((rank, i) => {
-    Object.entries(rank.submission_info).forEach(([problemId, info]) => {
+    Object.entries(rank.submissionInfo).forEach(([problemId, info]) => {
       if (info.error_number > 0) {
         userErrors[i].set(problemId, info.error_number)
       }

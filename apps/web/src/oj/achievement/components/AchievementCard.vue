@@ -17,7 +17,7 @@ const masked = computed(
 
 // 获得率低于 5% 的加稀有闪光边框
 const isRare = computed(
-  () => props.achievement.unlock_rate > 0 && props.achievement.unlock_rate < 5,
+  () => props.achievement.unlockRate > 0 && props.achievement.unlockRate < 5,
 )
 
 // 只有"越多越好"的成就画进度条。lte 类（如最短 AC 代码 ≤ 50 字符）
@@ -45,10 +45,10 @@ const percent = computed(() => {
 })
 
 const unlockDate = computed(() => {
-  const { unlock_time, backfilled } = props.achievement
+  const { unlockTime, backfilled } = props.achievement
   // 补发的记录不显示具体日期：一次补发会给几百人盖上同一个时间戳
-  if (backfilled || !unlock_time) return "已获得"
-  return `${new Date(unlock_time).toLocaleDateString()} 获得`
+  if (backfilled || !unlockTime) return "已获得"
+  return `${new Date(unlockTime).toLocaleDateString()} 获得`
 })
 </script>
 
@@ -86,7 +86,7 @@ const unlockDate = computed(() => {
         <template v-if="achievement.unlocked">
           <n-text depth="3" class="nowrap">{{ unlockDate }}</n-text>
           <n-text depth="3" class="nowrap">
-            仅 {{ achievement.unlock_rate }}% 的人获得
+            仅 {{ achievement.unlockRate }}% 的人获得
           </n-text>
         </template>
 
@@ -113,7 +113,7 @@ const unlockDate = computed(() => {
         </template>
 
         <n-text v-else depth="3" class="nowrap">
-          仅 {{ achievement.unlock_rate }}% 的人获得
+          仅 {{ achievement.unlockRate }}% 的人获得
         </n-text>
       </n-flex>
     </n-thing>

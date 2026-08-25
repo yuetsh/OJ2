@@ -59,8 +59,8 @@ const show = computed(() => {
 // 计算提交效率数据
 const efficiencyData = computed(() => {
   return aiStore.durationData.map((duration) => {
-    const problemCount = duration.problem_count || 0
-    const submissionCount = duration.submission_count || 0
+    const problemCount = duration.problemCount || 0
+    const submissionCount = duration.submissionCount || 0
 
     // 计算效率：提交次数/完成题目数
     // 值越接近1，说明一次AC率越高

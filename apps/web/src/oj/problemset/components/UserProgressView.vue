@@ -16,7 +16,7 @@ const total = ref(0)
 const statistics = ref<{
   total: number
   completed: number
-  avg_progress: number
+  avgProgress: number
 } | null>(null)
 const classFilter = ref<string>("")
 const completionFilter = ref<"" | "completed" | "in_progress" | "not_started">(
@@ -42,17 +42,17 @@ async function loadUserProgress() {
   const params: {
     limit?: number
     offset?: number
-    class_name?: string
-    completion_status?: "" | "completed" | "in_progress" | "not_started"
+    className?: string
+    completionStatus?: "" | "completed" | "in_progress" | "not_started"
   } = {
     limit: query.limit,
     offset,
   }
   if (classFilter.value.trim()) {
-    params.class_name = classFilter.value.trim()
+    params.className = classFilter.value.trim()
   }
   if (completionFilter.value) {
-    params.completion_status = completionFilter.value
+    params.completionStatus = completionFilter.value
   }
   const res = await getProblemSetUserProgress(problemSetId.value, params)
 
@@ -92,7 +92,7 @@ const stats = computed(() => {
     return {
       total: statistics.value.total,
       completed: statistics.value.completed,
-      avgProgress: Math.round(statistics.value.avg_progress),
+      avgProgress: Math.round(statistics.value.avgProgress),
     }
   }
   // 如果后端还没有返回统计数据，使用默认值
@@ -128,7 +128,7 @@ const progressColumns = [
     key: "join_time",
     width: 180,
     render: (row: ProblemSetProgress) =>
-      parseTime(row.join_time, "YYYY-MM-DD HH:mm:ss"),
+      parseTime(row.joinTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "已完成数量",
@@ -140,12 +140,12 @@ const progressColumns = [
     key: "completed_problems",
     width: 300,
     render: (row: ProblemSetProgress) => {
-      if (row.progress_percentage === 100) {
+      if (row.progressPercentage === 100) {
         return "全部题目已完成"
       }
-      if (row.progress_percentage > 50 && row.progress_percentage < 100) {
+      if (row.progressPercentage > 50 && row.progressPercentage < 100) {
         const completedProblemIds = new Set(
-          row.completed_problems.map((p: any) => p.id),
+          row.completedProblems.map((p: any) => p.id),
         )
         const incompleteProblems = allProblems.value.filter(
           (p) => !completedProblemIds.has(p.id),
@@ -164,7 +164,7 @@ const progressColumns = [
       }
       return h("div", { style: "max-height: 120px; overflow-y: auto" }, [
         h(NFlex, {}, () =>
-          row.completed_problems.map((problem: any) =>
+          row.completedProblems.map((problem: any) =>
             h(
               NTag,
               {
@@ -184,7 +184,7 @@ const progressColumns = [
     key: "progress_percentage",
     width: 120,
     render: (row: ProblemSetProgress) => {
-      return `${row.progress_percentage.toFixed(0)}%`
+      return `${row.progressPercentage.toFixed(0)}%`
     },
   },
   {
@@ -192,7 +192,7 @@ const progressColumns = [
     key: "is_completed",
     width: 100,
     render: (row: ProblemSetProgress) => {
-      if (row.is_completed) {
+      if (row.isCompleted) {
         return h(NTag, { type: "success" }, () => "已完成")
       } else {
         return h(NTag, { type: "warning" }, () => "进行中")

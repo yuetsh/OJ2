@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AcmHelperItem, SubmissionInfo } from "utils/types"
 import { NButton, NCheckbox, NSelect, NTag } from "naive-ui"
 import { parseTime } from "utils/functions"
 import { getACMHelperList, getContest, updateACMHelperChecked } from "../api"
@@ -10,19 +11,12 @@ interface Props {
   contestID: string
 }
 
-interface HelperItem {
-  id: number
-  username: string
-  real_name: string
-  problem_id: string
-  problem_display_id: string
-  ac_info: {
-    is_ac: boolean
-    ac_time: number
-    error_number: number
-    checked?: boolean
-  }
-  checked: boolean
+/**
+ * ACM 助手行。`acInfo` 的**内容**是 acm_contest_rank.submission_info 的 JSONB 原文，
+ * 键名保持 snake_case —— 回滚时旧后端还要读。
+ */
+type HelperItem = Omit<AcmHelperItem, "acInfo"> & {
+  acInfo: SubmissionInfo
 }
 
 const props = defineProps<Props>()
@@ -65,12 +59,12 @@ async function toggleChecked(item: HelperItem) {
     await updateACMHelperChecked(
       Number(props.contestID),
       item.id,
-      item.problem_id,
+      item.problemId,
       newChecked,
     )
     // 更新本地状态
     item.checked = newChecked
-    item.ac_info.checked = newChecked
+    item.acInfo.checked = newChecked
 
     // 强制触发响应式更新
     submissions.value = [...submissions.value]
@@ -95,11 +89,11 @@ async function markAllAsChecked() {
       await updateACMHelperChecked(
         Number(props.contestID),
         item.id,
-        item.problem_id,
+        item.problemId,
         true,
       )
       item.checked = true
-      item.ac_info.checked = true
+      item.acInfo.checked = true
     }
 
     // 强制触发响应式更新
@@ -117,7 +111,7 @@ async function markAllAsChecked() {
 const filteredSubmissions = computed(() => {
   return submissions.value.filter((item) => {
     if (query.username && !item.username.includes(query.username)) return false
-    if (query.problemId && !item.problem_display_id.includes(query.problemId))
+    if (query.problemId && !item.problemDisplayId.includes(query.problemId))
       return false
     if (query.checked === "checked" && !item.checked) return false
     if (query.checked === "unchecked" && item.checked) return false
@@ -139,8 +133,8 @@ async function viewSubmission(item: HelperItem) {
     // 查询该用户在该竞赛该题目的 AC 提交
     const res = await getSubmissions({
       username: item.username,
-      problem_id: item.problem_display_id,
-      contest_id: props.contestID,
+      problemId: item.problemDisplayId,
+      contestId: props.contestID,
       result: "0", // ACCEPTED
       language: "",
       page: 1,
@@ -161,7 +155,7 @@ async function viewSubmission(item: HelperItem) {
     currentSubmission.value = {
       ...detailRes.data,
       contest: Number(props.contestID),
-      problem_display_id: item.problem_display_id,
+      problem_display_id: item.problemDisplayId,
     }
 
     toggleCodePanel(true)
@@ -175,7 +169,7 @@ async function loadData() {
   try {
     // 先获取比赛信息，获取开始时间
     const contestRes = await getContest(props.contestID)
-    contestStartTime.value = new Date(contestRes.data.start_time)
+    contestStartTime.value = new Date(contestRes.data.startTime)
 
     // 再获取 AC 提交列表
     const { data } = await getACMHelperList(Number(props.contestID))
@@ -195,13 +189,13 @@ const columns: DataTableColumn<HelperItem>[] = [
     title: "题目",
     key: "problem_display_id",
     width: 100,
-    render: (row) => h(NTag, { type: "info" }, () => row.problem_display_id),
+    render: (row) => h(NTag, { type: "info" }, () => row.problemDisplayId),
   },
   {
     title: "AC时间",
     key: "ac_time",
     width: 180,
-    render: (row) => formatACTime(row.ac_info.ac_time),
+    render: (row) => formatACTime(row.acInfo.ac_time),
   },
   {
     title: "错误次数",
@@ -211,10 +205,10 @@ const columns: DataTableColumn<HelperItem>[] = [
       h(
         NTag,
         {
-          type: row.ac_info.error_number > 0 ? "warning" : "success",
+          type: row.acInfo.error_number > 0 ? "warning" : "success",
           size: "small",
         },
-        () => row.ac_info.error_number,
+        () => row.acInfo.error_number,
       ),
   },
   {
@@ -310,7 +304,7 @@ onMounted(loadData)
       <SubmissionDetail
         v-if="currentSubmission"
         :submission="currentSubmission"
-        :problemID="currentSubmission.problem_display_id"
+        :problemID="currentSubmission.problemDisplayId"
         :submissionID="currentSubmission.id"
         hideList
         @copied="toggleCodePanel(false)"

@@ -13,13 +13,14 @@ export const useAIStore = defineStore("ai", () => {
   const targetUsername = ref("")
   const durationData = ref<DurationData[]>([])
   const detailsData = reactive<DetailsData>({
+    user: "",
     start: "",
     end: "",
-    grade: "B",
-    class_name: "",
+    grade: "",
+    className: null,
     tags: {},
     difficulty: {},
-    contest_count: 0,
+    contestCount: 0,
     solved: [],
     flowcharts: [],
   })
@@ -44,10 +45,10 @@ export const useAIStore = defineStore("ai", () => {
     detailsData.end = res.data.end
     detailsData.solved = res.data.solved
     detailsData.grade = res.data.grade
-    detailsData.class_name = res.data.class_name
+    detailsData.className = res.data.className
     detailsData.tags = res.data.tags
     detailsData.difficulty = res.data.difficulty
-    detailsData.contest_count = res.data.contest_count
+    detailsData.contestCount = res.data.contestCount
     detailsData.flowcharts = res.data.flowcharts
   }
 

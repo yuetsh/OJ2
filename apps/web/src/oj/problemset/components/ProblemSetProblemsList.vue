@@ -41,7 +41,7 @@ function handleProblemClick(problemId: string) {
               style="margin-right: 10px"
               width="48"
               icon="fluent-emoji:check-mark-button"
-              v-if="problemSetProblem.is_completed"
+              v-if="problemSetProblem.isCompleted"
             />
 
             <n-flex vertical style="flex: 1">
@@ -60,7 +60,7 @@ function handleProblemClick(problemId: string) {
                   {{ DIFFICULTY[problemSetProblem.problem.difficulty] }}
                 </n-tag>
                 <n-text type="info">分数：{{ problemSetProblem.score }}</n-text>
-                <n-text v-if="!problemSetProblem.is_required">（选做）</n-text>
+                <n-text v-if="!problemSetProblem.isRequired">（选做）</n-text>
               </n-flex>
             </n-flex>
           </n-flex>

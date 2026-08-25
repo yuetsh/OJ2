@@ -24,12 +24,7 @@ export const userProfileSchema = z.object({
   realName: z.string().nullable(),
   acmProblemsStatus: z.record(z.string(), z.unknown()),
   avatar: z.string(),
-  blog: z.string().nullable(),
   mood: z.string().nullable(),
-  github: z.string().nullable(),
-  school: z.string().nullable(),
-  major: z.string().nullable(),
-  language: z.string().nullable(),
   acceptedNumber: z.number().int(),
   submissionNumber: z.number().int(),
 })

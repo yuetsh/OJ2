@@ -35,7 +35,7 @@ const activeTab = ref("problems")
 async function loadProblemSetDetail() {
   const res = await getProblemSetDetail(problemSetId.value)
   problemSet.value = res.data
-  isJoined.value = res.data.user_progress?.is_joined || false
+  isJoined.value = res.data.userProgress?.isJoined || false
 }
 
 async function loadProblems() {
@@ -48,14 +48,14 @@ async function loadUserBadges() {
 
   const res = await getUserBadges()
   userBadges.value = res.data.filter(
-    (badge: UserBadgeType) => badge.badge.problemset === problemSetId.value,
+    (badge: UserBadgeType) => badge.badge.problemsetId === problemSetId.value,
   )
 }
 
 async function init() {
   await Promise.all([loadProblemSetDetail(), loadProblems()])
   if (isJoined.value) {
-    if (problemSet.value?.user_progress?.is_completed) {
+    if (problemSet.value?.userProgress?.isCompleted) {
       celebrate()
     }
     loadUserBadges()
@@ -100,7 +100,7 @@ async function handleJoinProblemSet() {
 const showTabs = computed(
   () =>
     userStore.isSuperAdmin ||
-    (isJoined.value && problemSet.value?.user_progress?.is_completed),
+    (isJoined.value && problemSet.value?.userProgress?.isCompleted),
 )
 
 onMounted(init)

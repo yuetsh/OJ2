@@ -125,7 +125,7 @@ async function generate() {
     blanks.map(async (s) => {
       try {
         const res = await generateSQLTestcase({
-          ref_sql: refSQL.value,
+          refSql: refSQL.value,
           mode: props.mode,
         })
         s.sql = res.data.sql
@@ -154,8 +154,8 @@ async function preview() {
       s.stale = false
       try {
         const res = await previewSQLTestcase({
-          init_sql: s.sql,
-          ref_sql: refSQL.value,
+          initSql: s.sql,
+          refSql: refSQL.value,
           mode: props.mode,
         })
         s.display = res.data

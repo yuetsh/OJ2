@@ -29,12 +29,7 @@ export async function getUserProfileById(userId: number, showRealName: boolean) 
     realName: showRealName ? row.profile.realName : null,
     acmProblemsStatus: row.profile.acmProblemsStatus,
     avatar: row.profile.avatar,
-    blog: row.profile.blog,
     mood: row.profile.mood,
-    github: row.profile.github,
-    school: row.profile.school,
-    major: row.profile.major,
-    language: row.profile.language,
     acceptedNumber: row.profile.acceptedNumber,
     submissionNumber: row.profile.submissionNumber,
   })

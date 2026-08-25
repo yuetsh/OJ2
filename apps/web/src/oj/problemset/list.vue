@@ -3,7 +3,7 @@ import { Icon } from "@iconify/vue"
 import { useRouteQuery } from "@vueuse/router"
 import { getProblemSetList } from "../api"
 import { parseTime } from "utils/functions"
-import type { ProblemSetList } from "utils/types"
+import type { ProblemSet } from "utils/types"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -12,7 +12,7 @@ const router = useRouter()
 const { isDesktop } = useBreakpoints()
 
 const total = ref(0)
-const problemSets = ref<ProblemSetList[]>([])
+const problemSets = ref<ProblemSet[]>([])
 
 interface ProblemSetQuery {
   keyword: string
@@ -164,27 +164,25 @@ watch(
             <n-flex justify="space-between" align="center">
               <n-flex>
                 <Icon width="20" icon="streamline-emojis:blossom" />
-                <n-text>{{ problemSet.problems_count }} 道题目</n-text>
+                <n-text>{{ problemSet.problemsCount }} 道题目</n-text>
               </n-flex>
 
               <n-flex align="center" style="height: 28px">
                 <!-- 用户进度显示 -->
                 <n-progress
                   v-if="
-                    problemSet.user_progress?.is_joined &&
-                    !problemSet.user_progress?.is_completed
+                    problemSet.userProgress?.isJoined &&
+                    !problemSet.userProgress?.isCompleted
                   "
                   type="line"
                   :percentage="
-                    Math.round(problemSet.user_progress.progress_percentage)
+                    Math.round(problemSet.userProgress.progressPercentage)
                   "
                   :height="4"
                   :border-radius="2"
                   style="width: 100px"
                   :color="
-                    getProgressColor(
-                      problemSet.user_progress.progress_percentage,
-                    )
+                    getProgressColor(problemSet.userProgress.progressPercentage)
                   "
                 />
                 <n-tag type="warning" v-if="problemSet.status === 'archived'">
@@ -192,17 +190,14 @@ watch(
                 </n-tag>
                 <n-tag
                   v-if="
-                    problemSet.user_progress?.is_joined &&
-                    !problemSet.user_progress?.is_completed
+                    problemSet.userProgress?.isJoined &&
+                    !problemSet.userProgress?.isCompleted
                   "
                   type="warning"
                 >
                   已加入
                 </n-tag>
-                <n-tag
-                  v-if="problemSet.user_progress?.is_completed"
-                  type="error"
-                >
+                <n-tag v-if="problemSet.userProgress?.isCompleted" type="error">
                   已完成
                 </n-tag>
               </n-flex>
@@ -212,7 +207,7 @@ watch(
             <n-flex align="center" justify="space-between">
               <n-text depth="3">
                 创建于
-                {{ parseTime(problemSet.create_time, "YYYY-MM-DD") }}
+                {{ parseTime(problemSet.createTime, "YYYY-MM-DD") }}
               </n-text>
               <n-flex>
                 <n-tooltip
@@ -227,7 +222,7 @@ watch(
                       width="24"
                       height="24"
                       object-fit="cover"
-                      :class="{ 'earned-badge': badge.is_earned }"
+                      :class="{ 'earned-badge': badge.isEarned }"
                     />
                   </template>
                   <n-flex vertical size="small">
@@ -238,12 +233,12 @@ watch(
                       获取条件:
                       {{
                         getConditionText(
-                          badge.condition_type,
-                          badge.condition_value,
+                          badge.conditionType,
+                          badge.conditionValue,
                         )
                       }}
                     </span>
-                    <n-text type="primary" v-if="badge.is_earned">
+                    <n-text type="primary" v-if="badge.isEarned">
                       ✓ 已获得
                     </n-text>
                   </n-flex>

@@ -139,7 +139,7 @@ export function debounce<T extends (...args: any[]) => any>(
   }
 }
 
-export function getUserRole(role: User["admin_type"]): {
+export function getUserRole(role: User["adminType"]): {
   type: "default" | "info" | "warning" | "error"
   label: "普通" | "学生管理员" | "教师管理员" | "超管"
 } {

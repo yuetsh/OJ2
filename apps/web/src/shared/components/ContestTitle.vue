@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { ContestType } from "utils/constants"
-import type { Contest } from "utils/types"
+import type { Contest, OjContest } from "utils/types"
 
-defineProps<{ contest: Contest }>()
+defineProps<{ contest: Contest | OjContest }>()
 </script>
 <template>
   <n-flex>
     <Icon
-      v-if="contest.contest_type === ContestType.private"
+      v-if="contest.contestType === ContestType.private"
       :height="24"
       icon="streamline-ultimate-color:shield-lock"
     ></Icon>

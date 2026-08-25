@@ -3,19 +3,19 @@ import type { WebsiteConfig } from "utils/types"
 
 export const useConfigStore = defineStore("config", () => {
   const config = ref<WebsiteConfig>({
-    website_base_url: "",
-    website_name: "",
-    website_name_shortcut: "",
-    website_footer: "",
-    submission_list_show_all: true,
-    allow_register: false,
-    class_list: [],
-    enable_maxkb: true,
+    websiteBaseUrl: "",
+    websiteName: "",
+    websiteNameShortcut: "",
+    websiteFooter: "",
+    submissionListShowAll: true,
+    allowRegister: false,
+    classList: [],
+    enableMaxkb: true,
   })
   async function getConfig() {
     const res = await getWebsiteConfig()
     config.value = res.data
-    document.title = res.data.website_name
+    document.title = res.data.websiteName
   }
   return {
     config,

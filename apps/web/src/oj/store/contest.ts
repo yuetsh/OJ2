@@ -21,8 +21,8 @@ export const useContestStore = defineStore("contest", () => {
 
   const contestStatus = computed<ContestStatus>(() => {
     if (!contest.value) return ContestStatus.initial
-    const start = getTime(parseISO(contest.value.start_time.toString()))
-    const end = getTime(parseISO(contest.value.end_time.toString()))
+    const start = getTime(parseISO(contest.value.startTime.toString()))
+    const end = getTime(parseISO(contest.value.endTime.toString()))
     if (start > now.value) {
       return ContestStatus.not_started
     } else if (end < now.value) {
@@ -36,10 +36,10 @@ export const useContestStore = defineStore("contest", () => {
     if (contestStatus.value === ContestStatus.finished) {
       return "已结束"
     } else if (contestStatus.value === ContestStatus.not_started) {
-      const d = duration(formatISO(now.value), contest.value!.start_time, true)
+      const d = duration(formatISO(now.value), contest.value!.startTime, true)
       return "距离比赛开始 " + d
     } else {
-      const d = duration(formatISO(now.value), contest.value!.end_time, true)
+      const d = duration(formatISO(now.value), contest.value!.endTime, true)
       return "距离比赛结束 " + d
     }
   })
@@ -48,11 +48,11 @@ export const useContestStore = defineStore("contest", () => {
     () =>
       userStore.isSuperAdmin ||
       (userStore.isAuthed &&
-        contest.value?.created_by.id === userStore.user!.id),
+        contest.value?.createdBy.id === userStore.user!.id),
   )
 
   const isPrivate = computed(
-    () => contest.value!.contest_type === ContestType.private,
+    () => contest.value!.contestType === ContestType.private,
   )
 
   async function init(contestID: string) {
@@ -65,7 +65,7 @@ export const useContestStore = defineStore("contest", () => {
         now.value = now.value + 1000
       }, 1000)
     }
-    if (contest.value?.contest_type === ContestType.private) {
+    if (contest.value?.contestType === ContestType.private) {
       const res = await getContestAccess(contestID)
       toggleAccess(res.data.access)
     }

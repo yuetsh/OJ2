@@ -1,5 +1,5 @@
 <template>
-  <n-flex v-if="props.submission.show_link" align="center">
+  <n-flex v-if="props.submission.showLink" align="center">
     <n-button text type="info" @click="$emit('showCode')">
       {{ props.submission.id.slice(0, 12) }}
     </n-button>
@@ -43,7 +43,7 @@ defineEmits(["showCode"])
 
 const userStore = useUserStore()
 const isOwnSubmission = computed(
-  () => userStore.profile?.user?.id === props.submission.user_id,
+  () => userStore.profile?.user?.id === props.submission.userId,
 )
 
 function goto() {

@@ -284,7 +284,7 @@ async function save() {
       message.success("练习题已更新")
     } else {
       await createExercise({
-        tutorial_id: props.tutorialId,
+        tutorialId: props.tutorialId,
         type: formType.value,
         data,
         order: formOrder.value,

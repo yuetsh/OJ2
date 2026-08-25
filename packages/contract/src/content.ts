@@ -72,3 +72,7 @@ export const exerciseSchema = z.object({
   data: z.record(z.string(), z.unknown()),
   order: z.number().int(),
 })
+
+export type Message = z.infer<typeof messageSchema>
+export type MessageList = z.infer<typeof messageListSchema>
+export type Announcement = z.infer<typeof announcementSchema>

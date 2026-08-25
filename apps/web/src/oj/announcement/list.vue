@@ -33,15 +33,15 @@ const columns: DataTableColumn<Announcement>[] = [
     render: (row) => h(NTag, () => row.tag || "公告"),
   },
   {
-    key: "create_time",
+    key: "createTime",
     title: renderTableTitle("发布时间", "fluent-emoji-flat:eight-oclock"),
-    render: (row) => parseTime(row.create_time),
+    render: (row) => parseTime(row.createTime),
     width: 180,
   },
   {
     key: "username",
     title: renderTableTitle("发布人", "streamline-emojis:ghost"),
-    render: (row) => row.created_by.username,
+    render: (row) => row.createdBy.username,
     width: 120,
   },
 ]

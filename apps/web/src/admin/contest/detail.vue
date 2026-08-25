@@ -23,8 +23,8 @@ const durationMins = ref(10) // 比赛默认时长10分钟
 
 watch([waitMins, durationMins], () => {
   const times = getTimes()
-  contest.start_time = formatISO(times[0])
-  contest.end_time = formatISO(times[1])
+  contest.startTime = formatISO(times[0])
+  contest.endTime = formatISO(times[1])
 })
 
 // 编辑的时候
@@ -32,8 +32,8 @@ const startTime = ref(0)
 const endTime = ref(0)
 
 watch([startTime, endTime], (values) => {
-  contest.start_time = formatISO(values[0])
-  contest.end_time = formatISO(values[1])
+  contest.startTime = formatISO(values[0])
+  contest.endTime = formatISO(values[1])
 })
 
 const route = useRoute()
@@ -54,18 +54,18 @@ const contest = reactive<BlankContest & { id: number }>({
   title: "",
   description: "",
   tag: "练习",
-  start_time: "",
-  end_time: "",
+  startTime: "",
+  endTime: "",
   password: "",
   visible: false,
-  allowed_ip_ranges: [],
+  allowedIpRanges: [],
 })
 
 async function getContestDetail() {
   if (!props.contestID) {
     const times = getTimes()
-    contest.start_time = formatISO(times[0])
-    contest.end_time = formatISO(times[1])
+    contest.startTime = formatISO(times[0])
+    contest.endTime = formatISO(times[1])
     toggleReady(true)
     return
   }
@@ -75,15 +75,15 @@ async function getContestDetail() {
   contest.title = data.title
   contest.description = data.description
   contest.tag = data.tag
-  contest.start_time = data.start_time
-  contest.end_time = data.end_time
+  contest.startTime = data.startTime
+  contest.endTime = data.endTime
   contest.password = data.password
   contest.visible = data.visible
-  contest.allowed_ip_ranges = []
+  contest.allowedIpRanges = []
 
   // 显示
-  startTime.value = Date.parse(data.start_time)
-  endTime.value = Date.parse(data.end_time)
+  startTime.value = Date.parse(data.startTime)
+  endTime.value = Date.parse(data.endTime)
 }
 
 async function submit() {
@@ -118,12 +118,12 @@ onMounted(getContestDetail)
     <template v-if="!props.contestID">
       <n-alert type="success">
         <template #header>
-          开始时间 {{ parseTime(contest.start_time, "YYYY年M月D日 HH:mm:ss") }}
+          开始时间 {{ parseTime(contest.startTime, "YYYY年M月D日 HH:mm:ss") }}
         </template>
       </n-alert>
       <n-alert type="warning">
         <template #header>
-          结束时间 {{ parseTime(contest.end_time, "YYYY年M月D日 HH:mm:ss") }}
+          结束时间 {{ parseTime(contest.endTime, "YYYY年M月D日 HH:mm:ss") }}
         </template>
       </n-alert>
     </template>

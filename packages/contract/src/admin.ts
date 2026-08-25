@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { achievementRaritySchema } from "./achievement"
 import { paginatedSchema, sampleUserSchema } from "./common"
+import { problemDifficultySchema } from "./problem"
 
 /**
  * 后台侧的契约。与 oj 侧分开放：同一张表在两侧下发的字段集通常不同
@@ -497,12 +498,16 @@ export const adminProblemListItemSchema = z.object({
   createdBy: sampleUserSchema,
   visible: z.boolean(),
   createTime: z.string(),
-  difficulty: z.string(),
+  difficulty: problemDifficultySchema,
   tags: z.array(z.string()),
   hasAstRules: z.boolean(),
   allowFlowchart: z.boolean(),
   showFlowchart: z.boolean(),
-  topReaction: z.string().nullable(),
+  // 最高票评价 {type, count}。**当前后端恒传 null** —— 旧后端的
+  // reaction/services.py:get_top_reactions 没有跟着迁过来，这一列现在是空的。
+  topReaction: z
+    .object({ type: z.string(), count: z.number().int() })
+    .nullable(),
 })
 
 export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema)
@@ -526,7 +531,7 @@ export const adminProblemSchema = z.object({
   timeLimit: z.number().int(),
   memoryLimit: z.number().int(),
   visible: z.boolean(),
-  difficulty: z.string(),
+  difficulty: problemDifficultySchema,
   source: z.string().nullable(),
   submissionNumber: z.number().int(),
   acceptedNumber: z.number().int(),
@@ -621,3 +626,33 @@ export const generateSqlTestCaseRequestSchema = z.object({
 })
 
 export const generateSqlTestCaseResponseSchema = z.object({ sql: z.string() })
+
+export type AdminAchievement = z.infer<typeof adminAchievementSchema>
+export type AchievementMetric = z.infer<typeof achievementMetricSchema>
+
+export type AdminProblem = z.infer<typeof adminProblemSchema>
+export type AdminProblemListItem = z.infer<typeof adminProblemListItemSchema>
+export type AdminProblemList = z.infer<typeof adminProblemListSchema>
+export type CreateProblemRequest = z.infer<typeof createProblemRequestSchema>
+
+export type AdminContest = z.infer<typeof adminContestSchema>
+export type AdminContestList = z.infer<typeof adminContestListSchema>
+export type AcmHelperItem = z.infer<typeof acmHelperItemSchema>
+export type AdminUser = z.infer<typeof adminUserSchema>
+export type AdminUserList = z.infer<typeof adminUserListSchema>
+export type JudgeServer = z.infer<typeof judgeServerSchema>
+export type DashboardInfo = z.infer<typeof dashboardInfoSchema>
+export type JudgeServerList = z.infer<typeof judgeServerListSchema>
+export type OrphanTestCase = z.infer<typeof orphanTestCaseSchema>
+
+export type AdminAiReportListItem = z.infer<typeof adminAiReportListItemSchema>
+export type AdminAiReport = z.infer<typeof adminAiReportSchema>
+export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
+export type StuckProblem = z.infer<typeof stuckProblemSchema>
+export type AcTrend = z.infer<typeof acTrendSchema>
+
+export type AdminTag = z.infer<typeof adminTagSchema>
+export type RenameTagResponse = z.infer<typeof renameTagResponseSchema>
+export type BatchProblemTagResponse = z.infer<typeof batchProblemTagResponseSchema>
+export type SqlTestCaseScript = z.infer<typeof sqlTestCaseScriptSchema>
+export type GenerateSqlTestCaseResponse = z.infer<typeof generateSqlTestCaseResponseSchema>

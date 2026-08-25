@@ -59,15 +59,15 @@ const columns: DataTableColumn<Rank>[] = [
     title: "正确率",
     key: "rate",
     width: 100,
-    render: (row) => getACRate(row.accepted_number, row.submission_number),
+    render: (row) => getACRate(row.acceptedNumber, row.submissionNumber),
   },
 ]
 
 onMounted(async () => {
   const res = await getBaseInfo()
-  userCount.value = res.data.user_count
-  submissionCount.value = res.data.today_submission_count
-  contestCount.value = res.data.recent_contest_count
+  userCount.value = res.data.userCount
+  submissionCount.value = res.data.todaySubmissionCount
+  contestCount.value = res.data.recentContestCount
 })
 
 async function listRanks() {

@@ -10,17 +10,17 @@ defineProps<{
   <n-flex align="center">
     <span>{{ problem.title }}</span>
     <Icon
-      v-if="problem.allow_flowchart"
+      v-if="problem.allowFlowchart"
       width="18"
       icon="vscode-icons:file-type-drawio"
     />
     <Icon
-      v-else-if="problem.show_flowchart"
+      v-else-if="problem.showFlowchart"
       width="18"
       icon="vscode-icons:file-type-graphql"
     />
     <Icon
-      v-if="problem.has_ast_rules"
+      v-if="problem.hasAstRules"
       width="18"
       icon="vscode-icons:file-type-light-todo"
     />

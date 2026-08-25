@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AchievementRarity } from "utils/types"
 import {
   createAchievement,
   getMetricOptions,
@@ -29,7 +30,7 @@ function emptyForm() {
     name: "",
     description: "",
     icon: "noto:trophy",
-    rarity: "bronze",
+    rarity: "bronze" as AchievementRarity,
     hidden: false,
     metric: "",
     operator: "gte" as "gte" | "lte",
@@ -46,7 +47,7 @@ const metricOptions = computed(() =>
 )
 
 const metricHelp = computed(
-  () => metrics.value.find((m) => m.key === form.value.metric)?.help_text ?? "",
+  () => metrics.value.find((m) => m.key === form.value.metric)?.helpText ?? "",
 )
 
 watch(

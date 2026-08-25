@@ -57,7 +57,7 @@ const columns: DataTableColumn<AdminTag>[] = [
       h(
         NButton,
         { text: true, type: "primary", onClick: () => openTagProblems(row) },
-        () => String(row.problem_count),
+        () => String(row.problemCount),
       ),
   },
   {
@@ -123,7 +123,7 @@ async function saveTag(tag: AdminTag) {
   const res = await renameTag(tag.id, name)
   if (res.data.merged) {
     message.success(
-      `已合并到「${res.data.name}」，影响 ${res.data.affected_count} 道题`,
+      `已合并到「${res.data.name}」，影响 ${res.data.affectedCount} 道题`,
     )
   } else {
     message.success("已重命名")
@@ -135,7 +135,7 @@ async function saveTag(tag: AdminTag) {
 function confirmDelete(tag: AdminTag) {
   dialog.warning({
     title: "删除标签",
-    content: `确定删除标签「${tag.name}」吗？当前有 ${tag.problem_count} 道题在使用它，删除后这些题目会失去该标签。`,
+    content: `确定删除标签「${tag.name}」吗？当前有 ${tag.problemCount} 道题在使用它，删除后这些题目会失去该标签。`,
     positiveText: "删除",
     negativeText: "取消",
     onPositiveClick: async () => {

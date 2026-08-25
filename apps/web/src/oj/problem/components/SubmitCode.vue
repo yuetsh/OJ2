@@ -130,22 +130,22 @@ async function submit() {
 
   // 1. 构建提交数据
   const data: SubmitCodePayload = {
-    problem_id: problem.value!.id,
+    problemId: problem.value!.id,
     language: codeStore.code.language,
     code: codeStore.code.value,
   }
   if (contestID) {
-    data.contest_id = parseInt(contestID)
+    data.contestId = parseInt(contestID)
   }
   // 2. 提交代码到后端
   isSubmittingRequest.value = true
   try {
     const res = await submitCode(data)
-    console.log(`[Submit] 代码已提交: ID=${res.data.submission_id}`)
+    console.log(`[Submit] 代码已提交: ID=${res.data.submissionId}`)
 
     // 3. 启动冷却 + 监控
     startCooldown()
-    startMonitoring(res.data.submission_id)
+    startMonitoring(res.data.submissionId)
     showResult.value = true
   } finally {
     isSubmittingRequest.value = false
@@ -183,7 +183,7 @@ watch(
       return
 
     // 1. 刷新题目状态
-    problem.value!.my_status = 0
+    problem.value!.myStatus = 0
 
     // 2. 创建ProblemSetSubmission记录，更新题单进度
     if (problemSetId) {

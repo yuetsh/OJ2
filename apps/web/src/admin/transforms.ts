@@ -1,20 +1,23 @@
-import type { AdminProblem } from "utils/types"
+import type { AdminProblemFiltered, AdminProblemListItem } from "utils/types"
 
-// 把后端的 AdminProblem 塑形成管理端列表项，与请求逻辑解耦。
-export function toProblemListItem(result: AdminProblem) {
+// 把后端的列表项塑形成管理端列表行，与请求逻辑解耦。
+export function toProblemListItem(
+  result: AdminProblemListItem,
+): AdminProblemFiltered {
   return {
     id: result.id,
     _id: result._id,
     title: result.title,
-    username: result.created_by.username,
-    create_time: result.create_time,
+    username: result.createdBy.username,
+    createTime: result.createTime,
     visible: result.visible,
     difficulty: result.difficulty,
     tags: result.tags,
-    has_ast_rules: result.has_ast_rules,
-    allow_flowchart: result.allow_flowchart,
-    show_flowchart: result.show_flowchart,
+    hasAstRules: result.hasAstRules,
+    allowFlowchart: result.allowFlowchart,
+    showFlowchart: result.showFlowchart,
     // 比赛题目列表接口不返回这个字段
-    top_reaction: result.top_reaction ?? null,
+    topReaction: (result.topReaction ??
+      null) as AdminProblemFiltered["topReaction"],
   }
 }

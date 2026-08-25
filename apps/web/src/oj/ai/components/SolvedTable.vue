@@ -58,40 +58,40 @@ const columns: DataTableColumn<SolvedProblem>[] = [
         {
           text: true,
           onClick: () => {
-            if (row.problem.contest_id) {
+            if (row.problem.contestId) {
               router.push(
                 "/contest/" +
-                  row.problem.contest_id +
+                  row.problem.contestId +
                   "/problem/" +
-                  row.problem.display_id,
+                  row.problem.displayId,
               )
             } else {
-              router.push("/problem/" + row.problem.display_id)
+              router.push("/problem/" + row.problem.displayId)
             }
           },
         },
         () => {
-          if (row.problem.contest_id) {
+          if (row.problem.contestId) {
             return h(TagTitle, { problem: row.problem })
           } else {
-            return row.problem.display_id + " " + row.problem.title
+            return row.problem.displayId + " " + row.problem.title
           }
         },
       ),
   },
   {
-    title: () => (aiStore.detailsData.class_name ? "班级排名" : "全服排名"),
+    title: () => (aiStore.detailsData.className ? "班级排名" : "全服排名"),
     key: "rank",
     width: 100,
     align: "center",
-    render: (row) => row.rank + " / " + row.ac_count,
+    render: (row) => row.rank + " / " + row.acCount,
   },
   {
     title: "同期排名",
     key: "period_rank",
     width: 100,
     align: "center",
-    render: (row) => row.period_rank + " / " + row.period_ac_count,
+    render: (row) => row.periodRank + " / " + row.periodAcCount,
   },
   {
     title: () =>
@@ -128,10 +128,10 @@ const flowchartsColumns: DataTableColumn<FlowchartSummary>[] = [
         {
           text: true,
           onClick: () => {
-            router.push("/problem/" + row.problem__id)
+            router.push("/problem/" + row.problemId)
           },
         },
-        () => `${row.problem__id} ${row.problem_title}`,
+        () => `${row.problemId} ${row.problemTitle}`,
       ),
   },
   { title: "提交次数", key: "submission_count", width: 100, align: "center" },
@@ -140,14 +140,14 @@ const flowchartsColumns: DataTableColumn<FlowchartSummary>[] = [
     key: "best",
     width: 100,
     align: "center",
-    render: (row) => `${row.best_score} (${row.best_grade})`,
+    render: (row) => `${row.bestScore} (${row.bestGrade})`,
   },
   {
     title: "最新提交时间",
     key: "latest_submission_time",
     width: 200,
     align: "center",
-    render: (row) => parseTime(row.latest_submission_time),
+    render: (row) => parseTime(row.latestSubmissionTime),
   },
   { title: "平均分", key: "avg_score", width: 100, align: "center" },
 ]

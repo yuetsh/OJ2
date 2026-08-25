@@ -2,13 +2,13 @@
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
-import type { ProblemSetList } from "utils/types"
+import type { ProblemSet } from "utils/types"
 import { getProblemSetList, toggleProblemSetVisible } from "../api"
 import Actions from "./components/Actions.vue"
 import { NTag, NSwitch } from "naive-ui"
 
 const total = ref(0)
-const problemSets = ref<ProblemSetList[]>([])
+const problemSets = ref<ProblemSet[]>([])
 
 interface ProblemSetQuery {
   keyword: string
@@ -37,7 +37,7 @@ const statusOptions = [
   { label: "草稿", value: "draft" },
 ]
 
-const columns: DataTableColumn<ProblemSetList>[] = [
+const columns: DataTableColumn<ProblemSet>[] = [
   { title: "ID", key: "id", width: 80 },
   { title: "标题", key: "title", minWidth: 200 },
   { title: "描述", key: "description", minWidth: 300, ellipsis: true },
@@ -45,7 +45,7 @@ const columns: DataTableColumn<ProblemSetList>[] = [
     title: "创建者",
     key: "created_by",
     width: 120,
-    render: (row) => row.created_by.username,
+    render: (row) => row.createdBy.username,
   },
   {
     title: "难度",
@@ -87,7 +87,7 @@ const columns: DataTableColumn<ProblemSetList>[] = [
     title: "创建时间",
     key: "create_time",
     width: 180,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "可见",

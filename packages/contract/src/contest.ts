@@ -40,3 +40,8 @@ export const contestRankItemSchema = z.object({
 })
 
 export const contestRankSchema = paginatedSchema(contestRankItemSchema)
+
+export type Contest = z.infer<typeof contestSchema>
+export type ContestList = z.infer<typeof contestListSchema>
+export type ContestRankItem = z.infer<typeof contestRankItemSchema>
+export type ContestRank = z.infer<typeof contestRankSchema>

@@ -62,3 +62,8 @@ export const classComparisonResponseSchema = z.object({
   comparisons: z.array(classComparisonSchema),
   hasTimeRange: z.boolean(),
 })
+
+export type ClassRankItem = z.infer<typeof classRankItemSchema>
+export type ClassUserRank = z.infer<typeof classUserRankSchema>
+export type ClassComparison = z.infer<typeof classComparisonSchema>
+export type ClassComparisonResponse = z.infer<typeof classComparisonResponseSchema>

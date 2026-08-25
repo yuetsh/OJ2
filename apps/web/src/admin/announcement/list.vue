@@ -2,18 +2,19 @@
 import { NSwitch } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { parseTime } from "utils/functions"
-import type { Announcement } from "utils/types"
-import { editAnnouncement, getAnnouncementList } from "../api"
+import type { AnnouncementListItem } from "utils/types"
+import { editAnnouncement, getAnnouncement, getAnnouncementList } from "../api"
 import Actions from "./components/Actions.vue"
 
+const message = useMessage()
 const total = ref(0)
 const query = reactive({
   limit: 10,
   page: 1,
 })
-const announcements = ref<Announcement[]>([])
+const announcements = ref<AnnouncementListItem[]>([])
 
-const columns: DataTableColumn<Announcement>[] = [
+const columns: DataTableColumn<AnnouncementListItem>[] = [
   { title: "ID", key: "id", width: 60 },
   { title: "标题", key: "title", minWidth: 300 },
   { title: "标签", key: "tag", width: 80 },
@@ -25,20 +26,20 @@ const columns: DataTableColumn<Announcement>[] = [
   },
   {
     title: "创建时间",
-    key: "create_time",
+    key: "createTime",
     width: 180,
-    render: (row) => parseTime(row.create_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "上次更新时间",
-    key: "last_update_time",
+    key: "lastUpdateTime",
     width: 180,
-    render: (row) => parseTime(row.last_update_time, "YYYY-MM-DD HH:mm:ss"),
+    render: (row) => parseTime(row.lastUpdateTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "作者",
-    key: "created_by",
-    render: (row) => row.created_by.username,
+    key: "createdBy",
+    render: (row) => row.createdBy.username,
     width: 80,
   },
   {
@@ -61,16 +62,24 @@ const columns: DataTableColumn<Announcement>[] = [
   },
 ]
 
-async function toggleVisible(announcement: Announcement) {
-  announcement.visible = !announcement.visible
-  editAnnouncement({
-    id: announcement.id,
-    title: announcement.title,
-    tag: announcement.tag,
-    content: announcement.content,
-    visible: announcement.visible,
-    top: announcement.top,
-  })
+// 列表响应不含 content（正文是 8MB 上限的富文本），而更新接口要求 content 必填 ——
+// 拿列表里那行直接回传会 400。所以先取回整条再改。
+async function toggleVisible(announcement: AnnouncementListItem) {
+  const next = !announcement.visible
+  try {
+    const { data: full } = await getAnnouncement(announcement.id)
+    await editAnnouncement({
+      id: full.id,
+      title: full.title,
+      tag: full.tag,
+      content: full.content,
+      visible: next,
+      top: full.top,
+    })
+    announcement.visible = next
+  } catch {
+    message.error("修改可见性失败")
+  }
 }
 
 async function listAnnouncements() {
