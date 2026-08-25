@@ -13,7 +13,7 @@
     "db:down": "docker compose -f docker/compose.dev.yml down"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "@types/bun": "latest"
   }
 }

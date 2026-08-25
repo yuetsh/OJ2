@@ -16,20 +16,20 @@
     "db:pull": "drizzle-kit pull"
   },
   "dependencies": {
-    "@node-rs/jieba": "^2.0.1",
-    "@node-rs/jieba-linux-x64-gnu": "2.0.1",
+    "@node-rs/jieba": "^2.0.2",
+    "@node-rs/jieba-linux-x64-gnu": "2.0.2",
     "@oj2/contract": "workspace:*",
-    "bullmq": "^6.0.9",
+    "bullmq": "^6.2.2",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
-    "hono": "^4.0.0",
+    "hono": "^4.13.4",
     "ioredis": "^6.0.0",
-    "postgres": "^3.4.0",
-    "sql.js": "^1.14.1",
+    "postgres": "^3.4.9",
+    "sql.js": "^1.14.2",
     "tree-sitter-c": "^0.24.1",
     "tree-sitter-python": "^0.25.0",
-    "web-tree-sitter": "^0.26.11",
-    "zod": "^4.0.0"
+    "web-tree-sitter": "^0.26.13",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/sql.js": "^1.4.11",
