@@ -42,21 +42,13 @@ async function clone() {
     message.error("复制失败")
   }
 }
-
-const isACM = computed(() => props.contest.rule_type === "ACM")
 </script>
 <template>
   <n-flex>
     <n-button size="small" type="primary" secondary @click="goEditProblems">
       题目
     </n-button>
-    <n-button
-      v-if="isACM"
-      size="small"
-      type="warning"
-      secondary
-      @click="goACMHelper"
-    >
+    <n-button size="small" type="warning" secondary @click="goACMHelper">
       审核
     </n-button>
     <n-button size="small" type="info" secondary @click="goEdit">
