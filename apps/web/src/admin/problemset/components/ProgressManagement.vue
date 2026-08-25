@@ -2,10 +2,10 @@
 import { h } from "vue"
 import { NDataTable, NButton, NFlex } from "naive-ui"
 import { parseTime } from "utils/functions"
-import type { ProblemSetProgress } from "utils/types"
+import type { AdminProblemSetProgress } from "utils/types"
 
 interface Props {
-  progress: ProblemSetProgress[]
+  progress: AdminProblemSetProgress[]
 }
 
 interface Emits {
@@ -17,41 +17,41 @@ const emit = defineEmits<Emits>()
 
 // 定义表格列
 const progressColumns = [
-  { title: "用户", key: "user.username", width: 120 },
+  { title: "用户", key: "username", width: 120 },
   {
     title: "加入时间",
-    key: "join_time",
+    key: "joinTime",
     width: 180,
-    render: (row: ProblemSetProgress) =>
+    render: (row: AdminProblemSetProgress) =>
       parseTime(row.joinTime, "YYYY-MM-DD HH:mm:ss"),
   },
-  { title: "已完成", key: "completed_problems_count", width: 100 },
-  { title: "总题目", key: "total_problems_count", width: 100 },
+  { title: "已完成", key: "completedProblemsCount", width: 100 },
+  { title: "总题目", key: "totalProblemsCount", width: 100 },
   {
     title: "进度",
-    key: "progress_percentage",
+    key: "progressPercentage",
     width: 100,
-    render: (row: ProblemSetProgress) =>
+    render: (row: AdminProblemSetProgress) =>
       `${row.progressPercentage.toFixed(0)}%`,
   },
   {
     title: "是否完成",
-    key: "is_completed",
+    key: "isCompleted",
     width: 100,
-    render: (row: ProblemSetProgress) => (row.isCompleted ? "是" : "否"),
+    render: (row: AdminProblemSetProgress) => (row.isCompleted ? "是" : "否"),
   },
   {
     title: "操作",
     key: "actions",
     width: 120,
-    render: (row: ProblemSetProgress) =>
+    render: (row: AdminProblemSetProgress) =>
       h(
         NButton,
         {
           size: "small",
           type: "error",
           secondary: true,
-          onClick: () => emit("remove-user", row.user.id),
+          onClick: () => emit("remove-user", row.userId),
         },
         { default: () => "移除" },
       ),

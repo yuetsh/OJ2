@@ -134,7 +134,7 @@ const flowchartsColumns: DataTableColumn<FlowchartSummary>[] = [
         () => `${row.problemId} ${row.problemTitle}`,
       ),
   },
-  { title: "提交次数", key: "submission_count", width: 100, align: "center" },
+  { title: "提交次数", key: "submissionCount", width: 100, align: "center" },
   {
     title: "最高分",
     key: "best",
@@ -149,6 +149,6 @@ const flowchartsColumns: DataTableColumn<FlowchartSummary>[] = [
     align: "center",
     render: (row) => parseTime(row.latestSubmissionTime),
   },
-  { title: "平均分", key: "avg_score", width: 100, align: "center" },
+  { title: "平均分", key: "avgScore", width: 100, align: "center" },
 ]
 </script>

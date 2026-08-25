@@ -53,8 +53,8 @@ const columns: DataTableColumn<Rank>[] = [
       ),
   },
   { title: "个性签名", key: "mood" },
-  { title: "已解决", key: "accepted_number", width: 100 },
-  { title: "提交数", key: "submission_number", width: 100 },
+  { title: "已解决", key: "acceptedNumber", width: 100 },
+  { title: "提交数", key: "submissionNumber", width: 100 },
   {
     title: "正确率",
     key: "rate",

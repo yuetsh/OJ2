@@ -111,7 +111,7 @@ const progressColumns = [
     title: "排名",
     key: "rank",
     width: 80,
-    render: (row: ProblemSetProgress, index: number) => {
+    render: (_row: ProblemSetProgress, index: number) => {
       // 计算全局排名：当前页偏移 + 当前行索引 + 1
       const globalRank = (query.page - 1) * query.limit + index + 1
       return globalRank
@@ -132,7 +132,7 @@ const progressColumns = [
   },
   {
     title: "已完成数量",
-    key: "completed_problems_count",
+    key: "completedProblemsCount",
     width: 100,
   },
   {
