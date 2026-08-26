@@ -52,7 +52,9 @@ export const announcement = pgTable("announcement", {
 	top: boolean().notNull(),
 }, (table) => [
 	index("announcement_created_by_id_359ccf50").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
-	index("announcement_list_idx").using("btree", table.visible.asc().nullsLast().op("bool_ops"), table.top.desc().nullsFirst().op("bool_ops"), table.createTime.desc().nullsFirst().op("bool_ops")),
+	// 不写 .op()：opclass 会吞掉方向（见 CLAUDE.md）。生产库是 (visible, top DESC, create_time DESC)，
+	// 写了 .op() 的话 generate 出来的是全 ASC，schema.ts 就和真实库对不上了。
+	index("announcement_list_idx").using("btree", table.visible.asc().nullsLast(), table.top.desc().nullsFirst(), table.createTime.desc().nullsFirst()),
 	foreignKey({
 			columns: [table.createdById],
 			foreignColumns: [user.id],
@@ -466,7 +468,9 @@ export const submission = pgTable("submission", {
 	username: text().notNull(),
 	ip: text(),
 }, (table) => [
-	index("contest_create_time_idx").using("btree", table.contestId.asc().nullsLast().op("timestamptz_ops"), table.createTime.desc().nullsFirst().op("int4_ops")),
+	// 同上，不写 .op()。原先 pull 出来的 opclass 还串了位（contest_id 标成 timestamptz_ops、
+	// create_time 标成 int4_ops），那条 SQL 真拿去执行 Postgres 会直接拒绝。
+	index("contest_create_time_idx").using("btree", table.contestId.asc().nullsLast(), table.createTime.desc().nullsFirst()),
 	// 提交列表默认视图（WHERE contest_id IS NULL ORDER BY create_time DESC）专用。
 	// 上面的 contest_create_time_idx 看着能覆盖，但 Postgres 不把 `contest_id IS NULL`
 	// 当成能吃掉首列、从而继承第二列有序性的等值条件——把 seqscan/bitmapscan 全关掉逼它
@@ -474,8 +478,8 @@ export const submission = pgTable("submission", {
 	// 扫完整张表 + top-N 排序。改用部分索引后谓词由索引本身保证，排序序就是索引序。
 	// 生产快照（12.3 万条提交）实测：61.8ms / 18936 blocks → 0.22ms / 34 blocks。
 	// 这个索引不在 Django 的 migration 里，是 OJ2 单独加的，见 src/db/0001_naive_agent_zero.sql。
-	// 不写 .desc()：drizzle-kit 生成 SQL 时会把方向丢掉，写了会让快照（记 asc:false）和实际
-	// 建出来的索引（ASC）对不上，下次 pull 就产生假 diff。单列索引无所谓方向，Postgres 用
+	// 不写 .desc()：这条带 .op()，而 .op() 会吞掉方向（见 CLAUDE.md）——写了只会让快照
+	// （记 asc:false）和实际建出来的索引（ASC）对不上。单列索引本来也无所谓方向，Postgres 用
 	// Index Scan Backward 服务 ORDER BY ... DESC，实测同样是 0.08ms。
 	index("submission_public_create_time_idx").using("btree", table.createTime.op("timestamptz_ops")).where(sql`${table.contestId} is null`),
 	index("problem_user_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),

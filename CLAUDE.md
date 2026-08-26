@@ -176,11 +176,27 @@ schema，下面三处已经修过了，别让它们回潮）：
 - **表达式索引的 opclass**：`problem_tag_name_ci_unique` 在快照里带 `opclass`，但 drizzle
   自己序列化不出来，导致每次都 drop + recreate。已从快照里去掉。
 
-**还有两个改不掉的、写代码时要绕开的**：
+**还有两个写代码时要绕开的**：
 
-- **索引方向会被丢**：`.desc()` 在生成 SQL 时消失，但快照里记成 `asc: false`，两边对不上，
-  下次 pull 就是假 diff。单列索引不写方向就行（Postgres 用 Index Scan Backward 服务
-  `ORDER BY ... DESC`，代价一样）。**多列混合方向的索引别指望 generate**，得手写。
+- **`.op()` 会吞掉索引方向**：真正的根因不是 `.desc()`，是 opclass。drizzle-kit 的
+  `CreatePgIndexConvertor` 里那个三元一旦走进 opclass 分支就回不到方向分支：
+  `${it.opclass ? ` ${it.opclass}` : it.asc ? "" : " DESC"}`。而 `drizzle-kit pull`
+  给**每一列**都挂了 `.op(...)`，所以本仓库里"写了 `.desc()` 却生成不出 DESC"每次都会重演。
+
+  **要方向就别写 `.op()`。** 不写没有任何代价——`int4_ops` / `timestamptz_ops` 本来就是
+  这些类型的默认 opclass，写了等于没写。实测（drizzle-kit 0.31.10，探针索引跑过 generate）：
+
+  | schema.ts | 生成的 SQL |
+  |---|---|
+  | `.desc().nullsFirst().op("timestamptz_ops")` | `"create_time" timestamptz_ops` ← 方向丢了 |
+  | `.desc().nullsFirst()` | `"create_time" DESC NULLS FIRST` ✅ |
+  | `.desc()` | `"create_time" DESC NULLS LAST` ✅ |
+
+  所以**多列混合方向的索引可以正常 generate**，不必手写。
+
+  假 diff 的机制也要理解对：带 `.op()` 时快照记的是 `asc: false`，SQL 建出来却是 ASC，
+  **分歧在快照和真实库之间**，不在快照和 schema.ts 之间——所以再跑 generate 是干净的，
+  要等到下次 pull 才炸出来。这是当初难定位的原因。
 - **`CREATE INDEX CONCURRENTLY` 跑不了**：migrator 把所有语句包在一个事务里。大表加索引
   要是不能接受锁写窗口，只能绕开 migration 手工执行。参考量级：12.3 万行的部分索引，
   普通 `CREATE INDEX` 只锁 74ms，一般不用纠结。

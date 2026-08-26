@@ -489,22 +489,19 @@
               "expression": "visible",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "bool_ops"
+              "nulls": "last"
             },
             {
               "expression": "top",
               "isExpression": false,
               "asc": false,
-              "nulls": "first",
-              "opclass": "bool_ops"
+              "nulls": "first"
             },
             {
               "expression": "create_time",
               "isExpression": false,
               "asc": false,
-              "nulls": "first",
-              "opclass": "bool_ops"
+              "nulls": "first"
             }
           ],
           "isUnique": false,
@@ -2915,15 +2912,13 @@
               "expression": "contest_id",
               "isExpression": false,
               "asc": true,
-              "nulls": "last",
-              "opclass": "timestamptz_ops"
+              "nulls": "last"
             },
             {
               "expression": "create_time",
               "isExpression": false,
               "asc": false,
-              "nulls": "first",
-              "opclass": "int4_ops"
+              "nulls": "first"
             }
           ],
           "isUnique": false,
