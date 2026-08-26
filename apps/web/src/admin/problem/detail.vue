@@ -288,17 +288,16 @@ function resetTemplate(language: LANGUAGE) {
 
 async function handleUploadTestcases({ file }: UploadCustomRequestOptions) {
   try {
+    // 失败走 catch —— 原来这里还有一句 `if (res.error)`（拿 { error, data }
+    // 信封当返回值），被 @ts-ignore 压着，信封拆掉之后就是一段死代码了
     const res = await uploadTestcases(file.file!, { sql: isSQLProblem.value })
-    // @ts-ignore
-    if (res.error) {
-      message.error("上传测试用例失败")
-      return
-    }
     // score 不在上传响应里，前端按测试点数量平分补上
     const entries = res.info
     const testcases: Testcase[] = entries.map((entry) => ({
-      ...entry,
-      score: (100 / entries.length).toFixed(0),
+      input_name: entry.input_name,
+      output_name: entry.output_name,
+      // 取值与原来的 `.toFixed(0)` 逐字相同，只是不再包成字符串
+      score: Number((100 / entries.length).toFixed(0)),
     }))
     problem.value.testCaseScore = testcases
     problem.value.testCaseId = res.id

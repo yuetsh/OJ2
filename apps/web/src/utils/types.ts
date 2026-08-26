@@ -101,10 +101,12 @@ export type {
 export type { UploadTestCaseResponse } from "@oj2/contract"
 
 /**
- * 题目表单里的测试点：上传返回的条目 + 前端本地算出的分值。
- * `score` **不在响应里** —— 是上传完成后按测试点数量平分补上去的。
+ * 题目表单里的测试点。落库的只有 {input_name, output_name, score} 三个键 ——
+ * 上传响应里多出来的 stripped_output_md5 / input_size / output_size 在保存时
+ * 被剥掉（旧后端的 serializer 也是这么干的，见契约 problemTestCaseScoreSchema）。
+ * score 不在上传响应里，是上传完成后按测试点数量平分补上去的。
  */
-export type Testcase = TestCaseEntry & { score: string }
+export type { ProblemTestCaseScore as Testcase } from "@oj2/contract"
 
 /**
  * 题目详情。以契约的 ProblemDetail 为准，只在这里补两处前端自己的窄化：
@@ -140,18 +142,11 @@ export type {
 /** 后台题目详情：比 oj 侧多 answers / testCase* / astRules */
 export type AdminProblem = Omit<
   ContractAdminProblem,
-  | "languages"
-  | "template"
-  | "testCaseScore"
-  | "samples"
-  | "answers"
-  | "astRules"
+  "languages" | "template" | "answers" | "astRules"
 > & {
   languages: LANGUAGE[]
   template: { [key in LANGUAGE]?: string }
-  // 测试点条目的键名由判题沙箱定，保持 snake_case
-  testCaseScore: Testcase[]
-  samples: { input: string; output: string }[]
+  // 契约里 answers[].language 是 string，这里收窄成 LANGUAGE
   answers: { language: LANGUAGE; code: string }[]
   astRules?: AstRules | null
 }
@@ -470,7 +465,6 @@ import type {
   AdminExercise,
   AdminTutorial,
   CreateSubmissionRequest,
-  TestCaseEntry,
 } from "@oj2/contract"
 
 /**

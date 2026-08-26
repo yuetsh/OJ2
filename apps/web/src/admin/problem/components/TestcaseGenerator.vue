@@ -174,10 +174,9 @@ async function upload() {
     const baseScore = Math.floor(100 / entries.length)
     const remainder = 100 - baseScore * entries.length
     const testcases: Testcase[] = entries.map((entry, i) => ({
-      ...entry,
-      score: String(
-        i === entries.length - 1 ? baseScore + remainder : baseScore,
-      ),
+      input_name: entry.input_name,
+      output_name: entry.output_name,
+      score: i === entries.length - 1 ? baseScore + remainder : baseScore,
     }))
 
     emit("uploaded", res.id, testcases)

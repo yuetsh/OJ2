@@ -185,11 +185,12 @@ async function upload() {
     const entries = res.info
     const baseScore = Math.floor(100 / entries.length)
     const remainder = 100 - baseScore * entries.length
+    // 只留落库的三个键：上传响应里的 stripped_output_md5 / input_size /
+    // output_size 保存时会被剥掉，见契约 problemTestCaseScoreSchema
     const testcases: Testcase[] = entries.map((entry, i) => ({
-      ...entry,
-      score: String(
-        i === entries.length - 1 ? baseScore + remainder : baseScore,
-      ),
+      input_name: entry.input_name,
+      output_name: entry.output_name,
+      score: i === entries.length - 1 ? baseScore + remainder : baseScore,
     }))
 
     emit("uploaded", res.id, testcases)

@@ -43,6 +43,9 @@ export const createAnnouncementRequestSchema = z.object({
 
 export const updateAnnouncementRequestSchema = createAnnouncementRequestSchema
 
+export type ProblemSample = z.infer<typeof problemSampleSchema>
+export type ProblemAnswer = z.infer<typeof problemAnswerSchema>
+export type ProblemTestCaseScore = z.infer<typeof problemTestCaseScoreSchema>
 export type AdminAnnouncement = z.infer<typeof adminAnnouncementSchema>
 export type AdminAnnouncementListItem = z.infer<
   typeof adminAnnouncementListItemSchema
@@ -530,6 +533,39 @@ export const adminProblemListItemSchema = z.object({
 
 export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema)
 
+/**
+ * 题面样例 / 标准答案 / 测试点分值。这三个旧后端都是逐字段校验的
+ * （CreateSampleSerializer / CreateAnswerSerializer / CreateTestCaseScoreSerializer），
+ * 新后端一路写成 `z.record(z.unknown())` **反而比旧的松**。
+ *
+ * 生产库 956 道题逐条比对过：samples 947 条是 {input,output}（另外 9 条是空数组，
+ * SQL 题没样例）、answers 268 条是 {language,code}（633 条 null、55 条空数组）。
+ */
+export const problemSampleSchema = z.object({
+  input: z.string(),
+  output: z.string(),
+})
+
+export const problemAnswerSchema = z.object({
+  language: z.string(),
+  code: z.string(),
+})
+
+/**
+ * 测试点分值。**只有这三个键** —— 上传接口的响应比这多三个
+ * （stripped_output_md5 / input_size / output_size），旧后端的 DRF serializer
+ * 收下时把多的丢掉，生产库 956 行全是三键。zod 的 object 默认也剥未知键，
+ * 行为一致。
+ *
+ * score 前端算出来是字符串（`(100 / n).toFixed(0)`），旧后端 IntegerField 转成
+ * 整数落库，7990 条全是 int —— 这里用 coerce 保持同一个落库形状。
+ */
+export const problemTestCaseScoreSchema = z.object({
+  input_name: z.string().max(32),
+  output_name: z.string().max(32),
+  score: z.coerce.number().int().min(0),
+})
+
 /** 后台题目详情：包含 oj 侧永不下发的 answers / testCase* / astRules */
 export const adminProblemSchema = z.object({
   id: z.number().int(),
@@ -538,9 +574,9 @@ export const adminProblemSchema = z.object({
   description: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
-  samples: z.array(z.record(z.string(), z.unknown())),
+  samples: z.array(problemSampleSchema),
   testCaseId: z.string(),
-  testCaseScore: z.array(z.record(z.string(), z.unknown())),
+  testCaseScore: z.array(problemTestCaseScoreSchema),
   hint: z.string().nullable(),
   languages: z.array(z.string()),
   template: z.record(z.string(), z.string()),
@@ -564,7 +600,7 @@ export const adminProblemSchema = z.object({
   mermaidCode: z.string().nullable(),
   flowchartHint: z.string().nullable(),
   astRules: z.unknown(),
-  answers: z.array(z.record(z.string(), z.unknown())),
+  answers: z.array(problemAnswerSchema),
   prompt: z.string().nullable(),
   sqlConfig: sqlConfigSchema.nullable(),
   sqlDisplay: sqlDisplaySchema.nullable(),
@@ -576,9 +612,9 @@ export const createProblemRequestSchema = z.object({
   description: z.string(),
   inputDescription: z.string(),
   outputDescription: z.string(),
-  samples: z.array(z.record(z.string(), z.unknown())),
+  samples: z.array(problemSampleSchema),
   testCaseId: z.string().regex(/^[a-zA-Z0-9]+$/).max(32),
-  testCaseScore: z.array(z.record(z.string(), z.unknown())),
+  testCaseScore: z.array(problemTestCaseScoreSchema),
   timeLimit: z.number().int().min(1).max(1000 * 60),
   memoryLimit: z.number().int().min(1).max(1024),
   languages: z.array(z.string()).min(1),
@@ -589,7 +625,7 @@ export const createProblemRequestSchema = z.object({
   hint: z.string().nullable().default(null),
   source: z.string().max(256).nullable().default(null),
   prompt: z.string().nullable().default(null),
-  answers: z.array(z.record(z.string(), z.unknown())).default([]),
+  answers: z.array(problemAnswerSchema).default([]),
   shareSubmission: z.boolean(),
   allowFlowchart: z.boolean().default(false),
   showFlowchart: z.boolean().default(false),
