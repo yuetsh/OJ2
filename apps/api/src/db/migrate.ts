@@ -77,26 +77,35 @@ export async function runMigrations() {
       from drizzle.__drizzle_migrations
     `.catch(() => null)
 
-    // 基线缺失。这个库没法靠迁移自举 —— 0000 是 `drizzle-kit pull` 的产物，
-    // 整个文件被块注释包着，一条可执行语句都没有。结构只能来自 docs/specs/schema.sql
-    // 或生产 dump，然后手工把 0000 标记成已执行。
+    // 没有基线记录，两种情况分开处理：空库直接从 0000 建起来，有表的库要人来确认。
     const lastApplied = applied === null ? -1 : Number(applied[0]?.last ?? -1)
-    if (lastApplied < 0) {
+    const bootstrapping = lastApplied < 0
+    if (bootstrapping) {
       const rows = await client<{ count: number }[]>`
         select count(*)::int as count from information_schema.tables where table_schema = 'public'
       `
       const tableCount = rows[0]?.count ?? 0
-      console.error(
-        tableCount > 0
-          ? `库里已经有 ${tableCount} 张表，但没有迁移基线记录。\n` +
-              "直接迁移会从 0000 跑起，而 0000 是 introspect 产物、整份被注释掉，跑不了。\n\n" +
-              BASELINE_HOWTO
-          : "这是个空库，迁移没法自举建表（0000 是 introspect 产物，整份被注释掉）。\n" +
-              "先把结构灌进去：\n\n" +
-              "  psql -d <库> -f docs/specs/schema.sql\n\n" +
-              BASELINE_HOWTO,
-      )
-      process.exit(3)
+
+      // 有表却没有基线记录 —— 这个库不是 OJ2 从 0000 建起来的（多半是从旧后端接管、
+      // 或者从生产 dump 恢复出来的）。0000 是完整建表，直接跑必然撞上已存在的表，
+      // 而且是整个事务回滚。这种情况只能由人确认之后手工打基线。
+      if (tableCount > 0) {
+        console.error(
+          `库里已经有 ${tableCount} 张表，但没有迁移基线记录。\n` +
+            "直接迁移会从 0000 跑起，而 0000 是完整建表，撞上已存在的表会整条回滚。\n\n" +
+            BASELINE_HOWTO,
+        )
+        process.exit(3)
+      }
+
+      // 空库：drizzle 的记账表还不存在，先建出来。原来这一步由 drizzle 的 migrate()
+      // 顺手做掉，换成自己的执行器之后得自己建。
+      console.log("空库，从 0000 开始自举。")
+      await client`create schema if not exists drizzle`
+      await client`
+        create table if not exists drizzle.__drizzle_migrations (
+          id serial primary key, hash text not null, created_at bigint)
+      `
     }
 
     const pending = files.filter((f) => f.folderMillis > lastApplied)
@@ -124,7 +133,10 @@ export async function runMigrations() {
       }))
       .filter(({ reasons }) => reasons.length > 0)
 
-    if (blocked.length > 0 && process.env.OJ2_ALLOW_DESTRUCTIVE !== "1") {
+    // 自举时不拦：空库上没有数据可丢，0002 那串 DROP ... IF EXISTS 全是空转。
+    // 拦下来只会逼着每个新环境都带一次 OJ2_ALLOW_DESTRUCTIVE，把这道闸训练成习惯动作 ——
+    // 那正是它想避免的事。
+    if (blocked.length > 0 && !bootstrapping && process.env.OJ2_ALLOW_DESTRUCTIVE !== "1") {
       console.error(
         "待执行的迁移里有破坏性语句，已停下：\n" +
           blocked.map(({ tag, reasons }) => `  · ${tag}：${reasons.join(" / ")}`).join("\n") +

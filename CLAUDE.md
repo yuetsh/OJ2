@@ -143,16 +143,38 @@ OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
 ```
 
 `DROP INDEX` / `DROP CONSTRAINT` 不算——它们不掉数据，拦了只会让人习惯性带上放行开关。
+**空库自举时这道闸不生效**：没有数据可丢，0002 那串 `DROP ... IF EXISTS` 全是空转，
+拦下来只会逼每个新环境都带一次放行开关，把它训练成习惯动作。
 
-**0000 跑不了，库不能靠迁移自举。** `0000_crazy_gateway.sql` 是 `drizzle-kit pull`
-的产物，整份被 `/* */` 包着，可执行语句 0 条。所以任何新库的结构都只能来自
-`docs/specs/schema.sql` 或生产 dump，然后手工做基线。`oj2-api migrate` 会检测这两种
-情况并打印具体该做什么，不会让你撞上 drizzle 那个语焉不详的报错。
+**空库能自举了。** `oj2-api migrate` 指向一个空库时直接从 `0000` 建起：
+
+```bash
+DATABASE_URL=postgres://... oj2-api migrate
+# 空库，从 0000 开始自举。
+# 待执行 3 条迁移，开始。
+#   ✓ 0000_crazy_gateway
+#   ✓ 0001_add_submission_public_create_time_idx
+#   ✓ 0002_drop_django_leftovers
+```
+
+`0000_crazy_gateway.sql` 原本是 `drizzle-kit pull` 的产物、整份被 `/* */` 包着、可执行
+语句 0 条，所以以前新库只能先手工 `psql -f docs/specs/schema.sql`。现在它的内容由那份
+生产 dump 机械转换而来（去掉 psql 专有指令、去掉 7 张 Django 遗留表及其索引外键，
+其余原样保留）。**实测**：空库自举出来的结构，和「灌 schema.sql + 打基线 + 跑迁移」
+这条老路子跑出来的结构，`pg_dump --schema-only` 逐字节一致（734 行，零差异）。
+
+改 0000 对生产库没有影响 —— migrator 只比 `created_at`、**从不校验 hash**
+（`pg-core/dialect.js` 里就一句 `Number(lastDbMigration.created_at) < migration.folderMillis`），
+而生产库那行 `baseline-0000-faked` 早把它挡在门外了。
+
+⚠️ **0000 的注释里不要出现 statement-breakpoint 那个分隔标记的字面量。**
+`readMigrationFiles` 是纯文本切分，不管它在不在注释里，照切不误 —— 注释被从中间切开，
+后半截当成 SQL 发出去，报的是 `syntax error at or near "。"` 这种和真实原因毫不相干的错。
 
 **给一个已经存在的库做基线**：drizzle 没有 `--fake-initial`，`migrate` 见到空的
-`__drizzle_migrations` 会从 `0000` 的完整建表跑起，撞上已存在的表就整个事务回滚 ——
-**而且失败时 exit 1 但一个错误都不打印**（只有 NOTICE，实测过）。所以对已有数据的库
-第一次跑之前，先手插一行把 `0000` 标记成已执行：
+`__drizzle_migrations`、库里却已经有表，会拒绝执行并 exit 3（裸跑 `drizzle-kit migrate`
+的话则是从 `0000` 撞上已存在的表、整个事务回滚，**而且 exit 1 却一个错误都不打印**）。
+对已有数据的库第一次跑之前，先手插一行把 `0000` 标记成已执行：
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS drizzle;
