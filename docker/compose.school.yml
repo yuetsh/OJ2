@@ -81,7 +81,6 @@ services:
       AI_KEY: ${AI_KEY:-}
       # 机房走 http 直连 IP，没有 TLS。带 Secure 的 Cookie 浏览器不会回传，
       # 学生会「登录成功但立刻又是未登录」。这里必须是 false。
-      PASSWORD_HASH_UPGRADE: ${PASSWORD_HASH_UPGRADE:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     healthcheck:
       test: ["CMD", "oj2-api", "healthcheck"]

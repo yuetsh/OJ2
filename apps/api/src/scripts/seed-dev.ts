@@ -48,8 +48,7 @@ interface SeedAccount {
  * 就缺 profile 和 email，后台页面一律进不去，排查了很久才找到这里。
  */
 async function seed(account: SeedAccount) {
-  // 走 hashPassword 而不是直接 argon2：本机也跟着 PASSWORD_HASH_UPGRADE 走，
-  // 默认写 Django 格式的 pbkdf2，和线上一个行为
+  // 走 hashPassword，和线上五个写入点同一条路
   const passwordHash = await hashPassword(account.password)
   const email = `${account.username}@example.test`
   const [user] = await db

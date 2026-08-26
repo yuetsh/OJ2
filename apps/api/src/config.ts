@@ -66,24 +66,6 @@ export const config = {
   sessionCookie: "oj2_session",
   sessionTtlSeconds: Number(process.env.SESSION_TTL_SECONDS ?? 7 * 24 * 60 * 60),
   secureCookies: process.env.COOKIE_SECURE === "true",
-  // 写密码用 argon2id 还是 Django 格式的 pbkdf2。**默认 argon2** —— 旧站已经下线
-  // （2026-08-26），没有回滚路径要照顾了。
-  //
-  //   true（默认）：五个写入点全写 argon2id，登录成功时把存量 pbkdf2 顺手升级掉。
-  //   false：       全写 Django 格式的 `pbkdf2_sha256$1200000$…`，登录时也不动
-  //                 存量哈希 —— 旧后端验得了。**万一要把旧站拉回来，设这个。**
-  //
-  // ⚠️ **无论开关怎么设，`verifyPassword` 的 pbkdf2 分支永远不能删。** 生产库
-  //   1710 个账号全是 Django 写的 pbkdf2（迭代次数横跨 120000～1200000，因为
-  //   跨了好几个 Django 版本），它们只会在各自下次登录时才升级成 argon2；
-  //   删掉那个分支就是全站登不上。
-  //
-  // 历史：这个开关原来默认关闭，用来堵「升级成 argon2 的账号回不去旧站」这道
-  //   单向门（并行试跑第一天就撞过，见 phase5 切换手册）。但它当时**只管住了
-  //   登录时的自动升级那一处**，注册 / 管理员改密码 / 批量导入 / 重置密码四条
-  //   路无条件写 argon2 —— 老师给学生点一次「重置密码」，那个账号照样回不去。
-  //   现在五处统一走 auth/password.ts 的 hashPassword，开关两个方向都是真的。
-  passwordHashUpgrade: process.env.PASSWORD_HASH_UPGRADE !== "false",
   judgeServerUrl: process.env.JUDGE_SERVER_URL ?? "http://localhost:8081",
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2),
