@@ -30,6 +30,7 @@ import {
 } from "drizzle-orm"
 import { Hono } from "hono"
 
+import { hashPassword } from "../auth/password"
 import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
@@ -63,7 +64,7 @@ accountRoutes.post("/users", async (c) => {
   }
 
   const now = new Date().toISOString()
-  const password = await Bun.password.hash(parsed.data.password, { algorithm: "argon2id" })
+  const password = await hashPassword(parsed.data.password)
   await db.transaction(async (tx) => {
     const [created] = await tx.insert(schema.user).values({
       username,

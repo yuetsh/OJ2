@@ -12,6 +12,7 @@ import { randomInt } from "node:crypto"
 import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
+import { hashPassword } from "../../auth/password"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
@@ -198,7 +199,7 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
   if (data.password) {
     // 与旧 User.set_password 一致：哈希与明文一起写。明文是有意保留的运营需求，
     // 老师要能查学生密码，见设计文档 7.1.1。
-    patch.password = await Bun.password.hash(data.password, { algorithm: "argon2id" })
+    patch.password = await hashPassword(data.password)
     patch.rawPassword = data.password
   }
   if (data.openApi) {
@@ -236,7 +237,7 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
     if (!className.ok) return failure(c, 400, "invalid-class-name", className.message)
     prepared.push({
       username,
-      password: await Bun.password.hash(password, { algorithm: "argon2id" }),
+      password: await hashPassword(password),
       raw: password,
       email,
       realName,
@@ -310,7 +311,7 @@ adminAccountRoutes.post("/users/:id/reset-password", requireSuperAdmin, async (c
   // 6 位随机数字、不含 0，与旧后端一致：学生要照着念、要手输，0 和 O 分不清
   const password = Array.from({ length: 6 }, () => "123456789"[randomInt(9)]).join("")
   await db.update(schema.user).set({
-    password: await Bun.password.hash(password, { algorithm: "argon2id" }),
+    password: await hashPassword(password),
     rawPassword: password,
   }).where(eq(schema.user.id, id))
   return success(c, resetPasswordResponseSchema.parse({ password }))

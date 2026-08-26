@@ -5,7 +5,7 @@ import { Hono } from "hono"
 import { optionalAuth, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { createSession, destroySession } from "../auth/session"
-import { verifyPassword } from "../auth/password"
+import { hashPassword, verifyPassword } from "../auth/password"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { getUserProfileById } from "../services/profile"
@@ -55,12 +55,11 @@ authRoutes.post("/auth/login", async (c) => {
 
   const now = new Date().toISOString()
   const update: { lastLogin: string; password?: string } = { lastLogin: now }
-  // 见 config.passwordHashUpgrade 的注释：升级成 argon2 之后旧后端就验不了这个账号了，
-  // 是一道单向门。默认关闭，回滚窗口内不要打开。
+  // 存量 pbkdf2 顺手升级成 argon2。**只在总开关打开时做** —— 升过的账号回不去
+  // 旧站，见 config.passwordHashUpgrade。开关关着时 hashPassword 写的也是 pbkdf2，
+  // 所以这里不升级、别处不写 argon2，回滚路径才是完整的。
   if (password.needsUpgrade && config.passwordHashUpgrade) {
-    update.password = await Bun.password.hash(parsed.data.password, {
-      algorithm: "argon2id",
-    })
+    update.password = await hashPassword(parsed.data.password)
   }
   await db.update(schema.user).set(update).where(eq(schema.user.id, user.id))
   await createSession(c, user.id, user.lastLogin)
