@@ -291,6 +291,18 @@ accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
   return success(c, problemRankSchema.parse({ className, rank, classAcCount: classCount?.value ?? 0, allAcCount: all?.value ?? 0 }))
 })
 
+/**
+ * 把 `user_profile.acm_problems_status` 里缓存的题目编号刷成当前值 ——
+ * 教师改了题目的 `_id`（后台「修改题目编号」）之后，学生个人主页上的那份缓存会变旧。
+ *
+ * **目前没有任何前端在调用它**，两代前端都只定义了函数、没有调用点。保留是因为
+ * 它是唯一能修这份缓存的入口；要接 UI 的话，从这里开始。
+ *
+ * 旧后端 `ProfileProblemDisplayIDRefreshAPI` 这段是坏的：它用
+ * `dict(zip(ids, display_ids))` 把「dict 键顺序」和「查询返回顺序」硬凑成对，
+ * 题目一旦被隐藏或删除，display_ids 就比 ids 短 —— 轻则把编号张冠李戴写进库，
+ * 重则 `id_map[k]` KeyError。这里改成按 id 建 Map、查不到就不动。
+ */
 accountRoutes.post("/me/problem-display-ids/refresh", requireAuth, async (c) => {
   const user = c.get("user")!
   const [profile] = await db.select({ value: schema.userProfile.acmProblemsStatus }).from(schema.userProfile)

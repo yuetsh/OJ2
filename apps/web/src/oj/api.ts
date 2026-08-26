@@ -300,11 +300,6 @@ export function setReaction(problemID: number, type: ReactionKey) {
   return api2.post<ReactionState>(`problems/${problemID}/reaction`, { type })
 }
 
-// TODO: 这个API有问题
-export function refreshUserProblemDisplayIds() {
-  return api2.post("me/problem-display-ids/refresh")
-}
-
 export function getMetrics(userid: number) {
   return api2.get<Metrics>(`users/${userid}/metrics`)
 }
