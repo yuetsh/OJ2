@@ -41,6 +41,7 @@ import api from "utils/api"
 import { filterResult } from "oj/transforms"
 import type {
   Announcement,
+  AnnouncementListItem,
   ContestRank,
   Profile,
   Message,
@@ -260,7 +261,7 @@ export function updateProfile(data: { realName: string; mood: string }) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: Announcement[]; total: number }>("announcements", {
+  return api.get<{ results: AnnouncementListItem[]; total: number }>("announcements", {
     params: { limit, offset },
   })
 }

@@ -7,14 +7,26 @@ export const announcementSchema = z.object({
   id: z.number().int(),
   title: z.string(),
   tag: z.string(),
-  content: z.string().optional(),
+  content: z.string(),
   top: z.boolean(),
   createdBy: sampleUserSchema,
   createTime: z.string(),
   lastUpdateTime: z.string(),
 })
 
-export const announcementListSchema = paginatedSchema(announcementSchema)
+/**
+ * 列表不下发正文：公告是 8MB 上限的富文本，列表页只显示标题。
+ * 原来 content 写成 `.optional()` 让一个 schema 兼两种形态，结果详情页
+ * 拿到的 content 类型上也是 `string | undefined`，组件只能 ?? 兜底。
+ * 与后台侧 adminAnnouncementListItemSchema 同一个套路。
+ */
+export const announcementListItemSchema = announcementSchema.omit({
+  content: true,
+})
+
+export const announcementListSchema = paginatedSchema(
+  announcementListItemSchema,
+)
 
 export const messageSchema = z.object({
   id: z.number().int(),
@@ -76,6 +88,7 @@ export const exerciseSchema = z.object({
 export type Message = z.infer<typeof messageSchema>
 export type MessageList = z.infer<typeof messageListSchema>
 export type Announcement = z.infer<typeof announcementSchema>
+export type AnnouncementListItem = z.infer<typeof announcementListItemSchema>
 export type TutorialSummary = z.infer<typeof tutorialSummarySchema>
 
 export type AnnouncementList = z.infer<typeof announcementListSchema>

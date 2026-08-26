@@ -5,7 +5,7 @@ import Pagination from "shared/components/Pagination.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
 import { renderTableTitle } from "utils/renders"
-import type { Announcement } from "utils/types"
+import type { AnnouncementListItem } from "utils/types"
 import TitleWithTag from "./components/TitleWithTag.vue"
 
 const total = ref(0)
@@ -19,7 +19,7 @@ const query = reactive({
   limit: 10,
   page: 1,
 })
-const columns: DataTableColumn<Announcement>[] = [
+const columns: DataTableColumn<AnnouncementListItem>[] = [
   {
     key: "title",
     title: renderTableTitle("公告标题", "streamline-emojis:fire"),
@@ -45,20 +45,20 @@ const columns: DataTableColumn<Announcement>[] = [
     width: 120,
   },
 ]
-function rowProps(row: Announcement) {
+function rowProps(row: AnnouncementListItem) {
   return {
     style: "cursor: pointer",
     onclick: () => showContent(row),
   }
 }
 
-async function showContent(announcement: Announcement) {
+async function showContent(announcement: AnnouncementListItem) {
   const res = await getAnnouncement(announcement.id)
   toggleShow(true)
   title.value = announcement.title
   content.value = res.content
 }
-const announcements = ref<Announcement[]>([])
+const announcements = ref<AnnouncementListItem[]>([])
 
 async function listAnnouncements() {
   const offset = (query.page - 1) * query.limit

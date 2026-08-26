@@ -106,7 +106,7 @@ export function useSubmissionMonitor() {
         submission.value &&
         (submission.value.result === SubmissionStatus.judging ||
           submission.value.result === SubmissionStatus.pending ||
-          submission.value.result === 9) // 9 = submitting
+          submission.value.result === SubmissionStatus.submitting)
       ) {
         console.log("[SubmissionMonitor] WebSocket未及时响应，启动轮询保底")
         resumePolling()
@@ -119,7 +119,7 @@ export function useSubmissionMonitor() {
   // ==================== 启动监控 ====================
   const startMonitoring = (id: string) => {
     submissionId.value = id
-    submission.value = { id, result: 9 } as Submission // 9 = submitting
+    submission.value = { id, result: SubmissionStatus.submitting } as Submission
 
     // 取消之前的断开计划
     cancelScheduledDisconnect()

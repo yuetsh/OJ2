@@ -12,6 +12,8 @@ import type {
   Grade,
   ProblemDetail,
   ProblemDifficulty,
+  JudgeStatus,
+  CreateAnnouncementRequest,
 } from "@oj2/contract"
 
 /**
@@ -64,8 +66,15 @@ export type {
   SqlDisplayColumn,
 } from "@oj2/contract"
 
-export type SUBMISSION_RESULT =
-  -2 | -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+/**
+ * 判题状态码 + 前端本地的「正在提交」(9)。
+ *
+ * 后端那 11 个码**从契约派生**，不再手抄 —— judgeStatusSchema 加一个码，
+ * constants.ts 的 JUDGE_STATUS 会因为缺映射当场编译不过，这正是
+ * CLAUDE.md 说的「三处同步」想要的效果。9 是后端永远不会下发的伪状态，
+ * 见 constants.ts 的 SubmissionStatus.submitting。
+ */
+export type SUBMISSION_RESULT = JudgeStatus | 9
 
 export type ProblemStatus = "passed" | "failed" | "not_test"
 
@@ -89,7 +98,7 @@ export type {
  * （stripped_output_md5 / input_size / output_size）。这套键名保持 snake_case
  * 是因为它会原样落进 problem.test_case_score 和判题沙箱读的 info 文件。
  */
-export type { UploadTestCaseResponse as TestcaseUploadedReturns } from "@oj2/contract"
+export type { UploadTestCaseResponse } from "@oj2/contract"
 
 /**
  * 题目表单里的测试点：上传返回的条目 + 前端本地算出的分值。
@@ -408,23 +417,21 @@ export type {
   AcTrend,
 } from "@oj2/contract"
 
-export interface AnnouncementEdit {
-  id: number
-  title: string
-  tag: string
-  content: string
-  visible: boolean
-  top: boolean
-}
+/**
+ * 公告。两侧形状**不同**，原来这里只手抄了后台那份、oj 侧也拿它当类型用：
+ * oj 的 `/announcements` 列表既不下发 `content` 也不下发 `visible`
+ * （见 apps/api/src/routes/content.ts），于是类型声称有、实际是 undefined。
+ * 现在各取各的契约类型。
+ */
+export type {
+  Announcement,
+  AnnouncementListItem,
+  AdminAnnouncement,
+  AdminAnnouncementListItem,
+} from "@oj2/contract"
 
-export interface Announcement extends AnnouncementEdit {
-  createdBy: SampleUser
-  createTime: string
-  lastUpdateTime: string
-}
-
-/** 列表不下发正文：公告是 8MB 上限的富文本，列表页只显示标题 */
-export type AnnouncementListItem = Omit<Announcement, "content">
+/** 后台编辑表单：请求体 + id（新建时填 0，提交前由 api 层剥掉） */
+export type AnnouncementEdit = CreateAnnouncementRequest & { id: number }
 
 /**
  * 站内信。取契约的形状，只把 `submission` 换成前端窄化过的那个
@@ -445,7 +452,7 @@ export type {
   ReactionCounts,
   ReactionState,
 } from "@oj2/contract"
-import type { ReactionKey, SampleUser } from "@oj2/contract"
+import type { ReactionKey } from "@oj2/contract"
 
 /**
  * 教程。直接取契约 —— 手抄的那份把 `createdBy` 写成了可选的 `User`（后端下发的是

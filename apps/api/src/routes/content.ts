@@ -1,4 +1,5 @@
 import {
+  announcementListItemSchema,
   announcementListSchema,
   announcementSchema,
   createMessageRequestSchema,
@@ -35,7 +36,7 @@ contentRoutes.get("/announcements", async (c) => {
       .orderBy(desc(schema.announcement.top), desc(schema.announcement.createTime)).limit(limit).offset(offset),
   ])
   return success(c, announcementListSchema.parse({
-    results: rows.map(({ announcement, user, realName }) => announcementSchema.parse({
+    results: rows.map(({ announcement, user, realName }) => announcementListItemSchema.parse({
       id: announcement.id,
       title: announcement.title,
       tag: announcement.tag,

@@ -21,16 +21,16 @@ import type {
   AdminProblem,
   AdminProblemList,
   AdminTag,
-  Announcement,
+  AdminAnnouncement,
   AnnouncementEdit,
-  AnnouncementListItem,
+  AdminAnnouncementListItem,
   BlankContest,
   BlankProblem,
   Contest,
   Exercise,
   ExerciseType,
   SqlDisplay,
-  TestcaseUploadedReturns,
+  UploadTestCaseResponse,
   Tutorial,
   User,
   WebsiteConfig,
@@ -225,7 +225,7 @@ export function uploadTestcases(file: File, options: { sql?: boolean } = {}) {
   if (options.sql) {
     form.append("sql", "1")
   }
-  return api.post<TestcaseUploadedReturns>("admin/test-cases", form, {
+  return api.post<UploadTestCaseResponse>("admin/test-cases", form, {
     headers: { "content-type": "multipart/form-data" },
   })
 }
@@ -371,14 +371,14 @@ export function deleteJudgeServer(hostname: string) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: AnnouncementListItem[]; total: number }>(
+  return api.get<{ results: AdminAnnouncementListItem[]; total: number }>(
     "admin/announcements",
     { params: { offset, limit } },
   )
 }
 
 export function getAnnouncement(id: number) {
-  return api.get<Announcement>(`admin/announcements/${id}`)
+  return api.get<AdminAnnouncement>(`admin/announcements/${id}`)
 }
 
 export function deleteAnnouncement(id: number) {
@@ -387,12 +387,12 @@ export function deleteAnnouncement(id: number) {
 
 export function editAnnouncement(announcement: AnnouncementEdit) {
   const { id, ...body } = announcement
-  return api.put<Announcement>(`admin/announcements/${id}`, body)
+  return api.put<AdminAnnouncement>(`admin/announcements/${id}`, body)
 }
 
 export function createAnnouncement(announcement: AnnouncementEdit) {
   const { id: _id, ...body } = announcement
-  return api.post<Announcement>("admin/announcements", body)
+  return api.post<AdminAnnouncement>("admin/announcements", body)
 }
 
 export function getTutorialList() {

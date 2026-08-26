@@ -2,7 +2,7 @@
 import { NSwitch } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { parseTime } from "utils/functions"
-import type { AnnouncementListItem } from "utils/types"
+import type { AdminAnnouncementListItem } from "utils/types"
 import { editAnnouncement, getAnnouncement, getAnnouncementList } from "../api"
 import Actions from "./components/Actions.vue"
 
@@ -12,9 +12,9 @@ const query = reactive({
   limit: 10,
   page: 1,
 })
-const announcements = ref<AnnouncementListItem[]>([])
+const announcements = ref<AdminAnnouncementListItem[]>([])
 
-const columns: DataTableColumn<AnnouncementListItem>[] = [
+const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
   { title: "ID", key: "id", width: 60 },
   { title: "标题", key: "title", minWidth: 300 },
   { title: "标签", key: "tag", width: 80 },
@@ -64,7 +64,7 @@ const columns: DataTableColumn<AnnouncementListItem>[] = [
 
 // 列表响应不含 content（正文是 8MB 上限的富文本），而更新接口要求 content 必填 ——
 // 拿列表里那行直接回传会 400。所以先取回整条再改。
-async function toggleVisible(announcement: AnnouncementListItem) {
+async function toggleVisible(announcement: AdminAnnouncementListItem) {
   const next = !announcement.visible
   try {
     const full = await getAnnouncement(announcement.id)

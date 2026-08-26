@@ -24,9 +24,13 @@ export const adminAnnouncementSchema = z.object({
   lastUpdateTime: z.string(),
 })
 
+// 列表不带 content：公告正文是 8MB 上限的富文本，列表页只显示标题
+export const adminAnnouncementListItemSchema = adminAnnouncementSchema.omit({
+  content: true,
+})
+
 export const adminAnnouncementListSchema = paginatedSchema(
-  // 列表不带 content：公告正文是 8MB 上限的富文本，列表页只显示标题
-  adminAnnouncementSchema.omit({ content: true }),
+  adminAnnouncementListItemSchema,
 )
 
 export const createAnnouncementRequestSchema = z.object({
@@ -40,6 +44,9 @@ export const createAnnouncementRequestSchema = z.object({
 export const updateAnnouncementRequestSchema = createAnnouncementRequestSchema
 
 export type AdminAnnouncement = z.infer<typeof adminAnnouncementSchema>
+export type AdminAnnouncementListItem = z.infer<
+  typeof adminAnnouncementListItemSchema
+>
 
 // ---------------------------------------------------------------- 教程 / 练习
 
