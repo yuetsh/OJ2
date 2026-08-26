@@ -43,7 +43,7 @@ function filterClass() {
       <template #trigger>
         <n-button text @click="filterClass">
           <template #icon>
-            <Icon icon="ph:funnel"></Icon>
+            <Icon icon="streamline-emojis:scroll"></Icon>
           </template>
         </n-button>
       </template>
