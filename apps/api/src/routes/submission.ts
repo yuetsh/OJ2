@@ -371,10 +371,12 @@ submissionRoutes.post("/code/format", requireAuth, async (c) => {
   }
 })
 
+// 参数按「实际用到的字段」声明，而不是整行 $inferSelect：列表接口只 select 需要的列，
+// 传不进完整行。完整行在结构上满足这两个窄类型，详情接口照旧调用不受影响。
 function canViewSubmission(
   user: AuthUser | null,
-  row: typeof schema.submission.$inferSelect,
-  problem: typeof schema.problem.$inferSelect,
+  row: { userId: number; shared: boolean },
+  problem: { createdById: number; shareSubmission: boolean },
   contest: typeof schema.contest.$inferSelect | null,
   allowShared = true,
 ) {
@@ -384,6 +386,31 @@ function canViewSubmission(
   if (contest && contestStatus(contest) !== "-1") return false
   return problem.shareSubmission || row.shared
 }
+
+/**
+ * 提交列表只取序列化用得到的列。取 `submission.*` / `problem.*` 会把
+ * submission.code（学生源码）、info、ip 和 problem 的 description / input_description /
+ * output_description / hint / samples / answers / flowchart_data / sql_display 一并拉回来，
+ * 这些字段列表一个都不用，纯属白传。
+ */
+const submissionListColumns = {
+  submission: {
+    id: schema.submission.id,
+    createTime: schema.submission.createTime,
+    userId: schema.submission.userId,
+    username: schema.submission.username,
+    result: schema.submission.result,
+    language: schema.submission.language,
+    shared: schema.submission.shared,
+    statisticInfo: schema.submission.statisticInfo,
+  },
+  problem: {
+    displayId: schema.problem.displayId,
+    title: schema.problem.title,
+    shareSubmission: schema.problem.shareSubmission,
+    createdById: schema.problem.createdById,
+  },
+} as const
 
 async function submissionDetail(id: string, user: AuthUser) {
   const [row] = await db.select({ submission: schema.submission, problem: schema.problem, contest: schema.contest })
@@ -441,9 +468,15 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   if (language) filters.push(eq(schema.submission.language, language))
   if (c.req.query("today") === "1") filters.push(sql`${schema.submission.createTime} >= ${todayStart()}`)
   const where = and(...filters)
+  // count 不 join problem：problem 只有按题号筛选时才出现在 where 里，无条件 join 会让
+  // 计划器把 count 退化成 seq scan（生产快照实测 7.5ms → 78ms）。
+  const totalQuery = displayId
+    ? db.select({ value: count() }).from(schema.submission)
+        .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
+    : db.select({ value: count() }).from(schema.submission).where(where)
   const [totalRows, rows] = await Promise.all([
-    db.select({ value: count() }).from(schema.submission).innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where),
-    db.select({ submission: schema.submission, problem: schema.problem }).from(schema.submission)
+    totalQuery,
+    db.select(submissionListColumns).from(schema.submission)
       .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
       .orderBy(desc(schema.submission.createTime)).limit(limit).offset(offset),
   ])
@@ -480,9 +513,15 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
   if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, Number(result)))
   if (contestStatus(contest) !== "1") filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
   const where = and(...filters)
+  // count 不 join problem：problem 只有按题号筛选时才出现在 where 里，无条件 join 会让
+  // 计划器把 count 退化成 seq scan（生产快照实测 7.5ms → 78ms）。
+  const totalQuery = displayId
+    ? db.select({ value: count() }).from(schema.submission)
+        .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
+    : db.select({ value: count() }).from(schema.submission).where(where)
   const [totalRows, rows] = await Promise.all([
-    db.select({ value: count() }).from(schema.submission).innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where),
-    db.select({ submission: schema.submission, problem: schema.problem }).from(schema.submission)
+    totalQuery,
+    db.select(submissionListColumns).from(schema.submission)
       .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
       .orderBy(desc(schema.submission.createTime)).limit(limit).offset(offset),
   ])
