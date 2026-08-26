@@ -155,10 +155,11 @@ cat <<EOF
 
 $(printf '\033[1;32m✅ 起来了\033[0m')
 
-还差 NPM 那一步：
-  - proxy host: oj2.xuyue.cc → 宿主机:$port
-  - **Websockets Support 必须打开**，否则学生那边「判题中…」永远不动
-  - client_max_body_size 200M（上传测试用例压缩包）
+  https://oj2.xuyue.cc  （NPM 反代已配好，指向宿主机:$port）
 
-之后自己点一遍：登录、提交一道题看结果实时刷出来、后台判题机列表、带图片的题面。
+NPM 那边是一次性的，只有改了 WEB_PORT 才要回去动 proxy host 的端口。另外两项
+别关：Websockets Support（关了学生那边「判题中…」永远不动）、
+client_max_body_size 200M（上传测试用例压缩包）。
+
+自己点一遍：登录、提交一道题看结果实时刷出来、后台判题机列表、带图片的题面。
 EOF
