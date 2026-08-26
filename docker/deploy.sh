@@ -174,14 +174,19 @@ fi
 # ---------------------------------------------------------------- 迁移
 # 在起栈**之前**跑：schema 先就位，新代码再启动。
 #
-# --no-deps 是必须的：这一步只要 api 镜像里的二进制，不该顺带把 worker/web 拉起来。
-# 库连的是 env 里的 DB_HOST，和起栈用的是同一份配置。
+# **不要加 --no-deps。** `run` 只会拉起被点名服务的依赖，而 oj-api 的依赖恰好就是
+# oj-postgres / oj-redis：
+#   · 自带数据形态 —— 必须靠它把 postgres 起来，否则这一步连不上库（加过 --no-deps，
+#     踩过这个坑）。depends_on 的 condition: service_healthy 还顺带保证了库真的就绪。
+#   · 外接形态 —— 那两个服务不在启用的 profile 里，depends_on 上的 required: false
+#     让 compose 直接跳过，不会多起任何东西。
+# 两种形态下 worker / web 都不会被带起来，它们不是 api 的依赖。
 #
 # 含 DROP TABLE 这类破坏性语句的迁移会被拦下并退出 4，需要显式放行：
 #   OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
 # 放行前先备份。这道闸门在 apps/api/src/db/migrate.ts。
 say "数据库迁移"
-"${COMPOSE[@]}" run --rm --no-deps \
+"${COMPOSE[@]}" run --rm \
   -e OJ2_ALLOW_DESTRUCTIVE="${OJ2_ALLOW_DESTRUCTIVE:-}" \
   api oj2-api migrate \
   || die "迁移没通过，已中止部署（旧容器还在跑，没动过）。
