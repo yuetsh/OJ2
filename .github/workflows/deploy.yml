@@ -84,9 +84,15 @@ jobs:
       #                整个 postgres 数据目录。删了就是删库。
       #   node_modules 服务器上根本不需要（prebuilt 形态下连编都不编），传过去纯浪费。
       #   .git         checkout 出来的 .git 没有任何用处。
+      #
+      # --no-owner --no-group 别删：`-a` 展开含 `-o -g`（保留属主/属组），而接收端是
+      # root，rsync 会把**源端的 uid 真写上去**——GitHub 托管 runner 的 runner 用户是
+      # uid 1001，于是服务器上的工作区目录变成 1001 所有。而 `.git` 被 --exclude 掉，
+      # 还是当初手动 clone 时的 root。两者对不上，之后在服务器上跑任何 git 命令都会被
+      # 「检测到可疑的仓库所有权」挡下（git 2.35.2 起的 safe.directory 检查）。
       - name: 同步到服务器
         run: |
-          rsync -az --delete \
+          rsync -az --no-owner --no-group --delete \
             -e "ssh -i ~/.ssh/id_deploy -p $REMOTE_PORT" \
             --exclude node_modules \
             --exclude .git \
