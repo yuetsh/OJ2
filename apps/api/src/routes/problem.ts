@@ -25,6 +25,7 @@ import { Hono } from "hono"
 
 import { optionalAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
+import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { objectValue as toObject, queryInteger, sampleUser } from "./helpers"
@@ -319,6 +320,8 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 		flowchartHint: row.problem.flowchartHint,
 		sqlConfig: row.problem.sqlConfig ? objectValue(row.problem.sqlConfig) : null,
 		sqlDisplay: row.problem.sqlDisplay ? objectValue(row.problem.sqlDisplay) : null,
+		// 代码要求：只给渲染好的文案，规则原文不下发给学生
+		astRequirements: astRequirements(row.problem.astRules),
 	})
 
 	return success(c, data)

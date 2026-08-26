@@ -116,7 +116,7 @@ export type { ProblemTestCaseScore as Testcase } from "@oj2/contract"
 export type Problem = Omit<ProblemDetail, "languages" | "template"> & {
   languages: LANGUAGE[]
   template: { [key in LANGUAGE]?: string }
-  astRules?: AstRules | null
+  // oj 侧不下发 astRules 原文，只有 astRequirements（契约里就有）
   hasAstRules?: boolean
   visible?: boolean
   answers?: { language: LANGUAGE; code: string }[]

@@ -1,4 +1,10 @@
-import type { AstRule } from "@oj2/contract"
+import {
+  astRuleSchema,
+  AST_NODE_TARGET_LABELS,
+  type AstRequirement,
+  type AstRequirements,
+  type AstRule,
+} from "@oj2/contract"
 import { Language, Parser, type Node } from "web-tree-sitter"
 // 语法 wasm 内嵌成资源。原来是 `Bun.resolveSync(pkg + "/" + name, import.meta.dir)`，
 // 编译成单二进制后 import.meta.dir 是 /$bunfs/root，解析不到 node_modules。见 vendor/jieba.ts
@@ -90,16 +96,87 @@ function hasNode(root: Node, type: string): boolean {
 }
 
 function targetName(rule: AstRule) {
-  return rule.label || rule.target || "指定语法"
+  const target = rule.target ?? ""
+  return rule.label || AST_NODE_TARGET_LABELS[target] || target || "指定语法"
 }
 
-function rangeDescription(subject: string, rule: AstRule) {
+function countPhrase(verb: string, rule: AstRule) {
+  if (rule.exact !== undefined) return `${verb} ${rule.exact} 次`
+  if (rule.min !== undefined && rule.max !== undefined)
+    return `${verb} ${rule.min}～${rule.max} 次`
+  if (rule.min !== undefined) return `至少${verb} ${rule.min} 次`
+  if (rule.max !== undefined) return `至多${verb} ${rule.max} 次`
+  return ""
+}
+
+/**
+ * 一条规则的中文描述。判题结果（statistic_info.ast_results）和题目页的「要求」
+ * 用的是同一份 —— 原来前端 ProblemContent.vue 里另有一份几乎一样的实现，
+ * 只有 min/max 同时给出时的措辞不一样（生产库里没有这种规则）。
+ */
+export function describeAstRule(rule: AstRule): string {
   if (rule.message) return rule.message
-  if (rule.exact !== undefined) return `${subject} 出现 ${rule.exact} 次`
-  const parts: string[] = []
-  if (rule.min !== undefined) parts.push(`至少 ${rule.min} 次`)
-  if (rule.max !== undefined) parts.push(`至多 ${rule.max} 次`)
-  return `${subject} ${parts.join("、")}`.trim()
+  const name = targetName(rule)
+  const target = rule.target ?? ""
+  switch (rule.engine) {
+    case "must_exist_node":
+      return `必须使用 ${name}`
+    case "must_not_exist_node":
+      return `不能使用 ${name}`
+    case "count_node":
+      return `${name} ${countPhrase("出现", rule)}`.trim()
+    case "must_call_function":
+      return `必须调用 ${target}()`
+    case "must_not_call_function":
+      return `不能调用 ${target}()`
+    case "count_function_call":
+      return `${target}() ${countPhrase("调用", rule)}`.trim()
+    case "must_call_method":
+      return `必须调用 .${target}()`
+    case "must_not_call_method":
+      return `不能调用 .${target}()`
+    case "must_use_operator":
+      return `必须使用 ${target} 运算符`
+    case "must_have_nesting": {
+      const outer = rule.outer ?? ""
+      const inner = rule.inner ?? ""
+      return outer === inner
+        ? `必须使用 ${outer} 嵌套`
+        : `必须在 ${outer} 中嵌套使用 ${inner}`
+    }
+  }
+}
+
+/** 标签配色用的粗分类，见契约 astRequirementSchema */
+function requirementKind(engine: AstRule["engine"]): AstRequirement["kind"] {
+  if (engine.startsWith("must_not")) return "forbid"
+  if (engine.startsWith("count")) return "count"
+  return "require"
+}
+
+/**
+ * 把规则原文投影成下发给学生的「代码要求」。规则里的 engine / target 不出现在
+ * 响应里 —— 阶段 3 泄露评审收掉 ast_rules 时要的就是这个，见契约的注释。
+ */
+export function astRequirements(value: unknown): AstRequirements | null {
+  const grouped = value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+  if (!grouped) return null
+  const out: AstRequirements = {}
+  for (const [language, rules] of Object.entries(grouped)) {
+    if (!Array.isArray(rules)) continue
+    const items = rules.flatMap((rule) => {
+      const parsed = astRuleSchema.safeParse(rule)
+      if (!parsed.success) return []
+      return [{
+        description: describeAstRule(parsed.data),
+        kind: requirementKind(parsed.data.engine),
+      }]
+    })
+    if (items.length > 0) out[language] = items
+  }
+  return Object.keys(out).length > 0 ? out : null
 }
 
 function rangePassed(count: number, rule: AstRule) {
@@ -140,51 +217,51 @@ function evaluateRule(
   switch (rule.engine) {
     case "must_exist_node":
       return {
-        description: rule.message || `必须使用 ${targetName(rule)}`,
+        description: describeAstRule(rule),
         passed: hasNode(root, nodeType),
       }
     case "must_not_exist_node":
       return {
-        description: rule.message || `不能使用 ${targetName(rule)}`,
+        description: describeAstRule(rule),
         passed: !hasNode(root, nodeType),
       }
     case "count_node": {
       const count = collectNodes(root, nodeType).length
       return {
-        description: rangeDescription(targetName(rule), rule),
+        description: describeAstRule(rule),
         passed: rangePassed(count, rule),
       }
     }
     case "must_call_function":
       return {
-        description: rule.message || `必须调用 ${target}()`,
+        description: describeAstRule(rule),
         passed: functionCalls(root, target, language).length > 0,
       }
     case "must_not_call_function":
       return {
-        description: rule.message || `不能调用 ${target}()`,
+        description: describeAstRule(rule),
         passed: functionCalls(root, target, language).length === 0,
       }
     case "count_function_call": {
       const count = functionCalls(root, target, language).length
       return {
-        description: rangeDescription(`${target}()`, rule),
+        description: describeAstRule(rule),
         passed: rangePassed(count, rule),
       }
     }
     case "must_call_method":
       return {
-        description: rule.message || `必须调用 .${target}()`,
+        description: describeAstRule(rule),
         passed: methodCalls(root, target, language).length > 0,
       }
     case "must_not_call_method":
       return {
-        description: rule.message || `不能调用 .${target}()`,
+        description: describeAstRule(rule),
         passed: methodCalls(root, target, language).length === 0,
       }
     case "must_use_operator":
       return {
-        description: rule.message || `必须使用 ${target} 运算符`,
+        description: describeAstRule(rule),
         passed: hasNode(root, nodeType),
       }
     case "must_have_nesting": {
@@ -195,14 +272,7 @@ function evaluateRule(
       const passed = collectNodes(root, outerType).some((node) =>
         node.children.some((child) => hasNode(child, innerType)),
       )
-      return {
-        description:
-          rule.message ||
-          (outer === inner
-            ? `必须使用 ${outer} 嵌套`
-            : `必须在 ${outer} 中嵌套使用 ${inner}`),
-        passed,
-      }
+      return { description: describeAstRule(rule), passed }
     }
     default:
       return null

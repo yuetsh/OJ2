@@ -6,7 +6,7 @@ import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { createTestSubmission } from "utils/judge"
 import { DIFFICULTY } from "utils/constants"
-import type { AstRule, Problem, ProblemStatus } from "utils/types"
+import type { Problem, ProblemStatus } from "utils/types"
 import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
@@ -97,80 +97,18 @@ const samples = ref<Sample[]>(
   })),
 )
 
-const NODE_TARGET_LABELS: Record<string, string> = {
-  for_loop: "for 循环",
-  while_loop: "while 循环",
-  if_statement: "if 条件",
-  else_clause: "else 子句",
-  function_definition: "函数定义",
-  return: "return 语句",
-  break: "break 语句",
-  continue: "continue 语句",
-  list_comprehension: "列表推导式",
-  list_literal: "列表",
-  dict_literal: "字典",
-  set_literal: "集合",
-  f_string: "f-string",
-  try_except: "try-except",
-  class_definition: "类定义",
-}
+// 文案和配色分类都由后端生成 —— 原来这里有一份 NODE_TARGET_LABELS +
+// ruleDescription + ruleTagType，和判题机那份几乎一模一样，见契约
+// astRequirementSchema。规则原文（engine / target）不下发给学生。
+const KIND_TAG_TYPE = {
+  require: "success",
+  forbid: "error",
+  count: "info",
+} as const
 
-function ruleDescription(rule: AstRule): string {
-  if (rule.message) return rule.message
-  const target = rule.target || ""
-  const targetLabel = rule.label || NODE_TARGET_LABELS[target] || target
-  const countDesc = () => {
-    if (rule.exact !== undefined) return `出现 ${rule.exact} 次`
-    if (rule.min !== undefined && rule.max !== undefined)
-      return `出现 ${rule.min}～${rule.max} 次`
-    if (rule.min !== undefined) return `至少出现 ${rule.min} 次`
-    if (rule.max !== undefined) return `至多出现 ${rule.max} 次`
-    return ""
-  }
-  const callDesc = () => {
-    if (rule.exact !== undefined) return `调用 ${rule.exact} 次`
-    if (rule.min !== undefined && rule.max !== undefined)
-      return `调用 ${rule.min}～${rule.max} 次`
-    if (rule.min !== undefined) return `至少调用 ${rule.min} 次`
-    if (rule.max !== undefined) return `至多调用 ${rule.max} 次`
-    return ""
-  }
-  switch (rule.engine) {
-    case "must_exist_node":
-      return `必须使用 ${targetLabel}`
-    case "must_not_exist_node":
-      return `不能使用 ${targetLabel}`
-    case "count_node":
-      return `${targetLabel} ${countDesc()}`
-    case "must_call_function":
-      return `必须调用 ${target}()`
-    case "must_not_call_function":
-      return `不能调用 ${target}()`
-    case "count_function_call":
-      return `${target}() ${callDesc()}`
-    case "must_call_method":
-      return `必须调用 .${target}()`
-    case "must_not_call_method":
-      return `不能调用 .${target}()`
-    case "must_use_operator":
-      return `必须使用 ${target} 运算符`
-    default:
-      return rule.engine
-  }
-}
-
-function ruleTagType(engine: string): "error" | "success" | "info" {
-  if (engine.startsWith("must_not")) return "error"
-  if (engine.startsWith("must")) return "success"
-  return "info"
-}
-
-const astRulesForDisplay = computed(() => {
-  if (!problem.value?.astRules) return []
-  return Object.entries(problem.value.astRules).filter(
-    ([, rules]) => rules.length > 0,
-  )
-})
+const astRequirements = computed(() =>
+  Object.entries(problem.value?.astRequirements ?? {}),
+)
 
 async function test(sample: Sample, index: number) {
   samples.value = samples.value.map((sample) => {
@@ -360,27 +298,20 @@ function type(status: ProblemStatus) {
     </div>
 
     <!-- 代码要求（AST 规则） -->
-    <div v-if="astRulesForDisplay.length > 0">
+    <div v-if="astRequirements.length > 0">
       <p class="title" :style="style">
         <n-flex align="center">
           <Icon icon="streamline-ultimate-color:check-button"></Icon>
           要求
         </n-flex>
       </p>
-      <div v-for="[lang, rules] in astRulesForDisplay" :key="lang">
-        <p v-if="astRulesForDisplay.length > 1" class="lang-label">
+      <div v-for="[lang, rules] in astRequirements" :key="lang">
+        <p v-if="astRequirements.length > 1" class="lang-label">
           {{ lang }}
         </p>
         <n-list bordered style="margin-bottom: 8px">
           <n-list-item v-for="(rule, i) in rules" :key="i">
-            <n-flex align="center">
-              <n-tag :type="ruleTagType(rule.engine)">
-                {{ ruleDescription(rule) }}
-              </n-tag>
-              <span v-if="rule.message" class="rule-message">{{
-                rule.message
-              }}</span>
-            </n-flex>
+            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{ rule.description }}</n-tag>
           </n-list-item>
         </n-list>
       </div>
@@ -518,11 +449,6 @@ function type(status: ProblemStatus) {
 .lang-label {
   font-weight: 600;
   margin: 8px 0 4px;
-}
-
-.rule-message {
-  font-size: 13px;
-  opacity: 0.65;
 }
 
 .sqlTableName {

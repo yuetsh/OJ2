@@ -14,6 +14,7 @@ import { Hono } from "hono"
 import { optionalAuth, requireAuth } from "../auth/middleware"
 import { setContestPassword } from "../auth/session"
 import { db, schema } from "../db"
+import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import {
   canAccessContest,
@@ -180,6 +181,8 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
     flowchartHint: row.problem.flowchartHint,
     sqlConfig: row.problem.sqlConfig ? objectValue(row.problem.sqlConfig) : null,
     sqlDisplay: row.problem.sqlDisplay ? objectValue(row.problem.sqlDisplay) : null,
+    // 代码要求：只给渲染好的文案，规则原文不下发给学生
+    astRequirements: astRequirements(row.problem.astRules),
   }))
 })
 

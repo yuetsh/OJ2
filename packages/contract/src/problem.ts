@@ -55,6 +55,94 @@ export const sqlDisplaySchema = z.object({
   ]),
 })
 
+/**
+ * AST 代码要求。同一个形状原来在**三个地方**各写了一份，三份都不一样：
+ * apps/api/src/judge/ast.ts 的 AstRule（判题机真读的那份，九个字段）、
+ * apps/web/src/utils/types.ts 的 AstRules（少了 label / exact / outer / inner）、
+ * AstRulesEditor.vue 里的本地 AstRule（少了 outer / inner）。
+ * 编辑器写得出 label / exact，题目类型却描述不了它们。现在以这里为准。
+ *
+ * 除 engine 外全部可选：判题机每条规则只读自己那几个字段
+ * （见 ast.ts 的 evaluateRule），缺了就走默认文案。
+ */
+export const astRuleEngineSchema = z.enum([
+  "must_exist_node",
+  "must_not_exist_node",
+  "count_node",
+  "must_call_function",
+  "must_not_call_function",
+  "count_function_call",
+  "must_call_method",
+  "must_not_call_method",
+  "must_use_operator",
+  // 判题机实现了，但后台编辑器还没有对应的选项，目前只能手工造数据用上
+  "must_have_nesting",
+])
+
+export const astRuleSchema = z.object({
+  engine: astRuleEngineSchema,
+  /** 检查目标：节点类型 / 函数名 / 方法名 / 运算符，按 engine 而定 */
+  target: z.string().optional(),
+  /** must_have_nesting 专用：外层、内层节点 */
+  outer: z.string().optional(),
+  inner: z.string().optional(),
+  /** 展示用的中文名，缺省回落到 target */
+  label: z.string().optional(),
+  /** 自定义提示。生产库里存的是空串而不是缺键，判题机按 `||` 回落到默认文案 */
+  message: z.string().optional(),
+  /** count_* 引擎的次数约束 */
+  exact: z.number().int().optional(),
+  min: z.number().int().optional(),
+  max: z.number().int().optional(),
+})
+
+/** 按语言分组：`{ Python3: [...], C: [...] }`，键是 languages 里的语言名 */
+export const astRulesSchema = z.record(z.string(), z.array(astRuleSchema))
+
+/**
+ * 节点类型的中文名。后台编辑器的下拉选项、后端生成要求文案都要用它 ——
+ * 原来在 AstRulesEditor.vue（下拉 options）和 ProblemContent.vue
+ * （NODE_TARGET_LABELS）各存了一份同样的 15 条。
+ */
+export const AST_NODE_TARGET_LABELS: Record<string, string> = {
+  for_loop: "for 循环",
+  while_loop: "while 循环",
+  if_statement: "if 条件",
+  else_clause: "else 子句",
+  function_definition: "函数定义",
+  return: "return 语句",
+  break: "break 语句",
+  continue: "continue 语句",
+  list_comprehension: "列表推导式",
+  list_literal: "列表",
+  dict_literal: "字典",
+  set_literal: "集合",
+  f_string: "f-string",
+  try_except: "try-except",
+  class_definition: "类定义",
+}
+
+/**
+ * 下发给**学生**的代码要求。只有渲染要用的两个字段 —— 文案由后端生成，
+ * engine / target 这些内部字段不出现在响应里。
+ *
+ * 旧后端的 ProblemSerializer 没排掉 ast_rules，学生拿到的是规则原文；阶段 3
+ * 泄露评审刻意收掉了它，同时写明「前端要读具体内容的话得补个专门的字段」——
+ * 就是这个。收紧保留，展示恢复。
+ */
+export const astRequirementSchema = z.object({
+  /** 已经渲染好的中文文案，例如「if 条件 出现 2 次」 */
+  description: z.string(),
+  /** 标签配色：必须做 / 不能做 / 次数约束 */
+  kind: z.enum(["require", "forbid", "count"]),
+})
+
+/** 按语言分组，与 astRulesSchema 同一套键 */
+export const astRequirementsSchema = z.record(
+  z.string(),
+  z.array(astRequirementSchema),
+)
+
 export const problemDetailSchema = z.object({
   id: z.number().int(),
   _id: z.string(),
@@ -98,6 +186,8 @@ export const problemDetailSchema = z.object({
   flowchartHint: z.string().nullable(),
   sqlConfig: sqlConfigSchema.nullable(),
   sqlDisplay: sqlDisplaySchema.nullable(),
+  // 代码要求（AST 规则的展示投影）。规则原文不下发给学生，见 astRequirementSchema
+  astRequirements: astRequirementsSchema.nullable(),
 })
 
 export type ProblemDetail = z.infer<typeof problemDetailSchema>
@@ -138,6 +228,11 @@ export const yearlyAcSchema = z.object({
   acRate: z.number(),
 })
 
+export type AstRuleEngine = z.infer<typeof astRuleEngineSchema>
+export type AstRule = z.infer<typeof astRuleSchema>
+export type AstRules = z.infer<typeof astRulesSchema>
+export type AstRequirement = z.infer<typeof astRequirementSchema>
+export type AstRequirements = z.infer<typeof astRequirementsSchema>
 export type ProblemDifficulty = z.infer<typeof problemDifficultySchema>
 export type ProblemListItem = z.infer<typeof problemListItemSchema>
 export type ProblemList = z.infer<typeof problemListSchema>

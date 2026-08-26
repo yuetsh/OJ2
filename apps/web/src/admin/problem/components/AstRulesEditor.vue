@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AST_NODE_TARGET_LABELS } from "@oj2/contract"
 import type { AstRule, AstRules, LANGUAGE } from "utils/types"
 
 interface Props {
@@ -51,23 +52,11 @@ const ENGINE_OPTIONS: SelectOption[] = [
   },
 ]
 
-const NODE_TARGET_OPTIONS: SelectOption[] = [
-  { label: "for 循环", value: "for_loop" },
-  { label: "while 循环", value: "while_loop" },
-  { label: "if 条件", value: "if_statement" },
-  { label: "else 子句", value: "else_clause" },
-  { label: "函数定义", value: "function_definition" },
-  { label: "return 语句", value: "return" },
-  { label: "break 语句", value: "break" },
-  { label: "continue 语句", value: "continue" },
-  { label: "列表推导式", value: "list_comprehension" },
-  { label: "列表", value: "list_literal" },
-  { label: "字典", value: "dict_literal" },
-  { label: "集合", value: "set_literal" },
-  { label: "f-string", value: "f_string" },
-  { label: "try-except", value: "try_except" },
-  { label: "类定义", value: "class_definition" },
-]
+// 选项从契约的 AST_NODE_TARGET_LABELS 生成 —— 这 15 条原来在这里和
+// ProblemContent.vue 各手抄一份
+const NODE_TARGET_OPTIONS: SelectOption[] = Object.entries(
+  AST_NODE_TARGET_LABELS,
+).map(([value, label]) => ({ label, value }))
 
 const OPERATOR_TARGET_OPTIONS: SelectOption[] = [
   { label: "+", value: "+" },
