@@ -39,14 +39,17 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      # 依赖装到 ~/.bun/install/cache，命中的话 install 只剩几秒
-      - uses: actions/cache@v4
+      # 依赖装到 ~/.bun/install/cache，命中的话 install 只剩几秒。
+      # v6 起跑在 node24 上（v4 还是 node20，GitHub 正在退役 node20 runtime），
+      # 和上面两个 action 一致。v5+ 要求 runner >= 2.327.1，ubuntu-latest 是
+      # GitHub 托管的、始终满足；换自建 runner 的话要留意这条。
+      - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
