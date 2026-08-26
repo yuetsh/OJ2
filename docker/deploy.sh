@@ -54,6 +54,21 @@ say "自检"
 
 [ -f docker/.env ] || die "docker/.env 不存在。内容见手册第三节，别用 .env.example 直接改名（里面的值全是空的）"
 
+# 部署形态。判据用 DB_HOST 而不是另加一个开关：它本来就决定了 DATABASE_URL 指向谁，
+# 两个变量各说各话的话，迟早会出现「起了自带的库、却连到别处」这种自相矛盾的状态。
+#
+#   DB_HOST 为空 → 自带数据：本栈起 oj-postgres / oj-redis（compose 里挂在 local-data profile 下）
+#   DB_HOST 非空 → 外接数据：连别处的库，试跑期间连的是旧栈那两个容器
+db_host=$(grep -E '^DB_HOST=' docker/.env | tail -1 | cut -d= -f2- || true)
+if [ -z "$db_host" ]; then
+  LOCAL_DATA=1
+  COMPOSE+=(--profile local-data)
+  ok "形态：自带数据（postgres / redis 由本栈起）"
+else
+  LOCAL_DATA=0
+  ok "形态：外接数据（库在 $db_host）"
+fi
+
 # compose 版本：depends_on.required 是 v2.20 才有的字段，老版本会解析失败
 ver=$(docker compose version --short 2>/dev/null || echo 0)
 # 取 min(2.20, ver)：等于 2.20 就说明 ver 不低于它。别用 `sort -V -C`，
@@ -96,22 +111,51 @@ $bad
 检查 docker/.env 里的 DATA_DIR（注意：DATA_DIR= 空值等于没设，等号两边不能有空格）"
 ok "数据卷都在 $(grep 'source:' <<<"$cfg" | head -1 | sed 's|.*source: ||; s|/backend.*||')"
 
-# ② DB_HOST：不生效会静默回落成 oj-postgres，而试跑形态下那个容器根本没起
-! grep -q 'DATABASE_URL: postgres://[^@]*@oj-postgres' <<<"$cfg" \
-  || die "DB_HOST 没生效，DATABASE_URL 还指着 oj-postgres —— 试跑形态下它不存在，起来必然连不上库"
+# ② 库指向必须和形态一致，两个方向都要查
+if [ "$LOCAL_DATA" -eq 0 ]; then
+  # 外接：DB_HOST 不生效会静默回落成 oj-postgres，而这形态下本栈不起那个容器
+  ! grep -q 'DATABASE_URL: postgres://[^@]*@oj-postgres' <<<"$cfg" \
+    || die "DB_HOST 没生效，DATABASE_URL 还指着 oj-postgres —— 外接形态下本栈不起它，必然连不上库"
+else
+  # 自带：反过来必须指向服务名 + 容器内端口。连 :5432 一起查，是因为清了 DB_HOST 却
+  # 忘了清 DB_PORT 的话会拼出 oj-postgres:5445 —— 那是宿主机映射端口，容器网络里不通。
+  grep -q 'DATABASE_URL: postgres://[^@]*@oj-postgres:5432/' <<<"$cfg" \
+    || die "自带数据形态（DB_HOST 为空），但 DATABASE_URL 指向 $(grep -m1 'DATABASE_URL:' <<<"$cfg" | sed 's|.*@||; s|/onlinejudge.*||')。
+docker/.env 里 DB_PORT / REDIS_PORT 是不是也得一并清空？"
+fi
 ok "库指向 $(grep -m1 'DATABASE_URL:' <<<"$cfg" | sed 's|.*@||; s|/onlinejudge.*||')"
+
+# ②b 自带形态下数据目录必须已经是一个 16 版本的库。
+#     这是整个部署里唯一会**静默**走歪的地方：目录不对的话 postgres 当成全新部署，
+#     在空目录上初始化一个空库 —— 站点起得来、能注册能登录，就是一道题都没有。
+if [ "$LOCAL_DATA" -eq 1 ]; then
+  data_dir=$(grep -E '^DATA_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
+  [ -n "$data_dir" ] || die "自带数据形态必须显式设 DATA_DIR。
+默认值 ../data 解析出来是 OJ2/data，那是个空目录，postgres 会在上面初始化一个全新的空库，而且不报任何错。"
+  pgver_file="$data_dir/postgres/PG_VERSION"
+  [ -f "$pgver_file" ] || die "找不到 $pgver_file —— DATA_DIR 指的不是一个已有的 postgres 数据目录。
+就这么起下去会得到一个空库。确认 DATA_DIR=$data_dir 对不对。"
+  pgver=$(cat "$pgver_file")
+  [ "$pgver" = 16 ] || die "$data_dir/postgres 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:16-alpine，起不来。"
+  ok "数据目录 $data_dir/postgres（PostgreSQL $pgver）"
+fi
 
 # ③ 判题机运行目录必须和旧栈分开，否则两个 judger 往同一个目录里写
 judge_dir=$(grep -E '^JUDGE_STATE_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
 [ -n "$judge_dir" ] || die "JUDGE_STATE_DIR 没设 —— 试跑期间新旧两个判题机会共用运行目录"
 ok "判题机运行目录 $judge_dir"
 
-# ④ 旧栈的 postgres / redis 得还活着，新栈要连它们
-for c in oj-postgres oj-redis; do
-  docker ps --filter "name=$c" --filter status=running -q | grep -q . \
-    || die "旧栈的 $c 没在跑。试跑形态依赖它们 —— 先 docker compose -f /root/OJDeploy/docker-compose.yml up -d $c"
-done
-ok "旧栈的 postgres / redis 都在跑"
+# ④ 外接形态才需要预检：库不归本栈管，得确认它已经活着。
+#    自带形态下这两个容器就是本栈自己起的，起栈那步会拉起来，这里没什么可查。
+if [ "$LOCAL_DATA" -eq 0 ]; then
+  for c in oj-postgres oj-redis; do
+    docker ps --filter "name=$c" --filter status=running -q | grep -q . \
+      || die "外接形态依赖的 $c 没在跑 —— 先 docker compose -f /root/OJDeploy/docker-compose.yml up -d $c"
+  done
+  ok "外接的 postgres / redis 都在跑"
+else
+  ok "postgres / redis 由本栈起，不预检"
+fi
 
 port=$(grep -E '^WEB_PORT=' docker/.env | tail -1 | cut -d= -f2- || true)
 port=${port:-8080}
