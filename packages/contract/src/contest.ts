@@ -46,3 +46,7 @@ export type ContestList = z.infer<typeof contestListSchema>
 export type ContestRankItem = z.infer<typeof contestRankItemSchema>
 export type ContestRank = z.infer<typeof contestRankSchema>
 export type ContestAccess = z.infer<typeof contestAccessSchema>
+
+export type ContestStatus = z.infer<typeof contestStatusSchema>
+export type ContestPasswordRequest = z.infer<typeof contestPasswordRequestSchema>
+export type ContestProblems = z.infer<typeof contestProblemsSchema>

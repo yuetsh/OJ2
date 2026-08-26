@@ -19,3 +19,5 @@ export function paginatedSchema<T extends z.ZodType>(item: T) {
 }
 
 export type SampleUser = z.infer<typeof sampleUserSchema>
+
+export type PaginationQuery = z.infer<typeof paginationQuerySchema>

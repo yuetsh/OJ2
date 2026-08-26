@@ -34,7 +34,7 @@ export async function getProfile(
 }
 
 export function getProblemTagList() {
-  return api2.get<Array<Tag & { problemCount: number }>>("problem-tags")
+  return api2.get<Tag[]>("problem-tags")
 }
 
 export function getHitokoto() {

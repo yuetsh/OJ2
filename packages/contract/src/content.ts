@@ -77,3 +77,12 @@ export type Message = z.infer<typeof messageSchema>
 export type MessageList = z.infer<typeof messageListSchema>
 export type Announcement = z.infer<typeof announcementSchema>
 export type TutorialSummary = z.infer<typeof tutorialSummarySchema>
+
+export type AnnouncementList = z.infer<typeof announcementListSchema>
+export type CreateMessageRequest = z.infer<typeof createMessageRequestSchema>
+export type ReactionKey = z.infer<typeof reactionKeySchema>
+export type ReactionCounts = z.infer<typeof reactionCountsSchema>
+export type ReactionState = z.infer<typeof reactionStateSchema>
+export type SetReactionRequest = z.infer<typeof setReactionRequestSchema>
+export type Tutorial = z.infer<typeof tutorialSchema>
+export type Exercise = z.infer<typeof exerciseSchema>

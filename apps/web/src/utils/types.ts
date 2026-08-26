@@ -1,4 +1,3 @@
-import { LANGUAGE_SHOW_VALUE } from "./constants"
 import type {
   AdminProblem as ContractAdminProblem,
   SubmissionDetail,
@@ -9,6 +8,7 @@ import type {
   SessionUser,
   UserProfile,
   EmbeddedSubmission as ContractEmbeddedSubmission,
+  Message as ContractMessage,
   Grade,
   ProblemDetail,
   ProblemDifficulty,
@@ -31,9 +31,6 @@ export interface AcmProblemsStatus {
     [key: string]: { [key: string]: { _id: string; status: number } }
   }
 }
-
-export type UserAdminType =
-  "Regular User" | "Student Admin" | "Teacher Admin" | "Super Admin"
 
 /**
  * 后台用户管理里的用户。`rawPassword` 是明文密码，只有超管专属接口下发 ——
@@ -86,24 +83,17 @@ export interface SQLDisplay {
     | { changed_tables: SQLDisplayTable[] }
 }
 
-export type LANGUAGE_SHOW_LABEL =
-  (typeof LANGUAGE_SHOW_VALUE)[keyof typeof LANGUAGE_SHOW_VALUE]
-
 export type SUBMISSION_RESULT =
   -2 | -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 
 export type ProblemStatus = "passed" | "failed" | "not_test"
 
-interface SampleUser {
-  id: number
-  username: string
-  realName: string | null
-}
 
-export interface Tag {
-  id: number
-  name: string
-}
+/**
+ * 题目标签。用契约的 —— 它比手抄那份多一个 `problemCount`，
+ * shared/api.ts 原来还得用 `Tag & { problemCount: number }` 把它补回来。
+ */
+export type { Tag } from "@oj2/contract"
 
 export type {
   AdminTag,
@@ -113,16 +103,18 @@ export type {
   GenerateSqlTestCaseResponse,
 } from "@oj2/contract"
 
-export interface TestcaseUploadedReturns {
-  id: string
-  info: Testcase[]
-}
+/**
+ * 上传测试点的返回。取契约 —— 手抄那份少了三个字段
+ * （stripped_output_md5 / input_size / output_size）。这套键名保持 snake_case
+ * 是因为它会原样落进 problem.test_case_score 和判题沙箱读的 info 文件。
+ */
+export type { UploadTestCaseResponse as TestcaseUploadedReturns } from "@oj2/contract"
 
-export interface Testcase {
-  input_name: string
-  output_name: string
-  score: string
-}
+/**
+ * 题目表单里的测试点：上传返回的条目 + 前端本地算出的分值。
+ * `score` **不在响应里** —— 是上传完成后按测试点数量平分补上去的。
+ */
+export type Testcase = TestCaseEntry & { score: string }
 
 /**
  * 题目详情。以契约的 ProblemDetail 为准，只在这里补两处前端自己的窄化：
@@ -275,11 +267,9 @@ export interface Code {
   value: string
 }
 
-export interface SubmitCodePayload {
-  problemId: number
+/** 提交代码的请求体。取契约的形状，只把 language 收窄成前端的 LANGUAGE 联合 */
+export type SubmitCodePayload = Omit<CreateSubmissionRequest, "language"> & {
   language: LANGUAGE
-  code: string
-  contestId?: number
 }
 
 // ==================== 流程图相关类型 ====================
@@ -465,52 +455,56 @@ export interface Announcement extends AnnouncementEdit {
 /** 列表不下发正文：公告是 8MB 上限的富文本，列表页只显示标题 */
 export type AnnouncementListItem = Omit<Announcement, "content">
 
-export interface Message {
-  id: number
-  sender: SampleUser
-  createTime: string
-  message: string
+/**
+ * 站内信。取契约的形状，只把 `submission` 换成前端窄化过的那个
+ * （statisticInfo / language 在契约里是 unknown，见 EmbeddedSubmission）。
+ */
+export type Message = Omit<ContractMessage, "submission"> & {
   submission: EmbeddedSubmission
 }
 
-export interface CreateMessage {
-  sender: string
-  recipient: string
-  submission: string
-  message: string
-}
+/**
+ * 题目表情。三个类型都直接取自契约 —— 语义 key 必须与后端 reaction/models.py
+ * 的 ReactionType 一致（见根 CLAUDE.md），手抄一份迟早对不上。
+ *
+ * 注意 `ReactionCounts` 是 Partial 的：后端只下发有票的类型，没人投的键不出现。
+ */
+export type {
+  ReactionKey,
+  ReactionCounts,
+  ReactionState,
+} from "@oj2/contract"
+import type { ReactionKey, SampleUser } from "@oj2/contract"
 
-export type ReactionKey =
-  | "too_easy"
-  | "too_hard"
-  | "confusing"
-  | "buggy"
-  | "learned"
-  | "interesting"
-  | "want_explain"
+/**
+ * 教程。直接取契约 —— 手抄的那份把 `createdBy` 写成了可选的 `User`（后端下发的是
+ * SampleUser），`createdAt` / `updatedAt` 也写成了可选，列表页因此被迫写
+ * `row.createdBy?.username` 和 `row.createdAt!`。
+ *
+ * 列表项也用契约的：它比 `Omit<Tutorial, "content">` **还少一个 code** ——
+ * 后端列表接口连 code 一起省了，手抄那份声称它在。
+ */
+export type {
+  AdminTutorial as Tutorial,
+  AdminTutorialListItem as TutorialListItem,
+} from "@oj2/contract"
+import type {
+  AdminExercise,
+  AdminTutorial,
+  CreateSubmissionRequest,
+  TestCaseEntry,
+} from "@oj2/contract"
 
-export type ReactionCounts = Record<ReactionKey, number>
-
-export interface ReactionState {
-  mine: ReactionKey | null
-  counts: ReactionCounts | null
-}
-
-export interface Tutorial {
-  id: number
-  title: string
-  content: string
-  code: string
-  isPublic: boolean
-  order: number
-  type: "python" | "c"
-  createdBy?: User
-  updatedAt?: string
-  createdAt?: string
-}
-
-/** 后台教程列表不下发正文：教程正文是整篇 markdown，列表只排序和切换可见性 */
-export type TutorialListItem = Omit<Tutorial, "content">
+/**
+ * 教程编辑表单。只留可编辑字段 —— createdBy / createdAt / updatedAt 由后端产出，
+ * 新建时压根不存在（对齐 BlankProblem / BlankContest 的写法）。
+ *
+ * `code` 收窄成 string：读回来时统一 `?? ""`，代码编辑器的 v-model 不接受 null。
+ */
+export type TutorialEdit = Omit<
+  AdminTutorial,
+  "createdBy" | "createdAt" | "updatedAt" | "code"
+> & { code: string }
 
 export interface ExerciseMcqData {
   question: string
@@ -555,12 +549,13 @@ export interface ExerciseGroupData {
   answer: number[]
 }
 
-export type ExerciseType =
-  "mcq" | "sort" | "fill" | "match" | "predict" | "debug" | "group"
+export type { ExerciseType } from "@oj2/contract"
 
-export interface Exercise {
-  id: number
-  type: ExerciseType
+/**
+ * 练习题。契约里 `data` 是 Record<string, unknown>（各题型结构不同，后端不校验），
+ * 前端按题型收窄成判别联合 —— 组件靠它区分七种题型的字段。
+ */
+export type Exercise = Omit<AdminExercise, "data"> & {
   data:
     | ExerciseMcqData
     | ExerciseSortData
@@ -569,7 +564,6 @@ export interface Exercise {
     | ExercisePredictData
     | ExerciseDebugData
     | ExerciseGroupData
-  order: number
 }
 
 export type {

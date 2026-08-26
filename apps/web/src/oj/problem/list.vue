@@ -4,7 +4,7 @@ import { NFlex, NTag } from "naive-ui"
 import { useRouteQuery } from "@vueuse/router"
 import { getProblemList } from "oj/api"
 import { getTagColor } from "utils/functions"
-import type { ProblemFiltered } from "utils/types"
+import type { ProblemFiltered, Tag as ContractTag } from "utils/types"
 import { getProblemTagList } from "shared/api"
 import Hitokoto from "shared/components/Hitokoto.vue"
 import Pagination from "shared/components/Pagination.vue"
@@ -16,11 +16,8 @@ import ProblemStatus from "./components/ProblemStatus.vue"
 import AuthorSelect from "shared/components/AuthorSelect.vue"
 import ProblemListTitle from "./components/ProblemListTitle.vue"
 
-interface Tag {
-  id: number
-  name: string
-  checked: boolean
-}
+// 列表页的标签是个视图模型：契约的标签 + 本地的选中态
+type Tag = ContractTag & { checked: boolean }
 
 interface ProblemQuery {
   keyword: string

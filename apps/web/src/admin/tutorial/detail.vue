@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import CodeEditor from "shared/components/CodeEditor.vue"
 import MarkdownEditor from "shared/components/MarkdownEditor.vue"
-import type { Tutorial } from "utils/types"
+import type { TutorialEdit } from "utils/types"
 import { createTutorial, getTutorial, updateTutorial } from "../api"
 import ExerciseManager from "./components/ExerciseManager.vue"
 
@@ -13,7 +13,7 @@ const route = useRoute()
 const message = useMessage()
 const props = defineProps<Props>()
 
-const tutorial = reactive<Tutorial>({
+const tutorial = reactive<TutorialEdit>({
   id: 0,
   title: "",
   content: "",

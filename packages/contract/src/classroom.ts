@@ -67,3 +67,6 @@ export type ClassRankItem = z.infer<typeof classRankItemSchema>
 export type ClassUserRank = z.infer<typeof classUserRankSchema>
 export type ClassComparison = z.infer<typeof classComparisonSchema>
 export type ClassComparisonResponse = z.infer<typeof classComparisonResponseSchema>
+
+export type ClassUserRankItem = z.infer<typeof classUserRankItemSchema>
+export type ClassComparisonRequest = z.infer<typeof classComparisonRequestSchema>

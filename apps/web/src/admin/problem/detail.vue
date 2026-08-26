@@ -294,10 +294,12 @@ async function handleUploadTestcases({ file }: UploadCustomRequestOptions) {
       message.error("上传测试用例失败")
       return
     }
-    const testcases = res.data.info
-    for (let file of testcases) {
-      file.score = (100 / testcases.length).toFixed(0)
-    }
+    // score 不在上传响应里，前端按测试点数量平分补上
+    const entries = res.data.info
+    const testcases: Testcase[] = entries.map((entry) => ({
+      ...entry,
+      score: (100 / entries.length).toFixed(0),
+    }))
     problem.value.testCaseScore = testcases
     problem.value.testCaseId = res.data.id
   } catch (err) {

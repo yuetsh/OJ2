@@ -109,3 +109,8 @@ export type AiDetail = z.infer<typeof aiDetailSchema>
 export type HeatmapItem = z.infer<typeof heatmapItemSchema>
 export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>
 export type LoginSummary = z.infer<typeof loginSummarySchema>
+
+export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>
+export type AiHintRequest = z.infer<typeof aiHintRequestSchema>
+export type ClassAnalysisRequest = z.infer<typeof classAnalysisRequestSchema>
+export type ClassPkAnalysisRequest = z.infer<typeof classPkAnalysisRequestSchema>

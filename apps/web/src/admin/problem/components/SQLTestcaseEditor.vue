@@ -181,14 +181,16 @@ async function upload() {
     const file = new File([blob], "testcase.zip", { type: "application/zip" })
 
     const res = await uploadTestcases(file, { sql: true })
-    const testcases: Testcase[] = res.data.info
-    const baseScore = Math.floor(100 / testcases.length)
-    const remainder = 100 - baseScore * testcases.length
-    testcases.forEach((tc, i) => {
-      tc.score = String(
-        i === testcases.length - 1 ? baseScore + remainder : baseScore,
-      )
-    })
+    // score 不在上传响应里，是这里按测试点数量平分补上的（余数给最后一个）
+    const entries = res.data.info
+    const baseScore = Math.floor(100 / entries.length)
+    const remainder = 100 - baseScore * entries.length
+    const testcases: Testcase[] = entries.map((entry, i) => ({
+      ...entry,
+      score: String(
+        i === entries.length - 1 ? baseScore + remainder : baseScore,
+      ),
+    }))
 
     emit("uploaded", res.data.id, testcases)
     message.success("上传成功")

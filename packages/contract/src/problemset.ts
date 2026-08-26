@@ -107,3 +107,7 @@ export type ProblemSetProgress = z.infer<typeof problemSetProgressSchema>
 export type ProblemSetProgressList = z.infer<typeof problemSetProgressListSchema>
 export type UserBadge = z.infer<typeof userBadgeSchema>
 export type CompletedProblem = z.infer<typeof completedProblemSchema>
+
+export type ProblemSetUserProgressSummary = z.infer<typeof problemSetUserProgressSummarySchema>
+export type JoinProblemSetRequest = z.infer<typeof joinProblemSetRequestSchema>
+export type UpdateProblemSetProgressRequest = z.infer<typeof updateProblemSetProgressRequestSchema>

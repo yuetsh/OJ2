@@ -96,3 +96,5 @@ export type FlowchartCurrent = z.infer<typeof flowchartCurrentSchema>
 export type FlowchartDetail = z.infer<typeof flowchartDetailSchema>
 export type CreateFlowchartResponse = z.infer<typeof createFlowchartResponseSchema>
 export type CreateFlowchartRequest = z.infer<typeof createFlowchartRequestSchema>
+
+export type FlowchartStatus = z.infer<typeof flowchartStatusSchema>
