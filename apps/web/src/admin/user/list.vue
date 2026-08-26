@@ -13,6 +13,7 @@ import {
 } from "../api"
 import Actions from "./components/Actions.vue"
 import Name from "./components/Name.vue"
+import Password from "./components/Password.vue"
 import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { useRouteQuery } from "@vueuse/router"
 import TextCopy from "shared/components/TextCopy.vue"
@@ -49,6 +50,9 @@ const sortOptions = [
 ]
 const [create, toggleCreate] = useToggle(false)
 const password = ref("")
+// 已经点开的管理员密码，按 user id 记。listUsers() 里清空，所以翻页/搜索/换筛选之后
+// 一律回到打码状态 —— 不做定时自动隐藏，也不记进 localStorage。
+const revealedPasswords = ref(new Set<number>())
 const userIDs = ref<DataTableRowKey[]>([])
 
 const rowKey = (row: User) => row.id
@@ -65,8 +69,13 @@ const columns: DataTableColumn<User>[] = [
   {
     title: "密码",
     key: "raw_password",
-    width: 100,
-    render: (row) => h(TextCopy, () => row.rawPassword),
+    width: 150,
+    render: (row) =>
+      h(Password, {
+        user: row,
+        revealed: revealedPasswords.value.has(row.id),
+        onReveal: (id: number) => revealedPasswords.value.add(id),
+      }),
   },
   {
     title: "创建时间",
@@ -131,6 +140,7 @@ async function listUsers() {
   )
   total.value = res.total
   users.value = res.results
+  revealedPasswords.value.clear()
 }
 
 function chooseUsers(rowKeys: DataTableRowKey[]) {

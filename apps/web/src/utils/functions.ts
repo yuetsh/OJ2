@@ -141,7 +141,7 @@ export function debounce<T extends (...args: any[]) => any>(
 
 export function getUserRole(role: User["adminType"]): {
   type: "default" | "info" | "warning" | "error"
-  label: "普通" | "学生管理员" | "教师管理员" | "超管"
+  label: "普通" | "生管" | "师管" | "超管"
 } {
   const roleMap = {
     [USER_TYPE.REGULAR_USER]: {
@@ -150,11 +150,11 @@ export function getUserRole(role: User["adminType"]): {
     },
     [USER_TYPE.STUDENT_ADMIN]: {
       type: "info" as const,
-      label: "学生管理员" as const,
+      label: "生管" as const,
     },
     [USER_TYPE.TEACHER_ADMIN]: {
       type: "warning" as const,
-      label: "教师管理员" as const,
+      label: "师管" as const,
     },
     [USER_TYPE.SUPER_ADMIN]: {
       type: "error" as const,
