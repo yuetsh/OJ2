@@ -42,6 +42,13 @@ export const submissionDetailSchema = z.object({
   ip: z.string().nullable(),
   contestId: z.number().int().nullable(),
   problemId: z.number().int(),
+  /**
+   * 题目的展示编号（problem._id）。**独立的 /submission/:id 页面要靠它** ——
+   * 那条路由只喂 submissionID，组件拿不到 display id，而「复制回到题目」要用它
+   * 拼路由。原来只给内部数字 id，于是那个按钮在这条路由上一点就抛
+   * `Missing required param "problemID"`。
+   */
+  problemDisplayId: z.string(),
   showLink: z.boolean(),
   canUnshare: z.boolean(),
 })

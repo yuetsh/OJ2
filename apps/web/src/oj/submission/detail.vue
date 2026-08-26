@@ -78,10 +78,13 @@ function copyToCat() {
 
 function copyToProblem() {
   const { code, language, contestId } = submission.value!
-  // 编辑器的 storageKey 用 display id（problem._id），等于 props.problemID，
-  // 而非 submission.problem（内部数字 id）
+  // 编辑器的 storageKey 用 display id（problem._id），不是 submission.problemId
+  // （内部数字 id）。**不能只靠 props.problemID** —— 独立的 /submission/:id 路由
+  // 只喂 submissionID，那个 prop 是 undefined，原来会一路带进 router.push 抛
+  // `Missing required param "problemID"`。响应里的 problemDisplayId 就是干这个的。
+  const problemID = props.problemID ?? submission.value!.problemDisplayId
   const contestIDForKey = contestId || null
-  const storageKey = `problem_${props.problemID}_contest_${contestIDForKey}_lang_${language}`
+  const storageKey = `problem_${problemID}_contest_${contestIDForKey}_lang_${language}`
   storage.set(storageKey, code)
   // 设置语言 + 代码：localStorage 覆盖全新挂载的编辑器，
   // setCode 覆盖已挂载（同页 modal）的编辑器
@@ -92,17 +95,17 @@ function copyToProblem() {
   if (contestId) {
     router.push({
       name: "contest problem",
-      params: { contestID: String(contestId), problemID: props.problemID },
+      params: { contestID: String(contestId), problemID },
     })
   } else if (problemSetId) {
     router.push({
       name: "problemset problem",
-      params: { problemSetId, problemID: props.problemID },
+      params: { problemSetId, problemID },
     })
   } else {
     router.push({
       name: "problem",
-      params: { problemID: props.problemID },
+      params: { problemID },
     })
   }
 

@@ -413,6 +413,8 @@ async function submissionDetail(id: string, user: AuthUser) {
     // 首轮修复只处理了 info 与 ip，这里补齐。
     contestId: full ? row.submission.contestId : null,
     problemId: row.submission.problemId,
+    // problem 表本来就 join 了，不额外查库
+    problemDisplayId: row.problem.displayId,
     showLink: true,
     canUnshare: canViewSubmission(user, row.submission, row.problem, row.contest, false),
   })
