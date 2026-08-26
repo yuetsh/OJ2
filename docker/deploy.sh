@@ -18,7 +18,14 @@
 # 代码怎么上到服务器不归它管。没有 git remote 的话，在本机：
 #
 #   rsync -az --delete --exclude node_modules --exclude .git --exclude data \
-#     --exclude 'docker/.env*' ~/Projects/OJ/OJ2/ root@服务器:/root/OJDeploy/OJ2/
+#     --exclude 'docker/.env*' --exclude dist --exclude 'apps/web/dist' \
+#     ~/Projects/OJ/OJ2/ root@服务器:/root/OJDeploy/OJ2/
+#
+# 那两条 --exclude dist 别去掉。不带 --prebuilt 时服务器上根本不需要本机的产物，
+# 而 .dockerignore 末尾为 prebuilt 开的例外（`!apps/web/dist`）让它照样进构建上下文
+# ——于是本机重编一次前端，服务器上 `COPY apps/web` 那层的缓存键就变了，明明没改
+# 源码也要重编 160s。CI 那条路（--prebuilt）反过来必须传产物，它自己的 rsync 在
+# .github/workflows/deploy.yml 里，别照抄这条。
 #
 # 前提：docker/.env 已经填好（内容见 docs/specs/phase5-cutover-runbook.md 第三节）。
 

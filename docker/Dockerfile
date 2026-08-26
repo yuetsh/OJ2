@@ -62,16 +62,29 @@ RUN bun install --frozen-lockfile \
   || bun install --frozen-lockfile \
   || bun install --frozen-lockfile
 
-COPY . .
+# 源码**分开拷**，别用 `COPY . .`：那样任何一个文件变了都会一次作废下面两条
+# 构建，只改了后端也得陪着重编一次前端（160s）。
+#
+# 顺序是「先前端后后端」，因为 Dockerfile 的缓存是链式的 —— 一层失效，后面全失效。
+# 慢的那条要待在更靠前、更不容易被碰到的位置：
+#   只改 apps/api → 前端两层命中缓存，只重编后端（bun compile，几秒）
+#   只改 apps/web → 前端重编，后端跟着重编，但那点时间无所谓
+#   改 packages/contract → 两边都重编（本来就都依赖它，是对的）
+#
+# 加新的顶层目录 / 根文件时注意：builder 只看得见这里点名拷进来的东西。
+COPY tsconfig.base.json ./
+COPY packages/contract packages/contract
+
+# 前端：产物直接进镜像，不走挂载。
+# 一次构建 = 一个版本，切换那天不会出现「后端换了前端忘了拷」这种半新半旧状态。
+COPY apps/web apps/web
+RUN cd apps/web && bun run build
 
 # 后端：编译成不依赖 node_modules 的单二进制。
 # 能这么编是因为 wasm / 原生模块 / 词典都在源码里用 `with { type: "file" }`
 # 内嵌成了资源，详见 apps/api/src/vendor/jieba.ts 的注释。
+COPY apps/api apps/api
 RUN bun build --compile --target=bun-linux-x64 apps/api/src/main.ts --outfile /build/oj2-api
-
-# 前端：产物直接进镜像，不走挂载。
-# 一次构建 = 一个版本，切换那天不会出现「后端换了前端忘了拷」这种半新半旧状态。
-RUN cd apps/web && bun run build
 
 # ---------------------------------------------------------------- 产物来源
 # 两个来源都归一成同样的布局（/artifacts/oj2-api、/artifacts/web），下面的运行时

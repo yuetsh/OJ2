@@ -28,6 +28,14 @@ docker/.env.*
 # 前端 dist 由构建阶段自己生成，本地那份不要带进去污染
 apps/web/dist/
 
+# apps/ 下的非构建输入。Dockerfile 里是整个目录拷进去的（`COPY apps/web apps/web`），
+# 所以改一篇 docs/ 里的 markdown 也会让 `RUN vite build` 那层失效，白编 160s。
+# 这几样都不被源码 import，挡在上下文外面最省事。
+apps/web/docs/
+apps/web/tests/
+**/CLAUDE.md
+**/README.md
+
 # —— 例外：ARTIFACTS=prebuilt 时，产物本身就是构建输入 ——
 #
 # 这几条必须放在文件最后：dockerignore 是**最后一条匹配的规则说了算**，
@@ -35,6 +43,11 @@ apps/web/dist/
 #
 # ARTIFACTS=build（默认，服务器手动部署走的那条）时它们只是让上下文多传
 # 几十 MB，镜像里用不到；本地根本没编过的话这两个路径不存在，也不影响。
+#
+# ⚠️ 一个代价：`apps/web/dist` 因此会进 builder 的 `COPY apps/web` 那一层，
+# 也就进了它的缓存键 —— 手边有一份内容不同的本地 dist，就会白重编一次前端。
+# 所以 docker/deploy.sh 头上那条手动 rsync 用 --exclude dist 把它挡在服务器外。
+# （CI 走 --prebuilt，builder 整个不进构建图，不受这条影响。）
 !dist/oj2-api
 !apps/web/dist
 !apps/web/dist/**
