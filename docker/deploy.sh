@@ -188,9 +188,12 @@ fi
 say "数据库迁移"
 "${COMPOSE[@]}" run --rm \
   -e OJ2_ALLOW_DESTRUCTIVE="${OJ2_ALLOW_DESTRUCTIVE:-}" \
-  api oj2-api migrate \
-  || die "迁移没通过，已中止部署（旧容器还在跑，没动过）。
-上面的输出说明了原因。破坏性迁移需要 OJ2_ALLOW_DESTRUCTIVE=1 显式放行。"
+  oj-api oj2-api migrate \
+  || die "迁移没通过，已中止部署（容器没动过）。**原因看上面 migrate 自己的输出**，
+它对每种情况都打印了具体该做什么，别照搬下面这几条猜。常见的三种：
+  · 破坏性语句被拦    → 确认备份后 OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
+  · 缺迁移基线记录    → 按它打印的 SQL 插一行
+  · 连不上库          → 自带数据形态下 postgres 是否起来了、DATA_DIR 对不对"
 
 say "起栈"
 "${COMPOSE[@]}" up -d
