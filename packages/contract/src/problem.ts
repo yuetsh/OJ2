@@ -11,9 +11,8 @@ export const problemDifficultySchema = z.enum(["Low", "Mid", "High"])
 
 /**
  * SQL 题配置与展示数据。两者都是 `problem.sql_config` / `problem.sql_display`
- * 的 **JSONB 原文**，所以键名保持 snake_case —— 回滚时旧后端要读同一份，
- * 且旧后端 `judge/sql_runner.py:build_display` 产出的就是这个形状
- * （生产库 9 道 SQL 题逐条比对过，键集完全一致）。
+ * 的 **JSONB 原文**，所以键名保持 snake_case —— 生产库 9 道 SQL 题存的就是这个形状
+ * （移植自旧后端 `judge/sql_runner.py:build_display`，逐条比对过，键集完全一致）。
  *
  * 写成精确 schema 而不是 `z.record(z.unknown())`：前端原来得自己手抄一份
  * SQLDisplay 接口才能渲染表格，抄错了没人拦得住。

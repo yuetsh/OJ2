@@ -19,7 +19,8 @@ import type {
 
 /**
  * 个人主页数据。`acmProblemsStatus` 的**内容**保持 snake_case ——
- * 它是 user_profile.acm_problems_status 的 JSONB 原文，回滚时旧后端还要读。
+ * 它是 user_profile.acm_problems_status 的 JSONB 原文，库里存量数据就是这套键名，
+ * 改名等于要把全部历史行迁一遍。
  */
 export type Profile = Omit<UserProfile, "user" | "acmProblemsStatus"> & {
   user: SessionUser
@@ -281,7 +282,7 @@ interface Info {
 
 /**
  * 判题产出的统计。**键名保持 snake_case** —— 这是 submission.statistic_info
- * JSONB 的原文，判题机写进去、回滚时旧后端还要读，不能跟着响应字段一起改名。
+ * JSONB 的原文，判题机按这套键名写进去，不能跟着响应字段一起改名。
  */
 export interface StatisticInfo {
   score?: number
@@ -368,7 +369,7 @@ export type BlankContest = Omit<
 
 /**
  * acm_contest_rank.submission_info 的 JSONB 内容。**键名保持 snake_case** ——
- * 判题写进去、回滚时旧后端还要读，不能跟着响应字段一起改名。
+ * 判题按这套键名写进去，历史比赛的榜单行也是这个形状，不能跟着响应字段一起改名。
  */
 export interface SubmissionInfo {
   is_ac: boolean
@@ -380,7 +381,7 @@ export interface SubmissionInfo {
 
 /**
  * 榜单行。`submissionInfo` 的**内容**仍是 snake_case —— 它是 acm_contest_rank
- * 表的 JSONB 原文，回滚时旧后端还要读，见 SubmissionInfo。
+ * 表的 JSONB 原文，见 SubmissionInfo。
  */
 export type ContestRank = Omit<
   import("@oj2/contract").ContestRankItem,

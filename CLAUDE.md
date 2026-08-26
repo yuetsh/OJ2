@@ -95,11 +95,11 @@ dev 直接起不来。
 
 加完路由跑 `bun run --filter '@oj2/api' check:routes`。
 
-### 判题状态码要三处同步
+### 判题状态码不能改
 
-`apps/api/src/judge/status.ts`、`apps/web/src/utils/constants.ts`、
-以及上一代的 `../OnlineJudge/submission/models.py`（回滚时要对得上）。
-题目表情 reaction 的语义 key 同理。
+`apps/api/src/judge/status.ts` 和 `apps/web/src/utils/constants.ts` 必须一致。
+这些整数是**落库的值**：12 万条历史提交的 `submission.result` 就是它们，判题沙箱回的也是
+这套编码，所以只能新增、不能改已有的含义。题目表情 reaction 的语义 key 同理。
 
 ### 比赛只有 ACM 模式
 
@@ -112,9 +112,11 @@ dev 直接起不来。
 
 ## 数据库
 
-Drizzle schema 是从生产库 `drizzle-kit pull` 出来的，**不写迁移**。
-新旧后端跑在同一套表结构上（阶段 5 演练逐列比对过，零差异），这是回滚能成立的前提 ——
-所以改 schema 前先想清楚回滚怎么办。
+Drizzle schema 最初是 `drizzle-kit pull` 从生产库拉出来的，所以它长得像 Django 建的表
+（表名、bigint/int4 混用、外键全是 NO ACTION），`schema.ts` 顶部记了哪些地方是手工修的。
+
+**schema 现在归 OJ2 独占。** 旧后端已下线，「改 schema 要考虑回滚」这条约束不再存在，
+结构变更走下面的 migration 正常演进即可。
 
 ### 改 schema 走 drizzle migration
 

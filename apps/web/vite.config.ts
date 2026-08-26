@@ -92,9 +92,8 @@ function injectMaxkb(maxkbUrl: string | undefined): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "PUBLIC_")
 
-  // 开发时一律指向本机新后端。PUBLIC_OJ_URL / PUBLIC_WS_URL 是迁移期指向
-  // 旧 Django 用的，端点搬完后不再参与代理。
-  const newBackend = {
+  // 开发时一律指向本机后端（apps/api，3000）。
+  const backend = {
     target: "http://localhost:3000",
     changeOrigin: true,
   }
@@ -162,12 +161,11 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
-        // 迁移期间 /api2、/ws2 是「新后端」的临时前缀，/api、/ws 还指着 Django。
-        // 端点已全部搬完，临时前缀去掉、统一指向新后端 —— 生产的 Caddy 也只认
-        // /api、/ws、/public 这三段（docker/Caddyfile）。
-        "/api": newBackend,
-        "/public": newBackend,
-        "/ws": { ...newBackend, ws: true },
+        // 只有这三段过后端，和生产的 Caddy 认的是同一套（docker/Caddyfile），
+        // 别在这里加代理规则而不同步改 Caddyfile。
+        "/api": backend,
+        "/public": backend,
+        "/ws": { ...backend, ws: true },
       },
     },
   }

@@ -117,7 +117,7 @@ const abnormalServers = computed(() =>
 )
 
 const websiteConfig = reactive<WebsiteConfig>({
-  websiteBaseUrl: import.meta.env.PUBLIC_OJ_URL,
+  websiteBaseUrl: "",
   websiteName: "判题狗",
   websiteNameShortcut: "判题狗",
   websiteFooter: "所有权归属于徐越，感谢青岛大学开源 OJ 系统，感谢开源社区",

@@ -18,10 +18,8 @@ export interface WebSocketMessage {
  * WebSocket 配置
  */
 export interface WebSocketConfig {
-  /** WebSocket 路径（如 '/ws/submission/'） */
-  path: string
-  /** 完整 URL；提供后覆盖 PUBLIC_WS_URL + path */
-  url?: string
+  /** 完整 URL。后端只认 /ws/submissions 和 /ws/config 两条，按当前页面的协议与 host 拼 */
+  url: string
   /** 最大重连次数，默认 5 */
   maxReconnectAttempts?: number
   /** 重连延迟（毫秒），默认 1000 */
@@ -61,7 +59,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   public status: Ref<ConnectionStatus> = ref<ConnectionStatus>("disconnected")
 
   constructor(config: WebSocketConfig) {
-    this.url = config.url ?? `${import.meta.env.PUBLIC_WS_URL}/${config.path}/`
+    this.url = config.url
 
     this.maxReconnectAttempts = config.maxReconnectAttempts ?? 5
     this.reconnectDelay = config.reconnectDelay ?? 1000
@@ -306,10 +304,7 @@ class SubmissionWebSocket extends BaseWebSocket<SubmissionUpdate> {
 
   constructor() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({
-      path: "submission",
-      url: `${protocol}//${window.location.host}/ws/submissions`,
-    })
+    super({ url: `${protocol}//${window.location.host}/ws/submissions` })
   }
 
   /**
@@ -387,7 +382,8 @@ export function useSubmissionWebSocket(
  *
  * class NotificationWebSocket extends BaseWebSocket<NotificationMessage> {
  *   constructor() {
- *     super({ path: 'notification' })
+ *     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+ *     super({ url: `${protocol}//${window.location.host}/ws/notifications` })
  *   }
  * }
  *
@@ -448,10 +444,7 @@ export interface FlowchartEvaluationUpdate extends WebSocketMessage {
 class FlowchartWebSocket extends BaseWebSocket<FlowchartEvaluationUpdate> {
   constructor() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({
-      path: "flowchart",
-      url: `${protocol}//${window.location.host}/ws/submissions`,
-    })
+    super({ url: `${protocol}//${window.location.host}/ws/submissions` })
   }
 
   /**
@@ -518,10 +511,7 @@ export interface ConfigUpdate extends WebSocketMessage {
 class ConfigWebSocket extends BaseWebSocket<ConfigUpdate> {
   constructor() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({
-      path: "config",
-      url: `${protocol}//${window.location.host}/ws/config`,
-    })
+    super({ url: `${protocol}//${window.location.host}/ws/config` })
   }
 
   /**
