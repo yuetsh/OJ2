@@ -59,6 +59,10 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: api
+      # 产物来源，见 docker/Dockerfile 顶部。默认 build（服务器自己编）；
+      # CI 传 ARTIFACTS=prebuilt 用 runner 编好的产物。
+      args:
+        ARTIFACTS: ${ARTIFACTS:-build}
     image: oj2-api:latest
     container_name: oj-api
     restart: always
@@ -105,6 +109,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: web
+      args:
+        ARTIFACTS: ${ARTIFACTS:-build}
     image: oj2-web:latest
     container_name: oj-web
     restart: always

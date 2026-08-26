@@ -6,6 +6,33 @@
 # 构建上下文是**仓库根**，不是 docker/：
 #   docker compose -f docker/compose.debian.yml build
 #
+# ## 产物从哪来：ARTIFACTS
+#
+# 两个产物（后端单二进制 + 前端 dist）可以在镜像里现编，也可以用外面编好的：
+#
+#   ARTIFACTS=build     （默认）builder 阶段自己编。服务器上手动部署走这条，
+#                       只要有 docker 就行，不依赖 CI、不依赖别处传产物。
+#   ARTIFACTS=prebuilt  直接拿构建上下文里现成的 dist/oj2-api 和 apps/web/dist，
+#                       builder 阶段整个不进构建图（连 bun 镜像都不会拉）。
+#
+# ⚠️ prebuilt 省时间的前提是 **BuildKit**：只有它按依赖图构建、跳过用不到的阶段。
+# 没装 buildx 的机器上 compose 会退回 classic builder，那个把所有阶段挨个跑一遍，
+# 于是 builder 照样编一次，产物白编（结果仍然正确，只是没省下时间）。
+# docker/deploy.sh --prebuilt 会检查并提醒。
+#
+# 加这个开关是因为服务器性能差：builder 里 1238 个包的 bun install + bun compile +
+# vite build，首次约 5 分钟，光前端就 160s。GitHub Actions 的 runner 编完 rsync
+# 过来，服务器这边只剩几条 COPY。见 .github/workflows/deploy.yml。
+#
+# 两条路都得留着 —— CI 挂了 / 改不动网络时，服务器上 `docker/deploy.sh` 原样能跑。
+#
+# 手工产出 prebuilt 产物（仓库根）：
+#   bun install --frozen-lockfile
+#   bun run --filter '@oj2/api' build      # → dist/oj2-api
+#   cd apps/web && bun run build           # → apps/web/dist
+#
+ARG ARTIFACTS=build
+
 # 旧后端是一个容器里用 supervisord 跑 caddy + gunicorn + dramatiq 三个进程。
 # 这里拆开：Docker 自己就是进程管理器，拆开之后 worker 挂了能单独重启、
 # 也能单独看日志，少一层 supervisord 要维护。
@@ -46,6 +73,26 @@ RUN bun build --compile --target=bun-linux-x64 apps/api/src/main.ts --outfile /b
 # 一次构建 = 一个版本，切换那天不会出现「后端换了前端忘了拷」这种半新半旧状态。
 RUN cd apps/web && bun run build
 
+# ---------------------------------------------------------------- 产物来源
+# 两个来源都归一成同样的布局（/artifacts/oj2-api、/artifacts/web），下面的运行时
+# 阶段只认这个布局，不关心产物是谁编的。
+#
+# 用 scratch 是因为这里只是「摆放文件」，不需要任何基底；这两个阶段也不会单独产出
+# 镜像，只被 COPY --from 引用。
+#
+# BuildKit 只构建进了依赖图的阶段：选 prebuilt 时 builder 和 oven/bun 镜像
+# 完全不参与，选 build 时下面那条 `COPY dist/oj2-api` 不存在也不报错。
+FROM scratch AS artifacts-build
+COPY --from=builder /build/oj2-api /artifacts/oj2-api
+COPY --from=builder /build/apps/web/dist /artifacts/web
+
+FROM scratch AS artifacts-prebuilt
+COPY dist/oj2-api /artifacts/oj2-api
+COPY apps/web/dist /artifacts/web
+
+# 变量阶段名，取值来自顶部那个全局 ARG
+FROM artifacts-${ARTIFACTS} AS artifacts
+
 # ---------------------------------------------------------------- 后端运行时
 # 用 debian 基底而不是 alpine：内嵌的 jieba 原生模块是 linux-x64-**gnu**，
 # musl 基底跑不起来（换基底必须同步改 vendor/jieba.ts 里写死的导入）。
@@ -80,7 +127,7 @@ RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sou
 # 官方静态二进制 —— 不为它引入整个 Python 运行时。
 COPY --from=ghcr.io/astral-sh/ruff:0.15.12 /ruff /usr/local/bin/ruff
 
-COPY --from=builder /build/oj2-api /usr/local/bin/oj2-api
+COPY --from=artifacts /artifacts/oj2-api /usr/local/bin/oj2-api
 
 # /data 下是要持久化的东西：测试用例、上传的图片、头像。
 # 相对路径按 cwd 解析（见 apps/api/src/runtime.ts），所以 workdir 设成 /data；
@@ -102,6 +149,6 @@ CMD ["oj2-api", "serve"]
 
 # ---------------------------------------------------------------- 前端 + 反代
 FROM caddy:2-alpine AS web
-COPY --from=builder /build/apps/web/dist /srv
+COPY --from=artifacts /artifacts/web /srv
 COPY docker/Caddyfile /etc/caddy/Caddyfile
 EXPOSE 8000

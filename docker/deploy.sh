@@ -7,6 +7,13 @@
 #   docker/deploy.sh              # 自检 → 构建 → 起栈 → 冒烟
 #   docker/deploy.sh --check      # 只自检，不动任何容器
 #   docker/deploy.sh --no-build   # 跳过构建（只改了 env / compose 时用）
+#   docker/deploy.sh --prebuilt   # 用现成产物，不在这台机器上编（CI 走这条）
+#
+# 默认（不带 --prebuilt）是**服务器自己编**：只要有 docker 就能跑，不依赖 CI，
+# 也不依赖别处传产物过来。代价是这台机器性能差，builder 阶段首次约 5 分钟。
+#
+# --prebuilt 则要求 dist/oj2-api 和 apps/web/dist 已经在这个目录里（GitHub
+# Actions 编好后 rsync 过来的），镜像构建只剩几条 COPY。产物缺失会在自检就拦下。
 #
 # 代码怎么上到服务器不归它管。没有 git remote 的话，在本机：
 #
@@ -31,12 +38,15 @@ for arg in "$@"; do
   case "$arg" in
     --check)    CHECK_ONLY=1 ;;
     --no-build) BUILD=0 ;;
-    *) echo "未知参数：$arg（可用：--check、--no-build）" >&2; exit 2 ;;
+    # compose 里写的是 args: ARTIFACTS: ${ARTIFACTS:-build}，导出即可生效
+    --prebuilt) export ARTIFACTS=prebuilt ;;
+    *) echo "未知参数：$arg（可用：--check、--no-build、--prebuilt）" >&2; exit 2 ;;
   esac
 done
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '    \033[32m✓\033[0m %s\n' "$*"; }
+warn() { printf '    \033[33m!\033[0m %s\n' "$*"; }
 die()  { printf '\n\033[1;31m❌ %s\033[0m\n\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- 自检
@@ -51,6 +61,29 @@ ver=$(docker compose version --short 2>/dev/null || echo 0)
 [ "$(printf '2.20\n%s\n' "$ver" | sort -V | head -1)" = "2.20" ] \
   || die "docker compose 版本太老（$ver），需要 ≥ 2.20（depends_on.required 是那个版本才有的字段）"
 ok "docker compose $ver"
+
+# --prebuilt 时产物就是构建输入。缺了的话 docker 只会甩一句 COPY 找不到文件，
+# 这里提前拦下并说清楚该怎么办。
+if [ "${ARTIFACTS:-build}" = prebuilt ]; then
+  for f in dist/oj2-api apps/web/dist/index.html; do
+    [ -e "$f" ] || die "--prebuilt 需要现成产物，但 $f 不存在。
+
+要么让 CI 把产物 rsync 过来（.github/workflows/deploy.yml），
+要么去掉 --prebuilt 让这台机器自己编（慢，但不依赖任何外部环节）。"
+  done
+  ok "用现成产物（$(du -sh dist/oj2-api apps/web/dist 2>/dev/null | tr '\n' ' ')）"
+
+  # 没有 buildx 时 compose 会退回 classic builder（构建日志末尾那行
+  # `LABEL com.docker.compose.image.builder=classic` 就是它）。classic **不看
+  # 依赖图，所有阶段挨个跑**，于是 builder 照样 bun install + vite build 一遍，
+  # 产物白编了 —— 结果是对的，只是一分钟没省下来。
+  docker buildx version >/dev/null 2>&1 \
+    || warn "没装 buildx，compose 会退回老 builder，它不跳过用不到的阶段
+      —— 这次 --prebuilt 省不下时间（结果仍然正确）。
+      修：apt-get install docker-buildx-plugin"
+else
+  ok "产物在镜像里现编（首次约 5 分钟；CI 部署走的是 --prebuilt）"
+fi
 
 cfg=$("${COMPOSE[@]}" config) || die "compose 配置解析失败，看上面的报错"
 

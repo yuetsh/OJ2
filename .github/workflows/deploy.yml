@@ -1,0 +1,99 @@
+# 在 runner 上编好产物 → rsync 到服务器 → 服务器上跑 docker/deploy.sh 起栈。
+#
+# 为什么产物在这里编：服务器性能差，镜像 builder 阶段（1238 个包的 bun install +
+# bun compile + vite build）首次约 5 分钟，光前端就 160s。runner 编完传过去，
+# 服务器那边的镜像构建只剩几条 COPY。
+#
+# 服务器自己编的能力**没有砍掉**：docker/deploy.sh 不带 --prebuilt 就是原来的
+# 行为（ARTIFACTS=build），只要机器上有 docker 就能手动部署，不依赖这个工作流。
+#
+# 触发的是 push 到 **github** 这个 remote（origin 是 git.xuyue.cc，平时那次
+# push 不会触发）：
+#
+#   git push github main
+#
+# 仓库 Settings → Secrets 需要两个：
+#   HOST  服务器地址
+#   KEY   能以 root 登录该服务器的私钥（完整 PEM，含首尾 BEGIN/END 行）
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 两次 push 挨得近时，别让两个 deploy.sh 在服务器上同时起栈。
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  REMOTE_PORT: 22
+  REMOTE_DIR: /root/OJDeploy/OJ2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # 依赖装到 ~/.bun/install/cache，命中的话 install 只剩几秒
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: 装依赖
+        run: bun install --frozen-lockfile
+
+      # 单二进制，--target=bun-linux-x64（runner 就是 linux-x64，和服务器一致）。
+      # 输出到 dist/oj2-api，正是 Dockerfile 里 artifacts-prebuilt 阶段要的位置。
+      - name: 编后端
+        run: bun run --filter '@oj2/api' build
+
+      # 默认 production 模式，读 apps/web/.env.production（在版本库里）。
+      - name: 编前端
+        run: cd apps/web && bun run build
+
+      - name: 配置 SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "$REMOTE_PORT" -H "${{ secrets.HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # 源码和产物一起传。dist/oj2-api 有 77MB，但 rsync 对已存在的文件做增量，
+      # 重编后大部分（bun 运行时那段）字节不变，实际传输量远小于这个数。
+      #
+      # --delete 的排除项少一个就会出事，逐条说明：
+      #   docker/.env  服务器上唯一一份，不在版本库里（.gitignore 排掉了 .env*）。
+      #                删了下一步 deploy.sh 自检就直接 die。
+      #   data/        测试点、题面图片、学生上传的文件，还有「自带数据」形态下的
+      #                整个 postgres 数据目录。删了就是删库。
+      #   node_modules 服务器上根本不需要（prebuilt 形态下连编都不编），传过去纯浪费。
+      #   .git         checkout 出来的 .git 没有任何用处。
+      - name: 同步到服务器
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/id_deploy -p $REMOTE_PORT" \
+            --exclude node_modules \
+            --exclude .git \
+            --exclude data \
+            --exclude 'docker/.env*' \
+            ./ "root@${{ secrets.HOST }}:$REMOTE_DIR/"
+
+      # deploy.sh 自检不过 / 容器没起来 / 冒烟发现题目数是 0，都会非零退出，
+      # 这一步跟着红，日志里能看到具体是哪一条。
+      - name: 起栈
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "$REMOTE_PORT" "root@${{ secrets.HOST }}" \
+            "cd $REMOTE_DIR && docker/deploy.sh --prebuilt"

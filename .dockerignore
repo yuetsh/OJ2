@@ -27,3 +27,14 @@ docker/.env.*
 
 # 前端 dist 由构建阶段自己生成，本地那份不要带进去污染
 apps/web/dist/
+
+# —— 例外：ARTIFACTS=prebuilt 时，产物本身就是构建输入 ——
+#
+# 这几条必须放在文件最后：dockerignore 是**最后一条匹配的规则说了算**，
+# 写在上面那些 dist 规则前面等于没写。
+#
+# ARTIFACTS=build（默认，服务器手动部署走的那条）时它们只是让上下文多传
+# 几十 MB，镜像里用不到；本地根本没编过的话这两个路径不存在，也不影响。
+!dist/oj2-api
+!apps/web/dist
+!apps/web/dist/**
