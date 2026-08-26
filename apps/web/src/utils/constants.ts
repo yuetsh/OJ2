@@ -132,11 +132,6 @@ export const CONTEST_STATUS: {
   },
 }
 
-export const CONTEST_TYPE = {
-  PUBLIC: "Public",
-  PRIVATE: "Password Protected",
-}
-
 export const USER_TYPE = {
   REGULAR_USER: "Regular User",
   STUDENT_ADMIN: "Student Admin",
@@ -183,18 +178,6 @@ export const SOURCES = {
   Golang: "",
   Flowchart: "",
   SQL: "",
-} as const
-
-export const LANGUAGE_ID = {
-  C: 50,
-  "C++": 54,
-  Java: 62,
-  Python3: 71,
-  Python2: 0,
-  JavaScript: 0,
-  Golang: 0,
-  Flowchart: 0,
-  SQL: 0,
 } as const
 
 export const LANGUAGE_FORMAT_VALUE = {

@@ -109,6 +109,12 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
   }))
 })
 
+/**
+ * 发站内信。**目前没有任何前端在调用它** —— 后台那个页面
+ * （apps/web/src/admin/communication/messages.vue）两代前端都只是一句
+ * 「未完待续」的占位，ojnext 里定义过一个 createMessage 但同样零调用，
+ * 已在前端删掉。端点本身是完整实现的，要接 UI 从这里开始。
+ */
 contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
   const user = c.get("user")!
   const parsed = createMessageRequestSchema.safeParse(await c.req.json().catch(() => null))

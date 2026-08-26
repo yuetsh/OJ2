@@ -110,10 +110,6 @@ export function getProblem(id: string | number) {
   return api.get<AdminProblem>(`admin/problems/${id}`)
 }
 
-export function getContestProblem(id: number) {
-  return api.get<AdminProblem>(`admin/problems/${id}`)
-}
-
 // 标签管理
 export function getTagAdminList(keyword = "") {
   return api.get<AdminTag[]>("admin/problem-tags", { params: { keyword } })

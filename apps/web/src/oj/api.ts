@@ -270,18 +270,6 @@ export function getAnnouncement(id: number) {
   return api.get<Announcement>(`announcements/${id}`)
 }
 
-export function createMessage(data: {
-  recipient: number
-  message: string
-  submission: string
-}) {
-  return api.post("messages", {
-    recipientId: data.recipient,
-    message: data.message,
-    submissionId: data.submission,
-  })
-}
-
 export function getMessageList(offset = 0, limit = 10) {
   // language 的收窄同 getSubmissions，见那里的说明
   return api.get<{ results: Message[]; total: number }>("messages", {
