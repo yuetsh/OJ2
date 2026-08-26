@@ -21,7 +21,15 @@ on:
   push:
     branches:
       - main
+  # 手动触发时可以放行破坏性迁移。push 触发拿不到这个 input，值恒为空 ——
+  # 也就是说**自动部署永远不会执行 DROP TABLE 之类的迁移**，只会停在闸门上把
+  # 工作流判红。这是有意的：那种改动得有人先确认备份。
   workflow_dispatch:
+    inputs:
+      allow_destructive:
+        description: "放行破坏性迁移（DROP TABLE / DROP COLUMN / ALTER TYPE …）。勾之前先确认已备份数据库。"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -100,9 +108,20 @@ jobs:
             --exclude 'docker/.env*' \
             ./ "root@${{ secrets.HOST }}:$REMOTE_DIR/"
 
-      # deploy.sh 自检不过 / 容器没起来 / 冒烟发现题目数是 0，都会非零退出，
+      # deploy.sh 自检不过 / 迁移被拦 / 容器没起来 / 冒烟发现题目数是 0，都会非零退出，
       # 这一步跟着红，日志里能看到具体是哪一条。
+      #
+      # 迁移在 deploy.sh 里排在起栈之前：非破坏性的（加索引、加列）自动执行；
+      # 破坏性的会被拦下并退出 4，除非手动触发时勾了 allow_destructive。
+      # 走 env: 传而不是把 ${{ }} 直接拼进命令串 —— 值虽然是 GitHub 约束过的布尔，
+      # 但拼字符串进 shell 的写法不该在这个仓库里留下先例。
+      #
+      # ⚠️ 必须用 `inputs.`，**不能换成 `github.event.inputs.`**。后者把布尔
+      # 字符串化，没勾选时拿到的是字符串 "false" —— 那是个非空字符串，在
+      # `&&` 里为真，等于每次手动部署都无条件放行破坏性迁移。
       - name: 起栈
+        env:
+          ALLOW_DESTRUCTIVE: ${{ inputs.allow_destructive && '1' || '' }}
         run: |
           ssh -i ~/.ssh/id_deploy -p "$REMOTE_PORT" "root@${{ secrets.HOST }}" \
-            "cd $REMOTE_DIR && docker/deploy.sh --prebuilt"
+            "cd $REMOTE_DIR && OJ2_ALLOW_DESTRUCTIVE='$ALLOW_DESTRUCTIVE' docker/deploy.sh --prebuilt"
