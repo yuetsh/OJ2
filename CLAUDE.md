@@ -176,7 +176,7 @@ schema，下面三处已经修过了，别让它们回潮）：
 - **表达式索引的 opclass**：`problem_tag_name_ci_unique` 在快照里带 `opclass`，但 drizzle
   自己序列化不出来，导致每次都 drop + recreate。已从快照里去掉。
 
-**还有两个写代码时要绕开的**：
+**还有一个写代码时要绕开的**：
 
 - **`.op()` 会吞掉索引方向**：真正的根因不是 `.desc()`，是 opclass。drizzle-kit 的
   `CreatePgIndexConvertor` 里那个三元一旦走进 opclass 分支就回不到方向分支：
@@ -197,9 +197,36 @@ schema，下面三处已经修过了，别让它们回潮）：
   假 diff 的机制也要理解对：带 `.op()` 时快照记的是 `asc: false`，SQL 建出来却是 ASC，
   **分歧在快照和真实库之间**，不在快照和 schema.ts 之间——所以再跑 generate 是干净的，
   要等到下次 pull 才炸出来。这是当初难定位的原因。
-- **`CREATE INDEX CONCURRENTLY` 跑不了**：migrator 把所有语句包在一个事务里。大表加索引
-  要是不能接受锁写窗口，只能绕开 migration 手工执行。参考量级：12.3 万行的部分索引，
-  普通 `CREATE INDEX` 只锁 74ms，一般不用纠结。
+
+### 迁移执行器是自己的，不是 drizzle 那个
+
+`db/migrate.ts` 不调用 drizzle 的 `migrate()`，自己按 journal 逐条执行。换掉它是因为
+`pg-core/dialect.js` 里那个实现有两条硬伤：
+
+1. **所有待执行的迁移共用一个事务**，第 3 条失败会把第 1、2 条一起回滚。现在是**一条一个
+   事务**，语义和 Django `migrate` 一致，失败时也说得清库停在哪儿。
+2. 正因为全在事务里，`CREATE INDEX CONCURRENTLY` 一律跑不了，没有开关。
+
+记账行的写法和 drizzle 完全一致（`hash` = 整个文件的 sha256，`created_at` = journal 的
+`when`），而 migrator 只比 `created_at`、不校验 hash，所以两套执行器可以互换，不会看不懂
+对方写的记录。
+
+**`CREATE INDEX CONCURRENTLY` 现在能跑了。** 在迁移文件**第一行**写上标记：
+
+```sql
+-- oj2:no-transaction
+CREATE INDEX CONCURRENTLY "xxx_idx" ON "submission" USING btree ("language");
+```
+
+这条迁移就走裸执行（简单查询协议，不包事务）。代价是**没有回滚**：中途失败时前面的语句
+已经生效，而且 CONCURRENTLY 失败会在库里留下一个 INVALID 索引，要先
+`DROP INDEX` 再重来（`select indexrelid::regclass from pg_index where not indisvalid`
+能找出来）。所以**这种迁移一个文件只放一条语句**。
+
+要不要用是另一回事：参考量级是 12.3 万行的部分索引，普通 `CREATE INDEX` 只锁 74ms，
+一般不用纠结，CONCURRENTLY 留给真扛不住锁写窗口的场合。
+
+退出码：2 = 配置/文件问题，3 = 基线不对，4 = 撞上破坏性迁移，5 = 某条迁移执行失败。
 
 ## 部署
 
