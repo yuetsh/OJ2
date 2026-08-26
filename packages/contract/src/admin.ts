@@ -43,6 +43,9 @@ export const createAnnouncementRequestSchema = z.object({
 
 export const updateAnnouncementRequestSchema = createAnnouncementRequestSchema
 
+export type AstRuleEngine = z.infer<typeof astRuleEngineSchema>
+export type AstRule = z.infer<typeof astRuleSchema>
+export type AstRules = z.infer<typeof astRulesSchema>
 export type ProblemSample = z.infer<typeof problemSampleSchema>
 export type ProblemAnswer = z.infer<typeof problemAnswerSchema>
 export type ProblemTestCaseScore = z.infer<typeof problemTestCaseScoreSchema>
@@ -566,6 +569,50 @@ export const problemTestCaseScoreSchema = z.object({
   score: z.coerce.number().int().min(0),
 })
 
+/**
+ * AST 代码要求。同一个形状原来在**三个地方**各写了一份，三份都不一样：
+ * apps/api/src/judge/ast.ts 的 AstRule（判题机真读的那份，九个字段）、
+ * apps/web/src/utils/types.ts 的 AstRules（少了 label / exact / outer / inner）、
+ * AstRulesEditor.vue 里的本地 AstRule（少了 outer / inner）。
+ * 编辑器写得出 label / exact，题目类型却描述不了它们。现在以这里为准。
+ *
+ * 除 engine 外全部可选：判题机每条规则只读自己那几个字段
+ * （见 ast.ts 的 evaluateRule），缺了就走默认文案。
+ */
+export const astRuleEngineSchema = z.enum([
+  "must_exist_node",
+  "must_not_exist_node",
+  "count_node",
+  "must_call_function",
+  "must_not_call_function",
+  "count_function_call",
+  "must_call_method",
+  "must_not_call_method",
+  "must_use_operator",
+  // 判题机实现了，但后台编辑器还没有对应的选项，目前只能手工造数据用上
+  "must_have_nesting",
+])
+
+export const astRuleSchema = z.object({
+  engine: astRuleEngineSchema,
+  /** 检查目标：节点类型 / 函数名 / 方法名 / 运算符，按 engine 而定 */
+  target: z.string().optional(),
+  /** must_have_nesting 专用：外层、内层节点 */
+  outer: z.string().optional(),
+  inner: z.string().optional(),
+  /** 展示用的中文名，缺省回落到 target */
+  label: z.string().optional(),
+  /** 自定义提示。生产库里存的是空串而不是缺键，判题机按 `||` 回落到默认文案 */
+  message: z.string().optional(),
+  /** count_* 引擎的次数约束 */
+  exact: z.number().int().optional(),
+  min: z.number().int().optional(),
+  max: z.number().int().optional(),
+})
+
+/** 按语言分组：`{ Python3: [...], C: [...] }`，键是 languages 里的语言名 */
+export const astRulesSchema = z.record(z.string(), z.array(astRuleSchema))
+
 /** 后台题目详情：包含 oj 侧永不下发的 answers / testCase* / astRules */
 export const adminProblemSchema = z.object({
   id: z.number().int(),
@@ -599,7 +646,7 @@ export const adminProblemSchema = z.object({
   showFlowchart: z.boolean(),
   mermaidCode: z.string().nullable(),
   flowchartHint: z.string().nullable(),
-  astRules: z.unknown(),
+  astRules: astRulesSchema.nullable(),
   answers: z.array(problemAnswerSchema),
   prompt: z.string().nullable(),
   sqlConfig: sqlConfigSchema.nullable(),
@@ -631,7 +678,7 @@ export const createProblemRequestSchema = z.object({
   showFlowchart: z.boolean().default(false),
   mermaidCode: z.string().nullable().default(null),
   flowchartHint: z.string().nullable().default(null),
-  astRules: z.unknown().default(null),
+  astRules: astRulesSchema.nullable().default(null),
   // order_sensitive 缺省补 false —— 与旧后端 SQLConfigSerializer 的
   // `BooleanField(default=False)` 一致
   sqlConfig: sqlConfigSchema

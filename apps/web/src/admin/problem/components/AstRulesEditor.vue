@@ -1,24 +1,14 @@
 <script setup lang="ts">
-import type { LANGUAGE } from "utils/types"
-
-interface AstRule {
-  engine: string
-  target?: string
-  label?: string
-  exact?: number
-  min?: number
-  max?: number
-  message: string
-}
+import type { AstRule, AstRules, LANGUAGE } from "utils/types"
 
 interface Props {
-  modelValue: { [key: string]: AstRule[] } | null
+  modelValue: AstRules | null
   languages: LANGUAGE[]
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
-  (e: "update:modelValue", value: { [key: string]: AstRule[] } | null): void
+  (e: "update:modelValue", value: AstRules | null): void
 }>()
 
 const activeTab = ref(props.languages[0] || "Python3")

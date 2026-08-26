@@ -1,3 +1,4 @@
+import type { AstRule } from "@oj2/contract"
 import { Language, Parser, type Node } from "web-tree-sitter"
 // 语法 wasm 内嵌成资源。原来是 `Bun.resolveSync(pkg + "/" + name, import.meta.dir)`，
 // 编译成单二进制后 import.meta.dir 是 /$bunfs/root，解析不到 node_modules。见 vendor/jieba.ts
@@ -6,17 +7,9 @@ import pythonWasmPath from "tree-sitter-python/tree-sitter-python.wasm" with { t
 // web-tree-sitter 自己的运行时 wasm，Parser.init() 要用
 import treeSitterWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" }
 
-export interface AstRule {
-  engine?: string
-  target?: string
-  outer?: string
-  inner?: string
-  label?: string
-  message?: string
-  exact?: number
-  min?: number
-  max?: number
-}
+// AstRule 的形状在契约里（astRuleSchema）—— 原来这份和前端两份各写各的。
+// 这里 re-export，判题机的调用方不用再去 import 契约。
+export type { AstRule } from "@oj2/contract"
 
 export interface AstResult {
   description: string

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 
+import { astRuleSchema } from "@oj2/contract"
 import { and, eq, inArray } from "drizzle-orm"
 
 import { config } from "../config"
@@ -54,9 +55,19 @@ function templateForLanguage(value: unknown, language: string) {
   return typeof template === "string" ? template : null
 }
 
+/**
+ * 取某个语言的 AST 规则。逐条过 astRuleSchema 而不是整片 `as AstRule[]` 硬转 ——
+ * 这是从库里读出来的 JSONB，形状不对（比如 engine 是个 evaluateRule 不认识的值）
+ * 时丢掉那一条，行为和 evaluateRule 的 `default: return null` 一致，只是提前到了
+ * 这里、并且不再骗类型系统。
+ */
 function astRulesForLanguage(value: unknown, language: string): AstRule[] {
   const rules = objectValue(value)[language]
-  return Array.isArray(rules) ? (rules as AstRule[]) : []
+  if (!Array.isArray(rules)) return []
+  return rules.flatMap((rule) => {
+    const parsed = astRuleSchema.safeParse(rule)
+    return parsed.success ? [parsed.data] : []
+  })
 }
 
 async function requestJudge(

@@ -13,6 +13,7 @@ import type {
   ProblemDetail,
   ProblemDifficulty,
   JudgeStatus,
+  AstRules,
   CreateAnnouncementRequest,
 } from "@oj2/contract"
 
@@ -111,7 +112,6 @@ export type { ProblemTestCaseScore as Testcase } from "@oj2/contract"
 /**
  * 题目详情。以契约的 ProblemDetail 为准，只在这里补两处前端自己的窄化：
  * - `languages` / `template` 的键窄化成 LANGUAGE，组件按语言查模板要靠它
- * - `astRules` 契约里是 unknown，这里给出组件实际读的形状
  */
 export type Problem = Omit<ProblemDetail, "languages" | "template"> & {
   languages: LANGUAGE[]
@@ -122,15 +122,11 @@ export type Problem = Omit<ProblemDetail, "languages" | "template"> & {
   answers?: { language: LANGUAGE; code: string }[]
 }
 
-export type AstRules = {
-  [key: string]: {
-    engine: string
-    target?: string
-    min?: number
-    max?: number
-    message: string
-  }[]
-}
+/**
+ * AST 代码要求。原来这里手抄的那份少了 label / exact / outer / inner ——
+ * 编辑器写得出 label 和 exact，判题机也认，只有这个类型不认。形状在契约里。
+ */
+export type { AstRule, AstRules, AstRuleEngine } from "@oj2/contract"
 
 export type {
   ProblemDetail,

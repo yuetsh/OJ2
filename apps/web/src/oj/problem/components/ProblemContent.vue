@@ -6,7 +6,7 @@ import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { createTestSubmission } from "utils/judge"
 import { DIFFICULTY } from "utils/constants"
-import type { Problem, ProblemStatus } from "utils/types"
+import type { AstRule, Problem, ProblemStatus } from "utils/types"
 import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
@@ -113,16 +113,6 @@ const NODE_TARGET_LABELS: Record<string, string> = {
   f_string: "f-string",
   try_except: "try-except",
   class_definition: "类定义",
-}
-
-type AstRule = {
-  engine: string
-  target?: string
-  label?: string
-  exact?: number
-  min?: number
-  max?: number
-  message: string
 }
 
 function ruleDescription(rule: AstRule): string {
