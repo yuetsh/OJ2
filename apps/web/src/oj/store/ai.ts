@@ -41,15 +41,15 @@ export const useAIStore = defineStore("ai", () => {
       end,
       targetUsername.value || undefined,
     )
-    detailsData.start = res.data.start
-    detailsData.end = res.data.end
-    detailsData.solved = res.data.solved
-    detailsData.grade = res.data.grade
-    detailsData.className = res.data.className
-    detailsData.tags = res.data.tags
-    detailsData.difficulty = res.data.difficulty
-    detailsData.contestCount = res.data.contestCount
-    detailsData.flowcharts = res.data.flowcharts
+    detailsData.start = res.start
+    detailsData.end = res.end
+    detailsData.solved = res.solved
+    detailsData.grade = res.grade
+    detailsData.className = res.className
+    detailsData.tags = res.tags
+    detailsData.difficulty = res.difficulty
+    detailsData.contestCount = res.contestCount
+    detailsData.flowcharts = res.flowcharts
   }
 
   async function fetchDurationData(end: string, duration: string) {
@@ -58,13 +58,13 @@ export const useAIStore = defineStore("ai", () => {
       duration,
       targetUsername.value || undefined,
     )
-    durationData.value = res.data
+    durationData.value = res
   }
 
   async function fetchHeatmapData() {
     loading.heatmap = true
     const res = await getAIHeatmapData(targetUsername.value || undefined)
-    heatmapData.value = res.data
+    heatmapData.value = res
     loading.heatmap = false
   }
 
@@ -165,7 +165,7 @@ export const useAIStore = defineStore("ai", () => {
 
   async function fetchPinnedReport() {
     const res = await getAIPinnedReport()
-    pinnedReport.value = res.data
+    pinnedReport.value = res
   }
 
   async function simulatePinnedStream() {

@@ -97,7 +97,7 @@ const columns: DataTableColumn<AdminTag>[] = [
 
 async function listTags() {
   const res = await getTagAdminList(keyword.value)
-  tags.value = res.data
+  tags.value = res
 }
 
 function startEdit(tag: AdminTag) {
@@ -121,9 +121,9 @@ async function saveTag(tag: AdminTag) {
     return
   }
   const res = await renameTag(tag.id, name)
-  if (res.data.merged) {
+  if (res.merged) {
     message.success(
-      `已合并到「${res.data.name}」，影响 ${res.data.affectedCount} 道题`,
+      `已合并到「${res.name}」，影响 ${res.affectedCount} 道题`,
     )
   } else {
     message.success("已重命名")

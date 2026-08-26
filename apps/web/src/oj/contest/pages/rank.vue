@@ -96,8 +96,8 @@ async function listRanks() {
     limit: query.limit,
     offset: query.limit * (query.page - 1),
   })
-  total.value = res.data.total
-  data.value = res.data.results
+  total.value = res.total
+  data.value = res.results
   if (query.page === 1) {
     chart.value = data.value
   }
@@ -225,7 +225,7 @@ async function downloadExcel() {
       limit: total.value || 10000,
       offset: 0,
     })
-    const allRanks: ContestRank[] = res.data.results
+    const allRanks: ContestRank[] = res.results
 
     const rows = allRanks.map((rank, index) => {
       const rank1 = index + 1

@@ -110,7 +110,7 @@ async function init() {
   ;(inProblem.value ? loadProblemEditor : loadContestEditor)()
   try {
     const res = await getProblem(problemID, contestID)
-    problem.value = res.data
+    problem.value = res
   } catch (err: any) {
     problem.value = null
     if (err.error === "contest-not-started") {

@@ -56,15 +56,15 @@ async function showContent(announcement: Announcement) {
   const res = await getAnnouncement(announcement.id)
   toggleShow(true)
   title.value = announcement.title
-  content.value = res.data.content
+  content.value = res.content
 }
 const announcements = ref<Announcement[]>([])
 
 async function listAnnouncements() {
   const offset = (query.page - 1) * query.limit
   const res = await getAnnouncementList(offset, query.limit)
-  total.value = res.data.total
-  announcements.value = res.data.results
+  total.value = res.total
+  announcements.value = res.results
 }
 
 onMounted(listAnnouncements)

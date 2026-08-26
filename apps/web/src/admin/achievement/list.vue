@@ -30,7 +30,7 @@ async function load() {
   loading.value = true
   try {
     const res = await getAdminAchievements()
-    list.value = res.data
+    list.value = res
   } finally {
     loading.value = false
   }

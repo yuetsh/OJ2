@@ -129,14 +129,14 @@ const websiteConfig = reactive<WebsiteConfig>({
 
 async function getWebsiteConfig() {
   const res = await getWebsite()
-  websiteConfig.websiteBaseUrl = res.data.websiteBaseUrl
-  websiteConfig.websiteName = res.data.websiteName
-  websiteConfig.websiteNameShortcut = res.data.websiteNameShortcut
-  websiteConfig.websiteFooter = res.data.websiteFooter
-  websiteConfig.allowRegister = res.data.allowRegister
-  websiteConfig.submissionListShowAll = res.data.submissionListShowAll
-  websiteConfig.classList = res.data.classList
-  websiteConfig.enableMaxkb = res.data.enableMaxkb
+  websiteConfig.websiteBaseUrl = res.websiteBaseUrl
+  websiteConfig.websiteName = res.websiteName
+  websiteConfig.websiteNameShortcut = res.websiteNameShortcut
+  websiteConfig.websiteFooter = res.websiteFooter
+  websiteConfig.allowRegister = res.allowRegister
+  websiteConfig.submissionListShowAll = res.submissionListShowAll
+  websiteConfig.classList = res.classList
+  websiteConfig.enableMaxkb = res.enableMaxkb
 }
 
 async function saveWebsiteConfig() {
@@ -172,13 +172,13 @@ async function deleteTestcase(id?: string) {
 
 async function getTestcases() {
   const res = await listInvalidTestcases()
-  testcases.value = res.data
+  testcases.value = res
 }
 
 async function getJudgeServerData() {
   const res = await getJudgeServer()
-  token.value = res.data.token
-  servers.value = res.data.servers
+  token.value = res.token
+  servers.value = res.servers
 }
 
 async function delJudgeServer(hostname: string) {

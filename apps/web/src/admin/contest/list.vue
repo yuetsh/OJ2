@@ -87,8 +87,8 @@ const columns: DataTableColumn<Contest>[] = [
 async function listContests() {
   const offset = (query.page - 1) * query.limit
   const res = await getContestList(offset, query.limit, query.keyword)
-  contests.value = res.data.results
-  total.value = res.data.total
+  contests.value = res.results
+  total.value = res.total
 }
 onMounted(listContests)
 watch(() => [query.page, query.limit], listContests)

@@ -144,7 +144,7 @@ async function submitFlowchartData() {
     })
 
     // 获取提交ID并订阅更新
-    const submissionId = response.data.submissionId
+    const submissionId = response.submissionId
 
     if (submissionId) {
       subscribeToSubmission(submissionId)
@@ -167,7 +167,7 @@ function submit() {
 
 async function getCurrentSubmission() {
   if (!problem.value?.id) return
-  const { data } = await getCurrentProblemFlowchartSubmission(problem.value.id)
+  const data = await getCurrentProblemFlowchartSubmission(problem.value.id)
   submissionCount.value = data.count
   latestRating.value = {
     score: data.score,
@@ -177,7 +177,7 @@ async function getCurrentSubmission() {
 
 async function getSubmission(submissionPage = 0) {
   if (!problem.value?.id) return
-  const { data } = await getFlowchartSubmissionDetail(
+  const data = await getFlowchartSubmissionDetail(
     problem.value.id,
     submissionPage,
   )

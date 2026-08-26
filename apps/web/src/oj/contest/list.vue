@@ -93,8 +93,8 @@ async function listContests() {
     status: query.status,
     tag: query.tag,
   })
-  data.value = res.data.results
-  total.value = res.data.total
+  data.value = res.results
+  total.value = res.total
 }
 
 function search(value: string) {

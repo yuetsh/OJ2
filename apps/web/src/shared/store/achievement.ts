@@ -36,9 +36,8 @@ export const useAchievementStore = defineStore("achievement", () => {
 
   async function fetchPending() {
     try {
-      // http 客户端返回 ApiResponse<T>，真实载荷在 .data 里
       const res = await getPendingAchievements()
-      enqueue(res.data ?? [])
+      enqueue(res ?? [])
     } catch {
       // 拉取失败静默处理，下次路由切换会再拉
     }

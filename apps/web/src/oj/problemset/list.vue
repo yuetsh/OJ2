@@ -55,8 +55,8 @@ async function listProblemSets() {
     query.difficulty,
     query.status,
   )
-  total.value = res.data.total
-  problemSets.value = res.data.results
+  total.value = res.total
+  problemSets.value = res.results
 }
 
 function getDifficultyTag(difficulty: string) {

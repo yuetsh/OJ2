@@ -129,8 +129,8 @@ async function listSubmissions() {
     problemId: (route.params.problemID as string) ?? "",
     contestId: (route.params.contestID as string) ?? "",
   })
-  submissions.value = res.data.results
-  total.value = res.data.total
+  submissions.value = res.results
+  total.value = res.total
 }
 
 async function getRankOfThisProblem() {
@@ -138,10 +138,10 @@ async function getRankOfThisProblem() {
   const res = await getRankOfProblem((route.params.problemID as string) ?? "")
   loading.value = false
 
-  class_name.value = res.data.className
-  rank.value = res.data.rank
-  class_ac_count.value = res.data.classAcCount
-  all_ac_count.value = res.data.allAcCount
+  class_name.value = res.className
+  rank.value = res.rank
+  class_ac_count.value = res.classAcCount
+  all_ac_count.value = res.allAcCount
 }
 
 onMounted(() => {

@@ -31,9 +31,9 @@ export const useLoginSummaryStore = defineStore("loginSummary", () => {
     analysisError.value = ""
     try {
       const res = await getAILoginSummary()
-      summary.value = res.data.summary
-      analysis.value = res.data.analysis || ""
-      analysisError.value = res.data.analysisError || ""
+      summary.value = res.summary
+      analysis.value = res.analysis || ""
+      analysisError.value = res.analysisError || ""
     } catch (err) {
       analysisError.value = "获取登录统计失败，请稍后再试"
     } finally {

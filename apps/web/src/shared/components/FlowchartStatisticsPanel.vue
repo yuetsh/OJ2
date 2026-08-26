@@ -533,7 +533,7 @@ async function handleStatistics() {
     query.problem,
     query.username,
   )
-  Object.assign(data, res.data)
+  Object.assign(data, res)
   await nextTick()
   renderWordCloud()
 }

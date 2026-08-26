@@ -208,7 +208,7 @@ async function getProblemDetail() {
     return
   }
   try {
-    const { data } = await getProblem(props.problemID)
+    const data = await getProblem(props.problemID)
     problem.value.id = data.id
     problem.value._id = data._id
     problem.value.title = data.title
@@ -269,7 +269,7 @@ async function getProblemDetail() {
 
 async function getTagList() {
   const res = await getProblemTagList()
-  tagList.value = res.data
+  tagList.value = res
   tagListLoaded.value = true
   syncTagInputsFromProblemTags()
 }
@@ -295,13 +295,13 @@ async function handleUploadTestcases({ file }: UploadCustomRequestOptions) {
       return
     }
     // score 不在上传响应里，前端按测试点数量平分补上
-    const entries = res.data.info
+    const entries = res.info
     const testcases: Testcase[] = entries.map((entry) => ({
       ...entry,
       score: (100 / entries.length).toFixed(0),
     }))
     problem.value.testCaseScore = testcases
-    problem.value.testCaseId = res.data.id
+    problem.value.testCaseId = res.id
   } catch (err) {
     message.error("上传测试用例失败")
   }
@@ -495,7 +495,7 @@ async function generateMermaid() {
   )
   isAIGenerating.value = false
   message.warning("如果渲染不成功，请复制到外部 AI 网站检查语法")
-  problem.value.mermaidCode = res.data.flowchart
+  problem.value.mermaidCode = res.flowchart
 }
 
 const showGeneratorModal = ref(false)

@@ -129,8 +129,8 @@ async function listUsers() {
     query.keyword,
     query.orderBy,
   )
-  total.value = res.data.total
-  users.value = res.data.results
+  total.value = res.total
+  users.value = res.results
 }
 
 function chooseUsers(rowKeys: DataTableRowKey[]) {
@@ -144,10 +144,10 @@ async function onDeleteUsers(userIDs: DataTableRowKey[] | Ref<number[]>) {
 
 async function onResetPassword(user: User) {
   const res = await resetPassword(user.id)
-  message.success(`【${user.username}】的密码已重置成【${res.data}】`)
+  message.success(`【${user.username}】的密码已重置成【${res}】`)
   users.value = users.value.map((it) => {
     if (it.id === user.id && user.adminType === USER_TYPE.REGULAR_USER) {
-      it.rawPassword = res.data
+      it.rawPassword = res
     }
     return it
   })

@@ -122,8 +122,8 @@ async function compare() {
     const { startTime, endTime } = getTimeRange()
 
     const res = await getClassPK(selectedClasses.value, startTime, endTime)
-    comparisons.value = res.data.comparisons
-    hasTimeRange.value = res.data.hasTimeRange || false
+    comparisons.value = res.comparisons
+    hasTimeRange.value = res.hasTimeRange || false
   } catch (error) {
     message.error("获取数据失败")
   } finally {

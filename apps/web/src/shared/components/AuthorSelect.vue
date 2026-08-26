@@ -24,7 +24,7 @@ const authorOptions = ref([{ label: "全部", value: "" }])
 async function getAuthorOptions() {
   authorOptions.value = [{ label: "全部", value: "" }]
   const res = await getAuthors(all)
-  const remotes = res.data.map((item) => ({
+  const remotes = res.map((item) => ({
     label: `${item.username} (${item.problemCount})`,
     value: item.username,
   }))

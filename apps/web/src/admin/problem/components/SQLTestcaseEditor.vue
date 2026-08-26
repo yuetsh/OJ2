@@ -78,8 +78,8 @@ onMounted(async () => {
   if (!props.problemId) return
   try {
     const res = await getSQLTestcaseScripts(props.problemId)
-    if (res.data.length) {
-      scripts.value = res.data.map((f) => ({ ...blankEntry(), sql: f.content }))
+    if (res.length) {
+      scripts.value = res.map((f) => ({ ...blankEntry(), sql: f.content }))
     }
   } catch (err: any) {
     // 新题、以及旧格式（非 SQL）测试点，后端回 404/409，保持空白就是对的，不该报错。
@@ -128,7 +128,7 @@ async function generate() {
           refSql: refSQL.value,
           mode: props.mode,
         })
-        s.sql = res.data.sql
+        s.sql = res.sql
       } catch (err) {
         const data = (err as { data?: unknown })?.data
         message.error(typeof data === "string" ? data : "AI 生成失败")
@@ -158,7 +158,7 @@ async function preview() {
           refSql: refSQL.value,
           mode: props.mode,
         })
-        s.display = res.data
+        s.display = res
       } catch (err) {
         const data = (err as { data?: unknown })?.data
         s.error = typeof data === "string" ? data : "预览失败"
@@ -182,7 +182,7 @@ async function upload() {
 
     const res = await uploadTestcases(file, { sql: true })
     // score 不在上传响应里，是这里按测试点数量平分补上的（余数给最后一个）
-    const entries = res.data.info
+    const entries = res.info
     const baseScore = Math.floor(100 / entries.length)
     const remainder = 100 - baseScore * entries.length
     const testcases: Testcase[] = entries.map((entry, i) => ({
@@ -192,7 +192,7 @@ async function upload() {
       ),
     }))
 
-    emit("uploaded", res.data.id, testcases)
+    emit("uploaded", res.id, testcases)
     message.success("上传成功")
   } catch {
     message.error("上传失败")

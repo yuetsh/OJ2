@@ -142,18 +142,18 @@ async function viewSubmission(item: HelperItem) {
       limit: 1,
     })
 
-    if (res.data.results.length === 0) {
+    if (res.results.length === 0) {
       message.warning("未找到该用户的 AC 提交")
       return
     }
 
     // 获取提交详情
-    const submissionListItem = res.data.results[0]
+    const submissionListItem = res.results[0]
     const detailRes = await getSubmission(submissionListItem.id)
 
     // 手动添加 contest 字段（ACM模式下后端不返回此字段）
     currentSubmission.value = {
-      ...detailRes.data,
+      ...detailRes,
       contest: Number(props.contestID),
       problem_display_id: item.problemDisplayId,
     }
@@ -169,10 +169,10 @@ async function loadData() {
   try {
     // 先获取比赛信息，获取开始时间
     const contestRes = await getContest(props.contestID)
-    contestStartTime.value = new Date(contestRes.data.startTime)
+    contestStartTime.value = new Date(contestRes.startTime)
 
     // 再获取 AC 提交列表
-    const { data } = await getACMHelperList(Number(props.contestID))
+    const data = await getACMHelperList(Number(props.contestID))
     submissions.value = data
   } catch (err: any) {
     message.error(err.data || "加载失败")

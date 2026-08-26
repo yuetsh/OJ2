@@ -144,7 +144,7 @@ const columns: DataTableColumn<ReportItem>[] = [
 
 async function loadPinnedReports() {
   const res = await getPinnedAIReports()
-  pinnedReports.value = res.data.results
+  pinnedReports.value = res.results
 }
 
 async function togglePin(row: ReportItem) {
@@ -155,8 +155,8 @@ async function togglePin(row: ReportItem) {
 async function listReports() {
   const offset = (query.page - 1) * query.limit
   const res = await getAIReportList(offset, query.limit, query.username)
-  reports.value = res.data.results
-  total.value = res.data.total
+  reports.value = res.results
+  total.value = res.total
 }
 
 async function openDetail(id: number) {
@@ -165,7 +165,7 @@ async function openDetail(id: number) {
   detail.value = null
   try {
     const res = await getAIReportDetail(id)
-    detail.value = res.data
+    detail.value = res
   } finally {
     loadingDetail.value = false
   }

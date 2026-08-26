@@ -52,8 +52,7 @@ const similarLoaded = ref(false)
 async function loadSimilarProblems() {
   if (similarLoaded.value || !problem.value) return
   try {
-    const res = await getSimilarProblems(problem.value._id)
-    similarProblems.value = res.data || []
+    similarProblems.value = await getSimilarProblems(problem.value._id)
   } catch {
     similarProblems.value = []
   }

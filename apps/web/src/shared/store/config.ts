@@ -14,8 +14,8 @@ export const useConfigStore = defineStore("config", () => {
   })
   async function getConfig() {
     const res = await getWebsiteConfig()
-    config.value = res.data
-    document.title = res.data.websiteName
+    config.value = res
+    document.title = res.websiteName
   }
   return {
     config,

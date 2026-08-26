@@ -239,8 +239,8 @@ async function pick(key: ReactionKey) {
   submitting.value = key
   try {
     const res = await setReaction(problem.value.id, key)
-    mine.value = res.data.mine
-    counts.value = res.data.counts
+    mine.value = res.mine
+    counts.value = res.counts
     emit("submitted")
   } catch {
     message.error("提交失败，请重试")
@@ -255,8 +255,8 @@ async function load(problemId: number) {
   try {
     const res = await getReaction(problemId)
     if (sequence !== loadSequence) return
-    mine.value = res.data.mine
-    counts.value = res.data.counts
+    mine.value = res.mine
+    counts.value = res.counts
   } catch {
     if (sequence === loadSequence) message.error("暂时无法读取题目点评")
   } finally {

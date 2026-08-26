@@ -121,7 +121,7 @@ async function fetchData() {
       untilYear: untilYear.value,
       minPerYear: minPerYear.value,
     })
-    data.value = res.data
+    data.value = res
   } finally {
     loading.value = false
   }

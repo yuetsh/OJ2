@@ -175,7 +175,7 @@ async function loadSubmission() {
   try {
     const { getFlowchartSubmission } = await import("oj/api")
     const res = await getFlowchartSubmission(props.submissionId)
-    submission.value = res.data
+    submission.value = res
 
     // 渲染流程图
     if (submission.value?.mermaidCode) {

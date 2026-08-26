@@ -62,8 +62,8 @@ const query = reactive({
 async function listMessages() {
   const offset = (query.page - 1) * query.limit
   const res = await getMessageList(offset, query.limit)
-  total.value = res.data.total
-  messages.value = res.data.results
+  total.value = res.total
+  messages.value = res.results
 }
 
 onMounted(listMessages)

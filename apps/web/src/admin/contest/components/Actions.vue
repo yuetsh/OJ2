@@ -36,7 +36,7 @@ async function clone() {
     message.success("复制成功")
     router.push({
       name: "admin contest edit",
-      params: { contestID: res.data.id },
+      params: { contestID: res.id },
     })
   } catch {
     message.error("复制失败")

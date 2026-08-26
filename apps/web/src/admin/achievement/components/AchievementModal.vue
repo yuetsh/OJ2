@@ -56,7 +56,7 @@ watch(
     if (!show) return
     if (!metrics.value.length) {
       const res = await getMetricOptions()
-      metrics.value = res.data
+      metrics.value = res
     }
     if (props.editing) {
       form.value = { ...emptyForm(), ...props.editing }

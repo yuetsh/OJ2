@@ -41,7 +41,7 @@ function toggleTag(name: string) {
 
 async function listTags() {
   const res = await getTagAdminList()
-  tags.value = res.data
+  tags.value = res
 }
 
 function close() {
@@ -60,7 +60,7 @@ async function submit() {
   )
   const verb = props.action === "add" ? "添加" : "移除"
   message.success(
-    `已为 ${res.data.problemCount} 道题${verb} ${res.data.tagCount} 个标签`,
+    `已为 ${res.problemCount} 道题${verb} ${res.tagCount} 个标签`,
   )
   close()
   emit("done")

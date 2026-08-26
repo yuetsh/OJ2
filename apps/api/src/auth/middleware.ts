@@ -41,7 +41,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
  * 后台接口的角色守卫，对应旧后端 `account/decorators.py` 的四个装饰器。
  *
  * 未登录一律 401 `login-required`、登录但角色不够一律 403 `permission-denied`，
- * 与旧 `BasePermissionDecorator._permission_error` 的两分支一致 —— 前端 `utils/api2.ts`
+ * 与旧 `BasePermissionDecorator._permission_error` 的两分支一致 —— 前端 `utils/api.ts`
  * 的拦截器就是按这两个 code 分别弹登录框和弹提示的。禁用账号走第三个码，见 denied()。
  */
 function requireRole(

@@ -69,7 +69,7 @@ async function getContestDetail() {
     toggleReady(true)
     return
   }
-  const { data } = await getContest(props.contestID)
+  const data = await getContest(props.contestID)
   toggleReady(true)
   contest.id = data.id
   contest.title = data.title

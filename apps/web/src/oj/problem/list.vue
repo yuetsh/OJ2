@@ -81,7 +81,7 @@ async function listProblems() {
 
 async function listTags() {
   const res = await getProblemTagList()
-  tags.value = res.data.map((r: Omit<Tag, "checked">) => ({
+  tags.value = res.map((r: Omit<Tag, "checked">) => ({
     ...r,
     checked: query.tag === r.name,
   }))

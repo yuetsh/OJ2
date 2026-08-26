@@ -34,20 +34,20 @@ const activeTab = ref("problems")
 
 async function loadProblemSetDetail() {
   const res = await getProblemSetDetail(problemSetId.value)
-  problemSet.value = res.data
-  isJoined.value = res.data.userProgress?.isJoined || false
+  problemSet.value = res
+  isJoined.value = res.userProgress?.isJoined || false
 }
 
 async function loadProblems() {
   const res = await getProblemSetProblems(problemSetId.value)
-  problems.value = res.data
+  problems.value = res
 }
 
 async function loadUserBadges() {
   if (!isJoined.value) return
 
   const res = await getUserBadges()
-  userBadges.value = res.data.filter(
+  userBadges.value = res.filter(
     (badge: UserBadgeType) => badge.badge.problemsetId === problemSetId.value,
   )
 }

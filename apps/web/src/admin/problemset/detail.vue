@@ -52,7 +52,7 @@ const editingBadge = ref<ProblemSetBadge | null>(null)
 async function loadProblemSetDetail() {
   try {
     const res = await getProblemSetDetail(problemSetId.value)
-    problemSet.value = res.data
+    problemSet.value = res
   } catch (err: any) {
     message.error("加载题单详情失败：" + (err.data || "未知错误"))
   }
@@ -61,7 +61,7 @@ async function loadProblemSetDetail() {
 async function loadProblems() {
   try {
     const res = await getProblemSetProblems(problemSetId.value)
-    problems.value = res.data
+    problems.value = res
   } catch (err: any) {
     message.error("加载题目列表失败：" + (err.data || "未知错误"))
   }
@@ -70,7 +70,7 @@ async function loadProblems() {
 async function loadBadges() {
   try {
     const res = await getProblemSetBadges(problemSetId.value)
-    badges.value = res.data
+    badges.value = res
   } catch (err: any) {
     message.error("加载奖章列表失败：" + (err.data || "未知错误"))
   }
@@ -79,7 +79,7 @@ async function loadBadges() {
 async function loadProgress() {
   try {
     const res = await getProblemSetProgress(problemSetId.value)
-    progress.value = res.data
+    progress.value = res
   } catch (err: any) {
     message.error("加载进度列表失败：" + (err.data || "未知错误"))
   }

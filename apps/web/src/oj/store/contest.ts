@@ -58,9 +58,9 @@ export const useContestStore = defineStore("contest", () => {
   async function init(contestID: string) {
     problems.value = []
     const res = await getContest(contestID)
-    contest.value = res.data
+    contest.value = res
     // now 是学生侧比赛专有的服务器时间，用来对齐倒计时
-    now.value = getTime(parseISO(res.data.now ?? res.data.createTime))
+    now.value = getTime(parseISO(res.now ?? res.createTime))
     if (contestStatus.value !== ContestStatus.finished) {
       timer = setInterval(() => {
         now.value = now.value + 1000
@@ -68,7 +68,7 @@ export const useContestStore = defineStore("contest", () => {
     }
     if (contest.value?.contestType === ContestType.private) {
       const res = await getContestAccess(contestID)
-      toggleAccess(res.data.access)
+      toggleAccess(res.access)
     }
     _getProblems(contestID)
   }
@@ -84,8 +84,8 @@ export const useContestStore = defineStore("contest", () => {
   async function checkPassword(contestID: string, password: string) {
     try {
       const res = await checkContestPassword(contestID, password)
-      toggleAccess(res.data)
-      if (res.data) {
+      toggleAccess(res)
+      if (res) {
         _getProblems(contestID)
       }
     } catch (err) {

@@ -45,7 +45,7 @@ async function loadProblemSetDetail() {
 
   try {
     const res = await getProblemSetDetail(problemSetId.value)
-    const data = res.data
+    const data = res
     formData.value = {
       id: data.id,
       title: data.title,

@@ -67,7 +67,7 @@ const columns: DataTableColumn<AnnouncementListItem>[] = [
 async function toggleVisible(announcement: AnnouncementListItem) {
   const next = !announcement.visible
   try {
-    const { data: full } = await getAnnouncement(announcement.id)
+    const full = await getAnnouncement(announcement.id)
     await editAnnouncement({
       id: full.id,
       title: full.title,
@@ -85,8 +85,8 @@ async function toggleVisible(announcement: AnnouncementListItem) {
 async function listAnnouncements() {
   const offset = (query.page - 1) * query.limit
   const res = await getAnnouncementList(offset, query.limit)
-  announcements.value = res.data.results
-  total.value = res.data.total
+  announcements.value = res.results
+  total.value = res.total
 }
 
 onMounted(listAnnouncements)

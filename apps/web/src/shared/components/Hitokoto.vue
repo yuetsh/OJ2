@@ -10,7 +10,7 @@ async function receive() {
   try {
     const res = await getHitokoto()
     // 契约是 string | Record —— 一言数据集不在仓库里，形状留了余地
-    const quote = res.data
+    const quote = res
     if (typeof quote === "string") {
       hitokoto.sentence = quote
       hitokoto.from = ""

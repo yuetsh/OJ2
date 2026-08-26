@@ -63,7 +63,7 @@ export const useUserStore = defineStore("user", () => {
   async function getMyProfile() {
     isFinished.value = false
     const res = await getProfile()
-    profile.value = res.data
+    profile.value = res
     isFinished.value = true
     storage.set(STORAGE_KEY.AUTHED, !!user.value?.email)
   }

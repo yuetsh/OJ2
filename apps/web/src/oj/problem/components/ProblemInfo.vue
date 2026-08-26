@@ -91,12 +91,12 @@ const options = {
 
 async function getBeatRate() {
   const res = await getProblemBeatRate(problem.value!.id)
-  beatRate.value = res.data
+  beatRate.value = res
 }
 
 async function getYearlyAC() {
   const res = await getProblemYearlyAC(problem.value!._id)
-  yearlyACData.value = res.data
+  yearlyACData.value = res
 }
 
 onMounted(() => {

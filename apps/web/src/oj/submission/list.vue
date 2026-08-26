@@ -109,8 +109,8 @@ async function listSubmissions() {
       today: query.today,
       grade: query.result,
     })
-    total.value = res.data.total
-    flowcharts.value = res.data.results
+    total.value = res.total
+    flowcharts.value = res.results
   } else {
     const res = await getSubmissions({
       ...query,
@@ -120,14 +120,14 @@ async function listSubmissions() {
       language: query.language,
       today: query.today,
     })
-    submissions.value = res.data.results
-    total.value = res.data.total
+    submissions.value = res.results
+    total.value = res.total
   }
 }
 
 async function getTodayCount() {
   const res = await getTodaySubmissionCount(query.language)
-  todayCount.value = res.data
+  todayCount.value = res
 }
 
 onMounted(() => {

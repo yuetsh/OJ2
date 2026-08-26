@@ -41,7 +41,7 @@ async function init() {
   if (submission.value) return
   loading.value = true
   const res = await getSubmission(props.submissionID)
-  submission.value = res.data
+  submission.value = res
   loading.value = false
 }
 

@@ -80,7 +80,7 @@ async function loadClassUsernames(selectedClass: string) {
   classUserLoading.value = true
   try {
     const res = await getClassUsernames(selectedClass)
-    classUserOptions.value = res.data.map((name: string) => ({
+    classUserOptions.value = res.map((name: string) => ({
       label: name,
       value: name,
     }))

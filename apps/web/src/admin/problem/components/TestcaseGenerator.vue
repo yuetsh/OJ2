@@ -170,7 +170,7 @@ async function upload() {
 
     const res = await uploadTestcases(file)
     // score 不在上传响应里，是这里按测试点数量平分补上的（余数给最后一个）
-    const entries = res.data.info
+    const entries = res.info
     const baseScore = Math.floor(100 / entries.length)
     const remainder = 100 - baseScore * entries.length
     const testcases: Testcase[] = entries.map((entry, i) => ({
@@ -180,7 +180,7 @@ async function upload() {
       ),
     }))
 
-    emit("uploaded", res.data.id, testcases)
+    emit("uploaded", res.id, testcases)
     message.success("上传成功")
   } catch {
     message.error("上传失败")

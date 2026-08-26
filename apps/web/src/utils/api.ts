@@ -6,33 +6,25 @@ import storage from "./storage"
 
 const { message: toast } = createDiscreteApi(["message"])
 
-// 后端统一返回 { error, data } 信封；拦截器剥掉 axios 外层后，
-// 调用方拿到的就是这个信封，data 才是真正的业务数据。
-export interface ApiResponse<T = any> {
-  error: string | null
-  data: T
-}
-
-interface Api2Error {
+interface ApiError {
   error?: {
     code?: string
     message?: string
   }
 }
 
-interface Api2Client {
-  get<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>>
-  post<T>(
-    url: string,
-    data?: unknown,
-    config?: AxiosRequestConfig,
-  ): Promise<ApiResponse<T>>
-  put<T>(
-    url: string,
-    data?: unknown,
-    config?: AxiosRequestConfig,
-  ): Promise<ApiResponse<T>>
-  delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>>
+/**
+ * 成功时直接拿到业务数据本身。后端成功响应是 `{ data }`（见 apps/api/src/http.ts
+ * 的 success），拦截器把 axios 外层和这层信封一起剥掉。
+ *
+ * 失败走 reject，形状是 `{ error: 错误码, data: 文案 }` —— 和成功路径不对称是
+ * 故意的：成功没有错误码可言。分支处理一律判 `err.error` 里的错误码。
+ */
+interface ApiClient {
+  get<T>(url: string, config?: AxiosRequestConfig): Promise<T>
+  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
+  delete<T>(url: string, config?: AxiosRequestConfig): Promise<T>
 }
 
 const instance = axios.create({
@@ -52,16 +44,13 @@ instance.interceptors.request.use((config) => {
 })
 
 instance.interceptors.response.use(
-  // 这里**故意**不返回 AxiosResponse：把 { data } 信封剥掉，让调用方直接拿到
-  // ApiResponse。类型上和 axios 的拦截器签名对不上（它期望原样返回响应），
-  // 文件末尾的 `as unknown as Api2Client` 就是为了把这个真实形状交出去。
+  // 这里**故意**不返回 AxiosResponse：把 axios 的外层和后端的 { data } 信封一起
+  // 剥掉，让调用方直接拿到业务数据。类型上和 axios 的拦截器签名对不上（它期望原样
+  // 返回响应），文件末尾的 `as unknown as ApiClient` 就是为了把真实形状交出去。
   ((response: AxiosResponse) =>
-    Promise.resolve({
-      error: null,
-      data: response.data.data,
-    })) as unknown as (response: AxiosResponse) => AxiosResponse,
+    response.data.data) as unknown as (response: AxiosResponse) => AxiosResponse,
   (error) => {
-    const payload = error.response?.data as Api2Error | undefined
+    const payload = error.response?.data as ApiError | undefined
     const code = payload?.error?.code ?? "network-error"
     const message = payload?.error?.message ?? "Request failed"
 
@@ -85,4 +74,4 @@ instance.interceptors.response.use(
   },
 )
 
-export default instance as unknown as Api2Client
+export default instance as unknown as ApiClient

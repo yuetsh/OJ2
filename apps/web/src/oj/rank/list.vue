@@ -82,7 +82,7 @@ async function loadClassDetail(className: string) {
   classDetailData.value = null
   try {
     const res = await getClassPK([className])
-    classDetailData.value = res.data.comparisons[0] ?? null
+    classDetailData.value = res.comparisons[0] ?? null
   } catch {
     // ignore
   } finally {
@@ -151,10 +151,10 @@ async function analyzeSingleClassWithAI() {
 async function init() {
   const offset = (query.page - 1) * query.limit
   const res = await getRank(offset, query.limit)
-  data.value = res.data.results
-  total.value = res.data.total
-  me.value = res.data.me
-  return res.data.results
+  data.value = res.results
+  total.value = res.total
+  me.value = res.me
+  return res.results
 }
 
 function isMe(row: Rank) {
@@ -256,7 +256,7 @@ async function listActivity() {
   const start = formatISO(sub(current, subOptions.value))
   const res = await getActivityRank(start)
   // 活动榜只有「用户名 + 做题数」，塞进榜单图表复用的 Rank 形状里
-  activityChart.value = res.data.map((d, index) => ({
+  activityChart.value = res.map((d, index) => ({
     id: index,
     user: { id: index, username: d.username, realName: null },
     acceptedNumber: d.count,
@@ -268,7 +268,7 @@ async function listActivity() {
 // 「全服 Top10」就是同一个榜的第一页 —— 上限由服务端定，这里只要前 10 条
 async function listRank() {
   const res = await getRank(0, 10)
-  rankChart.value = res.data.results
+  rankChart.value = res.results
 }
 
 const options: SelectOption[] = [
@@ -439,7 +439,7 @@ async function listClassRank() {
     classQuery.grade = parseInt(className.slice(0, 2))
   }
   const res = await getClassRank(classQuery.grade)
-  classData.value = res.data
+  classData.value = res
 }
 
 async function listMyClassRank() {
@@ -450,10 +450,10 @@ async function listMyClassRank() {
         : 0
     const limit = myClassScope.value === "all" ? myClassQuery.limit : undefined
     const res = await getUserClassRank(myClassScope.value, offset, limit)
-    myRank.value = res.data.myRank
-    myClassName.value = res.data.className
-    myClassData.value = res.data.ranks
-    myClassTotal.value = res.data.total ?? res.data.ranks.length
+    myRank.value = res.myRank
+    myClassName.value = res.className
+    myClassData.value = res.ranks
+    myClassTotal.value = res.total ?? res.ranks.length
     if (myClassScope.value === "window") {
       myClassQuery.page = 1
     }

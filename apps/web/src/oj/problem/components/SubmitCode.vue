@@ -115,7 +115,7 @@ async function submit() {
         code: codeStore.code.value,
         language: formatLang,
       })
-      codeStore.setCode(res.data.code)
+      codeStore.setCode(res.code)
     } catch (e: any) {
       if (e?.error === "format-error") {
         // 仅 Python3 会出现：代码本身存在语法错误
@@ -141,11 +141,11 @@ async function submit() {
   isSubmittingRequest.value = true
   try {
     const res = await submitCode(data)
-    console.log(`[Submit] 代码已提交: ID=${res.data.submissionId}`)
+    console.log(`[Submit] 代码已提交: ID=${res.submissionId}`)
 
     // 3. 启动冷却 + 监控
     startCooldown()
-    startMonitoring(res.data.submissionId)
+    startMonitoring(res.submissionId)
     showResult.value = true
   } finally {
     isSubmittingRequest.value = false

@@ -29,7 +29,7 @@ const columns: DataTableColumn<StuckProblem>[] = [
 onMounted(async () => {
   try {
     const res = await getStuckProblems()
-    data.value = res.data
+    data.value = res
   } finally {
     loading.value = false
   }

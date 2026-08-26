@@ -63,10 +63,10 @@ async function init() {
   toggle(true)
   try {
     const res = await getProfile(route.query.name as string)
-    profile.value = res.data
+    profile.value = res
     // 用户不存在时后端返回 null，后面的统计全都无从算起
-    if (!res.data) return
-    const acm = res.data.acmProblemsStatus.problems || {}
+    if (!res) return
+    const acm = res.acmProblemsStatus.problems || {}
     const ac: string[] = []
     Object.keys(acm).forEach((id) => {
       if (acm[id]["status"] === 0) {
@@ -76,17 +76,17 @@ async function init() {
     ac.sort()
     problems.value = ac
 
-    if (res.data.submissionNumber > 0) {
-      const metricsRes = await getMetrics(res.data.user.id)
-      firstSubmissionAt.value = parseTime(metricsRes.data.first)
-      latestSubmissionAt.value = parseTime(metricsRes.data.latest)
+    if (res.submissionNumber > 0) {
+      const metricsRes = await getMetrics(res.user.id)
+      firstSubmissionAt.value = parseTime(metricsRes.first)
+      latestSubmissionAt.value = parseTime(metricsRes.latest)
       toLatestAt.value = durationToDays(
-        metricsRes.data.latest,
-        metricsRes.data.now,
+        metricsRes.latest,
+        metricsRes.now,
       )
       learnDuration.value = durationToDays(
-        metricsRes.data.first,
-        metricsRes.data.latest,
+        metricsRes.first,
+        metricsRes.latest,
       )
     }
   } finally {
@@ -101,7 +101,7 @@ async function loadAchievementSummary() {
     const res = await getAchievementSummary(
       (route.query.name as string) || undefined,
     )
-    achievementSummary.value = res.data
+    achievementSummary.value = res
   } catch {
     achievementSummary.value = null
   }

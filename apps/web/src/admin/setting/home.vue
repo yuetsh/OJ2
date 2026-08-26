@@ -64,16 +64,16 @@ const columns: DataTableColumn<Rank>[] = [
 
 onMounted(async () => {
   const res = await getBaseInfo()
-  userCount.value = res.data.userCount
-  submissionCount.value = res.data.todaySubmissionCount
-  contestCount.value = res.data.recentContestCount
+  userCount.value = res.userCount
+  submissionCount.value = res.todaySubmissionCount
+  contestCount.value = res.recentContestCount
 })
 
 async function listRanks() {
   const offset = (query.page - 1) * query.limit
   const res = await getAdminUserRank(offset, query.limit, query.classroom)
-  data.value = res.data.results
-  total.value = res.data.total
+  data.value = res.results
+  total.value = res.total
 }
 
 function stopRolling() {
@@ -108,7 +108,7 @@ function startRolling(finalName: string) {
 
 async function getRandom() {
   const res = await randomUser10(query.classroom)
-  const names = (res.data as string[]).map(
+  const names = (res as string[]).map(
     (name) => name.split(query.classroom)[1],
   )
   rollingNames.value = names

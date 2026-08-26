@@ -421,13 +421,15 @@ async function handleStatistics() {
     query.problem,
     query.username,
   )
-  count.total = res.data.submissionCount
-  count.accepted = res.data.acceptedCount
-  count.rate = res.data.correctRate
-  list.value = res.data.data
-  listUnaccepted.value = res.data.dataUnaccepted
-  person.count = res.data.personCount
-  person.rate = res.data.personRate
+  count.total = res.submissionCount
+  count.accepted = res.acceptedCount
+  count.rate = res.correctRate
+  // 这里的 res.data 是载荷**自己**的 data 字段（每个学生一行），
+  // 不是原来那层信封 —— 契约 submissionStatisticsSchema 就是这么定的
+  list.value = res.data
+  listUnaccepted.value = res.dataUnaccepted
+  person.count = res.personCount
+  person.rate = res.personRate
 }
 
 function rowKey(row: SubmissionStatisticsUser): DataTableRowKey {

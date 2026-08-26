@@ -206,7 +206,7 @@ function goToNextLesson() {
 
 async function init() {
   const res1 = await getTutorials(type.value)
-  titles.value = res1.data
+  titles.value = res1
   isEmpty.value = titles.value.length === 0
   if (isEmpty.value) return
   const id = titles.value[step.value - 1].id
@@ -214,7 +214,7 @@ async function init() {
     getTutorial(id),
     getExercises(id),
   ])
-  if (res2.status === "fulfilled") tutorial.value = res2.value.data
+  if (res2.status === "fulfilled") tutorial.value = res2.value
   exercises.value = exs.status === "fulfilled" ? exs.value : []
   learnStep.value[type.value] = step.value
 }

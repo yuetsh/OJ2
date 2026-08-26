@@ -56,15 +56,15 @@ async function loadUserProgress() {
   }
   const res = await getProblemSetUserProgress(problemSetId.value, params)
 
-  progress.value = res.data.results
-  total.value = res.data.total
+  progress.value = res.results
+  total.value = res.total
   // 使用后端返回的统计数据（基于所有数据）
-  if (res.data.statistics) {
-    statistics.value = res.data.statistics
+  if (res.statistics) {
+    statistics.value = res.statistics
   }
   // 保存所有题目信息
-  if (res.data.problems) {
-    allProblems.value = res.data.problems
+  if (res.problems) {
+    allProblems.value = res.problems
   }
   loading.value = false
 }

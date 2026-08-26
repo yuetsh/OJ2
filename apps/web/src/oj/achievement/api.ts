@@ -1,4 +1,4 @@
-import api2 from "utils/api2"
+import api from "utils/api"
 import type {
   AchievementList,
   AchievementSummary,
@@ -6,21 +6,21 @@ import type {
 } from "utils/types"
 
 export function getAchievements(name?: string) {
-  return api2.get<AchievementList>("achievements", {
+  return api.get<AchievementList>("achievements", {
     params: name ? { username: name } : {},
   })
 }
 
 export function getAchievementSummary(name?: string) {
-  return api2.get<AchievementSummary>("achievements/summary", {
+  return api.get<AchievementSummary>("achievements/summary", {
     params: name ? { username: name } : {},
   })
 }
 
 export function getPendingAchievements() {
-  return api2.get<PendingAchievement[]>("achievements/pending")
+  return api.get<PendingAchievement[]>("achievements/pending")
 }
 
 export function markAchievementsRead(ids: number[]) {
-  return api2.post("achievements/pending/read", { ids })
+  return api.post("achievements/pending/read", { ids })
 }

@@ -37,7 +37,7 @@ import {
   type FlowchartStatistics,
   type SubmissionStatistics,
 } from "@oj2/contract"
-import api2 from "utils/api2"
+import api from "utils/api"
 import { filterResult } from "oj/transforms"
 import type {
   Announcement,
@@ -65,7 +65,7 @@ function detailProblem(value: unknown): Problem {
 }
 
 export function getWebsiteConfig() {
-  return api2.get<WebsiteConfig>("site")
+  return api.get<WebsiteConfig>("site")
 }
 
 export async function getProblemList(
@@ -73,17 +73,17 @@ export async function getProblemList(
   limit = 10,
   searchParams: Record<string, unknown> = {},
 ) {
-  const res = await api2.get<ProblemList>("problems", {
+  const res = await api.get<ProblemList>("problems", {
     params: { paging: true, offset, limit, ...searchParams },
   })
   return {
-    results: res.data.results.map(filterResult),
-    total: res.data.total,
+    results: res.results.map(filterResult),
+    total: res.total,
   }
 }
 
 export function getAuthors(all = false) {
-  return api2.get<ProblemAuthor[]>("problem-authors", {
+  return api.get<ProblemAuthor[]>("problem-authors", {
     params: { all: all ? "1" : "0" },
   })
 }
@@ -92,27 +92,23 @@ export async function getProblem(problemID: string, contestID: string) {
   const endpoint = contestID
     ? `contests/${encodeURIComponent(contestID)}/problems/${encodeURIComponent(problemID)}`
     : `problems/${encodeURIComponent(problemID)}`
-  const response = await api2.get<unknown>(endpoint)
-  return { error: null, data: detailProblem(response.data) }
+  return detailProblem(await api.get<unknown>(endpoint))
 }
 
 // 未登录返回 "0"，登录后返回百分比字符串
 export function getProblemBeatRate(problemID: number) {
-  return api2.get<string>(`problems/${problemID}/beat-count`)
+  return api.get<string>(`problems/${problemID}/beat-count`)
 }
 
 export async function getSubmission(id: string) {
-  const response = await api2.get<unknown>(
+  const response = await api.get<unknown>(
     `submissions/${encodeURIComponent(id)}`,
   )
-  return {
-    error: null,
-    data: submissionDetailSchema.parse(response.data) as Submission,
-  }
+  return submissionDetailSchema.parse(response) as Submission
 }
 
 export function submitCode(data: SubmitCodePayload) {
-  return api2.post<CreateSubmissionResponse>("submissions", data)
+  return api.post<CreateSubmissionResponse>("submissions", data)
 }
 
 export function formatCode(data: { code: string; language: string }) {
@@ -122,7 +118,7 @@ export function formatCode(data: { code: string; language: string }) {
     "C++": "cpp",
     SQL: "sql",
   }
-  return api2.post<FormatCodeResponse>("code/format", {
+  return api.post<FormatCodeResponse>("code/format", {
     code: data.code,
     language: languages[data.language] ?? data.language.toLowerCase(),
   })
@@ -134,22 +130,22 @@ export function getSubmissions(params: Partial<SubmissionListPayload>) {
     : "submissions"
   // 契约里 language 是 z.string()（语言是配置项，随时可能加，收紧成枚举会让
   // 新加的语言在后端 parse 时直接抛），前端在这一处收窄成 LANGUAGE
-  return api2.get<{ results: SubmissionListItem[]; total: number }>(endpoint, {
+  return api.get<{ results: SubmissionListItem[]; total: number }>(endpoint, {
     // contestId 走的是路径，page 只有前端分页器用
     params: { ...params, contestId: undefined, page: undefined },
   })
 }
 
 export function getRankOfProblem(problemId: string) {
-  return api2.get<ProblemRank>(`problems/${encodeURIComponent(problemId)}/rank`)
+  return api.get<ProblemRank>(`problems/${encodeURIComponent(problemId)}/rank`)
 }
 
 export function getTodaySubmissionCount(language?: string) {
-  return api2.get<number>("submissions/today-count", { params: { language } })
+  return api.get<number>("submissions/today-count", { params: { language } })
 }
 
 export function adminRejudge(id: string) {
-  return api2.post<{ ok: boolean }>(
+  return api.post<{ ok: boolean }>(
     `submissions/${encodeURIComponent(id)}/rejudge`,
   )
 }
@@ -159,7 +155,7 @@ export function getSubmissionStatistics(
   problemID?: string,
   username?: string,
 ) {
-  return api2.get<SubmissionStatistics>("submissions/statistics", {
+  return api.get<SubmissionStatistics>("submissions/statistics", {
     params: { ...duration, problemId: problemID, username },
   })
 }
@@ -169,17 +165,17 @@ export function getSubmissionStatistics(
  * 「全服 Top10」就是这个榜的第一页，取 limit=10 即可，不需要另一个上限参数。
  */
 export function getRank(offset: number, limit: number) {
-  return api2.get<UserRank>("rankings/users", { params: { offset, limit } })
+  return api.get<UserRank>("rankings/users", { params: { offset, limit } })
 }
 
 export function getActivityRank(start: string) {
-  return api2.get<ActivityRankItem[]>("rankings/activity", {
+  return api.get<ActivityRankItem[]>("rankings/activity", {
     params: { start },
   })
 }
 
 export function getClassRank(grade?: number | null) {
-  return api2.get<ClassRankItem[]>("rankings/classes", { params: { grade } })
+  return api.get<ClassRankItem[]>("rankings/classes", { params: { grade } })
 }
 
 export function getUserClassRank(
@@ -187,7 +183,7 @@ export function getUserClassRank(
   offset?: number,
   limit?: number,
 ) {
-  return api2.get<ClassUserRank>("me/class-rank", {
+  return api.get<ClassUserRank>("me/class-rank", {
     params: { scope, offset, limit },
   })
 }
@@ -197,7 +193,7 @@ export function getClassPK(
   startTime?: string,
   endTime?: string,
 ) {
-  return api2.post<ClassComparisonResponse>("classes/comparison", {
+  return api.post<ClassComparisonResponse>("classes/comparison", {
     classNames,
     ...(startTime ? { startTime } : {}),
     ...(endTime ? { endTime } : {}),
@@ -211,20 +207,20 @@ export function getContestList(query: {
   status: string
   tag: string
 }) {
-  return api2.get<ContestList>("contests", { params: query })
+  return api.get<ContestList>("contests", { params: query })
 }
 
 export function getContest(id: string) {
-  return api2.get<OjContest>(`contests/${encodeURIComponent(id)}`)
+  return api.get<OjContest>(`contests/${encodeURIComponent(id)}`)
 }
 
 export function getContestAccess(id: string) {
-  return api2.get<ContestAccess>(`contests/${encodeURIComponent(id)}/access`)
+  return api.get<ContestAccess>(`contests/${encodeURIComponent(id)}/access`)
 }
 
 // 注意和 GET /access 不一样：这个返回裸 true，密码错是 403 走 catch
 export function checkContestPassword(contestID: string, password: string) {
-  return api2.post<boolean>(
+  return api.post<boolean>(
     `contests/${encodeURIComponent(contestID)}/access`,
     {
       password,
@@ -233,10 +229,10 @@ export function checkContestPassword(contestID: string, password: string) {
 }
 
 export async function getContestProblems(contestID: string) {
-  const res = await api2.get<ProblemListItem[]>(
+  const res = await api.get<ProblemListItem[]>(
     `contests/${encodeURIComponent(contestID)}/problems`,
   )
-  return res.data.map(filterResult)
+  return res.map(filterResult)
 }
 
 export function getContestRank(
@@ -245,7 +241,7 @@ export function getContestRank(
 ) {
   // submissionInfo 在契约里是 Record<string, unknown>（JSONB 原文），
   // 前端在这里收窄成 SubmissionInfo，见 utils/types 的 ContestRank
-  return api2.get<{ results: ContestRank[]; total: number }>(
+  return api.get<{ results: ContestRank[]; total: number }>(
     `contests/${encodeURIComponent(contestID)}/rank`,
     { params: query },
   )
@@ -254,23 +250,23 @@ export function getContestRank(
 export function uploadAvatar(file: File) {
   const form = new window.FormData()
   form.append("image", file)
-  return api2.post("me/avatar", form, {
+  return api.post("me/avatar", form, {
     headers: { "content-type": "multipart/form-data" },
   })
 }
 
 export function updateProfile(data: { realName: string; mood: string }) {
-  return api2.put<Profile>("me/profile", data)
+  return api.put<Profile>("me/profile", data)
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api2.get<{ results: Announcement[]; total: number }>("announcements", {
+  return api.get<{ results: Announcement[]; total: number }>("announcements", {
     params: { limit, offset },
   })
 }
 
 export function getAnnouncement(id: number) {
-  return api2.get<Announcement>(`announcements/${id}`)
+  return api.get<Announcement>(`announcements/${id}`)
 }
 
 export function createMessage(data: {
@@ -278,7 +274,7 @@ export function createMessage(data: {
   message: string
   submission: string
 }) {
-  return api2.post("messages", {
+  return api.post("messages", {
     recipientId: data.recipient,
     message: data.message,
     submissionId: data.submission,
@@ -287,33 +283,33 @@ export function createMessage(data: {
 
 export function getMessageList(offset = 0, limit = 10) {
   // language 的收窄同 getSubmissions，见那里的说明
-  return api2.get<{ results: Message[]; total: number }>("messages", {
+  return api.get<{ results: Message[]; total: number }>("messages", {
     params: { limit, offset },
   })
 }
 
 export function getReaction(problemID: number) {
-  return api2.get<ReactionState>(`problems/${problemID}/reaction`)
+  return api.get<ReactionState>(`problems/${problemID}/reaction`)
 }
 
 export function setReaction(problemID: number, type: ReactionKey) {
-  return api2.post<ReactionState>(`problems/${problemID}/reaction`, { type })
+  return api.post<ReactionState>(`problems/${problemID}/reaction`, { type })
 }
 
 export function getMetrics(userid: number) {
-  return api2.get<Metrics>(`users/${userid}/metrics`)
+  return api.get<Metrics>(`users/${userid}/metrics`)
 }
 
 export function getTutorial(id: number) {
-  return api2.get<Tutorial>(`tutorials/${id}`)
+  return api.get<Tutorial>(`tutorials/${id}`)
 }
 
 export function getTutorials(type: "python" | "c") {
-  return api2.get<TutorialSummary[]>("tutorials", { params: { type } })
+  return api.get<TutorialSummary[]>("tutorials", { params: { type } })
 }
 
 export function getAIDetailData(start: string, end: string, username?: string) {
-  return api2.get<AiDetail>("ai/detail", { params: { start, end, username } })
+  return api.get<AiDetail>("ai/detail", { params: { start, end, username } })
 }
 
 export function getAIDurationData(
@@ -321,40 +317,37 @@ export function getAIDurationData(
   duration: string,
   username?: string,
 ) {
-  return api2.get<DurationData[]>("ai/duration", {
+  return api.get<DurationData[]>("ai/duration", {
     params: { end, duration, username },
   })
 }
 
 export function getAIHeatmapData(username?: string) {
-  return api2.get<HeatmapItem[]>("ai/heatmap", {
+  return api.get<HeatmapItem[]>("ai/heatmap", {
     params: username ? { username } : {},
   })
 }
 
 export function getAILoginSummary() {
-  return api2.get<LoginSummary>("ai/login-summary")
+  return api.get<LoginSummary>("ai/login-summary")
 }
 
 export function getAIPinnedReport() {
-  return api2.get<AiAnalysisRecord | null>("ai/pinned")
+  return api.get<AiAnalysisRecord | null>("ai/pinned")
 }
 
 // ==================== 相似题目推荐 ====================
 
 export function getSimilarProblems(problemId: string) {
-  return api2
+  return api
     .get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
-    .then((response) => ({
-      ...response,
-      data: response.data.map(filterResult),
-    }))
+    .then((response) => response.map(filterResult))
 }
 
 export type { YearlyAc as YearlyACData } from "@oj2/contract"
 
 export function getProblemYearlyAC(problemId: string) {
-  return api2.get<YearlyAc[]>(
+  return api.get<YearlyAc[]>(
     `problems/${encodeURIComponent(problemId)}/yearly-ac`,
   )
 }
@@ -366,11 +359,11 @@ export function submitFlowchart(data: {
   mermaidCode: string
   flowchartData: Record<string, unknown> // 压缩之后的，元数据太长了
 }) {
-  return api2.post<CreateFlowchartResponse>("flowcharts", data)
+  return api.post<CreateFlowchartResponse>("flowcharts", data)
 }
 
 export function getFlowchartSubmission(id: string) {
-  return api2.get<FlowchartSubmission>(`flowcharts/${encodeURIComponent(id)}`)
+  return api.get<FlowchartSubmission>(`flowcharts/${encodeURIComponent(id)}`)
 }
 
 export function getFlowchartSubmissions(params: {
@@ -382,7 +375,7 @@ export function getFlowchartSubmissions(params: {
   today?: string
   grade?: string
 }) {
-  return api2.get<FlowchartList>("flowcharts", { params })
+  return api.get<FlowchartList>("flowcharts", { params })
 }
 
 export function getFlowchartStatistics(
@@ -390,23 +383,23 @@ export function getFlowchartStatistics(
   problemID?: string,
   username?: string,
 ) {
-  return api2.get<FlowchartStatistics>("flowcharts/statistics", {
+  return api.get<FlowchartStatistics>("flowcharts/statistics", {
     params: { ...duration, problemId: problemID, username },
   })
 }
 
 export function retryFlowchartSubmission(submissionId: string) {
-  return api2.post<{ status: string }>(
+  return api.post<{ status: string }>(
     `flowcharts/${encodeURIComponent(submissionId)}/retry`,
   )
 }
 
 export function getCurrentProblemFlowchartSubmission(problemId: number) {
-  return api2.get<FlowchartCurrent>(`problems/${problemId}/flowchart/current`)
+  return api.get<FlowchartCurrent>(`problems/${problemId}/flowchart/current`)
 }
 
 export function getFlowchartSubmissionDetail(problemId: number, page = 0) {
-  return api2.get<FlowchartDetail>(`problems/${problemId}/flowchart/history`, {
+  return api.get<FlowchartDetail>(`problems/${problemId}/flowchart/history`, {
     params: { page },
   })
 }
@@ -420,21 +413,21 @@ export function getProblemSetList(
   difficulty = "",
   status = "",
 ) {
-  return api2.get<ProblemSetList>("problem-sets", {
+  return api.get<ProblemSetList>("problem-sets", {
     params: { offset, limit, keyword, difficulty, status },
   })
 }
 
 export function getProblemSetDetail(id: number) {
-  return api2.get<ProblemSet>(`problem-sets/${id}`)
+  return api.get<ProblemSet>(`problem-sets/${id}`)
 }
 
 export function getProblemSetProblems(problemSetId: number) {
-  return api2.get<ProblemSetProblem[]>(`problem-sets/${problemSetId}/problems`)
+  return api.get<ProblemSetProblem[]>(`problem-sets/${problemSetId}/problems`)
 }
 
 export function joinProblemSet(problemSetId: number) {
-  return api2.post("problem-set-progress", { problemSetId })
+  return api.post("problem-set-progress", { problemSetId })
 }
 
 export function updateProblemSetProgress(
@@ -442,7 +435,7 @@ export function updateProblemSetProgress(
   problemId: number,
   submissionId: string,
 ) {
-  return api2.put("problem-set-progress", {
+  return api.put("problem-set-progress", {
     problemSetId,
     problemId,
     submissionId,
@@ -450,13 +443,13 @@ export function updateProblemSetProgress(
 }
 
 export function getUserBadges(username?: string) {
-  return api2.get<UserBadge[]>(
+  return api.get<UserBadge[]>(
     `users/${encodeURIComponent(username ?? "me")}/badges`,
   )
 }
 
 export function getProblemSetBadges(problemSetId: number) {
-  return api2.get<ProblemSetBadge[]>(`problem-sets/${problemSetId}/badges`)
+  return api.get<ProblemSetBadge[]>(`problem-sets/${problemSetId}/badges`)
 }
 
 export function getProblemSetUserProgress(
@@ -468,13 +461,12 @@ export function getProblemSetUserProgress(
     completionStatus?: "" | "completed" | "in_progress" | "not_started"
   },
 ) {
-  return api2.get<ProblemSetProgressList>(
+  return api.get<ProblemSetProgressList>(
     `problem-sets/${problemSetId}/user-progress`,
     { params },
   )
 }
 
-export async function getExercises(tutorialId: number): Promise<Exercise[]> {
-  const res = await api2.get<Exercise[]>(`tutorials/${tutorialId}/exercises`)
-  return res.data
+export function getExercises(tutorialId: number): Promise<Exercise[]> {
+  return api.get<Exercise[]>(`tutorials/${tutorialId}/exercises`)
 }

@@ -25,9 +25,9 @@ export function useSubmissionMonitor() {
 
       try {
         const res = await getSubmission(submissionId.value)
-        submission.value = res.data
+        submission.value = res
 
-        const result = res.data.result
+        const result = res.result
         // 判题完成，停止轮询
         if (
           result !== SubmissionStatus.judging &&
@@ -83,7 +83,7 @@ export function useSubmissionMonitor() {
       pausePolling()
 
       getSubmission(submissionId.value).then((res) => {
-        submission.value = res.data
+        submission.value = res
         // 15分钟无新提交则断开WebSocket（节省资源）
         scheduleDisconnect(15 * 60 * 1000)
       })

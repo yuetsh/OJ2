@@ -54,10 +54,9 @@ async function load() {
       getAchievementSummary(name.value),
       getUserBadges(name.value),
     ])
-    // http 客户端返回 ApiResponse<T>，真实载荷在 .data 里
-    achievements.value = list.data.achievements
-    summary.value = sum.data
-    badges.value = badgeRes.data ?? []
+    achievements.value = list.achievements
+    summary.value = sum
+    badges.value = badgeRes ?? []
   } finally {
     loading.value = false
   }
