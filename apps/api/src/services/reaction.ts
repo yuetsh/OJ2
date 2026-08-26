@@ -1,4 +1,4 @@
-import { reactionKeySchema } from "@oj2/contract"
+import { reactionKeySchema, type ReactionKey } from "@oj2/contract"
 import { count, inArray } from "drizzle-orm"
 
 import { db, schema } from "../db"
@@ -12,8 +12,13 @@ const TYPE_ORDER = new Map<string, number>(
   reactionKeySchema.options.map((key, index) => [key, index]),
 )
 
+/** 库里的 type 是裸字符串；在 TYPE_ORDER 里就等价于「契约认得的类型」。 */
+function isReactionKey(value: string): value is ReactionKey {
+  return TYPE_ORDER.has(value)
+}
+
 export interface TopReaction {
-  type: string
+  type: ReactionKey
   count: number
 }
 
@@ -38,10 +43,10 @@ export async function getTopReactions(problemIds: number[]) {
     .groupBy(schema.reaction.problemId, schema.reaction.type)
 
   for (const row of rows) {
-    const order = TYPE_ORDER.get(row.type)
     // 库里可能残留前端已经下掉的旧类型。跳过而不是当成并列最优 ——
     // 否则一个已经不展示的类型会把真正的最高票挤掉。
-    if (order === undefined) continue
+    if (!isReactionKey(row.type)) continue
+    const order = TYPE_ORDER.get(row.type)!
     const current = top.get(row.problemId)
     if (
       !current ||

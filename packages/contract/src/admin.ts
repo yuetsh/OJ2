@@ -3,7 +3,8 @@ import { z } from "zod"
 import { achievementRaritySchema } from "./achievement"
 import { rankProfileSchema } from "./account"
 import { paginatedSchema, sampleUserSchema } from "./common"
-import { problemDifficultySchema } from "./problem"
+import { reactionKeySchema } from "./content"
+import { problemDifficultySchema, sqlConfigSchema, sqlDisplaySchema } from "./problem"
 
 /**
  * 后台侧的契约。与 oj 侧分开放：同一张表在两侧下发的字段集通常不同
@@ -513,10 +514,10 @@ export const adminProblemListItemSchema = z.object({
   hasAstRules: z.boolean(),
   allowFlowchart: z.boolean(),
   showFlowchart: z.boolean(),
-  // 最高票评价 {type, count}。**当前后端恒传 null** —— 旧后端的
-  // reaction/services.py:get_top_reactions 没有跟着迁过来，这一列现在是空的。
+  // 最高票评价 {type, count}。**只有公开题列表下发**，比赛题列表恒传 null ——
+  // 与旧后端 reaction/services.py:get_top_reactions 的口径一致。
   topReaction: z
-    .object({ type: z.string(), count: z.number().int() })
+    .object({ type: reactionKeySchema, count: z.number().int() })
     .nullable(),
 })
 
@@ -558,8 +559,8 @@ export const adminProblemSchema = z.object({
   astRules: z.unknown(),
   answers: z.array(z.record(z.string(), z.unknown())),
   prompt: z.string().nullable(),
-  sqlConfig: z.record(z.string(), z.unknown()).nullable(),
-  sqlDisplay: z.record(z.string(), z.unknown()).nullable(),
+  sqlConfig: sqlConfigSchema.nullable(),
+  sqlDisplay: sqlDisplaySchema.nullable(),
 })
 
 export const createProblemRequestSchema = z.object({
@@ -588,7 +589,12 @@ export const createProblemRequestSchema = z.object({
   mermaidCode: z.string().nullable().default(null),
   flowchartHint: z.string().nullable().default(null),
   astRules: z.unknown().default(null),
-  sqlConfig: z.record(z.string(), z.unknown()).nullable().default(null),
+  // order_sensitive 缺省补 false —— 与旧后端 SQLConfigSerializer 的
+  // `BooleanField(default=False)` 一致
+  sqlConfig: sqlConfigSchema
+    .extend({ order_sensitive: z.boolean().default(false) })
+    .nullable()
+    .default(null),
 })
 
 export const updateProblemRequestSchema = createProblemRequestSchema

@@ -16,8 +16,6 @@ export function toProblemListItem(
     hasAstRules: result.hasAstRules,
     allowFlowchart: result.allowFlowchart,
     showFlowchart: result.showFlowchart,
-    // 比赛题目列表接口不返回这个字段
-    topReaction: (result.topReaction ??
-      null) as AdminProblemFiltered["topReaction"],
+    topReaction: result.topReaction,
   }
 }

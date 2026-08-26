@@ -11,6 +11,7 @@ import {
   sqlPreviewRequestSchema,
   sqlTestCaseScriptSchema,
   uploadTestCaseResponseSchema,
+  type SqlConfig,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -138,7 +139,7 @@ function commonChecks(data: {
   inputDescription: string
   outputDescription: string
   samples: unknown[]
-  sqlConfig: Record<string, unknown> | null
+  sqlConfig: SqlConfig | null
   answers: Record<string, unknown>[]
 }): { error: string } | { sql: boolean } {
   if (data.languages.includes("SQL")) {
@@ -164,7 +165,7 @@ function commonChecks(data: {
 async function generateSqlDisplay(
   testCaseId: string,
   answers: Record<string, unknown>[],
-  sqlConfig: Record<string, unknown>,
+  sqlConfig: SqlConfig,
 ): Promise<{ error: string } | { display: unknown }> {
   const info = await readInfo(testCaseId)
   if (!info) return { error: "测试点信息读取失败，请重新上传测试点" }
@@ -183,8 +184,7 @@ async function generateSqlDisplay(
     (item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim(),
   )?.code
   if (typeof refSql !== "string") return { error: "题目缺少 SQL 标准答案" }
-  const mode = sqlConfig.mode === "modify" ? "modify" as const : "query" as const
-  const outcome = await buildSqlDisplay(initSql, refSql, mode)
+  const outcome = await buildSqlDisplay(initSql, refSql, sqlConfig.mode)
   if (!outcome.ok) return { error: `SQL 展示数据生成失败: ${outcome.message}` }
   return { display: outcome.value }
 }

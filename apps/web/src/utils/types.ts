@@ -52,36 +52,17 @@ export type LANGUAGE =
   | "Flowchart"
   | "SQL"
 
-export interface SQLConfig {
-  mode: "query" | "modify"
-  order_sensitive: boolean
-}
-
-export interface SQLDisplayColumn {
-  name: string
-  type?: string
-}
-
-export interface SQLDisplayTable {
-  name: string
-  columns: SQLDisplayColumn[]
-  rows: (string | number | null)[][]
-  total_rows: number
-  truncated: boolean
-  dropped?: boolean
-}
-
-export interface SQLDisplay {
-  tables: SQLDisplayTable[]
-  expected:
-    | {
-        columns: SQLDisplayColumn[]
-        rows: (string | number | null)[][]
-        total_rows: number
-        truncated: boolean
-      }
-    | { changed_tables: SQLDisplayTable[] }
-}
+/**
+ * SQL 题的配置与展示数据。形状在契约里 —— 原来这里手抄了一份，
+ * 而契约那边是 `Record<string, unknown>`，等于渲染表格的那段代码全靠手抄件兜底。
+ * 键名的 snake_case 是 JSONB 原文，见契约 sqlDisplaySchema 的注释。
+ */
+export type {
+  SqlConfig,
+  SqlDisplay,
+  SqlDisplayTable,
+  SqlDisplayColumn,
+} from "@oj2/contract"
 
 export type SUBMISSION_RESULT =
   -2 | -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
@@ -119,17 +100,11 @@ export type Testcase = TestCaseEntry & { score: string }
 /**
  * 题目详情。以契约的 ProblemDetail 为准，只在这里补两处前端自己的窄化：
  * - `languages` / `template` 的键窄化成 LANGUAGE，组件按语言查模板要靠它
- * - `astRules` / `sqlConfig` / `sqlDisplay` 契约里是 Record<string, unknown>，
- *   这里给出组件实际读的形状
+ * - `astRules` 契约里是 unknown，这里给出组件实际读的形状
  */
-export type Problem = Omit<
-  ProblemDetail,
-  "languages" | "template" | "sqlConfig" | "sqlDisplay"
-> & {
+export type Problem = Omit<ProblemDetail, "languages" | "template"> & {
   languages: LANGUAGE[]
   template: { [key in LANGUAGE]?: string }
-  sqlConfig?: SQLConfig | null
-  sqlDisplay?: SQLDisplay | null
   astRules?: AstRules | null
   hasAstRules?: boolean
   visible?: boolean
@@ -159,8 +134,6 @@ export type AdminProblem = Omit<
   | "languages"
   | "template"
   | "testCaseScore"
-  | "sqlConfig"
-  | "sqlDisplay"
   | "samples"
   | "answers"
   | "astRules"
@@ -171,8 +144,6 @@ export type AdminProblem = Omit<
   testCaseScore: Testcase[]
   samples: { input: string; output: string }[]
   answers: { language: LANGUAGE; code: string }[]
-  sqlConfig?: SQLConfig | null
-  sqlDisplay?: SQLDisplay | null
   astRules?: AstRules | null
 }
 
@@ -227,8 +198,8 @@ export interface AdminProblemFiltered {
   hasAstRules: boolean
   allowFlowchart: boolean
   showFlowchart: boolean
-  // 比赛题目列表接口不返回这个字段
-  topReaction?: { type: ReactionKey; count: number } | null
+  // 比赛题目列表恒为 null —— 只有公开题列表下发最高票评价
+  topReaction: { type: ReactionKey; count: number } | null
 }
 
 // 题单相关类型

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LANGUAGE, SQLDisplay, Testcase } from "utils/types"
+import type { LANGUAGE, SqlDisplay, Testcase } from "utils/types"
 import { createZipBlob } from "utils/functions"
 import SQLDataTable from "oj/problem/components/SQLDataTable.vue"
 import {
@@ -12,7 +12,7 @@ import {
 interface ScriptEntry {
   id: number
   sql: string
-  display: SQLDisplay | null
+  display: SqlDisplay | null
   error: string
   // 标准答案或题型改过之后，旧预览结果作废，需重新预览才能上传
   stale: boolean
@@ -109,11 +109,11 @@ function reset() {
   scripts.value = [blankEntry(), blankEntry(), blankEntry()]
 }
 
-function expectedQuery(d: SQLDisplay) {
+function expectedQuery(d: SqlDisplay) {
   return "columns" in d.expected ? d.expected : null
 }
 
-function changedTables(d: SQLDisplay) {
+function changedTables(d: SqlDisplay) {
   return "changed_tables" in d.expected ? d.expected.changed_tables : []
 }
 

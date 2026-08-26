@@ -29,7 +29,7 @@ import type {
   Contest,
   Exercise,
   ExerciseType,
-  SQLDisplay,
+  SqlDisplay,
   TestcaseUploadedReturns,
   Tutorial,
   User,
@@ -237,7 +237,7 @@ export function previewSQLTestcase(data: {
   refSql: string
   mode: "query" | "modify"
 }) {
-  return api2.post<SQLDisplay>("admin/sql-test-cases/preview", data)
+  return api2.post<SqlDisplay>("admin/sql-test-cases/preview", data)
 }
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）

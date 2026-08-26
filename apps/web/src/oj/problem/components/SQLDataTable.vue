@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { SQLDisplayColumn } from "utils/types"
+import type { SqlDisplayColumn } from "utils/types"
 
 defineProps<{
-  columns: SQLDisplayColumn[]
+  columns: SqlDisplayColumn[]
   rows: (string | number | null)[][]
   totalRows?: number
   truncated?: boolean
