@@ -790,7 +790,6 @@ watch(
           </n-tag>
           <n-button
             type="info"
-            size="small"
             :loading="classDetailAiLoading"
             @click="analyzeSingleClassWithAI"
           >
