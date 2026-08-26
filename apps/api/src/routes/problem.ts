@@ -148,9 +148,16 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
 
 problemRoutes.get("/problem-tags", async (c) => {
 	const keyword = c.req.query("keyword")?.trim()
+	// 只数公开题库里可见的题：隐藏的题和比赛题都不算，否则标签会出现在
+	// 首页列表里，点进去却一道题都筛不出来（对齐 /problems 的过滤条件）
 	const rows = await db.select({ id: schema.problemTag.id, name: schema.problemTag.name, problemCount: countDistinct(schema.problemTags.problemId) })
 		.from(schema.problemTag)
 		.innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
+		.innerJoin(schema.problem, and(
+			eq(schema.problem.id, schema.problemTags.problemId),
+			eq(schema.problem.visible, true),
+			isNull(schema.problem.contestId),
+		))
 		.where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
 		.groupBy(schema.problemTag.id, schema.problemTag.name).having(sql`count(${schema.problemTags.problemId}) > 0`)
 		.orderBy(asc(schema.problemTag.name))
