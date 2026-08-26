@@ -8,6 +8,20 @@
       "when": 1786070652521,
       "tag": "0000_crazy_gateway",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787740189021,
+      "tag": "0001_add_submission_public_create_time_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787740469403,
+      "tag": "0002_drop_django_leftovers",
+      "breakpoints": true
     }
   ]
 }

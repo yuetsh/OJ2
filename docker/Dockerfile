@@ -129,6 +129,16 @@ COPY --from=ghcr.io/astral-sh/ruff:0.15.12 /ruff /usr/local/bin/ruff
 
 COPY --from=artifacts /artifacts/oj2-api /usr/local/bin/oj2-api
 
+# 迁移文件**不内嵌进二进制**，随镜像装在这个固定路径下（apps/api/src/runtime.ts
+# 的 migrationsDir 写死的就是它）。这样 drizzle 的 migrate() 能原样用 —— 它靠
+# meta/_journal.json 自动发现迁移，新增迁移不用改任何代码。内嵌的话得为每条迁移
+# 手写一行 import，那是迟早会漏的账。
+#
+# 只拷 .sql 和 journal，不拷 meta/*_snapshot.json（那是 drizzle-kit generate 用的，
+# 运行时不读，几百 KB 没必要进镜像）。
+COPY apps/api/src/db/*.sql /usr/local/share/oj2/migrations/
+COPY apps/api/src/db/meta/_journal.json /usr/local/share/oj2/migrations/meta/
+
 # /data 下是要持久化的东西：测试用例、上传的图片、头像。
 # 相对路径按 cwd 解析（见 apps/api/src/runtime.ts），所以 workdir 设成 /data；
 # 但下面的路径全写绝对值，不靠这个巧合。

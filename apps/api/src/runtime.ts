@@ -32,3 +32,20 @@ export function selfCommand(subcommand: string): string[] {
  *   就会落到 apps/api/data/ 下，两边不是同一个目录，新传的测试点判题时报「找不到测试数据」。
  */
 export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, "../../..")
+
+/**
+ * 迁移文件（`0000_*.sql` … + `meta/_journal.json`）所在目录。
+ *
+ * 这些文件**不内嵌进二进制**，而是随镜像一起装到一个固定绝对路径下。
+ * 之所以能这么做、也应该这么做：CLAUDE.md 里「单二进制是有代价的」那条讲的是
+ * 不能依赖 node_modules、不能拿 `import.meta.dir` 去推路径（编译后它恒为
+ * `/$bunfs/root`，往上几级就跑到文件系统根）。按一个**显式给定的绝对路径**读一个
+ * 数据目录不在此列。
+ *
+ * 换来的好处是 drizzle 的 `migrate()` 能原样用 —— 它靠 `_journal.json` 自动发现
+ * 迁移，和 Django 扫 `migrations/` 是一回事。要是改成内嵌，就得为每条迁移手写一行
+ * import，那是迟早会漏的账。
+ */
+export const migrationsDir =
+  process.env.OJ2_MIGRATIONS_DIR ??
+  (isCompiled ? "/usr/local/share/oj2/migrations" : resolve(import.meta.dir, "db"))

@@ -13,7 +13,9 @@
     "seed:dev": "bun src/scripts/seed-dev.ts",
     "typecheck": "tsc --noEmit",
     "check:routes": "bun src/scripts/check-route-shadowing.ts",
-    "db:pull": "drizzle-kit pull"
+    "db:pull": "drizzle-kit pull",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@node-rs/jieba": "^2.0.2",

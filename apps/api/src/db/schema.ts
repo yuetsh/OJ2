@@ -1,20 +1,27 @@
-// 本文件由 `drizzle-kit pull` 从本地库自动生成，drizzle.config.ts 的 tablesFilter
-// (["!django_*", "!auth_*"]) 已生效：34 张表中的 7 张 Django 框架表
-// (auth_group、auth_group_permissions、auth_permission、django_content_type、
-// django_dramatiq_task、django_migrations、django_session) 均未生成 pgTable 定义，
-// 剩余 27 张业务表原样保留。
+// 本文件由 `drizzle-kit pull` 从生产库自动生成，之后按下面几条手工维护。
 //
-// 手工剪枝：tablesFilter 只过滤了 pgTable，未过滤这些框架表的 id 序列，遗留了
-// 5 个孤儿 pgSequence 导出（authGroupIdSeq、authGroupPermissionsIdSeq、
-// authPermissionIdSeq、djangoContentTypeIdSeq、djangoMigrationsIdSeq）——
-// 它们不被任何剩余表引用，留着只会在未来 `drizzle-kit generate` 时生成多余的
-// `CREATE SEQUENCE` 迁移，因此手工删除。
+// 2026-08-26：旧 Django 后端下线，7 张框架表（auth_group、auth_group_permissions、
+// auth_permission、django_content_type、django_dramatiq_task、django_migrations、
+// django_session）已由 0002_drop_django_leftovers 删除，drizzle.config.ts 的
+// tablesFilter 随之移除。库里现在就是这 27 张业务表。
+//
+// 手工修正（都是 `pull` 自己没法无损 round-trip 的地方，改回去会让 generate 产生假 diff，
+// 详见 CLAUDE.md「改 schema 走 drizzle migration」）：
+//   * bigint identity 的 maxValue 用字符串，不能写成 JS number 字面量（会丢精度）。
+//   * 索引不写 `.desc()`，生成 SQL 时方向会被丢掉。
+//
+// 关于 10 张表的 bigint id（problemset*、achievement、user_achievement、user_stat、
+// user_badge、ai_analysis）：这是历史巧合不是设计——这些 app 的 0001_initial 生成时
+// Django 还没设 DEFAULT_AUTO_FIELD，用了 3.2+ 的默认 BigAutoField；更早的表（user、
+// problem、contest、submission）都是 int4。现存最大 id 一万出头，确实都用不上 bigint，
+// 但 2026-08-26 评估后决定**不改**：省 4 字节/行毫无意义，ALTER TYPE 要重写整表并拿
+// ACCESS EXCLUSIVE 锁，而且其中 6 处 id 被外键绑着得连坐。别再提这件事了。
 import { pgTable, index, foreignKey, bigint, text, jsonb, timestamp, integer, boolean, serial, doublePrecision, varchar, unique, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const aiAnalysis = pgTable("ai_analysis", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "ai_analysis_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "ai_analysis_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	provider: text().notNull(),
 	data: jsonb().notNull(),
 	systemPrompt: text("system_prompt").notNull(),
@@ -55,7 +62,7 @@ export const announcement = pgTable("announcement", {
 
 export const achievement = pgTable("achievement", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "achievement_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "achievement_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	name: text().notNull(),
 	description: text().notNull(),
 	icon: text().notNull(),
@@ -222,7 +229,7 @@ export const optionsSysoptions = pgTable("options_sysoptions", {
 
 export const problemset = pgTable("problemset", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	title: text().notNull(),
 	description: text().notNull(),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
@@ -243,7 +250,7 @@ export const problemset = pgTable("problemset", {
 
 export const problemsetProblem = pgTable("problemset_problem", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_problem_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_problem_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	order: integer().notNull(),
 	isRequired: boolean("is_required").notNull(),
 	score: integer().notNull(),
@@ -269,7 +276,7 @@ export const problemsetProblem = pgTable("problemset_problem", {
 
 export const problemsetProgress = pgTable("problemset_progress", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_progress_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_progress_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	joinTime: timestamp("join_time", { withTimezone: true, mode: 'string' }).notNull(),
 	completeTime: timestamp("complete_time", { withTimezone: true, mode: 'string' }),
 	isCompleted: boolean("is_completed").notNull(),
@@ -299,7 +306,7 @@ export const problemsetProgress = pgTable("problemset_progress", {
 
 export const problemsetSubmission = pgTable("problemset_submission", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_submission_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_submission_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	problemId: integer("problem_id").notNull(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
@@ -460,6 +467,17 @@ export const submission = pgTable("submission", {
 	ip: text(),
 }, (table) => [
 	index("contest_create_time_idx").using("btree", table.contestId.asc().nullsLast().op("timestamptz_ops"), table.createTime.desc().nullsFirst().op("int4_ops")),
+	// 提交列表默认视图（WHERE contest_id IS NULL ORDER BY create_time DESC）专用。
+	// 上面的 contest_create_time_idx 看着能覆盖，但 Postgres 不把 `contest_id IS NULL`
+	// 当成能吃掉首列、从而继承第二列有序性的等值条件——把 seqscan/bitmapscan 全关掉逼它
+	// 也不肯用，只会走单列 contest_id 索引再全量排序。结果是每翻一页都 Parallel Seq Scan
+	// 扫完整张表 + top-N 排序。改用部分索引后谓词由索引本身保证，排序序就是索引序。
+	// 生产快照（12.3 万条提交）实测：61.8ms / 18936 blocks → 0.22ms / 34 blocks。
+	// 这个索引不在 Django 的 migration 里，是 OJ2 单独加的，见 src/db/0001_naive_agent_zero.sql。
+	// 不写 .desc()：drizzle-kit 生成 SQL 时会把方向丢掉，写了会让快照（记 asc:false）和实际
+	// 建出来的索引（ASC）对不上，下次 pull 就产生假 diff。单列索引无所谓方向，Postgres 用
+	// Index Scan Backward 服务 ORDER BY ... DESC，实测同样是 0.08ms。
+	index("submission_public_create_time_idx").using("btree", table.createTime.op("timestamptz_ops")).where(sql`${table.contestId} is null`),
 	index("problem_user_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
 	index("submission_contest_id_775716d5").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
 	index("submission_problem_id_76847b55").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
@@ -500,7 +518,7 @@ export const tutorial = pgTable("tutorial", {
 
 export const userStat = pgTable("user_stat", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_stat_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_stat_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	metrics: jsonb().default({}).notNull(),
 	updateTime: timestamp("update_time", { withTimezone: true, mode: 'string' }).notNull(),
 	userId: integer("user_id").notNull(),
@@ -515,7 +533,7 @@ export const userStat = pgTable("user_stat", {
 
 export const userAchievement = pgTable("user_achievement", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_achievement_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_achievement_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	unlockTime: timestamp("unlock_time", { withTimezone: true, mode: 'string' }).notNull(),
 	backfilled: boolean().default(false).notNull(),
 	notified: boolean().default(false).notNull(),
@@ -542,7 +560,7 @@ export const userAchievement = pgTable("user_achievement", {
 
 export const userBadge = pgTable("user_badge", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_badge_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "user_badge_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	earnedTime: timestamp("earned_time", { withTimezone: true, mode: 'string' }).notNull(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	badgeId: bigint("badge_id", { mode: "number" }).notNull(),
@@ -634,7 +652,7 @@ export const user = pgTable("user", {
 
 export const problemsetBadge = pgTable("problemset_badge", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_badge_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 9223372036854775807, cache: 1 }),
+	id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({ name: "problemset_badge_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: "9223372036854775807", cache: 1 }),
 	name: text().notNull(),
 	description: text().notNull(),
 	icon: text().notNull(),

@@ -2552,7 +2552,6 @@
               "expression": "lower(name)",
               "asc": true,
               "nulls": "last",
-              "opclass": "text_ops",
               "isExpression": true
             }
           ],
@@ -3828,58 +3827,7 @@
   },
   "enums": {},
   "schemas": {},
-  "sequences": {
-    "public.auth_group_id_seq": {
-      "name": "auth_group_id_seq",
-      "schema": "public",
-      "startWith": "1",
-      "minValue": "1",
-      "maxValue": "2147483647",
-      "increment": "1",
-      "cycle": false,
-      "cache": "1"
-    },
-    "public.auth_group_permissions_id_seq": {
-      "name": "auth_group_permissions_id_seq",
-      "schema": "public",
-      "startWith": "1",
-      "minValue": "1",
-      "maxValue": "2147483647",
-      "increment": "1",
-      "cycle": false,
-      "cache": "1"
-    },
-    "public.auth_permission_id_seq": {
-      "name": "auth_permission_id_seq",
-      "schema": "public",
-      "startWith": "1",
-      "minValue": "1",
-      "maxValue": "2147483647",
-      "increment": "1",
-      "cycle": false,
-      "cache": "1"
-    },
-    "public.django_content_type_id_seq": {
-      "name": "django_content_type_id_seq",
-      "schema": "public",
-      "startWith": "1",
-      "minValue": "1",
-      "maxValue": "2147483647",
-      "increment": "1",
-      "cycle": false,
-      "cache": "1"
-    },
-    "public.django_migrations_id_seq": {
-      "name": "django_migrations_id_seq",
-      "schema": "public",
-      "startWith": "1",
-      "minValue": "1",
-      "maxValue": "2147483647",
-      "increment": "1",
-      "cycle": false,
-      "cache": "1"
-    }
-  },
+  "sequences": {},
   "roles": {},
   "policies": {},
   "views": {},

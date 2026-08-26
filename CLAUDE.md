@@ -1,17 +1,24 @@
 # CLAUDE.md
 
 OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScript，前后端同仓。
-上一代在 `../OnlineJudge/`（Django）和 `../ojnext/`（Vue SPA），**两者都是回滚路径，
-完全冻结、一行都不改。**
+上一代在 `../OnlineJudge/`（Django）和 `../ojnext/`（Vue SPA），**仍然完全冻结、
+一行都不改**。
 
-> **2026-08-26 起**：旧仓库零改动，没有例外——包括修 bug、包括不影响外部接口的
-> 内部小修（日志、缓存实现之类，以前允许，现已收紧）。所有后续工作，包括在旧仓库
-> 里发现的 bug，都只落在 OJ2：先确认 OJ2 是否有对应逻辑、是否重现了同样的问题，
-> 只在 OJ2 里修；旧仓库那边如实告知用户"未处理，按当前政策不动旧仓库"，不要顺手改掉。
+> **2026-08-26：回滚路径已废弃。** 旧 Django 后端确认不再使用，
+> `0002_drop_django_leftovers` 会删掉它的 7 张框架表（含 `django_session`、
+> `django_migrations`）。这条迁移**已在本机 dev 库和生产快照副本上跑通**，
+> **生产库尚未执行**——跑之前务必确认服务器上没有 Django 进程还活着，
+> 否则删的是它正在用的 session 表。跑完之后旧后端就起不来了，
+> 「把上游切回去」不再是可用的回滚手段，要退只能靠备份恢复。
+>
+> 所以「改 schema 要考虑回滚」这条约束**已经解除**，schema 现在归 OJ2 独占，
+> 走 drizzle migration 正常演进即可。
 
-冻结的目的是「回滚那天旧站能原样起来、和新站看到同一份数据」——改 OJ2 时，接口路径
-与响应结构、数据库 schema 这些外部可观测的东西都要小心，一动回滚就不再是「把上游
-切回去」那么简单。
+> **旧仓库仍然零改动**，没有例外——包括修 bug、包括不影响外部接口的内部小修。
+> 所有后续工作，包括在旧仓库里发现的 bug，都只落在 OJ2：先确认 OJ2 是否有对应逻辑、
+> 是否重现了同样的问题，只在 OJ2 里修；旧仓库那边如实告知用户"未处理，按当前政策
+> 不动旧仓库"，不要顺手改掉。冻结的理由现在只剩「留作参照、别分散精力」，
+> 不再是回滚保证。
 
 设计文档：`docs/specs/2026-08-06-bun-backend-rewrite-design.md`
 切换手册：`docs/specs/phase5-cutover-runbook.md` ← 上线当天照这份走
@@ -109,11 +116,71 @@ Drizzle schema 是从生产库 `drizzle-kit pull` 出来的，**不写迁移**�
 新旧后端跑在同一套表结构上（阶段 5 演练逐列比对过，零差异），这是回滚能成立的前提 ——
 所以改 schema 前先想清楚回滚怎么办。
 
-生产库的几个约定：
+### 改 schema 走 drizzle migration
 
-- `raw_password` 明文列**要保留**，老师用它找学生密码。不要"顺手清理"。
-- `judge_server_heartbeat` 保留。
-- `problem.prompt` 是给未来 AI 预留的，当前没接线，不要删。
+`bun run db:generate`（造迁移文件）→ `bun run db:migrate`（按 `drizzle.__drizzle_migrations`
+增量执行），就是 Django `makemigrations` / `migrate` 的等价物。索引/结构变更走这条，
+不要再手写 SQL 往 `docs/specs/` 里塞。
+
+**部署时自动执行。** `docker/deploy.sh` 在「构建镜像」之后、「起栈」之前会跑
+`oj2-api migrate`，失败就中止部署（旧容器原样还在跑）。CI 走的也是 deploy.sh，
+所以不需要给 GitHub 配数据库凭据，也不用把生产库对外开放。
+
+迁移文件**不内嵌进二进制**，随镜像装在 `/usr/local/share/oj2/migrations`
+（见 `runtime.ts` 的 `migrationsDir`、Dockerfile 里那两条 COPY）。这样 drizzle 的
+`migrate()` 能原样用——它靠 `meta/_journal.json` 自动发现迁移，**新增迁移不用改任何
+代码**。内嵌就得为每条迁移手写一行 import，那是迟早会漏的账。
+
+**破坏性迁移默认拦截。** 含 `DROP TABLE` / `DROP COLUMN` / `DROP SCHEMA` /
+`ALTER COLUMN ... TYPE` / `TRUNCATE` 的迁移会让部署停在迁移这步并退出 4，
+需要确认备份后显式放行：
+
+```bash
+OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
+```
+
+`DROP INDEX` / `DROP CONSTRAINT` 不算——它们不掉数据，拦了只会让人习惯性带上放行开关。
+
+**0000 跑不了，库不能靠迁移自举。** `0000_crazy_gateway.sql` 是 `drizzle-kit pull`
+的产物，整份被 `/* */` 包着，可执行语句 0 条。所以任何新库的结构都只能来自
+`docs/specs/schema.sql` 或生产 dump，然后手工做基线。`oj2-api migrate` 会检测这两种
+情况并打印具体该做什么，不会让你撞上 drizzle 那个语焉不详的报错。
+
+**给一个已经存在的库做基线**：drizzle 没有 `--fake-initial`，`migrate` 见到空的
+`__drizzle_migrations` 会从 `0000` 的完整建表跑起，撞上已存在的表就整个事务回滚 ——
+**而且失败时 exit 1 但一个错误都不打印**（只有 NOTICE，实测过）。所以对已有数据的库
+第一次跑之前，先手插一行把 `0000` 标记成已执行：
+
+```sql
+CREATE SCHEMA IF NOT EXISTS drizzle;
+CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
+  id SERIAL PRIMARY KEY, hash text NOT NULL, created_at bigint);
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+  VALUES ('baseline-0000-faked', 1786070652521);   -- = meta/_journal.json 里 0000 的 when
+```
+
+migrator 只比 `created_at`，不校验 hash，所以 hash 随便填。
+
+**已知的三个坑**（`meta/0000_snapshot.json` 是 `pull` 出来的，没法无损还原 Django 建的
+schema，下面三处已经修过了，别让它们回潮）：
+
+- ~~**快照里的 Django 序列**~~：已随 `0002_drop_django_leftovers` 删表一并解决，
+  `tablesFilter` 也移除了。（历史原因：`tablesFilter` 只过滤表、不过滤它们的序列，
+  于是 `generate` 会吐出 5 条 `DROP SEQUENCE`。）
+- **bigint 上限精度**：`pull` 生成的 `maxValue: 9223372036854775807` 是 JS number 字面量，
+  round-trip 成 `...776000`，每次 generate 都会多出 10 条 `ALTER COLUMN ... SET MAXVALUE`。
+  已改成字符串。
+- **表达式索引的 opclass**：`problem_tag_name_ci_unique` 在快照里带 `opclass`，但 drizzle
+  自己序列化不出来，导致每次都 drop + recreate。已从快照里去掉。
+
+**还有两个改不掉的、写代码时要绕开的**：
+
+- **索引方向会被丢**：`.desc()` 在生成 SQL 时消失，但快照里记成 `asc: false`，两边对不上，
+  下次 pull 就是假 diff。单列索引不写方向就行（Postgres 用 Index Scan Backward 服务
+  `ORDER BY ... DESC`，代价一样）。**多列混合方向的索引别指望 generate**，得手写。
+- **`CREATE INDEX CONCURRENTLY` 跑不了**：migrator 把所有语句包在一个事务里。大表加索引
+  要是不能接受锁写窗口，只能绕开 migration 手工执行。参考量级：12.3 万行的部分索引，
+  普通 `CREATE INDEX` 只锁 74ms，一般不用纠结。
 
 ## 部署
 

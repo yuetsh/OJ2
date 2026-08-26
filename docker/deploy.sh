@@ -127,6 +127,22 @@ if [ "$BUILD" -eq 1 ]; then
   "${COMPOSE[@]}" build
 fi
 
+# ---------------------------------------------------------------- 迁移
+# 在起栈**之前**跑：schema 先就位，新代码再启动。
+#
+# --no-deps 是必须的：这一步只要 api 镜像里的二进制，不该顺带把 worker/web 拉起来。
+# 库连的是 env 里的 DB_HOST，和起栈用的是同一份配置。
+#
+# 含 DROP TABLE 这类破坏性语句的迁移会被拦下并退出 4，需要显式放行：
+#   OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
+# 放行前先备份。这道闸门在 apps/api/src/db/migrate.ts。
+say "数据库迁移"
+"${COMPOSE[@]}" run --rm --no-deps \
+  -e OJ2_ALLOW_DESTRUCTIVE="${OJ2_ALLOW_DESTRUCTIVE:-}" \
+  api oj2-api migrate \
+  || die "迁移没通过，已中止部署（旧容器还在跑，没动过）。
+上面的输出说明了原因。破坏性迁移需要 OJ2_ALLOW_DESTRUCTIVE=1 显式放行。"
+
 say "起栈"
 "${COMPOSE[@]}" up -d
 "${COMPOSE[@]}" ps

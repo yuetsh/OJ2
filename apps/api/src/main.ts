@@ -11,6 +11,7 @@
  *   oj2-api worker       # BullMQ 判题消费者
  *   oj2-api healthcheck  # 探活，给 Dockerfile 的 HEALTHCHECK 用
  *   oj2-api sql-child    # SQL 判题子进程，由服务自己 spawn，不该手动调
+ *   oj2-api migrate      # 执行待办的数据库迁移，部署时由 docker/deploy.sh 调
  *
  * 用动态 import 而非顶层 import：这几个模块都有导入即执行的副作用
  * （Bun.serve、连 Redis 开消费者），静态导入会让 sql-child 也把整个服务拉起来。
@@ -27,6 +28,11 @@ switch (command) {
   case "worker":
     await import("./worker")
     break
+  case "migrate": {
+    const { runMigrations } = await import("./db/migrate")
+    await runMigrations()
+    break
+  }
   case "sql-child": {
     const { runSqlChild } = await import("./judge/sql/child")
     await runSqlChild()
@@ -47,6 +53,6 @@ switch (command) {
     }
   }
   default:
-    console.error(`未知子命令：${command}\n可用：serve | worker | healthcheck | sql-child`)
+    console.error(`未知子命令：${command}\n可用：serve | worker | migrate | healthcheck | sql-child`)
     process.exit(2)
 }

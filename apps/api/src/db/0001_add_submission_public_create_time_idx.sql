@@ -1,0 +1,1 @@
+CREATE INDEX "submission_public_create_time_idx" ON "submission" USING btree ("create_time" timestamptz_ops) WHERE "submission"."contest_id" is null;
