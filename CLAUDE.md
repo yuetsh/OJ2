@@ -4,14 +4,15 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 上一代在 `../OnlineJudge/`（Django）和 `../ojnext/`（Vue SPA），**仍然完全冻结、
 一行都不改**。
 
-> **2026-08-26：回滚路径已废弃。** 旧 Django 后端确认不再使用，
-> `0002_drop_django_leftovers` 会删掉它的 7 张框架表（含 `django_session`、
-> `django_migrations`）。这条迁移**已在本机 dev 库和生产快照副本上跑通**，
-> **生产库尚未执行**——跑之前务必确认服务器上没有 Django 进程还活着，
-> 否则删的是它正在用的 session 表。跑完之后旧后端就起不来了，
-> 「把上游切回去」不再是可用的回滚手段，要退只能靠备份恢复。
+> **2026-08-26：回滚路径已废弃，且已经不可逆。** 旧 Django 后端确认不再使用，
+> `0002_drop_django_leftovers` 删掉了它的 7 张框架表（含 `django_session`、
+> `django_migrations`）。**这条迁移已在生产库执行完毕**
+> （`docker exec oj-api oj2-api migrate` 回「没有待执行的迁移」）。
 >
-> 所以「改 schema 要考虑回滚」这条约束**已经解除**，schema 现在归 OJ2 独占，
+> 所以旧栈现在**起不来**了：「停新栈起旧栈」「把 NPM 上游改回 8080」都已失效，
+> 唯一退路是从数据库备份恢复。切换手册里的「回滚保证」那节只剩历史价值。
+>
+> 「改 schema 要考虑回滚」这条约束随之解除，schema 归 OJ2 独占，
 > 走 drizzle migration 正常演进即可。
 
 > **旧仓库仍然零改动**，没有例外——包括修 bug、包括不影响外部接口的内部小修。
