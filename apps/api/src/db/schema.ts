@@ -471,17 +471,28 @@ export const submission = pgTable("submission", {
 	// 同上，不写 .op()。原先 pull 出来的 opclass 还串了位（contest_id 标成 timestamptz_ops、
 	// create_time 标成 int4_ops），那条 SQL 真拿去执行 Postgres 会直接拒绝。
 	index("contest_create_time_idx").using("btree", table.contestId.asc().nullsLast(), table.createTime.desc().nullsFirst()),
-	// 提交列表默认视图（WHERE contest_id IS NULL ORDER BY create_time DESC）专用。
+	// 提交列表默认视图（WHERE contest_id IS NULL ORDER BY create_time DESC, id DESC）专用。
 	// 上面的 contest_create_time_idx 看着能覆盖，但 Postgres 不把 `contest_id IS NULL`
 	// 当成能吃掉首列、从而继承第二列有序性的等值条件——把 seqscan/bitmapscan 全关掉逼它
 	// 也不肯用，只会走单列 contest_id 索引再全量排序。结果是每翻一页都 Parallel Seq Scan
 	// 扫完整张表 + top-N 排序。改用部分索引后谓词由索引本身保证，排序序就是索引序。
 	// 生产快照（12.3 万条提交）实测：61.8ms / 18936 blocks → 0.22ms / 34 blocks。
-	// 这个索引不在 Django 的 migration 里，是 OJ2 单独加的，见 src/db/0001_naive_agent_zero.sql。
-	// 不写 .desc()：这条带 .op()，而 .op() 会吞掉方向（见 CLAUDE.md）——写了只会让快照
-	// （记 asc:false）和实际建出来的索引（ASC）对不上。单列索引本来也无所谓方向，Postgres 用
-	// Index Scan Backward 服务 ORDER BY ... DESC，实测同样是 0.08ms。
-	index("submission_public_create_time_idx").using("btree", table.createTime.op("timestamptz_ops")).where(sql`${table.contestId} is null`),
+	// 这个索引不在 Django 的 migration 里，是 OJ2 单独加的，见 src/db/0001。
+	//
+	// 带上 id 是为了让排序成为**全序**，深翻页的游标转换（routes/submission.ts 的
+	// paginateSubmissionRows）才精确。create_time 由 `new Date().toISOString()` 生成，
+	// 只有毫秒精度，同毫秒的两条提交靠 create_time 分不出先后：游标用 `<=` 回查时，
+	// 上一页的末行会重新出现在下一页页首。加上 id 之后两步用的是同一个全序，不会错位。
+	// 索引从 2.3MB 涨到 6.9MB，快照实测第一步 5.7ms → 8.9ms，换精确值得。
+	//
+	// 两列都建成默认的 ASC NULLS LAST，靠 Index Only Scan **Backward** 服务
+	// `ORDER BY create_time DESC, id DESC`。别照着 ORDER BY 写成 .desc()：Postgres 里
+	// `ORDER BY x DESC` 默认是 NULLS FIRST，而 `CREATE INDEX ... (x DESC)` 默认是
+	// NULLS LAST，两边 nulls 位置对不上，规划器就当这条索引出不了序——实测建成
+	// DESC NULLS LAST 之后深翻页退化成 external merge sort（5.2MB 落盘），比不建还糟。
+	// 两列同为 ASC 时整条索引反着扫就是精确的反序，所以反而是能用的那一种。
+	// 这两列都 NOT NULL，nulls 位置在语义上无所谓，纯粹是规划器的匹配规则。
+	index("submission_public_create_time_id_idx").using("btree", table.createTime.asc().nullsLast(), table.id.asc().nullsLast()).where(sql`${table.contestId} is null`),
 	index("problem_user_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
 	index("submission_contest_id_775716d5").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
 	index("submission_problem_id_76847b55").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
