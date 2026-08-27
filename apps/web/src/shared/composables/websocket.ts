@@ -287,13 +287,10 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
  */
 export interface SubmissionUpdate extends WebSocketMessage {
   type: "submission_update"
-  submission_id: string
+  submissionId: string
   result: number
   status: "pending" | "judging" | "finished" | "error"
-  time_cost?: number
-  memory_cost?: number
   score?: number
-  err_info?: string
 }
 
 /**
@@ -314,7 +311,7 @@ class SubmissionWebSocket extends BaseWebSocket<SubmissionUpdate> {
     this.pendingSubmissionId = submissionId
     const success = this.send({
       type: "subscribe",
-      submission_id: submissionId,
+      submissionId,
     })
     if (success) this.pendingSubmissionId = ""
   }
@@ -325,7 +322,7 @@ class SubmissionWebSocket extends BaseWebSocket<SubmissionUpdate> {
     if (
       this.send({
         type: "subscribe",
-        submission_id: submissionId,
+        submissionId,
       })
     ) {
       this.pendingSubmissionId = ""
@@ -429,7 +426,7 @@ export interface FlowchartEvaluationUpdate extends WebSocketMessage {
     | "flowchart_evaluation_completed"
     | "flowchart_evaluation_failed"
     | "flowchart_evaluation_update"
-  submission_id: string
+  submissionId: string
   score?: number
   grade?: string
   feedback?: string
@@ -453,7 +450,7 @@ class FlowchartWebSocket extends BaseWebSocket<FlowchartEvaluationUpdate> {
   subscribe(submissionId: string) {
     const success = this.send({
       type: "subscribe",
-      submission_id: submissionId,
+      submissionId,
     })
     if (!success) {
       console.error("[Flowchart WebSocket] 订阅失败: 连接未就绪")

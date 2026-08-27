@@ -67,7 +67,7 @@ async function handleMessage(
     return
   }
 
-  let message: { type?: unknown; timestamp?: unknown; submission_id?: unknown }
+  let message: { type?: unknown; timestamp?: unknown; submissionId?: unknown }
   try {
     message = JSON.parse(raw) as typeof message
   } catch {
@@ -79,7 +79,7 @@ async function handleMessage(
     ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
     return
   }
-  if (message.type !== "subscribe" || typeof message.submission_id !== "string") {
+  if (message.type !== "subscribe" || typeof message.submissionId !== "string") {
     ws.send(JSON.stringify({ type: "error", message: "Invalid message" }))
     return
   }
@@ -93,7 +93,7 @@ async function handleMessage(
     .from(schema.submission)
     .where(
       and(
-        eq(schema.submission.id, message.submission_id),
+        eq(schema.submission.id, message.submissionId),
         eq(schema.submission.userId, ws.data.userId),
       ),
     )
@@ -103,17 +103,17 @@ async function handleMessage(
     const [flowchart] = await db
       .select({ id: schema.flowchartSubmission.id, status: schema.flowchartSubmission.status, score: schema.flowchartSubmission.aiScore, grade: schema.flowchartSubmission.aiGrade })
       .from(schema.flowchartSubmission)
-      .where(and(eq(schema.flowchartSubmission.id, message.submission_id), eq(schema.flowchartSubmission.userId, ws.data.userId)))
+      .where(and(eq(schema.flowchartSubmission.id, message.submissionId), eq(schema.flowchartSubmission.userId, ws.data.userId)))
       .limit(1)
     if (!flowchart) {
       ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
       return
     }
     const replay = flowchart.status === 2
-      ? { type: "flowchart_evaluation_completed", submission_id: flowchart.id, score: flowchart.score ?? undefined, grade: flowchart.grade ?? undefined }
+      ? { type: "flowchart_evaluation_completed", submissionId: flowchart.id, score: flowchart.score ?? undefined, grade: flowchart.grade ?? undefined }
       : flowchart.status === 3
-        ? { type: "flowchart_evaluation_failed", submission_id: flowchart.id, error: "Evaluation failed" }
-        : { type: "flowchart_evaluation_update", submission_id: flowchart.id }
+        ? { type: "flowchart_evaluation_failed", submissionId: flowchart.id, error: "Evaluation failed" }
+        : { type: "flowchart_evaluation_update", submissionId: flowchart.id }
     ws.send(JSON.stringify(flowchartUpdateSchema.parse(replay)))
     return
   }
@@ -129,13 +129,10 @@ async function handleMessage(
           : "finished"
   const parsed = submissionUpdateSchema.safeParse({
     type: "submission_update",
-    submission_id: submission.id,
+    submissionId: submission.id,
     result: submission.result,
     status,
-    time_cost: statistics.time_cost,
-    memory_cost: statistics.memory_cost,
     score: statistics.score,
-    err_info: statistics.err_info,
   })
   if (parsed.success) ws.send(JSON.stringify(parsed.data))
 }

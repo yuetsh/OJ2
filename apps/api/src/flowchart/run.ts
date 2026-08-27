@@ -57,7 +57,7 @@ export async function evaluateFlowchart(job: FlowchartJobData) {
     }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, flowchartUpdateSchema.parse({
       type: "flowchart_evaluation_completed",
-      submission_id: row.flowchart.id,
+      submissionId: row.flowchart.id,
       score: result.score,
       grade: result.grade,
       feedback: result.feedback,
@@ -69,7 +69,7 @@ export async function evaluateFlowchart(job: FlowchartJobData) {
     await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, flowchartUpdateSchema.parse({
       type: "flowchart_evaluation_failed",
-      submission_id: row.flowchart.id,
+      submissionId: row.flowchart.id,
       error: message,
     }))
     throw error

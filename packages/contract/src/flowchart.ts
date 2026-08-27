@@ -78,7 +78,7 @@ export const flowchartUpdateSchema = z.object({
     "flowchart_evaluation_failed",
     "flowchart_evaluation_update",
   ]),
-  submission_id: z.string(),
+  submissionId: z.string(),
   score: z.number().optional(),
   grade: z.string().optional(),
   feedback: z.string().optional(),

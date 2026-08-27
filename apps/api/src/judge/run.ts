@@ -317,10 +317,9 @@ async function markSystemError(submissionId: string, userId: number, error: unkn
   if (updated.length > 0) {
     await publishSubmissionUpdate(userId, {
       type: "submission_update",
-      submission_id: submissionId,
+      submissionId,
       result: JudgeStatus.SYSTEM_ERROR,
       status: "error",
-      err_info: message,
     })
   }
 }
@@ -353,7 +352,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       .where(eq(schema.submission.id, row.submission.id))
     await publishSubmissionUpdate(row.submission.userId, {
       type: "submission_update",
-      submission_id: row.submission.id,
+      submissionId: row.submission.id,
       result: JudgeStatus.JUDGING,
       status: "judging",
     })
@@ -463,17 +462,9 @@ export async function judgeSubmission(job: JudgeJobData) {
 
     await publishSubmissionUpdate(row.submission.userId, {
       type: "submission_update",
-      submission_id: row.submission.id,
+      submissionId: row.submission.id,
       result,
       status: "finished",
-      time_cost:
-        typeof statisticInfo.time_cost === "number"
-          ? statisticInfo.time_cost
-          : undefined,
-      memory_cost:
-        typeof statisticInfo.memory_cost === "number"
-          ? statisticInfo.memory_cost
-          : undefined,
       score:
         typeof statisticInfo.score === "number" ? statisticInfo.score : undefined,
     })

@@ -62,7 +62,7 @@ export function useSubmissionMonitor() {
 
     console.log("[SubmissionMonitor] 收到WebSocket更新:", data)
 
-    if (data.submission_id !== submissionId.value) {
+    if (data.submissionId !== submissionId.value) {
       console.log("[SubmissionMonitor] 提交ID不匹配，忽略")
       return
     }

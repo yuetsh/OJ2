@@ -68,15 +68,20 @@ export const embeddedSubmissionSchema = submissionDetailSchema
   // 站内信页面拿它拼 `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。
   .extend({ problem: z.string() })
 
+/**
+ * 判题进度推送。**只带前端真正要用的东西**：靠 submissionId 认领、靠 result /
+ * status 决定是继续等还是去拉详情。
+ *
+ * 这里曾经还带着 time_cost / memory_cost / err_info —— 从 statistic_info 原样
+ * 抄一份出来，前端一处都没读过。耗时和错误信息在提交详情里本来就有，判完了去
+ * 拉一次就是了，不必让推送顺带背一份 JSONB 的形状。
+ */
 export const submissionUpdateSchema = z.object({
   type: z.literal("submission_update"),
-  submission_id: z.string(),
+  submissionId: z.string(),
   result: judgeStatusSchema,
   status: z.enum(["pending", "judging", "finished", "error"]),
-  time_cost: z.number().optional(),
-  memory_cost: z.number().optional(),
   score: z.number().optional(),
-  err_info: z.string().optional(),
 })
 
 export const submissionListItemSchema = z.object({
