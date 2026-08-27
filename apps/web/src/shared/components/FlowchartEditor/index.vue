@@ -19,6 +19,7 @@ import { getNodeTypeConfig } from "./useNodeStyles"
 import { useHistory } from "./useHistory"
 import { useFlowOperations } from "./useFlowOperations"
 import { useCache } from "./useCache"
+import { toPortableEdges, toPortableNodes } from "./serialize"
 import CustomNode from "./CustomNode.vue"
 import { useProblemStore } from "oj/store/problem"
 
@@ -120,10 +121,21 @@ const handleRedo = () => {
   }
 }
 
-// 清空画布
+// 清空画布。工具栏那个按钮点一下就全没了，且 clearCache() 会连本题存着的草稿
+// 一起删掉，刷新也找不回来 —— 学生误点的代价太大，加一道确认
+const dialog = useDialog()
 const handleClear = () => {
-  clearCanvas()
-  clearCache()
+  if (nodes.value.length === 0 && edges.value.length === 0) return
+  dialog.warning({
+    title: "清空画布",
+    content: "画布上的内容会被清掉，这道题存着的草稿也会一起删除。确定吗？",
+    positiveText: "清空",
+    negativeText: "再想想",
+    onPositiveClick: () => {
+      clearCanvas()
+      clearCache()
+    },
+  })
 }
 
 // 键盘事件
@@ -139,10 +151,12 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 
   if (event.ctrlKey || event.metaKey) {
-    if (event.key === "z" && !event.shiftKey) {
+    const key = event.key.toLowerCase()
+    if (key === "z" && !event.shiftKey) {
       event.preventDefault()
       handleUndo()
-    } else if (event.key === "z" && event.shiftKey) {
+    } else if ((key === "z" && event.shiftKey) || key === "y") {
+      // 工具栏上的提示写的就是 Ctrl+Y，但原来只实现了 Ctrl+Shift+Z，按 Y 没反应
       event.preventDefault()
       handleRedo()
     }
@@ -188,9 +202,10 @@ const setFlowchartData = (data: { nodes: Node[]; edges: Edge[] }) => {
 defineExpose({
   nodes,
   edges,
+  // 提交出去的这份会压缩后长期存进数据库，同样裁掉运行时内部字段
   getFlowchartData: () => ({
-    nodes: nodes.value,
-    edges: edges.value,
+    nodes: toPortableNodes(nodes.value),
+    edges: toPortableEdges(edges.value),
   }),
   setFlowchartData,
 })

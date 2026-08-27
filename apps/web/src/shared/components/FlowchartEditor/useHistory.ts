@@ -1,5 +1,6 @@
 import { shallowRef, computed } from "vue"
 import type { Node, Edge } from "@vue-flow/core"
+import { toPortableEdges, toPortableNodes } from "./serialize"
 
 /**
  * 简化的历史记录管理
@@ -18,7 +19,14 @@ export function useHistory() {
     nodes: Node[],
     edges: Edge[],
   ): { nodes: Node[]; edges: Edge[] } =>
-    JSON.parse(JSON.stringify({ nodes, edges })) as {
+    // 先裁掉 vue-flow 的运行时内部字段再深拷贝：20 份快照 × 每个节点几百字节的
+    // handleBounds/dimensions，纯属白拷
+    JSON.parse(
+      JSON.stringify({
+        nodes: toPortableNodes(nodes),
+        edges: toPortableEdges(edges),
+      }),
+    ) as {
       nodes: Node[]
       edges: Edge[]
     }

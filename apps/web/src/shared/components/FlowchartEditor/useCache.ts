@@ -1,6 +1,7 @@
 import { ref, toValue, watch, type Ref, type MaybeRefOrGetter } from "vue"
 import { useStorage, useDebounceFn } from "@vueuse/core"
 import type { Node, Edge } from "@vue-flow/core"
+import { toPortableEdges, toPortableNodes } from "./serialize"
 
 /**
  * 缓存管理 - 使用 @vueuse 的 useStorage
@@ -28,8 +29,8 @@ export function useCache(
 
   // 防抖保存：isSaving 在 watch 中置 true，保存完成后置 false，使 UI 能感知保存中状态
   const debouncedSave = useDebounceFn(() => {
-    storedData.value.nodes = nodes.value
-    storedData.value.edges = edges.value
+    storedData.value.nodes = toPortableNodes(nodes.value)
+    storedData.value.edges = toPortableEdges(edges.value)
     storedData.value.timestamp = new Date().toISOString()
     lastSaved.value = new Date()
     hasUnsavedChanges.value = false
@@ -39,8 +40,8 @@ export function useCache(
   // 立即保存
   const saveToCache = () => {
     isSaving.value = true
-    storedData.value.nodes = nodes.value
-    storedData.value.edges = edges.value
+    storedData.value.nodes = toPortableNodes(nodes.value)
+    storedData.value.edges = toPortableEdges(edges.value)
     storedData.value.timestamp = new Date().toISOString()
     lastSaved.value = new Date()
     hasUnsavedChanges.value = false
