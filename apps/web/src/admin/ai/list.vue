@@ -44,7 +44,7 @@
   >
     <n-spin :show="loadingDetail">
       <div v-if="detail" class="detail">
-        <n-descriptions :column="2" bordered size="small" class="meta">
+        <n-descriptions :column="3" bordered size="small" class="meta">
           <n-descriptions-item label="用户">
             {{ detail.username }}
           </n-descriptions-item>
