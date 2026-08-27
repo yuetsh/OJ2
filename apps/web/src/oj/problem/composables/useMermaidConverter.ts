@@ -1,9 +1,26 @@
 /**
- * 将流程图JSON数据转换为Mermaid格式
+ * 节点/连线标签是学生自己敲的任意文字，而下面是直接把它塞进 "..." 里。
+ * 出现一个双引号就会把 mermaid 语法撑破：图渲染不出来，坏掉的代码还会原样送去
+ * 给 AI 打分，学生完全不知道自己被扣分是因为一个引号。
+ *
+ * mermaid 用 `#NN;` 形式的实体转义。`#` 必须**先**转，否则标签里本来就有的
+ * `#quot;` 之类会被当成实体解释。换行转成 <br/>，不然会截断整条语句。
+ */
+function escapeLabel(raw: unknown) {
+  return String(raw ?? "")
+    .replace(/#/g, "#35;")
+    .replace(/"/g, "#quot;")
+    .replace(/\r?\n/g, "<br/>")
+}
+
+/**
+ * 将流程图 JSON 数据转换为 Mermaid 格式
  */
 export function useMermaidConverter() {
   const convertToMermaid = (flowchartData: any) => {
-    const { nodes, edges } = flowchartData
+    const nodes = flowchartData?.nodes
+    // edges 原来没做空值保护（nodes 有），拿到 undefined 会直接抛
+    const edges = flowchartData?.edges ?? []
 
     if (!nodes || nodes.length === 0) {
       return "graph TD\n    A[空流程图]"
@@ -22,7 +39,9 @@ export function useMermaidConverter() {
     // 处理节点 - 根据原始类型和自定义标签
     nodes.forEach((node: any) => {
       const nodeId = safeId(node.id)
-      const label = node.data?.customLabel || node.data?.label || "节点"
+      const label = escapeLabel(
+        node.data?.customLabel || node.data?.label || "节点",
+      )
       const originalType = node.data?.originalType || node.type
 
       // 根据节点原始类型确定Mermaid语法
@@ -60,10 +79,10 @@ export function useMermaidConverter() {
     edges.forEach((edge: any) => {
       const source = safeId(edge.source)
       const target = safeId(edge.target)
-      const label = edge.label ?? ""
+      const rawLabel = String(edge.label ?? "")
 
-      if (label && label.trim() !== "") {
-        mermaid += `    ${source} -->|"${label}"| ${target}\n`
+      if (rawLabel.trim() !== "") {
+        mermaid += `    ${source} -->|"${escapeLabel(rawLabel)}"| ${target}\n`
       } else {
         mermaid += `    ${source} --> ${target}\n`
       }
