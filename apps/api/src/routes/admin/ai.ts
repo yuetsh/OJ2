@@ -43,13 +43,20 @@ adminAiRoutes.get("/ai/reports", requireTeacher, async (c) => {
   const username = c.req.query("username")?.trim()
   const where = username ? ilike(schema.user.username, `%${username}%`) : undefined
 
-  // 置顶列表不分页：它是「每个学生最新钉住的那份」，数量等于学生数，前端一次性拿走
+  // 置顶列表不分页：它是「每个学生最新钉住的那份」，数量等于学生数，前端一次性拿走。
+  // 但**形状必须和分页那支一样**：同一个 URL 返回两种形状，调用方没法照着一个类型写。
+  // 这里原来返回裸数组，前端 getPinnedAIReports 声明的是 AdminAiReportList、
+  // 读的是 res.results，于是拿到 undefined，`pinnedReports.length` 在渲染时抛
+  // 「Cannot read properties of undefined」——空库也照抛，这个页面每次打开都白屏。
   if (c.req.query("pinnedOnly") === "true") {
     const rows = await db.select(listColumns).from(schema.aiAnalysis)
       .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
       .where(and(eq(schema.aiAnalysis.isPinned, true), where))
       .orderBy(desc(schema.aiAnalysis.createTime))
-    return success(c, rows.map(listItem))
+    return success(c, adminAiReportListSchema.parse({
+      results: rows.map(listItem),
+      total: rows.length,
+    }))
   }
 
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
