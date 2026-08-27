@@ -19,6 +19,7 @@ import { failure, success } from "../../http"
 import { JudgeStatus } from "../../judge/status"
 import { completeChat } from "../../services/ai"
 import { queryInteger, rounded } from "../helpers"
+import { findTagsByName, normalizeTagNames } from "./problem"
 
 export const adminTagRoutes = new Hono<AppEnv>()
 
@@ -113,29 +114,20 @@ adminTagRoutes.post("/problems/batch-tag", requireProblemPermission, async (c) =
   if (problems.length === 0) return failure(c, 404, "no-problems", "没有可操作的题目")
 
   // 去重且大小写不敏感，与旧 resolve_tags / find_tags 一致
-  const wanted: string[] = []
-  const seen = new Set<string>()
-  for (const raw of parsed.data.tagNames) {
-    const name = raw.trim()
-    if (!name || seen.has(name.toLowerCase())) continue
-    seen.add(name.toLowerCase())
-    wanted.push(name)
-  }
+  const wanted = normalizeTagNames(parsed.data.tagNames)
 
   const tagIds = await db.transaction(async (tx) => {
-    const ids: number[] = []
-    for (const name of wanted) {
-      const [existing] = await tx.select({ id: schema.problemTag.id }).from(schema.problemTag)
-        .where(sql`lower(${schema.problemTag.name}) = lower(${name})`).limit(1)
-      if (existing) { ids.push(existing.id); continue }
-      // 添加时按需新建标签，移除时只认已有标签 —— 否则「移除」会顺手造出一堆空标签
-      if (parsed.data.action === "add") {
-        const [created] = await tx.insert(schema.problemTag).values({ name })
-          .returning({ id: schema.problemTag.id })
-        ids.push(created!.id)
+    const existing = await findTagsByName(tx as unknown as typeof db, wanted)
+    // 添加时按需新建标签，移除时只认已有标签 —— 否则「移除」会顺手造出一堆空标签
+    if (parsed.data.action === "add") {
+      const missing = wanted.filter((name) => !existing.has(name.toLowerCase()))
+      if (missing.length) {
+        const created = await tx.insert(schema.problemTag).values(missing.map((name) => ({ name })))
+          .returning({ id: schema.problemTag.id, name: schema.problemTag.name })
+        for (const row of created) existing.set(row.name.toLowerCase(), row.id)
       }
     }
-    return ids
+    return wanted.map((name) => existing.get(name.toLowerCase())).filter((id) => id !== undefined)
   })
   if (tagIds.length === 0) return failure(c, 404, "no-tags", "没有匹配的标签")
 

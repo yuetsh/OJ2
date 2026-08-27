@@ -42,28 +42,43 @@ async function loadOwned(c: { req: { param(name: string): string } }, user: Auth
 }
 
 async function serialize(row: typeof schema.problemset.$inferSelect) {
-  const [[problems], [participants], [creator]] = await Promise.all([
-    db.select({ value: count() }).from(schema.problemsetProblem)
-      .where(eq(schema.problemsetProblem.problemsetId, row.id)),
-    db.select({ value: count() }).from(schema.problemsetProgress)
-      .where(eq(schema.problemsetProgress.problemsetId, row.id)),
+  return (await serializeMany([row]))[0]!
+}
+
+/** 批量版：列表接口走这个，固定 3 条查询，与行数无关（按行 serialize 就是 N+1） */
+async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
+  if (rows.length === 0) return []
+  const ids = rows.map((row) => row.id)
+  const [problems, participants, creators] = await Promise.all([
+    db.select({ problemsetId: schema.problemsetProblem.problemsetId, value: count() })
+      .from(schema.problemsetProblem).where(inArray(schema.problemsetProblem.problemsetId, ids))
+      .groupBy(schema.problemsetProblem.problemsetId),
+    db.select({ problemsetId: schema.problemsetProgress.problemsetId, value: count() })
+      .from(schema.problemsetProgress).where(inArray(schema.problemsetProgress.problemsetId, ids))
+      .groupBy(schema.problemsetProgress.problemsetId),
     db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
       .from(schema.user).leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(eq(schema.user.id, row.createdById)).limit(1),
+      .where(inArray(schema.user.id, [...new Set(rows.map((row) => row.createdById))])),
   ])
-  return adminProblemSetSchema.parse({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    difficulty: row.difficulty,
-    status: row.status,
-    endTime: row.endTime,
-    visible: row.visible,
-    createdBy: sampleUser(creator ?? { id: row.createdById, username: "" }, creator?.realName),
-    createTime: row.createTime,
-    lastUpdateTime: row.lastUpdateTime,
-    problemsCount: problems?.value ?? 0,
-    participantCount: participants?.value ?? 0,
+  const problemsBySet = new Map(problems.map((item) => [item.problemsetId, item.value]))
+  const participantsBySet = new Map(participants.map((item) => [item.problemsetId, item.value]))
+  const creatorById = new Map(creators.map((item) => [item.id, item]))
+  return rows.map((row) => {
+    const creator = creatorById.get(row.createdById)
+    return adminProblemSetSchema.parse({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      difficulty: row.difficulty,
+      status: row.status,
+      endTime: row.endTime,
+      visible: row.visible,
+      createdBy: sampleUser(creator ?? { id: row.createdById, username: "" }, creator?.realName),
+      createTime: row.createTime,
+      lastUpdateTime: row.lastUpdateTime,
+      problemsCount: problemsBySet.get(row.id) ?? 0,
+      participantCount: participantsBySet.get(row.id) ?? 0,
+    })
   })
 }
 
@@ -97,7 +112,7 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
       .orderBy(desc(schema.problemset.createTime)).limit(limit).offset(offset),
   ])
   return success(c, adminProblemSetListSchema.parse({
-    results: await Promise.all(rows.map(serialize)),
+    results: await serializeMany(rows),
     total: totalRows[0]?.value ?? 0,
   }))
 })
@@ -268,9 +283,17 @@ adminProblemSetRoutes.delete("/problem-sets/:id/problems/:itemId", requireTeache
 // ---------------------------------------------------------------- 奖章
 
 async function badgeWithCount(badge: BadgeRow) {
-  const [earned] = await db.select({ value: count() }).from(schema.userBadge)
-    .where(eq(schema.userBadge.badgeId, badge.id))
-  return adminProblemSetBadgeSchema.parse({
+  return (await badgesWithCount([badge]))[0]!
+}
+
+/** 批量版：一条 group by 数完整批奖章的获得人数 */
+async function badgesWithCount(badges: BadgeRow[]) {
+  if (badges.length === 0) return []
+  const earned = await db.select({ badgeId: schema.userBadge.badgeId, value: count() })
+    .from(schema.userBadge).where(inArray(schema.userBadge.badgeId, badges.map((badge) => badge.id)))
+    .groupBy(schema.userBadge.badgeId)
+  const countByBadge = new Map(earned.map((item) => [item.badgeId, item.value]))
+  return badges.map((badge) => adminProblemSetBadgeSchema.parse({
     id: badge.id,
     problemsetId: badge.problemsetId,
     name: badge.name,
@@ -278,8 +301,8 @@ async function badgeWithCount(badge: BadgeRow) {
     icon: badge.icon,
     conditionType: badge.conditionType,
     conditionValue: badge.conditionValue,
-    earnedCount: earned?.value ?? 0,
-  })
+    earnedCount: countByBadge.get(badge.id) ?? 0,
+  }))
 }
 
 /** 纯逻辑判定，对齐旧 `ProblemSetBadge._is_eligible` */
@@ -327,7 +350,7 @@ adminProblemSetRoutes.get("/problem-sets/:id/badges", requireTeacher, async (c) 
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
   const badges = await db.select().from(schema.problemsetBadge)
     .where(eq(schema.problemsetBadge.problemsetId, row.id)).orderBy(asc(schema.problemsetBadge.id))
-  return success(c, await Promise.all(badges.map(badgeWithCount)))
+  return success(c, await badgesWithCount(badges))
 })
 
 adminProblemSetRoutes.post("/problem-sets/:id/badges", requireTeacher, async (c) => {
@@ -393,21 +416,21 @@ adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher
  * 只重算分母与百分比，不碰 completeTime —— 已经完成过的事实不因加题而撤销。
  */
 async function resyncProgress(problemsetId: number) {
-  const [[totalRow], progresses] = await Promise.all([
-    db.select({ value: count() }).from(schema.problemsetProblem)
-      .where(eq(schema.problemsetProblem.problemsetId, problemsetId)),
-    db.select().from(schema.problemsetProgress)
-      .where(eq(schema.problemsetProgress.problemsetId, problemsetId)),
-  ])
+  const [totalRow] = await db.select({ value: count() }).from(schema.problemsetProblem)
+    .where(eq(schema.problemsetProblem.problemsetId, problemsetId))
   const total = totalRow?.value ?? 0
-  for (const progress of progresses) {
-    const completed = Math.min(progress.completedProblemsCount, total)
-    await db.update(schema.problemsetProgress).set({
-      totalProblemsCount: total,
-      completedProblemsCount: completed,
-      progressPercentage: total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
-    }).where(eq(schema.problemsetProgress.id, progress.id))
-  }
+  // 一条 UPDATE 把整个题单的参与者刷完。以前是先把 progress 全查出来再逐行 update，
+  // 一个班的题单就是几十次往返，而算出来的值只跟 total 和这一行自己的 completed 有关。
+  // completed 用 least(...) 夹住，百分比按 JS 那边同样的「乘 10000 四舍五入再除 100」
+  // 保留两位小数 —— 数都是非负的，numeric 的 round 和 Math.round 在这个区间一致。
+  const completed = sql`least(${schema.problemsetProgress.completedProblemsCount}, ${total})`
+  await db.update(schema.problemsetProgress).set({
+    totalProblemsCount: total,
+    completedProblemsCount: completed,
+    progressPercentage: total > 0
+      ? sql`round((${completed}::numeric / ${total}) * 10000) / 100`
+      : sql`0`,
+  }).where(eq(schema.problemsetProgress.problemsetId, problemsetId))
 }
 
 adminProblemSetRoutes.get("/problem-sets/:id/progress", requireTeacher, async (c) => {

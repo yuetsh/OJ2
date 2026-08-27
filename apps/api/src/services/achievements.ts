@@ -1,4 +1,4 @@
-import { and, count, countDistinct, eq, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm"
+import { and, count, countDistinct, eq, inArray, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm"
 
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
@@ -27,25 +27,27 @@ async function unlockAchievements(userId: number, metrics: Record<string, unknow
   if (onlyMeta) filters.push(eq(schema.achievement.metric, "achievement_unlocked_count"))
   else filters.push(ne(schema.achievement.metric, "achievement_unlocked_count"))
   const candidates = await db.select().from(schema.achievement).where(and(...filters))
-  const created: typeof schema.achievement.$inferSelect[] = []
-  for (const achievement of candidates) {
+  const hits = candidates.filter((achievement) => {
     const value = metrics[achievement.metric]
-    if (typeof value !== "number") continue
-    const hit = achievement.operator === "gte" ? value >= achievement.threshold : value <= achievement.threshold
-    if (!hit) continue
-    const inserted = await db.insert(schema.userAchievement).values({
-      userId,
-      achievementId: achievement.id,
-      unlockTime: new Date().toISOString(),
-      backfilled: false,
-      notified: false,
-    }).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] }).returning({ id: schema.userAchievement.id })
-    if (inserted.length) {
-      await db.update(schema.achievement).set({ unlockCount: sql`${schema.achievement.unlockCount} + 1` }).where(eq(schema.achievement.id, achievement.id))
-      created.push(achievement)
-    }
-  }
-  return created
+    if (typeof value !== "number") return false
+    return achievement.operator === "gte" ? value >= achievement.threshold : value <= achievement.threshold
+  })
+  if (hits.length === 0) return []
+  // 命中的成就一次插完，冲突忽略后 returning 回来的就是「这次真新解锁的」。
+  // 一个用户对同一个成就只会解锁一次，所以每个成就都恰好 +1，一条 UPDATE 就够。
+  const inserted = await db.insert(schema.userAchievement).values(hits.map((achievement) => ({
+    userId,
+    achievementId: achievement.id,
+    unlockTime: new Date().toISOString(),
+    backfilled: false,
+    notified: false,
+  }))).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] })
+    .returning({ achievementId: schema.userAchievement.achievementId })
+  if (inserted.length === 0) return []
+  const insertedIds = new Set(inserted.map((row) => row.achievementId))
+  await db.update(schema.achievement).set({ unlockCount: sql`${schema.achievement.unlockCount} + 1` })
+    .where(inArray(schema.achievement.id, [...insertedIds]))
+  return hits.filter((achievement) => insertedIds.has(achievement.id))
 }
 
 export async function updateAchievementsForSubmission(submissionId: string) {
@@ -161,21 +163,8 @@ export async function updateAchievementsForProblemSet(userId: number) {
   return [...first, ...(await unlockAchievements(userId, metrics, true))]
 }
 
-/**
- * 参赛场次。旧后端 `ContestJoined` 只实现了 recompute、不走 on_submission
- * （比赛提交在 build_ctx 就被跳过了），所以它只在 rescan 时刷新。这里保持同样口径：
- * 去重数一遍该用户有过提交的比赛数。
- *
- * 注意：迁移过来时新后端**整个漏掉了这个指标**，配在 contest_joined 上的成就
- * 会永远解锁不了。补上。
- */
-async function contestJoinedCount(userId: number) {
-  const [row] = await db
-    .select({ value: countDistinct(schema.submission.contestId) })
-    .from(schema.submission)
-    .where(and(eq(schema.submission.userId, userId), isNotNull(schema.submission.contestId)))
-  return row?.value ?? 0
-}
+/** 一条 INSERT 里塞多少行。5 个参数一行，离 Postgres 的 65535 个参数上限还很远 */
+const USER_ACHIEVEMENT_INSERT_CHUNK = 1000
 
 /**
  * 新建成就、调低阈值、或从下架改成上架之后，把已达标的存量用户补发一遍。
@@ -203,62 +192,90 @@ export async function rescanAchievement(achievementId: number) {
 
   const stats = await db.select({ userId: schema.userStat.userId, metrics: schema.userStat.metrics })
     .from(schema.userStat)
-  let unlocked = 0
-  for (const stat of stats) {
-    if (already.has(stat.userId)) continue
+  const eligible = stats.filter((stat) => {
+    if (already.has(stat.userId)) return false
     const value = objectValue(stat.metrics)[achievement.metric]
-    if (typeof value !== "number") continue
-    const hit = achievement.operator === "gte"
+    if (typeof value !== "number") return false
+    return achievement.operator === "gte"
       ? value >= achievement.threshold
       : value <= achievement.threshold
-    if (!hit) continue
-    const inserted = await db.insert(schema.userAchievement).values({
+  })
+
+  // 达标的人分批插，冲突忽略后 returning 回来的就是真新解锁的那批 —— 以前是每人
+  // 一条 insert 加一条 unlockCount+1，全站补发一次就是几千次往返。
+  // 计数改成一次 +N，通知照旧逐人推（那是 Redis，不是数据库）。
+  const unlockTime = new Date().toISOString()
+  const unlockedUserIds: number[] = []
+  for (let start = 0; start < eligible.length; start += USER_ACHIEVEMENT_INSERT_CHUNK) {
+    const chunk = eligible.slice(start, start + USER_ACHIEVEMENT_INSERT_CHUNK)
+    const inserted = await db.insert(schema.userAchievement).values(chunk.map((stat) => ({
       userId: stat.userId,
       achievementId: achievement.id,
-      unlockTime: new Date().toISOString(),
+      unlockTime,
       backfilled: true,
       notified: false,
-    }).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] })
-      .returning({ id: schema.userAchievement.id })
-    if (inserted.length === 0) continue
-    unlocked += 1
-    await db.update(schema.achievement)
-      .set({ unlockCount: sql`${schema.achievement.unlockCount} + 1` })
-      .where(eq(schema.achievement.id, achievement.id))
-    await publishAchievementNotification(stat.userId, [{
-      id: achievement.id,
-      name: achievement.name,
-      description: achievement.description,
-      icon: achievement.icon,
-      rarity: achievement.rarity,
-      kind: "achievement",
-    }])
+    }))).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] })
+      .returning({ userId: schema.userAchievement.userId })
+    unlockedUserIds.push(...inserted.map((row) => row.userId))
   }
-  return { scanned: stats.length, unlocked }
+  if (unlockedUserIds.length) {
+    await db.update(schema.achievement)
+      .set({ unlockCount: sql`${schema.achievement.unlockCount} + ${unlockedUserIds.length}` })
+      .where(eq(schema.achievement.id, achievement.id))
+    for (const userId of unlockedUserIds) {
+      await publishAchievementNotification(userId, [{
+        id: achievement.id,
+        name: achievement.name,
+        description: achievement.description,
+        icon: achievement.icon,
+        rarity: achievement.rarity,
+        kind: "achievement",
+      }])
+    }
+  }
+  return { scanned: stats.length, unlocked: unlockedUserIds.length }
 }
 
-/** 把所有有过比赛提交的用户的 contest_joined 重算一遍，供 rescan 前置调用 */
+
+/** 同上，3 个参数一行 */
+const STAT_UPSERT_CHUNK = 1000
+
+/**
+ * 把所有有过比赛提交的用户的 contest_joined 重算一遍，供 rescan 前置调用。
+ *
+ * 参赛场次这个指标：旧后端 `ContestJoined` 只实现了 recompute、不走 on_submission
+ * （比赛提交在 build_ctx 就被跳过了），所以它只在 rescan 时刷新。这里保持同样口径：
+ * 去重数一遍该用户有过提交的比赛数。
+ * （迁移过来时新后端整个漏掉过这个指标，配在 contest_joined 上的成就永远解锁不了。）
+ *
+ * 一条 group by 出全部用户的场次，再分批 upsert —— 以前是每个用户 1 条 count
+ * 加一个独立事务里的 insert/select for update/update，四次往返乘以全站用户数。
+ *
+ * `metrics || excluded.metrics` 是 jsonb 的浅合并，只覆盖 contest_joined 这一个键，
+ * 其余指标原样保留，语义和原来「读出来改一个键再写回去」一致，而且不需要 for update：
+ * 合并在一条语句里完成，并发写不会互相盖掉。
+ */
 async function refreshContestJoinedForAll() {
   const rows = await db
-    .selectDistinct({ userId: schema.submission.userId })
+    .select({ userId: schema.submission.userId, value: countDistinct(schema.submission.contestId) })
     .from(schema.submission)
     .where(isNotNull(schema.submission.contestId))
-  for (const { userId } of rows) {
-    const value = await contestJoinedCount(userId)
-    await db.transaction(async (tx) => {
-      await tx.insert(schema.userStat).values({
-        userId,
-        metrics: {},
-        updateTime: new Date().toISOString(),
-      }).onConflictDoNothing({ target: schema.userStat.userId })
-      const [stat] = await tx.select().from(schema.userStat)
-        .where(eq(schema.userStat.userId, userId)).for("update").limit(1)
-      if (!stat) return
-      const merged = objectValue(stat.metrics)
-      merged.contest_joined = value
-      await tx.update(schema.userStat)
-        .set({ metrics: merged, updateTime: new Date().toISOString() })
-        .where(eq(schema.userStat.id, stat.id))
-    })
+    .groupBy(schema.submission.userId)
+  const now = new Date().toISOString()
+  for (let start = 0; start < rows.length; start += STAT_UPSERT_CHUNK) {
+    const chunk = rows.slice(start, start + STAT_UPSERT_CHUNK)
+    await db.insert(schema.userStat)
+      .values(chunk.map((row) => ({
+        userId: row.userId,
+        metrics: { contest_joined: row.value },
+        updateTime: now,
+      })))
+      .onConflictDoUpdate({
+        target: schema.userStat.userId,
+        set: {
+          metrics: sql`${schema.userStat.metrics} || excluded.metrics`,
+          updateTime: sql`excluded.update_time`,
+        },
+      })
   }
 }

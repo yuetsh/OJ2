@@ -158,18 +158,43 @@ aiRoutes.get("/ai/duration", requireAuth, async (c) => {
     : duration === "months:6" ? { count: 6, unit: "months", rewind: (date: Date) => shiftMonths(date, -7), advance: (date: Date) => shiftMonths(date, 1) }
       : duration === "years:1" ? { count: 12, unit: "months", rewind: (date: Date) => shiftMonths(date, -13), advance: (date: Date) => shiftMonths(date, 1) }
         : { count: 4, unit: "weeks", rewind: (date: Date) => new Date(date.getTime() - 5 * 7 * 864e5), advance: (date: Date) => new Date(date.getTime() + 7 * 864e5) }
+  // 先把 count 个时间桶算出来，再一条查询把整段区间的提交拉回来在内存里分桶。
+  // 以前是每个桶两条查询、桶之间还是串行的，一年 12 个桶就是 24 次往返。
+  // 相邻桶首尾相接、两端都是闭区间（end_i == start_{i+1}），落在边界上的提交
+  // 两个桶都算 —— 这是旧行为，照搬，不要「顺手」改成半开区间。
   let cursor = config.rewind(new Date(endText))
-  const data = []
+  const buckets: { start: Date; end: Date }[] = []
   for (let index = 0; index < config.count; index++) {
     const start = config.advance(cursor)
-    const end = config.advance(start)
+    buckets.push({ start, end: config.advance(start) })
     cursor = start
-    const [submissions, solved] = await Promise.all([
-      db.select({ value: count() }).from(schema.submission).where(and(eq(schema.submission.userId, user.id), gte(schema.submission.createTime, start.toISOString()), lte(schema.submission.createTime, end.toISOString()))),
-      db.select({ value: countDistinct(schema.submission.problemId) }).from(schema.submission).where(and(eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted), gte(schema.submission.createTime, start.toISOString()), lte(schema.submission.createTime, end.toISOString()))),
-    ])
-    data.push(durationDataSchema.parse({ unit: config.unit, index: config.count - 1 - index, start: start.toISOString(), end: end.toISOString(), grade: solved[0]?.value ? "B" : "", problemCount: solved[0]?.value ?? 0, submissionCount: submissions[0]?.value ?? 0 }))
   }
+  // 时间戳取 epoch 毫秒回来，比较在 JS 里做，和原来在 SQL 里比 timestamptz 等价，
+  // 不受 pg 那个「空格分隔 + +00 偏移」字符串格式能否被 Date.parse 认的影响
+  const rows = await db.select({
+    time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(Number),
+    problemId: schema.submission.problemId,
+    result: schema.submission.result,
+  }).from(schema.submission).where(and(
+    eq(schema.submission.userId, user.id),
+    gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
+    lte(schema.submission.createTime, buckets.at(-1)!.end.toISOString()),
+  ))
+  const data = buckets.map((bucket, index) => {
+    const from = bucket.start.getTime()
+    const to = bucket.end.getTime()
+    const inRange = rows.filter((row) => row.time >= from && row.time <= to)
+    const solved = new Set(inRange.filter((row) => accepted.includes(row.result)).map((row) => row.problemId)).size
+    return durationDataSchema.parse({
+      unit: config.unit,
+      index: config.count - 1 - index,
+      start: bucket.start.toISOString(),
+      end: bucket.end.toISOString(),
+      grade: solved ? "B" : "",
+      problemCount: solved,
+      submissionCount: inRange.length,
+    })
+  })
   return success(c, data)
 })
 

@@ -6,7 +6,7 @@ import {
   updateAcmHelperRequestSchema,
   updateContestRequestSchema,
 } from "@oj2/contract"
-import { and, count, desc, eq, ilike } from "drizzle-orm"
+import { and, count, desc, eq, ilike, inArray } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
@@ -206,28 +206,33 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
 
     const problems = await tx.select().from(schema.problem)
       .where(eq(schema.problem.contestId, id))
-    for (const problem of problems) {
-      const { id: _oldId, ...rest } = problem
-      const [copy] = await tx.insert(schema.problem).values({
-        ...rest,
-        contestId: contest!.id,
-        // 计数器归零：克隆的是题面，不是历史战绩
-        submissionNumber: 0,
-        acceptedNumber: 0,
-        statisticInfo: {},
-        createdById: me,
-        createTime: now,
-        lastUpdateTime: now,
-      }).returning({ id: schema.problem.id })
-      // 标签是多对多中间表，Django 的 problem.tags.set(tags) 对应这里手工复制关系行
-      const tags = await tx.select({ tagId: schema.problemTags.problemtagId })
-        .from(schema.problemTags).where(eq(schema.problemTags.problemId, problem.id))
-      if (tags.length) {
-        await tx.insert(schema.problemTags).values(tags.map((tag) => ({
-          problemId: copy!.id,
-          problemtagId: tag.tagId,
-        })))
-      }
+    if (problems.length === 0) return contest!.id
+
+    // 题面、标签各一条语句，不再按题循环。新旧题的对应关系靠 _id 认：
+    // 克隆出来的题原样保留 _id，而它们全在同一场新比赛里，彼此不会重名。
+    const copies = await tx.insert(schema.problem).values(problems.map(({ id: _oldId, ...rest }) => ({
+      ...rest,
+      contestId: contest!.id,
+      // 计数器归零：克隆的是题面，不是历史战绩
+      submissionNumber: 0,
+      acceptedNumber: 0,
+      statisticInfo: {},
+      createdById: me,
+      createTime: now,
+      lastUpdateTime: now,
+    }))).returning({ id: schema.problem.id, displayId: schema.problem.displayId })
+    const newIdByDisplayId = new Map(copies.map((copy) => [copy.displayId, copy.id]))
+
+    // 标签是多对多中间表，Django 的 problem.tags.set(tags) 对应这里手工复制关系行
+    const tags = await tx.select({ problemId: schema.problemTags.problemId, tagId: schema.problemTags.problemtagId })
+      .from(schema.problemTags).where(inArray(schema.problemTags.problemId, problems.map((problem) => problem.id)))
+    if (tags.length) {
+      const displayIdByOldId = new Map(problems.map((problem) => [problem.id, problem.displayId]))
+      const links = tags.flatMap((tag) => {
+        const newId = newIdByDisplayId.get(displayIdByOldId.get(tag.problemId) ?? "")
+        return newId === undefined ? [] : [{ problemId: newId, problemtagId: tag.tagId }]
+      })
+      if (links.length) await tx.insert(schema.problemTags).values(links)
     }
     return contest!.id
   })

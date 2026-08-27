@@ -30,14 +30,22 @@ import { objectValue, publicTemplates, queryInteger, sampleUser, stringArray } f
 
 export const contestRoutes = new Hono<ContestEnv>()
 
-async function creator(id: number) {
-  const [row] = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
+/** 一次把这批比赛的创建者全查回来，按 userId 建 Map —— 比赛列表按行查会变成 N+1 */
+async function creators(ids: number[]) {
+  const map = new Map<number, ReturnType<typeof sampleUser>>()
+  if (ids.length === 0) return map
+  const rows = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
     .from(schema.user).leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(eq(schema.user.id, id)).limit(1)
-  return sampleUser(row ?? { id, username: "" }, row?.realName)
+    .where(inArray(schema.user.id, ids))
+  for (const row of rows) map.set(row.id, sampleUser(row, row.realName))
+  return map
 }
 
-async function serializeContest(contest: typeof schema.contest.$inferSelect, includeNow = false) {
+function serializeContest(
+  contest: typeof schema.contest.$inferSelect,
+  createdBy: ReturnType<typeof sampleUser>,
+  includeNow = false,
+) {
   return contestSchema.parse({
     id: contest.id,
     title: contest.title,
@@ -47,7 +55,7 @@ async function serializeContest(contest: typeof schema.contest.$inferSelect, inc
     endTime: contest.endTime,
     createTime: contest.createTime,
     lastUpdateTime: contest.lastUpdateTime,
-    createdBy: await creator(contest.createdById),
+    createdBy,
     status: contestStatus(contest),
     contestType: contest.password ? "Password Protected" : "Public",
     now: includeNow ? new Date().toISOString() : undefined,
@@ -72,8 +80,12 @@ contestRoutes.get("/contests", async (c) => {
     db.select({ value: count() }).from(schema.contest).where(where),
     db.select().from(schema.contest).where(where).orderBy(desc(schema.contest.startTime)).limit(limit).offset(offset),
   ])
+  const byId = await creators([...new Set(rows.map((row) => row.createdById))])
   return success(c, contestListSchema.parse({
-    results: await Promise.all(rows.map((row) => serializeContest(row))),
+    results: rows.map((row) => serializeContest(
+      row,
+      byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
+    )),
     total: totalRow[0]?.value ?? 0,
   }))
 })
@@ -81,7 +93,12 @@ contestRoutes.get("/contests", async (c) => {
 contestRoutes.get("/contests/:id", async (c) => {
   const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
-  return success(c, await serializeContest(contest, true))
+  const byId = await creators([contest.createdById])
+  return success(c, serializeContest(
+    contest,
+    byId.get(contest.createdById) ?? sampleUser({ id: contest.createdById, username: "" }, null),
+    true,
+  ))
 })
 
 contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {

@@ -54,28 +54,63 @@ async function canEdit(user: AuthUser, problem: ProblemRow) {
 }
 
 async function tagNames(problemId: number) {
-  const rows = await db.select({ name: schema.problemTag.name }).from(schema.problemTags)
-    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
-    .where(eq(schema.problemTags.problemId, problemId))
-  return rows.map((row) => row.name)
+  return (await tagNamesFor([problemId])).get(problemId) ?? []
 }
 
-/** 把标签名解析成 id：去空格、大小写不敏感复用已有标签，没有才新建。对齐旧 resolve_tags */
-async function resolveTags(tx: typeof db, names: string[]) {
-  const ids: number[] = []
+/** 批量版：列表接口一定要走这个，按行调 tagNames 就是 N+1 */
+async function tagNamesFor(problemIds: number[]) {
+  const result = new Map<number, string[]>()
+  if (problemIds.length === 0) return result
+  const rows = await db.select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name })
+    .from(schema.problemTags)
+    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
+    .where(inArray(schema.problemTags.problemId, problemIds))
+  for (const row of rows) result.set(row.problemId, [...(result.get(row.problemId) ?? []), row.name])
+  return result
+}
+
+/**
+ * 把一批标签名去空格、去重（大小写不敏感），保留每个名字第一次出现时的原始大小写。
+ * 解析和批量打标签两条路都用它，口径对齐旧 resolve_tags。
+ */
+export function normalizeTagNames(names: string[]) {
+  const wanted: string[] = []
   const seen = new Set<string>()
   for (const raw of names) {
     const name = raw.trim()
     if (!name || seen.has(name.toLowerCase())) continue
     seen.add(name.toLowerCase())
-    const [existing] = await tx.select({ id: schema.problemTag.id }).from(schema.problemTag)
-      .where(sql`lower(${schema.problemTag.name}) = lower(${name})`).limit(1)
-    if (existing) { ids.push(existing.id); continue }
-    const [created] = await tx.insert(schema.problemTag).values({ name })
-      .returning({ id: schema.problemTag.id })
-    ids.push(created!.id)
+    wanted.push(name)
   }
-  return ids
+  return wanted
+}
+
+/**
+ * 一条 `lower(name) in (...)` 把已有标签全查回来，按小写名建 Map。
+ * 以前是每个名字一条 SELECT，一次改十个标签就是十次往返。
+ */
+export async function findTagsByName(tx: typeof db, names: string[]) {
+  const map = new Map<string, number>()
+  if (names.length === 0) return map
+  const rows = await tx.select({ id: schema.problemTag.id, name: schema.problemTag.name })
+    .from(schema.problemTag)
+    .where(inArray(sql`lower(${schema.problemTag.name})`, names.map((name) => name.toLowerCase())))
+  for (const row of rows) map.set(row.name.toLowerCase(), row.id)
+  return map
+}
+
+/** 把标签名解析成 id：去空格、大小写不敏感复用已有标签，没有才新建。对齐旧 resolve_tags */
+async function resolveTags(tx: typeof db, names: string[]) {
+  const wanted = normalizeTagNames(names)
+  if (wanted.length === 0) return []
+  const existing = await findTagsByName(tx, wanted)
+  const missing = wanted.filter((name) => !existing.has(name.toLowerCase()))
+  if (missing.length) {
+    const created = await tx.insert(schema.problemTag).values(missing.map((name) => ({ name })))
+      .returning({ id: schema.problemTag.id, name: schema.problemTag.name })
+    for (const row of created) existing.set(row.name.toLowerCase(), row.id)
+  }
+  return wanted.map((name) => existing.get(name.toLowerCase())!).filter((id) => id !== undefined)
 }
 
 async function setTags(tx: typeof db, problemId: number, names: string[]) {
@@ -254,9 +289,10 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
       .where(where).orderBy(desc(schema.problem.createTime)).limit(limit).offset(offset),
   ])
   // 只有公开题列表下发最高票评价，比赛题列表不下发 —— 与旧后端一致
-  const topReactions = await getTopReactions(rows.map(({ problem }) => problem.id))
+  const problemIds = rows.map(({ problem }) => problem.id)
+  const [topReactions, tags] = await Promise.all([getTopReactions(problemIds), tagNamesFor(problemIds)])
   return success(c, adminProblemListSchema.parse({
-    results: await Promise.all(rows.map(async ({ problem, user: creator, realName }) =>
+    results: rows.map(({ problem, user: creator, realName }) =>
       adminProblemListItemSchema.parse({
         id: problem.id,
         _id: problem.displayId,
@@ -265,12 +301,12 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
         visible: problem.visible,
         createTime: problem.createTime,
         difficulty: problem.difficulty,
-        tags: await tagNames(problem.id),
+        tags: tags.get(problem.id) ?? [],
         hasAstRules: problem.astRules !== null,
         allowFlowchart: problem.allowFlowchart,
         showFlowchart: problem.showFlowchart,
         topReaction: topReactions.get(problem.id) ?? null,
-      }))),
+      })),
     total: totalRow[0]?.value ?? 0,
   }))
 })
@@ -425,8 +461,9 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where).orderBy(desc(schema.problem.createTime)).limit(limit).offset(offset),
   ])
+  const tags = await tagNamesFor(rows.map(({ problem }) => problem.id))
   return success(c, adminProblemListSchema.parse({
-    results: await Promise.all(rows.map(async ({ problem, user: creator, realName }) =>
+    results: rows.map(({ problem, user: creator, realName }) =>
       adminProblemListItemSchema.parse({
         id: problem.id,
         _id: problem.displayId,
@@ -435,12 +472,12 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
         visible: problem.visible,
         createTime: problem.createTime,
         difficulty: problem.difficulty,
-        tags: await tagNames(problem.id),
+        tags: tags.get(problem.id) ?? [],
         hasAstRules: problem.astRules !== null,
         allowFlowchart: problem.allowFlowchart,
         showFlowchart: problem.showFlowchart,
         topReaction: null,
-      }))),
+      })),
     total: totalRow[0]?.value ?? 0,
   }))
 })

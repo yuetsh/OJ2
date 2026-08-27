@@ -74,14 +74,17 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
   if (!parsed.success) {
     return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
   }
-  for (const [field, key] of Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]) {
-    const value = parsed.data[field]
-    await db.insert(schema.optionsSysoptions).values({ key, value })
-      .onConflictDoUpdate({ target: schema.optionsSysoptions.key, set: { value } })
-    // 广播给所有开着页面的人，改完立刻生效不必刷新，对齐旧 push_config_update。
-    // 推的是 options 表里的 snake_case key —— 前端 configStore.config 用的就是这套键名。
-    await publishConfigUpdate(key, value)
-  }
+  const entries = (Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][])
+    .map(([field, key]) => ({ key, value: parsed.data[field] }))
+  // 8 个键一条 upsert 写完，不再一个键一次往返
+  await db.insert(schema.optionsSysoptions).values(entries)
+    .onConflictDoUpdate({
+      target: schema.optionsSysoptions.key,
+      set: { value: sql`excluded.value` },
+    })
+  // 广播给所有开着页面的人，改完立刻生效不必刷新，对齐旧 push_config_update。
+  // 推的是 options 表里的 snake_case key —— 前端 configStore.config 用的就是这套键名。
+  for (const entry of entries) await publishConfigUpdate(entry.key, entry.value)
   return success(c, null)
 })
 

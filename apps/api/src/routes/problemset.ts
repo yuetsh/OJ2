@@ -55,11 +55,14 @@ function progressSummary(progress: typeof schema.problemsetProgress.$inferSelect
   }
 }
 
-async function problemSetCreator(id: number) {
-  const [row] = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
+async function problemSetCreators(ids: number[]) {
+  const map = new Map<number, ReturnType<typeof sampleUser>>()
+  if (ids.length === 0) return map
+  const rows = await db.select({ id: schema.user.id, username: schema.user.username, realName: schema.userProfile.realName })
     .from(schema.user).leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(eq(schema.user.id, id)).limit(1)
-  return sampleUser(row ?? { id, username: "" }, row?.realName)
+    .where(inArray(schema.user.id, ids))
+  for (const row of rows) map.set(row.id, sampleUser(row, row.realName))
+  return map
 }
 
 function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earned?: boolean) {
@@ -75,35 +78,58 @@ function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earned?: b
   })
 }
 
-async function serializeProblemSet(
-  row: ProblemSetRow,
+/**
+ * 一次把整页题单的附属数据全查回来，再在内存里按 problemsetId 分组。
+ *
+ * 以前是每行 5 条查询（题目数 / 我的进度 / 奖章 / 已获奖章 / 创建者），
+ * limit 最大 250 就是 1250 次往返。这里固定 5 条，与行数无关。
+ */
+async function serializeProblemSets(
+  rows: ProblemSetRow[],
   userId?: number,
   includeBadges = false,
 ) {
-  const [[problemCount], [progress], badges, earnedRows] = await Promise.all([
-    db.select({ value: count() }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, row.id)),
-    userId ? db.select().from(schema.problemsetProgress).where(and(eq(schema.problemsetProgress.problemsetId, row.id), eq(schema.problemsetProgress.userId, userId))).limit(1) : Promise.resolve([]),
-    includeBadges ? db.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, row.id)) : Promise.resolve([]),
+  if (rows.length === 0) return []
+  const ids = rows.map((row) => row.id)
+  const [problemCounts, progresses, badges, earnedRows, creators] = await Promise.all([
+    db.select({ problemsetId: schema.problemsetProblem.problemsetId, value: count() })
+      .from(schema.problemsetProblem).where(inArray(schema.problemsetProblem.problemsetId, ids))
+      .groupBy(schema.problemsetProblem.problemsetId),
+    userId ? db.select().from(schema.problemsetProgress)
+      .where(and(inArray(schema.problemsetProgress.problemsetId, ids), eq(schema.problemsetProgress.userId, userId)))
+      : Promise.resolve([] as (typeof schema.problemsetProgress.$inferSelect)[]),
+    includeBadges ? db.select().from(schema.problemsetBadge)
+      .where(inArray(schema.problemsetBadge.problemsetId, ids)).orderBy(asc(schema.problemsetBadge.id))
+      : Promise.resolve([] as (typeof schema.problemsetBadge.$inferSelect)[]),
     includeBadges && userId ? db.select({ id: schema.userBadge.badgeId }).from(schema.userBadge)
       .innerJoin(schema.problemsetBadge, eq(schema.userBadge.badgeId, schema.problemsetBadge.id))
-      .where(and(eq(schema.userBadge.userId, userId), eq(schema.problemsetBadge.problemsetId, row.id))) : Promise.resolve([]),
+      .where(and(eq(schema.userBadge.userId, userId), inArray(schema.problemsetBadge.problemsetId, ids)))
+      : Promise.resolve([] as { id: number }[]),
+    problemSetCreators([...new Set(rows.map((row) => row.createdById))]),
   ])
+  const countBySet = new Map(problemCounts.map((item) => [item.problemsetId, item.value]))
+  const progressBySet = new Map(progresses.map((item) => [item.problemsetId, item]))
+  const badgesBySet = new Map<number, (typeof schema.problemsetBadge.$inferSelect)[]>()
+  for (const badge of badges) badgesBySet.set(badge.problemsetId, [...(badgesBySet.get(badge.problemsetId) ?? []), badge])
   const earned = new Set(earnedRows.map((item) => item.id))
-  return problemSetSchema.parse({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    createdBy: await problemSetCreator(row.createdById),
-    createTime: row.createTime,
-    lastUpdateTime: row.lastUpdateTime,
-    difficulty: row.difficulty,
-    status: row.status,
-    endTime: row.endTime,
-    visible: row.visible,
-    problemsCount: problemCount?.value ?? 0,
-    completedCount: progress?.completedProblemsCount ?? 0,
-    userProgress: progressSummary(progress),
-    badges: includeBadges ? badges.map((badge) => badgeData(badge, earned.has(badge.id))) : undefined,
+  return rows.map((row) => {
+    const progress = progressBySet.get(row.id)
+    return problemSetSchema.parse({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      createdBy: creators.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
+      createTime: row.createTime,
+      lastUpdateTime: row.lastUpdateTime,
+      difficulty: row.difficulty,
+      status: row.status,
+      endTime: row.endTime,
+      visible: row.visible,
+      problemsCount: countBySet.get(row.id) ?? 0,
+      completedCount: progress?.completedProblemsCount ?? 0,
+      userProgress: progressSummary(progress),
+      badges: includeBadges ? (badgesBySet.get(row.id) ?? []).map((badge) => badgeData(badge, earned.has(badge.id))) : undefined,
+    })
   })
 }
 
@@ -123,7 +149,7 @@ problemsetRoutes.get("/problem-sets", optionalAuth, async (c) => {
     db.select().from(schema.problemset).where(where).orderBy(desc(schema.problemset.createTime)).limit(limit).offset(offset),
   ])
   return success(c, problemSetListSchema.parse({
-    results: await Promise.all(rows.map((row) => serializeProblemSet(row, c.get("user")?.id, true))),
+    results: await serializeProblemSets(rows, c.get("user")?.id, true),
     total: totalRows[0]?.value ?? 0,
   }))
 })
@@ -133,7 +159,8 @@ problemsetRoutes.get("/problem-sets/:id", optionalAuth, async (c) => {
   const [row] = await db.select().from(schema.problemset)
     .where(and(eq(schema.problemset.id, id), eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft"))).limit(1)
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  return success(c, await serializeProblemSet(row, c.get("user")?.id))
+  const [data] = await serializeProblemSets([row], c.get("user")?.id)
+  return success(c, data)
 })
 
 problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
@@ -282,22 +309,21 @@ problemsetRoutes.put("/problem-set-progress", requireAuth, async (c) => {
       })
     }
     const badges = await tx.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, problemSet.id))
-    const earned: typeof schema.problemsetBadge.$inferSelect[] = []
-    for (const badge of badges) {
-      const hit = badge.conditionType === "all_problems"
-        ? updated.totalProblemsCount > 0 && updated.completedProblemsCount === updated.totalProblemsCount
-        : badge.conditionType === "problem_count"
-          ? updated.completedProblemsCount >= badge.conditionValue
-          : badge.conditionType === "score" && updated.totalScore >= badge.conditionValue
-      if (!hit) continue
-      const inserted = await tx.insert(schema.userBadge).values({
-        userId: user.id,
-        badgeId: badge.id,
-        earnedTime: new Date().toISOString(),
-      }).onConflictDoNothing({ target: [schema.userBadge.badgeId, schema.userBadge.userId] }).returning({ id: schema.userBadge.id })
-      if (inserted.length) earned.push(badge)
-    }
-    return { earned }
+    const hits = badges.filter((badge) => badge.conditionType === "all_problems"
+      ? updated.totalProblemsCount > 0 && updated.completedProblemsCount === updated.totalProblemsCount
+      : badge.conditionType === "problem_count"
+        ? updated.completedProblemsCount >= badge.conditionValue
+        : badge.conditionType === "score" && updated.totalScore >= badge.conditionValue)
+    if (hits.length === 0) return { earned: [] as (typeof schema.problemsetBadge.$inferSelect)[] }
+    // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
+    const inserted = await tx.insert(schema.userBadge).values(hits.map((badge) => ({
+      userId: user.id,
+      badgeId: badge.id,
+      earnedTime: new Date().toISOString(),
+    }))).onConflictDoNothing({ target: [schema.userBadge.badgeId, schema.userBadge.userId] })
+      .returning({ badgeId: schema.userBadge.badgeId })
+    const insertedIds = new Set(inserted.map((row) => row.badgeId))
+    return { earned: hits.filter((badge) => insertedIds.has(badge.id)) }
   })
   if ("error" in result && result.error) {
     const error = result.error
