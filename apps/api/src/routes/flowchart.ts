@@ -158,6 +158,19 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
 
 const FLOWCHART_COMPLETED = 2
 
+/**
+ * 词云的分词条数上限。
+ *
+ * 数值统计（总数、均分、等级分布、各项平均分、完成人数）仍然按整个时间窗**精确**
+ * 计算 —— 那只是已取回行上的算术，不额外花钱。真正会随数据量线性变重的是分词：
+ * 每条 feedback / suggestions / comment 都要走一遍 jieba，而前端的「全部时段」
+ * 是不带 start 的，攒一学年就得把所有评语重新 cut 一遍。
+ *
+ * 词云是辅助性的，看的是高频问题，取最近这些条足够；数值不能采样 —— 采了之后
+ * 老师看到的完成率和均分就是错的，而且从界面上看不出来。
+ */
+const WORDCLOUD_TEXT_LIMIT = 3000
+
 flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const end = c.req.query("end")?.trim()
   if (!end) return failure(c, 400, "invalid-request", "end is required")
@@ -211,6 +224,8 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     .from(schema.flowchartSubmission)
     .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
     .where(and(...filters))
+    // 按时间倒序，好让词云取到的那部分是最近的
+    .orderBy(desc(schema.flowchartSubmission.createTime))
 
   const empty = {
     totalCount: 0,
@@ -227,6 +242,9 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const gradeDistribution: Record<string, number> = {}
   const criteriaTotals = new Map<string, { sum: number; count: number; max: number }>()
   const texts: string[] = []
+  const pushText = (value: string) => {
+    if (texts.length < WORDCLOUD_TEXT_LIMIT) texts.push(value)
+  }
   const submitted = new Set<string>()
   let scoreSum = 0
   let scoreCount = 0
@@ -255,10 +273,10 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
           max: typeof detail.max === "number" ? detail.max : 100,
         })
       }
-      if (typeof detail.comment === "string" && detail.comment) texts.push(detail.comment)
+      if (typeof detail.comment === "string" && detail.comment) pushText(detail.comment)
     }
-    if (row.feedback) texts.push(row.feedback)
-    if (row.suggestions) texts.push(row.suggestions)
+    if (row.feedback) pushText(row.feedback)
+    if (row.suggestions) pushText(row.suggestions)
   }
 
   const criteriaAverages: Record<string, { avg: number; max: number }> = {}
