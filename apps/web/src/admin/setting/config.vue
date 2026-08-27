@@ -8,7 +8,6 @@ import {
 import { parseTime } from "utils/functions"
 import type { OrphanTestCase, Server, WebsiteConfig } from "utils/types"
 import { useConfigStore } from "shared/store/config"
-import { useConfigWebSocket } from "shared/composables/websocket"
 import {
   deleteJudgeServer,
   editWebsite,
@@ -22,7 +21,6 @@ import { useUserStore } from "shared/store/user"
 const message = useMessage()
 const configStore = useConfigStore()
 const userStore = useUserStore()
-const { updateConfig } = useConfigWebSocket()
 
 // 确保只有登录用户才能使用WebSocket
 watch(
@@ -158,10 +156,9 @@ async function saveWebsiteConfig() {
   message.success("网站配置保存成功")
   getWebsiteConfig()
   configStore.getConfig()
-
-  // 通过 WebSocket 广播配置变化，实现实时切换
-  updateConfig("enable_maxkb", websiteConfig.enableMaxkb)
-  updateConfig("submission_list_show_all", websiteConfig.submissionListShowAll)
+  // 广播由后端在 POST /admin/website 里做，八个键一个不落。
+  // 这里原来还从客户端往 /ws/config 推两个键 —— 那条连接从没 connect() 过、
+  // send() 直接返回 false，而且服务端只认 ping/subscribe，本来就收不下。
 }
 
 async function deleteTestcase(id?: string) {

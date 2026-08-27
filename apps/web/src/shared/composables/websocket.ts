@@ -513,17 +513,9 @@ class ConfigWebSocket extends BaseWebSocket<ConfigUpdate> {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     super({ url: `${protocol}//${window.location.host}/ws/config` })
   }
-
-  /**
-   * 发送配置更新
-   */
-  updateConfig(key: string, value: any) {
-    this.send({
-      type: "config_update",
-      key,
-      value,
-    })
-  }
+  // 这条通道是**单向**的：只收后端广播。服务端的消息处理只认 ping / subscribe，
+  // 客户端往这里推 config_update 会被回一个 error 帧 —— 别再加发送方法。
+  // 配置变更走 POST /admin/website，由后端广播给所有人。
 }
 
 /**
@@ -548,7 +540,6 @@ export function useConfigWebSocket(handler?: MessageHandler<ConfigUpdate>) {
   return {
     connect: () => ws.connect(),
     disconnect: () => ws.disconnect(),
-    updateConfig: (key: string, value: any) => ws.updateConfig(key, value),
     status: ws.status,
     addHandler: (h: MessageHandler<ConfigUpdate>) => ws.addHandler(h),
     removeHandler: (h: MessageHandler<ConfigUpdate>) => ws.removeHandler(h),

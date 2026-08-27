@@ -75,18 +75,20 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
     return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
   }
   const entries = (Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][])
-    .map(([field, key]) => ({ key, value: parsed.data[field] }))
+    .map(([field, key]) => ({ field, key, value: parsed.data[field] }))
   // 8 个键一条 upsert 写完，不再一个键一次往返
-  await db.insert(schema.optionsSysoptions).values(entries)
+  await db.insert(schema.optionsSysoptions).values(entries.map(({ key, value }) => ({ key, value })))
     .onConflictDoUpdate({
       target: schema.optionsSysoptions.key,
       set: { value: sql`excluded.value` },
     })
   // 广播给所有开着页面的人，改完立刻生效不必刷新，对齐旧 push_config_update。
-  // 推的是 options 表里的 snake_case key。**前端 store 的字段是驼峰**，
-  // 换名在前端 configUpdate.ts 里做 —— 这里曾经注释成「前端用的就是这套键名」，
-  // 结果前端照着直接 `key in store` 判断，一条也命中不了，整个实时生效空转了很久。
-  for (const entry of entries) await publishConfigUpdate(entry.key, entry.value)
+  //
+  // 推的是**契约里的字段名**（websiteName），不是 options 表的列键（website_name）。
+  // snake_case 是这张表从 Django 继承来的存储格式，只该活在库里；线上这一跳两边
+  // 都是新写的，没理由让前端再写一层换名胶水。曾经推 snake、前端拿它去比驼峰字段，
+  // 一条也命中不了，整个「改完不必刷新」空转了很久。
+  for (const entry of entries) await publishConfigUpdate(entry.field, entry.value)
   return success(c, null)
 })
 
