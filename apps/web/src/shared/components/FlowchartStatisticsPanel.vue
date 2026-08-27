@@ -203,6 +203,8 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const message = useMessage()
+
 const durationOptions: SelectOption[] = [
   { label: "10分钟内", value: "minutes:10" },
   { label: "20分钟内", value: "minutes:20" },
@@ -528,12 +530,18 @@ async function handleStatistics() {
     query.duration === "all"
       ? { end }
       : { start: formatISO(sub(current, subOptions.value)), end }
-  const res = await getFlowchartStatistics(
-    duration,
-    query.problem,
-    query.username,
-  )
-  Object.assign(data, res)
+  try {
+    const res = await getFlowchartStatistics(
+      duration,
+      query.problem,
+      query.username,
+    )
+    Object.assign(data, res)
+  } catch (error) {
+    message.error("获取流程图统计失败")
+    console.error("获取流程图统计失败:", error)
+    return
+  }
   await nextTick()
   renderWordCloud()
 }

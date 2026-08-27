@@ -195,7 +195,21 @@ async function rejudge(submissionID: string) {
 }
 
 async function retryFlowchart(submissionId: string) {
-  await retryFlowchartSubmission(submissionId)
+  // 后端会拒掉「还在评分中」的提交（409 retry-not-allowed），也可能撞上限流。
+  // 不兜住的话拦截器静默 reject，老师点下去完全没反应。
+  // 按错误码分支而不是 match 文案（见 utils/api.ts 的约定）——后端文案是英文的，
+  // 直接弹给老师看不合适
+  const retryTips: Record<string, string> = {
+    "retry-not-allowed": "这条还在评分中，等出了结果再重新评分",
+    "too-many-submissions": "操作太频繁了，缓一下再试",
+    "flowchart-not-found": "提交不存在，或者没有权限",
+  }
+  try {
+    await retryFlowchartSubmission(submissionId)
+  } catch (err: any) {
+    message.error(retryTips[err?.error] ?? "重新评分失败")
+    return
+  }
   message.success("重新评分已提交")
   listSubmissions()
 }
