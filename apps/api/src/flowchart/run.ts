@@ -65,12 +65,14 @@ export async function evaluateFlowchart(job: FlowchartJobData) {
       criteriaDetails: result.criteria,
     }))
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    // 原来这里把 error.message 原样推给学生、前端还直接 message.error 弹出来 ——
+    // AI provider 的地址、内部报错就这么进了浏览器。真实原因留在服务端日志里，
+    // 学生只需要知道「失败了，再试一次」；error 字段留空，前端有兜底文案。
+    console.error(`Failed to evaluate flowchart ${row.flowchart.id}`, error)
     await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, flowchartUpdateSchema.parse({
       type: "flowchart_evaluation_failed",
       submissionId: row.flowchart.id,
-      error: message,
     }))
     throw error
   }

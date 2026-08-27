@@ -17,6 +17,7 @@ import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { queryInteger, sampleUser } from "../helpers"
+import { publishSessionRevoked } from "../../events"
 
 export const adminAccountRoutes = new Hono<AppEnv>()
 
@@ -220,6 +221,12 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
     await tx.update(schema.userProfile).set({ realName: data.realName })
       .where(eq(schema.userProfile.userId, id))
   })
+
+  // 禁用只改数据库这一列，不动 Redis 里的会话 —— 那个学生挂着的 WebSocket
+  // 靠会话巡检永远发现不了（token 还是好的），只能在这里主动断
+  if (data.isDisabled && !existing.user.isDisabled) {
+    await publishSessionRevoked({ userId: id }, "account-disabled")
+  }
 
   const [row] = await selectUser(id)
   return success(c, serialize(row!))

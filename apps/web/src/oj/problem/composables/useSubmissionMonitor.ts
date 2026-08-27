@@ -1,4 +1,4 @@
-import { ref, computed, watch, onUnmounted } from "vue"
+import { ref, computed, onUnmounted } from "vue"
 import { useIntervalFn, useTimeoutFn } from "@vueuse/core"
 import { getSubmission } from "oj/api"
 import { SubmissionStatus } from "utils/constants"
@@ -81,6 +81,8 @@ export function useSubmissionMonitor() {
 
       // 停止轮询（WebSocket已成功）
       pausePolling()
+      // 结果已经到手，别让重连再去重放这条早就判完的订阅
+      unsubscribe()
 
       getSubmission(submissionId.value).then((res) => {
         submission.value = res
@@ -94,9 +96,9 @@ export function useSubmissionMonitor() {
   const {
     connect,
     subscribe,
+    unsubscribe,
     scheduleDisconnect,
     cancelScheduledDisconnect,
-    status: wsStatus,
   } = useSubmissionWebSocket(handleSubmissionUpdate)
 
   // ==================== 轮询保底启动 ====================
@@ -124,27 +126,17 @@ export function useSubmissionMonitor() {
     // 取消之前的断开计划
     cancelScheduledDisconnect()
 
-    // 如果WebSocket未连接，先连接
-    if (wsStatus.value !== "connected") {
-      console.log("[SubmissionMonitor] 启动WebSocket连接...")
-      connect()
-    }
+    // connect() 是幂等的：已经连着就直接返回，顺带把上一次空闲断开留下的状态清掉
+    connect()
 
-    // 等待WebSocket连接并订阅
-    let unwatch: (() => void) | null = null
-    unwatch = watch(
-      wsStatus,
-      (status) => {
-        if (status === "connected") {
-          console.log("[SubmissionMonitor] WebSocket已连接，订阅提交:", id)
-          subscribe(id)
-          if (unwatch) {
-            unwatch() // 订阅成功后停止监听
-          }
-        }
-      },
-      { immediate: true },
-    )
+    // 直接订阅，不必先等 status 变成 connected：连接没就绪时 subscribe() 会把 id
+    // 记在 pendingSubmissionId 上，由 onConnected() 补发（断线重连后同样有效）。
+    //
+    // 原来这里是 watch(wsStatus, ..., { immediate: true })，而 immediate 的回调在
+    // watch() **返回之前**就同步跑了 —— 已经连着时 unwatch 还是 null，if 不成立，
+    // 这个 watcher 就永远停不掉：每提交一次泄漏一个，而且往后每次重连时它们都会
+    // 把各自那个早就判完的旧 submissionId 重新订阅一遍。
+    subscribe(id)
 
     // 5秒后启动轮询保底（防止WebSocket失败）
     startPollingFallback()

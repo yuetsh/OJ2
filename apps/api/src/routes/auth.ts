@@ -4,6 +4,7 @@ import { Hono } from "hono"
 
 import { optionalAuth, type AppEnv } from "../auth/middleware"
 import { createSession, destroySession } from "../auth/session"
+import { publishSessionRevoked } from "../events"
 import { hashPassword, verifyPassword } from "../auth/password"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
@@ -66,7 +67,11 @@ authRoutes.post("/auth/login", async (c) => {
 })
 
 authRoutes.delete("/auth/session", async (c) => {
-  await destroySession(c)
+  const token = await destroySession(c)
+  // 同一个浏览器的其他标签页还挂着 WebSocket，页面上仍显示着登录态。推一条让它们
+  // 立刻清掉，不用等最多 60 秒的会话巡检。
+  // 按 token 而不是按用户：这个人在别的设备上的登录是另一张会话，不该被牵连。
+  if (token) await publishSessionRevoked({ token }, "session-ended")
   return success(c, null)
 })
 

@@ -17,6 +17,7 @@ import { useMyFlowchartStore } from "shared/store/myFlowchart"
 // API 和状态管理
 import {
   getCurrentProblemFlowchartSubmission,
+  getFlowchartSubmission,
   getFlowchartSubmissionDetail,
   submitFlowchart,
 } from "oj/api"
@@ -87,30 +88,129 @@ function splitSuggestionLines(suggestions?: string | null) {
     : []
 }
 
+// ==================== 评分结果监听 ====================
+/**
+ * 评分结果有两条路进来：WebSocket 推送（快）和轮询（稳）。谁先到谁结算，
+ * 靠 monitoringId 去重 —— 结算时清空，另一条路后到就直接跳过。
+ *
+ * 之所以必须有轮询兜底：Redis pub/sub 是发完不管的，worker 推的那一刻只要这条
+ * 连接不在（重连空窗、页面刚从后台切回来），这条消息就永远丢了。判题那边一直
+ * 有兜底轮询，流程图这边没有，丢一次消息按钮就一直转圈转到用户自己刷新。
+ */
+const monitoringId = ref("")
+
+/** AI 评分比判题慢得多，轮询放缓一点 */
+const POLL_INTERVAL = 3000
+/** 到点还没结果就收手，别无限轮询下去 */
+const POLL_TIMEOUT = 3 * 60 * 1000
+
+type Outcome =
+  | { ok: true; score: number; grade: string }
+  | { ok: false; error?: string }
+
+const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
+  async () => {
+    if (!monitoringId.value) {
+      pausePolling()
+      return
+    }
+    try {
+      const data = await getFlowchartSubmission(monitoringId.value)
+      if (data.status === 2) {
+        settle(data.id, {
+          ok: true,
+          score: data.aiScore ?? 0,
+          grade: data.aiGrade ?? "",
+        })
+      } else if (data.status === 3) {
+        settle(data.id, { ok: false })
+      }
+    } catch (error) {
+      console.error("[Flowchart] 轮询失败:", error)
+      pausePolling()
+    }
+  },
+  POLL_INTERVAL,
+  { immediate: false },
+)
+
+// WebSocket 正常时压根用不上轮询，先给它 5 秒，到点还没结果才开始拉
+const { start: startPollingFallback, stop: stopPollingFallback } = useTimeoutFn(
+  () => {
+    if (monitoringId.value) resumePolling()
+  },
+  5000,
+  { immediate: false },
+)
+
+const { start: startPollingDeadline, stop: stopPollingDeadline } = useTimeoutFn(
+  () => {
+    if (!monitoringId.value) return
+    monitoringId.value = ""
+    unsubscribe()
+    pausePolling()
+    loading.value = false
+    message.warning("评分等待超时，请稍后刷新页面查看结果")
+  },
+  POLL_TIMEOUT,
+  { immediate: false },
+)
+
+function settle(submissionId: string, outcome: Outcome) {
+  // 一个学生可能同时开着几道题的页面，每条连接都订在同一个用户 topic 上，
+  // 别的页面的评分结果照样会推到这里来 —— 必须认 id，不然会张冠李戴
+  if (!submissionId || submissionId !== monitoringId.value) return
+  monitoringId.value = ""
+  unsubscribe()
+  pausePolling()
+  stopPollingFallback()
+  stopPollingDeadline()
+  loading.value = false
+
+  if (!outcome.ok) {
+    message.error(
+      outcome.error
+        ? `流程图评分失败: ${outcome.error}`
+        : "流程图评分失败，请稍后重试",
+    )
+    return
+  }
+  latestRating.value = { score: outcome.score, grade: outcome.grade }
+  message.success(
+    `流程图评分完成！得分: ${outcome.score}分 (${outcome.grade}级)`,
+  )
+  if (
+    (outcome.grade === "A" || outcome.grade === "S") &&
+    lastSubmittedMermaidCode.value
+  ) {
+    myFlowchartStore.show(lastSubmittedMermaidCode.value)
+  }
+}
+
 // ==================== WebSocket 相关函数 ====================
 const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
   if (data.type === "flowchart_evaluation_completed") {
-    loading.value = false
-    const grade = data.grade || ""
-    latestRating.value = { score: data.score || 0, grade }
-    message.success(`流程图评分完成！得分: ${data.score}分 (${grade}级)`)
-    if ((grade === "A" || grade === "S") && lastSubmittedMermaidCode.value) {
-      myFlowchartStore.show(lastSubmittedMermaidCode.value)
-    }
+    settle(data.submissionId, {
+      ok: true,
+      score: data.score ?? 0,
+      grade: data.grade || "",
+    })
   } else if (data.type === "flowchart_evaluation_failed") {
-    loading.value = false
-    message.error(`流程图评分失败: ${data.error}`)
+    settle(data.submissionId, { ok: false, error: data.error })
   }
 }
 
 // 创建 WebSocket 连接
-const { connect, disconnect, subscribe } = useFlowchartWebSocket(
+const { connect, disconnect, subscribe, unsubscribe } = useFlowchartWebSocket(
   handleWebSocketMessage,
 )
 
-// 订阅提交更新
+// 订阅提交更新，同时开启轮询兜底
 function subscribeToSubmission(submissionId: string) {
+  monitoringId.value = submissionId
   subscribe(submissionId)
+  startPollingFallback()
+  startPollingDeadline()
 }
 
 // ==================== 提交相关函数 ====================

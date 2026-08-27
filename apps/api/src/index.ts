@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { basename, resolve } from "node:path"
 
-import { getRequestSessionUser } from "./auth/session"
+import { getRequestSessionUser, readRequestSessionToken } from "./auth/session"
 import { config } from "./config"
 import { adminRoutes } from "./routes/admin"
 import { authRoutes } from "./routes/auth"
@@ -19,6 +19,8 @@ import { submissionRoutes } from "./routes/submission"
 import { siteRoutes } from "./routes/site"
 import {
   bridgeSubmissionEvents,
+  isAllowedWebSocketOrigin,
+  startSessionSweep,
   submissionWebSocketHandler,
   type SubmissionSocketData,
 } from "./websocket"
@@ -99,12 +101,19 @@ const server = Bun.serve<SubmissionSocketData>({
 			)
 		}
 		if (url.pathname === "/ws/submissions" || url.pathname === "/ws/config") {
+			if (!isAllowedWebSocketOrigin(request.headers.get("origin"), url)) {
+				return new Response("Forbidden", { status: 403 })
+			}
 			const user = await getRequestSessionUser(request)
 			if (!user) return new Response("Unauthorized", { status: 401 })
 			const kind = url.pathname === "/ws/config" ? "config" : "submissions"
 			if (
 				bunServer.upgrade(request, {
-					data: { userId: user.id, username: user.username, kind },
+					data: {
+						userId: user.id,
+						kind,
+						token: readRequestSessionToken(request),
+					},
 				})
 			) {
 				return undefined
@@ -117,4 +126,5 @@ const server = Bun.serve<SubmissionSocketData>({
 })
 
 await bridgeSubmissionEvents(server)
+startSessionSweep()
 console.log(`OJ2 API listening on http://localhost:${server.port}`)

@@ -76,6 +76,14 @@ export const config = {
   // 一言数据集（hitokoto.cn 官方导出），和旧后端读同一份：容器里是 /data/hitokoto。
   // 本机 dev 默认路径下没有这份数据，读不到就回落到内置的几条，不影响启动。
   hitokotoDirectory: repoPath(process.env.HITOKOTO_DIRECTORY ?? "data/hitokoto"),
+  /**
+   * WebSocket 升级时额外放行的来源（逗号分隔的完整 origin，如 https://oj.example.com）。
+   * 同源本来就放行，只有前后端分处不同域名时才需要配。
+   */
+  allowedWebSocketOrigins: (process.env.ALLOWED_WS_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean),
   uploadUriPrefix: process.env.UPLOAD_URI_PREFIX ?? "/public/upload",
   avatarUriPrefix: process.env.AVATAR_URI_PREFIX ?? "/public/avatar",
   aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",

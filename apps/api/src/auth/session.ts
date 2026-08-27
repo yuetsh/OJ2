@@ -58,10 +58,12 @@ export async function createSession(
   })
 }
 
+/** 返回被删掉的 token：调用方要拿它去广播会话吊销，好断掉同一浏览器里其他标签页的连接 */
 export async function destroySession(c: Context) {
   const token = getCookie(c, config.sessionCookie)
   if (token) await redis.del(sessionKey(token))
   deleteCookie(c, config.sessionCookie, { path: "/" })
+  return token ?? null
 }
 
 function readCookie(request: Request, name: string) {
@@ -139,6 +141,26 @@ export async function getSessionUser(c: Context) {
 
 export async function getRequestSessionUser(request: Request) {
   return (await getUserByToken(readCookie(request, config.sessionCookie))).user
+}
+
+/**
+ * WebSocket 升级时把 token 一起存进连接，之后才能定期确认这个会话还有效
+ * —— 握手时校验过一次，可这条连接能挂上好几个小时。
+ */
+export function readRequestSessionToken(request: Request) {
+  return readCookie(request, config.sessionCookie) ?? ""
+}
+
+/**
+ * 会话还在就续期并返回 true，已登出或已过期返回 false。
+ *
+ * 用 EXPIRE 一条命令同时完成「判断存在」和「续期」，比 GET + EXPIRE 少一趟往返。
+ * 续期这件事本身也是要的：HTTP 请求会走 getUserByToken 里的 redis.expire 续期，
+ * 而只开着页面挂 WebSocket 的人一次请求都不发，不该因此被算成不活跃踢下线。
+ */
+export async function touchSession(token: string) {
+  if (!token) return false
+  return (await redis.expire(sessionKey(token), config.sessionTtlSeconds)) === 1
 }
 
 async function getStoredSession(c: Context) {
