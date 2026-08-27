@@ -15,10 +15,18 @@ function requestBody(messages: ChatMessage[], stream: boolean) {
   }
 }
 
+/**
+ * 非流式调用的超时。fetch 默认不超时，AI 侧一挂就会把 worker 的并发位一直占着，
+ * 学生那边的按钮也就一直转。流式调用不设：那边超时会把正在推的长回答直接掐断，
+ * 客户端断开本来就能收尾。
+ */
+const COMPLETE_TIMEOUT_MS = 60_000
+
 export async function completeChat(system: string, user: string) {
   if (!config.aiKey) throw new Error("缺少 AI_KEY")
   const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
     method: "POST",
+    signal: AbortSignal.timeout(COMPLETE_TIMEOUT_MS),
     headers: { "content-type": "application/json", authorization: `Bearer ${config.aiKey}` },
     body: JSON.stringify(requestBody([
       { role: "system", content: system },

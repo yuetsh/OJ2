@@ -18,7 +18,11 @@ const worker = new Worker<JudgeJobData>(
 
 const flowchartWorker = new Worker<FlowchartJobData>(
   flowchartQueueName,
-  async (job) => evaluateFlowchart(job.data),
+  // attemptsMade 是「此前已经失败过几次」，当前这次还没计进去，
+  // 所以最后一次尝试的判据是 attemptsMade + 1 >= attempts
+  async (job) => evaluateFlowchart(job.data, {
+    isFinalAttempt: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+  }),
   { connection: createBlockingRedis(), concurrency: 2 },
 )
 

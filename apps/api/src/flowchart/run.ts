@@ -15,22 +15,38 @@ function evaluationPrompt(problem: typeof schema.problem.$inferSelect) {
 题目：${problem.title}\n${problem.description.slice(0, 2000)}`
 }
 
+/**
+ * 等级一律由分数推出来，不采信模型自报的 grade。
+ * 提示词里写死了这四档，但模型偶尔会给出 88 分配 S 级这种自相矛盾的结果，
+ * 甚至直接吐「优秀」；脏值会一路串到等级分布图和「A/S 才展示流程图」的判断里。
+ */
+function gradeForScore(score: number) {
+  if (score >= 90) return "S"
+  if (score >= 80) return "A"
+  if (score >= 70) return "B"
+  return "C"
+}
+
 function parseEvaluation(value: string) {
   const block = value.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]
   const json = block ?? value.match(/\{[\s\S]*\}/)?.[0]
   if (!json) throw new Error("AI response did not contain JSON")
   const data = JSON.parse(json) as Record<string, unknown>
-  if (typeof data.score !== "number" || typeof data.grade !== "string") throw new Error("AI response is missing score or grade")
+  if (typeof data.score !== "number" || Number.isNaN(data.score)) throw new Error("AI response is missing score")
+  const score = Math.max(0, Math.min(100, data.score))
   return {
-    score: Math.max(0, Math.min(100, data.score)),
-    grade: data.grade,
+    score,
+    grade: gradeForScore(score),
     feedback: typeof data.feedback === "string" ? data.feedback : "",
     suggestions: typeof data.suggestions === "string" ? data.suggestions : "",
     criteria: data.criteria_details && typeof data.criteria_details === "object" ? data.criteria_details : {},
   }
 }
 
-export async function evaluateFlowchart(job: FlowchartJobData) {
+export async function evaluateFlowchart(
+  job: FlowchartJobData,
+  { isFinalAttempt = true }: { isFinalAttempt?: boolean } = {},
+) {
   const [row] = await db.select({ flowchart: schema.flowchartSubmission, problem: schema.problem }).from(schema.flowchartSubmission)
     .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, job.submissionId)).limit(1)
@@ -69,6 +85,11 @@ export async function evaluateFlowchart(job: FlowchartJobData) {
     // AI provider 的地址、内部报错就这么进了浏览器。真实原因留在服务端日志里，
     // 学生只需要知道「失败了，再试一次」；error 字段留空，前端有兜底文案。
     console.error(`Failed to evaluate flowchart ${row.flowchart.id}`, error)
+    // 只有最后一次尝试才落 FAILED。中间几次必须把状态留在 PROCESSING(1)：
+    // 上面那道 `![0, 1].includes(status)` 的守卫会把状态为 3 的任务直接放行返回，
+    // 一旦提前写成 3，队列配的 attempts: 3 就成了摆设 —— 后两次尝试进来什么都不做
+    // 就算成功，AI 侧的偶发失败（限流、超时、网络抖动）永远等不到重试。
+    if (!isFinalAttempt) throw error
     await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, flowchartUpdateSchema.parse({
       type: "flowchart_evaluation_failed",
