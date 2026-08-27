@@ -7,18 +7,25 @@ const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 
 const { renderFlowchart, renderError, renderSuccess } = useMermaid()
 
+// 上报渲染结果而不是只上报成功：调用方拿它做保存前校验，只进不出的话，
+// 「先写对再改坏」照样能存进库
 const emit = defineEmits<{
-  renderSuccess: []
+  renderState: [ok: boolean]
 }>()
 
 const renderMermaid = async () => {
   await renderFlowchart(mermaidContainer.value, modelValue.value)
-  if (renderSuccess.value) emit("renderSuccess")
+  emit("renderState", renderSuccess.value)
 }
 
 onMounted(() => {
   nextTick(renderMermaid)
 })
+
+// 一改动就立刻把状态打回「未验证」，等防抖后的渲染真跑完再报结果。
+// 只挂防抖那一支的话，改完 300ms 内点保存，读到的还是上一次渲染的结论 ——
+// 刚改坏的代码会被当成校验通过。宁可让用户多等一下，也不能放脏数据进库。
+watch(modelValue, () => emit("renderState", false))
 
 // 出题页是边敲边预览，不防抖的话每个字符都会触发一次完整的 mermaid 渲染，
 // 而中间态几乎全是语法错误

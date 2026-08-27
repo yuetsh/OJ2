@@ -173,6 +173,16 @@ const languageOptions = [
 const isSQLProblem = computed(() => !!problem.value?.languages.includes("SQL"))
 
 // SQL 题联动：SQL 必须是唯一语言（后端强校验），不需要预制代码，自动初始化 sql_config
+// 两个流程图开关是互斥的：allowFlowchart 为真时后端不会把 mermaidCode 下发给
+// 学生，showFlowchart 就成了一个点进去什么都没有的 tab。UI 上已经把开关置灰，
+// 这里再把存量数据里两个都开着的情况纠正掉。
+watch(
+  () => problem.value?.allowFlowchart,
+  (allow) => {
+    if (allow) problem.value.showFlowchart = false
+  },
+)
+
 watch(
   () => problem.value?.languages,
   (langs) => {
@@ -310,9 +320,10 @@ function downloadTestcases() {
   download(`problems/${problem.value.id}/test-cases`)
 }
 
-// Mermaid 渲染事件处理
-function onMermaidRenderSuccess() {
-  mermaidRenderSuccess.value = true
+// Mermaid 渲染事件处理。这里必须原样接受 false ——
+// 原来只在成功时置 true、永不复位，先写对再改坏就能把语法错误的代码存进库
+function onMermaidRenderState(ok: boolean) {
+  mermaidRenderSuccess.value = ok
 }
 
 // 题目是否有漏写的
@@ -864,7 +875,15 @@ watch(
         <n-switch v-model:value="problem.allowFlowchart" />
       </n-form-item>
       <n-form-item label="显示标准流程图">
-        <n-switch v-model:value="problem.showFlowchart" />
+        <n-flex align="center">
+          <n-switch
+            v-model:value="problem.showFlowchart"
+            :disabled="problem.allowFlowchart"
+          />
+          <n-text v-if="problem.allowFlowchart" depth="3" style="font-size: 12px">
+            让学生自己画图时，标准流程图不会下发给学生，这个开关没有意义
+          </n-text>
+        </n-flex>
       </n-form-item>
     </n-form>
 
@@ -872,7 +891,7 @@ watch(
       <n-form-item>
         <MermaidEditor
           v-model="problem.mermaidCode"
-          @render-success="onMermaidRenderSuccess"
+          @render-state="onMermaidRenderState"
         />
       </n-form-item>
       <n-form-item label="流程图提示信息（选填）">

@@ -53,9 +53,17 @@ const { shouldShowProblem } = storeToRefs(screenModeStore)
 
 const { isMobile, isDesktop } = useBreakpoints()
 
+// tab 选项和面板必须用同一个条件。后端在 allowFlowchart 为真时会把 mermaidCode
+// 置成 null（不能把标准答案下发给正要自己画图的学生），只看 showFlowchart 的话，
+// 两个开关同时打开就会做出一个「选项存在、面板不存在」的 tab —— URL 里带
+// ?tab=flowchart 会选中一个渲染不出任何东西的页签。
+const canShowFlowchart = computed(
+  () => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode,
+)
+
 const tabOptions = computed(() => {
   const options: string[] = ["content"]
-  if (problem.value?.showFlowchart) {
+  if (canShowFlowchart.value) {
     options.push("flowchart")
   }
 
@@ -159,7 +167,7 @@ watch(
               <ProblemContent />
             </n-tab-pane>
             <n-tab-pane
-              v-if="problem.showFlowchart && problem.mermaidCode"
+              v-if="canShowFlowchart"
               name="flowchart"
               tab="流程图表"
             >
@@ -211,7 +219,7 @@ watch(
             <ProblemContent />
           </n-tab-pane>
           <n-tab-pane
-            v-if="problem.showFlowchart && problem.mermaidCode"
+            v-if="canShowFlowchart"
             name="flowchart"
             tab="流程图表"
           >
@@ -251,7 +259,7 @@ watch(
       <n-tab-pane name="content" tab="描述">
         <ProblemContent />
       </n-tab-pane>
-      <n-tab-pane v-if="problem.showFlowchart" name="flowchart" tab="流程">
+      <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程">
         <ProblemFlowchart />
       </n-tab-pane>
       <n-tab-pane name="editor" tab="代码">
