@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton } from "naive-ui"
+import { NButton, NTag, NText } from "naive-ui"
 import { useRouteQuery } from "@vueuse/router"
 import {
   adminRejudge,
@@ -22,6 +22,19 @@ import { usePagination } from "shared/composables/pagination"
 import { useUserStore } from "shared/store/user"
 import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
+import { FlowchartSubmissionStatus } from "utils/types"
+
+// 流程图提交的四种状态，列表里原来一列都没有 ——
+// 老师分不出「还在评」和「评失败了」，两种都只是分数栏空着
+const FLOWCHART_STATUS_TAG: Record<
+  number,
+  { text: string; type: "default" | "info" | "success" | "error" }
+> = {
+  [FlowchartSubmissionStatus.PENDING]: { text: "排队中", type: "default" },
+  [FlowchartSubmissionStatus.PROCESSING]: { text: "评分中", type: "info" },
+  [FlowchartSubmissionStatus.COMPLETED]: { text: "已完成", type: "success" },
+  [FlowchartSubmissionStatus.FAILED]: { text: "评分失败", type: "error" },
+}
 import ButtonWithSearch from "./components/ButtonWithSearch.vue"
 import SubmissionLink from "./components/SubmissionLink.vue"
 import Grade from "./components/Grade.vue"
@@ -399,16 +412,32 @@ const flowchartColumns = computed(() => {
         ),
     },
     {
+      title: renderTableTitle("状态", "fluent-emoji:hourglass-not-done"),
+      key: "status",
+      render: (row) => {
+        const tag = FLOWCHART_STATUS_TAG[row.status]
+        return h(
+          NTag,
+          { size: "small", round: true, type: tag?.type ?? "default" },
+          () => tag?.text ?? "未知",
+        )
+      },
+    },
+    {
       title: renderTableTitle(
         "评分",
         "streamline-ultimate-color:analytics-bars-3d",
       ),
       key: "ai_score",
+      // 只有评完的才有分数。没评完也渲染 Grade 的话会显示成 0 分，
+      // 看着像「评了但得了 0 分」
       render: (row) =>
-        h(Grade, {
-          score: row.aiScore ?? 0,
-          grade: (row.aiGrade ?? "") as GradeValue,
-        }),
+        row.status === FlowchartSubmissionStatus.COMPLETED
+          ? h(Grade, {
+              score: row.aiScore ?? 0,
+              grade: (row.aiGrade ?? "") as GradeValue,
+            })
+          : h(NText, { depth: 3 }, () => "—"),
     },
     {
       title: renderTableTitle(
@@ -435,6 +464,8 @@ const flowchartColumns = computed(() => {
     res.push({
       title: renderTableTitle("选项", "streamline-emojis:wrench"),
       key: "retry",
+      // 后端只接受已完成 / 已失败的重判（其余返回 409），这里同步置灰，
+      // 免得老师点了才发现不行
       render: (row) =>
         h(
           NButton,
@@ -442,6 +473,9 @@ const flowchartColumns = computed(() => {
             quaternary: true,
             size: "small",
             type: "primary",
+            disabled:
+              row.status !== FlowchartSubmissionStatus.COMPLETED &&
+              row.status !== FlowchartSubmissionStatus.FAILED,
             onClick: () => retryFlowchart(row.id),
           },
           () => "重新判题",
