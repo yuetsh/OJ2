@@ -45,15 +45,15 @@
     <n-spin :show="loadingDetail">
       <div v-if="detail" class="detail">
         <n-descriptions :column="2" bordered size="small" class="meta">
-          <n-descriptions-item label="用户">{{
-            detail.username
-          }}</n-descriptions-item>
-          <n-descriptions-item label="班级">{{
-            detail.className || "-"
-          }}</n-descriptions-item>
-          <n-descriptions-item label="时间" :span="2">{{
-            parseTime(detail.createTime, "YYYY-MM-DD HH:mm:ss")
-          }}</n-descriptions-item>
+          <n-descriptions-item label="用户">
+            {{ detail.username }}
+          </n-descriptions-item>
+          <n-descriptions-item label="班级">
+            {{ detail.className || "-" }}
+          </n-descriptions-item>
+          <n-descriptions-item label="时间">
+            {{ parseTime(detail.createTime, "YYYY-MM-DD HH:mm:ss") }}
+          </n-descriptions-item>
         </n-descriptions>
         <n-scrollbar style="max-height: 60vh; margin-top: 12px">
           <MdPreview :model-value="detail.analysis" />
