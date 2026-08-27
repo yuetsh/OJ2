@@ -29,6 +29,7 @@
     "postgres": "^3.4.9",
     "sql.js": "^1.14.2",
     "tree-sitter-c": "^0.24.1",
+    "tree-sitter-cpp": "^0.23.4",
     "tree-sitter-python": "^0.25.0",
     "web-tree-sitter": "^0.26.13",
     "zod": "^4.4.3"

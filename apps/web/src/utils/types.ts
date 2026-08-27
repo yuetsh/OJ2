@@ -289,7 +289,12 @@ export interface StatisticInfo {
   err_info?: string
   time_cost?: number
   memory_cost?: number
-  ast_results?: Array<{ description: string; passed: boolean }>
+  ast_results?: Array<{
+    description: string
+    passed: boolean
+    /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
+    actual?: number
+  }>
 }
 
 /**

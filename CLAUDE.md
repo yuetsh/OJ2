@@ -102,6 +102,33 @@ dev 直接起不来。
 这些整数是**落库的值**：12 万条历史提交的 `submission.result` 就是它们，判题沙箱回的也是
 这套编码，所以只能新增、不能改已有的含义。题目表情 reaction 的语义 key 同理。
 
+### AST 代码规则有两张表，必须同增同减
+
+契约的 `AST_NODE_TARGETS_BY_LANGUAGE`（target → 中文名）决定后台下拉能选什么，
+`apps/api/src/judge/ast.ts` 的 `mappings`（target → tree-sitter 节点类型）决定判题机
+认得什么。**加节点类型时两边都要加**，运算符表 `AST_OPERATOR_TARGETS_BY_LANGUAGE` 同理。
+
+只加一边是**静默错判**：判题机 `mapping[target] ?? target` 拿裸名去比节点类型，
+C 的语法树里永远不存在 `list_comprehension`，于是「必须使用列表推导式」永远失败、
+「不能使用 f-string」永远通过，两头都不报错，只有学生受着。原来那张表是 C/Python
+混在一起的 15 条，整份铺成下拉，给 C 题也能选到 Python 专有节点——就是这么来的。
+
+判题机只认 `AST_SUPPORTED_LANGUAGES` 里的语言（C / C++ / Python3）。别的语言配了规则
+一条都不会跑，所以后台不给它们开 tab，题目页也不把它们的规则展示成「要求」——
+**看得见却不检查**比没有更糟。
+
+C++ 的语法表是「C 的全集 + C++ 独有的几条」，因为 tree-sitter-cpp 继承 tree-sitter-c，
+C 那 14 个 target 在 C++ 树里逐个实测通用。但**调用形态两者不同**，加语言时必须一起看：
+`a.push_back()` 和 `p->push_back()` 在 C++ 都是 `call_expression` + `field_expression`，
+不是 Python 的 `attribute`；`std::sort(...)` 的 function 是 `qualified_identifier`
+而不是 `identifier`，所以 `functionCalls` 对 C++ 额外比一次 `::` 末段——否则学生写了
+`using namespace std` 与否会得到不同的判定结果。
+
+规则的语义校验在 `astRulesError()`，不在 zod 的 refine 上：`astRulesSchema` 同时用于
+**读**后台题目详情，在读路径上抛错会让历史脏数据把整个题目详情打不开。同理，保存前
+先 `pickAstRules()` 剔除够不着的分组再校验，否则早年配过 C++ 规则的题会把老师锁死
+——tab 里看不到那组规则，保存却被拦下。
+
 ### 比赛只有 ACM 模式
 
 没有 OI。上一代残留的 OI 分支在阶段 0 已经砍掉，不要"顺手补回来"。

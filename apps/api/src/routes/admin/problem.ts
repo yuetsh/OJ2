@@ -11,6 +11,7 @@ import {
   sqlPreviewRequestSchema,
   sqlTestCaseScriptSchema,
   uploadTestCaseResponseSchema,
+  type AstRules,
   type SqlConfig,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
@@ -20,6 +21,7 @@ import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
+import { astRulesError, pickAstRules } from "../../judge/ast"
 import { buildSqlDisplay } from "../../judge/sql"
 import { completeChat } from "../../services/ai"
 import { contestStatus } from "../../services/contest"
@@ -176,7 +178,10 @@ function commonChecks(data: {
   samples: unknown[]
   sqlConfig: SqlConfig | null
   answers: Record<string, unknown>[]
+  astRules: AstRules | null
 }): { error: string } | { sql: boolean } {
+  const astError = astRulesError(pickAstRules(data.astRules, data.languages))
+  if (astError) return { error: astError }
   if (data.languages.includes("SQL")) {
     if (data.languages.length !== 1) return { error: "SQL problem cannot be mixed with other languages" }
     if (!data.sqlConfig) return { error: "SQL problem requires sql_config" }
@@ -247,7 +252,7 @@ function problemValues(data: ReturnType<typeof createProblemRequestSchema.parse>
     showFlowchart: data.showFlowchart,
     mermaidCode: data.mermaidCode,
     flowchartHint: data.flowchartHint,
-    astRules: data.astRules ?? null,
+    astRules: pickAstRules(data.astRules, data.languages),
     answers: data.answers,
     prompt: data.prompt,
     // 防脏数据：非 SQL 题不应携带 SQL 配置，对齐旧 common_checks

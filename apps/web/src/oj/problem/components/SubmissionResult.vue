@@ -178,6 +178,13 @@ const columns: DataTableColumn<Submission["info"]["data"][number]>[] = [
               <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
             </n-icon>
             <span>{{ rule.description }}</span>
+            <!-- 次数类规则光说「出现 2 次 ✗」，学生不知道自己写了几次 -->
+            <span
+              v-if="!rule.passed && rule.actual !== undefined"
+              :style="{ color: theme.errorColor }"
+            >
+              当前 {{ rule.actual }} 次
+            </span>
           </n-flex>
         </n-flex>
       </n-card>

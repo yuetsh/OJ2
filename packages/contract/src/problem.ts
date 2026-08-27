@@ -99,26 +99,156 @@ export const astRuleSchema = z.object({
 export const astRulesSchema = z.record(z.string(), z.array(astRuleSchema))
 
 /**
- * 节点类型的中文名。后台编辑器的下拉选项、后端生成要求文案都要用它 ——
- * 原来在 AstRulesEditor.vue（下拉 options）和 ProblemContent.vue
- * （NODE_TARGET_LABELS）各存了一份同样的 15 条。
+ * 每种语言支持哪些节点 target，以及它的中文名。原来这里是一张 15 条的混合表，
+ * C 和 Python 的节点混在一起铺成后台下拉（更早之前 AstRulesEditor.vue 和
+ * ProblemContent.vue 还各手抄了一份）。
+ *
+ * **键必须和 judge/ast.ts 的 mappings 逐一对齐** —— 那边是 target → tree-sitter
+ * 节点类型，这边是 target → 中文名。少一边就是静默故障：老师给 C 题选到只有
+ * Python 有的 `list_comprehension`，判题机 `mapping[target] ?? target` 拿裸名去比
+ * 节点类型，C 的语法树里永远不存在它，于是「必须使用列表推导式」永远失败、
+ * 「不能使用 f-string」永远通过，两头都不报错。
  */
-export const AST_NODE_TARGET_LABELS: Record<string, string> = {
-  for_loop: "for 循环",
-  while_loop: "while 循环",
-  if_statement: "if 条件",
-  else_clause: "else 子句",
-  function_definition: "函数定义",
-  return: "return 语句",
-  break: "break 语句",
-  continue: "continue 语句",
-  list_comprehension: "列表推导式",
-  list_literal: "列表",
-  dict_literal: "字典",
-  set_literal: "集合",
-  f_string: "f-string",
-  try_except: "try-except",
-  class_definition: "类定义",
+export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, string>> = {
+  C: {
+    for_loop: "for 循环",
+    while_loop: "while 循环",
+    do_while: "do-while 循环",
+    if_statement: "if 条件",
+    else_clause: "else 子句",
+    switch_statement: "switch 语句",
+    case_statement: "case 分支",
+    break: "break 语句",
+    continue: "continue 语句",
+    return: "return 语句",
+    function_definition: "函数定义",
+    assignment: "赋值语句",
+    struct: "结构体",
+    include: "#include 指令",
+  },
+  // tree-sitter-cpp 继承 tree-sitter-c 的语法，C 那 14 条 target 在 C++ 树里
+  // 逐个实测通用，所以这张表是「C 的全集 + C++ 独有的几条」
+  "C++": {
+    for_loop: "for 循环",
+    range_for_loop: "范围 for 循环",
+    while_loop: "while 循环",
+    do_while: "do-while 循环",
+    if_statement: "if 条件",
+    else_clause: "else 子句",
+    switch_statement: "switch 语句",
+    case_statement: "case 分支",
+    break: "break 语句",
+    continue: "continue 语句",
+    return: "return 语句",
+    function_definition: "函数定义",
+    class_definition: "类定义",
+    struct: "结构体",
+    assignment: "赋值语句",
+    include: "#include 指令",
+    try_except: "try-catch",
+    throw: "throw 语句",
+    namespace: "namespace 定义",
+    template: "模板定义",
+    lambda: "lambda 表达式",
+    using: "using 声明",
+  },
+  Python3: {
+    for_loop: "for 循环",
+    while_loop: "while 循环",
+    if_statement: "if 条件",
+    elif_clause: "elif 子句",
+    else_clause: "else 子句",
+    break: "break 语句",
+    continue: "continue 语句",
+    return: "return 语句",
+    function_definition: "函数定义",
+    class_definition: "类定义",
+    assignment: "赋值语句",
+    try_except: "try-except",
+    with_statement: "with 语句",
+    import: "import 语句",
+    import_from: "from-import 语句",
+    list_comprehension: "列表推导式",
+    list_literal: "列表",
+    dict_literal: "字典",
+    set_literal: "集合",
+    f_string: "f-string",
+  },
+}
+
+/**
+ * 运算符 target → 该语言里的实际写法。逻辑名 `and` / `or` / `not` 在 C 里写作
+ * `&&` / `||` / `!`，判题机按 mappings 翻译，文案这边也得翻 —— 否则 C 题的学生
+ * 看到的要求是「必须使用 and 运算符」，而 C 里根本没有 `and` 这个词。
+ *
+ * 恒等的那些条目（`+`、`==` …）判题机的 mappings 里已经删掉了，走 `?? target`
+ * 回落到同一个值；这里保留完整列表是因为它同时是后台下拉的选项来源。
+ */
+export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<string, Record<string, string>> = {
+  C: {
+    "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+    "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
+    "++": "++", "--": "--",
+    "==": "==", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=",
+    and: "&&", or: "||", not: "!",
+    "&": "&", "|": "|",
+  },
+  // `<<` / `>>` 对 C++ 主要是 cout/cin 的流运算符（位移是同一个 token）
+  "C++": {
+    "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+    "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
+    "++": "++", "--": "--",
+    "==": "==", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=",
+    and: "&&", or: "||", not: "!",
+    "&": "&", "|": "|", "<<": "<<", ">>": ">>",
+  },
+  Python3: {
+    "+": "+", "-": "-", "*": "*", "/": "/", "//": "//", "%": "%", "**": "**",
+    "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
+    "==": "==", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=",
+    and: "and", or: "or", not: "not",
+    "&": "&", "|": "|",
+  },
+}
+
+/**
+ * 判题机真正能做 AST 检查的语言。设计文档写的是"支持全部 6 种语言"，落地的只有
+ * 这两种 —— 其余语言 judge/ast.ts 的 loadLanguage 返回 null，规则一条都不会跑。
+ * 所以后台不给别的语言开 tab，题目页也不把它们的规则展示成「要求」。
+ */
+export const AST_SUPPORTED_LANGUAGES = Object.keys(AST_NODE_TARGETS_BY_LANGUAGE)
+
+/** 全语言的节点中文名并集，只给拿不到语言的场合做回落。有语言一律走 astNodeLabel() */
+export const AST_NODE_TARGET_LABELS: Record<string, string> = Object.assign(
+  {},
+  ...Object.values(AST_NODE_TARGETS_BY_LANGUAGE),
+)
+
+export function astNodeLabel(target: string, language?: string): string {
+  const table = language ? AST_NODE_TARGETS_BY_LANGUAGE[language] : undefined
+  return table?.[target] ?? AST_NODE_TARGET_LABELS[target] ?? target
+}
+
+export function astOperatorLabel(target: string, language?: string): string {
+  return (language ? AST_OPERATOR_TARGETS_BY_LANGUAGE[language]?.[target] : undefined) ?? target
+}
+
+/**
+ * count_* 引擎至少要有一个数字约束，否则这条规则恒真 —— rangePassed 三个字段全
+ * undefined 直接返回 true，描述也退化成光秃秃一个「for 循环」。编辑器切到
+ * 「出现次数」时会清掉 exact/min/max，老师不填数字就会存出这种规则。
+ *
+ * 读取路径（判题、题目页要求）用它把这种规则整条丢掉，而不是让 schema 校验失败：
+ * astRulesSchema 同时用于**读**后台题目详情，在那儿抛错会让整个详情打不开。
+ */
+export function astRuleIsMeaningful(rule: {
+  engine: string
+  exact?: number
+  min?: number
+  max?: number
+}): boolean {
+  if (!rule.engine.startsWith("count")) return true
+  return rule.exact !== undefined || rule.min !== undefined || rule.max !== undefined
 }
 
 /**

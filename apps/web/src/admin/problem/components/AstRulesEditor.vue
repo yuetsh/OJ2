@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { AST_NODE_TARGET_LABELS } from "@oj2/contract"
+import {
+  AST_NODE_TARGETS_BY_LANGUAGE,
+  AST_OPERATOR_TARGETS_BY_LANGUAGE,
+  AST_SUPPORTED_LANGUAGES,
+} from "@oj2/contract"
 import type { AstRule, AstRules, LANGUAGE } from "utils/types"
 
 interface Props {
@@ -12,7 +16,17 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: AstRules | null): void
 }>()
 
-const activeTab = ref(props.languages[0] || "Python3")
+// 判题机只认 C / Python3，别的语言配了规则也一条都不会跑（judge/ast.ts 的
+// loadLanguage 返回 null 就直接放行）。原来这里按题目的全部语言开 tab，老师给
+// C++ 配的规则存得下、题目页也照常显示成「要求」，判题却从不检查。
+const supportedLanguages = computed(() =>
+  props.languages.filter((lang) => AST_SUPPORTED_LANGUAGES.includes(lang)),
+)
+const unsupportedLanguages = computed(() =>
+  props.languages.filter((lang) => !AST_SUPPORTED_LANGUAGES.includes(lang)),
+)
+
+const activeTab = ref(supportedLanguages.value[0] || "Python3")
 
 const ENGINE_OPTIONS: SelectOption[] = [
   {
@@ -52,32 +66,21 @@ const ENGINE_OPTIONS: SelectOption[] = [
   },
 ]
 
-// 选项从契约的 AST_NODE_TARGET_LABELS 生成 —— 这 15 条原来在这里和
-// ProblemContent.vue 各手抄一份
-const NODE_TARGET_OPTIONS: SelectOption[] = Object.entries(
-  AST_NODE_TARGET_LABELS,
-).map(([value, label]) => ({ label, value }))
+// 选项按语言生成。原来是一张 C/Python 混合的 15 条表整份铺开，给 C 题也能选到
+// 列表推导式、f-string 这些 C 根本没有的东西 —— 存得进去，判题时永远失败
+// （或者反过来，「不能使用 f-string」永远通过），两头都不报错。
+function nodeTargetOptions(lang: string): SelectOption[] {
+  return Object.entries(AST_NODE_TARGETS_BY_LANGUAGE[lang] ?? {}).map(
+    ([value, label]) => ({ label, value }),
+  )
+}
 
-const OPERATOR_TARGET_OPTIONS: SelectOption[] = [
-  { label: "+", value: "+" },
-  { label: "-", value: "-" },
-  { label: "*", value: "*" },
-  { label: "/", value: "/" },
-  { label: "//", value: "//" },
-  { label: "%", value: "%" },
-  { label: "**", value: "**" },
-  { label: "+=", value: "+=" },
-  { label: "-=", value: "-=" },
-  { label: "==", value: "==" },
-  { label: "!=", value: "!=" },
-  { label: ">", value: ">" },
-  { label: ">=", value: ">=" },
-  { label: "<", value: "<" },
-  { label: "<=", value: "<=" },
-  { label: "and / &&", value: "and" },
-  { label: "or / ||", value: "or" },
-  { label: "not / !", value: "not" },
-]
+// 逻辑名 and/or/not 在 C 里显示成 && / || / !，存进去的还是逻辑名
+function operatorTargetOptions(lang: string): SelectOption[] {
+  return Object.entries(AST_OPERATOR_TARGETS_BY_LANGUAGE[lang] ?? {}).map(
+    ([value, label]) => ({ label: label === value ? value : `${label}（${value}）`, value }),
+  )
+}
 
 const NODE_ENGINES = ["must_exist_node", "must_not_exist_node", "count_node"]
 const FUNCTION_ENGINES = [
@@ -122,6 +125,9 @@ function updateCountMode(lang: string, index: number, mode: "exact" | "range") {
     delete rule.min
     delete rule.max
   } else {
+    // 留空的 count 规则恒真（rangePassed 三个字段全 undefined 就返回 true），
+    // 描述还会退化成光秃秃一个「for 循环」。切过来先给个 1
+    rule.min = rule.min ?? 1
     delete rule.exact
   }
   rules[index] = rule
@@ -162,12 +168,14 @@ function updateRules(lang: string, rules: AstRule[]) {
   emit("update:modelValue", Object.keys(current).length > 0 ? current : null)
 }
 
-function getTargetLabel(engine: string, target: string): string | undefined {
-  if (isNodeEngine(engine))
-    return (NODE_TARGET_OPTIONS.find((o) => o.value === target) as any)?.label
-  if (isOperatorEngine(engine))
-    return (OPERATOR_TARGET_OPTIONS.find((o) => o.value === target) as any)
-      ?.label
+function getTargetLabel(
+  lang: string,
+  engine: string,
+  target: string,
+): string | undefined {
+  if (isNodeEngine(engine)) return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]
+  // 运算符不写 label：判题结果的文案按语言翻译（astOperatorLabel），
+  // 存一个固定 label 反而会把 C 的 && 钉死成 and
   return undefined
 }
 
@@ -176,7 +184,7 @@ function addRule(lang: string) {
   rules.push({
     engine: "must_exist_node",
     target: "for_loop",
-    label: "for 循环",
+    label: getTargetLabel(lang, "must_exist_node", "for_loop"),
     message: "",
   })
   updateRules(lang, rules)
@@ -196,10 +204,10 @@ function updateRule(lang: string, index: number, field: string, value: any) {
     rule.engine = value
     if (isNodeEngine(value)) {
       rule.target = "for_loop"
-      rule.label = "for 循环"
+      rule.label = getTargetLabel(lang, value, "for_loop")
     } else if (isOperatorEngine(value)) {
       rule.target = "+"
-      rule.label = "+"
+      delete rule.label
     } else {
       rule.target = ""
       delete rule.label
@@ -207,9 +215,11 @@ function updateRule(lang: string, index: number, field: string, value: any) {
     delete rule.min
     delete rule.max
     delete rule.exact
+    // 次数引擎不给默认值的话，存下去就是一条恒真规则
+    if (isCountEngine(value)) rule.exact = 1
   } else if (field === "target") {
     rule.target = value
-    const lbl = getTargetLabel(rule.engine, value)
+    const lbl = getTargetLabel(lang, rule.engine, value)
     if (lbl) rule.label = lbl
     else delete rule.label
   } else if (field === "min") {
@@ -226,22 +236,32 @@ function updateRule(lang: string, index: number, field: string, value: any) {
   updateRules(lang, rules)
 }
 
-watch(
-  () => props.languages,
-  (langs) => {
-    if (langs.length && !langs.includes(activeTab.value as LANGUAGE)) {
-      activeTab.value = langs[0]
-    }
-  },
-)
+watch(supportedLanguages, (langs) => {
+  if (langs.length && !langs.includes(activeTab.value as LANGUAGE)) {
+    activeTab.value = langs[0]
+  }
+})
 </script>
 
 <template>
   <n-collapse>
     <n-collapse-item title="代码规则检查（选填）" name="ast-rules">
-      <n-tabs v-if="languages.length" type="segment" v-model:value="activeTab">
+      <n-alert
+        v-if="unsupportedLanguages.length"
+        type="info"
+        :bordered="false"
+        style="margin-bottom: 8px"
+      >
+        {{ unsupportedLanguages.join("、") }} 暂不支持代码规则检查，判题机只能检查
+        {{ AST_SUPPORTED_LANGUAGES.join(" / ") }}
+      </n-alert>
+      <n-tabs
+        v-if="supportedLanguages.length"
+        type="segment"
+        v-model:value="activeTab"
+      >
         <n-tab-pane
-          v-for="lang in languages"
+          v-for="lang in supportedLanguages"
           :key="lang"
           :name="lang"
           :tab="lang"
@@ -264,7 +284,7 @@ watch(
                 />
                 <n-select
                   v-if="needsTargetDropdown(rule.engine)"
-                  :options="NODE_TARGET_OPTIONS"
+                  :options="nodeTargetOptions(lang)"
                   :value="rule.target"
                   @update:value="
                     (v: string) => updateRule(lang, index, 'target', v)
@@ -285,7 +305,7 @@ watch(
                 />
                 <n-select
                   v-if="needsOperatorDropdown(rule.engine)"
-                  :options="OPERATOR_TARGET_OPTIONS"
+                  :options="operatorTargetOptions(lang)"
                   :value="rule.target"
                   @update:value="
                     (v: string) => updateRule(lang, index, 'target', v)
@@ -370,7 +390,14 @@ watch(
           </n-flex>
         </n-tab-pane>
       </n-tabs>
-      <n-empty v-else description="请先选择编程语言" />
+      <n-empty
+        v-else
+        :description="
+          languages.length
+            ? '当前语言不支持代码规则检查'
+            : '请先选择编程语言'
+        "
+      />
     </n-collapse-item>
   </n-collapse>
 </template>
