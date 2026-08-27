@@ -304,6 +304,31 @@ export const RARITY_TEXT_COLOR: Record<
 }
 
 // 时间范围配置
+/**
+ * 流程图评分项的展示顺序（按分值从高到低）。
+ *
+ * `ai_criteria_details` 存在 jsonb 列里，而 Postgres 的 jsonb **不保留键序** ——
+ * 它按「键长度 + 字节序」重排，读出来会变成 完整性 / 清晰度 / 规范性 / 逻辑正确性，
+ * 40 分的那项排到最后。凡是要展示评分明细的地方都按这个顺序排，别直接遍历对象。
+ */
+export const FLOWCHART_CRITERIA_ORDER = [
+  "逻辑正确性",
+  "完整性",
+  "规范性",
+  "清晰度",
+]
+
+/** 按 FLOWCHART_CRITERIA_ORDER 排序，表里没有的键排在后面并保持原有相对顺序 */
+export function sortFlowchartCriteria<T>(
+  details: Record<string, T>,
+): [string, T][] {
+  const rank = (key: string) => {
+    const i = FLOWCHART_CRITERIA_ORDER.indexOf(key)
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  }
+  return Object.entries(details).sort(([a], [b]) => rank(a) - rank(b))
+}
+
 export const DURATION_OPTIONS = [
   { label: "本节课内", value: "hours:1" },
   { label: "两节课内", value: "hours:2" },

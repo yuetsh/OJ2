@@ -162,7 +162,7 @@
 import { formatISO, sub, type Duration } from "date-fns"
 import type { FlowchartStatistics } from "@oj2/contract"
 import { getFlowchartStatistics } from "oj/api"
-import { DURATION_OPTIONS } from "utils/constants"
+import { DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER } from "utils/constants"
 import { Doughnut, Radar, Bar } from "vue-chartjs"
 import {
   Chart as ChartJS,
@@ -366,7 +366,8 @@ const doughnutOptions = {
   },
 }
 
-const CRITERIA_ORDER = ["逻辑正确性", "完整性", "规范性", "清晰度"]
+// 与评分明细共用同一份顺序，见 utils/constants
+const CRITERIA_ORDER = FLOWCHART_CRITERIA_ORDER
 
 const hasRadarData = computed(() =>
   CRITERIA_ORDER.some((k) => k in data.criteriaAverages),
