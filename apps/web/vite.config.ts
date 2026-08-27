@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url"
-import { defineConfig, loadEnv, type Plugin } from "vite"
+import { defineConfig, loadEnv } from "vite"
 import vue from "@vitejs/plugin-vue"
 import legacy from "@vitejs/plugin-legacy"
 import AutoImport from "unplugin-auto-import/vite"
@@ -69,25 +69,15 @@ const polyfills = [
   "web.url.can-parse",
 ]
 
-// index.html 里按需注入 MaxKB 脚本（原 Rsbuild EJS 模板的等价实现）
-function injectMaxkb(maxkbUrl: string | undefined): Plugin {
-  return {
-    name: "inject-maxkb",
-    transformIndexHtml(html) {
-      if (!maxkbUrl) return html
-      return {
-        html,
-        tags: [
-          {
-            tag: "script",
-            attrs: { async: true, defer: true, src: maxkbUrl },
-            injectTo: "head",
-          },
-        ],
-      }
-    },
-  }
-}
+// MaxKB 脚本**不要**在这里注入 index.html。
+//
+// 原来有个 inject-maxkb 插件把 <script src> 写进 head，于是构建产物在 Vue 启动之前
+// 就把挂件拉下来执行了 —— 后台那个「启用 MaxKB」开关根本拦不住它，关掉也只是
+// 事后把标签和 DOM 删掉，代码早跑完了（表现之一：MaxKB 自带的性能上报在每个页面
+// 抛 `Cannot read properties of undefined (reading 'startTime')`，且关不掉）。
+//
+// 现在只走运行时那一条路：App.vue 的 useMaxKB() 等站点配置回来，
+// enableMaxkb 为真才建 script 标签。
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "PUBLIC_")
@@ -144,7 +134,6 @@ export default defineConfig(({ mode }) => {
         resolvers: [NaiveUiResolver()],
         dts: "./src/components.d.ts",
       }),
-      injectMaxkb(env["PUBLIC_MAXKB_URL"]),
     ],
     envPrefix: "PUBLIC_",
     resolve: {

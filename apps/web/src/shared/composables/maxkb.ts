@@ -43,6 +43,11 @@ export function useMaxKB() {
     if (!enableMaxkb) {
       return
     }
+    // 没配地址就什么都不做。这道判断原来在 vite 的 inject-maxkb 插件里，
+    // 插件删掉之后得挪过来，否则会拿 undefined 当 src 去请求一个 /undefined
+    if (!import.meta.env.PUBLIC_MAXKB_URL) {
+      return
+    }
 
     const existingScript = document.querySelector(
       `script[src="${import.meta.env.PUBLIC_MAXKB_URL}"]`,
