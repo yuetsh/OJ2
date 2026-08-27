@@ -1,3 +1,4 @@
+import { nextTick } from "vue"
 import type { Ref } from "vue"
 import type { Node, Edge, Connection } from "@vue-flow/core"
 import { useVueFlow } from "@vue-flow/core"
@@ -51,7 +52,7 @@ export function useFlowOperations(
     return ""
   }
 
-  const handleConnect = (params: Connection) => {
+  const handleConnect = async (params: Connection) => {
     const sourceNode = nodes.value.find((node) => node.id === params.source)
     const targetNode = nodes.value.find((node) => node.id === params.target)
 
@@ -74,25 +75,24 @@ export function useFlowOperations(
     }
 
     addEdges([newEdge])
+    // vue-flow 的 store → v-model 回写走的是 watch（pre flush，异步），
+    // 紧接着读 nodes/edges 拿到的还是改动前的数组，存进历史就会错开一步。
+    // 画布上 handleDrop 早就这么等了，这几处一直漏了。
+    await nextTick()
     saveState(nodes.value, edges.value)
   }
 
-  const handleEdgeClick = ({ edge }: { edge: Edge }) => {
+  const handleEdgeClick = async ({ edge }: { edge: Edge }) => {
     removeEdges([edge.id])
+    await nextTick()
     saveState(nodes.value, edges.value)
   }
 
-  // 节点删除
-  const handleNodeDelete = (nodeId: string) => {
-    // 删除相关边
-    const relatedEdges = edges.value.filter(
-      (edge) => edge.source === nodeId || edge.target === nodeId,
-    )
-    if (relatedEdges.length > 0) {
-      removeEdges(relatedEdges.map((edge) => edge.id))
-    }
-
+  // 节点删除。removeNodes 的 removeConnectedEdges 默认就是 true，
+  // 相连的边不用自己再删一遍
+  const handleNodeDelete = async (nodeId: string) => {
     removeNodes([nodeId])
+    await nextTick()
     saveState(nodes.value, edges.value)
   }
 
@@ -118,9 +118,10 @@ export function useFlowOperations(
   }
 
   // 删除选中的节点和边
-  const deleteSelected = () => {
+  const deleteSelected = async () => {
     const selectedNodes = getSelectedNodes.value
     const selectedEdges = getSelectedEdges.value
+    if (selectedNodes.length === 0 && selectedEdges.length === 0) return
 
     if (selectedNodes.length > 0) {
       removeNodes(selectedNodes.map((node) => node.id))
@@ -128,6 +129,7 @@ export function useFlowOperations(
     if (selectedEdges.length > 0) {
       removeEdges(selectedEdges.map((edge) => edge.id))
     }
+    await nextTick()
     saveState(nodes.value, edges.value)
   }
 

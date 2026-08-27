@@ -38,7 +38,7 @@ const nodes = ref([]) as Ref<Node[]>
 const edges = ref([]) as Ref<Edge[]>
 
 // 历史记录管理
-const { canUndo, canRedo, saveState, undo, redo } = useHistory()
+const { canUndo, canRedo, resetHistory, saveState, undo, redo } = useHistory()
 
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
@@ -55,7 +55,11 @@ const {
   saveToCache,
   loadFromCache,
   clearCache,
-} = useCache(nodes, edges, cacheKey)
+} = useCache(nodes, edges, cacheKey, () => {
+  // 换题后画布已经被换成新题的草稿，历史必须跟着重建，
+  // 否则一次撤销就会把上一题的图还原到这一题里
+  resetHistory(nodes.value, edges.value)
+})
 
 // 拖拽处理
 const { onDragOver, onDragLeave, onDrop, isDragOver, screenDragPos } = useDnD()
@@ -148,8 +152,10 @@ const handleKeyDown = (event: KeyboardEvent) => {
 onMounted(() => {
   document.addEventListener("keydown", handleKeyDown)
 
-  // 从缓存恢复数据
+  // 从缓存恢复数据，并把当前画布作为历史起点，
+  // 否则第一步操作没有可回退的目标，撤销按钮一直是灰的
   loadFromCache()
+  resetHistory(nodes.value, edges.value)
 })
 
 onUnmounted(() => {

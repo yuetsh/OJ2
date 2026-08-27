@@ -1,4 +1,4 @@
-import { ref, watch, type Ref, type MaybeRefOrGetter } from "vue"
+import { ref, toValue, watch, type Ref, type MaybeRefOrGetter } from "vue"
 import { useStorage, useDebounceFn } from "@vueuse/core"
 import type { Node, Edge } from "@vue-flow/core"
 
@@ -9,6 +9,7 @@ export function useCache(
   nodes: Ref<Node[]>,
   edges: Ref<Edge[]>,
   storageKey: MaybeRefOrGetter<string> = "flowchart-editor-data",
+  onReloaded?: () => void,
 ) {
   const isSaving = ref(false)
   const lastSaved = ref<Date | null>(null)
@@ -66,6 +67,26 @@ export function useCache(
     lastSaved.value = null
     hasUnsavedChanges.value = false
   }
+
+  // 题目 ID 异步加载完成、或直接切到下一题时 storageKey 会变。
+  // useStorage 只把新 key 的内容读进 storedData，不会回填 nodes/edges：
+  // 不处理的话画布会继续显示上一题的图，学生一动就把上一题的内容写进这一题的
+  // key，把这道题原本存着的草稿覆盖掉。
+  // 这里依赖 useStorage 内部对 key 的 watch 先于本 watch 执行（两者都是 pre
+  // flush，且 useStorage 在上方先创建，pre 队列按创建顺序跑），
+  // 因此此刻 storedData 已经是新 key 的数据。
+  watch(
+    () => toValue(storageKey),
+    () => {
+      if (!loadFromCache()) {
+        nodes.value = []
+        edges.value = []
+        lastSaved.value = null
+        hasUnsavedChanges.value = false
+      }
+      onReloaded?.()
+    },
+  )
 
   // 监听节点和边的变化，isSaving 在此置 true 以覆盖防抖等待窗口
   watch(

@@ -42,6 +42,14 @@ export function useHistory() {
     }
   }
 
+  // 用当前画布重建历史。挂载时和换题后都要调一次：
+  // 不播下这个初始快照的话 historyIndex 会从 -1 开始，canUndo 要求 index > 0，
+  // 第一步操作永远撤销不了；换题后不重建则一次撤销会把上一题的图还原到这一题里。
+  const resetHistory = (nodes: Node[], edges: Edge[]) => {
+    history.value = [deepCopyState(nodes, edges)]
+    historyIndex.value = 0
+  }
+
   // 撤销
   const undo = () => {
     if (canUndo.value) {
@@ -65,6 +73,7 @@ export function useHistory() {
   return {
     canUndo,
     canRedo,
+    resetHistory,
     saveState,
     undo,
     redo,
