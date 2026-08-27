@@ -256,25 +256,41 @@ function getChromeVersion(): number {
   return match ? parseInt(match[1]) : Infinity
 }
 
-let mermaidInstance: any = null
+let mermaidPromise: Promise<any> | null = null
 let mermaidIsLegacy = false
 
-async function loadMermaid() {
-  if (!mermaidInstance) {
-    if (getChromeVersion() < 94) {
-      mermaidInstance = (await import("mermaid-legacy")).default
-      mermaidIsLegacy = true
-    } else {
-      mermaidInstance = (await import("mermaid")).default
-    }
-    mermaidInstance.initialize({
-      startOnLoad: false,
-      securityLevel: "strict",
-      theme: "base",
-      themeVariables: mermaidThemeVariables,
+function loadMermaid(): Promise<any> {
+  // 缓存 Promise 而不是实例：同一屏里两个组件一起挂载时，缓存实例会让两边都
+  // 落进 if (!mermaidInstance)，import 两次、initialize 两次
+  if (!mermaidPromise) {
+    mermaidPromise = (async () => {
+      let instance: any
+      if (getChromeVersion() < 94) {
+        instance = (await import("mermaid-legacy")).default
+        mermaidIsLegacy = true
+      } else {
+        instance = (await import("mermaid")).default
+      }
+      instance.initialize({
+        startOnLoad: false,
+        securityLevel: "strict",
+        theme: "base",
+        // 解析失败时 mermaid 默认会先把一张「错误图」画进挂在 document.body 上的
+        // 临时容器，再抛异常，而清理临时容器的那行在 throw 之后，永远执行不到；
+        // 每次 render 用的又是新的随机 id，旧的也清不掉。于是每失败一次就往
+        // body 里留一个 div#dmermaid-xxx —— 出题页每敲一个字符渲染一次，一段
+        // 代码写下来能堆几十个。打开这个开关后 mermaid 会先清理再抛。
+        suppressErrorRendering: true,
+        themeVariables: mermaidThemeVariables,
+      })
+      return instance
+    })().catch((error) => {
+      // 失败的 Promise 不能留在缓存里，否则后面每次渲染都直接复用这个失败结果
+      mermaidPromise = null
+      throw error
     })
   }
-  return mermaidInstance
+  return mermaidPromise
 }
 
 export function useMermaid() {

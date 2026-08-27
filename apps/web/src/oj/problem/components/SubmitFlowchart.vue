@@ -314,26 +314,40 @@ async function getSubmission(submissionPage = 0) {
   }
 }
 
+// 请求失败时 rendering 必须复位：拦截器对普通业务错误是静默 reject 的，
+// 少了这个 finally，弹框就会永远停在转圈状态，也没有任何提示
 async function updatePage(val: number) {
   page.value = val
   rendering.value = true
-  await getSubmission(val)
-  // 等待 DOM 更新
-  await nextTick()
-  await renderFlowchart(mermaidContainer.value, myMermaidCode.value)
-  rendering.value = false
+  try {
+    await getSubmission(val)
+    // 等待 DOM 更新
+    await nextTick()
+    await renderFlowchart(mermaidContainer.value, myMermaidCode.value)
+  } catch (error) {
+    message.error("加载这次提交失败，请稍后重试")
+    console.error("加载流程图提交失败:", error)
+  } finally {
+    rendering.value = false
+  }
 }
 
 // ==================== 模态框相关函数 ====================
 async function openDetailModal() {
   showDetailModal.value = true
   rendering.value = true
-  await getSubmission()
-  page.value = submissionCount.value
-  // 等待 DOM 更新，确保弹框已经渲染
-  await nextTick()
-  await renderFlowchart(mermaidContainer.value, myMermaidCode.value)
-  rendering.value = false
+  try {
+    await getSubmission()
+    page.value = submissionCount.value
+    // 等待 DOM 更新，确保弹框已经渲染
+    await nextTick()
+    await renderFlowchart(mermaidContainer.value, myMermaidCode.value)
+  } catch (error) {
+    message.error("加载评分详情失败，请稍后重试")
+    console.error("加载流程图评分详情失败:", error)
+  } finally {
+    rendering.value = false
+  }
 }
 
 function closeModal() {
@@ -342,14 +356,18 @@ function closeModal() {
 
 function loadToEditor() {
   if (myFlowchartZippedStr.value) {
-    const str = atou(myFlowchartZippedStr.value)
-    const json = JSON.parse(str)
-    const processedData = {
-      nodes: json.nodes || [],
-      edges: json.edges || [],
-    }
-    if (flowchartEditorRef?.value) {
-      flowchartEditorRef.value.setFlowchartData(processedData)
+    // 老提交的压缩数据可能是坏的（格式换过、存了一半），
+    // 不兜住的话 atou/JSON.parse 直接抛，按钮点了毫无反应
+    try {
+      const json = JSON.parse(atou(myFlowchartZippedStr.value))
+      flowchartEditorRef?.value?.setFlowchartData({
+        nodes: json.nodes || [],
+        edges: json.edges || [],
+      })
+    } catch (error) {
+      message.error("这份流程图数据已损坏，无法加载到编辑器")
+      console.error("解析流程图数据失败:", error)
+      return
     }
   }
   closeModal()
@@ -432,7 +450,11 @@ onUnmounted(() => {
               <n-alert v-if="renderError" type="error" title="流程图渲染失败">
                 {{ renderError }}
               </n-alert>
-              <div class="flowchart" v-else ref="mermaidContainer"></div>
+              <div
+                class="flowchart"
+                v-show="!renderError"
+                ref="mermaidContainer"
+              ></div>
             </n-spin>
           </div>
           <!-- 加载到编辑器按钮 -->

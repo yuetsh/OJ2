@@ -22,7 +22,11 @@ watch(
     <n-alert v-if="renderError" type="error" title="渲染失败" size="small">
       {{ renderError }}
     </n-alert>
-    <div v-else ref="mermaidContainer" class="flowchart-container"></div>
+    <div
+      v-show="!renderError"
+      ref="mermaidContainer"
+      class="flowchart-container"
+    ></div>
   </div>
 </template>
 

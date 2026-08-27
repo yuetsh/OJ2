@@ -27,7 +27,9 @@ watch(() => problem.value?.mermaidCode, renderProblemFlowchart)
         {{ renderError }}
       </template>
     </n-alert>
-    <div v-else ref="mermaidContainer" class="container"></div>
+    <!-- 容器必须常驻：用 v-else 卸载掉之后 mermaidContainer 变成 null，
+         下一次渲染会因为拿不到容器直接 return，图就再也画不出来了 -->
+    <div v-show="!renderError" ref="mermaidContainer" class="container"></div>
   </div>
 </template>
 

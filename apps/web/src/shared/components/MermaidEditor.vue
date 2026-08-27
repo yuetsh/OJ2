@@ -20,7 +20,9 @@ onMounted(() => {
   nextTick(renderMermaid)
 })
 
-watch(modelValue, renderMermaid)
+// 出题页是边敲边预览，不防抖的话每个字符都会触发一次完整的 mermaid 渲染，
+// 而中间态几乎全是语法错误
+watchDebounced(modelValue, renderMermaid, { debounce: 300, maxWait: 1000 })
 
 const clearCode = () => {
   modelValue.value = ""

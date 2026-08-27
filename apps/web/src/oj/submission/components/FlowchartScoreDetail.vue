@@ -20,8 +20,9 @@
           <n-alert v-if="renderError" type="error" title="流程图渲染失败">
             {{ renderError }}
           </n-alert>
-          <Teleport v-else to="body" :disabled="!showLargeImage">
+          <Teleport to="body" :disabled="!showLargeImage">
             <div
+              v-show="!renderError"
               :class="['flowchart', { 'flowchart-fullscreen': showLargeImage }]"
               ref="mermaidContainer"
             ></div>
