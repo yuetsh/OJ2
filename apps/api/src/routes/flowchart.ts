@@ -330,7 +330,22 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
     status: 0, aiScore: null, aiGrade: null, aiFeedback: null, aiSuggestions: null,
     aiCriteriaDetails: {}, processingTime: null, evaluationTime: null,
   }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
-  await flowchartQueue.add("evaluate", { submissionId: row.flowchart.id }, { jobId: `${row.flowchart.id}:${Date.now()}` })
+  try {
+    // jobId 必须**正好三段**：bullmq 对含 `:` 的自定义 id 有一条兼容老的可重复
+    // 任务的校验（job.js 的 `split(':').length !== 3`），两段会直接抛
+    // `Custom Id cannot contain :`。原来写的是 `${id}:${时间戳}`，于是这个接口
+    // 从来没成功过 —— 而清空评分在入队之前，每点一次就把原来的分数永久清掉、
+    // 提交卡在 PENDING 且没有任何任务会来救它。
+    await flowchartQueue.add(
+      "evaluate",
+      { submissionId: row.flowchart.id },
+      { jobId: `${row.flowchart.id}:retry:${Date.now()}` },
+    )
+  } catch (error) {
+    // 入队失败就落 FAILED，别把提交丢在 PENDING 上 —— 和 POST /flowcharts 同一处理
+    await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+    return failure(c, 502, "queue-unavailable", "Evaluation queue is unavailable")
+  }
   return success(c, createFlowchartResponseSchema.parse({ submissionId: row.flowchart.id, status: "pending" }))
 })
 
