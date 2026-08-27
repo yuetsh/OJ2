@@ -64,6 +64,31 @@ const todayCount = ref(0)
 // 没有它的话，等接口这段时间表格就是一片空白，连转圈都没有
 const loading = ref(false)
 
+/**
+ * 转圈圈延迟出现。翻页、切筛选大多在一百毫秒内就回来了，直接切数据比「闪一下
+ * 转圈再切」看着稳；只有真的慢到 300ms 以上才值得给个反馈。
+ *
+ * 注意是**单向**延迟：只推迟「显示」，一旦请求结束立刻收掉，不留尾巴。
+ *
+ * 为什么不用 n-spin 的 delay：n-data-table 压根不走 n-spin，它渲染的是内部的
+ * _internal/loading，直接由 loading 控制、没有 delay 参数。要用内置的就得把表格
+ * 包进 <n-spin :show :delay> 再去掉 :loading —— 那会换掉加载样式，还会丢掉
+ * loading 时锁住排序/分页交互（DataTable 里那个 `disabled: this.loading`）。
+ * 下面这几行就是 n-spin 内部同样的写法（watchEffect + setTimeout + 清理）。
+ */
+const LOADING_DELAY = 300
+const showLoading = ref(false)
+let loadingTimer: ReturnType<typeof setTimeout> | undefined
+watch(loading, (value) => {
+  clearTimeout(loadingTimer)
+  if (!value) {
+    showLoading.value = false
+    return
+  }
+  loadingTimer = setTimeout(() => (showLoading.value = true), LOADING_DELAY)
+})
+onUnmounted(() => clearTimeout(loadingTimer))
+
 // 使用分页 composable
 const { query, clearQuery } = usePagination<SubmissionQuery>({
   username: useRouteQuery("username", "").value,
@@ -506,14 +531,14 @@ const flowchartColumns = computed(() => {
       :bordered="false"
       :columns="flowchartColumns"
       :data="flowcharts"
-      :loading="loading"
+      :loading="showLoading"
     />
     <n-data-table
       v-else
       :bordered="false"
       :columns="columns"
       :data="submissions"
-      :loading="loading"
+      :loading="showLoading"
     />
   </n-flex>
   <Pagination
