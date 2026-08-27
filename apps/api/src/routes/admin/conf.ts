@@ -83,7 +83,9 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
       set: { value: sql`excluded.value` },
     })
   // 广播给所有开着页面的人，改完立刻生效不必刷新，对齐旧 push_config_update。
-  // 推的是 options 表里的 snake_case key —— 前端 configStore.config 用的就是这套键名。
+  // 推的是 options 表里的 snake_case key。**前端 store 的字段是驼峰**，
+  // 换名在前端 configUpdate.ts 里做 —— 这里曾经注释成「前端用的就是这套键名」，
+  // 结果前端照着直接 `key in store` 判断，一条也命中不了，整个实时生效空转了很久。
   for (const entry of entries) await publishConfigUpdate(entry.key, entry.value)
   return success(c, null)
 })
