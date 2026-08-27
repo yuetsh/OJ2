@@ -18,6 +18,8 @@ import { config } from "../config"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import { flowchartQueue } from "../queue"
+import { getBooleanOption } from "../services/options"
+import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
 import {
   isAdminRole,
@@ -29,6 +31,11 @@ import {
 } from "./helpers"
 
 export const flowchartRoutes = new Hono<AppEnv>()
+
+// AI 评分单独一个限流桶，与代码提交的 `throttling:user:<id>` 分开计数
+function flowchartThrottleKey(userId: number) {
+  return `flowchart:${userId}`
+}
 
 function canView(user: import("../auth/session").AuthUser, row: { userId: number }, problem: { createdById: number }) {
   return row.userId === user.id || isAdminRole(user) || problem.createdById === user.id
@@ -67,6 +74,13 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
     .where(eq(schema.problem.id, parsed.data.problemId)).limit(1)
   if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   if (!problem.allow) return failure(c, 400, "flowchart-not-allowed", "This problem does not allow flowchart submission")
+  // 限流：每次提交都会触发一次外部 AI 调用，是和判题沙箱同级的有限资源。
+  // 身份前缀单独开一个桶，**不能**直接用 user id —— 那是代码提交在用的桶，
+  // 共用的话学生在机房连着交几次代码，流程图这边就会莫名其妙交不上去。
+  const throttle = await consumeToken("user", flowchartThrottleKey(c.get("user")!.id))
+  if (!throttle.allowed) {
+    return failure(c, 429, "too-many-submissions", `Please wait ${Math.floor(throttle.wait)} seconds`)
+  }
   const id = randomBytes(16).toString("hex")
   await db.insert(schema.flowchartSubmission).values({
     id,
@@ -103,6 +117,12 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   const displayId = c.req.query("problemId")?.trim()
   const username = c.req.query("username")?.trim()
   const grade = c.req.query("grade")
+  // 与代码提交列表同一套口径（submission.ts 的 GET /submissions）：关掉
+  // submission_list_show_all 时非管理员看不到列表。流程图这边一直漏了这道门，
+  // 学生把语言切成「流程图」、用户名随便填一个字就能翻出全班的 AI 评分。
+  if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
+    return success(c, flowchartListSchema.parse({ results: [], total: 0 }))
+  }
   if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
   if (c.req.query("myself") === "1" || (!username && user.adminType === "Regular User")) filters.push(eq(schema.flowchartSubmission.userId, user.id))
   else if (username) filters.push(ilike(schema.user.username, `%${username}%`))
@@ -274,11 +294,20 @@ flowchartRoutes.get("/flowcharts/:id", requireAuth, async (c) => {
 })
 
 flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
+  const user = c.get("user")!
   const [row] = await db.select({ flowchart: schema.flowchartSubmission, problem: schema.problem }).from(schema.flowchartSubmission)
     .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, c.req.param("id"))).limit(1)
-  if (!row || !canView(c.get("user")!, row.flowchart, row.problem)) return failure(c, 404, "flowchart-not-found", "Submission does not exist")
+  if (!row || !canView(user, row.flowchart, row.problem)) return failure(c, 404, "flowchart-not-found", "Submission does not exist")
   if (![2, 3].includes(row.flowchart.status)) return failure(c, 409, "retry-not-allowed", "Submission is not in a state that allows retry")
+  // canView 允许本人重试自己的提交，不限流的话学生可以反复点着刷 AI 调用。
+  // 教师放行：重新判题是他们的日常操作，成批点几十行是正常用法
+  if (!isAdminRole(user)) {
+    const throttle = await consumeToken("user", flowchartThrottleKey(user.id))
+    if (!throttle.allowed) {
+      return failure(c, 429, "too-many-submissions", `Please wait ${Math.floor(throttle.wait)} seconds`)
+    }
+  }
   await db.update(schema.flowchartSubmission).set({
     status: 0, aiScore: null, aiGrade: null, aiFeedback: null, aiSuggestions: null,
     aiCriteriaDetails: {}, processingTime: null, evaluationTime: null,
