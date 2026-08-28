@@ -63,6 +63,32 @@ export function handleCollabOpen(ws: CollabSocket) {
     ws.send(
       JSON.stringify({ type: "requests", list: listRequests().map(serializeRequest) }),
     )
+    return
+  }
+
+  // 学生（重）连：如果这个账号名下已经有一条请求（掉线重连回来，或者干脆是
+  // 同账号第二个标签页），把它迁移到这条新连接上，并把当前状态补发回去 ——
+  // 前端 onConnected 时会先把本地状态清空等着这条补发，不发的话就永远卡在
+  // idle；不迁移 socket 归属的话，旧连接一断，handleHelpCancel 的
+  // `request.socket === ws` 校验就会认不出这条新连接发起的取消
+  const request = getRequest(ws.data.userId)
+  if (!request) return
+  request.socket = ws
+
+  const room = getRoom(ws.data.userId)
+  if (room && room.studentSocket !== ws) {
+    // 旧 socket 不再是这间房的主人：清掉它的 roomOwnerId，不然它稍后触发的
+    // close 会经 roomOf 认出这间刚刚转移出去的房间，把它拆了——一条早该
+    // 死透的连接反而有权拆掉正在用的新连接的房间
+    room.studentSocket.data.roomOwnerId = undefined
+    room.studentSocket = ws
+    ws.data.roomOwnerId = ws.data.userId
+  }
+
+  if (request.status === "pending") {
+    sendHelpStatus(ws, "pending", { queueAhead: queueAheadOf(ws.data.userId) })
+  } else if (request.status === "active") {
+    sendHelpStatus(ws, "active", { teacherName: request.teacherName ?? "" })
   }
 }
 

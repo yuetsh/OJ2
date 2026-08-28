@@ -736,6 +736,7 @@ export interface CollabMessage extends WebSocketMessage {
  */
 export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
   private binaryHandler: ((data: ArrayBuffer) => void) | null = null
+  private connectHandler: (() => void) | null = null
 
   constructor() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
@@ -746,7 +747,21 @@ export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
     this.binaryHandler = handler
   }
 
+  /**
+   * 每次连接**建立**都触发，含重连 —— 不止首次 connect()。用来在重连瞬间
+   * 清掉本地缓存的求助/房间状态：旧连接期间的 pending/active 可能早就过时了，
+   * 服务端会在 handleCollabOpen 里紧接着补发 requests（老师）或 help_status
+   * （还在排队/协作中的学生），补发落地前先归零，好过让过时状态活过一次重连。
+   */
+  setConnectHandler(handler: (() => void) | null) {
+    this.connectHandler = handler
+  }
+
   protected override onBinary(data: ArrayBuffer) {
     this.binaryHandler?.(data)
+  }
+
+  protected override onConnected() {
+    this.connectHandler?.()
   }
 }

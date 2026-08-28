@@ -88,9 +88,15 @@ export const useCollabStore = defineStore("collab", () => {
         }
         return
       case "room_closed":
+        // 不管 reason 一律先归位到 idle：学生这一侧的 socket 发送失败时，
+        // 服务端把它从请求表里摘掉却**发不出**任何纠正性的 help_status
+        // （那正是刚失败的那条 socket），不这样兜底 store 会卡在陈旧的
+        // active/pending 上再也回不来。老师掉线的情况服务端会紧接着另发一条
+        // help_status:pending——teardownRoom 里 room_closed 先发、
+        // requeueAfterTeacherGone 后发，同一条连接上消息严格按发送顺序到达，
+        // 这里先归零，那条 pending 补发会立刻把它纠正回来，不会被这次重置盖掉
         room.value = null
-        // 老师掉线时服务端会另发一条 help_status:pending，这里不抢着改学生状态
-        if (data.reason === "done") helpStatus.value = "idle"
+        helpStatus.value = "idle"
         notice.value =
           data.reason === "peer_offline" ? "对方已断开连接" : "协作已结束"
         return
@@ -102,6 +108,19 @@ export const useCollabStore = defineStore("collab", () => {
 
   ws.addHandler(handleMessage)
 
+  // 每次连接**建立**都清一遍本地状态，不止首次 connect() —— 重连（掉线重连、
+  // API 重启后的自动重连）同样会触发。旧连接期间的 pending/active/requests
+  // 可能早就过时了：老师端等服务端在 handleCollabOpen 里重新推 requests 补齐；
+  // 学生端等服务端补发的 help_status 补齐（真在排队/协作中会被立刻纠正回来），
+  // 不该让上一条连接的陈旧状态越过重连活下来
+  ws.setConnectHandler(() => {
+    requests.value = []
+    helpStatus.value = "idle"
+    queueAhead.value = 0
+    teacherName.value = ""
+    room.value = null
+  })
+
   function connect() {
     ws.connect()
   }
@@ -110,7 +129,10 @@ export const useCollabStore = defineStore("collab", () => {
     ws.disconnect()
     requests.value = []
     helpStatus.value = "idle"
+    queueAhead.value = 0
+    teacherName.value = ""
     room.value = null
+    notice.value = ""
   }
 
   function requestHelp(problemId: string) {
