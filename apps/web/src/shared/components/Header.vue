@@ -6,6 +6,7 @@ import { useLearnProgress } from "shared/composables/learnProgress"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useScreenModeStore } from "shared/store/screenMode"
 import { logout } from "../api"
+import CollabModal from "./CollabModal.vue"
 import HelpRequestList from "./HelpRequestList.vue"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
@@ -363,6 +364,14 @@ function handleMenuSelect(key: string) {
         </template>
       </n-button>
     </n-flex>
+    <!--
+      挂在根 n-flex 内部而不是同级：Header.vue 一旦变成多根 fragment，
+      default.vue 里 `<Header class="header" />` 那个 class 就没有任何单一
+      根节点可以落地（Vue 会报 "Extraneous non-props attributes" 警告并把它
+      整个丢弃），header 行随之丢掉 `max-width: 2000px` 那条居中样式。
+      n-modal 默认 teleport 到 body，塞在这里不影响它的实际渲染位置。
+    -->
+    <CollabModal v-if="userStore.isTeacherOrAbove" />
   </n-flex>
 </template>
 
