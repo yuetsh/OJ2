@@ -66,6 +66,20 @@ export function handleCollabOpen(ws: CollabSocket) {
   }
 }
 
+/** 老师从房间消失（掉线，或发送失败被判定为事实上不可达）：请求退回排队，
+ * 学生不必重新点 —— 可能只是网络抖了一下 */
+function requeueAfterTeacherGone(studentId: number) {
+  const request = getRequest(studentId)
+  if (request) {
+    request.status = "pending"
+    request.teacherId = undefined
+    request.teacherName = undefined
+    sendHelpStatus(request.socket, "pending", {
+      queueAhead: queueAheadOf(studentId),
+    })
+  }
+}
+
 export function handleCollabClose(ws: CollabSocket) {
   if (isTeacher(ws)) removeTeacher(ws)
 
@@ -78,16 +92,7 @@ export function handleCollabClose(ws: CollabSocket) {
     peer.send(JSON.stringify({ type: "room_closed", reason: "peer_offline" }))
 
     if (ws === room.teacherSocket) {
-      // 老师掉线：请求退回排队，学生不必重新点 —— 可能只是网络抖了一下
-      const request = getRequest(room.studentId)
-      if (request) {
-        request.status = "pending"
-        request.teacherId = undefined
-        request.teacherName = undefined
-        sendHelpStatus(request.socket, "pending", {
-          queueAhead: queueAheadOf(room.studentId),
-        })
-      }
+      requeueAfterTeacherGone(room.studentId)
     } else {
       // 学生掉线：请求随人走
       removeRequest(room.studentId)
@@ -203,7 +208,9 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown) {
 
 function handleHelpCancel(ws: CollabSocket) {
   const request = getRequest(ws.data.userId)
-  if (!request || request.status === "active") return
+  // 同一账号可能开着两个标签页；只能取消自己这条连接发起的请求，不然 B 标签页
+  // 能把 A 标签页排队中的求助顶掉 —— 和 handleCollabClose 排队分支同一类归属漏洞
+  if (!request || request.socket !== ws || request.status === "active") return
   removeRequest(ws.data.userId)
   broadcastRequests()
 }
@@ -311,16 +318,29 @@ function handleLeave(ws: CollabSocket) {
 /**
  * 拆房间。reason 决定两端看到什么：
  *   done         —— 有人主动结束，双方都收到，请求一并清除
- *   peer_offline —— 有人断线，见 handleCollabClose
+ *   peer_offline —— 有人断线或发送失败被判定为不可达，见 handleCollabClose /
+ *                    handleCollabBinary。offlineSide 是消失的那一方：老师消失，
+ *                    请求退回排队；学生消失，请求随人清掉。不传时（当前只有
+ *                    handleLeave 走 "done"）不做这一步，只拆房间
  */
-function teardownRoom(room: Room, reason: "done" | "peer_offline") {
+function teardownRoom(
+  room: Room,
+  reason: "done" | "peer_offline",
+  offlineSide?: "student" | "teacher",
+) {
   closeRoom(room.studentId)
   room.studentSocket.data.roomOwnerId = undefined
   room.teacherSocket.data.roomOwnerId = undefined
   const frame = JSON.stringify({ type: "room_closed", reason })
   room.studentSocket.send(frame)
   room.teacherSocket.send(frame)
-  if (reason === "done") removeRequest(room.studentId)
+  if (reason === "done") {
+    removeRequest(room.studentId)
+  } else if (offlineSide === "teacher") {
+    requeueAfterTeacherGone(room.studentId)
+  } else if (offlineSide === "student") {
+    removeRequest(room.studentId)
+  }
   broadcastRequests()
 }
 
@@ -331,17 +351,26 @@ function teardownRoom(room: Room, reason: "done" | "peer_offline") {
  * 权限由 accept 时的库查询决定，与帧里装的是什么无关。
  */
 export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) {
+  // 空帧：Bun.serve 探测过，send() 对 0 字节帧也回 0（同一个返回值,
+  // 真实送达和真实丢弃分不清），不转发、不参与下面的失败判定，直接忽略。
+  // 否则任何一方发一个 0 字节二进制帧就能把整间房拆掉
+  if (data.length === 0) return
+
   const room = roomOf(ws)
   if (!room) return
   const peer = ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
   const sent = peer.send(data)
-  if (sent <= 0) {
-    // <= 0：背压丢帧或者对端事实上已经断了。这一帧丢了，两边的 Yjs 文档从此
-    // 悄悄分叉——教学工具里"看起来在协作、其实各看各的代码"比老实断开更糟，
-    // 不做续传，直接拆房间让双方收到 room_closed、自己决定要不要重新连
+  // Bun.serve 探测过：-1 不代表失败，是背压——消息已排队，最终会送达（实测 8MB
+  // 帧照样完整到达）；只有 0 才是真的丢了（对端事实上已经断开）。之前把 <= 0
+  // 当成失败，慢网/大粘贴一触发背压就把正常房间拆掉，是本该保护的场景反而先死
+  if (sent === 0) {
+    // 真丢帧：两边的 Yjs 文档会从此悄悄分叉——教学工具里"看起来在协作、其实
+    // 各看各的代码"比老实断开更糟，不做续传，直接拆房间。和教师断线走同一条
+    // 收尾路径：老师那侧消失就把请求退回排队，不让学生卡死在 active 出不来
     console.error("Collab binary forward failed, tearing down room", {
       studentId: room.studentId,
     })
-    teardownRoom(room, "peer_offline")
+    const offlineSide = peer === room.teacherSocket ? "teacher" : "student"
+    teardownRoom(room, "peer_offline", offlineSide)
   }
 }
