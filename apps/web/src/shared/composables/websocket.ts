@@ -140,6 +140,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       // 迟到的 onclose / onerror 不该去改现在这条连接的状态
       const ws = new WebSocket(this.url)
       this.ws = ws
+      ws.binaryType = "arraybuffer"
 
       ws.onopen = () => {
         if (ws !== this.ws) return
@@ -154,6 +155,14 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
 
       ws.onmessage = (event) => {
         if (ws !== this.ws) return
+
+        // Yjs 这类二进制帧不是 JSON，交给子类。基类的 pong / force_logout 都是文本帧，
+        // 不会走到这条路径上
+        if (typeof event.data !== "string") {
+          this.onBinary(event.data as ArrayBuffer)
+          return
+        }
+
         try {
           const data = JSON.parse(event.data) as T
 
@@ -325,6 +334,24 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   send(data: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data))
+      return true
+    }
+    return false
+  }
+
+  /**
+   * 二进制帧钩子。基类不认二进制，默认丢弃；collab 这类通道在子类里覆盖。
+   * 和 onMessage 对称，不要在这里做 JSON 解析。
+   */
+  protected onBinary(_data: ArrayBuffer) {}
+
+  /**
+   * 不做 JSON 序列化的发送。Yjs 的 update / awareness 本身就是 Uint8Array，
+   * 走 send() 会被 JSON.stringify 成一个 {"0":12,"1":3,...} 的对象。
+   */
+  sendRaw(data: ArrayBuffer | Uint8Array) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(data)
       return true
     }
     return false
