@@ -100,19 +100,30 @@ const server = Bun.serve<SubmissionSocketData>({
 				new Response("Not found", { status: 404 })
 			)
 		}
-		if (url.pathname === "/ws/submissions" || url.pathname === "/ws/config") {
+		if (
+			url.pathname === "/ws/submissions" ||
+			url.pathname === "/ws/config" ||
+			url.pathname === "/ws/collab"
+		) {
 			if (!isAllowedWebSocketOrigin(request.headers.get("origin"), url)) {
 				return new Response("Forbidden", { status: 403 })
 			}
 			const user = await getRequestSessionUser(request)
 			if (!user) return new Response("Unauthorized", { status: 401 })
-			const kind = url.pathname === "/ws/config" ? "config" : "submissions"
+			const kind =
+				url.pathname === "/ws/config"
+					? "config"
+					: url.pathname === "/ws/collab"
+						? "collab"
+						: "submissions"
 			if (
 				bunServer.upgrade(request, {
 					data: {
 						userId: user.id,
 						kind,
 						token: readRequestSessionToken(request),
+						username: user.username,
+						adminType: user.adminType,
 					},
 				})
 			) {

@@ -2,6 +2,12 @@ import { flowchartUpdateSchema, submissionUpdateSchema } from "@oj2/contract"
 import { and, eq } from "drizzle-orm"
 
 import { touchSession } from "./auth/session"
+import {
+  handleCollabBinary,
+  handleCollabClose,
+  handleCollabMessage,
+  handleCollabOpen,
+} from "./collab/handler"
 import { config } from "./config"
 import { db, schema } from "./db"
 import {
@@ -51,12 +57,17 @@ export function isAllowedWebSocketOrigin(origin: string | null, url: URL) {
 
 export interface SubmissionSocketData {
   userId: number
-  /** 同一个 Bun.serve 只能挂一个 websocket handler，用它区分两条通道 */
-  kind: "submissions" | "config"
+  /** 同一个 Bun.serve 只能挂一个 websocket handler，用它区分通道 */
+  kind: "submissions" | "config" | "collab"
   /** 握手时那张会话的 token，留着定期确认它还没被登出 / 过期，见 sweepSessions */
   token: string
   /** 令牌桶，open 时初始化，见 allowMessage */
   rate?: { tokens: number; updatedAt: number }
+  /** 以下两项只有 kind === "collab" 时才填，握手时从会话里读 */
+  username?: string
+  adminType?: string
+  /** 当前所在协作房间的房主（学生）id，见 collab/handler.ts */
+  roomOwnerId?: number
 }
 
 /**
@@ -69,11 +80,24 @@ export interface SubmissionSocketData {
 const RATE_BURST = 20
 const RATE_REFILL_PER_SECOND = 2
 
-function allowMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>) {
+/**
+ * collab 通道的二进制帧（Yjs update / awareness）单独一档。
+ *
+ * 它不查库、不解析，纯内存按房间转发，成本和文本控制帧完全不是一个量级；
+ * 而连续快速输入大约 5-10 帧/秒，用严格档几秒钟就会把正在协作的人踢下线。
+ */
+const COLLAB_BINARY_BURST = 200
+const COLLAB_BINARY_REFILL_PER_SECOND = 100
+
+function allowMessage(
+  ws: Bun.ServerWebSocket<SubmissionSocketData>,
+  burst = RATE_BURST,
+  refillPerSecond = RATE_REFILL_PER_SECOND,
+) {
   const now = Date.now()
-  const rate = (ws.data.rate ??= { tokens: RATE_BURST, updatedAt: now })
-  const refill = ((now - rate.updatedAt) / 1000) * RATE_REFILL_PER_SECOND
-  rate.tokens = Math.min(RATE_BURST, rate.tokens + refill)
+  const rate = (ws.data.rate ??= { tokens: burst, updatedAt: now })
+  const refill = ((now - rate.updatedAt) / 1000) * refillPerSecond
+  rate.tokens = Math.min(burst, rate.tokens + refill)
   rate.updatedAt = now
   if (rate.tokens < 1) return false
   rate.tokens -= 1
@@ -165,6 +189,10 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
     open(ws) {
       liveSockets.add(ws)
       ws.data.rate = { tokens: RATE_BURST, updatedAt: Date.now() }
+      if (ws.data.kind === "collab") {
+        handleCollabOpen(ws)
+        return
+      }
       if (ws.data.kind === "config") {
         ws.subscribe(configTopic)
         return
@@ -173,6 +201,25 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       ws.subscribe(userEventTopic(ws.data.userId))
     },
     message(ws, message) {
+      if (ws.data.kind === "collab") {
+        if (typeof message !== "string") {
+          if (!allowMessage(ws, COLLAB_BINARY_BURST, COLLAB_BINARY_REFILL_PER_SECOND)) {
+            ws.close(1008, "Too many messages")
+            return
+          }
+          handleCollabBinary(ws, message)
+          return
+        }
+        if (!allowMessage(ws)) {
+          ws.close(1008, "Too many messages")
+          return
+        }
+        handleCollabMessage(ws, message).catch((error) => {
+          console.error("Failed to handle collab message", error)
+          ws.send(JSON.stringify({ type: "error", message: "Internal error" }))
+        })
+        return
+      }
       if (!allowMessage(ws)) {
         ws.close(1008, "Too many messages")
         return
@@ -187,6 +234,10 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
     },
     close(ws) {
       liveSockets.delete(ws)
+      if (ws.data.kind === "collab") {
+        handleCollabClose(ws)
+        return
+      }
       if (ws.data.kind === "config") {
         ws.unsubscribe(configTopic)
         return
