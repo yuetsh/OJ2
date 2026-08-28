@@ -709,3 +709,44 @@ export function useConfigWebSocket(handler?: MessageHandler<ConfigUpdate>) {
     removeHandler: (h: MessageHandler<ConfigUpdate>) => ws.removeHandler(h),
   }
 }
+
+export interface CollabRequestItem {
+  studentId: number
+  studentName: string
+  className: string | null
+  problemId: string
+  problemTitle: string
+  createdAt: number
+  status: "pending" | "active"
+  teacherName: string | null
+}
+
+export interface CollabMessage extends WebSocketMessage {
+  type:
+    | "requests"
+    | "help_status"
+    | "room_open"
+    | "room_closed"
+    | "error"
+}
+
+/**
+ * 课堂求助 / 协作通道。和另外两条的区别是它**双向**且**收发二进制** ——
+ * 控制面是 JSON，Yjs 的 update / awareness 走 sendRaw 与 onBinary。
+ */
+export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
+  private binaryHandler: ((data: ArrayBuffer) => void) | null = null
+
+  constructor() {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+    super({ url: `${protocol}//${window.location.host}/ws/collab` })
+  }
+
+  setBinaryHandler(handler: ((data: ArrayBuffer) => void) | null) {
+    this.binaryHandler = handler
+  }
+
+  protected override onBinary(data: ArrayBuffer) {
+    this.binaryHandler?.(data)
+  }
+}

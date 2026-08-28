@@ -6,10 +6,12 @@ import { useConfigStore } from "shared/store/config"
 import { useConfigUpdate } from "shared/composables/configUpdate"
 import { useMaxKB } from "shared/composables/maxkb"
 import { useUserStore } from "shared/store/user"
+import { useCollabStore } from "shared/store/collab"
 
 const isDark = useDark()
 const configStore = useConfigStore()
 const userStore = useUserStore()
+const collabStore = useCollabStore()
 
 // 初始化配置和实时更新
 onMounted(() => {
@@ -22,6 +24,17 @@ onMounted(() => {
 // 知识库挂件根本不出现，且没有任何报错。两者现在都走新后端的 /ws/config。
 useConfigUpdate()
 useMaxKB()
+
+// 课堂求助通道。和 /ws/config 一样是全局常驻的：老师可能正在后台改题时
+// 收到求助，学生也要在排队期间一直挂着，所以不放在题目页里起落
+watch(
+  () => userStore.isAuthed,
+  (isAuthed) => {
+    if (isAuthed) collabStore.connect()
+    else collabStore.disconnect()
+  },
+  { immediate: true },
+)
 
 // 延迟加载 highlight.js，避免阻塞首屏
 const hljsInstance = ref<any>(null)
