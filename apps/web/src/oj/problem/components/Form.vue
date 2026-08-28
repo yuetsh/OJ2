@@ -3,8 +3,7 @@ import { storeToRefs } from "pinia"
 import { copyToClipboard, utoa } from "utils/functions"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
-import { injectSyncStatus } from "oj/composables/syncStatus"
-import { SYNC_MESSAGES } from "shared/composables/sync"
+import { useCollabStore } from "shared/store/collab"
 import {
   ICON_SET,
   LANGUAGE_FORMAT_VALUE,
@@ -27,17 +26,14 @@ const SubmitFlowchart = defineAsyncComponent(
 
 interface Props {
   storageKey: string
-  isConnected?: boolean // WebSocket 实际的连接状态（已建立/未建立）
 }
 
-const { storageKey, isConnected = false } = defineProps<Props>()
+const { storageKey } = defineProps<Props>()
 
-// 注入同步状态
-const syncStatus = injectSyncStatus()
+const collabStore = useCollabStore()
 
 const emit = defineEmits<{
   changeLanguage: [v: LANGUAGE]
-  toggleSync: [v: boolean]
 }>()
 
 const message = useMessage()
@@ -50,18 +46,40 @@ const { problem, languages } = storeToRefs(problemStore)
 
 const { isDesktop } = useBreakpoints()
 
-const syncEnabled = ref(false) // 用户点击按钮后的意图状态（想要开启/关闭）
 const statisticPanel = ref(false)
 
 // 计算属性
 const isContestMode = computed(() => route.name === "contest problem")
 const buttonSize = computed(() => (isDesktop.value ? "medium" : "small"))
-const showSyncFeature = computed(
+// 可见条件沿用原来的 showSyncFeature，再加上「不是教师」——
+// 教师端的入口在顶栏，不在题目页
+const showHelpButton = computed(
   () =>
     isDesktop.value &&
     userStore.isAuthed &&
+    !userStore.isTeacherOrAbove &&
     codeStore.code.language !== "Flowchart" &&
     !isContestMode.value,
+)
+
+const helpButtonText = computed(() => {
+  if (collabStore.helpStatus === "active") return "老师正在帮你"
+  if (collabStore.helpStatus === "pending") return "取消求助"
+  return "求助"
+})
+
+const toggleHelp = () => {
+  if (collabStore.helpStatus === "pending") collabStore.cancelHelp()
+  else if (collabStore.helpStatus === "idle")
+    collabStore.requestHelp(problem.value!._id)
+}
+
+// 服务端的一次性提示（没有老师在线、老师取消了求助）
+watch(
+  () => collabStore.notice,
+  (text) => {
+    if (text) message.info(collabStore.consumeNotice())
+  },
 )
 
 const showGoSubmissionButton = computed(() => {
@@ -191,17 +209,6 @@ const goEdit = () => {
   window.open(router.resolve(url).href, "_blank")
 }
 
-const toggleSync = () => {
-  syncEnabled.value = !syncEnabled.value
-  emit("toggleSync", syncEnabled.value)
-}
-
-defineExpose({
-  resetSyncStatus: () => {
-    syncEnabled.value = false
-  },
-})
-
 onMounted(() => {
   if (!languages.value.includes(codeStore.code.language)) {
     // 回退到题目支持的第一种语言（如 SQL 题只有 "SQL"，硬编码 Python3 会被后端拒绝）
@@ -250,31 +257,22 @@ onMounted(() => {
       <n-button :size="buttonSize">更多操作</n-button>
     </n-dropdown>
 
-    <template v-if="showSyncFeature">
+    <template v-if="showHelpButton">
       <n-button
         :size="buttonSize"
-        :type="syncEnabled ? 'warning' : 'default'"
-        @click="toggleSync"
+        :type="collabStore.helpStatus === 'idle' ? 'default' : 'warning'"
+        :disabled="collabStore.helpStatus === 'active'"
+        @click="toggleHelp"
       >
-        {{ syncEnabled ? SYNC_MESSAGES.SYNC_ON : SYNC_MESSAGES.SYNC_OFF }}
+        {{ helpButtonText }}
       </n-button>
 
-      <!-- 同步状态标签 -->
-      <template v-if="isConnected">
-        <n-tag v-if="syncStatus.otherUser.value" type="info">
-          {{ SYNC_MESSAGES.SYNCING_WITH(syncStatus.otherUser.value.name) }}
-        </n-tag>
-        <n-tag
-          v-if="
-            userStore.isSuperAdmin &&
-            !syncStatus.otherUser.value &&
-            syncStatus.hadConnection.value
-          "
-          type="warning"
-        >
-          {{ SYNC_MESSAGES.STUDENT_LEFT(syncStatus.lastLeftUser.value?.name) }}
-        </n-tag>
-      </template>
+      <n-tag v-if="collabStore.helpStatus === 'pending'" type="info">
+        已求助{{ collabStore.queueAhead > 0 ? `，前面还有 ${collabStore.queueAhead} 人` : "，等待老师接入" }}
+      </n-tag>
+      <n-tag v-else-if="collabStore.helpStatus === 'active'" type="success">
+        {{ collabStore.teacherName }} 老师正在帮你
+      </n-tag>
     </template>
   </n-flex>
 

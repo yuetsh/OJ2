@@ -2,7 +2,6 @@
 import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
-import { provideSyncStatus } from "oj/composables/syncStatus"
 import { SOURCES } from "utils/constants"
 import SyncCodeEditor from "shared/components/SyncCodeEditor.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -15,7 +14,6 @@ const FlowchartEditor = defineAsyncComponent(
 )
 
 const route = useRoute()
-const formRef = useTemplateRef<InstanceType<typeof Form>>("formRef")
 const flowchartEditorRef = useTemplateRef("flowchartEditorRef")
 
 const codeStore = useCodeStore()
@@ -23,10 +21,6 @@ const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
 
 const { isDesktop } = useBreakpoints()
-
-const sync = ref(false)
-// 提供同步状态给子组件使用
-const syncStatus = provideSyncStatus()
 
 const contestID = route.params.contestID || null
 const storageKey = computed(
@@ -72,38 +66,13 @@ const changeLanguage = (v: LANGUAGE) => {
   )
 }
 
-const toggleSync = (value: boolean) => {
-  sync.value = value
-  if (!value) {
-    syncStatus.reset()
-  }
-}
-
-const handleSyncClosed = () => {
-  sync.value = false
-  syncStatus.reset()
-  formRef.value?.resetSyncStatus()
-}
-
-const handleSyncStatusChange = (status: {
-  otherUser?: { name: string; isSuperAdmin: boolean }
-}) => {
-  syncStatus.setOtherUser(status.otherUser)
-}
-
 // 提供FlowchartEditor的ref给子组件
 provide("flowchartEditorRef", flowchartEditorRef)
 </script>
 
 <template>
   <n-flex vertical>
-    <Form
-      ref="formRef"
-      :storage-key="storageKey"
-      :is-connected="sync"
-      @change-language="changeLanguage"
-      @toggle-sync="toggleSync"
-    />
+    <Form :storage-key="storageKey" @change-language="changeLanguage" />
     <FlowchartEditor
       v-if="codeStore.code.language === 'Flowchart'"
       ref="flowchartEditorRef"
@@ -111,13 +80,10 @@ provide("flowchartEditorRef", flowchartEditorRef)
     <SyncCodeEditor
       v-else
       v-model:value="codeStore.code.value"
-      :sync="sync"
       :problem="problem!._id"
       :language="codeStore.code.language"
       :height="editorHeight"
       @update:model-value="changeCode"
-      @sync-closed="handleSyncClosed"
-      @sync-status-change="handleSyncStatusChange"
     />
   </n-flex>
 </template>

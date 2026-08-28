@@ -69,8 +69,8 @@ export function handleCollabOpen(ws: CollabSocket) {
   // 学生（重）连：如果这个账号名下已经有一条请求（掉线重连回来，或者干脆是
   // 同账号第二个标签页），把它迁移到这条新连接上，并把当前状态补发回去 ——
   // 前端 onConnected 时会先把本地状态清空等着这条补发，不发的话就永远卡在
-  // idle；不迁移 socket 归属的话，旧连接一断，handleHelpCancel 的
-  // `request.socket === ws` 校验就会认不出这条新连接发起的取消
+  // idle；不迁移 socket 归属的话，sendHelpStatus/accept 等后续推送会发到一条
+  // 已经不用的旧连接上，新连接（新标签页）什么都收不到
   const request = getRequest(ws.data.userId)
   if (!request) return
   request.socket = ws
@@ -234,9 +234,11 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown) {
 
 function handleHelpCancel(ws: CollabSocket) {
   const request = getRequest(ws.data.userId)
-  // 同一账号可能开着两个标签页；只能取消自己这条连接发起的请求，不然 B 标签页
-  // 能把 A 标签页排队中的求助顶掉 —— 和 handleCollabClose 排队分支同一类归属漏洞
-  if (!request || request.socket !== ws || request.status === "active") return
+  // 不比对 socket 归属：取消的是这个学生自己的求助，不管从他哪个标签页发起都
+  // 合法——getRequest(ws.data.userId) 已经把范围锁在这一个用户上了，不是跨用户
+  // 操作。这里和 handleCollabClose 的排队分支不是同一类问题：那边关闭事件是
+  // 「顺带」触发的，必须认出是不是本人这条连接；这里是用户主动点了取消
+  if (!request || request.status === "active") return
   removeRequest(ws.data.userId)
   broadcastRequests()
 }
