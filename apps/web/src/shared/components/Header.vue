@@ -6,6 +6,7 @@ import { useLearnProgress } from "shared/composables/learnProgress"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useScreenModeStore } from "shared/store/screenMode"
 import { logout } from "../api"
+import HelpRequestList from "./HelpRequestList.vue"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
 import { trickOrTreat } from "utils/functions"
@@ -328,6 +329,7 @@ function handleMenuSelect(key: string) {
       >
         {{ screenMode }}
       </n-button>
+      <HelpRequestList v-if="isDesktop && userStore.isTeacherOrAbove" />
       <div v-if="userStore.isFinished">
         <n-dropdown v-if="userStore.isAuthed" :options="options" size="large">
           <n-button>
