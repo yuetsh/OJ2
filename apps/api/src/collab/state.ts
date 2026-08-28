@@ -76,8 +76,38 @@ export function teacherSockets() {
   return teachers
 }
 
+export interface Room {
+  /** 房主 = 学生。房间以学生为键，因为学生的代码是内容源 */
+  studentId: number
+  teacherId: number
+  studentSocket: CollabSocket
+  teacherSocket: CollabSocket
+  problemId: string
+}
+
+const rooms = new Map<number, Room>()
+
+export function openRoom(room: Room) {
+  rooms.set(room.studentId, room)
+}
+
+export function getRoom(studentId: number) {
+  return rooms.get(studentId)
+}
+
+export function closeRoom(studentId: number) {
+  return rooms.delete(studentId)
+}
+
+/** 这条连接当前所在的房间。ws.data.roomOwnerId 是房主（学生）的 id */
+export function roomOf(ws: CollabSocket) {
+  const ownerId = ws.data.roomOwnerId
+  return ownerId === undefined ? undefined : rooms.get(ownerId)
+}
+
 /** 仅供进程退出或测试用，正常路径不该调 */
 export function resetCollabState() {
   requests.clear()
   teachers.clear()
+  rooms.clear()
 }

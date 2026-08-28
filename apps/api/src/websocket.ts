@@ -63,7 +63,7 @@ export interface SubmissionSocketData {
   token: string
   /** 令牌桶，open 时初始化，见 allowMessage */
   rate?: { tokens: number; updatedAt: number }
-  /** 以下两项只有 kind === "collab" 时才填，握手时从会话里读 */
+  /** 握手时从会话里读，三种 kind 都会填；collab 通道用它判断老师身份、拼 room_open 里的姓名 */
   username?: string
   adminType?: string
   /** 当前所在协作房间的房主（学生）id，见 collab/handler.ts */

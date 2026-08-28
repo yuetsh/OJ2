@@ -71,7 +71,7 @@ export function queryInteger(
 // 任何角色（助教、家长……）都会**默认拿到管理员权限**，包括 canViewSubmission 里的
 //「看所有人代码」。加角色的人多半想不到要回来改这里，白名单则会默认拒绝。
 const ADMIN_ROLES = ["Student Admin", "Teacher Admin", "Super Admin"]
-const TEACHER_ROLES = ["Teacher Admin", "Super Admin"]
+export const TEACHER_ROLES = ["Teacher Admin", "Super Admin"]
 
 // 注意：不要再加 isRegularUser(user) 这类「是普通用户才受限」的判断 ——
 // 匿名用户 user 为 null 时它返回 false，守卫会整体短路，匿名的权限反而大于登录学生。
