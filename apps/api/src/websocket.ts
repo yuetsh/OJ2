@@ -55,14 +55,27 @@ export function isAllowedWebSocketOrigin(origin: string | null, url: URL) {
   )
 }
 
+interface RateBucket {
+  tokens: number
+  updatedAt: number
+}
+
 export interface SubmissionSocketData {
   userId: number
   /** 同一个 Bun.serve 只能挂一个 websocket handler，用它区分通道 */
   kind: "submissions" | "config" | "collab"
   /** 握手时那张会话的 token，留着定期确认它还没被登出 / 过期，见 sweepSessions */
   token: string
-  /** 令牌桶，open 时初始化，见 allowMessage */
-  rate?: { tokens: number; updatedAt: number }
+  /** 文本控制帧的令牌桶，open 时初始化，见 allowMessage */
+  rate?: RateBucket
+  /**
+   * collab 二进制帧的令牌桶，和 rate 分开。
+   *
+   * 共用一个桶的话宽松档名存实亡：每条文本帧（含 30 秒一次的心跳）都会
+   * `Math.min(RATE_BURST, ...)` 把桶压回 20，二进制帧再怎么标 200 突发也拿不到。
+   * 实测连打 150 帧会在第 101 帧被 1008 踢下线。
+   */
+  binaryRate?: RateBucket
   /** 握手时从会话里读，三种 kind 都会填；collab 通道用它判断老师身份、拼 room_open 里的姓名 */
   username?: string
   adminType?: string
@@ -89,19 +102,29 @@ const RATE_REFILL_PER_SECOND = 2
 const COLLAB_BINARY_BURST = 200
 const COLLAB_BINARY_REFILL_PER_SECOND = 100
 
-function allowMessage(
-  ws: Bun.ServerWebSocket<SubmissionSocketData>,
-  burst = RATE_BURST,
-  refillPerSecond = RATE_REFILL_PER_SECOND,
-) {
+function consume(bucket: RateBucket, burst: number, refillPerSecond: number) {
   const now = Date.now()
-  const rate = (ws.data.rate ??= { tokens: burst, updatedAt: now })
-  const refill = ((now - rate.updatedAt) / 1000) * refillPerSecond
-  rate.tokens = Math.min(burst, rate.tokens + refill)
-  rate.updatedAt = now
-  if (rate.tokens < 1) return false
-  rate.tokens -= 1
+  const refill = ((now - bucket.updatedAt) / 1000) * refillPerSecond
+  bucket.tokens = Math.min(burst, bucket.tokens + refill)
+  bucket.updatedAt = now
+  if (bucket.tokens < 1) return false
+  bucket.tokens -= 1
   return true
+}
+
+/** 文本帧：严格档。会查库，走这一档的都按最坏情况算 */
+function allowMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>) {
+  const bucket = (ws.data.rate ??= { tokens: RATE_BURST, updatedAt: Date.now() })
+  return consume(bucket, RATE_BURST, RATE_REFILL_PER_SECOND)
+}
+
+/** collab 二进制帧：宽松档，独立的桶 —— 见 binaryRate 的注释 */
+function allowCollabBinary(ws: Bun.ServerWebSocket<SubmissionSocketData>) {
+  const bucket = (ws.data.binaryRate ??= {
+    tokens: COLLAB_BINARY_BURST,
+    updatedAt: Date.now(),
+  })
+  return consume(bucket, COLLAB_BINARY_BURST, COLLAB_BINARY_REFILL_PER_SECOND)
 }
 
 /**
@@ -190,6 +213,7 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       liveSockets.add(ws)
       ws.data.rate = { tokens: RATE_BURST, updatedAt: Date.now() }
       if (ws.data.kind === "collab") {
+        ws.data.binaryRate = { tokens: COLLAB_BINARY_BURST, updatedAt: Date.now() }
         handleCollabOpen(ws)
         return
       }
@@ -203,7 +227,7 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
     message(ws, message) {
       if (ws.data.kind === "collab") {
         if (typeof message !== "string") {
-          if (!allowMessage(ws, COLLAB_BINARY_BURST, COLLAB_BINARY_REFILL_PER_SECOND)) {
+          if (!allowCollabBinary(ws)) {
             ws.close(1008, "Too many messages")
             return
           }
