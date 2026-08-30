@@ -40,12 +40,34 @@ function serializeRequest(request: HelpRequest) {
   }
 }
 
+/**
+ * 把最新的排队位置推给每个还在等的学生。
+ *
+ * queueAhead 原来只在「建请求 / 重连 / 退回排队」这三处推过，前面的人被接走或被
+ * 取消之后不重算 —— 五个人排队、前四个都处理完了，第五个还一直显示「前面还有 4 人」。
+ */
+function broadcastQueuePositions() {
+  for (const request of listRequests()) {
+    if (request.status !== "pending") continue
+    sendHelpStatus(request.socket, "pending", {
+      queueAhead: queueAheadOf(request.studentId),
+    })
+  }
+}
+
+/**
+ * 队列变了：老师端收全量列表，排队中的学生各自收自己的新位置。
+ *
+ * 两件事捏在一起是因为它们永远同时发生 —— 拆成两个函数分别调，迟早会在某条
+ * 路径上漏掉一个。
+ */
 export function broadcastRequests() {
   const payload = JSON.stringify({
     type: "requests",
     list: listRequests().map(serializeRequest),
   })
   for (const ws of teacherSockets()) ws.send(payload)
+  broadcastQueuePositions()
 }
 
 function sendHelpStatus(
@@ -77,12 +99,32 @@ export function handleCollabOpen(ws: CollabSocket) {
 
   const room = getRoom(ws.data.userId)
   if (room && room.studentSocket !== ws) {
-    // 旧 socket 不再是这间房的主人：清掉它的 roomOwnerId，不然它稍后触发的
-    // close 会经 roomOf 认出这间刚刚转移出去的房间，把它拆了——一条早该
-    // 死透的连接反而有权拆掉正在用的新连接的房间
+    // 协作中的学生换了一条连接。**不迁移房间，直接拆掉。**
+    //
+    // 原来这里是把 studentSocket 换成新连接就算完，转发确实转到新连接了，
+    // 但客户端接不住：前端每次连接建立都会把 room 清成 null（旧连接的状态
+    // 不该越过重连活下来），而这里只补发了 help_status，没补 room_open ——
+    // 于是学生页面显示「老师正在帮你」、编辑器却早就把 yCollab 摘了，
+    // 老师照常敲字、一个字也到不了对面。正是 handleCollabBinary 注释里说的
+    // 「看起来在协作、其实各看各的」，比老实断开更糟。
+    //
+    // 而补发 room_open 也修不好：Yjs 的文档状态跟着旧连接一起没了，新连接
+    // 只能新建 Y.Doc，再拿学生编辑器里的内容当种子插进去，就会和老师那份
+    // 已有内容合并成重复文本（两份 doc 的 item 身份不同，CRDT 不去重）。
+    // 续接一个 CRDT 会话不是哑转发层做得到的事。
+    //
+    // 所以退回排队，老师再点一次 —— 和老师掉线走的是同一条路子。学生的代码
+    // 一直在他自己的编辑器里，不受影响。
+    closeRoom(room.studentId)
     room.studentSocket.data.roomOwnerId = undefined
-    room.studentSocket = ws
-    ws.data.roomOwnerId = ws.data.userId
+    room.teacherSocket.data.roomOwnerId = undefined
+    room.teacherSocket.send(
+      JSON.stringify({ type: "room_closed", reason: "peer_offline" }),
+    )
+    request.status = "pending"
+    request.teacherId = undefined
+    request.teacherName = undefined
+    broadcastRequests()
   }
 
   if (request.status === "pending") {

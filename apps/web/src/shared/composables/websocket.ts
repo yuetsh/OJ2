@@ -737,6 +737,21 @@ export interface CollabMessage extends WebSocketMessage {
 export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
   private binaryHandler: ((data: ArrayBuffer) => void) | null = null
   private connectHandler: (() => void) | null = null
+  /**
+   * 还没装 handler 时先收着的二进制帧。
+   *
+   * room_open 是两端同时收到的，但两端把 yCollab 挂上去的时刻并不同步：
+   * 教师端要等模态框挂出 CodeMirror，学生端要等 y* 那几个 chunk 下载完。
+   * 谁先挂好谁就先发 SyncStep1，而对面这时还没有 handler ——
+   * 服务端只管转发（peer.send() 是成功的），帧就在客户端这儿被静静丢掉了。
+   *
+   * 丢的偏偏是握手：y-protocols 里 A 的内容是靠 **B 发的 Step1** 换回来的。
+   * 教师的 Step1 一丢，学生的代码就永远到不了教师那边 —— 教师看到空编辑器，
+   * 自己敲的字倒是能同步过去，看着像在协作，实际上只有单向。
+   *
+   * 所以在这儿缓一手，等 setBinaryHandler 装上再按序放行。
+   */
+  private pendingBinary: ArrayBuffer[] = []
 
   constructor() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
@@ -745,6 +760,14 @@ export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
 
   setBinaryHandler(handler: ((data: ArrayBuffer) => void) | null) {
     this.binaryHandler = handler
+    if (!handler) {
+      // 协作结束：攒下的帧属于上一轮，放到下一轮去只会污染新文档
+      this.pendingBinary = []
+      return
+    }
+    const buffered = this.pendingBinary
+    this.pendingBinary = []
+    for (const data of buffered) handler(data)
   }
 
   /**
@@ -757,11 +780,22 @@ export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
     this.connectHandler = handler
   }
 
+  /** 一轮握手也就几帧，给个上限纯粹是防呆：真堆到这个数说明哪里不对 */
+  private static readonly MAX_PENDING_BINARY = 64
+
   protected override onBinary(data: ArrayBuffer) {
-    this.binaryHandler?.(data)
+    if (this.binaryHandler) {
+      this.binaryHandler(data)
+      return
+    }
+    if (this.pendingBinary.length < CollabWebSocket.MAX_PENDING_BINARY) {
+      this.pendingBinary.push(data)
+    }
   }
 
   protected override onConnected() {
+    // 新连接，旧连接攒下的帧一概作废
+    this.pendingBinary = []
     this.connectHandler?.()
   }
 }
