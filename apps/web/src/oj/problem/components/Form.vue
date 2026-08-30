@@ -58,6 +58,8 @@ const showHelpButton = computed(
     isDesktop.value &&
     userStore.isAuthed &&
     !userStore.isTeacherOrAbove &&
+    // 演示模式下协作通道是断开的（见 App.vue），按钮点了也没人收
+    !userStore.demoMode &&
     codeStore.code.language !== "Flowchart" &&
     !isContestMode.value,
 )
@@ -73,14 +75,6 @@ const toggleHelp = () => {
   else if (collabStore.helpStatus === "idle")
     collabStore.requestHelp(problem.value!._id)
 }
-
-// 服务端的一次性提示（没有老师在线、老师取消了求助）
-watch(
-  () => collabStore.notice,
-  (text) => {
-    if (text) message.info(collabStore.consumeNotice())
-  },
-)
 
 const showGoSubmissionButton = computed(() => {
   if (isContestMode.value) return true

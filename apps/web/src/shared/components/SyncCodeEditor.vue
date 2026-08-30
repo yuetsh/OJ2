@@ -68,8 +68,17 @@ interface EditorReadyPayload {
 // 项目里旧的 sync.ts 用的是裸变量，同一个道理，这里换成 shallowRef 规避。
 const editorView = shallowRef<EditorView | null>(null)
 
+const bind = (view: EditorView) => {
+  if (collabStore.isTeacher || !collabStore.room) return
+  // 学生端：当前编辑器内容就是内容源
+  start({ editorView: view, seedContent: view.state.doc.toString() })
+}
+
 const handleEditorReady = (payload: EditorReadyPayload) => {
   editorView.value = payload.view
+  // 也从这里起：学生排队时切去看提交记录、老师在这期间接了单，
+  // 等他切回来时 room 早就非空了，只靠下面的 watch 是等不到的
+  bind(payload.view)
 }
 
 // 房间开了才建文档。学生点求助时什么都不做 —— 老师没来之前不该动他的编辑器。
@@ -82,19 +91,19 @@ const handleEditorReady = (payload: EditorReadyPayload) => {
 watch(
   () => collabStore.room,
   (room) => {
-    if (room && !collabStore.isTeacher && editorView.value) {
-      // 学生端：当前编辑器内容就是内容源
-      start({
-        editorView: editorView.value,
-        seedContent: editorView.value.state.doc.toString(),
-      })
-    } else {
-      stop()
-    }
+    if (room && !collabStore.isTeacher && editorView.value) bind(editorView.value)
+    else stop()
   },
 )
 
-onUnmounted(stop)
+onUnmounted(() => {
+  stop()
+  // 这个组件卸载意味着编辑器没了（切走页面、或者把语言切成流程图），
+  // CRDT 会话没法接着用：回来时只能新建 Y.Doc，再拿编辑器内容当种子就会和
+  // 老师那份合并成重复文本。所以不是"悄悄把绑定拆了"，而是明确结束协作 ——
+  // 否则老师那边模态框照开、字照敲，一个也到不了学生那里
+  if (collabStore.room && !collabStore.isTeacher) collabStore.leave()
+})
 </script>
 
 <template>

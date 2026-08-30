@@ -26,11 +26,17 @@ useConfigUpdate()
 useMaxKB()
 
 // 课堂求助通道。和 /ws/config 一样是全局常驻的：老师可能正在后台改题时
-// 收到求助，学生也要在排队期间一直挂着，所以不放在题目页里起落
+// 收到求助，学生也要在排队期间一直挂着，所以不放在题目页里起落。
+//
+// 演示模式下整个关掉。它是超管把界面伪装成学生用来投屏的，而服务端只认库里的
+// 真实身份：连着的话这个人会被算进「在线老师」，学生因此拿到 pending 而不是
+// no_teacher，排队等一个顶栏里根本没有求助列表的人；反过来他自己看到的求助
+// 按钮点下去，服务端回的是「教师不能发起求助」。两头都不对，索性对演示模式
+// 关闭这个功能（Form.vue 的按钮同步隐藏）。
 watch(
-  () => userStore.isAuthed,
-  (isAuthed) => {
-    if (isAuthed) collabStore.connect()
+  () => userStore.isAuthed && !userStore.demoMode,
+  (available) => {
+    if (available) collabStore.connect()
     else collabStore.disconnect()
   },
   { immediate: true },

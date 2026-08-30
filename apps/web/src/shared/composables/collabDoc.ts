@@ -32,8 +32,21 @@ export function useCollabDoc() {
   let view: EditorView | null = null
   let detachDocUpdate: (() => void) | null = null
   let detachAwarenessUpdate: (() => void) | null = null
+  /**
+   * 会话代号。每次 start / stop 都推进一格。
+   *
+   * start 要 await 六个动态 import，房间可能在这期间就关了（机房首次加载
+   * y* 那几个 chunk 正是最慢的时候）。stop() 先跑完的话它面对的是 doc === null，
+   * 什么也拆不到；等 import 回来 start 的后半段照样建文档、装 binaryHandler、
+   * 往编辑器里挂 yCollab、还发一轮 SyncStep1 —— 给一个已经不存在的房间。
+   */
+  let generation = 0
 
   async function start({ editorView, seedContent }: StartOptions) {
+    // 已经有一份在跑就先收掉。重复 start 只可能来自时序竞争，叠加没有意义
+    if (doc) stop()
+    const myGeneration = ++generation
+
     const [Y, awarenessProtocol, syncProtocol, encoding, decoding, { yCollab }] =
       await Promise.all([
         import("yjs"),
@@ -43,6 +56,9 @@ export function useCollabDoc() {
         import("lib0/decoding"),
         import("y-codemirror.next"),
       ])
+
+    // 等 chunk 的这段时间里房间关了（或者又开了新的一轮），整个放弃
+    if (myGeneration !== generation) return
 
     view = editorView
     doc = new Y.Doc()
@@ -131,6 +147,7 @@ export function useCollabDoc() {
   }
 
   function stop() {
+    generation += 1
     collabStore.setBinaryHandler(null)
     detachDocUpdate?.()
     detachAwarenessUpdate?.()
