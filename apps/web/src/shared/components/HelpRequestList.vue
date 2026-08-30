@@ -33,7 +33,7 @@ const handleAccept = (studentId: number, status: string) => {
     <template #trigger>
       <n-badge :value="collabStore.pendingCount" :max="99">
         <n-button>
-          <Icon icon="fluent-emoji:raising-hand" height="20" />
+          <Icon icon="streamline-emojis:raising-hands-2" height="20" />
           <span style="padding-left: 8px">求助</span>
         </n-button>
       </n-badge>
