@@ -10,6 +10,16 @@ import { paginatedSchema, sampleUserSchema } from "./common"
 export const problemDifficultySchema = z.enum(["Low", "Mid", "High"])
 
 /**
+ * 题目详情/列表里的难度。**可为 null** —— 比赛进行中、看的人又不是管理员时，
+ * 难度和提交数一样属于「先别告诉参赛者」的信息（旧 Django 的
+ * `ProblemSafeSerializer` 直接把 difficulty 放进 exclude，字段整个不下发）。
+ *
+ * 端上必须当「没有」处理，不要拿它去查 DIFFICULTY 映射表 —— 这正是
+ * problemDifficultySchema 写成严格枚举要防的那件事。
+ */
+export const maskedProblemDifficultySchema = problemDifficultySchema.nullable()
+
+/**
  * SQL 题配置与展示数据。两者都是 `problem.sql_config` / `problem.sql_display`
  * 的 **JSONB 原文**，所以键名保持 snake_case —— 生产库 9 道 SQL 题存的就是这个形状
  * （移植自旧后端 `judge/sql_runner.py:build_display`，逐条比对过，键集完全一致）。
@@ -292,7 +302,7 @@ export const problemDetailSchema = z.object({
   lastUpdateTime: z.string().nullable(),
   timeLimit: z.number().int(),
   memoryLimit: z.number().int(),
-  difficulty: problemDifficultySchema,
+  difficulty: maskedProblemDifficultySchema,
   source: z.string().nullable(),
   prompt: z.string().nullable(),
   submissionNumber: z.number().int(),
@@ -327,7 +337,7 @@ export const problemListItemSchema = z.object({
   title: z.string(),
   submissionNumber: z.number().int(),
   acceptedNumber: z.number().int(),
-  difficulty: problemDifficultySchema,
+  difficulty: maskedProblemDifficultySchema,
   createdBy: sampleUserSchema,
   tags: z.array(z.string()),
   contestId: z.number().int().nullable(),

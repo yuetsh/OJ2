@@ -8,7 +8,7 @@ export function filterResult(result: ProblemListItem): ProblemFiltered {
     id: result.id,
     _id: result._id,
     title: result.title,
-    difficulty: DIFFICULTY[result.difficulty],
+    difficulty: result.difficulty ? DIFFICULTY[result.difficulty] : null,
     tags: result.tags,
     submission: result.submissionNumber,
     rate: getACRate(result.acceptedNumber, result.submissionNumber),

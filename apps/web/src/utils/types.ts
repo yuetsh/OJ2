@@ -176,7 +176,8 @@ export interface ProblemFiltered {
   _id: string
   id: number
   title: string
-  difficulty: "简单" | "中等" | "困难"
+  // 比赛进行中难度不下发，见 contract 的 maskedProblemDifficultySchema
+  difficulty: "简单" | "中等" | "困难" | null
   tags: string[]
   submission: number
   rate: string

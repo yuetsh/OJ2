@@ -173,7 +173,9 @@ const baseColumns: DataTableColumn<ProblemFiltered>[] = [
     key: "difficulty",
     width: 100,
     render: (row) =>
-      h(NTag, { type: getTagColor(row.difficulty) }, () => row.difficulty),
+      row.difficulty
+        ? h(NTag, { type: getTagColor(row.difficulty) }, () => row.difficulty)
+        : null,
   },
   {
     title: renderTableTitle("标签", "streamline-ultimate-color:attachment"),

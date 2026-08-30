@@ -54,6 +54,7 @@ function handleProblemClick(problemId: string) {
 
               <n-flex align="center" size="small">
                 <n-tag
+                  v-if="problemSetProblem.problem.difficulty"
                   :type="getTagColor(problemSetProblem.problem.difficulty)"
                   size="small"
                 >

@@ -121,7 +121,8 @@ onMounted(() => {
     <n-descriptions-item label="创建时间">
       {{ parseTime(problem.createTime) }}
     </n-descriptions-item>
-    <n-descriptions-item label="难度">
+    <!-- 比赛进行中，难度不下发（difficulty 为 null），这一项整个不显示 -->
+    <n-descriptions-item v-if="problem.difficulty" label="难度">
       <n-tag :type="getTagColor(problem.difficulty)">
         {{ DIFFICULTY[problem.difficulty] }}
       </n-tag>
