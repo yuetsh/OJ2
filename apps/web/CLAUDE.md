@@ -41,8 +41,8 @@ Each feature module (under `oj/` or `admin/`) typically has:
 - `api.ts` — API calls specific to the feature
 
 Shared logic lives in `shared/`:
-- `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `screenMode` (problem split-screen layout), `loginSummary` (AI activity summary)
-- `composables/` — `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `sync` (Yjs/y-webrtc for collaborative editing), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `breakpoints`, `maxkb`
+- `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `screenMode` (problem split-screen layout), `loginSummary` (AI activity summary), `collab` (help-request queue + collab room)
+- `composables/` — `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `breakpoints`, `maxkb`
 - `layout/` — `default.vue` and `admin.vue` layout wrappers
 - `api.ts` — shared API calls (auth, profile, tags, captcha)
 
@@ -94,7 +94,6 @@ Variables prefixed with `PUBLIC_` are injected at build time. Env files: `.env`,
 | `PUBLIC_CODE_URL` | Code execution service |
 | `PUBLIC_JUDGE0_URL` | Judge0 API |
 | `PUBLIC_MAXKB_URL` | Knowledge base service |
-| `PUBLIC_SIGNALING_URL` | WebRTC signaling server |
 | `PUBLIC_ICONIFY_URL` | Iconify icon CDN |
 
 ### Routing
@@ -107,7 +106,10 @@ Routes are defined in `src/routes.ts` with two root routes: `ojs` (user-facing) 
 ### Real-time Features
 
 - WebSocket via composable in `shared/composables/` for submission status updates
-- Yjs + y-webrtc for collaborative editing in the flowchart editor
+- Yjs over the `/ws/collab` channel for classroom help requests and collaborative
+  code editing (students raise a hand, teachers join their editor). The server is a
+  dumb relay — it authenticates, assigns rooms, and forwards frames without parsing
+  them. See `docs/specs/2026-08-28-collab-help-request-design.md`.
 
 ## Related Repository
 
