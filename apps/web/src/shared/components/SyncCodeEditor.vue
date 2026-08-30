@@ -24,7 +24,6 @@ const collabStore = useCollabStore()
 const { start, stop, getInitialExtension } = useCollabDoc()
 
 interface Props {
-  problem: string
   language?: LANGUAGE
   fontSize?: number
   height?: string

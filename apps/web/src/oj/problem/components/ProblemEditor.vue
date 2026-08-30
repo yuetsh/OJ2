@@ -80,7 +80,6 @@ provide("flowchartEditorRef", flowchartEditorRef)
     <SyncCodeEditor
       v-else
       v-model:value="codeStore.code.value"
-      :problem="problem!._id"
       :language="codeStore.code.language"
       :height="editorHeight"
       @update:model-value="changeCode"
