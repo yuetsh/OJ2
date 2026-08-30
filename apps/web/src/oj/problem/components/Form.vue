@@ -64,16 +64,39 @@ const showHelpButton = computed(
     !isContestMode.value,
 )
 
+/**
+ * 状态全塞进按钮本身。原来旁边还挂一个 n-tag 说明排队情况，一行工具栏
+ * （语言 / 提交 / 提交信息 / 课堂统计 / 更多操作 / 求助）在 1280 的机房屏上放不下。
+ */
 const helpButtonText = computed(() => {
-  if (collabStore.helpStatus === "active") return "老师正在帮你"
-  if (collabStore.helpStatus === "pending") return "取消求助"
+  if (collabStore.helpStatus === "active") {
+    const name = collabStore.teacherName
+    return name ? `${name} 老师帮你中` : "老师正在帮你"
+  }
+  if (collabStore.helpStatus === "pending") {
+    return collabStore.queueAhead > 0
+      ? `已求助 · 前面 ${collabStore.queueAhead} 人`
+      : "已求助 · 待接入"
+  }
   return "求助"
 })
+
+const helpButtonType = computed(() => {
+  if (collabStore.helpStatus === "active") return "success"
+  if (collabStore.helpStatus === "pending") return "warning"
+  return "default"
+})
+
+// 排队中点一下就是取消，这句话再挤进 label 就太长了，挂在原生 title 上。
+// active 时按钮是 disabled，浏览器不会给 disabled 元素显示 title，所以不放
+const helpButtonTitle = computed(() =>
+  collabStore.helpStatus === "pending" ? "点击取消求助" : undefined,
+)
 
 const toggleHelp = () => {
   if (collabStore.helpStatus === "pending") collabStore.cancelHelp()
   else if (collabStore.helpStatus === "idle")
-    collabStore.requestHelp(problem.value!._id)
+    collabStore.requestHelp(problem.value!._id, codeStore.code.language)
 }
 
 const showGoSubmissionButton = computed(() => {
@@ -251,23 +274,16 @@ onMounted(() => {
       <n-button :size="buttonSize">更多操作</n-button>
     </n-dropdown>
 
-    <template v-if="showHelpButton">
-      <n-button
-        :size="buttonSize"
-        :type="collabStore.helpStatus === 'idle' ? 'default' : 'warning'"
-        :disabled="collabStore.helpStatus === 'active'"
-        @click="toggleHelp"
-      >
-        {{ helpButtonText }}
-      </n-button>
-
-      <n-tag v-if="collabStore.helpStatus === 'pending'" type="info">
-        已求助{{ collabStore.queueAhead > 0 ? `，前面还有 ${collabStore.queueAhead} 人` : "，等待老师接入" }}
-      </n-tag>
-      <n-tag v-else-if="collabStore.helpStatus === 'active'" type="success">
-        {{ collabStore.teacherName }} 老师正在帮你
-      </n-tag>
-    </template>
+    <n-button
+      v-if="showHelpButton"
+      :size="buttonSize"
+      :type="helpButtonType"
+      :disabled="collabStore.helpStatus === 'active'"
+      :title="helpButtonTitle"
+      @click="toggleHelp"
+    >
+      {{ helpButtonText }}
+    </n-button>
   </n-flex>
 
   <n-modal

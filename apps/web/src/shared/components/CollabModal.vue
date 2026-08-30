@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { cpp } from "@codemirror/lang-cpp"
 import { bracketMatching } from "@codemirror/language"
-import { closeBrackets } from "@codemirror/autocomplete"
+import {
+  autocompletion,
+  closeBrackets,
+  completeAnyWord,
+} from "@codemirror/autocomplete"
 import type { EditorView } from "@codemirror/view"
 import { Codemirror } from "vue-codemirror"
+import type { LANGUAGE } from "utils/types"
 import { oneDark } from "../themes/oneDark"
 import { smoothy } from "../themes/smoothy"
 import { styleTheme } from "shared/extensions/baseTheme"
+import { enhanceCompletion } from "shared/extensions/autocompletion"
+import { languageExtension } from "shared/extensions/language"
 import { useCollabDoc } from "../composables/collabDoc"
 import { useCollabStore } from "shared/store/collab"
 
@@ -26,12 +32,25 @@ const show = computed({
   },
 })
 
+/**
+ * 语言跟着学生走：room_open 带过来，学生协作期间切语言会再来一条 room_language。
+ * 取不到时按 C —— 和这里原来写死 cpp() 的表现一致。
+ */
+const language = computed<LANGUAGE>(() => collabStore.room?.language ?? "C")
+
 const extensions = computed(() => [
   styleTheme,
-  cpp(),
+  languageExtension(language.value),
   bracketMatching(),
   closeBrackets(),
   isDark.value ? oneDark : smoothy,
+  // 学生端有的补全这里必须也有：老师是在替学生写代码，缺了下拉菜单只能盲敲。
+  // 数组一变 vue-codemirror 会整体 reconfigure，但 collabDoc 那个 compartment
+  // 的内容会被 CM6 沿用（@codemirror/state 的 flatten 里 `compartments.get() ||
+  // ext.inner`），所以切语言、切主题都不会把 yCollab 弄掉
+  autocompletion({
+    override: [enhanceCompletion(language.value), completeAnyWord],
+  }),
   getInitialExtension(),
 ])
 
@@ -80,7 +99,7 @@ onUnmounted(() => {
     v-model:show="show"
     preset="card"
     :style="{ width: '80vw', maxWidth: '1100px' }"
-    :title="`正在帮 ${collabStore.room?.peerName ?? ''} · ${collabStore.room?.problemId ?? ''}`"
+    :title="`正在帮 ${collabStore.room?.peerName ?? ''} · ${collabStore.room?.problemId ?? ''} · ${language}`"
   >
     <template #header-extra>
       <n-button

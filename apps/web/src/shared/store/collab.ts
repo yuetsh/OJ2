@@ -4,6 +4,7 @@ import {
   type CollabRequestItem,
 } from "shared/composables/websocket"
 import { useUserStore } from "shared/store/user"
+import type { LANGUAGE } from "utils/types"
 
 export type HelpStatus = "idle" | "pending" | "active"
 
@@ -11,6 +12,8 @@ export interface RoomInfo {
   peerName: string
   peerRole: "student" | "teacher"
   problemId: string
+  /** 学生编辑器的语言。教师端的弹框按它选高亮和补全 */
+  language: LANGUAGE
 }
 
 /**
@@ -98,7 +101,12 @@ export const useCollabStore = defineStore("collab", () => {
           peerName: String(data.peer?.name ?? ""),
           peerRole: data.peer?.role === "teacher" ? "teacher" : "student",
           problemId: String(data.problemId ?? ""),
+          language: (data.language as LANGUAGE) ?? "C",
         }
+        return
+      case "room_language":
+        // 学生在协作期间切了语言。只有教师端收得到这条
+        if (room.value) room.value.language = (data.language as LANGUAGE) ?? "C"
         return
       case "room_closed":
         // 不管 reason 一律先归位到 idle：学生这一侧的 socket 发送失败时，
@@ -149,8 +157,17 @@ export const useCollabStore = defineStore("collab", () => {
     notice.value = ""
   }
 
-  function requestHelp(problemId: string) {
-    ws.send({ type: "help_request", problemId })
+  function requestHelp(problemId: string, language: LANGUAGE) {
+    ws.send({ type: "help_request", problemId, language })
+  }
+
+  /**
+   * 求助期间换了语言。老师那边的高亮和补全按这个值选，不同步过去他就只能对着
+   * 建房那一刻的语言给学生写代码。idle 时不发 —— 服务端压根没有这条求助记录。
+   */
+  function updateLanguage(language: LANGUAGE) {
+    if (helpStatus.value === "idle") return
+    ws.send({ type: "help_language", language })
   }
 
   function cancelHelp() {
@@ -198,6 +215,7 @@ export const useCollabStore = defineStore("collab", () => {
     connect,
     disconnect,
     requestHelp,
+    updateLanguage,
     cancelHelp,
     accept,
     reject,

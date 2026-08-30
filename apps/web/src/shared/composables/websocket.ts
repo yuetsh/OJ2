@@ -726,6 +726,8 @@ export interface CollabMessage extends WebSocketMessage {
     | "requests"
     | "help_status"
     | "room_open"
+    // 协作期间学生换了语言，只发给教师端
+    | "room_language"
     | "room_closed"
     | "error"
 }

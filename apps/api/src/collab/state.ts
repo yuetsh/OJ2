@@ -8,6 +8,30 @@
 
 export type CollabSocket = Bun.ServerWebSocket<import("../websocket").SubmissionSocketData>
 
+/**
+ * 协作支持的语言。和前端 utils/types.ts 里的 LANGUAGE 对齐，去掉 Flowchart ——
+ * 流程图题没有代码编辑器，求助入口本身就是隐藏的。
+ */
+export const COLLAB_LANGUAGES = [
+  "C",
+  "C++",
+  "Python2",
+  "Python3",
+  "Java",
+  "JavaScript",
+  "Golang",
+  "SQL",
+] as const
+
+export type CollabLanguage = (typeof COLLAB_LANGUAGES)[number]
+
+/** 认不出来的一律当 C：老客户端不带这个字段，而它以前就是写死 C 的 */
+export function normalizeLanguage(value: unknown): CollabLanguage {
+  return (COLLAB_LANGUAGES as readonly string[]).includes(value as string)
+    ? (value as CollabLanguage)
+    : "C"
+}
+
 export interface HelpRequest {
   studentId: number
   studentName: string
@@ -15,6 +39,11 @@ export interface HelpRequest {
   /** 题目的展示号（problem._id 列，前端一路用的都是它），不是自增主键 */
   problemId: string
   problemTitle: string
+  /**
+   * 学生编辑器当前的语言。决定教师端弹框用哪套高亮和补全 —— 求助时带上，
+   * 协作期间学生切语言会用 help_language 更新这里
+   */
+  language: CollabLanguage
   createdAt: number
   status: "pending" | "active"
   teacherId?: number
@@ -83,6 +112,8 @@ export interface Room {
   studentSocket: CollabSocket
   teacherSocket: CollabSocket
   problemId: string
+  /** 建房那一刻学生的语言，之后跟着 help_language 走 */
+  language: CollabLanguage
 }
 
 const rooms = new Map<number, Room>()

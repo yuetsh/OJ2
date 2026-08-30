@@ -1,7 +1,4 @@
 <script lang="ts" setup>
-import { cpp } from "@codemirror/lang-cpp"
-import { python } from "@codemirror/lang-python"
-import { sql, SQLite } from "@codemirror/lang-sql"
 import { bracketMatching } from "@codemirror/language"
 import { Codemirror } from "vue-codemirror"
 import {
@@ -9,13 +6,13 @@ import {
   closeBrackets,
   completeAnyWord,
 } from "@codemirror/autocomplete"
-import type { Extension } from "@codemirror/state"
 import type { EditorView } from "@codemirror/view"
 import type { LANGUAGE } from "utils/types"
 import { oneDark } from "../themes/oneDark"
 import { smoothy } from "../themes/smoothy"
 import { styleTheme } from "shared/extensions/baseTheme"
 import { enhanceCompletion } from "shared/extensions/autocompletion"
+import { languageExtension } from "shared/extensions/language"
 import { useCollabDoc } from "../composables/collabDoc"
 import { useCollabStore } from "shared/store/collab"
 
@@ -40,11 +37,7 @@ const {
 } = defineProps<Props>()
 const code = defineModel<string>("value")
 
-const langExtension = computed((): Extension => {
-  if (language === "SQL")
-    return sql({ dialect: SQLite, upperCaseKeywords: true })
-  return ["Python2", "Python3"].includes(language) ? python() : cpp()
-})
+const langExtension = computed(() => languageExtension(language))
 
 const extensions = computed(() => [
   styleTheme,
@@ -93,6 +86,15 @@ watch(
   (room) => {
     if (room && !collabStore.isTeacher && editorView.value) bind(editorView.value)
     else stop()
+  },
+)
+
+// 求助期间切了语言：同步给老师，他那边的高亮和补全跟着换。
+// 教师端不发 —— 这个组件在教师自己的题目页上也挂着，他的语言和房间无关
+watch(
+  () => language,
+  (lang) => {
+    if (!collabStore.isTeacher) collabStore.updateLanguage(lang)
   },
 )
 

@@ -11,6 +11,7 @@ import {
   getRoom,
   hasTeacherOnline,
   listRequests,
+  normalizeLanguage,
   openRoom,
   queueAheadOf,
   removeRequest,
@@ -179,7 +180,12 @@ export function handleCollabClose(ws: CollabSocket) {
 }
 
 export async function handleCollabMessage(ws: CollabSocket, raw: string) {
-  let message: { type?: unknown; problemId?: unknown; studentId?: unknown }
+  let message: {
+    type?: unknown
+    problemId?: unknown
+    studentId?: unknown
+    language?: unknown
+  }
   try {
     message = JSON.parse(raw) as typeof message
   } catch {
@@ -201,7 +207,10 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
 
   switch (message.type) {
     case "help_request":
-      await handleHelpRequest(ws, message.problemId)
+      await handleHelpRequest(ws, message.problemId, message.language)
+      return
+    case "help_language":
+      handleHelpLanguage(ws, message.language)
       return
     case "help_cancel":
       handleHelpCancel(ws)
@@ -220,7 +229,11 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
   }
 }
 
-async function handleHelpRequest(ws: CollabSocket, problemId: unknown) {
+async function handleHelpRequest(
+  ws: CollabSocket,
+  problemId: unknown,
+  language: unknown,
+) {
   if (typeof problemId !== "string" || !problemId) {
     ws.send(JSON.stringify({ type: "error", message: "Invalid problemId" }))
     return
@@ -266,12 +279,36 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown) {
     className: student?.className ?? null,
     problemId,
     problemTitle: problem.title,
+    language: normalizeLanguage(language),
     createdAt: Date.now(),
     status: "pending",
     socket: ws,
   })
   sendHelpStatus(ws, "pending", { queueAhead: queueAheadOf(ws.data.userId) })
   broadcastRequests()
+}
+
+/**
+ * 学生在求助期间换了语言。
+ *
+ * 只更新语言，不动队列位置、不动房间 —— 换语言不该让他重新排队。已经在协作中的
+ * 话再推一条 room_language，老师端的高亮和补全立刻跟着换；不推的话老师会拿着
+ * 建房那一刻的语言，对着一套错的补全替学生写代码。
+ */
+function handleHelpLanguage(ws: CollabSocket, language: unknown) {
+  const request = getRequest(ws.data.userId)
+  // 比对 socket 归属：同账号的另一个标签页停在别的题上切语言，不该改这条求助
+  if (!request || request.socket !== ws) return
+  const next = normalizeLanguage(language)
+  if (request.language === next) return
+  request.language = next
+
+  const room = getRoom(ws.data.userId)
+  if (!room) return
+  room.language = next
+  room.teacherSocket.send(
+    JSON.stringify({ type: "room_language", language: next }),
+  )
 }
 
 function handleHelpCancel(ws: CollabSocket) {
@@ -341,6 +378,7 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
     studentSocket: request.socket,
     teacherSocket: ws,
     problemId: request.problemId,
+    language: request.language,
   })
 
   const openFrame = (peerName: string, peerRole: "student" | "teacher") =>
@@ -348,6 +386,7 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
       type: "room_open",
       peer: { name: peerName, role: peerRole },
       problemId: request.problemId,
+      language: request.language,
     })
   request.socket.send(openFrame(request.teacherName, "teacher"))
   ws.send(openFrame(request.studentName, "student"))
