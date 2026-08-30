@@ -32,8 +32,21 @@ export const useCollabStore = defineStore("collab", () => {
   const teacherName = ref("")
   /** 双方：当前房间。null 表示不在协作中 */
   const room = ref<RoomInfo | null>(null)
-  /** 一次性提示，由组件消费后清空 */
+  /** 一次性提示，由 Header 统一消费后清空 */
   const notice = ref("")
+  /**
+   * 提示序号，每次设置都自增。
+   *
+   * 消费方 watch 的是这个，不是 notice 本身：连着两次同样的文案（老师取消了
+   * 求助、学生又求助、又被取消）在 Vue 眼里 `===` 相等，watch(notice) 不会
+   * 第二次触发，第二条提示就这么没了。
+   */
+  const noticeSeq = ref(0)
+
+  function setNotice(text: string) {
+    notice.value = text
+    noticeSeq.value += 1
+  }
 
   const pendingCount = computed(
     () => requests.value.filter((it) => it.status === "pending").length,
@@ -74,10 +87,10 @@ export const useCollabStore = defineStore("collab", () => {
           teacherName.value = String(data.teacherName ?? "")
         } else if (data.status === "cancelled") {
           helpStatus.value = "idle"
-          notice.value = "老师已取消你的求助"
+          setNotice("老师已取消你的求助")
         } else if (data.status === "no_teacher") {
           helpStatus.value = "idle"
-          notice.value = "当前没有老师在线"
+          setNotice("当前没有老师在线")
         }
         return
       case "room_open":
@@ -97,11 +110,12 @@ export const useCollabStore = defineStore("collab", () => {
         // 这里先归零，那条 pending 补发会立刻把它纠正回来，不会被这次重置盖掉
         room.value = null
         helpStatus.value = "idle"
-        notice.value =
-          data.reason === "peer_offline" ? "对方已断开连接" : "协作已结束"
+        setNotice(
+          data.reason === "peer_offline" ? "对方已断开连接" : "协作已结束",
+        )
         return
       case "error":
-        notice.value = String(data.message ?? "")
+        setNotice(String(data.message ?? ""))
         return
     }
   }
@@ -179,6 +193,7 @@ export const useCollabStore = defineStore("collab", () => {
     teacherName,
     room,
     notice,
+    noticeSeq,
     isTeacher: computed(() => userStore.isTeacherOrAbove),
     connect,
     disconnect,

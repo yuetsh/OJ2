@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useLearnProgress } from "shared/composables/learnProgress"
 import { useAuthModalStore } from "shared/store/authModal"
+import { useCollabStore } from "shared/store/collab"
 import { useScreenModeStore } from "shared/store/screenMode"
 import { logout } from "../api"
 import CollabModal from "./CollabModal.vue"
@@ -14,6 +15,23 @@ import { trickOrTreat } from "utils/functions"
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
+const collabStore = useCollabStore()
+const message = useMessage()
+
+/**
+ * 课堂求助的一次性提示，统一在这里弹。
+ *
+ * 原来挂在题目页的 Form.vue 上：学生排着队切去看提交记录，老师这时候取消了
+ * 他的求助，那条「老师已取消你的求助」就永远没人消费。顶栏是全局的，放这儿
+ * 才收得全 —— 教师端的 error 提示（比如「请先退出当前协作」）同理。
+ */
+watch(
+  () => collabStore.noticeSeq,
+  () => {
+    const text = collabStore.consumeNotice()
+    if (text) message.info(text)
+  },
+)
 const authStore = useAuthModalStore()
 const screenModeStore = useScreenModeStore()
 const route = useRoute()
