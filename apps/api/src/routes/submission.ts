@@ -11,7 +11,7 @@ import {
   submissionListSchema,
   submissionStatisticsSchema,
 } from "@oj2/contract"
-import { and, count, desc, eq, ilike, inArray, isNull, sql, type SQL } from "drizzle-orm"
+import { and, count, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
 
 import {
@@ -371,16 +371,67 @@ submissionRoutes.post("/code/format", requireAuth, async (c) => {
   }
 })
 
+/**
+ * 题单防作弊闸门：查出这些题目里，哪些题的旧提交要对该用户藏起来，返回 problemId → 加入时间。
+ *
+ * 对齐旧后端 `submission/serializers.py:12` 的 `bulk_fetch_problemset_progress`。学生加入含
+ * 某道题的题单后，他在加入之前留下的 AC 代码还摆在提交列表里，复制粘贴就能把题单刷完。
+ * 备份快照里 1734 人次、188 名学生进过这个窗口（占已解题次的 22.5%），不是边角情况。
+ *
+ * 解锁的三条路全写在 where 里，任一成立就查不出来、也就不遮挡：
+ *   - 已经在题单里做出这道题（progress_detail 里有这道题的 key）
+ *   - 题单过了截止时间（end_time；为空表示不设期限，只能靠做出来解锁）
+ *   - 题单被归档（status 不是 active）
+ *
+ * 一道题可能同时落在多个已加入的题单里，取最晚的 join_time——「存在任一题单要求遮挡就遮挡」
+ * 等价于「提交时间早于最晚的那次加入」。旧后端这里用 `.first()` 取任意一条，一题多题单时
+ * 行为不确定，换成聚合顺手定死。
+ */
+async function problemSetJoinTimes(userId: number, problemIds: number[]) {
+  const joinTimes = new Map<number, string>()
+  if (problemIds.length === 0) return joinTimes
+  const rows = await db
+    .select({
+      problemId: schema.problemsetProblem.problemId,
+      // ::text 是为了拿回和 mode:"string" 列同样形状的字符串——聚合表达式不走列的类型映射，
+      // 不加这个 cast 驱动会把 timestamptz 解析成 Date，下游的 Date.parse 就接不住了
+      joinTime: sql<string>`max(${schema.problemsetProgress.joinTime})::text`,
+    })
+    .from(schema.problemsetProgress)
+    .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProgress.problemsetId))
+    .innerJoin(schema.problemsetProblem, eq(schema.problemsetProblem.problemsetId, schema.problemset.id))
+    .where(and(
+      eq(schema.problemsetProgress.userId, userId),
+      inArray(schema.problemsetProblem.problemId, problemIds),
+      eq(schema.problemset.status, "active"),
+      or(isNull(schema.problemset.endTime), gt(schema.problemset.endTime, sql`now()`)),
+      sql`not jsonb_exists(${schema.problemsetProgress.progressDetail}, ${schema.problemsetProblem.problemId}::text)`,
+    ))
+    .groupBy(schema.problemsetProblem.problemId)
+  for (const row of rows) joinTimes.set(row.problemId, row.joinTime)
+  return joinTimes
+}
+
 // 参数按「实际用到的字段」声明，而不是整行 $inferSelect：列表接口只 select 需要的列，
 // 传不进完整行。完整行在结构上满足这两个窄类型，详情接口照旧调用不受影响。
 function canViewSubmission(
   user: AuthUser | null,
-  row: { userId: number; shared: boolean },
+  row: { userId: number; shared: boolean; problemId: number; createTime: string },
   problem: { createdById: number; shareSubmission: boolean },
   contest: typeof schema.contest.$inferSelect | null,
   allowShared = true,
+  problemSetJoinTime?: Map<number, string>,
 ) {
   if (!user) return false
+  // 题单防作弊，见 problemSetJoinTimes。只对学生自己的提交生效，管理员不受限，对齐旧后端
+  // `get_show_link` 里的 `obj.user_id == self.user.id and self.user.is_regular_user()`。
+  //
+  // 只挡「看代码」这一路，不挡 allowShared=false 的那一路：后者是分享/取消分享的归属校验，
+  // 与作弊无关，挡了会让学生连自己旧提交的分享开关都动不了。
+  if (allowShared && row.userId === user.id && !isAdminRole(user)) {
+    const joinTime = problemSetJoinTime?.get(row.problemId)
+    if (joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)) return false
+  }
   if (row.userId === user.id || isAdminRole(user) || problem.createdById === user.id) return true
   if (!allowShared) return false
   if (contest && contestStatus(contest) !== "-1") return false
@@ -398,6 +449,8 @@ const submissionListColumns = {
     id: schema.submission.id,
     createTime: schema.submission.createTime,
     userId: schema.submission.userId,
+    // 题单闸门要按题定位，序列化本身用不到它
+    problemId: schema.submission.problemId,
     username: schema.submission.username,
     result: schema.submission.result,
     language: schema.submission.language,
@@ -418,7 +471,13 @@ async function submissionDetail(id: string, user: AuthUser) {
     .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     .leftJoin(schema.contest, eq(schema.submission.contestId, schema.contest.id))
     .where(eq(schema.submission.id, id)).limit(1)
-  if (!row || !canViewSubmission(user, row.submission, row.problem, row.contest)) return null
+  if (!row) return null
+  // 详情也要过闸门。旧后端只挡了列表里的链接，`SubmissionAPI.get`（views/oj.py:103）
+  // 光走 check_user_permission——知道 submission id 直接访问照样拿得到代码，遮挡是虚的。
+  const joinTimes = isAdminRole(user) || row.submission.userId !== user.id
+    ? undefined
+    : await problemSetJoinTimes(user.id, [row.submission.problemId])
+  if (!canViewSubmission(user, row.submission, row.problem, row.contest, true, joinTimes)) return null
   // info（含每个测试点的 test_case 编号与 output_md5）与 ip 只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer(exclude=("info", "contest", "ip")) 之间二选一，
@@ -531,12 +590,18 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
     totalQuery,
     paginateSubmissionRows(where, limit, offset, Boolean(displayId)),
   ])
+  // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
+  const joinTimes = user && !isAdminRole(user)
+    ? await problemSetJoinTimes(user.id, [...new Set(
+        rows.filter((row) => row.submission.userId === user.id).map((row) => row.submission.problemId),
+      )])
+    : undefined
   return success(c, submissionListSchema.parse({
     results: rows.map(({ submission, problem }) => submissionListItemSchema.parse({
       id: submission.id,
       problem: problem.displayId,
       problemTitle: problem.title,
-      showLink: user ? canViewSubmission(user, submission, problem, null) : false,
+      showLink: user ? canViewSubmission(user, submission, problem, null, true, joinTimes) : false,
       createTime: submission.createTime,
       userId: submission.userId,
       username: submission.username,
@@ -576,6 +641,10 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
       .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
       .orderBy(desc(schema.submission.createTime)).limit(limit).offset(offset),
   ])
+  // 这里不挂题单防作弊闸门（对比公开列表）：题单里的题必定是非比赛题——加题时卡了
+  // `isNull(problem.contestId)`（admin/problemset.ts:232）——而这条列表只出比赛提交，
+  // 两边交集恒空，挂上去就是每页白跑一次查询，而比赛进行中这条列表是被刷得最狠的。
+  // 旧后端 ContestSubmissionListAPI 照抄了 bulk_fetch，那边同样是死代码。
   return success(c, submissionListSchema.parse({
     results: rows.map(({ submission, problem }) => submissionListItemSchema.parse({
       id: submission.id,
