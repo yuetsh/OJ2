@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import { paginatedSchema, sampleUserSchema } from "./common"
-import { problemListItemSchema } from "./problem"
+import { maskedProblemDifficultySchema } from "./problem"
 
 export const problemSetUserProgressSummarySchema = z.object({
   isJoined: z.boolean(),
@@ -41,10 +41,25 @@ export const problemSetSchema = z.object({
 
 export const problemSetListSchema = paginatedSchema(problemSetSchema)
 
+/**
+ * 题单页的题目卡片只渲染题号、标题、难度，所以只下发这三样（外加题目主键）。
+ *
+ * 以前这里复用 problemListItemSchema，代价是服务端每次都要多 join 一次 user +
+ * user_profile 凑 createdBy、再多查一次标签表凑 tags，而 tags / submissionNumber /
+ * acceptedNumber / createdBy / flowchart / hasAstRules / myStatus 在题单页一个都不渲染
+ * —— myStatus 甚至是写死的 null。
+ */
+export const problemSetProblemItemSchema = z.object({
+  id: z.number().int(),
+  _id: z.string(),
+  title: z.string(),
+  difficulty: maskedProblemDifficultySchema,
+})
+
 export const problemSetProblemSchema = z.object({
   id: z.number().int(),
   problemsetId: z.number().int(),
-  problem: problemListItemSchema,
+  problem: problemSetProblemItemSchema,
   order: z.number().int(),
   isRequired: z.boolean(),
   score: z.number().int(),

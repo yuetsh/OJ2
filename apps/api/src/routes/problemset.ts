@@ -1,5 +1,4 @@
 import {
-  problemListItemSchema,
   problemSetBadgeSchema,
   problemSetListSchema,
   problemSetProblemSchema,
@@ -168,44 +167,37 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
   const [problemSet] = await db.select({ id: schema.problemset.id }).from(schema.problemset)
     .where(and(eq(schema.problemset.id, id), eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft"))).limit(1)
   if (!problemSet) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const rows = await db.select({ link: schema.problemsetProblem, problem: schema.problem, user: schema.user, realName: schema.userProfile.realName })
-    .from(schema.problemsetProblem).innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
-    .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(eq(schema.problemsetProblem.problemsetId, id)).orderBy(asc(schema.problemsetProblem.order))
-  const problemIds = rows.map((row) => row.problem.id)
-  const [tagRows, progressRows] = await Promise.all([
-    problemIds.length ? db.select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name }).from(schema.problemTags)
-      .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id)).where(inArray(schema.problemTags.problemId, problemIds)) : Promise.resolve([]),
-    c.get("user") ? db.select({ detail: schema.problemsetProgress.progressDetail }).from(schema.problemsetProgress)
-      .where(and(eq(schema.problemsetProgress.problemsetId, id), eq(schema.problemsetProgress.userId, c.get("user")!.id))).limit(1) : Promise.resolve([]),
-  ])
-  const tags = new Map<number, string[]>()
-  for (const tag of tagRows) tags.set(tag.problemId, [...(tags.get(tag.problemId) ?? []), tag.name])
+  // 只取卡片要渲染的四列。取 schema.problem 整行会把题面、样例、答案、ast_rules、
+  // flowchart_data、sql_display 一起拉回来，题单页一个都不用。
+  //
+  // order 后面必须再跟一个 tiebreaker：并列时 Postgres 不保证次序，而卡片是按数组
+  // 下标编号的（#1 #2 #3），题单 8 / 11 / 14 实际就存在 order 重复，不定死的话
+  // 「第 3 题」指哪道题每次刷新都可能不一样。后台那条列表一直是这么排的。
+  const rows = await db.select({
+    link: schema.problemsetProblem,
+    problemId: schema.problem.id,
+    displayId: schema.problem.displayId,
+    title: schema.problem.title,
+    difficulty: schema.problem.difficulty,
+  })
+    .from(schema.problemsetProblem)
+    .innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
+    .where(eq(schema.problemsetProblem.problemsetId, id))
+    .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id))
+  const progressRows = c.get("user")
+    ? await db.select({ detail: schema.problemsetProgress.progressDetail }).from(schema.problemsetProgress)
+      .where(and(eq(schema.problemsetProgress.problemsetId, id), eq(schema.problemsetProgress.userId, c.get("user")!.id))).limit(1)
+    : []
   const completed = objectValue(progressRows[0]?.detail)
-  return success(c, rows.map(({ link, problem, user, realName }) => problemSetProblemSchema.parse({
+  return success(c, rows.map(({ link, problemId, displayId, title, difficulty }) => problemSetProblemSchema.parse({
     id: link.id,
     problemsetId: link.problemsetId,
-    problem: problemListItemSchema.parse({
-      id: problem.id,
-      _id: problem.displayId,
-      title: problem.title,
-      submissionNumber: problem.submissionNumber,
-      acceptedNumber: problem.acceptedNumber,
-      difficulty: problem.difficulty,
-      createdBy: sampleUser(user, realName),
-      tags: tags.get(problem.id) ?? [],
-      contestId: problem.contestId,
-      allowFlowchart: problem.allowFlowchart,
-      showFlowchart: problem.showFlowchart,
-      hasAstRules: problem.astRules !== null,
-      myStatus: null,
-    }),
+    problem: { id: problemId, _id: displayId, title, difficulty },
     order: link.order,
     isRequired: link.isRequired,
     score: link.score,
     hint: link.hint,
-    isCompleted: String(problem.id) in completed,
+    isCompleted: String(problemId) in completed,
   })))
 })
 
@@ -395,7 +387,8 @@ problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c
       .orderBy(desc(schema.problemsetProgress.isCompleted), desc(schema.problemsetProgress.progressPercentage), asc(schema.problemsetProgress.joinTime)).limit(limit).offset(offset),
     db.select({ id: schema.problem.id, _id: schema.problem.displayId, title: schema.problem.title }).from(schema.problemsetProblem)
       .innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
-      .where(eq(schema.problemsetProblem.problemsetId, id)).orderBy(asc(schema.problemsetProblem.order)),
+      .where(eq(schema.problemsetProblem.problemsetId, id))
+      .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id)),
   ])
   const problemMap = new Map(problemRows.map((problem) => [String(problem.id), problem]))
   const results = rows.map(({ progress, user: progressUser, realName }) => problemSetProgressSchema.parse({
