@@ -6,6 +6,7 @@ import { useLearnProgress } from "shared/composables/learnProgress"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
 import { useScreenModeStore } from "shared/store/screenMode"
+import type { CollabRequestItem } from "shared/composables/websocket"
 import { logout } from "../api"
 import CollabModal from "./CollabModal.vue"
 import HelpRequestList from "./HelpRequestList.vue"
@@ -50,6 +51,45 @@ const hasHelpEntry = computed(
 )
 const pendingHelpCount = computed(() =>
   hasHelpEntry.value ? collabStore.pendingCount : 0,
+)
+
+/**
+ * 新求助进来只有角标默默 +1，上课走动的时候根本注意不到，补一条 toast。
+ *
+ * 只在数字**变大**时弹：老师自己接单、拒绝、别的老师接走都会让它变小，那些
+ * 不该打扰人。断线重连后服务端会重推一份全量列表，队里还有人的话这里会再弹
+ * 一次 —— 那正好是「你刚断过线，这些人还等着」，留着。
+ */
+watch(
+  () => pendingHelpCount.value,
+  (count, previous) => {
+    if (count <= previous) return
+    let latest: CollabRequestItem | null = null
+    for (const item of collabStore.requests) {
+      if (item.status !== "pending") continue
+      if (!latest || item.createdAt > latest.createdAt) latest = item
+    }
+    const text = latest
+      ? `${latest.studentName} 求助：${latest.problemTitle}`
+      : "有新的求助"
+    // 内容传 render 函数（naive 的 content 支持），这样整条 toast 可点：
+    // 点一下直接开求助列表，省得再去点名字、再点菜单。
+    const notice = message.info(
+      () =>
+        h(
+          "span",
+          {
+            style: { cursor: "pointer" },
+            onClick: () => {
+              showHelpRequests.value = true
+              notice.destroy()
+            },
+          },
+          `${text} · 点击处理`,
+        ),
+      { duration: 5000 },
+    )
+  },
 )
 
 const isDark = useDark()
@@ -142,12 +182,16 @@ const envVersion = computed(() => {
   return ""
 })
 
-const showEnvVersion = computed(() => {
-  return (
-    import.meta.env.PUBLIC_ENV === "test" ||
-    import.meta.env.PUBLIC_ENV === "dev"
-  )
-})
+/**
+ * 站名后面括号里的东西：环境名 + 演示中。
+ *
+ * 演示模式除了下拉里那行「退出演示」再没有别的痕迹，而它是存在 localStorage 里
+ * 的，刷新、关标签页都还在，只有退出登录才清 —— 不在这儿常驻标一下，很容易
+ * 投屏完忘了退，第二天纳闷后台入口怎么没了。
+ */
+const titleTags = computed(() =>
+  [envVersion.value, userStore.demoMode ? "演示中" : ""].filter(Boolean),
+)
 
 const active = computed(() => {
   const path = route.path.split("/")[1] || "problem"
@@ -338,7 +382,7 @@ function handleMenuSelect(key: string) {
       <n-flex align="center" class="title" @click="goHome">
         <Icon icon="streamline-emojis:dog" :height="30"></Icon>
         <div>{{ configStore.config?.websiteName }}</div>
-        <div v-if="showEnvVersion">({{ envVersion }})</div>
+        <div v-if="titleTags.length">({{ titleTags.join(" · ") }})</div>
       </n-flex>
       <div>
         <n-menu
