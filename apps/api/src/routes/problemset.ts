@@ -20,7 +20,6 @@ import {
   gt,
   ilike,
   inArray,
-  isNull,
   ne,
   or,
   sql,
@@ -33,6 +32,7 @@ import { publishAchievementNotification } from "../events"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { updateAchievementsForProblemSet } from "../services/achievements"
+import { computeProgress } from "../services/problemset"
 import { objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
@@ -216,27 +216,9 @@ async function recomputeProgress(
 ) {
   const links = await tx.select({ problemId: schema.problemsetProblem.problemId, score: schema.problemsetProblem.score })
     .from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, progress.problemsetId))
-  const valid = new Map(links.map((link) => [String(link.problemId), link.score]))
-  for (const key of Object.keys(detail)) if (!valid.has(key)) delete detail[key]
-  let totalScore = 0
-  for (const [key, value] of Object.entries(detail)) {
-    const score = valid.get(key)
-    if (score === undefined) continue
-    totalScore += score
-    detail[key] = { ...objectValue(value), score }
-  }
-  const completed = Object.keys(detail).length
-  const total = links.length
-  const isCompleted = completed === total
-  const update = {
-    progressDetail: detail,
-    totalProblemsCount: total,
-    completedProblemsCount: completed,
-    totalScore,
-    progressPercentage: total > 0 ? completed / total * 100 : 0,
-    isCompleted,
-    completeTime: isCompleted ? progress.completeTime ?? new Date().toISOString() : null,
-  }
+  // 算法本身在 services/problemset.ts —— 后台改题目后的批量重算走的是同一份，
+  // 两边曾经各写一遍，结果后台那份少算了 total_score 和 is_completed
+  const update = computeProgress(detail, links, progress.completeTime)
   await tx.update(schema.problemsetProgress).set(update).where(eq(schema.problemsetProgress.id, progress.id))
   return { ...progress, ...update }
 }

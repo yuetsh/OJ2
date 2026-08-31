@@ -12,19 +12,19 @@ import {
   updateProblemSetRequestSchema,
   updateProblemSetStatusRequestSchema,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, ilike, inArray, isNull, notInArray, or, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
+import { recalculateBadge, resyncProgress } from "../../services/problemset"
 import { queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemSetRoutes = new Hono<AppEnv>()
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
-type ProgressRow = typeof schema.problemsetProgress.$inferSelect
 
 /** 对齐旧 ensure_created_by：超管放行，其余人只能碰自己建的。越权报「不存在」 */
 function ownedBy(user: AuthUser, row: { createdById: number }) {
@@ -305,46 +305,6 @@ async function badgesWithCount(badges: BadgeRow[]) {
   }))
 }
 
-/** 纯逻辑判定，对齐旧 `ProblemSetBadge._is_eligible` */
-function eligible(badge: BadgeRow, progress: ProgressRow) {
-  if (badge.conditionType === "all_problems") {
-    return progress.totalProblemsCount > 0 &&
-      progress.completedProblemsCount === progress.totalProblemsCount
-  }
-  if (badge.conditionType === "problem_count") return progress.completedProblemsCount >= badge.conditionValue
-  if (badge.conditionType === "score") return progress.totalScore >= badge.conditionValue
-  return false
-}
-
-/**
- * 重算某个奖章的获得者，对齐旧 `recalculate_user_badges`（由 post_save 信号触发）。
- * 保留已有记录的 earnedTime —— 只增删差集，不是先清空再重建，
- * 否则每改一次条件所有人的获得时间都会刷新成今天。
- */
-async function recalculateBadge(badge: BadgeRow) {
-  const progresses = await db.select().from(schema.problemsetProgress)
-    .where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId))
-  const eligibleIds = progresses.filter((item) => eligible(badge, item)).map((item) => item.userId)
-  await db.transaction(async (tx) => {
-    await tx.delete(schema.userBadge).where(and(
-      eq(schema.userBadge.badgeId, badge.id),
-      eligibleIds.length ? notInArray(schema.userBadge.userId, eligibleIds) : undefined,
-    ))
-    if (!eligibleIds.length) return
-    const existing = await tx.select({ userId: schema.userBadge.userId }).from(schema.userBadge)
-      .where(eq(schema.userBadge.badgeId, badge.id))
-    const have = new Set(existing.map((item) => item.userId))
-    const missing = eligibleIds.filter((id) => !have.has(id))
-    if (missing.length) {
-      await tx.insert(schema.userBadge).values(missing.map((userId) => ({
-        userId,
-        badgeId: badge.id,
-        earnedTime: new Date().toISOString(),
-      })))
-    }
-  })
-}
-
 adminProblemSetRoutes.get("/problem-sets/:id/badges", requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get("user")!)
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
@@ -407,31 +367,6 @@ adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher
 })
 
 // ---------------------------------------------------------------- 学生进度
-
-/**
- * 题目集或分值变动后，把所有参与者的进度重算一遍。
- *
- * 旧后端不做这件事：往题单里加一道题，学生那边的 totalProblemsCount 还是老数字，
- * 进度百分比因此偏高，甚至已经「完成」的人分母变了却还标着完成。
- * 只重算分母与百分比，不碰 completeTime —— 已经完成过的事实不因加题而撤销。
- */
-async function resyncProgress(problemsetId: number) {
-  const [totalRow] = await db.select({ value: count() }).from(schema.problemsetProblem)
-    .where(eq(schema.problemsetProblem.problemsetId, problemsetId))
-  const total = totalRow?.value ?? 0
-  // 一条 UPDATE 把整个题单的参与者刷完。以前是先把 progress 全查出来再逐行 update，
-  // 一个班的题单就是几十次往返，而算出来的值只跟 total 和这一行自己的 completed 有关。
-  // completed 用 least(...) 夹住，百分比按 JS 那边同样的「乘 10000 四舍五入再除 100」
-  // 保留两位小数 —— 数都是非负的，numeric 的 round 和 Math.round 在这个区间一致。
-  const completed = sql`least(${schema.problemsetProgress.completedProblemsCount}, ${total})`
-  await db.update(schema.problemsetProgress).set({
-    totalProblemsCount: total,
-    completedProblemsCount: completed,
-    progressPercentage: total > 0
-      ? sql`round((${completed}::numeric / ${total}) * 10000) / 100`
-      : sql`0`,
-  }).where(eq(schema.problemsetProgress.problemsetId, problemsetId))
-}
 
 adminProblemSetRoutes.get("/problem-sets/:id/progress", requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get("user")!)
