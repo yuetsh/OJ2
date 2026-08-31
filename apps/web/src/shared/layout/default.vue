@@ -26,7 +26,12 @@ watch(
 <template>
   <n-layout position="absolute">
     <n-layout-header bordered style="padding: 8px">
-      <Header class="header" />
+      <!-- 居中限宽套在外面，别用 class 传给 Header：那样 Header 就永远只能有
+           一个根节点，多一个根就是 "Extraneous non-props attributes" 警告
+           加样式静默丢失 -->
+      <div class="header">
+        <Header />
+      </div>
     </n-layout-header>
     <n-layout-content
       content-style="padding: 16px; overflow-x: initial; max-width: 2000px; margin: 0 auto;"

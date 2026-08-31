@@ -2,37 +2,17 @@
 import { Icon } from "@iconify/vue"
 import { RouterLink } from "vue-router"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useDarkTransition } from "shared/composables/darkTransition"
 import { useLearnProgress } from "shared/composables/learnProgress"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
 import { useScreenModeStore } from "shared/store/screenMode"
-import type { CollabRequestItem } from "shared/composables/websocket"
-import { logout } from "../api"
-import CollabModal from "./CollabModal.vue"
-import HelpRequestList from "./HelpRequestList.vue"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
-import { trickOrTreat } from "utils/functions"
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
 const collabStore = useCollabStore()
-const message = useMessage()
-
-/**
- * 课堂求助的一次性提示，统一在这里弹。
- *
- * 原来挂在题目页的 Form.vue 上：学生排着队切去看提交记录，老师这时候取消了
- * 他的求助，那条「老师已取消你的求助」就永远没人消费。顶栏是全局的，放这儿
- * 才收得全 —— 教师端的 error 提示（比如「请先退出当前协作」）同理。
- */
-watch(
-  () => collabStore.noticeSeq,
-  () => {
-    const text = collabStore.consumeNotice()
-    if (text) message.info(text)
-  },
-)
 const authStore = useAuthModalStore()
 const screenModeStore = useScreenModeStore()
 const route = useRoute()
@@ -40,105 +20,16 @@ const router = useRouter()
 
 const { isMobile, isDesktop } = useBreakpoints()
 const { learnStep } = useLearnProgress()
+const { isDark, toggleDark } = useDarkTransition()
 
 /**
- * 课堂求助的入口收进姓名下拉里了，顶栏只留姓名按钮上的角标 —— 老师不用展开
- * 菜单也能看见有没有人举手。桌面端限定，教师端接单后要在弹框里替学生写代码。
+ * 求助的入口收进姓名下拉里，顶栏只留姓名按钮上的角标 —— 老师不用展开菜单
+ * 也能看见有没有人举手。窄屏同样给：接单之后要在弹框里替学生写代码，那件事
+ * 确实只有桌面端好使，但「有没有人在等」是宽度多少都得知道的。
  */
-const showHelpRequests = ref(false)
-const hasHelpEntry = computed(
-  () => isDesktop.value && userStore.isTeacherOrAbove,
-)
 const pendingHelpCount = computed(() =>
-  hasHelpEntry.value ? collabStore.pendingCount : 0,
+  collabStore.isTeacher ? collabStore.pendingCount : 0,
 )
-
-/**
- * 新求助进来只有角标默默 +1，上课走动的时候根本注意不到，补一条 toast。
- *
- * 只在数字**变大**时弹：老师自己接单、拒绝、别的老师接走都会让它变小，那些
- * 不该打扰人。断线重连后服务端会重推一份全量列表，队里还有人的话这里会再弹
- * 一次 —— 那正好是「你刚断过线，这些人还等着」，留着。
- */
-watch(
-  () => pendingHelpCount.value,
-  (count, previous) => {
-    if (count <= previous) return
-    let latest: CollabRequestItem | null = null
-    for (const item of collabStore.requests) {
-      if (item.status !== "pending") continue
-      if (!latest || item.createdAt > latest.createdAt) latest = item
-    }
-    const text = latest
-      ? `${latest.studentName} 求助：${latest.problemTitle}`
-      : "有新的求助"
-    // 内容传 render 函数（naive 的 content 支持），这样整条 toast 可点：
-    // 点一下直接开求助列表，省得再去点名字、再点菜单。
-    const notice = message.info(
-      () =>
-        h(
-          "span",
-          {
-            style: { cursor: "pointer" },
-            onClick: () => {
-              showHelpRequests.value = true
-              notice.destroy()
-            },
-          },
-          `${text} · 点击处理`,
-        ),
-      { duration: 5000 },
-    )
-  },
-)
-
-const isDark = useDark()
-
-/**
- * 圆环从哪儿开始扩散。正常点击就用指针落点；键盘触发（Enter / 空格）时浏览器给的
- * clientX/clientY 是 0，照用会让圆环从屏幕左上角冒出来——那种情况退回按钮自己的中心。
- * `event.detail` 是点击次数，键盘触发时为 0，用它区分最省事。
- */
-function revealOrigin(event: MouseEvent) {
-  if (event.detail > 0) return { x: event.clientX, y: event.clientY }
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-}
-
-function toggleDark(event: MouseEvent) {
-  if (!document.startViewTransition) {
-    // 机房那批 Chrome 低于 94，没有 View Transitions，直接切、不做动画。
-    isDark.value = !isDark.value
-    return
-  }
-  const { x, y } = revealOrigin(event)
-  // 半径要取到**最远**那个角的距离。用 hypot(x, y) 只覆盖到左上角，
-  // 点在偏左上时右下角会有一块旧画面等圆环扩过去，看着像是没刷新。
-  const radius = Math.hypot(
-    Math.max(x, window.innerWidth - x),
-    Math.max(y, window.innerHeight - y),
-  )
-  document
-    .startViewTransition(() => {
-      isDark.value = !isDark.value
-    })
-    .ready.then(() => {
-      document.documentElement.animate(
-        {
-          clipPath: [
-            `circle(0px at ${x}px ${y}px)`,
-            `circle(${radius}px at ${x}px ${y}px)`,
-          ],
-        },
-        {
-          duration: 400,
-          easing: "ease-in-out",
-          pseudoElement: "::view-transition-new(root)",
-        },
-      )
-    })
-    .catch(() => {})
-}
 
 // 从 store 中获取屏幕模式状态
 const { screenMode } = storeToRefs(screenModeStore)
@@ -193,14 +84,12 @@ const titleTags = computed(() =>
   [envVersion.value, userStore.demoMode ? "演示中" : ""].filter(Boolean),
 )
 
-const active = computed(() => {
-  const path = route.path.split("/")[1] || "problem"
-  return !["user", "setting"].includes(path) ? path : ""
-})
+// 一级路径就是菜单 key，对不上的页面（/user、/setting、/achievement 等）
+// 自然没有一项亮着
+const active = computed(() => route.path.split("/")[1] || "problem")
 
 async function handleLogout() {
-  await logout()
-  userStore.clearProfile()
+  await userStore.signOut()
   router.replace("/")
 }
 
@@ -272,12 +161,6 @@ const menus = computed<MenuOption[]>(() => [
     icon: renderIcon("fluent-emoji:trophy"),
   },
   {
-    label: () => h(RouterLink, { to: "/class/pk" }, { default: () => "班级" }),
-    show: false,
-    key: "class",
-    icon: renderIcon("fluent-emoji:crossed-swords"),
-  },
-  {
     label: () =>
       h(RouterLink, { to: "/announcement" }, { default: () => "公告" }),
     key: "announcement",
@@ -302,10 +185,10 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
       ? `课堂求助（${pendingHelpCount.value}）`
       : "课堂求助",
     key: "help",
-    show: hasHelpEntry.value,
+    show: collabStore.isTeacher,
     icon: renderIcon("streamline-emojis:raising-hands-2"),
     props: {
-      onClick: () => (showHelpRequests.value = true),
+      onClick: () => (collabStore.helpPanelOpen = true),
     },
   },
   {
@@ -314,15 +197,6 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
     icon: renderIcon("streamline-ultimate-color:newspaper-fold"),
     props: {
       onClick: () => router.push("/user"),
-    },
-  },
-  {
-    label: "我的消息",
-    key: "message",
-    show: false,
-    icon: renderIcon("streamline-emojis:herb"),
-    props: {
-      onClick: () => router.push("/message"),
     },
   },
   {
@@ -368,39 +242,30 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
 function goHome() {
   router.push("/")
 }
-
-function handleMenuSelect(key: string) {
-  if (key === "dont-click") {
-    trickOrTreat()
-  }
-}
 </script>
 
 <template>
   <n-flex justify="space-between" align="center">
     <n-flex align="center">
-      <n-flex align="center" class="title" @click="goHome">
-        <Icon icon="streamline-emojis:dog" :height="30"></Icon>
-        <div>{{ configStore.config?.websiteName }}</div>
-        <div v-if="titleTags.length">({{ titleTags.join(" · ") }})</div>
-      </n-flex>
+      <!-- text 按钮而不是带 @click 的 div：站名要能 tab 到、回车能按 -->
+      <n-button text class="title" @click="goHome">
+        <n-flex align="center">
+          <Icon icon="streamline-emojis:dog" :height="30"></Icon>
+          <div>{{ configStore.config?.websiteName }}</div>
+          <div v-if="titleTags.length">({{ titleTags.join(" · ") }})</div>
+        </n-flex>
+      </n-button>
       <div>
         <n-menu
           v-if="isDesktop"
           mode="horizontal"
           :options="menus"
           :value="active"
-          @update:value="handleMenuSelect"
         />
       </div>
     </n-flex>
     <n-flex align="center">
-      <n-dropdown
-        v-if="isMobile"
-        :options="menus"
-        size="large"
-        @select="handleMenuSelect"
-      >
+      <n-dropdown v-if="isMobile" :options="menus" size="large">
         <n-button>
           <Icon icon="fluent-emoji:artist-palette" height="20"></Icon>
           <span style="padding-left: 8px">菜单</span>
@@ -450,21 +315,11 @@ function handleMenuSelect(key: string) {
         </template>
       </n-button>
     </n-flex>
-    <!--
-      挂在根 n-flex 内部而不是同级：Header.vue 一旦变成多根 fragment，
-      default.vue 里 `<Header class="header" />` 那个 class 就没有任何单一
-      根节点可以落地（Vue 会报 "Extraneous non-props attributes" 警告并把它
-      整个丢弃），header 行随之丢掉 `max-width: 2000px` 那条居中样式。
-      n-modal 默认 teleport 到 body，塞在这里不影响它的实际渲染位置。
-    -->
-    <HelpRequestList v-if="hasHelpEntry" v-model:show="showHelpRequests" />
-    <CollabModal v-if="userStore.isTeacherOrAbove" />
   </n-flex>
 </template>
 
 <style scoped>
 .title {
   font-size: 18px;
-  cursor: pointer;
 }
 </style>

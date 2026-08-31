@@ -7,6 +7,7 @@ import { useConfigUpdate } from "shared/composables/configUpdate"
 import { useMaxKB } from "shared/composables/maxkb"
 import { useUserStore } from "shared/store/user"
 import { useCollabStore } from "shared/store/collab"
+import CollabHost from "shared/components/CollabHost.vue"
 
 const isDark = useDark()
 const configStore = useConfigStore()
@@ -95,6 +96,9 @@ provide("hljs", hljsInstance)
     <n-dialog-provider>
       <n-message-provider>
         <router-view></router-view>
+        <!-- 求助提示 / 列表 / 协作弹框。和上面那条常驻连接同级，
+             这样切到 /admin（另一套布局、没有顶栏）也照常收得到 -->
+        <CollabHost />
       </n-message-provider>
     </n-dialog-provider>
   </n-config-provider>

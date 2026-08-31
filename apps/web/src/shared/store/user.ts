@@ -1,7 +1,7 @@
 import { PROBLEM_PERMISSION, STORAGE_KEY, USER_TYPE } from "utils/constants"
 import storage from "utils/storage"
 import type { Profile, SessionUser } from "utils/types"
-import { getProfile } from "../api"
+import { getProfile, logout } from "../api"
 import { useConfigStore } from "./config"
 
 export const useUserStore = defineStore("user", () => {
@@ -60,18 +60,36 @@ export const useUserStore = defineStore("user", () => {
     return flag
   })
 
-  async function getMyProfile() {
+  // 同一时刻只发一份 /profile。App.vue 挂载时要拉、路由守卫要拉、页面自己也可能
+  // 要拉（子组件的 onMounted 比 App.vue 的先跑），不去重就是同一个请求发好几遍，
+  // 页面里等它的那些请求还得跟着排队。只合并「正在飞的那一次」，不缓存结果 ——
+  // 登录后和改完设置仍然要能重新拉一份。
+  let inflight: Promise<void> | null = null
+
+  function getMyProfile() {
+    if (inflight) return inflight
     isFinished.value = false
-    const res = await getProfile()
-    profile.value = res
-    isFinished.value = true
-    storage.set(STORAGE_KEY.AUTHED, !!user.value?.email)
+    inflight = getProfile()
+      .then((res) => {
+        profile.value = res
+        isFinished.value = true
+        storage.set(STORAGE_KEY.AUTHED, !!user.value?.email)
+      })
+      .finally(() => (inflight = null))
+    return inflight
   }
 
   function clearProfile() {
     profile.value = null
     demoMode.value = false
     storage.clear()
+  }
+
+  // 退登的两步（吊销服务端会话、清本地状态）绑在一起：只清本地会留一个还活着
+  // 的 cookie，下次进站又被 /profile 认回来。跳转留给调用方，store 里不碰路由。
+  async function signOut() {
+    await logout()
+    clearProfile()
   }
   return {
     profile,
@@ -90,5 +108,6 @@ export const useUserStore = defineStore("user", () => {
     showSubmissions,
     getMyProfile,
     clearProfile,
+    signOut,
   }
 })

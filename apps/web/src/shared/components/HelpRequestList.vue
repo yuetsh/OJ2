@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import { useCollabStore } from "shared/store/collab"
 
 /** 由顶栏的姓名下拉菜单打开 */
 const show = defineModel<boolean>("show", { default: false })
 
 const collabStore = useCollabStore()
+
+// 接单之后要在弹框里替学生写代码，那个编辑器窄屏上没法用 —— 所以窄屏只让看
+// 「谁在等」（角标、toast、这张列表照常给），接单留到桌面端
+const { isDesktop } = useBreakpoints()
 
 // 等待时长要每秒走一格，所以自己转一个 now。
 // 只在弹框开着时转 —— 这个组件跟着顶栏常驻，关着的时候没人看这个数。
@@ -40,7 +45,7 @@ const waited = (createdAt: number) => {
 
 const handleAccept = (studentId: number, status: string) => {
   // 已被别的老师接走的不能点
-  if (status === "active") return
+  if (status === "active" || !isDesktop.value) return
   collabStore.accept(studentId)
   // 接单后马上要弹 CollabModal，这个列表得让位
   show.value = false
@@ -55,7 +60,19 @@ const handleAccept = (studentId: number, status: string) => {
     :style="{ width: '420px' }"
   >
     <div style="max-height: 60vh; overflow: auto">
-      <n-empty v-if="collabStore.groupedRequests.length === 0" description="暂无求助" />
+      <n-alert
+        v-if="!isDesktop"
+        type="info"
+        :bordered="false"
+        style="margin-bottom: 8px"
+      >
+        接单要在电脑上打开
+      </n-alert>
+
+      <n-empty
+        v-if="collabStore.groupedRequests.length === 0"
+        description="暂无求助"
+      />
 
       <div v-for="group in collabStore.groupedRequests" :key="group.problemId">
         <!-- 同题多人是个教学信号：该停下来全班讲，而不是挨个救 -->
@@ -77,14 +94,17 @@ const handleAccept = (studentId: number, status: string) => {
             padding: '6px 8px',
             borderRadius: '4px',
             opacity: item.status === 'active' ? 0.5 : 1,
-            cursor: item.status === 'active' ? 'default' : 'pointer',
+            cursor:
+              item.status === 'active' || !isDesktop ? 'default' : 'pointer',
           }"
           @click="handleAccept(item.studentId, item.status)"
         >
           <n-flex vertical :size="2">
             <n-text>
               {{ item.studentName }}
-              <n-text depth="3" v-if="item.className">（{{ item.className }}）</n-text>
+              <n-text depth="3" v-if="item.className"
+                >（{{ item.className }}）</n-text
+              >
             </n-text>
             <n-text depth="3" style="font-size: 12px">
               {{

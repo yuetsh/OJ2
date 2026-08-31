@@ -35,8 +35,13 @@ export const useCollabStore = defineStore("collab", () => {
   const teacherName = ref("")
   /** 双方：当前房间。null 表示不在协作中 */
   const room = ref<RoomInfo | null>(null)
-  /** 一次性提示，由 Header 统一消费后清空 */
+  /** 一次性提示，由 CollabHost 统一消费后清空 */
   const notice = ref("")
+  /**
+   * 求助列表弹框开着没有。放在 store 里而不是组件内部：打开它的入口（顶栏的
+   * 姓名下拉、新求助 toast）和弹框本身已经不在同一棵子树里了。
+   */
+  const helpPanelOpen = ref(false)
   /**
    * 提示序号，每次设置都自增。
    *
@@ -57,7 +62,10 @@ export const useCollabStore = defineStore("collab", () => {
 
   /** 按题目聚合，同题多人时老师能一眼看出该停下来全班讲 */
   const groupedRequests = computed(() => {
-    const groups = new Map<string, { problemId: string; problemTitle: string; items: CollabRequestItem[] }>()
+    const groups = new Map<
+      string,
+      { problemId: string; problemTitle: string; items: CollabRequestItem[] }
+    >()
     for (const item of requests.value) {
       const group = groups.get(item.problemId)
       if (group) group.items.push(item)
@@ -155,6 +163,7 @@ export const useCollabStore = defineStore("collab", () => {
     teacherName.value = ""
     room.value = null
     notice.value = ""
+    helpPanelOpen.value = false
   }
 
   function requestHelp(problemId: string, language: LANGUAGE) {
@@ -211,6 +220,7 @@ export const useCollabStore = defineStore("collab", () => {
     room,
     notice,
     noticeSeq,
+    helpPanelOpen,
     isTeacher: computed(() => userStore.isTeacherOrAbove),
     connect,
     disconnect,
