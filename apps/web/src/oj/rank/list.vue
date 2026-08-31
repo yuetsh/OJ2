@@ -242,11 +242,13 @@ const columns: DataTableColumn<Rank>[] = [
 ]
 
 watch(() => query.page, init)
+// 改每页条数时，若当前不在第一页，把重新取数交给 page 的 watcher ——
+// 这里再自己取一次，就是两个一模一样的请求
 watch(
   () => query.limit,
   () => {
-    query.page = 1
-    init()
+    if (query.page === 1) init()
+    else query.page = 1
   },
 )
 watch(duration, listActivity)
@@ -263,12 +265,6 @@ async function listActivity() {
     submissionNumber: 0,
     mood: null,
   }))
-}
-
-// 「全服 Top10」就是同一个榜的第一页 —— 上限由服务端定，这里只要前 10 条
-async function listRank() {
-  const res = await getRank(0, 10)
-  rankChart.value = res.results
 }
 
 const options: SelectOption[] = [
@@ -288,8 +284,10 @@ const subOptions = computed<Duration>(() => {
 })
 
 onMounted(() => {
-  init()
-  listRank()
+  // 「全服 Top10」就是榜单第一页的前 10 条：挂载时 init() 取的正是 offset=0&limit=10，
+  // 再单发一次一模一样的 /rankings/users 只会让这张图排在日活后面出来。
+  // 图只在挂载时定一次，翻页/改每页条数不该动它。
+  init().then((results) => (rankChart.value = results.slice(0, 10)))
   listActivity()
   listClassRank()
   listMyClassRank()
@@ -480,13 +478,12 @@ watch(
   },
 )
 
+// 同上：page 改了自会触发下面那个 watcher，别重复取
 watch(
   () => myClassQuery.limit,
   () => {
-    myClassQuery.page = 1
-    if (myClassScope.value === "all") {
-      listMyClassRank()
-    }
+    if (myClassQuery.page !== 1) myClassQuery.page = 1
+    else if (myClassScope.value === "all") listMyClassRank()
   },
 )
 </script>

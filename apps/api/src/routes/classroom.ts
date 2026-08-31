@@ -5,7 +5,7 @@ import {
   classRankItemSchema,
   classUserRankSchema,
 } from "@oj2/contract"
-import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm"
+import { and, eq, gte, inArray, like, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
@@ -24,13 +24,19 @@ interface ClassUser {
   submissionNumber: number
 }
 
-async function loadClassUsers(classNames?: string[]) {
+/**
+ * 入班学生的 AC/提交数。`gradePrefix` 是年级（班号形如 `241` = 24 级 1 班），
+ * 走 SQL 的 like 而不是拉全表再在内存里 startsWith —— 班级榜每换一次年级就要跑一遍，
+ * 没必要每次都把全校一千多号人搬进进程。年级在调用处已校验为纯数字，不含 like 通配符。
+ */
+async function loadClassUsers(classNames?: string[], gradePrefix?: string) {
   const filters = [
     eq(schema.user.isDisabled, false),
     inArray(schema.user.adminType, ["Regular User", "Student Admin"]),
     sql`${schema.user.className} is not null`,
   ]
   if (classNames) filters.push(inArray(schema.user.className, classNames))
+  if (gradePrefix) filters.push(like(schema.user.className, `${gradePrefix}%`))
   const rows = await db.select({
     userId: schema.user.id,
     username: schema.user.username,
@@ -72,7 +78,7 @@ function sampleStdDev(values: number[]) {
 classroomRoutes.get("/rankings/classes", async (c) => {
   const grade = c.req.query("grade")?.trim()
   if (!grade || !/^\d+$/.test(grade)) return failure(c, 400, "invalid-grade", "grade is required")
-  const users = (await loadClassUsers()).filter((user) => user.className.startsWith(grade))
+  const users = await loadClassUsers(undefined, grade)
   const groups = new Map<string, ClassUser[]>()
   for (const user of users) groups.set(user.className, [...(groups.get(user.className) ?? []), user])
   const result = [...groups].map(([className, members]) => {

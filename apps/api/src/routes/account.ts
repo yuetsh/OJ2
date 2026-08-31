@@ -181,23 +181,27 @@ accountRoutes.get("/rankings/users", optionalAuth, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: LEADERBOARD_SIZE })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
 
-  const [totalRow] = await db.select({ value: count() }).from(schema.userProfile)
-    .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-    .where(leaderboardWhere)
-  const total = Math.min(totalRow?.value ?? 0, LEADERBOARD_SIZE)
+  // 榜单封顶 100 名，所以这一页最多还能取几条只取决于 offset，**不取决于总人数** ——
+  // 真人不够时数据库自己会少返回。不拿 total 当上限，三段查询就能并发发出去，
+  // 端点延迟从「四个来回相加」变成「最慢的那个」。越界页一条不剩，直接不发 SQL。
+  const pageLimit = Math.max(0, Math.min(limit, LEADERBOARD_SIZE - offset))
 
-  // 末页可能只剩不足 limit 条，越界页一条不剩 —— 后者直接不发 SQL
-  const pageLimit = Math.max(0, Math.min(limit, total - offset))
-  const rows = pageLimit === 0 ? [] : await db
-    .select({ profile: schema.userProfile, user: schema.user }).from(schema.userProfile)
-    .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-    .where(leaderboardWhere).orderBy(...leaderboardOrder)
-    .limit(pageLimit).offset(offset)
+  const [totalRow, rows, me] = await Promise.all([
+    db.select({ value: count() }).from(schema.userProfile)
+      .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
+      .where(leaderboardWhere).then(([row]) => row),
+    pageLimit === 0 ? [] : db
+      .select({ profile: schema.userProfile, user: schema.user }).from(schema.userProfile)
+      .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
+      .where(leaderboardWhere).orderBy(...leaderboardOrder)
+      .limit(pageLimit).offset(offset),
+    myLeaderboardRank(c.get("user")?.id),
+  ])
 
   return success(c, userRankSchema.parse({
     results: rows.map(serializeRankRow),
-    total,
-    me: await myLeaderboardRank(c.get("user")?.id),
+    total: Math.min(totalRow?.value ?? 0, LEADERBOARD_SIZE),
+    me,
   }))
 })
 
