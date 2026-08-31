@@ -40,6 +40,18 @@ const router = useRouter()
 const { isMobile, isDesktop } = useBreakpoints()
 const { learnStep } = useLearnProgress()
 
+/**
+ * 课堂求助的入口收进姓名下拉里了，顶栏只留姓名按钮上的角标 —— 老师不用展开
+ * 菜单也能看见有没有人举手。桌面端限定，教师端接单后要在弹框里替学生写代码。
+ */
+const showHelpRequests = ref(false)
+const hasHelpEntry = computed(
+  () => isDesktop.value && userStore.isTeacherOrAbove,
+)
+const pendingHelpCount = computed(() =>
+  hasHelpEntry.value ? collabStore.pendingCount : 0,
+)
+
 const isDark = useDark()
 
 /**
@@ -242,6 +254,17 @@ const menus = computed<MenuOption[]>(() => [
 
 const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
   {
+    label: pendingHelpCount.value
+      ? `课堂求助（${pendingHelpCount.value}）`
+      : "课堂求助",
+    key: "help",
+    show: hasHelpEntry.value,
+    icon: renderIcon("streamline-emojis:raising-hands-2"),
+    props: {
+      onClick: () => (showHelpRequests.value = true),
+    },
+  },
+  {
     label: "我的主页",
     key: "home",
     icon: renderIcon("streamline-ultimate-color:newspaper-fold"),
@@ -348,15 +371,16 @@ function handleMenuSelect(key: string) {
       >
         {{ screenMode }}
       </n-button>
-      <HelpRequestList v-if="isDesktop && userStore.isTeacherOrAbove" />
       <div v-if="userStore.isFinished">
         <n-dropdown v-if="userStore.isAuthed" :options="options" size="large">
-          <n-button>
-            <Icon :icon="avatar" height="20"></Icon>
-            <span style="padding-left: 8px">
-              {{ userStore.user!.username }}
-            </span>
-          </n-button>
+          <n-badge :value="pendingHelpCount" :max="99">
+            <n-button>
+              <Icon :icon="avatar" height="20"></Icon>
+              <span style="padding-left: 8px">
+                {{ userStore.user!.username }}
+              </span>
+            </n-button>
+          </n-badge>
         </n-dropdown>
         <n-flex align="center" v-else>
           <n-button
@@ -389,6 +413,7 @@ function handleMenuSelect(key: string) {
       整个丢弃），header 行随之丢掉 `max-width: 2000px` 那条居中样式。
       n-modal 默认 teleport 到 body，塞在这里不影响它的实际渲染位置。
     -->
+    <HelpRequestList v-if="hasHelpEntry" v-model:show="showHelpRequests" />
     <CollabModal v-if="userStore.isTeacherOrAbove" />
   </n-flex>
 </template>

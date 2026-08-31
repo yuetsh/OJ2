@@ -2,17 +2,34 @@
 import { Icon } from "@iconify/vue"
 import { useCollabStore } from "shared/store/collab"
 
+/** 由顶栏的姓名下拉菜单打开 */
+const show = defineModel<boolean>("show", { default: false })
+
 const collabStore = useCollabStore()
 
-// 等待时长要每秒走一格，所以自己转一个 now
+// 等待时长要每秒走一格，所以自己转一个 now。
+// 只在弹框开着时转 —— 这个组件跟着顶栏常驻，关着的时候没人看这个数。
 const now = ref(Date.now())
 let timer: number | null = null
-onMounted(() => {
-  timer = window.setInterval(() => (now.value = Date.now()), 1000)
+
+function stopTimer() {
+  if (timer === null) return
+  window.clearInterval(timer)
+  timer = null
+}
+
+watch(show, (opened) => {
+  if (!opened) {
+    stopTimer()
+    return
+  }
+  now.value = Date.now()
+  if (timer === null) {
+    timer = window.setInterval(() => (now.value = Date.now()), 1000)
+  }
 })
-onUnmounted(() => {
-  if (timer !== null) window.clearInterval(timer)
-})
+
+onUnmounted(stopTimer)
 
 const waited = (createdAt: number) => {
   const seconds = Math.max(0, Math.floor((now.value - createdAt) / 1000))
@@ -25,21 +42,19 @@ const handleAccept = (studentId: number, status: string) => {
   // 已被别的老师接走的不能点
   if (status === "active") return
   collabStore.accept(studentId)
+  // 接单后马上要弹 CollabModal，这个列表得让位
+  show.value = false
 }
 </script>
 
 <template>
-  <n-popover trigger="click" placement="bottom-end" style="padding: 0">
-    <template #trigger>
-      <n-badge :value="collabStore.pendingCount" :max="99">
-        <n-button>
-          <Icon icon="streamline-emojis:raising-hands-2" height="20" />
-          <span style="padding-left: 8px">求助</span>
-        </n-button>
-      </n-badge>
-    </template>
-
-    <div style="width: 320px; max-height: 60vh; overflow: auto; padding: 8px">
+  <n-modal
+    v-model:show="show"
+    preset="card"
+    title="课堂求助"
+    :style="{ width: '420px' }"
+  >
+    <div style="max-height: 60vh; overflow: auto">
       <n-empty v-if="collabStore.groupedRequests.length === 0" description="暂无求助" />
 
       <div v-for="group in collabStore.groupedRequests" :key="group.problemId">
@@ -94,5 +109,5 @@ const handleAccept = (studentId: number, status: string) => {
         <n-divider style="margin: 4px 0" />
       </div>
     </div>
-  </n-popover>
+  </n-modal>
 </template>
