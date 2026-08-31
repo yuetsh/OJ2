@@ -31,7 +31,7 @@ import { publishAchievementNotification } from "../events"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { updateAchievementsForProblemSet } from "../services/achievements"
-import { computeProgress } from "../services/problemset"
+import { computeProgress, eligibleForBadge } from "../services/problemset"
 import { objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
@@ -206,8 +206,11 @@ async function recomputeProgress(
   progress: typeof schema.problemsetProgress.$inferSelect,
   detail: Record<string, unknown>,
 ) {
-  const links = await tx.select({ problemId: schema.problemsetProblem.problemId, score: schema.problemsetProblem.score })
-    .from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, progress.problemsetId))
+  const links = await tx.select({
+    problemId: schema.problemsetProblem.problemId,
+    score: schema.problemsetProblem.score,
+    isRequired: schema.problemsetProblem.isRequired,
+  }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, progress.problemsetId))
   // 算法本身在 services/problemset.ts —— 后台改题目后的批量重算走的是同一份，
   // 两边曾经各写一遍，结果后台那份少算了 total_score 和 is_completed
   const update = computeProgress(detail, links, progress.completeTime)
@@ -283,11 +286,9 @@ problemsetRoutes.put("/problem-set-progress", requireAuth, async (c) => {
       })
     }
     const badges = await tx.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, problemSet.id))
-    const hits = badges.filter((badge) => badge.conditionType === "all_problems"
-      ? updated.totalProblemsCount > 0 && updated.completedProblemsCount === updated.totalProblemsCount
-      : badge.conditionType === "problem_count"
-        ? updated.completedProblemsCount >= badge.conditionValue
-        : badge.conditionType === "score" && updated.totalScore >= badge.conditionValue)
+    // 判定走 services/problemset.ts 那一份 —— 这里原来是第三份手抄的达标逻辑，
+    // 后台重算和补发脚本各有各的，改一处规则就会漏掉另外两处
+    const hits = badges.filter((badge) => eligibleForBadge(badge, updated))
     if (hits.length === 0) return { earned: [] as (typeof schema.problemsetBadge.$inferSelect)[] }
     // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
     const inserted = await tx.insert(schema.userBadge).values(hits.map((badge) => ({

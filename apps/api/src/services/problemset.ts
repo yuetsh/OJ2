@@ -5,8 +5,9 @@ import { objectValue } from "../routes/helpers"
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 type ProgressRow = typeof schema.problemsetProgress.$inferSelect
-type ProblemLink = { problemId: number; score: number }
-type BadgeCheck = Pick<ProgressRow, "completedProblemsCount" | "totalProblemsCount" | "totalScore">
+type ProblemLink = { problemId: number; score: number; isRequired: boolean }
+type BadgeCheck = Pick<ProgressRow,
+  "completedProblemsCount" | "totalProblemsCount" | "totalScore" | "progressDetail">
 
 /**
  * 题单进度的唯一算法：学生做出一道题后的增量更新、后台改动题目后的批量重算，都走这一份。
@@ -34,8 +35,17 @@ export function computeProgress(
     // 分值以题单当前的设置为准，detail 里存的是做出那一刻的快照
     kept[key] = { ...objectValue(value), score }
   }
-  const completed = Object.keys(kept).length
-  const total = links.length
+  // 分母只算必做题。「（选做）」这个标签一直只是卡片上的一行字，进度分母和 all_problems
+  // 奖章照样要求做完 —— 快照里 22 个人做完了全部必做题，界面却显示未完成、全通奖章也拿不到
+  // （题单 5/6/8/11）。选做题做了仍然计分（totalScore 把它算进去），只是不卡完成。
+  //
+  // 一道必做都没标的题单退回「全部都算必做」：那种题单多半是没用这个字段，而不是
+  // 真的整单选做；不兜住的话它永远完不成。
+  const required = links.filter((link) => link.isRequired)
+  const graded = required.length ? required : links
+  const gradedKeys = new Set(graded.map((link) => String(link.problemId)))
+  const completed = Object.keys(kept).filter((key) => gradedKeys.has(key)).length
+  const total = graded.length
   // total > 0 这个前提不能省：0 === 0 同样成立，没有题目的题单会让人一加入就算「完成」，
   // 还会写下 complete_time、计进「完成题单数」成就，而且后面补上题目也不会自愈。
   const isCompleted = total > 0 && completed === total
@@ -97,13 +107,23 @@ async function writeProgress(rows: ProgressWrite[]) {
   }
 }
 
-/** 纯逻辑判定，对齐旧 `ProblemSetBadge._is_eligible` */
+/**
+ * 奖章达标判定的唯一实现。学生做出一题、后台改题单、补发脚本三处都调它 ——
+ * 以前是三份各写一遍。
+ *
+ * problem_count 数的是**做出的题目总数（含选做）**，不是 completedProblemsCount
+ * （自从分母只算必做，那个只数必做题）。老师当初是按题单的总题数设阈值的：题单 5
+ * 的「一职欧拉」要 8 题，而它的必做只有 7 道 —— 改用必做计数会让这枚奖章一夜之间
+ * 不可得，76 个已经拿到的人被 recalculateBadge 收回。
+ */
 export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
   if (badge.conditionType === "all_problems") {
     return progress.totalProblemsCount > 0 &&
       progress.completedProblemsCount === progress.totalProblemsCount
   }
-  if (badge.conditionType === "problem_count") return progress.completedProblemsCount >= badge.conditionValue
+  if (badge.conditionType === "problem_count") {
+    return Object.keys(objectValue(progress.progressDetail)).length >= badge.conditionValue
+  }
   if (badge.conditionType === "score") return progress.totalScore >= badge.conditionValue
   return false
 }
@@ -154,8 +174,11 @@ export async function recalculateBadge(badge: BadgeRow, known?: (BadgeCheck & { 
  */
 export async function resyncProgress(problemsetId: number) {
   const [links, progresses, badges] = await Promise.all([
-    db.select({ problemId: schema.problemsetProblem.problemId, score: schema.problemsetProblem.score })
-      .from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, problemsetId)),
+    db.select({
+      problemId: schema.problemsetProblem.problemId,
+      score: schema.problemsetProblem.score,
+      isRequired: schema.problemsetProblem.isRequired,
+    }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, problemsetId)),
     db.select().from(schema.problemsetProgress)
       .where(eq(schema.problemsetProgress.problemsetId, problemsetId)),
     db.select().from(schema.problemsetBadge)
@@ -171,9 +194,9 @@ export async function resyncProgress(problemsetId: number) {
 }
 
 /** 按奖章算出「现在应该有谁」，只读，供补发脚本先看后写 */
-export async function badgeHolderDiff(badge: BadgeRow) {
+export async function badgeHolderDiff(badge: BadgeRow, known?: (BadgeCheck & { userId: number })[]) {
   const [progresses, holders] = await Promise.all([
-    db.select().from(schema.problemsetProgress)
+    known ?? db.select().from(schema.problemsetProgress)
       .where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId)),
     db.select({ userId: schema.userBadge.userId }).from(schema.userBadge)
       .where(eq(schema.userBadge.badgeId, badge.id)),
