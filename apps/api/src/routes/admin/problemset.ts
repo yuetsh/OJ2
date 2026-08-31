@@ -249,7 +249,8 @@ adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (
     hint: parsed.data.hint,
   }).returning({ id: schema.problemsetProblem.id })
   // 题目集变了，已加入的人的 totalProblemsCount / 百分比都得跟着变，
-  // 否则学生看到的进度分母还是老的。旧后端没做这一步。
+  // 否则学生看到的进度分母还是老的。旧栈是靠 ProblemSetProblem 的 post_save 信号做的，
+  // 不在 views 里，别因为翻不到显式调用就以为它没做（见 services/problemset.ts）。
   await resyncProgress(row.id)
   return success(c, { id: created!.id }, 201)
 })

@@ -47,9 +47,13 @@ export function computeProgress(
     // 乘 10000 四舍五入再除 100，保留两位小数
     progressPercentage: total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
     isCompleted,
-    // 完成状态没了，complete_time 也不该留着。学生那一路本来就是这么写的，
-    // 后台这一路以前保留旧时间，于是同一行会出现「未完成 + 有完成时间」。
-    completeTime: isCompleted ? previousCompleteTime ?? now : null,
+    // 只设不清，语义是「曾经完成于」，对齐旧栈 problemset/models.py:218。
+    //
+    // 「未完成 + 有完成时间」是允许的组合，快照里就有 4 条 —— 题单 8 那批人在它
+    // 还只有 6 题时完成过，老师后来加到 12 题，进度退回未完成，完成时间留了下来。
+    // 反过来清空的代价是不可逆：往一个 100 人已完成的题单里加一道题、再改主意删掉，
+    // 这 100 个人的历史完成时间就一起被冲成了「现在」。
+    completeTime: previousCompleteTime ?? (isCompleted ? now : null),
   }
 }
 
@@ -139,9 +143,14 @@ export async function recalculateBadge(badge: BadgeRow, known?: (BadgeCheck & { 
 /**
  * 题目集或分值变动后，把所有参与者的进度整体重算一遍，再重算这份题单的奖章。
  *
- * 旧后端两件事都不做：往题单里加一道题，学生那边的 totalProblemsCount 还是老数字，
- * 进度百分比因此偏高；奖章那边更是没人回头判过，生产快照里因此攒下 53 条应发未发
- * （30 名学生，其中 23 条来自 2026-05-22 那次批量补进度）。
+ * 别信「旧后端不做这件事」那个说法（本仓早先的注释里有，是错的）：旧栈用 signals 做了，
+ * 而且两件事都做 —— problemset/signals.py 在 ProblemSetProblem 的 post_save / post_delete
+ * 上重算全部参与者的进度、再重算该题单全部奖章的资格。重写时 views 里看不到显式调用，
+ * 就当成没做，于是奖章那一半漏了，生产快照里攒下 53 条应发未发（30 名学生）。
+ *
+ * 那 53 条里有 23 条另有出处：旧栈的管理命令 fix_problemset_progress 按实际 AC 记录补
+ * progress_detail，可 signals 只挂在 ProblemSetProblem 和 ProblemSetBadge 上、不挂 Progress，
+ * 所以进度补了、奖章一枚没补。OJ2 这边目前也还没有补进度的对应工具。
  */
 export async function resyncProgress(problemsetId: number) {
   const [links, progresses, badges] = await Promise.all([

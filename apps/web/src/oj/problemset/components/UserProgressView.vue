@@ -9,6 +9,7 @@ import { usePagination } from "shared/composables/pagination"
 import Pagination from "shared/components/Pagination.vue"
 
 const route = useRoute()
+const message = useMessage()
 const problemSetId = computed(() => Number(route.params.problemSetId))
 const progress = ref<ProblemSetProgress[]>([])
 const loading = ref(false)
@@ -54,19 +55,26 @@ async function loadUserProgress() {
   if (completionFilter.value) {
     params.completionStatus = completionFilter.value
   }
-  const res = await getProblemSetUserProgress(problemSetId.value, params)
+  try {
+    const res = await getProblemSetUserProgress(problemSetId.value, params)
 
-  progress.value = res.results
-  total.value = res.total
-  // 使用后端返回的统计数据（基于所有数据）
-  if (res.statistics) {
-    statistics.value = res.statistics
+    progress.value = res.results
+    total.value = res.total
+    // 使用后端返回的统计数据（基于所有数据）
+    if (res.statistics) {
+      statistics.value = res.statistics
+    }
+    // 保存所有题目信息
+    if (res.problems) {
+      allProblems.value = res.problems
+    }
+  } catch (err: any) {
+    // finally 里收掉 loading：以前 loading.value = false 写在 await 之后，
+    // 请求一失败（403、断网）转圈就永远停不下来
+    message.error("加载用户进度失败：" + (err.data || "未知错误"))
+  } finally {
+    loading.value = false
   }
-  // 保存所有题目信息
-  if (res.problems) {
-    allProblems.value = res.problems
-  }
-  loading.value = false
 }
 
 // 监听分页参数变化

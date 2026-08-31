@@ -97,11 +97,10 @@ async function handleJoinProblemSet() {
   }
 }
 
-const showTabs = computed(
-  () =>
-    userStore.isSuperAdmin ||
-    (isJoined.value && problemSet.value?.userProgress?.isCompleted),
-)
+// 「用户进度」那一栏调的是 requireTeacher 的接口（Teacher Admin | Super Admin），
+// 所以这里的条件必须跟它一致。以前写的是「超管 或 自己完成了题单」，两边正好错开：
+// 学生做完题单会看到这一栏、点进去 403；而真正该用它的 Teacher Admin 反倒看不到。
+const showTabs = computed(() => userStore.isTeacherOrAbove)
 
 onMounted(init)
 </script>
