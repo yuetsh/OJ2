@@ -255,7 +255,7 @@ onMounted(() => {
               :filter="filterClassUser"
               name="class-username"
               id="login-class-username"
-              placeholder="选择姓名，也可以打拼音"
+              placeholder="选择姓名，可打拼音或缩写搜索"
               @update:value="onUsernamePicked"
             />
             <n-input
@@ -305,6 +305,8 @@ onMounted(() => {
             </n-flex>
           </n-form-item>
           <n-alert :show-icon="false" class="tip">
+            找人不用切输入法：姓名那里直接打拼音 zhangsan 或缩写 zs
+            都能搜到张三。<br />
             往届的班级、列表里找不到的班级、以及自己注册的账号，选【没有我所在的班级】，用户名要写完整，比如
             23 计算机 1 班张三写 ks231张三。
           </n-alert>
