@@ -29,6 +29,20 @@
       "when": 1787850608174,
       "tag": "0003_submission_public_create_time_id_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788271411343,
+      "tag": "0004_add_tutorial_progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788272667927,
+      "tag": "0005_add_exercise_attempt",
+      "breakpoints": true
     }
   ]
 }

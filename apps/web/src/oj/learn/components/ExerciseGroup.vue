@@ -3,6 +3,10 @@ import type { Exercise, ExerciseGroupData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExerciseGroupData)
 
 const order = ref<number[]>([]) // item 的稳定展示顺序（初始乱序）
@@ -72,6 +76,10 @@ function chipStyle(i: number): Record<string, string> {
 
 function submit() {
   submitted.value = true
+  emit("attempt", {
+    correct: allCorrect.value,
+    answer: `分组 ${placement.value.map((b, i) => `${i + 1}→${b === -1 ? "?" : b + 1}`).join("、")}`,
+  })
 }
 
 function reset() {

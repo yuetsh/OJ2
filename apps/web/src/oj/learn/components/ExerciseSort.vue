@@ -5,6 +5,10 @@ import { highlightLines } from "../composables/useCodeHighlight"
 import "./exercise-highlight.css"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExerciseSortData)
 
 type LineItem = { originalIdx: number; text: string }
@@ -55,6 +59,11 @@ const allCorrect = computed(() =>
 
 function submit() {
   submitted.value = true
+  emit("attempt", {
+    correct: allCorrect.value,
+    // 报的是「他把原文第几行排在了第几位」，老师对着题面就能看出错在哪
+    answer: `顺序 ${lines.value.map((item) => item.originalIdx + 1).join("-")}`,
+  })
 }
 
 function reset() {

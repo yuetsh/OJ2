@@ -90,6 +90,20 @@ export function duration(
   return formatDurationUnits(durationObj, units)
 }
 
+/**
+ * 自学时长的显示。心跳是 15 秒一跳，本来就精确不到秒，一律按分钟取整；
+ * 0 显示成短横线而不是「0 分钟」——「没学过」和「学了不到一分钟」不是一回事。
+ */
+export function readableDuration(seconds: number): string {
+  if (seconds <= 0) return "-"
+  if (seconds < 60) return "不到 1 分钟"
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} 小时 ${rest} 分` : `${hours} 小时`
+}
+
 export function durationToDays(
   start: Date | string,
   end: Date | string,

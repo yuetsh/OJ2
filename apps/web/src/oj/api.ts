@@ -55,6 +55,7 @@ import type {
   SubmitCodePayload,
   WebsiteConfig,
   Tutorial,
+  TutorialProgress,
 } from "utils/types"
 
 /**
@@ -458,4 +459,51 @@ export function getProblemSetUserProgress(
 
 export function getExercises(tutorialId: number): Promise<Exercise[]> {
   return api.get<Exercise[]>(`tutorials/${tutorialId}/exercises`)
+}
+
+/**
+ * 上报一次练一练的作答。`answer` 是给老师看的一句人话（「选了 A、C」），
+ * 只在做错时才有意义，做对了不用带。
+ *
+ * 截到 200 字符再发：后端契约卡的就是 200，填空题填了一整段的话，
+ * 不截就是一个 400，而学生这边什么都看不见 —— 留痕失败得静悄悄的。
+ */
+export function reportExerciseAttempt(
+  exerciseId: number,
+  payload: { correct: boolean; answer?: string },
+) {
+  return fetch(`/api/exercises/${exerciseId}/attempts`, {
+    method: "POST",
+    credentials: "include",
+    keepalive: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      correct: payload.correct,
+      answer: payload.answer?.slice(0, 200),
+    }),
+  }).catch(() => undefined)
+}
+
+export function getLearnProgress(type: "python" | "c") {
+  return api.get<TutorialProgress[]>("learn/progress", { params: { type } })
+}
+
+/**
+ * 上报自学留痕。`opened` 为真表示刚进这一课，否则只是补停留时长。
+ *
+ * 走裸 fetch 而不是 axios，是为了 `keepalive`：离开页面那一下的最后一次上报，
+ * axios 发出去也会随页面卸载被浏览器掐掉，学生每节课的最后一段时长就永远丢了。
+ * 失败一律吞掉 —— 留痕是旁路，不该让学生看到任何报错。
+ */
+export function reportLearnProgress(
+  tutorialId: number,
+  payload: { seconds: number; opened: boolean },
+) {
+  return fetch(`/api/tutorials/${tutorialId}/progress`, {
+    method: "POST",
+    credentials: "include",
+    keepalive: true,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => undefined)
 }

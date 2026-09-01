@@ -78,6 +78,45 @@ export const tutorialSchema = tutorialSummarySchema.extend({
   updatedAt: z.string(),
 })
 
+/**
+ * 自学留痕的上报。前端每进一课发一次 `opened: true`（`seconds` 为 0），
+ * 之后按心跳补时长发 `opened: false`。
+ *
+ * `seconds` 卡在 1 小时以内：一次上报最多也就攒几分钟，超出这个量级只可能是
+ * 客户端算错或有人手造请求，直接拒掉比默默入库好——停留时长是要给老师看的。
+ */
+export const tutorialProgressPingSchema = z.object({
+  seconds: z.number().int().min(0).max(3600),
+  opened: z.boolean(),
+})
+
+/**
+ * 学习页目录要的整套进度：**每篇公开教程都有一行**，没读过的就是一行零。
+ * 让前端 `progress[id]` 永远取得到，省得目录里每处都判一次 undefined。
+ */
+export const tutorialProgressSchema = z.object({
+  tutorialId: z.number().int(),
+  viewCount: z.number().int(),
+  totalSeconds: z.number().int(),
+  // 没读过时是 null，不是假的零时间
+  firstViewedAt: z.string().nullable(),
+  lastViewedAt: z.string().nullable(),
+  exerciseTotal: z.number().int(),
+  exerciseSolved: z.number().int(),
+})
+
+/**
+ * 一次练一练的作答。
+ *
+ * `answer` 是前端拼好的一句人话（「选了 A、C」），只在做错时留下来给老师看；
+ * 做对了没什么好看的。长度卡在 200 字符：它是给人扫一眼的摘要，不是完整作答，
+ * 填空题写一整段进来只会把后台表格撑爆。
+ */
+export const exerciseAttemptRequestSchema = z.object({
+  correct: z.boolean(),
+  answer: z.string().max(200).optional(),
+})
+
 export const exerciseSchema = z.object({
   id: z.number().int(),
   type: z.enum(["mcq", "sort", "fill", "match", "predict", "debug", "group"]),
@@ -99,3 +138,6 @@ export type ReactionState = z.infer<typeof reactionStateSchema>
 export type SetReactionRequest = z.infer<typeof setReactionRequestSchema>
 export type Tutorial = z.infer<typeof tutorialSchema>
 export type Exercise = z.infer<typeof exerciseSchema>
+export type TutorialProgress = z.infer<typeof tutorialProgressSchema>
+export type TutorialProgressPing = z.infer<typeof tutorialProgressPingSchema>
+export type ExerciseAttemptRequest = z.infer<typeof exerciseAttemptRequestSchema>

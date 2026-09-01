@@ -4,6 +4,10 @@ import { highlightLines } from "../composables/useCodeHighlight"
 import "./exercise-highlight.css"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExerciseDebugData)
 
 const lineHtml = computed(() => highlightLines(data.value.lines, props.lang))
@@ -65,6 +69,11 @@ function lineStyle(i: number): Record<string, string> {
 
 function submit() {
   submitted.value = true
+  const picked = [...selected.value].sort((a, b) => a - b).map((i) => i + 1)
+  emit("attempt", {
+    correct: allCorrect.value,
+    answer: picked.length ? `选了第 ${picked.join("、")} 行` : "一行都没选",
+  })
 }
 
 function reset() {

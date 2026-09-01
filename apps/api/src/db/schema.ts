@@ -16,7 +16,7 @@
 // problem、contest、submission）都是 int4。现存最大 id 一万出头，确实都用不上 bigint，
 // 但 2026-08-26 评估后决定**不改**：省 4 字节/行毫无意义，ALTER TYPE 要重写整表并拿
 // ACCESS EXCLUSIVE 锁，而且其中 6 处 id 被外键绑着得连坐。别再提这件事了。
-import { pgTable, index, foreignKey, bigint, text, jsonb, timestamp, integer, boolean, serial, doublePrecision, varchar, unique, uniqueIndex } from "drizzle-orm/pg-core"
+import { pgTable, index, foreignKey, primaryKey, bigint, text, jsonb, timestamp, integer, boolean, serial, doublePrecision, varchar, unique, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const aiAnalysis = pgTable("ai_analysis", {
@@ -682,4 +682,83 @@ export const problemsetBadge = pgTable("problemset_badge", {
 			foreignColumns: [problemset.id],
 			name: "problemset_badge_problemset_id_6cb6c74f_fk_problemset_id"
 		}),
+]);
+
+/**
+ * 自学模块的留痕：一个学生 × 一课一行。
+ *
+ * OJ2 自己建的表，不是 Django 遗留，所以没有代理主键 —— 写入路径只有一条 upsert，
+ * 冲突目标就是 (user_id, tutorial_id)，再挂个 id 序列没有任何用处。
+ *
+ * **只记「读到哪一课 + 停留多久」，不记练一练的作答。** 练习的对错全在浏览器里判
+ * （见 apps/web/src/oj/learn/components/），学生可以随便重试到对为止，上报上来也只是
+ * 「他按了几次按钮」，不构成教学证据，还要为此多养一张按人按题膨胀的表。
+ *
+ * 外键这里**用了库级 CASCADE**，和 Django 建的那些 NO ACTION 外键不同：删教程、删用户
+ * 都不必再记得回来手工清一遍子表（后台删教程的事务里就没清它，靠的就是这里）。
+ */
+export const tutorialProgress = pgTable("tutorial_progress", {
+	userId: integer("user_id").notNull(),
+	tutorialId: integer("tutorial_id").notNull(),
+	// 打开次数。只有「进入这一课」才 +1，后续补时长的心跳不动它
+	viewCount: integer("view_count").default(0).notNull(),
+	// 累计停留秒数。前端只在页面可见、且人没挂机时计时，见 useLearnTrace.ts
+	totalSeconds: integer("total_seconds").default(0).notNull(),
+	firstViewedAt: timestamp("first_viewed_at", { withTimezone: true, mode: 'string' }).notNull(),
+	lastViewedAt: timestamp("last_viewed_at", { withTimezone: true, mode: 'string' }).notNull(),
+}, (table) => [
+	primaryKey({ columns: [table.userId, table.tutorialId], name: "tutorial_progress_pkey" }),
+	// 按课汇总（「这一课全班多少人读过」）要扫这一列，主键的前缀索引帮不上忙
+	index("tutorial_progress_tutorial_id_idx").on(table.tutorialId),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "tutorial_progress_user_id_fk_user_id"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.tutorialId],
+			foreignColumns: [tutorial.id],
+			name: "tutorial_progress_tutorial_id_fk_tutorial_id"
+		}).onDelete("cascade"),
+]);
+
+/**
+ * 练一练的留痕：一个学生 × 一道练习一行。
+ *
+ * 存的是**聚合**，不是流水：试了几次、错了几次、做没做对、第几次做对的、
+ * 最后一次做错时填的什么。一道题一个学生一行，全校封顶就是「学生数 × 练习数」，
+ * 而流水会随着学生反复点「提交」无限长 —— 而且多存的那些行回答不了任何新问题：
+ * 「他第 3 次和第 5 次都选了 B」对老师没有意义，「他试了 7 次才对」有。
+ *
+ * `lastWrongAnswer` 存的是**前端拼好的一句人话**（「选了 A、C」「第 2 空填了 xy」），
+ * 不是原始作答结构：七种题型的作答形状各不相同，存结构就得在后台按题型各写一套
+ * 渲染，而老师要看的只是「他错在哪」。前端本来就知道怎么把自己的作答说成人话。
+ */
+export const exerciseAttempt = pgTable("exercise_attempt", {
+	userId: integer("user_id").notNull(),
+	exerciseId: integer("exercise_id").notNull(),
+	// 提交次数。同一份答案连点两次只算一次，见 ExerciseWidget.vue 的去重
+	attempts: integer().default(0).notNull(),
+	wrongAttempts: integer("wrong_attempts").default(0).notNull(),
+	solved: boolean().default(false).notNull(),
+	// 第一次做对时累计试了几次。做对之后就不再变 —— 后面再点提交不该把它改大
+	attemptsToSolve: integer("attempts_to_solve"),
+	lastWrongAnswer: text("last_wrong_answer"),
+	firstAttemptAt: timestamp("first_attempt_at", { withTimezone: true, mode: 'string' }).notNull(),
+	lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true, mode: 'string' }).notNull(),
+	solvedAt: timestamp("solved_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	primaryKey({ columns: [table.userId, table.exerciseId], name: "exercise_attempt_pkey" }),
+	// 按题汇总（「这道题全班多少人做对」）要扫这一列
+	index("exercise_attempt_exercise_id_idx").on(table.exerciseId),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "exercise_attempt_user_id_fk_user_id"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.exerciseId],
+			foreignColumns: [exercise.id],
+			name: "exercise_attempt_exercise_id_fk_exercise_id"
+		}).onDelete("cascade"),
 ]);

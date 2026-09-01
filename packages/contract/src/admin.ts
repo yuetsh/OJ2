@@ -512,6 +512,90 @@ export const acTrendSchema = z.object({
   yearly: z.array(acTrendYearSchema),
 })
 
+// ---------------------------------------------------------------- 自学情况
+
+/**
+ * 「自学情况」按学生的一行。**没读过任何一课的学生也要有一行**（readCount = 0）——
+ * 这张表首要回答的问题是「谁还没开始」，只列有记录的人等于把该看的人筛掉了。
+ */
+export const learnStudentProgressSchema = z.object({
+  userId: z.number().int(),
+  username: z.string(),
+  realName: z.string().nullable(),
+  className: z.string().nullable(),
+  readCount: z.number().int(),
+  totalSeconds: z.number().int(),
+  lastViewedAt: z.string().nullable(),
+  // 练一练：做过几道、做对几道、一共点了几次提交
+  exerciseTried: z.number().int(),
+  exerciseSolved: z.number().int(),
+  exerciseAttempts: z.number().int(),
+})
+
+export const learnStudentProgressListSchema = z.object({
+  // 分母：该语言下已公开的教程篇数，前端拿它显示 3/17
+  tutorialCount: z.number().int(),
+  // 分母：这些教程里一共有多少道练一练
+  exerciseCount: z.number().int(),
+  results: z.array(learnStudentProgressSchema),
+})
+
+/**
+ * 「按练习」一行。回答的是「哪道练习卡住了全班」——
+ * `solvedUsers / triedUsers` 是正确率，`avgAttemptsToSolve` 是做对的人平均试了几次，
+ * `firstTryUsers` 是一次就做对的人数。三个一起看才分得清「题目难」和「题目有歧义」：
+ * 前者是试了几次终于做对，后者是很多人第一次就掉进同一个坑。
+ */
+export const learnExerciseProgressSchema = z.object({
+  exerciseId: z.number().int(),
+  tutorialId: z.number().int(),
+  tutorialTitle: z.string(),
+  tutorialOrder: z.number().int(),
+  type: exerciseTypeSchema,
+  order: z.number().int(),
+  question: z.string(),
+  triedUsers: z.number().int(),
+  solvedUsers: z.number().int(),
+  firstTryUsers: z.number().int(),
+  attempts: z.number().int(),
+  avgAttemptsToSolve: z.number(),
+})
+
+export const learnExerciseProgressListSchema = z.object({
+  studentCount: z.number().int(),
+  results: z.array(learnExerciseProgressSchema),
+})
+
+/** 单道练习的逐人明细，后台表格展开时才拉 */
+export const learnExerciseAttemptSchema = z.object({
+  userId: z.number().int(),
+  username: z.string(),
+  realName: z.string().nullable(),
+  className: z.string().nullable(),
+  attempts: z.number().int(),
+  wrongAttempts: z.number().int(),
+  solved: z.boolean(),
+  attemptsToSolve: z.number().int().nullable(),
+  lastWrongAnswer: z.string().nullable(),
+  lastAttemptAt: z.string(),
+})
+
+/** 「自学情况」按课的一行 */
+export const learnTutorialProgressSchema = z.object({
+  tutorialId: z.number().int(),
+  title: z.string(),
+  order: z.number().int(),
+  readers: z.number().int(),
+  totalSeconds: z.number().int(),
+  avgSeconds: z.number().int(),
+})
+
+export const learnTutorialProgressListSchema = z.object({
+  // 分母：统计范围内的学生数（受班级筛选影响）
+  studentCount: z.number().int(),
+  results: z.array(learnTutorialProgressSchema),
+})
+
 export const generateFlowchartRequestSchema = z.object({ python: z.string().min(1).max(64 * 1024) })
 export const generateFlowchartResponseSchema = z.object({ flowchart: z.string() })
 
@@ -715,6 +799,13 @@ export type AdminAiReportListItem = z.infer<typeof adminAiReportListItemSchema>
 export type AdminAiReport = z.infer<typeof adminAiReportSchema>
 export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
 export type StuckProblem = z.infer<typeof stuckProblemSchema>
+export type LearnStudentProgress = z.infer<typeof learnStudentProgressSchema>
+export type LearnStudentProgressList = z.infer<typeof learnStudentProgressListSchema>
+export type LearnTutorialProgress = z.infer<typeof learnTutorialProgressSchema>
+export type LearnTutorialProgressList = z.infer<typeof learnTutorialProgressListSchema>
+export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>
+export type LearnExerciseProgressList = z.infer<typeof learnExerciseProgressListSchema>
+export type LearnExerciseAttempt = z.infer<typeof learnExerciseAttemptSchema>
 export type AcTrend = z.infer<typeof acTrendSchema>
 
 export type AdminTag = z.infer<typeof adminTagSchema>

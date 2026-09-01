@@ -413,6 +413,13 @@ export type {
   AdminAiReportList,
   StuckProblem,
   AcTrend,
+  LearnStudentProgress,
+  LearnStudentProgressList,
+  LearnTutorialProgress,
+  LearnTutorialProgressList,
+  LearnExerciseProgress,
+  LearnExerciseProgressList,
+  LearnExerciseAttempt,
 } from "@oj2/contract"
 
 /**
@@ -464,6 +471,9 @@ export type {
   AdminTutorial as Tutorial,
   AdminTutorialListItem as TutorialListItem,
 } from "@oj2/contract"
+
+/** 学生自己的自学留痕，学习页的目录拿它打勾 */
+export type { TutorialProgress } from "@oj2/contract"
 import type {
   AdminExercise,
   AdminTutorial,

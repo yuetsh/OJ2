@@ -10,10 +10,13 @@ import {
   reactionStateSchema,
   setReactionRequestSchema,
   embeddedSubmissionSchema,
+  exerciseAttemptRequestSchema,
+  tutorialProgressPingSchema,
+  tutorialProgressSchema,
   tutorialSchema,
   tutorialSummarySchema,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
@@ -204,6 +207,162 @@ contentRoutes.get("/tutorials/:id", async (c) => {
     createdAt: row.tutorial.createdAt,
     updatedAt: row.tutorial.updatedAt,
   }))
+})
+
+// ---------------------------------------------------------------- 自学留痕
+
+/**
+ * 学生自己的自学进度，给学习页的目录打勾用。
+ *
+ * 路径特意不放在 `/tutorials` 下：Hono 按**注册顺序**匹配（不是静态优先），
+ * `/tutorials/:id` 就在上面几行，`/tutorials/progress` 会被它整个吃掉，而且不报错
+ * ——`queryInteger("progress")` 回落成 0，学生只会看到一个「教程不存在」。
+ */
+contentRoutes.get("/learn/progress", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const type = c.req.query("type") === "c" ? "c" : "python"
+  const visible = and(eq(schema.tutorial.type, type), eq(schema.tutorial.isPublic, true))
+
+  // 从 tutorial 打底 left join 进度，而不是反过来：没读过的课也要有一行零，
+  // 否则目录里「练习 0/5」和「这课没有练习」在前端分不出来
+  const [rows, exerciseRows] = await Promise.all([
+    db.select({
+      tutorialId: schema.tutorial.id,
+      viewCount: schema.tutorialProgress.viewCount,
+      totalSeconds: schema.tutorialProgress.totalSeconds,
+      firstViewedAt: schema.tutorialProgress.firstViewedAt,
+      lastViewedAt: schema.tutorialProgress.lastViewedAt,
+    }).from(schema.tutorial)
+      .leftJoin(schema.tutorialProgress, and(
+        eq(schema.tutorialProgress.tutorialId, schema.tutorial.id),
+        eq(schema.tutorialProgress.userId, user.id),
+      ))
+      .where(visible)
+      .orderBy(asc(schema.tutorial.order)),
+    db.select({
+      tutorialId: schema.exercise.tutorialId,
+      total: count(),
+      solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(Number),
+    }).from(schema.exercise)
+      .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
+      .leftJoin(schema.exerciseAttempt, and(
+        eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
+        eq(schema.exerciseAttempt.userId, user.id),
+      ))
+      .where(visible)
+      .groupBy(schema.exercise.tutorialId),
+  ])
+  const exercises = new Map(exerciseRows.map((row) => [row.tutorialId, row]))
+
+  return success(c, rows.map((row) => tutorialProgressSchema.parse({
+    tutorialId: row.tutorialId,
+    viewCount: row.viewCount ?? 0,
+    totalSeconds: row.totalSeconds ?? 0,
+    firstViewedAt: row.firstViewedAt,
+    lastViewedAt: row.lastViewedAt,
+    exerciseTotal: exercises.get(row.tutorialId)?.total ?? 0,
+    exerciseSolved: exercises.get(row.tutorialId)?.solved ?? 0,
+  })))
+})
+
+/**
+ * 上报一次自学留痕。`opened` 为真表示「刚进这一课」，计一次打开；
+ * 否则只是心跳补时长，见 apps/web/src/oj/learn/composables/useLearnTrace.ts。
+ *
+ * 未登录一律 401 而不是静默丢弃 —— 教程本身保持免登录可读，前端只在登录后才调它，
+ * 真收到匿名请求说明前端判断错了，得让它响。
+ */
+contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = tutorialProgressPingSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return failure(c, 400, "invalid-request", "Invalid progress payload")
+  const [tutorial] = await db.select({ id: schema.tutorial.id }).from(schema.tutorial)
+    .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true))).limit(1)
+  if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+
+  const now = new Date().toISOString()
+  const { seconds, opened } = parsed.data
+  await db.insert(schema.tutorialProgress).values({
+    userId: user.id,
+    tutorialId: id,
+    viewCount: opened ? 1 : 0,
+    totalSeconds: seconds,
+    firstViewedAt: now,
+    lastViewedAt: now,
+  }).onConflictDoUpdate({
+    target: [schema.tutorialProgress.userId, schema.tutorialProgress.tutorialId],
+    set: {
+      // 累加在库里做，不是「读出来加一下再写回去」：同一个学生开两个标签页
+      // 同时上报时，读改写会互相覆盖，时长凭空少掉一半
+      viewCount: sql`${schema.tutorialProgress.viewCount} + ${opened ? 1 : 0}`,
+      totalSeconds: sql`${schema.tutorialProgress.totalSeconds} + ${seconds}`,
+      lastViewedAt: now,
+    },
+  })
+  return success(c, null)
+})
+
+/**
+ * 上报一次练一练的作答。
+ *
+ * 对错是**前端判的** —— 练一练的答案本来就随题面一起下发给浏览器（见
+ * `/tutorials/:id/exercises`），后端再判一遍也挡不住任何人，只是重复实现七套判题。
+ * 所以这里存的是「学生自己说他做对了」，作为教学观察够用，**不能当考试成绩**。
+ *
+ * 做对之后的重复提交只更新时间，不再累加 —— 学生做对后再点几下提交，
+ * 不该把「他试了几次」这个数字变大。
+ */
+contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = exerciseAttemptRequestSchema.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) return failure(c, 400, "invalid-request", "Invalid attempt payload")
+  // 练习跟着教程走：教程没公开，它底下的练习也不该能上报
+  const [exercise] = await db.select({ id: schema.exercise.id }).from(schema.exercise)
+    .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
+    .where(and(eq(schema.exercise.id, id), eq(schema.tutorial.isPublic, true))).limit(1)
+  if (!exercise) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
+
+  const now = new Date().toISOString()
+  const { correct } = parsed.data
+  const answer = correct ? null : (parsed.data.answer ?? null)
+  await db.insert(schema.exerciseAttempt).values({
+    userId: user.id,
+    exerciseId: id,
+    attempts: 1,
+    wrongAttempts: correct ? 0 : 1,
+    solved: correct,
+    attemptsToSolve: correct ? 1 : null,
+    lastWrongAnswer: answer,
+    firstAttemptAt: now,
+    lastAttemptAt: now,
+    solvedAt: correct ? now : null,
+  }).onConflictDoUpdate({
+    target: [schema.exerciseAttempt.userId, schema.exerciseAttempt.exerciseId],
+    set: {
+      // 一律在库里算，不读出来改了再写回去：两个标签页同时提交会互相覆盖。
+      //
+      // 每一列都先看 `solved`：做对之后这一行就冻住了，只有 lastAttemptAt 还动。
+      // 不冻的话，学生做对后随手再点几下提交，「他试了几次才做对」就被改花了。
+      attempts: sql`${schema.exerciseAttempt.attempts} + case when ${schema.exerciseAttempt.solved} then 0 else 1 end`,
+      wrongAttempts: sql`${schema.exerciseAttempt.wrongAttempts} + case when ${schema.exerciseAttempt.solved} or ${correct} then 0 else 1 end`,
+      solved: sql`${schema.exerciseAttempt.solved} or ${correct}`,
+      attemptsToSolve: sql`case
+        when ${schema.exerciseAttempt.solved} then ${schema.exerciseAttempt.attemptsToSolve}
+        when ${correct} then ${schema.exerciseAttempt.attempts} + 1
+        else null end`,
+      solvedAt: sql`case
+        when ${schema.exerciseAttempt.solved} then ${schema.exerciseAttempt.solvedAt}
+        when ${correct} then ${now}::timestamptz
+        else null end`,
+      lastWrongAnswer: sql`case
+        when ${schema.exerciseAttempt.solved} or ${correct} then ${schema.exerciseAttempt.lastWrongAnswer}
+        else ${answer} end`,
+      lastAttemptAt: now,
+    },
+  })
+  return success(c, null)
 })
 
 contentRoutes.get("/tutorials/:id/exercises", async (c) => {

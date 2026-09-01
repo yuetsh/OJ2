@@ -335,5 +335,11 @@ export const admins: RouteRecordRaw = {
       component: () => import("admin/ai/list.vue"),
       meta: { requiresTeacherAdmin: true },
     },
+    {
+      path: "learn",
+      name: "admin learn analytics",
+      component: () => import("admin/learn/index.vue"),
+      meta: { requiresTeacherAdmin: true },
+    },
   ],
 }

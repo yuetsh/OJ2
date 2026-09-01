@@ -12,6 +12,10 @@ import type {
   AdminAiReport,
   AdminAiReportList,
   StuckProblem,
+  LearnStudentProgressList,
+  LearnTutorialProgressList,
+  LearnExerciseProgressList,
+  LearnExerciseAttempt,
   AdminContestList,
   AdminUser,
   AdminUserList,
@@ -662,6 +666,43 @@ export function removeUserFromProblemSet(problemSetId: number, userId: number) {
 // 学生卡点分析
 export function getStuckProblems() {
   return api.get<StuckProblem[]>("admin/problem-analytics/stuck")
+}
+
+export function getLearnStudents(params: {
+  type: "python" | "c"
+  className?: string
+}) {
+  return api.get<LearnStudentProgressList>("admin/learn-analytics/students", {
+    params,
+  })
+}
+
+export function getLearnTutorials(params: {
+  type: "python" | "c"
+  className?: string
+}) {
+  return api.get<LearnTutorialProgressList>("admin/learn-analytics/tutorials", {
+    params,
+  })
+}
+
+export function getLearnExercises(params: {
+  type: "python" | "c"
+  className?: string
+}) {
+  return api.get<LearnExerciseProgressList>("admin/learn-analytics/exercises", {
+    params,
+  })
+}
+
+export function getLearnExerciseAttempts(
+  exerciseId: number,
+  params: { className?: string },
+) {
+  return api.get<LearnExerciseAttempt[]>(
+    `admin/learn-analytics/exercises/${exerciseId}/attempts`,
+    { params },
+  )
 }
 
 export function getTopACTrend(params: {

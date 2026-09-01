@@ -67,6 +67,11 @@ const options = computed<MenuOption[]>(() => {
           ),
         key: "admin ai reports",
       },
+      {
+        label: () =>
+          h(RouterLink, { to: "/admin/learn" }, { default: () => "自学" }),
+        key: "admin learn analytics",
+      },
     )
   }
 
@@ -150,6 +155,11 @@ const options = computed<MenuOption[]>(() => {
           ),
         key: "admin ai reports",
       },
+      {
+        label: () =>
+          h(RouterLink, { to: "/admin/learn" }, { default: () => "自学" }),
+        key: "admin learn analytics",
+      },
     )
   }
 
@@ -171,6 +181,7 @@ const active = computed(() => {
   if (path.startsWith("/admin/announcement")) return "admin announcement list"
   if (path.startsWith("/admin/tutorial")) return "admin tutorial list"
   if (path.startsWith("/admin/ai")) return "admin ai reports"
+  if (path.startsWith("/admin/learn")) return "admin learn analytics"
   return route.name as string
 })
 

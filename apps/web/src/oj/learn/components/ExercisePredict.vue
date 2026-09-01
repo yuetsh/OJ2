@@ -4,6 +4,10 @@ import { highlight } from "../composables/useCodeHighlight"
 import "./exercise-highlight.css"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExercisePredictData)
 
 const codeHtml = computed(() => highlight(data.value.code, props.lang))
@@ -27,8 +31,21 @@ const allCorrect = computed(() =>
   data.value.answer.some((a) => normalize(a) === normalize(userInput.value)),
 )
 
+// 改了答案就把上一次的判定收回去，等他重新点提交 —— 排序/连线/找错/分组四种题
+// 本来就是这么做的（各自的交互处都会把 submitted 置回 false），只有这里漏了。
+// 不收回的话，`allCorrect` 是跟着输入实时算的，学生错一次之后把答案改对，
+// 界面直接跳成「输出正确！」、提交按钮同时禁用 —— submit() 再也不会执行，
+// 于是这道题**永远不会被记成做对**（留痕里他就一直卡在那次错的上面）。
+watch(userInput, () => {
+  submitted.value = false
+})
+
 function submit() {
   submitted.value = true
+  emit("attempt", {
+    correct: allCorrect.value,
+    answer: `答「${userInput.value.replace(/\n/g, "⏎")}」`,
+  })
 }
 
 function reset() {

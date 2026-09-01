@@ -4,6 +4,10 @@ import { highlight } from "../composables/useCodeHighlight"
 import "./exercise-highlight.css"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExerciseFillData)
 
 type CodeSeg = { type: "code"; html: string }
@@ -58,6 +62,10 @@ function submit() {
   }
   wrongBlanks.value = wrong
   allCorrect.value = wrong.size === 0
+  emit("attempt", {
+    correct: allCorrect.value,
+    answer: `填了 ${userInputs.value.map((v) => v.trim() || "（空）").join(" | ")}`,
+  })
 }
 
 function inputWidth(idx: number): string {

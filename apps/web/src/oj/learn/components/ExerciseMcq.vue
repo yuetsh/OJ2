@@ -2,6 +2,10 @@
 import type { Exercise, ExerciseMcqData } from "utils/types"
 
 const props = defineProps<{ exercise: Exercise }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExerciseMcqData)
 const isSingle = computed(() => data.value.answer.length === 1)
 
@@ -31,6 +35,7 @@ function submit() {
   const sel = selected.value
   const isEqual =
     sel.size === answer.size && [...sel].every((v) => answer.has(v))
+  emit("attempt", { correct: isEqual, answer: describe(sel) })
   if (isEqual) {
     correct.value = true
     wrong.value = false
@@ -46,6 +51,11 @@ function submit() {
       partial.value = false
     }
   }
+}
+
+/** 给老师看的一句人话：选项按 A/B/C 报，报下标没人看得懂 */
+function describe(sel: Set<number>) {
+  return `选了 ${[...sel].sort((a, b) => a - b).map((i) => String.fromCharCode(65 + i)).join("、")}`
 }
 
 function reset() {

@@ -3,6 +3,10 @@ import type { Exercise, ExerciseMatchData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
+const emit = defineEmits<{
+  attempt: [payload: { correct: boolean; answer?: string }]
+}>()
+
 const data = computed(() => props.exercise.data as ExerciseMatchData)
 
 const PALETTE = [
@@ -69,6 +73,10 @@ function onRightClick(rightIdx: number) {
 
 function submit() {
   submitted.value = true
+  emit("attempt", {
+    correct: allCorrect.value,
+    answer: `配对 ${pairs.value.map((p, i) => `${i + 1}→${p === null ? "?" : p + 1}`).join("、")}`,
+  })
 }
 
 function reset() {
