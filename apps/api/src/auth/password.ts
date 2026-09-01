@@ -54,6 +54,22 @@ export async function verifyPassword(password: string, encoded: string) {
 }
 
 /**
+ * 参数是显式写死的，不用 Bun 的默认值（`m=65536, t=2, p=1`，即每次哈希占 64 MiB）。
+ * 取的是 OWASP 对 argon2id 的推荐下限 `m=19MiB, t=2, p=1`：
+ *
+ * - 批量导入一个班要连算几十次哈希，64 MiB 那档单次 ~140ms，而 `oj-api` 的
+ *   mem_limit 只有 512m（docker/compose.debian.yml），并发度被内存卡死。
+ *   19 MiB 这档单次 ~20ms，并发 4 路的峰值也才 76 MiB。
+ * - 参数是编码进哈希串本身的（`$argon2id$v=19$m=19456,t=2,p=1$...`），所以**存量
+ *   账号一个都不用迁移**，Bun.password.verify 读串里的参数验，改这里只影响此后新写的哈希。
+ */
+const ARGON2_OPTIONS = {
+  algorithm: "argon2id",
+  memoryCost: 19456,
+  timeCost: 2,
+} as const
+
+/**
  * 写密码的**唯一入口**。五个调用方都走这里：注册、管理员改密码、批量导入用户、
  * 重置密码、登录时升级存量 pbkdf2。
  *
@@ -68,5 +84,5 @@ export async function verifyPassword(password: string, encoded: string) {
  * 账号；靠开关只能拦住将来，修不了已经发生的。
  */
 export function hashPassword(password: string) {
-  return Bun.password.hash(password, { algorithm: "argon2id" })
+  return Bun.password.hash(password, ARGON2_OPTIONS)
 }

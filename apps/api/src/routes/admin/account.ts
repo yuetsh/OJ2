@@ -238,18 +238,15 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
     return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
   }
   const rows = parsed.data.users
-  const prepared: { username: string; password: string; raw: string; email: string; realName: string; className: string | null }[] = []
+  type Prepared = { username: string; password: string; raw: string; email: string; realName: string; className: string | null }
+
+  // 先把不花钱的校验全做完，再动 argon2。班级号错、用户名重复这两种情况占了失败的绝大多数
+  // （老师习惯把同一份名单粘两次），先算哈希的话要白等一整个班的 argon2 才看到报错。
+  const prepared: Prepared[] = []
   for (const [username, password, email, realName] of rows) {
     const className = classNameOf(username)
     if (!className.ok) return failure(c, 400, "invalid-class-name", className.message)
-    prepared.push({
-      username,
-      password: await hashPassword(password),
-      raw: password,
-      email,
-      realName,
-      className: className.value,
-    })
+    prepared.push({ username, password: "", raw: password, email, realName, className: className.value })
   }
 
   const existing = await db.select({ username: schema.user.username }).from(schema.user)
@@ -257,6 +254,19 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
   if (existing.length) {
     return failure(c, 409, "username-exists", `用户名已存在：${existing.map((row) => row.username).join("、")}`)
   }
+
+  // argon2id 是**故意**做慢的，串行 await 的话一个班要转好几秒。但也不能 Promise.all
+  // 全量：每次哈希占 m=19MiB（见 auth/password.ts 的 ARGON2_OPTIONS），一个年级 300 人
+  // 同时开就是 5.7GB，而 oj-api 的 mem_limit 只有 512m（docker/compose.debian.yml）。
+  // 固定 4 路并发，瞬时峰值 76MiB 封顶。
+  const HASH_CONCURRENCY = 4
+  let cursor = 0
+  await Promise.all(Array.from({ length: Math.min(HASH_CONCURRENCY, prepared.length) }, async () => {
+    while (cursor < prepared.length) {
+      const item = prepared[cursor++]!
+      item.password = await hashPassword(item.raw)
+    }
+  }))
 
   // 整批要么全进要么全不进 —— 导入是粘一整个班的名单，进了一半再重试会撞已存在
   const created = await db.transaction(async (tx) => {
