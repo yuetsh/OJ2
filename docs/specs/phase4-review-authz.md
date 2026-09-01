@@ -446,7 +446,17 @@ POST   /api/admin/problems/batch-tag {problemIds:[40]}  → 404 no-problems     
 - `DELETE /problem-tags/:id`（`tag.ts:92-102`）的事务里先删 `problemTags` 再删 `problemTag`，但删的是同一个 id，标签不存在时前一句是空操作，**不存在 C1 那种连带破坏**
 - `DELETE /users`（`account.ts:237-257`）禁止删除自己，已实跑确认返回 400 `cannot-delete-self`
 - `PUT /users/:id` 的 `normalizePermission`（`account.ts:49-53`）与 `account/views/admin.py:98-105` 的归一逻辑一致，降级超管会同步清掉 All
-- 真名下发受控：`sampleUser`（`routes/helpers.ts:15-25`）默认 `realName: null`，只有 `acm-helper`（`contest.ts:272`）和题单进度（`problemset.ts:426`）两处显式下发，两处都在 requireTeacher + 归属校验之后
+- 真名下发受控：`sampleUser`（`routes/helpers.ts:15-25`）默认 `realName: null`，只有 `acm-helper`（`contest.ts:272`）显式下发，在 requireTeacher + 归属校验之后
+
+  > **2026-08-31 订正**：本条原先还写了「题单进度（`problemset.ts:426`）」，与代码不符 ——
+  > 学生端那条 `GET /problem-sets/:id/user-progress` 走的是 `sampleUser(progressUser, realName)`，
+  > 没传 `includeRealName`，`realName` 恒为 `null`（SQL 里那次 `leftJoin userProfile` 是白查的）。
+  > 真正显式下发真名的是**后台**那条 `GET /admin/problem-sets/:id/progress`，它手写
+  > `adminProblemSetProgressSchema`，在 requireTeacher + `loadOwned` 归属校验之后，结论仍成立。
+  >
+  > 另外当时漏了一条：学生端那条 `user-progress` 只有 `requireTeacher`、**没有归属校验**，
+  > 任何 Teacher Admin 都能读到别人建的题单的学生名单与进度（不含真名）。已补上归属校验，
+  > 口径与后台的 `loadOwned` 一致，越权报 404。
 - `GET /ai/reports/:id`（`ai.ts:70-83`）不下发 `data` / `systemPrompt` / `userPrompt`
 - `GET /judge-servers`（`conf.ts:90-100`）下发 judge token，但在 requireSuperAdmin 之后，与旧 `conf/views.py:66-74` 一致
 - `DELETE /orphan-test-cases`（`conf.ts:147-160`）对指定 id 也先确认是孤儿，比旧 `conf/views.py:162-171` 严 —— 合理收紧

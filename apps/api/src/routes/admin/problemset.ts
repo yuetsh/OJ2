@@ -275,8 +275,14 @@ adminProblemSetRoutes.delete("/problem-sets/:id/problems/:itemId", requireTeache
   const deleted = await db.delete(schema.problemsetProblem).where(and(
     eq(schema.problemsetProblem.id, queryInteger(c.req.param("itemId"), 0, { min: 1 })),
     eq(schema.problemsetProblem.problemsetId, row.id),
-  )).returning({ id: schema.problemsetProblem.id })
+  )).returning({ id: schema.problemsetProblem.id, problemId: schema.problemsetProblem.problemId })
   if (deleted.length === 0) return failure(c, 404, "problem-not-in-set", "题目不在该题单中")
+  // 这道题在本题单里的提交记录也要清掉，对齐旧栈 problemset/signals.py 的 post_delete。
+  // 不清的话 problemset_submission 会一直攒指向已移出题单的孤儿行。
+  await db.delete(schema.problemsetSubmission).where(and(
+    eq(schema.problemsetSubmission.problemsetId, row.id),
+    eq(schema.problemsetSubmission.problemId, deleted[0]!.problemId),
+  ))
   await resyncProgress(row.id)
   return success(c, null)
 })

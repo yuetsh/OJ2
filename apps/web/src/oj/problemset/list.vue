@@ -16,45 +16,22 @@ const problemSets = ref<ProblemSet[]>([])
 
 interface ProblemSetQuery {
   keyword: string
-  difficulty: string
-  status: string
 }
 
 // 使用分页 composable
 const { query, clearQuery } = usePagination<ProblemSetQuery>(
   {
     keyword: useRouteQuery("keyword", "").value,
-    difficulty: useRouteQuery("difficulty", "").value,
-    status: useRouteQuery("status", "").value,
   },
   {
     defaultLimit: 30,
   },
 )
 
-const difficultyOptions = [
-  { label: "全部", value: "" },
-  { label: "简单", value: "Easy" },
-  { label: "中等", value: "Medium" },
-  { label: "困难", value: "Hard" },
-]
-
-const statusOptions = [
-  { label: "全部", value: "" },
-  { label: "活跃", value: "active" },
-  { label: "已归档", value: "archived" },
-]
-
 async function listProblemSets() {
   if (query.page < 1) query.page = 1
   const offset = (query.page - 1) * query.limit
-  const res = await getProblemSetList(
-    offset,
-    query.limit,
-    query.keyword,
-    query.difficulty,
-    query.status,
-  )
+  const res = await getProblemSetList(offset, query.limit, query.keyword)
   total.value = res.total
   problemSets.value = res.results
 }
@@ -102,35 +79,15 @@ watchDebounced(() => query.keyword, listProblemSets, {
 })
 
 // 监听其他查询条件变化
-watch(
-  () => [query.page, query.limit, query.difficulty, query.status],
-  listProblemSets,
-)
+watch(() => [query.page, query.limit], listProblemSets)
 </script>
 
 <template>
   <n-flex vertical size="large">
+    <!-- 难度和状态两个筛选器撤了：线上 16 个题单全是 Easy / active，选「中等」「困难」
+         「已归档」永远是空列表。接口那两个 query 参数还在，哪天真的用起这两个字段，
+         把 select 加回来即可。 -->
     <n-space>
-      <n-space align="center">
-        <n-text>难度</n-text>
-        <n-select
-          v-model:value="query.difficulty"
-          :options="difficultyOptions"
-          placeholder="选择难度"
-          style="width: 120px"
-          clearable
-        />
-      </n-space>
-      <n-space align="center">
-        <n-text>状态</n-text>
-        <n-select
-          v-model:value="query.status"
-          :options="statusOptions"
-          placeholder="选择状态"
-          style="width: 120px"
-          clearable
-        />
-      </n-space>
       <n-input
         v-model:value="query.keyword"
         placeholder="搜索题单..."

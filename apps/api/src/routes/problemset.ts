@@ -365,10 +365,17 @@ problemsetRoutes.get("/problem-sets/:id/badges", async (c) => {
 
 problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const [problemSet] = await db.select({ id: schema.problemset.id }).from(schema.problemset).where(and(
-    eq(schema.problemset.id, id), eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft"),
-  )).limit(1)
-  if (!problemSet) return failure(c, 404, "problem-set-not-found", "题单不存在")
+  const [problemSet] = await db.select({ id: schema.problemset.id, createdById: schema.problemset.createdById })
+    .from(schema.problemset).where(and(
+      eq(schema.problemset.id, id), eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft"),
+    )).limit(1)
+  // 归属校验，和后台那条同类接口（admin/problemset.ts 的 loadOwned）一致：超管放行，
+  // 其余老师只能看自己建的题单。少了这一道，任何 Teacher Admin 都能读到别人班的名单。
+  // 越权报「不存在」，不泄露题单存在与否。
+  const user = c.get("user")!
+  if (!problemSet || (user.adminType !== "Super Admin" && problemSet.createdById !== user.id)) {
+    return failure(c, 404, "problem-set-not-found", "题单不存在")
+  }
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const className = c.req.query("className")?.trim()

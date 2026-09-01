@@ -53,7 +53,7 @@ const columns: DataTableColumn<SubmissionListItem>[] = [
                   h(Icon, { icon: "catppuccin:lock" }),
                 ),
               default: () =>
-                "这道题在你已经加入的题单中，只有在题单中完成此题，代码才可见。",
+                "这道题在你已经加入的题单里，加入之前的提交先藏起来了。在题单中做出此题即可解锁；题单过了截止时间也会解锁。",
             },
           ),
         ])
