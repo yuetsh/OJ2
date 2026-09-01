@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
-import { formatCode, submitCode, updateProblemSetProgress } from "oj/api"
+import { formatCode, submitCode } from "oj/api"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useFireworks } from "oj/problem/composables/useFireworks"
@@ -185,14 +185,10 @@ watch(
     // 1. 刷新题目状态
     problem.value!.myStatus = 0
 
-    // 2. 创建ProblemSetSubmission记录，更新题单进度
-    if (problemSetId) {
-      await updateProblemSetProgress(
-        Number(problemSetId),
-        problem.value!.id,
-        submission.value!.id,
-      )
-    }
+    // 题单进度不在这里更新了。以前是 AC 之后回调 PUT /problem-set-progress，只认路由
+    // 参数里那一个题单：从普通题库入口做出同一道题不计进度，网络一抖、页面提前关掉进度
+    // 就静默丢失。现在判题那一路直接记账（judge/run.ts），而且是记进所有已加入且包含
+    // 这道题的题单；收到「判完了」的时候进度已经落库，跳回题单页看到的就是新数据。
 
     if (result !== SubmissionStatus.accepted) return
 

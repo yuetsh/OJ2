@@ -6,7 +6,8 @@ import { and, eq, inArray } from "drizzle-orm"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
-import { updateAchievementsForSubmission } from "../services/achievements"
+import { updateAchievementsForProblemSet, updateAchievementsForSubmission } from "../services/achievements"
+import { recordSolvedProblem } from "../services/problemset"
 import { checkAst, type AstRule } from "./ast"
 import { publishSubmissionUpdate } from "./events"
 import type { JudgeJobData } from "./job"
@@ -445,6 +446,45 @@ export async function judgeSubmission(job: JudgeJobData) {
       row.submission.createTime,
     )
     if (!saved) return
+
+    // 题单记账挪到判题这一路。以前靠前端 AC 之后回调 PUT /problem-set-progress，
+    // 只认路由参数里那一个题单：从普通题库入口做出同一道题不计进度，网络一抖就静默丢失。
+    // 放在最后那条 publishSubmissionUpdate("finished") 之前 —— 前端收到「判完了」时
+    // 进度已经落库，跳回题单页看到的就是新数据。
+    // 比赛题不进题单（题单加题时卡了 contestId IS NULL），跳过。
+    if (row.submission.contestId === null && isAccepted(result)) {
+      try {
+        const { updated, earned } = await recordSolvedProblem(
+          row.submission.userId,
+          row.problem.id,
+          row.submission.id,
+          row.submission.createTime,
+        )
+        if (earned.length > 0) {
+          await publishAchievementNotification(row.submission.userId, earned.map((badge) => ({
+            id: badge.id,
+            name: badge.name,
+            description: badge.description,
+            icon: badge.icon,
+            rarity: "bronze",
+            kind: "badge",
+          })))
+        }
+        if (updated > 0) {
+          const unlocked = await updateAchievementsForProblemSet(row.submission.userId)
+          await publishAchievementNotification(row.submission.userId, unlocked.map((achievement) => ({
+            id: achievement.id,
+            name: achievement.name,
+            description: achievement.description,
+            icon: achievement.icon,
+            rarity: achievement.rarity,
+            kind: "achievement",
+          })))
+        }
+      } catch (error) {
+        console.error(`Failed to record problem set progress for ${row.submission.id}`, error)
+      }
+    }
 
     try {
       const unlocked = await updateAchievementsForSubmission(row.submission.id)

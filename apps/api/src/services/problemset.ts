@@ -210,3 +210,88 @@ export async function badgeHolderDiff(badge: BadgeRow, known?: (BadgeCheck & { u
     held: have.size,
   }
 }
+
+/**
+ * 判题通过后，把这道题记进该用户所有「已加入且包含这道题」的题单。
+ *
+ * 以前这件事由前端做：SubmitCode.vue 看到 AC 就回调 PUT /problem-set-progress，而且只回调
+ * 路由参数里那一个题单。于是从普通题库入口做出同一道题不计进度、网络一抖进度就静默丢失；
+ * 旧栈为此专门有个管理命令 fix_problemset_progress 定期按实际提交补账，2026-05-22 那次
+ * 批量补进度就是它跑的（而它不补奖章，53 条漏发里的 23 条由此而来）。
+ *
+ * 挪到判题这一路之后，记账和判题在同一个事务链里，前端只管显示。
+ *
+ * 不按 visible / status 过滤：进度是学生自己的记录，老师把题单藏起来不该让它停止累积。
+ * 更要紧的是这条规则必须和补账那条（scripts/backfill-problemsets.ts）一致 ——
+ * 两边口径不一样的话，补账工具会永远「发现」差异。
+ */
+export async function recordSolvedProblem(
+  userId: number,
+  problemId: number,
+  submissionId: string,
+  solvedAt: string,
+) {
+  const joined = await db
+    .select({ problemsetId: schema.problemsetProgress.problemsetId })
+    .from(schema.problemsetProgress)
+    .innerJoin(schema.problemsetProblem, and(
+      eq(schema.problemsetProblem.problemsetId, schema.problemsetProgress.problemsetId),
+      eq(schema.problemsetProblem.problemId, problemId),
+    ))
+    .where(eq(schema.problemsetProgress.userId, userId))
+  const earned: BadgeRow[] = []
+  let updated = 0
+  for (const { problemsetId } of joined) {
+    const hits = await db.transaction(async (tx) => {
+      const [progress] = await tx.select().from(schema.problemsetProgress).where(and(
+        eq(schema.problemsetProgress.problemsetId, problemsetId),
+        eq(schema.problemsetProgress.userId, userId),
+      )).for("update").limit(1)
+      if (!progress) return []
+
+      // 提交记录先补上，即使这道题早就记过 —— 老数据里有记了进度没记提交的行
+      const [existing] = await tx.select({ id: schema.problemsetSubmission.id })
+        .from(schema.problemsetSubmission).where(and(
+          eq(schema.problemsetSubmission.problemsetId, problemsetId),
+          eq(schema.problemsetSubmission.userId, userId),
+          eq(schema.problemsetSubmission.problemId, problemId),
+        )).limit(1)
+      if (!existing) {
+        await tx.insert(schema.problemsetSubmission)
+          .values({ problemsetId, userId, submissionId, problemId })
+      }
+
+      const detail = objectValue(progress.progressDetail)
+      if (String(problemId) in detail) return []
+      const links = await tx.select({
+        problemId: schema.problemsetProblem.problemId,
+        score: schema.problemsetProblem.score,
+        isRequired: schema.problemsetProblem.isRequired,
+      }).from(schema.problemsetProblem)
+        .where(eq(schema.problemsetProblem.problemsetId, problemsetId))
+      const link = links.find((item) => item.problemId === problemId)
+      if (!link) return []
+      detail[String(problemId)] = { score: link.score, submit_time: solvedAt }
+      const update = computeProgress(detail, links, progress.completeTime)
+      await tx.update(schema.problemsetProgress).set(update)
+        .where(eq(schema.problemsetProgress.id, progress.id))
+      updated += 1
+
+      const badges = await tx.select().from(schema.problemsetBadge)
+        .where(eq(schema.problemsetBadge.problemsetId, problemsetId))
+      const eligible = badges.filter((badge) => eligibleForBadge(badge, { ...progress, ...update }))
+      if (eligible.length === 0) return []
+      // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
+      const inserted = await tx.insert(schema.userBadge).values(eligible.map((badge) => ({
+        userId,
+        badgeId: badge.id,
+        earnedTime: new Date().toISOString(),
+      }))).onConflictDoNothing({ target: [schema.userBadge.badgeId, schema.userBadge.userId] })
+        .returning({ badgeId: schema.userBadge.badgeId })
+      const ids = new Set(inserted.map((row) => row.badgeId))
+      return eligible.filter((badge) => ids.has(badge.id))
+    })
+    earned.push(...hits)
+  }
+  return { updated, earned }
+}
