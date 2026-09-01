@@ -3,6 +3,8 @@ import { Icon } from "@iconify/vue"
 import { NFlex, NTag } from "naive-ui"
 import { useRouteQuery } from "@vueuse/router"
 import { getProblemList } from "oj/api"
+import { STORAGE_KEY } from "utils/constants"
+import storage from "utils/storage"
 import { getTagColor } from "utils/functions"
 import type { ProblemFiltered, Tag as ContractTag } from "utils/types"
 import { getProblemTagList } from "shared/api"
@@ -129,12 +131,19 @@ watch(
   },
 )
 
+// 这里只补「用登录框登进来」那一下：那时页面不刷新，列表还是匿名时拉的。
+//
+// 进站时的那次 listProblems 不需要它跟着再来一遍 —— 请求带 cookie（axios 开了
+// withCredentials），后端 optionalAuth 认的也是 cookie，所以首屏那一份里状态列
+// 本来就是全的。基线取 storage 里的登录态，它和 cookie 同生共死，正好用来区分
+// 「profile 回来了，还是原来那个人」和「刚登进来 / 刚退出去」。
+let authedAtLoad: boolean = storage.get(STORAGE_KEY.AUTHED) ?? false
 watch(
-  () => userStore.isFinished && userStore.isAuthed,
-  (isAuthenticatedAndFinished) => {
-    if (isAuthenticatedAndFinished) {
-      listProblems()
-    }
+  () => [userStore.isFinished, userStore.isAuthed],
+  ([isFinished, isAuthed]) => {
+    if (!isFinished || isAuthed === authedAtLoad) return
+    authedAtLoad = isAuthed
+    listProblems()
   },
 )
 

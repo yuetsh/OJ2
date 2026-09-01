@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CollabRequestItem } from "shared/composables/websocket"
 import { useCollabStore } from "shared/store/collab"
-import CollabModal from "./CollabModal.vue"
 import HelpRequestList from "./HelpRequestList.vue"
 
 /**
@@ -15,6 +14,19 @@ import HelpRequestList from "./HelpRequestList.vue"
  *
  * 位置要求：n-message-provider 的后代（useMessage 需要）。
  */
+/**
+ * 协作弹框异步加载。
+ *
+ * 这个组件静态 import 进来的话，整套 CodeMirror（view / state / language /
+ * autocomplete / lang-*）就跟着 App.vue 进了入口 chunk —— 首屏白白多下 640 KB
+ * （gzip 后 210 KB），而下面那个 v-if 决定了学生根本不渲染它。机房那批
+ * Chrome 91 的老机器解析这些字节是实打实的开销。
+ *
+ * 拆成异步之后首页的 JS 从 1.9 MB 降到 1.3 MB（gzip 642 KB → 428 KB），
+ * 老师那边只是在第一次接单时多一次 chunk 请求。
+ */
+const CollabModal = defineAsyncComponent(() => import("./CollabModal.vue"))
+
 const collabStore = useCollabStore()
 const message = useMessage()
 
