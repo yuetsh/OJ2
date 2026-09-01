@@ -305,10 +305,8 @@ onMounted(() => {
             </n-flex>
           </n-form-item>
           <n-alert :show-icon="false" class="tip">
-            找人不用切输入法：姓名那里直接打拼音 zhangsan 或缩写 zs
-            都能搜到张三。<br />
             往届的班级、列表里找不到的班级、以及自己注册的账号，选【没有我所在的班级】，用户名要写完整，比如
-            23 计算机 1 班张三写 ks231张三。
+            23 计算机 1 班张三写 ks231张三（姓名可以用拼音或拼音缩写快速查找）。
           </n-alert>
         </n-form>
       </n-tab-pane>
