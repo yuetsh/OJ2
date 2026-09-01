@@ -152,6 +152,7 @@ export const STORAGE_KEY = {
   ADMIN_PROBLEM: "adminProblem",
   ADMIN_PROBLEM_TAGS: "adminProblemTags",
   DEMO_MODE: "demoMode",
+  LOGIN_CLASS: "loginClass",
 }
 
 export const DIFFICULTY = {

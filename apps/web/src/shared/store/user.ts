@@ -82,7 +82,11 @@ export const useUserStore = defineStore("user", () => {
   function clearProfile() {
     profile.value = null
     demoMode.value = false
+    // 登录框记的班级要跨退登活下来：机房一台机器对一个班，下课登出、下节课再来
+    // 还是同一个班，清掉的话每个人都得重新选一遍。它是机器的属性，不是谁的隐私。
+    const loginClass = storage.get(STORAGE_KEY.LOGIN_CLASS)
     storage.clear()
+    if (loginClass !== null) storage.set(STORAGE_KEY.LOGIN_CLASS, loginClass)
   }
 
   // 退登的两步（吊销服务端会话、清本地状态）绑在一起：只清本地会留一个还活着

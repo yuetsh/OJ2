@@ -10,9 +10,11 @@ export const useAuthModalStore = defineStore("authModal", () => {
   const signupModalOpen = ref(false)
 
   // ==================== 登录表单状态 ====================
+  // class 为 null 表示还没选，别用空串 —— 空串是「没有我所在的班级」那一项的值。
+  // username 同理用 null：空串在 n-select 里是「选了一个空值」，占位符不显示。
   const loginForm = reactive({
-    class: "",
-    username: "",
+    class: null as string | null,
+    username: null as string | null,
     password: "",
   })
 
