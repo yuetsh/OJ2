@@ -26,6 +26,28 @@ const adminRef = useTemplateRef("adminRef")
 const studentPasswordRef = useTemplateRef("studentPasswordRef")
 const classUserOptions = ref<SelectOption[]>([])
 const classUserLoading = ref(false)
+// 姓名支持拼音和拼音缩写搜索（张三 ← zhangsan / zs）。pinyin-pro 带着一份几百 K 的
+// 词典，静态引入会压进首屏 —— 改成打开登录框才拉，已登录的人一次都不会下载。
+// 用 match 而不是自己拼拼音串：多音字它两个读音都认（单田芳 ← stf 和 dtf 都能搜到）。
+type MatchFn = typeof import("pinyin-pro").match
+const pinyinMatch = shallowRef<MatchFn | null>(null)
+async function ensurePinyin() {
+  if (pinyinMatch.value) return
+  try {
+    pinyinMatch.value = (await import("pinyin-pro")).match
+  } catch {
+    // 拉不下来就只剩中文匹配，不至于让人登不上
+  }
+}
+function filterClassUser(pattern: string, option: SelectOption) {
+  const keyword = pattern.trim()
+  if (!keyword) return true
+  const label = String(option.label ?? "")
+  if (label.includes(keyword)) return true
+  return pinyinMatch.value
+    ? pinyinMatch.value(label, keyword, { continuous: true }) !== null
+    : false
+}
 // 空串是「没有我所在的班级」，null 才是没选 —— 往届的班级毕业后会从后台配置里删掉，
 // 这一项是他们唯一的入口，写完整用户名登录
 const OTHER_CLASS = ""
@@ -179,6 +201,7 @@ watch(classList, restoreLastClass)
 // 每次打开都从干净的表单开始，别把上一个人的姓名和密码留在框里
 watch(loginModalOpen, (open) => {
   if (!open) return
+  ensurePinyin()
   resetForm()
   studentRef.value?.restoreValidation()
   adminRef.value?.restoreValidation()
@@ -188,6 +211,7 @@ watch(loginModalOpen, (open) => {
 onMounted(() => {
   authStore.clearLoginError()
   restoreLastClass()
+  if (loginModalOpen.value) ensurePinyin()
 })
 </script>
 
@@ -228,9 +252,10 @@ onMounted(() => {
               :options="classUserOptions"
               :loading="classUserLoading"
               filterable
+              :filter="filterClassUser"
               name="class-username"
               id="login-class-username"
-              placeholder="选择姓名"
+              placeholder="选择姓名，也可以打拼音"
               @update:value="onUsernamePicked"
             />
             <n-input
