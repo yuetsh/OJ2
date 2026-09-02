@@ -5,6 +5,7 @@ import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { createTestSubmission } from "utils/judge"
+import type { TranscriptSegment } from "utils/judge"
 import { DIFFICULTY } from "utils/constants"
 import type { Problem, ProblemStatus } from "utils/types"
 import Copy from "shared/components/Copy.vue"
@@ -17,8 +18,17 @@ import SQLDataTable from "./SQLDataTable.vue"
 type Sample = Problem["samples"][number] & {
   id: number
   msg: string
+  // 终端会话；不支持回显的语言（Java / Go / JS）拿不到，退回只显示 msg
+  segments: TranscriptSegment[] | null
   status: ProblemStatus
   loading: boolean
+}
+
+/** 会话里的一段在界面上怎么显示 */
+type ShownSegment = {
+  text: string
+  // out = 程序真正的输出，in = 喂进去的输入，prompt = 学生自己打的提示语
+  kind: "out" | "in" | "prompt"
 }
 
 const theme = useThemeVars()
@@ -92,6 +102,7 @@ const samples = ref<Sample[]>(
     ...sample,
     id: index,
     msg: "",
+    segments: null,
     status: "not_test",
     loading: false,
   })),
@@ -127,6 +138,7 @@ async function test(sample: Sample, index: number) {
       return {
         ...sample,
         msg: res.output,
+        segments: res.segments,
         status: status,
         loading: false,
       }
@@ -134,39 +146,79 @@ async function test(sample: Sample, index: number) {
       return sample
     }
   })
-
-  const id = setTimeout(() => {
-    clearTimeout(id)
-    samples.value = samples.value.map((sample) => {
-      if (sample.id === index) {
-        return {
-          ...sample,
-          msg: res.output,
-          status: "not_test",
-          loading: false,
-        }
-      } else {
-        return sample
-      }
-    })
-  }, 2000)
 }
 
-function label(status: ProblemStatus, loading: boolean) {
-  if (loading) return "测试中"
-  return {
-    not_test: "测试",
-    failed: "不通过",
-    passed: "通过",
-  }[status]
+// 运行结果不再自动复位后，按钮固定叫「测试」——
+// 一个绿色的「通过」按钮既当状态又当「再跑一次」的入口，容易误读，
+// 通过 / 不通过挪到旁边的 tag 上
+const STATUS_TAG = {
+  not_test: null,
+  failed: { label: "不通过", type: "error" },
+  passed: { label: "通过", type: "success" },
+} as const satisfies Record<
+  ProblemStatus,
+  { label: string; type: string } | null
+>
+
+/**
+ * 一段输出后面紧跟着一段输入，说明它是「请输入半径：」这类提示语。学生在自己电脑上
+ * 跑，这句是打给自己看的；到了判题狗这里它一样算进 stdout，是最常见的 WA 原因，
+ * 所以单独标出来。
+ */
+function shownSegments(sample: Sample): ShownSegment[] {
+  const segments = sample.segments
+  if (!segments) return [{ text: sample.msg, kind: "out" }]
+  return segments.map((seg, index) => ({
+    // 样例的输入大多不带结尾换行（库里就是 `"700"`），照原样贴出来，下一行输出会
+    // 和它挤在一起变成 `700` `7` → `7007`。学生真在终端里敲的话这里有个回车，
+    // 补上它才是他电脑上看到的样子 —— 只影响显示，判定用的是 msg。
+    text:
+      seg.kind === "input" && !seg.text.endsWith("\n")
+        ? seg.text + "\n"
+        : seg.text,
+    kind:
+      seg.kind === "input"
+        ? "in"
+        : segments[index + 1]?.kind === "input"
+          ? "prompt"
+          : "out",
+  }))
 }
 
-function type(status: ProblemStatus) {
-  return {
-    not_test: "",
-    failed: "error",
-    passed: "success",
-  }[status] as "warning" | "error" | "success"
+function hasFedInput(sample: Sample) {
+  return !!sample.segments?.some((seg) => seg.kind === "input")
+}
+
+/**
+ * 把提示语抠掉之后正好等于期望输出 —— 这时候能把话说死：答案是对的，删掉就通过。
+ * 抠掉还是对不上，就只说提示语也算输出，不误导。
+ */
+function hint(sample: Sample) {
+  if (sample.status !== "failed") return ""
+  const shown = shownSegments(sample)
+  if (!shown.some((seg) => seg.kind === "prompt")) return ""
+  const withoutPrompt = shown
+    .filter((seg) => seg.kind === "out")
+    .map((seg) => seg.text)
+    .join("")
+  if (withoutPrompt.trim() === sample.output.trim()) {
+    return "答案本身是对的，只是输出里多了带下划线的提示语 —— 判题狗只对比程序打印的结果，把 input() / printf() 里的提示语删掉就通过了。"
+  }
+  return "带下划线的是你自己打印的提示语，判题狗也会把它算进你的输出里。"
+}
+
+function segStyle(kind: ShownSegment["kind"]) {
+  if (kind === "in") {
+    return { color: theme.value.infoColor, fontWeight: 600 }
+  }
+  if (kind === "prompt") {
+    return {
+      color: theme.value.textColor3,
+      textDecoration: "underline dotted",
+      textUnderlineOffset: "3px",
+    }
+  }
+  return {}
 }
 </script>
 
@@ -311,7 +363,9 @@ function type(status: ProblemStatus) {
         </p>
         <n-list bordered style="margin-bottom: 8px">
           <n-list-item v-for="(rule, i) in rules" :key="i">
-            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{ rule.description }}</n-tag>
+            <n-tag :type="KIND_TAG_TYPE[rule.kind]">
+              {{ rule.description }}
+            </n-tag>
           </n-list-item>
         </n-list>
       </div>
@@ -328,11 +382,18 @@ function type(status: ProblemStatus) {
           </p>
           <n-button
             size="small"
-            :type="type(sample.status)"
+            :loading="sample.loading"
             @click="test(sample, index)"
           >
-            {{ label(sample.status, sample.loading) }}
+            测试
           </n-button>
+          <n-tag
+            v-if="STATUS_TAG[sample.status]"
+            size="small"
+            :type="STATUS_TAG[sample.status]!.type"
+          >
+            {{ STATUS_TAG[sample.status]!.label }}
+          </n-tag>
         </n-flex>
         <n-descriptions
           bordered
@@ -357,8 +418,23 @@ function type(status: ProblemStatus) {
             </template>
             <div class="testcase">{{ sample.output }}</div>
           </n-descriptions-item>
-          <n-descriptions-item label="运行结果" v-if="sample.msg">
-            <div class="testcase">{{ sample.msg }}</div>
+          <n-descriptions-item
+            label="运行过程"
+            v-if="sample.msg || sample.segments?.length"
+          >
+            <div class="terminal">
+              <span
+                v-for="(seg, i) of shownSegments(sample)"
+                :key="i"
+                :style="segStyle(seg.kind)"
+                >{{ seg.text }}</span
+              >
+            </div>
+            <p v-if="hasFedInput(sample)" class="terminalNote">
+              蓝色那几段是判题狗提前准备好、自动喂给程序的输入 ——
+              所以这里不用你敲键盘，程序也不会停下来等。
+            </p>
+            <p v-if="hint(sample)" class="terminalNote">{{ hint(sample) }}</p>
           </n-descriptions-item>
         </n-descriptions>
       </div>
@@ -440,6 +516,20 @@ function type(status: ProblemStatus) {
   font-size: 14px;
   white-space: pre;
   font-family: "Monaco";
+}
+
+.terminal {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.7;
+  font-family: Monaco, Consolas, monospace;
+}
+
+.terminalNote {
+  font-size: 13px;
+  opacity: 0.75;
+  margin: 8px 0 0;
 }
 
 .status-alert {
