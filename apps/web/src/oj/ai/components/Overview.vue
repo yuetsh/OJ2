@@ -17,18 +17,14 @@
     <Grade :grade="aiStore.detailsData.grade" />
     <span>{{ greeting }}</span>
   </n-alert>
-  <n-flex vertical size="large" v-else>
-    <n-alert type="error" title="你还没有完成任何题目">
-      开始解题，看看你的学习能力吧！
-    </n-alert>
-    <AI />
-  </n-flex>
+  <n-alert v-else type="error" title="你还没有完成任何题目">
+    开始解题，看看你的学习能力吧！
+  </n-alert>
 </template>
 <script lang="ts" setup>
 import Grade from "./Grade.vue"
 import { parseTime } from "utils/functions"
 import { useAIStore } from "oj/store/ai"
-import AI from "./AI.vue"
 
 const aiStore = useAIStore()
 

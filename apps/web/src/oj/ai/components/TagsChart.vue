@@ -1,16 +1,13 @@
 <template>
-  <n-card title="难度分布" size="small" v-if="show">
+  <n-card title="知识点分布" size="small" v-if="show">
     <template #header-extra>
-      <n-text depth="3" style="font-size: 12px">
-        看看简单题和难题各做了多少
-      </n-text>
+      <n-text depth="3" style="font-size: 12px">看看做过哪几类题</n-text>
     </template>
-    <div style="height: 300px">
+    <div class="chart">
       <Bar :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
-
 <script setup lang="ts">
 import type { ChartOptions } from "chart.js"
 import { Bar } from "vue-chartjs"
@@ -29,55 +26,57 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip)
 const aiStore = useAIStore()
 const { chartKey } = useChartTheme()
 
-// 难度和等级的顺序（后端返回的是中文）
-const difficultyOrder = ["简单", "中等", "困难"]
-const difficultyColors = ["#18A058", "#F0A020", "#D03050"]
-
-// 只按难度分。原来还往里叠了一层 S/A/B/C 等级，3×4 十二个格子，
-// 学生两个月做十来道题的话大部分格子恒为 0；等级信息在下面的解题表格里逐题都有
-const counts = computed(() =>
-  difficultyOrder.map(
-    (name) =>
-      aiStore.detailsData.solved.filter((item) => item.difficulty === name)
-        .length,
-  ),
+// 横向条形而不是雷达图：只有 3~5 个类目，雷达对「比较大小」是最差的形式之一，
+// 而且原来还把值归一化成「占最多标签的百分比」，第一名恒为 100%，等于只画了个排序。
+// 这里直接画真实题数。后端 topTags 已经截到前 5，不需要再截
+const entries = computed(() =>
+  Object.entries(aiStore.detailsData.tags).sort(([, a], [, b]) => b - a),
 )
 
-const show = computed(() => aiStore.detailsData.solved.length > 0)
+const show = computed(() => entries.value.length > 0)
 
 const data = computed(() => ({
-  labels: difficultyOrder,
+  labels: entries.value.map(([label]) => label),
   datasets: [
     {
       label: "完成题目数",
-      data: counts.value,
-      backgroundColor: difficultyColors,
-      borderColor: difficultyColors,
+      data: entries.value.map(([, value]) => value),
+      backgroundColor: "rgba(99, 102, 241, 0.75)",
+      borderColor: "rgb(99, 102, 241)",
       borderWidth: 1,
       borderRadius: 4,
-      maxBarThickness: 64,
+      maxBarThickness: 28,
     },
   ],
 }))
 
 const options = computed<ChartOptions<"bar">>(() => ({
+  indexAxis: "y",
   responsive: true,
   maintainAspectRatio: false,
   scales: {
-    x: { grid: { display: false } },
-    y: {
+    x: {
       beginAtZero: true,
       ticks: { stepSize: 1, precision: 0 },
       title: { display: true, text: "题目数量" },
+    },
+    y: {
+      grid: { display: false },
     },
   },
   plugins: {
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label: (ctx) => `完成 ${ctx.parsed.y} 道题`,
+        label: (ctx) => `完成 ${ctx.parsed.x} 道题`,
       },
     },
   },
 }))
 </script>
+<style scoped>
+.chart {
+  height: 300px;
+  width: 100%;
+}
+</style>

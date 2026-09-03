@@ -81,8 +81,10 @@ onMounted(async () => {
   }
 }
 
+/* 只按钮那一屏的时候别留一大片空白；出内容后高度由内容自己撑，
+   这里只是给加载中的 spin 一点地方 */
 .container {
-  min-height: 200px;
+  min-height: 120px;
 }
 
 :deep(.md-editor-preview h1) {

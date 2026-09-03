@@ -2,7 +2,7 @@
   <n-card title="时间活跃度分析" size="small" v-if="show">
     <template #header-extra>
       <n-text depth="3" style="font-size: 12px">
-        基于 AC 时间，发现解题高峰时段
+        基于全部提交，发现做题高峰时段
       </n-text>
     </template>
     <div style="height: 300px">
@@ -38,39 +38,27 @@ const TIME_PERIODS = [
   { label: "晚上(18-24)", start: 18, end: 24 },
 ]
 
-// 统计每个星期几和时间段的做题数量
+// 直接用后端聚合好的 activity（按全部提交、按东八区切好的 7×4）。
+// 原来是拿 solved 里的 acTime 在浏览器本地时区现算 —— 只统计 AC，
+// 28 个格子里能落进去的点太少；时区也和后端的热力图对不上
 const activityMatrix = computed(() => {
   const matrix: { [weekday: number]: { [period: number]: number } } = {}
-
-  // 初始化矩阵
   for (let i = 0; i < 7; i++) {
     matrix[i] = {}
     for (let j = 0; j < TIME_PERIODS.length; j++) {
       matrix[i][j] = 0
     }
   }
-
-  // 统计数据
-  aiStore.detailsData.solved.forEach((item) => {
-    const date = new Date(item.acTime)
-    const weekday = date.getDay() // 0-6，0是周日
-    const hour = date.getHours() // 0-23
-
-    // 找到对应的时间段
-    const periodIndex = TIME_PERIODS.findIndex(
-      (p) => hour >= p.start && hour < p.end,
-    )
-    if (periodIndex !== -1) {
-      matrix[weekday][periodIndex]++
-    }
+  aiStore.detailsData.activity.forEach((item) => {
+    const row = matrix[item.weekday]
+    if (row && item.period in row) row[item.period] += item.count
   })
-
   return matrix
 })
 
-const show = computed(() => {
-  return aiStore.detailsData.solved.length > 0
-})
+const show = computed(() =>
+  aiStore.detailsData.activity.some((item) => item.count > 0),
+)
 
 // 为每个时间段准备数据集
 const data = computed(() => {
@@ -124,7 +112,7 @@ const options = {
       },
       title: {
         display: true,
-        text: "完成题目数",
+        text: "提交次数",
       },
     },
   },
@@ -147,7 +135,7 @@ const options = {
       callbacks: {
         footer: (items: any[]) => {
           const total = items.reduce((sum, item) => sum + item.parsed.y, 0)
-          return `当天总计: ${total} 题`
+          return `当天总计: ${total} 次提交`
         },
       },
     },

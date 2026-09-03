@@ -94,6 +94,38 @@ async function targetUser(c: Context<AppEnv>, override?: string) {
 }
 
 async function buildDetail(user: AuthUser, start: string, end: string) {
+  // 时间活跃度按**全部提交**统计，不是只按 AC。只看 AC 的话，一个学生两个月十来次
+  // 通过撒进 7×4 的格子里几乎全是空的，"高峰时段"根本看不出来。
+  // 星期和小时都按东八区取，和热力图同口径；时区用 sql.raw 拼进去，
+  // 绑成参数的话 select 和 group by 会拿到不同占位符，PG 不认为是同一个表达式。
+  const weekday = sql<number>`extract(dow from ${schema.submission.createTime} at time zone ${CALENDAR_TZ_SQL})::int`.mapWith(Number)
+  const period = sql<number>`floor(extract(hour from ${schema.submission.createTime} at time zone ${CALENDAR_TZ_SQL}) / 6)::int`.mapWith(Number)
+  const activityRows = await db.select({ weekday, period, value: count() }).from(schema.submission)
+    .where(and(
+      eq(schema.submission.userId, user.id),
+      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
+    )).groupBy(weekday, period)
+  const activity = activityRows.map((row) => ({ weekday: row.weekday, period: row.period, count: row.value }))
+  // 区间内该用户的全部提交，一次拉回来喂两处：错题类型分布、每题到首次通过的尝试次数。
+  // 放在 problemIds 的空判断之前 —— 一道题都没做出来的学生，错题分布照样有意义
+  const submissions = await db.select({
+    problemId: schema.submission.problemId,
+    time: schema.submission.createTime,
+    result: schema.submission.result,
+  }).from(schema.submission).where(and(
+    eq(schema.submission.userId, user.id),
+    gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
+  ))
+  const settledFail = (result: number) =>
+    !accepted.includes(result) && result !== JudgeStatus.PENDING && result !== JudgeStatus.JUDGING
+  const errorCounts = new Map<number, number>()
+  for (const row of submissions) {
+    if (!settledFail(row.result)) continue
+    errorCounts.set(row.result, (errorCounts.get(row.result) ?? 0) + 1)
+  }
+  const errors = [...errorCounts]
+    .map(([result, count]) => ({ result, count }))
+    .sort((a, b) => b.count - a.count || a.result - b.result)
   const firstAc = await db.select({ problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
     .from(schema.submission).where(and(
       eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted),
@@ -102,7 +134,7 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
   const problemIds = firstAc.map((item) => item.problemId)
   if (!problemIds.length) return aiDetailSchema.parse({
     user: user.username, className: user.className, start, end, solved: [], flowcharts: [], grade: "", tags: {}, difficulty: {}, contestCount: 0,
-    rankScope: "global",
+    activity, errors, rankScope: "global",
   })
   const classUsers = user.className ? await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, user.className)) : []
   const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
@@ -122,6 +154,14 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
       .where(and(eq(schema.flowchartSubmission.userId, user.id), eq(schema.flowchartSubmission.status, 2), gte(schema.flowchartSubmission.createTime, start), lte(schema.flowchartSubmission.createTime, end))),
   ])
   const byProblem = new Map(problems.map((item) => [item.problem.id, item]))
+  // 到首次通过为止提交了几次：只数首次 AC 那一刻（含）之前的提交
+  const firstAcTime = new Map(firstAc.flatMap((item) => (item.first ? [[item.problemId, Date.parse(item.first)]] as const : [])))
+  const attemptsByProblem = new Map<number, number>()
+  for (const row of submissions) {
+    const deadline = firstAcTime.get(row.problemId)
+    if (deadline === undefined || Date.parse(row.time) > deadline) continue
+    attemptsByProblem.set(row.problemId, (attemptsByProblem.get(row.problemId) ?? 0) + 1)
+  }
   function ranks(rows: typeof rankRows, problemId: number) {
     return rows.filter((item) => item.problemId === problemId).sort((a, b) => Date.parse(a.first ?? "") - Date.parse(b.first ?? "") || a.userId - b.userId)
   }
@@ -136,6 +176,7 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
       problem: { title: problem.problem.title, displayId: problem.problem.displayId, contestTitle: problem.contestTitle ?? "", contestId: problem.problem.contestId },
       acTime: item.first, rank, acCount: all.length, grade: grade(periodRank, period.length, all.length), periodRank, periodAcCount: period.length,
       difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
+      attempts: attemptsByProblem.get(item.problemId) ?? 1,
     })
   }).sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
   const tags: Record<string, number> = {}
@@ -167,7 +208,7 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
     user: user.username, className: user.className, start, end, solved, flowcharts,
     grade: averageGrade(solved.map((item) => item.grade)), tags: topTags, difficulty,
     contestCount: new Set(solved.flatMap((item) => item.problem.contestId ?? [])).size,
-    rankScope: scopeIds ? "class" : "global",
+    activity, errors, rankScope: scopeIds ? "class" : "global",
   })
 }
 
@@ -287,20 +328,32 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
   const end = new Date()
-  // 365 格里最后一格是今天。原来退 365 天再往前数 365 格，最后一格落在昨天 ——
-  // 学生刚交完题打开热力图，今天那格永远是空的
-  const start = new Date(end.getTime() - 364 * 864e5)
+  // 一格一周，共 53 格，最后一格是「本周」。周一算一周的开头（不用 GitHub 的周日）。
+  // 日期部件全部取自东八区，再用它们构造本地零点的 Date 做日历运算 ——
+  // 前端 new Date(timestamp) 后取的也是本地部件，这样两边看到的是同一个日历日。
+  const [nowYear, nowMonth, nowDay] = calendarDay.format(end).split("-").map(Number)
+  const today = new Date(nowYear!, nowMonth! - 1, nowDay!)
+  const mondayOffset = (today.getDay() + 6) % 7
+  const firstMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset - 52 * 7)
+  // SQL 两端各放宽一天：范围只用来少拉行，精确匹配靠下面按日历日 key 查表
   const date = sql<string>`date(${schema.submission.createTime} at time zone ${CALENDAR_TZ_SQL})::text`
   const rows = await db.select({ date, value: count() }).from(schema.submission)
-    .where(and(eq(schema.submission.userId, user.id), gte(schema.submission.createTime, start.toISOString()), lte(schema.submission.createTime, end.toISOString())))
-    .groupBy(date).orderBy(date)
+    .where(and(
+      eq(schema.submission.userId, user.id),
+      gte(schema.submission.createTime, new Date(firstMonday.getTime() - 864e5).toISOString()),
+      lte(schema.submission.createTime, new Date(end.getTime() + 864e5).toISOString()),
+    )).groupBy(date).orderBy(date)
   const counts = new Map(rows.map((row) => [row.date, row.value]))
-  return success(c, Array.from({ length: 365 }, (_, index) => {
-    const key = calendarDay.format(new Date(start.getTime() + index * 864e5))
-    const [year, month, day] = key.split("-").map(Number)
-    // 时间戳给「该日历日的本地零点」：前端 Heatmap.vue 是 new Date(timestamp) 再取
-    // getMonth/getDay，按日期部件构造才能保证渲染出来的就是这一天
-    return heatmapItemSchema.parse({ timestamp: new Date(year!, month! - 1, day!).getTime(), value: counts.get(key) ?? 0 })
+  const dateKey = (value: Date) =>
+    `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`
+  return success(c, Array.from({ length: 53 }, (_, week) => {
+    const monday = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + week * 7)
+    let value = 0
+    for (let offset = 0; offset < 7; offset++) {
+      const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset)
+      value += counts.get(dateKey(day)) ?? 0
+    }
+    return heatmapItemSchema.parse({ timestamp: monday.getTime(), value })
   }))
 })
 

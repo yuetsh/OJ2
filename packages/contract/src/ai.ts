@@ -32,6 +32,8 @@ export const solvedProblemSchema = z.object({
   periodRank: z.number().int().nullable(),
   periodAcCount: z.number().int(),
   difficulty: z.string(),
+  /** 到首次通过为止在这道题上提交了几次（含通过那次）。1 就是一次过 */
+  attempts: z.number().int(),
 })
 
 export const flowchartSummarySchema = z.object({
@@ -42,6 +44,18 @@ export const flowchartSummarySchema = z.object({
   bestGrade: z.string(),
   latestSubmissionTime: z.string(),
   avgScore: z.number(),
+})
+
+/**
+ * 时间活跃度的一个格子。星期和时段都按东八区切，和热力图同一个口径 ——
+ * 别让容器或数据库的 TZ 决定「学生周几晚上做题多」。
+ */
+export const activityBucketSchema = z.object({
+  /** 0=周日 … 6=周六 */
+  weekday: z.number().int().min(0).max(6),
+  /** 0=凌晨(0-6) 1=上午(6-12) 2=下午(12-18) 3=晚上(18-24) */
+  period: z.number().int().min(0).max(3),
+  count: z.number().int(),
 })
 
 export const aiDetailSchema = z.object({
@@ -55,6 +69,16 @@ export const aiDetailSchema = z.object({
   tags: z.record(z.string(), z.number().int()),
   difficulty: z.record(z.string(), z.number().int()),
   contestCount: z.number().int(),
+  /** 时间活跃度：按**全部提交**统计，不是只统计 AC */
+  activity: z.array(activityBucketSchema),
+  /**
+   * 判完的失败提交按状态码分组，多的在前。状态码是落库的值，
+   * 前端用 utils/constants 的 JUDGE_STATUS 翻成中文，两边必须一致。
+   */
+  errors: z.array(z.object({
+    result: z.number().int(),
+    count: z.number().int(),
+  })),
   /**
    * solved 里的 rank/acCount 是在哪个范围里排的。班里只有一个人时后端会回退到全服，
    * 前端不能只看 className 有没有值就写「班级排名」。
@@ -85,6 +109,11 @@ export const classPkAnalysisRequestSchema = z.object({
   timeRangeLabel: z.string().default("全部时间"),
 })
 
+/**
+ * 热力图的一格 = **一周**（不是一天）。timestamp 是那一周周一的本地零点，
+ * value 是整周的提交次数。按天切的话一年 365 格里三百多格是空的，
+ * 中职学生一年也就在二三十天有提交，整张图看着像没用过。
+ */
 export const heatmapItemSchema = z.object({
   timestamp: z.number(),
   value: z.number().int(),
@@ -119,6 +148,7 @@ export type Grade = z.infer<typeof gradeSchema>
 export type DurationData = z.infer<typeof durationDataSchema>
 export type SolvedProblem = z.infer<typeof solvedProblemSchema>
 export type FlowchartSummary = z.infer<typeof flowchartSummarySchema>
+export type ActivityBucket = z.infer<typeof activityBucketSchema>
 export type AiDetail = z.infer<typeof aiDetailSchema>
 export type HeatmapItem = z.infer<typeof heatmapItemSchema>
 export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>

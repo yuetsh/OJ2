@@ -1,78 +1,60 @@
 <template>
   <n-spin :show="aiStore.loading.fetching" :delay="50">
-    <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
-      <n-gi :span="1">
-        <n-flex vertical size="large">
-          <n-flex align="center" justify="space-between">
-            <n-h3 style="margin: 0">请选择时间范围，智能分析学习情况</n-h3>
-            <n-flex align="center">
-              <n-input
-                v-if="userStore.isSuperAdmin"
-                v-model:value="urlUsername"
-                placeholder="查看指定用户"
-                clearable
-                style="width: 140px"
-                @change="onUsernameChange"
-                @clear="onUsernameChange"
-              />
-              <n-select
-                style="width: 140px"
-                :options="options"
-                v-model:value="urlDuration"
-              />
-            </n-flex>
-          </n-flex>
-          <Overview />
-          <n-grid :cols="2" :x-gap="20" :y-gap="20">
-            <n-gi :span="isDesktop ? 1 : 2">
-              <DifficultyGradeChart />
-            </n-gi>
-            <n-gi :span="isDesktop ? 1 : 2">
-              <TagsRadarChart />
-            </n-gi>
-            <n-gi :span="isDesktop ? 1 : 2">
-              <RankDistributionChart />
-            </n-gi>
-            <n-gi :span="isDesktop ? 1 : 2">
-              <TimeActivityHeatmap />
-            </n-gi>
-          </n-grid>
-          <SolvedTable />
+    <n-flex vertical size="large">
+      <n-flex align="center" justify="space-between">
+        <n-h3 style="margin: 0">请选择时间范围，智能分析学习情况</n-h3>
+        <n-flex align="center">
+          <n-input
+            v-if="userStore.isSuperAdmin"
+            v-model:value="urlUsername"
+            placeholder="查看指定用户"
+            clearable
+            style="width: 140px"
+            @change="onUsernameChange"
+            @clear="onUsernameChange"
+          />
+          <n-select
+            style="width: 140px"
+            :options="options"
+            v-model:value="urlDuration"
+          />
         </n-flex>
-      </n-gi>
-      <n-gi :span="1">
-        <n-flex vertical size="large">
-          <Heatmap />
-          <ProgressChart />
-          <EfficiencyChart />
-          <DurationChart />
-          <AI v-if="aiStore.detailsData.solved.length > 10" />
-        </n-flex>
-      </n-gi>
-      <n-gi :span="2">
-        <AI
-          v-if="
-            aiStore.detailsData.solved.length > 0 &&
-            aiStore.detailsData.solved.length <= 10
-          "
-        />
-      </n-gi>
-    </n-grid>
+      </n-flex>
+
+      <Overview />
+      <Heatmap />
+      <DurationChart />
+      <!-- 用弹性排布而不是两列网格：知识点分布在没有标签时整张卡不渲染，
+           固定两列会空掉一半；flex 下剩的那张自动占满整行 -->
+      <n-flex class="pair" :size="20">
+        <DifficultyGradeChart />
+        <TagsChart />
+      </n-flex>
+      <n-flex class="pair" :size="20">
+        <ErrorTypeChart />
+        <AttemptsChart />
+      </n-flex>
+      <n-flex class="pair" :size="20">
+        <TimeActivityHeatmap />
+        <FlowchartScoreChart />
+      </n-flex>
+      <SolvedTable />
+      <AI />
+    </n-flex>
   </n-spin>
 </template>
 <script setup lang="ts">
-import { useBreakpoints } from "shared/composables/breakpoints"
 import { formatISO, sub, type Duration } from "date-fns"
 import { useRouteQuery } from "@vueuse/router"
-import TagsRadarChart from "./components/TagsRadarChart.vue"
 import DifficultyGradeChart from "./components/DifficultyGradeChart.vue"
+import TagsChart from "./components/TagsChart.vue"
+import ErrorTypeChart from "./components/ErrorTypeChart.vue"
+import AttemptsChart from "./components/AttemptsChart.vue"
+import FlowchartScoreChart from "./components/FlowchartScoreChart.vue"
 import TimeActivityHeatmap from "./components/TimeActivityHeatmap.vue"
-import RankDistributionChart from "./components/RankDistributionChart.vue"
 import Overview from "./components/Overview.vue"
 import Heatmap from "./components/Heatmap.vue"
-import ProgressChart from "./components/ProgressChart.vue"
 import DurationChart from "./components/DurationChart.vue"
-import EfficiencyChart from "./components/EfficiencyChart.vue"
 import AI from "./components/AI.vue"
 import SolvedTable from "./components/SolvedTable.vue"
 import { useAIStore } from "../store/ai"
@@ -81,8 +63,6 @@ import { DURATION_OPTIONS } from "utils/constants"
 
 const aiStore = useAIStore()
 const userStore = useUserStore()
-const { isDesktop } = useBreakpoints()
-
 const options = [...DURATION_OPTIONS]
 
 const urlUsername = useRouteQuery<string>("username", "")
@@ -120,3 +100,8 @@ watch(
   { immediate: true },
 )
 </script>
+<style scoped>
+.pair > :deep(.n-card) {
+  flex: 1 1 320px;
+}
+</style>

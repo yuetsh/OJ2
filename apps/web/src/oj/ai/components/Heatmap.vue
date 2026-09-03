@@ -1,13 +1,18 @@
 <template>
   <n-card title="过去一年的提交热力图" size="small">
     <template #header-extra>
-      <n-text depth="3" style="font-size: 12px">激励持续学习</n-text>
+      <n-text depth="3" style="font-size: 12px">
+        每格一周，激励持续学习
+      </n-text>
     </template>
     <n-spin :show="aiStore.loading.heatmap" :delay="50">
       <div
         class="heatmap-container"
         ref="containerRef"
-        :style="{ '--cell-stroke': cellStroke, '--cell-stroke-hover': cellStrokeHover }"
+        :style="{
+          '--cell-stroke': cellStroke,
+          '--cell-stroke-hover': cellStrokeHover,
+        }"
       >
         <svg
           :viewBox="`0 0 ${svgWidth} ${svgHeight}`"
@@ -20,28 +25,17 @@
             </text>
           </g>
 
-          <g v-for="(day, i) in WEEK_DAYS" :key="i">
-            <text
-              :x="0"
-              :y="MONTH_HEIGHT + i * CELL_TOTAL + 8"
-              class="label"
-              font-size="9"
-            >
-              {{ day }}
-            </text>
-          </g>
-
-          <g :transform="`translate(${DAY_WIDTH}, ${MONTH_HEIGHT})`">
+          <g :transform="`translate(0, ${MONTH_HEIGHT})`">
             <rect
               v-for="(cell, i) in cells"
               :key="i"
               :x="cell.x"
-              :y="cell.y"
+              :y="0"
               :width="CELL_SIZE"
-              :height="CELL_SIZE"
+              :height="CELL_HEIGHT"
               :fill="cell.color"
               class="cell"
-              rx="2"
+              rx="3"
               @mouseenter="(e) => showTooltip(e, cell)"
               @mouseleave="hideTooltip"
             />
@@ -68,16 +62,17 @@ const aiStore = useAIStore()
 const { isDark } = useChartTheme()
 const containerRef = useTemplateRef<HTMLElement>("containerRef")
 
-const CELL_SIZE = 12
-const CELL_GAP = 3
+const CELL_SIZE = 22
+// 一格一周之后只剩一行，格子做成竖长条，卡片不至于扁成一条缝
+const CELL_HEIGHT = 34
+const CELL_GAP = 4
 const CELL_TOTAL = CELL_SIZE + CELL_GAP
-const DAY_WIDTH = 20
-const MONTH_HEIGHT = 20
+const MONTH_HEIGHT = 18
 const RIGHT_PADDING = 5
+
 // 深色下空格子不能再用接近白的 #ebedf0，整张图会变成一片发亮的方块
 const LIGHT_COLORS = ["#ebedf0", "#c6e48b", "#7bc96f", "#239a3b", "#196127"]
 const DARK_COLORS = ["#22272e", "#0e4429", "#006d32", "#26a641", "#39d353"]
-const WEEK_DAYS = ["", "一", "", "三", "", "五", ""]
 
 const COLORS = computed(() => (isDark.value ? DARK_COLORS : LIGHT_COLORS))
 const cellStroke = computed(() =>
@@ -87,34 +82,33 @@ const cellStrokeHover = computed(() =>
   isDark.value ? "rgba(255, 255, 255, 0.45)" : "rgba(0, 0, 0, 0.3)",
 )
 
+// 阈值按「一周」定，不是按一天。按天的老阈值（>7 就到顶）放到周上，
+// 稍微认真做几天题就全是最深的一档，看不出差别
 const getColor = (count: number) => {
   const palette = COLORS.value
   if (count === 0) return palette[0]
-  if (count <= 2) return palette[1]
-  if (count <= 4) return palette[2]
-  if (count <= 7) return palette[3]
+  if (count <= 3) return palette[1]
+  if (count <= 8) return palette[2]
+  if (count <= 15) return palette[3]
   return palette[4]
 }
 
-// 第一格未必是周日 —— 后端给的是「今天往前推 364 天」那天开始的 365 天。
-// 原来直接拿 i % 7 当行号，等于假设首日是周日，左边 一/三/五 的标签和月份标签
-// 会整体错位（今天是周四就错四行）。这里按首日真实的星期做偏移。
-const weekdayOffset = computed(() => {
-  const first = aiStore.heatmapData[0]
-  return first ? new Date(first.timestamp).getDay() : 0
-})
-
+// 一格一周，横向铺开。原来是一格一天、7 行 53 列，中职学生一年也就二三十天有提交，
+// 365 格里三百多格空着，整张图看着像没用过
 const cells = computed(() =>
   aiStore.heatmapData.map((item, i) => {
-    const slot = weekdayOffset.value + i
+    const start = new Date(item.timestamp)
+    const endOfWeek = new Date(
+      start.getFullYear(),
+      start.getMonth(),
+      start.getDate() + 6,
+    )
     return {
-      date: new Date(item.timestamp),
+      start,
+      end: endOfWeek,
       count: item.value,
       color: getColor(item.value),
-      week: Math.floor(slot / 7),
-      day: slot % 7,
-      x: Math.floor(slot / 7) * CELL_TOTAL,
-      y: (slot % 7) * CELL_TOTAL,
+      x: i * CELL_TOTAL,
     }
   }),
 )
@@ -122,39 +116,30 @@ const cells = computed(() =>
 const monthLabels = computed(() => {
   const labels: { text: string; x: number }[] = []
   let lastMonth = -1
-
   cells.value.forEach((cell, i) => {
-    const month = cell.date.getMonth()
-    const isWeekStart = cell.day === 0 || i === 0
-
-    if (month !== lastMonth && (isWeekStart || cell.day <= 3)) {
-      labels.push({
-        text: `${month + 1}月`,
-        x: DAY_WIDTH + cell.week * CELL_TOTAL,
-      })
+    const month = cell.start.getMonth()
+    if (month !== lastMonth) {
+      // 第一格所在的月往往只露出小半个月，标签会和下一个月挤在一起，跳过
+      if (i > 0 || cell.start.getDate() <= 7) {
+        labels.push({ text: `${month + 1}月`, x: cell.x })
+      }
       lastMonth = month
     }
   })
-
   return labels
 })
 
-const svgWidth = computed(() => {
-  const last = cells.value[cells.value.length - 1]
-  const weeks = last ? last.week + 1 : 0
-  return DAY_WIDTH + weeks * CELL_TOTAL + RIGHT_PADDING
-})
-
-const svgHeight = computed(() => MONTH_HEIGHT + 7 * CELL_TOTAL)
+const svgWidth = computed(
+  () => cells.value.length * CELL_TOTAL + RIGHT_PADDING,
+)
+const svgHeight = computed(() => MONTH_HEIGHT + CELL_HEIGHT)
 
 interface Cell {
-  date: Date
+  start: Date
+  end: Date
   count: number
   color: string
-  week: number
-  day: number
   x: number
-  y: number
 }
 
 const tooltip = ref<{
@@ -171,7 +156,7 @@ const tooltipStyle = computed(() => ({
 }))
 
 const getTooltipText = (count: number) =>
-  count === 0 ? "没有提交记录" : `提交了 ${count} 次`
+  count === 0 ? "这周没有提交" : `这周提交了 ${count} 次`
 
 const showTooltip = (e: MouseEvent, cell: Cell) => {
   const rect = (e.target as HTMLElement).getBoundingClientRect()
@@ -181,7 +166,7 @@ const showTooltip = (e: MouseEvent, cell: Cell) => {
     tooltip.value = {
       x: rect.left - containerRect.left + rect.width / 2,
       y: rect.top - containerRect.top - 10,
-      date: parseTime(cell.date, "YYYY年M月D日"),
+      date: `${parseTime(cell.start, "M月D日")} ～ ${parseTime(cell.end, "M月D日")}`,
       text: getTooltipText(cell.count),
       count: cell.count,
     }
