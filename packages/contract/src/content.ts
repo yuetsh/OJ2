@@ -141,3 +141,16 @@ export type Exercise = z.infer<typeof exerciseSchema>
 export type TutorialProgress = z.infer<typeof tutorialProgressSchema>
 export type TutorialProgressPing = z.infer<typeof tutorialProgressPingSchema>
 export type ExerciseAttemptRequest = z.infer<typeof exerciseAttemptRequestSchema>
+
+/**
+ * 「已读」的门槛：累计停留满 3 分钟才算读过这一课。
+ *
+ * 之前只要打开过（`viewCount > 0`）就记成已读，于是「点开看一眼就退」和「认真读完」
+ * 在老师那张表上长得一模一样，「已读 17/17」并不说明他学了。3 分钟是按最短的一课
+ * 定的下限——读不完还翻不动的课文，扫一眼是到不了这个数的。
+ *
+ * 门槛只管**「已读」这个口径**（学生端的 ✓、后台的已读课数与读过的人数），
+ * 不动累计时长：时长记的是真实停留，不满 3 分钟的那些秒数照样算进去，
+ * 「已读 0 课、累计 25 分钟」正是要让老师看见的一种情况。
+ */
+export const TUTORIAL_READ_SECONDS = 180

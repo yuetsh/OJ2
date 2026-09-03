@@ -1,4 +1,5 @@
 import {
+  TUTORIAL_READ_SECONDS,
   learnExerciseAttemptSchema,
   learnExerciseProgressListSchema,
   learnExerciseProgressSchema,
@@ -93,7 +94,9 @@ adminLearnRoutes.get("/learn-analytics/students", requireTeacher, async (c) => {
       username: schema.user.username,
       realName: schema.userProfile.realName,
       className: schema.user.className,
-      readCount: count(schema.tutorialProgress.tutorialId),
+      // 「已读」按 TUTORIAL_READ_SECONDS 卡，不是「有这条记录」：点开一眼就退的不算。
+      // 累计时长不卡，那些秒数照样算 —— 「已读 0 课、累计 25 分钟」是要看见的一种情况
+      readCount: sql<number>`count(${schema.tutorialProgress.tutorialId}) filter (where ${schema.tutorialProgress.totalSeconds} >= ${TUTORIAL_READ_SECONDS})`.mapWith(Number),
       totalSeconds: sql<number>`coalesce(sum(${schema.tutorialProgress.totalSeconds}), 0)`.mapWith(Number),
       lastViewedAt: sql<string | null>`max(${schema.tutorialProgress.lastViewedAt})`,
     }).from(schema.user)
@@ -148,8 +151,11 @@ adminLearnRoutes.get("/learn-analytics/tutorials", requireTeacher, async (c) => 
     // 数的是 user.id 而不是 progress.user_id：join 不上的（老师自己试读的、
     // 已禁用的、不在所选班级的）在这一列是 NULL，count(distinct) 正好不算它，
     // 而 progress.user_id 那边永远非空，会把过滤当没发生
-    readers: sql<number>`count(distinct ${schema.user.id})`.mapWith(Number),
+    readers: sql<number>`count(distinct ${schema.user.id}) filter (where ${schema.tutorialProgress.totalSeconds} >= ${TUTORIAL_READ_SECONDS})`.mapWith(Number),
     totalSeconds: sql<number>`coalesce(sum(${schema.tutorialProgress.totalSeconds}) filter (where ${schema.user.id} is not null), 0)`.mapWith(Number),
+    // 人均时长的分母是 readers（读满 3 分钟的人），分子就得是同一批人的时长，
+    // 否则拿全部时长去除达标人数，人均会被翻了一眼就走的人凭空抬高
+    readSeconds: sql<number>`coalesce(sum(${schema.tutorialProgress.totalSeconds}) filter (where ${schema.tutorialProgress.totalSeconds} >= ${TUTORIAL_READ_SECONDS}), 0)`.mapWith(Number),
   }).from(schema.tutorial)
     .leftJoin(schema.tutorialProgress, eq(schema.tutorialProgress.tutorialId, schema.tutorial.id))
     .leftJoin(schema.user, and(
@@ -164,9 +170,9 @@ adminLearnRoutes.get("/learn-analytics/tutorials", requireTeacher, async (c) => 
 
   return success(c, learnTutorialProgressListSchema.parse({
     studentCount,
-    results: rows.map((row) => learnTutorialProgressSchema.parse({
+    results: rows.map(({ readSeconds, ...row }) => learnTutorialProgressSchema.parse({
       ...row,
-      avgSeconds: row.readers ? Math.round(row.totalSeconds / row.readers) : 0,
+      avgSeconds: row.readers ? Math.round(readSeconds / row.readers) : 0,
     })),
   }))
 })

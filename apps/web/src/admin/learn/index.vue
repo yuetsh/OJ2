@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TUTORIAL_READ_SECONDS } from "@oj2/contract"
 import { NProgress, NText } from "naive-ui"
 import {
   getLearnStudents,
@@ -285,6 +286,10 @@ onMounted(load)
     <n-button type="primary" secondary @click="load">查询</n-button>
     <n-text depth="3">
       {{ studentCount }} 名学生，{{ startedCount }} 人已经开始学
+    </n-text>
+    <!-- 口径写在表上方，免得老师对着「已读 0 课 / 累计 25 分钟」猜是不是坏了 -->
+    <n-text depth="3" style="font-size: 12px">
+      「已读」按累计停留满 {{ TUTORIAL_READ_SECONDS / 60 }} 分钟算，不足的只计时长
     </n-text>
   </n-flex>
 
