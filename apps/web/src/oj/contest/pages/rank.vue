@@ -221,11 +221,21 @@ function openExportModal() {
 async function downloadExcel() {
   exportLoading.value = true
   try {
-    const res = await getContestRank(props.contestID, {
-      limit: total.value || 10000,
-      offset: 0,
-    })
-    const allRanks: ContestRank[] = res.results
+    // 自己翻页凑齐全量：后端 limit 上限 250，而**超出上限不是截断、是静默回落到
+    // 默认的 10**（routes/helpers.ts 的 queryInteger）。原来这里传 total（或 10000）
+    // 想一次拉完，参赛超过 250 人时只会拿回 10 行，而下面的等级分档仍按真实总人数算 ——
+    // 老师拿到的是一份 10 个人、等级全错的名单，还不报错
+    const PAGE = 250
+    const allRanks: ContestRank[] = []
+    for (;;) {
+      const res = await getContestRank(props.contestID, {
+        limit: PAGE,
+        offset: allRanks.length,
+      })
+      allRanks.push(...res.results)
+      // 两个出口都要留：拿不满一页说明到底了；比对 total 是防着最后一页正好整除
+      if (res.results.length < PAGE || allRanks.length >= res.total) break
+    }
 
     const rows = allRanks.map((rank, index) => {
       const rank1 = index + 1

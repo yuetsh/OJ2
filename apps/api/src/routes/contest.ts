@@ -213,7 +213,10 @@ contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("rank
     db.select({ rank: schema.acmContestRank, user: schema.user, realName: schema.userProfile.realName })
       .from(schema.acmContestRank).innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id)).where(where)
-      .orderBy(desc(schema.acmContestRank.acceptedNumber), asc(schema.acmContestRank.totalTime)).limit(limit).offset(offset),
+      // 末尾的 id 是给排序兜全序用的：同 AC 数同罚时前两列分不出先后，而这条列表是
+      // limit/offset 翻页的，行序不稳定就意味着同一个人在第 2 页出现两次、另一个人
+      // 从此消失。id 本身不参与名次，只保证同分的人每次都按同一个顺序排
+      .orderBy(desc(schema.acmContestRank.acceptedNumber), asc(schema.acmContestRank.totalTime), asc(schema.acmContestRank.id)).limit(limit).offset(offset),
   ])
   const admin = isContestAdmin(c.get("user"), contest)
   return success(c, contestRankSchema.parse({

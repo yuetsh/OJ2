@@ -245,8 +245,10 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
 
 adminContestRoutes.get("/contests/:id/acm-helper", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  // 不卡 visible：赛后核查恰恰常发生在比赛已经收起来之后，而同一场比赛的
+  // PUT acm-helper 从来不卡这一条 —— 卡着就成了「标记还能改、页面打不开」
   const [contest] = await db.select().from(schema.contest)
-    .where(and(eq(schema.contest.id, id), eq(schema.contest.visible, true))).limit(1)
+    .where(eq(schema.contest.id, id)).limit(1)
   if (!contest || !ownedBy(c.get("user")!, contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }

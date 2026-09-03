@@ -432,7 +432,16 @@ function canViewSubmission(
     const joinTime = problemSetJoinTime?.get(row.problemId)
     if (joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)) return false
   }
-  if (row.userId === user.id || isAdminRole(user) || problem.createdById === user.id) return true
+  // 比赛没结束时，学生管理员不吃「管理员看得到所有人代码」这条捷径：他自己也在排行榜里
+  // （contest.ts 的 rank 把 Student Admin 算作参赛者），既参赛又能读别人的提交就是开卷。
+  // 老师和超管不受影响 —— 他们不参赛。旧后端这里是 `not user.is_regular_user()`，
+  // 学生管理员同样放行，所以这条是 OJ2 相对旧栈**收紧**的一处，不是修回归。
+  //
+  // 只掐角色捷径，不掐 `problem.createdById === user.id`：那是这道题的作者本人，
+  // 他早就知道答案了，挡他没有意义。
+  const elevated = isAdminRole(user)
+    && !(contest && contestStatus(contest) !== "-1" && user.adminType === "Student Admin")
+  if (row.userId === user.id || elevated || problem.createdById === user.id) return true
   if (!allowShared) return false
   if (contest && contestStatus(contest) !== "-1") return false
   return problem.shareSubmission || row.shared

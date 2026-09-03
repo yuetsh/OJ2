@@ -43,6 +43,13 @@
       "when": 1788272667927,
       "tag": "0005_add_exercise_attempt",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788402925980,
+      "tag": "0006_drop_contest_announcement",
+      "breakpoints": true
     }
   ]
 }

@@ -101,29 +101,6 @@ export const contest = pgTable("contest", {
 		}),
 ]);
 
-export const contestAnnouncement = pgTable("contest_announcement", {
-	id: serial().primaryKey().notNull(),
-	title: text().notNull(),
-	content: text().notNull(),
-	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
-	contestId: integer("contest_id").notNull(),
-	createdById: integer("created_by_id").notNull(),
-	visible: boolean().notNull(),
-}, (table) => [
-	index("contest_announcement_contest_id_a8cb419f").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
-	index("contest_announcement_created_by_id_469a14ce").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.contestId],
-			foreignColumns: [contest.id],
-			name: "contest_announcement_contest_id_a8cb419f_fk_contest_id"
-		}),
-	foreignKey({
-			columns: [table.createdById],
-			foreignColumns: [user.id],
-			name: "contest_announcement_created_by_id_469a14ce_fk_user_id"
-		}),
-]);
-
 export const flowchartSubmission = pgTable("flowchart_submission", {
 	id: text().primaryKey().notNull(),
 	mermaidCode: text("mermaid_code").notNull(),

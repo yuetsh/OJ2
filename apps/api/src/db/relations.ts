@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { user, aiAnalysis, announcement, contest, contestAnnouncement, problem, flowchartSubmission, message, submission, tutorial, exercise, problemset, problemsetProblem, problemsetProgress, problemsetSubmission, reaction, problemTags, problemTag, userStat, achievement, userAchievement, problemsetBadge, userBadge, userProfile, acmContestRank } from "./schema";
+import { user, aiAnalysis, announcement, contest, problem, flowchartSubmission, message, submission, tutorial, exercise, problemset, problemsetProblem, problemsetProgress, problemsetSubmission, reaction, problemTags, problemTag, userStat, achievement, userAchievement, problemsetBadge, userBadge, userProfile, acmContestRank } from "./schema";
 
 export const aiAnalysisRelations = relations(aiAnalysis, ({one}) => ({
 	user: one(user, {
@@ -12,7 +12,6 @@ export const userRelations = relations(user, ({many}) => ({
 	aiAnalyses: many(aiAnalysis),
 	announcements: many(announcement),
 	contests: many(contest),
-	contestAnnouncements: many(contestAnnouncement),
 	flowchartSubmissions: many(flowchartSubmission),
 	messages_recipientId: many(message, {
 		relationName: "message_recipientId_user_id"
@@ -45,21 +44,9 @@ export const contestRelations = relations(contest, ({one, many}) => ({
 		fields: [contest.createdById],
 		references: [user.id]
 	}),
-	contestAnnouncements: many(contestAnnouncement),
 	problems: many(problem),
 	submissions: many(submission),
 	acmContestRanks: many(acmContestRank),
-}));
-
-export const contestAnnouncementRelations = relations(contestAnnouncement, ({one}) => ({
-	contest: one(contest, {
-		fields: [contestAnnouncement.contestId],
-		references: [contest.id]
-	}),
-	user: one(user, {
-		fields: [contestAnnouncement.createdById],
-		references: [user.id]
-	}),
 }));
 
 export const flowchartSubmissionRelations = relations(flowchartSubmission, ({one}) => ({

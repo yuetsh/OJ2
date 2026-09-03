@@ -1,0 +1,12 @@
+-- 删掉比赛公告表。旧 Django 栈有「比赛公告」这个功能，OJ2 从头到尾没有搬：
+-- 没有任何路由、契约或前端页面引用它，表建在那里纯粹是 introspect 0000 时一起拉进来的。
+--
+-- 已核实：
+--   * 没有任何表外键引用 contest_announcement，它只有两条指向 contest / user 的出边，
+--     删掉是自洽的；
+--   * 序列 contest_announcement_id_seq 由本表 owned，随 DROP TABLE 一并消失；
+--   * 数据：生产快照（db_backup_2026_08_07）里只有 1 行，是 2022 年 4 月挂在 contest 1 上的
+--     一条测试公告（「四月月赛」）。OJ2 侧没有写入路径，这个数字不会再增长。
+--
+-- 不写 CASCADE，同 0002：万一将来真有别的东西引用了，宁可这里报错，也别被悄悄级联掉。
+DROP TABLE IF EXISTS contest_announcement;
