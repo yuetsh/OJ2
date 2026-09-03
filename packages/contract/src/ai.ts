@@ -55,9 +55,16 @@ export const aiDetailSchema = z.object({
   contestCount: z.number().int(),
 })
 
+/**
+ * 请求只说「看谁、哪段时间、按什么粒度」，学情数据由服务端自己算。
+ * 以前是 `details: z.unknown()` / `duration: z.unknown()` —— 前端算好的整包 POST 回去，
+ * 原样进 prompt 又原样写进 ai_analysis 表，等于让任何登录用户决定喂给模型什么。
+ */
 export const aiAnalysisRequestSchema = z.object({
-  details: z.unknown(),
-  duration: z.unknown(),
+  start: z.string().min(1),
+  end: z.string().min(1),
+  duration: z.string().min(1),
+  username: z.string().optional(),
 })
 
 export const aiHintRequestSchema = z.object({ submissionId: z.string().min(1) })

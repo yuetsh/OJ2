@@ -210,14 +210,6 @@ export function decode(bytes?: string): string {
   }
 }
 
-export function getCSRFToken(): string {
-  if (typeof document === "undefined") {
-    return ""
-  }
-  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : ""
-}
-
 export function utoa(data: string): string {
   const buffer = strToU8(data)
   const zipped = zlibSync(buffer, { level: 9 })

@@ -16,7 +16,7 @@ import {
   getClassPK,
 } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { getACRate, getCSRFToken } from "utils/functions"
+import { getACRate } from "utils/functions"
 import Pagination from "shared/components/Pagination.vue"
 import { ChartType } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
@@ -26,7 +26,7 @@ import { useUserStore } from "shared/store/user"
 import { Icon } from "@iconify/vue"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import { consumeJSONEventStream } from "utils/stream"
+import { aiStreamError, consumeJSONEventStream } from "utils/stream"
 
 const gradeOptions = [
   { label: "24年级", value: 24 },
@@ -101,18 +101,14 @@ async function analyzeSingleClassWithAI() {
   classDetailAiContent.value = ""
   classDetailAiLoading.value = true
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
-  const csrfToken = getCSRFToken()
-  if (csrfToken) headers["X-CSRFToken"] = csrfToken
-
   try {
     const response = await fetch("/api/ai/class-analysis", {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ comparison: classDetailData.value }),
       signal: controller.signal,
     })
-    if (!response.ok) throw new Error("AI 分析生成失败")
+    if (!response.ok) throw await aiStreamError(response)
 
     let hasStarted = false
     await consumeJSONEventStream(response, {

@@ -1,16 +1,18 @@
 import type { DetailsData, DurationData } from "utils/types"
-import { consumeJSONEventStream } from "utils/stream"
+import { aiStreamError, consumeJSONEventStream } from "utils/stream"
 import {
   getAIDetailData,
   getAIDurationData,
   getAIHeatmapData,
   getAIPinnedReport,
 } from "../api"
-import { getCSRFToken } from "utils/functions"
 
 export const useAIStore = defineStore("ai", () => {
   const duration = ref("months:6")
   const targetUsername = ref("")
+  // 生成 AI 分析时要把同一段时间原样报给后端（数据由后端重算，前端只报范围）
+  const rangeStart = ref("")
+  const rangeEnd = ref("")
   const durationData = ref<DurationData[]>([])
   const detailsData = reactive<DetailsData>({
     user: "",
@@ -73,6 +75,8 @@ export const useAIStore = defineStore("ai", () => {
     end: string,
     duration: string,
   ) {
+    rangeStart.value = start
+    rangeEnd.value = end
     loading.fetching = true
     try {
       await Promise.all([
@@ -96,27 +100,21 @@ export const useAIStore = defineStore("ai", () => {
     loading.ai = true
     mdContent.value = ""
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-    const csrfToken = getCSRFToken()
-    if (csrfToken) {
-      headers["X-CSRFToken"] = csrfToken
-    }
-
     try {
       const response = await fetch("/api/ai/analysis", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          details: detailsData,
-          duration: durationData.value,
+          start: rangeStart.value,
+          end: rangeEnd.value,
+          duration: duration.value,
+          username: targetUsername.value || undefined,
         }),
         signal: controller.signal,
       })
 
       if (!response.ok) {
-        throw new Error("AI 分析生成失败")
+        throw await aiStreamError(response)
       }
 
       let hasStarted = false

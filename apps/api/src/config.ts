@@ -87,6 +87,8 @@ export const config = {
   uploadUriPrefix: process.env.UPLOAD_URI_PREFIX ?? "/public/upload",
   avatarUriPrefix: process.env.AVATAR_URI_PREFIX ?? "/public/avatar",
   aiBaseUrl: process.env.AI_BASE_URL ?? "https://api.deepseek.com",
+  /** 只用来写 ai_analysis.provider 这一列，换 provider 时和 AI_BASE_URL 一起改 */
+  aiProvider: process.env.AI_PROVIDER ?? "deepseek",
   aiKey: process.env.AI_KEY ?? "",
   aiModel: process.env.AI_MODEL ?? "deepseek-v4-flash",
   ruffPath: process.env.RUFF_PATH ?? "ruff",

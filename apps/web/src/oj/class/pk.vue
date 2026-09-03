@@ -10,8 +10,7 @@ import { Bar, Radar } from "vue-chartjs"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import { consumeJSONEventStream } from "utils/stream"
-import { getCSRFToken } from "utils/functions"
+import { aiStreamError, consumeJSONEventStream } from "utils/stream"
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -146,14 +145,10 @@ async function analyzeWithAI() {
   aiContent.value = ""
   aiLoading.value = true
 
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
-  const csrfToken = getCSRFToken()
-  if (csrfToken) headers["X-CSRFToken"] = csrfToken
-
   try {
     const response = await fetch("/api/ai/class-pk-analysis", {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         comparisons: comparisons.value,
         timeRangeLabel,
@@ -161,7 +156,7 @@ async function analyzeWithAI() {
       signal: controller.signal,
     })
 
-    if (!response.ok) throw new Error("AI 分析生成失败")
+    if (!response.ok) throw await aiStreamError(response)
 
     let hasStarted = false
 

@@ -92,3 +92,23 @@ export async function consumeJSONEventStream<T = any>(
     reader.releaseLock()
   }
 }
+
+/**
+ * AI 端点的非 2xx 响应体是 JSON 不是 SSE，直接丢给上面的解析器只会抛
+ * 「无法解析服务端事件数据: {...}」。后端 error.message 是英文的，按 code 换成中文。
+ */
+export async function aiStreamError(response: Response) {
+  const body = (await response.json().catch(() => null)) as
+    | { error?: { code?: string } }
+    | null
+  switch (body?.error?.code) {
+    case "too-many-requests":
+      return new Error("AI 请求太频繁了，歇一会儿再试")
+    case "hint-locked":
+      return new Error("再多试几次，AI 提示会自动解锁")
+    case "permission-denied":
+      return new Error("没有权限使用这个功能")
+    default:
+      return new Error("AI 分析生成失败")
+  }
+}
