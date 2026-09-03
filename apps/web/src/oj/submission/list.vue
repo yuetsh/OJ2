@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NTag, NText } from "naive-ui"
+import { NButton, NFlex, NTag, NText } from "naive-ui"
 import { useRouteQuery } from "@vueuse/router"
 import {
   adminRejudge,
@@ -322,9 +322,9 @@ const columns = computed(() => {
     {
       title: renderTableTitle("题目", "streamline-emojis:blossom"),
       key: "problem",
-      minWidth: 300,
-      render: (row) =>
-        h(
+      minWidth: 360,
+      render: (row) => {
+        const problem = h(
           ButtonWithSearch,
           {
             type: "题目",
@@ -332,7 +332,28 @@ const columns = computed(() => {
             onSearch: () => (query.problem = row.problem),
           },
           () => `${row.problem} ${row.problemTitle}`,
-        ),
+        )
+        // 从题单入口做出来的提交才有这个标记（后端只在提交时记来源），
+        // 同一道题从普通题库刷的不会带。老提交里只有当年首次 AC 那条有
+        const problemSet = row.problemSet
+        if (!problemSet) return problem
+        return h(NFlex, { align: "center", size: 8, wrap: false }, () => [
+          problem,
+          h(
+            NTag,
+            {
+              size: "small",
+              round: true,
+              type: "info",
+              bordered: false,
+              style: { cursor: "pointer", flexShrink: 0 },
+              onClick: () =>
+                window.open("/problemset/" + problemSet.id, "_blank"),
+            },
+            () => "题单 " + problemSet.title,
+          ),
+        ])
+      },
     },
     {
       title: renderTableTitle("语言", "streamline-ultimate-color:earth-pin-2"),

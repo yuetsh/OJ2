@@ -22,6 +22,15 @@ export const createSubmissionRequestSchema = z.object({
   language: z.string().min(1).max(32),
   code: z.string().min(1).max(1024 * 1024),
   contestId: z.number().int().positive().optional(),
+  /**
+   * 来源题单。学生从 `/problemset/:id/problem/:pid` 那个入口提交时前端带上，
+   * 后端落进 `submission.problemset_id`，提交列表据此标出「这条是刷题单刷出来的」。
+   *
+   * 只是**来源标记**，不参与判题、也不参与题单进度记账 —— 进度由判完之后的
+   * `recordSolvedProblem` 记进所有已加入且含这道题的题单，和从哪个入口进来无关。
+   * 所以这里带错了顶多是标记不准，不会影响成绩。
+   */
+  problemSetId: z.number().int().positive().optional(),
 })
 
 export const createSubmissionResponseSchema = z.object({
@@ -96,6 +105,12 @@ export const submissionListItemSchema = z.object({
   language: z.string(),
   shared: z.boolean(),
   statisticInfo: z.record(z.string(), z.unknown()),
+  /**
+   * 来源题单，非题单入口提交的为 null。比赛提交恒为 null（比赛题不会进题单）。
+   * 历史提交里只有「当年首次 AC 那一条」有值 —— 迁移 0007 从 problemset_submission
+   * 回填的就是这些，其余老提交无从判断入口，一律留空。
+   */
+  problemSet: z.object({ id: z.number().int(), title: z.string() }).nullable(),
 })
 
 export const submissionListSchema = paginatedSchema(submissionListItemSchema)

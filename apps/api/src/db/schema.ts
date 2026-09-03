@@ -444,6 +444,11 @@ export const submission = pgTable("submission", {
 	statisticInfo: jsonb("statistic_info").default({}).notNull(),
 	username: text().notNull(),
 	ip: text(),
+	// 来源题单：学生从题单入口（/problemset/:id/problem/:pid）提交时记下来，
+	// 提交列表据此标出「这条来自题单」。**只是来源标记**，题单进度、奖章一概不看它，
+	// 那些由判完之后的 recordSolvedProblem 按「已加入且含这道题的所有题单」记账。
+	// 老数据里只有迁移 0007 从 problemset_submission 回填的首次 AC 有值。
+	problemsetId: bigint("problemset_id", { mode: "number" }),
 }, (table) => [
 	// 同上，不写 .op()。原先 pull 出来的 opclass 还串了位（contest_id 标成 timestamptz_ops、
 	// create_time 标成 int4_ops），那条 SQL 真拿去执行 Postgres 会直接拒绝。
@@ -486,6 +491,16 @@ export const submission = pgTable("submission", {
 			foreignColumns: [problem.id],
 			name: "submission_problem_id_76847b55_fk_problem_id"
 		}),
+	// 部分索引：绝大多数提交不来自题单，全列索引等于给 12 万行白建一遍。
+	// 谓词是 IS NOT NULL，`problemset_id = $1` 蕴含非空，所以删题单时的外键检查
+	// 也能用上它——不然那条检查要顺序扫全表。
+	index("submission_problemset_id_idx").using("btree", table.problemsetId.asc().nullsLast()).where(sql`${table.problemsetId} is not null`),
+	// 删掉题单不该带走提交：置空来源标记就行，提交本身照旧存在。
+	foreignKey({
+			columns: [table.problemsetId],
+			foreignColumns: [problemset.id],
+			name: "submission_problemset_id_fk_problemset_id"
+		}).onDelete("set null"),
 ]);
 
 export const tutorial = pgTable("tutorial", {

@@ -137,6 +137,11 @@ async function submit() {
   if (contestID) {
     data.contestId = parseInt(contestID)
   }
+  // 从题单入口进来的，把来源题单一起报上去：提交列表要据此标出「来自题单」。
+  // 只是来源标记，题单进度仍由后端判完之后自己记账（见上面那段注释）
+  if (problemSetId) {
+    data.problemSetId = parseInt(problemSetId)
+  }
   // 2. 提交代码到后端
   isSubmittingRequest.value = true
   try {

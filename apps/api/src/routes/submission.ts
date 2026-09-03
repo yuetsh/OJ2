@@ -118,6 +118,23 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     )
   }
 
+  // 来源题单：前端只在 /problemset/:id/problem/:pid 那个入口带上它，落库纯粹是为了
+  // 在提交列表里标出「这条是刷题单刷出来的」。校验只确认这道题确实在那个题单里 ——
+  // 不查 visible / status，因为藏起来的题单里还困着已加入的学生（他们照样在做题），
+  // 也不查有没有加入：没加入照样能从题单页点进题目，标记来源不该比入口本身更严。
+  // 对不上就当没带，提交照收：来源标记错了顶多列表少个标签，不值得挡下一次提交。
+  let problemsetId: number | null = null
+  if (contestId === null && parsed.data.problemSetId) {
+    const [link] = await db.select({ id: schema.problemsetProblem.id })
+      .from(schema.problemsetProblem)
+      .where(and(
+        eq(schema.problemsetProblem.problemsetId, parsed.data.problemSetId),
+        eq(schema.problemsetProblem.problemId, problem.id),
+      ))
+      .limit(1)
+    if (link) problemsetId = parsed.data.problemSetId
+  }
+
   const user = c.get("user")!
   const submissionId = randomBytes(16).toString("hex")
   const createTime = new Date().toISOString()
@@ -126,6 +143,7 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
   await db.insert(schema.submission).values({
     id: submissionId,
     problemId: problem.id,
+    problemsetId,
     createTime,
     userId: user.id,
     username: user.username,
@@ -465,6 +483,9 @@ const submissionListColumns = {
     language: schema.submission.language,
     shared: schema.submission.shared,
     statisticInfo: schema.submission.statisticInfo,
+    // 只取 id，题单标题按页单独查一次（见 /submissions）——把 problemset 一起 join 进来
+    // 会动到下面那条调过的分页查询，而每页最多两三个不同的题单，PK 查一次更便宜
+    problemsetId: schema.submission.problemsetId,
   },
   problem: {
     displayId: schema.problem.displayId,
@@ -568,6 +589,19 @@ async function paginateSubmissionRows(
   ).limit(limit)
 }
 
+/**
+ * 这一页里出现过的来源题单，id → 标题。传进来的数组允许带 null 和重复值。
+ * 一页最多 250 行、实际能落到的题单数是个位数，按主键 IN 查一次就完了。
+ */
+async function problemsetTitleMap(ids: Array<number | null>) {
+  const unique = [...new Set(ids.filter((id): id is number => id !== null))]
+  if (unique.length === 0) return new Map<number, string>()
+  const rows = await db.select({ id: schema.problemset.id, title: schema.problemset.title })
+    .from(schema.problemset)
+    .where(inArray(schema.problemset.id, unique))
+  return new Map(rows.map((row) => [row.id, row.title]))
+}
+
 submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
@@ -600,11 +634,15 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
     paginateSubmissionRows(where, limit, offset, Boolean(displayId)),
   ])
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
-  const joinTimes = user && !isAdminRole(user)
-    ? await problemSetJoinTimes(user.id, [...new Set(
-        rows.filter((row) => row.submission.userId === user.id).map((row) => row.submission.problemId),
-      )])
-    : undefined
+  const [joinTimes, problemsetTitles] = await Promise.all([
+    user && !isAdminRole(user)
+      ? problemSetJoinTimes(user.id, [...new Set(
+          rows.filter((row) => row.submission.userId === user.id).map((row) => row.submission.problemId),
+        )])
+      : undefined,
+    // 来源题单的标题。一页里不同题单最多几个，按主键查一次就够
+    problemsetTitleMap(rows.map((row) => row.submission.problemsetId)),
+  ])
   return success(c, submissionListSchema.parse({
     results: rows.map(({ submission, problem }) => submissionListItemSchema.parse({
       id: submission.id,
@@ -618,6 +656,10 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
       language: submission.language,
       shared: submission.shared,
       statisticInfo: objectValue(submission.statisticInfo),
+      // 题单被删掉之后外键把 problemset_id 置了空，这里自然就没标记了
+      problemSet: submission.problemsetId !== null && problemsetTitles.has(submission.problemsetId)
+        ? { id: submission.problemsetId, title: problemsetTitles.get(submission.problemsetId)! }
+        : null,
     })),
     total: totalRows[0]?.value ?? 0,
   }))
@@ -667,6 +709,9 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
       language: submission.language,
       shared: submission.shared,
       statisticInfo: objectValue(submission.statisticInfo),
+      // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
+      // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
+      problemSet: null,
     })),
     total: totalRows[0]?.value ?? 0,
   }))
