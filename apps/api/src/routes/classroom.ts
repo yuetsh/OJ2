@@ -1,4 +1,5 @@
 import {
+  STUDENT_ROLES,
   classComparisonRequestSchema,
   classComparisonResponseSchema,
   classComparisonSchema,
@@ -32,7 +33,7 @@ interface ClassUser {
 async function loadClassUsers(classNames?: string[], gradePrefix?: string) {
   const filters = [
     eq(schema.user.isDisabled, false),
-    inArray(schema.user.adminType, ["Regular User", "Student Admin"]),
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
     sql`${schema.user.className} is not null`,
   ]
   if (classNames) filters.push(inArray(schema.user.className, classNames))

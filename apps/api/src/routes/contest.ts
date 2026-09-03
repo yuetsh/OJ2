@@ -1,4 +1,5 @@
 import {
+  STUDENT_ROLES,
   contestAccessSchema,
   contestListSchema,
   contestPasswordRequestSchema,
@@ -207,7 +208,7 @@ contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("rank
   const contest = c.get("contest")!
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const where = and(eq(schema.acmContestRank.contestId, contest.id), inArray(schema.user.adminType, ["Regular User", "Student Admin"]), eq(schema.user.isDisabled, false))
+  const where = and(eq(schema.acmContestRank.contestId, contest.id), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false))
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.acmContestRank).innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id)).where(where),
     db.select({ rank: schema.acmContestRank, user: schema.user, realName: schema.userProfile.realName })

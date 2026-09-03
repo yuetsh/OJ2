@@ -6,8 +6,11 @@ import { getOptions } from "./options"
  *
  * 参数与旧后端 `options/options.py:120` 的默认值逐字对齐：
  *   user: { capacity: 20, fill_rate: 0.03, default_capacity: 10 }
- *   ip:   { capacity: 100, fill_rate: 0.1, default_capacity: 50 }
  * 和旧后端一样，实际值以数据库 `throttling` 配置项为准，缺失时用上面的默认值。
+ *
+ * 旧后端还有一个按 IP 计数的桶，OJ2 从来没调用过（机房整个班共用一个出口 IP，
+ * 按 IP 限流等于按班限流），已随其余 IP 功能一并删除。库里 `throttling` 配置项
+ * 残留的 `ip` 键读不到就忽略，不用清。
  *
  * 旧实现在注释里写明「对于单个 key 的操作不是线程安全的」；这里改用 Lua 脚本做成原子操作，
  * 算法和参数不变 —— 限流要挡的正是并发突发，读改写有竞态的话等于没挡。
@@ -19,8 +22,7 @@ export type BucketConfig = {
   default_capacity: number
 }
 
-export const throttlingDefaults: Record<"ip" | "user", BucketConfig> = {
-  ip: { capacity: 100, fill_rate: 0.1, default_capacity: 50 },
+export const throttlingDefaults: Record<"user", BucketConfig> = {
   user: { capacity: 20, fill_rate: 0.03, default_capacity: 10 },
 }
 
@@ -73,7 +75,7 @@ function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig
   }
 }
 
-export async function getBucketConfig(scope: "ip" | "user"): Promise<BucketConfig> {
+export async function getBucketConfig(scope: "user"): Promise<BucketConfig> {
   const fallback = throttlingDefaults[scope]
   try {
     const values = await getOptions(["throttling"])
@@ -88,7 +90,7 @@ export async function getBucketConfig(scope: "ip" | "user"): Promise<BucketConfi
 export type ConsumeResult = { allowed: true } | { allowed: false; wait: number }
 
 export async function consumeToken(
-  scope: "ip" | "user",
+  scope: "user",
   identity: string,
   num = 1,
 ): Promise<ConsumeResult> {

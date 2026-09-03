@@ -183,7 +183,6 @@ function createNewUser() {
     problemPermission: "None",
     createTime: null,
     lastLogin: null,
-    openApi: false,
     isDisabled: false,
     rawPassword: null,
     className: null,

@@ -1,3 +1,4 @@
+import { toAdminType } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
 import { User } from "./types"
 import { USER_TYPE } from "./constants"
@@ -176,7 +177,9 @@ export function getUserRole(role: User["adminType"]): {
     },
   }
 
-  return roleMap[role] || roleMap[USER_TYPE.REGULAR_USER]
+  // role 是从接口来的裸字符串，toAdminType 把认不出来的值归到「普通」，
+  // 归一逻辑和后端共用同一个函数（@oj2/contract 的 roles.ts）
+  return roleMap[toAdminType(role)]
 }
 
 export function unique<T>(arr: T[]): T[] {

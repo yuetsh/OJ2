@@ -2,6 +2,8 @@ import { and, eq, isNull } from "drizzle-orm"
 
 import { touchSession } from "../auth/session"
 import { db, schema } from "../db"
+import { toAdminType } from "@oj2/contract"
+
 import { TEACHER_ROLES } from "../routes/helpers"
 import {
   addRequest,
@@ -24,7 +26,7 @@ import {
 } from "./state"
 
 function isTeacher(ws: CollabSocket) {
-  return TEACHER_ROLES.includes(ws.data.adminType ?? "")
+  return TEACHER_ROLES.includes(toAdminType(ws.data.adminType ?? ""))
 }
 
 /** 推给老师的列表条目。不含 socket，也不含任何代码内容 */
@@ -339,7 +341,7 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
     .from(schema.user)
     .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
-  if (!teacher || !TEACHER_ROLES.includes(teacher.adminType)) {
+  if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
     ws.close(1008, "Permission revoked")
     return
   }
@@ -404,7 +406,7 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
     .from(schema.user)
     .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
-  if (!teacher || !TEACHER_ROLES.includes(teacher.adminType)) {
+  if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
     ws.close(1008, "Permission revoked")
     return
   }

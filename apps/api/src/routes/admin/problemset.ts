@@ -178,20 +178,9 @@ adminProblemSetRoutes.put("/problem-sets/:id/status", requireTeacher, async (c) 
 adminProblemSetRoutes.delete("/problem-sets/:id", requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get("user")!)
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  // 五张子表全是 NO ACTION 外键，Django 的级联在应用层。顺序不能反：
-  // user_badge 挂在 problemset_badge 上，得先于 badge 删
-  await db.transaction(async (tx) => {
-    const badges = await tx.select({ id: schema.problemsetBadge.id }).from(schema.problemsetBadge)
-      .where(eq(schema.problemsetBadge.problemsetId, row.id))
-    if (badges.length) {
-      await tx.delete(schema.userBadge).where(inArray(schema.userBadge.badgeId, badges.map((b) => b.id)))
-    }
-    await tx.delete(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, row.id))
-    await tx.delete(schema.problemsetSubmission).where(eq(schema.problemsetSubmission.problemsetId, row.id))
-    await tx.delete(schema.problemsetProgress).where(eq(schema.problemsetProgress.problemsetId, row.id))
-    await tx.delete(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, row.id))
-    await tx.delete(schema.problemset).where(eq(schema.problemset.id, row.id))
-  })
+  // 子表交给库级 CASCADE（0010）：problemset_{badge,problem,progress,submission} 直接连坐，
+  // user_badge 经 problemset_badge 二级连坐。原先这里手抄五条 delete 并要求「顺序不能反」。
+  await db.delete(schema.problemset).where(eq(schema.problemset.id, row.id))
   return success(c, null)
 })
 
@@ -366,10 +355,8 @@ adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher
       eq(schema.problemsetBadge.problemsetId, row.id),
     )).limit(1)
   if (!badge) return failure(c, 404, "badge-not-found", "奖章不存在")
-  await db.transaction(async (tx) => {
-    await tx.delete(schema.userBadge).where(eq(schema.userBadge.badgeId, badge.id))
-    await tx.delete(schema.problemsetBadge).where(eq(schema.problemsetBadge.id, badge.id))
-  })
+  // 获奖记录随奖章一起没：user_badge.badge_id 是 CASCADE（0010）
+  await db.delete(schema.problemsetBadge).where(eq(schema.problemsetBadge.id, badge.id))
   return success(c, null)
 })
 

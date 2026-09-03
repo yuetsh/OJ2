@@ -61,9 +61,7 @@ async function seed(account: SeedAccount) {
       createTime: now,
       adminType: account.adminType,
       problemPermission: account.problemPermission,
-      openApi: false,
       isDisabled: false,
-      sessionKeys: [],
     })
     .onConflictDoUpdate({
       target: schema.user.username,

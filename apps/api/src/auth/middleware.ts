@@ -1,3 +1,4 @@
+import { ADMIN_ROLES, TEACHER_ROLES } from "@oj2/contract"
 import type { Context, MiddlewareHandler } from "hono"
 
 import { failure } from "../http"
@@ -55,9 +56,6 @@ function requireRole(
     await next()
   }
 }
-
-const ADMIN_ROLES = ["Student Admin", "Teacher Admin", "Super Admin"]
-const TEACHER_ROLES = ["Teacher Admin", "Super Admin"]
 
 /** 旧 `@admin_role_required` */
 export const requireAdmin = requireRole((user) => ADMIN_ROLES.includes(user.adminType))

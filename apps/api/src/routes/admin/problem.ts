@@ -423,7 +423,15 @@ adminProblemRoutes.delete("/problems/:id", requireProblemPermission, async (c) =
 })
 
 /**
- * 删题的共用实现。子表全是 NO ACTION 外键，Django 的级联在应用层，得手工清。
+ * 删题的共用实现。
+ *
+ * 「有提交就不让删」这道守卫**不能去掉**：submission.problem_id 是本次唯一**没有**
+ * 改成 CASCADE 的题目外键（0010），就是为了让 12 万条历史提交不会被一次误删带走。
+ * 守卫先拦，报的是人话；库级外键是最后一道保险。
+ * 其余子表（problem_tags / problemset_problem / problemset_submission / reaction /
+ * flowchart_submission）全部交给 CASCADE，原先这里手抄了四条 delete、且漏了
+ * problemset_submission —— 那条漏清被上面的守卫挡着，一直没能真的发作。
+ *
  * 测试用例目录**不删** —— 与旧后端一致（它把 rmtree 注释掉了）。
  * 删错了还能从磁盘捞回来，而误删的测试数据没有别处备份；孤儿目录另有清理入口。
  */
@@ -433,13 +441,7 @@ async function deleteProblem(c: Parameters<typeof success>[0], id: number) {
   if ((submissions?.value ?? 0) > 0) {
     return failure(c, 409, "problem-has-submissions", "该题目已有提交记录，不能删除")
   }
-  await db.transaction(async (tx) => {
-    await tx.delete(schema.problemTags).where(eq(schema.problemTags.problemId, id))
-    await tx.delete(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemId, id))
-    await tx.delete(schema.flowchartSubmission).where(eq(schema.flowchartSubmission.problemId, id))
-    await tx.delete(schema.reaction).where(eq(schema.reaction.problemId, id))
-    await tx.delete(schema.problem).where(eq(schema.problem.id, id))
-  })
+  await db.delete(schema.problem).where(eq(schema.problem.id, id))
   return success(c, null)
 }
 

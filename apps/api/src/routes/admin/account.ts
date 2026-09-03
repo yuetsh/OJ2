@@ -1,4 +1,6 @@
 import {
+  STUDENT_ROLES,
+  adminTypeSchema,
   adminUserListSchema,
   adminUserRankSchema,
   adminUserSchema,
@@ -7,6 +9,8 @@ import {
   rankProfileSchema,
   resetPasswordResponseSchema,
   updateUserRequestSchema,
+  type AdminType,
+  type ProblemPermission,
 } from "@oj2/contract"
 import { randomInt } from "node:crypto"
 import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm"
@@ -50,7 +54,7 @@ function classNameOf(username: string): { ok: true; value: string | null } | { o
  * 超管恒为 All、普通用户恒为 None、两种管理员取传入值或兜底 Own。
  * 不这么做的话，把一个超管降级成普通用户后，他还留着 All 的题目权限。
  */
-function normalizePermission(adminType: string, requested: string) {
+function normalizePermission(adminType: AdminType, requested: ProblemPermission): ProblemPermission {
   if (adminType === "Super Admin") return "All"
   if (adminType === "Regular User") return "None"
   return requested || "Own"
@@ -69,7 +73,6 @@ function serialize(row: {
     realName: row.realName,
     createTime: row.user.createTime,
     lastLogin: row.user.lastLogin,
-    openApi: row.user.openApi,
     isDisabled: row.user.isDisabled,
     rawPassword: row.user.rawPassword,
     className: row.user.className,
@@ -98,7 +101,7 @@ adminAccountRoutes.get("/rankings/users", requireSuperAdmin, async (c) => {
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const keyword = c.req.query("keyword")?.trim()
   const where = and(
-    inArray(schema.user.adminType, ["Regular User", "Student Admin"]),
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
     eq(schema.user.isDisabled, false),
     keyword ? ilike(schema.user.username, `%${keyword}%`) : undefined,
   )
@@ -134,7 +137,13 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
   const filters = []
   const type = c.req.query("type")?.trim()
   const keyword = c.req.query("keyword")?.trim()
-  if (type) filters.push(eq(schema.user.adminType, type))
+  if (type) {
+    // 以前这里直接把 query 塞进 eq()，传个不存在的角色名只会静默返回空列表。
+    // 列加了 $type 之后编译器会拦下来，顺势改成校验：前端的下拉只有这四个值。
+    const parsedType = adminTypeSchema.safeParse(type)
+    if (!parsedType.success) return failure(c, 400, "invalid-request", "角色筛选值不合法")
+    filters.push(eq(schema.user.adminType, parsedType.data))
+  }
   if (keyword) {
     filters.push(or(
       ilike(schema.user.username, `%${keyword}%`),
@@ -203,13 +212,6 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
     patch.password = await hashPassword(data.password)
     patch.rawPassword = data.password
   }
-  if (data.openApi) {
-    // 已经开着就不重置 appkey，否则每次保存用户都会把对方的 key 换掉
-    if (!existing.user.openApi) patch.openApiAppkey = randomBytes32()
-  } else {
-    patch.openApiAppkey = null
-  }
-  patch.openApi = data.openApi
 
   await db.transaction(async (tx) => {
     await tx.update(schema.user).set(patch).where(eq(schema.user.id, id))
@@ -276,12 +278,10 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
       rawPassword: item.raw,
       email: item.email,
       className: item.className,
-      adminType: "Regular User",
-      problemPermission: "None",
+      adminType: "Regular User" as const,
+      problemPermission: "None" as const,
       createTime: new Date().toISOString(),
-      openApi: false,
       isDisabled: false,
-      sessionKeys: [],
     }))).returning({ id: schema.user.id, username: schema.user.username })
     const byName = new Map(users.map((row) => [row.username, row.id]))
     await tx.insert(schema.userProfile).values(prepared.map((item) => ({
@@ -308,12 +308,15 @@ adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   // 用户是被引用最广的一张表（提交、题目、比赛、公告……），级联删除牵连太大，
   // 旧后端靠 Django 的应用层级联硬删。这里不复刻那个行为，改为让数据库拦下来：
   // 撞外键说明该用户还有历史数据，应当禁用而不是删除。
+  //
+  // 所以 0010 那一批 CASCADE **有意跳过了 user 的绝大多数外键**：成就、表情、题单进度、
+  // AI 分析、站内信全都继续拦着。只有 user_profile 和 user_stat 走 CASCADE ——
+  // 一个是一对一附属、一个是可重算的统计缓存，都不构成「这人做过什么」的证据。
+  // 别顺手把这里也改成全 CASCADE：submission.user_id 压根没有外键（Django 那边就是个
+  // 裸 IntegerField），全连坐的结果是成就没了、提交却留成孤儿行，一半删一半留。
   try {
-    const deleted = await db.transaction(async (tx) => {
-      await tx.delete(schema.userProfile).where(inArray(schema.userProfile.userId, parsed.data.ids))
-      return tx.delete(schema.user).where(inArray(schema.user.id, parsed.data.ids))
-        .returning({ id: schema.user.id })
-    })
+    const deleted = await db.delete(schema.user).where(inArray(schema.user.id, parsed.data.ids))
+      .returning({ id: schema.user.id })
     return success(c, { deleted: deleted.length })
   } catch {
     return failure(c, 409, "user-in-use", "该用户还有提交、题目等历史数据，无法删除；请改为禁用账号")
@@ -333,8 +336,3 @@ adminAccountRoutes.post("/users/:id/reset-password", requireSuperAdmin, async (c
   }).where(eq(schema.user.id, id))
   return success(c, resetPasswordResponseSchema.parse({ password }))
 })
-
-function randomBytes32() {
-  return Array.from({ length: 32 }, () =>
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[randomInt(62)]).join("")
-}

@@ -5,6 +5,12 @@
 // django_session）已由 0002_drop_django_leftovers 删除，drizzle.config.ts 的
 // tablesFilter 随之移除。库里现在就是这 27 张业务表。
 //
+// 2026-09-02：又清了一批只有 Django 时代写过、OJ2 一次都没读过的列 ——
+// 0008 删比赛 IP 白名单与 submission.ip（判题机的 judge_server.ip 保留，那是运维数据），
+// 0009 删 user 的 auth_token / open_api / open_api_appkey / session_keys 和
+// user_profile 的 blog / github / school / major / language。**删的判据是「全仓零读取」**，
+// 不是「看着没用」：raw_password 同样刺眼却是在用的（老师要能查学生密码），别一起清掉。
+//
 // 手工修正（都是 `pull` 自己没法无损 round-trip 的地方，改回去会让 generate 产生假 diff，
 // 详见 CLAUDE.md「改 schema 走 drizzle migration」）：
 //   * bigint identity 的 maxValue 用字符串，不能写成 JS number 字面量（会丢精度）。
@@ -16,6 +22,7 @@
 // problem、contest、submission）都是 int4。现存最大 id 一万出头，确实都用不上 bigint，
 // 但 2026-08-26 评估后决定**不改**：省 4 字节/行毫无意义，ALTER TYPE 要重写整表并拿
 // ACCESS EXCLUSIVE 锁，而且其中 6 处 id 被外键绑着得连坐。别再提这件事了。
+import type { AdminType, ProblemPermission } from "@oj2/contract"
 import { pgTable, index, foreignKey, primaryKey, bigint, text, jsonb, timestamp, integer, boolean, serial, doublePrecision, varchar, unique, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
@@ -90,7 +97,6 @@ export const contest = pgTable("contest", {
 	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }).notNull(),
 	visible: boolean().notNull(),
 	createdById: integer("created_by_id").notNull(),
-	allowedIpRanges: jsonb("allowed_ip_ranges").notNull(),
 	tag: text().notNull(),
 }, (table) => [
 	index("contest_created_by_id_a763ca7e").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
@@ -129,7 +135,7 @@ export const flowchartSubmission = pgTable("flowchart_submission", {
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
 			name: "flowchart_submission_problem_id_8551edbf_fk_problem_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
@@ -164,7 +170,7 @@ export const message = pgTable("message", {
 			columns: [table.submissionId],
 			foreignColumns: [submission.id],
 			name: "message_submission_id_2fdf8a47_fk_submission_id"
-		}),
+		}).onDelete("cascade"),
 ]);
 
 export const judgeServer = pgTable("judge_server", {
@@ -195,7 +201,7 @@ export const exercise = pgTable("exercise", {
 			columns: [table.tutorialId],
 			foreignColumns: [tutorial.id],
 			name: "exercise_tutorial_id_6fd04055_fk_tutorial_id"
-		}),
+		}).onDelete("cascade"),
 ]);
 
 export const optionsSysoptions = pgTable("options_sysoptions", {
@@ -244,12 +250,12 @@ export const problemsetProblem = pgTable("problemset_problem", {
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
 			name: "problemset_problem_problem_id_fff2d686_fk_problem_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.problemsetId],
 			foreignColumns: [problemset.id],
 			name: "problemset_problem_problemset_id_350d17fb_fk_problemset_id"
-		}),
+		}).onDelete("cascade"),
 	unique("unique_problemset_problem").on(table.problemId, table.problemsetId),
 ]);
 
@@ -274,7 +280,7 @@ export const problemsetProgress = pgTable("problemset_progress", {
 			columns: [table.problemsetId],
 			foreignColumns: [problemset.id],
 			name: "problemset_progress_problemset_id_20a9632e_fk_problemset_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
@@ -304,17 +310,17 @@ export const problemsetSubmission = pgTable("problemset_submission", {
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
 			name: "problemset_submission_problem_id_5629b105_fk_problem_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.problemsetId],
 			foreignColumns: [problemset.id],
 			name: "problemset_submission_problemset_id_85290e17_fk_problemset_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.submissionId],
 			foreignColumns: [submission.id],
 			name: "problemset_submission_submission_id_78e2b807_fk_submission_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
@@ -336,7 +342,7 @@ export const reaction = pgTable("reaction", {
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
 			name: "reaction_problem_id_a7f3b9f3_fk_problem_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
@@ -414,12 +420,12 @@ export const problemTags = pgTable("problem_tags", {
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
 			name: "problem_tags_problem_id_866ecb8d_fk_problem_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.problemtagId],
 			foreignColumns: [problemTag.id],
 			name: "problem_tags_problemtag_id_72d20571_fk_problem_tag_id"
-		}),
+		}).onDelete("cascade"),
 	unique("problem_tags_problem_id_problemtag_id_318459d1_uniq").on(table.problemId, table.problemtagId),
 ]);
 
@@ -443,7 +449,6 @@ export const submission = pgTable("submission", {
 	shared: boolean().default(false).notNull(),
 	statisticInfo: jsonb("statistic_info").default({}).notNull(),
 	username: text().notNull(),
-	ip: text(),
 	// 来源题单：学生从题单入口（/problemset/:id/problem/:pid）提交时记下来，
 	// 提交列表据此标出「这条来自题单」。**只是来源标记**，题单进度、奖章一概不看它，
 	// 那些由判完之后的 recordSolvedProblem 按「已加入且含这道题的所有题单」记账。
@@ -534,7 +539,7 @@ export const userStat = pgTable("user_stat", {
 			columns: [table.userId],
 			foreignColumns: [user.id],
 			name: "user_stat_user_id_73337fc0_fk_user_id"
-		}),
+		}).onDelete("cascade"),
 	unique("user_stat_user_id_key").on(table.userId),
 ]);
 
@@ -556,7 +561,7 @@ export const userAchievement = pgTable("user_achievement", {
 			columns: [table.achievementId],
 			foreignColumns: [achievement.id],
 			name: "user_achievement_achievement_id_29db600d_fk_achievement_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
@@ -579,7 +584,7 @@ export const userBadge = pgTable("user_badge", {
 			columns: [table.badgeId],
 			foreignColumns: [problemsetBadge.id],
 			name: "user_badge_badge_id_92a983e9_fk_problemset_badge_id"
-		}),
+		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
@@ -592,22 +597,17 @@ export const userProfile = pgTable("user_profile", {
 	id: serial().primaryKey().notNull(),
 	acmProblemsStatus: jsonb("acm_problems_status").default({}).notNull(),
 	avatar: text().notNull(),
-	blog: varchar({ length: 200 }),
 	mood: text(),
 	acceptedNumber: integer("accepted_number").default(0).notNull(),
 	submissionNumber: integer("submission_number").default(0).notNull(),
-	github: text(),
-	school: text(),
-	major: text(),
 	userId: integer("user_id").notNull(),
 	realName: text("real_name"),
-	language: text(),
 }, (table) => [
 	foreignKey({
 			columns: [table.userId],
 			foreignColumns: [user.id],
 			name: "user_profile_user_id_8fdce8e2_fk_user_id"
-		}),
+		}).onDelete("cascade"),
 	unique("user_profile_user_id_key").on(table.userId),
 ]);
 
@@ -644,13 +644,11 @@ export const user = pgTable("user", {
 	username: text().notNull(),
 	email: text(),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }),
-	adminType: text("admin_type").notNull(),
-	authToken: text("auth_token"),
-	openApi: boolean("open_api").default(false).notNull(),
-	openApiAppkey: text("open_api_appkey"),
+	// $type 只是 TS 层的收窄，不产生任何 SQL —— 让 eq(schema.user.adminType, "...")
+	// 里的角色名也受类型检查。运行时的兜底仍在 auth/session.ts 的 toAdminType。
+	adminType: text("admin_type").notNull().$type<AdminType>(),
 	isDisabled: boolean("is_disabled").default(false).notNull(),
-	problemPermission: text("problem_permission").notNull(),
-	sessionKeys: jsonb("session_keys").default([]).notNull(),
+	problemPermission: text("problem_permission").notNull().$type<ProblemPermission>(),
 	rawPassword: varchar("raw_password", { length: 20 }),
 	className: text("class_name"),
 }, (table) => [
@@ -673,7 +671,7 @@ export const problemsetBadge = pgTable("problemset_badge", {
 			columns: [table.problemsetId],
 			foreignColumns: [problemset.id],
 			name: "problemset_badge_problemset_id_6cb6c74f_fk_problemset_id"
-		}),
+		}).onDelete("cascade"),
 ]);
 
 /**

@@ -1,5 +1,12 @@
 import { randomBytes } from "node:crypto"
 
+import {
+  toAdminType,
+  toProblemPermission,
+  type AdminType,
+  type ProblemPermission,
+} from "@oj2/contract"
+
 import { eq } from "drizzle-orm"
 import type { Context } from "hono"
 import { deleteCookie, getCookie, setCookie } from "hono/cookie"
@@ -17,12 +24,17 @@ interface StoredSession {
   contestPasswords: Record<string, string>
 }
 
+/**
+ * 会话里的用户。`adminType` / `problemPermission` 是**联合类型而不是 string** ——
+ * 全仓二十多处 `user.adminType === "Super Admin"` 靠它兜底，拼错一个字母就编译不过。
+ * 收窄发生在下面读库那一处，是整个后端唯一一个把裸字符串变成角色的地方。
+ */
 export interface AuthUser {
   id: number
   username: string
   email: string | null
-  adminType: string
-  problemPermission: string
+  adminType: AdminType
+  problemPermission: ProblemPermission
   isDisabled: boolean
   className: string | null
 }
@@ -126,7 +138,14 @@ async function getUserByToken(token: string | undefined): Promise<SessionResult>
   }
 
   await redis.expire(sessionKey(token), config.sessionTtlSeconds)
-  return { user }
+  // 唯一的收窄点。库里是 text 列，认不出来的值降成最低权限，见 toAdminType 的注释。
+  return {
+    user: {
+      ...user,
+      adminType: toAdminType(user.adminType),
+      problemPermission: toProblemPermission(user.problemPermission),
+    },
+  }
 }
 
 /** 要区分「未登录」和「已被禁用」的用这个 —— 目前只有鉴权中间件需要 */

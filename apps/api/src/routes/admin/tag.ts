@@ -81,7 +81,8 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
         problemtagId: target.id,
       })))
     }
-    await tx.delete(schema.problemTags).where(eq(schema.problemTags.problemtagId, id))
+    // 旧标签上剩下的关系行随标签一起没：problem_tags.problemtag_id 是 CASCADE（0010）。
+    // 上面那批 insert 已经把题目挂到 target 上了，这里删掉的只是旧的那一份关系。
     await tx.delete(schema.problemTag).where(eq(schema.problemTag.id, id))
     return links.length
   })
@@ -92,12 +93,9 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
 
 adminTagRoutes.delete("/problem-tags/:id", requireProblemPermission, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // 中间表是 NO ACTION 外键，得先清关系再删标签
-  const deleted = await db.transaction(async (tx) => {
-    await tx.delete(schema.problemTags).where(eq(schema.problemTags.problemtagId, id))
-    return tx.delete(schema.problemTag).where(eq(schema.problemTag.id, id))
-      .returning({ id: schema.problemTag.id })
-  })
+  // 中间表 problem_tags 随标签一起清：problemtag_id 是 CASCADE（0010）
+  const deleted = await db.delete(schema.problemTag).where(eq(schema.problemTag.id, id))
+    .returning({ id: schema.problemTag.id })
   if (deleted.length === 0) return failure(c, 404, "tag-not-found", "标签不存在，请刷新后重试")
   return success(c, null)
 })

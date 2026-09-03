@@ -22,7 +22,6 @@ export async function getUserProfileById(userId: number, showRealName: boolean) 
       problemPermission: row.user.problemPermission,
       createTime: row.user.createTime,
       lastLogin: row.user.lastLogin,
-      openApi: row.user.openApi,
       isDisabled: row.user.isDisabled,
       className: row.user.className,
     }),

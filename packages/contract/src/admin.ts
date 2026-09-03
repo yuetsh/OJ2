@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { adminTypeSchema, problemPermissionSchema } from "./roles"
+
 import { achievementRaritySchema } from "./achievement"
 import { rankProfileSchema } from "./account"
 import { paginatedSchema, sampleUserSchema } from "./common"
@@ -206,7 +208,6 @@ export const adminUserSchema = z.object({
   realName: z.string().nullable(),
   createTime: z.string().nullable(),
   lastLogin: z.string().nullable(),
-  openApi: z.boolean(),
   isDisabled: z.boolean(),
   // 明文密码。是有意保留的运营需求：老师要能查学生的密码。
   // 只在超管专属的这一个接口下发，别往任何其它地方复制。
@@ -219,11 +220,10 @@ export const adminUserListSchema = paginatedSchema(adminUserSchema)
 export const updateUserRequestSchema = z.object({
   username: z.string().trim().min(1).max(32),
   email: z.email().max(64),
-  adminType: z.enum(["Regular User", "Student Admin", "Teacher Admin", "Super Admin"]),
-  problemPermission: z.enum(["None", "Own", "All"]),
+  adminType: adminTypeSchema,
+  problemPermission: problemPermissionSchema,
   realName: z.string().max(32).nullable().default(null),
   isDisabled: z.boolean(),
-  openApi: z.boolean(),
   // 空串表示不改密码，与旧 EditUserSerializer 的 allow_blank 一致
   password: z.string().max(128).default(""),
 })
@@ -322,7 +322,6 @@ export const adminContestSchema = z.object({
   // 后台要能看到自己设的密码（用来告诉学生），oj 侧的 contestSchema 则永远不含它
   password: z.string().nullable(),
   visible: z.boolean(),
-  allowedIpRanges: z.array(z.string()),
   createdBy: sampleUserSchema,
   status: z.enum(["1", "0", "-1"]),
   contestType: z.enum(["Public", "Password Protected"]),
@@ -339,7 +338,6 @@ export const createContestRequestSchema = z.object({
   // 空串等同于「不设密码」，与旧 CreateConetestSeriaizer 的 allow_blank 一致
   password: z.string().max(32).nullable().default(null),
   visible: z.boolean(),
-  allowedIpRanges: z.array(z.string().max(32)).default([]),
 })
 
 export const updateContestRequestSchema = createContestRequestSchema

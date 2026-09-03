@@ -13,7 +13,6 @@ export const sessionUserSchema = z.object({
   problemPermission: z.string(),
   createTime: z.string().nullable(),
   lastLogin: z.string().nullable(),
-  openApi: z.boolean(),
   isDisabled: z.boolean(),
   className: z.string().nullable(),
 })

@@ -48,7 +48,6 @@ export const submissionDetailSchema = z.object({
   language: z.string(),
   shared: z.boolean(),
   statisticInfo: z.record(z.string(), z.unknown()),
-  ip: z.string().nullable(),
   contestId: z.number().int().nullable(),
   problemId: z.number().int(),
   /**
@@ -65,13 +64,13 @@ export const submissionDetailSchema = z.object({
 /**
  * 内嵌在别处（目前只有站内信）的提交对象。对齐旧后端的
  * `SubmissionSafeModelSerializer(exclude=("info", "contest", "ip"))` ——
- * 这三个键**根本不出现**，而不是出现但值为空。
+ * 这些键**根本不出现**，而不是出现但值为空。（`ip` 已随 IP 功能整体删除。）
  *
  * 独立成一个 schema 而不是复用 submissionDetailSchema 传空值：形状一致了，
- * 将来有人「顺手」把空值改成真值就不会变成泄露，因为这里压根没有这三个字段。
+ * 将来有人「顺手」把空值改成真值就不会变成泄露，因为这里压根没有这些字段。
  */
 export const embeddedSubmissionSchema = submissionDetailSchema
-  .omit({ info: true, ip: true, contestId: true, problemId: true })
+  .omit({ info: true, contestId: true, problemId: true })
   // 旧 SubmissionSafeModelSerializer 里 problem 是
   // `SlugRelatedField(slug_field="_id")`，即**展示用题号**而非数字主键。
   // 站内信页面拿它拼 `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。

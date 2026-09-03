@@ -175,7 +175,6 @@ export function editUser(user: User) {
     problemPermission: user.problemPermission,
     realName: user.realName ?? null,
     isDisabled: user.isDisabled,
-    openApi: user.openApi,
     password: user.password ?? "",
   })
 }
@@ -312,7 +311,6 @@ function toContestBody(contest: Contest | BlankContest) {
     endTime: contest.endTime,
     password: contest.password || null,
     visible: contest.visible,
-    allowedIpRanges: contest.allowedIpRanges ?? [],
   }
 }
 

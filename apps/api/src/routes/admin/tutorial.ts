@@ -113,14 +113,11 @@ adminTutorialRoutes.put("/tutorials/:id/visibility", requireSuperAdmin, async (c
 
 adminTutorialRoutes.delete("/tutorials/:id", requireSuperAdmin, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // 必须先删练习。Django 的 on_delete=CASCADE 是**应用层**实现的，
-  // 库里的外键实际是 NO ACTION（已核对 pg_constraint.confdeltype='a'），
-  // 直接删教程会撞外键约束、变成 500。后台每个 DELETE 都要照此核一遍子表。
-  const deleted = await db.transaction(async (tx) => {
-    await tx.delete(schema.exercise).where(eq(schema.exercise.tutorialId, id))
-    return tx.delete(schema.tutorial).where(eq(schema.tutorial.id, id))
-      .returning({ id: schema.tutorial.id })
-  })
+  // 练习与学习留痕都随教程一起没：exercise.tutorial_id 与 tutorial_progress.tutorial_id
+  // 都是库级 CASCADE。**加子表时要回来想一遍该 CASCADE 还是该拦住**，
+  // 别默认新表会自己连坐 —— 0010 只改了当时存在的那批外键。
+  const deleted = await db.delete(schema.tutorial).where(eq(schema.tutorial.id, id))
+    .returning({ id: schema.tutorial.id })
   if (deleted.length === 0) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
   return success(c, null)
 })

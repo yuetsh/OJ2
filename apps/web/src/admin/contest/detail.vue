@@ -58,7 +58,6 @@ const contest = reactive<BlankContest & { id: number }>({
   endTime: "",
   password: "",
   visible: false,
-  allowedIpRanges: [],
 })
 
 async function getContestDetail() {
@@ -79,7 +78,6 @@ async function getContestDetail() {
   contest.endTime = data.endTime
   contest.password = data.password
   contest.visible = data.visible
-  contest.allowedIpRanges = []
 
   // 显示
   startTime.value = Date.parse(data.startTime)

@@ -1,4 +1,5 @@
 import {
+  STUDENT_ROLES,
   TUTORIAL_READ_SECONDS,
   learnExerciseAttemptSchema,
   learnExerciseProgressListSchema,
@@ -23,9 +24,6 @@ import { queryInteger, rounded } from "../helpers"
  * Hono 按注册顺序匹配，`/tutorials/:id` 会把同级的静态段整个吃掉且不报错。
  */
 export const adminLearnRoutes = new Hono<AppEnv>()
-
-/** 统计只算学生，不算老师和管理员自己 —— 和班级榜（classroom.ts）的口径一致 */
-const STUDENT_ROLES = ["Regular User", "Student Admin"]
 
 function tutorialTypeOf(value: string | undefined) {
   return value === "c" ? "c" : "python"
@@ -61,7 +59,7 @@ function classCondition(value: string | null) {
 function studentCondition(value: string | null) {
   return and(
     eq(schema.user.isDisabled, false),
-    inArray(schema.user.adminType, STUDENT_ROLES),
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
     classCondition(value),
   )
 }

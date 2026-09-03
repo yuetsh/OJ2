@@ -132,18 +132,9 @@ export const CONTEST_STATUS: {
   },
 }
 
-export const USER_TYPE = {
-  REGULAR_USER: "Regular User",
-  STUDENT_ADMIN: "Student Admin",
-  TEACHER_ADMIN: "Teacher Admin",
-  SUPER_ADMIN: "Super Admin",
-}
-
-export const PROBLEM_PERMISSION = {
-  NONE: "None",
-  OWN: "Own",
-  ALL: "All",
-}
+// 角色与题目权限的字符串在 `@oj2/contract` 的 roles.ts 定义，这里只是转出去，
+// 调用方照旧写 `USER_TYPE.SUPER_ADMIN`。原先这里是这批字符串的第三份手抄副本。
+export { USER_TYPE, PROBLEM_PERMISSION } from "@oj2/contract"
 
 export const STORAGE_KEY = {
   AUTHED: "authed",

@@ -360,7 +360,7 @@ export type {
 /** 后台比赛。oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生） */
 export type Contest = AdminContest
 
-/** 学生侧的比赛：不含 password / visible / allowedIpRanges */
+/** 学生侧的比赛：不含 password / visible */
 export type { Contest as OjContest } from "@oj2/contract"
 
 export type BlankContest = Omit<

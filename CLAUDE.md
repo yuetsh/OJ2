@@ -141,7 +141,18 @@ C 那 14 个 target 在 C++ 树里逐个实测通用。但**调用形态两者�
 ## 数据库
 
 Drizzle schema 最初是 `drizzle-kit pull` 从生产库拉出来的，所以它长得像 Django 建的表
-（表名、bigint/int4 混用、外键全是 NO ACTION），`schema.ts` 顶部记了哪些地方是手工修的。
+（表名、bigint/int4 混用），`schema.ts` 顶部记了哪些地方是手工修的。
+
+**外键的删除动作从 0010 起是显式的**，不再是 Django 留下的一律 NO ACTION：
+
+- **CASCADE**：父行消失后子行必然无意义、且不构成「学生做过什么」的证据 —— 中间表
+  （problem_tags）、题单/教程/成就的组成部分、一对一附属（user_profile）与可重算的
+  缓存（user_stat）。
+- **NO ACTION（即拦住）**：需要人看见的删除 —— `submission.problem_id`、以及 `user`
+  的绝大多数外键。删用户撞外键会被 handler 翻译成「请改为禁用账号」，这是有意的。
+
+**加新子表时必须回来想一遍该走哪一档**，别默认新外键会自己连坐 —— drizzle 不写
+`.onDelete()` 就是 NO ACTION，而 0010 只改了当时存在的那批。
 
 **schema 现在归 OJ2 独占。** 旧后端已下线，「改 schema 要考虑回滚」这条约束不再存在，
 结构变更走下面的 migration 正常演进即可。

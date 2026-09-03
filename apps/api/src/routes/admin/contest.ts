@@ -26,16 +26,6 @@ function ownedBy(user: AuthUser, contest: { createdById: number }) {
   return user.adminType === "Super Admin" || contest.createdById === user.id
 }
 
-/** CIDR 校验。`ip_network(strict=False)` 的等价物：允许主机位非零，如 192.168.1.5/24 */
-function validCidr(value: string) {
-  const [address, prefixText] = value.split("/")
-  const octets = (address ?? "").split(".")
-  if (octets.length !== 4) return false
-  if (!octets.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)) return false
-  if (prefixText === undefined) return true
-  return /^\d{1,2}$/.test(prefixText) && Number(prefixText) <= 32
-}
-
 async function serialize(row: {
   contest: typeof schema.contest.$inferSelect
   user: typeof schema.user.$inferSelect
@@ -52,9 +42,6 @@ async function serialize(row: {
     lastUpdateTime: row.contest.lastUpdateTime,
     password: row.contest.password,
     visible: row.contest.visible,
-    allowedIpRanges: Array.isArray(row.contest.allowedIpRanges)
-      ? row.contest.allowedIpRanges.filter((item): item is string => typeof item === "string")
-      : [],
     createdBy: sampleUser(row.user, row.realName),
     status: contestStatus(row.contest),
     contestType: row.contest.password ? "Password Protected" : "Public",
@@ -69,15 +56,12 @@ function selectContest(id: number) {
     .where(eq(schema.contest.id, id)).limit(1)
 }
 
-/** 请求体里的时间与 CIDR 校验，创建和编辑共用 */
-function validatePayload(data: { startTime: string; endTime: string; allowedIpRanges: string[] }) {
+/** 请求体里的时间校验，创建和编辑共用 */
+function validatePayload(data: { startTime: string; endTime: string }) {
   const start = Date.parse(data.startTime)
   const end = Date.parse(data.endTime)
   if (!Number.isFinite(start) || !Number.isFinite(end)) return "开始或结束时间不是合法的时间格式"
   if (end <= start) return "Start time must occur earlier than end time"
-  for (const range of data.allowedIpRanges) {
-    if (!validCidr(range)) return `${range} is not a valid cidr network`
-  }
   return null
 }
 
@@ -132,7 +116,6 @@ adminContestRoutes.post("/contests", requireTeacher, async (c) => {
     // 空串归一成 null，否则 contestType 会把「密码是空字符串」当成密码保护赛
     password: parsed.data.password || null,
     visible: parsed.data.visible,
-    allowedIpRanges: parsed.data.allowedIpRanges,
     createdById: c.get("user")!.id,
     createTime: now,
     lastUpdateTime: now,
@@ -162,7 +145,6 @@ adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
     endTime: new Date(parsed.data.endTime).toISOString(),
     password: parsed.data.password || null,
     visible: parsed.data.visible,
-    allowedIpRanges: parsed.data.allowedIpRanges,
     lastUpdateTime: new Date().toISOString(),
   }).where(eq(schema.contest.id, id))
   const [row] = await selectContest(id)
@@ -196,7 +178,6 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
       password: null,
       // 克隆出来的一律不可见：时间是拍脑袋定的 10 分钟后，直接开放会让学生看到一场没准备好的赛
       visible: false,
-      allowedIpRanges: original.contest.allowedIpRanges,
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       createdById: me,

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 import { extname, resolve } from "node:path"
 
 import {
+  STUDENT_ROLES,
   activityRankItemSchema,
   metricsSchema,
   problemRankSchema,
@@ -25,6 +26,7 @@ import {
   lt,
   lte,
   min,
+  ne,
   or,
   sql,
 } from "drizzle-orm"
@@ -74,12 +76,8 @@ accountRoutes.post("/users", async (c) => {
       lastLogin: null,
       createTime: now,
       adminType: "Regular User",
-      authToken: null,
-      openApi: false,
-      openApiAppkey: null,
       isDisabled: false,
       problemPermission: "None",
-      sessionKeys: [],
       className: null,
     }).returning({ id: schema.user.id })
     if (!created) throw new Error("User insert did not return an id")
@@ -161,7 +159,7 @@ const LEADERBOARD_SIZE = 100
 
 /** 入榜人群：正常状态的学生与学生管理员。教师和超管不参与排名。 */
 const leaderboardWhere = and(
-  inArray(schema.user.adminType, ["Regular User", "Student Admin"]),
+  inArray(schema.user.adminType, [...STUDENT_ROLES]),
   eq(schema.user.isDisabled, false),
 )
 
@@ -266,7 +264,7 @@ accountRoutes.get("/rankings/activity", async (c) => {
       gte(schema.submission.createTime, start),
       inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
       eq(schema.user.isDisabled, false),
-      sql`${schema.user.adminType} <> 'Super Admin'`,
+      ne(schema.user.adminType, "Super Admin"),
     ))
     .groupBy(schema.submission.username).orderBy(desc(countDistinct(schema.submission.problemId))).limit(10)
   return success(c, rows.map((row) => activityRankItemSchema.parse({ username: row.username, count: row.value })))

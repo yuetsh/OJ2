@@ -103,12 +103,9 @@ adminAchievementRoutes.put("/achievements/:id", requireSuperAdmin, async (c) => 
 
 adminAchievementRoutes.delete("/achievements/:id", requireSuperAdmin, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // user_achievement 的外键同样是 NO ACTION（Django 的级联在应用层），先清子表
-  const deleted = await db.transaction(async (tx) => {
-    await tx.delete(schema.userAchievement).where(eq(schema.userAchievement.achievementId, id))
-    return tx.delete(schema.achievement).where(eq(schema.achievement.id, id))
-      .returning({ id: schema.achievement.id })
-  })
+  // 解锁记录随成就一起没：user_achievement.achievement_id 是 CASCADE（0010）
+  const deleted = await db.delete(schema.achievement).where(eq(schema.achievement.id, id))
+    .returning({ id: schema.achievement.id })
   if (deleted.length === 0) return failure(c, 404, "achievement-not-found", "成就不存在")
   return success(c, null)
 })

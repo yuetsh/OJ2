@@ -29,7 +29,6 @@ import {
   canAccessContest,
   contestStatus,
   findVisibleContest,
-  ipAllowed,
   isContestAdmin,
   requireContestAccess,
   type ContestEnv,
@@ -59,11 +58,6 @@ function objectValue(value: unknown): Record<string, unknown> {
     : {}
 }
 
-function requestIp(c: { req: { header(name: string): string | undefined } }) {
-  const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim()
-  return forwarded || c.req.header("x-real-ip") || null
-}
-
 submissionRoutes.post("/submissions", requireAuth, async (c) => {
   const parsed = createSubmissionRequestSchema.safeParse(
     await c.req.json().catch(() => null),
@@ -80,9 +74,6 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     const access = await canAccessContest(c, contest, "problems")
     if (!access.ok) return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
     if (contestStatus(contest) === "-1") return failure(c, 403, "contest-ended", "The contest has ended")
-    if (!isContestAdmin(c.get("user"), contest) && !ipAllowed(requestIp(c), contest.allowedIpRanges)) {
-      return failure(c, 403, "ip-not-allowed", "Your IP is not allowed in this contest")
-    }
     contestId = contest.id
   }
 
@@ -138,7 +129,6 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
   const user = c.get("user")!
   const submissionId = randomBytes(16).toString("hex")
   const createTime = new Date().toISOString()
-  const ip = requestIp(c)
 
   await db.insert(schema.submission).values({
     id: submissionId,
@@ -153,7 +143,6 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     language: parsed.data.language,
     shared: false,
     statisticInfo: {},
-    ip,
     contestId,
   })
 
@@ -508,10 +497,9 @@ async function submissionDetail(id: string, user: AuthUser) {
     ? undefined
     : await problemSetJoinTimes(user.id, [row.submission.problemId])
   if (!canViewSubmission(user, row.submission, row.problem, row.contest, true, joinTimes)) return null
-  // info（含每个测试点的 test_case 编号与 output_md5）与 ip 只给管理员，对齐旧后端：
+  // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
-  // SubmissionSafeModelSerializer(exclude=("info", "contest", "ip")) 之间二选一，
-  // 把关的是角色，不是「是不是自己的提交」。
+  // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
   const full = isAdminRole(user)
   return submissionDetailSchema.parse({
     id: row.submission.id,
@@ -524,9 +512,7 @@ async function submissionDetail(id: string, user: AuthUser) {
     language: row.submission.language,
     shared: row.submission.shared,
     statisticInfo: objectValue(row.submission.statisticInfo),
-    ip: full ? row.submission.ip : null,
-    // contest 也在旧后端的排除名单里（exclude 的三个字段是 info / contest / ip），
-    // 首轮修复只处理了 info 与 ip，这里补齐。
+    // contest 也在旧后端的排除名单里，同样只给管理员
     contestId: full ? row.submission.contestId : null,
     problemId: row.submission.problemId,
     // problem 表本来就 join 了，不额外查库

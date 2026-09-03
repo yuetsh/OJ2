@@ -103,25 +103,3 @@ export function requireContestAccess(
     await next()
   }
 }
-
-function ipv4Number(value: string) {
-  const parts = value.split(".").map(Number)
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return null
-  return parts.reduce((result, part) => (result * 256 + part) >>> 0, 0)
-}
-
-export function ipAllowed(ip: string | null, ranges: unknown) {
-  if (!Array.isArray(ranges) || ranges.length === 0) return true
-  if (!ip) return false
-  const target = ipv4Number(ip.replace(/^::ffff:/, ""))
-  if (target === null) return false
-  return ranges.some((raw) => {
-    const value = typeof raw === "string" ? raw : raw && typeof raw === "object" ? String((raw as { value?: unknown }).value ?? "") : ""
-    const [address, prefixText = "32"] = value.split("/")
-    const network = ipv4Number(address ?? "")
-    const prefix = Number(prefixText)
-    if (network === null || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) return false
-    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0
-    return (target & mask) === (network & mask)
-  })
-}
