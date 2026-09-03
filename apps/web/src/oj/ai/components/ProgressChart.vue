@@ -4,7 +4,7 @@
       <n-text depth="3" style="font-size: 12px">追踪学习成长轨迹</n-text>
     </template>
     <div class="chart">
-      <Chart type="line" :data="data" :options="options" />
+      <Chart type="line" :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -24,6 +24,7 @@ import {
   Filler,
 } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 import { parseTime } from "utils/functions"
 import type { Grade } from "utils/types"
 
@@ -41,6 +42,7 @@ ChartJS.register(
 )
 
 const aiStore = useAIStore()
+const { chartKey } = useChartTheme()
 
 const gradeOrder = ["C", "B", "A", "S"] as const
 const gradeColors: Record<Grade, string> = {
@@ -78,8 +80,11 @@ const progressData = computed(() => {
     const problemCount = duration.problemCount || 0
     cumulativeCount += problemCount
 
-    // 计算本期等级的权重值
-    const currentGradeValue = gradeOrder.indexOf(duration.grade || "C")
+    // 契约里空串是「无评级」（该周期没有活动），不能当成 C —— 那会在 tooltip 上
+    // 把一个没做题的周期写成「本期等级: C」。这里权重取 0，反正 problemCount 也是 0
+    const currentGradeValue = duration.grade
+      ? gradeOrder.indexOf(duration.grade)
+      : 0
 
     // 累加加权等级
     totalWeightedGrade += currentGradeValue * problemCount
@@ -97,7 +102,7 @@ const progressData = computed(() => {
       start: parseTime(duration.start, "YYYY-MM-DD"),
       end: parseTime(duration.end, "YYYY-MM-DD"),
       count: cumulativeCount,
-      grade: duration.grade || "C",
+      grade: duration.grade,
       gradeValue: currentGradeValue,
       avgGradeValue: avgGradeValue, // 累计平均等级
       problemCount: problemCount,
@@ -235,7 +240,7 @@ const options = computed<ChartOptions<"line">>(() => {
               const avgIdx = Math.round(Number(ctx.parsed.y))
               return [
                 `${dsLabel}: ${gradeOrder[avgIdx] || ""}`,
-                `本期等级: ${progress.grade}`,
+                `本期等级: ${progress.grade || "无"}`,
                 `本期完成: ${progress.problemCount} 题`,
               ]
             } else {

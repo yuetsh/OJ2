@@ -6,7 +6,7 @@
       </n-text>
     </template>
     <div style="height: 300px">
-      <Bar :data="data" :options="options" />
+      <Bar :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -23,11 +23,13 @@ import {
   Legend,
 } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 import type { Grade } from "utils/types"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const aiStore = useAIStore()
+const { chartKey } = useChartTheme()
 
 // 难度和等级的顺序（后端返回的是中文）
 const difficultyOrder = ["简单", "中等", "困难"]

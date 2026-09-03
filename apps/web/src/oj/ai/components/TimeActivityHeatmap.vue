@@ -6,7 +6,7 @@
       </n-text>
     </template>
     <div style="height: 300px">
-      <Bar :data="data" :options="options" />
+      <Bar :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -23,10 +23,12 @@ import {
   Legend,
 } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const aiStore = useAIStore()
+const { chartKey } = useChartTheme()
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
 const TIME_PERIODS = [

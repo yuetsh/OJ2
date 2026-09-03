@@ -4,7 +4,7 @@
       <n-text depth="3" style="font-size: 12px"> 全面评估学习情况 </n-text>
     </template>
     <div class="chart">
-      <Chart type="bar" :data="data" :options="options" />
+      <Chart type="bar" :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -25,6 +25,7 @@ import {
   LineController,
 } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 import { parseTime } from "utils/functions"
 
 // 注册混合图表（Bar + Line）所需的 Chart.js 组件
@@ -42,6 +43,7 @@ ChartJS.register(
 )
 
 const aiStore = useAIStore()
+const { chartKey } = useChartTheme()
 
 const gradeOrder = ["C", "B", "A", "S"] as const
 
@@ -89,7 +91,6 @@ const data = computed<ChartData<"bar" | "line">>(() => {
         spanGaps: false,
         tension: 0.4,
         yAxisID: "y1",
-        barThickness: 10,
         order: 1,
         borderWidth: 2,
         pointRadius: 4,
@@ -128,8 +129,11 @@ const options = computed<ChartOptions<"bar" | "line">>(() => {
         max: gradeOrder.length - 0.5,
         ticks: {
           stepSize: 1,
+          // 轴是 -0.5 ~ 3.5，chart.js 生成的刻度值就是 -0.5/0.5/1.5/2.5/3.5，
+          // 直接拿去索引 gradeOrder 全是 undefined —— 右轴的 S/A/B/C 一个都不会显示。
+          // 四舍五入到整数档再取，和 ProgressChart 的写法一致
           callback: (v) => {
-            const idx = Number(v)
+            const idx = Math.round(Number(v))
             return gradeOrder[idx] || ""
           },
         },
@@ -167,24 +171,15 @@ const options = computed<ChartOptions<"bar" | "line">>(() => {
             }
             return `${dsLabel}: ${ctx.formattedValue}`
           },
+          // AC 率直接读该周期的 acceptedCount / submissionCount。原来拿柱子上的
+          // 「完成题目数 / 总提交次数」当 AC 率，分子是去重后的题数，不是一回事
           footer: (items: TooltipItem<"bar" | "line">[]) => {
-            const barItems = items.filter(
-              (item) => (item.dataset as any).yAxisID === "y",
-            )
-            if (barItems.length >= 2) {
-              const problemCount =
-                barItems.find((item) => item.dataset.label === "完成题目数")
-                  ?.parsed.y || 0
-              const submissionCount =
-                barItems.find((item) => item.dataset.label === "总提交次数")
-                  ?.parsed.y || 0
-              const efficiency =
-                submissionCount > 0
-                  ? ((problemCount / submissionCount) * 100).toFixed(1)
-                  : "0"
-              return `AC率: ${efficiency}%`
-            }
-            return ""
+            const index = items[0]?.dataIndex
+            const bucket =
+              index === undefined ? undefined : aiStore.durationData[index]
+            if (!bucket || bucket.submissionCount === 0) return ""
+            const rate = (bucket.acceptedCount / bucket.submissionCount) * 100
+            return `AC率: ${rate.toFixed(1)}%（通过 ${bucket.acceptedCount} / 共 ${bucket.submissionCount} 次）`
           },
         },
       },

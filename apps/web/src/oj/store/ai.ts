@@ -25,6 +25,7 @@ export const useAIStore = defineStore("ai", () => {
     contestCount: 0,
     solved: [],
     flowcharts: [],
+    rankScope: "global",
   })
   const heatmapData = ref<{ timestamp: number; value: number }[]>([])
 
@@ -51,6 +52,7 @@ export const useAIStore = defineStore("ai", () => {
     detailsData.tags = res.tags
     detailsData.difficulty = res.difficulty
     detailsData.contestCount = res.contestCount
+    detailsData.rankScope = res.rankScope
     detailsData.flowcharts = res.flowcharts
   }
 

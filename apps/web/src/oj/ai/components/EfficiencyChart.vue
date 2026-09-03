@@ -4,7 +4,7 @@
       <n-text depth="3" style="font-size: 12px">反映刷题质量提升</n-text>
     </template>
     <div class="chart">
-      <Chart type="line" :data="data" :options="options" />
+      <Chart type="line" :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -23,6 +23,7 @@ import {
   Filler,
 } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 import { parseTime } from "utils/functions"
 
 // 注册折线图所需的 Chart.js 组件
@@ -38,6 +39,7 @@ ChartJS.register(
 )
 
 const aiStore = useAIStore()
+const { chartKey } = useChartTheme()
 
 const title = computed(() => {
   if (aiStore.duration === "months:2") {
@@ -60,15 +62,17 @@ const show = computed(() => {
 const efficiencyData = computed(() => {
   return aiStore.durationData.map((duration) => {
     const problemCount = duration.problemCount || 0
+    const acceptedCount = duration.acceptedCount || 0
     const submissionCount = duration.submissionCount || 0
 
     // 计算效率：提交次数/完成题目数
     // 值越接近1，说明一次AC率越高
     const efficiency = problemCount > 0 ? submissionCount / problemCount : 0
 
-    // AC率：AC题目数 / 总提交次数（越高说明提交质量越好）
-    const onePassRate =
-      submissionCount > 0 ? (problemCount / submissionCount) * 100 : 0
+    // AC 率 = 判为通过的提交数 / 总提交数。原来分子用的是去重后的题目数，
+    // 那既不是 AC 率，算出来还正好是上面 efficiency 的倒数 —— 双轴画的是同一个数
+    const acRate =
+      submissionCount > 0 ? (acceptedCount / submissionCount) * 100 : 0
 
     return {
       label: [
@@ -76,8 +80,9 @@ const efficiencyData = computed(() => {
         parseTime(duration.end, "M月D日"),
       ].join("～"),
       efficiency: efficiency,
-      onePassRate: onePassRate,
+      acRate: acRate,
       problemCount: problemCount,
+      acceptedCount: acceptedCount,
       submissionCount: submissionCount,
     }
   })
@@ -107,7 +112,7 @@ const data = computed<ChartData<"line">>(() => {
       },
       {
         label: "提交AC率",
-        data: efficiency.map((e) => e.onePassRate),
+        data: efficiency.map((e) => e.acRate),
         borderColor: "rgb(34, 197, 94)",
         backgroundColor: "rgba(34, 197, 94, 0.1)",
         tension: 0.4,
@@ -203,8 +208,8 @@ const options = computed(() => {
             } else {
               // 提交AC率
               return [
-                `${dsLabel}: ${item.onePassRate.toFixed(1)}%`,
-                `提示: AC题目数 / 总提交次数，越高表示提交质量越好`,
+                `${dsLabel}: ${item.acRate.toFixed(1)}%`,
+                `通过 ${item.acceptedCount} 次 / 共提交 ${item.submissionCount} 次`,
               ]
             }
           },

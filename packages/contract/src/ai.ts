@@ -13,6 +13,8 @@ export const durationDataSchema = z.object({
   end: z.string(),
   grade: gradeSchema,
   problemCount: z.number().int(),
+  /** 该周期内判为通过的提交数。problemCount 是去重后的题数，两者不能互相代替 */
+  acceptedCount: z.number().int(),
   submissionCount: z.number().int(),
 })
 
@@ -53,6 +55,11 @@ export const aiDetailSchema = z.object({
   tags: z.record(z.string(), z.number().int()),
   difficulty: z.record(z.string(), z.number().int()),
   contestCount: z.number().int(),
+  /**
+   * solved 里的 rank/acCount 是在哪个范围里排的。班里只有一个人时后端会回退到全服，
+   * 前端不能只看 className 有没有值就写「班级排名」。
+   */
+  rankScope: z.enum(["class", "global"]),
 })
 
 /**

@@ -80,7 +80,10 @@ const columns: DataTableColumn<SolvedProblem>[] = [
       ),
   },
   {
-    title: () => (aiStore.detailsData.className ? "班级排名" : "全服排名"),
+    // 用后端下发的 rankScope，不要看 className 有没有值：班里只有一个人时
+    // 后端会回退到全服排名，那种学生原来看到的是「班级排名」配全服数据
+    title: () =>
+      aiStore.detailsData.rankScope === "class" ? "班级排名" : "全服排名",
     key: "rank",
     width: 100,
     align: "center",

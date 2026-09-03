@@ -102,6 +102,7 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
   const problemIds = firstAc.map((item) => item.problemId)
   if (!problemIds.length) return aiDetailSchema.parse({
     user: user.username, className: user.className, start, end, solved: [], flowcharts: [], grade: "", tags: {}, difficulty: {}, contestCount: 0,
+    rankScope: "global",
   })
   const classUsers = user.className ? await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, user.className)) : []
   const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
@@ -166,6 +167,7 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
     user: user.username, className: user.className, start, end, solved, flowcharts,
     grade: averageGrade(solved.map((item) => item.grade)), tags: topTags, difficulty,
     contestCount: new Set(solved.flatMap((item) => item.problem.contestId ?? [])).size,
+    rankScope: scopeIds ? "class" : "global",
   })
 }
 
@@ -258,7 +260,8 @@ async function buildDuration(user: AuthUser, endText: string, duration: string) 
     const from = bucket.start.getTime()
     const to = bucket.end.getTime()
     const inRange = rows.filter((row) => row.time >= from && row.time <= to)
-    const solved = [...new Set(inRange.filter((row) => accepted.includes(row.result)).map((row) => row.problemId))]
+    const acceptedRows = inRange.filter((row) => accepted.includes(row.result))
+    const solved = [...new Set(acceptedRows.map((row) => row.problemId))]
     return durationDataSchema.parse({
       unit: config.unit,
       index: config.count - 1 - index,
@@ -266,6 +269,7 @@ async function buildDuration(user: AuthUser, endText: string, duration: string) 
       end: bucket.end.toISOString(),
       grade: solved.length ? bucketGrade(solved, from, to) : "",
       problemCount: solved.length,
+      acceptedCount: acceptedRows.length,
       submissionCount: inRange.length,
     })
   })

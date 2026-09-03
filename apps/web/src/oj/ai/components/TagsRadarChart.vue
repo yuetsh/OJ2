@@ -4,7 +4,7 @@
       <n-text depth="3" style="font-size: 12px">可视化知识点覆盖面</n-text>
     </template>
     <div class="chart">
-      <Radar :data="data" :options="options" />
+      <Radar :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -20,6 +20,7 @@ import {
   Legend,
 } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 
 // 注册雷达图所需的 Chart.js 组件
 ChartJS.register(
@@ -32,13 +33,15 @@ ChartJS.register(
 )
 
 const aiStore = useAIStore()
+const { chartKey, gridColor } = useChartTheme()
 
 const show = computed(() => {
   return Object.keys(aiStore.detailsData.tags).length > 0
 })
 
-// 最多显示前10个标签，避免雷达图过于拥挤
-const MAX_TAGS = 10
+// 后端 /ai/detail 已经把 tags 截到前 5（routes/ai.ts 的 topTags），这里取同一个上限。
+// 原来写 10 是取不满的死数
+const MAX_TAGS = 5
 
 const title = computed(() => {
   const totalTags = Object.keys(aiStore.detailsData.tags).length
@@ -112,11 +115,11 @@ const options = computed(() => {
           },
         },
         grid: {
-          color: "rgba(0, 0, 0, 0.1)",
+          color: gridColor.value,
           circular: true,
         },
         angleLines: {
-          color: "rgba(0, 0, 0, 0.1)",
+          color: gridColor.value,
         },
         pointLabels: {
           font: {
@@ -138,7 +141,8 @@ const options = computed(() => {
             const index = context.dataIndex
             const actualValue = tagData[index].value
             const percentage = Math.round(Number(context.parsed.r))
-            return `完成 ${actualValue} 道题 (掌握度 ${percentage}%)`
+            // 这个百分比是「占最多的那个标签的比例」，不是掌握度 —— 第一名恒为 100%
+            return `完成 ${actualValue} 道题 (占最多标签的 ${percentage}%)`
           },
         },
       },

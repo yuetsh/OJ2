@@ -6,7 +6,7 @@
       </n-text>
     </template>
     <div style="height: 300px">
-      <Pie :data="data" :options="options" />
+      <Pie :key="chartKey" :data="data" :options="options" />
     </div>
   </n-card>
 </template>
@@ -15,10 +15,12 @@
 import { Pie } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
 import { useAIStore } from "oj/store/ai"
+import { useChartTheme } from "shared/composables/chartTheme"
 
 ChartJS.register(ArcElement, Title, Tooltip, Legend)
 
 const aiStore = useAIStore()
+const { chartKey } = useChartTheme()
 
 // 排名区间定义
 const RANK_RANGES = [
@@ -42,19 +44,21 @@ const rankDistribution = computed(() => {
     const acCount = item.periodAcCount
 
     if (rank && acCount && acCount > 0) {
-      const percentile = (rank / acCount) * 100
+      // 口径和后端 grade() 一致：(rank - 1) / count。少减这个 1 会让每道题整体降一档，
+      // 而且 rank === acCount 时正好算出 100，落在 [70, 100) 之外被 findIndex 丢掉 ——
+      // 班里只有他一个人做出来的题（1 / 1）既被当成垫底又整个消失
+      const percentile = ((rank - 1) / acCount) * 100
 
-      // 找到对应的区间
+      // 找到对应的区间；万一越界也归到最后一档，别让这道题凭空不见
       const rangeIndex = RANK_RANGES.findIndex(
         (r) => percentile >= r.min && percentile < r.max,
       )
+      const index = rangeIndex === -1 ? RANK_RANGES.length - 1 : rangeIndex
 
-      if (rangeIndex !== -1) {
-        distribution[rangeIndex].count++
-        distribution[rangeIndex].problems.push(
-          `${item.problem.displayId}: ${item.problem.title}`,
-        )
-      }
+      distribution[index].count++
+      distribution[index].problems.push(
+        `${item.problem.displayId}: ${item.problem.title}`,
+      )
     }
   })
 
