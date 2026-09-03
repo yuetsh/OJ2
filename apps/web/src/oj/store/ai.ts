@@ -1,10 +1,11 @@
-import type { DetailsData, DurationData } from "utils/types"
+import type { DetailsData, DurationData, SolvedProblem } from "utils/types"
 import { aiStreamError, consumeJSONEventStream } from "utils/stream"
 import {
   getAIDetailData,
   getAIDurationData,
   getAIHeatmapData,
   getAIPinnedReport,
+  getAISolved,
 } from "../api"
 
 export const useAIStore = defineStore("ai", () => {
@@ -23,7 +24,8 @@ export const useAIStore = defineStore("ai", () => {
     tags: {},
     difficulty: {},
     contestCount: 0,
-    solved: [],
+    solvedCount: 0,
+    attempts: [],
     flowcharts: [],
     activity: [],
     errors: [],
@@ -31,10 +33,17 @@ export const useAIStore = defineStore("ai", () => {
   })
   const heatmapData = ref<{ timestamp: number; value: number }[]>([])
 
+  // 解题明细走服务端分页：一个活跃学生一年几百道题，整份跟着 detail 一起下发没必要
+  const solvedRows = ref<SolvedProblem[]>([])
+  const solvedTotal = ref(0)
+  const solvedPage = ref(1)
+  const solvedPageSize = ref(20)
+
   const loading = reactive({
     fetching: false, // 合并 details 和 duration 的 loading
     ai: false,
     heatmap: false,
+    solved: false,
   })
 
   const mdContent = ref("")
@@ -48,12 +57,13 @@ export const useAIStore = defineStore("ai", () => {
     )
     detailsData.start = res.start
     detailsData.end = res.end
-    detailsData.solved = res.solved
     detailsData.grade = res.grade
     detailsData.className = res.className
     detailsData.tags = res.tags
     detailsData.difficulty = res.difficulty
     detailsData.contestCount = res.contestCount
+    detailsData.solvedCount = res.solvedCount
+    detailsData.attempts = res.attempts
     detailsData.activity = res.activity
     detailsData.errors = res.errors
     detailsData.rankScope = res.rankScope
@@ -67,6 +77,25 @@ export const useAIStore = defineStore("ai", () => {
       targetUsername.value || undefined,
     )
     durationData.value = res
+  }
+
+  async function fetchSolved(page = solvedPage.value) {
+    if (!rangeStart.value || !rangeEnd.value) return
+    loading.solved = true
+    try {
+      const res = await getAISolved(
+        rangeStart.value,
+        rangeEnd.value,
+        (page - 1) * solvedPageSize.value,
+        solvedPageSize.value,
+        targetUsername.value || undefined,
+      )
+      solvedRows.value = res.results
+      solvedTotal.value = res.total
+      solvedPage.value = page
+    } finally {
+      loading.solved = false
+    }
   }
 
   async function fetchHeatmapData() {
@@ -83,11 +112,14 @@ export const useAIStore = defineStore("ai", () => {
   ) {
     rangeStart.value = start
     rangeEnd.value = end
+    // 换时间范围就回到第一页，否则停在第 5 页但新范围只有两页
+    solvedPage.value = 1
     loading.fetching = true
     try {
       await Promise.all([
         fetchDetailsData(start, end),
         fetchDurationData(end, duration),
+        fetchSolved(1),
       ])
     } finally {
       loading.fetching = false
@@ -196,6 +228,11 @@ export const useAIStore = defineStore("ai", () => {
   return {
     fetchAnalysisData,
     fetchHeatmapData,
+    fetchSolved,
+    solvedRows,
+    solvedTotal,
+    solvedPage,
+    solvedPageSize,
     fetchAIAnalysis,
     fetchPinnedReport,
     simulatePinnedStream,

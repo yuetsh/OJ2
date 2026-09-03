@@ -26,6 +26,7 @@ import {
   type DurationData,
   type HeatmapItem,
   type LoginSummary,
+  type SolvedList,
   type ProblemSet,
   type ProblemSetBadge,
   type ProblemSetList,
@@ -300,6 +301,18 @@ export function getTutorials(type: "python" | "c") {
 
 export function getAIDetailData(start: string, end: string, username?: string) {
   return api.get<AiDetail>("ai/detail", { params: { start, end, username } })
+}
+
+export function getAISolved(
+  start: string,
+  end: string,
+  offset: number,
+  limit: number,
+  username?: string,
+) {
+  return api.get<SolvedList>("ai/solved", {
+    params: { start, end, offset, limit, username },
+  })
 }
 
 export function getAIDurationData(

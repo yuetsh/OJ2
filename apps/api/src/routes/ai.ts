@@ -8,9 +8,10 @@ import {
   durationDataSchema,
   heatmapItemSchema,
   loginSummarySchema,
+  solvedListSchema,
   solvedProblemSchema,
 } from "@oj2/contract"
-import { and, count, countDistinct, eq, gte, inArray, isNull, lte, min, notInArray, sql } from "drizzle-orm"
+import { and, asc, count, countDistinct, eq, gte, inArray, isNull, lte, min, notInArray, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
@@ -21,7 +22,7 @@ import { JudgeStatus } from "../judge/status"
 import { failure, success } from "../http"
 import { completeChat, streamChat } from "../services/ai"
 import { consumeToken } from "../services/throttling"
-import { isTeacherOrAbove, objectValue, rounded } from "./helpers"
+import { isTeacherOrAbove, objectValue, queryInteger, rounded } from "./helpers"
 
 export const aiRoutes = new Hono<AppEnv>()
 
@@ -93,6 +94,85 @@ async function targetUser(c: Context<AppEnv>, override?: string) {
   return target ?? null
 }
 
+type FirstAcRow = { problemId: number; first: string | null }
+
+/** 区间内首次 AC 的题，按通过时间升序。limit/offset 给分页用，不传就是全部 */
+function firstAcQuery(user: AuthUser, start: string, end: string, limit?: number, offset?: number) {
+  const first = min(schema.submission.createTime)
+  const query = db.select({ problemId: schema.submission.problemId, first })
+    .from(schema.submission).where(and(
+      eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted),
+      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
+    )).groupBy(schema.submission.problemId).orderBy(asc(first))
+  return limit === undefined ? query : query.limit(limit).offset(offset ?? 0)
+}
+
+/**
+ * 把一批「首次 AC」的题算成逐题明细（排名、等级、尝试次数）。
+ * 排名只跟这批题有关，所以分页那支只需要给一页的 problemIds，不必把整年算一遍。
+ */
+async function buildSolved(user: AuthUser, start: string, end: string, firstAc: FirstAcRow[]) {
+  const problemIds = firstAc.map((item) => item.problemId)
+  if (!problemIds.length) return { solved: [], problems: [] as { problem: typeof schema.problem.$inferSelect; contestTitle: string | null }[], scopeIds: null as number[] | null }
+  const classUsers = user.className ? await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, user.className)) : []
+  const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
+  const [problems, rankRows, periodRows, attemptRows] = await Promise.all([
+    db.select({ problem: schema.problem, contestTitle: schema.contest.title }).from(schema.problem)
+      .leftJoin(schema.contest, eq(schema.problem.contestId, schema.contest.id)).where(inArray(schema.problem.id, problemIds)),
+    db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
+      .from(schema.submission).where(and(inArray(schema.submission.result, accepted), inArray(schema.submission.problemId, problemIds), scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined))
+      .groupBy(schema.submission.userId, schema.submission.problemId),
+    db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
+      .from(schema.submission).where(and(inArray(schema.submission.result, accepted), inArray(schema.submission.problemId, problemIds), gte(schema.submission.createTime, start), lte(schema.submission.createTime, end), scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined))
+      .groupBy(schema.submission.userId, schema.submission.problemId),
+    db.select({ problemId: schema.submission.problemId, time: schema.submission.createTime })
+      .from(schema.submission).where(and(
+        eq(schema.submission.userId, user.id), inArray(schema.submission.problemId, problemIds),
+        gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
+      )),
+  ])
+  const byProblem = new Map(problems.map((item) => [item.problem.id, item]))
+  // 到首次通过为止提交了几次：只数首次 AC 那一刻（含）之前的提交
+  const firstAcTime = new Map(firstAc.flatMap((item) => (item.first ? [[item.problemId, Date.parse(item.first)]] as const : [])))
+  const attemptsByProblem = new Map<number, number>()
+  for (const row of attemptRows) {
+    const deadline = firstAcTime.get(row.problemId)
+    if (deadline === undefined || Date.parse(row.time) > deadline) continue
+    attemptsByProblem.set(row.problemId, (attemptsByProblem.get(row.problemId) ?? 0) + 1)
+  }
+  function ranks(rows: typeof rankRows, problemId: number) {
+    return rows.filter((item) => item.problemId === problemId).sort((a, b) => Date.parse(a.first ?? "") - Date.parse(b.first ?? "") || a.userId - b.userId)
+  }
+  const solved = firstAc.flatMap((item) => {
+    const problem = byProblem.get(item.problemId)
+    if (!problem || !item.first) return []
+    const all = ranks(rankRows, item.problemId)
+    const period = ranks(periodRows, item.problemId)
+    const rank = all.findIndex((row) => row.userId === user.id) + 1 || null
+    const periodRank = period.findIndex((row) => row.userId === user.id) + 1 || null
+    return solvedProblemSchema.parse({
+      problem: { title: problem.problem.title, displayId: problem.problem.displayId, contestTitle: problem.contestTitle ?? "", contestId: problem.problem.contestId },
+      acTime: item.first, rank, acCount: all.length, grade: grade(periodRank, period.length, all.length), periodRank, periodAcCount: period.length,
+      difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
+      attempts: attemptsByProblem.get(item.problemId) ?? 1,
+    })
+  }).sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
+  return { solved, problems, scopeIds }
+}
+
+/** 分页版：只算这一页的题 */
+async function listSolved(user: AuthUser, start: string, end: string, limit: number, offset: number) {
+  const [firstAc, totalRows] = await Promise.all([
+    firstAcQuery(user, start, end, limit, offset),
+    db.select({ value: countDistinct(schema.submission.problemId) }).from(schema.submission).where(and(
+      eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted),
+      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
+    )),
+  ])
+  const { solved } = await buildSolved(user, start, end, firstAc)
+  return solvedListSchema.parse({ results: solved, total: totalRows[0]?.value ?? 0 })
+}
+
 async function buildDetail(user: AuthUser, start: string, end: string) {
   // 时间活跃度按**全部提交**统计，不是只按 AC。只看 AC 的话，一个学生两个月十来次
   // 通过撒进 7×4 的格子里几乎全是空的，"高峰时段"根本看不出来。
@@ -126,59 +206,20 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
   const errors = [...errorCounts]
     .map(([result, count]) => ({ result, count }))
     .sort((a, b) => b.count - a.count || a.result - b.result)
-  const firstAc = await db.select({ problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
-    .from(schema.submission).where(and(
-      eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted),
-      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
-    )).groupBy(schema.submission.problemId)
+  const firstAc = await firstAcQuery(user, start, end)
   const problemIds = firstAc.map((item) => item.problemId)
   if (!problemIds.length) return aiDetailSchema.parse({
-    user: user.username, className: user.className, start, end, solved: [], flowcharts: [], grade: "", tags: {}, difficulty: {}, contestCount: 0,
+    user: user.username, className: user.className, start, end, solvedCount: 0, attempts: [], flowcharts: [], grade: "", tags: {}, difficulty: {}, contestCount: 0,
     activity, errors, rankScope: "global",
   })
-  const classUsers = user.className ? await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, user.className)) : []
-  const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
-  const [problems, rankRows, periodRows, tagRows, flowRows] = await Promise.all([
-    db.select({ problem: schema.problem, contestTitle: schema.contest.title }).from(schema.problem)
-      .leftJoin(schema.contest, eq(schema.problem.contestId, schema.contest.id)).where(inArray(schema.problem.id, problemIds)),
-    db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
-      .from(schema.submission).where(and(inArray(schema.submission.result, accepted), inArray(schema.submission.problemId, problemIds), scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined))
-      .groupBy(schema.submission.userId, schema.submission.problemId),
-    db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
-      .from(schema.submission).where(and(inArray(schema.submission.result, accepted), inArray(schema.submission.problemId, problemIds), gte(schema.submission.createTime, start), lte(schema.submission.createTime, end), scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined))
-      .groupBy(schema.submission.userId, schema.submission.problemId),
+  const [{ solved, problems, scopeIds }, tagRows, flowRows] = await Promise.all([
+    buildSolved(user, start, end, firstAc),
     db.select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name }).from(schema.problemTags)
       .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id)).where(inArray(schema.problemTags.problemId, problemIds)),
     db.select({ flow: schema.flowchartSubmission, displayId: schema.problem.displayId, title: schema.problem.title })
       .from(schema.flowchartSubmission).innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
       .where(and(eq(schema.flowchartSubmission.userId, user.id), eq(schema.flowchartSubmission.status, 2), gte(schema.flowchartSubmission.createTime, start), lte(schema.flowchartSubmission.createTime, end))),
   ])
-  const byProblem = new Map(problems.map((item) => [item.problem.id, item]))
-  // 到首次通过为止提交了几次：只数首次 AC 那一刻（含）之前的提交
-  const firstAcTime = new Map(firstAc.flatMap((item) => (item.first ? [[item.problemId, Date.parse(item.first)]] as const : [])))
-  const attemptsByProblem = new Map<number, number>()
-  for (const row of submissions) {
-    const deadline = firstAcTime.get(row.problemId)
-    if (deadline === undefined || Date.parse(row.time) > deadline) continue
-    attemptsByProblem.set(row.problemId, (attemptsByProblem.get(row.problemId) ?? 0) + 1)
-  }
-  function ranks(rows: typeof rankRows, problemId: number) {
-    return rows.filter((item) => item.problemId === problemId).sort((a, b) => Date.parse(a.first ?? "") - Date.parse(b.first ?? "") || a.userId - b.userId)
-  }
-  const solved = firstAc.flatMap((item) => {
-    const problem = byProblem.get(item.problemId)
-    if (!problem || !item.first) return []
-    const all = ranks(rankRows, item.problemId)
-    const period = ranks(periodRows, item.problemId)
-    const rank = all.findIndex((row) => row.userId === user.id) + 1 || null
-    const periodRank = period.findIndex((row) => row.userId === user.id) + 1 || null
-    return solvedProblemSchema.parse({
-      problem: { title: problem.problem.title, displayId: problem.problem.displayId, contestTitle: problem.contestTitle ?? "", contestId: problem.problem.contestId },
-      acTime: item.first, rank, acCount: all.length, grade: grade(periodRank, period.length, all.length), periodRank, periodAcCount: period.length,
-      difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
-      attempts: attemptsByProblem.get(item.problemId) ?? 1,
-    })
-  }).sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
   const tags: Record<string, number> = {}
   for (const tag of tagRows) tags[tag.name] = (tags[tag.name] ?? 0) + 1
   const topTags = Object.fromEntries(Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 5))
@@ -205,7 +246,8 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
     }
   }).sort((a, b) => b.latestSubmissionTime.localeCompare(a.latestSubmissionTime))
   return aiDetailSchema.parse({
-    user: user.username, className: user.className, start, end, solved, flowcharts,
+    user: user.username, className: user.className, start, end, flowcharts,
+    solvedCount: solved.length, attempts: solved.map((item) => item.attempts),
     grade: averageGrade(solved.map((item) => item.grade)), tags: topTags, difficulty,
     contestCount: new Set(solved.flatMap((item) => item.problem.contestId ?? [])).size,
     activity, errors, rankScope: scopeIds ? "class" : "global",
@@ -221,6 +263,19 @@ aiRoutes.get("/ai/detail", requireAuth, async (c) => {
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
   return success(c, await buildDetail(user, start, end))
+})
+
+aiRoutes.get("/ai/solved", requireAuth, async (c) => {
+  const start = c.req.query("start")
+  const end = c.req.query("end")
+  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
+    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
+  }
+  const user = await targetUser(c)
+  if (!user) return failure(c, 404, "user-not-found", "User not found")
+  const limit = queryInteger(c.req.query("limit"), 20, { min: 1, max: 100 })
+  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+  return success(c, await listSolved(user, start, end, limit, offset))
 })
 
 function shiftMonths(date: Date, months: number) {
@@ -414,17 +469,20 @@ aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
   const limited = await throttleAi(c)
   if (limited) return limited
   // 学情数据一律服务端重算，客户端只说看谁、哪段时间
-  const [details, duration] = await Promise.all([
+  // detail 现在只带聚合，逐题明细单独取一页给模型看。顺带把喂进 prompt 的条数
+  // 卡在 200 —— 以前是整份 solved 无上限塞进去，题做得多的学生一次调用能顶好几倍 token
+  const [details, duration, solved] = await Promise.all([
     buildDetail(user, parsed.data.start, parsed.data.end),
     buildDuration(user, parsed.data.end, parsed.data.duration),
+    listSolved(user, parsed.data.start, parsed.data.end, 200, 0),
   ])
   const system = "你是一个风趣的编程老师。请根据学生的详细数据和每周数据给出学习建议，最后写一句鼓励的话。使用 Markdown，不要放在代码块中。"
-  const prompt = `详细数据: ${JSON.stringify(details)}\n每周或每月数据: ${JSON.stringify(duration)}`
+  const prompt = `详细数据: ${JSON.stringify({ ...details, solved: solved.results })}\n每周或每月数据: ${JSON.stringify(duration)}`
   return streamChat(system, prompt, async (analysis) => {
     // 报告归被分析的那个人，不归发起请求的人 —— 教师后台的 pin 和学生侧的
     // GET /ai/pinned 都是按 user_id 找报告的，记在教师名下学生就永远看不到
     await db.insert(schema.aiAnalysis).values({
-      provider: config.aiProvider, model: config.aiModel, data: { details, duration }, systemPrompt: system,
+      provider: config.aiProvider, model: config.aiModel, data: { details, duration, solved: solved.results }, systemPrompt: system,
       userPrompt: "学习详情与周期数据", analysis, createTime: new Date().toISOString(), userId: user.id, isPinned: false,
     })
   })

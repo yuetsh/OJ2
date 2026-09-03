@@ -63,7 +63,13 @@ export const aiDetailSchema = z.object({
   className: z.string().nullable(),
   start: z.string(),
   end: z.string(),
-  solved: z.array(solvedProblemSchema),
+  /**
+   * 区间内做出来的题数。逐题明细走 `GET /ai/solved` 分页拿 ——
+   * 一个活跃学生一年能做几百道，整份塞进这个响应没有必要。
+   */
+  solvedCount: z.number().int(),
+  /** 每道做出来的题「到首次通过为止提交了几次」，分档放在前端 */
+  attempts: z.array(z.number().int()),
   flowcharts: z.array(flowchartSummarySchema),
   grade: gradeSchema,
   tags: z.record(z.string(), z.number().int()),
@@ -91,6 +97,12 @@ export const aiDetailSchema = z.object({
  * 以前是 `details: z.unknown()` / `duration: z.unknown()` —— 前端算好的整包 POST 回去，
  * 原样进 prompt 又原样写进 ai_analysis 表，等于让任何登录用户决定喂给模型什么。
  */
+/** GET /ai/solved 的分页响应 */
+export const solvedListSchema = z.object({
+  results: z.array(solvedProblemSchema),
+  total: z.number().int(),
+})
+
 export const aiAnalysisRequestSchema = z.object({
   start: z.string().min(1),
   end: z.string().min(1),
@@ -150,6 +162,7 @@ export type SolvedProblem = z.infer<typeof solvedProblemSchema>
 export type FlowchartSummary = z.infer<typeof flowchartSummarySchema>
 export type ActivityBucket = z.infer<typeof activityBucketSchema>
 export type AiDetail = z.infer<typeof aiDetailSchema>
+export type SolvedList = z.infer<typeof solvedListSchema>
 export type HeatmapItem = z.infer<typeof heatmapItemSchema>
 export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>
 export type LoginSummary = z.infer<typeof loginSummarySchema>

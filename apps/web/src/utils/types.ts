@@ -555,6 +555,7 @@ export type {
   DurationData,
   FlowchartSummary,
   SolvedProblem,
+  SolvedList,
   AiDetail as DetailsData,
 } from "@oj2/contract"
 

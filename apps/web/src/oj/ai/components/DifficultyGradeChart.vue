@@ -34,16 +34,13 @@ const difficultyOrder = ["简单", "中等", "困难"]
 const difficultyColors = ["#18A058", "#F0A020", "#D03050"]
 
 // 只按难度分。原来还往里叠了一层 S/A/B/C 等级，3×4 十二个格子，
-// 学生两个月做十来道题的话大部分格子恒为 0；等级信息在下面的解题表格里逐题都有
+// 学生两个月做十来道题的话大部分格子恒为 0；等级信息在下面的解题表格里逐题都有。
+// 直接读后端的 difficulty 聚合 —— 逐题列表现在是分页拿的，前端手上没有全量
 const counts = computed(() =>
-  difficultyOrder.map(
-    (name) =>
-      aiStore.detailsData.solved.filter((item) => item.difficulty === name)
-        .length,
-  ),
+  difficultyOrder.map((name) => aiStore.detailsData.difficulty[name] ?? 0),
 )
 
-const show = computed(() => aiStore.detailsData.solved.length > 0)
+const show = computed(() => aiStore.detailsData.solvedCount > 0)
 
 const data = computed(() => ({
   labels: difficultyOrder,

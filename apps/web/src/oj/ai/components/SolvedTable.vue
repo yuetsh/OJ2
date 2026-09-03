@@ -1,11 +1,14 @@
 <template>
-  <n-tabs animated v-if="submissions.length && flowcharts.length">
+  <n-tabs animated v-if="hasSolved && flowcharts.length">
     <n-tab-pane name="代码提交">
       <n-data-table
+        remote
         striped
-        :data="submissions"
+        :data="aiStore.solvedRows"
         :columns="columns"
-        :max-height="isDesktop ? 1500 : 500"
+        :loading="aiStore.loading.solved"
+        :pagination="solvedPagination"
+        @update:page="aiStore.fetchSolved"
       />
     </n-tab-pane>
     <n-tab-pane name="流程图提交">
@@ -13,23 +16,26 @@
         striped
         :data="flowcharts"
         :columns="flowchartsColumns"
-        :max-height="isDesktop ? 1500 : 500"
+        :pagination="paginationFor(flowcharts)"
       />
     </n-tab-pane>
   </n-tabs>
   <n-data-table
-    v-else-if="submissions.length"
+    v-else-if="hasSolved"
+    remote
     striped
-    :data="submissions"
+    :data="aiStore.solvedRows"
     :columns="columns"
-    :max-height="isDesktop ? 1500 : 500"
+    :loading="aiStore.loading.solved"
+    :pagination="solvedPagination"
+    @update:page="aiStore.fetchSolved"
   />
   <n-data-table
     v-else-if="flowcharts.length"
     striped
     :data="flowcharts"
     :columns="flowchartsColumns"
-    :max-height="isDesktop ? 1500 : 500"
+    :pagination="paginationFor(flowcharts)"
   />
 </template>
 
@@ -38,16 +44,30 @@ import { NButton, NTooltip } from "naive-ui"
 import TagTitle from "./TagTitle.vue"
 import type { FlowchartSummary, SolvedProblem } from "utils/types"
 import { useAIStore } from "oj/store/ai"
-import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
 
 const router = useRouter()
 const aiStore = useAIStore()
 
-const { isDesktop } = useBreakpoints()
-
-const submissions = computed(() => aiStore.detailsData.solved)
+const hasSolved = computed(() => aiStore.detailsData.solvedCount > 0)
 const flowcharts = computed(() => aiStore.detailsData.flowcharts)
+
+// 代码提交这张走服务端分页：翻页只拉一页，不把整年的题一次发给浏览器。
+// 流程图那张仍然是全量下发的（一个 OJ 的流程图题就那么几道），本地分页即可。
+// 行数不够一页时不显示分页器，和 ExerciseAttempts.vue 一致
+const solvedPagination = computed(() =>
+  aiStore.solvedTotal > aiStore.solvedPageSize
+    ? {
+        page: aiStore.solvedPage,
+        pageSize: aiStore.solvedPageSize,
+        itemCount: aiStore.solvedTotal,
+      }
+    : false,
+)
+function paginationFor(rows: unknown[]) {
+  const pageSize = aiStore.solvedPageSize
+  return rows.length > pageSize ? { pageSize } : false
+}
 const columns: DataTableColumn<SolvedProblem>[] = [
   {
     title: "完成的题目",

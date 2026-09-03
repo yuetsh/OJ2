@@ -2,11 +2,11 @@
   <n-alert
     :show-icon="false"
     type="success"
-    v-if="aiStore.detailsData.solved.length"
+    v-if="aiStore.detailsData.solvedCount"
   >
     <span>{{ durationLabel }}，</span>
     <span>你一共解决 </span>
-    <b class="charming"> {{ aiStore.detailsData.solved.length }} </b>
+    <b class="charming"> {{ aiStore.detailsData.solvedCount }} </b>
     <span> 道题</span>
     <span v-if="aiStore.detailsData.contestCount > 0">
       ，并且参加
