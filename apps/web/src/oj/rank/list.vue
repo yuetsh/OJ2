@@ -29,6 +29,7 @@ import "md-editor-v3/lib/preview.css"
 import { aiStreamError, consumeJSONEventStream } from "utils/stream"
 
 const gradeOptions = [
+  { label: "25年级", value: 25 },
   { label: "24年级", value: 24 },
   { label: "23年级", value: 23 },
   { label: "22年级", value: 22 },
