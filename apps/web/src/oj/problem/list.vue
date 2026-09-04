@@ -47,6 +47,19 @@ const sortOptions = [
   { label: "语法检查", value: "ast" },
 ]
 
+// naive-ui 下拉菜单默认只给 7.6 个选项的高度（InternalSelectMenu 主题里的
+// height: calc(var(--n-option-height) * 7.6)），8 条排序正好多出半条，逼出一根
+// 只能滚两像素的滚动条。按实际条数放开，+8px 是菜单自己的上下内边距。
+// 注意：NSelect 没有 dropdown-style 这个 prop，写了会当普通属性掉到根节点上
+// 不起作用；控制高度只能走 peers.InternalSelectMenu。
+const sortMenuTheme = {
+  peers: {
+    InternalSelectMenu: {
+      height: `calc(var(--n-option-height) * ${sortOptions.length} + 8px)`,
+    },
+  },
+}
+
 const router = useRouter()
 
 const userStore = useUserStore()
@@ -250,7 +263,7 @@ function rowProps(row: ProblemFiltered) {
               style="width: 120px"
               v-model:value="query.sort"
               :options="sortOptions"
-              :dropdown-style="{ maxHeight: 'unset' }"
+              :theme-overrides="sortMenuTheme"
             />
           </n-form-item>
           <n-form-item>
