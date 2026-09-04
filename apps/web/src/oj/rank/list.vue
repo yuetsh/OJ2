@@ -33,8 +33,8 @@ const GRADES = [20, 25]
 const gradeOptions = Array.from(
   { length: GRADES[1] - GRADES[0] + 1 },
   (_, i) => ({
-    label: `${GRADES[0] + i}年级`,
-    value: GRADES[0] + i,
+    label: `${GRADES[1] - i}年级`,
+    value: GRADES[1] - i,
   }),
 )
 
