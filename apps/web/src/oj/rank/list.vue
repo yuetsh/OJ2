@@ -28,14 +28,15 @@ import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { aiStreamError, consumeJSONEventStream } from "utils/stream"
 
-const gradeOptions = [
-  { label: "25年级", value: 25 },
-  { label: "24年级", value: 24 },
-  { label: "23年级", value: 23 },
-  { label: "22年级", value: 22 },
-  { label: "21年级", value: 21 },
-  { label: "20年级", value: 20 },
-]
+const GRADES = [20, 25]
+
+const gradeOptions = Array.from(
+  { length: GRADES[1] - GRADES[0] + 1 },
+  (_, i) => ({
+    label: `${GRADES[0] + i}年级`,
+    value: GRADES[0] + i,
+  }),
+)
 
 const router = useRouter()
 const userStore = useUserStore()
