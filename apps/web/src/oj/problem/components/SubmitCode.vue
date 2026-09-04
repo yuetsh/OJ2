@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
-import { formatCode, submitCode } from "oj/api"
+import { formatCode, getReaction, submitCode } from "oj/api"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useFireworks } from "oj/problem/composables/useFireworks"
@@ -67,6 +67,20 @@ const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
   controls: true,
   immediate: false,
 })
+
+// ==================== AC 后弹出点评轮盘 ====================
+// 只对已经能评价、且还没评过的人弹：后端要求先有 AC 才收评价，这里刚 AC 完正好；
+// mine 非 null 说明早就评过了，别再打扰。
+const { start: showCommentPanelDelayed } = useTimeoutFn(
+  async () => {
+    const res = await getReaction(problem.value!.id)
+    if (res.mine === null) {
+      commentPanel.value = true
+    }
+  },
+  1500,
+  { immediate: false },
+)
 
 const { start: goToProblemSetDelayed } = useTimeoutFn(
   () => {
@@ -199,6 +213,11 @@ watch(
 
     // 3. 放烟花
     celebrate()
+
+    // 4. 弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
+    if (!contestID && !problemSetId) {
+      showCommentPanelDelayed()
+    }
 
     if (problemSetId) {
       // 延迟回到题单页面
