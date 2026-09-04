@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { parseTime } from "utils/functions"
-import type { ProblemSet } from "utils/types"
+import type { AdminProblemSet } from "utils/types"
 
 interface Props {
-  problemSet: ProblemSet
+  problemSet: AdminProblemSet
 }
 
 defineProps<Props>()

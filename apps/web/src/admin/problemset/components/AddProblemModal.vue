@@ -8,9 +8,9 @@ interface Emits {
   (
     e: "confirm",
     data: {
-      problem_id: string
+      problemId: string
       order: number
-      is_required: boolean
+      isRequired: boolean
       score: number
       hint: string
     },
@@ -28,9 +28,9 @@ const newProblemHint = ref("")
 
 function handleConfirm() {
   emit("confirm", {
-    problem_id: newProblemId.value,
+    problemId: newProblemId.value,
     order: newProblemOrder.value,
-    is_required: newProblemRequired.value,
+    isRequired: newProblemRequired.value,
     score: newProblemScore.value,
     hint: newProblemHint.value,
   })

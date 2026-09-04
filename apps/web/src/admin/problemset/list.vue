@@ -2,13 +2,13 @@
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
-import type { ProblemSet } from "utils/types"
+import type { AdminProblemSet } from "utils/types"
 import { getProblemSetList, toggleProblemSetVisible } from "../api"
 import Actions from "./components/Actions.vue"
 import { NTag, NSwitch } from "naive-ui"
 
 const total = ref(0)
-const problemSets = ref<ProblemSet[]>([])
+const problemSets = ref<AdminProblemSet[]>([])
 
 interface ProblemSetQuery {
   keyword: string
@@ -37,7 +37,7 @@ const statusOptions = [
   { label: "草稿", value: "draft" },
 ]
 
-const columns: DataTableColumn<ProblemSet>[] = [
+const columns: DataTableColumn<AdminProblemSet>[] = [
   { title: "ID", key: "id", width: 80 },
   { title: "标题", key: "title", minWidth: 200 },
   { title: "描述", key: "description", minWidth: 300, ellipsis: true },

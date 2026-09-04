@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { h } from "vue"
-import type { ProblemSetBadge } from "utils/types"
+import type { AdminProblemSetBadge } from "utils/types"
 import { NButton, NImage } from "naive-ui"
 
 interface Props {
-  badges: ProblemSetBadge[]
+  badges: AdminProblemSetBadge[]
 }
 
 interface Emits {
   (e: "add-badge"): void
-  (e: "edit-badge", badge: ProblemSetBadge): void
+  (e: "edit-badge", badge: AdminProblemSetBadge): void
   (e: "delete-badge", badgeId: number): void
 }
 

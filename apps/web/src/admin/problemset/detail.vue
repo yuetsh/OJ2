@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { NTabPane, NTabs, NButton, NFlex } from "naive-ui"
 import type {
-  ProblemSet,
-  ProblemSetProblem,
-  ProblemSetBadge,
+  AdminProblemSet,
+  AdminProblemSetProblem,
+  AddProblemToSetRequest,
+  UpdateProblemInSetRequest,
+  CreateProblemSetBadgeRequest,
+  AdminProblemSetBadge,
   AdminProblemSetProgress,
 } from "utils/types"
 import {
@@ -32,11 +35,16 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 
+/** 奖章弹窗的表单值：条件类型是「完成所有题目」时不带 conditionValue，后端补 0 */
+type BadgeFormData = Omit<CreateProblemSetBadgeRequest, "conditionValue"> & {
+  conditionValue?: number
+}
+
 const problemSetId = computed(() => Number(route.params.problemSetId))
 
-const problemSet = ref<ProblemSet | null>(null)
-const problems = ref<ProblemSetProblem[]>([])
-const badges = ref<ProblemSetBadge[]>([])
+const problemSet = ref<AdminProblemSet | null>(null)
+const problems = ref<AdminProblemSetProblem[]>([])
+const badges = ref<AdminProblemSetBadge[]>([])
 const progress = ref<AdminProblemSetProgress[]>([])
 
 // 模态框状态
@@ -46,8 +54,8 @@ const showAddBadgeModal = ref(false)
 const showEditBadgeModal = ref(false)
 
 // 编辑数据
-const editingProblem = ref<ProblemSetProblem | null>(null)
-const editingBadge = ref<ProblemSetBadge | null>(null)
+const editingProblem = ref<AdminProblemSetProblem | null>(null)
+const editingBadge = ref<AdminProblemSetBadge | null>(null)
 
 async function loadProblemSetDetail() {
   try {
@@ -85,7 +93,7 @@ async function loadProgress() {
   }
 }
 
-async function handleAddProblem(data: any) {
+async function handleAddProblem(data: AddProblemToSetRequest) {
   try {
     await addProblemToSet(problemSetId.value, data)
     message.success("题目添加成功")
@@ -108,7 +116,7 @@ async function handleRemoveProblem(problemSetProblemId: number) {
   }
 }
 
-async function handleEditProblem(data: any) {
+async function handleEditProblem(data: UpdateProblemInSetRequest) {
   if (!editingProblem.value) return
 
   try {
@@ -121,7 +129,7 @@ async function handleEditProblem(data: any) {
   }
 }
 
-async function handleAddBadge(data: any) {
+async function handleAddBadge(data: BadgeFormData) {
   try {
     await createProblemSetBadge(problemSetId.value, data)
     message.success("奖章创建成功")
@@ -142,7 +150,7 @@ async function handleDeleteBadge(badgeId: number) {
   }
 }
 
-async function handleEditBadge(data: any) {
+async function handleEditBadge(data: BadgeFormData) {
   if (!editingBadge.value) return
 
   try {
@@ -173,12 +181,12 @@ function openAddBadgeModal() {
   showAddBadgeModal.value = true
 }
 
-function openEditProblemModal(problem: ProblemSetProblem) {
+function openEditProblemModal(problem: AdminProblemSetProblem) {
   editingProblem.value = problem
   showEditProblemModal.value = true
 }
 
-function openEditBadgeModal(badge: ProblemSetBadge) {
+function openEditBadgeModal(badge: AdminProblemSetBadge) {
   editingBadge.value = badge
   showEditBadgeModal.value = true
 }

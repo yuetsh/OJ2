@@ -11,8 +11,8 @@ interface Emits {
       name: string
       description: string
       icon: string
-      condition_type: "all_problems" | "problem_count" | "score"
-      condition_value?: number
+      conditionType: "all_problems" | "problem_count" | "score"
+      conditionValue?: number
     },
   ): void
 }
@@ -45,19 +45,16 @@ const conditionTypeOptions = [
 ]
 
 function handleConfirm() {
-  const data: any = {
+  emit("confirm", {
     name: newBadgeName.value,
     description: newBadgeDescription.value,
     icon: newBadgeIcon.value,
-    condition_type: newBadgeConditionType.value,
-  }
-
-  // 只有非"完成所有题目"时才添加条件值
-  if (newBadgeConditionType.value !== "all_problems") {
-    data.conditionValue = newBadgeConditionValue.value
-  }
-
-  emit("confirm", data)
+    conditionType: newBadgeConditionType.value,
+    // 只有非"完成所有题目"时才带条件值
+    ...(newBadgeConditionType.value === "all_problems"
+      ? {}
+      : { conditionValue: newBadgeConditionValue.value }),
+  })
 }
 
 function handleCancel() {

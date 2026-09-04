@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { h } from "vue"
 import { NDataTable, NButton, NFlex } from "naive-ui"
-import type { ProblemSetProblem } from "utils/types"
+import type { AdminProblemSetProblem } from "utils/types"
 
 interface Props {
-  problems: ProblemSetProblem[]
+  problems: AdminProblemSetProblem[]
 }
 
 interface Emits {
   (e: "add-problem"): void
-  (e: "edit-problem", problem: ProblemSetProblem): void
+  (e: "edit-problem", problem: AdminProblemSetProblem): void
   (e: "remove-problem", problemSetProblemId: number): void
 }
 
@@ -27,12 +27,12 @@ defineEmits<Emits>()
     </n-flex>
     <n-data-table
       :columns="[
-        { title: '题目ID', key: 'problem._id', width: 80 },
-        { title: '题目标题', key: 'problem.title', minWidth: 200 },
+        { title: '题目ID', key: 'displayId', width: 80 },
+        { title: '题目标题', key: 'title', minWidth: 200 },
         { title: '顺序', key: 'order', width: 80 },
         {
           title: '必做',
-          key: 'is_required',
+          key: 'isRequired',
           width: 80,
           render: (row) => (row.isRequired ? '是' : '否'),
         },

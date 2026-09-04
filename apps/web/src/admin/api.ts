@@ -38,10 +38,10 @@ import type {
   Tutorial,
   User,
   WebsiteConfig,
-  ProblemSet,
-  ProblemSetBadge,
-  ProblemSetList,
-  ProblemSetProblem,
+  AdminProblemSetBadge,
+  AdminProblemSetList,
+  AdminProblemSet,
+  AdminProblemSetProblem,
   TutorialListItem,
 } from "utils/types"
 
@@ -498,20 +498,20 @@ export function getProblemSetList(
   difficulty = "",
   status = "",
 ) {
-  return api.get<ProblemSetList>("admin/problem-sets", {
+  return api.get<AdminProblemSetList>("admin/problem-sets", {
     params: { offset, limit, keyword, difficulty, status },
   })
 }
 
 export function getProblemSetDetail(id: number) {
-  return api.get<ProblemSet>(`admin/problem-sets/${id}`)
+  return api.get<AdminProblemSet>(`admin/problem-sets/${id}`)
 }
 
 interface ProblemSetBody {
   title?: string
   description?: string
-  difficulty?: ProblemSet["difficulty"]
-  status?: ProblemSet["status"]
+  difficulty?: AdminProblemSet["difficulty"]
+  status?: AdminProblemSet["status"]
   // 表单里是 Date，出站要 ISO 串
   endTime?: Date | null
   visible?: boolean
@@ -529,11 +529,11 @@ function toProblemSetBody(data: ProblemSetBody) {
 }
 
 export function createProblemSet(data: ProblemSetBody) {
-  return api.post<ProblemSet>("admin/problem-sets", toProblemSetBody(data))
+  return api.post<AdminProblemSet>("admin/problem-sets", toProblemSetBody(data))
 }
 
 export function editProblemSet(data: ProblemSetBody & { id: number }) {
-  return api.put<ProblemSet>(
+  return api.put<AdminProblemSet>(
     `admin/problem-sets/${data.id}`,
     toProblemSetBody(data),
   )
@@ -544,16 +544,16 @@ export function deleteProblemSet(id: number) {
 }
 
 export function toggleProblemSetVisible(id: number) {
-  return api.put<ProblemSet>(`admin/problem-sets/${id}/visibility`)
+  return api.put<AdminProblemSet>(`admin/problem-sets/${id}/visibility`)
 }
 
 export function updateProblemSetStatus(id: number, status: string) {
-  return api.put<ProblemSet>(`admin/problem-sets/${id}/status`, { status })
+  return api.put<AdminProblemSet>(`admin/problem-sets/${id}/status`, { status })
 }
 
 // 题单题目管理 API
 export function getProblemSetProblems(problemSetId: number) {
-  return api.get<ProblemSetProblem[]>(
+  return api.get<AdminProblemSetProblem[]>(
     `admin/problem-sets/${problemSetId}/problems`,
   )
 }
@@ -604,7 +604,7 @@ export function removeProblemFromSet(
 
 // 题单奖章管理 API
 export function getProblemSetBadges(problemSetId: number) {
-  return api.get<ProblemSetBadge[]>(
+  return api.get<AdminProblemSetBadge[]>(
     `admin/problem-sets/${problemSetId}/badges`,
   )
 }
@@ -613,7 +613,7 @@ interface BadgeBody {
   name?: string
   description?: string
   icon?: string
-  conditionType?: ProblemSetBadge["conditionType"]
+  conditionType?: AdminProblemSetBadge["conditionType"]
   conditionValue?: number
 }
 
@@ -628,7 +628,7 @@ function toBadgeBody(data: BadgeBody) {
 }
 
 export function createProblemSetBadge(problemSetId: number, data: BadgeBody) {
-  return api.post<ProblemSetBadge>(
+  return api.post<AdminProblemSetBadge>(
     `admin/problem-sets/${problemSetId}/badges`,
     toBadgeBody(data),
   )
@@ -639,7 +639,7 @@ export function editProblemSetBadge(
   badgeId: number,
   data: BadgeBody,
 ) {
-  return api.put<ProblemSetBadge>(
+  return api.put<AdminProblemSetBadge>(
     `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
     toBadgeBody(data),
   )

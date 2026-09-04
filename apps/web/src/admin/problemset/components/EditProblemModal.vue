@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ProblemSetProblem } from "utils/types"
+import type { AdminProblemSetProblem } from "utils/types"
 
 interface Props {
   show: boolean
-  problem: ProblemSetProblem | null
+  problem: AdminProblemSetProblem | null
 }
 
 interface Emits {
@@ -12,7 +12,7 @@ interface Emits {
     e: "confirm",
     data: {
       order: number
-      is_required: boolean
+      isRequired: boolean
       score: number
       hint: string
     },
@@ -30,7 +30,7 @@ const editProblemHint = ref("")
 function handleConfirm() {
   emit("confirm", {
     order: editProblemOrder.value,
-    is_required: editProblemRequired.value,
+    isRequired: editProblemRequired.value,
     score: editProblemScore.value,
     hint: editProblemHint.value || "",
   })
@@ -65,7 +65,7 @@ watch(
   >
     <n-form v-if="problem">
       <n-form-item label="题目标题">
-        <n-input :value="problem.problem.title" disabled />
+        <n-input :value="problem.title" disabled />
       </n-form-item>
       <n-form-item label="顺序">
         <n-input-number

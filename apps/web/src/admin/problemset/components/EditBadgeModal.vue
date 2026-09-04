@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ProblemSetBadge } from "utils/types"
+import type { AdminProblemSetBadge } from "utils/types"
 
 interface Props {
   show: boolean
-  badge: ProblemSetBadge | null
+  badge: AdminProblemSetBadge | null
 }
 
 interface Emits {
@@ -14,8 +14,8 @@ interface Emits {
       name: string
       description: string
       icon: string
-      condition_type: "all_problems" | "problem_count" | "score"
-      condition_value?: number
+      conditionType: "all_problems" | "problem_count" | "score"
+      conditionValue?: number
     },
   ): void
 }
@@ -49,19 +49,16 @@ const conditionTypeOptions = [
 ]
 
 function handleConfirm() {
-  const data: any = {
+  emit("confirm", {
     name: editBadgeName.value,
     description: editBadgeDescription.value,
     icon: editBadgeIcon.value,
-    condition_type: editBadgeConditionType.value,
-  }
-
-  // 只有非"完成所有题目"时才添加条件值
-  if (editBadgeConditionType.value !== "all_problems") {
-    data.conditionValue = editBadgeConditionValue.value
-  }
-
-  emit("confirm", data)
+    conditionType: editBadgeConditionType.value,
+    // 只有非"完成所有题目"时才带条件值
+    ...(editBadgeConditionType.value === "all_problems"
+      ? {}
+      : { conditionValue: editBadgeConditionValue.value }),
+  })
 }
 
 function handleCancel() {
