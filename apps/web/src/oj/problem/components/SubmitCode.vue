@@ -172,6 +172,9 @@ async function submit() {
 }
 
 // ==================== 失败计数 ====================
+// 这里只数本次会话的增量，历史失败数由 problem.myFailedCount 带进来。
+// 排除的状态要和后端 judge/status.ts 的 NON_FAILURE_RESULTS 对齐，
+// 尤其是 system_error —— 判题机自己崩了不该推进 AI 提示的解锁进度。
 watch(
   () => submission.value?.result,
   (result) => {
@@ -184,7 +187,8 @@ watch(
       return
     if (
       result !== SubmissionStatus.accepted &&
-      result !== SubmissionStatus.ast_check_failed
+      result !== SubmissionStatus.ast_check_failed &&
+      result !== SubmissionStatus.system_error
     ) {
       problemStore.incrementFailCount()
     }
@@ -228,9 +232,13 @@ watch(
 </script>
 
 <template>
-  <!-- 提交按钮 + 结果弹窗 -->
+  <!-- 提交按钮 + 结果弹窗。
+       display-directive 默认是 "if"：面板一收起来整个 SubmissionResult 就被卸载，
+       正在流式输出的 AI 提示连同已经生成的内容一起没了，那次 LLM 调用白花。
+       改成 "show" 之后内容留着，重新打开还是原样。 -->
   <n-popover
     trigger="manual"
+    display-directive="show"
     placement="bottom-end"
     scrollable
     :show-arrow="false"
@@ -257,6 +265,17 @@ watch(
     <!-- 结果展示 -->
     <SubmissionResult :submission="submission" />
   </n-popover>
+
+  <!-- 结果面板点一下别处就收起来，而 showResult 只在提交时被置 true ——
+       原来唯一的重开方式是「再提交一次」，AI 提示读到一半去看眼题面就回不来了。
+       只在这次会话提交过之后才出现，没提交时工具栏保持原样。 -->
+  <n-button
+    v-if="submission && !showResult"
+    :size="isDesktop ? 'medium' : 'small'"
+    @click="showResult = true"
+  >
+    上次结果
+  </n-button>
 
   <!-- 评价弹窗 -->
   <n-modal

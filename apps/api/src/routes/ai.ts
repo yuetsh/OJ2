@@ -1,4 +1,5 @@
 import {
+  HINT_MIN_FAILURES,
   aiAnalysisRecordSchema,
   aiAnalysisRequestSchema,
   aiDetailSchema,
@@ -11,25 +12,23 @@ import {
   solvedListSchema,
   solvedProblemSchema,
 } from "@oj2/contract"
-import { and, asc, count, countDistinct, eq, gte, inArray, isNull, lte, min, notInArray, sql } from "drizzle-orm"
+import { and, asc, count, countDistinct, eq, gte, inArray, isNull, lte, min, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { getPreviousLogin, type AuthUser } from "../auth/session"
 import { config } from "../config"
 import { db, schema } from "../db"
-import { JudgeStatus } from "../judge/status"
+import { JudgeStatus, judgeStatusName } from "../judge/status"
 import { failure, success } from "../http"
 import { completeChat, streamChat } from "../services/ai"
 import { consumeToken } from "../services/throttling"
-import { isTeacherOrAbove, objectValue, queryInteger, rounded } from "./helpers"
+import { countFailedSubmissions, isTeacherOrAbove, objectValue, queryInteger, rounded } from "./helpers"
 
 export const aiRoutes = new Hono<AppEnv>()
 
 const accepted = [0, 10]
 const difficultyNames: Record<string, string> = { Low: "简单", Mid: "中等", High: "困难" }
-/** 解锁 AI 提示所需的失败提交数，与前端 SubmissionResult.vue 的显示条件一致 */
-const HINT_MIN_FAILURES = 3
 
 /**
  * 每次 AI 调用都过一遍令牌桶，复用 services/throttling 的那只桶（capacity 20 / 0.03 每秒）。
@@ -495,15 +494,15 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
     .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     .where(and(eq(schema.submission.id, parsed.data.submissionId), eq(schema.submission.userId, c.get("user")!.id))).limit(1)
   if (!row) return failure(c, 404, "submission-not-found", "Submission not found")
-  // 失败次数在端点这边也要卡一道。前端那个 problemStore.failCount 是页面内的计数器，
-  // 刷新就归零，直接 POST 更是完全绕开它 —— 不然这就是个不限次数的免费 LLM 接口。
-  // 判题中的提交不算失败，否则连点几次提交就能提前解锁。
-  const [failed] = await db.select({ value: count() }).from(schema.submission).where(and(
-    eq(schema.submission.userId, c.get("user")!.id),
-    eq(schema.submission.problemId, row.submission.problemId),
-    notInArray(schema.submission.result, [...accepted, JudgeStatus.PENDING, JudgeStatus.JUDGING]),
-  ))
-  if ((failed?.value ?? 0) < HINT_MIN_FAILURES) return failure(c, 403, "hint-locked", "Hint unlocks after 3 failed submissions")
+  // 比赛里不给 AI 提示，和「求助」按钮同一个口径。前端在比赛路由下压根不显示按钮，
+  // 这里是防直接 POST 的那一道 —— 比赛只有 ACM 模式，提示等于变相放水。
+  if (row.submission.contestId !== null) return failure(c, 403, "contest-hint-disabled", "Hint is disabled in contests")
+  // 失败次数在端点这边也要卡一道：直接 POST 完全绕开前端的显示条件 ——
+  // 不然这就是个不限次数的免费 LLM 接口。数法（判题中的不算、判题机自己崩的不算）
+  // 由 countFailedSubmissions 统一，题目详情的 myFailedCount 走的是同一个函数，
+  // 所以前端亮出按钮的时刻和这里放行的时刻严格对齐。
+  const failed = await countFailedSubmissions(c.get("user")!.id, row.submission.problemId)
+  if (failed < HINT_MIN_FAILURES) return failure(c, 403, "hint-locked", `Hint unlocks after ${HINT_MIN_FAILURES} failed submissions`)
   const limited = await throttleAi(c)
   if (limited) return limited
   // 这里**不要**把 problem.answers 的参考答案放进 prompt。学生的代码本身就是 prompt 的
@@ -511,7 +510,7 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   // 写「不可透露」只是软约束，挡不住。题面预算从 500 提到 2000（正好是参考答案让出来的那份），
   // 让模型靠题目要求 + 报错信息判断，入门题的常见错误够用了。
   const system = "你是编程助教。指出学生代码最关键的一个问题，循序渐进地提示，绝不直接给出核心算法或完整解法。输入读取错误可以直接给出正确片段。使用 Markdown，不超过6句话。"
-  const prompt = `题目：${row.problem.title}\n描述：${row.problem.description.slice(0, 2000)}\n语言：${row.submission.language}\n结果：${row.submission.result}\n错误：${String(objectValue(row.submission.statisticInfo).err_info ?? "无")}\n代码：${row.submission.code.slice(0, 2000)}`
+  const prompt = `题目：${row.problem.title}\n描述：${row.problem.description.slice(0, 2000)}\n语言：${row.submission.language}\n结果：${judgeStatusName(row.submission.result)}\n错误：${String(objectValue(row.submission.statisticInfo).err_info ?? "无")}\n代码：${row.submission.code.slice(0, 2000)}`
   return streamChat(system, prompt)
 })
 

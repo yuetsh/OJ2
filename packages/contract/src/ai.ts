@@ -110,6 +110,12 @@ export const aiAnalysisRequestSchema = z.object({
   username: z.string().optional(),
 })
 
+/**
+ * 解锁「让 AI 分析我的代码」所需的失败提交数。前端拿它决定按钮露不露面、
+ * 后端拿它卡 POST /ai/hint —— 放在契约里就是为了不让两边各写一个 3。
+ */
+export const HINT_MIN_FAILURES = 3
+
 export const aiHintRequestSchema = z.object({ submissionId: z.string().min(1) })
 
 export const classAnalysisRequestSchema = z.object({

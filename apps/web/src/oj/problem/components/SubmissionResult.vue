@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
+import { HINT_MIN_FAILURES } from "@oj2/contract"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
   submissionMemoryFormat,
@@ -54,18 +55,38 @@ const msg = computed(() => {
   return msg
 })
 
-// 是否显示AI提示区域
+// 是否显示AI提示区域。
+// 阈值和后端 POST /ai/hint 共用契约里的 HINT_MIN_FAILURES，别在这里写死数字；
+// failCount 现在含服务端下发的历史失败数，刷新页面不会把进度清掉。
+// system_error 也要排掉：那是判题机自己崩了，学生代码没毛病，让 AI 去分析
+// 只会瞎编一通，后端的失败计数同样不认这个状态。
 const showAIHint = computed(() => {
   if (!props.submission) return false
+  // 比赛题不给提示，和「求助」按钮一致。用 problem.contestId 而不是路由参数：
+  // 带 contestId 的题目只可能从比赛入口进来（题库列表按 contest_id is null 过滤）。
+  if (problemStore.problem?.contestId != null) return false
   return (
-    problemStore.failCount >= 3 &&
+    problemStore.failCount >= HINT_MIN_FAILURES &&
     props.submission.result !== SubmissionStatus.accepted &&
     props.submission.result !== SubmissionStatus.ast_check_failed &&
+    props.submission.result !== SubmissionStatus.system_error &&
     props.submission.result !== SubmissionStatus.pending &&
     props.submission.result !== SubmissionStatus.judging &&
     props.submission.result !== SubmissionStatus.submitting
   )
 })
+
+// 结果面板现在是 display-directive="show"，关掉不再销毁组件，提示内容能留到重新打开。
+// 代价是换了一次提交它也留着，所以这里按提交 id 手动清一次 —— 否则新结果底下挂着
+// 上一次提交的提示，而且按钮已经被 v-if 藏了，学生没法重新分析。
+watch(
+  () => props.submission?.id,
+  () => {
+    hintContent.value = ""
+    hintError.value = ""
+    hintLoading.value = false
+  },
+)
 
 async function fetchHint(submissionId: string) {
   hintLoading.value = true

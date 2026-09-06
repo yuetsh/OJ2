@@ -5,7 +5,11 @@ import {
   type SampleUser,
 } from "@oj2/contract"
 
+import { and, count, eq, notInArray } from "drizzle-orm"
+
 import type { AuthUser } from "../auth/session"
+import { db, schema } from "../db"
+import { NON_FAILURE_RESULTS } from "../judge/status"
 
 /**
  * 用户对象的序列化层，对齐旧后端 `utils/api/_serializers.py` 的 `UsernameSerializer`。
@@ -107,4 +111,26 @@ export function todayStart() {
 export function rounded(value: number, digits = 2) {
   const factor = 10 ** digits
   return Math.round(value * factor) / factor
+}
+
+/**
+ * 这个用户在这道题上失败了几次 —— 也就是 AI 提示的解锁进度。
+ *
+ * 题目详情下发的 `myFailedCount` 和 `POST /ai/hint` 的服务端闸门必须用**同一个**口径，
+ * 所以两边都走这里。原来是各写各的：详情那边 `notInArray(result, [0, 10])` 把
+ * 等待评分 / 正在评分也算成失败，连点三次提交就能让按钮亮起来，而 hint 端点排掉了
+ * 这两个状态，于是按钮亮着、点下去回 `hint-locked`。
+ */
+export async function countFailedSubmissions(userId: number, problemId: number) {
+  const [failed] = await db
+    .select({ value: count() })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, userId),
+        eq(schema.submission.problemId, problemId),
+        notInArray(schema.submission.result, NON_FAILURE_RESULTS),
+      ),
+    )
+  return failed?.value ?? 0
 }

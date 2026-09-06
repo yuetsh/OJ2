@@ -5,6 +5,7 @@ import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { useScreenModeStore } from "shared/store/screenMode"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
+import { useUserStore } from "shared/store/user"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk
 const loadProblemEditor = () => import("./components/ProblemEditor.vue")
@@ -128,6 +129,21 @@ async function init() {
 }
 onMounted(init)
 watch(() => problemID, init)
+
+// 题目详情里的 myStatus / myFailedCount 是按当前用户算的，而登录不重新挂载这个页面 ——
+// 会话过期后直接在题目页登录的（机房里最常见的那条路）不补拉一次，AI 提示的解锁进度
+// 就还是匿名时的 0，等于白改。只换 problem，不走 init：那里还会重置分栏模式。
+watch(
+  () => useUserStore().isAuthed,
+  async (authed) => {
+    if (!authed || !problem.value) return
+    try {
+      problem.value = await getProblem(problemID, contestID)
+    } catch {
+      // 拉不到就留着现在这份题面，不要把页面清空
+    }
+  },
+)
 onBeforeUnmount(() => {
   problem.value = null
   errMsg.value = "无数据"

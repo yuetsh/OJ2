@@ -28,7 +28,7 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { objectValue as toObject, queryInteger, sampleUser } from "./helpers"
+import { countFailedSubmissions, objectValue as toObject, queryInteger, sampleUser } from "./helpers"
 
 export const problemRoutes = new Hono<AppEnv>()
 
@@ -277,17 +277,9 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 		const problemStatus = objectValue(statuses[String(row.problem.id)]).status
 		if (typeof problemStatus === "number") myStatus = problemStatus
 
-		const [failed] = await db
-			.select({ value: count() })
-			.from(schema.submission)
-			.where(
-				and(
-					eq(schema.submission.userId, user.id),
-					eq(schema.submission.problemId, row.problem.id),
-					notInArray(schema.submission.result, [0, 10]),
-				),
-			)
-		myFailedCount = failed?.value ?? 0
+		// 前端拿这个数决定「让 AI 分析我的代码」露不露面，口径必须和 POST /ai/hint
+		// 的服务端闸门一致，所以两边共用 countFailedSubmissions
+		myFailedCount = await countFailedSubmissions(user.id, row.problem.id)
 	}
 
 	const samples = Array.isArray(row.problem.samples) ? row.problem.samples : []

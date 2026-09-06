@@ -106,6 +106,8 @@ export async function aiStreamError(response: Response) {
       return new Error("AI 请求太频繁了，歇一会儿再试")
     case "hint-locked":
       return new Error("再多试几次，AI 提示会自动解锁")
+    case "contest-hint-disabled":
+      return new Error("比赛中不提供 AI 提示")
     case "permission-denied":
       return new Error("没有权限使用这个功能")
     default:
