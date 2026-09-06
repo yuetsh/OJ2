@@ -11,6 +11,7 @@ import { getAdminUserRank, getBaseInfo, randomUser10 } from "../api"
 const userCount = ref(0)
 const submissionCount = ref(0)
 const contestCount = ref(0)
+const judgeServerCount = ref(0)
 const userStore = useUserStore()
 const router = useRouter()
 const showModal = ref(false)
@@ -67,6 +68,7 @@ onMounted(async () => {
   userCount.value = res.userCount
   submissionCount.value = res.todaySubmissionCount
   contestCount.value = res.recentContestCount
+  judgeServerCount.value = res.judgeServerCount
 })
 
 async function listRanks() {
@@ -167,6 +169,13 @@ watch(showModal, (v) => {
     <h2>
       <n-gradient-text type="warning">
         近期比赛：{{ contestCount }}
+      </n-gradient-text>
+    </h2>
+    <h2>
+      <!-- 判题机数量后端一直在下发，这里以前没显示 —— 判题机全掉线的时候，
+           这一栏是 0，比学生喊「交了没反应」早得多 -->
+      <n-gradient-text :type="judgeServerCount > 0 ? 'success' : 'error'">
+        在线判题机：{{ judgeServerCount }}
       </n-gradient-text>
     </h2>
   </n-flex>

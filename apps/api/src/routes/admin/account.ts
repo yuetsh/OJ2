@@ -13,15 +13,16 @@ import {
   type ProblemPermission,
 } from "@oj2/contract"
 import { randomInt } from "node:crypto"
+import { z } from "zod"
 import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { hashPassword } from "../../auth/password"
+import { revokeUserSessions } from "../../auth/session"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { queryInteger, sampleUser } from "../helpers"
-import { publishSessionRevoked } from "../../events"
 
 export const adminAccountRoutes = new Hono<AppEnv>()
 
@@ -186,16 +187,17 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
   const [existing] = await selectUser(id)
   if (!existing) return failure(c, 404, "user-not-found", "User does not exist")
 
-  const username = data.username.toLowerCase()
-  const email = data.email.toLowerCase()
+  const username = data.username.trim().toLowerCase()
+  const email = data.email.trim().toLowerCase()
   const className = classNameOf(username)
   if (!className.ok) return failure(c, 400, "invalid-class-name", className.message)
 
   const [dupUsername] = await db.select({ id: schema.user.id }).from(schema.user)
     .where(and(eq(schema.user.username, username), ne(schema.user.id, id))).limit(1)
   if (dupUsername) return failure(c, 409, "username-exists", "Username already exists")
+  // 比 lower(email)：存量数据里有大小写混着的邮箱，按原值比会漏掉冲突
   const [dupEmail] = await db.select({ id: schema.user.id }).from(schema.user)
-    .where(and(eq(schema.user.email, email), ne(schema.user.id, id))).limit(1)
+    .where(and(sql`lower(${schema.user.email}) = ${email}`, ne(schema.user.id, id))).limit(1)
   if (dupEmail) return failure(c, 409, "email-exists", "Email already exists")
 
   const patch: Partial<typeof schema.user.$inferInsert> = {
@@ -224,10 +226,16 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
       .where(eq(schema.userProfile.userId, id))
   })
 
-  // 禁用只改数据库这一列，不动 Redis 里的会话 —— 那个学生挂着的 WebSocket
-  // 靠会话巡检永远发现不了（token 还是好的），只能在这里主动断
+  // 禁用只改数据库这一列，会话在 Redis 里还好好的 —— 那个学生挂着的 WebSocket
+  // 靠会话巡检永远发现不了（token 还是好的），只能在这里主动断。
+  //
+  // 改密码同样要吊销：不删旧会话的话，「给被盗用的账号改个密码」这个动作对已经
+  // 登着的那一方毫无作用，他能一直用到会话自然过期。两件事都发生时按禁用报，
+  // 学生看到的提示更贴近实际。
   if (data.isDisabled && !existing.user.isDisabled) {
-    await publishSessionRevoked({ userId: id }, "account-disabled")
+    await revokeUserSessions(id, "account-disabled")
+  } else if (data.password) {
+    await revokeUserSessions(id, "session-ended")
   }
 
   const [row] = await selectUser(id)
@@ -244,17 +252,56 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
 
   // 先把不花钱的校验全做完，再动 argon2。班级号错、用户名重复这两种情况占了失败的绝大多数
   // （老师习惯把同一份名单粘两次），先算哈希的话要白等一整个班的 argon2 才看到报错。
+  //
+  // 用户名和邮箱都归一成小写：登录是 `lower(username) = lower(?)` 比的，注册和
+  // PUT /users/:id 也都存小写。只有这条导入路径原样存，于是 `ks251Ab` 能绕过下面的
+  // 查重建出第二个账号，两个人登录时撞成同一条记录。
   const prepared: Prepared[] = []
   for (const [username, password, email, realName] of rows) {
-    const className = classNameOf(username)
+    const name = username.toLowerCase()
+    const className = classNameOf(name)
     if (!className.ok) return failure(c, 400, "invalid-class-name", className.message)
-    prepared.push({ username, password: "", raw: password, email, realName, className: className.value })
+    const mail = email.trim().toLowerCase()
+    // 邮箱在本站是唯一的（注册和 PUT /users/:id 两条路都查重），唯独导入这条以前
+    // 什么都不查 —— 而前端生成的占位邮箱按「班级+批内序号」拼，同一个班导第二批
+    // 必然重号。存进去不会报错（库里没有唯一约束），但这两个账号从此**编辑不了**：
+    // PUT 一保存就撞自己的查重回 409，老师只看到「Email already exists」。
+    if (!z.email().max(64).safeParse(mail).success) {
+      return failure(c, 400, "invalid-email", `用户 ${name} 的邮箱 ${mail || "（空）"} 不是合法邮箱`)
+    }
+    prepared.push({ username: name, password: "", raw: password, email: mail, realName, className: className.value })
   }
 
-  const existing = await db.select({ username: schema.user.username }).from(schema.user)
-    .where(inArray(schema.user.username, prepared.map((item) => item.username)))
-  if (existing.length) {
-    return failure(c, 409, "username-exists", `用户名已存在：${existing.map((row) => row.username).join("、")}`)
+  const dupInBatch = (values: string[]) => {
+    const seen = new Set<string>()
+    return [...new Set(values.filter((value) => seen.size === seen.add(value).size))]
+  }
+  const batchNames = dupInBatch(prepared.map((item) => item.username))
+  if (batchNames.length) {
+    return failure(c, 409, "username-exists", `这批名单里用户名重复：${batchNames.join("、")}`)
+  }
+  const batchMails = dupInBatch(prepared.map((item) => item.email))
+  if (batchMails.length) {
+    return failure(c, 409, "email-exists", `这批名单里邮箱重复：${batchMails.join("、")}`)
+  }
+
+  const existing = await db.select({ username: schema.user.username, email: schema.user.email })
+    .from(schema.user)
+    .where(or(
+      inArray(schema.user.username, prepared.map((item) => item.username)),
+      inArray(sql`lower(${schema.user.email})`, prepared.map((item) => item.email)),
+    ))
+  const takenNames = new Set(prepared.map((item) => item.username))
+  const clashNames = existing.filter((row) => takenNames.has(row.username)).map((row) => row.username)
+  if (clashNames.length) {
+    return failure(c, 409, "username-exists", `用户名已存在：${clashNames.join("、")}`)
+  }
+  const takenMails = new Set(prepared.map((item) => item.email))
+  const clashMails = existing
+    .map((row) => row.email?.toLowerCase())
+    .filter((mail): mail is string => !!mail && takenMails.has(mail))
+  if (clashMails.length) {
+    return failure(c, 409, "email-exists", `邮箱已被占用：${[...new Set(clashMails)].join("、")}`)
   }
 
   // argon2id 是**故意**做慢的，串行 await 的话一个班要转好几秒。但也不能 Promise.all
@@ -298,6 +345,18 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
   return success(c, { imported: created }, 201)
 })
 
+/**
+ * 外键冲突（PostgresError 23503）。要顺着 cause 链找 —— drizzle 0.45 把驱动的错误
+ * 包进 DrizzleQueryError，`error.code` 在最外层是 undefined，只看外层会把所有
+ * 删除失败都当成系统故障报 500。
+ */
+function isForeignKeyViolation(error: unknown) {
+  for (let current = error; current; current = (current as { cause?: unknown }).cause) {
+    if ((current as { code?: string }).code === "23503") return true
+  }
+  return false
+}
+
 adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   const parsed = deleteUsersRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return failure(c, 400, "invalid-request", "ids is required")
@@ -318,7 +377,10 @@ adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
     const deleted = await db.delete(schema.user).where(inArray(schema.user.id, parsed.data.ids))
       .returning({ id: schema.user.id })
     return success(c, { deleted: deleted.length })
-  } catch {
+  } catch (error) {
+    // 只有外键冲突（23503）才是「这人还有历史数据」。以前这里是裸 catch，
+    // 连接断了、语句超时也照报这句，超管会照着提示去禁用账号，真正的故障一直没人看见
+    if (!isForeignKeyViolation(error)) throw error
     return failure(c, 409, "user-in-use", "该用户还有提交、题目等历史数据，无法删除；请改为禁用账号")
   }
 })
@@ -334,5 +396,7 @@ adminAccountRoutes.post("/users/:id/reset-password", requireSuperAdmin, async (c
     password: await hashPassword(password),
     rawPassword: password,
   }).where(eq(schema.user.id, id))
+  // 旧密码登出来的会话立刻作废，理由同 PUT /users/:id
+  await revokeUserSessions(id, "session-ended")
   return success(c, resetPasswordResponseSchema.parse({ password }))
 })

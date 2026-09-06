@@ -178,8 +178,12 @@ function createNewUser() {
     id: 0,
     username: "",
     realName: "",
-    email: "",
-    adminType: "Student Admin",
+    // 预填一个唯一的占位邮箱：这条路走的是导入接口，后端要求邮箱合法且不重复，
+    // 留空会直接被打回。想填真邮箱就改掉它
+    email: `user.${Math.random().toString(36).slice(2, 10)}@example.com`,
+    // 导入接口写死建成普通用户（后端 POST /admin/users），这里不摆一个建不出来的
+    // 角色。要给管理员权限，建完再用「编辑」改
+    adminType: "Regular User",
     problemPermission: "None",
     createTime: null,
     lastLogin: null,
@@ -204,6 +208,11 @@ function onCloseEditModal() {
 
 async function handleEditUser() {
   if (!userEditing.value) return
+  // 新建走的是导入接口，密码是必填的（后端 min(1)），留空只会换来一句 400
+  if (create.value && !password.value) {
+    message.error("新建用户必须填写密码")
+    return
+  }
   if (password.value && password.value.length < 6) {
     message.error("密码长度不得小于 6")
     return
@@ -317,8 +326,14 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
         <n-form-item-gi :span="1" label="真名">
           <n-input v-model:value="userEditing.realName" />
         </n-form-item-gi>
+        <!-- 班级是后端从用户名的 ks 数字前缀推出来的（classNameOf），
+             editUser 也不发这个字段，所以这里只读 —— 以前是个能改、改了没用的输入框 -->
         <n-form-item-gi v-if="!create" :span="1" label="班级">
-          <n-input v-model:value="userEditing.className" />
+          <n-input
+            :value="userEditing.className"
+            disabled
+            placeholder="由用户名自动推导"
+          />
         </n-form-item-gi>
         <n-form-item-gi :span="1" label="邮箱">
           <n-input v-model:value="userEditing.email" />

@@ -154,8 +154,21 @@ adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
 adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
   const [original] = await selectContest(id)
-  // 克隆不要求 ownedBy：旧后端这里也没有 ensure_created_by，教师可以拿别人的比赛做模板。
-  // 克隆出来的归调用者所有、且默认不可见，所以不构成越权修改。
+  // 这个接口是干什么的：**把以前那场比赛快速再开一场**，不用从头建一遍题。
+  // 所以副本要带着整套题（含 answers 和 testCaseId），时间挪到 10 分钟后、默认不可见，
+  // 前端点完「复制」直接跳进副本的编辑页改标题和时间（admin/contest/components/Actions.vue）。
+  //
+  // 克隆**故意不要求 ownedBy**，任何教师都能克隆任何一场比赛，包括别人的、隐藏的、
+  // 还没开始的 —— 于是克隆完就能从 GET /admin/problems/:id 读到别人的标准答案、
+  // 从 /test-cases 下载别人的测试点。这是**明确定过的政策**（2026-09-06 确认）：
+  // 保密边界在师生之间，不在教师之间。别再把它当越权读取报上来。
+  //
+  // 注意这条政策**不能顺手推广到 make-public / from-public**：那两条守的是另一件事 ——
+  // 别让 B 把 A 还没考的卷子发布给**学生**，或者把 A 的草稿拖进自己比赛再放出去。
+  // 边界是学生，所以那两处的归属校验照旧（见 admin/problem.ts 的注释）。
+  //
+  // 已知的副作用，别当成 bug 去"修"：副本和原题共用同一个测试点目录（testCaseId 原样复制），
+  // 今天无害（删题特意不删目录），但以后要是加"删题顺手清测试点"，得先把这里改成复制目录。
   if (!original) return failure(c, 404, "contest-not-found", "Contest does not exist")
 
   const duration = Date.parse(original.contest.endTime) - Date.parse(original.contest.startTime)

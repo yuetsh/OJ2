@@ -181,6 +181,8 @@ async function getJudgeServerData() {
 async function delJudgeServer(hostname: string) {
   await deleteJudgeServer(hostname)
   message.success("删除成功")
+  // 不刷新的话删掉的那行还挂在表里，得手动刷新页面才消失（批量删除那支一直是刷的）
+  getJudgeServerData()
 }
 
 async function deleteAbnormalServers() {

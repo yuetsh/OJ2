@@ -162,6 +162,15 @@ function splitLines(text: string): string[] {
 
 function buildData(): Record<string, unknown> | null {
   if (formType.value === "mcq") {
+    // 后端 exerciseDataError 也卡这三条，先在这儿报，省一次往返
+    if (mcqOptions.value.length < 2) {
+      message.error("选择题至少要有 2 个选项")
+      return null
+    }
+    if (mcqOptions.value.some((option) => !option.trim())) {
+      message.error("选项不能留空")
+      return null
+    }
     if (mcqAnswer.value.length === 0) {
       message.error("请至少勾选一个正确答案")
       return null
@@ -173,12 +182,27 @@ function buildData(): Record<string, unknown> | null {
     }
   }
   if (formType.value === "sort") {
+    const lines = sortCode.value.split("\n").filter((l) => l.trim() !== "")
+    if (lines.length < 2) {
+      message.error("排序题至少要有 2 行代码")
+      return null
+    }
     return {
       question: sortQuestion.value || "将下列代码行排列为正确顺序",
-      lines: sortCode.value.split("\n").filter((l) => l.trim() !== ""),
+      lines,
     }
   }
   if (formType.value === "fill") {
+    if (!fillCode.value.trim()) {
+      message.error("请填写含空位的代码")
+      return null
+    }
+    // 学生端按 {{...}} 抠空位，没有标记就是一段谁也做不了的代码，
+    // 而老师这边看不出任何异样 —— 这是这个编辑器以前唯一完全不校验的题型
+    if (!/\{\{[^}]+\}\}/.test(fillCode.value)) {
+      message.error("代码里没有空位，用 {{答案}} 标记，多个合法答案用 | 分隔")
+      return null
+    }
     return { question: fillQuestion.value, code: fillCode.value }
   }
   if (formType.value === "match") {

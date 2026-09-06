@@ -20,7 +20,7 @@ import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
 import { failure, success } from "../../http"
 import { getWebsiteOptions } from "../../services/options"
-import { todayStart } from "../helpers"
+import { queryInteger, todayStart } from "../helpers"
 
 export const adminConfRoutes = new Hono<AppEnv>()
 
@@ -111,7 +111,7 @@ adminConfRoutes.put("/judge-servers/:id", requireSuperAdmin, async (c) => {
   if (!parsed.success) return failure(c, 400, "invalid-request", "isDisabled is required")
   const updated = await db.update(schema.judgeServer)
     .set({ isDisabled: parsed.data.isDisabled })
-    .where(eq(schema.judgeServer.id, Number(c.req.param("id"))))
+    .where(eq(schema.judgeServer.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .returning({ id: schema.judgeServer.id })
   if (updated.length === 0) return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
   // 旧后端在这里会 process_pending_task() 把积压的待判任务重新分发。

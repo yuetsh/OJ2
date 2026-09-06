@@ -185,7 +185,7 @@ const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
 // 比赛题目接口不返回 top_reaction，这一列只在普通题目列表里显示
 const columns = computed<DataTableColumn<AdminProblemFiltered>[]>(() =>
   isContestProblemList.value
-    ? baseColumns.filter((it) => !("key" in it) || it.key !== "top_reaction")
+    ? baseColumns.filter((it) => !("key" in it) || it.key !== "topReaction")
     : [{ type: "selection" }, ...baseColumns],
 )
 

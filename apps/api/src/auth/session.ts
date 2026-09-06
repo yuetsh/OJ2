@@ -13,9 +13,11 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie"
 
 import { config } from "../config"
 import { db, schema } from "../db"
+import { publishSessionRevoked, type SessionRevokedReason } from "../events"
 import { redis } from "../redis"
 
 const SESSION_PREFIX = "session:"
+const USER_SESSIONS_PREFIX = "user-sessions:"
 
 interface StoredSession {
   userId: number
@@ -43,6 +45,21 @@ function sessionKey(token: string) {
   return `${SESSION_PREFIX}${token}`
 }
 
+/**
+ * 某个用户名下所有还活着的会话 token。
+ *
+ * 会话本体是 `session:<token>`，里面记着 userId —— 从 token 找人很快，从人找 token
+ * 却只能 SCAN 整个 Redis。改密码、重置密码、禁用账号这三件事都要求「把这个人所有
+ * 设备上的会话立刻作废」，所以额外维护这张反向索引。
+ *
+ * **它是索引，不是真相**：成员可能指向已经过期的 token（集合成员没有各自的 TTL），
+ * 吊销时按成员逐个 DEL 即可，删到不存在的 key 没有代价。集合自己跟着会话续期，
+ * 整个人不活动满一个 TTL 之后自然消失。
+ */
+function userSessionsKey(userId: number) {
+  return `${USER_SESSIONS_PREFIX}${userId}`
+}
+
 export async function createSession(
   c: Context,
   userId: number,
@@ -61,6 +78,8 @@ export async function createSession(
     "EX",
     config.sessionTtlSeconds,
   )
+  await redis.sadd(userSessionsKey(userId), token)
+  await redis.expire(userSessionsKey(userId), config.sessionTtlSeconds)
   setCookie(c, config.sessionCookie, token, {
     httpOnly: true,
     sameSite: "Lax",
@@ -73,9 +92,44 @@ export async function createSession(
 /** 返回被删掉的 token：调用方要拿它去广播会话吊销，好断掉同一浏览器里其他标签页的连接 */
 export async function destroySession(c: Context) {
   const token = getCookie(c, config.sessionCookie)
-  if (token) await redis.del(sessionKey(token))
+  if (token) {
+    // 先读出 userId 再删，否则反向索引里会留下一个永远清不掉的成员
+    const userId = await sessionUserId(token)
+    await redis.del(sessionKey(token))
+    if (userId !== null) await redis.srem(userSessionsKey(userId), token)
+  }
   deleteCookie(c, config.sessionCookie, { path: "/" })
   return token ?? null
+}
+
+async function sessionUserId(token: string) {
+  const raw = await redis.get(sessionKey(token))
+  if (!raw) return null
+  try {
+    const value = JSON.parse(raw) as StoredSession
+    return Number.isInteger(value.userId) ? value.userId : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 把一个用户所有设备上的会话真的删掉，并广播给还挂着的 WebSocket。
+ *
+ * 光广播是不够的：`publishSessionRevoked` 只断 WebSocket，HTTP 请求照样能拿着
+ * 那张 cookie 继续用。改密码之后旧密码登出来的会话必须立刻失效，否则「改密码」
+ * 对已经被别人登着的账号毫无作用 —— 而学生密码是明文存着给老师查的，
+ * 改密码正是发现密码泄露之后唯一的补救手段。
+ */
+export async function revokeUserSessions(
+  userId: number,
+  reason: SessionRevokedReason,
+) {
+  const tokens = await redis.smembers(userSessionsKey(userId))
+  if (tokens.length) await redis.del(...tokens.map(sessionKey))
+  await redis.del(userSessionsKey(userId))
+  await publishSessionRevoked({ userId }, reason)
+  return tokens.length
 }
 
 function readCookie(request: Request, name: string) {
@@ -126,6 +180,7 @@ async function getUserByToken(token: string | undefined): Promise<SessionResult>
 
   if (!user) {
     await redis.del(sessionKey(token))
+    await redis.srem(userSessionsKey(session.userId), token)
     return { user: null, reason: "anonymous" }
   }
 
@@ -134,10 +189,14 @@ async function getUserByToken(token: string | undefined): Promise<SessionResult>
     // 都返回 null 的话，中途被禁用的学生看到的是 401 login-required，
     // 前端据此弹登录框，登进去又被弹 —— 死循环，而且看不出发生了什么。
     await redis.del(sessionKey(token))
+    await redis.srem(userSessionsKey(session.userId), token)
     return { user: null, reason: "disabled" }
   }
 
   await redis.expire(sessionKey(token), config.sessionTtlSeconds)
+  // 反向索引跟着会话一起续期，否则活跃用户的索引会先于会话到期，
+  // 之后再吊销就找不到这张会话了
+  await redis.expire(userSessionsKey(session.userId), config.sessionTtlSeconds)
   // 唯一的收窄点。库里是 text 列，认不出来的值降成最低权限，见 toAdminType 的注释。
   return {
     user: {

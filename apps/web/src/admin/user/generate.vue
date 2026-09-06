@@ -30,6 +30,11 @@ function generateUsers() {
     return false
   }
   let className = !!prefix.value ? `ks${prefix.value}` : ""
+  // 占位邮箱必须全站唯一：注册、编辑用户、导入三条路都查重，而且库里同一个邮箱
+  // 出现两次的话，那两个账号在「编辑用户」里保存一次就撞 409，从此改不动。
+  // 原来只按「班级 + 批内序号」拼，同一个班分两批导入必然重号 —— 加一段每批随机的
+  // 后缀错开。这个地址不发给任何人，纯占位。
+  const batch = Math.random().toString(36).slice(2, 8)
   rawInput.value = rawInput.value.trim()
   const inputs = rawInput.value.split("\n")
   users.value = inputs.map((u, i) => {
@@ -39,7 +44,7 @@ function generateUsers() {
       password += "123456789".charAt(Math.floor(Math.random() * 9))
     }
     const realName = u
-    const email = `${className}.${i + 1}@example.com`
+    const email = `${className || "user"}.${batch}.${i + 1}@example.com`
     return [username, password, email, realName]
   })
   return true

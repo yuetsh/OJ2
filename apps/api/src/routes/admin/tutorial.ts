@@ -14,6 +14,7 @@ import { Hono } from "hono"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
+import { exerciseDataError } from "../../services/exercise"
 import { objectValue, queryInteger, sampleUser } from "../helpers"
 
 export const adminTutorialRoutes = new Hono<AppEnv>()
@@ -150,6 +151,8 @@ adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
   const [tutorial] = await db.select({ id: schema.tutorial.id }).from(schema.tutorial)
     .where(eq(schema.tutorial.id, parsed.data.tutorialId)).limit(1)
   if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  const dataError = exerciseDataError(parsed.data.type, parsed.data.data)
+  if (dataError) return failure(c, 400, "invalid-exercise", dataError)
   const [created] = await db.insert(schema.exercise).values({
     tutorialId: parsed.data.tutorialId,
     type: parsed.data.type,
@@ -165,6 +168,8 @@ adminTutorialRoutes.put("/exercises/:id", requireSuperAdmin, async (c) => {
   if (!parsed.success) {
     return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
   }
+  const dataError = exerciseDataError(parsed.data.type, parsed.data.data)
+  if (dataError) return failure(c, 400, "invalid-exercise", dataError)
   const [updated] = await db.update(schema.exercise)
     .set({ type: parsed.data.type, data: parsed.data.data, order: parsed.data.order })
     .where(eq(schema.exercise.id, queryInteger(c.req.param("id"), 0, { min: 1 })))

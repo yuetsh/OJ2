@@ -500,12 +500,18 @@ function clear() {
 
 async function generateMermaid() {
   isAIGenerating.value = true
-  const res = await generateFlowchartFromPythonCode(
-    problem.value.answers.filter((a) => a.language === "Python3")[0].code,
-  )
-  isAIGenerating.value = false
-  message.warning("如果渲染不成功，请复制到外部 AI 网站检查语法")
-  problem.value.mermaidCode = res.flowchart
+  try {
+    const res = await generateFlowchartFromPythonCode(
+      problem.value.answers.filter((a) => a.language === "Python3")[0].code,
+    )
+    problem.value.mermaidCode = res.flowchart
+    message.warning("如果渲染不成功，请复制到外部 AI 网站检查语法")
+  } catch (err: any) {
+    // 没有 finally 的话，AI 接口回 502 时按钮永远卡在 loading，只能刷页面
+    message.error(err.data || "生成失败，请稍后再试")
+  } finally {
+    isAIGenerating.value = false
+  }
 }
 
 const showGeneratorModal = ref(false)
