@@ -202,7 +202,7 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
   }
 
   // 握手时校验过一次不算数 —— 这条连接能挂几个小时
-  if (!(await touchSession(ws.data.token))) {
+  if (!(await touchSession(ws.data.token, ws.data.userId))) {
     ws.close(1008, "Session expired")
     return
   }

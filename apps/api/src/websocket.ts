@@ -178,7 +178,7 @@ export async function sweepSessions() {
     let alive = checked.get(token)
     if (alive === undefined) {
       try {
-        alive = await touchSession(token)
+        alive = await touchSession(token, ws.data.userId)
       } catch (error) {
         // Redis 抖一下不该把全班踢下线：这一轮直接放弃，下一轮再说
         console.error("Failed to verify websocket sessions", error)
@@ -299,7 +299,7 @@ async function handleMessage(
 
   // 会话可能在连接期间就失效了：用户在别的标签页登出，或者会话自己到期。
   // 握手时校验过一次不算数 —— 这条连接能挂几个小时。
-  if (!(await touchSession(ws.data.token))) {
+  if (!(await touchSession(ws.data.token, ws.data.userId))) {
     ws.close(1008, "Session expired")
     return
   }

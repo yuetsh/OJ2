@@ -232,13 +232,28 @@ export function readRequestSessionToken(request: Request) {
 /**
  * 会话还在就续期并返回 true，已登出或已过期返回 false。
  *
- * 用 EXPIRE 一条命令同时完成「判断存在」和「续期」，比 GET + EXPIRE 少一趟往返。
- * 续期这件事本身也是要的：HTTP 请求会走 getUserByToken 里的 redis.expire 续期，
+ * 用 EXPIRE 同时完成「判断存在」和「续期」，比 GET + EXPIRE 少一趟往返；两条 EXPIRE
+ * 走一次 pipeline，仍然只有一趟。
+ *
+ * 续期这件事本身是要的：HTTP 请求会走 getUserByToken 里的 redis.expire 续期，
  * 而只开着页面挂 WebSocket 的人一次请求都不发，不该因此被算成不活跃踢下线。
+ *
+ * **反向索引必须跟着一起续。** 走到这里的正是那种一次 HTTP 请求都不发的连接，
+ * 它碰不到 getUserByToken 里那两条并排的 expire。只续会话不续索引的话，索引先到期、
+ * 会话却被巡检一直续着，之后改密码 / 禁用账号走 revokeUserSessions 就 SMEMBERS
+ * 不到这张 token —— WebSocket 那边还有 publishSessionRevoked 按 userId 兜底能断掉，
+ * 但 HTTP 一侧拿着那张 cookie 照用不误，而改密码要的恰恰是让 HTTP 立刻失效。
  */
-export async function touchSession(token: string) {
+export async function touchSession(token: string, userId: number) {
   if (!token) return false
-  return (await redis.expire(sessionKey(token), config.sessionTtlSeconds)) === 1
+  const results = await redis
+    .pipeline()
+    .expire(sessionKey(token), config.sessionTtlSeconds)
+    .expire(userSessionsKey(userId), config.sessionTtlSeconds)
+    .exec()
+  // 索引那条的返回值不看：存量会话（反向索引上线之前签发的）本来就没有索引键，
+  // 续不到很正常，不能因此判定会话已死
+  return results?.[0]?.[1] === 1
 }
 
 async function getStoredSession(c: Context) {
