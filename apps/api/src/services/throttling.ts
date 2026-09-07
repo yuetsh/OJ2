@@ -75,16 +75,38 @@ function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig
   }
 }
 
+/**
+ * 桶参数的进程内缓存。
+ *
+ * 限流点在提交判题、AI 分析、流程图评分上，原来每检查一次就查一次 `throttling`
+ * 配置项 —— 判题高峰期等于每条提交多一趟数据库，只为读一个几乎从不变的值。
+ * 上一代在 `options/options.py` 的 my_property 里也是带 TTL 缓存的，重写时漏掉了。
+ *
+ * 放进程内而不是 Redis：值只有几十字节，跨进程共享省不下什么，反倒要多一趟网络。
+ * `throttling` 没有后台界面，只能直接改库，改完最多一分钟后生效。
+ */
+const BUCKET_CACHE_TTL = 60_000
+const bucketCache = new Map<"user", { value: BucketConfig; expiresAt: number }>()
+
 export async function getBucketConfig(scope: "user"): Promise<BucketConfig> {
+  const cached = bucketCache.get(scope)
+  if (cached && cached.expiresAt > Date.now()) return cached.value
+
   const fallback = throttlingDefaults[scope]
+  let value: BucketConfig
   try {
     const values = await getOptions(["throttling"])
     const throttling = values.throttling
-    if (!throttling || typeof throttling !== "object" || Array.isArray(throttling)) return fallback
-    return parseBucketConfig((throttling as Record<string, unknown>)[scope], fallback)
+    value = !throttling || typeof throttling !== "object" || Array.isArray(throttling)
+      ? fallback
+      : parseBucketConfig((throttling as Record<string, unknown>)[scope], fallback)
   } catch {
+    // 读不到就退回默认值，但**不写缓存** —— 数据库抖一下不该让接下来一整分钟
+    // 全站都按默认参数限流
     return fallback
   }
+  bucketCache.set(scope, { value, expiresAt: Date.now() + BUCKET_CACHE_TTL })
+  return value
 }
 
 export type ConsumeResult = { allowed: true } | { allowed: false; wait: number }
