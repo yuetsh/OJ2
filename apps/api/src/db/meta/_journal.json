@@ -78,6 +78,13 @@
       "when": 1788409961010,
       "tag": "0010_fk_cascade_on_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788788493497,
+      "tag": "0011_user_lookup_indexes",
+      "breakpoints": true
     }
   ]
 }

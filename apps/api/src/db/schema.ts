@@ -664,6 +664,12 @@ export const user = pgTable("user", {
 	className: text("class_name"),
 }, (table) => [
 	unique("user_username_key").on(table.username),
+	// 「近两年登录过的活跃人数」—— problems/:id/beat-count 每次打开题目详情都要算一遍，
+	// 而这张表原来只有主键和 username 两个索引，那句统计是全表扫。
+	index("user_active_idx").using("btree", table.isDisabled.asc().nullsLast(), table.lastLogin.desc().nullsFirst()),
+	// 按班级 / 按年级（class_name like '241%'）取学生：班级榜、班级对比、AI 学情的
+	// 排名 scope 都走它，见 routes/classroom.ts 的 loadClassUsers。
+	index("user_class_name_idx").using("btree", table.className.asc().nullsLast()),
 ]);
 
 export const problemsetBadge = pgTable("problemset_badge", {
