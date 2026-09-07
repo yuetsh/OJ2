@@ -200,6 +200,14 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
     },
   },
   {
+    label: "我的成就",
+    key: "achievement",
+    icon: renderIcon("streamline-ultimate-color:award-medal-4"),
+    props: {
+      onClick: () => router.push("/achievement"),
+    },
+  },
+  {
     label: "我的提交",
     key: "status",
     icon: renderIcon("streamline-ultimate-color:analytics-bars-3d"),
