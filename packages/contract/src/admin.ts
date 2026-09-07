@@ -694,6 +694,18 @@ export const adminProblemSchema = z.object({
   sqlDisplay: sqlDisplaySchema.nullable(),
 })
 
+/**
+ * 出题页新建标签时的名字上限，沿用旧 CreateProblemSerializer 的 32。
+ * 出题页的输入框拿它做 maxlength —— 不共享一个常量的话，超长标签只会在保存时
+ * 撞出 zod 的英文报错（"Too big: expected string to have <=32 characters"），
+ * 老师看不懂也不知道该改哪里。
+ *
+ * 列本身是 text 没有长度限制，标签管理页（createTagRequestSchema /
+ * renameTagRequestSchema）放到 64 —— 两处口径不同是旧后端就有的，这里只是把
+ * 出题页这一侧的数字挪到一处，没有改任何校验的松紧。
+ */
+export const PROBLEM_TAG_MAX_LENGTH = 32
+
 export const createProblemRequestSchema = z.object({
   _id: z.string().trim().min(1).max(32),
   title: z.string().trim().min(1).max(1024),
@@ -709,7 +721,7 @@ export const createProblemRequestSchema = z.object({
   template: z.record(z.string(), z.string()),
   visible: z.boolean(),
   difficulty: z.enum(["Low", "Mid", "High"]),
-  tags: z.array(z.string().max(32)).min(1),
+  tags: z.array(z.string().max(PROBLEM_TAG_MAX_LENGTH)).min(1),
   hint: z.string().nullable().default(null),
   source: z.string().max(256).nullable().default(null),
   prompt: z.string().nullable().default(null),

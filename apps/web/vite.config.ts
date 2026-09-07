@@ -83,8 +83,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "PUBLIC_")
 
   // 开发时一律指向本机后端（apps/api，3000）。
+  // **必须写 IP，不能写 localhost**：api 用 Bun.serve 起，只绑 IPv4 的
+  // 0.0.0.0:3000，而 Node 解析 localhost 时 ::1 排在前面。别的项目的 dev server
+  // 一旦占着 [::1]:3000，两边端口不冲突（一个 v4 一个 v6，谁都不报错），
+  // 浏览器发出的 /api/* 就整个落到那个站上 —— 表现是后台一进就被弹回首页。
   const backend = {
-    target: "http://localhost:3000",
+    target: "http://127.0.0.1:3000",
     changeOrigin: true,
   }
 

@@ -84,6 +84,8 @@ export function deleteContestProblem(id: number) {
   return api.delete(`admin/problems/${id}`)
 }
 
+// 比赛题也走这条：后端是同一条 PUT admin/problems/:id，比赛由题目自己推导，
+// 所以不像新建那样需要分两个函数
 export function editProblem(problem: AdminProblem | BlankProblem) {
   return api.put<AdminProblem>(
     `admin/problems/${(problem as AdminProblem).id}`,
@@ -101,13 +103,6 @@ export function generateFlowchartFromPythonCode(python: string) {
   return api.post<{ flowchart: string }>("admin/problems/flowchart", {
     python,
   })
-}
-
-export function editContestProblem(problem: AdminProblem | BlankProblem) {
-  return api.put<AdminProblem>(
-    `admin/problems/${(problem as AdminProblem).id}`,
-    toProblemBody(problem),
-  )
 }
 
 export function getProblem(id: string | number) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PROBLEM_TAG_MAX_LENGTH } from "@oj2/contract"
 import { getProblemTagList } from "shared/api"
 import TextEditor from "shared/components/TextEditor.vue"
 import TestcaseGenerator from "./components/TestcaseGenerator.vue"
@@ -15,7 +16,6 @@ import type { BlankProblem, LANGUAGE, Tag, Testcase } from "utils/types"
 import {
   createContestProblem,
   createProblem,
-  editContestProblem,
   editProblem,
   generateFlowchartFromPythonCode,
   getProblem,
@@ -136,6 +136,12 @@ function validateNewTags(v: string[]) {
   const existing = new Set(tagList.value.map((t) => t.name))
   const blanks: string[] = []
   for (const tag of unique(v)) {
+    // 输入框已经挂了 maxlength，这里兜住粘贴等绕过的情况。只丢这一个标签、
+    // 不像重复那支那样 break —— 后端撞上来只会回一句 zod 的英文
+    if (tag.length > PROBLEM_TAG_MAX_LENGTH) {
+      message.error(`标签最多 ${PROBLEM_TAG_MAX_LENGTH} 个字：` + tag)
+      continue
+    }
     if (existing.has(tag)) {
       message.error("已经存在标签：" + tag)
       break
@@ -213,6 +219,11 @@ watch(
 
 async function getProblemDetail() {
   if (!props.problemID) {
+    // 草稿缓存和编辑页共用同一个 localStorage key：编辑页会把服务器数据连 id
+    // 一起写进去，没保存就离开的话，这个 id 会跟着草稿漂到新建页 ——「下载测试点」
+    // 下的是那道旧题的包，SQL 测试点编辑器也会去回显那道旧题的脚本。
+    // 新建页不存在 id，进来先摘掉。
+    delete problem.value.id
     syncTagInputsFromProblemTags()
     toggleReady(true)
     return
@@ -445,7 +456,7 @@ async function submit() {
     "admin problem create": createProblem,
     "admin problem edit": editProblem,
     "admin contest problem create": createContestProblem,
-    "admin contest problem edit": editContestProblem,
+    "admin contest problem edit": editProblem,
   }[route.name as string]
   if (
     route.name === "admin contest problem create" ||
@@ -588,6 +599,7 @@ watch(
         </n-flex>
         <n-dynamic-tags
           v-model:value="newTags"
+          :input-props="{ maxlength: PROBLEM_TAG_MAX_LENGTH }"
           @update:value="validateNewTags"
         />
       </n-flex>
