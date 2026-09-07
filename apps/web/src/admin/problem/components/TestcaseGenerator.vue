@@ -83,13 +83,32 @@ watch(
 const isRunning = ref(false)
 const isUploading = ref(false)
 
-const hasAnyInput = computed(() => files.value.some((f) => f.in.trim()))
+/**
+ * 一个测试点必须有输出，但不一定有输入 —— 打印类题目（输出星号矩形、只靠
+ * print 的格式化输出题…）的 `N.in` 本来就该是空文件。
+ *
+ * 原来「这行算不算数」判的是 `f.in.trim()`，把「这题没有输入」和「这行我还没填」
+ * 撞成了同一种状态：输入留空 → 点「先运行」整行被删 → 一行不剩 → 「上传」
+ * 永远是灰的。老师只能往输入框里塞个「无」才存得下去，那两个字节就真的进了 stdin。
+ */
+function hasOutput(file: FileEntry) {
+  return !!file.out.trim() && !file.error
+}
+
+/** 老师碰过这一行没有。面板一开就铺 5 个空行，`+1` / `+5` 还能再加，空行是占位不是测试点 */
+function isFilled(file: FileEntry) {
+  return !!(file.in.trim() || file.out.trim())
+}
+
+/** 真正会被打进 zip 的行：有输出就算数，输入空不空无所谓 */
+const uploadable = computed(() => files.value.filter(hasOutput))
 
 const canUpload = computed(
   () =>
     !isRunning.value &&
-    hasAnyInput.value &&
-    files.value.filter((f) => f.in.trim()).every((f) => f.out && !f.error),
+    uploadable.value.length > 0 &&
+    // 填了输入却没跑出输出：要么还没运行，要么运行炸了，这种状态不许传
+    files.value.every((f) => !f.in.trim() || hasOutput(f)),
 )
 
 function reset() {
@@ -122,14 +141,16 @@ async function run() {
   )
   if (!answer?.code.trim()) return
 
-  // 过滤空行，去重（按输入内容）
+  // 过滤没填过的行，去重（按输入内容）。全没填就留一行，当成无输入题跑一次 ——
+  // 无输入题只可能有一个测试点，去重那条规则本来也会把多行空输入并成一行。
   const seen = new Set<string>()
-  files.value = files.value.filter((f) => {
-    if (!f.in.trim()) return false
+  const kept = files.value.filter((f) => {
+    if (!isFilled(f)) return false
     if (seen.has(f.in)) return false
     seen.add(f.in)
     return true
   })
+  files.value = kept.length > 0 ? kept : files.value.slice(0, 1)
 
   // 清空旧输出
   files.value = files.value.map((f) => ({ ...f, out: "", error: false }))
@@ -158,8 +179,7 @@ async function run() {
 async function upload() {
   isUploading.value = true
   try {
-    const data = files.value
-      .filter((f) => f.in.trim() && f.out && !f.error)
+    const data = uploadable.value
       .flatMap((f, i) => [
         { name: `${i + 1}.in`, content: f.in },
         { name: `${i + 1}.out`, content: f.out },
@@ -208,20 +228,20 @@ async function upload() {
       <n-button :disabled="isRunning" @click="reset">清空</n-button>
       <n-button :disabled="isRunning" @click="add(1)">+1</n-button>
       <n-button :disabled="isRunning" @click="add(5)">+5</n-button>
-      <n-tooltip :disabled="hasAnswerCode && hasAnyInput">
+      <n-tooltip :disabled="hasAnswerCode">
         <template #trigger>
           <span>
             <n-button
               type="success"
               :loading="isRunning"
-              :disabled="!hasAnswerCode || !hasAnyInput"
+              :disabled="!hasAnswerCode"
               @click="run"
             >
               先运行
             </n-button>
           </span>
         </template>
-        {{ !hasAnswerCode ? "请先在题目中填写答案代码" : "请先填写输入" }}
+        请先在题目中填写答案代码
       </n-tooltip>
       <n-button
         type="primary"
