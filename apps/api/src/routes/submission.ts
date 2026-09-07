@@ -5,7 +5,6 @@ import {
   createSubmissionResponseSchema,
   formatCodeRequestSchema,
   formatCodeResponseSchema,
-  shareSubmissionRequestSchema,
   submissionDetailSchema,
   submissionListItemSchema,
   submissionListSchema,
@@ -141,7 +140,6 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     result: JudgeStatus.PENDING,
     info: {},
     language: parsed.data.language,
-    shared: false,
     statisticInfo: {},
     contestId,
   })
@@ -423,19 +421,15 @@ async function problemSetJoinTimes(userId: number, problemIds: number[]) {
 // 传不进完整行。完整行在结构上满足这两个窄类型，详情接口照旧调用不受影响。
 function canViewSubmission(
   user: AuthUser | null,
-  row: { userId: number; shared: boolean; problemId: number; createTime: string },
-  problem: { createdById: number; shareSubmission: boolean },
+  row: { userId: number; problemId: number; createTime: string },
+  problem: { createdById: number },
   contest: typeof schema.contest.$inferSelect | null,
-  allowShared = true,
   problemSetJoinTime?: Map<number, string>,
 ) {
   if (!user) return false
   // 题单防作弊，见 problemSetJoinTimes。只对学生自己的提交生效，管理员不受限，对齐旧后端
   // `get_show_link` 里的 `obj.user_id == self.user.id and self.user.is_regular_user()`。
-  //
-  // 只挡「看代码」这一路，不挡 allowShared=false 的那一路：后者是分享/取消分享的归属校验，
-  // 与作弊无关，挡了会让学生连自己旧提交的分享开关都动不了。
-  if (allowShared && row.userId === user.id && !isAdminRole(user)) {
+  if (row.userId === user.id && !isAdminRole(user)) {
     const joinTime = problemSetJoinTime?.get(row.problemId)
     if (joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)) return false
   }
@@ -448,10 +442,12 @@ function canViewSubmission(
   // 他早就知道答案了，挡他没有意义。
   const elevated = isAdminRole(user)
     && !(contest && contestStatus(contest) !== "-1" && user.adminType === "Student Admin")
-  if (row.userId === user.id || elevated || problem.createdById === user.id) return true
-  if (!allowShared) return false
-  if (contest && contestStatus(contest) !== "-1") return false
-  return problem.shareSubmission || row.shared
+  // 这三条就是全部：别人的代码谁都看不到，比赛内外一样。
+  // 分享功能（problem.share_submission 题目级 / submission.shared 单条）已经删掉，
+  // 原来结尾的 `return problem.shareSubmission || row.shared` 随之消失；它上面那条
+  // 「比赛未结束一律不给」也一并去掉 —— 走到那里的必然不是本人/管理员/作者，
+  // 现在无论比赛与否都是 false，留着是重复的。
+  return row.userId === user.id || elevated || problem.createdById === user.id
 }
 
 /**
@@ -470,7 +466,6 @@ const submissionListColumns = {
     username: schema.submission.username,
     result: schema.submission.result,
     language: schema.submission.language,
-    shared: schema.submission.shared,
     statisticInfo: schema.submission.statisticInfo,
     // 只取 id，题单标题按页单独查一次（见 /submissions）——把 problemset 一起 join 进来
     // 会动到下面那条调过的分页查询，而每页最多两三个不同的题单，PK 查一次更便宜
@@ -479,7 +474,6 @@ const submissionListColumns = {
   problem: {
     displayId: schema.problem.displayId,
     title: schema.problem.title,
-    shareSubmission: schema.problem.shareSubmission,
     createdById: schema.problem.createdById,
   },
 } as const
@@ -496,7 +490,7 @@ async function submissionDetail(id: string, user: AuthUser) {
   const joinTimes = isAdminRole(user) || row.submission.userId !== user.id
     ? undefined
     : await problemSetJoinTimes(user.id, [row.submission.problemId])
-  if (!canViewSubmission(user, row.submission, row.problem, row.contest, true, joinTimes)) return null
+  if (!canViewSubmission(user, row.submission, row.problem, row.contest, joinTimes)) return null
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
@@ -510,7 +504,6 @@ async function submissionDetail(id: string, user: AuthUser) {
     result: row.submission.result,
     info: full ? row.submission.info : {},
     language: row.submission.language,
-    shared: row.submission.shared,
     statisticInfo: objectValue(row.submission.statisticInfo),
     // contest 也在旧后端的排除名单里，同样只给管理员
     contestId: full ? row.submission.contestId : null,
@@ -518,7 +511,6 @@ async function submissionDetail(id: string, user: AuthUser) {
     // problem 表本来就 join 了，不额外查库
     problemDisplayId: row.problem.displayId,
     showLink: true,
-    canUnshare: canViewSubmission(user, row.submission, row.problem, row.contest, false),
   })
 }
 
@@ -634,13 +626,12 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
       id: submission.id,
       problem: problem.displayId,
       problemTitle: problem.title,
-      showLink: user ? canViewSubmission(user, submission, problem, null, true, joinTimes) : false,
+      showLink: user ? canViewSubmission(user, submission, problem, null, joinTimes) : false,
       createTime: submission.createTime,
       userId: submission.userId,
       username: submission.username,
       result: submission.result,
       language: submission.language,
-      shared: submission.shared,
       statisticInfo: objectValue(submission.statisticInfo),
       // 题单被删掉之后外键把 problemset_id 置了空，这里自然就没标记了
       problemSet: submission.problemsetId !== null && problemsetTitles.has(submission.problemsetId)
@@ -693,7 +684,6 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
       username: submission.username,
       result: submission.result,
       language: submission.language,
-      shared: submission.shared,
       statisticInfo: objectValue(submission.statisticInfo),
       // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
       // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
@@ -710,21 +700,4 @@ submissionRoutes.get("/submissions/:id", requireAuth, async (c) => {
     return failure(c, 404, "submission-not-found", "Submission does not exist")
   }
   return success(c, data)
-})
-
-submissionRoutes.put("/submissions/:id", requireAuth, async (c) => {
-  const parsed = shareSubmissionRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "Invalid share payload")
-  const [row] = await db.select({ submission: schema.submission, problem: schema.problem, contest: schema.contest })
-    .from(schema.submission).innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-    .leftJoin(schema.contest, eq(schema.submission.contestId, schema.contest.id))
-    .where(eq(schema.submission.id, c.req.param("id"))).limit(1)
-  if (!row || !canViewSubmission(c.get("user")!, row.submission, row.problem, row.contest, false)) {
-    return failure(c, 404, "submission-not-found", "Submission does not exist")
-  }
-  if (row.contest && contestStatus(row.contest) === "0") {
-    return failure(c, 403, "contest-underway", "Can not share submission now")
-  }
-  await db.update(schema.submission).set({ shared: parsed.data.shared }).where(eq(schema.submission.id, row.submission.id))
-  return success(c, null)
 })

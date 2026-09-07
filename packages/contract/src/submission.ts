@@ -46,7 +46,6 @@ export const submissionDetailSchema = z.object({
   result: judgeStatusSchema,
   info: z.unknown(),
   language: z.string(),
-  shared: z.boolean(),
   statisticInfo: z.record(z.string(), z.unknown()),
   contestId: z.number().int().nullable(),
   problemId: z.number().int(),
@@ -58,7 +57,6 @@ export const submissionDetailSchema = z.object({
    */
   problemDisplayId: z.string(),
   showLink: z.boolean(),
-  canUnshare: z.boolean(),
 })
 
 /**
@@ -102,7 +100,6 @@ export const submissionListItemSchema = z.object({
   username: z.string(),
   result: judgeStatusSchema,
   language: z.string(),
-  shared: z.boolean(),
   statisticInfo: z.record(z.string(), z.unknown()),
   /**
    * 来源题单，非题单入口提交的为 null。比赛提交恒为 null（比赛题不会进题单）。
@@ -113,8 +110,6 @@ export const submissionListItemSchema = z.object({
 })
 
 export const submissionListSchema = paginatedSchema(submissionListItemSchema)
-
-export const shareSubmissionRequestSchema = z.object({ shared: z.boolean() })
 
 /**
  * 未完成学生。`realName` 是从用户名里剥掉 `ks<班级号>` 前缀后剩下的那一段，
@@ -173,5 +168,4 @@ export type EmbeddedSubmission = z.infer<typeof embeddedSubmissionSchema>
 export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>
 export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>
 
-export type ShareSubmissionRequest = z.infer<typeof shareSubmissionRequestSchema>
 export type FormatCodeRequest = z.infer<typeof formatCodeRequestSchema>

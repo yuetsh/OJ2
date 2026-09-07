@@ -62,7 +62,6 @@ const problem = useLocalStorage<BlankProblem>(STORAGE_KEY.ADMIN_PROBLEM, {
   memoryLimit: 64,
   difficulty: "Low",
   visible: false,
-  shareSubmission: false,
   tags: [],
   languages: ["Python3", "C"] as LANGUAGE[],
   template: {} as { [key in LANGUAGE]?: string },
@@ -241,7 +240,6 @@ async function getProblemDetail() {
     problem.value.memoryLimit = data.memoryLimit
     problem.value.difficulty = data.difficulty
     problem.value.visible = data.visible
-    problem.value.shareSubmission = data.shareSubmission
     problem.value.tags = normalizeTagNames(data.tags)
     problem.value.languages = data.languages
     problem.value.template = data.template

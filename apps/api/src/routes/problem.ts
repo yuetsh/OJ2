@@ -304,7 +304,6 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 		submissionNumber: row.problem.submissionNumber,
 		acceptedNumber: row.problem.acceptedNumber,
 		statisticInfo: objectValue(row.problem.statisticInfo),
-		shareSubmission: row.problem.shareSubmission,
 		contestId: row.problem.contestId,
 		tags: tagRows.map((tag) => tag.name),
 		createdBy: sampleUser({ id: row.creatorId, username: row.creatorUsername }, null),

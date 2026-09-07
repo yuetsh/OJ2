@@ -186,7 +186,6 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
     submissionNumber: allowed ? row.problem.submissionNumber : 0,
     acceptedNumber: allowed ? row.problem.acceptedNumber : 0,
     statisticInfo: allowed ? objectValue(row.problem.statisticInfo) : {},
-    shareSubmission: row.problem.shareSubmission,
     contestId: contest.id,
     tags: tags.get(row.problem.id) ?? [],
     createdBy: sampleUser(row.user, row.realName),

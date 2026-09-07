@@ -274,7 +274,6 @@ function toProblemBody(problem: AdminProblem | BlankProblem) {
     source: p.source ?? null,
     prompt: p.prompt ?? null,
     answers: p.answers ?? [],
-    shareSubmission: p.shareSubmission ?? false,
     allowFlowchart: p.allowFlowchart ?? false,
     showFlowchart: p.showFlowchart ?? false,
     mermaidCode: p.mermaidCode ?? null,

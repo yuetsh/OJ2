@@ -308,7 +308,6 @@ export const problemDetailSchema = z.object({
   submissionNumber: z.number().int(),
   acceptedNumber: z.number().int(),
   statisticInfo: z.record(z.string(), z.unknown()),
-  shareSubmission: z.boolean(),
   contestId: z.number().int().nullable(),
   tags: z.array(z.string()),
   createdBy: z.object({

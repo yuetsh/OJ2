@@ -379,6 +379,12 @@ export const problem = pgTable("problem", {
 	statisticInfo: jsonb("statistic_info").default({}).notNull(),
 	contestId: integer("contest_id"),
 	isPublic: boolean("is_public").default(false).notNull(),
+	/**
+	 * 已停用。「提交互相可见」的两个开关（这个是题目级，submission.shared 是单条级）
+	 * 连同判定分支一起删掉了：生产库 956 道题里只有 2 道打开过，还都是比赛题
+	 * （比赛未结束时那条分支根本走不到），出题页也从来没给过开关。
+	 * 列保留不删：删列是破坏性迁移，而留着不写不读没有任何代价。
+	 */
 	shareSubmission: boolean("share_submission").default(false).notNull(),
 	prompt: text(),
 	answers: jsonb(),
@@ -446,6 +452,11 @@ export const submission = pgTable("submission", {
 	result: integer().default(6).notNull(),
 	info: jsonb().default({}).notNull(),
 	language: text().notNull(),
+	/**
+	 * 已停用，见 problem.share_submission 的说明。历史上 12.3 万条提交里有 40 条
+	 * 为真（2022 年 39 条、2023 年 1 条），入口在更早的那版前端上，ojnext 和 OJ2
+	 * 都没有把它搬过来。现在没有任何代码读写它，行里的历史值原样留着。
+	 */
 	shared: boolean().default(false).notNull(),
 	statisticInfo: jsonb("statistic_info").default({}).notNull(),
 	username: text().notNull(),

@@ -100,12 +100,10 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
         // info / ip / contestId 三个字段不在 embeddedSubmissionSchema 里，故不传 ——
         // 对齐旧后端 SubmissionSafeModelSerializer 的 exclude，这三个键不出现在响应中
         language: submission.language,
-        shared: submission.shared,
         statisticInfo: objectValue(submission.statisticInfo),
         // 展示用题号而非数字主键，站内信页面拿它拼 /problem/<题号>
         problem: displayId,
         showLink: true,
-        canUnshare: false,
       }),
     })),
     total: totalRows[0]?.value ?? 0,
