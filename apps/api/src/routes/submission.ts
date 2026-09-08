@@ -22,7 +22,7 @@ import {
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
-import { JudgeStatus } from "../judge/status"
+import { JudgeStatus, UNJUDGED_RESULTS } from "../judge/status"
 import { judgeQueue } from "../queue"
 import {
   canAccessContest,
@@ -180,6 +180,11 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
 
 const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 
+/** 正确率。分母是判完的条数，一条都还没判完时给 0 而不是 NaN */
+function judgedRate(accepted: number, judged: number) {
+  return judged > 0 ? rounded((accepted / judged) * 100) : 0
+}
+
 /**
  * 统计接口共用的时间窗解析。旧后端 `end` 必填、`start` 可选（不给就是「全部时段」）。
  */
@@ -190,23 +195,173 @@ function statisticsRange(c: { req: { query(name: string): string | undefined } }
   return { start: start || null, end }
 }
 
+/** 一次最多查几道题。课堂上一节课布置三五道，20 是留足了余量的上限 */
+const STATISTICS_MAX_PROBLEMS = 20
+
 /**
- * 按题号（展示用的 _id）定位公开题目。找不到时统计接口要报错而不是退化成「全部题目」，
- * 否则教师打错一个字就会看到全站数据还以为是本题的。
+ * 题号框允许一次填几道：`1001,1005,1010`。中英文逗号、空格、分号都当分隔符 ——
+ * 老师在投影前手敲，不该因为打了个全角逗号就查不出来。
  */
-async function findPublicProblemByDisplayId(displayId: string) {
-  const [row] = await db
-    .select({ id: schema.problem.id })
+function parseDisplayIds(raw: string) {
+  const seen = new Set<string>()
+  const ids: string[] = []
+  for (const part of raw.split(/[,，;；\s]+/)) {
+    const id = part.trim()
+    if (!id) continue
+    const key = id.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    ids.push(id)
+  }
+  return ids
+}
+
+/**
+ * 按题号（展示用的 _id）定位公开题目。**有一个找不到就整体报错**，不退化成「全部题目」——
+ * 否则教师打错一个字就会看到全站数据还以为是这几道题的。
+ */
+async function findPublicProblemsByDisplayIds(displayIds: string[]) {
+  const lowered = displayIds.map((id) => id.toLowerCase())
+  const rows = await db
+    .select({ id: schema.problem.id, displayId: schema.problem.displayId })
     .from(schema.problem)
     .where(
       and(
-        sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+        inArray(sql`lower(${schema.problem.displayId})`, lowered),
         isNull(schema.problem.contestId),
         eq(schema.problem.visible, true),
       ),
     )
-    .limit(1)
-  return row ?? null
+  const found = new Set(rows.map((row) => row.displayId.toLowerCase()))
+  const missing = displayIds.find((id) => !found.has(id.toLowerCase()))
+  return { ids: rows.map((row) => row.id), missing: missing ?? null }
+}
+
+/**
+ * 表格展开行要看的「这个人交了哪几次」。两道闸都是为了不让「全部时段 + 不填条件」
+ * 把十几万条提交整个搬进响应体：
+ *
+ * - **只取有 AC 的人**。明细只挂在 `data` 里，而 `data` 本来就只留有 AC 的人，
+ *   原来给「一次没对的人」也捞一份明细，捞完直接扔掉。
+ * - **每人只留最近 50 条**。展开行是一排 120px 的按钮，几十个就已经翻不动了。
+ *   表格「提交数」那一列走的是 perUser 的 count，仍然是真实总数，不受这里截断影响。
+ */
+const STATISTICS_ITEMS_PER_USER = 50
+
+async function submissionItemsByUser(where: SQL | undefined, usernames: string[]) {
+  const byUser = new Map<string, { id: string; result: number }[]>()
+  if (!usernames.length) return byUser
+
+  // 走窗口函数而不是「查全量再在 JS 里截断」：截断要发生在数据库那边才省得下来。
+  const rows = await db.execute<{ username: string; id: string; result: number }>(sql`
+    select username, id, result from (
+      select
+        ${schema.submission.username} as username,
+        ${schema.submission.id} as id,
+        ${schema.submission.result} as result,
+        row_number() over (
+          partition by ${schema.submission.username}
+          order by ${schema.submission.createTime} desc
+        ) as rn
+      from ${schema.submission}
+      where ${and(where, inArray(schema.submission.username, usernames))}
+    ) t
+    where rn <= ${STATISTICS_ITEMS_PER_USER}
+    -- rn 就是「这个人的第几新」，外层不排的话展开行里的按钮是乱序的
+    order by username, rn
+  `)
+
+  for (const row of rows) {
+    const bucket = byUser.get(row.username)
+    if (bucket) bucket.push({ id: row.id, result: row.result })
+    else byUser.set(row.username, [{ id: row.id, result: row.result }])
+  }
+  return byUser
+}
+
+/** 错误摘要截断长度。编译错误能刷几十行，弹层里放不下，也没必要 */
+const FAILURE_MESSAGE_LIMIT = 400
+
+/**
+ * 「交了没对」那一栏点开要看的：这个人**最近一条**提交错在哪。
+ *
+ * 有了它，老师看到「张三 12次」之后不用再切到提交列表、翻到这个人、点开代码 ——
+ * 点一下名字就知道是编译错了还是答案错了、报的什么。err_info 是判题机塞进
+ * statistic_info 的那一段，提交详情页读的也是它。
+ */
+async function lastFailureByUser(where: SQL | undefined, usernames: string[]) {
+  const byUser = new Map<
+    string,
+    { id: string; problem: string; result: number; error: string | null }
+  >()
+  if (!usernames.length) return byUser
+
+  // 不给 submission 起别名：where 里的条件是 drizzle 拼的，引用的是 "submission"."x"
+  const rows = await db.execute<{
+    username: string
+    id: string
+    problem: string
+    result: number
+    error: string | null
+  }>(sql`
+    select username, id, problem, result, error from (
+      select
+        ${schema.submission.username} as username,
+        ${schema.submission.id} as id,
+        ${schema.problem.displayId} as problem,
+        ${schema.submission.result} as result,
+        left(${schema.submission.statisticInfo}->>'err_info', ${FAILURE_MESSAGE_LIMIT}) as error,
+        row_number() over (
+          partition by ${schema.submission.username}
+          order by ${schema.submission.createTime} desc
+        ) as rn
+      from ${schema.submission}
+      join ${schema.problem} on ${schema.problem.id} = ${schema.submission.problemId}
+      where ${and(where, inArray(schema.submission.username, usernames))}
+    ) t
+    where rn = 1
+  `)
+
+  for (const row of rows) {
+    byUser.set(row.username, {
+      id: row.id,
+      problem: row.problem,
+      result: row.result,
+      error: row.error,
+    })
+  }
+  return byUser
+}
+
+/**
+ * 「答案对了，但没按要求的语法写」的题数（AST_CHECK_FAILED）。
+ *
+ * 只算**最后也没改对**的：同一道题上既有 AST_CHECK_FAILED 又有 ACCEPTED，说明学生后来
+ * 改成要求的写法了，不该再拿这个提醒老师。所以要先按「人 × 题」聚一层，不能直接
+ * `count(distinct problem_id) filter (result = 10)`。
+ *
+ * 口径本身不动 —— AST_CHECK_FAILED 仍然算通过（答案确实对了，全站一致）。这里只是
+ * 让教师看得见「这几个人是绕过要求做出来的」，教学上那不算达标。
+ */
+async function astOnlyByUser(where: SQL | undefined, usernames: string[]) {
+  const byUser = new Map<string, number>()
+  if (!usernames.length) return byUser
+
+  const rows = await db.execute<{ username: string; n: number }>(sql`
+    select username, count(*)::int as n from (
+      select
+        ${schema.submission.username} as username,
+        bool_or(${schema.submission.result} = ${JudgeStatus.AST_CHECK_FAILED}) as has_ast,
+        bool_or(${schema.submission.result} = ${JudgeStatus.ACCEPTED}) as has_ac
+      from ${schema.submission}
+      where ${and(where, inArray(schema.submission.username, usernames))}
+      group by ${schema.submission.username}, ${schema.submission.problemId}
+    ) t
+    where has_ast and not has_ac
+    group by username
+  `)
+  for (const row of rows) byUser.set(row.username, row.n)
+  return byUser
 }
 
 /**
@@ -236,11 +391,16 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   ]
   if (range.start) filters.push(sql`${schema.submission.createTime} >= ${range.start}`)
 
-  const displayId = c.req.query("problemId")?.trim()
-  if (displayId) {
-    const problem = await findPublicProblemByDisplayId(displayId)
-    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-    filters.push(eq(schema.submission.problemId, problem.id))
+  const displayIds = parseDisplayIds(c.req.query("problemId") ?? "")
+  if (displayIds.length > STATISTICS_MAX_PROBLEMS) {
+    return failure(c, 400, "invalid-request", `At most ${STATISTICS_MAX_PROBLEMS} problems`)
+  }
+  if (displayIds.length) {
+    const { ids, missing } = await findPublicProblemsByDisplayIds(displayIds)
+    if (missing) {
+      return failure(c, 404, "problem-not-found", `Problem ${missing} does not exist`)
+    }
+    filters.push(inArray(schema.submission.problemId, ids))
   }
 
   const username = c.req.query("username")?.trim()
@@ -248,10 +408,22 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   const where = and(...filters)
 
   const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
+  // 判题中的条数。要单独数出来，正确率的分母才能把它们摘掉
+  const judgingFilter = sql`count(*) filter (where ${inArray(schema.submission.result, UNJUDGED_RESULTS)})`
+  /**
+   * **解决的题数**，不是通过的提交条数。同一道题重复 AC（改完再交一次仍然对）
+   * 在这里只算一道 —— 表格那一列叫「已解决」，数条数就名不副实了。
+   * 指定了题号时它最多是 1，不指定时才看得出差别（老师查「这节课全班」就是这种）。
+   */
+  const solvedFilter = sql`count(distinct ${schema.submission.problemId}) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
 
-  const [[totals], perUser, rosterRows, items] = await Promise.all([
+  const [[totals], perUser, rosterRows] = await Promise.all([
     db
-      .select({ total: count(), accepted: acceptedFilter.mapWith(Number) })
+      .select({
+        total: count(),
+        accepted: acceptedFilter.mapWith(Number),
+        judging: judgingFilter.mapWith(Number),
+      })
       .from(schema.submission)
       .where(where),
     db
@@ -259,6 +431,8 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
         username: schema.submission.username,
         submissionCount: count(),
         acceptedCount: acceptedFilter.mapWith(Number),
+        solvedCount: solvedFilter.mapWith(Number),
+        judgingCount: judgingFilter.mapWith(Number),
       })
       .from(schema.submission)
       .where(where)
@@ -266,26 +440,34 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       .orderBy(desc(count())),
     // 只有指定了用户名才有「班级人数」这个概念；不指定时分母无意义，旧后端也返回 0
     username ? matchedStudents(username) : Promise.resolve([]),
-    db
-      .select({
-        username: schema.submission.username,
-        id: schema.submission.id,
-        result: schema.submission.result,
-      })
-      .from(schema.submission)
-      .where(where)
-      .orderBy(desc(schema.submission.createTime)),
   ])
 
   const submissionCount = totals?.total ?? 0
   const acceptedCount = totals?.accepted ?? 0
+  const judgingCount = totals?.judging ?? 0
+  // 正确率的分母是**判完的条数**，不是总条数
+  const judgedCount = submissionCount - judgingCount
 
-  const itemsByUser = new Map<string, { id: string; result: number }[]>()
-  for (const item of items) {
-    const bucket = itemsByUser.get(item.username)
-    if (bucket) bucket.push({ id: item.id, result: item.result })
-    else itemsByUser.set(item.username, [{ id: item.id, result: item.result }])
-  }
+  /**
+   * 「做完了」的判定。**指定了几道题，就要几道都解决**（这是教师选的口径：
+   * 「今天布置三道，谁全做完了」）—— 做出两道差一道的人落在「交了没全对」那一栏，
+   * 那里带着 `solvedCount`，老师看得出他差几道。
+   *
+   * 只填一道题时 `solvedCount >= 1` 和原来的 `acceptedCount > 0` 完全等价；
+   * 不填题号时无所谓「全部」，退回「至少做出一道」。
+   */
+  const requiredSolved = displayIds.length
+  const isDone = (row: { solvedCount: number; acceptedCount: number }) =>
+    requiredSolved > 0 ? row.solvedCount >= requiredSolved : row.acceptedCount > 0
+
+  // 表格列的是做完了的人。没做完的（一条没交 / 交了没全对）在「未完成」那一栏
+  const acceptedUsers = perUser.filter(isDone)
+  // 这两个都要等 acceptedUsers 定下来才能查，所以进不了上面那个 Promise.all
+  const acceptedNames = acceptedUsers.map((row) => row.username)
+  const [itemsByUser, astOnlyByUserMap] = await Promise.all([
+    submissionItemsByUser(where, acceptedNames),
+    astOnlyByUser(where, acceptedNames),
+  ])
 
   const submittedUsernames = new Set(perUser.map((row) => row.username))
   const classNames = new Map<string, string | null>()
@@ -297,17 +479,17 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
     for (const row of rows) classNames.set(row.username, row.className)
   }
 
-  // 只列出有正确提交的人。做了但一次没对的学生落在「未完成」那一栏
-  const data = perUser
-    .filter((row) => row.acceptedCount > 0)
-    .map((row) => ({
-      username: row.username,
-      className: classNames.get(row.username) ?? null,
-      submissionCount: row.submissionCount,
-      acceptedCount: row.acceptedCount,
-      correctRate: rounded((row.acceptedCount / row.submissionCount) * 100),
-      submissionItems: itemsByUser.get(row.username) ?? [],
-    }))
+  const data = acceptedUsers.map((row) => ({
+    username: row.username,
+    className: classNames.get(row.username) ?? null,
+    submissionCount: row.submissionCount,
+    acceptedCount: row.acceptedCount,
+    solvedCount: row.solvedCount,
+    astOnlyCount: astOnlyByUserMap.get(row.username) ?? 0,
+    judgingCount: row.judgingCount,
+    correctRate: judgedRate(row.acceptedCount, row.submissionCount - row.judgingCount),
+    submissionItems: itemsByUser.get(row.username) ?? [],
+  }))
 
   const dataUnaccepted = rosterRows
     .filter((row) => !submittedUsernames.has(row.username))
@@ -316,25 +498,42 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       realName: stripClassPrefix(row.username, row.className),
     }))
 
-  // 顺序照搬旧后端：先用原始 person_count 算完成度，再修正 person_count。
-  // 修正是为了兜住「学生已删号但提交记录还在」——那时完成人数会大于花名册人数。
+  // 交了但一次没对的。**按花名册取**，和 dataUnaccepted 同一个范围 ——
+  // 不指定用户名时没有花名册，这一栏也就跟着为空，不会冒出一堆别的班的人。
+  const rosterNames = new Map(rosterRows.map((row) => [row.username, row.className]))
+  // 交了但没做完的：包括一道都没对的，也包括三道里做出两道的
+  const attemptedRows = perUser.filter(
+    (row) => !isDone(row) && rosterNames.has(row.username),
+  )
+  const failureByUser = await lastFailureByUser(
+    where,
+    attemptedRows.map((row) => row.username),
+  )
+  const dataAttempted = attemptedRows.map((row) => ({
+    username: row.username,
+    realName: stripClassPrefix(row.username, rosterNames.get(row.username) ?? null),
+    submissionCount: row.submissionCount,
+    solvedCount: row.solvedCount,
+    lastFailure: failureByUser.get(row.username) ?? null,
+  }))
+
+  // 「学生已删号但提交记录还在」时完成人数会大于花名册人数，分母兜到完成人数为止。
+  // 旧后端在这之前还先算了一个 person_rate 一起下发，前端从来没读过它（完成度是
+  // 前端自己按「减掉请假人数之后的分母」重算的），所以这条链路上只留 person_count。
   let personCount = rosterRows.length
-  let personRate = 0
-  if (personCount) {
-    personRate = Math.min(100, rounded((data.length / personCount) * 100))
-    if (personCount < data.length) personCount = data.length
-  }
+  if (personCount && personCount < data.length) personCount = data.length
 
   return success(
     c,
     submissionStatisticsSchema.parse({
       submissionCount,
       acceptedCount,
-      correctRate: submissionCount ? rounded((acceptedCount / submissionCount) * 100) : 0,
+      judgingCount,
+      correctRate: judgedRate(acceptedCount, judgedCount),
       personCount,
-      personRate,
       data,
       dataUnaccepted,
+      dataAttempted,
     }),
   )
 })

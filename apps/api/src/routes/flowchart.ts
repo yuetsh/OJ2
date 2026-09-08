@@ -235,7 +235,12 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     personCount: roster.length,
     completedCount: 0,
     wordFrequencies: [],
-    dataUnaccepted: [],
+    // 一条提交都没有时，花名册上的人**全都**是「没做」—— 原来这里写死空数组，
+    // 于是一节课刚开始、最该点名的时候，教师面板反而一个名字都不给
+    dataUnaccepted: roster.map((row) => ({
+      username: row.username,
+      realName: stripClassPrefix(row.username, row.className),
+    })),
   }
   if (rows.length === 0) return success(c, flowchartStatisticsSchema.parse(empty))
 

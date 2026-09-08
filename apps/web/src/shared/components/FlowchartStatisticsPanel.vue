@@ -20,13 +20,9 @@
     <n-button type="primary" @click="handleStatistics">统计</n-button>
   </n-flex>
 
-  <n-empty
-    v-if="data.totalCount === 0"
-    description="暂无数据"
-    style="margin: 40px 0"
-  />
+  <n-empty v-if="!hasResult" description="暂无数据" style="margin: 40px 0" />
 
-  <template v-if="data.totalCount > 0">
+  <template v-if="hasResult">
     <n-divider style="margin: 16px 0" />
     <n-flex justify="space-around">
       <div class="stat-item">
@@ -68,7 +64,7 @@
       <n-tab-pane name="charts" tab="数据图表">
         <n-grid :cols="2" :x-gap="20" :y-gap="20" style="margin-top: 12px">
           <!-- 1. Grade pie chart -->
-          <n-gi>
+          <n-gi v-if="data.totalCount > 0">
             <n-card title="等级分布">
               <div class="chart-container">
                 <Doughnut :data="gradeChartData" :options="doughnutOptions" />
@@ -229,6 +225,14 @@ const data = reactive<FlowchartStatistics>({
   wordFrequencies: [],
   dataUnaccepted: [],
 })
+
+/**
+ * 「查出东西了吗」。和 StatisticsPanel 同一个道理：一节课刚开始时没有任何提交，
+ * 但花名册整份都在 dataUnaccepted 里，那会儿正是老师要看名单的时候。
+ */
+const hasResult = computed(
+  () => data.totalCount > 0 || data.dataUnaccepted.length > 0,
+)
 
 const wordcloudCanvas = useTemplateRef<HTMLCanvasElement>("wordcloudCanvas")
 let wordcloudChart: ChartJS | null = null

@@ -112,20 +112,64 @@ export const submissionListItemSchema = z.object({
 export const submissionListSchema = paginatedSchema(submissionListItemSchema)
 
 /**
- * 未完成学生。`realName` 是从用户名里剥掉 `ks<班级号>` 前缀后剩下的那一段，
+ * **一条都没交**的学生。`realName` 是从用户名里剥掉 `ks<班级号>` 前缀后剩下的那一段，
  * 不是 user.real_name 列 —— 与 F2「真名默认不下发」不冲突：这里只有教师能看到，
  * 且教师面板的用途正是点名谁没做。
+ *
+ * 注意它不是「未完成」的全部：交了但一次没对的学生在 `dataAttempted` 里。
  */
 export const unacceptedStudentSchema = z.object({
   username: z.string(),
   realName: z.string(),
 })
 
+/**
+ * **交了但一次没对**的学生。这批人原来两栏都不在 —— 不在「完成人数」（没 AC），
+ * 也不在「未完成」名单（那一栏只收一条没交的），于是课堂上最该去看一眼的人
+ * 反而从屏幕上消失了。`submissionCount` 是窗口内的提交次数，教师据此判断
+ * 「卡了多久」。
+ */
+export const attemptedStudentSchema = unacceptedStudentSchema.extend({
+  submissionCount: z.number().int(),
+  /**
+   * 已经解决的题数。查多道题时这一栏里混着「一道没对」和「三道做出两道」两种人，
+   * 差几道决定了老师先管谁 —— 所以名字后面要缀 `2/3`。
+   */
+  solvedCount: z.number().int(),
+  /**
+   * 最近一条提交错在哪。教师点名字就能看到「是编译错了还是答案错了」，
+   * 不必再切去提交列表翻这个人。`error` 是判题机写进 statistic_info 的 err_info，
+   * 已截断；没有错误文本（比如答案错误那种）时为 null。
+   */
+  lastFailure: z
+    .object({
+      id: z.string(),
+      /** 题目的展示编号，用来告诉老师错在哪道题 */
+      problem: z.string(),
+      result: judgeStatusSchema,
+      error: z.string().nullable(),
+    })
+    .nullable(),
+})
+
 export const submissionStatisticsUserSchema = z.object({
   username: z.string(),
   className: z.string().nullable(),
   submissionCount: z.number().int(),
+  /** 通过的**提交条数**。correctRate 的分子就是它 */
   acceptedCount: z.number().int(),
+  /**
+   * 解决的**题数**（同一道题重复 AC 只算一道）。表格「已解决」那一列显示的是它 ——
+   * 不指定题号查「这节课全班」时，条数和题数能差出好几倍。
+   */
+  solvedCount: z.number().int(),
+  /**
+   * 「答案对了但语法没按要求写」且**最后也没改对**的题数。这些题算在 solvedCount 里
+   * （AST_CHECK_FAILED 全站都算通过），单列出来只是让教师看得见教学上没达标的那几个。
+   */
+  astOnlyCount: z.number().int(),
+  /** 这个人还在判题队列里的条数。`submissionCount` 含它，`correctRate` 的分母不含 */
+  judgingCount: z.number().int(),
   // 百分比数值，不带 %。旧后端返回 "85.5%" 字符串，展示格式化交给前端。
   correctRate: z.number(),
   submissionItems: z.array(
@@ -136,11 +180,21 @@ export const submissionStatisticsUserSchema = z.object({
 export const submissionStatisticsSchema = z.object({
   submissionCount: z.number().int(),
   acceptedCount: z.number().int(),
+  /**
+   * 还没判完的条数（PENDING / JUDGING）。`submissionCount` 把它算在内，
+   * `correctRate` 的分母不算 —— 全班同时交卷的那几秒，分母涨了分子没涨，
+   * 正确率会凭空掉一截。下发它是为了让教师看得出「那几条还在判」。
+   */
+  judgingCount: z.number().int(),
   correctRate: z.number(),
+  // 花名册人数（未禁用的普通用户）。**只有这一个分母下发**：完成度由前端算，
+  // 因为「请假隐藏」会把请假的人从分母里减掉，那是后端不知道的浏览器本地状态。
   personCount: z.number().int(),
-  personRate: z.number(),
   data: z.array(submissionStatisticsUserSchema),
+  /** 一条都没交的（花名册里的人减去有提交的人） */
   dataUnaccepted: z.array(unacceptedStudentSchema),
+  /** 交了但一次没对的。和 dataUnaccepted 一样只在传了用户名（有花名册）时才有内容 */
+  dataAttempted: z.array(attemptedStudentSchema),
 })
 
 export const formatCodeRequestSchema = z.object({
@@ -161,6 +215,7 @@ export type SubmissionStatisticsUser = z.infer<
   typeof submissionStatisticsUserSchema
 >
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
+export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>
 
 export type SubmissionListItem = z.infer<typeof submissionListItemSchema>
 export type SubmissionList = z.infer<typeof submissionListSchema>
