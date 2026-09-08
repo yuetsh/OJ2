@@ -209,6 +209,8 @@ export const adminUserSchema = z.object({
   createTime: z.string().nullable(),
   lastLogin: z.string().nullable(),
   isDisabled: z.boolean(),
+  // 在线与否不在库里，是从 Redis 的活动时间戳算出来的（api 的 auth/presence.ts）
+  isOnline: z.boolean(),
   // 明文密码。是有意保留的运营需求：老师要能查学生的密码。
   // 只在超管专属的这一个接口下发，别往任何其它地方复制。
   rawPassword: z.string().nullable(),

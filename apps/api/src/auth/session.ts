@@ -14,6 +14,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { publishSessionRevoked, type SessionRevokedReason } from "../events"
+import { clearOnline, markOnline } from "./presence"
 import { redis } from "../redis"
 
 const SESSION_PREFIX = "session:"
@@ -74,12 +75,13 @@ export async function createSession(
   }
   // 三条写进一个 pipeline：一个班四十号人同时登录时，三趟往返和一趟的差别
   // 全压在登录这一下上
-  await redis
+  const pipeline = redis
     .pipeline()
     .set(sessionKey(token), JSON.stringify(value), "EX", config.sessionTtlSeconds)
     .sadd(userSessionsKey(userId), token)
     .expire(userSessionsKey(userId), config.sessionTtlSeconds)
-    .exec()
+  markOnline(pipeline, userId)
+  await pipeline.exec()
   setCookie(c, config.sessionCookie, token, {
     httpOnly: true,
     sameSite: "Lax",
@@ -96,7 +98,10 @@ export async function destroySession(c: Context) {
     // 先读出 userId 再删，否则反向索引里会留下一个永远清不掉的成员
     const userId = await sessionUserId(token)
     await redis.del(sessionKey(token))
-    if (userId !== null) await redis.srem(userSessionsKey(userId), token)
+    if (userId !== null) {
+      await redis.srem(userSessionsKey(userId), token)
+      await clearOnline(userId)
+    }
   }
   deleteCookie(c, config.sessionCookie, { path: "/" })
   return token ?? null
@@ -128,6 +133,7 @@ export async function revokeUserSessions(
   const tokens = await redis.smembers(userSessionsKey(userId))
   if (tokens.length) await redis.del(...tokens.map(sessionKey))
   await redis.del(userSessionsKey(userId))
+  await clearOnline(userId)
   await publishSessionRevoked({ userId }, reason)
   return tokens.length
 }
@@ -196,11 +202,13 @@ async function getUserByToken(token: string | undefined): Promise<SessionResult>
   // 反向索引跟着会话一起续期，否则活跃用户的索引会先于会话到期，
   // 之后再吊销就找不到这张会话了。两条走一次 pipeline —— 这是全后端最热的 Redis
   // 路径，每个带鉴权的请求都要走一趟，形状和 touchSession 里那对保持一致
-  await redis
+  const renew = redis
     .pipeline()
     .expire(sessionKey(token), config.sessionTtlSeconds)
     .expire(userSessionsKey(session.userId), config.sessionTtlSeconds)
-    .exec()
+  // 在线状态就是搭在这条 pipeline 上记的，见 presence.ts
+  markOnline(renew, session.userId)
+  await renew.exec()
   // 唯一的收窄点。库里是 text 列，认不出来的值降成最低权限，见 toAdminType 的注释。
   return {
     user: {
@@ -250,11 +258,13 @@ export function readRequestSessionToken(request: Request) {
  */
 export async function touchSession(token: string, userId: number) {
   if (!token) return false
-  const results = await redis
+  const pipeline = redis
     .pipeline()
     .expire(sessionKey(token), config.sessionTtlSeconds)
     .expire(userSessionsKey(userId), config.sessionTtlSeconds)
-    .exec()
+  // 只挂着 WebSocket 不发请求的人，在线状态全靠这里（sweepSessions 每 60 秒一轮）
+  markOnline(pipeline, userId)
+  const results = await pipeline.exec()
   // 索引那条的返回值不看：存量会话（反向索引上线之前签发的）本来就没有索引键，
   // 续不到很正常，不能因此判定会话已死
   return results?.[0]?.[1] === 1

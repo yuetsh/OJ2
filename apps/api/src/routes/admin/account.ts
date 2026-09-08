@@ -18,6 +18,7 @@ import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-
 import { Hono } from "hono"
 
 import { hashPassword } from "../../auth/password"
+import { isUserOnline, onlineUserIds } from "../../auth/presence"
 import { revokeUserSessions } from "../../auth/session"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
@@ -64,7 +65,7 @@ function normalizePermission(adminType: AdminType, requested: ProblemPermission)
 function serialize(row: {
   user: typeof schema.user.$inferSelect
   realName: string | null
-}) {
+}, isOnline: boolean) {
   return adminUserSchema.parse({
     id: row.user.id,
     username: row.user.username,
@@ -75,6 +76,7 @@ function serialize(row: {
     createTime: row.user.createTime,
     lastLogin: row.user.lastLogin,
     isDisabled: row.user.isDisabled,
+    isOnline,
     rawPassword: row.user.rawPassword,
     className: row.user.className,
   })
@@ -153,10 +155,24 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
     )!)
   }
   const where = filters.length ? and(...filters) : undefined
+  // 在线状态每行都要下发（列表里显示），所以不管怎么排都先取一次
+  const online = await onlineUserIds()
+  const orderBy = c.req.query("orderBy")
   // 「最近登录」排序要把从未登录的排在最后，否则一堆 null 顶在最前面，这个排序就没用了
-  const order = c.req.query("orderBy") === "-lastLogin"
-    ? [sql`${schema.user.lastLogin} desc nulls last`]
-    : [desc(schema.user.createTime)]
+  //
+  // 「在线优先」没有对应的库表列 —— 在线只存在于 Redis，所以把在线的 id 捞出来
+  // 在 SQL 里分两档；档内仍按最近登录排，这样一屏离线用户之间还是有意义的顺序。
+  // 没人在线时那个 case 恒等于 1，直接省掉（inArray 拿空数组也不合法）。
+  const order = orderBy === "-online"
+    ? [
+        ...(online.size
+          ? [sql`case when ${inArray(schema.user.id, [...online])} then 0 else 1 end`]
+          : []),
+        sql`${schema.user.lastLogin} desc nulls last`,
+      ]
+    : orderBy === "-lastLogin"
+      ? [sql`${schema.user.lastLogin} desc nulls last`]
+      : [desc(schema.user.createTime)]
 
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.user)
@@ -166,7 +182,7 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
       .orderBy(...order, asc(schema.user.id)).limit(limit).offset(offset),
   ])
   return success(c, adminUserListSchema.parse({
-    results: rows.map(serialize),
+    results: rows.map((row) => serialize(row, online.has(row.user.id))),
     total: totalRows[0]?.value ?? 0,
   }))
 })
@@ -174,7 +190,7 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
 adminAccountRoutes.get("/users/:id", requireSuperAdmin, async (c) => {
   const [row] = await selectUser(queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!row) return failure(c, 404, "user-not-found", "User does not exist")
-  return success(c, serialize(row))
+  return success(c, serialize(row, await isUserOnline(row.user.id)))
 })
 
 adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
@@ -239,7 +255,7 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
   }
 
   const [row] = await selectUser(id)
-  return success(c, serialize(row!))
+  return success(c, serialize(row!, await isUserOnline(id)))
 })
 
 adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DataTableRowKey, SelectOption } from "naive-ui"
+import { DataTableRowKey, NFlex, NTag, SelectOption } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
@@ -47,6 +47,7 @@ const adminOptions = [
 const sortOptions = [
   { label: "默认排序", value: "" },
   { label: "最近登录", value: "-last_login" },
+  { label: "在线优先", value: "-online" },
 ]
 const [create, toggleCreate] = useToggle(false)
 const password = ref("")
@@ -87,11 +88,18 @@ const columns: DataTableColumn<User>[] = [
   {
     title: "上次登录",
     key: "last_login",
-    width: 200,
+    width: 240,
+    // 在线是 5 分钟内有过活动（后端 auth/presence.ts），不是「有会话」——
+    // 会话能留 7 天。上次登录时间照旧显示，在线的人前面多一个标记
     render: (row) =>
-      row.lastLogin
-        ? parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss")
-        : "从未登录",
+      h(NFlex, { align: "center", size: "small" }, () => [
+        row.isOnline
+          ? h(NTag, { type: "success", size: "small" }, () => "在线")
+          : null,
+        row.lastLogin
+          ? parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss")
+          : "从未登录",
+      ]),
   },
   {
     title: "真名",
@@ -188,6 +196,7 @@ function createNewUser() {
     createTime: null,
     lastLogin: null,
     isDisabled: false,
+    isOnline: false,
     rawPassword: null,
     className: null,
     password: "",

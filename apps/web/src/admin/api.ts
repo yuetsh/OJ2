@@ -150,7 +150,8 @@ export function getUserList(
   orderBy = "",
 ) {
   return api.get<AdminUserList>("admin/users", {
-    // 旧接口的 order_by 只有 "-last_login" 一个取值
+    // "-last_login" 是旧接口传下来的取值（路由 query 里可能还存着），改叫 "-lastLogin"；
+    // "-online" 是新增的，原样透传
     params: {
       offset,
       limit,
