@@ -61,6 +61,26 @@ redis.call('EXPIRE', key, ttl)
 return { allowed, tostring(wait) }
 `
 
+/**
+ * 注册成自定义命令而不是每次 `redis.eval`：eval 会把上面 900 多字节的脚本全文
+ * 一起发过去，而限流点在提交判题、AI 分析、流程图评分上，判题高峰期每条提交都要发
+ * 一遍。ioredis 的 defineCommand 走 EVALSHA，只发 40 字节的 sha1，遇到 NOSCRIPT
+ * 自动回退成一次 EVAL 把脚本重新灌进去 —— Redis 重启或 SCRIPT FLUSH 之后不用管。
+ */
+redis.defineCommand("throttleConsume", { numberOfKeys: 1, lua: CONSUME_SCRIPT })
+
+type ThrottleRedis = typeof redis & {
+  throttleConsume(
+    key: string,
+    capacity: string,
+    fillRate: string,
+    defaultCapacity: string,
+    now: string,
+    num: string,
+    ttl: string,
+  ): Promise<[number, string]>
+}
+
 function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback
   const raw = value as Record<string, unknown>
@@ -121,9 +141,7 @@ export async function consumeToken(
   // 每次调用都会刷新 TTL，因此只有长时间无提交才会过期，届时桶早已回满，
   // 重新按 default_capacity 初始化只会更严，不会放水。
   const ttl = Math.ceil(bucket.capacity / bucket.fill_rate) + 60
-  const result = (await redis.eval(
-    CONSUME_SCRIPT,
-    1,
+  const result = await (redis as ThrottleRedis).throttleConsume(
     `throttling:${scope}:${identity}`,
     String(bucket.capacity),
     String(bucket.fill_rate),
@@ -131,7 +149,7 @@ export async function consumeToken(
     String(Date.now() / 1000),
     String(num),
     String(ttl),
-  )) as [number, string]
+  )
   if (Number(result[0]) === 1) return { allowed: true }
   return { allowed: false, wait: Number(result[1]) || 0 }
 }

@@ -438,9 +438,8 @@ export async function bridgeSubmissionEvents(
       console.error("Failed to bridge submission event", error)
     })
   })
-  subscriber.on("error", (error) => {
-    console.error("Submission event subscriber error", error)
-  })
+  // 连接层的 error 已经由 createSubscriberRedis 里的 withErrorLogging 打了
+  // （带连接名），这里再挂一个只会把同一条错误打两遍
   await subscriber.subscribe(
     submissionUpdateChannel,
     userEventChannel,

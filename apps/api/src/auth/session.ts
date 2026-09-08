@@ -72,14 +72,14 @@ export async function createSession(
     previousLogin,
     contestPasswords: {},
   }
-  await redis.set(
-    sessionKey(token),
-    JSON.stringify(value),
-    "EX",
-    config.sessionTtlSeconds,
-  )
-  await redis.sadd(userSessionsKey(userId), token)
-  await redis.expire(userSessionsKey(userId), config.sessionTtlSeconds)
+  // 三条写进一个 pipeline：一个班四十号人同时登录时，三趟往返和一趟的差别
+  // 全压在登录这一下上
+  await redis
+    .pipeline()
+    .set(sessionKey(token), JSON.stringify(value), "EX", config.sessionTtlSeconds)
+    .sadd(userSessionsKey(userId), token)
+    .expire(userSessionsKey(userId), config.sessionTtlSeconds)
+    .exec()
   setCookie(c, config.sessionCookie, token, {
     httpOnly: true,
     sameSite: "Lax",
@@ -193,10 +193,14 @@ async function getUserByToken(token: string | undefined): Promise<SessionResult>
     return { user: null, reason: "disabled" }
   }
 
-  await redis.expire(sessionKey(token), config.sessionTtlSeconds)
   // 反向索引跟着会话一起续期，否则活跃用户的索引会先于会话到期，
-  // 之后再吊销就找不到这张会话了
-  await redis.expire(userSessionsKey(session.userId), config.sessionTtlSeconds)
+  // 之后再吊销就找不到这张会话了。两条走一次 pipeline —— 这是全后端最热的 Redis
+  // 路径，每个带鉴权的请求都要走一趟，形状和 touchSession 里那对保持一致
+  await redis
+    .pipeline()
+    .expire(sessionKey(token), config.sessionTtlSeconds)
+    .expire(userSessionsKey(session.userId), config.sessionTtlSeconds)
+    .exec()
   // 唯一的收窄点。库里是 text 列，认不出来的值降成最低权限，见 toAdminType 的注释。
   return {
     user: {
