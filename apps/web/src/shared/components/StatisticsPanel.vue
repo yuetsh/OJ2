@@ -192,7 +192,7 @@
 <script setup lang="ts">
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
-import { getSubmissionStatistics } from "oj/api"
+import { getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
 import { DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import { useConfigStore } from "../store/config"
@@ -202,6 +202,7 @@ import { NButton, NFlex, NText, type DataTableRowKey } from "naive-ui"
 import { JUDGE_STATUS } from "utils/constants"
 import type {
   AttemptedStudent,
+  SubmissionStatisticsItems,
   SubmissionStatisticsUser,
   UnacceptedStudent,
 } from "@oj2/contract"
@@ -232,24 +233,35 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
   {
     type: "expand",
     renderExpand: (row) => {
-      return h(NFlex, { size: "small", wrap: true }, () =>
-        row.submissionItems.map((item) =>
-          h(
-            NButton,
-            {
-              size: "small",
-              tertiary: true,
-              type: JUDGE_STATUS[item.result]?.type ?? "default",
-              style: "width: 120px",
-              onClick: (event: MouseEvent) => {
-                event.stopPropagation()
-                openSubmission(item.id)
+      const loaded = items[row.username]
+      if (!loaded) return h(NText, { depth: 3 }, () => "加载中…")
+      return h(NFlex, { vertical: true, size: "small" }, () => [
+        h(NFlex, { size: "small", wrap: true }, () =>
+          loaded.items.map((item) =>
+            h(
+              NButton,
+              {
+                size: "small",
+                tertiary: true,
+                type: JUDGE_STATUS[item.result]?.type ?? "default",
+                style: "width: 120px",
+                onClick: (event: MouseEvent) => {
+                  event.stopPropagation()
+                  openSubmission(item.id)
+                },
               },
-            },
-            () => item.id.toString().slice(0, 12),
+              () => item.id.toString().slice(0, 12),
+            ),
           ),
         ),
-      )
+        loaded.truncated
+          ? h(
+              NText,
+              { depth: 3 },
+              () => `只显示最近 ${loaded.items.length} 条，上面「提交数」才是总数`,
+            )
+          : null,
+      ])
     },
   },
   { title: "用户", key: "username" },
@@ -324,6 +336,41 @@ const listUnaccepted = ref<UnacceptedStudent[]>([])
 // 交了但一次没对的。和上面那一栏合起来才是「未完成」的全部
 const listAttempted = ref<AttemptedStudent[]>([])
 const expandedRowKeys = ref<DataTableRowKey[]>([])
+
+/**
+ * 展开行的明细，按人缓存。**每次重新统计都清空** —— 时间窗滚过之后旧明细就不对了；
+ * 清完如果还有展开着的行，顺手把那一行重拉一遍，让它跟着自动刷新一起活着。
+ */
+const items = reactive<Record<string, SubmissionStatisticsItems>>({})
+
+// 点一行会同时走 rowProps 的 onClick 和表格的 update:expanded-row-keys，
+// 两边都想拉一次；去重放在这里，调用方不用各自判
+const itemsLoading = new Set<string>()
+
+async function loadItems(username: string) {
+  if (items[username] || itemsLoading.has(username)) return
+  itemsLoading.add(username)
+  const current = Date.now()
+  const duration =
+    query.duration === "all"
+      ? { end: formatISO(current) }
+      : {
+          start: formatISO(sub(current, subOptions.value)),
+          end: formatISO(current),
+        }
+  try {
+    items[username] = await getSubmissionStatisticsItems(
+      duration,
+      username,
+      query.problem,
+    )
+  } catch {
+    // 拉不到就当空的：展开行显示不出东西，但不该把整个面板带崩
+    items[username] = { items: [], truncated: false }
+  } finally {
+    itemsLoading.delete(username)
+  }
+}
 
 /**
  * 「查出东西了吗」。**不能只看提交数** —— 一节课刚开始时一条提交都没有，但后端
@@ -624,6 +671,10 @@ async function fetchStatistics() {
   personCount.value = res.personCount
   // 查过的班级记下来，下次打开直接带上
   if (query.username) storage.set(STORAGE_KEY.STATISTICS_CLASS, query.username)
+
+  const expanded = expandedRowKeys.value[0]
+  for (const key of Object.keys(items)) delete items[key]
+  if (typeof expanded === "string") loadItems(expanded)
 }
 
 function rowKey(row: SubmissionStatisticsUser): DataTableRowKey {
@@ -632,6 +683,8 @@ function rowKey(row: SubmissionStatisticsUser): DataTableRowKey {
 
 function updateExpandedRowKeys(keys: DataTableRowKey[]) {
   expandedRowKeys.value = keys.slice(-1)
+  const opened = expandedRowKeys.value[0]
+  if (typeof opened === "string") loadItems(opened)
 }
 
 function rowProps(row: SubmissionStatisticsUser) {
@@ -641,6 +694,7 @@ function rowProps(row: SubmissionStatisticsUser) {
       const key = rowKey(row)
       const isExpanded = expandedRowKeys.value.includes(key)
       expandedRowKeys.value = isExpanded ? [] : [key]
+      if (!isExpanded) loadItems(row.username)
     },
   }
 }

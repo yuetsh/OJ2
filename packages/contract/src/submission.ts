@@ -172,9 +172,18 @@ export const submissionStatisticsUserSchema = z.object({
   judgingCount: z.number().int(),
   // 百分比数值，不带 %。旧后端返回 "85.5%" 字符串，展示格式化交给前端。
   correctRate: z.number(),
-  submissionItems: z.array(
-    z.object({ id: z.string(), result: judgeStatusSchema }),
-  ),
+})
+
+/**
+ * 展开行的明细，**按需拉**（GET /submissions/statistics/items）。
+ *
+ * 原来是随统计一起给每个人各带一份，可表格一次只展开一行 —— 生产快照上那是
+ * 4.9 万行没人看的数据。`truncated` 为真时前端要说明「只显示最近 N 条」，
+ * 免得老师以为这人就交了这么多。
+ */
+export const submissionStatisticsItemsSchema = z.object({
+  items: z.array(z.object({ id: z.string(), result: judgeStatusSchema })),
+  truncated: z.boolean(),
 })
 
 export const submissionStatisticsSchema = z.object({
@@ -213,6 +222,9 @@ export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
 export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
 export type SubmissionStatisticsUser = z.infer<
   typeof submissionStatisticsUserSchema
+>
+export type SubmissionStatisticsItems = z.infer<
+  typeof submissionStatisticsItemsSchema
 >
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
 export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>

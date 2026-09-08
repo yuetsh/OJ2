@@ -8,6 +8,7 @@ import {
   submissionDetailSchema,
   submissionListItemSchema,
   submissionListSchema,
+  submissionStatisticsItemsSchema,
   submissionStatisticsSchema,
 } from "@oj2/contract"
 import { and, count, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
@@ -238,46 +239,13 @@ async function findPublicProblemsByDisplayIds(displayIds: string[]) {
 }
 
 /**
- * 表格展开行要看的「这个人交了哪几次」。两道闸都是为了不让「全部时段 + 不填条件」
- * 把十几万条提交整个搬进响应体：
+ * 展开行一次只看一个人（表格的 updateExpandedRowKeys 只留最后一个 key），所以明细
+ * **按需拉**，不再随统计一起下发。
  *
- * - **只取有 AC 的人**。明细只挂在 `data` 里，而 `data` 本来就只留有 AC 的人，
- *   原来给「一次没对的人」也捞一份明细，捞完直接扔掉。
- * - **每人只留最近 50 条**。展开行是一排 120px 的按钮，几十个就已经翻不动了。
- *   表格「提交数」那一列走的是 perUser 的 count，仍然是真实总数，不受这里截断影响。
+ * 原来是随 data 一起给所有人各带一份：生产快照实测，「全部时段 + 不填条件」要搬
+ * 49108 行（最早那版不截断是 105631 行），而其中真正被人看到的最多一个人的那几十条。
  */
-const STATISTICS_ITEMS_PER_USER = 50
-
-async function submissionItemsByUser(where: SQL | undefined, usernames: string[]) {
-  const byUser = new Map<string, { id: string; result: number }[]>()
-  if (!usernames.length) return byUser
-
-  // 走窗口函数而不是「查全量再在 JS 里截断」：截断要发生在数据库那边才省得下来。
-  const rows = await db.execute<{ username: string; id: string; result: number }>(sql`
-    select username, id, result from (
-      select
-        ${schema.submission.username} as username,
-        ${schema.submission.id} as id,
-        ${schema.submission.result} as result,
-        row_number() over (
-          partition by ${schema.submission.username}
-          order by ${schema.submission.createTime} desc
-        ) as rn
-      from ${schema.submission}
-      where ${and(where, inArray(schema.submission.username, usernames))}
-    ) t
-    where rn <= ${STATISTICS_ITEMS_PER_USER}
-    -- rn 就是「这个人的第几新」，外层不排的话展开行里的按钮是乱序的
-    order by username, rn
-  `)
-
-  for (const row of rows) {
-    const bucket = byUser.get(row.username)
-    if (bucket) bucket.push({ id: row.id, result: row.result })
-    else byUser.set(row.username, [{ id: row.id, result: row.result }])
-  }
-  return byUser
-}
+const STATISTICS_ITEMS_LIMIT = 200
 
 /** 错误摘要截断长度。编译错误能刷几十行，弹层里放不下，也没必要 */
 const FAILURE_MESSAGE_LIMIT = 400
@@ -381,9 +349,21 @@ async function matchedStudents(username: string) {
     )
 }
 
-submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
+/**
+ * 两个统计接口共用的范围：时间窗 + 题号。**用户名不在里面** —— 统计那边是
+ * ilike 模糊匹配（填 ks251 要匹配整个班），明细那边必须精确到人，口径不同。
+ */
+type StatisticsScope =
+  | { ok: true; filters: SQL[]; problemCount: number }
+  | { ok: false; status: 400 | 404; code: string; message: string }
+
+async function statisticsScope(c: {
+  req: { query(name: string): string | undefined }
+}): Promise<StatisticsScope> {
   const range = statisticsRange(c)
-  if (!range) return failure(c, 400, "invalid-request", "end is required")
+  if (!range) {
+    return { ok: false, status: 400, code: "invalid-request", message: "end is required" }
+  }
 
   const filters = [
     isNull(schema.submission.contestId),
@@ -393,15 +373,33 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
 
   const displayIds = parseDisplayIds(c.req.query("problemId") ?? "")
   if (displayIds.length > STATISTICS_MAX_PROBLEMS) {
-    return failure(c, 400, "invalid-request", `At most ${STATISTICS_MAX_PROBLEMS} problems`)
+    return {
+      ok: false,
+      status: 400,
+      code: "invalid-request",
+      message: `At most ${STATISTICS_MAX_PROBLEMS} problems`,
+    }
   }
   if (displayIds.length) {
     const { ids, missing } = await findPublicProblemsByDisplayIds(displayIds)
     if (missing) {
-      return failure(c, 404, "problem-not-found", `Problem ${missing} does not exist`)
+      return {
+        ok: false,
+        status: 404,
+        code: "problem-not-found",
+        message: `Problem ${missing} does not exist`,
+      }
     }
     filters.push(inArray(schema.submission.problemId, ids))
   }
+
+  return { ok: true, filters, problemCount: displayIds.length }
+}
+
+submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
+  const scope = await statisticsScope(c)
+  if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
+  const filters = scope.filters
 
   const username = c.req.query("username")?.trim()
   if (username) filters.push(ilike(schema.submission.username, `%${username}%`))
@@ -456,18 +454,17 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
    * 只填一道题时 `solvedCount >= 1` 和原来的 `acceptedCount > 0` 完全等价；
    * 不填题号时无所谓「全部」，退回「至少做出一道」。
    */
-  const requiredSolved = displayIds.length
+  const requiredSolved = scope.problemCount
   const isDone = (row: { solvedCount: number; acceptedCount: number }) =>
     requiredSolved > 0 ? row.solvedCount >= requiredSolved : row.acceptedCount > 0
 
   // 表格列的是做完了的人。没做完的（一条没交 / 交了没全对）在「未完成」那一栏
   const acceptedUsers = perUser.filter(isDone)
-  // 这两个都要等 acceptedUsers 定下来才能查，所以进不了上面那个 Promise.all
-  const acceptedNames = acceptedUsers.map((row) => row.username)
-  const [itemsByUser, astOnlyByUserMap] = await Promise.all([
-    submissionItemsByUser(where, acceptedNames),
-    astOnlyByUser(where, acceptedNames),
-  ])
+  // 要等 acceptedUsers 定下来才能查，所以进不了上面那个 Promise.all
+  const astOnlyByUserMap = await astOnlyByUser(
+    where,
+    acceptedUsers.map((row) => row.username),
+  )
 
   const submittedUsernames = new Set(perUser.map((row) => row.username))
   const classNames = new Map<string, string | null>()
@@ -488,7 +485,6 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
     astOnlyCount: astOnlyByUserMap.get(row.username) ?? 0,
     judgingCount: row.judgingCount,
     correctRate: judgedRate(row.acceptedCount, row.submissionCount - row.judgingCount),
-    submissionItems: itemsByUser.get(row.username) ?? [],
   }))
 
   const dataUnaccepted = rosterRows
@@ -534,6 +530,38 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       data,
       dataUnaccepted,
       dataAttempted,
+    }),
+  )
+})
+
+/**
+ * 统计面板展开一行时拉这个人的提交明细。
+ *
+ * 用户名这里是**精确匹配**，不是统计接口那种 ilike —— 那边填 `ks251` 要圈出整个班，
+ * 这边是「点开的这一行是谁」。时间窗和题号沿用同一个 scope，不然展开行看到的
+ * 会是另一个范围的数据。
+ */
+submissionRoutes.get("/submissions/statistics/items", requireTeacher, async (c) => {
+  const username = c.req.query("username")?.trim()
+  if (!username) return failure(c, 400, "invalid-request", "username is required")
+
+  const scope = await statisticsScope(c)
+  if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
+
+  // 多取一条，好知道是不是被截断了
+  const rows = await db
+    .select({ id: schema.submission.id, result: schema.submission.result })
+    .from(schema.submission)
+    .where(and(...scope.filters, eq(schema.submission.username, username)))
+    .orderBy(desc(schema.submission.createTime), desc(schema.submission.id))
+    .limit(STATISTICS_ITEMS_LIMIT + 1)
+
+  const truncated = rows.length > STATISTICS_ITEMS_LIMIT
+  return success(
+    c,
+    submissionStatisticsItemsSchema.parse({
+      items: rows.slice(0, STATISTICS_ITEMS_LIMIT),
+      truncated,
     }),
   )
 })

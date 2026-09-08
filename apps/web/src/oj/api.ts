@@ -37,6 +37,7 @@ import {
   submissionDetailSchema,
   type FlowchartStatistics,
   type SubmissionStatistics,
+  type SubmissionStatisticsItems,
 } from "@oj2/contract"
 import api from "utils/api"
 import { filterResult } from "oj/transforms"
@@ -157,6 +158,20 @@ export function adminRejudge(id: string) {
   return api.post<{ ok: boolean }>(
     `submissions/${encodeURIComponent(id)}/rejudge`,
   )
+}
+
+/**
+ * 统计面板展开一行时拉这个人的明细。username 这里要**精确**到人，
+ * 和上面那个按班级模糊匹配的不是一回事。
+ */
+export function getSubmissionStatisticsItems(
+  duration: { start?: string; end: string },
+  username: string,
+  problemID?: string,
+) {
+  return api.get<SubmissionStatisticsItems>("submissions/statistics/items", {
+    params: { ...duration, problemId: problemID, username },
+  })
 }
 
 export function getSubmissionStatistics(
