@@ -120,20 +120,36 @@ case "$OUT_DIR/" in
 esac
 ok "备份目录 $OUT_DIR"
 
+# 拿回来的数要进 [ ] 比大小，不是数字就当「读不出来」，不能让它把整个备份带崩
+digits_or_zero() {
+  case "$1" in
+    '' | *[!0-9]*) printf '0\n' ;;
+    *)             printf '%s\n' "$1" ;;
+  esac
+}
+
 # datallowconn 是为了跳过 template0：它不让连，pg_database_size 也算不了
 db_bytes=$(docker exec "$CONTAINER" psql -U "$DB_USER" -d postgres -tAc \
   "select coalesce(sum(pg_database_size(datname)), 0)::bigint from pg_database where datallowconn" \
   2>/dev/null | tr -d '[:space:]' || true)
-[ -n "${db_bytes:-}" ] || db_bytes=0
+db_bytes=$(digits_or_zero "${db_bytes:-}")
 
-free_bytes=$(df -Pk "$OUT_DIR" | awk 'NR == 2 { print $4 * 1024 }')
-ok "库 $(human "$db_bytes")，磁盘剩 $(human "$free_bytes")"
-
-if [ "$db_bytes" -gt 0 ] && [ "$free_bytes" -lt "$db_bytes" ]; then
-  [ "$FORCE" -eq 1 ] \
-    || die "磁盘余量比库还小。压缩后通常小一个数量级，确认够用就加 --force
+# df 的第 4 列是 KB。**原样取字段，不让 awk 参与算术** —— Debian 的 /usr/bin/awk 是
+# mawk，超过 2^31 的数会按 OFMT（%.6g）打成 `4.29685e+10`，丢回 [ ] 就是
+# 「需要整数表达式」，脚本当场退出。换算放到 bash 的 64 位算术里做，谁的 awk 都一样。
+free_kb=$(digits_or_zero "$(df -Pk "$OUT_DIR" | awk 'NR == 2 { print $4 }')")
+free_bytes=$(( free_kb * 1024 ))
+# 余量检查是**提醒**，不是前置条件：读不出来就跳过，不能因为读不到 df 就不备份
+if [ "$free_bytes" -eq 0 ]; then
+  warn "库 $(human "$db_bytes")，磁盘余量读不出来 —— 跳过余量检查"
+else
+  ok "库 $(human "$db_bytes")，磁盘剩 $(human "$free_bytes")"
+  if [ "$db_bytes" -gt 0 ] && [ "$free_bytes" -lt "$db_bytes" ]; then
+    [ "$FORCE" -eq 1 ] \
+      || die "磁盘余量比库还小。压缩后通常小一个数量级，确认够用就加 --force
    —— 备份把生产磁盘写满，比没有备份更糟"
-  warn "磁盘余量不足，--force 已指定，继续"
+    warn "磁盘余量不足，--force 已指定，继续"
+  fi
 fi
 
 # ---------------------------------------------------------------- 导出
