@@ -51,8 +51,8 @@ const sortOptions = [
 ]
 const [create, toggleCreate] = useToggle(false)
 const password = ref("")
-// 已经点开的管理员密码，按 user id 记。listUsers() 里清空，所以翻页/搜索/换筛选之后
-// 一律回到打码状态 —— 不做定时自动隐藏，也不记进 localStorage。
+// 已经点开的管理员密码，按 user id 记。同一个按钮再点一下收回去；listUsers() 里清空，
+// 所以翻页/搜索/换筛选之后也一律回到打码状态 —— 不做定时自动隐藏，也不记进 localStorage。
 const revealedPasswords = ref(new Set<number>())
 const userIDs = ref<DataTableRowKey[]>([])
 
@@ -68,14 +68,17 @@ const columns: DataTableColumn<User>[] = [
     render: (row) => h(Name, { user: row }),
   },
   {
+    // 显示出来的密码后面还跟着「隐藏」按钮，150 挤得下点点、挤不下密码
     title: "密码",
     key: "raw_password",
-    width: 150,
+    width: 180,
     render: (row) =>
       h(Password, {
         user: row,
         revealed: revealedPasswords.value.has(row.id),
-        onReveal: (id: number) => revealedPasswords.value.add(id),
+        onToggle: (id: number) => {
+          if (!revealedPasswords.value.delete(id)) revealedPasswords.value.add(id)
+        },
       }),
   },
   {
