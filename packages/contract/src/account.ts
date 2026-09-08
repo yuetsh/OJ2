@@ -27,6 +27,12 @@ export const rankProfileSchema = z.object({
   acceptedNumber: z.number().int(),
   submissionNumber: z.number().int(),
   mood: z.string().nullable(),
+  /**
+   * 在线与否。**null 表示「这个调用方不该知道」** —— 学生之间互相盯着谁在刷题
+   * 不合适，所以只对老师及以上下发 true/false，其余一律 null。
+   * 三态是有意的：写成 boolean 的话，学生看到的 false 和真的离线分不开。
+   */
+  isOnline: z.boolean().nullable().default(null),
 })
 
 /**

@@ -41,6 +41,15 @@ export async function onlineUserIds() {
   return new Set(members.map(Number).filter(Number.isInteger))
 }
 
+/**
+ * 在线人数。前台榜单页要的就是这一个数 —— 不必像 onlineUserIds 那样把成员全拉回来，
+ * ZCOUNT 让 Redis 自己数（O(log N)）。这里不顺手清过期成员：清理是写操作，
+ * 而这个端点是匿名可访问的。
+ */
+export async function onlineCount() {
+  return redis.zcount(PRESENCE_KEY, Date.now() - ONLINE_WINDOW_MS, "+inf")
+}
+
 /** 登出、被禁用、被踢下线：立刻从在线名单里摘掉，别等窗口自然过期 */
 export async function clearOnline(userId: number) {
   await redis.zrem(PRESENCE_KEY, String(userId))

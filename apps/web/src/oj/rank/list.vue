@@ -11,6 +11,7 @@ import { NButton, NFlex } from "naive-ui"
 import {
   getActivityRank,
   getClassRank,
+  getOnlineCount,
   getRank,
   getUserClassRank,
   getClassPK,
@@ -53,6 +54,8 @@ const query = reactive({
 })
 const message = useMessage()
 const rankChart = ref<Rank[]>([])
+/** 全站在线人数。只是个聚合数字；「谁在线」是每行的 isOnline，服务端只对老师下发 */
+const onlineCount = ref(0)
 const activityChart = ref<Rank[]>([])
 const duration = ref("months:1")
 const classData = ref<ClassRank[]>([])
@@ -182,6 +185,14 @@ const columns: DataTableColumn<Rank>[] = [
     width: 240,
     render: (row) =>
       h("div", { style: "display:flex;align-items:center;gap:6px" }, [
+        // isOnline 是三态：null 表示服务端没给（学生视角），只有 true 才点亮
+        row.isOnline
+          ? h("span", {
+              title: "在线（5 分钟内有活动）",
+              style:
+                "width:8px;height:8px;border-radius:50%;background:#18a058;flex:none",
+            })
+          : null,
         h(
           NButton,
           {
@@ -251,6 +262,11 @@ watch(
 )
 watch(duration, listActivity)
 
+async function listOnline() {
+  const res = await getOnlineCount()
+  onlineCount.value = res.count
+}
+
 async function listActivity() {
   const current = Date.now()
   const start = formatISO(sub(current, subOptions.value))
@@ -262,6 +278,7 @@ async function listActivity() {
     acceptedNumber: d.count,
     submissionNumber: 0,
     mood: null,
+    isOnline: null,
   }))
 }
 
@@ -286,6 +303,7 @@ onMounted(() => {
   // 再单发一次一模一样的 /rankings/users 只会让这张图排在日活后面出来。
   // 图只在挂载时定一次，翻页/改每页条数不该动它。
   init().then((results) => (rankChart.value = results.slice(0, 10)))
+  listOnline()
   listActivity()
   listClassRank()
   listMyClassRank()
@@ -523,6 +541,11 @@ watch(
     </n-grid>
     <n-card>
       <template #header>全服 Top100</template>
+      <template #header-extra>
+        <n-tag v-if="onlineCount > 0" round :bordered="false" type="success">
+          当前在线 {{ onlineCount }} 人
+        </n-tag>
+      </template>
       <n-data-table
         :data="data"
         :columns="columns"

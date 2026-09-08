@@ -396,7 +396,7 @@ export type ContestRank = Omit<
   submissionInfo: { [key: string]: SubmissionInfo }
 }
 
-export type { WebsiteConfig } from "@oj2/contract"
+export type { WebsiteConfig, OnlineCount } from "@oj2/contract"
 
 export type {
   JudgeServer as Server,

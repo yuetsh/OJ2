@@ -33,6 +33,7 @@ import {
 import { Hono } from "hono"
 
 import { hashPassword } from "../auth/password"
+import { onlineUserIds } from "../auth/presence"
 import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
@@ -40,7 +41,7 @@ import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { getUserProfileById } from "../services/profile"
-import { objectValue, queryInteger, sampleUser } from "./helpers"
+import { isTeacherOrAbove, objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const accountRoutes = new Hono<AppEnv>()
 
@@ -184,7 +185,8 @@ accountRoutes.get("/rankings/users", optionalAuth, async (c) => {
   // 端点延迟从「四个来回相加」变成「最慢的那个」。越界页一条不剩，直接不发 SQL。
   const pageLimit = Math.max(0, Math.min(limit, LEADERBOARD_SIZE - offset))
 
-  const [totalRow, rows, me] = await Promise.all([
+  // 谁在线只给老师看，学生那边整列都是 null（见 rankProfileSchema.isOnline）
+  const [totalRow, rows, me, online] = await Promise.all([
     db.select({ value: count() }).from(schema.userProfile)
       .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
       .where(leaderboardWhere).then(([row]) => row),
@@ -194,10 +196,11 @@ accountRoutes.get("/rankings/users", optionalAuth, async (c) => {
       .where(leaderboardWhere).orderBy(...leaderboardOrder)
       .limit(pageLimit).offset(offset),
     myLeaderboardRank(c.get("user")?.id),
+    isTeacherOrAbove(c.get("user")) ? onlineUserIds() : null,
   ])
 
   return success(c, userRankSchema.parse({
-    results: rows.map(serializeRankRow),
+    results: rows.map((row) => serializeRankRow(row, online)),
     total: Math.min(totalRow?.value ?? 0, LEADERBOARD_SIZE),
     me,
   }))
@@ -206,13 +209,14 @@ accountRoutes.get("/rankings/users", optionalAuth, async (c) => {
 function serializeRankRow({ profile, user }: {
   profile: typeof schema.userProfile.$inferSelect
   user: typeof schema.user.$inferSelect
-}) {
+}, online: Set<number> | null = null) {
   return rankProfileSchema.parse({
     id: profile.id,
     user: sampleUser(user, profile.realName),
     acceptedNumber: profile.acceptedNumber,
     submissionNumber: profile.submissionNumber,
     mood: profile.mood,
+    isOnline: online ? online.has(user.id) : null,
   })
 }
 

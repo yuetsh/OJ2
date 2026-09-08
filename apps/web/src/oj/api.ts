@@ -54,6 +54,7 @@ import type {
   Submission,
   SubmissionListPayload,
   SubmitCodePayload,
+  OnlineCount,
   WebsiteConfig,
   Tutorial,
   TutorialProgress,
@@ -69,6 +70,11 @@ function detailProblem(value: unknown): Problem {
 
 export function getWebsiteConfig() {
   return api.get<WebsiteConfig>("site")
+}
+
+/** 当前在线人数。只有聚合数字，「谁在线」在榜单接口里、且只对老师下发 */
+export function getOnlineCount() {
+  return api.get<OnlineCount>("site/online")
 }
 
 export async function getProblemList(
