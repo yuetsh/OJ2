@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 
-import { and, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { Context, MiddlewareHandler } from "hono"
 
 import type { AppEnv } from "../auth/middleware"
@@ -48,10 +48,21 @@ export function checkContestPassword(candidate: string | null | undefined, expec
   return signature === expectedSignature && Date.now() < Number(expiresAt) * 1000
 }
 
-export async function findVisibleContest(id: number) {
+/**
+ * 取一场「这个人看得见」的比赛：公开（visible）的谁都取得到，隐藏的只有比赛管理员
+ * （出题人本人 / 超管）取得到，对其余人一律当作不存在。
+ *
+ * 原来这里一律卡 visible，于是老师赛后把比赛收起来之后，核查页的「查看代码」必然 404：
+ * 那个页面自己**故意不卡** visible（赛后核查恰恰发生在比赛收起来之后，见
+ * admin/contest.ts 的说明），它调的比赛提交列表却卡着，两边对不上。
+ *
+ * 放宽的只有出题人自己的视角，学生看隐藏比赛照旧是 404。
+ */
+export async function findAccessibleContest(user: AuthUser | null | undefined, id: number) {
   const [contest] = await db.select().from(schema.contest)
-    .where(and(eq(schema.contest.id, id), eq(schema.contest.visible, true))).limit(1)
-  return contest ?? null
+    .where(eq(schema.contest.id, id)).limit(1)
+  if (!contest) return null
+  return contest.visible || isContestAdmin(user, contest) ? contest : null
 }
 
 // 泛型而不是写死 Context<AppEnv>：requireContestAccess 传进来的是 Context<ContestEnv>，
@@ -93,7 +104,7 @@ export function requireContestAccess(
 ): MiddlewareHandler<ContestEnv> {
   return async (c, next) => {
     const id = Number(c.req.param(paramName))
-    const contest = Number.isInteger(id) && id > 0 ? await findVisibleContest(id) : null
+    const contest = Number.isInteger(id) && id > 0 ? await findAccessibleContest(c.get("user"), id) : null
     if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
     const access = await canAccessContest(c, contest, checkType)
     if (!access.ok) {

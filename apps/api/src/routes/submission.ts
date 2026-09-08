@@ -27,7 +27,7 @@ import { judgeQueue } from "../queue"
 import {
   canAccessContest,
   contestStatus,
-  findVisibleContest,
+  findAccessibleContest,
   isContestAdmin,
   requireContestAccess,
   type ContestEnv,
@@ -68,7 +68,7 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
   if (parsed.data.contestId) {
     // 这里用不了 requireContestAccess 中间件：比赛 id 来自请求体，
     // 中间件跑的时候 body 还没解析。全仓只有这一处仍是手工调用，改动时留意别漏掉鉴权。
-    const contest = await findVisibleContest(parsed.data.contestId)
+    const contest = await findAccessibleContest(c.get("user"), parsed.data.contestId)
     if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
     const access = await canAccessContest(c, contest, "problems")
     if (!access.ok) return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)

@@ -272,7 +272,16 @@ async function downloadExcel() {
 
 // 监听分页参数变化
 watch([() => query.page, () => query.limit], listRanks)
-watch(autoRefresh, (checked) => (checked ? resume() : pause()))
+
+// 自动刷新只在比赛进行中有意义（开关本身也只在这一档渲染），所以由「开关 + 比赛状态」
+// 一起驱动。原来只 watch(autoRefresh)：开关初值就是 true、进页面不产生变化，而
+// useIntervalFn 建的时候又传了 immediate: false，于是表从没启动过 —— 开关明明是开着的，
+// 排名却一直不刷新，得手动关一次再开。
+watchEffect(() => {
+  const running = contestStore.contestStatus === ContestStatus.underway
+  if (autoRefresh.value && running) resume()
+  else pause()
+})
 
 onMounted(() => {
   listRanks()

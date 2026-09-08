@@ -22,7 +22,7 @@ import {
   checkContestPassword,
   contestDetailsAllowed,
   contestStatus,
-  findVisibleContest,
+  findAccessibleContest,
   isContestAdmin,
   requireContestAccess,
   type ContestEnv,
@@ -91,8 +91,10 @@ contestRoutes.get("/contests", async (c) => {
   }))
 })
 
-contestRoutes.get("/contests/:id", async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
+// optionalAuth 是为了下面那句 findAccessibleContest 认得出「这是出题人自己」——
+// 隐藏的比赛只有他看得到详情，匿名访问照旧当作不存在
+contestRoutes.get("/contests/:id", optionalAuth, async (c) => {
+  const contest = await findAccessibleContest(c.get("user"), queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
   const byId = await creators([contest.createdById])
   return success(c, serializeContest(
@@ -103,7 +105,7 @@ contestRoutes.get("/contests/:id", async (c) => {
 })
 
 contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
+  const contest = await findAccessibleContest(c.get("user"), queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "Contest does not exist")
   const parsed = contestPasswordRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return failure(c, 400, "invalid-request", "Password is required")
@@ -115,11 +117,34 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
 })
 
 contestRoutes.get("/contests/:id/access", requireAuth, async (c) => {
-  const contest = await findVisibleContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
+  const contest = await findAccessibleContest(c.get("user"), queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "Contest does not exist")
   const access = await canAccessContest(c, contest, "details")
   return success(c, contestAccessSchema.parse({ access: access.ok }))
 })
+
+/**
+ * 当前用户在**比赛题**上的做题状态。判题回写记在 user_profile 的
+ * `acm_problems_status.contest_problems`（judge/run.ts），公开题库那份记在 `problems`
+ * 下，两边互不干扰。
+ *
+ * 原来这两条路由一律下发空状态，于是比赛题目页的「状态」列永远是「未做」，赛后也不
+ * 恢复 —— 而库里其实一直记着。
+ *
+ * 不按「比赛结没结束」分档：这是学生自己的判题结果，赛中赛后都不泄露别人的任何信息
+ * （旧后端赛中不下发，纯粹是因为它整条路换了个 serializer，不是什么保密考虑）。
+ */
+async function contestProblemStatuses(userId: number | undefined) {
+  if (!userId) return {}
+  const [profile] = await db.select({ status: schema.userProfile.acmProblemsStatus })
+    .from(schema.userProfile).where(eq(schema.userProfile.userId, userId)).limit(1)
+  return objectValue(objectValue(profile?.status).contest_problems)
+}
+
+function myStatusOf(statuses: Record<string, unknown>, problemId: number) {
+  const status = objectValue(statuses[String(problemId)]).status
+  return typeof status === "number" ? status : null
+}
 
 async function contestProblemTags(problemIds: number[]) {
   if (problemIds.length === 0) return new Map<number, string[]>()
@@ -139,6 +164,7 @@ contestRoutes.get("/contests/:id/problems", optionalAuth, requireContestAccess("
     .where(and(eq(schema.problem.contestId, contest.id), eq(schema.problem.visible, true))).orderBy(asc(schema.problem.displayId))
   const tags = await contestProblemTags(rows.map((row) => row.problem.id))
   const allowed = contestDetailsAllowed(c.get("user"), contest)
+  const statuses = await contestProblemStatuses(c.get("user")?.id)
   return success(c, rows.map(({ problem, user, realName }) => problemListItemSchema.parse({
     id: problem.id,
     _id: problem.displayId,
@@ -152,7 +178,7 @@ contestRoutes.get("/contests/:id/problems", optionalAuth, requireContestAccess("
     allowFlowchart: problem.allowFlowchart,
     showFlowchart: problem.showFlowchart,
     hasAstRules: problem.astRules !== null,
-    myStatus: null,
+    myStatus: myStatusOf(statuses, problem.id),
   })))
 })
 
@@ -165,6 +191,7 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
   if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
   const tags = await contestProblemTags([row.problem.id])
   const allowed = contestDetailsAllowed(c.get("user"), contest)
+  const statuses = await contestProblemStatuses(c.get("user")?.id)
   return success(c, problemDetailSchema.parse({
     id: row.problem.id,
     _id: row.problem.displayId,
@@ -189,7 +216,8 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
     contestId: contest.id,
     tags: tags.get(row.problem.id) ?? [],
     createdBy: sampleUser(row.user, row.realName),
-    myStatus: null,
+    myStatus: myStatusOf(statuses, row.problem.id),
+    // 比赛里不给 AI 提示（POST /ai/hint 见到比赛提交直接 403），这个数只喂那个按钮，恒 0
     myFailedCount: 0,
     allowFlowchart: row.problem.allowFlowchart,
     showFlowchart: row.problem.showFlowchart,
