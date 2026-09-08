@@ -31,6 +31,11 @@
 #   CONTAINER=oj2-redis docker/clear-sessions.sh  # 本机 dev
 #   YES=1 docker/clear-sessions.sh                # 跳过确认
 #
+# `sh docker/clear-sessions.sh` 会用 dash 跑（Debian 的 /bin/sh 就是 dash），而下面
+# 那行的 pipefail 是 bash 专有的，一上来就报 `Illegal option -o pipefail`。
+# 这行必须在 set 之前，且只能用 dash 也认的语法。deploy.sh 里是同一道垫片。
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+
 set -euo pipefail
 
 CONTAINER="${CONTAINER:-oj-redis}"
