@@ -483,6 +483,10 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
          */
         username: sql<string>`coalesce(${schema.user.username}, max(${schema.submission.username}))`,
         className: schema.user.className,
+        // 不传用户名时「交了没全对」那一栏靠它把教师和禁用账号挡在外面 ——
+        // 传了用户名时这件事是花名册（rosterRows）做的
+        isDisabled: schema.user.isDisabled,
+        adminType: schema.user.adminType,
         submissionCount: count(),
         acceptedCount: acceptedFilter.mapWith(Number),
         solvedCount: solvedFilter.mapWith(Number),
@@ -493,7 +497,13 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       .where(where)
       // user_id 定了 user 那一行就定了，把 username / class_name 一起放进 group by
       // 不会多分出组来，但省掉再对它们套一层聚合函数
-      .groupBy(schema.submission.userId, schema.user.username, schema.user.className)
+      .groupBy(
+        schema.submission.userId,
+        schema.user.username,
+        schema.user.className,
+        schema.user.isDisabled,
+        schema.user.adminType,
+      )
       .orderBy(desc(count())),
   ])
 
@@ -515,17 +525,24 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   const isDone = (row: { solvedCount: number; acceptedCount: number }) =>
     requiredSolved > 0 ? row.solvedCount >= requiredSolved : row.acceptedCount > 0
 
-  // 表格列的是做完了的人。没做完的（一条没交 / 交了没全对）在「未完成」那一栏
-  const acceptedUsers = perUser.filter(isDone)
-  // 要等 acceptedUsers 定下来才能查，所以进不了上面那个 Promise.all
+  /**
+   * 「提交记录」那张表列的是**窗口里交过东西的所有人**，`done` 标出谁做完了 ——
+   * 原来只给做完的人，于是一次没对的学生连同他的提交在这张表里根本不存在，
+   * 教师想看「他到底错在哪」得切到提交列表再翻。展开一行拉的是那个人的全部
+   * 提交（GET /submissions/statistics/items 不按结果过滤），对错都在里面。
+   *
+   * 「完成人数」这些数字跟着 `done` 算，不是 `data.length`。
+   */
+  const doneCount = perUser.filter(isDone).length
+  // 要等 perUser 回来才能查，所以进不了上面那个 Promise.all
   const astOnlyByUserMap = await astOnlyByUser(
     where,
-    acceptedUsers.map((row) => row.userId),
+    perUser.map((row) => row.userId),
   )
 
   const submittedUserIds = new Set(perUser.map((row) => row.userId))
 
-  const data = acceptedUsers.map((row) => ({
+  const data = perUser.map((row) => ({
     username: row.username,
     className: row.className,
     submissionCount: row.submissionCount,
@@ -534,6 +551,7 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
     astOnlyCount: astOnlyByUserMap.get(row.userId) ?? 0,
     judgingCount: row.judgingCount,
     correctRate: judgedRate(row.acceptedCount, row.submissionCount - row.judgingCount),
+    done: isDone(row),
   }))
 
   const dataUnaccepted = rosterRows
@@ -543,20 +561,38 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       realName: stripClassPrefix(row.username, row.className),
     }))
 
-  // 交了但一次没对的。**按花名册取**，和 dataUnaccepted 同一个范围 ——
-  // 不指定用户名时没有花名册，这一栏也就跟着为空，不会冒出一堆别的班的人。
-  const rosterClassNames = new Map(rosterRows.map((row) => [row.id, row.className]))
-  // 交了但没做完的：包括一道都没对的，也包括三道里做出两道的
-  const attemptedRows = perUser.filter(
-    (row) => !isDone(row) && rosterClassNames.has(row.userId),
-  )
+  /**
+   * 交了但没做完的：包括一道都没对的，也包括三道里做出两道的。
+   *
+   * **传了用户名时按花名册取**，和 dataUnaccepted 同一个范围，查一个班不会冒出
+   * 一堆别的班的人。
+   *
+   * 不传用户名时没有花名册，这一栏原先跟着空掉 —— 于是只交了错误答案的学生
+   * 「已完成」那张表进不去（没做完）、「未完成」那一栏也没有，整个人从屏幕上
+   * 消失，看起来就像统计只认成功的提交。这种情况退回「有提交但没做完的全部人」，
+   * 教师和禁用账号照样排除（否则老师自己试题留下的错误提交会混进点名名单）。
+   *
+   * 「还没交」那一栏没有花名册是真的算不出来（不知道该有谁），仍然为空。
+   */
+  const rosterIds = new Set(rosterRows.map((row) => row.id))
+  const attemptedRows = perUser.filter((row) => {
+    if (isDone(row)) return false
+    return username
+      ? rosterIds.has(row.userId)
+      : !row.isDisabled && row.adminType === "Regular User"
+  })
   const failureByUser = await lastFailureByUser(
     where,
     attemptedRows.map((row) => row.userId),
   )
   const dataAttempted = attemptedRows.map((row) => ({
     username: row.username,
-    realName: stripClassPrefix(row.username, rosterClassNames.get(row.userId) ?? null),
+    /**
+     * 剥前缀只在**查了某个班**的时候做：那时满屏都是同一个班，留着 `ks251` 是噪音。
+     * 不传用户名的全站视图里各班混在一起，剥完只剩一串重名的名字，反而认不出谁，
+     * 所以原样给完整用户名。班名取 perUser join 出来的那一列，和花名册同一份数据。
+     */
+    realName: username ? stripClassPrefix(row.username, row.className) : row.username,
     submissionCount: row.submissionCount,
     solvedCount: row.solvedCount,
     lastFailure: failureByUser.get(row.userId) ?? null,
@@ -566,7 +602,7 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   // 旧后端在这之前还先算了一个 person_rate 一起下发，前端从来没读过它（完成度是
   // 前端自己按「减掉请假人数之后的分母」重算的），所以这条链路上只留 person_count。
   let personCount = rosterRows.length
-  if (personCount && personCount < data.length) personCount = data.length
+  if (personCount && personCount < doneCount) personCount = doneCount
 
   return success(
     c,

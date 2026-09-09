@@ -61,7 +61,7 @@
         <div class="stat-item">
           <n-text>完成人数</n-text>
           <n-gradient-text type="error" font-size="28">{{
-            list.length
+            doneList.length
           }}</n-gradient-text>
         </div>
         <div class="stat-item">
@@ -99,7 +99,12 @@
         </n-grid>
       </n-tab-pane>
 
-      <n-tab-pane name="submissions" tab="提交记录">
+      <!--
+        窗口里交过东西的**所有人**，一行一个，展开是他这段时间的全部提交（对的错的
+        都在）。没做完的人也在表里 —— 一次没对的学生正是老师最想点开看的那个。
+        隔壁「未完成」是点名用的名单，只有名字，两栏用途不同。
+      -->
+      <n-tab-pane name="submissions" :tab="`提交记录（${list.length}）`">
         <n-data-table
           v-if="list.length"
           striped
@@ -111,7 +116,7 @@
           :row-props="rowProps"
           style="margin-top: 12px"
         />
-        <n-empty v-else description="还没有人做出来" style="margin: 24px 0" />
+        <n-empty v-else description="还没有人提交" style="margin: 24px 0" />
       </n-tab-pane>
 
       <n-tab-pane name="unaccepted" :tab="`未完成（${unfinishedTotal}）`">
@@ -198,7 +203,7 @@ import storage from "utils/storage"
 import { useConfigStore } from "../store/config"
 import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
-import { NButton, NFlex, NText, type DataTableRowKey } from "naive-ui"
+import { NButton, NFlex, NTag, NText, type DataTableRowKey } from "naive-ui"
 import { JUDGE_STATUS } from "utils/constants"
 import type {
   AttemptedStudent,
@@ -265,6 +270,17 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
     },
   },
   { title: "用户", key: "username" },
+  // 做完没做完在同一张表里，用标签区分 —— 少了它这张表看不出谁还卡着
+  {
+    title: "完成",
+    key: "done",
+    render: (row) =>
+      h(
+        NTag,
+        { size: "small", type: row.done ? "success" : "default", bordered: false },
+        () => (row.done ? "已完成" : "未完成"),
+      ),
+  },
   {
     title: "提交数",
     key: "submissionCount",
@@ -331,7 +347,10 @@ const personCount = ref(0)
 const route = useRoute()
 const router = useRouter()
 
+// 交过东西的所有人（做没做完看 done）
 const list = ref<SubmissionStatisticsUser[]>([])
+// 「完成人数」「完成度」算的是做完了的那些，不是整张表的行数
+const doneList = computed(() => list.value.filter((row) => row.done))
 const listUnaccepted = ref<UnacceptedStudent[]>([])
 // 交了但一次没对的。和上面那一栏合起来才是「未完成」的全部
 const listAttempted = ref<AttemptedStudent[]>([])
@@ -499,7 +518,7 @@ const adjustedPersonRate = computed(() => {
   if (adjustedPersonCount.value <= 0) return "0%"
   const rate = Math.min(
     100,
-    (list.value.length / adjustedPersonCount.value) * 100,
+    (doneList.value.length / adjustedPersonCount.value) * 100,
   )
   return `${Math.round(rate * 100) / 100}%`
 })

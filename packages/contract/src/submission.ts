@@ -172,6 +172,13 @@ export const submissionStatisticsUserSchema = z.object({
   judgingCount: z.number().int(),
   // 百分比数值，不带 %。旧后端返回 "85.5%" 字符串，展示格式化交给前端。
   correctRate: z.number(),
+  /**
+   * 这个人在本次查询的口径下做完了没有（查了 N 道题就要 N 道都解决）。
+   *
+   * `data` 里**没做完的人也在**，教师才能在同一张表里展开看他错在哪；「完成人数」
+   * 和完成度算的是 `done` 为真的那些，不是 `data.length`。
+   */
+  done: z.boolean(),
 })
 
 /**
@@ -199,10 +206,17 @@ export const submissionStatisticsSchema = z.object({
   // 花名册人数（未禁用的普通用户）。**只有这一个分母下发**：完成度由前端算，
   // 因为「请假隐藏」会把请假的人从分母里减掉，那是后端不知道的浏览器本地状态。
   personCount: z.number().int(),
+  /** 窗口里交过东西的所有人（做没做完看 `done`），按提交数倒序 */
   data: z.array(submissionStatisticsUserSchema),
   /** 一条都没交的（花名册里的人减去有提交的人） */
   dataUnaccepted: z.array(unacceptedStudentSchema),
-  /** 交了但一次没对的。和 dataUnaccepted 一样只在传了用户名（有花名册）时才有内容 */
+  /**
+   * 交了但没做完的（一道没对，或者查三道只做出两道）。
+   *
+   * 传了用户名时按花名册取，和 dataUnaccepted 同一个范围；不传用户名时没有花名册，
+   * 退回「窗口内有提交但没做完的全部普通学生」—— 否则这批人两栏都不在，看起来
+   * 就像统计只认成功的提交。dataUnaccepted 没有花名册就真的算不出来，仍然为空。
+   */
   dataAttempted: z.array(attemptedStudentSchema),
 })
 
