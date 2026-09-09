@@ -325,6 +325,31 @@ async function markSystemError(submissionId: string, userId: number, error: unkn
   }
 }
 
+/**
+ * 判题任务在 `judgeSubmission` 之外失败时的兜底。
+ *
+ * 正常路径上的异常都被 judgeSubmission 自己的 try/catch 接住、落成 SYSTEM_ERROR
+ * 并且推给前端，所以能走到队列 `failed` 事件的只剩两种：取提交那一步就炸了，
+ * 以及**worker 进程中途死掉** —— 机房断电、容器 OOM 被杀、部署时重启。后一种
+ * BullMQ 会先按 stalled 重入队一次，再没人接就彻底放手；判题队列又没配 attempts，
+ * 失败即终局。没有这个兜底，那条提交就永远停在「等待评分」，学生看着转圈，
+ * 教师统计里它还占着一个「判题中」的名额。生产库里 3 条卡死的 PENDING
+ * （2022-11 / 2026-03 / 2026-04，都是旧栈时代留下的）就是这么来的。
+ *
+ * `markSystemError` 只动 PENDING / JUDGING 两个状态，所以判完了的、被重判改过的
+ * 都不会被它覆盖。唯一能撞上的是「重判刚把状态置回 PENDING，同一刻上一个被遗弃的
+ * 任务才失败」——结果是这次重判被吃掉、显示成系统错误，比静默卡死看得见。
+ */
+export async function failAbandonedSubmission(submissionId: string, error: unknown) {
+  const [row] = await db
+    .select({ userId: schema.submission.userId })
+    .from(schema.submission)
+    .where(eq(schema.submission.id, submissionId))
+    .limit(1)
+  if (!row) return
+  await markSystemError(submissionId, row.userId, error)
+}
+
 export async function judgeSubmission(job: JudgeJobData) {
   const [row] = await db
     .select({

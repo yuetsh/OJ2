@@ -2,7 +2,7 @@ import { Worker } from "bullmq"
 
 import { config } from "./config"
 import { judgeQueueName, type JudgeJobData } from "./judge/job"
-import { judgeSubmission } from "./judge/run"
+import { failAbandonedSubmission, judgeSubmission } from "./judge/run"
 import { flowchartQueueName, type FlowchartJobData } from "./flowchart/job"
 import { evaluateFlowchart } from "./flowchart/run"
 import { createBlockingRedis } from "./redis"
@@ -29,8 +29,17 @@ const flowchartWorker = new Worker<FlowchartJobData>(
 worker.on("ready", () => {
   console.log(`Judge worker ready (concurrency=${config.judgeConcurrency})`)
 })
-worker.on("failed", (job, error) => {
+worker.on("failed", async (job, error) => {
   console.error(`Judge job ${job?.id ?? "unknown"} failed`, error)
+  // 队列没配 attempts，失败即终局；worker 被杀掉那种 BullMQ 走完 stalled 重试也会
+  // 落到这里。不在这里写一个终态，提交就永远停在「等待评分」，没有任何人会再管它。
+  const submissionId = job?.data.submissionId
+  if (!submissionId) return
+  try {
+    await failAbandonedSubmission(submissionId, error)
+  } catch (markError) {
+    console.error(`Failed to mark submission ${submissionId} as system error`, markError)
+  }
 })
 worker.on("error", (error) => {
   console.error("Judge worker error", error)
