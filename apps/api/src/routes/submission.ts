@@ -257,41 +257,41 @@ const FAILURE_MESSAGE_LIMIT = 400
  * 点一下名字就知道是编译错了还是答案错了、报的什么。err_info 是判题机塞进
  * statistic_info 的那一段，提交详情页读的也是它。
  */
-async function lastFailureByUser(where: SQL | undefined, usernames: string[]) {
+async function lastFailureByUser(where: SQL | undefined, userIds: number[]) {
   const byUser = new Map<
-    string,
+    number,
     { id: string; problem: string; result: number; error: string | null }
   >()
-  if (!usernames.length) return byUser
+  if (!userIds.length) return byUser
 
   // 不给 submission 起别名：where 里的条件是 drizzle 拼的，引用的是 "submission"."x"
   const rows = await db.execute<{
-    username: string
+    user_id: number
     id: string
     problem: string
     result: number
     error: string | null
   }>(sql`
-    select username, id, problem, result, error from (
+    select user_id, id, problem, result, error from (
       select
-        ${schema.submission.username} as username,
+        ${schema.submission.userId} as user_id,
         ${schema.submission.id} as id,
         ${schema.problem.displayId} as problem,
         ${schema.submission.result} as result,
         left(${schema.submission.statisticInfo}->>'err_info', ${FAILURE_MESSAGE_LIMIT}) as error,
         row_number() over (
-          partition by ${schema.submission.username}
+          partition by ${schema.submission.userId}
           order by ${schema.submission.createTime} desc
         ) as rn
       from ${schema.submission}
       join ${schema.problem} on ${schema.problem.id} = ${schema.submission.problemId}
-      where ${and(where, inArray(schema.submission.username, usernames))}
+      where ${and(where, inArray(schema.submission.userId, userIds))}
     ) t
     where rn = 1
   `)
 
   for (const row of rows) {
-    byUser.set(row.username, {
+    byUser.set(row.user_id, {
       id: row.id,
       problem: row.problem,
       result: row.result,
@@ -311,47 +311,78 @@ async function lastFailureByUser(where: SQL | undefined, usernames: string[]) {
  * 口径本身不动 —— AST_CHECK_FAILED 仍然算通过（答案确实对了，全站一致）。这里只是
  * 让教师看得见「这几个人是绕过要求做出来的」，教学上那不算达标。
  */
-async function astOnlyByUser(where: SQL | undefined, usernames: string[]) {
-  const byUser = new Map<string, number>()
-  if (!usernames.length) return byUser
+async function astOnlyByUser(where: SQL | undefined, userIds: number[]) {
+  const byUser = new Map<number, number>()
+  if (!userIds.length) return byUser
 
-  const rows = await db.execute<{ username: string; n: number }>(sql`
-    select username, count(*)::int as n from (
+  const rows = await db.execute<{ user_id: number; n: number }>(sql`
+    select user_id, count(*)::int as n from (
       select
-        ${schema.submission.username} as username,
+        ${schema.submission.userId} as user_id,
         bool_or(${schema.submission.result} = ${JudgeStatus.AST_CHECK_FAILED}) as has_ast,
         bool_or(${schema.submission.result} = ${JudgeStatus.ACCEPTED}) as has_ac
       from ${schema.submission}
-      where ${and(where, inArray(schema.submission.username, usernames))}
-      group by ${schema.submission.username}, ${schema.submission.problemId}
+      where ${and(where, inArray(schema.submission.userId, userIds))}
+      group by ${schema.submission.userId}, ${schema.submission.problemId}
     ) t
     where has_ast and not has_ac
-    group by username
+    group by user_id
   `)
-  for (const row of rows) byUser.set(row.username, row.n)
+  for (const row of rows) byUser.set(row.user_id, row.n)
   return byUser
 }
 
 /**
- * 用户名模糊匹配到的在册学生，用来算「班级人数」和「谁没做」。
- * 只算未禁用的普通用户 —— 教师和管理员不该出现在完成度分母里。
+ * 用户名模糊匹配到的账号。统计的两件事都从它出发：**筛哪些提交**（拿 id），
+ * 以及**花名册**（班级人数、谁没做，见下面的过滤）。
+ *
+ * 这里必须查 `user` 表而不是 `submission.username` —— 后者是提交那一刻冻结的
+ * 快照，学生改名之后旧提交还挂着旧名字，`ilike submission.username` 匹配不上。
+ *
+ * 生产快照实测（2026-09-08）：24 级数媒两个班改成编号制用户名之后，85 人的
+ * 提交挂在旧名下。查 `ks249` 旧口径 0 条 / 新口径 7 条 —— 整个班 48 人全掉进
+ * 「一条没交」；查 `ks248` 20 条 / 54 条，13 个人的成绩查不出来。
+ *
+ * 返回**全部**匹配到的账号，禁用的和教师也在内 —— 「谁交过」不该受这两个条件
+ * 影响。花名册那一份在调用处再筛（未禁用 + 普通用户），教师和管理员不进分母。
  */
-async function matchedStudents(username: string) {
+async function matchedUsers(username: string) {
   return db
-    .select({ username: schema.user.username, className: schema.user.className })
+    .select({
+      id: schema.user.id,
+      username: schema.user.username,
+      className: schema.user.className,
+      isDisabled: schema.user.isDisabled,
+      adminType: schema.user.adminType,
+    })
     .from(schema.user)
-    .where(
-      and(
-        ilike(schema.user.username, `%${username}%`),
-        eq(schema.user.isDisabled, false),
-        eq(schema.user.adminType, "Regular User"),
-      ),
-    )
+    .where(ilike(schema.user.username, `%${username}%`))
+}
+
+/**
+ * 两条提交列表的用户名筛选。**两边都要匹配**：
+ *
+ * - `user_id in (改过名的当前用户名匹配到的账号)` —— 老师用现在的班级前缀查
+ *   `ks248`，要能查出这个人改名之前交的那些（生产快照：比赛提交里有 685 条
+ *   挂在旧名字下）；
+ * - `submission.username ilike` —— 已删号的学生在 `user` 表里没有行，只剩提交里
+ *   冻结的那份名字；顺带也让「按记得的旧名字查」还查得到。
+ *
+ * 统计接口那边只按 user_id 筛（口径是「花名册上这个班谁做完了」，已删号的人本来
+ * 就不在花名册里）；这两条是公开列表，不该因为改名或删号少给记录，所以取并集。
+ */
+function usernameFilter(username: string) {
+  const like = `%${username}%`
+  return or(
+    sql`${schema.submission.userId} in (select ${schema.user.id} from ${schema.user} where ${ilike(schema.user.username, like)})`,
+    ilike(schema.submission.username, like),
+  )!
 }
 
 /**
  * 两个统计接口共用的范围：时间窗 + 题号。**用户名不在里面** —— 统计那边是
  * ilike 模糊匹配（填 ks251 要匹配整个班），明细那边必须精确到人，口径不同。
+ * 两边都是先拿用户名去 `user` 表解析成 user_id，再按 user_id 筛提交。
  */
 type StatisticsScope =
   | { ok: true; filters: SQL[]; problemCount: number }
@@ -402,8 +433,24 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   const filters = scope.filters
 
   const username = c.req.query("username")?.trim()
-  if (username) filters.push(ilike(schema.submission.username, `%${username}%`))
+  // 用户名先解析成账号，再拿 user_id 去筛提交。这一趟查询挡在 Promise.all 前面，
+  // 但换掉的是下面**四条**语句各一次的 submission 全表扫：`ilike` 走不了索引，
+  // 换成 `user_id in (...)` 之后四条全走索引（生产快照实测单条 18448 → 537
+  // buffers；同一个快照上整个接口查一个班 120~250ms → 10ms 上下），多这一次往返是赚的。
+  const matched = username ? await matchedUsers(username) : []
+  if (username) {
+    const matchedIds = matched.map((row) => row.id)
+    // 一个账号都没匹配上时得留个恒假条件。少推一个 filter 的话过滤条件整个消失，
+    // 「查无此班」会变成「全站统计」
+    filters.push(
+      matchedIds.length ? inArray(schema.submission.userId, matchedIds) : sql`false`,
+    )
+  }
   const where = and(...filters)
+  // 花名册：只有未禁用的普通用户算进班级人数和「谁没做」，教师和管理员不进分母
+  const rosterRows = matched.filter(
+    (row) => !row.isDisabled && row.adminType === "Regular User",
+  )
 
   const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
   // 判题中的条数。要单独数出来，正确率的分母才能把它们摘掉
@@ -415,7 +462,7 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
    */
   const solvedFilter = sql`count(distinct ${schema.submission.problemId}) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
 
-  const [[totals], perUser, rosterRows] = await Promise.all([
+  const [[totals], perUser] = await Promise.all([
     db
       .select({
         total: count(),
@@ -426,18 +473,28 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       .where(where),
     db
       .select({
-        username: schema.submission.username,
+        userId: schema.submission.userId,
+        /**
+         * 显示的是**当前**用户名，从 user 表 join 出来 —— 按 submission.username
+         * 分组的话，改过名的学生会裂成新旧两行，两边各算各的，谁都够不到「全做完」。
+         *
+         * 已删号的学生 user 表里没有行，退回提交里冻结的那份名字（下面的
+         * personCount 兜底就是给这种情况的）。
+         */
+        username: sql<string>`coalesce(${schema.user.username}, max(${schema.submission.username}))`,
+        className: schema.user.className,
         submissionCount: count(),
         acceptedCount: acceptedFilter.mapWith(Number),
         solvedCount: solvedFilter.mapWith(Number),
         judgingCount: judgingFilter.mapWith(Number),
       })
       .from(schema.submission)
+      .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
       .where(where)
-      .groupBy(schema.submission.username)
+      // user_id 定了 user 那一行就定了，把 username / class_name 一起放进 group by
+      // 不会多分出组来，但省掉再对它们套一层聚合函数
+      .groupBy(schema.submission.userId, schema.user.username, schema.user.className)
       .orderBy(desc(count())),
-    // 只有指定了用户名才有「班级人数」这个概念；不指定时分母无意义，旧后端也返回 0
-    username ? matchedStudents(username) : Promise.resolve([]),
   ])
 
   const submissionCount = totals?.total ?? 0
@@ -463,32 +520,24 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
   // 要等 acceptedUsers 定下来才能查，所以进不了上面那个 Promise.all
   const astOnlyByUserMap = await astOnlyByUser(
     where,
-    acceptedUsers.map((row) => row.username),
+    acceptedUsers.map((row) => row.userId),
   )
 
-  const submittedUsernames = new Set(perUser.map((row) => row.username))
-  const classNames = new Map<string, string | null>()
-  if (submittedUsernames.size) {
-    const rows = await db
-      .select({ username: schema.user.username, className: schema.user.className })
-      .from(schema.user)
-      .where(inArray(schema.user.username, [...submittedUsernames]))
-    for (const row of rows) classNames.set(row.username, row.className)
-  }
+  const submittedUserIds = new Set(perUser.map((row) => row.userId))
 
   const data = acceptedUsers.map((row) => ({
     username: row.username,
-    className: classNames.get(row.username) ?? null,
+    className: row.className,
     submissionCount: row.submissionCount,
     acceptedCount: row.acceptedCount,
     solvedCount: row.solvedCount,
-    astOnlyCount: astOnlyByUserMap.get(row.username) ?? 0,
+    astOnlyCount: astOnlyByUserMap.get(row.userId) ?? 0,
     judgingCount: row.judgingCount,
     correctRate: judgedRate(row.acceptedCount, row.submissionCount - row.judgingCount),
   }))
 
   const dataUnaccepted = rosterRows
-    .filter((row) => !submittedUsernames.has(row.username))
+    .filter((row) => !submittedUserIds.has(row.id))
     .map((row) => ({
       username: row.username,
       realName: stripClassPrefix(row.username, row.className),
@@ -496,21 +545,21 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
 
   // 交了但一次没对的。**按花名册取**，和 dataUnaccepted 同一个范围 ——
   // 不指定用户名时没有花名册，这一栏也就跟着为空，不会冒出一堆别的班的人。
-  const rosterNames = new Map(rosterRows.map((row) => [row.username, row.className]))
+  const rosterClassNames = new Map(rosterRows.map((row) => [row.id, row.className]))
   // 交了但没做完的：包括一道都没对的，也包括三道里做出两道的
   const attemptedRows = perUser.filter(
-    (row) => !isDone(row) && rosterNames.has(row.username),
+    (row) => !isDone(row) && rosterClassNames.has(row.userId),
   )
   const failureByUser = await lastFailureByUser(
     where,
-    attemptedRows.map((row) => row.username),
+    attemptedRows.map((row) => row.userId),
   )
   const dataAttempted = attemptedRows.map((row) => ({
     username: row.username,
-    realName: stripClassPrefix(row.username, rosterNames.get(row.username) ?? null),
+    realName: stripClassPrefix(row.username, rosterClassNames.get(row.userId) ?? null),
     submissionCount: row.submissionCount,
     solvedCount: row.solvedCount,
-    lastFailure: failureByUser.get(row.username) ?? null,
+    lastFailure: failureByUser.get(row.userId) ?? null,
   }))
 
   // 「学生已删号但提交记录还在」时完成人数会大于花名册人数，分母兜到完成人数为止。
@@ -548,11 +597,28 @@ submissionRoutes.get("/submissions/statistics/items", requireTeacher, async (c) 
   const scope = await statisticsScope(c)
   if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
 
+  /**
+   * 展开的那一行给的是**当前**用户名，先换成 user_id 再查 —— 直接按
+   * `submission.username` 精确匹配的话，改过名的学生展开来是空的（他的提交
+   * 全挂在旧名字下）。
+   *
+   * 查不到账号才退回按提交里冻结的用户名匹配：已删号的学生仍然会出现在统计
+   * 表格里（那一行的名字取自提交），展开行不能因此空着。
+   */
+  const [account] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.username, username))
+    .limit(1)
+  const identity = account
+    ? eq(schema.submission.userId, account.id)
+    : eq(schema.submission.username, username)
+
   // 多取一条，好知道是不是被截断了
   const rows = await db
     .select({ id: schema.submission.id, result: schema.submission.result })
     .from(schema.submission)
-    .where(and(...scope.filters, eq(schema.submission.username, username)))
+    .where(and(...scope.filters, identity))
     .orderBy(desc(schema.submission.createTime), desc(schema.submission.id))
     .limit(STATISTICS_ITEMS_LIMIT + 1)
 
@@ -690,7 +756,14 @@ const submissionListColumns = {
     userId: schema.submission.userId,
     // 题单闸门要按题定位，序列化本身用不到它
     problemId: schema.submission.problemId,
-    username: schema.submission.username,
+    /**
+     * 显示**当前**用户名，和统计面板、个人主页对齐。列表里读的那份是提交时冻结的
+     * 快照，改过名的学生会显示旧名字 —— 按 `ks248` 筛出来的行却写着
+     * `ks24数媒1班ksXXX`，看着像筛错了。
+     *
+     * 已删号的学生 user 表里没有行，退回冻结的那份（否则整列空着）。
+     */
+    username: sql<string>`coalesce(${schema.user.username}, ${schema.submission.username})`,
     result: schema.submission.result,
     language: schema.submission.language,
     statisticInfo: schema.submission.statisticInfo,
@@ -774,6 +847,9 @@ async function paginateSubmissionRows(
       .select(submissionListColumns)
       .from(schema.submission)
       .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+      // 取当前用户名用。left join 不是 inner —— 已删号的学生这边没有行，
+      // inner join 会把他们的提交整条从列表里抹掉
+      .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
       .where(cursor ? and(where, cursor) : where)
       .orderBy(...order)
 
@@ -823,7 +899,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   const language = c.req.query("language")?.trim()
   if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
   if (c.req.query("myself") === "1" && user) filters.push(eq(schema.submission.userId, user.id))
-  else if (username) filters.push(ilike(schema.submission.username, `%${username}%`))
+  else if (username) filters.push(usernameFilter(username))
   if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, Number(result)))
   if (language) filters.push(eq(schema.submission.language, language))
   if (c.req.query("today") === "1") filters.push(sql`${schema.submission.createTime} >= ${todayStart()}`)
@@ -880,7 +956,7 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
   const result = c.req.query("result")
   if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
   if (c.req.query("myself") === "1" && user) filters.push(eq(schema.submission.userId, user.id))
-  else if (username) filters.push(ilike(schema.submission.username, `%${username}%`))
+  else if (username) filters.push(usernameFilter(username))
   if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, Number(result)))
   if (contestStatus(contest) !== "1") filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
   const where = and(...filters)
@@ -893,7 +969,8 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
   const [totalRows, rows] = await Promise.all([
     totalQuery,
     db.select(submissionListColumns).from(schema.submission)
-      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
+      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+      .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId)).where(where)
       .orderBy(desc(schema.submission.createTime)).limit(limit).offset(offset),
   ])
   // 这里不挂题单防作弊闸门（对比公开列表）：题单里的题必定是非比赛题——加题时卡了

@@ -260,7 +260,14 @@ async function myLeaderboardRank(userId: number | undefined) {
 accountRoutes.get("/rankings/activity", async (c) => {
   const start = c.req.query("start")
   if (!start || Number.isNaN(Date.parse(start))) return failure(c, 400, "invalid-start", "start time is required")
-  const rows = await db.select({ username: schema.submission.username, value: countDistinct(schema.submission.problemId) })
+  /**
+   * 按 **user_id** 聚合，名字从 user 表取。按 `submission.username` 分组的话，
+   * 改过名的学生会裂成新旧两条各算各的 AC 题数 —— 排名被拆低，运气不好还会以
+   * 两个名字同时挂在榜上。同 `/submissions/statistics` 那批。
+   *
+   * innerJoin user 顺带把已删号学生的孤儿提交挡在外面，不用再兜底名字。
+   */
+  const rows = await db.select({ username: schema.user.username, value: countDistinct(schema.submission.problemId) })
     .from(schema.submission)
     .innerJoin(schema.user, eq(schema.submission.userId, schema.user.id))
     .where(and(
@@ -270,7 +277,8 @@ accountRoutes.get("/rankings/activity", async (c) => {
       eq(schema.user.isDisabled, false),
       ne(schema.user.adminType, "Super Admin"),
     ))
-    .groupBy(schema.submission.username).orderBy(desc(countDistinct(schema.submission.problemId))).limit(10)
+    .groupBy(schema.submission.userId, schema.user.username)
+    .orderBy(desc(countDistinct(schema.submission.problemId))).limit(10)
   return success(c, rows.map((row) => activityRankItemSchema.parse({ username: row.username, count: row.value })))
 })
 
