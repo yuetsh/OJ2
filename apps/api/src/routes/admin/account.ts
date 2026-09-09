@@ -233,10 +233,20 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
 
   await db.transaction(async (tx) => {
     await tx.update(schema.user).set(patch).where(eq(schema.user.id, id))
-    // submission.username 是冗余列（判题历史按用户名查），改名后必须一起改，否则历史提交查不到
+    /**
+     * submission.username 是冗余列，改名后跟着改。
+     *
+     * 条件按 **user_id** 而不是「等于旧用户名」：后者只改得动「当前正好还等于旧名」
+     * 的行，一个已经漂移过的账号再改一次名，更早那批仍然改不动 —— 生产库里 726 条
+     * 挂着旧名字的提交就是旧栈时代这么留下的，之后每次改名都从它身边绕过去。
+     * 按 user_id 写是幂等的，顺带把这个人的历史行一次性拉平。
+     *
+     * 读路径本身已经不依赖这一列了（列表和统计都从 user 表取当前名字），
+     * 这里保持同步是为了「已删号回退显示」和按名字搜索那两条路。
+     */
     if (existing.user.username !== username) {
       await tx.update(schema.submission).set({ username })
-        .where(eq(schema.submission.username, existing.user.username))
+        .where(eq(schema.submission.userId, id))
     }
     await tx.update(schema.userProfile).set({ realName: data.realName })
       .where(eq(schema.userProfile.userId, id))
@@ -373,6 +383,9 @@ function isForeignKeyViolation(error: unknown) {
   return false
 }
 
+/** 「这人还有提交」的信号。提交那张表没有外键，拦不住，只能自己查出来再把事务掀了 */
+class UserHasSubmissionsError extends Error {}
+
 adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   const parsed = deleteUsersRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return failure(c, 400, "invalid-request", "ids is required")
@@ -390,13 +403,33 @@ adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   // 别顺手把这里也改成全 CASCADE：submission.user_id 压根没有外键（Django 那边就是个
   // 裸 IntegerField），全连坐的结果是成就没了、提交却留成孤儿行，一半删一半留。
   try {
-    const deleted = await db.delete(schema.user).where(inArray(schema.user.id, parsed.data.ids))
-      .returning({ id: schema.user.id })
+    const deleted = await db.transaction(async (tx) => {
+      /**
+       * 外键拦得住成就、题单进度、比赛排名这些，**唯独提交拦不住** ——
+       * `submission.user_id` 没有外键（Django 那边就是个裸 IntegerField，上面已经
+       * 说了为什么不补）。所以下面那句报错里写的「还有提交」一直是空头支票：
+       * 只交过题、没拿过成就没进过题单的学生照样删得掉，提交留在库里成了孤儿 ——
+       * 用户没了、`submission.user_id` 还指着一个不存在的 id。生产快照实测：
+       * 28 个已删账号留下 935 条这样的提交。
+       *
+       * 补一次查询把它拦下来，口径和外键那批一致：有历史数据就该禁用，不该删。
+       * 和 delete 放同一个事务里，免得中间正好交了一发。
+       */
+      const [withSubmission] = await tx
+        .select({ userId: schema.submission.userId })
+        .from(schema.submission)
+        .where(inArray(schema.submission.userId, parsed.data.ids))
+        .limit(1)
+      if (withSubmission) throw new UserHasSubmissionsError()
+
+      return tx.delete(schema.user).where(inArray(schema.user.id, parsed.data.ids))
+        .returning({ id: schema.user.id })
+    })
     return success(c, { deleted: deleted.length })
   } catch (error) {
-    // 只有外键冲突（23503）才是「这人还有历史数据」。以前这里是裸 catch，
-    // 连接断了、语句超时也照报这句，超管会照着提示去禁用账号，真正的故障一直没人看见
-    if (!isForeignKeyViolation(error)) throw error
+    // 只有外键冲突（23503）和上面那条提交检查才是「这人还有历史数据」。以前这里是裸
+    // catch，连接断了、语句超时也照报这句，超管会照着提示去禁用账号，真正的故障一直没人看见
+    if (!(error instanceof UserHasSubmissionsError) && !isForeignKeyViolation(error)) throw error
     return failure(c, 409, "user-in-use", "该用户还有提交、题目等历史数据，无法删除；请改为禁用账号")
   }
 })
