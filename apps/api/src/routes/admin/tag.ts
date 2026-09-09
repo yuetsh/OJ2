@@ -192,6 +192,19 @@ adminTagRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
     failedUsers: sql<number>`count(distinct ${schema.submission.userId}) ${failedFilter}`.mapWith(Number),
   }).from(schema.submission)
     .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+    /**
+     * 只看公共题，和隔壁 ac-trend 同一个口径。原来这里一个 where 都没有，比赛题
+     * 也进榜 —— 而比赛题的题号是每场比赛各自从 1 开始编的（快照里 61 道不同的题
+     * 都叫「1」），一旦挤进前 40，那一行显示的题号会指向一道根本不存在的公共题。
+     *
+     * 眼下还没发生：前 40 的门槛是 97 人卡住，比赛题最多的一道是 59 人。但两个班
+     * 一起考的场次有 95 人，撞上一道难题就够得着了。
+     *
+     * 加了这条对公共题的数字**没有任何影响**：比赛提交挂的是比赛自己的 problem 行
+     * （快照实测两个方向的交叉都是 0 条），公共题那一行本来就只统计自己的提交。
+     * 顺带让这条查询能用上 0013 的 submission_public_metrics_idx，173ms → 82ms。
+     */
+    .where(isNull(schema.submission.contestId))
     .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title)
     .having(sql`count(distinct ${schema.submission.userId}) ${failedFilter} > 0`)
     .orderBy(desc(sql`count(distinct ${schema.submission.userId}) ${failedFilter}`))
