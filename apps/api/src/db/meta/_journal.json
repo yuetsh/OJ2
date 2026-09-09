@@ -85,6 +85,20 @@
       "when": 1788788493497,
       "tag": "0011_user_lookup_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788869393805,
+      "tag": "0012_drop_redundant_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788913334948,
+      "tag": "0013_add_filter_and_metrics_indexes",
+      "breakpoints": true
     }
   ]
 }

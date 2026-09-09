@@ -127,9 +127,10 @@ export const flowchartSubmission = pgTable("flowchart_submission", {
 }, (table) => [
 	index("flowchart_problem_time_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.createTime.asc().nullsLast().op("int4_ops")),
 	index("flowchart_status_idx").using("btree", table.status.asc().nullsLast().op("int4_ops")),
-	index("flowchart_submission_id_0dbfc4f9_like").using("btree", table.id.asc().nullsLast().op("text_pattern_ops")),
-	index("flowchart_submission_problem_id_8551edbf").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
-	index("flowchart_submission_user_id_225c83e8").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
+	// 流程图列表分页。原来是 hash join 全表再 top-N 排序（4.5ms / 551 buffers），
+	// 走这条之后 0.19ms / 47。绝对值不大，但索引只要 64kB，而这张表每行带一大坨
+	// jsonb，行数涨上去是线性恶化的。ASC 反向扫，理由同 submission 那几条。
+	index("flowchart_create_time_idx").using("btree", table.createTime.asc().nullsLast()),
 	index("flowchart_user_time_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.createTime.asc().nullsLast().op("int4_ops")),
 	foreignKey({
 			columns: [table.problemId],
@@ -151,11 +152,9 @@ export const message = pgTable("message", {
 	senderId: integer("sender_id").notNull(),
 	submissionId: text("submission_id").notNull(),
 }, (table) => [
-	index("message_recipient_id_2aa5dd76").using("btree", table.recipientId.asc().nullsLast().op("int4_ops")),
 	index("message_recipient_time_idx").using("btree", table.recipientId.asc().nullsLast().op("timestamptz_ops"), table.createTime.asc().nullsLast().op("int4_ops")),
 	index("message_sender_id_a2a2e825").using("btree", table.senderId.asc().nullsLast().op("int4_ops")),
 	index("message_submission_id_2fdf8a47").using("btree", table.submissionId.asc().nullsLast().op("text_ops")),
-	index("message_submission_id_2fdf8a47_like").using("btree", table.submissionId.asc().nullsLast().op("text_pattern_ops")),
 	foreignKey({
 			columns: [table.recipientId],
 			foreignColumns: [user.id],
@@ -245,7 +244,6 @@ export const problemsetProblem = pgTable("problemset_problem", {
 	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
 }, (table) => [
 	index("problemset_problem_problem_id_fff2d686").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
-	index("problemset_problem_problemset_id_350d17fb").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
 	foreignKey({
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
@@ -274,7 +272,6 @@ export const problemsetProgress = pgTable("problemset_progress", {
 	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
 	userId: integer("user_id").notNull(),
 }, (table) => [
-	index("problemset_progress_problemset_id_20a9632e").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
 	index("problemset_progress_user_id_c8041a80").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	foreignKey({
 			columns: [table.problemsetId],
@@ -302,10 +299,7 @@ export const problemsetSubmission = pgTable("problemset_submission", {
 	index("problemset__problem_22f053_idx").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops"), table.problemId.asc().nullsLast().op("int8_ops")),
 	index("problemset__user_id_2f1501_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	index("problemset_submission_problem_id_5629b105").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
-	index("problemset_submission_problemset_id_85290e17").using("btree", table.problemsetId.asc().nullsLast().op("int8_ops")),
 	index("problemset_submission_submission_id_78e2b807").using("btree", table.submissionId.asc().nullsLast().op("text_ops")),
-	index("problemset_submission_submission_id_78e2b807_like").using("btree", table.submissionId.asc().nullsLast().op("text_pattern_ops")),
-	index("problemset_submission_user_id_915fc9c6").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	foreignKey({
 			columns: [table.problemId],
 			foreignColumns: [problem.id],
@@ -335,7 +329,6 @@ export const reaction = pgTable("reaction", {
 	problemId: integer("problem_id").notNull(),
 	userId: integer("user_id").notNull(),
 }, (table) => [
-	index("reaction_problem_id_a7f3b9f3").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
 	index("reaction_problem_type_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.type.asc().nullsLast().op("int4_ops")),
 	index("reaction_user_id_cfa7f469").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	foreignKey({
@@ -397,8 +390,6 @@ export const problem = pgTable("problem", {
 	sqlConfig: jsonb("sql_config"),
 	sqlDisplay: jsonb("sql_display"),
 }, (table) => [
-	index("problem__id_919b1d80").using("btree", table.displayId.asc().nullsLast().op("text_ops")),
-	index("problem_contest_id_328e013a").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
 	index("problem_contest_visible_idx").using("btree", table.contestId.asc().nullsLast().op("bool_ops"), table.visible.asc().nullsLast().op("int4_ops")),
 	index("problem_created_by_id_cb362143").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
 	index("problem_visible_idx").using("btree", table.visible.asc().nullsLast().op("bool_ops")),
@@ -420,7 +411,6 @@ export const problemTags = pgTable("problem_tags", {
 	problemId: integer("problem_id").notNull(),
 	problemtagId: integer("problemtag_id").notNull(),
 }, (table) => [
-	index("problem_tags_problem_id_866ecb8d").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
 	index("problem_tags_problemtag_id_72d20571").using("btree", table.problemtagId.asc().nullsLast().op("int4_ops")),
 	foreignKey({
 			columns: [table.problemId],
@@ -491,12 +481,53 @@ export const submission = pgTable("submission", {
 	// 两列同为 ASC 时整条索引反着扫就是精确的反序，所以反而是能用的那一种。
 	// 这两列都 NOT NULL，nulls 位置在语义上无所谓，纯粹是规划器的匹配规则。
 	index("submission_public_create_time_id_idx").using("btree", table.createTime.asc().nullsLast(), table.id.asc().nullsLast()).where(sql`${table.contestId} is null`),
+	/**
+	 * Django 给每个外键都自动建了一个单列索引，`db_index=True` 的还会多一个
+	 * `_like`（text_pattern_ops）。0012 把其中 21 个删了 —— 它们的列都是某个
+	 * 复合索引的**最左前缀**，规划器本来就走那一个，多出来的只是每次写入要多维护
+	 * 一棵树。这张表上删的三个是 contest_id / problem_id / user_id，分别被下面
+	 * 的 contest_create_time_idx、problem_user_idx、user_create_time_idx 覆盖。
+	 *
+	 * 加新索引时先看一眼有没有现成的复合索引已经以它打头，别把这批又建回来。
+	 */
 	index("problem_user_idx").using("btree", table.problemId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
-	index("submission_contest_id_775716d5").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
-	index("submission_problem_id_76847b55").using("btree", table.problemId.asc().nullsLast().op("int4_ops")),
+	/**
+	 * `submission_result_37e2f67a` 是 Django 建的单列索引，**别当成被下面
+	 * submission_result_time_idx 覆盖了就删**：那个是 `WHERE contest_id IS NULL`
+	 * 的部分索引，管不了「全库含比赛按 result 统计」那类查询（实测删掉之后
+	 * `count(*) where result in (6,7)` 从走索引掉回 75ms 全表扫）。856kB，留着。
+	 */
 	index("submission_result_37e2f67a").using("btree", table.result.asc().nullsLast().op("int4_ops")),
-	index("submission_user_id_3779a8c1").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	index("user_create_time_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.createTime.asc().nullsLast().op("timestamptz_ops")),
+	/**
+	 * 提交列表的「语言」和「结果」两个下拉筛选。原来这两列上要么没索引、要么只有
+	 * 不带 `contest_id IS NULL` 的单列索引，翻页那条靠 submission_public_create_time_id_idx
+	 * 边扫边滤还能对付，**count 那条只能全表扫**（快照实测固定 75~82ms / 18448 buffers，
+	 * 筛什么值都一样）。加完：语言 count 80ms → 11ms（Python3，占 8 成）/ 1.6ms（C），
+	 * 结果 count 75ms → 2.0ms。
+	 *
+	 * 更要命的是冷门语言的**翻页**：Python2 只有 3 条、全是 2022 年的，分页索引得从
+	 * 最新一路倒扫到底才凑够一页，43ms 全表扫；走这条索引是 0.02ms。
+	 *
+	 * 两列都 ASC NULLS LAST，理由同上面 submission_public_create_time_id_idx ——
+	 * 靠 Index Scan **Backward** 出 `ORDER BY create_time DESC`。这里再实测了一遍：
+	 * 写成 DESC NULLS LAST 规划器直接不认这条索引，回落到分页索引带 Filter。
+	 */
+	index("submission_language_time_idx").using("btree", table.language.asc().nullsLast(), table.createTime.asc().nullsLast()).where(sql`${table.contestId} is null`),
+	index("submission_result_time_idx").using("btree", table.result.asc().nullsLast(), table.createTime.asc().nullsLast()).where(sql`${table.contestId} is null`),
+	/**
+	 * 覆盖索引，专门给「在全部公开提交上做聚合」那几个接口用：教师统计不填班级、
+	 * 活跃榜、题目 AC 趋势。它们慢的**不是聚合本身，是为了读这四个小列把 145MB 的堆
+	 * 翻一遍** —— `code` 和 `info` 占了这张表的绝大部分体积，聚合一列都用不上。
+	 *
+	 * 有了它这些查询走 Index Only Scan，只读 6MB。快照实测：
+	 * 教师统计全站 186ms → 49ms（还消掉了 4.2MB 的落盘排序）、活跃榜 108ms → 18ms、
+	 * AC 趋势 120ms → 41ms，buffers 一律从 18000+ 掉到 2000 以内。
+	 *
+	 * 列序按 user_id 打头：三个查询里两个按人分组，能省掉排序。加列要谨慎 ——
+	 * 多一列就多一份 10 万行的拷贝，而它的价值全在「窄」上。
+	 */
+	index("submission_public_metrics_idx").using("btree", table.userId.asc().nullsLast(), table.problemId.asc().nullsLast(), table.result.asc().nullsLast(), table.createTime.asc().nullsLast()).where(sql`${table.contestId} is null`),
 	foreignKey({
 			columns: [table.contestId],
 			foreignColumns: [contest.id],
@@ -565,7 +596,6 @@ export const userAchievement = pgTable("user_achievement", {
 	userId: integer("user_id").notNull(),
 }, (table) => [
 	index("user_achievement_achievement_id_29db600d").using("btree", table.achievementId.asc().nullsLast().op("int8_ops")),
-	index("user_achievement_user_id_b8ec7d6a").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	index("user_achv_notified_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.notified.asc().nullsLast().op("bool_ops")),
 	index("user_achv_time_idx").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.unlockTime.desc().nullsFirst().op("timestamptz_ops")),
 	foreignKey({
@@ -590,7 +620,6 @@ export const userBadge = pgTable("user_badge", {
 	userId: integer("user_id").notNull(),
 }, (table) => [
 	index("user_badge_badge_id_92a983e9").using("btree", table.badgeId.asc().nullsLast().op("int8_ops")),
-	index("user_badge_user_id_a286d718").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	foreignKey({
 			columns: [table.badgeId],
 			foreignColumns: [problemsetBadge.id],
@@ -631,8 +660,6 @@ export const acmContestRank = pgTable("acm_contest_rank", {
 	contestId: integer("contest_id").notNull(),
 	userId: integer("user_id").notNull(),
 }, (table) => [
-	index("acm_contest_rank_contest_id_21030ccd").using("btree", table.contestId.asc().nullsLast().op("int4_ops")),
-	index("acm_contest_rank_user_id_40391ab2").using("btree", table.userId.asc().nullsLast().op("int4_ops")),
 	index("acm_rank_contest_user_idx").using("btree", table.contestId.asc().nullsLast().op("int4_ops"), table.userId.asc().nullsLast().op("int4_ops")),
 	index("acm_rank_order_idx").using("btree", table.contestId.asc().nullsLast().op("int4_ops"), table.acceptedNumber.asc().nullsLast().op("int4_ops"), table.totalTime.asc().nullsLast().op("int4_ops")),
 	foreignKey({

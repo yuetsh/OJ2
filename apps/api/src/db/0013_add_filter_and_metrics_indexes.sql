@@ -1,0 +1,4 @@
+CREATE INDEX "flowchart_create_time_idx" ON "flowchart_submission" USING btree ("create_time");--> statement-breakpoint
+CREATE INDEX "submission_language_time_idx" ON "submission" USING btree ("language","create_time") WHERE "submission"."contest_id" is null;--> statement-breakpoint
+CREATE INDEX "submission_result_time_idx" ON "submission" USING btree ("result","create_time") WHERE "submission"."contest_id" is null;--> statement-breakpoint
+CREATE INDEX "submission_public_metrics_idx" ON "submission" USING btree ("user_id","problem_id","result","create_time") WHERE "submission"."contest_id" is null;
