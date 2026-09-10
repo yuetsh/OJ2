@@ -90,7 +90,7 @@ export const config = {
   /** 只用来写 ai_analysis.provider 这一列，换 provider 时和 AI_BASE_URL 一起改 */
   aiProvider: process.env.AI_PROVIDER ?? "deepseek",
   aiKey: process.env.AI_KEY ?? "",
-  aiModel: process.env.AI_MODEL ?? "deepseek-v4-flash",
+  aiModel: process.env.AI_MODEL ?? "deepseek-flash",
   ruffPath: process.env.RUFF_PATH ?? "ruff",
   clangFormatPath: process.env.CLANG_FORMAT_PATH ?? "clang-format",
 }

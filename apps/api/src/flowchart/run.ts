@@ -67,7 +67,7 @@ export async function evaluateFlowchart(
       aiSuggestions: result.suggestions,
       aiCriteriaDetails: result.criteria,
       aiProvider: "deepseek",
-      aiModel: process.env.AI_MODEL ?? "deepseek-v4-flash",
+      aiModel: process.env.AI_MODEL ?? "deepseek-flash",
       processingTime: (performance.now() - started) / 1000,
       evaluationTime: new Date().toISOString(),
     }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
