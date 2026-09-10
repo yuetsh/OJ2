@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getSubmission } from "oj/api"
+import type { JudgeCaseResult } from "@oj2/contract"
 import {
   JUDGE_STATUS,
   LANGUAGE_FORMAT_VALUE,
@@ -7,6 +8,7 @@ import {
 } from "utils/constants"
 import {
   parseTime,
+  submissionCaseResults,
   submissionMemoryFormat,
   submissionTimeFormat,
   utoa,
@@ -36,6 +38,12 @@ const { isMobile, isDesktop } = useBreakpoints()
 const submission = ref<Submission>()
 const loading = ref(false)
 
+/**
+ * 测试点明细。`info` 在契约里是「完整形状或空对象」的联合（非管理员拿到的是空对象），
+ * `data` 本身也可能为 null —— 两种情况都由这个访问器归成空数组，模板里不再直接取。
+ */
+const caseResults = computed(() => submissionCaseResults(submission.value?.info))
+
 async function init() {
   submission.value = props.submission
   if (submission.value) return
@@ -45,7 +53,7 @@ async function init() {
   loading.value = false
 }
 
-const columns: DataTableColumn<Submission["info"]["data"][number]>[] = [
+const columns: DataTableColumn<JudgeCaseResult>[] = [
   { title: "测试用例", key: "test_case" },
   {
     title: "测试状态",
@@ -149,9 +157,9 @@ onMounted(init)
       />
     </n-card>
     <n-data-table
-      v-if="!hideList && submission.info && submission.info.data"
+      v-if="!hideList && caseResults.length"
       :columns="columns"
-      :data="submission.info.data"
+      :data="caseResults"
     />
   </n-flex>
   <n-spin v-else :show="loading" class="loading-container"> </n-spin>

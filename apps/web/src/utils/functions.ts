@@ -1,4 +1,5 @@
 import { toAdminType } from "@oj2/contract"
+import type { JudgeCaseResult, SubmissionDetail } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
 import { User } from "./types"
 import { USER_TYPE } from "./constants"
@@ -17,6 +18,23 @@ function calculateACRate(acCount: number, totalCount: number): string {
   if (totalCount === 0) return "0.00"
   if (acCount >= totalCount) return "100.00"
   return ((acCount / totalCount) * 100).toFixed(2)
+}
+
+/**
+ * 从 `submission.info` 里取测试点明细，取不到就返回空数组。
+ *
+ * 契约里 `info` 是**联合类型**：判题机写的完整形状，或者空对象 —— 后者是后端对
+ * 非管理员下发的权限投影（`routes/submission.ts` 的 `full ? row.submission.info : {}`），
+ * 也是待判提交的初值。所以调用方不能直接 `.data`，得先在这里收口。
+ *
+ * 另外 `data` 本身也可能是 null：生产库 124191 条提交里有 12048 条是编译失败之类
+ * 没有逐测试点结果的情形。两种「没有」在这里一并归成空数组。
+ */
+export function submissionCaseResults(
+  info: SubmissionDetail["info"] | null | undefined,
+): JudgeCaseResult[] {
+  if (!info || !("data" in info) || !info.data) return []
+  return info.data
 }
 
 export function getACRate(acCount: number, totalCount: number): string {

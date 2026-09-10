@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { paginatedSchema } from "./common"
+import { problemLanguageSchema } from "./language"
 
 export const judgeStatusSchema = z.union([
   z.literal(-2),
@@ -17,9 +18,93 @@ export const judgeStatusSchema = z.union([
   z.literal(10),
 ])
 
+/**
+ * 判题机原始输出（`submission.info` 的 JSONB 原文）。
+ *
+ * 形状按**生产库 124191 条提交实测**得出，不是照着前端那份额外手抄的：
+ *
+ * - `err` 实测 124191 条**全是 null**，从来没见过字符串 —— 但契约仍留 `string`，
+ *   因为判题机层面它是有意义的通道，收紧成 `z.null()` 会在它第一次真的报错时炸。
+ * - `data` 有 **12048 条是 null**（编译失败等没有逐测试点结果的情形），
+ *   所以它必须 nullable。前端原来手抄的 `Info` 把 data 写成了非空数组，
+ *   这 12048 条在类型上根本不成立，只是没有一处会去读它才没炸。
+ * - 数组项比前端手抄的多三处：SQL 判题多带 `error_message`（201 个测试点）、
+ *   部分带 `score`（10 个）。所以这里的字段一律可选，不用 strictObject。
+ *
+ * 键名是**判题沙箱定的 snake_case**，不要跟着响应字段一起改。
+ */
+export const judgeCaseResultSchema = z.object({
+  error: z.number(),
+  memory: z.number(),
+  output: z.string().nullable(),
+  result: judgeStatusSchema,
+  signal: z.number(),
+  cpu_time: z.number(),
+  exit_code: z.number(),
+  real_time: z.number(),
+  test_case: z.string(),
+  output_md5: z.string(),
+  /** SQL 判题会带上中文原因，沙箱判题没有这个键 */
+  error_message: z.string().optional(),
+  score: z.number().optional(),
+})
+
+export const judgeInfoSchema = z.object({
+  err: z.string().nullable(),
+  data: z.array(judgeCaseResultSchema).nullable(),
+})
+
+/**
+ * `info` 允许的两种取值，**不能只写成完整形状**：
+ *
+ * 1. 完整形状：判题机写的 JSONB 原文；
+ * 2. **空对象**：后端对非管理员用 `info: {}` 下发的占位（`routes/submission.ts:841`
+ *    的 `full ? row.submission.info : {}`），同一个空对象也是插入待判提交时的初值。
+ *
+ * 第 2 种是真实存在的合法取值，收紧成只认完整形状会让**每一条非管理员看的提交详情
+ * 直接 500**（`submissionDetailSchema.parse` 在路由里抛，被 onError 兜成 internal-error）。
+ * 这不是假想：收紧当天就在本地实测复现了。
+ *
+ * 换句话说，空对象表达的是「这条响应对你不含 info」，一个**权限投影**，
+ * 而不是「字段缺失」—— 契约要如实描述它。
+ */
+export const submissionInfoSchema = z.union([judgeInfoSchema, z.object({})])
+
+/**
+ * 判题产出的统计（`submission.statistic_info` 的 JSONB 原文）。
+ *
+ * 五个键全部可选，依据是生产库实测的出现次数：time_cost / memory_cost 各 112097、
+ * score 3993、err_info 3153、ast_results 56，另有 27 条空对象。
+ *
+ * **不能用严格对象。** 有 8916 条历史记录里的 JSONB 原文内嵌了带转义的 shell
+ * 输出、本身不是合法 JSON，后端 `objectValue()` 会把它兜成 `{ value: "<原串>" }`
+ * 再下发 —— 严格 schema 会把这 8916 条判成契约分歧，而它们其实是正常的失败记录。
+ */
+export const statisticInfoSchema = z.object({
+  score: z.number().optional(),
+  /** 判题机写进 statistic_info 的错误文本，教师面板的「最近一条错在哪」也读它 */
+  err_info: z.string().optional(),
+  time_cost: z.number().optional(),
+  memory_cost: z.number().optional(),
+  ast_results: z.array(
+    z.object({
+      description: z.string(),
+      passed: z.boolean(),
+      /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
+      actual: z.number().optional(),
+    }),
+  ).optional(),
+})
+
 export const createSubmissionRequestSchema = z.object({
   problemId: z.number().int().positive(),
-  language: z.string().min(1).max(32),
+  /**
+   * 提交的语言。用题目语言的联合而不是 `z.string()` —— 学生能选的语言就是题目
+   * `languages` 里列出的那些，写宽松了的话，前端把语言拼错（`"C＋＋"`、`"python3"`
+   * 大小写）会一路走到判题机才以 `Unsupported judge language` 报系统错误，
+   * 学生看到的是「系统错误」而不是「语言不对」。
+   */
+  language: problemLanguageSchema,
   code: z.string().min(1).max(1024 * 1024),
   contestId: z.number().int().positive().optional(),
   /**
@@ -44,9 +129,10 @@ export const submissionDetailSchema = z.object({
   username: z.string(),
   code: z.string(),
   result: judgeStatusSchema,
-  info: z.unknown(),
-  language: z.string(),
-  statisticInfo: z.record(z.string(), z.unknown()),
+  /** 未判完或非管理员看时为 `{}`，见 submissionInfoSchema 的注释 */
+  info: submissionInfoSchema,
+  language: problemLanguageSchema,
+  statisticInfo: statisticInfoSchema,
   contestId: z.number().int().nullable(),
   problemId: z.number().int(),
   /**
@@ -99,8 +185,8 @@ export const submissionListItemSchema = z.object({
   userId: z.number().int(),
   username: z.string(),
   result: judgeStatusSchema,
-  language: z.string(),
-  statisticInfo: z.record(z.string(), z.unknown()),
+  language: problemLanguageSchema,
+  statisticInfo: statisticInfoSchema,
   /**
    * 来源题单，非题单入口提交的为 null。比赛提交恒为 null（比赛题不会进题单）。
    * 历史提交里只有「当年首次 AC 那一条」有值 —— 迁移 0007 从 problemset_submission
@@ -228,6 +314,9 @@ export const formatCodeRequestSchema = z.object({
 export const formatCodeResponseSchema = z.object({ code: z.string() })
 
 export type JudgeStatus = z.infer<typeof judgeStatusSchema>
+export type JudgeInfo = z.infer<typeof judgeInfoSchema>
+export type JudgeCaseResult = z.infer<typeof judgeCaseResultSchema>
+export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type CreateSubmissionRequest = z.infer<
   typeof createSubmissionRequestSchema
 >

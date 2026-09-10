@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { paginatedSchema, sampleUserSchema } from "./common"
+import { problemLanguageSchema } from "./language"
 
 /**
  * 题目难度。生产库 956 道题只有这三个值（旧 Django 的 Problem.difficulty choices
@@ -296,8 +297,16 @@ export const problemDetailSchema = z.object({
     }),
   ),
   hint: z.string().nullable(),
-  languages: z.array(z.string()),
-  template: z.record(z.string(), z.string()),
+  languages: z.array(problemLanguageSchema),
+  /**
+   * 语言 → 代码模板。**用 partialRecord 让键受语言联合约束** ——
+   * 原来这里是 `z.record(z.string(), z.string())`，等价于 `Record<string, string>`，
+   * 前端按语言查模板时拿不到任何键名保护（`template["Pytho3"]` 也是合法表达式）。
+   *
+   * partialRecord 而非 record：没配模板的语言不该出现该键（`template: {}` 是常态），
+   * 用 record 会要求每一个语言键都存在。
+   */
+  template: z.partialRecord(problemLanguageSchema, z.string()),
   createTime: z.string(),
   lastUpdateTime: z.string().nullable(),
   timeLimit: z.number().int(),

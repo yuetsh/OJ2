@@ -15,6 +15,7 @@ import type {
   JudgeStatus,
   AstRules,
   CreateAnnouncementRequest,
+  ProblemLanguage,
 } from "@oj2/contract"
 
 /**
@@ -45,16 +46,17 @@ export type User = AdminUser & {
   password?: string
 }
 
-export type LANGUAGE =
-  | "C"
-  | "C++"
-  | "Python2"
-  | "Python3"
-  | "Java"
-  | "JavaScript"
-  | "Golang"
-  | "Flowchart"
-  | "SQL"
+/**
+ * 语言联合。**从契约派生，不再手抄** —— 原来这里手写了一份 9 个值的联合，
+ * 而后端 `judge/languages.ts` 与生产库各有自己的答案，三份真相各自演进：
+ * 手抄那份漏了 `SQL`，于是生产库里 91 条 SQL 提交的 `language` 在类型上是
+ * `undefined`（提交列表、表情组件都按它渲染）。现在唯一来源是契约的
+ * `problemLanguageSchema`，见 packages/contract/src/language.ts。
+ *
+ * constants.ts 的 SOURCES / LANGUAGE_FORMAT_VALUE / LANGUAGE_SHOW_VALUE
+ * 都以它为键 —— 契约里加一种语言而那边没补映射，会当场编译不过。
+ */
+export type LANGUAGE = ProblemLanguage
 
 /**
  * SQL 题的配置与展示数据。形状在契约里 —— 原来这里手抄了一份，
@@ -262,74 +264,25 @@ export type {
 export type { CreateFlowchartRequest as SubmitFlowchartPayload } from "@oj2/contract"
 
 /**
- * 判题机原始输出。契约里是 `info: z.unknown()` —— 后端不校验沙箱产物，
- * 这些键名是沙箱定的，**保持 snake_case**，不要跟着响应字段一起改名。
+ * 提交详情。**info / statisticInfo / language 三处窄化都搬进契约了**
+ * （`judgeInfoSchema` / `statisticInfoSchema` / `problemLanguageSchema`），
+ * 依据是生产库 124191 条提交的实测分布，见 packages/contract/src/submission.ts。
+ *
+ * 前端仍要保留一处：`result` 多一个 9 —— 点了提交、还没拿到结果时前端本地先填的
+ * 伪状态，后端永远不会下发，见 constants.ts 的 SubmissionStatus.submitting。
+ * 这是「前端自己造的状态」，不属于契约能描述的东西。
  */
-interface Info {
-  err: string | null
-  data: {
-    error: number
-    memory: number
-    output: null
-    result: SUBMISSION_RESULT
-    signal: number
-    cpu_time: number
-    exit_code: number
-    real_time: number
-    test_case: string
-    output_md5: string
-  }[]
-}
-
-/**
- * 判题产出的统计。**键名保持 snake_case** —— 这是 submission.statistic_info
- * JSONB 的原文，判题机按这套键名写进去，不能跟着响应字段一起改名。
- */
-export interface StatisticInfo {
-  score?: number
-  err_info?: string
-  time_cost?: number
-  memory_cost?: number
-  ast_results?: Array<{
-    description: string
-    passed: boolean
-    /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
-    actual?: number
-  }>
-}
-
-/**
- * 提交详情。以契约的 SubmissionDetail 为准，只窄化两处 unknown：
- * `info` 是判题沙箱原始输出，`statisticInfo` 是判题写的 JSONB —— 两者内部都是 snake。
- */
-export type Submission = Omit<
-  SubmissionDetail,
-  "info" | "statisticInfo" | "language" | "result"
-> & {
-  info: Info
-  statisticInfo: StatisticInfo
-  language: LANGUAGE
-  // 比契约多一个 9：点了提交、还没拿到结果时前端本地先填这个伪状态，
-  // 见 constants.ts 的 SubmissionStatus.submitting
+export type Submission = Omit<SubmissionDetail, "result"> & {
   result: SUBMISSION_RESULT
 }
 
-/** 站内信里嵌的提交：problem 是展示题号而非数字 id，且不含 info / ip / contestId */
-export type EmbeddedSubmission = Omit<
-  ContractEmbeddedSubmission,
-  "statisticInfo" | "language"
-> & {
-  statisticInfo: StatisticInfo
-  language: LANGUAGE
-}
+/**
+ * 站内信里嵌的提交：problem 是展示题号而非数字 id，且不含 info / ip / contestId。
+ * 契约里已经窄化好了（`embeddedSubmissionSchema`），这里不再重复 Omit + 增补。
+ */
+export type EmbeddedSubmission = ContractEmbeddedSubmission
 
-export type SubmissionListItem = Omit<
-  ContractSubmissionListItem,
-  "statisticInfo" | "language"
-> & {
-  statisticInfo: StatisticInfo
-  language: LANGUAGE
-}
+export type SubmissionListItem = ContractSubmissionListItem
 
 export interface SubmissionListPayload {
   myself?: "1" | "0"

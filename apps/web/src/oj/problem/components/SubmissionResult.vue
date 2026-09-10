@@ -2,8 +2,10 @@
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { HINT_MIN_FAILURES } from "@oj2/contract"
+import type { JudgeCaseResult } from "@oj2/contract"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
+  submissionCaseResults,
   submissionMemoryFormat,
   submissionTimeFormat,
 } from "utils/functions"
@@ -124,9 +126,12 @@ async function fetchHint(submissionId: string) {
 
 // 测试用例表格数据（只在部分通过时显示）
 const infoTable = computed(() => {
-  if (!props.submission?.info?.data?.length) return []
+  const submission = props.submission
+  if (!submission) return []
+  const data = submissionCaseResults(submission.info)
+  if (!data.length) return []
 
-  const result = props.submission.result
+  const result = submission.result
   // AC、编译错误、运行时错误不显示测试用例表格
   if (
     result === SubmissionStatus.accepted ||
@@ -137,13 +142,12 @@ const infoTable = computed(() => {
     return []
   }
 
-  const data = props.submission.info.data
   // 只有存在失败的测试用例时才显示
   return data.some((item) => item.result === 0) ? data : []
 })
 
 // 测试用例表格列配置
-const columns: DataTableColumn<Submission["info"]["data"][number]>[] = [
+const columns: DataTableColumn<JudgeCaseResult>[] = [
   { title: "测试用例", key: "test_case" },
   {
     title: "测试状态",

@@ -16,7 +16,6 @@ import {
   type ProblemAuthor,
   type ProblemListItem,
   type YearlyAc,
-  type ProblemList,
   type CreateFlowchartResponse,
   type FlowchartCurrent,
   type FlowchartDetail,
@@ -34,12 +33,17 @@ import {
   type ProblemSetProgressList,
   type UserBadge,
   problemDetailSchema,
+  problemListSchema,
   submissionDetailSchema,
+  submissionListSchema,
+  onlineCountSchema,
+  websiteConfigSchema,
   type FlowchartStatistics,
   type SubmissionStatistics,
   type SubmissionStatisticsItems,
 } from "@oj2/contract"
 import api from "utils/api"
+import { contract } from "utils/contract"
 import { filterResult } from "oj/transforms"
 import type {
   Announcement,
@@ -47,16 +51,12 @@ import type {
   ContestRank,
   Profile,
   Message,
-  SubmissionListItem,
   Exercise,
   Problem,
   ReactionKey,
   ReactionState,
-  Submission,
   SubmissionListPayload,
   SubmitCodePayload,
-  OnlineCount,
-  WebsiteConfig,
   Tutorial,
   TutorialProgress,
 } from "utils/types"
@@ -64,18 +64,33 @@ import type {
 /**
  * 题目详情。走契约的 zod 解析，形状即契约 —— 之前这里手抄了一份 camel→snake 的
  * 键名映射，抄漏一个字段就是静默 undefined。
+ *
+ * 走 `contract()` 而不是裸 `parse()`：这里原来是
+ * `problemDetailSchema.parse(value) as Problem` —— `as` 把校验结果又断言回本地
+ * 类型，等于校验白做。契约现在把 `languages` / `template` 都收进了联合，
+ * `Problem` 不再需要额外窄化，`as` 也就没有存在的理由了。
  */
 function detailProblem(value: unknown): Problem {
-  return problemDetailSchema.parse(value) as Problem
+  return contract("GET /problems/:id", problemDetailSchema, value)
 }
 
-export function getWebsiteConfig() {
-  return api.get<WebsiteConfig>("site")
+export async function getWebsiteConfig() {
+  const endpoint = "site"
+  return contract(
+    "GET /site",
+    websiteConfigSchema,
+    await api.get<unknown>(endpoint),
+  )
 }
 
 /** 当前在线人数。只有聚合数字，「谁在线」在榜单接口里、且只对老师下发 */
-export function getOnlineCount() {
-  return api.get<OnlineCount>("site/online")
+export async function getOnlineCount() {
+  const endpoint = "site/online"
+  return contract(
+    "GET /site/online",
+    onlineCountSchema,
+    await api.get<unknown>(endpoint),
+  )
 }
 
 export async function getProblemList(
@@ -83,9 +98,14 @@ export async function getProblemList(
   limit = 10,
   searchParams: Record<string, unknown> = {},
 ) {
-  const res = await api.get<ProblemList>("problems", {
-    params: { paging: true, offset, limit, ...searchParams },
-  })
+  const endpoint = "problems"
+  const res = contract(
+    "GET /problems",
+    problemListSchema,
+    await api.get<unknown>(endpoint, {
+      params: { paging: true, offset, limit, ...searchParams },
+    }),
+  )
   return {
     results: res.results.map(filterResult),
     total: res.total,
@@ -111,10 +131,12 @@ export function getProblemBeatRate(problemID: number) {
 }
 
 export async function getSubmission(id: string) {
-  const response = await api.get<unknown>(
-    `submissions/${encodeURIComponent(id)}`,
+  const endpoint = `submissions/${encodeURIComponent(id)}`
+  return contract(
+    "GET /submissions/:id",
+    submissionDetailSchema,
+    await api.get<unknown>(endpoint),
   )
-  return submissionDetailSchema.parse(response) as Submission
 }
 
 export function submitCode(data: SubmitCodePayload) {
@@ -138,12 +160,27 @@ export function getSubmissions(params: Partial<SubmissionListPayload>) {
   const endpoint = params.contestId
     ? `contests/${encodeURIComponent(params.contestId)}/submissions`
     : "submissions"
-  // 契约里 language 是 z.string()（语言是配置项，随时可能加，收紧成枚举会让
-  // 新加的语言在后端 parse 时直接抛），前端在这一处收窄成 LANGUAGE
-  return api.get<{ results: SubmissionListItem[]; total: number }>(endpoint, {
-    // contestId 走的是路径，page 只有前端分页器用
-    params: { ...params, contestId: undefined, page: undefined },
-  })
+  return getSubmissionPage(endpoint, params)
+}
+
+/**
+ * 提交列表。后端在 `submissionListItemSchema.parse` 上真的会抛 —— 它逐个列表项
+ * 过 schema，所以这条链路上的分歧**后端自己就拦住了**，前端这层校验是第二道保险：
+ * 主要防「后端加了字段但契约没跟上、前端类型声称有实际是 undefined」这类
+ * 只在展示端出问题的偏差。
+ */
+async function getSubmissionPage(
+  endpoint: string,
+  params: Partial<SubmissionListPayload>,
+) {
+  return contract(
+    `GET /${endpoint}`,
+    submissionListSchema,
+    await api.get<unknown>(endpoint, {
+      // contestId 走的是路径，page 只有前端分页器用
+      params: { ...params, contestId: undefined, page: undefined },
+    }),
+  )
 }
 
 export function getRankOfProblem(problemId: string) {
