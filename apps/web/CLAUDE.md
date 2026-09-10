@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**ojnext** is the frontend for an Online Judge platform. Built with Vue 3 + TypeScript using Vite (Rolldown-based bundler), Naive UI component library, Pinia for state management, and Vue Router.
+**OJ2 的前端**（`OJ2/apps/web`），代码从上一代 `ojnext/` 原样搬来、只替换了 API 层
+（`ojnext` 与 `../OnlineJudge` 都已下线且**完全冻结，一行都不改**）。Vue 3 + TypeScript，
+Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
+
+**要兼容机房的老 Chrome（< 94）**：`vite.config.ts` 的 legacy 配置与
+`mermaid-legacy` 等 fallback 依赖不能动，理由写在该文件的注释里。
 
 ## Commands
 
@@ -70,15 +75,37 @@ shared →  ./src/shared
 
 ### HTTP Client
 
-`utils/http.ts` — Axios instance with interceptors. All API calls proxy through the dev server:
-- `/api` and `/public` → `PUBLIC_OJ_URL` (backend)
-- `/ws` → `PUBLIC_WS_URL` (WebSocket backend)
+`utils/api.ts` — Axios instance with interceptors (`baseURL: "/api"`,
+`withCredentials`). It unwraps both the axios envelope and the backend's
+`{ data }` envelope, so callers get the payload directly. All API calls proxy
+through the dev server (see `vite.config.ts`).
+
+### Contract guard (`utils/contract.ts`)
+
+`@oj2/contract` 的 zod schema 是**前后端唯一的形状来源**，`utils/types.ts` 只做
+`z.infer` 派生与少量前端专有的收窄（都写了理由）。读接口应当走守卫：
+
+```ts
+const endpoint = `problems/${encodeURIComponent(id)}`
+return contract("GET /problems/:id", problemDetailSchema, await api.get<unknown>(endpoint))
+```
+
+**失败策略是「记日志 + 放行原始数据」，不抛错。** 形状对不上时：控制台打一条带
+端点和字段路径的记录、去重后记进 `window.__OJ2_CONTRACT_DRIFT__`、然后**返回原始
+数据让页面继续渲染**。面向学生的生产站点，少一个字段的代价远小于白屏。
+
+排查线上分歧就是打开控制台敲 `window.__OJ2_CONTRACT_DRIFT__`；某条路径长期为空之后，
+那条路径可以升级成硬失败（直接 `schema.parse`），在那之前不要改。
+
+改动 schema 时要记住**同一个 schema 后端也在 `parse`**（如
+`submissionDetailSchema.parse` 在路由里），所以收紧一个字段前先用生产数据核一遍，
+否则一条不符合的历史记录会让整个列表 500。
 
 ### Key Utilities
 
 - `utils/constants.ts` — Judge status codes, language IDs, difficulty levels, contest types
-- `utils/types.ts` — TypeScript interfaces for all domain models
-- `utils/permissions.ts` — Permission check helpers
+- `utils/types.ts` — 契约类型的派生与前端专有收窄（不是手写的一份平行类型）
+- `utils/contract.ts` — 运行时契约闸门，见上
 - `utils/judge.ts` — Judge-related utilities
 - `utils/renders.ts` — Table column render helpers for Naive UI DataTable
 
@@ -113,4 +140,6 @@ Routes are defined in `src/routes.ts` with two root routes: `ojs` (user-facing) 
 
 ## Related Repository
 
-The backend is at `../OnlineJudge` — a Django 5 + DRF project. See its CLAUDE.md for backend details.
+后端就在同一个仓库的 `../api`（Bun + Hono + Drizzle，编译成单二进制），
+契约在 `../../packages/contract`。**不要再去看 `OnlineJudge/`** —— 那是已下线的
+Django 后端，只作参照、完全冻结。详见 `../CLAUDE.md`。

@@ -1,20 +1,12 @@
 import {
-  type AiAnalysisRecord,
   type FormatCodeResponse,
-  type TutorialSummary,
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
   type CreateSubmissionResponse,
   type ProblemAuthor,
-  type YearlyAc,
   type CreateFlowchartResponse,
   type FlowchartSubmission,
-  type AiDetail,
-  type DurationData,
-  type HeatmapItem,
-  type LoginSummary,
-  type SolvedList,
   problemDetailSchema,
   problemListSchema,
   problemListItemSchema,
@@ -45,20 +37,28 @@ import {
   flowchartStatisticsSchema,
   problemSetProgressListSchema,
   problemSetProblemSchema,
+  tutorialSummarySchema,
+  tutorialProgressSchema,
+  messageListSchema,
+  yearlyAcSchema,
+  aiDetailSchema,
+  solvedListSchema,
+  durationDataSchema,
+  heatmapItemSchema,
+  loginSummarySchema,
+  aiAnalysisRecordSchema,
 } from "@oj2/contract"
 import api from "utils/api"
 import { contract } from "utils/contract"
 import { filterResult } from "oj/transforms"
 import type {
   Profile,
-  Message,
   Exercise,
   Problem,
   ReactionKey,
   ReactionState,
   SubmissionListPayload,
   SubmitCodePayload,
-  TutorialProgress,
 } from "utils/types"
 
 /**
@@ -384,11 +384,13 @@ export async function getAnnouncement(id: number) {
   )
 }
 
-export function getMessageList(offset = 0, limit = 10) {
-  // language 的收窄同 getSubmissions，见那里的说明
-  return api.get<{ results: Message[]; total: number }>("messages", {
-    params: { limit, offset },
-  })
+export async function getMessageList(offset = 0, limit = 10) {
+  const endpoint = "messages"
+  return contract(
+    "GET /messages",
+    messageListSchema,
+    await api.get<unknown>(endpoint, { params: { limit, offset } }),
+  )
 }
 
 export function getReaction(problemID: number) {
@@ -417,48 +419,85 @@ export async function getTutorial(id: number) {
   )
 }
 
-export function getTutorials(type: "python" | "c") {
-  return api.get<TutorialSummary[]>("tutorials", { params: { type } })
+export async function getTutorials(type: "python" | "c") {
+  const endpoint = "tutorials"
+  return contract(
+    "GET /tutorials",
+    tutorialSummarySchema.array(),
+    await api.get<unknown>(endpoint, { params: { type } }),
+  )
 }
 
-export function getAIDetailData(start: string, end: string, username?: string) {
-  return api.get<AiDetail>("ai/detail", { params: { start, end, username } })
+export async function getAIDetailData(
+  start: string,
+  end: string,
+  username?: string,
+) {
+  const endpoint = "ai/detail"
+  return contract(
+    "GET /ai/detail",
+    aiDetailSchema,
+    await api.get<unknown>(endpoint, { params: { start, end, username } }),
+  )
 }
 
-export function getAISolved(
+export async function getAISolved(
   start: string,
   end: string,
   offset: number,
   limit: number,
   username?: string,
 ) {
-  return api.get<SolvedList>("ai/solved", {
-    params: { start, end, offset, limit, username },
-  })
+  const endpoint = "ai/solved"
+  return contract(
+    "GET /ai/solved",
+    solvedListSchema,
+    await api.get<unknown>(endpoint, {
+      params: { start, end, offset, limit, username },
+    }),
+  )
 }
 
-export function getAIDurationData(
+export async function getAIDurationData(
   end: string,
   duration: string,
   username?: string,
 ) {
-  return api.get<DurationData[]>("ai/duration", {
-    params: { end, duration, username },
-  })
+  const endpoint = "ai/duration"
+  return contract(
+    "GET /ai/duration",
+    durationDataSchema.array(),
+    await api.get<unknown>(endpoint, { params: { end, duration, username } }),
+  )
 }
 
-export function getAIHeatmapData(username?: string) {
-  return api.get<HeatmapItem[]>("ai/heatmap", {
-    params: username ? { username } : {},
-  })
+export async function getAIHeatmapData(username?: string) {
+  const endpoint = "ai/heatmap"
+  return contract(
+    "GET /ai/heatmap",
+    heatmapItemSchema.array(),
+    await api.get<unknown>(endpoint, {
+      params: username ? { username } : {},
+    }),
+  )
 }
 
-export function getAILoginSummary() {
-  return api.get<LoginSummary>("ai/login-summary")
+export async function getAILoginSummary() {
+  const endpoint = "ai/login-summary"
+  return contract(
+    "GET /ai/login-summary",
+    loginSummarySchema,
+    await api.get<unknown>(endpoint),
+  )
 }
 
-export function getAIPinnedReport() {
-  return api.get<AiAnalysisRecord | null>("ai/pinned")
+export async function getAIPinnedReport() {
+  const endpoint = "ai/pinned"
+  return contract(
+    "GET /ai/pinned",
+    aiAnalysisRecordSchema.nullable(),
+    await api.get<unknown>(endpoint),
+  )
 }
 
 // ==================== 相似题目推荐 ====================
@@ -475,9 +514,12 @@ export async function getSimilarProblems(problemId: string) {
 
 export type { YearlyAc as YearlyACData } from "@oj2/contract"
 
-export function getProblemYearlyAC(problemId: string) {
-  return api.get<YearlyAc[]>(
-    `problems/${encodeURIComponent(problemId)}/yearly-ac`,
+export async function getProblemYearlyAC(problemId: string) {
+  const endpoint = `problems/${encodeURIComponent(problemId)}/yearly-ac`
+  return contract(
+    "GET /problems/:id/yearly-ac",
+    yearlyAcSchema.array(),
+    await api.get<unknown>(endpoint),
   )
 }
 
@@ -666,8 +708,13 @@ export function reportExerciseAttempt(
   }).catch(() => undefined)
 }
 
-export function getLearnProgress(type: "python" | "c") {
-  return api.get<TutorialProgress[]>("learn/progress", { params: { type } })
+export async function getLearnProgress(type: "python" | "c") {
+  const endpoint = "learn/progress"
+  return contract(
+    "GET /learn/progress",
+    tutorialProgressSchema.array(),
+    await api.get<unknown>(endpoint, { params: { type } }),
+  )
 }
 
 /**
