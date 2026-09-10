@@ -4,28 +4,14 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 上一代在 `../OnlineJudge/`（Django）和 `../ojnext/`（Vue SPA），**仍然完全冻结、
 一行都不改**。
 
-> **2026-08-26：回滚路径已废弃，且已经不可逆。** 旧 Django 后端确认不再使用，
-> `0002_drop_django_leftovers` 删掉了它的 7 张框架表（含 `django_session`、
-> `django_migrations`）。**这条迁移已在生产库执行完毕**
-> （`docker exec oj-api oj2-api migrate` 回「没有待执行的迁移」）。
+> **旧栈已不可逆地下线。** `0002_drop_django_leftovers` 删掉了 Django 的框架表
+> （`django_session` 等），且已在生产库执行完毕。所以「停新栈起旧栈」「把 NPM 上游
+> 改回 8080」都已失效，**唯一退路是从数据库备份恢复** —— 切换手册里的「回滚保证」
+> 那节只剩历史价值。
 >
-> 所以旧栈现在**起不来**了：「停新栈起旧栈」「把 NPM 上游改回 8080」都已失效，
-> 唯一退路是从数据库备份恢复。切换手册里的「回滚保证」那节只剩历史价值。
+> 生产库上 0002 有一张没删干净（0 行的 `django_migrations`，来源已无法复原），
+> 由 `0014_drop_django_migrations` 补删，前因后果写在那个迁移文件的注释里。
 >
-> 「改 schema 要考虑回滚」这条约束随之解除，schema 归 OJ2 独占，
-> 走 drizzle migration 正常演进即可。
->
-> **2026-09-10 更正：上面「7 张框架表已删」在生产库上并不成立。** 实测生产库
-> 29 张 public 表 = `schema.ts` 的 28 张 + 一张 **0 行的 `django_migrations`**：0002 里
-> 另外 6 张（`auth_group*` / `auth_permission` / `django_content_type` /
-> `django_dramatiq_task` / `django_session`）确实都不在了，只有它复活/残留了下来。
-> 原因已无法从库里复原（0002 的记账行在，说明它当年执行过；`DROP TABLE IF EXISTS`
-> 也不会静默跳过后续语句），多半是事后有人手工建过它、或从旧 dump 单独恢复过。
->
-> 处置见 `0014_drop_django_migrations`：全仓零读写、表为空，直接删掉，用
-> `IF EXISTS` 让「空库自举」（0002 已删过）与「老生产库」（还留着）两条路径收敛到
-> 同一结构。**旧栈起不来这个结论不变** —— 它缺的是 `django_session` 等表，不是这张。
-
 > **旧仓库仍然零改动**，没有例外——包括修 bug、包括不影响外部接口的内部小修。
 > 所有后续工作，包括在旧仓库里发现的 bug，都只落在 OJ2：先确认 OJ2 是否有对应逻辑、
 > 是否重现了同样的问题，只在 OJ2 里修；旧仓库那边如实告知用户"未处理，按当前政策
@@ -63,12 +49,19 @@ bun run dev            # api(3000) + worker + web(5173) 一起起
 常用检查：
 
 ```bash
-bunx tsc --noEmit -p apps/api                 # 后端类型检查
+bun run --filter '@oj2/api' typecheck         # 后端类型检查
 bun run --filter '@oj2/api' check:routes      # 路由遮蔽检查，加完路由跑一下
-cd apps/web && bun run build                  # 前端构建（vite 不做类型检查，构建即验证）
+cd apps/web && bun run type-check             # 前端类型检查
+cd apps/web && bun run build                  # 前端构建
 ```
 
+⚠️ **前端类型检查只能走 `bun run type-check` 这个脚本。** 两条看起来等价的路子
+都会**静默通过**：`vue-tsc --noEmit -p tsconfig.json` 检查 0 个文件（那个
+tsconfig 是 `files: []` + references 的壳，真正的配置在 `tsconfig.app.json`），
+而 `vite build` 根本不做类型检查。改完 .vue / .ts 别拿构建当验证。
+
 **不要写测试** —— 沿用上一代的项目约定。验证靠实跑：起服务、打接口、看结果。
+本机 Docker 全套都能起，实跑的成本比想象中低。
 
 ## 几件必须知道的事
 
@@ -112,6 +105,27 @@ dev 直接起不来。
 `apps/api/src/judge/status.ts` 和 `apps/web/src/utils/constants.ts` 必须一致。
 这些整数是**落库的值**：12 万条历史提交的 `submission.result` 就是它们，判题沙箱回的也是
 这套编码，所以只能新增、不能改已有的含义。题目表情 reaction 的语义 key 同理。
+
+### 契约收紧要挑地方：闸在写入侧，不在读出侧
+
+`packages/contract` 的 schema 前后端共用，而且**后端在读路径上 `parse`**
+（`submissionDetailSchema` / `exerciseSchema` / `contestRankItemSchema` 都是）。
+所以收紧一个字段不只是「类型更准」，是给全部历史数据加了一道闸：
+
+- 对不上就 500 —— `exerciseSchema` 按题型收紧过，库里一行脏数据能让整条学生练习
+  列表打不开，坏的不是那一道题；
+- 更坏的是**不 500**：`info` 当时写成 `union([完整形状, z.object({})])`，对不上的
+  一律落进空对象那支且 parse 成功，管理员详情页的测试点表格**静默消失**。全量核出来
+  9163/124192 条中招，RE 8480/8480、TLE 338/338、MLE 1/1 全中 —— 沙箱在非正常退出
+  的测试点上写 `output_md5: null`，而契约写的是 `z.string()`。
+
+所以：**JSONB 原文（`submission.info` / `statistic_info` / `exercise.data`）的形状
+真相在写入侧** —— 判题机、`services/exercise.ts` 的 `exerciseDataError` —— 闸就设在
+那里，读出侧放行。下一条 AST 规则的 `astRulesError()` 是同一个道理的另一个实例。
+
+真要收紧读出侧的字段，先拿根目录那份生产备份跑一遍全量，**重点看空值，不是键集合**：
+上面那次翻车就是键集合全对、空值没看。前端那侧（`utils/contract.ts` 为什么只挂三处）
+见 `apps/web/CLAUDE.md`。
 
 ### AST 代码规则有两张表，必须同增同减
 

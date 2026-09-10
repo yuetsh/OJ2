@@ -13,15 +13,21 @@ Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
 
 ## Commands
 
+前端一般不单独起，`OJ2/` 根目录 `bun run dev` 会把 api + worker + web 一起拉起来。
+只跑前端或要验证时：
+
 ```bash
-npm start              # Start dev server on port 5173
-npm run build          # Production build
-npm run build:staging  # Staging build
-npm run build:test     # Test build
-npm fmt                # Format with Prettier
+bun run dev            # 只起前端 dev server（5173），后端得另外起
+bun run type-check     # 类型检查。改完 .vue / .ts 必须跑这个
+bun run build          # 生产构建
+bun run fmt            # Prettier
 ```
 
-No test suite is configured. Linting is via Prettier only.
+⚠️ **验证只认 `bun run type-check`。** `vue-tsc --noEmit -p tsconfig.json` 会**静默
+通过**——那个 tsconfig 是 `files: []` + references 的壳，真正的配置在
+`tsconfig.app.json`（0.2 秒跑完就是没在检查的信号）；`vite build` 也不做类型检查。
+
+不写测试（沿用项目约定），验证靠实跑。lint 只有 Prettier。
 
 ## Architecture
 
@@ -41,9 +47,12 @@ src/
 ### Module Pattern
 
 Each feature module (under `oj/` or `admin/`) typically has:
-- `views/` — page-level Vue components
+- 页面组件直接放模块根下（`problem/list.vue`、`problem/detail.vue`），**没有 `views/` 这一层**
 - `components/` — feature-specific components
-- `api.ts` — API calls specific to the feature
+- `composables/` / `utils/` — 模块自己的组合式函数与纯函数（按需，不是每个模块都有）
+
+API 调用不按模块分：学生端全在 `oj/api.ts`、后台全在 `admin/api.ts`、
+跨端的（登录、资料、标签、验证码）在 `shared/api.ts`。
 
 Shared logic lives in `shared/`:
 - `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `screenMode` (problem split-screen layout), `loginSummary` (AI activity summary), `collab` (help-request queue + collab room)
