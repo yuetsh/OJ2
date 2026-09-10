@@ -149,7 +149,10 @@ export const submissionDetailSchema = z.object({
  * 将来有人「顺手」把空值改成真值就不会变成泄露，因为这里压根没有这些字段。
  */
 export const embeddedSubmissionSchema = submissionDetailSchema
-  .omit({ info: true, contestId: true, problemId: true })
+  // problemDisplayId 也要去掉：下面的 problem 就是它，同一个值留两份，
+  // 而路由只填了 problem —— 这里漏 omit 的那阵子，凡是收到过站内信的人
+  // 打开消息页都是 500（parse 抛在缺失的 problemDisplayId 上，列表为空时才碰巧不炸）。
+  .omit({ info: true, contestId: true, problemId: true, problemDisplayId: true })
   // 旧 SubmissionSafeModelSerializer 里 problem 是
   // `SlugRelatedField(slug_field="_id")`，即**展示用题号**而非数字主键。
   // 站内信页面拿它拼 `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。

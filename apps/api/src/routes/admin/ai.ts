@@ -1,8 +1,8 @@
-import {
-  adminAiReportListSchema,
-  adminAiReportListItemSchema,
-  adminAiReportSchema,
-  toggleAiReportPinResponseSchema,
+import type {
+  AdminAiReport,
+  AdminAiReportList,
+  AdminAiReportListItem,
+  ToggleAiReportPinResponse,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike } from "drizzle-orm"
 import { Hono } from "hono"
@@ -22,13 +22,13 @@ function excerpt(analysis: string | null) {
 }
 
 function listItem(row: { id: number; username: string; createTime: string; analysis: string; isPinned: boolean }) {
-  return adminAiReportListItemSchema.parse({
+  return {
     id: row.id,
     username: row.username,
     createTime: row.createTime,
     analysisExcerpt: excerpt(row.analysis),
     isPinned: row.isPinned,
-  })
+  } satisfies AdminAiReportListItem
 }
 
 const listColumns = {
@@ -53,10 +53,10 @@ adminAiRoutes.get("/ai/reports", requireTeacher, async (c) => {
       .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
       .where(and(eq(schema.aiAnalysis.isPinned, true), where))
       .orderBy(desc(schema.aiAnalysis.createTime))
-    return success(c, adminAiReportListSchema.parse({
+    return success(c, {
       results: rows.map(listItem),
       total: rows.length,
-    }))
+    } satisfies AdminAiReportList)
   }
 
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
@@ -68,10 +68,10 @@ adminAiRoutes.get("/ai/reports", requireTeacher, async (c) => {
       .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id)).where(where)
       .orderBy(desc(schema.aiAnalysis.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, adminAiReportListSchema.parse({
+  return success(c, {
     results: rows.map(listItem),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AdminAiReportList)
 })
 
 adminAiRoutes.get("/ai/reports/:id", requireTeacher, async (c) => {
@@ -86,7 +86,7 @@ adminAiRoutes.get("/ai/reports/:id", requireTeacher, async (c) => {
     .where(eq(schema.aiAnalysis.id, queryInteger(c.req.param("id"), 0, { min: 1 }))).limit(1)
   if (!row) return failure(c, 404, "report-not-found", "AIAnalysis not found")
   // data / systemPrompt / userPrompt 一律不下发：里面是喂给模型的原始学情数据与提示词
-  return success(c, adminAiReportSchema.parse(row))
+  return success(c, row satisfies AdminAiReport)
 })
 
 adminAiRoutes.post("/ai/reports/:id/pin", requireTeacher, async (c) => {
@@ -104,5 +104,5 @@ adminAiRoutes.post("/ai/reports/:id/pin", requireTeacher, async (c) => {
     }
     await tx.update(schema.aiAnalysis).set({ isPinned: next }).where(eq(schema.aiAnalysis.id, id))
   })
-  return success(c, toggleAiReportPinResponseSchema.parse({ isPinned: next }))
+  return success(c, { isPinned: next } satisfies ToggleAiReportPinResponse)
 })

@@ -2,15 +2,16 @@ import { randomBytes } from "node:crypto"
 import { extname, resolve } from "node:path"
 
 import {
-  STUDENT_ROLES,
-  activityRankItemSchema,
-  metricsSchema,
-  problemRankSchema,
-  myRankSchema,
   rankProfileSchema,
   registerRequestSchema,
+  STUDENT_ROLES,
   updateProfileRequestSchema,
-  userRankSchema,
+  type ActivityRankItem,
+  type Metrics,
+  type MyRank,
+  type ProblemRank,
+  type RankProfile,
+  type UserRank,
 } from "@oj2/contract"
 import {
   and,
@@ -144,7 +145,7 @@ accountRoutes.get("/users/:id/metrics", async (c) => {
     .from(schema.submission)
     .where(and(eq(schema.submission.userId, userId), isNull(schema.submission.contestId)))
   if (!row?.total || !row.first || !row.latest) return failure(c, 404, "no-submissions", "暂无提交")
-  return success(c, metricsSchema.parse({ now: new Date().toISOString(), first: row.first, latest: row.latest }))
+  return success(c, { now: new Date().toISOString(), first: row.first, latest: row.latest } satisfies Metrics)
 })
 
 /**
@@ -199,25 +200,25 @@ accountRoutes.get("/rankings/users", optionalAuth, async (c) => {
     isTeacherOrAbove(c.get("user")) ? onlineUserIds() : null,
   ])
 
-  return success(c, userRankSchema.parse({
+  return success(c, {
     results: rows.map((row) => serializeRankRow(row, online)),
     total: Math.min(totalRow?.value ?? 0, LEADERBOARD_SIZE),
     me,
-  }))
+  } satisfies UserRank)
 })
 
 function serializeRankRow({ profile, user }: {
   profile: typeof schema.userProfile.$inferSelect
   user: typeof schema.user.$inferSelect
 }, online: Set<number> | null = null) {
-  return rankProfileSchema.parse({
+  return {
     id: profile.id,
     user: sampleUser(user, profile.realName),
     acceptedNumber: profile.acceptedNumber,
     submissionNumber: profile.submissionNumber,
     mood: profile.mood,
     isOnline: online ? online.has(user.id) : null,
-  })
+  } satisfies RankProfile
 }
 
 /**
@@ -251,10 +252,10 @@ async function myLeaderboardRank(userId: number | undefined) {
       ),
     )))
 
-  return myRankSchema.parse({
+  return {
     ...serializeRankRow(mine),
     rank: (ahead?.value ?? 0) + 1,
-  })
+  } satisfies MyRank
 }
 
 accountRoutes.get("/rankings/activity", async (c) => {
@@ -279,7 +280,7 @@ accountRoutes.get("/rankings/activity", async (c) => {
     ))
     .groupBy(schema.submission.userId, schema.user.username)
     .orderBy(desc(countDistinct(schema.submission.problemId))).limit(10)
-  return success(c, rows.map((row) => activityRankItemSchema.parse({ username: row.username, count: row.value })))
+  return success(c, rows.map((row) => ({ username: row.username, count: row.value } satisfies ActivityRankItem)))
 })
 
 accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
@@ -303,7 +304,7 @@ accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
     const [rankRow] = await db.select({ value: count() }).from(schema.submission).where(and(classWhere, lte(schema.submission.createTime, first.value)))
     rank = rankRow?.value ?? -1
   }
-  return success(c, problemRankSchema.parse({ className, rank, classAcCount: classCount?.value ?? 0, allAcCount: all?.value ?? 0 }))
+  return success(c, { className, rank, classAcCount: classCount?.value ?? 0, allAcCount: all?.value ?? 0 } satisfies ProblemRank)
 })
 
 /**

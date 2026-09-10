@@ -1,12 +1,12 @@
 import {
-  adminExerciseSchema,
-  adminTutorialGroupsSchema,
-  adminTutorialSchema,
   createExerciseRequestSchema,
   createTutorialRequestSchema,
   setTutorialVisibilityRequestSchema,
   updateExerciseRequestSchema,
   updateTutorialRequestSchema,
+  type AdminExercise,
+  type AdminTutorial,
+  type AdminTutorialGroups,
 } from "@oj2/contract"
 import { asc, desc, eq } from "drizzle-orm"
 import { Hono } from "hono"
@@ -24,7 +24,7 @@ function serializeTutorial(row: {
   user: typeof schema.user.$inferSelect
   realName: string | null
 }) {
-  return adminTutorialSchema.parse({
+  return {
     id: row.tutorial.id,
     title: row.tutorial.title,
     content: row.tutorial.content,
@@ -35,7 +35,7 @@ function serializeTutorial(row: {
     createdBy: sampleUser(row.user, row.realName),
     createdAt: row.tutorial.createdAt,
     updatedAt: row.tutorial.updatedAt,
-  })
+  } satisfies AdminTutorial
 }
 
 function selectTutorial(id: number) {
@@ -57,10 +57,10 @@ adminTutorialRoutes.get("/tutorials", requireSuperAdmin, async (c) => {
     .orderBy(asc(schema.tutorial.order), desc(schema.tutorial.createdAt))
   const all = rows.map(serializeTutorial)
   // 分组返回，形状对齐旧 TutorialAdminAPI.get；列表 schema omit 掉了 content/code，Zod 会 strip
-  return success(c, adminTutorialGroupsSchema.parse({
+  return success(c, {
     python: all.filter((item) => item.type === "python"),
     c: all.filter((item) => item.type === "c"),
-  }))
+  } satisfies AdminTutorialGroups)
 })
 
 adminTutorialRoutes.post("/tutorials", requireSuperAdmin, async (c) => {
@@ -126,12 +126,12 @@ adminTutorialRoutes.delete("/tutorials/:id", requireSuperAdmin, async (c) => {
 // ---------------------------------------------------------------- 练习
 
 function serializeExercise(row: typeof schema.exercise.$inferSelect) {
-  return adminExerciseSchema.parse({
+  return {
     id: row.id,
     type: row.type,
     data: objectValue(row.data),
     order: row.order,
-  })
+  } satisfies AdminExercise
 }
 
 // 练习挂在教程下，路径嵌套 —— 旧后端是 ?tutorial_id= 查询参数，

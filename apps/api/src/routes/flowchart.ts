@@ -2,13 +2,13 @@ import { randomBytes } from "node:crypto"
 
 import {
   createFlowchartRequestSchema,
-  createFlowchartResponseSchema,
-  flowchartCurrentSchema,
-  flowchartDetailSchema,
-  flowchartListItemSchema,
-  flowchartListSchema,
-  flowchartStatisticsSchema,
-  flowchartSubmissionSchema,
+  type CreateFlowchartResponse,
+  type FlowchartCurrent,
+  type FlowchartDetail,
+  type FlowchartList,
+  type FlowchartListItem,
+  type FlowchartStatistics,
+  type FlowchartSubmission,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, ilike, isNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -45,7 +45,7 @@ function flowchartData(
   flowchart: typeof schema.flowchartSubmission.$inferSelect,
   username: string,
 ) {
-  return flowchartSubmissionSchema.parse({
+  return {
     id: flowchart.id,
     username,
     problemId: flowchart.problemId,
@@ -62,7 +62,7 @@ function flowchartData(
     aiModel: flowchart.aiModel,
     processingTime: flowchart.processingTime,
     evaluationTime: flowchart.evaluationTime,
-  })
+  } satisfies FlowchartSubmission
 }
 
 flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
@@ -106,7 +106,7 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
     await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, id))
     return failure(c, 502, "queue-unavailable", "Evaluation queue is unavailable")
   }
-  return success(c, createFlowchartResponseSchema.parse({ submissionId: id, status: "pending" }), 201)
+  return success(c, { submissionId: id, status: "pending" } satisfies CreateFlowchartResponse, 201)
 })
 
 flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
@@ -121,7 +121,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   // submission_list_show_all 时非管理员看不到列表。流程图这边一直漏了这道门，
   // 学生把语言切成「流程图」、用户名随便填一个字就能翻出全班的 AI 评分。
   if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
-    return success(c, flowchartListSchema.parse({ results: [], total: 0 }))
+    return success(c, { results: [], total: 0 } satisfies FlowchartList)
   }
   if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
   if (c.req.query("myself") === "1" || (!username && user.adminType === "Regular User")) filters.push(eq(schema.flowchartSubmission.userId, user.id))
@@ -136,8 +136,8 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
       .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id)).where(where)
       .orderBy(desc(schema.flowchartSubmission.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, flowchartListSchema.parse({
-    results: rows.map(({ flowchart, username, problem }) => flowchartListItemSchema.parse({
+  return success(c, {
+    results: rows.map(({ flowchart, username, problem }) => ({
       id: flowchart.id,
       username,
       problem: problem.displayId,
@@ -151,9 +151,9 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
       processingTime: flowchart.processingTime,
       evaluationTime: flowchart.evaluationTime,
       showLink: canView(user, flowchart, problem),
-    })),
+    } satisfies FlowchartListItem)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies FlowchartList)
 })
 
 const FLOWCHART_COMPLETED = 2
@@ -242,7 +242,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
       realName: stripClassPrefix(row.username, row.className),
     })),
   }
-  if (rows.length === 0) return success(c, flowchartStatisticsSchema.parse(empty))
+  if (rows.length === 0) return success(c, empty satisfies FlowchartStatistics)
 
   const gradeDistribution: Record<string, number> = {}
   const criteriaTotals = new Map<string, { sum: number; count: number; max: number }>()
@@ -289,7 +289,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     criteriaAverages[key] = { avg: rounded(bucket.sum / bucket.count, 1), max: bucket.max }
   }
 
-  return success(c, flowchartStatisticsSchema.parse({
+  return success(c, {
     totalCount: rows.length,
     // 分母是有分数的条数，不是总条数 —— 对齐 Django 的 Avg()，它跳过 NULL
     avgScore: scoreCount ? rounded(scoreSum / scoreCount, 1) : 0,
@@ -304,7 +304,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         username: row.username,
         realName: stripClassPrefix(row.username, row.className),
       })),
-  }))
+  } satisfies FlowchartStatistics)
 })
 
 flowchartRoutes.get("/flowcharts/:id", requireAuth, async (c) => {
@@ -351,7 +351,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
     await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     return failure(c, 502, "queue-unavailable", "Evaluation queue is unavailable")
   }
-  return success(c, createFlowchartResponseSchema.parse({ submissionId: row.flowchart.id, status: "pending" }))
+  return success(c, { submissionId: row.flowchart.id, status: "pending" } satisfies CreateFlowchartResponse)
 })
 
 flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) => {
@@ -359,7 +359,7 @@ flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) =>
   const rows = await db.select({ score: schema.flowchartSubmission.aiScore, grade: schema.flowchartSubmission.aiGrade })
     .from(schema.flowchartSubmission).where(and(eq(schema.flowchartSubmission.userId, c.get("user")!.id), eq(schema.flowchartSubmission.problemId, problemId), eq(schema.flowchartSubmission.status, 2)))
     .orderBy(desc(schema.flowchartSubmission.createTime))
-  return success(c, flowchartCurrentSchema.parse({ count: rows.length, score: rows[0]?.score ?? 0, grade: rows[0]?.grade ?? "" }))
+  return success(c, { count: rows.length, score: rows[0]?.score ?? 0, grade: rows[0]?.grade ?? "" } satisfies FlowchartCurrent)
 })
 
 flowchartRoutes.get("/problems/:id/flowchart/history", requireAuth, async (c) => {
@@ -371,5 +371,5 @@ flowchartRoutes.get("/problems/:id/flowchart/history", requireAuth, async (c) =>
     .orderBy(asc(schema.flowchartSubmission.createTime))
   const selected = page === 0 ? rows.at(-1) : rows[page - 1]
   if (page > rows.length) return failure(c, 400, "page-out-of-range", "Page out of range")
-  return success(c, flowchartDetailSchema.parse({ submission: selected ? flowchartData(selected.flowchart, selected.username) : null, count: rows.length }))
+  return success(c, { submission: selected ? flowchartData(selected.flowchart, selected.username) : null, count: rows.length } satisfies FlowchartDetail)
 })

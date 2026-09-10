@@ -1,12 +1,12 @@
 import {
-  dashboardInfoSchema,
-  judgeServerListSchema,
-  judgeServerSchema,
-  orphanTestCaseSchema,
   updateJudgeServerRequestSchema,
   updateWebsiteConfigRequestSchema,
-  uploadImageResponseSchema,
-  websiteConfigSchema,
+  type DashboardInfo,
+  type JudgeServer,
+  type JudgeServerList,
+  type OrphanTestCase,
+  type UploadImageResponse,
+  type WebsiteConfig,
 } from "@oj2/contract"
 import { randomInt } from "node:crypto"
 import { mkdir, readdir, rm, stat } from "node:fs/promises"
@@ -57,7 +57,7 @@ const OPTION_KEYS = {
 
 adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
   const options = await getWebsiteOptions()
-  return success(c, websiteConfigSchema.parse({
+  return success(c, {
     websiteBaseUrl: options.website_base_url,
     websiteName: options.website_name,
     websiteNameShortcut: options.website_name_shortcut,
@@ -66,7 +66,7 @@ adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
     submissionListShowAll: options.submission_list_show_all,
     classList: options.class_list,
     enableMaxkb: options.enable_maxkb,
-  }))
+  } satisfies WebsiteConfig)
 })
 
 adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
@@ -96,14 +96,14 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
 
 adminConfRoutes.get("/judge-servers", requireSuperAdmin, async (c) => {
   const rows = await db.select().from(schema.judgeServer).orderBy(desc(schema.judgeServer.lastHeartbeat))
-  return success(c, judgeServerListSchema.parse({
+  return success(c, {
     // 后台要显示 token 才能拿去配判题机。这个接口是超管专属的
     token: config.judgeServerToken,
-    servers: rows.map((row) => judgeServerSchema.parse({
+    servers: rows.map((row) => ({
       ...row,
       status: isAlive(row.lastHeartbeat) ? "normal" : "abnormal",
-    })),
-  }))
+    } satisfies JudgeServer)),
+  } satisfies JudgeServerList)
 })
 
 adminConfRoutes.put("/judge-servers/:id", requireSuperAdmin, async (c) => {
@@ -146,7 +146,7 @@ adminConfRoutes.get("/orphan-test-cases", requireSuperAdmin, async (c) => {
   const ids = await orphanTestCaseIds()
   const rows = await Promise.all(ids.map(async (id) => {
     const info = await stat(resolve(config.testCaseDirectory, id)).catch(() => null)
-    return orphanTestCaseSchema.parse({ id, createTime: info ? info.mtimeMs / 1000 : 0 })
+    return { id, createTime: info ? info.mtimeMs / 1000 : 0 } satisfies OrphanTestCase
   }))
   return success(c, rows)
 })
@@ -180,12 +180,12 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
       .where(gte(schema.judgeServer.lastHeartbeat, aliveSince())),
   ])
   // 旧接口还回了 env.FORCE_HTTPS / STATIC_CDN_HOST，前端从未读过，不再下发
-  return success(c, dashboardInfoSchema.parse({
+  return success(c, {
     userCount: users?.value ?? 0,
     todaySubmissionCount: submissions?.value ?? 0,
     recentContestCount: contests?.value ?? 0,
     judgeServerCount: servers?.value ?? 0,
-  }))
+  } satisfies DashboardInfo)
 })
 
 adminConfRoutes.get("/random-usernames", requireSuperAdmin, async (c) => {
@@ -218,16 +218,16 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
   const form = await c.req.formData().catch(() => null)
   const image = form?.get("image")
   if (!(image instanceof File)) {
-    return success(c, uploadImageResponseSchema.parse({ success: false, msg: "Upload failed", filePath: "" }))
+    return success(c, { success: false, msg: "Upload failed", filePath: "" } satisfies UploadImageResponse)
   }
   const suffix = image.name.slice(image.name.lastIndexOf(".")).toLowerCase()
   if (!IMAGE_SUFFIXES.includes(suffix)) {
-    return success(c, uploadImageResponseSchema.parse({ success: false, msg: "Unsupported file format", filePath: "" }))
+    return success(c, { success: false, msg: "Unsupported file format", filePath: "" } satisfies UploadImageResponse)
   }
   // 旧后端没有大小限制，靠 nginx 兜。这里显式限一道：文件写在本地磁盘上，
   // 一个超大文件就能把机房那台机器的盘写满，而写满之后判题也一起挂
   if (image.size > MAX_IMAGE_BYTES) {
-    return success(c, uploadImageResponseSchema.parse({ success: false, msg: "图片不能超过 10MB", filePath: "" }))
+    return success(c, { success: false, msg: "图片不能超过 10MB", filePath: "" } satisfies UploadImageResponse)
   }
   // 文件名完全由服务端生成，不带用户提供的任何一段 —— 原名里的 ../ 或空字节都进不来
   const name = `${randomFileName()}${suffix}`
@@ -236,13 +236,13 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
     await Bun.write(resolve(config.uploadDirectory, name), image)
   } catch (error) {
     console.error("Failed to save uploaded image", error)
-    return success(c, uploadImageResponseSchema.parse({ success: false, msg: "Upload Error", filePath: "" }))
+    return success(c, { success: false, msg: "Upload Error", filePath: "" } satisfies UploadImageResponse)
   }
-  return success(c, uploadImageResponseSchema.parse({
+  return success(c, {
     success: true,
     msg: "Success",
     filePath: `${config.uploadUriPrefix}/${name}`,
-  }))
+  } satisfies UploadImageResponse)
 })
 
 function randomFileName() {

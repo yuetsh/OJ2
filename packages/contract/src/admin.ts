@@ -6,6 +6,7 @@ import { achievementRaritySchema } from "./achievement"
 import { rankProfileSchema } from "./account"
 import { paginatedSchema, sampleUserSchema } from "./common"
 import { reactionKeySchema } from "./content"
+import { problemLanguageSchema } from "./language"
 import {
   astRulesSchema,
   problemDifficultySchema,
@@ -671,7 +672,12 @@ export const adminProblemSchema = z.object({
   languages: z.array(z.string()),
   template: z.record(z.string(), z.string()),
   createTime: z.string(),
-  lastUpdateTime: z.string(),
+  /**
+   * `problem.last_update_time` 是全库唯一可空的那一列（961 道题里 470 道是 NULL：
+   * 从来没被编辑过的老题）。公共的 problemDetailSchema 早就是 nullable，这里漏了，
+   * 于是后台打开任何一道没编辑过的题都会 500 在 parse 上。
+   */
+  lastUpdateTime: z.string().nullable(),
   timeLimit: z.number().int(),
   memoryLimit: z.number().int(),
   visible: z.boolean(),
@@ -718,7 +724,9 @@ export const createProblemRequestSchema = z.object({
   testCaseScore: z.array(problemTestCaseScoreSchema),
   timeLimit: z.number().int().min(1).max(1000 * 60),
   memoryLimit: z.number().int().min(1).max(1024),
-  languages: z.array(z.string()).min(1),
+  // 收窄到语言联合而不是裸 string[]：`problem.languages` 列上挂着
+  // `$type<ProblemLanguage[]>()`，那个断言得有人兑现 —— 闸就设在这里（写入侧）。
+  languages: z.array(problemLanguageSchema).min(1),
   template: z.record(z.string(), z.string()),
   visible: z.boolean(),
   difficulty: z.enum(["Low", "Mid", "High"]),

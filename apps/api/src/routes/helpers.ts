@@ -1,9 +1,4 @@
-import {
-  ADMIN_ROLES,
-  TEACHER_ROLES,
-  sampleUserSchema,
-  type SampleUser,
-} from "@oj2/contract"
+import { ADMIN_ROLES, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
 
 import { and, count, eq, notInArray } from "drizzle-orm"
 
@@ -26,11 +21,11 @@ export function sampleUser(
   realName: string | null | undefined,
   options: { includeRealName?: boolean } = {},
 ): SampleUser {
-  return sampleUserSchema.parse({
+  return {
     id: source.id,
     username: source.username,
     realName: options.includeRealName === true ? (realName ?? null) : null,
-  })
+  } satisfies SampleUser
 }
 
 /**
@@ -49,16 +44,21 @@ export function stripClassPrefix(
   return username.startsWith(prefix) ? username.slice(prefix.length) : username
 }
 
+/**
+ * 拿 query 里的筛选值去比对 `$type` 收窄过的列（`submission.result`、`problem.difficulty` 这些）。
+ *
+ * 值来自 URL，不受控：前端下拉框以外的任何字符串都可能进来。对不上枚举时 SQL 一行都匹配不到，
+ * 和列没收窄之前的行为完全一致 —— 所以这里只做类型上的交接，**不加校验**：
+ * 在这儿拦一道会把「筛出空列表」变成「筛条件被忽略、返回全部」，那是另一种行为。
+ */
+export function asFilterValue<T extends string | number>(value: string | number): T {
+  return value as T
+}
+
 export function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {}
-}
-
-export function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : []
 }
 
 export function queryInteger(

@@ -1,4 +1,4 @@
-import { flowchartUpdateSchema } from "@oj2/contract"
+import type { FlowchartUpdate } from "@oj2/contract"
 import { eq } from "drizzle-orm"
 
 import { db, schema } from "../db"
@@ -71,7 +71,7 @@ export async function evaluateFlowchart(
       processingTime: (performance.now() - started) / 1000,
       evaluationTime: new Date().toISOString(),
     }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
-    await publishFlowchartUpdate(row.flowchart.userId, flowchartUpdateSchema.parse({
+    await publishFlowchartUpdate(row.flowchart.userId, {
       type: "flowchart_evaluation_completed",
       submissionId: row.flowchart.id,
       score: result.score,
@@ -79,7 +79,7 @@ export async function evaluateFlowchart(
       feedback: result.feedback,
       suggestions: result.suggestions,
       criteriaDetails: result.criteria,
-    }))
+    } satisfies FlowchartUpdate)
   } catch (error) {
     // 原来这里把 error.message 原样推给学生、前端还直接 message.error 弹出来 ——
     // AI provider 的地址、内部报错就这么进了浏览器。真实原因留在服务端日志里，
@@ -91,10 +91,10 @@ export async function evaluateFlowchart(
     // 就算成功，AI 侧的偶发失败（限流、超时、网络抖动）永远等不到重试。
     if (!isFinalAttempt) throw error
     await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
-    await publishFlowchartUpdate(row.flowchart.userId, flowchartUpdateSchema.parse({
+    await publishFlowchartUpdate(row.flowchart.userId, {
       type: "flowchart_evaluation_failed",
       submissionId: row.flowchart.id,
-    }))
+    } satisfies FlowchartUpdate)
     throw error
   }
 }

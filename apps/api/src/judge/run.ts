@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 
-import { astRuleSchema } from "@oj2/contract"
+import { astRuleSchema, type ContestSubmissionInfo } from "@oj2/contract"
 import { and, eq, inArray } from "drizzle-orm"
 
 import { config } from "../config"
@@ -248,15 +248,12 @@ async function persistResult(
         .for("update")
       if (!rank) throw new Error("Contest rank could not be created")
 
-      const rankInfo = objectValue(rank.submissionInfo)
-      const previousInfo = objectValue(rankInfo[String(problemId)])
-      const alreadyAccepted = previousInfo.is_ac === true
+      const rankInfo = rank.submissionInfo
+      const previousInfo = rankInfo[String(problemId)]
+      const alreadyAccepted = previousInfo?.is_ac === true
       if (!alreadyAccepted) {
-        const errorNumber =
-          typeof previousInfo.error_number === "number"
-            ? previousInfo.error_number
-            : 0
-        const nextInfo: Record<string, unknown> = {
+        const errorNumber = previousInfo?.error_number ?? 0
+        const nextInfo: ContestSubmissionInfo = {
           is_ac: acceptedNow,
           ac_time: 0,
           error_number:

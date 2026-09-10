@@ -1,13 +1,13 @@
 import {
   STUDENT_ROLES,
   TUTORIAL_READ_SECONDS,
-  learnExerciseAttemptSchema,
-  learnExerciseProgressListSchema,
-  learnExerciseProgressSchema,
-  learnStudentProgressListSchema,
-  learnStudentProgressSchema,
-  learnTutorialProgressListSchema,
-  learnTutorialProgressSchema,
+  type LearnExerciseAttempt,
+  type LearnExerciseProgress,
+  type LearnExerciseProgressList,
+  type LearnStudentProgress,
+  type LearnStudentProgressList,
+  type LearnTutorialProgress,
+  type LearnTutorialProgressList,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, inArray, like, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -120,16 +120,16 @@ adminLearnRoutes.get("/learn-analytics/students", requireTeacher, async (c) => {
         .where(inArray(schema.exercise.tutorialId, tutorialIds))
     : [{ value: 0 }]
 
-  return success(c, learnStudentProgressListSchema.parse({
+  return success(c, {
     tutorialCount: tutorialIds.length,
     exerciseCount: exerciseCountRow?.value ?? 0,
-    results: rows.map((row) => learnStudentProgressSchema.parse({
+    results: rows.map((row) => ({
       ...row,
       exerciseTried: attempts.get(row.userId)?.tried ?? 0,
       exerciseSolved: attempts.get(row.userId)?.solved ?? 0,
       exerciseAttempts: attempts.get(row.userId)?.attempts ?? 0,
-    })),
-  }))
+    } satisfies LearnStudentProgress)),
+  } satisfies LearnStudentProgressList)
 })
 
 adminLearnRoutes.get("/learn-analytics/tutorials", requireTeacher, async (c) => {
@@ -166,13 +166,13 @@ adminLearnRoutes.get("/learn-analytics/tutorials", requireTeacher, async (c) => 
     .groupBy(schema.tutorial.id, schema.tutorial.title, schema.tutorial.order)
     .orderBy(asc(schema.tutorial.order))
 
-  return success(c, learnTutorialProgressListSchema.parse({
+  return success(c, {
     studentCount,
-    results: rows.map(({ readSeconds, ...row }) => learnTutorialProgressSchema.parse({
+    results: rows.map(({ readSeconds, ...row }) => ({
       ...row,
       avgSeconds: row.readers ? Math.round(readSeconds / row.readers) : 0,
-    })),
-  }))
+    } satisfies LearnTutorialProgress)),
+  } satisfies LearnTutorialProgressList)
 })
 
 /**
@@ -216,13 +216,13 @@ adminLearnRoutes.get("/learn-analytics/exercises", requireTeacher, async (c) => 
     .groupBy(schema.exercise.id, schema.tutorial.id, schema.tutorial.title, schema.tutorial.order)
     .orderBy(asc(schema.tutorial.order), asc(schema.exercise.order))
 
-  return success(c, learnExerciseProgressListSchema.parse({
+  return success(c, {
     studentCount: studentCountRow?.value ?? 0,
-    results: rows.map((row) => learnExerciseProgressSchema.parse({
+    results: rows.map((row) => ({
       ...row,
       avgAttemptsToSolve: rounded(Number(row.avgAttemptsToSolve), 1),
-    })),
-  }))
+    } satisfies LearnExerciseProgress)),
+  } satisfies LearnExerciseProgressList)
 })
 
 /** 单道练习的逐人明细。后台表格展开某一行时才拉，不跟着列表一起下发 */
@@ -249,5 +249,5 @@ adminLearnRoutes.get("/learn-analytics/exercises/:id/attempts", requireTeacher, 
     // 没做对的排前面，错得最多的最前 —— 展开这一行的人是来找卡住的学生的
     .orderBy(asc(schema.exerciseAttempt.solved), desc(schema.exerciseAttempt.wrongAttempts))
 
-  return success(c, rows.map((row) => learnExerciseAttemptSchema.parse(row)))
+  return success(c, rows satisfies LearnExerciseAttempt[])
 })

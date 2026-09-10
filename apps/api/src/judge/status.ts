@@ -48,14 +48,14 @@ export function judgeStatusName(result: number) {
  * 它们从分母里摘掉 —— 否则全班同时交卷的那几秒，分母涨了分子没涨，正确率凭空掉一截。
  * 人数口径不受影响：交了但还在判的学生仍然算「交过」，不该被点名成「没做」。
  */
-export const UNJUDGED_RESULTS: number[] = [JudgeStatus.PENDING, JudgeStatus.JUDGING]
+export const UNJUDGED_RESULTS: JudgeStatusValue[] = [JudgeStatus.PENDING, JudgeStatus.JUDGING]
 
 /**
  * **不**计入「这道题失败了几次」的状态。除了通过（含 AST_CHECK_FAILED，那也是答案对了）
  * 和还没判完的两个，还排掉 SYSTEM_ERROR —— 判题机自己崩了不是学生的问题，
  * 不该推着 AI 提示的解锁进度往前走。
  */
-export const NON_FAILURE_RESULTS: number[] = [
+export const NON_FAILURE_RESULTS: JudgeStatusValue[] = [
   JudgeStatus.ACCEPTED,
   JudgeStatus.AST_CHECK_FAILED,
   JudgeStatus.PENDING,

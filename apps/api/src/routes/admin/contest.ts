@@ -1,10 +1,10 @@
 import {
-  acmHelperItemSchema,
-  adminContestListSchema,
-  adminContestSchema,
   createContestRequestSchema,
   updateAcmHelperRequestSchema,
   updateContestRequestSchema,
+  type AcmHelperItem,
+  type AdminContest,
+  type AdminContestList,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray } from "drizzle-orm"
 import { Hono } from "hono"
@@ -31,7 +31,7 @@ async function serialize(row: {
   user: typeof schema.user.$inferSelect
   realName: string | null
 }) {
-  return adminContestSchema.parse({
+  return {
     id: row.contest.id,
     title: row.contest.title,
     description: row.contest.description,
@@ -45,7 +45,7 @@ async function serialize(row: {
     createdBy: sampleUser(row.user, row.realName),
     status: contestStatus(row.contest),
     contestType: row.contest.password ? "Password Protected" : "Public",
-  })
+  } satisfies AdminContest
 }
 
 function selectContest(id: number) {
@@ -84,10 +84,10 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where).orderBy(desc(schema.contest.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, adminContestListSchema.parse({
+  return success(c, {
     results: await Promise.all(rows.map(serialize)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AdminContestList)
 })
 
 adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
@@ -266,8 +266,7 @@ adminContestRoutes.get("/contests/:id/acm-helper", requireTeacher, async (c) => 
   const results = []
   for (const rank of ranks) {
     if (rank.acceptedNumber <= 0) continue
-    for (const [problemId, raw] of Object.entries(objectValue(rank.submissionInfo))) {
-      const info = objectValue(raw)
+    for (const [problemId, info] of Object.entries(rank.submissionInfo)) {
       if (info.is_ac !== true) continue
       results.push({
         id: rank.id,
@@ -285,7 +284,7 @@ adminContestRoutes.get("/contests/:id/acm-helper", requireTeacher, async (c) => 
   }
   // 按 AC 用时倒序：最后才做出来的排前面，那是最值得看的
   results.sort((left, right) => right._acTime - left._acTime)
-  return success(c, results.map(({ _acTime, ...item }) => acmHelperItemSchema.parse(item)))
+  return success(c, results.map(({ _acTime, ...item }) => item) satisfies AcmHelperItem[])
 })
 
 adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => {
@@ -306,9 +305,9 @@ adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => 
   )).limit(1)
   if (!rank) return failure(c, 404, "rank-not-found", "Rank id does not exist")
 
-  const info = objectValue(rank.submissionInfo)
-  const entry = objectValue(info[parsed.data.problemId])
-  if (!info[parsed.data.problemId]) {
+  const info = rank.submissionInfo
+  const entry = info[parsed.data.problemId]
+  if (!entry) {
     return failure(c, 404, "problem-not-in-rank", "Problem id does not exist")
   }
   entry.checked = parsed.data.checked

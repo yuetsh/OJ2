@@ -1,16 +1,17 @@
 import {
-  HINT_MIN_FAILURES,
-  aiAnalysisRecordSchema,
   aiAnalysisRequestSchema,
-  aiDetailSchema,
   aiHintRequestSchema,
   classAnalysisRequestSchema,
   classPkAnalysisRequestSchema,
-  durationDataSchema,
-  heatmapItemSchema,
-  loginSummarySchema,
-  solvedListSchema,
-  solvedProblemSchema,
+  HINT_MIN_FAILURES,
+  type AiAnalysisRecord,
+  type AiDetail,
+  type DurationData,
+  type Grade,
+  type HeatmapItem,
+  type LoginSummary,
+  type SolvedList,
+  type SolvedProblem,
 } from "@oj2/contract"
 import { and, asc, count, countDistinct, eq, gte, inArray, isNull, lte, min, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
@@ -19,7 +20,7 @@ import { requireAuth, type AppEnv } from "../auth/middleware"
 import { getPreviousLogin, type AuthUser } from "../auth/session"
 import { config } from "../config"
 import { db, schema } from "../db"
-import { JudgeStatus, judgeStatusName } from "../judge/status"
+import { JudgeStatus, judgeStatusName, type JudgeStatusValue } from "../judge/status"
 import { failure, success } from "../http"
 import { completeChat, streamChat } from "../services/ai"
 import { consumeToken } from "../services/throttling"
@@ -27,7 +28,7 @@ import { countFailedSubmissions, isTeacherOrAbove, objectValue, queryInteger, ro
 
 export const aiRoutes = new Hono<AppEnv>()
 
-const accepted = [0, 10]
+const accepted: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 const difficultyNames: Record<string, string> = { Low: "简单", Mid: "中等", High: "困难" }
 
 /**
@@ -61,15 +62,15 @@ const calendarDay = new Intl.DateTimeFormat("en-CA", {
   timeZone: CALENDAR_TZ, year: "numeric", month: "2-digit", day: "2-digit",
 })
 
-function grade(rank: number | null, count: number, reference = count) {
+function grade(rank: number | null, count: number, reference = count): Grade {
   if (!rank || count <= 0) return "C"
   const percentile = (rank - 1) / count * 100
-  let value = percentile < 10 ? "S" : percentile < 35 ? "A" : percentile < 75 ? "B" : "C"
+  let value: Grade = percentile < 10 ? "S" : percentile < 35 ? "A" : percentile < 75 ? "B" : "C"
   if (reference < 10) value = value === "S" ? "A" : value === "A" ? "B" : value
   return value
 }
 
-function averageGrade(grades: string[]) {
+function averageGrade(grades: Grade[]): Grade {
   const weights: Record<string, number> = { S: 4, A: 3, B: 2, C: 1 }
   const values = grades.flatMap((item) => weights[item] ?? [])
   if (!values.length) return ""
@@ -149,12 +150,12 @@ async function buildSolved(user: AuthUser, start: string, end: string, firstAc: 
     const period = ranks(periodRows, item.problemId)
     const rank = all.findIndex((row) => row.userId === user.id) + 1 || null
     const periodRank = period.findIndex((row) => row.userId === user.id) + 1 || null
-    return solvedProblemSchema.parse({
+    return {
       problem: { title: problem.problem.title, displayId: problem.problem.displayId, contestTitle: problem.contestTitle ?? "", contestId: problem.problem.contestId },
       acTime: item.first, rank, acCount: all.length, grade: grade(periodRank, period.length, all.length), periodRank, periodAcCount: period.length,
       difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
       attempts: attemptsByProblem.get(item.problemId) ?? 1,
-    })
+    } satisfies SolvedProblem
   }).sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
   return { solved, problems, scopeIds }
 }
@@ -169,7 +170,7 @@ async function listSolved(user: AuthUser, start: string, end: string, limit: num
     )),
   ])
   const { solved } = await buildSolved(user, start, end, firstAc)
-  return solvedListSchema.parse({ results: solved, total: totalRows[0]?.value ?? 0 })
+  return { results: solved, total: totalRows[0]?.value ?? 0 } satisfies SolvedList
 }
 
 async function buildDetail(user: AuthUser, start: string, end: string) {
@@ -195,7 +196,7 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
     eq(schema.submission.userId, user.id),
     gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
   ))
-  const settledFail = (result: number) =>
+  const settledFail = (result: JudgeStatusValue) =>
     !accepted.includes(result) && result !== JudgeStatus.PENDING && result !== JudgeStatus.JUDGING
   const errorCounts = new Map<number, number>()
   for (const row of submissions) {
@@ -207,10 +208,10 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
     .sort((a, b) => b.count - a.count || a.result - b.result)
   const firstAc = await firstAcQuery(user, start, end)
   const problemIds = firstAc.map((item) => item.problemId)
-  if (!problemIds.length) return aiDetailSchema.parse({
+  if (!problemIds.length) return {
     user: user.username, className: user.className, start, end, solvedCount: 0, attempts: [], flowcharts: [], grade: "", tags: {}, difficulty: {}, contestCount: 0,
     activity, errors, rankScope: "global",
-  })
+  } satisfies AiDetail
   const [{ solved, problems, scopeIds }, tagRows, flowRows] = await Promise.all([
     buildSolved(user, start, end, firstAc),
     db.select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name }).from(schema.problemTags)
@@ -244,13 +245,13 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
       avgScore: rounded(scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0, 0),
     }
   }).sort((a, b) => b.latestSubmissionTime.localeCompare(a.latestSubmissionTime))
-  return aiDetailSchema.parse({
+  return {
     user: user.username, className: user.className, start, end, flowcharts,
     solvedCount: solved.length, attempts: solved.map((item) => item.attempts),
     grade: averageGrade(solved.map((item) => item.grade)), tags: topTags, difficulty,
     contestCount: new Set(solved.flatMap((item) => item.problem.contestId ?? [])).size,
     activity, errors, rankScope: scopeIds ? "class" : "global",
-  })
+  } satisfies AiDetail
 }
 
 aiRoutes.get("/ai/detail", requireAuth, async (c) => {
@@ -357,7 +358,7 @@ async function buildDuration(user: AuthUser, endText: string, duration: string) 
     const inRange = rows.filter((row) => row.time >= from && row.time <= to)
     const acceptedRows = inRange.filter((row) => accepted.includes(row.result))
     const solved = [...new Set(acceptedRows.map((row) => row.problemId))]
-    return durationDataSchema.parse({
+    return {
       unit: config.unit,
       index: config.count - 1 - index,
       start: bucket.start.toISOString(),
@@ -366,7 +367,7 @@ async function buildDuration(user: AuthUser, endText: string, duration: string) 
       problemCount: solved.length,
       acceptedCount: acceptedRows.length,
       submissionCount: inRange.length,
-    })
+    } satisfies DurationData
   })
 }
 
@@ -407,7 +408,7 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
       const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset)
       value += counts.get(dateKey(day)) ?? 0
     }
-    return heatmapItemSchema.parse({ timestamp: monday.getTime(), value })
+    return { timestamp: monday.getTime(), value } satisfies HeatmapItem
   }))
 })
 
@@ -442,7 +443,7 @@ aiRoutes.get("/ai/login-summary", requireAuth, async (c) => {
       analysisError = error instanceof Error ? error.message : String(error)
     }
   }
-  return success(c, loginSummarySchema.parse({ summary, analysis, analysisError }))
+  return success(c, { summary, analysis, analysisError } satisfies LoginSummary)
 })
 
 aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
@@ -450,10 +451,10 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
     .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
     .where(and(eq(schema.aiAnalysis.userId, c.get("user")!.id), eq(schema.aiAnalysis.isPinned, true))).limit(1)
   if (!row) return success(c, null)
-  return success(c, aiAnalysisRecordSchema.parse({
+  return success(c, {
     id: row.analysis.id, provider: row.analysis.provider, model: row.analysis.model, data: objectValue(row.analysis.data),
     analysis: row.analysis.analysis, createTime: row.analysis.createTime, isPinned: row.analysis.isPinned, username: row.username,
-  }))
+  } satisfies AiAnalysisRecord)
 })
 
 aiRoutes.post("/ai/analysis", requireAuth, async (c) => {

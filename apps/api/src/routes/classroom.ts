@@ -1,10 +1,10 @@
 import {
-  STUDENT_ROLES,
   classComparisonRequestSchema,
-  classComparisonResponseSchema,
-  classComparisonSchema,
-  classRankItemSchema,
-  classUserRankSchema,
+  STUDENT_ROLES,
+  type ClassComparison,
+  type ClassComparisonResponse,
+  type ClassRankItem,
+  type ClassUserRank,
 } from "@oj2/contract"
 import { and, eq, gte, inArray, like, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -94,7 +94,7 @@ classroomRoutes.get("/rankings/classes", async (c) => {
       acRate: totalSubmission > 0 ? rounded(totalAc / totalSubmission * 100) : 0,
     }
   }).sort((a, b) => b.totalAc - a.totalAc || a.totalSubmission - b.totalSubmission)
-  return success(c, result.map((item, index) => classRankItemSchema.parse({ ...item, rank: index + 1 })))
+  return success(c, result.map((item, index) => ({ ...item, rank: index + 1 } satisfies ClassRankItem)))
 })
 
 classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
@@ -121,7 +121,7 @@ classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
     const start = Math.min(Math.max(0, myRank - 6), ranks.length - 10)
     selected = ranks.slice(start, start + 10)
   }
-  return success(c, classUserRankSchema.parse({ className: user.className, myRank, total: ranks.length, ranks: selected }))
+  return success(c, { className: user.className, myRank, total: ranks.length, ranks: selected } satisfies ClassUserRank)
 })
 
 classroomRoutes.post("/classes/comparison", async (c) => {
@@ -166,7 +166,7 @@ classroomRoutes.post("/classes/comparison", async (c) => {
     const middle = topCount + bottomCount < userCount ? ac.slice(topCount, -bottomCount) : ac
     const totalAc = ac.reduce((sum, value) => sum + value, 0)
     const totalSubmission = submissions.reduce((sum, value) => sum + value, 0)
-    const base: Record<string, number | string> = {
+    const base: ClassComparison = {
       className,
       userCount,
       totalAc,
@@ -197,21 +197,18 @@ classroomRoutes.post("/classes/comparison", async (c) => {
     }
     return base
   })
-  const maxMedian = Math.max(1, ...comparisons.map((item) => Number(item.medianAc)))
-  const maxMiddle = Math.max(1, ...comparisons.map((item) => Number(item.middle80Avg)))
+  const maxMedian = Math.max(1, ...comparisons.map((item) => item.medianAc))
+  const maxMiddle = Math.max(1, ...comparisons.map((item) => item.middle80Avg))
   for (const item of comparisons) {
     item.compositeScore = rounded(
-      0.4 * (Number(item.medianAc) / maxMedian * 100) +
-      0.15 * (Number(item.middle80Avg) / maxMiddle * 100) +
-      0.2 * Number(item.activeRate) +
-      0.15 * Number(item.passRate) +
-      0.1 * Number(item.excellentRate),
+      0.4 * (item.medianAc / maxMedian * 100) +
+      0.15 * (item.middle80Avg / maxMiddle * 100) +
+      0.2 * item.activeRate +
+      0.15 * item.passRate +
+      0.1 * item.excellentRate,
       1,
     )
   }
-  comparisons.sort((a, b) => Number(b.compositeScore) - Number(a.compositeScore) || Number(b.medianAc) - Number(a.medianAc))
-  return success(c, classComparisonResponseSchema.parse({
-    comparisons: comparisons.map((item) => classComparisonSchema.parse(item)),
-    hasTimeRange,
-  }))
+  comparisons.sort((a, b) => b.compositeScore - a.compositeScore || b.medianAc - a.medianAc)
+  return success(c, { comparisons, hasTimeRange } satisfies ClassComparisonResponse)
 })

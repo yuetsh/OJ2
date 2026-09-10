@@ -1,18 +1,19 @@
 import {
   addContestProblemRequestSchema,
-  adminProblemListItemSchema,
-  adminProblemListSchema,
-  adminProblemSchema,
   createProblemRequestSchema,
-  makeProblemPublicRequestSchema,
-  updateProblemRequestSchema,
   generateSqlTestCaseRequestSchema,
-  generateSqlTestCaseResponseSchema,
+  makeProblemPublicRequestSchema,
   sqlPreviewRequestSchema,
-  sqlTestCaseScriptSchema,
-  uploadTestCaseResponseSchema,
+  updateProblemRequestSchema,
+  type AdminProblem,
+  type AdminProblemList,
+  type AdminProblemListItem,
   type AstRules,
+  type GenerateSqlTestCaseResponse,
   type SqlConfig,
+  type SqlDisplay,
+  type SqlTestCaseScript,
+  type UploadTestCaseResponse,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -30,7 +31,7 @@ import { config } from "../../config"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { getTopReactions } from "../../services/reaction"
-import { objectValue, queryInteger, sampleUser, stringArray } from "../helpers"
+import { objectValue, queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
 
@@ -130,7 +131,7 @@ async function serialize(row: ProblemRow) {
       .where(eq(schema.user.id, row.createdById)).limit(1),
     tagNames(row.id),
   ])
-  return adminProblemSchema.parse({
+  return {
     id: row.id,
     _id: row.displayId,
     title: row.title,
@@ -141,8 +142,8 @@ async function serialize(row: ProblemRow) {
     testCaseId: row.testCaseId,
     testCaseScore: Array.isArray(row.testCaseScore) ? row.testCaseScore : [],
     hint: row.hint,
-    languages: stringArray(row.languages),
-    template: objectValue(row.template),
+    languages: row.languages,
+    template: row.template,
     createTime: row.createTime,
     lastUpdateTime: row.lastUpdateTime,
     timeLimit: row.timeLimit,
@@ -164,9 +165,9 @@ async function serialize(row: ProblemRow) {
     astRules: row.astRules,
     answers: Array.isArray(row.answers) ? row.answers : [],
     prompt: row.prompt,
-    sqlConfig: row.sqlConfig ? objectValue(row.sqlConfig) : null,
-    sqlDisplay: row.sqlDisplay ? objectValue(row.sqlDisplay) : null,
-  })
+    sqlConfig: row.sqlConfig,
+    sqlDisplay: row.sqlDisplay,
+  } satisfies AdminProblem
 }
 
 /** 公共校验，对齐旧 `ProblemBase.common_checks` */
@@ -205,7 +206,7 @@ async function generateSqlDisplay(
   testCaseId: string,
   answers: Record<string, unknown>[],
   sqlConfig: SqlConfig,
-): Promise<{ error: string } | { display: unknown }> {
+): Promise<{ error: string } | { display: SqlDisplay }> {
   const info = await readInfo(testCaseId)
   if (!info) return { error: "测试点信息读取失败，请重新上传测试点" }
   if (!info.sql) return { error: "测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包" }
@@ -294,9 +295,9 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
   // 只有公开题列表下发最高票评价，比赛题列表不下发 —— 与旧后端一致
   const problemIds = rows.map(({ problem }) => problem.id)
   const [topReactions, tags] = await Promise.all([getTopReactions(problemIds), tagNamesFor(problemIds)])
-  return success(c, adminProblemListSchema.parse({
+  return success(c, {
     results: rows.map(({ problem, user: creator, realName }) =>
-      adminProblemListItemSchema.parse({
+      ({
         id: problem.id,
         _id: problem.displayId,
         title: problem.title,
@@ -309,9 +310,9 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
         allowFlowchart: problem.allowFlowchart,
         showFlowchart: problem.showFlowchart,
         topReaction: topReactions.get(problem.id) ?? null,
-      })),
+      } satisfies AdminProblemListItem)),
     total: totalRow[0]?.value ?? 0,
-  }))
+  } satisfies AdminProblemList)
 })
 
 adminProblemRoutes.get("/problems/:id", requireProblemPermission, async (c) => {
@@ -331,7 +332,7 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
   }
   const checked = commonChecks(parsed.data)
   if ("error" in checked) return failure(c, 400, "invalid-problem", checked.error)
-  let sqlDisplay: unknown = null
+  let sqlDisplay: SqlDisplay | null = null
   if (checked.sql) {
     const built = await generateSqlDisplay(parsed.data.testCaseId, parsed.data.answers, parsed.data.sqlConfig!)
     if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
@@ -388,7 +389,7 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
   if (duplicate) return failure(c, 409, "display-id-exists", "Display ID already exists")
 
   // SQL 题每次保存都重算展示数据：测试点或标准答案可能刚改过，留着旧的就会和判题结果对不上
-  let sqlDisplay: unknown = null
+  let sqlDisplay: SqlDisplay | null = null
   if (checked.sql) {
     const built = await generateSqlDisplay(parsed.data.testCaseId, parsed.data.answers, parsed.data.sqlConfig!)
     if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
@@ -467,9 +468,9 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
       .where(where).orderBy(desc(schema.problem.createTime)).limit(limit).offset(offset),
   ])
   const tags = await tagNamesFor(rows.map(({ problem }) => problem.id))
-  return success(c, adminProblemListSchema.parse({
+  return success(c, {
     results: rows.map(({ problem, user: creator, realName }) =>
-      adminProblemListItemSchema.parse({
+      ({
         id: problem.id,
         _id: problem.displayId,
         title: problem.title,
@@ -482,9 +483,9 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
         allowFlowchart: problem.allowFlowchart,
         showFlowchart: problem.showFlowchart,
         topReaction: null,
-      })),
+      } satisfies AdminProblemListItem)),
     total: totalRow[0]?.value ?? 0,
-  }))
+  } satisfies AdminProblemList)
 })
 
 adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermission, async (c) => {
@@ -500,7 +501,7 @@ adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermissio
   }
   const checked = commonChecks(parsed.data)
   if ("error" in checked) return failure(c, 400, "invalid-problem", checked.error)
-  let sqlDisplay: unknown = null
+  let sqlDisplay: SqlDisplay | null = null
   if (checked.sql) {
     const built = await generateSqlDisplay(parsed.data.testCaseId, parsed.data.answers, parsed.data.sqlConfig!)
     if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
@@ -652,10 +653,10 @@ adminProblemRoutes.post("/test-cases", requireProblemPermission, async (c) => {
   const sql = ["1", "true", "True"].includes(String(form?.get("sql") ?? ""))
   try {
     const result = await processTestCaseZip(new Uint8Array(await file.arrayBuffer()), { sql })
-    return success(c, uploadTestCaseResponseSchema.parse({
+    return success(c, {
       id: result.testCaseId,
       info: result.info,
-    }), 201)
+    } satisfies UploadTestCaseResponse, 201)
   } catch (error) {
     if (error instanceof TestCaseError) return failure(c, 400, "invalid-test-case", error.message)
     console.error("Failed to process test case zip", error)
@@ -701,7 +702,7 @@ adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, as
   if (!info.sql) return failure(c, 409, "not-sql-test-case", "该题的测试点不是 SQL 类型")
   try {
     const scripts = await readSqlScripts(problem.testCaseId)
-    return success(c, scripts.map((script) => sqlTestCaseScriptSchema.parse(script)))
+    return success(c, scripts satisfies SqlTestCaseScript[])
   } catch (error) {
     console.error("Failed to read SQL test case scripts", error)
     return failure(c, 500, "test-case-error", "测试点脚本读取失败")
@@ -735,7 +736,7 @@ SELECT 语句，或增删改题的 UPDATE/DELETE/INSERT 语句）和题型。
 请只返回 SQL 脚本本身，连 \`\`\` 都不需要，不要任何解释文字。`,
       `题型：${parsed.data.mode}\n标准答案：\n${parsed.data.refSql}`,
     )
-    return success(c, generateSqlTestCaseResponseSchema.parse({ sql }))
+    return success(c, { sql } satisfies GenerateSqlTestCaseResponse)
   } catch (error) {
     console.error("SQL test case generation failed", error)
     return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")

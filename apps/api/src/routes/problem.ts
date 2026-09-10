@@ -1,11 +1,4 @@
-import {
-	problemAuthorSchema,
-	problemDetailSchema,
-	problemListItemSchema,
-	problemListSchema,
-	tagSchema,
-	yearlyAcSchema,
-} from "@oj2/contract"
+import type { ProblemAuthor, ProblemDetail, ProblemList, ProblemListItem, Tag, YearlyAc } from "@oj2/contract"
 import {
 	and,
 	asc,
@@ -28,7 +21,7 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { countFailedSubmissions, objectValue as toObject, queryInteger, sampleUser } from "./helpers"
+import { asFilterValue, countFailedSubmissions, objectValue as toObject, queryInteger, sampleUser } from "./helpers"
 
 export const problemRoutes = new Hono<AppEnv>()
 
@@ -36,10 +29,6 @@ function objectValue(value: unknown): Record<string, unknown> {
 	return value && typeof value === "object" && !Array.isArray(value)
 		? (value as Record<string, unknown>)
 		: {}
-}
-
-function stringArray(value: unknown): string[] {
-	return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
 }
 
 function publicTemplates(value: unknown) {
@@ -76,7 +65,7 @@ function listItem(
 	statuses: Record<string, unknown>,
 ) {
 	const status = toObject(statuses[String(row.problem.id)]).status
-	return problemListItemSchema.parse({
+	return {
 		id: row.problem.id,
 		_id: row.problem.displayId,
 		title: row.problem.title,
@@ -90,7 +79,7 @@ function listItem(
 		showFlowchart: row.problem.showFlowchart,
 		hasAstRules: row.problem.astRules !== null,
 		myStatus: typeof status === "number" ? status : null,
-	})
+	} satisfies ProblemListItem
 }
 
 problemRoutes.get("/problems", optionalAuth, async (c) => {
@@ -103,7 +92,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
 	const tag = c.req.query("tag")?.trim()
 	if (author) filters.push(eq(schema.user.username, author))
 	if (keyword) filters.push(or(ilike(schema.problem.title, `%${keyword}%`), ilike(schema.problem.displayId, `%${keyword}%`))!)
-	if (difficulty) filters.push(eq(schema.problem.difficulty, difficulty))
+	if (difficulty) filters.push(eq(schema.problem.difficulty, asFilterValue(difficulty)))
 	if (tag) {
 		filters.push(inArray(schema.problem.id, db.select({ id: schema.problemTags.problemId }).from(schema.problemTags)
 			.innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
@@ -140,10 +129,10 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
 		getProblemTags(rows.map((row) => row.problem.id)),
 		getProblemStatuses(c.get("user")?.id),
 	])
-	return success(c, problemListSchema.parse({
+	return success(c, {
 		results: rows.map((row) => listItem(row, tags, statuses)),
 		total: totalRow?.value ?? 0,
-	}))
+	} satisfies ProblemList)
 })
 
 problemRoutes.get("/problem-tags", async (c) => {
@@ -161,7 +150,7 @@ problemRoutes.get("/problem-tags", async (c) => {
 		.where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
 		.groupBy(schema.problemTag.id, schema.problemTag.name).having(sql`count(${schema.problemTags.problemId}) > 0`)
 		.orderBy(asc(schema.problemTag.name))
-	return success(c, rows.map((row) => tagSchema.parse(row)))
+	return success(c, rows satisfies Tag[])
 })
 
 problemRoutes.get("/problems/random", async (c) => {
@@ -177,7 +166,7 @@ problemRoutes.get("/problem-authors", async (c) => {
 		.from(schema.problem).innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
 		.where(and(isNull(schema.problem.contestId), eq(schema.user.isDisabled, false), showAll ? undefined : eq(schema.problem.visible, true)))
 		.groupBy(schema.user.username).orderBy(desc(count(schema.problem.id)))
-	return success(c, rows.map((row) => problemAuthorSchema.parse(row)))
+	return success(c, rows satisfies ProblemAuthor[])
 })
 
 problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
@@ -232,7 +221,7 @@ problemRoutes.get("/problems/:displayId/yearly-ac", async (c) => {
 		accepted: sql<number>`count(*) filter (where ${schema.submission.result} in (0, 10))::int`,
 	}).from(schema.submission).where(and(eq(schema.submission.problemId, problem.id), isNull(schema.submission.contestId), notInArray(schema.submission.result, [6, 7])))
 		.groupBy(year).orderBy(year)
-	return success(c, rows.map((row) => yearlyAcSchema.parse({ ...row, acRate: row.total > 0 ? Math.round(row.accepted / row.total * 10_000) / 100 : 0 })))
+	return success(c, rows.map((row) => ({ ...row, acRate: row.total > 0 ? Math.round(row.accepted / row.total * 10_000) / 100 : 0 } satisfies YearlyAc)))
 })
 
 problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
@@ -283,7 +272,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 	}
 
 	const samples = Array.isArray(row.problem.samples) ? row.problem.samples : []
-	const data = problemDetailSchema.parse({
+	const data = {
 		id: row.problem.id,
 		_id: row.problem.displayId,
 		title: row.problem.title,
@@ -292,7 +281,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 		outputDescription: row.problem.outputDescription,
 		samples,
 		hint: row.problem.hint,
-		languages: stringArray(row.problem.languages),
+		languages: row.problem.languages,
 		template: publicTemplates(row.problem.template),
 		createTime: row.problem.createTime,
 		lastUpdateTime: row.problem.lastUpdateTime,
@@ -316,11 +305,11 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
 			? null
 			: objectValue(row.problem.flowchartData),
 		flowchartHint: row.problem.flowchartHint,
-		sqlConfig: row.problem.sqlConfig ? objectValue(row.problem.sqlConfig) : null,
-		sqlDisplay: row.problem.sqlDisplay ? objectValue(row.problem.sqlDisplay) : null,
+		sqlConfig: row.problem.sqlConfig,
+		sqlDisplay: row.problem.sqlDisplay,
 		// 代码要求：只给渲染好的文案，规则原文不下发给学生
 		astRequirements: astRequirements(row.problem.astRules),
-	})
+	} satisfies ProblemDetail
 
 	return success(c, data)
 })

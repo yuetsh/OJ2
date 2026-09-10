@@ -1,16 +1,16 @@
 import {
-  STUDENT_ROLES,
   adminTypeSchema,
-  adminUserListSchema,
-  adminUserRankSchema,
-  adminUserSchema,
   deleteUsersRequestSchema,
   importUsersRequestSchema,
-  rankProfileSchema,
-  resetPasswordResponseSchema,
+  STUDENT_ROLES,
   updateUserRequestSchema,
   type AdminType,
+  type AdminUser,
+  type AdminUserList,
+  type AdminUserRank,
   type ProblemPermission,
+  type RankProfile,
+  type ResetPasswordResponse,
 } from "@oj2/contract"
 import { randomInt } from "node:crypto"
 import { z } from "zod"
@@ -66,7 +66,7 @@ function serialize(row: {
   user: typeof schema.user.$inferSelect
   realName: string | null
 }, isOnline: boolean) {
-  return adminUserSchema.parse({
+  return {
     id: row.user.id,
     username: row.user.username,
     email: row.user.email,
@@ -79,7 +79,7 @@ function serialize(row: {
     isOnline,
     rawPassword: row.user.rawPassword,
     className: row.user.className,
-  })
+  } satisfies AdminUser
 }
 
 function selectUser(id: number) {
@@ -122,16 +122,19 @@ adminAccountRoutes.get("/rankings/users", requireSuperAdmin, async (c) => {
       .limit(limit).offset(offset),
   ])
 
-  return success(c, adminUserRankSchema.parse({
-    results: rows.map(({ profile, user }) => rankProfileSchema.parse({
+  return success(c, {
+    results: rows.map(({ profile, user }) => ({
       id: profile.id,
       user: sampleUser(user, profile.realName),
       acceptedNumber: profile.acceptedNumber,
       submissionNumber: profile.submissionNumber,
       mood: profile.mood,
-    })),
+      // 这张榜不下发在线状态（null = 「调用方不该知道」，见契约里 isOnline 的注释）。
+      // 原来是靠 schema 的 .default(null) 填出来的，改成显式写死。
+      isOnline: null,
+    } satisfies RankProfile)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AdminUserRank)
 })
 
 adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
@@ -181,10 +184,10 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id)).where(where)
       .orderBy(...order, asc(schema.user.id)).limit(limit).offset(offset),
   ])
-  return success(c, adminUserListSchema.parse({
+  return success(c, {
     results: rows.map((row) => serialize(row, online.has(row.user.id))),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AdminUserList)
 })
 
 adminAccountRoutes.get("/users/:id", requireSuperAdmin, async (c) => {
@@ -447,5 +450,5 @@ adminAccountRoutes.post("/users/:id/reset-password", requireSuperAdmin, async (c
   }).where(eq(schema.user.id, id))
   // 旧密码登出来的会话立刻作废，理由同 PUT /users/:id
   await revokeUserSessions(id, "session-ended")
-  return success(c, resetPasswordResponseSchema.parse({ password }))
+  return success(c, { password } satisfies ResetPasswordResponse)
 })

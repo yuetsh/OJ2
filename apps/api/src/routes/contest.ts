@@ -1,13 +1,13 @@
 import {
-  STUDENT_ROLES,
-  contestAccessSchema,
-  contestListSchema,
   contestPasswordRequestSchema,
-  contestRankItemSchema,
-  contestRankSchema,
-  contestSchema,
-  problemDetailSchema,
-  problemListItemSchema,
+  STUDENT_ROLES,
+  type Contest,
+  type ContestAccess,
+  type ContestList,
+  type ContestRank,
+  type ContestRankItem,
+  type ProblemDetail,
+  type ProblemListItem,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, gte, ilike, inArray, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -27,7 +27,7 @@ import {
   requireContestAccess,
   type ContestEnv,
 } from "../services/contest"
-import { objectValue, publicTemplates, queryInteger, sampleUser, stringArray } from "./helpers"
+import { objectValue, publicTemplates, queryInteger, sampleUser } from "./helpers"
 
 export const contestRoutes = new Hono<ContestEnv>()
 
@@ -47,7 +47,7 @@ function serializeContest(
   createdBy: ReturnType<typeof sampleUser>,
   includeNow = false,
 ) {
-  return contestSchema.parse({
+  return {
     id: contest.id,
     title: contest.title,
     description: contest.description,
@@ -60,7 +60,7 @@ function serializeContest(
     status: contestStatus(contest),
     contestType: contest.password ? "Password Protected" : "Public",
     now: includeNow ? new Date().toISOString() : undefined,
-  })
+  } satisfies Contest
 }
 
 contestRoutes.get("/contests", async (c) => {
@@ -82,13 +82,13 @@ contestRoutes.get("/contests", async (c) => {
     db.select().from(schema.contest).where(where).orderBy(desc(schema.contest.startTime)).limit(limit).offset(offset),
   ])
   const byId = await creators([...new Set(rows.map((row) => row.createdById))])
-  return success(c, contestListSchema.parse({
+  return success(c, {
     results: rows.map((row) => serializeContest(
       row,
       byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
     )),
     total: totalRow[0]?.value ?? 0,
-  }))
+  } satisfies ContestList)
 })
 
 // optionalAuth 是为了下面那句 findAccessibleContest 认得出「这是出题人自己」——
@@ -120,7 +120,7 @@ contestRoutes.get("/contests/:id/access", requireAuth, async (c) => {
   const contest = await findAccessibleContest(c.get("user"), queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "Contest does not exist")
   const access = await canAccessContest(c, contest, "details")
-  return success(c, contestAccessSchema.parse({ access: access.ok }))
+  return success(c, { access: access.ok } satisfies ContestAccess)
 })
 
 /**
@@ -165,7 +165,7 @@ contestRoutes.get("/contests/:id/problems", optionalAuth, requireContestAccess("
   const tags = await contestProblemTags(rows.map((row) => row.problem.id))
   const allowed = contestDetailsAllowed(c.get("user"), contest)
   const statuses = await contestProblemStatuses(c.get("user")?.id)
-  return success(c, rows.map(({ problem, user, realName }) => problemListItemSchema.parse({
+  return success(c, rows.map(({ problem, user, realName }) => ({
     id: problem.id,
     _id: problem.displayId,
     title: problem.title,
@@ -179,7 +179,7 @@ contestRoutes.get("/contests/:id/problems", optionalAuth, requireContestAccess("
     showFlowchart: problem.showFlowchart,
     hasAstRules: problem.astRules !== null,
     myStatus: myStatusOf(statuses, problem.id),
-  })))
+  } satisfies ProblemListItem)))
 })
 
 contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireContestAccess("problems"), async (c) => {
@@ -192,7 +192,7 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
   const tags = await contestProblemTags([row.problem.id])
   const allowed = contestDetailsAllowed(c.get("user"), contest)
   const statuses = await contestProblemStatuses(c.get("user")?.id)
-  return success(c, problemDetailSchema.parse({
+  return success(c, {
     id: row.problem.id,
     _id: row.problem.displayId,
     title: row.problem.title,
@@ -201,7 +201,7 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
     outputDescription: row.problem.outputDescription,
     samples: Array.isArray(row.problem.samples) ? row.problem.samples : [],
     hint: row.problem.hint,
-    languages: stringArray(row.problem.languages),
+    languages: row.problem.languages,
     template: publicTemplates(row.problem.template),
     createTime: row.problem.createTime,
     lastUpdateTime: row.problem.lastUpdateTime,
@@ -224,11 +224,11 @@ contestRoutes.get("/contests/:id/problems/:displayId", optionalAuth, requireCont
     mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
     flowchartData: row.problem.allowFlowchart ? null : objectValue(row.problem.flowchartData),
     flowchartHint: row.problem.flowchartHint,
-    sqlConfig: row.problem.sqlConfig ? objectValue(row.problem.sqlConfig) : null,
-    sqlDisplay: row.problem.sqlDisplay ? objectValue(row.problem.sqlDisplay) : null,
+    sqlConfig: row.problem.sqlConfig,
+    sqlDisplay: row.problem.sqlDisplay,
     // 代码要求：只给渲染好的文案，规则原文不下发给学生
     astRequirements: astRequirements(row.problem.astRules),
-  }))
+  } satisfies ProblemDetail)
 })
 
 contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("ranks"), async (c) => {
@@ -247,8 +247,8 @@ contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("rank
       .orderBy(desc(schema.acmContestRank.acceptedNumber), asc(schema.acmContestRank.totalTime), asc(schema.acmContestRank.id)).limit(limit).offset(offset),
   ])
   const admin = isContestAdmin(c.get("user"), contest)
-  return success(c, contestRankSchema.parse({
-    results: rows.map(({ rank, user, realName }) => contestRankItemSchema.parse({
+  return success(c, {
+    results: rows.map(({ rank, user, realName }) => ({
       id: rank.id,
       // 唯一显式打开真名的地方，对齐旧后端 contest/serializers.py:84
       // `UsernameSerializer(obj.user, need_real_name=self.is_contest_admin)`
@@ -256,9 +256,9 @@ contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("rank
       submissionNumber: rank.submissionNumber,
       acceptedNumber: rank.acceptedNumber,
       totalTime: rank.totalTime,
-      submissionInfo: objectValue(rank.submissionInfo),
+      submissionInfo: rank.submissionInfo,
       contestId: rank.contestId,
-    })),
+    } satisfies ContestRankItem)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies ContestRank)
 })

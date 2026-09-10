@@ -1,8 +1,8 @@
 import {
-  adminAnnouncementListSchema,
-  adminAnnouncementSchema,
   createAnnouncementRequestSchema,
   updateAnnouncementRequestSchema,
+  type AdminAnnouncement,
+  type AdminAnnouncementList,
 } from "@oj2/contract"
 import { count, desc, eq } from "drizzle-orm"
 import { Hono } from "hono"
@@ -19,7 +19,7 @@ function serialize(row: {
   user: typeof schema.user.$inferSelect
   realName: string | null
 }) {
-  return adminAnnouncementSchema.parse({
+  return {
     id: row.announcement.id,
     title: row.announcement.title,
     tag: row.announcement.tag,
@@ -29,7 +29,7 @@ function serialize(row: {
     createdBy: sampleUser(row.user, row.realName),
     createTime: row.announcement.createTime,
     lastUpdateTime: row.announcement.lastUpdateTime,
-  })
+  } satisfies AdminAnnouncement
 }
 
 function selectOne(id: number) {
@@ -55,11 +55,11 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
       .limit(limit)
       .offset(offset),
   ])
-  return success(c, adminAnnouncementListSchema.parse({
+  return success(c, {
     // 列表 schema omit 掉了 content，Zod 会 strip 掉多出来的键，这里不必手工再挑一遍
     results: rows.map(serialize),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AdminAnnouncementList)
 })
 
 adminAnnouncementRoutes.post("/announcements", requireSuperAdmin, async (c) => {

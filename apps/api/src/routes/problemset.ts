@@ -1,13 +1,13 @@
 import {
-  problemSetBadgeSchema,
-  problemSetListSchema,
-  problemSetProblemSchema,
-  problemSetProgressListSchema,
-  problemSetProgressSchema,
-  problemSetSchema,
-  updateProblemSetProgressRequestSchema,
   joinProblemSetRequestSchema,
-  userBadgeSchema,
+  updateProblemSetProgressRequestSchema,
+  type ProblemSet,
+  type ProblemSetBadge,
+  type ProblemSetList,
+  type ProblemSetProblem,
+  type ProblemSetProgress,
+  type ProblemSetProgressList,
+  type UserBadge,
 } from "@oj2/contract"
 import {
   and,
@@ -32,7 +32,7 @@ import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { updateAchievementsForProblemSet } from "../services/achievements"
 import { computeProgress, eligibleForBadge } from "../services/problemset"
-import { objectValue, queryInteger, sampleUser } from "./helpers"
+import { asFilterValue, objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
@@ -65,7 +65,7 @@ async function problemSetCreators(ids: number[]) {
 }
 
 function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earned?: boolean) {
-  return problemSetBadgeSchema.parse({
+  return {
     id: badge.id,
     problemsetId: badge.problemsetId,
     name: badge.name,
@@ -74,7 +74,7 @@ function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earned?: b
     conditionType: badge.conditionType,
     conditionValue: badge.conditionValue,
     isEarned: earned,
-  })
+  } satisfies ProblemSetBadge
 }
 
 /**
@@ -113,7 +113,7 @@ async function serializeProblemSets(
   const earned = new Set(earnedRows.map((item) => item.id))
   return rows.map((row) => {
     const progress = progressBySet.get(row.id)
-    return problemSetSchema.parse({
+    return {
       id: row.id,
       title: row.title,
       description: row.description,
@@ -128,7 +128,7 @@ async function serializeProblemSets(
       completedCount: progress?.completedProblemsCount ?? 0,
       userProgress: progressSummary(progress),
       badges: includeBadges ? (badgesBySet.get(row.id) ?? []).map((badge) => badgeData(badge, earned.has(badge.id))) : undefined,
-    })
+    } satisfies ProblemSet
   })
 }
 
@@ -140,17 +140,17 @@ problemsetRoutes.get("/problem-sets", optionalAuth, async (c) => {
   const difficulty = c.req.query("difficulty")?.trim()
   const status = c.req.query("status")?.trim()
   if (keyword) filters.push(or(ilike(schema.problemset.title, `%${keyword}%`), ilike(schema.problemset.description, `%${keyword}%`))!)
-  if (difficulty) filters.push(eq(schema.problemset.difficulty, difficulty))
-  if (status) filters.push(eq(schema.problemset.status, status))
+  if (difficulty) filters.push(eq(schema.problemset.difficulty, asFilterValue(difficulty)))
+  if (status) filters.push(eq(schema.problemset.status, asFilterValue(status)))
   const where = and(...filters)
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.problemset).where(where),
     db.select().from(schema.problemset).where(where).orderBy(desc(schema.problemset.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, problemSetListSchema.parse({
+  return success(c, {
     results: await serializeProblemSets(rows, c.get("user")?.id, true),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies ProblemSetList)
 })
 
 problemsetRoutes.get("/problem-sets/:id", optionalAuth, async (c) => {
@@ -189,7 +189,7 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
       .where(and(eq(schema.problemsetProgress.problemsetId, id), eq(schema.problemsetProgress.userId, c.get("user")!.id))).limit(1)
     : []
   const completed = objectValue(progressRows[0]?.detail)
-  return success(c, rows.map(({ link, problemId, displayId, title, difficulty }) => problemSetProblemSchema.parse({
+  return success(c, rows.map(({ link, problemId, displayId, title, difficulty }) => ({
     id: link.id,
     problemsetId: link.problemsetId,
     problem: { id: problemId, _id: displayId, title, difficulty },
@@ -198,7 +198,7 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
     score: link.score,
     hint: link.hint,
     isCompleted: String(problemId) in completed,
-  })))
+  } satisfies ProblemSetProblem)))
 })
 
 async function recomputeProgress(
@@ -344,13 +344,13 @@ problemsetRoutes.get("/users/:username/badges", optionalAuth, async (c) => {
     .from(schema.userBadge).innerJoin(schema.problemsetBadge, eq(schema.userBadge.badgeId, schema.problemsetBadge.id))
     .innerJoin(schema.problemset, eq(schema.problemsetBadge.problemsetId, schema.problemset.id))
     .where(eq(schema.userBadge.userId, target.id)).orderBy(desc(schema.userBadge.earnedTime))
-  return success(c, rows.map(({ userBadge, badge, problemSet }) => userBadgeSchema.parse({
+  return success(c, rows.map(({ userBadge, badge, problemSet }) => ({
     id: userBadge.id,
     userId: userBadge.userId,
     badge: badgeData(badge),
     earnedTime: userBadge.earnedTime,
     problemset: { id: problemSet.id, title: problemSet.title },
-  })))
+  } satisfies UserBadge)))
 })
 
 problemsetRoutes.get("/problem-sets/:id/badges", async (c) => {
@@ -399,7 +399,7 @@ problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c
       .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id)),
   ])
   const problemMap = new Map(problemRows.map((problem) => [String(problem.id), problem]))
-  const results = rows.map(({ progress, user: progressUser, realName }) => problemSetProgressSchema.parse({
+  const results = rows.map(({ progress, user: progressUser, realName }) => ({
     id: progress.id,
     problemsetId: progress.problemsetId,
     user: sampleUser(progressUser, realName),
@@ -411,12 +411,12 @@ problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c
     totalProblemsCount: progress.totalProblemsCount,
     totalScore: progress.totalScore,
     completedProblems: Object.keys(objectValue(progress.progressDetail)).flatMap((key) => problemMap.get(key) ?? []),
-  }))
+  } satisfies ProblemSetProgress))
   const stats = statsRows[0]
-  return success(c, problemSetProgressListSchema.parse({
+  return success(c, {
     results,
     total: stats?.total ?? 0,
     statistics: { total: stats?.total ?? 0, completed: stats?.completed ?? 0, avgProgress: Number(stats?.avgProgress ?? 0) },
     problems: problemRows,
-  }))
+  } satisfies ProblemSetProgressList)
 })

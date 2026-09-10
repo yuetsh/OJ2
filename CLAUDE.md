@@ -106,26 +106,46 @@ dev 直接起不来。
 这些整数是**落库的值**：12 万条历史提交的 `submission.result` 就是它们，判题沙箱回的也是
 这套编码，所以只能新增、不能改已有的含义。题目表情 reaction 的语义 key 同理。
 
-### 契约收紧要挑地方：闸在写入侧，不在读出侧
+### 出参不 `parse`，用 `satisfies`
 
-`packages/contract` 的 schema 前后端共用，而且**后端在读路径上 `parse`**
-（`submissionDetailSchema` / `exerciseSchema` / `contestRankItemSchema` 都是）。
-所以收紧一个字段不只是「类型更准」，是给全部历史数据加了一道闸：
+**后端的响应一律 `satisfies XxxType`，不要写 `xxxSchema.parse({...})`。**
+出参是后端自己刚拼出来的字面量，TS 已经在编译期校验过；再 `parse` 一遍拿不到任何新
+信息，唯一可能失败的输入是**库里的历史数据**，而失败的代价是 500。这一层原来有 136 处，
+已经全部撤掉，撤的时候当场炸出两个一直存在的线上 500：
 
-- 对不上就 500 —— `exerciseSchema` 按题型收紧过，库里一行脏数据能让整条学生练习
-  列表打不开，坏的不是那一道题；
-- 更坏的是**不 500**：`info` 当时写成 `union([完整形状, z.object({})])`，对不上的
-  一律落进空对象那支且 parse 成功，管理员详情页的测试点表格**静默消失**。全量核出来
-  9163/124192 条中招，RE 8480/8480、TLE 338/338、MLE 1/1 全中 —— 沙箱在非正常退出
-  的测试点上写 `output_md5: null`，而契约写的是 `z.string()`。
+- `adminProblemSchema.lastUpdateTime` 写的是 `z.string()`，但 `problem.last_update_time`
+  是全库唯一可空的列（961 道题里 470 道是 NULL）——**后台打开任何一道没编辑过的老题都是 500**；
+- `embeddedSubmissionSchema` 从 `submissionDetailSchema` 继承了 `problemDisplayId` 却没
+  omit，而路由只填了同义的 `problem`——**凡是收到过站内信的人，消息页都打不开**（列表为空
+  时才碰巧不炸，所以一直没人报）。
 
-所以：**JSONB 原文（`submission.info` / `statistic_info` / `exercise.data`）的形状
-真相在写入侧** —— 判题机、`services/exercise.ts` 的 `exerciseDataError` —— 闸就设在
-那里，读出侧放行。下一条 AST 规则的 `astRulesError()` 是同一个道理的另一个实例。
+两个都是「读出侧校验」自己造出来的故障，不是它拦住的故障。历史上还有两次同类：
+`exerciseSchema` 按题型收紧后一行脏数据让整条练习列表 500；`info` 写成
+`union([完整形状, z.object({})])` 后对不上的一律落进空对象那支且 parse **成功**，
+管理员详情页的测试点表格静默消失（全量核出 9163/124192 条中招，RE 8480/8480 全中——
+沙箱在非正常退出的测试点上写 `output_md5: null`，而契约写的是 `z.string()`）。
 
-真要收紧读出侧的字段，先拿根目录那份生产备份跑一遍全量，**重点看空值，不是键集合**：
-上面那次翻车就是键集合全对、空值没看。前端那侧（`utils/contract.ts` 为什么只挂三处）
-见 `apps/web/CLAUDE.md`。
+**闸设在写入侧，一共三处形态：**
+
+1. **入参 `safeParse`**（58 处，全部保留）—— 请求体进来的那一刻校验，对不上回 400。
+2. **`db/schema.ts` 的 `.$type<>()`** —— 枚举型的列（`submission.result` / `.language`、
+   `problem.difficulty` / `.languages`、`achievement.rarity`、`exercise.type`…）和几个
+   形状确定的 JSONB（`problem.template` / `.astRules` / `.sqlConfig` / `.sqlDisplay`、
+   `acm_contest_rank.submission_info`）直接在列上收窄，只影响 TS、不产生任何 SQL。
+   这些断言**逐列拿根目录那份生产备份核过**（12.4 万条提交的 `result` 全在 `-2..6,10`、
+   961 道题的 `languages` 全是合法数组、10050 条榜单条目形状全对）。
+   加这类断言前先照样核一遍，别凭直觉。
+3. **语义校验函数** —— `astRulesError()`、`services/exercise.ts` 的 `exerciseDataError`。
+
+**JSONB 原文（`submission.info` / `statistic_info` / `exercise.data`）仍然一律放行**，
+读出侧不收窄：它们的形状真相在判题机那边。
+
+query 里的筛选值要和收窄过的列比较时走 `routes/helpers.ts` 的 `asFilterValue()` ——
+那是纯类型交接，**不加校验**：在那儿拦一道会把「筛出空列表」变成「筛条件被忽略、
+返回全部」。前端那侧（`utils/contract.ts` 为什么只挂三处）见 `apps/web/CLAUDE.md`。
+
+唯一还留着 `parse` 的地方是 `judge/events.ts` 的 `parseSubmissionEvent` ——
+那是从 Redis 收回来的报文，真边界，且失败返回 `null` 而不是 500。
 
 ### AST 代码规则有两张表，必须同增同减
 

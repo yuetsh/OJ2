@@ -1,20 +1,22 @@
 import {
-  announcementListItemSchema,
-  announcementListSchema,
-  announcementSchema,
   createMessageRequestSchema,
-  exerciseSchema,
-  messageListSchema,
-  messageSchema,
-  reactionKeySchema,
-  reactionStateSchema,
-  setReactionRequestSchema,
   embeddedSubmissionSchema,
   exerciseAttemptRequestSchema,
+  reactionKeySchema,
+  setReactionRequestSchema,
   tutorialProgressPingSchema,
-  tutorialProgressSchema,
-  tutorialSchema,
-  tutorialSummarySchema,
+  type Announcement,
+  type AnnouncementList,
+  type AnnouncementListItem,
+  type EmbeddedSubmission,
+  type Exercise,
+  type Message,
+  type MessageList,
+  type ReactionCounts,
+  type ReactionState,
+  type Tutorial,
+  type TutorialProgress,
+  type TutorialSummary,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -38,8 +40,8 @@ contentRoutes.get("/announcements", async (c) => {
       .where(eq(schema.announcement.visible, true))
       .orderBy(desc(schema.announcement.top), desc(schema.announcement.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, announcementListSchema.parse({
-    results: rows.map(({ announcement, user, realName }) => announcementListItemSchema.parse({
+  return success(c, {
+    results: rows.map(({ announcement, user, realName }) => ({
       id: announcement.id,
       title: announcement.title,
       tag: announcement.tag,
@@ -47,9 +49,9 @@ contentRoutes.get("/announcements", async (c) => {
       createdBy: sampleUser(user, realName),
       createTime: announcement.createTime,
       lastUpdateTime: announcement.lastUpdateTime,
-    })),
+    } satisfies AnnouncementListItem)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AnnouncementList)
 })
 
 contentRoutes.get("/announcements/:id", async (c) => {
@@ -59,7 +61,7 @@ contentRoutes.get("/announcements/:id", async (c) => {
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(and(eq(schema.announcement.id, id), eq(schema.announcement.visible, true))).limit(1)
   if (!row) return failure(c, 404, "announcement-not-found", "Announcement does not exist")
-  return success(c, announcementSchema.parse({
+  return success(c, {
     id: row.announcement.id,
     title: row.announcement.title,
     tag: row.announcement.tag,
@@ -68,7 +70,7 @@ contentRoutes.get("/announcements/:id", async (c) => {
     createdBy: sampleUser(row.user, row.realName),
     createTime: row.announcement.createTime,
     lastUpdateTime: row.announcement.lastUpdateTime,
-  }))
+  } satisfies Announcement)
 })
 
 contentRoutes.get("/messages", requireAuth, async (c) => {
@@ -84,13 +86,13 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
       .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
       .where(eq(schema.message.recipientId, user.id)).orderBy(desc(schema.message.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, messageListSchema.parse({
-    results: rows.map(({ message, sender, realName, submission, displayId }) => messageSchema.parse({
+  return success(c, {
+    results: rows.map(({ message, sender, realName, submission, displayId }) => ({
       id: message.id,
       sender: sampleUser(sender, realName),
       createTime: message.createTime,
       message: message.message,
-      submission: embeddedSubmissionSchema.parse({
+      submission: {
         id: submission.id,
         createTime: submission.createTime,
         userId: submission.userId,
@@ -104,10 +106,10 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
         // 展示用题号而非数字主键，站内信页面拿它拼 /problem/<题号>
         problem: displayId,
         showLink: true,
-      }),
-    })),
+      } satisfies EmbeddedSubmission,
+    } satisfies Message)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies MessageList)
 })
 
 /**
@@ -140,15 +142,16 @@ contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
 async function reactionState(problemId: number, userId: number) {
   const [mine] = await db.select({ type: schema.reaction.type }).from(schema.reaction)
     .where(and(eq(schema.reaction.problemId, problemId), eq(schema.reaction.userId, userId))).limit(1)
-  if (!mine) return reactionStateSchema.parse({ mine: null, counts: null })
+  if (!mine) return { mine: null, counts: null } satisfies ReactionState
   const rows = await db.select({ type: schema.reaction.type, value: count() }).from(schema.reaction)
     .where(eq(schema.reaction.problemId, problemId)).groupBy(schema.reaction.type)
-  const counts = Object.fromEntries(reactionKeySchema.options.map((key) => [key, 0]))
-  for (const row of rows) {
-    const key = reactionKeySchema.safeParse(row.type)
-    if (key.success) counts[key.data] = row.value
-  }
-  return reactionStateSchema.parse({ mine: mine.type, counts })
+  // fromEntries 推不出这个键集，但 options 就是 ReactionKey 的全集，断言是成立的。
+  // row.type 不必再 safeParse：reaction.type 列上挂着 $type<ReactionKey>()
+  const counts = Object.fromEntries(
+    reactionKeySchema.options.map((key) => [key, 0]),
+  ) as ReactionCounts
+  for (const row of rows) counts[row.type] = row.value
+  return { mine: mine.type, counts } satisfies ReactionState
 }
 
 contentRoutes.get("/problems/:id/reaction", requireAuth, async (c) => {
@@ -183,7 +186,7 @@ contentRoutes.get("/tutorials", async (c) => {
   const type = c.req.query("type") === "c" ? "c" : "python"
   const rows = await db.select({ id: schema.tutorial.id, title: schema.tutorial.title }).from(schema.tutorial)
     .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type))).orderBy(asc(schema.tutorial.order))
-  return success(c, rows.map((row) => tutorialSummarySchema.parse(row)))
+  return success(c, rows satisfies TutorialSummary[])
 })
 
 contentRoutes.get("/tutorials/:id", async (c) => {
@@ -193,7 +196,7 @@ contentRoutes.get("/tutorials/:id", async (c) => {
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true))).limit(1)
   if (!row) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
-  return success(c, tutorialSchema.parse({
+  return success(c, {
     id: row.tutorial.id,
     title: row.tutorial.title,
     content: row.tutorial.content,
@@ -204,7 +207,7 @@ contentRoutes.get("/tutorials/:id", async (c) => {
     createdBy: sampleUser(row.user, row.realName),
     createdAt: row.tutorial.createdAt,
     updatedAt: row.tutorial.updatedAt,
-  }))
+  } satisfies Tutorial)
 })
 
 // ---------------------------------------------------------------- 自学留痕
@@ -252,7 +255,7 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
   ])
   const exercises = new Map(exerciseRows.map((row) => [row.tutorialId, row]))
 
-  return success(c, rows.map((row) => tutorialProgressSchema.parse({
+  return success(c, rows.map((row) => ({
     tutorialId: row.tutorialId,
     viewCount: row.viewCount ?? 0,
     totalSeconds: row.totalSeconds ?? 0,
@@ -260,7 +263,7 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
     lastViewedAt: row.lastViewedAt,
     exerciseTotal: exercises.get(row.tutorialId)?.total ?? 0,
     exerciseSolved: exercises.get(row.tutorialId)?.solved ?? 0,
-  })))
+  } satisfies TutorialProgress)))
 })
 
 /**
@@ -369,5 +372,5 @@ contentRoutes.get("/tutorials/:id/exercises", async (c) => {
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true))).limit(1)
   if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
   const rows = await db.select().from(schema.exercise).where(eq(schema.exercise.tutorialId, id)).orderBy(asc(schema.exercise.order))
-  return success(c, rows.map((row) => exerciseSchema.parse({ id: row.id, type: row.type, data: objectValue(row.data), order: row.order })))
+  return success(c, rows.map((row) => ({ id: row.id, type: row.type, data: objectValue(row.data), order: row.order } satisfies Exercise)))
 })

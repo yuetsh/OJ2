@@ -1,4 +1,4 @@
-import { onlineCountSchema, quoteSchema, websiteConfigSchema } from "@oj2/contract"
+import type { OnlineCount, Quote, WebsiteConfig } from "@oj2/contract"
 import { asc, desc, eq } from "drizzle-orm"
 import { Hono } from "hono"
 import { resolve } from "node:path"
@@ -14,7 +14,7 @@ export const siteRoutes = new Hono()
 
 siteRoutes.get("/site", async (c) => {
   const options = await getWebsiteOptions()
-  return success(c, websiteConfigSchema.parse({
+  return success(c, {
     websiteBaseUrl: options.website_base_url,
     websiteName: options.website_name,
     websiteNameShortcut: options.website_name_shortcut,
@@ -23,7 +23,7 @@ siteRoutes.get("/site", async (c) => {
     submissionListShowAll: options.submission_list_show_all,
     classList: options.class_list,
     enableMaxkb: options.enable_maxkb,
-  }))
+  } satisfies WebsiteConfig)
 })
 
 /**
@@ -31,7 +31,7 @@ siteRoutes.get("/site", async (c) => {
  * 而榜单页本身就允许匿名看。谁在线是另一回事，只在 /rankings/users 里对老师下发。
  */
 siteRoutes.get("/site/online", async (c) => {
-  return success(c, onlineCountSchema.parse({ count: await onlineCount() }))
+  return success(c, { count: await onlineCount() } satisfies OnlineCount)
 })
 
 // 数据集读不到时的兜底（本机 dev 没挂 data/hitokoto 就会走这里）
@@ -46,11 +46,6 @@ const fallbackQuotes = [
 // 解析后的对象要占 60~100MB，而 api 容器只有 512m。裁完全量也就几 MB。
 let categoryPaths: string[] | null = null
 const sentenceCache = new Map<string, Quote[]>()
-
-interface Quote {
-  hitokoto: string
-  from: string
-}
 
 async function loadSentences(path: string) {
   const cached = sentenceCache.get(path)
@@ -78,10 +73,10 @@ async function randomQuote() {
 
 siteRoutes.get("/quotes/random", async (c) => {
   try {
-    return success(c, quoteSchema.parse(await randomQuote()))
+    return success(c, (await randomQuote()) satisfies Quote)
   } catch {
     const item = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)]!
-    return success(c, quoteSchema.parse(item))
+    return success(c, item satisfies Quote)
   }
 })
 

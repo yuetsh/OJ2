@@ -1,7 +1,4 @@
-import {
-  submissionUpdateSchema,
-  type SubmissionUpdate,
-} from "@oj2/contract"
+import { submissionUpdateSchema, type SubmissionUpdate } from "@oj2/contract"
 
 import { redis } from "../redis"
 
@@ -20,10 +17,7 @@ export async function publishSubmissionUpdate(
   userId: number,
   data: SubmissionUpdate,
 ) {
-  const event: SubmissionEvent = {
-    userId,
-    data: submissionUpdateSchema.parse(data),
-  }
+  const event: SubmissionEvent = { userId, data }
   await redis.publish(submissionUpdateChannel, JSON.stringify(event))
 }
 

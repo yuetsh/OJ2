@@ -120,9 +120,12 @@ return contract("GET /problems/:id", problemDetailSchema, value)
 - `exercise.data` 按题型收紧后，后端读路径（`routes/content.ts` 硬 parse）变成
   一道闸，一行脏数据能让整条练习列表 500。
 
-所以：**同一个 schema 后端也在 `parse`**（`submissionDetailSchema` /
-`exerciseSchema` / `contestRankItemSchema` 都是），收紧任何字段之前，拿根目录
-那份生产备份把全量数据跑一遍，尤其要看**空值**而不只是键集合。
+**后端出参已经不 `parse` 了**（原来 136 处，全部改成 `satisfies`；撤的时候炸出两个
+一直存在的线上 500，见 `../CLAUDE.md` 的「出参不 `parse`，用 `satisfies`」）。
+所以现在收紧一个字段的直接后果落在 **`tsc` 编译期**，而不再是运行时 500 —— 这是好事，
+但别因此就放心大胆收：契约里的形状仍然要对得上库里的存量数据，前端拿到对不上的值
+一样会渲染错。收紧任何字段之前，拿根目录那份生产备份把全量数据跑一遍，
+尤其要看**空值**而不只是键集合。
 
 ### Key Utilities
 

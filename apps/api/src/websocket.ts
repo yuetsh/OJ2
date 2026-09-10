@@ -1,4 +1,4 @@
-import { flowchartUpdateSchema, submissionUpdateSchema } from "@oj2/contract"
+import { submissionUpdateSchema, type FlowchartUpdate } from "@oj2/contract"
 import { and, eq } from "drizzle-orm"
 
 import { touchSession } from "./auth/session"
@@ -345,11 +345,11 @@ async function handleMessage(
       return
     }
     const replay = flowchart.status === 2
-      ? { type: "flowchart_evaluation_completed", submissionId: flowchart.id, score: flowchart.score ?? undefined, grade: flowchart.grade ?? undefined }
+      ? { type: "flowchart_evaluation_completed" as const, submissionId: flowchart.id, score: flowchart.score ?? undefined, grade: flowchart.grade ?? undefined }
       : flowchart.status === 3
-        ? { type: "flowchart_evaluation_failed", submissionId: flowchart.id }
-        : { type: "flowchart_evaluation_update", submissionId: flowchart.id }
-    ws.send(JSON.stringify(flowchartUpdateSchema.parse(replay)))
+        ? { type: "flowchart_evaluation_failed" as const, submissionId: flowchart.id }
+        : { type: "flowchart_evaluation_update" as const, submissionId: flowchart.id }
+    ws.send(JSON.stringify(replay satisfies FlowchartUpdate))
     return
   }
 

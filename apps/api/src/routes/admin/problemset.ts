@@ -1,16 +1,16 @@
 import {
   addProblemToSetRequestSchema,
-  adminProblemSetBadgeSchema,
-  adminProblemSetListSchema,
-  adminProblemSetProblemSchema,
-  adminProblemSetProgressSchema,
-  adminProblemSetSchema,
   createProblemSetBadgeRequestSchema,
   createProblemSetRequestSchema,
   updateProblemInSetRequestSchema,
   updateProblemSetBadgeRequestSchema,
   updateProblemSetRequestSchema,
   updateProblemSetStatusRequestSchema,
+  type AdminProblemSet,
+  type AdminProblemSetBadge,
+  type AdminProblemSetList,
+  type AdminProblemSetProblem,
+  type AdminProblemSetProgress,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -20,7 +20,7 @@ import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { recalculateBadge, resyncProgress } from "../../services/problemset"
-import { queryInteger, sampleUser } from "../helpers"
+import { asFilterValue, queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemSetRoutes = new Hono<AppEnv>()
 
@@ -65,7 +65,7 @@ async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
   const creatorById = new Map(creators.map((item) => [item.id, item]))
   return rows.map((row) => {
     const creator = creatorById.get(row.createdById)
-    return adminProblemSetSchema.parse({
+    return {
       id: row.id,
       title: row.title,
       description: row.description,
@@ -78,7 +78,7 @@ async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
       lastUpdateTime: row.lastUpdateTime,
       problemsCount: problemsBySet.get(row.id) ?? 0,
       participantCount: participantsBySet.get(row.id) ?? 0,
-    })
+    } satisfies AdminProblemSet
   })
 }
 
@@ -102,8 +102,8 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
       ilike(schema.problemset.description, `%${keyword}%`),
     )!)
   }
-  if (difficulty) filters.push(eq(schema.problemset.difficulty, difficulty))
-  if (status) filters.push(eq(schema.problemset.status, status))
+  if (difficulty) filters.push(eq(schema.problemset.difficulty, asFilterValue(difficulty)))
+  if (status) filters.push(eq(schema.problemset.status, asFilterValue(status)))
   const where = filters.length ? and(...filters) : undefined
 
   const [totalRows, rows] = await Promise.all([
@@ -111,10 +111,10 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
     db.select().from(schema.problemset).where(where)
       .orderBy(desc(schema.problemset.createTime)).limit(limit).offset(offset),
   ])
-  return success(c, adminProblemSetListSchema.parse({
+  return success(c, {
     results: await serializeMany(rows),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies AdminProblemSetList)
 })
 
 adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
@@ -194,7 +194,7 @@ adminProblemSetRoutes.get("/problem-sets/:id/problems", requireTeacher, async (c
     .innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
     .where(eq(schema.problemsetProblem.problemsetId, row.id))
     .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id))
-  return success(c, rows.map(({ item, problem }) => adminProblemSetProblemSchema.parse({
+  return success(c, rows.map(({ item, problem }) => ({
     id: item.id,
     problemsetId: item.problemsetId,
     problemId: item.problemId,
@@ -205,7 +205,7 @@ adminProblemSetRoutes.get("/problem-sets/:id/problems", requireTeacher, async (c
     isRequired: item.isRequired,
     score: item.score,
     hint: item.hint,
-  })))
+  } satisfies AdminProblemSetProblem)))
 })
 
 adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (c) => {
@@ -289,7 +289,7 @@ async function badgesWithCount(badges: BadgeRow[]) {
     .from(schema.userBadge).where(inArray(schema.userBadge.badgeId, badges.map((badge) => badge.id)))
     .groupBy(schema.userBadge.badgeId)
   const countByBadge = new Map(earned.map((item) => [item.badgeId, item.value]))
-  return badges.map((badge) => adminProblemSetBadgeSchema.parse({
+  return badges.map((badge) => ({
     id: badge.id,
     problemsetId: badge.problemsetId,
     name: badge.name,
@@ -298,7 +298,7 @@ async function badgesWithCount(badges: BadgeRow[]) {
     conditionType: badge.conditionType,
     conditionValue: badge.conditionValue,
     earnedCount: countByBadge.get(badge.id) ?? 0,
-  }))
+  } satisfies AdminProblemSetBadge))
 }
 
 adminProblemSetRoutes.get("/problem-sets/:id/badges", requireTeacher, async (c) => {
@@ -375,7 +375,7 @@ adminProblemSetRoutes.get("/problem-sets/:id/progress", requireTeacher, async (c
     .where(eq(schema.problemsetProgress.problemsetId, row.id))
     .orderBy(desc(schema.problemsetProgress.joinTime))
   return success(c, rows.map(({ progress, username, realName }) =>
-    adminProblemSetProgressSchema.parse({
+    ({
       id: progress.id,
       userId: progress.userId,
       username,
@@ -388,7 +388,7 @@ adminProblemSetRoutes.get("/problem-sets/:id/progress", requireTeacher, async (c
       completedProblemsCount: progress.completedProblemsCount,
       totalProblemsCount: progress.totalProblemsCount,
       totalScore: progress.totalScore,
-    })))
+    } satisfies AdminProblemSetProgress)))
 })
 
 adminProblemSetRoutes.delete("/problem-sets/:id/progress/:userId", requireTeacher, async (c) => {

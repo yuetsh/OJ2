@@ -1,13 +1,13 @@
 import {
-  acTrendSchema,
-  adminTagSchema,
   batchProblemTagRequestSchema,
-  batchProblemTagResponseSchema,
   generateFlowchartRequestSchema,
-  generateFlowchartResponseSchema,
   renameTagRequestSchema,
-  renameTagResponseSchema,
-  stuckProblemSchema,
+  type AcTrend,
+  type AdminTag,
+  type BatchProblemTagResponse,
+  type GenerateFlowchartResponse,
+  type RenameTagResponse,
+  type StuckProblem,
 } from "@oj2/contract"
 import { and, asc, countDistinct, count, desc, eq, gte, ilike, inArray, isNull, lte, ne, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -46,7 +46,7 @@ adminTagRoutes.get("/problem-tags", requireProblemPermission, async (c) => {
     // 后台标签管理要看到 problemCount=0 的标签（正是要清理的那些），
     // 所以这里用 leftJoin 且不加 having —— oj 侧的 /problem-tags 才过滤 >0
     .orderBy(desc(countDistinct(schema.problemTags.problemId)), asc(schema.problemTag.name))
-  return success(c, rows.map((row) => adminTagSchema.parse(row)))
+  return success(c, rows satisfies AdminTag[])
 })
 
 adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
@@ -63,7 +63,7 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
 
   if (!target) {
     await db.update(schema.problemTag).set({ name }).where(eq(schema.problemTag.id, id))
-    return success(c, renameTagResponseSchema.parse({ merged: false, id, name, affectedCount: 0 }))
+    return success(c, { merged: false, id, name, affectedCount: 0 } satisfies RenameTagResponse)
   }
 
   // 改名撞上已有标签，视为合并：题目关系转移过去，原标签删除
@@ -86,9 +86,9 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
     await tx.delete(schema.problemTag).where(eq(schema.problemTag.id, id))
     return links.length
   })
-  return success(c, renameTagResponseSchema.parse({
+  return success(c, {
     merged: true, id: target.id, name: target.name, affectedCount: affected,
-  }))
+  } satisfies RenameTagResponse)
 })
 
 adminTagRoutes.delete("/problem-tags/:id", requireProblemPermission, async (c) => {
@@ -152,10 +152,10 @@ adminTagRoutes.post("/problems/batch-tag", requireProblemPermission, async (c) =
     if (rows.length) await tx.insert(schema.problemTags).values(rows)
   })
 
-  return success(c, batchProblemTagResponseSchema.parse({
+  return success(c, {
     problemCount: problems.length,
     tagCount: tagIds.length,
-  }))
+  } satisfies BatchProblemTagResponse)
 })
 
 // ---------------------------------------------------------------- 题目可见性
@@ -209,14 +209,14 @@ adminTagRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
     .having(sql`count(distinct ${schema.submission.userId}) ${failedFilter} > 0`)
     .orderBy(desc(sql`count(distinct ${schema.submission.userId}) ${failedFilter}`))
     .limit(40)
-  return success(c, rows.map((row) => stuckProblemSchema.parse({
+  return success(c, rows.map((row) => ({
     problemId: row.displayId,
     problemTitle: row.title,
     total: row.total,
     failed: row.failed,
     failedUsers: row.failedUsers,
     acRate: row.total ? rounded((row.accepted / row.total) * 100, 1) : 0,
-  })))
+  } satisfies StuckProblem)))
 })
 
 adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
@@ -263,7 +263,7 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
     // 每一年都得有数据，且每年提交量都超过门槛 —— 否则趋势没有可比性
     if (![...required].every((y) => years.has(y))) continue
     if (!entry.yearly.every((row) => row.total > minPerYear)) continue
-    result.push(acTrendSchema.parse({
+    result.push({
       problemId: entry.displayId,
       problemTitle: entry.title,
       yearly: entry.yearly
@@ -274,7 +274,7 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
           acRate: row.total ? rounded((row.accepted / row.total) * 100, 1) : 0,
         }))
         .sort((left, right) => left.year - right.year),
-    }))
+    } satisfies AcTrend)
   }
   return success(c, result)
 })
@@ -292,7 +292,7 @@ adminTagRoutes.post("/problems/flowchart", requireProblemPermission, async (c) =
 请只返回 mermaid 代码，连 \`\`\` 都不需要。`,
       parsed.data.python,
     )
-    return success(c, generateFlowchartResponseSchema.parse({ flowchart }))
+    return success(c, { flowchart } satisfies GenerateFlowchartResponse)
   } catch (error) {
     console.error("Flowchart generation failed", error)
     return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")

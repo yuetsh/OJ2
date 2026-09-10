@@ -15,6 +15,17 @@
 // 详见 CLAUDE.md「改 schema 走 drizzle migration」）：
 //   * bigint identity 的 maxValue 用字符串，不能写成 JS number 字面量（会丢精度）。
 //   * 索引不写 `.desc()`，生成 SQL 时方向会被丢掉。
+//   * `.$type<...>()` 的收窄（见下）—— `pull` 只会吐出 text/integer/jsonb，重新 pull
+//     会把这些断言全抹掉，之后出参的 `satisfies` 会当场编译不过（这是好事，别拿
+//     `as` 糊过去，把断言补回来）。
+//
+// 2026-09-10：出参不再 `xxxSchema.parse()` 而是 `satisfies`（原来 136 处），
+// 收窄的责任因此挪到了列上：枚举型的列和几个形状确定的 JSONB 都挂了 `.$type<>()`。
+// `$type` 只是 TS 层的断言、不产生任何 SQL，所以它成立与否得靠数据说话 ——
+// 下面每一处都拿根目录那份生产备份逐列核过（12.4 万条提交的 result 全在 -2..6,10、
+// 961 道题的 languages 全是合法数组、10050 条榜单条目形状全对，无一例外）。
+// **再给别的列加 $type 之前，照样先核一遍全量数据。** 兑现这些断言的是写入侧的
+// `safeParse`，不是读出侧。前因后果见 CLAUDE.md「出参不 `parse`，用 `satisfies`」。
 //
 // 关于 10 张表的 bigint id（problemset*、achievement、user_achievement、user_stat、
 // user_badge、ai_analysis）：这是历史巧合不是设计——这些 app 的 0001_initial 生成时
@@ -22,7 +33,26 @@
 // problem、contest、submission）都是 int4。现存最大 id 一万出头，确实都用不上 bigint，
 // 但 2026-08-26 评估后决定**不改**：省 4 字节/行毫无意义，ALTER TYPE 要重写整表并拿
 // ACCESS EXCLUSIVE 锁，而且其中 6 处 id 被外键绑着得连坐。别再提这件事了。
-import type { AdminType, ProblemPermission } from "@oj2/contract"
+import type {
+	AchievementOperator,
+	AchievementRarity,
+	AdminType,
+	AstRules,
+	BadgeConditionType,
+	ContestSubmissionInfo,
+	ExerciseType,
+	FlowchartStatus,
+	JudgeStatus,
+	ProblemDifficulty,
+	ProblemLanguage,
+	ProblemPermission,
+	ProblemSetDifficulty,
+	ProblemSetStatus,
+	ReactionKey,
+	SqlConfig,
+	SqlDisplay,
+	TutorialType,
+} from "@oj2/contract"
 import { pgTable, index, foreignKey, primaryKey, bigint, text, jsonb, timestamp, integer, boolean, serial, doublePrecision, varchar, unique, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
@@ -75,10 +105,10 @@ export const achievement = pgTable("achievement", {
 	name: text().notNull(),
 	description: text().notNull(),
 	icon: text().notNull(),
-	rarity: text().notNull(),
+	rarity: text().notNull().$type<AchievementRarity>(),
 	hidden: boolean().default(false).notNull(),
 	metric: text().notNull(),
-	operator: text().notNull(),
+	operator: text().notNull().$type<AchievementOperator>(),
 	threshold: integer().notNull(),
 	visible: boolean().default(true).notNull(),
 	unlockCount: integer("unlock_count").default(0).notNull(),
@@ -111,7 +141,7 @@ export const flowchartSubmission = pgTable("flowchart_submission", {
 	id: text().primaryKey().notNull(),
 	mermaidCode: text("mermaid_code").notNull(),
 	flowchartData: jsonb("flowchart_data").notNull(),
-	status: integer().notNull(),
+	status: integer().notNull().$type<FlowchartStatus>(),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
 	aiScore: doublePrecision("ai_score"),
 	aiGrade: varchar("ai_grade", { length: 10 }),
@@ -189,7 +219,7 @@ export const judgeServer = pgTable("judge_server", {
 
 export const exercise = pgTable("exercise", {
 	id: integer().primaryKey().generatedByDefaultAsIdentity({ name: "exercise_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
-	type: varchar({ length: 16 }).notNull(),
+	type: varchar({ length: 16 }).notNull().$type<ExerciseType>(),
 	data: jsonb().notNull(),
 	order: integer().notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).notNull(),
@@ -219,8 +249,8 @@ export const problemset = pgTable("problemset", {
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
 	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }).notNull(),
 	visible: boolean().notNull(),
-	difficulty: text().notNull(),
-	status: text().notNull(),
+	difficulty: text().notNull().$type<ProblemSetDifficulty>(),
+	status: text().notNull().$type<ProblemSetStatus>(),
 	createdById: integer("created_by_id").notNull(),
 	endTime: timestamp("end_time", { withTimezone: true, mode: 'string' }),
 }, (table) => [
@@ -324,7 +354,7 @@ export const problemsetSubmission = pgTable("problemset_submission", {
 
 export const reaction = pgTable("reaction", {
 	id: integer().primaryKey().generatedByDefaultAsIdentity({ name: "reaction_id_seq", startWith: 1, increment: 1, minValue: 1, maxValue: 2147483647, cache: 1 }),
-	type: varchar({ length: 20 }).notNull(),
+	type: varchar({ length: 20 }).notNull().$type<ReactionKey>(),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
 	problemId: integer("problem_id").notNull(),
 	userId: integer("user_id").notNull(),
@@ -354,14 +384,14 @@ export const problem = pgTable("problem", {
 	testCaseId: text("test_case_id").notNull(),
 	testCaseScore: jsonb("test_case_score").notNull(),
 	hint: text(),
-	languages: jsonb().notNull(),
-	template: jsonb().notNull(),
+	languages: jsonb().notNull().$type<ProblemLanguage[]>(),
+	template: jsonb().notNull().$type<Record<string, string>>(),
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
 	lastUpdateTime: timestamp("last_update_time", { withTimezone: true, mode: 'string' }),
 	timeLimit: integer("time_limit").notNull(),
 	memoryLimit: integer("memory_limit").notNull(),
 	visible: boolean().default(true).notNull(),
-	difficulty: text().notNull(),
+	difficulty: text().notNull().$type<ProblemDifficulty>(),
 	source: text(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	submissionNumber: bigint("submission_number", { mode: "number" }).default(0).notNull(),
@@ -386,9 +416,9 @@ export const problem = pgTable("problem", {
 	flowchartHint: text("flowchart_hint"),
 	mermaidCode: text("mermaid_code"),
 	showFlowchart: boolean("show_flowchart").default(false).notNull(),
-	astRules: jsonb("ast_rules"),
-	sqlConfig: jsonb("sql_config"),
-	sqlDisplay: jsonb("sql_display"),
+	astRules: jsonb("ast_rules").$type<AstRules>(),
+	sqlConfig: jsonb("sql_config").$type<SqlConfig>(),
+	sqlDisplay: jsonb("sql_display").$type<SqlDisplay>(),
 }, (table) => [
 	index("problem_contest_visible_idx").using("btree", table.contestId.asc().nullsLast().op("bool_ops"), table.visible.asc().nullsLast().op("int4_ops")),
 	index("problem_created_by_id_cb362143").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
@@ -439,9 +469,9 @@ export const submission = pgTable("submission", {
 	createTime: timestamp("create_time", { withTimezone: true, mode: 'string' }).notNull(),
 	userId: integer("user_id").notNull(),
 	code: text().notNull(),
-	result: integer().default(6).notNull(),
+	result: integer().default(6).notNull().$type<JudgeStatus>(),
 	info: jsonb().default({}).notNull(),
-	language: text().notNull(),
+	language: text().notNull().$type<ProblemLanguage>(),
 	/**
 	 * 已停用，见 problem.share_submission 的说明。历史上 12.3 万条提交里有 40 条
 	 * 为真（2022 年 39 条、2023 年 1 条），入口在更早的那版前端上，ojnext 和 OJ2
@@ -560,7 +590,7 @@ export const tutorial = pgTable("tutorial", {
 	order: integer().notNull(),
 	createdById: integer("created_by_id").notNull(),
 	code: text(),
-	type: varchar({ length: 10 }).notNull(),
+	type: varchar({ length: 10 }).notNull().$type<TutorialType>(),
 }, (table) => [
 	index("tutorial_created_by_id_07973cab").using("btree", table.createdById.asc().nullsLast().op("int4_ops")),
 	foreignKey({
@@ -635,7 +665,7 @@ export const userBadge = pgTable("user_badge", {
 
 export const userProfile = pgTable("user_profile", {
 	id: serial().primaryKey().notNull(),
-	acmProblemsStatus: jsonb("acm_problems_status").default({}).notNull(),
+	acmProblemsStatus: jsonb("acm_problems_status").default({}).notNull().$type<Record<string, unknown>>(),
 	avatar: text().notNull(),
 	mood: text(),
 	acceptedNumber: integer("accepted_number").default(0).notNull(),
@@ -656,7 +686,7 @@ export const acmContestRank = pgTable("acm_contest_rank", {
 	submissionNumber: integer("submission_number").default(0).notNull(),
 	acceptedNumber: integer("accepted_number").default(0).notNull(),
 	totalTime: integer("total_time").default(0).notNull(),
-	submissionInfo: jsonb("submission_info").default({}).notNull(),
+	submissionInfo: jsonb("submission_info").default({}).notNull().$type<Record<string, ContestSubmissionInfo>>(),
 	contestId: integer("contest_id").notNull(),
 	userId: integer("user_id").notNull(),
 }, (table) => [
@@ -705,7 +735,7 @@ export const problemsetBadge = pgTable("problemset_badge", {
 	name: text().notNull(),
 	description: text().notNull(),
 	icon: text().notNull(),
-	conditionType: text("condition_type").notNull(),
+	conditionType: text("condition_type").notNull().$type<BadgeConditionType>(),
 	conditionValue: integer("condition_value").notNull(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),

@@ -1,9 +1,9 @@
 import {
-  achievementListSchema,
-  achievementSchema,
-  achievementSummarySchema,
   markAchievementsReadSchema,
-  pendingAchievementSchema,
+  type Achievement,
+  type AchievementList,
+  type AchievementSummary,
+  type PendingAchievement,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm"
 import { Hono } from "hono"
@@ -27,13 +27,13 @@ async function resolveUser(requested: string | undefined, currentId: number) {
 }
 
 function pendingData(row: { achievement: typeof schema.achievement.$inferSelect }) {
-  return pendingAchievementSchema.parse({
+  return {
     id: row.achievement.id,
     name: row.achievement.name,
     description: row.achievement.description,
     icon: row.achievement.icon,
     rarity: row.achievement.rarity,
-  })
+  } satisfies PendingAchievement
 }
 
 achievementRoutes.get("/achievements", requireAuth, async (c) => {
@@ -52,7 +52,7 @@ achievementRoutes.get("/achievements", requireAuth, async (c) => {
     const record = unlocked.get(achievement.id)
     const masked = achievement.hidden && !record
     const progress = metrics[achievement.metric]
-    return achievementSchema.parse({
+    return {
       id: achievement.id,
       name: masked ? "???" : achievement.name,
       description: masked ? "达成条件保密" : achievement.description,
@@ -67,9 +67,9 @@ achievementRoutes.get("/achievements", requireAuth, async (c) => {
       backfilled: record?.backfilled ?? false,
       progress: masked ? null : typeof progress === "number" ? progress : 0,
       unlockRate: active > 0 ? Math.round(achievement.unlockCount / active * 1000) / 10 : 0,
-    })
+    } satisfies Achievement
   })
-  return success(c, achievementListSchema.parse({ username: target.username, achievements: result }))
+  return success(c, { username: target.username, achievements: result } satisfies AchievementList)
 })
 
 achievementRoutes.get("/achievements/summary", requireAuth, async (c) => {
@@ -85,7 +85,7 @@ achievementRoutes.get("/achievements/summary", requireAuth, async (c) => {
   const rarities = ["bronze", "silver", "gold", "platinum"] as const
   const total = achievements.length
   const unlocked = unlockedRows.length
-  return success(c, achievementSummarySchema.parse({
+  return success(c, {
     username: target.username,
     total,
     unlocked,
@@ -97,7 +97,7 @@ achievementRoutes.get("/achievements/summary", requireAuth, async (c) => {
       unlocked: unlockedRows.filter((item) => item.achievement.rarity === rarity).length,
     })),
     recent: unlockedRows.slice(0, 10).map(pendingData),
-  }))
+  } satisfies AchievementSummary)
 })
 
 achievementRoutes.get("/achievements/pending", requireAuth, async (c) => {

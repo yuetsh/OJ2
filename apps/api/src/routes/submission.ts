@@ -2,14 +2,14 @@ import { randomBytes } from "node:crypto"
 
 import {
   createSubmissionRequestSchema,
-  createSubmissionResponseSchema,
   formatCodeRequestSchema,
-  formatCodeResponseSchema,
-  submissionDetailSchema,
-  submissionListItemSchema,
-  submissionListSchema,
-  submissionStatisticsItemsSchema,
-  submissionStatisticsSchema,
+  type CreateSubmissionResponse,
+  type FormatCodeResponse,
+  type SubmissionDetail,
+  type SubmissionList,
+  type SubmissionListItem,
+  type SubmissionStatistics,
+  type SubmissionStatisticsItems,
 } from "@oj2/contract"
 import { and, count, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
@@ -23,7 +23,7 @@ import {
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
-import { JudgeStatus, UNJUDGED_RESULTS } from "../judge/status"
+import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
 import { judgeQueue } from "../queue"
 import {
   canAccessContest,
@@ -36,21 +36,9 @@ import {
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
-import {
-  isAdminRole,
-  queryInteger,
-  rounded,
-  stripClassPrefix,
-  todayStart,
-} from "./helpers"
+import { asFilterValue, isAdminRole, queryInteger, rounded, stripClassPrefix, todayStart } from "./helpers"
 
 export const submissionRoutes = new Hono<ContestEnv>()
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : []
-}
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -100,7 +88,7 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     .limit(1)
 
   if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!stringArray(problem.languages).includes(parsed.data.language)) {
+  if (!problem.languages.includes(parsed.data.language)) {
     return failure(
       c,
       400,
@@ -162,7 +150,7 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
 
   return success(
     c,
-    createSubmissionResponseSchema.parse({ submissionId }),
+    { submissionId } satisfies CreateSubmissionResponse,
     201,
   )
 })
@@ -258,9 +246,11 @@ const FAILURE_MESSAGE_LIMIT = 400
  * statistic_info 的那一段，提交详情页读的也是它。
  */
 async function lastFailureByUser(where: SQL | undefined, userIds: number[]) {
+  // result 手写成 JudgeStatusValue：这条裸 SQL 读的就是 submission.result 那一列，
+  // 口径要和列上的 $type 一致
   const byUser = new Map<
     number,
-    { id: string; problem: string; result: number; error: string | null }
+    { id: string; problem: string; result: JudgeStatusValue; error: string | null }
   >()
   if (!userIds.length) return byUser
 
@@ -269,7 +259,7 @@ async function lastFailureByUser(where: SQL | undefined, userIds: number[]) {
     user_id: number
     id: string
     problem: string
-    result: number
+    result: JudgeStatusValue
     error: string | null
   }>(sql`
     select user_id, id, problem, result, error from (
@@ -606,7 +596,7 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
 
   return success(
     c,
-    submissionStatisticsSchema.parse({
+    {
       submissionCount,
       acceptedCount,
       judgingCount,
@@ -615,7 +605,7 @@ submissionRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
       data,
       dataUnaccepted,
       dataAttempted,
-    }),
+    } satisfies SubmissionStatistics,
   )
 })
 
@@ -661,10 +651,10 @@ submissionRoutes.get("/submissions/statistics/items", requireTeacher, async (c) 
   const truncated = rows.length > STATISTICS_ITEMS_LIMIT
   return success(
     c,
-    submissionStatisticsItemsSchema.parse({
+    {
       items: rows.slice(0, STATISTICS_ITEMS_LIMIT),
       truncated,
-    }),
+    } satisfies SubmissionStatisticsItems,
   )
 })
 
@@ -696,7 +686,7 @@ submissionRoutes.post("/code/format", requireAuth, async (c) => {
   if (!parsed.success) return failure(c, 400, "invalid-request", "Invalid format payload")
   try {
     const code = await formatCode(parsed.data.code, parsed.data.language)
-    return success(c, formatCodeResponseSchema.parse({ code }))
+    return success(c, { code } satisfies FormatCodeResponse)
   } catch (error) {
     if (error instanceof CodeFormatError) {
       return failure(c, error.kind === "syntax" ? 400 : 500, error.kind === "syntax" ? "format-error" : "format-tool-error", error.message)
@@ -831,7 +821,7 @@ async function submissionDetail(id: string, user: AuthUser) {
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
   const full = isAdminRole(user)
-  return submissionDetailSchema.parse({
+  return {
     id: row.submission.id,
     createTime: row.submission.createTime,
     userId: row.submission.userId,
@@ -847,7 +837,7 @@ async function submissionDetail(id: string, user: AuthUser) {
     // problem 表本来就 join 了，不额外查库
     problemDisplayId: row.problem.displayId,
     showLink: true,
-  })
+  } satisfies SubmissionDetail
 }
 
 /**
@@ -926,7 +916,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   // 「非管理员即受限」，不能写成「是普通用户才受限」——
   // 后者对匿名用户（user 为 null）会短路，匿名反而能看到全部提交，权限大于登录学生。
   if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
-    return success(c, submissionListSchema.parse({ results: [], total: 0 }))
+    return success(c, { results: [], total: 0 } satisfies SubmissionList)
   }
   const filters = [isNull(schema.submission.contestId)]
   const displayId = c.req.query("problemId")?.trim()
@@ -936,8 +926,8 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
   if (c.req.query("myself") === "1" && user) filters.push(eq(schema.submission.userId, user.id))
   else if (username) filters.push(usernameFilter(username))
-  if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, Number(result)))
-  if (language) filters.push(eq(schema.submission.language, language))
+  if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
+  if (language) filters.push(eq(schema.submission.language, asFilterValue(language)))
   if (c.req.query("today") === "1") filters.push(sql`${schema.submission.createTime} >= ${todayStart()}`)
   const where = and(...filters)
   // count 不 join problem：problem 只有按题号筛选时才出现在 where 里，无条件 join 会让
@@ -960,8 +950,8 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
     // 来源题单的标题。一页里不同题单最多几个，按主键查一次就够
     problemsetTitleMap(rows.map((row) => row.submission.problemsetId)),
   ])
-  return success(c, submissionListSchema.parse({
-    results: rows.map(({ submission, problem }) => submissionListItemSchema.parse({
+  return success(c, {
+    results: rows.map(({ submission, problem }) => ({
       id: submission.id,
       problem: problem.displayId,
       problemTitle: problem.title,
@@ -976,9 +966,9 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
       problemSet: submission.problemsetId !== null && problemsetTitles.has(submission.problemsetId)
         ? { id: submission.problemsetId, title: problemsetTitles.get(submission.problemsetId)! }
         : null,
-    })),
+    } satisfies SubmissionListItem)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies SubmissionList)
 })
 
 submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireContestAccess("submissions", "contestId"), async (c) => {
@@ -993,7 +983,7 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
   if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
   if (c.req.query("myself") === "1" && user) filters.push(eq(schema.submission.userId, user.id))
   else if (username) filters.push(usernameFilter(username))
-  if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, Number(result)))
+  if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
   if (contestStatus(contest) !== "1") filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
   const where = and(...filters)
   // count 不 join problem：problem 只有按题号筛选时才出现在 where 里，无条件 join 会让
@@ -1013,8 +1003,8 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
   // `isNull(problem.contestId)`（admin/problemset.ts:232）——而这条列表只出比赛提交，
   // 两边交集恒空，挂上去就是每页白跑一次查询，而比赛进行中这条列表是被刷得最狠的。
   // 旧后端 ContestSubmissionListAPI 照抄了 bulk_fetch，那边同样是死代码。
-  return success(c, submissionListSchema.parse({
-    results: rows.map(({ submission, problem }) => submissionListItemSchema.parse({
+  return success(c, {
+    results: rows.map(({ submission, problem }) => ({
       id: submission.id,
       problem: problem.displayId,
       problemTitle: problem.title,
@@ -1028,9 +1018,9 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
       // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
       // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
       problemSet: null,
-    })),
+    } satisfies SubmissionListItem)),
     total: totalRows[0]?.value ?? 0,
-  }))
+  } satisfies SubmissionList)
 })
 
 submissionRoutes.get("/submissions/:id", requireAuth, async (c) => {

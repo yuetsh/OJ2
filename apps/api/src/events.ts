@@ -1,4 +1,4 @@
-import { flowchartUpdateSchema, type FlowchartUpdate } from "@oj2/contract"
+import type { FlowchartUpdate } from "@oj2/contract"
 
 import { redis } from "./redis"
 
@@ -72,7 +72,7 @@ export function userEventTopic(userId: number) {
 }
 
 export async function publishFlowchartUpdate(userId: number, data: FlowchartUpdate) {
-  await redis.publish(userEventChannel, JSON.stringify({ userId, data: flowchartUpdateSchema.parse(data) }))
+  await redis.publish(userEventChannel, JSON.stringify({ userId, data }))
 }
 
 export async function publishAchievementNotification(

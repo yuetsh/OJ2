@@ -1,8 +1,8 @@
 import {
-  achievementMetricSchema,
-  adminAchievementSchema,
   createAchievementRequestSchema,
   updateAchievementRequestSchema,
+  type AchievementMetric,
+  type AdminAchievement,
 } from "@oj2/contract"
 import { asc, eq } from "drizzle-orm"
 import { Hono } from "hono"
@@ -17,7 +17,7 @@ import { queryInteger } from "../helpers"
 export const adminAchievementRoutes = new Hono<AppEnv>()
 
 function serialize(row: typeof schema.achievement.$inferSelect) {
-  return adminAchievementSchema.parse({
+  return {
     id: row.id,
     name: row.name,
     description: row.description,
@@ -32,12 +32,12 @@ function serialize(row: typeof schema.achievement.$inferSelect) {
     unlockCount: row.unlockCount,
     order: row.order,
     createTime: row.createTime,
-  })
+  } satisfies AdminAchievement
 }
 
 /** 下拉框的可选项就是代码里注册了什么，见 services/achievement-metrics.ts 的说明 */
 adminAchievementRoutes.get("/achievement-metrics", requireSuperAdmin, (c) =>
-  success(c, ACHIEVEMENT_METRICS.map((item) => achievementMetricSchema.parse(item))))
+  success(c, ACHIEVEMENT_METRICS satisfies AchievementMetric[]))
 
 adminAchievementRoutes.get("/achievements", requireSuperAdmin, async (c) => {
   const rows = await db.select().from(schema.achievement)

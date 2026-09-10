@@ -1,4 +1,4 @@
-import { sessionUserSchema, userProfileSchema } from "@oj2/contract"
+import type { SessionUser, UserProfile } from "@oj2/contract"
 import { and, eq } from "drizzle-orm"
 
 import { db, schema } from "../db"
@@ -12,9 +12,9 @@ export async function getUserProfileById(userId: number, showRealName: boolean) 
     .limit(1)
 
   if (!row) return null
-  return userProfileSchema.parse({
+  return {
     id: row.profile.id,
-    user: sessionUserSchema.parse({
+    user: {
       id: row.user.id,
       username: row.user.username,
       email: row.user.email,
@@ -24,12 +24,12 @@ export async function getUserProfileById(userId: number, showRealName: boolean) 
       lastLogin: row.user.lastLogin,
       isDisabled: row.user.isDisabled,
       className: row.user.className,
-    }),
+    } satisfies SessionUser,
     realName: showRealName ? row.profile.realName : null,
     acmProblemsStatus: row.profile.acmProblemsStatus,
     avatar: row.profile.avatar,
     mood: row.profile.mood,
     acceptedNumber: row.profile.acceptedNumber,
     submissionNumber: row.profile.submissionNumber,
-  })
+  } satisfies UserProfile
 }

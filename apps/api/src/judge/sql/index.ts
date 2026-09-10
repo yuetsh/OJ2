@@ -1,3 +1,5 @@
+import type { SqlDisplay } from "@oj2/contract"
+
 import { selfCommand } from "../../runtime"
 import { JudgeStatus, type JudgeStatusValue } from "../status"
 import { DISPLAY_BUDGET_MS, trustedBudgetMs, type CaseResult } from "./engine"
@@ -175,7 +177,9 @@ export function runSqlCase(job: Extract<SqlJob, { kind: "judge" }>) {
 }
 
 export function buildSqlDisplay(initSql: string, refSql: string, mode: "query" | "modify") {
-  return runJob<{ tables: unknown[]; expected: unknown }>(
+  // 子进程产出的形状由 engine.ts 的 dumpDisplayTables / runDisplay 决定，就是契约里的
+  // SqlDisplay —— 同一个仓库里的两端，不在这儿再 parse 一遍
+  return runJob<SqlDisplay>(
     { kind: "display", initSql, refSql, mode },
     { trustedMs: DISPLAY_BUDGET_MS, studentMs: null },
   )
