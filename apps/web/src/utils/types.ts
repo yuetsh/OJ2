@@ -113,17 +113,18 @@ export type { UploadTestCaseResponse } from "@oj2/contract"
 export type { ProblemTestCaseScore as Testcase } from "@oj2/contract"
 
 /**
- * 题目详情。以契约的 ProblemDetail 为准，只在这里补两处前端自己的窄化：
- * - `languages` / `template` 的键窄化成 LANGUAGE，组件按语言查模板要靠它
+ * 题目详情。**直接取契约** —— `languages` / `template` 的收窄已经搬进
+ * `problemDetailSchema`（`z.array(problemLanguageSchema)` 与
+ * `z.partialRecord(problemLanguageSchema, …)`），这里原来那份
+ * `Omit<ProblemDetail, "languages" | "template"> & {...}` 与契约**双向可赋值**，
+ * 即完全等价，是一层没有内容的重复（已用类型探针验证）。
+ *
+ * 原来它还多挂三个可选字段（`hasAstRules` / `visible` / `answers`）。它们在
+ * 契约里**本来就有**（`hasAstRules` 在题目列表项上、`ProblemDetail` 带的是
+ * `astRequirements`），少数管理端调用点需要补充时应该就地声明自己的类型，
+ * 不该让一个全局别名对所有调用方声称这些字段存在。
  */
-export type Problem = Omit<ProblemDetail, "languages" | "template"> & {
-  languages: LANGUAGE[]
-  template: { [key in LANGUAGE]?: string }
-  // oj 侧不下发 astRules 原文，只有 astRequirements（契约里就有）
-  hasAstRules?: boolean
-  visible?: boolean
-  answers?: { language: LANGUAGE; code: string }[]
-}
+export type Problem = ProblemDetail
 
 /**
  * AST 代码要求。原来这里手抄的那份少了 label / exact / outer / inner ——
@@ -327,27 +328,16 @@ export type BlankContest = Omit<
 >
 
 /**
- * acm_contest_rank.submission_info 的 JSONB 内容。**键名保持 snake_case** ——
- * 判题按这套键名写进去，历史比赛的榜单行也是这个形状，不能跟着响应字段一起改名。
+ * `acm_contest_rank.submission_info` 的 JSONB 内容。**形状已搬进契约**
+ * （`contestSubmissionInfoSchema`），这里保留别名给既有调用点。
  */
-export interface SubmissionInfo {
-  is_ac: boolean
-  ac_time: number
-  is_first_ac: boolean
-  error_number: number
-  checked?: boolean
-}
+export type { ContestSubmissionInfo as SubmissionInfo } from "@oj2/contract"
 
 /**
- * 榜单行。`submissionInfo` 的**内容**仍是 snake_case —— 它是 acm_contest_rank
- * 表的 JSONB 原文，见 SubmissionInfo。
+ * 榜单行。`submissionInfo` 的收窄（JSONB 原文的 snake_case 形状）已经搬进
+ * `contestRankItemSchema`，这里不再需要 Omit + 覆盖。
  */
-export type ContestRank = Omit<
-  import("@oj2/contract").ContestRankItem,
-  "submissionInfo"
-> & {
-  submissionInfo: { [key: string]: SubmissionInfo }
-}
+export type ContestRank = import("@oj2/contract").ContestRankItem
 
 export type { WebsiteConfig, OnlineCount } from "@oj2/contract"
 
@@ -399,12 +389,12 @@ export type {
 export type AnnouncementEdit = CreateAnnouncementRequest & { id: number }
 
 /**
- * 站内信。取契约的形状，只把 `submission` 换成前端窄化过的那个
- * （statisticInfo / language 在契约里是 unknown，见 EmbeddedSubmission）。
+ * 站内信。**直接取契约** —— 原来这里把 `submission` 换成前端窄化过的
+ * `EmbeddedSubmission`，但那个窄化已经搬进 `embeddedSubmissionSchema`
+ * （statisticInfo / language 在契约里不再是 unknown），两者双向可赋值、
+ * 完全等价，这层 Omit 已经没有内容。
  */
-export type Message = Omit<ContractMessage, "submission"> & {
-  submission: EmbeddedSubmission
-}
+export type Message = ContractMessage
 
 /**
  * 题目表情。三个类型都直接取自契约 —— 语义 key 必须与后端 reaction/models.py
