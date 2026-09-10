@@ -33,8 +33,9 @@ export const contestProblemsSchema = z.array(z.union([problemListItemSchema, pro
  * `acm_contest_rank.submission_info` 的 JSONB 原文。
  *
  * 键名是**判题链路写进去的 snake_case**（历史比赛的榜单行也是这个形状），
- * 不要跟着响应字段一起改成 camelCase。字段全部可选：只有真正提交过的题目键
- * 才会出现，`checked` 更是前端在本地标「已看」时补的。
+ * 不要跟着响应字段一起改成 camelCase。只有真正提交过的题目才会有自己的键，
+ * 键一旦存在，前四个字段判题链路一定会写全；`checked` 是前端本地标「已看」时补的，
+ * 所以只有它可选。生产库 2401 行榜单实测全部符合。
  *
  * 原来契约这里是 `z.record(z.string(), z.unknown())`，于是前端不得不
  * 自己再声明一份 `SubmissionInfo` 去覆盖它（utils/types 的 ContestRank）。

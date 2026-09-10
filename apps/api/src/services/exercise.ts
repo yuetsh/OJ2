@@ -1,11 +1,14 @@
-import type { ExerciseType } from "@oj2/contract"
+import { exerciseDataByType, type ExerciseType } from "@oj2/contract"
 
 /**
- * 练习题 `data` 的语义校验。
+ * 练习题 `data` 的校验。**这是唯一的校验点** —— 契约里 `data` 是
+ * `z.record(z.string(), z.unknown())`，七种题型的字段完全不同，用 zod 写成判别联合
+ * 会让**读**路径也跟着卡（后台详情、学生端列表都过同一个 schema），历史脏数据会把
+ * 整页打不开。所以和 astRulesError 一样：只在写入前校验，读路径照样放行。
  *
- * 契约里 `data` 是 `z.record(z.string(), z.unknown())` —— 七种题型的字段完全不同，
- * 用 zod 写成判别联合会让**读**路径也跟着卡（后台详情、学生端列表都过同一个 schema），
- * 历史脏数据会把整页打不开。所以和 astRulesError 一样：只在写入前校验，读路径照样放行。
+ * 两层：先按 `exerciseDataByType` 查形状（键在不在、类型对不对），再走下面的语义
+ * 检查（选项够不够、下标越不越界）。形状那层是后补的 —— 之前只有语义检查，
+ * 而它**一次都没查过 `question`**，一道没有题干的练习能存进库。
  *
  * 为什么非校验不可：以前唯一的校验在前端 ExerciseManager 的 buildData()，而它对
  * fill 和 mcq 几乎不查 —— 一道没有 `{{空位}}` 的填空题能存进库，学生端渲染出来是
@@ -17,6 +20,16 @@ export function exerciseDataError(
   type: ExerciseType,
   data: Record<string, unknown>,
 ): string | null {
+  const shape = exerciseDataByType[type]
+  if (!shape) return `未知的题型 ${type}`
+  const parsed = shape.safeParse(data)
+  if (!parsed.success) {
+    // 老师看到的是「题干必须是文字」这种话，不是 zod 的英文 issue
+    const issue = parsed.error.issues[0]!
+    // 只取第一段：数组项的 path 是 ["options", 0]，老师要看的是「选项」
+    const field = String(issue.path[0] ?? "内容")
+    return `${FIELD_LABELS[field] ?? field}的格式不对（${issue.message}）`
+  }
   switch (type) {
     case "mcq": {
       const options = strings(data.options)
@@ -65,6 +78,20 @@ export function exerciseDataError(
       return indexAnswerError(data.answer, buckets.length, "归类答案", items.length, false)
     }
   }
+}
+
+/** zod 报的是键名，老师看的得是人话 */
+const FIELD_LABELS: Record<string, string> = {
+  question: "题干",
+  options: "选项",
+  answer: "答案",
+  lines: "代码行",
+  code: "代码",
+  left: "左列",
+  right: "右列",
+  buckets: "分组",
+  items: "项目",
+  explanation: "解析",
 }
 
 function strings(value: unknown): string[] {

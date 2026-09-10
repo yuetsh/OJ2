@@ -265,9 +265,10 @@ export type {
 export type { CreateFlowchartRequest as SubmitFlowchartPayload } from "@oj2/contract"
 
 /**
- * 提交详情。**info / statisticInfo / language 三处窄化都搬进契约了**
- * （`judgeInfoSchema` / `statisticInfoSchema` / `problemLanguageSchema`），
- * 依据是生产库 124191 条提交的实测分布，见 packages/contract/src/submission.ts。
+ * 提交详情。`statisticInfo` / `language` 的窄化在契约里
+ * （`statisticInfoSchema` / `problemLanguageSchema`）；`info` 在契约里是
+ * `z.unknown()`，形状由 `JudgeInfo` / `JudgeCaseResult` 两个 TS 类型描述，
+ * 取值统一走 `utils/functions` 的 `submissionCaseResults()`（原因见契约那边）。
  *
  * 前端仍要保留一处：`result` 多一个 9 —— 点了提交、还没拿到结果时前端本地先填的
  * 伪状态，后端永远不会下发，见 constants.ts 的 SubmissionStatus.submitting。

@@ -1,5 +1,5 @@
 import { toAdminType } from "@oj2/contract"
-import type { JudgeCaseResult, SubmissionDetail } from "@oj2/contract"
+import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
 import { User } from "./types"
 import { USER_TYPE } from "./constants"
@@ -23,18 +23,18 @@ function calculateACRate(acCount: number, totalCount: number): string {
 /**
  * 从 `submission.info` 里取测试点明细，取不到就返回空数组。
  *
- * 契约里 `info` 是**联合类型**：判题机写的完整形状，或者空对象 —— 后者是后端对
- * 非管理员下发的权限投影（`routes/submission.ts` 的 `full ? row.submission.info : {}`），
- * 也是待判提交的初值。所以调用方不能直接 `.data`，得先在这里收口。
+ * `info` 在契约里是 `z.unknown()`（判题产物不在读出侧校验，见契约那边的说明），
+ * 它有三种真实取值：判题机写的完整形状、**空对象**（后端对非管理员下发的
+ * `info: {}`，也是待判提交的初值）、以及 `data: null`（编译失败等没有逐测试点
+ * 结果的情形）。三种「没有」在这里一并归成空数组。
  *
- * 另外 `data` 本身也可能是 null：生产库 124191 条提交里有 12048 条是编译失败之类
- * 没有逐测试点结果的情形。两种「没有」在这里一并归成空数组。
+ * **这是判题产物在前端唯一需要的运行时判断** —— 有没有 data 数组。数组项的形状
+ * 直接信判题机（`JudgeCaseResult`）。
  */
-export function submissionCaseResults(
-  info: SubmissionDetail["info"] | null | undefined,
-): JudgeCaseResult[] {
-  if (!info || !("data" in info) || !info.data) return []
-  return info.data
+export function submissionCaseResults(info: unknown): JudgeCaseResult[] {
+  if (!info || typeof info !== "object" || !("data" in info)) return []
+  const data = (info as JudgeInfo).data
+  return Array.isArray(data) ? data : []
 }
 
 export function getACRate(acCount: number, totalCount: number): string {

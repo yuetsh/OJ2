@@ -83,23 +83,37 @@ through the dev server (see `vite.config.ts`).
 ### Contract guard (`utils/contract.ts`)
 
 `@oj2/contract` 的 zod schema 是**前后端唯一的形状来源**，`utils/types.ts` 只做
-`z.infer` 派生与少量前端专有的收窄（都写了理由）。读接口应当走守卫：
+`z.infer` 派生与少量前端专有的收窄（都写了理由）。
+
+运行时闸门**只挂三处**：题目详情、提交详情、`shared/api.ts` 的用户资料 ——
+原本就写了 `.parse()` 的那三条。留着它们的理由是**别抛错**，不是校验：
 
 ```ts
-const endpoint = `problems/${encodeURIComponent(id)}`
-return contract("GET /problems/:id", problemDetailSchema, await api.get<unknown>(endpoint))
+// 原来是 problemDetailSchema.parse(v) as Problem —— `as` 让校验白做，
+// 而 parse 抛错会让整个题目页白屏
+return contract("GET /problems/:id", problemDetailSchema, value)
 ```
 
-**失败策略是「记日志 + 放行原始数据」，不抛错。** 形状对不上时：控制台打一条带
-端点和字段路径的记录、去重后记进 `window.__OJ2_CONTRACT_DRIFT__`、然后**返回原始
-数据让页面继续渲染**。面向学生的生产站点，少一个字段的代价远小于白屏。
+失败时记一条控制台日志再**放行原始数据**，页面照常渲染。
 
-排查线上分歧就是打开控制台敲 `window.__OJ2_CONTRACT_DRIFT__`；某条路径长期为空之后，
-那条路径可以升级成硬失败（直接 `schema.parse`），在那之前不要改。
+**不要把它铺到更多端点上。** 试过一次（41 个），收益是 41 次 safeParse 加一条
+没人读的 console.error：前后端同仓、共享同一份 schema，「后端改字段前端不知道」
+`tsc` 已经抓了。
 
-改动 schema 时要记住**同一个 schema 后端也在 `parse`**（如
-`submissionDetailSchema.parse` 在路由里），所以收紧一个字段前先用生产数据核一遍，
-否则一条不符合的历史记录会让整个列表 500。
+### 什么该收紧，什么不该
+
+**JSONB 原文（`submission.info` / `statistic_info` / `exercise.data`）不在读出侧
+校验。** 它们的形状真相在写入侧 —— 判题机、`services/exercise.ts`。在读出侧再收
+一遍的结果实测过两次：
+
+- `info` 按采样键集收紧后，124192 条提交里 9163 条（RE、TLE、MLE 全中）对不上，
+  被 union 的空对象分支**静默剥成 `{}`**，管理员的测试点表格无声消失；
+- `exercise.data` 按题型收紧后，后端读路径（`routes/content.ts` 硬 parse）变成
+  一道闸，一行脏数据能让整条练习列表 500。
+
+所以：**同一个 schema 后端也在 `parse`**（`submissionDetailSchema` /
+`exerciseSchema` / `contestRankItemSchema` 都是），收紧任何字段之前，拿根目录
+那份生产备份把全量数据跑一遍，尤其要看**空值**而不只是键集合。
 
 ### Key Utilities
 

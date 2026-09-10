@@ -19,56 +19,51 @@ export const judgeStatusSchema = z.union([
 ])
 
 /**
- * 判题机原始输出（`submission.info` 的 JSONB 原文）。
+ * 判题机原始输出（`submission.info` 的 JSONB 原文）。**只是类型，不作运行时校验。**
  *
- * 形状按**生产库 124191 条提交实测**得出，不是照着前端那份额外手抄的：
+ * 这里曾经是一组 zod schema，按生产库实测的键集收紧过，结果是 124192 条提交里有
+ * 9163 条（RE 8480/8480、TLE 338/338、MLE 1/1 全中）被判成不符：沙箱在非正常退出
+ * 的测试点上写 `output_md5: null`，而 SQL 判题（`judge/sql/engine.ts` 的 CaseResult）
+ * 压根没有 `output` 这个键、`error_message` 通过时是 null。收紧当时只对了键集合，
+ * 没对空值。
  *
- * - `err` 实测 124191 条**全是 null**，从来没见过字符串 —— 但契约仍留 `string`，
- *   因为判题机层面它是有意义的通道，收紧成 `z.null()` 会在它第一次真的报错时炸。
- * - `data` 有 **12048 条是 null**（编译失败等没有逐测试点结果的情形），
- *   所以它必须 nullable。前端原来手抄的 `Info` 把 data 写成了非空数组，
- *   这 12048 条在类型上根本不成立，只是没有一处会去读它才没炸。
- * - 数组项比前端手抄的多三处：SQL 判题多带 `error_message`（201 个测试点）、
- *   部分带 `score`（10 个）。所以这里的字段一律可选，不用 strictObject。
+ * 更糟的是失败方式：`info` 当时是 `union([完整形状, z.object({})])`，对不上的一律
+ * 落进第二支被剥成 `{}` 且 parse 成功 —— 管理员的测试点表格**静默消失**。
+ *
+ * 结论：JSONB 的形状真相在**写入侧**（判题机、`judge/run.ts`），在读出侧再校验一遍
+ * 只会在两边分叉时丢数据。所以 `info` 回到 `z.unknown()`，形状以下面的 TS 类型
+ * 描述，取值处由 `submissionCaseResults()` 做一次真正需要的运行时判断（有没有
+ * data 数组）。**改这里的字段时对着判题机改，不要对着采样出来的键集改。**
  *
  * 键名是**判题沙箱定的 snake_case**，不要跟着响应字段一起改。
  */
-export const judgeCaseResultSchema = z.object({
-  error: z.number(),
-  memory: z.number(),
-  output: z.string().nullable(),
-  result: judgeStatusSchema,
-  signal: z.number(),
-  cpu_time: z.number(),
-  exit_code: z.number(),
-  real_time: z.number(),
-  test_case: z.string(),
-  output_md5: z.string(),
-  /** SQL 判题会带上中文原因，沙箱判题没有这个键 */
-  error_message: z.string().optional(),
-  score: z.number().optional(),
-})
-
-export const judgeInfoSchema = z.object({
-  err: z.string().nullable(),
-  data: z.array(judgeCaseResultSchema).nullable(),
-})
+export interface JudgeCaseResult {
+  error: number
+  memory: number
+  /** SQL 判题没有这个键 */
+  output?: string | null
+  result: JudgeStatus
+  signal: number
+  cpu_time: number
+  exit_code: number
+  real_time: number
+  test_case: string
+  /** 非正常退出的测试点上是 null */
+  output_md5: string | null
+  /** SQL 判题会带上中文原因（通过的测试点是 null），沙箱判题没有这个键 */
+  error_message?: string | null
+  score?: number
+}
 
 /**
- * `info` 允许的两种取值，**不能只写成完整形状**：
- *
- * 1. 完整形状：判题机写的 JSONB 原文；
- * 2. **空对象**：后端对非管理员用 `info: {}` 下发的占位（`routes/submission.ts:841`
- *    的 `full ? row.submission.info : {}`），同一个空对象也是插入待判提交时的初值。
- *
- * 第 2 种是真实存在的合法取值，收紧成只认完整形状会让**每一条非管理员看的提交详情
- * 直接 500**（`submissionDetailSchema.parse` 在路由里抛，被 onError 兜成 internal-error）。
- * 这不是假想：收紧当天就在本地实测复现了。
- *
- * 换句话说，空对象表达的是「这条响应对你不含 info」，一个**权限投影**，
- * 而不是「字段缺失」—— 契约要如实描述它。
+ * `info` 的完整形状。实际取值还有第三种：**空对象** —— 后端对非管理员下发
+ * `info: {}`（`routes/submission.ts` 的 `full ? row.submission.info : {}`），
+ * 也是插入待判提交时的初值。所以调用方不能直接 `.data`。
  */
-export const submissionInfoSchema = z.union([judgeInfoSchema, z.object({})])
+export interface JudgeInfo {
+  err: string | null
+  data: JudgeCaseResult[] | null
+}
 
 /**
  * 判题产出的统计（`submission.statistic_info` 的 JSONB 原文）。
@@ -76,11 +71,11 @@ export const submissionInfoSchema = z.union([judgeInfoSchema, z.object({})])
  * 五个键全部可选，依据是生产库实测的出现次数：time_cost / memory_cost 各 112097、
  * score 3993、err_info 3153、ast_results 56，另有 27 条空对象。
  *
- * **不能用严格对象。** 有 8916 条历史记录里的 JSONB 原文内嵌了带转义的 shell
- * 输出、本身不是合法 JSON，后端 `objectValue()` 会把它兜成 `{ value: "<原串>" }`
- * 再下发 —— 严格 schema 会把这 8916 条判成契约分歧，而它们其实是正常的失败记录。
+ * 用 `looseObject`：所有键可选 + 不剥未知键 = **对任何对象都不会失败、也不丢字段**，
+ * 它在这里的作用是给前端一个能读 `err_info` 的类型，而不是一道闸门。判题产物的
+ * 闸门在写入侧，理由见上面 `JudgeCaseResult`。
  */
-export const statisticInfoSchema = z.object({
+export const statisticInfoSchema = z.looseObject({
   score: z.number().optional(),
   /** 判题机写进 statistic_info 的错误文本，教师面板的「最近一条错在哪」也读它 */
   err_info: z.string().optional(),
@@ -129,8 +124,8 @@ export const submissionDetailSchema = z.object({
   username: z.string(),
   code: z.string(),
   result: judgeStatusSchema,
-  /** 未判完或非管理员看时为 `{}`，见 submissionInfoSchema 的注释 */
-  info: submissionInfoSchema,
+  /** 判题机原文；未判完或非管理员看时为 `{}`，见 JudgeInfo 的注释 */
+  info: z.unknown(),
   language: problemLanguageSchema,
   statisticInfo: statisticInfoSchema,
   contestId: z.number().int().nullable(),
@@ -314,8 +309,6 @@ export const formatCodeRequestSchema = z.object({
 export const formatCodeResponseSchema = z.object({ code: z.string() })
 
 export type JudgeStatus = z.infer<typeof judgeStatusSchema>
-export type JudgeInfo = z.infer<typeof judgeInfoSchema>
-export type JudgeCaseResult = z.infer<typeof judgeCaseResultSchema>
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type CreateSubmissionRequest = z.infer<
   typeof createSubmissionRequestSchema
