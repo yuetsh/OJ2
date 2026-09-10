@@ -6,7 +6,6 @@ import {
   type CreateSubmissionResponse,
   type ProblemAuthor,
   type CreateFlowchartResponse,
-  type FlowchartSubmission,
   problemDetailSchema,
   problemListSchema,
   problemListItemSchema,
@@ -35,6 +34,9 @@ import {
   flowchartDetailSchema,
   flowchartCurrentSchema,
   flowchartStatisticsSchema,
+  flowchartSubmissionSchema,
+  exerciseSchema,
+  exerciseDataByType,
   problemSetProgressListSchema,
   problemSetProblemSchema,
   tutorialSummarySchema,
@@ -533,8 +535,13 @@ export function submitFlowchart(data: {
   return api.post<CreateFlowchartResponse>("flowcharts", data)
 }
 
-export function getFlowchartSubmission(id: string) {
-  return api.get<FlowchartSubmission>(`flowcharts/${encodeURIComponent(id)}`)
+export async function getFlowchartSubmission(id: string) {
+  const endpoint = `flowcharts/${encodeURIComponent(id)}`
+  return contract(
+    "GET /flowcharts/:id",
+    flowchartSubmissionSchema,
+    await api.get<unknown>(endpoint),
+  )
 }
 
 export async function getFlowchartSubmissions(params: {
@@ -681,8 +688,34 @@ export async function getProblemSetUserProgress(
   )
 }
 
-export function getExercises(tutorialId: number): Promise<Exercise[]> {
-  return api.get<Exercise[]>(`tutorials/${tutorialId}/exercises`)
+export async function getExercises(
+  tutorialId: number,
+): Promise<Exercise[]> {
+  const endpoint = `tutorials/${tutorialId}/exercises`
+  // 外层走 exerciseSchema，内层 data 在这里按题型逐支校验：
+  // `z.infer` 只能把 data 还原成 Record<string, unknown>（superRefine 无法把
+  // 校验结果反映到推断类型上），所以那 7 个 Exercise*.vue 直接读
+  // data.question / data.options 时本没有任何运行时保护。
+  // 生产库 151 道练习题已确认七种题型的键集全部吻合。
+  const rows = contract(
+    "GET /tutorials/:id/exercises",
+    exerciseSchema.array(),
+    await api.get<unknown>(endpoint),
+  )
+  for (const row of rows) {
+    const shape = exerciseDataByType[row.type]
+    if (!shape) continue
+    // 故意用同一个 contract()：形状不符时它负责记日志并放行，不抛错
+    contract(
+      `GET /tutorials/:id/exercises（type=${row.type} 的 data）`,
+      shape,
+      row.data,
+    )
+  }
+  // 类型上仍要收窄一次：契约推断出的 data 是宽松 record，组件要的是判别联合，
+  // 两者不重叠，所以只能经过 unknown。**这个断言是有意的，不是假校验** ——
+  // 上面那个循环已经在运行时按题型逐支验过；它只是把「运行时已确认」告诉 TS。
+  return rows as unknown as Exercise[]
 }
 
 /**
