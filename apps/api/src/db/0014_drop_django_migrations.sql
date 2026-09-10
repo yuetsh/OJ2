@@ -1,0 +1,25 @@
+-- 补删 django_migrations。它本该被 0002_drop_django_leftovers 删掉，但生产库里还留着。
+--
+-- 2026-09-10 核实（生产库 oj-postgres）：
+--   * 库里 29 张 public 表 = schema.ts 的 28 张 + 这张 django_migrations；
+--   * 它 0 行，且 0002 里另外 6 张表（auth_group* / auth_permission /
+--     django_content_type / django_dramatiq_task / django_session）确实都不在了；
+--   * 全仓（二进制、路由、compose、脚本）零处读写它；
+--   * 服务器上已无任何 Django 容器，只有 oj-api / oj-worker / oj-web。
+--
+-- 为什么 0002 没删干净，已无法从库里复原现场：0002 的记账行（created_at
+-- 1787740469403）在，说明它当年是执行过的，而 DROP TABLE IF EXISTS 不会因为
+-- 「表不存在」静默跳过之后的分号——这条迁移只有一个语句块。最可能是事后有人为了
+-- 「给已有数据的库打基线」手工建了它（CLAUDE.md 里那段基线 SQL 建的是
+-- drizzle.__drizzle_migrations，不是这张），或从旧 dump 单独恢复过它。
+-- 来源不明不影响处置：空表 + 零引用，删掉没有任何数据损失。
+--
+-- 用 IF EXISTS 是为了**两种环境收敛到同一个结构**：空库自举时 0002 已经把它删了，
+-- 生产库还留着。新环境跑到这一条是空转，生产库跑到这一条才真正动手，之后两边一致。
+--
+-- ⚠️ 这条会被部署的破坏性迁移闸拦下（migrate.ts 的 DESTRUCTIVE_PATTERNS）。
+-- 那是**有意保留**的：DROP TABLE 该有人看一眼再放行，不值得为一张空表在闸门上开洞。
+-- 放行前确认已备份，然后：
+--
+--   OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
+DROP TABLE IF EXISTS django_migrations;

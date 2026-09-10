@@ -99,6 +99,13 @@
       "when": 1788913334948,
       "tag": "0013_add_filter_and_metrics_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789034426259,
+      "tag": "0014_drop_django_migrations",
+      "breakpoints": true
     }
   ]
 }

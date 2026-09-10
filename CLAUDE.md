@@ -14,6 +14,17 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 >
 > 「改 schema 要考虑回滚」这条约束随之解除，schema 归 OJ2 独占，
 > 走 drizzle migration 正常演进即可。
+>
+> **2026-09-10 更正：上面「7 张框架表已删」在生产库上并不成立。** 实测生产库
+> 29 张 public 表 = `schema.ts` 的 28 张 + 一张 **0 行的 `django_migrations`**：0002 里
+> 另外 6 张（`auth_group*` / `auth_permission` / `django_content_type` /
+> `django_dramatiq_task` / `django_session`）确实都不在了，只有它复活/残留了下来。
+> 原因已无法从库里复原（0002 的记账行在，说明它当年执行过；`DROP TABLE IF EXISTS`
+> 也不会静默跳过后续语句），多半是事后有人手工建过它、或从旧 dump 单独恢复过。
+>
+> 处置见 `0014_drop_django_migrations`：全仓零读写、表为空，直接删掉，用
+> `IF EXISTS` 让「空库自举」（0002 已删过）与「老生产库」（还留着）两条路径收敛到
+> 同一结构。**旧栈起不来这个结论不变** —— 它缺的是 `django_session` 等表，不是这张。
 
 > **旧仓库仍然零改动**，没有例外——包括修 bug、包括不影响外部接口的内部小修。
 > 所有后续工作，包括在旧仓库里发现的 bug，都只落在 OJ2：先确认 OJ2 是否有对应逻辑、
@@ -184,15 +195,28 @@ OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
 **空库自举时这道闸不生效**：没有数据可丢，0002 那串 `DROP ... IF EXISTS` 全是空转，
 拦下来只会逼每个新环境都带一次放行开关，把它训练成习惯动作。
 
+**放行的三条路，别记错：**
+
+1. 服务器上手工部署：`OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh`。
+2. CI（`.github/workflows/deploy.yml`）：**必须先手工触发**并在
+   `workflow_dispatch` 上勾 `allow_destructive`。push 触发拿不到这个 input，值恒为空
+   —— 也就是说**自动部署永远不会执行破坏性迁移**，只会停在闸门上把工作流判红。
+   这是有意的：那种改动得有人先确认备份。
+3. 先单跑迁移把结构推到位，再 push 代码：迁移一旦记进
+   `drizzle.__drizzle_migrations` 就不会再跑，后续自动部署里它已不是 pending，
+   自然不触发闸门。多环境共库时（机房 + 服务器）推荐这条。
+
 **空库能自举了。** `oj2-api migrate` 指向一个空库时直接从 `0000` 建起：
 
 ```bash
 DATABASE_URL=postgres://... oj2-api migrate
 # 空库，从 0000 开始自举。
-# 待执行 3 条迁移，开始。
+# 待执行 15 条迁移，开始。
 #   ✓ 0000_crazy_gateway
 #   ✓ 0001_add_submission_public_create_time_idx
 #   ✓ 0002_drop_django_leftovers
+#   …
+#   ✓ 0014_drop_django_migrations
 ```
 
 `0000_crazy_gateway.sql` 原本是 `drizzle-kit pull` 的产物、整份被 `/* */` 包着、可执行
