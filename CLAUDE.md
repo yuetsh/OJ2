@@ -51,6 +51,7 @@ bun run dev            # api(3000) + worker + web(5173) 一起起
 ```bash
 bun run --filter '@oj2/api' typecheck         # 后端类型检查
 bun run --filter '@oj2/api' check:routes      # 路由遮蔽检查，加完路由跑一下
+bun run --filter '@oj2/api' check:ast        # AST 节点类型检查，升级 tree-sitter 后跑
 cd apps/web && bun run type-check             # 前端类型检查
 cd apps/web && bun run build                  # 前端构建
 ```
@@ -147,16 +148,31 @@ query 里的筛选值要和收窄过的列比较时走 `routes/helpers.ts` 的 `
 唯一还留着 `parse` 的地方是 `judge/events.ts` 的 `parseSubmissionEvent` ——
 那是从 Redis 收回来的报文，真边界，且失败返回 `null` 而不是 500。
 
-### AST 代码规则有两张表，必须同增同减
+### AST 代码规则：一张表，外加一个机器检查
 
-契约的 `AST_NODE_TARGETS_BY_LANGUAGE`（target → 中文名）决定后台下拉能选什么，
-`apps/api/src/judge/ast.ts` 的 `mappings`（target → tree-sitter 节点类型）决定判题机
-认得什么。**加节点类型时两边都要加**，运算符表 `AST_OPERATOR_TARGETS_BY_LANGUAGE` 同理。
+契约的 `AST_NODE_TARGETS_BY_LANGUAGE` 是**唯一**一张表，一个 target 一条
+`{ label, node }`：`label` 给后台下拉和题目页，`node` 给判题机比 tree-sitter 节点类型。
+运算符表 `AST_OPERATOR_TARGETS_BY_LANGUAGE` 一份两用（它的值既是文案又是要比的 token）。
+判题机侧没有第二张表，解析统一走契约的 `astTargetNodeType()`。
 
-只加一边是**静默错判**：判题机 `mapping[target] ?? target` 拿裸名去比节点类型，
-C 的语法树里永远不存在 `list_comprehension`，于是「必须使用列表推导式」永远失败、
-「不能使用 f-string」永远通过，两头都不报错，只有学生受着。原来那张表是 C/Python
-混在一起的 15 条，整份铺成下拉，给 C 题也能选到 Python 专有节点——就是这么来的。
+> 这里原来是两张表：契约那张 target → 中文名，`judge/ast.ts` 的 `mappings` 是
+> target → 节点类型，靠一句「两边必须同增同减」的注释维持。**加 target 而漏配节点类型
+> 现在在结构上不可能了**，那条注释也就不必再守。
+
+但**配错**仍然可能，而且完全静默：节点类型对不上就是一个都收不到，于是「必须使用 X」
+永远失败、「不能使用 X」永远通过，两头不报错，只有学生受着。所以有：
+
+```bash
+bun run --filter '@oj2/api' check:ast     # 每个 target 的 node 在语法里是否真实存在
+```
+
+**升级 `tree-sitter-*` 依赖之后一定要跑一次** —— 语法改节点名是常事，后果全静默。
+加这个检查那天，56 个 target 里就抓出一个：`f_string` 一直配的是 `format_string`，
+而这个版本的 tree-sitter-python 根本没有这种节点（f-string 是 `string` 里带
+`interpolation`），所以「不能使用 f-string」从上线起就没生效过。
+
+它只验节点类型**存在**，不验语义对不对（把 `while_loop` 配成 `for_statement`
+这种两个都存在，机器看不出来），语义那层还是得实跑。
 
 判题机只认 `AST_SUPPORTED_LANGUAGES` 里的语言（C / C++ / Python3）。别的语言配了规则
 一条都不会跑，所以后台不给它们开 tab，题目页也不把它们的规则展示成「要求」——

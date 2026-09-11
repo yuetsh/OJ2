@@ -200,7 +200,18 @@ export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNode
     list_literal: { label: "列表", node: "list" },
     dict_literal: { label: "字典", node: "dictionary" },
     set_literal: { label: "集合", node: "set" },
-    f_string: { label: "f-string", node: "format_string" },
+    /**
+     * f-string 认的是 `interpolation`（`f"{x}"` 里的 `{x}`），不是 `format_string` ——
+     * 这个版本的 tree-sitter-python 里**没有** format_string 这种节点，f-string 是
+     * 一个 `string`，靠 `string_start` 为 `f"` 和内部的 interpolation 子节点来认。
+     * 配成 format_string 的那阵子，「不能使用 f-string」从上线起就一直判成通过。
+     *
+     * 代价是 `f"abc"` 这种**没有占位符**的 f-string 认不出来（它确实不含
+     * interpolation）。没占位符的 f-string 本来也没有意义，而且比起「一个都认不出来」
+     * 这已经是严格的改善。实测 `%` 格式化、`.format()`、普通字符串、字符串拼接
+     * 都不会误伤。
+     */
+    f_string: { label: "f-string", node: "interpolation" },
   },
 }
 
