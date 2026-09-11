@@ -198,8 +198,7 @@
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
 import { getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
-import { PANEL_DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
-import storage from "utils/storage"
+import { PANEL_DURATION_OPTIONS } from "utils/constants"
 import { useConfigStore } from "../store/config"
 import { useHiddenStudents } from "../composables/hiddenStudents"
 import { Doughnut } from "vue-chartjs"
@@ -417,14 +416,16 @@ const classOptions = computed<SelectOption[]>(
     })) ?? [],
 )
 
-// 机房电脑一台对一个班，用过的班级记在本地，下次打开就带上（和登录框同一套做法）
-function lastUsedClass() {
-  const last = storage.get(STORAGE_KEY.STATISTICS_CLASS)
-  return typeof last === "string" ? last : ""
-}
-
+/**
+ * 班级/用户**不记本地**：这个选择框每次打开都从空的开始。
+ *
+ * 曾经把上次的班级写进 localStorage（statisticsClass），下次打开自动带上。但那正是
+ * 最危险的地方 —— 下课换了班、或者换个人坐这台机器，上一个人查的班悄悄留在框里，
+ * 老师没注意就按了「统计」，看到的整个是别人的班。宁可多选一次。
+ * 登录框那份 LOGIN_CLASS 是另一回事：那记的是这台机器的身份，不是一次临时查询。
+ */
 const query = reactive({
-  username: props.username || lastUsedClass(),
+  username: props.username,
   problem: props.problem,
   duration: options[0].value,
 })
@@ -744,8 +745,6 @@ async function fetchStatistics() {
   listUnaccepted.value = res.dataUnaccepted
   listAttempted.value = res.dataAttempted
   personCount.value = res.personCount
-  // 查过的班级记下来，下次打开直接带上
-  if (query.username) storage.set(STORAGE_KEY.STATISTICS_CLASS, query.username)
 
   const expanded = expandedRowKeys.value[0]
   for (const key of Object.keys(items)) delete items[key]
