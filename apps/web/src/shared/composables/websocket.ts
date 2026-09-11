@@ -47,27 +47,23 @@ export interface WebSocketMessage {
 }
 
 /**
- * WebSocket 配置
+ * 重连与心跳的参数。
+ *
+ * 原来这三个（连同「最大重连次数」「是否心跳」「是否自动重连」）是构造函数上的六个
+ * 可选项，六个默认值、六处 `??` —— 而三条通道从建起来到现在，**没有一个调用方传过
+ * 任何一个**，也从没在运行时改过。所以它们是常量，不是配置。
+ *
+ * **重连不封顶**是有意的：原来默认 5 次、线性退避，加起来只有 15 秒 —— 后端 deploy
+ * 重启一次就超了，之后这条连接死到用户刷新页面为止。机房网络抖动同理。
  */
-export interface WebSocketConfig {
-  /** 完整 URL。后端只认 /ws/submissions 和 /ws/config 两条，按当前页面的协议与 host 拼 */
-  url: string
-  /**
-   * 最大重连次数，默认不限。
-   * 原来默认 5 次、线性退避，加起来只有 15 秒 —— 后端 deploy 重启一次就超了，
-   * 之后这条连接死到用户刷新页面为止。机房网络抖动同理，所以默认不再封顶。
-   */
-  maxReconnectAttempts?: number
-  /** 首次重连延迟（毫秒），默认 1000。之后指数退避 */
-  reconnectDelay?: number
-  /** 重连延迟上限（毫秒），默认 30000 */
-  maxReconnectDelay?: number
-  /** 心跳间隔（毫秒），默认 30000（30秒） */
-  heartbeatTime?: number
-  /** 是否启用心跳，默认 true */
-  enableHeartbeat?: boolean
-  /** 是否启用自动重连，默认 true */
-  enableAutoReconnect?: boolean
+const RECONNECT_BASE_DELAY = 1000
+const RECONNECT_MAX_DELAY = 30_000
+const HEARTBEAT_INTERVAL = 30_000
+
+/** 按当前页面的协议与 host 拼通道地址。后端只认 /ws/submissions、/ws/config、/ws/collab */
+function channelUrl(path: string) {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+  return `${protocol}//${window.location.host}${path}`
 }
 
 /**
@@ -86,34 +82,22 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   protected url: string
   protected handlers: Set<MessageHandler<T>> = new Set()
   protected reconnectAttempts = 0
-  protected maxReconnectAttempts: number
-  protected reconnectDelay: number
   protected heartbeatInterval: number | null = null
-  protected heartbeatTime: number
-  protected enableHeartbeat: boolean
-  protected enableAutoReconnect: boolean
-  protected maxReconnectDelay: number
   protected disconnectTimer: number | null = null
   protected reconnectTimer: number | null = null
   /**
-   * 「用户主动断开」的意图，和 enableAutoReconnect 这个**配置**分开存。
-   * 以前两者共用一个字段：disconnect() 把配置改成 false 来阻止重连，而 connect()
-   * 从不改回 true —— 登出再登录后，这条连接就永远失去了自动重连能力。
+   * 「用户主动断开」的意图。这是**唯一**能阻止自动重连的东西 ——
+   * 以前它和一个 enableAutoReconnect 配置项共用一个字段：disconnect() 把配置改成
+   * false 来阻止重连，而 connect() 从不改回 true —— 登出再登录后，这条连接就永远
+   * 失去了自动重连能力。
    */
   protected closedByUser = false
   protected reviveBound = false
 
   public status: Ref<ConnectionStatus> = ref<ConnectionStatus>("disconnected")
 
-  constructor(config: WebSocketConfig) {
-    this.url = config.url
-
-    this.maxReconnectAttempts = config.maxReconnectAttempts ?? Number.POSITIVE_INFINITY
-    this.reconnectDelay = config.reconnectDelay ?? 1000
-    this.maxReconnectDelay = config.maxReconnectDelay ?? 30000
-    this.heartbeatTime = config.heartbeatTime ?? 30000
-    this.enableHeartbeat = config.enableHeartbeat ?? true
-    this.enableAutoReconnect = config.enableAutoReconnect ?? true
+  constructor(path: string) {
+    this.url = channelUrl(path)
   }
 
   /**
@@ -147,9 +131,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
         this.status.value = "connected"
         this.reconnectAttempts = 0
         console.log(`[WebSocket] 连接成功: ${this.url}`)
-        if (this.enableHeartbeat) {
-          this.startHeartbeat()
-        }
+        this.startHeartbeat()
         this.onConnected()
       }
 
@@ -220,14 +202,13 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    * 别在同一毫秒一起冲回来把刚起来的后端再压趴一次。
    */
   protected scheduleReconnect() {
-    if (this.closedByUser || !this.enableAutoReconnect) return
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) return
+    if (this.closedByUser) return
     if (this.reconnectTimer !== null) return
 
     this.reconnectAttempts++
     const base = Math.min(
-      this.reconnectDelay * 2 ** (this.reconnectAttempts - 1),
-      this.maxReconnectDelay,
+      RECONNECT_BASE_DELAY * 2 ** (this.reconnectAttempts - 1),
+      RECONNECT_MAX_DELAY,
     )
     const delay = Math.round(base * (0.5 + Math.random() * 0.5))
     console.log(`[WebSocket] 将在 ${delay}ms 后重连 (第 ${this.reconnectAttempts} 次)`)
@@ -249,7 +230,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    * 退避到 30 秒后，用户切回页面却还要再干等半分钟是说不过去的。
    */
   protected readonly revive = () => {
-    if (this.closedByUser || !this.enableAutoReconnect) return
+    if (this.closedByUser) return
     if (
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN ||
@@ -310,9 +291,9 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       this.disconnectTimer = null
       const minutes = Math.floor(delay / 60000)
       console.log(`WebSocket idle for ${minutes} minutes, disconnecting...`)
-      // 这里**只断开**。原来断完紧接着一句 `enableAutoReconnect = true`，
-      // 而 close 是异步的 —— 等 onclose 跑到时标志已经翻回来了，于是 1 秒后
-      // 又自动连上：这个「省资源」的空闲断开从来没有真正生效过。
+      // 这里**只断开**。原来断完紧接着一句 `enableAutoReconnect = true`（那个配置项
+      // 已经不存在了），而 close 是异步的 —— 等 onclose 跑到时标志已经翻回来了，
+      // 于是 1 秒后又自动连上：这个「省资源」的空闲断开从来没有真正生效过。
       // 下一次 connect()（新提交）会自己把 closedByUser 清掉，不需要在这里预置。
       this.disconnect()
     }, delay)
@@ -392,7 +373,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
     this.stopHeartbeat()
     this.heartbeatInterval = window.setInterval(() => {
       this.sendHeartbeat()
-    }, this.heartbeatTime)
+    }, HEARTBEAT_INTERVAL)
   }
 
   /**
@@ -403,13 +384,6 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       clearInterval(this.heartbeatInterval)
       this.heartbeatInterval = null
     }
-  }
-
-  /**
-   * 连接成功钩子（子类可重写）
-   */
-  protected onConnected() {
-    // 子类实现
   }
 
   /**
@@ -424,6 +398,45 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    */
   protected onError(_error: Event) {
     // 子类实现
+  }
+
+  /**
+   * 当前在等结果的提交。**一直留着**，直到调用方 unsubscribe()。
+   *
+   * 原来这个字段叫 pendingSubmissionId，订阅一发成功就清空 —— 它只解决了
+   * 「还没连上就调 subscribe」，没解决断线重连。而真正会丢结果的恰恰是后者：
+   * 服务端收到 subscribe 会回一份当前状态，掉线期间错过的那条推送就是靠这次
+   * 重放补回来的。不重新订阅，重连后就只收得到「将来」的事件，可结果已经是过去式了。
+   */
+  private subscribedId = ""
+
+  /**
+   * 订阅特定提交的更新。连接没就绪也可以调，连上后会自动补发 ——
+   * 调用方不用关心此刻连上没有，断线重连后也会自动重新订阅。
+   *
+   * 只有 /ws/submissions 用得上；/ws/config 是单向广播、/ws/collab 自己有房间语义，
+   * 它们不调这两个方法，subscribedId 一直是空串，onConnected 里那一行就是空转。
+   */
+  subscribe(submissionId: string) {
+    this.subscribedId = submissionId
+    this.sendSubscribe(submissionId)
+  }
+
+  /** 结果已经拿到，重连后不必再问一遍 */
+  unsubscribe() {
+    this.subscribedId = ""
+  }
+
+  private sendSubscribe(submissionId: string) {
+    return this.send({ type: "subscribe", submissionId })
+  }
+
+  /**
+   * 连接成功钩子。子类重写时**必须先调 super.onConnected()**，否则断线重连后
+   * 不会补订阅，那次判题的结果就再也回不来。
+   */
+  protected onConnected() {
+    if (this.subscribedId) this.sendSubscribe(this.subscribedId)
   }
 
   /**
@@ -453,79 +466,28 @@ export interface SubmissionUpdate extends WebSocketMessage {
 }
 
 /**
- * 带「订阅意图」的连接。
+ * 三条通道共用的 composable。
  *
- * subscribe() 在连接还没就绪时先把 id 记下来，等 onConnected() 补发 —— 调用方
- * 不用关心此刻连上没有，断线重连后也会自动重新订阅。
+ * 原来每条通道各有一个空壳子类（只在构造函数里拼 URL）加一个三十行的 composable，
+ * 而三份 composable 除了类型参数逐字相同 —— `SubmissionWebSocket` 和
+ * `FlowchartWebSocket` 甚至连 URL 都是同一条 `/ws/submissions`。中间还搁着一个
+ * 带二十五行示例注释的 `createWebSocketComposable` 工厂，示例里那条通知通道并不
+ * 存在，三个真实的 composable 一个都没用它。现在只剩这一个。
  *
- * 原来这套只有 SubmissionWebSocket 有，FlowchartWebSocket 是 send 失败就打一行
- * 日志了事：socket 一掉，那次评分的结果就再也回不来，页面永远转圈。提到基类上，
- * 两条通道共用同一套语义。
+ * 每次调用都新建一条连接（和原来一致，不是单例），并在组件卸载时摘掉 handler、断开。
  */
-class SubscribingWebSocket<
-  T extends WebSocketMessage,
-> extends BaseWebSocket<T> {
-  /**
-   * 当前在等结果的提交。**一直留着**，直到调用方 unsubscribe()。
-   *
-   * 原来这个字段叫 pendingSubmissionId，订阅一发成功就清空 —— 它只解决了
-   * 「还没连上就调 subscribe」，没解决断线重连。而真正会丢结果的恰恰是后者：
-   * 服务端收到 subscribe 会回一份当前状态，掉线期间错过的那条推送就是靠这次
-   * 重放补回来的。不重新订阅，重连后就只收得到「将来」的事件，可结果已经是过去式了。
-   */
-  private subscribedId = ""
-
-  /**
-   * 订阅特定提交的更新。连接没就绪也可以调，连上后会自动补发。
-   */
-  subscribe(submissionId: string) {
-    this.subscribedId = submissionId
-    this.sendSubscribe(submissionId)
-  }
-
-  /** 结果已经拿到，重连后不必再问一遍 */
-  unsubscribe() {
-    this.subscribedId = ""
-  }
-
-  protected onConnected() {
-    if (this.subscribedId) this.sendSubscribe(this.subscribedId)
-  }
-
-  private sendSubscribe(submissionId: string) {
-    return this.send({ type: "subscribe", submissionId })
-  }
-}
-
-/**
- * 提交 WebSocket 连接管理类
- */
-class SubmissionWebSocket extends SubscribingWebSocket<SubmissionUpdate> {
-  constructor() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({ url: `${protocol}//${window.location.host}/ws/submissions` })
-  }
-}
-
-/**
- * 用于组件中使用 WebSocket 的 Composable
- * 每次调用创建新的 WebSocket 实例
- */
-export function useSubmissionWebSocket(
-  handler?: MessageHandler<SubmissionUpdate>,
+function useChannel<T extends WebSocketMessage>(
+  path: string,
+  handler?: MessageHandler<T>,
 ) {
-  const ws = new SubmissionWebSocket()
+  const ws = new BaseWebSocket<T>(path)
 
-  // 如果提供了处理器，添加到实例中
-  if (handler) {
-    ws.addHandler(handler)
-  }
+  // 同步注册，不放 onMounted：调用方（如 useConfigUpdate）在 setup 阶段就 connect()，
+  // 中间那段窗口收到的广播没有任何 handler 接。窗口极小，但没有理由留着它。
+  if (handler) ws.addHandler(handler)
 
-  // 组件卸载时清理资源
   onUnmounted(() => {
-    if (handler) {
-      ws.removeHandler(handler)
-    }
+    if (handler) ws.removeHandler(handler)
     ws.disconnect()
   })
 
@@ -537,63 +499,25 @@ export function useSubmissionWebSocket(
     scheduleDisconnect: (delay?: number) => ws.scheduleDisconnect(delay),
     cancelScheduledDisconnect: () => ws.cancelScheduledDisconnect(),
     status: ws.status,
-    addHandler: (h: MessageHandler<SubmissionUpdate>) => ws.addHandler(h),
-    removeHandler: (h: MessageHandler<SubmissionUpdate>) => ws.removeHandler(h),
+    addHandler: (h: MessageHandler<T>) => ws.addHandler(h),
+    removeHandler: (h: MessageHandler<T>) => ws.removeHandler(h),
   }
 }
 
 /**
- * 通用 WebSocket Composable 工厂函数
- * 用于创建自定义的 WebSocket composable
- *
- * @example
- * ```ts
- * // 创建通知 WebSocket
- * interface NotificationMessage extends WebSocketMessage {
- *   type: 'notification'
- *   title: string
- *   content: string
- * }
- *
- * class NotificationWebSocket extends BaseWebSocket<NotificationMessage> {
- *   constructor() {
- *     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
- *     super({ url: `${protocol}//${window.location.host}/ws/notifications` })
- *   }
- * }
- *
- * let notificationWs: NotificationWebSocket | null = null
- *
- * export function useNotificationWebSocket(handler?: MessageHandler<NotificationMessage>) {
- *   if (!notificationWs) {
- *     notificationWs = new NotificationWebSocket()
- *   }
- *   return createWebSocketComposable(notificationWs, handler)
- * }
- * ```
+ * 提交状态更新的数据类型
  */
-export function createWebSocketComposable<T extends WebSocketMessage>(
-  ws: BaseWebSocket<T>,
-  handler?: MessageHandler<T>,
-) {
-  if (handler) {
-    ws.addHandler(handler)
-  }
+export interface SubmissionUpdate extends WebSocketMessage {
+  type: "submission_update"
+  submissionId: string
+  result: number
+  status: "pending" | "judging" | "finished" | "error"
+  score?: number
+}
 
-  onUnmounted(() => {
-    if (handler) {
-      ws.removeHandler(handler)
-    }
-  })
-
-  return {
-    connect: () => ws.connect(),
-    disconnect: () => ws.disconnect(),
-    send: (data: any) => ws.send(data),
-    status: ws.status,
-    addHandler: (h: MessageHandler<T>) => ws.addHandler(h),
-    removeHandler: (h: MessageHandler<T>) => ws.removeHandler(h),
-  }
+/** 判题进度。subscribe(submissionId) 认领，断线重连会自动补订阅 */
+export function useSubmissionWebSocket(handler?: MessageHandler<SubmissionUpdate>) {
+  return useChannel<SubmissionUpdate>("/ws/submissions", handler)
 }
 
 /**
@@ -614,49 +538,13 @@ export interface FlowchartEvaluationUpdate extends WebSocketMessage {
 }
 
 /**
- * 流程图 WebSocket 连接管理类
- */
-class FlowchartWebSocket extends SubscribingWebSocket<FlowchartEvaluationUpdate> {
-  constructor() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({ url: `${protocol}//${window.location.host}/ws/submissions` })
-  }
-}
-
-/**
- * 用于组件中使用流程图 WebSocket 的 Composable
+ * 流程图评分进度。和判题走的是**同一条** `/ws/submissions` ——
+ * 服务端按 submissionId 分辨是代码提交还是流程图，这里只是换一套消息类型。
  */
 export function useFlowchartWebSocket(
   handler?: MessageHandler<FlowchartEvaluationUpdate>,
 ) {
-  const ws = new FlowchartWebSocket()
-
-  // 如果提供了处理器，添加到实例中
-  if (handler) {
-    ws.addHandler(handler)
-  }
-
-  // 组件卸载时清理资源
-  onUnmounted(() => {
-    if (handler) {
-      ws.removeHandler(handler)
-    }
-    ws.disconnect()
-  })
-
-  return {
-    connect: () => ws.connect(),
-    disconnect: () => ws.disconnect(),
-    subscribe: (submissionId: string) => ws.subscribe(submissionId),
-    unsubscribe: () => ws.unsubscribe(),
-    scheduleDisconnect: (delay?: number) => ws.scheduleDisconnect(delay),
-    cancelScheduledDisconnect: () => ws.cancelScheduledDisconnect(),
-    status: ws.status,
-    addHandler: (h: MessageHandler<FlowchartEvaluationUpdate>) =>
-      ws.addHandler(h),
-    removeHandler: (h: MessageHandler<FlowchartEvaluationUpdate>) =>
-      ws.removeHandler(h),
-  }
+  return useChannel<FlowchartEvaluationUpdate>("/ws/submissions", handler)
 }
 
 /**
@@ -669,45 +557,13 @@ export interface ConfigUpdate extends WebSocketMessage {
 }
 
 /**
- * 配置 WebSocket 连接管理类
- */
-class ConfigWebSocket extends BaseWebSocket<ConfigUpdate> {
-  constructor() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({ url: `${protocol}//${window.location.host}/ws/config` })
-  }
-  // 这条通道是**单向**的：只收后端广播。服务端的消息处理只认 ping / subscribe，
-  // 客户端往这里推 config_update 会被回一个 error 帧 —— 别再加发送方法。
-  // 配置变更走 POST /admin/website，由后端广播给所有人。
-}
-
-/**
- * 用于组件中使用配置 WebSocket 的 Composable
+ * 站点配置广播。这条通道是**单向**的：只收后端广播。服务端的消息处理只认
+ * ping / subscribe，客户端往这里推 config_update 会被回一个 error 帧 ——
+ * 别拿返回值里的 subscribe 往这条通道上发东西。配置变更走 POST /admin/website，
+ * 由后端广播给所有人。
  */
 export function useConfigWebSocket(handler?: MessageHandler<ConfigUpdate>) {
-  const ws = new ConfigWebSocket()
-
-  // 同步注册，和另外两个 composable 一致。原来放在 onMounted 里，而调用方
-  // （useConfigUpdate）在 setup 阶段就 connect() 了 —— 中间那段窗口收到的广播
-  // 没有任何 handler 接。窗口极小，但没有任何理由留着它。
-  if (handler) {
-    ws.addHandler(handler)
-  }
-
-  onUnmounted(() => {
-    if (handler) {
-      ws.removeHandler(handler)
-    }
-    ws.disconnect()
-  })
-
-  return {
-    connect: () => ws.connect(),
-    disconnect: () => ws.disconnect(),
-    status: ws.status,
-    addHandler: (h: MessageHandler<ConfigUpdate>) => ws.addHandler(h),
-    removeHandler: (h: MessageHandler<ConfigUpdate>) => ws.removeHandler(h),
-  }
+  return useChannel<ConfigUpdate>("/ws/config", handler)
 }
 
 export interface CollabRequestItem {
@@ -756,8 +612,7 @@ export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
   private pendingBinary: ArrayBuffer[] = []
 
   constructor() {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
-    super({ url: `${protocol}//${window.location.host}/ws/collab` })
+    super("/ws/collab")
   }
 
   setBinaryHandler(handler: ((data: ArrayBuffer) => void) | null) {
@@ -796,6 +651,8 @@ export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
   }
 
   protected override onConnected() {
+    // 基类那一步是补订阅：collab 从不调 subscribe()，这里是空转，但按约定照调不误
+    super.onConnected()
     // 新连接，旧连接攒下的帧一概作废
     this.pendingBinary = []
     this.connectHandler?.()
