@@ -158,7 +158,8 @@
 import { formatISO, sub, type Duration } from "date-fns"
 import type { FlowchartStatistics } from "@oj2/contract"
 import { getFlowchartStatistics } from "oj/api"
-import { DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER } from "utils/constants"
+import { PANEL_DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER } from "utils/constants"
+import { durationFromValue } from "utils/functions"
 import { useHiddenStudents } from "../composables/hiddenStudents"
 import { Doughnut, Radar, Bar } from "vue-chartjs"
 import {
@@ -202,13 +203,7 @@ const props = defineProps<Props>()
 
 const message = useMessage()
 
-const durationOptions: SelectOption[] = [
-  { label: "10分钟内", value: "minutes:10" },
-  { label: "20分钟内", value: "minutes:20" },
-  { label: "30分钟内", value: "minutes:30" },
-  ...DURATION_OPTIONS,
-  { label: "全部时段", value: "all" },
-]
+const durationOptions: SelectOption[] = [...PANEL_DURATION_OPTIONS]
 
 const query = reactive({
   username: props.username,
@@ -474,13 +469,10 @@ function renderWordCloud() {
   })
 }
 
-const subOptions = computed<Duration>(() => {
-  const dur =
-    durationOptions.find((it) => it.value === query.duration) ??
-    durationOptions[0]
-  const x = dur.value!.toString().split(":")
-  return { [x[0]]: parseInt(x[1]) }
-})
+const subOptions = computed<Duration>(
+  () =>
+    durationFromValue(query.duration) ?? durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
+)
 
 async function handleStatistics() {
   const current = Date.now()

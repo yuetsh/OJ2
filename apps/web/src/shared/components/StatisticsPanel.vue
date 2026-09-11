@@ -198,7 +198,7 @@
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
 import { getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
-import { DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
+import { PANEL_DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import { useConfigStore } from "../store/config"
 import { useHiddenStudents } from "../composables/hiddenStudents"
@@ -206,7 +206,7 @@ import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
 import { NFlex, NTag, NText, NTooltip, type DataTableRowKey } from "naive-ui"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
-import { parseTime } from "utils/functions"
+import { durationFromValue, parseTime } from "utils/functions"
 import type {
   AttemptedStudent,
   SubmissionStatisticsItems,
@@ -224,13 +224,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const options: SelectOption[] = [
-  { label: "10分钟内", value: "minutes:10" },
-  { label: "20分钟内", value: "minutes:20" },
-  { label: "30分钟内", value: "minutes:30" },
-  ...DURATION_OPTIONS,
-  { label: "全部时段", value: "all" },
-]
+const options: SelectOption[] = [...PANEL_DURATION_OPTIONS]
 
 /**
  * 轨迹方块的颜色。取值就是 JUDGE_STATUS 里那个 type，色号沿用 Naive UI 的语义色
@@ -695,13 +689,11 @@ const completionChartOptions = {
   },
 }
 
-const subOptions = computed<Duration>(() => {
-  let dur = options.find((it) => it.value === query.duration) ?? options[0]
-  const x = dur.value!.toString().split(":")
-  const unit = x[0]
-  const n = x[1]
-  return { [unit]: parseInt(n) }
-})
+const subOptions = computed<Duration>(
+  // 认不出来（含 all）就退回列表第一档，和原来 `?? options[0]` 一致；
+  // all 实际不会走到这里，handleStatistics 先分支掉了
+  () => durationFromValue(query.duration) ?? durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
+)
 
 function goSubmissions() {
   router.push({

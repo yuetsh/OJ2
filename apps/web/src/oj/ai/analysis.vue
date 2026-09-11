@@ -60,6 +60,7 @@ import SolvedTable from "./components/SolvedTable.vue"
 import { useAIStore } from "../store/ai"
 import { useUserStore } from "shared/store/user"
 import { DURATION_OPTIONS } from "utils/constants"
+import { durationFromValue } from "utils/functions"
 
 const aiStore = useAIStore()
 const userStore = useUserStore()
@@ -72,11 +73,9 @@ const urlDuration = useRouteQuery<string>("duration", "months:6")
 aiStore.targetUsername = urlUsername.value
 aiStore.duration = urlDuration.value
 
-const subOptions = computed<Duration>(() => {
-  let dur = options.find((it) => it.value === aiStore.duration) ?? options[0]
-  const x = dur.value!.toString().split(":")
-  return { [x[0]]: parseInt(x[1]) } as Duration
-})
+const subOptions = computed<Duration>(
+  () => durationFromValue(aiStore.duration) ?? durationFromValue(DURATION_OPTIONS[0].value)!,
+)
 
 const start = computed(() => formatISO(sub(new Date(), subOptions.value)))
 const end = computed(() => formatISO(new Date()))

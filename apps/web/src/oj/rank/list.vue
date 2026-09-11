@@ -17,9 +17,9 @@ import {
   getClassPK,
 } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { getACRate } from "utils/functions"
+import { durationFromValue, getACRate } from "utils/functions"
 import Pagination from "shared/components/Pagination.vue"
-import { ChartType } from "utils/constants"
+import { ChartType, LONG_DURATION_OPTIONS } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
 import Chart from "./components/Chart.vue"
 import Index from "./components/Index.vue"
@@ -282,21 +282,12 @@ async function listActivity() {
   }))
 }
 
-const options: SelectOption[] = [
-  { label: "一周内", value: "weeks:1" },
-  { label: "一个月内", value: "months:1" },
-  { label: "两个月内", value: "months:2" },
-  { label: "半年内", value: "months:6" },
-  { label: "一年内", value: "years:1" },
-]
+const options: SelectOption[] = [...LONG_DURATION_OPTIONS]
 
-const subOptions = computed<Duration>(() => {
-  let dur = options.find((it) => it.value === duration.value) ?? options[1]
-  const x = dur.value!.toString().split(":")
-  const unit = x[0]
-  const n = x[1]
-  return { [unit]: parseInt(n) }
-})
+// 认不出来退回 options[1]（一个月内），和 duration 的初值一致
+const subOptions = computed<Duration>(
+  () => durationFromValue(duration.value) ?? durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
+)
 
 onMounted(() => {
   // 「全服 Top10」就是榜单第一页的前 10 条：挂载时 init() 取的正是 offset=0&limit=10，

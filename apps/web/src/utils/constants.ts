@@ -322,6 +322,10 @@ export function sortFlowchartCriteria<T>(
   return Object.entries(details).sort(([a], [b]) => rank(a) - rank(b))
 }
 
+/**
+ * 时段选项。`value` 是 `<date-fns 的单位>:<数量>`，由 `durationFromValue()` 解析 ——
+ * 别在组件里再手写一遍 `split(":")`，那套解析原来散在五个文件里。
+ */
 export const DURATION_OPTIONS = [
   { label: "本节课内", value: "hours:1" },
   { label: "两节课内", value: "hours:2" },
@@ -332,6 +336,34 @@ export const DURATION_OPTIONS = [
   { label: "半年内", value: "months:6" },
   { label: "一年内", value: "years:1" },
 ] as const
+
+/**
+ * 两个统计面板（提交统计、流程图统计）的时段下拉。
+ *
+ * 比通用的那份多了头尾：前面三档分钟级是给**上课当场**用的 —— 老师布置完一道题，
+ * 想看的就是「刚才这十分钟谁交了」；末尾的 `all` 不是一个时长，`query.duration === "all"`
+ * 会走各自的分支不带时间条件，所以它永远不会进 durationFromValue()。
+ *
+ * 原来这份列表在两个面板里逐字抄了两遍。
+ */
+export const PANEL_DURATION_OPTIONS = [
+  { label: "10分钟内", value: "minutes:10" },
+  { label: "20分钟内", value: "minutes:20" },
+  { label: "30分钟内", value: "minutes:30" },
+  ...DURATION_OPTIONS,
+  { label: "全部时段", value: "all" },
+] as const
+
+/**
+ * 榜单和班级对比用的长时段，一周起步。
+ *
+ * 这两个页面看的是长期趋势，「本节课内」这种窗口在那儿没有意义 —— 全班一小时内的
+ * AC 数拉出来比不出什么。原来 rank/list.vue 和 class/pk.vue 各手抄了一份同样的五条，
+ * pk.vue 里还留着「与 rank/list.vue 保持一致」的注释，现在从上面那份派生。
+ */
+export const LONG_DURATION_OPTIONS = DURATION_OPTIONS.filter(
+  (option) => !["hours:1", "hours:2", "days:1"].includes(option.value),
+)
 
 // 班级号的位数范围。学生用户名形如 ks<班级号><姓名>，班级号还要跟
 // 网站配置里的班级列表对得上。

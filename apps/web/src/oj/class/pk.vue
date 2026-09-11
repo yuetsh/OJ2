@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { ClassComparison } from "utils/types"
+import { LONG_DURATION_OPTIONS } from "utils/constants"
+import { durationFromValue } from "utils/functions"
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
 import { getClassPK } from "oj/api"
@@ -57,30 +59,14 @@ const aiContent = ref("")
 const showAIModal = ref(false)
 let aiController: AbortController | null = null
 
-// 时间段选项（与 rank/list.vue 保持一致）
+// 长时段和榜单页同一份（LONG_DURATION_OPTIONS），外加一个「全部时间」
 const timeRangeOptions: SelectOption[] = [
   { label: "全部时间", value: "" },
-  { label: "一周内", value: "weeks:1" },
-  { label: "一个月内", value: "months:1" },
-  { label: "两个月内", value: "months:2" },
-  { label: "半年内", value: "months:6" },
-  { label: "一年内", value: "years:1" },
+  ...LONG_DURATION_OPTIONS,
 ]
 
-// 计算时间段（与 rank/list.vue 保持一致）
-const subOptions = computed<Duration | null>(() => {
-  if (!duration.value || duration.value === "") {
-    return null
-  }
-  const dur = timeRangeOptions.find((it) => it.value === duration.value)
-  if (!dur || !dur.value || dur.value === "") {
-    return null
-  }
-  const x = dur.value.toString().split(":")
-  const unit = x[0]
-  const n = x[1]
-  return { [unit]: parseInt(n) } as Duration
-})
+// 「全部时间」的 value 是空串，解不出来就是 null —— 正是不带时间条件的意思
+const subOptions = computed<Duration | null>(() => durationFromValue(duration.value))
 
 // 根据时间段选项计算开始和结束时间
 function getTimeRange(): {

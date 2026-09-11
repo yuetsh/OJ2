@@ -70,6 +70,24 @@ export function getTagColor(
 }
 
 // 2023-04-03T02:43:28.673156Z
+/**
+ * 把时段选项的 `value`（`"weeks:1"`、`"minutes:10"`）解成 date-fns 的 Duration。
+ *
+ * 认不出来返回 null —— 「全部时段」那个 `all` 走的就是这条，调用方本来就该在
+ * `duration === "all"` 时不带时间条件。原来这段 `split(":")` 在五个组件里各写了一遍
+ * （两个统计面板、AI 分析页、榜单页、班级对比页），每份的兜底还都不一样。
+ */
+export function durationFromValue(
+  // 放宽到 SelectOption["value"] 那个形状：这些值直接来自 n-select 的绑定，
+  // Naive 那边的类型是 string | number | undefined。数字解不出来，照样回 null
+  value: string | number | null | undefined,
+): Duration | null {
+  const [unit, amount] = String(value ?? "").split(":")
+  const count = Number(amount)
+  if (!unit || !Number.isFinite(count)) return null
+  return { [unit]: count } as Duration
+}
+
 export function parseTime(utc: Date | string, format = "YYYY年M月D日") {
   const time = useDateFormat(utc, format, { locales: "zh-CN" })
   return time.value
