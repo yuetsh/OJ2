@@ -1,6 +1,5 @@
 import {
   joinProblemSetRequestSchema,
-  updateProblemSetProgressRequestSchema,
   type ProblemSet,
   type ProblemSetBadge,
   type ProblemSetList,
@@ -27,11 +26,8 @@ import { Hono } from "hono"
 
 import { optionalAuth, requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
-import { publishAchievementNotification } from "../events"
 import { failure, success } from "../http"
-import { JudgeStatus } from "../judge/status"
-import { updateAchievementsForProblemSet } from "../services/achievements"
-import { computeProgress, eligibleForBadge } from "../services/problemset"
+import { computeProgress } from "../services/problemset"
 import { asFilterValue, objectValue, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
@@ -244,93 +240,6 @@ problemsetRoutes.post("/problem-set-progress", requireAuth, async (c) => {
     if (created) await recomputeProgress(tx, created, {})
   })
   return success(c, null, 201)
-})
-
-problemsetRoutes.put("/problem-set-progress", requireAuth, async (c) => {
-  const parsed = updateProblemSetProgressRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "Invalid progress payload")
-  const user = c.get("user")!
-  const result = await db.transaction(async (tx) => {
-    const [problemSet] = await tx.select().from(schema.problemset).where(and(
-      eq(schema.problemset.id, parsed.data.problemSetId), eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft"),
-    )).limit(1)
-    if (!problemSet) return { error: "problem-set-not-found" as const }
-    const [progress] = await tx.select().from(schema.problemsetProgress).where(and(
-      eq(schema.problemsetProgress.problemsetId, problemSet.id), eq(schema.problemsetProgress.userId, user.id),
-    )).for("update").limit(1)
-    if (!progress) return { error: "not-joined" as const }
-    const [submission] = await tx.select().from(schema.submission).where(and(
-      eq(schema.submission.id, parsed.data.submissionId), eq(schema.submission.userId, user.id), eq(schema.submission.problemId, parsed.data.problemId),
-    )).limit(1)
-    if (!submission) return { error: "submission-not-found" as const }
-    if (![JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED].includes(submission.result as 0 | 10)) return { error: "submission-not-accepted" as const }
-    const [link] = await tx.select().from(schema.problemsetProblem).where(and(
-      eq(schema.problemsetProblem.problemsetId, problemSet.id), eq(schema.problemsetProblem.problemId, parsed.data.problemId),
-    )).limit(1)
-    if (!link) return { error: "problem-not-in-set" as const }
-    const detail = objectValue(progress.progressDetail)
-    detail[String(parsed.data.problemId)] = { score: link.score, submit_time: new Date().toISOString() }
-    const updated = await recomputeProgress(tx, progress, detail)
-    const [existingSubmission] = await tx.select({ id: schema.problemsetSubmission.id })
-      .from(schema.problemsetSubmission).where(and(
-        eq(schema.problemsetSubmission.problemsetId, problemSet.id),
-        eq(schema.problemsetSubmission.userId, user.id),
-        eq(schema.problemsetSubmission.problemId, parsed.data.problemId),
-      )).limit(1)
-    if (!existingSubmission) {
-      await tx.insert(schema.problemsetSubmission).values({
-        problemsetId: problemSet.id,
-        userId: user.id,
-        submissionId: submission.id,
-        problemId: parsed.data.problemId,
-      })
-    }
-    const badges = await tx.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, problemSet.id))
-    // 判定走 services/problemset.ts 那一份 —— 这里原来是第三份手抄的达标逻辑，
-    // 后台重算和补发脚本各有各的，改一处规则就会漏掉另外两处
-    const hits = badges.filter((badge) => eligibleForBadge(badge, updated))
-    if (hits.length === 0) return { earned: [] as (typeof schema.problemsetBadge.$inferSelect)[] }
-    // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
-    const inserted = await tx.insert(schema.userBadge).values(hits.map((badge) => ({
-      userId: user.id,
-      badgeId: badge.id,
-      earnedTime: new Date().toISOString(),
-    }))).onConflictDoNothing({ target: [schema.userBadge.badgeId, schema.userBadge.userId] })
-      .returning({ badgeId: schema.userBadge.badgeId })
-    const insertedIds = new Set(inserted.map((row) => row.badgeId))
-    return { earned: hits.filter((badge) => insertedIds.has(badge.id)) }
-  })
-  if ("error" in result && result.error) {
-    const error = result.error
-    const messages = {
-      "problem-set-not-found": "题单不存在",
-      "not-joined": "未加入该题单",
-      "submission-not-found": "提交记录不存在",
-      "submission-not-accepted": "只有通过的提交才能更新进度",
-      "problem-not-in-set": "题目不在题单中",
-    }
-    return failure(c, error.endsWith("not-found") ? 404 : 400, error, messages[error])
-  }
-  const unlocked = await updateAchievementsForProblemSet(user.id)
-  await Promise.all([
-    publishAchievementNotification(user.id, result.earned.map((badge) => ({
-      id: badge.id,
-      name: badge.name,
-      description: badge.description,
-      icon: badge.icon,
-      rarity: "bronze",
-      kind: "badge",
-    }))),
-    publishAchievementNotification(user.id, unlocked.map((achievement) => ({
-      id: achievement.id,
-      name: achievement.name,
-      description: achievement.description,
-      icon: achievement.icon,
-      rarity: achievement.rarity,
-      kind: "achievement",
-    }))),
-  ])
-  return success(c, { earnedBadges: result.earned.map((badge) => badgeData(badge)) })
 })
 
 problemsetRoutes.get("/users/:username/badges", optionalAuth, async (c) => {

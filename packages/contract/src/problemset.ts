@@ -71,11 +71,6 @@ export const joinProblemSetRequestSchema = z.object({
   problemSetId: z.number().int().positive(),
 })
 
-export const updateProblemSetProgressRequestSchema = z.object({
-  problemSetId: z.number().int().positive(),
-  problemId: z.number().int().positive(),
-  submissionId: z.string().min(1),
-})
 
 export const completedProblemSchema = z.object({
   id: z.number().int(),
@@ -125,4 +120,3 @@ export type CompletedProblem = z.infer<typeof completedProblemSchema>
 
 export type ProblemSetUserProgressSummary = z.infer<typeof problemSetUserProgressSummarySchema>
 export type JoinProblemSetRequest = z.infer<typeof joinProblemSetRequestSchema>
-export type UpdateProblemSetProgressRequest = z.infer<typeof updateProblemSetProgressRequestSchema>
