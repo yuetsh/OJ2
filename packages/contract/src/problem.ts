@@ -110,109 +110,122 @@ export const astRuleSchema = z.object({
 export const astRulesSchema = z.record(z.string(), z.array(astRuleSchema))
 
 /**
- * 每种语言支持哪些节点 target，以及它的中文名。原来这里是一张 15 条的混合表，
- * C 和 Python 的节点混在一起铺成后台下拉（更早之前 AstRulesEditor.vue 和
- * ProblemContent.vue 还各手抄了一份）。
+ * 一个 target 一条，`label` 给人看（后台下拉、题目页的「要求」），`node` 给判题机
+ * 拿去比 tree-sitter 的节点类型。
  *
- * **键必须和 judge/ast.ts 的 mappings 逐一对齐** —— 那边是 target → tree-sitter
- * 节点类型，这边是 target → 中文名。少一边就是静默故障：老师给 C 题选到只有
- * Python 有的 `list_comprehension`，判题机 `mapping[target] ?? target` 拿裸名去比
- * 节点类型，C 的语法树里永远不存在它，于是「必须使用列表推导式」永远失败、
- * 「不能使用 f-string」永远通过，两头都不报错。
+ * **这两半原来是分在两个包里的两张表** —— 这边 target → 中文名，
+ * `apps/api/src/judge/ast.ts` 的 mappings 是 target → tree-sitter 节点类型，靠一句
+ * 「两边必须同增同减」的注释维持。只加一边是静默错判：老师给 C 题选到只有 Python
+ * 有的 `list_comprehension`，判题机 `mapping[target] ?? target` 拿裸名去比节点类型，
+ * C 的语法树里永远不存在它，于是「必须使用列表推导式」永远失败、「不能使用
+ * f-string」永远通过，两头都不报错，只有学生受着。并成一张之后，加 target 而漏配
+ * 节点类型在结构上就不可能了。
+ *
+ * （更早之前 AstRulesEditor.vue 和 ProblemContent.vue 还各手抄过一份中文名，
+ * 且 C 和 Python 的节点混在一张 15 条的表里铺成后台下拉。）
  */
-export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, string>> = {
-  C: {
-    for_loop: "for 循环",
-    while_loop: "while 循环",
-    do_while: "do-while 循环",
-    if_statement: "if 条件",
-    else_clause: "else 子句",
-    switch_statement: "switch 语句",
-    case_statement: "case 分支",
-    break: "break 语句",
-    continue: "continue 语句",
-    return: "return 语句",
-    function_definition: "函数定义",
-    assignment: "赋值语句",
-    struct: "结构体",
-    include: "#include 指令",
-  },
-  // tree-sitter-cpp 继承 tree-sitter-c 的语法，C 那 14 条 target 在 C++ 树里
-  // 逐个实测通用，所以这张表是「C 的全集 + C++ 独有的几条」
+export interface AstNodeTarget {
+  /** 后台下拉和题目页展示的中文名 */
+  label: string
+  /** tree-sitter 里对应的节点类型，判题机按它 collectNodes */
+  node: string
+}
+
+const C_NODE_TARGETS = {
+  for_loop: { label: "for 循环", node: "for_statement" },
+  while_loop: { label: "while 循环", node: "while_statement" },
+  do_while: { label: "do-while 循环", node: "do_statement" },
+  if_statement: { label: "if 条件", node: "if_statement" },
+  else_clause: { label: "else 子句", node: "else_clause" },
+  switch_statement: { label: "switch 语句", node: "switch_statement" },
+  case_statement: { label: "case 分支", node: "case_statement" },
+  break: { label: "break 语句", node: "break_statement" },
+  continue: { label: "continue 语句", node: "continue_statement" },
+  return: { label: "return 语句", node: "return_statement" },
+  function_definition: { label: "函数定义", node: "function_definition" },
+  assignment: { label: "赋值语句", node: "assignment_expression" },
+  struct: { label: "结构体", node: "struct_specifier" },
+  include: { label: "#include 指令", node: "preproc_include" },
+} satisfies Record<string, AstNodeTarget>
+
+export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNodeTarget>> = {
+  C: C_NODE_TARGETS,
+  /**
+   * tree-sitter-cpp 继承 tree-sitter-c 的语法，C 那 14 条在 C++ 树里逐个实测通用，
+   * 所以共用的条目一律**引用** C_NODE_TARGETS 而不是抄一遍 —— 原来 C 的 14 行在
+   * 契约和判题机两个文件里各抄了两遍（C 一份、C++ 一份），同一份数据四份拷贝。
+   * 这里逐条列出来是为了保住下拉框的显示顺序（C++ 独有的几条是插在中间的）。
+   */
   "C++": {
-    for_loop: "for 循环",
-    range_for_loop: "范围 for 循环",
-    while_loop: "while 循环",
-    do_while: "do-while 循环",
-    if_statement: "if 条件",
-    else_clause: "else 子句",
-    switch_statement: "switch 语句",
-    case_statement: "case 分支",
-    break: "break 语句",
-    continue: "continue 语句",
-    return: "return 语句",
-    function_definition: "函数定义",
-    class_definition: "类定义",
-    struct: "结构体",
-    assignment: "赋值语句",
-    include: "#include 指令",
-    try_except: "try-catch",
-    throw: "throw 语句",
-    namespace: "namespace 定义",
-    template: "模板定义",
-    lambda: "lambda 表达式",
-    using: "using 声明",
+    for_loop: C_NODE_TARGETS.for_loop,
+    range_for_loop: { label: "范围 for 循环", node: "for_range_loop" },
+    while_loop: C_NODE_TARGETS.while_loop,
+    do_while: C_NODE_TARGETS.do_while,
+    if_statement: C_NODE_TARGETS.if_statement,
+    else_clause: C_NODE_TARGETS.else_clause,
+    switch_statement: C_NODE_TARGETS.switch_statement,
+    case_statement: C_NODE_TARGETS.case_statement,
+    break: C_NODE_TARGETS.break,
+    continue: C_NODE_TARGETS.continue,
+    return: C_NODE_TARGETS.return,
+    function_definition: C_NODE_TARGETS.function_definition,
+    class_definition: { label: "类定义", node: "class_specifier" },
+    struct: C_NODE_TARGETS.struct,
+    assignment: C_NODE_TARGETS.assignment,
+    include: C_NODE_TARGETS.include,
+    try_except: { label: "try-catch", node: "try_statement" },
+    throw: { label: "throw 语句", node: "throw_statement" },
+    namespace: { label: "namespace 定义", node: "namespace_definition" },
+    template: { label: "模板定义", node: "template_declaration" },
+    lambda: { label: "lambda 表达式", node: "lambda_expression" },
+    using: { label: "using 声明", node: "using_declaration" },
   },
   Python3: {
-    for_loop: "for 循环",
-    while_loop: "while 循环",
-    if_statement: "if 条件",
-    elif_clause: "elif 子句",
-    else_clause: "else 子句",
-    break: "break 语句",
-    continue: "continue 语句",
-    return: "return 语句",
-    function_definition: "函数定义",
-    class_definition: "类定义",
-    assignment: "赋值语句",
-    try_except: "try-except",
-    with_statement: "with 语句",
-    import: "import 语句",
-    import_from: "from-import 语句",
-    list_comprehension: "列表推导式",
-    list_literal: "列表",
-    dict_literal: "字典",
-    set_literal: "集合",
-    f_string: "f-string",
+    for_loop: { label: "for 循环", node: "for_statement" },
+    while_loop: { label: "while 循环", node: "while_statement" },
+    if_statement: { label: "if 条件", node: "if_statement" },
+    elif_clause: { label: "elif 子句", node: "elif_clause" },
+    else_clause: { label: "else 子句", node: "else_clause" },
+    break: { label: "break 语句", node: "break_statement" },
+    continue: { label: "continue 语句", node: "continue_statement" },
+    return: { label: "return 语句", node: "return_statement" },
+    function_definition: { label: "函数定义", node: "function_definition" },
+    class_definition: { label: "类定义", node: "class_definition" },
+    assignment: { label: "赋值语句", node: "assignment" },
+    try_except: { label: "try-except", node: "try_statement" },
+    with_statement: { label: "with 语句", node: "with_statement" },
+    import: { label: "import 语句", node: "import_statement" },
+    import_from: { label: "from-import 语句", node: "import_from_statement" },
+    list_comprehension: { label: "列表推导式", node: "list_comprehension" },
+    list_literal: { label: "列表", node: "list" },
+    dict_literal: { label: "字典", node: "dictionary" },
+    set_literal: { label: "集合", node: "set" },
+    f_string: { label: "f-string", node: "format_string" },
   },
 }
 
 /**
  * 运算符 target → 该语言里的实际写法。逻辑名 `and` / `or` / `not` 在 C 里写作
- * `&&` / `||` / `!`，判题机按 mappings 翻译，文案这边也得翻 —— 否则 C 题的学生
- * 看到的要求是「必须使用 and 运算符」，而 C 里根本没有 `and` 这个词。
+ * `&&` / `||` / `!`，文案要翻（否则 C 题的学生看到「必须使用 and 运算符」，而 C 里
+ * 根本没有 `and` 这个词），判题机也正好拿同一个值去比节点类型 —— 所以这张表**一份
+ * 两用**，不像节点那样需要两个字段。原来判题机的 mappings 里还抄了一份非恒等的
+ * （`and`→`&&` 那三条），取值逐个相同，纯属重复。
  *
- * 恒等的那些条目（`+`、`==` …）判题机的 mappings 里已经删掉了，走 `?? target`
- * 回落到同一个值；这里保留完整列表是因为它同时是后台下拉的选项来源。
+ * 恒等的条目（`+`、`==` …）写全是因为这张表同时是后台下拉的选项来源。
  */
+const C_OPERATOR_TARGETS = {
+  "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+  "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
+  "++": "++", "--": "--",
+  "==": "==", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=",
+  and: "&&", or: "||", not: "!",
+  "&": "&", "|": "|",
+}
+
 export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<string, Record<string, string>> = {
-  C: {
-    "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
-    "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
-    "++": "++", "--": "--",
-    "==": "==", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=",
-    and: "&&", or: "||", not: "!",
-    "&": "&", "|": "|",
-  },
+  C: C_OPERATOR_TARGETS,
   // `<<` / `>>` 对 C++ 主要是 cout/cin 的流运算符（位移是同一个 token）
-  "C++": {
-    "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
-    "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
-    "++": "++", "--": "--",
-    "==": "==", "!=": "!=", ">": ">", ">=": ">=", "<": "<", "<=": "<=",
-    and: "&&", or: "||", not: "!",
-    "&": "&", "|": "|", "<<": "<<", ">>": ">>",
-  },
+  "C++": { ...C_OPERATOR_TARGETS, "<<": "<<", ">>": ">>" },
   Python3: {
     "+": "+", "-": "-", "*": "*", "/": "/", "//": "//", "%": "%", "**": "**",
     "+=": "+=", "-=": "-=", "*=": "*=", "/=": "/=", "%=": "%=",
@@ -230,14 +243,28 @@ export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<string, Record<string, str
 export const AST_SUPPORTED_LANGUAGES = Object.keys(AST_NODE_TARGETS_BY_LANGUAGE)
 
 /** 全语言的节点中文名并集，只给拿不到语言的场合做回落。有语言一律走 astNodeLabel() */
-export const AST_NODE_TARGET_LABELS: Record<string, string> = Object.assign(
-  {},
-  ...Object.values(AST_NODE_TARGETS_BY_LANGUAGE),
+export const AST_NODE_TARGET_LABELS: Record<string, string> = Object.fromEntries(
+  Object.values(AST_NODE_TARGETS_BY_LANGUAGE).flatMap((table) =>
+    Object.entries(table).map(([target, entry]) => [target, entry.label]),
+  ),
 )
 
 export function astNodeLabel(target: string, language?: string): string {
   const table = language ? AST_NODE_TARGETS_BY_LANGUAGE[language] : undefined
-  return table?.[target] ?? AST_NODE_TARGET_LABELS[target] ?? target
+  return table?.[target]?.label ?? AST_NODE_TARGET_LABELS[target] ?? target
+}
+
+/**
+ * target → tree-sitter 节点类型。判题机唯一的解析入口 ——
+ * 节点走上面那张表的 `node`，运算符走运算符表（它的值本身就是要比的 token），
+ * 都对不上就回落到裸 target（恒等的运算符 `+` / `==` 走的就是这条）。
+ */
+export function astTargetNodeType(target: string, language: string): string {
+  return (
+    AST_NODE_TARGETS_BY_LANGUAGE[language]?.[target]?.node ??
+    AST_OPERATOR_TARGETS_BY_LANGUAGE[language]?.[target] ??
+    target
+  )
 }
 
 export function astOperatorLabel(target: string, language?: string): string {

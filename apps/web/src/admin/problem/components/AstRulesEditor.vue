@@ -71,7 +71,7 @@ const ENGINE_OPTIONS: SelectOption[] = [
 // （或者反过来，「不能使用 f-string」永远通过），两头都不报错。
 function nodeTargetOptions(lang: string): SelectOption[] {
   return Object.entries(AST_NODE_TARGETS_BY_LANGUAGE[lang] ?? {}).map(
-    ([value, label]) => ({ label, value }),
+    ([value, entry]) => ({ label: entry.label, value }),
   )
 }
 
@@ -173,7 +173,7 @@ function getTargetLabel(
   engine: string,
   target: string,
 ): string | undefined {
-  if (isNodeEngine(engine)) return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]
+  if (isNodeEngine(engine)) return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]?.label
   // 运算符不写 label：判题结果的文案按语言翻译（astOperatorLabel），
   // 存一个固定 label 反而会把 C 的 && 钉死成 and
   return undefined

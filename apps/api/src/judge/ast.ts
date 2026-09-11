@@ -4,6 +4,7 @@ import {
   astNodeLabel,
   astOperatorLabel,
   astRuleIsMeaningful,
+  astTargetNodeType,
   astRuleSchema,
   AST_SUPPORTED_LANGUAGES,
   type AstRequirement,
@@ -31,91 +32,11 @@ export interface AstResult {
   actual?: number
 }
 
-/**
- * target → tree-sitter 节点类型。恒等的条目（`+`、`==` 这些运算符）不列，
- * 走 `mapping[target] ?? target` 回落。
- *
- * **这里的键集是契约 AST_NODE_TARGETS_BY_LANGUAGE 的另一半**，两边必须同增同减：
- * 那边决定后台下拉能选什么，这边决定判题机认得什么。只加一边就是静默错判。
- */
-const mappings: Record<string, Record<string, string>> = {
-  C: {
-    for_loop: "for_statement",
-    while_loop: "while_statement",
-    do_while: "do_statement",
-    if_statement: "if_statement",
-    else_clause: "else_clause",
-    break: "break_statement",
-    continue: "continue_statement",
-    function_definition: "function_definition",
-    return: "return_statement",
-    switch_statement: "switch_statement",
-    case_statement: "case_statement",
-    assignment: "assignment_expression",
-    struct: "struct_specifier",
-    include: "preproc_include",
-    and: "&&",
-    or: "||",
-    not: "!",
-  },
-  "C++": {
-    // C 的那 14 条原样通用（tree-sitter-cpp 继承 tree-sitter-c 的语法）
-    for_loop: "for_statement",
-    while_loop: "while_statement",
-    do_while: "do_statement",
-    if_statement: "if_statement",
-    else_clause: "else_clause",
-    break: "break_statement",
-    continue: "continue_statement",
-    function_definition: "function_definition",
-    return: "return_statement",
-    switch_statement: "switch_statement",
-    case_statement: "case_statement",
-    assignment: "assignment_expression",
-    struct: "struct_specifier",
-    include: "preproc_include",
-    // C++ 独有
-    range_for_loop: "for_range_loop",
-    class_definition: "class_specifier",
-    try_except: "try_statement",
-    throw: "throw_statement",
-    namespace: "namespace_definition",
-    template: "template_declaration",
-    lambda: "lambda_expression",
-    using: "using_declaration",
-    and: "&&",
-    or: "||",
-    not: "!",
-  },
-  Python3: {
-    for_loop: "for_statement",
-    while_loop: "while_statement",
-    if_statement: "if_statement",
-    else_clause: "else_clause",
-    elif_clause: "elif_clause",
-    break: "break_statement",
-    continue: "continue_statement",
-    function_definition: "function_definition",
-    return: "return_statement",
-    try_except: "try_statement",
-    with_statement: "with_statement",
-    list_comprehension: "list_comprehension",
-    list_literal: "list",
-    dict_literal: "dictionary",
-    set_literal: "set",
-    f_string: "format_string",
-    import: "import_statement",
-    import_from: "import_from_statement",
-    assignment: "assignment",
-    class_definition: "class_definition",
-  },
-}
-
 let initPromise: Promise<void> | undefined
 const languages = new Map<string, Language>()
 
 async function loadLanguage(language: string) {
-  if (!(language in mappings)) return null
+  if (!AST_SUPPORTED_LANGUAGES.includes(language)) return null
   // locateFile 指到内嵌的 tree-sitter.wasm：emscripten 默认按脚本所在目录找，
   // 单二进制里那个目录是 /$bunfs/root，它自己找不着
   if (!initPromise) initPromise = Parser.init({ locateFile: () => treeSitterWasmPath })
@@ -240,7 +161,7 @@ export function astRequirements(value: unknown): AstRequirements | null {
 /**
  * AST 规则的语义校验。zod 只管形状（engine 在枚举里、min 是整数），管不了
  * 「给 C 题选了只有 Python 才有的 list_comprehension」这类组合 —— 那种规则存得进去，
- * 判题时 `mapping[target] ?? target` 拿裸名去比节点类型，永远失败或永远通过，
+ * 判题时 astTargetNodeType() 找不到就回落成裸名去比节点类型，永远失败或永远通过，
  * 两头都不报错，只有学生受着。
  *
  * 放这儿而不是 astRulesSchema 的 refine 上：那个 schema 同时用于**读**后台题目详情，
@@ -345,14 +266,9 @@ function methodCalls(root: Node, target: string, language: string) {
   })
 }
 
-function evaluateRule(
-  root: Node,
-  rule: AstRule,
-  language: string,
-  mapping: Record<string, string>,
-): AstResult | null {
+function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | null {
   const target = rule.target ?? ""
-  const nodeType = mapping[target] ?? target
+  const nodeType = astTargetNodeType(target, language)
 
   switch (rule.engine) {
     case "must_exist_node":
@@ -409,8 +325,8 @@ function evaluateRule(
     case "must_have_nesting": {
       const outer = rule.outer ?? ""
       const inner = rule.inner ?? ""
-      const outerType = mapping[outer] ?? outer
-      const innerType = mapping[inner] ?? inner
+      const outerType = astTargetNodeType(outer, language)
+      const innerType = astTargetNodeType(inner, language)
       const passed = collectNodes(root, outerType).some((node) =>
         node.children.some((child) => hasNode(child, innerType)),
       )
@@ -437,10 +353,9 @@ export async function checkAst(
     const tree = parser.parse(code)
     if (!tree) return { passed: true, results: [] }
     try {
-      const mapping = mappings[language] ?? {}
       const results = rules
         .filter(astRuleIsMeaningful)
-        .map((rule) => evaluateRule(tree.rootNode, rule, language, mapping))
+        .map((rule) => evaluateRule(tree.rootNode, rule, language))
         .filter((result): result is AstResult => result !== null)
       return { passed: results.every((result) => result.passed), results }
     } finally {
