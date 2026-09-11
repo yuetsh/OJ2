@@ -139,16 +139,3 @@ export function usePagination<T extends Record<string, any>>(
     syncFromRoute,
   }
 }
-
-/**
- * 简化版本的分页 composable，只处理基本的分页逻辑
- * 每次调用创建新的分页状态实例
- * @param defaultLimit 默认每页条数
- * @param defaultPage 默认页码
- */
-export function useSimplePagination(defaultLimit = 10, defaultPage = 1) {
-  return usePagination(
-    {},
-    { defaultLimit, defaultPage, resetPageOnChange: false },
-  )
-}

@@ -38,8 +38,6 @@ export const problemLanguageSchema = z.enum([
   "Flowchart",
 ])
 
-/** 沙箱语言组成的数组（顺序即提权顺序，前端用它排语言 tab） */
-export const JUDGE_LANGUAGES = judgeLanguageSchema.options
 
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
 export type ProblemLanguage = z.infer<typeof problemLanguageSchema>

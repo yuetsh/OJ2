@@ -44,6 +44,3 @@ export function metricName(key: string) {
   return BY_KEY.get(key)?.name ?? key
 }
 
-/** 稀有度四档。乱填的值会让成就汇总接口的分档统计对不上：野值算进总数却不出现在任何一档 */
-export const RARITIES = ["bronze", "silver", "gold", "platinum"] as const
-export const OPERATORS = ["gte", "lte"] as const

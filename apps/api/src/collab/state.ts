@@ -69,9 +69,6 @@ export function removeRequest(studentId: number) {
   return requests.delete(studentId)
 }
 
-export function hasRequest(studentId: number) {
-  return requests.has(studentId)
-}
 
 /** 按发起时间正序。老师端按等待时长排序展示，不强制先来先到 */
 export function listRequests() {
@@ -136,9 +133,3 @@ export function roomOf(ws: CollabSocket) {
   return ownerId === undefined ? undefined : rooms.get(ownerId)
 }
 
-/** 仅供进程退出或测试用，正常路径不该调 */
-export function resetCollabState() {
-  requests.clear()
-  teachers.clear()
-  rooms.clear()
-}

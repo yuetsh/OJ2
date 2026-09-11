@@ -459,17 +459,6 @@ export function joinProblemSet(problemSetId: number) {
   return api.post("problem-set-progress", { problemSetId })
 }
 
-export function updateProblemSetProgress(
-  problemSetId: number,
-  problemId: number,
-  submissionId: string,
-) {
-  return api.put("problem-set-progress", {
-    problemSetId,
-    problemId,
-    submissionId,
-  })
-}
 
 export function getUserBadges(username?: string) {
   return api.get<UserBadge[]>(
