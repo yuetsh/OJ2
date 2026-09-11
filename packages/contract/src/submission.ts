@@ -273,7 +273,22 @@ export const submissionStatisticsUserSchema = z.object({
  * 免得老师以为这人就交了这么多。
  */
 export const submissionStatisticsItemsSchema = z.object({
-  items: z.array(z.object({ id: z.string(), result: judgeStatusSchema })),
+  /**
+   * 展开某个学生时列出他这段时间的提交。**带上题目**：一节课里学生往往在好几道题
+   * 之间来回跳，一串只有编号的按钮看不出他卡在哪一道 —— 前端按题目分组展示。
+   *
+   * 字段名沿用 submissionListItemSchema 的口径：`problem` 是展示用题号（problem._id），
+   * `problemTitle` 是标题。
+   */
+  items: z.array(
+    z.object({
+      id: z.string(),
+      result: judgeStatusSchema,
+      createTime: z.string(),
+      problem: z.string(),
+      problemTitle: z.string(),
+    }),
+  ),
   truncated: z.boolean(),
 })
 

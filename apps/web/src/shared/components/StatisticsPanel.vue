@@ -204,8 +204,9 @@ import { useConfigStore } from "../store/config"
 import { useHiddenStudents } from "../composables/hiddenStudents"
 import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
-import { NButton, NFlex, NTag, NText, type DataTableRowKey } from "naive-ui"
-import { JUDGE_STATUS } from "utils/constants"
+import { NFlex, NTag, NText, NTooltip, type DataTableRowKey } from "naive-ui"
+import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
+import { parseTime } from "utils/functions"
 import type {
   AttemptedStudent,
   SubmissionStatisticsItems,
@@ -231,6 +232,62 @@ const options: SelectOption[] = [
   { label: "全部时段", value: "all" },
 ]
 
+/**
+ * 轨迹方块的颜色。取值就是 JUDGE_STATUS 里那个 type，色号沿用 Naive UI 的语义色
+ * （项目里 ExerciseMatch.vue 等处也是直接写这几个值）。
+ */
+const ATTEMPT_COLORS: Record<string, string> = {
+  success: "#18a058",
+  error: "#d03050",
+  warning: "#f0a020",
+  info: "#2080f0",
+  default: "#909399",
+}
+
+/**
+ * 把一个学生的提交按题目聚成组，给展开行画「状态轨迹」用。
+ *
+ * 原来展开行是一排提交编号按钮 —— 12 位十六进制本身没有信息量，一节课里学生在好几道
+ * 题之间来回跳，那一排看不出他到底卡在哪。现在一道题一行：题号、标题、交了几次、
+ * 过没过，后面跟一排按时间**从早到晚**的小方块，颜色就是判题状态。
+ * 「三红一绿」和「七红到底」一眼分得开。
+ *
+ * 排序按老师的用法来：**没过的排前面**，其中交得越多越靠前 —— 卡得最久的那道顶到眼前；
+ * 已通过的沉底，它们只是「做完了」，不需要再看。
+ */
+function groupByProblem(list: SubmissionStatisticsItems["items"]) {
+  const groups = new Map<string, {
+    problem: string
+    problemTitle: string
+    items: SubmissionStatisticsItems["items"]
+  }>()
+  for (const item of list) {
+    const group = groups.get(item.problem)
+    if (group) group.items.push(item)
+    else groups.set(item.problem, {
+      problem: item.problem,
+      problemTitle: item.problemTitle,
+      items: [item],
+    })
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      ...group,
+      // 后端按时间倒序给，轨迹要从早到晚读，所以翻过来
+      items: [...group.items].reverse(),
+      // 「语法未过」(ast_check_failed) 也算做出来了 —— 答案对了，只是没按要求写；
+      // 和统计表格上「已解决」那一列的口径保持一致
+      solved: group.items.some(
+        (item) =>
+          item.result === SubmissionStatus.accepted ||
+          item.result === SubmissionStatus.ast_check_failed,
+      ),
+    }))
+    .sort((a, b) =>
+      Number(a.solved) - Number(b.solved) || b.items.length - a.items.length,
+    )
+}
+
 function openSubmission(id: string) {
   window.open(`/submission/${id}`, "_blank", "noopener")
 }
@@ -241,24 +298,68 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
     renderExpand: (row) => {
       const loaded = items[row.username]
       if (!loaded) return h(NText, { depth: 3 }, () => "加载中…")
-      return h(NFlex, { vertical: true, size: "small" }, () => [
-        h(NFlex, { size: "small", wrap: true }, () =>
-          loaded.items.map((item) =>
+      return h(NFlex, { vertical: true, size: "medium" }, () => [
+        ...groupByProblem(loaded.items).map((group) =>
+          // 题头一栏、轨迹一栏，**外层不换行**：一道题交了几十发时方块要在自己那一栏里
+          // 折行，折下来的一行才会和上一行对齐
+          h(NFlex, { size: "small", align: "flex-start", wrap: false }, () => [
             h(
-              NButton,
-              {
-                size: "small",
-                tertiary: true,
-                type: JUDGE_STATUS[item.result]?.type ?? "default",
-                style: "width: 120px",
-                onClick: (event: MouseEvent) => {
-                  event.stopPropagation()
-                  openSubmission(item.id)
-                },
-              },
-              () => item.id.toString().slice(0, 12),
+              NFlex,
+              { size: 4, align: "center", wrap: false, style: "width: 200px; flex: none" },
+              () => [
+                h(NTag, { size: "small", bordered: false }, () => group.problem),
+                h(
+                  NText,
+                  {
+                    depth: 2,
+                    style:
+                      "overflow: hidden; text-overflow: ellipsis; white-space: nowrap",
+                  },
+                  () => group.problemTitle,
+                ),
+              ],
             ),
-          ),
+            h(
+              NText,
+              {
+                depth: 3,
+                style: "width: 104px; flex: none",
+              },
+              () => `${group.items.length} 次 · ${group.solved ? "已通过" : "未通过"}`,
+            ),
+            h(NFlex, { size: 4, wrap: true, style: "flex: 1; min-width: 0" }, () =>
+              group.items.map((item) =>
+                h(
+                  NTooltip,
+                  { delay: 200 },
+                  {
+                    trigger: () =>
+                      h("button", {
+                        // 内联样式而不是 class：这些方块是 h() 出来、挂在 NDataTable 的
+                        // 展开槽里渲染的，<style scoped> 能不能盖到它并不确定
+                        style: {
+                          width: "14px",
+                          height: "14px",
+                          padding: "0",
+                          border: "none",
+                          borderRadius: "3px",
+                          cursor: "pointer",
+                          background: ATTEMPT_COLORS[JUDGE_STATUS[item.result]?.type ?? "default"],
+                        },
+                        onClick: (event: MouseEvent) => {
+                          event.stopPropagation()
+                          openSubmission(item.id)
+                        },
+                      }),
+                    default: () =>
+                      `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
+                      `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
+                      `${item.id.toString().slice(0, 12)}`,
+                  },
+                ),
+              ),
+            ),
+          ]),
         ),
         loaded.truncated
           ? h(

@@ -641,9 +641,18 @@ submissionRoutes.get("/submissions/statistics/items", requireTeacher, async (c) 
     : eq(schema.submission.username, username)
 
   // 多取一条，好知道是不是被截断了
+  // innerJoin 不会漏行：submission.problem_id 是 NOT NULL 且外键是 NO ACTION，
+  // 题目删不掉（真要删会被外键拦住并提示改为隐藏）
   const rows = await db
-    .select({ id: schema.submission.id, result: schema.submission.result })
+    .select({
+      id: schema.submission.id,
+      result: schema.submission.result,
+      createTime: schema.submission.createTime,
+      problem: schema.problem.displayId,
+      problemTitle: schema.problem.title,
+    })
     .from(schema.submission)
+    .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
     .where(and(...scope.filters, identity))
     .orderBy(desc(schema.submission.createTime), desc(schema.submission.id))
     .limit(STATISTICS_ITEMS_LIMIT + 1)
