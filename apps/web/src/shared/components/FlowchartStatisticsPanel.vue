@@ -159,6 +159,7 @@ import { formatISO, sub, type Duration } from "date-fns"
 import type { FlowchartStatistics } from "@oj2/contract"
 import { getFlowchartStatistics } from "oj/api"
 import { DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER } from "utils/constants"
+import { useHiddenStudents } from "../composables/hiddenStudents"
 import { Doughnut, Radar, Bar } from "vue-chartjs"
 import {
   Chart as ChartJS,
@@ -237,65 +238,18 @@ const hasResult = computed(
 const wordcloudCanvas = useTemplateRef<HTMLCanvasElement>("wordcloudCanvas")
 let wordcloudChart: ChartJS | null = null
 
-const HIDE_DURATION = 2 * 60 * 60 * 1000
-const STORAGE_KEY = "oj_hidden_students_flowchart"
+const { hideMode, hideStudent, showAll, isHidden, notHidden } =
+  useHiddenStudents("oj_hidden_students_flowchart")
 
-function loadHidden(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}")
-  } catch {
-    return {}
-  }
-}
+const visibleUnaccepted = computed(() => data.dataUnaccepted.filter(notHidden))
 
-const hiddenStudents = ref<Record<string, number>>(loadHidden())
-const hideMode = ref(false)
-
-function saveHidden(d: Record<string, number>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(d))
-}
-
-function hideStudent(username: string) {
-  hiddenStudents.value = {
-    ...hiddenStudents.value,
-    [username]: Date.now() + HIDE_DURATION,
-  }
-  saveHidden(hiddenStudents.value)
-}
-
-function showAll() {
-  hiddenStudents.value = {}
-  saveHidden({})
-}
-
-const visibleUnaccepted = computed(() => {
-  const now = Date.now()
-  return data.dataUnaccepted.filter((item) => {
-    const exp = hiddenStudents.value[item.username]
-    return !exp || exp <= now
-  })
-})
-
-const hiddenCount = computed(() => {
-  const now = Date.now()
-  return data.dataUnaccepted.filter((item) => {
-    const exp = hiddenStudents.value[item.username]
-    return !!exp && exp > now
-  }).length
-})
+const hiddenCount = computed(
+  () => data.dataUnaccepted.filter((item) => isHidden(item.username)).length,
+)
 
 const adjustedPersonCount = computed(() =>
   Math.max(0, data.personCount - hiddenCount.value),
 )
-
-onMounted(() => {
-  const now = Date.now()
-  const cleaned = Object.fromEntries(
-    Object.entries(hiddenStudents.value).filter(([, exp]) => exp > now),
-  )
-  hiddenStudents.value = cleaned
-  saveHidden(cleaned)
-})
 
 const completionRate = computed(() => {
   if (adjustedPersonCount.value <= 0) return "0%"

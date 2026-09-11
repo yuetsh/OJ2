@@ -201,6 +201,7 @@ import { getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
 import { DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import { useConfigStore } from "../store/config"
+import { useHiddenStudents } from "../composables/hiddenStudents"
 import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
 import { NButton, NFlex, NTag, NText, type DataTableRowKey } from "naive-ui"
@@ -400,41 +401,8 @@ const hasResult = computed(
   () => count.total > 0 || listUnaccepted.value.length > 0,
 )
 
-const HIDE_DURATION = 2 * 60 * 60 * 1000
-const HIDDEN_KEY = "oj_hidden_students"
-
-function loadHidden(): Record<string, number> {
-  try {
-    return JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "{}")
-  } catch {
-    return {}
-  }
-}
-
-const hiddenStudents = ref<Record<string, number>>(loadHidden())
-const hideMode = ref(false)
-
-function saveHidden(data: Record<string, number>) {
-  localStorage.setItem(HIDDEN_KEY, JSON.stringify(data))
-}
-
-function hideStudent(username: string) {
-  hiddenStudents.value = {
-    ...hiddenStudents.value,
-    [username]: Date.now() + HIDE_DURATION,
-  }
-  saveHidden(hiddenStudents.value)
-}
-
-function showAll() {
-  hiddenStudents.value = {}
-  saveHidden({})
-}
-
-function notHidden(item: { username: string }) {
-  const exp = hiddenStudents.value[item.username]
-  return !exp || exp <= Date.now()
-}
+const { hideMode, hideStudent, showAll, notHidden } =
+  useHiddenStudents("oj_hidden_students")
 
 const visibleUnaccepted = computed(() => listUnaccepted.value.filter(notHidden))
 const visibleAttempted = computed(() => listAttempted.value.filter(notHidden))
@@ -524,13 +492,8 @@ const adjustedPersonRate = computed(() => {
 })
 
 onMounted(() => {
-  const now = Date.now()
-  const cleaned = Object.fromEntries(
-    Object.entries(hiddenStudents.value).filter(([, exp]) => exp > now),
-  )
-  hiddenStudents.value = cleaned
-  saveHidden(cleaned)
-  // 打开就查一次。老师是投在屏幕上盯着看的，不该还要先点一下按钮
+  // 过期清理在 useHiddenStudents 里，这里只管「打开就查一次」——
+  // 老师是投在屏幕上盯着看的，不该还要先点一下按钮
   handleStatistics()
 })
 
