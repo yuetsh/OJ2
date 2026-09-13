@@ -813,6 +813,18 @@ const submissionListColumns = {
   },
 } as const
 
+/**
+ * 从判题原文里数出通过的测试点，为 null 的情形见契约 `caseSummary` 的注释。
+ * 这里只信「有没有 data 数组」，数组项的形状信判题机，和前端 submissionCaseResults 同口径。
+ */
+function caseSummary(submission: typeof schema.submission.$inferSelect) {
+  if (submission.contestId !== null || submission.language === "SQL") return null
+  const data = objectValue(submission.info).data
+  if (!Array.isArray(data) || data.length === 0) return null
+  const passed = data.filter((item) => objectValue(item).result === JudgeStatus.ACCEPTED).length
+  return { passed, total: data.length }
+}
+
 async function submissionDetail(id: string, user: AuthUser) {
   const [row] = await db.select({ submission: schema.submission, problem: schema.problem, contest: schema.contest })
     .from(schema.submission)
@@ -846,6 +858,7 @@ async function submissionDetail(id: string, user: AuthUser) {
     // problem 表本来就 join 了，不额外查库
     problemDisplayId: row.problem.displayId,
     showLink: true,
+    caseSummary: caseSummary(row.submission),
   } satisfies SubmissionDetail
 }
 

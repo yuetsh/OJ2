@@ -502,8 +502,12 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   // 不然这就是个不限次数的免费 LLM 接口。数法（判题中的不算、判题机自己崩的不算）
   // 由 countFailedSubmissions 统一，题目详情的 myFailedCount 走的是同一个函数，
   // 所以前端亮出按钮的时刻和这里放行的时刻严格对齐。
-  const failed = await countFailedSubmissions(c.get("user")!.id, row.submission.problemId)
-  if (failed < HINT_MIN_FAILURES) return failure(c, 403, "hint-locked", `Hint unlocks after ${HINT_MIN_FAILURES} failed submissions`)
+  // 编译失败不数次数（理由见 HINT_MIN_FAILURES 的注释）。放开的只是这一次提交本身，
+  // 下面的 throttleAi 照样卡着，不会因此变成不限次数的接口。
+  if (row.submission.result !== JudgeStatus.COMPILE_ERROR) {
+    const failed = await countFailedSubmissions(c.get("user")!.id, row.submission.problemId)
+    if (failed < HINT_MIN_FAILURES) return failure(c, 403, "hint-locked", `Hint unlocks after ${HINT_MIN_FAILURES} failed submissions`)
+  }
   const limited = await throttleAi(c)
   if (limited) return limited
   // 这里**不要**把 problem.answers 的参考答案放进 prompt。学生的代码本身就是 prompt 的

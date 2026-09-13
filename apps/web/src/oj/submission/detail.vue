@@ -10,6 +10,7 @@ import {
   parseTime,
   submissionCaseResults,
   submissionMemoryFormat,
+  submissionResultTitle,
   submissionTimeFormat,
   utoa,
 } from "utils/functions"
@@ -129,7 +130,7 @@ onMounted(init)
       <n-alert
         style="flex: 1"
         :type="JUDGE_STATUS[submission.result]['type']"
-        :title="JUDGE_STATUS[submission.result]['title']"
+        :title="submissionResultTitle(submission)"
       >
         <n-flex>
           <span>提交时间：{{ parseTime(submission.createTime) }}</span>

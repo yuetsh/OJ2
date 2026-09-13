@@ -7,6 +7,8 @@ import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
   submissionCaseResults,
   submissionMemoryFormat,
+  submissionPartialCases,
+  submissionResultTitle,
   submissionTimeFormat,
 } from "utils/functions"
 import type { Submission } from "utils/types"
@@ -57,8 +59,13 @@ const msg = computed(() => {
   return msg
 })
 
+// 部分测试点通过时的进度。学生拿不到 info，那张测试点表格只有管理员看得见，
+// 这是学生这边唯一能看出「比上次多过了几个点」的地方。
+const partialCases = computed(() => submissionPartialCases(props.submission))
+
 // 是否显示AI提示区域。
 // 阈值和后端 POST /ai/hint 共用契约里的 HINT_MIN_FAILURES，别在这里写死数字；
+// 编译失败不数次数，和后端同口径（理由见 HINT_MIN_FAILURES 的注释）；
 // failCount 现在含服务端下发的历史失败数，刷新页面不会把进度清掉。
 // system_error 也要排掉：那是判题机自己崩了，学生代码没毛病，让 AI 去分析
 // 只会瞎编一通，后端的失败计数同样不认这个状态。
@@ -68,7 +75,8 @@ const showAIHint = computed(() => {
   // 带 contestId 的题目只可能从比赛入口进来（题库列表按 contest_id is null 过滤）。
   if (problemStore.problem?.contestId != null) return false
   return (
-    problemStore.failCount >= HINT_MIN_FAILURES &&
+    (problemStore.failCount >= HINT_MIN_FAILURES ||
+      props.submission.result === SubmissionStatus.compile_error) &&
     props.submission.result !== SubmissionStatus.accepted &&
     props.submission.result !== SubmissionStatus.ast_check_failed &&
     props.submission.result !== SubmissionStatus.system_error &&
@@ -172,9 +180,18 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
   <div v-if="submission">
     <n-alert
       :type="JUDGE_STATUS[submission.result]['type']"
-      :title="JUDGE_STATUS[submission.result]['title']"
+      :title="submissionResultTitle(submission)"
       class="mb-3"
-    />
+    >
+      <template v-if="partialCases" #default>
+        <n-progress
+          type="line"
+          status="success"
+          :percentage="(partialCases.passed / partialCases.total) * 100"
+          :show-indicator="false"
+        />
+      </template>
+    </n-alert>
     <n-flex
       vertical
       v-if="

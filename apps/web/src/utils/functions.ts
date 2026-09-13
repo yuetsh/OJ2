@@ -1,8 +1,8 @@
 import { toAdminType } from "@oj2/contract"
 import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
-import { User } from "./types"
-import { USER_TYPE } from "./constants"
+import { Submission, User } from "./types"
+import { JUDGE_STATUS, USER_TYPE } from "./constants"
 import {
   strFromU8,
   strToU8,
@@ -35,6 +35,32 @@ export function submissionCaseResults(info: unknown): JudgeCaseResult[] {
   if (!info || typeof info !== "object" || !("data" in info)) return []
   const data = (info as JudgeInfo).data
   return Array.isArray(data) ? data : []
+}
+
+/**
+ * 没通过、但已经过了一部分测试点时的进度，其余情况（通过、一个都没过、没有逐点结果）为 null。
+ *
+ * 一个都没过不给：「通过 0/8」只是把「答案错误」换个更刺眼的说法再说一遍。
+ * 全过也不给：AC 用不着；AST_CHECK_FAILED 是测试点全过、语法规则没过，那边有自己的规则清单。
+ */
+export function submissionPartialCases(
+  submission: Pick<Submission, "caseSummary"> | undefined,
+) {
+  const summary = submission?.caseSummary
+  if (!summary || summary.passed === 0 || summary.passed >= summary.total)
+    return null
+  return summary
+}
+
+/** 结果标题：部分测试点通过时缀上「通过 x/y 个测试点」 */
+export function submissionResultTitle(
+  submission: Pick<Submission, "result" | "caseSummary">,
+) {
+  const title = JUDGE_STATUS[submission.result]["title"]
+  const partial = submissionPartialCases(submission)
+  return partial
+    ? `${title} · 通过 ${partial.passed}/${partial.total} 个测试点`
+    : title
 }
 
 export function getACRate(acCount: number, totalCount: number): string {

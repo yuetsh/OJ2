@@ -138,6 +138,18 @@ export const submissionDetailSchema = z.object({
    */
   problemDisplayId: z.string(),
   showLink: z.boolean(),
+  /**
+   * 通过了几个测试点，给学生看「离 AC 还差多远」。`info` 只给管理员（每个点带
+   * output_md5），所以这里只算出两个数下发，不放开原文。
+   *
+   * 为 null 的情形：比赛提交（ACM 只报对错，多给通过数等于变相放水，和 AI 提示同口径）、
+   * SQL 题（`judge/run.ts` 遇到被杀的测试点会 break，total 偏小）、没有逐点结果
+   * （待判、编译失败）。
+   */
+  caseSummary: z.object({
+    passed: z.number().int(),
+    total: z.number().int(),
+  }).nullable(),
 })
 
 /**
@@ -152,7 +164,7 @@ export const embeddedSubmissionSchema = submissionDetailSchema
   // problemDisplayId 也要去掉：下面的 problem 就是它，同一个值留两份，
   // 而路由只填了 problem —— 这里漏 omit 的那阵子，凡是收到过站内信的人
   // 打开消息页都是 500（parse 抛在缺失的 problemDisplayId 上，列表为空时才碰巧不炸）。
-  .omit({ info: true, contestId: true, problemId: true, problemDisplayId: true })
+  .omit({ info: true, contestId: true, problemId: true, problemDisplayId: true, caseSummary: true })
   // 旧 SubmissionSafeModelSerializer 里 problem 是
   // `SlugRelatedField(slug_field="_id")`，即**展示用题号**而非数字主键。
   // 站内信页面拿它拼 `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。

@@ -113,6 +113,9 @@ export const aiAnalysisRequestSchema = z.object({
 /**
  * 解锁「让 AI 分析我的代码」所需的失败提交数。前端拿它决定按钮露不露面、
  * 后端拿它卡 POST /ai/hint —— 放在契约里就是为了不让两边各写一个 3。
+ *
+ * 编译失败不受这个门槛限制：报错只关乎语法、不涉及解法，而英文编译报错恰恰是
+ * 零基础学生最先撞上、最容易直接放弃的那堵墙。
  */
 export const HINT_MIN_FAILURES = 3
 
