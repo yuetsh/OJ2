@@ -227,8 +227,55 @@ export async function rescanAchievement(achievementId: number) {
         kind: "achievement",
       }])
     }
+    // 补发的非白金成就同样计入「已解锁数」，要和判题结算一样接着做第二轮（元成就）判定。
+    // 旧 `rescan_achievement` 就漏了这步，OJ2 原样搬过来：2026-09-07 一次补发之后
+    // 269 人的计数停在旧值，其中 10 人实际够了「奖杯收藏家」却一直没发 ——
+    // 判题结算只在「这次有新解锁」时才重算，被补发的人不再解锁新成就就永远不会自愈。
+    if (achievement.rarity !== "platinum" && achievement.metric !== "achievement_unlocked_count") {
+      await refreshUnlockedCount(unlockedUserIds)
+      for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
+    }
   }
   return { scanned: stats.length, unlocked: unlockedUserIds.length }
+}
+
+/** 以「已解锁数」为指标的元成就（奖杯收藏家）。只取上架的，和 rescan 的口径一致 */
+export function metaAchievements() {
+  return db.select({ id: schema.achievement.id, name: schema.achievement.name, threshold: schema.achievement.threshold, operator: schema.achievement.operator })
+    .from(schema.achievement)
+    .where(and(eq(schema.achievement.visible, true), eq(schema.achievement.metric, "achievement_unlocked_count")))
+}
+
+/**
+ * 按 `user_achievement` 重算 `achievement_unlocked_count`，返回实际改动了的用户 id。
+ *
+ * 口径和判题结算一致：已解锁的**非白金**成就数。只 `jsonb_set` 这一个键、只写值变了的行，
+ * 不整体覆盖 `metrics` —— 整体写回会和并发判题写的其它指标互相踩。
+ * 不传 `userIds` 就是全体有 `user_stat` 的用户（`recount` 存量订正用）。
+ */
+export async function refreshUnlockedCount(userIds?: number[]) {
+  if (userIds && userIds.length === 0) return []
+  const scope = userIds ? sql`and s.user_id in ${userIds}` : sql``
+  const rows = await db.execute<{ user_id: number }>(sql`
+    update ${schema.userStat} as target
+    set metrics = jsonb_set(target.metrics, '{achievement_unlocked_count}', to_jsonb(fresh.value))
+    from (
+      select s.id, coalesce(c.value, 0) as value
+      from ${schema.userStat} s
+      left join (
+        select ua.user_id, count(*)::int as value
+        from ${schema.userAchievement} ua
+        join ${schema.achievement} a on a.id = ua.achievement_id
+        where a.rarity <> 'platinum'
+        group by ua.user_id
+      ) c on c.user_id = s.user_id
+      where true ${scope}
+    ) fresh
+    where target.id = fresh.id
+      and (target.metrics -> 'achievement_unlocked_count') is distinct from to_jsonb(fresh.value)
+    returning target.user_id
+  `)
+  return rows.map((row) => row.user_id)
 }
 
 

@@ -13,7 +13,7 @@
  *   oj2-api sql-child    # SQL 判题子进程，由服务自己 spawn，不该手动调
  *   oj2-api migrate      # 执行待办的数据库迁移，部署时由 docker/deploy.sh 调
  *   oj2-api backfill-problemsets  # 把题单进度与奖章订正到与规则一致，默认只读预演
- *   oj2-api recount               # 把题目/用户的计数列重算回与 submission 一致，默认只读预演
+ *   oj2-api recount               # 把题目/用户的计数列、成就的已解锁数重算回与明细一致，默认只读预演
  *   oj2-api fix-achievement-hours # 订正「夜猫子」「早起的鸟儿」的历史误发，默认只读预演
  *
  * 用动态 import 而非顶层 import：这几个模块都有导入即执行的副作用

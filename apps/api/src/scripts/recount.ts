@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm"
 import { db, schema } from "../db"
 import { JudgeStatus, isAccepted } from "../judge/status"
 import { objectValue } from "../routes/helpers"
+import { metaAchievements, refreshUnlockedCount, rescanAchievement } from "../services/achievements"
 
 /**
  * 把反范式的计数列重算回与 submission 表一致。
@@ -15,6 +16,11 @@ import { objectValue } from "../routes/helpers"
  * 管的六个列：
  *   problem.submission_number / accepted_number / statistic_info
  *   user_profile.submission_number / accepted_number / acm_problems_status
+ *
+ * 外加 `user_stat.metrics.achievement_unlocked_count`（已解锁的非白金成就数，是
+ * user_achievement 的副本）以及它连带的「奖杯收藏家」：计数改对之后，达标却没发的
+ * 走 `rescanAchievement` 补发（backfilled、推通知）。已知漂移来源是后台补发成就 ——
+ * 2026-09-07 一次补发后 269 人少算、10 人漏发，`rescanAchievement` 已修，这里订存量。
  *
  * **不管**的：acm_contest_rank（比赛榜有自己的一套罚时累计，重算要连带 submission_info
  * 里每题的尝试次数，口径复杂，单独一件事）、achievement.unlock_count（0010 之后
@@ -151,6 +157,51 @@ type Plan = {
   diffs: Diff[]
   problemFixes: { id: number; value: ProblemExpected }[]
   profileFixes: { id: number; value: ProfileExpected & { merged: Record<string, unknown> } }[]
+  /** achievement_unlocked_count 不对的用户 */
+  unlockedCountFixes: number[]
+  /** 按正确计数已达标、却没持有元成就的 (用户, 元成就) */
+  metaGrants: { userId: number; achievementId: number }[]
+}
+
+/**
+ * 已解锁数与元成就的差异。口径和 `refreshUnlockedCount` / 判题结算一致；
+ * 元成就只看有 user_stat 的用户 —— `rescanAchievement` 也只扫这些人。
+ */
+async function unlockedCountPlan(plan: Plan) {
+  const [rows, metas] = await Promise.all([
+    db.execute<{ user_id: number; counter: unknown; actual: number }>(sql`
+      select s.user_id, s.metrics -> 'achievement_unlocked_count' as counter, coalesce(c.value, 0) as actual
+      from user_stat s
+      left join (
+        select ua.user_id, count(*)::int as value
+        from user_achievement ua
+        join achievement a on a.id = ua.achievement_id
+        where a.rarity <> 'platinum'
+        group by ua.user_id
+      ) c on c.user_id = s.user_id
+    `),
+    metaAchievements(),
+  ])
+  const holders = metas.length
+    ? await db.select({ userId: schema.userAchievement.userId, achievementId: schema.userAchievement.achievementId })
+      .from(schema.userAchievement)
+      .where(sql`${schema.userAchievement.achievementId} in ${metas.map((meta) => meta.id)}`)
+    : []
+  const held = new Set(holders.map((row) => `${row.userId}:${row.achievementId}`))
+
+  for (const row of rows) {
+    const label = `用户 ${row.user_id}`
+    if (row.counter !== row.actual) {
+      plan.diffs.push({ label, field: "achievement_unlocked_count", before: row.counter ?? null, after: row.actual })
+      plan.unlockedCountFixes.push(row.user_id)
+    }
+    for (const meta of metas) {
+      const met = meta.operator === "gte" ? row.actual >= meta.threshold : row.actual <= meta.threshold
+      if (!met || held.has(`${row.user_id}:${meta.id}`)) continue
+      plan.diffs.push({ label, field: `成就「${meta.name}」`, before: "未发", after: "补发" })
+      plan.metaGrants.push({ userId: row.user_id, achievementId: meta.id })
+    }
+  }
 }
 
 /** 只算差异，不写库。预演和落库后的复核共用它 —— 两边口径必须是同一份代码 */
@@ -174,7 +225,7 @@ async function computePlan(): Promise<Plan> {
     expectedProfiles(),
   ])
 
-  const plan: Plan = { diffs: [], problemFixes: [], profileFixes: [] }
+  const plan: Plan = { diffs: [], problemFixes: [], profileFixes: [], unlockedCountFixes: [], metaGrants: [] }
 
   for (const problem of problems) {
     const want = expectedProblem.get(problem.id) ?? {
@@ -230,11 +281,12 @@ async function computePlan(): Promise<Plan> {
       plan.profileFixes.push({ id: profile.id, value: { ...want, merged } })
     }
   }
+  await unlockedCountPlan(plan)
   return plan
 }
 
 function report(plan: Plan) {
-  console.log(`发现 ${plan.diffs.length} 处不一致（题目 ${plan.problemFixes.length} 道 / 用户 ${plan.profileFixes.length} 人）：`)
+  console.log(`发现 ${plan.diffs.length} 处不一致（题目 ${plan.problemFixes.length} 道 / 用户 ${plan.profileFixes.length} 人 / 已解锁数 ${plan.unlockedCountFixes.length} 人 / 元成就补发 ${plan.metaGrants.length} 条）：`)
   for (const diff of plan.diffs.slice(0, 40)) {
     console.log(`  ${diff.label}  ${diff.field}: ${JSON.stringify(diff.before)} → ${JSON.stringify(diff.after)}`)
   }
@@ -245,7 +297,7 @@ function report(plan: Plan) {
 export async function recount(options: { apply: boolean }) {
   const plan = await computePlan()
   if (plan.diffs.length === 0) {
-    console.log("计数列与 submission 表一致，没有要订正的。")
+    console.log("计数列与 submission / user_achievement 一致，没有要订正的。")
     return 0
   }
   report(plan)
@@ -271,13 +323,19 @@ export async function recount(options: { apply: boolean }) {
       }).where(eq(schema.userProfile.id, fix.id))
     }
   })
-  console.log(`\n已订正题目 ${plan.problemFixes.length} 道、用户 ${plan.profileFixes.length} 人，复核中……`)
+  // 先改计数、再补发：rescanAchievement 读的是 metrics 里的计数。
+  // 补发幂等（唯一键 + 冲突忽略），重跑不会重复发
+  const recounted = await refreshUnlockedCount(plan.unlockedCountFixes)
+  if (plan.metaGrants.length) {
+    for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
+  }
+  console.log(`\n已订正题目 ${plan.problemFixes.length} 道、用户 ${plan.profileFixes.length} 人、已解锁数 ${recounted.length} 人，补发元成就 ${plan.metaGrants.length} 条，复核中……`)
 
   // 复核跑的是同一份 computePlan。这里还剩差异说明口径本身有问题（不是数据脏），
   // 必须让部署脚本看见非零退出码，而不是打一行字了事。
   const after = await computePlan()
   if (after.diffs.length === 0) {
-    console.log("复核通过：计数列与 submission 表一致")
+    console.log("复核通过：计数列与 submission / user_achievement 一致")
     return 0
   }
   console.error(`复核未通过，仍有 ${after.diffs.length} 处差异：`)
