@@ -22,6 +22,7 @@
 </template>
 <script lang="ts" setup>
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { zonedYear } from "utils/functions"
 
 const route = useRoute()
 const { isMobile } = useBreakpoints()
@@ -29,7 +30,9 @@ const hiddenICP = computed(() =>
   ["problem", "contest problem"].includes(route.name as string),
 )
 
-const currentYear = new Date().getFullYear()
+// 版权年份也走东八区：站内不留任何一处按浏览器时区取时间部件的代码，
+// 免得下一个人照着抄
+const currentYear = zonedYear()
 const copyrightText = `© 2022 - ${currentYear} 判题狗 保留所有权利`
 
 function goICP() {

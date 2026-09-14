@@ -127,11 +127,32 @@ return contract("GET /problems/:id", problemDetailSchema, value)
 一样会渲染错。收紧任何字段之前，拿根目录那份生产备份把全量数据跑一遍，
 尤其要看**空值**而不只是键集合。
 
+### 时间一律按东八区展示，不跟浏览器走
+
+**显示时间走 `utils/functions.ts` 的 `parseTime()`；要日历部件走 `zonedParts()` /
+`zonedYear()`。** 不要在组件里写 `new Date(x).getFullYear()` / `getMonth()` /
+`getDate()` / `toLocaleDateString()` / `toLocaleTimeString()` —— 那些取的是
+**浏览器本地**时区。机房电脑、学生手机平时都在东八区所以看不出来，但只要有人
+（比如时区没设对的机房机器、或在外地的老师）从别的时区打开，同一张提交记录表就会
+显示成另一个时间，和榜单、统计、成就里的日期对不上。
+
+锚点在后端 `../api/src/time.ts`（`Asia/Shanghai`），前端的 `DISPLAY_TIME_ZONE`
+必须和它一致。实现用 `Intl` 的 IANA 时区而不是自己加 8 小时，`timeZone` 选项
+Chrome 24+ 就支持，不影响机房老 Chrome。
+
+**唯一还没跟上的是 `n-date-picker`**（`admin/contest/detail.vue`、
+`admin/problemset/edit.vue`）：Naive 的日期选择器按浏览器本地时区渲染，没有
+`timezone` 属性。它在绝对值上往返正确（选的是什么时刻就是什么时刻），只是在非东八区
+的机器上「输入框里显示的时间」和「列表里显示的时间」会差一个时区。要修得在
+value ↔ 显示值之间做偏移换算，属于独立改动。
+
 ### Key Utilities
 
 - `utils/constants.ts` — Judge status codes, language IDs, difficulty levels, contest types
 - `utils/types.ts` — 契约类型的派生与前端专有收窄（不是手写的一份平行类型）
 - `utils/contract.ts` — 运行时契约闸门，见上
+- `utils/functions.ts` — `parseTime` / `zonedParts` / `zonedYear`（东八区时间口径，见上）、
+  `duration`、压缩与剪贴板等杂项
 - `utils/judge.ts` — Judge-related utilities
 - `utils/renders.ts` — Table column render helpers for Naive UI DataTable
 

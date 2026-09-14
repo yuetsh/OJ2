@@ -21,13 +21,13 @@ import { flowchartQueue } from "../queue"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
+import { todayStart } from "../time"
 import {
   isAdminRole,
   objectValue,
   queryInteger,
   rounded,
   stripClassPrefix,
-  todayStart,
 } from "./helpers"
 
 export const flowchartRoutes = new Hono<AppEnv>()

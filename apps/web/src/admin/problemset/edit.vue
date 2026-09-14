@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CreateProblemSetData, EditProblemSetData } from "utils/types"
+import { fromPickerValue, toPickerValue } from "utils/functions"
 import { getProblemSetDetail, createProblemSet, editProblemSet } from "../api"
 
 const route = useRoute()
@@ -18,11 +19,15 @@ const formData = ref<CreateProblemSetData & Partial<EditProblemSetData>>({
   endTime: null,
 })
 
+// n-date-picker 按浏览器本地渲染，所以要平移一次再绑定（见 utils/functions.ts
+// 的 toPickerValue）。`formData.endTime` 里始终存**真实时刻**，只有喂给选择器那一步换。
 const endTimeTimestamp = computed({
   get: () =>
-    formData.value.endTime ? new Date(formData.value.endTime).getTime() : null,
+    formData.value.endTime
+      ? toPickerValue(formData.value.endTime.getTime())
+      : null,
   set: (val: number | null) => {
-    formData.value.endTime = val ? new Date(val) : null
+    formData.value.endTime = val ? new Date(fromPickerValue(val)) : null
   },
 })
 

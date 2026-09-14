@@ -36,7 +36,8 @@ import {
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
-import { asFilterValue, isAdminRole, queryInteger, rounded, stripClassPrefix, todayStart } from "./helpers"
+import { todayStart } from "../time"
+import { asFilterValue, isAdminRole, queryInteger, rounded, stripClassPrefix } from "./helpers"
 
 export const submissionRoutes = new Hono<ContestEnv>()
 
@@ -749,9 +750,10 @@ async function problemSetJoinTimes(userId: number, problemIds: number[]) {
   const rows = await db
     .select({
       problemId: schema.problemsetProblem.problemId,
-      // ::text 是为了拿回和 mode:"string" 列同样形状的字符串——聚合表达式不走列的类型映射，
-      // 不加这个 cast 驱动会把 timestamptz 解析成 Date，下游的 Date.parse 就接不住了
-      joinTime: sql<string>`max(${schema.problemsetProgress.joinTime})::text`,
+      // 聚合表达式不走列的类型映射，但 OID 还是 1184 —— db/index.ts 给这个 OID 挂了
+      // 「转成 ISO 8601」的 parser，所以这里拿到的和 `mode:"string"` 的列同形状。
+      // 原来那个 `::text` 要撤掉：它的 OID 是 25、绕过那个 parser，反而会变成 PG 文本。
+      joinTime: sql<string>`max(${schema.problemsetProgress.joinTime})`,
     })
     .from(schema.problemsetProgress)
     .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProgress.problemsetId))

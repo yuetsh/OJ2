@@ -21,6 +21,7 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
+import { calendarDayYearsAgo, startOfCalendarDay } from "../time"
 import { asFilterValue, countFailedSubmissions, objectValue as toObject, queryInteger, sampleUser } from "./helpers"
 
 export const problemRoutes = new Hono<AppEnv>()
@@ -178,11 +179,13 @@ problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
 		inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
 	))
 	if (!mine?.value) return success(c, "0")
-	const since = new Date(); since.setFullYear(since.getFullYear() - 2); since.setHours(0, 0, 0, 0)
+	// 「近两年」按东八区日历算到当天零点。原先是 setFullYear/setHours，
+	// 切的是进程时区的零点。
+	const since = startOfCalendarDay(calendarDayYearsAgo(2)).toISOString()
 	const [active, accepted] = await Promise.all([
-		db.select({ value: count() }).from(schema.user).where(and(eq(schema.user.isDisabled, false), gte(schema.user.lastLogin, since.toISOString()))),
+		db.select({ value: count() }).from(schema.user).where(and(eq(schema.user.isDisabled, false), gte(schema.user.lastLogin, since))),
 		db.select({ value: countDistinct(schema.submission.userId) }).from(schema.submission).where(and(
-			eq(schema.submission.problemId, id), inArray(schema.submission.result, [0, 10]), gte(schema.submission.createTime, since.toISOString()),
+			eq(schema.submission.problemId, id), inArray(schema.submission.result, [0, 10]), gte(schema.submission.createTime, since),
 		)),
 	])
 	const total = active[0]?.value ?? 0

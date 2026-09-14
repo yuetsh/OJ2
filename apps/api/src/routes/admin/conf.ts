@@ -20,7 +20,8 @@ import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
 import { failure, success } from "../../http"
 import { getWebsiteOptions } from "../../services/options"
-import { queryInteger, todayStart } from "../helpers"
+import { todayStart } from "../../time"
+import { queryInteger } from "../helpers"
 
 export const adminConfRoutes = new Hono<AppEnv>()
 

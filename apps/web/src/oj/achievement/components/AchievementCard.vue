@@ -2,6 +2,7 @@
 import AchievementIcon from "shared/components/AchievementIcon.vue"
 import { useRarityColor } from "shared/composables/rarity"
 import { RARITY_COLOR, RARITY_LABEL } from "utils/constants"
+import { parseTime } from "utils/functions"
 import type { Achievement } from "utils/types"
 
 const props = defineProps<{ achievement: Achievement }>()
@@ -48,7 +49,9 @@ const unlockDate = computed(() => {
   const { unlockTime, backfilled } = props.achievement
   // 补发的记录不显示具体日期：一次补发会给几百人盖上同一个时间戳
   if (backfilled || !unlockTime) return "已获得"
-  return `${new Date(unlockTime).toLocaleDateString()} 获得`
+  // 走 parseTime 而不是 toLocaleDateString()：后者按浏览器时区渲染，
+  // 站内所有日期都是东八区口径
+  return `${parseTime(unlockTime)} 获得`
 })
 </script>
 

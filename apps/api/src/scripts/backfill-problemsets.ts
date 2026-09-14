@@ -69,7 +69,11 @@ async function recoverable(links: ProblemLink[], progresses: (typeof schema.prob
   const rows = await db.select({
     userId: schema.submission.userId,
     problemId: schema.submission.problemId,
-    solvedAt: sql<string>`min(${schema.submission.createTime})::text`,
+    // 和 recoverable 上面那段同口径。不加 `::text`：OID 1184 由 db/index.ts 统一转成
+    // ISO 8601 UTC，比 PG 文本更稳定（PG 文本的形状跟着会话时区走）。
+    // 注：这个值写进 progress_detail.submit_time，而那个字段没有任何读取方，
+    // 存量里还混着 Django 的 `...+00:00`，所以形状变化只影响 backfill 自己的差异比对。
+    solvedAt: sql<string>`min(${schema.submission.createTime})`,
   }).from(schema.submission).where(and(
     inArray(schema.submission.userId, [...new Set(gaps.map((g) => g.userId))]),
     inArray(schema.submission.problemId, [...new Set(gaps.map((g) => g.problemId))]),

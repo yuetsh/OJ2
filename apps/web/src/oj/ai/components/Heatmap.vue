@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { useAIStore } from "oj/store/ai"
-import { parseTime } from "utils/functions"
+import { parseTime, zonedParts } from "utils/functions"
 import { useChartTheme } from "shared/composables/chartTheme"
 
 const aiStore = useAIStore()
@@ -94,18 +94,21 @@ const getColor = (count: number) => {
 }
 
 // 一格一周，横向铺开。原来是一格一天、7 行 53 列，中职学生一年也就二三十天有提交，
-// 365 格里三百多格空着，整张图看着像没用过
+// 365 格里三百多格空着，整张图看着像没用过。
+//
+// 服务端给的 timestamp 是**东八区某个周一**的 UTC 零点，所以年月日一律按东八区取
+// （`zonedParts`），不能用 `getMonth()` / `getDate()` —— 那是浏览器本地部件，
+// 从别的时区打开会整体错一格。周末直接加 6 天的毫秒数：大陆没有夏令时，
+// 那正好是东八区的 6 天。
 const cells = computed(() =>
   aiStore.heatmapData.map((item, i) => {
     const start = new Date(item.timestamp)
-    const endOfWeek = new Date(
-      start.getFullYear(),
-      start.getMonth(),
-      start.getDate() + 6,
-    )
+    const parts = zonedParts(start)
     return {
       start,
-      end: endOfWeek,
+      end: new Date(start.getTime() + 6 * 86_400_000),
+      month: parts?.month ?? 1,
+      day: parts?.day ?? 1,
       count: item.value,
       color: getColor(item.value),
       x: i * CELL_TOTAL,
@@ -117,11 +120,11 @@ const monthLabels = computed(() => {
   const labels: { text: string; x: number }[] = []
   let lastMonth = -1
   cells.value.forEach((cell, i) => {
-    const month = cell.start.getMonth()
+    const month = cell.month
     if (month !== lastMonth) {
       // 第一格所在的月往往只露出小半个月，标签会和下一个月挤在一起，跳过
-      if (i > 0 || cell.start.getDate() <= 7) {
-        labels.push({ text: `${month + 1}月`, x: cell.x })
+      if (i > 0 || cell.day <= 7) {
+        labels.push({ text: `${month}月`, x: cell.x })
       }
       lastMonth = month
     }
@@ -129,9 +132,7 @@ const monthLabels = computed(() => {
   return labels
 })
 
-const svgWidth = computed(
-  () => cells.value.length * CELL_TOTAL + RIGHT_PADDING,
-)
+const svgWidth = computed(() => cells.value.length * CELL_TOTAL + RIGHT_PADDING)
 const svgHeight = computed(() => MONTH_HEIGHT + CELL_HEIGHT)
 
 interface Cell {

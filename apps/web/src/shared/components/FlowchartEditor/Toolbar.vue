@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue"
+import { parseTime } from "utils/functions"
 import { getNodeTypeConfig } from "./useNodeStyles"
 import { currentDragNodeType } from "./useDnD"
 
@@ -60,7 +61,8 @@ const saveStatusTitle = computed(() => {
   } else if (props.hasUnsavedChanges) {
     return "有未保存的更改"
   } else if (props.lastSaved) {
-    return `已保存 - ${new Date(props.lastSaved).toLocaleTimeString()}`
+    // 和站内其它时间同一口径（东八区），不用 toLocaleTimeString() 跟着浏览器走
+    return `已保存 - ${parseTime(props.lastSaved, "HH:mm:ss")}`
   } else {
     return "已保存"
   }

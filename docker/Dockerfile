@@ -160,7 +160,18 @@ COPY apps/api/src/db/meta/_journal.json /usr/local/share/oj2/migrations/meta/
 # 这不是审美问题：切换那天不用搬动任何文件，回滚时旧后端也立刻能找到自己的数据。
 # 少一次几十 GB 的 mv，就少一个在停机窗口里出错的机会。
 WORKDIR /data
-ENV TEST_CASE_DIRECTORY=/data/test_case \
+# TZ 是**兜底**，不是时区口径的依据 —— 业务时区的唯一锚点在 apps/api/src/time.ts。
+# 设它是为了任何一处还在用 `getHours()` / `setHours(0,0,0,0)` 这类跟进程时区走的代码
+# 也落在北京时间上（旧 Django 栈的 `settings.TIME_ZONE` 就是这个作用）。
+#
+# **必须同时设 worker 容器**：worker 跑的是同一个镜像、同样的 ENV，所以这一行两边都覆盖。
+# 本机 `bun run dev` 走不到这里，进程时区是开发机的 —— 这也是为什么 time.ts 用固定
+# 偏移而不是依赖进程 TZ：dev 和线上必须算得一样。
+#
+# debian:trixie-slim 自带 tzdata（实测 /usr/share/zoneinfo/Asia/Shanghai 存在），
+# 不用额外 apt 装。哪天换基底要重新确认这一条，否则 TZ 会被静默忽略、回落成 UTC。
+ENV TZ=Asia/Shanghai \
+    TEST_CASE_DIRECTORY=/data/test_case \
     HITOKOTO_DIRECTORY=/data/hitokoto \
     UPLOAD_DIRECTORY=/data/public/upload \
     AVATAR_DIRECTORY=/data/public/avatar \

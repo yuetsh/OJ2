@@ -2,6 +2,7 @@ import { and, count, countDistinct, eq, inArray, isNotNull, isNull, ne, notInArr
 
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
+import { calendarDay, dayNumber, localHour } from "../time"
 import { findMetric } from "./achievement-metrics"
 import { isAccepted, JudgeStatus } from "../judge/status"
 import { objectValue } from "../routes/helpers"
@@ -9,14 +10,6 @@ import { objectValue } from "../routes/helpers"
 function numberMetric(metrics: Record<string, unknown>, key: string) {
   const value = metrics[key]
   return typeof value === "number" ? value : 0
-}
-
-function localDate(value: string) {
-  const date = new Date(value)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
 }
 
 async function unlockAchievements(userId: number, metrics: Record<string, unknown>, onlyMeta = false) {
@@ -66,8 +59,8 @@ export async function updateAchievementsForSubmission(submissionId: string) {
   const accepted = isAccepted(row.submission.result)
   const firstAc = accepted && !priorAccepted
   const firstTry = accepted && priorRows.length === 0
-  const date = localDate(row.submission.createTime)
-  const hour = new Date(row.submission.createTime).getHours()
+  const date = calendarDay(row.submission.createTime)
+  const hour = localHour(row.submission.createTime)
 
   const metrics = await db.transaction(async (tx) => {
     await tx.insert(schema.userStat).values({
@@ -97,7 +90,9 @@ export async function updateAchievementsForSubmission(submissionId: string) {
     if (accepted) {
       const last = typeof value._last_ac_date === "string" ? value._last_ac_date : null
       if (last !== date) {
-        const current = last && (Date.parse(`${date}T00:00:00`) - Date.parse(`${last}T00:00:00`)) / 86_400_000 === 1
+        // 差一天要按日历日算，不能用 Date 相减：夏令时地区相邻两天差 23/25 小时，
+        // 除 86400000 得到的不是 1，`=== 1` 会静默把连续打卡判成断掉。
+        const current = last && dayNumber(date) - dayNumber(last) === 1
           ? numberMetric(value, "_current_ac_streak") + 1
           : 1
         value._last_ac_date = date

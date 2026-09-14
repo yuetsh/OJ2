@@ -12,6 +12,7 @@ import {
   type Zippable,
 } from "fflate"
 import copyTextFallback from "copy-text-to-clipboard"
+import { normalizeDate } from "@vueuse/core"
 import { customAlphabet } from "nanoid"
 
 function calculateACRate(acCount: number, totalCount: number): string {
@@ -114,9 +115,118 @@ export function durationFromValue(
   return { [unit]: count } as Duration
 }
 
+/**
+ * 站内所有时间一律按**东八区**展示，不跟浏览器时区走。
+ *
+ * 后端存的是 UTC 绝对时刻，显示口径的锚点在 `apps/api/src/time.ts`
+ * （`Asia/Shanghai`）。前端原来走 `useDateFormat`，那是按**浏览器本地时区**渲染的
+ * —— 机房电脑和学生手机都在东八区，所以平时看不出来；但只要有人从别的时区打开，
+ * 同一张提交记录表就会显示成另一个时间，和榜单、统计、成就里的日期对不上。
+ *
+ * 大陆 1991 年起没有夏令时，但这里仍然走 `Intl` 的 IANA 时区而不是自己加 8 小时：
+ * 万一时区规则变了，`Intl` 跟着 tzdata 走，写死的偏移不会。
+ * `timeZone` 选项 Chrome 24+ 就支持，不影响机房老 Chrome。
+ */
+export const DISPLAY_TIME_ZONE = "Asia/Shanghai"
+
+const zonedFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: DISPLAY_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+})
+
+const pad2 = (value: number) => String(value).padStart(2, "0")
+
+/**
+ * 取一个时刻在东八区的年月日时分秒（都是数字，月/日/时/分/秒已补零成两位数）。
+ * 无效日期返回 null。
+ *
+ * **不要在组件里写 `getFullYear()` / `getMonth()` / `getDate()`** —— 那些取的是
+ * 浏览器本地部件，和站内的东八区口径不是一回事。要日历部件就用这个。
+ */
+export function zonedParts(value: Date | string) {
+  const date = normalizeDate(value)
+  if (Number.isNaN(date.getTime())) return null
+  const raw: Record<string, number> = {}
+  for (const part of zonedFormatter.formatToParts(date)) {
+    if (part.type !== "literal") raw[part.type] = Number(part.value)
+  }
+  return {
+    year: raw.year!,
+    month: raw.month!,
+    day: raw.day!,
+    hour: raw.hour!,
+    minute: raw.minute!,
+    second: raw.second!,
+  }
+}
+
+/** 东八区的年份。跨年那几个小时里它和 `new Date().getFullYear()` 会差一年 */
+export function zonedYear(value: Date | string = new Date()) {
+  return zonedParts(value)?.year ?? new Date().getFullYear()
+}
+
+/**
+ * 按东八区格式化。格式串只认下面这几个 token（站内实际用到的就这些），
+ * 其余字符原样输出，所以 `YYYY年M月D日` 这种中英混排也能用。
+ *
+ * 长度不同的 token 靠正则的**顺序**区分：`YYYY` 必须排在 `M`/`D` 前面，
+ * 否则 `MM` 会被拆成两个 `M`。
+ */
 export function parseTime(utc: Date | string, format = "YYYY年M月D日") {
-  const time = useDateFormat(utc, format, { locales: "zh-CN" })
-  return time.value
+  const parts = zonedParts(utc)
+  if (!parts) return ""
+  const table: Record<string, string> = {
+    YYYY: String(parts.year),
+    MM: pad2(parts.month),
+    DD: pad2(parts.day),
+    HH: pad2(parts.hour),
+    mm: pad2(parts.minute),
+    ss: pad2(parts.second),
+    M: String(parts.month),
+    D: String(parts.day),
+  }
+  return format.replace(/YYYY|MM|DD|HH|mm|ss|M|D/g, (token) => table[token]!)
+}
+
+/**
+ * Naive 的 `n-date-picker` 没有 `timezone` 属性，它把绑定的时间戳按**浏览器本地**
+ * 渲染。站内的口径是东八区，所以非东八区的机器上要平移一次再交给它。
+ *
+ * 于是这两个函数是一对逆运算：
+ *
+ *   toPickerValue(真实时刻)   → 绑给 n-date-picker，本地渲染出来正好是北京墙上时间
+ *   fromPickerValue(选择器值) → 换回真实时刻，再formatISO/存库
+ *
+ * 北京机器上换算是**恒等**（480 + (-480) = 0），所以不会改变现状；只在别处才起作用。
+ *
+ * 偏移写成常量而不是查 `Intl`：大陆 1991 年起没有夏令时，东八区恒为 UTC+8，
+ * 和 `../api/src/time.ts` 一个道理。`longOffset` 那套要 Chrome 95+，机房老 Chrome 用不了。
+ *
+ * ⚠️ **只有 `n-date-picker` 需要这一对。** 要显示时间用 `parseTime`，不要把
+ * 平移过的值喂给它 —— 那会显示成北京时间的「再平移」。
+ */
+const PICKER_OFFSET_MINUTES = 8 * 60
+
+/** 真实时刻（epoch 毫秒）→ n-date-picker 的绑定值 */
+export function toPickerValue(instant: number) {
+  return (
+    instant +
+    (PICKER_OFFSET_MINUTES + new Date(instant).getTimezoneOffset()) * 60_000
+  )
+}
+
+/** n-date-picker 的绑定值 → 真实时刻（epoch 毫秒） */
+export function fromPickerValue(value: number) {
+  return (
+    value -
+    (PICKER_OFFSET_MINUTES + new Date(value).getTimezoneOffset()) * 60_000
+  )
 }
 
 function getDurationObject(start: Date | string, end: Date | string) {

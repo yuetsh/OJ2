@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "chart.js"
 import { getTopACTrend } from "admin/api"
+import { zonedYear } from "utils/functions"
 
 ChartJS.register(
   CategoryScale,
@@ -25,7 +26,10 @@ ChartJS.register(
 
 type ProblemTrend = AcTrend
 
-const currentYear = new Date().getFullYear()
+// 年份按东八区取，和后端 ac-trend 的夹逼口径（`localYear()`）对齐。
+// 用 `new Date().getFullYear()` 的话，跨年那几个小时里浏览器年份可能比后端认定的
+// 年份晚一年，默认的 untilYear 会被后端夹掉、图表悄悄变成另一个区间。
+const currentYear = zonedYear()
 const yearOptions = Array.from({ length: currentYear - 2022 + 1 }, (_, i) => ({
   label: String(2022 + i),
   value: 2022 + i,
@@ -37,7 +41,7 @@ const minPerYearOptions = [
 ]
 
 const sinceYear = ref(2023)
-const untilYear = ref(new Date().getFullYear() - 1)
+const untilYear = ref(zonedYear() - 1)
 const minPerYear = ref(100)
 const loading = ref(false)
 const data = ref<ProblemTrend[]>([])

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatISO } from "date-fns"
 import TextEditor from "shared/components/TextEditor.vue"
-import { parseTime } from "utils/functions"
+import { fromPickerValue, parseTime, toPickerValue } from "utils/functions"
 import type { BlankContest } from "utils/types"
 import { createContest, editContest, getContest } from "../api"
 
@@ -27,13 +27,15 @@ watch([waitMins, durationMins], () => {
   contest.endTime = formatISO(times[1])
 })
 
-// 编辑的时候
+// 编辑的时候。这两个 ref 绑给 n-date-picker，值要平移过（见 utils/functions.ts
+// 的 toPickerValue）—— 选择器按浏览器本地渲染，不换算的话非东八区的老师看到的是
+// 自己时区的钟点，存进去就成了另一个时刻。
 const startTime = ref(0)
 const endTime = ref(0)
 
 watch([startTime, endTime], (values) => {
-  contest.startTime = formatISO(values[0])
-  contest.endTime = formatISO(values[1])
+  contest.startTime = formatISO(fromPickerValue(values[0]))
+  contest.endTime = formatISO(fromPickerValue(values[1]))
 })
 
 const route = useRoute()
@@ -79,9 +81,9 @@ async function getContestDetail() {
   contest.password = data.password
   contest.visible = data.visible
 
-  // 显示
-  startTime.value = Date.parse(data.startTime)
-  endTime.value = Date.parse(data.endTime)
+  // 显示：交给选择器之前先平移成「北京墙上时间」
+  startTime.value = toPickerValue(Date.parse(data.startTime))
+  endTime.value = toPickerValue(Date.parse(data.endTime))
 }
 
 async function submit() {

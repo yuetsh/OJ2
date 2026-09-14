@@ -131,7 +131,8 @@ export const classPkAnalysisRequestSchema = z.object({
 })
 
 /**
- * 热力图的一格 = **一周**（不是一天）。timestamp 是那一周周一的本地零点，
+ * 热力图的一格 = **一周**（不是一天）。timestamp 是那一周（按东八区日历）周一的 UTC 零点，
+ * 前端按东八区取年月日（`zonedParts`），不要用浏览器本地部件。
  * value 是整周的提交次数。按天切的话一年 365 格里三百多格是空的，
  * 中职学生一年也就在二三十天有提交，整张图看着像没用过。
  */

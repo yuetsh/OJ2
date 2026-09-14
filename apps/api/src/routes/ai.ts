@@ -24,6 +24,14 @@ import { JudgeStatus, judgeStatusName, type JudgeStatusValue } from "../judge/st
 import { failure, success } from "../http"
 import { completeChat, streamChat } from "../services/ai"
 import { consumeToken } from "../services/throttling"
+import {
+  calendarDay,
+  dayNumber,
+  dayText,
+  localWeekday,
+  shiftMonthsByCalendar,
+  TIME_ZONE_SQL,
+} from "../time"
 import { countFailedSubmissions, isTeacherOrAbove, objectValue, queryInteger, rounded } from "./helpers"
 
 export const aiRoutes = new Hono<AppEnv>()
@@ -46,21 +54,14 @@ async function throttleAi(c: Context<AppEnv>) {
   return failure(c, 429, "too-many-requests", `Please wait ${Math.floor(throttle.wait)} seconds`)
 }
 
-/**
- * 日历分桶固定按东八区，不跟容器或数据库的 TZ 走。原来 SQL 里 `date(create_time)` 用会话时区、
- * JS 里 `toISOString()` 取 UTC 日期当 key、`getDate()` 又用容器本地时区 —— 三套混着用，
- * 眼下容器恰好是 UTC 才对得上，哪天给容器设了 TZ 热力图就整体错一格。
+/*
+ * 日历分桶固定按东八区，**不跟容器或数据库的 TZ 走**。
+ *
+ * 原先这里是三套口径混着用：SQL 的 `date(create_time)` 走数据库会话时区、JS 的
+ * `toISOString()` 取 UTC 日期当 key、`getDate()` 又走容器本地时区 —— 容器恰好是
+ * UTC 时才自洽。锚点和助手都收进了 `../time`：**凡是要换算「哪一天 / 几点」，
+ * 一律走那边**，这里不再自己拼日期部件。
  */
-const CALENDAR_TZ = "Asia/Shanghai"
-/**
- * 时区直接拼进 SQL，不走参数绑定：同一个表达式在 select 和 group by 里各出现一次，
- * 绑定成参数会拿到两个不同的占位符，PG 就不认为它们是同一个表达式，直接报
- * 「must appear in the GROUP BY clause」。常量拼接，没有注入面。
- */
-const CALENDAR_TZ_SQL = sql.raw(`'${CALENDAR_TZ}'`)
-const calendarDay = new Intl.DateTimeFormat("en-CA", {
-  timeZone: CALENDAR_TZ, year: "numeric", month: "2-digit", day: "2-digit",
-})
 
 function grade(rank: number | null, count: number, reference = count): Grade {
   if (!rank || count <= 0) return "C"
@@ -178,8 +179,8 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
   // 通过撒进 7×4 的格子里几乎全是空的，"高峰时段"根本看不出来。
   // 星期和小时都按东八区取，和热力图同口径；时区用 sql.raw 拼进去，
   // 绑成参数的话 select 和 group by 会拿到不同占位符，PG 不认为是同一个表达式。
-  const weekday = sql<number>`extract(dow from ${schema.submission.createTime} at time zone ${CALENDAR_TZ_SQL})::int`.mapWith(Number)
-  const period = sql<number>`floor(extract(hour from ${schema.submission.createTime} at time zone ${CALENDAR_TZ_SQL}) / 6)::int`.mapWith(Number)
+  const weekday = sql<number>`extract(dow from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})::int`.mapWith(Number)
+  const period = sql<number>`floor(extract(hour from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL}) / 6)::int`.mapWith(Number)
   const activityRows = await db.select({ weekday, period, value: count() }).from(schema.submission)
     .where(and(
       eq(schema.submission.userId, user.id),
@@ -278,19 +279,10 @@ aiRoutes.get("/ai/solved", requireAuth, async (c) => {
   return success(c, await listSolved(user, start, end, limit, offset))
 })
 
-function shiftMonths(date: Date, months: number) {
-  const result = new Date(date)
-  const day = result.getDate()
-  result.setDate(1)
-  result.setMonth(result.getMonth() + months)
-  result.setDate(Math.min(day, new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()))
-  return result
-}
-
 async function buildDuration(user: AuthUser, endText: string, duration: string) {
   const config = duration === "months:2" ? { count: 8, unit: "weeks", rewind: (date: Date) => new Date(date.getTime() - 9 * 7 * 864e5), advance: (date: Date) => new Date(date.getTime() + 7 * 864e5) }
-    : duration === "months:6" ? { count: 6, unit: "months", rewind: (date: Date) => shiftMonths(date, -7), advance: (date: Date) => shiftMonths(date, 1) }
-      : duration === "years:1" ? { count: 12, unit: "months", rewind: (date: Date) => shiftMonths(date, -13), advance: (date: Date) => shiftMonths(date, 1) }
+    : duration === "months:6" ? { count: 6, unit: "months", rewind: (date: Date) => shiftMonthsByCalendar(date, -7), advance: (date: Date) => shiftMonthsByCalendar(date, 1) }
+      : duration === "years:1" ? { count: 12, unit: "months", rewind: (date: Date) => shiftMonthsByCalendar(date, -13), advance: (date: Date) => shiftMonthsByCalendar(date, 1) }
         : { count: 4, unit: "weeks", rewind: (date: Date) => new Date(date.getTime() - 5 * 7 * 864e5), advance: (date: Date) => new Date(date.getTime() + 7 * 864e5) }
   // 先把 count 个时间桶算出来，再一条查询把整段区间的提交拉回来在内存里分桶。
   // 以前是每个桶两条查询、桶之间还是串行的，一年 12 个桶就是 24 次往返。
@@ -384,31 +376,29 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
   if (!user) return failure(c, 404, "user-not-found", "User not found")
   const end = new Date()
   // 一格一周，共 53 格，最后一格是「本周」。周一算一周的开头（不用 GitHub 的周日）。
-  // 日期部件全部取自东八区，再用它们构造本地零点的 Date 做日历运算 ——
-  // 前端 new Date(timestamp) 后取的也是本地部件，这样两边看到的是同一个日历日。
-  const [nowYear, nowMonth, nowDay] = calendarDay.format(end).split("-").map(Number)
-  const today = new Date(nowYear!, nowMonth! - 1, nowDay!)
-  const mondayOffset = (today.getDay() + 6) % 7
-  const firstMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset - 52 * 7)
+  //
+  // 整段以**日历日序号**为单位算（`dayNumber` / `dayText`），不构造任何本地 Date：
+  // 原先是「东八区的日期部件 + 容器本地时区的零点和 getDay()」拼出来的，
+  // 容器 TZ 一换就整体错一格。
+  const today = dayNumber(calendarDay(end))
+  const mondayOffset = (localWeekday(today) + 6) % 7
+  const firstMonday = today - mondayOffset - 52 * 7
   // SQL 两端各放宽一天：范围只用来少拉行，精确匹配靠下面按日历日 key 查表
-  const date = sql<string>`date(${schema.submission.createTime} at time zone ${CALENDAR_TZ_SQL})::text`
+  const date = sql<string>`date(${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})::text`
   const rows = await db.select({ date, value: count() }).from(schema.submission)
     .where(and(
       eq(schema.submission.userId, user.id),
-      gte(schema.submission.createTime, new Date(firstMonday.getTime() - 864e5).toISOString()),
+      gte(schema.submission.createTime, new Date((firstMonday - 1) * 864e5).toISOString()),
       lte(schema.submission.createTime, new Date(end.getTime() + 864e5).toISOString()),
     )).groupBy(date).orderBy(date)
   const counts = new Map(rows.map((row) => [row.date, row.value]))
-  const dateKey = (value: Date) =>
-    `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`
   return success(c, Array.from({ length: 53 }, (_, week) => {
-    const monday = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + week * 7)
+    const monday = firstMonday + week * 7
     let value = 0
-    for (let offset = 0; offset < 7; offset++) {
-      const day = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset)
-      value += counts.get(dateKey(day)) ?? 0
-    }
-    return { timestamp: monday.getTime(), value } satisfies HeatmapItem
+    for (let offset = 0; offset < 7; offset++) value += counts.get(dayText(monday + offset)) ?? 0
+    // timestamp 取该周周一的 UTC 零点（= 今天线上发出去的那个值，前端只取年月日部件），
+    // 换算成「北京时间的周一零点」会让 UTC 以西的浏览器看到周日，那是另一种错
+    return { timestamp: monday * 864e5, value } satisfies HeatmapItem
   }))
 })
 
