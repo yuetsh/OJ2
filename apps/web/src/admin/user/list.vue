@@ -110,7 +110,7 @@ const columns: DataTableColumn<User>[] = [
     width: 100,
     render: (row) => h(TextCopy, () => row.realName),
   },
-  { title: "邮箱", key: "email", width: 220 },
+  { title: "邮箱", key: "email", width: 260 },
   {
     key: "actions",
     title: "选项",
