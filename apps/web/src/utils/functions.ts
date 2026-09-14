@@ -1,4 +1,4 @@
-import { toAdminType } from "@oj2/contract"
+import { TIME_ZONE_OFFSET_MINUTES, toAdminType } from "@oj2/contract"
 import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
 import { Submission, User } from "./types"
@@ -115,60 +115,35 @@ export function durationFromValue(
   return { [unit]: count } as Duration
 }
 
-/**
- * 站内所有时间一律按**东八区**展示，不跟浏览器时区走。
- *
- * 后端存的是 UTC 绝对时刻，显示口径的锚点在 `apps/api/src/time.ts`
- * （`Asia/Shanghai`）。前端原来走 `useDateFormat`，那是按**浏览器本地时区**渲染的
- * —— 机房电脑和学生手机都在东八区，所以平时看不出来；但只要有人从别的时区打开，
- * 同一张提交记录表就会显示成另一个时间，和榜单、统计、成就里的日期对不上。
- *
- * 大陆 1991 年起没有夏令时，但这里仍然走 `Intl` 的 IANA 时区而不是自己加 8 小时：
- * 万一时区规则变了，`Intl` 跟着 tzdata 走，写死的偏移不会。
- * `timeZone` 选项 Chrome 24+ 就支持，不影响机房老 Chrome。
- */
-export const DISPLAY_TIME_ZONE = "Asia/Shanghai"
-
-const zonedFormatter = new Intl.DateTimeFormat("en-CA", {
-  timeZone: DISPLAY_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-})
+const OFFSET_MS = TIME_ZONE_OFFSET_MINUTES * 60_000
 
 const pad2 = (value: number) => String(value).padStart(2, "0")
 
 /**
- * 取一个时刻在东八区的年月日时分秒（都是数字，月/日/时/分/秒已补零成两位数）。
- * 无效日期返回 null。
+ * 取一个时刻在东八区的年月日时分秒（数字）。无效日期返回 null。
  *
- * **不要在组件里写 `getFullYear()` / `getMonth()` / `getDate()`** —— 那些取的是
- * 浏览器本地部件，和站内的东八区口径不是一回事。要日历部件就用这个。
+ * 站内所有时间一律按**东八区**展示、不跟浏览器时区走，口径是契约里的
+ * `TIME_ZONE`（和后端 `apps/api/src/time.ts` 同一个常量）。平移固定偏移后读 `getUTC*`，
+ * 就是北京的墙上时间。**不要在组件里写 `getFullYear()` / `getMonth()` / `getDate()`**
+ * —— 那是浏览器本地部件。
  */
 export function zonedParts(value: Date | string) {
-  const date = normalizeDate(value)
-  if (Number.isNaN(date.getTime())) return null
-  const raw: Record<string, number> = {}
-  for (const part of zonedFormatter.formatToParts(date)) {
-    if (part.type !== "literal") raw[part.type] = Number(part.value)
-  }
+  const time = normalizeDate(value).getTime()
+  if (Number.isNaN(time)) return null
+  const wall = new Date(time + OFFSET_MS)
   return {
-    year: raw.year!,
-    month: raw.month!,
-    day: raw.day!,
-    hour: raw.hour!,
-    minute: raw.minute!,
-    second: raw.second!,
+    year: wall.getUTCFullYear(),
+    month: wall.getUTCMonth() + 1,
+    day: wall.getUTCDate(),
+    hour: wall.getUTCHours(),
+    minute: wall.getUTCMinutes(),
+    second: wall.getUTCSeconds(),
   }
 }
 
-/** 东八区的年份。跨年那几个小时里它和 `new Date().getFullYear()` 会差一年 */
-export function zonedYear(value: Date | string = new Date()) {
-  return zonedParts(value)?.year ?? new Date().getFullYear()
+/** 东八区的当前年份。跨年那几个小时里它和 `new Date().getFullYear()` 会差一年 */
+export function zonedYear() {
+  return zonedParts(new Date())!.year
 }
 
 /**
@@ -195,38 +170,20 @@ export function parseTime(utc: Date | string, format = "YYYY年M月D日") {
 }
 
 /**
- * Naive 的 `n-date-picker` 没有 `timezone` 属性，它把绑定的时间戳按**浏览器本地**
- * 渲染。站内的口径是东八区，所以非东八区的机器上要平移一次再交给它。
- *
- * 于是这两个函数是一对逆运算：
+ * Naive 的 `n-date-picker` 没有 `timezone` 属性，按**浏览器本地**渲染绑定的时间戳，
+ * 所以要平移一次再交给它。这两个函数互为逆运算，东八区的机器上是恒等：
  *
  *   toPickerValue(真实时刻)   → 绑给 n-date-picker，本地渲染出来正好是北京墙上时间
- *   fromPickerValue(选择器值) → 换回真实时刻，再formatISO/存库
+ *   fromPickerValue(选择器值) → 换回真实时刻，再 formatISO / 存库
  *
- * 北京机器上换算是**恒等**（480 + (-480) = 0），所以不会改变现状；只在别处才起作用。
- *
- * 偏移写成常量而不是查 `Intl`：大陆 1991 年起没有夏令时，东八区恒为 UTC+8，
- * 和 `../api/src/time.ts` 一个道理。`longOffset` 那套要 Chrome 95+，机房老 Chrome 用不了。
- *
- * ⚠️ **只有 `n-date-picker` 需要这一对。** 要显示时间用 `parseTime`，不要把
- * 平移过的值喂给它 —— 那会显示成北京时间的「再平移」。
+ * ⚠️ **只有 `n-date-picker` 需要这一对。** 显示时间用 `parseTime`，别把平移过的值喂给它。
  */
-const PICKER_OFFSET_MINUTES = 8 * 60
-
-/** 真实时刻（epoch 毫秒）→ n-date-picker 的绑定值 */
 export function toPickerValue(instant: number) {
-  return (
-    instant +
-    (PICKER_OFFSET_MINUTES + new Date(instant).getTimezoneOffset()) * 60_000
-  )
+  return instant + OFFSET_MS + new Date(instant).getTimezoneOffset() * 60_000
 }
 
-/** n-date-picker 的绑定值 → 真实时刻（epoch 毫秒） */
 export function fromPickerValue(value: number) {
-  return (
-    value -
-    (PICKER_OFFSET_MINUTES + new Date(value).getTimezoneOffset()) * 60_000
-  )
+  return value - OFFSET_MS - new Date(value).getTimezoneOffset() * 60_000
 }
 
 function getDurationObject(start: Date | string, end: Date | string) {

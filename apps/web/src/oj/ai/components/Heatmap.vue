@@ -96,10 +96,8 @@ const getColor = (count: number) => {
 // 一格一周，横向铺开。原来是一格一天、7 行 53 列，中职学生一年也就二三十天有提交，
 // 365 格里三百多格空着，整张图看着像没用过。
 //
-// 服务端给的 timestamp 是**东八区某个周一**的 UTC 零点，所以年月日一律按东八区取
-// （`zonedParts`），不能用 `getMonth()` / `getDate()` —— 那是浏览器本地部件，
-// 从别的时区打开会整体错一格。周末直接加 6 天的毫秒数：大陆没有夏令时，
-// 那正好是东八区的 6 天。
+// 服务端给的 timestamp 是**东八区某个周一**的 UTC 零点，年月日按东八区取（`zonedParts`），
+// 不用浏览器本地的 `getMonth()` / `getDate()`。东八区没有夏令时，周日就是加 6 天。
 const cells = computed(() =>
   aiStore.heatmapData.map((item, i) => {
     const start = new Date(item.timestamp)

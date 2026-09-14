@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm"
 
 import { db, schema } from "../db"
-import { TIME_ZONE } from "../time"
+import { localTime, TIME_ZONE } from "../time"
 
 /**
  * 一次性数据对账：把「夜猫子」「早起的鸟儿」的历史发放与真实提交时间对齐。
@@ -88,7 +88,7 @@ interface Plan {
 async function audit(): Promise<Plan> {
   // 用 SQL 一次算完，口径和 apps/api/src/time.ts 完全一致（东八区墙上时钟的钟点）。
   // 只统计非比赛提交 —— 和 updateAchievementsForSubmission 的 contestId !== null 提前返回对齐。
-  const hour = sql`extract(hour from ${schema.submission.createTime} at time zone ${TIME_ZONE})`
+  const hour = sql`extract(hour from ${localTime(schema.submission.createTime)})`
   const recomputed = await db
     .select({
       userId: schema.submission.userId,

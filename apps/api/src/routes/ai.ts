@@ -28,9 +28,9 @@ import {
   calendarDay,
   dayNumber,
   dayText,
+  localTime,
   localWeekday,
   shiftMonthsByCalendar,
-  TIME_ZONE_SQL,
 } from "../time"
 import { countFailedSubmissions, isTeacherOrAbove, objectValue, queryInteger, rounded } from "./helpers"
 
@@ -53,15 +53,6 @@ async function throttleAi(c: Context<AppEnv>) {
   if (throttle.allowed) return null
   return failure(c, 429, "too-many-requests", `Please wait ${Math.floor(throttle.wait)} seconds`)
 }
-
-/*
- * 日历分桶固定按东八区，**不跟容器或数据库的 TZ 走**。
- *
- * 原先这里是三套口径混着用：SQL 的 `date(create_time)` 走数据库会话时区、JS 的
- * `toISOString()` 取 UTC 日期当 key、`getDate()` 又走容器本地时区 —— 容器恰好是
- * UTC 时才自洽。锚点和助手都收进了 `../time`：**凡是要换算「哪一天 / 几点」，
- * 一律走那边**，这里不再自己拼日期部件。
- */
 
 function grade(rank: number | null, count: number, reference = count): Grade {
   if (!rank || count <= 0) return "C"
@@ -177,10 +168,9 @@ async function listSolved(user: AuthUser, start: string, end: string, limit: num
 async function buildDetail(user: AuthUser, start: string, end: string) {
   // 时间活跃度按**全部提交**统计，不是只按 AC。只看 AC 的话，一个学生两个月十来次
   // 通过撒进 7×4 的格子里几乎全是空的，"高峰时段"根本看不出来。
-  // 星期和小时都按东八区取，和热力图同口径；时区用 sql.raw 拼进去，
-  // 绑成参数的话 select 和 group by 会拿到不同占位符，PG 不认为是同一个表达式。
-  const weekday = sql<number>`extract(dow from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})::int`.mapWith(Number)
-  const period = sql<number>`floor(extract(hour from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL}) / 6)::int`.mapWith(Number)
+  // 星期和小时都按东八区取，和热力图同口径
+  const weekday = sql<number>`extract(dow from ${localTime(schema.submission.createTime)})::int`.mapWith(Number)
+  const period = sql<number>`floor(extract(hour from ${localTime(schema.submission.createTime)}) / 6)::int`.mapWith(Number)
   const activityRows = await db.select({ weekday, period, value: count() }).from(schema.submission)
     .where(and(
       eq(schema.submission.userId, user.id),
@@ -376,15 +366,12 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
   if (!user) return failure(c, 404, "user-not-found", "User not found")
   const end = new Date()
   // 一格一周，共 53 格，最后一格是「本周」。周一算一周的开头（不用 GitHub 的周日）。
-  //
-  // 整段以**日历日序号**为单位算（`dayNumber` / `dayText`），不构造任何本地 Date：
-  // 原先是「东八区的日期部件 + 容器本地时区的零点和 getDay()」拼出来的，
-  // 容器 TZ 一换就整体错一格。
+  // 整段以东八区的**日历日序号**为单位算（`dayNumber` / `dayText`），不构造本地 Date。
   const today = dayNumber(calendarDay(end))
   const mondayOffset = (localWeekday(today) + 6) % 7
   const firstMonday = today - mondayOffset - 52 * 7
   // SQL 两端各放宽一天：范围只用来少拉行，精确匹配靠下面按日历日 key 查表
-  const date = sql<string>`date(${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})::text`
+  const date = sql<string>`date(${localTime(schema.submission.createTime)})::text`
   const rows = await db.select({ date, value: count() }).from(schema.submission)
     .where(and(
       eq(schema.submission.userId, user.id),
@@ -396,8 +383,7 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
     const monday = firstMonday + week * 7
     let value = 0
     for (let offset = 0; offset < 7; offset++) value += counts.get(dayText(monday + offset)) ?? 0
-    // timestamp 取该周周一的 UTC 零点（= 今天线上发出去的那个值，前端只取年月日部件），
-    // 换算成「北京时间的周一零点」会让 UTC 以西的浏览器看到周日，那是另一种错
+    // timestamp 是该周周一的 UTC 零点，前端按东八区只取年月日部件
     return { timestamp: monday * 864e5, value } satisfies HeatmapItem
   }))
 })

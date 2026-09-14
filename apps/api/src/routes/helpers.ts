@@ -102,9 +102,6 @@ export function publicTemplates(value: unknown) {
   return templates
 }
 
-// todayStart() 搬去了 `../time` —— 它原来用 setHours(0,0,0,0) 切进程时区的零点，
-// 而全仓的日历口径是东八区。别在这里再放一份。
-
 export function rounded(value: number, digits = 2) {
   const factor = 10 ** digits
   return Math.round(value * factor) / factor

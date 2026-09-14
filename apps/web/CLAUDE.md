@@ -136,15 +136,13 @@ return contract("GET /problems/:id", problemDetailSchema, value)
 （比如时区没设对的机房机器、或在外地的老师）从别的时区打开，同一张提交记录表就会
 显示成另一个时间，和榜单、统计、成就里的日期对不上。
 
-锚点在后端 `../api/src/time.ts`（`Asia/Shanghai`），前端的 `DISPLAY_TIME_ZONE`
-必须和它一致。实现用 `Intl` 的 IANA 时区而不是自己加 8 小时，`timeZone` 选项
-Chrome 24+ 就支持，不影响机房老 Chrome。
+时区常量在契约 `@oj2/contract` 的 `TIME_ZONE_OFFSET_MINUTES`，和后端 `time.ts` 共用。
+实现是「平移固定偏移 + 读 `getUTC*`」，不用 `Intl` 的时区选项：东八区没有夏令时，
+纯算术在表格里逐格调用也不费事，老 Chrome 上结果也一致。
 
-**唯一还没跟上的是 `n-date-picker`**（`admin/contest/detail.vue`、
-`admin/problemset/edit.vue`）：Naive 的日期选择器按浏览器本地时区渲染，没有
-`timezone` 属性。它在绝对值上往返正确（选的是什么时刻就是什么时刻），只是在非东八区
-的机器上「输入框里显示的时间」和「列表里显示的时间」会差一个时区。要修得在
-value ↔ 显示值之间做偏移换算，属于独立改动。
+**`n-date-picker` 要平移**（`admin/contest/detail.vue`、`admin/problemset/edit.vue`）：
+Naive 的日期选择器按浏览器本地时区渲染、没有 `timezone` 属性，所以绑定值走
+`toPickerValue()`，取回来走 `fromPickerValue()`。显示时间不要用这对函数。
 
 ### Key Utilities
 

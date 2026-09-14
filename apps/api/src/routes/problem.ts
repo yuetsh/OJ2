@@ -21,7 +21,7 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { calendarDayYearsAgo, startOfCalendarDay } from "../time"
+import { localTime, shiftMonthsByCalendar, todayStart } from "../time"
 import { asFilterValue, countFailedSubmissions, objectValue as toObject, queryInteger, sampleUser } from "./helpers"
 
 export const problemRoutes = new Hono<AppEnv>()
@@ -179,9 +179,8 @@ problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
 		inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
 	))
 	if (!mine?.value) return success(c, "0")
-	// 「近两年」按东八区日历算到当天零点。原先是 setFullYear/setHours，
-	// 切的是进程时区的零点。
-	const since = startOfCalendarDay(calendarDayYearsAgo(2)).toISOString()
+	// 「近两年」按东八区日历算到当天零点
+	const since = todayStart(shiftMonthsByCalendar(new Date(), -24))
 	const [active, accepted] = await Promise.all([
 		db.select({ value: count() }).from(schema.user).where(and(eq(schema.user.isDisabled, false), gte(schema.user.lastLogin, since))),
 		db.select({ value: countDistinct(schema.submission.userId) }).from(schema.submission).where(and(
@@ -217,7 +216,7 @@ problemRoutes.get("/problems/:displayId/yearly-ac", async (c) => {
 	const [problem] = await db.select({ id: schema.problem.id }).from(schema.problem)
 		.where(and(sql`lower(${schema.problem.displayId}) = lower(${c.req.param("displayId")})`, isNull(schema.problem.contestId), eq(schema.problem.visible, true))).limit(1)
 	if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-	const year = sql<number>`extract(year from ${schema.submission.createTime})::int`
+	const year = sql<number>`extract(year from ${localTime(schema.submission.createTime)})::int`
 	const rows = await db.select({
 		year,
 		total: count(),

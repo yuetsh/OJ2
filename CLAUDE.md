@@ -204,36 +204,39 @@ C 那 14 个 target 在 C++ 树里逐个实测通用。但**调用形态两者�
 **凡是要把一个时刻换算成「哪一天 / 几点 / 哪一年」，一律走那个模块。**
 不要写 `new Date(x).getHours()`、`setHours(0,0,0,0)`、`getFullYear()`、
 `new Date(y, m, d)` 这类跟**进程时区**走的代码 —— 容器是 UTC、开发机是本机时区，
-两边答案不同而且不报错。SQL 里要按日历切，显式写
-`at time zone ${TIME_ZONE_SQL}`，别依赖数据库会话时区。
+两边答案不同而且不报错。SQL 里要按日历切，用 `localTime(列)`（生成
+`列 at time zone 'Asia/Shanghai'`），别依赖数据库会话时区。
 
 旧栈 Django 是 `TIME_ZONE = "Asia/Shanghai"` + `USE_TZ = True`：库里存 UTC、
 应用层按北京时间算日历。重写时这个锚点丢了，直到 2026-09 才收回来 —— 期间
 「今日提交」在北京时间 0:00–8:00 是空的，两个成就（「凌晨提交次数」0:00–5:00、
 「早起提交次数」5:00–7:00）整体偏 8 小时。别再把口径散出去。
 
-实现上按**固定偏移**算（大陆 1991 年起没有夏令时），不查 tzdata、不用 `Intl`，
-所以 dev / 编译产物 / 任何镜像基底都算得一样。Dockerfile 里的 `TZ=Asia/Shanghai`
-和数据库连接上的 `TimeZone` 都只是**兜底**，不是依据。
+时区常量 `TIME_ZONE` / `TIME_ZONE_OFFSET_MINUTES` 在 `packages/contract/src/time.ts`，
+前后端共用一份。实现按**固定偏移**算（大陆 1991 年起没有夏令时），不查 tzdata、不用
+`Intl`，所以 dev / 编译产物 / 任何镜像基底 / 任何浏览器都算得一样。
+**刻意不设** Dockerfile 的 `TZ`、也不设数据库连接的 `TimeZone`：它们不改变正确代码的
+行为，只会在线上把漏写的地方掩盖掉（`/problems/:displayId/yearly-ac` 就这样漏过一次），
+而 dev 上又是另一个答案。
 
 **分层：存 UTC 时刻 → 后端判定按东八区 → 出参 ISO UTC → 前端按东八区渲染。**
 
 - **存**：35 个时间列全是 `timestamptz`（`without time zone` 0 个、`date` 0 个），
   写侧一律 `new Date().toISOString()`。库里永远是绝对时刻，换时区不用动数据。
-- **判定**：日历语义（哪一天/几点/哪一年）走 `time.ts`，SQL 显式 `at time zone`。
+- **判定**：日历语义（哪一天/几点/哪一年）走 `time.ts`，SQL 用 `localTime()`。
 - **出参**：`db/index.ts` 给 OID 1184 挂了 parser，**所有读出来的时刻统一成
   ISO 8601 UTC**（`2026-09-14T12:00:00.000Z`，库里带微秒的保留成 `…00.123456Z`）。
   别在这里退回去 —— 原来 drizzle 把 1184 的 parser
   换成了恒等函数，读出来是 PG 文本（`2026-09-14 20:00:00+08`），于是同一个字段在
   接口上有两种形状（实测同一批端点：PG 文本 77 处 + ISO 14 处），对接外部系统时对方
-  得解析两套，而 `+08` 还取决于服务器会话时区、不该进契约。
+  得解析两套，而偏移还取决于服务器会话时区、不该进契约。
   ⚠️ **微秒不能丢**，别改回 `new Date(v).toISOString()`：读出的时刻常被原样塞回查询条件
   （提交列表翻页的分界行、班级 AC 排名的 `<= min(create_time)`），截成毫秒后分界行自己
   被排除 —— 翻页每页丢一条、排名少 1。生产库 12.3 万条 Django 时代的提交几乎全带微秒。
   ⚠️ **`::text` 的 OID 是 25、绕过那个 parser**，所以「为了拿回和列一样形状」而写的
   `max(join_time)::text` 之类现在会变成异类，见到就撤掉。**只换 1184，别碰 1082(date)**
   —— `date(... at time zone ...)` 要的是 `2026-09-14`，套上 `toISOString()` 就错了。
-- **渲染**：前端 `parseTime()` 走 `Intl` 的 `timeZone: "Asia/Shanghai"`（见
+- **渲染**：前端 `parseTime()` / `zonedParts()` 按同一个固定偏移取东八区部件（见
   `apps/web/CLAUDE.md`）。三条解析路径（`new Date` / date-fns `parseISO` / VueUse
   `normalizeDate`）实测都能吃 ISO，改动出参格式不需要动前端。
 

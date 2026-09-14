@@ -18,7 +18,7 @@ import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { JudgeStatus } from "../../judge/status"
 import { completeChat } from "../../services/ai"
-import { localYear, TIME_ZONE_SQL } from "../../time"
+import { localTime, localYear } from "../../time"
 import { queryInteger, rounded } from "../helpers"
 import { findTagsByName, normalizeTagNames } from "./problem"
 
@@ -230,11 +230,8 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
   let minPerYear = queryInteger(c.req.query("minPerYear"), 100)
   if (![50, 100, 200].includes(minPerYear)) minPerYear = 100
 
-  // 年份一律按东八区切：`extract(year from timestamptz)` 默认走**数据库会话时区**，
-  // 而 `currentYear` 走的是进程时区 —— 两个不同来源碰巧都等于 UTC 时才自洽。
-  // 这里两处都用同一个常量，谁都不依赖环境。group by 会重复这个表达式，
-  // 所以必须内联（见 time.ts 的 TIME_ZONE_SQL）。
-  const year = sql<number>`extract(year from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})`.mapWith(Number)
+  // 年份按东八区切，和上面 `currentYear` 的夹逼同口径
+  const year = sql<number>`extract(year from ${localTime(schema.submission.createTime)})`.mapWith(Number)
   const rows = await db.select({
     problemId: schema.problem.id,
     displayId: schema.problem.displayId,
@@ -246,8 +243,8 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
     .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     .where(and(
       isNull(schema.submission.contestId),
-      gte(sql`extract(year from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})`, sinceYear),
-      lte(sql`extract(year from ${schema.submission.createTime} at time zone ${TIME_ZONE_SQL})`, untilYear),
+      gte(year, sinceYear),
+      lte(year, untilYear),
     ))
     .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title, year)
     .orderBy(asc(schema.problem.id), asc(year))
