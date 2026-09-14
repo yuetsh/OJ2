@@ -125,6 +125,67 @@ const websiteConfig = reactive<WebsiteConfig>({
   enableMaxkb: true,
 })
 
+// 班级列表的顺序就是登录页、班级 PK、统计面板下拉框里的顺序，数组原样存进 options 表，
+// 所以拖拽只改前端数组，点「保存」生效
+const dragFrom = ref<number | null>(null)
+const dragOver = ref<number | null>(null)
+
+function moveClass(from: number, to: number) {
+  const list = [...websiteConfig.classList]
+  const [moved] = list.splice(from, 1)
+  list.splice(to, 0, moved)
+  websiteConfig.classList = list
+}
+
+function renderClassTag(tag: string | { label: string }, index: number) {
+  const label = typeof tag === "string" ? tag : tag.label
+  return h(
+    NTag,
+    {
+      key: index,
+      closable: true,
+      draggable: true,
+      type: dragOver.value === index ? "primary" : "default",
+      style: {
+        cursor: "move",
+        opacity: dragFrom.value === index ? 0.4 : 1,
+      },
+      onClose: () => {
+        websiteConfig.classList = websiteConfig.classList.filter(
+          (_, i) => i !== index,
+        )
+      },
+      onDragstart: (e: DragEvent) => {
+        dragFrom.value = index
+        // Firefox 不 setData 就不会开始拖
+        e.dataTransfer?.setData("text/plain", label)
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"
+      },
+      onDragover: (e: DragEvent) => {
+        if (dragFrom.value === null) return
+        e.preventDefault()
+        dragOver.value = index
+      },
+      onDragleave: () => {
+        if (dragOver.value === index) dragOver.value = null
+      },
+      onDrop: (e: DragEvent) => {
+        e.preventDefault()
+        if (dragFrom.value !== null && dragFrom.value !== index) {
+          moveClass(dragFrom.value, index)
+        }
+        dragFrom.value = null
+        dragOver.value = null
+      },
+      onDragend: () => {
+        dragFrom.value = null
+        dragOver.value = null
+      },
+    },
+    () => label,
+  )
+}
+
 async function getWebsiteConfig() {
   const res = await getWebsite()
   websiteConfig.websiteBaseUrl = res.websiteBaseUrl
@@ -225,10 +286,14 @@ onMounted(() => {
     <n-form label-placement="left">
       <n-form-item label="班级列表">
         <n-flex vertical size="small">
-          <n-dynamic-tags v-model:value="websiteConfig.classList" />
+          <n-dynamic-tags
+            v-model:value="websiteConfig.classList"
+            :render-tag="renderClassTag"
+          />
           <n-text depth="3" style="font-size: 12px">
             填 {{ CLASS_NAME_MIN_DIGITS }}~{{ CLASS_NAME_MAX_DIGITS }}
-            位数字，如 251、2510，要和用户名里 ks 后面那段一致
+            位数字，如 251、2510，要和用户名里 ks 后面那段一致；
+            拖动标签调整顺序（登录页等下拉框按此顺序），改完点保存
           </n-text>
         </n-flex>
       </n-form-item>
