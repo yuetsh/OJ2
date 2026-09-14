@@ -546,6 +546,23 @@ export const submission = pgTable("submission", {
 	index("submission_language_time_idx").using("btree", table.language.asc().nullsLast(), table.createTime.asc().nullsLast()).where(sql`${table.contestId} is null`),
 	index("submission_result_time_idx").using("btree", table.result.asc().nullsLast(), table.createTime.asc().nullsLast()).where(sql`${table.contestId} is null`),
 	/**
+	 * 提交列表的「题号」筛选。路由先把题号解析成 problem.id（见 routes/submission.ts 的
+	 * problemFilter），这条索引才用得上：等值定位到一道题，剩下两列正好是翻页的全序，
+	 * 深翻页的游标也照走。列方向同上面几条，全 ASC 靠 Backward 扫。
+	 *
+	 * problem_user_idx 以 problem_id 打头，但不带时间：一道题最近几个月没人交的话，
+	 * 规划器照样选分页索引倒扫、边扫边滤。快照实测 1047（6 月之后没人交）17ms 倒扫
+	 * 2 万行、3017（最后一次在 2024 年）59ms 倒扫 8.2 万行、不存在的题号扫完全表。
+	 */
+	index("submission_public_problem_time_idx").using("btree", table.problemId.asc().nullsLast(), table.createTime.asc().nullsLast(), table.id.asc().nullsLast()).where(sql`${table.contestId} is null`),
+	/**
+	 * 提交列表的「用户名」筛选是 `ilike '%x%'`，btree 帮不上，只有 trigram 能索引中缀匹配。
+	 * 扩展在迁移 0015 里装（官方 postgres 镜像自带 contrib，pg_trgm 是 trusted 扩展）。
+	 * 3MB。模式不足 3 个字符时 trigram 抽不出东西，照旧全表扫——那种前缀匹配大半张表，
+	 * 扫表本来就是对的计划。
+	 */
+	index("submission_public_username_trgm_idx").using("gin", table.username.op("gin_trgm_ops")).where(sql`${table.contestId} is null`),
+	/**
 	 * 覆盖索引，专门给「在全部公开提交上做聚合」那几个接口用：教师统计不填班级、
 	 * 活跃榜、题目 AC 趋势。它们慢的**不是聚合本身，是为了读这四个小列把 145MB 的堆
 	 * 翻一遍** —— `code` 和 `info` 占了这张表的绝大部分体积，聚合一列都用不上。

@@ -360,13 +360,36 @@ async function matchedUsers(username: string) {
  *
  * 统计接口那边只按 user_id 筛（口径是「花名册上这个班谁做完了」，已删号的人本来
  * 就不在花名册里）；这两条是公开列表，不该因为改名或删号少给记录，所以取并集。
+ *
+ * 账号那一支**先查出 id 再拼成字面列表**，不写成 `user_id in (子查询)`：子查询夹在 OR
+ * 里会被做成 hashed SubPlan，整条 OR 就不可索引，加了 trigram 索引照样全表扫。拆开之后
+ * 两支各走各的索引（submission_public_metrics_idx + submission_public_username_trgm_idx），
+ * 快照实测 count 65ms → 0.6ms。`ks2` 这种匹配上千个账号的宽前缀退回扫表，30~50ms，
+ * 和原来持平。
  */
-function usernameFilter(username: string) {
+async function usernameFilter(username: string) {
   const like = `%${username}%`
-  return or(
-    sql`${schema.submission.userId} in (select ${schema.user.id} from ${schema.user} where ${ilike(schema.user.username, like)})`,
-    ilike(schema.submission.username, like),
-  )!
+  const users = await db.select({ id: schema.user.id }).from(schema.user)
+    .where(ilike(schema.user.username, like))
+  const frozen = ilike(schema.submission.username, like)
+  return users.length ? or(inArray(schema.submission.userId, users.map((row) => row.id)), frozen)! : frozen
+}
+
+/**
+ * 两条提交列表的题号筛选：先把题号解析成 problem.id，再按 `submission.problem_id` 筛。
+ * 原来是 join problem 之后比 `lower(problem._id)`，条件落在 problem 表上，规划器只能
+ * 顺着时间索引倒扫、逐行回表比对，走不上 submission_public_problem_time_idx。
+ *
+ * 公开列表只认公开题、比赛列表只认本场的题：题号只在这个范围内唯一（比赛题的 `_id`
+ * 和公开题撞号是常态），而公开提交从不指向比赛题（快照核过，0 条）。
+ * 查无此题时留恒假条件，少推一个 filter 就成了「不筛」。
+ */
+async function problemFilter(displayId: string, contestId: number | null) {
+  const problems = await db.select({ id: schema.problem.id }).from(schema.problem).where(and(
+    sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+    contestId === null ? isNull(schema.problem.contestId) : eq(schema.problem.contestId, contestId),
+  ))
+  return problems.length ? inArray(schema.submission.problemId, problems.map((row) => row.id)) : sql`false`
 }
 
 /**
@@ -879,18 +902,24 @@ async function submissionDetail(id: string, user: AuthUser) {
  * 游标用 `<=` 回查时同毫秒的上一页末行会重复出现在下一页页首。索引已按 (create_time DESC,
  * id DESC) 建好，带上 id 不会多出 Sort 节点。
  *
- * 两种情况退回普通 offset：offset 为 0 时没有可跳过的行，白搭一次往返；按题号筛选时条件
- * 在 problem 表上，第一步得跟着 join、index-only 就没了——而那时结果集只剩几百条，
- * offset 本来也不慢。
+ * offset 为 0 时没有可跳过的行，直接取，省一次往返。
+ *
+ * **按用户名筛选另走一条路**：先把匹配的行整个圈出来（`materialized` 挡住规划器），
+ * 在圈里排序取页，再按主键回表。不圈的话规划器一见 `ORDER BY ... LIMIT` 就选时间索引
+ * 倒扫、边扫边滤——它按平均密度估一个班的提交散布在全表，实际上一个班的提交扎堆在它
+ * 上课的那一两年，早就毕业的班要倒扫大半张表。快照实测第一页：ks248 66ms → 0.75ms、
+ * ks225 142ms → 2.7ms、ks212 翻到 1000 条 79ms → 3.6ms。圈的代价和匹配行数成正比，
+ * 最宽的 `ks2`（9.5 万行）要 65ms，和同一请求里 count 扫表的量级一样，不另外拖慢响应。
+ * 游标那条路帮不了它：第一步游标定位本身就是同一个倒扫。
  */
 async function paginateSubmissionRows(
   where: SQL | undefined,
   limit: number,
   offset: number,
-  filtersNeedProblem: boolean,
+  byUsername: boolean,
 ) {
   const order = [desc(schema.submission.createTime), desc(schema.submission.id)] as const
-  const page = (cursor?: SQL) =>
+  const page = (condition: SQL | undefined) =>
     db
       .select(submissionListColumns)
       .from(schema.submission)
@@ -898,10 +927,21 @@ async function paginateSubmissionRows(
       // 取当前用户名用。left join 不是 inner —— 已删号的学生这边没有行，
       // inner join 会把他们的提交整条从列表里抹掉
       .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-      .where(cursor ? and(where, cursor) : where)
+      .where(condition)
       .orderBy(...order)
+      .limit(limit)
 
-  if (offset === 0 || filtersNeedProblem) return page().limit(limit).offset(offset)
+  if (byUsername) {
+    const matched = db
+      .select({ id: schema.submission.id, createTime: schema.submission.createTime })
+      .from(schema.submission)
+      .where(where)
+    return page(sql`${schema.submission.id} in (
+      with matched as materialized ${matched}
+      select id from matched order by create_time desc, id desc limit ${limit} offset ${offset}
+    )`)
+  }
+  if (offset === 0) return page(where)
 
   const [boundary] = await db
     .select({ createTime: schema.submission.createTime, id: schema.submission.id })
@@ -913,9 +953,10 @@ async function paginateSubmissionRows(
   // offset 越过了结果集尾巴，这一页本来就该是空的
   if (!boundary) return []
 
-  return page(
+  return page(and(
+    where,
     sql`(${schema.submission.createTime}, ${schema.submission.id}) <= (${boundary.createTime}::timestamptz, ${boundary.id}::text)`,
-  ).limit(limit)
+  ))
 }
 
 /**
@@ -940,27 +981,27 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
     return success(c, { results: [], total: 0 } satisfies SubmissionList)
   }
-  const filters = [isNull(schema.submission.contestId)]
   const displayId = c.req.query("problemId")?.trim()
-  const username = c.req.query("username")?.trim()
+  const myself = c.req.query("myself") === "1" ? user : null
+  // 「只看自己」盖过用户名
+  const username = myself ? undefined : c.req.query("username")?.trim()
   const result = c.req.query("result")
   const language = c.req.query("language")?.trim()
-  if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
-  if (c.req.query("myself") === "1" && user) filters.push(eq(schema.submission.userId, user.id))
-  else if (username) filters.push(usernameFilter(username))
+  const filters: Array<SQL | undefined> = [isNull(schema.submission.contestId)]
+  filters.push(...await Promise.all([
+    displayId ? problemFilter(displayId, null) : undefined,
+    username ? usernameFilter(username) : undefined,
+  ]))
+  if (myself) filters.push(eq(schema.submission.userId, myself.id))
   if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
   if (language) filters.push(eq(schema.submission.language, asFilterValue(language)))
   if (c.req.query("today") === "1") filters.push(sql`${schema.submission.createTime} >= ${todayStart()}`)
   const where = and(...filters)
-  // count 不 join problem：problem 只有按题号筛选时才出现在 where 里，无条件 join 会让
-  // 计划器把 count 退化成 seq scan（生产快照实测 7.5ms → 78ms）。
-  const totalQuery = displayId
-    ? db.select({ value: count() }).from(schema.submission)
-        .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
-    : db.select({ value: count() }).from(schema.submission).where(where)
+  // count 不 join problem：无条件 join 会让计划器把 count 退化成 seq scan
+  // （生产快照实测 7.5ms → 78ms）。题号已经解析成 problem_id，也用不着 join。
   const [totalRows, rows] = await Promise.all([
-    totalQuery,
-    paginateSubmissionRows(where, limit, offset, Boolean(displayId)),
+    db.select({ value: count() }).from(schema.submission).where(where),
+    paginateSubmissionRows(where, limit, offset, Boolean(username)),
   ])
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
   const [joinTimes, problemsetTitles] = await Promise.all([
@@ -997,25 +1038,24 @@ submissionRoutes.get("/contests/:contestId/submissions", optionalAuth, requireCo
   const contest = c.get("contest")!
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const filters = [eq(schema.submission.contestId, contest.id)]
   const user = c.get("user")
   const displayId = c.req.query("problemId")?.trim()
-  const username = c.req.query("username")?.trim()
+  const myself = c.req.query("myself") === "1" ? user : null
+  const username = myself ? undefined : c.req.query("username")?.trim()
   const result = c.req.query("result")
-  if (displayId) filters.push(sql`lower(${schema.problem.displayId}) = lower(${displayId})`)
-  if (c.req.query("myself") === "1" && user) filters.push(eq(schema.submission.userId, user.id))
-  else if (username) filters.push(usernameFilter(username))
+  const filters: Array<SQL | undefined> = [eq(schema.submission.contestId, contest.id)]
+  filters.push(...await Promise.all([
+    displayId ? problemFilter(displayId, contest.id) : undefined,
+    username ? usernameFilter(username) : undefined,
+  ]))
+  if (myself) filters.push(eq(schema.submission.userId, myself.id))
   if (result !== undefined && result !== "" && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
   if (contestStatus(contest) !== "1") filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
   const where = and(...filters)
-  // count 不 join problem：problem 只有按题号筛选时才出现在 where 里，无条件 join 会让
-  // 计划器把 count 退化成 seq scan（生产快照实测 7.5ms → 78ms）。
-  const totalQuery = displayId
-    ? db.select({ value: count() }).from(schema.submission)
-        .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id)).where(where)
-    : db.select({ value: count() }).from(schema.submission).where(where)
+  // 一场比赛最多一两千条提交，按 contest_create_time_idx 定位之后怎么滤都不贵，
+  // 所以不像公开列表那样分游标 / 圈选两条路
   const [totalRows, rows] = await Promise.all([
-    totalQuery,
+    db.select({ value: count() }).from(schema.submission).where(where),
     db.select(submissionListColumns).from(schema.submission)
       .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
       .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId)).where(where)
