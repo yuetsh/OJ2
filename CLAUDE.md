@@ -237,6 +237,60 @@ C 那 14 个 target 在 C++ 树里逐个实测通用。但**调用形态两者�
   `apps/web/CLAUDE.md`）。三条解析路径（`new Date` / date-fns `parseISO` / VueUse
   `normalizeDate`）实测都能吃 ISO，改动出参格式不需要动前端。
 
+### 存量成就的口径是东八区，别再退回 UTC
+
+（2026-09-14 用生产备份 `db_backup_2026_09_08_19_22_11.sql` 实测过，结论和直觉相反，
+记在这里省得下次重新推。下面「那两周留下的实际后果」和脚本的跑数，又用
+`db_backup_2026_09_14_18_17_37.sql`（最新提交到北京时间 9-14 17:06）逐项复核过，一致。）
+
+**历史指标本来就是北京时间。** 旧栈 `OnlineJudge/achievement/metrics.py` 全程用
+`timezone.localtime(...)`，而 `settings.TIME_ZONE = "Asia/Shanghai"`，所以
+2022-04 到 OJ2 上线之间那 10 万多条提交累积出的 `user_stat.metrics` 是**东八区口径**。
+判别性核对（只在新旧口径算出不同值的用户里看存量更像哪边）：
+
+| 指标 | 两口径不同 | 存量==UTC | 存量==东八区 |
+|---|---|---|---|
+| `midnight_submissions` | 1259 | 132 | 1123 |
+| `early_bird_submissions` | 909 | 1 | 905 |
+| `active_days` | 90 | 0 | 90 |
+| `max_ac_in_one_day` | 17 | 0 | 17 |
+| `max_ac_streak_days` | 40 | 0 | 40 |
+
+**所以修 OJ2 的时区不是「换口径」，是「把 OJ2 弄丢的口径补回来」。** 别以为改动会让
+存量数据失配 —— 失配的是 OJ2 上线后那两周，修完反而对齐了。
+
+**那两周留下的实际后果**（截至 2026-09-14 备份，1508 条 OJ2 期提交、约 1500 个已结算用户）：
+
+- **日期键没被污染**：`_active_dates` / `_ac_per_day` 一个都没偏 —— 上课时间的提交
+  在 UTC 下日期和北京是同一天。所以 5 个日期口径的成就（活跃天数、单日最多 AC、
+  连续天数）一条都没错。
+- **只有小时键被污染**：145 人 `midnight_submissions` 虚高、45 人 `early_bird_submissions`
+  虚高。因为 UTC 的「凌晨 0–5 点」正好是北京的上午 9–13 点，而学生恰恰在上课时间提交。
+- **结果是 60 条误发**：47 个「夜猫子」+ 13 个「早起的鸟儿」，涉及 50 人，全是 OJ2
+  时期的新账号（`backfilled = false`）。
+- **0 条漏发**，而且是结构性的：OJ2 窗口那 1508 条提交里，真正落在北京 0–5 点和
+  5–7 点的**都是 0 条** —— 真熬夜、真早起的人都在 Django 时代活跃过了，他们的成就
+  是当时按东八区正确发的。这个 bug 只会多给，不会少给。
+
+**改数据时最大的坑：不能只删 `user_achievement`。**
+`unlockAchievements()` 的判定是**纯阈值比较**（`metrics[metric] >= threshold`），不是
+「这次有没有跨过阈值」。只删行、不修 `user_stat.metrics` 的话，学生**下一次提交就把
+同一个成就原样再发一次**。必须「按东八区重算小时指标」和「对账发放」一起做。
+
+现成的工具是一次性对账脚本 `apps/api/src/scripts/fix-achievement-hours.ts`
+（`bun run --filter '@oj2/api' fix:achievement-hours`，默认 dry-run，`--apply` 才写）：
+重算两个小时指标 → 撤回不达标的 → 补发达标却没发的 → 同步 `achievement.unlock_count`
+→ 校正 `achievement_unlocked_count` 与「奖杯收藏家」连锁。实测幂等，2026-09-14 那批
+跑出来是「修正 148 行 · 撤回 60 条 · 补发 0 条 · 连锁 0 条」。
+
+⚠️ **顺序：先部署时区修复，再跑这个脚本。** 反过来的话，旧代码还在按 UTC 累加，
+跑完马上又被写脏、成就又发回来。
+
+**下次再动日历口径，照这套方法核实**：从生产备份里捞出 `submission` / `user_stat` /
+`user_achievement` / `achievement` 四张表回放一遍，先用与时间无关的指标
+（`submission_count` / `accepted_count`）校准重放器（实测逐人 0 差异 / 4 人差异），
+再比受影响的指标。别靠推理 —— 这次推理就得出过相反的结论。
+
 ## 数据库
 
 Drizzle schema 最初是 `drizzle-kit pull` 从生产库拉出来的，所以它长得像 Django 建的表
