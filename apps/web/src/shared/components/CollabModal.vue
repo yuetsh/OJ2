@@ -15,6 +15,11 @@ import { enhanceCompletion } from "shared/extensions/autocompletion"
 import { languageExtension } from "shared/extensions/language"
 import { useCollabDoc } from "../composables/collabDoc"
 import { useCollabStore } from "shared/store/collab"
+import { MdPreview } from "md-editor-v3"
+import "md-editor-v3/lib/preview.css"
+import { getProblem } from "oj/api"
+import type { Problem } from "utils/types"
+import SQLDataTable from "oj/problem/components/SQLDataTable.vue"
 
 const isDark = useDark()
 const collabStore = useCollabStore()
@@ -53,6 +58,51 @@ const extensions = computed(() => [
   }),
   getInitialExtension(),
 ])
+
+/**
+ * 题面直接放在弹框左侧。原来只有一个「打开题面」链接，老师得在两个标签页之间
+ * 来回切着对照学生的代码。
+ *
+ * 不复用 ProblemContent：它读写全局的 problemStore，老师接单时可能正开着另一道题
+ * 的详情页，一写就把那边的题面换掉了；它的「测试」按钮跑的也是 codeStore 里老师
+ * 自己的代码。这里只要只读的题面。
+ *
+ * 求助入口在比赛里是关掉的（Form.vue 的 showHelpButton），problemId 一定是公开
+ * 题目的展示 ID，按非比赛的接口取就行。
+ */
+const problem = ref<Problem | null>(null)
+const problemLoading = ref(false)
+
+watch(
+  () => collabStore.room?.problemId,
+  async (problemId) => {
+    if (!problemId) {
+      problem.value = null
+      problemLoading.value = false
+      return
+    }
+    if (problem.value?._id === problemId) return
+    problem.value = null
+    problemLoading.value = true
+    try {
+      const res = await getProblem(problemId, "")
+      // 请求在路上时老师结束协作、又接了另一道题的单，旧响应不能盖掉新题面
+      if (collabStore.room?.problemId === problemId) problem.value = res
+    } catch {
+      // 取不到就留空，右上角的「打开题面」还能兜底
+    } finally {
+      if (collabStore.room?.problemId === problemId)
+        problemLoading.value = false
+    }
+  },
+  { immediate: true },
+)
+
+const sqlDisplay = computed(() => problem.value?.sqlDisplay ?? null)
+const sqlExpectedQuery = computed(() => {
+  const exp = sqlDisplay.value?.expected
+  return exp && "columns" in exp ? exp : null
+})
 
 const bind = (view: EditorView) => {
   if (!collabStore.isTeacher || !collabStore.room) return
@@ -98,7 +148,7 @@ onUnmounted(() => {
   <n-modal
     v-model:show="show"
     preset="card"
-    :style="{ width: '80vw', maxWidth: '1100px' }"
+    :style="{ width: '94vw', maxWidth: '1600px' }"
     :title="`正在帮 ${collabStore.room?.peerName ?? ''} · ${collabStore.room?.problemId ?? ''} · ${language}`"
   >
     <template #header-extra>
@@ -112,25 +162,145 @@ onUnmounted(() => {
       </n-button>
     </template>
 
-    <!--
-      不绑 v-model：这个编辑器的内容完全由 Yjs 文档接管。
-      原来绑了一个跨会话不清的 code ref —— 模态框重挂时 CodeMirror 拿它当初始
-      文档，而 yCollab 只观察 ytext、从不反过来用 ytext 覆盖编辑器，于是上一个
-      学生的代码留在文档里，新学生的内容作为 delta 插到位置 0，两边的偏移从此
-      对不上，教师和学生显示的是两份不同的文档。
-    -->
-    <Codemirror
-      indentWithTab
-      :extensions="extensions"
-      :tab-size="4"
-      style="height: 60vh; font-size: 18px"
-      @ready="handleEditorReady"
-    />
+    <n-split
+      direction="horizontal"
+      :default-size="0.4"
+      :min="0.2"
+      :max="0.7"
+      style="height: 70vh"
+    >
+      <template #1>
+        <n-scrollbar style="height: 100%">
+          <div class="statement">
+            <n-spin v-if="problemLoading" size="small" />
+            <n-empty v-else-if="!problem" description="题面加载失败" />
+            <template v-else>
+              <h3 class="problemTitle">{{ problem.title }}</h3>
+              <MdPreview
+                preview-theme="vuepress"
+                :model-value="problem.description"
+                :theme="isDark ? 'dark' : 'light'"
+              />
+
+              <template v-if="!sqlDisplay">
+                <template v-if="problem.inputDescription">
+                  <p class="section">输入</p>
+                  <MdPreview
+                    preview-theme="vuepress"
+                    :model-value="problem.inputDescription"
+                    :theme="isDark ? 'dark' : 'light'"
+                  />
+                </template>
+                <template v-if="problem.outputDescription">
+                  <p class="section">输出</p>
+                  <MdPreview
+                    preview-theme="vuepress"
+                    :model-value="problem.outputDescription"
+                    :theme="isDark ? 'dark' : 'light'"
+                  />
+                </template>
+                <template
+                  v-for="(sample, index) of problem.samples"
+                  :key="index"
+                >
+                  <p class="section">例子 {{ index + 1 }}</p>
+                  <n-descriptions bordered :column="2" size="small">
+                    <n-descriptions-item label="输入">
+                      <div class="testcase">{{ sample.input }}</div>
+                    </n-descriptions-item>
+                    <n-descriptions-item label="输出">
+                      <div class="testcase">{{ sample.output }}</div>
+                    </n-descriptions-item>
+                  </n-descriptions>
+                </template>
+              </template>
+
+              <template v-else>
+                <p class="section">数据表</p>
+                <div v-for="t in sqlDisplay.tables" :key="t.name">
+                  <p class="sqlTableName">{{ t.name }}</p>
+                  <SQLDataTable
+                    :columns="t.columns"
+                    :rows="t.rows"
+                    :total-rows="t.total_rows"
+                    :truncated="t.truncated"
+                  />
+                </div>
+                <template v-if="sqlExpectedQuery">
+                  <p class="section">期望结果</p>
+                  <SQLDataTable
+                    :columns="sqlExpectedQuery.columns"
+                    :rows="sqlExpectedQuery.rows"
+                    :total-rows="sqlExpectedQuery.total_rows"
+                    :truncated="sqlExpectedQuery.truncated"
+                  />
+                </template>
+              </template>
+
+              <template v-if="problem.hint">
+                <p class="section">提示</p>
+                <MdPreview
+                  preview-theme="vuepress"
+                  :model-value="problem.hint"
+                  :theme="isDark ? 'dark' : 'light'"
+                />
+              </template>
+            </template>
+          </div>
+        </n-scrollbar>
+      </template>
+      <template #2>
+        <!--
+          不绑 v-model：这个编辑器的内容完全由 Yjs 文档接管。
+          原来绑了一个跨会话不清的 code ref —— 模态框重挂时 CodeMirror 拿它当初始
+          文档，而 yCollab 只观察 ytext、从不反过来用 ytext 覆盖编辑器，于是上一个
+          学生的代码留在文档里，新学生的内容作为 delta 插到位置 0，两边的偏移从此
+          对不上，教师和学生显示的是两份不同的文档。
+        -->
+        <Codemirror
+          indentWithTab
+          :extensions="extensions"
+          :tab-size="4"
+          style="height: 100%; font-size: 18px"
+          @ready="handleEditorReady"
+        />
+      </template>
+    </n-split>
 
     <template #footer>
       <n-flex justify="end">
-        <n-button type="primary" @click="collabStore.leave()">结束协作</n-button>
+        <n-button type="primary" @click="collabStore.leave()">
+          结束协作
+        </n-button>
       </n-flex>
     </template>
   </n-modal>
 </template>
+
+<style scoped>
+.statement {
+  padding-right: 16px;
+}
+
+.problemTitle {
+  margin: 0 0 8px;
+}
+
+.section {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+
+.testcase {
+  font-size: 14px;
+  white-space: pre;
+  font-family: Monaco, Consolas, monospace;
+}
+
+.sqlTableName {
+  font-weight: 600;
+  margin: 8px 0 4px;
+  font-family: Monaco, Consolas, monospace;
+}
+</style>
