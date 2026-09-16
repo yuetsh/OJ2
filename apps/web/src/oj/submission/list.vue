@@ -49,6 +49,9 @@ const StatisticsPanel = defineAsyncComponent(
 const FlowchartStatisticsPanel = defineAsyncComponent(
   () => import("shared/components/FlowchartStatisticsPanel.vue"),
 )
+const TodayStatistics = defineAsyncComponent(
+  () => import("./components/TodayStatistics.vue"),
+)
 const SubmissionDetail = defineAsyncComponent(() => import("./detail.vue"))
 const FlowchartScoreDetail = defineAsyncComponent(
   () => import("./components/FlowchartScoreDetail.vue"),
@@ -114,6 +117,8 @@ const { query, clearQuery } = usePagination<SubmissionQuery>({
 const submissionID = ref("")
 const problemDisplayID = ref("")
 const [statisticPanel, toggleStatisticPanel] = useToggle(false)
+// 「今日提交数」旁边那颗「统计」按钮的弹框
+const [todayPanel, toggleTodayPanel] = useToggle(false)
 
 const [codePanel, toggleCodePanel] = useToggle(false)
 const [scoreDetailPanel, toggleScoreDetailPanel] = useToggle(false)
@@ -239,6 +244,12 @@ function problemClicked(row: SubmissionListItem | FlowchartSubmissionListItem) {
   } else {
     window.open("/problem/" + row.problem, "_blank")
   }
+}
+
+// 今日统计弹框里点题目。那颗按钮只在 route.name === "submissions" 上出现
+// （今日提交数本身就只在那一页拉），所以不用管比赛里的题目路由
+function openProblem(displayId: string) {
+  window.open("/problem/" + displayId, "_blank")
 }
 
 function showCodePanel(id: string, problem: string) {
@@ -581,19 +592,33 @@ const flowchartColumns = computed(() => {
           </n-button>
         </n-form-item>
       </n-form>
-      <n-tag
-        v-if="todayCount > 0"
-        checkable
-        :checked="query.today === '1'"
-        type="success"
-        size="large"
-        @update:checked="(v: boolean) => (query.today = v ? '1' : '0')"
-      >
-        <n-gradient-text v-if="query.today !== '1'" type="success">
-          今日提交数：{{ todayCount }}
-        </n-gradient-text>
-        <template v-else>今日提交数：{{ todayCount }}</template>
-      </n-tag>
+      <n-flex v-if="todayCount > 0" align="center" :size="8">
+        <n-tag
+          checkable
+          :checked="query.today === '1'"
+          type="success"
+          size="large"
+          @update:checked="(v: boolean) => (query.today = v ? '1' : '0')"
+        >
+          <n-gradient-text v-if="query.today !== '1'" type="success">
+            今日提交数：{{ todayCount }}
+          </n-gradient-text>
+          <template v-else>今日提交数：{{ todayCount }}</template>
+        </n-tag>
+        <!--
+          筛到今天之后才出现。流程图那档不给 —— 这个统计只算代码提交
+          （流程图提交在另一张表、只有 AI 评级没有判题状态），点开会是一份
+          对不上标签数字的统计。
+        -->
+        <n-button
+          v-if="query.today === '1' && query.language !== 'Flowchart'"
+          quaternary
+          type="success"
+          @click="toggleTodayPanel(true)"
+        >
+          统计
+        </n-button>
+      </n-flex>
     </n-space>
     <n-data-table
       v-if="query.language === 'Flowchart'"
@@ -635,6 +660,15 @@ const flowchartColumns = computed(() => {
       :problem="query.problem"
       :username="query.username"
     />
+  </n-modal>
+  <n-modal
+    v-model:show="todayPanel"
+    preset="card"
+    :style="{ maxWidth: isDesktop && '700px', maxHeight: '80vh' }"
+    :content-style="{ overflow: 'auto' }"
+    title="今日提交统计"
+  >
+    <TodayStatistics @open-problem="(id: string) => openProblem(id)" />
   </n-modal>
   <n-modal
     v-model:show="codePanel"

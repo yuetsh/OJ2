@@ -38,6 +38,7 @@ import {
   type FlowchartStatistics,
   type SubmissionStatistics,
   type SubmissionStatisticsItems,
+  type TodaySubmissionStatistics,
 } from "@oj2/contract"
 import api from "utils/api"
 import { contract } from "utils/contract"
@@ -157,6 +158,11 @@ export function getRankOfProblem(problemId: string) {
 
 export function getTodaySubmissionCount(language?: string) {
   return api.get<number>("submissions/today-count", { params: { language } })
+}
+
+/** 「今日提交数」标签点开的统计。公开接口，口径同那颗标签：今天 + 非比赛提交 */
+export function getTodaySubmissionStatistics() {
+  return api.get<TodaySubmissionStatistics>("submissions/today-statistics")
 }
 
 export function adminRejudge(id: string) {

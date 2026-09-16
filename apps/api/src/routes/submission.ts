@@ -10,6 +10,7 @@ import {
   type SubmissionListItem,
   type SubmissionStatistics,
   type SubmissionStatisticsItems,
+  type TodaySubmissionStatistics,
 } from "@oj2/contract"
 import { and, count, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
@@ -36,7 +37,7 @@ import {
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
-import { todayStart } from "../time"
+import { localTime, todayStart } from "../time"
 import {
   asFilterValue,
   isAdminRole,
@@ -181,6 +182,100 @@ const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 function judgedRate(accepted: number, judged: number) {
   return judged > 0 ? rounded((accepted / judged) * 100) : 0
 }
+
+/**
+ * 「今日提交数」标签点开的统计。**公开、只出聚合数**（没有用户名、没有代码，
+ * 热门题只算公开可见的题），口径和那颗标签一致：东八区今天 + 非比赛提交。
+ *
+ * 按钟点切用 `localTime()`，不能写 `extract(hour from create_time)` ——
+ * 后者按数据库会话时区算，容器是 UTC，整张分布图会整体左移 8 小时。
+ */
+submissionRoutes.get("/submissions/today-statistics", optionalAuth, async (c) => {
+  /**
+   * 「提交列表对学生全开」关掉时（考试那种场合）不给热门题这张表 —— 总数、正确率
+   * 这些聚合数原本就从公开的 today-count 看得出来，但「哪几道题在被刷」已经贴近
+   * 提交列表本身的内容了，得跟着同一个开关走。数字照给，不然标签说 21、弹框说 0。
+   */
+  const showProblems =
+    (await getBooleanOption("submission_list_show_all", true)) || isAdminRole(c.get("user"))
+  const where = and(
+    isNull(schema.submission.contestId),
+    sql`${schema.submission.createTime} >= ${todayStart()}`,
+  )
+  const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
+  const judgingFilter = sql`count(*) filter (where ${inArray(schema.submission.result, UNJUDGED_RESULTS)})`
+  const hour = sql<number>`extract(hour from ${localTime(schema.submission.createTime)})::int`
+
+  const [[totals], hourRows, languageRows, resultRows, problemRows] = await Promise.all([
+    db
+      .select({
+        total: count(),
+        accepted: acceptedFilter.mapWith(Number),
+        judging: judgingFilter.mapWith(Number),
+        userCount: sql<number>`count(distinct ${schema.submission.userId})`.mapWith(Number),
+      })
+      .from(schema.submission)
+      .where(where),
+    db
+      .select({ hour, value: count() })
+      .from(schema.submission)
+      .where(where)
+      .groupBy(hour),
+    db
+      .select({ language: schema.submission.language, value: count() })
+      .from(schema.submission)
+      .where(where)
+      .groupBy(schema.submission.language)
+      .orderBy(desc(count())),
+    db
+      .select({ result: schema.submission.result, value: count() })
+      .from(schema.submission)
+      .where(where)
+      .groupBy(schema.submission.result)
+      .orderBy(desc(count())),
+    showProblems
+      ? db
+          .select({
+            displayId: schema.problem.displayId,
+            title: schema.problem.title,
+            value: count(),
+            accepted: acceptedFilter.mapWith(Number),
+          })
+          .from(schema.submission)
+          .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
+          // 隐藏题目不出现在这张表里：接口不需要登录，标题本身就是不该外露的东西
+          .where(and(where, eq(schema.problem.visible, true)))
+          .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title)
+          .orderBy(desc(count()))
+          .limit(10)
+      : [],
+  ])
+
+  const total = totals?.total ?? 0
+  const judging = totals?.judging ?? 0
+  const hours = Array.from({ length: 24 }, () => 0)
+  for (const row of hourRows) hours[row.hour] = row.value
+
+  return success(
+    c,
+    {
+      total,
+      accepted: totals?.accepted ?? 0,
+      judging,
+      correctRate: judgedRate(totals?.accepted ?? 0, total - judging),
+      userCount: totals?.userCount ?? 0,
+      hours,
+      languages: languageRows.map((row) => ({ language: row.language, count: row.value })),
+      results: resultRows.map((row) => ({ result: row.result, count: row.value })),
+      problems: problemRows.map((row) => ({
+        problem: row.displayId,
+        problemTitle: row.title,
+        count: row.value,
+        acceptedCount: row.accepted,
+      })),
+    } satisfies TodaySubmissionStatistics,
+  )
+})
 
 /**
  * 统计接口共用的时间窗解析。旧后端 `end` 必填、`start` 可选（不给就是「全部时段」）。

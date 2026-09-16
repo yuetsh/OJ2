@@ -331,6 +331,52 @@ export const submissionStatisticsSchema = z.object({
   dataAttempted: z.array(attemptedStudentSchema),
 })
 
+/**
+ * 提交列表那颗「今日提交数」标签点开之后的统计弹框（GET /submissions/today-statistics）。
+ *
+ * **公开接口，只下发聚合数** —— 没有用户名、没有代码、没有隐藏题目的标题，学生和
+ * 匿名访客看到的和教师一样。教师那套按班级/按题号钻取的口径在
+ * `submissionStatisticsSchema`，两者不是一回事，别把这个当它的简版去加字段。
+ *
+ * 口径跟着那颗标签走：**东八区今天、非比赛提交、不分语言**（语言分布就是
+ * `languages` 这张表本身）。
+ */
+export const todaySubmissionStatisticsSchema = z.object({
+  total: z.number().int(),
+  /** 通过的条数，含 AST_CHECK_FAILED（那也是答案对了） */
+  accepted: z.number().int(),
+  /**
+   * 还没判完的条数（PENDING / JUDGING）。`total` 把它算在内，`correctRate` 的分母
+   * 不算 —— 全班同时交卷的那几秒，分母涨了分子没涨，正确率会凭空掉一截。
+   */
+  judging: z.number().int(),
+  correctRate: z.number(),
+  /** 今天交过东西的人数，按 user_id 去重 */
+  userCount: z.number().int(),
+  /** 按东八区钟点分的 24 个桶，**下标就是钟点**，没有提交的钟点是 0 */
+  hours: z.array(z.number().int()).length(24),
+  /** 按语言，提交数倒序。零提交的语言不在表里 */
+  languages: z.array(
+    z.object({ language: problemLanguageSchema, count: z.number().int() }),
+  ),
+  /** 按判题结果，条数倒序 */
+  results: z.array(
+    z.object({ result: judgeStatusSchema, count: z.number().int() }),
+  ),
+  /**
+   * 今天最热的几道题，提交数倒序，最多 10 道。
+   * **只含公开可见的题目** —— 这个接口不需要登录，不能拿它探未发布题目的标题。
+   */
+  problems: z.array(
+    z.object({
+      problem: z.string(),
+      problemTitle: z.string(),
+      count: z.number().int(),
+      acceptedCount: z.number().int(),
+    }),
+  ),
+})
+
 export const formatCodeRequestSchema = z.object({
   code: z.string().max(1024 * 1024),
   language: z.enum(["python", "c", "cpp", "sql"]),
@@ -346,6 +392,9 @@ export type CreateSubmissionRequest = z.infer<
 export type SubmissionDetail = z.infer<typeof submissionDetailSchema>
 export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
 export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
+export type TodaySubmissionStatistics = z.infer<
+  typeof todaySubmissionStatisticsSchema
+>
 export type SubmissionStatisticsUser = z.infer<
   typeof submissionStatisticsUserSchema
 >
