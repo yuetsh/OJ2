@@ -12,9 +12,7 @@
  *   oj2-api healthcheck  # 探活，给 Dockerfile 的 HEALTHCHECK 用
  *   oj2-api sql-child    # SQL 判题子进程，由服务自己 spawn，不该手动调
  *   oj2-api migrate      # 执行待办的数据库迁移，部署时由 docker/deploy.sh 调
- *   oj2-api backfill-problemsets  # 把题单进度与奖章订正到与规则一致，默认只读预演
- *   oj2-api recount               # 把题目/用户的计数列、成就的已解锁数重算回与明细一致，默认只读预演
- *   oj2-api fix-achievement-hours # 订正「夜猫子」「早起的鸟儿」的历史误发，默认只读预演
+ *   oj2-api recount      # 把题目/用户的计数列、成就的已解锁数重算回与明细一致，默认只读预演
  *
  * 用动态 import 而非顶层 import：这几个模块都有导入即执行的副作用
  * （Bun.serve、连 Redis 开消费者），静态导入会让 sql-child 也把整个服务拉起来。
@@ -36,24 +34,11 @@ switch (command) {
     await runMigrations()
     break
   }
-  // 一次性的数据订正，跟着二进制走而不是留成源码脚本 —— 生产镜像里没有 bun 也没有源码
-  case "backfill-problemsets": {
-    const { backfillProblemSets } = await import("./scripts/backfill-problemsets")
-    const args = process.argv.slice(3)
-    process.exit(await backfillProblemSets({
-      apply: args.includes("--apply"),
-      allowRevoke: args.includes("--allow-revoke"),
-    }))
-  }
-  // 同上，一次性的数据订正。反范式计数列被重判等操作带偏之后拿它对账。
+  // 数据订正，跟着二进制走而不是留成源码脚本 —— 生产镜像里没有 bun 也没有源码。
+  // 反范式计数列被重判等操作带偏之后拿它对账，默认只读预演，--apply 才写。
   case "recount": {
     const { recount } = await import("./scripts/recount")
     process.exit(await recount({ apply: process.argv.slice(3).includes("--apply") }))
-  }
-  // 同上。OJ2 上线时区丢了两周，两个小时口径的成就按 UTC 误发了一批，拿它订正。
-  case "fix-achievement-hours": {
-    const { fixAchievementHours } = await import("./scripts/fix-achievement-hours")
-    process.exit(await fixAchievementHours({ apply: process.argv.slice(3).includes("--apply") }))
   }
   case "sql-child": {
     const { runSqlChild } = await import("./judge/sql/child")
@@ -75,6 +60,6 @@ switch (command) {
     }
   }
   default:
-    console.error(`未知子命令：${command}\n可用：serve | worker | migrate | backfill-problemsets | recount | fix-achievement-hours | healthcheck | sql-child`)
+    console.error(`未知子命令：${command}\n可用：serve | worker | migrate | recount | healthcheck | sql-child`)
     process.exit(2)
 }

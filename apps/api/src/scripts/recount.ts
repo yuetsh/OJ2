@@ -24,7 +24,7 @@ import { metaAchievements, refreshUnlockedCount, rescanAchievement } from "../se
  *
  * **不管**的：acm_contest_rank（比赛榜有自己的一套罚时累计，重算要连带 submission_info
  * 里每题的尝试次数，口径复杂，单独一件事）、achievement.unlock_count（0010 之后
- * user_achievement 随成就级联，漂不了）、题单进度与奖章（走 backfill-problemsets）。
+ * user_achievement 随成就级联，漂不了）、题单进度与奖章（判题这一路自己记账，见 services/problemset.ts）。
  *
  * 默认只读，把差异打出来；确认无误再加 --apply 落库。跑法对齐 migrate：
  *

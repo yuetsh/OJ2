@@ -193,24 +193,6 @@ export async function resyncProgress(problemsetId: number) {
   for (const badge of badges) await recalculateBadge(badge, updated)
 }
 
-/** 按奖章算出「现在应该有谁」，只读，供补发脚本先看后写 */
-export async function badgeHolderDiff(badge: BadgeRow, known?: (BadgeCheck & { userId: number })[]) {
-  const [progresses, holders] = await Promise.all([
-    known ?? db.select().from(schema.problemsetProgress)
-      .where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId)),
-    db.select({ userId: schema.userBadge.userId }).from(schema.userBadge)
-      .where(eq(schema.userBadge.badgeId, badge.id)),
-  ])
-  const eligible = new Set(progresses.filter((item) => eligibleForBadge(badge, item)).map((item) => item.userId))
-  const have = new Set(holders.map((item) => item.userId))
-  return {
-    missing: [...eligible].filter((id) => !have.has(id)),
-    extra: [...have].filter((id) => !eligible.has(id)),
-    eligible: eligible.size,
-    held: have.size,
-  }
-}
-
 /**
  * 判题通过后，把这道题记进该用户所有「已加入且包含这道题」的题单。
  *
@@ -222,8 +204,6 @@ export async function badgeHolderDiff(badge: BadgeRow, known?: (BadgeCheck & { u
  * 挪到判题这一路之后，记账和判题在同一个事务链里，前端只管显示。
  *
  * 不按 visible / status 过滤：进度是学生自己的记录，老师把题单藏起来不该让它停止累积。
- * 更要紧的是这条规则必须和补账那条（scripts/backfill-problemsets.ts）一致 ——
- * 两边口径不一样的话，补账工具会永远「发现」差异。
  */
 export async function recordSolvedProblem(
   userId: number,
