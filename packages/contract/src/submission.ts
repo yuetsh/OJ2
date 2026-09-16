@@ -81,14 +81,16 @@ export const statisticInfoSchema = z.looseObject({
   err_info: z.string().optional(),
   time_cost: z.number().optional(),
   memory_cost: z.number().optional(),
-  ast_results: z.array(
-    z.object({
-      description: z.string(),
-      passed: z.boolean(),
-      /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
-      actual: z.number().optional(),
-    }),
-  ).optional(),
+  ast_results: z
+    .array(
+      z.object({
+        description: z.string(),
+        passed: z.boolean(),
+        /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
+        actual: z.number().optional(),
+      }),
+    )
+    .optional(),
 })
 
 export const createSubmissionRequestSchema = z.object({
@@ -100,7 +102,10 @@ export const createSubmissionRequestSchema = z.object({
    * 学生看到的是「系统错误」而不是「语言不对」。
    */
   language: problemLanguageSchema,
-  code: z.string().min(1).max(1024 * 1024),
+  code: z
+    .string()
+    .min(1)
+    .max(1024 * 1024),
   contestId: z.number().int().positive().optional(),
   /**
    * 来源题单。学生从 `/problemset/:id/problem/:pid` 那个入口提交时前端带上，
@@ -146,10 +151,12 @@ export const submissionDetailSchema = z.object({
    * SQL 题（`judge/run.ts` 遇到被杀的测试点会 break，total 偏小）、没有逐点结果
    * （待判、编译失败）。
    */
-  caseSummary: z.object({
-    passed: z.number().int(),
-    total: z.number().int(),
-  }).nullable(),
+  caseSummary: z
+    .object({
+      passed: z.number().int(),
+      total: z.number().int(),
+    })
+    .nullable(),
 })
 
 /**
@@ -164,7 +171,13 @@ export const embeddedSubmissionSchema = submissionDetailSchema
   // problemDisplayId 也要去掉：下面的 problem 就是它，同一个值留两份，
   // 而路由只填了 problem —— 这里漏 omit 的那阵子，凡是收到过站内信的人
   // 打开消息页都是 500（parse 抛在缺失的 problemDisplayId 上，列表为空时才碰巧不炸）。
-  .omit({ info: true, contestId: true, problemId: true, problemDisplayId: true, caseSummary: true })
+  .omit({
+    info: true,
+    contestId: true,
+    problemId: true,
+    problemDisplayId: true,
+    caseSummary: true,
+  })
   // 旧 SubmissionSafeModelSerializer 里 problem 是
   // `SlugRelatedField(slug_field="_id")`，即**展示用题号**而非数字主键。
   // 站内信页面拿它拼 `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。
@@ -407,7 +420,9 @@ export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>
 export type SubmissionListItem = z.infer<typeof submissionListItemSchema>
 export type SubmissionList = z.infer<typeof submissionListSchema>
 export type EmbeddedSubmission = z.infer<typeof embeddedSubmissionSchema>
-export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>
+export type CreateSubmissionResponse = z.infer<
+  typeof createSubmissionResponseSchema
+>
 export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>
 
 export type FormatCodeRequest = z.infer<typeof formatCodeRequestSchema>

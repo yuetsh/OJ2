@@ -27,14 +27,27 @@ export async function completeChat(system: string, user: string) {
   const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
     method: "POST",
     signal: AbortSignal.timeout(COMPLETE_TIMEOUT_MS),
-    headers: { "content-type": "application/json", authorization: `Bearer ${config.aiKey}` },
-    body: JSON.stringify(requestBody([
-      { role: "system", content: system },
-      { role: "user", content: user },
-    ], false)),
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${config.aiKey}`,
+    },
+    body: JSON.stringify(
+      requestBody(
+        [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        false,
+      ),
+    ),
   })
-  if (!response.ok) throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+  if (!response.ok)
+    throw new Error(
+      `AI provider returned HTTP ${response.status}: ${await response.text()}`,
+    )
+  const payload = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>
+  }
   return payload.choices?.[0]?.message?.content?.trim() ?? ""
 }
 
@@ -48,21 +61,37 @@ export function streamChat(
     async start(controller) {
       const send = (value: string) => controller.enqueue(encoder.encode(value))
       if (!config.aiKey) {
-        send(`data: ${JSON.stringify({ type: "error", message: "缺少 AI_KEY" })}\n\n`)
+        send(
+          `data: ${JSON.stringify({ type: "error", message: "缺少 AI_KEY" })}\n\n`,
+        )
         send("event: end\n\n")
         controller.close()
         return
       }
       try {
-        const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${config.aiKey}` },
-          body: JSON.stringify(requestBody([
-            { role: "system", content: system },
-            { role: "user", content: user },
-          ], true)),
-        })
-        if (!response.ok || !response.body) throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
+        const response = await fetch(
+          new URL("/chat/completions", config.aiBaseUrl),
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${config.aiKey}`,
+            },
+            body: JSON.stringify(
+              requestBody(
+                [
+                  { role: "system", content: system },
+                  { role: "user", content: user },
+                ],
+                true,
+              ),
+            ),
+          },
+        )
+        if (!response.ok || !response.body)
+          throw new Error(
+            `AI provider returned HTTP ${response.status}: ${await response.text()}`,
+          )
         send("event: start\n\n")
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
@@ -79,7 +108,12 @@ export function streamChat(
             const data = line.slice(5).trim()
             if (data === "[DONE]") continue
             try {
-              const item = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }> }
+              const item = JSON.parse(data) as {
+                choices?: Array<{
+                  delta?: { content?: string }
+                  finish_reason?: string | null
+                }>
+              }
               const choice = item.choices?.[0]
               const content = choice?.delta?.content
               if (content) {
@@ -96,7 +130,9 @@ export function streamChat(
         if (onComplete) await onComplete(full)
         send(`data: ${JSON.stringify({ type: "done" })}\n\n`)
       } catch (error) {
-        send(`data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : String(error) })}\n\n`)
+        send(
+          `data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : String(error) })}\n\n`,
+        )
       } finally {
         send("event: end\n\n")
         controller.close()

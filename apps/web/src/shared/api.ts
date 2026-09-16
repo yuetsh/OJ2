@@ -41,7 +41,5 @@ export function getHitokoto() {
 }
 
 export function getClassUsernames(classroom: string) {
-  return api.get<string[]>(
-    `classes/${encodeURIComponent(classroom)}/usernames`,
-  )
+  return api.get<string[]>(`classes/${encodeURIComponent(classroom)}/usernames`)
 }

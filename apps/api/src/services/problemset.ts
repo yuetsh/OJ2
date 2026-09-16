@@ -6,8 +6,13 @@ import { objectValue } from "../routes/helpers"
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 type ProgressRow = typeof schema.problemsetProgress.$inferSelect
 type ProblemLink = { problemId: number; score: number; isRequired: boolean }
-type BadgeCheck = Pick<ProgressRow,
-  "completedProblemsCount" | "totalProblemsCount" | "totalScore" | "progressDetail">
+type BadgeCheck = Pick<
+  ProgressRow,
+  | "completedProblemsCount"
+  | "totalProblemsCount"
+  | "totalScore"
+  | "progressDetail"
+>
 
 /**
  * 题单进度的唯一算法：学生做出一道题后的增量更新、后台改动题目后的批量重算，都走这一份。
@@ -24,7 +29,9 @@ export function computeProgress(
   previousCompleteTime: string | null,
   now = new Date().toISOString(),
 ) {
-  const scoreByProblem = new Map(links.map((link) => [String(link.problemId), link.score]))
+  const scoreByProblem = new Map(
+    links.map((link) => [String(link.problemId), link.score]),
+  )
   // 已经移出题单的题目要从 detail 里剔掉，留着它 completed 就会比实际做出的题还多
   const kept: Record<string, unknown> = {}
   let totalScore = 0
@@ -44,7 +51,9 @@ export function computeProgress(
   const required = links.filter((link) => link.isRequired)
   const graded = required.length ? required : links
   const gradedKeys = new Set(graded.map((link) => String(link.problemId)))
-  const completed = Object.keys(kept).filter((key) => gradedKeys.has(key)).length
+  const completed = Object.keys(kept).filter((key) =>
+    gradedKeys.has(key),
+  ).length
   const total = graded.length
   // total > 0 这个前提不能省：0 === 0 同样成立，没有题目的题单会让人一加入就算「完成」，
   // 还会写下 complete_time、计进「完成题单数」成就，而且后面补上题目也不会自愈。
@@ -55,7 +64,8 @@ export function computeProgress(
     completedProblemsCount: completed,
     totalScore,
     // 乘 10000 四舍五入再除 100，保留两位小数
-    progressPercentage: total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
+    progressPercentage:
+      total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
     isCompleted,
     // 只设不清，语义是「曾经完成于」，对齐旧栈 problemset/models.py:218。
     //
@@ -78,7 +88,8 @@ async function writeProgress(rows: ProgressWrite[]) {
   for (let start = 0; start < rows.length; start += 1000) {
     const chunk = rows.slice(start, start + 1000)
     const values = sql.join(
-      chunk.map((row) => sql`(
+      chunk.map(
+        (row) => sql`(
         ${row.id}::bigint,
         ${JSON.stringify(row.progressDetail)}::jsonb,
         ${row.totalProblemsCount}::int,
@@ -87,7 +98,8 @@ async function writeProgress(rows: ProgressWrite[]) {
         ${row.progressPercentage}::double precision,
         ${row.isCompleted}::boolean,
         ${row.completeTime}::timestamptz
-      )`),
+      )`,
+      ),
       sql`, `,
     )
     await db.execute(sql`
@@ -118,13 +130,19 @@ async function writeProgress(rows: ProgressWrite[]) {
  */
 export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
   if (badge.conditionType === "all_problems") {
-    return progress.totalProblemsCount > 0 &&
+    return (
+      progress.totalProblemsCount > 0 &&
       progress.completedProblemsCount === progress.totalProblemsCount
+    )
   }
   if (badge.conditionType === "problem_count") {
-    return Object.keys(objectValue(progress.progressDetail)).length >= badge.conditionValue
+    return (
+      Object.keys(objectValue(progress.progressDetail)).length >=
+      badge.conditionValue
+    )
   }
-  if (badge.conditionType === "score") return progress.totalScore >= badge.conditionValue
+  if (badge.conditionType === "score")
+    return progress.totalScore >= badge.conditionValue
   return false
 }
 
@@ -136,26 +154,45 @@ export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
  * 调用方手里已经有最新的进度时把它传进来（`known`），省掉一次回表；
  * 更要紧的是别用刚写完库之前的旧值去判定。
  */
-export async function recalculateBadge(badge: BadgeRow, known?: (BadgeCheck & { userId: number })[]) {
-  const progresses = known ?? await db.select().from(schema.problemsetProgress)
-    .where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId))
-  const eligibleIds = progresses.filter((item) => eligibleForBadge(badge, item)).map((item) => item.userId)
+export async function recalculateBadge(
+  badge: BadgeRow,
+  known?: (BadgeCheck & { userId: number })[],
+) {
+  const progresses =
+    known ??
+    (await db
+      .select()
+      .from(schema.problemsetProgress)
+      .where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId)))
+  const eligibleIds = progresses
+    .filter((item) => eligibleForBadge(badge, item))
+    .map((item) => item.userId)
   await db.transaction(async (tx) => {
-    await tx.delete(schema.userBadge).where(and(
-      eq(schema.userBadge.badgeId, badge.id),
-      eligibleIds.length ? notInArray(schema.userBadge.userId, eligibleIds) : undefined,
-    ))
+    await tx
+      .delete(schema.userBadge)
+      .where(
+        and(
+          eq(schema.userBadge.badgeId, badge.id),
+          eligibleIds.length
+            ? notInArray(schema.userBadge.userId, eligibleIds)
+            : undefined,
+        ),
+      )
     if (!eligibleIds.length) return
-    const existing = await tx.select({ userId: schema.userBadge.userId }).from(schema.userBadge)
+    const existing = await tx
+      .select({ userId: schema.userBadge.userId })
+      .from(schema.userBadge)
       .where(eq(schema.userBadge.badgeId, badge.id))
     const have = new Set(existing.map((item) => item.userId))
     const missing = eligibleIds.filter((id) => !have.has(id))
     if (missing.length) {
-      await tx.insert(schema.userBadge).values(missing.map((userId) => ({
-        userId,
-        badgeId: badge.id,
-        earnedTime: new Date().toISOString(),
-      })))
+      await tx.insert(schema.userBadge).values(
+        missing.map((userId) => ({
+          userId,
+          badgeId: badge.id,
+          earnedTime: new Date().toISOString(),
+        })),
+      )
     }
   })
 }
@@ -174,20 +211,32 @@ export async function recalculateBadge(badge: BadgeRow, known?: (BadgeCheck & { 
  */
 export async function resyncProgress(problemsetId: number) {
   const [links, progresses, badges] = await Promise.all([
-    db.select({
-      problemId: schema.problemsetProblem.problemId,
-      score: schema.problemsetProblem.score,
-      isRequired: schema.problemsetProblem.isRequired,
-    }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, problemsetId)),
-    db.select().from(schema.problemsetProgress)
+    db
+      .select({
+        problemId: schema.problemsetProblem.problemId,
+        score: schema.problemsetProblem.score,
+        isRequired: schema.problemsetProblem.isRequired,
+      })
+      .from(schema.problemsetProblem)
+      .where(eq(schema.problemsetProblem.problemsetId, problemsetId)),
+    db
+      .select()
+      .from(schema.problemsetProgress)
       .where(eq(schema.problemsetProgress.problemsetId, problemsetId)),
-    db.select().from(schema.problemsetBadge)
+    db
+      .select()
+      .from(schema.problemsetBadge)
       .where(eq(schema.problemsetBadge.problemsetId, problemsetId)),
   ])
   const now = new Date().toISOString()
   const updated = progresses.map((progress) => ({
     ...progress,
-    ...computeProgress(objectValue(progress.progressDetail), links, progress.completeTime, now),
+    ...computeProgress(
+      objectValue(progress.progressDetail),
+      links,
+      progress.completeTime,
+      now,
+    ),
   }))
   if (updated.length) await writeProgress(updated)
   for (const badge of badges) await recalculateBadge(badge, updated)
@@ -214,59 +263,93 @@ export async function recordSolvedProblem(
   const joined = await db
     .select({ problemsetId: schema.problemsetProgress.problemsetId })
     .from(schema.problemsetProgress)
-    .innerJoin(schema.problemsetProblem, and(
-      eq(schema.problemsetProblem.problemsetId, schema.problemsetProgress.problemsetId),
-      eq(schema.problemsetProblem.problemId, problemId),
-    ))
+    .innerJoin(
+      schema.problemsetProblem,
+      and(
+        eq(
+          schema.problemsetProblem.problemsetId,
+          schema.problemsetProgress.problemsetId,
+        ),
+        eq(schema.problemsetProblem.problemId, problemId),
+      ),
+    )
     .where(eq(schema.problemsetProgress.userId, userId))
   const earned: BadgeRow[] = []
   let updated = 0
   for (const { problemsetId } of joined) {
     const hits = await db.transaction(async (tx) => {
-      const [progress] = await tx.select().from(schema.problemsetProgress).where(and(
-        eq(schema.problemsetProgress.problemsetId, problemsetId),
-        eq(schema.problemsetProgress.userId, userId),
-      )).for("update").limit(1)
+      const [progress] = await tx
+        .select()
+        .from(schema.problemsetProgress)
+        .where(
+          and(
+            eq(schema.problemsetProgress.problemsetId, problemsetId),
+            eq(schema.problemsetProgress.userId, userId),
+          ),
+        )
+        .for("update")
+        .limit(1)
       if (!progress) return []
 
       // 提交记录先补上，即使这道题早就记过 —— 老数据里有记了进度没记提交的行
-      const [existing] = await tx.select({ id: schema.problemsetSubmission.id })
-        .from(schema.problemsetSubmission).where(and(
-          eq(schema.problemsetSubmission.problemsetId, problemsetId),
-          eq(schema.problemsetSubmission.userId, userId),
-          eq(schema.problemsetSubmission.problemId, problemId),
-        )).limit(1)
+      const [existing] = await tx
+        .select({ id: schema.problemsetSubmission.id })
+        .from(schema.problemsetSubmission)
+        .where(
+          and(
+            eq(schema.problemsetSubmission.problemsetId, problemsetId),
+            eq(schema.problemsetSubmission.userId, userId),
+            eq(schema.problemsetSubmission.problemId, problemId),
+          ),
+        )
+        .limit(1)
       if (!existing) {
-        await tx.insert(schema.problemsetSubmission)
+        await tx
+          .insert(schema.problemsetSubmission)
           .values({ problemsetId, userId, submissionId, problemId })
       }
 
       const detail = objectValue(progress.progressDetail)
       if (String(problemId) in detail) return []
-      const links = await tx.select({
-        problemId: schema.problemsetProblem.problemId,
-        score: schema.problemsetProblem.score,
-        isRequired: schema.problemsetProblem.isRequired,
-      }).from(schema.problemsetProblem)
+      const links = await tx
+        .select({
+          problemId: schema.problemsetProblem.problemId,
+          score: schema.problemsetProblem.score,
+          isRequired: schema.problemsetProblem.isRequired,
+        })
+        .from(schema.problemsetProblem)
         .where(eq(schema.problemsetProblem.problemsetId, problemsetId))
       const link = links.find((item) => item.problemId === problemId)
       if (!link) return []
       detail[String(problemId)] = { score: link.score, submit_time: solvedAt }
       const update = computeProgress(detail, links, progress.completeTime)
-      await tx.update(schema.problemsetProgress).set(update)
+      await tx
+        .update(schema.problemsetProgress)
+        .set(update)
         .where(eq(schema.problemsetProgress.id, progress.id))
       updated += 1
 
-      const badges = await tx.select().from(schema.problemsetBadge)
+      const badges = await tx
+        .select()
+        .from(schema.problemsetBadge)
         .where(eq(schema.problemsetBadge.problemsetId, problemsetId))
-      const eligible = badges.filter((badge) => eligibleForBadge(badge, { ...progress, ...update }))
+      const eligible = badges.filter((badge) =>
+        eligibleForBadge(badge, { ...progress, ...update }),
+      )
       if (eligible.length === 0) return []
       // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
-      const inserted = await tx.insert(schema.userBadge).values(eligible.map((badge) => ({
-        userId,
-        badgeId: badge.id,
-        earnedTime: new Date().toISOString(),
-      }))).onConflictDoNothing({ target: [schema.userBadge.badgeId, schema.userBadge.userId] })
+      const inserted = await tx
+        .insert(schema.userBadge)
+        .values(
+          eligible.map((badge) => ({
+            userId,
+            badgeId: badge.id,
+            earnedTime: new Date().toISOString(),
+          })),
+        )
+        .onConflictDoNothing({
+          target: [schema.userBadge.badgeId, schema.userBadge.userId],
+        })
         .returning({ badgeId: schema.userBadge.badgeId })
       const ids = new Set(inserted.map((row) => row.badgeId))
       return eligible.filter((badge) => ids.has(badge.id))

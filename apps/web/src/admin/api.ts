@@ -94,9 +94,7 @@ export function editProblem(problem: AdminProblem | BlankProblem) {
 }
 
 export function toggleProblemVisible(problemID: number) {
-  return api.put<{ visible: boolean }>(
-    `admin/problems/${problemID}/visibility`,
-  )
+  return api.put<{ visible: boolean }>(`admin/problems/${problemID}/visibility`)
 }
 
 export function generateFlowchartFromPythonCode(python: string) {
@@ -135,7 +133,11 @@ export function batchTagProblems(
 }
 
 // 用户排名（后台版，无 100 名上限；公开榜单是 oj/api.ts 的 getRank）
-export function getAdminUserRank(offset: number, limit: number, keyword: string) {
+export function getAdminUserRank(
+  offset: number,
+  limit: number,
+  keyword: string,
+) {
   return api.get<AdminUserRank>("admin/rankings/users", {
     params: { offset, limit, keyword },
   })
@@ -236,9 +238,7 @@ export function previewSQLTestcase(data: {
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
 export function getSQLTestcaseScripts(problemId: number) {
-  return api.get<SqlTestCaseScript[]>(
-    `admin/problems/${problemId}/sql-scripts`,
-  )
+  return api.get<SqlTestCaseScript[]>(`admin/problems/${problemId}/sql-scripts`)
 }
 
 // AI 根据标准答案生成一个 SQL 测试点初始化脚本
@@ -412,10 +412,7 @@ export function createTutorial(data: Partial<Tutorial>) {
 }
 
 export function updateTutorial(data: Partial<Tutorial>) {
-  return api.put<Tutorial>(
-    `admin/tutorials/${data.id}`,
-    toTutorialBody(data),
-  )
+  return api.put<Tutorial>(`admin/tutorials/${data.id}`, toTutorialBody(data))
 }
 
 export function deleteTutorial(id: number) {

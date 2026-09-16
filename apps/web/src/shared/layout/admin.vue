@@ -60,11 +60,7 @@ const options = computed<MenuOption[]>(() => {
       },
       {
         label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/ai/reports" },
-            { default: () => "报告" },
-          ),
+          h(RouterLink, { to: "/admin/ai/reports" }, { default: () => "报告" }),
         key: "admin ai reports",
       },
       {
@@ -148,11 +144,7 @@ const options = computed<MenuOption[]>(() => {
       },
       {
         label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/ai/reports" },
-            { default: () => "报告" },
-          ),
+          h(RouterLink, { to: "/admin/ai/reports" }, { default: () => "报告" }),
         key: "admin ai reports",
       },
       {

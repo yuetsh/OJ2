@@ -47,8 +47,9 @@ instance.interceptors.response.use(
   // 这里**故意**不返回 AxiosResponse：把 axios 的外层和后端的 { data } 信封一起
   // 剥掉，让调用方直接拿到业务数据。类型上和 axios 的拦截器签名对不上（它期望原样
   // 返回响应），文件末尾的 `as unknown as ApiClient` 就是为了把真实形状交出去。
-  ((response: AxiosResponse) =>
-    response.data.data) as unknown as (response: AxiosResponse) => AxiosResponse,
+  ((response: AxiosResponse) => response.data.data) as unknown as (
+    response: AxiosResponse,
+  ) => AxiosResponse,
   (error) => {
     const payload = error.response?.data as ApiError | undefined
     const code = payload?.error?.code ?? "network-error"

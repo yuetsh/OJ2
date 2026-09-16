@@ -98,9 +98,9 @@ export async function consumeJSONEventStream<T = any>(
  * 「无法解析服务端事件数据: {...}」。后端 error.message 是英文的，按 code 换成中文。
  */
 export async function aiStreamError(response: Response) {
-  const body = (await response.json().catch(() => null)) as
-    | { error?: { code?: string } }
-    | null
+  const body = (await response.json().catch(() => null)) as {
+    error?: { code?: string }
+  } | null
   switch (body?.error?.code) {
     case "too-many-requests":
       return new Error("AI 请求太频繁了，歇一会儿再试")

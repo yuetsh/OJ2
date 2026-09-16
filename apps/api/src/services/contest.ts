@@ -29,23 +29,40 @@ export function contestStatus(contest: ContestRow) {
   return "0" as const
 }
 
-export function isContestAdmin(user: AuthUser | null | undefined, contest: ContestRow) {
-  return Boolean(user && (user.id === contest.createdById || user.adminType === "Super Admin"))
+export function isContestAdmin(
+  user: AuthUser | null | undefined,
+  contest: ContestRow,
+) {
+  return Boolean(
+    user &&
+    (user.id === contest.createdById || user.adminType === "Super Admin"),
+  )
 }
 
-export function contestDetailsAllowed(user: AuthUser | null | undefined, contest: ContestRow) {
+export function contestDetailsAllowed(
+  user: AuthUser | null | undefined,
+  contest: ContestRow,
+) {
   return contestStatus(contest) === "-1" || isContestAdmin(user, contest)
 }
 
-export function checkContestPassword(candidate: string | null | undefined, expected: string | null) {
+export function checkContestPassword(
+  candidate: string | null | undefined,
+  expected: string | null,
+) {
   if (!candidate || !expected) return false
   if (candidate === expected) return true
   const parts = candidate.split("#")
   if (parts.length !== 2) return false
   const [signature, expiresAt] = parts
   if (!signature || !expiresAt || !/^\d+$/.test(expiresAt)) return false
-  const expectedSignature = createHash("sha256").update(`${expected}${expiresAt}`).digest("hex").slice(0, 8)
-  return signature === expectedSignature && Date.now() < Number(expiresAt) * 1000
+  const expectedSignature = createHash("sha256")
+    .update(`${expected}${expiresAt}`)
+    .digest("hex")
+    .slice(0, 8)
+  return (
+    signature === expectedSignature && Date.now() < Number(expiresAt) * 1000
+  )
 }
 
 /**
@@ -58,9 +75,15 @@ export function checkContestPassword(candidate: string | null | undefined, expec
  *
  * 放宽的只有出题人自己的视角，学生看隐藏比赛照旧是 404。
  */
-export async function findAccessibleContest(user: AuthUser | null | undefined, id: number) {
-  const [contest] = await db.select().from(schema.contest)
-    .where(eq(schema.contest.id, id)).limit(1)
+export async function findAccessibleContest(
+  user: AuthUser | null | undefined,
+  id: number,
+) {
+  const [contest] = await db
+    .select()
+    .from(schema.contest)
+    .where(eq(schema.contest.id, id))
+    .limit(1)
   if (!contest) return null
   return contest.visible || isContestAdmin(user, contest) ? contest : null
 }
@@ -73,16 +96,25 @@ export async function canAccessContest<E extends AppEnv>(
   checkType: "details" | "problems" | "ranks" | "submissions",
 ) {
   const user = c.get("user")
-  if (!user) return { ok: false as const, code: "login-required", message: "请先登录" }
+  if (!user)
+    return { ok: false as const, code: "login-required", message: "请先登录" }
   if (isContestAdmin(user, contest)) return { ok: true as const }
   if (contest.password) {
     const stored = await getContestPassword(c, contest.id)
     if (!checkContestPassword(stored, contest.password)) {
-      return { ok: false as const, code: "wrong-password", message: "Wrong password or password expired" }
+      return {
+        ok: false as const,
+        code: "wrong-password",
+        message: "Wrong password or password expired",
+      }
     }
   }
   if (contestStatus(contest) === "1" && checkType !== "details") {
-    return { ok: false as const, code: "contest-not-started", message: "Contest has not started yet." }
+    return {
+      ok: false as const,
+      code: "contest-not-started",
+      message: "Contest has not started yet.",
+    }
   }
   return { ok: true as const }
 }
@@ -104,11 +136,20 @@ export function requireContestAccess(
 ): MiddlewareHandler<ContestEnv> {
   return async (c, next) => {
     const id = Number(c.req.param(paramName))
-    const contest = Number.isInteger(id) && id > 0 ? await findAccessibleContest(c.get("user"), id) : null
-    if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
+    const contest =
+      Number.isInteger(id) && id > 0
+        ? await findAccessibleContest(c.get("user"), id)
+        : null
+    if (!contest)
+      return failure(c, 404, "contest-not-found", "Contest does not exist")
     const access = await canAccessContest(c, contest, checkType)
     if (!access.ok) {
-      return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
+      return failure(
+        c,
+        access.code === "login-required" ? 401 : 403,
+        access.code,
+        access.message,
+      )
     }
     c.set("contest", contest)
     await next()

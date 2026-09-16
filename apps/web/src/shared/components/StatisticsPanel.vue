@@ -249,19 +249,23 @@ const ATTEMPT_COLORS: Record<string, string> = {
  * 已通过的沉底，它们只是「做完了」，不需要再看。
  */
 function groupByProblem(list: SubmissionStatisticsItems["items"]) {
-  const groups = new Map<string, {
-    problem: string
-    problemTitle: string
-    items: SubmissionStatisticsItems["items"]
-  }>()
+  const groups = new Map<
+    string,
+    {
+      problem: string
+      problemTitle: string
+      items: SubmissionStatisticsItems["items"]
+    }
+  >()
   for (const item of list) {
     const group = groups.get(item.problem)
     if (group) group.items.push(item)
-    else groups.set(item.problem, {
-      problem: item.problem,
-      problemTitle: item.problemTitle,
-      items: [item],
-    })
+    else
+      groups.set(item.problem, {
+        problem: item.problem,
+        problemTitle: item.problemTitle,
+        items: [item],
+      })
   }
   return [...groups.values()]
     .map((group) => ({
@@ -276,8 +280,9 @@ function groupByProblem(list: SubmissionStatisticsItems["items"]) {
           item.result === SubmissionStatus.ast_check_failed,
       ),
     }))
-    .sort((a, b) =>
-      Number(a.solved) - Number(b.solved) || b.items.length - a.items.length,
+    .sort(
+      (a, b) =>
+        Number(a.solved) - Number(b.solved) || b.items.length - a.items.length,
     )
 }
 
@@ -298,9 +303,18 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
           h(NFlex, { size: "small", align: "flex-start", wrap: false }, () => [
             h(
               NFlex,
-              { size: 4, align: "center", wrap: false, style: "width: 200px; flex: none" },
+              {
+                size: 4,
+                align: "center",
+                wrap: false,
+                style: "width: 200px; flex: none",
+              },
               () => [
-                h(NTag, { size: "small", bordered: false }, () => group.problem),
+                h(
+                  NTag,
+                  { size: "small", bordered: false },
+                  () => group.problem,
+                ),
                 h(
                   NText,
                   {
@@ -318,39 +332,46 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
                 depth: 3,
                 style: "width: 104px; flex: none",
               },
-              () => `${group.items.length} 次 · ${group.solved ? "已通过" : "未通过"}`,
+              () =>
+                `${group.items.length} 次 · ${group.solved ? "已通过" : "未通过"}`,
             ),
-            h(NFlex, { size: 4, wrap: true, style: "flex: 1; min-width: 0" }, () =>
-              group.items.map((item) =>
-                h(
-                  NTooltip,
-                  { delay: 200 },
-                  {
-                    trigger: () =>
-                      h("button", {
-                        // 内联样式而不是 class：这些方块是 h() 出来、挂在 NDataTable 的
-                        // 展开槽里渲染的，<style scoped> 能不能盖到它并不确定
-                        style: {
-                          width: "14px",
-                          height: "14px",
-                          padding: "0",
-                          border: "none",
-                          borderRadius: "3px",
-                          cursor: "pointer",
-                          background: ATTEMPT_COLORS[JUDGE_STATUS[item.result]?.type ?? "default"],
-                        },
-                        onClick: (event: MouseEvent) => {
-                          event.stopPropagation()
-                          openSubmission(item.id)
-                        },
-                      }),
-                    default: () =>
-                      `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
-                      `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
-                      `${item.id.toString().slice(0, 12)}`,
-                  },
+            h(
+              NFlex,
+              { size: 4, wrap: true, style: "flex: 1; min-width: 0" },
+              () =>
+                group.items.map((item) =>
+                  h(
+                    NTooltip,
+                    { delay: 200 },
+                    {
+                      trigger: () =>
+                        h("button", {
+                          // 内联样式而不是 class：这些方块是 h() 出来、挂在 NDataTable 的
+                          // 展开槽里渲染的，<style scoped> 能不能盖到它并不确定
+                          style: {
+                            width: "14px",
+                            height: "14px",
+                            padding: "0",
+                            border: "none",
+                            borderRadius: "3px",
+                            cursor: "pointer",
+                            background:
+                              ATTEMPT_COLORS[
+                                JUDGE_STATUS[item.result]?.type ?? "default"
+                              ],
+                          },
+                          onClick: (event: MouseEvent) => {
+                            event.stopPropagation()
+                            openSubmission(item.id)
+                          },
+                        }),
+                      default: () =>
+                        `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
+                        `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
+                        `${item.id.toString().slice(0, 12)}`,
+                    },
+                  ),
                 ),
-              ),
             ),
           ]),
         ),
@@ -358,7 +379,8 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
           ? h(
               NText,
               { depth: 3 },
-              () => `只显示最近 ${loaded.items.length} 条，上面「提交数」才是总数`,
+              () =>
+                `只显示最近 ${loaded.items.length} 条，上面「提交数」才是总数`,
             )
           : null,
       ])
@@ -372,7 +394,11 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
     render: (row) =>
       h(
         NTag,
-        { size: "small", type: row.done ? "success" : "default", bordered: false },
+        {
+          size: "small",
+          type: row.done ? "success" : "default",
+          bordered: false,
+        },
         () => (row.done ? "已完成" : "未完成"),
       ),
   },
@@ -693,7 +719,9 @@ const completionChartOptions = {
 const subOptions = computed<Duration>(
   // 认不出来（含 all）就退回列表第一档，和原来 `?? options[0]` 一致；
   // all 实际不会走到这里，handleStatistics 先分支掉了
-  () => durationFromValue(query.duration) ?? durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
+  () =>
+    durationFromValue(query.duration) ??
+    durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
 )
 
 function goSubmissions() {

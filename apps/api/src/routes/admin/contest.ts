@@ -49,18 +49,25 @@ async function serialize(row: {
 }
 
 function selectContest(id: number) {
-  return db.select({ contest: schema.contest, user: schema.user, realName: schema.userProfile.realName })
+  return db
+    .select({
+      contest: schema.contest,
+      user: schema.user,
+      realName: schema.userProfile.realName,
+    })
     .from(schema.contest)
     .innerJoin(schema.user, eq(schema.contest.createdById, schema.user.id))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(eq(schema.contest.id, id)).limit(1)
+    .where(eq(schema.contest.id, id))
+    .limit(1)
 }
 
 /** 请求体里的时间校验，创建和编辑共用 */
 function validatePayload(data: { startTime: string; endTime: string }) {
   const start = Date.parse(data.startTime)
   const end = Date.parse(data.endTime)
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return "开始或结束时间不是合法的时间格式"
+  if (!Number.isFinite(start) || !Number.isFinite(end))
+    return "开始或结束时间不是合法的时间格式"
   if (end <= start) return "Start time must occur earlier than end time"
   return null
 }
@@ -71,18 +78,30 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
   const user = c.get("user")!
   const filters = []
   // 非超管只看得到自己建的比赛，与旧后端一致
-  if (user.adminType !== "Super Admin") filters.push(eq(schema.contest.createdById, user.id))
+  if (user.adminType !== "Super Admin")
+    filters.push(eq(schema.contest.createdById, user.id))
   const keyword = c.req.query("keyword")?.trim()
   if (keyword) filters.push(ilike(schema.contest.title, `%${keyword}%`))
   const where = filters.length ? and(...filters) : undefined
 
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.contest).where(where),
-    db.select({ contest: schema.contest, user: schema.user, realName: schema.userProfile.realName })
+    db
+      .select({
+        contest: schema.contest,
+        user: schema.user,
+        realName: schema.userProfile.realName,
+      })
       .from(schema.contest)
       .innerJoin(schema.user, eq(schema.contest.createdById, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(where).orderBy(desc(schema.contest.createTime)).limit(limit).offset(offset),
+      .leftJoin(
+        schema.userProfile,
+        eq(schema.userProfile.userId, schema.user.id),
+      )
+      .where(where)
+      .orderBy(desc(schema.contest.createTime))
+      .limit(limit)
+      .offset(offset),
   ])
   return success(c, {
     results: await Promise.all(rows.map(serialize)),
@@ -91,7 +110,9 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
 })
 
 adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
-  const [row] = await selectContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
+  const [row] = await selectContest(
+    queryInteger(c.req.param("id"), 0, { min: 1 }),
+  )
   if (!row || !ownedBy(c.get("user")!, row.contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
@@ -99,36 +120,53 @@ adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
 })
 
 adminContestRoutes.post("/contests", requireTeacher, async (c) => {
-  const parsed = createContestRequestSchema.safeParse(await c.req.json().catch(() => null))
+  const parsed = createContestRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
   if (!parsed.success) {
-    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
+    return failure(
+      c,
+      400,
+      "invalid-request",
+      parsed.error.issues[0]?.message ?? "Invalid payload",
+    )
   }
   const error = validatePayload(parsed.data)
   if (error) return failure(c, 400, "invalid-contest", error)
 
   const now = new Date().toISOString()
-  const [created] = await db.insert(schema.contest).values({
-    title: parsed.data.title,
-    description: parsed.data.description,
-    tag: parsed.data.tag,
-    startTime: new Date(parsed.data.startTime).toISOString(),
-    endTime: new Date(parsed.data.endTime).toISOString(),
-    // 空串归一成 null，否则 contestType 会把「密码是空字符串」当成密码保护赛
-    password: parsed.data.password || null,
-    visible: parsed.data.visible,
-    createdById: c.get("user")!.id,
-    createTime: now,
-    lastUpdateTime: now,
-  }).returning({ id: schema.contest.id })
+  const [created] = await db
+    .insert(schema.contest)
+    .values({
+      title: parsed.data.title,
+      description: parsed.data.description,
+      tag: parsed.data.tag,
+      startTime: new Date(parsed.data.startTime).toISOString(),
+      endTime: new Date(parsed.data.endTime).toISOString(),
+      // 空串归一成 null，否则 contestType 会把「密码是空字符串」当成密码保护赛
+      password: parsed.data.password || null,
+      visible: parsed.data.visible,
+      createdById: c.get("user")!.id,
+      createTime: now,
+      lastUpdateTime: now,
+    })
+    .returning({ id: schema.contest.id })
   const [row] = await selectContest(created!.id)
   return success(c, await serialize(row!), 201)
 })
 
 adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateContestRequestSchema.safeParse(await c.req.json().catch(() => null))
+  const parsed = updateContestRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
   if (!parsed.success) {
-    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
+    return failure(
+      c,
+      400,
+      "invalid-request",
+      parsed.error.issues[0]?.message ?? "Invalid payload",
+    )
   }
   const [existing] = await selectContest(id)
   if (!existing || !ownedBy(c.get("user")!, existing.contest)) {
@@ -137,16 +175,19 @@ adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
   const error = validatePayload(parsed.data)
   if (error) return failure(c, 400, "invalid-contest", error)
 
-  await db.update(schema.contest).set({
-    title: parsed.data.title,
-    description: parsed.data.description,
-    tag: parsed.data.tag,
-    startTime: new Date(parsed.data.startTime).toISOString(),
-    endTime: new Date(parsed.data.endTime).toISOString(),
-    password: parsed.data.password || null,
-    visible: parsed.data.visible,
-    lastUpdateTime: new Date().toISOString(),
-  }).where(eq(schema.contest.id, id))
+  await db
+    .update(schema.contest)
+    .set({
+      title: parsed.data.title,
+      description: parsed.data.description,
+      tag: parsed.data.tag,
+      startTime: new Date(parsed.data.startTime).toISOString(),
+      endTime: new Date(parsed.data.endTime).toISOString(),
+      password: parsed.data.password || null,
+      visible: parsed.data.visible,
+      lastUpdateTime: new Date().toISOString(),
+    })
+    .where(eq(schema.contest.id, id))
   const [row] = await selectContest(id)
   return success(c, await serialize(row!))
 })
@@ -169,9 +210,12 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   //
   // 已知的副作用，别当成 bug 去"修"：副本和原题共用同一个测试点目录（testCaseId 原样复制），
   // 今天无害（删题特意不删目录），但以后要是加"删题顺手清测试点"，得先把这里改成复制目录。
-  if (!original) return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!original)
+    return failure(c, 404, "contest-not-found", "Contest does not exist")
 
-  const duration = Date.parse(original.contest.endTime) - Date.parse(original.contest.startTime)
+  const duration =
+    Date.parse(original.contest.endTime) -
+    Date.parse(original.contest.startTime)
   // 新比赛从 10 分钟后开始，时长与原比赛相同 —— 给出题人留出改时间的余地，
   // 又不至于建出一个已经结束的比赛
   const start = new Date(Date.now() + 10 * 60 * 1000)
@@ -180,51 +224,79 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   const me = c.get("user")!.id
 
   const cloned = await db.transaction(async (tx) => {
-    const [contest] = await tx.insert(schema.contest).values({
-      title: original.contest.title,
-      description: original.contest.description,
-      tag: original.contest.tag,
-      // 不复制原比赛的密码。两个理由：一是克隆出来是一场新比赛、时间也是新的，
-      // 沿用旧密码意味着拿着旧密码的学生直接能进；二是本接口不校验归属
-      // （旧后端也不校验，教师可以拿别人的比赛做模板），复制过来就等于把别人的
-      // 比赛密码原样回传给调用者。克隆者自己重新设一个。
-      password: null,
-      // 克隆出来的一律不可见：时间是拍脑袋定的 10 分钟后，直接开放会让学生看到一场没准备好的赛
-      visible: false,
-      startTime: start.toISOString(),
-      endTime: end.toISOString(),
-      createdById: me,
-      createTime: now,
-      lastUpdateTime: now,
-    }).returning({ id: schema.contest.id })
+    const [contest] = await tx
+      .insert(schema.contest)
+      .values({
+        title: original.contest.title,
+        description: original.contest.description,
+        tag: original.contest.tag,
+        // 不复制原比赛的密码。两个理由：一是克隆出来是一场新比赛、时间也是新的，
+        // 沿用旧密码意味着拿着旧密码的学生直接能进；二是本接口不校验归属
+        // （旧后端也不校验，教师可以拿别人的比赛做模板），复制过来就等于把别人的
+        // 比赛密码原样回传给调用者。克隆者自己重新设一个。
+        password: null,
+        // 克隆出来的一律不可见：时间是拍脑袋定的 10 分钟后，直接开放会让学生看到一场没准备好的赛
+        visible: false,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        createdById: me,
+        createTime: now,
+        lastUpdateTime: now,
+      })
+      .returning({ id: schema.contest.id })
 
-    const problems = await tx.select().from(schema.problem)
+    const problems = await tx
+      .select()
+      .from(schema.problem)
       .where(eq(schema.problem.contestId, id))
     if (problems.length === 0) return contest!.id
 
     // 题面、标签各一条语句，不再按题循环。新旧题的对应关系靠 _id 认：
     // 克隆出来的题原样保留 _id，而它们全在同一场新比赛里，彼此不会重名。
-    const copies = await tx.insert(schema.problem).values(problems.map(({ id: _oldId, ...rest }) => ({
-      ...rest,
-      contestId: contest!.id,
-      // 计数器归零：克隆的是题面，不是历史战绩
-      submissionNumber: 0,
-      acceptedNumber: 0,
-      statisticInfo: {},
-      createdById: me,
-      createTime: now,
-      lastUpdateTime: now,
-    }))).returning({ id: schema.problem.id, displayId: schema.problem.displayId })
-    const newIdByDisplayId = new Map(copies.map((copy) => [copy.displayId, copy.id]))
+    const copies = await tx
+      .insert(schema.problem)
+      .values(
+        problems.map(({ id: _oldId, ...rest }) => ({
+          ...rest,
+          contestId: contest!.id,
+          // 计数器归零：克隆的是题面，不是历史战绩
+          submissionNumber: 0,
+          acceptedNumber: 0,
+          statisticInfo: {},
+          createdById: me,
+          createTime: now,
+          lastUpdateTime: now,
+        })),
+      )
+      .returning({ id: schema.problem.id, displayId: schema.problem.displayId })
+    const newIdByDisplayId = new Map(
+      copies.map((copy) => [copy.displayId, copy.id]),
+    )
 
     // 标签是多对多中间表，Django 的 problem.tags.set(tags) 对应这里手工复制关系行
-    const tags = await tx.select({ problemId: schema.problemTags.problemId, tagId: schema.problemTags.problemtagId })
-      .from(schema.problemTags).where(inArray(schema.problemTags.problemId, problems.map((problem) => problem.id)))
+    const tags = await tx
+      .select({
+        problemId: schema.problemTags.problemId,
+        tagId: schema.problemTags.problemtagId,
+      })
+      .from(schema.problemTags)
+      .where(
+        inArray(
+          schema.problemTags.problemId,
+          problems.map((problem) => problem.id),
+        ),
+      )
     if (tags.length) {
-      const displayIdByOldId = new Map(problems.map((problem) => [problem.id, problem.displayId]))
+      const displayIdByOldId = new Map(
+        problems.map((problem) => [problem.id, problem.displayId]),
+      )
       const links = tags.flatMap((tag) => {
-        const newId = newIdByDisplayId.get(displayIdByOldId.get(tag.problemId) ?? "")
-        return newId === undefined ? [] : [{ problemId: newId, problemtagId: tag.tagId }]
+        const newId = newIdByDisplayId.get(
+          displayIdByOldId.get(tag.problemId) ?? "",
+        )
+        return newId === undefined
+          ? []
+          : [{ problemId: newId, problemtagId: tag.tagId }]
       })
       if (links.length) await tx.insert(schema.problemTags).values(links)
     }
@@ -237,82 +309,128 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
 
 // ---------------------------------------------------------------- ACM 赛后核查
 
-adminContestRoutes.get("/contests/:id/acm-helper", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // 不卡 visible：赛后核查恰恰常发生在比赛已经收起来之后，而同一场比赛的
-  // PUT acm-helper 从来不卡这一条 —— 卡着就成了「标记还能改、页面打不开」
-  const [contest] = await db.select().from(schema.contest)
-    .where(eq(schema.contest.id, id)).limit(1)
-  if (!contest || !ownedBy(c.get("user")!, contest)) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
-  }
-
-  const [problems, ranks] = await Promise.all([
-    db.select({ id: schema.problem.id, displayId: schema.problem.displayId })
-      .from(schema.problem).where(eq(schema.problem.contestId, id)),
-    db.select({
-      id: schema.acmContestRank.id,
-      username: schema.user.username,
-      realName: schema.userProfile.realName,
-      submissionInfo: schema.acmContestRank.submissionInfo,
-      acceptedNumber: schema.acmContestRank.acceptedNumber,
-    }).from(schema.acmContestRank)
-      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(eq(schema.acmContestRank.contestId, id)),
-  ])
-  const displayIds = new Map(problems.map((problem) => [String(problem.id), problem.displayId]))
-
-  const results = []
-  for (const rank of ranks) {
-    if (rank.acceptedNumber <= 0) continue
-    for (const [problemId, info] of Object.entries(rank.submissionInfo)) {
-      if (info.is_ac !== true) continue
-      results.push({
-        id: rank.id,
-        username: rank.username,
-        // 真名在这里是**有意下发**的：核查页就是老师对着名单一个个确认谁抄了。
-        // 接口已由 requireTeacher + ownedBy 双重把关。
-        realName: rank.realName,
-        problemId,
-        problemDisplayId: displayIds.get(problemId) ?? problemId,
-        acInfo: info,
-        checked: info.checked === true,
-        _acTime: typeof info.ac_time === "number" ? info.ac_time : 0,
-      })
+adminContestRoutes.get(
+  "/contests/:id/acm-helper",
+  requireTeacher,
+  async (c) => {
+    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+    // 不卡 visible：赛后核查恰恰常发生在比赛已经收起来之后，而同一场比赛的
+    // PUT acm-helper 从来不卡这一条 —— 卡着就成了「标记还能改、页面打不开」
+    const [contest] = await db
+      .select()
+      .from(schema.contest)
+      .where(eq(schema.contest.id, id))
+      .limit(1)
+    if (!contest || !ownedBy(c.get("user")!, contest)) {
+      return failure(c, 404, "contest-not-found", "Contest does not exist")
     }
-  }
-  // 按 AC 用时倒序：最后才做出来的排前面，那是最值得看的
-  results.sort((left, right) => right._acTime - left._acTime)
-  return success(c, results.map(({ _acTime, ...item }) => item) satisfies AcmHelperItem[])
-})
 
-adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => {
-  const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateAcmHelperRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) {
-    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
-  }
-  const [contest] = await db.select().from(schema.contest).where(eq(schema.contest.id, contestId)).limit(1)
-  if (!contest || !ownedBy(c.get("user")!, contest)) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
-  }
-  // rank 必须属于这场比赛。旧后端只按 rank_id 取，不校验归属 ——
-  // 那样带上任意 rank_id 就能改别的比赛的核查标记
-  const [rank] = await db.select().from(schema.acmContestRank).where(and(
-    eq(schema.acmContestRank.id, parsed.data.rankId),
-    eq(schema.acmContestRank.contestId, contestId),
-  )).limit(1)
-  if (!rank) return failure(c, 404, "rank-not-found", "Rank id does not exist")
+    const [problems, ranks] = await Promise.all([
+      db
+        .select({ id: schema.problem.id, displayId: schema.problem.displayId })
+        .from(schema.problem)
+        .where(eq(schema.problem.contestId, id)),
+      db
+        .select({
+          id: schema.acmContestRank.id,
+          username: schema.user.username,
+          realName: schema.userProfile.realName,
+          submissionInfo: schema.acmContestRank.submissionInfo,
+          acceptedNumber: schema.acmContestRank.acceptedNumber,
+        })
+        .from(schema.acmContestRank)
+        .innerJoin(
+          schema.user,
+          eq(schema.acmContestRank.userId, schema.user.id),
+        )
+        .leftJoin(
+          schema.userProfile,
+          eq(schema.userProfile.userId, schema.user.id),
+        )
+        .where(eq(schema.acmContestRank.contestId, id)),
+    ])
+    const displayIds = new Map(
+      problems.map((problem) => [String(problem.id), problem.displayId]),
+    )
 
-  const info = rank.submissionInfo
-  const entry = info[parsed.data.problemId]
-  if (!entry) {
-    return failure(c, 404, "problem-not-in-rank", "Problem id does not exist")
-  }
-  entry.checked = parsed.data.checked
-  info[parsed.data.problemId] = entry
-  await db.update(schema.acmContestRank).set({ submissionInfo: info })
-    .where(eq(schema.acmContestRank.id, rank.id))
-  return success(c, null)
-})
+    const results = []
+    for (const rank of ranks) {
+      if (rank.acceptedNumber <= 0) continue
+      for (const [problemId, info] of Object.entries(rank.submissionInfo)) {
+        if (info.is_ac !== true) continue
+        results.push({
+          id: rank.id,
+          username: rank.username,
+          // 真名在这里是**有意下发**的：核查页就是老师对着名单一个个确认谁抄了。
+          // 接口已由 requireTeacher + ownedBy 双重把关。
+          realName: rank.realName,
+          problemId,
+          problemDisplayId: displayIds.get(problemId) ?? problemId,
+          acInfo: info,
+          checked: info.checked === true,
+          _acTime: typeof info.ac_time === "number" ? info.ac_time : 0,
+        })
+      }
+    }
+    // 按 AC 用时倒序：最后才做出来的排前面，那是最值得看的
+    results.sort((left, right) => right._acTime - left._acTime)
+    return success(
+      c,
+      results.map(({ _acTime, ...item }) => item) satisfies AcmHelperItem[],
+    )
+  },
+)
+
+adminContestRoutes.put(
+  "/contests/:id/acm-helper",
+  requireTeacher,
+  async (c) => {
+    const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })
+    const parsed = updateAcmHelperRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    )
+    if (!parsed.success) {
+      return failure(
+        c,
+        400,
+        "invalid-request",
+        parsed.error.issues[0]?.message ?? "Invalid payload",
+      )
+    }
+    const [contest] = await db
+      .select()
+      .from(schema.contest)
+      .where(eq(schema.contest.id, contestId))
+      .limit(1)
+    if (!contest || !ownedBy(c.get("user")!, contest)) {
+      return failure(c, 404, "contest-not-found", "Contest does not exist")
+    }
+    // rank 必须属于这场比赛。旧后端只按 rank_id 取，不校验归属 ——
+    // 那样带上任意 rank_id 就能改别的比赛的核查标记
+    const [rank] = await db
+      .select()
+      .from(schema.acmContestRank)
+      .where(
+        and(
+          eq(schema.acmContestRank.id, parsed.data.rankId),
+          eq(schema.acmContestRank.contestId, contestId),
+        ),
+      )
+      .limit(1)
+    if (!rank)
+      return failure(c, 404, "rank-not-found", "Rank id does not exist")
+
+    const info = rank.submissionInfo
+    const entry = info[parsed.data.problemId]
+    if (!entry) {
+      return failure(c, 404, "problem-not-in-rank", "Problem id does not exist")
+    }
+    entry.checked = parsed.data.checked
+    info[parsed.data.problemId] = entry
+    await db
+      .update(schema.acmContestRank)
+      .set({ submissionInfo: info })
+      .where(eq(schema.acmContestRank.id, rank.id))
+    return success(c, null)
+  },
+)

@@ -23,10 +23,7 @@ const IDLE_MS = 10 * 60 * 1000
  * @param tutorialId 当前这一课，0 表示还没加载好
  * @param enabled 是否留痕。未登录时为 false：教程本身保持免登录可读，只是不记
  */
-export function useLearnTrace(
-  tutorialId: Ref<number>,
-  enabled: Ref<boolean>,
-) {
+export function useLearnTrace(tutorialId: Ref<number>, enabled: Ref<boolean>) {
   const visibility = useDocumentVisibility()
   const { idle } = useIdle(IDLE_MS)
 

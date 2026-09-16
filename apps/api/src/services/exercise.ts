@@ -34,7 +34,8 @@ export function exerciseDataError(
     case "mcq": {
       const options = strings(data.options)
       if (options.length < 2) return "选择题至少要有 2 个选项"
-      if (options.some((option) => !option.trim())) return "选择题的选项不能为空"
+      if (options.some((option) => !option.trim()))
+        return "选择题的选项不能为空"
       return indexAnswerError(data.answer, options.length, "正确答案")
     }
     case "sort": {
@@ -53,12 +54,19 @@ export function exerciseDataError(
     case "match": {
       const left = strings(data.left)
       const right = strings(data.right)
-      if (left.length < 2 || right.length < 2) return "连线题左右两列各至少 2 项"
+      if (left.length < 2 || right.length < 2)
+        return "连线题左右两列各至少 2 项"
       if (left.length !== right.length) return "连线题左右两列的行数必须相等"
-      return indexAnswerError(data.answer, right.length, "连线答案", left.length)
+      return indexAnswerError(
+        data.answer,
+        right.length,
+        "连线答案",
+        left.length,
+      )
     }
     case "predict": {
-      if (!(typeof data.code === "string" && data.code.trim())) return "输出预测题的代码不能为空"
+      if (!(typeof data.code === "string" && data.code.trim()))
+        return "输出预测题的代码不能为空"
       if (strings(data.answer).filter((item) => item.trim()).length === 0) {
         return "输出预测题至少要有一个正确输出"
       }
@@ -75,7 +83,13 @@ export function exerciseDataError(
       if (buckets.length < 2) return "归类题至少要有 2 个分组"
       if (items.length === 0) return "归类题至少要有一个项目"
       // 归类题的下标**允许重复**：好几个项目落在同一个分组是常态，别顺手加去重
-      return indexAnswerError(data.answer, buckets.length, "归类答案", items.length, false)
+      return indexAnswerError(
+        data.answer,
+        buckets.length,
+        "归类答案",
+        items.length,
+        false,
+      )
     }
   }
 }
@@ -122,7 +136,9 @@ function indexAnswerError(
       ? `请至少勾选一个${label}`
       : `${label}的条数（${answer.length}）和项目数（${length}）对不上`
   }
-  if (answer.some((item) => item < 0 || item >= bound)) return `${label}的下标越界`
-  if (unique && new Set(answer).size !== answer.length) return `${label}里有重复的下标`
+  if (answer.some((item) => item < 0 || item >= bound))
+    return `${label}的下标越界`
+  if (unique && new Set(answer).size !== answer.length)
+    return `${label}里有重复的下标`
   return null
 }

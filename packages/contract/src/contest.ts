@@ -27,7 +27,9 @@ export const contestPasswordRequestSchema = z.object({
 })
 
 export const contestAccessSchema = z.object({ access: z.boolean() })
-export const contestProblemsSchema = z.array(z.union([problemListItemSchema, problemDetailSchema]))
+export const contestProblemsSchema = z.array(
+  z.union([problemListItemSchema, problemDetailSchema]),
+)
 
 /**
  * `acm_contest_rank.submission_info` 的 JSONB 原文。
@@ -69,5 +71,7 @@ export type ContestAccess = z.infer<typeof contestAccessSchema>
 export type ContestSubmissionInfo = z.infer<typeof contestSubmissionInfoSchema>
 
 export type ContestStatus = z.infer<typeof contestStatusSchema>
-export type ContestPasswordRequest = z.infer<typeof contestPasswordRequestSchema>
+export type ContestPasswordRequest = z.infer<
+  typeof contestPasswordRequestSchema
+>
 export type ContestProblems = z.infer<typeof contestProblemsSchema>

@@ -114,7 +114,10 @@ function consume(bucket: RateBucket, burst: number, refillPerSecond: number) {
 
 /** 文本帧：严格档。会查库，走这一档的都按最坏情况算 */
 function allowMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>) {
-  const bucket = (ws.data.rate ??= { tokens: RATE_BURST, updatedAt: Date.now() })
+  const bucket = (ws.data.rate ??= {
+    tokens: RATE_BURST,
+    updatedAt: Date.now(),
+  })
   return consume(bucket, RATE_BURST, RATE_REFILL_PER_SECOND)
 }
 
@@ -213,7 +216,10 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       liveSockets.add(ws)
       ws.data.rate = { tokens: RATE_BURST, updatedAt: Date.now() }
       if (ws.data.kind === "collab") {
-        ws.data.binaryRate = { tokens: COLLAB_BINARY_BURST, updatedAt: Date.now() }
+        ws.data.binaryRate = {
+          tokens: COLLAB_BINARY_BURST,
+          updatedAt: Date.now(),
+        }
         handleCollabOpen(ws)
         return
       }
@@ -292,7 +298,10 @@ async function handleMessage(
     ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
     return
   }
-  if (message.type !== "subscribe" || typeof message.submissionId !== "string") {
+  if (
+    message.type !== "subscribe" ||
+    typeof message.submissionId !== "string"
+  ) {
     ws.send(JSON.stringify({ type: "error", message: "Invalid message" }))
     return
   }
@@ -336,19 +345,43 @@ async function handleMessage(
 
   if (!submission) {
     const [flowchart] = await db
-      .select({ id: schema.flowchartSubmission.id, status: schema.flowchartSubmission.status, score: schema.flowchartSubmission.aiScore, grade: schema.flowchartSubmission.aiGrade })
+      .select({
+        id: schema.flowchartSubmission.id,
+        status: schema.flowchartSubmission.status,
+        score: schema.flowchartSubmission.aiScore,
+        grade: schema.flowchartSubmission.aiGrade,
+      })
       .from(schema.flowchartSubmission)
-      .where(and(eq(schema.flowchartSubmission.id, message.submissionId), eq(schema.flowchartSubmission.userId, ws.data.userId)))
+      .where(
+        and(
+          eq(schema.flowchartSubmission.id, message.submissionId),
+          eq(schema.flowchartSubmission.userId, ws.data.userId),
+        ),
+      )
       .limit(1)
     if (!flowchart) {
-      ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
+      ws.send(
+        JSON.stringify({ type: "error", message: "Submission not found" }),
+      )
       return
     }
-    const replay = flowchart.status === 2
-      ? { type: "flowchart_evaluation_completed" as const, submissionId: flowchart.id, score: flowchart.score ?? undefined, grade: flowchart.grade ?? undefined }
-      : flowchart.status === 3
-        ? { type: "flowchart_evaluation_failed" as const, submissionId: flowchart.id }
-        : { type: "flowchart_evaluation_update" as const, submissionId: flowchart.id }
+    const replay =
+      flowchart.status === 2
+        ? {
+            type: "flowchart_evaluation_completed" as const,
+            submissionId: flowchart.id,
+            score: flowchart.score ?? undefined,
+            grade: flowchart.grade ?? undefined,
+          }
+        : flowchart.status === 3
+          ? {
+              type: "flowchart_evaluation_failed" as const,
+              submissionId: flowchart.id,
+            }
+          : {
+              type: "flowchart_evaluation_update" as const,
+              submissionId: flowchart.id,
+            }
     ws.send(JSON.stringify(replay satisfies FlowchartUpdate))
     return
   }
@@ -407,7 +440,12 @@ export async function bridgeSubmissionEvents(
         const [activeUser] = await db
           .select({ id: schema.user.id })
           .from(schema.user)
-          .where(and(eq(schema.user.id, event.userId), eq(schema.user.isDisabled, false)))
+          .where(
+            and(
+              eq(schema.user.id, event.userId),
+              eq(schema.user.isDisabled, false),
+            ),
+          )
           .limit(1)
         if (!activeUser) return
         server.publish(topic, JSON.stringify(event.data))

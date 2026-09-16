@@ -85,16 +85,24 @@ const PHASE_FAILURE: Record<string, SqlJobFailure> = {
     result: JudgeStatus.SYSTEM_ERROR,
     message: "初始化脚本或标准答案超时/内存超限，请检查题目配置",
   },
-  student: { ok: false, result: JudgeStatus.CPU_TIME_LIMIT_EXCEEDED, message: "SQL 执行超时" },
+  student: {
+    ok: false,
+    result: JudgeStatus.CPU_TIME_LIMIT_EXCEEDED,
+    message: "SQL 执行超时",
+  },
 }
 
-async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<T>> {
+async function runJob<T>(
+  job: SqlJob,
+  budget: JobBudget,
+): Promise<SqlJobOutcome<T>> {
   // 递归闸。子进程里绝不允许再 spawn 子进程 —— 见文件头「为什么必须有这道闸」。
   if (process.env[CHILD_MARKER]) {
     return {
       ok: false,
       result: JudgeStatus.SYSTEM_ERROR,
-      message: "SQL 判题子进程试图再起子进程，已阻断（入口子命令分发可能不正确）",
+      message:
+        "SQL 判题子进程试图再起子进程，已阻断（入口子命令分发可能不正确）",
     }
   }
 
@@ -115,7 +123,10 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
   child.stdin.write(JSON.stringify(job))
   await child.stdin.end()
 
-  let timer = setTimeout(() => child.kill("SIGKILL"), budget.trustedMs + STARTUP_SLACK_MS)
+  let timer = setTimeout(
+    () => child.kill("SIGKILL"),
+    budget.trustedMs + STARTUP_SLACK_MS,
+  )
   let phase = ""
   // stderr 要边读边看：阶段标记一到就得马上换兜底时限，攒到进程结束再读就没意义了
   const readStderr = (async () => {
@@ -132,7 +143,10 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
         phase = latest
         if (phase === "student" && budget.studentMs !== null) {
           clearTimeout(timer)
-          timer = setTimeout(() => child.kill("SIGKILL"), budget.studentMs + STUDENT_SLACK_MS)
+          timer = setTimeout(
+            () => child.kill("SIGKILL"),
+            budget.studentMs + STUDENT_SLACK_MS,
+          )
         }
       }
     }
@@ -140,7 +154,10 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
 
   let stdout = ""
   try {
-    ;[stdout] = await Promise.all([new Response(child.stdout).text(), readStderr])
+    ;[stdout] = await Promise.all([
+      new Response(child.stdout).text(),
+      readStderr,
+    ])
     await child.exited
   } finally {
     clearTimeout(timer)
@@ -160,12 +177,15 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
 
   try {
     const parsed = JSON.parse(stdout) as
-      | { ok: true; case?: CaseResult; display?: unknown }
-      | SqlJobFailure
+      { ok: true; case?: CaseResult; display?: unknown } | SqlJobFailure
     if (!parsed.ok) return parsed
     return { ok: true, value: (parsed.case ?? parsed.display) as T }
   } catch {
-    return { ok: false, result: JudgeStatus.SYSTEM_ERROR, message: "SQL 判题子进程返回了无法解析的结果" }
+    return {
+      ok: false,
+      result: JudgeStatus.SYSTEM_ERROR,
+      message: "SQL 判题子进程返回了无法解析的结果",
+    }
   }
 }
 
@@ -176,7 +196,11 @@ export function runSqlCase(job: Extract<SqlJob, { kind: "judge" }>) {
   })
 }
 
-export function buildSqlDisplay(initSql: string, refSql: string, mode: "query" | "modify") {
+export function buildSqlDisplay(
+  initSql: string,
+  refSql: string,
+  mode: "query" | "modify",
+) {
   // 子进程产出的形状由 engine.ts 的 dumpDisplayTables / runDisplay 决定，就是契约里的
   // SqlDisplay —— 同一个仓库里的两端，不在这儿再 parse 一遍
   return runJob<SqlDisplay>(

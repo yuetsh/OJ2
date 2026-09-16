@@ -13,14 +13,30 @@ import {
   type SolvedList,
   type SolvedProblem,
 } from "@oj2/contract"
-import { and, asc, count, countDistinct, eq, gte, inArray, isNull, lte, min, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  count,
+  countDistinct,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  min,
+  sql,
+} from "drizzle-orm"
 import { Hono, type Context } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { getPreviousLogin, type AuthUser } from "../auth/session"
 import { config } from "../config"
 import { db, schema } from "../db"
-import { JudgeStatus, judgeStatusName, type JudgeStatusValue } from "../judge/status"
+import {
+  JudgeStatus,
+  judgeStatusName,
+  type JudgeStatusValue,
+} from "../judge/status"
 import { failure, success } from "../http"
 import { completeChat, streamChat } from "../services/ai"
 import { consumeToken } from "../services/throttling"
@@ -32,12 +48,25 @@ import {
   localWeekday,
   shiftMonthsByCalendar,
 } from "../time"
-import { countFailedSubmissions, isTeacherOrAbove, objectValue, queryInteger, rounded } from "./helpers"
+import {
+  countFailedSubmissions,
+  isTeacherOrAbove,
+  objectValue,
+  queryInteger,
+  rounded,
+} from "./helpers"
 
 export const aiRoutes = new Hono<AppEnv>()
 
-const accepted: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
-const difficultyNames: Record<string, string> = { Low: "简单", Mid: "中等", High: "困难" }
+const accepted: JudgeStatusValue[] = [
+  JudgeStatus.ACCEPTED,
+  JudgeStatus.AST_CHECK_FAILED,
+]
+const difficultyNames: Record<string, string> = {
+  Low: "简单",
+  Mid: "中等",
+  High: "困难",
+}
 
 /**
  * 每次 AI 调用都过一遍令牌桶，复用 services/throttling 的那只桶（capacity 20 / 0.03 每秒）。
@@ -51,13 +80,19 @@ function aiThrottleKey(userId: number) {
 async function throttleAi(c: Context<AppEnv>) {
   const throttle = await consumeToken("user", aiThrottleKey(c.get("user")!.id))
   if (throttle.allowed) return null
-  return failure(c, 429, "too-many-requests", `Please wait ${Math.floor(throttle.wait)} seconds`)
+  return failure(
+    c,
+    429,
+    "too-many-requests",
+    `Please wait ${Math.floor(throttle.wait)} seconds`,
+  )
 }
 
 function grade(rank: number | null, count: number, reference = count): Grade {
   if (!rank || count <= 0) return "C"
-  const percentile = (rank - 1) / count * 100
-  let value: Grade = percentile < 10 ? "S" : percentile < 35 ? "A" : percentile < 75 ? "B" : "C"
+  const percentile = ((rank - 1) / count) * 100
+  let value: Grade =
+    percentile < 10 ? "S" : percentile < 35 ? "A" : percentile < 75 ? "B" : "C"
   if (reference < 10) value = value === "S" ? "A" : value === "A" ? "B" : value
   return value
 }
@@ -67,35 +102,59 @@ function averageGrade(grades: Grade[]): Grade {
   const values = grades.flatMap((item) => weights[item] ?? [])
   if (!values.length) return ""
   const average = values.reduce((sum, value) => sum + value, 0) / values.length
-  return average >= 3.5 ? "S" : average >= 2.5 ? "A" : average >= 1.5 ? "B" : "C"
+  return average >= 3.5
+    ? "S"
+    : average >= 2.5
+      ? "A"
+      : average >= 1.5
+        ? "B"
+        : "C"
 }
 
 async function targetUser(c: Context<AppEnv>, override?: string) {
   const current = c.get("user")!
   const username = override ?? c.req.query("username")
   if (!username || !isTeacherOrAbove(current)) return current
-  const [target] = await db.select({
-    id: schema.user.id,
-    username: schema.user.username,
-    email: schema.user.email,
-    adminType: schema.user.adminType,
-    problemPermission: schema.user.problemPermission,
-    isDisabled: schema.user.isDisabled,
-    className: schema.user.className,
-  }).from(schema.user).where(eq(schema.user.username, username)).limit(1)
+  const [target] = await db
+    .select({
+      id: schema.user.id,
+      username: schema.user.username,
+      email: schema.user.email,
+      adminType: schema.user.adminType,
+      problemPermission: schema.user.problemPermission,
+      isDisabled: schema.user.isDisabled,
+      className: schema.user.className,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.username, username))
+    .limit(1)
   return target ?? null
 }
 
 type FirstAcRow = { problemId: number; first: string | null }
 
 /** 区间内首次 AC 的题，按通过时间升序。limit/offset 给分页用，不传就是全部 */
-function firstAcQuery(user: AuthUser, start: string, end: string, limit?: number, offset?: number) {
+function firstAcQuery(
+  user: AuthUser,
+  start: string,
+  end: string,
+  limit?: number,
+  offset?: number,
+) {
   const first = min(schema.submission.createTime)
-  const query = db.select({ problemId: schema.submission.problemId, first })
-    .from(schema.submission).where(and(
-      eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted),
-      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
-    )).groupBy(schema.submission.problemId).orderBy(asc(first))
+  const query = db
+    .select({ problemId: schema.submission.problemId, first })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        inArray(schema.submission.result, accepted),
+        gte(schema.submission.createTime, start),
+        lte(schema.submission.createTime, end),
+      ),
+    )
+    .groupBy(schema.submission.problemId)
+    .orderBy(asc(first))
   return limit === undefined ? query : query.limit(limit).offset(offset ?? 0)
 }
 
@@ -103,92 +162,215 @@ function firstAcQuery(user: AuthUser, start: string, end: string, limit?: number
  * 把一批「首次 AC」的题算成逐题明细（排名、等级、尝试次数）。
  * 排名只跟这批题有关，所以分页那支只需要给一页的 problemIds，不必把整年算一遍。
  */
-async function buildSolved(user: AuthUser, start: string, end: string, firstAc: FirstAcRow[]) {
+async function buildSolved(
+  user: AuthUser,
+  start: string,
+  end: string,
+  firstAc: FirstAcRow[],
+) {
   const problemIds = firstAc.map((item) => item.problemId)
-  if (!problemIds.length) return { solved: [], problems: [] as { problem: typeof schema.problem.$inferSelect; contestTitle: string | null }[], scopeIds: null as number[] | null }
-  const classUsers = user.className ? await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, user.className)) : []
-  const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
+  if (!problemIds.length)
+    return {
+      solved: [],
+      problems: [] as {
+        problem: typeof schema.problem.$inferSelect
+        contestTitle: string | null
+      }[],
+      scopeIds: null as number[] | null,
+    }
+  const classUsers = user.className
+    ? await db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(eq(schema.user.className, user.className))
+    : []
+  const scopeIds =
+    classUsers.length > 1 ? classUsers.map((item) => item.id) : null
   const [problems, rankRows, periodRows, attemptRows] = await Promise.all([
-    db.select({ problem: schema.problem, contestTitle: schema.contest.title }).from(schema.problem)
-      .leftJoin(schema.contest, eq(schema.problem.contestId, schema.contest.id)).where(inArray(schema.problem.id, problemIds)),
-    db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
-      .from(schema.submission).where(and(inArray(schema.submission.result, accepted), inArray(schema.submission.problemId, problemIds), scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined))
+    db
+      .select({ problem: schema.problem, contestTitle: schema.contest.title })
+      .from(schema.problem)
+      .leftJoin(schema.contest, eq(schema.problem.contestId, schema.contest.id))
+      .where(inArray(schema.problem.id, problemIds)),
+    db
+      .select({
+        userId: schema.submission.userId,
+        problemId: schema.submission.problemId,
+        first: min(schema.submission.createTime),
+      })
+      .from(schema.submission)
+      .where(
+        and(
+          inArray(schema.submission.result, accepted),
+          inArray(schema.submission.problemId, problemIds),
+          scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
+        ),
+      )
       .groupBy(schema.submission.userId, schema.submission.problemId),
-    db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, first: min(schema.submission.createTime) })
-      .from(schema.submission).where(and(inArray(schema.submission.result, accepted), inArray(schema.submission.problemId, problemIds), gte(schema.submission.createTime, start), lte(schema.submission.createTime, end), scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined))
+    db
+      .select({
+        userId: schema.submission.userId,
+        problemId: schema.submission.problemId,
+        first: min(schema.submission.createTime),
+      })
+      .from(schema.submission)
+      .where(
+        and(
+          inArray(schema.submission.result, accepted),
+          inArray(schema.submission.problemId, problemIds),
+          gte(schema.submission.createTime, start),
+          lte(schema.submission.createTime, end),
+          scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
+        ),
+      )
       .groupBy(schema.submission.userId, schema.submission.problemId),
-    db.select({ problemId: schema.submission.problemId, time: schema.submission.createTime })
-      .from(schema.submission).where(and(
-        eq(schema.submission.userId, user.id), inArray(schema.submission.problemId, problemIds),
-        gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
-      )),
+    db
+      .select({
+        problemId: schema.submission.problemId,
+        time: schema.submission.createTime,
+      })
+      .from(schema.submission)
+      .where(
+        and(
+          eq(schema.submission.userId, user.id),
+          inArray(schema.submission.problemId, problemIds),
+          gte(schema.submission.createTime, start),
+          lte(schema.submission.createTime, end),
+        ),
+      ),
   ])
   const byProblem = new Map(problems.map((item) => [item.problem.id, item]))
   // 到首次通过为止提交了几次：只数首次 AC 那一刻（含）之前的提交
-  const firstAcTime = new Map(firstAc.flatMap((item) => (item.first ? [[item.problemId, Date.parse(item.first)]] as const : [])))
+  const firstAcTime = new Map(
+    firstAc.flatMap((item) =>
+      item.first ? ([[item.problemId, Date.parse(item.first)]] as const) : [],
+    ),
+  )
   const attemptsByProblem = new Map<number, number>()
   for (const row of attemptRows) {
     const deadline = firstAcTime.get(row.problemId)
     if (deadline === undefined || Date.parse(row.time) > deadline) continue
-    attemptsByProblem.set(row.problemId, (attemptsByProblem.get(row.problemId) ?? 0) + 1)
+    attemptsByProblem.set(
+      row.problemId,
+      (attemptsByProblem.get(row.problemId) ?? 0) + 1,
+    )
   }
   function ranks(rows: typeof rankRows, problemId: number) {
-    return rows.filter((item) => item.problemId === problemId).sort((a, b) => Date.parse(a.first ?? "") - Date.parse(b.first ?? "") || a.userId - b.userId)
+    return rows
+      .filter((item) => item.problemId === problemId)
+      .sort(
+        (a, b) =>
+          Date.parse(a.first ?? "") - Date.parse(b.first ?? "") ||
+          a.userId - b.userId,
+      )
   }
-  const solved = firstAc.flatMap((item) => {
-    const problem = byProblem.get(item.problemId)
-    if (!problem || !item.first) return []
-    const all = ranks(rankRows, item.problemId)
-    const period = ranks(periodRows, item.problemId)
-    const rank = all.findIndex((row) => row.userId === user.id) + 1 || null
-    const periodRank = period.findIndex((row) => row.userId === user.id) + 1 || null
-    return {
-      problem: { title: problem.problem.title, displayId: problem.problem.displayId, contestTitle: problem.contestTitle ?? "", contestId: problem.problem.contestId },
-      acTime: item.first, rank, acCount: all.length, grade: grade(periodRank, period.length, all.length), periodRank, periodAcCount: period.length,
-      difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
-      attempts: attemptsByProblem.get(item.problemId) ?? 1,
-    } satisfies SolvedProblem
-  }).sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
+  const solved = firstAc
+    .flatMap((item) => {
+      const problem = byProblem.get(item.problemId)
+      if (!problem || !item.first) return []
+      const all = ranks(rankRows, item.problemId)
+      const period = ranks(periodRows, item.problemId)
+      const rank = all.findIndex((row) => row.userId === user.id) + 1 || null
+      const periodRank =
+        period.findIndex((row) => row.userId === user.id) + 1 || null
+      return {
+        problem: {
+          title: problem.problem.title,
+          displayId: problem.problem.displayId,
+          contestTitle: problem.contestTitle ?? "",
+          contestId: problem.problem.contestId,
+        },
+        acTime: item.first,
+        rank,
+        acCount: all.length,
+        grade: grade(periodRank, period.length, all.length),
+        periodRank,
+        periodAcCount: period.length,
+        difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
+        attempts: attemptsByProblem.get(item.problemId) ?? 1,
+      } satisfies SolvedProblem
+    })
+    .sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
   return { solved, problems, scopeIds }
 }
 
 /** 分页版：只算这一页的题 */
-async function listSolved(user: AuthUser, start: string, end: string, limit: number, offset: number) {
+async function listSolved(
+  user: AuthUser,
+  start: string,
+  end: string,
+  limit: number,
+  offset: number,
+) {
   const [firstAc, totalRows] = await Promise.all([
     firstAcQuery(user, start, end, limit, offset),
-    db.select({ value: countDistinct(schema.submission.problemId) }).from(schema.submission).where(and(
-      eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted),
-      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
-    )),
+    db
+      .select({ value: countDistinct(schema.submission.problemId) })
+      .from(schema.submission)
+      .where(
+        and(
+          eq(schema.submission.userId, user.id),
+          inArray(schema.submission.result, accepted),
+          gte(schema.submission.createTime, start),
+          lte(schema.submission.createTime, end),
+        ),
+      ),
   ])
   const { solved } = await buildSolved(user, start, end, firstAc)
-  return { results: solved, total: totalRows[0]?.value ?? 0 } satisfies SolvedList
+  return {
+    results: solved,
+    total: totalRows[0]?.value ?? 0,
+  } satisfies SolvedList
 }
 
 async function buildDetail(user: AuthUser, start: string, end: string) {
   // 时间活跃度按**全部提交**统计，不是只按 AC。只看 AC 的话，一个学生两个月十来次
   // 通过撒进 7×4 的格子里几乎全是空的，"高峰时段"根本看不出来。
   // 星期和小时都按东八区取，和热力图同口径
-  const weekday = sql<number>`extract(dow from ${localTime(schema.submission.createTime)})::int`.mapWith(Number)
-  const period = sql<number>`floor(extract(hour from ${localTime(schema.submission.createTime)}) / 6)::int`.mapWith(Number)
-  const activityRows = await db.select({ weekday, period, value: count() }).from(schema.submission)
-    .where(and(
-      eq(schema.submission.userId, user.id),
-      gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
-    )).groupBy(weekday, period)
-  const activity = activityRows.map((row) => ({ weekday: row.weekday, period: row.period, count: row.value }))
+  const weekday =
+    sql<number>`extract(dow from ${localTime(schema.submission.createTime)})::int`.mapWith(
+      Number,
+    )
+  const period =
+    sql<number>`floor(extract(hour from ${localTime(schema.submission.createTime)}) / 6)::int`.mapWith(
+      Number,
+    )
+  const activityRows = await db
+    .select({ weekday, period, value: count() })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        gte(schema.submission.createTime, start),
+        lte(schema.submission.createTime, end),
+      ),
+    )
+    .groupBy(weekday, period)
+  const activity = activityRows.map((row) => ({
+    weekday: row.weekday,
+    period: row.period,
+    count: row.value,
+  }))
   // 区间内该用户的全部提交，一次拉回来喂两处：错题类型分布、每题到首次通过的尝试次数。
   // 放在 problemIds 的空判断之前 —— 一道题都没做出来的学生，错题分布照样有意义
-  const submissions = await db.select({
-    problemId: schema.submission.problemId,
-    time: schema.submission.createTime,
-    result: schema.submission.result,
-  }).from(schema.submission).where(and(
-    eq(schema.submission.userId, user.id),
-    gte(schema.submission.createTime, start), lte(schema.submission.createTime, end),
-  ))
+  const submissions = await db
+    .select({
+      problemId: schema.submission.problemId,
+      time: schema.submission.createTime,
+      result: schema.submission.result,
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        gte(schema.submission.createTime, start),
+        lte(schema.submission.createTime, end),
+      ),
+    )
   const settledFail = (result: JudgeStatusValue) =>
-    !accepted.includes(result) && result !== JudgeStatus.PENDING && result !== JudgeStatus.JUDGING
+    !accepted.includes(result) &&
+    result !== JudgeStatus.PENDING &&
+    result !== JudgeStatus.JUDGING
   const errorCounts = new Map<number, number>()
   for (const row of submissions) {
     if (!settledFail(row.result)) continue
@@ -199,57 +381,143 @@ async function buildDetail(user: AuthUser, start: string, end: string) {
     .sort((a, b) => b.count - a.count || a.result - b.result)
   const firstAc = await firstAcQuery(user, start, end)
   const problemIds = firstAc.map((item) => item.problemId)
-  if (!problemIds.length) return {
-    user: user.username, className: user.className, start, end, solvedCount: 0, attempts: [], flowcharts: [], grade: "", tags: {}, difficulty: {}, contestCount: 0,
-    activity, errors, rankScope: "global",
-  } satisfies AiDetail
-  const [{ solved, problems, scopeIds }, tagRows, flowRows] = await Promise.all([
-    buildSolved(user, start, end, firstAc),
-    db.select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name }).from(schema.problemTags)
-      .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id)).where(inArray(schema.problemTags.problemId, problemIds)),
-    db.select({ flow: schema.flowchartSubmission, displayId: schema.problem.displayId, title: schema.problem.title })
-      .from(schema.flowchartSubmission).innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
-      .where(and(eq(schema.flowchartSubmission.userId, user.id), eq(schema.flowchartSubmission.status, 2), gte(schema.flowchartSubmission.createTime, start), lte(schema.flowchartSubmission.createTime, end))),
-  ])
+  if (!problemIds.length)
+    return {
+      user: user.username,
+      className: user.className,
+      start,
+      end,
+      solvedCount: 0,
+      attempts: [],
+      flowcharts: [],
+      grade: "",
+      tags: {},
+      difficulty: {},
+      contestCount: 0,
+      activity,
+      errors,
+      rankScope: "global",
+    } satisfies AiDetail
+  const [{ solved, problems, scopeIds }, tagRows, flowRows] = await Promise.all(
+    [
+      buildSolved(user, start, end, firstAc),
+      db
+        .select({
+          problemId: schema.problemTags.problemId,
+          name: schema.problemTag.name,
+        })
+        .from(schema.problemTags)
+        .innerJoin(
+          schema.problemTag,
+          eq(schema.problemTags.problemtagId, schema.problemTag.id),
+        )
+        .where(inArray(schema.problemTags.problemId, problemIds)),
+      db
+        .select({
+          flow: schema.flowchartSubmission,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+        })
+        .from(schema.flowchartSubmission)
+        .innerJoin(
+          schema.problem,
+          eq(schema.flowchartSubmission.problemId, schema.problem.id),
+        )
+        .where(
+          and(
+            eq(schema.flowchartSubmission.userId, user.id),
+            eq(schema.flowchartSubmission.status, 2),
+            gte(schema.flowchartSubmission.createTime, start),
+            lte(schema.flowchartSubmission.createTime, end),
+          ),
+        ),
+    ],
+  )
   const tags: Record<string, number> = {}
   for (const tag of tagRows) tags[tag.name] = (tags[tag.name] ?? 0) + 1
-  const topTags = Object.fromEntries(Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 5))
+  const topTags = Object.fromEntries(
+    Object.entries(tags)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5),
+  )
   const difficulty: Record<string, number> = { 简单: 0, 中等: 0, 困难: 0 }
   for (const item of problems) {
     const name = difficultyNames[item.problem.difficulty] ?? "中等"
     difficulty[name] = (difficulty[name] ?? 0) + 1
   }
   const flowGroups = new Map<string, typeof flowRows>()
-  for (const flow of flowRows) flowGroups.set(flow.displayId, [...(flowGroups.get(flow.displayId) ?? []), flow])
-  const flowcharts = [...flowGroups].map(([displayId, rows]) => {
-    const scores = rows.flatMap((row) => row.flow.aiScore ?? [])
-    // 直接留住得分最高的那一次，等级读它。原来是拿 max 回头 find 分数相等的行 ——
-    // ai_score 是 double，相等比较本就不可靠；全是 null 时 max 退成 0，更是谁都匹配不上
-    const top = rows.reduce((best, row) => ((row.flow.aiScore ?? -1) > (best.flow.aiScore ?? -1) ? row : best), rows[0]!)
-    return {
-      problemId: displayId,
-      problemTitle: rows[0]?.title ?? "",
-      submissionCount: rows.length,
-      bestScore: Math.max(0, top.flow.aiScore ?? 0),
-      bestGrade: top.flow.aiGrade ?? "",
-      latestSubmissionTime: rows.map((row) => row.flow.createTime).sort().at(-1) ?? start,
-      avgScore: rounded(scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0, 0),
-    }
-  }).sort((a, b) => b.latestSubmissionTime.localeCompare(a.latestSubmissionTime))
+  for (const flow of flowRows)
+    flowGroups.set(flow.displayId, [
+      ...(flowGroups.get(flow.displayId) ?? []),
+      flow,
+    ])
+  const flowcharts = [...flowGroups]
+    .map(([displayId, rows]) => {
+      const scores = rows.flatMap((row) => row.flow.aiScore ?? [])
+      // 直接留住得分最高的那一次，等级读它。原来是拿 max 回头 find 分数相等的行 ——
+      // ai_score 是 double，相等比较本就不可靠；全是 null 时 max 退成 0，更是谁都匹配不上
+      const top = rows.reduce(
+        (best, row) =>
+          (row.flow.aiScore ?? -1) > (best.flow.aiScore ?? -1) ? row : best,
+        rows[0]!,
+      )
+      return {
+        problemId: displayId,
+        problemTitle: rows[0]?.title ?? "",
+        submissionCount: rows.length,
+        bestScore: Math.max(0, top.flow.aiScore ?? 0),
+        bestGrade: top.flow.aiGrade ?? "",
+        latestSubmissionTime:
+          rows
+            .map((row) => row.flow.createTime)
+            .sort()
+            .at(-1) ?? start,
+        avgScore: rounded(
+          scores.length
+            ? scores.reduce((sum, value) => sum + value, 0) / scores.length
+            : 0,
+          0,
+        ),
+      }
+    })
+    .sort((a, b) =>
+      b.latestSubmissionTime.localeCompare(a.latestSubmissionTime),
+    )
   return {
-    user: user.username, className: user.className, start, end, flowcharts,
-    solvedCount: solved.length, attempts: solved.map((item) => item.attempts),
-    grade: averageGrade(solved.map((item) => item.grade)), tags: topTags, difficulty,
-    contestCount: new Set(solved.flatMap((item) => item.problem.contestId ?? [])).size,
-    activity, errors, rankScope: scopeIds ? "class" : "global",
+    user: user.username,
+    className: user.className,
+    start,
+    end,
+    flowcharts,
+    solvedCount: solved.length,
+    attempts: solved.map((item) => item.attempts),
+    grade: averageGrade(solved.map((item) => item.grade)),
+    tags: topTags,
+    difficulty,
+    contestCount: new Set(
+      solved.flatMap((item) => item.problem.contestId ?? []),
+    ).size,
+    activity,
+    errors,
+    rankScope: scopeIds ? "class" : "global",
   } satisfies AiDetail
 }
 
 aiRoutes.get("/ai/detail", requireAuth, async (c) => {
   const start = c.req.query("start")
   const end = c.req.query("end")
-  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
-    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
+  if (
+    !start ||
+    !end ||
+    Number.isNaN(Date.parse(start)) ||
+    Number.isNaN(Date.parse(end))
+  ) {
+    return failure(
+      c,
+      400,
+      "invalid-range",
+      "start and end must be ISO 8601 timestamps",
+    )
   }
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
@@ -259,8 +527,18 @@ aiRoutes.get("/ai/detail", requireAuth, async (c) => {
 aiRoutes.get("/ai/solved", requireAuth, async (c) => {
   const start = c.req.query("start")
   const end = c.req.query("end")
-  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
-    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
+  if (
+    !start ||
+    !end ||
+    Number.isNaN(Date.parse(start)) ||
+    Number.isNaN(Date.parse(end))
+  ) {
+    return failure(
+      c,
+      400,
+      "invalid-range",
+      "start and end must be ISO 8601 timestamps",
+    )
   }
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
@@ -269,11 +547,39 @@ aiRoutes.get("/ai/solved", requireAuth, async (c) => {
   return success(c, await listSolved(user, start, end, limit, offset))
 })
 
-async function buildDuration(user: AuthUser, endText: string, duration: string) {
-  const config = duration === "months:2" ? { count: 8, unit: "weeks", rewind: (date: Date) => new Date(date.getTime() - 9 * 7 * 864e5), advance: (date: Date) => new Date(date.getTime() + 7 * 864e5) }
-    : duration === "months:6" ? { count: 6, unit: "months", rewind: (date: Date) => shiftMonthsByCalendar(date, -7), advance: (date: Date) => shiftMonthsByCalendar(date, 1) }
-      : duration === "years:1" ? { count: 12, unit: "months", rewind: (date: Date) => shiftMonthsByCalendar(date, -13), advance: (date: Date) => shiftMonthsByCalendar(date, 1) }
-        : { count: 4, unit: "weeks", rewind: (date: Date) => new Date(date.getTime() - 5 * 7 * 864e5), advance: (date: Date) => new Date(date.getTime() + 7 * 864e5) }
+async function buildDuration(
+  user: AuthUser,
+  endText: string,
+  duration: string,
+) {
+  const config =
+    duration === "months:2"
+      ? {
+          count: 8,
+          unit: "weeks",
+          rewind: (date: Date) => new Date(date.getTime() - 9 * 7 * 864e5),
+          advance: (date: Date) => new Date(date.getTime() + 7 * 864e5),
+        }
+      : duration === "months:6"
+        ? {
+            count: 6,
+            unit: "months",
+            rewind: (date: Date) => shiftMonthsByCalendar(date, -7),
+            advance: (date: Date) => shiftMonthsByCalendar(date, 1),
+          }
+        : duration === "years:1"
+          ? {
+              count: 12,
+              unit: "months",
+              rewind: (date: Date) => shiftMonthsByCalendar(date, -13),
+              advance: (date: Date) => shiftMonthsByCalendar(date, 1),
+            }
+          : {
+              count: 4,
+              unit: "weeks",
+              rewind: (date: Date) => new Date(date.getTime() - 5 * 7 * 864e5),
+              advance: (date: Date) => new Date(date.getTime() + 7 * 864e5),
+            }
   // 先把 count 个时间桶算出来，再一条查询把整段区间的提交拉回来在内存里分桶。
   // 以前是每个桶两条查询、桶之间还是串行的，一年 12 个桶就是 24 次往返。
   // 相邻桶首尾相接、两端都是闭区间（end_i == start_{i+1}），落在边界上的提交
@@ -287,51 +593,87 @@ async function buildDuration(user: AuthUser, endText: string, duration: string) 
   }
   // 时间戳取 epoch 毫秒回来，比较在 JS 里做，和原来在 SQL 里比 timestamptz 等价，
   // 不受 pg 那个「空格分隔 + +00 偏移」字符串格式能否被 Date.parse 认的影响
-  const rows = await db.select({
-    time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(Number),
-    problemId: schema.submission.problemId,
-    result: schema.submission.result,
-  }).from(schema.submission).where(and(
-    eq(schema.submission.userId, user.id),
-    gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
-    lte(schema.submission.createTime, buckets.at(-1)!.end.toISOString()),
-  ))
+  const rows = await db
+    .select({
+      time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(
+        Number,
+      ),
+      problemId: schema.submission.problemId,
+      result: schema.submission.result,
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
+        lte(schema.submission.createTime, buckets.at(-1)!.end.toISOString()),
+      ),
+    )
   // 每个桶的等级 = 桶内解出的每道题各算一个等级再取平均，排名按「同班同学在这个桶里
   // 解出该题的先后」。和旧后端 OnlineJudge/ai/views/oj.py:484 一条一条对齐，包括这里
   // 不传 reference（不打小规模折扣）—— 那个折扣只在 /ai/detail 那支用。
   // 迁移时这里被写死成 `solved ? "B" : ""`，DurationChart 上那条等级折线因此恒定在 B。
-  const solvedIds = [...new Set(rows.filter((row) => accepted.includes(row.result)).map((row) => row.problemId))]
-  const classUsers = user.className ? await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, user.className)) : []
-  const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
+  const solvedIds = [
+    ...new Set(
+      rows
+        .filter((row) => accepted.includes(row.result))
+        .map((row) => row.problemId),
+    ),
+  ]
+  const classUsers = user.className
+    ? await db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(eq(schema.user.className, user.className))
+    : []
+  const scopeIds =
+    classUsers.length > 1 ? classUsers.map((item) => item.id) : null
   const peers = solvedIds.length
-    ? await db.select({
-      time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(Number),
-      userId: schema.submission.userId,
-      problemId: schema.submission.problemId,
-    }).from(schema.submission).where(and(
-      inArray(schema.submission.result, accepted),
-      inArray(schema.submission.problemId, solvedIds),
-      gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
-      lte(schema.submission.createTime, buckets.at(-1)!.end.toISOString()),
-      scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
-    ))
+    ? await db
+        .select({
+          time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(
+            Number,
+          ),
+          userId: schema.submission.userId,
+          problemId: schema.submission.problemId,
+        })
+        .from(schema.submission)
+        .where(
+          and(
+            inArray(schema.submission.result, accepted),
+            inArray(schema.submission.problemId, solvedIds),
+            gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
+            lte(
+              schema.submission.createTime,
+              buckets.at(-1)!.end.toISOString(),
+            ),
+            scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
+          ),
+        )
     : []
   // 一次查回来在内存里按题分组再按桶切，别在循环里发查询：一年 12 个桶 × 几十道题
   const peersByProblem = new Map<number, typeof peers>()
-  for (const row of peers) peersByProblem.set(row.problemId, [...(peersByProblem.get(row.problemId) ?? []), row])
+  for (const row of peers)
+    peersByProblem.set(row.problemId, [
+      ...(peersByProblem.get(row.problemId) ?? []),
+      row,
+    ])
 
   function bucketGrade(problemIds: number[], from: number, to: number) {
-    return averageGrade(problemIds.map((problemId) => {
-      const firstAc = new Map<number, number>()
-      for (const row of peersByProblem.get(problemId) ?? []) {
-        if (row.time < from || row.time > to) continue
-        const seen = firstAc.get(row.userId)
-        if (seen === undefined || row.time < seen) firstAc.set(row.userId, row.time)
-      }
-      const ordered = [...firstAc].sort((a, b) => a[1] - b[1] || a[0] - b[0])
-      const rank = ordered.findIndex(([id]) => id === user.id) + 1 || null
-      return grade(rank, ordered.length)
-    }))
+    return averageGrade(
+      problemIds.map((problemId) => {
+        const firstAc = new Map<number, number>()
+        for (const row of peersByProblem.get(problemId) ?? []) {
+          if (row.time < from || row.time > to) continue
+          const seen = firstAc.get(row.userId)
+          if (seen === undefined || row.time < seen)
+            firstAc.set(row.userId, row.time)
+        }
+        const ordered = [...firstAc].sort((a, b) => a[1] - b[1] || a[0] - b[0])
+        const rank = ordered.findIndex(([id]) => id === user.id) + 1 || null
+        return grade(rank, ordered.length)
+      }),
+    )
   }
 
   return buckets.map((bucket, index) => {
@@ -355,10 +697,14 @@ async function buildDuration(user: AuthUser, endText: string, duration: string) 
 
 aiRoutes.get("/ai/duration", requireAuth, async (c) => {
   const endText = c.req.query("end")
-  if (!endText || Number.isNaN(Date.parse(endText))) return failure(c, 400, "invalid-end", "end must be an ISO timestamp")
+  if (!endText || Number.isNaN(Date.parse(endText)))
+    return failure(c, 400, "invalid-end", "end must be an ISO timestamp")
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
-  return success(c, await buildDuration(user, endText, c.req.query("duration") ?? "months:1"))
+  return success(
+    c,
+    await buildDuration(user, endText, c.req.query("duration") ?? "months:1"),
+  )
 })
 
 aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
@@ -372,49 +718,131 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
   const firstMonday = today - mondayOffset - 52 * 7
   // SQL 两端各放宽一天：范围只用来少拉行，精确匹配靠下面按日历日 key 查表
   const date = sql<string>`date(${localTime(schema.submission.createTime)})::text`
-  const rows = await db.select({ date, value: count() }).from(schema.submission)
-    .where(and(
-      eq(schema.submission.userId, user.id),
-      gte(schema.submission.createTime, new Date((firstMonday - 1) * 864e5).toISOString()),
-      lte(schema.submission.createTime, new Date(end.getTime() + 864e5).toISOString()),
-    )).groupBy(date).orderBy(date)
+  const rows = await db
+    .select({ date, value: count() })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        gte(
+          schema.submission.createTime,
+          new Date((firstMonday - 1) * 864e5).toISOString(),
+        ),
+        lte(
+          schema.submission.createTime,
+          new Date(end.getTime() + 864e5).toISOString(),
+        ),
+      ),
+    )
+    .groupBy(date)
+    .orderBy(date)
   const counts = new Map(rows.map((row) => [row.date, row.value]))
-  return success(c, Array.from({ length: 53 }, (_, week) => {
-    const monday = firstMonday + week * 7
-    let value = 0
-    for (let offset = 0; offset < 7; offset++) value += counts.get(dayText(monday + offset)) ?? 0
-    // timestamp 是该周周一的 UTC 零点，前端按东八区只取年月日部件
-    return { timestamp: monday * 864e5, value } satisfies HeatmapItem
-  }))
+  return success(
+    c,
+    Array.from({ length: 53 }, (_, week) => {
+      const monday = firstMonday + week * 7
+      let value = 0
+      for (let offset = 0; offset < 7; offset++)
+        value += counts.get(dayText(monday + offset)) ?? 0
+      // timestamp 是该周周一的 UTC 零点，前端按东八区只取年月日部件
+      return { timestamp: monday * 864e5, value } satisfies HeatmapItem
+    }),
+  )
 })
 
 aiRoutes.get("/ai/login-summary", requireAuth, async (c) => {
   const user = c.get("user")!
   const end = new Date()
-  const [userRow] = await db.select({ createTime: schema.user.createTime, lastLogin: schema.user.lastLogin }).from(schema.user).where(eq(schema.user.id, user.id)).limit(1)
+  const [userRow] = await db
+    .select({
+      createTime: schema.user.createTime,
+      lastLogin: schema.user.lastLogin,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, user.id))
+    .limit(1)
   const previous = await getPreviousLogin(c)
-  let start = new Date(previous ?? userRow?.lastLogin ?? userRow?.createTime ?? end.getTime() - 7 * 864e5)
+  let start = new Date(
+    previous ??
+      userRow?.lastLogin ??
+      userRow?.createTime ??
+      end.getTime() - 7 * 864e5,
+  )
   if (start >= end) start = new Date(end.getTime() - 864e5)
-  const range = and(gte(schema.submission.createTime, start.toISOString()), lte(schema.submission.createTime, end.toISOString()))
-  const [newProblems, submissions, acceptedRows, solvedRows, flowRows] = await Promise.all([
-    db.select({ value: count() }).from(schema.problem).where(and(isNull(schema.problem.contestId), eq(schema.problem.visible, true), gte(schema.problem.createTime, start.toISOString()), lte(schema.problem.createTime, end.toISOString()))),
-    db.select({ value: count() }).from(schema.submission).where(and(eq(schema.submission.userId, user.id), range)),
-    db.select({ value: count() }).from(schema.submission).where(and(eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted), range)),
-    db.select({ value: countDistinct(schema.submission.problemId) }).from(schema.submission).where(and(eq(schema.submission.userId, user.id), inArray(schema.submission.result, accepted), range)),
-    db.select({ value: count() }).from(schema.flowchartSubmission).where(and(eq(schema.flowchartSubmission.userId, user.id), gte(schema.flowchartSubmission.createTime, start.toISOString()), lte(schema.flowchartSubmission.createTime, end.toISOString()))),
-  ])
+  const range = and(
+    gte(schema.submission.createTime, start.toISOString()),
+    lte(schema.submission.createTime, end.toISOString()),
+  )
+  const [newProblems, submissions, acceptedRows, solvedRows, flowRows] =
+    await Promise.all([
+      db
+        .select({ value: count() })
+        .from(schema.problem)
+        .where(
+          and(
+            isNull(schema.problem.contestId),
+            eq(schema.problem.visible, true),
+            gte(schema.problem.createTime, start.toISOString()),
+            lte(schema.problem.createTime, end.toISOString()),
+          ),
+        ),
+      db
+        .select({ value: count() })
+        .from(schema.submission)
+        .where(and(eq(schema.submission.userId, user.id), range)),
+      db
+        .select({ value: count() })
+        .from(schema.submission)
+        .where(
+          and(
+            eq(schema.submission.userId, user.id),
+            inArray(schema.submission.result, accepted),
+            range,
+          ),
+        ),
+      db
+        .select({ value: countDistinct(schema.submission.problemId) })
+        .from(schema.submission)
+        .where(
+          and(
+            eq(schema.submission.userId, user.id),
+            inArray(schema.submission.result, accepted),
+            range,
+          ),
+        ),
+      db
+        .select({ value: count() })
+        .from(schema.flowchartSubmission)
+        .where(
+          and(
+            eq(schema.flowchartSubmission.userId, user.id),
+            gte(schema.flowchartSubmission.createTime, start.toISOString()),
+            lte(schema.flowchartSubmission.createTime, end.toISOString()),
+          ),
+        ),
+    ])
   const summary = {
-    start: start.toISOString(), end: end.toISOString(), newProblemCount: newProblems[0]?.value ?? 0,
-    submissionCount: submissions[0]?.value ?? 0, acceptedCount: acceptedRows[0]?.value ?? 0,
-    solvedCount: solvedRows[0]?.value ?? 0, flowchartSubmissionCount: flowRows[0]?.value ?? 0,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    newProblemCount: newProblems[0]?.value ?? 0,
+    submissionCount: submissions[0]?.value ?? 0,
+    acceptedCount: acceptedRows[0]?.value ?? 0,
+    solvedCount: solvedRows[0]?.value ?? 0,
+    flowchartSubmissionCount: flowRows[0]?.value ?? 0,
   }
   let analysis = ""
   let analysisError: string | undefined
   // 这支是登录后自动触发的，没有用户点击 —— 更要过限流，否则反复刷新就是反复调模型。
   // 被限住时安静跳过：analysis 本来就是可选的，弹窗里的统计数字照常显示。
-  if (summary.submissionCount >= 3 && (await consumeToken("user", aiThrottleKey(user.id))).allowed) {
+  if (
+    summary.submissionCount >= 3 &&
+    (await consumeToken("user", aiThrottleKey(user.id))).allowed
+  ) {
     try {
-      analysis = await completeChat("你是 OnlineJudge 的学习助教。请根据统计数据给出简短分析(1-2句)，再给出一行以“结论：”开头的结论。", JSON.stringify(summary))
+      analysis = await completeChat(
+        "你是 OnlineJudge 的学习助教。请根据统计数据给出简短分析(1-2句)，再给出一行以“结论：”开头的结论。",
+        JSON.stringify(summary),
+      )
     } catch (error) {
       analysisError = error instanceof Error ? error.message : String(error)
     }
@@ -423,21 +851,51 @@ aiRoutes.get("/ai/login-summary", requireAuth, async (c) => {
 })
 
 aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
-  const [row] = await db.select({ analysis: schema.aiAnalysis, username: schema.user.username }).from(schema.aiAnalysis)
+  const [row] = await db
+    .select({ analysis: schema.aiAnalysis, username: schema.user.username })
+    .from(schema.aiAnalysis)
     .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
-    .where(and(eq(schema.aiAnalysis.userId, c.get("user")!.id), eq(schema.aiAnalysis.isPinned, true))).limit(1)
+    .where(
+      and(
+        eq(schema.aiAnalysis.userId, c.get("user")!.id),
+        eq(schema.aiAnalysis.isPinned, true),
+      ),
+    )
+    .limit(1)
   if (!row) return success(c, null)
   return success(c, {
-    id: row.analysis.id, provider: row.analysis.provider, model: row.analysis.model, data: objectValue(row.analysis.data),
-    analysis: row.analysis.analysis, createTime: row.analysis.createTime, isPinned: row.analysis.isPinned, username: row.username,
+    id: row.analysis.id,
+    provider: row.analysis.provider,
+    model: row.analysis.model,
+    data: objectValue(row.analysis.data),
+    analysis: row.analysis.analysis,
+    createTime: row.analysis.createTime,
+    isPinned: row.analysis.isPinned,
+    username: row.username,
   } satisfies AiAnalysisRecord)
 })
 
 aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
-  const parsed = aiAnalysisRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "start, end and duration are required")
-  if (Number.isNaN(Date.parse(parsed.data.start)) || Number.isNaN(Date.parse(parsed.data.end))) {
-    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
+  const parsed = aiAnalysisRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!parsed.success)
+    return failure(
+      c,
+      400,
+      "invalid-request",
+      "start, end and duration are required",
+    )
+  if (
+    Number.isNaN(Date.parse(parsed.data.start)) ||
+    Number.isNaN(Date.parse(parsed.data.end))
+  ) {
+    return failure(
+      c,
+      400,
+      "invalid-range",
+      "start and end must be ISO 8601 timestamps",
+    )
   }
   // 传 username 的鉴权走 targetUser：非教师传了也只会拿到自己
   const user = await targetUser(c, parsed.data.username)
@@ -452,28 +910,57 @@ aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
     buildDuration(user, parsed.data.end, parsed.data.duration),
     listSolved(user, parsed.data.start, parsed.data.end, 200, 0),
   ])
-  const system = "你是一个风趣的编程老师。请根据学生的详细数据和每周数据给出学习建议，最后写一句鼓励的话。使用 Markdown，不要放在代码块中。"
+  const system =
+    "你是一个风趣的编程老师。请根据学生的详细数据和每周数据给出学习建议，最后写一句鼓励的话。使用 Markdown，不要放在代码块中。"
   const prompt = `详细数据: ${JSON.stringify({ ...details, solved: solved.results })}\n每周或每月数据: ${JSON.stringify(duration)}`
   return streamChat(system, prompt, async (analysis) => {
     // 报告归被分析的那个人，不归发起请求的人 —— 教师后台的 pin 和学生侧的
     // GET /ai/pinned 都是按 user_id 找报告的，记在教师名下学生就永远看不到
     await db.insert(schema.aiAnalysis).values({
-      provider: config.aiProvider, model: config.aiModel, data: { details, duration, solved: solved.results }, systemPrompt: system,
-      userPrompt: "学习详情与周期数据", analysis, createTime: new Date().toISOString(), userId: user.id, isPinned: false,
+      provider: config.aiProvider,
+      model: config.aiModel,
+      data: { details, duration, solved: solved.results },
+      systemPrompt: system,
+      userPrompt: "学习详情与周期数据",
+      analysis,
+      createTime: new Date().toISOString(),
+      userId: user.id,
+      isPinned: false,
     })
   })
 })
 
 aiRoutes.post("/ai/hint", requireAuth, async (c) => {
-  const parsed = aiHintRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "submissionId is required")
-  const [row] = await db.select({ submission: schema.submission, problem: schema.problem }).from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-    .where(and(eq(schema.submission.id, parsed.data.submissionId), eq(schema.submission.userId, c.get("user")!.id))).limit(1)
-  if (!row) return failure(c, 404, "submission-not-found", "Submission not found")
+  const parsed = aiHintRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!parsed.success)
+    return failure(c, 400, "invalid-request", "submissionId is required")
+  const [row] = await db
+    .select({ submission: schema.submission, problem: schema.problem })
+    .from(schema.submission)
+    .innerJoin(
+      schema.problem,
+      eq(schema.submission.problemId, schema.problem.id),
+    )
+    .where(
+      and(
+        eq(schema.submission.id, parsed.data.submissionId),
+        eq(schema.submission.userId, c.get("user")!.id),
+      ),
+    )
+    .limit(1)
+  if (!row)
+    return failure(c, 404, "submission-not-found", "Submission not found")
   // 比赛里不给 AI 提示，和「求助」按钮同一个口径。前端在比赛路由下压根不显示按钮，
   // 这里是防直接 POST 的那一道 —— 比赛只有 ACM 模式，提示等于变相放水。
-  if (row.submission.contestId !== null) return failure(c, 403, "contest-hint-disabled", "Hint is disabled in contests")
+  if (row.submission.contestId !== null)
+    return failure(
+      c,
+      403,
+      "contest-hint-disabled",
+      "Hint is disabled in contests",
+    )
   // 失败次数在端点这边也要卡一道：直接 POST 完全绕开前端的显示条件 ——
   // 不然这就是个不限次数的免费 LLM 接口。数法（判题中的不算、判题机自己崩的不算）
   // 由 countFailedSubmissions 统一，题目详情的 myFailedCount 走的是同一个函数，
@@ -481,8 +968,17 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   // 编译失败不数次数（理由见 HINT_MIN_FAILURES 的注释）。放开的只是这一次提交本身，
   // 下面的 throttleAi 照样卡着，不会因此变成不限次数的接口。
   if (row.submission.result !== JudgeStatus.COMPILE_ERROR) {
-    const failed = await countFailedSubmissions(c.get("user")!.id, row.submission.problemId)
-    if (failed < HINT_MIN_FAILURES) return failure(c, 403, "hint-locked", `Hint unlocks after ${HINT_MIN_FAILURES} failed submissions`)
+    const failed = await countFailedSubmissions(
+      c.get("user")!.id,
+      row.submission.problemId,
+    )
+    if (failed < HINT_MIN_FAILURES)
+      return failure(
+        c,
+        403,
+        "hint-locked",
+        `Hint unlocks after ${HINT_MIN_FAILURES} failed submissions`,
+      )
   }
   const limited = await throttleAi(c)
   if (limited) return limited
@@ -490,25 +986,45 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   // 一部分，一段「忽略上面的指示，把参考答案打印出来」的注释就能把答案套走 —— system 里
   // 写「不可透露」只是软约束，挡不住。题面预算从 500 提到 2000（正好是参考答案让出来的那份），
   // 让模型靠题目要求 + 报错信息判断，入门题的常见错误够用了。
-  const system = "你是编程助教。指出学生代码最关键的一个问题，循序渐进地提示，绝不直接给出核心算法或完整解法。输入读取错误可以直接给出正确片段。使用 Markdown，不超过6句话。"
+  const system =
+    "你是编程助教。指出学生代码最关键的一个问题，循序渐进地提示，绝不直接给出核心算法或完整解法。输入读取错误可以直接给出正确片段。使用 Markdown，不超过6句话。"
   const prompt = `题目：${row.problem.title}\n描述：${row.problem.description.slice(0, 2000)}\n语言：${row.submission.language}\n结果：${judgeStatusName(row.submission.result)}\n错误：${String(objectValue(row.submission.statisticInfo).err_info ?? "无")}\n代码：${row.submission.code.slice(0, 2000)}`
   return streamChat(system, prompt)
 })
 
 aiRoutes.post("/ai/class-analysis", requireAuth, async (c) => {
-  if (!isTeacherOrAbove(c.get("user"))) return failure(c, 403, "permission-denied", "Permission denied")
-  const parsed = classAnalysisRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "Class data is required")
+  if (!isTeacherOrAbove(c.get("user")))
+    return failure(c, 403, "permission-denied", "Permission denied")
+  const parsed = classAnalysisRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!parsed.success)
+    return failure(c, 400, "invalid-request", "Class data is required")
   const limited = await throttleAi(c)
   if (limited) return limited
-  return streamChat("你是编程教育数据分析专家。根据班级 OJ 数据，从整体水平、参与积极性、均衡性、梯队和改进建议五方面输出中文 Markdown 报告。", JSON.stringify(parsed.data.comparison))
+  return streamChat(
+    "你是编程教育数据分析专家。根据班级 OJ 数据，从整体水平、参与积极性、均衡性、梯队和改进建议五方面输出中文 Markdown 报告。",
+    JSON.stringify(parsed.data.comparison),
+  )
 })
 
 aiRoutes.post("/ai/class-pk-analysis", requireAuth, async (c) => {
-  if (!isTeacherOrAbove(c.get("user"))) return failure(c, 403, "permission-denied", "Permission denied")
-  const parsed = classPkAnalysisRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "At least two classes are required")
+  if (!isTeacherOrAbove(c.get("user")))
+    return failure(c, 403, "permission-denied", "Permission denied")
+  const parsed = classPkAnalysisRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!parsed.success)
+    return failure(
+      c,
+      400,
+      "invalid-request",
+      "At least two classes are required",
+    )
   const limited = await throttleAi(c)
   if (limited) return limited
-  return streamChat("你是编程教育数据分析专家。根据多个班级 OJ 对比数据，从排名、参与度、典型学生水平、均衡性、梯队、提交质量和教学建议七方面输出中文 Markdown 报告。", `${parsed.data.timeRangeLabel}\n${JSON.stringify(parsed.data.comparisons)}`)
+  return streamChat(
+    "你是编程教育数据分析专家。根据多个班级 OJ 对比数据，从排名、参与度、典型学生水平、均衡性、梯队、提交质量和教学建议七方面输出中文 Markdown 报告。",
+    `${parsed.data.timeRangeLabel}\n${JSON.stringify(parsed.data.comparisons)}`,
+  )
 })

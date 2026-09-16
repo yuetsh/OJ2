@@ -69,11 +69,7 @@
       </n-card>
 
       <!-- 详细评分 -->
-      <n-card
-        v-if="sortedCriteria.length > 0"
-        size="small"
-        title="详细评分"
-      >
+      <n-card v-if="sortedCriteria.length > 0" size="small" title="详细评分">
         <div
           v-for="[key, detail] in sortedCriteria"
           :key="key"
@@ -148,7 +144,9 @@ const criteriaDetails = computed<
   )
 })
 // jsonb 不保留键序，直接遍历会把 40 分的「逻辑正确性」排到最后
-const sortedCriteria = computed(() => sortFlowchartCriteria(criteriaDetails.value))
+const sortedCriteria = computed(() =>
+  sortFlowchartCriteria(criteriaDetails.value),
+)
 
 const loading = ref(false)
 const rendering = ref(false)

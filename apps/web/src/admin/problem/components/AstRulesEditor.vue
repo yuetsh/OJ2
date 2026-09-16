@@ -78,7 +78,10 @@ function nodeTargetOptions(lang: string): SelectOption[] {
 // 逻辑名 and/or/not 在 C 里显示成 && / || / !，存进去的还是逻辑名
 function operatorTargetOptions(lang: string): SelectOption[] {
   return Object.entries(AST_OPERATOR_TARGETS_BY_LANGUAGE[lang] ?? {}).map(
-    ([value, label]) => ({ label: label === value ? value : `${label}（${value}）`, value }),
+    ([value, label]) => ({
+      label: label === value ? value : `${label}（${value}）`,
+      value,
+    }),
   )
 }
 
@@ -173,7 +176,8 @@ function getTargetLabel(
   engine: string,
   target: string,
 ): string | undefined {
-  if (isNodeEngine(engine)) return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]?.label
+  if (isNodeEngine(engine))
+    return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]?.label
   // 运算符不写 label：判题结果的文案按语言翻译（astOperatorLabel），
   // 存一个固定 label 反而会把 C 的 && 钉死成 and
   return undefined
@@ -252,7 +256,8 @@ watch(supportedLanguages, (langs) => {
         :bordered="false"
         style="margin-bottom: 8px"
       >
-        {{ unsupportedLanguages.join("、") }} 暂不支持代码规则检查，判题机只能检查
+        {{ unsupportedLanguages.join("、") }}
+        暂不支持代码规则检查，判题机只能检查
         {{ AST_SUPPORTED_LANGUAGES.join(" / ") }}
       </n-alert>
       <n-tabs
@@ -393,9 +398,7 @@ watch(supportedLanguages, (langs) => {
       <n-empty
         v-else
         :description="
-          languages.length
-            ? '当前语言不支持代码规则检查'
-            : '请先选择编程语言'
+          languages.length ? '当前语言不支持代码规则检查' : '请先选择编程语言'
         "
       />
     </n-collapse-item>

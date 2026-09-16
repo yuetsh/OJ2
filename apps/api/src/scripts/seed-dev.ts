@@ -8,7 +8,9 @@ import { db, schema } from "../db"
  * raw_password，其中一个还是超管。对着生产库跑一次就是把超管密码改掉，
  * 所以这里按 DATABASE_URL 的主机名拦一道，需要绕过时显式设 OJ2_SEED_FORCE=true。
  */
-const url = process.env.DATABASE_URL ?? "postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge"
+const url =
+  process.env.DATABASE_URL ??
+  "postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge"
 const host = (() => {
   try {
     return new URL(url).hostname
@@ -93,7 +95,9 @@ async function seed(account: SeedAccount) {
     })
   }
 
-  console.log(`  ${account.adminType.padEnd(13)} ${user.username} / ${account.password}`)
+  console.log(
+    `  ${account.adminType.padEnd(13)} ${user.username} / ${account.password}`,
+  )
 }
 
 console.log("Seeded development logins:")

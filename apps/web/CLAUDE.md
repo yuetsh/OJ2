@@ -22,14 +22,15 @@ Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
 bun run dev            # 只起前端 dev server（5173），后端得另外起
 bun run type-check     # 类型检查。改完 .vue / .ts 必须跑这个
 bun run build          # 生产构建
-bun run fmt            # Prettier
 ```
 
 ⚠️ **验证只认 `bun run type-check`。** `vue-tsc --noEmit -p tsconfig.json` 会**静默
 通过**——那个 tsconfig 是 `files: []` + references 的壳，真正的配置在
 `tsconfig.app.json`（0.2 秒跑完就是没在检查的信号）；`vite build` 也不做类型检查。
 
-不写测试（沿用项目约定），验证靠实跑。lint 只有 Prettier。
+不写测试（沿用项目约定），验证靠实跑。lint 只有 Prettier，**脚本在仓库根目录**
+（`cd ../.. && bun run fmt`，一把把后端、契约、前端全格式化）—— 前端这边原来那个
+只管 `apps/web` 的 `fmt` 已经删掉，配置也收到了根目录的 `.prettierrc.toml`。
 
 ## Architecture
 

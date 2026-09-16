@@ -16,7 +16,11 @@ async function verifyDjangoPbkdf2(password: string, encoded: string) {
 
   const iterations = Number(iterationsText)
   const expected = Buffer.from(digestText, "base64")
-  if (!Number.isSafeInteger(iterations) || iterations <= 0 || expected.length === 0) {
+  if (
+    !Number.isSafeInteger(iterations) ||
+    iterations <= 0 ||
+    expected.length === 0
+  ) {
     return false
   }
 

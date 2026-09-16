@@ -51,20 +51,27 @@ function requireRole(
   return async (c, next) => {
     const session = await resolveSession(c)
     if (!session.user) return denied(c, session.reason)
-    if (!allowed(session.user)) return failure(c, 403, "permission-denied", "权限不足")
+    if (!allowed(session.user))
+      return failure(c, 403, "permission-denied", "权限不足")
     c.set("user", session.user)
     await next()
   }
 }
 
 /** 旧 `@admin_role_required` */
-export const requireAdmin = requireRole((user) => ADMIN_ROLES.includes(user.adminType))
+export const requireAdmin = requireRole((user) =>
+  ADMIN_ROLES.includes(user.adminType),
+)
 
 /** 旧 `@teacher_admin_required` */
-export const requireTeacher = requireRole((user) => TEACHER_ROLES.includes(user.adminType))
+export const requireTeacher = requireRole((user) =>
+  TEACHER_ROLES.includes(user.adminType),
+)
 
 /** 旧 `@super_admin_required` */
-export const requireSuperAdmin = requireRole((user) => user.adminType === "Super Admin")
+export const requireSuperAdmin = requireRole(
+  (user) => user.adminType === "Super Admin",
+)
 
 /**
  * 旧 `@problem_permission_required`：先要是管理员，再要 problem_permission 不为 None。
@@ -72,5 +79,6 @@ export const requireSuperAdmin = requireRole((user) => user.adminType === "Super
  * created_by 过滤 —— 旧后端也是这么分工的，别把两件事混在一起。
  */
 export const requireProblemPermission = requireRole(
-  (user) => ADMIN_ROLES.includes(user.adminType) && user.problemPermission !== "None",
+  (user) =>
+    ADMIN_ROLES.includes(user.adminType) && user.problemPermission !== "None",
 )

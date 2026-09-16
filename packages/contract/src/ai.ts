@@ -81,10 +81,12 @@ export const aiDetailSchema = z.object({
    * 判完的失败提交按状态码分组，多的在前。状态码是落库的值，
    * 前端用 utils/constants 的 JUDGE_STATUS 翻成中文，两边必须一致。
    */
-  errors: z.array(z.object({
-    result: z.number().int(),
-    count: z.number().int(),
-  })),
+  errors: z.array(
+    z.object({
+      result: z.number().int(),
+      count: z.number().int(),
+    }),
+  ),
   /**
    * solved 里的 rank/acCount 是在哪个范围里排的。班里只有一个人时后端会回退到全服，
    * 前端不能只看 className 有没有值就写「班级排名」。
@@ -180,4 +182,6 @@ export type LoginSummary = z.infer<typeof loginSummarySchema>
 export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>
 export type AiHintRequest = z.infer<typeof aiHintRequestSchema>
 export type ClassAnalysisRequest = z.infer<typeof classAnalysisRequestSchema>
-export type ClassPkAnalysisRequest = z.infer<typeof classPkAnalysisRequestSchema>
+export type ClassPkAnalysisRequest = z.infer<
+  typeof classPkAnalysisRequestSchema
+>

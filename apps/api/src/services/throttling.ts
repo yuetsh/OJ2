@@ -81,11 +81,17 @@ type ThrottleRedis = typeof redis & {
   ): Promise<[number, string]>
 }
 
-function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback
+function parseBucketConfig(
+  value: unknown,
+  fallback: BucketConfig,
+): BucketConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return fallback
   const raw = value as Record<string, unknown>
   const pick = (key: keyof BucketConfig) =>
-    typeof raw[key] === "number" && Number.isFinite(raw[key]) && (raw[key] as number) > 0
+    typeof raw[key] === "number" &&
+    Number.isFinite(raw[key]) &&
+    (raw[key] as number) > 0
       ? (raw[key] as number)
       : fallback[key]
   return {
@@ -106,7 +112,10 @@ function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig
  * `throttling` 没有后台界面，只能直接改库，改完最多一分钟后生效。
  */
 const BUCKET_CACHE_TTL = 60_000
-const bucketCache = new Map<"user", { value: BucketConfig; expiresAt: number }>()
+const bucketCache = new Map<
+  "user",
+  { value: BucketConfig; expiresAt: number }
+>()
 
 export async function getBucketConfig(scope: "user"): Promise<BucketConfig> {
   const cached = bucketCache.get(scope)
@@ -117,9 +126,13 @@ export async function getBucketConfig(scope: "user"): Promise<BucketConfig> {
   try {
     const values = await getOptions(["throttling"])
     const throttling = values.throttling
-    value = !throttling || typeof throttling !== "object" || Array.isArray(throttling)
-      ? fallback
-      : parseBucketConfig((throttling as Record<string, unknown>)[scope], fallback)
+    value =
+      !throttling || typeof throttling !== "object" || Array.isArray(throttling)
+        ? fallback
+        : parseBucketConfig(
+            (throttling as Record<string, unknown>)[scope],
+            fallback,
+          )
   } catch {
     // 读不到就退回默认值，但**不写缓存** —— 数据库抖一下不该让接下来一整分钟
     // 全站都按默认参数限流

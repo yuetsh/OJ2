@@ -47,15 +47,21 @@ export function useCollabDoc() {
     if (doc) stop()
     const myGeneration = ++generation
 
-    const [Y, awarenessProtocol, syncProtocol, encoding, decoding, { yCollab }] =
-      await Promise.all([
-        import("yjs"),
-        import("y-protocols/awareness"),
-        import("y-protocols/sync"),
-        import("lib0/encoding"),
-        import("lib0/decoding"),
-        import("y-codemirror.next"),
-      ])
+    const [
+      Y,
+      awarenessProtocol,
+      syncProtocol,
+      encoding,
+      decoding,
+      { yCollab },
+    ] = await Promise.all([
+      import("yjs"),
+      import("y-protocols/awareness"),
+      import("y-protocols/sync"),
+      import("lib0/encoding"),
+      import("lib0/decoding"),
+      import("y-codemirror.next"),
+    ])
 
     // 等 chunk 的这段时间里房间关了（或者又开了新的一轮），整个放弃
     if (myGeneration !== generation) return
@@ -106,7 +112,11 @@ export function useCollabDoc() {
     detachDocUpdate = () => doc?.off("update", onDocUpdate)
 
     const onAwarenessUpdate = (
-      { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
+      {
+        added,
+        updated,
+        removed,
+      }: { added: number[]; updated: number[]; removed: number[] },
       origin: any,
     ) => {
       if (origin === "remote") return

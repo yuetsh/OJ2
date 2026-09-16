@@ -1,4 +1,15 @@
-import { and, count, countDistinct, eq, inArray, isNotNull, isNull, ne, notInArray, sql } from "drizzle-orm"
+import {
+  and,
+  count,
+  countDistinct,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+  sql,
+} from "drizzle-orm"
 
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
@@ -12,49 +23,90 @@ function numberMetric(metrics: Record<string, unknown>, key: string) {
   return typeof value === "number" ? value : 0
 }
 
-async function unlockAchievements(userId: number, metrics: Record<string, unknown>, onlyMeta = false) {
-  const unlocked = await db.select({ id: schema.userAchievement.achievementId }).from(schema.userAchievement)
+async function unlockAchievements(
+  userId: number,
+  metrics: Record<string, unknown>,
+  onlyMeta = false,
+) {
+  const unlocked = await db
+    .select({ id: schema.userAchievement.achievementId })
+    .from(schema.userAchievement)
     .where(eq(schema.userAchievement.userId, userId))
   const filters = [eq(schema.achievement.visible, true)]
-  if (unlocked.length) filters.push(notInArray(schema.achievement.id, unlocked.map((row) => row.id)))
-  if (onlyMeta) filters.push(eq(schema.achievement.metric, "achievement_unlocked_count"))
+  if (unlocked.length)
+    filters.push(
+      notInArray(
+        schema.achievement.id,
+        unlocked.map((row) => row.id),
+      ),
+    )
+  if (onlyMeta)
+    filters.push(eq(schema.achievement.metric, "achievement_unlocked_count"))
   else filters.push(ne(schema.achievement.metric, "achievement_unlocked_count"))
-  const candidates = await db.select().from(schema.achievement).where(and(...filters))
+  const candidates = await db
+    .select()
+    .from(schema.achievement)
+    .where(and(...filters))
   const hits = candidates.filter((achievement) => {
     const value = metrics[achievement.metric]
     if (typeof value !== "number") return false
-    return achievement.operator === "gte" ? value >= achievement.threshold : value <= achievement.threshold
+    return achievement.operator === "gte"
+      ? value >= achievement.threshold
+      : value <= achievement.threshold
   })
   if (hits.length === 0) return []
   // 命中的成就一次插完，冲突忽略后 returning 回来的就是「这次真新解锁的」。
   // 一个用户对同一个成就只会解锁一次，所以每个成就都恰好 +1，一条 UPDATE 就够。
-  const inserted = await db.insert(schema.userAchievement).values(hits.map((achievement) => ({
-    userId,
-    achievementId: achievement.id,
-    unlockTime: new Date().toISOString(),
-    backfilled: false,
-    notified: false,
-  }))).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] })
+  const inserted = await db
+    .insert(schema.userAchievement)
+    .values(
+      hits.map((achievement) => ({
+        userId,
+        achievementId: achievement.id,
+        unlockTime: new Date().toISOString(),
+        backfilled: false,
+        notified: false,
+      })),
+    )
+    .onConflictDoNothing({
+      target: [
+        schema.userAchievement.achievementId,
+        schema.userAchievement.userId,
+      ],
+    })
     .returning({ achievementId: schema.userAchievement.achievementId })
   if (inserted.length === 0) return []
   const insertedIds = new Set(inserted.map((row) => row.achievementId))
-  await db.update(schema.achievement).set({ unlockCount: sql`${schema.achievement.unlockCount} + 1` })
+  await db
+    .update(schema.achievement)
+    .set({ unlockCount: sql`${schema.achievement.unlockCount} + 1` })
     .where(inArray(schema.achievement.id, [...insertedIds]))
   return hits.filter((achievement) => insertedIds.has(achievement.id))
 }
 
 export async function updateAchievementsForSubmission(submissionId: string) {
-  const [row] = await db.select({ submission: schema.submission, problem: schema.problem }).from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-    .where(eq(schema.submission.id, submissionId)).limit(1)
+  const [row] = await db
+    .select({ submission: schema.submission, problem: schema.problem })
+    .from(schema.submission)
+    .innerJoin(
+      schema.problem,
+      eq(schema.submission.problemId, schema.problem.id),
+    )
+    .where(eq(schema.submission.id, submissionId))
+    .limit(1)
   if (!row || row.submission.contestId !== null) return []
 
-  const priorRows = await db.select({ result: schema.submission.result }).from(schema.submission).where(and(
-    eq(schema.submission.userId, row.submission.userId),
-    eq(schema.submission.problemId, row.submission.problemId),
-    isNull(schema.submission.contestId),
-    ne(schema.submission.id, row.submission.id),
-  ))
+  const priorRows = await db
+    .select({ result: schema.submission.result })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, row.submission.userId),
+        eq(schema.submission.problemId, row.submission.problemId),
+        isNull(schema.submission.contestId),
+        ne(schema.submission.id, row.submission.id),
+      ),
+    )
   const priorAccepted = priorRows.some((item) => isAccepted(item.result))
   const accepted = isAccepted(row.submission.result)
   const firstAc = accepted && !priorAccepted
@@ -63,97 +115,184 @@ export async function updateAchievementsForSubmission(submissionId: string) {
   const hour = localHour(row.submission.createTime)
 
   const metrics = await db.transaction(async (tx) => {
-    await tx.insert(schema.userStat).values({
-      userId: row.submission.userId,
-      metrics: {},
-      updateTime: new Date().toISOString(),
-    }).onConflictDoNothing({ target: schema.userStat.userId })
-    const [stat] = await tx.select().from(schema.userStat).where(eq(schema.userStat.userId, row.submission.userId)).for("update")
+    await tx
+      .insert(schema.userStat)
+      .values({
+        userId: row.submission.userId,
+        metrics: {},
+        updateTime: new Date().toISOString(),
+      })
+      .onConflictDoNothing({ target: schema.userStat.userId })
+    const [stat] = await tx
+      .select()
+      .from(schema.userStat)
+      .where(eq(schema.userStat.userId, row.submission.userId))
+      .for("update")
     if (!stat) throw new Error("User achievement stat could not be created")
     const value = objectValue(stat.metrics)
     value.submission_count = numberMetric(value, "submission_count") + 1
     if (firstAc) {
       value.accepted_count = numberMetric(value, "accepted_count") + 1
-      if (row.problem.difficulty === "Mid") value.mid_ac_count = numberMetric(value, "mid_ac_count") + 1
-      if (row.problem.difficulty === "High") value.hard_ac_count = numberMetric(value, "hard_ac_count") + 1
-      if (firstTry) value.first_try_ac_count = numberMetric(value, "first_try_ac_count") + 1
-      value.max_wa_before_ac = Math.max(numberMetric(value, "max_wa_before_ac"), priorRows.length)
+      if (row.problem.difficulty === "Mid")
+        value.mid_ac_count = numberMetric(value, "mid_ac_count") + 1
+      if (row.problem.difficulty === "High")
+        value.hard_ac_count = numberMetric(value, "hard_ac_count") + 1
+      if (firstTry)
+        value.first_try_ac_count = numberMetric(value, "first_try_ac_count") + 1
+      value.max_wa_before_ac = Math.max(
+        numberMetric(value, "max_wa_before_ac"),
+        priorRows.length,
+      )
       const perDay = objectValue(value._ac_per_day)
       perDay[date] = (typeof perDay[date] === "number" ? perDay[date] : 0) + 1
       value._ac_per_day = perDay
-      value.max_ac_in_one_day = Math.max(...Object.values(perDay).filter((item): item is number => typeof item === "number"))
+      value.max_ac_in_one_day = Math.max(
+        ...Object.values(perDay).filter(
+          (item): item is number => typeof item === "number",
+        ),
+      )
     }
-    const activeDates = Array.isArray(value._active_dates) ? value._active_dates.filter((item): item is string => typeof item === "string") : []
+    const activeDates = Array.isArray(value._active_dates)
+      ? value._active_dates.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : []
     if (!activeDates.includes(date)) activeDates.push(date)
     value._active_dates = activeDates
     value.active_days = activeDates.length
     if (accepted) {
-      const last = typeof value._last_ac_date === "string" ? value._last_ac_date : null
+      const last =
+        typeof value._last_ac_date === "string" ? value._last_ac_date : null
       if (last !== date) {
         // 差一天要按日历日算，不能用 Date 相减：夏令时地区相邻两天差 23/25 小时，
         // 除 86400000 得到的不是 1，`=== 1` 会静默把连续打卡判成断掉。
-        const current = last && dayNumber(date) - dayNumber(last) === 1
-          ? numberMetric(value, "_current_ac_streak") + 1
-          : 1
+        const current =
+          last && dayNumber(date) - dayNumber(last) === 1
+            ? numberMetric(value, "_current_ac_streak") + 1
+            : 1
         value._last_ac_date = date
         value._current_ac_streak = current
-        value.max_ac_streak_days = Math.max(numberMetric(value, "max_ac_streak_days"), current)
+        value.max_ac_streak_days = Math.max(
+          numberMetric(value, "max_ac_streak_days"),
+          current,
+        )
       }
     }
-    const languages = Array.isArray(value._languages) ? value._languages.filter((item): item is string => typeof item === "string") : []
-    if (!languages.includes(row.submission.language)) languages.push(row.submission.language)
+    const languages = Array.isArray(value._languages)
+      ? value._languages.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : []
+    if (!languages.includes(row.submission.language))
+      languages.push(row.submission.language)
     value._languages = languages
     value.languages_used = languages.length
-    if (hour < 5) value.midnight_submissions = numberMetric(value, "midnight_submissions") + 1
-    else if (hour < 7) value.early_bird_submissions = numberMetric(value, "early_bird_submissions") + 1
-    if (row.submission.result === JudgeStatus.COMPILE_ERROR) value.compile_error_count = numberMetric(value, "compile_error_count") + 1
-    value.max_code_lines = Math.max(numberMetric(value, "max_code_lines"), row.submission.code.split(/\r?\n/).length)
-    await tx.update(schema.userStat).set({ metrics: value, updateTime: new Date().toISOString() }).where(eq(schema.userStat.id, stat.id))
+    if (hour < 5)
+      value.midnight_submissions =
+        numberMetric(value, "midnight_submissions") + 1
+    else if (hour < 7)
+      value.early_bird_submissions =
+        numberMetric(value, "early_bird_submissions") + 1
+    if (row.submission.result === JudgeStatus.COMPILE_ERROR)
+      value.compile_error_count = numberMetric(value, "compile_error_count") + 1
+    value.max_code_lines = Math.max(
+      numberMetric(value, "max_code_lines"),
+      row.submission.code.split(/\r?\n/).length,
+    )
+    await tx
+      .update(schema.userStat)
+      .set({ metrics: value, updateTime: new Date().toISOString() })
+      .where(eq(schema.userStat.id, stat.id))
     return value
   })
 
   const first = await unlockAchievements(row.submission.userId, metrics)
   if (!first.length) return []
-  const [meta] = await db.select({ value: count() }).from(schema.userAchievement)
-    .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
-    .where(and(eq(schema.userAchievement.userId, row.submission.userId), ne(schema.achievement.rarity, "platinum")))
+  const [meta] = await db
+    .select({ value: count() })
+    .from(schema.userAchievement)
+    .innerJoin(
+      schema.achievement,
+      eq(schema.userAchievement.achievementId, schema.achievement.id),
+    )
+    .where(
+      and(
+        eq(schema.userAchievement.userId, row.submission.userId),
+        ne(schema.achievement.rarity, "platinum"),
+      ),
+    )
   metrics.achievement_unlocked_count = meta?.value ?? 0
-  await db.update(schema.userStat).set({ metrics, updateTime: new Date().toISOString() }).where(eq(schema.userStat.userId, row.submission.userId))
-  return [...first, ...(await unlockAchievements(row.submission.userId, metrics, true))]
+  await db
+    .update(schema.userStat)
+    .set({ metrics, updateTime: new Date().toISOString() })
+    .where(eq(schema.userStat.userId, row.submission.userId))
+  return [
+    ...first,
+    ...(await unlockAchievements(row.submission.userId, metrics, true)),
+  ]
 }
 
 export async function updateAchievementsForProblemSet(userId: number) {
   const [[badgeRow], [completedRow]] = await Promise.all([
-    db.select({ value: count() }).from(schema.userBadge).where(eq(schema.userBadge.userId, userId)),
-    db.select({ value: count() }).from(schema.problemsetProgress).where(and(
-      eq(schema.problemsetProgress.userId, userId),
-      eq(schema.problemsetProgress.isCompleted, true),
-    )),
+    db
+      .select({ value: count() })
+      .from(schema.userBadge)
+      .where(eq(schema.userBadge.userId, userId)),
+    db
+      .select({ value: count() })
+      .from(schema.problemsetProgress)
+      .where(
+        and(
+          eq(schema.problemsetProgress.userId, userId),
+          eq(schema.problemsetProgress.isCompleted, true),
+        ),
+      ),
   ])
   const metrics = await db.transaction(async (tx) => {
-    await tx.insert(schema.userStat).values({
-      userId,
-      metrics: {},
-      updateTime: new Date().toISOString(),
-    }).onConflictDoNothing({ target: schema.userStat.userId })
-    const [stat] = await tx.select().from(schema.userStat)
-      .where(eq(schema.userStat.userId, userId)).for("update").limit(1)
+    await tx
+      .insert(schema.userStat)
+      .values({
+        userId,
+        metrics: {},
+        updateTime: new Date().toISOString(),
+      })
+      .onConflictDoNothing({ target: schema.userStat.userId })
+    const [stat] = await tx
+      .select()
+      .from(schema.userStat)
+      .where(eq(schema.userStat.userId, userId))
+      .for("update")
+      .limit(1)
     if (!stat) throw new Error("User achievement stat could not be created")
     const value = objectValue(stat.metrics)
     value.badge_count = badgeRow?.value ?? 0
     value.problemset_completed = completedRow?.value ?? 0
-    await tx.update(schema.userStat).set({ metrics: value, updateTime: new Date().toISOString() })
+    await tx
+      .update(schema.userStat)
+      .set({ metrics: value, updateTime: new Date().toISOString() })
       .where(eq(schema.userStat.id, stat.id))
     return value
   })
 
   const first = await unlockAchievements(userId, metrics)
   if (!first.length) return []
-  const [meta] = await db.select({ value: count() }).from(schema.userAchievement)
-    .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
-    .where(and(eq(schema.userAchievement.userId, userId), ne(schema.achievement.rarity, "platinum")))
+  const [meta] = await db
+    .select({ value: count() })
+    .from(schema.userAchievement)
+    .innerJoin(
+      schema.achievement,
+      eq(schema.userAchievement.achievementId, schema.achievement.id),
+    )
+    .where(
+      and(
+        eq(schema.userAchievement.userId, userId),
+        ne(schema.achievement.rarity, "platinum"),
+      ),
+    )
   metrics.achievement_unlocked_count = meta?.value ?? 0
-  await db.update(schema.userStat).set({ metrics, updateTime: new Date().toISOString() })
+  await db
+    .update(schema.userStat)
+    .set({ metrics, updateTime: new Date().toISOString() })
     .where(eq(schema.userStat.userId, userId))
   return [...first, ...(await unlockAchievements(userId, metrics, true))]
 }
@@ -170,22 +309,39 @@ const USER_ACHIEVEMENT_INSERT_CHUNK = 1000
  * 而不显示日期，否则一次补发会给几百人盖同一个时间戳，把「最近获得」板块冲垮。
  */
 export async function rescanAchievement(achievementId: number) {
-  const [achievement] = await db.select().from(schema.achievement)
-    .where(and(eq(schema.achievement.id, achievementId), eq(schema.achievement.visible, true))).limit(1)
+  const [achievement] = await db
+    .select()
+    .from(schema.achievement)
+    .where(
+      and(
+        eq(schema.achievement.id, achievementId),
+        eq(schema.achievement.visible, true),
+      ),
+    )
+    .limit(1)
   if (!achievement) return { scanned: 0, unlocked: 0 }
 
   const metric = findMetric(achievement.metric)
   if (!metric) return { scanned: 0, unlocked: 0 }
 
   // contest_joined 不由判题结算维护，扫之前先把它刷新一遍，否则永远读到旧值（或没有值）
-  if (achievement.metric === "contest_joined") await refreshContestJoinedForAll()
+  if (achievement.metric === "contest_joined")
+    await refreshContestJoinedForAll()
 
   const already = new Set(
-    (await db.select({ userId: schema.userAchievement.userId }).from(schema.userAchievement)
-      .where(eq(schema.userAchievement.achievementId, achievement.id))).map((row) => row.userId),
+    (
+      await db
+        .select({ userId: schema.userAchievement.userId })
+        .from(schema.userAchievement)
+        .where(eq(schema.userAchievement.achievementId, achievement.id))
+    ).map((row) => row.userId),
   )
 
-  const stats = await db.select({ userId: schema.userStat.userId, metrics: schema.userStat.metrics })
+  const stats = await db
+    .select({
+      userId: schema.userStat.userId,
+      metrics: schema.userStat.metrics,
+    })
     .from(schema.userStat)
   const eligible = stats.filter((stat) => {
     if (already.has(stat.userId)) return false
@@ -201,39 +357,62 @@ export async function rescanAchievement(achievementId: number) {
   // 计数改成一次 +N，通知照旧逐人推（那是 Redis，不是数据库）。
   const unlockTime = new Date().toISOString()
   const unlockedUserIds: number[] = []
-  for (let start = 0; start < eligible.length; start += USER_ACHIEVEMENT_INSERT_CHUNK) {
+  for (
+    let start = 0;
+    start < eligible.length;
+    start += USER_ACHIEVEMENT_INSERT_CHUNK
+  ) {
     const chunk = eligible.slice(start, start + USER_ACHIEVEMENT_INSERT_CHUNK)
-    const inserted = await db.insert(schema.userAchievement).values(chunk.map((stat) => ({
-      userId: stat.userId,
-      achievementId: achievement.id,
-      unlockTime,
-      backfilled: true,
-      notified: false,
-    }))).onConflictDoNothing({ target: [schema.userAchievement.achievementId, schema.userAchievement.userId] })
+    const inserted = await db
+      .insert(schema.userAchievement)
+      .values(
+        chunk.map((stat) => ({
+          userId: stat.userId,
+          achievementId: achievement.id,
+          unlockTime,
+          backfilled: true,
+          notified: false,
+        })),
+      )
+      .onConflictDoNothing({
+        target: [
+          schema.userAchievement.achievementId,
+          schema.userAchievement.userId,
+        ],
+      })
       .returning({ userId: schema.userAchievement.userId })
     unlockedUserIds.push(...inserted.map((row) => row.userId))
   }
   if (unlockedUserIds.length) {
-    await db.update(schema.achievement)
-      .set({ unlockCount: sql`${schema.achievement.unlockCount} + ${unlockedUserIds.length}` })
+    await db
+      .update(schema.achievement)
+      .set({
+        unlockCount: sql`${schema.achievement.unlockCount} + ${unlockedUserIds.length}`,
+      })
       .where(eq(schema.achievement.id, achievement.id))
     for (const userId of unlockedUserIds) {
-      await publishAchievementNotification(userId, [{
-        id: achievement.id,
-        name: achievement.name,
-        description: achievement.description,
-        icon: achievement.icon,
-        rarity: achievement.rarity,
-        kind: "achievement",
-      }])
+      await publishAchievementNotification(userId, [
+        {
+          id: achievement.id,
+          name: achievement.name,
+          description: achievement.description,
+          icon: achievement.icon,
+          rarity: achievement.rarity,
+          kind: "achievement",
+        },
+      ])
     }
     // 补发的非白金成就同样计入「已解锁数」，要和判题结算一样接着做第二轮（元成就）判定。
     // 旧 `rescan_achievement` 就漏了这步，OJ2 原样搬过来：2026-09-07 一次补发之后
     // 269 人的计数停在旧值，其中 10 人实际够了「奖杯收藏家」却一直没发 ——
     // 判题结算只在「这次有新解锁」时才重算，被补发的人不再解锁新成就就永远不会自愈。
-    if (achievement.rarity !== "platinum" && achievement.metric !== "achievement_unlocked_count") {
+    if (
+      achievement.rarity !== "platinum" &&
+      achievement.metric !== "achievement_unlocked_count"
+    ) {
       await refreshUnlockedCount(unlockedUserIds)
-      for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
+      for (const meta of await metaAchievements())
+        await rescanAchievement(meta.id)
     }
   }
   return { scanned: stats.length, unlocked: unlockedUserIds.length }
@@ -241,9 +420,20 @@ export async function rescanAchievement(achievementId: number) {
 
 /** 以「已解锁数」为指标的元成就（奖杯收藏家）。只取上架的，和 rescan 的口径一致 */
 export function metaAchievements() {
-  return db.select({ id: schema.achievement.id, name: schema.achievement.name, threshold: schema.achievement.threshold, operator: schema.achievement.operator })
+  return db
+    .select({
+      id: schema.achievement.id,
+      name: schema.achievement.name,
+      threshold: schema.achievement.threshold,
+      operator: schema.achievement.operator,
+    })
     .from(schema.achievement)
-    .where(and(eq(schema.achievement.visible, true), eq(schema.achievement.metric, "achievement_unlocked_count")))
+    .where(
+      and(
+        eq(schema.achievement.visible, true),
+        eq(schema.achievement.metric, "achievement_unlocked_count"),
+      ),
+    )
 }
 
 /**
@@ -278,7 +468,6 @@ export async function refreshUnlockedCount(userIds?: number[]) {
   return rows.map((row) => row.user_id)
 }
 
-
 /** 同上，3 个参数一行 */
 const STAT_UPSERT_CHUNK = 1000
 
@@ -299,19 +488,25 @@ const STAT_UPSERT_CHUNK = 1000
  */
 async function refreshContestJoinedForAll() {
   const rows = await db
-    .select({ userId: schema.submission.userId, value: countDistinct(schema.submission.contestId) })
+    .select({
+      userId: schema.submission.userId,
+      value: countDistinct(schema.submission.contestId),
+    })
     .from(schema.submission)
     .where(isNotNull(schema.submission.contestId))
     .groupBy(schema.submission.userId)
   const now = new Date().toISOString()
   for (let start = 0; start < rows.length; start += STAT_UPSERT_CHUNK) {
     const chunk = rows.slice(start, start + STAT_UPSERT_CHUNK)
-    await db.insert(schema.userStat)
-      .values(chunk.map((row) => ({
-        userId: row.userId,
-        metrics: { contest_joined: row.value },
-        updateTime: now,
-      })))
+    await db
+      .insert(schema.userStat)
+      .values(
+        chunk.map((row) => ({
+          userId: row.userId,
+          metrics: { contest_joined: row.value },
+          updateTime: now,
+        })),
+      )
       .onConflictDoUpdate({
         target: schema.userStat.userId,
         set: {

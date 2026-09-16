@@ -39,17 +39,19 @@ async function loadLanguage(language: string) {
   if (!AST_SUPPORTED_LANGUAGES.includes(language)) return null
   // locateFile 指到内嵌的 tree-sitter.wasm：emscripten 默认按脚本所在目录找，
   // 单二进制里那个目录是 /$bunfs/root，它自己找不着
-  if (!initPromise) initPromise = Parser.init({ locateFile: () => treeSitterWasmPath })
+  if (!initPromise)
+    initPromise = Parser.init({ locateFile: () => treeSitterWasmPath })
   await initPromise
 
   const cached = languages.get(language)
   if (cached) return cached
 
-  const wasmPath = language === "C"
-    ? cWasmPath
-    : language === "C++"
-      ? cppWasmPath
-      : pythonWasmPath
+  const wasmPath =
+    language === "C"
+      ? cWasmPath
+      : language === "C++"
+        ? cppWasmPath
+        : pythonWasmPath
   const loaded = await Language.load(wasmPath)
   languages.set(language, loaded)
   return loaded
@@ -136,9 +138,10 @@ function requirementKind(engine: AstRule["engine"]): AstRequirement["kind"] {
  * checkAst 直接放行 —— 学生看得见要求，判题从不检查。
  */
 export function astRequirements(value: unknown): AstRequirements | null {
-  const grouped = value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
+  const grouped =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null
   if (!grouped) return null
   const out: AstRequirements = {}
   for (const [language, rules] of Object.entries(grouped)) {
@@ -148,10 +151,12 @@ export function astRequirements(value: unknown): AstRequirements | null {
       const parsed = astRuleSchema.safeParse(rule)
       if (!parsed.success) return []
       if (!astRuleIsMeaningful(parsed.data)) return []
-      return [{
-        description: describeAstRule(parsed.data, language),
-        kind: requirementKind(parsed.data.engine),
-      }]
+      return [
+        {
+          description: describeAstRule(parsed.data, language),
+          kind: requirementKind(parsed.data.engine),
+        },
+      ]
     })
     if (items.length > 0) out[language] = items
   }
@@ -180,12 +185,15 @@ export function astRulesError(astRules: AstRules | null): string | null {
       const at = `代码规则 ${language} 第 ${index + 1} 条`
       const target = rule.target ?? ""
       if (rule.engine.endsWith("_node")) {
-        if (!(target in nodes)) return `${at}：${language} 没有「${target}」这种语法`
+        if (!(target in nodes))
+          return `${at}：${language} 没有「${target}」这种语法`
       } else if (rule.engine === "must_use_operator") {
-        if (!(target in operators)) return `${at}：${language} 没有「${target}」运算符`
+        if (!(target in operators))
+          return `${at}：${language} 没有「${target}」运算符`
       } else if (rule.engine === "must_have_nesting") {
         for (const value of [rule.outer ?? "", rule.inner ?? ""]) {
-          if (!(value in nodes)) return `${at}：${language} 没有「${value}」这种语法`
+          if (!(value in nodes))
+            return `${at}：${language} 没有「${value}」这种语法`
         }
       } else if (!target.trim()) {
         return `${at}：要检查的函数名/方法名不能为空`
@@ -204,7 +212,10 @@ export function astRulesError(astRules: AstRules | null): string | null {
  * 早年配过 C++ 规则，如今 tab 里看不到那组规则，保存却被「暂不支持 C++」拦下，
  * 老师在界面上无从修改。
  */
-export function pickAstRules(astRules: AstRules | null, languages: string[]): AstRules | null {
+export function pickAstRules(
+  astRules: AstRules | null,
+  languages: string[],
+): AstRules | null {
   if (!astRules) return null
   const out: AstRules = {}
   for (const [language, rules] of Object.entries(astRules)) {
@@ -266,7 +277,11 @@ function methodCalls(root: Node, target: string, language: string) {
   })
 }
 
-function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | null {
+function evaluateRule(
+  root: Node,
+  rule: AstRule,
+  language: string,
+): AstResult | null {
   const target = rule.target ?? ""
   const nodeType = astTargetNodeType(target, language)
 

@@ -896,7 +896,11 @@ watch(
             v-model:value="problem.showFlowchart"
             :disabled="problem.allowFlowchart"
           />
-          <n-text v-if="problem.allowFlowchart" depth="3" style="font-size: 12px">
+          <n-text
+            v-if="problem.allowFlowchart"
+            depth="3"
+            style="font-size: 12px"
+          >
             让学生自己画图时，标准流程图不会下发给学生，这个开关没有意义
           </n-text>
         </n-flex>

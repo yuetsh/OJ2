@@ -77,7 +77,8 @@ const columns: DataTableColumn<User>[] = [
         user: row,
         revealed: revealedPasswords.value.has(row.id),
         onToggle: (id: number) => {
-          if (!revealedPasswords.value.delete(id)) revealedPasswords.value.add(id)
+          if (!revealedPasswords.value.delete(id))
+            revealedPasswords.value.add(id)
         },
       }),
   },

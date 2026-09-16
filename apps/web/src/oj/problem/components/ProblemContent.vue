@@ -311,7 +311,9 @@ function type(status: ProblemStatus) {
         </p>
         <n-list bordered style="margin-bottom: 8px">
           <n-list-item v-for="(rule, i) in rules" :key="i">
-            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{ rule.description }}</n-tag>
+            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{
+              rule.description
+            }}</n-tag>
           </n-list-item>
         </n-list>
       </div>

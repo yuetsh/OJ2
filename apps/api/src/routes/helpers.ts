@@ -51,7 +51,9 @@ export function stripClassPrefix(
  * 和列没收窄之前的行为完全一致 —— 所以这里只做类型上的交接，**不加校验**：
  * 在这儿拦一道会把「筛出空列表」变成「筛条件被忽略、返回全部」，那是另一种行为。
  */
-export function asFilterValue<T extends string | number>(value: string | number): T {
+export function asFilterValue<T extends string | number>(
+  value: string | number,
+): T {
   return value as T
 }
 
@@ -115,7 +117,10 @@ export function rounded(value: number, digits = 2) {
  * 等待评分 / 正在评分也算成失败，连点三次提交就能让按钮亮起来，而 hint 端点排掉了
  * 这两个状态，于是按钮亮着、点下去回 `hint-locked`。
  */
-export async function countFailedSubmissions(userId: number, problemId: number) {
+export async function countFailedSubmissions(
+  userId: number,
+  problemId: number,
+) {
   const [failed] = await db
     .select({ value: count() })
     .from(schema.submission)

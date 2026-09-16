@@ -1,6 +1,11 @@
 import { z } from "zod"
 
-export const achievementRaritySchema = z.enum(["bronze", "silver", "gold", "platinum"])
+export const achievementRaritySchema = z.enum([
+  "bronze",
+  "silver",
+  "gold",
+  "platinum",
+])
 
 export const achievementSchema = z.object({
   id: z.number().int(),
@@ -66,6 +71,8 @@ export type PendingAchievement = z.infer<typeof pendingAchievementSchema>
 export type AchievementSummary = z.infer<typeof achievementSummarySchema>
 export type AchievementRarity = z.infer<typeof achievementRaritySchema>
 export type AchievementRarityStat = z.infer<typeof achievementRarityStatSchema>
-export type AchievementNotification = z.infer<typeof achievementNotificationSchema>
+export type AchievementNotification = z.infer<
+  typeof achievementNotificationSchema
+>
 
 export type MarkAchievementsRead = z.infer<typeof markAchievementsReadSchema>

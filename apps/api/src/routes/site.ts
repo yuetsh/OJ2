@@ -36,7 +36,10 @@ siteRoutes.get("/site/online", async (c) => {
 
 // 数据集读不到时的兜底（本机 dev 没挂 data/hitokoto 就会走这里）
 const fallbackQuotes = [
-  { hitokoto: "程序首先是写给人读的，其次才是让机器执行。", from: "Structure and Interpretation of Computer Programs" },
+  {
+    hitokoto: "程序首先是写给人读的，其次才是让机器执行。",
+    from: "Structure and Interpretation of Computer Programs",
+  },
   { hitokoto: "把大问题拆成足够小的问题，答案就会浮现。", from: "判题狗" },
   { hitokoto: "一次没通过，只是多得到了一条线索。", from: "判题狗" },
 ]
@@ -50,10 +53,15 @@ const sentenceCache = new Map<string, Quote[]>()
 async function loadSentences(path: string) {
   const cached = sentenceCache.get(path)
   if (cached) return cached
-  const raw = await Bun.file(resolve(config.hitokotoDirectory, path)).json() as { hitokoto?: unknown, from?: unknown }[]
+  const raw = (await Bun.file(
+    resolve(config.hitokotoDirectory, path),
+  ).json()) as { hitokoto?: unknown; from?: unknown }[]
   const rows = (Array.isArray(raw) ? raw : [])
     .filter((it) => typeof it.hitokoto === "string" && it.hitokoto.length > 0)
-    .map((it) => ({ hitokoto: it.hitokoto as string, from: typeof it.from === "string" ? it.from : "佚名" }))
+    .map((it) => ({
+      hitokoto: it.hitokoto as string,
+      from: typeof it.from === "string" ? it.from : "佚名",
+    }))
   if (rows.length === 0) throw new Error(`empty hitokoto category: ${path}`)
   sentenceCache.set(path, rows)
   return rows
@@ -61,8 +69,12 @@ async function loadSentences(path: string) {
 
 async function randomQuote() {
   if (!categoryPaths) {
-    const categories = await Bun.file(resolve(config.hitokotoDirectory, "categories.json")).json() as { path?: string }[]
-    const paths = categories.map((it) => it.path).filter((it): it is string => typeof it === "string")
+    const categories = (await Bun.file(
+      resolve(config.hitokotoDirectory, "categories.json"),
+    ).json()) as { path?: string }[]
+    const paths = categories
+      .map((it) => it.path)
+      .filter((it): it is string => typeof it === "string")
     if (paths.length === 0) throw new Error("no hitokoto categories")
     categoryPaths = paths
   }
@@ -75,7 +87,8 @@ siteRoutes.get("/quotes/random", async (c) => {
   try {
     return success(c, (await randomQuote()) satisfies Quote)
   } catch {
-    const item = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)]!
+    const item =
+      fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)]!
     return success(c, item satisfies Quote)
   }
 })
@@ -83,7 +96,12 @@ siteRoutes.get("/quotes/random", async (c) => {
 siteRoutes.get("/classes/:className/usernames", async (c) => {
   const className = c.req.param("className").trim()
   if (!/^\d{3,4}$/.test(className)) {
-    return failure(c, 400, "invalid-class", "Class name must contain 3 or 4 digits")
+    return failure(
+      c,
+      400,
+      "invalid-class",
+      "Class name must contain 3 or 4 digits",
+    )
   }
   const rows = await db
     .select({ username: schema.user.username })
@@ -91,5 +109,8 @@ siteRoutes.get("/classes/:className/usernames", async (c) => {
     .where(eq(schema.user.className, className))
     .orderBy(desc(schema.user.createTime), asc(schema.user.id))
   // 用 stripClassPrefix 而不是 replace：replace 会把中间的匹配也删掉，前缀对不上时截出乱码
-  return success(c, rows.map(({ username }) => stripClassPrefix(username, className)))
+  return success(
+    c,
+    rows.map(({ username }) => stripClassPrefix(username, className)),
+  )
 })

@@ -86,7 +86,10 @@ export function handleCollabOpen(ws: CollabSocket) {
     addTeacher(ws)
     // 新上线的老师要立刻看到当前队列，不能等下一次变更
     ws.send(
-      JSON.stringify({ type: "requests", list: listRequests().map(serializeRequest) }),
+      JSON.stringify({
+        type: "requests",
+        list: listRequests().map(serializeRequest),
+      }),
     )
     return
   }
@@ -159,7 +162,8 @@ export function handleCollabClose(ws: CollabSocket) {
     closeRoom(room.studentId)
     room.studentSocket.data.roomOwnerId = undefined
     room.teacherSocket.data.roomOwnerId = undefined
-    const peer = ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
+    const peer =
+      ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
     peer.send(JSON.stringify({ type: "room_closed", reason: "peer_offline" }))
 
     if (ws === room.teacherSocket) {
@@ -197,7 +201,9 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
 
   // 心跳不查库，和 /ws/submissions 的处理一致
   if (message.type === "ping") {
-    ws.send(JSON.stringify({ type: "pong", timestamp: (message as any).timestamp }))
+    ws.send(
+      JSON.stringify({ type: "pong", timestamp: (message as any).timestamp }),
+    )
     return
   }
 
@@ -261,7 +267,9 @@ async function handleHelpRequest(
     )
     .limit(1)
   if (!problem) {
-    ws.send(JSON.stringify({ type: "error", message: "题目不存在或不支持求助" }))
+    ws.send(
+      JSON.stringify({ type: "error", message: "题目不存在或不支持求助" }),
+    )
     return
   }
 
@@ -339,7 +347,12 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
   const [teacher] = await db
     .select({ adminType: schema.user.adminType })
     .from(schema.user)
-    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
+    .where(
+      and(
+        eq(schema.user.id, ws.data.userId),
+        eq(schema.user.isDisabled, false),
+      ),
+    )
     .limit(1)
   if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
     ws.close(1008, "Permission revoked")
@@ -363,7 +376,10 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
     // （正常路径走不到，是两个标签页 + 断线重连缝隙的最后一道闸）——
     // 回一份最新列表让老师端自己纠正
     ws.send(
-      JSON.stringify({ type: "requests", list: listRequests().map(serializeRequest) }),
+      JSON.stringify({
+        type: "requests",
+        list: listRequests().map(serializeRequest),
+      }),
     )
     return
   }
@@ -404,7 +420,12 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
   const [teacher] = await db
     .select({ adminType: schema.user.adminType })
     .from(schema.user)
-    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
+    .where(
+      and(
+        eq(schema.user.id, ws.data.userId),
+        eq(schema.user.isDisabled, false),
+      ),
+    )
     .limit(1)
   if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
     ws.close(1008, "Permission revoked")
@@ -461,7 +482,10 @@ function teardownRoom(
  * 「服务端不知道代码内容」是有意的：这个通道要做的事只有认证和分房间，
  * 权限由 accept 时的库查询决定，与帧里装的是什么无关。
  */
-export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) {
+export function handleCollabBinary(
+  ws: CollabSocket,
+  data: Buffer | Uint8Array,
+) {
   // 空帧：Bun.serve 探测过，send() 对 0 字节帧也回 0（同一个返回值,
   // 真实送达和真实丢弃分不清），不转发、不参与下面的失败判定，直接忽略。
   // 否则任何一方发一个 0 字节二进制帧就能把整间房拆掉
@@ -469,7 +493,8 @@ export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) 
 
   const room = roomOf(ws)
   if (!room) return
-  const peer = ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
+  const peer =
+    ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
   const sent = peer.send(data)
   // Bun.serve 探测过：-1 不代表失败，是背压——消息已排队，最终会送达（实测 8MB
   // 帧照样完整到达）；只有 0 才是真的丢了（对端事实上已经断开）。之前把 <= 0

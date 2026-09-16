@@ -179,11 +179,10 @@ async function run() {
 async function upload() {
   isUploading.value = true
   try {
-    const data = uploadable.value
-      .flatMap((f, i) => [
-        { name: `${i + 1}.in`, content: f.in },
-        { name: `${i + 1}.out`, content: f.out },
-      ])
+    const data = uploadable.value.flatMap((f, i) => [
+      { name: `${i + 1}.in`, content: f.in },
+      { name: `${i + 1}.out`, content: f.out },
+    ])
 
     const blob = createZipBlob(data)
     const file = new File([blob], "testcase.zip", { type: "application/zip" })

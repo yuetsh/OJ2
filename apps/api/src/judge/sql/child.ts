@@ -29,7 +29,12 @@ export type SqlJob =
       timeLimitMs: number
       memoryLimitMb: number
     }
-  | { kind: "display"; initSql: string; refSql: string; mode: "query" | "modify" }
+  | {
+      kind: "display"
+      initSql: string
+      refSql: string
+      mode: "query" | "modify"
+    }
 
 /**
  * 写阶段标记。必须用 writeSync：父进程正是靠这个标记决定「多久之后 SIGKILL」
@@ -90,10 +95,13 @@ export async function runSqlChild() {
     // WASM 堆触顶时 emscripten 抛的是普通 Error（"Aborted"/"out of memory"），
     // 到这里说明连引擎自身都没撑住，按内存超限报，不当成出题人的错
     const message = String((error as Error)?.message ?? error)
-    const memoryish = message.includes("out of memory") || message.includes("Aborted")
+    const memoryish =
+      message.includes("out of memory") || message.includes("Aborted")
     finish({
       ok: false,
-      result: memoryish ? JudgeStatus.MEMORY_LIMIT_EXCEEDED : JudgeStatus.SYSTEM_ERROR,
+      result: memoryish
+        ? JudgeStatus.MEMORY_LIMIT_EXCEEDED
+        : JudgeStatus.SYSTEM_ERROR,
       message: memoryish ? "内存超出限制" : message.slice(0, 200),
     })
   }

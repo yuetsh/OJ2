@@ -211,7 +211,9 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       RECONNECT_MAX_DELAY,
     )
     const delay = Math.round(base * (0.5 + Math.random() * 0.5))
-    console.log(`[WebSocket] 将在 ${delay}ms 后重连 (第 ${this.reconnectAttempts} 次)`)
+    console.log(
+      `[WebSocket] 将在 ${delay}ms 后重连 (第 ${this.reconnectAttempts} 次)`,
+    )
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null
       this.connect()
@@ -516,7 +518,9 @@ export interface SubmissionUpdate extends WebSocketMessage {
 }
 
 /** 判题进度。subscribe(submissionId) 认领，断线重连会自动补订阅 */
-export function useSubmissionWebSocket(handler?: MessageHandler<SubmissionUpdate>) {
+export function useSubmissionWebSocket(
+  handler?: MessageHandler<SubmissionUpdate>,
+) {
   return useChannel<SubmissionUpdate>("/ws/submissions", handler)
 }
 

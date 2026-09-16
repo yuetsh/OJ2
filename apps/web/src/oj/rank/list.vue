@@ -286,7 +286,9 @@ const options: SelectOption[] = [...LONG_DURATION_OPTIONS]
 
 // 认不出来退回 options[1]（一个月内），和 duration 的初值一致
 const subOptions = computed<Duration>(
-  () => durationFromValue(duration.value) ?? durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
+  () =>
+    durationFromValue(duration.value) ??
+    durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
 )
 
 onMounted(() => {

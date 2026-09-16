@@ -84,7 +84,8 @@ const handleEditorReady = (payload: EditorReadyPayload) => {
 watch(
   () => collabStore.room,
   (room) => {
-    if (room && !collabStore.isTeacher && editorView.value) bind(editorView.value)
+    if (room && !collabStore.isTeacher && editorView.value)
+      bind(editorView.value)
     else stop()
   },
 )

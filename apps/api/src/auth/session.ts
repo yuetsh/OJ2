@@ -77,7 +77,12 @@ export async function createSession(
   // 全压在登录这一下上
   const pipeline = redis
     .pipeline()
-    .set(sessionKey(token), JSON.stringify(value), "EX", config.sessionTtlSeconds)
+    .set(
+      sessionKey(token),
+      JSON.stringify(value),
+      "EX",
+      config.sessionTtlSeconds,
+    )
     .sadd(userSessionsKey(userId), token)
     .expire(userSessionsKey(userId), config.sessionTtlSeconds)
   markOnline(pipeline, userId)
@@ -156,7 +161,9 @@ export type SessionResult =
   | { user: AuthUser; reason?: undefined }
   | { user: null; reason: "anonymous" | "disabled" }
 
-async function getUserByToken(token: string | undefined): Promise<SessionResult> {
+async function getUserByToken(
+  token: string | undefined,
+): Promise<SessionResult> {
   if (!token) return { user: null, reason: "anonymous" }
 
   const raw = await redis.get(sessionKey(token))
@@ -285,7 +292,11 @@ async function getStoredSession(c: Context) {
   }
 }
 
-export async function setContestPassword(c: Context, contestId: number, password: string) {
+export async function setContestPassword(
+  c: Context,
+  contestId: number,
+  password: string,
+) {
   const session = await getStoredSession(c)
   if (!session) return false
   session.value.contestPasswords[String(contestId)] = password

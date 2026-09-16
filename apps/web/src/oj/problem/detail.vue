@@ -182,11 +182,7 @@ watch(
             <n-tab-pane name="content" tab="题目描述">
               <ProblemContent />
             </n-tab-pane>
-            <n-tab-pane
-              v-if="canShowFlowchart"
-              name="flowchart"
-              tab="流程图表"
-            >
+            <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程图表">
               <ProblemFlowchart />
             </n-tab-pane>
             <n-tab-pane name="info" tab="题目统计" :disabled="!!problemSetId">
@@ -234,11 +230,7 @@ watch(
           <n-tab-pane name="content" tab="题目描述">
             <ProblemContent />
           </n-tab-pane>
-          <n-tab-pane
-            v-if="canShowFlowchart"
-            name="flowchart"
-            tab="流程图表"
-          >
+          <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程图表">
             <ProblemFlowchart />
           </n-tab-pane>
           <n-tab-pane name="info" tab="题目统计" :disabled="!!problemSetId">

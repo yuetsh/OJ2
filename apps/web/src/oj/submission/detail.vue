@@ -43,7 +43,9 @@ const loading = ref(false)
  * 测试点明细。`info` 在契约里是「完整形状或空对象」的联合（非管理员拿到的是空对象），
  * `data` 本身也可能为 null —— 两种情况都由这个访问器归成空数组，模板里不再直接取。
  */
-const caseResults = computed(() => submissionCaseResults(submission.value?.info))
+const caseResults = computed(() =>
+  submissionCaseResults(submission.value?.info),
+)
 
 async function init() {
   submission.value = props.submission

@@ -54,8 +54,9 @@ export async function withBuiltinDict(): Promise<JiebaInstance> {
       with: { type: "file" },
     })
   ).default as unknown as string
-  const dictPath = (await import("@node-rs/jieba/dict.txt", { with: { type: "file" } }))
-    .default as unknown as string
+  const dictPath = (
+    await import("@node-rs/jieba/dict.txt", { with: { type: "file" } })
+  ).default as unknown as string
 
   let addon: { Jieba: { withDict(dict: Buffer): JiebaInstance } }
   try {

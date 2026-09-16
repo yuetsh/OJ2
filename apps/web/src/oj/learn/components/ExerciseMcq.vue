@@ -55,7 +55,10 @@ function submit() {
 
 /** 给老师看的一句人话：选项按 A/B/C 报，报下标没人看得懂 */
 function describe(sel: Set<number>) {
-  return `选了 ${[...sel].sort((a, b) => a - b).map((i) => String.fromCharCode(65 + i)).join("、")}`
+  return `选了 ${[...sel]
+    .sort((a, b) => a - b)
+    .map((i) => String.fromCharCode(65 + i))
+    .join("、")}`
 }
 
 function reset() {

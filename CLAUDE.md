@@ -56,7 +56,15 @@ bun run --filter '@oj2/api' check:routes      # 路由遮蔽检查，加完路�
 bun run --filter '@oj2/api' check:ast         # AST 节点类型检查，升级 tree-sitter 后跑
 cd apps/web && bun run type-check             # 前端类型检查
 cd apps/web && bun run build                  # 前端构建
+bun run fmt                                   # Prettier，全仓一把（只在根目录有）
 ```
+
+**格式化是全仓一套 Prettier**，配置只有根目录的 `.prettierrc.toml`（`semi=false`，
+其余全默认，printWidth 80）。`bun run fmt` 覆盖 `apps/*/src`、`packages/*/src` 和两个
+构建配置；`.prettierignore` 挡掉 drizzle-kit 生成的 `src/db/meta/` 快照和 unplugin
+每次 dev 都会重写的两个 `.d.ts`。后端和契约原来没进 Prettier（手写在 100 列上下），
+2026-09-16 一次性全量格式化过 —— 之后**改完代码顺手跑一下 `bun run fmt`**，
+别再让两边的口径分叉。
 
 ⚠️ **前端类型检查只能走 `bun run type-check` 这个脚本。** 两条看起来等价的路子都会**静默
 通过**：`vue-tsc --noEmit -p tsconfig.json` 检查 0 个文件（那个 tsconfig 是 `files: []` +

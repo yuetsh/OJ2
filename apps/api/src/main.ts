@@ -38,7 +38,9 @@ switch (command) {
   // 反范式计数列被重判等操作带偏之后拿它对账，默认只读预演，--apply 才写。
   case "recount": {
     const { recount } = await import("./scripts/recount")
-    process.exit(await recount({ apply: process.argv.slice(3).includes("--apply") }))
+    process.exit(
+      await recount({ apply: process.argv.slice(3).includes("--apply") }),
+    )
   }
   case "sql-child": {
     const { runSqlChild } = await import("./judge/sql/child")
@@ -60,6 +62,8 @@ switch (command) {
     }
   }
   default:
-    console.error(`未知子命令：${command}\n可用：serve | worker | migrate | recount | healthcheck | sql-child`)
+    console.error(
+      `未知子命令：${command}\n可用：serve | worker | migrate | recount | healthcheck | sql-child`,
+    )
     process.exit(2)
 }

@@ -1,0 +1,7 @@
+# drizzle-kit 生成的迁移快照。内容等价的重排也别做 —— 这些文件是
+# db:generate 拿来比对上一版结构的输入，只该由 drizzle-kit 写。
+apps/api/src/db/meta/
+
+# unplugin 每次 dev 都会重写，格式化了也留不住
+apps/web/src/auto-imports.d.ts
+apps/web/src/components.d.ts

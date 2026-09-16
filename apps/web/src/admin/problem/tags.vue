@@ -122,9 +122,7 @@ async function saveTag(tag: AdminTag) {
   }
   const res = await renameTag(tag.id, name)
   if (res.merged) {
-    message.success(
-      `已合并到「${res.name}」，影响 ${res.affectedCount} 道题`,
-    )
+    message.success(`已合并到「${res.name}」，影响 ${res.affectedCount} 道题`)
   } else {
     message.success("已重命名")
   }

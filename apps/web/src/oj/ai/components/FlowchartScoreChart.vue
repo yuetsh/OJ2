@@ -31,7 +31,8 @@ const { chartKey } = useChartTheme()
 // 第二个 tab 里列成表格。这里直接画出来，不用改后端和契约
 const items = computed(() =>
   [...aiStore.detailsData.flowcharts].sort(
-    (a, b) => b.bestScore - a.bestScore || a.problemId.localeCompare(b.problemId),
+    (a, b) =>
+      b.bestScore - a.bestScore || a.problemId.localeCompare(b.problemId),
   ),
 )
 

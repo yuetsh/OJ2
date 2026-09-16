@@ -6,17 +6,16 @@ import { and, eq, inArray } from "drizzle-orm"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
-import { updateAchievementsForProblemSet, updateAchievementsForSubmission } from "../services/achievements"
+import {
+  updateAchievementsForProblemSet,
+  updateAchievementsForSubmission,
+} from "../services/achievements"
 import { recordSolvedProblem } from "../services/problemset"
 import { checkAst, type AstRule } from "./ast"
 import { publishSubmissionUpdate } from "./events"
 import type { JudgeJobData } from "./job"
 import { languageConfigs } from "./languages"
-import {
-  isAccepted,
-  JudgeStatus,
-  type JudgeStatusValue,
-} from "./status"
+import { isAccepted, JudgeStatus, type JudgeStatusValue } from "./status"
 import { parseProblemTemplate } from "./template"
 import { runSqlCase } from "./sql"
 import { readInfo } from "../services/test-case"
@@ -79,7 +78,8 @@ async function requestJudge(
   testCaseId: string,
 ) {
   const languageConfig = languageConfigs[language]
-  if (!languageConfig) throw new Error(`Unsupported judge language: ${language}`)
+  if (!languageConfig)
+    throw new Error(`Unsupported judge language: ${language}`)
 
   const token = createHash("sha256")
     .update(config.judgeServerToken)
@@ -173,8 +173,7 @@ async function persistResult(
       .update(schema.problem)
       .set({
         submissionNumber: problem.submissionNumber + 1,
-        acceptedNumber:
-          problem.acceptedNumber + (isAccepted(result) ? 1 : 0),
+        acceptedNumber: problem.acceptedNumber + (isAccepted(result) ? 1 : 0),
         statisticInfo: problemStatistics,
       })
       .where(eq(schema.problem.id, problemId))
@@ -233,7 +232,10 @@ async function persistResult(
           submissionInfo: {},
         })
         .onConflictDoNothing({
-          target: [schema.acmContestRank.contestId, schema.acmContestRank.userId],
+          target: [
+            schema.acmContestRank.contestId,
+            schema.acmContestRank.userId,
+          ],
         })
 
       const [rank] = await tx
@@ -267,7 +269,8 @@ async function persistResult(
           const acTime = Math.max(
             0,
             Math.floor(
-              (Date.parse(submissionCreateTime) - Date.parse(contest.startTime)) /
+              (Date.parse(submissionCreateTime) -
+                Date.parse(contest.startTime)) /
                 1000,
             ),
           )
@@ -293,7 +296,11 @@ async function persistResult(
   })
 }
 
-async function markSystemError(submissionId: string, userId: number, error: unknown) {
+async function markSystemError(
+  submissionId: string,
+  userId: number,
+  error: unknown,
+) {
   const message = error instanceof Error ? error.message : String(error)
   const updated = await db
     .update(schema.submission)
@@ -337,7 +344,10 @@ async function markSystemError(submissionId: string, userId: number, error: unkn
  * 都不会被它覆盖。唯一能撞上的是「重判刚把状态置回 PENDING，同一刻上一个被遗弃的
  * 任务才失败」——结果是这次重判被吃掉、显示成系统错误，比静默卡死看得见。
  */
-export async function failAbandonedSubmission(submissionId: string, error: unknown) {
+export async function failAbandonedSubmission(
+  submissionId: string,
+  error: unknown,
+) {
   const [row] = await db
     .select({ userId: schema.submission.userId })
     .from(schema.submission)
@@ -354,7 +364,10 @@ export async function judgeSubmission(job: JudgeJobData) {
       problem: schema.problem,
     })
     .from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+    .innerJoin(
+      schema.problem,
+      eq(schema.submission.problemId, schema.problem.id),
+    )
     .where(
       and(
         eq(schema.submission.id, job.submissionId),
@@ -364,7 +377,11 @@ export async function judgeSubmission(job: JudgeJobData) {
     .limit(1)
 
   if (!row) throw new Error(`Submission ${job.submissionId} does not exist`)
-  if (![JudgeStatus.PENDING, JudgeStatus.JUDGING].includes(row.submission.result as 6 | 7)) {
+  if (
+    ![JudgeStatus.PENDING, JudgeStatus.JUDGING].includes(
+      row.submission.result as 6 | 7,
+    )
+  ) {
     return
   }
 
@@ -391,15 +408,16 @@ export async function judgeSubmission(job: JudgeJobData) {
 
     // SQL 题不经判题沙箱：沙箱是给编译型/脚本型语言用的，SQL 判的是结果集，
     // 走 judge/sql 的 WASM 引擎（在独立子进程里跑，见那边的说明）。
-    const response = row.submission.language === "SQL"
-      ? await judgeSqlSubmission(row.problem, row.submission.code)
-      : await requestJudge(
-          row.submission.language,
-          source,
-          row.problem.timeLimit,
-          row.problem.memoryLimit,
-          row.problem.testCaseId,
-        )
+    const response =
+      row.submission.language === "SQL"
+        ? await judgeSqlSubmission(row.problem, row.submission.code)
+        : await requestJudge(
+            row.submission.language,
+            source,
+            row.problem.timeLimit,
+            row.problem.memoryLimit,
+            row.problem.testCaseId,
+          )
 
     let result: JudgeStatusValue
     let info: unknown = {}
@@ -422,11 +440,19 @@ export async function judgeSubmission(job: JudgeJobData) {
         (left, right) => Number(left.test_case) - Number(right.test_case),
       )
       info = { err: null, data: cases }
-      const firstFailure = cases.find((item) => item.result !== JudgeStatus.ACCEPTED)
+      const firstFailure = cases.find(
+        (item) => item.result !== JudgeStatus.ACCEPTED,
+      )
       result = statusValue(firstFailure?.result ?? JudgeStatus.ACCEPTED)
       statisticInfo = {
-        time_cost: Math.max(0, ...cases.map((item) => Number(item.cpu_time) || 0)),
-        memory_cost: Math.max(0, ...cases.map((item) => Number(item.memory) || 0)),
+        time_cost: Math.max(
+          0,
+          ...cases.map((item) => Number(item.cpu_time) || 0),
+        ),
+        memory_cost: Math.max(
+          0,
+          ...cases.map((item) => Number(item.memory) || 0),
+        ),
         score: 0,
       }
       // SQL 判题给出的中文提示（只读拒绝/超时/内存/无结果集）只存在测试点的
@@ -435,7 +461,8 @@ export async function judgeSubmission(job: JudgeJobData) {
       const failedMessage = cases.find(
         (item) => item.result !== JudgeStatus.ACCEPTED && item.error_message,
       )?.error_message
-      if (typeof failedMessage === "string") statisticInfo.err_info = failedMessage
+      if (typeof failedMessage === "string")
+        statisticInfo.err_info = failedMessage
 
       if (result === JudgeStatus.ACCEPTED) {
         const rules = astRulesForLanguage(
@@ -483,43 +510,60 @@ export async function judgeSubmission(job: JudgeJobData) {
           row.submission.createTime,
         )
         if (earned.length > 0) {
-          await publishAchievementNotification(row.submission.userId, earned.map((badge) => ({
-            id: badge.id,
-            name: badge.name,
-            description: badge.description,
-            icon: badge.icon,
-            rarity: "bronze",
-            kind: "badge",
-          })))
+          await publishAchievementNotification(
+            row.submission.userId,
+            earned.map((badge) => ({
+              id: badge.id,
+              name: badge.name,
+              description: badge.description,
+              icon: badge.icon,
+              rarity: "bronze",
+              kind: "badge",
+            })),
+          )
         }
         if (updated > 0) {
-          const unlocked = await updateAchievementsForProblemSet(row.submission.userId)
-          await publishAchievementNotification(row.submission.userId, unlocked.map((achievement) => ({
-            id: achievement.id,
-            name: achievement.name,
-            description: achievement.description,
-            icon: achievement.icon,
-            rarity: achievement.rarity,
-            kind: "achievement",
-          })))
+          const unlocked = await updateAchievementsForProblemSet(
+            row.submission.userId,
+          )
+          await publishAchievementNotification(
+            row.submission.userId,
+            unlocked.map((achievement) => ({
+              id: achievement.id,
+              name: achievement.name,
+              description: achievement.description,
+              icon: achievement.icon,
+              rarity: achievement.rarity,
+              kind: "achievement",
+            })),
+          )
         }
       } catch (error) {
-        console.error(`Failed to record problem set progress for ${row.submission.id}`, error)
+        console.error(
+          `Failed to record problem set progress for ${row.submission.id}`,
+          error,
+        )
       }
     }
 
     try {
       const unlocked = await updateAchievementsForSubmission(row.submission.id)
-      await publishAchievementNotification(row.submission.userId, unlocked.map((achievement) => ({
-        id: achievement.id,
-        name: achievement.name,
-        description: achievement.description,
-        icon: achievement.icon,
-        rarity: achievement.rarity,
-        kind: "achievement",
-      })))
+      await publishAchievementNotification(
+        row.submission.userId,
+        unlocked.map((achievement) => ({
+          id: achievement.id,
+          name: achievement.name,
+          description: achievement.description,
+          icon: achievement.icon,
+          rarity: achievement.rarity,
+          kind: "achievement",
+        })),
+      )
     } catch (error) {
-      console.error(`Failed to update achievements for ${row.submission.id}`, error)
+      console.error(
+        `Failed to update achievements for ${row.submission.id}`,
+        error,
+      )
     }
 
     await publishSubmissionUpdate(row.submission.userId, {
@@ -528,14 +572,15 @@ export async function judgeSubmission(job: JudgeJobData) {
       result,
       status: "finished",
       score:
-        typeof statisticInfo.score === "number" ? statisticInfo.score : undefined,
+        typeof statisticInfo.score === "number"
+          ? statisticInfo.score
+          : undefined,
     })
   } catch (error) {
     console.error(`Failed to judge submission ${row.submission.id}`, error)
     await markSystemError(row.submission.id, row.submission.userId, error)
   }
 }
-
 
 /**
  * SQL 题判题：逐个测试点用各自的初始化脚本跑一遍，产出与沙箱同构的结果结构，
@@ -554,15 +599,23 @@ async function judgeSqlSubmission(
   const answers = Array.isArray(problem.answers) ? problem.answers : []
   const refSql = answers
     .map((item) => objectValue(item))
-    .find((item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim())?.code
+    .find(
+      (item) =>
+        item.language === "SQL" &&
+        typeof item.code === "string" &&
+        item.code.trim(),
+    )?.code
   if (typeof refSql !== "string") throw new Error("题目缺少 SQL 标准答案")
 
   const info = await readInfo(problem.testCaseId)
   if (!info) throw new Error("测试点信息读取失败")
-  if (!info.sql) throw new Error("测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包")
+  if (!info.sql)
+    throw new Error("测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包")
 
   // 按 "1","2",… 的数字序遍历，保证测试点顺序稳定
-  const keys = Object.keys(info.test_cases ?? {}).sort((a, b) => Number(a) - Number(b))
+  const keys = Object.keys(info.test_cases ?? {}).sort(
+    (a, b) => Number(a) - Number(b),
+  )
   if (keys.length === 0) throw new Error("题目没有任何测试点")
 
   const cases: JudgeCase[] = []
@@ -571,7 +624,9 @@ async function judgeSqlSubmission(
     const initSql = await readFile(
       resolvePath(config.testCaseDirectory, problem.testCaseId, inputName),
       "utf8",
-    ).catch(() => { throw new Error(`测试点脚本 ${inputName} 读取失败`) })
+    ).catch(() => {
+      throw new Error(`测试点脚本 ${inputName} 读取失败`)
+    })
 
     const outcome = await runSqlCase({
       kind: "judge",
@@ -585,7 +640,8 @@ async function judgeSqlSubmission(
     })
     if (!outcome.ok) {
       // 初始化/标准答案执行失败属出题配置问题，整题 SYSTEM_ERROR
-      if (outcome.result === JudgeStatus.SYSTEM_ERROR) throw new Error(outcome.message)
+      if (outcome.result === JudgeStatus.SYSTEM_ERROR)
+        throw new Error(outcome.message)
       // 子进程被杀（超时/内存）也走这里，按学生错误记成一个测试点
       cases.push({
         test_case: String(index + 1),

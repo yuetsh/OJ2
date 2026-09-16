@@ -42,11 +42,15 @@ function getProgressPercentage() {
 
 // 有选做题时把「必做 N 题」标出来，否则「共 10 道题目」和「9 / 9」对不上
 const optionalCount = computed(
-  () => props.problemSet.problemsCount - (props.problemSet.userProgress?.totalCount ?? 0),
+  () =>
+    props.problemSet.problemsCount -
+    (props.problemSet.userProgress?.totalCount ?? 0),
 )
 
 const endTimeText = computed(() =>
-  props.problemSet.endTime ? parseTime(props.problemSet.endTime, "YYYY-MM-DD HH:mm") : "",
+  props.problemSet.endTime
+    ? parseTime(props.problemSet.endTime, "YYYY-MM-DD HH:mm")
+    : "",
 )
 
 function handleJoin() {

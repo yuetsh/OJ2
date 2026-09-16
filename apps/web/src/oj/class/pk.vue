@@ -66,7 +66,9 @@ const timeRangeOptions: SelectOption[] = [
 ]
 
 // 「全部时间」的 value 是空串，解不出来就是 null —— 正是不带时间条件的意思
-const subOptions = computed<Duration | null>(() => durationFromValue(duration.value))
+const subOptions = computed<Duration | null>(() =>
+  durationFromValue(duration.value),
+)
 
 // 根据时间段选项计算开始和结束时间
 function getTimeRange(): {

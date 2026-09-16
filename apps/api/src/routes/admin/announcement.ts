@@ -34,7 +34,11 @@ function serialize(row: {
 
 function selectOne(id: number) {
   return db
-    .select({ announcement: schema.announcement, user: schema.user, realName: schema.userProfile.realName })
+    .select({
+      announcement: schema.announcement,
+      user: schema.user,
+      realName: schema.userProfile.realName,
+    })
     .from(schema.announcement)
     .innerJoin(schema.user, eq(schema.announcement.createdById, schema.user.id))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
@@ -47,10 +51,21 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.announcement),
-    db.select({ announcement: schema.announcement, user: schema.user, realName: schema.userProfile.realName })
+    db
+      .select({
+        announcement: schema.announcement,
+        user: schema.user,
+        realName: schema.userProfile.realName,
+      })
       .from(schema.announcement)
-      .innerJoin(schema.user, eq(schema.announcement.createdById, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .innerJoin(
+        schema.user,
+        eq(schema.announcement.createdById, schema.user.id),
+      )
+      .leftJoin(
+        schema.userProfile,
+        eq(schema.userProfile.userId, schema.user.id),
+      )
       .orderBy(desc(schema.announcement.createTime))
       .limit(limit)
       .offset(offset),
@@ -63,52 +78,106 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
 })
 
 adminAnnouncementRoutes.post("/announcements", requireSuperAdmin, async (c) => {
-  const parsed = createAnnouncementRequestSchema.safeParse(await c.req.json().catch(() => null))
+  const parsed = createAnnouncementRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
   if (!parsed.success) {
-    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
+    return failure(
+      c,
+      400,
+      "invalid-request",
+      parsed.error.issues[0]?.message ?? "Invalid payload",
+    )
   }
   const now = new Date().toISOString()
-  const [created] = await db.insert(schema.announcement).values({
-    ...parsed.data,
-    createTime: now,
-    lastUpdateTime: now,
-    createdById: c.get("user")!.id,
-  }).returning({ id: schema.announcement.id })
+  const [created] = await db
+    .insert(schema.announcement)
+    .values({
+      ...parsed.data,
+      createTime: now,
+      lastUpdateTime: now,
+      createdById: c.get("user")!.id,
+    })
+    .returning({ id: schema.announcement.id })
   const [row] = await selectOne(created!.id)
   return success(c, serialize(row!), 201)
 })
 
-adminAnnouncementRoutes.get("/announcements/:id", requireSuperAdmin, async (c) => {
-  const [row] = await selectOne(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!row) return failure(c, 404, "announcement-not-found", "Announcement does not exist")
-  return success(c, serialize(row))
-})
+adminAnnouncementRoutes.get(
+  "/announcements/:id",
+  requireSuperAdmin,
+  async (c) => {
+    const [row] = await selectOne(
+      queryInteger(c.req.param("id"), 0, { min: 1 }),
+    )
+    if (!row)
+      return failure(
+        c,
+        404,
+        "announcement-not-found",
+        "Announcement does not exist",
+      )
+    return success(c, serialize(row))
+  },
+)
 
-adminAnnouncementRoutes.put("/announcements/:id", requireSuperAdmin, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateAnnouncementRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) {
-    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
-  }
-  const updated = await db.update(schema.announcement)
-    .set({ ...parsed.data, lastUpdateTime: new Date().toISOString() })
-    .where(eq(schema.announcement.id, id))
-    .returning({ id: schema.announcement.id })
-  if (updated.length === 0) {
-    return failure(c, 404, "announcement-not-found", "Announcement does not exist")
-  }
-  const [row] = await selectOne(id)
-  return success(c, serialize(row!))
-})
+adminAnnouncementRoutes.put(
+  "/announcements/:id",
+  requireSuperAdmin,
+  async (c) => {
+    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+    const parsed = updateAnnouncementRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    )
+    if (!parsed.success) {
+      return failure(
+        c,
+        400,
+        "invalid-request",
+        parsed.error.issues[0]?.message ?? "Invalid payload",
+      )
+    }
+    const updated = await db
+      .update(schema.announcement)
+      .set({ ...parsed.data, lastUpdateTime: new Date().toISOString() })
+      .where(eq(schema.announcement.id, id))
+      .returning({ id: schema.announcement.id })
+    if (updated.length === 0) {
+      return failure(
+        c,
+        404,
+        "announcement-not-found",
+        "Announcement does not exist",
+      )
+    }
+    const [row] = await selectOne(id)
+    return success(c, serialize(row!))
+  },
+)
 
-adminAnnouncementRoutes.delete("/announcements/:id", requireSuperAdmin, async (c) => {
-  // 旧后端删不存在的公告也返回成功（filter().delete() 不报错）。这里改成 404：
-  // 后台是人手点删除，静默成功会让人以为删掉了，刷新后它还在。
-  const deleted = await db.delete(schema.announcement)
-    .where(eq(schema.announcement.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
-    .returning({ id: schema.announcement.id })
-  if (deleted.length === 0) {
-    return failure(c, 404, "announcement-not-found", "Announcement does not exist")
-  }
-  return success(c, null)
-})
+adminAnnouncementRoutes.delete(
+  "/announcements/:id",
+  requireSuperAdmin,
+  async (c) => {
+    // 旧后端删不存在的公告也返回成功（filter().delete() 不报错）。这里改成 404：
+    // 后台是人手点删除，静默成功会让人以为删掉了，刷新后它还在。
+    const deleted = await db
+      .delete(schema.announcement)
+      .where(
+        eq(
+          schema.announcement.id,
+          queryInteger(c.req.param("id"), 0, { min: 1 }),
+        ),
+      )
+      .returning({ id: schema.announcement.id })
+    if (deleted.length === 0) {
+      return failure(
+        c,
+        404,
+        "announcement-not-found",
+        "Announcement does not exist",
+      )
+    }
+    return success(c, null)
+  },
+)

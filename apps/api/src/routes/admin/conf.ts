@@ -14,7 +14,11 @@ import { resolve } from "node:path"
 import { count, desc, eq, gte, ilike, not, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { requireAdmin, requireSuperAdmin, type AppEnv } from "../../auth/middleware"
+import {
+  requireAdmin,
+  requireSuperAdmin,
+  type AppEnv,
+} from "../../auth/middleware"
 import { config } from "../../config"
 import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
@@ -39,7 +43,9 @@ function aliveSince() {
  * 于是同一天的心跳永远小于阈值，**所有判题机都会被标成离线**。
  */
 function isAlive(lastHeartbeat: string) {
-  return Date.parse(lastHeartbeat) >= Date.now() - HEARTBEAT_ALIVE_SECONDS * 1000
+  return (
+    Date.parse(lastHeartbeat) >= Date.now() - HEARTBEAT_ALIVE_SECONDS * 1000
+  )
 }
 
 // ---------------------------------------------------------------- 网站配置
@@ -71,14 +77,24 @@ adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
 })
 
 adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
-  const parsed = updateWebsiteConfigRequestSchema.safeParse(await c.req.json().catch(() => null))
+  const parsed = updateWebsiteConfigRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
   if (!parsed.success) {
-    return failure(c, 400, "invalid-request", parsed.error.issues[0]?.message ?? "Invalid payload")
+    return failure(
+      c,
+      400,
+      "invalid-request",
+      parsed.error.issues[0]?.message ?? "Invalid payload",
+    )
   }
-  const entries = (Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][])
-    .map(([field, key]) => ({ field, key, value: parsed.data[field] }))
+  const entries = (
+    Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]
+  ).map(([field, key]) => ({ field, key, value: parsed.data[field] }))
   // 8 个键一条 upsert 写完，不再一个键一次往返
-  await db.insert(schema.optionsSysoptions).values(entries.map(({ key, value }) => ({ key, value })))
+  await db
+    .insert(schema.optionsSysoptions)
+    .values(entries.map(({ key, value }) => ({ key, value })))
     .onConflictDoUpdate({
       target: schema.optionsSysoptions.key,
       set: { value: sql`excluded.value` },
@@ -89,45 +105,75 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
   // snake_case 是这张表从 Django 继承来的存储格式，只该活在库里；线上这一跳两边
   // 都是新写的，没理由让前端再写一层换名胶水。曾经推 snake、前端拿它去比驼峰字段，
   // 一条也命中不了，整个「改完不必刷新」空转了很久。
-  for (const entry of entries) await publishConfigUpdate(entry.field, entry.value)
+  for (const entry of entries)
+    await publishConfigUpdate(entry.field, entry.value)
   return success(c, null)
 })
 
 // ---------------------------------------------------------------- 判题机
 
 adminConfRoutes.get("/judge-servers", requireSuperAdmin, async (c) => {
-  const rows = await db.select().from(schema.judgeServer).orderBy(desc(schema.judgeServer.lastHeartbeat))
+  const rows = await db
+    .select()
+    .from(schema.judgeServer)
+    .orderBy(desc(schema.judgeServer.lastHeartbeat))
   return success(c, {
     // 后台要显示 token 才能拿去配判题机。这个接口是超管专属的
     token: config.judgeServerToken,
-    servers: rows.map((row) => ({
-      ...row,
-      status: isAlive(row.lastHeartbeat) ? "normal" : "abnormal",
-    } satisfies JudgeServer)),
+    servers: rows.map(
+      (row) =>
+        ({
+          ...row,
+          status: isAlive(row.lastHeartbeat) ? "normal" : "abnormal",
+        }) satisfies JudgeServer,
+    ),
   } satisfies JudgeServerList)
 })
 
 adminConfRoutes.put("/judge-servers/:id", requireSuperAdmin, async (c) => {
-  const parsed = updateJudgeServerRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "isDisabled is required")
-  const updated = await db.update(schema.judgeServer)
+  const parsed = updateJudgeServerRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!parsed.success)
+    return failure(c, 400, "invalid-request", "isDisabled is required")
+  const updated = await db
+    .update(schema.judgeServer)
     .set({ isDisabled: parsed.data.isDisabled })
-    .where(eq(schema.judgeServer.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .where(
+      eq(schema.judgeServer.id, queryInteger(c.req.param("id"), 0, { min: 1 })),
+    )
     .returning({ id: schema.judgeServer.id })
-  if (updated.length === 0) return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
+  if (updated.length === 0)
+    return failure(
+      c,
+      404,
+      "judge-server-not-found",
+      "Judge server does not exist",
+    )
   // 旧后端在这里会 process_pending_task() 把积压的待判任务重新分发。
   // 新架构不需要：任务在 BullMQ 里排着，worker 恢复就自己接着消费，不存在「没有新提交
   // 就一直 waiting」那种情况 —— 那是旧的自研分发器才有的问题。
   return success(c, null)
 })
 
-adminConfRoutes.delete("/judge-servers/:hostname", requireSuperAdmin, async (c) => {
-  const deleted = await db.delete(schema.judgeServer)
-    .where(eq(schema.judgeServer.hostname, c.req.param("hostname")))
-    .returning({ id: schema.judgeServer.id })
-  if (deleted.length === 0) return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
-  return success(c, null)
-})
+adminConfRoutes.delete(
+  "/judge-servers/:hostname",
+  requireSuperAdmin,
+  async (c) => {
+    const deleted = await db
+      .delete(schema.judgeServer)
+      .where(eq(schema.judgeServer.hostname, c.req.param("hostname")))
+      .returning({ id: schema.judgeServer.id })
+    if (deleted.length === 0)
+      return failure(
+        c,
+        404,
+        "judge-server-not-found",
+        "Judge server does not exist",
+      )
+    return success(c, null)
+  },
+)
 
 // ---------------------------------------------------------------- 孤儿测试用例
 
@@ -140,15 +186,24 @@ async function orphanTestCaseIds() {
     db.select({ id: schema.problem.testCaseId }).from(schema.problem),
   ])
   const referenced = new Set(inDb.map((row) => row.id))
-  return onDisk.filter((name) => TEST_CASE_ID_RE.test(name) && !referenced.has(name))
+  return onDisk.filter(
+    (name) => TEST_CASE_ID_RE.test(name) && !referenced.has(name),
+  )
 }
 
 adminConfRoutes.get("/orphan-test-cases", requireSuperAdmin, async (c) => {
   const ids = await orphanTestCaseIds()
-  const rows = await Promise.all(ids.map(async (id) => {
-    const info = await stat(resolve(config.testCaseDirectory, id)).catch(() => null)
-    return { id, createTime: info ? info.mtimeMs / 1000 : 0 } satisfies OrphanTestCase
-  }))
+  const rows = await Promise.all(
+    ids.map(async (id) => {
+      const info = await stat(resolve(config.testCaseDirectory, id)).catch(
+        () => null,
+      )
+      return {
+        id,
+        createTime: info ? info.mtimeMs / 1000 : 0,
+      } satisfies OrphanTestCase
+    }),
+  )
   return success(c, rows)
 })
 
@@ -159,10 +214,18 @@ adminConfRoutes.delete("/orphan-test-cases", requireSuperAdmin, async (c) => {
   // 而测试数据没有别处备份 —— 旧后端这里是不校验的。
   const targets = requested ? orphans.filter((id) => id === requested) : orphans
   if (requested && targets.length === 0) {
-    return failure(c, 404, "not-an-orphan", "该用例目录不存在或仍被题目引用，未删除")
+    return failure(
+      c,
+      404,
+      "not-an-orphan",
+      "该用例目录不存在或仍被题目引用，未删除",
+    )
   }
   for (const id of targets) {
-    await rm(resolve(config.testCaseDirectory, id), { recursive: true, force: true })
+    await rm(resolve(config.testCaseDirectory, id), {
+      recursive: true,
+      force: true,
+    })
   }
   return success(c, { deleted: targets.length })
 })
@@ -173,11 +236,17 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
   const now = new Date().toISOString()
   const [[users], [submissions], [contests], [servers]] = await Promise.all([
     db.select({ value: count() }).from(schema.user),
-    db.select({ value: count() }).from(schema.submission)
+    db
+      .select({ value: count() })
+      .from(schema.submission)
       .where(gte(schema.submission.createTime, todayStart())),
-    db.select({ value: count() }).from(schema.contest)
+    db
+      .select({ value: count() })
+      .from(schema.contest)
       .where(not(sql`${schema.contest.endTime} < ${now}`)),
-    db.select({ value: count() }).from(schema.judgeServer)
+    db
+      .select({ value: count() })
+      .from(schema.judgeServer)
       .where(gte(schema.judgeServer.lastHeartbeat, aliveSince())),
   ])
   // 旧接口还回了 env.FORCE_HTTPS / STATIC_CDN_HOST，前端从未读过，不再下发
@@ -195,10 +264,16 @@ adminConfRoutes.get("/random-usernames", requireSuperAdmin, async (c) => {
   // 不额外按 className 过滤：那会改变旧行为，而这个功能就是随机点名，宁可宽松
   const classroom = c.req.query("classroom")?.trim()
   if (!classroom) return failure(c, 400, "invalid-request", "需要班级号")
-  const rows = await db.select({ username: schema.user.username }).from(schema.user)
+  const rows = await db
+    .select({ username: schema.user.username })
+    .from(schema.user)
     .where(ilike(schema.user.username, `${classroom}%`))
-    .orderBy(sql`random()`).limit(10)
-  return success(c, rows.map((row) => row.username))
+    .orderBy(sql`random()`)
+    .limit(10)
+  return success(
+    c,
+    rows.map((row) => row.username),
+  )
 })
 
 // ---------------------------------------------------------------- 富文本图片上传
@@ -219,16 +294,28 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
   const form = await c.req.formData().catch(() => null)
   const image = form?.get("image")
   if (!(image instanceof File)) {
-    return success(c, { success: false, msg: "Upload failed", filePath: "" } satisfies UploadImageResponse)
+    return success(c, {
+      success: false,
+      msg: "Upload failed",
+      filePath: "",
+    } satisfies UploadImageResponse)
   }
   const suffix = image.name.slice(image.name.lastIndexOf(".")).toLowerCase()
   if (!IMAGE_SUFFIXES.includes(suffix)) {
-    return success(c, { success: false, msg: "Unsupported file format", filePath: "" } satisfies UploadImageResponse)
+    return success(c, {
+      success: false,
+      msg: "Unsupported file format",
+      filePath: "",
+    } satisfies UploadImageResponse)
   }
   // 旧后端没有大小限制，靠 nginx 兜。这里显式限一道：文件写在本地磁盘上，
   // 一个超大文件就能把机房那台机器的盘写满，而写满之后判题也一起挂
   if (image.size > MAX_IMAGE_BYTES) {
-    return success(c, { success: false, msg: "图片不能超过 10MB", filePath: "" } satisfies UploadImageResponse)
+    return success(c, {
+      success: false,
+      msg: "图片不能超过 10MB",
+      filePath: "",
+    } satisfies UploadImageResponse)
   }
   // 文件名完全由服务端生成，不带用户提供的任何一段 —— 原名里的 ../ 或空字节都进不来
   const name = `${randomFileName()}${suffix}`
@@ -237,7 +324,11 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
     await Bun.write(resolve(config.uploadDirectory, name), image)
   } catch (error) {
     console.error("Failed to save uploaded image", error)
-    return success(c, { success: false, msg: "Upload Error", filePath: "" } satisfies UploadImageResponse)
+    return success(c, {
+      success: false,
+      msg: "Upload Error",
+      filePath: "",
+    } satisfies UploadImageResponse)
   }
   return success(c, {
     success: true,
@@ -247,6 +338,8 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
 })
 
 function randomFileName() {
-  return Array.from({ length: 10 }, () =>
-    "abcdefghijklmnopqrstuvwxyz0123456789"[randomInt(36)]).join("")
+  return Array.from(
+    { length: 10 },
+    () => "abcdefghijklmnopqrstuvwxyz0123456789"[randomInt(36)],
+  ).join("")
 }

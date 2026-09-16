@@ -1,4 +1,8 @@
-const defaultEnv = ["LANG=en_US.UTF-8", "LANGUAGE=en_US:en", "LC_ALL=en_US.UTF-8"]
+const defaultEnv = [
+  "LANG=en_US.UTF-8",
+  "LANGUAGE=en_US:en",
+  "LC_ALL=en_US.UTF-8",
+]
 
 export const languageConfigs: Record<string, Record<string, unknown>> = {
   C: {

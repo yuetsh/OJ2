@@ -71,7 +71,6 @@ export const joinProblemSetRequestSchema = z.object({
   problemSetId: z.number().int().positive(),
 })
 
-
 export const completedProblemSchema = z.object({
   id: z.number().int(),
   _id: z.string(),
@@ -92,7 +91,9 @@ export const problemSetProgressSchema = z.object({
   completedProblems: z.array(completedProblemSchema),
 })
 
-export const problemSetProgressListSchema = paginatedSchema(problemSetProgressSchema).extend({
+export const problemSetProgressListSchema = paginatedSchema(
+  problemSetProgressSchema,
+).extend({
   statistics: z.object({
     total: z.number().int(),
     completed: z.number().int(),
@@ -114,9 +115,13 @@ export type ProblemSetList = z.infer<typeof problemSetListSchema>
 export type ProblemSetBadge = z.infer<typeof problemSetBadgeSchema>
 export type ProblemSetProblem = z.infer<typeof problemSetProblemSchema>
 export type ProblemSetProgress = z.infer<typeof problemSetProgressSchema>
-export type ProblemSetProgressList = z.infer<typeof problemSetProgressListSchema>
+export type ProblemSetProgressList = z.infer<
+  typeof problemSetProgressListSchema
+>
 export type UserBadge = z.infer<typeof userBadgeSchema>
 export type CompletedProblem = z.infer<typeof completedProblemSchema>
 
-export type ProblemSetUserProgressSummary = z.infer<typeof problemSetUserProgressSummarySchema>
+export type ProblemSetUserProgressSummary = z.infer<
+  typeof problemSetUserProgressSummarySchema
+>
 export type JoinProblemSetRequest = z.infer<typeof joinProblemSetRequestSchema>

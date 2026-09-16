@@ -111,8 +111,7 @@ const POLL_INTERVAL = 3000
 const POLL_TIMEOUT = 3 * 60 * 1000
 
 type Outcome =
-  | { ok: true; score: number; grade: string }
-  | { ok: false; error?: string }
+  { ok: true; score: number; grade: string } | { ok: false; error?: string }
 
 const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
   async () => {
@@ -509,11 +508,7 @@ onUnmounted(() => {
           </n-card>
 
           <!-- 详细评分 -->
-          <n-card
-            v-if="sortedCriteria.length"
-            size="small"
-            title="详细评分"
-          >
+          <n-card v-if="sortedCriteria.length" size="small" title="详细评分">
             <div
               v-for="[key, detail] in sortedCriteria"
               :key="key"

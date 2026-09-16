@@ -6,7 +6,9 @@
  * 所以内存态够用，不需要 Redis 同步。进程重启丢掉全部状态，两端重连后回到干净状态。
  */
 
-export type CollabSocket = Bun.ServerWebSocket<import("../websocket").SubmissionSocketData>
+export type CollabSocket = Bun.ServerWebSocket<
+  import("../websocket").SubmissionSocketData
+>
 
 /**
  * 协作支持的语言。和前端 utils/types.ts 里的 LANGUAGE 对齐，去掉 Flowchart ——
@@ -69,7 +71,6 @@ export function removeRequest(studentId: number) {
   return requests.delete(studentId)
 }
 
-
 /** 按发起时间正序。老师端按等待时长排序展示，不强制先来先到 */
 export function listRequests() {
   return Array.from(requests.values()).sort((a, b) => a.createdAt - b.createdAt)
@@ -81,7 +82,8 @@ export function queueAheadOf(studentId: number) {
   if (!self) return 0
   let ahead = 0
   for (const request of requests.values()) {
-    if (request.status === "pending" && request.createdAt < self.createdAt) ahead += 1
+    if (request.status === "pending" && request.createdAt < self.createdAt)
+      ahead += 1
   }
   return ahead
 }
@@ -132,4 +134,3 @@ export function roomOf(ws: CollabSocket) {
   const ownerId = ws.data.roomOwnerId
   return ownerId === undefined ? undefined : rooms.get(ownerId)
 }
-

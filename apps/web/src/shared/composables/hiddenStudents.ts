@@ -64,7 +64,9 @@ export function useHiddenStudents(storageKey: string) {
     // 把已经到期的清掉再落一次盘，否则这张表只增不减
     const now = Date.now()
     const cleaned = Object.fromEntries(
-      Object.entries(hiddenStudents.value).filter(([, expiresAt]) => expiresAt > now),
+      Object.entries(hiddenStudents.value).filter(
+        ([, expiresAt]) => expiresAt > now,
+      ),
     )
     hiddenStudents.value = cleaned
     save(cleaned)

@@ -42,8 +42,12 @@ const missing: Array<{ language: string; target: string; node: string }> = []
 for (const [language, table] of Object.entries(AST_NODE_TARGETS_BY_LANGUAGE)) {
   const wasmPath = WASM_BY_LANGUAGE[language]
   if (!wasmPath) {
-    console.log(`⚠ ${language} 在 AST_NODE_TARGETS_BY_LANGUAGE 里，但这个脚本没有它的语法 wasm`)
-    console.log(`   加语言时记得同步 WASM_BY_LANGUAGE 和 judge/ast.ts 的 loadLanguage`)
+    console.log(
+      `⚠ ${language} 在 AST_NODE_TARGETS_BY_LANGUAGE 里，但这个脚本没有它的语法 wasm`,
+    )
+    console.log(
+      `   加语言时记得同步 WASM_BY_LANGUAGE 和 judge/ast.ts 的 loadLanguage`,
+    )
     process.exit(2)
   }
   const loaded = await Language.load(wasmPath)
@@ -55,7 +59,8 @@ for (const [language, table] of Object.entries(AST_NODE_TARGETS_BY_LANGUAGE)) {
   }
   for (const [target, entry] of Object.entries(table)) {
     checked++
-    if (!declared.has(entry.node)) missing.push({ language, target, node: entry.node })
+    if (!declared.has(entry.node))
+      missing.push({ language, target, node: entry.node })
   }
 }
 
@@ -66,7 +71,11 @@ if (missing.length === 0) {
 }
 for (const { language, target, node } of missing) {
   console.log(`\n⚠ ${language} 的 ${target} → "${node}"`)
-  console.log(`   这个节点类型在语法里不存在，规则永远失败（或永远通过），且不报错`)
-  console.log(`   改法：在 packages/contract/src/problem.ts 把它的 node 改成语法里真实的名字`)
+  console.log(
+    `   这个节点类型在语法里不存在，规则永远失败（或永远通过），且不报错`,
+  )
+  console.log(
+    `   改法：在 packages/contract/src/problem.ts 把它的 node 改成语法里真实的名字`,
+  )
 }
 process.exit(1)

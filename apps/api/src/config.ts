@@ -25,7 +25,10 @@ function loadRepoRootEnv() {
       if (eq <= 0) continue
       const key = trimmed.slice(0, eq).trim()
       if (process.env[key] !== undefined) continue
-      process.env[key] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, "")
+      process.env[key] = trimmed
+        .slice(eq + 1)
+        .trim()
+        .replace(/^["']|["']$/g, "")
     }
   } catch {
     // 根目录没有 .env 是正常情况（例如生产用真实环境变量注入），静默跳过
@@ -64,18 +67,24 @@ export const config = {
   port: Number(process.env.PORT ?? 3000),
   redisUrl: process.env.REDIS_URL ?? "redis://localhost:6380",
   sessionCookie: "oj2_session",
-  sessionTtlSeconds: Number(process.env.SESSION_TTL_SECONDS ?? 7 * 24 * 60 * 60),
+  sessionTtlSeconds: Number(
+    process.env.SESSION_TTL_SECONDS ?? 7 * 24 * 60 * 60,
+  ),
   secureCookies: process.env.COOKIE_SECURE === "true",
   judgeServerUrl: process.env.JUDGE_SERVER_URL ?? "http://localhost:8081",
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: Number(process.env.JUDGE_CONCURRENCY ?? 2),
   avatarDirectory: repoPath(process.env.AVATAR_DIRECTORY ?? "data/avatar"),
   // 判题沙箱把这个目录挂成只读的 /test_case，两边必须指同一处
-  testCaseDirectory: repoPath(process.env.TEST_CASE_DIRECTORY ?? "data/test_case"),
+  testCaseDirectory: repoPath(
+    process.env.TEST_CASE_DIRECTORY ?? "data/test_case",
+  ),
   uploadDirectory: repoPath(process.env.UPLOAD_DIRECTORY ?? "data/upload"),
   // 一言数据集（hitokoto.cn 官方导出），和旧后端读同一份：容器里是 /data/hitokoto。
   // 本机 dev 默认路径下没有这份数据，读不到就回落到内置的几条，不影响启动。
-  hitokotoDirectory: repoPath(process.env.HITOKOTO_DIRECTORY ?? "data/hitokoto"),
+  hitokotoDirectory: repoPath(
+    process.env.HITOKOTO_DIRECTORY ?? "data/hitokoto",
+  ),
   /**
    * WebSocket 升级时额外放行的来源（逗号分隔的完整 origin，如 https://oj.example.com）。
    * 同源本来就放行，只有前后端分处不同域名时才需要配。

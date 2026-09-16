@@ -32,20 +32,25 @@ async function runFormatter(command: string[], code: string) {
 }
 
 function formatSql(code: string) {
-  return code
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter(Boolean)
-    .map((statement) =>
-      statement.replace(
-        /\b(select|from|where|join|left|right|inner|outer|on|group by|order by|having|limit|insert into|values|update|set|delete from|create table|drop table|alter table|and|or|as)\b/gi,
-        (keyword) => keyword.toUpperCase(),
-      ),
-    )
-    .join(";\n\n") + (code.trim().endsWith(";") ? ";" : "")
+  return (
+    code
+      .split(";")
+      .map((statement) => statement.trim())
+      .filter(Boolean)
+      .map((statement) =>
+        statement.replace(
+          /\b(select|from|where|join|left|right|inner|outer|on|group by|order by|having|limit|insert into|values|update|set|delete from|create table|drop table|alter table|and|or|as)\b/gi,
+          (keyword) => keyword.toUpperCase(),
+        ),
+      )
+      .join(";\n\n") + (code.trim().endsWith(";") ? ";" : "")
+  )
 }
 
-export async function formatCode(code: string, language: "python" | "c" | "cpp" | "sql") {
+export async function formatCode(
+  code: string,
+  language: "python" | "c" | "cpp" | "sql",
+) {
   if (language === "sql") return formatSql(code)
 
   if (language === "python") {
@@ -54,7 +59,10 @@ export async function formatCode(code: string, language: "python" | "c" | "cpp" 
       code,
     )
     if (result.exitCode !== 0) {
-      throw new CodeFormatError(result.stderr || "Invalid Python syntax", "syntax")
+      throw new CodeFormatError(
+        result.stderr || "Invalid Python syntax",
+        "syntax",
+      )
     }
     return result.stdout
   }

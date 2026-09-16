@@ -82,7 +82,6 @@ export type SUBMISSION_RESULT = JudgeStatus | 9
 
 export type ProblemStatus = "passed" | "failed" | "not_test"
 
-
 /**
  * 题目标签。用契约的 —— 它比手抄那份多一个 `problemCount`，
  * shared/api.ts 原来还得用 `Tag & { problemCount: number }` 把它补回来。
@@ -403,11 +402,7 @@ export type Message = ContractMessage
  *
  * 注意 `ReactionCounts` 是 Partial 的：后端只下发有票的类型，没人投的键不出现。
  */
-export type {
-  ReactionKey,
-  ReactionCounts,
-  ReactionState,
-} from "@oj2/contract"
+export type { ReactionKey, ReactionCounts, ReactionState } from "@oj2/contract"
 import type { ReactionKey } from "@oj2/contract"
 
 /**

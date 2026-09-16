@@ -110,9 +110,7 @@ function startRolling(finalName: string) {
 
 async function getRandom() {
   const res = await randomUser10(query.classroom)
-  const names = (res as string[]).map(
-    (name) => name.split(query.classroom)[1],
-  )
+  const names = (res as string[]).map((name) => name.split(query.classroom)[1])
   rollingNames.value = names
   const finalName = names[names.length - 1]
   startRolling(finalName)

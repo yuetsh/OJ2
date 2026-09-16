@@ -12,9 +12,11 @@
     "db:up": "docker compose -f docker/compose.dev.yml up -d",
     "db:generate": "bun run --filter '@oj2/api' db:generate",
     "db:migrate": "bun run --filter '@oj2/api' db:migrate",
-    "db:down": "docker compose -f docker/compose.dev.yml down"
+    "db:down": "docker compose -f docker/compose.dev.yml down",
+    "fmt": "prettier --write apps/api/src apps/web/src apps/web/tests packages/contract/src apps/api/drizzle.config.ts apps/web/vite.config.ts"
   },
   "devDependencies": {
+    "prettier": "^3.9.6",
     "typescript": "^5.9.3",
     "@types/bun": "latest"
   }

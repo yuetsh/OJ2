@@ -38,25 +38,36 @@ async function loadClassUsers(classNames?: string[], gradePrefix?: string) {
   ]
   if (classNames) filters.push(inArray(schema.user.className, classNames))
   if (gradePrefix) filters.push(like(schema.user.className, `${gradePrefix}%`))
-  const rows = await db.select({
-    userId: schema.user.id,
-    username: schema.user.username,
-    className: schema.user.className,
-    acceptedNumber: schema.userProfile.acceptedNumber,
-    submissionNumber: schema.userProfile.submissionNumber,
-  }).from(schema.user).innerJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id)).where(and(...filters))
+  const rows = await db
+    .select({
+      userId: schema.user.id,
+      username: schema.user.username,
+      className: schema.user.className,
+      acceptedNumber: schema.userProfile.acceptedNumber,
+      submissionNumber: schema.userProfile.submissionNumber,
+    })
+    .from(schema.user)
+    .innerJoin(
+      schema.userProfile,
+      eq(schema.userProfile.userId, schema.user.id),
+    )
+    .where(and(...filters))
   return rows.filter((row): row is ClassUser => row.className !== null)
 }
 
 function mean(values: number[]) {
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
+  return values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : 0
 }
 
 function median(values: number[]) {
   if (!values.length) return 0
   const sorted = [...values].sort((a, b) => a - b)
   const middle = Math.floor(sorted.length / 2)
-  return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2
+  return sorted.length % 2
+    ? sorted[middle]!
+    : (sorted[middle - 1]! + sorted[middle]!) / 2
 }
 
 function quantile(values: number[], p: number) {
@@ -73,35 +84,59 @@ function quantile(values: number[], p: number) {
 function sampleStdDev(values: number[]) {
   if (values.length <= 1) return 0
   const average = mean(values)
-  return Math.sqrt(values.reduce((sum, value) => sum + (value - average) ** 2, 0) / (values.length - 1))
+  return Math.sqrt(
+    values.reduce((sum, value) => sum + (value - average) ** 2, 0) /
+      (values.length - 1),
+  )
 }
 
 classroomRoutes.get("/rankings/classes", async (c) => {
   const grade = c.req.query("grade")?.trim()
-  if (!grade || !/^\d+$/.test(grade)) return failure(c, 400, "invalid-grade", "grade is required")
+  if (!grade || !/^\d+$/.test(grade))
+    return failure(c, 400, "invalid-grade", "grade is required")
   const users = await loadClassUsers(undefined, grade)
   const groups = new Map<string, ClassUser[]>()
-  for (const user of users) groups.set(user.className, [...(groups.get(user.className) ?? []), user])
-  const result = [...groups].map(([className, members]) => {
-    const totalAc = members.reduce((sum, member) => sum + member.acceptedNumber, 0)
-    const totalSubmission = members.reduce((sum, member) => sum + member.submissionNumber, 0)
-    return {
-      className,
-      userCount: members.length,
-      totalAc,
-      totalSubmission,
-      avgAc: rounded(totalAc / members.length),
-      acRate: totalSubmission > 0 ? rounded(totalAc / totalSubmission * 100) : 0,
-    }
-  }).sort((a, b) => b.totalAc - a.totalAc || a.totalSubmission - b.totalSubmission)
-  return success(c, result.map((item, index) => ({ ...item, rank: index + 1 } satisfies ClassRankItem)))
+  for (const user of users)
+    groups.set(user.className, [...(groups.get(user.className) ?? []), user])
+  const result = [...groups]
+    .map(([className, members]) => {
+      const totalAc = members.reduce(
+        (sum, member) => sum + member.acceptedNumber,
+        0,
+      )
+      const totalSubmission = members.reduce(
+        (sum, member) => sum + member.submissionNumber,
+        0,
+      )
+      return {
+        className,
+        userCount: members.length,
+        totalAc,
+        totalSubmission,
+        avgAc: rounded(totalAc / members.length),
+        acRate:
+          totalSubmission > 0 ? rounded((totalAc / totalSubmission) * 100) : 0,
+      }
+    })
+    .sort(
+      (a, b) => b.totalAc - a.totalAc || a.totalSubmission - b.totalSubmission,
+    )
+  return success(
+    c,
+    result.map(
+      (item, index) => ({ ...item, rank: index + 1 }) satisfies ClassRankItem,
+    ),
+  )
 })
 
 classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
   const user = c.get("user")!
-  if (!user.className) return failure(c, 400, "class-missing", "用户没有班级信息")
+  if (!user.className)
+    return failure(c, 400, "class-missing", "用户没有班级信息")
   const members = (await loadClassUsers([user.className])).sort(
-    (a, b) => b.acceptedNumber - a.acceptedNumber || a.submissionNumber - b.submissionNumber,
+    (a, b) =>
+      b.acceptedNumber - a.acceptedNumber ||
+      a.submissionNumber - b.submissionNumber,
   )
   const ranks = members.map((member, index) => ({
     userId: member.userId,
@@ -121,35 +156,64 @@ classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
     const start = Math.min(Math.max(0, myRank - 6), ranks.length - 10)
     selected = ranks.slice(start, start + 10)
   }
-  return success(c, { className: user.className, myRank, total: ranks.length, ranks: selected } satisfies ClassUserRank)
+  return success(c, {
+    className: user.className,
+    myRank,
+    total: ranks.length,
+    ranks: selected,
+  } satisfies ClassUserRank)
 })
 
 classroomRoutes.post("/classes/comparison", async (c) => {
-  const parsed = classComparisonRequestSchema.safeParse(await c.req.json().catch(() => null))
-  if (!parsed.success) return failure(c, 400, "invalid-request", "At least one class is required")
+  const parsed = classComparisonRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!parsed.success)
+    return failure(c, 400, "invalid-request", "At least one class is required")
   const users = await loadClassUsers(parsed.data.classNames)
   const allAc = users.map((user) => user.acceptedNumber)
   const globalQ1 = quantile(allAc, 0.25)
   const globalQ3 = quantile(allAc, 0.75)
   const byClass = new Map<string, ClassUser[]>()
-  for (const user of users) byClass.set(user.className, [...(byClass.get(user.className) ?? []), user])
+  for (const user of users)
+    byClass.set(user.className, [...(byClass.get(user.className) ?? []), user])
 
   let recentByUser = new Map<number, Set<number>>()
   let recentSubmissionCount = new Map<string, number>()
   const hasTimeRange = Boolean(parsed.data.startTime && parsed.data.endTime)
   if (hasTimeRange) {
-    const rows = await db.select({ userId: schema.submission.userId, problemId: schema.submission.problemId, result: schema.submission.result })
-      .from(schema.submission).where(and(
-        inArray(schema.submission.userId, users.map((user) => user.userId)),
-        gte(schema.submission.createTime, parsed.data.startTime!),
-        lte(schema.submission.createTime, parsed.data.endTime!),
-      ))
-    const userClass = new Map(users.map((user) => [user.userId, user.className]))
+    const rows = await db
+      .select({
+        userId: schema.submission.userId,
+        problemId: schema.submission.problemId,
+        result: schema.submission.result,
+      })
+      .from(schema.submission)
+      .where(
+        and(
+          inArray(
+            schema.submission.userId,
+            users.map((user) => user.userId),
+          ),
+          gte(schema.submission.createTime, parsed.data.startTime!),
+          lte(schema.submission.createTime, parsed.data.endTime!),
+        ),
+      )
+    const userClass = new Map(
+      users.map((user) => [user.userId, user.className]),
+    )
     for (const row of rows) {
       const className = userClass.get(row.userId)
       if (!className) continue
-      recentSubmissionCount.set(className, (recentSubmissionCount.get(className) ?? 0) + 1)
-      if ([JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED].includes(row.result as 0 | 10)) {
+      recentSubmissionCount.set(
+        className,
+        (recentSubmissionCount.get(className) ?? 0) + 1,
+      )
+      if (
+        [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED].includes(
+          row.result as 0 | 10,
+        )
+      ) {
         const set = recentByUser.get(row.userId) ?? new Set<number>()
         set.add(row.problemId)
         recentByUser.set(row.userId, set)
@@ -158,12 +222,17 @@ classroomRoutes.post("/classes/comparison", async (c) => {
   }
 
   const comparisons = [...byClass].map(([className, members]) => {
-    const ac = members.map((member) => member.acceptedNumber).sort((a, b) => b - a)
-    const submissions = members.map((member) => member.submissionNumber).sort((a, b) => b - a)
+    const ac = members
+      .map((member) => member.acceptedNumber)
+      .sort((a, b) => b - a)
+    const submissions = members
+      .map((member) => member.submissionNumber)
+      .sort((a, b) => b - a)
     const userCount = members.length
     const topCount = Math.max(1, Math.ceil(userCount * 0.1))
     const bottomCount = topCount
-    const middle = topCount + bottomCount < userCount ? ac.slice(topCount, -bottomCount) : ac
+    const middle =
+      topCount + bottomCount < userCount ? ac.slice(topCount, -bottomCount) : ac
     const totalAc = ac.reduce((sum, value) => sum + value, 0)
     const totalSubmission = submissions.reduce((sum, value) => sum + value, 0)
     const base: ClassComparison = {
@@ -180,19 +249,30 @@ classroomRoutes.post("/classes/comparison", async (c) => {
       top10Avg: rounded(mean(ac.slice(0, topCount))),
       middle80Avg: rounded(mean(middle)),
       bottom10Avg: rounded(mean(ac.slice(-bottomCount))),
-      excellentRate: rounded(ac.filter((value) => value >= globalQ3).length / userCount * 100),
-      passRate: rounded(ac.filter((value) => value >= globalQ1).length / userCount * 100),
-      activeRate: rounded(submissions.filter((value) => value > 0).length / userCount * 100),
-      acRate: totalSubmission > 0 ? rounded(totalAc / totalSubmission * 100) : 0,
+      excellentRate: rounded(
+        (ac.filter((value) => value >= globalQ3).length / userCount) * 100,
+      ),
+      passRate: rounded(
+        (ac.filter((value) => value >= globalQ1).length / userCount) * 100,
+      ),
+      activeRate: rounded(
+        (submissions.filter((value) => value > 0).length / userCount) * 100,
+      ),
+      acRate:
+        totalSubmission > 0 ? rounded((totalAc / totalSubmission) * 100) : 0,
       compositeScore: 0,
     }
     if (hasTimeRange) {
-      const recent = members.map((member) => recentByUser.get(member.userId)?.size ?? 0).sort((a, b) => b - a)
+      const recent = members
+        .map((member) => recentByUser.get(member.userId)?.size ?? 0)
+        .sort((a, b) => b - a)
       base.recentTotalAc = recent.reduce((sum, value) => sum + value, 0)
       base.recentTotalSubmission = recentSubmissionCount.get(className) ?? 0
       base.recentAvgAc = rounded(mean(recent))
       base.recentMedianAc = rounded(median(recent))
-      base.recentTop10Avg = rounded(mean(recent.slice(0, Math.max(1, Math.ceil(recent.length * 0.1)))))
+      base.recentTop10Avg = rounded(
+        mean(recent.slice(0, Math.max(1, Math.ceil(recent.length * 0.1)))),
+      )
       base.recentActiveCount = recent.filter((value) => value > 0).length
     }
     return base
@@ -201,14 +281,19 @@ classroomRoutes.post("/classes/comparison", async (c) => {
   const maxMiddle = Math.max(1, ...comparisons.map((item) => item.middle80Avg))
   for (const item of comparisons) {
     item.compositeScore = rounded(
-      0.4 * (item.medianAc / maxMedian * 100) +
-      0.15 * (item.middle80Avg / maxMiddle * 100) +
-      0.2 * item.activeRate +
-      0.15 * item.passRate +
-      0.1 * item.excellentRate,
+      0.4 * ((item.medianAc / maxMedian) * 100) +
+        0.15 * ((item.middle80Avg / maxMiddle) * 100) +
+        0.2 * item.activeRate +
+        0.15 * item.passRate +
+        0.1 * item.excellentRate,
       1,
     )
   }
-  comparisons.sort((a, b) => b.compositeScore - a.compositeScore || b.medianAc - a.medianAc)
-  return success(c, { comparisons, hasTimeRange } satisfies ClassComparisonResponse)
+  comparisons.sort(
+    (a, b) => b.compositeScore - a.compositeScore || b.medianAc - a.medianAc,
+  )
+  return success(c, {
+    comparisons,
+    hasTimeRange,
+  } satisfies ClassComparisonResponse)
 })

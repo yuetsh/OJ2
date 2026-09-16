@@ -33,23 +33,35 @@ export const problemPermissionSchema = z.enum(PROBLEM_PERMISSIONS)
  */
 
 /** 能进后台的三种 */
-export const ADMIN_ROLES: readonly AdminType[] = ["Student Admin", "Teacher Admin", "Super Admin"]
+export const ADMIN_ROLES: readonly AdminType[] = [
+  "Student Admin",
+  "Teacher Admin",
+  "Super Admin",
+]
 
 /** 老师及以上 */
-export const TEACHER_ROLES: readonly AdminType[] = ["Teacher Admin", "Super Admin"]
+export const TEACHER_ROLES: readonly AdminType[] = [
+  "Teacher Admin",
+  "Super Admin",
+]
 
 /**
  * 学生口径：排行榜、班级榜、比赛榜、自学统计都只算这两种，教师和超管不入榜。
  * 注意 Student Admin 算学生 —— 他要参赛、要上榜，只是多了个后台入口。
  */
-export const STUDENT_ROLES: readonly AdminType[] = ["Regular User", "Student Admin"]
+export const STUDENT_ROLES: readonly AdminType[] = [
+  "Regular User",
+  "Student Admin",
+]
 
 /**
  * 把库里读出来的裸字符串收成联合类型。**认不出来的一律降成最低权限**，
  * 不抛错：脏数据不该让人登不上，但更不该让人凭一个拼错的角色名拿到权限。
  */
 export function toAdminType(value: string): AdminType {
-  return (ADMIN_TYPES as readonly string[]).includes(value) ? (value as AdminType) : "Regular User"
+  return (ADMIN_TYPES as readonly string[]).includes(value)
+    ? (value as AdminType)
+    : "Regular User"
 }
 
 export function toProblemPermission(value: string): ProblemPermission {

@@ -168,10 +168,14 @@ const tutorialColumns = computed<DataTableColumn<LearnTutorialProgress>[]>(
 
 const exerciseColumns = computed<DataTableColumn<LearnExerciseProgress>[]>(
   () => [
-    { type: "expand", renderExpand: (row) => h(ExerciseAttempts, {
-      exerciseId: row.exerciseId,
-      className: className.value.trim(),
-    }) },
+    {
+      type: "expand",
+      renderExpand: (row) =>
+        h(ExerciseAttempts, {
+          exerciseId: row.exerciseId,
+          className: className.value.trim(),
+        }),
+    },
     {
       title: "课",
       key: "tutorialOrder",
@@ -289,7 +293,8 @@ onMounted(load)
     </n-text>
     <!-- 口径写在表上方，免得老师对着「已读 0 课 / 累计 25 分钟」猜是不是坏了 -->
     <n-text depth="3" style="font-size: 12px">
-      「已读」按累计停留满 {{ TUTORIAL_READ_SECONDS / 60 }} 分钟算，不足的只计时长
+      「已读」按累计停留满
+      {{ TUTORIAL_READ_SECONDS / 60 }} 分钟算，不足的只计时长
     </n-text>
   </n-flex>
 

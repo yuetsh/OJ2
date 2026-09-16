@@ -32,14 +32,18 @@ function parseEvaluation(value: string) {
   const json = block ?? value.match(/\{[\s\S]*\}/)?.[0]
   if (!json) throw new Error("AI response did not contain JSON")
   const data = JSON.parse(json) as Record<string, unknown>
-  if (typeof data.score !== "number" || Number.isNaN(data.score)) throw new Error("AI response is missing score")
+  if (typeof data.score !== "number" || Number.isNaN(data.score))
+    throw new Error("AI response is missing score")
   const score = Math.max(0, Math.min(100, data.score))
   return {
     score,
     grade: gradeForScore(score),
     feedback: typeof data.feedback === "string" ? data.feedback : "",
     suggestions: typeof data.suggestions === "string" ? data.suggestions : "",
-    criteria: data.criteria_details && typeof data.criteria_details === "object" ? data.criteria_details : {},
+    criteria:
+      data.criteria_details && typeof data.criteria_details === "object"
+        ? data.criteria_details
+        : {},
   }
 }
 
@@ -47,30 +51,46 @@ export async function evaluateFlowchart(
   job: FlowchartJobData,
   { isFinalAttempt = true }: { isFinalAttempt?: boolean } = {},
 ) {
-  const [row] = await db.select({ flowchart: schema.flowchartSubmission, problem: schema.problem }).from(schema.flowchartSubmission)
-    .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
-    .where(eq(schema.flowchartSubmission.id, job.submissionId)).limit(1)
+  const [row] = await db
+    .select({ flowchart: schema.flowchartSubmission, problem: schema.problem })
+    .from(schema.flowchartSubmission)
+    .innerJoin(
+      schema.problem,
+      eq(schema.flowchartSubmission.problemId, schema.problem.id),
+    )
+    .where(eq(schema.flowchartSubmission.id, job.submissionId))
+    .limit(1)
   if (!row || ![0, 1].includes(row.flowchart.status)) return
-  await db.update(schema.flowchartSubmission).set({ status: 1 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+  await db
+    .update(schema.flowchartSubmission)
+    .set({ status: 1 })
+    .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
   const started = performance.now()
   try {
-    const reference = row.problem.mermaidCode ? `\n标准答案参考：\n${row.problem.mermaidCode}` : "\n此题没有标准流程图。"
-    const result = parseEvaluation(await completeChat(
-      evaluationPrompt(row.problem),
-      `学生流程图：\n${row.flowchart.mermaidCode}${reference}\n设计提示：${row.problem.flowchartHint ?? "无"}`,
-    ))
-    await db.update(schema.flowchartSubmission).set({
-      status: 2,
-      aiScore: result.score,
-      aiGrade: result.grade,
-      aiFeedback: result.feedback,
-      aiSuggestions: result.suggestions,
-      aiCriteriaDetails: result.criteria,
-      aiProvider: "deepseek",
-      aiModel: process.env.AI_MODEL ?? "deepseek-flash",
-      processingTime: (performance.now() - started) / 1000,
-      evaluationTime: new Date().toISOString(),
-    }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+    const reference = row.problem.mermaidCode
+      ? `\n标准答案参考：\n${row.problem.mermaidCode}`
+      : "\n此题没有标准流程图。"
+    const result = parseEvaluation(
+      await completeChat(
+        evaluationPrompt(row.problem),
+        `学生流程图：\n${row.flowchart.mermaidCode}${reference}\n设计提示：${row.problem.flowchartHint ?? "无"}`,
+      ),
+    )
+    await db
+      .update(schema.flowchartSubmission)
+      .set({
+        status: 2,
+        aiScore: result.score,
+        aiGrade: result.grade,
+        aiFeedback: result.feedback,
+        aiSuggestions: result.suggestions,
+        aiCriteriaDetails: result.criteria,
+        aiProvider: "deepseek",
+        aiModel: process.env.AI_MODEL ?? "deepseek-flash",
+        processingTime: (performance.now() - started) / 1000,
+        evaluationTime: new Date().toISOString(),
+      })
+      .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, {
       type: "flowchart_evaluation_completed",
       submissionId: row.flowchart.id,
@@ -90,7 +110,10 @@ export async function evaluateFlowchart(
     // 一旦提前写成 3，队列配的 attempts: 3 就成了摆设 —— 后两次尝试进来什么都不做
     // 就算成功，AI 侧的偶发失败（限流、超时、网络抖动）永远等不到重试。
     if (!isFinalAttempt) throw error
-    await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+    await db
+      .update(schema.flowchartSubmission)
+      .set({ status: 3 })
+      .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, {
       type: "flowchart_evaluation_failed",
       submissionId: row.flowchart.id,

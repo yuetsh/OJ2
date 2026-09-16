@@ -57,7 +57,9 @@ export async function runMigrations() {
     process.exit(2)
   }
   if (files.length === 0) {
-    console.error(`${migrationsDir} 下没找到任何迁移。镜像里的迁移目录是不是漏拷了？`)
+    console.error(
+      `${migrationsDir} 下没找到任何迁移。镜像里的迁移目录是不是漏拷了？`,
+    )
     process.exit(2)
   }
 
@@ -136,10 +138,16 @@ export async function runMigrations() {
     // 自举时不拦：空库上没有数据可丢，0002 那串 DROP ... IF EXISTS 全是空转。
     // 拦下来只会逼着每个新环境都带一次 OJ2_ALLOW_DESTRUCTIVE，把这道闸训练成习惯动作 ——
     // 那正是它想避免的事。
-    if (blocked.length > 0 && !bootstrapping && process.env.OJ2_ALLOW_DESTRUCTIVE !== "1") {
+    if (
+      blocked.length > 0 &&
+      !bootstrapping &&
+      process.env.OJ2_ALLOW_DESTRUCTIVE !== "1"
+    ) {
       console.error(
         "待执行的迁移里有破坏性语句，已停下：\n" +
-          blocked.map(({ tag, reasons }) => `  · ${tag}：${reasons.join(" / ")}`).join("\n") +
+          blocked
+            .map(({ tag, reasons }) => `  · ${tag}：${reasons.join(" / ")}`)
+            .join("\n") +
           "\n\n这类改动不可逆，不该在一次日常部署里顺手执行。" +
           "\n确认已经做过备份之后，用这个显式放行：\n\n" +
           "  OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh\n",
@@ -180,7 +188,9 @@ export async function runMigrations() {
 
 function destructiveReasons(sql: string) {
   const bare = stripComments(sql)
-  return DESTRUCTIVE_PATTERNS.filter(([re]) => re.test(bare)).map(([, label]) => label)
+  return DESTRUCTIVE_PATTERNS.filter(([re]) => re.test(bare)).map(
+    ([, label]) => label,
+  )
 }
 
 /**
@@ -192,7 +202,9 @@ function destructiveReasons(sql: string) {
  */
 function readMigrationTags(): Map<number, string> {
   try {
-    const journal = JSON.parse(readFileSync(`${migrationsDir}/meta/_journal.json`, "utf8")) as {
+    const journal = JSON.parse(
+      readFileSync(`${migrationsDir}/meta/_journal.json`, "utf8"),
+    ) as {
       entries?: Array<{ when: number; tag: string }>
     }
     return new Map((journal.entries ?? []).map((e) => [e.when, e.tag]))
@@ -234,7 +246,9 @@ async function applyMigration(
 ) {
   // 只留有可执行内容的段。`readMigrationFiles` 按 `--> statement-breakpoint` 切开后
   // 保留原文，所以纯注释段（比如 0002 开头那一大段说明）会自成一段。
-  const statements = migration.sql.filter((stmt) => stripComments(stmt).trim() !== "")
+  const statements = migration.sql.filter(
+    (stmt) => stripComments(stmt).trim() !== "",
+  )
   if (statements.length === 0) {
     // 上游已经拦过一次（那条兜底检查），走到这里说明拦漏了，宁可响一声也别静默跳过
     throw new Error(`${tag} 没有任何可执行语句`)

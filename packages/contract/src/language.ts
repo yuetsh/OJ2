@@ -38,6 +38,5 @@ export const problemLanguageSchema = z.enum([
   "Flowchart",
 ])
 
-
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
 export type ProblemLanguage = z.infer<typeof problemLanguageSchema>

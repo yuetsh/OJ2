@@ -59,9 +59,7 @@ async function submit() {
     props.action,
   )
   const verb = props.action === "add" ? "添加" : "移除"
-  message.success(
-    `已为 ${res.problemCount} 道题${verb} ${res.tagCount} 个标签`,
-  )
+  message.success(`已为 ${res.problemCount} 道题${verb} ${res.tagCount} 个标签`)
   close()
   emit("done")
 }

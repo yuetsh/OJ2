@@ -255,12 +255,9 @@ export function getContestAccess(id: string) {
 
 // 注意和 GET /access 不一样：这个返回裸 true，密码错是 403 走 catch
 export function checkContestPassword(contestID: string, password: string) {
-  return api.post<boolean>(
-    `contests/${encodeURIComponent(contestID)}/access`,
-    {
-      password,
-    },
-  )
+  return api.post<boolean>(`contests/${encodeURIComponent(contestID)}/access`, {
+    password,
+  })
 }
 
 export async function getContestProblems(contestID: string) {
@@ -295,9 +292,12 @@ export function updateProfile(data: { realName: string; mood: string }) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: AnnouncementListItem[]; total: number }>("announcements", {
-    params: { limit, offset },
-  })
+  return api.get<{ results: AnnouncementListItem[]; total: number }>(
+    "announcements",
+    {
+      params: { limit, offset },
+    },
+  )
 }
 
 export function getAnnouncement(id: number) {
@@ -464,7 +464,6 @@ export function getProblemSetProblems(problemSetId: number) {
 export function joinProblemSet(problemSetId: number) {
   return api.post("problem-set-progress", { problemSetId })
 }
-
 
 export function getUserBadges(username?: string) {
   return api.get<UserBadge[]>(

@@ -16,7 +16,9 @@ export const JudgeStatus = {
 export type JudgeStatusValue = (typeof JudgeStatus)[keyof typeof JudgeStatus]
 
 export function isAccepted(result: number) {
-  return result === JudgeStatus.ACCEPTED || result === JudgeStatus.AST_CHECK_FAILED
+  return (
+    result === JudgeStatus.ACCEPTED || result === JudgeStatus.AST_CHECK_FAILED
+  )
 }
 
 /**
@@ -48,7 +50,10 @@ export function judgeStatusName(result: number) {
  * 它们从分母里摘掉 —— 否则全班同时交卷的那几秒，分母涨了分子没涨，正确率凭空掉一截。
  * 人数口径不受影响：交了但还在判的学生仍然算「交过」，不该被点名成「没做」。
  */
-export const UNJUDGED_RESULTS: JudgeStatusValue[] = [JudgeStatus.PENDING, JudgeStatus.JUDGING]
+export const UNJUDGED_RESULTS: JudgeStatusValue[] = [
+  JudgeStatus.PENDING,
+  JudgeStatus.JUDGING,
+]
 
 /**
  * **不**计入「这道题失败了几次」的状态。除了通过（含 AST_CHECK_FAILED，那也是答案对了）

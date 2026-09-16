@@ -31,7 +31,9 @@ export function selfCommand(subcommand: string): string[] {
  *   而 docker/compose.dev.yml 挂给判题沙箱的是**仓库根**的 data/test_case —— 按 cwd 解析
  *   就会落到 apps/api/data/ 下，两边不是同一个目录，新传的测试点判题时报「找不到测试数据」。
  */
-export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, "../../..")
+export const pathBase = isCompiled
+  ? process.cwd()
+  : resolve(import.meta.dir, "../../..")
 
 /**
  * 迁移文件（`0000_*.sql` … + `meta/_journal.json`）所在目录。
@@ -48,4 +50,6 @@ export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, ".
  */
 export const migrationsDir =
   process.env.OJ2_MIGRATIONS_DIR ??
-  (isCompiled ? "/usr/local/share/oj2/migrations" : resolve(import.meta.dir, "db"))
+  (isCompiled
+    ? "/usr/local/share/oj2/migrations"
+    : resolve(import.meta.dir, "db"))

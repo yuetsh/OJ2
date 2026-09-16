@@ -41,7 +41,10 @@ export const messageListSchema = paginatedSchema(messageSchema)
 export const createMessageRequestSchema = z.object({
   recipientId: z.number().int().positive(),
   submissionId: z.string().min(1),
-  message: z.string().min(1).max(1024 * 1024),
+  message: z
+    .string()
+    .min(1)
+    .max(1024 * 1024),
 })
 
 export const reactionKeySchema = z.enum([
@@ -54,7 +57,10 @@ export const reactionKeySchema = z.enum([
   "want_explain",
 ])
 
-export const reactionCountsSchema = z.record(reactionKeySchema, z.number().int())
+export const reactionCountsSchema = z.record(
+  reactionKeySchema,
+  z.number().int(),
+)
 export const reactionStateSchema = z.object({
   mine: reactionKeySchema.nullable(),
   counts: reactionCountsSchema.nullable(),
@@ -130,13 +136,36 @@ export const exerciseAttemptRequestSchema = z.object({
  * 也不会让历史数据把学生端打不开。
  */
 export const exerciseDataByType: Record<string, z.ZodType> = {
-  mcq: z.object({ question: z.string(), options: z.array(z.string()), answer: z.array(z.number()) }),
+  mcq: z.object({
+    question: z.string(),
+    options: z.array(z.string()),
+    answer: z.array(z.number()),
+  }),
   sort: z.object({ question: z.string(), lines: z.array(z.string()) }),
   fill: z.object({ question: z.string(), code: z.string() }),
-  match: z.object({ question: z.string(), left: z.array(z.string()), right: z.array(z.string()), answer: z.array(z.number()) }),
-  predict: z.object({ question: z.string(), code: z.string(), answer: z.array(z.string()) }),
-  debug: z.object({ question: z.string(), lines: z.array(z.string()), answer: z.array(z.number()), explanation: z.string().optional() }),
-  group: z.object({ question: z.string(), buckets: z.array(z.string()), items: z.array(z.string()), answer: z.array(z.number()) }),
+  match: z.object({
+    question: z.string(),
+    left: z.array(z.string()),
+    right: z.array(z.string()),
+    answer: z.array(z.number()),
+  }),
+  predict: z.object({
+    question: z.string(),
+    code: z.string(),
+    answer: z.array(z.string()),
+  }),
+  debug: z.object({
+    question: z.string(),
+    lines: z.array(z.string()),
+    answer: z.array(z.number()),
+    explanation: z.string().optional(),
+  }),
+  group: z.object({
+    question: z.string(),
+    buckets: z.array(z.string()),
+    items: z.array(z.string()),
+    answer: z.array(z.number()),
+  }),
 }
 
 /**
@@ -167,7 +196,9 @@ export type Tutorial = z.infer<typeof tutorialSchema>
 export type Exercise = z.infer<typeof exerciseSchema>
 export type TutorialProgress = z.infer<typeof tutorialProgressSchema>
 export type TutorialProgressPing = z.infer<typeof tutorialProgressPingSchema>
-export type ExerciseAttemptRequest = z.infer<typeof exerciseAttemptRequestSchema>
+export type ExerciseAttemptRequest = z.infer<
+  typeof exerciseAttemptRequestSchema
+>
 
 /**
  * 「已读」的门槛：累计停留满 3 分钟才算读过这一课。

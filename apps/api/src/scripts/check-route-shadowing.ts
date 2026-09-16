@@ -63,7 +63,9 @@ export function shadows(pattern: string, target: string) {
 function collect(): Route[] {
   const routerFile = new Map<string, string>()
   for (const file of walk(SRC)) {
-    for (const m of readFileSync(file, "utf8").matchAll(/export const (\w+) = new Hono/g)) {
+    for (const m of readFileSync(file, "utf8").matchAll(
+      /export const (\w+) = new Hono/g,
+    )) {
       routerFile.set(m[1]!, file)
     }
   }
@@ -72,7 +74,10 @@ function collect(): Route[] {
     const file = routerFile.get(router)
     if (!file) return []
     const text = readFileSync(file, "utf8")
-    const pattern = new RegExp(`${router}\\.(get|post|put|delete|patch)\\(\\s*"([^"]+)"`, "g")
+    const pattern = new RegExp(
+      `${router}\\.(get|post|put|delete|patch)\\(\\s*"([^"]+)"`,
+      "g",
+    )
     return [...text.matchAll(pattern)].map((m) => ({
       method: m[1]!.toUpperCase(),
       path: (prefix + m[2]!).replace(/\/+/g, "/").replace(/\/$/, "") || "/",
@@ -83,10 +88,14 @@ function collect(): Route[] {
   // 挂载顺序就是匹配顺序，所以必须按 index.ts 里出现的先后来摊平
   const index = readFileSync(join(SRC, "index.ts"), "utf8")
   const adminIndex = readFileSync(join(SRC, "routes/admin/index.ts"), "utf8")
-  const adminMounts = [...adminIndex.matchAll(/\.route\(\s*"([^"]*)"\s*,\s*(\w+)\s*\)/g)]
+  const adminMounts = [
+    ...adminIndex.matchAll(/\.route\(\s*"([^"]*)"\s*,\s*(\w+)\s*\)/g),
+  ]
 
   const all: Route[] = []
-  for (const m of index.matchAll(/app\.route\(\s*"([^"]+)"\s*,\s*(\w+)\s*\)/g)) {
+  for (const m of index.matchAll(
+    /app\.route\(\s*"([^"]+)"\s*,\s*(\w+)\s*\)/g,
+  )) {
     const [, prefix, router] = m
     if (router === "adminRoutes") {
       for (const a of adminMounts) all.push(...routesOf(a[2]!, prefix! + a[1]!))
@@ -102,7 +111,8 @@ const hits: [Route, Route][] = []
 for (let i = 0; i < routes.length; i++) {
   for (let j = i + 1; j < routes.length; j++) {
     if (routes[i]!.method !== routes[j]!.method) continue
-    if (shadows(routes[i]!.path, routes[j]!.path)) hits.push([routes[i]!, routes[j]!])
+    if (shadows(routes[i]!.path, routes[j]!.path))
+      hits.push([routes[i]!, routes[j]!])
   }
 }
 
@@ -113,7 +123,9 @@ if (hits.length === 0) {
 }
 for (const [first, second] of hits) {
   console.log(`\n⚠ ${second.method} ${second.path}  （${second.file}）`)
-  console.log(`   进不去：被先注册的 ${first.method} ${first.path} 吃掉（${first.file}）`)
+  console.log(
+    `   进不去：被先注册的 ${first.method} ${first.path} 吃掉（${first.file}）`,
+  )
   console.log(`   改法：把它挪到那条之前注册，或换一个不同形的路径`)
 }
 process.exit(1)

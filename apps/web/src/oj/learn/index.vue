@@ -126,7 +126,12 @@
 <script setup lang="ts">
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import type { Tutorial, Exercise, LANGUAGE, TutorialProgress } from "utils/types"
+import type {
+  Tutorial,
+  Exercise,
+  LANGUAGE,
+  TutorialProgress,
+} from "utils/types"
 import {
   getTutorial,
   getTutorials,
@@ -220,7 +225,9 @@ async function loadProgress() {
   }
   try {
     const rows = await getLearnProgress(type.value)
-    progress.value = Object.fromEntries(rows.map((row) => [row.tutorialId, row]))
+    progress.value = Object.fromEntries(
+      rows.map((row) => [row.tutorialId, row]),
+    )
   } catch {
     progress.value = {}
   }

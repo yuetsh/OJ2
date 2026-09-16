@@ -20,9 +20,10 @@ const flowchartWorker = new Worker<FlowchartJobData>(
   flowchartQueueName,
   // attemptsMade 是「此前已经失败过几次」，当前这次还没计进去，
   // 所以最后一次尝试的判据是 attemptsMade + 1 >= attempts
-  async (job) => evaluateFlowchart(job.data, {
-    isFinalAttempt: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
-  }),
+  async (job) =>
+    evaluateFlowchart(job.data, {
+      isFinalAttempt: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
+    }),
   { connection: createBlockingRedis(), concurrency: 2 },
 )
 
@@ -38,15 +39,24 @@ worker.on("failed", async (job, error) => {
   try {
     await failAbandonedSubmission(submissionId, error)
   } catch (markError) {
-    console.error(`Failed to mark submission ${submissionId} as system error`, markError)
+    console.error(
+      `Failed to mark submission ${submissionId} as system error`,
+      markError,
+    )
   }
 })
 worker.on("error", (error) => {
   console.error("Judge worker error", error)
 })
-flowchartWorker.on("ready", () => console.log("Flowchart worker ready (concurrency=2)"))
-flowchartWorker.on("failed", (job, error) => console.error(`Flowchart job ${job?.id ?? "unknown"} failed`, error))
-flowchartWorker.on("error", (error) => console.error("Flowchart worker error", error))
+flowchartWorker.on("ready", () =>
+  console.log("Flowchart worker ready (concurrency=2)"),
+)
+flowchartWorker.on("failed", (job, error) =>
+  console.error(`Flowchart job ${job?.id ?? "unknown"} failed`, error),
+)
+flowchartWorker.on("error", (error) =>
+  console.error("Flowchart worker error", error),
+)
 
 async function shutdown() {
   await worker.close()
