@@ -57,8 +57,8 @@ API 调用不按模块分：学生端全在 `oj/api.ts`、后台全在 `admin/ap
 跨端的（登录、资料、标签、验证码）在 `shared/api.ts`。
 
 Shared logic lives in `shared/`:
-- `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `screenMode` (problem split-screen layout), `loginSummary` (AI activity summary), `collab` (help-request queue + collab room)
-- `composables/` — `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `breakpoints`, `maxkb`
+- `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `screenMode` (problem split-screen layout), `loginSummary` (AI activity summary), `collab` (help-request queue + collab room), `achievement` (解锁弹窗队列), `myFlowchart` (流程图弹窗的 mermaid 源码)
+- `composables/` — `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `hiddenStudents` (统计面板的「请假隐藏」), `chartTheme`, `breakpoints`, `maxkb`, `learnProgress`, `rarity`
 - `layout/` — `default.vue` and `admin.vue` layout wrappers
 - `api.ts` — shared API calls (auth, profile, tags, captcha)
 
@@ -158,17 +158,19 @@ Naive 的日期选择器按浏览器本地时区渲染、没有 `timezone` 属�
 
 ### Environment Variables
 
-Variables prefixed with `PUBLIC_` are injected at build time. Env files: `.env`, `.env.staging`, `.env.test`.
+Variables prefixed with `PUBLIC_` are injected at build time，声明在 `src/env.d.ts`。
+Env files: `.env`（本机）、`.env.production`（服务器）、`.env.staging` / `.env.test`（机房）。
 
 | Variable | Purpose |
 |---|---|
-| `PUBLIC_OJ_URL` | Backend REST API base URL |
-| `PUBLIC_WS_URL` | WebSocket server URL |
-| `PUBLIC_ENV` | Environment name (dev/staging/production) |
-| `PUBLIC_CODE_URL` | Code execution service |
-| `PUBLIC_JUDGE0_URL` | Judge0 API |
-| `PUBLIC_MAXKB_URL` | Knowledge base service |
-| `PUBLIC_ICONIFY_URL` | Iconify icon CDN |
+| `PUBLIC_ENV` | 环境角标：`test` → 「测试版」，`dev` → 「开发版」，其余不显示 |
+| `PUBLIC_CODE_URL` | 代码分享服务（提交详情、题目页的「分享」） |
+| `PUBLIC_JUDGE0_URL` | Judge0 API（`utils/judge.ts` 的在线运行） |
+| `PUBLIC_MAXKB_URL` | 知识库问答挂件 |
+| `PUBLIC_ICONIFY_URL` | 自建 Iconify 图标源，不设则走公共 CDN |
+
+后端地址**不在这里**：`utils/api.ts` 写死 `baseURL: "/api"`，dev 由 `vite.config.ts` 的
+proxy 转给 3000，线上由 Caddy 同源伺服。（原来的 `PUBLIC_OJ_URL` / `PUBLIC_WS_URL` 早已不存在。）
 
 ### Routing
 

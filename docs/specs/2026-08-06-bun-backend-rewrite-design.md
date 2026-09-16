@@ -1,7 +1,11 @@
 # OJ2 设计文档：后端重写为 Bun + TypeScript
 
 日期：2026-08-06
-状态：已确认，待实施
+状态：**已实施、已上线**（2026-08 切换完成，旧栈已不可逆下线）。本文保留为「当初为什么这么定」
+的记录，**不是现状的说明** —— 现状看 `CLAUDE.md` 和 `docs/` 下的专题文档。
+文中引用的 `docs/spikes/`（三个 spike 脚本）与 `docs/specs/schema.sql`（生产库结构 dump）
+已在 2026-09-16 删除：结论都已落进代码，脚本跑完就没用了，schema dump 的内容进了迁移
+`0000_crazy_gateway.sql`。要看它们去 git 历史。
 
 ## 1. 背景与动机
 
@@ -65,7 +69,7 @@
 | 全站不用的分支 | OI 赛制（所有比赛均为 ACM） |
 | Python 生态锁定 | 仅 2 处：`jieba`（`flowchart/views/admin.py` 单文件）、`tree-sitter`（`ast_checker/`，177 行） |
 
-> 更正（2026-08-06 阶段 0 重跑后）：本表原写「端点合计 122（oj 74 / admin 48）、DEPRECATED 16、前端调用 78、疑似无人调用约 35%」，四项全错。前三项来自一版漏抓了 `tutorial/urls/tutorial.py` 与 `utils/urls.py` 的提取脚本（共漏 5 个端点，其中 4 个前端在用）与一版只数字面量、不含模板串的前端统计；「约 35%」是从 `(122−78)/122` 推出来的，两个输入都错。现表为 `docs/spikes/` 三个脚本重跑的实测值，独立核验：`cd OnlineJudge && cat */urls/*.py utils/urls.py | grep -c "path("` → 127。
+> 更正（2026-08-06 阶段 0 重跑后）：本表原写「端点合计 122（oj 74 / admin 48）、DEPRECATED 16、前端调用 78、疑似无人调用约 35%」，四项全错。前三项来自一版漏抓了 `tutorial/urls/tutorial.py` 与 `utils/urls.py` 的提取脚本（共漏 5 个端点，其中 4 个前端在用）与一版只数字面量、不含模板串的前端统计；「约 35%」是从 `(122−78)/122` 推出来的，两个输入都错。现表为当时三个提取脚本重跑的实测值，独立核验：`cd OnlineJudge && cat */urls/*.py utils/urls.py | grep -c "path("` → 127。
 > **减法空间只有 18%，不是三分之一。** 后续阶段按 18% 排期。
 
 前端网络层集中度高，改动面小：
@@ -141,9 +145,9 @@ Projects/OJ/
 
 ## 7. 已验证的技术假设
 
-三处高风险假设已在 Bun 1.3.11 上实测通过，spike 代码见 `docs/spikes/`。依赖清单与 lockfile 已随 spike 源码入库（`docs/spikes/package.json`、`bun.lock`），`cd docs/spikes && bun install` 后三个脚本均可直接重跑。
+三处高风险假设已在 Bun 1.3.11 上实测通过。当时的 spike 代码在 `docs/spikes/`，已删除（见顶部说明），三条结论都已落进 `apps/api` 的实现。
 
-### 7.1 Django 密码哈希兼容（`docs/spikes/pbkdf2-spike.ts`）
+### 7.1 Django 密码哈希兼容
 
 用 Django 生成 `pbkdf2_sha256$1200000$...` 格式哈希，Bun 侧用 `node:crypto` 的 `pbkdf2` 验证：
 
@@ -163,7 +167,7 @@ argon2id  : true 耗时 88 ms
 
 #### 7.1.1 `raw_password` 明文列保留（已决策）
 
-生产库 `user` 表有一列 `raw_password character varying(20)`（`docs/specs/schema.sql:939`），存学生明文密码。
+生产库 `user` 表有一列 `raw_password character varying(20)`），存学生明文密码。
 
 **决策：保留。** 这是有意的运维需求——学生忘记密码是高频事件，教师需要能直接查到并告知，走"重置密码"流程在机房环境里成本过高。新后端照样维护这一列。
 
@@ -176,7 +180,7 @@ argon2id  : true 耗时 88 ms
 
 **若日后想在不改变教师查密码这一工作流的前提下收紧**（本次未采纳，仅备查）：把 `raw_password` 改为用一把存在环境变量/密钥文件里、**不在数据库内**的密钥做可逆加密。教师查询走应用层解密，体验不变；而一份裸的数据库备份泄露时不再直接暴露明文。改动量约为一个加解密工具函数 + 一次存量数据迁移。
 
-### 7.2 tree-sitter 迁移（`docs/spikes/ast-spike.ts`）
+### 7.2 tree-sitter 迁移
 
 复刻 `ast_checker/mappings/c.py` 的映射表，在 Bun 中用 `web-tree-sitter` 解析 C 代码：
 
@@ -204,7 +208,7 @@ C 与 Python 两套 grammar 均正常。`.wasm` 文件随 npm 包分发（`tree-
 
 未选原生 NAPI 绑定：性能更高但需 node-gyp 现场编译，Bun 支持稳定性较差。1.1ms 解析耗时在判题流程中可忽略（沙箱启动本身即数十毫秒），选 WASM 图部署简单。
 
-### 7.3 `@node-rs/jieba` 替代 Python jieba（`docs/spikes/jieba-spike.ts`）
+### 7.3 `@node-rs/jieba` 替代 Python jieba
 
 对照 `flowchart/views/admin.py:65,191` 的两处用法——`jieba.add_word(w, freq=9999)` 加自定义词、`jieba.cut(text)` 切词——在 Bun 1.3.11 下验证 `@node-rs/jieba@2.0.1`（NAPI 绑定）：
 
@@ -249,9 +253,9 @@ jieba.loadDict(Buffer.from("两个整数 9999\n"))
 盘点中发现的、明确不应带进新后端的实现：
 
 - **`SessionRecordMiddleware`（`account/middleware.py:22-33`）**：每个已登录请求都写一遍 session（user_agent / ip / last_activity），遇到新 session key 还额外触发一次 `request.user.save()` —— 即每请求一次数据库写。这是"Django 太慢"的实际来源之一。新后端的会话信息留在 Redis，不落库。
-- **`User.session_keys`**：只写不读的死字段，随 `/api/sessions` 端点一并砍掉。（已由 `schema.sql:938` 确认该列存在。）
+- **`User.session_keys`**：只写不读的死字段，随 `/api/sessions` 端点一并砍掉。
 
-反过来，**必须复刻**的一项：`user.raw_password`（`schema.sql:939`）保留，见 7.1.1。
+反过来，**必须复刻**的一项：`user.raw_password` 保留，见 7.1.1。
 
 ## 9. 判题链路
 
