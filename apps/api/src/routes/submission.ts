@@ -37,7 +37,14 @@ import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
 import { todayStart } from "../time"
-import { asFilterValue, isAdminRole, queryInteger, rounded, stripClassPrefix } from "./helpers"
+import {
+  asFilterValue,
+  isAdminRole,
+  matchedUsers,
+  queryInteger,
+  rounded,
+  stripClassPrefix,
+} from "./helpers"
 
 export const submissionRoutes = new Hono<ContestEnv>()
 
@@ -321,33 +328,6 @@ async function astOnlyByUser(where: SQL | undefined, userIds: number[]) {
   `)
   for (const row of rows) byUser.set(row.user_id, row.n)
   return byUser
-}
-
-/**
- * 用户名模糊匹配到的账号。统计的两件事都从它出发：**筛哪些提交**（拿 id），
- * 以及**花名册**（班级人数、谁没做，见下面的过滤）。
- *
- * 这里必须查 `user` 表而不是 `submission.username` —— 后者是提交那一刻冻结的
- * 快照，学生改名之后旧提交还挂着旧名字，`ilike submission.username` 匹配不上。
- *
- * 生产快照实测（2026-09-08）：24 级数媒两个班改成编号制用户名之后，85 人的
- * 提交挂在旧名下。查 `ks249` 旧口径 0 条 / 新口径 7 条 —— 整个班 48 人全掉进
- * 「一条没交」；查 `ks248` 20 条 / 54 条，13 个人的成绩查不出来。
- *
- * 返回**全部**匹配到的账号，禁用的和教师也在内 —— 「谁交过」不该受这两个条件
- * 影响。花名册那一份在调用处再筛（未禁用 + 普通用户），教师和管理员不进分母。
- */
-async function matchedUsers(username: string) {
-  return db
-    .select({
-      id: schema.user.id,
-      username: schema.user.username,
-      className: schema.user.className,
-      isDisabled: schema.user.isDisabled,
-      adminType: schema.user.adminType,
-    })
-    .from(schema.user)
-    .where(ilike(schema.user.username, `%${username}%`))
 }
 
 /**

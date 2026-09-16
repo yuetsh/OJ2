@@ -1,6 +1,6 @@
 import { ADMIN_ROLES, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
 
-import { and, count, eq, notInArray } from "drizzle-orm"
+import { and, count, eq, ilike, notInArray } from "drizzle-orm"
 
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
@@ -127,4 +127,34 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
       ),
     )
   return failed?.value ?? 0
+}
+
+/**
+ * 用户名模糊匹配到的账号。统计的两件事都从它出发：**筛哪些提交**（拿 id），
+ * 以及**花名册**（班级人数、谁没做，见调用处的过滤）。
+ *
+ * 这里必须查 `user` 表而不是 `submission.username` —— 后者是提交那一刻冻结的
+ * 快照，学生改名之后旧提交还挂着旧名字，`ilike submission.username` 匹配不上。
+ *
+ * 生产快照实测（2026-09-08）：24 级数媒两个班改成编号制用户名之后，85 人的
+ * 提交挂在旧名下。查 `ks249` 旧口径 0 条 / 新口径 7 条 —— 整个班 48 人全掉进
+ * 「一条没交」；查 `ks248` 20 条 / 54 条，13 个人的成绩查不出来。
+ *
+ * 返回**全部**匹配到的账号，禁用的和教师也在内 —— 「谁交过」不该受这两个条件
+ * 影响。花名册那一份在调用处再筛（未禁用 + 普通用户），教师和管理员不进分母。
+ *
+ * 代码提交和流程图两条统计都走这里。流程图那张表连冻结用户名都没有（只有
+ * `user_id`），更是只能从这儿拿 id。
+ */
+export async function matchedUsers(username: string) {
+  return db
+    .select({
+      id: schema.user.id,
+      username: schema.user.username,
+      className: schema.user.className,
+      isDisabled: schema.user.isDisabled,
+      adminType: schema.user.adminType,
+    })
+    .from(schema.user)
+    .where(ilike(schema.user.username, `%${username}%`))
 }
