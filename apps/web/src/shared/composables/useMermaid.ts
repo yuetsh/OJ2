@@ -251,26 +251,14 @@ function applyFlowchartDisplayStyle(container: HTMLElement) {
   svg.insertBefore(style, svg.firstChild)
 }
 
-function getChromeVersion(): number {
-  const match = navigator.userAgent.match(/Chrome\/(\d+)/)
-  return match ? parseInt(match[1]) : Infinity
-}
-
 let mermaidPromise: Promise<any> | null = null
-let mermaidIsLegacy = false
 
 function loadMermaid(): Promise<any> {
   // 缓存 Promise 而不是实例：同一屏里两个组件一起挂载时，缓存实例会让两边都
   // 落进 if (!mermaidInstance)，import 两次、initialize 两次
   if (!mermaidPromise) {
     mermaidPromise = (async () => {
-      let instance: any
-      if (getChromeVersion() < 94) {
-        instance = (await import("mermaid-legacy")).default
-        mermaidIsLegacy = true
-      } else {
-        instance = (await import("mermaid")).default
-      }
+      const instance = (await import("mermaid")).default
       instance.initialize({
         startOnLoad: false,
         securityLevel: "strict",
@@ -313,17 +301,7 @@ export function useMermaid() {
     try {
       const m = await loadMermaid()
       const id = `mermaid-${getRandomId()}`
-      // v9 (mermaid-legacy): callback-based render(id, code, cb)
-      // v10+: Promise-based render(id, code) → { svg }
-      const svg = mermaidIsLegacy
-        ? await new Promise<string>((resolve, reject) => {
-            try {
-              m.render(id, mermaidCode, resolve)
-            } catch (e) {
-              reject(e)
-            }
-          })
-        : (await m.render(id, mermaidCode)).svg
+      const { svg } = await m.render(id, mermaidCode)
       if (gen !== renderGeneration) return
       container.innerHTML = svg
       applyFlowchartDisplayStyle(container)

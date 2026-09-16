@@ -194,10 +194,19 @@ C 那 14 个 target 在 C++ 树里逐个实测通用。但**调用形态两者�
 
 没有 OI。上一代残留的 OI 分支在阶段 0 已经砍掉，不要"顺手补回来"。
 
-### 前端要兼容老 Chrome
+### 前端基线是 Chrome 105（2026-09-16 从 < 94 上调）
 
-机房电脑 Chrome < 94。`mermaid-legacy` 等 fallback 依赖和 vite 的构建 target
-不能动，`vite.config.ts` 里有注释说明。
+机房**部分**电脑是 Chrome 105，其余更新 —— 按最低那档定基线。
+
+- **`@vitejs/plugin-legacy` 留着，别删**：vite 8 的默认构建 target 是 `chrome111`，
+  比 105 高。这个插件同时把 `build.target` 压到 `es2020/chrome105`、给现代产物补
+  core-js polyfill（`toSorted` / `Set` 运算 / 迭代器辅助那批是 Chrome 110+ 才有的）。
+  `modernTargets` 不写，用插件自带的基线（`chrome>=105`），正好是这一档。
+  polyfill 清单写死在 `vite.config.ts`，**升级前端依赖后重新审计**：
+  `DEBUG=vite:legacy bun run build` 会打印探测到的全集。
+- **Chrome < 94 那套删掉了**：`mermaid-legacy`（mermaid@9）、cytoscape 的 UMD→ESM
+  别名、`useMermaid.ts` 里按 UA 分叉的 v9 回调式 render —— 105 用得上 mermaid 11。
+- **View Transitions 要 111，105 没有**，`darkTransition.ts` 的降级分支是真在用的。
 
 ### 时间只有一个锚点：`apps/api/src/time.ts`
 

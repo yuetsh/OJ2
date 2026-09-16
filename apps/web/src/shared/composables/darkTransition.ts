@@ -22,7 +22,7 @@ export function useDarkTransition() {
 
   function toggleDark(event: MouseEvent) {
     if (!document.startViewTransition) {
-      // 机房那批 Chrome 低于 94，没有 View Transitions，直接切、不做动画。
+      // View Transitions 要 Chrome 111，机房那批 105 没有，直接切、不做动画。
       isDark.value = !isDark.value
       return
     }

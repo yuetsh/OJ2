@@ -8,8 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 （`ojnext` 与 `../OnlineJudge` 都已下线且**完全冻结，一行都不改**）。Vue 3 + TypeScript，
 Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
 
-**要兼容机房的老 Chrome（< 94）**：`vite.config.ts` 的 legacy 配置与
-`mermaid-legacy` 等 fallback 依赖不能动，理由写在该文件的注释里。
+**浏览器基线是 Chrome 105**（机房部分电脑那一档，2026-09-16 从 < 94 上调）：
+`vite.config.ts` 的 `@vitejs/plugin-legacy` 和写死的 polyfill 清单不能删 —— vite 8
+默认 target 是 chrome111，比机房高。`mermaid-legacy` 那条 < 94 的 fallback 已删除。
+理由写在该文件的注释里，详见 `../CLAUDE.md`。
 
 ## Commands
 
@@ -138,7 +140,7 @@ return contract("GET /problems/:id", problemDetailSchema, value)
 
 时区常量在契约 `@oj2/contract` 的 `TIME_ZONE_OFFSET_MINUTES`，和后端 `time.ts` 共用。
 实现是「平移固定偏移 + 读 `getUTC*`」，不用 `Intl` 的时区选项：东八区没有夏令时，
-纯算术在表格里逐格调用也不费事，老 Chrome 上结果也一致。
+纯算术在表格里逐格调用也不费事，和后端 `time.ts` 算得一模一样。
 
 **`n-date-picker` 要平移**（`admin/contest/detail.vue`、`admin/problemset/edit.vue`）：
 Naive 的日期选择器按浏览器本地时区渲染、没有 `timezone` 属性，所以绑定值走

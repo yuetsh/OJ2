@@ -6,21 +6,25 @@ import AutoImport from "unplugin-auto-import/vite"
 import Components from "unplugin-vue-components/vite"
 import { NaiveUiResolver } from "unplugin-vue-components/resolvers"
 
-// 显式保留 Chrome 90 所需的运行时兼容项，避免 plugin-legacy 对每个产物执行 Babel 扫描。
-// 升级前端依赖后需要重新审计此列表。
+// 机房电脑的 Chrome 是 105 一档，比 plugin-legacy 的现代基线（chrome>=105）正好压线，
+// 但比 vite 8 的默认构建 target（chrome111）低。所以这个插件必须留着：它同时管两件事
+// —— 把 build.target 压到 chrome105/es2020，再给现代产物补 core-js 的 API polyfill。
+//
+// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 50 项，抄下来写死：自动探测要
+// 对每个产物跑一遍 Babel 扫描，构建从 3 秒涨到 12 秒。**升级前端依赖后重新审计一次**：
+//   DEBUG=vite:legacy bun run build   # 会打印 modern polyfills 的全集
+// 少一项就是老机器上一个静默的 TypeError（这批缺的大多是 Chrome 110+ 的
+// Array.prototype.toSorted / Set 运算 / 迭代器辅助）。
 const polyfills = [
-  "es.aggregate-error.cause",
   "es.array-buffer.detached",
-  "es.array-buffer.transfer-to-fixed-length",
   "es.array-buffer.transfer",
-  "es.array.at",
-  "es.array.find-last-index",
+  "es.array-buffer.transfer-to-fixed-length",
+  "es.array.includes",
   "es.array.push",
   "es.array.to-reversed",
   "es.array.to-sorted",
   "es.array.to-spliced",
   "es.array.with",
-  "es.error.cause",
   "es.iterator.constructor",
   "es.iterator.drop",
   "es.iterator.every",
@@ -34,9 +38,9 @@ const polyfills = [
   "es.iterator.to-array",
   "es.json.parse",
   "es.json.stringify",
-  "es.map.get-or-insert-computed",
   "es.map.get-or-insert",
-  "es.object.has-own",
+  "es.map.get-or-insert-computed",
+  "es.regexp.escape",
   "es.regexp.flags",
   "es.set.difference.v2",
   "es.set.intersection.v2",
@@ -45,11 +49,6 @@ const polyfills = [
   "es.set.is-superset-of.v2",
   "es.set.symmetric-difference.v2",
   "es.set.union.v2",
-  "es.string.at-alternative",
-  "es.typed-array.at",
-  "es.typed-array.find-last-index",
-  "es.typed-array.find-last",
-  "es.typed-array.set",
   "es.typed-array.to-reversed",
   "es.typed-array.to-sorted",
   "es.typed-array.with",
@@ -57,8 +56,8 @@ const polyfills = [
   "es.uint8-array.set-from-hex",
   "es.uint8-array.to-base64",
   "es.uint8-array.to-hex",
-  "es.weak-map.get-or-insert-computed",
   "es.weak-map.get-or-insert",
+  "es.weak-map.get-or-insert-computed",
   "esnext.array.group",
   "web.dom-exception.stack",
   "web.immediate",
@@ -95,11 +94,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
-      // 机房存在 Chrome 91 等旧浏览器：不做 SystemJS 双构建，
-      // 只按使用情况给现代产物注入 core-js API polyfill（Array.at 等）
+      // 不做 SystemJS 双构建，只给现代产物注入 polyfill；modernTargets 不写，
+      // 用插件自带的基线（chrome>=105 / firefox>=106 / safari>=16.4），正好是机房那档。
       legacy({
         renderLegacyChunks: false,
-        modernTargets: "chrome>=90",
         modernPolyfills: polyfills,
       }),
       AutoImport({
@@ -142,9 +140,6 @@ export default defineConfig(({ mode }) => {
     envPrefix: "PUBLIC_",
     resolve: {
       alias: {
-        // mermaid-legacy (mermaid@9) 写死了 UMD 路径，新版 cytoscape 的 exports
-        // 不允许 import 条件访问它，转到 ESM 产物
-        "cytoscape/dist/cytoscape.umd.js": "cytoscape/dist/cytoscape.esm.mjs",
         utils: fileURLToPath(new URL("./src/utils", import.meta.url)),
         oj: fileURLToPath(new URL("./src/oj", import.meta.url)),
         admin: fileURLToPath(new URL("./src/admin", import.meta.url)),
