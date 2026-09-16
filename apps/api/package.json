@@ -18,7 +18,7 @@
     "check:ast": "bun src/scripts/check-ast-targets.ts",
     "db:pull": "drizzle-kit pull",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "bun --env-file=../../.env src/main.ts migrate"
   },
   "dependencies": {
     "@node-rs/jieba": "^2.0.2",
