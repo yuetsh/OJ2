@@ -594,7 +594,7 @@ watch(
   <n-flex vertical size="large">
     <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
       <n-gi :span="1">
-        <n-card>
+        <n-card :bordered="false">
           <template #header>
             <div style="height: 34px">全服 Top10</div>
           </template>
@@ -607,7 +607,7 @@ watch(
         </n-card>
       </n-gi>
       <n-gi :span="1">
-        <n-card>
+        <n-card :bordered="false">
           <template #header>日活 Top10</template>
           <template #header-extra>
             <n-select
@@ -631,7 +631,7 @@ watch(
     -->
     <n-grid :cols="isDesktop ? 3 : 1" :x-gap="20" :y-gap="20">
       <n-gi :span="isDesktop ? 2 : 1">
-        <n-card>
+        <n-card :bordered="false">
           <template #header>全服 Top100</template>
           <template #header-extra>
             <n-tag
@@ -671,7 +671,7 @@ watch(
         </n-card>
       </n-gi>
       <n-gi :span="1">
-        <n-card>
+        <n-card :bordered="false">
           <template #header>
             <n-flex align="center" :size="8">
               <span>本周进步榜</span>
@@ -729,7 +729,7 @@ watch(
     </n-grid>
     <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
       <n-gi :span="1">
-        <n-card>
+        <n-card :bordered="false">
           <template #header>
             <n-flex align="center">
               <span>班级排名</span>
@@ -756,7 +756,7 @@ watch(
         </n-card>
       </n-gi>
       <n-gi :span="1">
-        <n-card>
+        <n-card :bordered="false">
           <template #header>我在班级的排名</template>
           <template #header-extra>
             <n-select
