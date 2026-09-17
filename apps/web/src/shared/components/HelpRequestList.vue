@@ -2,14 +2,19 @@
 import { Icon } from "@iconify/vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useCollabStore } from "shared/store/collab"
+import { useScreenModeStore } from "shared/store/screenMode"
 
 /** 由顶栏的姓名下拉菜单打开 */
 const show = defineModel<boolean>("show", { default: false })
 
 const collabStore = useCollabStore()
+const screenModeStore = useScreenModeStore()
+const router = useRouter()
+const route = useRoute()
+const message = useMessage()
 
-// 接单之后要在弹框里替学生写代码，那个编辑器窄屏上没法用 —— 所以窄屏只让看
-// 「谁在等」（角标、toast、这张列表照常给），接单留到桌面端
+// 接单之后要在题目页的编辑器里替学生写代码，那个编辑器窄屏上没法用 —— 所以窄屏
+// 只让看「谁在等」（角标、toast、这张列表照常给），接单留到桌面端
 const { isDesktop } = useBreakpoints()
 
 // 等待时长要每秒走一格，所以自己转一个 now。
@@ -43,12 +48,37 @@ const waited = (createdAt: number) => {
   return `${m}:${String(s).padStart(2, "0")}`
 }
 
-const handleAccept = (studentId: number, status: string) => {
+/**
+ * 接单 = 跳到那道题的页面，在页面自带的编辑器里协作。
+ *
+ * 原来是接单后弹一个 CollabModal（弹框里再挂一个 CodeMirror + 一份只读题面），
+ * 那个弹框按一下 Esc 就关、协作跟着结束，上课时太容易误触；题面也只能看不能用。
+ * 直接跳题目页之后，老师看到的就是学生看到的那一页。
+ *
+ * 求助入口在比赛里是关掉的（Form.vue 的 showHelpButton），problemId 一定是公开
+ * 题目的展示 ID，走 /problem/:id 就行。
+ */
+const handleAccept = (studentId: number, problemId: string, status: string) => {
   // 已被别的老师接走的不能点
   if (status === "active" || !isDesktop.value) return
+  // 一个老师同时只能在一个房间里（服务端也拦，见 handler 的「请先退出当前协作」）。
+  // 这里先拦一道：不拦的话服务端拒了、前端却已经跳到新那道题上，
+  // 反而把手上正在进行的那场协作断掉（对老师来说「跳走」就等于结束协作）
+  if (collabStore.room) {
+    message.warning("请先结束当前协作")
+    return
+  }
   collabStore.accept(studentId)
-  // 接单后马上要弹 CollabModal，这个列表得让位
+  // 协作用的是右侧那个编辑器，而「题目」「自测」两种分屏模式下它根本没挂出来 ——
+  // 落进那样一个页面就是：学生显示「老师正在帮你」，老师这边什么都没有。
+  // 跳到另一道题时 detail.vue 的 init() 会重置分屏模式，**停在同一道题上接单
+  // 不会**（路由没变、组件不重建），所以这里显式重置一次。
+  screenModeStore.resetScreenMode()
   show.value = false
+  // 已经在这道题的页面上就不跳了（老师正投影着这道题时就是这种）。
+  // 重复导航在 vue-router 里是一个 rejected promise，不拦一下控制台会报
+  const target = `/problem/${problemId}`
+  if (route.path !== target) router.push(target)
 }
 </script>
 
@@ -97,7 +127,7 @@ const handleAccept = (studentId: number, status: string) => {
             cursor:
               item.status === 'active' || !isDesktop ? 'default' : 'pointer',
           }"
-          @click="handleAccept(item.studentId, item.status)"
+          @click="handleAccept(item.studentId, group.problemId, item.status)"
         >
           <n-flex vertical :size="2">
             <n-text>

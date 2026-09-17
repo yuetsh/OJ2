@@ -65,6 +65,20 @@ const showHelpButton = computed(
 )
 
 /**
+ * 教师端：协作就开在这道题上。接单后直接跳到题目页协作（原来是 CollabModal 弹框），
+ * 所以状态和「结束协作」得摆在题目页的工具栏上 —— 也只有这一个按钮能结束，
+ * 不像弹框那样按一下 Esc 就把协作关掉了。
+ */
+const collabHere = computed(
+  () =>
+    collabStore.room !== null &&
+    collabStore.room.problemId === problem.value?._id,
+)
+const showCollabBar = computed(
+  () => collabHere.value && userStore.isTeacherOrAbove,
+)
+
+/**
  * 状态全塞进按钮本身。原来旁边还挂一个 n-tag 说明排队情况，一行工具栏
  * （语言 / 提交 / 提交信息 / 课堂统计 / 更多操作 / 求助）在 1280 的机房屏上放不下。
  */
@@ -134,10 +148,14 @@ const menuOptions = computed<DropdownOption[]>(() => {
       label: "复制代码",
       key: "copy",
     })
-    options.push({
-      label: "重置代码",
-      key: "reset",
-    })
+    // 协作中的教师不给「重置代码」：那会儿编辑器里是**学生的**代码，而 v-model
+    // 一写回去就顺着 Yjs 同步过去，等于一键清空学生的作业，他还没法撤回
+    if (!showCollabBar.value) {
+      options.push({
+        label: "重置代码",
+        key: "reset",
+      })
+    }
   }
   if (isDesktop.value && userStore.isSuperAdmin) {
     options.push({
@@ -216,7 +234,15 @@ const goTestCat = () => {
 
 const goSubmissions = () => {
   const name = route.params.contestID ? "contest submissions" : "submissions"
-  router.push({ name, query: { problem: problem.value!._id } })
+  const target = { name, query: { problem: problem.value!._id } }
+  // 协作中走新标签：教师端「页面即协作现场」，跳走这一页协作就结束了
+  // （求助会退回排队，但老师还得再接一次）。而「看看这学生都交了什么」恰好是
+  // 协作时最常点的一个按钮 —— 这是整条工具栏上唯一会跳路由的按钮
+  if (showCollabBar.value) {
+    window.open(router.resolve(target).href, "_blank")
+    return
+  }
+  router.push(target)
 }
 
 const goEdit = () => {
@@ -236,11 +262,13 @@ onMounted(() => {
 
 <template>
   <n-flex align="center">
+    <!-- 协作中编辑器的语言跟着学生走，这个选择器改了也不会生效，索性禁掉 -->
     <n-select
       v-model:value="codeStore.code.language"
       style="width: 120px"
       :size="buttonSize"
       :options="languageOptions"
+      :disabled="showCollabBar"
       @update:value="changeLanguage"
     />
 
@@ -273,6 +301,22 @@ onMounted(() => {
     >
       <n-button :size="buttonSize">更多操作</n-button>
     </n-dropdown>
+
+    <template v-if="showCollabBar">
+      <n-tag type="success" :size="buttonSize">
+        正在帮 {{ collabStore.room!.peerName }} ·
+        {{ LANGUAGE_SHOW_VALUE[collabStore.room!.language] }}
+      </n-tag>
+      <!-- 显式的「结束」：求助记录一并清掉。跳走页面发的是 leave("left")，
+           那边只是退回排队 —— 见 store 里 leave 的注释 -->
+      <n-button
+        :size="buttonSize"
+        type="primary"
+        @click="collabStore.leave('done')"
+      >
+        结束协作
+      </n-button>
+    </template>
 
     <n-button
       v-if="showHelpButton"

@@ -84,6 +84,37 @@ export const useCollabStore = defineStore("collab", () => {
     )
   })
 
+  /**
+   * room_closed 的提示语。四种 reason 各自对两个角色说一句准确的话 ——
+   * 原来不管什么情况都是一句「协作已结束」，学生分不出「老师处理完了」和
+   * 「老师走开了」。
+   *
+   * 服务端保证发起方和对面**收到的 reason 不同**（teardownRoom 的 initiator）：
+   * 自己干的是 `done` / `self_left`，对面才是 `peer_left` / `peer_offline`。
+   * 所以这里既要看 reason 也要看角色。
+   */
+  function closedNotice(reason: unknown) {
+    const teacher = userStore.isTeacherOrAbove
+    switch (reason) {
+      case "peer_offline":
+        return "对方已断开连接"
+      // 对面离开了这道题：学生那侧要说明求助的去向 —— 服务端紧接着会补一条
+      // help_status:pending 把他放回队列
+      case "peer_left":
+        return teacher
+          ? "学生离开了这道题，协作已结束"
+          : "老师暂时离开，你的求助已重新排队"
+      // 自己离开了这道题（跳走页面、把语言切成流程图）
+      case "self_left":
+        return teacher
+          ? "你已离开这道题，求助退回队列了"
+          : "你已离开这道题，协作结束"
+      // done：有人点了「结束协作」
+      default:
+        return teacher ? "已结束这次协作" : "老师已结束这次帮忙"
+    }
+  }
+
   const handleMessage = (data: CollabMessage) => {
     switch (data.type) {
       case "requests":
@@ -126,9 +157,7 @@ export const useCollabStore = defineStore("collab", () => {
         // 这里先归零，那条 pending 补发会立刻把它纠正回来，不会被这次重置盖掉
         room.value = null
         helpStatus.value = "idle"
-        setNotice(
-          data.reason === "peer_offline" ? "对方已断开连接" : "协作已结束",
-        )
+        setNotice(closedNotice(data.reason))
         return
       case "error":
         setNotice(String(data.message ?? ""))
@@ -192,8 +221,16 @@ export const useCollabStore = defineStore("collab", () => {
     ws.send({ type: "reject", studentId })
   }
 
-  function leave() {
-    ws.send({ type: "leave" })
+  /**
+   * 退出房间。**两种语义**（服务端按 reason 分，见 collab/handler.ts 的 handleLeave）：
+   *
+   * - `"done"` —— 点了「结束协作」，这次帮忙结束，求助记录一并清掉；
+   * - `"left"` —— 只是离开了这道题的页面。教师端「页面即协作现场」，跳走就不在
+   *   房间里了，但那不等于处理完了：服务端会把求助**退回排队**，老师回来再点一次
+   *   就接上，学生不用重新举手。
+   */
+  function leave(reason: "done" | "left" = "done") {
+    ws.send({ type: "leave", reason })
   }
 
   function sendBinary(data: Uint8Array) {

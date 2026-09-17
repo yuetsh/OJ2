@@ -5,7 +5,7 @@ import type { Extension } from "@codemirror/state"
 import type { LANGUAGE } from "utils/types"
 
 /**
- * 语言对应的高亮扩展。学生端（SyncCodeEditor）和教师端（CollabModal）共用同一份 ——
+ * 语言对应的高亮扩展。学生端和教师端共用同一份（两边都是题目页上的 SyncCodeEditor） ——
  * 两边各选各的，就是老师看到的高亮和补全跟学生手里那份对不上。
  *
  * Java / Golang / JavaScript 没有单独的包，落到 cpp()，是既有行为，不是遗漏。

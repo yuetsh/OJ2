@@ -4,29 +4,20 @@ import { useCollabStore } from "shared/store/collab"
 import HelpRequestList from "./HelpRequestList.vue"
 
 /**
- * 课堂求助的全局界面：一次性提示、新求助 toast、求助列表、教师端协作弹框。
+ * 课堂求助的全局界面：一次性提示、新求助 toast、求助列表。
+ *
+ * 教师端的协作**没有弹框**：接单会跳到那道题的页面，在页面自带的编辑器里协作
+ * （见 HelpRequestList 的 handleAccept、ProblemEditor 的 collabHere）。
+ * 原来这里还异步挂一个 CollabModal，那个弹框按一下 Esc 就关、协作跟着结束。
  *
  * 挂在 App.vue 而不是顶栏或 default.vue 布局里。这些东西跟着**连接**走，
  * 而连接是全局常驻的（App.vue 按登录态开关）—— 挂在顶栏里的时候，老师一进
  * /admin 就换成了 admin.vue 布局，顶栏连同这几个消费者一起卸载：求助照收，
- * 提示、角标、协作弹框全都不出现，正好错过 collab.ts 里写的那句「老师可能
+ * 提示、角标、协作界面全都不出现，正好错过 collab.ts 里写的那句「老师可能
  * 正在后台改题时收到求助」。放在这里才真的全局。
  *
  * 位置要求：n-message-provider 的后代（useMessage 需要）。
  */
-/**
- * 协作弹框异步加载。
- *
- * 这个组件静态 import 进来的话，整套 CodeMirror（view / state / language /
- * autocomplete / lang-*）就跟着 App.vue 进了入口 chunk —— 首屏白白多下 640 KB
- * （gzip 后 210 KB），而下面那个 v-if 决定了学生根本不渲染它 —— 机房那批老机器
- * 解析这些字节是实打实的开销。
- *
- * 拆成异步之后首页的 JS 从 1.9 MB 降到 1.3 MB（gzip 642 KB → 428 KB），
- * 老师那边只是在第一次接单时多一次 chunk 请求。
- */
-const CollabModal = defineAsyncComponent(() => import("./CollabModal.vue"))
-
 const collabStore = useCollabStore()
 const message = useMessage()
 
@@ -90,5 +81,4 @@ watch(
     v-if="collabStore.isTeacher"
     v-model:show="collabStore.helpPanelOpen"
   />
-  <CollabModal v-if="collabStore.isTeacher" />
 </template>

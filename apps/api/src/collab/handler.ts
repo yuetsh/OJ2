@@ -25,6 +25,12 @@ import {
   type Room,
 } from "./state"
 
+/**
+ * `type: "error"` 的 message **会被前端原样弹成 toast**（store 的 case "error"
+ * → setNotice → CollabHost 的 message.info），所以这里一律写中文、写成学生看得懂的
+ * 话。协议层的校验错误（格式不对、题号不对）正常前端触发不到，但真触发了也得是
+ * 一句人话 —— 原来那几条是 "Invalid problemId" 这样的英文，直接糊在学生脸上。
+ */
 function isTeacher(ws: CollabSocket) {
   return TEACHER_ROLES.includes(toAdminType(ws.data.adminType ?? ""))
 }
@@ -191,11 +197,17 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
     problemId?: unknown
     studentId?: unknown
     language?: unknown
+    reason?: unknown
   }
   try {
     message = JSON.parse(raw) as typeof message
   } catch {
-    ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }))
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "消息格式不对，请刷新页面重试",
+      }),
+    )
     return
   }
 
@@ -230,10 +242,15 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
       await handleReject(ws, message.studentId)
       return
     case "leave":
-      handleLeave(ws)
+      handleLeave(ws, message.reason)
       return
     default:
-      ws.send(JSON.stringify({ type: "error", message: "Invalid message" }))
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "不认识的操作，请刷新页面重试",
+        }),
+      )
   }
 }
 
@@ -243,7 +260,9 @@ async function handleHelpRequest(
   language: unknown,
 ) {
   if (typeof problemId !== "string" || !problemId) {
-    ws.send(JSON.stringify({ type: "error", message: "Invalid problemId" }))
+    ws.send(
+      JSON.stringify({ type: "error", message: "题号不对，请刷新页面重试" }),
+    )
     return
   }
   if (isTeacher(ws)) {
@@ -338,7 +357,12 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
     return
   }
   if (typeof studentId !== "number") {
-    ws.send(JSON.stringify({ type: "error", message: "Invalid studentId" }))
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "学生标识不对，请刷新页面重试",
+      }),
+    )
     return
   }
 
@@ -366,7 +390,7 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
 
   // 老师同时只能在一个房间
   if (roomOf(ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "请先退出当前协作" }))
+    ws.send(JSON.stringify({ type: "error", message: "请先结束当前协作" }))
     return
   }
 
@@ -440,32 +464,63 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
   broadcastRequests()
 }
 
-/** 主动退出房间。老师点关闭、学生点结束都走这里 */
-function handleLeave(ws: CollabSocket) {
+/**
+ * 主动退出房间。**两种语义，靠 reason 分**：
+ *
+ * - 不带 reason（或 `"done"`）—— 有人点了「结束协作」，这次帮忙到此结束，
+ *   求助记录一并清掉；
+ * - `"left"` —— 人只是离开了这道题的页面（教师端「页面即协作现场」，跳走就不在
+ *   房间里了）。**这跟他掉线是同一件事**，所以走同一条收尾：教师离开 → 求助退回
+ *   排队，学生不用重新举手，老师回来再点一次就接上；学生离开 → 求助随人清掉。
+ *
+ * 分开是因为两者对学生的意义完全不同：前者是「搞定了」，后者是「老师先走一下」，
+ * 而原来都按前者处理 —— 老师点一下「提交信息」，学生就得重新举手。
+ */
+function handleLeave(ws: CollabSocket, reason: unknown) {
   const room = roomOf(ws)
   if (!room) return
-  teardownRoom(room, "done")
+  if (reason !== "left") {
+    teardownRoom(room, "done")
+    return
+  }
+  const side = ws === room.teacherSocket ? "teacher" : "student"
+  teardownRoom(room, "peer_left", side, ws)
 }
 
 /**
  * 拆房间。reason 决定两端看到什么：
  *   done         —— 有人主动结束，双方都收到，请求一并清除
  *   peer_offline —— 有人断线或发送失败被判定为不可达，见 handleCollabClose /
- *                    handleCollabBinary。offlineSide 是消失的那一方：老师消失，
- *                    请求退回排队；学生消失，请求随人清掉。不传时（当前只有
- *                    handleLeave 走 "done"）不做这一步，只拆房间
+ *                    handleCollabBinary
+ *   peer_left    —— 有人离开了这道题的页面（handleLeave 的 "left"）
+ *
+ * offlineSide 是消失的那一方，决定请求的去向：老师消失 → 退回排队；学生消失 →
+ * 随人清掉。不传时只拆房间。
+ *
+ * initiator 是主动发起的那条连接：**他收到的 reason 不一样** —— 点了「结束协作」
+ * 是 `done`，离开页面是 `self_left`。对他来说这是「我自己干的」，不该看到一句
+ * 「对方离开了」，也不该看到「老师已结束这次帮忙」。
  */
 function teardownRoom(
   room: Room,
-  reason: "done" | "peer_offline",
+  reason: "done" | "peer_offline" | "peer_left",
   offlineSide?: "student" | "teacher",
+  initiator?: CollabSocket,
 ) {
   closeRoom(room.studentId)
   room.studentSocket.data.roomOwnerId = undefined
   room.teacherSocket.data.roomOwnerId = undefined
-  const frame = JSON.stringify({ type: "room_closed", reason })
-  room.studentSocket.send(frame)
-  room.teacherSocket.send(frame)
+  // 发起方收到的是「我自己干的」那一版：点了结束就是 done，离开页面是 self_left。
+  // 不能跟对面收同一条 —— 学生自己切走了却看到「老师已结束这次帮忙」是假话
+  const selfReason = reason === "peer_left" ? "self_left" : "done"
+  for (const socket of [room.studentSocket, room.teacherSocket]) {
+    socket.send(
+      JSON.stringify({
+        type: "room_closed",
+        reason: socket === initiator ? selfReason : reason,
+      }),
+    )
+  }
   if (reason === "done") {
     removeRequest(room.studentId)
   } else if (offlineSide === "teacher") {
