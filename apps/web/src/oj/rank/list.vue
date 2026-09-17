@@ -323,7 +323,7 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
   {
     title: renderTableTitle("排名", "streamline-emojis:flexed-biceps-1"),
     key: "rank",
-    width: 70,
+    width: 100,
     align: "center",
     // rank 是服务端给的周榜名次，不是行号 —— 换算回 Index 要的 0 基下标
     render: (row) => h(Index, { index: row.rank - 1, page: 1, limit: 10 }),
