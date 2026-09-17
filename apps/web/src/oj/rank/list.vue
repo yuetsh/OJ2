@@ -317,11 +317,13 @@ const subOptions = computed<Duration>(
     durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
 )
 
+// 周榜占的是三栏里的一栏，列头不再重复「本周」（卡片标题已经写着），
+// 宽度也压到 1280 那一档能整张放下，不出横向滚动条
 const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
   {
     title: renderTableTitle("排名", "streamline-emojis:flexed-biceps-1"),
     key: "rank",
-    width: 80,
+    width: 70,
     align: "center",
     // rank 是服务端给的周榜名次，不是行号 —— 换算回 Index 要的 0 基下标
     render: (row) => h(Index, { index: row.rank - 1, page: 1, limit: 10 }),
@@ -332,7 +334,8 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
       "streamline-emojis:smiling-face-with-sunglasses",
     ),
     key: "username",
-    minWidth: 160,
+    minWidth: 120,
+    ellipsis: { tooltip: true },
     render: (row) =>
       h(
         NButton,
@@ -345,15 +348,15 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
       ),
   },
   {
-    title: renderTableTitle("本周新解决", "fluent-emoji:party-popper"),
+    title: renderTableTitle("新解决", "fluent-emoji:party-popper"),
     key: "solvedCount",
-    width: 120,
+    width: 100,
     align: "center",
   },
   {
-    title: renderTableTitle("本周提交", "streamline-emojis:rocket"),
+    title: renderTableTitle("提交", "streamline-emojis:rocket"),
     key: "submissionCount",
-    width: 110,
+    width: 90,
     align: "center",
   },
 ]
@@ -622,92 +625,108 @@ watch(
         </n-card>
       </n-gi>
     </n-grid>
-    <n-card>
-      <template #header>
-        <n-flex align="center" :size="8">
-          <span>本周进步榜</span>
-          <n-text depth="3" style="font-size: 13px">
-            {{ weeklyStart ? parseTime(weeklyStart, "M月D日") + "起" : "" }} ·
-            每周一清零
-          </n-text>
-        </n-flex>
-      </template>
-      <template #header-extra>
-        <n-select
-          v-if="userStore.user?.className"
-          style="width: 140px"
-          :options="[
-            { label: '本班', value: 'class' },
-            { label: '全服', value: 'global' },
-          ]"
-          v-model:value="weeklyScope"
-        />
-      </template>
-      <n-data-table
-        v-if="weeklyData.length"
-        :data="weeklyData"
-        :columns="weeklyColumns"
-        :row-class-name="
-          (row: WeeklyRankItem) =>
-            weeklyMe && row.rank === weeklyMe.rank ? 'me-row' : ''
-        "
-      />
-      <n-empty
-        v-else
-        style="padding: 20px 0"
-        description="这周还没有人解决新题目 —— 现在做出一题就是第一名"
-      />
-      <!--
-        本周一题没做出来时 weeklyMe 是 null，这一行照样要出现：它是这张榜对
-        「还没上榜的人」说的话，而那恰好是最需要被推一把的那批学生。
-      -->
-      <template #footer v-if="weeklyMeOffBoard">
-        <n-tag type="info" round :bordered="false">
-          <template #icon>
-            <Icon width="18" icon="fluent-emoji:person-raising-hand" />
+    <!--
+      两张榜并排：左边全服总榜（分母是历史全部 AC，名次几乎不动），右边本周进步榜
+      （分母只有这一周）。同一屏里对照着看，「追不上」和「这周还能进前十」是一眼的事。
+    -->
+    <n-grid :cols="isDesktop ? 3 : 1" :x-gap="20" :y-gap="20">
+      <n-gi :span="isDesktop ? 2 : 1">
+        <n-card>
+          <template #header>全服 Top100</template>
+          <template #header-extra>
+            <n-tag
+              v-if="onlineCount > 0"
+              round
+              :bordered="false"
+              type="success"
+            >
+              当前在线 {{ onlineCount }} 人
+            </n-tag>
           </template>
-          <template v-if="weeklyMe">
-            我这周第 {{ weeklyMe.rank }} 名（共 {{ weeklyTotal }} 人上榜）·
-            新解决 {{ weeklyMe.solvedCount }} 题
-          </template>
-          <template v-else>
-            我这周还没有解决新题目，做出 1 题就能上榜
-          </template>
-        </n-tag>
-      </template>
-    </n-card>
-    <n-card>
-      <template #header>全服 Top100</template>
-      <template #header-extra>
-        <n-tag v-if="onlineCount > 0" round :bordered="false" type="success">
-          当前在线 {{ onlineCount }} 人
-        </n-tag>
-      </template>
-      <n-data-table
-        :data="data"
-        :columns="columns"
-        :row-class-name="rowClassName"
-      />
-      <template #footer>
-        <n-flex align="center" justify="space-between" :wrap="false">
-          <!-- 前 100 名之外的学生榜上找不到自己，这里单独给一行 -->
-          <n-tag v-if="meOffBoard" type="info" round :bordered="false">
-            <template #icon>
-              <Icon width="18" icon="fluent-emoji:person-raising-hand" />
-            </template>
-            我的排名：第 {{ me!.rank }} 名 · 已解决 {{ me!.acceptedNumber }} ·
-            提交 {{ me!.submissionNumber }} · 正确率
-            {{ getACRate(me!.acceptedNumber, me!.submissionNumber) }}
-          </n-tag>
-          <span v-else />
-          <Pagination
-            :total="total"
-            v-model:page="query.page"
-            v-model:limit="query.limit"
+          <n-data-table
+            :data="data"
+            :columns="columns"
+            :row-class-name="rowClassName"
           />
-        </n-flex>
-      </template>
-    </n-card>
+          <template #footer>
+            <n-flex align="center" justify="space-between" :wrap="false">
+              <!-- 前 100 名之外的学生榜上找不到自己，这里单独给一行 -->
+              <n-tag v-if="meOffBoard" type="info" round :bordered="false">
+                <template #icon>
+                  <Icon width="18" icon="fluent-emoji:person-raising-hand" />
+                </template>
+                我的排名：第 {{ me!.rank }} 名 · 已解决
+                {{ me!.acceptedNumber }} · 提交 {{ me!.submissionNumber }} ·
+                正确率
+                {{ getACRate(me!.acceptedNumber, me!.submissionNumber) }}
+              </n-tag>
+              <span v-else />
+              <Pagination
+                :total="total"
+                v-model:page="query.page"
+                v-model:limit="query.limit"
+              />
+            </n-flex>
+          </template>
+        </n-card>
+      </n-gi>
+      <n-gi :span="1">
+        <n-card>
+          <template #header>
+            <n-flex align="center" :size="8">
+              <span>本周进步榜</span>
+              <n-text depth="3" style="font-size: 13px">
+                {{ weeklyStart ? parseTime(weeklyStart, "M月D日") + "起" : "" }}
+                · 每周一清零
+              </n-text>
+            </n-flex>
+          </template>
+          <template #header-extra>
+            <n-select
+              v-if="userStore.user?.className"
+              style="width: 140px"
+              :options="[
+                { label: '本班', value: 'class' },
+                { label: '全服', value: 'global' },
+              ]"
+              v-model:value="weeklyScope"
+            />
+          </template>
+          <n-data-table
+            v-if="weeklyData.length"
+            :data="weeklyData"
+            :columns="weeklyColumns"
+            :row-class-name="
+              (row: WeeklyRankItem) =>
+                weeklyMe && row.rank === weeklyMe.rank ? 'me-row' : ''
+            "
+          />
+          <n-empty
+            v-else
+            style="padding: 20px 0"
+            description="这周还没有人解决新题目 —— 现在做出一题就是第一名"
+          />
+          <!--
+            本周一题没做出来时 weeklyMe 是 null，这一行照样要出现：它是这张榜对
+            「还没上榜的人」说的话，而那恰好是最需要被推一把的那批学生。
+          -->
+          <template #footer v-if="weeklyMeOffBoard">
+            <n-tag type="info" round :bordered="false">
+              <template #icon>
+                <Icon width="18" icon="fluent-emoji:person-raising-hand" />
+              </template>
+              <template v-if="weeklyMe">
+                我这周第 {{ weeklyMe.rank }} 名（共 {{ weeklyTotal }} 人上榜）·
+                新解决 {{ weeklyMe.solvedCount }} 题
+              </template>
+              <template v-else>
+                我这周还没有解决新题目，做出 1 题就能上榜
+              </template>
+            </n-tag>
+          </template>
+        </n-card>
+      </n-gi>
+    </n-grid>
     <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
       <n-gi :span="1">
         <n-card>
