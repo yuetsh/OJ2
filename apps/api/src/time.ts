@@ -71,6 +71,19 @@ export function todayStart(now: Date | number | string = new Date()): string {
   ).toISOString()
 }
 
+/**
+ * 「东八区本周一」的零点，返回 ISO 字符串。周榜按自然周清零，周一起算。
+ *
+ * `localWeekday` 的 0 是周日（跟 `Date#getDay()` 同一套编号），直接拿来减会把周日
+ * 算成「本周第一天」，于是周日一整天单独成一周、周一又清零一次 —— 所以先把 0 折成 7，
+ * 得到的 `weekday - 1` 才是「从本周一到今天过了几个日历日」。
+ */
+export function weekStart(now: Date | number | string = new Date()): string {
+  const today = dayNumber(calendarDay(now))
+  const weekday = localWeekday(today) || 7
+  return new Date((today - (weekday - 1)) * DAY_MS - OFFSET_MS).toISOString()
+}
+
 /** 按北京时间的日历做月份平移，日号超出目标月长度时截到月末，时分秒毫秒原样保留 */
 export function shiftMonthsByCalendar(instant: Date, months: number): Date {
   const wall = toWallClock(instant)

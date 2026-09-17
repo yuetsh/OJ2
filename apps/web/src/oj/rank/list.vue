@@ -5,6 +5,7 @@ import type {
   ClassUserRank,
   MyRank,
   Rank,
+  WeeklyRankItem,
 } from "utils/types"
 import { formatISO, sub, type Duration } from "date-fns"
 import { NButton, NFlex } from "naive-ui"
@@ -15,9 +16,10 @@ import {
   getRank,
   getUserClassRank,
   getClassPK,
+  getWeeklyRank,
 } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { durationFromValue, getACRate } from "utils/functions"
+import { durationFromValue, getACRate, parseTime } from "utils/functions"
 import Pagination from "shared/components/Pagination.vue"
 import { ChartType, LONG_DURATION_OPTIONS } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
@@ -71,6 +73,30 @@ const myClassQuery = reactive({
   page: 1,
   limit: 10,
 })
+
+/**
+ * 本周进步榜。默认落在**本班** —— 全服榜上中位学生仍然看不到自己，班内 30 个人的
+ * 周榜才是「我这周排第几」有答案的那张。没有班级（教师、超管、没入班的账号）才退回全服。
+ */
+const weeklyScope = ref<"global" | "class">("global")
+const weeklyData = ref<WeeklyRankItem[]>([])
+const weeklyMe = ref<WeeklyRankItem | null>(null)
+const weeklyTotal = ref(0)
+const weeklyStart = ref("")
+/**
+ * 我入不入这张榜。教师/超管本来就不参与排名（服务端 me 恒为 null），未登录同理 ——
+ * 这两种情况下 footer 那句「做出 1 题就能上榜」是说给不相干的人听的，不该出现。
+ */
+const weeklyMeEligible = computed(
+  () => userStore.isAuthed && !userStore.isTeacherOrAbove,
+)
+/** 我在榜面之外（或本周还没做出题）—— 榜上高亮不到我，footer 另起一行 */
+const weeklyMeOffBoard = computed(
+  () =>
+    weeklyMeEligible.value &&
+    (!weeklyMe.value ||
+      !weeklyData.value.some((row) => row.rank === weeklyMe.value!.rank)),
+)
 
 const showClassDetailModal = ref(false)
 const classDetailData = ref<ClassComparison | null>(null)
@@ -291,6 +317,55 @@ const subOptions = computed<Duration>(
     durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
 )
 
+const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
+  {
+    title: renderTableTitle("排名", "streamline-emojis:flexed-biceps-1"),
+    key: "rank",
+    width: 80,
+    align: "center",
+    // rank 是服务端给的周榜名次，不是行号 —— 换算回 Index 要的 0 基下标
+    render: (row) => h(Index, { index: row.rank - 1, page: 1, limit: 10 }),
+  },
+  {
+    title: renderTableTitle(
+      "用户",
+      "streamline-emojis:smiling-face-with-sunglasses",
+    ),
+    key: "username",
+    minWidth: 160,
+    render: (row) =>
+      h(
+        NButton,
+        {
+          text: true,
+          type: "info",
+          onClick: () => router.push("/user?name=" + row.user.username),
+        },
+        () => row.user.username,
+      ),
+  },
+  {
+    title: renderTableTitle("本周新解决", "fluent-emoji:party-popper"),
+    key: "solvedCount",
+    width: 120,
+    align: "center",
+  },
+  {
+    title: renderTableTitle("本周提交", "streamline-emojis:rocket"),
+    key: "submissionCount",
+    width: 110,
+    align: "center",
+  },
+]
+
+async function initWeeklyRank() {
+  if (!userStore.user) await userStore.getMyProfile()
+  // 有班级就默认看班内榜。改值会触发上面那个 watch 去取数，
+  // 这里再调一次 listWeeklyRank 就是重复发一次请求
+  if (userStore.user?.className) weeklyScope.value = "class"
+  else await listWeeklyRank()
+}
+
 onMounted(() => {
   // 「全服 Top10」就是榜单第一页的前 10 条：挂载时 init() 取的正是 offset=0&limit=10，
   // 再单发一次一模一样的 /rankings/users 只会让这张图排在日活后面出来。
@@ -300,6 +375,7 @@ onMounted(() => {
   listActivity()
   listClassRank()
   listMyClassRank()
+  initWeeklyRank()
 })
 
 const classColumns: DataTableColumn<ClassRank>[] = [
@@ -469,6 +545,20 @@ async function listMyClassRank() {
   }
 }
 
+async function listWeeklyRank() {
+  try {
+    const res = await getWeeklyRank(weeklyScope.value)
+    weeklyData.value = res.results
+    weeklyMe.value = res.me
+    weeklyTotal.value = res.total
+    weeklyStart.value = res.start
+  } catch (err: any) {
+    console.error(err)
+  }
+}
+
+watch(weeklyScope, listWeeklyRank)
+
 watch(
   () => classQuery.grade,
   () => {
@@ -532,6 +622,60 @@ watch(
         </n-card>
       </n-gi>
     </n-grid>
+    <n-card>
+      <template #header>
+        <n-flex align="center" :size="8">
+          <span>本周进步榜</span>
+          <n-text depth="3" style="font-size: 13px">
+            {{ weeklyStart ? parseTime(weeklyStart, "M月D日") + "起" : "" }} ·
+            每周一清零
+          </n-text>
+        </n-flex>
+      </template>
+      <template #header-extra>
+        <n-select
+          v-if="userStore.user?.className"
+          style="width: 140px"
+          :options="[
+            { label: '本班', value: 'class' },
+            { label: '全服', value: 'global' },
+          ]"
+          v-model:value="weeklyScope"
+        />
+      </template>
+      <n-data-table
+        v-if="weeklyData.length"
+        :data="weeklyData"
+        :columns="weeklyColumns"
+        :row-class-name="
+          (row: WeeklyRankItem) =>
+            weeklyMe && row.rank === weeklyMe.rank ? 'me-row' : ''
+        "
+      />
+      <n-empty
+        v-else
+        style="padding: 20px 0"
+        description="这周还没有人解决新题目 —— 现在做出一题就是第一名"
+      />
+      <!--
+        本周一题没做出来时 weeklyMe 是 null，这一行照样要出现：它是这张榜对
+        「还没上榜的人」说的话，而那恰好是最需要被推一把的那批学生。
+      -->
+      <template #footer v-if="weeklyMeOffBoard">
+        <n-tag type="info" round :bordered="false">
+          <template #icon>
+            <Icon width="18" icon="fluent-emoji:person-raising-hand" />
+          </template>
+          <template v-if="weeklyMe">
+            我这周第 {{ weeklyMe.rank }} 名（共 {{ weeklyTotal }} 人上榜）·
+            新解决 {{ weeklyMe.solvedCount }} 题
+          </template>
+          <template v-else>
+            我这周还没有解决新题目，做出 1 题就能上榜
+          </template>
+        </n-tag>
+      </template>
+    </n-card>
     <n-card>
       <template #header>全服 Top100</template>
       <template #header-extra>

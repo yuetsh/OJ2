@@ -12,6 +12,8 @@ import {
   type ProblemRank,
   type RankProfile,
   type UserRank,
+  type WeeklyRank,
+  type WeeklyRankItem,
 } from "@oj2/contract"
 import {
   and,
@@ -28,9 +30,11 @@ import {
   lte,
   min,
   ne,
+  notExists,
   or,
   sql,
 } from "drizzle-orm"
+import { alias } from "drizzle-orm/pg-core"
 import { Hono } from "hono"
 
 import { hashPassword } from "../auth/password"
@@ -42,6 +46,7 @@ import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { getUserProfileById } from "../services/profile"
+import { weekStart } from "../time"
 import {
   isTeacherOrAbove,
   objectValue,
@@ -392,6 +397,124 @@ accountRoutes.get("/rankings/activity", async (c) => {
         }) satisfies ActivityRankItem,
     ),
   )
+})
+
+/**
+ * 周榜的榜面大小。**存量榜（`/rankings/users`）解决的是「谁最强」，周榜解决的是
+ * 「这一周谁在往前走」** —— 后者每周一清零，所以榜面短一点更像「这周的头名」，
+ * 长了反而又变成一张追不上的总表。榜外的人靠 `me` 单独看到自己的名次。
+ */
+const WEEKLY_BOARD_SIZE = 10
+
+/** 算「解决」的两个状态：AST_CHECK_FAILED 也是答案对了，与 /rankings/activity 同口径 */
+const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
+
+/**
+ * 本周进步榜：按**本周首次 AC 的题目数**排名，每周一 0:00（东八区）清零。
+ *
+ * 和 `/rankings/users` 的区别不只是加了时间窗：那张榜排的是 `user_profile` 的存量
+ * AC 总数，名次几乎不动，中位学生看一眼就知道追不上，等于负反馈。这张榜的分母是
+ * 「这一周」，谁都可能进前十。
+ *
+ * 「首次 AC」是靠 NOT EXISTS 排掉本周之前已经通过过的 (user, problem) 对，不是简单
+ * 数本周 AC 的去重题数 —— 后者把老题重交一遍也算成绩，一分钟能刷满一屏。
+ * 相关子查询的四个条件正好是 `submission_public_metrics_idx`
+ * （user_id, problem_id, result, create_time，WHERE contest_id IS NULL）的全部列，
+ * 而且外层已经把行数收在「本周的 AC」这一小撮上，不会退化成按人全表回查。
+ */
+accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
+  const user = c.get("user")
+  const scope = c.req.query("scope") === "class" ? "class" : "global"
+  const className = scope === "class" ? (user?.className ?? null) : null
+  if (scope === "class" && !className)
+    return failure(c, 400, "class-missing", "用户没有班级信息")
+
+  const start = weekStart()
+
+  // 入榜人群与全服榜一致（leaderboardWhere）：正常状态的学生与学生管理员
+  const audience = and(
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
+    eq(schema.user.isDisabled, false),
+    className ? eq(schema.user.className, className) : undefined,
+  )
+  const thisWeek = and(
+    isNull(schema.submission.contestId),
+    gte(schema.submission.createTime, start),
+    audience,
+  )
+
+  const earlier = alias(schema.submission, "earlier")
+  const [solvedRows, submittedRows] = await Promise.all([
+    db
+      .select({
+        userId: schema.submission.userId,
+        username: schema.user.username,
+        value: countDistinct(schema.submission.problemId),
+      })
+      .from(schema.submission)
+      .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+      .where(
+        and(
+          thisWeek,
+          inArray(schema.submission.result, ACCEPTED_RESULTS),
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(earlier)
+              .where(
+                and(
+                  eq(earlier.userId, schema.submission.userId),
+                  eq(earlier.problemId, schema.submission.problemId),
+                  isNull(earlier.contestId),
+                  inArray(earlier.result, ACCEPTED_RESULTS),
+                  lt(earlier.createTime, start),
+                ),
+              ),
+          ),
+        ),
+      )
+      .groupBy(schema.submission.userId, schema.user.username),
+    db
+      .select({ userId: schema.submission.userId, value: count() })
+      .from(schema.submission)
+      .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+      .where(thisWeek)
+      .groupBy(schema.submission.userId),
+  ])
+
+  const submissions = new Map(
+    submittedRows.map((row) => [row.userId, row.value]),
+  )
+  /**
+   * 排序键与全服榜同构：解决多的在前 → 同解决数时提交少的在前 → 再同按 id。
+   * 第三档同样不是凑数，周榜上「都是 1 题」的学生成片存在，没有稳定兜底键时
+   * postgres 每次返回的顺序可以不同，刷新一下名次就变了。
+   */
+  const ranked = solvedRows
+    .sort(
+      (a, b) =>
+        b.value - a.value ||
+        (submissions.get(a.userId) ?? 0) - (submissions.get(b.userId) ?? 0) ||
+        a.userId - b.userId,
+    )
+    .map(
+      (row, index) =>
+        ({
+          user: sampleUser({ id: row.userId, username: row.username }, null),
+          solvedCount: row.value,
+          submissionCount: submissions.get(row.userId) ?? 0,
+          rank: index + 1,
+        }) satisfies WeeklyRankItem,
+    )
+
+  return success(c, {
+    start,
+    scope,
+    className,
+    total: ranked.length,
+    results: ranked.slice(0, WEEKLY_BOARD_SIZE),
+    me: ranked.find((row) => row.user.id === user?.id) ?? null,
+  } satisfies WeeklyRank)
 })
 
 accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {

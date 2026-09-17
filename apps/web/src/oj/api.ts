@@ -11,6 +11,7 @@ import {
   type ClassRankItem,
   type ClassUserRank,
   type UserRank,
+  type WeeklyRank,
   type ProblemRank,
   type CreateSubmissionResponse,
   type ProblemAuthor,
@@ -207,6 +208,14 @@ export function getActivityRank(start: string) {
   return api.get<ActivityRankItem[]>("rankings/activity", {
     params: { start },
   })
+}
+
+/**
+ * 本周进步榜。`scope` 只有两个取值，服务端认不出的一律当 global ——
+ * 班级榜要求调用者有班级，教师/超管拿到的是 400，所以别在没班级时切过去。
+ */
+export function getWeeklyRank(scope: "global" | "class") {
+  return api.get<WeeklyRank>("rankings/weekly", { params: { scope } })
 }
 
 export function getClassRank(grade?: number | null) {
