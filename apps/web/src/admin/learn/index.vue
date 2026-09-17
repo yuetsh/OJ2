@@ -28,6 +28,8 @@ const type = ref<"python" | "c">("python")
 // 3-4 位是具体班级，1-2 位当年级前缀（后端 classFilter 分的岔）
 const className = ref("")
 const tab = ref("students")
+// 按学生那张表的姓名/学号搜索，纯前端过滤（整表本来就一次拉完）
+const keyword = ref("")
 
 const loading = ref(false)
 const students = ref<LearnStudentProgress[]>([])
@@ -47,6 +49,18 @@ const typeOptions = [
 const startedCount = computed(
   () => students.value.filter((row) => row.readCount > 0).length,
 )
+
+// 姓名和学号都已经在手里，不再打接口。学号是纯数字，姓名是中文，
+// 一个框同时匹配两列就够了 —— 老师要么记得学号要么记得名字
+const filteredStudents = computed(() => {
+  const value = keyword.value.trim().toLowerCase()
+  if (!value) return students.value
+  return students.value.filter(
+    (row) =>
+      row.username.toLowerCase().includes(value) ||
+      (row.realName ?? "").toLowerCase().includes(value),
+  )
+})
 
 const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
   { title: "班级", key: "className", width: 90, sorter: "default" },
@@ -300,10 +314,21 @@ onMounted(load)
 
   <n-tabs v-model:value="tab" type="line" animated>
     <n-tab-pane name="students" tab="按学生">
+      <n-flex align="center" style="margin-bottom: 12px">
+        <n-input
+          v-model:value="keyword"
+          placeholder="搜索姓名或学号"
+          clearable
+          style="width: 200px"
+        />
+        <n-text v-if="keyword.trim()" depth="3">
+          找到 {{ filteredStudents.length }} 人
+        </n-text>
+      </n-flex>
       <n-data-table
         :loading="loading"
         :columns="studentColumns"
-        :data="students"
+        :data="filteredStudents"
         :row-key="(row: LearnStudentProgress) => row.userId"
         striped
         :pagination="{ pageSize: 20 }"

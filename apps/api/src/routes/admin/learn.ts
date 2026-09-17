@@ -123,7 +123,11 @@ adminLearnRoutes.get("/learn-analytics/students", requireTeacher, async (c) => {
         schema.user.username,
         schema.userProfile.realName,
         schema.user.className,
-      ),
+      )
+      // 前端默认按「已读」升序排，同分的一大批（尤其一堆 0）就落回这里的次序。
+      // 不给 orderBy 的话那是聚合吐出来的任意顺序，刷一次换一个样 —— 按班级、
+      // 学号排稳住它。className 为空的（推不出班级的）ASC 默认排在最后
+      .orderBy(asc(schema.user.className), asc(schema.user.username)),
     db
       .select({
         userId: schema.exerciseAttempt.userId,
