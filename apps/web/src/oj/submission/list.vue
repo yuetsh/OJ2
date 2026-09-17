@@ -183,6 +183,7 @@ async function listSubmissions() {
   } finally {
     loading.value = false
   }
+  consumePendingJump()
 }
 
 async function getTodayCount() {
@@ -257,6 +258,73 @@ function showCodePanel(id: string, problem: string) {
   submissionID.value = id
   problemDisplayID.value = problem
 }
+
+/**
+ * 代码详情的键盘翻阅。老师看一个班的提交时原来是「点开 → 看 → 关掉 → 再点下一行」，
+ * 这里让弹框开着就能上下切换，走到本页头尾自动翻页续上。
+ *
+ * 只在**能看代码**的行之间走 —— showLink 是后端按题单规则算出来的，
+ * 跳到一条看不了的上面只会得到一个空弹框。
+ */
+const viewableSubmissions = computed(() =>
+  submissions.value.filter((row) => row.showLink),
+)
+const currentCodeIndex = computed(() =>
+  viewableSubmissions.value.findIndex((row) => row.id === submissionID.value),
+)
+const maxPage = computed(() => Math.ceil(total.value / query.limit))
+
+// 翻页是异步的，所以先记下「落地后停在哪一头」，等新一页的数据回来再开
+let pendingJump: "first" | "last" | null = null
+
+function consumePendingJump() {
+  const jump = pendingJump
+  pendingJump = null
+  if (!jump || !codePanel.value) return
+  const list = viewableSubmissions.value
+  const row = jump === "first" ? list[0] : list[list.length - 1]
+  // 整页都是看不了代码的（题单没做出来那批），此时保持弹框里原来那条不动
+  if (!row) {
+    message.info("这一页没有可以查看的代码")
+    return
+  }
+  showCodePanel(row.id, row.problem)
+}
+
+function moveCodePanel(step: 1 | -1) {
+  const index = currentCodeIndex.value
+  if (index === -1) return
+  const next = viewableSubmissions.value[index + step]
+  if (next) {
+    showCodePanel(next.id, next.problem)
+    return
+  }
+  const page = query.page + step
+  if (page < 1 || page > maxPage.value) return
+  pendingJump = step > 0 ? "first" : "last"
+  query.page = page // 监听器会去 listSubmissions，回来后 consumePendingJump 接手
+}
+
+// 上下（和左右）翻阅代码详情。Esc 关弹框是 n-modal 自带的，不用管。
+// 弹框没开就什么都不做，页面正常滚动
+onKeyStroke(
+  ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"],
+  (e: KeyboardEvent) => {
+    if (!codePanel.value) return
+    // 焦点在输入框里（弹框底下那几个筛选框）时不抢方向键
+    const target = e.target as HTMLElement | null
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    ) {
+      return
+    }
+    e.preventDefault()
+    moveCodePanel(e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1)
+  },
+)
 
 function showScoreDetail(id: string) {
   selectedFlowchartId.value = id
@@ -675,9 +743,24 @@ const flowchartColumns = computed(() => {
     preset="card"
     :style="{ maxWidth: isDesktop && '70vw', maxHeight: '80vh' }"
     :content-style="{ overflow: 'auto' }"
-    title="代码详情"
   >
+    <template #header>
+      <n-flex align="center" :size="12">
+        <n-text>代码详情</n-text>
+        <n-text v-if="isDesktop && viewableSubmissions.length > 1" depth="3">
+          <span class="shortcut-hint">
+            本页第 {{ currentCodeIndex + 1 }} / {{ viewableSubmissions.length }}
+            条 · ↑ ↓ ← → 切换上下一条 · Esc 关闭
+          </span>
+        </n-text>
+      </n-flex>
+    </template>
+    <!--
+      key 换掉才会重新拉代码 —— detail.vue 只在 onMounted 里取一次，
+      键盘切换时不换 key 的话弹框里还是上一条的代码
+    -->
     <SubmissionDetail
+      :key="submissionID"
       :problemID="problemDisplayID"
       :submissionID="submissionID"
       hideList
@@ -712,6 +795,11 @@ const flowchartColumns = computed(() => {
 .code {
   font-size: 20px;
   overflow: auto;
+}
+
+.shortcut-hint {
+  font-size: 13px;
+  font-weight: normal;
 }
 
 .flowchart-iframe {
