@@ -7,6 +7,7 @@ import {
   completeAnyWord,
 } from "@codemirror/autocomplete"
 import type { EditorView } from "@codemirror/view"
+import type { Extension } from "@codemirror/state"
 import type { LANGUAGE } from "utils/types"
 import { oneDark } from "../themes/oneDark"
 import { smoothy } from "../themes/smoothy"
@@ -26,6 +27,8 @@ interface Props {
   height?: string
   readonly?: boolean
   placeholder?: string
+  /** 追加的 CodeMirror 扩展。传一个稳定的数组实例，每次渲染新建会让编辑器反复重配 */
+  extraExtensions?: Extension[]
   /**
    * 当前这个编辑器属于哪道题（题目的展示 ID）。
    *
@@ -43,6 +46,7 @@ const {
   height = "100%",
   readonly = false,
   placeholder = "",
+  extraExtensions = [],
   problemId = "",
 } = defineProps<Props>()
 const code = defineModel<string>("value")
@@ -59,6 +63,7 @@ const extensions = computed(() => [
     override: [enhanceCompletion(language), completeAnyWord],
   }),
   getInitialExtension(),
+  ...extraExtensions,
 ])
 
 interface EditorReadyPayload {

@@ -8,6 +8,7 @@ import SyncCodeEditor from "shared/components/SyncCodeEditor.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
+import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import Form from "./Form.vue"
 
 const FlowchartEditor = defineAsyncComponent(
@@ -98,6 +99,11 @@ function loadCode() {
       problem.value!.template[codeStore.code.language] ||
       SOURCES[codeStore.code.language],
   )
+  // 换了题才重新计数，同一道题重复 loadCode（协作结束读回草稿）是接着记
+  beginEditTrace(
+    `problem_${problem.value!._id}_contest_${contestID}`,
+    codeStore.code.value.length,
+  )
 }
 
 onMounted(loadCode)
@@ -151,6 +157,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
       :language="codeStore.code.language"
       :problem-id="problem!._id"
       :height="editorHeight"
+      :extra-extensions="editTraceExtensions"
       @update:model-value="changeCode"
     />
   </n-flex>

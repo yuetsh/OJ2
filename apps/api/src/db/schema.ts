@@ -953,6 +953,44 @@ export const submission = pgTable(
   ],
 )
 
+/**
+ * 提交时附带的编辑过程信号，和 submission 一对一。字段含义见契约的
+ * `submissionTraceSchema`，这里只记表本身的取舍：
+ *
+ * - **没有行 ≠ 可疑。** 2026-09 之前的全部历史提交、刷新过页面的、老版本前端交的
+ *   都没有 trace，用它的地方一律把「缺失」当「无数据」。
+ * - 类型化的列而不是一个 jsonb：「可信 AC」和学情热力图要在 SQL 里按这些值筛、聚合。
+ * - `since_prev_ms` 是唯一由**服务端**算的一列（距同一用户同一道题上一次提交），
+ *   客户端伪造不了；这道题的第一次提交为 null。
+ * - CASCADE 挂在 submission 上、不挂 user：它是提交的附属，提交没了它没有意义，
+ *   人是谁顺着 submission 就能查到。同表的 message / problemset_submission 也是这一档。
+ */
+export const submissionTrace = pgTable(
+  "submission_trace",
+  {
+    submissionId: text("submission_id").primaryKey().notNull(),
+    activeMs: integer("active_ms").notNull(),
+    sinceOpenMs: integer("since_open_ms").notNull(),
+    typedChars: integer("typed_chars").notNull(),
+    pastedChars: integer("pasted_chars").notNull(),
+    pasteCount: integer("paste_count").notNull(),
+    maxPaste: integer("max_paste").notNull(),
+    deletedChars: integer("deleted_chars").notNull(),
+    blurCount: integer("blur_count").notNull(),
+    initialLen: integer("initial_len").notNull(),
+    collab: boolean().notNull(),
+    // bigint：int4 的毫秒数只够 24.8 天，隔一个假期回来重交就溢出了
+    sincePrevMs: bigint("since_prev_ms", { mode: "number" }),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.submissionId],
+      foreignColumns: [submission.id],
+      name: "submission_trace_submission_id_fk_submission_id",
+    }).onDelete("cascade"),
+  ],
+)
+
 export const tutorial = pgTable(
   "tutorial",
   {

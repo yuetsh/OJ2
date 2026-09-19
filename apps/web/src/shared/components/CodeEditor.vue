@@ -4,6 +4,7 @@ import { python } from "@codemirror/lang-python"
 import { sql, SQLite } from "@codemirror/lang-sql"
 import { bracketMatching } from "@codemirror/language"
 import { Codemirror } from "vue-codemirror"
+import type { Extension } from "@codemirror/state"
 import {
   autocompletion,
   closeBrackets,
@@ -21,6 +22,8 @@ interface Props {
   height?: string
   readonly?: boolean
   placeholder?: string
+  /** 追加的 CodeMirror 扩展。传一个稳定的数组实例，每次渲染新建会让编辑器反复重配 */
+  extraExtensions?: Extension[]
 }
 
 const {
@@ -29,6 +32,7 @@ const {
   height = "100%",
   readonly = false,
   placeholder = "",
+  extraExtensions = [],
 } = defineProps<Props>()
 const code = defineModel<string>("value")
 
@@ -49,6 +53,7 @@ const extensions = computed(() => [
     override: [enhanceCompletion(language), completeAnyWord],
   }),
   isDark.value ? oneDark : smoothy,
+  ...extraExtensions,
 ])
 </script>
 

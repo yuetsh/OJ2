@@ -12,6 +12,8 @@ import SubmissionResult from "./SubmissionResult.vue"
 import { getSubmitButtonState } from "./submitButtonState"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
+import { useCollabStore } from "shared/store/collab"
+import { restartEditTrace, snapshotEditTrace } from "oj/problem/utils/editTrace"
 import {
   checkPythonSyntax,
   prefetchPythonSyntaxChecker,
@@ -24,6 +26,7 @@ const ProblemReaction = defineAsyncComponent(
 
 // ==================== 基础状态 ====================
 const userStore = useUserStore()
+const collabStore = useCollabStore()
 const codeStore = useCodeStore()
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
@@ -147,6 +150,11 @@ async function submit() {
     problemId: problem.value!.id,
     language: codeStore.code.language,
     code: codeStore.code.value,
+    // 编辑过程信号，见 utils/editTrace.ts。协作的判断和 ProblemEditor 的 collabHere 同一个口径
+    trace: snapshotEditTrace(
+      collabStore.room !== null &&
+        collabStore.room.problemId === problem.value!._id,
+    ),
   }
   if (contestID) {
     data.contestId = parseInt(contestID)
@@ -161,6 +169,8 @@ async function submit() {
   try {
     const res = await submitCode(data)
     console.log(`[Submit] 代码已提交: ID=${res.submissionId}`)
+    // 交上了才清零；被限流 / 网络失败的话这一段接着记，下次提交一起报
+    restartEditTrace(codeStore.code.value.length)
 
     // 3. 启动冷却 + 监控
     startCooldown()

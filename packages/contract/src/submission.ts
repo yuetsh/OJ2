@@ -79,6 +79,36 @@ export const statisticInfoSchema = z.looseObject({
     .optional(),
 })
 
+/**
+ * 编辑过程的聚合信号，落进 `submission_trace`。**只有计数，不含任何按键内容。**
+ *
+ * 口径是「自上次提交以来」的增量（前端每次提交成功后清零，切题也清零），
+ * 所以同一道题连交几次，每条提交各记各的那一段。
+ *
+ * 全部来自客户端，**可以伪造** —— 这是接受了的：它只用来给「可信 AC」加权、
+ * 给老师提示「建议关注」，不单独判任何事。服务端自己算的间隔另见 `since_prev_ms`。
+ */
+export const submissionTraceSchema = z.object({
+  /** 活跃编辑时长：相邻两次编辑间隔不超过 60 秒才累加，页面不可见时不计 */
+  activeMs: z.number().int().min(0).max(1e8),
+  /** 打开这道题（或上次提交）到这次提交的墙钟时长 */
+  sinceOpenMs: z.number().int().min(0).max(1e9),
+  /** 键入、输入法上屏、补全插入的字符数 */
+  typedChars: z.number().int().min(0).max(1e7),
+  /** 粘贴、从外部拖入的字符数 */
+  pastedChars: z.number().int().min(0).max(1e7),
+  pasteCount: z.number().int().min(0).max(1e5),
+  /** 单次最大粘贴的字符数 */
+  maxPaste: z.number().int().min(0).max(1e7),
+  deletedChars: z.number().int().min(0).max(1e7),
+  /** 页面切到后台的次数（切标签页、切窗口、最小化）。只作辅助，别单独拿来说事 */
+  blurCount: z.number().int().min(0).max(1e5),
+  /** 这一段开始时编辑器里已有的字符数（本地草稿 / 模板 / 上次提交后的代码） */
+  initialLen: z.number().int().min(0).max(1e7),
+  /** 提交时这道题正在课堂协作中。老师替学生交的那条也会是 true，统计时要排掉 */
+  collab: z.boolean(),
+})
+
 export const createSubmissionRequestSchema = z.object({
   problemId: z.number().int().positive(),
   /**
@@ -102,6 +132,13 @@ export const createSubmissionRequestSchema = z.object({
    * 所以这里带错了顶多是标记不准，不会影响成绩。
    */
   problemSetId: z.number().int().positive().optional(),
+  /**
+   * 编辑过程信号，见 submissionTraceSchema。**坏了就当没带**（`.catch`）：
+   * 整个请求体是一把 safeParse，这里要是能 400，一份附带的统计数据就能挡住
+   * 学生交作业。刷新过页面、老版本前端、脚本提交都会没有它，那是「无数据」，
+   * 不是「可疑」。
+   */
+  trace: submissionTraceSchema.optional().catch(undefined),
 })
 
 export const createSubmissionResponseSchema = z.object({
@@ -384,6 +421,7 @@ export const formatCodeRequestSchema = z.object({
 export const formatCodeResponseSchema = z.object({ code: z.string() })
 
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
+export type SubmissionTrace = z.infer<typeof submissionTraceSchema>
 export type CreateSubmissionRequest = z.infer<
   typeof createSubmissionRequestSchema
 >

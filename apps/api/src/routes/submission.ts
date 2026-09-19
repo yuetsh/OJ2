@@ -8,6 +8,7 @@ import {
   type SubmissionDetail,
   type SubmissionList,
   type SubmissionListItem,
+  type SubmissionTrace,
 } from "@oj2/contract"
 import {
   and,
@@ -57,6 +58,38 @@ function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {}
+}
+
+/**
+ * 落编辑过程信号。**失败只记日志、不影响提交** —— 这是附带的统计数据，
+ * 提交已经进库了，不能因为它回一个 500 让学生以为没交上。
+ *
+ * `since_prev_ms` 在同一条 INSERT 里用子查询算，排掉刚插进去的这条自己；
+ * 两次提交并发到达时也各自取到的是对方之外的最近一条。这道题第一次提交时
+ * `max()` 为 null，列就是 null。
+ */
+async function saveTrace(
+  submissionId: string,
+  userId: number,
+  problemId: number,
+  createTime: string,
+  trace: SubmissionTrace,
+) {
+  try {
+    await db.insert(schema.submissionTrace).values({
+      submissionId,
+      ...trace,
+      sincePrevMs: sql`(
+        select (extract(epoch from ${createTime}::timestamptz - max(${schema.submission.createTime})) * 1000)::bigint
+        from ${schema.submission}
+        where ${schema.submission.userId} = ${userId}
+          and ${schema.submission.problemId} = ${problemId}
+          and ${schema.submission.id} <> ${submissionId}
+      )`,
+    })
+  } catch (error) {
+    console.error("Failed to record submission trace", error)
+  }
 }
 
 submissionRoutes.post("/submissions", requireAuth, async (c) => {
@@ -167,6 +200,15 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     statisticInfo: {},
     contestId,
   })
+
+  if (parsed.data.trace)
+    await saveTrace(
+      submissionId,
+      user.id,
+      problem.id,
+      createTime,
+      parsed.data.trace,
+    )
 
   try {
     await judgeQueue.add(
