@@ -1,3 +1,4 @@
+import type { JudgeStatusValue } from "@oj2/contract"
 import type { AchievementRarity, SUBMISSION_RESULT, ReactionKey } from "./types"
 
 // 与后端 judge/status.ts 的 JudgeStatus 逐条对齐（submitting 除外，见下）。
@@ -20,6 +21,18 @@ export enum SubmissionStatus {
   submitting = 9,
   ast_check_failed = 10,
 }
+
+// 编译期对齐契约：契约加/改一个码而这里没跟，下面两行会当场编译不过。
+type SyncedWithContract =
+  Exclude<
+    `${SubmissionStatus}`,
+    `${SubmissionStatus.submitting}`
+  > extends `${JudgeStatusValue}`
+    ? `${JudgeStatusValue}` extends `${Exclude<SubmissionStatus, SubmissionStatus.submitting>}`
+      ? true
+      : never
+    : never
+export const _submissionStatusSynced: SyncedWithContract = true
 
 export enum ContestStatus {
   initial = "2", // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位

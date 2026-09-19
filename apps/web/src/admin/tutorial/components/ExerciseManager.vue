@@ -391,7 +391,7 @@ function typeTagType(type: ExerciseType) {
               {{ typeName(ex.type) }}
             </n-tag>
             <n-text style="margin-left: 10px">
-              {{ (ex.data as any).question }}
+              {{ (ex.data as { question?: string }).question }}
             </n-text>
           </div>
           <n-space :size="8">

@@ -1,22 +1,8 @@
 import { z } from "zod"
 
 import { paginatedSchema } from "./common"
+import { judgeStatusSchema, type JudgeStatus } from "./judge-status"
 import { problemLanguageSchema } from "./language"
-
-export const judgeStatusSchema = z.union([
-  z.literal(-2),
-  z.literal(-1),
-  z.literal(0),
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(4),
-  z.literal(5),
-  z.literal(6),
-  z.literal(7),
-  z.literal(8),
-  z.literal(10),
-])
 
 /**
  * 判题机原始输出（`submission.info` 的 JSONB 原文）。**只是类型，不作运行时校验。**
@@ -397,7 +383,6 @@ export const formatCodeRequestSchema = z.object({
 
 export const formatCodeResponseSchema = z.object({ code: z.string() })
 
-export type JudgeStatus = z.infer<typeof judgeStatusSchema>
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type CreateSubmissionRequest = z.infer<
   typeof createSubmissionRequestSchema

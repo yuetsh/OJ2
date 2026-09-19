@@ -1,19 +1,8 @@
-export const JudgeStatus = {
-  COMPILE_ERROR: -2,
-  WRONG_ANSWER: -1,
-  ACCEPTED: 0,
-  CPU_TIME_LIMIT_EXCEEDED: 1,
-  REAL_TIME_LIMIT_EXCEEDED: 2,
-  MEMORY_LIMIT_EXCEEDED: 3,
-  RUNTIME_ERROR: 4,
-  SYSTEM_ERROR: 5,
-  PENDING: 6,
-  JUDGING: 7,
-  PARTIALLY_ACCEPTED: 8,
-  AST_CHECK_FAILED: 10,
-} as const
+import { JudgeStatus, type JudgeStatusValue } from "@oj2/contract"
 
-export type JudgeStatusValue = (typeof JudgeStatus)[keyof typeof JudgeStatus]
+// 状态码的唯一一份在 packages/contract/src/judge-status.ts，这里只再导出，
+// 省得二十几处 import 一起改
+export { JudgeStatus, type JudgeStatusValue }
 
 export function isAccepted(result: number) {
   return (
@@ -22,7 +11,7 @@ export function isAccepted(result: number) {
 }
 
 /**
- * 判题状态的中文名，和前端 `utils/constants.ts` 的 `JUDGE_STATUS` 一致，两边必须同步。
+ * 判题状态的中文名，和前端 `utils/constants.ts` 的 `JUDGE_STATUS` 措辞对应（状态码本身已收进契约，名字仍是两份）。
  * 目前只用在喂给模型的 prompt 里 —— 原来那里拼的是裸状态码（`结果：-1`），
  * 模型根本不知道 -1 是「答案错误」还是别的什么，等于白给一条信息。
  */

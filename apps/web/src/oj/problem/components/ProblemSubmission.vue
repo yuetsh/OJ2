@@ -298,7 +298,7 @@ watch(query, listSubmissions)
       <n-tag
         v-for="item in statusDistribution"
         :key="item.result"
-        :type="item.type as any"
+        :type="item.type"
         size="small"
         round
       >

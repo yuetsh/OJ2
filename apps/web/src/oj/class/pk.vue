@@ -26,6 +26,7 @@ import {
   Legend,
   Colors,
   Filler,
+  type TooltipItem,
 } from "chart.js"
 
 // 注册Chart.js组件
@@ -673,9 +674,12 @@ const radarChartOptions = {
     },
     tooltip: {
       callbacks: {
-        label: function (context: any) {
-          const dataset = context.dataset as any
-          const rawValue = dataset?.rawData?.[context.dataIndex]
+        label: function (context: TooltipItem<"radar">) {
+          // rawData 是我们自己塞进 dataset 的扩展字段，chart.js 的类型里没有
+          const dataset = context.dataset as typeof context.dataset & {
+            rawData?: (number | null)[]
+          }
+          const rawValue = dataset.rawData?.[context.dataIndex]
           const metric = context.label || ""
           const isRate = context.dataIndex >= 3
           if (rawValue === undefined || rawValue === null) {

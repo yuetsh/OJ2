@@ -198,6 +198,7 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
     studentId?: unknown
     language?: unknown
     reason?: unknown
+    timestamp?: unknown
   }
   try {
     message = JSON.parse(raw) as typeof message
@@ -213,9 +214,7 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
 
   // 心跳不查库，和 /ws/submissions 的处理一致
   if (message.type === "ping") {
-    ws.send(
-      JSON.stringify({ type: "pong", timestamp: (message as any).timestamp }),
-    )
+    ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
     return
   }
 

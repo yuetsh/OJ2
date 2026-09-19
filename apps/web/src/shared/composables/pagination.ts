@@ -42,11 +42,13 @@ export function usePagination<T extends Record<string, any>>(
     limit: parseInt(<string>route.query.limit) || defaultLimit,
     ...initialQuery,
   }) as unknown as T & PaginationQuery
+  // 键是运行时按 initialQuery 枚举出来的，静态类型写不出来；写入统一走这一个口子
+  const writable = query as Record<string, unknown>
 
   // 同步 URL 查询参数到本地状态
   function syncFromRoute() {
-    ;(query as any).page = parseInt(<string>route.query.page) || defaultPage
-    ;(query as any).limit = parseInt(<string>route.query.limit) || defaultLimit
+    writable.page = parseInt(<string>route.query.page) || defaultPage
+    writable.limit = parseInt(<string>route.query.limit) || defaultLimit
 
     // 同步其他查询参数
     Object.keys(initialQuery).forEach((key) => {
@@ -54,11 +56,11 @@ export function usePagination<T extends Record<string, any>>(
       if (value !== undefined) {
         // 处理不同类型的参数
         if (typeof initialQuery[key] === "boolean") {
-          ;(query as any)[key] = value === "1" || value === "true"
+          writable[key] = value === "1" || value === "true"
         } else if (typeof initialQuery[key] === "number") {
-          ;(query as any)[key] = parseInt(<string>value) || initialQuery[key]
+          writable[key] = parseInt(<string>value) || initialQuery[key]
         } else {
-          ;(query as any)[key] = <string>value || initialQuery[key]
+          writable[key] = <string>value || initialQuery[key]
         }
       }
     })
@@ -75,7 +77,7 @@ export function usePagination<T extends Record<string, any>>(
 
   // 重置页码到第一页
   function resetPage() {
-    ;(query as any).page = defaultPage
+    writable.page = defaultPage
   }
 
   // 清空所有查询条件（除了分页参数）
@@ -83,13 +85,13 @@ export function usePagination<T extends Record<string, any>>(
     Object.keys(initialQuery).forEach((key) => {
       const initialValue = initialQuery[key]
       if (typeof initialValue === "string") {
-        ;(query as any)[key] = ""
+        writable[key] = ""
       } else if (typeof initialValue === "boolean") {
-        ;(query as any)[key] = false
+        writable[key] = false
       } else if (typeof initialValue === "number") {
-        ;(query as any)[key] = 0
+        writable[key] = 0
       } else {
-        ;(query as any)[key] = initialValue
+        writable[key] = initialValue
       }
     })
     resetPage()
