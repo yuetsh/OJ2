@@ -28,6 +28,7 @@ import {
   isNull,
   lt,
   lte,
+  max,
   min,
   ne,
   notExists,
@@ -196,16 +197,11 @@ accountRoutes.post("/me/avatar", requireAuth, async (c) => {
 
 accountRoutes.get("/users/:id/metrics", async (c) => {
   const userId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // 学习天数连比赛提交一起算；首末提交时间照旧只看比赛外的提交
-  const outsideContest = sql`filter (where ${schema.submission.contestId} is null)`
+  // 比赛提交也算：首末提交时间、学习天数都连比赛一起统计
   const [row] = await db
     .select({
-      first: sql<
-        string | null
-      >`min(${schema.submission.createTime}) ${outsideContest}`,
-      latest: sql<
-        string | null
-      >`max(${schema.submission.createTime}) ${outsideContest}`,
+      first: min(schema.submission.createTime),
+      latest: max(schema.submission.createTime),
       activeDays: countDistinct(
         sql`date(${localTime(schema.submission.createTime)})`,
       ),
