@@ -123,6 +123,12 @@ export const HINT_MIN_FAILURES = 3
 
 export const aiHintRequestSchema = z.object({ submissionId: z.string().min(1) })
 
+/**
+ * 学生对一条 AI 提示的评价（POST /ai/hint/:id/feedback）。提示的 id 由 /ai/hint 流的
+ * `done` 事件带回来。可以改票，以最后一次为准。
+ */
+export const aiHintFeedbackRequestSchema = z.object({ helpful: z.boolean() })
+
 export const classAnalysisRequestSchema = z.object({
   comparison: z.record(z.string(), z.unknown()),
 })
@@ -181,6 +187,7 @@ export type LoginSummary = z.infer<typeof loginSummarySchema>
 
 export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>
 export type AiHintRequest = z.infer<typeof aiHintRequestSchema>
+export type AiHintFeedbackRequest = z.infer<typeof aiHintFeedbackRequestSchema>
 export type ClassAnalysisRequest = z.infer<typeof classAnalysisRequestSchema>
 export type ClassPkAnalysisRequest = z.infer<
   typeof classPkAnalysisRequestSchema

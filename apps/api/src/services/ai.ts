@@ -51,16 +51,34 @@ export async function completeChat(system: string, user: string) {
   return payload.choices?.[0]?.message?.content?.trim() ?? ""
 }
 
+export interface StreamChatHooks {
+  /**
+   * 生成完整结束后调，拿到的是全文。**返回的对象会并进 `done` 事件**，
+   * 用来把落库之后才有的东西（比如 ai_hint 的 id）交给前端。
+   */
+  onComplete?: (value: string) => Promise<Record<string, unknown> | void>
+  /**
+   * 生成失败时调（没配 AI_KEY、provider 报错、流中途断掉）。只用来留痕，
+   * 抛出的异常会被吞掉 —— 记录失败不该再搅乱这条流本身的收尾。
+   */
+  onError?: (message: string) => Promise<void>
+}
+
 export function streamChat(
   system: string,
   user: string,
-  onComplete?: (value: string) => Promise<void>,
+  hooks: StreamChatHooks = {},
 ) {
   const encoder = new TextEncoder()
+  const reportError = (message: string) =>
+    hooks.onError?.(message).catch((error) => {
+      console.error("streamChat onError hook failed", error)
+    })
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (value: string) => controller.enqueue(encoder.encode(value))
       if (!config.aiKey) {
+        await reportError("缺少 AI_KEY")
         send(
           `data: ${JSON.stringify({ type: "error", message: "缺少 AI_KEY" })}\n\n`,
         )
@@ -127,12 +145,15 @@ export function streamChat(
           if (done) break
         }
         const full = chunks.join("").trim()
-        if (onComplete) await onComplete(full)
-        send(`data: ${JSON.stringify({ type: "done" })}\n\n`)
+        const extra = hooks.onComplete
+          ? await hooks.onComplete(full)
+          : undefined
+        send(`data: ${JSON.stringify({ ...extra, type: "done" })}\n\n`)
       } catch (error) {
-        send(
-          `data: ${JSON.stringify({ type: "error", message: error instanceof Error ? error.message : String(error) })}\n\n`,
-        )
+        const message = error instanceof Error ? error.message : String(error)
+        // 先留痕再回前端：客户端已经断开的话下面这个 send 自己也会抛
+        await reportError(message)
+        send(`data: ${JSON.stringify({ type: "error", message })}\n\n`)
       } finally {
         send("event: end\n\n")
         controller.close()

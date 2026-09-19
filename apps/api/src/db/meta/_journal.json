@@ -120,6 +120,13 @@
       "when": 1789817209482,
       "tag": "0016_add_submission_trace",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789818766735,
+      "tag": "0017_add_ai_hint",
+      "breakpoints": true
     }
   ]
 }

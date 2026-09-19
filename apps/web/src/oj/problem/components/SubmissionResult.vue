@@ -15,6 +15,7 @@ import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
 import { aiStreamError, consumeJSONEventStream } from "utils/stream"
+import { submitHintFeedback } from "oj/api"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { useDark } from "@vueuse/core"
@@ -31,6 +32,10 @@ const theme = useThemeVars()
 const hintContent = ref("")
 const hintLoading = ref(false)
 const hintError = ref("")
+// 这条提示在 ai_hint 里的 id，生成完由 done 事件带回来；后端落库失败时没有，就不出评价按钮
+const hintId = ref<number | null>(null)
+const hintHelpful = ref<boolean | null>(null)
+const hintFeedbackSending = ref(false)
 
 // 错误信息格式化
 const msg = computed(() => {
@@ -95,6 +100,8 @@ watch(
     hintContent.value = ""
     hintError.value = ""
     hintLoading.value = false
+    hintId.value = null
+    hintHelpful.value = null
   },
 )
 
@@ -102,6 +109,8 @@ async function fetchHint(submissionId: string) {
   hintLoading.value = true
   hintContent.value = ""
   hintError.value = ""
+  hintId.value = null
+  hintHelpful.value = null
 
   try {
     const response = await fetch("/api/ai/hint", {
@@ -117,9 +126,12 @@ async function fetchHint(submissionId: string) {
         type: string
         content?: string
         message?: string
+        hintId?: number
       }) => {
         if (data.type === "delta" && data.content) {
           hintContent.value += data.content
+        } else if (data.type === "done") {
+          hintId.value = data.hintId ?? null
         } else if (data.type === "error") {
           hintError.value = data.message || "AI 提示生成失败"
         }
@@ -129,6 +141,22 @@ async function fetchHint(submissionId: string) {
     hintError.value = e.message || "请求失败"
   } finally {
     hintLoading.value = false
+  }
+}
+
+// 可以改票：点另一个就覆盖。失败了不打扰学生，按钮恢复原样就行 ——
+// 评价是给我们看的，不值得为它弹一条报错
+async function sendHintFeedback(helpful: boolean) {
+  if (hintId.value === null || hintFeedbackSending.value) return
+  if (hintHelpful.value === helpful) return
+  hintFeedbackSending.value = true
+  try {
+    await submitHintFeedback(hintId.value, helpful)
+    hintHelpful.value = helpful
+  } catch {
+    // 静默
+  } finally {
+    hintFeedbackSending.value = false
   }
 }
 
@@ -254,6 +282,30 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
           preview-theme="vuepress"
           :theme="isDark ? 'dark' : 'light'"
         />
+        <n-flex
+          v-if="hintId !== null && !hintLoading"
+          align="center"
+          size="small"
+          style="margin-top: 8px"
+        >
+          <n-text depth="3">这条提示对你有帮助吗？</n-text>
+          <n-button
+            size="tiny"
+            :type="hintHelpful === true ? 'primary' : 'default'"
+            :disabled="hintFeedbackSending"
+            @click="sendHintFeedback(true)"
+          >
+            有帮助
+          </n-button>
+          <n-button
+            size="tiny"
+            :type="hintHelpful === false ? 'warning' : 'default'"
+            :disabled="hintFeedbackSending"
+            @click="sendHintFeedback(false)"
+          >
+            没帮助
+          </n-button>
+        </n-flex>
       </n-card>
     </template>
   </div>

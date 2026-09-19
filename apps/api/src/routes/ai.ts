@@ -1,5 +1,6 @@
 import {
   aiAnalysisRequestSchema,
+  aiHintFeedbackRequestSchema,
   aiHintRequestSchema,
   classAnalysisRequestSchema,
   classPkAnalysisRequestSchema,
@@ -913,22 +914,60 @@ aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
   const system =
     "你是一个风趣的编程老师。请根据学生的详细数据和每周数据给出学习建议，最后写一句鼓励的话。使用 Markdown，不要放在代码块中。"
   const prompt = `详细数据: ${JSON.stringify({ ...details, solved: solved.results })}\n每周或每月数据: ${JSON.stringify(duration)}`
-  return streamChat(system, prompt, async (analysis) => {
-    // 报告归被分析的那个人，不归发起请求的人 —— 教师后台的 pin 和学生侧的
-    // GET /ai/pinned 都是按 user_id 找报告的，记在教师名下学生就永远看不到
-    await db.insert(schema.aiAnalysis).values({
-      provider: config.aiProvider,
-      model: config.aiModel,
-      data: { details, duration, solved: solved.results },
-      systemPrompt: system,
-      userPrompt: "学习详情与周期数据",
-      analysis,
-      createTime: new Date().toISOString(),
-      userId: user.id,
-      isPinned: false,
-    })
+  return streamChat(system, prompt, {
+    onComplete: async (analysis) => {
+      // 报告归被分析的那个人，不归发起请求的人 —— 教师后台的 pin 和学生侧的
+      // GET /ai/pinned 都是按 user_id 找报告的，记在教师名下学生就永远看不到
+      await db.insert(schema.aiAnalysis).values({
+        provider: config.aiProvider,
+        model: config.aiModel,
+        data: { details, duration, solved: solved.results },
+        systemPrompt: system,
+        userPrompt: "学习详情与周期数据",
+        analysis,
+        createTime: new Date().toISOString(),
+        userId: user.id,
+        isPinned: false,
+      })
+    },
   })
 })
+
+/**
+ * 改了 /ai/hint 的 system 或 prompt 拼法就把这个数加一，落进 ai_hint.prompt_version，
+ * 事后对比「改之前 / 改之后」的评价和做出率才分得开两批数据。
+ */
+const HINT_PROMPT_VERSION = 1
+
+/**
+ * 记一条提示（成功或失败）。**失败只打日志、返回 null** —— 留痕是附带的，
+ * 不能因为它写不进去就让学生看到「AI 提示生成失败」。
+ */
+async function recordHint(
+  submissionId: string,
+  startedAt: number,
+  content: string,
+  error: string | null,
+) {
+  try {
+    const [row] = await db
+      .insert(schema.aiHint)
+      .values({
+        submissionId,
+        model: config.aiModel,
+        promptVersion: HINT_PROMPT_VERSION,
+        content,
+        error,
+        durationMs: Math.round(performance.now() - startedAt),
+        createTime: new Date().toISOString(),
+      })
+      .returning({ id: schema.aiHint.id })
+    return row?.id ?? null
+  } catch (e) {
+    console.error("Failed to record AI hint", e)
+    return null
+  }
+}
 
 aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   const parsed = aiHintRequestSchema.safeParse(
@@ -989,7 +1028,50 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   const system =
     "你是编程助教。指出学生代码最关键的一个问题，循序渐进地提示，绝不直接给出核心算法或完整解法。输入读取错误可以直接给出正确片段。使用 Markdown，不超过6句话。"
   const prompt = `题目：${row.problem.title}\n描述：${row.problem.description.slice(0, 2000)}\n语言：${row.submission.language}\n结果：${judgeStatusName(row.submission.result)}\n错误：${String(objectValue(row.submission.statisticInfo).err_info ?? "无")}\n代码：${row.submission.code.slice(0, 2000)}`
-  return streamChat(system, prompt)
+  const submissionId = row.submission.id
+  const startedAt = performance.now()
+  return streamChat(system, prompt, {
+    onComplete: async (content) => {
+      const id = await recordHint(submissionId, startedAt, content, null)
+      // 落库失败就不带 id：前端据此不出评价按钮，提示本身照常显示
+      return id === null ? undefined : { hintId: id }
+    },
+    onError: async (message) => {
+      await recordHint(submissionId, startedAt, "", message)
+    },
+  })
+})
+
+aiRoutes.post("/ai/hint/:id/feedback", requireAuth, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = aiHintFeedbackRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  )
+  if (!id || !parsed.success)
+    return failure(c, 400, "invalid-request", "helpful is required")
+  // 只能评自己的提示：顺着 submission 核对是不是本人。别人的和不存在的一样回 404，
+  // 不透露那个 id 上有没有东西
+  const [updated] = await db
+    .update(schema.aiHint)
+    .set({
+      helpful: parsed.data.helpful,
+      feedbackTime: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(schema.aiHint.id, id),
+        inArray(
+          schema.aiHint.submissionId,
+          db
+            .select({ id: schema.submission.id })
+            .from(schema.submission)
+            .where(eq(schema.submission.userId, c.get("user")!.id)),
+        ),
+      ),
+    )
+    .returning({ id: schema.aiHint.id })
+  if (!updated) return failure(c, 404, "hint-not-found", "Hint not found")
+  return success(c, null)
 })
 
 aiRoutes.post("/ai/class-analysis", requireAuth, async (c) => {

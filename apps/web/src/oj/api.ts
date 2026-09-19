@@ -1,5 +1,6 @@
 import {
   type AiAnalysisRecord,
+  type AiHintFeedbackRequest,
   type Contest as OjContest,
   type ContestAccess,
   type ContestList,
@@ -378,6 +379,13 @@ export function getAILoginSummary() {
 
 export function getAIPinnedReport() {
   return api.get<AiAnalysisRecord | null>("ai/pinned")
+}
+
+/** 学生评价一条 AI 提示。id 来自 /ai/hint 流的 done 事件，可以改票 */
+export function submitHintFeedback(hintId: number, helpful: boolean) {
+  return api.post<null>(`ai/hint/${hintId}/feedback`, {
+    helpful,
+  } satisfies AiHintFeedbackRequest)
 }
 
 // ==================== 相似题目推荐 ====================

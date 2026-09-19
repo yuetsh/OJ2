@@ -991,6 +991,60 @@ export const submissionTrace = pgTable(
   ],
 )
 
+/**
+ * 每一次「让 AI 分析我的代码」（POST /ai/hint）的留痕，连同学生的评价。
+ *
+ * 在此之前提示一条都没落库，用了多少次、在哪些题上用、用完有没有做出来都无从知道；
+ * 之后要做的提示分级、错误归因都得拿这张表做对照。**生成失败的也记**（content 为空、
+ * error 有值），失败率是 AI 功能悄悄变差时最先动的那个数。
+ *
+ * - 不存 prompt 原文：学生代码在 submission 里、题面在 problem 里，重复存一遍没有意义。
+ *   存的是 `prompt_version` —— 改 system / prompt 的拼法时在 routes/ai.ts 里加一，
+ *   事后才分得清哪批提示是按哪版生成的。
+ * - 人和题顺着 submission 查（submission_id 上有索引）。和 submission_trace 一样
+ *   CASCADE 挂在提交上：提交没了，这条提示也就没有上下文了。
+ * - 同一条提交可以有多条：刷新页面之后按钮会重新出现。
+ */
+export const aiHint = pgTable(
+  "ai_hint",
+  {
+    id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+      name: "ai_hint_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: "9223372036854775807",
+      cache: 1,
+    }),
+    submissionId: text("submission_id").notNull(),
+    model: text().notNull(),
+    promptVersion: integer("prompt_version").notNull(),
+    // 生成失败时为空串，失败原因在 error
+    content: text().notNull(),
+    error: text(),
+    // 从收到请求到生成结束（或失败）的毫秒数
+    durationMs: integer("duration_ms").notNull(),
+    // 学生的评价：null = 没评
+    helpful: boolean(),
+    feedbackTime: timestamp("feedback_time", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createTime: timestamp("create_time", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+  },
+  (table) => [
+    index("ai_hint_submission_id_idx").on(table.submissionId),
+    foreignKey({
+      columns: [table.submissionId],
+      foreignColumns: [submission.id],
+      name: "ai_hint_submission_id_fk_submission_id",
+    }).onDelete("cascade"),
+  ],
+)
+
 export const tutorial = pgTable(
   "tutorial",
   {
