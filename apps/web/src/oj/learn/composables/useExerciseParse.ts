@@ -1,6 +1,6 @@
 import type { Exercise } from "utils/types"
 
-type Segment =
+export type Segment =
   { type: "md"; content: string } | { type: "exercise"; exercise: Exercise }
 
 export function parseExercises(

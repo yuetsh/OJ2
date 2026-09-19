@@ -1,14 +1,18 @@
 <template>
   <div class="learn-container">
-    <!-- 桌面端布局 -->
-    <n-grid
-      :cols="5"
-      :x-gap="16"
-      v-if="tutorial.id && isDesktop"
-      class="learn-grid"
-    >
-      <n-gi :span="1" class="learn-col">
-        <n-card title="教程目录" :bordered="false" size="small">
+    <template v-if="tutorial.id">
+      <!-- 桌面端：目录 | 正文（居中限宽） | 可收起的示例代码 -->
+      <div
+        v-if="isDesktop"
+        class="learn-layout"
+        :class="{ 'with-code': codeOpen }"
+      >
+        <aside class="rail">
+          <LearnSummary
+            :titles="titles"
+            :progress="progress"
+            :traced="traced"
+          />
           <LessonList
             :titles="titles"
             :step="step"
@@ -16,103 +20,60 @@
             :traced="traced"
             @select="goToLesson"
           />
-        </n-card>
-      </n-gi>
+        </aside>
 
-      <n-gi :span="tutorial.code ? 2 : 4" class="learn-col">
-        <n-card
-          :title="`第 ${step} 课：${titles[step - 1]?.title}`"
-          :bordered="false"
-          size="small"
-        >
-          <template v-for="(seg, i) in segments" :key="i">
-            <MdPreview
-              v-if="seg.type === 'md'"
-              preview-theme="vuepress"
-              :theme="isDark ? 'dark' : 'light'"
-              :model-value="seg.content"
-            />
-            <ExerciseWidget
-              v-else
-              :exercise="seg.exercise"
-              :lang="tutorial.type"
-            />
-          </template>
-        </n-card>
-      </n-gi>
+        <main class="reader">
+          <article class="reader-body">
+            <header class="lesson-head">
+              <n-text depth="3">第 {{ step }} / {{ titles.length }} 课</n-text>
+              <n-flex align="center" justify="space-between" :wrap="false">
+                <span />
+                <n-button
+                  v-if="tutorial.code"
+                  size="small"
+                  secondary
+                  @click="codeOpen = !codeOpen"
+                >
+                  {{ codeOpen ? "收起示例代码" : "展开示例代码" }}
+                </n-button>
+              </n-flex>
+            </header>
+            <LessonBody :segments="segments" :lang="tutorial.type" />
+          </article>
+          <PagerBar :step="step" :total="titles.length" @go="goToLesson" />
+        </main>
 
-      <n-gi :span="2" v-if="tutorial.code" class="learn-col learn-col--code">
-        <n-card
-          title="示例代码"
-          :bordered="false"
-          size="small"
-          class="code-card"
-          content-style="height: calc(100% - 44px); padding: 0;"
-        >
+        <aside v-if="tutorial.code && codeOpen" class="code-panel">
           <CodeEditor
             :language="editorLanguage"
             v-model="tutorial.code"
             height="100%"
           />
-        </n-card>
-      </n-gi>
-    </n-grid>
+        </aside>
+      </div>
 
-    <!-- 手机端布局 -->
-    <template v-if="tutorial.id && !isDesktop">
-      <n-tabs type="line" animated v-model:value="activeTab">
-        <n-tab-pane name="catalog" tab="目录">
-          <LessonList
-            :titles="titles"
-            :step="step"
-            :progress="progress"
-            :traced="traced"
-            @select="goToLesson"
-          />
-        </n-tab-pane>
-
-        <n-tab-pane name="content" :tab="`第 ${step} 课`">
-          <template v-for="(seg, i) in segments" :key="i">
-            <MdPreview
-              v-if="seg.type === 'md'"
-              preview-theme="vuepress"
-              :theme="isDark ? 'dark' : 'light'"
-              :model-value="seg.content"
+      <!-- 手机端 -->
+      <template v-else>
+        <LearnSummary :titles="titles" :progress="progress" :traced="traced" />
+        <n-tabs type="line" animated v-model:value="activeTab">
+          <n-tab-pane name="catalog" tab="目录">
+            <LessonList
+              :titles="titles"
+              :step="step"
+              :progress="progress"
+              :traced="traced"
+              @select="goToLesson"
             />
-            <ExerciseWidget
-              v-else
-              :exercise="seg.exercise"
-              :lang="tutorial.type"
-            />
-          </template>
-        </n-tab-pane>
-
-        <n-tab-pane name="code" tab="示例代码" v-if="tutorial.code">
-          <CodeEditor :language="editorLanguage" v-model="tutorial.code" />
-        </n-tab-pane>
-      </n-tabs>
-
-      <n-divider style="margin: 12px 0" />
-
-      <n-flex align="center" justify="space-between">
-        <n-button
-          secondary
-          type="primary"
-          :disabled="isFirstLesson"
-          @click="goToPrevLesson"
-        >
-          ← 上一课
-        </n-button>
-        <n-text>{{ step }} / {{ titles.length }}</n-text>
-        <n-button
-          secondary
-          type="primary"
-          :disabled="isLastLesson"
-          @click="goToNextLesson"
-        >
-          下一课 →
-        </n-button>
-      </n-flex>
+          </n-tab-pane>
+          <n-tab-pane name="content" :tab="`第 ${step} 课`">
+            <LessonBody :segments="segments" :lang="tutorial.type" />
+          </n-tab-pane>
+          <n-tab-pane name="code" tab="示例代码" v-if="tutorial.code">
+            <CodeEditor :language="editorLanguage" v-model="tutorial.code" />
+          </n-tab-pane>
+        </n-tabs>
+        <PagerBar :step="step" :total="titles.length" @go="goToLesson" />
+      </template>
     </template>
 
     <n-empty
@@ -124,8 +85,6 @@
 </template>
 
 <script setup lang="ts">
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
 import type {
   Tutorial,
   Exercise,
@@ -144,15 +103,13 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { useLearnProgress } from "shared/composables/learnProgress"
 import { useUserStore } from "shared/store/user"
 import LessonList from "./components/LessonList.vue"
-
-const ExerciseWidget = defineAsyncComponent(
-  () => import("./components/ExerciseWidget.vue"),
-)
+import LearnSummary from "./components/LearnSummary.vue"
+import LessonBody from "./components/LessonBody.vue"
+import PagerBar from "./components/PagerBar.vue"
 const CodeEditor = defineAsyncComponent(
   () => import("shared/components/CodeEditor.vue"),
 )
 
-const isDark = useDark()
 const route = useRoute()
 const router = useRouter()
 const { isDesktop } = useBreakpoints()
@@ -186,6 +143,8 @@ const titles = ref<{ id: number; title: string }[]>([])
 const progress = ref<Record<number, TutorialProgress>>({})
 const exercises = ref<Exercise[]>([])
 const activeTab = ref("content")
+// 示例代码栏默认展开，收起后正文独占版面；偏好记在本机
+const codeOpen = useStorage("oj2:learn-code-open", true)
 const isEmpty = ref(false)
 
 const segments = computed(() =>
@@ -198,22 +157,12 @@ useLearnTrace(
   traced,
 )
 
-const isFirstLesson = computed(() => step.value === 1)
-const isLastLesson = computed(() => step.value === titles.value.length)
-
 function goToLesson(lessonNumber: number) {
   activeTab.value = "content"
   router.push(
     `/learn/${type.value}/${lessonNumber.toString().padStart(2, "0")}`,
   )
 }
-function goToPrevLesson() {
-  if (step.value > 1) goToLesson(step.value - 1)
-}
-function goToNextLesson() {
-  if (step.value < titles.value.length) goToLesson(step.value + 1)
-}
-
 /**
  * 拉自己的自学留痕，给目录打勾。失败就当没有 —— 目录少几个勾不影响上课，
  * 但弹个错会把「我是不是没学」的焦虑塞给学生。
@@ -263,27 +212,58 @@ watch(traced, loadProgress)
 </script>
 
 <style scoped>
-/* 桌面端固定高度，让目录/内容/代码三栏各自内部滚动；移动端不限高，交给页面整体滚动 */
+/* 桌面端固定高度，目录/正文/代码各自内部滚动；移动端交给页面整体滚动 */
 @media (min-width: 769px) {
   .learn-container {
     height: calc(100vh - 138px);
   }
 }
 
-.learn-grid {
+.learn-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
   height: 100%;
 }
+.learn-layout.with-code {
+  grid-template-columns: 240px minmax(0, 1fr) minmax(360px, 40%);
+}
 
-.learn-col {
+.rail,
+.reader {
   overflow-y: auto;
   height: 100%;
 }
-
-.learn-col--code {
-  overflow-y: hidden;
+.reader {
+  display: flex;
+  flex-direction: column;
+}
+.reader-body {
+  flex: 1;
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.reader :deep(.pager) {
+  max-width: 820px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.code-card {
+.lesson-head h1,
+.mobile-title {
+  margin: 4px 0 12px;
+  font-size: 26px;
+  line-height: 1.3;
+}
+.mobile-title {
+  font-size: 20px;
+}
+
+.code-panel {
   height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
 }
 </style>

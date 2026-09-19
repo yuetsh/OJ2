@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { TUTORIAL_READ_SECONDS } from "@oj2/contract"
 import type { TutorialProgress } from "utils/types"
-import { readableDuration } from "utils/functions"
 
-defineProps<{
+const props = defineProps<{
   titles: { id: number; title: string }[]
   step: number
   /** 按教程 id 索引的自学留痕，未登录时是空的 */
@@ -14,70 +13,114 @@ defineProps<{
 
 const emit = defineEmits<{ select: [lesson: number] }>()
 
-// 打开过但一秒都没攒够时 readableDuration 给的是 "-"，「读了 -」不像人话。
-// 心跳 15 秒一跳，点开就走确实会落在 0 上
-function readSoFar(seconds: number) {
-  return seconds > 0 ? readableDuration(seconds) : "不到 1 分钟"
+type Status = "todo" | "reading" | "done"
+
+/**
+ * 三态：没打开过 / 读过但没读满或练习没做完 / 读满且练习全对。
+ * 没有练习的课只看阅读；「已读」的门槛沿用契约的 TUTORIAL_READ_SECONDS。
+ */
+function statusOf(id: number): Status {
+  const p = props.progress[id]
+  if (!p?.viewCount) return "todo"
+  const read = p.totalSeconds >= TUTORIAL_READ_SECONDS
+  const practiced = !p.exerciseTotal || p.exerciseSolved >= p.exerciseTotal
+  return read && practiced ? "done" : "reading"
+}
+
+function hint(id: number) {
+  const p = props.progress[id]
+  if (!p?.exerciseTotal) return ""
+  return `练一练 ${p.exerciseSolved}/${p.exerciseTotal}`
 }
 </script>
 
 <template>
-  <n-list hoverable clickable>
-    <n-list-item
+  <ol class="lessons">
+    <li
       v-for="(item, index) in titles"
       :key="item.id"
+      class="lesson"
+      :class="{ active: step === index + 1 }"
       @click="emit('select', index + 1)"
     >
-      <!-- 标题独占一行：目录栏只有屏幕的五分之一宽，把「已读」摆在同一行会把
-           中文标题挤成两截 -->
-      <n-flex vertical :size="2">
-        <n-text
-          :type="step === index + 1 ? 'primary' : undefined"
-          :strong="step === index + 1"
-        >
-          {{ index + 1 }}. {{ item.title }}
-        </n-text>
-        <!-- 每篇教程都有一条进度（没读过的是一行零），所以这里判的是读没读过，
-             不是有没有这条记录。
-             满 TUTORIAL_READ_SECONDS 才打 ✓：打开过但没读满的仍然显示时长，
-             只是不带勾、也不是成功色 —— 记是记下了，还没到「已读」 -->
-        <n-text
-          v-if="progress[item.id]?.totalSeconds >= TUTORIAL_READ_SECONDS"
-          type="success"
-          style="font-size: 12px"
-        >
-          ✓ 已读 · {{ readableDuration(progress[item.id].totalSeconds) }}
-        </n-text>
-        <n-text
-          v-else-if="progress[item.id]?.viewCount"
-          depth="3"
-          style="font-size: 12px"
-        >
-          读了 {{ readSoFar(progress[item.id].totalSeconds) }}
-        </n-text>
-        <n-text
-          v-if="progress[item.id]?.exerciseTotal"
-          :type="
-            progress[item.id].exerciseSolved === progress[item.id].exerciseTotal
-              ? 'success'
-              : undefined
-          "
-          :depth="
-            progress[item.id].exerciseSolved === progress[item.id].exerciseTotal
-              ? undefined
-              : 3
-          "
-          style="font-size: 12px"
-        >
-          练一练 {{ progress[item.id].exerciseSolved }} /
-          {{ progress[item.id].exerciseTotal }}
-        </n-text>
-      </n-flex>
-    </n-list-item>
-  </n-list>
-
-  <!-- 只在没登录时提一句。登录了却还没读的人不需要被提醒「你还没读」 -->
-  <n-text v-if="!traced" depth="3" style="display: block; padding: 8px 4px">
+      <span class="dot" :class="traced ? statusOf(item.id) : 'todo'">
+        <template v-if="traced && statusOf(item.id) === 'done'">✓</template>
+        <template v-else>{{ index + 1 }}</template>
+      </span>
+      <span class="text">
+        <span class="title">{{ item.title }}</span>
+        <span v-if="traced && hint(item.id)" class="hint">
+          {{ hint(item.id) }}
+        </span>
+      </span>
+    </li>
+  </ol>
+  <n-text v-if="!traced" depth="3" class="login-tip">
     登录后可以记录学习进度
   </n-text>
 </template>
+
+<style scoped>
+.lessons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lesson {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.lesson:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+.lesson.active {
+  background: rgba(24, 160, 88, 0.14);
+}
+.dot {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  border: 1.5px solid rgba(128, 128, 128, 0.5);
+}
+.dot.reading {
+  border-color: #f0a020;
+  color: #f0a020;
+}
+.dot.done {
+  border-color: #18a058;
+  background: #18a058;
+  color: #fff;
+}
+.active .dot.todo {
+  border-color: #18a058;
+  color: #18a058;
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.title {
+  line-height: 1.4;
+}
+.active .title {
+  font-weight: 600;
+}
+.hint {
+  font-size: 12px;
+  opacity: 0.6;
+}
+.login-tip {
+  display: block;
+  padding: 8px 10px;
+}
+</style>

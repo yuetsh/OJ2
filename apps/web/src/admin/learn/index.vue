@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { TUTORIAL_READ_SECONDS } from "@oj2/contract"
-import { NProgress, NText } from "naive-ui"
+import { NProgress, NTag, NText } from "naive-ui"
 import {
   getLearnStudents,
   getLearnTutorials,
@@ -46,19 +46,89 @@ const typeOptions = [
   { label: "C 语言", value: "c" },
 ]
 
+type StudentStatus = "idle" | "stalled" | "noPractice" | "going" | "done"
+
+const STALL_DAYS = 7
+const STATUS_META: Record<
+  StudentStatus,
+  { label: string; type: "default" | "error" | "warning" | "info" | "success" }
+> = {
+  idle: { label: "未开始", type: "error" },
+  stalled: { label: `${STALL_DAYS} 天没学`, type: "warning" },
+  noPractice: { label: "只读不练", type: "info" },
+  going: { label: "进行中", type: "default" },
+  done: { label: "已学完", type: "success" },
+}
+
+// 一个学生只落进一个状态，按「最需要老师看一眼」的顺序判：
+// 没开始 > 学完了 > 停滞 > 只读不练 > 正常推进
+function statusOf(row: LearnStudentProgress): StudentStatus {
+  if (row.readCount === 0 && row.totalSeconds === 0 && !row.exerciseTried) {
+    return "idle"
+  }
+  if (tutorialCount.value && row.readCount >= tutorialCount.value) return "done"
+  if (row.lastViewedAt) {
+    // 只比两个时刻相差多少毫秒，不涉及「哪一天」，所以不必走 time.ts 的日历口径
+    const days = (Date.now() - Date.parse(row.lastViewedAt)) / 86_400_000
+    if (days > STALL_DAYS) return "stalled"
+  }
+  if (exerciseCount.value && row.readCount > 0 && row.exerciseTried === 0) {
+    return "noPractice"
+  }
+  return "going"
+}
+
+const statusFilter = ref<StudentStatus | "all">("all")
+
+const statusCounts = computed(() => {
+  const counts: Record<StudentStatus, number> = {
+    idle: 0,
+    stalled: 0,
+    noPractice: 0,
+    going: 0,
+    done: 0,
+  }
+  for (const row of students.value) counts[statusOf(row)]++
+  return counts
+})
+
 const startedCount = computed(
-  () => students.value.filter((row) => row.readCount > 0).length,
+  () => students.value.length - statusCounts.value.idle,
 )
+
+const avgRead = computed(() =>
+  students.value.length
+    ? (
+        students.value.reduce((n, row) => n + row.readCount, 0) /
+        students.value.length
+      ).toFixed(1)
+    : "0",
+)
+
+// 全班做题的总体正确口径：做对的题数 / 做过的题数
+const solveRate = computed(() => {
+  const tried = students.value.reduce((n, row) => n + row.exerciseTried, 0)
+  const solved = students.value.reduce((n, row) => n + row.exerciseSolved, 0)
+  return tried ? Math.round((solved / tried) * 100) : null
+})
+
+function lastSeen(value: string | null) {
+  if (!value) return "-"
+  const days = Math.floor((Date.now() - Date.parse(value)) / 86_400_000)
+  const absolute = parseTime(value, "M月D日 HH:mm")
+  return days >= 1 ? `${absolute}（${days} 天前）` : absolute
+}
 
 // 姓名和学号都已经在手里，不再打接口。学号是纯数字，姓名是中文，
 // 一个框同时匹配两列就够了 —— 老师要么记得学号要么记得名字
 const filteredStudents = computed(() => {
   const value = keyword.value.trim().toLowerCase()
-  if (!value) return students.value
   return students.value.filter(
     (row) =>
-      row.username.toLowerCase().includes(value) ||
-      (row.realName ?? "").toLowerCase().includes(value),
+      (statusFilter.value === "all" || statusOf(row) === statusFilter.value) &&
+      (!value ||
+        row.username.toLowerCase().includes(value) ||
+        (row.realName ?? "").toLowerCase().includes(value)),
   )
 })
 
@@ -70,6 +140,19 @@ const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
     key: "realName",
     width: 110,
     render: (row) => row.realName || "-",
+  },
+  {
+    title: "状态",
+    key: "status",
+    width: 110,
+    render: (row) => {
+      const meta = STATUS_META[statusOf(row)]
+      return h(
+        NTag,
+        { size: "small", type: meta.type, bordered: false },
+        () => meta.label,
+      )
+    },
   },
   {
     title: `已读（共 ${tutorialCount.value} 课）`,
@@ -128,10 +211,9 @@ const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
   {
     title: "最后学习",
     key: "lastViewedAt",
-    width: 170,
+    width: 210,
     sorter: "default",
-    render: (row) =>
-      row.lastViewedAt ? parseTime(row.lastViewedAt, "M月D日 HH:mm") : "-",
+    render: (row) => lastSeen(row.lastViewedAt),
   },
 ])
 
@@ -211,6 +293,31 @@ const exerciseColumns = computed<DataTableColumn<LearnExerciseProgress>[]>(
       render: (row) => row.question || "（无题干）",
     },
     {
+      // 试的人不少、却没人一次做对，或者一半以上的人没做对 —— 多半是题有坑，
+      // 老师应该先去看展开里全班「最后一次错在」是不是同一个干扰项
+      title: "提示",
+      key: "flag",
+      width: 100,
+      render: (row) => {
+        if (row.triedUsers < 3) return null
+        if (row.firstTryUsers === 0 && row.solvedUsers > 0) {
+          return h(
+            NTag,
+            { size: "small", type: "warning", bordered: false },
+            () => "没人一次对",
+          )
+        }
+        if (row.solvedUsers / row.triedUsers < 0.5) {
+          return h(
+            NTag,
+            { size: "small", type: "error", bordered: false },
+            () => "多数人卡住",
+          )
+        }
+        return null
+      },
+    },
+    {
       title: "做对 / 做过",
       key: "solvedUsers",
       width: 150,
@@ -258,6 +365,7 @@ const exerciseColumns = computed<DataTableColumn<LearnExerciseProgress>[]>(
 async function load() {
   loading.value = true
   expanded.value = []
+  statusFilter.value = "all"
   const params = { type: type.value, className: className.value.trim() }
   try {
     // 三张表一起拉：切 tab 是纯前端的事，不该再等一次网络
@@ -312,6 +420,49 @@ onMounted(load)
     </n-text>
   </n-flex>
 
+  <n-grid
+    cols="2 s:3 m:5"
+    :x-gap="12"
+    :y-gap="12"
+    responsive="screen"
+    style="margin-bottom: 16px"
+  >
+    <n-gi>
+      <n-card size="small" :bordered="true">
+        <n-statistic label="学生" :value="studentCount" />
+      </n-card>
+    </n-gi>
+    <n-gi>
+      <n-card size="small">
+        <n-statistic label="已开始" :value="startedCount">
+          <template #suffix>/ {{ students.length }}</template>
+        </n-statistic>
+      </n-card>
+    </n-gi>
+    <n-gi>
+      <n-card size="small">
+        <n-statistic label="人均已读课数" :value="avgRead">
+          <template #suffix>/ {{ tutorialCount }}</template>
+        </n-statistic>
+      </n-card>
+    </n-gi>
+    <n-gi>
+      <n-card size="small">
+        <n-statistic
+          label="练一练做对率"
+          :value="solveRate === null ? '-' : `${solveRate}%`"
+        />
+      </n-card>
+    </n-gi>
+    <n-gi>
+      <n-card size="small">
+        <n-statistic label="停滞（7 天没学）" :value="statusCounts.stalled">
+          <template #suffix>人</template>
+        </n-statistic>
+      </n-card>
+    </n-gi>
+  </n-grid>
+
   <n-tabs v-model:value="tab" type="line" animated>
     <n-tab-pane name="students" tab="按学生">
       <n-flex align="center" style="margin-bottom: 12px">
@@ -324,6 +475,25 @@ onMounted(load)
         <n-text v-if="keyword.trim()" depth="3">
           找到 {{ filteredStudents.length }} 人
         </n-text>
+      </n-flex>
+      <n-flex :size="8" style="margin-bottom: 12px">
+        <n-tag
+          checkable
+          :checked="statusFilter === 'all'"
+          @update:checked="statusFilter = 'all'"
+        >
+          全部 {{ students.length }}
+        </n-tag>
+        <n-tag
+          v-for="(meta, key) in STATUS_META"
+          :key="key"
+          checkable
+          :type="meta.type"
+          :checked="statusFilter === key"
+          @update:checked="statusFilter = statusFilter === key ? 'all' : key"
+        >
+          {{ meta.label }} {{ statusCounts[key] }}
+        </n-tag>
       </n-flex>
       <n-data-table
         :loading="loading"
