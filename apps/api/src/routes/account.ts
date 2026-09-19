@@ -46,7 +46,7 @@ import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { getUserProfileById } from "../services/profile"
-import { weekStart } from "../time"
+import { localTime, weekStart } from "../time"
 import {
   isTeacherOrAbove,
   objectValue,
@@ -196,25 +196,29 @@ accountRoutes.post("/me/avatar", requireAuth, async (c) => {
 
 accountRoutes.get("/users/:id/metrics", async (c) => {
   const userId = queryInteger(c.req.param("id"), 0, { min: 1 })
+  // 学习天数连比赛提交一起算；首末提交时间照旧只看比赛外的提交
+  const outsideContest = sql`filter (where ${schema.submission.contestId} is null)`
   const [row] = await db
     .select({
-      total: count(),
-      first: min(schema.submission.createTime),
-      latest: sql<string>`max(${schema.submission.createTime})`,
+      first: sql<
+        string | null
+      >`min(${schema.submission.createTime}) ${outsideContest}`,
+      latest: sql<
+        string | null
+      >`max(${schema.submission.createTime}) ${outsideContest}`,
+      activeDays: countDistinct(
+        sql`date(${localTime(schema.submission.createTime)})`,
+      ),
     })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, userId),
-        isNull(schema.submission.contestId),
-      ),
-    )
-  if (!row?.total || !row.first || !row.latest)
+    .where(eq(schema.submission.userId, userId))
+  if (!row?.first || !row.latest)
     return failure(c, 404, "no-submissions", "暂无提交")
   return success(c, {
     now: new Date().toISOString(),
     first: row.first,
     latest: row.latest,
+    activeDays: row.activeDays,
   } satisfies Metrics)
 })
 

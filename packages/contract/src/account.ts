@@ -19,6 +19,8 @@ export const metricsSchema = z.object({
   now: z.string(),
   latest: z.string(),
   first: z.string(),
+  /** 有提交的日历天数（东八区），不是首末提交之间跨了多少天 */
+  activeDays: z.number().int(),
 })
 
 export const rankProfileSchema = z.object({

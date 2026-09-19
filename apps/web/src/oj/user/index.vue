@@ -81,7 +81,7 @@ async function init() {
       firstSubmissionAt.value = parseTime(metricsRes.first)
       latestSubmissionAt.value = parseTime(metricsRes.latest)
       toLatestAt.value = durationToDays(metricsRes.latest, metricsRes.now)
-      learnDuration.value = durationToDays(metricsRes.first, metricsRes.latest)
+      learnDuration.value = `${metricsRes.activeDays} 天`
     }
   } finally {
     toggle(false)
