@@ -124,6 +124,49 @@ export const HINT_MIN_FAILURES = 3
 export const aiHintRequestSchema = z.object({ submissionId: z.string().min(1) })
 
 /**
+ * AI 提示第一段「诊断」给错误归的类。**key 是落库的值（`ai_hint.diagnosis.tag`），
+ * 和判题状态码一样只能新增、不能改已有 key 的含义** —— 教师端的学情统计要按它聚合。
+ * `label` 只是给人看的说明，可以改措辞。
+ *
+ * 口径按中职入门的 C / Python 定的。`output_format` 刻意写细：多余的输入提示语、
+ * 全角冒号、多一个空格、小数位数，是这批学生最常见、也最冤的一类 WA。
+ */
+export const HINT_ERROR_TAGS = {
+  syntax: "语法错误",
+  input_format: "输入读取方式不对（格式、分隔、个数）",
+  output_format:
+    "输出格式不对（多余的输入提示语、全角/半角符号、多余空格或换行、小数位数）",
+  condition: "条件判断写错（比较符、漏了分支）",
+  loop_bound: "循环次数或边界不对（差一）",
+  integer_division: "整数除法或取余用错",
+  type_overflow: "数据类型不对或溢出（int 不够、浮点精度）",
+  uninitialized: "变量没初始化，或累加器没清零",
+  missing_case: "漏了特殊情况（0、负数、边界值）",
+  runtime_error: "运行时错误（下标越界、除以零）",
+  timeout: "超时（算法太慢或死循环）",
+  wrong_approach: "思路整体不对",
+  other: "其他，或者看不出来",
+} as const
+
+export type HintErrorTag = keyof typeof HINT_ERROR_TAGS
+
+/**
+ * 诊断的出参。**只有枚举和数字，不允许任何自由文本** —— 诊断那一段能看到标准答案，
+ * 学生代码又是它的输入，出参里只要有一段文字就是一条把答案带出去的通道。
+ * 这样注入最多能左右一个枚举值和两个行号。多出来的字段被 zod 剥掉。
+ */
+export const hintDiagnosisSchema = z.object({
+  tag: z.enum(
+    Object.keys(HINT_ERROR_TAGS) as [HintErrorTag, ...HintErrorTag[]],
+  ),
+  /** 问题所在的行号区间（从 1 起，含两端）；说不准就是 null */
+  lines: z.tuple([z.number().int().min(1), z.number().int().min(1)]).nullable(),
+  confidence: z.enum(["high", "low"]),
+})
+
+export type HintDiagnosis = z.infer<typeof hintDiagnosisSchema>
+
+/**
  * 学生对一条 AI 提示的评价（POST /ai/hint/:id/feedback）。提示的 id 由 /ai/hint 流的
  * `done` 事件带回来。可以改票，以最后一次为准。
  */

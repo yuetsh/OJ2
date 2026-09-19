@@ -5,13 +5,15 @@ interface ChatMessage {
   content: string
 }
 
-function requestBody(messages: ChatMessage[], stream: boolean) {
+function requestBody(messages: ChatMessage[], stream: boolean, json = false) {
   return {
     model: config.aiModel,
     messages,
     stream,
     temperature: 0,
     thinking: { type: "disabled" },
+    // DeepSeek 的 JSON 模式：保证回的是合法 JSON，但 prompt 里得出现「json」字样
+    ...(json ? { response_format: { type: "json_object" } } : {}),
   }
 }
 
@@ -22,11 +24,15 @@ function requestBody(messages: ChatMessage[], stream: boolean) {
  */
 const COMPLETE_TIMEOUT_MS = 60_000
 
-export async function completeChat(system: string, user: string) {
+export async function completeChat(
+  system: string,
+  user: string,
+  options: { json?: boolean; timeoutMs?: number } = {},
+) {
   if (!config.aiKey) throw new Error("缺少 AI_KEY")
   const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
     method: "POST",
-    signal: AbortSignal.timeout(COMPLETE_TIMEOUT_MS),
+    signal: AbortSignal.timeout(options.timeoutMs ?? COMPLETE_TIMEOUT_MS),
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${config.aiKey}`,
@@ -38,6 +44,7 @@ export async function completeChat(system: string, user: string) {
           { role: "user", content: user },
         ],
         false,
+        options.json,
       ),
     ),
   })

@@ -42,6 +42,7 @@ import type {
   ContestSubmissionInfo,
   ExerciseType,
   FlowchartStatus,
+  HintDiagnosis,
   JudgeStatus,
   ProblemDifficulty,
   ProblemLanguage,
@@ -1022,8 +1023,16 @@ export const aiHint = pgTable(
     // 生成失败时为空串，失败原因在 error
     content: text().notNull(),
     error: text(),
-    // 从收到请求到生成结束（或失败）的毫秒数
+    // 从收到请求到生成结束（或失败）的毫秒数，两段式时含诊断那一段
     durationMs: integer("duration_ms").notNull(),
+    /**
+     * 两段式第一段的诊断结果（见 services/hint-diagnosis.ts）。**只存 safeParse 过的**，
+     * 所以 `$type` 成立 —— 闸在写入侧。没开两段式、编译失败（不诊断）、诊断失败时为 null。
+     * 同一条提交再要提示时复用这里的结果，不再调一次模型。
+     */
+    diagnosis: jsonb().$type<HintDiagnosis>(),
+    // 诊断失败的原因（超时、回的不是 JSON、校验不过）。这时第二段退回单段式的 prompt
+    diagnosisError: text("diagnosis_error"),
     // 学生的评价：null = 没评
     helpful: boolean(),
     feedbackTime: timestamp("feedback_time", {

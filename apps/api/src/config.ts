@@ -100,6 +100,12 @@ export const config = {
   aiProvider: process.env.AI_PROVIDER ?? "deepseek",
   aiKey: process.env.AI_KEY ?? "",
   aiModel: process.env.AI_MODEL ?? "deepseek-flash",
+  /**
+   * AI 提示走两段式（先诊断、再生成），见 services/hint-diagnosis.ts。**默认关**：
+   * 2026-09-19 起 ai_hint 在攒单段式的基线数据，攒够之前别打开，否则两批数据混在一起没法比。
+   * 设成 "1" 打开。
+   */
+  aiHintDiagnose: process.env.AI_HINT_DIAGNOSE === "1",
   ruffPath: process.env.RUFF_PATH ?? "ruff",
   clangFormatPath: process.env.CLANG_FORMAT_PATH ?? "clang-format",
 }

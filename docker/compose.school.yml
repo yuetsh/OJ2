@@ -79,6 +79,7 @@ services:
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-4}
       AI_KEY: ${AI_KEY:-}
+      AI_HINT_DIAGNOSE: ${AI_HINT_DIAGNOSE:-}
       # 机房走 http 直连 IP，没有 TLS。带 Secure 的 Cookie 浏览器不会回传，
       # 学生会「登录成功但立刻又是未登录」。这里必须是 false。
       COOKIE_SECURE: ${COOKIE_SECURE:-false}

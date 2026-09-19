@@ -127,6 +127,13 @@
       "when": 1789818766735,
       "tag": "0017_add_ai_hint",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789822227451,
+      "tag": "0018_ai_hint_diagnosis",
+      "breakpoints": true
     }
   ]
 }

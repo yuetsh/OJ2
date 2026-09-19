@@ -135,6 +135,7 @@ services:
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       AI_KEY: ${AI_KEY:-}
+      AI_HINT_DIAGNOSE: ${AI_HINT_DIAGNOSE:-}
       # 走 NPM 终止 TLS，浏览器侧是 https，Cookie 必须带 Secure
       COOKIE_SECURE: "true"
     healthcheck:
