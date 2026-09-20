@@ -31,7 +31,7 @@ import treeSitterWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { typ
 const WASM_BY_LANGUAGE: Record<string, string> = {
   C: cWasmPath,
   "C++": cppWasmPath,
-  Python3: pythonWasmPath,
+  Python: pythonWasmPath,
 }
 
 await Parser.init({ locateFile: () => treeSitterWasmPath })

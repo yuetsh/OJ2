@@ -64,6 +64,23 @@ docker/deploy.sh --no-build   # 只改了 env / compose 时跳过构建
 有没有生效、库指向和形态是否自洽、判题机运行目录有没有和旧栈分开、外接的
 postgres / redis 是否活着。起完再跑四条冒烟，**题目数是 0 也中止** —— 那意味着连错库了。
 
+### 判题镜像是自建的，不在 registry 上
+
+`compose.*.yml` 里的 `oj2-judge-2` 是本机构建的（上游 JudgeServer 停更在
+2024-04，官方镜像的编译器停在 gcc-13）。**新机器或换镜像之后，先把镜像 load 进去
+再部署**：
+
+```bash
+# 本机
+docker/judge/build.sh --save
+scp dist/oj2-judge-2.tar root@服务器:/root/OJDeploy/
+# 服务器 / 机房各来一次（两个站点各有各的判题沙箱）
+docker load -i /root/OJDeploy/oj2-judge-2.tar
+```
+
+忘了这一步，`deploy.sh` 起栈时会去 pull 一个不存在的镜像并失败（响亮地失败，
+不会静默降级）。构建、回滚和工具链版本表见 `docker/judge/README.md`。
+
 ### 迁移在起栈之前跑
 
 `deploy.sh` 在「构建镜像」之后、「起栈」之前跑 `oj2-api migrate`，失败就中止部署

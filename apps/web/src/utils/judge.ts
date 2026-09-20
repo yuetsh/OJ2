@@ -12,8 +12,7 @@ const JUDGE0_LANGUAGE_ID: Partial<Record<LANGUAGE, number>> = {
   Java: 62,
   Golang: 60,
   JavaScript: 63,
-  Python2: 70,
-  Python3: 71,
+  Python: 71,
 }
 
 export async function createTestSubmission(code: Code, input: string) {

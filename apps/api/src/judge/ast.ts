@@ -236,7 +236,7 @@ function rangePassed(count: number, rule: AstRule) {
 const CALL_NODE_TYPES: Record<string, string> = {
   C: "call_expression",
   "C++": "call_expression",
-  Python3: "call",
+  Python: "call",
 }
 
 function functionCalls(root: Node, target: string, language: string) {
@@ -267,7 +267,7 @@ function methodCalls(root: Node, target: string, language: string) {
       )
     })
   }
-  if (language !== "Python3") return []
+  if (language !== "Python") return []
   return collectNodes(root, "call").filter((call) => {
     const fn = call.childForFieldName("function")
     return (

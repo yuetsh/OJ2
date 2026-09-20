@@ -13,7 +13,7 @@
     "db:generate": "bun run --filter '@oj2/api' db:generate",
     "db:migrate": "bun run --filter '@oj2/api' db:migrate",
     "db:down": "docker compose -f docker/compose.dev.yml down",
-    "fmt": "prettier --write apps/api/src apps/web/src apps/web/tests packages/contract/src apps/api/drizzle.config.ts apps/web/vite.config.ts"
+    "fmt": "prettier --write apps/api/src apps/web/src apps/web/tests packages/contract/src apps/api/drizzle.config.ts apps/web/vite.config.ts docker/judge/smoke.ts"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

@@ -131,7 +131,7 @@ export function submitCode(data: SubmitCodePayload) {
 
 export function formatCode(data: { code: string; language: string }) {
   const languages: Record<string, string> = {
-    Python3: "python",
+    Python: "python",
     C: "c",
     "C++": "cpp",
     SQL: "sql",

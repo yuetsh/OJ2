@@ -14,7 +14,7 @@ import { recordSolvedProblem } from "../services/problemset"
 import { checkAst, type AstRule } from "./ast"
 import { publishSubmissionUpdate } from "./events"
 import type { JudgeJobData } from "./job"
-import { languageConfigs } from "./languages"
+import { judgeConfigFor } from "./languages"
 import { isAccepted, JudgeStatus, type JudgeStatusValue } from "./status"
 import { parseProblemTemplate } from "./template"
 import { runSqlCase } from "./sql"
@@ -77,7 +77,7 @@ async function requestJudge(
   memoryLimit: number,
   testCaseId: string,
 ) {
-  const languageConfig = languageConfigs[language]
+  const languageConfig = judgeConfigFor(language)
   if (!languageConfig)
     throw new Error(`Unsupported judge language: ${language}`)
 

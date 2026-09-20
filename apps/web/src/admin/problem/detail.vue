@@ -63,7 +63,7 @@ const problem = useLocalStorage<BlankProblem>(STORAGE_KEY.ADMIN_PROBLEM, {
   difficulty: "Low",
   visible: false,
   tags: [],
-  languages: ["Python3", "C"] as LANGUAGE[],
+  languages: ["Python", "C"] as LANGUAGE[],
   template: {} as { [key in LANGUAGE]?: string },
   samples: [
     { input: "", output: "" },
@@ -153,8 +153,8 @@ function validateNewTags(v: string[]) {
 // 这几个用的少，就不缓存本地了
 const [needTemplate, toggleNeedTemplate] = useToggle(false)
 const template = reactive(JSON.parse(JSON.stringify(CODE_TEMPLATES)))
-const currentActiveTemplate = ref<LANGUAGE>("Python3")
-const currentActiveAnswer = ref<LANGUAGE>("Python3")
+const currentActiveTemplate = ref<LANGUAGE>("Python")
+const currentActiveAnswer = ref<LANGUAGE>("Python")
 
 // 给 TextEditor 用
 const [ready, toggleReady] = useToggle(false)
@@ -169,7 +169,7 @@ const difficultyOptions: SelectOption[] = [
 ]
 
 const languageOptions = [
-  { label: LANGUAGE_SHOW_VALUE["Python3"], value: "Python3" },
+  { label: LANGUAGE_SHOW_VALUE["Python"], value: "Python" },
   { label: LANGUAGE_SHOW_VALUE["C"], value: "C" },
   { label: LANGUAGE_SHOW_VALUE["C++"], value: "C++" },
   { label: LANGUAGE_SHOW_VALUE["SQL"], value: "SQL" },
@@ -511,7 +511,7 @@ async function generateMermaid() {
   isAIGenerating.value = true
   try {
     const res = await generateFlowchartFromPythonCode(
-      problem.value.answers.filter((a) => a.language === "Python3")[0].code,
+      problem.value.answers.filter((a) => a.language === "Python")[0].code,
     )
     problem.value.mermaidCode = res.flowchart
     message.warning("如果渲染不成功，请复制到外部 AI 网站检查语法")
@@ -736,7 +736,7 @@ watch(
         >
           <n-tabs
             type="segment"
-            default-value="Python3"
+            default-value="Python"
             v-model:value="currentActiveAnswer"
           >
             <n-tab-pane
@@ -760,7 +760,7 @@ watch(
         <n-form-item label="编写预制代码">
           <n-tabs
             type="segment"
-            default-value="Python3"
+            default-value="Python"
             v-model:value="currentActiveTemplate"
           >
             <n-tab-pane
@@ -878,7 +878,7 @@ watch(
           type="primary"
           size="small"
           :disabled="
-            !problem.answers.filter((a) => a.language === 'Python3')[0]?.code
+            !problem.answers.filter((a) => a.language === 'Python')[0]?.code
               .length
           "
           :loading="isAIGenerating"

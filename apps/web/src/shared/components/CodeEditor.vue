@@ -27,7 +27,7 @@ interface Props {
 }
 
 const {
-  language = "Python3",
+  language = "Python",
   fontSize = 20,
   height = "100%",
   readonly = false,
@@ -41,7 +41,7 @@ const isDark = useDark()
 const langExtension = computed(() => {
   if (language === "SQL")
     return sql({ dialect: SQLite, upperCaseKeywords: true })
-  return ["Python2", "Python3"].includes(language) ? python() : cpp()
+  return language === "Python" ? python() : cpp()
 })
 
 const extensions = computed(() => [

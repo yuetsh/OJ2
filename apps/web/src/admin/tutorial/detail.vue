@@ -107,7 +107,7 @@ onMounted(init)
     <n-tab-pane name="code" tab="示例代码">
       <CodeEditor
         v-model:value="tutorial.code"
-        :language="tutorial.type === 'python' ? 'Python3' : 'C'"
+        :language="tutorial.type === 'python' ? 'Python' : 'C'"
         height="400px"
       />
     </n-tab-pane>

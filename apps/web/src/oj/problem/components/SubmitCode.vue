@@ -56,11 +56,11 @@ const isFormatting = ref(false)
 const isSubmittingRequest = ref(false)
 
 // ==================== Python 语法检测器预取 ====================
-// 选中 Python3 时就把 Skulpt 拉下来，避免点提交时才开始下载
+// 选中 Python 时就把 Skulpt 拉下来，避免点提交时才开始下载
 watch(
   () => codeStore.code.language,
   (language) => {
-    if (language === "Python3") prefetchPythonSyntaxChecker()
+    if (language === "Python") prefetchPythonSyntaxChecker()
   },
   { immediate: true },
 )
@@ -114,8 +114,8 @@ const buttonState = computed(() =>
 async function submit() {
   if (buttonState.value.disabled) return
 
-  // 0. Python3 语法检测
-  if (codeStore.code.language === "Python3") {
+  // 0. Python 语法检测
+  if (codeStore.code.language === "Python") {
     const syntaxError = await checkPythonSyntax(codeStore.code.value)
     if (syntaxError) {
       message.warning(`第 ${syntaxError.line} 行存在语法错误，请修正后再提交`)
@@ -123,7 +123,7 @@ async function submit() {
     }
   }
 
-  // 0.5 提交前自动格式化（Python3 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）
+  // 0.5 提交前自动格式化（Python 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）
   const formatLang = LANGUAGE_FORMAT_VALUE[codeStore.code.language]
   if (["python", "c", "cpp", "sql"].includes(formatLang)) {
     isFormatting.value = true
@@ -135,7 +135,7 @@ async function submit() {
       codeStore.setCode(res.code)
     } catch (e: any) {
       if (e?.error === "format-error") {
-        // 仅 Python3 会出现：代码本身存在语法错误
+        // 仅 Python 会出现：代码本身存在语法错误
         message.warning(`代码格式化失败：${e.data}，请检查代码后重试`)
         return
       }

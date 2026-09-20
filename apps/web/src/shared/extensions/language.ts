@@ -13,5 +13,5 @@ import type { LANGUAGE } from "utils/types"
 export function languageExtension(language: LANGUAGE): Extension {
   if (language === "SQL")
     return sql({ dialect: SQLite, upperCaseKeywords: true })
-  return ["Python2", "Python3"].includes(language) ? python() : cpp()
+  return language === "Python" ? python() : cpp()
 }

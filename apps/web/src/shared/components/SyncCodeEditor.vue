@@ -41,7 +41,7 @@ interface Props {
 }
 
 const {
-  language = "Python3",
+  language = "Python",
   fontSize = 20,
   height = "100%",
   readonly = false,

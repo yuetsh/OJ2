@@ -5,7 +5,7 @@ export interface PythonSyntaxError {
 let skulptPromise: Promise<any> | null = null
 
 /**
- * 按需加载 Skulpt（约 233KB gzip），只在提交 Python3 代码时才下载。
+ * 按需加载 Skulpt（约 233KB gzip），只在提交 Python 代码时才下载。
  * 结果缓存，同一页面只加载一次。
  */
 function loadSkulpt(): Promise<any> {

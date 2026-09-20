@@ -47,7 +47,7 @@ function makeInitialFiles(): FileEntry[] {
 
 const files = ref<FileEntry[]>(makeInitialFiles())
 
-const selectedLanguage = ref<LANGUAGE>("Python3")
+const selectedLanguage = ref<LANGUAGE>("Python")
 
 // 始终显示所有语言，不管有没有答案代码
 const availableLanguages = computed(() =>

@@ -16,7 +16,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: AstRules | null): void
 }>()
 
-// 判题机只认 C / Python3，别的语言配了规则也一条都不会跑（judge/ast.ts 的
+// 判题机只认 C / Python，别的语言配了规则也一条都不会跑（judge/ast.ts 的
 // loadLanguage 返回 null 就直接放行）。原来这里按题目的全部语言开 tab，老师给
 // C++ 配的规则存得下、题目页也照常显示成「要求」，判题却从不检查。
 const supportedLanguages = computed(() =>
@@ -26,7 +26,7 @@ const unsupportedLanguages = computed(() =>
   props.languages.filter((lang) => !AST_SUPPORTED_LANGUAGES.includes(lang)),
 )
 
-const activeTab = ref(supportedLanguages.value[0] || "Python3")
+const activeTab = ref(supportedLanguages.value[0] || "Python")
 
 const ENGINE_OPTIONS: SelectOption[] = [
   {

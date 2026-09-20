@@ -858,11 +858,12 @@ export const submission = pgTable(
      * 提交列表的「语言」和「结果」两个下拉筛选。原来这两列上要么没索引、要么只有
      * 不带 `contest_id IS NULL` 的单列索引，翻页那条靠 submission_public_create_time_id_idx
      * 边扫边滤还能对付，**count 那条只能全表扫**（快照实测固定 75~82ms / 18448 buffers，
-     * 筛什么值都一样）。加完：语言 count 80ms → 11ms（Python3，占 8 成）/ 1.6ms（C），
+     * 筛什么值都一样）。加完：语言 count 80ms → 11ms（Python，占 8 成）/ 1.6ms（C），
      * 结果 count 75ms → 2.0ms。
      *
-     * 更要命的是冷门语言的**翻页**：Python2 只有 3 条、全是 2022 年的，分页索引得从
-     * 最新一路倒扫到底才凑够一页，43ms 全表扫；走这条索引是 0.02ms。
+     * 更要命的是冷门语言的**翻页**：JavaScript 只有 3 条、全是很早以前的，分页索引得从
+     * 最新一路倒扫到底才凑够一页，43ms 全表扫；走这条索引是 0.02ms。（这个实测当年用的
+     * 是 Python2，那 3 条 2026-09 已被 0019 迁移并进 Python，换了个同样冷门的值举例。）
      *
      * 两列都 ASC NULLS LAST，理由同上面 submission_public_create_time_id_idx ——
      * 靠 Index Scan **Backward** 出 `ORDER BY create_time DESC`。这里再实测了一遍：

@@ -106,7 +106,7 @@ export const astRuleSchema = z.object({
   max: z.number().int().optional(),
 })
 
-/** 按语言分组：`{ Python3: [...], C: [...] }`，键是 languages 里的语言名 */
+/** 按语言分组：`{ Python: [...], C: [...] }`，键是 languages 里的语言名 */
 export const astRulesSchema = z.record(z.string(), z.array(astRuleSchema))
 
 /**
@@ -183,7 +183,7 @@ export const AST_NODE_TARGETS_BY_LANGUAGE: Record<
     lambda: { label: "lambda 表达式", node: "lambda_expression" },
     using: { label: "using 声明", node: "using_declaration" },
   },
-  Python3: {
+  Python: {
     for_loop: { label: "for 循环", node: "for_statement" },
     while_loop: { label: "while 循环", node: "while_statement" },
     if_statement: { label: "if 条件", node: "if_statement" },
@@ -260,7 +260,7 @@ export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<
   C: C_OPERATOR_TARGETS,
   // `<<` / `>>` 对 C++ 主要是 cout/cin 的流运算符（位移是同一个 token）
   "C++": { ...C_OPERATOR_TARGETS, "<<": "<<", ">>": ">>" },
-  Python3: {
+  Python: {
     "+": "+",
     "-": "-",
     "*": "*",

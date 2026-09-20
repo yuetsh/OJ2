@@ -21,6 +21,7 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 | `docs/timezone.md` | 动日历口径、动时间出参格式 |
 | `docs/contract.md` | 动 zod 契约、想给某个字段加校验 |
 | `docs/ast-rules.md` | 动 AST 代码规则、升级 tree-sitter |
+| `docker/judge/README.md` | 换判题沙箱镜像、升语言版本（gcc / Python / Node …） |
 | `docs/specs/` | 两份设计文档：后端重写、课堂求助与协作编辑 |
 
 ## 仓库结构
@@ -114,6 +115,28 @@ handler。阶段 4 真实发生过一次，两个教师用的分析端点被吃�
 这些整数是**落库的值**：12 万条历史提交的 `submission.result` 就是它们，判题沙箱回的也是
 这套编码，所以只能新增、不能改已有的含义。题目表情 reaction 的语义 key 同理。
 
+### 判题镜像是自己构建的
+
+`compose.*.yml` 里的 `oj2-judge-2` **不在任何 registry 上**：上游
+QingdaoU/JudgeServer 停更在 2024-04（官方镜像的 `latest` 和 `1.6.1` 是同一份，
+编译器停在 gcc-13），新工具链只能自己编。`docker/judge/` 里是只改版本的 Dockerfile
+分叉 + 构建脚本 + 冒烟测试，判题逻辑一行没动。
+
+- 新机器、换镜像：先 `docker/judge/build.sh --save` → scp → `docker load`，再部署。
+  **服务器和机房各有各的判题沙箱，两边都要装。**
+- 改工具链就把末尾序号 +1（下一版 `oj2-judge-3`）。`up -d` 不带 `--pull`，名字没变会静默用旧镜像。
+- 编译/运行命令在 `apps/api/src/judge/languages.ts`，不在镜像里。gcc-14 把隐式函数
+  声明等提成了 error（`-w` 压不住），那边的 `cLooseErrors` 三个 `-Wno-error=` 就是
+  为此加的 —— 删掉它们等于让一批历史题解和 C 教程示例集体 CE。
+- **判题沙箱只认 C / C++ / Python。** Java / JavaScript / Golang 连同镜像里的
+  JDK / Node / Go 在 2026-09 一起砍了（前端本来就没给入口，12 万条提交里它们共 62 条），
+  契约 `judgeLanguageSchema` 里的键留着是为了渲染那 62 条历史提交。
+  **`Python3` / `Python2` 这两个旧值已经没有了** —— 0019 迁移把 104530 条提交、937 道题、
+  1235 个用户的成就指标并成了一个 `Python`，0020 顺手把那三种语言从题目的可选语言里摘掉
+  （不摘的话 84 道题的语言下拉还能选 Java，提交必 SYSTEM_ERROR）。查判题配置走
+  `judgeConfigFor()`，它带旧值别名；**回滚要连数据一起回**，只滚代码会让 Python 提交全炸。
+- 换完镜像跑 `bun docker/judge/smoke.ts`：三种语言、六种状态码、gcc 宽松度一起核。
+
 ### 出参不 `parse`，用 `satisfies`
 
 **后端的响应一律 `satisfies XxxType`，不要写 `xxxSchema.parse({...})`。** 出参是后端自己刚
@@ -138,7 +161,7 @@ handler。阶段 4 真实发生过一次，两个教师用的分析端点被吃�
 bun run --filter '@oj2/api' check:ast     # 升级 tree-sitter-* 之后一定要跑
 ```
 
-判题机只认 C / C++ / Python3（`AST_SUPPORTED_LANGUAGES`），别的语言配了规则一条都不会跑，
+判题机只认 C / C++ / Python（`AST_SUPPORTED_LANGUAGES`），别的语言配了规则一条都不会跑，
 所以后台不给它们开 tab —— **看得见却不检查**比没有更糟。C++ 的调用形态和 C 不一样、
 规则的语义校验为什么不挂在 zod 上，见 `docs/ast-rules.md`。
 

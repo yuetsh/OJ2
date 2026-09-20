@@ -27,7 +27,7 @@ bun run --filter '@oj2/api' check:ast     # 每个 target 的 node 在语法里�
 
 ## 只有三种语言真的会跑
 
-判题机只认 `AST_SUPPORTED_LANGUAGES`（C / C++ / Python3）。别的语言配了规则一条都不会跑，
+判题机只认 `AST_SUPPORTED_LANGUAGES`（C / C++ / Python）。别的语言配了规则一条都不会跑，
 所以后台不给它们开 tab，题目页也不把它们的规则展示成「要求」——
 **看得见却不检查**比没有更糟。
 

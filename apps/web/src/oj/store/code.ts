@@ -1,3 +1,4 @@
+import { normalizeLanguage } from "@oj2/contract"
 import { defineStore } from "pinia"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
@@ -11,7 +12,9 @@ export const useCodeStore = defineStore("code", () => {
   // ==================== 状态 ====================
   const code = reactive<Code>({
     value: "",
-    language: storage.get(STORAGE_KEY.LANGUAGE) || "Python3",
+    // 过一道 normalizeLanguage：上线那一刻学生浏览器的 localStorage 里存的还是
+    // 旧值 Python3，直接拿来用会被后端的契约挡掉（而且报错看不出是这个原因）
+    language: normalizeLanguage(storage.get(STORAGE_KEY.LANGUAGE)) ?? "Python",
   })
 
   const input = ref("")

@@ -6,6 +6,8 @@
  * 所以内存态够用，不需要 Redis 同步。进程重启丢掉全部状态，两端重连后回到干净状态。
  */
 
+import { normalizeLanguage } from "@oj2/contract"
+
 export type CollabSocket = Bun.ServerWebSocket<
   import("../websocket").SubmissionSocketData
 >
@@ -17,8 +19,7 @@ export type CollabSocket = Bun.ServerWebSocket<
 export const COLLAB_LANGUAGES = [
   "C",
   "C++",
-  "Python2",
-  "Python3",
+  "Python",
   "Java",
   "JavaScript",
   "Golang",
@@ -27,10 +28,16 @@ export const COLLAB_LANGUAGES = [
 
 export type CollabLanguage = (typeof COLLAB_LANGUAGES)[number]
 
-/** 认不出来的一律当 C：老客户端不带这个字段，而它以前就是写死 C 的 */
-export function normalizeLanguage(value: unknown): CollabLanguage {
-  return (COLLAB_LANGUAGES as readonly string[]).includes(value as string)
-    ? (value as CollabLanguage)
+/**
+ * 认不出来的一律当 C：老客户端不带这个字段，而它以前就是写死 C 的。
+ *
+ * 先过契约的别名表 —— 上线那一刻学生页面里还揣着 `Python3`，不翻译的话会**静默**
+ * 落到 C，求助窗口里的代码高亮和同步编辑都按 C 走，没人会报错。
+ */
+export function normalizeCollabLanguage(value: unknown): CollabLanguage {
+  const normalized = normalizeLanguage(value) ?? value
+  return (COLLAB_LANGUAGES as readonly string[]).includes(normalized as string)
+    ? (normalized as CollabLanguage)
     : "C"
 }
 

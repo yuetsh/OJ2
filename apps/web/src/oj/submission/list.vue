@@ -147,7 +147,7 @@ const gradeOptions: SelectOption[] = [
 const languageOptions: SelectOption[] = [
   { label: "流程图", value: "Flowchart" },
   { label: "全部语言", value: "" },
-  { label: "Python", value: "Python3" },
+  { label: "Python", value: "Python" },
   { label: "C语言", value: "C" },
   { label: "C++", value: "C++" },
 ]

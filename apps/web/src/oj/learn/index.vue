@@ -137,7 +137,7 @@ const tutorial = ref<Partial<Tutorial>>({
 })
 
 const editorLanguage = computed<LANGUAGE>(() =>
-  tutorial.value.type === "c" ? "C" : "Python3",
+  tutorial.value.type === "c" ? "C" : "Python",
 )
 const titles = ref<{ id: number; title: string }[]>([])
 const progress = ref<Record<number, TutorialProgress>>({})

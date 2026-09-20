@@ -72,7 +72,11 @@ services:
       retries: 10
 
   oj-judge:
-    image: registry.cn-hongkong.aliyuncs.com/oj-image/judge:1.6.1
+    # 自己构建的判题沙箱（上游 JudgeServer 1.6.1 + 新工具链，见 docker/judge/）。
+    # 上游停更在 2024-04，registry 上的 1.6.1 == latest，没有新版可拉。
+    # ⚠️ 这个 tag 不在任何 registry 上：本机 docker/judge/build.sh 构建，
+    #    服务器/机房用 docker load 装。镜像不在本地时 compose 会去 pull 然后报找不到。
+    image: oj2-judge-2
     container_name: oj-judge
     restart: always
     read_only: true

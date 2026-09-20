@@ -152,7 +152,22 @@ judge_dir=$(grep -E '^JUDGE_STATE_DIR=' docker/.env | tail -1 | cut -d= -f2- || 
 [ -n "$judge_dir" ] || die "JUDGE_STATE_DIR 没设 —— 试跑期间新旧两个判题机会共用运行目录"
 ok "判题机运行目录 $judge_dir"
 
-# ④ 外接形态才需要预检：库不归本栈管，得确认它已经活着。
+# ④ 判题镜像是自建的（上游 JudgeServer 停更，官方镜像的编译器停在 gcc-13），
+#    registry 上没有这个 tag。忘了 docker load 的话，要到「起栈」那步 compose 去 pull
+#    才失败 —— 不如在这里就把该跑的三条命令说清楚。
+#    回滚到官方镜像时这段自动跳过：那个 tag 是 pull 得到的。
+judge_image=$(grep -m1 -E '^[[:space:]]*image: oj2-judge' <<<"$cfg" | awk '{print $2}' || true)
+if [ -n "$judge_image" ]; then
+  docker image inspect "$judge_image" >/dev/null 2>&1 \
+    || die "判题镜像 $judge_image 不在这台机器上，而且 registry 上也没有（它是自建的）。
+  本机：docker/judge/build.sh --save
+        scp dist/${judge_image/:/-}.tar root@这台机器:/root/OJDeploy/
+  这里：docker load -i /root/OJDeploy/${judge_image/:/-}.tar
+构建和回滚见 docker/judge/README.md。"
+  ok "判题镜像 $judge_image 在本机"
+fi
+
+# ⑤ 外接形态才需要预检：库不归本栈管，得确认它已经活着。
 #    自带形态下这两个容器就是本栈自己起的，起栈那步会拉起来，这里没什么可查。
 if [ "$LOCAL_DATA" -eq 0 ]; then
   for c in oj-postgres oj-redis; do

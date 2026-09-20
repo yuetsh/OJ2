@@ -13,7 +13,7 @@ import {
   getRoom,
   hasTeacherOnline,
   listRequests,
-  normalizeLanguage,
+  normalizeCollabLanguage,
   openRoom,
   queueAheadOf,
   removeRequest,
@@ -307,7 +307,7 @@ async function handleHelpRequest(
     className: student?.className ?? null,
     problemId,
     problemTitle: problem.title,
-    language: normalizeLanguage(language),
+    language: normalizeCollabLanguage(language),
     createdAt: Date.now(),
     status: "pending",
     socket: ws,
@@ -327,7 +327,7 @@ function handleHelpLanguage(ws: CollabSocket, language: unknown) {
   const request = getRequest(ws.data.userId)
   // 比对 socket 归属：同账号的另一个标签页停在别的题上切语言，不该改这条求助
   if (!request || request.socket !== ws) return
-  const next = normalizeLanguage(language)
+  const next = normalizeCollabLanguage(language)
   if (request.language === next) return
   request.language = next
 
