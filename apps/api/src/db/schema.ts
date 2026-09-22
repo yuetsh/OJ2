@@ -1034,6 +1034,29 @@ export const aiHint = pgTable(
     diagnosis: jsonb().$type<HintDiagnosis>(),
     // 诊断失败的原因（超时、回的不是 JSON、校验不过）。这时第二段退回单段式的 prompt
     diagnosisError: text("diagnosis_error"),
+    /**
+     * 这条提示给的是哪一级（契约的 `HINT_LEVELS`，AI 时代 OJ 设计 2c）。
+     * -1 = 编译失败那一档，**不在阶梯上**；null = 2c 上线前那批不分级的提示。
+     * 查阶梯的 SQL 一律 `level >= 0`，两者都被摘掉。
+     */
+    level: integer(),
+    /**
+     * 一共生成了几次（1 = 一次就过，2 = 重生成过）。**整段生成、过滤后才推**（边流式边
+     * 过滤做不到：发现违规时内容已经在学生屏幕上了），违规就重生成一次，只重一次。
+     *
+     * **不是「发出去的是第几次生成」** —— `filter_blocked` 为真时两次都作废了，发的是
+     * 兜底话术。7.5 的「输出过滤触发率」= `filter_attempt = 2` ÷ `filter_attempt` 非空。
+     */
+    filterAttempt: integer("filter_attempt"),
+    /**
+     * 两次都违规，发的是写死的兜底话术（content 是那句话，不是模型的输出）。
+     *
+     * **这种行的 `error` 仍是 null** —— 生成本身没失败，是内容被拦了。所以算「生成失败率」
+     * 看 `error`，算「学生有没有真拿到提示」要另外扣掉 `filter_blocked` 为真的这批。
+     */
+    filterBlocked: boolean("filter_blocked"),
+    // 被拦下的原因，两次都被拦时是两条（用 ; 连）。null = 一次都没触发过过滤
+    filterReason: text("filter_reason"),
     // 学生的评价：null = 没评
     helpful: boolean(),
     feedbackTime: timestamp("feedback_time", {

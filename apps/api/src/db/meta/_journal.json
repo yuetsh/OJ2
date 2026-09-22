@@ -148,6 +148,13 @@
       "when": 1789906612433,
       "tag": "0020_drop_unsupported_languages",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789990062378,
+      "tag": "0021_ai_hint_level",
+      "breakpoints": true
     }
   ]
 }

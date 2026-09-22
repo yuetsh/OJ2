@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
-import { HINT_MIN_FAILURES } from "@oj2/contract"
+import { HINT_MIN_FAILURES, hintLevelLabel } from "@oj2/contract"
 import type { JudgeCaseResult } from "@oj2/contract"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
@@ -28,14 +28,64 @@ const isDark = useDark()
 const problemStore = useProblemStore()
 const theme = useThemeVars()
 
-// AI 提示状态
+// AI 提示状态。
+// hintTarget 是后端发来的全文，hintContent 是已经"打"出来的那一截 ——
+// 后端从 2c 起整段生成、过滤通过才推（设计 2.6），一次就把全文发过来，
+// 逐字显示改在这边模拟。
+const hintTarget = ref("")
 const hintContent = ref("")
 const hintLoading = ref(false)
 const hintError = ref("")
 // 这条提示在 ai_hint 里的 id，生成完由 done 事件带回来；后端落库失败时没有，就不出评价按钮
 const hintId = ref<number | null>(null)
+// 这条提示是哪一级（-1 = 编译错误那一档，不在阶梯上），以及还能不能再往上要一级。
+// 两个都由后端算好在 done 里给，前端不自己推阶梯
+const hintLevel = ref<number | null>(null)
+const hintCanEscalate = ref(false)
 const hintHelpful = ref<boolean | null>(null)
 const hintFeedbackSending = ref(false)
+
+// 打字机：每 24ms 吐 3 个字，约 125 字/秒。步子不敢迈太小 ——
+// 每一帧都要让 MdPreview 重渲染一次 Markdown，机房那批机器扛不住逐字
+const TYPE_STEP = 3
+const TYPE_INTERVAL = 24
+let typingTimer: ReturnType<typeof setInterval> | null = null
+const hintTyping = computed(
+  () => hintContent.value.length < hintTarget.value.length,
+)
+
+function stopTyping() {
+  if (typingTimer === null) return
+  clearInterval(typingTimer)
+  typingTimer = null
+}
+
+function startTyping() {
+  if (typingTimer !== null) return
+  typingTimer = setInterval(() => {
+    if (!hintTyping.value) {
+      stopTyping()
+      return
+    }
+    hintContent.value = hintTarget.value.slice(
+      0,
+      hintContent.value.length + TYPE_STEP,
+    )
+  }, TYPE_INTERVAL)
+}
+
+function resetHint() {
+  stopTyping()
+  hintTarget.value = ""
+  hintContent.value = ""
+  hintError.value = ""
+  hintId.value = null
+  hintLevel.value = null
+  hintCanEscalate.value = false
+  hintHelpful.value = null
+}
+
+onUnmounted(stopTyping)
 
 // 错误信息格式化
 const msg = computed(() => {
@@ -97,26 +147,22 @@ const showAIHint = computed(() => {
 watch(
   () => props.submission?.id,
   () => {
-    hintContent.value = ""
-    hintError.value = ""
+    resetHint()
     hintLoading.value = false
-    hintId.value = null
-    hintHelpful.value = null
   },
 )
 
-async function fetchHint(submissionId: string) {
+// more = 学生点的是「再多一点提示」。升级只能由学生主动发起，而且后端还要看
+// 「上次开出这一级之后有没有再交过」，所以点了也未必真升 —— 以 done 里的 level 为准
+async function fetchHint(submissionId: string, more = false) {
   hintLoading.value = true
-  hintContent.value = ""
-  hintError.value = ""
-  hintId.value = null
-  hintHelpful.value = null
+  resetHint()
 
   try {
     const response = await fetch("/api/ai/hint", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId }),
+      body: JSON.stringify({ submissionId, more }),
     })
 
     if (!response.ok) throw await aiStreamError(response)
@@ -126,12 +172,17 @@ async function fetchHint(submissionId: string) {
         type: string
         content?: string
         message?: string
-        hintId?: number
+        hintId?: number | null
+        level?: number
+        canEscalate?: boolean
       }) => {
         if (data.type === "delta" && data.content) {
-          hintContent.value += data.content
+          hintTarget.value += data.content
+          startTyping()
         } else if (data.type === "done") {
           hintId.value = data.hintId ?? null
+          hintLevel.value = data.level ?? null
+          hintCanEscalate.value = data.canEscalate === true
         } else if (data.type === "error") {
           hintError.value = data.message || "AI 提示生成失败"
         }
@@ -269,21 +320,42 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
           class="mb-3"
         />
         <n-button
-          v-if="!hintContent && !hintLoading"
+          v-if="!hintTarget && !hintLoading"
           type="primary"
           @click="fetchHint(submission.id)"
         >
           让 AI 分析我的代码
         </n-button>
-        <n-spin v-else-if="hintLoading && !hintContent" size="small" />
+        <n-spin v-else-if="hintLoading && !hintTarget" size="small" />
         <MdPreview
           v-if="hintContent"
           :model-value="hintContent"
           preview-theme="vuepress"
           :theme="isDark ? 'dark' : 'light'"
         />
+        <!-- 等级和「再多一点提示」。按钮出不出由后端 done 里的 canEscalate 定，
+             前端不自己推阶梯（要再交一次才升得动，规则在 services/hint-level.ts） -->
         <n-flex
-          v-if="hintId !== null && !hintLoading"
+          v-if="hintLevel !== null && !hintLoading && !hintTyping"
+          align="center"
+          size="small"
+          style="margin-top: 8px"
+        >
+          <n-tag size="small" :bordered="false">
+            {{ hintLevelLabel(hintLevel) }}
+          </n-tag>
+          <n-button
+            v-if="hintCanEscalate"
+            size="tiny"
+            type="primary"
+            ghost
+            @click="fetchHint(submission.id, true)"
+          >
+            再多一点提示
+          </n-button>
+        </n-flex>
+        <n-flex
+          v-if="hintId !== null && !hintLoading && !hintTyping"
           align="center"
           size="small"
           style="margin-top: 8px"

@@ -114,14 +114,70 @@ export const aiAnalysisRequestSchema = z.object({
 
 /**
  * 解锁「让 AI 分析我的代码」所需的失败提交数。前端拿它决定按钮露不露面、
- * 后端拿它卡 POST /ai/hint —— 放在契约里就是为了不让两边各写一个 3。
+ * 后端拿它卡 POST /ai/hint —— 放在契约里就是为了不让两边各写一个数字。
  *
  * 编译失败不受这个门槛限制：报错只关乎语法、不涉及解法，而英文编译报错恰恰是
  * 零基础学生最先撞上、最容易直接放弃的那堵墙。
+ *
+ * **2c 起从 3 降到 1**（设计 2.6）：门槛的活由下面的等级阶梯接走了 —— 第一次失败
+ * 只开放 L0，而 L0 只反问、什么都不泄露，拦着它没有意义；再往上每级都要学生自己
+ * 点、而且要再交一次，比一刀切的「攒够 3 次」更贴学生卡住的时刻。
  */
-export const HINT_MIN_FAILURES = 3
+export const HINT_MIN_FAILURES = 1
 
-export const aiHintRequestSchema = z.object({ submissionId: z.string().min(1) })
+/**
+ * AI 提示的等级（AI 时代 OJ 设计 2.2）。**数字是落库的值（`ai_hint.level`）**，
+ * 和判题状态码一样只能新增、不能改已有含义 —— 教师端「依赖提示」这类风险标签
+ * 要按它聚合，改含义等于把历史数据一起改了。
+ *
+ * 0～2 是一条阶梯，只能逐级上升：**一条新的失败提交最多解锁一级**，而且要学生自己
+ * 点「再多一点提示」才升，不会自动往上爬（2.6）。L3 思路 / L4 示例留给 2d。
+ */
+export const HINT_LEVELS = [
+  { level: 0, name: "反问", summary: "只反问，不给结论" },
+  { level: 1, name: "定位", summary: "只说问题在哪，不说为什么" },
+  { level: 2, name: "概念", summary: "讲清涉及的概念，不给改法" },
+] as const
+
+export const HINT_MAX_LEVEL = 2
+
+/**
+ * 编译失败的提示走这个值，**不在阶梯上**（查阶梯的 SQL 一律 `level >= 0`）。
+ *
+ * 编译错误只关乎语法、不涉及解法，给出定位甚至正确片段都不算放水 —— 而英文编译
+ * 报错恰恰是零基础学生最先撞上、最容易直接放弃的那堵墙，所以它既不消耗等级、
+ * 也不推进等级（同 HINT_MIN_FAILURES 对编译失败的豁免）。
+ *
+ * `ai_hint.level` 还有第三种值 null：2c 上线之前那批不分级的提示，同样不参与阶梯。
+ */
+export const HINT_LEVEL_COMPILE = -1
+
+/** 给界面看的等级名。编译失败那一档不叫 L-1 */
+export function hintLevelLabel(level: number) {
+  if (level === HINT_LEVEL_COMPILE) return "编译错误"
+  const item = HINT_LEVELS.find((entry) => entry.level === level)
+  return item ? `L${item.level} ${item.name}` : `L${level}`
+}
+
+/**
+ * `more` = 学生点的是「再多一点提示」。**升级只能由学生主动发起**：不带它就按当前
+ * 等级再生成一次（换了提交也一样），带上它且距上次升级之后又交过一次才会 +1。
+ */
+export const aiHintRequestSchema = z.object({
+  submissionId: z.string().min(1),
+  more: z.boolean().optional(),
+})
+
+/**
+ * `/ai/hint` 流末尾 `done` 事件的载荷。`hintId` 落库失败时为 null（前端据此不出评价
+ * 按钮），`canEscalate` 是「现在再点一次『再多一点提示』能不能升级」—— 前端拿它决定
+ * 那个按钮出不出，而不是自己去推算阶梯。
+ */
+export const aiHintDoneSchema = z.object({
+  hintId: z.number().int().nullable(),
+  level: z.number().int(),
+  canEscalate: z.boolean(),
+})
 
 /**
  * AI 提示第一段「诊断」给错误归的类。**key 是落库的值（`ai_hint.diagnosis.tag`），
@@ -230,6 +286,7 @@ export type LoginSummary = z.infer<typeof loginSummarySchema>
 
 export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>
 export type AiHintRequest = z.infer<typeof aiHintRequestSchema>
+export type AiHintDone = z.infer<typeof aiHintDoneSchema>
 export type AiHintFeedbackRequest = z.infer<typeof aiHintFeedbackRequestSchema>
 export type ClassAnalysisRequest = z.infer<typeof classAnalysisRequestSchema>
 export type ClassPkAnalysisRequest = z.infer<

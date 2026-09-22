@@ -6,6 +6,7 @@ import {
   classPkAnalysisRequestSchema,
   HINT_MIN_FAILURES,
   type AiAnalysisRecord,
+  type AiHintDone,
   type AiDetail,
   type DurationData,
   type HintDiagnosis,
@@ -36,8 +37,14 @@ import { config } from "../config"
 import { db, schema } from "../db"
 import { JudgeStatus, type JudgeStatusValue } from "../judge/status"
 import { failure, success } from "../http"
-import { completeChat, streamChat } from "../services/ai"
-import { hintDiagnosis, hintPrompt } from "../services/hint-diagnosis"
+import { completeChat, streamChat, streamWhole } from "../services/ai"
+import { generateFilteredHint } from "../services/hint-filter"
+import { decideHintLevel } from "../services/hint-level"
+import {
+  hintDiagnosis,
+  hintPrompt,
+  referenceAnswer,
+} from "../services/hint-diagnosis"
 import { consumeToken } from "../services/throttling"
 import {
   calendarDay,
@@ -942,9 +949,11 @@ async function recordHint(
     promptVersion: number
     diagnosis: HintDiagnosis | null
     diagnosisError: string | null
+    level: number
   },
   content: string,
   error: string | null,
+  filter?: { attempt: number; blocked: boolean; reason: string | null },
 ) {
   try {
     const [row] = await db
@@ -958,6 +967,11 @@ async function recordHint(
         durationMs: Math.round(performance.now() - base.startedAt),
         diagnosis: base.diagnosis,
         diagnosisError: base.diagnosisError,
+        level: base.level,
+        // 生成就失败的那条没走到过滤，三列都留 null（分母里不该有它）
+        filterAttempt: filter?.attempt ?? null,
+        filterBlocked: filter?.blocked ?? null,
+        filterReason: filter?.reason ?? null,
         createTime: new Date().toISOString(),
       })
       .returning({ id: schema.aiHint.id })
@@ -1020,28 +1034,49 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   }
   const limited = await throttleAi(c)
   if (limited) return limited
+  // 这次按第几级生成。等级记在「学生 × 题目」上，怎么算出来的见 services/hint-level.ts
+  const { level, canEscalate } = await decideHintLevel(
+    c.get("user")!.id,
+    row.submission,
+    parsed.data.more === true,
+  )
   // 标准答案**只进诊断那一段**、出参只有枚举和行号；生成提示这一段看不到它。
   // 为什么这么拆、诊断怎么退回单段式，见 services/hint-diagnosis.ts 的文件头
   const startedAt = performance.now()
   const { diagnosis, error: diagnosisError } = await hintDiagnosis(row)
-  const { system, prompt, version } = hintPrompt(row, diagnosis)
+  const { system, prompt, version } = hintPrompt(row, diagnosis, level)
   const base = {
     submissionId: row.submission.id,
     startedAt,
     promptVersion: version,
     diagnosis,
     diagnosisError,
+    level,
   }
-  return streamChat(system, prompt, {
-    onComplete: async (content) => {
-      const id = await recordHint(base, content, null)
+  // 不是 streamChat：提示要整段生成、过滤通过才推给学生（设计 2.6），
+  // 边流式边过滤做不到 —— 发现违规时内容已经在屏幕上了
+  return streamWhole(
+    async () => {
+      const filtered = await generateFilteredHint({
+        system,
+        prompt,
+        level,
+        // 标程只用来核「有没有把它抄出来」，不进任何 prompt
+        referenceCode: referenceAnswer(row)?.code ?? null,
+      })
       // 落库失败就不带 id：前端据此不出评价按钮，提示本身照常显示
-      return id === null ? undefined : { hintId: id }
+      const hintId = await recordHint(base, filtered.content, null, filtered)
+      return {
+        content: filtered.content,
+        extra: { hintId, level, canEscalate } satisfies AiHintDone,
+      }
     },
-    onError: async (message) => {
-      await recordHint(base, "", message)
+    {
+      onError: async (message) => {
+        await recordHint(base, "", message)
+      },
     },
-  })
+  )
 })
 
 aiRoutes.post("/ai/hint/:id/feedback", requireAuth, async (c) => {
