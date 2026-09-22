@@ -17,6 +17,7 @@ import {
   ilike,
   inArray,
   isNull,
+  ne,
   notInArray,
   or,
   sql,
@@ -335,6 +336,18 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
     .from(schema.problemTags)
     .where(eq(schema.problemTags.problemId, target.id))
   if (targetTags.length === 0) return success(c, [])
+  // 「已 AC 的不再推荐」必须下推到 SQL。早先是先 limit(5) 再在内存里筛，刷题多的
+  // 学生 5 条候选能被筛到只剩一两条、甚至清零（前端 v-if 一空整块就不渲染）——
+  // 而这个接口恰好只在**刚 AC** 或**连挂三次**时才被调用，正是候选最容易全中的时候。
+  const statuses = await getProblemStatuses(c.get("user")?.id)
+  const solvedIds = Object.entries(statuses)
+    .filter(([, value]) => toObject(value).status === JudgeStatus.ACCEPTED)
+    .map(([key]) => Number(key))
+    .filter((id) => Number.isInteger(id))
+  // difficulty 是 text（Low / Mid / High），直接 order by 走的是字典序 ——
+  // High 排在 Low 前面，「由易到难」会变成「最难的先上」。按语义显式排。
+  const difficultyRank = sql`case ${schema.problem.difficulty} when 'Low' then 0 when 'Mid' then 1 else 2 end`
+  const sharedTags = count(schema.problemTags.problemtagId)
   const rows = await db
     .select({
       problem: schema.problem,
@@ -344,40 +357,39 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
     .from(schema.problem)
     .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+    // 直接 join 中间表（而不是 id in (子查询)）是为了数出重合了几个标签，
+    // 拿来当第一排序键。(problem_id, problemtag_id) 上有唯一约束，不会重复计数。
+    .innerJoin(
+      schema.problemTags,
+      and(
+        eq(schema.problemTags.problemId, schema.problem.id),
+        inArray(
+          schema.problemTags.problemtagId,
+          targetTags.map((tag) => tag.id),
+        ),
+      ),
+    )
     .where(
       and(
         eq(schema.problem.visible, true),
         isNull(schema.problem.contestId),
-        sql`${schema.problem.id} <> ${target.id}`,
-        inArray(
-          schema.problem.id,
-          db
-            .select({ id: schema.problemTags.problemId })
-            .from(schema.problemTags)
-            .where(
-              inArray(
-                schema.problemTags.problemtagId,
-                targetTags.map((tag) => tag.id),
-              ),
-            ),
-        ),
+        ne(schema.problem.id, target.id),
+        solvedIds.length ? notInArray(schema.problem.id, solvedIds) : undefined,
       ),
     )
     .groupBy(schema.problem.id, schema.user.id, schema.userProfile.realName)
-    .orderBy(asc(schema.problem.difficulty))
+    // 末尾的 id 是稳定排序用的：并列时没有它，同一道题两次请求能返回不同的 5 条
+    .orderBy(
+      desc(sharedTags),
+      asc(difficultyRank),
+      desc(schema.problem.acceptedNumber),
+      asc(schema.problem.id),
+    )
     .limit(5)
-  const [tags, statuses] = await Promise.all([
-    getProblemTags(rows.map((row) => row.problem.id)),
-    getProblemStatuses(c.get("user")?.id),
-  ])
-  const filtered = rows.filter(
-    (row) =>
-      toObject(statuses[String(row.problem.id)]).status !==
-      JudgeStatus.ACCEPTED,
-  )
+  const tags = await getProblemTags(rows.map((row) => row.problem.id))
   return success(
     c,
-    filtered.map((row) => listItem(row, tags, statuses)),
+    rows.map((row) => listItem(row, tags, statuses)),
   )
 })
 

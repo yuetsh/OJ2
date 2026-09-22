@@ -5,8 +5,7 @@ import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { createTestSubmission } from "utils/judge"
-import { DIFFICULTY } from "utils/constants"
-import type { Problem, ProblemStatus } from "utils/types"
+import type { Problem, ProblemFiltered, ProblemStatus } from "utils/types"
 import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
@@ -46,11 +45,14 @@ const sqlChangedTables = computed(() => {
 const router = useRouter()
 
 // 相似题目推荐
-const similarProblems = ref<any[]>([])
+const similarProblems = ref<ProblemFiltered[]>([])
 const similarLoaded = ref(false)
 
 async function loadSimilarProblems() {
   if (similarLoaded.value || !problem.value) return
+  // 比赛题不推荐：接口按 displayId 在**公开题库**里找，比赛题的编号默认是 1/2/3，
+  // 一般白跑一趟 404，撞上同号公开题时反而会在比赛中把题库列给学生。
+  if (problem.value.contestId !== null) return
   try {
     similarProblems.value = await getSimilarProblems(problem.value._id)
   } catch {
@@ -407,19 +409,19 @@ function type(status: ProblemStatus) {
                 {{ sp.title }}
               </n-button>
             </n-flex>
+            <!-- getSimilarProblems 已经过 filterResult，难度是中文，不是 Low/Mid/High -->
             <n-tag
+              v-if="sp.difficulty"
               size="small"
               :type="
-                sp.difficulty === 'Low'
+                sp.difficulty === '简单'
                   ? 'success'
-                  : sp.difficulty === 'High'
+                  : sp.difficulty === '困难'
                     ? 'error'
                     : 'warning'
               "
             >
-              {{
-                DIFFICULTY[sp.difficulty as keyof typeof DIFFICULTY] || "中等"
-              }}
+              {{ sp.difficulty }}
             </n-tag>
           </n-flex>
         </n-list-item>
