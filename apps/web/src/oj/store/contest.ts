@@ -1,3 +1,4 @@
+import { errorCode } from "utils/api"
 import { formatISO, getTime, parseISO } from "date-fns"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
@@ -96,9 +97,9 @@ export const useContestStore = defineStore("contest", () => {
         _getProblems(contestID)
       }
       return null
-    } catch (err: any) {
+    } catch (err) {
       toggleAccess(false)
-      return (err?.error as string | undefined) ?? "unknown"
+      return errorCode(err) ?? "unknown"
     }
   }
 

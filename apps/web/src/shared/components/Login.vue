@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorCode } from "utils/api"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import { getClassUsernames, login } from "../api"
@@ -124,13 +125,13 @@ function submit() {
         merged.username = form.value.class + merged.username
       }
       await login(merged)
-    } catch (err: any) {
+    } catch (err) {
       // 判错误码而不是错误文案：文案在后端，改一个字这里就静默掉进「无法登录」
-      if (err.error === "account-disabled") {
+      if (errorCode(err) === "account-disabled") {
         authStore.setLoginError("此账号已被封禁")
-      } else if (err.error === "invalid-credentials") {
+      } else if (errorCode(err) === "invalid-credentials") {
         authStore.setLoginError("用户名或密码不正确")
-      } else if (err.error === "too-many-login-attempts") {
+      } else if (errorCode(err) === "too-many-login-attempts") {
         authStore.setLoginError("密码错误次数太多，请 15 分钟后再试")
       } else {
         authStore.setLoginError("无法登录")

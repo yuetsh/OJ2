@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorCode } from "utils/api"
 import { getProblem } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { storeToRefs } from "pinia"
@@ -120,9 +121,9 @@ async function init() {
   try {
     const res = await getProblem(problemID, contestID)
     problem.value = res
-  } catch (err: any) {
+  } catch (err) {
     problem.value = null
-    if (err.error === "contest-not-started") {
+    if (errorCode(err) === "contest-not-started") {
       errMsg.value = "比赛还没有开始"
     }
   }

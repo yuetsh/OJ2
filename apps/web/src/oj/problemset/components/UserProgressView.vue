@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import { h, computed, ref, onMounted, watch } from "vue"
 import { watchDebounced } from "@vueuse/core"
 import { parseTime } from "utils/functions"
@@ -68,10 +69,10 @@ async function loadUserProgress() {
     if (res.problems) {
       allProblems.value = res.problems
     }
-  } catch (err: any) {
+  } catch (err) {
     // finally 里收掉 loading：以前 loading.value = false 写在 await 之后，
     // 请求一失败（403、断网）转圈就永远停不下来
-    message.error("加载用户进度失败：" + (err.data || "未知错误"))
+    message.error("加载用户进度失败：" + errorMessage(err, "未知错误"))
   } finally {
     loading.value = false
   }

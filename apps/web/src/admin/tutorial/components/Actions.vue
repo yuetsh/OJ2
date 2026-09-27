@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { errorMessage } from "utils/api"
 import { deleteTutorial } from "admin/api"
 
 interface Props {
@@ -22,8 +23,8 @@ async function handleDelete() {
     await deleteTutorial(props.tutorialID)
     message.success("删除成功")
     emit("deleted")
-  } catch (err: any) {
-    message.error(err.data)
+  } catch (err) {
+    message.error(errorMessage(err))
   }
 }
 </script>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import { NTabPane, NTabs, NButton, NFlex } from "naive-ui"
 import type {
   AdminProblemSet,
@@ -61,8 +62,8 @@ async function loadProblemSetDetail() {
   try {
     const res = await getProblemSetDetail(problemSetId.value)
     problemSet.value = res
-  } catch (err: any) {
-    message.error("加载题单详情失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("加载题单详情失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -70,8 +71,8 @@ async function loadProblems() {
   try {
     const res = await getProblemSetProblems(problemSetId.value)
     problems.value = res
-  } catch (err: any) {
-    message.error("加载题目列表失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("加载题目列表失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -79,8 +80,8 @@ async function loadBadges() {
   try {
     const res = await getProblemSetBadges(problemSetId.value)
     badges.value = res
-  } catch (err: any) {
-    message.error("加载奖章列表失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("加载奖章列表失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -88,8 +89,8 @@ async function loadProgress() {
   try {
     const res = await getProblemSetProgress(problemSetId.value)
     progress.value = res
-  } catch (err: any) {
-    message.error("加载进度列表失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("加载进度列表失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -100,8 +101,8 @@ async function handleAddProblem(data: AddProblemToSetRequest) {
     showAddProblemModal.value = false
     loadProblems()
     loadProblemSetDetail() // 刷新题目数量
-  } catch (err: any) {
-    message.error("添加题目失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("添加题目失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -111,8 +112,8 @@ async function handleRemoveProblem(problemSetProblemId: number) {
     message.success("题目移除成功")
     loadProblems()
     loadProblemSetDetail() // 刷新题目数量
-  } catch (err: any) {
-    message.error("移除题目失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("移除题目失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -124,8 +125,8 @@ async function handleEditProblem(data: UpdateProblemInSetRequest) {
     message.success("题目编辑成功")
     showEditProblemModal.value = false
     loadProblems()
-  } catch (err: any) {
-    message.error("编辑题目失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("编辑题目失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -135,8 +136,8 @@ async function handleAddBadge(data: BadgeFormData) {
     message.success("奖章创建成功")
     showAddBadgeModal.value = false
     loadBadges()
-  } catch (err: any) {
-    message.error("创建奖章失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("创建奖章失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -145,8 +146,8 @@ async function handleDeleteBadge(badgeId: number) {
     await deleteProblemSetBadge(problemSetId.value, badgeId)
     message.success("奖章删除成功")
     loadBadges()
-  } catch (err: any) {
-    message.error("删除奖章失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("删除奖章失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -158,8 +159,8 @@ async function handleEditBadge(data: BadgeFormData) {
     message.success("奖章编辑成功")
     showEditBadgeModal.value = false
     loadBadges()
-  } catch (err: any) {
-    message.error("编辑奖章失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("编辑奖章失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -168,8 +169,8 @@ async function handleRemoveUser(userId: number) {
     await removeUserFromProblemSet(problemSetId.value, userId)
     message.success("用户移除成功")
     loadProgress()
-  } catch (err: any) {
-    message.error("移除用户失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("移除用户失败：" + errorMessage(err, "未知错误"))
   }
 }
 

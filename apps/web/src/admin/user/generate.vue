@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import {
   CLASS_NAME_MAX_DIGITS,
   CLASS_NAME_MAX_VALUE,
@@ -66,8 +67,8 @@ async function uploadUsers() {
     hiddenElement.download = prefix.value + ".csv"
     hiddenElement.click()
     hiddenElement.remove()
-  } catch (err: any) {
-    message.error("上传失败：" + err.data)
+  } catch (err) {
+    message.error("上传失败：" + errorMessage(err))
   } finally {
     toggleLoading(false)
   }

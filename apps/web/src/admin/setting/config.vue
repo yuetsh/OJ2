@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import { NButton, NTag } from "naive-ui"
 import {
   CLASS_NAME_MAX_DIGITS,
@@ -210,8 +211,8 @@ async function saveWebsiteConfig() {
   }
   try {
     await editWebsite(websiteConfig)
-  } catch (err: any) {
-    message.error("保存失败：" + err.data)
+  } catch (err) {
+    message.error("保存失败：" + errorMessage(err))
     return
   }
   message.success("网站配置保存成功")

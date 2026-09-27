@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import { NSwitch } from "naive-ui"
 import { parseTime } from "utils/functions"
 import type { TutorialListItem } from "utils/types"
@@ -63,8 +64,8 @@ async function toggleVisible(tutorial: TutorialListItem) {
   try {
     await setTutorialVisibility(tutorial.id, tutorial.isPublic)
     message.success("更新成功")
-  } catch (err: any) {
-    message.error(err.data)
+  } catch (err) {
+    message.error(errorMessage(err))
     tutorial.isPublic = !tutorial.isPublic
   }
 }

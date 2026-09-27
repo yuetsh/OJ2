@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { errorMessage } from "utils/api"
 import TextEditor from "shared/components/TextEditor.vue"
 import type { AnnouncementEdit } from "utils/types"
 import { createAnnouncement, editAnnouncement, getAnnouncement } from "../api"
@@ -63,8 +64,8 @@ async function submit() {
       message.success("修改已保存")
     }
     router.push({ name: "admin announcement list" })
-  } catch (err: any) {
-    message.error(err.data)
+  } catch (err) {
+    message.error(errorMessage(err))
   }
 }
 

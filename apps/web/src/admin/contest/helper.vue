@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import type { AcmHelperItem, SubmissionInfo } from "utils/types"
 import { NButton, NCheckbox, NSelect, NTag } from "naive-ui"
 import { parseTime } from "utils/functions"
@@ -70,8 +71,8 @@ async function toggleChecked(item: HelperItem) {
     submissions.value = [...submissions.value]
 
     message.success(newChecked ? "已标记为已检查" : "已取消标记")
-  } catch (err: any) {
-    message.error(err.data || "操作失败")
+  } catch (err) {
+    message.error(errorMessage(err, "操作失败"))
   }
 }
 
@@ -101,9 +102,9 @@ async function markAllAsChecked() {
 
     loadingMsg.destroy()
     message.success(`已标记 ${unchecked.length} 个提交为已检查`)
-  } catch (err: any) {
+  } catch (err) {
     loadingMsg.destroy()
-    message.error(err.data || "批量操作失败")
+    message.error(errorMessage(err, "批量操作失败"))
   }
 }
 
@@ -159,8 +160,8 @@ async function viewSubmission(item: HelperItem) {
     }
 
     toggleCodePanel(true)
-  } catch (err: any) {
-    message.error(err.data || "加载提交失败")
+  } catch (err) {
+    message.error(errorMessage(err, "加载提交失败"))
   }
 }
 
@@ -174,8 +175,8 @@ async function loadData() {
     // 再获取 AC 提交列表
     const data = await getACMHelperList(Number(props.contestID))
     submissions.value = data
-  } catch (err: any) {
-    message.error(err.data || "加载失败")
+  } catch (err) {
+    message.error(errorMessage(err, "加载失败"))
   }
 }
 

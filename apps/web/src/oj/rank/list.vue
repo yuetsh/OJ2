@@ -505,7 +505,7 @@ async function listMyClassRank() {
     if (myClassScope.value === "window") {
       myClassQuery.page = 1
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
   }
 }
@@ -517,7 +517,7 @@ async function listWeeklyRank() {
     weeklyMe.value = res.me
     weeklyTotal.value = res.total
     weeklyStart.value = res.start
-  } catch (err: any) {
+  } catch (err) {
     console.error(err)
   }
 }

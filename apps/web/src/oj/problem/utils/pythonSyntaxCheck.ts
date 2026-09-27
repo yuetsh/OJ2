@@ -46,8 +46,10 @@ export async function checkPythonSyntax(
   try {
     Sk.compile(code, "prog.py", "exec")
     return null
-  } catch (e: any) {
-    const line: number = e?.traceback?.[0]?.lineno ?? 1
+  } catch (e) {
+    // Skulpt 的语法错误对象，不是 Error 的子类
+    const traceback = (e as { traceback?: { lineno?: number }[] }).traceback
+    const line = traceback?.[0]?.lineno ?? 1
     return { line }
   }
 }

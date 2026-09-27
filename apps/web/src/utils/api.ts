@@ -6,11 +6,43 @@ import storage from "./storage"
 
 const { message: toast } = createDiscreteApi(["message"])
 
-interface ApiError {
+/** 后端失败响应体的形状，见 apps/api/src/http.ts 的 failure */
+interface ErrorPayload {
   error?: {
     code?: string
     message?: string
   }
+}
+
+/**
+ * 拦截器 reject 出来的就是它：`error` 是错误码，`data` 是后端文案。
+ *
+ * 字段名沿用原来那个裸对象 `{ error, data }`，存量调用点读 `err.error` / `err.data`
+ * 的语义不变；做成 Error 的子类是为了在 catch 里能和代码 bug（TypeError 之类）分开，
+ * 也顺带有了堆栈。catch 块里别写 `err: any`，用下面的 errorCode / errorMessage。
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly error: string,
+    readonly data: string,
+  ) {
+    super(data)
+    this.name = "ApiError"
+  }
+}
+
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError
+}
+
+/** 接口错误的错误码；不是接口错误（代码 bug、被中止……）就是 undefined */
+export function errorCode(err: unknown) {
+  return isApiError(err) ? err.error : undefined
+}
+
+/** 给用户看的文案：接口错误用后端文案，其它一律 fallback —— 别把 TypeError 的英文甩给学生 */
+export function errorMessage(err: unknown, fallback = "未知错误") {
+  return isApiError(err) && err.data ? err.data : fallback
 }
 
 /**
@@ -74,12 +106,13 @@ instance.interceptors.response.use(
     response: AxiosResponse,
   ) => AxiosResponse,
   (error) => {
-    const payload = error.response?.data as ApiError | undefined
+    const payload = error.response?.data as ErrorPayload | undefined
     const code = payload?.error?.code ?? "network-error"
-    const message = payload?.error?.message ?? "Request failed"
+    // 没有响应体 = 请求根本没到后端（断网、反代挂了、超时），学生看到的就是这一句
+    const message = payload?.error?.message ?? "网络异常，请检查网络后重试"
 
     handleGlobalApiError(code, message)
-    return Promise.reject({ error: code, data: message })
+    return Promise.reject(new ApiError(code, message))
   },
 )
 

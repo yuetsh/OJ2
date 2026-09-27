@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorCode, errorMessage } from "utils/api"
 import { addProblemForContest } from "admin/api"
 
 interface Props {
@@ -22,13 +23,13 @@ async function addProblem() {
       displayID.value,
     )
     emit("added")
-  } catch (err: any) {
-    if (err.error === "display-id-exists") {
+  } catch (err) {
+    if (errorCode(err) === "display-id-exists") {
       message.error("显示编号重复了，请重新写一个")
-    } else if (err.error === "contest-ended") {
+    } else if (errorCode(err) === "contest-ended") {
       message.error("这场比赛已经结束了，不能添加题目")
     } else {
-      message.error(err.data)
+      message.error(errorMessage(err))
     }
   }
 }

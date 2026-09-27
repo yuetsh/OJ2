@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import {
   getProblemSetDetail,
   getProblemSetProblems,
@@ -90,8 +91,8 @@ async function handleJoinProblemSet() {
     message.success("成功加入题单！")
     // 加入题单后加载用户徽章
     await loadUserBadges()
-  } catch (err: any) {
-    message.error("加入题单失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("加入题单失败：" + errorMessage(err, "未知错误"))
   } finally {
     isJoining.value = false
   }

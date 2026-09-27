@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorCode, errorMessage } from "utils/api"
 import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
 import { formatCode, getReaction, submitCode } from "oj/api"
@@ -133,10 +134,10 @@ async function submit() {
         language: formatLang,
       })
       codeStore.setCode(res.code)
-    } catch (e: any) {
-      if (e?.error === "format-error") {
+    } catch (e) {
+      if (errorCode(e) === "format-error") {
         // 仅 Python 会出现：代码本身存在语法错误
-        message.warning(`代码格式化失败：${e.data}，请检查代码后重试`)
+        message.warning(`代码格式化失败：${errorMessage(e)}，请检查代码后重试`)
         return
       }
       // server-error / 网络异常：格式化工具问题，静默降级，提交原代码

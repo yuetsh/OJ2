@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { errorMessage } from "utils/api"
 import { deleteProblemSet, updateProblemSetStatus } from "admin/api"
 
 interface Props {
@@ -24,8 +25,8 @@ async function handleDeleteProblemSet() {
     await deleteProblemSet(props.problemSetId)
     message.success("删除成功")
     emit("updated")
-  } catch (err: any) {
-    message.error("删除失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("删除失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -53,8 +54,8 @@ async function handleUpdateStatus() {
     message.success("状态更新成功")
     showStatusModal.value = false
     emit("updated")
-  } catch (err: any) {
-    message.error("状态更新失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("状态更新失败：" + errorMessage(err, "未知错误"))
   }
 }
 </script>

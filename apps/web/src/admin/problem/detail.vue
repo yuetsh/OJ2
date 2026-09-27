@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorCode, errorMessage } from "utils/api"
 import { PROBLEM_TAG_MAX_LENGTH } from "@oj2/contract"
 import { getProblemTagList } from "shared/api"
 import TextEditor from "shared/components/TextEditor.vue"
@@ -484,11 +485,11 @@ async function submit() {
         params: { contestID: props.contestID },
       })
     }
-  } catch (err: any) {
-    if (err.error === "display-id-exists") {
+  } catch (err) {
+    if (errorCode(err) === "display-id-exists") {
       message.error("显示编号重复了，请换一个显示编号")
     } else {
-      message.error(err.data)
+      message.error(errorMessage(err))
     }
   }
 }
@@ -515,9 +516,9 @@ async function generateMermaid() {
     )
     problem.value.mermaidCode = res.flowchart
     message.warning("如果渲染不成功，请复制到外部 AI 网站检查语法")
-  } catch (err: any) {
+  } catch (err) {
     // 没有 finally 的话，AI 接口回 502 时按钮永远卡在 loading，只能刷页面
-    message.error(err.data || "生成失败，请稍后再试")
+    message.error(errorMessage(err, "生成失败，请稍后再试"))
   } finally {
     isAIGenerating.value = false
   }

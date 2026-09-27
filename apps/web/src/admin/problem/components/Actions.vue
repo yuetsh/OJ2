@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { errorCode, errorMessage } from "utils/api"
 import {
   deleteContestProblem,
   deleteProblem,
@@ -33,8 +34,8 @@ async function handleDeleteProblem() {
     }
     message.success("删除成功")
     emit("updated")
-  } catch (err: any) {
-    if (err.error === "problem-has-submissions") {
+  } catch (err) {
+    if (errorCode(err) === "problem-has-submissions") {
       message.error("这道题有提交之后，就不能被删除")
     } else {
       message.error("删除失败")
@@ -81,13 +82,13 @@ async function handleMakePublic() {
     message.success("已成功转为公开题目（需要手动设置可见）")
     showMakePublicModal.value = false
     emit("updated") // 刷新列表
-  } catch (err: any) {
-    if (err.error === "display-id-exists") {
+  } catch (err) {
+    if (errorCode(err) === "display-id-exists") {
       message.error("该题目编号已存在，请使用其他编号")
-    } else if (err.error === "already-public") {
+    } else if (errorCode(err) === "already-public") {
       message.error("该题目已经是公开题目")
     } else {
-      message.error("转换失败：" + (err.data || "未知错误"))
+      message.error("转换失败：" + errorMessage(err, "未知错误"))
     }
   }
 }

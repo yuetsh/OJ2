@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import { formatISO } from "date-fns"
 import TextEditor from "shared/components/TextEditor.vue"
 import { fromPickerValue, parseTime, toPickerValue } from "utils/functions"
@@ -102,8 +103,8 @@ async function submit() {
       message.success("修改已保存")
     }
     router.push({ name: "admin contest list" })
-  } catch (err: any) {
-    message.error(err.data)
+  } catch (err) {
+    message.error(errorMessage(err))
   }
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import type {
   Exercise,
   ExerciseType,
@@ -317,8 +318,8 @@ async function save() {
     }
     showForm.value = false
     await load()
-  } catch (e: any) {
-    message.error(e.data ?? "保存失败")
+  } catch (e) {
+    message.error(errorMessage(e, "保存失败"))
   }
 }
 

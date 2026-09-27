@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorCode } from "utils/api"
 import { NButton, NFlex, NTag, NText } from "naive-ui"
 import { useRouteQuery } from "@vueuse/router"
 import {
@@ -225,8 +226,8 @@ async function retryFlowchart(submissionId: string) {
   }
   try {
     await retryFlowchartSubmission(submissionId)
-  } catch (err: any) {
-    message.error(retryTips[err?.error] ?? "重新评分失败")
+  } catch (err) {
+    message.error(retryTips[errorCode(err) ?? ""] ?? "重新评分失败")
     return
   }
   message.success("重新评分已提交")

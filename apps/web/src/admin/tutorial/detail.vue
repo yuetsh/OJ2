@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { errorMessage } from "utils/api"
 import CodeEditor from "shared/components/CodeEditor.vue"
 import MarkdownEditor from "shared/components/MarkdownEditor.vue"
 import type { TutorialEdit } from "utils/types"
@@ -63,8 +64,8 @@ async function submit() {
       await updateTutorial(tutorial)
       message.success("修改已保存")
     }
-  } catch (err: any) {
-    message.error(err.data)
+  } catch (err) {
+    message.error(errorMessage(err))
   }
 }
 

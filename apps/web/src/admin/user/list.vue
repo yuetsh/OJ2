@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import { DataTableRowKey, NFlex, NTag, SelectOption } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
@@ -250,8 +251,8 @@ async function handleEditUser() {
       })
       await editUser(user)
     }
-  } catch (err: any) {
-    message.error("保存失败：" + err.data)
+  } catch (err) {
+    message.error("保存失败：" + errorMessage(err))
     return
   }
   userEditing.value = null

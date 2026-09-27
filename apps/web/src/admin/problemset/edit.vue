@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errorMessage } from "utils/api"
 import type { CreateProblemSetData, EditProblemSetData } from "utils/types"
 import { fromPickerValue, toPickerValue } from "utils/functions"
 import { getProblemSetDetail, createProblemSet, editProblemSet } from "../api"
@@ -60,8 +61,8 @@ async function loadProblemSetDetail() {
       visible: data.visible,
       endTime: data.endTime ? new Date(data.endTime) : null,
     }
-  } catch (err: any) {
-    message.error("加载题单详情失败：" + (err.data || "未知错误"))
+  } catch (err) {
+    message.error("加载题单详情失败：" + errorMessage(err, "未知错误"))
   }
 }
 
@@ -87,11 +88,11 @@ async function handleSubmit() {
       message.success("题单创建成功")
     }
     router.push({ name: "admin problemset list" })
-  } catch (err: any) {
+  } catch (err) {
     message.error(
       (isEdit.value ? "更新" : "创建") +
         "题单失败：" +
-        (err.data || "未知错误"),
+        errorMessage(err, "未知错误"),
     )
   } finally {
     loading.value = false

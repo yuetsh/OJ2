@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { errorCode } from "utils/api"
 import { toRefs } from "vue"
 
 // 工具函数
@@ -256,13 +257,13 @@ async function submitFlowchartData() {
     }
 
     message.success("流程图已提交，请耐心等待评分")
-  } catch (error: any) {
+  } catch (error) {
     loading.value = false
     // 按错误码分支（见 utils/api.ts 的约定）。限流是最容易撞上的一种：
     // 只说「提交失败」的话，学生会以为是自己的图有问题，然后反复点，越点越久
-    if (error?.error === "too-many-submissions") {
+    if (errorCode(error) === "too-many-submissions") {
       message.warning("提交太频繁了，缓一会儿再交")
-    } else if (error?.error === "flowchart-not-allowed") {
+    } else if (errorCode(error) === "flowchart-not-allowed") {
       message.error("这道题不接受流程图提交")
     } else {
       message.error("流程图提交失败")
