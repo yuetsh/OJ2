@@ -162,185 +162,41 @@ function getClassColor(index: number) {
   return colors[index % colors.length]
 }
 
-// 综合分对比图
-const compositeScoreChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
+// 值一定是数字的那些指标（recent* 是可选字段，不在其列）
+type BarMetric = {
+  [K in keyof ClassComparison]-?: ClassComparison[K] extends number ? K : never
+}[keyof ClassComparison]
 
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "综合分",
-      data: comparisons.value.map((c) => c.compositeScore),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
+// 十张柱状对比图只差标题和取哪一列：每个班级一种颜色，和雷达图用同一套配色
+function barChart(label: string, key: BarMetric) {
+  return computed(() => {
+    if (comparisons.value.length === 0) return null
 
-  return { labels, datasets }
-})
+    const labels = comparisons.value.map((c) => c.className)
+    const datasets = [
+      {
+        label,
+        data: comparisons.value.map((c) => c[key]),
+        backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
+        borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
+        borderWidth: 2,
+      },
+    ]
 
-// 总AC数对比图 - 每个班级用不同颜色
-const totalAcChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
+    return { labels, datasets }
+  })
+}
 
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "总AC数",
-      data: comparisons.value.map((c) => c.totalAc),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 平均AC数对比图
-const avgAcChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "平均AC数",
-      data: comparisons.value.map((c) => c.avgAc),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 中位数AC数对比图
-const medianAcChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "中位数AC数",
-      data: comparisons.value.map((c) => c.medianAc),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 优秀率对比图
-const excellentRateChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "优秀率",
-      data: comparisons.value.map((c) => c.excellentRate),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 及格率对比图
-const passRateChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "及格率",
-      data: comparisons.value.map((c) => c.passRate),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 参与度对比图
-const activeRateChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "参与度",
-      data: comparisons.value.map((c) => c.activeRate),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 前10%平均对比图
-const top10AvgChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "前10%平均",
-      data: comparisons.value.map((c) => c.top10Avg),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 后10%平均对比图
-const bottom10AvgChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "后10%平均",
-      data: comparisons.value.map((c) => c.bottom10Avg),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
-
-// 中间80%均值对比图
-const middle80AvgChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  const labels = comparisons.value.map((c) => c.className)
-  const datasets = [
-    {
-      label: "中间80%均值",
-      data: comparisons.value.map((c) => c.middle80Avg),
-      backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-      borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-      borderWidth: 2,
-    },
-  ]
-
-  return { labels, datasets }
-})
+const compositeScoreChartData = barChart("综合分", "compositeScore")
+const totalAcChartData = barChart("总AC数", "totalAc")
+const avgAcChartData = barChart("平均AC数", "avgAc")
+const medianAcChartData = barChart("中位数AC数", "medianAc")
+const excellentRateChartData = barChart("优秀率", "excellentRate")
+const passRateChartData = barChart("及格率", "passRate")
+const activeRateChartData = barChart("参与度", "activeRate")
+const top10AvgChartData = barChart("前10%平均", "top10Avg")
+const bottom10AvgChartData = barChart("后10%平均", "bottom10Avg")
+const middle80AvgChartData = barChart("中间80%均值", "middle80Avg")
 
 // 雷达图数据 - 多维度综合对比
 const radarChartData = computed(() => {
