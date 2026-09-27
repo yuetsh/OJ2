@@ -78,9 +78,11 @@ const { query, clearQuery } = usePagination<ProblemQuery>({
   sort: useRouteQuery("sort", "").value,
 })
 
-// 标签默认收起：四十多个标签在桌面上要占三行，把题目表格顶到半屏以下。
-// 从带 ?tag= 的链接进来时展开，让人看得见是哪个标签在起作用
-const [showTag, toggleShowTag] = useToggle(!!query.tag)
+// 标签在桌面上默认展开：分成「知识点」「主题」两组之后，按知识点找题成了常规入口
+// （首页、个人主页的知识点地图都链到 ?tag=），收着的话学生根本不知道能这么筛。
+// 手机上还是收起：窄屏上四十多个标签能把题目表格整个顶出屏幕。
+// 从带 ?tag= 的链接进来时一律展开，让人看得见是哪个标签在起作用
+const [showTag, toggleShowTag] = useToggle(!!query.tag || isDesktop.value)
 
 async function listProblems() {
   if (query.page < 1) query.page = 1
