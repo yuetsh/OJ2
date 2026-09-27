@@ -55,7 +55,7 @@ const waited = (createdAt: number) => {
  * 那个弹框按一下 Esc 就关、协作跟着结束，上课时太容易误触；题面也只能看不能用。
  * 直接跳题目页之后，老师看到的就是学生看到的那一页。
  *
- * 求助入口在比赛里是关掉的（Form.vue 的 showHelpButton），problemId 一定是公开
+ * 求助入口在比赛里是关掉的（EditorToolbar.vue 的 showHelpButton），problemId 一定是公开
  * 题目的展示 ID，走 /problem/:id 就行。
  */
 const handleAccept = (studentId: number, problemId: string, status: string) => {

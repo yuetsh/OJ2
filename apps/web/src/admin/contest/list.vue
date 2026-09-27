@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { NSwitch, NTag } from "naive-ui"
 import ContestTitle from "shared/components/ContestTitle.vue"
-import ContestType from "shared/components/ContestType.vue"
+import ContestAccessTag from "shared/components/ContestAccessTag.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { CONTEST_STATUS } from "utils/constants"
 import { parseTime } from "utils/functions"
-import type { Contest } from "utils/types"
+import type { AdminContest } from "utils/types"
 import { editContest, getContestList } from "../api"
 import Actions from "./components/Actions.vue"
 
-const contests = ref<Contest[]>([])
+const contests = ref<AdminContest[]>([])
 const total = ref(0)
 const query = reactive({
   limit: 10,
@@ -17,12 +17,12 @@ const query = reactive({
   keyword: "",
 })
 
-function toggleVisible(contest: Contest) {
+function toggleVisible(contest: AdminContest) {
   contest.visible = !contest.visible
   editContest(contest)
 }
 
-const columns: DataTableColumn<Contest>[] = [
+const columns: DataTableColumn<AdminContest>[] = [
   { title: "ID", key: "id", width: 60 },
   {
     title: "比赛",
@@ -39,7 +39,7 @@ const columns: DataTableColumn<Contest>[] = [
     title: "类型",
     key: "contest_type",
     width: 100,
-    render: (row) => h(ContestType, { contest: row, size: "small" }),
+    render: (row) => h(ContestAccessTag, { contest: row, size: "small" }),
   },
   {
     title: "状态",

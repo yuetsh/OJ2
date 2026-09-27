@@ -13,7 +13,7 @@ import { and, desc, eq, isNotNull } from "drizzle-orm"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { JudgeStatus, judgeStatusName } from "../judge/status"
-import { objectValue } from "../routes/helpers"
+import { asRecord } from "../routes/helpers"
 import { completeChat } from "./ai"
 import { KEY_LINE_LEVEL } from "./hint-filter"
 import { readInfo } from "./test-case"
@@ -80,7 +80,7 @@ const SINGLE_SYSTEM =
   "你是编程助教。指出学生代码最关键的一个问题，循序渐进地提示，绝不直接给出核心算法或完整解法。输入读取错误可以直接给出正确片段。使用 Markdown，不超过6句话。"
 
 function errInfo(row: HintRow) {
-  return String(objectValue(row.submission.statisticInfo).err_info ?? "无")
+  return String(asRecord(row.submission.statisticInfo).err_info ?? "无")
 }
 
 /**
@@ -122,7 +122,7 @@ function problemBrief(row: HintRow) {
   const samples = (
     Array.isArray(row.problem.samples) ? row.problem.samples : []
   )
-    .map((item) => objectValue(item))
+    .map((item) => asRecord(item))
     .filter(
       (item): item is { input: string; output: string } =>
         typeof item.input === "string" && typeof item.output === "string",
@@ -152,7 +152,7 @@ function numbered(code: string) {
 /** 同语言的标准答案优先；没有就拿别的语言的（思路一样，照样能帮诊断）；再没有就 null */
 export function referenceAnswer(row: HintRow) {
   const answers = Array.isArray(row.problem.answers)
-    ? row.problem.answers.map((item) => objectValue(item))
+    ? row.problem.answers.map((item) => asRecord(item))
     : []
   const usable = answers.filter(
     (item): item is { language: string; code: string } =>
@@ -174,10 +174,10 @@ export function referenceAnswer(row: HintRow) {
  */
 async function firstFailedCase(row: HintRow) {
   if (row.submission.language === "SQL") return null
-  const data = objectValue(row.submission.info).data
+  const data = asRecord(row.submission.info).data
   if (!Array.isArray(data)) return null
   const failed = data
-    .map((item) => objectValue(item))
+    .map((item) => asRecord(item))
     .find((item) => typeof item.result === "number" && item.result !== 0)
   if (!failed || typeof failed.test_case !== "string") return null
   try {

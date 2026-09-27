@@ -55,7 +55,7 @@ import {
 import {
   countFailedSubmissions,
   isTeacherOrAbove,
-  objectValue,
+  asRecord,
   queryInteger,
 } from "./helpers"
 
@@ -317,7 +317,7 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
     id: row.analysis.id,
     provider: row.analysis.provider,
     model: row.analysis.model,
-    data: objectValue(row.analysis.data),
+    data: asRecord(row.analysis.data),
     analysis: row.analysis.analysis,
     createTime: row.analysis.createTime,
     isPinned: row.analysis.isPinned,

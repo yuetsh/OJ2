@@ -24,7 +24,7 @@ import Pagination from "shared/components/Pagination.vue"
 import { ChartType, LONG_DURATION_OPTIONS } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
 import Chart from "./components/Chart.vue"
-import Index from "./components/Index.vue"
+import RankMedal from "./components/RankMedal.vue"
 import { useUserStore } from "shared/store/user"
 import { Icon } from "@iconify/vue"
 import { MdPreview } from "md-editor-v3"
@@ -162,7 +162,7 @@ const columns: DataTableColumn<Rank>[] = [
     width: 100,
     align: "center",
     render: (_, index) =>
-      h(Index, { index, page: query.page, limit: query.limit }),
+      h(RankMedal, { index, page: query.page, limit: query.limit }),
   },
   {
     title: renderTableTitle(
@@ -287,8 +287,8 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
     key: "rank",
     width: 100,
     align: "center",
-    // rank 是服务端给的周榜名次，不是行号 —— 换算回 Index 要的 0 基下标
-    render: (row) => h(Index, { index: row.rank - 1, page: 1, limit: 10 }),
+    // rank 是服务端给的周榜名次，不是行号 —— 换算回 RankMedal 要的 0 基下标
+    render: (row) => h(RankMedal, { index: row.rank - 1, page: 1, limit: 10 }),
   },
   {
     title: renderTableTitle(

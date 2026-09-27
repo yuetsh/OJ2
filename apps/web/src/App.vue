@@ -33,7 +33,7 @@ useMaxKB()
 // 真实身份：连着的话这个人会被算进「在线老师」，学生因此拿到 pending 而不是
 // no_teacher，排队等一个顶栏里根本没有求助列表的人；反过来他自己看到的求助
 // 按钮点下去，服务端回的是「教师不能发起求助」。两头都不对，索性对演示模式
-// 关闭这个功能（Form.vue 的按钮同步隐藏）。
+// 关闭这个功能（EditorToolbar.vue 的按钮同步隐藏）。
 watch(
   () => userStore.isAuthed && !userStore.demoMode,
   (available) => {

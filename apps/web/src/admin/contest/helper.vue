@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { errorMessage } from "utils/api"
-import type { AcmHelperItem, SubmissionInfo } from "utils/types"
+import type { AcmHelperItem, ContestSubmissionInfo } from "utils/types"
 import { NButton, NCheckbox, NSelect, NTag } from "naive-ui"
 import { parseTime } from "utils/functions"
 import { getACMHelperList, getContest, updateACMHelperChecked } from "../api"
@@ -14,10 +14,10 @@ interface Props {
 
 /**
  * ACM 助手行。`acInfo` 的**内容**是 acm_contest_rank.submission_info 的 JSONB 原文，
- * 键名保持 snake_case —— 判题写进去的就是这套键名，见 utils/types.ts 的 SubmissionInfo。
+ * 键名保持 snake_case —— 判题写进去的就是这套键名，见 utils/types.ts 的 ContestSubmissionInfo。
  */
 type HelperItem = Omit<AcmHelperItem, "acInfo"> & {
-  acInfo: SubmissionInfo
+  acInfo: ContestSubmissionInfo
 }
 
 const props = defineProps<Props>()

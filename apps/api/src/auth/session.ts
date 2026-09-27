@@ -161,7 +161,7 @@ export type SessionResult =
   | { user: AuthUser; reason?: undefined }
   | { user: null; reason: "anonymous" | "disabled" }
 
-async function getUserByToken(
+async function authenticateToken(
   token: string | undefined,
 ): Promise<SessionResult> {
   if (!token) return { user: null, reason: "anonymous" }
@@ -228,7 +228,7 @@ async function getUserByToken(
 
 /** 要区分「未登录」和「已被禁用」的用这个 —— 目前只有鉴权中间件需要 */
 export function resolveSession(c: Context) {
-  return getUserByToken(getCookie(c, config.sessionCookie))
+  return authenticateToken(getCookie(c, config.sessionCookie))
 }
 
 /** 只关心「是谁」的调用方用这个 */
@@ -237,7 +237,8 @@ export async function getSessionUser(c: Context) {
 }
 
 export async function getRequestSessionUser(request: Request) {
-  return (await getUserByToken(readCookie(request, config.sessionCookie))).user
+  return (await authenticateToken(readCookie(request, config.sessionCookie)))
+    .user
 }
 
 /**
@@ -254,11 +255,11 @@ export function readRequestSessionToken(request: Request) {
  * 用 EXPIRE 同时完成「判断存在」和「续期」，比 GET + EXPIRE 少一趟往返；两条 EXPIRE
  * 走一次 pipeline，仍然只有一趟。
  *
- * 续期这件事本身是要的：HTTP 请求会走 getUserByToken 里的 redis.expire 续期，
+ * 续期这件事本身是要的：HTTP 请求会走 authenticateToken 里的 redis.expire 续期，
  * 而只开着页面挂 WebSocket 的人一次请求都不发，不该因此被算成不活跃踢下线。
  *
  * **反向索引必须跟着一起续。** 走到这里的正是那种一次 HTTP 请求都不发的连接，
- * 它碰不到 getUserByToken 里那两条并排的 expire。只续会话不续索引的话，索引先到期、
+ * 它碰不到 authenticateToken 里那两条并排的 expire。只续会话不续索引的话，索引先到期、
  * 会话却被巡检一直续着，之后改密码 / 禁用账号走 revokeUserSessions 就 SMEMBERS
  * 不到这张 token —— WebSocket 那边还有 publishSessionRevoked 按 userId 兜底能断掉，
  * 但 HTTP 一侧拿着那张 cookie 照用不误，而改密码要的恰恰是让 HTTP 立刻失效。

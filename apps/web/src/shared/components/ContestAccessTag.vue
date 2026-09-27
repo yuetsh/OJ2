@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ContestType } from "utils/constants"
-import type { Contest, OjContest } from "utils/types"
+import type { AdminContest, Contest } from "utils/types"
 
 interface Props {
-  contest: Contest | OjContest
+  contest: AdminContest | Contest
   size?: "small"
 }
 

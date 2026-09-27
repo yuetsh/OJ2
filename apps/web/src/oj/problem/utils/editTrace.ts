@@ -5,7 +5,7 @@ import type { SubmissionTrace } from "@oj2/contract"
  * 编辑过程信号的采集，随提交一起报给后端（落进 `submission_trace`）。
  * 字段含义见契约的 `submissionTraceSchema`。**只数字符数和次数，不留任何按键内容。**
  *
- * 是模块单例而不是 Pinia store：编辑器（ProblemEditor / ContestEditor 里）和
+ * 是模块单例而不是 Pinia store：编辑器（ProblemEditor / BasicEditor 里）和
  * 提交按钮（Form → SubmitCode）是兄弟组件，得共用一份计数；而 CodeMirror 的
  * 扩展对象一旦经过 store 就会被包成响应式代理，facet 靠身份比较，代理过的扩展
  * 直接失效。计数本身也不需要响应式。

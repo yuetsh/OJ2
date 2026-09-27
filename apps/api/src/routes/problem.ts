@@ -29,26 +29,20 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { localTime, shiftMonthsByCalendar, todayStart } from "../time"
+import { dayStart, localTime, shiftMonthsByCalendar } from "../time"
 import {
   asFilterValue,
   countFailedSubmissions,
-  objectValue as toObject,
+  asRecord,
   queryInteger,
   sampleUser,
 } from "./helpers"
 
 export const problemRoutes = new Hono<AppEnv>()
 
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
 function publicTemplates(value: unknown) {
   const templates: Record<string, string> = {}
-  for (const [language, raw] of Object.entries(objectValue(value))) {
+  for (const [language, raw] of Object.entries(asRecord(value))) {
     if (typeof raw !== "string") continue
     const match = raw.match(/\/\/TEMPLATE BEGIN\n([\s\S]+?)\/\/TEMPLATE END/)
     templates[language] = match?.[1] ?? ""
@@ -63,7 +57,7 @@ async function getProblemStatuses(userId: number | undefined) {
     .from(schema.userProfile)
     .where(eq(schema.userProfile.userId, userId))
     .limit(1)
-  return toObject(toObject(profile?.value).problems)
+  return asRecord(asRecord(profile?.value).problems)
 }
 
 async function getProblemTags(problemIds: number[]) {
@@ -94,7 +88,7 @@ function listItem(
   tags: Map<number, string[]>,
   statuses: Record<string, unknown>,
 ) {
-  const status = toObject(statuses[String(row.problem.id)]).status
+  const status = asRecord(statuses[String(row.problem.id)]).status
   return {
     id: row.problem.id,
     _id: row.problem.displayId,
@@ -287,7 +281,7 @@ problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
     )
   if (!mine?.value) return success(c, "0")
   // 「近两年」按东八区日历算到当天零点
-  const since = todayStart(shiftMonthsByCalendar(new Date(), -24))
+  const since = dayStart(shiftMonthsByCalendar(new Date(), -24))
   const [active, accepted] = await Promise.all([
     db
       .select({ value: count() })
@@ -341,7 +335,7 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
   // 而这个接口恰好只在**刚 AC** 或**连挂三次**时才被调用，正是候选最容易全中的时候。
   const statuses = await getProblemStatuses(c.get("user")?.id)
   const solvedIds = Object.entries(statuses)
-    .filter(([, value]) => toObject(value).status === JudgeStatus.ACCEPTED)
+    .filter(([, value]) => asRecord(value).status === JudgeStatus.ACCEPTED)
     .map(([key]) => Number(key))
     .filter((id) => Number.isInteger(id))
   // difficulty 是 text（Low / Mid / High），直接 order by 走的是字典序 ——
@@ -478,8 +472,8 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
       .from(schema.userProfile)
       .where(eq(schema.userProfile.userId, user.id))
       .limit(1)
-    const statuses = objectValue(objectValue(profile?.status).problems)
-    const problemStatus = objectValue(statuses[String(row.problem.id)]).status
+    const statuses = asRecord(asRecord(profile?.status).problems)
+    const problemStatus = asRecord(statuses[String(row.problem.id)]).status
     if (typeof problemStatus === "number") myStatus = problemStatus
 
     // 前端拿这个数决定「让 AI 分析我的代码」露不露面，口径必须和 POST /ai/hint
@@ -508,7 +502,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
     prompt: row.problem.prompt,
     submissionNumber: row.problem.submissionNumber,
     acceptedNumber: row.problem.acceptedNumber,
-    statisticInfo: objectValue(row.problem.statisticInfo),
+    statisticInfo: asRecord(row.problem.statisticInfo),
     contestId: row.problem.contestId,
     tags: tagRows.map((tag) => tag.name),
     createdBy: sampleUser(
@@ -522,7 +516,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
     mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
     flowchartData: row.problem.allowFlowchart
       ? null
-      : objectValue(row.problem.flowchartData),
+      : asRecord(row.problem.flowchartData),
     flowchartHint: row.problem.flowchartHint,
     sqlConfig: row.problem.sqlConfig,
     sqlDisplay: row.problem.sqlDisplay,

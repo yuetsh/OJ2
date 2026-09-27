@@ -4,11 +4,11 @@ import { Icon } from "@iconify/vue"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { getTagColor, parseTime } from "utils/functions"
-import type { AdminProblemFiltered } from "utils/types"
+import type { AdminProblemRow } from "utils/types"
 import { DIFFICULTY, REACTIONS } from "utils/constants"
 import { getProblemList, toggleProblemVisible } from "../api"
 import Actions from "./components/Actions.vue"
-import Modal from "./components/Modal.vue"
+import AddFromLibraryModal from "./components/AddFromLibraryModal.vue"
 import { useRouteQuery } from "@vueuse/router"
 import AuthorSelect from "shared/components/AuthorSelect.vue"
 import type { DataTableRowKey } from "naive-ui"
@@ -36,7 +36,7 @@ const isContestProblemList = computed(
 const [show, toggleShow] = useToggle()
 const { count, inc } = useCounter(0)
 const total = ref(0)
-const problems = ref<AdminProblemFiltered[]>([])
+const problems = ref<AdminProblemRow[]>([])
 
 const selectedRowKeys = ref<DataTableRowKey[]>([])
 const batchTagAction = ref<"add" | "remove">("add")
@@ -46,7 +46,7 @@ const selectedProblemIds = computed(() =>
   selectedRowKeys.value.map((key) => Number(key)),
 )
 
-const rowKey = (row: AdminProblemFiltered) => row.id
+const rowKey = (row: AdminProblemRow) => row.id
 
 function chooseProblems(rowKeys: DataTableRowKey[]) {
   selectedRowKeys.value = rowKeys
@@ -83,7 +83,7 @@ const { query, clearQuery } = usePagination<ProblemQuery>({
   author: useRouteQuery("author", "").value,
 })
 
-const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
+const baseColumns: DataTableColumn<AdminProblemRow>[] = [
   { title: "ID", key: "id", width: 100 },
   { title: "显示编号", key: "_id", width: 100 },
   { title: "标题", key: "title", minWidth: 200 },
@@ -183,7 +183,7 @@ const baseColumns: DataTableColumn<AdminProblemFiltered>[] = [
 ]
 
 // 比赛题目接口不返回 top_reaction，这一列只在普通题目列表里显示
-const columns = computed<DataTableColumn<AdminProblemFiltered>[]>(() =>
+const columns = computed<DataTableColumn<AdminProblemRow>[]>(() =>
   isContestProblemList.value
     ? baseColumns.filter((it) => !("key" in it) || it.key !== "topReaction")
     : [{ type: "selection" }, ...baseColumns],
@@ -310,7 +310,7 @@ watch(() => [query.page, query.limit, query.author], listProblems)
     v-model:limit="query.limit"
     v-model:page="query.page"
   />
-  <Modal
+  <AddFromLibraryModal
     v-model:show="show"
     :count="count"
     :next-display-id="nextDisplayID"

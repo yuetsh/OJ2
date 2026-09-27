@@ -3,7 +3,7 @@ import { errorCode } from "utils/api"
 import { toRefs } from "vue"
 
 // 工具函数
-import { atou, utoa } from "utils/functions"
+import { decompressFromBase64, compressToBase64 } from "utils/functions"
 import { sortFlowchartCriteria } from "utils/constants"
 
 // 组合式函数
@@ -235,7 +235,7 @@ async function submitFlowchartData() {
 
   const mermaidCode = convertToMermaid(flowchartData)
   lastSubmittedMermaidCode.value = mermaidCode
-  const compressed = utoa(JSON.stringify(flowchartData))
+  const compressed = compressToBase64(JSON.stringify(flowchartData))
 
   loading.value = true
   latestRating.value = { score: 0, grade: "" }
@@ -372,9 +372,9 @@ function closeModal() {
 function loadToEditor() {
   if (myFlowchartZippedStr.value) {
     // 老提交的压缩数据可能是坏的（格式换过、存了一半），
-    // 不兜住的话 atou/JSON.parse 直接抛，按钮点了毫无反应
+    // 不兜住的话 decompressFromBase64/JSON.parse 直接抛，按钮点了毫无反应
     try {
-      const json = JSON.parse(atou(myFlowchartZippedStr.value))
+      const json = JSON.parse(decompressFromBase64(myFlowchartZippedStr.value))
       flowchartEditorRef?.value?.setFlowchartData({
         nodes: json.nodes || [],
         edges: json.edges || [],

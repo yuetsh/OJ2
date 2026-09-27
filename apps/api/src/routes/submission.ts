@@ -44,8 +44,8 @@ import {
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
-import { todayStart } from "../time"
-import { asFilterValue, isAdminRole, queryInteger } from "./helpers"
+import { dayStart } from "../time"
+import { asFilterValue, asRecord, isAdminRole, queryInteger } from "./helpers"
 import {
   problemFilter,
   submissionStatisticsRoutes,
@@ -53,12 +53,6 @@ import {
 } from "./submission-statistics"
 
 export const submissionRoutes = new Hono<ContestEnv>()
-
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
 
 /**
  * 落编辑过程信号。**失败只记日志、不影响提交** —— 这是附带的统计数据，
@@ -234,7 +228,7 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
     const [row] = await db
       .select({ value: count() })
       .from(schema.flowchartSubmission)
-      .where(sql`${schema.flowchartSubmission.createTime} >= ${todayStart()}`)
+      .where(sql`${schema.flowchartSubmission.createTime} >= ${dayStart()}`)
     return success(c, row?.value ?? 0)
   }
   const [row] = await db
@@ -243,7 +237,7 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
     .where(
       and(
         isNull(schema.submission.contestId),
-        sql`${schema.submission.createTime} >= ${todayStart()}`,
+        sql`${schema.submission.createTime} >= ${dayStart()}`,
       ),
     )
   return success(c, row?.value ?? 0)
@@ -452,10 +446,10 @@ const submissionListColumns = {
 function caseSummary(submission: typeof schema.submission.$inferSelect) {
   if (submission.contestId !== null || submission.language === "SQL")
     return null
-  const data = objectValue(submission.info).data
+  const data = asRecord(submission.info).data
   if (!Array.isArray(data) || data.length === 0) return null
   const passed = data.filter(
-    (item) => objectValue(item).result === JudgeStatus.ACCEPTED,
+    (item) => asRecord(item).result === JudgeStatus.ACCEPTED,
   ).length
   return { passed, total: data.length }
 }
@@ -508,7 +502,7 @@ async function submissionDetail(id: string, user: AuthUser) {
     result: row.submission.result,
     info: full ? row.submission.info : {},
     language: row.submission.language,
-    statisticInfo: objectValue(row.submission.statisticInfo),
+    statisticInfo: asRecord(row.submission.statisticInfo),
     // contest 也在旧后端的排除名单里，同样只给管理员
     contestId: full ? row.submission.contestId : null,
     problemId: row.submission.problemId,
@@ -652,7 +646,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   if (language)
     filters.push(eq(schema.submission.language, asFilterValue(language)))
   if (c.req.query("today") === "1")
-    filters.push(sql`${schema.submission.createTime} >= ${todayStart()}`)
+    filters.push(sql`${schema.submission.createTime} >= ${dayStart()}`)
   const where = and(...filters)
   // count 不 join problem：无条件 join 会让计划器把 count 退化成 seq scan
   // （生产快照实测 7.5ms → 78ms）。题号已经解析成 problem_id，也用不着 join。
@@ -689,7 +683,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
           username: submission.username,
           result: submission.result,
           language: submission.language,
-          statisticInfo: objectValue(submission.statisticInfo),
+          statisticInfo: asRecord(submission.statisticInfo),
           // 题单被删掉之后外键把 problemset_id 置了空，这里自然就没标记了
           problemSet:
             submission.problemsetId !== null &&
@@ -773,7 +767,7 @@ submissionRoutes.get(
             username: submission.username,
             result: submission.result,
             language: submission.language,
-            statisticInfo: objectValue(submission.statisticInfo),
+            statisticInfo: asRecord(submission.statisticInfo),
             // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
             // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
             problemSet: null,

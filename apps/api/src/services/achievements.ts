@@ -16,7 +16,7 @@ import { publishAchievementNotification } from "../events"
 import { calendarDay, dayNumber, localHour } from "../time"
 import { findMetric } from "./achievement-metrics"
 import { isAccepted, JudgeStatus } from "../judge/status"
-import { objectValue } from "../routes/helpers"
+import { asRecord } from "../routes/helpers"
 
 function numberMetric(metrics: Record<string, unknown>, key: string) {
   const value = metrics[key]
@@ -129,7 +129,7 @@ export async function updateAchievementsForSubmission(submissionId: string) {
       .where(eq(schema.userStat.userId, row.submission.userId))
       .for("update")
     if (!stat) throw new Error("User achievement stat could not be created")
-    const value = objectValue(stat.metrics)
+    const value = asRecord(stat.metrics)
     value.submission_count = numberMetric(value, "submission_count") + 1
     if (firstAc) {
       value.accepted_count = numberMetric(value, "accepted_count") + 1
@@ -143,7 +143,7 @@ export async function updateAchievementsForSubmission(submissionId: string) {
         numberMetric(value, "max_wa_before_ac"),
         priorRows.length,
       )
-      const perDay = objectValue(value._ac_per_day)
+      const perDay = asRecord(value._ac_per_day)
       perDay[date] = (typeof perDay[date] === "number" ? perDay[date] : 0) + 1
       value._ac_per_day = perDay
       value.max_ac_in_one_day = Math.max(
@@ -264,7 +264,7 @@ export async function updateAchievementsForProblemSet(userId: number) {
       .for("update")
       .limit(1)
     if (!stat) throw new Error("User achievement stat could not be created")
-    const value = objectValue(stat.metrics)
+    const value = asRecord(stat.metrics)
     value.badge_count = badgeRow?.value ?? 0
     value.problemset_completed = completedRow?.value ?? 0
     await tx
@@ -345,7 +345,7 @@ export async function rescanAchievement(achievementId: number) {
     .from(schema.userStat)
   const eligible = stats.filter((stat) => {
     if (already.has(stat.userId)) return false
-    const value = objectValue(stat.metrics)[achievement.metric]
+    const value = asRecord(stat.metrics)[achievement.metric]
     if (typeof value !== "number") return false
     return achievement.operator === "gte"
       ? value >= achievement.threshold

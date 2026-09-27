@@ -5,7 +5,7 @@ import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { createTestSubmission } from "utils/judge"
-import type { Problem, ProblemFiltered, ProblemStatus } from "utils/types"
+import type { ProblemDetail, ProblemRow, ProblemStatus } from "utils/types"
 import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
@@ -13,7 +13,7 @@ import "md-editor-v3/lib/preview.css"
 import { getSimilarProblems } from "oj/api"
 import SQLDataTable from "./SQLDataTable.vue"
 
-type Sample = Problem["samples"][number] & {
+type Sample = ProblemDetail["samples"][number] & {
   id: number
   msg: string
   status: ProblemStatus
@@ -45,7 +45,7 @@ const sqlChangedTables = computed(() => {
 const router = useRouter()
 
 // 相似题目推荐
-const similarProblems = ref<ProblemFiltered[]>([])
+const similarProblems = ref<ProblemRow[]>([])
 const similarLoaded = ref(false)
 
 async function loadSimilarProblems() {
@@ -409,7 +409,7 @@ function type(status: ProblemStatus) {
                 {{ sp.title }}
               </n-button>
             </n-flex>
-            <!-- getSimilarProblems 已经过 filterResult，难度是中文，不是 Low/Mid/High -->
+            <!-- getSimilarProblems 已经过 toProblemRow，难度是中文，不是 Low/Mid/High -->
             <n-tag
               v-if="sp.difficulty"
               size="small"

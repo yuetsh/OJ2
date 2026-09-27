@@ -35,7 +35,7 @@ import {
 } from "../judge/status"
 import { type ContestEnv } from "../services/contest"
 import { getBooleanOption } from "../services/options"
-import { localTime, todayStart } from "../time"
+import { localTime, dayStart } from "../time"
 import { isAdminRole, matchedUsers, rounded, stripClassPrefix } from "./helpers"
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
@@ -68,7 +68,7 @@ submissionStatisticsRoutes.get(
       isAdminRole(c.get("user"))
     const where = and(
       isNull(schema.submission.contestId),
-      sql`${schema.submission.createTime} >= ${todayStart()}`,
+      sql`${schema.submission.createTime} >= ${dayStart()}`,
     )
     const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
     const judgingFilter = sql`count(*) filter (where ${inArray(schema.submission.result, UNJUDGED_RESULTS)})`

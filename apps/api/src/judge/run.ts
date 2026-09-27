@@ -13,6 +13,7 @@ import {
 import { recordSolvedProblem } from "../services/problemset"
 import { checkAst, type AstRule } from "./ast"
 import { publishSubmissionUpdate } from "./events"
+import { asRecord } from "../routes/helpers"
 import type { JudgeJobData } from "./job"
 import { judgeConfigFor } from "./languages"
 import { isAccepted, JudgeStatus, type JudgeStatusValue } from "./status"
@@ -37,12 +38,6 @@ interface JudgeResponse {
   data: JudgeCase[] | unknown
 }
 
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
 function statusValue(value: number): JudgeStatusValue {
   const statuses = new Set<number>(Object.values(JudgeStatus))
   return statuses.has(value)
@@ -51,7 +46,7 @@ function statusValue(value: number): JudgeStatusValue {
 }
 
 function templateForLanguage(value: unknown, language: string) {
-  const template = objectValue(value)[language]
+  const template = asRecord(value)[language]
   return typeof template === "string" ? template : null
 }
 
@@ -62,7 +57,7 @@ function templateForLanguage(value: unknown, language: string) {
  * 这里、并且不再骗类型系统。
  */
 function astRulesForLanguage(value: unknown, language: string): AstRule[] {
-  const rules = objectValue(value)[language]
+  const rules = asRecord(value)[language]
   if (!Array.isArray(rules)) return []
   return rules.flatMap((rule) => {
     const parsed = astRuleSchema.safeParse(rule)
@@ -163,7 +158,7 @@ async function persistResult(
       .set({ result, info, statisticInfo })
       .where(eq(schema.submission.id, submissionId))
 
-    const problemStatistics = objectValue(problem.statisticInfo)
+    const problemStatistics = asRecord(problem.statisticInfo)
     const resultKey = String(result)
     const previousResultCount = problemStatistics[resultKey]
     problemStatistics[resultKey] =
@@ -178,10 +173,10 @@ async function persistResult(
       })
       .where(eq(schema.problem.id, problemId))
 
-    const acmStatus = objectValue(profile.acmProblemsStatus)
+    const acmStatus = asRecord(profile.acmProblemsStatus)
     const statusKey = contestId === null ? "problems" : "contest_problems"
-    const problems = objectValue(acmStatus[statusKey])
-    const previous = objectValue(problems[String(problemId)])
+    const problems = asRecord(acmStatus[statusKey])
+    const previous = asRecord(problems[String(problemId)])
     const previousStatus = previous.status
     const wasAccepted =
       typeof previousStatus === "number" && isAccepted(previousStatus)
@@ -591,14 +586,14 @@ async function judgeSqlSubmission(
   problem: typeof schema.problem.$inferSelect,
   studentSql: string,
 ): Promise<JudgeResponse> {
-  const sqlConfig = objectValue(problem.sqlConfig)
+  const sqlConfig = asRecord(problem.sqlConfig)
   const mode = sqlConfig.mode
   if (mode !== "query" && mode !== "modify") {
     throw new Error("题目缺少 SQL 配置（题型）")
   }
   const answers = Array.isArray(problem.answers) ? problem.answers : []
   const refSql = answers
-    .map((item) => objectValue(item))
+    .map((item) => asRecord(item))
     .find(
       (item) =>
         item.language === "SQL" &&

@@ -8,7 +8,7 @@ import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { ContestStatus } from "utils/constants"
 import { renderTableTitle } from "utils/renders"
-import type { ContestRank, ProblemFiltered } from "utils/types"
+import type { ContestRank, ProblemRow } from "utils/types"
 import AcAndSubmission from "../components/AcAndSubmission.vue"
 import LineChart from "../components/LineChart.vue"
 
@@ -27,7 +27,7 @@ const contestStore = useContestStore()
 const total = ref(0)
 const data = ref<ContestRank[]>([])
 const chart = ref<ContestRank[]>([])
-const problems = ref<ProblemFiltered[]>([])
+const problems = ref<ProblemRow[]>([])
 const [autoRefresh] = useToggle(true)
 const { resume, pause } = useIntervalFn(
   () => {

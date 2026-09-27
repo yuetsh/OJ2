@@ -1,7 +1,7 @@
 import { TIME_ZONE_OFFSET_MINUTES, toAdminType } from "@oj2/contract"
 import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
-import { Submission, User } from "./types"
+import { AdminUser, Submission } from "./types"
 import { JUDGE_STATUS, USER_TYPE } from "./constants"
 import {
   strFromU8,
@@ -283,7 +283,7 @@ export function debounce<T extends (...args: any[]) => any>(
   }
 }
 
-export function getUserRole(role: User["adminType"]): {
+export function getUserRole(role: AdminUser["adminType"]): {
   type: "default" | "info" | "warning" | "error"
   label: "普通" | "生管" | "师管" | "超管"
 } {
@@ -315,7 +315,7 @@ export function unique<T>(arr: T[]): T[] {
   return [...new Set(arr)]
 }
 
-export function encode(string?: string): string {
+export function base64EncodeUtf8(string?: string): string {
   try {
     return btoa(String.fromCharCode(...new TextEncoder().encode(string ?? "")))
   } catch (error) {
@@ -324,7 +324,7 @@ export function encode(string?: string): string {
   }
 }
 
-export function decode(bytes?: string): string {
+export function base64DecodeUtf8(bytes?: string): string {
   try {
     if (!bytes) return ""
     const latin = atob(bytes)
@@ -339,14 +339,14 @@ export function decode(bytes?: string): string {
   }
 }
 
-export function utoa(data: string): string {
+export function compressToBase64(data: string): string {
   const buffer = strToU8(data)
   const zipped = zlibSync(buffer, { level: 9 })
   const binary = strFromU8(zipped, true)
   return btoa(binary)
 }
 
-export function atou(base64: string): string {
+export function decompressFromBase64(base64: string): string {
   const binary = atob(base64)
   const buffer = strToU8(binary, true)
   const unzipped = unzlibSync(buffer)

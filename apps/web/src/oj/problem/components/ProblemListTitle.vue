@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import type { ProblemFiltered } from "utils/types"
+import type { ProblemRow } from "utils/types"
 import { Icon } from "@iconify/vue"
 
 defineProps<{
-  problem: ProblemFiltered
+  problem: ProblemRow
 }>()
 </script>
 <template>

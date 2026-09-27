@@ -10,9 +10,9 @@ import { useUserStore } from "shared/store/user"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk
 const loadProblemEditor = () => import("./components/ProblemEditor.vue")
-const loadContestEditor = () => import("./components/ContestEditor.vue")
+const loadContestEditor = () => import("./components/BasicEditor.vue")
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
-const ContestEditor = defineAsyncComponent(loadContestEditor)
+const BasicEditor = defineAsyncComponent(loadContestEditor)
 const EditorForTest = defineAsyncComponent(
   () => import("./components/EditorForTest.vue"),
 )
@@ -85,7 +85,7 @@ const tabOptions = computed(() => {
 
 const currentTab = ref("content")
 
-const inProblem = computed(() => route.name === "problem")
+const isPublicProblemRoute = computed(() => route.name === "problem")
 
 watch(
   [() => route.query.tab, () => tabOptions.value],
@@ -117,7 +117,7 @@ async function init() {
   screenModeStore.resetScreenMode()
   // 并行预取右侧编辑器 chunk（CodeMirror ~370K+），
   // 避免等 getProblem 返回后才串行下载，编辑器才迟迟出现
-  ;(inProblem.value ? loadProblemEditor : loadContestEditor)()
+  ;(isPublicProblemRoute.value ? loadProblemEditor : loadContestEditor)()
   try {
     const res = await getProblem(problemID, contestID)
     problem.value = res
@@ -215,7 +215,7 @@ watch(
         </n-scrollbar>
       </template>
       <template #2>
-        <component :is="inProblem ? ProblemEditor : ContestEditor" />
+        <component :is="isPublicProblemRoute ? ProblemEditor : BasicEditor" />
       </template>
     </n-split>
 
@@ -272,7 +272,7 @@ watch(
         <ProblemFlowchart />
       </n-tab-pane>
       <n-tab-pane name="editor" tab="代码">
-        <component :is="inProblem ? ProblemEditor : ContestEditor" />
+        <component :is="isPublicProblemRoute ? ProblemEditor : BasicEditor" />
       </n-tab-pane>
       <n-tab-pane name="info" tab="统计" :disabled="!!problemSetId">
         <ProblemInfo />

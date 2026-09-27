@@ -6,7 +6,7 @@ import { getProblemList } from "oj/api"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import { getTagColor } from "utils/functions"
-import type { ProblemFiltered, Tag as ContractTag } from "utils/types"
+import type { ProblemRow, Tag as ContractTag } from "utils/types"
 import { getProblemTagList } from "shared/api"
 import Hitokoto from "shared/components/Hitokoto.vue"
 import Pagination from "shared/components/Pagination.vue"
@@ -66,7 +66,7 @@ const userStore = useUserStore()
 
 const { isDesktop } = useBreakpoints()
 
-const problems = ref<ProblemFiltered[]>([])
+const problems = ref<ProblemRow[]>([])
 const total = ref(0)
 const tags = ref<Tag[]>([])
 const [showTag, toggleShowTag] = useToggle(isDesktop.value)
@@ -165,7 +165,7 @@ onMounted(() => {
   listTags()
 })
 
-const baseColumns: DataTableColumn<ProblemFiltered>[] = [
+const baseColumns: DataTableColumn<ProblemRow>[] = [
   {
     title: renderTableTitle("状态", "streamline-emojis:high-voltage"),
     key: "status",
@@ -213,13 +213,13 @@ const baseColumns: DataTableColumn<ProblemFiltered>[] = [
   },
   {
     title: renderTableTitle("提交数", "streamline-ultimate-color:paper-write"),
-    key: "submission",
+    key: "submissionCount",
     align: "center",
     width: 100,
   },
   {
     title: renderTableTitle("通过率", "streamline-emojis:victory-hand-2"),
-    key: "rate",
+    key: "acRate",
     width: 100,
     align: "center",
   },
@@ -231,7 +231,7 @@ const columns = computed(() =>
     : baseColumns.filter((c: any) => c.key !== "status"),
 )
 
-function rowProps(row: ProblemFiltered) {
+function rowProps(row: ProblemRow) {
   return {
     style: "cursor: pointer",
     onClick() {

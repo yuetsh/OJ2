@@ -43,12 +43,7 @@ import {
   lockoutRemaining,
   type AttemptRule,
 } from "../services/throttling"
-import {
-  objectValue,
-  publicTemplates,
-  queryInteger,
-  sampleUser,
-} from "./helpers"
+import { asRecord, publicTemplates, queryInteger, sampleUser } from "./helpers"
 
 export const contestRoutes = new Hono<ContestEnv>()
 
@@ -223,11 +218,11 @@ async function contestProblemStatuses(userId: number | undefined) {
     .from(schema.userProfile)
     .where(eq(schema.userProfile.userId, userId))
     .limit(1)
-  return objectValue(objectValue(profile?.status).contest_problems)
+  return asRecord(asRecord(profile?.status).contest_problems)
 }
 
 function myStatusOf(statuses: Record<string, unknown>, problemId: number) {
-  const status = objectValue(statuses[String(problemId)]).status
+  const status = asRecord(statuses[String(problemId)]).status
   return typeof status === "number" ? status : null
 }
 
@@ -353,7 +348,7 @@ contestRoutes.get(
       prompt: row.problem.prompt,
       submissionNumber: allowed ? row.problem.submissionNumber : 0,
       acceptedNumber: allowed ? row.problem.acceptedNumber : 0,
-      statisticInfo: allowed ? objectValue(row.problem.statisticInfo) : {},
+      statisticInfo: allowed ? asRecord(row.problem.statisticInfo) : {},
       contestId: contest.id,
       tags: tags.get(row.problem.id) ?? [],
       createdBy: sampleUser(row.user, row.realName),
@@ -365,7 +360,7 @@ contestRoutes.get(
       mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
       flowchartData: row.problem.allowFlowchart
         ? null
-        : objectValue(row.problem.flowchartData),
+        : asRecord(row.problem.flowchartData),
       flowchartHint: row.problem.flowchartHint,
       sqlConfig: row.problem.sqlConfig,
       sqlDisplay: row.problem.sqlDisplay,

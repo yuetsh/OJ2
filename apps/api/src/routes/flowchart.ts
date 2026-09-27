@@ -31,11 +31,11 @@ import { flowchartQueue } from "../queue"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
-import { todayStart } from "../time"
+import { dayStart } from "../time"
 import {
   isAdminRole,
   matchedUsers,
-  objectValue,
+  asRecord,
   queryInteger,
   rounded,
   stripClassPrefix,
@@ -69,14 +69,14 @@ function flowchartData(
     username,
     problemId: flowchart.problemId,
     mermaidCode: flowchart.mermaidCode,
-    flowchartData: objectValue(flowchart.flowchartData),
+    flowchartData: asRecord(flowchart.flowchartData),
     status: flowchart.status,
     createTime: flowchart.createTime,
     aiScore: flowchart.aiScore,
     aiGrade: flowchart.aiGrade,
     aiFeedback: flowchart.aiFeedback,
     aiSuggestions: flowchart.aiSuggestions,
-    aiCriteriaDetails: objectValue(flowchart.aiCriteriaDetails),
+    aiCriteriaDetails: asRecord(flowchart.aiCriteriaDetails),
     aiProvider: flowchart.aiProvider,
     aiModel: flowchart.aiModel,
     processingTime: flowchart.processingTime,
@@ -269,9 +269,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   )
   if (onlyMyself) filters.push(eq(schema.flowchartSubmission.userId, user.id))
   if (c.req.query("today") === "1")
-    filters.push(
-      sql`${schema.flowchartSubmission.createTime} >= ${todayStart()}`,
-    )
+    filters.push(sql`${schema.flowchartSubmission.createTime} >= ${dayStart()}`)
   if (["S", "A", "B", "C"].includes(grade ?? ""))
     filters.push(eq(schema.flowchartSubmission.aiGrade, grade!))
   const where = and(...filters)
@@ -520,8 +518,8 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     if (texts.length < WORDCLOUD_TEXT_LIMIT) texts.push(value)
   }
   for (const row of textRows) {
-    for (const [key, value] of Object.entries(objectValue(row.criteria))) {
-      const detail = objectValue(value)
+    for (const [key, value] of Object.entries(asRecord(row.criteria))) {
+      const detail = asRecord(value)
       // 和上面那条聚合同一道闸：分数不是数字的项当没配过，满分和评语也都不收
       if (typeof detail.score !== "number") continue
       if (!criteriaMax.has(key)) {

@@ -15,7 +15,7 @@ import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { exerciseDataError } from "../../services/exercise"
-import { objectValue, queryInteger, sampleUser } from "../helpers"
+import { asRecord, queryInteger, sampleUser } from "../helpers"
 
 export const adminTutorialRoutes = new Hono<AppEnv>()
 
@@ -156,7 +156,7 @@ function serializeExercise(row: typeof schema.exercise.$inferSelect) {
   return {
     id: row.id,
     type: row.type,
-    data: objectValue(row.data),
+    data: asRecord(row.data),
     order: row.order,
   } satisfies AdminExercise
 }

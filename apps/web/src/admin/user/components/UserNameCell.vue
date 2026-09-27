@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { getUserRole } from "utils/functions"
-import type { User } from "utils/types"
+import type { AdminUserForm } from "utils/types"
 import TextCopy from "shared/components/TextCopy.vue"
 
 interface Props {
-  user: User
+  user: AdminUserForm
 }
 const props = defineProps<Props>()
-const isNotRegularUser = computed(
+const hasRoleTag = computed(
   () => props.user.adminType !== USER_TYPE.REGULAR_USER,
 )
 </script>
@@ -18,7 +18,7 @@ const isNotRegularUser = computed(
       封号中
     </n-tag>
     <n-tag
-      v-if="isNotRegularUser"
+      v-if="hasRoleTag"
       :type="getUserRole(props.user.adminType).type"
       size="small"
     >

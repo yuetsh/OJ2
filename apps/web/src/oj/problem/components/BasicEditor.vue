@@ -8,7 +8,7 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
-import Form from "./Form.vue"
+import EditorToolbar from "./EditorToolbar.vue"
 
 const route = useRoute()
 
@@ -58,7 +58,10 @@ const changeLanguage = (v: LANGUAGE) => {
 
 <template>
   <n-flex vertical>
-    <Form :storage-key="storageKey" @change-language="changeLanguage" />
+    <EditorToolbar
+      :storage-key="storageKey"
+      @change-language="changeLanguage"
+    />
     <CodeEditor
       v-model:value="codeStore.code.value"
       :language="codeStore.code.language"

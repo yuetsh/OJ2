@@ -9,7 +9,7 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
-import Form from "./Form.vue"
+import EditorToolbar from "./EditorToolbar.vue"
 
 const FlowchartEditor = defineAsyncComponent(
   () => import("shared/components/FlowchartEditor/index.vue"),
@@ -43,14 +43,14 @@ const teacherCollab = computed(() => collabHere.value && collabStore.isTeacher)
 let teacherLanguageBefore: LANGUAGE | null = null
 
 /**
- * 协作中**教师的语言选择跟着学生走**（选择器同时禁用，见 Form.vue），学生中途切了
+ * 协作中**教师的语言选择跟着学生走**（选择器同时禁用，见 EditorToolbar.vue），学生中途切了
  * 还会再同步一次。
  *
  * 写的是 codeStore 而不是只改编辑器的高亮：提交、语法检查、去自测猫读的都是
  * `codeStore.code.language` —— 只改高亮的话，老师会拿着自己那档语言提交学生的代码
  * （学生写 C、老师选的是 Python，当场 CE），工具栏还可能显示「提交流程图」。
  *
- * 直接写 store 不会连带重载模板代码：那是 Form 里选择器的 `update:value` 才做的事。
+ * 直接写 store 不会连带重载模板代码：那是 EditorToolbar 里选择器的 `update:value` 才做的事。
  *
  * **学生端一个字都不动**（早退出），他的语言本来就是权威那一份 —— 服务端的
  * `room_language` 只发给教师，学生本地那份 `room.language` 停在建房那一刻，
@@ -139,10 +139,13 @@ provide("flowchartEditorRef", flowchartEditorRef)
 
 <template>
   <n-flex vertical>
-    <Form :storage-key="storageKey" @change-language="changeLanguage" />
+    <EditorToolbar
+      :storage-key="storageKey"
+      @change-language="changeLanguage"
+    />
     <!--
       协作中教师这边不会落到流程图分支：上面那个 watch 已经把他的语言换成了学生的，
-      而求助入口本身就排掉了流程图（Form.vue 的 showHelpButton、服务端的
+      而求助入口本身就排掉了流程图（EditorToolbar.vue 的 showHelpButton、服务端的
       COLLAB_LANGUAGES），所以 room.language 不可能是 Flowchart。
       学生自己切到流程图就是不写代码了，编辑器卸载、协作正常结束（SyncCodeEditor
       的 detach），这是原来就有的语义。

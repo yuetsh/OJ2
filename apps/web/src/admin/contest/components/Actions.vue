@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import type { Contest } from "utils/types"
+import type { AdminContest } from "utils/types"
 import { cloneContest } from "../../api"
 
 interface Props {
-  contest: Contest
+  contest: AdminContest
 }
 const props = defineProps<Props>()
 const router = useRouter()

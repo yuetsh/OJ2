@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { ContestType } from "utils/constants"
-import type { Contest, OjContest } from "utils/types"
+import type { AdminContest, Contest } from "utils/types"
 
-defineProps<{ contest: Contest | OjContest }>()
+defineProps<{ contest: AdminContest | Contest }>()
 </script>
 <template>
   <n-flex>

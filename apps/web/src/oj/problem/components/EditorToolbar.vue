@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia"
-import { copyToClipboard, utoa } from "utils/functions"
+import { copyToClipboard, compressToBase64 } from "utils/functions"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useCollabStore } from "shared/store/collab"
@@ -227,7 +227,7 @@ const goTestCat = () => {
     code: codeStore.code.value,
     input: problemStore.problem?.samples[0].input,
   }
-  const base64 = utoa(JSON.stringify(data))
+  const base64 = compressToBase64(JSON.stringify(data))
   const url = `${import.meta.env.PUBLIC_CODE_URL}?share=${encodeURIComponent(base64)}`
   window.open(url, "_blank")
 }

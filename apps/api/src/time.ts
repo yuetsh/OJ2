@@ -64,10 +64,13 @@ export function localWeekday(day: number): number {
   return new Date(day * DAY_MS).getUTCDay()
 }
 
-/** 「东八区今天」的零点，返回 ISO 字符串。提交列表、流程图列表的 `?today=1` 和后台「今日提交数」用它 */
-export function todayStart(now: Date | number | string = new Date()): string {
+/**
+ * `instant` 所在东八区日历日的零点，返回 ISO 字符串，缺省是今天。
+ * 提交列表、流程图列表的 `?today=1` 和后台「今日提交数」用它
+ */
+export function dayStart(instant: Date | number | string = new Date()): string {
   return new Date(
-    dayNumber(calendarDay(now)) * DAY_MS - OFFSET_MS,
+    dayNumber(calendarDay(instant)) * DAY_MS - OFFSET_MS,
   ).toISOString()
 }
 

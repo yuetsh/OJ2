@@ -33,7 +33,7 @@ import {
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { computeProgress } from "../services/problemset"
-import { asFilterValue, objectValue, queryInteger, sampleUser } from "./helpers"
+import { asFilterValue, asRecord, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
@@ -299,7 +299,7 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
         )
         .limit(1)
     : []
-  const completed = objectValue(progressRows[0]?.detail)
+  const completed = asRecord(progressRows[0]?.detail)
   return success(
     c,
     rows.map(
@@ -582,7 +582,7 @@ problemsetRoutes.get(
           totalProblemsCount: progress.totalProblemsCount,
           totalScore: progress.totalScore,
           completedProblems: Object.keys(
-            objectValue(progress.progressDetail),
+            asRecord(progress.progressDetail),
           ).flatMap((key) => problemMap.get(key) ?? []),
         }) satisfies ProblemSetProgress,
     )

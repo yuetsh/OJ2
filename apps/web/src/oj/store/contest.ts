@@ -3,7 +3,7 @@ import { formatISO, getTime, parseISO } from "date-fns"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
 import { duration } from "utils/functions"
-import type { OjContest, ProblemFiltered } from "utils/types"
+import type { Contest, ProblemRow } from "utils/types"
 import {
   checkContestPassword,
   getContest,
@@ -14,8 +14,8 @@ import {
 export const useContestStore = defineStore("contest", () => {
   const userStore = useUserStore()
   const [access, toggleAccess] = useToggle(false)
-  const contest = ref<OjContest | null>(null)
-  const problems = ref<ProblemFiltered[]>([])
+  const contest = ref<Contest | null>(null)
+  const problems = ref<ProblemRow[]>([])
   const now = ref(0)
 
   let timer = 0

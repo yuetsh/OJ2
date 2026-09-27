@@ -1,5 +1,5 @@
 import api from "utils/api"
-import { toProblemListItem } from "admin/transforms"
+import { toAdminProblemRow } from "admin/transforms"
 import type {
   AcTrend,
   AdminProblemSetProgress,
@@ -8,7 +8,7 @@ import type {
   RenameTagResponse,
   SqlTestCaseScript,
   AcmHelperItem,
-  SubmissionInfo,
+  ContestSubmissionInfo,
   AdminAiReport,
   AdminAiReportList,
   StuckProblem,
@@ -30,13 +30,13 @@ import type {
   AdminAnnouncementListItem,
   BlankContest,
   BlankProblem,
-  Contest,
+  AdminContest,
   Exercise,
   ExerciseType,
   SqlDisplay,
   UploadTestCaseResponse,
   Tutorial,
-  User,
+  AdminUserForm,
   WebsiteConfig,
   AdminProblemSetBadge,
   AdminProblemSetList,
@@ -70,7 +70,7 @@ export async function getProblemList(
     params: { offset, limit, keyword, author, tagId },
   })
   return {
-    results: res.results.map(toProblemListItem),
+    results: res.results.map(toAdminProblemRow),
     total: res.total,
   }
 }
@@ -165,7 +165,7 @@ export function getUserList(
 }
 
 // 编辑用户
-export function editUser(user: User) {
+export function editUser(user: AdminUserForm) {
   return api.put<AdminUser>(`admin/users/${user.id}`, {
     username: user.username,
     email: user.email,
@@ -297,7 +297,7 @@ export function createContestProblem(problem: BlankProblem) {
 }
 
 /** 组件里的比赛对象是 snake_case，出站转成新后端要的 camelCase */
-function toContestBody(contest: Contest | BlankContest) {
+function toContestBody(contest: AdminContest | BlankContest) {
   return {
     title: contest.title,
     description: contest.description,
@@ -310,22 +310,22 @@ function toContestBody(contest: Contest | BlankContest) {
 }
 
 export function createContest(contest: BlankContest) {
-  return api.post<Contest>("admin/contests", toContestBody(contest))
+  return api.post<AdminContest>("admin/contests", toContestBody(contest))
 }
 
-export function editContest(contest: Contest | BlankContest) {
-  return api.put<Contest>(
-    `admin/contests/${(contest as Contest).id}`,
+export function editContest(contest: AdminContest | BlankContest) {
+  return api.put<AdminContest>(
+    `admin/contests/${(contest as AdminContest).id}`,
     toContestBody(contest),
   )
 }
 
 export function cloneContest(contestId: number) {
-  return api.post<Contest>(`admin/contests/${contestId}/clone`)
+  return api.post<AdminContest>(`admin/contests/${contestId}/clone`)
 }
 
 export function getContest(id: string) {
-  return api.get<Contest>(`admin/contests/${id}`)
+  return api.get<AdminContest>(`admin/contests/${id}`)
 }
 
 export function addProblemForContest(
@@ -463,9 +463,9 @@ export function makeProblemPublic(id: number, displayId: string) {
 // 比赛辅助检查
 export function getACMHelperList(contestId: number) {
   // acInfo 在契约里是 Record<string, unknown>（acm_contest_rank 的 JSONB 原文），
-  // 组件侧按 SubmissionInfo 读，收窄放在这里
+  // 组件侧按 ContestSubmissionInfo 读，收窄放在这里
   return api.get<
-    Array<Omit<AcmHelperItem, "acInfo"> & { acInfo: SubmissionInfo }>
+    Array<Omit<AcmHelperItem, "acInfo"> & { acInfo: ContestSubmissionInfo }>
   >(`admin/contests/${contestId}/acm-helper`)
 }
 

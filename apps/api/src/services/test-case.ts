@@ -224,7 +224,7 @@ export async function packTestCaseZip(testCaseId: string) {
   try {
     entries = await readdir(directory)
   } catch {
-    throw new TestCaseError("Test case does not exists")
+    throw new TestCaseError("Test case does not exist")
   }
   const names = new Set(entries)
   const isSql = await readInfo(testCaseId)

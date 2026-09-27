@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { getProblemList } from "admin/api"
 import Pagination from "shared/components/Pagination.vue"
-import type { AdminProblemFiltered } from "utils/types"
+import type { AdminProblemRow } from "utils/types"
 import AddButton from "./AddButton.vue"
 
 interface Props {
@@ -23,9 +23,9 @@ const query = reactive({
   keyword: "",
 })
 const total = ref(0)
-const problems = shallowRef<AdminProblemFiltered[]>([])
+const problems = shallowRef<AdminProblemRow[]>([])
 
-const columns: DataTableColumn<AdminProblemFiltered>[] = [
+const columns: DataTableColumn<AdminProblemRow>[] = [
   { title: "编号", key: "_id", width: 80 },
   { title: "标题", key: "title" },
   {

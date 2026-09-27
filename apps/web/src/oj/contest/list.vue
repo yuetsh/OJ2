@@ -3,7 +3,7 @@ import { useRouteQuery } from "@vueuse/router"
 import { NTag } from "naive-ui"
 import { getContestList } from "oj/api"
 import { duration, parseTime } from "utils/functions"
-import type { OjContest } from "utils/types"
+import type { Contest } from "utils/types"
 import ContestTitle from "shared/components/ContestTitle.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { useAuthModalStore } from "shared/store/authModal"
@@ -29,7 +29,7 @@ const { query, clearQuery } = usePagination<ContestQuery>({
   tag: useRouteQuery("tag", "").value,
 })
 
-const data = ref<OjContest[]>([])
+const data = ref<Contest[]>([])
 const total = ref(0)
 
 const options: SelectOption[] = [
@@ -46,7 +46,7 @@ const tags: SelectOption[] = [
   { label: "期末", value: "期末" },
 ]
 
-const columns: DataTableColumn<OjContest>[] = [
+const columns: DataTableColumn<Contest>[] = [
   {
     title: renderTableTitle("状态", "streamline-emojis:collision"),
     key: "status",
@@ -116,7 +116,7 @@ watchDebounced(() => query.keyword, listContests, {
 // 监听其他查询条件变化
 watch(() => [query.page, query.limit, query.status, query.tag], listContests)
 
-function rowProps(row: OjContest) {
+function rowProps(row: Contest) {
   return {
     style: "cursor: pointer",
     onClick() {

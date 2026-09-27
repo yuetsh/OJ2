@@ -24,7 +24,7 @@ import { requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { objectValue, queryInteger, sampleUser } from "./helpers"
+import { asRecord, queryInteger, sampleUser } from "./helpers"
 
 export const contentRoutes = new Hono<AppEnv>()
 
@@ -167,7 +167,7 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
             // info / ip / contestId 三个字段不在 embeddedSubmissionSchema 里，故不传 ——
             // 对齐旧后端 SubmissionSafeModelSerializer 的 exclude，这三个键不出现在响应中
             language: submission.language,
-            statisticInfo: objectValue(submission.statisticInfo),
+            statisticInfo: asRecord(submission.statisticInfo),
             // 展示用题号而非数字主键，站内信页面拿它拼 /problem/<题号>
             problem: displayId,
             showLink: true,
@@ -590,7 +590,7 @@ contentRoutes.get("/tutorials/:id/exercises", async (c) => {
         ({
           id: row.id,
           type: row.type,
-          data: objectValue(row.data),
+          data: asRecord(row.data),
           order: row.order,
         }) satisfies Exercise,
     ),

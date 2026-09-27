@@ -1,7 +1,7 @@
 import {
   type AiAnalysisRecord,
   type AiHintFeedbackRequest,
-  type Contest as OjContest,
+  type Contest,
   type ContestAccess,
   type ContestList,
   type ActivityRankItem,
@@ -43,7 +43,7 @@ import {
 } from "@oj2/contract"
 import api from "utils/api"
 import { contract } from "utils/contract"
-import { filterResult } from "oj/transforms"
+import { toProblemRow } from "oj/transforms"
 import type {
   Announcement,
   AnnouncementListItem,
@@ -52,7 +52,7 @@ import type {
   Message,
   SubmissionListItem,
   Exercise,
-  Problem,
+  ProblemDetail,
   ReactionKey,
   ReactionState,
   Submission,
@@ -67,11 +67,11 @@ import type {
  * 题目详情。走契约的 zod 解析，形状即契约 —— 之前这里手抄了一份 camel→snake 的
  * 键名映射，抄漏一个字段就是静默 undefined。
  *
- * 走 `contract()` 而不是裸 `parse()`：原来是 `problemDetailSchema.parse(v) as Problem`，
+ * 走 `contract()` 而不是裸 `parse()`：原来是 `problemDetailSchema.parse(v) as ProblemDetail`，
  * `as` 把校验结果又断言回去、等于没校验，而 `parse` 抛错会让整个题目页白屏。
  * 现在形状不符时记一条控制台分歧再放行原始数据。
  */
-function detailProblem(value: unknown): Problem {
+function detailProblem(value: unknown): ProblemDetail {
   return contract("GET /problems/:id", problemDetailSchema, value)
 }
 
@@ -89,7 +89,7 @@ export async function getProblemList(
     params: { paging: true, offset, limit, ...searchParams },
   })
   return {
-    results: res.results.map(filterResult),
+    results: res.results.map(toProblemRow),
     total: res.total,
   }
 }
@@ -250,7 +250,7 @@ export function getContestList(query: {
 }
 
 export function getContest(id: string) {
-  return api.get<OjContest>(`contests/${encodeURIComponent(id)}`)
+  return api.get<Contest>(`contests/${encodeURIComponent(id)}`)
 }
 
 export function getContestAccess(id: string) {
@@ -268,7 +268,7 @@ export async function getContestProblems(contestID: string) {
   const res = await api.get<ProblemListItem[]>(
     `contests/${encodeURIComponent(contestID)}/problems`,
   )
-  return res.map(filterResult)
+  return res.map(toProblemRow)
 }
 
 export function getContestRank(
@@ -276,7 +276,7 @@ export function getContestRank(
   query: { limit: number; offset: number },
 ) {
   // submissionInfo 在契约里是 Record<string, unknown>（JSONB 原文），
-  // 前端在这里收窄成 SubmissionInfo，见 utils/types 的 ContestRank
+  // 前端在这里收窄成 ContestSubmissionInfo，见 utils/types 的 ContestRank
   return api.get<{ results: ContestRank[]; total: number }>(
     `contests/${encodeURIComponent(contestID)}/rank`,
     { params: query },
@@ -383,7 +383,7 @@ export function submitHintFeedback(hintId: number, helpful: boolean) {
 export function getSimilarProblems(problemId: string) {
   return api
     .get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
-    .then((response) => response.map(filterResult))
+    .then((response) => response.map(toProblemRow))
 }
 
 export type { YearlyAc as YearlyACData } from "@oj2/contract"

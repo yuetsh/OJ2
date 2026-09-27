@@ -57,7 +57,7 @@ export function asFilterValue<T extends string | number>(
   return value as T
 }
 
-export function objectValue(value: unknown): Record<string, unknown> {
+export function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {}
@@ -96,7 +96,7 @@ export function isSuperAdmin(user: AuthUser | null | undefined) {
 
 export function publicTemplates(value: unknown) {
   const templates: Record<string, string> = {}
-  for (const [language, raw] of Object.entries(objectValue(value))) {
+  for (const [language, raw] of Object.entries(asRecord(value))) {
     if (typeof raw !== "string") continue
     const match = raw.match(/\/\/TEMPLATE BEGIN\n([\s\S]+?)\/\/TEMPLATE END/)
     templates[language] = match?.[1] ?? ""

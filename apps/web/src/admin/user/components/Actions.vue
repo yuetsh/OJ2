@@ -1,16 +1,16 @@
 <script lang="ts" setup>
 import { editUser } from "admin/api"
-import type { User } from "utils/types"
+import type { AdminUserForm } from "utils/types"
 
 interface Props {
-  user: User
+  user: AdminUserForm
 }
 const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: "deleteUser", value: number[]): void
-  (e: "userBanned", value: User): void
-  (e: "openEditModal", value: User): void
-  (e: "resetPassword", value: User): void
+  (e: "userBanned", value: AdminUserForm): void
+  (e: "openEditModal", value: AdminUserForm): void
+  (e: "resetPassword", value: AdminUserForm): void
 }>()
 
 async function banUser() {

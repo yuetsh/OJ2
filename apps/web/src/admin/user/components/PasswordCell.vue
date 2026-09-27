@@ -1,10 +1,10 @@
 <script lang="ts" setup>
 import TextCopy from "shared/components/TextCopy.vue"
 import { USER_TYPE } from "utils/constants"
-import type { User } from "utils/types"
+import type { AdminUserForm } from "utils/types"
 
 interface Props {
-  user: User
+  user: AdminUserForm
   revealed: boolean
 }
 const props = defineProps<Props>()

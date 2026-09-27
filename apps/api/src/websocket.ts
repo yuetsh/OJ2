@@ -17,6 +17,7 @@ import {
 } from "./judge/events"
 import { JudgeStatus } from "./judge/status"
 import { createSubscriberRedis } from "./redis"
+import { asRecord } from "./routes/helpers"
 import {
   configTopic,
   configUpdateChannel,
@@ -204,12 +205,6 @@ export function startSessionSweep() {
   return timer
 }
 
-function objectValue(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
 export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSocketData> {
   return {
     open(ws) {
@@ -386,7 +381,7 @@ async function handleMessage(
     return
   }
 
-  const statistics = objectValue(submission.statisticInfo)
+  const statistics = asRecord(submission.statisticInfo)
   const status =
     submission.result === JudgeStatus.PENDING
       ? "pending"

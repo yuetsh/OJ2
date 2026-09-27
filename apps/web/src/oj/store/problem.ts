@@ -1,8 +1,8 @@
 import { defineStore } from "pinia"
-import type { LANGUAGE, Problem } from "utils/types"
+import type { LANGUAGE, ProblemDetail } from "utils/types"
 
 export const useProblemStore = defineStore("problem", () => {
-  const problem = ref<Problem | null>(null)
+  const problem = ref<ProblemDetail | null>(null)
   const route = useRoute()
 
   /**

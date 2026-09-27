@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProblemFiltered } from "utils/types"
+import type { ProblemRow } from "utils/types"
 import ProblemStatus from "oj/problem/components/ProblemStatus.vue"
 import { useContestStore } from "oj/store/contest"
 import { renderTableTitle } from "utils/renders"
@@ -8,7 +8,7 @@ const props = defineProps<{ contestID: string }>()
 
 const router = useRouter()
 const contestStore = useContestStore()
-const problemsColumns: DataTableColumn<ProblemFiltered>[] = [
+const problemsColumns: DataTableColumn<ProblemRow>[] = [
   {
     title: renderTableTitle("状态", "streamline-ultimate-color:music-note-1"),
     key: "status",
@@ -27,19 +27,19 @@ const problemsColumns: DataTableColumn<ProblemFiltered>[] = [
   },
   {
     title: renderTableTitle("提交数", "streamline-emojis:clinking-beer-mugs"),
-    key: "submission",
+    key: "submissionCount",
     align: "center",
     width: 120,
   },
   {
     title: renderTableTitle("通过率", "streamline-emojis:clapping-hands-1"),
-    key: "rate",
+    key: "acRate",
     align: "center",
     width: 120,
   },
 ]
 
-function rowProps(row: ProblemFiltered) {
+function rowProps(row: ProblemRow) {
   return {
     style: "cursor: pointer",
     onClick() {

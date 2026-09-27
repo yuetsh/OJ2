@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm"
 
 import { db, schema } from "../db"
 import { JudgeStatus, isAccepted } from "../judge/status"
-import { objectValue } from "../routes/helpers"
+import { asRecord } from "../routes/helpers"
 import {
   metaAchievements,
   refreshUnlockedCount,
@@ -305,7 +305,7 @@ async function computePlan(): Promise<Plan> {
       })
     }
     if (
-      stable(objectValue(problem.statisticInfo)) !== stable(want.statisticInfo)
+      stable(asRecord(problem.statisticInfo)) !== stable(want.statisticInfo)
     ) {
       rows.push({
         label,
@@ -328,7 +328,7 @@ async function computePlan(): Promise<Plan> {
     }
     // acm_problems_status 里除了 problems / contest_problems 之外的键原样保留 ——
     // persistResult 只写这两个桶，别的键是从哪来的没人说得清，重算不该顺手抹掉。
-    const existing = objectValue(profile.acmProblemsStatus)
+    const existing = asRecord(profile.acmProblemsStatus)
     const merged: Record<string, unknown> = { ...existing }
     delete merged.problems
     delete merged.contest_problems
@@ -355,13 +355,13 @@ async function computePlan(): Promise<Plan> {
     }
     if (stable(existing) !== stable(merged)) {
       const keys = new Set([
-        ...Object.keys(objectValue(existing.problems)),
+        ...Object.keys(asRecord(existing.problems)),
         ...Object.keys(want.status.problems ?? {}),
       ])
       rows.push({
         label,
         field: "acm_problems_status",
-        before: `${Object.keys(objectValue(existing.problems)).length} 题`,
+        before: `${Object.keys(asRecord(existing.problems)).length} 题`,
         after: `${keys.size} 题（含比赛桶重建）`,
       })
     }

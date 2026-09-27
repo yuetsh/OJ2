@@ -1,5 +1,5 @@
 import axios from "axios"
-import { decode, encode } from "./functions"
+import { base64DecodeUtf8, base64EncodeUtf8 } from "./functions"
 import type { Code, LANGUAGE } from "./types"
 
 const http = axios.create({ baseURL: import.meta.env.PUBLIC_JUDGE0_URL })
@@ -16,7 +16,7 @@ const JUDGE0_LANGUAGE_ID: Partial<Record<LANGUAGE, number>> = {
 }
 
 export async function createTestSubmission(code: Code, input: string) {
-  const encodedCode = encode(code.value)
+  const encodedCode = base64EncodeUtf8(code.value)
   const id = JUDGE0_LANGUAGE_ID[code.language]
   if (id === undefined) {
     return { status: null, output: `${code.language} 不支持在线试运行` }
@@ -26,7 +26,7 @@ export async function createTestSubmission(code: Code, input: string) {
   const payload = {
     source_code: encodedCode,
     language_id: id,
-    stdin: encode(input),
+    stdin: base64EncodeUtf8(input),
     redirect_stderr_to_stdout: true,
     compiler_options: compilerOptions,
   }
@@ -36,7 +36,10 @@ export async function createTestSubmission(code: Code, input: string) {
   const data = response.data
   return {
     status: data.status && data.status.id,
-    output: [decode(data.compile_output), decode(data.stdout)]
+    output: [
+      base64DecodeUtf8(data.compile_output),
+      base64DecodeUtf8(data.stdout),
+    ]
       .join("\n")
       .trim(),
   }

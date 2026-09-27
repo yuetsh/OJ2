@@ -11,7 +11,7 @@ import { Hono } from "hono"
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
-import { objectValue } from "./helpers"
+import { asRecord } from "./helpers"
 
 export const achievementRoutes = new Hono<AppEnv>()
 
@@ -73,7 +73,7 @@ achievementRoutes.get("/achievements", requireAuth, async (c) => {
       .where(eq(schema.user.isDisabled, false)),
   ])
   const unlocked = new Map(unlockedRows.map((row) => [row.achievementId, row]))
-  const metrics = objectValue(statRows[0]?.metrics)
+  const metrics = asRecord(statRows[0]?.metrics)
   const active = activeRows[0]?.value ?? 0
   const result = achievements.map((achievement) => {
     const record = unlocked.get(achievement.id)

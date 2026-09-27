@@ -48,7 +48,7 @@ import { config } from "../../config"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { getTopReactions } from "../../services/reaction"
-import { objectValue, queryInteger, sampleUser } from "../helpers"
+import { asRecord, queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
 
@@ -205,7 +205,7 @@ async function serialize(row: ProblemRow) {
     source: row.source,
     submissionNumber: row.submissionNumber,
     acceptedNumber: row.acceptedNumber,
-    statisticInfo: objectValue(row.statisticInfo),
+    statisticInfo: asRecord(row.statisticInfo),
     contestId: row.contestId,
     createdBy: sampleUser(
       creator ?? { id: row.createdById, username: "" },
@@ -616,9 +616,9 @@ adminProblemRoutes.delete(
       .where(eq(schema.problem.id, id))
       .limit(1)
     if (!existing)
-      return failure(c, 404, "problem-not-found", "Problem does not exists")
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
     if (!(await canEdit(c.get("user")!, existing))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exists")
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
     }
     return deleteProblem(c, id)
   },
@@ -793,7 +793,7 @@ adminProblemRoutes.post(
       return failure(c, 404, "problem-not-found", "Problem does not exist")
     }
     if (!problem.contestId || problem.isPublic) {
-      return failure(c, 409, "already-public", "Already be a public problem")
+      return failure(c, 409, "already-public", "Already a public problem")
     }
     const [duplicate] = await db
       .select({ id: schema.problem.id })
@@ -936,9 +936,9 @@ adminProblemRoutes.get(
       )
       .limit(1)
     if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exists")
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
     if (!(await canEdit(c.get("user")!, problem))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exists")
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
     }
     try {
       const archive = await packTestCaseZip(problem.testCaseId)
@@ -973,9 +973,9 @@ adminProblemRoutes.get(
       )
       .limit(1)
     if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exists")
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
     if (!(await canEdit(c.get("user")!, problem))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exists")
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
     }
     const info = await readInfo(problem.testCaseId)
     if (!info)

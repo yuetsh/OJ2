@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NButton, NTag } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
-import type { AdminProblemFiltered } from "utils/types"
+import type { AdminProblemRow } from "utils/types"
 import { batchTagProblems, getProblemList } from "admin/api"
 
 interface Props {
@@ -19,13 +19,13 @@ const emit = defineEmits<{
 const router = useRouter()
 const message = useMessage()
 
-const problems = ref<AdminProblemFiltered[]>([])
+const problems = ref<AdminProblemRow[]>([])
 const total = ref(0)
 const page = ref(1)
 const limit = ref(10)
 const keyword = ref("")
 
-const columns: DataTableColumn<AdminProblemFiltered>[] = [
+const columns: DataTableColumn<AdminProblemRow>[] = [
   { title: "显示编号", key: "_id", width: 100 },
   {
     title: "标题",
@@ -81,12 +81,12 @@ function close() {
   emit("update:show", false)
 }
 
-function goEdit(row: AdminProblemFiltered) {
+function goEdit(row: AdminProblemRow) {
   close()
   router.push({ name: "admin problem edit", params: { problemID: row.id } })
 }
 
-async function removeTag(row: AdminProblemFiltered) {
+async function removeTag(row: AdminProblemRow) {
   await batchTagProblems([row.id], [props.tagName], "remove")
   message.success(`已移除「${row.title}」的标签`)
   emit("changed")

@@ -25,7 +25,7 @@ import { publishConfigUpdate } from "../../events"
 import { failure, parseBody, success } from "../../http"
 import { sniffImageExtension } from "../../services/image"
 import { getWebsiteOptions } from "../../services/options"
-import { todayStart } from "../../time"
+import { dayStart } from "../../time"
 import { queryInteger } from "../helpers"
 
 export const adminConfRoutes = new Hono<AppEnv>()
@@ -232,7 +232,7 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
     db
       .select({ value: count() })
       .from(schema.submission)
-      .where(gte(schema.submission.createTime, todayStart())),
+      .where(gte(schema.submission.createTime, dayStart())),
     db
       .select({ value: count() })
       .from(schema.contest)

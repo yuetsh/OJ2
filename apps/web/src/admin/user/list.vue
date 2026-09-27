@@ -4,7 +4,7 @@ import { DataTableRowKey, NFlex, NTag, SelectOption } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
-import type { User } from "utils/types"
+import type { AdminUserForm } from "utils/types"
 import {
   deleteUsers,
   editUser,
@@ -13,8 +13,8 @@ import {
   resetPassword,
 } from "../api"
 import Actions from "./components/Actions.vue"
-import Name from "./components/Name.vue"
-import Password from "./components/Password.vue"
+import UserNameCell from "./components/UserNameCell.vue"
+import PasswordCell from "./components/PasswordCell.vue"
 import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { useRouteQuery } from "@vueuse/router"
 import TextCopy from "shared/components/TextCopy.vue"
@@ -35,8 +35,8 @@ const { query, clearQuery } = usePagination<UserQuery>({
 })
 
 const total = ref(0)
-const users = ref<User[]>([])
-const userEditing = ref<User | null>(null)
+const users = ref<AdminUserForm[]>([])
+const userEditing = ref<AdminUserForm | null>(null)
 
 const adminOptions = [
   { label: "全部用户", value: "" },
@@ -57,16 +57,16 @@ const password = ref("")
 const revealedPasswords = ref(new Set<number>())
 const userIDs = ref<DataTableRowKey[]>([])
 
-const rowKey = (row: User) => row.id
+const rowKey = (row: AdminUserForm) => row.id
 
-const columns: DataTableColumn<User>[] = [
+const columns: DataTableColumn<AdminUserForm>[] = [
   { type: "selection" },
   { title: "ID", key: "id", width: 80 },
   {
     title: "用户名",
     key: "username",
     width: 220,
-    render: (row) => h(Name, { user: row }),
+    render: (row) => h(UserNameCell, { user: row }),
   },
   {
     // 显示出来的密码后面还跟着「隐藏」按钮，150 挤得下点点、挤不下密码
@@ -74,7 +74,7 @@ const columns: DataTableColumn<User>[] = [
     key: "raw_password",
     width: 180,
     render: (row) =>
-      h(Password, {
+      h(PasswordCell, {
         user: row,
         revealed: revealedPasswords.value.has(row.id),
         onToggle: (id: number) => {
@@ -165,7 +165,7 @@ async function onDeleteUsers(userIDs: DataTableRowKey[] | Ref<number[]>) {
   listUsers()
 }
 
-async function onResetPassword(user: User) {
+async function onResetPassword(user: AdminUserForm) {
   const res = await resetPassword(user.id)
   message.success(`【${user.username}】的密码已重置成【${res}】`)
   users.value = users.value.map((it) => {
@@ -176,7 +176,7 @@ async function onResetPassword(user: User) {
   })
 }
 
-async function onUserBanned(user: User) {
+async function onUserBanned(user: AdminUserForm) {
   users.value = users.value.map((it) => {
     if (it.id === user.id) {
       it.isDisabled = user.isDisabled
@@ -209,7 +209,7 @@ function createNewUser() {
   password.value = ""
 }
 
-function onOpenEditModal(user: User) {
+function onOpenEditModal(user: AdminUserForm) {
   userEditing.value = user
   password.value = ""
 }

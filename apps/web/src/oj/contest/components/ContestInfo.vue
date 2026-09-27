@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { useContestStore } from "oj/store/contest"
 import { parseTime } from "utils/functions"
-import ContestType from "shared/components/ContestType.vue"
+import ContestAccessTag from "shared/components/ContestAccessTag.vue"
 
 const contestStore = useContestStore()
 </script>
@@ -30,7 +30,7 @@ const contestStore = useContestStore()
         {{ parseTime(contestStore.contest.endTime, "YYYY年M月D日 HH:mm:ss") }}
       </n-descriptions-item>
       <n-descriptions-item label="比赛类型">
-        <ContestType :contest="contestStore.contest" />
+        <ContestAccessTag :contest="contestStore.contest" />
       </n-descriptions-item>
       <n-descriptions-item label="发起人">
         {{ contestStore.contest.createdBy.username }}

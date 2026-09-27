@@ -12,7 +12,7 @@ import {
   submissionMemoryFormat,
   submissionResultTitle,
   submissionTimeFormat,
-  utoa,
+  compressToBase64,
 } from "utils/functions"
 import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
@@ -82,7 +82,7 @@ function copyToCat() {
     code: submission.value!.code,
     input: "",
   }
-  const base64 = utoa(JSON.stringify(data))
+  const base64 = compressToBase64(JSON.stringify(data))
   const url = `${import.meta.env.PUBLIC_CODE_URL}?share=${encodeURIComponent(base64)}`
   window.open(url, "_blank")
 }

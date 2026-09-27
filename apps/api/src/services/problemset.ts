@@ -1,7 +1,7 @@
 import { and, eq, notInArray, sql } from "drizzle-orm"
 
 import { db, schema } from "../db"
-import { objectValue } from "../routes/helpers"
+import { asRecord } from "../routes/helpers"
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 type ProgressRow = typeof schema.problemsetProgress.$inferSelect
@@ -40,7 +40,7 @@ export function computeProgress(
     if (score === undefined) continue
     totalScore += score
     // 分值以题单当前的设置为准，detail 里存的是做出那一刻的快照
-    kept[key] = { ...objectValue(value), score }
+    kept[key] = { ...asRecord(value), score }
   }
   // 分母只算必做题。「（选做）」这个标签一直只是卡片上的一行字，进度分母和 all_problems
   // 奖章照样要求做完 —— 快照里 22 个人做完了全部必做题，界面却显示未完成、全通奖章也拿不到
@@ -137,7 +137,7 @@ export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
   }
   if (badge.conditionType === "problem_count") {
     return (
-      Object.keys(objectValue(progress.progressDetail)).length >=
+      Object.keys(asRecord(progress.progressDetail)).length >=
       badge.conditionValue
     )
   }
@@ -232,7 +232,7 @@ export async function resyncProgress(problemsetId: number) {
   const updated = progresses.map((progress) => ({
     ...progress,
     ...computeProgress(
-      objectValue(progress.progressDetail),
+      asRecord(progress.progressDetail),
       links,
       progress.completeTime,
       now,
@@ -309,7 +309,7 @@ export async function recordSolvedProblem(
           .values({ problemsetId, userId, submissionId, problemId })
       }
 
-      const detail = objectValue(progress.progressDetail)
+      const detail = asRecord(progress.progressDetail)
       if (String(problemId) in detail) return []
       const links = await tx
         .select({

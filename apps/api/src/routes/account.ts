@@ -54,12 +54,7 @@ import {
   type AttemptRule,
 } from "../services/throttling"
 import { localTime, weekStart } from "../time"
-import {
-  isTeacherOrAbove,
-  objectValue,
-  queryInteger,
-  sampleUser,
-} from "./helpers"
+import { isTeacherOrAbove, asRecord, queryInteger, sampleUser } from "./helpers"
 
 export const accountRoutes = new Hono<AppEnv>()
 
@@ -632,8 +627,8 @@ accountRoutes.post(
       .from(schema.userProfile)
       .where(eq(schema.userProfile.userId, user.id))
       .limit(1)
-    const status = objectValue(profile?.value)
-    const problems = objectValue(status.problems)
+    const status = asRecord(profile?.value)
+    const problems = asRecord(status.problems)
     const ids = Object.keys(problems).map(Number).filter(Number.isInteger)
     if (ids.length > 0) {
       const rows = await db
@@ -649,7 +644,7 @@ accountRoutes.post(
         rows.map((row) => [String(row.id), row.displayId]),
       )
       for (const [id, value] of Object.entries(problems)) {
-        const item = objectValue(value)
+        const item = asRecord(value)
         const displayId = displayIds.get(id)
         if (displayId) item._id = displayId
         problems[id] = item

@@ -10,7 +10,6 @@ import type {
   EmbeddedSubmission as ContractEmbeddedSubmission,
   Message as ContractMessage,
   Grade,
-  ProblemDetail,
   ProblemDifficulty,
   JudgeStatus,
   AstRules,
@@ -41,7 +40,7 @@ export interface AcmProblemsStatus {
  * 后台用户管理里的用户。`rawPassword` 是明文密码，只有超管专属接口下发 ——
  * 老师要能查学生密码，见契约 adminUserSchema 的注释。
  */
-export type User = AdminUser & {
+export type AdminUserForm = AdminUser & {
   // 编辑表单里临时填的新密码，不在响应里
   password?: string
 }
@@ -112,20 +111,6 @@ export type { UploadTestCaseResponse } from "@oj2/contract"
 export type { ProblemTestCaseScore as Testcase } from "@oj2/contract"
 
 /**
- * 题目详情。**直接取契约** —— `languages` / `template` 的收窄已经搬进
- * `problemDetailSchema`（`z.array(problemLanguageSchema)` 与
- * `z.partialRecord(problemLanguageSchema, …)`），这里原来那份
- * `Omit<ProblemDetail, "languages" | "template"> & {...}` 与契约**双向可赋值**，
- * 即完全等价，是一层没有内容的重复（已用类型探针验证）。
- *
- * 原来它还多挂三个可选字段（`hasAstRules` / `visible` / `answers`）。它们在
- * 契约里**本来就有**（`hasAstRules` 在题目列表项上、`ProblemDetail` 带的是
- * `astRequirements`），少数管理端调用点需要补充时应该就地声明自己的类型，
- * 不该让一个全局别名对所有调用方声称这些字段存在。
- */
-export type Problem = ProblemDetail
-
-/**
  * AST 代码要求。原来这里手抄的那份少了 label / exact / outer / inner ——
  * 编辑器写得出 label 和 exact，判题机也认，只有这个类型不认。形状在契约里。
  */
@@ -174,15 +159,15 @@ export type BlankProblem = Omit<
   mermaidCode: string
 }
 
-export interface ProblemFiltered {
+export interface ProblemRow {
   _id: string
   id: number
   title: string
   // 比赛进行中难度不下发，见 contract 的 maskedProblemDifficultySchema
   difficulty: "简单" | "中等" | "困难" | null
   tags: string[]
-  submission: number
-  rate: string
+  submissionCount: number
+  acRate: string
   status: "not_test" | "passed" | "failed"
   author: string
   allowFlowchart: boolean
@@ -190,7 +175,7 @@ export interface ProblemFiltered {
   hasAstRules: boolean
 }
 
-export interface AdminProblemFiltered {
+export interface AdminProblemRow {
   _id: string
   id: number
   title: string
@@ -314,11 +299,11 @@ export type {
   ClassUserRank,
 } from "@oj2/contract"
 
-/** 后台比赛。oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生） */
-export type Contest = AdminContest
-
-/** 学生侧的比赛：不含 password / visible */
-export type { Contest as OjContest } from "@oj2/contract"
+/**
+ * 学生侧的比赛：不含 password / visible。后台用 `AdminContest` ——
+ * oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生）
+ */
+export type { Contest, AdminContest } from "@oj2/contract"
 
 export type BlankContest = Omit<
   AdminContest,
@@ -331,10 +316,10 @@ export type BlankContest = Omit<
 >
 
 /**
- * `acm_contest_rank.submission_info` 的 JSONB 内容。**形状已搬进契约**
- * （`contestSubmissionInfoSchema`），这里保留别名给既有调用点。
+ * `acm_contest_rank.submission_info` 的 JSONB 内容，形状在契约
+ * （`contestSubmissionInfoSchema`）。别和 `submission.info`（判题结果）混了。
  */
-export type { ContestSubmissionInfo as SubmissionInfo } from "@oj2/contract"
+export type { ContestSubmissionInfo } from "@oj2/contract"
 
 /**
  * 榜单行。`submissionInfo` 的收窄（JSONB 原文的 snake_case 形状）已经搬进
