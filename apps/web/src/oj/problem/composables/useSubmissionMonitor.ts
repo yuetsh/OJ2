@@ -129,6 +129,18 @@ export function useSubmissionMonitor() {
     startPollingFallback()
   }
 
+  /**
+   * 换题的时候丢掉当前这条提交。题目页换题（顶栏题号直达、「下一题」）是同一个组件
+   * 复用、只换路由参数，不清的话上一道题的结果面板原样挂在新题上；而且上一道还在判的话，
+   * 判完触发的「通过」处理会把**新题**标成已解决。提交本身照常判完落库，只是这边不再跟。
+   */
+  const reset = () => {
+    pausePolling()
+    unsubscribe()
+    submissionId.value = ""
+    submission.value = undefined
+  }
+
   // ==================== 计算属性 ====================
   const judging = computed(() => submission.value?.result === SubmissionStatus.judging)
 
@@ -159,5 +171,6 @@ export function useSubmissionMonitor() {
     // 方法
     startMonitoring,
     pausePolling,
+    reset,
   }
 }

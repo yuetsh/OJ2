@@ -37,6 +37,9 @@ const [commentPanel] = useToggle()
 
 function closeCommentPanel() {
   commentPanel.value = false
+  // 点评价弹窗时，结果面板会当成「点了外面」收起来 —— 而「下一题」就在面板里
+  // （LessonNext），评价完得把它重新打开
+  showResult.value = true
 }
 
 const { isDesktop } = useBreakpoints()
@@ -45,7 +48,14 @@ const { isDesktop } = useBreakpoints()
 const { celebrate } = useFireworks()
 
 // ==================== 判题监控 ====================
-const { submission, judging, pending, submitting, startMonitoring } = useSubmissionMonitor()
+const {
+  submission,
+  judging,
+  pending,
+  submitting,
+  startMonitoring,
+  reset: resetSubmission,
+} = useSubmissionMonitor()
 
 const showResult = ref(false)
 const isFormatting = ref(false)
@@ -69,7 +79,7 @@ const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
 // ==================== AC 后弹出点评轮盘 ====================
 // 只对已经能评价、且还没评过的人弹：后端要求先有 AC 才收评价，这里刚 AC 完正好；
 // mine 非 null 说明早就评过了，别再打扰。
-const { start: showCommentPanelDelayed } = useTimeoutFn(
+const { start: showCommentPanelDelayed, stop: cancelCommentPanel } = useTimeoutFn(
   async () => {
     const res = await getReaction(problem.value!.id)
     if (res.mine === null) {
@@ -80,7 +90,7 @@ const { start: showCommentPanelDelayed } = useTimeoutFn(
   { immediate: false },
 )
 
-const { start: goToProblemSetDelayed } = useTimeoutFn(
+const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutFn(
   () => {
     router.push({
       name: "problemset",
@@ -91,6 +101,27 @@ const { start: goToProblemSetDelayed } = useTimeoutFn(
   },
   1500,
   { immediate: false },
+)
+
+/**
+ * 换题时把上一道题的东西全收掉：结果面板、提交前的语法错误、还在跟的那条提交，以及
+ * 通过之后那两个 1.5 秒的定时器 —— 评价弹窗是按**当前**题目去查、去弹的，学生通过后
+ * 马上点了「下一题」，不取消的话就会给一道还没做的题弹评价。
+ *
+ * 题目页换题是同一个组件复用（只换路由参数），以前几乎只有退回列表再点进来这一条路，
+ * 有了顶栏题号直达和结果面板里的「下一题」之后，这成了常规操作。
+ */
+watch(
+  () => problem.value?._id,
+  (next, previous) => {
+    if (!previous || next === previous) return
+    showResult.value = false
+    syntaxErrorInfo.value = ""
+    commentPanel.value = false
+    cancelCommentPanel()
+    cancelGoToProblemSet()
+    resetSubmission()
+  },
 )
 
 // ==================== 计算属性 ====================
