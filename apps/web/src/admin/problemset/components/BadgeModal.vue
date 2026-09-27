@@ -1,33 +1,39 @@
 <script setup lang="ts">
+import type { AdminProblemSetBadge } from "utils/types"
+
+// 添加和编辑共用一个弹窗：传了 badge 就是编辑，null 就是添加。
+// 原来是两份八成相同的组件，改一处表单项另一处总要漏
 interface Props {
   show: boolean
+  badge: AdminProblemSetBadge | null
+}
+
+type BadgeFormData = {
+  name: string
+  description: string
+  icon: string
+  conditionType: "all_problems" | "problem_count" | "score"
+  conditionValue?: number
 }
 
 interface Emits {
   (e: "update:show", value: boolean): void
-  (
-    e: "confirm",
-    data: {
-      name: string
-      description: string
-      icon: string
-      conditionType: "all_problems" | "problem_count" | "score"
-      conditionValue?: number
-    },
-  ): void
+  (e: "create", data: BadgeFormData): void
+  (e: "update", data: BadgeFormData): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const newBadgeName = ref("")
-const newBadgeDescription = ref("")
-const newBadgeIcon = ref("")
-const newBadgeConditionType = ref<"all_problems" | "problem_count" | "score">(
+const badgeName = ref("")
+const badgeDescription = ref("")
+const badgeIcon = ref("")
+const badgeConditionType = ref<"all_problems" | "problem_count" | "score">(
   "all_problems",
 )
-const newBadgeConditionValue = ref(1)
+const badgeConditionValue = ref(1)
 
+// 预设奖章图标选项
 const BADGE_LEN = 6
 const badgeIconOptions = []
 for (let i = 1; i <= BADGE_LEN; i++) {
@@ -45,34 +51,38 @@ const conditionTypeOptions = [
 ]
 
 function handleConfirm() {
-  emit("confirm", {
-    name: newBadgeName.value,
-    description: newBadgeDescription.value,
-    icon: newBadgeIcon.value,
-    conditionType: newBadgeConditionType.value,
+  const data: BadgeFormData = {
+    name: badgeName.value,
+    description: badgeDescription.value,
+    icon: badgeIcon.value,
+    conditionType: badgeConditionType.value,
     // 只有非"完成所有题目"时才带条件值
-    ...(newBadgeConditionType.value === "all_problems"
+    ...(badgeConditionType.value === "all_problems"
       ? {}
-      : { conditionValue: newBadgeConditionValue.value }),
-  })
+      : { conditionValue: badgeConditionValue.value }),
+  }
+  if (props.badge) emit("update", data)
+  else emit("create", data)
 }
 
 function handleCancel() {
   emit("update:show", false)
 }
 
-// 重置表单
+// 每次打开都按当前模式重新填表：编辑就填这枚奖章的值，添加就清空。
+// 编辑取消后再打开同一枚，看到的是库里的值，而不是上次没保存的改动
 watch(
   () => props.show,
-  (newVal) => {
-    if (newVal) {
-      newBadgeName.value = ""
-      newBadgeDescription.value = ""
-      newBadgeIcon.value = ""
-      newBadgeConditionType.value = "all_problems"
-      newBadgeConditionValue.value = 1
-    }
+  (open) => {
+    if (!open) return
+    const badge = props.badge
+    badgeName.value = badge?.name ?? ""
+    badgeDescription.value = badge?.description ?? ""
+    badgeIcon.value = badge?.icon ?? ""
+    badgeConditionType.value = badge?.conditionType ?? "all_problems"
+    badgeConditionValue.value = badge?.conditionValue ?? 1
   },
+  { immediate: true },
 )
 </script>
 
@@ -80,17 +90,17 @@ watch(
   <n-modal
     :show="show"
     preset="card"
-    title="添加奖章"
+    :title="badge ? '编辑奖章' : '添加奖章'"
     style="width: 500px"
     @update:show="emit('update:show', $event)"
   >
     <n-form>
       <n-form-item label="奖章名称" required>
-        <n-input v-model:value="newBadgeName" placeholder="请输入奖章名称" />
+        <n-input v-model:value="badgeName" placeholder="请输入奖章名称" />
       </n-form-item>
       <n-form-item label="描述">
         <n-input
-          v-model:value="newBadgeDescription"
+          v-model:value="badgeDescription"
           type="textarea"
           placeholder="奖章描述"
           required
@@ -101,12 +111,12 @@ watch(
           <div
             v-for="option in badgeIconOptions"
             :key="option.value"
-            @click="newBadgeIcon = option.value"
+            @click="badgeIcon = option.value"
             :style="{
               width: '60px',
               height: '60px',
               border:
-                newBadgeIcon === option.value
+                badgeIcon === option.value
                   ? '2px solid #1890ff'
                   : '1px solid #d9d9d9',
               borderRadius: '4px',
@@ -115,7 +125,7 @@ watch(
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor:
-                newBadgeIcon === option.value ? '#f0f8ff' : 'transparent',
+                badgeIcon === option.value ? '#f0f8ff' : 'transparent',
             }"
           >
             <n-image
@@ -133,17 +143,17 @@ watch(
         <n-form-item label="获得条件">
           <n-select
             style="width: 200px"
-            v-model:value="newBadgeConditionType"
+            v-model:value="badgeConditionType"
             :options="conditionTypeOptions"
           />
         </n-form-item>
         <n-form-item
           label="条件值"
-          v-if="newBadgeConditionType !== 'all_problems'"
+          v-if="badgeConditionType !== 'all_problems'"
         >
           <n-input-number
             style="width: 120px"
-            v-model:value="newBadgeConditionValue"
+            v-model:value="badgeConditionValue"
             placeholder="条件值"
           />
         </n-form-item>

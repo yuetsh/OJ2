@@ -27,10 +27,8 @@ import ProblemSetInfo from "./components/ProblemSetInfo.vue"
 import ProblemManagement from "./components/ProblemManagement.vue"
 import BadgeManagement from "./components/BadgeManagement.vue"
 import ProgressManagement from "./components/ProgressManagement.vue"
-import AddProblemModal from "./components/AddProblemModal.vue"
-import EditProblemModal from "./components/EditProblemModal.vue"
-import AddBadgeModal from "./components/AddBadgeModal.vue"
-import EditBadgeModal from "./components/EditBadgeModal.vue"
+import ProblemModal from "./components/ProblemModal.vue"
+import BadgeModal from "./components/BadgeModal.vue"
 
 const route = useRoute()
 const router = useRouter()
@@ -48,11 +46,9 @@ const problems = ref<AdminProblemSetProblem[]>([])
 const badges = ref<AdminProblemSetBadge[]>([])
 const progress = ref<AdminProblemSetProgress[]>([])
 
-// 模态框状态
-const showAddProblemModal = ref(false)
-const showEditProblemModal = ref(false)
-const showAddBadgeModal = ref(false)
-const showEditBadgeModal = ref(false)
+// 模态框状态。添加和编辑共用一个弹窗，editing* 为 null 就是添加
+const showProblemModal = ref(false)
+const showBadgeModal = ref(false)
 
 // 编辑数据
 const editingProblem = ref<AdminProblemSetProblem | null>(null)
@@ -98,7 +94,7 @@ async function handleAddProblem(data: AddProblemToSetRequest) {
   try {
     await addProblemToSet(problemSetId.value, data)
     message.success("题目添加成功")
-    showAddProblemModal.value = false
+    showProblemModal.value = false
     loadProblems()
     loadProblemSetDetail() // 刷新题目数量
   } catch (err) {
@@ -123,7 +119,7 @@ async function handleEditProblem(data: UpdateProblemInSetRequest) {
   try {
     await editProblemInSet(problemSetId.value, editingProblem.value.id, data)
     message.success("题目编辑成功")
-    showEditProblemModal.value = false
+    showProblemModal.value = false
     loadProblems()
   } catch (err) {
     message.error("编辑题目失败：" + errorMessage(err, "未知错误"))
@@ -134,7 +130,7 @@ async function handleAddBadge(data: BadgeFormData) {
   try {
     await createProblemSetBadge(problemSetId.value, data)
     message.success("奖章创建成功")
-    showAddBadgeModal.value = false
+    showBadgeModal.value = false
     loadBadges()
   } catch (err) {
     message.error("创建奖章失败：" + errorMessage(err, "未知错误"))
@@ -157,7 +153,7 @@ async function handleEditBadge(data: BadgeFormData) {
   try {
     await editProblemSetBadge(problemSetId.value, editingBadge.value.id, data)
     message.success("奖章编辑成功")
-    showEditBadgeModal.value = false
+    showBadgeModal.value = false
     loadBadges()
   } catch (err) {
     message.error("编辑奖章失败：" + errorMessage(err, "未知错误"))
@@ -175,21 +171,23 @@ async function handleRemoveUser(userId: number) {
 }
 
 function openAddProblemModal() {
-  showAddProblemModal.value = true
+  editingProblem.value = null
+  showProblemModal.value = true
 }
 
 function openAddBadgeModal() {
-  showAddBadgeModal.value = true
+  editingBadge.value = null
+  showBadgeModal.value = true
 }
 
 function openEditProblemModal(problem: AdminProblemSetProblem) {
   editingProblem.value = problem
-  showEditProblemModal.value = true
+  showProblemModal.value = true
 }
 
 function openEditBadgeModal(badge: AdminProblemSetBadge) {
   editingBadge.value = badge
-  showEditBadgeModal.value = true
+  showBadgeModal.value = true
 }
 
 onMounted(() => {
@@ -247,23 +245,18 @@ onMounted(() => {
     </n-tabs>
 
     <!-- 模态框组件 -->
-    <AddProblemModal
-      v-model:show="showAddProblemModal"
-      @confirm="handleAddProblem"
-    />
-
-    <EditProblemModal
-      v-model:show="showEditProblemModal"
+    <ProblemModal
+      v-model:show="showProblemModal"
       :problem="editingProblem"
-      @confirm="handleEditProblem"
+      @create="handleAddProblem"
+      @update="handleEditProblem"
     />
 
-    <AddBadgeModal v-model:show="showAddBadgeModal" @confirm="handleAddBadge" />
-
-    <EditBadgeModal
-      v-model:show="showEditBadgeModal"
+    <BadgeModal
+      v-model:show="showBadgeModal"
       :badge="editingBadge"
-      @confirm="handleEditBadge"
+      @create="handleAddBadge"
+      @update="handleEditBadge"
     />
   </div>
 </template>
