@@ -131,6 +131,8 @@ const classActivityTitle = computed(() => {
   if (!day) return ""
   const now = zonedParts(new Date())!
   const today = `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`
+  // 老师在课堂看板布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
+  if (classActivity.value?.source === "teacher") return "今天老师布置的题"
   if (day === today) return "今天班里在做"
   const [, month, date] = day.split("-").map(Number)
   return `${month}月${date}日班里做了`
@@ -259,7 +261,8 @@ async function openAnnouncement(item: AnnouncementListItem) {
               {{ MY_STATUS[item.myStatus].label }}
             </n-tag>
             <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
-            <n-text depth="3" class="row-meta">
+            <!-- 老师刚布置、还没人交的时候不显示「0/0 人通过」 -->
+            <n-text v-if="item.userCount" depth="3" class="row-meta">
               {{ item.acceptedCount }}/{{ item.userCount }} 人通过
             </n-text>
           </router-link>

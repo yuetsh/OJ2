@@ -70,6 +70,12 @@ export const ojs: RouteRecordRaw = {
       component: () => import("oj/rank/list.vue"),
     },
     {
+      path: "classroom",
+      name: "classroom board",
+      component: () => import("oj/classroom/board.vue"),
+      meta: { requiresAuth: true, requiresTeacherAdmin: true },
+    },
+    {
       path: "class",
       name: "class",
       component: () => import("oj/class/pk.vue"),

@@ -9,6 +9,7 @@ import {
   type Metrics,
   type TutorialSummary,
   type ClassActivity,
+  type ClassBoard,
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
@@ -215,6 +216,16 @@ export function getActivityRank(start: string) {
  */
 export function getWeeklyRank(scope: "global" | "class") {
   return api.get<WeeklyRank>("rankings/weekly", { params: { scope } })
+}
+
+/** 课堂看板（老师）。不给班级时后端猜最近两小时在交题的那个班 */
+export function getClassBoard(className?: string) {
+  return api.get<ClassBoard>("classroom/board", { params: { className } })
+}
+
+/** 给这个班布置今天的题，空数组 = 清掉 */
+export function setClassLesson(className: string, problemDisplayIds: string[]) {
+  return api.put<null>("classroom/lesson", { className, problemDisplayIds })
 }
 
 export function getClassActivity() {

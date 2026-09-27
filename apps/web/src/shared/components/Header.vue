@@ -194,6 +194,15 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
     },
   },
   {
+    label: "课堂看板",
+    key: "classroom-board",
+    show: userStore.isTeacherOrAbove,
+    icon: renderIcon("fluent-emoji:school"),
+    props: {
+      onClick: () => router.push("/classroom"),
+    },
+  },
+  {
     label: "我的主页",
     key: "home",
     icon: renderIcon("streamline-ultimate-color:newspaper-fold"),

@@ -81,7 +81,52 @@ export const classActivityProblemSchema = z.object({
 export const classActivitySchema = z.object({
   className: z.string().nullable(),
   day: z.string().nullable(),
+  /** teacher = 老师在课堂看板里布置的；inferred = 从同班提交记录推断的 */
+  source: z.enum(["teacher", "inferred"]).nullable(),
   problems: z.array(classActivityProblemSchema),
+})
+
+/** 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉 */
+export const classLessonRequestSchema = z.object({
+  className: z.string().trim().min(1),
+  problemDisplayIds: z.array(z.string().trim().min(1)).max(20),
+})
+
+export const classBoardProblemSchema = z.object({
+  problemId: z.number().int(),
+  problemDisplayId: z.string(),
+  title: z.string(),
+})
+
+export const classBoardCellSchema = z.object({
+  /** accepted 看的是题库里（不含比赛）有没有通过过，不限今天 —— 以前做过的也算做完 */
+  status: z.enum(["accepted", "tried", "none"]),
+  /** 今天在这道题上交了几次 */
+  attempts: z.number().int(),
+  /** 第一次通过的时刻；今天之前通过的，前端显示成「之前」 */
+  acceptedAt: z.string().nullable(),
+})
+
+export const classBoardStudentSchema = z.object({
+  userId: z.number().int(),
+  username: z.string(),
+  realName: z.string().nullable(),
+  /** 和 problems 同序 */
+  cells: z.array(classBoardCellSchema),
+  /** 今天最后一次提交（任何题），没交过为 null */
+  lastSubmitAt: z.string().nullable(),
+})
+
+/**
+ * 课堂看板：一个班、今天、这节课的几道题 × 全班学生。
+ * className 为 null = 没指定班级、最近两小时也没有哪个班在交（没法猜）。
+ */
+export const classBoardSchema = z.object({
+  className: z.string().nullable(),
+  day: z.string(),
+  source: z.enum(["teacher", "inferred"]).nullable(),
+  problems: z.array(classBoardProblemSchema),
+  students: z.array(classBoardStudentSchema),
 })
 
 export type ClassRankItem = z.infer<typeof classRankItemSchema>
@@ -90,6 +135,11 @@ export type ClassComparison = z.infer<typeof classComparisonSchema>
 export type ClassComparisonResponse = z.infer<typeof classComparisonResponseSchema>
 
 export type ClassActivity = z.infer<typeof classActivitySchema>
+export type ClassLessonRequest = z.infer<typeof classLessonRequestSchema>
+export type ClassBoard = z.infer<typeof classBoardSchema>
+export type ClassBoardProblem = z.infer<typeof classBoardProblemSchema>
+export type ClassBoardStudent = z.infer<typeof classBoardStudentSchema>
+export type ClassBoardCell = z.infer<typeof classBoardCellSchema>
 export type ClassActivityProblem = z.infer<typeof classActivityProblemSchema>
 
 export type ClassUserRankItem = z.infer<typeof classUserRankItemSchema>

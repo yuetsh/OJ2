@@ -1449,3 +1449,47 @@ export const exerciseAttempt = pgTable(
     }).onDelete("cascade"),
   ],
 )
+
+/**
+ * 老师给某个班「这节课」布置的题（课堂看板里输入的题号），一个班一天一行。
+ *
+ * 学生首页的「班里在做」优先读它，没有才退回从提交记录推断（routes/classroom.ts）。
+ * 推断在上课头几分钟是空的 —— 还没人交 —— 而这正是没听清题号的学生最需要它的时候。
+ *
+ * - `day` 是**东八区日历日**文本（`calendarDay()` 写的 `YYYY-MM-DD`），不用 date 列：
+ *   「哪一天」的口径只在 time.ts 一处定，不交给驱动和会话时区去解释。
+ * - `problem_ids` 按老师输入的顺序存 problem.id。**不挂外键**（jsonb 挂不了），
+ *   读的时候按 visible 过滤，题目被删、被藏的自然不出现；写的时候校验过都存在。
+ * - `created_by` CASCADE：备课记录不是「学生做过什么」的证据，老师账号没了它也没有意义
+ *   （外键分档见 CLAUDE.md「数据库」一节）。
+ */
+export const classLesson = pgTable(
+  "class_lesson",
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: "class_lesson_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    className: text("class_name").notNull(),
+    day: text().notNull(),
+    problemIds: jsonb("problem_ids").notNull().$type<number[]>(),
+    createdBy: integer("created_by").notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+  },
+  (table) => [
+    unique("class_lesson_class_day_unique").on(table.className, table.day),
+    index("class_lesson_created_by_idx").on(table.createdBy),
+    foreignKey({
+      columns: [table.createdBy],
+      foreignColumns: [user.id],
+      name: "class_lesson_created_by_fk_user_id",
+    }).onDelete("cascade"),
+  ],
+)
