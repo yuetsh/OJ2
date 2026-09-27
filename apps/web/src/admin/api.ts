@@ -43,6 +43,7 @@ import type {
   AdminProblemSet,
   AdminProblemSetProblem,
   TutorialListItem,
+  TagCategory,
 } from "utils/types"
 
 export function getBaseInfo() {
@@ -112,6 +113,10 @@ export function getTagAdminList(keyword = "") {
 
 export function renameTag(id: number, name: string) {
   return api.put<RenameTagResponse>(`admin/problem-tags/${id}`, { name })
+}
+
+export function setTagCategory(id: number, category: TagCategory) {
+  return api.put<null>(`admin/problem-tags/${id}/category`, { category })
 }
 
 export function deleteTag(id: number) {

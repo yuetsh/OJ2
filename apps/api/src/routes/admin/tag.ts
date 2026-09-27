@@ -2,6 +2,7 @@ import {
   batchProblemTagRequestSchema,
   generateFlowchartRequestSchema,
   renameTagRequestSchema,
+  setTagCategoryRequestSchema,
   type AcTrend,
   type AdminTag,
   type BatchProblemTagResponse,
@@ -54,15 +55,22 @@ adminTagRoutes.get("/problem-tags", requireProblemPermission, async (c) => {
     .select({
       id: schema.problemTag.id,
       name: schema.problemTag.name,
+      category: schema.problemTag.category,
+      categoryConfirmed: schema.problemTag.categoryConfirmed,
       problemCount: countDistinct(schema.problemTags.problemId),
     })
     .from(schema.problemTag)
     .leftJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
-    .groupBy(schema.problemTag.id, schema.problemTag.name)
+    .groupBy(schema.problemTag.id)
     // 后台标签管理要看到 problemCount=0 的标签（正是要清理的那些），
-    // 所以这里用 leftJoin 且不加 having —— oj 侧的 /problem-tags 才过滤 >0
-    .orderBy(desc(countDistinct(schema.problemTags.problemId)), asc(schema.problemTag.name))
+    // 所以这里用 leftJoin 且不加 having —— oj 侧的 /problem-tags 才过滤 >0。
+    // 待归类的新标签排最前面（false 在 true 之前），不然会沉在几十个老标签底下
+    .orderBy(
+      asc(schema.problemTag.categoryConfirmed),
+      desc(countDistinct(schema.problemTags.problemId)),
+      asc(schema.problemTag.name),
+    )
   return success(c, rows satisfies AdminTag[])
 })
 
@@ -132,6 +140,20 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
     name: target.name,
     affectedCount: affected,
   } satisfies RenameTagResponse)
+})
+
+adminTagRoutes.put("/problem-tags/:id/category", requireProblemPermission, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = await parseBody(c, setTagCategoryRequestSchema, "分类只能是知识点或主题")
+  if (!parsed.success) return parsed.response
+  const [row] = await db
+    .update(schema.problemTag)
+    // 选了分类就算确认过，哪怕选的还是默认的「知识点」
+    .set({ category: parsed.data.category, categoryConfirmed: true })
+    .where(eq(schema.problemTag.id, id))
+    .returning({ id: schema.problemTag.id })
+  if (!row) return failure(c, 404, "tag-not-found", "标签不存在，请刷新后重试")
+  return success(c, null)
 })
 
 adminTagRoutes.delete("/problem-tags/:id", requireProblemPermission, async (c) => {

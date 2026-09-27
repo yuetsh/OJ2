@@ -12,6 +12,7 @@ import {
   problemDifficultySchema,
   sqlConfigSchema,
   sqlDisplaySchema,
+  tagCategorySchema,
 } from "./problem"
 
 // 放这里而不是 roles.ts：roles.ts 要保持不 import zod，理由见那边的文件头
@@ -472,7 +473,14 @@ export const adminProblemSetProgressSchema = z.object({
 export const adminTagSchema = z.object({
   id: z.number().int(),
   name: z.string(),
+  category: tagCategorySchema,
+  /** 分类有没有人确认过。出题时新建的标签是 false，默认先算知识点，等老师归类 */
+  categoryConfirmed: z.boolean(),
   problemCount: z.number().int(),
+})
+
+export const setTagCategoryRequestSchema = z.object({
+  category: tagCategorySchema,
 })
 
 export const renameTagRequestSchema = z.object({

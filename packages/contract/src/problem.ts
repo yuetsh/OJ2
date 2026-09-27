@@ -427,9 +427,17 @@ export const problemListItemSchema = z.object({
 
 export const problemListSchema = paginatedSchema(problemListItemSchema)
 
+/**
+ * 标签分两类：`knowledge` 是知识点（循环结构、字符串……），`theme` 是题目的
+ * 题材（LOL、周杰伦、哈利波特……）。两类原来混在一起，题目列表上四十多个标签
+ * 挤成一片，学生想按知识点找题得在一堆游戏名里挑。新标签默认算知识点。
+ */
+export const tagCategorySchema = z.enum(["knowledge", "theme"])
+
 export const tagSchema = z.object({
   id: z.number().int(),
   name: z.string(),
+  category: tagCategorySchema,
   problemCount: z.number().int().nonnegative(),
 })
 
@@ -454,6 +462,7 @@ export type ProblemDifficulty = z.infer<typeof problemDifficultySchema>
 export type ProblemListItem = z.infer<typeof problemListItemSchema>
 export type ProblemList = z.infer<typeof problemListSchema>
 export type Tag = z.infer<typeof tagSchema>
+export type TagCategory = z.infer<typeof tagCategorySchema>
 export type ProblemAuthor = z.infer<typeof problemAuthorSchema>
 export type SqlConfig = z.infer<typeof sqlConfigSchema>
 export type SqlDisplay = z.infer<typeof sqlDisplaySchema>

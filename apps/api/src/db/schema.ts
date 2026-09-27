@@ -52,6 +52,7 @@ import type {
   ReactionKey,
   SqlConfig,
   SqlDisplay,
+  TagCategory,
   TutorialType,
 } from "@oj2/contract"
 import {
@@ -738,6 +739,10 @@ export const problemTag = pgTable(
   {
     id: serial().primaryKey().notNull(),
     name: text().notNull(),
+    category: text().notNull().default("knowledge").$type<TagCategory>(),
+    // 分类有没有人确认过。出题时顺手新建的标签一律先落在「知识点」，这一列为 false，
+    // 后台标签管理把它们排在最前面等老师归类；存量标签由 0022 统一标成 true
+    categoryConfirmed: boolean("category_confirmed").notNull().default(false),
   },
   () => [uniqueIndex("problem_tag_name_ci_unique").using("btree", sql`lower(name)`)],
 )

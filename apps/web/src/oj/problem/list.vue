@@ -104,6 +104,22 @@ async function listTags() {
   }))
 }
 
+// 知识点在前、主题在后；组内按题目数从多到少，最常用的「输入输出」「选择结构」
+// 排在最前面，不再和一堆游戏名按拼音混排
+const TAG_GROUPS = [
+  { category: "knowledge", label: "知识点" },
+  { category: "theme", label: "主题" },
+] as const
+
+const tagGroups = computed(() =>
+  TAG_GROUPS.map((group) => ({
+    ...group,
+    tags: tags.value
+      .filter((t) => t.category === group.category)
+      .sort((a, b) => b.problemCount - a.problemCount),
+  })).filter((group) => group.tags.length > 0),
+)
+
 function chooseTag(tag: Tag) {
   query.tag = tag.checked ? "" : tag.name
   tags.value = tags.value.map((t) => {
@@ -293,18 +309,24 @@ function rowProps(row: ProblemRow) {
       <Hitokoto v-if="isDesktop" class="problem-list-hitokoto" />
     </div>
     <n-collapse-transition :show="showTag">
-      <n-flex>
-        <n-tag
-          v-for="tag in tags"
-          :closable="tag.checked"
-          @close="chooseTag(tag)"
-          @click="chooseTag(tag)"
-          :key="tag.id"
-          :type="tag.checked ? 'success' : 'default'"
-        >
-          {{ tag.name }}
-        </n-tag>
-      </n-flex>
+      <div class="tag-groups">
+        <div v-for="group in tagGroups" :key="group.category" class="tag-group">
+          <n-text depth="3" class="tag-group-label">{{ group.label }}</n-text>
+          <n-flex>
+            <n-tag
+              v-for="tag in group.tags"
+              :closable="tag.checked"
+              @close="chooseTag(tag)"
+              @click="chooseTag(tag)"
+              :key="tag.id"
+              :type="tag.checked ? 'success' : 'default'"
+              class="tag-chip"
+            >
+              {{ tag.name }}
+            </n-tag>
+          </n-flex>
+        </div>
+      </div>
     </n-collapse-transition>
     <n-data-table :bordered="false" :data="problems" :columns="columns" :row-props="rowProps" />
   </n-flex>
@@ -328,6 +350,28 @@ function rowProps(row: ProblemRow) {
   width: 100%;
   max-width: 720px;
   min-width: 0;
+}
+
+.tag-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tag-group {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.tag-group-label {
+  font-size: 13px;
+  line-height: 28px;
+}
+
+.tag-chip {
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

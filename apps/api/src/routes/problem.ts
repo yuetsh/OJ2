@@ -193,6 +193,7 @@ problemRoutes.get("/problem-tags", async (c) => {
     .select({
       id: schema.problemTag.id,
       name: schema.problemTag.name,
+      category: schema.problemTag.category,
       problemCount: countDistinct(schema.problemTags.problemId),
     })
     .from(schema.problemTag)
@@ -206,7 +207,7 @@ problemRoutes.get("/problem-tags", async (c) => {
       ),
     )
     .where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
-    .groupBy(schema.problemTag.id, schema.problemTag.name)
+    .groupBy(schema.problemTag.id, schema.problemTag.name, schema.problemTag.category)
     .having(sql`count(${schema.problemTags.problemId}) > 0`)
     .orderBy(asc(schema.problemTag.name))
   return success(c, rows satisfies Tag[])
