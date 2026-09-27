@@ -47,7 +47,7 @@ export async function consumeJSONEventStream<T = any>(
     let parsed: T
     try {
       parsed = JSON.parse(payloadStr)
-    } catch (error) {
+    } catch {
       throw new Error(`无法解析服务端事件数据: ${payloadStr}`)
     }
 

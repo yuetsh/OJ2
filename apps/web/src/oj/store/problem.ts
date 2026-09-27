@@ -29,7 +29,7 @@ export const useProblemStore = defineStore("problem", () => {
 
   const languages = computed<LANGUAGE[]>(() => {
     if (route.name === "problem" && problem.value?.allowFlowchart) {
-      return ["Flowchart", ...problem.value?.languages]
+      return ["Flowchart", ...problem.value.languages]
     }
     return problem.value?.languages ?? []
   })

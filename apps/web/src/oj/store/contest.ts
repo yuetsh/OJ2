@@ -106,7 +106,7 @@ export const useContestStore = defineStore("contest", () => {
   async function _getProblems(contestID: string) {
     try {
       problems.value = await getContestProblems(contestID)
-    } catch (err) {
+    } catch {
       problems.value = []
       toggleAccess(false)
     }

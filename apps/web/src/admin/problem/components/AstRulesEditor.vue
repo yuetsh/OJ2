@@ -162,7 +162,7 @@ function getRulesForLang(lang: string): AstRule[] {
 }
 
 function updateRules(lang: string, rules: AstRule[]) {
-  const current = { ...(props.modelValue || {}) }
+  const current = { ...props.modelValue }
   if (rules.length === 0) {
     delete current[lang]
   } else {

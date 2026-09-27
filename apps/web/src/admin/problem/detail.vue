@@ -266,9 +266,6 @@ async function getProblemDetail() {
         code: "",
       }))
     }
-    if (problem.value.contestId) {
-      problem.value.contestId = problem.value.contestId
-    }
 
     // 下面是用来显示的：
     // 代码模板 和 模板开关

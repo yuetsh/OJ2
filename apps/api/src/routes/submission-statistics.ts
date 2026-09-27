@@ -26,7 +26,6 @@ import {
 import { Hono } from "hono"
 
 import { optionalAuth, requireTeacher } from "../auth/middleware"
-import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
 import {

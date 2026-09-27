@@ -12,7 +12,7 @@ import { copyToClipboard } from "utils/functions"
 
 const message = useMessage()
 const route = useRoute()
-const contestID = !!route.params.contestID ? route.params.contestID : null
+const contestID = route.params.contestID ? route.params.contestID : null
 
 const codeStore = useCodeStore()
 const problemStore = useProblemStore()

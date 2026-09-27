@@ -55,7 +55,7 @@ router.beforeEach(async (to, _from, next) => {
     if (!userStore.user) {
       try {
         await userStore.getMyProfile()
-      } catch (error) {
+      } catch {
         next("/")
         return
       }
@@ -85,7 +85,7 @@ router.beforeEach(async (to, _from, next) => {
 
 app.mount("#app")
 
-if (!!import.meta.env.PUBLIC_ICONIFY_URL) {
+if (import.meta.env.PUBLIC_ICONIFY_URL) {
   addAPIProvider("", {
     resources: [import.meta.env.PUBLIC_ICONIFY_URL],
   })

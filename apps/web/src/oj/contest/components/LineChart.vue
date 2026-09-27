@@ -113,7 +113,7 @@ const chartData = computed(() => {
       if (b.solved !== a.solved) return b.solved - a.solved
       return a.penalty - b.penalty
     })
-    const ranks = new Array(topUsers.length).fill(0)
+    const ranks = Array.from({ length: topUsers.length }, () => 0)
     indexed.forEach((item, pos) => {
       ranks[item.i] = pos + 1
     })

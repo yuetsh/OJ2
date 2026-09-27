@@ -1,6 +1,5 @@
 import {
   createMessageRequestSchema,
-  embeddedSubmissionSchema,
   exerciseAttemptRequestSchema,
   reactionKeySchema,
   setReactionRequestSchema,

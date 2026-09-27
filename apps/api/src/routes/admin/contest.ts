@@ -14,7 +14,7 @@ import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { contestStatus } from "../../services/contest"
-import { objectValue, queryInteger, sampleUser } from "../helpers"
+import { queryInteger, sampleUser } from "../helpers"
 
 export const adminContestRoutes = new Hono<AppEnv>()
 

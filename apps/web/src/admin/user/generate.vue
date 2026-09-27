@@ -30,7 +30,7 @@ function generateUsers() {
     )
     return false
   }
-  let className = !!prefix.value ? `ks${prefix.value}` : ""
+  let className = prefix.value ? `ks${prefix.value}` : ""
   // 占位邮箱必须全站唯一：注册、编辑用户、导入三条路都查重，而且库里同一个邮箱
   // 出现两次的话，那两个账号在「编辑用户」里保存一次就撞 409，从此改不动。
   // 原来只按「班级 + 批内序号」拼，同一个班分两批导入必然重号 —— 加一段每批随机的

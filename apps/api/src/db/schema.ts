@@ -755,7 +755,7 @@ export const problemTag = pgTable(
     id: serial().primaryKey().notNull(),
     name: text().notNull(),
   },
-  (table) => [
+  () => [
     uniqueIndex("problem_tag_name_ci_unique").using("btree", sql`lower(name)`),
   ],
 )

@@ -159,7 +159,7 @@ function iterate(db: Database, script: string): Iterable<PreparedStatement> {
 
 /**
  * 取语句的首关键字。优先用 sqlite3_normalized_sql —— 归一化由 SQLite 自己做，
- * 注释、大小写、空白都已抹平（`/*x*​/ pragma  Query_Only = 0` → `PRAGMA query_only=?`），
+ * 注释、大小写、空白都已抹平（`/*x*\/ pragma  Query_Only = 0` → `PRAGMA query_only=?`），
  * 比在原文上自己做词法猜测可靠得多。
  */
 function leadingKeyword(statement: PreparedStatement) {

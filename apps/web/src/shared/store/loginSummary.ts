@@ -34,7 +34,7 @@ export const useLoginSummaryStore = defineStore("loginSummary", () => {
       summary.value = res.summary
       analysis.value = res.analysis || ""
       analysisError.value = res.analysisError || ""
-    } catch (err) {
+    } catch {
       analysisError.value = "获取登录统计失败，请稍后再试"
     } finally {
       loading.value = false

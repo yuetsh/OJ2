@@ -147,7 +147,7 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
   })
   try {
     await flowchartQueue.add("evaluate", { submissionId: id }, { jobId: id })
-  } catch (error) {
+  } catch {
     await db
       .update(schema.flowchartSubmission)
       .set({ status: 3 })
@@ -642,7 +642,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
       { submissionId: row.flowchart.id },
       { jobId: `${row.flowchart.id}:retry:${Date.now()}` },
     )
-  } catch (error) {
+  } catch {
     // 入队失败就落 FAILED，别把提交丢在 PENDING 上 —— 和 POST /flowcharts 同一处理
     await db
       .update(schema.flowchartSubmission)

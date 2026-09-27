@@ -58,6 +58,7 @@ bun run --filter '@oj2/api' check:ast         # AST 节点类型检查，升级 
 cd apps/web && bun run type-check             # 前端类型检查
 cd apps/web && bun run build                  # 前端构建
 bun run fmt                                   # Prettier，全仓一把（只在根目录有）
+bun run lint                                  # oxlint，全仓一把，有一条 warning 就算失败
 ```
 
 **格式化是全仓一套 Prettier**，配置只有根目录的 `.prettierrc.toml`（`semi=false`，

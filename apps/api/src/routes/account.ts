@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto"
 import { resolve } from "node:path"
 
 import {
-  rankProfileSchema,
   registerRequestSchema,
   STUDENT_ROLES,
   updateProfileRequestSchema,
