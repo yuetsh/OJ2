@@ -90,7 +90,9 @@ const active = computed(() => route.path.split("/")[1] || "problem")
 
 async function handleLogout() {
   await userStore.signOut()
-  router.replace("/")
+  // 整页跳转而不是 router.replace：AI 分析、学情小结这些 store 还装着这个人的数据，
+  // 机房下一个学生坐下来就能看到。重载一次把内存清干净，比挨个 reset 可靠。
+  window.location.replace("/")
 }
 
 function handleToggleDemoMode() {

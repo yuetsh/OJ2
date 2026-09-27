@@ -66,11 +66,24 @@ export const useUserStore = defineStore("user", () => {
   // 登录后和改完设置仍然要能重新拉一份。
   let inflight: Promise<void> | null = null
 
+  // 这个页面生命周期里最后一个登录过的人。**clearProfile 不清它**，就是为了下面那道闸。
+  let lastUserId: number | null = null
+
   function getMyProfile() {
     if (inflight) return inflight
     isFinished.value = false
     inflight = getProfile()
       .then((res) => {
+        // 换了人就整页重载。会话过期、别的标签页登出这类被动下线是**原地**弹登录框
+        // 的（学生正在写的代码不能丢），可内存里的 store 全是上一个人的：AI 分析、
+        // 学情小结、协作状态……机房一台机器轮着用，下一个学生登进来就能看到。
+        // 挨个 store 去 reset 迟早漏一个，重载一次最彻底；同一个人重新登录不受影响。
+        const id = res?.user?.id ?? null
+        if (id !== null && lastUserId !== null && id !== lastUserId) {
+          window.location.reload()
+          return
+        }
+        if (id !== null) lastUserId = id
         profile.value = res
         isFinished.value = true
         storage.set(STORAGE_KEY.AUTHED, !!user.value?.email)
@@ -90,7 +103,8 @@ export const useUserStore = defineStore("user", () => {
   }
 
   // 退登的两步（吊销服务端会话、清本地状态）绑在一起：只清本地会留一个还活着
-  // 的 cookie，下次进站又被 /profile 认回来。跳转留给调用方，store 里不碰路由。
+  // 的 cookie，下次进站又被 /profile 认回来。跳转留给调用方，store 里不碰路由 ——
+  // 调用方要**整页**跳走，别用 router：各个 store 里还留着这个人的数据。
   async function signOut() {
     await logout()
     clearProfile()
