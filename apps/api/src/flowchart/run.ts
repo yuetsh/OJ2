@@ -1,6 +1,7 @@
 import type { FlowchartUpdate } from "@oj2/contract"
 import { eq } from "drizzle-orm"
 
+import { config } from "../config"
 import { db, schema } from "../db"
 import { publishFlowchartUpdate } from "../events"
 import { completeChat } from "../services/ai"
@@ -85,8 +86,8 @@ export async function evaluateFlowchart(
         aiFeedback: result.feedback,
         aiSuggestions: result.suggestions,
         aiCriteriaDetails: result.criteria,
-        aiProvider: "deepseek",
-        aiModel: process.env.AI_MODEL ?? "deepseek-flash",
+        aiProvider: config.aiProvider,
+        aiModel: config.aiModel,
         processingTime: (performance.now() - started) / 1000,
         evaluationTime: new Date().toISOString(),
       })
