@@ -52,21 +52,33 @@ bun run dev            # api(3000) + worker + web(5173) 一起起
 常用检查：
 
 ```bash
+bunx vp run verify                            # 下面这些一次跑完，带缓存（没改过的直接跳过）
+bun run check                                 # 格式 + lint（vp check），不含类型检查
+bun run fmt                                   # 格式化（Oxfmt），全仓一把
+bun run lint                                  # lint（Oxlint），有一条 warning 就算失败
 bun run --filter '@oj2/api' typecheck         # 后端类型检查
 bun run --filter '@oj2/api' check:routes      # 路由遮蔽检查，加完路由跑一下
 bun run --filter '@oj2/api' check:ast         # AST 节点类型检查，升级 tree-sitter 后跑
 cd apps/web && bun run type-check             # 前端类型检查
-cd apps/web && bun run build                  # 前端构建
-bun run fmt                                   # Prettier，全仓一把（只在根目录有）
-bun run lint                                  # oxlint，全仓一把，有一条 warning 就算失败
+cd apps/web && bun run build                  # 前端构建（不在 verify 里）
 ```
 
-**格式化是全仓一套 Prettier**，配置只有根目录的 `.prettierrc.toml`（`semi=false`，
-其余全默认，printWidth 80）。`bun run fmt` 覆盖 `apps/*/src`、`packages/*/src` 和两个
-构建配置；`.prettierignore` 挡掉 drizzle-kit 生成的 `src/db/meta/` 快照和 unplugin
-每次 dev 都会重写的两个 `.d.ts`。后端和契约原来没进 Prettier（手写在 100 列上下），
-2026-09-16 一次性全量格式化过 —— 之后**改完代码顺手跑一下 `bun run fmt`**，
-别再让两边的口径分叉。
+**格式化、lint、任务编排都走 Vite+**（`vite-plus`，`vp` 命令），配置只有根目录的
+`vite.config.ts` 一份：`fmt` 块（Oxfmt，`semi: false`、`printWidth: 80`）、`lint` 块
+（Oxlint，`denyWarnings`）、`run.tasks`（`verify` 和它依赖的四个检查）。前端自己的构建
+配置在 `apps/web/vite.config.ts`，和根目录那份无关。
+
+- **Oxfmt 在 Vite+ 下默认 100 列**，根配置显式写了 80，别删 —— 删了就是几百个文件的 diff。
+- 格式化只管代码：`.md` / `.yml` / `.json` / `.toml` 在 `fmt.ignorePatterns` 里排掉了
+  （文档的中文表格、compose 的逐行注释是手排的），`src/db/meta/` 快照和 unplugin 的两个
+  `.d.ts` 也排掉了。
+- **`run.tasks` 里一律经 `bun run <脚本>` 调**，不直接写 `tsc`：任务定义在根包，PATH 是根目录
+  的 `node_modules/.bin`，直接写拿到的是根目录的 TS 5.9 而不是 `apps/api` 的 TS 7。
+- 任务名不能和根 `package.json` 的脚本重名（Vite+ 直接报错），所以 `verify` 没有对应的
+  `bun run` 脚本，用 `bunx vp run verify`。
+- 缓存在 `node_modules/.vite/task-cache`，按读到的文件内容做指纹；怀疑缓存不对时删掉它。
+- 2026-09-16 用 Prettier 全量格式化过一次，2026-09-27 换成 Oxfmt，差异只有 5 个文件
+  （长联合类型的换行）。之后**改完代码顺手跑一下 `bun run fmt`**。
 
 ⚠️ **前端类型检查只能走 `bun run type-check` 这个脚本。** 两条看起来等价的路子都会**静默
 通过**：`vue-tsc --noEmit -p tsconfig.json` 检查 0 个文件（那个 tsconfig 是 `files: []` +

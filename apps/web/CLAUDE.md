@@ -28,9 +28,9 @@ bun run build          # 生产构建
 通过**——那个 tsconfig 是 `files: []` + references 的壳，真正的配置在
 `tsconfig.app.json`（0.2 秒跑完就是没在检查的信号）；`vite build` 也不做类型检查。
 
-不写测试（沿用项目约定），验证靠实跑。lint 只有 Prettier，**脚本在仓库根目录**
-（`cd ../.. && bun run fmt`，一把把后端、契约、前端全格式化）—— 前端这边原来那个
-只管 `apps/web` 的 `fmt` 已经删掉，配置也收到了根目录的 `.prettierrc.toml`。
+不写测试（沿用项目约定），验证靠实跑。格式化和 lint 走 Vite+，**脚本在仓库根目录**
+（`cd ../.. && bun run fmt` / `bun run lint`，一把把后端、契约、前端全过一遍），配置在
+根目录的 `vite.config.ts`，不是本目录那份（本目录的 `vite.config.ts` 只管前端构建）。
 
 ## Architecture
 

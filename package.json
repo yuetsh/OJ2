@@ -13,13 +13,13 @@
     "db:generate": "bun run --filter '@oj2/api' db:generate",
     "db:migrate": "bun run --filter '@oj2/api' db:migrate",
     "db:down": "docker compose -f docker/compose.dev.yml down",
-    "lint": "oxlint --deny-warnings apps/api/src apps/web/src packages/contract/src",
-    "fmt": "prettier --write apps/api/src apps/web/src apps/web/tests packages/contract/src apps/api/drizzle.config.ts apps/web/vite.config.ts docker/judge/smoke.ts"
+    "lint": "vp lint",
+    "fmt": "vp fmt",
+    "check": "vp check"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "oxlint": "^1.85.0",
-    "prettier": "^3.9.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite-plus": "^1.0.0-rc.1"
   }
 }

@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from "node:url"
-import { defineConfig, loadEnv } from "vite"
+import { defineConfig } from "vite"
 import vue from "@vitejs/plugin-vue"
 import legacy from "@vitejs/plugin-legacy"
 import AutoImport from "unplugin-auto-import/vite"
@@ -78,9 +78,7 @@ const polyfills = [
 // 现在只走运行时那一条路：App.vue 的 useMaxKB() 等站点配置回来，
 // enableMaxkb 为真才建 script 标签。
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "PUBLIC_")
-
+export default defineConfig(() => {
   // 开发时一律指向本机后端（apps/api，3000）。
   // **必须写 IP，不能写 localhost**：api 用 Bun.serve 起，只绑 IPv4 的
   // 0.0.0.0:3000，而 Node 解析 localhost 时 ::1 排在前面。别的项目的 dev server
