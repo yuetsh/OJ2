@@ -130,9 +130,7 @@ export function handleCollabOpen(ws: CollabSocket) {
     closeRoom(room.studentId)
     room.studentSocket.data.roomOwnerId = undefined
     room.teacherSocket.data.roomOwnerId = undefined
-    room.teacherSocket.send(
-      JSON.stringify({ type: "room_closed", reason: "peer_offline" }),
-    )
+    room.teacherSocket.send(JSON.stringify({ type: "room_closed", reason: "peer_offline" }))
     request.status = "pending"
     request.teacherId = undefined
     request.teacherName = undefined
@@ -168,8 +166,7 @@ export function handleCollabClose(ws: CollabSocket) {
     closeRoom(room.studentId)
     room.studentSocket.data.roomOwnerId = undefined
     room.teacherSocket.data.roomOwnerId = undefined
-    const peer =
-      ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
+    const peer = ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
     peer.send(JSON.stringify({ type: "room_closed", reason: "peer_offline" }))
 
     if (ws === room.teacherSocket) {
@@ -253,15 +250,9 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
   }
 }
 
-async function handleHelpRequest(
-  ws: CollabSocket,
-  problemId: unknown,
-  language: unknown,
-) {
+async function handleHelpRequest(ws: CollabSocket, problemId: unknown, language: unknown) {
   if (typeof problemId !== "string" || !problemId) {
-    ws.send(
-      JSON.stringify({ type: "error", message: "题号不对，请刷新页面重试" }),
-    )
+    ws.send(JSON.stringify({ type: "error", message: "题号不对，请刷新页面重试" }))
     return
   }
   if (isTeacher(ws)) {
@@ -277,17 +268,10 @@ async function handleHelpRequest(
   const [problem] = await db
     .select({ title: schema.problem.title })
     .from(schema.problem)
-    .where(
-      and(
-        eq(schema.problem.displayId, problemId),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(eq(schema.problem.displayId, problemId), isNull(schema.problem.contestId)))
     .limit(1)
   if (!problem) {
-    ws.send(
-      JSON.stringify({ type: "error", message: "题目不存在或不支持求助" }),
-    )
+    ws.send(JSON.stringify({ type: "error", message: "题目不存在或不支持求助" }))
     return
   }
 
@@ -334,9 +318,7 @@ function handleHelpLanguage(ws: CollabSocket, language: unknown) {
   const room = getRoom(ws.data.userId)
   if (!room) return
   room.language = next
-  room.teacherSocket.send(
-    JSON.stringify({ type: "room_language", language: next }),
-  )
+  room.teacherSocket.send(JSON.stringify({ type: "room_language", language: next }))
 }
 
 function handleHelpCancel(ws: CollabSocket) {
@@ -370,12 +352,7 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
   const [teacher] = await db
     .select({ adminType: schema.user.adminType })
     .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.id, ws.data.userId),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
   if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
     ws.close(1008, "Permission revoked")
@@ -443,12 +420,7 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
   const [teacher] = await db
     .select({ adminType: schema.user.adminType })
     .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.id, ws.data.userId),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
   if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
     ws.close(1008, "Permission revoked")
@@ -536,10 +508,7 @@ function teardownRoom(
  * 「服务端不知道代码内容」是有意的：这个通道要做的事只有认证和分房间，
  * 权限由 accept 时的库查询决定，与帧里装的是什么无关。
  */
-export function handleCollabBinary(
-  ws: CollabSocket,
-  data: Buffer | Uint8Array,
-) {
+export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) {
   // 空帧：Bun.serve 探测过，send() 对 0 字节帧也回 0（同一个返回值,
   // 真实送达和真实丢弃分不清），不转发、不参与下面的失败判定，直接忽略。
   // 否则任何一方发一个 0 字节二进制帧就能把整间房拆掉
@@ -547,8 +516,7 @@ export function handleCollabBinary(
 
   const room = roomOf(ws)
   if (!room) return
-  const peer =
-    ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
+  const peer = ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
   const sent = peer.send(data)
   // Bun.serve 探测过：-1 不代表失败，是背压——消息已排队，最终会送达（实测 8MB
   // 帧照样完整到达）；只有 0 才是真的丢了（对端事实上已经断开）。之前把 <= 0

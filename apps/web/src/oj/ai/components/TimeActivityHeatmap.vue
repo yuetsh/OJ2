@@ -1,9 +1,7 @@
 <template>
   <n-card title="时间活跃度分析" size="small" v-if="show">
     <template #header-extra>
-      <n-text depth="3" style="font-size: 12px">
-        基于全部提交，发现做题高峰时段
-      </n-text>
+      <n-text depth="3" style="font-size: 12px"> 基于全部提交，发现做题高峰时段 </n-text>
     </template>
     <div style="height: 300px">
       <Bar :key="chartKey" :data="data" :options="options" />
@@ -56,18 +54,14 @@ const activityMatrix = computed(() => {
   return matrix
 })
 
-const show = computed(() =>
-  aiStore.detailsData.activity.some((item) => item.count > 0),
-)
+const show = computed(() => aiStore.detailsData.activity.some((item) => item.count > 0))
 
 // 为每个时间段准备数据集
 const data = computed(() => {
   const datasets = TIME_PERIODS.map((period, periodIndex) => {
     return {
       label: period.label,
-      data: WEEKDAYS.map(
-        (_, weekday) => activityMatrix.value[weekday][periodIndex],
-      ),
+      data: WEEKDAYS.map((_, weekday) => activityMatrix.value[weekday][periodIndex]),
       backgroundColor: getTimePeriodColor(periodIndex),
       borderColor: getTimePeriodColor(periodIndex),
       borderWidth: 1,

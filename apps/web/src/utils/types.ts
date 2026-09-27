@@ -62,12 +62,7 @@ export type LANGUAGE = ProblemLanguage
  * 而契约那边是 `Record<string, unknown>`，等于渲染表格的那段代码全靠手抄件兜底。
  * 键名的 snake_case 是 JSONB 原文，见契约 sqlDisplaySchema 的注释。
  */
-export type {
-  SqlConfig,
-  SqlDisplay,
-  SqlDisplayTable,
-  SqlDisplayColumn,
-} from "@oj2/contract"
+export type { SqlConfig, SqlDisplay, SqlDisplayTable, SqlDisplayColumn } from "@oj2/contract"
 
 /**
  * 判题状态码 + 前端本地的「正在提交」(9)。
@@ -146,10 +141,7 @@ type ExcludeKeys =
   | "isPublic"
   | "contestId"
 
-export type BlankProblem = Omit<
-  AdminProblem,
-  ExcludeKeys | "hint" | "mermaidCode"
-> & {
+export type BlankProblem = Omit<AdminProblem, ExcludeKeys | "hint" | "mermaidCode"> & {
   id?: number
   // 新建比赛题时由 detail.vue 在提交前写进来
   contestId?: number | null
@@ -293,11 +285,7 @@ export type { MyRank } from "@oj2/contract"
 /** 本周进步榜：`rank` 是周榜名次，跟存量总榜的名次没有关系 */
 export type { WeeklyRank, WeeklyRankItem } from "@oj2/contract"
 
-export type {
-  ClassComparison,
-  ClassRankItem,
-  ClassUserRank,
-} from "@oj2/contract"
+export type { ClassComparison, ClassRankItem, ClassUserRank } from "@oj2/contract"
 
 /**
  * 学生侧的比赛：不含 password / visible。后台用 `AdminContest` ——
@@ -307,12 +295,7 @@ export type { Contest, AdminContest } from "@oj2/contract"
 
 export type BlankContest = Omit<
   AdminContest,
-  | "id"
-  | "createdBy"
-  | "createTime"
-  | "lastUpdateTime"
-  | "status"
-  | "contestType"
+  "id" | "createdBy" | "createTime" | "lastUpdateTime" | "status" | "contestType"
 >
 
 /**
@@ -408,11 +391,7 @@ export type {
 
 /** 学生自己的自学留痕，学习页的目录拿它打勾 */
 export type { TutorialProgress } from "@oj2/contract"
-import type {
-  AdminExercise,
-  AdminTutorial,
-  CreateSubmissionRequest,
-} from "@oj2/contract"
+import type { AdminExercise, AdminTutorial, CreateSubmissionRequest } from "@oj2/contract"
 
 /**
  * 教程编辑表单。只留可编辑字段 —— createdBy / createdAt / updatedAt 由后端产出，
@@ -420,10 +399,9 @@ import type {
  *
  * `code` 收窄成 string：读回来时统一 `?? ""`，代码编辑器的 v-model 不接受 null。
  */
-export type TutorialEdit = Omit<
-  AdminTutorial,
-  "createdBy" | "createdAt" | "updatedAt" | "code"
-> & { code: string }
+export type TutorialEdit = Omit<AdminTutorial, "createdBy" | "createdAt" | "updatedAt" | "code"> & {
+  code: string
+}
 
 export interface ExerciseMcqData {
   question: string
@@ -514,5 +492,4 @@ export type {
  * 弹窗队列里的条目。`/achievements/pending` 拉来的没有 kind，
  * WebSocket 推来的有 —— 两个来源会汇进同一个队列。
  */
-export type QueuedAchievement = PendingAchievement &
-  Partial<Pick<AchievementNotification, "kind">>
+export type QueuedAchievement = PendingAchievement & Partial<Pick<AchievementNotification, "kind">>

@@ -250,17 +250,11 @@ export const flowchartSubmission = pgTable(
       table.problemId.asc().nullsLast().op("int4_ops"),
       table.createTime.asc().nullsLast().op("int4_ops"),
     ),
-    index("flowchart_status_idx").using(
-      "btree",
-      table.status.asc().nullsLast().op("int4_ops"),
-    ),
+    index("flowchart_status_idx").using("btree", table.status.asc().nullsLast().op("int4_ops")),
     // 流程图列表分页。原来是 hash join 全表再 top-N 排序（4.5ms / 551 buffers），
     // 走这条之后 0.19ms / 47。绝对值不大，但索引只要 64kB，而这张表每行带一大坨
     // jsonb，行数涨上去是线性恶化的。ASC 反向扫，理由同 submission 那几条。
-    index("flowchart_create_time_idx").using(
-      "btree",
-      table.createTime.asc().nullsLast(),
-    ),
+    index("flowchart_create_time_idx").using("btree", table.createTime.asc().nullsLast()),
     index("flowchart_user_time_idx").using(
       "btree",
       table.userId.asc().nullsLast().op("int4_ops"),
@@ -520,10 +514,7 @@ export const problemsetProgress = pgTable(
       foreignColumns: [user.id],
       name: "problemset_progress_user_id_c8041a80_fk_user_id",
     }),
-    unique("unique_problemset_progress_user").on(
-      table.problemsetId,
-      table.userId,
-    ),
+    unique("unique_problemset_progress_user").on(table.problemsetId, table.userId),
   ],
 )
 
@@ -662,13 +653,9 @@ export const problem = pgTable(
     difficulty: text().notNull().$type<ProblemDifficulty>(),
     source: text(),
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    submissionNumber: bigint("submission_number", { mode: "number" })
-      .default(0)
-      .notNull(),
+    submissionNumber: bigint("submission_number", { mode: "number" }).default(0).notNull(),
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    acceptedNumber: bigint("accepted_number", { mode: "number" })
-      .default(0)
-      .notNull(),
+    acceptedNumber: bigint("accepted_number", { mode: "number" }).default(0).notNull(),
     createdById: integer("created_by_id").notNull(),
     displayId: text("_id").notNull(),
     statisticInfo: jsonb("statistic_info").default({}).notNull(),
@@ -702,10 +689,7 @@ export const problem = pgTable(
       "btree",
       table.createdById.asc().nullsLast().op("int4_ops"),
     ),
-    index("problem_visible_idx").using(
-      "btree",
-      table.visible.asc().nullsLast().op("bool_ops"),
-    ),
+    index("problem_visible_idx").using("btree", table.visible.asc().nullsLast().op("bool_ops")),
     foreignKey({
       columns: [table.contestId],
       foreignColumns: [contest.id],
@@ -755,9 +739,7 @@ export const problemTag = pgTable(
     id: serial().primaryKey().notNull(),
     name: text().notNull(),
   },
-  () => [
-    uniqueIndex("problem_tag_name_ci_unique").using("btree", sql`lower(name)`),
-  ],
+  () => [uniqueIndex("problem_tag_name_ci_unique").using("btree", sql`lower(name)`)],
 )
 
 export const submission = pgTable(
@@ -819,11 +801,7 @@ export const submission = pgTable(
     // 两列同为 ASC 时整条索引反着扫就是精确的反序，所以反而是能用的那一种。
     // 这两列都 NOT NULL，nulls 位置在语义上无所谓，纯粹是规划器的匹配规则。
     index("submission_public_create_time_id_idx")
-      .using(
-        "btree",
-        table.createTime.asc().nullsLast(),
-        table.id.asc().nullsLast(),
-      )
+      .using("btree", table.createTime.asc().nullsLast(), table.id.asc().nullsLast())
       .where(sql`${table.contestId} is null`),
     /**
      * Django 给每个外键都自动建了一个单列索引，`db_index=True` 的还会多一个
@@ -870,18 +848,10 @@ export const submission = pgTable(
      * 写成 DESC NULLS LAST 规划器直接不认这条索引，回落到分页索引带 Filter。
      */
     index("submission_language_time_idx")
-      .using(
-        "btree",
-        table.language.asc().nullsLast(),
-        table.createTime.asc().nullsLast(),
-      )
+      .using("btree", table.language.asc().nullsLast(), table.createTime.asc().nullsLast())
       .where(sql`${table.contestId} is null`),
     index("submission_result_time_idx")
-      .using(
-        "btree",
-        table.result.asc().nullsLast(),
-        table.createTime.asc().nullsLast(),
-      )
+      .using("btree", table.result.asc().nullsLast(), table.createTime.asc().nullsLast())
       .where(sql`${table.contestId} is null`),
     /**
      * 提交列表的「题号」筛选。路由先把题号解析成 problem.id（见 routes/submission.ts 的
@@ -1318,9 +1288,7 @@ export const user = pgTable(
     // 里的角色名也受类型检查。运行时的兜底仍在 auth/session.ts 的 toAdminType。
     adminType: text("admin_type").notNull().$type<AdminType>(),
     isDisabled: boolean("is_disabled").default(false).notNull(),
-    problemPermission: text("problem_permission")
-      .notNull()
-      .$type<ProblemPermission>(),
+    problemPermission: text("problem_permission").notNull().$type<ProblemPermission>(),
     rawPassword: varchar("raw_password", { length: 20 }),
     className: text("class_name"),
   },
@@ -1335,10 +1303,7 @@ export const user = pgTable(
     ),
     // 按班级 / 按年级（class_name like '241%'）取学生：班级榜、班级对比、AI 学情的
     // 排名 scope 都走它，见 routes/classroom.ts 的 loadClassUsers。
-    index("user_class_name_idx").using(
-      "btree",
-      table.className.asc().nullsLast(),
-    ),
+    index("user_class_name_idx").using("btree", table.className.asc().nullsLast()),
   ],
 )
 

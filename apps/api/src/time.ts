@@ -27,9 +27,7 @@ function fromWallClock(wall: Date): Date {
 }
 
 /** 北京时间的日历日，形如 `2026-09-14` */
-export function calendarDay(
-  value: Date | number | string = new Date(),
-): string {
+export function calendarDay(value: Date | number | string = new Date()): string {
   return toWallClock(value).toISOString().slice(0, 10)
 }
 
@@ -69,9 +67,7 @@ export function localWeekday(day: number): number {
  * 提交列表、流程图列表的 `?today=1` 和后台「今日提交数」用它
  */
 export function dayStart(instant: Date | number | string = new Date()): string {
-  return new Date(
-    dayNumber(calendarDay(instant)) * DAY_MS - OFFSET_MS,
-  ).toISOString()
+  return new Date(dayNumber(calendarDay(instant)) * DAY_MS - OFFSET_MS).toISOString()
 }
 
 /**
@@ -93,9 +89,7 @@ export function shiftMonthsByCalendar(instant: Date, months: number): Date {
   const date = wall.getUTCDate()
   wall.setUTCDate(1)
   wall.setUTCMonth(wall.getUTCMonth() + months)
-  const lastDay = new Date(
-    Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth() + 1, 0),
-  ).getUTCDate()
+  const lastDay = new Date(Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth() + 1, 0)).getUTCDate()
   wall.setUTCDate(Math.min(date, lastDay))
   return fromWallClock(wall)
 }

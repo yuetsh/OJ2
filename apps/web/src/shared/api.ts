@@ -7,11 +7,7 @@ export function login(data: { username: string; password: string }) {
   return api.post("auth/login", data)
 }
 
-export function signup(data: {
-  username: string
-  email: string
-  password: string
-}) {
+export function signup(data: { username: string; email: string; password: string }) {
   return api.post("users", data)
 }
 
@@ -19,9 +15,7 @@ export function logout() {
   return api.delete("auth/session")
 }
 
-export async function getProfile(
-  username: string = "",
-): Promise<Profile | null> {
+export async function getProfile(username: string = ""): Promise<Profile | null> {
   const endpoint = username ? `profiles/${encodeURIComponent(username)}` : "me"
   const response = await api.get<unknown>(endpoint)
   if (response === null) return null

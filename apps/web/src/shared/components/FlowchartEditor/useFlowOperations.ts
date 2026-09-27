@@ -57,12 +57,7 @@ export function useFlowOperations(
     const targetNode = nodes.value.find((node) => node.id === params.target)
 
     // 自动推断标签
-    const autoLabel = getAutoLabel(
-      sourceNode,
-      targetNode,
-      params.sourceHandle,
-      params.targetHandle,
-    )
+    const autoLabel = getAutoLabel(sourceNode, targetNode, params.sourceHandle, params.targetHandle)
 
     const newEdge: Edge = {
       id: `edge-${getRandomId()}`,

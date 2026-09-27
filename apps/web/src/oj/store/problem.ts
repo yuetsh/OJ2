@@ -23,9 +23,7 @@ export const useProblemStore = defineStore("problem", () => {
    * 题目详情只在 problemID 变化时重新拉（见 oj/problem/detail.vue 的 init），
    * 而那时下面的 watch 已经把增量清零了，不会和新的 myFailedCount 叠加。
    */
-  const failCount = computed(
-    () => (problem.value?.myFailedCount ?? 0) + sessionFailCount.value,
-  )
+  const failCount = computed(() => (problem.value?.myFailedCount ?? 0) + sessionFailCount.value)
 
   const languages = computed<LANGUAGE[]>(() => {
     if (route.name === "problem" && problem.value?.allowFlowchart) {

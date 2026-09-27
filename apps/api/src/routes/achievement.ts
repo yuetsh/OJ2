@@ -27,19 +27,12 @@ async function resolveUser(requested: string | undefined, currentId: number) {
   const [target] = await db
     .select({ id: schema.user.id, username: schema.user.username })
     .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.username, requested),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(eq(schema.user.username, requested), eq(schema.user.isDisabled, false)))
     .limit(1)
   return target ?? null
 }
 
-function pendingData(row: {
-  achievement: typeof schema.achievement.$inferSelect
-}) {
+function pendingData(row: { achievement: typeof schema.achievement.$inferSelect }) {
   return {
     id: row.achievement.id,
     name: row.achievement.name,
@@ -58,19 +51,13 @@ achievementRoutes.get("/achievements", requireAuth, async (c) => {
       .from(schema.achievement)
       .where(eq(schema.achievement.visible, true))
       .orderBy(asc(schema.achievement.order), asc(schema.achievement.id)),
-    db
-      .select()
-      .from(schema.userAchievement)
-      .where(eq(schema.userAchievement.userId, target.id)),
+    db.select().from(schema.userAchievement).where(eq(schema.userAchievement.userId, target.id)),
     db
       .select({ metrics: schema.userStat.metrics })
       .from(schema.userStat)
       .where(eq(schema.userStat.userId, target.id))
       .limit(1),
-    db
-      .select({ value: count() })
-      .from(schema.user)
-      .where(eq(schema.user.isDisabled, false)),
+    db.select({ value: count() }).from(schema.user).where(eq(schema.user.isDisabled, false)),
   ])
   const unlocked = new Map(unlockedRows.map((row) => [row.achievementId, row]))
   const metrics = asRecord(statRows[0]?.metrics)
@@ -93,10 +80,7 @@ achievementRoutes.get("/achievements", requireAuth, async (c) => {
       unlockTime: record?.unlockTime ?? null,
       backfilled: record?.backfilled ?? false,
       progress: masked ? null : typeof progress === "number" ? progress : 0,
-      unlockRate:
-        active > 0
-          ? Math.round((achievement.unlockCount / active) * 1000) / 10
-          : 0,
+      unlockRate: active > 0 ? Math.round((achievement.unlockCount / active) * 1000) / 10 : 0,
     } satisfies Achievement
   })
   return success(c, {
@@ -124,10 +108,7 @@ achievementRoutes.get("/achievements/summary", requireAuth, async (c) => {
         eq(schema.userAchievement.achievementId, schema.achievement.id),
       )
       .where(
-        and(
-          eq(schema.userAchievement.userId, target.id),
-          eq(schema.achievement.visible, true),
-        ),
+        and(eq(schema.userAchievement.userId, target.id), eq(schema.achievement.visible, true)),
       )
       .orderBy(desc(schema.userAchievement.unlockTime)),
   ])
@@ -149,9 +130,7 @@ achievementRoutes.get("/achievements/summary", requireAuth, async (c) => {
       rarity,
       label: labels[rarity],
       total: achievements.filter((item) => item.rarity === rarity).length,
-      unlocked: unlockedRows.filter(
-        (item) => item.achievement.rarity === rarity,
-      ).length,
+      unlocked: unlockedRows.filter((item) => item.achievement.rarity === rarity).length,
     })),
     recent: unlockedRows.slice(0, 10).map(pendingData),
   } satisfies AchievementSummary)
@@ -161,10 +140,7 @@ achievementRoutes.get("/achievements/pending", requireAuth, async (c) => {
   const rows = await db
     .select({ record: schema.userAchievement, achievement: schema.achievement })
     .from(schema.userAchievement)
-    .innerJoin(
-      schema.achievement,
-      eq(schema.userAchievement.achievementId, schema.achievement.id),
-    )
+    .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
     .where(
       and(
         eq(schema.userAchievement.userId, c.get("user")!.id),
@@ -177,11 +153,7 @@ achievementRoutes.get("/achievements/pending", requireAuth, async (c) => {
 })
 
 achievementRoutes.post("/achievements/pending/read", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    markAchievementsReadSchema,
-    "Invalid achievement ids",
-  )
+  const parsed = await parseBody(c, markAchievementsReadSchema, "Invalid achievement ids")
   if (!parsed.success) return parsed.response
   if (parsed.data.ids.length > 0) {
     await db

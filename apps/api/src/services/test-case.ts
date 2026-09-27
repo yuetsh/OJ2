@@ -95,15 +95,11 @@ function entryFilter() {
   return (file: { name: string; originalSize: number }) => {
     if (!wantedEntry(file)) return false
     if (file.originalSize > MAX_ENTRY_BYTES) {
-      throw new TestCaseError(
-        `测试点 ${file.name} 超过 ${MAX_ENTRY_BYTES / 1024 / 1024}MB`,
-      )
+      throw new TestCaseError(`测试点 ${file.name} 超过 ${MAX_ENTRY_BYTES / 1024 / 1024}MB`)
     }
     total += file.originalSize
     if (total > MAX_TOTAL_BYTES) {
-      throw new TestCaseError(
-        `测试点总大小超过 ${MAX_TOTAL_BYTES / 1024 / 1024}MB`,
-      )
+      throw new TestCaseError(`测试点总大小超过 ${MAX_TOTAL_BYTES / 1024 / 1024}MB`)
     }
     return true
   }
@@ -134,16 +130,11 @@ export async function processTestCaseZip(
   // 条目名一律不参与路径拼接，zip slip（`../../etc/passwd` 这类条目名）从设计上就进不来。
   const names = new Set(Object.keys(files))
 
-  const selected = options.sql
-    ? collectSqlScripts(names)
-    : collectPairs(names).flat()
-  if (selected.length === 0)
-    throw new TestCaseError("压缩包里没有找到从 1 开始连续编号的测试点")
+  const selected = options.sql ? collectSqlScripts(names) : collectPairs(names).flat()
+  if (selected.length === 0) throw new TestCaseError("压缩包里没有找到从 1 开始连续编号的测试点")
   if (options.sql && selected.length < 2) {
     // 题目页会展示测试点 1 的期望结果，只有一个测试点时学生可以对照着硬编码 AC
-    throw new TestCaseError(
-      "SQL 题至少需要 2 个数据不同的测试点，防止硬编码期望结果",
-    )
+    throw new TestCaseError("SQL 题至少需要 2 个数据不同的测试点，防止硬编码期望结果")
   }
 
   let total = 0
@@ -151,16 +142,12 @@ export async function processTestCaseZip(
   for (const name of selected) {
     const raw = files[name]!
     if (raw.length > MAX_ENTRY_BYTES) {
-      throw new TestCaseError(
-        `测试点 ${name} 超过 ${MAX_ENTRY_BYTES / 1024 / 1024}MB`,
-      )
+      throw new TestCaseError(`测试点 ${name} 超过 ${MAX_ENTRY_BYTES / 1024 / 1024}MB`)
     }
     const content = normalizeNewlines(raw)
     total += content.length
     if (total > MAX_TOTAL_BYTES) {
-      throw new TestCaseError(
-        `测试点总大小超过 ${MAX_TOTAL_BYTES / 1024 / 1024}MB`,
-      )
+      throw new TestCaseError(`测试点总大小超过 ${MAX_TOTAL_BYTES / 1024 / 1024}MB`)
     }
     contents.set(name, content)
   }
@@ -195,9 +182,7 @@ export async function processTestCaseZip(
     collectPairs(names).forEach(([input, output], index) => {
       const outputContent = contents.get(output)!
       const entry: TestCaseEntry = {
-        stripped_output_md5: createHash("md5")
-          .update(rstrip(outputContent))
-          .digest("hex"),
+        stripped_output_md5: createHash("md5").update(rstrip(outputContent)).digest("hex"),
         input_size: contents.get(input)!.length,
         output_size: outputContent.length,
         input_name: input,
@@ -269,7 +254,5 @@ function randomId() {
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
-  return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join(
-    "",
-  )
+  return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join("")
 }

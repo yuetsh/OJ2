@@ -8,10 +8,7 @@ type ProgressRow = typeof schema.problemsetProgress.$inferSelect
 type ProblemLink = { problemId: number; score: number; isRequired: boolean }
 type BadgeCheck = Pick<
   ProgressRow,
-  | "completedProblemsCount"
-  | "totalProblemsCount"
-  | "totalScore"
-  | "progressDetail"
+  "completedProblemsCount" | "totalProblemsCount" | "totalScore" | "progressDetail"
 >
 
 /**
@@ -29,9 +26,7 @@ export function computeProgress(
   previousCompleteTime: string | null,
   now = new Date().toISOString(),
 ) {
-  const scoreByProblem = new Map(
-    links.map((link) => [String(link.problemId), link.score]),
-  )
+  const scoreByProblem = new Map(links.map((link) => [String(link.problemId), link.score]))
   // 已经移出题单的题目要从 detail 里剔掉，留着它 completed 就会比实际做出的题还多
   const kept: Record<string, unknown> = {}
   let totalScore = 0
@@ -51,9 +46,7 @@ export function computeProgress(
   const required = links.filter((link) => link.isRequired)
   const graded = required.length ? required : links
   const gradedKeys = new Set(graded.map((link) => String(link.problemId)))
-  const completed = Object.keys(kept).filter((key) =>
-    gradedKeys.has(key),
-  ).length
+  const completed = Object.keys(kept).filter((key) => gradedKeys.has(key)).length
   const total = graded.length
   // total > 0 这个前提不能省：0 === 0 同样成立，没有题目的题单会让人一加入就算「完成」，
   // 还会写下 complete_time、计进「完成题单数」成就，而且后面补上题目也不会自愈。
@@ -64,8 +57,7 @@ export function computeProgress(
     completedProblemsCount: completed,
     totalScore,
     // 乘 10000 四舍五入再除 100，保留两位小数
-    progressPercentage:
-      total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
+    progressPercentage: total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
     isCompleted,
     // 只设不清，语义是「曾经完成于」，对齐旧栈 problemset/models.py:218。
     //
@@ -136,13 +128,9 @@ export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
     )
   }
   if (badge.conditionType === "problem_count") {
-    return (
-      Object.keys(asRecord(progress.progressDetail)).length >=
-      badge.conditionValue
-    )
+    return Object.keys(asRecord(progress.progressDetail)).length >= badge.conditionValue
   }
-  if (badge.conditionType === "score")
-    return progress.totalScore >= badge.conditionValue
+  if (badge.conditionType === "score") return progress.totalScore >= badge.conditionValue
   return false
 }
 
@@ -173,9 +161,7 @@ export async function recalculateBadge(
       .where(
         and(
           eq(schema.userBadge.badgeId, badge.id),
-          eligibleIds.length
-            ? notInArray(schema.userBadge.userId, eligibleIds)
-            : undefined,
+          eligibleIds.length ? notInArray(schema.userBadge.userId, eligibleIds) : undefined,
         ),
       )
     if (!eligibleIds.length) return
@@ -231,12 +217,7 @@ export async function resyncProgress(problemsetId: number) {
   const now = new Date().toISOString()
   const updated = progresses.map((progress) => ({
     ...progress,
-    ...computeProgress(
-      asRecord(progress.progressDetail),
-      links,
-      progress.completeTime,
-      now,
-    ),
+    ...computeProgress(asRecord(progress.progressDetail), links, progress.completeTime, now),
   }))
   if (updated.length) await writeProgress(updated)
   for (const badge of badges) await recalculateBadge(badge, updated)
@@ -266,10 +247,7 @@ export async function recordSolvedProblem(
     .innerJoin(
       schema.problemsetProblem,
       and(
-        eq(
-          schema.problemsetProblem.problemsetId,
-          schema.problemsetProgress.problemsetId,
-        ),
+        eq(schema.problemsetProblem.problemsetId, schema.problemsetProgress.problemsetId),
         eq(schema.problemsetProblem.problemId, problemId),
       ),
     )
@@ -333,9 +311,7 @@ export async function recordSolvedProblem(
         .select()
         .from(schema.problemsetBadge)
         .where(eq(schema.problemsetBadge.problemsetId, problemsetId))
-      const eligible = badges.filter((badge) =>
-        eligibleForBadge(badge, { ...progress, ...update }),
-      )
+      const eligible = badges.filter((badge) => eligibleForBadge(badge, { ...progress, ...update }))
       if (eligible.length === 0) return []
       // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
       const inserted = await tx

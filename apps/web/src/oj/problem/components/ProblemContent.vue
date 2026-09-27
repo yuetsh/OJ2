@@ -108,9 +108,7 @@ const KIND_TAG_TYPE = {
   count: "info",
 } as const
 
-const astRequirements = computed(() =>
-  Object.entries(problem.value?.astRequirements ?? {}),
-)
+const astRequirements = computed(() => Object.entries(problem.value?.astRequirements ?? {}))
 
 async function test(sample: Sample, index: number) {
   samples.value = samples.value.map((sample) => {
@@ -122,10 +120,7 @@ async function test(sample: Sample, index: number) {
   const res = await createTestSubmission(codeStore.code, sample.input)
   samples.value = samples.value.map((sample) => {
     if (sample.id === index) {
-      const status =
-        res.status === 3 && res.output.trim() === sample.output
-          ? "passed"
-          : "failed"
+      const status = res.status === 3 && res.output.trim() === sample.output ? "passed" : "failed"
       return {
         ...sample,
         msg: res.output,
@@ -267,9 +262,7 @@ function type(status: ProblemStatus) {
           :total-rows="sqlExpectedQuery.total_rows"
           :truncated="sqlExpectedQuery.truncated"
         />
-        <p v-if="!problem.sqlConfig?.order_sensitive" class="sqlNote">
-          结果顺序不限
-        </p>
+        <p v-if="!problem.sqlConfig?.order_sensitive" class="sqlNote">结果顺序不限</p>
       </template>
       <div v-for="t in sqlChangedTables" :key="t.name">
         <p class="sqlTableName">
@@ -313,9 +306,7 @@ function type(status: ProblemStatus) {
         </p>
         <n-list bordered style="margin-bottom: 8px">
           <n-list-item v-for="(rule, i) in rules" :key="i">
-            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{
-              rule.description
-            }}</n-tag>
+            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{ rule.description }}</n-tag>
           </n-list-item>
         </n-list>
       </div>
@@ -330,19 +321,11 @@ function type(status: ProblemStatus) {
               例子 {{ index + 1 }}
             </n-flex>
           </p>
-          <n-button
-            size="small"
-            :type="type(sample.status)"
-            @click="test(sample, index)"
-          >
+          <n-button size="small" :type="type(sample.status)" @click="test(sample, index)">
             {{ label(sample.status, sample.loading) }}
           </n-button>
         </n-flex>
-        <n-descriptions
-          bordered
-          :column="2"
-          label-style="width: 50%; min-width: 100px"
-        >
+        <n-descriptions bordered :column="2" label-style="width: 50%; min-width: 100px">
           <n-descriptions-item>
             <template #label>
               <n-flex>

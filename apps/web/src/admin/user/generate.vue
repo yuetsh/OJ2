@@ -58,9 +58,7 @@ async function uploadUsers() {
     message.success("用户已上传成功")
     // 只导出用户名和密码两列 —— 发给学生的就是这两样，邮箱是占位生成的、
     // 真名本来就是老师粘进来的那一列，都不用回传
-    const csv = users.value
-      .map(([username, password]) => `${username},${password}`)
-      .join("\n")
+    const csv = users.value.map(([username, password]) => `${username},${password}`).join("\n")
     const hiddenElement = document.createElement("a")
     hiddenElement.href = "data:text/csv;charset=utf-8," + encodeURI(csv)
     hiddenElement.target = "_blank"
@@ -102,9 +100,7 @@ async function submit() {
         placeholder="每行一个用户名"
         v-model:value="rawInput"
       />
-      <n-button type="warning" :loading="loading" @click="submit">
-        确定导入
-      </n-button>
+      <n-button type="warning" :loading="loading" @click="submit"> 确定导入 </n-button>
     </n-flex>
   </n-space>
 </template>

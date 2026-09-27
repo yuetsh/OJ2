@@ -2,17 +2,9 @@
   <div class="learn-container">
     <template v-if="tutorial.id">
       <!-- 桌面端：目录 | 正文（居中限宽） | 可收起的示例代码 -->
-      <div
-        v-if="isDesktop"
-        class="learn-layout"
-        :class="{ 'with-code': codeOpen }"
-      >
+      <div v-if="isDesktop" class="learn-layout" :class="{ 'with-code': codeOpen }">
         <aside class="rail">
-          <LearnSummary
-            :titles="titles"
-            :progress="progress"
-            :traced="traced"
-          />
+          <LearnSummary :titles="titles" :progress="progress" :traced="traced" />
           <LessonList
             :titles="titles"
             :step="step"
@@ -28,12 +20,7 @@
               <n-text depth="3">第 {{ step }} / {{ titles.length }} 课</n-text>
               <n-flex align="center" justify="space-between" :wrap="false">
                 <span />
-                <n-button
-                  v-if="tutorial.code"
-                  size="small"
-                  secondary
-                  @click="codeOpen = !codeOpen"
-                >
+                <n-button v-if="tutorial.code" size="small" secondary @click="codeOpen = !codeOpen">
                   {{ codeOpen ? "收起示例代码" : "展开示例代码" }}
                 </n-button>
               </n-flex>
@@ -44,11 +31,7 @@
         </main>
 
         <aside v-if="tutorial.code && codeOpen" class="code-panel">
-          <CodeEditor
-            :language="editorLanguage"
-            v-model="tutorial.code"
-            height="100%"
-          />
+          <CodeEditor :language="editorLanguage" v-model="tutorial.code" height="100%" />
         </aside>
       </div>
 
@@ -76,27 +59,13 @@
       </template>
     </template>
 
-    <n-empty
-      v-if="isEmpty"
-      description="该教程还没有公开"
-      style="margin-top: 80px"
-    />
+    <n-empty v-if="isEmpty" description="该教程还没有公开" style="margin-top: 80px" />
   </div>
 </template>
 
 <script setup lang="ts">
-import type {
-  Tutorial,
-  Exercise,
-  LANGUAGE,
-  TutorialProgress,
-} from "utils/types"
-import {
-  getTutorial,
-  getTutorials,
-  getExercises,
-  getLearnProgress,
-} from "../api"
+import type { Tutorial, Exercise, LANGUAGE, TutorialProgress } from "utils/types"
+import { getTutorial, getTutorials, getExercises, getLearnProgress } from "../api"
 import { parseExercises } from "./composables/useExerciseParse"
 import { useLearnTrace } from "./composables/useLearnTrace"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -106,9 +75,7 @@ import LessonList from "./components/LessonList.vue"
 import LearnSummary from "./components/LearnSummary.vue"
 import LessonBody from "./components/LessonBody.vue"
 import PagerBar from "./components/PagerBar.vue"
-const CodeEditor = defineAsyncComponent(
-  () => import("shared/components/CodeEditor.vue"),
-)
+const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
 
 const route = useRoute()
 const router = useRouter()
@@ -125,9 +92,7 @@ const step = computed(() => {
   return parseInt(value)
 })
 
-const type = computed<"python" | "c">(() =>
-  route.params.type === "c" ? "c" : "python",
-)
+const type = computed<"python" | "c">(() => (route.params.type === "c" ? "c" : "python"))
 
 const tutorial = ref<Partial<Tutorial>>({
   id: 0,
@@ -136,9 +101,7 @@ const tutorial = ref<Partial<Tutorial>>({
   code: "",
 })
 
-const editorLanguage = computed<LANGUAGE>(() =>
-  tutorial.value.type === "c" ? "C" : "Python",
-)
+const editorLanguage = computed<LANGUAGE>(() => (tutorial.value.type === "c" ? "C" : "Python"))
 const titles = ref<{ id: number; title: string }[]>([])
 const progress = ref<Record<number, TutorialProgress>>({})
 const exercises = ref<Exercise[]>([])
@@ -147,9 +110,7 @@ const activeTab = ref("content")
 const codeOpen = useStorage("oj2:learn-code-open", true)
 const isEmpty = ref(false)
 
-const segments = computed(() =>
-  parseExercises(tutorial.value.content ?? "", exercises.value),
-)
+const segments = computed(() => parseExercises(tutorial.value.content ?? "", exercises.value))
 
 // 留痕的计时器。tutorial.id 变了才算换课 —— 用 step 会在内容还没加载好时就上报
 useLearnTrace(
@@ -159,9 +120,7 @@ useLearnTrace(
 
 function goToLesson(lessonNumber: number) {
   activeTab.value = "content"
-  router.push(
-    `/learn/${type.value}/${lessonNumber.toString().padStart(2, "0")}`,
-  )
+  router.push(`/learn/${type.value}/${lessonNumber.toString().padStart(2, "0")}`)
 }
 /**
  * 拉自己的自学留痕，给目录打勾。失败就当没有 —— 目录少几个勾不影响上课，
@@ -174,9 +133,7 @@ async function loadProgress() {
   }
   try {
     const rows = await getLearnProgress(type.value)
-    progress.value = Object.fromEntries(
-      rows.map((row) => [row.tutorialId, row]),
-    )
+    progress.value = Object.fromEntries(rows.map((row) => [row.tutorialId, row]))
   } catch {
     progress.value = {}
   }
@@ -188,10 +145,7 @@ async function init() {
   isEmpty.value = titles.value.length === 0
   if (isEmpty.value) return
   const id = titles.value[step.value - 1].id
-  const [res2, exs] = await Promise.allSettled([
-    getTutorial(id),
-    getExercises(id),
-  ])
+  const [res2, exs] = await Promise.allSettled([getTutorial(id), getExercises(id)])
   if (res2.status === "fulfilled") tutorial.value = res2.value
   exercises.value = exs.status === "fulfilled" ? exs.value : []
   learnStep.value[type.value] = step.value

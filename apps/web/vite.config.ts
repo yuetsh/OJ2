@@ -104,12 +104,7 @@ export default defineConfig(() => {
           "@vueuse/core",
           "pinia",
           {
-            "naive-ui": [
-              "useDialog",
-              "useMessage",
-              "useNotification",
-              "useLoadingBar",
-            ],
+            "naive-ui": ["useDialog", "useMessage", "useNotification", "useLoadingBar"],
           },
           {
             from: "naive-ui",

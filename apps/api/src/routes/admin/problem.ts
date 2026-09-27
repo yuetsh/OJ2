@@ -15,18 +15,7 @@ import {
   type SqlTestCaseScript,
   type UploadTestCaseResponse,
 } from "@oj2/contract"
-import {
-  and,
-  count,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  ne,
-  or,
-  sql,
-} from "drizzle-orm"
+import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
@@ -90,10 +79,7 @@ async function tagNamesFor(problemIds: number[]) {
       name: schema.problemTag.name,
     })
     .from(schema.problemTags)
-    .innerJoin(
-      schema.problemTag,
-      eq(schema.problemTags.problemtagId, schema.problemTag.id),
-    )
+    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(inArray(schema.problemTags.problemId, problemIds))
   for (const row of rows)
     result.set(row.problemId, [...(result.get(row.problemId) ?? []), row.name])
@@ -149,16 +135,12 @@ async function resolveTags(tx: DbOrTx, names: string[]) {
       .returning({ id: schema.problemTag.id, name: schema.problemTag.name })
     for (const row of created) existing.set(row.name.toLowerCase(), row.id)
   }
-  return wanted
-    .map((name) => existing.get(name.toLowerCase())!)
-    .filter((id) => id !== undefined)
+  return wanted.map((name) => existing.get(name.toLowerCase())!).filter((id) => id !== undefined)
 }
 
 async function setTags(tx: DbOrTx, problemId: number, names: string[]) {
   const ids = await resolveTags(tx, names)
-  await tx
-    .delete(schema.problemTags)
-    .where(eq(schema.problemTags.problemId, problemId))
+  await tx.delete(schema.problemTags).where(eq(schema.problemTags.problemId, problemId))
   if (ids.length) {
     await tx
       .insert(schema.problemTags)
@@ -175,10 +157,7 @@ async function serialize(row: ProblemRow) {
         realName: schema.userProfile.realName,
       })
       .from(schema.user)
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(eq(schema.user.id, row.createdById))
       .limit(1),
     tagNames(row.id),
@@ -207,10 +186,7 @@ async function serialize(row: ProblemRow) {
     acceptedNumber: row.acceptedNumber,
     statisticInfo: asRecord(row.statisticInfo),
     contestId: row.contestId,
-    createdBy: sampleUser(
-      creator ?? { id: row.createdById, username: "" },
-      creator?.realName,
-    ),
+    createdBy: sampleUser(creator ?? { id: row.createdById, username: "" }, creator?.realName),
     isPublic: row.isPublic,
     tags,
     allowFlowchart: row.allowFlowchart,
@@ -242,13 +218,9 @@ function commonChecks(data: {
       return { error: "SQL problem cannot be mixed with other languages" }
     if (!data.sqlConfig) return { error: "SQL problem requires sql_config" }
     const hasAnswer = data.answers.some(
-      (item) =>
-        item.language === "SQL" &&
-        typeof item.code === "string" &&
-        item.code.trim(),
+      (item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim(),
     )
-    if (!hasAnswer)
-      return { error: "SQL problem requires a SQL reference answer" }
+    if (!hasAnswer) return { error: "SQL problem requires a SQL reference answer" }
     return { sql: true }
   }
   if (!data.inputDescription || !data.outputDescription) {
@@ -270,28 +242,19 @@ async function generateSqlDisplay(
 ): Promise<{ error: string } | { display: SqlDisplay }> {
   const info = await readInfo(testCaseId)
   if (!info) return { error: "测试点信息读取失败，请重新上传测试点" }
-  if (!info.sql)
-    return { error: "测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包" }
-  const keys = Object.keys(info.test_cases ?? {}).sort(
-    (a, b) => Number(a) - Number(b),
-  )
+  if (!info.sql) return { error: "测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包" }
+  const keys = Object.keys(info.test_cases ?? {}).sort((a, b) => Number(a) - Number(b))
   if (keys.length === 0) return { error: "题目没有任何测试点" }
   const inputName = info.test_cases![keys[0]!]?.input_name
   if (!inputName) return { error: "测试点信息损坏，请重新上传测试点" }
   let initSql: string
   try {
-    initSql = await readFile(
-      resolve(config.testCaseDirectory, testCaseId, inputName),
-      "utf8",
-    )
+    initSql = await readFile(resolve(config.testCaseDirectory, testCaseId, inputName), "utf8")
   } catch {
     return { error: `测试点脚本 ${inputName} 读取失败` }
   }
   const refSql = answers.find(
-    (item) =>
-      item.language === "SQL" &&
-      typeof item.code === "string" &&
-      item.code.trim(),
+    (item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim(),
   )?.code
   if (typeof refSql !== "string") return { error: "题目缺少 SQL 标准答案" }
   const outcome = await buildSqlDisplay(initSql, refSql, sqlConfig.mode)
@@ -299,10 +262,7 @@ async function generateSqlDisplay(
   return { display: outcome.value }
 }
 
-function problemValues(
-  data: ReturnType<typeof createProblemRequestSchema.parse>,
-  isSql: boolean,
-) {
+function problemValues(data: ReturnType<typeof createProblemRequestSchema.parse>, isSql: boolean) {
   return {
     displayId: data._id,
     title: data.title,
@@ -342,17 +302,11 @@ type ProblemInput = ReturnType<typeof createProblemRequestSchema.parse>
  */
 async function validateProblem(
   data: ProblemInput,
-): Promise<
-  { error: string } | { sql: boolean; sqlDisplay: SqlDisplay | null }
-> {
+): Promise<{ error: string } | { sql: boolean; sqlDisplay: SqlDisplay | null }> {
   const checked = commonChecks(data)
   if ("error" in checked) return checked
   if (!checked.sql) return { sql: false, sqlDisplay: null }
-  const built = await generateSqlDisplay(
-    data.testCaseId,
-    data.answers,
-    data.sqlConfig!,
-  )
+  const built = await generateSqlDisplay(data.testCaseId, data.answers, data.sqlConfig!)
   if ("error" in built) return built
   return { sql: true, sqlDisplay: built.display }
 }
@@ -418,9 +372,7 @@ async function copyProblem(
   if (tags.length) {
     await tx
       .insert(schema.problemTags)
-      .values(
-        tags.map((tag) => ({ problemId: copy!.id, problemtagId: tag.tagId })),
-      )
+      .values(tags.map((tag) => ({ problemId: copy!.id, problemtagId: tag.tagId })))
   }
   return copy!
 }
@@ -471,10 +423,7 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
       })
       .from(schema.problem)
       .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where)
       .orderBy(desc(schema.problem.createTime))
       .limit(limit)
@@ -512,12 +461,9 @@ adminProblemRoutes.get("/problems/:id", requireProblemPermission, async (c) => {
   const [row] = await db
     .select()
     .from(schema.problem)
-    .where(
-      eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })),
-    )
+    .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .limit(1)
-  if (!row)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
   if (!(await canEdit(c.get("user")!, row))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
@@ -528,21 +474,14 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
   const parsed = await parseBody(c, createProblemRequestSchema)
   if (!parsed.success) return parsed.response
   const validated = await validateProblem(parsed.data)
-  if ("error" in validated)
-    return failure(c, 400, "invalid-problem", validated.error)
+  if ("error" in validated) return failure(c, 400, "invalid-problem", validated.error)
 
   const [duplicate] = await db
     .select({ id: schema.problem.id })
     .from(schema.problem)
-    .where(
-      and(
-        eq(schema.problem.displayId, parsed.data._id),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(eq(schema.problem.displayId, parsed.data._id), isNull(schema.problem.contestId)))
     .limit(1)
-  if (duplicate)
-    return failure(c, 409, "display-id-exists", "Display ID already exists")
+  if (duplicate) return failure(c, 409, "display-id-exists", "Display ID already exists")
 
   const created = await insertProblem(parsed.data, validated, {
     contestId: null,
@@ -560,14 +499,12 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
     .from(schema.problem)
     .where(eq(schema.problem.id, id))
     .limit(1)
-  if (!existing)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!existing) return failure(c, 404, "problem-not-found", "Problem does not exist")
   if (!(await canEdit(c.get("user")!, existing))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   const validated = await validateProblem(parsed.data)
-  if ("error" in validated)
-    return failure(c, 400, "invalid-problem", validated.error)
+  if ("error" in validated) return failure(c, 400, "invalid-problem", validated.error)
 
   // 题号唯一性的作用域跟着题目走：公开题在全部公开题里唯一，比赛题在本场比赛内唯一
   const [duplicate] = await db
@@ -583,8 +520,7 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
       ),
     )
     .limit(1)
-  if (duplicate)
-    return failure(c, 409, "display-id-exists", "Display ID already exists")
+  if (duplicate) return failure(c, 409, "display-id-exists", "Display ID already exists")
 
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx
@@ -605,24 +541,19 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
 // 公开题与比赛题共用一条删除路由。旧接口分成两个（admin/problem 与
 // admin/contest/problem），但两边都只按题目 id 取、比赛是从题目推导出来的，
 // 分开没有意义，还逼前端多传一个它未必知道的 contestId。
-adminProblemRoutes.delete(
-  "/problems/:id",
-  requireProblemPermission,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const [existing] = await db
-      .select()
-      .from(schema.problem)
-      .where(eq(schema.problem.id, id))
-      .limit(1)
-    if (!existing)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    if (!(await canEdit(c.get("user")!, existing))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    }
-    return deleteProblem(c, id)
-  },
-)
+adminProblemRoutes.delete("/problems/:id", requireProblemPermission, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const [existing] = await db
+    .select()
+    .from(schema.problem)
+    .where(eq(schema.problem.id, id))
+    .limit(1)
+  if (!existing) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!(await canEdit(c.get("user")!, existing))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  }
+  return deleteProblem(c, id)
+})
 
 /**
  * 删题的共用实现。
@@ -643,12 +574,7 @@ async function deleteProblem(c: Parameters<typeof success>[0], id: number) {
     .from(schema.submission)
     .where(eq(schema.submission.problemId, id))
   if ((submissions?.value ?? 0) > 0) {
-    return failure(
-      c,
-      409,
-      "problem-has-submissions",
-      "该题目已有提交记录，不能删除",
-    )
+    return failure(c, 409, "problem-has-submissions", "该题目已有提交记录，不能删除")
   }
   await db.delete(schema.problem).where(eq(schema.problem.id, id))
   return success(c, null)
@@ -656,175 +582,133 @@ async function deleteProblem(c: Parameters<typeof success>[0], id: number) {
 
 // ---------------------------------------------------------------- 比赛题目
 
-adminProblemRoutes.get(
-  "/contests/:contestId/problems",
-  requireProblemPermission,
-  async (c) => {
-    const contestId = queryInteger(c.req.param("contestId"), 0, { min: 1 })
-    const [contest] = await db
-      .select()
-      .from(schema.contest)
-      .where(eq(schema.contest.id, contestId))
-      .limit(1)
-    const user = c.get("user")!
-    if (
-      !contest ||
-      (user.adminType !== "Super Admin" && contest.createdById !== user.id)
-    ) {
-      return failure(c, 404, "contest-not-found", "Contest does not exist")
-    }
-    const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-    const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-    const filters = [eq(schema.problem.contestId, contestId)]
-    const keyword = c.req.query("keyword")?.trim()
-    if (keyword) filters.push(ilike(schema.problem.title, `%${keyword}%`))
-    const where = and(...filters)
-    const [totalRow, rows] = await Promise.all([
-      db.select({ value: count() }).from(schema.problem).where(where),
-      db
-        .select({
-          problem: schema.problem,
-          user: schema.user,
-          realName: schema.userProfile.realName,
-        })
-        .from(schema.problem)
-        .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-        .leftJoin(
-          schema.userProfile,
-          eq(schema.userProfile.userId, schema.user.id),
-        )
-        .where(where)
-        .orderBy(desc(schema.problem.createTime))
-        .limit(limit)
-        .offset(offset),
-    ])
-    const tags = await tagNamesFor(rows.map(({ problem }) => problem.id))
-    return success(c, {
-      results: rows.map(
-        ({ problem, user: creator, realName }) =>
-          ({
-            id: problem.id,
-            _id: problem.displayId,
-            title: problem.title,
-            createdBy: sampleUser(creator, realName),
-            visible: problem.visible,
-            createTime: problem.createTime,
-            difficulty: problem.difficulty,
-            tags: tags.get(problem.id) ?? [],
-            hasAstRules: problem.astRules !== null,
-            allowFlowchart: problem.allowFlowchart,
-            showFlowchart: problem.showFlowchart,
-            topReaction: null,
-          }) satisfies AdminProblemListItem,
-      ),
-      total: totalRow[0]?.value ?? 0,
-    } satisfies AdminProblemList)
-  },
-)
-
-adminProblemRoutes.post(
-  "/contests/:contestId/problems",
-  requireProblemPermission,
-  async (c) => {
-    const contestId = queryInteger(c.req.param("contestId"), 0, { min: 1 })
-    const [contest] = await db
-      .select()
-      .from(schema.contest)
-      .where(eq(schema.contest.id, contestId))
-      .limit(1)
-    const user = c.get("user")!
-    if (
-      !contest ||
-      (user.adminType !== "Super Admin" && contest.createdById !== user.id)
-    ) {
-      return failure(c, 404, "contest-not-found", "Contest does not exist")
-    }
-    const parsed = await parseBody(c, createProblemRequestSchema)
-    if (!parsed.success) return parsed.response
-    const validated = await validateProblem(parsed.data)
-    if ("error" in validated)
-      return failure(c, 400, "invalid-problem", validated.error)
-
-    const [duplicate] = await db
-      .select({ id: schema.problem.id })
+adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission, async (c) => {
+  const contestId = queryInteger(c.req.param("contestId"), 0, { min: 1 })
+  const [contest] = await db
+    .select()
+    .from(schema.contest)
+    .where(eq(schema.contest.id, contestId))
+    .limit(1)
+  const user = c.get("user")!
+  if (!contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)) {
+    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  }
+  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+  const filters = [eq(schema.problem.contestId, contestId)]
+  const keyword = c.req.query("keyword")?.trim()
+  if (keyword) filters.push(ilike(schema.problem.title, `%${keyword}%`))
+  const where = and(...filters)
+  const [totalRow, rows] = await Promise.all([
+    db.select({ value: count() }).from(schema.problem).where(where),
+    db
+      .select({
+        problem: schema.problem,
+        user: schema.user,
+        realName: schema.userProfile.realName,
+      })
       .from(schema.problem)
-      .where(
-        and(
-          eq(schema.problem.displayId, parsed.data._id),
-          eq(schema.problem.contestId, contestId),
-        ),
-      )
-      .limit(1)
-    if (duplicate)
-      return failure(c, 409, "display-id-exists", "Duplicate Display id")
+      .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .where(where)
+      .orderBy(desc(schema.problem.createTime))
+      .limit(limit)
+      .offset(offset),
+  ])
+  const tags = await tagNamesFor(rows.map(({ problem }) => problem.id))
+  return success(c, {
+    results: rows.map(
+      ({ problem, user: creator, realName }) =>
+        ({
+          id: problem.id,
+          _id: problem.displayId,
+          title: problem.title,
+          createdBy: sampleUser(creator, realName),
+          visible: problem.visible,
+          createTime: problem.createTime,
+          difficulty: problem.difficulty,
+          tags: tags.get(problem.id) ?? [],
+          hasAstRules: problem.astRules !== null,
+          allowFlowchart: problem.allowFlowchart,
+          showFlowchart: problem.showFlowchart,
+          topReaction: null,
+        }) satisfies AdminProblemListItem,
+    ),
+    total: totalRow[0]?.value ?? 0,
+  } satisfies AdminProblemList)
+})
 
-    const created = await insertProblem(parsed.data, validated, {
-      contestId,
-      createdById: user.id,
-    })
-    return success(c, await serialize(created), 201)
-  },
-)
+adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermission, async (c) => {
+  const contestId = queryInteger(c.req.param("contestId"), 0, { min: 1 })
+  const [contest] = await db
+    .select()
+    .from(schema.contest)
+    .where(eq(schema.contest.id, contestId))
+    .limit(1)
+  const user = c.get("user")!
+  if (!contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)) {
+    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  }
+  const parsed = await parseBody(c, createProblemRequestSchema)
+  if (!parsed.success) return parsed.response
+  const validated = await validateProblem(parsed.data)
+  if ("error" in validated) return failure(c, 400, "invalid-problem", validated.error)
+
+  const [duplicate] = await db
+    .select({ id: schema.problem.id })
+    .from(schema.problem)
+    .where(
+      and(eq(schema.problem.displayId, parsed.data._id), eq(schema.problem.contestId, contestId)),
+    )
+    .limit(1)
+  if (duplicate) return failure(c, 409, "display-id-exists", "Duplicate Display id")
+
+  const created = await insertProblem(parsed.data, validated, {
+    contestId,
+    createdById: user.id,
+  })
+  return success(c, await serialize(created), 201)
+})
 
 // ---------------------------------------------------------------- 比赛题 ⇄ 公开题
 
-adminProblemRoutes.post(
-  "/problems/:id/make-public",
-  requireProblemPermission,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = await parseBody(
-      c,
-      makeProblemPublicRequestSchema,
-      "displayId 不能为空",
+adminProblemRoutes.post("/problems/:id/make-public", requireProblemPermission, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = await parseBody(c, makeProblemPublicRequestSchema, "displayId 不能为空")
+  if (!parsed.success) return parsed.response
+  const [problem] = await db.select().from(schema.problem).where(eq(schema.problem.id, id)).limit(1)
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  // 归属校验不能少：这个接口会把整道题（含 answers 标准答案）复制出来并回传，
+  // 没有它，任何有出题权的人拿别人比赛题的 id 就能把题面和答案整份拿走。
+  // 旧后端同样缺这个校验，但它只 `return self.success()` 不带数据，泄露面比这里小。
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  }
+  if (!problem.contestId || problem.isPublic) {
+    return failure(c, 409, "already-public", "Already a public problem")
+  }
+  const [duplicate] = await db
+    .select({ id: schema.problem.id })
+    .from(schema.problem)
+    .where(
+      and(eq(schema.problem.displayId, parsed.data.displayId), isNull(schema.problem.contestId)),
     )
-    if (!parsed.success) return parsed.response
-    const [problem] = await db
-      .select()
-      .from(schema.problem)
-      .where(eq(schema.problem.id, id))
-      .limit(1)
-    if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    // 归属校验不能少：这个接口会把整道题（含 answers 标准答案）复制出来并回传，
-    // 没有它，任何有出题权的人拿别人比赛题的 id 就能把题面和答案整份拿走。
-    // 旧后端同样缺这个校验，但它只 `return self.success()` 不带数据，泄露面比这里小。
-    if (!(await canEdit(c.get("user")!, problem))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    }
-    if (!problem.contestId || problem.isPublic) {
-      return failure(c, 409, "already-public", "Already a public problem")
-    }
-    const [duplicate] = await db
-      .select({ id: schema.problem.id })
-      .from(schema.problem)
-      .where(
-        and(
-          eq(schema.problem.displayId, parsed.data.displayId),
-          isNull(schema.problem.contestId),
-        ),
-      )
-      .limit(1)
-    if (duplicate)
-      return failure(c, 409, "display-id-exists", "Duplicate display ID")
+    .limit(1)
+  if (duplicate) return failure(c, 409, "display-id-exists", "Duplicate display ID")
 
-    const created = await db.transaction(async (tx) => {
-      // 原比赛题标记成「已转公开」，避免同一道题被转两次
-      await tx
-        .update(schema.problem)
-        .set({ isPublic: true })
-        .where(eq(schema.problem.id, id))
-      // 转出来的公开题默认不可见：题面往往还要按公开场景改一遍
-      return copyProblem(tx, problem, {
-        contestId: null,
-        displayId: parsed.data.displayId,
-        visible: false,
-        isPublic: true,
-      })
+  const created = await db.transaction(async (tx) => {
+    // 原比赛题标记成「已转公开」，避免同一道题被转两次
+    await tx.update(schema.problem).set({ isPublic: true }).where(eq(schema.problem.id, id))
+    // 转出来的公开题默认不可见：题面往往还要按公开场景改一遍
+    return copyProblem(tx, problem, {
+      contestId: null,
+      displayId: parsed.data.displayId,
+      visible: false,
+      isPublic: true,
     })
-    return success(c, await serialize(created), 201)
-  },
-)
+  })
+  return success(c, await serialize(created), 201)
+})
 
 adminProblemRoutes.post(
   "/contests/:contestId/problems/from-public",
@@ -848,12 +732,9 @@ adminProblemRoutes.post(
     // problemId 就能靠错误码差异枚举出哪些 contestId 真实存在。全仓其余跨租户路径都是
     // 统一码（contest 系列一律 contest-not-found），这里对齐。
     const denyContest =
-      !contest ||
-      (user.adminType !== "Super Admin" && contest.createdById !== user.id)
-    if (denyContest)
-      return failure(c, 404, "contest-not-found", "Contest does not exist")
-    if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
+      !contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)
+    if (denyContest) return failure(c, 404, "contest-not-found", "Contest does not exist")
+    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
     // 源题必须是**公开题**，且要么已可见、要么是自己的。旧后端只按 id 取，不校验任何东西 ——
     // 于是能把别人比赛里的题（或别人尚未公开的草稿）拖进自己比赛，进而读到 answers。
     if (problem.contestId !== null) {
@@ -876,12 +757,7 @@ adminProblemRoutes.post(
       )
       .limit(1)
     if (duplicate)
-      return failure(
-        c,
-        409,
-        "display-id-exists",
-        "Duplicate display id in this contest",
-      )
+      return failure(c, 409, "display-id-exists", "Duplicate display id in this contest")
 
     const created = await db.transaction((tx) =>
       copyProblem(tx, problem, {
@@ -900,14 +776,10 @@ adminProblemRoutes.post(
 adminProblemRoutes.post("/test-cases", requireProblemPermission, async (c) => {
   const form = await c.req.formData().catch(() => null)
   const file = form?.get("file")
-  if (!(file instanceof File))
-    return failure(c, 400, "invalid-request", "Upload failed")
+  if (!(file instanceof File)) return failure(c, 400, "invalid-request", "Upload failed")
   const sql = ["1", "true", "True"].includes(String(form?.get("sql") ?? ""))
   try {
-    const result = await processTestCaseZip(
-      new Uint8Array(await file.arrayBuffer()),
-      { sql },
-    )
+    const result = await processTestCaseZip(new Uint8Array(await file.arrayBuffer()), { sql })
     return success(
       c,
       {
@@ -917,120 +789,89 @@ adminProblemRoutes.post("/test-cases", requireProblemPermission, async (c) => {
       201,
     )
   } catch (error) {
-    if (error instanceof TestCaseError)
-      return failure(c, 400, "invalid-test-case", error.message)
+    if (error instanceof TestCaseError) return failure(c, 400, "invalid-test-case", error.message)
     console.error("Failed to process test case zip", error)
     return failure(c, 500, "test-case-error", "测试点处理失败")
   }
 })
 
-adminProblemRoutes.get(
-  "/problems/:id/test-cases",
-  requireProblemPermission,
-  async (c) => {
-    const [problem] = await db
-      .select()
-      .from(schema.problem)
-      .where(
-        eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })),
-      )
-      .limit(1)
-    if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    if (!(await canEdit(c.get("user")!, problem))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    }
-    try {
-      const archive = await packTestCaseZip(problem.testCaseId)
-      return new Response(archive, {
-        headers: {
-          "content-type": "application/zip",
-          "content-disposition": `attachment; filename=problem_${problem.id}_test_cases.zip`,
-        },
-      })
-    } catch (error) {
-      if (error instanceof TestCaseError)
-        return failure(c, 404, "test-case-not-found", error.message)
-      throw error
-    }
-  },
-)
+adminProblemRoutes.get("/problems/:id/test-cases", requireProblemPermission, async (c) => {
+  const [problem] = await db
+    .select()
+    .from(schema.problem)
+    .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .limit(1)
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  }
+  try {
+    const archive = await packTestCaseZip(problem.testCaseId)
+    return new Response(archive, {
+      headers: {
+        "content-type": "application/zip",
+        "content-disposition": `attachment; filename=problem_${problem.id}_test_cases.zip`,
+      },
+    })
+  } catch (error) {
+    if (error instanceof TestCaseError) return failure(c, 404, "test-case-not-found", error.message)
+    throw error
+  }
+})
 
 /**
  * 回显 SQL 题已上传的测试点脚本内容。只读磁盘上的 N.sql，不需要 SQL 引擎 ——
  * 同组的 sql-preview / sql-ai-gen 要跑 SQLite 生成展示数据，新后端还没有那条链路，
  * 那两个仍在旧后端上。
  */
-adminProblemRoutes.get(
-  "/problems/:id/sql-scripts",
-  requireProblemPermission,
-  async (c) => {
-    const [problem] = await db
-      .select()
-      .from(schema.problem)
-      .where(
-        eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })),
-      )
-      .limit(1)
-    if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    if (!(await canEdit(c.get("user")!, problem))) {
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
-    }
-    const info = await readInfo(problem.testCaseId)
-    if (!info)
-      return failure(c, 404, "test-case-info-unreadable", "测试点信息读取失败")
-    if (!info.sql)
-      return failure(c, 409, "not-sql-test-case", "该题的测试点不是 SQL 类型")
-    try {
-      const scripts = await readSqlScripts(problem.testCaseId)
-      return success(c, scripts satisfies SqlTestCaseScript[])
-    } catch (error) {
-      console.error("Failed to read SQL test case scripts", error)
-      return failure(c, 500, "test-case-error", "测试点脚本读取失败")
-    }
-  },
-)
+adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, async (c) => {
+  const [problem] = await db
+    .select()
+    .from(schema.problem)
+    .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .limit(1)
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  }
+  const info = await readInfo(problem.testCaseId)
+  if (!info) return failure(c, 404, "test-case-info-unreadable", "测试点信息读取失败")
+  if (!info.sql) return failure(c, 409, "not-sql-test-case", "该题的测试点不是 SQL 类型")
+  try {
+    const scripts = await readSqlScripts(problem.testCaseId)
+    return success(c, scripts satisfies SqlTestCaseScript[])
+  } catch (error) {
+    console.error("Failed to read SQL test case scripts", error)
+    return failure(c, 500, "test-case-error", "测试点脚本读取失败")
+  }
+})
 
 /** SQL 题测试点预览：跑一遍初始化脚本 + 标准答案，返回题目页要展示的数据表与期望结果 */
-adminProblemRoutes.post(
-  "/sql-test-cases/preview",
-  requireProblemPermission,
-  async (c) => {
-    const parsed = await parseBody(c, sqlPreviewRequestSchema)
-    if (!parsed.success) return parsed.response
-    const outcome = await buildSqlDisplay(
-      parsed.data.initSql,
-      parsed.data.refSql,
-      parsed.data.mode,
-    )
-    if (!outcome.ok)
-      return failure(c, 400, "sql-preview-failed", outcome.message)
-    return success(c, outcome.value)
-  },
-)
+adminProblemRoutes.post("/sql-test-cases/preview", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, sqlPreviewRequestSchema)
+  if (!parsed.success) return parsed.response
+  const outcome = await buildSqlDisplay(parsed.data.initSql, parsed.data.refSql, parsed.data.mode)
+  if (!outcome.ok) return failure(c, 400, "sql-preview-failed", outcome.message)
+  return success(c, outcome.value)
+})
 
 /** AI 按标准答案倒推表结构、生成一份自洽的初始化脚本 */
-adminProblemRoutes.post(
-  "/sql-test-cases/generate",
-  requireProblemPermission,
-  async (c) => {
-    const parsed = await parseBody(c, generateSqlTestCaseRequestSchema)
-    if (!parsed.success) return parsed.response
-    try {
-      const sql = await completeChat(
-        `你是一个 SQL 出题助手。用户会给你一道 SQL 题的标准答案（查询题的
+adminProblemRoutes.post("/sql-test-cases/generate", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, generateSqlTestCaseRequestSchema)
+  if (!parsed.success) return parsed.response
+  try {
+    const sql = await completeChat(
+      `你是一个 SQL 出题助手。用户会给你一道 SQL 题的标准答案（查询题的
 SELECT 语句，或增删改题的 UPDATE/DELETE/INSERT 语句）和题型。
 请你推断出该标准答案所需要的表结构，生成一份自洽的 SQLite 兼容初始化脚本，
 包含 CREATE TABLE 和若干条 INSERT 语句，插入的数据要足够让标准答案跑出有意义的结果
 （比如查询题要有能被筛选出来和被过滤掉的行；增删改题要有能被改动和不受影响的行）。
 请只返回 SQL 脚本本身，连 \`\`\` 都不需要，不要任何解释文字。`,
-        `题型：${parsed.data.mode}\n标准答案：\n${parsed.data.refSql}`,
-      )
-      return success(c, { sql } satisfies GenerateSqlTestCaseResponse)
-    } catch (error) {
-      console.error("SQL test case generation failed", error)
-      return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")
-    }
-  },
-)
+      `题型：${parsed.data.mode}\n标准答案：\n${parsed.data.refSql}`,
+    )
+    return success(c, { sql } satisfies GenerateSqlTestCaseResponse)
+  } catch (error) {
+    console.error("SQL test case generation failed", error)
+    return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")
+  }
+})

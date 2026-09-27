@@ -22,8 +22,7 @@ defineEmits<{
  * TextCopy（渲染成空）。
  */
 const maskable = computed(
-  () =>
-    props.user.adminType !== USER_TYPE.REGULAR_USER && !!props.user.rawPassword,
+  () => props.user.adminType !== USER_TYPE.REGULAR_USER && !!props.user.rawPassword,
 )
 </script>
 <template>

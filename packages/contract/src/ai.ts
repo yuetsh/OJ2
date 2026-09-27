@@ -196,8 +196,7 @@ export const aiHintDoneSchema = z.object({
 export const HINT_ERROR_TAGS = {
   syntax: "语法错误",
   input_format: "输入读取方式不对（格式、分隔、个数）",
-  output_format:
-    "输出格式不对（多余的输入提示语、全角/半角符号、多余空格或换行、小数位数）",
+  output_format: "输出格式不对（多余的输入提示语、全角/半角符号、多余空格或换行、小数位数）",
   condition: "条件判断写错（比较符、漏了分支）",
   loop_bound: "循环次数或边界不对（差一）",
   integer_division: "整数除法或取余用错",
@@ -218,9 +217,7 @@ export type HintErrorTag = keyof typeof HINT_ERROR_TAGS
  * 这样注入最多能左右一个枚举值和两个行号。多出来的字段被 zod 剥掉。
  */
 export const hintDiagnosisSchema = z.object({
-  tag: z.enum(
-    Object.keys(HINT_ERROR_TAGS) as [HintErrorTag, ...HintErrorTag[]],
-  ),
+  tag: z.enum(Object.keys(HINT_ERROR_TAGS) as [HintErrorTag, ...HintErrorTag[]]),
   /** 问题所在的行号区间（从 1 起，含两端）；说不准就是 null */
   lines: z.tuple([z.number().int().min(1), z.number().int().min(1)]).nullable(),
   confidence: z.enum(["high", "low"]),
@@ -295,6 +292,4 @@ export type AiHintRequest = z.infer<typeof aiHintRequestSchema>
 export type AiHintDone = z.infer<typeof aiHintDoneSchema>
 export type AiHintFeedbackRequest = z.infer<typeof aiHintFeedbackRequestSchema>
 export type ClassAnalysisRequest = z.infer<typeof classAnalysisRequestSchema>
-export type ClassPkAnalysisRequest = z.infer<
-  typeof classPkAnalysisRequestSchema
->
+export type ClassPkAnalysisRequest = z.infer<typeof classPkAnalysisRequestSchema>

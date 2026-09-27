@@ -71,17 +71,8 @@ onMounted(listAnnouncements)
 watch(query, listAnnouncements, { deep: true })
 </script>
 <template>
-  <n-data-table
-    :bordered="false"
-    :data="announcements"
-    :columns="columns"
-    :row-props="rowProps"
-  />
-  <Pagination
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-    :total="total"
-  />
+  <n-data-table :bordered="false" :data="announcements" :columns="columns" :row-props="rowProps" />
+  <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
   <n-modal
     v-model:show="show"
     preset="card"

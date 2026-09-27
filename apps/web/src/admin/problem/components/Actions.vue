@@ -1,10 +1,6 @@
 <script lang="ts" setup>
 import { errorCode, errorMessage } from "utils/api"
-import {
-  deleteContestProblem,
-  deleteProblem,
-  makeProblemPublic,
-} from "admin/api"
+import { deleteContestProblem, deleteProblem, makeProblemPublic } from "admin/api"
 import download from "utils/download"
 
 interface Props {
@@ -18,9 +14,7 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 
-const isContestProblem = computed(
-  () => route.name === "admin contest problem list",
-)
+const isContestProblem = computed(() => route.name === "admin contest problem list")
 
 const showMakePublicModal = ref(false)
 const newDisplayID = ref("")
@@ -95,20 +89,11 @@ async function handleMakePublic() {
 </script>
 <template>
   <n-flex>
-    <n-button size="small" secondary type="primary" @click="goEdit">
-      编辑
-    </n-button>
-    <n-button size="small" secondary type="info" @click="goCheck">
-      查看
-    </n-button>
+    <n-button size="small" secondary type="primary" @click="goEdit"> 编辑 </n-button>
+    <n-button size="small" secondary type="info" @click="goCheck"> 查看 </n-button>
     <n-tooltip v-if="isContestProblem">
       <template #trigger>
-        <n-button
-          size="small"
-          secondary
-          type="warning"
-          @click="openMakePublicModal"
-        >
+        <n-button size="small" secondary type="warning" @click="openMakePublicModal">
           公开
         </n-button>
       </template>
@@ -135,9 +120,7 @@ async function handleMakePublic() {
     style="width: 500px"
   >
     <n-space vertical>
-      <p>
-        将竞赛题目转为公开题目后，会创建一个新的公开题目副本，原题目保持不变。
-      </p>
+      <p>将竞赛题目转为公开题目后，会创建一个新的公开题目副本，原题目保持不变。</p>
       <n-form>
         <n-form-item label="新的题目编号" required>
           <n-input
@@ -148,8 +131,7 @@ async function handleMakePublic() {
           />
         </n-form-item>
       </n-form>
-      <n-alert type="info" title="提示：请输入一个未被使用的题目编号">
-      </n-alert>
+      <n-alert type="info" title="提示：请输入一个未被使用的题目编号"> </n-alert>
     </n-space>
     <template #footer>
       <n-flex justify="end">

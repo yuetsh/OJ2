@@ -10,18 +10,14 @@ const props = defineProps<{
 
 const stats = computed(() => {
   const rows = props.titles.map((t) => props.progress[t.id])
-  const read = rows.filter(
-    (p) => p && p.totalSeconds >= TUTORIAL_READ_SECONDS,
-  ).length
+  const read = rows.filter((p) => p && p.totalSeconds >= TUTORIAL_READ_SECONDS).length
   const solved = rows.reduce((n, p) => n + (p?.exerciseSolved ?? 0), 0)
   const total = rows.reduce((n, p) => n + (p?.exerciseTotal ?? 0), 0)
   return { read, solved, total }
 })
 
 const percent = computed(() =>
-  props.titles.length
-    ? Math.round((stats.value.read / props.titles.length) * 100)
-    : 0,
+  props.titles.length ? Math.round((stats.value.read / props.titles.length) * 100) : 0,
 )
 </script>
 
@@ -36,9 +32,7 @@ const percent = computed(() =>
     />
     <n-text depth="3" class="numbers">
       已读 {{ stats.read }}/{{ titles.length }} 课
-      <template v-if="stats.total">
-        · 练一练 {{ stats.solved }}/{{ stats.total }}
-      </template>
+      <template v-if="stats.total"> · 练一练 {{ stats.solved }}/{{ stats.total }} </template>
     </n-text>
   </div>
 </template>

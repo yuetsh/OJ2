@@ -17,9 +17,7 @@ export const useUserStore = defineStore("user", () => {
 
   // 不受伪装影响的真实身份，只用于判断能否切换演示模式。
   // 若这里用被伪装后的 isSuperAdmin，一进入演示模式入口就消失了，退不出来。
-  const realIsSuperAdmin = computed(
-    () => user.value?.adminType === USER_TYPE.SUPER_ADMIN,
-  )
+  const realIsSuperAdmin = computed(() => user.value?.adminType === USER_TYPE.SUPER_ADMIN)
 
   const isAdminRole = computed(
     () =>
@@ -42,9 +40,7 @@ export const useUserStore = defineStore("user", () => {
   )
   const isSuperAdmin = computed(() => !demoMode.value && realIsSuperAdmin.value)
   const hasProblemPermission = computed(
-    () =>
-      !demoMode.value &&
-      user.value?.problemPermission !== PROBLEM_PERMISSION.NONE,
+    () => !demoMode.value && user.value?.problemPermission !== PROBLEM_PERMISSION.NONE,
   )
 
   const canToggleDemoMode = computed(() => realIsSuperAdmin.value)

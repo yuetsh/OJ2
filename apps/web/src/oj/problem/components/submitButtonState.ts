@@ -21,13 +21,7 @@ export function getSubmitButtonState({
   isJudging,
   isCooldown,
 }: SubmitButtonStateInput): SubmitButtonState {
-  const disabled =
-    !isAuthed ||
-    !hasCode ||
-    isFormatting ||
-    isSubmitting ||
-    isJudging ||
-    isCooldown
+  const disabled = !isAuthed || !hasCode || isFormatting || isSubmitting || isJudging || isCooldown
 
   let label = "提交代码"
   if (!isAuthed) {

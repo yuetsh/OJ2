@@ -43,19 +43,10 @@ contentRoutes.get("/announcements", async (c) => {
         realName: schema.userProfile.realName,
       })
       .from(schema.announcement)
-      .innerJoin(
-        schema.user,
-        eq(schema.announcement.createdById, schema.user.id),
-      )
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .innerJoin(schema.user, eq(schema.announcement.createdById, schema.user.id))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(eq(schema.announcement.visible, true))
-      .orderBy(
-        desc(schema.announcement.top),
-        desc(schema.announcement.createTime),
-      )
+      .orderBy(desc(schema.announcement.top), desc(schema.announcement.createTime))
       .limit(limit)
       .offset(offset),
   ])
@@ -87,20 +78,9 @@ contentRoutes.get("/announcements/:id", async (c) => {
     .from(schema.announcement)
     .innerJoin(schema.user, eq(schema.announcement.createdById, schema.user.id))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(
-      and(
-        eq(schema.announcement.id, id),
-        eq(schema.announcement.visible, true),
-      ),
-    )
+    .where(and(eq(schema.announcement.id, id), eq(schema.announcement.visible, true)))
     .limit(1)
-  if (!row)
-    return failure(
-      c,
-      404,
-      "announcement-not-found",
-      "Announcement does not exist",
-    )
+  if (!row) return failure(c, 404, "announcement-not-found", "Announcement does not exist")
   return success(c, {
     id: row.announcement.id,
     title: row.announcement.title,
@@ -132,18 +112,9 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
       })
       .from(schema.message)
       .innerJoin(schema.user, eq(schema.message.senderId, schema.user.id))
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
-      .innerJoin(
-        schema.submission,
-        eq(schema.message.submissionId, schema.submission.id),
-      )
-      .innerJoin(
-        schema.problem,
-        eq(schema.submission.problemId, schema.problem.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .innerJoin(schema.submission, eq(schema.message.submissionId, schema.submission.id))
+      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
       .where(eq(schema.message.recipientId, user.id))
       .orderBy(desc(schema.message.createTime))
       .limit(limit)
@@ -186,29 +157,15 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
  */
 contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
   const user = c.get("user")!
-  const parsed = await parseBody(
-    c,
-    createMessageRequestSchema,
-    "Invalid message payload",
-  )
+  const parsed = await parseBody(c, createMessageRequestSchema, "Invalid message payload")
   if (!parsed.success) return parsed.response
   if (parsed.data.recipientId === user.id)
-    return failure(
-      c,
-      400,
-      "invalid-recipient",
-      "Can not send a message to yourself",
-    )
+    return failure(c, 400, "invalid-recipient", "Can not send a message to yourself")
   const [[recipient], [submission]] = await Promise.all([
     db
       .select({ id: schema.user.id })
       .from(schema.user)
-      .where(
-        and(
-          eq(schema.user.id, parsed.data.recipientId),
-          eq(schema.user.isDisabled, false),
-        ),
-      )
+      .where(and(eq(schema.user.id, parsed.data.recipientId), eq(schema.user.isDisabled, false)))
       .limit(1),
     db
       .select({ id: schema.submission.id })
@@ -216,10 +173,8 @@ contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
       .where(eq(schema.submission.id, parsed.data.submissionId))
       .limit(1),
   ])
-  if (!recipient)
-    return failure(c, 404, "user-not-found", "User does not exist")
-  if (!submission)
-    return failure(c, 404, "submission-not-found", "Submission does not exist")
+  if (!recipient) return failure(c, 404, "user-not-found", "User does not exist")
+  if (!submission) return failure(c, 404, "submission-not-found", "Submission does not exist")
   await db.insert(schema.message).values({
     message: parsed.data.message,
     createTime: new Date().toISOString(),
@@ -234,12 +189,7 @@ async function reactionState(problemId: number, userId: number) {
   const [mine] = await db
     .select({ type: schema.reaction.type })
     .from(schema.reaction)
-    .where(
-      and(
-        eq(schema.reaction.problemId, problemId),
-        eq(schema.reaction.userId, userId),
-      ),
-    )
+    .where(and(eq(schema.reaction.problemId, problemId), eq(schema.reaction.userId, userId)))
     .limit(1)
   if (!mine) return { mine: null, counts: null } satisfies ReactionState
   const rows = await db
@@ -263,20 +213,14 @@ contentRoutes.get("/problems/:id/reaction", requireAuth, async (c) => {
 
 contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(
-    c,
-    setReactionRequestSchema,
-    "Invalid reaction",
-  )
+  const parsed = await parseBody(c, setReactionRequestSchema, "Invalid reaction")
   if (!parsed.success) return parsed.response
   const user = c.get("user")!
   const [[problem], [solved]] = await Promise.all([
     db
       .select({ id: schema.problem.id })
       .from(schema.problem)
-      .where(
-        and(eq(schema.problem.id, problemId), eq(schema.problem.visible, true)),
-      )
+      .where(and(eq(schema.problem.id, problemId), eq(schema.problem.visible, true)))
       .limit(1),
     db
       .select({ id: schema.submission.id })
@@ -285,23 +229,14 @@ contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
         and(
           eq(schema.submission.userId, user.id),
           eq(schema.submission.problemId, problemId),
-          inArray(schema.submission.result, [
-            JudgeStatus.ACCEPTED,
-            JudgeStatus.AST_CHECK_FAILED,
-          ]),
+          inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
         ),
       )
       .limit(1),
   ])
-  if (!problem)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   if (!solved)
-    return failure(
-      c,
-      403,
-      "accepted-submission-required",
-      "An accepted submission is required",
-    )
+    return failure(c, 403, "accepted-submission-required", "An accepted submission is required")
   await db
     .insert(schema.reaction)
     .values({
@@ -321,9 +256,7 @@ contentRoutes.get("/tutorials", async (c) => {
   const rows = await db
     .select({ id: schema.tutorial.id, title: schema.tutorial.title })
     .from(schema.tutorial)
-    .where(
-      and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)),
-    )
+    .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
     .orderBy(asc(schema.tutorial.order))
   return success(c, rows satisfies TutorialSummary[])
 })
@@ -341,8 +274,7 @@ contentRoutes.get("/tutorials/:id", async (c) => {
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!row)
-    return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (!row) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
   return success(c, {
     id: row.tutorial.id,
     title: row.tutorial.title,
@@ -369,10 +301,7 @@ contentRoutes.get("/tutorials/:id", async (c) => {
 contentRoutes.get("/learn/progress", requireAuth, async (c) => {
   const user = c.get("user")!
   const type = c.req.query("type") === "c" ? "c" : "python"
-  const visible = and(
-    eq(schema.tutorial.type, type),
-    eq(schema.tutorial.isPublic, true),
-  )
+  const visible = and(eq(schema.tutorial.type, type), eq(schema.tutorial.isPublic, true))
 
   // 从 tutorial 打底 left join 进度，而不是反过来：没读过的课也要有一行零，
   // 否则目录里「练习 0/5」和「这课没有练习」在前端分不出来
@@ -399,16 +328,12 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
       .select({
         tutorialId: schema.exercise.tutorialId,
         total: count(),
-        solved:
-          sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
-            Number,
-          ),
+        solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
+          Number,
+        ),
       })
       .from(schema.exercise)
-      .innerJoin(
-        schema.tutorial,
-        eq(schema.tutorial.id, schema.exercise.tutorialId),
-      )
+      .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
       .leftJoin(
         schema.exerciseAttempt,
         and(
@@ -448,19 +373,14 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
 contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
   const user = c.get("user")!
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(
-    c,
-    tutorialProgressPingSchema,
-    "Invalid progress payload",
-  )
+  const parsed = await parseBody(c, tutorialProgressPingSchema, "Invalid progress payload")
   if (!parsed.success) return parsed.response
   const [tutorial] = await db
     .select({ id: schema.tutorial.id })
     .from(schema.tutorial)
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!tutorial)
-    return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
 
   const now = new Date().toISOString()
   const { seconds, opened } = parsed.data
@@ -475,10 +395,7 @@ contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
       lastViewedAt: now,
     })
     .onConflictDoUpdate({
-      target: [
-        schema.tutorialProgress.userId,
-        schema.tutorialProgress.tutorialId,
-      ],
+      target: [schema.tutorialProgress.userId, schema.tutorialProgress.tutorialId],
       set: {
         // 累加在库里做，不是「读出来加一下再写回去」：同一个学生开两个标签页
         // 同时上报时，读改写会互相覆盖，时长凭空少掉一半
@@ -503,24 +420,16 @@ contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
 contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
   const user = c.get("user")!
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(
-    c,
-    exerciseAttemptRequestSchema,
-    "Invalid attempt payload",
-  )
+  const parsed = await parseBody(c, exerciseAttemptRequestSchema, "Invalid attempt payload")
   if (!parsed.success) return parsed.response
   // 练习跟着教程走：教程没公开，它底下的练习也不该能上报
   const [exercise] = await db
     .select({ id: schema.exercise.id })
     .from(schema.exercise)
-    .innerJoin(
-      schema.tutorial,
-      eq(schema.tutorial.id, schema.exercise.tutorialId),
-    )
+    .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
     .where(and(eq(schema.exercise.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!exercise)
-    return failure(c, 404, "exercise-not-found", "Exercise does not exist")
+  if (!exercise) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
 
   const now = new Date().toISOString()
   const { correct } = parsed.data
@@ -540,10 +449,7 @@ contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
       solvedAt: correct ? now : null,
     })
     .onConflictDoUpdate({
-      target: [
-        schema.exerciseAttempt.userId,
-        schema.exerciseAttempt.exerciseId,
-      ],
+      target: [schema.exerciseAttempt.userId, schema.exerciseAttempt.exerciseId],
       set: {
         // 一律在库里算，不读出来改了再写回去：两个标签页同时提交会互相覆盖。
         //
@@ -576,8 +482,7 @@ contentRoutes.get("/tutorials/:id/exercises", async (c) => {
     .from(schema.tutorial)
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!tutorial)
-    return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
   const rows = await db
     .select()
     .from(schema.exercise)

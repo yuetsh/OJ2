@@ -8,46 +8,20 @@ import {
   type ProblemSetProgressList,
   type UserBadge,
 } from "@oj2/contract"
-import {
-  and,
-  asc,
-  avg,
-  count,
-  desc,
-  eq,
-  gt,
-  ilike,
-  inArray,
-  ne,
-  or,
-  sql,
-} from "drizzle-orm"
+import { and, asc, avg, count, desc, eq, gt, ilike, inArray, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import {
-  optionalAuth,
-  requireAuth,
-  requireTeacher,
-  type AppEnv,
-} from "../auth/middleware"
+import { optionalAuth, requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { computeProgress } from "../services/problemset"
-import {
-  asFilterValue,
-  asRecord,
-  classPrefixCondition,
-  queryInteger,
-  sampleUser,
-} from "./helpers"
+import { asFilterValue, asRecord, classPrefixCondition, queryInteger, sampleUser } from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
 type ProblemSetRow = typeof schema.problemset.$inferSelect
 
-function progressSummary(
-  progress: typeof schema.problemsetProgress.$inferSelect | undefined,
-) {
+function progressSummary(progress: typeof schema.problemsetProgress.$inferSelect | undefined) {
   return progress
     ? {
         isJoined: true,
@@ -81,10 +55,7 @@ async function problemSetCreators(ids: number[]) {
   return map
 }
 
-function badgeData(
-  badge: typeof schema.problemsetBadge.$inferSelect,
-  earned?: boolean,
-) {
+function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earned?: boolean) {
   return {
     id: badge.id,
     problemSetId: badge.problemsetId,
@@ -103,75 +74,58 @@ function badgeData(
  * 以前是每行 5 条查询（题目数 / 我的进度 / 奖章 / 已获奖章 / 创建者），
  * limit 最大 250 就是 1250 次往返。这里固定 5 条，与行数无关。
  */
-async function serializeProblemSets(
-  rows: ProblemSetRow[],
-  userId?: number,
-  includeBadges = false,
-) {
+async function serializeProblemSets(rows: ProblemSetRow[], userId?: number, includeBadges = false) {
   if (rows.length === 0) return []
   const ids = rows.map((row) => row.id)
-  const [problemCounts, progresses, badges, earnedRows, creators] =
-    await Promise.all([
-      db
-        .select({
-          problemsetId: schema.problemsetProblem.problemsetId,
-          value: count(),
-        })
-        .from(schema.problemsetProblem)
-        .where(inArray(schema.problemsetProblem.problemsetId, ids))
-        .groupBy(schema.problemsetProblem.problemsetId),
-      userId
-        ? db
-            .select()
-            .from(schema.problemsetProgress)
-            .where(
-              and(
-                inArray(schema.problemsetProgress.problemsetId, ids),
-                eq(schema.problemsetProgress.userId, userId),
-              ),
-            )
-        : Promise.resolve(
-            [] as (typeof schema.problemsetProgress.$inferSelect)[],
-          ),
-      includeBadges
-        ? db
-            .select()
-            .from(schema.problemsetBadge)
-            .where(inArray(schema.problemsetBadge.problemsetId, ids))
-            .orderBy(asc(schema.problemsetBadge.id))
-        : Promise.resolve([] as (typeof schema.problemsetBadge.$inferSelect)[]),
-      includeBadges && userId
-        ? db
-            .select({ id: schema.userBadge.badgeId })
-            .from(schema.userBadge)
-            .innerJoin(
-              schema.problemsetBadge,
-              eq(schema.userBadge.badgeId, schema.problemsetBadge.id),
-            )
-            .where(
-              and(
-                eq(schema.userBadge.userId, userId),
-                inArray(schema.problemsetBadge.problemsetId, ids),
-              ),
-            )
-        : Promise.resolve([] as { id: number }[]),
-      problemSetCreators([...new Set(rows.map((row) => row.createdById))]),
-    ])
-  const countBySet = new Map(
-    problemCounts.map((item) => [item.problemsetId, item.value]),
-  )
-  const progressBySet = new Map(
-    progresses.map((item) => [item.problemsetId, item]),
-  )
-  const badgesBySet = new Map<
-    number,
-    (typeof schema.problemsetBadge.$inferSelect)[]
-  >()
+  const [problemCounts, progresses, badges, earnedRows, creators] = await Promise.all([
+    db
+      .select({
+        problemsetId: schema.problemsetProblem.problemsetId,
+        value: count(),
+      })
+      .from(schema.problemsetProblem)
+      .where(inArray(schema.problemsetProblem.problemsetId, ids))
+      .groupBy(schema.problemsetProblem.problemsetId),
+    userId
+      ? db
+          .select()
+          .from(schema.problemsetProgress)
+          .where(
+            and(
+              inArray(schema.problemsetProgress.problemsetId, ids),
+              eq(schema.problemsetProgress.userId, userId),
+            ),
+          )
+      : Promise.resolve([] as (typeof schema.problemsetProgress.$inferSelect)[]),
+    includeBadges
+      ? db
+          .select()
+          .from(schema.problemsetBadge)
+          .where(inArray(schema.problemsetBadge.problemsetId, ids))
+          .orderBy(asc(schema.problemsetBadge.id))
+      : Promise.resolve([] as (typeof schema.problemsetBadge.$inferSelect)[]),
+    includeBadges && userId
+      ? db
+          .select({ id: schema.userBadge.badgeId })
+          .from(schema.userBadge)
+          .innerJoin(
+            schema.problemsetBadge,
+            eq(schema.userBadge.badgeId, schema.problemsetBadge.id),
+          )
+          .where(
+            and(
+              eq(schema.userBadge.userId, userId),
+              inArray(schema.problemsetBadge.problemsetId, ids),
+            ),
+          )
+      : Promise.resolve([] as { id: number }[]),
+    problemSetCreators([...new Set(rows.map((row) => row.createdById))]),
+  ])
+  const countBySet = new Map(problemCounts.map((item) => [item.problemsetId, item.value]))
+  const progressBySet = new Map(progresses.map((item) => [item.problemsetId, item]))
+  const badgesBySet = new Map<number, (typeof schema.problemsetBadge.$inferSelect)[]>()
   for (const badge of badges)
-    badgesBySet.set(badge.problemsetId, [
-      ...(badgesBySet.get(badge.problemsetId) ?? []),
-      badge,
-    ])
+    badgesBySet.set(badge.problemsetId, [...(badgesBySet.get(badge.problemsetId) ?? []), badge])
   const earned = new Set(earnedRows.map((item) => item.id))
   return rows.map((row) => {
     const progress = progressBySet.get(row.id)
@@ -180,8 +134,7 @@ async function serializeProblemSets(
       title: row.title,
       description: row.description,
       createdBy:
-        creators.get(row.createdById) ??
-        sampleUser({ id: row.createdById, username: "" }, null),
+        creators.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
       createTime: row.createTime,
       lastUpdateTime: row.lastUpdateTime,
       difficulty: row.difficulty,
@@ -192,9 +145,7 @@ async function serializeProblemSets(
       completedCount: progress?.completedProblemsCount ?? 0,
       userProgress: progressSummary(progress),
       badges: includeBadges
-        ? (badgesBySet.get(row.id) ?? []).map((badge) =>
-            badgeData(badge, earned.has(badge.id)),
-          )
+        ? (badgesBySet.get(row.id) ?? []).map((badge) => badgeData(badge, earned.has(badge.id)))
         : undefined,
     } satisfies ProblemSet
   })
@@ -203,10 +154,7 @@ async function serializeProblemSets(
 problemsetRoutes.get("/problem-sets", optionalAuth, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const filters = [
-    eq(schema.problemset.visible, true),
-    ne(schema.problemset.status, "draft"),
-  ]
+  const filters = [eq(schema.problemset.visible, true), ne(schema.problemset.status, "draft")]
   const keyword = c.req.query("keyword")?.trim()
   const difficulty = c.req.query("difficulty")?.trim()
   const status = c.req.query("status")?.trim()
@@ -217,8 +165,7 @@ problemsetRoutes.get("/problem-sets", optionalAuth, async (c) => {
         ilike(schema.problemset.description, `%${keyword}%`),
       )!,
     )
-  if (difficulty)
-    filters.push(eq(schema.problemset.difficulty, asFilterValue(difficulty)))
+  if (difficulty) filters.push(eq(schema.problemset.difficulty, asFilterValue(difficulty)))
   if (status) filters.push(eq(schema.problemset.status, asFilterValue(status)))
   const where = and(...filters)
   const [totalRows, rows] = await Promise.all([
@@ -284,15 +231,9 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
       difficulty: schema.problem.difficulty,
     })
     .from(schema.problemsetProblem)
-    .innerJoin(
-      schema.problem,
-      eq(schema.problemsetProblem.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
     .where(eq(schema.problemsetProblem.problemsetId, id))
-    .orderBy(
-      asc(schema.problemsetProblem.order),
-      asc(schema.problemsetProblem.id),
-    )
+    .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id))
   const progressRows = c.get("user")
     ? await db
         .select({ detail: schema.problemsetProgress.progressDetail })
@@ -348,11 +289,7 @@ async function recomputeProgress(
 }
 
 problemsetRoutes.post("/problem-set-progress", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    joinProblemSetRequestSchema,
-    "Invalid problem set",
-  )
+  const parsed = await parseBody(c, joinProblemSetRequestSchema, "Invalid problem set")
   if (!parsed.success) return parsed.response
   const user = c.get("user")!
   const [problemSet] = await db
@@ -402,17 +339,11 @@ problemsetRoutes.post("/problem-set-progress", requireAuth, async (c) => {
 problemsetRoutes.get("/users/:username/badges", optionalAuth, async (c) => {
   const requested = c.req.param("username")
   const username = requested === "me" ? c.get("user")?.username : requested
-  if (!username)
-    return failure(c, 401, "login-required", "Authentication required")
+  if (!username) return failure(c, 401, "login-required", "Authentication required")
   const [target] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.username, username),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(eq(schema.user.username, username), eq(schema.user.isDisabled, false)))
     .limit(1)
   if (!target) return failure(c, 404, "user-not-found", "用户不存在")
   const rows = await db
@@ -422,14 +353,8 @@ problemsetRoutes.get("/users/:username/badges", optionalAuth, async (c) => {
       problemSet: schema.problemset,
     })
     .from(schema.userBadge)
-    .innerJoin(
-      schema.problemsetBadge,
-      eq(schema.userBadge.badgeId, schema.problemsetBadge.id),
-    )
-    .innerJoin(
-      schema.problemset,
-      eq(schema.problemsetBadge.problemsetId, schema.problemset.id),
-    )
+    .innerJoin(schema.problemsetBadge, eq(schema.userBadge.badgeId, schema.problemsetBadge.id))
+    .innerJoin(schema.problemset, eq(schema.problemsetBadge.problemsetId, schema.problemset.id))
     .where(eq(schema.userBadge.userId, target.id))
     .orderBy(desc(schema.userBadge.earnedTime))
   return success(
@@ -471,145 +396,117 @@ problemsetRoutes.get("/problem-sets/:id/badges", async (c) => {
   )
 })
 
-problemsetRoutes.get(
-  "/problem-sets/:id/user-progress",
-  requireTeacher,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const [problemSet] = await db
+problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const [problemSet] = await db
+    .select({
+      id: schema.problemset.id,
+      createdById: schema.problemset.createdById,
+    })
+    .from(schema.problemset)
+    .where(
+      and(
+        eq(schema.problemset.id, id),
+        eq(schema.problemset.visible, true),
+        ne(schema.problemset.status, "draft"),
+      ),
+    )
+    .limit(1)
+  // 归属校验，和后台那条同类接口（admin/problemset.ts 的 loadOwned）一致：超管放行，
+  // 其余老师只能看自己建的题单。少了这一道，任何 Teacher Admin 都能读到别人班的名单。
+  // 越权报「不存在」，不泄露题单存在与否。
+  const user = c.get("user")!
+  if (!problemSet || (user.adminType !== "Super Admin" && problemSet.createdById !== user.id)) {
+    return failure(c, 404, "problem-set-not-found", "题单不存在")
+  }
+  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+  const className = c.req.query("className")?.trim()
+  const completion = c.req.query("completionStatus")?.trim()
+  const filters = [eq(schema.problemsetProgress.problemsetId, id)]
+  // 只填数字（251）当班级号补上 ks；班级按 classPrefixCondition 匹配，
+  // 否则 251 会把 2511 班也算进来。别的输入照旧按用户名包含
+  if (className) {
+    const classPrefix = /^\d+$/.test(className) ? `ks${className}` : className
+    filters.push(classPrefixCondition(classPrefix) ?? ilike(schema.user.username, `%${className}%`))
+  }
+  if (completion === "completed") filters.push(eq(schema.problemsetProgress.isCompleted, true))
+  else if (completion === "in_progress")
+    filters.push(
+      and(
+        eq(schema.problemsetProgress.isCompleted, false),
+        gt(schema.problemsetProgress.completedProblemsCount, 0),
+      )!,
+    )
+  else if (completion === "not_started")
+    filters.push(eq(schema.problemsetProgress.completedProblemsCount, 0))
+  const where = and(...filters)
+  const [statsRows, rows, problemRows] = await Promise.all([
+    db
       .select({
-        id: schema.problemset.id,
-        createdById: schema.problemset.createdById,
+        total: count(),
+        completed: sql<number>`count(*) filter (where ${schema.problemsetProgress.isCompleted})::int`,
+        avgProgress: avg(schema.problemsetProgress.progressPercentage),
       })
-      .from(schema.problemset)
-      .where(
-        and(
-          eq(schema.problemset.id, id),
-          eq(schema.problemset.visible, true),
-          ne(schema.problemset.status, "draft"),
+      .from(schema.problemsetProgress)
+      .innerJoin(schema.user, eq(schema.problemsetProgress.userId, schema.user.id))
+      .where(where),
+    db
+      .select({
+        progress: schema.problemsetProgress,
+        user: schema.user,
+        realName: schema.userProfile.realName,
+      })
+      .from(schema.problemsetProgress)
+      .innerJoin(schema.user, eq(schema.problemsetProgress.userId, schema.user.id))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .where(where)
+      .orderBy(
+        desc(schema.problemsetProgress.isCompleted),
+        desc(schema.problemsetProgress.progressPercentage),
+        asc(schema.problemsetProgress.joinTime),
+      )
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({
+        id: schema.problem.id,
+        _id: schema.problem.displayId,
+        title: schema.problem.title,
+      })
+      .from(schema.problemsetProblem)
+      .innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
+      .where(eq(schema.problemsetProblem.problemsetId, id))
+      .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id)),
+  ])
+  const problemMap = new Map(problemRows.map((problem) => [String(problem.id), problem]))
+  const results = rows.map(
+    ({ progress, user: progressUser, realName }) =>
+      ({
+        id: progress.id,
+        problemSetId: progress.problemsetId,
+        user: sampleUser(progressUser, realName),
+        joinTime: progress.joinTime,
+        completeTime: progress.completeTime,
+        isCompleted: progress.isCompleted,
+        progressPercentage: progress.progressPercentage,
+        completedProblemsCount: progress.completedProblemsCount,
+        totalProblemsCount: progress.totalProblemsCount,
+        totalScore: progress.totalScore,
+        completedProblems: Object.keys(asRecord(progress.progressDetail)).flatMap(
+          (key) => problemMap.get(key) ?? [],
         ),
-      )
-      .limit(1)
-    // 归属校验，和后台那条同类接口（admin/problemset.ts 的 loadOwned）一致：超管放行，
-    // 其余老师只能看自己建的题单。少了这一道，任何 Teacher Admin 都能读到别人班的名单。
-    // 越权报「不存在」，不泄露题单存在与否。
-    const user = c.get("user")!
-    if (
-      !problemSet ||
-      (user.adminType !== "Super Admin" && problemSet.createdById !== user.id)
-    ) {
-      return failure(c, 404, "problem-set-not-found", "题单不存在")
-    }
-    const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-    const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-    const className = c.req.query("className")?.trim()
-    const completion = c.req.query("completionStatus")?.trim()
-    const filters = [eq(schema.problemsetProgress.problemsetId, id)]
-    // 只填数字（251）当班级号补上 ks；班级按 classPrefixCondition 匹配，
-    // 否则 251 会把 2511 班也算进来。别的输入照旧按用户名包含
-    if (className) {
-      const classPrefix = /^\d+$/.test(className) ? `ks${className}` : className
-      filters.push(
-        classPrefixCondition(classPrefix) ??
-          ilike(schema.user.username, `%${className}%`),
-      )
-    }
-    if (completion === "completed")
-      filters.push(eq(schema.problemsetProgress.isCompleted, true))
-    else if (completion === "in_progress")
-      filters.push(
-        and(
-          eq(schema.problemsetProgress.isCompleted, false),
-          gt(schema.problemsetProgress.completedProblemsCount, 0),
-        )!,
-      )
-    else if (completion === "not_started")
-      filters.push(eq(schema.problemsetProgress.completedProblemsCount, 0))
-    const where = and(...filters)
-    const [statsRows, rows, problemRows] = await Promise.all([
-      db
-        .select({
-          total: count(),
-          completed: sql<number>`count(*) filter (where ${schema.problemsetProgress.isCompleted})::int`,
-          avgProgress: avg(schema.problemsetProgress.progressPercentage),
-        })
-        .from(schema.problemsetProgress)
-        .innerJoin(
-          schema.user,
-          eq(schema.problemsetProgress.userId, schema.user.id),
-        )
-        .where(where),
-      db
-        .select({
-          progress: schema.problemsetProgress,
-          user: schema.user,
-          realName: schema.userProfile.realName,
-        })
-        .from(schema.problemsetProgress)
-        .innerJoin(
-          schema.user,
-          eq(schema.problemsetProgress.userId, schema.user.id),
-        )
-        .leftJoin(
-          schema.userProfile,
-          eq(schema.userProfile.userId, schema.user.id),
-        )
-        .where(where)
-        .orderBy(
-          desc(schema.problemsetProgress.isCompleted),
-          desc(schema.problemsetProgress.progressPercentage),
-          asc(schema.problemsetProgress.joinTime),
-        )
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({
-          id: schema.problem.id,
-          _id: schema.problem.displayId,
-          title: schema.problem.title,
-        })
-        .from(schema.problemsetProblem)
-        .innerJoin(
-          schema.problem,
-          eq(schema.problemsetProblem.problemId, schema.problem.id),
-        )
-        .where(eq(schema.problemsetProblem.problemsetId, id))
-        .orderBy(
-          asc(schema.problemsetProblem.order),
-          asc(schema.problemsetProblem.id),
-        ),
-    ])
-    const problemMap = new Map(
-      problemRows.map((problem) => [String(problem.id), problem]),
-    )
-    const results = rows.map(
-      ({ progress, user: progressUser, realName }) =>
-        ({
-          id: progress.id,
-          problemSetId: progress.problemsetId,
-          user: sampleUser(progressUser, realName),
-          joinTime: progress.joinTime,
-          completeTime: progress.completeTime,
-          isCompleted: progress.isCompleted,
-          progressPercentage: progress.progressPercentage,
-          completedProblemsCount: progress.completedProblemsCount,
-          totalProblemsCount: progress.totalProblemsCount,
-          totalScore: progress.totalScore,
-          completedProblems: Object.keys(
-            asRecord(progress.progressDetail),
-          ).flatMap((key) => problemMap.get(key) ?? []),
-        }) satisfies ProblemSetProgress,
-    )
-    const stats = statsRows[0]
-    return success(c, {
-      results,
+      }) satisfies ProblemSetProgress,
+  )
+  const stats = statsRows[0]
+  return success(c, {
+    results,
+    total: stats?.total ?? 0,
+    statistics: {
       total: stats?.total ?? 0,
-      statistics: {
-        total: stats?.total ?? 0,
-        completed: stats?.completed ?? 0,
-        avgProgress: Number(stats?.avgProgress ?? 0),
-      },
-      problems: problemRows,
-    } satisfies ProblemSetProgressList)
-  },
-)
+      completed: stats?.completed ?? 0,
+      avgProgress: Number(stats?.avgProgress ?? 0),
+    },
+    problems: problemRows,
+  } satisfies ProblemSetProgressList)
+})

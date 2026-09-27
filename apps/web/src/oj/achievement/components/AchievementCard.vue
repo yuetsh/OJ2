@@ -12,14 +12,10 @@ const rarityTextColor = useRarityColor()
 
 // 隐藏且未解锁：后端已把名称/描述/图标和条件三件套都遮成 ??? 和 null，
 // 这里只负责不要把 null 渲染出来，也不要画出会泄露门槛的进度条
-const masked = computed(
-  () => props.achievement.hidden && !props.achievement.unlocked,
-)
+const masked = computed(() => props.achievement.hidden && !props.achievement.unlocked)
 
 // 获得率低于 5% 的加稀有闪光边框
-const isRare = computed(
-  () => props.achievement.unlockRate > 0 && props.achievement.unlockRate < 5,
-)
+const isRare = computed(() => props.achievement.unlockRate > 0 && props.achievement.unlockRate < 5)
 
 // 只有"越多越好"的成就画进度条。lte 类（如最短 AC 代码 ≤ 50 字符）
 // 画成百分比毫无意义，改成直接显示当前最好成绩
@@ -88,9 +84,7 @@ const unlockDate = computed(() => {
       <n-flex align="center" :size="8" :wrap="false">
         <template v-if="achievement.unlocked">
           <n-text depth="3" class="nowrap">{{ unlockDate }}</n-text>
-          <n-text depth="3" class="nowrap">
-            仅 {{ achievement.unlockRate }}% 的人获得
-          </n-text>
+          <n-text depth="3" class="nowrap"> 仅 {{ achievement.unlockRate }}% 的人获得 </n-text>
         </template>
 
         <template v-else-if="showProgressBar">
@@ -107,17 +101,13 @@ const unlockDate = computed(() => {
         </template>
 
         <template v-else-if="showBestSoFar">
-          <n-text depth="3" class="nowrap">
-            目标 ≤ {{ achievement.threshold }}
-          </n-text>
+          <n-text depth="3" class="nowrap"> 目标 ≤ {{ achievement.threshold }} </n-text>
           <n-text v-if="achievement.progress !== null" depth="3" class="nowrap">
             当前最好 {{ achievement.progress }}
           </n-text>
         </template>
 
-        <n-text v-else depth="3" class="nowrap">
-          仅 {{ achievement.unlockRate }}% 的人获得
-        </n-text>
+        <n-text v-else depth="3" class="nowrap"> 仅 {{ achievement.unlockRate }}% 的人获得 </n-text>
       </n-flex>
     </n-thing>
   </n-card>

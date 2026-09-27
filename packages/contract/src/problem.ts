@@ -148,10 +148,7 @@ const C_NODE_TARGETS = {
   include: { label: "#include 指令", node: "preproc_include" },
 } satisfies Record<string, AstNodeTarget>
 
-export const AST_NODE_TARGETS_BY_LANGUAGE: Record<
-  string,
-  Record<string, AstNodeTarget>
-> = {
+export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNodeTarget>> = {
   C: C_NODE_TARGETS,
   /**
    * tree-sitter-cpp 继承 tree-sitter-c 的语法，C 那 14 条在 C++ 树里逐个实测通用，
@@ -253,10 +250,7 @@ const C_OPERATOR_TARGETS = {
   "|": "|",
 }
 
-export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<
-  string,
-  Record<string, string>
-> = {
+export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<string, Record<string, string>> = {
   C: C_OPERATOR_TARGETS,
   // `<<` / `>>` 对 C++ 主要是 cout/cin 的流运算符（位移是同一个 token）
   "C++": { ...C_OPERATOR_TARGETS, "<<": "<<", ">>": ">>" },
@@ -295,12 +289,11 @@ export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<
 export const AST_SUPPORTED_LANGUAGES = Object.keys(AST_NODE_TARGETS_BY_LANGUAGE)
 
 /** 全语言的节点中文名并集，只给拿不到语言的场合做回落。有语言一律走 astNodeLabel() */
-export const AST_NODE_TARGET_LABELS: Record<string, string> =
-  Object.fromEntries(
-    Object.values(AST_NODE_TARGETS_BY_LANGUAGE).flatMap((table) =>
-      Object.entries(table).map(([target, entry]) => [target, entry.label]),
-    ),
-  )
+export const AST_NODE_TARGET_LABELS: Record<string, string> = Object.fromEntries(
+  Object.values(AST_NODE_TARGETS_BY_LANGUAGE).flatMap((table) =>
+    Object.entries(table).map(([target, entry]) => [target, entry.label]),
+  ),
+)
 
 export function astNodeLabel(target: string, language?: string): string {
   const table = language ? AST_NODE_TARGETS_BY_LANGUAGE[language] : undefined
@@ -321,11 +314,7 @@ export function astTargetNodeType(target: string, language: string): string {
 }
 
 export function astOperatorLabel(target: string, language?: string): string {
-  return (
-    (language
-      ? AST_OPERATOR_TARGETS_BY_LANGUAGE[language]?.[target]
-      : undefined) ?? target
-  )
+  return (language ? AST_OPERATOR_TARGETS_BY_LANGUAGE[language]?.[target] : undefined) ?? target
 }
 
 /**
@@ -343,9 +332,7 @@ export function astRuleIsMeaningful(rule: {
   max?: number
 }): boolean {
   if (!rule.engine.startsWith("count")) return true
-  return (
-    rule.exact !== undefined || rule.min !== undefined || rule.max !== undefined
-  )
+  return rule.exact !== undefined || rule.min !== undefined || rule.max !== undefined
 }
 
 /**
@@ -364,10 +351,7 @@ export const astRequirementSchema = z.object({
 })
 
 /** 按语言分组，与 astRulesSchema 同一套键 */
-export const astRequirementsSchema = z.record(
-  z.string(),
-  z.array(astRequirementSchema),
-)
+export const astRequirementsSchema = z.record(z.string(), z.array(astRequirementSchema))
 
 export const problemDetailSchema = z.object({
   id: z.number().int(),

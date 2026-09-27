@@ -33,8 +33,7 @@ function submit() {
   if (selected.value.size === 0 || correct.value) return
   const answer = new Set(data.value.answer)
   const sel = selected.value
-  const isEqual =
-    sel.size === answer.size && [...sel].every((v) => answer.has(v))
+  const isEqual = sel.size === answer.size && [...sel].every((v) => answer.has(v))
   emit("attempt", { correct: isEqual, answer: describe(sel) })
   if (isEqual) {
     correct.value = true
@@ -105,9 +104,7 @@ function optionType(idx: number): "default" | "primary" | "success" {
         @click="select(idx)"
       >
         <template #icon>
-          <span style="font-weight: 700">{{
-            String.fromCharCode(65 + idx)
-          }}</span>
+          <span style="font-weight: 700">{{ String.fromCharCode(65 + idx) }}</span>
         </template>
         {{ opt }}
       </n-button>
@@ -116,18 +113,12 @@ function optionType(idx: number): "default" | "primary" | "success" {
     <n-alert
       v-if="correct || wrong || partial"
       :type="correct ? 'success' : partial ? 'warning' : 'error'"
-      :title="
-        correct ? '正确！' : partial ? '部分正确，请重试' : '选择有误，请重试'
-      "
+      :title="correct ? '正确！' : partial ? '部分正确，请重试' : '选择有误，请重试'"
       style="margin-top: 12px"
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button
-        type="primary"
-        :disabled="selected.size === 0 || correct"
-        @click="submit"
-      >
+      <n-button type="primary" :disabled="selected.size === 0 || correct" @click="submit">
         提交
       </n-button>
       <n-button @click="reset">重置</n-button>

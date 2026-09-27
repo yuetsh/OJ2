@@ -21,9 +21,7 @@ defineEmits<Emits>()
   <div>
     <n-flex justify="space-between" align="center" style="margin-bottom: 16px">
       <h3>题目列表</h3>
-      <n-button type="primary" @click="$emit('add-problem')">
-        添加题目
-      </n-button>
+      <n-button type="primary" @click="$emit('add-problem')"> 添加题目 </n-button>
     </n-flex>
     <n-data-table
       :columns="[

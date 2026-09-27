@@ -36,9 +36,7 @@ export async function parseBody<S extends z.ZodType>(
   c: Context,
   schema: S,
   message?: string,
-): Promise<
-  { success: true; data: z.output<S> } | { success: false; response: Response }
-> {
+): Promise<{ success: true; data: z.output<S> } | { success: false; response: Response }> {
   const parsed = await readJson(c, schema)
   if (parsed.success) return { success: true, data: parsed.data }
   return {

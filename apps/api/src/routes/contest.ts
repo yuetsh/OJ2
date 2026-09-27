@@ -9,18 +9,7 @@ import {
   type ProblemDetail,
   type ProblemListItem,
 } from "@oj2/contract"
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  lte,
-  sql,
-} from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, requireAuth } from "../auth/middleware"
@@ -38,11 +27,7 @@ import {
   requireContestAccess,
   type ContestEnv,
 } from "../services/contest"
-import {
-  countAttempt,
-  lockoutRemaining,
-  type AttemptRule,
-} from "../services/throttling"
+import { countAttempt, lockoutRemaining, type AttemptRule } from "../services/throttling"
 import { asRecord, publicTemplates, queryInteger, sampleUser } from "./helpers"
 
 export const contestRoutes = new Hono<ContestEnv>()
@@ -98,12 +83,7 @@ contestRoutes.get("/contests", async (c) => {
   if (status === "1") filters.push(gte(schema.contest.startTime, now))
   else if (status === "-1") filters.push(lte(schema.contest.endTime, now))
   else if (status === "0")
-    filters.push(
-      and(
-        lte(schema.contest.startTime, now),
-        gte(schema.contest.endTime, now),
-      )!,
-    )
+    filters.push(and(lte(schema.contest.startTime, now), gte(schema.contest.endTime, now))!)
   const where = and(...filters)
   const [totalRow, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.contest).where(where),
@@ -120,8 +100,7 @@ contestRoutes.get("/contests", async (c) => {
     results: rows.map((row) =>
       serializeContest(
         row,
-        byId.get(row.createdById) ??
-          sampleUser({ id: row.createdById, username: "" }, null),
+        byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
       ),
     ),
     total: totalRow[0]?.value ?? 0,
@@ -135,15 +114,13 @@ contestRoutes.get("/contests/:id", optionalAuth, async (c) => {
     c.get("user"),
     queryInteger(c.req.param("id"), 0, { min: 1 }),
   )
-  if (!contest)
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
   const byId = await creators([contest.createdById])
   return success(
     c,
     serializeContest(
       contest,
-      byId.get(contest.createdById) ??
-        sampleUser({ id: contest.createdById, username: "" }, null),
+      byId.get(contest.createdById) ?? sampleUser({ id: contest.createdById, username: "" }, null),
       true,
     ),
   )
@@ -158,11 +135,7 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
   )
   if (!contest || !contest.password)
     return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const parsed = await parseBody(
-    c,
-    contestPasswordRequestSchema,
-    "Password is required",
-  )
+  const parsed = await parseBody(c, contestPasswordRequestSchema, "Password is required")
   if (!parsed.success) return parsed.response
   // 比赛密码往往就是几位数字，不限的话一个脚本几分钟就能扫完。
   // 按「人 × 比赛」计失败次数：猜错的是自己，锁的也只是自己进这一场。
@@ -178,12 +151,7 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
   }
   if (!checkContestPassword(parsed.data.password, contest.password)) {
     await countAttempt(attemptKey, CONTEST_PASSWORD_RULE)
-    return failure(
-      c,
-      403,
-      "wrong-password",
-      "Wrong password or password expired",
-    )
+    return failure(c, 403, "wrong-password", "Wrong password or password expired")
   }
   await setContestPassword(c, contest.id, parsed.data.password)
   return success(c, true)
@@ -234,14 +202,10 @@ async function contestProblemTags(problemIds: number[]) {
       name: schema.problemTag.name,
     })
     .from(schema.problemTags)
-    .innerJoin(
-      schema.problemTag,
-      eq(schema.problemTags.problemtagId, schema.problemTag.id),
-    )
+    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(inArray(schema.problemTags.problemId, problemIds))
   const map = new Map<number, string[]>()
-  for (const row of rows)
-    map.set(row.problemId, [...(map.get(row.problemId) ?? []), row.name])
+  for (const row of rows) map.set(row.problemId, [...(map.get(row.problemId) ?? []), row.name])
   return map
 }
 
@@ -259,16 +223,8 @@ contestRoutes.get(
       })
       .from(schema.problem)
       .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
-      .where(
-        and(
-          eq(schema.problem.contestId, contest.id),
-          eq(schema.problem.visible, true),
-        ),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .where(and(eq(schema.problem.contestId, contest.id), eq(schema.problem.visible, true)))
       .orderBy(asc(schema.problem.displayId))
     const tags = await contestProblemTags(rows.map((row) => row.problem.id))
     const allowed = contestDetailsAllowed(c.get("user"), contest)
@@ -311,10 +267,7 @@ contestRoutes.get(
       })
       .from(schema.problem)
       .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(
         and(
           eq(schema.problem.contestId, contest.id),
@@ -323,8 +276,7 @@ contestRoutes.get(
         ),
       )
       .limit(1)
-    if (!row)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
+    if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
     const tags = await contestProblemTags([row.problem.id])
     const allowed = contestDetailsAllowed(c.get("user"), contest)
     const statuses = await contestProblemStatuses(c.get("user")?.id)
@@ -358,9 +310,7 @@ contestRoutes.get(
       allowFlowchart: row.problem.allowFlowchart,
       showFlowchart: row.problem.showFlowchart,
       mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
-      flowchartData: row.problem.allowFlowchart
-        ? null
-        : asRecord(row.problem.flowchartData),
+      flowchartData: row.problem.allowFlowchart ? null : asRecord(row.problem.flowchartData),
       flowchartHint: row.problem.flowchartHint,
       sqlConfig: row.problem.sqlConfig,
       sqlDisplay: row.problem.sqlDisplay,
@@ -370,72 +320,58 @@ contestRoutes.get(
   },
 )
 
-contestRoutes.get(
-  "/contests/:id/rank",
-  optionalAuth,
-  requireContestAccess("ranks"),
-  async (c) => {
-    const contest = c.get("contest")!
-    const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-    const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-    const where = and(
-      eq(schema.acmContestRank.contestId, contest.id),
-      inArray(schema.user.adminType, [...STUDENT_ROLES]),
-      eq(schema.user.isDisabled, false),
-    )
-    const [totalRows, rows] = await Promise.all([
-      db
-        .select({ value: count() })
-        .from(schema.acmContestRank)
-        .innerJoin(
-          schema.user,
-          eq(schema.acmContestRank.userId, schema.user.id),
-        )
-        .where(where),
-      db
-        .select({
-          rank: schema.acmContestRank,
-          user: schema.user,
-          realName: schema.userProfile.realName,
-        })
-        .from(schema.acmContestRank)
-        .innerJoin(
-          schema.user,
-          eq(schema.acmContestRank.userId, schema.user.id),
-        )
-        .leftJoin(
-          schema.userProfile,
-          eq(schema.userProfile.userId, schema.user.id),
-        )
-        .where(where)
-        // 末尾的 id 是给排序兜全序用的：同 AC 数同罚时前两列分不出先后，而这条列表是
-        // limit/offset 翻页的，行序不稳定就意味着同一个人在第 2 页出现两次、另一个人
-        // 从此消失。id 本身不参与名次，只保证同分的人每次都按同一个顺序排
-        .orderBy(
-          desc(schema.acmContestRank.acceptedNumber),
-          asc(schema.acmContestRank.totalTime),
-          asc(schema.acmContestRank.id),
-        )
-        .limit(limit)
-        .offset(offset),
-    ])
-    const admin = isContestAdmin(c.get("user"), contest)
-    return success(c, {
-      results: rows.map(
-        ({ rank, user, realName }) =>
-          ({
-            id: rank.id,
-            // 唯一显式打开真名的地方，对齐旧后端 contest/serializers.py:84
-            // `UsernameSerializer(obj.user, need_real_name=self.is_contest_admin)`
-            user: sampleUser(user, realName, { includeRealName: admin }),
-            submissionNumber: rank.submissionNumber,
-            acceptedNumber: rank.acceptedNumber,
-            totalTime: rank.totalTime,
-            submissionInfo: rank.submissionInfo,
-            contestId: rank.contestId,
-          }) satisfies ContestRankItem,
-      ),
-      total: totalRows[0]?.value ?? 0,
-    } satisfies ContestRank)
-  },
-)
+contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("ranks"), async (c) => {
+  const contest = c.get("contest")!
+  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+  const where = and(
+    eq(schema.acmContestRank.contestId, contest.id),
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
+    eq(schema.user.isDisabled, false),
+  )
+  const [totalRows, rows] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(schema.acmContestRank)
+      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
+      .where(where),
+    db
+      .select({
+        rank: schema.acmContestRank,
+        user: schema.user,
+        realName: schema.userProfile.realName,
+      })
+      .from(schema.acmContestRank)
+      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .where(where)
+      // 末尾的 id 是给排序兜全序用的：同 AC 数同罚时前两列分不出先后，而这条列表是
+      // limit/offset 翻页的，行序不稳定就意味着同一个人在第 2 页出现两次、另一个人
+      // 从此消失。id 本身不参与名次，只保证同分的人每次都按同一个顺序排
+      .orderBy(
+        desc(schema.acmContestRank.acceptedNumber),
+        asc(schema.acmContestRank.totalTime),
+        asc(schema.acmContestRank.id),
+      )
+      .limit(limit)
+      .offset(offset),
+  ])
+  const admin = isContestAdmin(c.get("user"), contest)
+  return success(c, {
+    results: rows.map(
+      ({ rank, user, realName }) =>
+        ({
+          id: rank.id,
+          // 唯一显式打开真名的地方，对齐旧后端 contest/serializers.py:84
+          // `UsernameSerializer(obj.user, need_real_name=self.is_contest_admin)`
+          user: sampleUser(user, realName, { includeRealName: admin }),
+          submissionNumber: rank.submissionNumber,
+          acceptedNumber: rank.acceptedNumber,
+          totalTime: rank.totalTime,
+          submissionInfo: rank.submissionInfo,
+          contestId: rank.contestId,
+        }) satisfies ContestRankItem,
+    ),
+    total: totalRows[0]?.value ?? 0,
+  } satisfies ContestRank)
+})

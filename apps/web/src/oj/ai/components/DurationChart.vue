@@ -1,9 +1,7 @@
 <template>
   <n-card :title="title" size="small" v-if="show">
     <template #header-extra>
-      <n-text depth="3" style="font-size: 12px">
-        做题量和提交质量的变化
-      </n-text>
+      <n-text depth="3" style="font-size: 12px"> 做题量和提交质量的变化 </n-text>
     </template>
     <div class="chart">
       <Chart type="bar" :key="chartKey" :data="data" :options="options" />
@@ -67,10 +65,7 @@ const show = computed(() => aiStore.durationData.length > 0)
 // 而且逐题的等级在下面的解题表格里本来就有
 const data = computed<ChartData<"bar" | "line">>(() => ({
   labels: aiStore.durationData.map((duration) =>
-    [
-      parseTime(duration.start, "M月D日"),
-      parseTime(duration.end, "M月D日"),
-    ].join("～"),
+    [parseTime(duration.start, "M月D日"), parseTime(duration.end, "M月D日")].join("～"),
   ),
   datasets: [
     {
@@ -155,14 +150,11 @@ const options = computed<ChartOptions<"bar" | "line">>(() => ({
         },
         footer: (items: TooltipItem<"bar" | "line">[]) => {
           const index = items[0]?.dataIndex
-          const bucket =
-            index === undefined ? undefined : aiStore.durationData[index]
+          const bucket = index === undefined ? undefined : aiStore.durationData[index]
           if (!bucket) return ""
           const lines = [`本期等级: ${bucket.grade || "无"}`]
           if (bucket.submissionCount > 0) {
-            lines.push(
-              `通过 ${bucket.acceptedCount} 次 / 共提交 ${bucket.submissionCount} 次`,
-            )
+            lines.push(`通过 ${bucket.acceptedCount} 次 / 共提交 ${bucket.submissionCount} 次`)
           }
           return lines
         },

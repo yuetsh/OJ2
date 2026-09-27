@@ -9,7 +9,5 @@ import { RARITY_TEXT_COLOR } from "utils/constants"
  */
 export function useRarityColor() {
   const isDark = useDark()
-  return computed(() =>
-    isDark.value ? RARITY_TEXT_COLOR.dark : RARITY_TEXT_COLOR.light,
-  )
+  return computed(() => (isDark.value ? RARITY_TEXT_COLOR.dark : RARITY_TEXT_COLOR.light))
 }

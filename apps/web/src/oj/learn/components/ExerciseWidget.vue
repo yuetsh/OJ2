@@ -7,9 +7,7 @@ const ExerciseMcq = defineAsyncComponent(() => import("./ExerciseMcq.vue"))
 const ExerciseSort = defineAsyncComponent(() => import("./ExerciseSort.vue"))
 const ExerciseFill = defineAsyncComponent(() => import("./ExerciseFill.vue"))
 const ExerciseMatch = defineAsyncComponent(() => import("./ExerciseMatch.vue"))
-const ExercisePredict = defineAsyncComponent(
-  () => import("./ExercisePredict.vue"),
-)
+const ExercisePredict = defineAsyncComponent(() => import("./ExercisePredict.vue"))
 const ExerciseDebug = defineAsyncComponent(() => import("./ExerciseDebug.vue"))
 const ExerciseGroup = defineAsyncComponent(() => import("./ExerciseGroup.vue"))
 
@@ -48,11 +46,7 @@ function onAttempt(payload: { correct: boolean; answer?: string }) {
 </script>
 
 <template>
-  <ExerciseMcq
-    v-if="exercise.type === 'mcq'"
-    :exercise="exercise"
-    @attempt="onAttempt"
-  />
+  <ExerciseMcq v-if="exercise.type === 'mcq'" :exercise="exercise" @attempt="onAttempt" />
   <ExerciseSort
     v-else-if="exercise.type === 'sort'"
     :exercise="exercise"
@@ -65,11 +59,7 @@ function onAttempt(payload: { correct: boolean; answer?: string }) {
     :lang="lang"
     @attempt="onAttempt"
   />
-  <ExerciseMatch
-    v-else-if="exercise.type === 'match'"
-    :exercise="exercise"
-    @attempt="onAttempt"
-  />
+  <ExerciseMatch v-else-if="exercise.type === 'match'" :exercise="exercise" @attempt="onAttempt" />
   <ExercisePredict
     v-else-if="exercise.type === 'predict'"
     :exercise="exercise"
@@ -82,9 +72,5 @@ function onAttempt(payload: { correct: boolean; answer?: string }) {
     :lang="lang"
     @attempt="onAttempt"
   />
-  <ExerciseGroup
-    v-else-if="exercise.type === 'group'"
-    :exercise="exercise"
-    @attempt="onAttempt"
-  />
+  <ExerciseGroup v-else-if="exercise.type === 'group'" :exercise="exercise" @attempt="onAttempt" />
 </template>

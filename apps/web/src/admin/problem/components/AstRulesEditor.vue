@@ -70,27 +70,22 @@ const ENGINE_OPTIONS: SelectOption[] = [
 // 列表推导式、f-string 这些 C 根本没有的东西 —— 存得进去，判题时永远失败
 // （或者反过来，「不能使用 f-string」永远通过），两头都不报错。
 function nodeTargetOptions(lang: string): SelectOption[] {
-  return Object.entries(AST_NODE_TARGETS_BY_LANGUAGE[lang] ?? {}).map(
-    ([value, entry]) => ({ label: entry.label, value }),
-  )
+  return Object.entries(AST_NODE_TARGETS_BY_LANGUAGE[lang] ?? {}).map(([value, entry]) => ({
+    label: entry.label,
+    value,
+  }))
 }
 
 // 逻辑名 and/or/not 在 C 里显示成 && / || / !，存进去的还是逻辑名
 function operatorTargetOptions(lang: string): SelectOption[] {
-  return Object.entries(AST_OPERATOR_TARGETS_BY_LANGUAGE[lang] ?? {}).map(
-    ([value, label]) => ({
-      label: label === value ? value : `${label}（${value}）`,
-      value,
-    }),
-  )
+  return Object.entries(AST_OPERATOR_TARGETS_BY_LANGUAGE[lang] ?? {}).map(([value, label]) => ({
+    label: label === value ? value : `${label}（${value}）`,
+    value,
+  }))
 }
 
 const NODE_ENGINES = ["must_exist_node", "must_not_exist_node", "count_node"]
-const FUNCTION_ENGINES = [
-  "must_call_function",
-  "must_not_call_function",
-  "count_function_call",
-]
+const FUNCTION_ENGINES = ["must_call_function", "must_not_call_function", "count_function_call"]
 const METHOD_ENGINES = ["must_call_method", "must_not_call_method"]
 const OPERATOR_ENGINES = ["must_use_operator"]
 const COUNT_ENGINES = ["count_node", "count_function_call"]
@@ -171,13 +166,8 @@ function updateRules(lang: string, rules: AstRule[]) {
   emit("update:modelValue", Object.keys(current).length > 0 ? current : null)
 }
 
-function getTargetLabel(
-  lang: string,
-  engine: string,
-  target: string,
-): string | undefined {
-  if (isNodeEngine(engine))
-    return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]?.label
+function getTargetLabel(lang: string, engine: string, target: string): string | undefined {
+  if (isNodeEngine(engine)) return AST_NODE_TARGETS_BY_LANGUAGE[lang]?.[target]?.label
   // 运算符不写 label：判题结果的文案按语言翻译（astOperatorLabel），
   // 存一个固定 label 反而会把 C 的 && 钉死成 and
   return undefined
@@ -260,17 +250,8 @@ watch(supportedLanguages, (langs) => {
         暂不支持代码规则检查，判题机只能检查
         {{ AST_SUPPORTED_LANGUAGES.join(" / ") }}
       </n-alert>
-      <n-tabs
-        v-if="supportedLanguages.length"
-        type="segment"
-        v-model:value="activeTab"
-      >
-        <n-tab-pane
-          v-for="lang in supportedLanguages"
-          :key="lang"
-          :name="lang"
-          :tab="lang"
-        >
+      <n-tabs v-if="supportedLanguages.length" type="segment" v-model:value="activeTab">
+        <n-tab-pane v-for="lang in supportedLanguages" :key="lang" :name="lang" :tab="lang">
           <n-flex vertical>
             <div
               v-for="(rule, index) in getRulesForLang(lang)"
@@ -281,9 +262,7 @@ watch(supportedLanguages, (langs) => {
                 <n-select
                   :options="ENGINE_OPTIONS"
                   :value="rule.engine"
-                  @update:value="
-                    (v: string) => updateRule(lang, index, 'engine', v)
-                  "
+                  @update:value="(v: string) => updateRule(lang, index, 'engine', v)"
                   style="width: 150px"
                   size="small"
                 />
@@ -291,9 +270,7 @@ watch(supportedLanguages, (langs) => {
                   v-if="needsTargetDropdown(rule.engine)"
                   :options="nodeTargetOptions(lang)"
                   :value="rule.target"
-                  @update:value="
-                    (v: string) => updateRule(lang, index, 'target', v)
-                  "
+                  @update:value="(v: string) => updateRule(lang, index, 'target', v)"
                   style="width: 150px"
                   size="small"
                   filterable
@@ -301,9 +278,7 @@ watch(supportedLanguages, (langs) => {
                 <n-input
                   v-if="needsTargetInput(rule.engine)"
                   :value="rule.target"
-                  @update:value="
-                    (v: string) => updateRule(lang, index, 'target', v)
-                  "
+                  @update:value="(v: string) => updateRule(lang, index, 'target', v)"
                   placeholder="函数/方法名"
                   style="width: 150px"
                   size="small"
@@ -312,9 +287,7 @@ watch(supportedLanguages, (langs) => {
                   v-if="needsOperatorDropdown(rule.engine)"
                   :options="operatorTargetOptions(lang)"
                   :value="rule.target"
-                  @update:value="
-                    (v: string) => updateRule(lang, index, 'target', v)
-                  "
+                  @update:value="(v: string) => updateRule(lang, index, 'target', v)"
                   style="width: 150px"
                   size="small"
                 />
@@ -322,18 +295,14 @@ watch(supportedLanguages, (langs) => {
                   <n-select
                     :options="COUNT_MODE_OPTIONS"
                     :value="getCountMode(rule)"
-                    @update:value="
-                      (v: 'exact' | 'range') => updateCountMode(lang, index, v)
-                    "
+                    @update:value="(v: 'exact' | 'range') => updateCountMode(lang, index, v)"
                     style="width: 80px"
                     size="small"
                   />
                   <n-input-number
                     v-if="getCountMode(rule) === 'exact'"
                     :value="rule.exact ?? null"
-                    @update:value="
-                      (v: number | null) => updateExactCount(lang, index, v)
-                    "
+                    @update:value="(v: number | null) => updateExactCount(lang, index, v)"
                     placeholder="次数"
                     style="width: 100px"
                     size="small"
@@ -343,9 +312,7 @@ watch(supportedLanguages, (langs) => {
                   <template v-else>
                     <n-input-number
                       :value="rule.min ?? null"
-                      @update:value="
-                        (v: number | null) => updateRule(lang, index, 'min', v)
-                      "
+                      @update:value="(v: number | null) => updateRule(lang, index, 'min', v)"
                       placeholder="最少"
                       style="width: 100px"
                       size="small"
@@ -354,9 +321,7 @@ watch(supportedLanguages, (langs) => {
                     />
                     <n-input-number
                       :value="rule.max ?? null"
-                      @update:value="
-                        (v: number | null) => updateRule(lang, index, 'max', v)
-                      "
+                      @update:value="(v: number | null) => updateRule(lang, index, 'max', v)"
                       placeholder="最多"
                       style="width: 100px"
                       size="small"
@@ -367,29 +332,17 @@ watch(supportedLanguages, (langs) => {
                 </template>
                 <n-input
                   :value="rule.message"
-                  @update:value="
-                    (v: string) => updateRule(lang, index, 'message', v)
-                  "
+                  @update:value="(v: string) => updateRule(lang, index, 'message', v)"
                   placeholder="错误提示（选填）"
                   style="flex: 1"
                   size="small"
                 />
-                <n-button
-                  size="small"
-                  tertiary
-                  type="error"
-                  @click="removeRule(lang, index)"
-                >
+                <n-button size="small" tertiary type="error" @click="removeRule(lang, index)">
                   删除
                 </n-button>
               </n-flex>
             </div>
-            <n-button
-              size="small"
-              tertiary
-              type="primary"
-              @click="addRule(lang)"
-            >
+            <n-button size="small" tertiary type="primary" @click="addRule(lang)">
               添加规则
             </n-button>
           </n-flex>
@@ -397,9 +350,7 @@ watch(supportedLanguages, (langs) => {
       </n-tabs>
       <n-empty
         v-else
-        :description="
-          languages.length ? '当前语言不支持代码规则检查' : '请先选择编程语言'
-        "
+        :description="languages.length ? '当前语言不支持代码规则检查' : '请先选择编程语言'"
       />
     </n-collapse-item>
   </n-collapse>

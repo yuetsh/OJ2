@@ -13,10 +13,7 @@ export function userSubmissionTopic(userId: number) {
   return `submission:user:${userId}`
 }
 
-export async function publishSubmissionUpdate(
-  userId: number,
-  data: SubmissionUpdate,
-) {
+export async function publishSubmissionUpdate(userId: number, data: SubmissionUpdate) {
   const event: SubmissionEvent = { userId, data }
   await redis.publish(submissionUpdateChannel, JSON.stringify(event))
 }

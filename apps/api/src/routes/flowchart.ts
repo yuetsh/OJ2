@@ -10,17 +10,7 @@ import {
   type FlowchartStatistics,
   type FlowchartSubmission,
 } from "@oj2/contract"
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  inArray,
-  isNull,
-  sql,
-  type SQL,
-} from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
@@ -53,11 +43,7 @@ function canView(
   row: { userId: number },
   problem: { createdById: number },
 ) {
-  return (
-    row.userId === user.id ||
-    isAdminRole(user) ||
-    problem.createdById === user.id
-  )
+  return row.userId === user.id || isAdminRole(user) || problem.createdById === user.id
 }
 
 function flowchartData(
@@ -86,10 +72,7 @@ function flowchartData(
 
 flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
   const parsed = await readJson(c, createFlowchartRequestSchema)
-  if (
-    !parsed.success ||
-    JSON.stringify(parsed.data?.flowchartData ?? {}).length > 500 * 1024
-  ) {
+  if (!parsed.success || JSON.stringify(parsed.data?.flowchartData ?? {}).length > 500 * 1024) {
     return failure(
       c,
       400,
@@ -102,8 +85,7 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
     .from(schema.problem)
     .where(eq(schema.problem.id, parsed.data.problemId))
     .limit(1)
-  if (!problem)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   if (!problem.allow)
     return failure(
       c,
@@ -114,10 +96,7 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
   // 限流：每次提交都会触发一次外部 AI 调用，是和判题沙箱同级的有限资源。
   // 身份前缀单独开一个桶，**不能**直接用 user id —— 那是代码提交在用的桶，
   // 共用的话学生在机房连着交几次代码，流程图这边就会莫名其妙交不上去。
-  const throttle = await consumeToken(
-    "user",
-    flowchartThrottleKey(c.get("user")!.id),
-  )
+  const throttle = await consumeToken("user", flowchartThrottleKey(c.get("user")!.id))
   if (!throttle.allowed) {
     return failure(
       c,
@@ -152,18 +131,9 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
       .update(schema.flowchartSubmission)
       .set({ status: 3 })
       .where(eq(schema.flowchartSubmission.id, id))
-    return failure(
-      c,
-      502,
-      "queue-unavailable",
-      "Evaluation queue is unavailable",
-    )
+    return failure(c, 502, "queue-unavailable", "Evaluation queue is unavailable")
   }
-  return success(
-    c,
-    { submissionId: id, status: "pending" } satisfies CreateFlowchartResponse,
-    201,
-  )
+  return success(c, { submissionId: id, status: "pending" } satisfies CreateFlowchartResponse, 201)
 })
 
 /**
@@ -202,9 +172,7 @@ async function flowchartProblemFilter(displayId: string) {
 
 async function flowchartUserFilter(username: string) {
   const ids = (await matchedUsers(username)).map((row) => row.id)
-  return ids.length
-    ? inArray(schema.flowchartSubmission.userId, ids)
-    : sql`false`
+  return ids.length ? inArray(schema.flowchartSubmission.userId, ids) : sql`false`
 }
 
 /**
@@ -250,16 +218,12 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   // 与代码提交列表同一套口径（submission.ts 的 GET /submissions）：关掉
   // submission_list_show_all 时非管理员看不到列表。流程图这边一直漏了这道门，
   // 学生把语言切成「流程图」、用户名随便填一个字就能翻出全班的 AI 评分。
-  if (
-    !(await getBooleanOption("submission_list_show_all", true)) &&
-    !isAdminRole(user)
-  ) {
+  if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
     return success(c, { results: [], total: 0 } satisfies FlowchartList)
   }
   // 「只看自己」盖过用户名；普通学生不填用户名时也只看自己
   const onlyMyself =
-    c.req.query("myself") === "1" ||
-    (!username && user.adminType === "Regular User")
+    c.req.query("myself") === "1" || (!username && user.adminType === "Regular User")
   const filters: Array<SQL | undefined> = []
   filters.push(
     ...(await Promise.all([
@@ -279,14 +243,8 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
     db
       .select(flowchartListColumns)
       .from(schema.flowchartSubmission)
-      .innerJoin(
-        schema.user,
-        eq(schema.flowchartSubmission.userId, schema.user.id),
-      )
-      .innerJoin(
-        schema.problem,
-        eq(schema.flowchartSubmission.problemId, schema.problem.id),
-      )
+      .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
+      .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
       .where(where)
       .orderBy(desc(schema.flowchartSubmission.createTime))
       .limit(limit)
@@ -346,8 +304,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     eq(schema.flowchartSubmission.status, FLOWCHART_COMPLETED),
     sql`${schema.flowchartSubmission.createTime} <= ${end}`,
   ]
-  if (start)
-    filters.push(sql`${schema.flowchartSubmission.createTime} >= ${start}`)
+  if (start) filters.push(sql`${schema.flowchartSubmission.createTime} >= ${start}`)
 
   const displayId = c.req.query("problemDisplayId")?.trim()
   if (displayId) {
@@ -362,8 +319,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         ),
       )
       .limit(1)
-    if (!problem)
-      return failure(c, 404, "problem-not-found", "Problem does not exist")
+    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
     filters.push(eq(schema.flowchartSubmission.problemId, problem.id))
   }
 
@@ -374,17 +330,13 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   if (username) {
     const ids = matched.map((row) => row.id)
     // 一个账号都没匹配上时得留个恒假条件，否则「查无此班」变成「全站统计」
-    filters.push(
-      ids.length ? inArray(schema.flowchartSubmission.userId, ids) : sql`false`,
-    )
+    filters.push(ids.length ? inArray(schema.flowchartSubmission.userId, ids) : sql`false`)
   }
   const where = and(...filters)
   // 花名册：只有指定了用户名才谈得上「班级人数」，不指定时分母无意义。
   // 未禁用的普通用户才进分母，教师和管理员不算
   const roster = username
-    ? matched.filter(
-        (row) => !row.isDisabled && row.adminType === "Regular User",
-      )
+    ? matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
     : []
 
   /**
@@ -396,56 +348,49 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
    * （criteria 255 + suggestions 64 + feedback 47），现在 2134 条无感，5 万条就是一次
    * 点击 18MB，而老师是开着面板反复切时段、切班的。
    */
-  const [[totals], gradeRows, criteriaRows, textRows, submittedRows] =
-    await Promise.all([
-      db
-        .select({
-          total: count(),
-          /**
-           * 均分拆成 sum / count 两项，不直接用 `avg()`：分母是**有分数的条数**而不是
-           * 总条数（对齐 Django 的 Avg()，它跳过 NULL），拆开之后这个口径在代码里是
-           * 写明的，也省掉 avg() 在空集上回 NULL 还要兜底。
-           */
-          scoreSum:
-            sql<number>`coalesce(sum(${schema.flowchartSubmission.aiScore}), 0)`.mapWith(
-              Number,
-            ),
-          scoreCount:
-            sql<number>`count(${schema.flowchartSubmission.aiScore})::int`.mapWith(
-              Number,
-            ),
-          // 完成人数。user_id 和 username 一一对应，按哪个 distinct 都一样，
-          // 按 user_id 就不必 join user
-          completedCount:
-            sql<number>`count(distinct ${schema.flowchartSubmission.userId})::int`.mapWith(
-              Number,
-            ),
-        })
-        .from(schema.flowchartSubmission)
-        .where(where),
-      db
-        .select({ grade: schema.flowchartSubmission.aiGrade, n: count() })
-        .from(schema.flowchartSubmission)
-        .where(where)
-        .groupBy(schema.flowchartSubmission.aiGrade),
-      /**
-       * 各项**平均分**。`ai_criteria_details` 是 `{ 项名: { score, max, comment } }`，
-       * 用 jsonb_each 展开之后按项名分组。分数不是数字的项整项跳过，和原来 JS 那句
-       * `typeof detail.score !== "number"` 的 continue 一致。
-       *
-       * **那道 `jsonb_typeof(...) = 'object'` 的闸不能省，而且要写在 jsonb_each 的参数里。**
-       * 不能省：撞上标量（历史脏数据）jsonb_each 直接抛错，整个面板 500 ——
-       * 拿 `'5'::jsonb` 和 `'[1,2]'::jsonb` 各插一行验过。
-       *
-       * 写在哪儿则纯是规划器的脸色：挪进 where 当基表过滤条件时，53350 行的探针上
-       * 实测 180ms → 360ms，因为计划从「并行 Partial HashAggregate」换成了「串行
-       * GroupAggregate + 21 万行外部归并排序、落盘 26MB」。两种写法都正确，选快的那个。
-       *
-       * 每项的**满分**不在这里取，见下面 criteriaMax 的注释：在这条 SQL 里按
-       * create_time 取「最新那条」要给 21 万行（4 项 × 5 万条）排序，同一个探针上
-       * 实测 254ms → 842ms，而满分本来就是几个常数。
-       */
-      db.execute<{ key: string; avg: number }>(sql`
+  const [[totals], gradeRows, criteriaRows, textRows, submittedRows] = await Promise.all([
+    db
+      .select({
+        total: count(),
+        /**
+         * 均分拆成 sum / count 两项，不直接用 `avg()`：分母是**有分数的条数**而不是
+         * 总条数（对齐 Django 的 Avg()，它跳过 NULL），拆开之后这个口径在代码里是
+         * 写明的，也省掉 avg() 在空集上回 NULL 还要兜底。
+         */
+        scoreSum: sql<number>`coalesce(sum(${schema.flowchartSubmission.aiScore}), 0)`.mapWith(
+          Number,
+        ),
+        scoreCount: sql<number>`count(${schema.flowchartSubmission.aiScore})::int`.mapWith(Number),
+        // 完成人数。user_id 和 username 一一对应，按哪个 distinct 都一样，
+        // 按 user_id 就不必 join user
+        completedCount:
+          sql<number>`count(distinct ${schema.flowchartSubmission.userId})::int`.mapWith(Number),
+      })
+      .from(schema.flowchartSubmission)
+      .where(where),
+    db
+      .select({ grade: schema.flowchartSubmission.aiGrade, n: count() })
+      .from(schema.flowchartSubmission)
+      .where(where)
+      .groupBy(schema.flowchartSubmission.aiGrade),
+    /**
+     * 各项**平均分**。`ai_criteria_details` 是 `{ 项名: { score, max, comment } }`，
+     * 用 jsonb_each 展开之后按项名分组。分数不是数字的项整项跳过，和原来 JS 那句
+     * `typeof detail.score !== "number"` 的 continue 一致。
+     *
+     * **那道 `jsonb_typeof(...) = 'object'` 的闸不能省，而且要写在 jsonb_each 的参数里。**
+     * 不能省：撞上标量（历史脏数据）jsonb_each 直接抛错，整个面板 500 ——
+     * 拿 `'5'::jsonb` 和 `'[1,2]'::jsonb` 各插一行验过。
+     *
+     * 写在哪儿则纯是规划器的脸色：挪进 where 当基表过滤条件时，53350 行的探针上
+     * 实测 180ms → 360ms，因为计划从「并行 Partial HashAggregate」换成了「串行
+     * GroupAggregate + 21 万行外部归并排序、落盘 26MB」。两种写法都正确，选快的那个。
+     *
+     * 每项的**满分**不在这里取，见下面 criteriaMax 的注释：在这条 SQL 里按
+     * create_time 取「最新那条」要给 21 万行（4 项 × 5 万条）排序，同一个探针上
+     * 实测 254ms → 842ms，而满分本来就是几个常数。
+     */
+    db.execute<{ key: string; avg: number }>(sql`
       select e.key as key, avg((e.value->>'score')::double precision) as avg
       from ${schema.flowchartSubmission}
       cross join lateral jsonb_each(
@@ -456,25 +401,25 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
       where ${where} and jsonb_typeof(e.value->'score') = 'number'
       group by e.key
     `),
-      // 词云的原料。只有这条要读大列，所以只有它按时间倒序取最近的 N 条
-      db
-        .select({
-          criteria: schema.flowchartSubmission.aiCriteriaDetails,
-          feedback: schema.flowchartSubmission.aiFeedback,
-          suggestions: schema.flowchartSubmission.aiSuggestions,
-        })
-        .from(schema.flowchartSubmission)
-        .where(where)
-        .orderBy(desc(schema.flowchartSubmission.createTime))
-        .limit(WORDCLOUD_TEXT_LIMIT),
-      // 「谁没做」只在有花名册时算得出来，行数也就一个班
-      roster.length
-        ? db
-            .selectDistinct({ userId: schema.flowchartSubmission.userId })
-            .from(schema.flowchartSubmission)
-            .where(where)
-        : [],
-    ])
+    // 词云的原料。只有这条要读大列，所以只有它按时间倒序取最近的 N 条
+    db
+      .select({
+        criteria: schema.flowchartSubmission.aiCriteriaDetails,
+        feedback: schema.flowchartSubmission.aiFeedback,
+        suggestions: schema.flowchartSubmission.aiSuggestions,
+      })
+      .from(schema.flowchartSubmission)
+      .where(where)
+      .orderBy(desc(schema.flowchartSubmission.createTime))
+      .limit(WORDCLOUD_TEXT_LIMIT),
+    // 「谁没做」只在有花名册时算得出来，行数也就一个班
+    roster.length
+      ? db
+          .selectDistinct({ userId: schema.flowchartSubmission.userId })
+          .from(schema.flowchartSubmission)
+          .where(where)
+      : [],
+  ])
 
   if (!totals || totals.total === 0) {
     return success(c, {
@@ -525,8 +470,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
       if (!criteriaMax.has(key)) {
         criteriaMax.set(key, typeof detail.max === "number" ? detail.max : 100)
       }
-      if (typeof detail.comment === "string" && detail.comment)
-        pushText(detail.comment)
+      if (typeof detail.comment === "string" && detail.comment) pushText(detail.comment)
     }
     if (row.feedback) pushText(row.feedback)
     if (row.suggestions) pushText(row.suggestions)
@@ -543,9 +487,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const submitted = new Set(submittedRows.map((row) => row.userId))
   return success(c, {
     totalCount: totals.total,
-    avgScore: totals.scoreCount
-      ? rounded(totals.scoreSum / totals.scoreCount, 1)
-      : 0,
+    avgScore: totals.scoreCount ? rounded(totals.scoreSum / totals.scoreCount, 1) : 0,
     gradeDistribution,
     criteriaAverages,
     personCount: roster.length,
@@ -568,14 +510,8 @@ flowchartRoutes.get("/flowcharts/:id", requireAuth, async (c) => {
       problem: schema.problem,
     })
     .from(schema.flowchartSubmission)
-    .innerJoin(
-      schema.user,
-      eq(schema.flowchartSubmission.userId, schema.user.id),
-    )
-    .innerJoin(
-      schema.problem,
-      eq(schema.flowchartSubmission.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
+    .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, c.req.param("id")))
     .limit(1)
   if (!row || !canView(c.get("user")!, row.flowchart, row.problem))
@@ -588,21 +524,13 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
   const [row] = await db
     .select({ flowchart: schema.flowchartSubmission, problem: schema.problem })
     .from(schema.flowchartSubmission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.flowchartSubmission.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, c.req.param("id")))
     .limit(1)
   if (!row || !canView(user, row.flowchart, row.problem))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
   if (![2, 3].includes(row.flowchart.status))
-    return failure(
-      c,
-      409,
-      "retry-not-allowed",
-      "Submission is not in a state that allows retry",
-    )
+    return failure(c, 409, "retry-not-allowed", "Submission is not in a state that allows retry")
   // canView 允许本人重试自己的提交，不限流的话学生可以反复点着刷 AI 调用。
   // 教师放行：重新判题是他们的日常操作，成批点几十行是正常用法
   if (!isAdminRole(user)) {
@@ -646,12 +574,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
       .update(schema.flowchartSubmission)
       .set({ status: 3 })
       .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
-    return failure(
-      c,
-      502,
-      "queue-unavailable",
-      "Evaluation queue is unavailable",
-    )
+    return failure(c, 502, "queue-unavailable", "Evaluation queue is unavailable")
   }
   return success(c, {
     submissionId: row.flowchart.id,
@@ -659,65 +582,51 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
   } satisfies CreateFlowchartResponse)
 })
 
-flowchartRoutes.get(
-  "/problems/:id/flowchart/current",
-  requireAuth,
-  async (c) => {
-    const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const rows = await db
-      .select({
-        score: schema.flowchartSubmission.aiScore,
-        grade: schema.flowchartSubmission.aiGrade,
-      })
-      .from(schema.flowchartSubmission)
-      .where(
-        and(
-          eq(schema.flowchartSubmission.userId, c.get("user")!.id),
-          eq(schema.flowchartSubmission.problemId, problemId),
-          eq(schema.flowchartSubmission.status, 2),
-        ),
-      )
-      .orderBy(desc(schema.flowchartSubmission.createTime))
-    return success(c, {
-      count: rows.length,
-      score: rows[0]?.score ?? 0,
-      grade: rows[0]?.grade ?? "",
-    } satisfies FlowchartCurrent)
-  },
-)
+flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) => {
+  const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const rows = await db
+    .select({
+      score: schema.flowchartSubmission.aiScore,
+      grade: schema.flowchartSubmission.aiGrade,
+    })
+    .from(schema.flowchartSubmission)
+    .where(
+      and(
+        eq(schema.flowchartSubmission.userId, c.get("user")!.id),
+        eq(schema.flowchartSubmission.problemId, problemId),
+        eq(schema.flowchartSubmission.status, 2),
+      ),
+    )
+    .orderBy(desc(schema.flowchartSubmission.createTime))
+  return success(c, {
+    count: rows.length,
+    score: rows[0]?.score ?? 0,
+    grade: rows[0]?.grade ?? "",
+  } satisfies FlowchartCurrent)
+})
 
-flowchartRoutes.get(
-  "/problems/:id/flowchart/history",
-  requireAuth,
-  async (c) => {
-    const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const page = queryInteger(c.req.query("page"), 0, { min: 0 })
-    const rows = await db
-      .select({
-        flowchart: schema.flowchartSubmission,
-        username: schema.user.username,
-      })
-      .from(schema.flowchartSubmission)
-      .innerJoin(
-        schema.user,
-        eq(schema.flowchartSubmission.userId, schema.user.id),
-      )
-      .where(
-        and(
-          eq(schema.flowchartSubmission.userId, c.get("user")!.id),
-          eq(schema.flowchartSubmission.problemId, problemId),
-          eq(schema.flowchartSubmission.status, 2),
-        ),
-      )
-      .orderBy(asc(schema.flowchartSubmission.createTime))
-    const selected = page === 0 ? rows.at(-1) : rows[page - 1]
-    if (page > rows.length)
-      return failure(c, 400, "page-out-of-range", "Page out of range")
-    return success(c, {
-      submission: selected
-        ? flowchartData(selected.flowchart, selected.username)
-        : null,
-      count: rows.length,
-    } satisfies FlowchartDetail)
-  },
-)
+flowchartRoutes.get("/problems/:id/flowchart/history", requireAuth, async (c) => {
+  const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const page = queryInteger(c.req.query("page"), 0, { min: 0 })
+  const rows = await db
+    .select({
+      flowchart: schema.flowchartSubmission,
+      username: schema.user.username,
+    })
+    .from(schema.flowchartSubmission)
+    .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
+    .where(
+      and(
+        eq(schema.flowchartSubmission.userId, c.get("user")!.id),
+        eq(schema.flowchartSubmission.problemId, problemId),
+        eq(schema.flowchartSubmission.status, 2),
+      ),
+    )
+    .orderBy(asc(schema.flowchartSubmission.createTime))
+  const selected = page === 0 ? rows.at(-1) : rows[page - 1]
+  if (page > rows.length) return failure(c, 400, "page-out-of-range", "Page out of range")
+  return success(c, {
+    submission: selected ? flowchartData(selected.flowchart, selected.username) : null,
+    count: rows.length,
+  } satisfies FlowchartDetail)
+})

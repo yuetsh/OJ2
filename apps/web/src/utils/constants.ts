@@ -24,10 +24,7 @@ export enum SubmissionStatus {
 
 // 编译期对齐契约：契约加/改一个码而这里没跟，下面两行会当场编译不过。
 type SyncedWithContract =
-  Exclude<
-    `${SubmissionStatus}`,
-    `${SubmissionStatus.submitting}`
-  > extends `${JudgeStatusValue}`
+  Exclude<`${SubmissionStatus}`, `${SubmissionStatus.submitting}`> extends `${JudgeStatusValue}`
     ? `${JudgeStatusValue}` extends `${Exclude<SubmissionStatus, SubmissionStatus.submitting>}`
       ? true
       : never
@@ -165,8 +162,7 @@ export const DIFFICULTY = {
   High: "困难",
 } as const
 
-const cSource =
-  "#include<stdio.h>\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
+const cSource = "#include<stdio.h>\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
 const cppSource =
   "#include<iostream>\r\n\r\nusing namespace std;\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
 const pythonSource = ""
@@ -285,10 +281,7 @@ export const RARITY_COLOR: Record<AchievementRarity, string> = {
 
 // 文字要另配一套。上面那组是照深色底调的，搬到白底上白金只有 1.7:1、
 // 黄金 2.2:1，12px 的稀有度标签根本看不清。取色见 useRarityColor
-export const RARITY_TEXT_COLOR: Record<
-  "dark" | "light",
-  Record<AchievementRarity, string>
-> = {
+export const RARITY_TEXT_COLOR: Record<"dark" | "light", Record<AchievementRarity, string>> = {
   dark: {
     bronze: "#e08d63",
     silver: "#b6bcc7",
@@ -311,17 +304,10 @@ export const RARITY_TEXT_COLOR: Record<
  * 它按「键长度 + 字节序」重排，读出来会变成 完整性 / 清晰度 / 规范性 / 逻辑正确性，
  * 40 分的那项排到最后。凡是要展示评分明细的地方都按这个顺序排，别直接遍历对象。
  */
-export const FLOWCHART_CRITERIA_ORDER = [
-  "逻辑正确性",
-  "完整性",
-  "规范性",
-  "清晰度",
-]
+export const FLOWCHART_CRITERIA_ORDER = ["逻辑正确性", "完整性", "规范性", "清晰度"]
 
 /** 按 FLOWCHART_CRITERIA_ORDER 排序，表里没有的键排在后面并保持原有相对顺序 */
-export function sortFlowchartCriteria<T>(
-  details: Record<string, T>,
-): [string, T][] {
+export function sortFlowchartCriteria<T>(details: Record<string, T>): [string, T][] {
   const rank = (key: string) => {
     const i = FLOWCHART_CRITERIA_ORDER.indexOf(key)
     return i === -1 ? Number.MAX_SAFE_INTEGER : i
@@ -380,9 +366,7 @@ export const CLASS_NAME_MIN_DIGITS = 3
 export const CLASS_NAME_MAX_DIGITS = 4
 
 /** 合法班级号：3~4 位纯数字 */
-export const CLASS_NAME_RE = new RegExp(
-  `^\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}$`,
-)
+export const CLASS_NAME_RE = new RegExp(`^\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}$`)
 
 /** 用户名开头的 ks<班级号>，用于从用户名里认出班级 */
 export const USERNAME_CLASS_RE = new RegExp(

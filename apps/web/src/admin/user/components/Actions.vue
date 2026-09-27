@@ -21,20 +21,10 @@ async function banUser() {
 </script>
 <template>
   <n-flex>
-    <n-button
-      size="small"
-      type="error"
-      secondary
-      @click="$emit('resetPassword', props.user)"
-    >
+    <n-button size="small" type="error" secondary @click="$emit('resetPassword', props.user)">
       重置密码
     </n-button>
-    <n-button
-      size="small"
-      type="primary"
-      secondary
-      @click="$emit('openEditModal', props.user)"
-    >
+    <n-button size="small" type="primary" secondary @click="$emit('openEditModal', props.user)">
       编辑
     </n-button>
     <n-button

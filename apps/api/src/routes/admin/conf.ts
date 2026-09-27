@@ -14,11 +14,7 @@ import { resolve } from "node:path"
 import { count, desc, eq, gte, ilike, not, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import {
-  requireAdmin,
-  requireSuperAdmin,
-  type AppEnv,
-} from "../../auth/middleware"
+import { requireAdmin, requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { config } from "../../config"
 import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
@@ -44,9 +40,7 @@ function aliveSince() {
  * 于是同一天的心跳永远小于阈值，**所有判题机都会被标成离线**。
  */
 function isAlive(lastHeartbeat: string) {
-  return (
-    Date.parse(lastHeartbeat) >= Date.now() - HEARTBEAT_ALIVE_SECONDS * 1000
-  )
+  return Date.parse(lastHeartbeat) >= Date.now() - HEARTBEAT_ALIVE_SECONDS * 1000
 }
 
 // ---------------------------------------------------------------- 网站配置
@@ -80,9 +74,9 @@ adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
 adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, updateWebsiteConfigRequestSchema)
   if (!parsed.success) return parsed.response
-  const entries = (
-    Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]
-  ).map(([field, key]) => ({ field, key, value: parsed.data[field] }))
+  const entries = (Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]).map(
+    ([field, key]) => ({ field, key, value: parsed.data[field] }),
+  )
   // 8 个键一条 upsert 写完，不再一个键一次往返
   await db
     .insert(schema.optionsSysoptions)
@@ -97,8 +91,7 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
   // snake_case 是这张表从 Django 继承来的存储格式，只该活在库里；线上这一跳两边
   // 都是新写的，没理由让前端再写一层换名胶水。曾经推 snake、前端拿它去比驼峰字段，
   // 一条也命中不了，整个「改完不必刷新」空转了很久。
-  for (const entry of entries)
-    await publishConfigUpdate(entry.field, entry.value)
+  for (const entry of entries) await publishConfigUpdate(entry.field, entry.value)
   return success(c, null)
 })
 
@@ -123,50 +116,30 @@ adminConfRoutes.get("/judge-servers", requireSuperAdmin, async (c) => {
 })
 
 adminConfRoutes.put("/judge-servers/:id", requireSuperAdmin, async (c) => {
-  const parsed = await parseBody(
-    c,
-    updateJudgeServerRequestSchema,
-    "isDisabled is required",
-  )
+  const parsed = await parseBody(c, updateJudgeServerRequestSchema, "isDisabled is required")
   if (!parsed.success) return parsed.response
   const updated = await db
     .update(schema.judgeServer)
     .set({ isDisabled: parsed.data.isDisabled })
-    .where(
-      eq(schema.judgeServer.id, queryInteger(c.req.param("id"), 0, { min: 1 })),
-    )
+    .where(eq(schema.judgeServer.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .returning({ id: schema.judgeServer.id })
   if (updated.length === 0)
-    return failure(
-      c,
-      404,
-      "judge-server-not-found",
-      "Judge server does not exist",
-    )
+    return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
   // 旧后端在这里会 process_pending_task() 把积压的待判任务重新分发。
   // 新架构不需要：任务在 BullMQ 里排着，worker 恢复就自己接着消费，不存在「没有新提交
   // 就一直 waiting」那种情况 —— 那是旧的自研分发器才有的问题。
   return success(c, null)
 })
 
-adminConfRoutes.delete(
-  "/judge-servers/:hostname",
-  requireSuperAdmin,
-  async (c) => {
-    const deleted = await db
-      .delete(schema.judgeServer)
-      .where(eq(schema.judgeServer.hostname, c.req.param("hostname")))
-      .returning({ id: schema.judgeServer.id })
-    if (deleted.length === 0)
-      return failure(
-        c,
-        404,
-        "judge-server-not-found",
-        "Judge server does not exist",
-      )
-    return success(c, null)
-  },
-)
+adminConfRoutes.delete("/judge-servers/:hostname", requireSuperAdmin, async (c) => {
+  const deleted = await db
+    .delete(schema.judgeServer)
+    .where(eq(schema.judgeServer.hostname, c.req.param("hostname")))
+    .returning({ id: schema.judgeServer.id })
+  if (deleted.length === 0)
+    return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
+  return success(c, null)
+})
 
 // ---------------------------------------------------------------- 孤儿测试用例
 
@@ -179,18 +152,14 @@ async function orphanTestCaseIds() {
     db.select({ id: schema.problem.testCaseId }).from(schema.problem),
   ])
   const referenced = new Set(inDb.map((row) => row.id))
-  return onDisk.filter(
-    (name) => TEST_CASE_ID_RE.test(name) && !referenced.has(name),
-  )
+  return onDisk.filter((name) => TEST_CASE_ID_RE.test(name) && !referenced.has(name))
 }
 
 adminConfRoutes.get("/orphan-test-cases", requireSuperAdmin, async (c) => {
   const ids = await orphanTestCaseIds()
   const rows = await Promise.all(
     ids.map(async (id) => {
-      const info = await stat(resolve(config.testCaseDirectory, id)).catch(
-        () => null,
-      )
+      const info = await stat(resolve(config.testCaseDirectory, id)).catch(() => null)
       return {
         id,
         createTime: info ? info.mtimeMs / 1000 : 0,
@@ -207,12 +176,7 @@ adminConfRoutes.delete("/orphan-test-cases", requireSuperAdmin, async (c) => {
   // 而测试数据没有别处备份 —— 旧后端这里是不校验的。
   const targets = requested ? orphans.filter((id) => id === requested) : orphans
   if (requested && targets.length === 0) {
-    return failure(
-      c,
-      404,
-      "not-an-orphan",
-      "该用例目录不存在或仍被题目引用，未删除",
-    )
+    return failure(c, 404, "not-an-orphan", "该用例目录不存在或仍被题目引用，未删除")
   }
   for (const id of targets) {
     await rm(resolve(config.testCaseDirectory, id), {
@@ -260,10 +224,7 @@ adminConfRoutes.get("/random-usernames", requireSuperAdmin, async (c) => {
   const rows = await db
     .select({ username: schema.user.username })
     .from(schema.user)
-    .where(
-      classPrefixCondition(classroom) ??
-        ilike(schema.user.username, `${classroom}%`),
-    )
+    .where(classPrefixCondition(classroom) ?? ilike(schema.user.username, `${classroom}%`))
     .orderBy(sql`random()`)
     .limit(10)
   return success(
@@ -298,9 +259,7 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
   }
   // 以文件头为准，扩展名只是第一道快速筛
   const claimed = image.name.slice(image.name.lastIndexOf(".")).toLowerCase()
-  const suffix = IMAGE_SUFFIXES.includes(claimed)
-    ? await sniffImageExtension(image)
-    : null
+  const suffix = IMAGE_SUFFIXES.includes(claimed) ? await sniffImageExtension(image) : null
   if (!suffix) {
     return success(c, {
       success: false,

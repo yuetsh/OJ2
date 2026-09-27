@@ -5,32 +5,17 @@ const pbkdf2Async = promisify(pbkdf2)
 
 async function verifyDjangoPbkdf2(password: string, encoded: string) {
   const [algorithm, iterationsText, salt, digestText] = encoded.split("$")
-  if (
-    algorithm !== "pbkdf2_sha256" ||
-    !iterationsText ||
-    !salt ||
-    !digestText
-  ) {
+  if (algorithm !== "pbkdf2_sha256" || !iterationsText || !salt || !digestText) {
     return false
   }
 
   const iterations = Number(iterationsText)
   const expected = Buffer.from(digestText, "base64")
-  if (
-    !Number.isSafeInteger(iterations) ||
-    iterations <= 0 ||
-    expected.length === 0
-  ) {
+  if (!Number.isSafeInteger(iterations) || iterations <= 0 || expected.length === 0) {
     return false
   }
 
-  const actual = await pbkdf2Async(
-    password,
-    salt,
-    iterations,
-    expected.length,
-    "sha256",
-  )
+  const actual = await pbkdf2Async(password, salt, iterations, expected.length, "sha256")
   return timingSafeEqual(actual, expected)
 }
 

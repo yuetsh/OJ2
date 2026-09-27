@@ -11,12 +11,7 @@ import type {
   ExerciseDebugData,
   ExerciseGroupData,
 } from "utils/types"
-import {
-  getAdminExercises,
-  createExercise,
-  updateExercise,
-  deleteExercise,
-} from "admin/api"
+import { getAdminExercises, createExercise, updateExercise, deleteExercise } from "admin/api"
 
 const props = defineProps<{ tutorialId: number }>()
 const message = useMessage()
@@ -55,9 +50,7 @@ const groupQuestion = ref("")
 const groupBuckets = ref("")
 const groupItems = ref("")
 
-const debugLines = computed(() =>
-  debugCode.value === "" ? [] : debugCode.value.split("\n"),
-)
+const debugLines = computed(() => (debugCode.value === "" ? [] : debugCode.value.split("\n")))
 
 async function load() {
   exercises.value = await getAdminExercises(props.tutorialId)
@@ -135,9 +128,7 @@ function openEdit(ex: Exercise) {
     const d = ex.data as ExerciseGroupData
     groupQuestion.value = d.question
     groupBuckets.value = d.buckets.join("\n")
-    groupItems.value = d.items
-      .map((it, i) => `${it} => ${d.buckets[d.answer[i]]}`)
-      .join("\n")
+    groupItems.value = d.items.map((it, i) => `${it} => ${d.buckets[d.answer[i]]}`).join("\n")
   }
   showForm.value = true
 }
@@ -241,9 +232,7 @@ function buildData(): Record<string, unknown> | null {
   }
   if (formType.value === "debug") {
     const lines = debugCode.value.split("\n")
-    const answer = debugAnswer.value
-      .filter((i) => i < lines.length)
-      .sort((a, b) => a - b)
+    const answer = debugAnswer.value.filter((i) => i < lines.length).sort((a, b) => a - b)
     if (lines.length === 0 || answer.length === 0) {
       message.error("请填写代码并勾选至少一行错误")
       return null
@@ -377,9 +366,7 @@ function typeTagType(type: ExerciseType) {
   <div>
     <n-flex justify="space-between" align="center" style="margin-bottom: 16px">
       <n-text>共 {{ exercises.length }} 道练习题</n-text>
-      <n-button type="primary" size="small" @click="openCreate"
-        >+ 添加练习题</n-button
-      >
+      <n-button type="primary" size="small" @click="openCreate">+ 添加练习题</n-button>
     </n-flex>
 
     <n-empty v-if="exercises.length === 0" description="暂无练习题" />
@@ -398,16 +385,12 @@ function typeTagType(type: ExerciseType) {
           <n-space :size="8">
             <n-tooltip trigger="hover">
               <template #trigger>
-                <n-button size="small" @click="copyPlaceholder(ex.id)">
-                  复制占位符
-                </n-button>
+                <n-button size="small" @click="copyPlaceholder(ex.id)"> 复制占位符 </n-button>
               </template>
               将 [[exercise:{{ ex.id }}]] 粘贴到 Markdown 内容中
             </n-tooltip>
             <n-button size="small" @click="openEdit(ex)">编辑</n-button>
-            <n-button size="small" type="error" @click="confirmDelete(ex.id)">
-              删除
-            </n-button>
+            <n-button size="small" type="error" @click="confirmDelete(ex.id)"> 删除 </n-button>
           </n-space>
         </n-flex>
       </n-list-item>
@@ -433,11 +416,7 @@ function typeTagType(type: ExerciseType) {
         </n-form-item>
 
         <n-form-item label="顺序">
-          <n-input-number
-            v-model:value="formOrder"
-            :min="0"
-            style="width: 100px"
-          />
+          <n-input-number v-model:value="formOrder" :min="0" style="width: 100px" />
         </n-form-item>
 
         <template v-if="formType === 'mcq'">
@@ -451,16 +430,8 @@ function typeTagType(type: ExerciseType) {
           </n-form-item>
           <n-form-item label="选项（勾选所有正确答案）">
             <n-space vertical style="width: 100%">
-              <n-flex
-                v-for="(_opt, i) in mcqOptions"
-                :key="i"
-                align="center"
-                :size="8"
-              >
-                <n-checkbox
-                  :checked="mcqAnswer.includes(i)"
-                  @update:checked="toggleAnswer(i)"
-                />
+              <n-flex v-for="(_opt, i) in mcqOptions" :key="i" align="center" :size="8">
+                <n-checkbox :checked="mcqAnswer.includes(i)" @update:checked="toggleAnswer(i)" />
                 <n-input
                   v-model:value="mcqOptions[i]"
                   :placeholder="`选项 ${String.fromCharCode(65 + i)}`"
@@ -472,18 +443,14 @@ function typeTagType(type: ExerciseType) {
                   @click="
                     () => {
                       mcqOptions.splice(i, 1)
-                      mcqAnswer = mcqAnswer
-                        .filter((a) => a !== i)
-                        .map((a) => (a > i ? a - 1 : a))
+                      mcqAnswer = mcqAnswer.filter((a) => a !== i).map((a) => (a > i ? a - 1 : a))
                     }
                   "
                 >
                   ✕
                 </n-button>
               </n-flex>
-              <n-button size="small" @click="mcqOptions.push('')">
-                + 添加选项
-              </n-button>
+              <n-button size="small" @click="mcqOptions.push('')"> + 添加选项 </n-button>
             </n-space>
           </n-form-item>
         </template>
@@ -573,9 +540,7 @@ function typeTagType(type: ExerciseType) {
               style="font-family: &quot;Monaco&quot;"
             />
           </n-form-item>
-          <n-form-item
-            label="正确输出（多个可接受答案之间用单独一行 === 分隔）"
-          >
+          <n-form-item label="正确输出（多个可接受答案之间用单独一行 === 分隔）">
             <n-input
               v-model:value="predictAnswer"
               type="textarea"
@@ -606,21 +571,9 @@ function typeTagType(type: ExerciseType) {
           </n-form-item>
           <n-form-item label="勾选错误行">
             <n-space vertical style="width: 100%">
-              <n-empty
-                v-if="debugLines.length === 0"
-                description="先填写代码"
-                size="small"
-              />
-              <n-flex
-                v-for="(line, i) in debugLines"
-                :key="i"
-                align="center"
-                :size="8"
-              >
-                <n-checkbox
-                  :checked="debugAnswer.includes(i)"
-                  @update:checked="toggleDebug(i)"
-                />
+              <n-empty v-if="debugLines.length === 0" description="先填写代码" size="small" />
+              <n-flex v-for="(line, i) in debugLines" :key="i" align="center" :size="8">
+                <n-checkbox :checked="debugAnswer.includes(i)" @update:checked="toggleDebug(i)" />
                 <n-text style="font-family: Monaco; white-space: pre">
                   {{ i + 1 }}. {{ line }}
                 </n-text>

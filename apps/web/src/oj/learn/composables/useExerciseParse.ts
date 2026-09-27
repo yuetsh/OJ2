@@ -1,13 +1,8 @@
 import type { Exercise } from "utils/types"
 
-export type Segment =
-  | { type: "md"; content: string }
-  | { type: "exercise"; exercise: Exercise }
+export type Segment = { type: "md"; content: string } | { type: "exercise"; exercise: Exercise }
 
-export function parseExercises(
-  content: string,
-  exercises: Exercise[],
-): Segment[] {
+export function parseExercises(content: string, exercises: Exercise[]): Segment[] {
   const exerciseMap = new Map(exercises.map((e) => [e.id, e]))
   const segments: Segment[] = []
   const regex = /\[\[exercise:(\d+)\]\]/g

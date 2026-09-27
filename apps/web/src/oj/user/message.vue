@@ -1,10 +1,6 @@
 <template>
   <n-list v-if="messages.length">
-    <n-list-item
-      :style="{ overflow: 'auto' }"
-      v-for="(item, index) in messages"
-      :key="index"
-    >
+    <n-list-item :style="{ overflow: 'auto' }" v-for="(item, index) in messages" :key="index">
       <n-flex size="large" vertical>
         <n-flex align="center">
           <div>发送时间</div>
@@ -36,11 +32,7 @@
     </n-list-item>
   </n-list>
   <n-empty v-else description="没有消息"></n-empty>
-  <Pagination
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-    :total="total"
-  />
+  <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
 </template>
 <script lang="ts" setup>
 import { getMessageList } from "oj/api"

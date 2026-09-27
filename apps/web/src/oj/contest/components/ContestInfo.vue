@@ -8,11 +8,7 @@ const contestStore = useContestStore()
 </script>
 
 <template>
-  <n-popover
-    v-if="contestStore.contest"
-    placement="bottom-end"
-    :show-arrow="false"
-  >
+  <n-popover v-if="contestStore.contest" placement="bottom-end" :show-arrow="false">
     <template #trigger>
       <n-button>
         <template #icon>

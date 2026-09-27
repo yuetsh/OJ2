@@ -6,11 +6,7 @@ import TextEditor from "shared/components/TextEditor.vue"
 import TestcaseGenerator from "./components/TestcaseGenerator.vue"
 import SQLTestcaseEditor from "./components/SQLTestcaseEditor.vue"
 import AstRulesEditor from "./components/AstRulesEditor.vue"
-import {
-  CODE_TEMPLATES,
-  LANGUAGE_SHOW_VALUE,
-  STORAGE_KEY,
-} from "utils/constants"
+import { CODE_TEMPLATES, LANGUAGE_SHOW_VALUE, STORAGE_KEY } from "utils/constants"
 import download from "utils/download"
 import { unique } from "utils/functions"
 import type { BlankProblem, LANGUAGE, Tag, Testcase } from "utils/types"
@@ -23,13 +19,9 @@ import {
   uploadTestcases,
 } from "../api"
 
-const CodeEditor = defineAsyncComponent(
-  () => import("shared/components/CodeEditor.vue"),
-)
+const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
 
-const MermaidEditor = defineAsyncComponent(
-  () => import("shared/components/MermaidEditor.vue"),
-)
+const MermaidEditor = defineAsyncComponent(() => import("shared/components/MermaidEditor.vue"))
 
 interface Props {
   problemID?: string
@@ -349,8 +341,7 @@ async function validateProblem() {
   // 题目
   else if (
     !problem.value.description ||
-    (!isSQLProblem.value &&
-      (!problem.value.inputDescription || !problem.value.outputDescription))
+    (!isSQLProblem.value && (!problem.value.inputDescription || !problem.value.outputDescription))
   ) {
     message.error("题目或输入或输出没有填写")
     hasErrors = true
@@ -363,9 +354,7 @@ async function validateProblem() {
   // 样例是空的
   else if (
     !isSQLProblem.value &&
-    problem.value.samples.some(
-      (sample) => sample.output === "" || sample.input === "",
-    )
+    problem.value.samples.some((sample) => sample.output === "" || sample.input === "")
   ) {
     message.error("空样例没有删干净")
     hasErrors = true
@@ -384,9 +373,7 @@ async function validateProblem() {
     hasErrors = true
   } else if (
     isSQLProblem.value &&
-    !problem.value.answers.find(
-      (ans) => ans.language === "SQL" && ans.code.trim() !== "",
-    )
+    !problem.value.answers.find((ans) => ans.language === "SQL" && ans.code.trim() !== "")
   ) {
     message.error("SQL 题必须填写标准答案（判题时用它生成期望结果）")
     hasErrors = true
@@ -430,9 +417,7 @@ function filterHint() {
 }
 
 function filterAnswers() {
-  problem.value.answers = problem.value.answers.filter(
-    (ans) => ans.code.trim() !== "",
-  )
+  problem.value.answers = problem.value.answers.filter((ans) => ans.code.trim() !== "")
 }
 
 function filterSamplesForSQL() {
@@ -465,16 +450,10 @@ async function submit() {
     problem.value = null
     selectedTags.value = []
     newTags.value = []
-    if (
-      route.name === "admin problem create" ||
-      route.name === "admin contest problem create"
-    ) {
+    if (route.name === "admin problem create" || route.name === "admin contest problem create") {
       message.success("恭喜你 💐 出题成功")
     }
-    if (
-      route.name === "admin problem create" ||
-      route.name === "admin problem edit"
-    ) {
+    if (route.name === "admin problem create" || route.name === "admin problem edit") {
       router.push({ name: "admin problem list" })
     } else {
       router.push({
@@ -492,9 +471,7 @@ async function submit() {
 }
 
 const showClear = computed(
-  () =>
-    route.name === "admin problem create" ||
-    route.name === "admin contest problem create",
+  () => route.name === "admin problem create" || route.name === "admin contest problem create",
 )
 
 function clear() {
@@ -523,10 +500,7 @@ async function generateMermaid() {
 
 const showGeneratorModal = ref(false)
 
-function handleTestcasesGenerated(
-  testCaseId: string,
-  testCaseScore: Testcase[],
-) {
+function handleTestcasesGenerated(testCaseId: string, testCaseScore: Testcase[]) {
   problem.value.testCaseId = testCaseId
   problem.value.testCaseScore = testCaseScore
   showGeneratorModal.value = false
@@ -545,9 +519,7 @@ watch(
   () => problem.value.languages,
   (langs) => {
     const answers = langs.map((lang) => {
-      const existing = problem.value.answers.find(
-        (ans) => ans.language === lang,
-      )
+      const existing = problem.value.answers.find((ans) => ans.language === lang)
       return existing || { language: lang, code: "" }
     })
     problem.value.answers = answers
@@ -569,11 +541,7 @@ watch(
       <n-input class="problemTitleInput" v-model:value="problem.title" />
     </n-form-item>
     <n-form-item label="难度">
-      <n-select
-        class="w-100"
-        :options="difficultyOptions"
-        v-model:value="problem.difficulty"
-      />
+      <n-select class="w-100" :options="difficultyOptions" v-model:value="problem.difficulty" />
     </n-form-item>
     <n-form-item label="可见">
       <n-switch v-model:value="problem.visible" />
@@ -621,12 +589,7 @@ watch(
     <div class="box" v-for="(sample, index) in problem.samples" :key="index">
       <n-flex justify="space-between" align="center">
         <strong>测试样例 {{ index + 1 }}</strong>
-        <n-button
-          tertiary
-          type="warning"
-          size="small"
-          @click="removeSample(index)"
-        >
+        <n-button tertiary type="warning" size="small" @click="removeSample(index)">
           删除 {{ index + 1 }}
         </n-button>
       </n-flex>
@@ -658,10 +621,7 @@ watch(
       />
     </n-form-item>
     <n-form-item label="本题的考察知识点（选填，用于 AI 分析）">
-      <n-input
-        v-model:value="problem.prompt"
-        placeholder="比如考察选择、循环、算法等知识点"
-      />
+      <n-input v-model:value="problem.prompt" placeholder="比如考察选择、循环、算法等知识点" />
     </n-form-item>
   </n-form>
 
@@ -683,10 +643,7 @@ watch(
       </n-checkbox-group>
     </n-form-item>
     <n-form-item v-if="!isSQLProblem">
-      <n-checkbox
-        v-model:checked="needTemplate"
-        label="预制代码（显示在编辑器中，帮助快速上手）"
-      />
+      <n-checkbox v-model:checked="needTemplate" label="预制代码（显示在编辑器中，帮助快速上手）" />
     </n-form-item>
     <n-form-item>
       <n-button
@@ -701,17 +658,11 @@ watch(
     </n-form-item>
   </n-form>
 
-  <n-form
-    v-if="isSQLProblem && problem.sqlConfig"
-    inline
-    label-placement="left"
-  >
+  <n-form v-if="isSQLProblem && problem.sqlConfig" inline label-placement="left">
     <n-form-item label="SQL 题型">
       <n-radio-group v-model:value="problem.sqlConfig.mode">
         <n-radio-button value="query">查询题（比对查询结果）</n-radio-button>
-        <n-radio-button value="modify">
-          增删改题（比对执行后的表数据）
-        </n-radio-button>
+        <n-radio-button value="modify"> 增删改题（比对执行后的表数据） </n-radio-button>
       </n-radio-group>
     </n-form-item>
     <n-form-item label="严格比对行顺序">
@@ -732,11 +683,7 @@ watch(
               : '本题参考答案（选填，用于 AI 分析，不会泄露）'
           "
         >
-          <n-tabs
-            type="segment"
-            default-value="Python"
-            v-model:value="currentActiveAnswer"
-          >
+          <n-tabs type="segment" default-value="Python" v-model:value="currentActiveAnswer">
             <n-tab-pane
               v-for="(answer, index) in problem.answers"
               :key="index"
@@ -756,16 +703,8 @@ watch(
     <n-gi>
       <n-form v-if="needTemplate">
         <n-form-item label="编写预制代码">
-          <n-tabs
-            type="segment"
-            default-value="Python"
-            v-model:value="currentActiveTemplate"
-          >
-            <n-tab-pane
-              v-for="(lang, index) in problem.languages"
-              :key="index"
-              :name="lang"
-            >
+          <n-tabs type="segment" default-value="Python" v-model:value="currentActiveTemplate">
+            <n-tab-pane v-for="(lang, index) in problem.languages" :key="index" :name="lang">
               <CodeEditor
                 v-model:value="template[lang]"
                 :language="lang"
@@ -781,10 +720,7 @@ watch(
 
   <n-grid v-if="!isSQLProblem" :cols="2">
     <n-gi :span="1">
-      <AstRulesEditor
-        v-model="problem.astRules!"
-        :languages="problem.languages"
-      />
+      <AstRulesEditor v-model="problem.astRules!" :languages="problem.languages" />
     </n-gi>
   </n-grid>
 
@@ -794,16 +730,10 @@ watch(
 
   <n-flex v-if="!isSQLProblem" align="center" style="margin-bottom: 12px">
     <div>
-      <n-button type="success" @click="showGeneratorModal = true">
-        （新）直接生成
-      </n-button>
+      <n-button type="success" @click="showGeneratorModal = true"> （新）直接生成 </n-button>
     </div>
     <div>
-      <n-upload
-        :show-file-list="false"
-        accept=".zip"
-        :custom-request="handleUploadTestcases"
-      >
+      <n-upload :show-file-list="false" accept=".zip" :custom-request="handleUploadTestcases">
         <n-button type="info">（老）手动上传</n-button>
       </n-upload>
     </div>
@@ -823,12 +753,7 @@ watch(
     @uploaded="handleTestcasesGenerated"
   />
 
-  <n-alert
-    class="box"
-    v-if="problem.testCaseScore.length"
-    :show-icon="false"
-    type="info"
-  >
+  <n-alert class="box" v-if="problem.testCaseScore.length" :show-icon="false" type="info">
     <template #header>
       <n-flex align="center">
         <div>
@@ -836,13 +761,7 @@ watch(
           {{ problem.testCaseScore.length }}
           条测试用例
         </div>
-        <n-button
-          v-if="problem.id"
-          tertiary
-          type="info"
-          size="small"
-          @click="downloadTestcases"
-        >
+        <n-button v-if="problem.id" tertiary type="info" size="small" @click="downloadTestcases">
           下载
         </n-button>
       </n-flex>
@@ -875,10 +794,7 @@ watch(
         <n-button
           type="primary"
           size="small"
-          :disabled="
-            !problem.answers.filter((a) => a.language === 'Python')[0]?.code
-              .length
-          "
+          :disabled="!problem.answers.filter((a) => a.language === 'Python')[0]?.code.length"
           :loading="isAIGenerating"
           @click="generateMermaid"
         >
@@ -890,15 +806,8 @@ watch(
       </n-form-item>
       <n-form-item label="显示标准流程图">
         <n-flex align="center">
-          <n-switch
-            v-model:value="problem.showFlowchart"
-            :disabled="problem.allowFlowchart"
-          />
-          <n-text
-            v-if="problem.allowFlowchart"
-            depth="3"
-            style="font-size: 12px"
-          >
+          <n-switch v-model:value="problem.showFlowchart" :disabled="problem.allowFlowchart" />
+          <n-text v-if="problem.allowFlowchart" depth="3" style="font-size: 12px">
             让学生自己画图时，标准流程图不会下发给学生，这个开关没有意义
           </n-text>
         </n-flex>
@@ -907,10 +816,7 @@ watch(
 
     <n-form>
       <n-form-item>
-        <MermaidEditor
-          v-model="problem.mermaidCode"
-          @render-state="onMermaidRenderState"
-        />
+        <MermaidEditor v-model="problem.mermaidCode" @render-state="onMermaidRenderState" />
       </n-form-item>
       <n-form-item label="流程图提示信息（选填）">
         <n-input

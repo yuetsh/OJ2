@@ -17,10 +17,7 @@ const { isDesktop } = useBreakpoints()
 const password = ref("")
 
 async function check() {
-  const error = await contestStore.checkPassword(
-    props.contestID,
-    password.value,
-  )
+  const error = await contestStore.checkPassword(props.contestID, password.value)
   if (error === "too-many-password-attempts") {
     message.error("密码错误次数太多，请 10 分钟后再试")
   } else if (!contestStore.access) {
@@ -44,10 +41,7 @@ onMounted(() => {
 onBeforeUnmount(contestStore.clear)
 
 const passwordFormVisible = computed(
-  () =>
-    contestStore.isPrivate &&
-    !contestStore.access &&
-    !contestStore.isContestAdmin,
+  () => contestStore.isPrivate && !contestStore.access && !contestStore.isContestAdmin,
 )
 </script>
 
@@ -70,17 +64,9 @@ const passwordFormVisible = computed(
         <ContestMenu />
       </n-flex>
     </n-flex>
-    <n-form
-      :inline="isDesktop"
-      label-placement="left"
-      v-if="passwordFormVisible"
-    >
+    <n-form :inline="isDesktop" label-placement="left" v-if="passwordFormVisible">
       <n-form-item label="需要输入密码才能看到题目">
-        <n-input
-          name="ContestPassword"
-          type="password"
-          v-model:value="password"
-        />
+        <n-input name="ContestPassword" type="password" v-model:value="password" />
       </n-form-item>
       <n-form-item>
         <n-button @click="check" :disabled="!password">确认</n-button>

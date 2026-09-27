@@ -42,12 +42,7 @@
     <!-- 右侧：评分详情区域 -->
     <n-gi :span="2">
       <!-- AI反馈 -->
-      <n-card
-        v-if="submission.aiFeedback"
-        size="small"
-        title="AI反馈"
-        style="margin-bottom: 16px"
-      >
+      <n-card v-if="submission.aiFeedback" size="small" title="AI反馈" style="margin-bottom: 16px">
         <n-text>{{ submission.aiFeedback }}</n-text>
       </n-card>
 
@@ -59,10 +54,7 @@
         style="margin-bottom: 16px"
       >
         <n-flex vertical :size="6">
-          <n-text
-            v-for="(suggestion, index) in suggestionLines"
-            :key="`${index}-${suggestion}`"
-          >
+          <n-text v-for="(suggestion, index) in suggestionLines" :key="`${index}-${suggestion}`">
             {{ suggestion }}
           </n-text>
         </n-flex>
@@ -70,23 +62,11 @@
 
       <!-- 详细评分 -->
       <n-card v-if="sortedCriteria.length > 0" size="small" title="详细评分">
-        <div
-          v-for="[key, detail] in sortedCriteria"
-          :key="key"
-          style="margin-bottom: 12px"
-        >
+        <div v-for="[key, detail] in sortedCriteria" :key="key" style="margin-bottom: 12px">
           <!-- 评分项标题和分数 -->
-          <n-flex
-            justify="space-between"
-            align="center"
-            style="margin-bottom: 4px"
-          >
+          <n-flex justify="space-between" align="center" style="margin-bottom: 4px">
             <n-text strong>{{ key }}</n-text>
-            <n-tag
-              :type="getPercentType(detail.score / detail.max)"
-              size="small"
-              round
-            >
+            <n-tag :type="getPercentType(detail.score / detail.max)" size="small" round>
               {{ detail.score || 0 }}分 / {{ detail.max }}分
             </n-tag>
           </n-flex>
@@ -121,39 +101,35 @@ const submission = ref<FlowchartSubmission | null>(null)
  * 评分项明细。契约里是 `Record<string, unknown>` —— 内容是 AI 模型原样吐出的 JSON，
  * 后端不校验形状，所以这里只能按约定断言，字段缺失时用 0 / 空串兜底。
  */
-const criteriaDetails = computed<
-  Record<string, { score: number; max: number; comment: string }>
->(() => {
-  const raw = submission.value?.aiCriteriaDetails ?? {}
-  return Object.fromEntries(
-    Object.entries(raw).map(([key, value]) => {
-      const item = (value ?? {}) as Partial<{
-        score: number
-        max: number
-        comment: string
-      }>
-      return [
-        key,
-        {
-          score: item.score ?? 0,
-          max: item.max ?? 0,
-          comment: item.comment ?? "",
-        },
-      ]
-    }),
-  )
-})
-// jsonb 不保留键序，直接遍历会把 40 分的「逻辑正确性」排到最后
-const sortedCriteria = computed(() =>
-  sortFlowchartCriteria(criteriaDetails.value),
+const criteriaDetails = computed<Record<string, { score: number; max: number; comment: string }>>(
+  () => {
+    const raw = submission.value?.aiCriteriaDetails ?? {}
+    return Object.fromEntries(
+      Object.entries(raw).map(([key, value]) => {
+        const item = (value ?? {}) as Partial<{
+          score: number
+          max: number
+          comment: string
+        }>
+        return [
+          key,
+          {
+            score: item.score ?? 0,
+            max: item.max ?? 0,
+            comment: item.comment ?? "",
+          },
+        ]
+      }),
+    )
+  },
 )
+// jsonb 不保留键序，直接遍历会把 40 分的「逻辑正确性」排到最后
+const sortedCriteria = computed(() => sortFlowchartCriteria(criteriaDetails.value))
 
 const loading = ref(false)
 const rendering = ref(false)
 const showLargeImage = ref(false)
-const suggestionLines = computed(() =>
-  splitSuggestionLines(submission.value?.aiSuggestions),
-)
+const suggestionLines = computed(() => splitSuggestionLines(submission.value?.aiSuggestions))
 
 function splitSuggestionLines(suggestions?: string | null) {
   return suggestions
@@ -184,10 +160,7 @@ async function loadSubmission() {
     if (submission.value?.mermaidCode) {
       rendering.value = true
       await nextTick()
-      await renderFlowchart(
-        mermaidContainer.value,
-        submission.value.mermaidCode,
-      )
+      await renderFlowchart(mermaidContainer.value, submission.value.mermaidCode)
       rendering.value = false
     }
   } catch (error) {

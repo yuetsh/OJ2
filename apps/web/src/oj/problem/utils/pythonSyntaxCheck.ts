@@ -31,9 +31,7 @@ export function prefetchPythonSyntaxChecker() {
  * 只编译不执行，不受 input() 等 IO 调用影响。
  * 加载失败时返回 null（放行提交），交给后端判题兜底。
  */
-export async function checkPythonSyntax(
-  code: string,
-): Promise<PythonSyntaxError | null> {
+export async function checkPythonSyntax(code: string): Promise<PythonSyntaxError | null> {
   let Sk: any
   try {
     Sk = await loadSkulpt()

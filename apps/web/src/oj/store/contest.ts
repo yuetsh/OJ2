@@ -4,12 +4,7 @@ import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
 import { duration } from "utils/functions"
 import type { Contest, ProblemRow } from "utils/types"
-import {
-  checkContestPassword,
-  getContest,
-  getContestAccess,
-  getContestProblems,
-} from "../api"
+import { checkContestPassword, getContest, getContestAccess, getContestProblems } from "../api"
 
 export const useContestStore = defineStore("contest", () => {
   const userStore = useUserStore()
@@ -48,13 +43,10 @@ export const useContestStore = defineStore("contest", () => {
   const isContestAdmin = computed(
     () =>
       userStore.isSuperAdmin ||
-      (userStore.isAuthed &&
-        contest.value?.createdBy.id === userStore.user!.id),
+      (userStore.isAuthed && contest.value?.createdBy.id === userStore.user!.id),
   )
 
-  const isPrivate = computed(
-    () => contest.value!.contestType === ContestType.private,
-  )
+  const isPrivate = computed(() => contest.value!.contestType === ContestType.private)
 
   async function init(contestID: string) {
     problems.value = []

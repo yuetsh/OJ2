@@ -53,10 +53,7 @@ const columns = ref<DataTableColumn<ContestRank>[]>([
     render: (_, index) => index + (query.page - 1) * query.limit + 1,
   },
   {
-    title: renderTableTitle(
-      "用户",
-      "streamline-emojis:smiling-face-with-sunglasses",
-    ),
+    title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
     key: "username",
     width: 120,
     fixed: "left",
@@ -73,10 +70,7 @@ const columns = ref<DataTableColumn<ContestRank>[]>([
       ),
   },
   {
-    title: renderTableTitle(
-      "正确数/总提交",
-      "streamline-ultimate-color:color-palette",
-    ),
+    title: renderTableTitle("正确数/总提交", "streamline-ultimate-color:color-palette"),
     key: "submission",
     width: 140,
     align: "center",
@@ -147,16 +141,9 @@ async function addColumns() {
               ]
             }
             if (status.error_number) {
-              errorNumber = h(
-                "span",
-                { style: "margin: 0" },
-                `(-${status.error_number})`,
-              )
+              errorNumber = h("span", { style: "margin: 0" }, `(-${status.error_number})`)
             }
-            return h("div", { class: "oj-time-with-modal" }, [
-              acTime,
-              errorNumber,
-            ])
+            return h("div", { class: "oj-time-with-modal" }, [acTime, errorNumber])
           }
         },
         cellProps: (row) => {
@@ -244,10 +231,7 @@ async function downloadExcel() {
         level = "一等奖"
       } else if (rank1 <= exportForm.first + exportForm.second) {
         level = "二等奖"
-      } else if (
-        rank1 <=
-        exportForm.first + exportForm.second + exportForm.third
-      ) {
+      } else if (rank1 <= exportForm.first + exportForm.second + exportForm.third) {
         level = "三等奖"
       } else {
         level = "参与奖"
@@ -255,8 +239,7 @@ async function downloadExcel() {
       return { 用户名: rank.user.username, 等级: level }
     })
 
-    const csv =
-      "用户名,等级\n" + rows.map((r) => `${r.用户名},${r.等级}`).join("\n")
+    const csv = "用户名,等级\n" + rows.map((r) => `${r.用户名},${r.等级}`).join("\n")
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -294,13 +277,7 @@ onMounted(() => {
   <LineChart :ranks="chart" :problems="problems" v-if="chart.length > 0" />
 
   <!-- 排名表格 -->
-  <n-data-table
-    striped
-    :single-line="false"
-    :scroll-x="1200"
-    :columns="columns"
-    :data="data"
-  />
+  <n-data-table striped :single-line="false" :scroll-x="1200" :columns="columns" :data="data" />
   <n-space justify="end" align="center">
     <n-form
       label-placement="left"
@@ -347,9 +324,7 @@ onMounted(() => {
     </n-form>
     <template #action>
       <n-button @click="showExportModal = false">取消</n-button>
-      <n-button type="primary" :loading="exportLoading" @click="downloadExcel">
-        下载 CSV
-      </n-button>
+      <n-button type="primary" :loading="exportLoading" @click="downloadExcel"> 下载 CSV </n-button>
     </template>
   </n-modal>
 </template>

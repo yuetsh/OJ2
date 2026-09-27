@@ -48,10 +48,7 @@ const columns: DataTableColumn<SubmissionListItem>[] = [
             NTooltip,
             {},
             {
-              trigger: () =>
-                h(NButton, { text: true }, () =>
-                  h(Icon, { icon: "catppuccin:lock" }),
-                ),
+              trigger: () => h(NButton, { text: true }, () => h(Icon, { icon: "catppuccin:lock" })),
               default: () =>
                 "这道题在你已经加入的题单里，加入之前的提交先藏起来了。在题单中做出此题即可解锁；题单过了截止时间也会解锁。",
             },
@@ -190,12 +187,7 @@ watch(query, listSubmissions)
           </n-flex>
         </template>
       </n-alert>
-      <n-alert
-        class="tip"
-        type="error"
-        :show-icon="false"
-        v-if="rank === -1 && class_ac_count > 0"
-      >
+      <n-alert class="tip" type="error" :show-icon="false" v-if="rank === -1 && class_ac_count > 0">
         <template #header>
           <n-flex align="center">
             <span>
@@ -252,12 +244,7 @@ watch(query, listSubmissions)
           </n-flex>
         </template>
       </n-alert>
-      <n-alert
-        class="tip"
-        type="error"
-        :show-icon="false"
-        v-if="rank === -1 && all_ac_count > 0"
-      >
+      <n-alert class="tip" type="error" :show-icon="false" v-if="rank === -1 && all_ac_count > 0">
         <template #header>
           <n-flex align="center">
             <span>
@@ -288,12 +275,7 @@ watch(query, listSubmissions)
 
   <template v-if="userStore.showSubmissions && userStore.isAuthed">
     <!-- 错误分布统计 -->
-    <n-flex
-      v-if="statusDistribution.length"
-      class="tip"
-      align="center"
-      :wrap="true"
-    >
+    <n-flex v-if="statusDistribution.length" class="tip" align="center" :wrap="true">
       <span style="font-weight: bold; font-size: 13px">我的提交统计：</span>
       <n-tag
         v-for="item in statusDistribution"
@@ -306,17 +288,8 @@ watch(query, listSubmissions)
       </n-tag>
     </n-flex>
 
-    <n-data-table
-      v-if="submissions.length > 0"
-      striped
-      :columns="columns"
-      :data="submissions"
-    />
-    <Pagination
-      :total="total"
-      v-model:limit="query.limit"
-      v-model:page="query.page"
-    />
+    <n-data-table v-if="submissions.length > 0" striped :columns="columns" :data="submissions" />
+    <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   </template>
 
   <!-- 代码详情弹框 -->

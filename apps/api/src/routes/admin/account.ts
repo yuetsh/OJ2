@@ -14,18 +14,7 @@ import {
 } from "@oj2/contract"
 import { randomInt } from "node:crypto"
 import { z } from "zod"
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  ne,
-  or,
-  sql,
-} from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { hashPassword } from "../../auth/password"
@@ -55,10 +44,7 @@ function classNameOf(
   const matched = /^ks(\d+)/.exec(username)
   if (!matched) return { ok: true, value: null }
   const digits = matched[1]!
-  if (
-    digits.length < CLASS_NAME_MIN_DIGITS ||
-    digits.length > CLASS_NAME_MAX_DIGITS
-  ) {
+  if (digits.length < CLASS_NAME_MIN_DIGITS || digits.length > CLASS_NAME_MAX_DIGITS) {
     return {
       ok: false,
       message: `用户名 ${username} 的班级号 ${digits} 是 ${digits.length} 位，必须是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字`,
@@ -132,8 +118,7 @@ adminAccountRoutes.get("/rankings/users", requireSuperAdmin, async (c) => {
     eq(schema.user.isDisabled, false),
     // 输入班级前缀（ks251）按班级匹配，否则照旧按用户名包含
     keyword
-      ? (classPrefixCondition(keyword) ??
-          ilike(schema.user.username, `%${keyword}%`))
+      ? (classPrefixCondition(keyword) ?? ilike(schema.user.username, `%${keyword}%`))
       : undefined,
   )
 
@@ -185,8 +170,7 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
     // 以前这里直接把 query 塞进 eq()，传个不存在的角色名只会静默返回空列表。
     // 列加了 $type 之后编译器会拦下来，顺势改成校验：前端的下拉只有这四个值。
     const parsedType = adminTypeSchema.safeParse(type)
-    if (!parsedType.success)
-      return failure(c, 400, "invalid-request", "角色筛选值不合法")
+    if (!parsedType.success) return failure(c, 400, "invalid-request", "角色筛选值不合法")
     filters.push(eq(schema.user.adminType, parsedType.data))
   }
   if (keyword) {
@@ -211,9 +195,7 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
     orderBy === "-online"
       ? [
           ...(online.size
-            ? [
-                sql`case when ${inArray(schema.user.id, [...online])} then 0 else 1 end`,
-              ]
+            ? [sql`case when ${inArray(schema.user.id, [...online])} then 0 else 1 end`]
             : []),
           sql`${schema.user.lastLogin} desc nulls last`,
         ]
@@ -225,18 +207,12 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
     db
       .select({ value: count() })
       .from(schema.user)
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where),
     db
       .select({ user: schema.user, realName: schema.userProfile.realName })
       .from(schema.user)
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where)
       .orderBy(...order, asc(schema.user.id))
       .limit(limit)
@@ -265,23 +241,19 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
   const username = data.username.trim().toLowerCase()
   const email = data.email.trim().toLowerCase()
   const className = classNameOf(username)
-  if (!className.ok)
-    return failure(c, 400, "invalid-class-name", className.message)
+  if (!className.ok) return failure(c, 400, "invalid-class-name", className.message)
 
   const [dupUsername] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
     .where(and(eq(schema.user.username, username), ne(schema.user.id, id)))
     .limit(1)
-  if (dupUsername)
-    return failure(c, 409, "username-exists", "Username already exists")
+  if (dupUsername) return failure(c, 409, "username-exists", "Username already exists")
   // 比 lower(email)：存量数据里有大小写混着的邮箱，按原值比会漏掉冲突
   const [dupEmail] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(
-      and(sql`lower(${schema.user.email}) = ${email}`, ne(schema.user.id, id)),
-    )
+    .where(and(sql`lower(${schema.user.email}) = ${email}`, ne(schema.user.id, id)))
     .limit(1)
   if (dupEmail) return failure(c, 409, "email-exists", "Email already exists")
 
@@ -291,10 +263,7 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
     className: className.value,
     adminType: data.adminType,
     isDisabled: data.isDisabled,
-    problemPermission: normalizePermission(
-      data.adminType,
-      data.problemPermission,
-    ),
+    problemPermission: normalizePermission(data.adminType, data.problemPermission),
   }
   if (data.password) {
     // 与旧 User.set_password 一致：哈希与明文一起写。明文是有意保留的运营需求，
@@ -317,10 +286,7 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
      * 这里保持同步是为了「已删号回退显示」和按名字搜索那两条路。
      */
     if (existing.user.username !== username) {
-      await tx
-        .update(schema.submission)
-        .set({ username })
-        .where(eq(schema.submission.userId, id))
+      await tx.update(schema.submission).set({ username }).where(eq(schema.submission.userId, id))
     }
     await tx
       .update(schema.userProfile)
@@ -367,8 +333,7 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
   for (const [username, password, email, realName] of rows) {
     const name = username.toLowerCase()
     const className = classNameOf(name)
-    if (!className.ok)
-      return failure(c, 400, "invalid-class-name", className.message)
+    if (!className.ok) return failure(c, 400, "invalid-class-name", className.message)
     const mail = email.trim().toLowerCase()
     // 邮箱在本站是唯一的（注册和 PUT /users/:id 两条路都查重），唯独导入这条以前
     // 什么都不查 —— 而前端生成的占位邮箱按「班级+批内序号」拼，同一个班导第二批
@@ -394,27 +359,15 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
 
   const dupInBatch = (values: string[]) => {
     const seen = new Set<string>()
-    return [
-      ...new Set(values.filter((value) => seen.size === seen.add(value).size)),
-    ]
+    return [...new Set(values.filter((value) => seen.size === seen.add(value).size))]
   }
   const batchNames = dupInBatch(prepared.map((item) => item.username))
   if (batchNames.length) {
-    return failure(
-      c,
-      409,
-      "username-exists",
-      `这批名单里用户名重复：${batchNames.join("、")}`,
-    )
+    return failure(c, 409, "username-exists", `这批名单里用户名重复：${batchNames.join("、")}`)
   }
   const batchMails = dupInBatch(prepared.map((item) => item.email))
   if (batchMails.length) {
-    return failure(
-      c,
-      409,
-      "email-exists",
-      `这批名单里邮箱重复：${batchMails.join("、")}`,
-    )
+    return failure(c, 409, "email-exists", `这批名单里邮箱重复：${batchMails.join("、")}`)
   }
 
   const existing = await db
@@ -437,24 +390,14 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
     .filter((row) => takenNames.has(row.username))
     .map((row) => row.username)
   if (clashNames.length) {
-    return failure(
-      c,
-      409,
-      "username-exists",
-      `用户名已存在：${clashNames.join("、")}`,
-    )
+    return failure(c, 409, "username-exists", `用户名已存在：${clashNames.join("、")}`)
   }
   const takenMails = new Set(prepared.map((item) => item.email))
   const clashMails = existing
     .map((row) => row.email?.toLowerCase())
     .filter((mail): mail is string => !!mail && takenMails.has(mail))
   if (clashMails.length) {
-    return failure(
-      c,
-      409,
-      "email-exists",
-      `邮箱已被占用：${[...new Set(clashMails)].join("、")}`,
-    )
+    return failure(c, 409, "email-exists", `邮箱已被占用：${[...new Set(clashMails)].join("、")}`)
   }
 
   // argon2id 是**故意**做慢的，串行 await 的话一个班要转好几秒。但也不能 Promise.all
@@ -464,15 +407,12 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
   const HASH_CONCURRENCY = 4
   let cursor = 0
   await Promise.all(
-    Array.from(
-      { length: Math.min(HASH_CONCURRENCY, prepared.length) },
-      async () => {
-        while (cursor < prepared.length) {
-          const item = prepared[cursor++]!
-          item.password = await hashPassword(item.raw)
-        }
-      },
-    ),
+    Array.from({ length: Math.min(HASH_CONCURRENCY, prepared.length) }, async () => {
+      while (cursor < prepared.length) {
+        const item = prepared[cursor++]!
+        item.password = await hashPassword(item.raw)
+      }
+    }),
   )
 
   // 整批要么全进要么全不进 —— 导入是粘一整个班的名单，进了一半再重试会撞已存在
@@ -516,11 +456,7 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
  * 删除失败都当成系统故障报 500。
  */
 function isForeignKeyViolation(error: unknown) {
-  for (
-    let current = error;
-    current;
-    current = (current as { cause?: unknown }).cause
-  ) {
+  for (let current = error; current; current = (current as { cause?: unknown }).cause) {
     if ((current as { code?: string }).code === "23503") return true
   }
   return false
@@ -534,12 +470,7 @@ adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   if (!parsed.success) return parsed.response
   const me = c.get("user")!.id
   if (parsed.data.ids.includes(me)) {
-    return failure(
-      c,
-      400,
-      "cannot-delete-self",
-      "Current user can not be deleted",
-    )
+    return failure(c, 400, "cannot-delete-self", "Current user can not be deleted")
   }
   // 用户是被引用最广的一张表（提交、题目、比赛、公告……），级联删除牵连太大，
   // 旧后端靠 Django 的应用层级联硬删。这里不复刻那个行为，改为让数据库拦下来：
@@ -579,11 +510,7 @@ adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   } catch (error) {
     // 只有外键冲突（23503）和上面那条提交检查才是「这人还有历史数据」。以前这里是裸
     // catch，连接断了、语句超时也照报这句，超管会照着提示去禁用账号，真正的故障一直没人看见
-    if (
-      !(error instanceof UserHasSubmissionsError) &&
-      !isForeignKeyViolation(error)
-    )
-      throw error
+    if (!(error instanceof UserHasSubmissionsError) && !isForeignKeyViolation(error)) throw error
     return failure(
       c,
       409,
@@ -593,32 +520,24 @@ adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
   }
 })
 
-adminAccountRoutes.post(
-  "/users/:id/reset-password",
-  requireSuperAdmin,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const [existing] = await db
-      .select({ id: schema.user.id })
-      .from(schema.user)
-      .where(eq(schema.user.id, id))
-      .limit(1)
-    if (!existing)
-      return failure(c, 404, "user-not-found", "User does not exist")
-    // 6 位随机数字、不含 0，与旧后端一致：学生要照着念、要手输，0 和 O 分不清
-    const password = Array.from(
-      { length: 6 },
-      () => "123456789"[randomInt(9)],
-    ).join("")
-    await db
-      .update(schema.user)
-      .set({
-        password: await hashPassword(password),
-        rawPassword: password,
-      })
-      .where(eq(schema.user.id, id))
-    // 旧密码登出来的会话立刻作废，理由同 PUT /users/:id
-    await revokeUserSessions(id, "session-ended")
-    return success(c, { password } satisfies ResetPasswordResponse)
-  },
-)
+adminAccountRoutes.post("/users/:id/reset-password", requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const [existing] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.id, id))
+    .limit(1)
+  if (!existing) return failure(c, 404, "user-not-found", "User does not exist")
+  // 6 位随机数字、不含 0，与旧后端一致：学生要照着念、要手输，0 和 O 分不清
+  const password = Array.from({ length: 6 }, () => "123456789"[randomInt(9)]).join("")
+  await db
+    .update(schema.user)
+    .set({
+      password: await hashPassword(password),
+      rawPassword: password,
+    })
+    .where(eq(schema.user.id, id))
+  // 旧密码登出来的会话立刻作废，理由同 PUT /users/:id
+  await revokeUserSessions(id, "session-ended")
+  return success(c, { password } satisfies ResetPasswordResponse)
+})

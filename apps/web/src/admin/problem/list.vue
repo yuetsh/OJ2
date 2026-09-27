@@ -29,9 +29,7 @@ const title = computed(
       "admin contest problem list": "比赛题目列表",
     })[route.name as string],
 )
-const isContestProblemList = computed(
-  () => route.name === "admin contest problem list",
-)
+const isContestProblemList = computed(() => route.name === "admin contest problem list")
 
 const [show, toggleShow] = useToggle()
 const { count, inc } = useCounter(0)
@@ -42,9 +40,7 @@ const selectedRowKeys = ref<DataTableRowKey[]>([])
 const batchTagAction = ref<"add" | "remove">("add")
 const [showBatchTag, toggleBatchTag] = useToggle(false)
 
-const selectedProblemIds = computed(() =>
-  selectedRowKeys.value.map((key) => Number(key)),
-)
+const selectedProblemIds = computed(() => selectedRowKeys.value.map((key) => Number(key)))
 
 const rowKey = (row: AdminProblemRow) => row.id
 
@@ -103,9 +99,7 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
     key: "tags",
     minWidth: 120,
     render: (row) =>
-      h(NFlex, { size: 4 }, () =>
-        row.tags.map((t) => h(NTag, { key: t, size: "small" }, () => t)),
-      ),
+      h(NFlex, { size: 4 }, () => row.tags.map((t) => h(NTag, { key: t, size: "small" }, () => t))),
   },
   {
     title: "功能",
@@ -254,16 +248,10 @@ watch(() => [query.page, query.limit, query.author], listProblems)
       >
         卡点分析
       </n-button>
-      <n-button
-        v-if="!isContestProblemList"
-        @click="$router.push({ name: 'admin top ac trend' })"
-      >
+      <n-button v-if="!isContestProblemList" @click="$router.push({ name: 'admin top ac trend' })">
         年度趋势
       </n-button>
-      <n-button
-        v-if="!isContestProblemList"
-        @click="$router.push({ name: 'admin tag list' })"
-      >
+      <n-button v-if="!isContestProblemList" @click="$router.push({ name: 'admin tag list' })">
         标签管理
       </n-button>
     </n-flex>
@@ -274,14 +262,8 @@ watch(() => [query.page, query.limit, query.author], listProblems)
         </n-button>
         <n-button @click="openBatchTag('remove')">移除标签</n-button>
       </template>
-      <n-button v-if="isContestProblemList" @click="createContestProblem">
-        新建比赛题目
-      </n-button>
-      <n-button
-        v-if="isContestProblemList"
-        type="primary"
-        @click="selectProblems"
-      >
+      <n-button v-if="isContestProblemList" @click="createContestProblem"> 新建比赛题目 </n-button>
+      <n-button v-if="isContestProblemList" type="primary" @click="selectProblems">
         从题目中选择
       </n-button>
       <n-flex align="center" v-if="!props.contestID">
@@ -305,11 +287,7 @@ watch(() => [query.page, query.limit, query.author], listProblems)
     :row-key="rowKey"
     @update:checked-row-keys="chooseProblems"
   />
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   <AddFromLibraryModal
     v-model:show="show"
     :count="count"

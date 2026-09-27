@@ -12,11 +12,7 @@
       style="width: 120px"
       clearable
     />
-    <n-select
-      style="width: 120px"
-      v-model:value="query.duration"
-      :options="durationOptions"
-    />
+    <n-select style="width: 120px" v-model:value="query.duration" :options="durationOptions" />
     <n-button type="primary" @click="handleStatistics">统计</n-button>
   </n-flex>
 
@@ -75,10 +71,7 @@
           <n-gi v-if="data.personCount > 0">
             <n-card title="班级完成度">
               <div class="chart-container">
-                <Doughnut
-                  :data="completionChartData"
-                  :options="doughnutOptions"
-                />
+                <Doughnut :data="completionChartData" :options="doughnutOptions" />
               </div>
             </n-card>
           </n-gi>
@@ -119,21 +112,12 @@
             <template #checked>请假隐藏中</template>
             <template #unchecked>请假隐藏</template>
           </n-switch>
-          <n-button
-            v-if="hiddenCount > 0"
-            size="small"
-            type="info"
-            @click="showAll"
-          >
+          <n-button v-if="hiddenCount > 0" size="small" type="info" @click="showAll">
             恢复 {{ hiddenCount }} 位
           </n-button>
         </n-flex>
         <n-flex size="large" align="center">
-          <n-gradient-text
-            v-if="visibleUnaccepted.length === 0"
-            font-size="24"
-            type="success"
-          >
+          <n-gradient-text v-if="visibleUnaccepted.length === 0" font-size="24" type="success">
             全都完成了
           </n-gradient-text>
           <template v-for="item in visibleUnaccepted" :key="item.username">
@@ -158,10 +142,7 @@
 import { formatISO, sub, type Duration } from "date-fns"
 import type { FlowchartStatistics } from "@oj2/contract"
 import { getFlowchartStatistics } from "oj/api"
-import {
-  PANEL_DURATION_OPTIONS,
-  FLOWCHART_CRITERIA_ORDER,
-} from "utils/constants"
+import { PANEL_DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER } from "utils/constants"
 import { durationFromValue } from "utils/functions"
 import { useHiddenStudents } from "../composables/hiddenStudents"
 import { Doughnut, Radar, Bar } from "vue-chartjs"
@@ -229,15 +210,14 @@ const data = reactive<FlowchartStatistics>({
  * 「查出东西了吗」。和 StatisticsPanel 同一个道理：一节课刚开始时没有任何提交，
  * 但花名册整份都在 dataUnaccepted 里，那会儿正是老师要看名单的时候。
  */
-const hasResult = computed(
-  () => data.totalCount > 0 || data.dataUnaccepted.length > 0,
-)
+const hasResult = computed(() => data.totalCount > 0 || data.dataUnaccepted.length > 0)
 
 const wordcloudCanvas = useTemplateRef<HTMLCanvasElement>("wordcloudCanvas")
 let wordcloudChart: ChartJS | null = null
 
-const { hideMode, hideStudent, showAll, isHidden, notHidden } =
-  useHiddenStudents("oj_hidden_students_flowchart")
+const { hideMode, hideStudent, showAll, isHidden, notHidden } = useHiddenStudents(
+  "oj_hidden_students_flowchart",
+)
 
 const visibleUnaccepted = computed(() => data.dataUnaccepted.filter(notHidden))
 
@@ -245,16 +225,11 @@ const hiddenCount = computed(
   () => data.dataUnaccepted.filter((item) => isHidden(item.username)).length,
 )
 
-const adjustedPersonCount = computed(() =>
-  Math.max(0, data.personCount - hiddenCount.value),
-)
+const adjustedPersonCount = computed(() => Math.max(0, data.personCount - hiddenCount.value))
 
 const completionRate = computed(() => {
   if (adjustedPersonCount.value <= 0) return "0%"
-  const rate = Math.min(
-    100,
-    (data.completedCount / adjustedPersonCount.value) * 100,
-  )
+  const rate = Math.min(100, (data.completedCount / adjustedPersonCount.value) * 100)
   return `${Math.round(rate * 100) / 100}%`
 })
 
@@ -283,10 +258,7 @@ const gradeChartData = computed(() => {
 })
 
 const completionChartData = computed(() => {
-  const uncompleted = Math.max(
-    0,
-    adjustedPersonCount.value - data.completedCount,
-  )
+  const uncompleted = Math.max(0, adjustedPersonCount.value - data.completedCount)
   return {
     labels: ["已完成", "未完成"],
     datasets: [
@@ -310,10 +282,7 @@ const doughnutOptions = {
         label(context: any) {
           const label = context.label || ""
           const value = context.parsed || 0
-          const total = context.dataset.data.reduce(
-            (a: number, b: number) => a + b,
-            0,
-          )
+          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
           const pct = ((value / total) * 100).toFixed(1)
           return `${label}: ${value} (${pct}%)`
         },
@@ -325,9 +294,7 @@ const doughnutOptions = {
 // 与评分明细共用同一份顺序，见 utils/constants
 const CRITERIA_ORDER = FLOWCHART_CRITERIA_ORDER
 
-const hasRadarData = computed(() =>
-  CRITERIA_ORDER.some((k) => k in data.criteriaAverages),
-)
+const hasRadarData = computed(() => CRITERIA_ORDER.some((k) => k in data.criteriaAverages))
 
 const radarChartData = computed(() => {
   const labels = CRITERIA_ORDER
@@ -384,12 +351,8 @@ const criteriaBarChartData = computed(() => {
       {
         label: "平均得分",
         data: labels.map((k) => data.criteriaAverages[k]?.avg ?? 0),
-        backgroundColor: labels.map(
-          (_, i) => GRADE_COLORS[["S", "A", "B", "C"][i]].bg,
-        ),
-        borderColor: labels.map(
-          (_, i) => GRADE_COLORS[["S", "A", "B", "C"][i]].border,
-        ),
+        backgroundColor: labels.map((_, i) => GRADE_COLORS[["S", "A", "B", "C"][i]].bg),
+        borderColor: labels.map((_, i) => GRADE_COLORS[["S", "A", "B", "C"][i]].border),
         borderWidth: 2,
       },
     ],
@@ -473,24 +436,16 @@ function renderWordCloud() {
 }
 
 const subOptions = computed<Duration>(
-  () =>
-    durationFromValue(query.duration) ??
-    durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
+  () => durationFromValue(query.duration) ?? durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
 )
 
 async function handleStatistics() {
   const current = Date.now()
   const end = formatISO(current)
   const duration =
-    query.duration === "all"
-      ? { end }
-      : { start: formatISO(sub(current, subOptions.value)), end }
+    query.duration === "all" ? { end } : { start: formatISO(sub(current, subOptions.value)), end }
   try {
-    const res = await getFlowchartStatistics(
-      duration,
-      query.problem,
-      query.username,
-    )
+    const res = await getFlowchartStatistics(duration, query.problem, query.username)
     Object.assign(data, res)
   } catch (error) {
     message.error("获取流程图统计失败")

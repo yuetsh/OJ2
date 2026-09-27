@@ -7,8 +7,6 @@ import { defineConfig } from "vite-plus"
 export default defineConfig({
   fmt: {
     semi: false,
-    // Oxfmt 在 Vite+ 下默认 100 列，全仓一直是 80 —— 不写的话一格式化就是几百个文件的 diff
-    printWidth: 80,
     ignorePatterns: [
       // drizzle-kit 生成的迁移快照。内容等价的重排也别做 —— 这些文件是
       // db:generate 拿来比对上一版结构的输入，只该由 drizzle-kit 写。
@@ -52,12 +50,7 @@ export default defineConfig({
       // 提交前、CI 里跑这一条：格式 + lint + 两边类型检查 + 路由遮蔽 + AST 节点
       verify: {
         command: "vp check",
-        dependsOn: [
-          "typecheck:api",
-          "typecheck:web",
-          "check:routes",
-          "check:ast",
-        ],
+        dependsOn: ["typecheck:api", "typecheck:web", "check:routes", "check:ast"],
       },
     },
   },

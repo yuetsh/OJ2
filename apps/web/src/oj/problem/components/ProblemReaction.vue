@@ -54,15 +54,12 @@ function getWheelItemStyle(index: number): CSSProperties {
   const dividerAngle = index * sliceAngle - sliceAngle / 2
   const position = pointOnCircle(centerAngle, wheelGeometry.contentRadius)
   const push = pointOnCircle(centerAngle, wheelGeometry.pushRadius)
-  const arcPoints = Array.from(
-    { length: wheelGeometry.arcPointCount },
-    (_, pointIndex) => {
-      const progress = pointIndex / (wheelGeometry.arcPointCount - 1)
-      const angle = startAngle + (endAngle - startAngle) * progress
-      const point = pointOnCircle(angle, wheelGeometry.outerRadius)
-      return `${point.x.toFixed(3)}% ${point.y.toFixed(3)}%`
-    },
-  )
+  const arcPoints = Array.from({ length: wheelGeometry.arcPointCount }, (_, pointIndex) => {
+    const progress = pointIndex / (wheelGeometry.arcPointCount - 1)
+    const angle = startAngle + (endAngle - startAngle) * progress
+    const point = pointOnCircle(angle, wheelGeometry.outerRadius)
+    return `${point.x.toFixed(3)}% ${point.y.toFixed(3)}%`
+  })
 
   return {
     "--segment-path": `polygon(50% 50%, ${arcPoints.join(", ")})`,
@@ -192,9 +189,7 @@ function getPointerIndex(event: PointerEvent | MouseEvent) {
 
   const angle = (Math.atan2(y, x) * 180) / Math.PI
   const rawIndex = Math.round((angle - wheelGeometry.startAngle) / sliceAngle)
-  return (
-    ((rawIndex % wheelItems.length) + wheelItems.length) % wheelItems.length
-  )
+  return ((rawIndex % wheelItems.length) + wheelItems.length) % wheelItems.length
 }
 
 function preview(index: number, fromKeyboard = false) {
@@ -225,14 +220,7 @@ function onWheelClick(event: MouseEvent) {
 }
 
 async function pick(key: ReactionKey) {
-  if (
-    !problem.value ||
-    !solved.value ||
-    locked.value ||
-    loading.value ||
-    submitting.value
-  )
-    return
+  if (!problem.value || !solved.value || locked.value || loading.value || submitting.value) return
 
   activeIndex.value = null
   keyboardActive.value = false
@@ -345,18 +333,10 @@ watch(
         >
           <span class="option-content">
             <span class="option-icon" aria-hidden="true">
-              <Icon
-                :icon="
-                  submitting === item.key
-                    ? 'svg-spinners:180-ring-with-bg'
-                    : item.icon
-                "
-              />
+              <Icon :icon="submitting === item.key ? 'svg-spinners:180-ring-with-bg' : item.icon" />
             </span>
             <span class="option-label">{{ item.label }}</span>
-            <span v-if="counts" class="option-count">
-              {{ counts[item.key] }} 人
-            </span>
+            <span v-if="counts" class="option-count"> {{ counts[item.key] }} 人 </span>
           </span>
         </button>
 
@@ -420,22 +400,13 @@ watch(
 
 .segment-face:is(.is-active, .is-submitting) {
   z-index: 2;
-  background: color-mix(
-    in srgb,
-    var(--reaction-accent) 10%,
-    var(--reaction-card)
-  );
-  transform: translate(calc(var(--push-x) * 0.7), calc(var(--push-y) * 0.7))
-    scale(1.045);
+  background: color-mix(in srgb, var(--reaction-accent) 10%, var(--reaction-card));
+  transform: translate(calc(var(--push-x) * 0.7), calc(var(--push-y) * 0.7)) scale(1.045);
 }
 
 .segment-face.is-selected {
   z-index: 3;
-  background: color-mix(
-    in srgb,
-    var(--reaction-accent) 18%,
-    var(--reaction-card)
-  );
+  background: color-mix(in srgb, var(--reaction-accent) 18%, var(--reaction-card));
   transform: translate(var(--push-x), var(--push-y)) scale(1.075);
 }
 
@@ -512,14 +483,11 @@ watch(
 }
 
 .reaction-option:is(.is-active, .is-submitting) .option-content {
-  transform: translate(calc(var(--push-x) * 0.8), calc(var(--push-y) * 0.8))
-    scale(1.18);
+  transform: translate(calc(var(--push-x) * 0.8), calc(var(--push-y) * 0.8)) scale(1.18);
 }
 
-.reaction-option:is(.is-active, .is-submitting):active:not(:disabled)
-  .option-content {
-  transform: translate(calc(var(--push-x) * 0.8), calc(var(--push-y) * 0.8))
-    scale(1.1);
+.reaction-option:is(.is-active, .is-submitting):active:not(:disabled) .option-content {
+  transform: translate(calc(var(--push-x) * 0.8), calc(var(--push-y) * 0.8)) scale(1.1);
 }
 
 .reaction-option.is-selected .option-content {
@@ -623,13 +591,11 @@ watch(
   }
 
   .segment-face:is(.is-active, .is-submitting) {
-    transform: translate(calc(var(--push-x) * 0.5), calc(var(--push-y) * 0.5))
-      scale(1.03);
+    transform: translate(calc(var(--push-x) * 0.5), calc(var(--push-y) * 0.5)) scale(1.03);
   }
 
   .segment-face.is-selected {
-    transform: translate(calc(var(--push-x) * 0.75), calc(var(--push-y) * 0.75))
-      scale(1.05);
+    transform: translate(calc(var(--push-x) * 0.75), calc(var(--push-y) * 0.75)) scale(1.05);
   }
 
   .option-content {
@@ -637,19 +603,15 @@ watch(
   }
 
   .reaction-option:is(.is-active, .is-submitting) .option-content {
-    transform: translate(calc(var(--push-x) * 0.55), calc(var(--push-y) * 0.55))
-      scale(1.12);
+    transform: translate(calc(var(--push-x) * 0.55), calc(var(--push-y) * 0.55)) scale(1.12);
   }
 
-  .reaction-option:is(.is-active, .is-submitting):active:not(:disabled)
-    .option-content {
-    transform: translate(calc(var(--push-x) * 0.55), calc(var(--push-y) * 0.55))
-      scale(1.06);
+  .reaction-option:is(.is-active, .is-submitting):active:not(:disabled) .option-content {
+    transform: translate(calc(var(--push-x) * 0.55), calc(var(--push-y) * 0.55)) scale(1.06);
   }
 
   .reaction-option.is-selected .option-content {
-    transform: translate(calc(var(--push-x) * 0.75), calc(var(--push-y) * 0.75))
-      scale(1.17);
+    transform: translate(calc(var(--push-x) * 0.75), calc(var(--push-y) * 0.75)) scale(1.17);
   }
 
   .option-icon {

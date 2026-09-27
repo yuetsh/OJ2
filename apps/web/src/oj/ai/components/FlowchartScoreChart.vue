@@ -11,14 +11,7 @@
 <script setup lang="ts">
 import type { ChartOptions } from "chart.js"
 import { Bar } from "vue-chartjs"
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-  Legend,
-} from "chart.js"
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from "chart.js"
 import { useAIStore } from "oj/store/ai"
 import { useChartTheme } from "shared/composables/chartTheme"
 
@@ -31,8 +24,7 @@ const { chartKey } = useChartTheme()
 // 第二个 tab 里列成表格。这里直接画出来，不用改后端和契约
 const items = computed(() =>
   [...aiStore.detailsData.flowcharts].sort(
-    (a, b) =>
-      b.bestScore - a.bestScore || a.problemId.localeCompare(b.problemId),
+    (a, b) => b.bestScore - a.bestScore || a.problemId.localeCompare(b.problemId),
   ),
 )
 

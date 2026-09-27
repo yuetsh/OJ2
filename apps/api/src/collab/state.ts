@@ -8,9 +8,7 @@
 
 import { normalizeLanguage } from "@oj2/contract"
 
-export type CollabSocket = Bun.ServerWebSocket<
-  import("../websocket").SubmissionSocketData
->
+export type CollabSocket = Bun.ServerWebSocket<import("../websocket").SubmissionSocketData>
 
 /**
  * 协作支持的语言。和前端 utils/types.ts 里的 LANGUAGE 对齐，去掉 Flowchart ——
@@ -89,8 +87,7 @@ export function queueAheadOf(studentId: number) {
   if (!self) return 0
   let ahead = 0
   for (const request of requests.values()) {
-    if (request.status === "pending" && request.createdAt < self.createdAt)
-      ahead += 1
+    if (request.status === "pending" && request.createdAt < self.createdAt) ahead += 1
   }
   return ahead
 }

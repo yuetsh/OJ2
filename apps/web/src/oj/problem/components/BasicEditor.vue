@@ -20,8 +20,7 @@ const { isDesktop } = useBreakpoints()
 
 const contestID = route.params.contestID || null
 const storageKey = computed(
-  () =>
-    `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
+  () => `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
 )
 
 const editorHeight = computed(() =>
@@ -35,10 +34,7 @@ onMounted(() => {
       problem.value!.template[codeStore.code.language] ||
       SOURCES[codeStore.code.language],
   )
-  beginEditTrace(
-    `problem_${problem.value!._id}_contest_${contestID}`,
-    codeStore.code.value.length,
-  )
+  beginEditTrace(`problem_${problem.value!._id}_contest_${contestID}`, codeStore.code.value.length)
 })
 
 const changeCode = (v: string) => {
@@ -50,18 +46,14 @@ const changeLanguage = (v: LANGUAGE) => {
   codeStore.setCode(
     savedCode && storageKey.value.split("_").pop() === v
       ? savedCode
-      : problem.value!.template[codeStore.code.language] ||
-          SOURCES[codeStore.code.language],
+      : problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
   )
 }
 </script>
 
 <template>
   <n-flex vertical>
-    <EditorToolbar
-      :storage-key="storageKey"
-      @change-language="changeLanguage"
-    />
+    <EditorToolbar :storage-key="storageKey" @change-language="changeLanguage" />
     <CodeEditor
       v-model:value="codeStore.code.value"
       :language="codeStore.code.language"

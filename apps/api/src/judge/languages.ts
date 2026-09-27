@@ -16,11 +16,7 @@ import { normalizeLanguage } from "@oj2/contract"
  *
  * SQL 题不走这里，走 `judge/sql/`；流程图题走 AI 评分。
  */
-const defaultEnv = [
-  "LANG=en_US.UTF-8",
-  "LANGUAGE=en_US:en",
-  "LC_ALL=en_US.UTF-8",
-]
+const defaultEnv = ["LANG=en_US.UTF-8", "LANGUAGE=en_US:en", "LC_ALL=en_US.UTF-8"]
 
 /**
  * gcc-14 起这三类老写法从 warning 提成了 error，而 `-w` 只关警告、压不住 error：
@@ -92,9 +88,5 @@ export const languageConfigs: Record<string, Record<string, unknown>> = {
  * 它先过 `normalizeLanguage()`，所以 `Python3` / `Python2` 这类旧值也能命中。
  */
 export function judgeConfigFor(language: string) {
-  return (
-    languageConfigs[language] ??
-    languageConfigs[normalizeLanguage(language) ?? ""] ??
-    null
-  )
+  return languageConfigs[language] ?? languageConfigs[normalizeLanguage(language) ?? ""] ?? null
 }

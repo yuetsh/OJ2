@@ -83,26 +83,13 @@ const handleAccept = (studentId: number, problemId: string, status: string) => {
 </script>
 
 <template>
-  <n-modal
-    v-model:show="show"
-    preset="card"
-    title="课堂求助"
-    :style="{ width: '420px' }"
-  >
+  <n-modal v-model:show="show" preset="card" title="课堂求助" :style="{ width: '420px' }">
     <div style="max-height: 60vh; overflow: auto">
-      <n-alert
-        v-if="!isDesktop"
-        type="info"
-        :bordered="false"
-        style="margin-bottom: 8px"
-      >
+      <n-alert v-if="!isDesktop" type="info" :bordered="false" style="margin-bottom: 8px">
         接单要在电脑上打开
       </n-alert>
 
-      <n-empty
-        v-if="collabStore.groupedRequests.length === 0"
-        description="暂无求助"
-      />
+      <n-empty v-if="collabStore.groupedRequests.length === 0" description="暂无求助" />
 
       <div v-for="group in collabStore.groupedRequests" :key="group.problemId">
         <!-- 同题多人是个教学信号：该停下来全班讲，而不是挨个救 -->
@@ -124,17 +111,14 @@ const handleAccept = (studentId: number, problemId: string, status: string) => {
             padding: '6px 8px',
             borderRadius: '4px',
             opacity: item.status === 'active' ? 0.5 : 1,
-            cursor:
-              item.status === 'active' || !isDesktop ? 'default' : 'pointer',
+            cursor: item.status === 'active' || !isDesktop ? 'default' : 'pointer',
           }"
           @click="handleAccept(item.studentId, group.problemId, item.status)"
         >
           <n-flex vertical :size="2">
             <n-text>
               {{ item.studentName }}
-              <n-text depth="3" v-if="item.className"
-                >（{{ item.className }}）</n-text
-              >
+              <n-text depth="3" v-if="item.className">（{{ item.className }}）</n-text>
             </n-text>
             <n-text depth="3" style="font-size: 12px">
               {{

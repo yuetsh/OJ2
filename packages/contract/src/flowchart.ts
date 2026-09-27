@@ -77,19 +77,12 @@ export const flowchartStatisticsSchema = z.object({
   totalCount: z.number().int(),
   avgScore: z.number(),
   gradeDistribution: z.record(z.string(), z.number().int()),
-  criteriaAverages: z.record(
-    z.string(),
-    z.object({ avg: z.number(), max: z.number() }),
-  ),
+  criteriaAverages: z.record(z.string(), z.object({ avg: z.number(), max: z.number() })),
   personCount: z.number().int(),
   completedCount: z.number().int(),
-  wordFrequencies: z.array(
-    z.object({ word: z.string(), count: z.number().int() }),
-  ),
+  wordFrequencies: z.array(z.object({ word: z.string(), count: z.number().int() })),
   // 与提交统计共用「未完成学生」的形状，见 submission.ts 的 unacceptedStudentSchema
-  dataUnaccepted: z.array(
-    z.object({ username: z.string(), realName: z.string() }),
-  ),
+  dataUnaccepted: z.array(z.object({ username: z.string(), realName: z.string() })),
 })
 
 export const flowchartUpdateSchema = z.object({
@@ -114,11 +107,7 @@ export type FlowchartListItem = z.infer<typeof flowchartListItemSchema>
 export type FlowchartList = z.infer<typeof flowchartListSchema>
 export type FlowchartCurrent = z.infer<typeof flowchartCurrentSchema>
 export type FlowchartDetail = z.infer<typeof flowchartDetailSchema>
-export type CreateFlowchartResponse = z.infer<
-  typeof createFlowchartResponseSchema
->
-export type CreateFlowchartRequest = z.infer<
-  typeof createFlowchartRequestSchema
->
+export type CreateFlowchartResponse = z.infer<typeof createFlowchartResponseSchema>
+export type CreateFlowchartRequest = z.infer<typeof createFlowchartRequestSchema>
 
 export type FlowchartStatus = z.infer<typeof flowchartStatusSchema>

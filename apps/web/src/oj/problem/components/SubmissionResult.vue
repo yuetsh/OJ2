@@ -52,9 +52,7 @@ const hintFeedbackSending = ref(false)
 const TYPE_STEP = 3
 const TYPE_INTERVAL = 24
 let typingTimer: ReturnType<typeof setInterval> | null = null
-const hintTyping = computed(
-  () => hintContent.value.length < hintTarget.value.length,
-)
+const hintTyping = computed(() => hintContent.value.length < hintTarget.value.length)
 
 function stopTyping() {
   if (typingTimer === null) return
@@ -69,10 +67,7 @@ function startTyping() {
       stopTyping()
       return
     }
-    hintContent.value = hintTarget.value.slice(
-      0,
-      hintContent.value.length + TYPE_STEP,
-    )
+    hintContent.value = hintTarget.value.slice(0, hintContent.value.length + TYPE_STEP)
   }, TYPE_INTERVAL)
 }
 
@@ -99,17 +94,13 @@ const msg = computed(() => {
   // 编译错误或运行时错误时给出提示；
   // SQL 题的运行错误多半是"查询题里写了增删改"这类被判题拒绝的语句，err_info 已说明原因，不套这句
   if (
-    (result === SubmissionStatus.compile_error ||
-      result === SubmissionStatus.runtime_error) &&
+    (result === SubmissionStatus.compile_error || result === SubmissionStatus.runtime_error) &&
     props.submission.language !== "SQL"
   ) {
     msg += "请仔细检查，看看代码的格式是不是写错了！\n\n"
   }
 
-  if (
-    result !== SubmissionStatus.ast_check_failed &&
-    props.submission.statisticInfo?.err_info
-  ) {
+  if (result !== SubmissionStatus.ast_check_failed && props.submission.statisticInfo?.err_info) {
     msg += props.submission.statisticInfo.err_info
   }
 
@@ -258,9 +249,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
     </n-alert>
     <n-flex
       vertical
-      v-if="
-        msg || infoTable.length || submission.statisticInfo?.ast_results?.length
-      "
+      v-if="msg || infoTable.length || submission.statisticInfo?.ast_results?.length"
     >
       <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
         <n-flex vertical :size="8">
@@ -270,9 +259,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
             align="center"
             :size="6"
           >
-            <n-icon
-              :color="rule.passed ? theme.successColor : theme.errorColor"
-            >
+            <n-icon :color="rule.passed ? theme.successColor : theme.errorColor">
               <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
             </n-icon>
             <span>{{ rule.description }}</span>
@@ -287,23 +274,13 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
         </n-flex>
       </n-card>
       <n-card v-if="msg" embedded class="msg">{{ msg }}</n-card>
-      <n-data-table
-        v-if="infoTable.length"
-        striped
-        :data="infoTable"
-        :columns="columns"
-      />
+      <n-data-table v-if="infoTable.length" striped :data="infoTable" :columns="columns" />
     </n-flex>
 
     <!-- AI 提示区域 -->
     <template v-if="showAIHint">
       <n-card size="small" style="margin-top: 12px; max-width: 480px">
-        <n-alert
-          v-if="hintError"
-          type="error"
-          :title="hintError"
-          class="mb-3"
-        />
+        <n-alert v-if="hintError" type="error" :title="hintError" class="mb-3" />
         <n-button
           v-if="!hintTarget && !hintLoading"
           type="primary"

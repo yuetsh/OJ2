@@ -33,15 +33,12 @@ export function useMermaidConverter() {
     nodes.forEach((node: any, index: number) => {
       idMap.set(node.id, `node_${index}`)
     })
-    const safeId = (id: string) =>
-      idMap.get(id) || id.replace(/[^a-zA-Z0-9_]/g, "_")
+    const safeId = (id: string) => idMap.get(id) || id.replace(/[^a-zA-Z0-9_]/g, "_")
 
     // 处理节点 - 根据原始类型和自定义标签
     nodes.forEach((node: any) => {
       const nodeId = safeId(node.id)
-      const label = escapeLabel(
-        node.data?.customLabel || node.data?.label || "节点",
-      )
+      const label = escapeLabel(node.data?.customLabel || node.data?.label || "节点")
       const originalType = node.data?.originalType || node.type
 
       // 根据节点原始类型确定Mermaid语法
@@ -90,20 +87,13 @@ export function useMermaidConverter() {
 
     // 添加样式定义来区分不同类型的节点
     mermaid += "\n"
-    mermaid +=
-      "    classDef startNode fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#0f172a\n"
-    mermaid +=
-      "    classDef endNode fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a\n"
-    mermaid +=
-      "    classDef input fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a\n"
-    mermaid +=
-      "    classDef output fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a\n"
-    mermaid +=
-      "    classDef process fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0f172a\n"
-    mermaid +=
-      "    classDef decision fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a\n"
-    mermaid +=
-      "    classDef loop fill:#fae8ff,stroke:#c026d3,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef startNode fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef endNode fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef input fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef output fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef process fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef decision fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a\n"
+    mermaid += "    classDef loop fill:#fae8ff,stroke:#c026d3,stroke-width:2px,color:#0f172a\n"
     mermaid += "\n"
 
     // 为节点应用样式

@@ -27,11 +27,7 @@ export function usePagination<T extends Record<string, any>>(
   initialQuery: Omit<T, "page" | "limit"> = {} as Omit<T, "page" | "limit">,
   options: UsePaginationOptions = {},
 ) {
-  const {
-    defaultLimit = 10,
-    defaultPage = 1,
-    resetPageOnChange = true,
-  } = options
+  const { defaultLimit = 10, defaultPage = 1, resetPageOnChange = true } = options
 
   const route = useRoute()
   const router = useRouter()

@@ -9,9 +9,7 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const isPrivate = computed(
-  () => props.contest.contestType === ContestType.private,
-)
+const isPrivate = computed(() => props.contest.contestType === ContestType.private)
 </script>
 
 <template>

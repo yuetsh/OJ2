@@ -52,12 +52,8 @@ onBeforeUnmount(() => {
       <n-flex align="center">
         <span>Mermaid 代码</span>
         <n-flex align="center">
-          <n-button text @click="copyCode" size="small" type="primary">
-            复制
-          </n-button>
-          <n-button text @click="clearCode" type="error" size="small">
-            清空
-          </n-button>
+          <n-button text @click="copyCode" size="small" type="primary"> 复制 </n-button>
+          <n-button text @click="clearCode" type="error" size="small"> 清空 </n-button>
         </n-flex>
       </n-flex>
       <n-input
@@ -70,16 +66,9 @@ onBeforeUnmount(() => {
     <n-flex vertical>
       <n-flex align="center" justify="space-between">
         <span>图表预览</span>
-        <n-tag v-if="modelValue && renderSuccess" type="success" size="small">
-          ✓ 渲染成功
-        </n-tag>
+        <n-tag v-if="modelValue && renderSuccess" type="success" size="small"> ✓ 渲染成功 </n-tag>
       </n-flex>
-      <n-alert
-        v-if="renderError"
-        type="error"
-        title="Mermaid 语法错误"
-        style="margin-bottom: 8px"
-      >
+      <n-alert v-if="renderError" type="error" title="Mermaid 语法错误" style="margin-bottom: 8px">
         <n-text style="font-size: 12px">{{ renderError }}</n-text>
       </n-alert>
       <div ref="mermaidContainer" class="mermaid-container"></div>

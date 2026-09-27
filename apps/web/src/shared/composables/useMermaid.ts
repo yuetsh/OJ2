@@ -286,10 +286,7 @@ export function useMermaid() {
   const renderSuccess = ref(false)
   let renderGeneration = 0
 
-  const renderFlowchart = async (
-    container: HTMLElement | null,
-    mermaidCode: string,
-  ) => {
+  const renderFlowchart = async (container: HTMLElement | null, mermaidCode: string) => {
     renderError.value = null
     renderSuccess.value = false
 
@@ -308,10 +305,7 @@ export function useMermaid() {
       renderSuccess.value = true
     } catch (error) {
       if (gen !== renderGeneration) return
-      renderError.value =
-        error instanceof Error
-          ? error.message
-          : "流程图渲染失败，请检查代码格式"
+      renderError.value = error instanceof Error ? error.message : "流程图渲染失败，请检查代码格式"
     }
   }
 

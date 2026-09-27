@@ -33,13 +33,10 @@ import { useAIStream } from "shared/composables/aiStream"
 
 const GRADES = [20, 25]
 
-const gradeOptions = Array.from(
-  { length: GRADES[1] - GRADES[0] + 1 },
-  (_, i) => ({
-    label: `${GRADES[1] - i}年级`,
-    value: GRADES[1] - i,
-  }),
-)
+const gradeOptions = Array.from({ length: GRADES[1] - GRADES[0] + 1 }, (_, i) => ({
+  label: `${GRADES[1] - i}年级`,
+  value: GRADES[1] - i,
+}))
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -87,15 +84,12 @@ const weeklyStart = ref("")
  * 我入不入这张榜。教师/超管本来就不参与排名（服务端 me 恒为 null），未登录同理 ——
  * 这两种情况下 footer 那句「做出 1 题就能上榜」是说给不相干的人听的，不该出现。
  */
-const weeklyMeEligible = computed(
-  () => userStore.isAuthed && !userStore.isTeacherOrAbove,
-)
+const weeklyMeEligible = computed(() => userStore.isAuthed && !userStore.isTeacherOrAbove)
 /** 我在榜面之外（或本周还没做出题）—— 榜上高亮不到我，footer 另起一行 */
 const weeklyMeOffBoard = computed(
   () =>
     weeklyMeEligible.value &&
-    (!weeklyMe.value ||
-      !weeklyData.value.some((row) => row.rank === weeklyMe.value!.rank)),
+    (!weeklyMe.value || !weeklyData.value.some((row) => row.rank === weeklyMe.value!.rank)),
 )
 
 const showClassDetailModal = ref(false)
@@ -161,14 +155,10 @@ const columns: DataTableColumn<Rank>[] = [
     key: "index",
     width: 100,
     align: "center",
-    render: (_, index) =>
-      h(RankMedal, { index, page: query.page, limit: query.limit }),
+    render: (_, index) => h(RankMedal, { index, page: query.page, limit: query.limit }),
   },
   {
-    title: renderTableTitle(
-      "用户",
-      "streamline-emojis:smiling-face-with-sunglasses",
-    ),
+    title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
     key: "username",
     width: 240,
     render: (row) =>
@@ -177,8 +167,7 @@ const columns: DataTableColumn<Rank>[] = [
         row.isOnline
           ? h("span", {
               title: "在线（5 分钟内有活动）",
-              style:
-                "width:8px;height:8px;border-radius:50%;background:#18a058;flex:none",
+              style: "width:8px;height:8px;border-radius:50%;background:#18a058;flex:none",
             })
           : null,
         h(
@@ -190,27 +179,21 @@ const columns: DataTableColumn<Rank>[] = [
           },
           () => row.user.username,
         ),
-        isMe(row)
-          ? h(Icon, { width: 20, icon: "fluent-emoji:person-raising-hand" })
-          : null,
+        isMe(row) ? h(Icon, { width: 20, icon: "fluent-emoji:person-raising-hand" }) : null,
         h(
           NButton,
           {
             text: true,
             size: "tiny",
             title: "查看成就",
-            onClick: () =>
-              router.push("/achievement?name=" + row.user.username),
+            onClick: () => router.push("/achievement?name=" + row.user.username),
           },
           () => "🏆",
         ),
       ]),
   },
   {
-    title: renderTableTitle(
-      "个性签名",
-      "streamline-emojis:no-one-under-eighteen",
-    ),
+    title: renderTableTitle("个性签名", "streamline-emojis:no-one-under-eighteen"),
     key: "mood",
     minWidth: 200,
   },
@@ -221,10 +204,7 @@ const columns: DataTableColumn<Rank>[] = [
     align: "center",
   },
   {
-    title: renderTableTitle(
-      "提交数",
-      "streamline-ultimate-color:space-rocket-earth",
-    ),
+    title: renderTableTitle("提交数", "streamline-ultimate-color:space-rocket-earth"),
     key: "submissionNumber",
     width: 120,
     align: "center",
@@ -274,9 +254,7 @@ const options: SelectOption[] = [...LONG_DURATION_OPTIONS]
 
 // 认不出来退回 options[1]（一个月内），和 duration 的初值一致
 const subOptions = computed<Duration>(
-  () =>
-    durationFromValue(duration.value) ??
-    durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
+  () => durationFromValue(duration.value) ?? durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
 )
 
 // 周榜占的是三栏里的一栏，列头不再重复「本周」（卡片标题已经写着），
@@ -291,10 +269,7 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
     render: (row) => h(RankMedal, { index: row.rank - 1, page: 1, limit: 10 }),
   },
   {
-    title: renderTableTitle(
-      "用户",
-      "streamline-emojis:smiling-face-with-sunglasses",
-    ),
+    title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
     key: "username",
     minWidth: 120,
     ellipsis: { tooltip: true },
@@ -354,8 +329,7 @@ const classColumns: DataTableColumn<ClassRank>[] = [
   {
     title: "班级",
     key: "class_name",
-    render: (row) =>
-      `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
+    render: (row) => `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
     minWidth: 120,
     titleAlign: "center",
     align: "center",
@@ -492,10 +466,7 @@ async function listClassRank() {
 
 async function listMyClassRank() {
   try {
-    const offset =
-      myClassScope.value === "all"
-        ? (myClassQuery.page - 1) * myClassQuery.limit
-        : 0
+    const offset = myClassScope.value === "all" ? (myClassQuery.page - 1) * myClassQuery.limit : 0
     const limit = myClassScope.value === "all" ? myClassQuery.limit : undefined
     const res = await getUserClassRank(myClassScope.value, offset, limit)
     myRank.value = res.myRank
@@ -560,11 +531,7 @@ watch(
           <template #header>
             <div style="height: 34px">全服 Top10</div>
           </template>
-          <Chart
-            v-if="rankChart.length"
-            :type="ChartType.Rank"
-            :rank-data="rankChart"
-          />
+          <Chart v-if="rankChart.length" :type="ChartType.Rank" :rank-data="rankChart" />
           <n-empty v-else style="padding: 20px 0"></n-empty>
         </n-card>
       </n-gi>
@@ -572,11 +539,7 @@ watch(
         <n-card :bordered="false">
           <template #header>日活 Top10</template>
           <template #header-extra>
-            <n-select
-              style="width: 120px"
-              :options="options"
-              v-model:value="duration"
-            />
+            <n-select style="width: 120px" :options="options" v-model:value="duration" />
           </template>
           <Chart
             v-if="activityChart.length"
@@ -596,20 +559,11 @@ watch(
         <n-card :bordered="false">
           <template #header>全服 Top100</template>
           <template #header-extra>
-            <n-tag
-              v-if="onlineCount > 0"
-              round
-              :bordered="false"
-              type="success"
-            >
+            <n-tag v-if="onlineCount > 0" round :bordered="false" type="success">
               当前在线 {{ onlineCount }} 人
             </n-tag>
           </template>
-          <n-data-table
-            :data="data"
-            :columns="columns"
-            :row-class-name="rowClassName"
-          />
+          <n-data-table :data="data" :columns="columns" :row-class-name="rowClassName" />
           <template #footer>
             <n-flex align="center" justify="space-between" :wrap="false">
               <!-- 前 100 名之外的学生榜上找不到自己，这里单独给一行 -->
@@ -617,17 +571,12 @@ watch(
                 <template #icon>
                   <Icon width="18" icon="fluent-emoji:person-raising-hand" />
                 </template>
-                我的排名：第 {{ me!.rank }} 名 · 已解决
-                {{ me!.acceptedNumber }} · 提交 {{ me!.submissionNumber }} ·
-                正确率
+                我的排名：第 {{ me!.rank }} 名 · 已解决 {{ me!.acceptedNumber }} · 提交
+                {{ me!.submissionNumber }} · 正确率
                 {{ getACRate(me!.acceptedNumber, me!.submissionNumber) }}
               </n-tag>
               <span v-else />
-              <Pagination
-                :total="total"
-                v-model:page="query.page"
-                v-model:limit="query.limit"
-              />
+              <Pagination :total="total" v-model:page="query.page" v-model:limit="query.limit" />
             </n-flex>
           </template>
         </n-card>
@@ -659,8 +608,7 @@ watch(
             :data="weeklyData"
             :columns="weeklyColumns"
             :row-class-name="
-              (row: WeeklyRankItem) =>
-                weeklyMe && row.rank === weeklyMe.rank ? 'me-row' : ''
+              (row: WeeklyRankItem) => (weeklyMe && row.rank === weeklyMe.rank ? 'me-row' : '')
             "
           />
           <n-empty
@@ -678,12 +626,10 @@ watch(
                 <Icon width="18" icon="fluent-emoji:person-raising-hand" />
               </template>
               <template v-if="weeklyMe">
-                我这周第 {{ weeklyMe.rank }} 名（共 {{ weeklyTotal }} 人上榜）·
-                新解决 {{ weeklyMe.solvedCount }} 题
+                我这周第 {{ weeklyMe.rank }} 名（共 {{ weeklyTotal }} 人上榜）· 新解决
+                {{ weeklyMe.solvedCount }} 题
               </template>
-              <template v-else>
-                我这周还没有解决新题目，做出 1 题就能上榜
-              </template>
+              <template v-else> 我这周还没有解决新题目，做出 1 题就能上榜 </template>
             </n-tag>
           </template>
         </n-card>
@@ -776,10 +722,7 @@ watch(
               class="stat-avg-ac"
             >
               <template #suffix>
-                <Icon
-                  icon="streamline-ultimate-color:analytics-pie-2"
-                  width="20"
-                />
+                <Icon icon="streamline-ultimate-color:analytics-pie-2" width="20" />
               </template>
             </n-statistic>
           </n-gi>
@@ -791,10 +734,7 @@ watch(
               class="stat-median-ac"
             >
               <template #suffix>
-                <Icon
-                  icon="streamline-ultimate-color:cursor-target-1"
-                  width="20"
-                />
+                <Icon icon="streamline-ultimate-color:cursor-target-1" width="20" />
               </template>
             </n-statistic>
           </n-gi>
@@ -806,10 +746,7 @@ watch(
               class="stat-total-submission"
             >
               <template #suffix>
-                <Icon
-                  icon="streamline-ultimate-color:common-file-text"
-                  width="20"
-                />
+                <Icon icon="streamline-ultimate-color:common-file-text" width="20" />
               </template>
             </n-statistic>
           </n-gi>
@@ -829,12 +766,7 @@ watch(
 
         <n-divider style="margin: 12px 0" />
 
-        <n-descriptions
-          bordered
-          :column="2"
-          size="small"
-          label-placement="left"
-        >
+        <n-descriptions bordered :column="2" size="small" label-placement="left">
           <n-descriptions-item label="第一四分位数(Q1)">
             <span style="color: #9254de; font-weight: 500">{{
               classDetailData.q1Ac.toFixed(2)
@@ -871,9 +803,7 @@ watch(
             }}</span>
           </n-descriptions-item>
           <n-descriptions-item label="人数">
-            <span style="color: #1890ff; font-weight: 600">{{
-              classDetailData.userCount
-            }}</span>
+            <span style="color: #1890ff; font-weight: 600">{{ classDetailData.userCount }}</span>
           </n-descriptions-item>
         </n-descriptions>
 
@@ -885,10 +815,7 @@ watch(
               :show-indicator="true"
               :border-radius="4"
             >
-              <template #default
-                >优秀率:
-                {{ classDetailData.excellentRate.toFixed(1) }}%</template
-              >
+              <template #default>优秀率: {{ classDetailData.excellentRate.toFixed(1) }}%</template>
             </n-progress>
             <n-progress
               type="line"
@@ -897,9 +824,7 @@ watch(
               :border-radius="4"
               status="success"
             >
-              <template #default
-                >及格率: {{ classDetailData.passRate.toFixed(1) }}%</template
-              >
+              <template #default>及格率: {{ classDetailData.passRate.toFixed(1) }}%</template>
             </n-progress>
             <n-progress
               type="line"
@@ -908,27 +833,16 @@ watch(
               :border-radius="4"
               status="info"
             >
-              <template #default
-                >参与度: {{ classDetailData.activeRate.toFixed(1) }}%</template
-              >
+              <template #default>参与度: {{ classDetailData.activeRate.toFixed(1) }}%</template>
             </n-progress>
           </n-space>
         </n-card>
 
-        <n-flex
-          justify="center"
-          align="center"
-          :size="12"
-          style="margin-top: 12px"
-        >
+        <n-flex justify="center" align="center" :size="12" style="margin-top: 12px">
           <n-tag type="success" size="large">
             综合分: {{ classDetailData.compositeScore.toFixed(1) }}
           </n-tag>
-          <n-button
-            type="info"
-            :loading="classDetailAiLoading"
-            @click="analyzeSingleClassWithAI"
-          >
+          <n-button type="info" :loading="classDetailAiLoading" @click="analyzeSingleClassWithAI">
             <template #icon>
               <Icon icon="ph:sparkle" />
             </template>
@@ -936,11 +850,7 @@ watch(
           </n-button>
         </n-flex>
       </n-flex>
-      <n-empty
-        v-else-if="!classDetailLoading"
-        description="暂无数据"
-        style="padding: 40px 0"
-      />
+      <n-empty v-else-if="!classDetailLoading" description="暂无数据" style="padding: 40px 0" />
     </n-spin>
   </n-modal>
 
@@ -952,10 +862,7 @@ watch(
   >
     <n-spin :show="classDetailAiLoading" :delay="50">
       <div style="min-height: 200px">
-        <MdPreview
-          v-if="classDetailAiContent"
-          :model-value="classDetailAiContent"
-        />
+        <MdPreview v-if="classDetailAiContent" :model-value="classDetailAiContent" />
         <n-flex
           v-else-if="!classDetailAiLoading"
           align="center"

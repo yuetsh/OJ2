@@ -30,11 +30,7 @@
     </n-flex>
   </n-alert>
   <n-data-table striped :columns="columns" :data="reports" />
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 
   <n-modal
     v-model:show="showModal"
@@ -68,12 +64,7 @@ import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import Pagination from "shared/components/Pagination.vue"
 import { parseTime } from "utils/functions"
-import {
-  getAIReportList,
-  getAIReportDetail,
-  pinAIReport,
-  getPinnedAIReports,
-} from "../api"
+import { getAIReportList, getAIReportDetail, pinAIReport, getPinnedAIReports } from "../api"
 import { NButton, NTag } from "naive-ui"
 import type { AdminAiReport, AdminAiReportListItem } from "utils/types"
 
@@ -95,8 +86,7 @@ const columns: DataTableColumn<ReportItem>[] = [
     title: "用户名",
     key: "username",
     width: 150,
-    render: (row) =>
-      h("span", { style: row.isPinned ? "font-weight:600" : "" }, row.username),
+    render: (row) => h("span", { style: row.isPinned ? "font-weight:600" : "" }, row.username),
   },
   {
     title: "AI 分析内容",
@@ -114,9 +104,7 @@ const columns: DataTableColumn<ReportItem>[] = [
     key: "is_pinned",
     width: 100,
     render: (row) =>
-      row.isPinned
-        ? h(NTag, { type: "warning", size: "small" }, () => "已锁定")
-        : null,
+      row.isPinned ? h(NTag, { type: "warning", size: "small" }, () => "已锁定") : null,
   },
   {
     title: "操作",

@@ -5,13 +5,7 @@ import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
 import type { AdminUserForm } from "utils/types"
-import {
-  deleteUsers,
-  editUser,
-  getUserList,
-  importUsers,
-  resetPassword,
-} from "../api"
+import { deleteUsers, editUser, getUserList, importUsers, resetPassword } from "../api"
 import Actions from "./components/Actions.vue"
 import UserNameCell from "./components/UserNameCell.vue"
 import PasswordCell from "./components/PasswordCell.vue"
@@ -78,8 +72,7 @@ const columns: DataTableColumn<AdminUserForm>[] = [
         user: row,
         revealed: revealedPasswords.value.has(row.id),
         onToggle: (id: number) => {
-          if (!revealedPasswords.value.delete(id))
-            revealedPasswords.value.add(id)
+          if (!revealedPasswords.value.delete(id)) revealedPasswords.value.add(id)
         },
       }),
   },
@@ -87,8 +80,7 @@ const columns: DataTableColumn<AdminUserForm>[] = [
     title: "创建时间",
     key: "create_time",
     width: 200,
-    render: (row) =>
-      row.createTime ? parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss") : "",
+    render: (row) => (row.createTime ? parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss") : ""),
   },
   {
     title: "上次登录",
@@ -98,12 +90,8 @@ const columns: DataTableColumn<AdminUserForm>[] = [
     // 会话能留 7 天。上次登录时间照旧显示，在线的人前面多一个标记
     render: (row) =>
       h(NFlex, { align: "center", size: "small" }, () => [
-        row.isOnline
-          ? h(NTag, { type: "success", size: "small" }, () => "在线")
-          : null,
-        row.lastLogin
-          ? parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss")
-          : "从未登录",
+        row.isOnline ? h(NTag, { type: "success", size: "small" }, () => "在线") : null,
+        row.lastLogin ? parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss") : "从未登录",
       ]),
   },
   {
@@ -144,13 +132,7 @@ const problemPermissionOptions: SelectOption[] = [
 async function listUsers() {
   if (query.page < 1) query.page = 1
   const offset = (query.page - 1) * query.limit
-  const res = await getUserList(
-    offset,
-    query.limit,
-    query.type,
-    query.keyword,
-    query.orderBy,
-  )
+  const res = await getUserList(offset, query.limit, query.type, query.keyword, query.orderBy)
   total.value = res.total
   users.value = res.results
   revealedPasswords.value.clear()
@@ -274,15 +256,10 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
     <n-flex>
       <h2 class="title">用户列表</h2>
       <n-button type="primary" @click="createNewUser">新建</n-button>
-      <n-button @click="$router.push({ name: 'admin user generate' })">
-        导入
-      </n-button>
+      <n-button @click="$router.push({ name: 'admin user generate' })"> 导入 </n-button>
     </n-flex>
     <n-flex>
-      <n-popconfirm
-        v-if="userIDs.length"
-        @positive-click="onDeleteUsers(userIDs)"
-      >
+      <n-popconfirm v-if="userIDs.length" @positive-click="onDeleteUsers(userIDs)">
         <template #trigger>
           <n-button type="warning">删除</n-button>
         </template>
@@ -319,11 +296,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
     :row-key="rowKey"
     @update:checked-row-keys="chooseUsers"
   />
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   <n-modal
     :mask-closable="false"
     :show="!!userEditing"
@@ -343,11 +316,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
         <!-- 班级是后端从用户名的 ks 数字前缀推出来的（classNameOf），
              editUser 也不发这个字段，所以这里只读 —— 以前是个能改、改了没用的输入框 -->
         <n-form-item-gi v-if="!create" :span="1" label="班级">
-          <n-input
-            :value="userEditing.className"
-            disabled
-            placeholder="由用户名自动推导"
-          />
+          <n-input :value="userEditing.className" disabled placeholder="由用户名自动推导" />
         </n-form-item-gi>
         <n-form-item-gi :span="1" label="邮箱">
           <n-input v-model:value="userEditing.email" />
@@ -355,11 +324,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
         <n-form-item-gi v-if="!create" :span="1" label="类型">
           <n-select v-model:value="userEditing.adminType" :options="options" />
         </n-form-item-gi>
-        <n-form-item-gi
-          :span="1"
-          label="密码"
-          label-style="color: red; font-weight: bold"
-        >
+        <n-form-item-gi :span="1" label="密码" label-style="color: red; font-weight: bold">
           <n-input v-model:value="password" />
         </n-form-item-gi>
         <n-form-item-gi

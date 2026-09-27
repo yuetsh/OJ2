@@ -15,10 +15,7 @@ export function useHistory() {
   // 是否可以重做
   const canRedo = computed(() => historyIndex.value < history.value.length - 1)
 
-  const deepCopyState = (
-    nodes: Node[],
-    edges: Edge[],
-  ): { nodes: Node[]; edges: Edge[] } =>
+  const deepCopyState = (nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } =>
     // 先裁掉 vue-flow 的运行时内部字段再深拷贝：20 份快照 × 每个节点几百字节的
     // handleBounds/dimensions，纯属白拷
     JSON.parse(

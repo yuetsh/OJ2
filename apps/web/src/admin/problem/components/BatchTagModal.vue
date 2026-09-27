@@ -20,9 +20,7 @@ const tags = ref<AdminTag[]>([])
 const selected = ref<string[]>([])
 const newTags = ref<string[]>([])
 
-const title = computed(() =>
-  props.action === "add" ? "批量添加标签" : "批量移除标签",
-)
+const title = computed(() => (props.action === "add" ? "批量添加标签" : "批量移除标签"))
 
 const selectedSet = computed(() => new Set(selected.value))
 
@@ -53,11 +51,7 @@ async function submit() {
     message.error("请先选择标签")
     return
   }
-  const res = await batchTagProblems(
-    props.problemIds,
-    names.value,
-    props.action,
-  )
+  const res = await batchTagProblems(props.problemIds, names.value, props.action)
   const verb = props.action === "add" ? "添加" : "移除"
   message.success(`已为 ${res.problemCount} 道题${verb} ${res.tagCount} 个标签`)
   close()

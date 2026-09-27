@@ -79,12 +79,7 @@ const columns: DataTableColumn<SolvedProblem>[] = [
           text: true,
           onClick: () => {
             if (row.problem.contestId) {
-              router.push(
-                "/contest/" +
-                  row.problem.contestId +
-                  "/problem/" +
-                  row.problem.displayId,
-              )
+              router.push("/contest/" + row.problem.contestId + "/problem/" + row.problem.displayId)
             } else {
               router.push("/problem/" + row.problem.displayId)
             }
@@ -102,8 +97,7 @@ const columns: DataTableColumn<SolvedProblem>[] = [
   {
     // 用后端下发的 rankScope，不要看 className 有没有值：班里只有一个人时
     // 后端会回退到全服排名，那种学生原来看到的是「班级排名」配全服数据
-    title: () =>
-      aiStore.detailsData.rankScope === "class" ? "班级排名" : "全服排名",
+    title: () => (aiStore.detailsData.rankScope === "class" ? "班级排名" : "全服排名"),
     key: "rank",
     width: 100,
     align: "center",
@@ -119,12 +113,7 @@ const columns: DataTableColumn<SolvedProblem>[] = [
   {
     title: () =>
       h(NTooltip, null, {
-        trigger: () =>
-          h(
-            "span",
-            { style: "cursor:help; border-bottom: 1px dashed" },
-            "等级",
-          ),
+        trigger: () => h("span", { style: "cursor:help; border-bottom: 1px dashed" }, "等级"),
         default: () =>
           h("div", null, [
             h("div", null, "基于同时段排名的百分位："),

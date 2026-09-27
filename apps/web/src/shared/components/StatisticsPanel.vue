@@ -15,17 +15,9 @@
       style="width: 200px"
       clearable
     />
-    <n-select
-      style="width: 120px"
-      v-model:value="query.duration"
-      :options="options"
-    />
-    <n-button type="primary" :loading="loading" @click="handleStatistics">
-      统计
-    </n-button>
-    <n-button v-if="route.name !== 'submissions'" @click="goSubmissions">
-      前往提交列表
-    </n-button>
+    <n-select style="width: 120px" v-model:value="query.duration" :options="options" />
+    <n-button type="primary" :loading="loading" @click="handleStatistics"> 统计 </n-button>
+    <n-button v-if="route.name !== 'submissions'" @click="goSubmissions"> 前往提交列表 </n-button>
   </n-flex>
 
   <n-empty v-if="!hasResult" description="暂无数据" style="margin: 40px 0" />
@@ -35,46 +27,32 @@
     <n-flex justify="space-around">
       <div class="stat-item">
         <n-text>总提交</n-text>
-        <n-gradient-text type="info" font-size="28">{{
-          count.total
-        }}</n-gradient-text>
+        <n-gradient-text type="info" font-size="28">{{ count.total }}</n-gradient-text>
       </div>
       <div class="stat-item">
         <n-text>正确提交</n-text>
-        <n-gradient-text type="primary" font-size="28">{{
-          count.accepted
-        }}</n-gradient-text>
+        <n-gradient-text type="primary" font-size="28">{{ count.accepted }}</n-gradient-text>
       </div>
       <div class="stat-item" v-if="count.judging > 0">
         <n-text>判题中</n-text>
-        <n-gradient-text type="info" font-size="28">{{
-          count.judging
-        }}</n-gradient-text>
+        <n-gradient-text type="info" font-size="28">{{ count.judging }}</n-gradient-text>
       </div>
       <div class="stat-item">
         <n-text>正确率</n-text>
-        <n-gradient-text type="warning" font-size="28"
-          >{{ count.rate }}%</n-gradient-text
-        >
+        <n-gradient-text type="warning" font-size="28">{{ count.rate }}%</n-gradient-text>
       </div>
       <template v-if="personCount > 0">
         <div class="stat-item">
           <n-text>完成人数</n-text>
-          <n-gradient-text type="error" font-size="28">{{
-            doneList.length
-          }}</n-gradient-text>
+          <n-gradient-text type="error" font-size="28">{{ doneList.length }}</n-gradient-text>
         </div>
         <div class="stat-item">
           <n-text>班级人数</n-text>
-          <n-gradient-text type="warning" font-size="28">{{
-            adjustedPersonCount
-          }}</n-gradient-text>
+          <n-gradient-text type="warning" font-size="28">{{ adjustedPersonCount }}</n-gradient-text>
         </div>
         <div class="stat-item">
           <n-text>完成度</n-text>
-          <n-gradient-text type="success" font-size="28">{{
-            adjustedPersonRate
-          }}</n-gradient-text>
+          <n-gradient-text type="success" font-size="28">{{ adjustedPersonRate }}</n-gradient-text>
         </div>
       </template>
     </n-flex>
@@ -90,10 +68,7 @@
           </n-gi>
           <n-gi v-if="personCount > 0">
             <n-card title="班级完成度">
-              <Doughnut
-                :data="completionChartData"
-                :options="completionChartOptions"
-              />
+              <Doughnut :data="completionChartData" :options="completionChartOptions" />
             </n-card>
           </n-gi>
         </n-grid>
@@ -125,20 +100,11 @@
             <template #checked>请假隐藏中</template>
             <template #unchecked>请假隐藏</template>
           </n-switch>
-          <n-button
-            v-if="hiddenCount > 0"
-            size="small"
-            type="info"
-            @click="showAll"
-          >
+          <n-button v-if="hiddenCount > 0" size="small" type="info" @click="showAll">
             恢复 {{ hiddenCount }} 位
           </n-button>
         </n-flex>
-        <n-gradient-text
-          v-if="unfinishedGroups.length === 0"
-          font-size="24"
-          type="success"
-        >
+        <n-gradient-text v-if="unfinishedGroups.length === 0" font-size="24" type="success">
           全都完成了
         </n-gradient-text>
         <template v-for="group in unfinishedGroups" :key="group.title">
@@ -163,10 +129,7 @@
                   >
                     {{ item.label }}
                   </n-tag>
-                  <span
-                    v-else
-                    :class="{ name: true, 'name-clickable': !!item.failure }"
-                  >
+                  <span v-else :class="{ name: true, 'name-clickable': !!item.failure }">
                     {{ item.label }}
                   </span>
                 </template>
@@ -178,11 +141,7 @@
                   <pre v-if="item.failure?.error" class="failure-error">{{
                     item.failure?.error
                   }}</pre>
-                  <n-button
-                    size="small"
-                    tertiary
-                    @click="openFailure(item.failure?.id)"
-                  >
+                  <n-button size="small" tertiary @click="openFailure(item.failure?.id)">
                     看代码
                   </n-button>
                 </n-flex>
@@ -280,10 +239,7 @@ function groupByProblem(list: SubmissionStatisticsItems["items"]) {
           item.result === SubmissionStatus.ast_check_failed,
       ),
     }))
-    .sort(
-      (a, b) =>
-        Number(a.solved) - Number(b.solved) || b.items.length - a.items.length,
-    )
+    .sort((a, b) => Number(a.solved) - Number(b.solved) || b.items.length - a.items.length)
 }
 
 function openSubmission(id: string) {
@@ -310,17 +266,12 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
                 style: "width: 200px; flex: none",
               },
               () => [
-                h(
-                  NTag,
-                  { size: "small", bordered: false },
-                  () => group.problemDisplayId,
-                ),
+                h(NTag, { size: "small", bordered: false }, () => group.problemDisplayId),
                 h(
                   NText,
                   {
                     depth: 2,
-                    style:
-                      "overflow: hidden; text-overflow: ellipsis; white-space: nowrap",
+                    style: "overflow: hidden; text-overflow: ellipsis; white-space: nowrap",
                   },
                   () => group.problemTitle,
                 ),
@@ -332,46 +283,39 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
                 depth: 3,
                 style: "width: 104px; flex: none",
               },
-              () =>
-                `${group.items.length} 次 · ${group.solved ? "已通过" : "未通过"}`,
+              () => `${group.items.length} 次 · ${group.solved ? "已通过" : "未通过"}`,
             ),
-            h(
-              NFlex,
-              { size: 4, wrap: true, style: "flex: 1; min-width: 0" },
-              () =>
-                group.items.map((item) =>
-                  h(
-                    NTooltip,
-                    { delay: 200 },
-                    {
-                      trigger: () =>
-                        h("button", {
-                          // 内联样式而不是 class：这些方块是 h() 出来、挂在 NDataTable 的
-                          // 展开槽里渲染的，<style scoped> 能不能盖到它并不确定
-                          style: {
-                            width: "14px",
-                            height: "14px",
-                            padding: "0",
-                            border: "none",
-                            borderRadius: "3px",
-                            cursor: "pointer",
-                            background:
-                              ATTEMPT_COLORS[
-                                JUDGE_STATUS[item.result]?.type ?? "default"
-                              ],
-                          },
-                          onClick: (event: MouseEvent) => {
-                            event.stopPropagation()
-                            openSubmission(item.id)
-                          },
-                        }),
-                      default: () =>
-                        `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
-                        `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
-                        `${item.id.toString().slice(0, 12)}`,
-                    },
-                  ),
+            h(NFlex, { size: 4, wrap: true, style: "flex: 1; min-width: 0" }, () =>
+              group.items.map((item) =>
+                h(
+                  NTooltip,
+                  { delay: 200 },
+                  {
+                    trigger: () =>
+                      h("button", {
+                        // 内联样式而不是 class：这些方块是 h() 出来、挂在 NDataTable 的
+                        // 展开槽里渲染的，<style scoped> 能不能盖到它并不确定
+                        style: {
+                          width: "14px",
+                          height: "14px",
+                          padding: "0",
+                          border: "none",
+                          borderRadius: "3px",
+                          cursor: "pointer",
+                          background: ATTEMPT_COLORS[JUDGE_STATUS[item.result]?.type ?? "default"],
+                        },
+                        onClick: (event: MouseEvent) => {
+                          event.stopPropagation()
+                          openSubmission(item.id)
+                        },
+                      }),
+                    default: () =>
+                      `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
+                      `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
+                      `${item.id.toString().slice(0, 12)}`,
+                  },
                 ),
+              ),
             ),
           ]),
         ),
@@ -379,8 +323,7 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
           ? h(
               NText,
               { depth: 3 },
-              () =>
-                `只显示最近 ${loaded.items.length} 条，上面「提交数」才是总数`,
+              () => `只显示最近 ${loaded.items.length} 条，上面「提交数」才是总数`,
             )
           : null,
       ])
@@ -501,11 +444,7 @@ async function loadItems(username: string) {
           end: formatISO(current),
         }
   try {
-    items[username] = await getSubmissionStatisticsItems(
-      duration,
-      username,
-      query.problem,
-    )
+    items[username] = await getSubmissionStatisticsItems(duration, username, query.problem)
   } catch {
     // 拉不到就当空的：展开行显示不出东西，但不该把整个面板带崩
     items[username] = { items: [], truncated: false }
@@ -519,12 +458,9 @@ async function loadItems(username: string) {
  * 已经把整份花名册当作「未完成」返回了，而那正是老师最想看名单的时刻。
  * 原来整个面板 v-if 在 count.total > 0 上，那会儿只显示「暂无数据」。
  */
-const hasResult = computed(
-  () => count.total > 0 || listUnaccepted.value.length > 0,
-)
+const hasResult = computed(() => count.total > 0 || listUnaccepted.value.length > 0)
 
-const { hideMode, hideStudent, showAll, notHidden } =
-  useHiddenStudents("oj_hidden_students")
+const { hideMode, hideStudent, showAll, notHidden } = useHiddenStudents("oj_hidden_students")
 
 const visibleUnaccepted = computed(() => listUnaccepted.value.filter(notHidden))
 const visibleAttempted = computed(() => listAttempted.value.filter(notHidden))
@@ -560,27 +496,26 @@ type UnfinishedItem = {
   failure: AttemptedStudent["lastFailure"]
 }
 
-const unfinishedGroups = computed<{ title: string; items: UnfinishedItem[] }[]>(
-  () =>
-    [
-      {
-        title: "还没交",
-        items: visibleUnaccepted.value.map((item) => ({
-          username: item.username,
-          label: item.realName,
-          failure: null,
-        })),
-      },
-      {
-        // 查多道题时这一栏混着「一道没对」和「差一道」两种人，标题得说清是「没全对」
-        title: queriedProblemCount.value > 1 ? "交了没全对" : "交了没对",
-        items: visibleAttempted.value.map((item) => ({
-          username: item.username,
-          label: attemptedLabel(item),
-          failure: item.lastFailure,
-        })),
-      },
-    ].filter((group) => group.items.length > 0),
+const unfinishedGroups = computed<{ title: string; items: UnfinishedItem[] }[]>(() =>
+  [
+    {
+      title: "还没交",
+      items: visibleUnaccepted.value.map((item) => ({
+        username: item.username,
+        label: item.realName,
+        failure: null,
+      })),
+    },
+    {
+      // 查多道题时这一栏混着「一道没对」和「差一道」两种人，标题得说清是「没全对」
+      title: queriedProblemCount.value > 1 ? "交了没全对" : "交了没对",
+      items: visibleAttempted.value.map((item) => ({
+        username: item.username,
+        label: attemptedLabel(item),
+        failure: item.lastFailure,
+      })),
+    },
+  ].filter((group) => group.items.length > 0),
 )
 
 type FailureResult = NonNullable<AttemptedStudent["lastFailure"]>["result"]
@@ -600,16 +535,11 @@ function openFailure(id?: string) {
   if (id) openSubmission(id)
 }
 
-const adjustedPersonCount = computed(
-  () => personCount.value - hiddenCount.value,
-)
+const adjustedPersonCount = computed(() => personCount.value - hiddenCount.value)
 
 const adjustedPersonRate = computed(() => {
   if (adjustedPersonCount.value <= 0) return "0%"
-  const rate = Math.min(
-    100,
-    (doneList.value.length / adjustedPersonCount.value) * 100,
-  )
+  const rate = Math.min(100, (doneList.value.length / adjustedPersonCount.value) * 100)
   return `${Math.round(rate * 100) / 100}%`
 })
 
@@ -659,10 +589,7 @@ const pieChartOptions = {
         label: function (context: any) {
           const label = context.label || ""
           const value = context.parsed || 0
-          const total = context.dataset.data.reduce(
-            (a: number, b: number) => a + b,
-            0,
-          )
+          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
           const percentage = ((value / total) * 100).toFixed(1)
           return `${label}: ${value} (${percentage}%)`
         },
@@ -674,10 +601,7 @@ const pieChartOptions = {
 // 环形图数据 - 班级完成度
 const completionChartData = computed(() => {
   const completedCount = list.value.length
-  const uncompletedCount = Math.max(
-    0,
-    adjustedPersonCount.value - completedCount,
-  )
+  const uncompletedCount = Math.max(0, adjustedPersonCount.value - completedCount)
   return {
     labels: ["已完成", "未完成"],
     datasets: [
@@ -704,10 +628,7 @@ const completionChartOptions = {
         label: function (context: any) {
           const label = context.label || ""
           const value = context.parsed || 0
-          const total = context.dataset.data.reduce(
-            (a: number, b: number) => a + b,
-            0,
-          )
+          const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
           const percentage = ((value / total) * 100).toFixed(1)
           return `${label}: ${value} (${percentage}%)`
         },
@@ -719,9 +640,7 @@ const completionChartOptions = {
 const subOptions = computed<Duration>(
   // 认不出来（含 all）就退回列表第一档，和原来 `?? options[0]` 一致；
   // all 实际不会走到这里，handleStatistics 先分支掉了
-  () =>
-    durationFromValue(query.duration) ??
-    durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
+  () => durationFromValue(query.duration) ?? durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
 )
 
 function goSubmissions() {
@@ -750,18 +669,12 @@ async function fetchStatistics() {
   const current = Date.now()
   const end = formatISO(current)
   const duration =
-    query.duration === "all"
-      ? { end }
-      : { start: formatISO(sub(current, subOptions.value)), end }
+    query.duration === "all" ? { end } : { start: formatISO(sub(current, subOptions.value)), end }
   const problems = query.problem
     .split(/[,，;；\s]+/)
     .map((item) => item.trim())
     .filter(Boolean)
-  const res = await getSubmissionStatistics(
-    duration,
-    query.problem,
-    query.username,
-  )
+  const res = await getSubmissionStatistics(duration, query.problem, query.username)
   queriedProblemCount.value = new Set(problems.map((p) => p.toLowerCase())).size
   count.total = res.submissionCount
   count.accepted = res.acceptedCount

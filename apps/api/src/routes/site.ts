@@ -53,9 +53,10 @@ const sentenceCache = new Map<string, Quote[]>()
 async function loadSentences(path: string) {
   const cached = sentenceCache.get(path)
   if (cached) return cached
-  const raw = (await Bun.file(
-    resolve(config.hitokotoDirectory, path),
-  ).json()) as { hitokoto?: unknown; from?: unknown }[]
+  const raw = (await Bun.file(resolve(config.hitokotoDirectory, path)).json()) as {
+    hitokoto?: unknown
+    from?: unknown
+  }[]
   const rows = (Array.isArray(raw) ? raw : [])
     .filter((it) => typeof it.hitokoto === "string" && it.hitokoto.length > 0)
     .map((it) => ({
@@ -87,8 +88,7 @@ siteRoutes.get("/quotes/random", async (c) => {
   try {
     return success(c, (await randomQuote()) satisfies Quote)
   } catch {
-    const item =
-      fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)]!
+    const item = fallbackQuotes[Math.floor(Math.random() * fallbackQuotes.length)]!
     return success(c, item satisfies Quote)
   }
 })
@@ -96,12 +96,7 @@ siteRoutes.get("/quotes/random", async (c) => {
 siteRoutes.get("/classes/:className/usernames", async (c) => {
   const className = c.req.param("className").trim()
   if (!/^\d{3,4}$/.test(className)) {
-    return failure(
-      c,
-      400,
-      "invalid-class",
-      "Class name must contain 3 or 4 digits",
-    )
+    return failure(c, 400, "invalid-class", "Class name must contain 3 or 4 digits")
   }
   const rows = await db
     .select({ username: schema.user.username })

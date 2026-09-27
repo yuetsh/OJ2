@@ -54,10 +54,8 @@ const columns: DataTableColumn<AdminTag>[] = [
     key: "problem_count",
     width: 100,
     render: (row) =>
-      h(
-        NButton,
-        { text: true, type: "primary", onClick: () => openTagProblems(row) },
-        () => String(row.problemCount),
+      h(NButton, { text: true, type: "primary", onClick: () => openTagProblems(row) }, () =>
+        String(row.problemCount),
       ),
   },
   {
@@ -76,11 +74,7 @@ const columns: DataTableColumn<AdminTag>[] = [
               h(NButton, { size: "small", onClick: cancelEdit }, () => "取消"),
             ]
           : [
-              h(
-                NButton,
-                { size: "small", onClick: () => startEdit(row) },
-                () => "重命名",
-              ),
+              h(NButton, { size: "small", onClick: () => startEdit(row) }, () => "重命名"),
               h(
                 NButton,
                 {
@@ -153,16 +147,9 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   <n-flex class="titleWrapper" justify="space-between">
     <n-flex align="center">
       <h2 class="title">标签管理</h2>
-      <n-button @click="$router.push({ name: 'admin problem list' })">
-        返回题目列表
-      </n-button>
+      <n-button @click="$router.push({ name: 'admin problem list' })"> 返回题目列表 </n-button>
     </n-flex>
-    <n-input
-      v-model:value="keyword"
-      style="width: 200px"
-      placeholder="搜索标签"
-      clearable
-    />
+    <n-input v-model:value="keyword" style="width: 200px" placeholder="搜索标签" clearable />
   </n-flex>
   <n-data-table striped :columns="columns" :data="tags" />
   <TagProblemsModal

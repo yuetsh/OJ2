@@ -38,9 +38,7 @@ function sqlSchemaCompletions(): Completion[] {
     },
     ...table.columns.map((col) => ({
       label: col.name,
-      detail: col.type
-        ? `${table.name} 的字段 · ${col.type}`
-        : `${table.name} 的字段`,
+      detail: col.type ? `${table.name} 的字段 · ${col.type}` : `${table.name} 的字段`,
       type: "property",
       boost: 105,
     })),
@@ -48,51 +46,38 @@ function sqlSchemaCompletions(): Completion[] {
 }
 
 export function enhanceCompletion(language: LANGUAGE): CompletionSource {
-  return async function (
-    context: CompletionContext,
-  ): Promise<CompletionResult | null> {
+  return async function (context: CompletionContext): Promise<CompletionResult | null> {
     const word = context.matchBefore(/\w+/)
     if (!word && !context.explicit) return null
 
     const trulyLanguage =
-      language === "SQL"
-        ? "sql"
-        : language.startsWith("Python")
-          ? "python"
-          : "c"
-    const completions: Completion[] = (
-      chineseAnnotations[trulyLanguage] || []
-    ).map((completion) => {
-      const insertText =
-        typeof completion.apply === "string"
-          ? completion.apply
-          : completion.label
-      const cursorOffset = insertText.includes("(")
-        ? insertText.indexOf("(") + 1
-        : insertText.length
+      language === "SQL" ? "sql" : language.startsWith("Python") ? "python" : "c"
+    const completions: Completion[] = (chineseAnnotations[trulyLanguage] || []).map(
+      (completion) => {
+        const insertText =
+          typeof completion.apply === "string" ? completion.apply : completion.label
+        const cursorOffset = insertText.includes("(")
+          ? insertText.indexOf("(") + 1
+          : insertText.length
 
-      if (
-        (completion.type === "function" || completion.type === "method") &&
-        insertText.includes(")")
-      ) {
-        return {
-          ...completion,
-          apply: (
-            view: EditorView,
-            _c: Completion,
-            from: number,
-            to: number,
-          ) => {
-            view.dispatch({
-              changes: { from, to, insert: insertText },
-              selection: { anchor: from + cursorOffset },
-            })
-          },
+        if (
+          (completion.type === "function" || completion.type === "method") &&
+          insertText.includes(")")
+        ) {
+          return {
+            ...completion,
+            apply: (view: EditorView, _c: Completion, from: number, to: number) => {
+              view.dispatch({
+                changes: { from, to, insert: insertText },
+                selection: { anchor: from + cursorOffset },
+              })
+            },
+          }
         }
-      }
 
-      return completion
-    })
+        return completion
+      },
+    )
 
     if (trulyLanguage === "sql") {
       completions.push(...sqlSchemaCompletions())

@@ -6,9 +6,7 @@ import type { Segment } from "../composables/useExerciseParse"
 defineProps<{ segments: Segment[]; lang?: string }>()
 
 const isDark = useDark()
-const ExerciseWidget = defineAsyncComponent(
-  () => import("./ExerciseWidget.vue"),
-)
+const ExerciseWidget = defineAsyncComponent(() => import("./ExerciseWidget.vue"))
 </script>
 
 <template>

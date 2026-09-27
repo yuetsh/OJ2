@@ -42,9 +42,7 @@ const props = defineProps<Props>()
 defineEmits(["showCode"])
 
 const userStore = useUserStore()
-const isOwnSubmission = computed(
-  () => userStore.profile?.user?.id === props.submission.userId,
-)
+const isOwnSubmission = computed(() => userStore.profile?.user?.id === props.submission.userId)
 
 function goto() {
   window.open("/submission/" + props.submission.id, "_blank")

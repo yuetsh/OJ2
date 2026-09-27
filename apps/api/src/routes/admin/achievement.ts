@@ -10,11 +10,7 @@ import { Hono } from "hono"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
-import {
-  ACHIEVEMENT_METRICS,
-  findMetric,
-  metricName,
-} from "../../services/achievement-metrics"
+import { ACHIEVEMENT_METRICS, findMetric, metricName } from "../../services/achievement-metrics"
 import { rescanAchievement } from "../../services/achievements"
 import { queryInteger } from "../helpers"
 
@@ -52,30 +48,20 @@ adminAchievementRoutes.get("/achievements", requireSuperAdmin, async (c) => {
   return success(c, rows.map(serialize))
 })
 
-adminAchievementRoutes.get(
-  "/achievements/:id",
-  requireSuperAdmin,
-  async (c) => {
-    const [row] = await db
-      .select()
-      .from(schema.achievement)
-      .where(
-        eq(
-          schema.achievement.id,
-          queryInteger(c.req.param("id"), 0, { min: 1 }),
-        ),
-      )
-      .limit(1)
-    if (!row) return failure(c, 404, "achievement-not-found", "成就不存在")
-    return success(c, serialize(row))
-  },
-)
+adminAchievementRoutes.get("/achievements/:id", requireSuperAdmin, async (c) => {
+  const [row] = await db
+    .select()
+    .from(schema.achievement)
+    .where(eq(schema.achievement.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .limit(1)
+  if (!row) return failure(c, 404, "achievement-not-found", "成就不存在")
+  return success(c, serialize(row))
+})
 
 adminAchievementRoutes.post("/achievements", requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, createAchievementRequestSchema)
   if (!parsed.success) return parsed.response
-  if (!findMetric(parsed.data.metric))
-    return failure(c, 400, "invalid-metric", "指标不存在")
+  if (!findMetric(parsed.data.metric)) return failure(c, 400, "invalid-metric", "指标不存在")
 
   const [created] = await db
     .insert(schema.achievement)
@@ -97,61 +83,51 @@ adminAchievementRoutes.post("/achievements", requireSuperAdmin, async (c) => {
   return success(c, serialize(row!), 201)
 })
 
-adminAchievementRoutes.put(
-  "/achievements/:id",
-  requireSuperAdmin,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = await parseBody(c, updateAchievementRequestSchema)
-    if (!parsed.success) return parsed.response
-    if (!findMetric(parsed.data.metric))
-      return failure(c, 400, "invalid-metric", "指标不存在")
+adminAchievementRoutes.put("/achievements/:id", requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = await parseBody(c, updateAchievementRequestSchema)
+  if (!parsed.success) return parsed.response
+  if (!findMetric(parsed.data.metric)) return failure(c, 400, "invalid-metric", "指标不存在")
 
-    const [before] = await db
-      .select()
-      .from(schema.achievement)
-      .where(eq(schema.achievement.id, id))
-      .limit(1)
-    if (!before) return failure(c, 404, "achievement-not-found", "成就不存在")
+  const [before] = await db
+    .select()
+    .from(schema.achievement)
+    .where(eq(schema.achievement.id, id))
+    .limit(1)
+  if (!before) return failure(c, 404, "achievement-not-found", "成就不存在")
 
-    const [after] = await db
-      .update(schema.achievement)
-      .set(parsed.data)
-      .where(eq(schema.achievement.id, id))
-      .returning()
+  const [after] = await db
+    .update(schema.achievement)
+    .set(parsed.data)
+    .where(eq(schema.achievement.id, id))
+    .returning()
 
-    // 只要「谁能达成」这件事可能变了就补发，不去精细判断是否放宽。补发幂等（唯一键 + 冲突忽略），
-    // 多跑一次只花一次扫描；漏跑却是学生已达标却拿不到，两个方向代价不对称。
-    // 判据必须包含 metric（换了维度）和 visible（草稿期已达标的人），
-    // 只看 operator/threshold 会漏掉这两种。
-    const changed =
-      before.metric !== after!.metric ||
-      before.operator !== after!.operator ||
-      before.threshold !== after!.threshold ||
-      before.visible !== after!.visible
-    if (after!.visible && changed) await rescanAchievement(id)
+  // 只要「谁能达成」这件事可能变了就补发，不去精细判断是否放宽。补发幂等（唯一键 + 冲突忽略），
+  // 多跑一次只花一次扫描；漏跑却是学生已达标却拿不到，两个方向代价不对称。
+  // 判据必须包含 metric（换了维度）和 visible（草稿期已达标的人），
+  // 只看 operator/threshold 会漏掉这两种。
+  const changed =
+    before.metric !== after!.metric ||
+    before.operator !== after!.operator ||
+    before.threshold !== after!.threshold ||
+    before.visible !== after!.visible
+  if (after!.visible && changed) await rescanAchievement(id)
 
-    const [row] = await db
-      .select()
-      .from(schema.achievement)
-      .where(eq(schema.achievement.id, id))
-      .limit(1)
-    return success(c, serialize(row!))
-  },
-)
+  const [row] = await db
+    .select()
+    .from(schema.achievement)
+    .where(eq(schema.achievement.id, id))
+    .limit(1)
+  return success(c, serialize(row!))
+})
 
-adminAchievementRoutes.delete(
-  "/achievements/:id",
-  requireSuperAdmin,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    // 解锁记录随成就一起没：user_achievement.achievement_id 是 CASCADE（0010）
-    const deleted = await db
-      .delete(schema.achievement)
-      .where(eq(schema.achievement.id, id))
-      .returning({ id: schema.achievement.id })
-    if (deleted.length === 0)
-      return failure(c, 404, "achievement-not-found", "成就不存在")
-    return success(c, null)
-  },
-)
+adminAchievementRoutes.delete("/achievements/:id", requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  // 解锁记录随成就一起没：user_achievement.achievement_id 是 CASCADE（0010）
+  const deleted = await db
+    .delete(schema.achievement)
+    .where(eq(schema.achievement.id, id))
+    .returning({ id: schema.achievement.id })
+  if (deleted.length === 0) return failure(c, 404, "achievement-not-found", "成就不存在")
+  return success(c, null)
+})

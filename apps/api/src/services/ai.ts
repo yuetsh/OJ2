@@ -67,9 +67,7 @@ export async function completeChat(
     ),
   })
   if (!response.ok)
-    throw new Error(
-      `AI provider returned HTTP ${response.status}: ${await response.text()}`,
-    )
+    throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
   const payload = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>
   }
@@ -89,11 +87,7 @@ export interface StreamChatHooks {
   onError?: (message: string) => Promise<void>
 }
 
-export function streamChat(
-  system: string,
-  user: string,
-  hooks: StreamChatHooks = {},
-) {
+export function streamChat(system: string, user: string, hooks: StreamChatHooks = {}) {
   const encoder = new TextEncoder()
   const reportError = (message: string) =>
     hooks.onError?.(message).catch((error) => {
@@ -130,30 +124,25 @@ export function streamChat(
       }
       try {
         touch()
-        const response = await fetch(
-          new URL("/chat/completions", config.aiBaseUrl),
-          {
-            method: "POST",
-            signal: upstream.signal,
-            headers: {
-              "content-type": "application/json",
-              authorization: `Bearer ${config.aiKey}`,
-            },
-            body: JSON.stringify(
-              requestBody(
-                [
-                  { role: "system", content: system },
-                  { role: "user", content: user },
-                ],
-                true,
-              ),
-            ),
+        const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
+          method: "POST",
+          signal: upstream.signal,
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${config.aiKey}`,
           },
-        )
+          body: JSON.stringify(
+            requestBody(
+              [
+                { role: "system", content: system },
+                { role: "user", content: user },
+              ],
+              true,
+            ),
+          ),
+        })
         if (!response.ok || !response.body)
-          throw new Error(
-            `AI provider returned HTTP ${response.status}: ${await response.text()}`,
-          )
+          throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
         send("event: start\n\n")
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
@@ -190,9 +179,7 @@ export function streamChat(
           if (done) break
         }
         const full = chunks.join("").trim()
-        const extra = hooks.onComplete
-          ? await hooks.onComplete(full)
-          : undefined
+        const extra = hooks.onComplete ? await hooks.onComplete(full) : undefined
         send(`data: ${JSON.stringify({ ...extra, type: "done" })}\n\n`)
       } catch (error) {
         // 客户端主动走掉不算 AI 失败，但照样留痕：这条分析没有落库
@@ -275,13 +262,7 @@ export function streamWhole(
         await hooks.onError?.(message).catch((e) => {
           console.error("streamWhole onError hook failed", e)
         })
-        send(
-          errorEvent(
-            message === "缺少 AI_KEY"
-              ? MISSING_KEY_MESSAGE
-              : CLIENT_ERROR_MESSAGE,
-          ),
-        )
+        send(errorEvent(message === "缺少 AI_KEY" ? MISSING_KEY_MESSAGE : CLIENT_ERROR_MESSAGE))
       } finally {
         clearInterval(heartbeat)
         send("event: end\n\n")

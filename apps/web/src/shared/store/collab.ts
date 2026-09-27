@@ -56,9 +56,7 @@ export const useCollabStore = defineStore("collab", () => {
     noticeSeq.value += 1
   }
 
-  const pendingCount = computed(
-    () => requests.value.filter((it) => it.status === "pending").length,
-  )
+  const pendingCount = computed(() => requests.value.filter((it) => it.status === "pending").length)
 
   /** 按题目聚合，同题多人时老师能一眼看出该停下来全班讲 */
   const groupedRequests = computed(() => {
@@ -78,9 +76,7 @@ export const useCollabStore = defineStore("collab", () => {
     }
     // 人多的题排前面；人数相同按最久等待排
     return Array.from(groups.values()).sort(
-      (a, b) =>
-        b.items.length - a.items.length ||
-        a.items[0].createdAt - b.items[0].createdAt,
+      (a, b) => b.items.length - a.items.length || a.items[0].createdAt - b.items[0].createdAt,
     )
   })
 
@@ -101,14 +97,10 @@ export const useCollabStore = defineStore("collab", () => {
       // 对面离开了这道题：学生那侧要说明求助的去向 —— 服务端紧接着会补一条
       // help_status:pending 把他放回队列
       case "peer_left":
-        return teacher
-          ? "学生离开了这道题，协作已结束"
-          : "老师暂时离开，你的求助已重新排队"
+        return teacher ? "学生离开了这道题，协作已结束" : "老师暂时离开，你的求助已重新排队"
       // 自己离开了这道题（跳走页面、把语言切成流程图）
       case "self_left":
-        return teacher
-          ? "你已离开这道题，求助退回队列了"
-          : "你已离开这道题，协作结束"
+        return teacher ? "你已离开这道题，求助退回队列了" : "你已离开这道题，协作结束"
       // done：有人点了「结束协作」
       default:
         return teacher ? "已结束这次协作" : "老师已结束这次帮忙"

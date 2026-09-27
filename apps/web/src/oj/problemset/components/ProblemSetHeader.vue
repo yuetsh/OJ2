@@ -42,15 +42,11 @@ function getProgressPercentage() {
 
 // 有选做题时把「必做 N 题」标出来，否则「共 10 道题目」和「9 / 9」对不上
 const optionalCount = computed(
-  () =>
-    props.problemSet.problemsCount -
-    (props.problemSet.userProgress?.totalCount ?? 0),
+  () => props.problemSet.problemsCount - (props.problemSet.userProgress?.totalCount ?? 0),
 )
 
 const endTimeText = computed(() =>
-  props.problemSet.endTime
-    ? parseTime(props.problemSet.endTime, "YYYY-MM-DD HH:mm")
-    : "",
+  props.problemSet.endTime ? parseTime(props.problemSet.endTime, "YYYY-MM-DD HH:mm") : "",
 )
 
 function handleJoin() {
@@ -62,9 +58,7 @@ function handleJoin() {
   <n-card style="margin-bottom: 24px">
     <n-flex justify="space-between" align="center">
       <n-flex align="center">
-        <n-tag type="warning" v-if="problemSet.status === 'archived'">
-          已归档
-        </n-tag>
+        <n-tag type="warning" v-if="problemSet.status === 'archived'"> 已归档 </n-tag>
         <n-tag :type="getDifficultyTag(problemSet.difficulty).type">
           {{ getDifficultyTag(problemSet.difficulty).text }}
         </n-tag>
@@ -89,11 +83,7 @@ function handleJoin() {
         <!-- 用户徽章显示区域 - 只在已加入且有徽章时显示 -->
         <n-flex v-if="isJoined && userBadges.length > 0" align="center">
           <n-text>已获徽章</n-text>
-          <UserBadge
-            v-for="badge in userBadges"
-            :key="badge.id"
-            :badge="badge"
-          />
+          <UserBadge v-for="badge in userBadges" :key="badge.id" :badge="badge" />
         </n-flex>
 
         <!-- 完成进度 - 只在已加入时显示 -->
@@ -103,9 +93,7 @@ function handleJoin() {
             {{ problemSet.userProgress?.completedCount ?? 0 }} /
             {{ problemSet.userProgress?.totalCount ?? 0 }}
           </n-text>
-          <n-text depth="3" v-if="optionalCount > 0">
-            （另有 {{ optionalCount }} 道选做）
-          </n-text>
+          <n-text depth="3" v-if="optionalCount > 0"> （另有 {{ optionalCount }} 道选做） </n-text>
         </n-flex>
         <n-progress
           v-if="isJoined"

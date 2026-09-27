@@ -22,14 +22,7 @@ import { z } from "zod"
  * 从别处冒出来（旧客户端的 localStorage、迁移之前排进队列的任务），走下面的
  * `normalizeLanguage()`，别直接 parse。
  */
-export const judgeLanguageSchema = z.enum([
-  "C",
-  "C++",
-  "Python",
-  "Java",
-  "JavaScript",
-  "Golang",
-])
+export const judgeLanguageSchema = z.enum(["C", "C++", "Python", "Java", "JavaScript", "Golang"])
 
 /**
  * 题目可以挂的语言 = 沙箱语言 + 两种非沙箱题型。
@@ -42,11 +35,7 @@ export const judgeLanguageSchema = z.enum([
  * 于是那 91 条提交的 `language` 在类型上是 `undefined` —— 这就是两份真相
  * 各自演进的代价，现在并成一份。
  */
-export const problemLanguageSchema = z.enum([
-  ...judgeLanguageSchema.options,
-  "SQL",
-  "Flowchart",
-])
+export const problemLanguageSchema = z.enum([...judgeLanguageSchema.options, "SQL", "Flowchart"])
 
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
 export type ProblemLanguage = z.infer<typeof problemLanguageSchema>
@@ -68,8 +57,6 @@ const LANGUAGE_ALIASES: Record<string, ProblemLanguage> = {
 /** 把可能是旧值的语言名归一化；认不出来返回 null，由调用方决定怎么兜底。 */
 export function normalizeLanguage(value: unknown): ProblemLanguage | null {
   if (typeof value !== "string") return null
-  const parsed = problemLanguageSchema.safeParse(
-    LANGUAGE_ALIASES[value] ?? value,
-  )
+  const parsed = problemLanguageSchema.safeParse(LANGUAGE_ALIASES[value] ?? value)
   return parsed.success ? parsed.data : null
 }

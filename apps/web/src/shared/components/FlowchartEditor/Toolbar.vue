@@ -14,8 +14,7 @@ const onDragStart = (event: DragEvent, type: string) => {
 
   // 隐藏浏览器默认拖影，改用 canvas 跟随预览
   const emptyImg = new Image(1, 1)
-  emptyImg.src =
-    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+  emptyImg.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
   event.dataTransfer.setDragImage(emptyImg, 0, 0)
 }
 
@@ -44,15 +43,13 @@ const emit = defineEmits<{
 
 // 节点类型定义 - 优化性能
 const nodeTypes = computed(() =>
-  ["start", "input", "default", "decision", "loop", "output", "end"].map(
-    (type) => {
-      const config = getNodeTypeConfig(type)
-      return {
-        type,
-        ...config,
-      }
-    },
-  ),
+  ["start", "input", "default", "decision", "loop", "output", "end"].map((type) => {
+    const config = getNodeTypeConfig(type)
+    return {
+      type,
+      ...config,
+    }
+  }),
 )
 
 const saveStatusTitle = computed(() => {
@@ -135,11 +132,7 @@ const saveStatusTitle = computed(() => {
           <span class="btn-text">重做</span>
         </button>
       </div>
-      <button
-        class="action-btn clear-btn"
-        @click="$emit('clear')"
-        title="清空画布"
-      >
+      <button class="action-btn clear-btn" @click="$emit('clear')" title="清空画布">
         <span class="btn-icon">🗑️</span>
         <span class="btn-text">清空画布</span>
       </button>

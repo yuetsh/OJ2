@@ -63,9 +63,7 @@ export async function getProblemList(
   contestID?: string,
   tagId?: number,
 ) {
-  const endpoint = contestID
-    ? `admin/contests/${contestID}/problems`
-    : "admin/problems"
+  const endpoint = contestID ? `admin/contests/${contestID}/problems` : "admin/problems"
   const res = await api.get<AdminProblemList>(endpoint, {
     params: { offset, limit, keyword, author, tagId },
   })
@@ -133,24 +131,14 @@ export function batchTagProblems(
 }
 
 // 用户排名（后台版，无 100 名上限；公开榜单是 oj/api.ts 的 getRank）
-export function getAdminUserRank(
-  offset: number,
-  limit: number,
-  keyword: string,
-) {
+export function getAdminUserRank(offset: number, limit: number, keyword: string) {
   return api.get<AdminUserRank>("admin/rankings/users", {
     params: { offset, limit, keyword },
   })
 }
 
 // 用户列表
-export function getUserList(
-  offset = 0,
-  limit = 10,
-  type = "",
-  keyword: string,
-  orderBy = "",
-) {
+export function getUserList(offset = 0, limit = 10, type = "", keyword: string, orderBy = "") {
   return api.get<AdminUserList>("admin/users", {
     // "-last_login" 是旧接口传下来的取值（路由 query 里可能还存着），改叫 "-lastLogin"；
     // "-online" 是新增的，原样透传
@@ -179,9 +167,7 @@ export function editUser(user: AdminUserForm) {
 
 // 重置用户密码，返回新密码
 export async function resetPassword(userID: number) {
-  const res = await api.post<{ password: string }>(
-    `admin/users/${userID}/reset-password`,
-  )
+  const res = await api.post<{ password: string }>(`admin/users/${userID}/reset-password`)
   return res.password
 }
 
@@ -242,14 +228,8 @@ export function getSQLTestcaseScripts(problemId: number) {
 }
 
 // AI 根据标准答案生成一个 SQL 测试点初始化脚本
-export function generateSQLTestcase(data: {
-  refSql: string
-  mode: "query" | "modify"
-}) {
-  return api.post<GenerateSqlTestCaseResponse>(
-    "admin/sql-test-cases/generate",
-    data,
-  )
+export function generateSQLTestcase(data: { refSql: string; mode: "query" | "modify" }) {
+  return api.post<GenerateSqlTestCaseResponse>("admin/sql-test-cases/generate", data)
 }
 
 /** 出站补默认值。字段名两边已经一致，不再做键名转换 */
@@ -328,15 +308,11 @@ export function getContest(id: string) {
   return api.get<AdminContest>(`admin/contests/${id}`)
 }
 
-export function addProblemForContest(
-  contestID: string,
-  problemID: number,
-  displayID: string,
-) {
-  return api.post<AdminProblem>(
-    `admin/contests/${contestID}/problems/from-public`,
-    { problemId: problemID, displayId: displayID },
-  )
+export function addProblemForContest(contestID: string, problemID: number, displayID: string) {
+  return api.post<AdminProblem>(`admin/contests/${contestID}/problems/from-public`, {
+    problemId: problemID,
+    displayId: displayID,
+  })
 }
 
 export function getWebsite() {
@@ -364,10 +340,9 @@ export function deleteJudgeServer(hostname: string) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: AdminAnnouncementListItem[]; total: number }>(
-    "admin/announcements",
-    { params: { offset, limit } },
-  )
+  return api.get<{ results: AdminAnnouncementListItem[]; total: number }>("admin/announcements", {
+    params: { offset, limit },
+  })
 }
 
 export function getAnnouncement(id: number) {
@@ -464,9 +439,9 @@ export function makeProblemPublic(id: number, displayId: string) {
 export function getACMHelperList(contestId: number) {
   // acInfo 在契约里是 Record<string, unknown>（acm_contest_rank 的 JSONB 原文），
   // 组件侧按 ContestSubmissionInfo 读，收窄放在这里
-  return api.get<
-    Array<Omit<AcmHelperItem, "acInfo"> & { acInfo: ContestSubmissionInfo }>
-  >(`admin/contests/${contestId}/acm-helper`)
+  return api.get<Array<Omit<AcmHelperItem, "acInfo"> & { acInfo: ContestSubmissionInfo }>>(
+    `admin/contests/${contestId}/acm-helper`,
+  )
 }
 
 export function updateACMHelperChecked(
@@ -525,10 +500,7 @@ export function createProblemSet(data: ProblemSetBody) {
 }
 
 export function editProblemSet(data: ProblemSetBody & { id: number }) {
-  return api.put<AdminProblemSet>(
-    `admin/problem-sets/${data.id}`,
-    toProblemSetBody(data),
-  )
+  return api.put<AdminProblemSet>(`admin/problem-sets/${data.id}`, toProblemSetBody(data))
 }
 
 export function deleteProblemSet(id: number) {
@@ -545,9 +517,7 @@ export function updateProblemSetStatus(id: number, status: string) {
 
 // 题单题目管理 API
 export function getProblemSetProblems(problemSetId: number) {
-  return api.get<AdminProblemSetProblem[]>(
-    `admin/problem-sets/${problemSetId}/problems`,
-  )
+  return api.get<AdminProblemSetProblem[]>(`admin/problem-sets/${problemSetId}/problems`)
 }
 
 export function addProblemToSet(
@@ -579,26 +549,16 @@ export function editProblemInSet(
     hint?: string
   },
 ) {
-  return api.put(
-    `admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`,
-    data,
-  )
+  return api.put(`admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`, data)
 }
 
-export function removeProblemFromSet(
-  problemSetId: number,
-  problemSetProblemId: number,
-) {
-  return api.delete(
-    `admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`,
-  )
+export function removeProblemFromSet(problemSetId: number, problemSetProblemId: number) {
+  return api.delete(`admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`)
 }
 
 // 题单奖章管理 API
 export function getProblemSetBadges(problemSetId: number) {
-  return api.get<AdminProblemSetBadge[]>(
-    `admin/problem-sets/${problemSetId}/badges`,
-  )
+  return api.get<AdminProblemSetBadge[]>(`admin/problem-sets/${problemSetId}/badges`)
 }
 
 interface BadgeBody {
@@ -626,11 +586,7 @@ export function createProblemSetBadge(problemSetId: number, data: BadgeBody) {
   )
 }
 
-export function editProblemSetBadge(
-  problemSetId: number,
-  badgeId: number,
-  data: BadgeBody,
-) {
+export function editProblemSetBadge(problemSetId: number, badgeId: number, data: BadgeBody) {
   return api.put<AdminProblemSetBadge>(
     `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
     toBadgeBody(data),
@@ -644,9 +600,7 @@ export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
 // 题单进度管理 API
 // 注意：返回的是裸数组，不是分页信封 —— 和 oj 侧的 /user-progress 不同
 export function getProblemSetProgress(problemSetId: number) {
-  return api.get<AdminProblemSetProgress[]>(
-    `admin/problem-sets/${problemSetId}/progress`,
-  )
+  return api.get<AdminProblemSetProgress[]>(`admin/problem-sets/${problemSetId}/progress`)
 }
 
 export function removeUserFromProblemSet(problemSetId: number, userId: number) {
@@ -658,41 +612,28 @@ export function getStuckProblems() {
   return api.get<StuckProblem[]>("admin/problem-analytics/stuck")
 }
 
-export function getLearnStudents(params: {
-  type: "python" | "c"
-  className?: string
-}) {
+export function getLearnStudents(params: { type: "python" | "c"; className?: string }) {
   return api.get<LearnStudentProgressList>("admin/learn-analytics/students", {
     params,
   })
 }
 
-export function getLearnTutorials(params: {
-  type: "python" | "c"
-  className?: string
-}) {
+export function getLearnTutorials(params: { type: "python" | "c"; className?: string }) {
   return api.get<LearnTutorialProgressList>("admin/learn-analytics/tutorials", {
     params,
   })
 }
 
-export function getLearnExercises(params: {
-  type: "python" | "c"
-  className?: string
-}) {
+export function getLearnExercises(params: { type: "python" | "c"; className?: string }) {
   return api.get<LearnExerciseProgressList>("admin/learn-analytics/exercises", {
     params,
   })
 }
 
-export function getLearnExerciseAttempts(
-  exerciseId: number,
-  params: { className?: string },
-) {
-  return api.get<LearnExerciseAttempt[]>(
-    `admin/learn-analytics/exercises/${exerciseId}/attempts`,
-    { params },
-  )
+export function getLearnExerciseAttempts(exerciseId: number, params: { className?: string }) {
+  return api.get<LearnExerciseAttempt[]>(`admin/learn-analytics/exercises/${exerciseId}/attempts`, {
+    params,
+  })
 }
 
 export function getTopACTrend(params: {
@@ -757,17 +698,11 @@ export function getMetricOptions() {
 }
 
 export function createAchievement(data: Partial<AdminAchievement>) {
-  return api.post<AdminAchievement>(
-    "admin/achievements",
-    toAchievementBody(data),
-  )
+  return api.post<AdminAchievement>("admin/achievements", toAchievementBody(data))
 }
 
 export function updateAchievement(data: Partial<AdminAchievement>) {
-  return api.put<AdminAchievement>(
-    `admin/achievements/${data.id}`,
-    toAchievementBody(data),
-  )
+  return api.put<AdminAchievement>(`admin/achievements/${data.id}`, toAchievementBody(data))
 }
 
 export function deleteAchievement(id: number) {

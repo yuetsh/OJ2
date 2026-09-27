@@ -62,15 +62,9 @@ async function handleUpdateStatus() {
 
 <template>
   <n-flex>
-    <n-button size="small" secondary type="primary" @click="goEdit">
-      编辑
-    </n-button>
-    <n-button size="small" secondary type="info" @click="goDetail">
-      详情
-    </n-button>
-    <n-button size="small" secondary type="warning" @click="openStatusModal">
-      状态
-    </n-button>
+    <n-button size="small" secondary type="primary" @click="goEdit"> 编辑 </n-button>
+    <n-button size="small" secondary type="info" @click="goDetail"> 详情 </n-button>
+    <n-button size="small" secondary type="warning" @click="openStatusModal"> 状态 </n-button>
     <n-popconfirm @positive-click="handleDeleteProblemSet">
       <template #trigger>
         <n-button secondary size="small" type="error">删除</n-button>
@@ -79,20 +73,11 @@ async function handleUpdateStatus() {
     </n-popconfirm>
   </n-flex>
 
-  <n-modal
-    v-model:show="showStatusModal"
-    preset="card"
-    title="更新题单状态"
-    style="width: 400px"
-  >
+  <n-modal v-model:show="showStatusModal" preset="card" title="更新题单状态" style="width: 400px">
     <n-space vertical>
       <n-form>
         <n-form-item label="状态" required>
-          <n-select
-            v-model:value="newStatus"
-            :options="statusOptions"
-            placeholder="选择状态"
-          />
+          <n-select v-model:value="newStatus" :options="statusOptions" placeholder="选择状态" />
         </n-form-item>
       </n-form>
     </n-space>

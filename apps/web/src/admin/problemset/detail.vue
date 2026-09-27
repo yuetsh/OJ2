@@ -237,10 +237,7 @@ onMounted(() => {
       </n-tab-pane>
 
       <n-tab-pane name="progress" tab="进度管理">
-        <ProgressManagement
-          :progress="progress"
-          @remove-user="handleRemoveUser"
-        />
+        <ProgressManagement :progress="progress" @remove-user="handleRemoveUser" />
       </n-tab-pane>
     </n-tabs>
 

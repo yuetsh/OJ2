@@ -68,10 +68,7 @@ async function getProblemTags(problemIds: number[]) {
       name: schema.problemTag.name,
     })
     .from(schema.problemTags)
-    .innerJoin(
-      schema.problemTag,
-      eq(schema.problemTags.problemtagId, schema.problemTag.id),
-    )
+    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(inArray(schema.problemTags.problemId, problemIds))
   const result = new Map<number, string[]>()
   for (const row of rows)
@@ -109,10 +106,7 @@ function listItem(
 problemRoutes.get("/problems", optionalAuth, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 20, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const filters = [
-    eq(schema.problem.visible, true),
-    isNull(schema.problem.contestId),
-  ]
+  const filters = [eq(schema.problem.visible, true), isNull(schema.problem.contestId)]
   const author = c.req.query("author")?.trim()
   const keyword = c.req.query("keyword")?.trim()
   const difficulty = c.req.query("difficulty")?.trim()
@@ -125,8 +119,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
         ilike(schema.problem.displayId, `%${keyword}%`),
       )!,
     )
-  if (difficulty)
-    filters.push(eq(schema.problem.difficulty, asFilterValue(difficulty)))
+  if (difficulty) filters.push(eq(schema.problem.difficulty, asFilterValue(difficulty)))
   if (tag) {
     filters.push(
       inArray(
@@ -134,10 +127,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
         db
           .select({ id: schema.problemTags.problemId })
           .from(schema.problemTags)
-          .innerJoin(
-            schema.problemTag,
-            eq(schema.problemTags.problemtagId, schema.problemTag.id),
-          )
+          .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
           .where(eq(schema.problemTag.name, tag)),
       ),
     )
@@ -153,10 +143,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
           desc(schema.problem.createTime),
         ]
       : sort === "ast"
-        ? [
-            desc(sql`(${schema.problem.astRules} is not null)`),
-            desc(schema.problem.createTime),
-          ]
+        ? [desc(sql`(${schema.problem.astRules} is not null)`), desc(schema.problem.createTime)]
         : sort === "-accepted_number"
           ? [desc(schema.problem.acceptedNumber)]
           : sort === "accepted_number"
@@ -209,10 +196,7 @@ problemRoutes.get("/problem-tags", async (c) => {
       problemCount: countDistinct(schema.problemTags.problemId),
     })
     .from(schema.problemTag)
-    .innerJoin(
-      schema.problemTags,
-      eq(schema.problemTags.problemtagId, schema.problemTag.id),
-    )
+    .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .innerJoin(
       schema.problem,
       and(
@@ -232,9 +216,7 @@ problemRoutes.get("/problems/random", async (c) => {
   const [row] = await db
     .select({ displayId: schema.problem.displayId })
     .from(schema.problem)
-    .where(
-      and(eq(schema.problem.visible, true), isNull(schema.problem.contestId)),
-    )
+    .where(and(eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
     .orderBy(sql`random()`)
     .limit(1)
   if (!row) return failure(c, 404, "no-problems", "No problem to pick")
@@ -273,10 +255,7 @@ problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
       and(
         eq(schema.submission.userId, user.id),
         eq(schema.submission.problemId, id),
-        inArray(schema.submission.result, [
-          JudgeStatus.ACCEPTED,
-          JudgeStatus.AST_CHECK_FAILED,
-        ]),
+        inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
       ),
     )
   if (!mine?.value) return success(c, "0")
@@ -286,12 +265,7 @@ problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
     db
       .select({ value: count() })
       .from(schema.user)
-      .where(
-        and(
-          eq(schema.user.isDisabled, false),
-          gte(schema.user.lastLogin, since),
-        ),
-      ),
+      .where(and(eq(schema.user.isDisabled, false), gte(schema.user.lastLogin, since))),
     db
       .select({ value: countDistinct(schema.submission.userId) })
       .from(schema.submission)
@@ -307,9 +281,7 @@ problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
   const solved = accepted[0]?.value ?? 0
   return success(
     c,
-    total > 0 && solved < total
-      ? (((total - solved) / total) * 100).toFixed(2)
-      : "0",
+    total > 0 && solved < total ? (((total - solved) / total) * 100).toFixed(2) : "0",
   )
 })
 
@@ -399,8 +371,7 @@ problemRoutes.get("/problems/:displayId/yearly-ac", async (c) => {
       ),
     )
     .limit(1)
-  if (!problem)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   const year = sql<number>`extract(year from ${localTime(schema.submission.createTime)})::int`
   const rows = await db
     .select({
@@ -424,10 +395,7 @@ problemRoutes.get("/problems/:displayId/yearly-ac", async (c) => {
       (row) =>
         ({
           ...row,
-          acRate:
-            row.total > 0
-              ? Math.round((row.accepted / row.total) * 10_000) / 100
-              : 0,
+          acRate: row.total > 0 ? Math.round((row.accepted / row.total) * 10_000) / 100 : 0,
         }) satisfies YearlyAc,
     ),
   )
@@ -451,16 +419,12 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
     )
     .limit(1)
 
-  if (!row)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
 
   const tagRows = await db
     .select({ name: schema.problemTag.name })
     .from(schema.problemTags)
-    .innerJoin(
-      schema.problemTag,
-      eq(schema.problemTags.problemtagId, schema.problemTag.id),
-    )
+    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(eq(schema.problemTags.problemId, row.problem.id))
 
   const user = c.get("user")
@@ -505,18 +469,13 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
     statisticInfo: asRecord(row.problem.statisticInfo),
     contestId: row.problem.contestId,
     tags: tagRows.map((tag) => tag.name),
-    createdBy: sampleUser(
-      { id: row.creatorId, username: row.creatorUsername },
-      null,
-    ),
+    createdBy: sampleUser({ id: row.creatorId, username: row.creatorUsername }, null),
     myStatus,
     myFailedCount,
     allowFlowchart: row.problem.allowFlowchart,
     showFlowchart: row.problem.showFlowchart,
     mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
-    flowchartData: row.problem.allowFlowchart
-      ? null
-      : asRecord(row.problem.flowchartData),
+    flowchartData: row.problem.allowFlowchart ? null : asRecord(row.problem.flowchartData),
     flowchartHint: row.problem.flowchartHint,
     sqlConfig: row.problem.sqlConfig,
     sqlDisplay: row.problem.sqlDisplay,

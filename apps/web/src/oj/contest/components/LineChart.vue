@@ -17,15 +17,7 @@ import {
 } from "chart.js"
 import type { ContestRank } from "utils/types"
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
 interface Props {
   ranks: ContestRank[]

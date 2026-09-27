@@ -14,15 +14,7 @@ import {
 import { getTopACTrend } from "admin/api"
 import { zonedYear } from "utils/functions"
 
-ChartJS.register(
-  CategoryScale,
-  Filler,
-  LinearScale,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-)
+ChartJS.register(CategoryScale, Filler, LinearScale, LineElement, PointElement, Title, Tooltip)
 
 type ProblemTrend = AcTrend
 
@@ -161,10 +153,7 @@ onMounted(fetchData)
     <n-tag type="info" size="small">共 {{ data.length }} 题</n-tag>
   </n-space>
   <n-spin :show="loading">
-    <div
-      v-if="!loading && data.length === 0"
-      style="text-align: center; padding: 40px"
-    >
+    <div v-if="!loading && data.length === 0" style="text-align: center; padding: 40px">
       暂无数据
     </div>
     <div v-else class="grid">

@@ -1,11 +1,7 @@
 <script lang="ts" setup>
 import { bracketMatching } from "@codemirror/language"
 import { Codemirror } from "vue-codemirror"
-import {
-  autocompletion,
-  closeBrackets,
-  completeAnyWord,
-} from "@codemirror/autocomplete"
+import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
 import type { EditorView } from "@codemirror/view"
 import type { Extension } from "@codemirror/state"
 import type { LANGUAGE } from "utils/types"
@@ -78,9 +74,7 @@ const editorView = shallowRef<EditorView | null>(null)
 
 /** 房间开着，而且开的就是这道题 */
 const roomIsHere = computed(
-  () =>
-    collabStore.room !== null &&
-    (!problemId || collabStore.room.problemId === problemId),
+  () => collabStore.room !== null && (!problemId || collabStore.room.problemId === problemId),
 )
 
 /**

@@ -35,11 +35,7 @@ function handleForceLogout(reason: string) {
 /**
  * WebSocket 连接状态
  */
-export type ConnectionStatus =
-  | "disconnected"
-  | "connecting"
-  | "connected"
-  | "error"
+export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error"
 
 /**
  * WebSocket 消息类型
@@ -72,9 +68,7 @@ function channelUrl(path: string) {
 /**
  * WebSocket 消息处理器
  */
-export type MessageHandler<T extends WebSocketMessage = WebSocketMessage> = (
-  data: T,
-) => void
+export type MessageHandler<T extends WebSocketMessage = WebSocketMessage> = (data: T) => void
 
 /**
  * WebSocket 基础连接管理类
@@ -113,8 +107,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
 
     if (
       this.ws &&
-      (this.ws.readyState === WebSocket.OPEN ||
-        this.ws.readyState === WebSocket.CONNECTING)
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
     ) {
       return
     }
@@ -185,9 +178,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
         // 收尾由 disconnect() 自己做 —— 也就不会再像以前那样「断完立刻重连」
         if (ws !== this.ws) return
         this.ws = null
-        console.log(
-          `[WebSocket] 连接关闭: code=${event.code}, reason=${event.reason}`,
-        )
+        console.log(`[WebSocket] 连接关闭: code=${event.code}, reason=${event.reason}`)
         this.status.value = "disconnected"
         this.stopHeartbeat()
         this.onDisconnected(event)
@@ -214,9 +205,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       RECONNECT_MAX_DELAY,
     )
     const delay = Math.round(base * (0.5 + Math.random() * 0.5))
-    console.log(
-      `[WebSocket] 将在 ${delay}ms 后重连 (第 ${this.reconnectAttempts} 次)`,
-    )
+    console.log(`[WebSocket] 将在 ${delay}ms 后重连 (第 ${this.reconnectAttempts} 次)`)
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null
       this.connect()
@@ -238,8 +227,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
     if (this.closedByUser) return
     if (
       this.ws &&
-      (this.ws.readyState === WebSocket.OPEN ||
-        this.ws.readyState === WebSocket.CONNECTING)
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
     ) {
       return
     }
@@ -481,10 +469,7 @@ export interface SubmissionUpdate extends WebSocketMessage {
  *
  * 每次调用都新建一条连接（和原来一致，不是单例），并在组件卸载时摘掉 handler、断开。
  */
-function useChannel<T extends WebSocketMessage>(
-  path: string,
-  handler?: MessageHandler<T>,
-) {
+function useChannel<T extends WebSocketMessage>(path: string, handler?: MessageHandler<T>) {
   const ws = new BaseWebSocket<T>(path)
 
   // 同步注册，不放 onMounted：调用方（如 useConfigUpdate）在 setup 阶段就 connect()，
@@ -521,9 +506,7 @@ export interface SubmissionUpdate extends WebSocketMessage {
 }
 
 /** 判题进度。subscribe(submissionId) 认领，断线重连会自动补订阅 */
-export function useSubmissionWebSocket(
-  handler?: MessageHandler<SubmissionUpdate>,
-) {
+export function useSubmissionWebSocket(handler?: MessageHandler<SubmissionUpdate>) {
   return useChannel<SubmissionUpdate>("/ws/submissions", handler)
 }
 
@@ -548,9 +531,7 @@ export interface FlowchartEvaluationUpdate extends WebSocketMessage {
  * 流程图评分进度。和判题走的是**同一条** `/ws/submissions` ——
  * 服务端按 submissionId 分辨是代码提交还是流程图，这里只是换一套消息类型。
  */
-export function useFlowchartWebSocket(
-  handler?: MessageHandler<FlowchartEvaluationUpdate>,
-) {
+export function useFlowchartWebSocket(handler?: MessageHandler<FlowchartEvaluationUpdate>) {
   return useChannel<FlowchartEvaluationUpdate>("/ws/submissions", handler)
 }
 

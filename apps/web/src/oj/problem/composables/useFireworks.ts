@@ -35,14 +35,7 @@ function svgToBitmapShape(svg: string): Promise<confetti.Shape> {
         resolve({
           type: "bitmap",
           bitmap,
-          matrix: [
-            scale,
-            0,
-            0,
-            scale,
-            (-renderSize * scale) / 2,
-            (-renderSize * scale) / 2,
-          ],
+          matrix: [scale, 0, 0, scale, (-renderSize * scale) / 2, (-renderSize * scale) / 2],
         } as unknown as confetti.Shape)
       } catch (e) {
         reject(e)
@@ -176,14 +169,7 @@ export function useFireworks() {
       () => {
         const end = Date.now() + 2000
 
-        const colors = [
-          "#ff595e",
-          "#ff924c",
-          "#ffca3a",
-          "#8ac926",
-          "#1982c4",
-          "#6a4c93",
-        ]
+        const colors = ["#ff595e", "#ff924c", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93"]
 
         const frame = () => {
           confetti({
@@ -228,14 +214,7 @@ export function useFireworks() {
               x: Math.random(),
               y: Math.random() - 0.2,
             },
-            colors: [
-              "#ff0000",
-              "#00ff00",
-              "#0000ff",
-              "#ffff00",
-              "#ff00ff",
-              "#00ffff",
-            ],
+            colors: ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff"],
           })
         }, 200)
         timers.add(interval)
@@ -380,8 +359,7 @@ export function useFireworks() {
     ]
 
     // 随机选择一种效果
-    const randomEffect =
-      fireworkTypes[Math.floor(Math.random() * fireworkTypes.length)]
+    const randomEffect = fireworkTypes[Math.floor(Math.random() * fireworkTypes.length)]
     randomEffect()
   }
 

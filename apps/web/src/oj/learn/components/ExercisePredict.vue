@@ -96,13 +96,7 @@ function reset() {
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button
-        type="error"
-        :disabled="submitted && allCorrect"
-        @click="submit"
-      >
-        提交
-      </n-button>
+      <n-button type="error" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
   </n-card>

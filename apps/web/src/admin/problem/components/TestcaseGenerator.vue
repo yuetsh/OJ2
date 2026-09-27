@@ -54,15 +54,11 @@ const availableLanguages = computed(() =>
   props.answers.map((a) => ({ label: a.language, value: a.language })),
 )
 
-const hasAnyAnswerCode = computed(() =>
-  props.answers.some((a) => a.code.trim()),
-)
+const hasAnyAnswerCode = computed(() => props.answers.some((a) => a.code.trim()))
 
 // 当前选中语言是否有答案代码（用于控制"先运行"按钮）
 const hasAnswerCode = computed(() => {
-  const answer = props.answers.find(
-    (a) => a.language === selectedLanguage.value,
-  )
+  const answer = props.answers.find((a) => a.language === selectedLanguage.value)
   return !!answer?.code.trim()
 })
 
@@ -70,10 +66,7 @@ const hasAnswerCode = computed(() => {
 watch(
   availableLanguages,
   (langs) => {
-    if (
-      langs.length &&
-      !langs.find((l) => l.value === selectedLanguage.value)
-    ) {
+    if (langs.length && !langs.find((l) => l.value === selectedLanguage.value)) {
       selectedLanguage.value = langs[0].value
     }
   },
@@ -136,9 +129,7 @@ function remove(index: number) {
 }
 
 async function run() {
-  const answer = props.answers.find(
-    (a) => a.language === selectedLanguage.value,
-  )
+  const answer = props.answers.find((a) => a.language === selectedLanguage.value)
   if (!answer?.code.trim()) return
 
   // 过滤没填过的行，去重（按输入内容）。全没填就留一行，当成无输入题跑一次 ——
@@ -210,12 +201,7 @@ async function upload() {
 
 <template>
   <n-flex vertical>
-    <n-alert
-      v-if="!hasAnyAnswerCode"
-      type="warning"
-      :show-icon="false"
-      style="margin-bottom: 8px"
-    >
+    <n-alert v-if="!hasAnyAnswerCode" type="warning" :show-icon="false" style="margin-bottom: 8px">
       还没有填写答案代码，请先在上方"本题参考答案"中填写至少一种语言的答案，再来生成测试用例
     </n-alert>
     <n-flex align="center" wrap>
@@ -230,34 +216,19 @@ async function upload() {
       <n-tooltip :disabled="hasAnswerCode">
         <template #trigger>
           <span>
-            <n-button
-              type="success"
-              :loading="isRunning"
-              :disabled="!hasAnswerCode"
-              @click="run"
-            >
+            <n-button type="success" :loading="isRunning" :disabled="!hasAnswerCode" @click="run">
               先运行
             </n-button>
           </span>
         </template>
         请先在题目中填写答案代码
       </n-tooltip>
-      <n-button
-        type="primary"
-        :loading="isUploading"
-        :disabled="!canUpload"
-        @click="upload"
-      >
+      <n-button type="primary" :loading="isUploading" :disabled="!canUpload" @click="upload">
         上传
       </n-button>
     </n-flex>
 
-    <n-flex
-      v-for="(file, index) in files"
-      :key="file.id"
-      align="start"
-      style="gap: 8px"
-    >
+    <n-flex v-for="(file, index) in files" :key="file.id" align="start" style="gap: 8px">
       <n-flex vertical style="flex: 1">
         <span>{{ index + 1 }}.in</span>
         <n-input type="textarea" v-model:value="file.in" :rows="3" />

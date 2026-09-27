@@ -55,10 +55,7 @@ export async function evaluateFlowchart(
   const [row] = await db
     .select({ flowchart: schema.flowchartSubmission, problem: schema.problem })
     .from(schema.flowchartSubmission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.flowchartSubmission.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, job.submissionId))
     .limit(1)
   if (!row || ![0, 1].includes(row.flowchart.status)) return

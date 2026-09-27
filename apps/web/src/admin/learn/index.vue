@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { TUTORIAL_READ_SECONDS } from "@oj2/contract"
 import { NProgress, NTag, NText } from "naive-ui"
-import {
-  getLearnStudents,
-  getLearnTutorials,
-  getLearnExercises,
-} from "admin/api"
+import { getLearnStudents, getLearnTutorials, getLearnExercises } from "admin/api"
 import { readableDuration, parseTime } from "utils/functions"
 import type {
   LearnStudentProgress,
@@ -92,16 +88,11 @@ const statusCounts = computed(() => {
   return counts
 })
 
-const startedCount = computed(
-  () => students.value.length - statusCounts.value.idle,
-)
+const startedCount = computed(() => students.value.length - statusCounts.value.idle)
 
 const avgRead = computed(() =>
   students.value.length
-    ? (
-        students.value.reduce((n, row) => n + row.readCount, 0) /
-        students.value.length
-      ).toFixed(1)
+    ? (students.value.reduce((n, row) => n + row.readCount, 0) / students.value.length).toFixed(1)
     : "0",
 )
 
@@ -147,11 +138,7 @@ const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
     width: 110,
     render: (row) => {
       const meta = STATUS_META[statusOf(row)]
-      return h(
-        NTag,
-        { size: "small", type: meta.type, bordered: false },
-        () => meta.label,
-      )
+      return h(NTag, { size: "small", type: meta.type, bordered: false }, () => meta.label)
     },
   },
   {
@@ -193,11 +180,7 @@ const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
             )
           : null,
         row.exerciseAttempts
-          ? h(
-              NText,
-              { depth: 3, style: "font-size: 12px" },
-              () => `共 ${row.exerciseAttempts} 次`,
-            )
+          ? h(NText, { depth: 3, style: "font-size: 12px" }, () => `共 ${row.exerciseAttempts} 次`)
           : null,
       ]),
   },
@@ -217,150 +200,134 @@ const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
   },
 ])
 
-const tutorialColumns = computed<DataTableColumn<LearnTutorialProgress>[]>(
-  () => [
-    {
-      title: "#",
-      key: "order",
-      width: 60,
-      render: (_, index) => index + 1,
-    },
-    { title: "课程", key: "title", minWidth: 200 },
-    {
-      title: `读过的人（共 ${studentCount.value} 人）`,
-      key: "readers",
-      width: 200,
-      sorter: "default",
-      render: (row) =>
-        h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
-          h("span", `${row.readers} / ${studentCount.value}`),
-          h(NProgress, {
-            type: "line",
-            percentage: studentCount.value
-              ? Math.round((row.readers / studentCount.value) * 100)
-              : 0,
-            showIndicator: false,
-            status: row.readers === 0 ? "error" : "success",
-            style: "width: 70px",
-          }),
-        ]),
-    },
-    {
-      title: "人均时长",
-      key: "avgSeconds",
-      width: 130,
-      sorter: "default",
-      render: (row) => readableDuration(row.avgSeconds),
-    },
-    {
-      title: "累计时长",
-      key: "totalSeconds",
-      width: 130,
-      sorter: "default",
-      render: (row) => readableDuration(row.totalSeconds),
-    },
-  ],
-)
-
-const exerciseColumns = computed<DataTableColumn<LearnExerciseProgress>[]>(
-  () => [
-    {
-      type: "expand",
-      renderExpand: (row) =>
-        h(ExerciseAttempts, {
-          exerciseId: row.exerciseId,
-          className: className.value.trim(),
+const tutorialColumns = computed<DataTableColumn<LearnTutorialProgress>[]>(() => [
+  {
+    title: "#",
+    key: "order",
+    width: 60,
+    render: (_, index) => index + 1,
+  },
+  { title: "课程", key: "title", minWidth: 200 },
+  {
+    title: `读过的人（共 ${studentCount.value} 人）`,
+    key: "readers",
+    width: 200,
+    sorter: "default",
+    render: (row) =>
+      h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
+        h("span", `${row.readers} / ${studentCount.value}`),
+        h(NProgress, {
+          type: "line",
+          percentage: studentCount.value ? Math.round((row.readers / studentCount.value) * 100) : 0,
+          showIndicator: false,
+          status: row.readers === 0 ? "error" : "success",
+          style: "width: 70px",
         }),
+      ]),
+  },
+  {
+    title: "人均时长",
+    key: "avgSeconds",
+    width: 130,
+    sorter: "default",
+    render: (row) => readableDuration(row.avgSeconds),
+  },
+  {
+    title: "累计时长",
+    key: "totalSeconds",
+    width: 130,
+    sorter: "default",
+    render: (row) => readableDuration(row.totalSeconds),
+  },
+])
+
+const exerciseColumns = computed<DataTableColumn<LearnExerciseProgress>[]>(() => [
+  {
+    type: "expand",
+    renderExpand: (row) =>
+      h(ExerciseAttempts, {
+        exerciseId: row.exerciseId,
+        className: className.value.trim(),
+      }),
+  },
+  {
+    title: "课",
+    key: "tutorialOrder",
+    width: 160,
+    ellipsis: { tooltip: true },
+    render: (row) => `${row.tutorialOrder}. ${row.tutorialTitle}`,
+  },
+  {
+    title: "题型",
+    key: "type",
+    width: 90,
+    render: (row) => EXERCISE_TYPE_LABEL[row.type] ?? row.type,
+  },
+  {
+    title: "题干",
+    key: "question",
+    minWidth: 220,
+    ellipsis: { tooltip: true },
+    render: (row) => row.question || "（无题干）",
+  },
+  {
+    // 试的人不少、却没人一次做对，或者一半以上的人没做对 —— 多半是题有坑，
+    // 老师应该先去看展开里全班「最后一次错在」是不是同一个干扰项
+    title: "提示",
+    key: "flag",
+    width: 100,
+    render: (row) => {
+      if (row.triedUsers < 3) return null
+      if (row.firstTryUsers === 0 && row.solvedUsers > 0) {
+        return h(NTag, { size: "small", type: "warning", bordered: false }, () => "没人一次对")
+      }
+      if (row.solvedUsers / row.triedUsers < 0.5) {
+        return h(NTag, { size: "small", type: "error", bordered: false }, () => "多数人卡住")
+      }
+      return null
     },
-    {
-      title: "课",
-      key: "tutorialOrder",
-      width: 160,
-      ellipsis: { tooltip: true },
-      render: (row) => `${row.tutorialOrder}. ${row.tutorialTitle}`,
-    },
-    {
-      title: "题型",
-      key: "type",
-      width: 90,
-      render: (row) => EXERCISE_TYPE_LABEL[row.type] ?? row.type,
-    },
-    {
-      title: "题干",
-      key: "question",
-      minWidth: 220,
-      ellipsis: { tooltip: true },
-      render: (row) => row.question || "（无题干）",
-    },
-    {
-      // 试的人不少、却没人一次做对，或者一半以上的人没做对 —— 多半是题有坑，
-      // 老师应该先去看展开里全班「最后一次错在」是不是同一个干扰项
-      title: "提示",
-      key: "flag",
-      width: 100,
-      render: (row) => {
-        if (row.triedUsers < 3) return null
-        if (row.firstTryUsers === 0 && row.solvedUsers > 0) {
-          return h(
-            NTag,
-            { size: "small", type: "warning", bordered: false },
-            () => "没人一次对",
-          )
-        }
-        if (row.solvedUsers / row.triedUsers < 0.5) {
-          return h(
-            NTag,
-            { size: "small", type: "error", bordered: false },
-            () => "多数人卡住",
-          )
-        }
-        return null
-      },
-    },
-    {
-      title: "做对 / 做过",
-      key: "solvedUsers",
-      width: 150,
-      sorter: "default",
-      render: (row) =>
-        h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
-          h("span", `${row.solvedUsers} / ${row.triedUsers}`),
-          h(NProgress, {
-            type: "line",
-            percentage: row.triedUsers
-              ? Math.round((row.solvedUsers / row.triedUsers) * 100)
-              : 0,
-            showIndicator: false,
-            status: row.triedUsers === 0 ? "error" : "success",
-            style: "width: 60px",
-          }),
-        ]),
-    },
-    {
-      title: "一次做对",
-      key: "firstTryUsers",
-      width: 110,
-      sorter: "default",
-      render: (row) => `${row.firstTryUsers} 人`,
-    },
-    {
-      // 做对的人平均试了几次。它和「一次做对」一起看才分得清难题和歧义题：
-      // 平均 3 次但没人一次对 → 题目本身有坑
-      title: "平均试几次",
-      key: "avgAttemptsToSolve",
-      width: 120,
-      sorter: "default",
-      defaultSortOrder: "descend",
-      render: (row) => (row.solvedUsers ? `${row.avgAttemptsToSolve} 次` : "-"),
-    },
-    {
-      title: "提交总次数",
-      key: "attempts",
-      width: 120,
-      sorter: "default",
-    },
-  ],
-)
+  },
+  {
+    title: "做对 / 做过",
+    key: "solvedUsers",
+    width: 150,
+    sorter: "default",
+    render: (row) =>
+      h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
+        h("span", `${row.solvedUsers} / ${row.triedUsers}`),
+        h(NProgress, {
+          type: "line",
+          percentage: row.triedUsers ? Math.round((row.solvedUsers / row.triedUsers) * 100) : 0,
+          showIndicator: false,
+          status: row.triedUsers === 0 ? "error" : "success",
+          style: "width: 60px",
+        }),
+      ]),
+  },
+  {
+    title: "一次做对",
+    key: "firstTryUsers",
+    width: 110,
+    sorter: "default",
+    render: (row) => `${row.firstTryUsers} 人`,
+  },
+  {
+    // 做对的人平均试了几次。它和「一次做对」一起看才分得清难题和歧义题：
+    // 平均 3 次但没人一次对 → 题目本身有坑
+    title: "平均试几次",
+    key: "avgAttemptsToSolve",
+    width: 120,
+    sorter: "default",
+    defaultSortOrder: "descend",
+    render: (row) => (row.solvedUsers ? `${row.avgAttemptsToSolve} 次` : "-"),
+  },
+  {
+    title: "提交总次数",
+    key: "attempts",
+    width: 120,
+    sorter: "default",
+  },
+])
 
 async function load() {
   loading.value = true
@@ -410,9 +377,7 @@ onMounted(load)
       @clear="load"
     />
     <n-button type="primary" secondary @click="load">查询</n-button>
-    <n-text depth="3">
-      {{ studentCount }} 名学生，{{ startedCount }} 人已经开始学
-    </n-text>
+    <n-text depth="3"> {{ studentCount }} 名学生，{{ startedCount }} 人已经开始学 </n-text>
     <!-- 口径写在表上方，免得老师对着「已读 0 课 / 累计 25 分钟」猜是不是坏了 -->
     <n-text depth="3" style="font-size: 12px">
       「已读」按累计停留满
@@ -420,13 +385,7 @@ onMounted(load)
     </n-text>
   </n-flex>
 
-  <n-grid
-    cols="2 s:3 m:5"
-    :x-gap="12"
-    :y-gap="12"
-    responsive="screen"
-    style="margin-bottom: 16px"
-  >
+  <n-grid cols="2 s:3 m:5" :x-gap="12" :y-gap="12" responsive="screen" style="margin-bottom: 16px">
     <n-gi>
       <n-card size="small" :bordered="true">
         <n-statistic label="学生" :value="studentCount" />
@@ -448,10 +407,7 @@ onMounted(load)
     </n-gi>
     <n-gi>
       <n-card size="small">
-        <n-statistic
-          label="练一练做对率"
-          :value="solveRate === null ? '-' : `${solveRate}%`"
-        />
+        <n-statistic label="练一练做对率" :value="solveRate === null ? '-' : `${solveRate}%`" />
       </n-card>
     </n-gi>
     <n-gi>
@@ -472,16 +428,10 @@ onMounted(load)
           clearable
           style="width: 200px"
         />
-        <n-text v-if="keyword.trim()" depth="3">
-          找到 {{ filteredStudents.length }} 人
-        </n-text>
+        <n-text v-if="keyword.trim()" depth="3"> 找到 {{ filteredStudents.length }} 人 </n-text>
       </n-flex>
       <n-flex :size="8" style="margin-bottom: 12px">
-        <n-tag
-          checkable
-          :checked="statusFilter === 'all'"
-          @update:checked="statusFilter = 'all'"
-        >
+        <n-tag checkable :checked="statusFilter === 'all'" @update:checked="statusFilter = 'all'">
           全部 {{ students.length }}
         </n-tag>
         <n-tag

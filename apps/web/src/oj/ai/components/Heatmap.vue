@@ -1,9 +1,7 @@
 <template>
   <n-card title="过去一年的提交热力图" size="small">
     <template #header-extra>
-      <n-text depth="3" style="font-size: 12px">
-        每格一周，激励持续学习
-      </n-text>
+      <n-text depth="3" style="font-size: 12px"> 每格一周，激励持续学习 </n-text>
     </template>
     <n-spin :show="aiStore.loading.heatmap" :delay="50">
       <div
@@ -154,8 +152,7 @@ const tooltipStyle = computed(() => ({
   top: `${tooltip.value?.y}px`,
 }))
 
-const getTooltipText = (count: number) =>
-  count === 0 ? "这周没有提交" : `这周提交了 ${count} 次`
+const getTooltipText = (count: number) => (count === 0 ? "这周没有提交" : `这周提交了 ${count} 次`)
 
 const showTooltip = (e: MouseEvent, cell: Cell) => {
   const rect = (e.target as HTMLElement).getBoundingClientRect()

@@ -82,8 +82,7 @@ export function restartEditTrace(len: number) {
 
 function touch() {
   const now = performance.now()
-  if (lastEditAt !== null && now - lastEditAt <= IDLE_MS)
-    activeMs += now - lastEditAt
+  if (lastEditAt !== null && now - lastEditAt <= IDLE_MS) activeMs += now - lastEditAt
   lastEditAt = now
 }
 
@@ -103,8 +102,7 @@ export const editTraceExtensions = [
     for (const tr of update.transactions) {
       if (!tr.docChanged) continue
       // 顺序要紧：isUserEvent("input") 也会匹配 "input.paste"
-      const pasted =
-        tr.isUserEvent("input.paste") || tr.isUserEvent("input.drop")
+      const pasted = tr.isUserEvent("input.paste") || tr.isUserEvent("input.drop")
       const typed = !pasted && tr.isUserEvent("input")
       const deleted = tr.isUserEvent("delete")
       if (!pasted && !typed && !deleted) continue
@@ -115,10 +113,7 @@ export const editTraceExtensions = [
         // 原样替换不算：closeBrackets 越过已有的右括号 / 引号时，是把 `)` 替换成 `)`
         // 而不是只挪光标（@codemirror/autocomplete 的 handleClose），不排掉的话
         // 每敲一个右括号就多记一个键入加一个删除
-        if (
-          toA - fromA === text.length &&
-          tr.startState.sliceDoc(fromA, toA) === text.toString()
-        )
+        if (toA - fromA === text.length && tr.startState.sliceDoc(fromA, toA) === text.toString())
           return
         removed += toA - fromA
         inserted += text.length

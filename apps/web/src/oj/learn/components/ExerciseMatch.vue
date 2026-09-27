@@ -37,9 +37,7 @@ onMounted(init)
 watch(() => props.exercise.id, init)
 
 const allPaired = computed(() => pairs.value.every((p) => p !== null))
-const allCorrect = computed(() =>
-  pairs.value.every((p, i) => p === data.value.answer[i]),
-)
+const allCorrect = computed(() => pairs.value.every((p, i) => p === data.value.answer[i]))
 const locked = computed(() => submitted.value && allCorrect.value)
 
 function leftOf(rightIdx: number): number {
@@ -183,9 +181,7 @@ function dotStyle(color: string): Record<string, string> {
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="primary" :disabled="!allPaired || locked" @click="submit">
-        提交
-      </n-button>
+      <n-button type="primary" :disabled="!allPaired || locked" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
   </n-card>

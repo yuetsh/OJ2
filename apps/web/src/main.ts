@@ -70,9 +70,7 @@ router.beforeEach(async (to, _from, next) => {
         next("/")
         return
       }
-    } else if (
-      to.matched.some((record) => record.meta.requiresProblemPermission)
-    ) {
+    } else if (to.matched.some((record) => record.meta.requiresProblemPermission)) {
       if (!userStore.hasProblemPermission) {
         next("/")
         return

@@ -55,9 +55,7 @@ function hint(id: number) {
       </span>
     </li>
   </ol>
-  <n-text v-if="!traced" depth="3" class="login-tip">
-    登录后可以记录学习进度
-  </n-text>
+  <n-text v-if="!traced" depth="3" class="login-tip"> 登录后可以记录学习进度 </n-text>
 </template>
 
 <style scoped>

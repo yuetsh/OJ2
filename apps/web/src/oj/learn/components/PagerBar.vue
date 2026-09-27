@@ -8,9 +8,7 @@ const emit = defineEmits<{ go: [lesson: number] }>()
 
 <template>
   <nav class="pager" :style="{ background: theme.bodyColor }">
-    <n-button secondary :disabled="step <= 1" @click="emit('go', step - 1)">
-      ← 上一课
-    </n-button>
+    <n-button secondary :disabled="step <= 1" @click="emit('go', step - 1)"> ← 上一课 </n-button>
     <n-text depth="3">{{ step }} / {{ total }}</n-text>
     <n-button
       type="primary"

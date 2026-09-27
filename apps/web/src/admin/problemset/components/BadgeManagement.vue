@@ -55,9 +55,7 @@ defineEmits<Emits>()
           title: '条件值',
           key: 'condition_value',
           render: (row) => {
-            return row.conditionType === 'all_problems'
-              ? '-'
-              : row.conditionValue
+            return row.conditionType === 'all_problems' ? '-' : row.conditionValue
           },
         },
         { title: '描述', key: 'description' },

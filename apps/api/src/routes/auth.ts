@@ -32,11 +32,7 @@ const LOGIN_PER_USERNAME: AttemptRule = { limit: 10, windowSeconds: 15 * 60 }
 const LOGIN_PER_IP: AttemptRule = { limit: 100, windowSeconds: 15 * 60 }
 
 authRoutes.post("/auth/login", async (c) => {
-  const parsed = await parseBody(
-    c,
-    loginRequestSchema,
-    "Username and password are required",
-  )
+  const parsed = await parseBody(c, loginRequestSchema, "Username and password are required")
   if (!parsed.success) return parsed.response
 
   const usernameKey = `login:user:${parsed.data.username.toLowerCase()}`
@@ -57,12 +53,7 @@ authRoutes.post("/auth/login", async (c) => {
       countAttempt(usernameKey, LOGIN_PER_USERNAME),
       countAttempt(ipKey, LOGIN_PER_IP),
     ])
-    return failure(
-      c,
-      401,
-      "invalid-credentials",
-      "Invalid username or password",
-    )
+    return failure(c, 401, "invalid-credentials", "Invalid username or password")
   }
 
   const [user] = await db
@@ -107,7 +98,6 @@ authRoutes.get("/me", optionalAuth, async (c) => {
   if (!authUser) return success(c, null)
 
   const data = await getUserProfileById(authUser.id, true)
-  if (!data)
-    return failure(c, 404, "profile-not-found", "User profile does not exist")
+  if (!data) return failure(c, 404, "profile-not-found", "User profile does not exist")
   return success(c, data)
 })

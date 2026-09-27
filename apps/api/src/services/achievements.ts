@@ -40,8 +40,7 @@ async function unlockAchievements(
         unlocked.map((row) => row.id),
       ),
     )
-  if (onlyMeta)
-    filters.push(eq(schema.achievement.metric, "achievement_unlocked_count"))
+  if (onlyMeta) filters.push(eq(schema.achievement.metric, "achievement_unlocked_count"))
   else filters.push(ne(schema.achievement.metric, "achievement_unlocked_count"))
   const candidates = await db
     .select()
@@ -69,10 +68,7 @@ async function unlockAchievements(
       })),
     )
     .onConflictDoNothing({
-      target: [
-        schema.userAchievement.achievementId,
-        schema.userAchievement.userId,
-      ],
+      target: [schema.userAchievement.achievementId, schema.userAchievement.userId],
     })
     .returning({ achievementId: schema.userAchievement.achievementId })
   if (inserted.length === 0) return []
@@ -88,10 +84,7 @@ export async function updateAchievementsForSubmission(submissionId: string) {
   const [row] = await db
     .select({ submission: schema.submission, problem: schema.problem })
     .from(schema.submission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.submission.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     .where(eq(schema.submission.id, submissionId))
     .limit(1)
   if (!row || row.submission.contestId !== null) return []
@@ -137,32 +130,23 @@ export async function updateAchievementsForSubmission(submissionId: string) {
         value.mid_ac_count = numberMetric(value, "mid_ac_count") + 1
       if (row.problem.difficulty === "High")
         value.hard_ac_count = numberMetric(value, "hard_ac_count") + 1
-      if (firstTry)
-        value.first_try_ac_count = numberMetric(value, "first_try_ac_count") + 1
-      value.max_wa_before_ac = Math.max(
-        numberMetric(value, "max_wa_before_ac"),
-        priorRows.length,
-      )
+      if (firstTry) value.first_try_ac_count = numberMetric(value, "first_try_ac_count") + 1
+      value.max_wa_before_ac = Math.max(numberMetric(value, "max_wa_before_ac"), priorRows.length)
       const perDay = asRecord(value._ac_per_day)
       perDay[date] = (typeof perDay[date] === "number" ? perDay[date] : 0) + 1
       value._ac_per_day = perDay
       value.max_ac_in_one_day = Math.max(
-        ...Object.values(perDay).filter(
-          (item): item is number => typeof item === "number",
-        ),
+        ...Object.values(perDay).filter((item): item is number => typeof item === "number"),
       )
     }
     const activeDates = Array.isArray(value._active_dates)
-      ? value._active_dates.filter(
-          (item): item is string => typeof item === "string",
-        )
+      ? value._active_dates.filter((item): item is string => typeof item === "string")
       : []
     if (!activeDates.includes(date)) activeDates.push(date)
     value._active_dates = activeDates
     value.active_days = activeDates.length
     if (accepted) {
-      const last =
-        typeof value._last_ac_date === "string" ? value._last_ac_date : null
+      const last = typeof value._last_ac_date === "string" ? value._last_ac_date : null
       if (last !== date) {
         // 差一天要按日历日算，不能用 Date 相减：夏令时地区相邻两天差 23/25 小时，
         // 除 86400000 得到的不是 1，`=== 1` 会静默把连续打卡判成断掉。
@@ -172,27 +156,18 @@ export async function updateAchievementsForSubmission(submissionId: string) {
             : 1
         value._last_ac_date = date
         value._current_ac_streak = current
-        value.max_ac_streak_days = Math.max(
-          numberMetric(value, "max_ac_streak_days"),
-          current,
-        )
+        value.max_ac_streak_days = Math.max(numberMetric(value, "max_ac_streak_days"), current)
       }
     }
     const languages = Array.isArray(value._languages)
-      ? value._languages.filter(
-          (item): item is string => typeof item === "string",
-        )
+      ? value._languages.filter((item): item is string => typeof item === "string")
       : []
-    if (!languages.includes(row.submission.language))
-      languages.push(row.submission.language)
+    if (!languages.includes(row.submission.language)) languages.push(row.submission.language)
     value._languages = languages
     value.languages_used = languages.length
-    if (hour < 5)
-      value.midnight_submissions =
-        numberMetric(value, "midnight_submissions") + 1
+    if (hour < 5) value.midnight_submissions = numberMetric(value, "midnight_submissions") + 1
     else if (hour < 7)
-      value.early_bird_submissions =
-        numberMetric(value, "early_bird_submissions") + 1
+      value.early_bird_submissions = numberMetric(value, "early_bird_submissions") + 1
     if (row.submission.result === JudgeStatus.COMPILE_ERROR)
       value.compile_error_count = numberMetric(value, "compile_error_count") + 1
     value.max_code_lines = Math.max(
@@ -211,10 +186,7 @@ export async function updateAchievementsForSubmission(submissionId: string) {
   const [meta] = await db
     .select({ value: count() })
     .from(schema.userAchievement)
-    .innerJoin(
-      schema.achievement,
-      eq(schema.userAchievement.achievementId, schema.achievement.id),
-    )
+    .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
     .where(
       and(
         eq(schema.userAchievement.userId, row.submission.userId),
@@ -226,18 +198,12 @@ export async function updateAchievementsForSubmission(submissionId: string) {
     .update(schema.userStat)
     .set({ metrics, updateTime: new Date().toISOString() })
     .where(eq(schema.userStat.userId, row.submission.userId))
-  return [
-    ...first,
-    ...(await unlockAchievements(row.submission.userId, metrics, true)),
-  ]
+  return [...first, ...(await unlockAchievements(row.submission.userId, metrics, true))]
 }
 
 export async function updateAchievementsForProblemSet(userId: number) {
   const [[badgeRow], [completedRow]] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.userBadge)
-      .where(eq(schema.userBadge.userId, userId)),
+    db.select({ value: count() }).from(schema.userBadge).where(eq(schema.userBadge.userId, userId)),
     db
       .select({ value: count() })
       .from(schema.problemsetProgress)
@@ -279,15 +245,9 @@ export async function updateAchievementsForProblemSet(userId: number) {
   const [meta] = await db
     .select({ value: count() })
     .from(schema.userAchievement)
-    .innerJoin(
-      schema.achievement,
-      eq(schema.userAchievement.achievementId, schema.achievement.id),
-    )
+    .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
     .where(
-      and(
-        eq(schema.userAchievement.userId, userId),
-        ne(schema.achievement.rarity, "platinum"),
-      ),
+      and(eq(schema.userAchievement.userId, userId), ne(schema.achievement.rarity, "platinum")),
     )
   metrics.achievement_unlocked_count = meta?.value ?? 0
   await db
@@ -312,12 +272,7 @@ export async function rescanAchievement(achievementId: number) {
   const [achievement] = await db
     .select()
     .from(schema.achievement)
-    .where(
-      and(
-        eq(schema.achievement.id, achievementId),
-        eq(schema.achievement.visible, true),
-      ),
-    )
+    .where(and(eq(schema.achievement.id, achievementId), eq(schema.achievement.visible, true)))
     .limit(1)
   if (!achievement) return { scanned: 0, unlocked: 0 }
 
@@ -325,8 +280,7 @@ export async function rescanAchievement(achievementId: number) {
   if (!metric) return { scanned: 0, unlocked: 0 }
 
   // contest_joined 不由判题结算维护，扫之前先把它刷新一遍，否则永远读到旧值（或没有值）
-  if (achievement.metric === "contest_joined")
-    await refreshContestJoinedForAll()
+  if (achievement.metric === "contest_joined") await refreshContestJoinedForAll()
 
   const already = new Set(
     (
@@ -357,11 +311,7 @@ export async function rescanAchievement(achievementId: number) {
   // 计数改成一次 +N，通知照旧逐人推（那是 Redis，不是数据库）。
   const unlockTime = new Date().toISOString()
   const unlockedUserIds: number[] = []
-  for (
-    let start = 0;
-    start < eligible.length;
-    start += USER_ACHIEVEMENT_INSERT_CHUNK
-  ) {
+  for (let start = 0; start < eligible.length; start += USER_ACHIEVEMENT_INSERT_CHUNK) {
     const chunk = eligible.slice(start, start + USER_ACHIEVEMENT_INSERT_CHUNK)
     const inserted = await db
       .insert(schema.userAchievement)
@@ -375,10 +325,7 @@ export async function rescanAchievement(achievementId: number) {
         })),
       )
       .onConflictDoNothing({
-        target: [
-          schema.userAchievement.achievementId,
-          schema.userAchievement.userId,
-        ],
+        target: [schema.userAchievement.achievementId, schema.userAchievement.userId],
       })
       .returning({ userId: schema.userAchievement.userId })
     unlockedUserIds.push(...inserted.map((row) => row.userId))
@@ -406,13 +353,9 @@ export async function rescanAchievement(achievementId: number) {
     // 旧 `rescan_achievement` 就漏了这步，OJ2 原样搬过来：2026-09-07 一次补发之后
     // 269 人的计数停在旧值，其中 10 人实际够了「奖杯收藏家」却一直没发 ——
     // 判题结算只在「这次有新解锁」时才重算，被补发的人不再解锁新成就就永远不会自愈。
-    if (
-      achievement.rarity !== "platinum" &&
-      achievement.metric !== "achievement_unlocked_count"
-    ) {
+    if (achievement.rarity !== "platinum" && achievement.metric !== "achievement_unlocked_count") {
       await refreshUnlockedCount(unlockedUserIds)
-      for (const meta of await metaAchievements())
-        await rescanAchievement(meta.id)
+      for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
     }
   }
   return { scanned: stats.length, unlocked: unlockedUserIds.length }

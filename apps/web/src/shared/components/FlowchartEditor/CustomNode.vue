@@ -87,9 +87,7 @@ let globalClickHandler: ((event: MouseEvent) => void) | null = null
 // 计算属性
 const nodeType = computed(() => props.data.originalType || props.type)
 const nodeConfig = computed(() => getNodeTypeConfig(nodeType.value))
-const displayLabel = computed(
-  () => props.data.customLabel || nodeConfig.value.label,
-)
+const displayLabel = computed(() => props.data.customLabel || nodeConfig.value.label)
 
 // 事件处理器
 const handleDelete = () => emit("delete", props.id)
@@ -164,10 +162,7 @@ const addGlobalClickHandler = () => {
   if (globalClickHandler) return
 
   globalClickHandler = (event: MouseEvent) => {
-    if (
-      isEditing.value &&
-      !(event.target as Element)?.closest(".custom-node")
-    ) {
+    if (isEditing.value && !(event.target as Element)?.closest(".custom-node")) {
       handleSaveEdit()
     }
   }

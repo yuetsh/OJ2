@@ -50,11 +50,7 @@ export const useAIStore = defineStore("ai", () => {
   const pinnedReport = ref<{ analysis: string } | null>(null)
 
   async function fetchDetailsData(start: string, end: string) {
-    const res = await getAIDetailData(
-      start,
-      end,
-      targetUsername.value || undefined,
-    )
+    const res = await getAIDetailData(start, end, targetUsername.value || undefined)
     detailsData.start = res.start
     detailsData.end = res.end
     detailsData.grade = res.grade
@@ -71,11 +67,7 @@ export const useAIStore = defineStore("ai", () => {
   }
 
   async function fetchDurationData(end: string, duration: string) {
-    const res = await getAIDurationData(
-      end,
-      duration,
-      targetUsername.value || undefined,
-    )
+    const res = await getAIDurationData(end, duration, targetUsername.value || undefined)
     durationData.value = res
   }
 
@@ -105,11 +97,7 @@ export const useAIStore = defineStore("ai", () => {
     loading.heatmap = false
   }
 
-  async function fetchAnalysisData(
-    start: string,
-    end: string,
-    duration: string,
-  ) {
+  async function fetchAnalysisData(start: string, end: string, duration: string) {
     rangeStart.value = start
     rangeEnd.value = end
     // 换时间范围就回到第一页，否则停在第 5 页但新范围只有两页

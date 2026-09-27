@@ -5,11 +5,7 @@ import { sql, SQLite } from "@codemirror/lang-sql"
 import { bracketMatching } from "@codemirror/language"
 import { Codemirror } from "vue-codemirror"
 import type { Extension } from "@codemirror/state"
-import {
-  autocompletion,
-  closeBrackets,
-  completeAnyWord,
-} from "@codemirror/autocomplete"
+import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
 import type { LANGUAGE } from "utils/types"
 import { oneDark } from "../themes/oneDark"
 import { smoothy } from "../themes/smoothy"
@@ -39,8 +35,7 @@ const code = defineModel<string>("value")
 const isDark = useDark()
 
 const langExtension = computed(() => {
-  if (language === "SQL")
-    return sql({ dialect: SQLite, upperCaseKeywords: true })
+  if (language === "SQL") return sql({ dialect: SQLite, upperCaseKeywords: true })
   return language === "Python" ? python() : cpp()
 })
 

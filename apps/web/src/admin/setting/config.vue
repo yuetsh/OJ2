@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { errorMessage } from "utils/api"
 import { NButton, NTag } from "naive-ui"
-import {
-  CLASS_NAME_MAX_DIGITS,
-  CLASS_NAME_MIN_DIGITS,
-  CLASS_NAME_RE,
-} from "utils/constants"
+import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from "utils/constants"
 import { parseTime } from "utils/functions"
 import type { OrphanTestCase, Server, WebsiteConfig } from "utils/types"
 import { useConfigStore } from "shared/store/config"
@@ -41,11 +37,7 @@ const testcaseColumns: DataTableColumn<OrphanTestCase>[] = [
     title: "选项",
     key: "delete",
     render: (row) =>
-      h(
-        NButton,
-        { size: "small", onClick: () => deleteTestcase(row.id) },
-        () => "删除",
-      ),
+      h(NButton, { size: "small", onClick: () => deleteTestcase(row.id) }, () => "删除"),
   },
 ]
 
@@ -111,9 +103,7 @@ const serverColumns: DataTableColumn<Server>[] = [
 const testcases = ref<OrphanTestCase[]>([])
 const token = ref("")
 const servers = ref<Server[]>([])
-const abnormalServers = computed(() =>
-  servers.value.filter((item) => item.status === "abnormal"),
-)
+const abnormalServers = computed(() => servers.value.filter((item) => item.status === "abnormal"))
 
 const websiteConfig = reactive<WebsiteConfig>({
   websiteBaseUrl: "",
@@ -152,9 +142,7 @@ function renderClassTag(tag: string | { label: string }, index: number) {
         opacity: dragFrom.value === index ? 0.4 : 1,
       },
       onClose: () => {
-        websiteConfig.classList = websiteConfig.classList.filter(
-          (_, i) => i !== index,
-        )
+        websiteConfig.classList = websiteConfig.classList.filter((_, i) => i !== index)
       },
       onDragstart: (e: DragEvent) => {
         dragFrom.value = index
@@ -248,9 +236,7 @@ async function delJudgeServer(hostname: string) {
 }
 
 async function deleteAbnormalServers() {
-  const dels = abnormalServers.value.map((item) =>
-    deleteJudgeServer(item.hostname),
-  )
+  const dels = abnormalServers.value.map((item) => deleteJudgeServer(item.hostname))
   await Promise.all(dels)
   message.success("删除成功")
   getJudgeServerData()
@@ -268,9 +254,7 @@ onMounted(() => {
     <template #header>
       <n-flex align="center">
         网站设置
-        <n-button type="primary" size="small" @click="saveWebsiteConfig">
-          保存
-        </n-button>
+        <n-button type="primary" size="small" @click="saveWebsiteConfig"> 保存 </n-button>
       </n-flex>
     </template>
     <n-form inline label-placement="left">
@@ -287,10 +271,7 @@ onMounted(() => {
     <n-form label-placement="left">
       <n-form-item label="班级列表">
         <n-flex vertical size="small">
-          <n-dynamic-tags
-            v-model:value="websiteConfig.classList"
-            :render-tag="renderClassTag"
-          />
+          <n-dynamic-tags v-model:value="websiteConfig.classList" :render-tag="renderClassTag" />
           <n-text depth="3" style="font-size: 12px">
             填 {{ CLASS_NAME_MIN_DIGITS }}~{{ CLASS_NAME_MAX_DIGITS }}
             位数字，如 251、2510，要和用户名里 ks 后面那段一致；
@@ -331,28 +312,16 @@ onMounted(() => {
     <div class="box">
       接口凭证 <n-tag size="small">{{ token }}</n-tag>
     </div>
-    <n-data-table
-      :single-line="false"
-      striped
-      :columns="serverColumns"
-      :data="servers"
-    />
+    <n-data-table :single-line="false" striped :columns="serverColumns" :data="servers" />
   </n-card>
   <n-card class="box" v-if="testcases.length">
     <template #header>
       <n-flex align="center">
         无效的测试用例
-        <n-button size="small" type="warning" @click="() => deleteTestcase()">
-          全部删除
-        </n-button>
+        <n-button size="small" type="warning" @click="() => deleteTestcase()"> 全部删除 </n-button>
       </n-flex>
     </template>
-    <n-data-table
-      striped
-      class="table"
-      :columns="testcaseColumns"
-      :data="testcases"
-    />
+    <n-data-table striped class="table" :columns="testcaseColumns" :data="testcases" />
   </n-card>
 </template>
 

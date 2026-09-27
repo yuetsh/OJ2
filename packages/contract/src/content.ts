@@ -24,9 +24,7 @@ export const announcementListItemSchema = announcementSchema.omit({
   content: true,
 })
 
-export const announcementListSchema = paginatedSchema(
-  announcementListItemSchema,
-)
+export const announcementListSchema = paginatedSchema(announcementListItemSchema)
 
 export const messageSchema = z.object({
   id: z.number().int(),
@@ -57,10 +55,7 @@ export const reactionKeySchema = z.enum([
   "want_explain",
 ])
 
-export const reactionCountsSchema = z.record(
-  reactionKeySchema,
-  z.number().int(),
-)
+export const reactionCountsSchema = z.record(reactionKeySchema, z.number().int())
 export const reactionStateSchema = z.object({
   mine: reactionKeySchema.nullable(),
   counts: reactionCountsSchema.nullable(),
@@ -196,9 +191,7 @@ export type Tutorial = z.infer<typeof tutorialSchema>
 export type Exercise = z.infer<typeof exerciseSchema>
 export type TutorialProgress = z.infer<typeof tutorialProgressSchema>
 export type TutorialProgressPing = z.infer<typeof tutorialProgressPingSchema>
-export type ExerciseAttemptRequest = z.infer<
-  typeof exerciseAttemptRequestSchema
->
+export type ExerciseAttemptRequest = z.infer<typeof exerciseAttemptRequestSchema>
 
 /**
  * 「已读」的门槛：累计停留满 3 分钟才算读过这一课。

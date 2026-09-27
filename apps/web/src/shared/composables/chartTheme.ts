@@ -11,9 +11,7 @@ import { Chart as ChartJS } from "chart.js"
 export function useChartTheme() {
   const isDark = useDark()
 
-  const textColor = computed(() =>
-    isDark.value ? "rgba(255, 255, 255, 0.75)" : "#606266",
-  )
+  const textColor = computed(() => (isDark.value ? "rgba(255, 255, 255, 0.75)" : "#606266"))
   const gridColor = computed(() =>
     isDark.value ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.1)",
   )

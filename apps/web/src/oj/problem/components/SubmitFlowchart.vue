@@ -10,10 +10,7 @@ import { sortFlowchartCriteria } from "utils/constants"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useMermaid } from "shared/composables/useMermaid"
 import { useMermaidConverter } from "../composables/useMermaidConverter"
-import {
-  useFlowchartWebSocket,
-  type FlowchartEvaluationUpdate,
-} from "shared/composables/websocket"
+import { useFlowchartWebSocket, type FlowchartEvaluationUpdate } from "shared/composables/websocket"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 
 // API 和状态管理
@@ -46,8 +43,7 @@ interface FlowchartEditorInstance {
 }
 
 // 通过inject获取FlowchartEditor组件的引用
-const flowchartEditorRef =
-  inject<Ref<FlowchartEditorInstance | null>>("flowchartEditorRef")
+const flowchartEditorRef = inject<Ref<FlowchartEditorInstance | null>>("flowchartEditorRef")
 const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 
 // 基础组合式函数
@@ -77,14 +73,10 @@ const evaluation = ref<Evaluation>({
 })
 const page = ref(1)
 const lastSubmittedMermaidCode = ref("")
-const suggestionLines = computed(() =>
-  splitSuggestionLines(evaluation.value.suggestions),
-)
+const suggestionLines = computed(() => splitSuggestionLines(evaluation.value.suggestions))
 
 // jsonb 不保留键序，直接遍历会把 40 分的「逻辑正确性」排到最后
-const sortedCriteria = computed(() =>
-  sortFlowchartCriteria(evaluation.value.criteria_details),
-)
+const sortedCriteria = computed(() => sortFlowchartCriteria(evaluation.value.criteria_details))
 
 function splitSuggestionLines(suggestions?: string | null) {
   return suggestions
@@ -111,9 +103,7 @@ const POLL_INTERVAL = 3000
 /** 到点还没结果就收手，别无限轮询下去 */
 const POLL_TIMEOUT = 3 * 60 * 1000
 
-type Outcome =
-  | { ok: true; score: number; grade: string }
-  | { ok: false; error?: string }
+type Outcome = { ok: true; score: number; grade: string } | { ok: false; error?: string }
 
 const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
   async () => {
@@ -175,21 +165,12 @@ function settle(submissionId: string, outcome: Outcome) {
   loading.value = false
 
   if (!outcome.ok) {
-    message.error(
-      outcome.error
-        ? `流程图评分失败: ${outcome.error}`
-        : "流程图评分失败，请稍后重试",
-    )
+    message.error(outcome.error ? `流程图评分失败: ${outcome.error}` : "流程图评分失败，请稍后重试")
     return
   }
   latestRating.value = { score: outcome.score, grade: outcome.grade }
-  message.success(
-    `流程图评分完成！得分: ${outcome.score}分 (${outcome.grade}级)`,
-  )
-  if (
-    (outcome.grade === "A" || outcome.grade === "S") &&
-    lastSubmittedMermaidCode.value
-  ) {
+  message.success(`流程图评分完成！得分: ${outcome.score}分 (${outcome.grade}级)`)
+  if ((outcome.grade === "A" || outcome.grade === "S") && lastSubmittedMermaidCode.value) {
     myFlowchartStore.show(lastSubmittedMermaidCode.value)
   }
 }
@@ -208,9 +189,8 @@ const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
 }
 
 // 创建 WebSocket 连接
-const { connect, disconnect, subscribe, unsubscribe } = useFlowchartWebSocket(
-  handleWebSocketMessage,
-)
+const { connect, disconnect, subscribe, unsubscribe } =
+  useFlowchartWebSocket(handleWebSocketMessage)
 
 // 订阅提交更新，同时开启轮询兜底
 function subscribeToSubmission(submissionId: string) {
@@ -292,10 +272,7 @@ async function getCurrentSubmission() {
 
 async function getSubmission(submissionPage = 0) {
   if (!problem.value?.id) return
-  const data = await getFlowchartSubmissionDetail(
-    problem.value.id,
-    submissionPage,
-  )
+  const data = await getFlowchartSubmissionDetail(problem.value.id, submissionPage)
   submissionCount.value = data.count
   const submission = data.submission
   // 翻到没有提交的页时后端返回 null（契约里 submission 是 nullable）——
@@ -324,8 +301,7 @@ async function getSubmission(submissionPage = 0) {
     grade: (submission.aiGrade ?? "") as Rating["grade"],
     feedback: submission.aiFeedback ?? "",
     suggestions: submission.aiSuggestions ?? "",
-    criteria_details:
-      submission.aiCriteriaDetails as Evaluation["criteria_details"],
+    criteria_details: submission.aiCriteriaDetails as Evaluation["criteria_details"],
   }
 }
 
@@ -465,18 +441,12 @@ onUnmounted(() => {
               <n-alert v-if="renderError" type="error" title="流程图渲染失败">
                 {{ renderError }}
               </n-alert>
-              <div
-                class="flowchart"
-                v-show="!renderError"
-                ref="mermaidContainer"
-              ></div>
+              <div class="flowchart" v-show="!renderError" ref="mermaidContainer"></div>
             </n-spin>
           </div>
           <!-- 加载到编辑器按钮 -->
           <n-flex style="margin-top: 16px" justify="center">
-            <n-button @click="loadToEditor" type="primary">
-              加载到流程图编辑器
-            </n-button>
+            <n-button @click="loadToEditor" type="primary"> 加载到流程图编辑器 </n-button>
           </n-flex>
         </n-gi>
 
@@ -511,23 +481,11 @@ onUnmounted(() => {
 
           <!-- 详细评分 -->
           <n-card v-if="sortedCriteria.length" size="small" title="详细评分">
-            <div
-              v-for="[key, detail] in sortedCriteria"
-              :key="key"
-              style="margin-bottom: 12px"
-            >
+            <div v-for="[key, detail] in sortedCriteria" :key="key" style="margin-bottom: 12px">
               <!-- 评分项标题和分数 -->
-              <n-flex
-                justify="space-between"
-                align="center"
-                style="margin-bottom: 4px"
-              >
+              <n-flex justify="space-between" align="center" style="margin-bottom: 4px">
                 <n-text strong>{{ key }}</n-text>
-                <n-tag
-                  :type="getPercentType(detail.score / detail.max)"
-                  size="small"
-                  round
-                >
+                <n-tag :type="getPercentType(detail.score / detail.max)" size="small" round>
                   {{ detail.score || 0 }}分 / {{ detail.max }}分
                 </n-tag>
               </n-flex>
@@ -541,16 +499,8 @@ onUnmounted(() => {
       </n-grid>
 
       <!-- 分页组件 -->
-      <n-flex
-        justify="center"
-        style="margin-top: 24px"
-        v-if="submissionCount > 1"
-      >
-        <n-pagination
-          v-model:page="page"
-          :page-count="submissionCount"
-          @update-page="updatePage"
-        />
+      <n-flex justify="center" style="margin-top: 24px" v-if="submissionCount > 1">
+        <n-pagination v-model:page="page" :page-count="submissionCount" @update-page="updatePage" />
       </n-flex>
     </n-modal>
   </n-flex>

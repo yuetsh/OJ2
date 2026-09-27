@@ -4,13 +4,7 @@ import Toolbar from "./Toolbar.vue"
 import "@vue-flow/core/dist/style.css"
 import "@vue-flow/core/dist/theme-default.css"
 import "@vue-flow/controls/dist/style.css"
-import {
-  useVueFlow,
-  VueFlow,
-  type Node,
-  type Edge,
-  MarkerType,
-} from "@vue-flow/core"
+import { useVueFlow, VueFlow, type Node, type Edge, MarkerType } from "@vue-flow/core"
 import { Controls } from "@vue-flow/controls"
 import { Background } from "@vue-flow/background"
 
@@ -49,18 +43,16 @@ const cacheKey = computed(() =>
     ? `flowchart-editor-data-problem-${problem.value!._id}`
     : "flowchart-editor-data",
 )
-const {
-  isSaving,
-  lastSaved,
-  hasUnsavedChanges,
-  saveToCache,
-  loadFromCache,
-  clearCache,
-} = useCache(nodes, edges, cacheKey, () => {
-  // 换题后画布已经被换成新题的草稿，历史必须跟着重建，
-  // 否则一次撤销就会把上一题的图还原到这一题里
-  resetHistory(nodes.value, edges.value)
-})
+const { isSaving, lastSaved, hasUnsavedChanges, saveToCache, loadFromCache, clearCache } = useCache(
+  nodes,
+  edges,
+  cacheKey,
+  () => {
+    // 换题后画布已经被换成新题的草稿，历史必须跟着重建，
+    // 否则一次撤销就会把上一题的图还原到这一题里
+    resetHistory(nodes.value, edges.value)
+  },
+)
 
 // 拖拽处理
 const { onDragOver, onDragLeave, onDrop, isDragOver, screenDragPos } = useDnD()
@@ -85,14 +77,7 @@ const {
   handleNodeUpdate,
   clearCanvas,
   deleteSelected,
-} = useFlowOperations(
-  nodes,
-  edges,
-  addEdges,
-  removeNodes,
-  removeEdges,
-  saveState,
-)
+} = useFlowOperations(nodes, edges, addEdges, removeNodes, removeEdges, saveState)
 
 const handleDrop = async (event: DragEvent) => {
   const newNode = onDrop(event)
@@ -140,10 +125,7 @@ const handleClear = () => {
 
 // 键盘事件
 const handleKeyDown = (event: KeyboardEvent) => {
-  if (
-    event.target instanceof HTMLInputElement ||
-    event.target instanceof HTMLTextAreaElement
-  )
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
     return
 
   if (event.key === "Delete" || event.key === "Backspace") {
@@ -220,9 +202,7 @@ defineExpose({
         class="drag-node-preview"
         :style="dragPreviewStyle"
       >
-        <span class="preview-icon">{{
-          getNodeTypeConfig(currentDragNodeType).icon
-        }}</span>
+        <span class="preview-icon">{{ getNodeTypeConfig(currentDragNodeType).icon }}</span>
         <span>{{ getNodeTypeConfig(currentDragNodeType).label }}</span>
       </div>
     </Transition>
@@ -272,12 +252,7 @@ defineExpose({
           orient="auto"
           markerUnits="strokeWidth"
         >
-          <path
-            d="M0,0 L0,6 L10,3 z"
-            fill="#6366f1"
-            stroke="#6366f1"
-            strokeWidth="0.5"
-          />
+          <path d="M0,0 L0,6 L10,3 z" fill="#6366f1" stroke="#6366f1" strokeWidth="0.5" />
         </marker>
       </defs>
       <template #node-custom="{ data, id, type }">

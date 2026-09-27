@@ -1,9 +1,6 @@
 import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
-import {
-  useConfigWebSocket,
-  type ConfigUpdate,
-} from "shared/composables/websocket"
+import { useConfigWebSocket, type ConfigUpdate } from "shared/composables/websocket"
 
 /**
  * 收 /ws/config 的站点配置广播，写进 configStore —— 超管改完配置，所有开着页面
@@ -19,8 +16,7 @@ export function useConfigUpdate() {
   const handleConfigUpdate = (data: ConfigUpdate) => {
     // 认不出来的键直接忽略：后端将来多推一个字段，不该把 store 撑出个野字段
     if (!(data.key in configStore.config)) return
-    ;(configStore.config as unknown as Record<string, unknown>)[data.key] =
-      data.value
+    ;(configStore.config as unknown as Record<string, unknown>)[data.key] = data.value
     // getConfig() 里也是这么设的，站点改名后标签页跟着变，别只更新页面里那份
     if (data.key === "websiteName") document.title = data.value
   }

@@ -1,8 +1,4 @@
-import {
-  HighlightStyle,
-  TagStyle,
-  syntaxHighlighting,
-} from "@codemirror/language"
+import { HighlightStyle, TagStyle, syntaxHighlighting } from "@codemirror/language"
 import { Extension } from "@codemirror/state"
 import { EditorView } from "@codemirror/view"
 
@@ -64,11 +60,7 @@ interface Settings {
   gutterBorderRight: string
 }
 
-export const createTheme = ({
-  variant,
-  settings,
-  styles,
-}: Options): Extension => {
+export const createTheme = ({ variant, settings, styles }: Options): Extension => {
   const theme = EditorView.theme(
     {
       // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -82,10 +74,9 @@ export const createTheme = ({
       ".cm-cursor, .cm-dropCursor": {
         borderLeftColor: settings.caret,
       },
-      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-        {
-          backgroundColor: settings.selection,
-        },
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+        backgroundColor: settings.selection,
+      },
       ".cm-activeLine": {
         backgroundColor: settings.lineHighlight,
       },

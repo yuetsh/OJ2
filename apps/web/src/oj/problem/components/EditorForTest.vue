@@ -20,8 +20,7 @@ const { input, output } = storeToRefs(codeStore)
 const { problem } = storeToRefs(problemStore)
 
 const storageKey = computed(
-  () =>
-    `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
+  () => `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
 )
 
 onMounted(() => {
@@ -29,8 +28,7 @@ onMounted(() => {
     codeStore.setCode(storage.get(storageKey.value))
   } else {
     codeStore.setCode(
-      problem.value!.template[codeStore.code.language] ||
-        SOURCES[codeStore.code.language],
+      problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
     )
   }
 })
@@ -40,15 +38,11 @@ function changeCode(v: string) {
 }
 
 function changeLanguage(v: string) {
-  if (
-    storage.get(storageKey.value) &&
-    storageKey.value.split("_").pop() === v
-  ) {
+  if (storage.get(storageKey.value) && storageKey.value.split("_").pop() === v) {
     codeStore.setCode(storage.get(storageKey.value))
   } else {
     codeStore.setCode(
-      problem.value!.template[codeStore.code.language] ||
-        SOURCES[codeStore.code.language],
+      problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
     )
   }
 }
@@ -60,8 +54,7 @@ const copy = async () => {
 
 const reset = () => {
   codeStore.setCode(
-    problem.value!.template[codeStore.code.language] ||
-      SOURCES[codeStore.code.language],
+    problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
   )
   storage.remove(storageKey.value)
   message.success("代码重置成功")
@@ -72,12 +65,10 @@ const runCode = async () => {
   output.value = res.output
 }
 
-const languageOptions: DropdownOption[] = problem.value!.languages.map(
-  (it) => ({
-    label: () => LANGUAGE_SHOW_VALUE[it],
-    value: it,
-  }),
-)
+const languageOptions: DropdownOption[] = problem.value!.languages.map((it) => ({
+  label: () => LANGUAGE_SHOW_VALUE[it],
+  value: it,
+}))
 </script>
 
 <template>
@@ -94,9 +85,7 @@ const languageOptions: DropdownOption[] = problem.value!.languages.map(
             />
             <n-button @click="copy">复制代码</n-button>
             <n-button @click="reset">重置代码</n-button>
-            <n-button type="primary" secondary @click="runCode">
-              运行代码
-            </n-button>
+            <n-button type="primary" secondary @click="runCode"> 运行代码 </n-button>
           </n-flex>
           <CodeEditor
             v-model:value="codeStore.code.value"
@@ -106,12 +95,7 @@ const languageOptions: DropdownOption[] = problem.value!.languages.map(
         </n-flex>
       </template>
       <template #2>
-        <n-split
-          direction="vertical"
-          :default-size="1 / 3"
-          :min="1 / 5"
-          :max="3 / 5"
-        >
+        <n-split direction="vertical" :default-size="1 / 3" :min="1 / 5" :max="3 / 5">
           <template #1>
             <div class="title">输入框</div>
             <n-input

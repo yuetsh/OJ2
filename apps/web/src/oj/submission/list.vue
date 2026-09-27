@@ -11,11 +11,7 @@ import {
 } from "oj/api"
 import { parseTime } from "utils/functions"
 import type { Grade as GradeValue } from "utils/types"
-import type {
-  FlowchartSubmissionListItem,
-  LANGUAGE,
-  SubmissionListItem,
-} from "utils/types"
+import type { FlowchartSubmissionListItem, LANGUAGE, SubmissionListItem } from "utils/types"
 import Pagination from "shared/components/Pagination.vue"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -44,15 +40,11 @@ import FlowchartLink from "./components/FlowchartLink.vue"
 // 下面四个组件只在默认关闭的 n-modal 里用，其中两个统计面板还只有老师看得见。
 // 静态 import 会把它们拖进本路由的关键路径——光 chart.js 就 197KB，进页面前必须先下完。
 // 改成异步后本路由增量下载从 675KB / 59 个文件降到 360KB 出头。
-const StatisticsPanel = defineAsyncComponent(
-  () => import("shared/components/StatisticsPanel.vue"),
-)
+const StatisticsPanel = defineAsyncComponent(() => import("shared/components/StatisticsPanel.vue"))
 const FlowchartStatisticsPanel = defineAsyncComponent(
   () => import("shared/components/FlowchartStatisticsPanel.vue"),
 )
-const TodayStatistics = defineAsyncComponent(
-  () => import("./components/TodayStatistics.vue"),
-)
+const TodayStatistics = defineAsyncComponent(() => import("./components/TodayStatistics.vue"))
 const SubmissionDetail = defineAsyncComponent(() => import("./detail.vue"))
 const FlowchartScoreDetail = defineAsyncComponent(
   () => import("./components/FlowchartScoreDetail.vue"),
@@ -267,9 +259,7 @@ function showCodePanel(id: string, problem: string) {
  * 只在**能看代码**的行之间走 —— showLink 是后端按题单规则算出来的，
  * 跳到一条看不了的上面只会得到一个空弹框。
  */
-const viewableSubmissions = computed(() =>
-  submissions.value.filter((row) => row.showLink),
-)
+const viewableSubmissions = computed(() => submissions.value.filter((row) => row.showLink))
 const currentCodeIndex = computed(() =>
   viewableSubmissions.value.findIndex((row) => row.id === submissionID.value),
 )
@@ -308,24 +298,19 @@ function moveCodePanel(step: 1 | -1) {
 
 // 上下（和左右）翻阅代码详情。Esc 关弹框是 n-modal 自带的，不用管。
 // 弹框没开就什么都不做，页面正常滚动
-onKeyStroke(
-  ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"],
-  (e: KeyboardEvent) => {
-    if (!codePanel.value) return
-    // 焦点在输入框里（弹框底下那几个筛选框）时不抢方向键
-    const target = e.target as HTMLElement | null
-    if (
-      target &&
-      (target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable)
-    ) {
-      return
-    }
-    e.preventDefault()
-    moveCodePanel(e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1)
-  },
-)
+onKeyStroke(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"], (e: KeyboardEvent) => {
+  if (!codePanel.value) return
+  // 焦点在输入框里（弹框底下那几个筛选框）时不抢方向键
+  const target = e.target as HTMLElement | null
+  if (
+    target &&
+    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+  ) {
+    return
+  }
+  e.preventDefault()
+  moveCodePanel(e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1)
+})
 
 function showScoreDetail(id: string) {
   selectedFlowchartId.value = id
@@ -348,14 +333,7 @@ watchDebounced(() => [query.username, query.problem], listSubmissions, {
 
 // 监听其他查询条件变化
 watch(
-  () => [
-    query.page,
-    query.limit,
-    query.myself,
-    query.result,
-    query.language,
-    query.today,
-  ],
+  () => [query.page, query.limit, query.myself, query.result, query.language, query.today],
   listSubmissions,
 )
 
@@ -427,8 +405,7 @@ const columns = computed(() => {
               type: "info",
               bordered: false,
               style: { cursor: "pointer", flexShrink: 0 },
-              onClick: () =>
-                window.open("/problemset/" + problemSet.id, "_blank"),
+              onClick: () => window.open("/problemset/" + problemSet.id, "_blank"),
             },
             () => "题单 " + problemSet.title,
           ),
@@ -442,10 +419,7 @@ const columns = computed(() => {
       render: (row) => LANGUAGE_SHOW_VALUE[row.language],
     },
     {
-      title: renderTableTitle(
-        "用户",
-        "streamline-emojis:smiling-face-with-sunglasses",
-      ),
+      title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
       key: "username",
       minWidth: 200,
       render: (row) =>
@@ -525,10 +499,7 @@ const flowchartColumns = computed(() => {
       },
     },
     {
-      title: renderTableTitle(
-        "评分",
-        "streamline-ultimate-color:analytics-bars-3d",
-      ),
+      title: renderTableTitle("评分", "streamline-ultimate-color:analytics-bars-3d"),
       key: "ai_score",
       // 只有评完的才有分数。没评完也渲染 Grade 的话会显示成 0 分，
       // 看着像「评了但得了 0 分」
@@ -541,10 +512,7 @@ const flowchartColumns = computed(() => {
           : h(NText, { depth: 3 }, () => "—"),
     },
     {
-      title: renderTableTitle(
-        "用户",
-        "streamline-emojis:smiling-face-with-sunglasses",
-      ),
+      title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
       key: "username",
       minWidth: 200,
       render: (row) =>
@@ -591,26 +559,16 @@ const flowchartColumns = computed(() => {
     <n-space>
       <n-form :show-feedback="false" inline label-placement="left">
         <n-form-item v-if="isDesktop && userStore.isAuthed" label="只看自己">
-          <n-switch
-            v-model:value="query.myself"
-            checked-value="1"
-            unchecked-value="0"
-          />
+          <n-switch v-model:value="query.myself" checked-value="1" unchecked-value="0" />
         </n-form-item>
         <n-form-item label="语言" v-if="route.name !== 'contest submissions'">
-          <n-select
-            class="select"
-            v-model:value="query.language"
-            :options="languageOptions"
-          />
+          <n-select class="select" v-model:value="query.language" :options="languageOptions" />
         </n-form-item>
         <n-form-item :label="query.language === 'Flowchart' ? '等级' : '状态'">
           <n-select
             class="select"
             v-model:value="query.result"
-            :options="
-              query.language === 'Flowchart' ? gradeOptions : resultOptions
-            "
+            :options="query.language === 'Flowchart' ? gradeOptions : resultOptions"
           />
         </n-form-item>
       </n-form>
@@ -635,28 +593,16 @@ const flowchartColumns = computed(() => {
       </n-form>
       <n-form :show-feedback="false" inline label-placement="left">
         <n-form-item v-if="isMobile && userStore.isAuthed" label="只看自己">
-          <n-switch
-            v-model:value="query.myself"
-            checked-value="1"
-            unchecked-value="0"
-          />
+          <n-switch v-model:value="query.myself" checked-value="1" unchecked-value="0" />
         </n-form-item>
         <n-form-item>
-          <n-button @click="search(query.username, query.problem)">
-            搜索
-          </n-button>
+          <n-button @click="search(query.username, query.problem)"> 搜索 </n-button>
         </n-form-item>
         <n-form-item>
           <n-button @click="clear" quaternary>重置</n-button>
         </n-form-item>
-        <n-form-item
-          v-if="userStore.isTeacherOrAbove && route.name === 'submissions'"
-        >
-          <n-button
-            quaternary
-            type="warning"
-            @click="toggleStatisticPanel(true)"
-          >
+        <n-form-item v-if="userStore.isTeacherOrAbove && route.name === 'submissions'">
+          <n-button quaternary type="warning" @click="toggleStatisticPanel(true)">
             数据统计
           </n-button>
         </n-form-item>
@@ -704,31 +650,21 @@ const flowchartColumns = computed(() => {
       :loading="showLoading"
     />
   </n-flex>
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   <n-modal
     v-if="userStore.isTeacherOrAbove"
     v-model:show="statisticPanel"
     preset="card"
     :style="{ maxWidth: isDesktop && '800px', maxHeight: '80vh' }"
     :content-style="{ overflow: 'auto' }"
-    :title="
-      query.language === 'Flowchart' ? '流程图提交的统计' : '提交记录的统计'
-    "
+    :title="query.language === 'Flowchart' ? '流程图提交的统计' : '提交记录的统计'"
   >
     <FlowchartStatisticsPanel
       v-if="query.language === 'Flowchart'"
       :problem="query.problem"
       :username="query.username"
     />
-    <StatisticsPanel
-      v-else
-      :problem="query.problem"
-      :username="query.username"
-    />
+    <StatisticsPanel v-else :problem="query.problem" :username="query.username" />
   </n-modal>
   <n-modal
     v-model:show="todayPanel"
@@ -777,10 +713,7 @@ const flowchartColumns = computed(() => {
     <template #header>
       <n-flex align="center">
         <n-text>流程图评分详情</n-text>
-        <n-text
-          v-if="selectedFlowchart"
-          :type="getGradeType(selectedFlowchart.aiGrade ?? '')"
-        >
+        <n-text v-if="selectedFlowchart" :type="getGradeType(selectedFlowchart.aiGrade ?? '')">
           {{ selectedFlowchart.aiScore }}分 {{ selectedFlowchart.aiGrade }}级
         </n-text>
       </n-flex>

@@ -112,15 +112,11 @@ async function save() {
             <div class="icon-preview">
               <AchievementIcon :icon="form.icon" :size="28" />
             </div>
-            <n-input
-              v-model:value="form.icon"
-              placeholder="iconify 图标名，例如 noto:owl"
-            />
+            <n-input v-model:value="form.icon" placeholder="iconify 图标名，例如 noto:owl" />
           </n-flex>
           <n-text depth="3" style="font-size: 12px">
             填 iconify 图标名（推荐 noto: 开头的彩色 emoji 图标），左侧是实时
-            预览；预览不出来说明名字写错了。图标名可在 icon-sets.iconify.design
-            搜索。
+            预览；预览不出来说明名字写错了。图标名可在 icon-sets.iconify.design 搜索。
           </n-text>
         </n-flex>
       </n-form-item>
@@ -128,11 +124,7 @@ async function save() {
         <n-select v-model:value="form.rarity" :options="rarityOptions" />
       </n-form-item>
       <n-form-item label="指标" required>
-        <n-select
-          v-model:value="form.metric"
-          :options="metricOptions"
-          filterable
-        />
+        <n-select v-model:value="form.metric" :options="metricOptions" filterable />
       </n-form-item>
       <n-form-item v-if="metricHelp" label=" ">
         <n-text depth="3">{{ metricHelp }}</n-text>
@@ -152,9 +144,7 @@ async function save() {
       </n-form-item>
       <n-form-item label="隐藏成就">
         <n-switch v-model:value="form.hidden" />
-        <n-text depth="3" style="margin-left: 12px">
-          未解锁时学生只能看到 ???
-        </n-text>
+        <n-text depth="3" style="margin-left: 12px"> 未解锁时学生只能看到 ??? </n-text>
       </n-form-item>
       <n-form-item label="上架">
         <n-switch v-model:value="form.visible" />
@@ -166,9 +156,7 @@ async function save() {
     <template #footer>
       <n-flex justify="end">
         <n-button @click="emit('update:show', false)">取消</n-button>
-        <n-button type="primary" :loading="saving" @click="save">
-          保存
-        </n-button>
+        <n-button type="primary" :loading="saving" @click="save"> 保存 </n-button>
       </n-flex>
     </template>
   </n-modal>

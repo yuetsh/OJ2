@@ -11,17 +11,7 @@ import {
   type HeatmapItem,
   type LoginSummary,
 } from "@oj2/contract"
-import {
-  and,
-  count,
-  countDistinct,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lte,
-  sql,
-} from "drizzle-orm"
+import { and, count, countDistinct, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
@@ -32,32 +22,12 @@ import { JudgeStatus } from "../judge/status"
 import { failure, parseBody, readJson, success } from "../http"
 import { completeChat, streamChat, streamWhole } from "../services/ai"
 import { generateFilteredHint } from "../services/hint-filter"
-import {
-  accepted,
-  buildDetail,
-  buildDuration,
-  listSolved,
-} from "../services/learning-stats"
+import { accepted, buildDetail, buildDuration, listSolved } from "../services/learning-stats"
 import { decideHintLevel } from "../services/hint-level"
-import {
-  hintDiagnosis,
-  hintPrompt,
-  referenceAnswer,
-} from "../services/hint-diagnosis"
+import { hintDiagnosis, hintPrompt, referenceAnswer } from "../services/hint-diagnosis"
 import { consumeToken } from "../services/throttling"
-import {
-  calendarDay,
-  dayNumber,
-  dayText,
-  localTime,
-  localWeekday,
-} from "../time"
-import {
-  countFailedSubmissions,
-  isTeacherOrAbove,
-  asRecord,
-  queryInteger,
-} from "./helpers"
+import { calendarDay, dayNumber, dayText, localTime, localWeekday } from "../time"
+import { countFailedSubmissions, isTeacherOrAbove, asRecord, queryInteger } from "./helpers"
 
 export const aiRoutes = new Hono<AppEnv>()
 
@@ -73,12 +43,7 @@ function aiThrottleKey(userId: number) {
 async function throttleAi(c: Context<AppEnv>) {
   const throttle = await consumeToken("user", aiThrottleKey(c.get("user")!.id))
   if (throttle.allowed) return null
-  return failure(
-    c,
-    429,
-    "too-many-requests",
-    `Please wait ${Math.floor(throttle.wait)} seconds`,
-  )
+  return failure(c, 429, "too-many-requests", `Please wait ${Math.floor(throttle.wait)} seconds`)
 }
 
 async function targetUser(c: Context<AppEnv>, override?: string) {
@@ -104,18 +69,8 @@ async function targetUser(c: Context<AppEnv>, override?: string) {
 aiRoutes.get("/ai/detail", requireAuth, async (c) => {
   const start = c.req.query("start")
   const end = c.req.query("end")
-  if (
-    !start ||
-    !end ||
-    Number.isNaN(Date.parse(start)) ||
-    Number.isNaN(Date.parse(end))
-  ) {
-    return failure(
-      c,
-      400,
-      "invalid-range",
-      "start and end must be ISO 8601 timestamps",
-    )
+  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
+    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
   }
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
@@ -125,18 +80,8 @@ aiRoutes.get("/ai/detail", requireAuth, async (c) => {
 aiRoutes.get("/ai/solved", requireAuth, async (c) => {
   const start = c.req.query("start")
   const end = c.req.query("end")
-  if (
-    !start ||
-    !end ||
-    Number.isNaN(Date.parse(start)) ||
-    Number.isNaN(Date.parse(end))
-  ) {
-    return failure(
-      c,
-      400,
-      "invalid-range",
-      "start and end must be ISO 8601 timestamps",
-    )
+  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
+    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
   }
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
@@ -151,10 +96,7 @@ aiRoutes.get("/ai/duration", requireAuth, async (c) => {
     return failure(c, 400, "invalid-end", "end must be an ISO timestamp")
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
-  return success(
-    c,
-    await buildDuration(user, endText, c.req.query("duration") ?? "months:1"),
-  )
+  return success(c, await buildDuration(user, endText, c.req.query("duration") ?? "months:1"))
 })
 
 aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
@@ -174,14 +116,8 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
     .where(
       and(
         eq(schema.submission.userId, user.id),
-        gte(
-          schema.submission.createTime,
-          new Date((firstMonday - 1) * 864e5).toISOString(),
-        ),
-        lte(
-          schema.submission.createTime,
-          new Date(end.getTime() + 864e5).toISOString(),
-        ),
+        gte(schema.submission.createTime, new Date((firstMonday - 1) * 864e5).toISOString()),
+        lte(schema.submission.createTime, new Date(end.getTime() + 864e5).toISOString()),
       ),
     )
     .groupBy(date)
@@ -192,8 +128,7 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
     Array.from({ length: 53 }, (_, week) => {
       const monday = firstMonday + week * 7
       let value = 0
-      for (let offset = 0; offset < 7; offset++)
-        value += counts.get(dayText(monday + offset)) ?? 0
+      for (let offset = 0; offset < 7; offset++) value += counts.get(dayText(monday + offset)) ?? 0
       // timestamp 是该周周一的 UTC 零点，前端按东八区只取年月日部件
       return { timestamp: monday * 864e5, value } satisfies HeatmapItem
     }),
@@ -213,64 +148,60 @@ aiRoutes.get("/ai/login-summary", requireAuth, async (c) => {
     .limit(1)
   const previous = await getPreviousLogin(c)
   let start = new Date(
-    previous ??
-      userRow?.lastLogin ??
-      userRow?.createTime ??
-      end.getTime() - 7 * 864e5,
+    previous ?? userRow?.lastLogin ?? userRow?.createTime ?? end.getTime() - 7 * 864e5,
   )
   if (start >= end) start = new Date(end.getTime() - 864e5)
   const range = and(
     gte(schema.submission.createTime, start.toISOString()),
     lte(schema.submission.createTime, end.toISOString()),
   )
-  const [newProblems, submissions, acceptedRows, solvedRows, flowRows] =
-    await Promise.all([
-      db
-        .select({ value: count() })
-        .from(schema.problem)
-        .where(
-          and(
-            isNull(schema.problem.contestId),
-            eq(schema.problem.visible, true),
-            gte(schema.problem.createTime, start.toISOString()),
-            lte(schema.problem.createTime, end.toISOString()),
-          ),
+  const [newProblems, submissions, acceptedRows, solvedRows, flowRows] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(schema.problem)
+      .where(
+        and(
+          isNull(schema.problem.contestId),
+          eq(schema.problem.visible, true),
+          gte(schema.problem.createTime, start.toISOString()),
+          lte(schema.problem.createTime, end.toISOString()),
         ),
-      db
-        .select({ value: count() })
-        .from(schema.submission)
-        .where(and(eq(schema.submission.userId, user.id), range)),
-      db
-        .select({ value: count() })
-        .from(schema.submission)
-        .where(
-          and(
-            eq(schema.submission.userId, user.id),
-            inArray(schema.submission.result, accepted),
-            range,
-          ),
+      ),
+    db
+      .select({ value: count() })
+      .from(schema.submission)
+      .where(and(eq(schema.submission.userId, user.id), range)),
+    db
+      .select({ value: count() })
+      .from(schema.submission)
+      .where(
+        and(
+          eq(schema.submission.userId, user.id),
+          inArray(schema.submission.result, accepted),
+          range,
         ),
-      db
-        .select({ value: countDistinct(schema.submission.problemId) })
-        .from(schema.submission)
-        .where(
-          and(
-            eq(schema.submission.userId, user.id),
-            inArray(schema.submission.result, accepted),
-            range,
-          ),
+      ),
+    db
+      .select({ value: countDistinct(schema.submission.problemId) })
+      .from(schema.submission)
+      .where(
+        and(
+          eq(schema.submission.userId, user.id),
+          inArray(schema.submission.result, accepted),
+          range,
         ),
-      db
-        .select({ value: count() })
-        .from(schema.flowchartSubmission)
-        .where(
-          and(
-            eq(schema.flowchartSubmission.userId, user.id),
-            gte(schema.flowchartSubmission.createTime, start.toISOString()),
-            lte(schema.flowchartSubmission.createTime, end.toISOString()),
-          ),
+      ),
+    db
+      .select({ value: count() })
+      .from(schema.flowchartSubmission)
+      .where(
+        and(
+          eq(schema.flowchartSubmission.userId, user.id),
+          gte(schema.flowchartSubmission.createTime, start.toISOString()),
+          lte(schema.flowchartSubmission.createTime, end.toISOString()),
         ),
-    ])
+      ),
+  ])
   const summary = {
     start: start.toISOString(),
     end: end.toISOString(),
@@ -306,10 +237,7 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
     .from(schema.aiAnalysis)
     .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
     .where(
-      and(
-        eq(schema.aiAnalysis.userId, c.get("user")!.id),
-        eq(schema.aiAnalysis.isPinned, true),
-      ),
+      and(eq(schema.aiAnalysis.userId, c.get("user")!.id), eq(schema.aiAnalysis.isPinned, true)),
     )
     .limit(1)
   if (!row) return success(c, null)
@@ -326,22 +254,10 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
 })
 
 aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    aiAnalysisRequestSchema,
-    "start, end and duration are required",
-  )
+  const parsed = await parseBody(c, aiAnalysisRequestSchema, "start, end and duration are required")
   if (!parsed.success) return parsed.response
-  if (
-    Number.isNaN(Date.parse(parsed.data.start)) ||
-    Number.isNaN(Date.parse(parsed.data.end))
-  ) {
-    return failure(
-      c,
-      400,
-      "invalid-range",
-      "start and end must be ISO 8601 timestamps",
-    )
+  if (Number.isNaN(Date.parse(parsed.data.start)) || Number.isNaN(Date.parse(parsed.data.end))) {
+    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
   }
   // 传 username 的鉴权走 targetUser：非教师传了也只会拿到自己
   const user = await targetUser(c, parsed.data.username)
@@ -423,19 +339,12 @@ async function recordHint(
 }
 
 aiRoutes.post("/ai/hint", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    aiHintRequestSchema,
-    "submissionId is required",
-  )
+  const parsed = await parseBody(c, aiHintRequestSchema, "submissionId is required")
   if (!parsed.success) return parsed.response
   const [row] = await db
     .select({ submission: schema.submission, problem: schema.problem })
     .from(schema.submission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.submission.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     .where(
       and(
         eq(schema.submission.id, parsed.data.submissionId),
@@ -443,17 +352,11 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
       ),
     )
     .limit(1)
-  if (!row)
-    return failure(c, 404, "submission-not-found", "Submission not found")
+  if (!row) return failure(c, 404, "submission-not-found", "Submission not found")
   // 比赛里不给 AI 提示，和「求助」按钮同一个口径。前端在比赛路由下压根不显示按钮，
   // 这里是防直接 POST 的那一道 —— 比赛只有 ACM 模式，提示等于变相放水。
   if (row.submission.contestId !== null)
-    return failure(
-      c,
-      403,
-      "contest-hint-disabled",
-      "Hint is disabled in contests",
-    )
+    return failure(c, 403, "contest-hint-disabled", "Hint is disabled in contests")
   // 失败次数在端点这边也要卡一道：直接 POST 完全绕开前端的显示条件 ——
   // 不然这就是个不限次数的免费 LLM 接口。数法（判题中的不算、判题机自己崩的不算）
   // 由 countFailedSubmissions 统一，题目详情的 myFailedCount 走的是同一个函数，
@@ -461,10 +364,7 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
   // 编译失败不数次数（理由见 HINT_MIN_FAILURES 的注释）。放开的只是这一次提交本身，
   // 下面的 throttleAi 照样卡着，不会因此变成不限次数的接口。
   if (row.submission.result !== JudgeStatus.COMPILE_ERROR) {
-    const failed = await countFailedSubmissions(
-      c.get("user")!.id,
-      row.submission.problemId,
-    )
+    const failed = await countFailedSubmissions(c.get("user")!.id, row.submission.problemId)
     if (failed < HINT_MIN_FAILURES)
       return failure(
         c,
@@ -523,8 +423,7 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
 aiRoutes.post("/ai/hint/:id/feedback", requireAuth, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
   const parsed = await readJson(c, aiHintFeedbackRequestSchema)
-  if (!id || !parsed.success)
-    return failure(c, 400, "invalid-request", "helpful is required")
+  if (!id || !parsed.success) return failure(c, 400, "invalid-request", "helpful is required")
   // 只能评自己的提示：顺着 submission 核对是不是本人。别人的和不存在的一样回 404，
   // 不透露那个 id 上有没有东西
   const [updated] = await db
@@ -553,11 +452,7 @@ aiRoutes.post("/ai/hint/:id/feedback", requireAuth, async (c) => {
 aiRoutes.post("/ai/class-analysis", requireAuth, async (c) => {
   if (!isTeacherOrAbove(c.get("user")))
     return failure(c, 403, "permission-denied", "Permission denied")
-  const parsed = await parseBody(
-    c,
-    classAnalysisRequestSchema,
-    "Class data is required",
-  )
+  const parsed = await parseBody(c, classAnalysisRequestSchema, "Class data is required")
   if (!parsed.success) return parsed.response
   const limited = await throttleAi(c)
   if (limited) return limited

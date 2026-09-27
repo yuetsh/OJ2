@@ -22,14 +22,11 @@ export const judgeServerRoutes = new Hono()
 
 function tokenMatches(value: string | undefined) {
   if (!value) return false
-  const expected = createHash("sha256")
-    .update(config.judgeServerToken)
-    .digest("hex")
+  const expected = createHash("sha256").update(config.judgeServerToken).digest("hex")
   const actualBuffer = Buffer.from(value)
   const expectedBuffer = Buffer.from(expected)
   return (
-    actualBuffer.length === expectedBuffer.length &&
-    timingSafeEqual(actualBuffer, expectedBuffer)
+    actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
   )
 }
 
@@ -51,10 +48,7 @@ async function heartbeat(c: Context) {
     .limit(1)
 
   const common = {
-    ip:
-      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ||
-      c.req.header("x-real-ip") ||
-      null,
+    ip: c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || c.req.header("x-real-ip") || null,
     judgerVersion: parsed.data.judger_version,
     cpuCore: parsed.data.cpu_core,
     memoryUsage: parsed.data.memory,
@@ -64,10 +58,7 @@ async function heartbeat(c: Context) {
   }
 
   if (existing) {
-    await db
-      .update(schema.judgeServer)
-      .set(common)
-      .where(eq(schema.judgeServer.id, existing.id))
+    await db.update(schema.judgeServer).set(common).where(eq(schema.judgeServer.id, existing.id))
   } else {
     await db.insert(schema.judgeServer).values({
       ...common,

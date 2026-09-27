@@ -6,7 +6,6 @@ export default defineConfig({
   out: "./src/db",
   dbCredentials: {
     url:
-      process.env.DATABASE_URL ??
-      "postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge",
+      process.env.DATABASE_URL ?? "postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge",
   },
 })

@@ -3,11 +3,7 @@ import { eq, sql } from "drizzle-orm"
 import { db, schema } from "../db"
 import { JudgeStatus, isAccepted } from "../judge/status"
 import { asRecord } from "../routes/helpers"
-import {
-  metaAchievements,
-  refreshUnlockedCount,
-  rescanAchievement,
-} from "../services/achievements"
+import { metaAchievements, refreshUnlockedCount, rescanAchievement } from "../services/achievements"
 
 /**
  * 把反范式的计数列重算回与 submission 表一致。
@@ -162,8 +158,8 @@ async function expectedProfiles() {
 function stable(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`
   if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(
-      ([a], [b]) => (a < b ? -1 : 1),
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a < b ? -1 : 1,
     )
     return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stable(v)}`).join(",")}}`
   }
@@ -210,13 +206,9 @@ async function unlockedCountPlan(plan: Plan) {
           achievementId: schema.userAchievement.achievementId,
         })
         .from(schema.userAchievement)
-        .where(
-          sql`${schema.userAchievement.achievementId} in ${metas.map((meta) => meta.id)}`,
-        )
+        .where(sql`${schema.userAchievement.achievementId} in ${metas.map((meta) => meta.id)}`)
     : []
-  const held = new Set(
-    holders.map((row) => `${row.userId}:${row.achievementId}`),
-  )
+  const held = new Set(holders.map((row) => `${row.userId}:${row.achievementId}`))
 
   for (const row of rows) {
     const label = `用户 ${row.user_id}`
@@ -231,9 +223,7 @@ async function unlockedCountPlan(plan: Plan) {
     }
     for (const meta of metas) {
       const met =
-        meta.operator === "gte"
-          ? row.actual >= meta.threshold
-          : row.actual <= meta.threshold
+        meta.operator === "gte" ? row.actual >= meta.threshold : row.actual <= meta.threshold
       if (!met || held.has(`${row.user_id}:${meta.id}`)) continue
       plan.diffs.push({
         label,
@@ -248,29 +238,28 @@ async function unlockedCountPlan(plan: Plan) {
 
 /** 只算差异，不写库。预演和落库后的复核共用它 —— 两边口径必须是同一份代码 */
 async function computePlan(): Promise<Plan> {
-  const [problems, profiles, expectedProblem, expectedProfile] =
-    await Promise.all([
-      db
-        .select({
-          id: schema.problem.id,
-          displayId: schema.problem.displayId,
-          submissionNumber: schema.problem.submissionNumber,
-          acceptedNumber: schema.problem.acceptedNumber,
-          statisticInfo: schema.problem.statisticInfo,
-        })
-        .from(schema.problem),
-      db
-        .select({
-          id: schema.userProfile.id,
-          userId: schema.userProfile.userId,
-          submissionNumber: schema.userProfile.submissionNumber,
-          acceptedNumber: schema.userProfile.acceptedNumber,
-          acmProblemsStatus: schema.userProfile.acmProblemsStatus,
-        })
-        .from(schema.userProfile),
-      expectedProblems(),
-      expectedProfiles(),
-    ])
+  const [problems, profiles, expectedProblem, expectedProfile] = await Promise.all([
+    db
+      .select({
+        id: schema.problem.id,
+        displayId: schema.problem.displayId,
+        submissionNumber: schema.problem.submissionNumber,
+        acceptedNumber: schema.problem.acceptedNumber,
+        statisticInfo: schema.problem.statisticInfo,
+      })
+      .from(schema.problem),
+    db
+      .select({
+        id: schema.userProfile.id,
+        userId: schema.userProfile.userId,
+        submissionNumber: schema.userProfile.submissionNumber,
+        acceptedNumber: schema.userProfile.acceptedNumber,
+        acmProblemsStatus: schema.userProfile.acmProblemsStatus,
+      })
+      .from(schema.userProfile),
+    expectedProblems(),
+    expectedProfiles(),
+  ])
 
   const plan: Plan = {
     diffs: [],
@@ -304,9 +293,7 @@ async function computePlan(): Promise<Plan> {
         after: want.acceptedNumber,
       })
     }
-    if (
-      stable(asRecord(problem.statisticInfo)) !== stable(want.statisticInfo)
-    ) {
+    if (stable(asRecord(problem.statisticInfo)) !== stable(want.statisticInfo)) {
       rows.push({
         label,
         field: "statistic_info",
@@ -332,8 +319,7 @@ async function computePlan(): Promise<Plan> {
     const merged: Record<string, unknown> = { ...existing }
     delete merged.problems
     delete merged.contest_problems
-    for (const [bucket, value] of Object.entries(want.status))
-      merged[bucket] = value
+    for (const [bucket, value] of Object.entries(want.status)) merged[bucket] = value
 
     const label = `用户 ${profile.userId}`
     const rows: Diff[] = []
@@ -383,8 +369,7 @@ function report(plan: Plan) {
       `  ${diff.label}  ${diff.field}: ${JSON.stringify(diff.before)} → ${JSON.stringify(diff.after)}`,
     )
   }
-  if (plan.diffs.length > 40)
-    console.log(`  ……另有 ${plan.diffs.length - 40} 处`)
+  if (plan.diffs.length > 40) console.log(`  ……另有 ${plan.diffs.length - 40} 处`)
 }
 
 /** 退出码：0 = 一致或预演正常，1 = 落库后复核仍有差异 */
@@ -427,8 +412,7 @@ export async function recount(options: { apply: boolean }) {
   // 补发幂等（唯一键 + 冲突忽略），重跑不会重复发
   const recounted = await refreshUnlockedCount(plan.unlockedCountFixes)
   if (plan.metaGrants.length) {
-    for (const meta of await metaAchievements())
-      await rescanAchievement(meta.id)
+    for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
   }
   console.log(
     `\n已订正题目 ${plan.problemFixes.length} 道、用户 ${plan.profileFixes.length} 人、已解锁数 ${recounted.length} 人，补发元成就 ${plan.metaGrants.length} 条，复核中……`,

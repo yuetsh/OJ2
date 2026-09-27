@@ -49,11 +49,7 @@ async function lastAcceptedAt(userId: number, problemId: number) {
  * 这道题上有没有**比 `hintAt` 这个时刻更新**的提交 —— 「升一级要先再交一次」就卡在这里。
  * `hintAt` 是当前这一级开出来的那条提示的时间（见上面的规则 2）。
  */
-async function hasNewerSubmission(
-  userId: number,
-  problemId: number,
-  hintAt: string,
-) {
+async function hasNewerSubmission(userId: number, problemId: number, hintAt: string) {
   const [row] = await db
     .select({ id: schema.submission.id })
     .from(schema.submission)
@@ -77,10 +73,7 @@ async function currentLadder(userId: number, problemId: number) {
   const rows = await db
     .select({ level: schema.aiHint.level, hintAt: schema.aiHint.createTime })
     .from(schema.aiHint)
-    .innerJoin(
-      schema.submission,
-      eq(schema.aiHint.submissionId, schema.submission.id),
-    )
+    .innerJoin(schema.submission, eq(schema.aiHint.submissionId, schema.submission.id))
     .where(
       and(
         eq(schema.submission.userId, userId),
@@ -129,8 +122,7 @@ export async function decideHintLevel(
   // 这道题还没开过阶梯：从 L0 起，而这条提示就是 L0 的锚点，不可能已经有更新的提交
   if (!ladder) return { level: 0, canEscalate: false }
   const unlocked =
-    ladder.level < HINT_MAX_LEVEL &&
-    (await hasNewerSubmission(userId, problemId, ladder.anchor))
+    ladder.level < HINT_MAX_LEVEL && (await hasNewerSubmission(userId, problemId, ladder.anchor))
   if (more && unlocked) return { level: ladder.level + 1, canEscalate: false }
   return { level: ladder.level, canEscalate: unlocked }
 }

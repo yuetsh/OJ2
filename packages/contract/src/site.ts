@@ -16,10 +16,7 @@ export const onlineCountSchema = z.object({
   count: z.number().int().nonnegative(),
 })
 
-export const quoteSchema = z.union([
-  z.string(),
-  z.record(z.string(), z.unknown()),
-])
+export const quoteSchema = z.union([z.string(), z.record(z.string(), z.unknown())])
 
 export type WebsiteConfig = z.infer<typeof websiteConfigSchema>
 export type Quote = z.infer<typeof quoteSchema>

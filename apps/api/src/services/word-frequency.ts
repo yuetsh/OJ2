@@ -75,9 +75,7 @@ function jieba() {
     const built = await withBuiltinDict()
     // 对应旧后端的 jieba.add_word(w, freq=9999)。
     // @node-rs/jieba@2 没有导出 insertWord/addWord，改用用户词典缓冲区，格式为「词 词频」。
-    built.loadDict(
-      Buffer.from(CUSTOM_WORDS.map((word) => `${word} 9999`).join("\n") + "\n"),
-    )
+    built.loadDict(Buffer.from(CUSTOM_WORDS.map((word) => `${word} 9999`).join("\n") + "\n"))
     return built
   })()
   return instance

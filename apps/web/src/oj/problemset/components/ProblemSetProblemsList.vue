@@ -27,10 +27,7 @@ function handleProblemClick(problemId: string) {
 <template>
   <div>
     <n-grid :cols="isDesktop ? 4 : 1" :x-gap="16" :y-gap="16">
-      <n-grid-item
-        v-for="(problemSetProblem, index) in problems"
-        :key="problemSetProblem.id"
-      >
+      <n-grid-item v-for="(problemSetProblem, index) in problems" :key="problemSetProblem.id">
         <n-card
           hoverable
           @click="handleProblemClick(problemSetProblem.problem._id)"

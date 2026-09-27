@@ -57,8 +57,7 @@ const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
     title: "选项",
     key: "actions",
     width: 140,
-    render: (row) =>
-      h(Actions, { announcementID: row.id, onDeleted: listAnnouncements }),
+    render: (row) => h(Actions, { announcementID: row.id, onDeleted: listAnnouncements }),
   },
 ]
 
@@ -96,19 +95,12 @@ watch(query, listAnnouncements, { deep: true })
 <template>
   <n-flex align="center" class="titleWrapper">
     <h2 class="title">网站公告</h2>
-    <n-button
-      type="primary"
-      @click="$router.push({ name: 'admin announcement create' })"
-    >
+    <n-button type="primary" @click="$router.push({ name: 'admin announcement create' })">
       新建
     </n-button>
   </n-flex>
   <n-data-table striped :columns="columns" :data="announcements" />
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
 <style scoped>

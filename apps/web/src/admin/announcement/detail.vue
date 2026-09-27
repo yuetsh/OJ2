@@ -80,11 +80,7 @@ onMounted(init)
       <n-input class="contestTitle" v-model:value="announcement.title" />
     </n-form-item>
     <n-form-item label="标签">
-      <n-select
-        class="select"
-        v-model:value="announcement.tag"
-        :options="tags"
-      />
+      <n-select class="select" v-model:value="announcement.tag" :options="tags" />
     </n-form-item>
     <n-form-item label="可见">
       <n-switch v-model:value="announcement.visible" />
@@ -93,12 +89,7 @@ onMounted(init)
       <n-switch v-model:value="announcement.top" />
     </n-form-item>
   </n-form>
-  <TextEditor
-    v-if="ready"
-    title="正文"
-    v-model:value="announcement.content"
-    :min-height="200"
-  />
+  <TextEditor v-if="ready" title="正文" v-model:value="announcement.content" :min-height="200" />
   <n-flex style="margin-bottom: 100px" justify="end">
     <n-button type="primary" @click="submit">保存</n-button>
   </n-flex>

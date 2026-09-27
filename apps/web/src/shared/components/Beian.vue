@@ -14,9 +14,7 @@
     </n-flex>
     <template v-if="!isMobile">
       <n-button text @click="goICP">浙ICP备2023044109号-1</n-button>
-      <n-button text @click="goPublicSecurity">
-        浙公网安备33100402331786号
-      </n-button>
+      <n-button text @click="goPublicSecurity"> 浙公网安备33100402331786号 </n-button>
     </template>
   </n-flex>
 </template>
@@ -26,9 +24,7 @@ import { zonedYear } from "utils/functions"
 
 const route = useRoute()
 const { isMobile } = useBreakpoints()
-const hiddenICP = computed(() =>
-  ["problem", "contest problem"].includes(route.name as string),
-)
+const hiddenICP = computed(() => ["problem", "contest problem"].includes(route.name as string))
 
 // 版权年份也走东八区：站内不留任何一处按浏览器时区取时间部件的代码，
 // 免得下一个人照着抄
@@ -40,17 +36,11 @@ function goICP() {
 }
 
 function goCC() {
-  window.open(
-    "https://creativecommons.org/licenses/by-nc/4.0/deed.zh-hans",
-    "_blank",
-  )
+  window.open("https://creativecommons.org/licenses/by-nc/4.0/deed.zh-hans", "_blank")
 }
 
 function goPublicSecurity() {
-  window.open(
-    "https://beian.mps.gov.cn/#/query/webSearch?code=33100402331786",
-    "_blank",
-  )
+  window.open("https://beian.mps.gov.cn/#/query/webSearch?code=33100402331786", "_blank")
 }
 </script>
 <style scoped>

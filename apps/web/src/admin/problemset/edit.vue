@@ -23,10 +23,7 @@ const formData = ref<CreateProblemSetData & Partial<EditProblemSetData>>({
 // n-date-picker 按浏览器本地渲染，所以要平移一次再绑定（见 utils/functions.ts
 // 的 toPickerValue）。`formData.endTime` 里始终存**真实时刻**，只有喂给选择器那一步换。
 const endTimeTimestamp = computed({
-  get: () =>
-    formData.value.endTime
-      ? toPickerValue(formData.value.endTime.getTime())
-      : null,
+  get: () => (formData.value.endTime ? toPickerValue(formData.value.endTime.getTime()) : null),
   set: (val: number | null) => {
     formData.value.endTime = val ? new Date(fromPickerValue(val)) : null
   },
@@ -89,11 +86,7 @@ async function handleSubmit() {
     }
     router.push({ name: "admin problemset list" })
   } catch (err) {
-    message.error(
-      (isEdit.value ? "更新" : "创建") +
-        "题单失败：" +
-        errorMessage(err, "未知错误"),
-    )
+    message.error((isEdit.value ? "更新" : "创建") + "题单失败：" + errorMessage(err, "未知错误"))
   } finally {
     loading.value = false
   }

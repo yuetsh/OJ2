@@ -6,14 +6,7 @@ import { DIFFICULTY, JUDGE_STATUS } from "utils/constants"
 import type { SUBMISSION_RESULT } from "utils/types"
 import { getACRateNumber, getTagColor, parseTime } from "utils/functions"
 import { Pie } from "vue-chartjs"
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Colors,
-} from "chart.js"
+import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend, Colors } from "chart.js"
 import { getProblemBeatRate } from "oj/api"
 import { getProblemYearlyAC, type YearlyACData } from "oj/api"
 import ProblemYearlyChart from "./ProblemYearlyChart.vue"
@@ -106,12 +99,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <n-descriptions
-    bordered
-    label-placement="left"
-    :column="isDesktop ? 3 : 1"
-    v-if="problem"
-  >
+  <n-descriptions bordered label-placement="left" :column="isDesktop ? 3 : 1" v-if="problem">
     <n-descriptions-item label="编号">
       {{ problem._id }}
     </n-descriptions-item>
@@ -141,10 +129,7 @@ onMounted(() => {
         <n-flex vertical align="center">
           <Icon v-if="isDesktop" :icon="item.icon" width="40" />
           <n-h2 class="number">
-            <n-number-animation
-              :to="item.title"
-              :precision="item.int ? 0 : 2"
-            />
+            <n-number-animation :to="item.title" :precision="item.int ? 0 : 2" />
             <span v-if="item.suffix">{{ item.suffix }}</span>
           </n-h2>
           <n-h4 class="number-label">{{ item.content }}</n-h4>

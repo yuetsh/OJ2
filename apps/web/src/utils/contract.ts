@@ -33,10 +33,7 @@ export function contract<T extends z.ZodType>(
     .slice(0, 5)
     .map((issue) => `${issue.path.join(".") || "(根)"}: ${issue.message}`)
     .join("；")
-  const more =
-    result.error.issues.length > 5
-      ? `；另有 ${result.error.issues.length - 5} 处`
-      : ""
+  const more = result.error.issues.length > 5 ? `；另有 ${result.error.issues.length - 5} 处` : ""
   console.error(
     `[契约] ${endpoint} 的响应不符合契约 —— ${issues}${more}\n` +
       "  已放行原始数据（页面照常渲染）。契约在 packages/contract/src/。",

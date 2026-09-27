@@ -1,9 +1,7 @@
 <template>
   <n-card title="几次做对" size="small" v-if="show">
     <template #header-extra>
-      <n-text depth="3" style="font-size: 12px">
-        通过前提交了几次，看有没有在死磕
-      </n-text>
+      <n-text depth="3" style="font-size: 12px"> 通过前提交了几次，看有没有在死磕 </n-text>
     </template>
     <div class="chart">
       <Bar :key="chartKey" :data="data" :options="options" />
@@ -13,13 +11,7 @@
 <script setup lang="ts">
 import type { ChartOptions } from "chart.js"
 import { Bar } from "vue-chartjs"
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-} from "chart.js"
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from "chart.js"
 import { useAIStore } from "oj/store/ai"
 import { useChartTheme } from "shared/composables/chartTheme"
 

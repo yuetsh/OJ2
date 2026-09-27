@@ -107,11 +107,7 @@ export async function getProblem(problemID: string, contestID: string) {
   // `problemDetailSchema.parse(v) as ProblemDetail`，`as` 把校验结果又断言回去、
   // 等于没校验，而 `parse` 抛错会让整个题目页白屏。现在形状不符时记一条控制台
   // 分歧再放行原始数据。
-  const problem: ProblemDetail = contract(
-    "GET /problems/:id",
-    problemDetailSchema,
-    response,
-  )
+  const problem: ProblemDetail = contract("GET /problems/:id", problemDetailSchema, response)
   return problem
 }
 
@@ -171,9 +167,7 @@ export function getTodaySubmissionStatistics() {
 }
 
 export function adminRejudge(id: string) {
-  return api.post<{ ok: boolean }>(
-    `submissions/${encodeURIComponent(id)}/rejudge`,
-  )
+  return api.post<{ ok: boolean }>(`submissions/${encodeURIComponent(id)}/rejudge`)
 }
 
 /**
@@ -226,21 +220,13 @@ export function getClassRank(grade?: number | null) {
   return api.get<ClassRankItem[]>("rankings/classes", { params: { grade } })
 }
 
-export function getUserClassRank(
-  scope?: "all" | "window",
-  offset?: number,
-  limit?: number,
-) {
+export function getUserClassRank(scope?: "all" | "window", offset?: number, limit?: number) {
   return api.get<ClassUserRank>("me/class-rank", {
     params: { scope, offset, limit },
   })
 }
 
-export function getClassPK(
-  classNames: string[],
-  startTime?: string,
-  endTime?: string,
-) {
+export function getClassPK(classNames: string[], startTime?: string, endTime?: string) {
   return api.post<ClassComparisonResponse>("classes/comparison", {
     classNames,
     ...(startTime ? { startTime } : {}),
@@ -274,16 +260,11 @@ export function checkContestPassword(contestID: string, password: string) {
 }
 
 export async function getContestProblems(contestID: string) {
-  const res = await api.get<ProblemListItem[]>(
-    `contests/${encodeURIComponent(contestID)}/problems`,
-  )
+  const res = await api.get<ProblemListItem[]>(`contests/${encodeURIComponent(contestID)}/problems`)
   return res.map(toProblemRow)
 }
 
-export function getContestRank(
-  contestID: string,
-  query: { limit: number; offset: number },
-) {
+export function getContestRank(contestID: string, query: { limit: number; offset: number }) {
   // submissionInfo 在契约里是 Record<string, unknown>（JSONB 原文），
   // 前端在这里收窄成 ContestSubmissionInfo，见 utils/types 的 ContestRank
   return api.get<{ results: ContestRank[]; total: number }>(
@@ -305,12 +286,9 @@ export function updateProfile(data: { realName: string; mood: string }) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: AnnouncementListItem[]; total: number }>(
-    "announcements",
-    {
-      params: { limit, offset },
-    },
-  )
+  return api.get<{ results: AnnouncementListItem[]; total: number }>("announcements", {
+    params: { limit, offset },
+  })
 }
 
 export function getAnnouncement(id: number) {
@@ -360,11 +338,7 @@ export function getAISolved(
   })
 }
 
-export function getAIDurationData(
-  end: string,
-  duration: string,
-  username?: string,
-) {
+export function getAIDurationData(end: string, duration: string, username?: string) {
   return api.get<DurationData[]>("ai/duration", {
     params: { end, duration, username },
   })
@@ -398,9 +372,7 @@ export function getSimilarProblems(problemId: string) {
 export type { YearlyAc as YearlyACData } from "@oj2/contract"
 
 export function getProblemYearlyAC(problemId: string) {
-  return api.get<YearlyAc[]>(
-    `problems/${encodeURIComponent(problemId)}/yearly-ac`,
-  )
+  return api.get<YearlyAc[]>(`problems/${encodeURIComponent(problemId)}/yearly-ac`)
 }
 
 // ==================== 流程图相关API ====================
@@ -440,9 +412,7 @@ export function getFlowchartStatistics(
 }
 
 export function retryFlowchartSubmission(submissionId: string) {
-  return api.post<{ status: string }>(
-    `flowcharts/${encodeURIComponent(submissionId)}/retry`,
-  )
+  return api.post<{ status: string }>(`flowcharts/${encodeURIComponent(submissionId)}/retry`)
 }
 
 export function getCurrentProblemFlowchartSubmission(problemId: number) {
@@ -482,9 +452,7 @@ export function joinProblemSet(problemSetId: number) {
 }
 
 export function getUserBadges(username?: string) {
-  return api.get<UserBadge[]>(
-    `users/${encodeURIComponent(username ?? "me")}/badges`,
-  )
+  return api.get<UserBadge[]>(`users/${encodeURIComponent(username ?? "me")}/badges`)
 }
 
 export function getProblemSetBadges(problemSetId: number) {
@@ -500,10 +468,7 @@ export function getProblemSetUserProgress(
     completionStatus?: "" | "completed" | "in_progress" | "not_started"
   },
 ) {
-  return api.get<ProblemSetProgressList>(
-    `problem-sets/${problemSetId}/user-progress`,
-    { params },
-  )
+  return api.get<ProblemSetProgressList>(`problem-sets/${problemSetId}/user-progress`, { params })
 }
 
 export function getExercises(tutorialId: number): Promise<Exercise[]> {

@@ -1,9 +1,5 @@
 <template>
-  <MdEditor
-    :theme="isDark ? 'dark' : 'light'"
-    v-model="modelValue"
-    @onUploadImg="onUploadImg"
-  />
+  <MdEditor :theme="isDark ? 'dark' : 'light'" v-model="modelValue" @onUploadImg="onUploadImg" />
 </template>
 
 <script setup lang="ts">
@@ -16,10 +12,7 @@ const modelValue = defineModel<string>("value")
 
 const message = useMessage()
 
-const onUploadImg = async (
-  files: File[],
-  callback: (urls: string[]) => void,
-) => {
+const onUploadImg = async (files: File[], callback: (urls: string[]) => void) => {
   try {
     const res = await Promise.all(
       files.map(async (file) => {

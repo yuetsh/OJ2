@@ -35,18 +35,11 @@ const options: DropdownOption[] = [
 <template>
   <div v-if="contestMenuVisible">
     <n-flex v-if="isDesktop">
-      <n-button :type="getCurrentType('problems')" @click="goto('problems')">
-        比赛题目
-      </n-button>
-      <n-button
-        :type="getCurrentType('submissions')"
-        @click="goto('submissions')"
-      >
+      <n-button :type="getCurrentType('problems')" @click="goto('problems')"> 比赛题目 </n-button>
+      <n-button :type="getCurrentType('submissions')" @click="goto('submissions')">
         提交信息
       </n-button>
-      <n-button :type="getCurrentType('rank')" @click="goto('rank')">
-        比赛排名
-      </n-button>
+      <n-button :type="getCurrentType('rank')" @click="goto('rank')"> 比赛排名 </n-button>
     </n-flex>
     <n-dropdown v-else :options="options" @select="goto">
       <n-button>菜单</n-button>

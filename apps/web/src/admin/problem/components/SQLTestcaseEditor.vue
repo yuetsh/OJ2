@@ -40,9 +40,7 @@ function blankEntry(): ScriptEntry {
 const scripts = ref<ScriptEntry[]>([blankEntry(), blankEntry(), blankEntry()])
 
 const refSQL = computed(
-  () =>
-    props.answers.find((a) => a.language === "SQL" && a.code.trim())?.code ??
-    "",
+  () => props.answers.find((a) => a.language === "SQL" && a.code.trim())?.code ?? "",
 )
 
 /** 已有脚本读取失败时的提示。空白编辑器和「本来就没测试点」长得一样，必须区分开 */
@@ -54,9 +52,7 @@ const isGenerating = ref(false)
 const hasAnyScript = computed(() => scripts.value.some((s) => s.sql.trim()))
 const hasBlankScript = computed(() => scripts.value.some((s) => !s.sql.trim()))
 
-const filledCount = computed(
-  () => scripts.value.filter((s) => s.sql.trim()).length,
-)
+const filledCount = computed(() => scripts.value.filter((s) => s.sql.trim()).length)
 
 const canUpload = computed(() => {
   const filled = scripts.value.filter((s) => s.sql.trim())
@@ -206,29 +202,15 @@ async function upload() {
 
 <template>
   <n-flex vertical>
-    <n-alert
-      v-if="!refSQL"
-      type="warning"
-      :show-icon="false"
-      style="margin-bottom: 8px"
-    >
+    <n-alert v-if="!refSQL" type="warning" :show-icon="false" style="margin-bottom: 8px">
       还没有填写 SQL 标准答案，请先在上方"本题参考答案"中填写，再来编写测试点
     </n-alert>
-    <n-alert
-      v-if="loadError"
-      type="error"
-      :show-icon="false"
-      style="margin-bottom: 8px"
-    >
+    <n-alert v-if="loadError" type="error" :show-icon="false" style="margin-bottom: 8px">
       {{ loadError }}
     </n-alert>
     <n-flex align="center" wrap>
-      <n-button :disabled="isPreviewing || isGenerating" @click="reset">
-        清空
-      </n-button>
-      <n-button :disabled="isPreviewing || isGenerating" @click="add">
-        +1
-      </n-button>
+      <n-button :disabled="isPreviewing || isGenerating" @click="reset"> 清空 </n-button>
+      <n-button :disabled="isPreviewing || isGenerating" @click="add"> +1 </n-button>
       <n-tooltip :disabled="!!refSQL && hasBlankScript">
         <template #trigger>
           <span>
@@ -297,9 +279,7 @@ async function upload() {
         placeholder="-- 本测试点的建表 + 插入数据脚本
 CREATE TABLE ...;
 INSERT INTO ...;"
-        :status="
-          s.error ? 'error' : s.display && !s.stale ? 'success' : undefined
-        "
+        :status="s.error ? 'error' : s.display && !s.stale ? 'success' : undefined"
       />
       <n-alert v-if="s.error" type="error" :show-icon="false">
         {{ s.error }}

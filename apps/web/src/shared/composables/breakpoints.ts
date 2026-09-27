@@ -1,7 +1,4 @@
-import {
-  breakpointsTailwind,
-  useBreakpoints as useVueUseBreakpoints,
-} from "@vueuse/core"
+import { breakpointsTailwind, useBreakpoints as useVueUseBreakpoints } from "@vueuse/core"
 
 /**
  * 响应式断点检测 composable

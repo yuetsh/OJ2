@@ -134,18 +134,10 @@ function rowProps(row: Contest) {
     <n-space>
       <n-form :show-feedback="false" label-placement="left" inline>
         <n-form-item label="比赛状态">
-          <n-select
-            style="width: 120px"
-            :options="options"
-            v-model:value="query.status"
-          />
+          <n-select style="width: 120px" :options="options" v-model:value="query.status" />
         </n-form-item>
         <n-form-item label="标签">
-          <n-select
-            style="width: 120px"
-            :options="tags"
-            v-model:value="query.tag"
-          />
+          <n-select style="width: 120px" :options="tags" v-model:value="query.tag" />
         </n-form-item>
       </n-form>
       <n-form :show-feedback="false" label-placement="left" inline>
@@ -165,16 +157,7 @@ function rowProps(row: Contest) {
         </n-form-item>
       </n-form>
     </n-space>
-    <n-data-table
-      :bordered="false"
-      :columns="columns"
-      :data="data"
-      :row-props="rowProps"
-    />
+    <n-data-table :bordered="false" :columns="columns" :data="data" :row-props="rowProps" />
   </n-flex>
-  <Pagination
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-    :total="total"
-  />
+  <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
 </template>

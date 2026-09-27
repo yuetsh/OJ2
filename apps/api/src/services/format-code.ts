@@ -47,10 +47,7 @@ function formatSql(code: string) {
   )
 }
 
-export async function formatCode(
-  code: string,
-  language: "python" | "c" | "cpp" | "sql",
-) {
+export async function formatCode(code: string, language: "python" | "c" | "cpp" | "sql") {
   if (language === "sql") return formatSql(code)
 
   if (language === "python") {
@@ -59,10 +56,7 @@ export async function formatCode(
       code,
     )
     if (result.exitCode !== 0) {
-      throw new CodeFormatError(
-        result.stderr || "Invalid Python syntax",
-        "syntax",
-      )
+      throw new CodeFormatError(result.stderr || "Invalid Python syntax", "syntax")
     }
     return result.stdout
   }

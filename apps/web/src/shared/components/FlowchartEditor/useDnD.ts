@@ -1,10 +1,6 @@
 import { ref } from "vue"
 import { useVueFlow } from "@vue-flow/core"
-import {
-  getNodeTypeConfig,
-  createNodeStyle,
-  getNodeDimensions,
-} from "./useNodeStyles"
+import { getNodeTypeConfig, createNodeStyle, getNodeDimensions } from "./useNodeStyles"
 import { getRandomId } from "utils/functions"
 
 // 模块级共享：当前拖拽的节点类型（Toolbar 写入，canvas 读取）

@@ -4,10 +4,7 @@ import { getSubmission } from "oj/api"
 import { SubmissionStatus } from "utils/constants"
 import type { PendingAchievement, Submission } from "utils/types"
 import { useAchievementStore } from "shared/store/achievement"
-import {
-  useSubmissionWebSocket,
-  type SubmissionUpdate,
-} from "shared/composables/websocket"
+import { useSubmissionWebSocket, type SubmissionUpdate } from "shared/composables/websocket"
 
 /**
  * 判题监控 Composable
@@ -29,10 +26,7 @@ export function useSubmissionMonitor() {
 
         const result = res.result
         // 判题完成，停止轮询
-        if (
-          result !== SubmissionStatus.judging &&
-          result !== SubmissionStatus.pending
-        ) {
+        if (result !== SubmissionStatus.judging && result !== SubmissionStatus.pending) {
           pausePolling()
         }
       } catch (error) {
@@ -75,9 +69,7 @@ export function useSubmissionMonitor() {
 
     // 判题完成或出错，获取完整详情
     if (data.status === "finished" || data.status === "error") {
-      console.log(
-        `[SubmissionMonitor] 判题${data.status === "finished" ? "完成" : "出错"}`,
-      )
+      console.log(`[SubmissionMonitor] 判题${data.status === "finished" ? "完成" : "出错"}`)
 
       // 停止轮询（WebSocket已成功）
       pausePolling()
@@ -93,13 +85,8 @@ export function useSubmissionMonitor() {
   }
 
   // 初始化 WebSocket
-  const {
-    connect,
-    subscribe,
-    unsubscribe,
-    scheduleDisconnect,
-    cancelScheduledDisconnect,
-  } = useSubmissionWebSocket(handleSubmissionUpdate)
+  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect } =
+    useSubmissionWebSocket(handleSubmissionUpdate)
 
   // ==================== 轮询保底启动 ====================
   const { start: startPollingFallback } = useTimeoutFn(
@@ -143,17 +130,11 @@ export function useSubmissionMonitor() {
   }
 
   // ==================== 计算属性 ====================
-  const judging = computed(
-    () => submission.value?.result === SubmissionStatus.judging,
-  )
+  const judging = computed(() => submission.value?.result === SubmissionStatus.judging)
 
-  const pending = computed(
-    () => submission.value?.result === SubmissionStatus.pending,
-  )
+  const pending = computed(() => submission.value?.result === SubmissionStatus.pending)
 
-  const submitting = computed(
-    () => submission.value?.result === SubmissionStatus.submitting,
-  )
+  const submitting = computed(() => submission.value?.result === SubmissionStatus.submitting)
 
   const isProcessing = computed(() => {
     return judging.value || pending.value || submitting.value

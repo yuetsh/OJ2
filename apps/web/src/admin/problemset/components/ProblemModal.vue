@@ -75,16 +75,10 @@ watch(
         <n-input :value="problem.title" disabled />
       </n-form-item>
       <n-form-item v-else label="题目ID" required>
-        <n-input
-          v-model:value="problemId"
-          placeholder="请输入题目的显示ID（如：1001）"
-        />
+        <n-input v-model:value="problemId" placeholder="请输入题目的显示ID（如：1001）" />
       </n-form-item>
       <n-form-item label="顺序">
-        <n-input-number
-          v-model:value="problemOrder"
-          placeholder="题目在题单中的顺序"
-        />
+        <n-input-number v-model:value="problemOrder" placeholder="题目在题单中的顺序" />
       </n-form-item>
       <n-form-item label="是否必做">
         <n-switch v-model:value="problemRequired" />
@@ -93,11 +87,7 @@ watch(
         <n-input-number v-model:value="problemScore" placeholder="题目分数" />
       </n-form-item>
       <n-form-item label="提示">
-        <n-input
-          v-model:value="problemHint"
-          type="textarea"
-          placeholder="题目提示"
-        />
+        <n-input v-model:value="problemHint" type="textarea" placeholder="题目提示" />
       </n-form-item>
     </n-form>
     <template #footer>

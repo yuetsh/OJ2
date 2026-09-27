@@ -40,9 +40,7 @@ interface JudgeResponse {
 
 function statusValue(value: number): JudgeStatusValue {
   const statuses = new Set<number>(Object.values(JudgeStatus))
-  return statuses.has(value)
-    ? (value as JudgeStatusValue)
-    : JudgeStatus.SYSTEM_ERROR
+  return statuses.has(value) ? (value as JudgeStatusValue) : JudgeStatus.SYSTEM_ERROR
 }
 
 function templateForLanguage(value: unknown, language: string) {
@@ -73,12 +71,9 @@ async function requestJudge(
   testCaseId: string,
 ) {
   const languageConfig = judgeConfigFor(language)
-  if (!languageConfig)
-    throw new Error(`Unsupported judge language: ${language}`)
+  if (!languageConfig) throw new Error(`Unsupported judge language: ${language}`)
 
-  const token = createHash("sha256")
-    .update(config.judgeServerToken)
-    .digest("hex")
+  const token = createHash("sha256").update(config.judgeServerToken).digest("hex")
   const response = await fetch(new URL("/judge", config.judgeServerUrl), {
     method: "POST",
     headers: {
@@ -126,9 +121,7 @@ async function persistResult(
 
     if (
       !currentSubmission ||
-      ![JudgeStatus.PENDING, JudgeStatus.JUDGING].includes(
-        currentSubmission.result as 6 | 7,
-      )
+      ![JudgeStatus.PENDING, JudgeStatus.JUDGING].includes(currentSubmission.result as 6 | 7)
     ) {
       return false
     }
@@ -178,8 +171,7 @@ async function persistResult(
     const problems = asRecord(acmStatus[statusKey])
     const previous = asRecord(problems[String(problemId)])
     const previousStatus = previous.status
-    const wasAccepted =
-      typeof previousStatus === "number" && isAccepted(previousStatus)
+    const wasAccepted = typeof previousStatus === "number" && isAccepted(previousStatus)
     const acceptedNow = isAccepted(result)
 
     if (previousStatus === undefined) {
@@ -199,11 +191,9 @@ async function persistResult(
     await tx
       .update(schema.userProfile)
       .set({
-        submissionNumber:
-          profile.submissionNumber + (contestId === null ? 1 : 0),
+        submissionNumber: profile.submissionNumber + (contestId === null ? 1 : 0),
         acceptedNumber:
-          profile.acceptedNumber +
-          (contestId === null && acceptedNow && !wasAccepted ? 1 : 0),
+          profile.acceptedNumber + (contestId === null && acceptedNow && !wasAccepted ? 1 : 0),
         acmProblemsStatus: acmStatus,
       })
       .where(eq(schema.userProfile.id, profile.id))
@@ -227,10 +217,7 @@ async function persistResult(
           submissionInfo: {},
         })
         .onConflictDoNothing({
-          target: [
-            schema.acmContestRank.contestId,
-            schema.acmContestRank.userId,
-          ],
+          target: [schema.acmContestRank.contestId, schema.acmContestRank.userId],
         })
 
       const [rank] = await tx
@@ -254,8 +241,7 @@ async function persistResult(
           is_ac: acceptedNow,
           ac_time: 0,
           error_number:
-            errorNumber +
-            (!acceptedNow && result !== JudgeStatus.COMPILE_ERROR ? 1 : 0),
+            errorNumber + (!acceptedNow && result !== JudgeStatus.COMPILE_ERROR ? 1 : 0),
           is_first_ac: false,
         }
         let totalTime = rank.totalTime
@@ -263,11 +249,7 @@ async function persistResult(
         if (acceptedNow) {
           const acTime = Math.max(
             0,
-            Math.floor(
-              (Date.parse(submissionCreateTime) -
-                Date.parse(contest.startTime)) /
-                1000,
-            ),
+            Math.floor((Date.parse(submissionCreateTime) - Date.parse(contest.startTime)) / 1000),
           )
           nextInfo.ac_time = acTime
           nextInfo.is_first_ac = problem.acceptedNumber === 0
@@ -291,11 +273,7 @@ async function persistResult(
   })
 }
 
-async function markSystemError(
-  submissionId: string,
-  userId: number,
-  error: unknown,
-) {
+async function markSystemError(submissionId: string, userId: number, error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
   const updated = await db
     .update(schema.submission)
@@ -306,10 +284,7 @@ async function markSystemError(
     .where(
       and(
         eq(schema.submission.id, submissionId),
-        inArray(schema.submission.result, [
-          JudgeStatus.PENDING,
-          JudgeStatus.JUDGING,
-        ]),
+        inArray(schema.submission.result, [JudgeStatus.PENDING, JudgeStatus.JUDGING]),
       ),
     )
     .returning({ id: schema.submission.id })
@@ -339,10 +314,7 @@ async function markSystemError(
  * 都不会被它覆盖。唯一能撞上的是「重判刚把状态置回 PENDING，同一刻上一个被遗弃的
  * 任务才失败」——结果是这次重判被吃掉、显示成系统错误，比静默卡死看得见。
  */
-export async function failAbandonedSubmission(
-  submissionId: string,
-  error: unknown,
-) {
+export async function failAbandonedSubmission(submissionId: string, error: unknown) {
   const [row] = await db
     .select({ userId: schema.submission.userId })
     .from(schema.submission)
@@ -359,24 +331,12 @@ export async function judgeSubmission(job: JudgeJobData) {
       problem: schema.problem,
     })
     .from(schema.submission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.submission.problemId, schema.problem.id),
-    )
-    .where(
-      and(
-        eq(schema.submission.id, job.submissionId),
-        eq(schema.problem.id, job.problemId),
-      ),
-    )
+    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+    .where(and(eq(schema.submission.id, job.submissionId), eq(schema.problem.id, job.problemId)))
     .limit(1)
 
   if (!row) throw new Error(`Submission ${job.submissionId} does not exist`)
-  if (
-    ![JudgeStatus.PENDING, JudgeStatus.JUDGING].includes(
-      row.submission.result as 6 | 7,
-    )
-  ) {
+  if (![JudgeStatus.PENDING, JudgeStatus.JUDGING].includes(row.submission.result as 6 | 7)) {
     return
   }
 
@@ -392,10 +352,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       status: "judging",
     })
 
-    const rawTemplate = templateForLanguage(
-      row.problem.template,
-      row.submission.language,
-    )
+    const rawTemplate = templateForLanguage(row.problem.template, row.submission.language)
     const template = rawTemplate ? parseProblemTemplate(rawTemplate) : null
     const source = template
       ? `${template.prepend}\n${row.submission.code}\n${template.append}`
@@ -421,10 +378,7 @@ export async function judgeSubmission(job: JudgeJobData) {
     if (response.err) {
       result = JudgeStatus.COMPILE_ERROR
       statisticInfo = {
-        err_info:
-          typeof response.data === "string"
-            ? response.data
-            : JSON.stringify(response.data),
+        err_info: typeof response.data === "string" ? response.data : JSON.stringify(response.data),
         score: 0,
       }
     } else {
@@ -435,19 +389,11 @@ export async function judgeSubmission(job: JudgeJobData) {
         (left, right) => Number(left.test_case) - Number(right.test_case),
       )
       info = { err: null, data: cases }
-      const firstFailure = cases.find(
-        (item) => item.result !== JudgeStatus.ACCEPTED,
-      )
+      const firstFailure = cases.find((item) => item.result !== JudgeStatus.ACCEPTED)
       result = statusValue(firstFailure?.result ?? JudgeStatus.ACCEPTED)
       statisticInfo = {
-        time_cost: Math.max(
-          0,
-          ...cases.map((item) => Number(item.cpu_time) || 0),
-        ),
-        memory_cost: Math.max(
-          0,
-          ...cases.map((item) => Number(item.memory) || 0),
-        ),
+        time_cost: Math.max(0, ...cases.map((item) => Number(item.cpu_time) || 0)),
+        memory_cost: Math.max(0, ...cases.map((item) => Number(item.memory) || 0)),
         score: 0,
       }
       // SQL 判题给出的中文提示（只读拒绝/超时/内存/无结果集）只存在测试点的
@@ -456,20 +402,12 @@ export async function judgeSubmission(job: JudgeJobData) {
       const failedMessage = cases.find(
         (item) => item.result !== JudgeStatus.ACCEPTED && item.error_message,
       )?.error_message
-      if (typeof failedMessage === "string")
-        statisticInfo.err_info = failedMessage
+      if (typeof failedMessage === "string") statisticInfo.err_info = failedMessage
 
       if (result === JudgeStatus.ACCEPTED) {
-        const rules = astRulesForLanguage(
-          row.problem.astRules,
-          row.submission.language,
-        )
+        const rules = astRulesForLanguage(row.problem.astRules, row.submission.language)
         if (rules.length > 0) {
-          const ast = await checkAst(
-            row.submission.code,
-            row.submission.language,
-            rules,
-          )
+          const ast = await checkAst(row.submission.code, row.submission.language, rules)
           if (!ast.passed) {
             result = JudgeStatus.AST_CHECK_FAILED
             statisticInfo.ast_results = ast.results
@@ -518,9 +456,7 @@ export async function judgeSubmission(job: JudgeJobData) {
           )
         }
         if (updated > 0) {
-          const unlocked = await updateAchievementsForProblemSet(
-            row.submission.userId,
-          )
+          const unlocked = await updateAchievementsForProblemSet(row.submission.userId)
           await publishAchievementNotification(
             row.submission.userId,
             unlocked.map((achievement) => ({
@@ -534,10 +470,7 @@ export async function judgeSubmission(job: JudgeJobData) {
           )
         }
       } catch (error) {
-        console.error(
-          `Failed to record problem set progress for ${row.submission.id}`,
-          error,
-        )
+        console.error(`Failed to record problem set progress for ${row.submission.id}`, error)
       }
     }
 
@@ -555,10 +488,7 @@ export async function judgeSubmission(job: JudgeJobData) {
         })),
       )
     } catch (error) {
-      console.error(
-        `Failed to update achievements for ${row.submission.id}`,
-        error,
-      )
+      console.error(`Failed to update achievements for ${row.submission.id}`, error)
     }
 
     await publishSubmissionUpdate(row.submission.userId, {
@@ -566,10 +496,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       submissionId: row.submission.id,
       result,
       status: "finished",
-      score:
-        typeof statisticInfo.score === "number"
-          ? statisticInfo.score
-          : undefined,
+      score: typeof statisticInfo.score === "number" ? statisticInfo.score : undefined,
     })
   } catch (error) {
     console.error(`Failed to judge submission ${row.submission.id}`, error)
@@ -595,22 +522,16 @@ async function judgeSqlSubmission(
   const refSql = answers
     .map((item) => asRecord(item))
     .find(
-      (item) =>
-        item.language === "SQL" &&
-        typeof item.code === "string" &&
-        item.code.trim(),
+      (item) => item.language === "SQL" && typeof item.code === "string" && item.code.trim(),
     )?.code
   if (typeof refSql !== "string") throw new Error("题目缺少 SQL 标准答案")
 
   const info = await readInfo(problem.testCaseId)
   if (!info) throw new Error("测试点信息读取失败")
-  if (!info.sql)
-    throw new Error("测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包")
+  if (!info.sql) throw new Error("测试点不是 SQL 类型，请重新上传 SQL 测试点压缩包")
 
   // 按 "1","2",… 的数字序遍历，保证测试点顺序稳定
-  const keys = Object.keys(info.test_cases ?? {}).sort(
-    (a, b) => Number(a) - Number(b),
-  )
+  const keys = Object.keys(info.test_cases ?? {}).sort((a, b) => Number(a) - Number(b))
   if (keys.length === 0) throw new Error("题目没有任何测试点")
 
   const cases: JudgeCase[] = []
@@ -635,8 +556,7 @@ async function judgeSqlSubmission(
     })
     if (!outcome.ok) {
       // 初始化/标准答案执行失败属出题配置问题，整题 SYSTEM_ERROR
-      if (outcome.result === JudgeStatus.SYSTEM_ERROR)
-        throw new Error(outcome.message)
+      if (outcome.result === JudgeStatus.SYSTEM_ERROR) throw new Error(outcome.message)
       // 子进程被杀（超时/内存）也走这里，按学生错误记成一个测试点
       cases.push({
         test_case: String(index + 1),

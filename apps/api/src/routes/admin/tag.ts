@@ -26,11 +26,7 @@ import {
 } from "drizzle-orm"
 import { Hono } from "hono"
 
-import {
-  requireProblemPermission,
-  requireTeacher,
-  type AppEnv,
-} from "../../auth/middleware"
+import { requireProblemPermission, requireTeacher, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
@@ -43,11 +39,7 @@ import { findTagsByName, normalizeTagNames } from "./problem"
 export const adminTagRoutes = new Hono<AppEnv>()
 
 const ACCEPTED = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
-const FAILED = [
-  JudgeStatus.WRONG_ANSWER,
-  JudgeStatus.COMPILE_ERROR,
-  JudgeStatus.RUNTIME_ERROR,
-]
+const FAILED = [JudgeStatus.WRONG_ANSWER, JudgeStatus.COMPILE_ERROR, JudgeStatus.RUNTIME_ERROR]
 
 /** 能管所有题目：超管，或 problemPermission 为 All */
 function canManageAllProblems(user: AuthUser) {
@@ -65,18 +57,12 @@ adminTagRoutes.get("/problem-tags", requireProblemPermission, async (c) => {
       problemCount: countDistinct(schema.problemTags.problemId),
     })
     .from(schema.problemTag)
-    .leftJoin(
-      schema.problemTags,
-      eq(schema.problemTags.problemtagId, schema.problemTag.id),
-    )
+    .leftJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
     .groupBy(schema.problemTag.id, schema.problemTag.name)
     // 后台标签管理要看到 problemCount=0 的标签（正是要清理的那些），
     // 所以这里用 leftJoin 且不加 having —— oj 侧的 /problem-tags 才过滤 >0
-    .orderBy(
-      desc(countDistinct(schema.problemTags.problemId)),
-      asc(schema.problemTag.name),
-    )
+    .orderBy(desc(countDistinct(schema.problemTags.problemId)), asc(schema.problemTag.name))
   return success(c, rows satisfies AdminTag[])
 })
 
@@ -97,18 +83,12 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
     .select()
     .from(schema.problemTag)
     .where(
-      and(
-        sql`lower(${schema.problemTag.name}) = lower(${name})`,
-        ne(schema.problemTag.id, id),
-      ),
+      and(sql`lower(${schema.problemTag.name}) = lower(${name})`, ne(schema.problemTag.id, id)),
     )
     .limit(1)
 
   if (!target) {
-    await db
-      .update(schema.problemTag)
-      .set({ name })
-      .where(eq(schema.problemTag.id, id))
+    await db.update(schema.problemTag).set({ name }).where(eq(schema.problemTag.id, id))
     return success(c, {
       merged: false,
       id,
@@ -154,142 +134,119 @@ adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
   } satisfies RenameTagResponse)
 })
 
-adminTagRoutes.delete(
-  "/problem-tags/:id",
-  requireProblemPermission,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    // 中间表 problem_tags 随标签一起清：problemtag_id 是 CASCADE（0010）
-    const deleted = await db
-      .delete(schema.problemTag)
-      .where(eq(schema.problemTag.id, id))
-      .returning({ id: schema.problemTag.id })
-    if (deleted.length === 0)
-      return failure(c, 404, "tag-not-found", "标签不存在，请刷新后重试")
-    return success(c, null)
-  },
-)
+adminTagRoutes.delete("/problem-tags/:id", requireProblemPermission, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  // 中间表 problem_tags 随标签一起清：problemtag_id 是 CASCADE（0010）
+  const deleted = await db
+    .delete(schema.problemTag)
+    .where(eq(schema.problemTag.id, id))
+    .returning({ id: schema.problemTag.id })
+  if (deleted.length === 0) return failure(c, 404, "tag-not-found", "标签不存在，请刷新后重试")
+  return success(c, null)
+})
 
-adminTagRoutes.post(
-  "/problems/batch-tag",
-  requireProblemPermission,
-  async (c) => {
-    const parsed = await parseBody(c, batchProblemTagRequestSchema)
-    if (!parsed.success) return parsed.response
-    const user = c.get("user")!
-    const filters = [
-      inArray(schema.problem.id, parsed.data.problemIds),
-      isNull(schema.problem.contestId),
-    ]
-    if (!canManageAllProblems(user))
-      filters.push(eq(schema.problem.createdById, user.id))
-    const problems = await db
-      .select({ id: schema.problem.id })
-      .from(schema.problem)
-      .where(and(...filters))
-    if (problems.length === 0)
-      return failure(c, 404, "no-problems", "没有可操作的题目")
+adminTagRoutes.post("/problems/batch-tag", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, batchProblemTagRequestSchema)
+  if (!parsed.success) return parsed.response
+  const user = c.get("user")!
+  const filters = [
+    inArray(schema.problem.id, parsed.data.problemIds),
+    isNull(schema.problem.contestId),
+  ]
+  if (!canManageAllProblems(user)) filters.push(eq(schema.problem.createdById, user.id))
+  const problems = await db
+    .select({ id: schema.problem.id })
+    .from(schema.problem)
+    .where(and(...filters))
+  if (problems.length === 0) return failure(c, 404, "no-problems", "没有可操作的题目")
 
-    // 去重且大小写不敏感，与旧 resolve_tags / find_tags 一致
-    const wanted = normalizeTagNames(parsed.data.tagNames)
+  // 去重且大小写不敏感，与旧 resolve_tags / find_tags 一致
+  const wanted = normalizeTagNames(parsed.data.tagNames)
 
-    const tagIds = await db.transaction(async (tx) => {
-      const existing = await findTagsByName(tx, wanted)
-      // 添加时按需新建标签，移除时只认已有标签 —— 否则「移除」会顺手造出一堆空标签
-      if (parsed.data.action === "add") {
-        const missing = wanted.filter(
-          (name) => !existing.has(name.toLowerCase()),
-        )
-        if (missing.length) {
-          const created = await tx
-            .insert(schema.problemTag)
-            .values(missing.map((name) => ({ name })))
-            .returning({
-              id: schema.problemTag.id,
-              name: schema.problemTag.name,
-            })
-          for (const row of created)
-            existing.set(row.name.toLowerCase(), row.id)
-        }
+  const tagIds = await db.transaction(async (tx) => {
+    const existing = await findTagsByName(tx, wanted)
+    // 添加时按需新建标签，移除时只认已有标签 —— 否则「移除」会顺手造出一堆空标签
+    if (parsed.data.action === "add") {
+      const missing = wanted.filter((name) => !existing.has(name.toLowerCase()))
+      if (missing.length) {
+        const created = await tx
+          .insert(schema.problemTag)
+          .values(missing.map((name) => ({ name })))
+          .returning({
+            id: schema.problemTag.id,
+            name: schema.problemTag.name,
+          })
+        for (const row of created) existing.set(row.name.toLowerCase(), row.id)
       }
-      return wanted
-        .map((name) => existing.get(name.toLowerCase()))
-        .filter((id) => id !== undefined)
-    })
-    if (tagIds.length === 0) return failure(c, 404, "no-tags", "没有匹配的标签")
+    }
+    return wanted.map((name) => existing.get(name.toLowerCase())).filter((id) => id !== undefined)
+  })
+  if (tagIds.length === 0) return failure(c, 404, "no-tags", "没有匹配的标签")
 
-    const problemIds = problems.map((problem) => problem.id)
-    await db.transaction(async (tx) => {
-      if (parsed.data.action === "remove") {
-        await tx
-          .delete(schema.problemTags)
-          .where(
-            and(
-              inArray(schema.problemTags.problemId, problemIds),
-              inArray(schema.problemTags.problemtagId, tagIds),
-            ),
-          )
-        return
-      }
-      const existing = await tx
-        .select()
-        .from(schema.problemTags)
+  const problemIds = problems.map((problem) => problem.id)
+  await db.transaction(async (tx) => {
+    if (parsed.data.action === "remove") {
+      await tx
+        .delete(schema.problemTags)
         .where(
           and(
             inArray(schema.problemTags.problemId, problemIds),
             inArray(schema.problemTags.problemtagId, tagIds),
           ),
         )
-      const have = new Set(
-        existing.map((row) => `${row.problemId}:${row.problemtagId}`),
+      return
+    }
+    const existing = await tx
+      .select()
+      .from(schema.problemTags)
+      .where(
+        and(
+          inArray(schema.problemTags.problemId, problemIds),
+          inArray(schema.problemTags.problemtagId, tagIds),
+        ),
       )
-      const rows = []
-      for (const problemId of problemIds) {
-        for (const tagId of tagIds) {
-          if (!have.has(`${problemId}:${tagId}`))
-            rows.push({ problemId, problemtagId: tagId })
-        }
+    const have = new Set(existing.map((row) => `${row.problemId}:${row.problemtagId}`))
+    const rows = []
+    for (const problemId of problemIds) {
+      for (const tagId of tagIds) {
+        if (!have.has(`${problemId}:${tagId}`)) rows.push({ problemId, problemtagId: tagId })
       }
-      if (rows.length) await tx.insert(schema.problemTags).values(rows)
-    })
+    }
+    if (rows.length) await tx.insert(schema.problemTags).values(rows)
+  })
 
-    return success(c, {
-      problemCount: problems.length,
-      tagCount: tagIds.length,
-    } satisfies BatchProblemTagResponse)
-  },
-)
+  return success(c, {
+    problemCount: problems.length,
+    tagCount: tagIds.length,
+  } satisfies BatchProblemTagResponse)
+})
 
 // ---------------------------------------------------------------- 题目可见性
 
-adminTagRoutes.put(
-  "/problems/:id/visibility",
-  requireProblemPermission,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const [problem] = await db
-      .select({
-        id: schema.problem.id,
-        visible: schema.problem.visible,
-        createdById: schema.problem.createdById,
-      })
-      .from(schema.problem)
-      .where(eq(schema.problem.id, id))
-      .limit(1)
-    // 旧后端这里的 `self.error(...)` 少写了 return，题目不存在时会继续往下跑并抛
-    // AttributeError（500）。这里正常返回 404。
-    if (!problem) return failure(c, 404, "problem-not-found", "题目不存在")
-    const user = c.get("user")!
-    if (!canManageAllProblems(user) && problem.createdById !== user.id) {
-      return failure(c, 404, "problem-not-found", "题目不存在")
-    }
-    await db
-      .update(schema.problem)
-      .set({ visible: !problem.visible })
-      .where(eq(schema.problem.id, id))
-    return success(c, { visible: !problem.visible })
-  },
-)
+adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const [problem] = await db
+    .select({
+      id: schema.problem.id,
+      visible: schema.problem.visible,
+      createdById: schema.problem.createdById,
+    })
+    .from(schema.problem)
+    .where(eq(schema.problem.id, id))
+    .limit(1)
+  // 旧后端这里的 `self.error(...)` 少写了 return，题目不存在时会继续往下跑并抛
+  // AttributeError（500）。这里正常返回 404。
+  if (!problem) return failure(c, 404, "problem-not-found", "题目不存在")
+  const user = c.get("user")!
+  if (!canManageAllProblems(user) && problem.createdById !== user.id) {
+    return failure(c, 404, "problem-not-found", "题目不存在")
+  }
+  await db
+    .update(schema.problem)
+    .set({ visible: !problem.visible })
+    .where(eq(schema.problem.id, id))
+  return success(c, { visible: !problem.visible })
+})
 
 // ---------------------------------------------------------------- 卡点题目 / AC 趋势
 
@@ -309,16 +266,12 @@ adminTagRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
           Number,
         ),
       failed: sql<number>`count(*) ${failedFilter}`.mapWith(Number),
-      failedUsers:
-        sql<number>`count(distinct ${schema.submission.userId}) ${failedFilter}`.mapWith(
-          Number,
-        ),
+      failedUsers: sql<number>`count(distinct ${schema.submission.userId}) ${failedFilter}`.mapWith(
+        Number,
+      ),
     })
     .from(schema.submission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.submission.problemId, schema.problem.id),
-    )
+    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     /**
      * 只看公共题，和隔壁 ac-trend 同一个口径。原来这里一个 where 都没有，比赛题
      * 也进榜 —— 而比赛题的题号是每场比赛各自从 1 开始编的（快照里 61 道不同的题
@@ -333,12 +286,8 @@ adminTagRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
      */
     .where(isNull(schema.submission.contestId))
     .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title)
-    .having(
-      sql`count(distinct ${schema.submission.userId}) ${failedFilter} > 0`,
-    )
-    .orderBy(
-      desc(sql`count(distinct ${schema.submission.userId}) ${failedFilter}`),
-    )
+    .having(sql`count(distinct ${schema.submission.userId}) ${failedFilter} > 0`)
+    .orderBy(desc(sql`count(distinct ${schema.submission.userId}) ${failedFilter}`))
     .limit(40)
   return success(
     c,
@@ -362,16 +311,14 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
   let sinceYear = queryInteger(c.req.query("sinceYear"), 2023)
   if (sinceYear < 2022 || sinceYear > currentYear) sinceYear = 2023
   let untilYear = queryInteger(c.req.query("untilYear"), currentYear)
-  if (untilYear < sinceYear || untilYear > currentYear)
-    untilYear = currentYear - 1
+  if (untilYear < sinceYear || untilYear > currentYear) untilYear = currentYear - 1
   let minPerYear = queryInteger(c.req.query("minPerYear"), 100)
   if (![50, 100, 200].includes(minPerYear)) minPerYear = 100
 
   // 年份按东八区切，和上面 `currentYear` 的夹逼同口径
-  const year =
-    sql<number>`extract(year from ${localTime(schema.submission.createTime)})`.mapWith(
-      Number,
-    )
+  const year = sql<number>`extract(year from ${localTime(schema.submission.createTime)})`.mapWith(
+    Number,
+  )
   const rows = await db
     .select({
       problemId: schema.problem.id,
@@ -385,32 +332,15 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
         ),
     })
     .from(schema.submission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.submission.problemId, schema.problem.id),
-    )
-    .where(
-      and(
-        isNull(schema.submission.contestId),
-        gte(year, sinceYear),
-        lte(year, untilYear),
-      ),
-    )
-    .groupBy(
-      schema.problem.id,
-      schema.problem.displayId,
-      schema.problem.title,
-      year,
-    )
+    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+    .where(and(isNull(schema.submission.contestId), gte(year, sinceYear), lte(year, untilYear)))
+    .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title, year)
     .orderBy(asc(schema.problem.id), asc(year))
 
   const required = new Set<number>()
   for (let y = sinceYear; y <= untilYear; y += 1) required.add(y)
 
-  const grouped = new Map<
-    number,
-    { displayId: string; title: string; yearly: typeof rows }
-  >()
+  const grouped = new Map<number, { displayId: string; title: string; yearly: typeof rows }>()
   for (const row of rows) {
     const bucket = grouped.get(row.problemId)
     if (bucket) bucket.yearly.push(row)
@@ -446,28 +376,20 @@ adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
 
 // ---------------------------------------------------------------- Python → 流程图
 
-adminTagRoutes.post(
-  "/problems/flowchart",
-  requireProblemPermission,
-  async (c) => {
-    const parsed = await parseBody(
-      c,
-      generateFlowchartRequestSchema,
-      "python 代码不能为空",
-    )
-    if (!parsed.success) return parsed.response
-    try {
-      const flowchart = await completeChat(
-        `你是一个可以将Python代码转换为mermaid的助手。
+adminTagRoutes.post("/problems/flowchart", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, generateFlowchartRequestSchema, "python 代码不能为空")
+  if (!parsed.success) return parsed.response
+  try {
+    const flowchart = await completeChat(
+      `你是一个可以将Python代码转换为mermaid的助手。
 请将用户提供的Python代码转换为 Mermaid 纯文本。
 注意括号内的内容用引号包裹，如果本身就有引号，请注意双引号和单引号的问题。
 请只返回 mermaid 代码，连 \`\`\` 都不需要。`,
-        parsed.data.python,
-      )
-      return success(c, { flowchart } satisfies GenerateFlowchartResponse)
-    } catch (error) {
-      console.error("Flowchart generation failed", error)
-      return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")
-    }
-  },
-)
+      parsed.data.python,
+    )
+    return success(c, { flowchart } satisfies GenerateFlowchartResponse)
+  } catch (error) {
+    console.error("Flowchart generation failed", error)
+    return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")
+  }
+})

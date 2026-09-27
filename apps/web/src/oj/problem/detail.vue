@@ -13,27 +13,13 @@ const loadProblemEditor = () => import("./components/ProblemEditor.vue")
 const loadContestEditor = () => import("./components/BasicEditor.vue")
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
 const BasicEditor = defineAsyncComponent(loadContestEditor)
-const EditorForTest = defineAsyncComponent(
-  () => import("./components/EditorForTest.vue"),
-)
-const ProblemContent = defineAsyncComponent(
-  () => import("./components/ProblemContent.vue"),
-)
-const ProblemInfo = defineAsyncComponent(
-  () => import("./components/ProblemInfo.vue"),
-)
-const ProblemSubmission = defineAsyncComponent(
-  () => import("./components/ProblemSubmission.vue"),
-)
-const ProblemReaction = defineAsyncComponent(
-  () => import("./components/ProblemReaction.vue"),
-)
-const ProblemFlowchart = defineAsyncComponent(
-  () => import("./components/ProblemFlowchart.vue"),
-)
-const MyFlowchartTab = defineAsyncComponent(
-  () => import("./components/MyFlowchartTab.vue"),
-)
+const EditorForTest = defineAsyncComponent(() => import("./components/EditorForTest.vue"))
+const ProblemContent = defineAsyncComponent(() => import("./components/ProblemContent.vue"))
+const ProblemInfo = defineAsyncComponent(() => import("./components/ProblemInfo.vue"))
+const ProblemSubmission = defineAsyncComponent(() => import("./components/ProblemSubmission.vue"))
+const ProblemReaction = defineAsyncComponent(() => import("./components/ProblemReaction.vue"))
+const ProblemFlowchart = defineAsyncComponent(() => import("./components/ProblemFlowchart.vue"))
+const MyFlowchartTab = defineAsyncComponent(() => import("./components/MyFlowchartTab.vue"))
 
 interface Props {
   problemID: string
@@ -92,9 +78,7 @@ watch(
   ([rawTab]) => {
     const tabs = tabOptions.value
     const fallback = tabs[0] ?? "content"
-    currentTab.value = tabs.includes(rawTab as string)
-      ? (rawTab as string)
-      : fallback
+    currentTab.value = tabs.includes(rawTab as string) ? (rawTab as string) : fallback
   },
   { immediate: true },
 )
@@ -189,26 +173,13 @@ watch(
             <n-tab-pane name="info" tab="题目统计" :disabled="!!problemSetId">
               <ProblemInfo />
             </n-tab-pane>
-            <n-tab-pane
-              v-if="!contestID"
-              name="comment"
-              tab="题目点评"
-              :disabled="!!problemSetId"
-            >
+            <n-tab-pane v-if="!contestID" name="comment" tab="题目点评" :disabled="!!problemSetId">
               <ProblemReaction />
             </n-tab-pane>
-            <n-tab-pane
-              v-if="myFlowchartStore.showing"
-              name="my-flowchart"
-              tab="我的流程图"
-            >
+            <n-tab-pane v-if="myFlowchartStore.showing" name="my-flowchart" tab="我的流程图">
               <MyFlowchartTab />
             </n-tab-pane>
-            <n-tab-pane
-              name="submission"
-              tab="我的提交"
-              :disabled="!!problemSetId"
-            >
+            <n-tab-pane name="submission" tab="我的提交" :disabled="!!problemSetId">
               <ProblemSubmission />
             </n-tab-pane>
           </n-tabs>
@@ -237,26 +208,13 @@ watch(
           <n-tab-pane name="info" tab="题目统计" :disabled="!!problemSetId">
             <ProblemInfo />
           </n-tab-pane>
-          <n-tab-pane
-            v-if="!contestID"
-            name="comment"
-            tab="题目点评"
-            :disabled="!!problemSetId"
-          >
+          <n-tab-pane v-if="!contestID" name="comment" tab="题目点评" :disabled="!!problemSetId">
             <ProblemReaction />
           </n-tab-pane>
-          <n-tab-pane
-            v-if="myFlowchartStore.showing"
-            name="my-flowchart"
-            tab="我的流程图"
-          >
+          <n-tab-pane v-if="myFlowchartStore.showing" name="my-flowchart" tab="我的流程图">
             <MyFlowchartTab />
           </n-tab-pane>
-          <n-tab-pane
-            name="submission"
-            tab="我的提交"
-            :disabled="!!problemSetId"
-          >
+          <n-tab-pane name="submission" tab="我的提交" :disabled="!!problemSetId">
             <ProblemSubmission />
           </n-tab-pane>
         </n-tabs>
@@ -277,19 +235,10 @@ watch(
       <n-tab-pane name="info" tab="统计" :disabled="!!problemSetId">
         <ProblemInfo />
       </n-tab-pane>
-      <n-tab-pane
-        v-if="!contestID"
-        name="comment"
-        tab="点评"
-        :disabled="!!problemSetId"
-      >
+      <n-tab-pane v-if="!contestID" name="comment" tab="点评" :disabled="!!problemSetId">
         <ProblemReaction />
       </n-tab-pane>
-      <n-tab-pane
-        v-if="myFlowchartStore.showing"
-        name="my-flowchart"
-        tab="我的流程图"
-      >
+      <n-tab-pane v-if="myFlowchartStore.showing" name="my-flowchart" tab="我的流程图">
         <MyFlowchartTab />
       </n-tab-pane>
       <n-tab-pane name="submission" tab="提交" :disabled="!!problemSetId">

@@ -52,10 +52,7 @@ function goToProblemSet(problemSetId: number) {
   router.push(`/problemset/${problemSetId}`)
 }
 
-function getConditionText(
-  conditionType: string,
-  conditionValue: number,
-): string {
+function getConditionText(conditionType: string, conditionValue: number): string {
   const conditionMap: Record<string, string> = {
     all_problems: "完成所有题目",
     problem_count: `完成 ${conditionValue} 道题目`,
@@ -97,18 +94,9 @@ watch(() => [query.page, query.limit], listProblemSets)
       />
     </n-space>
 
-    <n-grid
-      v-if="problemSets.length > 0"
-      :cols="isDesktop ? 3 : 1"
-      :x-gap="16"
-      :y-gap="16"
-    >
+    <n-grid v-if="problemSets.length > 0" :cols="isDesktop ? 3 : 1" :x-gap="16" :y-gap="16">
       <n-grid-item v-for="problemSet in problemSets" :key="problemSet.id">
-        <n-card
-          hoverable
-          @click="goToProblemSet(problemSet.id)"
-          style="cursor: pointer"
-        >
+        <n-card hoverable @click="goToProblemSet(problemSet.id)" style="cursor: pointer">
           <template #header>
             <n-flex justify="space-between" align="center">
               <n-text strong>{{ problemSet.title }}</n-text>
@@ -127,36 +115,22 @@ watch(() => [query.page, query.limit], listProblemSets)
               <n-flex align="center" style="height: 28px">
                 <!-- 用户进度显示 -->
                 <n-progress
-                  v-if="
-                    problemSet.userProgress?.isJoined &&
-                    !problemSet.userProgress?.isCompleted
-                  "
+                  v-if="problemSet.userProgress?.isJoined && !problemSet.userProgress?.isCompleted"
                   type="line"
-                  :percentage="
-                    Math.round(problemSet.userProgress.progressPercentage)
-                  "
+                  :percentage="Math.round(problemSet.userProgress.progressPercentage)"
                   :height="4"
                   :border-radius="2"
                   style="width: 100px"
-                  :color="
-                    getProgressColor(problemSet.userProgress.progressPercentage)
-                  "
+                  :color="getProgressColor(problemSet.userProgress.progressPercentage)"
                 />
-                <n-tag type="warning" v-if="problemSet.status === 'archived'">
-                  已归档
-                </n-tag>
+                <n-tag type="warning" v-if="problemSet.status === 'archived'"> 已归档 </n-tag>
                 <n-tag
-                  v-if="
-                    problemSet.userProgress?.isJoined &&
-                    !problemSet.userProgress?.isCompleted
-                  "
+                  v-if="problemSet.userProgress?.isJoined && !problemSet.userProgress?.isCompleted"
                   type="warning"
                 >
                   已加入
                 </n-tag>
-                <n-tag v-if="problemSet.userProgress?.isCompleted" type="error">
-                  已完成
-                </n-tag>
+                <n-tag v-if="problemSet.userProgress?.isCompleted" type="error"> 已完成 </n-tag>
               </n-flex>
             </n-flex>
 
@@ -167,11 +141,7 @@ watch(() => [query.page, query.limit], listProblemSets)
                 {{ parseTime(problemSet.createTime, "YYYY-MM-DD") }}
               </n-text>
               <n-flex>
-                <n-tooltip
-                  v-for="badge in problemSet.badges"
-                  :key="badge.id"
-                  trigger="hover"
-                >
+                <n-tooltip v-for="badge in problemSet.badges" :key="badge.id" trigger="hover">
                   <template #trigger>
                     <n-image
                       :src="badge.icon"
@@ -183,21 +153,12 @@ watch(() => [query.page, query.limit], listProblemSets)
                     />
                   </template>
                   <n-flex vertical size="small">
-                    <span style="font-weight: bold">
-                      徽章: {{ badge.name }}
-                    </span>
+                    <span style="font-weight: bold"> 徽章: {{ badge.name }} </span>
                     <span>
                       获取条件:
-                      {{
-                        getConditionText(
-                          badge.conditionType,
-                          badge.conditionValue,
-                        )
-                      }}
+                      {{ getConditionText(badge.conditionType, badge.conditionValue) }}
                     </span>
-                    <n-text type="primary" v-if="badge.isEarned">
-                      ✓ 已获得
-                    </n-text>
+                    <n-text type="primary" v-if="badge.isEarned"> ✓ 已获得 </n-text>
                   </n-flex>
                 </n-tooltip>
               </n-flex>

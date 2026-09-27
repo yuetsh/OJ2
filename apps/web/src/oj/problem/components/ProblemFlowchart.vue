@@ -9,10 +9,7 @@ const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 const { renderError, renderFlowchart } = useMermaid()
 
 const renderProblemFlowchart = async () => {
-  await renderFlowchart(
-    mermaidContainer.value,
-    problem.value?.mermaidCode ?? "",
-  )
+  await renderFlowchart(mermaidContainer.value, problem.value?.mermaidCode ?? "")
 }
 
 onMounted(renderProblemFlowchart)

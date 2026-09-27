@@ -5,10 +5,7 @@ import { useUserStore } from "shared/store/user"
 const userStore = useUserStore()
 const message = useMessage()
 
-async function beforeUpload(data: {
-  file: UploadFileInfo
-  fileList: UploadFileInfo[]
-}) {
+async function beforeUpload(data: { file: UploadFileInfo; fileList: UploadFileInfo[] }) {
   if (!data.file.file) return false
   if (data.file.file.size > 2 * 1024 * 1024) {
     message.warning("图片太大啦！不能超过 2 MB 啊")

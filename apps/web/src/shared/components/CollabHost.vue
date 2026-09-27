@@ -52,9 +52,7 @@ watch(
       if (item.status !== "pending") continue
       if (!latest || item.createdAt > latest.createdAt) latest = item
     }
-    const text = latest
-      ? `${latest.studentName} 求助：${latest.problemTitle}`
-      : "有新的求助"
+    const text = latest ? `${latest.studentName} 求助：${latest.problemTitle}` : "有新的求助"
     // 内容传 render 函数（naive 的 content 支持），这样整条 toast 可点：
     // 点一下直接开求助列表，省得再去点名字、再点菜单。
     const notice = message.info(
@@ -77,8 +75,5 @@ watch(
 </script>
 
 <template>
-  <HelpRequestList
-    v-if="collabStore.isTeacher"
-    v-model:show="collabStore.helpPanelOpen"
-  />
+  <HelpRequestList v-if="collabStore.isTeacher" v-model:show="collabStore.helpPanelOpen" />
 </template>

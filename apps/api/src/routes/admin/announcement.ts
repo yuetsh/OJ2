@@ -58,14 +58,8 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
         realName: schema.userProfile.realName,
       })
       .from(schema.announcement)
-      .innerJoin(
-        schema.user,
-        eq(schema.announcement.createdById, schema.user.id),
-      )
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .innerJoin(schema.user, eq(schema.announcement.createdById, schema.user.id))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .orderBy(desc(schema.announcement.createTime))
       .limit(limit)
       .offset(offset),
@@ -94,72 +88,37 @@ adminAnnouncementRoutes.post("/announcements", requireSuperAdmin, async (c) => {
   return success(c, serialize(row!), 201)
 })
 
-adminAnnouncementRoutes.get(
-  "/announcements/:id",
-  requireSuperAdmin,
-  async (c) => {
-    const [row] = await selectOne(
-      queryInteger(c.req.param("id"), 0, { min: 1 }),
-    )
-    if (!row)
-      return failure(
-        c,
-        404,
-        "announcement-not-found",
-        "Announcement does not exist",
-      )
-    return success(c, serialize(row))
-  },
-)
+adminAnnouncementRoutes.get("/announcements/:id", requireSuperAdmin, async (c) => {
+  const [row] = await selectOne(queryInteger(c.req.param("id"), 0, { min: 1 }))
+  if (!row) return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+  return success(c, serialize(row))
+})
 
-adminAnnouncementRoutes.put(
-  "/announcements/:id",
-  requireSuperAdmin,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = await parseBody(c, updateAnnouncementRequestSchema)
-    if (!parsed.success) return parsed.response
-    const updated = await db
-      .update(schema.announcement)
-      .set({ ...parsed.data, lastUpdateTime: new Date().toISOString() })
-      .where(eq(schema.announcement.id, id))
-      .returning({ id: schema.announcement.id })
-    if (updated.length === 0) {
-      return failure(
-        c,
-        404,
-        "announcement-not-found",
-        "Announcement does not exist",
-      )
-    }
-    const [row] = await selectOne(id)
-    return success(c, serialize(row!))
-  },
-)
+adminAnnouncementRoutes.put("/announcements/:id", requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = await parseBody(c, updateAnnouncementRequestSchema)
+  if (!parsed.success) return parsed.response
+  const updated = await db
+    .update(schema.announcement)
+    .set({ ...parsed.data, lastUpdateTime: new Date().toISOString() })
+    .where(eq(schema.announcement.id, id))
+    .returning({ id: schema.announcement.id })
+  if (updated.length === 0) {
+    return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+  }
+  const [row] = await selectOne(id)
+  return success(c, serialize(row!))
+})
 
-adminAnnouncementRoutes.delete(
-  "/announcements/:id",
-  requireSuperAdmin,
-  async (c) => {
-    // 旧后端删不存在的公告也返回成功（filter().delete() 不报错）。这里改成 404：
-    // 后台是人手点删除，静默成功会让人以为删掉了，刷新后它还在。
-    const deleted = await db
-      .delete(schema.announcement)
-      .where(
-        eq(
-          schema.announcement.id,
-          queryInteger(c.req.param("id"), 0, { min: 1 }),
-        ),
-      )
-      .returning({ id: schema.announcement.id })
-    if (deleted.length === 0) {
-      return failure(
-        c,
-        404,
-        "announcement-not-found",
-        "Announcement does not exist",
-      )
-    }
-    return success(c, null)
-  },
-)
+adminAnnouncementRoutes.delete("/announcements/:id", requireSuperAdmin, async (c) => {
+  // 旧后端删不存在的公告也返回成功（filter().delete() 不报错）。这里改成 404：
+  // 后台是人手点删除，静默成功会让人以为删掉了，刷新后它还在。
+  const deleted = await db
+    .delete(schema.announcement)
+    .where(eq(schema.announcement.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .returning({ id: schema.announcement.id })
+  if (deleted.length === 0) {
+    return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+  }
+  return success(c, null)
+})

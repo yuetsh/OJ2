@@ -13,10 +13,7 @@ export const configUpdateChannel = "config:updates"
 export const configTopic = "events:config"
 
 export async function publishConfigUpdate(key: string, value: unknown) {
-  await redis.publish(
-    configUpdateChannel,
-    JSON.stringify({ type: "config_update", key, value }),
-  )
+  await redis.publish(configUpdateChannel, JSON.stringify({ type: "config_update", key, value }))
 }
 
 /**
@@ -42,19 +39,14 @@ export async function publishSessionRevoked(
   target: { token: string } | { userId: number },
   reason: SessionRevokedReason,
 ) {
-  await redis.publish(
-    sessionRevokedChannel,
-    JSON.stringify({ ...target, reason }),
-  )
+  await redis.publish(sessionRevokedChannel, JSON.stringify({ ...target, reason }))
 }
 
 export function parseSessionRevoked(raw: string): SessionRevoked | null {
   try {
     const value = JSON.parse(raw) as SessionRevoked
-    if (typeof value.token !== "string" && !Number.isInteger(value.userId))
-      return null
-    if (value.reason !== "session-ended" && value.reason !== "account-disabled")
-      return null
+    if (typeof value.token !== "string" && !Number.isInteger(value.userId)) return null
+    if (value.reason !== "session-ended" && value.reason !== "account-disabled") return null
     return value
   } catch {
     return null
@@ -79,10 +71,7 @@ export function userEventTopic(userId: number) {
   return `events:user:${userId}`
 }
 
-export async function publishFlowchartUpdate(
-  userId: number,
-  data: FlowchartUpdate,
-) {
+export async function publishFlowchartUpdate(userId: number, data: FlowchartUpdate) {
   await redis.publish(userEventChannel, JSON.stringify({ userId, data }))
 }
 
@@ -103,11 +92,7 @@ export async function publishAchievementNotification(
 export function parseUserEvent(raw: string): UserEvent | null {
   try {
     const value = JSON.parse(raw) as UserEvent
-    if (
-      !Number.isInteger(value.userId) ||
-      !value.data ||
-      typeof value.data !== "object"
-    )
+    if (!Number.isInteger(value.userId) || !value.data || typeof value.data !== "object")
       return null
     return value
   } catch {

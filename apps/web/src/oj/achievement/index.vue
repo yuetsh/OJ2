@@ -3,12 +3,7 @@ import { getAchievements, getAchievementSummary } from "oj/achievement/api"
 import { getUserBadges } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useRarityColor } from "shared/composables/rarity"
-import type {
-  Achievement,
-  AchievementRarity,
-  AchievementSummary,
-  UserBadge,
-} from "utils/types"
+import type { Achievement, AchievementRarity, AchievementSummary, UserBadge } from "utils/types"
 import AchievementCard from "./components/AchievementCard.vue"
 
 const route = useRoute()
@@ -29,9 +24,7 @@ const RARITY_RANK: Record<AchievementRarity, number> = {
 }
 
 const rarities = computed(() =>
-  [...(summary.value?.rarity ?? [])].sort(
-    (a, b) => RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity],
-  ),
+  [...(summary.value?.rarity ?? [])].sort((a, b) => RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity]),
 )
 const badges = ref<UserBadge[]>([])
 const { isDesktop } = useBreakpoints()
@@ -39,10 +32,8 @@ const tab = ref("all")
 const loading = ref(true)
 
 const filtered = computed(() => {
-  if (tab.value === "unlocked")
-    return achievements.value.filter((a) => a.unlocked)
-  if (tab.value === "locked")
-    return achievements.value.filter((a) => !a.unlocked)
+  if (tab.value === "unlocked") return achievements.value.filter((a) => a.unlocked)
+  if (tab.value === "locked") return achievements.value.filter((a) => !a.unlocked)
   return achievements.value
 })
 
@@ -73,11 +64,7 @@ watch(name, load)
       <n-card v-if="summary">
         <n-flex align="center" :wrap="false" :size="isDesktop ? 32 : 16">
           <n-flex vertical align="center" :size="6">
-            <n-progress
-              type="circle"
-              :percentage="summary.percent"
-              :stroke-width="8"
-            >
+            <n-progress type="circle" :percentage="summary.percent" :stroke-width="8">
               <n-text strong :style="{ fontSize: isDesktop ? '20px' : '14px' }">
                 {{ summary.percent }}%
               </n-text>
@@ -88,13 +75,7 @@ watch(name, load)
           </n-flex>
 
           <n-flex vertical :size="8" class="rarity">
-            <n-flex
-              v-for="r in rarities"
-              :key="r.rarity"
-              align="center"
-              :wrap="false"
-              :size="10"
-            >
+            <n-flex v-for="r in rarities" :key="r.rarity" align="center" :wrap="false" :size="10">
               <n-text strong :style="{ color: rarityColor[r.rarity] }">
                 {{ r.label }}
               </n-text>
@@ -108,9 +89,7 @@ watch(name, load)
                 :color="rarityColor[r.rarity]"
                 :show-indicator="false"
               />
-              <n-text depth="3" class="nowrap">
-                {{ r.unlocked }} / {{ r.total }}
-              </n-text>
+              <n-text depth="3" class="nowrap"> {{ r.unlocked }} / {{ r.total }} </n-text>
             </n-flex>
           </n-flex>
         </n-flex>
@@ -124,13 +103,7 @@ watch(name, load)
       </n-tabs>
 
       <template v-if="tab !== 'badges'">
-        <n-grid
-          v-if="filtered.length"
-          responsive="screen"
-          cols="1 s:2 l:3"
-          :x-gap="12"
-          :y-gap="12"
-        >
+        <n-grid v-if="filtered.length" responsive="screen" cols="1 s:2 l:3" :x-gap="12" :y-gap="12">
           <n-gi v-for="a in filtered" :key="a.id">
             <AchievementCard :achievement="a" />
           </n-gi>
@@ -140,19 +113,10 @@ watch(name, load)
       </template>
 
       <template v-else>
-        <n-grid
-          v-if="badges.length"
-          responsive="screen"
-          cols="1 s:2 l:3"
-          :x-gap="12"
-          :y-gap="12"
-        >
+        <n-grid v-if="badges.length" responsive="screen" cols="1 s:2 l:3" :x-gap="12" :y-gap="12">
           <n-gi v-for="b in badges" :key="b.id">
             <n-card size="small">
-              <n-thing
-                :title="b.badge?.name"
-                :description="b.badge?.description"
-              >
+              <n-thing :title="b.badge?.name" :description="b.badge?.description">
                 <template #avatar v-if="b.badge?.icon">
                   <n-avatar
                     :size="40"

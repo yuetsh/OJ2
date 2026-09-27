@@ -119,13 +119,11 @@ export function hintFilterReason(
   if (!text) return "空回复"
   if (level === KEY_LINE_LEVEL) {
     const lines = keyLineCount(text)
-    if (lines > KEY_LINES_MAX)
-      return `代码 ${lines} 行，超过 ${KEY_LINES_MAX} 行`
+    if (lines > KEY_LINES_MAX) return `代码 ${lines} 行，超过 ${KEY_LINES_MAX} 行`
   } else if (level !== HINT_LEVEL_COMPILE) {
     if (/```/.test(text)) return "出现代码块"
     const inline = text.match(/`([^`\n]+)`/g) ?? []
-    if (inline.some((item) => item.length - 2 > INLINE_CODE_MAX))
-      return "行内代码过长"
+    if (inline.some((item) => item.length - 2 > INLINE_CODE_MAX)) return "行内代码过长"
     // 围栏里的代码已经被上面拦掉了，这里找的是摊平进正文的
     const bare = text.split("\n").filter(looksLikeCode)
     if (bare.length) return `正文里出现代码：${bare[0]!.trim().slice(0, 60)}`
@@ -133,9 +131,7 @@ export function hintFilterReason(
   }
   if (referenceCode) {
     const flat = text.replace(/\s+/g, "")
-    const hits = new Set(
-      answerLines(referenceCode).filter((line) => flat.includes(line)),
-    )
+    const hits = new Set(answerLines(referenceCode).filter((line) => flat.includes(line)))
     if (hits.size >= ANSWER_LINE_HITS) return `和标准答案重合 ${hits.size} 行`
   }
   return null
@@ -187,14 +183,11 @@ export async function generateFilteredHint(options: {
   const { system, prompt, level, referenceCode } = options
   const first = (await completeChat(system, prompt)).trim()
   const firstReason = hintFilterReason(first, level, referenceCode)
-  if (!firstReason)
-    return { content: first, attempt: 1, blocked: false, reason: null }
+  if (!firstReason) return { content: first, attempt: 1, blocked: false, reason: null }
 
   let second: string
   try {
-    second = (
-      await completeChat(retrySystem(system, firstReason, level), prompt)
-    ).trim()
+    second = (await completeChat(retrySystem(system, firstReason, level), prompt)).trim()
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return {
@@ -205,8 +198,7 @@ export async function generateFilteredHint(options: {
     }
   }
   const secondReason = hintFilterReason(second, level, referenceCode)
-  if (!secondReason)
-    return { content: second, attempt: 2, blocked: false, reason: firstReason }
+  if (!secondReason) return { content: second, attempt: 2, blocked: false, reason: firstReason }
   return {
     content: fallbackText(level),
     attempt: 2,

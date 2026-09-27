@@ -36,10 +36,7 @@ export async function createTestSubmission(code: Code, input: string) {
   const data = response.data
   return {
     status: data.status && data.status.id,
-    output: [
-      base64DecodeUtf8(data.compile_output),
-      base64DecodeUtf8(data.stdout),
-    ]
+    output: [base64DecodeUtf8(data.compile_output), base64DecodeUtf8(data.stdout)]
       .join("\n")
       .trim(),
   }

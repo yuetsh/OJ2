@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { NButton, NFlex } from "naive-ui"
-import {
-  deleteAchievement,
-  getAdminAchievements,
-  type AdminAchievement,
-} from "admin/api"
+import { deleteAchievement, getAdminAchievements, type AdminAchievement } from "admin/api"
 import AchievementIcon from "shared/components/AchievementIcon.vue"
 import AchievementModal from "./components/AchievementModal.vue"
 import { RARITY_LABEL } from "utils/constants"
@@ -100,16 +96,8 @@ const columns: DataTableColumn<AdminAchievement>[] = [
     width: 130,
     render: (row) =>
       h(NFlex, { size: 8 }, () => [
-        h(
-          NButton,
-          { text: true, type: "primary", onClick: () => edit(row) },
-          () => "编辑",
-        ),
-        h(
-          NButton,
-          { text: true, type: "error", onClick: () => remove(row) },
-          () => "删除",
-        ),
+        h(NButton, { text: true, type: "primary", onClick: () => edit(row) }, () => "编辑"),
+        h(NButton, { text: true, type: "error", onClick: () => remove(row) }, () => "删除"),
       ]),
   },
 ]
@@ -124,8 +112,7 @@ onMounted(load)
     </template>
 
     <n-alert type="info" style="margin-bottom: 12px">
-      「已解锁人数」是唯一的仪表盘：配置一周后仍为
-      0，多半是阈值配错了而不是太难。
+      「已解锁人数」是唯一的仪表盘：配置一周后仍为 0，多半是阈值配错了而不是太难。
     </n-alert>
 
     <n-data-table
@@ -135,10 +122,6 @@ onMounted(load)
       :row-key="(row: AdminAchievement) => row.id"
     />
 
-    <AchievementModal
-      v-model:show="showModal"
-      :editing="editing"
-      @saved="load"
-    />
+    <AchievementModal v-model:show="showModal" :editing="editing" @saved="load" />
   </n-card>
 </template>

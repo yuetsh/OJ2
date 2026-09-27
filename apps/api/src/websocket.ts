@@ -10,11 +10,7 @@ import {
 } from "./collab/handler"
 import { config } from "./config"
 import { db, schema } from "./db"
-import {
-  parseSubmissionEvent,
-  submissionUpdateChannel,
-  userSubmissionTopic,
-} from "./judge/events"
+import { parseSubmissionEvent, submissionUpdateChannel, userSubmissionTopic } from "./judge/events"
 import { JudgeStatus } from "./judge/status"
 import { createSubscriberRedis } from "./redis"
 import { asRecord } from "./routes/helpers"
@@ -51,9 +47,7 @@ export function isAllowedWebSocketOrigin(origin: string | null, url: URL) {
   }
   if (originUrl.host === url.host) return true
   // 两边都是本机才放行。生产环境 url.hostname 是正式域名，这条永远不成立
-  return (
-    LOCAL_HOSTNAMES.has(originUrl.hostname) && LOCAL_HOSTNAMES.has(url.hostname)
-  )
+  return LOCAL_HOSTNAMES.has(originUrl.hostname) && LOCAL_HOSTNAMES.has(url.hostname)
 }
 
 interface RateBucket {
@@ -149,10 +143,7 @@ const FORCE_LOGOUT_CLOSE_DELAY = 100
  * 之所以先发一帧再断：只断连接的话前端只看到一次普通掉线，会照常重连，页面上
  * 还显示着登录态；收到 force_logout 才知道要清掉身份、弹登录框或者提示被禁用。
  */
-function forceLogout(
-  targets: Bun.ServerWebSocket<SubmissionSocketData>[],
-  reason: string,
-) {
+function forceLogout(targets: Bun.ServerWebSocket<SubmissionSocketData>[], reason: string) {
   if (targets.length === 0) return
   const frame = JSON.stringify({ type: "force_logout", reason })
   for (const ws of targets) ws.send(frame)
@@ -273,10 +264,7 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
   }
 }
 
-async function handleMessage(
-  ws: Bun.ServerWebSocket<SubmissionSocketData>,
-  raw: string,
-) {
+async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw: string) {
   let message: { type?: unknown; timestamp?: unknown; submissionId?: unknown }
   try {
     message = JSON.parse(raw) as typeof message
@@ -293,10 +281,7 @@ async function handleMessage(
     ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
     return
   }
-  if (
-    message.type !== "subscribe" ||
-    typeof message.submissionId !== "string"
-  ) {
+  if (message.type !== "subscribe" || typeof message.submissionId !== "string") {
     ws.send(JSON.stringify({ type: "error", message: "Invalid message" }))
     return
   }
@@ -311,12 +296,7 @@ async function handleMessage(
   const [activeUser] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.id, ws.data.userId),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
   if (!activeUser) {
     ws.close(1008, "Account disabled")
@@ -355,9 +335,7 @@ async function handleMessage(
       )
       .limit(1)
     if (!flowchart) {
-      ws.send(
-        JSON.stringify({ type: "error", message: "Submission not found" }),
-      )
+      ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
       return
     }
     const replay =
@@ -400,9 +378,7 @@ async function handleMessage(
   if (parsed.success) ws.send(JSON.stringify(parsed.data))
 }
 
-export async function bridgeSubmissionEvents(
-  server: Bun.Server<SubmissionSocketData>,
-) {
+export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocketData>) {
   const subscriber = createSubscriberRedis()
   subscriber.on("message", (channel, raw) => {
     if (channel === configUpdateChannel) {
@@ -435,12 +411,7 @@ export async function bridgeSubmissionEvents(
         const [activeUser] = await db
           .select({ id: schema.user.id })
           .from(schema.user)
-          .where(
-            and(
-              eq(schema.user.id, event.userId),
-              eq(schema.user.isDisabled, false),
-            ),
-          )
+          .where(and(eq(schema.user.id, event.userId), eq(schema.user.isDisabled, false)))
           .limit(1)
         if (!activeUser) return
         server.publish(topic, JSON.stringify(event.data))
@@ -458,12 +429,7 @@ export async function bridgeSubmissionEvents(
       const [activeUser] = await db
         .select({ id: schema.user.id })
         .from(schema.user)
-        .where(
-          and(
-            eq(schema.user.id, event.userId),
-            eq(schema.user.isDisabled, false),
-          ),
-        )
+        .where(and(eq(schema.user.id, event.userId), eq(schema.user.isDisabled, false)))
         .limit(1)
       if (!activeUser) return
       server.publish(topic, JSON.stringify(event.data))

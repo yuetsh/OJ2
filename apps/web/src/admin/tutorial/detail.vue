@@ -80,18 +80,10 @@ onMounted(init)
       <n-input class="contestTitle" v-model:value="tutorial.title" />
     </n-form-item>
     <n-form-item label="语言">
-      <n-select
-        v-model:value="tutorial.type"
-        :options="typeOptions"
-        class="select"
-      />
+      <n-select v-model:value="tutorial.type" :options="typeOptions" class="select" />
     </n-form-item>
     <n-form-item label="顺序">
-      <n-input-number
-        style="width: 100px"
-        v-model:value="tutorial.order"
-        :min="0"
-      />
+      <n-input-number style="width: 100px" v-model:value="tutorial.order" :min="0" />
     </n-form-item>
     <n-form-item label="可见">
       <n-switch v-model:value="tutorial.isPublic" />

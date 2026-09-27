@@ -20,20 +20,8 @@ const kind = computed(() => {
 </script>
 
 <template>
-  <img
-    v-if="kind === 'image'"
-    :src="icon"
-    :width="size"
-    :height="size"
-    class="image"
-    alt=""
-  />
-  <Icon
-    v-else-if="kind === 'iconify'"
-    :icon="icon"
-    :width="size"
-    :height="size"
-  />
+  <img v-if="kind === 'image'" :src="icon" :width="size" :height="size" class="image" alt="" />
+  <Icon v-else-if="kind === 'iconify'" :icon="icon" :width="size" :height="size" />
   <span v-else class="fallback" :style="{ fontSize: `${size}px` }">
     {{ icon }}
   </span>

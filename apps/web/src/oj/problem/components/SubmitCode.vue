@@ -14,20 +14,13 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
 import { useCollabStore } from "shared/store/collab"
 import { restartEditTrace, snapshotEditTrace } from "oj/problem/utils/editTrace"
-import {
-  checkPythonSyntax,
-  prefetchPythonSyntaxChecker,
-} from "oj/problem/utils/pythonSyntaxCheck"
+import { checkPythonSyntax, prefetchPythonSyntaxChecker } from "oj/problem/utils/pythonSyntaxCheck"
 
 // ==================== 异步组件 ====================
-const ProblemReaction = defineAsyncComponent(
-  () => import("./ProblemReaction.vue"),
-)
+const ProblemReaction = defineAsyncComponent(() => import("./ProblemReaction.vue"))
 // 结果面板第一次弹出（也就是第一次提交）时才加载：它带着 DataTable，而判题要等
 // 好几秒，这点下载时间藏得住。进页面就加载的话，只看题不提交的人也要付这笔
-const SubmissionResult = defineAsyncComponent(
-  () => import("./SubmissionResult.vue"),
-)
+const SubmissionResult = defineAsyncComponent(() => import("./SubmissionResult.vue"))
 
 // ==================== 基础状态 ====================
 const userStore = useUserStore()
@@ -53,8 +46,7 @@ const { isDesktop } = useBreakpoints()
 const { celebrate } = useFireworks()
 
 // ==================== 判题监控 ====================
-const { submission, judging, pending, submitting, startMonitoring } =
-  useSubmissionMonitor()
+const { submission, judging, pending, submitting, startMonitoring } = useSubmissionMonitor()
 
 const showResult = ref(false)
 const isFormatting = ref(false)
@@ -68,8 +60,7 @@ watch(
   () => codeStore.code.language === "Python" && userStore.isAuthed,
   (needed) => {
     if (!needed) return
-    if ("requestIdleCallback" in window)
-      requestIdleCallback(prefetchPythonSyntaxChecker)
+    if ("requestIdleCallback" in window) requestIdleCallback(prefetchPythonSyntaxChecker)
     else setTimeout(prefetchPythonSyntaxChecker, 1000)
   },
   { immediate: true },
@@ -162,8 +153,7 @@ async function submit() {
     code: codeStore.code.value,
     // 编辑过程信号，见 utils/editTrace.ts。协作的判断和 ProblemEditor 的 collabHere 同一个口径
     trace: snapshotEditTrace(
-      collabStore.room !== null &&
-        collabStore.room.problemId === problem.value!._id,
+      collabStore.room !== null && collabStore.room.problemId === problem.value!._id,
     ),
   }
   if (contestID) {
@@ -219,11 +209,7 @@ watch(
 watch(
   () => submission.value?.result,
   async (result) => {
-    if (
-      result !== SubmissionStatus.accepted &&
-      result !== SubmissionStatus.ast_check_failed
-    )
-      return
+    if (result !== SubmissionStatus.accepted && result !== SubmissionStatus.ast_check_failed) return
 
     // 1. 刷新题目状态
     problem.value!.myStatus = 0

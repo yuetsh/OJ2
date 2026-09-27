@@ -53,9 +53,7 @@ export function useCache(
     if (storedData.value.nodes?.length || storedData.value.edges?.length) {
       nodes.value = storedData.value.nodes
       edges.value = storedData.value.edges
-      lastSaved.value = storedData.value.timestamp
-        ? new Date(storedData.value.timestamp)
-        : null
+      lastSaved.value = storedData.value.timestamp ? new Date(storedData.value.timestamp) : null
       hasUnsavedChanges.value = false
       return true
     }

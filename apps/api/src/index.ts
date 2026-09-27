@@ -45,10 +45,7 @@ app.route("/api/admin", adminRoutes)
 
 app.onError((error, c) => {
   console.error(error)
-  return c.json(
-    { error: { code: "internal-error", message: "Internal server error" } },
-    500,
-  )
+  return c.json({ error: { code: "internal-error", message: "Internal server error" } }, 500)
 })
 
 /** 头像取不到时的占位图，避免每个没设头像的学生都打一次 404 */
@@ -64,11 +61,7 @@ const DEFAULT_AVATAR_SVG =
  * 生产环境这些请求也走后端（Caddy 把 /public/* 整段反代过来），不让 Caddy 直接读盘：
  * 这样开发（Vite 代理）和生产是同一条代码路径，少一处只在服务器上才出错的差异。
  */
-async function serveUpload(
-  pathname: string,
-  prefix: string,
-  directory: string,
-) {
+async function serveUpload(pathname: string, prefix: string, directory: string) {
   const decoded = decodeURIComponent(pathname)
   const filename = basename(decoded)
   if (!filename || filename !== decoded.slice(prefix.length + 1)) {
@@ -99,11 +92,7 @@ const server = Bun.serve<SubmissionSocketData>({
   async fetch(request, bunServer) {
     const url = new URL(request.url)
     if (url.pathname.startsWith(`${config.avatarUriPrefix}/`)) {
-      const hit = await serveUpload(
-        url.pathname,
-        config.avatarUriPrefix,
-        config.avatarDirectory,
-      )
+      const hit = await serveUpload(url.pathname, config.avatarUriPrefix, config.avatarDirectory)
       if (hit) return hit
       if (basename(decodeURIComponent(url.pathname)) === "default.png") {
         return new Response(DEFAULT_AVATAR_SVG, {
@@ -119,11 +108,8 @@ const server = Bun.serve<SubmissionSocketData>({
     // 但没有任何路由伺服它，题面图片一律 404。
     if (url.pathname.startsWith(`${config.uploadUriPrefix}/`)) {
       return (
-        (await serveUpload(
-          url.pathname,
-          config.uploadUriPrefix,
-          config.uploadDirectory,
-        )) ?? new Response("Not found", { status: 404 })
+        (await serveUpload(url.pathname, config.uploadUriPrefix, config.uploadDirectory)) ??
+        new Response("Not found", { status: 404 })
       )
     }
     if (

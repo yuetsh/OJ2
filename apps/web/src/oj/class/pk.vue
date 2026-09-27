@@ -67,9 +67,7 @@ const timeRangeOptions: SelectOption[] = [
 ]
 
 // 「全部时间」的 value 是空串，解不出来就是 null —— 正是不带时间条件的意思
-const subOptions = computed<Duration | null>(() =>
-  durationFromValue(duration.value),
-)
+const subOptions = computed<Duration | null>(() => durationFromValue(duration.value))
 
 // 根据时间段选项计算开始和结束时间
 function getTimeRange(): {
@@ -121,8 +119,7 @@ async function compare() {
 
 async function analyzeWithAI() {
   const timeRangeLabel =
-    timeRangeOptions.find((o) => o.value === duration.value)?.label ??
-    "全部时间"
+    timeRangeOptions.find((o) => o.value === duration.value)?.label ?? "全部时间"
 
   showAIModal.value = true
   aiContent.value = ""
@@ -208,14 +205,7 @@ const radarChartData = computed(() => {
     return ((value - min) / (max - min)) * 100
   }
 
-  const metrics = [
-    "总AC数",
-    "平均AC数",
-    "中位数AC数",
-    "优秀率",
-    "及格率",
-    "参与度",
-  ]
+  const metrics = ["总AC数", "平均AC数", "中位数AC数", "优秀率", "及格率", "参与度"]
 
   // 计算每个指标的最大最小值
   const maxValues = [
@@ -238,14 +228,7 @@ const radarChartData = computed(() => {
 
   const datasets = comparisons.value.map((c, index) => {
     const color = getClassColor(index)
-    const rawData = [
-      c.totalAc,
-      c.avgAc,
-      c.medianAc,
-      c.excellentRate,
-      c.passRate,
-      c.activeRate,
-    ]
+    const rawData = [c.totalAc, c.avgAc, c.medianAc, c.excellentRate, c.passRate, c.activeRate]
     return {
       label: c.className,
       data: [
@@ -360,86 +343,55 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
   {
     title: "班级",
     key: "class_name",
-    render: (row) =>
-      `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
+    render: (row) => `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
     width: 160,
   },
   {
     title: "人数",
     key: "user_count",
     width: 80,
-    render: (row) =>
-      h(
-        "span",
-        { style: { color: "#1890ff", fontWeight: "600" } },
-        row.userCount,
-      ),
+    render: (row) => h("span", { style: { color: "#1890ff", fontWeight: "600" } }, row.userCount),
   },
   {
     title: "总AC数",
     key: "total_ac",
     width: 100,
-    render: (row) =>
-      h(
-        "span",
-        { style: { color: "#ff4d4f", fontWeight: "600" } },
-        row.totalAc,
-      ),
+    render: (row) => h("span", { style: { color: "#ff4d4f", fontWeight: "600" } }, row.totalAc),
   },
   {
     title: "平均AC",
     key: "avg_ac",
     width: 100,
     render: (row) =>
-      h(
-        "span",
-        { style: { color: "#52c41a", fontWeight: "600" } },
-        row.avgAc.toFixed(2),
-      ),
+      h("span", { style: { color: "#52c41a", fontWeight: "600" } }, row.avgAc.toFixed(2)),
   },
   {
     title: "中位数AC",
     key: "median_ac",
     width: 100,
     render: (row) =>
-      h(
-        "span",
-        { style: { color: "#fa8c16", fontWeight: "600" } },
-        row.medianAc.toFixed(2),
-      ),
+      h("span", { style: { color: "#fa8c16", fontWeight: "600" } }, row.medianAc.toFixed(2)),
   },
   {
     title: "前10%均值",
     key: "top10_avg",
     width: 100,
     render: (row) =>
-      h(
-        "span",
-        { style: { color: "#cf1322", fontWeight: "600" } },
-        row.top10Avg.toFixed(2),
-      ),
+      h("span", { style: { color: "#cf1322", fontWeight: "600" } }, row.top10Avg.toFixed(2)),
   },
   {
     title: "中间80%均值",
     key: "middle80_avg",
     width: 110,
     render: (row) =>
-      h(
-        "span",
-        { style: { color: "#389e0d", fontWeight: "600" } },
-        row.middle80Avg.toFixed(2),
-      ),
+      h("span", { style: { color: "#389e0d", fontWeight: "600" } }, row.middle80Avg.toFixed(2)),
   },
   {
     title: "后10%均值",
     key: "bottom10_avg",
     width: 100,
     render: (row) =>
-      h(
-        "span",
-        { style: { color: "#096dd9", fontWeight: "500" } },
-        row.bottom10Avg.toFixed(2),
-      ),
+      h("span", { style: { color: "#096dd9", fontWeight: "500" } }, row.bottom10Avg.toFixed(2)),
   },
   {
     title: "优秀率",
@@ -457,11 +409,7 @@ const tableColumns: DataTableColumn<ClassComparison>[] = [
     key: "pass_rate",
     width: 100,
     render: (row) =>
-      h(
-        "span",
-        { style: { color: "#52c41a", fontWeight: "600" } },
-        row.passRate.toFixed(1) + "%",
-      ),
+      h("span", { style: { color: "#52c41a", fontWeight: "600" } }, row.passRate.toFixed(1) + "%"),
   },
   {
     title: "参与度",
@@ -527,10 +475,7 @@ const radarChartOptions = {
       <n-h2 style="margin-bottom: 0">班级PK</n-h2>
 
       <n-flex :wrap="false" align="flex-start" :size="16">
-        <n-form-item
-          label="选择班级（至少2个）"
-          style="width: 300px; margin-bottom: 0"
-        >
+        <n-form-item label="选择班级（至少2个）" style="width: 300px; margin-bottom: 0">
           <n-select
             v-model:value="selectedClasses"
             :options="classOptions"
@@ -539,10 +484,7 @@ const radarChartOptions = {
           />
         </n-form-item>
 
-        <n-form-item
-          label="时间段（可选）"
-          style="width: 200px; margin-bottom: 0"
-        >
+        <n-form-item label="时间段（可选）" style="width: 200px; margin-bottom: 0">
           <n-select
             v-model:value="duration"
             :options="timeRangeOptions"
@@ -552,12 +494,7 @@ const radarChartOptions = {
           />
         </n-form-item>
 
-        <n-button
-          type="primary"
-          @click="compare"
-          :loading="loading"
-          style="margin-top: 26px"
-        >
+        <n-button type="primary" @click="compare" :loading="loading" style="margin-top: 26px">
           开始PK
         </n-button>
         <n-button
@@ -644,10 +581,7 @@ const radarChartOptions = {
                     class="stat-avg-ac"
                   >
                     <template #suffix>
-                      <Icon
-                        icon="streamline-ultimate-color:analytics-pie-2"
-                        width="20"
-                      />
+                      <Icon icon="streamline-ultimate-color:analytics-pie-2" width="20" />
                     </template>
                   </n-statistic>
                 </n-gi>
@@ -659,10 +593,7 @@ const radarChartOptions = {
                     class="stat-median-ac"
                   >
                     <template #suffix>
-                      <Icon
-                        icon="streamline-ultimate-color:cursor-target-1"
-                        width="20"
-                      />
+                      <Icon icon="streamline-ultimate-color:cursor-target-1" width="20" />
                     </template>
                   </n-statistic>
                 </n-gi>
@@ -674,10 +605,7 @@ const radarChartOptions = {
                     class="stat-total-submission"
                   >
                     <template #suffix>
-                      <Icon
-                        icon="streamline-ultimate-color:common-file-text"
-                        width="20"
-                      />
+                      <Icon icon="streamline-ultimate-color:common-file-text" width="20" />
                     </template>
                   </n-statistic>
                 </n-gi>
@@ -698,12 +626,7 @@ const radarChartOptions = {
               <n-divider style="margin: 12px 0" />
 
               <!-- 详细统计 - 紧凑布局，统一格式 -->
-              <n-descriptions
-                bordered
-                :column="2"
-                size="small"
-                label-placement="left"
-              >
+              <n-descriptions bordered :column="2" size="small" label-placement="left">
                 <!-- 分位数统计 -->
                 <n-descriptions-item label="第一四分位数(Q1)">
                   <span style="color: #9254de; font-weight: 500">{{
@@ -745,19 +668,12 @@ const radarChartOptions = {
 
                 <!-- 人数 -->
                 <n-descriptions-item label="人数">
-                  <span style="color: #1890ff; font-weight: 600">{{
-                    classData.userCount
-                  }}</span>
+                  <span style="color: #1890ff; font-weight: 600">{{ classData.userCount }}</span>
                 </n-descriptions-item>
               </n-descriptions>
 
               <!-- 比率统计 - 使用进度条图表 -->
-              <n-card
-                size="small"
-                title="比率统计"
-                embedded
-                style="margin-top: 12px"
-              >
+              <n-card size="small" title="比率统计" embedded style="margin-top: 12px">
                 <n-space vertical :size="10">
                   <n-progress
                     type="line"
@@ -776,9 +692,7 @@ const radarChartOptions = {
                     :border-radius="4"
                     status="success"
                   >
-                    <template #default>
-                      及格率: {{ classData.passRate.toFixed(1) }}%
-                    </template>
+                    <template #default> 及格率: {{ classData.passRate.toFixed(1) }}% </template>
                   </n-progress>
                   <n-progress
                     type="line"
@@ -787,17 +701,13 @@ const radarChartOptions = {
                     :border-radius="4"
                     status="info"
                   >
-                    <template #default>
-                      参与度: {{ classData.activeRate.toFixed(1) }}%
-                    </template>
+                    <template #default> 参与度: {{ classData.activeRate.toFixed(1) }}% </template>
                   </n-progress>
                 </n-space>
               </n-card>
 
               <!-- 时间段统计（如果有） -->
-              <template
-                v-if="hasTimeRange && classData.recentTotalAc !== undefined"
-              >
+              <template v-if="hasTimeRange && classData.recentTotalAc !== undefined">
                 <n-descriptions
                   bordered
                   :column="2"
@@ -855,11 +765,7 @@ const radarChartOptions = {
           <n-gi>
             <n-card title="多维度综合对比" style="height: 100%">
               <div style="height: 380px">
-                <Radar
-                  v-if="radarChartData"
-                  :data="radarChartData"
-                  :options="radarChartOptions"
-                />
+                <Radar v-if="radarChartData" :data="radarChartData" :options="radarChartOptions" />
               </div>
             </n-card>
           </n-gi>
@@ -870,29 +776,17 @@ const radarChartOptions = {
           <n-grid :cols="3" :x-gap="16" :y-gap="16">
             <n-gi>
               <div style="height: 300px">
-                <Bar
-                  v-if="totalAcChartData"
-                  :data="totalAcChartData"
-                  :options="chartOptions"
-                />
+                <Bar v-if="totalAcChartData" :data="totalAcChartData" :options="chartOptions" />
               </div>
             </n-gi>
             <n-gi>
               <div style="height: 300px">
-                <Bar
-                  v-if="avgAcChartData"
-                  :data="avgAcChartData"
-                  :options="chartOptions"
-                />
+                <Bar v-if="avgAcChartData" :data="avgAcChartData" :options="chartOptions" />
               </div>
             </n-gi>
             <n-gi>
               <div style="height: 300px">
-                <Bar
-                  v-if="medianAcChartData"
-                  :data="medianAcChartData"
-                  :options="chartOptions"
-                />
+                <Bar v-if="medianAcChartData" :data="medianAcChartData" :options="chartOptions" />
               </div>
             </n-gi>
           </n-grid>
@@ -912,11 +806,7 @@ const radarChartOptions = {
             </n-gi>
             <n-gi>
               <div style="height: 300px">
-                <Bar
-                  v-if="passRateChartData"
-                  :data="passRateChartData"
-                  :options="chartOptions"
-                />
+                <Bar v-if="passRateChartData" :data="passRateChartData" :options="chartOptions" />
               </div>
             </n-gi>
             <n-gi>
@@ -936,11 +826,7 @@ const radarChartOptions = {
           <n-grid :cols="3" :x-gap="16" :y-gap="16">
             <n-gi>
               <div style="height: 300px">
-                <Bar
-                  v-if="top10AvgChartData"
-                  :data="top10AvgChartData"
-                  :options="chartOptions"
-                />
+                <Bar v-if="top10AvgChartData" :data="top10AvgChartData" :options="chartOptions" />
               </div>
             </n-gi>
             <n-gi>
@@ -966,11 +852,7 @@ const radarChartOptions = {
       </template>
 
       <!-- 对比表格 -->
-      <n-card
-        v-if="comparisons.length > 0"
-        title="对比表格"
-        style="margin-top: 20px"
-      >
+      <n-card v-if="comparisons.length > 0" title="对比表格" style="margin-top: 20px">
         <n-data-table :data="comparisons" :columns="tableColumns" />
       </n-card>
     </n-flex>

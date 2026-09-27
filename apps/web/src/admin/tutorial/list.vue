@@ -54,8 +54,7 @@ const columns: DataTableColumn<TutorialListItem>[] = [
     title: "操作",
     key: "actions",
     width: 140,
-    render: (row) =>
-      h(Actions, { tutorialID: row.id, onDeleted: listTutorials }),
+    render: (row) => h(Actions, { tutorialID: row.id, onDeleted: listTutorials }),
   },
 ]
 
@@ -80,10 +79,7 @@ onMounted(listTutorials)
 <template>
   <n-flex align="center" class="titleWrapper">
     <h2 class="title">教程列表</h2>
-    <n-button
-      type="primary"
-      @click="$router.push({ name: 'admin tutorial create' })"
-    >
+    <n-button type="primary" @click="$router.push({ name: 'admin tutorial create' })">
       新建
     </n-button>
   </n-flex>

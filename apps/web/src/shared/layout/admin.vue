@@ -22,8 +22,7 @@ const options = computed<MenuOption[]>(() => {
   // Student Admin: only problems
   if (userStore.isStudentAdmin) {
     baseOptions.push({
-      label: () =>
-        h(RouterLink, { to: "/admin/problem/list" }, { default: () => "题目" }),
+      label: () => h(RouterLink, { to: "/admin/problem/list" }, { default: () => "题目" }),
       key: "admin problem list",
     })
   }
@@ -32,40 +31,23 @@ const options = computed<MenuOption[]>(() => {
   if (userStore.isTeacherAdmin) {
     baseOptions.push(
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/problem/list" },
-            { default: () => "题目" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/problem/list" }, { default: () => "题目" }),
         key: "admin problem list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/contest/list" },
-            { default: () => "比赛" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/contest/list" }, { default: () => "比赛" }),
         key: "admin contest list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/problemset/list" },
-            { default: () => "题单" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/problemset/list" }, { default: () => "题单" }),
         key: "admin problemset list",
       },
       {
-        label: () =>
-          h(RouterLink, { to: "/admin/ai/reports" }, { default: () => "报告" }),
+        label: () => h(RouterLink, { to: "/admin/ai/reports" }, { default: () => "报告" }),
         key: "admin ai reports",
       },
       {
-        label: () =>
-          h(RouterLink, { to: "/admin/learn" }, { default: () => "自学" }),
+        label: () => h(RouterLink, { to: "/admin/learn" }, { default: () => "自学" }),
         key: "admin learn analytics",
       },
     )
@@ -79,77 +61,43 @@ const options = computed<MenuOption[]>(() => {
         key: "admin home",
       },
       {
-        label: () =>
-          h(RouterLink, { to: "/admin/config" }, { default: () => "设置" }),
+        label: () => h(RouterLink, { to: "/admin/config" }, { default: () => "设置" }),
         key: "admin config",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/problem/list" },
-            { default: () => "题目" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/problem/list" }, { default: () => "题目" }),
         key: "admin problem list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/contest/list" },
-            { default: () => "比赛" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/contest/list" }, { default: () => "比赛" }),
         key: "admin contest list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/problemset/list" },
-            { default: () => "题单" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/problemset/list" }, { default: () => "题单" }),
         key: "admin problemset list",
       },
       {
-        label: () =>
-          h(RouterLink, { to: "/admin/user/list" }, { default: () => "用户" }),
+        label: () => h(RouterLink, { to: "/admin/user/list" }, { default: () => "用户" }),
         key: "admin user list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/announcement/list" },
-            { default: () => "公告" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/announcement/list" }, { default: () => "公告" }),
         key: "admin announcement list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/tutorial/list" },
-            { default: () => "教程" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/tutorial/list" }, { default: () => "教程" }),
         key: "admin tutorial list",
       },
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: "/admin/achievement/list" },
-            { default: () => "成就" },
-          ),
+        label: () => h(RouterLink, { to: "/admin/achievement/list" }, { default: () => "成就" }),
         key: "admin achievement list",
       },
       {
-        label: () =>
-          h(RouterLink, { to: "/admin/ai/reports" }, { default: () => "报告" }),
+        label: () => h(RouterLink, { to: "/admin/ai/reports" }, { default: () => "报告" }),
         key: "admin ai reports",
       },
       {
-        label: () =>
-          h(RouterLink, { to: "/admin/learn" }, { default: () => "自学" }),
+        label: () => h(RouterLink, { to: "/admin/learn" }, { default: () => "自学" }),
         key: "admin learn analytics",
       },
     )

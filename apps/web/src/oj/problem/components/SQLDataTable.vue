@@ -30,9 +30,7 @@ defineProps<{
       </tr>
     </tbody>
   </n-table>
-  <p v-if="truncated" class="truncNote">
-    共 {{ totalRows }} 行，仅展示前 {{ rows.length }} 行
-  </p>
+  <p v-if="truncated" class="truncNote">共 {{ totalRows }} 行，仅展示前 {{ rows.length }} 行</p>
 </template>
 
 <style scoped>

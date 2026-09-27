@@ -28,9 +28,7 @@ const emit = defineEmits<Emits>()
 const badgeName = ref("")
 const badgeDescription = ref("")
 const badgeIcon = ref("")
-const badgeConditionType = ref<"all_problems" | "problem_count" | "score">(
-  "all_problems",
-)
+const badgeConditionType = ref<"all_problems" | "problem_count" | "score">("all_problems")
 const badgeConditionValue = ref(1)
 
 // 预设奖章图标选项
@@ -99,12 +97,7 @@ watch(
         <n-input v-model:value="badgeName" placeholder="请输入奖章名称" />
       </n-form-item>
       <n-form-item label="描述">
-        <n-input
-          v-model:value="badgeDescription"
-          type="textarea"
-          placeholder="奖章描述"
-          required
-        />
+        <n-input v-model:value="badgeDescription" type="textarea" placeholder="奖章描述" required />
       </n-form-item>
       <n-form-item label="图标" required>
         <n-flex align="center" gap="small">
@@ -115,17 +108,13 @@ watch(
             :style="{
               width: '60px',
               height: '60px',
-              border:
-                badgeIcon === option.value
-                  ? '2px solid #1890ff'
-                  : '1px solid #d9d9d9',
+              border: badgeIcon === option.value ? '2px solid #1890ff' : '1px solid #d9d9d9',
               borderRadius: '4px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor:
-                badgeIcon === option.value ? '#f0f8ff' : 'transparent',
+              backgroundColor: badgeIcon === option.value ? '#f0f8ff' : 'transparent',
             }"
           >
             <n-image
@@ -147,10 +136,7 @@ watch(
             :options="conditionTypeOptions"
           />
         </n-form-item>
-        <n-form-item
-          label="条件值"
-          v-if="badgeConditionType !== 'all_problems'"
-        >
+        <n-form-item label="条件值" v-if="badgeConditionType !== 'all_problems'">
           <n-input-number
             style="width: 120px"
             v-model:value="badgeConditionValue"

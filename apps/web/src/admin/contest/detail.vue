@@ -134,26 +134,14 @@ onMounted(getContestDetail)
       <n-input style="width: 300px" v-model:value="contest.title" />
     </n-form-item>
     <n-form-item label="标签">
-      <n-select
-        style="width: 100px"
-        :options="tags"
-        v-model:value="contest.tag"
-      />
+      <n-select style="width: 100px" :options="tags" v-model:value="contest.tag" />
     </n-form-item>
     <template v-if="props.contestID">
       <n-form-item label="开始">
-        <n-date-picker
-          style="width: 200px"
-          v-model:value="startTime"
-          type="datetime"
-        />
+        <n-date-picker style="width: 200px" v-model:value="startTime" type="datetime" />
       </n-form-item>
       <n-form-item label="结束">
-        <n-date-picker
-          style="width: 200px"
-          v-model:value="endTime"
-          type="datetime"
-        />
+        <n-date-picker style="width: 200px" v-model:value="endTime" type="datetime" />
       </n-form-item>
     </template>
     <template v-else>
@@ -161,11 +149,7 @@ onMounted(getContestDetail)
         <n-input-number style="width: 120px" v-model:value="waitMins" />
       </n-form-item>
       <n-form-item label="比赛时长">
-        <n-input-number
-          style="width: 120px"
-          step="5"
-          v-model:value="durationMins"
-        />
+        <n-input-number style="width: 120px" step="5" v-model:value="durationMins" />
       </n-form-item>
     </template>
     <n-form-item label="密码">
@@ -175,12 +159,7 @@ onMounted(getContestDetail)
       <n-switch v-model:value="contest.visible" />
     </n-form-item>
   </n-form>
-  <TextEditor
-    v-if="ready"
-    title="描述"
-    v-model:value="contest.description"
-    :min-height="200"
-  />
+  <TextEditor v-if="ready" title="描述" v-model:value="contest.description" :min-height="200" />
   <n-flex style="margin-bottom: 100px" justify="end">
     <n-button type="primary" @click="submit">保存</n-button>
   </n-flex>

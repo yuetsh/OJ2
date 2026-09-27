@@ -27,15 +27,9 @@ export const redis = withErrorLogging(
 )
 
 export function createBlockingRedis() {
-  return withErrorLogging(
-    new Redis(config.redisUrl, { maxRetriesPerRequest: null }),
-    "blocking",
-  )
+  return withErrorLogging(new Redis(config.redisUrl, { maxRetriesPerRequest: null }), "blocking")
 }
 
 export function createSubscriberRedis() {
-  return withErrorLogging(
-    new Redis(config.redisUrl, { maxRetriesPerRequest: null }),
-    "subscriber",
-  )
+  return withErrorLogging(new Redis(config.redisUrl, { maxRetriesPerRequest: null }), "subscriber")
 }

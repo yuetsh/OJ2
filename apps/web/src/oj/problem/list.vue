@@ -122,14 +122,7 @@ watchDebounced(() => query.keyword, listProblems, {
 
 // 监听其他查询条件变化
 watch(
-  () => [
-    query.tag,
-    query.difficulty,
-    query.limit,
-    query.page,
-    query.author,
-    query.sort,
-  ],
+  () => [query.tag, query.difficulty, query.limit, query.page, query.author, query.sort],
   listProblems,
 )
 
@@ -174,18 +167,12 @@ const baseColumns: DataTableColumn<ProblemRow>[] = [
     render: (row) => h(ProblemStatus, { status: row.status }),
   },
   {
-    title: renderTableTitle(
-      "编号",
-      "streamline-ultimate-color:board-game-dice-1",
-    ),
+    title: renderTableTitle("编号", "streamline-ultimate-color:board-game-dice-1"),
     key: "_id",
     width: 100,
   },
   {
-    title: renderTableTitle(
-      "题目",
-      "streamline-ultimate-color:fruit-watermelon",
-    ),
+    title: renderTableTitle("题目", "streamline-ultimate-color:fruit-watermelon"),
     key: "title",
     minWidth: 200,
     render: (row) => h(ProblemListTitle, { problem: row }),
@@ -195,16 +182,13 @@ const baseColumns: DataTableColumn<ProblemRow>[] = [
     key: "difficulty",
     width: 100,
     render: (row) =>
-      row.difficulty
-        ? h(NTag, { type: getTagColor(row.difficulty) }, () => row.difficulty)
-        : null,
+      row.difficulty ? h(NTag, { type: getTagColor(row.difficulty) }, () => row.difficulty) : null,
   },
   {
     title: renderTableTitle("标签", "streamline-ultimate-color:attachment"),
     key: "tags",
     width: 260,
-    render: (row) =>
-      h(NFlex, () => row.tags.map((t) => h(NTag, { key: t }, () => t))),
+    render: (row) => h(NFlex, () => row.tags.map((t) => h(NTag, { key: t }, () => t))),
   },
   {
     title: renderTableTitle("出题者", "streamline-emojis:man-raising-hand-2"),
@@ -226,9 +210,7 @@ const baseColumns: DataTableColumn<ProblemRow>[] = [
 ]
 
 const columns = computed(() =>
-  userStore.isAuthed
-    ? baseColumns
-    : baseColumns.filter((c: any) => c.key !== "status"),
+  userStore.isAuthed ? baseColumns : baseColumns.filter((c: any) => c.key !== "status"),
 )
 
 function rowProps(row: ProblemRow) {
@@ -280,11 +262,7 @@ function rowProps(row: ProblemRow) {
             <n-button @click="clearQuery" quaternary>重置</n-button>
           </n-form-item>
           <n-form-item>
-            <n-button
-              @click="toggleShowTag()"
-              quaternary
-              icon-placement="right"
-            >
+            <n-button @click="toggleShowTag()" quaternary icon-placement="right">
               <template #icon>
                 <Icon v-if="showTag" icon="ph:caret-down"></Icon>
                 <Icon v-else icon="ph:caret-up"></Icon>
@@ -310,18 +288,9 @@ function rowProps(row: ProblemRow) {
         </n-tag>
       </n-flex>
     </n-collapse-transition>
-    <n-data-table
-      :bordered="false"
-      :data="problems"
-      :columns="columns"
-      :row-props="rowProps"
-    />
+    <n-data-table :bordered="false" :data="problems" :columns="columns" :row-props="rowProps" />
   </n-flex>
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
 <style scoped>

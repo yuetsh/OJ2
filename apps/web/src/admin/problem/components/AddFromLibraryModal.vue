@@ -73,18 +73,9 @@ watchDebounced(
     title="从题库中添加"
     @close="$emit('update:show', false)"
   >
-    <n-input
-      class="search"
-      v-model:value="query.keyword"
-      clearable
-      placeholder="搜索标题或编号"
-    />
+    <n-input class="search" v-model:value="query.keyword" clearable placeholder="搜索标题或编号" />
     <n-data-table striped :columns="columns" :data="problems" />
-    <Pagination
-      :total="total"
-      v-model:limit="query.limit"
-      v-model:page="query.page"
-    />
+    <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   </n-modal>
 </template>
 <style scoped>

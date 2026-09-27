@@ -51,13 +51,9 @@ loadRepoRootEnv()
  * 空字符串一律按「没设」处理 —— compose 里 `${X:-}` 展开出来就是空串。
  */
 const blankAsUnset = (value: unknown) => (value === "" ? undefined : value)
-const text = (fallback: string) =>
-  z.preprocess(blankAsUnset, z.string().default(fallback))
+const text = (fallback: string) => z.preprocess(blankAsUnset, z.string().default(fallback))
 const positiveInt = (fallback: number) =>
-  z.preprocess(
-    blankAsUnset,
-    z.coerce.number().int().positive().default(fallback),
-  )
+  z.preprocess(blankAsUnset, z.coerce.number().int().positive().default(fallback))
 const requiredWhenCompiled = (devDefault: string) =>
   isCompiled
     ? z.preprocess(blankAsUnset, z.string({ error: "编译形态下必须设置" }))
@@ -70,10 +66,7 @@ const envSchema = z.object({
   ),
   REDIS_URL: requiredWhenCompiled("redis://localhost:6380"),
   SESSION_TTL_SECONDS: positiveInt(7 * 24 * 60 * 60),
-  COOKIE_SECURE: z.preprocess(
-    blankAsUnset,
-    z.enum(["true", "false"]).optional(),
-  ),
+  COOKIE_SECURE: z.preprocess(blankAsUnset, z.enum(["true", "false"]).optional()),
   JUDGE_SERVER_URL: text("http://localhost:8081"),
   // dev 不设时生成一次性随机值，见 judgeServerToken()
   JUDGE_SERVER_TOKEN: isCompiled
@@ -87,10 +80,7 @@ const envSchema = z.object({
   ALLOWED_WS_ORIGINS: text(""),
   UPLOAD_URI_PREFIX: text("/public/upload"),
   AVATAR_URI_PREFIX: text("/public/avatar"),
-  AI_BASE_URL: z.preprocess(
-    blankAsUnset,
-    z.url().default("https://api.deepseek.com"),
-  ),
+  AI_BASE_URL: z.preprocess(blankAsUnset, z.url().default("https://api.deepseek.com")),
   AI_PROVIDER: text("deepseek"),
   AI_KEY: text(""),
   AI_MODEL: text("deepseek-flash"),
@@ -104,9 +94,7 @@ function parseEnv() {
   if (parsed.success) return parsed.data
   console.error(
     "[config] 环境变量有误，拒绝启动：\n" +
-      parsed.error.issues
-        .map((issue) => `  ${issue.path.join(".")}: ${issue.message}`)
-        .join("\n"),
+      parsed.error.issues.map((issue) => `  ${issue.path.join(".")}: ${issue.message}`).join("\n"),
   )
   process.exit(1)
 }

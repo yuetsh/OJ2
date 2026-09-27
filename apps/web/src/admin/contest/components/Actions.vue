@@ -45,15 +45,9 @@ async function clone() {
 </script>
 <template>
   <n-flex>
-    <n-button size="small" type="primary" secondary @click="goEditProblems">
-      题目
-    </n-button>
-    <n-button size="small" type="warning" secondary @click="goACMHelper">
-      审核
-    </n-button>
-    <n-button size="small" type="info" secondary @click="goEdit">
-      编辑
-    </n-button>
+    <n-button size="small" type="primary" secondary @click="goEditProblems"> 题目 </n-button>
+    <n-button size="small" type="warning" secondary @click="goACMHelper"> 审核 </n-button>
+    <n-button size="small" type="info" secondary @click="goEdit"> 编辑 </n-button>
     <n-button size="small" secondary @click="clone"> 复制 </n-button>
   </n-flex>
 </template>

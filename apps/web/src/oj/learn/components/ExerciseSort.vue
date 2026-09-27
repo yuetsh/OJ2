@@ -17,9 +17,7 @@ const lines = ref<LineItem[]>([])
 const submitted = ref(false)
 
 function init() {
-  const shuffled = shuffle(
-    data.value.lines.map((text, idx) => ({ originalIdx: idx, text })),
-  )
+  const shuffled = shuffle(data.value.lines.map((text, idx) => ({ originalIdx: idx, text })))
   // 打乱后若恰好与原顺序一致，交换前两项，避免一进入就是已解出状态
   const isCorrect = shuffled.every((item, i) => item.originalIdx === i)
   if (isCorrect && shuffled.length > 1) {
@@ -53,9 +51,7 @@ function lineStatus(idx: number): "correct" | "wrong" | "default" {
   return lines.value[idx].originalIdx === idx ? "correct" : "wrong"
 }
 
-const allCorrect = computed(() =>
-  lines.value.every((item, i) => item.originalIdx === i),
-)
+const allCorrect = computed(() => lines.value.every((item, i) => item.originalIdx === i))
 
 function submit() {
   submitted.value = true
@@ -70,9 +66,7 @@ function reset() {
   init()
 }
 
-const lineHtml = computed<string[]>(() =>
-  highlightLines(data.value.lines, props.lang),
-)
+const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props.lang))
 </script>
 
 <template>
@@ -130,9 +124,7 @@ const lineHtml = computed<string[]>(() =>
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="info" :disabled="submitted && allCorrect" @click="submit">
-        提交
-      </n-button>
+      <n-button type="info" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
   </n-card>

@@ -18,15 +18,7 @@ import {
 } from "chart.js"
 import type { YearlyACData } from "oj/api"
 
-ChartJS.register(
-  CategoryScale,
-  Filler,
-  LinearScale,
-  LineElement,
-  PointElement,
-  Title,
-  Tooltip,
-)
+ChartJS.register(CategoryScale, Filler, LinearScale, LineElement, PointElement, Title, Tooltip)
 
 const props = defineProps<{ data: YearlyACData[] }>()
 

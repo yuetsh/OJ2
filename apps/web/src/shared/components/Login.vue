@@ -86,9 +86,7 @@ const studentRules = computed<FormRules>(() => ({
   password: passwordRule,
 }))
 const adminRules: FormRules = {
-  username: [
-    { required: true, message: "用户名必填", trigger: ["blur", "change"] },
-  ],
+  username: [{ required: true, message: "用户名必填", trigger: ["blur", "change"] }],
   password: passwordRule,
 }
 
@@ -196,10 +194,7 @@ function onUsernamePicked() {
 function restoreLastClass() {
   if (form.value.class !== null) return
   const last = storage.get(STORAGE_KEY.LOGIN_CLASS)
-  if (
-    typeof last === "string" &&
-    classList.value.some((item) => item.value === last)
-  ) {
+  if (typeof last === "string" && classList.value.some((item) => item.value === last)) {
     form.value.class = last
   }
 }
@@ -234,12 +229,7 @@ onMounted(() => {
   >
     <n-tabs v-model:value="activeTab" @update:value="onTabChange">
       <n-tab-pane name="student" tab="学生登录">
-        <n-form
-          ref="studentRef"
-          :model="form"
-          :rules="studentRules"
-          show-require-mark
-        >
+        <n-form ref="studentRef" :model="form" :rules="studentRules" show-require-mark>
           <n-form-item label="班级" path="class">
             <n-select
               v-model:value="form.class"
@@ -250,10 +240,7 @@ onMounted(() => {
               placeholder="选择班级"
             />
           </n-form-item>
-          <n-form-item
-            :label="isClassLogin ? '姓名' : '用户名'"
-            path="username"
-          >
+          <n-form-item :label="isClassLogin ? '姓名' : '用户名'" path="username">
             <n-select
               v-if="isClassLogin"
               v-model:value="form.username"
@@ -289,9 +276,7 @@ onMounted(() => {
               @keyup.enter="submit"
             />
           </n-form-item>
-          <n-alert v-if="msg" type="error" :show-icon="false">{{
-            msg
-          }}</n-alert>
+          <n-alert v-if="msg" type="error" :show-icon="false">{{ msg }}</n-alert>
           <n-form-item>
             <n-flex style="width: 100%">
               <n-button
@@ -304,10 +289,7 @@ onMounted(() => {
               >
                 登录
               </n-button>
-              <n-button
-                v-if="configStore.config?.allowRegister"
-                @click="goSignup"
-              >
+              <n-button v-if="configStore.config?.allowRegister" @click="goSignup">
                 没有账号？立即注册
               </n-button>
             </n-flex>
@@ -320,12 +302,7 @@ onMounted(() => {
       </n-tab-pane>
 
       <n-tab-pane name="admin" tab="管理员登录">
-        <n-form
-          ref="adminRef"
-          :model="form"
-          :rules="adminRules"
-          show-require-mark
-        >
+        <n-form ref="adminRef" :model="form" :rules="adminRules" show-require-mark>
           <n-form-item label="用户名" path="username">
             <n-input
               v-model:value="form.username"
@@ -347,13 +324,9 @@ onMounted(() => {
               @keyup.enter="submit"
             />
           </n-form-item>
-          <n-alert v-if="msg" type="error" :show-icon="false">{{
-            msg
-          }}</n-alert>
+          <n-alert v-if="msg" type="error" :show-icon="false">{{ msg }}</n-alert>
           <n-form-item>
-            <n-button block type="primary" :loading="isLoading" @click="submit">
-              登录
-            </n-button>
+            <n-button block type="primary" :loading="isLoading" @click="submit"> 登录 </n-button>
           </n-form-item>
           <n-alert :show-icon="false" class="tip">
             管理员和老师从这里登录，学生请走【学生登录】页签。

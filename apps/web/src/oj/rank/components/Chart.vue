@@ -14,15 +14,7 @@ import { ChartType } from "utils/constants"
 import type { Rank } from "utils/types"
 
 // 仅注册柱状图所需的 Chart.js 组件
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Colors,
-)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, Colors)
 
 const props = defineProps<{ rankData: Rank[]; type: ChartType }>()
 

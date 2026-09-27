@@ -32,21 +32,15 @@ const columns: DataTableColumn<AdminProblemRow>[] = [
     key: "title",
     minWidth: 200,
     render: (row) =>
-      h(
-        NButton,
-        { text: true, type: "primary", onClick: () => goEdit(row) },
-        () => row.title,
-      ),
+      h(NButton, { text: true, type: "primary", onClick: () => goEdit(row) }, () => row.title),
   },
   {
     title: "可见",
     key: "visible",
     width: 80,
     render: (row) =>
-      h(
-        NTag,
-        { size: "small", type: row.visible ? "success" : "default" },
-        () => (row.visible ? "公开" : "隐藏"),
+      h(NTag, { size: "small", type: row.visible ? "success" : "default" }, () =>
+        row.visible ? "公开" : "隐藏",
       ),
   },
   {
@@ -54,25 +48,14 @@ const columns: DataTableColumn<AdminProblemRow>[] = [
     key: "actions",
     width: 110,
     render: (row) =>
-      h(
-        NButton,
-        { size: "small", type: "error", onClick: () => removeTag(row) },
-        () => "移除标签",
-      ),
+      h(NButton, { size: "small", type: "error", onClick: () => removeTag(row) }, () => "移除标签"),
   },
 ]
 
 async function listProblems() {
   if (page.value < 1) page.value = 1
   const offset = (page.value - 1) * limit.value
-  const res = await getProblemList(
-    offset,
-    limit.value,
-    keyword.value,
-    "",
-    undefined,
-    props.tagId,
-  )
+  const res = await getProblemList(offset, limit.value, keyword.value, "", undefined, props.tagId)
   problems.value = res.results
   total.value = res.total
 }

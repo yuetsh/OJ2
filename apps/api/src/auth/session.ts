@@ -77,12 +77,7 @@ export async function createSession(
   // 全压在登录这一下上
   const pipeline = redis
     .pipeline()
-    .set(
-      sessionKey(token),
-      JSON.stringify(value),
-      "EX",
-      config.sessionTtlSeconds,
-    )
+    .set(sessionKey(token), JSON.stringify(value), "EX", config.sessionTtlSeconds)
     .sadd(userSessionsKey(userId), token)
     .expire(userSessionsKey(userId), config.sessionTtlSeconds)
   markOnline(pipeline, userId)
@@ -131,10 +126,7 @@ async function sessionUserId(token: string) {
  * 对已经被别人登着的账号毫无作用 —— 而学生密码是明文存着给老师查的，
  * 改密码正是发现密码泄露之后唯一的补救手段。
  */
-export async function revokeUserSessions(
-  userId: number,
-  reason: SessionRevokedReason,
-) {
+export async function revokeUserSessions(userId: number, reason: SessionRevokedReason) {
   const tokens = await redis.smembers(userSessionsKey(userId))
   if (tokens.length) await redis.del(...tokens.map(sessionKey))
   await redis.del(userSessionsKey(userId))
@@ -161,9 +153,7 @@ export type SessionResult =
   | { user: AuthUser; reason?: undefined }
   | { user: null; reason: "anonymous" | "disabled" }
 
-async function authenticateToken(
-  token: string | undefined,
-): Promise<SessionResult> {
+async function authenticateToken(token: string | undefined): Promise<SessionResult> {
   if (!token) return { user: null, reason: "anonymous" }
 
   const raw = await redis.get(sessionKey(token))
@@ -237,8 +227,7 @@ export async function getSessionUser(c: Context) {
 }
 
 export async function getRequestSessionUser(request: Request) {
-  return (await authenticateToken(readCookie(request, config.sessionCookie)))
-    .user
+  return (await authenticateToken(readCookie(request, config.sessionCookie))).user
 }
 
 /**
@@ -293,11 +282,7 @@ async function getStoredSession(c: Context) {
   }
 }
 
-export async function setContestPassword(
-  c: Context,
-  contestId: number,
-  password: string,
-) {
+export async function setContestPassword(c: Context, contestId: number, password: string) {
   const session = await getStoredSession(c)
   if (!session) return false
   session.value.contestPasswords[String(contestId)] = password

@@ -386,13 +386,9 @@ export const todaySubmissionStatisticsSchema = z.object({
   /** 按东八区钟点分的 24 个桶，**下标就是钟点**，没有提交的钟点是 0 */
   hours: z.array(z.number().int()).length(24),
   /** 按语言，提交数倒序。零提交的语言不在表里 */
-  languages: z.array(
-    z.object({ language: problemLanguageSchema, count: z.number().int() }),
-  ),
+  languages: z.array(z.object({ language: problemLanguageSchema, count: z.number().int() })),
   /** 按判题结果，条数倒序 */
-  results: z.array(
-    z.object({ result: judgeStatusSchema, count: z.number().int() }),
-  ),
+  results: z.array(z.object({ result: judgeStatusSchema, count: z.number().int() })),
   /**
    * 今天最热的几道题，提交数倒序，最多 10 道。
    * **只含公开可见的题目** —— 这个接口不需要登录，不能拿它探未发布题目的标题。
@@ -416,30 +412,20 @@ export const formatCodeResponseSchema = z.object({ code: z.string() })
 
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type SubmissionTrace = z.infer<typeof submissionTraceSchema>
-export type CreateSubmissionRequest = z.infer<
-  typeof createSubmissionRequestSchema
->
+export type CreateSubmissionRequest = z.infer<typeof createSubmissionRequestSchema>
 export type SubmissionDetail = z.infer<typeof submissionDetailSchema>
 export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
 export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
-export type TodaySubmissionStatistics = z.infer<
-  typeof todaySubmissionStatisticsSchema
->
-export type SubmissionStatisticsUser = z.infer<
-  typeof submissionStatisticsUserSchema
->
-export type SubmissionStatisticsItems = z.infer<
-  typeof submissionStatisticsItemsSchema
->
+export type TodaySubmissionStatistics = z.infer<typeof todaySubmissionStatisticsSchema>
+export type SubmissionStatisticsUser = z.infer<typeof submissionStatisticsUserSchema>
+export type SubmissionStatisticsItems = z.infer<typeof submissionStatisticsItemsSchema>
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
 export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>
 
 export type SubmissionListItem = z.infer<typeof submissionListItemSchema>
 export type SubmissionList = z.infer<typeof submissionListSchema>
 export type EmbeddedSubmission = z.infer<typeof embeddedSubmissionSchema>
-export type CreateSubmissionResponse = z.infer<
-  typeof createSubmissionResponseSchema
->
+export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>
 export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>
 
 export type FormatCodeRequest = z.infer<typeof formatCodeRequestSchema>

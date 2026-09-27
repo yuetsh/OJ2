@@ -17,11 +17,7 @@ const displayID = ref(props.nextDisplayId || "")
 async function addProblem() {
   if (!displayID.value) return
   try {
-    await addProblemForContest(
-      props.contestID,
-      props.problemID,
-      displayID.value,
-    )
+    await addProblemForContest(props.contestID, props.problemID, displayID.value)
     emit("added")
   } catch (err) {
     if (errorCode(err) === "display-id-exists") {

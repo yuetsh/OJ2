@@ -3,14 +3,7 @@ import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
 import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
 import { AdminUser, Submission } from "./types"
 import { JUDGE_STATUS, USER_TYPE } from "./constants"
-import {
-  strFromU8,
-  strToU8,
-  unzlibSync,
-  zipSync,
-  zlibSync,
-  type Zippable,
-} from "fflate"
+import { strFromU8, strToU8, unzlibSync, zipSync, zlibSync, type Zippable } from "fflate"
 import copyTextFallback from "copy-text-to-clipboard"
 import { normalizeDate } from "@vueuse/core"
 import { customAlphabet } from "nanoid"
@@ -44,24 +37,17 @@ export function submissionCaseResults(info: unknown): JudgeCaseResult[] {
  * 一个都没过不给：「通过 0/8」只是把「答案错误」换个更刺眼的说法再说一遍。
  * 全过也不给：AC 用不着；AST_CHECK_FAILED 是测试点全过、语法规则没过，那边有自己的规则清单。
  */
-export function submissionPartialCases(
-  submission: Pick<Submission, "caseSummary"> | undefined,
-) {
+export function submissionPartialCases(submission: Pick<Submission, "caseSummary"> | undefined) {
   const summary = submission?.caseSummary
-  if (!summary || summary.passed === 0 || summary.passed >= summary.total)
-    return null
+  if (!summary || summary.passed === 0 || summary.passed >= summary.total) return null
   return summary
 }
 
 /** 结果标题：部分测试点通过时缀上「通过 x/y 个测试点」 */
-export function submissionResultTitle(
-  submission: Pick<Submission, "result" | "caseSummary">,
-) {
+export function submissionResultTitle(submission: Pick<Submission, "result" | "caseSummary">) {
   const title = JUDGE_STATUS[submission.result]["title"]
   const partial = submissionPartialCases(submission)
-  return partial
-    ? `${title} · 通过 ${partial.passed}/${partial.total} 个测试点`
-    : title
+  return partial ? `${title} · 通过 ${partial.passed}/${partial.total} 个测试点` : title
 }
 
 export function getACRate(acCount: number, totalCount: number): string {
@@ -72,9 +58,7 @@ export function getACRateNumber(acCount: number, totalCount: number): number {
   return parseFloat(calculateACRate(acCount, totalCount))
 }
 
-export function filterEmptyValue<T extends Record<string, any>>(
-  object: T,
-): Partial<T> {
+export function filterEmptyValue<T extends Record<string, any>>(object: T): Partial<T> {
   return Object.entries(object).reduce((query, [key, value]) => {
     if (value != null && value !== "" && value !== undefined) {
       query[key as keyof T] = value
@@ -83,9 +67,7 @@ export function filterEmptyValue<T extends Record<string, any>>(
   }, {} as Partial<T>)
 }
 
-export function getTagColor(
-  tag: "Low" | "Mid" | "High" | "简单" | "中等" | "困难",
-) {
+export function getTagColor(tag: "Low" | "Mid" | "High" | "简单" | "中等" | "困难") {
   return <"success" | "info" | "error">{
     Low: "success",
     Mid: "info",
@@ -203,11 +185,7 @@ function formatDurationUnits(
     .join("")
 }
 
-export function duration(
-  start: Date | string,
-  end: Date | string,
-  showSeconds = false,
-): string {
+export function duration(start: Date | string, end: Date | string, showSeconds = false): string {
   const durationObj = getDurationObject(start, end)
   const units = [
     { key: "years" as const, suffix: "年" },
@@ -234,10 +212,7 @@ export function readableDuration(seconds: number): string {
   return rest ? `${hours} 小时 ${rest} 分` : `${hours} 小时`
 }
 
-export function durationToDays(
-  start: Date | string,
-  end: Date | string,
-): string {
+export function durationToDays(start: Date | string, end: Date | string): string {
   const durationObj = getDurationObject(start, end)
   const units = [
     { key: "years" as const, suffix: "年" },
@@ -255,9 +230,7 @@ export function secondsToDuration(seconds: number): string {
   })
   const hours = (duration.days ?? 0) * 24 + (duration.hours ?? 0)
   const pad = (n: number) => String(n).padStart(2, "0")
-  return [hours, pad(duration.minutes ?? 0), pad(duration.seconds ?? 0)].join(
-    ":",
-  )
+  return [hours, pad(duration.minutes ?? 0), pad(duration.seconds ?? 0)].join(":")
 }
 
 export function submissionMemoryFormat(memory: number | string | undefined) {
@@ -329,9 +302,7 @@ export function base64DecodeUtf8(bytes?: string): string {
     if (!bytes) return ""
     const latin = atob(bytes)
     return new TextDecoder("utf-8").decode(
-      Uint8Array.from({ length: latin.length }, (_, index) =>
-        latin.charCodeAt(index),
-      ),
+      Uint8Array.from({ length: latin.length }, (_, index) => latin.charCodeAt(index)),
     )
   } catch (error) {
     console.error("解码失败:", error)

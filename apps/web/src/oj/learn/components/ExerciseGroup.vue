@@ -25,9 +25,7 @@ onMounted(init)
 watch(() => props.exercise.id, init)
 
 const allPlaced = computed(() => placement.value.every((p) => p !== -1))
-const allCorrect = computed(() =>
-  placement.value.every((p, i) => p === data.value.answer[i]),
-)
+const allCorrect = computed(() => placement.value.every((p, i) => p === data.value.answer[i]))
 const locked = computed(() => submitted.value && allCorrect.value)
 
 function onDragStart(i: number) {
@@ -42,9 +40,7 @@ function dropTo(bucket: number) {
   submitted.value = false
 }
 
-const poolItems = computed(() =>
-  order.value.filter((i) => placement.value[i] === -1),
-)
+const poolItems = computed(() => order.value.filter((i) => placement.value[i] === -1))
 function itemsIn(bucket: number): number[] {
   return order.value.filter((i) => placement.value[i] === bucket)
 }
@@ -57,11 +53,7 @@ function itemStatus(i: number): "correct" | "wrong" | "default" {
 function chipStyle(i: number): Record<string, string> {
   const status = itemStatus(i)
   const color =
-    status === "correct"
-      ? "#18a058"
-      : status === "wrong"
-        ? "#d03050"
-        : "var(--n-border-color)"
+    status === "correct" ? "#18a058" : status === "wrong" ? "#d03050" : "var(--n-border-color)"
   const plain = color === "var(--n-border-color)"
   return {
     padding: "6px 12px",
@@ -114,10 +106,7 @@ function reset() {
       @dragover.prevent
       @drop="dropTo(-1)"
     >
-      <span
-        v-if="poolItems.length === 0"
-        style="color: var(--n-text-color-3); font-size: 13px"
-      >
+      <span v-if="poolItems.length === 0" style="color: var(--n-text-color-3); font-size: 13px">
         （已全部归类）
       </span>
       <div
@@ -150,14 +139,7 @@ function reset() {
         @dragover.prevent
         @drop="dropTo(b)"
       >
-        <p
-          style="
-            font-weight: 600;
-            margin: 0 0 8px;
-            text-align: center;
-            font-size: 14px;
-          "
-        >
+        <p style="font-weight: 600; margin: 0 0 8px; text-align: center; font-size: 14px">
           {{ bucket }}
         </p>
         <n-space :size="8">
@@ -182,9 +164,7 @@ function reset() {
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="warning" :disabled="!allPlaced || locked" @click="submit">
-        提交
-      </n-button>
+      <n-button type="warning" :disabled="!allPlaced || locked" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
   </n-card>

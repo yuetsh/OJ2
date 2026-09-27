@@ -47,9 +47,7 @@ const listColumns = {
 
 adminAiRoutes.get("/ai/reports", requireTeacher, async (c) => {
   const username = c.req.query("username")?.trim()
-  const where = username
-    ? ilike(schema.user.username, `%${username}%`)
-    : undefined
+  const where = username ? ilike(schema.user.username, `%${username}%`) : undefined
 
   // 置顶列表不分页：它是「每个学生最新钉住的那份」，数量等于学生数，前端一次性拿走。
   // 但**形状必须和分页那支一样**：同一个 URL 返回两种形状，调用方没法照着一个类型写。
@@ -103,9 +101,7 @@ adminAiRoutes.get("/ai/reports/:id", requireTeacher, async (c) => {
     })
     .from(schema.aiAnalysis)
     .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
-    .where(
-      eq(schema.aiAnalysis.id, queryInteger(c.req.param("id"), 0, { min: 1 })),
-    )
+    .where(eq(schema.aiAnalysis.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .limit(1)
   if (!row) return failure(c, 404, "report-not-found", "AIAnalysis not found")
   // data / systemPrompt / userPrompt 一律不下发：里面是喂给模型的原始学情数据与提示词
@@ -123,8 +119,7 @@ adminAiRoutes.post("/ai/reports/:id/pin", requireTeacher, async (c) => {
     .from(schema.aiAnalysis)
     .where(eq(schema.aiAnalysis.id, id))
     .limit(1)
-  if (!report)
-    return failure(c, 404, "report-not-found", "AIAnalysis not found")
+  if (!report) return failure(c, 404, "report-not-found", "AIAnalysis not found")
 
   // 切换语义，与旧后端一致：已置顶则取消；未置顶则先把该学生其它置顶清掉，保证每人至多一份
   const next = !report.isPinned
@@ -134,16 +129,10 @@ adminAiRoutes.post("/ai/reports/:id/pin", requireTeacher, async (c) => {
         .update(schema.aiAnalysis)
         .set({ isPinned: false })
         .where(
-          and(
-            eq(schema.aiAnalysis.userId, report.userId),
-            eq(schema.aiAnalysis.isPinned, true),
-          ),
+          and(eq(schema.aiAnalysis.userId, report.userId), eq(schema.aiAnalysis.isPinned, true)),
         )
     }
-    await tx
-      .update(schema.aiAnalysis)
-      .set({ isPinned: next })
-      .where(eq(schema.aiAnalysis.id, id))
+    await tx.update(schema.aiAnalysis).set({ isPinned: next }).where(eq(schema.aiAnalysis.id, id))
   })
   return success(c, { isPinned: next } satisfies ToggleAiReportPinResponse)
 })

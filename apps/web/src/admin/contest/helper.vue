@@ -47,9 +47,7 @@ const currentSubmission = ref<any>(null)
 // 格式化 AC 时间（ac_time 是相对于比赛开始的秒数）
 function formatACTime(relativeSeconds: number) {
   if (!contestStartTime.value) return "-"
-  const acTime = new Date(
-    contestStartTime.value.getTime() + relativeSeconds * 1000,
-  )
+  const acTime = new Date(contestStartTime.value.getTime() + relativeSeconds * 1000)
   return parseTime(acTime, "YYYY-MM-DD HH:mm:ss")
 }
 
@@ -57,12 +55,7 @@ function formatACTime(relativeSeconds: number) {
 async function toggleChecked(item: HelperItem) {
   const newChecked = !item.checked
   try {
-    await updateACMHelperChecked(
-      Number(props.contestID),
-      item.id,
-      item.problemId,
-      newChecked,
-    )
+    await updateACMHelperChecked(Number(props.contestID), item.id, item.problemId, newChecked)
     // 更新本地状态
     item.checked = newChecked
     item.acInfo.checked = newChecked
@@ -87,12 +80,7 @@ async function markAllAsChecked() {
   const loadingMsg = message.loading("正在标记...", { duration: 0 })
   try {
     for (const item of unchecked) {
-      await updateACMHelperChecked(
-        Number(props.contestID),
-        item.id,
-        item.problemId,
-        true,
-      )
+      await updateACMHelperChecked(Number(props.contestID), item.id, item.problemId, true)
       item.checked = true
       item.acInfo.checked = true
     }
@@ -112,8 +100,7 @@ async function markAllAsChecked() {
 const filteredSubmissions = computed(() => {
   return submissions.value.filter((item) => {
     if (query.username && !item.username.includes(query.username)) return false
-    if (query.problemId && !item.problemDisplayId.includes(query.problemId))
-      return false
+    if (query.problemId && !item.problemDisplayId.includes(query.problemId)) return false
     if (query.checked === "checked" && !item.checked) return false
     if (query.checked === "unchecked" && item.checked) return false
     return true
@@ -250,15 +237,9 @@ onMounted(loadData)
         <h2 style="margin: 0">比赛辅助检查</h2>
         <n-tag type="info" size="large"> 总计: {{ stats.total }} </n-tag>
         <n-tag type="success" size="large"> 已检查: {{ stats.checked }} </n-tag>
-        <n-tag type="warning" size="large">
-          未检查: {{ stats.unchecked }}
-        </n-tag>
+        <n-tag type="warning" size="large"> 未检查: {{ stats.unchecked }} </n-tag>
       </n-flex>
-      <n-button
-        type="primary"
-        :disabled="stats.unchecked === 0"
-        @click="markAllAsChecked"
-      >
+      <n-button type="primary" :disabled="stats.unchecked === 0" @click="markAllAsChecked">
         标记全部为已检查
       </n-button>
     </n-flex>
@@ -281,11 +262,7 @@ onMounted(loadData)
         style="width: 150px"
         clearable
       />
-      <n-select
-        v-model:value="query.checked"
-        :options="checkedOptions"
-        style="width: 120px"
-      />
+      <n-select v-model:value="query.checked" :options="checkedOptions" style="width: 120px" />
     </n-flex>
 
     <n-data-table

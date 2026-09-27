@@ -25,8 +25,7 @@ const rules: FormRules = {
     { required: true, message: "密码必填", trigger: "blur" },
     { min: 6, max: 20, message: "长度在 6 到 20 位之间", trigger: "input" },
     {
-      validator: (_: FormItemRule, value: string) =>
-        value === form.value.password,
+      validator: (_: FormItemRule, value: string) => value === form.value.password,
       message: "两次密码输入不一致",
       trigger: "blur",
     },
@@ -122,9 +121,7 @@ function submit() {
       <n-alert v-if="msg" type="error" :show-icon="false"> {{ msg }}</n-alert>
       <n-form-item>
         <n-space>
-          <n-button type="primary" :loading="isLoading" @click="submit">
-            注册
-          </n-button>
+          <n-button type="primary" :loading="isLoading" @click="submit"> 注册 </n-button>
           <n-button @click="goLogin">已经注册？现在登录</n-button>
         </n-space>
       </n-form-item>

@@ -11,13 +11,7 @@
 <script setup lang="ts">
 import type { ChartOptions } from "chart.js"
 import { Bar } from "vue-chartjs"
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-} from "chart.js"
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from "chart.js"
 import { useAIStore } from "oj/store/ai"
 import { useChartTheme } from "shared/composables/chartTheme"
 

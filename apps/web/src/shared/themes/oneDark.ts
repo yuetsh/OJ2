@@ -35,8 +35,9 @@ const oneDarkTheme = EditorView.theme(
     },
 
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: cursor },
-    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-      { backgroundColor: selection },
+    "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+      backgroundColor: selection,
+    },
 
     ".cm-panels": { backgroundColor: darkBackground, color: ivory },
     ".cm-panels.cm-panels-top": { borderBottom: "2px solid black" },
@@ -119,15 +120,7 @@ const oneDarkHighlightStyle = HighlightStyle.define([
     color: chalky,
   },
   {
-    tag: [
-      t.operator,
-      t.operatorKeyword,
-      t.url,
-      t.escape,
-      t.regexp,
-      t.link,
-      t.special(t.string),
-    ],
+    tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)],
     color: cyan,
   },
   { tag: [t.meta, t.comment], color: stone },
@@ -143,7 +136,4 @@ const oneDarkHighlightStyle = HighlightStyle.define([
 
 /// Extension to enable the One Dark theme (both the editor theme and
 /// the highlight style).
-export const oneDark: Extension = [
-  oneDarkTheme,
-  syntaxHighlighting(oneDarkHighlightStyle),
-]
+export const oneDark: Extension = [oneDarkTheme, syntaxHighlighting(oneDarkHighlightStyle)]

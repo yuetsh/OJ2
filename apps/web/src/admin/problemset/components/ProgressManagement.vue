@@ -22,8 +22,7 @@ const progressColumns = [
     title: "加入时间",
     key: "joinTime",
     width: 180,
-    render: (row: AdminProblemSetProgress) =>
-      parseTime(row.joinTime, "YYYY-MM-DD HH:mm:ss"),
+    render: (row: AdminProblemSetProgress) => parseTime(row.joinTime, "YYYY-MM-DD HH:mm:ss"),
   },
   { title: "已完成", key: "completedProblemsCount", width: 100 },
   { title: "总题目", key: "totalProblemsCount", width: 100 },
@@ -31,8 +30,7 @@ const progressColumns = [
     title: "进度",
     key: "progressPercentage",
     width: 100,
-    render: (row: AdminProblemSetProgress) =>
-      `${row.progressPercentage.toFixed(0)}%`,
+    render: (row: AdminProblemSetProgress) => `${row.progressPercentage.toFixed(0)}%`,
   },
   {
     title: "是否完成",

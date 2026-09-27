@@ -19,14 +19,10 @@ import { Icon } from "@iconify/vue"
 import { NFlex } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 
-const SubmitFlowchart = defineAsyncComponent(
-  () => import("./SubmitFlowchart.vue"),
-)
+const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
 // 只有老师看得见（下面的弹框挂了 isTeacherOrAbove），静态 import 的话每个学生
 // 打开题目都要白拉一份 chart.js（~68KB gzip）
-const StatisticsPanel = defineAsyncComponent(
-  () => import("shared/components/StatisticsPanel.vue"),
-)
+const StatisticsPanel = defineAsyncComponent(() => import("shared/components/StatisticsPanel.vue"))
 
 interface Props {
   storageKey: string
@@ -74,13 +70,9 @@ const showHelpButton = computed(
  * 不像弹框那样按一下 Esc 就把协作关掉了。
  */
 const collabHere = computed(
-  () =>
-    collabStore.room !== null &&
-    collabStore.room.problemId === problem.value?._id,
+  () => collabStore.room !== null && collabStore.room.problemId === problem.value?._id,
 )
-const showCollabBar = computed(
-  () => collabHere.value && userStore.isTeacherOrAbove,
-)
+const showCollabBar = computed(() => collabHere.value && userStore.isTeacherOrAbove)
 
 /**
  * 状态全塞进按钮本身。原来旁边还挂一个 n-tag 说明排队情况，一行工具栏
@@ -212,8 +204,7 @@ const copy = async () => {
 
 const reset = () => {
   codeStore.setCode(
-    problem.value!.template[codeStore.code.language] ||
-      SOURCES[codeStore.code.language],
+    problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
   )
   storage.remove(storageKey)
   message.success("代码重置成功")
@@ -280,11 +271,7 @@ onMounted(() => {
 
     <SubmitCode v-else />
 
-    <n-button
-      v-if="isDesktop && showGoSubmissionButton"
-      :size="buttonSize"
-      @click="goSubmissions"
-    >
+    <n-button v-if="isDesktop && showGoSubmissionButton" :size="buttonSize" @click="goSubmissions">
       提交信息
     </n-button>
 
@@ -313,11 +300,7 @@ onMounted(() => {
       </n-tag>
       <!-- 显式的「结束」：求助记录一并清掉。跳走页面发的是 leave("left")，
            那边只是退回排队 —— 见 store 里 leave 的注释 -->
-      <n-button
-        :size="buttonSize"
-        type="primary"
-        @click="collabStore.leave('done')"
-      >
+      <n-button :size="buttonSize" type="primary" @click="collabStore.leave('done')">
         结束协作
       </n-button>
     </template>

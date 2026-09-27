@@ -27,9 +27,7 @@ const { isDark, toggleDark } = useDarkTransition()
  * 也能看见有没有人举手。窄屏同样给：接单之后要在弹框里替学生写代码，那件事
  * 确实只有桌面端好使，但「有没有人在等」是宽度多少都得知道的。
  */
-const pendingHelpCount = computed(() =>
-  collabStore.isTeacher ? collabStore.pendingCount : 0,
-)
+const pendingHelpCount = computed(() => (collabStore.isTeacher ? collabStore.pendingCount : 0))
 
 // 从 store 中获取屏幕模式状态
 const { screenMode } = storeToRefs(screenModeStore)
@@ -119,17 +117,11 @@ const menus = computed<MenuOption[]>(() => [
     icon: renderIcon("fluent-emoji:books"),
     children: [
       {
-        label: () =>
-          h(
-            RouterLink,
-            { to: learnLink("python") },
-            { default: () => "Python" },
-          ),
+        label: () => h(RouterLink, { to: learnLink("python") }, { default: () => "Python" }),
         key: "learn-python",
       },
       {
-        label: () =>
-          h(RouterLink, { to: learnLink("c") }, { default: () => "C语言" }),
+        label: () => h(RouterLink, { to: learnLink("c") }, { default: () => "C语言" }),
         key: "learn-c",
       },
     ],
@@ -140,14 +132,12 @@ const menus = computed<MenuOption[]>(() => [
     icon: renderIcon("fluent-emoji:memo"),
   },
   {
-    label: () =>
-      h(RouterLink, { to: "/problemset" }, { default: () => "题单" }),
+    label: () => h(RouterLink, { to: "/problemset" }, { default: () => "题单" }),
     key: "problemset",
     icon: renderIcon("fluent-emoji:clipboard"),
   },
   {
-    label: () =>
-      h(RouterLink, { to: "/submission" }, { default: () => "提交" }),
+    label: () => h(RouterLink, { to: "/submission" }, { default: () => "提交" }),
     key: "submission",
     icon: renderIcon("fluent-emoji:inbox-tray"),
     show: userStore.showSubmissions,
@@ -163,8 +153,7 @@ const menus = computed<MenuOption[]>(() => [
     icon: renderIcon("fluent-emoji:trophy"),
   },
   {
-    label: () =>
-      h(RouterLink, { to: "/announcement" }, { default: () => "公告" }),
+    label: () => h(RouterLink, { to: "/announcement" }, { default: () => "公告" }),
     key: "announcement",
     icon: renderIcon("fluent-emoji:loudspeaker"),
   },
@@ -183,9 +172,7 @@ const menus = computed<MenuOption[]>(() => [
 
 const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
   {
-    label: pendingHelpCount.value
-      ? `课堂求助（${pendingHelpCount.value}）`
-      : "课堂求助",
+    label: pendingHelpCount.value ? `课堂求助（${pendingHelpCount.value}）` : "课堂求助",
     key: "help",
     show: collabStore.isTeacher,
     icon: renderIcon("streamline-emojis:raising-hands-2"),
@@ -266,12 +253,7 @@ function goHome() {
         </n-flex>
       </n-button>
       <div>
-        <n-menu
-          v-if="isDesktop"
-          mode="horizontal"
-          :options="menus"
-          :value="active"
-        />
+        <n-menu v-if="isDesktop" mode="horizontal" :options="menus" :value="active" />
       </div>
     </n-flex>
     <n-flex align="center">
@@ -282,10 +264,7 @@ function goHome() {
         </n-button>
       </n-dropdown>
       <n-button
-        v-if="
-          isDesktop &&
-          (route.name === 'problem' || route.name === 'contest problem')
-        "
+        v-if="isDesktop && (route.name === 'problem' || route.name === 'contest problem')"
         @click="() => screenModeStore.switchScreenMode()"
       >
         {{ screenMode }}
@@ -302,13 +281,7 @@ function goHome() {
           </n-badge>
         </n-dropdown>
         <n-flex align="center" v-else>
-          <n-button
-            secondary
-            type="primary"
-            @click="authStore.openLoginModal()"
-          >
-            登录
-          </n-button>
+          <n-button secondary type="primary" @click="authStore.openLoginModal()"> 登录 </n-button>
           <n-button
             tertiary
             v-if="configStore.config?.allowRegister"

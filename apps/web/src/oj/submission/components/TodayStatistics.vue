@@ -94,9 +94,7 @@ onMounted(async () => {
                 class="hour-bars"
                 :style="{
                   borderBottomColor:
-                    hour === currentHour
-                      ? themeVars.primaryColor
-                      : themeVars.dividerColor,
+                    hour === currentHour ? themeVars.primaryColor : themeVars.dividerColor,
                 }"
               >
                 <div
@@ -118,9 +116,7 @@ onMounted(async () => {
       <n-divider style="margin: 16px 0">按语言</n-divider>
       <div class="rows">
         <div class="row" v-for="row in stats.languages" :key="row.language">
-          <n-text class="row-name">{{
-            LANGUAGE_SHOW_VALUE[row.language]
-          }}</n-text>
+          <n-text class="row-name">{{ LANGUAGE_SHOW_VALUE[row.language] }}</n-text>
           <n-progress
             class="row-bar"
             type="line"
@@ -134,12 +130,7 @@ onMounted(async () => {
 
       <n-divider style="margin: 16px 0">按状态</n-divider>
       <n-flex align="center">
-        <n-flex
-          align="center"
-          :size="4"
-          v-for="row in stats.results"
-          :key="row.result"
-        >
+        <n-flex align="center" :size="4" v-for="row in stats.results" :key="row.result">
           <SubmissionResultTag :result="row.result" />
           <n-text>{{ row.count }}</n-text>
         </n-flex>
@@ -148,11 +139,7 @@ onMounted(async () => {
       <template v-if="stats.problems.length">
         <n-divider style="margin: 16px 0">今天最热的题</n-divider>
         <div class="rows">
-          <div
-            class="row"
-            v-for="row in stats.problems"
-            :key="row.problemDisplayId"
-          >
+          <div class="row" v-for="row in stats.problems" :key="row.problemDisplayId">
             <n-button
               class="problem"
               text
@@ -169,11 +156,7 @@ onMounted(async () => {
       </template>
     </template>
     <!-- 请求失败时 stats 还是 null，转圈停下来总得留句话 -->
-    <n-empty
-      v-else-if="!loading"
-      description="统计拉取失败"
-      style="margin: 40px 0"
-    />
+    <n-empty v-else-if="!loading" description="统计拉取失败" style="margin: 40px 0" />
     <div v-else style="height: 200px"></div>
   </n-spin>
 </template>

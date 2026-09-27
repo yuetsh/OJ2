@@ -160,14 +160,10 @@ watch(showModal, (v) => {
       <n-gradient-text type="info"> 总用户数：{{ userCount }} </n-gradient-text>
     </h2>
     <h2>
-      <n-gradient-text type="error">
-        今日提交：{{ submissionCount }}
-      </n-gradient-text>
+      <n-gradient-text type="error"> 今日提交：{{ submissionCount }} </n-gradient-text>
     </h2>
     <h2>
-      <n-gradient-text type="warning">
-        近期比赛：{{ contestCount }}
-      </n-gradient-text>
+      <n-gradient-text type="warning"> 近期比赛：{{ contestCount }} </n-gradient-text>
     </h2>
     <h2>
       <!-- 判题机数量后端一直在下发，这里以前没显示 —— 判题机全掉线的时候，
@@ -199,12 +195,7 @@ watch(showModal, (v) => {
     />
   </n-flex>
   <n-data-table v-if="data.length" striped :data="data" :columns="columns" />
-  <n-modal
-    preset="card"
-    title="猜猜看幸运儿是谁？"
-    v-model:show="showModal"
-    style="width: 400px"
-  >
+  <n-modal preset="card" title="猜猜看幸运儿是谁？" v-model:show="showModal" style="width: 400px">
     <n-flex vertical justify="center" align="center">
       <n-h1 :key="pulseKey" class="lucky pulse">{{ luckyGuy }}</n-h1>
       <n-button block :disabled="isRolling" @click="getRandom">

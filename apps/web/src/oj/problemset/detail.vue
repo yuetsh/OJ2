@@ -1,16 +1,7 @@
 <script setup lang="ts">
 import { errorMessage } from "utils/api"
-import {
-  getProblemSetDetail,
-  getProblemSetProblems,
-  joinProblemSet,
-  getUserBadges,
-} from "../api"
-import type {
-  ProblemSet,
-  ProblemSetProblem,
-  UserBadge as UserBadgeType,
-} from "utils/types"
+import { getProblemSetDetail, getProblemSetProblems, joinProblemSet, getUserBadges } from "../api"
+import type { ProblemSet, ProblemSetProblem, UserBadge as UserBadgeType } from "utils/types"
 import { useFireworks } from "../problem/composables/useFireworks"
 import ProblemSetHeader from "./components/ProblemSetHeader.vue"
 import ProblemSetProblemsList from "./components/ProblemSetProblemsList.vue"

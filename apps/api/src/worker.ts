@@ -7,14 +7,10 @@ import { flowchartQueueName, type FlowchartJobData } from "./flowchart/job"
 import { evaluateFlowchart } from "./flowchart/run"
 import { createBlockingRedis } from "./redis"
 
-const worker = new Worker<JudgeJobData>(
-  judgeQueueName,
-  async (job) => judgeSubmission(job.data),
-  {
-    connection: createBlockingRedis(),
-    concurrency: config.judgeConcurrency,
-  },
-)
+const worker = new Worker<JudgeJobData>(judgeQueueName, async (job) => judgeSubmission(job.data), {
+  connection: createBlockingRedis(),
+  concurrency: config.judgeConcurrency,
+})
 
 const flowchartWorker = new Worker<FlowchartJobData>(
   flowchartQueueName,
@@ -39,24 +35,17 @@ worker.on("failed", async (job, error) => {
   try {
     await failAbandonedSubmission(submissionId, error)
   } catch (markError) {
-    console.error(
-      `Failed to mark submission ${submissionId} as system error`,
-      markError,
-    )
+    console.error(`Failed to mark submission ${submissionId} as system error`, markError)
   }
 })
 worker.on("error", (error) => {
   console.error("Judge worker error", error)
 })
-flowchartWorker.on("ready", () =>
-  console.log("Flowchart worker ready (concurrency=2)"),
-)
+flowchartWorker.on("ready", () => console.log("Flowchart worker ready (concurrency=2)"))
 flowchartWorker.on("failed", (job, error) =>
   console.error(`Flowchart job ${job?.id ?? "unknown"} failed`, error),
 )
-flowchartWorker.on("error", (error) =>
-  console.error("Flowchart worker error", error),
-)
+flowchartWorker.on("error", (error) => console.error("Flowchart worker error", error))
 
 async function shutdown() {
   await worker.close()

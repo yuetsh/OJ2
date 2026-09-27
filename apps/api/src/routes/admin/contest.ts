@@ -66,8 +66,7 @@ function selectContest(id: number) {
 function validatePayload(data: { startTime: string; endTime: string }) {
   const start = Date.parse(data.startTime)
   const end = Date.parse(data.endTime)
-  if (!Number.isFinite(start) || !Number.isFinite(end))
-    return "开始或结束时间不是合法的时间格式"
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "开始或结束时间不是合法的时间格式"
   if (end <= start) return "Start time must occur earlier than end time"
   return null
 }
@@ -78,8 +77,7 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
   const user = c.get("user")!
   const filters = []
   // 非超管只看得到自己建的比赛，与旧后端一致
-  if (user.adminType !== "Super Admin")
-    filters.push(eq(schema.contest.createdById, user.id))
+  if (user.adminType !== "Super Admin") filters.push(eq(schema.contest.createdById, user.id))
   const keyword = c.req.query("keyword")?.trim()
   if (keyword) filters.push(ilike(schema.contest.title, `%${keyword}%`))
   const where = filters.length ? and(...filters) : undefined
@@ -94,10 +92,7 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
       })
       .from(schema.contest)
       .innerJoin(schema.user, eq(schema.contest.createdById, schema.user.id))
-      .leftJoin(
-        schema.userProfile,
-        eq(schema.userProfile.userId, schema.user.id),
-      )
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where)
       .orderBy(desc(schema.contest.createTime))
       .limit(limit)
@@ -110,9 +105,7 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
 })
 
 adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
-  const [row] = await selectContest(
-    queryInteger(c.req.param("id"), 0, { min: 1 }),
-  )
+  const [row] = await selectContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
   if (!row || !ownedBy(c.get("user")!, row.contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
@@ -192,12 +185,9 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   //
   // 已知的副作用，别当成 bug 去"修"：副本和原题共用同一个测试点目录（testCaseId 原样复制），
   // 今天无害（删题特意不删目录），但以后要是加"删题顺手清测试点"，得先把这里改成复制目录。
-  if (!original)
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!original) return failure(c, 404, "contest-not-found", "Contest does not exist")
 
-  const duration =
-    Date.parse(original.contest.endTime) -
-    Date.parse(original.contest.startTime)
+  const duration = Date.parse(original.contest.endTime) - Date.parse(original.contest.startTime)
   // 新比赛从 10 分钟后开始，时长与原比赛相同 —— 给出题人留出改时间的余地，
   // 又不至于建出一个已经结束的比赛
   const start = new Date(Date.now() + 10 * 60 * 1000)
@@ -227,10 +217,7 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
       })
       .returning({ id: schema.contest.id })
 
-    const problems = await tx
-      .select()
-      .from(schema.problem)
-      .where(eq(schema.problem.contestId, id))
+    const problems = await tx.select().from(schema.problem).where(eq(schema.problem.contestId, id))
     if (problems.length === 0) return contest!.id
 
     // 题面、标签各一条语句，不再按题循环。新旧题的对应关系靠 _id 认：
@@ -251,9 +238,7 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
         })),
       )
       .returning({ id: schema.problem.id, displayId: schema.problem.displayId })
-    const newIdByDisplayId = new Map(
-      copies.map((copy) => [copy.displayId, copy.id]),
-    )
+    const newIdByDisplayId = new Map(copies.map((copy) => [copy.displayId, copy.id]))
 
     // 标签是多对多中间表，Django 的 problem.tags.set(tags) 对应这里手工复制关系行
     const tags = await tx
@@ -269,16 +254,10 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
         ),
       )
     if (tags.length) {
-      const displayIdByOldId = new Map(
-        problems.map((problem) => [problem.id, problem.displayId]),
-      )
+      const displayIdByOldId = new Map(problems.map((problem) => [problem.id, problem.displayId]))
       const links = tags.flatMap((tag) => {
-        const newId = newIdByDisplayId.get(
-          displayIdByOldId.get(tag.problemId) ?? "",
-        )
-        return newId === undefined
-          ? []
-          : [{ problemId: newId, problemtagId: tag.tagId }]
+        const newId = newIdByDisplayId.get(displayIdByOldId.get(tag.problemId) ?? "")
+        return newId === undefined ? [] : [{ problemId: newId, problemtagId: tag.tagId }]
       })
       if (links.length) await tx.insert(schema.problemTags).values(links)
     }
@@ -291,119 +270,95 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
 
 // ---------------------------------------------------------------- ACM 赛后核查
 
-adminContestRoutes.get(
-  "/contests/:id/acm-helper",
-  requireTeacher,
-  async (c) => {
-    const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    // 不卡 visible：赛后核查恰恰常发生在比赛已经收起来之后，而同一场比赛的
-    // PUT acm-helper 从来不卡这一条 —— 卡着就成了「标记还能改、页面打不开」
-    const [contest] = await db
-      .select()
-      .from(schema.contest)
-      .where(eq(schema.contest.id, id))
-      .limit(1)
-    if (!contest || !ownedBy(c.get("user")!, contest)) {
-      return failure(c, 404, "contest-not-found", "Contest does not exist")
-    }
+adminContestRoutes.get("/contests/:id/acm-helper", requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  // 不卡 visible：赛后核查恰恰常发生在比赛已经收起来之后，而同一场比赛的
+  // PUT acm-helper 从来不卡这一条 —— 卡着就成了「标记还能改、页面打不开」
+  const [contest] = await db.select().from(schema.contest).where(eq(schema.contest.id, id)).limit(1)
+  if (!contest || !ownedBy(c.get("user")!, contest)) {
+    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  }
 
-    const [problems, ranks] = await Promise.all([
-      db
-        .select({ id: schema.problem.id, displayId: schema.problem.displayId })
-        .from(schema.problem)
-        .where(eq(schema.problem.contestId, id)),
-      db
-        .select({
-          id: schema.acmContestRank.id,
-          username: schema.user.username,
-          realName: schema.userProfile.realName,
-          submissionInfo: schema.acmContestRank.submissionInfo,
-          acceptedNumber: schema.acmContestRank.acceptedNumber,
-        })
-        .from(schema.acmContestRank)
-        .innerJoin(
-          schema.user,
-          eq(schema.acmContestRank.userId, schema.user.id),
-        )
-        .leftJoin(
-          schema.userProfile,
-          eq(schema.userProfile.userId, schema.user.id),
-        )
-        .where(eq(schema.acmContestRank.contestId, id)),
-    ])
-    const displayIds = new Map(
-      problems.map((problem) => [String(problem.id), problem.displayId]),
-    )
-
-    const results = []
-    for (const rank of ranks) {
-      if (rank.acceptedNumber <= 0) continue
-      for (const [problemId, info] of Object.entries(rank.submissionInfo)) {
-        if (info.is_ac !== true) continue
-        results.push({
-          id: rank.id,
-          username: rank.username,
-          // 真名在这里是**有意下发**的：核查页就是老师对着名单一个个确认谁抄了。
-          // 接口已由 requireTeacher + ownedBy 双重把关。
-          realName: rank.realName,
-          problemId,
-          problemDisplayId: displayIds.get(problemId) ?? problemId,
-          acInfo: info,
-          checked: info.checked === true,
-          _acTime: typeof info.ac_time === "number" ? info.ac_time : 0,
-        })
-      }
-    }
-    // 按 AC 用时倒序：最后才做出来的排前面，那是最值得看的
-    results.sort((left, right) => right._acTime - left._acTime)
-    return success(
-      c,
-      results.map(({ _acTime, ...item }) => item) satisfies AcmHelperItem[],
-    )
-  },
-)
-
-adminContestRoutes.put(
-  "/contests/:id/acm-helper",
-  requireTeacher,
-  async (c) => {
-    const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = await parseBody(c, updateAcmHelperRequestSchema)
-    if (!parsed.success) return parsed.response
-    const [contest] = await db
-      .select()
-      .from(schema.contest)
-      .where(eq(schema.contest.id, contestId))
-      .limit(1)
-    if (!contest || !ownedBy(c.get("user")!, contest)) {
-      return failure(c, 404, "contest-not-found", "Contest does not exist")
-    }
-    // rank 必须属于这场比赛。旧后端只按 rank_id 取，不校验归属 ——
-    // 那样带上任意 rank_id 就能改别的比赛的核查标记
-    const [rank] = await db
-      .select()
+  const [problems, ranks] = await Promise.all([
+    db
+      .select({ id: schema.problem.id, displayId: schema.problem.displayId })
+      .from(schema.problem)
+      .where(eq(schema.problem.contestId, id)),
+    db
+      .select({
+        id: schema.acmContestRank.id,
+        username: schema.user.username,
+        realName: schema.userProfile.realName,
+        submissionInfo: schema.acmContestRank.submissionInfo,
+        acceptedNumber: schema.acmContestRank.acceptedNumber,
+      })
       .from(schema.acmContestRank)
-      .where(
-        and(
-          eq(schema.acmContestRank.id, parsed.data.rankId),
-          eq(schema.acmContestRank.contestId, contestId),
-        ),
-      )
-      .limit(1)
-    if (!rank)
-      return failure(c, 404, "rank-not-found", "Rank id does not exist")
+      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+      .where(eq(schema.acmContestRank.contestId, id)),
+  ])
+  const displayIds = new Map(problems.map((problem) => [String(problem.id), problem.displayId]))
 
-    const info = rank.submissionInfo
-    const entry = info[parsed.data.problemId]
-    if (!entry) {
-      return failure(c, 404, "problem-not-in-rank", "Problem id does not exist")
+  const results = []
+  for (const rank of ranks) {
+    if (rank.acceptedNumber <= 0) continue
+    for (const [problemId, info] of Object.entries(rank.submissionInfo)) {
+      if (info.is_ac !== true) continue
+      results.push({
+        id: rank.id,
+        username: rank.username,
+        // 真名在这里是**有意下发**的：核查页就是老师对着名单一个个确认谁抄了。
+        // 接口已由 requireTeacher + ownedBy 双重把关。
+        realName: rank.realName,
+        problemId,
+        problemDisplayId: displayIds.get(problemId) ?? problemId,
+        acInfo: info,
+        checked: info.checked === true,
+        _acTime: typeof info.ac_time === "number" ? info.ac_time : 0,
+      })
     }
-    entry.checked = parsed.data.checked
-    info[parsed.data.problemId] = entry
-    await db
-      .update(schema.acmContestRank)
-      .set({ submissionInfo: info })
-      .where(eq(schema.acmContestRank.id, rank.id))
-    return success(c, null)
-  },
-)
+  }
+  // 按 AC 用时倒序：最后才做出来的排前面，那是最值得看的
+  results.sort((left, right) => right._acTime - left._acTime)
+  return success(c, results.map(({ _acTime, ...item }) => item) satisfies AcmHelperItem[])
+})
+
+adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => {
+  const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const parsed = await parseBody(c, updateAcmHelperRequestSchema)
+  if (!parsed.success) return parsed.response
+  const [contest] = await db
+    .select()
+    .from(schema.contest)
+    .where(eq(schema.contest.id, contestId))
+    .limit(1)
+  if (!contest || !ownedBy(c.get("user")!, contest)) {
+    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  }
+  // rank 必须属于这场比赛。旧后端只按 rank_id 取，不校验归属 ——
+  // 那样带上任意 rank_id 就能改别的比赛的核查标记
+  const [rank] = await db
+    .select()
+    .from(schema.acmContestRank)
+    .where(
+      and(
+        eq(schema.acmContestRank.id, parsed.data.rankId),
+        eq(schema.acmContestRank.contestId, contestId),
+      ),
+    )
+    .limit(1)
+  if (!rank) return failure(c, 404, "rank-not-found", "Rank id does not exist")
+
+  const info = rank.submissionInfo
+  const entry = info[parsed.data.problemId]
+  if (!entry) {
+    return failure(c, 404, "problem-not-in-rank", "Problem id does not exist")
+  }
+  entry.checked = parsed.data.checked
+  info[parsed.data.problemId] = entry
+  await db
+    .update(schema.acmContestRank)
+    .set({ submissionInfo: info })
+    .where(eq(schema.acmContestRank.id, rank.id))
+  return success(c, null)
+})

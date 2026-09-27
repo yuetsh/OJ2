@@ -36,9 +36,7 @@ const segments = computed<Segment[]>(() => {
   return result
 })
 
-const blankCount = computed(
-  () => segments.value.filter((s) => s.type === "blank").length,
-)
+const blankCount = computed(() => segments.value.filter((s) => s.type === "blank").length)
 const userInputs = ref<string[]>([])
 const wrongBlanks = ref<Set<number>>(new Set())
 const allCorrect = ref(false)
@@ -134,9 +132,7 @@ function inputWidth(idx: number): string {
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="warning" :disabled="allCorrect" @click="submit">
-        提交
-      </n-button>
+      <n-button type="warning" :disabled="allCorrect" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
   </n-card>

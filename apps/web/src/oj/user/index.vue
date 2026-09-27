@@ -25,9 +25,7 @@ const [show, toggleShow] = useToggle(false)
 
 const { isDesktop } = useBreakpoints()
 
-const isDefaultAvatar = computed(
-  () => profile.value?.avatar.endsWith("default.png") ?? true,
-)
+const isDefaultAvatar = computed(() => profile.value?.avatar.endsWith("default.png") ?? true)
 
 const problemsFlexRef = useTemplateRef<HTMLElement>("problemsFlexRef")
 const itemsPerRow = ref(8)
@@ -55,9 +53,7 @@ const visibleProblems = computed(() =>
   show.value ? problems.value : problems.value.slice(0, itemsPerRow.value * 3),
 )
 
-const hasMoreProblems = computed(
-  () => problems.value.length > itemsPerRow.value * 3,
-)
+const hasMoreProblems = computed(() => problems.value.length > itemsPerRow.value * 3)
 
 async function init() {
   toggle(true)
@@ -92,9 +88,7 @@ async function init() {
 // 插一项进去会打乱既有索引。成就摘要取不到也不该影响整个个人主页
 async function loadAchievementSummary() {
   try {
-    const res = await getAchievementSummary(
-      (route.query.name as string) || undefined,
-    )
+    const res = await getAchievementSummary((route.query.name as string) || undefined)
     achievementSummary.value = res
   } catch {
     achievementSummary.value = null
@@ -145,13 +139,7 @@ onMounted(() => {
 })
 </script>
 <template>
-  <n-flex
-    class="wrapper"
-    vertical
-    justify="center"
-    align="center"
-    v-if="!loading && profile"
-  >
+  <n-flex class="wrapper" vertical justify="center" align="center" v-if="!loading && profile">
     <n-image
       :width="140"
       :height="140"
@@ -207,20 +195,14 @@ onMounted(() => {
   </n-grid>
 
   <!-- 成就摘要 -->
-  <n-card
-    v-if="!loading && profile && achievementSummary"
-    class="wrapper"
-    hoverable
-  >
+  <n-card v-if="!loading && profile && achievementSummary" class="wrapper" hoverable>
     <n-flex align="center" justify="space-between">
       <n-flex align="center" :size="12">
         <span class="achievement-title">
           成就 {{ achievementSummary.unlocked }} /
           {{ achievementSummary.total }}
         </span>
-        <n-tag size="small" type="info">
-          {{ achievementSummary.percent }}%
-        </n-tag>
+        <n-tag size="small" type="info"> {{ achievementSummary.percent }}% </n-tag>
       </n-flex>
       <n-button
         text
@@ -236,9 +218,7 @@ onMounted(() => {
       </n-button>
     </n-flex>
     <n-flex align="center" :size="10" class="achievement-recent">
-      <n-text v-if="achievementSummary.recent.length" depth="3">
-        最近获得
-      </n-text>
+      <n-text v-if="achievementSummary.recent.length" depth="3"> 最近获得 </n-text>
       <n-tooltip v-for="a in achievementSummary.recent" :key="a.id">
         <template #trigger>
           <span class="achievement-icon">
@@ -247,9 +227,7 @@ onMounted(() => {
         </template>
         {{ a.name }}
       </n-tooltip>
-      <n-text v-if="!achievementSummary.recent.length" depth="3">
-        还没有获得成就
-      </n-text>
+      <n-text v-if="!achievementSummary.recent.length" depth="3"> 还没有获得成就 </n-text>
     </n-flex>
   </n-card>
 
@@ -258,23 +236,14 @@ onMounted(() => {
       <template #label>
         <n-flex justify="space-between" align="center">
           <span>已解决的题目</span>
-          <n-button
-            text
-            type="primary"
-            v-if="hasMoreProblems"
-            @click="toggleShow(!show)"
-          >
+          <n-button text type="primary" v-if="hasMoreProblems" @click="toggleShow(!show)">
             {{ show ? "隐藏全部" : "显示全部" }}
           </n-button>
         </n-flex>
       </template>
       <div ref="problemsFlexRef">
         <n-flex>
-          <n-button
-            v-for="id in visibleProblems"
-            :key="id"
-            @click="router.push('/problem/' + id)"
-          >
+          <n-button v-for="id in visibleProblems" :key="id" @click="router.push('/problem/' + id)">
             {{ id }}
           </n-button>
         </n-flex>

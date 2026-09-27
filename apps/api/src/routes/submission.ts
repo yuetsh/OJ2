@@ -10,25 +10,10 @@ import {
   type SubmissionListItem,
   type SubmissionTrace,
 } from "@oj2/contract"
-import {
-  and,
-  count,
-  desc,
-  eq,
-  gt,
-  inArray,
-  isNull,
-  or,
-  sql,
-  type SQL,
-} from "drizzle-orm"
+import { and, count, desc, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
 
-import {
-  optionalAuth,
-  requireAuth,
-  requireSuperAdmin,
-} from "../auth/middleware"
+import { optionalAuth, requireAuth, requireSuperAdmin } from "../auth/middleware"
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
@@ -46,11 +31,7 @@ import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
 import { dayStart } from "../time"
 import { asFilterValue, asRecord, isAdminRole, queryInteger } from "./helpers"
-import {
-  problemFilter,
-  submissionStatisticsRoutes,
-  usernameFilter,
-} from "./submission-statistics"
+import { problemFilter, submissionStatisticsRoutes, usernameFilter } from "./submission-statistics"
 
 export const submissionRoutes = new Hono<ContestEnv>()
 
@@ -87,30 +68,17 @@ async function saveTrace(
 }
 
 submissionRoutes.post("/submissions", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    createSubmissionRequestSchema,
-    "Invalid submission payload",
-  )
+  const parsed = await parseBody(c, createSubmissionRequestSchema, "Invalid submission payload")
   if (!parsed.success) return parsed.response
   let contestId: number | null = null
   if (parsed.data.contestId) {
     // 这里用不了 requireContestAccess 中间件：比赛 id 来自请求体，
     // 中间件跑的时候 body 还没解析。全仓只有这一处仍是手工调用，改动时留意别漏掉鉴权。
-    const contest = await findAccessibleContest(
-      c.get("user"),
-      parsed.data.contestId,
-    )
-    if (!contest)
-      return failure(c, 404, "contest-not-found", "Contest does not exist")
+    const contest = await findAccessibleContest(c.get("user"), parsed.data.contestId)
+    if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
     const access = await canAccessContest(c, contest, "problems")
     if (!access.ok)
-      return failure(
-        c,
-        access.code === "login-required" ? 401 : 403,
-        access.code,
-        access.message,
-      )
+      return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
     if (contestStatus(contest) === "-1")
       return failure(c, 403, "contest-ended", "The contest has ended")
     contestId = contest.id
@@ -145,8 +113,7 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     )
     .limit(1)
 
-  if (!problem)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   if (!problem.languages.includes(parsed.data.language)) {
     return failure(
       c,
@@ -196,20 +163,10 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
   })
 
   if (parsed.data.trace)
-    await saveTrace(
-      submissionId,
-      user.id,
-      problem.id,
-      createTime,
-      parsed.data.trace,
-    )
+    await saveTrace(submissionId, user.id, problem.id, createTime, parsed.data.trace)
 
   try {
-    await judgeQueue.add(
-      "judge",
-      { submissionId, problemId: problem.id },
-      { jobId: submissionId },
-    )
+    await judgeQueue.add("judge", { submissionId, problemId: problem.id }, { jobId: submissionId })
   } catch (error) {
     await db
       .update(schema.submission)
@@ -245,53 +202,34 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
 
 submissionRoutes.route("/", submissionStatisticsRoutes)
 
-submissionRoutes.post(
-  "/submissions/:id/rejudge",
-  requireSuperAdmin,
-  async (c) => {
-    const [row] = await db
-      .select({
-        id: schema.submission.id,
-        problemId: schema.submission.problemId,
-      })
-      .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.id, c.req.param("id")),
-          isNull(schema.submission.contestId),
-        ),
-      )
-      .limit(1)
-    if (!row)
-      return failure(
-        c,
-        404,
-        "submission-not-found",
-        "Submission does not exist",
-      )
+submissionRoutes.post("/submissions/:id/rejudge", requireSuperAdmin, async (c) => {
+  const [row] = await db
+    .select({
+      id: schema.submission.id,
+      problemId: schema.submission.problemId,
+    })
+    .from(schema.submission)
+    .where(and(eq(schema.submission.id, c.req.param("id")), isNull(schema.submission.contestId)))
+    .limit(1)
+  if (!row) return failure(c, 404, "submission-not-found", "Submission does not exist")
 
-    await db
-      .update(schema.submission)
-      .set({ statisticInfo: {}, result: JudgeStatus.PENDING })
-      .where(eq(schema.submission.id, row.id))
+  await db
+    .update(schema.submission)
+    .set({ statisticInfo: {}, result: JudgeStatus.PENDING })
+    .where(eq(schema.submission.id, row.id))
 
-    // jobId 必须带时间戳。队列保留最近 100 个已完成任务，沿用 submissionId 做 jobId 的话
-    // BullMQ 会认为这个任务已经存在，重判静默变成空操作。与 flowcharts/:id/retry 同一处理。
-    await judgeQueue.add(
-      "judge",
-      { submissionId: row.id, problemId: row.problemId },
-      { jobId: `${row.id}:rejudge:${Date.now()}` },
-    )
-    return success(c, null)
-  },
-)
+  // jobId 必须带时间戳。队列保留最近 100 个已完成任务，沿用 submissionId 做 jobId 的话
+  // BullMQ 会认为这个任务已经存在，重判静默变成空操作。与 flowcharts/:id/retry 同一处理。
+  await judgeQueue.add(
+    "judge",
+    { submissionId: row.id, problemId: row.problemId },
+    { jobId: `${row.id}:rejudge:${Date.now()}` },
+  )
+  return success(c, null)
+})
 
 submissionRoutes.post("/code/format", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    formatCodeRequestSchema,
-    "Invalid format payload",
-  )
+  const parsed = await parseBody(c, formatCodeRequestSchema, "Invalid format payload")
   if (!parsed.success) return parsed.response
   try {
     const code = await formatCode(parsed.data.code, parsed.data.language)
@@ -337,10 +275,7 @@ async function problemSetJoinTimes(userId: number, problemIds: number[]) {
       joinTime: sql<string>`max(${schema.problemsetProgress.joinTime})`,
     })
     .from(schema.problemsetProgress)
-    .innerJoin(
-      schema.problemset,
-      eq(schema.problemset.id, schema.problemsetProgress.problemsetId),
-    )
+    .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProgress.problemsetId))
     .innerJoin(
       schema.problemsetProblem,
       eq(schema.problemsetProblem.problemsetId, schema.problemset.id),
@@ -350,10 +285,7 @@ async function problemSetJoinTimes(userId: number, problemIds: number[]) {
         eq(schema.problemsetProgress.userId, userId),
         inArray(schema.problemsetProblem.problemId, problemIds),
         eq(schema.problemset.status, "active"),
-        or(
-          isNull(schema.problemset.endTime),
-          gt(schema.problemset.endTime, sql`now()`),
-        ),
+        or(isNull(schema.problemset.endTime), gt(schema.problemset.endTime, sql`now()`)),
         sql`not jsonb_exists(${schema.problemsetProgress.progressDetail}, ${schema.problemsetProblem.problemId}::text)`,
       ),
     )
@@ -376,11 +308,7 @@ function canViewSubmission(
   // `get_show_link` 里的 `obj.user_id == self.user.id and self.user.is_regular_user()`。
   if (row.userId === user.id && !isAdminRole(user)) {
     const joinTime = problemSetJoinTime?.get(row.problemId)
-    if (
-      joinTime !== undefined &&
-      Date.parse(row.createTime) < Date.parse(joinTime)
-    )
-      return false
+    if (joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)) return false
   }
   // 比赛没结束时，学生管理员不吃「管理员看得到所有人代码」这条捷径：他自己也在排行榜里
   // （contest.ts 的 rank 把 Student Admin 算作参赛者），既参赛又能读别人的提交就是开卷。
@@ -391,11 +319,7 @@ function canViewSubmission(
   // 他早就知道答案了，挡他没有意义。
   const elevated =
     isAdminRole(user) &&
-    !(
-      contest &&
-      contestStatus(contest) !== "-1" &&
-      user.adminType === "Student Admin"
-    )
+    !(contest && contestStatus(contest) !== "-1" && user.adminType === "Student Admin")
   // 这三条就是全部：别人的代码谁都看不到，比赛内外一样。
   // 分享功能（problem.share_submission 题目级 / submission.shared 单条）已经删掉，
   // 原来结尾的 `return problem.shareSubmission || row.shared` 随之消失；它上面那条
@@ -444,13 +368,10 @@ const submissionListColumns = {
  * 这里只信「有没有 data 数组」，数组项的形状信判题机，和前端 submissionCaseResults 同口径。
  */
 function caseSummary(submission: typeof schema.submission.$inferSelect) {
-  if (submission.contestId !== null || submission.language === "SQL")
-    return null
+  if (submission.contestId !== null || submission.language === "SQL") return null
   const data = asRecord(submission.info).data
   if (!Array.isArray(data) || data.length === 0) return null
-  const passed = data.filter(
-    (item) => asRecord(item).result === JudgeStatus.ACCEPTED,
-  ).length
+  const passed = data.filter((item) => asRecord(item).result === JudgeStatus.ACCEPTED).length
   return { passed, total: data.length }
 }
 
@@ -462,14 +383,8 @@ async function submissionDetail(id: string, user: AuthUser) {
       contest: schema.contest,
     })
     .from(schema.submission)
-    .innerJoin(
-      schema.problem,
-      eq(schema.submission.problemId, schema.problem.id),
-    )
-    .leftJoin(
-      schema.contest,
-      eq(schema.submission.contestId, schema.contest.id),
-    )
+    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+    .leftJoin(schema.contest, eq(schema.submission.contestId, schema.contest.id))
     .where(eq(schema.submission.id, id))
     .limit(1)
   if (!row) return null
@@ -479,16 +394,7 @@ async function submissionDetail(id: string, user: AuthUser) {
     isAdminRole(user) || row.submission.userId !== user.id
       ? undefined
       : await problemSetJoinTimes(user.id, [row.submission.problemId])
-  if (
-    !canViewSubmission(
-      user,
-      row.submission,
-      row.problem,
-      row.contest,
-      joinTimes,
-    )
-  )
-    return null
+  if (!canViewSubmission(user, row.submission, row.problem, row.contest, joinTimes)) return null
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
@@ -546,18 +452,12 @@ async function paginateSubmissionRows(
   offset: number,
   byUsername: boolean,
 ) {
-  const order = [
-    desc(schema.submission.createTime),
-    desc(schema.submission.id),
-  ] as const
+  const order = [desc(schema.submission.createTime), desc(schema.submission.id)] as const
   const page = (condition: SQL | undefined) =>
     db
       .select(submissionListColumns)
       .from(schema.submission)
-      .innerJoin(
-        schema.problem,
-        eq(schema.submission.problemId, schema.problem.id),
-      )
+      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
       // 取当前用户名用。left join 不是 inner —— 已删号的学生这边没有行，
       // inner join 会把他们的提交整条从列表里抹掉
       .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
@@ -621,10 +521,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   const user = c.get("user")
   // 「非管理员即受限」，不能写成「是普通用户才受限」——
   // 后者对匿名用户（user 为 null）会短路，匿名反而能看到全部提交，权限大于登录学生。
-  if (
-    !(await getBooleanOption("submission_list_show_all", true)) &&
-    !isAdminRole(user)
-  ) {
+  if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
     return success(c, { results: [], total: 0 } satisfies SubmissionList)
   }
   const displayId = c.req.query("problemDisplayId")?.trim()
@@ -643,8 +540,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   if (myself) filters.push(eq(schema.submission.userId, myself.id))
   if (result !== undefined && result !== "" && Number.isInteger(Number(result)))
     filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
-  if (language)
-    filters.push(eq(schema.submission.language, asFilterValue(language)))
+  if (language) filters.push(eq(schema.submission.language, asFilterValue(language)))
   if (c.req.query("today") === "1")
     filters.push(sql`${schema.submission.createTime} >= ${dayStart()}`)
   const where = and(...filters)
@@ -675,9 +571,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
           id: submission.id,
           problemDisplayId: problem.displayId,
           problemTitle: problem.title,
-          showLink: user
-            ? canViewSubmission(user, submission, problem, null, joinTimes)
-            : false,
+          showLink: user ? canViewSubmission(user, submission, problem, null, joinTimes) : false,
           createTime: submission.createTime,
           userId: submission.userId,
           username: submission.username,
@@ -686,8 +580,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
           statisticInfo: asRecord(submission.statisticInfo),
           // 题单被删掉之后外键把 problemset_id 置了空，这里自然就没标记了
           problemSet:
-            submission.problemsetId !== null &&
-            problemsetTitles.has(submission.problemsetId)
+            submission.problemsetId !== null && problemsetTitles.has(submission.problemsetId)
               ? {
                   id: submission.problemsetId,
                   title: problemsetTitles.get(submission.problemsetId)!,
@@ -712,9 +605,7 @@ submissionRoutes.get(
     const myself = c.req.query("myself") === "1" ? user : null
     const username = myself ? undefined : c.req.query("username")?.trim()
     const result = c.req.query("result")
-    const filters: Array<SQL | undefined> = [
-      eq(schema.submission.contestId, contest.id),
-    ]
+    const filters: Array<SQL | undefined> = [eq(schema.submission.contestId, contest.id)]
     filters.push(
       ...(await Promise.all([
         displayId ? problemFilter(displayId, contest.id) : undefined,
@@ -722,11 +613,7 @@ submissionRoutes.get(
       ])),
     )
     if (myself) filters.push(eq(schema.submission.userId, myself.id))
-    if (
-      result !== undefined &&
-      result !== "" &&
-      Number.isInteger(Number(result))
-    )
+    if (result !== undefined && result !== "" && Number.isInteger(Number(result)))
       filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
     if (contestStatus(contest) !== "1")
       filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
@@ -738,10 +625,7 @@ submissionRoutes.get(
       db
         .select(submissionListColumns)
         .from(schema.submission)
-        .innerJoin(
-          schema.problem,
-          eq(schema.submission.problemId, schema.problem.id),
-        )
+        .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
         .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
         .where(where)
         .orderBy(desc(schema.submission.createTime))
@@ -759,9 +643,7 @@ submissionRoutes.get(
             id: submission.id,
             problemDisplayId: problem.displayId,
             problemTitle: problem.title,
-            showLink: user
-              ? canViewSubmission(user, submission, problem, contest)
-              : false,
+            showLink: user ? canViewSubmission(user, submission, problem, contest) : false,
             createTime: submission.createTime,
             userId: submission.userId,
             username: submission.username,

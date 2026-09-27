@@ -5,9 +5,7 @@ import { parseTime } from "utils/functions"
 
 // md-editor-v3 按需加载：这个弹框挂在默认布局上，静态 import 的话首页每次都要多拉
 // ~160KB JS + ~76KB CSS，而 AI 分析只在登录后、且期间提交够 3 次才有
-const MdPreview = defineAsyncComponent(
-  () => import("./LoginSummaryPreview.vue"),
-)
+const MdPreview = defineAsyncComponent(() => import("./LoginSummaryPreview.vue"))
 
 const loginSummaryStore = useLoginSummaryStore()
 const { isDesktop } = useBreakpoints()
@@ -47,16 +45,10 @@ const hasAnalysis = computed(() => !!loginSummaryStore.analysis)
             />
           </n-gi>
           <n-gi>
-            <n-statistic
-              label="AC 次数"
-              :value="loginSummaryStore.summary?.acceptedCount ?? 0"
-            />
+            <n-statistic label="AC 次数" :value="loginSummaryStore.summary?.acceptedCount ?? 0" />
           </n-gi>
           <n-gi>
-            <n-statistic
-              label="AC 题目数"
-              :value="loginSummaryStore.summary?.solvedCount ?? 0"
-            />
+            <n-statistic label="AC 题目数" :value="loginSummaryStore.summary?.solvedCount ?? 0" />
           </n-gi>
           <n-gi>
             <n-statistic
@@ -67,17 +59,10 @@ const hasAnalysis = computed(() => !!loginSummaryStore.analysis)
         </n-grid>
 
         <n-divider>AI 分析</n-divider>
-        <n-alert
-          v-if="loginSummaryStore.analysisError"
-          type="warning"
-          :show-icon="false"
-        >
+        <n-alert v-if="loginSummaryStore.analysisError" type="warning" :show-icon="false">
           {{ loginSummaryStore.analysisError }}
         </n-alert>
-        <MdPreview
-          v-if="hasAnalysis"
-          :model-value="loginSummaryStore.analysis"
-        />
+        <MdPreview v-if="hasAnalysis" :model-value="loginSummaryStore.analysis" />
         <n-empty v-else description="期间提交数少于 3 次，暂不生成 AI 分析" />
       </n-flex>
     </n-spin>

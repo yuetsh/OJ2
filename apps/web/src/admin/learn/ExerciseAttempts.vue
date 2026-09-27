@@ -24,11 +24,7 @@ const columns: DataTableColumn<LearnExerciseAttempt>[] = [
     width: 130,
     render: (row) =>
       row.solved
-        ? h(
-            NText,
-            { type: "success" },
-            () => `做对了（第 ${row.attemptsToSolve} 次）`,
-          )
+        ? h(NText, { type: "success" }, () => `做对了（第 ${row.attemptsToSolve} 次）`)
         : h(NText, { type: "error" }, () => "还没做对"),
   },
   { title: "提交次数", key: "attempts", width: 100, sorter: "default" },

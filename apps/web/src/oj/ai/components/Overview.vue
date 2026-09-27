@@ -1,9 +1,5 @@
 <template>
-  <n-alert
-    :show-icon="false"
-    type="success"
-    v-if="aiStore.detailsData.solvedCount"
-  >
+  <n-alert :show-icon="false" type="success" v-if="aiStore.detailsData.solvedCount">
     <span>{{ durationLabel }}，</span>
     <span>你一共解决 </span>
     <b class="charming"> {{ aiStore.detailsData.solvedCount }} </b>
@@ -33,10 +29,7 @@ const durationLabel = computed(() => {
     return `在 ${parseTime(aiStore.detailsData.start, "HH:mm")} - ${parseTime(aiStore.detailsData.end, "HH:mm")} 期间`
   } else if (aiStore.duration.includes("days")) {
     return `在 ${parseTime(aiStore.detailsData.end, "MM月DD日")}`
-  } else if (
-    aiStore.duration.includes("weeks") ||
-    aiStore.duration.includes("months")
-  ) {
+  } else if (aiStore.duration.includes("weeks") || aiStore.duration.includes("months")) {
     return `在 ${parseTime(aiStore.detailsData.start, "MM月DD日")} - ${parseTime(aiStore.detailsData.end, "MM月DD日")} 期间`
   } else {
     return `在 ${parseTime(aiStore.detailsData.start, "YYYY年MM月DD日")} - ${parseTime(aiStore.detailsData.end, "YYYY年MM月DD日")} 期间`

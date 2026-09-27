@@ -13,11 +13,7 @@
             @change="onUsernameChange"
             @clear="onUsernameChange"
           />
-          <n-select
-            style="width: 140px"
-            :options="options"
-            v-model:value="urlDuration"
-          />
+          <n-select style="width: 140px" :options="options" v-model:value="urlDuration" />
         </n-flex>
       </n-flex>
 
@@ -74,9 +70,7 @@ aiStore.targetUsername = urlUsername.value
 aiStore.duration = urlDuration.value
 
 const subOptions = computed<Duration>(
-  () =>
-    durationFromValue(aiStore.duration) ??
-    durationFromValue(DURATION_OPTIONS[0].value)!,
+  () => durationFromValue(aiStore.duration) ?? durationFromValue(DURATION_OPTIONS[0].value)!,
 )
 
 const start = computed(() => formatISO(sub(new Date(), subOptions.value)))

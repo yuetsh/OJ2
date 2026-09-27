@@ -25,9 +25,7 @@ async function handleDelete() {
 </script>
 <template>
   <n-flex>
-    <n-button size="small" type="success" secondary @click="goEdit">
-      编辑
-    </n-button>
+    <n-button size="small" type="success" secondary @click="goEdit"> 编辑 </n-button>
     <n-popconfirm @positive-click="handleDelete">
       <template #trigger>
         <n-button size="small" type="error" secondary>删除</n-button>

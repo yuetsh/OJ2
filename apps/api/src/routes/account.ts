@@ -47,12 +47,7 @@ import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { sniffImageExtension } from "../services/image"
 import { getUserProfileById } from "../services/profile"
-import {
-  clientIp,
-  countAttempt,
-  lockoutRemaining,
-  type AttemptRule,
-} from "../services/throttling"
+import { clientIp, countAttempt, lockoutRemaining, type AttemptRule } from "../services/throttling"
 import { localTime, weekStart } from "../time"
 import { isTeacherOrAbove, asRecord, queryInteger, sampleUser } from "./helpers"
 
@@ -65,19 +60,10 @@ export const accountRoutes = new Hono<AppEnv>()
 const REGISTER_PER_IP: AttemptRule = { limit: 100, windowSeconds: 60 * 60 }
 
 accountRoutes.post("/users", async (c) => {
-  const parsed = await parseBody(
-    c,
-    registerRequestSchema,
-    "Invalid registration payload",
-  )
+  const parsed = await parseBody(c, registerRequestSchema, "Invalid registration payload")
   if (!parsed.success) return parsed.response
   if (!(await getBooleanOption("allow_register", true))) {
-    return failure(
-      c,
-      403,
-      "registration-disabled",
-      "Register function has been disabled by admin",
-    )
+    return failure(c, 403, "registration-disabled", "Register function has been disabled by admin")
   }
 
   const registerKey = `register:ip:${clientIp(c)}`
@@ -159,47 +145,31 @@ accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
     )
     .limit(1)
   if (!target) return failure(c, 404, "user-not-found", "User does not exist")
-  const profile = await getUserProfileById(
-    target.id,
-    c.get("user")?.id === target.id,
-  )
-  if (!profile)
-    return failure(c, 404, "profile-not-found", "User profile does not exist")
+  const profile = await getUserProfileById(target.id, c.get("user")?.id === target.id)
+  if (!profile) return failure(c, 404, "profile-not-found", "User profile does not exist")
   return success(c, profile)
 })
 
 accountRoutes.put("/me/profile", requireAuth, async (c) => {
-  const parsed = await parseBody(
-    c,
-    updateProfileRequestSchema,
-    "Invalid profile payload",
-  )
+  const parsed = await parseBody(c, updateProfileRequestSchema, "Invalid profile payload")
   if (!parsed.success) return parsed.response
   const values = Object.fromEntries(
-    Object.entries(parsed.data).map(([key, value]) => [
-      key,
-      value === "" ? null : value,
-    ]),
+    Object.entries(parsed.data).map(([key, value]) => [key, value === "" ? null : value]),
   )
   await db
     .update(schema.userProfile)
     .set(values)
     .where(eq(schema.userProfile.userId, c.get("user")!.id))
   const profile = await getUserProfileById(c.get("user")!.id, true)
-  if (!profile)
-    return failure(c, 404, "profile-not-found", "User profile does not exist")
+  if (!profile) return failure(c, 404, "profile-not-found", "User profile does not exist")
   return success(c, profile)
 })
 
 accountRoutes.post("/me/avatar", requireAuth, async (c) => {
-  const body: Record<string, string | File> = await c.req
-    .parseBody()
-    .catch(() => ({}))
+  const body: Record<string, string | File> = await c.req.parseBody().catch(() => ({}))
   const image = body.image
-  if (!(image instanceof File))
-    return failure(c, 400, "invalid-file", "Invalid file content")
-  if (image.size > 2 * 1024 * 1024)
-    return failure(c, 400, "file-too-large", "Picture is too large")
+  if (!(image instanceof File)) return failure(c, 400, "invalid-file", "Invalid file content")
+  if (image.size > 2 * 1024 * 1024) return failure(c, 400, "file-too-large", "Picture is too large")
   const extension = await sniffImageExtension(image)
   if (!extension) {
     return failure(c, 400, "unsupported-file", "Unsupported file format")
@@ -223,14 +193,11 @@ accountRoutes.get("/users/:id/metrics", async (c) => {
     .select({
       first: min(schema.submission.createTime),
       latest: max(schema.submission.createTime),
-      activeDays: countDistinct(
-        sql`date(${localTime(schema.submission.createTime)})`,
-      ),
+      activeDays: countDistinct(sql`date(${localTime(schema.submission.createTime)})`),
     })
     .from(schema.submission)
     .where(eq(schema.submission.userId, userId))
-  if (!row?.first || !row.latest)
-    return failure(c, 404, "no-submissions", "暂无提交")
+  if (!row?.first || !row.latest) return failure(c, 404, "no-submissions", "暂无提交")
   return success(c, {
     now: new Date().toISOString(),
     first: row.first,
@@ -397,10 +364,7 @@ accountRoutes.get("/rankings/activity", async (c) => {
       and(
         isNull(schema.submission.contestId),
         gte(schema.submission.createTime, start),
-        inArray(schema.submission.result, [
-          JudgeStatus.ACCEPTED,
-          JudgeStatus.AST_CHECK_FAILED,
-        ]),
+        inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
         eq(schema.user.isDisabled, false),
         ne(schema.user.adminType, "Super Admin"),
       ),
@@ -447,8 +411,7 @@ accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
   const user = c.get("user")
   const scope = c.req.query("scope") === "class" ? "class" : "global"
   const className = scope === "class" ? (user?.className ?? null) : null
-  if (scope === "class" && !className)
-    return failure(c, 400, "class-missing", "用户没有班级信息")
+  if (scope === "class" && !className) return failure(c, 400, "class-missing", "用户没有班级信息")
 
   const start = weekStart()
 
@@ -503,9 +466,7 @@ accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
       .groupBy(schema.submission.userId),
   ])
 
-  const submissions = new Map(
-    submittedRows.map((row) => [row.userId, row.value]),
-  )
+  const submissions = new Map(submittedRows.map((row) => [row.userId, row.value]))
   /**
    * 排序键与全服榜同构：解决多的在前 → 同解决数时提交少的在前 → 再同按 id。
    * 第三档同样不是凑数，周榜上「都是 1 题」的学生成片存在，没有稳定兜底键时
@@ -551,8 +512,7 @@ accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
       ),
     )
     .limit(1)
-  if (!problem)
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
   const accepted = and(
     eq(schema.submission.problemId, problem.id),
     inArray(schema.submission.result, [0, 10]),
@@ -570,12 +530,7 @@ accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
           db
             .select({ id: schema.user.id })
             .from(schema.user)
-            .where(
-              and(
-                eq(schema.user.className, className),
-                eq(schema.user.isDisabled, false),
-              ),
-            ),
+            .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false))),
         ),
       )
     : accepted
@@ -617,44 +572,33 @@ accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
  * 题目一旦被隐藏或删除，display_ids 就比 ids 短 —— 轻则把编号张冠李戴写进库，
  * 重则 `id_map[k]` KeyError。这里改成按 id 建 Map、查不到就不动。
  */
-accountRoutes.post(
-  "/me/problem-display-ids/refresh",
-  requireAuth,
-  async (c) => {
-    const user = c.get("user")!
-    const [profile] = await db
-      .select({ value: schema.userProfile.acmProblemsStatus })
-      .from(schema.userProfile)
-      .where(eq(schema.userProfile.userId, user.id))
-      .limit(1)
-    const status = asRecord(profile?.value)
-    const problems = asRecord(status.problems)
-    const ids = Object.keys(problems).map(Number).filter(Number.isInteger)
-    if (ids.length > 0) {
-      const rows = await db
-        .select({ id: schema.problem.id, displayId: schema.problem.displayId })
-        .from(schema.problem)
-        .where(
-          and(
-            inArray(schema.problem.id, ids),
-            eq(schema.problem.visible, true),
-          ),
-        )
-      const displayIds = new Map(
-        rows.map((row) => [String(row.id), row.displayId]),
-      )
-      for (const [id, value] of Object.entries(problems)) {
-        const item = asRecord(value)
-        const displayId = displayIds.get(id)
-        if (displayId) item._id = displayId
-        problems[id] = item
-      }
-      status.problems = problems
-      await db
-        .update(schema.userProfile)
-        .set({ acmProblemsStatus: status })
-        .where(eq(schema.userProfile.userId, user.id))
+accountRoutes.post("/me/problem-display-ids/refresh", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const [profile] = await db
+    .select({ value: schema.userProfile.acmProblemsStatus })
+    .from(schema.userProfile)
+    .where(eq(schema.userProfile.userId, user.id))
+    .limit(1)
+  const status = asRecord(profile?.value)
+  const problems = asRecord(status.problems)
+  const ids = Object.keys(problems).map(Number).filter(Number.isInteger)
+  if (ids.length > 0) {
+    const rows = await db
+      .select({ id: schema.problem.id, displayId: schema.problem.displayId })
+      .from(schema.problem)
+      .where(and(inArray(schema.problem.id, ids), eq(schema.problem.visible, true)))
+    const displayIds = new Map(rows.map((row) => [String(row.id), row.displayId]))
+    for (const [id, value] of Object.entries(problems)) {
+      const item = asRecord(value)
+      const displayId = displayIds.get(id)
+      if (displayId) item._id = displayId
+      problems[id] = item
     }
-    return success(c, null)
-  },
-)
+    status.problems = problems
+    await db
+      .update(schema.userProfile)
+      .set({ acmProblemsStatus: status })
+      .where(eq(schema.userProfile.userId, user.id))
+  }
+  return success(c, null)
+})

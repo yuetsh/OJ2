@@ -58,11 +58,7 @@ const columns: DataTableColumn<AdminProblemSet>[] = [
         Hard: { type: "error" as const, text: "困难" },
       }
       const config = difficultyMap[row.difficulty]
-      return h(
-        NTag,
-        { type: config.type, size: "small" },
-        { default: () => config.text },
-      )
+      return h(NTag, { type: config.type, size: "small" }, { default: () => config.text })
     },
   },
   {
@@ -76,11 +72,7 @@ const columns: DataTableColumn<AdminProblemSet>[] = [
         draft: { type: "info" as const, text: "草稿" },
       }
       const config = statusMap[row.status]
-      return h(
-        NTag,
-        { type: config.type, size: "small" },
-        { default: () => config.text },
-      )
+      return h(NTag, { type: config.type, size: "small" }, { default: () => config.text })
     },
   },
   {
@@ -146,20 +138,14 @@ watchDebounced(() => query.keyword, listProblemSets, {
 })
 
 // 监听其他查询条件变化
-watch(
-  () => [query.page, query.limit, query.difficulty, query.status],
-  listProblemSets,
-)
+watch(() => [query.page, query.limit, query.difficulty, query.status], listProblemSets)
 </script>
 
 <template>
   <n-flex class="titleWrapper" justify="space-between">
     <n-flex align="center">
       <h2 class="title">题单管理</h2>
-      <n-button
-        type="primary"
-        @click="$router.push({ name: 'admin problemset create' })"
-      >
+      <n-button type="primary" @click="$router.push({ name: 'admin problemset create' })">
         新建题单
       </n-button>
     </n-flex>
@@ -194,11 +180,7 @@ watch(
     </n-flex>
   </n-flex>
   <n-data-table striped :columns="columns" :data="problemSets" />
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
 <style scoped>

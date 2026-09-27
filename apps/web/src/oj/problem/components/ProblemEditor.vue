@@ -31,9 +31,7 @@ const { problem } = storeToRefs(problemStore)
  * 协作跟着结束」：页面上没有弹框可关，结束协作只有工具栏那个按钮和离开这一页两条路。
  */
 const collabHere = computed(
-  () =>
-    collabStore.room !== null &&
-    collabStore.room.problemId === problem.value?._id,
+  () => collabStore.room !== null && collabStore.room.problemId === problem.value?._id,
 )
 
 /** 协作中的教师：编辑器里是学生的代码，不是他自己的 */
@@ -66,8 +64,7 @@ watch(
     const wasHere = previous?.[0] ?? false
     if (here && language) {
       if (!wasHere) teacherLanguageBefore = codeStore.code.language
-      if (codeStore.code.language !== language)
-        codeStore.code.language = language
+      if (codeStore.code.language !== language) codeStore.code.language = language
       return
     }
     if (!here && wasHere) {
@@ -84,8 +81,7 @@ const { isDesktop } = useBreakpoints()
 
 const contestID = route.params.contestID || null
 const storageKey = computed(
-  () =>
-    `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
+  () => `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
 )
 
 const editorHeight = computed(() =>
@@ -100,10 +96,7 @@ function loadCode() {
       SOURCES[codeStore.code.language],
   )
   // 换了题才重新计数，同一道题重复 loadCode（协作结束读回草稿）是接着记
-  beginEditTrace(
-    `problem_${problem.value!._id}_contest_${contestID}`,
-    codeStore.code.value.length,
-  )
+  beginEditTrace(`problem_${problem.value!._id}_contest_${contestID}`, codeStore.code.value.length)
 }
 
 onMounted(loadCode)
@@ -128,8 +121,7 @@ const changeLanguage = (v: LANGUAGE) => {
   codeStore.setCode(
     savedCode && storageKey.value.split("_").pop() === v
       ? savedCode
-      : problem.value!.template[codeStore.code.language] ||
-          SOURCES[codeStore.code.language],
+      : problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
   )
 }
 
@@ -139,10 +131,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
 
 <template>
   <n-flex vertical>
-    <EditorToolbar
-      :storage-key="storageKey"
-      @change-language="changeLanguage"
-    />
+    <EditorToolbar :storage-key="storageKey" @change-language="changeLanguage" />
     <!--
       协作中教师这边不会落到流程图分支：上面那个 watch 已经把他的语言换成了学生的，
       而求助入口本身就排掉了流程图（EditorToolbar.vue 的 showHelpButton、服务端的
@@ -150,10 +139,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
       学生自己切到流程图就是不写代码了，编辑器卸载、协作正常结束（SyncCodeEditor
       的 detach），这是原来就有的语义。
     -->
-    <FlowchartEditor
-      v-if="codeStore.code.language === 'Flowchart'"
-      ref="flowchartEditorRef"
-    />
+    <FlowchartEditor v-if="codeStore.code.language === 'Flowchart'" ref="flowchartEditorRef" />
     <SyncCodeEditor
       v-else
       v-model:value="codeStore.code.value"

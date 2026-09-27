@@ -102,10 +102,7 @@ watchDebounced(() => query.keyword, listContests, {
   <n-flex justify="space-between" class="titleWrapper">
     <n-flex align="center">
       <h2 class="title">比赛列表</h2>
-      <n-button
-        type="primary"
-        @click="$router.push({ name: 'admin contest create' })"
-      >
+      <n-button type="primary" @click="$router.push({ name: 'admin contest create' })">
         新建
       </n-button>
     </n-flex>
@@ -114,11 +111,7 @@ watchDebounced(() => query.keyword, listContests, {
     </div>
   </n-flex>
   <n-data-table :columns="columns" :data="contests" />
-  <Pagination
-    :total="total"
-    v-model:limit="query.limit"
-    v-model:page="query.page"
-  />
+  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
 <style scoped>

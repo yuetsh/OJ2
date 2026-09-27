@@ -1,9 +1,5 @@
 import api from "utils/api"
-import type {
-  AchievementList,
-  AchievementSummary,
-  PendingAchievement,
-} from "utils/types"
+import type { AchievementList, AchievementSummary, PendingAchievement } from "utils/types"
 
 export function getAchievements(name?: string) {
   return api.get<AchievementList>("achievements", {

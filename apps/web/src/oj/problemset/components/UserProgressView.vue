@@ -21,9 +21,7 @@ const statistics = ref<{
   avgProgress: number
 } | null>(null)
 const classFilter = ref<string>("")
-const completionFilter = ref<"" | "completed" | "in_progress" | "not_started">(
-  "",
-)
+const completionFilter = ref<"" | "completed" | "in_progress" | "not_started">("")
 const allProblems = ref<Array<{ id: number; _id: string; title: string }>>([])
 
 // 完成度筛选选项
@@ -136,8 +134,7 @@ const progressColumns = [
     title: "加入时间",
     key: "join_time",
     width: 180,
-    render: (row: ProblemSetProgress) =>
-      parseTime(row.joinTime, "YYYY-MM-DD HH:mm:ss"),
+    render: (row: ProblemSetProgress) => parseTime(row.joinTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
     title: "已完成数量",
@@ -153,12 +150,8 @@ const progressColumns = [
         return "全部题目已完成"
       }
       if (row.progressPercentage > 50 && row.progressPercentage < 100) {
-        const completedProblemIds = new Set(
-          row.completedProblems.map((p: any) => p.id),
-        )
-        const incompleteProblems = allProblems.value.filter(
-          (p) => !completedProblemIds.has(p.id),
-        )
+        const completedProblemIds = new Set(row.completedProblems.map((p: any) => p.id))
+        const incompleteProblems = allProblems.value.filter((p) => !completedProblemIds.has(p.id))
         return h("div", { style: "max-height: 120px; overflow-y: auto" }, [
           h(NFlex, {}, () =>
             incompleteProblems.map((problem) =>
@@ -249,10 +242,7 @@ const progressColumns = [
       </n-grid-item>
       <n-grid-item>
         <n-card size="small">
-          <n-statistic
-            label="平均进度"
-            :value="stats.avgProgress.toFixed(0) + '%'"
-          />
+          <n-statistic label="平均进度" :value="stats.avgProgress.toFixed(0) + '%'" />
         </n-card>
       </n-grid-item>
     </n-grid>

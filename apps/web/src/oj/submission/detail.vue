@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { getSubmission } from "oj/api"
 import type { JudgeCaseResult } from "@oj2/contract"
-import {
-  JUDGE_STATUS,
-  LANGUAGE_FORMAT_VALUE,
-  LANGUAGE_SHOW_VALUE,
-} from "utils/constants"
+import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, LANGUAGE_SHOW_VALUE } from "utils/constants"
 import {
   parseTime,
   submissionCaseResults,
@@ -43,9 +39,7 @@ const loading = ref(false)
  * 测试点明细。`info` 在契约里是「完整形状或空对象」的联合（非管理员拿到的是空对象），
  * `data` 本身也可能为 null —— 两种情况都由这个访问器归成空数组，模板里不再直接取。
  */
-const caseResults = computed(() =>
-  submissionCaseResults(submission.value?.info),
-)
+const caseResults = computed(() => submissionCaseResults(submission.value?.info))
 
 async function init() {
   submission.value = props.submission
@@ -141,11 +135,7 @@ onMounted(init)
         </n-flex>
       </n-alert>
       <n-flex :vertical="isDesktop" justify="center">
-        <n-button
-          v-if="submission.language !== 'SQL'"
-          secondary
-          @click="copyToCat"
-        >
+        <n-button v-if="submission.language !== 'SQL'" secondary @click="copyToCat">
           复制到自测猫
         </n-button>
         <n-button secondary @click="copyToProblem">复制回到题目</n-button>
@@ -159,11 +149,7 @@ onMounted(init)
         show-line-numbers
       />
     </n-card>
-    <n-data-table
-      v-if="!hideList && caseResults.length"
-      :columns="columns"
-      :data="caseResults"
-    />
+    <n-data-table v-if="!hideList && caseResults.length" :columns="columns" :data="caseResults" />
   </n-flex>
   <n-spin v-else :show="loading" class="loading-container"> </n-spin>
 </template>

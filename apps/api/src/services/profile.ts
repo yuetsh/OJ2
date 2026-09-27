@@ -3,10 +3,7 @@ import { and, eq } from "drizzle-orm"
 
 import { db, schema } from "../db"
 
-export async function getUserProfileById(
-  userId: number,
-  showRealName: boolean,
-) {
+export async function getUserProfileById(userId: number, showRealName: boolean) {
   const [row] = await db
     .select({ profile: schema.userProfile, user: schema.user })
     .from(schema.userProfile)

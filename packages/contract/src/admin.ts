@@ -41,9 +41,7 @@ export const adminAnnouncementListItemSchema = adminAnnouncementSchema.omit({
   content: true,
 })
 
-export const adminAnnouncementListSchema = paginatedSchema(
-  adminAnnouncementListItemSchema,
-)
+export const adminAnnouncementListSchema = paginatedSchema(adminAnnouncementListItemSchema)
 
 export const createAnnouncementRequestSchema = z.object({
   title: z.string().trim().min(1).max(64),
@@ -59,9 +57,7 @@ export type ProblemSample = z.infer<typeof problemSampleSchema>
 export type ProblemAnswer = z.infer<typeof problemAnswerSchema>
 export type ProblemTestCaseScore = z.infer<typeof problemTestCaseScoreSchema>
 export type AdminAnnouncement = z.infer<typeof adminAnnouncementSchema>
-export type AdminAnnouncementListItem = z.infer<
-  typeof adminAnnouncementListItemSchema
->
+export type AdminAnnouncementListItem = z.infer<typeof adminAnnouncementListItemSchema>
 
 // ---------------------------------------------------------------- 教程 / 练习
 
@@ -157,9 +153,7 @@ export const adminAiReportSchema = z.object({
   analysis: z.string(),
 })
 
-export const adminAiReportListSchema = paginatedSchema(
-  adminAiReportListItemSchema,
-)
+export const adminAiReportListSchema = paginatedSchema(adminAiReportListItemSchema)
 export const toggleAiReportPinResponseSchema = z.object({
   isPinned: z.boolean(),
 })
@@ -244,14 +238,7 @@ export const updateUserRequestSchema = z.object({
 /** 导入用户：每行 [用户名, 密码, 邮箱, 真名]，与前端粘贴的 Excel 列序一致 */
 export const importUsersRequestSchema = z.object({
   users: z
-    .array(
-      z.tuple([
-        z.string().trim().min(1).max(32),
-        z.string().min(1),
-        z.string(),
-        z.string(),
-      ]),
-    )
+    .array(z.tuple([z.string().trim().min(1).max(32), z.string().min(1), z.string(), z.string()]))
     .min(1),
 })
 
@@ -381,11 +368,7 @@ export const updateAcmHelperRequestSchema = z.object({
 
 export const problemSetDifficultySchema = z.enum(["Easy", "Medium", "Hard"])
 export const problemSetStatusSchema = z.enum(["draft", "active", "archived"])
-export const badgeConditionTypeSchema = z.enum([
-  "all_problems",
-  "problem_count",
-  "score",
-])
+export const badgeConditionTypeSchema = z.enum(["all_problems", "problem_count", "score"])
 
 export const adminProblemSetSchema = z.object({
   id: z.number().int(),
@@ -468,8 +451,7 @@ export const createProblemSetBadgeRequestSchema = z.object({
   conditionValue: z.number().int().default(0),
 })
 
-export const updateProblemSetBadgeRequestSchema =
-  createProblemSetBadgeRequestSchema
+export const updateProblemSetBadgeRequestSchema = createProblemSetBadgeRequestSchema
 
 export const adminProblemSetProgressSchema = z.object({
   id: z.number().int(),
@@ -648,14 +630,10 @@ export const adminProblemListItemSchema = z.object({
   showFlowchart: z.boolean(),
   // 最高票评价 {type, count}。**只有公开题列表下发**，比赛题列表恒传 null ——
   // 与旧后端 reaction/services.py:get_top_reactions 的口径一致。
-  topReaction: z
-    .object({ type: reactionKeySchema, count: z.number().int() })
-    .nullable(),
+  topReaction: z.object({ type: reactionKeySchema, count: z.number().int() }).nullable(),
 })
 
-export const adminProblemListSchema = paginatedSchema(
-  adminProblemListItemSchema,
-)
+export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema)
 
 /**
  * 题面样例 / 标准答案 / 测试点分值。这三个旧后端都是逐字段校验的
@@ -867,132 +845,72 @@ export type AdminAiReport = z.infer<typeof adminAiReportSchema>
 export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
 export type StuckProblem = z.infer<typeof stuckProblemSchema>
 export type LearnStudentProgress = z.infer<typeof learnStudentProgressSchema>
-export type LearnStudentProgressList = z.infer<
-  typeof learnStudentProgressListSchema
->
+export type LearnStudentProgressList = z.infer<typeof learnStudentProgressListSchema>
 export type LearnTutorialProgress = z.infer<typeof learnTutorialProgressSchema>
-export type LearnTutorialProgressList = z.infer<
-  typeof learnTutorialProgressListSchema
->
+export type LearnTutorialProgressList = z.infer<typeof learnTutorialProgressListSchema>
 export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>
-export type LearnExerciseProgressList = z.infer<
-  typeof learnExerciseProgressListSchema
->
+export type LearnExerciseProgressList = z.infer<typeof learnExerciseProgressListSchema>
 export type LearnExerciseAttempt = z.infer<typeof learnExerciseAttemptSchema>
 export type AcTrend = z.infer<typeof acTrendSchema>
 
 export type AdminTag = z.infer<typeof adminTagSchema>
 export type RenameTagResponse = z.infer<typeof renameTagResponseSchema>
-export type BatchProblemTagResponse = z.infer<
-  typeof batchProblemTagResponseSchema
->
+export type BatchProblemTagResponse = z.infer<typeof batchProblemTagResponseSchema>
 export type SqlTestCaseScript = z.infer<typeof sqlTestCaseScriptSchema>
-export type GenerateSqlTestCaseResponse = z.infer<
-  typeof generateSqlTestCaseResponseSchema
->
-export type AdminProblemSetProgress = z.infer<
-  typeof adminProblemSetProgressSchema
->
+export type GenerateSqlTestCaseResponse = z.infer<typeof generateSqlTestCaseResponseSchema>
+export type AdminProblemSetProgress = z.infer<typeof adminProblemSetProgressSchema>
 
 export type AdminAnnouncementList = z.infer<typeof adminAnnouncementListSchema>
-export type CreateAnnouncementRequest = z.infer<
-  typeof createAnnouncementRequestSchema
->
-export type UpdateAnnouncementRequest = z.infer<
-  typeof updateAnnouncementRequestSchema
->
+export type CreateAnnouncementRequest = z.infer<typeof createAnnouncementRequestSchema>
+export type UpdateAnnouncementRequest = z.infer<typeof updateAnnouncementRequestSchema>
 export type TutorialType = z.infer<typeof tutorialTypeSchema>
 export type AdminTutorial = z.infer<typeof adminTutorialSchema>
 export type AdminTutorialListItem = z.infer<typeof adminTutorialListItemSchema>
 export type AdminTutorialGroups = z.infer<typeof adminTutorialGroupsSchema>
 export type CreateTutorialRequest = z.infer<typeof createTutorialRequestSchema>
 export type UpdateTutorialRequest = z.infer<typeof updateTutorialRequestSchema>
-export type SetTutorialVisibilityRequest = z.infer<
-  typeof setTutorialVisibilityRequestSchema
->
+export type SetTutorialVisibilityRequest = z.infer<typeof setTutorialVisibilityRequestSchema>
 export type ExerciseType = z.infer<typeof exerciseTypeSchema>
 export type AdminExercise = z.infer<typeof adminExerciseSchema>
 export type CreateExerciseRequest = z.infer<typeof createExerciseRequestSchema>
 export type UpdateExerciseRequest = z.infer<typeof updateExerciseRequestSchema>
-export type ToggleAiReportPinResponse = z.infer<
-  typeof toggleAiReportPinResponseSchema
->
+export type ToggleAiReportPinResponse = z.infer<typeof toggleAiReportPinResponseSchema>
 export type AchievementOperator = z.infer<typeof achievementOperatorSchema>
-export type CreateAchievementRequest = z.infer<
-  typeof createAchievementRequestSchema
->
-export type UpdateAchievementRequest = z.infer<
-  typeof updateAchievementRequestSchema
->
+export type CreateAchievementRequest = z.infer<typeof createAchievementRequestSchema>
+export type UpdateAchievementRequest = z.infer<typeof updateAchievementRequestSchema>
 export type UpdateUserRequest = z.infer<typeof updateUserRequestSchema>
 export type ImportUsersRequest = z.infer<typeof importUsersRequestSchema>
 export type DeleteUsersRequest = z.infer<typeof deleteUsersRequestSchema>
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>
-export type UpdateWebsiteConfigRequest = z.infer<
-  typeof updateWebsiteConfigRequestSchema
->
-export type UpdateJudgeServerRequest = z.infer<
-  typeof updateJudgeServerRequestSchema
->
+export type UpdateWebsiteConfigRequest = z.infer<typeof updateWebsiteConfigRequestSchema>
+export type UpdateJudgeServerRequest = z.infer<typeof updateJudgeServerRequestSchema>
 export type UploadImageResponse = z.infer<typeof uploadImageResponseSchema>
 export type CreateContestRequest = z.infer<typeof createContestRequestSchema>
 export type UpdateContestRequest = z.infer<typeof updateContestRequestSchema>
-export type UpdateAcmHelperRequest = z.infer<
-  typeof updateAcmHelperRequestSchema
->
+export type UpdateAcmHelperRequest = z.infer<typeof updateAcmHelperRequestSchema>
 export type ProblemSetDifficulty = z.infer<typeof problemSetDifficultySchema>
 export type ProblemSetStatus = z.infer<typeof problemSetStatusSchema>
 export type BadgeConditionType = z.infer<typeof badgeConditionTypeSchema>
 export type AdminProblemSet = z.infer<typeof adminProblemSetSchema>
 export type AdminProblemSetList = z.infer<typeof adminProblemSetListSchema>
-export type CreateProblemSetRequest = z.infer<
-  typeof createProblemSetRequestSchema
->
-export type UpdateProblemSetRequest = z.infer<
-  typeof updateProblemSetRequestSchema
->
-export type UpdateProblemSetStatusRequest = z.infer<
-  typeof updateProblemSetStatusRequestSchema
->
-export type AdminProblemSetProblem = z.infer<
-  typeof adminProblemSetProblemSchema
->
-export type AddProblemToSetRequest = z.infer<
-  typeof addProblemToSetRequestSchema
->
-export type UpdateProblemInSetRequest = z.infer<
-  typeof updateProblemInSetRequestSchema
->
+export type CreateProblemSetRequest = z.infer<typeof createProblemSetRequestSchema>
+export type UpdateProblemSetRequest = z.infer<typeof updateProblemSetRequestSchema>
+export type UpdateProblemSetStatusRequest = z.infer<typeof updateProblemSetStatusRequestSchema>
+export type AdminProblemSetProblem = z.infer<typeof adminProblemSetProblemSchema>
+export type AddProblemToSetRequest = z.infer<typeof addProblemToSetRequestSchema>
+export type UpdateProblemInSetRequest = z.infer<typeof updateProblemInSetRequestSchema>
 export type AdminProblemSetBadge = z.infer<typeof adminProblemSetBadgeSchema>
-export type CreateProblemSetBadgeRequest = z.infer<
-  typeof createProblemSetBadgeRequestSchema
->
-export type UpdateProblemSetBadgeRequest = z.infer<
-  typeof updateProblemSetBadgeRequestSchema
->
+export type CreateProblemSetBadgeRequest = z.infer<typeof createProblemSetBadgeRequestSchema>
+export type UpdateProblemSetBadgeRequest = z.infer<typeof updateProblemSetBadgeRequestSchema>
 export type RenameTagRequest = z.infer<typeof renameTagRequestSchema>
-export type BatchProblemTagRequest = z.infer<
-  typeof batchProblemTagRequestSchema
->
+export type BatchProblemTagRequest = z.infer<typeof batchProblemTagRequestSchema>
 export type AcTrendYear = z.infer<typeof acTrendYearSchema>
-export type GenerateFlowchartRequest = z.infer<
-  typeof generateFlowchartRequestSchema
->
-export type GenerateFlowchartResponse = z.infer<
-  typeof generateFlowchartResponseSchema
->
+export type GenerateFlowchartRequest = z.infer<typeof generateFlowchartRequestSchema>
+export type GenerateFlowchartResponse = z.infer<typeof generateFlowchartResponseSchema>
 export type UpdateProblemRequest = z.infer<typeof updateProblemRequestSchema>
-export type MakeProblemPublicRequest = z.infer<
-  typeof makeProblemPublicRequestSchema
->
-export type AddContestProblemRequest = z.infer<
-  typeof addContestProblemRequestSchema
->
+export type MakeProblemPublicRequest = z.infer<typeof makeProblemPublicRequestSchema>
+export type AddContestProblemRequest = z.infer<typeof addContestProblemRequestSchema>
 export type TestCaseEntry = z.infer<typeof testCaseEntrySchema>
-export type UploadTestCaseResponse = z.infer<
-  typeof uploadTestCaseResponseSchema
->
+export type UploadTestCaseResponse = z.infer<typeof uploadTestCaseResponseSchema>
 export type SqlPreviewRequest = z.infer<typeof sqlPreviewRequestSchema>
-export type GenerateSqlTestCaseRequest = z.infer<
-  typeof generateSqlTestCaseRequestSchema
->
+export type GenerateSqlTestCaseRequest = z.infer<typeof generateSqlTestCaseRequestSchema>
