@@ -52,19 +52,93 @@ type HintRow = {
  */
 export const HINT_PROMPT_SINGLE = 1
 export const HINT_PROMPT_DIAGNOSED = 2
+/** 3 / 4 已停用（2026-09-27 起换成 5 / 6），常量留着给库里那批数据当注脚 */
 export const HINT_PROMPT_LEVELED = 3
 export const HINT_PROMPT_LEVELED_DIAGNOSED = 4
+/**
+ * 5 / 6（2026-09-27）：阶梯那条路的题面改走 `problemBrief`，补上输入说明、输出说明和样例，
+ * HTML 去了标签。3 / 4 只有描述，而且是 HTML 原文 —— 模型拿不到输出格式要求，
+ * 「输出格式不对」这类最常见的 WA 基本看不出来。system 没动，变的只是 prompt 里的题面。
+ *
+ * 诊断那一段的题面同步换了。6 的提示**大体**配的是新诊断，但同一条提交会复用之前的诊断
+ * 结果，所以跨上线那一刻的几条提交可能是「版本 6 + 旧诊断」，量小，不单独区分。
+ *
+ * 编译失败那一档（1 / 2）不动：编译错误只关乎语法，样例帮不上忙，而 1 是要留着对比的基线。
+ */
+export const HINT_PROMPT_BRIEFED = 5
+export const HINT_PROMPT_BRIEFED_DIAGNOSED = 6
 
 /** 诊断这一段让学生干等着（提示还没开始流），超时就退回单段式，别让按钮一直转 */
 const DIAGNOSE_TIMEOUT_MS = 20_000
 /** 喂给诊断的测试点输入 / 期望输出各截多少字符。入门题的测试点绝大多数很短 */
 const CASE_EXCERPT = 600
+/** 题面里放几组样例、每组的输入 / 输出各截多少字符 */
+const SAMPLE_COUNT = 3
+const SAMPLE_EXCERPT = 300
 
 const SINGLE_SYSTEM =
   "你是编程助教。指出学生代码最关键的一个问题，循序渐进地提示，绝不直接给出核心算法或完整解法。输入读取错误可以直接给出正确片段。使用 Markdown，不超过6句话。"
 
 function errInfo(row: HintRow) {
   return String(objectValue(row.submission.statisticInfo).err_info ?? "无")
+}
+
+/**
+ * 题面是后台富文本编辑器存的 HTML。喂给模型前去掉标签、解码常见实体 ——
+ * 输出说明里的 `&lt;`、`&nbsp;` 恰恰可能就是格式要求本身，不解码模型会读歪。
+ * 图片直接丢掉（模型看不到图），只留一个占位，让它知道那里原本有东西。
+ */
+function plainText(html: string) {
+  return (
+    html
+      .replace(/<img\b[^>]*>/gi, "[图片]")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(p|div|li|h[1-6]|tr|pre)>/gi, "\n")
+      // 表格单元格之间补个空格，不然 <td>1</td><td>2</td> 会粘成「12」
+      .replace(/<\/t[dh]>/gi, " ")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#(\d+);/g, (_, code: string) =>
+        String.fromCodePoint(Number(code)),
+      )
+      .replace(/&#x([0-9a-f]+);/gi, (_, code: string) =>
+        String.fromCodePoint(parseInt(code, 16)),
+      )
+      .replace(/&amp;/g, "&")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  )
+}
+
+/**
+ * 题面：描述 + 输入说明 + 输出说明 + 样例。**全是学生本来就看得到的东西**，所以两段都能放，
+ * 不构成泄露。样例原样放、不去空白 —— 多一个空格、少一个换行正是要让模型看出来的地方。
+ */
+function problemBrief(row: HintRow) {
+  const samples = (
+    Array.isArray(row.problem.samples) ? row.problem.samples : []
+  )
+    .map((item) => objectValue(item))
+    .filter(
+      (item): item is { input: string; output: string } =>
+        typeof item.input === "string" && typeof item.output === "string",
+    )
+    .slice(0, SAMPLE_COUNT)
+  return [
+    `题目：${row.problem.title}`,
+    `描述：${plainText(row.problem.description).slice(0, 2000)}`,
+    `输入说明：${plainText(row.problem.inputDescription).slice(0, 600) || "无"}`,
+    `输出说明：${plainText(row.problem.outputDescription).slice(0, 600) || "无"}`,
+    ...samples.map(
+      (sample, index) =>
+        `样例 ${index + 1} 输入：\n${sample.input.slice(0, SAMPLE_EXCERPT)}\n样例 ${index + 1} 输出：\n${sample.output.slice(0, SAMPLE_EXCERPT)}`,
+    ),
+    "（判题是逐字比对输出的：多一句输入提示语、多一个空格、全角半角不同都算错）",
+  ].join("\n")
 }
 
 /** 带行号的代码，诊断回的行号和第二段里说的「第几行」都以它为准 */
@@ -142,8 +216,7 @@ async function diagnose(
   const failedCase = await firstFailedCase(row)
   const code = row.submission.code.slice(0, 4000)
   const prompt = [
-    `题目：${row.problem.title}`,
-    `描述：${row.problem.description.slice(0, 2000)}`,
+    problemBrief(row),
     answer
       ? `标准答案（${answer.language}）：\n${answer.code.slice(0, 3000)}`
       : "标准答案：无",
@@ -323,8 +396,7 @@ export function hintPrompt(
     ? `${levelSystem(level)}\n问题已经定位好了，会在「问题定位」里给出，就围着它说。把握低时别说得太肯定。不要提到「诊断」「定位」这些说法。`
     : levelSystem(level)
   const prompt = [
-    `题目：${row.problem.title}`,
-    `描述：${row.problem.description.slice(0, 2000)}`,
+    problemBrief(row),
     `语言：${row.submission.language}`,
     `结果：${judgeStatusName(row.submission.result)}`,
     `错误：${errInfo(row)}`,
@@ -334,6 +406,6 @@ export function hintPrompt(
   return {
     system,
     prompt,
-    version: diagnosis ? HINT_PROMPT_LEVELED_DIAGNOSED : HINT_PROMPT_LEVELED,
+    version: diagnosis ? HINT_PROMPT_BRIEFED_DIAGNOSED : HINT_PROMPT_BRIEFED,
   }
 }
