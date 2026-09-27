@@ -15,6 +15,7 @@ import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
 import PythonErrorExplain from "./PythonErrorExplain.vue"
+import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import { useAIStream } from "shared/composables/aiStream"
 import { submitHintFeedback } from "oj/api"
 import { MdPreview } from "md-editor-v3"
@@ -102,21 +103,34 @@ const pythonCompileError = computed(() => {
 })
 
 // 错误信息格式化
+/**
+ * 运行时错误的诊断（行号 + 归类），交给 RuntimeErrorExplain。比赛提交、诊断失败的
+ * 没有这个字段（见后端 judge/run.ts 的 diagnoseRuntimeError），走下面 msg 的通用提示。
+ */
+const runtimeError = computed(() => {
+  const submission = props.submission
+  if (!submission || submission.result !== SubmissionStatus.runtime_error) return null
+  return submission.statisticInfo?.runtime_error ?? null
+})
+
 const msg = computed(() => {
   if (!props.submission) return ""
-  // 走 PythonErrorExplain 那张中文卡片，英文原文在它的折叠区里
-  if (pythonCompileError.value) return ""
+  // 走 PythonErrorExplain / RuntimeErrorExplain 那两张中文卡片
+  if (pythonCompileError.value || runtimeError.value) return ""
 
   let msg = ""
   const result = props.submission.result
 
   // 编译错误或运行时错误时给出提示；
   // SQL 题的运行错误多半是"查询题里写了增删改"这类被判题拒绝的语句，err_info 已说明原因，不套这句
-  if (
-    (result === SubmissionStatus.compile_error || result === SubmissionStatus.runtime_error) &&
-    props.submission.language !== "SQL"
-  ) {
-    msg += "请仔细检查，看看代码的格式是不是写错了！\n\n"
+  if (props.submission.language !== "SQL") {
+    if (result === SubmissionStatus.compile_error) {
+      msg += "请仔细检查，看看代码的格式是不是写错了！\n\n"
+    } else if (result === SubmissionStatus.runtime_error) {
+      // 原来和编译错误共用「代码格式写错了」那句，可运行时错误恰恰是格式没错、跑起来才出事
+      msg +=
+        "程序运行到一半出错，停下来了。检查一下输入是怎么读的、下标有没有越界、除数是不是 0。\n\n"
+    }
   }
 
   if (result !== SubmissionStatus.ast_check_failed && props.submission.statisticInfo?.err_info) {
@@ -270,12 +284,14 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       vertical
       v-if="
         pythonCompileError ||
+        runtimeError ||
         msg ||
         infoTable.length ||
         submission.statisticInfo?.ast_results?.length
       "
     >
       <PythonErrorExplain v-if="pythonCompileError" :err-info="pythonCompileError" />
+      <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
       <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
         <n-flex vertical :size="8">
           <n-flex

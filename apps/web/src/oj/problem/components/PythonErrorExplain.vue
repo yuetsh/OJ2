@@ -63,7 +63,7 @@ onUnmounted(clearErrorMark)
 </script>
 
 <template>
-  <n-card embedded>
+  <n-card embedded class="explain-card">
     <n-flex vertical :size="12">
       <template v-if="explanation">
         <div class="explain">
@@ -95,6 +95,11 @@ onUnmounted(clearErrorMark)
 </template>
 
 <style scoped>
+/* 结果弹窗不限宽，长句子不折行会把弹窗撑出屏幕 */
+.explain-card {
+  max-width: 560px;
+}
+
 .explain {
   font-size: 16px;
   line-height: 1.7;

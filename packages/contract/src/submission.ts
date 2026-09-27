@@ -77,6 +77,30 @@ export const statisticInfoSchema = z.looseObject({
       }),
     )
     .optional(),
+  /**
+   * 运行时错误的诊断，judge/runtime-diagnosis.ts 写，前端翻成中文。只在非比赛提交上有。
+   *
+   * **不存异常的原文消息**：Python 的消息里常带着测试点的输入（`invalid literal for
+   * int() with base 10: '1 2'`），给学生看就等于放出隐藏数据。所以只存归好类的
+   * `kind`，和确实出现在学生自己代码里的名字。
+   */
+  runtime_error: z
+    .object({
+      /** 学生代码里的行号（已经扣掉题目模板的前置代码），对不上时为 null */
+      line: z.number().int().nullable().optional(),
+      /** Python 异常类型，如 ValueError */
+      type: z.string().optional(),
+      /** 细分，如 int-parse / index / str-concat，见 runtime-diagnosis.ts 的 KINDS */
+      kind: z.string().optional(),
+      /** NameError / AttributeError 点名的那个名字，只在它出现在学生代码里时才存 */
+      name: z.string().optional(),
+      /** NameError 的「Did you mean」，Python 从作用域里的名字挑的，不来自输入 */
+      suggestion: z.string().optional(),
+      /** C / C++：进程收到的信号（11 段错误、8 除零……）和退出码 */
+      signal: z.number().int().optional(),
+      exit_code: z.number().int().optional(),
+    })
+    .optional(),
 })
 
 /**

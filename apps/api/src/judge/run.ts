@@ -19,6 +19,11 @@ import { judgeConfigFor } from "./languages"
 import { isAccepted, JudgeStatus, type JudgeStatusValue } from "./status"
 import { parseProblemTemplate } from "./template"
 import { runSqlCase } from "./sql"
+import {
+  nativeRuntimeError,
+  parsePythonTraceback,
+  type RuntimeErrorInfo,
+} from "./runtime-diagnosis"
 import { readInfo } from "../services/test-case"
 import { readFile } from "node:fs/promises"
 import { resolve as resolvePath } from "node:path"
@@ -63,12 +68,18 @@ function astRulesForLanguage(value: unknown, language: string): AstRule[] {
   })
 }
 
+/**
+ * `testCase` 是测试点目录名（正常判题），或者内联的测试点（诊断重跑，见
+ * diagnoseRuntimeError）。`output` 只在诊断时打开：它让判题机把每个测试点的
+ * 程序输出原样带回来，正常判题开着的话，死循环打印能把 worker 内存撑爆。
+ */
 async function requestJudge(
   language: string,
   code: string,
   timeLimit: number,
   memoryLimit: number,
-  testCaseId: string,
+  testCase: string | { input: string; output: string }[],
+  output = false,
 ) {
   const languageConfig = judgeConfigFor(language)
   if (!languageConfig) throw new Error(`Unsupported judge language: ${language}`)
@@ -85,8 +96,8 @@ async function requestJudge(
       src: code,
       max_cpu_time: timeLimit,
       max_memory: 1024 * 1024 * memoryLimit,
-      test_case_id: testCaseId,
-      output: false,
+      ...(typeof testCase === "string" ? { test_case_id: testCase } : { test_case: testCase }),
+      output,
       io_mode: {
         io_mode: "Standard IO",
         input: "input.txt",
@@ -324,6 +335,48 @@ export async function failAbandonedSubmission(submissionId: string, error: unkno
   await markSystemError(submissionId, row.userId, error)
 }
 
+/**
+ * 运行时错误的诊断，结果写进 `statistic_info.runtime_error`（字段说明见契约）。
+ *
+ * C / C++ 直接用失败测试点的信号和退出码。Python 要拿回溯，得**重跑那一个测试点**：
+ * 主判题不开 output（理由见 requestJudge），所以这里读出第一个失败测试点的输入，
+ * 以内联测试点的形式单独再跑一次、打开 output。同样的代码、同样的输入，抛的是
+ * 同一个异常。只多跑一个点，而且只在 Python 判出运行时错误时才跑。
+ *
+ * 诊断失败（读不到测试点、判题机没回回溯）就不写这个字段，学生看到的和原来一样。
+ */
+async function diagnoseRuntimeError(
+  row: {
+    submission: typeof schema.submission.$inferSelect
+    problem: typeof schema.problem.$inferSelect
+  },
+  source: string,
+  prependLines: number,
+  failed: JudgeCase,
+): Promise<RuntimeErrorInfo | null> {
+  if (row.submission.language !== "Python")
+    return nativeRuntimeError(failed.signal, failed.exit_code)
+
+  const info = await readInfo(row.problem.testCaseId)
+  const inputName = info?.test_cases?.[failed.test_case]?.input_name
+  if (!inputName) return null
+  const input = await readFile(
+    resolvePath(config.testCaseDirectory, row.problem.testCaseId, inputName),
+    "utf8",
+  )
+  const response = await requestJudge(
+    row.submission.language,
+    source,
+    row.problem.timeLimit,
+    row.problem.memoryLimit,
+    [{ input, output: "" }],
+    true,
+  )
+  const output = Array.isArray(response.data) ? response.data[0]?.output : null
+  if (typeof output !== "string") return null
+  return parsePythonTraceback(output, row.submission.code, prependLines)
+}
+
 export async function judgeSubmission(job: JudgeJobData) {
   const [row] = await db
     .select({
@@ -403,6 +456,22 @@ export async function judgeSubmission(job: JudgeJobData) {
         (item) => item.result !== JudgeStatus.ACCEPTED && item.error_message,
       )?.error_message
       if (typeof failedMessage === "string") statisticInfo.err_info = failedMessage
+
+      // 比赛不诊断：ACM 只报对错，和「通过几个测试点」、AI 提示不给比赛提交同一个口径
+      if (
+        result === JudgeStatus.RUNTIME_ERROR &&
+        firstFailure &&
+        row.submission.contestId === null
+      ) {
+        const prependLines = template ? template.prepend.split("\n").length : 0
+        const diagnosis = await diagnoseRuntimeError(row, source, prependLines, firstFailure).catch(
+          (error: unknown) => {
+            console.warn(`[judge] 运行时错误诊断失败 ${row.submission.id}:`, error)
+            return null
+          },
+        )
+        if (diagnosis) statisticInfo.runtime_error = diagnosis
+      }
 
       if (result === JudgeStatus.ACCEPTED) {
         const rules = astRulesForLanguage(row.problem.astRules, row.submission.language)
