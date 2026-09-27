@@ -14,6 +14,7 @@ import {
 import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
+import PythonErrorExplain from "./PythonErrorExplain.vue"
 import { useAIStream } from "shared/composables/aiStream"
 import { submitHintFeedback } from "oj/api"
 import { MdPreview } from "md-editor-v3"
@@ -84,9 +85,27 @@ function resetHint() {
 
 onUnmounted(stopTyping)
 
+/** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
+function stripJudgePath(text: string) {
+  return text.replace(/\/judger\/run\/[^/"]+\//g, "")
+}
+
+/**
+ * Python 的编译错误交给 PythonErrorExplain 翻成中文。只管 Python：C / C++ 的
+ * gcc 报错另是一套句式，还没做。
+ */
+const pythonCompileError = computed(() => {
+  const submission = props.submission
+  if (!submission || submission.result !== SubmissionStatus.compile_error) return ""
+  if (submission.language !== "Python") return ""
+  return submission.statisticInfo?.err_info ?? ""
+})
+
 // 错误信息格式化
 const msg = computed(() => {
   if (!props.submission) return ""
+  // 走 PythonErrorExplain 那张中文卡片，英文原文在它的折叠区里
+  if (pythonCompileError.value) return ""
 
   let msg = ""
   const result = props.submission.result
@@ -101,7 +120,7 @@ const msg = computed(() => {
   }
 
   if (result !== SubmissionStatus.ast_check_failed && props.submission.statisticInfo?.err_info) {
-    msg += props.submission.statisticInfo.err_info
+    msg += stripJudgePath(props.submission.statisticInfo.err_info)
   }
 
   return msg
@@ -249,8 +268,14 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
     </n-alert>
     <n-flex
       vertical
-      v-if="msg || infoTable.length || submission.statisticInfo?.ast_results?.length"
+      v-if="
+        pythonCompileError ||
+        msg ||
+        infoTable.length ||
+        submission.statisticInfo?.ast_results?.length
+      "
     >
+      <PythonErrorExplain v-if="pythonCompileError" :err-info="pythonCompileError" />
       <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
         <n-flex vertical :size="8">
           <n-flex

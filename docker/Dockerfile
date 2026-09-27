@@ -114,6 +114,12 @@ ENV NODE_ENV=production
 
 # clang-format 给 C 代码格式化用，对应旧镜像 apt 装的那个。
 #
+# python3-minimal 给提交前的 Python 语法检查用（services/format-code.ts 的
+# checkPythonSyntax，只编译不执行）。trixie 自带的是 3.13，和判题机同一个大版本 ——
+# 这一点是要的：报错原文要和判题机的编译错误一字不差，前端才能用同一张翻译表。
+# **判题机换 Python 大版本时这里要一起换**（Debian 换代或者改装 python3.x-minimal）。
+# 实测只让 /usr 多 17MB。
+#
 # **不装 ca-certificates。** AI 接口那条 https 出站不需要它 —— Bun 和 Node 一样
 # 内嵌了一份根证书，走自己那份，不读系统的 `/etc/ssl/certs`。实测：把探针二进制
 # 丢进裸 debian:trixie-slim（没有 ca-certificates）请求 api.deepseek.com，
@@ -133,11 +139,11 @@ ENV NODE_ENV=production
 ARG APT_MIRROR=mirrors.tuna.tsinghua.edu.cn
 RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sources \
   && apt-get update \
-  && apt-get install -y --no-install-recommends clang-format \
+  && apt-get install -y --no-install-recommends clang-format python3-minimal \
   && rm -rf /var/lib/apt/lists/*
 
 # ruff 给 Python 代码格式化用。旧后端是 pip 装的 ruff==0.15.12，这里取同版本的
-# 官方静态二进制 —— 不为它引入整个 Python 运行时。
+# 官方静态二进制（上面那个 python3-minimal 没有 pip，也不该为 ruff 装）。
 COPY --from=ghcr.io/astral-sh/ruff:0.15.12 /ruff /usr/local/bin/ruff
 
 COPY --from=artifacts /artifacts/oj2-api /usr/local/bin/oj2-api

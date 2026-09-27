@@ -22,6 +22,11 @@ registry 上的 `oj-image/judge:latest` 和 `:1.6.1` 是同一份镜像（config
 | base | debian:trixie-slim（2024 年的） | debian:trixie-slim（当前） |
 | 镜像体积 | 1.1 GB | **433 MB** |
 
+⚠️ **换 Python 大版本时，api 镜像（`docker/Dockerfile` 的 `python3-minimal`）要一起换。**
+提交前的语法检查在 api 那边用 CPython 编译一遍，前端再按报错原文翻成中文（翻译表在
+`apps/web/src/oj/problem/utils/pythonError.ts`）。两边版本不一致的话，同一份代码
+在提交前和判题时报的句式可能不同，翻译表只能对上其中一边。
+
 砍语言的依据：前端的题目语言复选框从来只给 Python / C / C++ / SQL，
 生产库 12 万条提交里 Java 44 条、Golang 15 条、JavaScript 3 条，全是很早以前的。
 契约 `judgeLanguageSchema` 里那几个键留着（渲染历史提交要用），只是判题机不再认。

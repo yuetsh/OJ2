@@ -76,7 +76,6 @@
         "normalize.css": "^8.0.1",
         "pinia": "^4.0.3",
         "pinyin-pro": "^3.29.3",
-        "skulpt": "^1.2.0",
         "vue": "^3.5.41",
         "vue-chartjs": "^5.3.4",
         "vue-codemirror": "^6.1.1",
@@ -1295,8 +1294,6 @@
 
     "js-tokens": ["js-tokens@4.0.0", "https://registry.npmjs.com/js-tokens/-/js-tokens-4.0.0.tgz", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 
-    "jsbi": ["jsbi@3.2.5", "https://registry.npmjs.com/jsbi/-/jsbi-3.2.5.tgz", {}, "sha512-aBE4n43IPvjaddScbvWRA2YlTzKEynHzu7MqOyTipdHucf/VxS63ViCjxYRg86M8Rxwbt/GfzHl1kKERkt45fQ=="],
-
     "jsesc": ["jsesc@3.1.0", "https://registry.npmjs.com/jsesc/-/jsesc-3.1.0.tgz", { "bin": { "jsesc": "bin/jsesc" } }, "sha512-/sM3dO2FOzXjKQhJuo0Q173wf2KOo8t4I8vHy6lF9poUp7bKT0/NHE8fPX23PwfhnykfqnC2xRxOnVw5XuGIaA=="],
 
     "json5": ["json5@2.2.3", "https://registry.npmjs.com/json5/-/json5-2.2.3.tgz", { "bin": { "json5": "lib/cli.js" } }, "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="],
@@ -1524,8 +1521,6 @@
     "siginfo": ["siginfo@2.0.0", "https://registry.npmjs.com/siginfo/-/siginfo-2.0.0.tgz", {}, "sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g=="],
 
     "sirv": ["sirv@3.0.2", "https://registry.npmjs.com/sirv/-/sirv-3.0.2.tgz", { "dependencies": { "@polka/url": "^1.0.0-next.24", "mrmime": "^2.0.0", "totalist": "^3.0.0" } }, "sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g=="],
-
-    "skulpt": ["skulpt@1.2.0", "https://registry.npmjs.com/skulpt/-/skulpt-1.2.0.tgz", { "dependencies": { "jsbi": "^3.1.4" } }, "sha512-T0cv0sdSOXLlIJTuyXSeYJ3TFdWYSZfX2PcBLpRKrKZ3dTbVQXRMiYudSuko2xzcyMif47DS2ShatCwjCbsSsA=="],
 
     "slate": ["slate@0.124.1", "https://registry.npmjs.com/slate/-/slate-0.124.1.tgz", {}, "sha512-ii7DwezgvbLAyKtHBIunjTR1kzbNfYLCUKLMzJELlbTZkvHzX4DzN7HKIwcakf6dPxO6AoeT/P7kHOcyTym/hA=="],
 

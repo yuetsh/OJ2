@@ -9,6 +9,7 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
+import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import EditorToolbar from "./EditorToolbar.vue"
 
 const FlowchartEditor = defineAsyncComponent(
@@ -79,6 +80,9 @@ watch(
 
 const { isDesktop } = useBreakpoints()
 
+// 拼一次、留同一个数组：每次渲染新建会让编辑器反复重配扩展
+const editorExtensions = [...editTraceExtensions, ...errorMarkExtensions]
+
 const contestID = route.params.contestID || null
 const storageKey = computed(
   () => `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
@@ -146,7 +150,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
       :language="codeStore.code.language"
       :problem-id="problem!._id"
       :height="editorHeight"
-      :extra-extensions="editTraceExtensions"
+      :extra-extensions="editorExtensions"
       @update:model-value="changeCode"
     />
   </n-flex>

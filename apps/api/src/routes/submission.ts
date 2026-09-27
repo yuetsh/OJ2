@@ -239,7 +239,8 @@ submissionRoutes.post("/code/format", requireAuth, async (c) => {
       return failure(
         c,
         error.kind === "syntax" ? 400 : 500,
-        error.kind === "syntax" ? "format-error" : "format-tool-error",
+        // syntax-error 的 message 是 CPython 的报错原文，前端拿去翻成中文
+        error.kind === "syntax" ? "syntax-error" : "format-tool-error",
         error.message,
       )
     }

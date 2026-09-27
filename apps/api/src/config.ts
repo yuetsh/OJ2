@@ -87,6 +87,7 @@ const envSchema = z.object({
   AI_HINT_DIAGNOSE: z.preprocess(blankAsUnset, z.enum(["1", "0"]).optional()),
   RUFF_PATH: text("ruff"),
   CLANG_FORMAT_PATH: text("clang-format"),
+  PYTHON_PATH: text("python3"),
 })
 
 function parseEnv() {
@@ -171,4 +172,6 @@ export const config = {
   aiHintDiagnose: env.AI_HINT_DIAGNOSE === "1",
   ruffPath: env.RUFF_PATH,
   clangFormatPath: env.CLANG_FORMAT_PATH,
+  /** 提交前的 Python 语法检查用（services/format-code.ts），要和判题机同一个大版本 */
+  pythonPath: env.PYTHON_PATH,
 }

@@ -14,13 +14,13 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
 import { useCollabStore } from "shared/store/collab"
 import { restartEditTrace, snapshotEditTrace } from "oj/problem/utils/editTrace"
-import { checkPythonSyntax, prefetchPythonSyntaxChecker } from "oj/problem/utils/pythonSyntaxCheck"
 
 // ==================== 异步组件 ====================
 const ProblemReaction = defineAsyncComponent(() => import("./ProblemReaction.vue"))
 // 结果面板第一次弹出（也就是第一次提交）时才加载：它带着 DataTable，而判题要等
 // 好几秒，这点下载时间藏得住。进页面就加载的话，只看题不提交的人也要付这笔
 const SubmissionResult = defineAsyncComponent(() => import("./SubmissionResult.vue"))
+const PythonErrorExplain = defineAsyncComponent(() => import("./PythonErrorExplain.vue"))
 
 // ==================== 基础状态 ====================
 const userStore = useUserStore()
@@ -34,7 +34,6 @@ const problemSetId = (route.params.problemSetId as string) ?? ""
 
 const router = useRouter()
 const [commentPanel] = useToggle()
-const message = useMessage()
 
 function closeCommentPanel() {
   commentPanel.value = false
@@ -52,19 +51,14 @@ const showResult = ref(false)
 const isFormatting = ref(false)
 const isSubmittingRequest = ref(false)
 
-// ==================== Python 语法检测器预取 ====================
-// 选中 Python 时就把 Skulpt 拉下来，避免点提交时才开始下载。
-// 但它有 ~226KB gzip，比题面和编辑器加起来还大：没登录的提交不了，不拉；
-// 登录了也等浏览器空闲再拉，别和首屏的题面、编辑器抢带宽
-watch(
-  () => codeStore.code.language === "Python" && userStore.isAuthed,
-  (needed) => {
-    if (!needed) return
-    if ("requestIdleCallback" in window) requestIdleCallback(prefetchPythonSyntaxChecker)
-    else setTimeout(prefetchPythonSyntaxChecker, 1000)
-  },
-  { immediate: true },
-)
+/**
+ * 提交前语法检查查出来的错误（CPython 的报错原文），有它时结果面板显示中文说明、
+ * 不显示上一次的判题结果。这次没交上去，所以不是一条提交、也不数进失败次数。
+ *
+ * 检查在服务端做（`/code/format` 里先用 CPython 编译一遍），原来是浏览器里的 Skulpt：
+ * 那个只能报「第 N 行有错」，而且要下载 ~226KB。
+ */
+const syntaxErrorInfo = ref("")
 
 // ==================== 提交冷却 ====================
 const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
@@ -115,16 +109,10 @@ const buttonState = computed(() =>
 async function submit() {
   if (buttonState.value.disabled) return
 
-  // 0. Python 语法检测
-  if (codeStore.code.language === "Python") {
-    const syntaxError = await checkPythonSyntax(codeStore.code.value)
-    if (syntaxError) {
-      message.warning(`第 ${syntaxError.line} 行存在语法错误，请修正后再提交`)
-      return
-    }
-  }
+  syntaxErrorInfo.value = ""
 
-  // 0.5 提交前自动格式化（Python 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）
+  // 0. 提交前自动格式化（Python 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）。
+  //    Python 在格式化之前先由服务端的 CPython 查一遍语法，有错就不提交
   const formatLang = LANGUAGE_FORMAT_VALUE[codeStore.code.language]
   if (["python", "c", "cpp", "sql"].includes(formatLang)) {
     isFormatting.value = true
@@ -135,9 +123,10 @@ async function submit() {
       })
       codeStore.setCode(res.code)
     } catch (e) {
-      if (errorCode(e) === "format-error") {
-        // 仅 Python 会出现：代码本身存在语法错误
-        message.warning(`代码格式化失败：${errorMessage(e)}，请检查代码后重试`)
+      if (errorCode(e) === "syntax-error") {
+        // 仅 Python 会出现：message 是 CPython 的报错原文，交给 PythonErrorExplain 翻译
+        syntaxErrorInfo.value = errorMessage(e)
+        showResult.value = true
         return
       }
       // server-error / 网络异常：格式化工具问题，静默降级，提交原代码
@@ -268,15 +257,19 @@ watch(
       </n-button>
     </template>
 
-    <!-- 结果展示 -->
-    <SubmissionResult :submission="submission" />
+    <!-- 结果展示。SubmissionResult 用 v-show 留着：它身上可能挂着正在生成的 AI 提示 -->
+    <n-flex v-if="syntaxErrorInfo" vertical style="max-width: 560px">
+      <n-alert type="warning" title="代码有语法错误，还没有提交" />
+      <PythonErrorExplain :err-info="syntaxErrorInfo" />
+    </n-flex>
+    <SubmissionResult v-show="!syntaxErrorInfo" :submission="submission" />
   </n-popover>
 
   <!-- 结果面板点一下别处就收起来，而 showResult 只在提交时被置 true ——
        原来唯一的重开方式是「再提交一次」，AI 提示读到一半去看眼题面就回不来了。
        只在这次会话提交过之后才出现，没提交时工具栏保持原样。 -->
   <n-button
-    v-if="submission && !showResult"
+    v-if="(submission || syntaxErrorInfo) && !showResult"
     :size="isDesktop ? 'medium' : 'small'"
     @click="showResult = true"
   >

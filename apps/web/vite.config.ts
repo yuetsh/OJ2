@@ -136,10 +136,10 @@ export default defineConfig(() => {
       tsconfigPaths: true,
     },
     build: {
-      // 超过 500 kB 的三个 chunk 都是懒加载的：skulpt（Python 语法检查，产物名叫
-      // main-*.js，是 skulpt 自己入口的名字，不是应用入口）、wangeditor（后台富文本）、
-      // @mermaid-js/parser。默认阈值下这条警告每次构建都在报，真涨了反而没人看，
-      // 所以抬到比它们略高。首屏入口 index-*.js 在 175 kB 左右
+      // 超过 500 kB 的两个 chunk 都是懒加载的：wangeditor（后台富文本，TextEditor-*.js）、
+      // @mermaid-js/parser，各 660 kB 上下。默认阈值下这条警告每次构建都在报，真涨了
+      // 反而没人看，所以抬到比它们略高。首屏入口 index-*.js 在 175 kB 左右。
+      // （原来还有 Python 语法检查用的 skulpt，语法检查挪到服务端的 CPython 之后删了）
       chunkSizeWarningLimit: 1000,
     },
     server: {
