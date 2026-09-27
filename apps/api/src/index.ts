@@ -78,7 +78,12 @@ async function serveUpload(
   if (await file.exists()) {
     // 文件名由后端生成且内容不变，可以放心长缓存
     return new Response(file, {
-      headers: { "cache-control": "public, max-age=86400" },
+      headers: {
+        "cache-control": "public, max-age=86400",
+        // 线上 Caddy 也加了这个头，这里再加一道：content-type 按扩展名配，
+        // 不让浏览器自己嗅探成 HTML 去执行
+        "x-content-type-options": "nosniff",
+      },
     })
   }
   return null

@@ -23,6 +23,7 @@ import { config } from "../../config"
 import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
 import { failure, parseBody, success } from "../../http"
+import { sniffImageExtension } from "../../services/image"
 import { getWebsiteOptions } from "../../services/options"
 import { todayStart } from "../../time"
 import { queryInteger } from "../helpers"
@@ -292,8 +293,12 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
       filePath: "",
     } satisfies UploadImageResponse)
   }
-  const suffix = image.name.slice(image.name.lastIndexOf(".")).toLowerCase()
-  if (!IMAGE_SUFFIXES.includes(suffix)) {
+  // 以文件头为准，扩展名只是第一道快速筛
+  const claimed = image.name.slice(image.name.lastIndexOf(".")).toLowerCase()
+  const suffix = IMAGE_SUFFIXES.includes(claimed)
+    ? await sniffImageExtension(image)
+    : null
+  if (!suffix) {
     return success(c, {
       success: false,
       msg: "Unsupported file format",

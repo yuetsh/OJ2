@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto"
-import { extname, resolve } from "node:path"
+import { resolve } from "node:path"
 
 import {
   rankProfileSchema,
@@ -46,6 +46,7 @@ import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
+import { sniffImageExtension } from "../services/image"
 import { getUserProfileById } from "../services/profile"
 import {
   clientIp,
@@ -205,8 +206,8 @@ accountRoutes.post("/me/avatar", requireAuth, async (c) => {
     return failure(c, 400, "invalid-file", "Invalid file content")
   if (image.size > 2 * 1024 * 1024)
     return failure(c, 400, "file-too-large", "Picture is too large")
-  const extension = extname(image.name).toLowerCase()
-  if (![".gif", ".jpg", ".jpeg", ".bmp", ".png"].includes(extension)) {
+  const extension = await sniffImageExtension(image)
+  if (!extension) {
     return failure(c, 400, "unsupported-file", "Unsupported file format")
   }
   const filename = `${randomBytes(10).toString("hex")}${extension}`
