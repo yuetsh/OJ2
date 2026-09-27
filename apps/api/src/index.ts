@@ -86,6 +86,11 @@ async function serveUpload(
 
 const server = Bun.serve<SubmissionSocketData>({
   port: config.port,
+  // Bun 默认 10 秒没有字节往来就掐连接，而且不报任何错。AI 的 SSE 两条路都会静默
+  // 超过 10 秒：streamWhole 在 produce 期间每 15 秒才发一次心跳，streamChat 等首
+  // token 也常过 10 秒 —— 学生看到的就是「AI 提示生成失败」。对齐反代链上最短的
+  // 那一环（NPM 的 proxy_read_timeout 60s），两边的心跳 / 空闲超时都在它之内。
+  idleTimeout: 60,
   async fetch(request, bunServer) {
     const url = new URL(request.url)
     if (url.pathname.startsWith(`${config.avatarUriPrefix}/`)) {
