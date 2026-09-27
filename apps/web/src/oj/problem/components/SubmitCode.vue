@@ -9,7 +9,6 @@ import { useFireworks } from "oj/problem/composables/useFireworks"
 import { useSubmissionMonitor } from "oj/problem/composables/useSubmissionMonitor"
 import { LANGUAGE_FORMAT_VALUE, SubmissionStatus } from "utils/constants"
 import type { SubmitCodePayload } from "utils/types"
-import SubmissionResult from "./SubmissionResult.vue"
 import { getSubmitButtonState } from "./submitButtonState"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
@@ -23,6 +22,11 @@ import {
 // ==================== 异步组件 ====================
 const ProblemReaction = defineAsyncComponent(
   () => import("./ProblemReaction.vue"),
+)
+// 结果面板第一次弹出（也就是第一次提交）时才加载：它带着 DataTable，而判题要等
+// 好几秒，这点下载时间藏得住。进页面就加载的话，只看题不提交的人也要付这笔
+const SubmissionResult = defineAsyncComponent(
+  () => import("./SubmissionResult.vue"),
 )
 
 // ==================== 基础状态 ====================
@@ -57,11 +61,16 @@ const isFormatting = ref(false)
 const isSubmittingRequest = ref(false)
 
 // ==================== Python 语法检测器预取 ====================
-// 选中 Python 时就把 Skulpt 拉下来，避免点提交时才开始下载
+// 选中 Python 时就把 Skulpt 拉下来，避免点提交时才开始下载。
+// 但它有 ~226KB gzip，比题面和编辑器加起来还大：没登录的提交不了，不拉；
+// 登录了也等浏览器空闲再拉，别和首屏的题面、编辑器抢带宽
 watch(
-  () => codeStore.code.language,
-  (language) => {
-    if (language === "Python") prefetchPythonSyntaxChecker()
+  () => codeStore.code.language === "Python" && userStore.isAuthed,
+  (needed) => {
+    if (!needed) return
+    if ("requestIdleCallback" in window)
+      requestIdleCallback(prefetchPythonSyntaxChecker)
+    else setTimeout(prefetchPythonSyntaxChecker, 1000)
   },
   { immediate: true },
 )

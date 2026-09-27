@@ -34,8 +34,6 @@ import {
   type ProblemSetProblem,
   type ProblemSetProgressList,
   type UserBadge,
-  problemDetailSchema,
-  submissionDetailSchema,
   type FlowchartStatistics,
   type SubmissionStatistics,
   type SubmissionStatisticsItems,
@@ -64,16 +62,12 @@ import type {
 } from "utils/types"
 
 /**
- * 题目详情。走契约的 zod 解析，形状即契约 —— 之前这里手抄了一份 camel→snake 的
- * 键名映射，抄漏一个字段就是静默 undefined。
- *
- * 走 `contract()` 而不是裸 `parse()`：原来是 `problemDetailSchema.parse(v) as ProblemDetail`，
- * `as` 把校验结果又断言回去、等于没校验，而 `parse` 抛错会让整个题目页白屏。
- * 现在形状不符时记一条控制台分歧再放行原始数据。
+ * 题目详情 / 提交详情的 schema 按需加载，和请求并行发出。静态 import 会把 zod
+ * 运行时带进首页 —— 题目列表的 getProblemList 也在这个文件里。
+ * 闸门本身仍是同步的（等 schema 到了再返回），submissionDetailSchema 有 `.catch()`，
+ * 放行原文和解析结果不等价，所以不能像 /me 那样改成 contractDeferred。
  */
-function detailProblem(value: unknown): ProblemDetail {
-  return contract("GET /problems/:id", problemDetailSchema, value)
-}
+const loadDetailSchemas = () => import("./detailSchemas")
 
 /** 当前在线人数。只有聚合数字，「谁在线」在榜单接口里、且只对老师下发 */
 export function getOnlineCount() {
@@ -104,7 +98,21 @@ export async function getProblem(problemID: string, contestID: string) {
   const endpoint = contestID
     ? `contests/${encodeURIComponent(contestID)}/problems/${encodeURIComponent(problemID)}`
     : `problems/${encodeURIComponent(problemID)}`
-  return detailProblem(await api.get<unknown>(endpoint))
+  const [{ problemDetailSchema }, response] = await Promise.all([
+    loadDetailSchemas(),
+    api.get<unknown>(endpoint),
+  ])
+  // 形状即契约 —— 之前这里手抄了一份 camel→snake 的键名映射，抄漏一个字段就是
+  // 静默 undefined。走 `contract()` 而不是裸 `parse()`：原来是
+  // `problemDetailSchema.parse(v) as ProblemDetail`，`as` 把校验结果又断言回去、
+  // 等于没校验，而 `parse` 抛错会让整个题目页白屏。现在形状不符时记一条控制台
+  // 分歧再放行原始数据。
+  const problem: ProblemDetail = contract(
+    "GET /problems/:id",
+    problemDetailSchema,
+    response,
+  )
+  return problem
 }
 
 // 未登录返回 "0"，登录后返回百分比字符串
@@ -113,9 +121,10 @@ export function getProblemBeatRate(problemID: number) {
 }
 
 export async function getSubmission(id: string): Promise<Submission> {
-  const response = await api.get<unknown>(
-    `submissions/${encodeURIComponent(id)}`,
-  )
+  const [{ submissionDetailSchema }, response] = await Promise.all([
+    loadDetailSchemas(),
+    api.get<unknown>(`submissions/${encodeURIComponent(id)}`),
+  ])
   return contract("GET /submissions/:id", submissionDetailSchema, response)
 }
 

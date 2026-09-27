@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useLoginSummaryStore } from "shared/store/loginSummary"
 import { parseTime } from "utils/functions"
+
+// md-editor-v3 按需加载：这个弹框挂在默认布局上，静态 import 的话首页每次都要多拉
+// ~160KB JS + ~76KB CSS，而 AI 分析只在登录后、且期间提交够 3 次才有
+const MdPreview = defineAsyncComponent(
+  () => import("./LoginSummaryPreview.vue"),
+)
 
 const loginSummaryStore = useLoginSummaryStore()
 const { isDesktop } = useBreakpoints()

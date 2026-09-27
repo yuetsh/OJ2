@@ -15,13 +15,17 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
 import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
-import StatisticsPanel from "shared/components/StatisticsPanel.vue"
 import { Icon } from "@iconify/vue"
 import { NFlex } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 
 const SubmitFlowchart = defineAsyncComponent(
   () => import("./SubmitFlowchart.vue"),
+)
+// 只有老师看得见（下面的弹框挂了 isTeacherOrAbove），静态 import 的话每个学生
+// 打开题目都要白拉一份 chart.js（~68KB gzip）
+const StatisticsPanel = defineAsyncComponent(
+  () => import("shared/components/StatisticsPanel.vue"),
 )
 
 interface Props {
