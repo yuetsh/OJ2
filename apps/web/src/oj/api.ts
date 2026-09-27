@@ -27,7 +27,6 @@ import {
   type AiDetail,
   type DurationData,
   type HeatmapItem,
-  type LoginSummary,
   type SolvedList,
   type ProblemSet,
   type ProblemSetBadge,
@@ -60,7 +59,6 @@ import type {
   SubmissionListPayload,
   SubmitCodePayload,
   OnlineCount,
-  WebsiteConfig,
   Tutorial,
   TutorialProgress,
 } from "utils/types"
@@ -75,10 +73,6 @@ import type {
  */
 function detailProblem(value: unknown): Problem {
   return contract("GET /problems/:id", problemDetailSchema, value)
-}
-
-export function getWebsiteConfig() {
-  return api.get<WebsiteConfig>("site")
 }
 
 /** 当前在线人数。只有聚合数字，「谁在线」在榜单接口里、且只对老师下发 */
@@ -371,10 +365,6 @@ export function getAIHeatmapData(username?: string) {
   return api.get<HeatmapItem[]>("ai/heatmap", {
     params: username ? { username } : {},
   })
-}
-
-export function getAILoginSummary() {
-  return api.get<LoginSummary>("ai/login-summary")
 }
 
 export function getAIPinnedReport() {

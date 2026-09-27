@@ -1,4 +1,4 @@
-import { getWebsiteConfig } from "oj/api"
+import { getWebsiteConfig } from "shared/api"
 import type { WebsiteConfig } from "utils/types"
 
 export const useConfigStore = defineStore("config", () => {

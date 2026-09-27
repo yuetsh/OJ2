@@ -1,5 +1,3 @@
-import { z } from "zod"
-
 /**
  * 角色与题目权限的字面量。**全仓唯一的定义处。**
  *
@@ -10,6 +8,9 @@ import { z } from "zod"
  * ADMIN_ROLES / TEACHER_ROLES，`["Regular User", "Student Admin"]` 这个学生口径
  * 在四个文件里各写一遍，另有二十多处散落的 `=== "Super Admin"`。拼错一个字母
  * TypeScript 一个字都不会说，只会在运行时静默放行或静默拒绝。
+ *
+ * **这个文件不能 import zod。** 前端入口要用这里的 USER_TYPE / toAdminType，
+ * 一 import 就把整个 zod 运行时（~100KB）拖进首屏包。对应的 zod schema 在 admin.ts。
  */
 export const ADMIN_TYPES = [
   "Regular User",
@@ -18,11 +19,9 @@ export const ADMIN_TYPES = [
   "Super Admin",
 ] as const
 export type AdminType = (typeof ADMIN_TYPES)[number]
-export const adminTypeSchema = z.enum(ADMIN_TYPES)
 
 export const PROBLEM_PERMISSIONS = ["None", "Own", "All"] as const
 export type ProblemPermission = (typeof PROBLEM_PERMISSIONS)[number]
-export const problemPermissionSchema = z.enum(PROBLEM_PERMISSIONS)
 
 /**
  * 三个分组一律是**白名单**，对齐旧后端 `account/models.py:65-73` 的显式列举写法。

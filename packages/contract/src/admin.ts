@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { adminTypeSchema, problemPermissionSchema } from "./roles"
+import { ADMIN_TYPES, PROBLEM_PERMISSIONS } from "./roles"
 
 import { achievementRaritySchema } from "./achievement"
 import { rankProfileSchema } from "./account"
@@ -13,6 +13,10 @@ import {
   sqlConfigSchema,
   sqlDisplaySchema,
 } from "./problem"
+
+// 放这里而不是 roles.ts：roles.ts 要保持不 import zod，理由见那边的文件头
+export const adminTypeSchema = z.enum(ADMIN_TYPES)
+export const problemPermissionSchema = z.enum(PROBLEM_PERMISSIONS)
 
 /**
  * 后台侧的契约。与 oj 侧分开放：同一张表在两侧下发的字段集通常不同

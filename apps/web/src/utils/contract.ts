@@ -45,3 +45,24 @@ export function contract<T extends z.ZodType>(
   // 「能渲染的东西」而不是一个异常，分歧已经通过上面那条日志暴露出来了。
   return value as z.infer<T>
 }
+
+/**
+ * 同 `contract`，但校验挪到后台：先原样交出数据，schema 按需加载之后再核、只记日志。
+ *
+ * 给**首屏路径**用（启动就要拉的 /me）。同步校验得在入口包里带上 schema，也就带上
+ * 整个 zod 运行时（~100KB）；而这道闸本来就只记日志、不改数据 —— schema 里没有
+ * default / transform 时，放行原文和放行解析结果只差 zod 剥掉的多余字段，前端用不上。
+ * 给 schema 加 default / transform 之前，得先把调用方从这里挪回 `contract`。
+ */
+export function contractDeferred<T extends z.ZodType>(
+  endpoint: string,
+  loadSchema: () => Promise<T>,
+  value: unknown,
+): z.infer<T> {
+  loadSchema()
+    .then((schema) => contract(endpoint, schema, value))
+    .catch(() => {
+      // schema 那个 chunk 加载失败（部署换了哈希之类）不影响页面，闸门本来就只记日志
+    })
+  return value as z.infer<T>
+}

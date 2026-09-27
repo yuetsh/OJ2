@@ -1,5 +1,5 @@
 import type { LoginSummary as ContractLoginSummary } from "@oj2/contract"
-import { getAILoginSummary } from "oj/api"
+import { getAILoginSummary } from "shared/api"
 
 type LoginSummary = ContractLoginSummary["summary"]
 
