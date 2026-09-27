@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import KnowledgeMap from "./components/KnowledgeMap.vue"
 import { Icon } from "@iconify/vue"
 import { getProfile } from "shared/api"
 import { durationToDays, parseTime } from "utils/functions"
@@ -11,6 +12,15 @@ import { useUserStore } from "shared/store/user"
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+/**
+ * 在看自己的主页。知识点地图只在这时候挂：它不给别人看（见 KnowledgeMap.vue），
+ * 后端 /me/knowledge 也只认当前登录的人。带 ?name= 看的是别人，除非名字就是自己。
+ */
+const isSelf = computed(() => {
+  const name = route.query.name as string | undefined
+  return !name || name === userStore.user?.username
+})
 const profile = ref<Profile | null>(null)
 const problems = ref<string[]>([])
 const firstSubmissionAt = ref("")
@@ -219,6 +229,7 @@ onMounted(() => {
     </n-flex>
   </n-card>
 
+  <KnowledgeMap v-if="!loading && profile && isSelf" />
   <n-descriptions v-if="!loading && profile" class="wrapper" bordered>
     <n-descriptions-item v-if="!!problems.length">
       <template #label>

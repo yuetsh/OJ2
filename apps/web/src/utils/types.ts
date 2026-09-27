@@ -293,6 +293,9 @@ export type { ClassActivity, ClassActivityProblem } from "@oj2/contract"
 /** 课堂看板：一个班今天这节课的题 × 全班学生 */
 export type { ClassBoard, ClassBoardStudent, ClassBoardCell } from "@oj2/contract"
 
+/** 知识点地图：每个知识点做对几道、在第几档，只给自己看 */
+export type { KnowledgeLevel, KnowledgeMap } from "@oj2/contract"
+
 /**
  * 学生侧的比赛：不含 password / visible。后台用 `AdminContest` ——
  * oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生）

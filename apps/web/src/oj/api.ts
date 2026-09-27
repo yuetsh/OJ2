@@ -10,6 +10,7 @@ import {
   type TutorialSummary,
   type ClassActivity,
   type ClassBoard,
+  type KnowledgeMap,
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
@@ -226,6 +227,11 @@ export function getClassBoard(className?: string) {
 /** 给这个班布置今天的题，空数组 = 清掉 */
 export function setClassLesson(className: string, problemDisplayIds: string[]) {
   return api.put<null>("classroom/lesson", { className, problemDisplayIds })
+}
+
+/** 我的知识点地图（只有自己的，不能查别人） */
+export function getKnowledgeMap() {
+  return api.get<KnowledgeMap>("me/knowledge")
 }
 
 export function getClassActivity() {

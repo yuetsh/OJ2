@@ -4,6 +4,7 @@ import {
   getAnnouncement,
   getAnnouncementList,
   getClassActivity,
+  getKnowledgeMap,
   getContestList,
   getLearnProgress,
   getSubmissions,
@@ -13,6 +14,7 @@ import {
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useProblemJump } from "shared/composables/problemJump"
+import { pickHeadline, type Headline } from "oj/user/knowledge"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, CONTEST_STATUS } from "utils/constants"
 import { duration, parseTime, zonedParts } from "utils/functions"
@@ -49,6 +51,8 @@ const submissions = ref<SubmissionListItem[]>([])
 const announcements = ref<AnnouncementListItem[]>([])
 const weekly = ref<WeeklyRank | null>(null)
 const classActivity = ref<ClassActivity | null>(null)
+/** 知识点地图挑出来的那一句（本周升级 / 再做几道升档 / 去点亮一个），见 oj/user/knowledge.ts */
+const knowledgeHeadline = ref<Headline | null>(null)
 const loaded = ref(false)
 const keyword = ref("")
 
@@ -121,6 +125,10 @@ async function loadAnnouncements() {
   announcements.value = res.results
 }
 
+async function loadKnowledge() {
+  knowledgeHeadline.value = pickHeadline(await getKnowledgeMap())
+}
+
 async function loadClassActivity() {
   classActivity.value = await getClassActivity()
 }
@@ -160,6 +168,7 @@ async function load() {
     loadAnnouncements(),
     loadWeekly(),
     loadClassActivity(),
+    loadKnowledge(),
   ])
   loaded.value = true
 }
@@ -226,6 +235,13 @@ async function openAnnouncement(item: AnnouncementListItem) {
             <router-link to="/rank" class="plain-link">{{ weeklyText }}</router-link>
           </template>
         </n-text>
+        <div v-if="knowledgeHeadline" class="knowledge-line">
+          <router-link v-if="knowledgeHeadline.to" :to="knowledgeHeadline.to" class="plain-link">
+            {{ knowledgeHeadline.text }}
+          </router-link>
+          <span v-else>{{ knowledgeHeadline.text }}</span>
+          <router-link to="/user" class="more">我的知识点</router-link>
+        </div>
       </div>
       <n-input-group class="search">
         <n-input
@@ -419,6 +435,21 @@ async function openAnnouncement(item: AnnouncementListItem) {
   font-size: 24px;
   font-weight: 600;
   margin: 0 0 6px;
+}
+
+.knowledge-line {
+  margin-top: 6px;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  color: #18a058;
+}
+
+/* 这一行本身就是链接（去按知识点筛的题目列表），下划线说明它能点 */
+.knowledge-line .plain-link {
+  color: #18a058;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .search {

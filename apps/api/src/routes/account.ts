@@ -6,6 +6,8 @@ import {
   STUDENT_ROLES,
   updateProfileRequestSchema,
   type ActivityRankItem,
+  type KnowledgeLevel,
+  type KnowledgeMap,
   type Metrics,
   type MyRank,
   type ProblemRank,
@@ -497,6 +499,159 @@ accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
     results: ranked.slice(0, WEEKLY_BOARD_SIZE),
     me: ranked.find((row) => row.user.id === user?.id) ?? null,
   } satisfies WeeklyRank)
+})
+
+/** 题数少于这个的知识点不参与升级：3 道题的知识点做完就「精通」，没有意义 */
+const KNOWLEDGE_MIN_PROBLEMS = 10
+/** 同班这么多比例的人点亮过，才算「班里在学」，才会出现在「还没碰过」里 */
+const KNOWLEDGE_CLASS_TOUCHED_RATIO = 0.3
+
+/**
+ * 四档门槛：入门 1 道、会了 3 道、熟练 = 题数的 40%（最多 10）、精通 = 75%（最多 20）。
+ * 按题量缩放是因为知识点之间差得很远（循环结构 107 道、数组 15 道）。
+ *
+ * 拿 2025 秋回测过：中位数的学生一学期升 5 档，前 25% 升 9 档；加上「入门」这一档之前，
+ * 26% 的学生一档都没升，其中一半做对过带标签的题、只是没到 3 道。
+ */
+function levelThresholds(problemCount: number) {
+  return [
+    1,
+    3,
+    Math.max(4, Math.min(10, Math.round(problemCount * 0.4))),
+    Math.max(5, Math.min(20, Math.round(problemCount * 0.75))),
+  ]
+}
+
+function levelOf(solved: number, thresholds: number[]) {
+  return thresholds.filter((threshold) => solved >= threshold).length
+}
+
+/**
+ * 我的知识点地图。「做对」按题目算（同一题只算一次），不含比赛提交，
+ * 题目只算公开的题库题 —— 和 problemCount 同一个口径，不然会出现 12/10。
+ */
+accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const tags = await db
+    .select({
+      id: schema.problemTag.id,
+      name: schema.problemTag.name,
+      problemCount: count(),
+    })
+    .from(schema.problemTag)
+    .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
+    .innerJoin(schema.problem, eq(schema.problem.id, schema.problemTags.problemId))
+    .where(
+      and(
+        eq(schema.problemTag.category, "knowledge"),
+        eq(schema.problem.visible, true),
+        isNull(schema.problem.contestId),
+      ),
+    )
+    .groupBy(schema.problemTag.id, schema.problemTag.name)
+    .having(sql`count(*) >= ${KNOWLEDGE_MIN_PROBLEMS}`)
+  const tagIds = tags.map((tag) => tag.id)
+  if (!tagIds.length) return success(c, { tags: [], classTouched: [] } satisfies KnowledgeMap)
+
+  const firstAccepted = db
+    .select({
+      problemId: schema.submission.problemId,
+      firstAt: min(schema.submission.createTime).as("first_at"),
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        isNull(schema.submission.contestId),
+        inArray(schema.submission.result, ACCEPTED_RESULTS),
+      ),
+    )
+    .groupBy(schema.submission.problemId)
+    .as("first_accepted")
+
+  const start = weekStart()
+  const [mine, classTouchedRows, classSize] = await Promise.all([
+    db
+      .select({
+        tagId: schema.problemTags.problemtagId,
+        solved: count(),
+        solvedBeforeWeek: sql<number>`count(*) filter (where ${firstAccepted.firstAt} < ${start})::int`,
+      })
+      .from(firstAccepted)
+      .innerJoin(schema.problemTags, eq(schema.problemTags.problemId, firstAccepted.problemId))
+      .innerJoin(schema.problem, eq(schema.problem.id, firstAccepted.problemId))
+      .where(
+        and(
+          inArray(schema.problemTags.problemtagId, tagIds),
+          eq(schema.problem.visible, true),
+          isNull(schema.problem.contestId),
+        ),
+      )
+      .groupBy(schema.problemTags.problemtagId),
+    user.className
+      ? db
+          .select({
+            tagId: schema.problemTags.problemtagId,
+            users: countDistinct(schema.submission.userId),
+          })
+          .from(schema.submission)
+          .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+          .innerJoin(
+            schema.problemTags,
+            eq(schema.problemTags.problemId, schema.submission.problemId),
+          )
+          .where(
+            and(
+              eq(schema.user.className, user.className),
+              eq(schema.user.isDisabled, false),
+              inArray(schema.user.adminType, [...STUDENT_ROLES]),
+              isNull(schema.submission.contestId),
+              inArray(schema.submission.result, ACCEPTED_RESULTS),
+              inArray(schema.problemTags.problemtagId, tagIds),
+            ),
+          )
+          .groupBy(schema.problemTags.problemtagId)
+      : [],
+    user.className
+      ? db
+          .select({ total: count() })
+          .from(schema.user)
+          .where(
+            and(
+              eq(schema.user.className, user.className),
+              eq(schema.user.isDisabled, false),
+              inArray(schema.user.adminType, [...STUDENT_ROLES]),
+            ),
+          )
+      : [],
+  ])
+
+  const mineByTag = new Map(mine.map((row) => [row.tagId, row]))
+  const total = classSize[0]?.total ?? 0
+  const touchedIds = new Set(
+    classTouchedRows
+      .filter((row) => total > 0 && row.users / total >= KNOWLEDGE_CLASS_TOUCHED_RATIO)
+      .map((row) => row.tagId),
+  )
+
+  return success(c, {
+    tags: tags
+      .sort((a, b) => b.problemCount - a.problemCount)
+      .map((tag) => {
+        const thresholds = levelThresholds(tag.problemCount)
+        const solved = mineByTag.get(tag.id)?.solved ?? 0
+        const level = levelOf(solved, thresholds)
+        return {
+          name: tag.name,
+          problemCount: tag.problemCount,
+          solved,
+          level,
+          levelAtWeekStart: levelOf(mineByTag.get(tag.id)?.solvedBeforeWeek ?? 0, thresholds),
+          nextAt: thresholds[level] ?? null,
+        } satisfies KnowledgeLevel
+      }),
+    classTouched: tags.filter((tag) => touchedIds.has(tag.id)).map((tag) => tag.name),
+  } satisfies KnowledgeMap)
 })
 
 accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
