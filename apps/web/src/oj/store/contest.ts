@@ -87,6 +87,7 @@ export const useContestStore = defineStore("contest", () => {
     timer = 0
   }
 
+  /** 返回失败时的错误码（成功为 null），调用方据此给提示 */
   async function checkPassword(contestID: string, password: string) {
     try {
       const res = await checkContestPassword(contestID, password)
@@ -94,8 +95,10 @@ export const useContestStore = defineStore("contest", () => {
       if (res) {
         _getProblems(contestID)
       }
-    } catch (err) {
+      return null
+    } catch (err: any) {
       toggleAccess(false)
+      return (err?.error as string | undefined) ?? "unknown"
     }
   }
 

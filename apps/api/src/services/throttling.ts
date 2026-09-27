@@ -1,3 +1,5 @@
+import type { Context } from "hono"
+
 import { redis } from "../redis"
 import { getOptions } from "./options"
 
@@ -165,4 +167,51 @@ export async function consumeToken(
   )
   if (Number(result[0]) === 1) return { allowed: true }
   return { allowed: false, wait: Number(result[1]) || 0 }
+}
+
+/**
+ * 计数锁定：固定窗口内计满 `limit` 次就锁到窗口结束。**什么时候计数由调用方决定**：
+ *
+ * - 登录、比赛密码只在**失败**时计数 —— 正常用户几乎不会连续输错，暴力猜解全是失败，
+ *   只数失败的话机房一个班同时登录也不会误伤；
+ * - 注册在**成功**时计数 —— 限的是批量造号。
+ *
+ * 和上面的令牌桶是两回事：令牌桶限的是资源消耗（判题沙箱、AI），带匀速回填；
+ * 这里是「窗口内满多少次就停」。用固定窗口而不是滑动窗口：一个 INCR + EXPIRE NX 就够，
+ * 锁定时长就是 key 的剩余 TTL，精度对防爆破足够了。
+ */
+export type AttemptRule = { limit: number; windowSeconds: number }
+
+/** 已锁定时返回还要等几秒，否则 null。只读，不计数。 */
+export async function lockoutRemaining(key: string, rule: AttemptRule) {
+  const [count, ttl] = await Promise.all([
+    redis.get(`attempts:${key}`),
+    redis.ttl(`attempts:${key}`),
+  ])
+  if (Number(count) < rule.limit) return null
+  // ttl 为 -1（没有过期时间）理论上不会出现，EXPIRE NX 总会补上；兜底按整窗算
+  return ttl > 0 ? ttl : rule.windowSeconds
+}
+
+export async function countAttempt(key: string, rule: AttemptRule) {
+  await redis
+    .multi()
+    .incr(`attempts:${key}`)
+    // NX：只在窗口里第一次计数时设过期，之后不续期 —— 否则攻击者持续猜就永远锁着，
+    // 真正的主人过了窗口也登不进来
+    .expire(`attempts:${key}`, rule.windowSeconds, "NX")
+    .exec()
+}
+
+export async function resetAttempts(key: string) {
+  await redis.del(`attempts:${key}`)
+}
+
+/**
+ * 客户端 IP。线上 api 端口不对外发布，只有 Caddy 连得到它，Caddy 用 `{client_ip}`
+ * **覆盖**写入 X-Real-IP（它只信任内网来源的 X-Forwarded-For，见 docker/Caddyfile），
+ * 所以这个头是可信的。本机 dev 走 Vite 代理没有这个头，统一落到一个桶里，无所谓。
+ */
+export function clientIp(c: Context) {
+  return c.req.header("x-real-ip") || "unknown"
 }

@@ -52,6 +52,8 @@ function submit() {
           authStore.setSignupError("用户名已存在")
         } else if (err.error === "email-exists") {
           authStore.setSignupError("邮箱已存在")
+        } else if (err.error === "too-many-registrations") {
+          authStore.setSignupError("注册太频繁，请稍后再试")
         } else {
           authStore.setSignupError("无法注册")
         }

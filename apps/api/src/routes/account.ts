@@ -47,6 +47,12 @@ import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { getUserProfileById } from "../services/profile"
+import {
+  clientIp,
+  countAttempt,
+  lockoutRemaining,
+  type AttemptRule,
+} from "../services/throttling"
 import { localTime, weekStart } from "../time"
 import {
   isTeacherOrAbove,
@@ -56,6 +62,12 @@ import {
 } from "./helpers"
 
 export const accountRoutes = new Hono<AppEnv>()
+
+/**
+ * 注册限流：按 IP 每小时 100 个号，只数成功的。拦的是脚本批量造号；
+ * 机房一个班共用一个出口 IP，一节课全班现场注册也够用。
+ */
+const REGISTER_PER_IP: AttemptRule = { limit: 100, windowSeconds: 60 * 60 }
 
 accountRoutes.post("/users", async (c) => {
   const parsed = registerRequestSchema.safeParse(
@@ -69,6 +81,17 @@ accountRoutes.post("/users", async (c) => {
       403,
       "registration-disabled",
       "Register function has been disabled by admin",
+    )
+  }
+
+  const registerKey = `register:ip:${clientIp(c)}`
+  const wait = await lockoutRemaining(registerKey, REGISTER_PER_IP)
+  if (wait !== null) {
+    return failure(
+      c,
+      429,
+      "too-many-registrations",
+      `Too many registrations, please wait ${wait} seconds`,
     )
   }
 
@@ -120,6 +143,7 @@ accountRoutes.post("/users", async (c) => {
       realName: null,
     })
   })
+  await countAttempt(registerKey, REGISTER_PER_IP)
   return success(c, { ok: true }, 201)
 })
 

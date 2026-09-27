@@ -130,6 +130,8 @@ function submit() {
         authStore.setLoginError("此账号已被封禁")
       } else if (err.error === "invalid-credentials") {
         authStore.setLoginError("用户名或密码不正确")
+      } else if (err.error === "too-many-login-attempts") {
+        authStore.setLoginError("密码错误次数太多，请 15 分钟后再试")
       } else {
         authStore.setLoginError("无法登录")
       }

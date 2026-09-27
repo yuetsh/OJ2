@@ -39,6 +39,11 @@ import {
   type ContestEnv,
 } from "../services/contest"
 import {
+  countAttempt,
+  lockoutRemaining,
+  type AttemptRule,
+} from "../services/throttling"
+import {
   objectValue,
   publicTemplates,
   queryInteger,
@@ -149,6 +154,8 @@ contestRoutes.get("/contests/:id", optionalAuth, async (c) => {
   )
 })
 
+const CONTEST_PASSWORD_RULE: AttemptRule = { limit: 10, windowSeconds: 10 * 60 }
+
 contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
   const contest = await findAccessibleContest(
     c.get("user"),
@@ -161,7 +168,20 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
   )
   if (!parsed.success)
     return failure(c, 400, "invalid-request", "Password is required")
+  // 比赛密码往往就是几位数字，不限的话一个脚本几分钟就能扫完。
+  // 按「人 × 比赛」计失败次数：猜错的是自己，锁的也只是自己进这一场。
+  const attemptKey = `contest-password:${contest.id}:${c.get("user")!.id}`
+  const wait = await lockoutRemaining(attemptKey, CONTEST_PASSWORD_RULE)
+  if (wait !== null) {
+    return failure(
+      c,
+      429,
+      "too-many-password-attempts",
+      `Too many wrong passwords, please wait ${wait} seconds`,
+    )
+  }
   if (!checkContestPassword(parsed.data.password, contest.password)) {
+    await countAttempt(attemptKey, CONTEST_PASSWORD_RULE)
     return failure(
       c,
       403,

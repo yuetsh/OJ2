@@ -17,8 +17,13 @@ const { isDesktop } = useBreakpoints()
 const password = ref("")
 
 async function check() {
-  await contestStore.checkPassword(props.contestID, password.value)
-  if (!contestStore.access) {
+  const error = await contestStore.checkPassword(
+    props.contestID,
+    password.value,
+  )
+  if (error === "too-many-password-attempts") {
+    message.error("密码错误次数太多，请 10 分钟后再试")
+  } else if (!contestStore.access) {
     message.error("密码错误")
   }
 }
