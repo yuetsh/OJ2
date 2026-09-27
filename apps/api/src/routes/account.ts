@@ -43,7 +43,7 @@ import { onlineUserIds } from "../auth/presence"
 import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { getBooleanOption } from "../services/options"
 import { getUserProfileById } from "../services/profile"
@@ -70,11 +70,12 @@ export const accountRoutes = new Hono<AppEnv>()
 const REGISTER_PER_IP: AttemptRule = { limit: 100, windowSeconds: 60 * 60 }
 
 accountRoutes.post("/users", async (c) => {
-  const parsed = registerRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    registerRequestSchema,
+    "Invalid registration payload",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid registration payload")
+  if (!parsed.success) return parsed.response
   if (!(await getBooleanOption("allow_register", true))) {
     return failure(
       c,
@@ -173,11 +174,12 @@ accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
 })
 
 accountRoutes.put("/me/profile", requireAuth, async (c) => {
-  const parsed = updateProfileRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    updateProfileRequestSchema,
+    "Invalid profile payload",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid profile payload")
+  if (!parsed.success) return parsed.response
   const values = Object.fromEntries(
     Object.entries(parsed.data).map(([key, value]) => [
       key,

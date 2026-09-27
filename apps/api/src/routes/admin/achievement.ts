@@ -9,7 +9,7 @@ import { Hono } from "hono"
 
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import {
   ACHIEVEMENT_METRICS,
   findMetric,
@@ -72,17 +72,8 @@ adminAchievementRoutes.get(
 )
 
 adminAchievementRoutes.post("/achievements", requireSuperAdmin, async (c) => {
-  const parsed = createAchievementRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "参数错误",
-    )
-  }
+  const parsed = await parseBody(c, createAchievementRequestSchema)
+  if (!parsed.success) return parsed.response
   if (!findMetric(parsed.data.metric))
     return failure(c, 400, "invalid-metric", "指标不存在")
 
@@ -111,17 +102,8 @@ adminAchievementRoutes.put(
   requireSuperAdmin,
   async (c) => {
     const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = updateAchievementRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, updateAchievementRequestSchema)
+    if (!parsed.success) return parsed.response
     if (!findMetric(parsed.data.metric))
       return failure(c, 400, "invalid-metric", "指标不存在")
 

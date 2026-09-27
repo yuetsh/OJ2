@@ -26,7 +26,7 @@ import { Hono } from "hono"
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, readJson, success } from "../http"
 import { flowchartQueue } from "../queue"
 import { getBooleanOption } from "../services/options"
 import { consumeToken } from "../services/throttling"
@@ -85,9 +85,7 @@ function flowchartData(
 }
 
 flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
-  const parsed = createFlowchartRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
+  const parsed = await readJson(c, createFlowchartRequestSchema)
   if (
     !parsed.success ||
     JSON.stringify(parsed.data?.flowchartData ?? {}).length > 500 * 1024

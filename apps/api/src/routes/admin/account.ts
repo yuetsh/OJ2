@@ -33,7 +33,7 @@ import { isUserOnline, onlineUserIds } from "../../auth/presence"
 import { revokeUserSessions } from "../../auth/session"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { queryInteger, sampleUser } from "../helpers"
 
 export const adminAccountRoutes = new Hono<AppEnv>()
@@ -252,17 +252,8 @@ adminAccountRoutes.get("/users/:id", requireSuperAdmin, async (c) => {
 
 adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateUserRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, updateUserRequestSchema)
+  if (!parsed.success) return parsed.response
   const data = parsed.data
   const [existing] = await selectUser(id)
   if (!existing) return failure(c, 404, "user-not-found", "User does not exist")
@@ -350,17 +341,8 @@ adminAccountRoutes.put("/users/:id", requireSuperAdmin, async (c) => {
 })
 
 adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
-  const parsed = importUsersRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, importUsersRequestSchema)
+  if (!parsed.success) return parsed.response
   const rows = parsed.data.users
   type Prepared = {
     username: string
@@ -544,11 +526,8 @@ function isForeignKeyViolation(error: unknown) {
 class UserHasSubmissionsError extends Error {}
 
 adminAccountRoutes.delete("/users", requireSuperAdmin, async (c) => {
-  const parsed = deleteUsersRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "ids is required")
+  const parsed = await parseBody(c, deleteUsersRequestSchema, "ids is required")
+  if (!parsed.success) return parsed.response
   const me = c.get("user")!.id
   if (parsed.data.ids.includes(me)) {
     return failure(

@@ -7,7 +7,7 @@ import { createSession, destroySession } from "../auth/session"
 import { publishSessionRevoked } from "../events"
 import { hashPassword, verifyPassword } from "../auth/password"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { getUserProfileById } from "../services/profile"
 import {
   clientIp,
@@ -32,17 +32,12 @@ const LOGIN_PER_USERNAME: AttemptRule = { limit: 10, windowSeconds: 15 * 60 }
 const LOGIN_PER_IP: AttemptRule = { limit: 100, windowSeconds: 15 * 60 }
 
 authRoutes.post("/auth/login", async (c) => {
-  const parsed = loginRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    loginRequestSchema,
+    "Username and password are required",
   )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      "Username and password are required",
-    )
-  }
+  if (!parsed.success) return parsed.response
 
   const usernameKey = `login:user:${parsed.data.username.toLowerCase()}`
   const ipKey = `login:ip:${clientIp(c)}`

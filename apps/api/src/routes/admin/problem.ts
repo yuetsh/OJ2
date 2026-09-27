@@ -32,7 +32,7 @@ import { Hono } from "hono"
 import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { astRulesError, pickAstRules } from "../../judge/ast"
 import { buildSqlDisplay } from "../../judge/sql"
 import { completeChat } from "../../services/ai"
@@ -432,17 +432,8 @@ adminProblemRoutes.get("/problems/:id", requireProblemPermission, async (c) => {
 })
 
 adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
-  const parsed = createProblemRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "参数错误",
-    )
-  }
+  const parsed = await parseBody(c, createProblemRequestSchema)
+  if (!parsed.success) return parsed.response
   const checked = commonChecks(parsed.data)
   if ("error" in checked)
     return failure(c, 400, "invalid-problem", checked.error)
@@ -495,17 +486,8 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
 
 adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateProblemRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "参数错误",
-    )
-  }
+  const parsed = await parseBody(c, updateProblemRequestSchema)
+  if (!parsed.success) return parsed.response
   const [existing] = await db
     .select()
     .from(schema.problem)
@@ -702,17 +684,8 @@ adminProblemRoutes.post(
     ) {
       return failure(c, 404, "contest-not-found", "Contest does not exist")
     }
-    const parsed = createProblemRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, createProblemRequestSchema)
+    if (!parsed.success) return parsed.response
     const checked = commonChecks(parsed.data)
     if ("error" in checked)
       return failure(c, 400, "invalid-problem", checked.error)
@@ -774,12 +747,12 @@ adminProblemRoutes.post(
   requireProblemPermission,
   async (c) => {
     const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = makeProblemPublicRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
+    const parsed = await parseBody(
+      c,
+      makeProblemPublicRequestSchema,
+      "displayId 不能为空",
     )
-    if (!parsed.success)
-      return failure(c, 400, "invalid-request", "displayId 不能为空")
-
+    if (!parsed.success) return parsed.response
     const [problem] = await db
       .select()
       .from(schema.problem)
@@ -856,17 +829,8 @@ adminProblemRoutes.post(
   requireProblemPermission,
   async (c) => {
     const contestId = queryInteger(c.req.param("contestId"), 0, { min: 1 })
-    const parsed = addContestProblemRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, addContestProblemRequestSchema)
+    if (!parsed.success) return parsed.response
     const [contest] = await db
       .select()
       .from(schema.contest)
@@ -1055,17 +1019,8 @@ adminProblemRoutes.post(
   "/sql-test-cases/preview",
   requireProblemPermission,
   async (c) => {
-    const parsed = sqlPreviewRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, sqlPreviewRequestSchema)
+    if (!parsed.success) return parsed.response
     const outcome = await buildSqlDisplay(
       parsed.data.initSql,
       parsed.data.refSql,
@@ -1082,17 +1037,8 @@ adminProblemRoutes.post(
   "/sql-test-cases/generate",
   requireProblemPermission,
   async (c) => {
-    const parsed = generateSqlTestCaseRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, generateSqlTestCaseRequestSchema)
+    if (!parsed.success) return parsed.response
     try {
       const sql = await completeChat(
         `你是一个 SQL 出题助手。用户会给你一道 SQL 题的标准答案（查询题的

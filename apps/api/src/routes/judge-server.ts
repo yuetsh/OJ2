@@ -6,7 +6,7 @@ import { z } from "zod"
 
 import { config } from "../config"
 import { db, schema } from "../db"
-import { failure } from "../http"
+import { failure, readJson } from "../http"
 
 const heartbeatSchema = z.object({
   hostname: z.string().min(1).max(128),
@@ -38,7 +38,7 @@ async function heartbeat(c: Context) {
     return failure(c, 403, "invalid-judge-token", "Invalid token")
   }
 
-  const parsed = heartbeatSchema.safeParse(await c.req.json().catch(() => null))
+  const parsed = await readJson(c, heartbeatSchema)
   if (!parsed.success) {
     return failure(c, 400, "invalid-heartbeat", "Invalid heartbeat payload")
   }

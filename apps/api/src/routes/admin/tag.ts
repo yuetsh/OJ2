@@ -33,7 +33,7 @@ import {
 } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { JudgeStatus } from "../../judge/status"
 import { completeChat } from "../../services/ai"
 import { localTime, localYear } from "../../time"
@@ -82,11 +82,8 @@ adminTagRoutes.get("/problem-tags", requireProblemPermission, async (c) => {
 
 adminTagRoutes.put("/problem-tags/:id", requireProblemPermission, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = renameTagRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "标签名不能为空")
+  const parsed = await parseBody(c, renameTagRequestSchema, "标签名不能为空")
+  if (!parsed.success) return parsed.response
   const name = parsed.data.name
 
   const [tag] = await db
@@ -177,17 +174,8 @@ adminTagRoutes.post(
   "/problems/batch-tag",
   requireProblemPermission,
   async (c) => {
-    const parsed = batchProblemTagRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, batchProblemTagRequestSchema)
+    if (!parsed.success) return parsed.response
     const user = c.get("user")!
     const filters = [
       inArray(schema.problem.id, parsed.data.problemIds),
@@ -462,11 +450,12 @@ adminTagRoutes.post(
   "/problems/flowchart",
   requireProblemPermission,
   async (c) => {
-    const parsed = generateFlowchartRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
+    const parsed = await parseBody(
+      c,
+      generateFlowchartRequestSchema,
+      "python 代码不能为空",
     )
-    if (!parsed.success)
-      return failure(c, 400, "invalid-request", "python 代码不能为空")
+    if (!parsed.success) return parsed.response
     try {
       const flowchart = await completeChat(
         `你是一个可以将Python代码转换为mermaid的助手。

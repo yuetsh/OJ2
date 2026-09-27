@@ -29,7 +29,7 @@ import { Hono } from "hono"
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { recalculateBadge, resyncProgress } from "../../services/problemset"
 import { asFilterValue, queryInteger, sampleUser } from "../helpers"
 
@@ -175,17 +175,8 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
 })
 
 adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
-  const parsed = createProblemSetRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "参数错误",
-    )
-  }
+  const parsed = await parseBody(c, createProblemSetRequestSchema)
+  if (!parsed.success) return parsed.response
   const now = new Date().toISOString()
   const [created] = await db
     .insert(schema.problemset)
@@ -211,17 +202,8 @@ adminProblemSetRoutes.get("/problem-sets/:id", requireTeacher, async (c) => {
 adminProblemSetRoutes.put("/problem-sets/:id", requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get("user")!)
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const parsed = updateProblemSetRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "参数错误",
-    )
-  }
+  const parsed = await parseBody(c, updateProblemSetRequestSchema)
+  if (!parsed.success) return parsed.response
   const [updated] = await db
     .update(schema.problemset)
     .set({
@@ -258,11 +240,12 @@ adminProblemSetRoutes.put(
   async (c) => {
     const row = await loadOwned(c, c.get("user")!)
     if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-    const parsed = updateProblemSetStatusRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
+    const parsed = await parseBody(
+      c,
+      updateProblemSetStatusRequestSchema,
+      "status 不合法",
     )
-    if (!parsed.success)
-      return failure(c, 400, "invalid-request", "status 不合法")
+    if (!parsed.success) return parsed.response
     const [updated] = await db
       .update(schema.problemset)
       .set({
@@ -331,17 +314,8 @@ adminProblemSetRoutes.post(
   async (c) => {
     const row = await loadOwned(c, c.get("user")!)
     if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-    const parsed = addProblemToSetRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, addProblemToSetRequestSchema)
+    if (!parsed.success) return parsed.response
     const [problem] = await db
       .select({ id: schema.problem.id })
       .from(schema.problem)
@@ -394,10 +368,12 @@ adminProblemSetRoutes.put(
   async (c) => {
     const row = await loadOwned(c, c.get("user")!)
     if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-    const parsed = updateProblemInSetRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
+    const parsed = await parseBody(
+      c,
+      updateProblemInSetRequestSchema,
+      "参数错误",
     )
-    if (!parsed.success) return failure(c, 400, "invalid-request", "参数错误")
+    if (!parsed.success) return parsed.response
     const updated = await db
       .update(schema.problemsetProblem)
       .set(parsed.data)
@@ -512,17 +488,8 @@ adminProblemSetRoutes.post(
   async (c) => {
     const row = await loadOwned(c, c.get("user")!)
     if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-    const parsed = createProblemSetBadgeRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, createProblemSetBadgeRequestSchema)
+    if (!parsed.success) return parsed.response
     const [created] = await db
       .insert(schema.problemsetBadge)
       .values({
@@ -542,17 +509,8 @@ adminProblemSetRoutes.put(
   async (c) => {
     const row = await loadOwned(c, c.get("user")!)
     if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-    const parsed = updateProblemSetBadgeRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "参数错误",
-      )
-    }
+    const parsed = await parseBody(c, updateProblemSetBadgeRequestSchema)
+    if (!parsed.success) return parsed.response
     const [updated] = await db
       .update(schema.problemsetBadge)
       .set(parsed.data)

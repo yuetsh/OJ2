@@ -22,7 +22,7 @@ import {
 import { config } from "../../config"
 import { db, schema } from "../../db"
 import { publishConfigUpdate } from "../../events"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { getWebsiteOptions } from "../../services/options"
 import { todayStart } from "../../time"
 import { queryInteger } from "../helpers"
@@ -77,17 +77,8 @@ adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
 })
 
 adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
-  const parsed = updateWebsiteConfigRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, updateWebsiteConfigRequestSchema)
+  if (!parsed.success) return parsed.response
   const entries = (
     Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]
   ).map(([field, key]) => ({ field, key, value: parsed.data[field] }))
@@ -131,11 +122,12 @@ adminConfRoutes.get("/judge-servers", requireSuperAdmin, async (c) => {
 })
 
 adminConfRoutes.put("/judge-servers/:id", requireSuperAdmin, async (c) => {
-  const parsed = updateJudgeServerRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    updateJudgeServerRequestSchema,
+    "isDisabled is required",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "isDisabled is required")
+  if (!parsed.success) return parsed.response
   const updated = await db
     .update(schema.judgeServer)
     .set({ isDisabled: parsed.data.isDisabled })

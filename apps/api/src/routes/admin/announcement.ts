@@ -9,7 +9,7 @@ import { Hono } from "hono"
 
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { queryInteger, sampleUser } from "../helpers"
 
 export const adminAnnouncementRoutes = new Hono<AppEnv>()
@@ -78,17 +78,8 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
 })
 
 adminAnnouncementRoutes.post("/announcements", requireSuperAdmin, async (c) => {
-  const parsed = createAnnouncementRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, createAnnouncementRequestSchema)
+  if (!parsed.success) return parsed.response
   const now = new Date().toISOString()
   const [created] = await db
     .insert(schema.announcement)
@@ -126,17 +117,8 @@ adminAnnouncementRoutes.put(
   requireSuperAdmin,
   async (c) => {
     const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = updateAnnouncementRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "Invalid payload",
-      )
-    }
+    const parsed = await parseBody(c, updateAnnouncementRequestSchema)
+    if (!parsed.success) return parsed.response
     const updated = await db
       .update(schema.announcement)
       .set({ ...parsed.data, lastUpdateTime: new Date().toISOString() })

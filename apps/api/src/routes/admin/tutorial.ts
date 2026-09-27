@@ -13,7 +13,7 @@ import { Hono } from "hono"
 
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { exerciseDataError } from "../../services/exercise"
 import { objectValue, queryInteger, sampleUser } from "../helpers"
 
@@ -72,17 +72,8 @@ adminTutorialRoutes.get("/tutorials", requireSuperAdmin, async (c) => {
 })
 
 adminTutorialRoutes.post("/tutorials", requireSuperAdmin, async (c) => {
-  const parsed = createTutorialRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, createTutorialRequestSchema)
+  if (!parsed.success) return parsed.response
   const now = new Date().toISOString()
   const [created] = await db
     .insert(schema.tutorial)
@@ -108,17 +99,8 @@ adminTutorialRoutes.get("/tutorials/:id", requireSuperAdmin, async (c) => {
 
 adminTutorialRoutes.put("/tutorials/:id", requireSuperAdmin, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateTutorialRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, updateTutorialRequestSchema)
+  if (!parsed.success) return parsed.response
   const updated = await db
     .update(schema.tutorial)
     .set({ ...parsed.data, updatedAt: new Date().toISOString() })
@@ -135,11 +117,12 @@ adminTutorialRoutes.put(
   requireSuperAdmin,
   async (c) => {
     const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = setTutorialVisibilityRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
+    const parsed = await parseBody(
+      c,
+      setTutorialVisibilityRequestSchema,
+      "isPublic is required",
     )
-    if (!parsed.success)
-      return failure(c, 400, "invalid-request", "isPublic is required")
+    if (!parsed.success) return parsed.response
     // 只改可见性，不动 updatedAt —— 上下架不是内容修改，改了会打乱按更新时间排序的直觉
     const updated = await db
       .update(schema.tutorial)
@@ -199,17 +182,8 @@ adminTutorialRoutes.get(
 )
 
 adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
-  const parsed = createExerciseRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, createExerciseRequestSchema)
+  if (!parsed.success) return parsed.response
   const [tutorial] = await db
     .select({ id: schema.tutorial.id })
     .from(schema.tutorial)
@@ -233,17 +207,8 @@ adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
 })
 
 adminTutorialRoutes.put("/exercises/:id", requireSuperAdmin, async (c) => {
-  const parsed = updateExerciseRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, updateExerciseRequestSchema)
+  if (!parsed.success) return parsed.response
   const dataError = exerciseDataError(parsed.data.type, parsed.data.data)
   if (dataError) return failure(c, 400, "invalid-exercise", dataError)
   const [updated] = await db

@@ -31,7 +31,7 @@ import {
 } from "../auth/middleware"
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { judgeQueue } from "../queue"
 import {
@@ -93,12 +93,12 @@ async function saveTrace(
 }
 
 submissionRoutes.post("/submissions", requireAuth, async (c) => {
-  const parsed = createSubmissionRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    createSubmissionRequestSchema,
+    "Invalid submission payload",
   )
-  if (!parsed.success) {
-    return failure(c, 400, "invalid-request", "Invalid submission payload")
-  }
+  if (!parsed.success) return parsed.response
   let contestId: number | null = null
   if (parsed.data.contestId) {
     // 这里用不了 requireContestAccess 中间件：比赛 id 来自请求体，
@@ -293,11 +293,12 @@ submissionRoutes.post(
 )
 
 submissionRoutes.post("/code/format", requireAuth, async (c) => {
-  const parsed = formatCodeRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    formatCodeRequestSchema,
+    "Invalid format payload",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid format payload")
+  if (!parsed.success) return parsed.response
   try {
     const code = await formatCode(parsed.data.code, parsed.data.language)
     return success(c, { code } satisfies FormatCodeResponse)

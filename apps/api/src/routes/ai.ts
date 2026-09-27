@@ -36,7 +36,7 @@ import { getPreviousLogin, type AuthUser } from "../auth/session"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { JudgeStatus, type JudgeStatusValue } from "../judge/status"
-import { failure, success } from "../http"
+import { failure, parseBody, readJson, success } from "../http"
 import { completeChat, streamChat, streamWhole } from "../services/ai"
 import { generateFilteredHint } from "../services/hint-filter"
 import { decideHintLevel } from "../services/hint-level"
@@ -882,16 +882,12 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
 })
 
 aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
-  const parsed = aiAnalysisRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    aiAnalysisRequestSchema,
+    "start, end and duration are required",
   )
-  if (!parsed.success)
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      "start, end and duration are required",
-    )
+  if (!parsed.success) return parsed.response
   if (
     Number.isNaN(Date.parse(parsed.data.start)) ||
     Number.isNaN(Date.parse(parsed.data.end))
@@ -983,11 +979,12 @@ async function recordHint(
 }
 
 aiRoutes.post("/ai/hint", requireAuth, async (c) => {
-  const parsed = aiHintRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    aiHintRequestSchema,
+    "submissionId is required",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "submissionId is required")
+  if (!parsed.success) return parsed.response
   const [row] = await db
     .select({ submission: schema.submission, problem: schema.problem })
     .from(schema.submission)
@@ -1081,9 +1078,7 @@ aiRoutes.post("/ai/hint", requireAuth, async (c) => {
 
 aiRoutes.post("/ai/hint/:id/feedback", requireAuth, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = aiHintFeedbackRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
+  const parsed = await readJson(c, aiHintFeedbackRequestSchema)
   if (!id || !parsed.success)
     return failure(c, 400, "invalid-request", "helpful is required")
   // 只能评自己的提示：顺着 submission 核对是不是本人。别人的和不存在的一样回 404，
@@ -1114,11 +1109,12 @@ aiRoutes.post("/ai/hint/:id/feedback", requireAuth, async (c) => {
 aiRoutes.post("/ai/class-analysis", requireAuth, async (c) => {
   if (!isTeacherOrAbove(c.get("user")))
     return failure(c, 403, "permission-denied", "Permission denied")
-  const parsed = classAnalysisRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    classAnalysisRequestSchema,
+    "Class data is required",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Class data is required")
+  if (!parsed.success) return parsed.response
   const limited = await throttleAi(c)
   if (limited) return limited
   return streamChat(
@@ -1130,16 +1126,12 @@ aiRoutes.post("/ai/class-analysis", requireAuth, async (c) => {
 aiRoutes.post("/ai/class-pk-analysis", requireAuth, async (c) => {
   if (!isTeacherOrAbove(c.get("user")))
     return failure(c, 403, "permission-denied", "Permission denied")
-  const parsed = classPkAnalysisRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    classPkAnalysisRequestSchema,
+    "At least two classes are required",
   )
-  if (!parsed.success)
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      "At least two classes are required",
-    )
+  if (!parsed.success) return parsed.response
   const limited = await throttleAi(c)
   if (limited) return limited
   return streamChat(

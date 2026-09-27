@@ -27,7 +27,7 @@ import { optionalAuth, requireAuth } from "../auth/middleware"
 import { setContestPassword } from "../auth/session"
 import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import {
   canAccessContest,
   checkContestPassword,
@@ -163,11 +163,12 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
   )
   if (!contest || !contest.password)
     return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const parsed = contestPasswordRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    contestPasswordRequestSchema,
+    "Password is required",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Password is required")
+  if (!parsed.success) return parsed.response
   // 比赛密码往往就是几位数字，不限的话一个脚本几分钟就能扫完。
   // 按「人 × 比赛」计失败次数：猜错的是自己，锁的也只是自己进这一场。
   const attemptKey = `contest-password:${contest.id}:${c.get("user")!.id}`

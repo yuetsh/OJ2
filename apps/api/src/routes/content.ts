@@ -23,7 +23,7 @@ import { Hono } from "hono"
 
 import { requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { objectValue, queryInteger, sampleUser } from "./helpers"
 
@@ -187,11 +187,12 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
  */
 contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
   const user = c.get("user")!
-  const parsed = createMessageRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    createMessageRequestSchema,
+    "Invalid message payload",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid message payload")
+  if (!parsed.success) return parsed.response
   if (parsed.data.recipientId === user.id)
     return failure(
       c,
@@ -263,11 +264,12 @@ contentRoutes.get("/problems/:id/reaction", requireAuth, async (c) => {
 
 contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = setReactionRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    setReactionRequestSchema,
+    "Invalid reaction",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid reaction")
+  if (!parsed.success) return parsed.response
   const user = c.get("user")!
   const [[problem], [solved]] = await Promise.all([
     db
@@ -447,11 +449,12 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
 contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
   const user = c.get("user")!
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = tutorialProgressPingSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    tutorialProgressPingSchema,
+    "Invalid progress payload",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid progress payload")
+  if (!parsed.success) return parsed.response
   const [tutorial] = await db
     .select({ id: schema.tutorial.id })
     .from(schema.tutorial)
@@ -501,11 +504,12 @@ contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
 contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
   const user = c.get("user")!
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = exerciseAttemptRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    exerciseAttemptRequestSchema,
+    "Invalid attempt payload",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid attempt payload")
+  if (!parsed.success) return parsed.response
   // 练习跟着教程走：教程没公开，它底下的练习也不该能上报
   const [exercise] = await db
     .select({ id: schema.exercise.id })

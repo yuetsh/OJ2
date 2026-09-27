@@ -12,7 +12,7 @@ import { Hono } from "hono"
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
-import { failure, success } from "../../http"
+import { failure, parseBody, success } from "../../http"
 import { contestStatus } from "../../services/contest"
 import { objectValue, queryInteger, sampleUser } from "../helpers"
 
@@ -120,17 +120,8 @@ adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
 })
 
 adminContestRoutes.post("/contests", requireTeacher, async (c) => {
-  const parsed = createContestRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, createContestRequestSchema)
+  if (!parsed.success) return parsed.response
   const error = validatePayload(parsed.data)
   if (error) return failure(c, 400, "invalid-contest", error)
 
@@ -157,17 +148,8 @@ adminContestRoutes.post("/contests", requireTeacher, async (c) => {
 
 adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = updateContestRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
-  )
-  if (!parsed.success) {
-    return failure(
-      c,
-      400,
-      "invalid-request",
-      parsed.error.issues[0]?.message ?? "Invalid payload",
-    )
-  }
+  const parsed = await parseBody(c, updateContestRequestSchema)
+  if (!parsed.success) return parsed.response
   const [existing] = await selectContest(id)
   if (!existing || !ownedBy(c.get("user")!, existing.contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
@@ -386,17 +368,8 @@ adminContestRoutes.put(
   requireTeacher,
   async (c) => {
     const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })
-    const parsed = updateAcmHelperRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
-    )
-    if (!parsed.success) {
-      return failure(
-        c,
-        400,
-        "invalid-request",
-        parsed.error.issues[0]?.message ?? "Invalid payload",
-      )
-    }
+    const parsed = await parseBody(c, updateAcmHelperRequestSchema)
+    if (!parsed.success) return parsed.response
     const [contest] = await db
       .select()
       .from(schema.contest)

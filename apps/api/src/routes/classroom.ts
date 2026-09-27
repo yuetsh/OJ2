@@ -11,7 +11,7 @@ import { Hono } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { queryInteger, rounded } from "./helpers"
 
@@ -165,11 +165,12 @@ classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
 })
 
 classroomRoutes.post("/classes/comparison", async (c) => {
-  const parsed = classComparisonRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    classComparisonRequestSchema,
+    "At least one class is required",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "At least one class is required")
+  if (!parsed.success) return parsed.response
   const users = await loadClassUsers(parsed.data.classNames)
   const allAc = users.map((user) => user.acceptedNumber)
   const globalQ1 = quantile(allAc, 0.25)

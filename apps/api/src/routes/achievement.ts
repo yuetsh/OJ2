@@ -10,7 +10,7 @@ import { Hono } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { objectValue } from "./helpers"
 
 export const achievementRoutes = new Hono<AppEnv>()
@@ -177,11 +177,12 @@ achievementRoutes.get("/achievements/pending", requireAuth, async (c) => {
 })
 
 achievementRoutes.post("/achievements/pending/read", requireAuth, async (c) => {
-  const parsed = markAchievementsReadSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    markAchievementsReadSchema,
+    "Invalid achievement ids",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid achievement ids")
+  if (!parsed.success) return parsed.response
   if (parsed.data.ids.length > 0) {
     await db
       .update(schema.userAchievement)

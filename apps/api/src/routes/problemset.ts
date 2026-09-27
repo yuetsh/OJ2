@@ -31,7 +31,7 @@ import {
   type AppEnv,
 } from "../auth/middleware"
 import { db, schema } from "../db"
-import { failure, success } from "../http"
+import { failure, parseBody, success } from "../http"
 import { computeProgress } from "../services/problemset"
 import { asFilterValue, objectValue, queryInteger, sampleUser } from "./helpers"
 
@@ -342,11 +342,12 @@ async function recomputeProgress(
 }
 
 problemsetRoutes.post("/problem-set-progress", requireAuth, async (c) => {
-  const parsed = joinProblemSetRequestSchema.safeParse(
-    await c.req.json().catch(() => null),
+  const parsed = await parseBody(
+    c,
+    joinProblemSetRequestSchema,
+    "Invalid problem set",
   )
-  if (!parsed.success)
-    return failure(c, 400, "invalid-request", "Invalid problem set")
+  if (!parsed.success) return parsed.response
   const user = c.get("user")!
   const [problemSet] = await db
     .select({ id: schema.problemset.id })
