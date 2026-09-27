@@ -76,7 +76,7 @@ const showCollabBar = computed(() => collabHere.value && userStore.isTeacherOrAb
 
 /**
  * 状态全塞进按钮本身。原来旁边还挂一个 n-tag 说明排队情况，一行工具栏
- * （语言 / 提交 / 提交信息 / 课堂统计 / 更多操作 / 求助）在 1280 的机房屏上放不下。
+ * （语言 / 提交 / 本题提交 / 课堂统计 / 更多 / 求助）在 1280 的机房屏上放不下。
  */
 const helpButtonText = computed(() => {
   if (collabStore.helpStatus === "active") {
@@ -122,7 +122,7 @@ const menuOptions = computed<DropdownOption[]>(() => {
   if (!isDesktop.value) {
     if (showGoSubmissionButton.value) {
       options.push({
-        label: "提交信息",
+        label: "本题提交",
         key: "submissions",
       })
     }
@@ -272,7 +272,7 @@ onMounted(() => {
     <SubmitCode v-else />
 
     <n-button v-if="isDesktop && showGoSubmissionButton" :size="buttonSize" @click="goSubmissions">
-      提交信息
+      本题提交
     </n-button>
 
     <n-button
@@ -283,14 +283,14 @@ onMounted(() => {
       课堂统计
     </n-button>
 
-    <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；移动端再加上提交信息 / 课堂统计 -->
+    <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；移动端再加上本题提交 / 课堂统计 -->
     <n-dropdown
       v-if="menuOptions.length"
       trigger="click"
       :options="menuOptions"
       @select="handleMenuSelect"
     >
-      <n-button :size="buttonSize">更多操作</n-button>
+      <n-button :size="buttonSize">更多</n-button>
     </n-dropdown>
 
     <template v-if="showCollabBar">

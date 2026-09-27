@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
+import { DIFFICULTY } from "utils/constants"
+import { getTagColor } from "utils/functions"
 import { createTestSubmission } from "utils/judge"
 import type { ProblemDetail, ProblemRow, ProblemStatus } from "utils/types"
 import Copy from "shared/components/Copy.vue"
@@ -20,8 +21,6 @@ type Sample = ProblemDetail["samples"][number] & {
   loading: boolean
 }
 
-const theme = useThemeVars()
-const style = computed(() => "color: " + theme.value.primaryColor)
 const isDark = useDark()
 const route = useRoute()
 const codeStore = useCodeStore()
@@ -190,16 +189,47 @@ function type(status: ProblemStatus) {
       </n-alert>
     </template>
 
-    <n-flex align="center">
-      <n-tag>{{ problem._id }}</n-tag>
-      <h2 class="problemTitle">{{ problem.title }}</h2>
-    </n-flex>
-    <p class="title" :style="style">
-      <n-flex align="center">
-        <Icon icon="streamline-ultimate-color:checklist"></Icon>
-        描述
+    <header class="problem-head">
+      <n-flex align="center" :size="10" :wrap="false">
+        <n-tag :bordered="false">{{ problem._id }}</n-tag>
+        <h2 class="problemTitle">{{ problem.title }}</h2>
       </n-flex>
-    </p>
+      <n-flex align="center" :size="8" class="problem-meta">
+        <n-tag
+          v-if="problem.difficulty"
+          size="small"
+          :bordered="false"
+          :type="getTagColor(problem.difficulty)"
+        >
+          {{ DIFFICULTY[problem.difficulty] }}
+        </n-tag>
+        <n-text depth="3" v-if="!isSQL">
+          时间限制 {{ problem.timeLimit }} ms · 内存限制 {{ problem.memoryLimit }} MB
+        </n-text>
+      </n-flex>
+    </header>
+
+    <!-- 代码要求（AST 规则）放在最前面：它是硬性的判定条件，写到一半才看见就晚了 -->
+    <div v-if="astRequirements.length > 0" class="requirements">
+      <n-flex align="center" :size="6" class="requirements-head">
+        <Icon icon="streamline-ultimate-color:check-button" :width="18"></Icon>
+        <span>代码要求</span>
+        <n-text depth="3" class="requirements-note">提交时会逐条检查</n-text>
+      </n-flex>
+      <div v-for="[lang, rules] in astRequirements" :key="lang" class="requirements-lang">
+        <span v-if="astRequirements.length > 1" class="lang-label">{{ lang }}</span>
+        <n-flex :size="6">
+          <n-tag v-for="(rule, i) in rules" :key="i" :type="KIND_TAG_TYPE[rule.kind]" size="small">
+            {{ rule.description }}
+          </n-tag>
+        </n-flex>
+      </div>
+    </div>
+
+    <h3 class="title">
+      <Icon icon="streamline-ultimate-color:checklist"></Icon>
+      描述
+    </h3>
     <MdPreview
       preview-theme="vuepress"
       :model-value="problem.description"
@@ -207,24 +237,20 @@ function type(status: ProblemStatus) {
     />
 
     <template v-if="!isSQL">
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-ultimate-color:envelope-back-front"></Icon>
-          输入
-        </n-flex>
-      </p>
+      <h3 class="title">
+        <Icon icon="streamline-ultimate-color:envelope-back-front"></Icon>
+        输入
+      </h3>
       <MdPreview
         preview-theme="vuepress"
         :model-value="problem.inputDescription"
         :theme="isDark ? 'dark' : 'light'"
       />
 
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-ultimate-color:mailbox-post"></Icon>
-          输出
-        </n-flex>
-      </p>
+      <h3 class="title">
+        <Icon icon="streamline-ultimate-color:mailbox-post"></Icon>
+        输出
+      </h3>
       <MdPreview
         preview-theme="vuepress"
         :model-value="problem.outputDescription"
@@ -232,13 +258,51 @@ function type(status: ProblemStatus) {
       />
     </template>
 
-    <template v-if="isSQL && sqlDisplay">
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="devicon:sqlite"></Icon>
-          数据表
+    <template v-if="!isSQL">
+      <section v-for="(sample, index) of samples" :key="index" class="sample">
+        <n-flex align="center" justify="space-between" class="sample-head">
+          <h3 class="title">
+            <Icon icon="streamline-emojis:microscope"></Icon>
+            例子 {{ index + 1 }}
+          </h3>
+          <n-button
+            size="small"
+            secondary
+            :type="type(sample.status) || 'default'"
+            :loading="sample.loading"
+            @click="test(sample, index)"
+          >
+            {{ label(sample.status, sample.loading) }}
+          </n-button>
         </n-flex>
-      </p>
+        <div class="sample-grid">
+          <div class="sample-box">
+            <n-flex align="center" justify="space-between" class="sample-label">
+              <span>输入</span>
+              <Copy :value="sample.input" />
+            </n-flex>
+            <pre class="testcase">{{ sample.input }}</pre>
+          </div>
+          <div class="sample-box">
+            <n-flex align="center" justify="space-between" class="sample-label">
+              <span>输出</span>
+              <Copy :value="sample.output" />
+            </n-flex>
+            <pre class="testcase">{{ sample.output }}</pre>
+          </div>
+        </div>
+        <div v-if="sample.msg" class="sample-box sample-result">
+          <div class="sample-label">运行结果</div>
+          <pre class="testcase">{{ sample.msg }}</pre>
+        </div>
+      </section>
+    </template>
+
+    <template v-if="isSQL && sqlDisplay">
+      <h3 class="title">
+        <Icon icon="devicon:sqlite"></Icon>
+        数据表
+      </h3>
       <div v-for="t in sqlDisplay.tables" :key="t.name">
         <p class="sqlTableName">{{ t.name }}</p>
         <SQLDataTable
@@ -249,12 +313,10 @@ function type(status: ProblemStatus) {
         />
       </div>
 
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-ultimate-color:check-button"></Icon>
-          期望结果
-        </n-flex>
-      </p>
+      <h3 class="title">
+        <Icon icon="streamline-ultimate-color:check-button"></Icon>
+        期望结果
+      </h3>
       <template v-if="sqlExpectedQuery">
         <SQLDataTable
           :columns="sqlExpectedQuery.columns"
@@ -279,12 +341,10 @@ function type(status: ProblemStatus) {
     </template>
 
     <div v-if="problem.hint">
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-emojis:man-tipping-hand-1"></Icon>
-          提示
-        </n-flex>
-      </p>
+      <h3 class="title">
+        <Icon icon="streamline-emojis:man-tipping-hand-1"></Icon>
+        提示
+      </h3>
       <MdPreview
         preview-theme="preview"
         :model-value="problem.hint"
@@ -292,72 +352,11 @@ function type(status: ProblemStatus) {
       />
     </div>
 
-    <!-- 代码要求（AST 规则） -->
-    <div v-if="astRequirements.length > 0">
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-ultimate-color:check-button"></Icon>
-          要求
-        </n-flex>
-      </p>
-      <div v-for="[lang, rules] in astRequirements" :key="lang">
-        <p v-if="astRequirements.length > 1" class="lang-label">
-          {{ lang }}
-        </p>
-        <n-list bordered style="margin-bottom: 8px">
-          <n-list-item v-for="(rule, i) in rules" :key="i">
-            <n-tag :type="KIND_TAG_TYPE[rule.kind]">{{ rule.description }}</n-tag>
-          </n-list-item>
-        </n-list>
-      </div>
-    </div>
-
-    <template v-if="!isSQL">
-      <div v-for="(sample, index) of samples" :key="index">
-        <n-flex align="center">
-          <p class="title" :style="style">
-            <n-flex align="center">
-              <Icon icon="streamline-emojis:microscope"></Icon>
-              例子 {{ index + 1 }}
-            </n-flex>
-          </p>
-          <n-button size="small" :type="type(sample.status)" @click="test(sample, index)">
-            {{ label(sample.status, sample.loading) }}
-          </n-button>
-        </n-flex>
-        <n-descriptions bordered :column="2" label-style="width: 50%; min-width: 100px">
-          <n-descriptions-item>
-            <template #label>
-              <n-flex>
-                <span>输入</span>
-                <Copy :value="sample.input" />
-              </n-flex>
-            </template>
-            <div class="testcase">{{ sample.input }}</div>
-          </n-descriptions-item>
-          <n-descriptions-item>
-            <template #label>
-              <n-flex>
-                <span>输出</span>
-                <Copy :value="sample.output" />
-              </n-flex>
-            </template>
-            <div class="testcase">{{ sample.output }}</div>
-          </n-descriptions-item>
-          <n-descriptions-item label="运行结果" v-if="sample.msg">
-            <div class="testcase">{{ sample.msg }}</div>
-          </n-descriptions-item>
-        </n-descriptions>
-      </div>
-    </template>
-
     <div v-if="problem.source">
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-ultimate-color:book-open-bookmark"></Icon>
-          来源
-        </n-flex>
-      </p>
+      <h3 class="title">
+        <Icon icon="streamline-ultimate-color:book-open-bookmark"></Icon>
+        来源
+      </h3>
       <MdPreview
         preview-theme="vuepress"
         :model-value="problem.source"
@@ -368,12 +367,10 @@ function type(status: ProblemStatus) {
     <!-- 相似题目推荐 -->
     <div v-if="similarProblems.length > 0">
       <n-divider />
-      <p class="title" :style="style">
-        <n-flex align="center">
-          <Icon icon="streamline-ultimate-color:like"></Icon>
-          相似题目推荐
-        </n-flex>
-      </p>
+      <h3 class="title">
+        <Icon icon="streamline-ultimate-color:like"></Icon>
+        相似题目推荐
+      </h3>
       <n-list bordered>
         <n-list-item v-for="sp in similarProblems" :key="sp._id">
           <n-flex align="center" justify="space-between">
@@ -414,28 +411,121 @@ function type(status: ProblemStatus) {
 </template>
 
 <style scoped>
+.problem-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
 .problemTitle {
   margin: 0;
+  font-size: 22px;
+  line-height: 1.3;
+}
+
+.problem-meta {
+  font-size: 13px;
 }
 
 .title {
-  font-size: 20px;
-  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 20px 0 4px;
 }
 
-.testcase {
-  font-size: 14px;
-  white-space: pre;
-  font-family: "Monaco";
+/* md-editor 的预览自带一圈 padding 和段落外边距，放在小节标题下面显得很散 */
+:deep(.md-editor-preview-wrapper) {
+  padding: 0;
 }
 
-.status-alert {
-  margin-bottom: 16px;
+:deep(.md-editor-preview > :first-child) {
+  margin-top: 0;
+}
+
+:deep(.md-editor-preview > :last-child) {
+  margin-bottom: 0;
+}
+
+.requirements {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(24, 160, 88, 0.3);
+  background-color: rgba(24, 160, 88, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.requirements-head {
+  font-weight: 600;
+}
+
+.requirements-note {
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.requirements-lang {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .lang-label {
   font-weight: 600;
-  margin: 8px 0 4px;
+  font-size: 13px;
+}
+
+.sample {
+  margin-top: 20px;
+}
+
+.sample-head {
+  margin-bottom: 8px;
+}
+
+.sample-head .title {
+  margin: 0;
+}
+
+.sample-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.sample-box {
+  min-width: 0;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.08);
+  padding: 6px 10px 10px;
+}
+
+.sample-result {
+  margin-top: 8px;
+}
+
+.sample-label {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.testcase {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre;
+  overflow-x: auto;
+  font-family: Monaco, Consolas, monospace;
+}
+
+.status-alert {
+  margin-bottom: 16px;
 }
 
 .sqlTableName {

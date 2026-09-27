@@ -83,8 +83,8 @@ const titleTags = computed(() =>
 )
 
 // 一级路径就是菜单 key，对不上的页面（/user、/setting、/achievement 等）
-// 自然没有一项亮着
-const active = computed(() => route.path.split("/")[1] || "problem")
+// 自然没有一项亮着。根路径没登录时就是题目列表，登录了是个人首页，不亮任何一项
+const active = computed(() => route.path.split("/")[1] || (userStore.isAuthed ? "" : "problem"))
 
 async function handleLogout() {
   await userStore.signOut()
@@ -127,7 +127,7 @@ const menus = computed<MenuOption[]>(() => [
     ],
   },
   {
-    label: () => h(RouterLink, { to: "/" }, { default: () => "题目" }),
+    label: () => h(RouterLink, { to: "/problem" }, { default: () => "题目" }),
     key: "problem",
     icon: renderIcon("fluent-emoji:memo"),
   },

@@ -4,7 +4,9 @@ export const ojs: RouteRecordRaw = {
   path: "/",
   component: () => import("shared/layout/default.vue"),
   children: [
-    { path: "", component: () => import("oj/problem/list.vue") },
+    // 登录后是个人首页，没登录还是题目列表（见 oj/home/index.vue）
+    { path: "", component: () => import("oj/home/index.vue"), name: "home" },
+    { path: "problem", component: () => import("oj/problem/list.vue"), name: "problems" },
     {
       path: "problem/:problemID",
       component: () => import("oj/problem/detail.vue"),
