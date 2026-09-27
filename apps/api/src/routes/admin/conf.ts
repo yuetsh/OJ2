@@ -26,7 +26,7 @@ import { failure, parseBody, success } from "../../http"
 import { sniffImageExtension } from "../../services/image"
 import { getWebsiteOptions } from "../../services/options"
 import { dayStart } from "../../time"
-import { queryInteger } from "../helpers"
+import { classPrefixCondition, queryInteger } from "../helpers"
 
 export const adminConfRoutes = new Hono<AppEnv>()
 
@@ -253,14 +253,17 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
 
 adminConfRoutes.get("/random-usernames", requireSuperAdmin, async (c) => {
   // 传的是**班级前缀**（形如 ks251），不是班级号 —— 前端输入框写的就是「班级前缀」，
-  // 拿到结果后按这个前缀 split 取姓名。这里按前缀匹配，与旧 istartswith 一致，
-  // 不额外按 className 过滤：那会改变旧行为，而这个功能就是随机点名，宁可宽松
+  // 拿到结果后按这个前缀 split 取姓名。班级前缀走 classPrefixCondition（ks251 不带上
+  // ks2511）；别的形状的输入照旧 istartswith，与旧接口一致
   const classroom = c.req.query("classroom")?.trim()
   if (!classroom) return failure(c, 400, "invalid-request", "需要班级号")
   const rows = await db
     .select({ username: schema.user.username })
     .from(schema.user)
-    .where(ilike(schema.user.username, `${classroom}%`))
+    .where(
+      classPrefixCondition(classroom) ??
+        ilike(schema.user.username, `${classroom}%`),
+    )
     .orderBy(sql`random()`)
     .limit(10)
   return success(

@@ -33,7 +33,13 @@ import {
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { computeProgress } from "../services/problemset"
-import { asFilterValue, asRecord, queryInteger, sampleUser } from "./helpers"
+import {
+  asFilterValue,
+  asRecord,
+  classPrefixCondition,
+  queryInteger,
+  sampleUser,
+} from "./helpers"
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
@@ -499,7 +505,15 @@ problemsetRoutes.get(
     const className = c.req.query("className")?.trim()
     const completion = c.req.query("completionStatus")?.trim()
     const filters = [eq(schema.problemsetProgress.problemsetId, id)]
-    if (className) filters.push(ilike(schema.user.username, `%${className}%`))
+    // 只填数字（251）当班级号补上 ks；班级按 classPrefixCondition 匹配，
+    // 否则 251 会把 2511 班也算进来。别的输入照旧按用户名包含
+    if (className) {
+      const classPrefix = /^\d+$/.test(className) ? `ks${className}` : className
+      filters.push(
+        classPrefixCondition(classPrefix) ??
+          ilike(schema.user.username, `%${className}%`),
+      )
+    }
     if (completion === "completed")
       filters.push(eq(schema.problemsetProgress.isCompleted, true))
     else if (completion === "in_progress")

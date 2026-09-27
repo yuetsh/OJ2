@@ -34,7 +34,7 @@ import { revokeUserSessions } from "../../auth/session"
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
-import { queryInteger, sampleUser } from "../helpers"
+import { classPrefixCondition, queryInteger, sampleUser } from "../helpers"
 
 export const adminAccountRoutes = new Hono<AppEnv>()
 
@@ -130,7 +130,11 @@ adminAccountRoutes.get("/rankings/users", requireSuperAdmin, async (c) => {
   const where = and(
     inArray(schema.user.adminType, [...STUDENT_ROLES]),
     eq(schema.user.isDisabled, false),
-    keyword ? ilike(schema.user.username, `%${keyword}%`) : undefined,
+    // 输入班级前缀（ks251）按班级匹配，否则照旧按用户名包含
+    keyword
+      ? (classPrefixCondition(keyword) ??
+          ilike(schema.user.username, `%${keyword}%`))
+      : undefined,
   )
 
   const [totalRows, rows] = await Promise.all([

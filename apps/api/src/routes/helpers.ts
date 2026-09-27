@@ -1,6 +1,6 @@
 import { ADMIN_ROLES, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
 
-import { and, count, eq, ilike, notInArray } from "drizzle-orm"
+import { and, count, eq, ilike, notInArray, sql } from "drizzle-orm"
 
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
@@ -42,6 +42,22 @@ export function stripClassPrefix(
   if (!className) return username
   const prefix = `ks${className}`
   return username.startsWith(prefix) ? username.slice(prefix.length) : username
+}
+
+/**
+ * 用户名按「班级前缀」匹配：`ks251` 只匹配 251 班，**不能**把 `ks2511张三` 也捞进来。
+ *
+ * 班级号 3~4 位并存（见 admin/account.ts 的 classNameOf），裸 `ilike 'ks251%'` 会把
+ * 2510~2519 班全算进 251 班。所以输入是 `ks` + 3 位以上数字时，要求紧跟着的不是数字；
+ * 1~2 位（`ks25`）是年级前缀，照旧宽松匹配。输入不是 `ks+数字` 形状时返回 undefined，
+ * 由调用方决定退回什么匹配方式。
+ */
+export function classPrefixCondition(input: string) {
+  const matched = /^ks(\d+)$/i.exec(input)
+  if (!matched) return undefined
+  const prefix = ilike(schema.user.username, `${input}%`)
+  if (matched[1]!.length < 3) return prefix
+  return and(prefix, sql`${schema.user.username} !~* ${`^${input}[0-9]`}`)
 }
 
 /**
