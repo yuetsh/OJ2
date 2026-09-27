@@ -61,10 +61,16 @@ services:
     # redis 里没有非丢不可的东西（会话、判题队列），用旧的那个也无所谓 ——
     # 旧后端已经停了，新后端独占它，剩下的 Django / dramatiq 残留键前缀不同，互不干扰。
     profiles: ["local-data"]
+    # 会话存在这里：谁能连上它，谁就能写一条 session:<token> 冒充超管。所以必须带密码，
+    # 端口也只发布在本机（api / worker 走 compose 网络连 oj-redis，用不着宿主机端口）。
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?}"]
+    environment:
+      # redis-cli 认这个变量，healthcheck 和 docker exec 进来的 redis-cli 都不用再带 -a
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?}
     volumes:
       - ${DATA_DIR:-../data}/redis:/data
     ports:
-      - "5446:6379"
+      - "127.0.0.1:5446:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -134,7 +140,8 @@ services:
       - ${DATA_DIR:-../data}/backend:/data
     environment: &api-env
       DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@${DB_HOST:-oj-postgres}:${DB_PORT:-5432}/onlinejudge
-      REDIS_URL: redis://${REDIS_HOST:-oj-redis}:${REDIS_PORT:-6379}
+      # 密码拼进 URL，所以只能用 URL 安全的字符 —— 用 openssl rand -hex 32 生成
+      REDIS_URL: redis://:${REDIS_PASSWORD:?请在 docker/.env 里设置 REDIS_PASSWORD}@${REDIS_HOST:-oj-redis}:${REDIS_PORT:-6379}
       JUDGE_SERVER_URL: http://oj-judge:8080
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}

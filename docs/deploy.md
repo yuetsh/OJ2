@@ -33,6 +33,31 @@ Redis）和 WebSocket 推送（本地 pub/sub）是每站独立的 —— 学生
 沿用旧数据却忘了设它，会静默挂上一堆空目录：空库、没测试点、题面图片 404，
 **而且不报错**。这是整个部署里唯一会静默走歪的地方，`deploy.sh` 专门为它设了一道自检。
 
+## Redis 口令
+
+**会话存在 Redis 里**（`session:<token>` → 用户 id），谁能连上它，谁就能写一条会话
+冒充任意用户，包括超管。所以服务器那台的 Redis **必须带口令**：`compose.debian.yml`
+的 `REDIS_URL` 用 `${REDIS_PASSWORD:?}` 强制要求，`deploy.sh` 在外接形态下还会实测
+「不带口令连不上、带 `docker/.env` 的口令连得上」，两条有一条不满足就中止部署。
+
+2026-09-27 以前，旧栈 compose 起的那个 `oj-redis` 发布在 `0.0.0.0:5446`、不带口令，
+**从公网直接 PING 得通**（实测过）。给它加口令的一次性步骤，在服务器上：
+
+```bash
+cd /root/OJDeploy
+PW=$(openssl rand -hex 32)
+echo "REDIS_PASSWORD=$PW" >> OJ2/docker/.env
+# 编辑 docker-compose.yml 的 oj-redis，加一行（$PW 换成上面的值，别提交到任何仓库）：
+#   command: ["redis-server", "--requirepass", "<PW>"]
+docker compose up -d oj-redis           # 重建 redis，此刻起旧口令（无）的连接全部失败
+cd OJ2 && docker/deploy.sh              # 马上重新部署，api / worker 带上口令
+```
+
+两步之间 api 连不上 Redis，站点会 500 一两分钟，挑没人用的时候做。
+会话会保留（redis 退出时落盘 RDB），学生不用重新登录。
+
+机房那台的 `oj-redis` 不发布端口、只在 compose 网络里，不需要口令。
+
 ## 上线
 
 ### 服务器：push 就部署

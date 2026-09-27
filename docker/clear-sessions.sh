@@ -40,23 +40,35 @@ set -euo pipefail
 
 CONTAINER="${CONTAINER:-oj-redis}"
 
+# redis 带口令时（服务器那台），redis-cli 靠 REDISCLI_AUTH 认证。没显式给就从
+# docker/.env 里读；机房和本机 dev 的 redis 不带口令，读不到就留空，不影响。
+if [ -z "${REDIS_PASSWORD:-}" ] && [ -f "$(dirname "$0")/.env" ]; then
+  REDIS_PASSWORD=$(grep -E '^REDIS_PASSWORD=' "$(dirname "$0")/.env" | tail -1 | cut -d= -f2- || true)
+fi
+# 口令为空时连 -e 都不能带：空的 REDISCLI_AUTH 会让 redis-cli 发一条 AUTH ""，
+# 在不带口令的 redis 上报一行 AUTH failed（实测，虽然随后命令照常执行）。
+EXEC=(docker exec)
+[ -z "${REDIS_PASSWORD:-}" ] || EXEC+=(-e REDISCLI_AUTH="$REDIS_PASSWORD")
+EXEC+=("$CONTAINER" redis-cli)
+cli() { "${EXEC[@]}" "$@"; }
+
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '    \033[32m✓\033[0m %s\n' "$*"; }
 die()  { printf '\n\033[1;31m❌ %s\033[0m\n\n' "$*" >&2; exit 1; }
 
-docker exec "$CONTAINER" redis-cli ping >/dev/null 2>&1 \
-  || die "连不上容器 $CONTAINER 里的 redis（用 CONTAINER=... 指定容器名）"
+[ "$(cli ping 2>/dev/null)" = PONG ] \
+  || die "连不上容器 $CONTAINER 里的 redis（用 CONTAINER=... 指定容器名；带口令的话检查 REDIS_PASSWORD）"
 
 # 用 SCAN 而不是 KEYS：KEYS 会阻塞住整个 Redis，而这上面还挂着判题队列和所有人的
 # 会话读写。xargs 分批是因为单条 DEL 传太多 key 会顶到命令行长度上限；每批 DEL 返回
 # 删掉的个数，累加起来就是总数。
 purge() {
-  docker exec "$CONTAINER" redis-cli --scan --pattern "$1" 2>/dev/null \
-    | xargs -r -n 400 docker exec "$CONTAINER" redis-cli del \
+  cli --scan --pattern "$1" 2>/dev/null \
+    | xargs -r -n 400 "${EXEC[@]}" del \
     | awk '{ sum += $1 } END { print sum + 0 }'
 }
 
-count() { docker exec "$CONTAINER" redis-cli --scan --pattern "$1" 2>/dev/null | wc -l; }
+count() { cli --scan --pattern "$1" 2>/dev/null | wc -l; }
 
 say "容器 $CONTAINER"
 before_sessions=$(count 'session:*')

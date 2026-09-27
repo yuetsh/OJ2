@@ -175,6 +175,17 @@ if [ "$LOCAL_DATA" -eq 0 ]; then
       || die "外接形态依赖的 $c 没在跑 —— 先 docker compose -f /root/OJDeploy/docker-compose.yml up -d $c"
   done
   ok "外接的 postgres / redis 都在跑"
+
+  # 外接的 redis 不归本栈管，口令是否真的生效只能在这里查。旧栈那份 compose 的 redis
+  # 原本没有口令、端口发布在公网上 —— 会话存在里面，等于人人可以伪造超管登录态。
+  # 不带口令能 PING 通就说明那边还没加 --requirepass，这种状态不许上线。
+  redis_pw=$(grep -E '^REDIS_PASSWORD=' docker/.env | tail -1 | cut -d= -f2- || true)
+  [ -n "$redis_pw" ] || die "docker/.env 里没有 REDIS_PASSWORD（openssl rand -hex 32 生成）"
+  [ "$(docker exec -e REDISCLI_AUTH= oj-redis redis-cli ping 2>/dev/null)" != PONG ] \
+    || die "外接的 oj-redis 不带口令也能连上 —— 先给它加 --requirepass，见 docs/deploy.md「Redis 口令」"
+  [ "$(docker exec -e REDISCLI_AUTH="$redis_pw" oj-redis redis-cli ping 2>/dev/null)" = PONG ] \
+    || die "用 docker/.env 的 REDIS_PASSWORD 连不上外接的 oj-redis —— 两边口令不一致"
+  ok "外接的 redis 要求口令，且和 docker/.env 一致"
 else
   ok "postgres / redis 由本栈起，不预检"
 fi
