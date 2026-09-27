@@ -77,8 +77,7 @@ cd apps/web && bun run build                  # 前端构建（不在 verify 里
 - 任务名不能和根 `package.json` 的脚本重名（Vite+ 直接报错），所以 `verify` 没有对应的
   `bun run` 脚本，用 `bunx vp run verify`。
 - 缓存在 `node_modules/.vite/task-cache`，按读到的文件内容做指纹；怀疑缓存不对时删掉它。
-- 2026-09-16 用 Prettier 全量格式化过一次，2026-09-27 换成 Oxfmt，差异只有 5 个文件
-  （长联合类型的换行）。之后**改完代码顺手跑一下 `bun run fmt`**。
+- **改完代码顺手跑一下 `bun run fmt`**。
 
 ⚠️ **前端类型检查只能走 `bun run type-check` 这个脚本。** 两条看起来等价的路子都会**静默
 通过**：`vue-tsc --noEmit -p tsconfig.json` 检查 0 个文件（那个 tsconfig 是 `files: []` +
@@ -87,6 +86,15 @@ references 的壳，真正的配置在 `tsconfig.app.json`），而 `vite build`
 
 **不要写测试** —— 沿用上一代的项目约定。验证靠实跑：起服务、打接口、看结果。
 本机 Docker 全套都能起，实跑的成本比想象中低。
+
+## 提交
+
+**直接在 `main` 上干活，不开特性分支。** 注意 push 到 `github` 这个 remote 的 `main`
+会触发 CI 部署（平时 push 的 `origin` 不会），见 `docs/deploy.md`。
+
+提交信息用中文，格式 `type(范围): 从用户视角描述现象`，例如
+`fix(流程图): 「重新判题」从来没成功过，而且会把原来的评分清掉`。
+常用 type：`fix` / `feat` / `refactor` / `perf` / `chore` / `style`。
 
 ## 几件必须知道的事
 
@@ -182,7 +190,7 @@ bun run --filter '@oj2/api' check:ast     # 升级 tree-sitter-* 之后一定要
 
 没有 OI。上一代残留的 OI 分支在阶段 0 已经砍掉，不要「顺手补回来」。
 
-### 前端基线是 Chrome 105（2026-09-16 从 < 94 上调）
+### 前端基线是 Chrome 105
 
 机房**部分**电脑是 Chrome 105，其余更新 —— 按最低那档定基线。
 
@@ -191,8 +199,6 @@ bun run --filter '@oj2/api' check:ast     # 升级 tree-sitter-* 之后一定要
   （`toSorted` / `Set` 运算 / 迭代器辅助那批是 Chrome 110+ 才有的）。`modernTargets` 不写，
   用插件自带的基线（`chrome>=105`），正好是这一档。polyfill 清单写死在 `vite.config.ts`，
   **升级前端依赖后重新审计**：`DEBUG=vite:legacy bun run build` 会打印探测到的全集。
-- **Chrome < 94 那套删掉了**：`mermaid-legacy`（mermaid@9）、cytoscape 的 UMD→ESM 别名、
-  `useMermaid.ts` 里按 UA 分叉的 v9 回调式 render —— 105 用得上 mermaid 11。
 - **View Transitions 要 111，105 没有**，`darkTransition.ts` 的降级分支是真在用的。
 
 ### 时间只有一个锚点：`apps/api/src/time.ts`
@@ -213,9 +219,7 @@ SQL 里要按日历切，用 `localTime(列)`（生成 `列 at time zone 'Asia/S
   （见 `apps/web/CLAUDE.md`）。
 
 时区常量 `TIME_ZONE` / `TIME_ZONE_OFFSET_MINUTES` 在 `packages/contract/src/time.ts`，
-前后端共用一份，按**固定偏移**算（大陆 1991 年起没有夏令时）。旧栈的口径本来就是东八区，
-重写时丢过一次、2026-09 才收回来 —— 期间「今日提交」在北京时间 0:00–8:00 是空的，
-两个小时口径的成就整体偏 8 小时，事后已用一次性脚本对账订正（账平了，脚本已删）。
+前后端共用一份，按**固定偏移**算（大陆 1991 年起没有夏令时），与旧栈的东八区口径一致。
 **再动日历口径之前先读 `docs/timezone.md`**，那里有实测数据和核实方法；
 Dockerfile 的 `TZ` 和数据库连接的 `TimeZone` 是**刻意不设**的，别「顺手补上」。
 

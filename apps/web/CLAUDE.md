@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 （`ojnext` 与 `../OnlineJudge` 都已下线且**完全冻结，一行都不改**）。Vue 3 + TypeScript，
 Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
 
-**浏览器基线是 Chrome 105**（机房部分电脑那一档，2026-09-16 从 < 94 上调）：
+**浏览器基线是 Chrome 105**（机房部分电脑那一档）：
 `vite.config.ts` 的 `@vitejs/plugin-legacy` 和写死的 polyfill 清单不能删 —— vite 8
-默认 target 是 chrome111，比机房高。`mermaid-legacy` 那条 < 94 的 fallback 已删除。
-理由写在该文件的注释里，详见 `../CLAUDE.md`。
+默认 target 是 chrome111，比机房高。
+理由写在该文件的注释里，详见 `../../CLAUDE.md`。
 
 ## Commands
 
@@ -59,7 +59,7 @@ API 调用不按模块分：学生端全在 `oj/api.ts`、后台全在 `admin/ap
 
 Shared logic lives in `shared/`:
 - `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `screenMode` (problem split-screen layout), `loginSummary` (AI activity summary), `collab` (help-request queue + collab room), `achievement` (解锁弹窗队列), `myFlowchart` (流程图弹窗的 mermaid 源码)
-- `composables/` — `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `hiddenStudents` (统计面板的「请假隐藏」), `chartTheme`, `breakpoints`, `maxkb`, `learnProgress`, `rarity`
+- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `hiddenStudents` (统计面板的「请假隐藏」), `chartTheme`, `breakpoints`, `maxkb`, `learnProgress`, `rarity`
 - `layout/` — `default.vue` and `admin.vue` layout wrappers
 - `api.ts` — shared API calls (auth, profile, tags, captcha)
 
@@ -127,7 +127,7 @@ return contract("GET /problems/:id", problemDetailSchema, value)
   一道闸，一行脏数据能让整条练习列表 500。
 
 **后端出参已经不 `parse` 了**（原来 136 处，全部改成 `satisfies`；撤的时候炸出两个
-一直存在的线上 500，见 `../CLAUDE.md` 的「出参不 `parse`，用 `satisfies`」）。
+一直存在的线上 500，见 `../../CLAUDE.md` 的「出参不 `parse`，用 `satisfies`」）。
 所以现在收紧一个字段的直接后果落在 **`tsc` 编译期**，而不再是运行时 500 —— 这是好事，
 但别因此就放心大胆收：契约里的形状仍然要对得上库里的存量数据，前端拿到对不上的值
 一样会渲染错。收紧任何字段之前，拿根目录那份生产备份把全量数据跑一遍，
@@ -174,7 +174,7 @@ Env files: `.env`（本机）、`.env.production`（服务器）、`.env.staging
 | `PUBLIC_ICONIFY_URL` | 自建 Iconify 图标源，不设则走公共 CDN |
 
 后端地址**不在这里**：`utils/api.ts` 写死 `baseURL: "/api"`，dev 由 `vite.config.ts` 的
-proxy 转给 3000，线上由 Caddy 同源伺服。（原来的 `PUBLIC_OJ_URL` / `PUBLIC_WS_URL` 早已不存在。）
+proxy 转给 3000，线上由 Caddy 同源伺服。
 
 ### Routing
 
@@ -195,4 +195,4 @@ Routes are defined in `src/routes.ts` with two root routes: `ojs` (user-facing) 
 
 后端就在同一个仓库的 `../api`（Bun + Hono + Drizzle，编译成单二进制），
 契约在 `../../packages/contract`。**不要再去看 `OnlineJudge/`** —— 那是已下线的
-Django 后端，只作参照、完全冻结。详见 `../CLAUDE.md`。
+Django 后端，只作参照、完全冻结。详见 `../../CLAUDE.md`。
