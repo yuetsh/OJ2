@@ -85,6 +85,9 @@ admin  →  ./src/admin
 shared →  ./src/shared
 ```
 
+只在 `tsconfig.app.json` 的 `paths` 里写一份，`vite.config.ts` 用 `resolve.tsconfigPaths`
+直接读它 —— 加别名只改 tsconfig。
+
 ### HTTP Client
 
 `utils/api.ts` — Axios instance with interceptors (`baseURL: "/api"`,

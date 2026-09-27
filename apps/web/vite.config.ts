@@ -1,4 +1,3 @@
-import { fileURLToPath, URL } from "node:url"
 import { defineConfig } from "vite"
 import vue from "@vitejs/plugin-vue"
 import legacy from "@vitejs/plugin-legacy"
@@ -137,12 +136,16 @@ export default defineConfig(() => {
     ],
     envPrefix: "PUBLIC_",
     resolve: {
-      alias: {
-        utils: fileURLToPath(new URL("./src/utils", import.meta.url)),
-        oj: fileURLToPath(new URL("./src/oj", import.meta.url)),
-        admin: fileURLToPath(new URL("./src/admin", import.meta.url)),
-        shared: fileURLToPath(new URL("./src/shared", import.meta.url)),
-      },
+      // 别名（utils / oj / admin / shared）只在 tsconfig.app.json 的 paths 写一份，
+      // 这里直接读它。tsconfig.json 是 references 空壳也没关系，会顺着找过去（实测）
+      tsconfigPaths: true,
+    },
+    build: {
+      // 超过 500 kB 的三个 chunk 都是懒加载的：skulpt（Python 语法检查，产物名叫
+      // main-*.js，是 skulpt 自己入口的名字，不是应用入口）、wangeditor（后台富文本）、
+      // @mermaid-js/parser。默认阈值下这条警告每次构建都在报，真涨了反而没人看，
+      // 所以抬到比它们略高。首屏入口 index-*.js 在 175 kB 左右
+      chunkSizeWarningLimit: 1000,
     },
     server: {
       port: 5173,
