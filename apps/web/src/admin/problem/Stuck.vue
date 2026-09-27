@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { getStuckProblems } from "admin/api"
 import type { StuckProblem } from "utils/types"
 
@@ -37,7 +38,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <h2 style="margin-top: 0">学生卡点分析（只分析前40道题目）</h2>
+  <PageHeader title="卡点分析" description="只分析前 40 道题目" />
   <n-data-table
     :loading="loading"
     :columns="columns"

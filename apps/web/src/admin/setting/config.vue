@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import { NButton, NTag } from "naive-ui"
 import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from "utils/constants"
@@ -250,12 +251,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <n-card class="box">
-    <template #header>
-      <n-flex align="center">
-        网站设置
-        <n-button type="primary" size="small" @click="saveWebsiteConfig"> 保存 </n-button>
-      </n-flex>
+  <PageHeader title="设置" />
+  <n-card class="box" title="网站">
+    <template #header-extra>
+      <n-button type="primary" size="small" @click="saveWebsiteConfig">保存</n-button>
     </template>
     <n-form inline label-placement="left">
       <n-form-item label="网站 URL">
@@ -295,31 +294,25 @@ onMounted(() => {
       </n-flex>
     </n-flex>
   </n-card>
-  <n-card class="box">
-    <template #header>
-      <n-flex align="center">
-        判题服务器
-        <n-button
-          v-if="abnormalServers.length"
-          size="small"
-          type="warning"
-          @click="deleteAbnormalServers"
-        >
-          删除无效服务器
-        </n-button>
-      </n-flex>
+  <n-card class="box" title="判题服务器">
+    <template #header-extra>
+      <n-button
+        v-if="abnormalServers.length"
+        size="small"
+        type="warning"
+        @click="deleteAbnormalServers"
+      >
+        删除无效服务器
+      </n-button>
     </template>
     <div class="box">
       接口凭证 <n-tag size="small">{{ token }}</n-tag>
     </div>
     <n-data-table :single-line="false" striped :columns="serverColumns" :data="servers" />
   </n-card>
-  <n-card class="box" v-if="testcases.length">
-    <template #header>
-      <n-flex align="center">
-        无效的测试用例
-        <n-button size="small" type="warning" @click="() => deleteTestcase()"> 全部删除 </n-button>
-      </n-flex>
+  <n-card class="box" v-if="testcases.length" title="无效的测试用例">
+    <template #header-extra>
+      <n-button size="small" type="warning" @click="() => deleteTestcase()">全部删除</n-button>
     </template>
     <n-data-table striped class="table" :columns="testcaseColumns" :data="testcases" />
   </n-card>

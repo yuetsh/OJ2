@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import CodeEditor from "shared/components/CodeEditor.vue"
 import MarkdownEditor from "shared/components/MarkdownEditor.vue"
@@ -72,9 +73,10 @@ async function submit() {
 onMounted(init)
 </script>
 <template>
-  <h2 class="title">
-    {{ route.name === "admin tutorial create" ? "新建教程" : "编辑教程" }}
-  </h2>
+  <PageHeader
+    :title="route.name === 'admin tutorial create' ? '新建教程' : '编辑教程'"
+    :back="{ name: 'admin tutorial list' }"
+  />
   <n-form inline>
     <n-form-item label="标题">
       <n-input class="contestTitle" v-model:value="tutorial.title" />
@@ -111,10 +113,6 @@ onMounted(init)
   </n-tabs>
 </template>
 <style scoped>
-.title {
-  margin-top: 0;
-}
-
 .select {
   width: 100px;
 }

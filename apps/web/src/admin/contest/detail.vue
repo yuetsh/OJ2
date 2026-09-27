@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import { formatISO } from "date-fns"
 import TextEditor from "shared/components/TextEditor.vue"
@@ -112,23 +113,19 @@ onMounted(getContestDetail)
 </script>
 
 <template>
-  <n-flex class="titleWrapper" align="center">
-    <h2 class="title">
-      {{ route.name === "admin contest create" ? "新建比赛" : "编辑比赛" }}
-    </h2>
-    <template v-if="!props.contestID">
-      <n-alert type="success">
-        <template #header>
-          开始时间 {{ parseTime(contest.startTime, "YYYY年M月D日 HH:mm:ss") }}
-        </template>
-      </n-alert>
-      <n-alert type="warning">
-        <template #header>
-          结束时间 {{ parseTime(contest.endTime, "YYYY年M月D日 HH:mm:ss") }}
-        </template>
-      </n-alert>
+  <PageHeader
+    :title="route.name === 'admin contest create' ? '新建比赛' : '编辑比赛'"
+    :back="{ name: 'admin contest list' }"
+  >
+    <template v-if="!props.contestID" #extra>
+      <n-tag type="success" round>
+        开始 {{ parseTime(contest.startTime, "YYYY年M月D日 HH:mm:ss") }}
+      </n-tag>
+      <n-tag type="warning" round>
+        结束 {{ parseTime(contest.endTime, "YYYY年M月D日 HH:mm:ss") }}
+      </n-tag>
     </template>
-  </n-flex>
+  </PageHeader>
   <n-form inline>
     <n-form-item label="标题">
       <n-input style="width: 300px" v-model:value="contest.title" />
@@ -164,13 +161,3 @@ onMounted(getContestDetail)
     <n-button type="primary" @click="submit">保存</n-button>
   </n-flex>
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

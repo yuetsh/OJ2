@@ -2,6 +2,7 @@
 import { h, onMounted, reactive, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { NButton } from "naive-ui"
+import PageHeader from "admin/components/PageHeader.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { useUserStore } from "shared/store/user"
 import { getACRate } from "utils/functions"
@@ -151,50 +152,56 @@ watch(showModal, (v) => {
 </script>
 
 <template>
-  <n-flex align="center">
-    <n-avatar round :size="60" :src="userStore.profile?.avatar" />
-    <h1 class="name">亲爱的管理员：{{ userStore.user?.username }}</h1>
-  </n-flex>
-  <n-flex>
-    <h2>
-      <n-gradient-text type="info"> 总用户数：{{ userCount }} </n-gradient-text>
-    </h2>
-    <h2>
-      <n-gradient-text type="error"> 今日提交：{{ submissionCount }} </n-gradient-text>
-    </h2>
-    <h2>
-      <n-gradient-text type="warning"> 近期比赛：{{ contestCount }} </n-gradient-text>
-    </h2>
-    <h2>
+  <PageHeader :title="`你好，${userStore.user?.username ?? '管理员'}`">
+    <template #actions>
+      <n-button @click="router.push('/admin/contest/create')">新建比赛</n-button>
+      <n-button type="primary" @click="router.push('/admin/problem/create')">新建题目</n-button>
+    </template>
+  </PageHeader>
+
+  <n-grid cols="2 m:4" :x-gap="12" :y-gap="12" responsive="screen" class="stats">
+    <n-gi>
+      <n-card size="small"><n-statistic label="总用户数" :value="userCount" /></n-card>
+    </n-gi>
+    <n-gi>
+      <n-card size="small"><n-statistic label="今日提交" :value="submissionCount" /></n-card>
+    </n-gi>
+    <n-gi>
+      <n-card size="small"><n-statistic label="近期比赛" :value="contestCount" /></n-card>
+    </n-gi>
+    <n-gi>
       <!-- 判题机数量后端一直在下发，这里以前没显示 —— 判题机全掉线的时候，
            这一栏是 0，比学生喊「交了没反应」早得多 -->
-      <n-gradient-text :type="judgeServerCount > 0 ? 'success' : 'error'">
-        在线判题机：{{ judgeServerCount }}
-      </n-gradient-text>
-    </h2>
-  </n-flex>
-  <n-flex align="center" class="actions">
-    <span>我猜你要：</span>
-    <n-button @click="router.push('/admin/problem/create')">新题目</n-button>
-    <n-button @click="router.push('/admin/contest/create')">新比赛</n-button>
-    <div>
-      <n-input
-        style="width: 200px"
-        clearable
-        v-model:value="query.classroom"
-        placeholder="班级前缀"
-      />
-    </div>
-    <n-button @click="listRanks">用户排名</n-button>
-    <n-button @click="getRandomModal" v-if="query.classroom">随机抽签</n-button>
-    <Pagination
-      class="pagination"
-      :total="total"
-      v-model:page="query.page"
-      v-model:limit="query.limit"
-    />
-  </n-flex>
-  <n-data-table v-if="data.length" striped :data="data" :columns="columns" />
+      <n-card size="small">
+        <n-statistic label="在线判题机">
+          <n-text :type="judgeServerCount > 0 ? 'success' : 'error'">
+            {{ judgeServerCount }}
+          </n-text>
+        </n-statistic>
+      </n-card>
+    </n-gi>
+  </n-grid>
+
+  <n-card size="small" title="班级排名">
+    <template #header-extra>
+      <n-flex align="center" :size="8">
+        <n-input
+          style="width: 160px"
+          clearable
+          v-model:value="query.classroom"
+          placeholder="班级前缀"
+          @keyup.enter="listRanks"
+        />
+        <n-button secondary type="primary" @click="listRanks">查询</n-button>
+        <n-button v-if="query.classroom" @click="getRandomModal">随机抽签</n-button>
+      </n-flex>
+    </template>
+    <template v-if="data.length">
+      <n-data-table striped :data="data" :columns="columns" />
+      <Pagination :total="total" v-model:page="query.page" v-model:limit="query.limit" />
+    </template>
+    <n-empty v-else description="输入班级前缀后查询" style="padding: 24px 0" />
+  </n-card>
   <n-modal preset="card" title="猜猜看幸运儿是谁？" v-model:show="showModal" style="width: 400px">
     <n-flex vertical justify="center" align="center">
       <n-h1 :key="pulseKey" class="lucky pulse">{{ luckyGuy }}</n-h1>
@@ -206,17 +213,8 @@ watch(showModal, (v) => {
 </template>
 
 <style scoped>
-.name {
-  font-size: 32px;
-  margin: 0;
-}
-
-.actions {
-  margin-bottom: 20px;
-}
-
-.pagination {
-  margin: 0;
+.stats {
+  margin-bottom: 16px;
 }
 
 .lucky {

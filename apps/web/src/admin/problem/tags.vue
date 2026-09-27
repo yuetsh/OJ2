@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { NButton, NFlex, NInput } from "naive-ui"
 import type { AdminTag } from "utils/types"
 import { deleteTag, getTagAdminList, renameTag } from "../api"
@@ -144,13 +145,11 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
 </script>
 
 <template>
-  <n-flex class="titleWrapper" justify="space-between">
-    <n-flex align="center">
-      <h2 class="title">标签管理</h2>
-      <n-button @click="$router.push({ name: 'admin problem list' })"> 返回题目列表 </n-button>
-    </n-flex>
-    <n-input v-model:value="keyword" style="width: 200px" placeholder="搜索标签" clearable />
-  </n-flex>
+  <PageHeader title="标签管理">
+    <template #filters>
+      <n-input v-model:value="keyword" style="width: 220px" placeholder="搜索标签" clearable />
+    </template>
+  </PageHeader>
   <n-data-table striped :columns="columns" :data="tags" />
   <TagProblemsModal
     v-model:show="showTagProblems"
@@ -159,13 +158,3 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
     @changed="listTags"
   />
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

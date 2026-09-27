@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { TUTORIAL_READ_SECONDS } from "@oj2/contract"
 import { NProgress, NTag, NText } from "naive-ui"
 import { getLearnStudents, getLearnTutorials, getLearnExercises } from "admin/api"
@@ -357,33 +358,31 @@ onMounted(load)
 </script>
 
 <template>
-  <h2 style="margin-top: 0">自学情况</h2>
-
-  <n-flex align="center" style="margin-bottom: 16px">
-    <n-radio-group v-model:value="type" size="small">
-      <n-radio-button
-        v-for="item in typeOptions"
-        :key="item.value"
-        :value="item.value"
-        :label="item.label"
+  <!-- 口径写在表上方，免得老师对着「已读 0 课 / 累计 25 分钟」猜是不是坏了 -->
+  <PageHeader
+    title="自学情况"
+    :description="`「已读」按累计停留满 ${TUTORIAL_READ_SECONDS / 60} 分钟算，不足的只计时长`"
+  >
+    <template #filters>
+      <n-radio-group v-model:value="type" size="small">
+        <n-radio-button
+          v-for="item in typeOptions"
+          :key="item.value"
+          :value="item.value"
+          :label="item.label"
+        />
+      </n-radio-group>
+      <n-input
+        v-model:value="className"
+        placeholder="班级或年级，如 241 / 24"
+        clearable
+        style="width: 200px"
+        @keyup.enter="load"
+        @clear="load"
       />
-    </n-radio-group>
-    <n-input
-      v-model:value="className"
-      placeholder="班级或年级，如 241 / 24"
-      clearable
-      style="width: 200px"
-      @keyup.enter="load"
-      @clear="load"
-    />
-    <n-button type="primary" secondary @click="load">查询</n-button>
-    <n-text depth="3"> {{ studentCount }} 名学生，{{ startedCount }} 人已经开始学 </n-text>
-    <!-- 口径写在表上方，免得老师对着「已读 0 课 / 累计 25 分钟」猜是不是坏了 -->
-    <n-text depth="3" style="font-size: 12px">
-      「已读」按累计停留满
-      {{ TUTORIAL_READ_SECONDS / 60 }} 分钟算，不足的只计时长
-    </n-text>
-  </n-flex>
+      <n-button type="primary" secondary @click="load">查询</n-button>
+    </template>
+  </PageHeader>
 
   <n-grid cols="2 s:3 m:5" :x-gap="12" :y-gap="12" responsive="screen" style="margin-bottom: 16px">
     <n-gi>

@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import TextEditor from "shared/components/TextEditor.vue"
 import type { AnnouncementEdit } from "utils/types"
@@ -72,9 +73,10 @@ async function submit() {
 onMounted(init)
 </script>
 <template>
-  <h2 class="title">
-    {{ route.name === "admin announcement create" ? "新建公告" : "编辑公告" }}
-  </h2>
+  <PageHeader
+    :title="route.name === 'admin announcement create' ? '新建公告' : '编辑公告'"
+    :back="{ name: 'admin announcement list' }"
+  />
   <n-form inline>
     <n-form-item label="标题">
       <n-input class="contestTitle" v-model:value="announcement.title" />
@@ -95,10 +97,6 @@ onMounted(init)
   </n-flex>
 </template>
 <style scoped>
-.title {
-  margin-top: 0;
-}
-
 .select {
   width: 100px;
 }

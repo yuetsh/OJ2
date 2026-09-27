@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { NButton, NFlex } from "naive-ui"
 import { deleteAchievement, getAdminAchievements, type AdminAchievement } from "admin/api"
 import AchievementIcon from "shared/components/AchievementIcon.vue"
@@ -106,22 +107,21 @@ onMounted(load)
 </script>
 
 <template>
-  <n-card :title="title">
-    <template #header-extra>
+  <PageHeader
+    :title="title"
+    description="「已解锁人数」是唯一的仪表盘：配置一周后仍为 0，多半是阈值配错了而不是太难。"
+  >
+    <template #actions>
       <n-button type="primary" @click="create">新建成就</n-button>
     </template>
+  </PageHeader>
 
-    <n-alert type="info" style="margin-bottom: 12px">
-      「已解锁人数」是唯一的仪表盘：配置一周后仍为 0，多半是阈值配错了而不是太难。
-    </n-alert>
+  <n-data-table
+    :loading="loading"
+    :data="list"
+    :columns="columns"
+    :row-key="(row: AdminAchievement) => row.id"
+  />
 
-    <n-data-table
-      :loading="loading"
-      :data="list"
-      :columns="columns"
-      :row-key="(row: AdminAchievement) => row.id"
-    />
-
-    <AchievementModal v-model:show="showModal" :editing="editing" @saved="load" />
-  </n-card>
+  <AchievementModal v-model:show="showModal" :editing="editing" @saved="load" />
 </template>

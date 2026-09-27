@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import {
   CLASS_NAME_MAX_DIGITS,
@@ -81,6 +82,11 @@ async function submit() {
 </script>
 
 <template>
+  <PageHeader
+    title="批量导入用户"
+    description="每行一个名字，用户名为 ks + 班级号 + 名字，密码随机生成；导入后会下载账号清单"
+    :back="{ name: 'admin user list' }"
+  />
   <n-space>
     <n-flex vertical>
       <n-flex align="center">

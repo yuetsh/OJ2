@@ -13,6 +13,7 @@ import { useRouteQuery } from "@vueuse/router"
 import AuthorSelect from "shared/components/AuthorSelect.vue"
 import type { DataTableRowKey } from "naive-ui"
 import BatchTagModal from "./components/BatchTagModal.vue"
+import PageHeader from "admin/components/PageHeader.vue"
 
 interface Props {
   contestID?: string
@@ -166,6 +167,7 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
   {
     title: "选项",
     key: "actions",
+    fixed: "right",
     width: 320,
     render: (row) =>
       h(Actions, {
@@ -232,54 +234,41 @@ watch(() => [query.page, query.limit, query.author], listProblems)
 </script>
 
 <template>
-  <n-flex class="titleWrapper" justify="space-between">
-    <n-flex align="center">
-      <h2 class="title">{{ title }}</h2>
-      <n-button
-        v-if="!isContestProblemList"
-        type="primary"
-        @click="$router.push({ name: 'admin problem create' })"
-      >
-        新建
-      </n-button>
-      <n-button
-        v-if="!isContestProblemList"
-        @click="$router.push({ name: 'admin stuck problems' })"
-      >
-        卡点分析
-      </n-button>
-      <n-button v-if="!isContestProblemList" @click="$router.push({ name: 'admin top ac trend' })">
-        年度趋势
-      </n-button>
-      <n-button v-if="!isContestProblemList" @click="$router.push({ name: 'admin tag list' })">
-        标签管理
-      </n-button>
-    </n-flex>
-    <n-flex>
-      <template v-if="!isContestProblemList && selectedProblemIds.length">
-        <n-button type="primary" @click="openBatchTag('add')">
-          添加标签（{{ selectedProblemIds.length }}）
+  <PageHeader
+    :title="title ?? '题目列表'"
+    :back="isContestProblemList ? { name: 'admin contest list' } : undefined"
+  >
+    <template #actions>
+      <template v-if="!isContestProblemList">
+        <template v-if="selectedProblemIds.length">
+          <n-button @click="openBatchTag('remove')">移除标签</n-button>
+          <n-button secondary type="primary" @click="openBatchTag('add')">
+            添加标签（{{ selectedProblemIds.length }}）
+          </n-button>
+        </template>
+        <n-button type="primary" @click="$router.push({ name: 'admin problem create' })">
+          新建题目
         </n-button>
-        <n-button @click="openBatchTag('remove')">移除标签</n-button>
       </template>
-      <n-button v-if="isContestProblemList" @click="createContestProblem"> 新建比赛题目 </n-button>
-      <n-button v-if="isContestProblemList" type="primary" @click="selectProblems">
-        从题目中选择
-      </n-button>
-      <n-flex align="center" v-if="!props.contestID">
-        <span>出题人</span>
+      <template v-else>
+        <n-button @click="createContestProblem">新建比赛题目</n-button>
+        <n-button type="primary" @click="selectProblems">从题库中选择</n-button>
+      </template>
+    </template>
+    <template #filters>
+      <n-input
+        v-model:value="query.keyword"
+        placeholder="输入标题关键字"
+        clearable
+        style="width: 220px"
+        @clear="clearQuery"
+      />
+      <n-flex v-if="!props.contestID" align="center" :size="8">
+        <n-text depth="3">出题人</n-text>
         <AuthorSelect v-model:value="query.author" all />
       </n-flex>
-      <div>
-        <n-input
-          v-model:value="query.keyword"
-          placeholder="输入标题关键字"
-          clearable
-          @clear="clearQuery"
-        />
-      </div>
-    </n-flex>
-  </n-flex>
+    </template>
+  </PageHeader>
   <n-data-table
     striped
     :columns="columns"
@@ -301,13 +290,3 @@ watch(() => [query.page, query.limit, query.author], listProblems)
     @done="onBatchTagDone"
   />
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

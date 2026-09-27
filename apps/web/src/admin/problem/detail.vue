@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorCode, errorMessage } from "utils/api"
 import { PROBLEM_TAG_MAX_LENGTH } from "@oj2/contract"
 import { getProblemTagList } from "shared/api"
@@ -529,10 +530,18 @@ watch(
 </script>
 
 <template>
-  <n-flex>
-    <h2 class="title">{{ title }}</h2>
-    <n-button v-if="showClear" @click="clear">清空缓存</n-button>
-  </n-flex>
+  <PageHeader
+    :title="title ?? '题目'"
+    :back="
+      props.contestID
+        ? { name: 'admin contest problem list', params: { contestID: props.contestID } }
+        : { name: 'admin problem list' }
+    "
+  >
+    <template #actions>
+      <n-button v-if="showClear" @click="clear">清空缓存</n-button>
+    </template>
+  </PageHeader>
   <n-form inline label-placement="left">
     <n-form-item label="显示编号">
       <n-input class="w-100" v-model:value="problem._id" />
@@ -832,10 +841,6 @@ watch(
 </template>
 
 <style scoped>
-.title {
-  margin-top: 0;
-}
-
 .box {
   margin-bottom: 20px;
 }

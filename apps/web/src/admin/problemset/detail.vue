@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
-import { NTabPane, NTabs, NButton, NFlex } from "naive-ui"
+import { NTabPane, NTabs, NButton } from "naive-ui"
 import type {
   AdminProblemSet,
   AdminProblemSetProblem,
@@ -200,20 +201,21 @@ onMounted(() => {
 
 <template>
   <div v-if="problemSet">
-    <n-flex class="titleWrapper" justify="space-between" align="center">
-      <h2 class="title">{{ problemSet.title }}</h2>
-      <n-button
-        type="primary"
-        @click="
-          router.push({
-            name: 'admin problemset edit',
-            params: { problemSetId },
-          })
-        "
-      >
-        编辑题单
-      </n-button>
-    </n-flex>
+    <PageHeader :title="problemSet.title" :back="{ name: 'admin problemset list' }">
+      <template #actions>
+        <n-button
+          type="primary"
+          @click="
+            router.push({
+              name: 'admin problemset edit',
+              params: { problemSetId },
+            })
+          "
+        >
+          编辑题单
+        </n-button>
+      </template>
+    </PageHeader>
 
     <ProblemSetInfo :problem-set="problemSet" />
 
@@ -257,13 +259,3 @@ onMounted(() => {
     />
   </div>
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

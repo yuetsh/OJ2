@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
@@ -96,6 +97,7 @@ const columns: DataTableColumn<AdminProblemSet>[] = [
   {
     title: "选项",
     key: "actions",
+    fixed: "right",
     width: 300,
     render: (row) =>
       h(Actions, {
@@ -142,53 +144,36 @@ watch(() => [query.page, query.limit, query.difficulty, query.status], listProbl
 </script>
 
 <template>
-  <n-flex class="titleWrapper" justify="space-between">
-    <n-flex align="center">
-      <h2 class="title">题单管理</h2>
+  <PageHeader title="题单列表">
+    <template #actions>
       <n-button type="primary" @click="$router.push({ name: 'admin problemset create' })">
         新建题单
       </n-button>
-    </n-flex>
-    <n-flex align="center">
-      <n-flex align="center">
-        <span>难度：</span>
-        <n-select
-          v-model:value="query.difficulty"
-          :options="difficultyOptions"
-          placeholder="选择难度"
-          style="width: 120px"
-          clearable
-        />
-      </n-flex>
-      <n-flex align="center">
-        <span>状态：</span>
-        <n-select
-          v-model:value="query.status"
-          :options="statusOptions"
-          placeholder="选择状态"
-          style="width: 120px"
-          clearable
-        />
-      </n-flex>
+    </template>
+    <template #filters>
       <n-input
         v-model:value="query.keyword"
         placeholder="输入标题关键字"
         clearable
         @clear="clearQuery"
-        style="width: 200px"
+        style="width: 220px"
       />
-    </n-flex>
-  </n-flex>
+      <n-select
+        v-model:value="query.difficulty"
+        :options="difficultyOptions"
+        placeholder="全部难度"
+        style="width: 120px"
+        clearable
+      />
+      <n-select
+        v-model:value="query.status"
+        :options="statusOptions"
+        placeholder="全部状态"
+        style="width: 120px"
+        clearable
+      />
+    </template>
+  </PageHeader>
   <n-data-table striped :columns="columns" :data="problemSets" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

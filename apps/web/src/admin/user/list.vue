@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import { DataTableRowKey, NFlex, NTag, SelectOption } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
@@ -105,6 +106,7 @@ const columns: DataTableColumn<AdminUserForm>[] = [
     key: "actions",
     title: "选项",
     width: 280,
+    fixed: "right",
     render: (row) =>
       h(Actions, {
         user: row,
@@ -252,43 +254,39 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
 </script>
 
 <template>
-  <n-flex class="titleWrapper" justify="space-between">
-    <n-flex>
-      <h2 class="title">用户列表</h2>
-      <n-button type="primary" @click="createNewUser">新建</n-button>
-      <n-button @click="$router.push({ name: 'admin user generate' })"> 导入 </n-button>
-    </n-flex>
-    <n-flex>
+  <PageHeader title="用户列表">
+    <template #actions>
       <n-popconfirm v-if="userIDs.length" @positive-click="onDeleteUsers(userIDs)">
         <template #trigger>
-          <n-button type="warning">删除</n-button>
+          <n-button type="error" secondary>删除选中（{{ userIDs.length }}）</n-button>
         </template>
         确定删除选中的用户吗？删除后无法恢复！
       </n-popconfirm>
-      <n-flex align="center">
-        <n-select
-          v-model:value="query.orderBy"
-          :options="sortOptions"
-          placeholder="排序方式"
-          style="width: 120px"
-        />
-        <n-select
-          v-model:value="query.type"
-          :options="adminOptions"
-          placeholder="选择用户类型"
-          style="width: 120px"
-        />
-        <div>
-          <n-input
-            style="width: 200px"
-            v-model:value="query.keyword"
-            clearable
-            @clear="clearQuery"
-          />
-        </div>
-      </n-flex>
-    </n-flex>
-  </n-flex>
+      <n-button @click="$router.push({ name: 'admin user generate' })">批量导入</n-button>
+      <n-button type="primary" @click="createNewUser">新建用户</n-button>
+    </template>
+    <template #filters>
+      <n-input
+        style="width: 220px"
+        v-model:value="query.keyword"
+        placeholder="用户名 / 真名 / 邮箱"
+        clearable
+        @clear="clearQuery"
+      />
+      <n-select
+        v-model:value="query.type"
+        :options="adminOptions"
+        placeholder="选择用户类型"
+        style="width: 120px"
+      />
+      <n-select
+        v-model:value="query.orderBy"
+        :options="sortOptions"
+        placeholder="排序方式"
+        style="width: 120px"
+      />
+    </template>
+  </PageHeader>
   <n-data-table
     :data="users"
     :columns="columns"
@@ -353,13 +351,3 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
     </n-form>
   </n-modal>
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

@@ -1,13 +1,14 @@
 <template>
-  <n-flex justify="space-between" class="titleWrapper">
-    <h2 class="title">AI 学习分析报告</h2>
-    <n-input
-      v-model:value="query.username"
-      clearable
-      placeholder="输入用户名筛选"
-      style="width: 200px"
-    />
-  </n-flex>
+  <PageHeader title="AI 学习分析报告">
+    <template #filters>
+      <n-input
+        v-model:value="query.username"
+        clearable
+        placeholder="输入用户名筛选"
+        style="width: 220px"
+      />
+    </template>
+  </PageHeader>
   <n-alert
     v-if="pinnedReports.length > 0"
     type="warning"
@@ -60,6 +61,7 @@
 </template>
 
 <script lang="ts" setup>
+import PageHeader from "admin/components/PageHeader.vue"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import Pagination from "shared/components/Pagination.vue"
@@ -168,13 +170,6 @@ watchDebounced(() => query.username, listReports, {
 </script>
 
 <style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-  align-items: center;
-}
-.title {
-  margin: 0;
-}
 .detail .meta {
   margin-bottom: 0;
 }

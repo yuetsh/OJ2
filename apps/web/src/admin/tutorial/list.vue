@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import { NSwitch } from "naive-ui"
 import { parseTime } from "utils/functions"
@@ -77,12 +78,13 @@ onMounted(listTutorials)
 </script>
 
 <template>
-  <n-flex align="center" class="titleWrapper">
-    <h2 class="title">教程列表</h2>
-    <n-button type="primary" @click="$router.push({ name: 'admin tutorial create' })">
-      新建
-    </n-button>
-  </n-flex>
+  <PageHeader title="教程列表">
+    <template #actions>
+      <n-button type="primary" @click="$router.push({ name: 'admin tutorial create' })">
+        新建教程
+      </n-button>
+    </template>
+  </PageHeader>
   <n-tabs v-model:value="activeTab" type="line" animated>
     <n-tab-pane name="python" tab="Python">
       <n-data-table striped :columns="columns" :data="tutorials.python" />
@@ -92,13 +94,3 @@ onMounted(listTutorials)
     </n-tab-pane>
   </n-tabs>
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

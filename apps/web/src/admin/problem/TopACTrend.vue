@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import type { AcTrend } from "utils/types"
 import { Line } from "vue-chartjs"
 import {
@@ -127,31 +128,34 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <h2 style="margin-top: 0">年度趋势</h2>
-  <n-space align="center" style="margin-bottom: 16px">
-    <span>年份范围</span>
-    <n-select
-      v-model:value="sinceYear"
-      :options="yearOptions"
-      style="width: 100px"
-      @update:value="fetchData"
-    />
-    <span>—</span>
-    <n-select
-      v-model:value="untilYear"
-      :options="yearOptions"
-      style="width: 100px"
-      @update:value="fetchData"
-    />
-    <span>年提交下限</span>
-    <n-select
-      v-model:value="minPerYear"
-      :options="minPerYearOptions"
-      style="width: 90px"
-      @update:value="fetchData"
-    />
-    <n-tag type="info" size="small">共 {{ data.length }} 题</n-tag>
-  </n-space>
+  <PageHeader title="年度趋势">
+    <template #extra>
+      <n-tag type="info" size="small" round>共 {{ data.length }} 题</n-tag>
+    </template>
+    <template #filters>
+      <span>年份范围</span>
+      <n-select
+        v-model:value="sinceYear"
+        :options="yearOptions"
+        style="width: 100px"
+        @update:value="fetchData"
+      />
+      <span>—</span>
+      <n-select
+        v-model:value="untilYear"
+        :options="yearOptions"
+        style="width: 100px"
+        @update:value="fetchData"
+      />
+      <span>年提交下限</span>
+      <n-select
+        v-model:value="minPerYear"
+        :options="minPerYearOptions"
+        style="width: 90px"
+        @update:value="fetchData"
+      />
+    </template>
+  </PageHeader>
   <n-spin :show="loading">
     <div v-if="!loading && data.length === 0" style="text-align: center; padding: 40px">
       暂无数据

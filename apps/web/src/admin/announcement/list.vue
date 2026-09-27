@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { NSwitch } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { parseTime } from "utils/functions"
@@ -93,22 +94,13 @@ watch(query, listAnnouncements, { deep: true })
 </script>
 
 <template>
-  <n-flex align="center" class="titleWrapper">
-    <h2 class="title">网站公告</h2>
-    <n-button type="primary" @click="$router.push({ name: 'admin announcement create' })">
-      新建
-    </n-button>
-  </n-flex>
+  <PageHeader title="网站公告">
+    <template #actions>
+      <n-button type="primary" @click="$router.push({ name: 'admin announcement create' })">
+        新建公告
+      </n-button>
+    </template>
+  </PageHeader>
   <n-data-table striped :columns="columns" :data="announcements" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

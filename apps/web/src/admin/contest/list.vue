@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { NSwitch, NTag } from "naive-ui"
 import ContestTitle from "shared/components/ContestTitle.vue"
 import ContestAccessTag from "shared/components/ContestAccessTag.vue"
@@ -79,6 +80,7 @@ const columns: DataTableColumn<AdminContest>[] = [
   {
     title: "选项",
     key: "actions",
+    fixed: "right",
     width: 300,
     render: (row) => h(Actions, { contest: row }),
   },
@@ -99,27 +101,21 @@ watchDebounced(() => query.keyword, listContests, {
 </script>
 
 <template>
-  <n-flex justify="space-between" class="titleWrapper">
-    <n-flex align="center">
-      <h2 class="title">比赛列表</h2>
+  <PageHeader title="比赛列表">
+    <template #actions>
       <n-button type="primary" @click="$router.push({ name: 'admin contest create' })">
-        新建
+        新建比赛
       </n-button>
-    </n-flex>
-    <div>
-      <n-input v-model:value="query.keyword" placeholder="输入标题关键字" />
-    </div>
-  </n-flex>
+    </template>
+    <template #filters>
+      <n-input
+        v-model:value="query.keyword"
+        placeholder="输入标题关键字"
+        clearable
+        style="width: 220px"
+      />
+    </template>
+  </PageHeader>
   <n-data-table :columns="columns" :data="contests" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
-
-<style scoped>
-.titleWrapper {
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-}
-</style>

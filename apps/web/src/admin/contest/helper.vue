@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import type { AcmHelperItem, ContestSubmissionInfo } from "utils/types"
 import { NButton, NCheckbox, NSelect, NTag } from "naive-ui"
@@ -232,38 +233,37 @@ onMounted(loadData)
 
 <template>
   <n-flex vertical>
-    <n-flex justify="space-between" align="center">
-      <n-flex align="center">
-        <h2 style="margin: 0">比赛辅助检查</h2>
-        <n-tag type="info" size="large"> 总计: {{ stats.total }} </n-tag>
-        <n-tag type="success" size="large"> 已检查: {{ stats.checked }} </n-tag>
-        <n-tag type="warning" size="large"> 未检查: {{ stats.unchecked }} </n-tag>
-      </n-flex>
-      <n-button type="primary" :disabled="stats.unchecked === 0" @click="markAllAsChecked">
-        标记全部为已检查
-      </n-button>
-    </n-flex>
-
-    <n-alert type="info" style="margin-bottom: 16px">
-      <template #header>使用说明</template>
-      此工具用于赛后人工审核代码，检查是否存在抄袭、作弊等行为。请逐个查看通过（AC）的提交代码，检查完成后勾选"已检查"。
-    </n-alert>
-
-    <n-flex align="center" style="margin-bottom: 16px">
-      <n-input
-        v-model:value="query.username"
-        placeholder="筛选用户名"
-        style="width: 150px"
-        clearable
-      />
-      <n-input
-        v-model:value="query.problemId"
-        placeholder="筛选题目"
-        style="width: 150px"
-        clearable
-      />
-      <n-select v-model:value="query.checked" :options="checkedOptions" style="width: 120px" />
-    </n-flex>
+    <PageHeader
+      title="比赛辅助检查"
+      description="赛后人工审核代码，检查是否存在抄袭、作弊等行为。请逐个查看通过（AC）的提交代码，检查完成后勾选「已检查」。"
+      :back="{ name: 'admin contest list' }"
+    >
+      <template #extra>
+        <n-tag type="info" round>总计 {{ stats.total }}</n-tag>
+        <n-tag type="success" round>已检查 {{ stats.checked }}</n-tag>
+        <n-tag type="warning" round>未检查 {{ stats.unchecked }}</n-tag>
+      </template>
+      <template #actions>
+        <n-button type="primary" :disabled="stats.unchecked === 0" @click="markAllAsChecked">
+          标记全部为已检查
+        </n-button>
+      </template>
+      <template #filters>
+        <n-input
+          v-model:value="query.username"
+          placeholder="筛选用户名"
+          style="width: 150px"
+          clearable
+        />
+        <n-input
+          v-model:value="query.problemId"
+          placeholder="筛选题目"
+          style="width: 150px"
+          clearable
+        />
+        <n-select v-model:value="query.checked" :options="checkedOptions" style="width: 120px" />
+      </template>
+    </PageHeader>
 
     <n-data-table
       :columns="columns"

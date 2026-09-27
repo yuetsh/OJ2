@@ -152,6 +152,7 @@ export const STORAGE_KEY = {
   LEARN_CURRENT_STEP: "learnStep",
   ADMIN_PROBLEM: "adminProblem",
   ADMIN_PROBLEM_TAGS: "adminProblemTags",
+  ADMIN_SIDER_COLLAPSED: "adminSiderCollapsed",
   DEMO_MODE: "demoMode",
   LOGIN_CLASS: "loginClass",
 }

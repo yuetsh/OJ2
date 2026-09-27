@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import type { CreateProblemSetData, EditProblemSetData } from "utils/types"
 import { fromPickerValue, toPickerValue } from "utils/functions"
@@ -101,7 +102,14 @@ onMounted(() => {
 
 <template>
   <div>
-    <h2 class="title">{{ isEdit ? "编辑题单" : "创建题单" }}</h2>
+    <PageHeader
+      :title="isEdit ? '编辑题单' : '新建题单'"
+      :back="
+        isEdit
+          ? { name: 'admin problemset detail', params: { problemSetId } }
+          : { name: 'admin problemset list' }
+      "
+    />
 
     <n-form :model="formData" label-placement="top">
       <n-flex>
@@ -158,9 +166,3 @@ onMounted(() => {
     </n-form>
   </div>
 </template>
-
-<style scoped>
-.title {
-  margin: 0 0 16px 0;
-}
-</style>
