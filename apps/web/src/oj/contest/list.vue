@@ -9,8 +9,7 @@ import Pagination from "shared/components/Pagination.vue"
 import { useAuthModalStore } from "shared/store/authModal"
 import { usePagination } from "shared/composables/pagination"
 import { useUserStore } from "shared/store/user"
-import { CONTEST_STATUS, ContestType } from "utils/constants"
-import { renderTableTitle } from "utils/renders"
+import { CONTEST_STATUS, ContestStatus, ContestType } from "utils/constants"
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -48,7 +47,7 @@ const tags: SelectOption[] = [
 
 const columns: DataTableColumn<Contest>[] = [
   {
-    title: renderTableTitle("状态", "streamline-emojis:collision"),
+    title: "状态",
     key: "status",
     width: 100,
     render: (row) =>
@@ -59,25 +58,25 @@ const columns: DataTableColumn<Contest>[] = [
       ),
   },
   {
-    title: renderTableTitle("比赛", "streamline-emojis:bouquet"),
+    title: "比赛",
     key: "title",
     minWidth: 360,
     render: (row) => h(ContestTitle, { contest: row }),
   },
   {
-    title: renderTableTitle("标签", "fluent-emoji-flat:keycap-hashtag"),
+    title: "标签",
     key: "tag",
     width: 100,
     render: (row) => h(NTag, () => row.tag),
   },
   {
-    title: renderTableTitle("开始时间", "fluent-emoji-flat:eleven-thirty"),
+    title: "开始时间",
     key: "start_time",
     width: 180,
     render: (row) => parseTime(row.startTime),
   },
   {
-    title: renderTableTitle("比赛时长", "streamline-emojis:fishing-pole"),
+    title: "比赛时长",
     key: "duration",
     width: 180,
     render: (row) => duration(row.startTime, row.endTime),
@@ -116,17 +115,45 @@ watchDebounced(() => query.keyword, listContests, {
 // 监听其他查询条件变化
 watch(() => [query.page, query.limit, query.status, query.tag], listContests)
 
+function openContest(row: Contest) {
+  if (!userStore.isAuthed && row.contestType === ContestType.private) {
+    authStore.openLoginModal()
+  } else {
+    router.push("/contest/" + row.id)
+  }
+}
+
 function rowProps(row: Contest) {
   return {
     style: "cursor: pointer",
-    onClick() {
-      if (!userStore.isAuthed && row.contestType === ContestType.private) {
-        authStore.openLoginModal()
-      } else {
-        router.push("/contest/" + row.id)
-      }
-    },
+    onClick: () => openContest(row),
   }
+}
+
+// 进行中 / 即将开始的比赛单独拎到最上面：表格按开始时间倒序，一场开了一周的
+// 练习赛会被后来建的比赛压到第二页去，学生找不着正在比的那一场
+const active = ref<Contest[]>([])
+const showActive = computed(
+  () =>
+    active.value.length > 0 && query.page === 1 && !query.keyword && !query.status && !query.tag,
+)
+
+async function listActive() {
+  const base = { offset: 0, limit: 6, keyword: "", tag: "" }
+  const [underway, upcoming] = await Promise.all([
+    getContestList({ ...base, status: ContestStatus.underway }),
+    getContestList({ ...base, status: ContestStatus.not_started }),
+  ])
+  active.value = [...underway.results, ...upcoming.results].slice(0, 6)
+}
+
+onMounted(listActive)
+
+function activeTime(row: Contest) {
+  if (row.status === ContestStatus.underway) {
+    return `${parseTime(row.endTime, "M月D日 HH:mm")} 结束`
+  }
+  return `${parseTime(row.startTime, "M月D日 HH:mm")} 开始`
 }
 </script>
 <template>
@@ -157,7 +184,64 @@ function rowProps(row: Contest) {
         </n-form-item>
       </n-form>
     </n-space>
+    <div v-if="showActive" class="active-grid">
+      <div
+        v-for="contest in active"
+        :key="contest.id"
+        class="active-card"
+        :class="{ underway: contest.status === ContestStatus.underway }"
+        @click="openContest(contest)"
+      >
+        <n-flex align="center" :size="8">
+          <n-tag :type="CONTEST_STATUS[contest.status].type" size="small" :bordered="false">
+            {{ CONTEST_STATUS[contest.status].name }}
+          </n-tag>
+          <n-text depth="3" class="active-meta">{{ contest.tag }}</n-text>
+        </n-flex>
+        <ContestTitle :contest="contest" class="active-title" />
+        <n-text depth="3" class="active-meta">
+          {{ activeTime(contest) }} · 时长 {{ duration(contest.startTime, contest.endTime) }}
+        </n-text>
+      </div>
+    </div>
     <n-data-table :bordered="false" :columns="columns" :data="data" :row-props="rowProps" />
   </n-flex>
   <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
 </template>
+
+<style scoped>
+.active-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.active-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.active-card.underway {
+  border-color: rgba(24, 160, 88, 0.5);
+  background-color: rgba(24, 160, 88, 0.06);
+}
+
+.active-card:hover {
+  border-color: #18a058;
+}
+
+.active-title {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.active-meta {
+  font-size: 12px;
+}
+</style>

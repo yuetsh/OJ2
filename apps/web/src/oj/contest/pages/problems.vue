@@ -2,7 +2,6 @@
 import type { ProblemRow } from "utils/types"
 import ProblemStatus from "oj/problem/components/ProblemStatus.vue"
 import { useContestStore } from "oj/store/contest"
-import { renderTableTitle } from "utils/renders"
 
 const props = defineProps<{ contestID: string }>()
 
@@ -10,29 +9,29 @@ const router = useRouter()
 const contestStore = useContestStore()
 const problemsColumns: DataTableColumn<ProblemRow>[] = [
   {
-    title: renderTableTitle("状态", "streamline-ultimate-color:music-note-1"),
+    title: "状态",
     key: "status",
     width: 100,
     render: (row) => h(ProblemStatus, { status: row.status }),
   },
   {
-    title: renderTableTitle("编号", "fluent-emoji-flat:input-numbers"),
+    title: "编号",
     key: "_id",
     width: 100,
   },
   {
-    title: renderTableTitle("题目", "streamline-emojis:rice-ball"),
+    title: "题目",
     key: "title",
     minWidth: 200,
   },
   {
-    title: renderTableTitle("提交数", "streamline-emojis:clinking-beer-mugs"),
+    title: "提交数",
     key: "submissionCount",
     align: "center",
     width: 120,
   },
   {
-    title: renderTableTitle("通过率", "streamline-emojis:clapping-hands-1"),
+    title: "通过率",
     key: "acRate",
     align: "center",
     width: 120,

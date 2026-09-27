@@ -24,7 +24,12 @@ watch(
 </script>
 
 <template>
-  <n-layout position="absolute">
+  <!-- 滚动容器竖排、内容区撑满剩余高度：内容少的页面（比赛列表、班级 PK）
+       页脚才会贴在底上，而不是悬在半屏 -->
+  <n-layout
+    position="absolute"
+    content-style="display: flex; flex-direction: column; min-height: 100%"
+  >
     <n-layout-header bordered style="padding: 8px">
       <!-- 居中限宽套在外面，别用 class 传给 Header：那样 Header 就永远只能有
            一个根节点，多一个根就是 "Extraneous non-props attributes" 警告
@@ -34,6 +39,7 @@ watch(
       </div>
     </n-layout-header>
     <n-layout-content
+      style="flex: 1 0 auto"
       content-style="padding: 16px; overflow-x: initial; max-width: 2000px; margin: 0 auto;"
     >
       <router-view></router-view>

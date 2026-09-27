@@ -120,7 +120,7 @@ export const JUDGE_STATUS: {
 export const CONTEST_STATUS: {
   [key in ContestStatus]: {
     name: string
-    type: "error" | "success" | "warning"
+    type: "default" | "success" | "warning"
   }
 } = {
   // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位
@@ -136,9 +136,10 @@ export const CONTEST_STATUS: {
     name: "进行中",
     type: "success",
   },
+  // 灰的不是红的：列表里九成是已结束的比赛，一片红像满屏报错
   "-1": {
     name: "已结束",
-    type: "error",
+    type: "default",
   },
 }
 

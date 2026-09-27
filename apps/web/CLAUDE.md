@@ -158,7 +158,6 @@ Naive 的日期选择器按浏览器本地时区渲染、没有 `timezone` 属�
 - `utils/functions.ts` — `parseTime` / `zonedParts` / `zonedYear`（东八区时间口径，见上）、
   `duration`、压缩与剪贴板等杂项
 - `utils/judge.ts` — Judge-related utilities
-- `utils/renders.ts` — Table column render helpers for Naive UI DataTable
 
 ### Environment Variables
 

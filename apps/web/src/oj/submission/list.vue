@@ -18,7 +18,6 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { usePagination } from "shared/composables/pagination"
 import { useUserStore } from "shared/store/user"
 import { LANGUAGE_SHOW_VALUE } from "utils/constants"
-import { renderTableTitle } from "utils/renders"
 import { FlowchartSubmissionStatus } from "utils/types"
 
 // 流程图提交的四种状态，列表里原来一列都没有 ——
@@ -356,13 +355,13 @@ watch(
 const columns = computed(() => {
   const res: DataTableColumn<SubmissionListItem>[] = [
     {
-      title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
+      title: "提交时间",
       key: "create_time",
       minWidth: 200,
       render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
     },
     {
-      title: renderTableTitle("提交编号", "fluent-emoji-flat:input-numbers"),
+      title: "提交编号",
       key: "id",
       minWidth: 200,
       render: (row) =>
@@ -372,13 +371,13 @@ const columns = computed(() => {
         }),
     },
     {
-      title: renderTableTitle("状态", "streamline-emojis:panda-face"),
+      title: "状态",
       key: "status",
       minWidth: 140,
       render: (row) => h(SubmissionResultTag, { result: row.result }),
     },
     {
-      title: renderTableTitle("题目", "streamline-emojis:blossom"),
+      title: "题目",
       key: "problem",
       minWidth: 360,
       render: (row) => {
@@ -413,13 +412,13 @@ const columns = computed(() => {
       },
     },
     {
-      title: renderTableTitle("语言", "streamline-ultimate-color:earth-pin-2"),
+      title: "语言",
       key: "language",
       minWidth: 120,
       render: (row) => LANGUAGE_SHOW_VALUE[row.language],
     },
     {
-      title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
+      title: "用户",
       key: "username",
       minWidth: 200,
       render: (row) =>
@@ -438,7 +437,7 @@ const columns = computed(() => {
   ]
   if (!route.params.contestID && userStore.isTeacherOrAbove) {
     res.push({
-      title: renderTableTitle("选项", "streamline-emojis:wrench"),
+      title: "选项",
       key: "rejudge",
       render: (row) =>
         h(
@@ -459,12 +458,12 @@ const columns = computed(() => {
 const flowchartColumns = computed(() => {
   const res: DataTableColumn<FlowchartSubmissionListItem>[] = [
     {
-      title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
+      title: "提交时间",
       key: "create_time",
       render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
     },
     {
-      title: renderTableTitle("提交编号", "fluent-emoji-flat:input-numbers"),
+      title: "提交编号",
       key: "id",
       render: (row) =>
         h(FlowchartLink, {
@@ -473,7 +472,7 @@ const flowchartColumns = computed(() => {
         }),
     },
     {
-      title: renderTableTitle("题目", "streamline-emojis:blossom"),
+      title: "题目",
       key: "problem_title",
       render: (row) =>
         h(
@@ -487,7 +486,7 @@ const flowchartColumns = computed(() => {
         ),
     },
     {
-      title: renderTableTitle("状态", "fluent-emoji:hourglass-not-done"),
+      title: "状态",
       key: "status",
       render: (row) => {
         const tag = FLOWCHART_STATUS_TAG[row.status]
@@ -499,7 +498,7 @@ const flowchartColumns = computed(() => {
       },
     },
     {
-      title: renderTableTitle("评分", "streamline-ultimate-color:analytics-bars-3d"),
+      title: "评分",
       key: "ai_score",
       // 只有评完的才有分数。没评完也渲染 Grade 的话会显示成 0 分，
       // 看着像「评了但得了 0 分」
@@ -512,7 +511,7 @@ const flowchartColumns = computed(() => {
           : h(NText, { depth: 3 }, () => "—"),
     },
     {
-      title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
+      title: "用户",
       key: "username",
       minWidth: 200,
       render: (row) =>
@@ -531,7 +530,7 @@ const flowchartColumns = computed(() => {
   ]
   if (!route.params.contestID && userStore.isTeacherOrAbove) {
     res.push({
-      title: renderTableTitle("选项", "streamline-emojis:wrench"),
+      title: "选项",
       key: "retry",
       // 后端只接受已完成 / 已失败的重判（其余返回 409），这里同步置灰，
       // 免得老师点了才发现不行

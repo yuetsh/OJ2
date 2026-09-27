@@ -22,7 +22,6 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { durationFromValue, getACRate, parseTime } from "utils/functions"
 import Pagination from "shared/components/Pagination.vue"
 import { ChartType, LONG_DURATION_OPTIONS } from "utils/constants"
-import { renderTableTitle } from "utils/renders"
 import Chart from "./components/Chart.vue"
 import RankMedal from "./components/RankMedal.vue"
 import { useUserStore } from "shared/store/user"
@@ -151,14 +150,14 @@ function rowClassName(row: Rank) {
 
 const columns: DataTableColumn<Rank>[] = [
   {
-    title: renderTableTitle("排名", "streamline-emojis:flexed-biceps-1"),
+    title: "排名",
     key: "index",
     width: 100,
     align: "center",
     render: (_, index) => h(RankMedal, { index, page: query.page, limit: query.limit }),
   },
   {
-    title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
+    title: "用户",
     key: "username",
     width: 240,
     render: (row) =>
@@ -193,24 +192,24 @@ const columns: DataTableColumn<Rank>[] = [
       ]),
   },
   {
-    title: renderTableTitle("个性签名", "streamline-emojis:no-one-under-eighteen"),
+    title: "个性签名",
     key: "mood",
     minWidth: 200,
   },
   {
-    title: renderTableTitle("已解决", "streamline-emojis:raised-fist-1"),
+    title: "已解决",
     key: "acceptedNumber",
     width: 120,
     align: "center",
   },
   {
-    title: renderTableTitle("提交数", "streamline-ultimate-color:space-rocket-earth"),
+    title: "提交数",
     key: "submissionNumber",
     width: 120,
     align: "center",
   },
   {
-    title: renderTableTitle("正确率", "streamline-ultimate-color:gift-box-1"),
+    title: "正确率",
     key: "rate",
     width: 120,
     align: "center",
@@ -261,7 +260,7 @@ const subOptions = computed<Duration>(
 // 宽度也压到 1280 那一档能整张放下，不出横向滚动条
 const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
   {
-    title: renderTableTitle("排名", "streamline-emojis:flexed-biceps-1"),
+    title: "排名",
     key: "rank",
     width: 100,
     align: "center",
@@ -269,7 +268,7 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
     render: (row) => h(RankMedal, { index: row.rank - 1, page: 1, limit: 10 }),
   },
   {
-    title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
+    title: "用户",
     key: "username",
     minWidth: 120,
     ellipsis: { tooltip: true },
@@ -285,13 +284,13 @@ const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
       ),
   },
   {
-    title: renderTableTitle("新解决", "fluent-emoji:party-popper"),
+    title: "新解决",
     key: "solvedCount",
     width: 100,
     align: "center",
   },
   {
-    title: renderTableTitle("提交", "streamline-emojis:rocket"),
+    title: "提交",
     key: "submissionCount",
     width: 90,
     align: "center",
@@ -525,31 +524,6 @@ watch(
 
 <template>
   <n-flex vertical size="large">
-    <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>
-            <div style="height: 34px">全服 Top10</div>
-          </template>
-          <Chart v-if="rankChart.length" :type="ChartType.Rank" :rank-data="rankChart" />
-          <n-empty v-else style="padding: 20px 0"></n-empty>
-        </n-card>
-      </n-gi>
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>日活 Top10</template>
-          <template #header-extra>
-            <n-select style="width: 120px" :options="options" v-model:value="duration" />
-          </template>
-          <Chart
-            v-if="activityChart.length"
-            :type="ChartType.Activity"
-            :rank-data="activityChart"
-          />
-          <n-empty v-else style="padding: 20px 0"></n-empty>
-        </n-card>
-      </n-gi>
-    </n-grid>
     <!--
       两张榜并排：左边全服总榜（分母是历史全部 AC，名次几乎不动），右边本周进步榜
       （分母只有这一周）。同一屏里对照着看，「追不上」和「这周还能进前十」是一眼的事。
@@ -684,6 +658,33 @@ watch(
               v-model:limit="myClassQuery.limit"
             />
           </template>
+        </n-card>
+      </n-gi>
+    </n-grid>
+    <!-- 图表放最后：它和上面的榜单是同一份数据换个画法，放第一屏的话学生
+         得往下滚才看得到自己在哪 -->
+    <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
+      <n-gi :span="1">
+        <n-card :bordered="false">
+          <template #header>
+            <div style="height: 34px">全服 Top10</div>
+          </template>
+          <Chart v-if="rankChart.length" :type="ChartType.Rank" :rank-data="rankChart" />
+          <n-empty v-else style="padding: 20px 0"></n-empty>
+        </n-card>
+      </n-gi>
+      <n-gi :span="1">
+        <n-card :bordered="false">
+          <template #header>日活 Top10</template>
+          <template #header-extra>
+            <n-select style="width: 120px" :options="options" v-model:value="duration" />
+          </template>
+          <Chart
+            v-if="activityChart.length"
+            :type="ChartType.Activity"
+            :rank-data="activityChart"
+          />
+          <n-empty v-else style="padding: 20px 0"></n-empty>
         </n-card>
       </n-gi>
     </n-grid>

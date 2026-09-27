@@ -7,7 +7,6 @@ import { useContestStore } from "oj/store/contest"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { ContestStatus } from "utils/constants"
-import { renderTableTitle } from "utils/renders"
 import type { ContestRank, ProblemRow } from "utils/types"
 import AcAndSubmission from "../components/AcAndSubmission.vue"
 import LineChart from "../components/LineChart.vue"
@@ -45,7 +44,7 @@ const { query } = usePagination({}, { defaultLimit: 50 })
 
 const columns = ref<DataTableColumn<ContestRank>[]>([
   {
-    title: renderTableTitle("编号", "fluent-emoji-flat:input-numbers"),
+    title: "编号",
     key: "id",
     width: 80,
     fixed: "left",
@@ -53,7 +52,7 @@ const columns = ref<DataTableColumn<ContestRank>[]>([
     render: (_, index) => index + (query.page - 1) * query.limit + 1,
   },
   {
-    title: renderTableTitle("用户", "streamline-emojis:smiling-face-with-sunglasses"),
+    title: "用户",
     key: "username",
     width: 120,
     fixed: "left",
@@ -70,7 +69,7 @@ const columns = ref<DataTableColumn<ContestRank>[]>([
       ),
   },
   {
-    title: renderTableTitle("正确数/总提交", "streamline-ultimate-color:color-palette"),
+    title: "正确数/总提交",
     key: "submission",
     width: 140,
     align: "center",

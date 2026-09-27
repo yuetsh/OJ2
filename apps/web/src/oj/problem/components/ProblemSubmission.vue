@@ -7,7 +7,6 @@ import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useUserStore } from "shared/store/user"
 import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
-import { renderTableTitle } from "utils/renders"
 import type { SubmissionListItem } from "utils/types"
 import SubmissionDetail from "oj/submission/detail.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -31,13 +30,13 @@ function showCodePanel(id: string, problem: string) {
 
 const columns: DataTableColumn<SubmissionListItem>[] = [
   {
-    title: renderTableTitle("提交时间", "fluent-emoji:seven-oclock"),
+    title: "提交时间",
     key: "create_time",
     width: 200,
     render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
   },
   {
-    title: renderTableTitle("编号", "fluent-emoji-flat:input-numbers"),
+    title: "编号",
     key: "id",
     minWidth: 160,
     render: (row) => {
@@ -68,13 +67,13 @@ const columns: DataTableColumn<SubmissionListItem>[] = [
     },
   },
   {
-    title: renderTableTitle("状态", "streamline-emojis:panda-face"),
+    title: "状态",
     key: "status",
     width: 140,
     render: (row) => h(SubmissionResultTag, { result: row.result }),
   },
   {
-    title: renderTableTitle("语言", "streamline-ultimate-color:earth-pin-2"),
+    title: "语言",
     key: "language",
     width: 100,
     render: (row) => LANGUAGE_SHOW_VALUE[row.language],

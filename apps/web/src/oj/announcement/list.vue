@@ -4,7 +4,6 @@ import { getAnnouncement, getAnnouncementList } from "oj/api"
 import Pagination from "shared/components/Pagination.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
-import { renderTableTitle } from "utils/renders"
 import type { AnnouncementListItem } from "utils/types"
 import TitleWithTag from "./components/TitleWithTag.vue"
 
@@ -22,25 +21,25 @@ const query = reactive({
 const columns: DataTableColumn<AnnouncementListItem>[] = [
   {
     key: "title",
-    title: renderTableTitle("公告标题", "streamline-emojis:fire"),
+    title: "公告标题",
     render: (row) => h(TitleWithTag, { title: row.title, top: row.top }),
     minWidth: 300,
   },
   {
     key: "tag",
-    title: renderTableTitle("标签", "fluent-emoji-flat:keycap-hashtag"),
+    title: "标签",
     width: 100,
     render: (row) => h(NTag, () => row.tag || "公告"),
   },
   {
     key: "createTime",
-    title: renderTableTitle("发布时间", "fluent-emoji-flat:eight-oclock"),
+    title: "发布时间",
     render: (row) => parseTime(row.createTime),
     width: 180,
   },
   {
     key: "username",
-    title: renderTableTitle("发布人", "streamline-emojis:ghost"),
+    title: "发布人",
     render: (row) => row.createdBy.username,
     width: 120,
   },

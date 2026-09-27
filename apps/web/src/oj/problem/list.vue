@@ -13,7 +13,6 @@ import Pagination from "shared/components/Pagination.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { usePagination } from "shared/composables/pagination"
 import { useUserStore } from "shared/store/user"
-import { renderTableTitle } from "utils/renders"
 import ProblemStatus from "./components/ProblemStatus.vue"
 import AuthorSelect from "shared/components/AuthorSelect.vue"
 import ProblemListTitle from "./components/ProblemListTitle.vue"
@@ -160,49 +159,49 @@ onMounted(() => {
 
 const baseColumns: DataTableColumn<ProblemRow>[] = [
   {
-    title: renderTableTitle("状态", "streamline-emojis:high-voltage"),
+    title: "状态",
     key: "status",
     width: 80,
     align: "center",
     render: (row) => h(ProblemStatus, { status: row.status }),
   },
   {
-    title: renderTableTitle("编号", "streamline-ultimate-color:board-game-dice-1"),
+    title: "编号",
     key: "_id",
     width: 100,
   },
   {
-    title: renderTableTitle("题目", "streamline-ultimate-color:fruit-watermelon"),
+    title: "题目",
     key: "title",
     minWidth: 200,
     render: (row) => h(ProblemListTitle, { problem: row }),
   },
   {
-    title: renderTableTitle("难度", "streamline-emojis:lady-beetle"),
+    title: "难度",
     key: "difficulty",
     width: 100,
     render: (row) =>
       row.difficulty ? h(NTag, { type: getTagColor(row.difficulty) }, () => row.difficulty) : null,
   },
   {
-    title: renderTableTitle("标签", "streamline-ultimate-color:attachment"),
+    title: "标签",
     key: "tags",
     width: 260,
     render: (row) => h(NFlex, () => row.tags.map((t) => h(NTag, { key: t }, () => t))),
   },
   {
-    title: renderTableTitle("出题者", "streamline-emojis:man-raising-hand-2"),
+    title: "出题者",
     key: "author",
     width: 130,
   },
   {
-    title: renderTableTitle("提交数", "streamline-ultimate-color:paper-write"),
+    title: "提交数",
     key: "submissionCount",
     align: "center",
     width: 100,
   },
   {
-    title: renderTableTitle("通过率", "streamline-emojis:victory-hand-2"),
+    title: "通过率",
     key: "acRate",
     width: 100,
     align: "center",
