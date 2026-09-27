@@ -101,6 +101,26 @@ export const statisticInfoSchema = z.looseObject({
       exit_code: z.number().int().optional(),
     })
     .optional(),
+  /**
+   * 答案错误时拿题目的**公开样例**重跑的结果，judge/run.ts 的 checkSamples 写。
+   * 只在非比赛提交上有。
+   *
+   * 这里的东西全是学生本来就看得到的：样例写在题面上，output 是他自己的程序在
+   * 公开输入上的输出。隐藏测试点的内容一概不碰。三段文本都截断过（见 SAMPLE_TEXT_LIMIT）。
+   */
+  sample_check: z
+    .object({
+      /** 所有样例都过了（错在隐藏测试点上） */
+      passed: z.boolean(),
+      /** 第一个没过的样例，0 起；passed 为 true 时没有下面这些 */
+      index: z.number().int().optional(),
+      input: z.string().optional(),
+      expected: z.string().optional(),
+      output: z.string().optional(),
+      /** 样例上的判题结果：多数是答案错误，也可能在样例上就超时、运行出错 */
+      result: z.number().int().optional(),
+    })
+    .optional(),
 })
 
 /**

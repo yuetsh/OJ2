@@ -76,7 +76,7 @@ export const PUNCTUATION_MAP: Record<string, string> = {
  * 几乎一样，「把「：」换成「:」」这句话学生看不出区别。「冒号是中文的，要换成英文的」
  * 看得懂，要换哪一个由卡片里那行代码的标红来指。
  */
-const PUNCTUATION_NAMES: Record<string, string> = {
+export const PUNCTUATION_NAMES: Record<string, string> = {
   "（": "左括号",
   "）": "右括号",
   "，": "逗号",

@@ -16,6 +16,7 @@ import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
 import PythonErrorExplain from "./PythonErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
+import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import { useAIStream } from "shared/composables/aiStream"
 import { submitHintFeedback } from "oj/api"
 import { MdPreview } from "md-editor-v3"
@@ -111,6 +112,13 @@ const runtimeError = computed(() => {
   const submission = props.submission
   if (!submission || submission.result !== SubmissionStatus.runtime_error) return null
   return submission.statisticInfo?.runtime_error ?? null
+})
+
+/** 答案错误时公开样例上的对比，交给 WrongAnswerExplain；比赛提交没有（见后端 checkSamples） */
+const sampleCheck = computed(() => {
+  const submission = props.submission
+  if (!submission || submission.result !== SubmissionStatus.wrong_answer) return null
+  return submission.statisticInfo?.sample_check ?? null
 })
 
 const msg = computed(() => {
@@ -285,6 +293,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       v-if="
         pythonCompileError ||
         runtimeError ||
+        sampleCheck ||
         msg ||
         infoTable.length ||
         submission.statisticInfo?.ast_results?.length
@@ -292,6 +301,12 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
     >
       <PythonErrorExplain v-if="pythonCompileError" :err-info="pythonCompileError" />
       <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
+      <WrongAnswerExplain
+        v-if="sampleCheck"
+        :check="sampleCheck"
+        :code="submission.code"
+        :language="submission.language"
+      />
       <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
         <n-flex vertical :size="8">
           <n-flex

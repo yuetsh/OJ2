@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 
-import { astRuleSchema, type ContestSubmissionInfo } from "@oj2/contract"
+import { astRuleSchema, type ContestSubmissionInfo, type StatisticInfo } from "@oj2/contract"
 import { and, eq, inArray } from "drizzle-orm"
 
 import { config } from "../config"
@@ -377,6 +377,69 @@ async function diagnoseRuntimeError(
   return parsePythonTraceback(output, row.submission.code, prependLines)
 }
 
+/** sample_check 里三段文本各自的上限。样例本身很短，截的主要是学生的输出（死循环打印） */
+const SAMPLE_TEXT_LIMIT = 2000
+
+type SampleCheck = NonNullable<StatisticInfo["sample_check"]>
+
+/**
+ * 答案错误时拿题目的**公开样例**重跑一次，记下第一个没过的样例和学生在它上面的输出，
+ * 写进 `statistic_info.sample_check`。
+ *
+ * 2025 秋以来的 6901 条答案错误在样例上重跑过：73% 在样例上就已经错了。样例写在题面上，
+ * 所以「输入 700，正确输出 7，你的输出 007」给学生看不泄露任何隐藏数据，而这正是他最
+ * 缺的线索 —— 原来答案错误只有四个字，连错在哪一类都不知道。其中约三分之一只差格式
+ * （多了提示文字、空格换行、中英文标点、小数位数），前端按差异类型再补一句中文提示。
+ *
+ * 和运行时错误的诊断一样，主判题不开 output；这里的样例是内联传的，输出只回这几个点。
+ */
+async function checkSamples(
+  row: {
+    submission: typeof schema.submission.$inferSelect
+    problem: typeof schema.problem.$inferSelect
+  },
+  source: string,
+): Promise<SampleCheck | null> {
+  const samples = (Array.isArray(row.problem.samples) ? row.problem.samples : [])
+    .map((item) => asRecord(item))
+    .filter(
+      (item): item is { input: string; output: string } =>
+        typeof item.input === "string" && typeof item.output === "string",
+    )
+  if (!samples.length) return null
+
+  const response = await requestJudge(
+    row.submission.language,
+    source,
+    row.problem.timeLimit,
+    row.problem.memoryLimit,
+    // 题面上的样例输入常常没有结尾换行，而 input() 读到文件末尾没有换行照样能读，
+    // C 的 scanf 也不在乎。补一个是为了和测试点文件的样子一致
+    samples.map((item) => ({
+      input: item.input.endsWith("\n") ? item.input : `${item.input}\n`,
+      output: item.output,
+    })),
+    true,
+  )
+  // 在样例上就编译不过不会发生（正式判题刚编译过同一份代码），真遇到了就当没检查
+  if (response.err || !Array.isArray(response.data)) return null
+  const cases = [...(response.data as JudgeCase[])].sort(
+    (left, right) => Number(left.test_case) - Number(right.test_case),
+  )
+  const index = cases.findIndex((item) => item.result !== JudgeStatus.ACCEPTED)
+  if (index < 0) return { passed: true }
+  const sample = samples[index]!
+  const output = cases[index]!.output
+  return {
+    passed: false,
+    index,
+    input: sample.input.slice(0, SAMPLE_TEXT_LIMIT),
+    expected: sample.output.slice(0, SAMPLE_TEXT_LIMIT),
+    output: typeof output === "string" ? output.slice(0, SAMPLE_TEXT_LIMIT) : "",
+    result: cases[index]!.result,
+  }
+}
+
 export async function judgeSubmission(job: JudgeJobData) {
   const [row] = await db
     .select({
@@ -471,6 +534,19 @@ export async function judgeSubmission(job: JudgeJobData) {
           },
         )
         if (diagnosis) statisticInfo.runtime_error = diagnosis
+      }
+
+      // 同上，比赛不跑：比赛里有期末考试，格式提示在那里不该给
+      if (
+        result === JudgeStatus.WRONG_ANSWER &&
+        row.submission.contestId === null &&
+        row.submission.language !== "SQL"
+      ) {
+        const check = await checkSamples(row, source).catch((error: unknown) => {
+          console.warn(`[judge] 样例重跑失败 ${row.submission.id}:`, error)
+          return null
+        })
+        if (check) statisticInfo.sample_check = check
       }
 
       if (result === JudgeStatus.ACCEPTED) {
