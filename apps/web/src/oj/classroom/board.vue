@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getClassBoard, setClassLesson } from "oj/api"
+import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
 import { errorMessage } from "utils/api"
 import { parseTime } from "utils/functions"
@@ -21,6 +22,7 @@ const STUCK_ATTEMPTS = 3
 const REFRESH_MS = 15_000
 
 const configStore = useConfigStore()
+const collabStore = useCollabStore()
 const message = useMessage()
 
 const board = ref<ClassBoard | null>(null)
@@ -98,9 +100,28 @@ onUnmounted(pause)
 
 // ---------- 分组与排序 ----------
 
-type Group = "idle" | "stuck" | "working" | "done"
+type Group = "help" | "idle" | "stuck" | "working" | "done"
+
+/**
+ * 正在课堂求助的学生。列表是老师端 WebSocket 实时推的（collabStore，全局常驻连接），
+ * 不经看板接口 —— 求助只在 serve 进程的内存里，本来就不落库。所以也只看得到连着
+ * **本站**的学生：服务器和机房各有各的求助队列，和课堂求助本身一样。
+ */
+function helpOf(student: ClassBoardStudent) {
+  return collabStore.requests.find((request) => request.studentId === student.userId) ?? null
+}
+
+/**
+ * 经常不动手：最近几节课里最多只交过一节。至少有 3 节课可比才下结论，
+ * 开学头两节谁都一样。只给老师看，投影模式里不出现。
+ */
+function oftenIdle(student: ClassBoardStudent) {
+  const total = board.value?.recentLessons ?? 0
+  return total >= 3 && student.recentAttended <= 1
+}
 
 function groupOf(student: ClassBoardStudent): Group {
+  if (helpOf(student)) return "help"
   const cells = student.cells
   if (cells.length && cells.every((cell) => cell.status === "accepted")) return "done"
   if (!student.lastSubmitAt) return "idle"
@@ -109,7 +130,7 @@ function groupOf(student: ClassBoardStudent): Group {
   return "working"
 }
 
-const GROUP_ORDER: Record<Group, number> = { idle: 0, stuck: 1, working: 2, done: 3 }
+const GROUP_ORDER: Record<Group, number> = { help: 0, idle: 1, stuck: 2, working: 3, done: 4 }
 
 function nameOf(student: ClassBoardStudent) {
   return student.realName || student.username
@@ -119,11 +140,24 @@ const students = computed(() =>
   [...(board.value?.students ?? [])].sort(
     (a, b) =>
       GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)] ||
+      // 同样是没交过，经常不动手的排前面
+      Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
       nameOf(a).localeCompare(nameOf(b), "zh-CN"),
   ),
 )
 
 const idle = computed(() => students.value.filter((student) => groupOf(student) === "idle"))
+const idleOften = computed(() => idle.value.filter(oftenIdle))
+const idleOthers = computed(() => idle.value.filter((student) => !oftenIdle(student)))
+const helpNames = computed(() =>
+  students.value
+    .filter((student) => groupOf(student) === "help")
+    .map(nameOf)
+    .join("、"),
+)
+const helpCount = computed(
+  () => students.value.filter((student) => groupOf(student) === "help").length,
+)
 const stuckCount = computed(
   () => students.value.filter((student) => groupOf(student) === "stuck").length,
 )
@@ -157,6 +191,7 @@ const GROUP_LABEL: Record<
   Group,
   { text: string; type: "default" | "error" | "warning" | "info" | "success" }
 > = {
+  help: { text: "在求助", type: "warning" },
   idle: { text: "没交过", type: "default" },
   stuck: { text: "卡住了", type: "error" },
   working: { text: "在做", type: "info" },
@@ -223,6 +258,16 @@ const GROUP_LABEL: Record<
         </n-text>
       </n-card>
 
+      <!-- 求助和布没布置题无关，放在「还没有题」的判断外面；投影时不出名字，这条也收起来 -->
+      <n-alert
+        v-if="helpCount && !projector"
+        type="info"
+        :title="`有 ${helpCount} 人在求助：${helpNames}`"
+        class="section"
+      >
+        <n-button size="small" @click="collabStore.helpPanelOpen = true">打开求助列表</n-button>
+      </n-alert>
+
       <n-empty
         v-if="!board.problems.length"
         description="还没有题：在上面输入这节课的题号"
@@ -252,11 +297,20 @@ const GROUP_LABEL: Record<
             :title="`今天还没交过（${idle.length} 人）`"
             class="section"
           >
-            {{ idle.map(nameOf).join("、") }}
+            <div v-if="idleOften.length">
+              <b>经常没交</b>（最近 {{ board.recentLessons }} 节课最多交过 1 节）：{{
+                idleOften.map(nameOf).join("、")
+              }}
+            </div>
+            <div v-if="idleOthers.length">
+              <template v-if="idleOften.length"><b>其他</b>：</template
+              >{{ idleOthers.map(nameOf).join("、") }}
+            </div>
           </n-alert>
+
           <n-text v-if="stuckCount" type="error" class="meta">
             有 {{ stuckCount }} 人卡住了（同一道题今天交了
-            {{ STUCK_ATTEMPTS }} 次以上还没过），排在表格最前面
+            {{ STUCK_ATTEMPTS }} 次以上还没过），有题的话排在表格最前面
           </n-text>
 
           <div class="table-wrap">
@@ -271,6 +325,7 @@ const GROUP_LABEL: Record<
                     </router-link>
                   </th>
                   <th>最后提交</th>
+                  <th>最近 {{ board.recentLessons }} 节</th>
                 </tr>
               </thead>
               <tbody>
@@ -281,8 +336,16 @@ const GROUP_LABEL: Record<
                       size="small"
                       :bordered="false"
                       :type="GROUP_LABEL[groupOf(student)].type"
+                      :class="{ 'help-tag': helpOf(student) }"
+                      @click="helpOf(student) && (collabStore.helpPanelOpen = true)"
                     >
-                      {{ GROUP_LABEL[groupOf(student)].text }}
+                      {{
+                        helpOf(student)
+                          ? helpOf(student)!.status === "active"
+                            ? "老师在帮"
+                            : "举手了"
+                          : GROUP_LABEL[groupOf(student)].text
+                      }}
                     </n-tag>
                   </td>
                   <td v-for="(cell, i) in student.cells" :key="i" :class="cellClass(cell)">
@@ -290,6 +353,11 @@ const GROUP_LABEL: Record<
                   </td>
                   <td class="meta">
                     {{ student.lastSubmitAt ? parseTime(student.lastSubmitAt, "HH:mm") : "—" }}
+                  </td>
+                  <td :class="{ 'cell-stuck': oftenIdle(student) }">
+                    {{
+                      board.recentLessons ? `${student.recentAttended}/${board.recentLessons}` : "—"
+                    }}
                   </td>
                 </tr>
               </tbody>
@@ -397,6 +465,10 @@ const GROUP_LABEL: Record<
 .cell-stuck {
   color: #d03050;
   font-weight: 600;
+}
+
+.help-tag {
+  cursor: pointer;
 }
 
 .cell-none {

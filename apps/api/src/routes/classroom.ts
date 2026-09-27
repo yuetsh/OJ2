@@ -343,6 +343,15 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
   } satisfies ClassActivity)
 })
 
+/**
+ * 看板上的「最近几节课交了几节」：分清「今天没来」和「一直不动手」。2025 秋至少上过
+ * 5 节课的学生里，12.5% 七成以上的课一道都没交，37% 的学生贡献了一半以上的「没交」
+ * —— 当堂那份名单把这两种人排在同一行里，老师分不出来。
+ */
+const RECENT_LESSONS = 5
+/** 往回找最近几节课时最多看多远：寒暑假之后开学第一节课，前面几节是上学期的，没意义 */
+const RECENT_LESSONS_WINDOW_DAYS = 45
+
 /** 看板没指定班级时，猜「最近这么久里提交人数最多的班」—— 老师多半正在上这个班的课 */
 const ACTIVE_CLASS_WINDOW_MS = 2 * 60 * 60 * 1000
 
@@ -389,6 +398,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
       source: null,
       problems: [],
       students: [],
+      recentLessons: 0,
     } satisfies ClassBoard)
   }
 
@@ -414,7 +424,21 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     )
   const userIds = roster.map((row) => row.userId)
 
-  const [cells, lastSubmits] = await Promise.all([
+  // 最近几节课：这个班同学一起做题的那些天（不含今天）
+  const windowStart = dayStart(Date.now() - RECENT_LESSONS_WINDOW_DAYS * 86_400_000)
+  const recentDays = [
+    ...new Set(
+      (await classDayGroups(className, windowStart, { minUsers: CLASS_ACTIVITY_MIN_USERS })).map(
+        (row) => row.day,
+      ),
+    ),
+  ]
+    .filter((d) => d < day)
+    .sort()
+    .slice(-RECENT_LESSONS)
+
+  const localDay = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
+  const [cells, lastSubmits, attendance] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -450,9 +474,27 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           )
           .groupBy(schema.submission.userId)
       : [],
+    recentDays.length && userIds.length
+      ? db
+          .select({
+            userId: schema.submission.userId,
+            days: sql<number>`count(distinct ${localDay})::int`,
+          })
+          .from(schema.submission)
+          .where(
+            and(
+              isNull(schema.submission.contestId),
+              inArray(schema.submission.userId, userIds),
+              gte(schema.submission.createTime, windowStart),
+              inArray(localDay, recentDays),
+            ),
+          )
+          .groupBy(schema.submission.userId)
+      : [],
   ])
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
+  const attendedByUser = new Map(attendance.map((row) => [row.userId, row.days]))
 
   return success(c, {
     className,
@@ -478,8 +520,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             }
           }),
           lastSubmitAt: lastByUser.get(student.userId) ?? null,
+          recentAttended: attendedByUser.get(student.userId) ?? 0,
         }) satisfies ClassBoardStudent,
     ),
+    recentLessons: recentDays.length,
   } satisfies ClassBoard)
 })
 

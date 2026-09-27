@@ -115,6 +115,8 @@ export const classBoardStudentSchema = z.object({
   cells: z.array(classBoardCellSchema),
   /** 今天最后一次提交（任何题），没交过为 null */
   lastSubmitAt: z.string().nullable(),
+  /** 最近几节课（不含今天，个数见 ClassBoard.recentLessons）里交过题的有几节 */
+  recentAttended: z.number().int(),
 })
 
 /**
@@ -127,6 +129,11 @@ export const classBoardSchema = z.object({
   source: z.enum(["teacher", "inferred"]).nullable(),
   problems: z.array(classBoardProblemSchema),
   students: z.array(classBoardStudentSchema),
+  /**
+   * 「最近几节课」一共几节（最多 5，不含今天）。一节课 = 这个班同学一起做题的一天
+   * （同班同一天 ≥ 5 人做同一道题，和「班里在做」同一个判据）。新班、开学头几周不满 5。
+   */
+  recentLessons: z.number().int(),
 })
 
 export type ClassRankItem = z.infer<typeof classRankItemSchema>
