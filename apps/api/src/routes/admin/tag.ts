@@ -194,7 +194,7 @@ adminTagRoutes.post(
     const wanted = normalizeTagNames(parsed.data.tagNames)
 
     const tagIds = await db.transaction(async (tx) => {
-      const existing = await findTagsByName(tx as unknown as typeof db, wanted)
+      const existing = await findTagsByName(tx, wanted)
       // 添加时按需新建标签，移除时只认已有标签 —— 否则「移除」会顺手造出一堆空标签
       if (parsed.data.action === "add") {
         const missing = wanted.filter(

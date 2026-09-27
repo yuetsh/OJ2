@@ -31,7 +31,7 @@ import { Hono } from "hono"
 
 import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
-import { db, schema } from "../../db"
+import { db, schema, type DbOrTx } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { astRulesError, pickAstRules } from "../../judge/ast"
 import { buildSqlDisplay } from "../../judge/sql"
@@ -120,7 +120,7 @@ export function normalizeTagNames(names: string[]) {
  * 一条 `lower(name) in (...)` 把已有标签全查回来，按小写名建 Map。
  * 以前是每个名字一条 SELECT，一次改十个标签就是十次往返。
  */
-export async function findTagsByName(tx: typeof db, names: string[]) {
+export async function findTagsByName(tx: DbOrTx, names: string[]) {
   const map = new Map<string, number>()
   if (names.length === 0) return map
   const rows = await tx
@@ -137,7 +137,7 @@ export async function findTagsByName(tx: typeof db, names: string[]) {
 }
 
 /** 把标签名解析成 id：去空格、大小写不敏感复用已有标签，没有才新建。对齐旧 resolve_tags */
-async function resolveTags(tx: typeof db, names: string[]) {
+async function resolveTags(tx: DbOrTx, names: string[]) {
   const wanted = normalizeTagNames(names)
   if (wanted.length === 0) return []
   const existing = await findTagsByName(tx, wanted)
@@ -154,7 +154,7 @@ async function resolveTags(tx: typeof db, names: string[]) {
     .filter((id) => id !== undefined)
 }
 
-async function setTags(tx: typeof db, problemId: number, names: string[]) {
+async function setTags(tx: DbOrTx, problemId: number, names: string[]) {
   const ids = await resolveTags(tx, names)
   await tx
     .delete(schema.problemTags)
@@ -332,6 +332,99 @@ function problemValues(
   }
 }
 
+type ProblemInput = ReturnType<typeof createProblemRequestSchema.parse>
+
+/**
+ * 保存前的全部校验：公共校验 + SQL 题的展示数据。新建公开题、新建比赛题、编辑题目
+ * 三条路径共用 —— 原来各抄一份，比赛题那份还把算好的 sqlDisplay 丢了（见 insertProblem）。
+ *
+ * SQL 题每次保存都重算展示数据：测试点或标准答案可能刚改过，留着旧的就会和判题结果对不上。
+ */
+async function validateProblem(
+  data: ProblemInput,
+): Promise<
+  { error: string } | { sql: boolean; sqlDisplay: SqlDisplay | null }
+> {
+  const checked = commonChecks(data)
+  if ("error" in checked) return checked
+  if (!checked.sql) return { sql: false, sqlDisplay: null }
+  const built = await generateSqlDisplay(
+    data.testCaseId,
+    data.answers,
+    data.sqlConfig!,
+  )
+  if ("error" in built) return built
+  return { sql: true, sqlDisplay: built.display }
+}
+
+/** 新建一道题（公开题 contestId 为 null）连同标签，一个事务 */
+async function insertProblem(
+  data: ProblemInput,
+  validated: { sql: boolean; sqlDisplay: SqlDisplay | null },
+  owner: { contestId: number | null; createdById: number },
+) {
+  const now = new Date().toISOString()
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(schema.problem)
+      .values({
+        ...problemValues(data, validated.sql),
+        ...owner,
+        createTime: now,
+        lastUpdateTime: now,
+        submissionNumber: 0,
+        acceptedNumber: 0,
+        statisticInfo: {},
+        isPublic: false,
+        // 比赛题原来这里写死 null，结果比赛里的 SQL 题打开后看不到示例数据表和期望结果
+        sqlDisplay: validated.sqlDisplay,
+      })
+      .returning()
+    await setTags(tx, row!.id, data.tags)
+    return row!
+  })
+}
+
+/**
+ * 把一道已有的题复制一份（连同标签），统计清零。比赛题转公开、从公开题库拉进比赛
+ * 都是这个动作，只是落到哪、可见性怎么设不同，由 `overrides` 给。
+ */
+async function copyProblem(
+  tx: DbOrTx,
+  source: ProblemRow,
+  overrides: Pick<
+    typeof schema.problem.$inferInsert,
+    "contestId" | "displayId" | "visible" | "isPublic"
+  >,
+) {
+  const now = new Date().toISOString()
+  const { id: _old, ...rest } = source
+  const [copy] = await tx
+    .insert(schema.problem)
+    .values({
+      ...rest,
+      ...overrides,
+      submissionNumber: 0,
+      acceptedNumber: 0,
+      statisticInfo: {},
+      createTime: now,
+      lastUpdateTime: now,
+    })
+    .returning()
+  const tags = await tx
+    .select({ tagId: schema.problemTags.problemtagId })
+    .from(schema.problemTags)
+    .where(eq(schema.problemTags.problemId, source.id))
+  if (tags.length) {
+    await tx
+      .insert(schema.problemTags)
+      .values(
+        tags.map((tag) => ({ problemId: copy!.id, problemtagId: tag.tagId })),
+      )
+  }
+  return copy!
+}
+
 // ---------------------------------------------------------------- 公开题目
 
 adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
@@ -434,19 +527,9 @@ adminProblemRoutes.get("/problems/:id", requireProblemPermission, async (c) => {
 adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
   const parsed = await parseBody(c, createProblemRequestSchema)
   if (!parsed.success) return parsed.response
-  const checked = commonChecks(parsed.data)
-  if ("error" in checked)
-    return failure(c, 400, "invalid-problem", checked.error)
-  let sqlDisplay: SqlDisplay | null = null
-  if (checked.sql) {
-    const built = await generateSqlDisplay(
-      parsed.data.testCaseId,
-      parsed.data.answers,
-      parsed.data.sqlConfig!,
-    )
-    if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
-    sqlDisplay = built.display
-  }
+  const validated = await validateProblem(parsed.data)
+  if ("error" in validated)
+    return failure(c, 400, "invalid-problem", validated.error)
 
   const [duplicate] = await db
     .select({ id: schema.problem.id })
@@ -461,25 +544,9 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
   if (duplicate)
     return failure(c, 409, "display-id-exists", "Display ID already exists")
 
-  const now = new Date().toISOString()
-  const created = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(schema.problem)
-      .values({
-        ...problemValues(parsed.data, checked.sql),
-        contestId: null,
-        createdById: c.get("user")!.id,
-        createTime: now,
-        lastUpdateTime: now,
-        submissionNumber: 0,
-        acceptedNumber: 0,
-        statisticInfo: {},
-        isPublic: false,
-        sqlDisplay,
-      })
-      .returning()
-    await setTags(tx as unknown as typeof db, row!.id, parsed.data.tags)
-    return row!
+  const created = await insertProblem(parsed.data, validated, {
+    contestId: null,
+    createdById: c.get("user")!.id,
   })
   return success(c, await serialize(created), 201)
 })
@@ -498,9 +565,9 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
   if (!(await canEdit(c.get("user")!, existing))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
-  const checked = commonChecks(parsed.data)
-  if ("error" in checked)
-    return failure(c, 400, "invalid-problem", checked.error)
+  const validated = await validateProblem(parsed.data)
+  if ("error" in validated)
+    return failure(c, 400, "invalid-problem", validated.error)
 
   // 题号唯一性的作用域跟着题目走：公开题在全部公开题里唯一，比赛题在本场比赛内唯一
   const [duplicate] = await db
@@ -519,29 +586,17 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
   if (duplicate)
     return failure(c, 409, "display-id-exists", "Display ID already exists")
 
-  // SQL 题每次保存都重算展示数据：测试点或标准答案可能刚改过，留着旧的就会和判题结果对不上
-  let sqlDisplay: SqlDisplay | null = null
-  if (checked.sql) {
-    const built = await generateSqlDisplay(
-      parsed.data.testCaseId,
-      parsed.data.answers,
-      parsed.data.sqlConfig!,
-    )
-    if ("error" in built) return failure(c, 400, "invalid-problem", built.error)
-    sqlDisplay = built.display
-  }
-
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx
       .update(schema.problem)
       .set({
-        ...problemValues(parsed.data, checked.sql),
-        sqlDisplay,
+        ...problemValues(parsed.data, validated.sql),
+        sqlDisplay: validated.sqlDisplay,
         lastUpdateTime: new Date().toISOString(),
       })
       .where(eq(schema.problem.id, id))
       .returning()
-    await setTags(tx as unknown as typeof db, id, parsed.data.tags)
+    await setTags(tx, id, parsed.data.tags)
     return row!
   })
   return success(c, await serialize(updated))
@@ -686,20 +741,9 @@ adminProblemRoutes.post(
     }
     const parsed = await parseBody(c, createProblemRequestSchema)
     if (!parsed.success) return parsed.response
-    const checked = commonChecks(parsed.data)
-    if ("error" in checked)
-      return failure(c, 400, "invalid-problem", checked.error)
-    let sqlDisplay: SqlDisplay | null = null
-    if (checked.sql) {
-      const built = await generateSqlDisplay(
-        parsed.data.testCaseId,
-        parsed.data.answers,
-        parsed.data.sqlConfig!,
-      )
-      if ("error" in built)
-        return failure(c, 400, "invalid-problem", built.error)
-      sqlDisplay = built.display
-    }
+    const validated = await validateProblem(parsed.data)
+    if ("error" in validated)
+      return failure(c, 400, "invalid-problem", validated.error)
 
     const [duplicate] = await db
       .select({ id: schema.problem.id })
@@ -714,27 +758,9 @@ adminProblemRoutes.post(
     if (duplicate)
       return failure(c, 409, "display-id-exists", "Duplicate Display id")
 
-    const now = new Date().toISOString()
-    const created = await db.transaction(async (tx) => {
-      const [row] = await tx
-        .insert(schema.problem)
-        .values({
-          ...problemValues(parsed.data, checked.sql),
-          contestId,
-          createdById: user.id,
-          createTime: now,
-          lastUpdateTime: now,
-          submissionNumber: 0,
-          acceptedNumber: 0,
-          statisticInfo: {},
-          isPublic: false,
-          // 上面 generateSqlDisplay 已经把展示数据算好了，之前这里写死 null，
-          // 结果比赛里的 SQL 题打开后看不到示例数据表和期望结果（公开题那两条路径都是对的）
-          sqlDisplay,
-        })
-        .returning()
-      await setTags(tx as unknown as typeof db, row!.id, parsed.data.tags)
-      return row!
+    const created = await insertProblem(parsed.data, validated, {
+      contestId,
+      createdById: user.id,
     })
     return success(c, await serialize(created), 201)
   },
@@ -782,43 +808,19 @@ adminProblemRoutes.post(
     if (duplicate)
       return failure(c, 409, "display-id-exists", "Duplicate display ID")
 
-    const now = new Date().toISOString()
     const created = await db.transaction(async (tx) => {
       // 原比赛题标记成「已转公开」，避免同一道题被转两次
       await tx
         .update(schema.problem)
         .set({ isPublic: true })
         .where(eq(schema.problem.id, id))
-      const { id: _old, ...rest } = problem
-      const [copy] = await tx
-        .insert(schema.problem)
-        .values({
-          ...rest,
-          contestId: null,
-          displayId: parsed.data.displayId,
-          // 转出来的公开题默认不可见：题面往往还要按公开场景改一遍
-          visible: false,
-          isPublic: true,
-          submissionNumber: 0,
-          acceptedNumber: 0,
-          statisticInfo: {},
-          createTime: now,
-          lastUpdateTime: now,
-        })
-        .returning()
-      const tags = await tx
-        .select({ tagId: schema.problemTags.problemtagId })
-        .from(schema.problemTags)
-        .where(eq(schema.problemTags.problemId, id))
-      if (tags.length) {
-        await tx.insert(schema.problemTags).values(
-          tags.map((tag) => ({
-            problemId: copy!.id,
-            problemtagId: tag.tagId,
-          })),
-        )
-      }
-      return copy!
+      // 转出来的公开题默认不可见：题面往往还要按公开场景改一遍
+      return copyProblem(tx, problem, {
+        contestId: null,
+        displayId: parsed.data.displayId,
+        visible: false,
+        isPublic: true,
+      })
     })
     return success(c, await serialize(created), 201)
   },
@@ -881,38 +883,14 @@ adminProblemRoutes.post(
         "Duplicate display id in this contest",
       )
 
-    const now = new Date().toISOString()
-    const created = await db.transaction(async (tx) => {
-      const { id: _old, ...rest } = problem
-      const [copy] = await tx
-        .insert(schema.problem)
-        .values({
-          ...rest,
-          contestId,
-          isPublic: true,
-          visible: true,
-          displayId: parsed.data.displayId,
-          submissionNumber: 0,
-          acceptedNumber: 0,
-          statisticInfo: {},
-          createTime: now,
-          lastUpdateTime: now,
-        })
-        .returning()
-      const tags = await tx
-        .select({ tagId: schema.problemTags.problemtagId })
-        .from(schema.problemTags)
-        .where(eq(schema.problemTags.problemId, problem.id))
-      if (tags.length) {
-        await tx.insert(schema.problemTags).values(
-          tags.map((tag) => ({
-            problemId: copy!.id,
-            problemtagId: tag.tagId,
-          })),
-        )
-      }
-      return copy!
-    })
+    const created = await db.transaction((tx) =>
+      copyProblem(tx, problem, {
+        contestId,
+        displayId: parsed.data.displayId,
+        visible: true,
+        isPublic: true,
+      }),
+    )
     return success(c, await serialize(created), 201)
   },
 )

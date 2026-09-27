@@ -11,6 +11,14 @@ const client = postgres(config.databaseUrl)
 export const db = drizzle(client, { schema })
 
 /**
+ * 「库或事务」都能接的参数类型。辅助函数既要能单独调、又要能在事务里调时用它，
+ * 别再写 `tx as unknown as typeof db` —— 那个断言把两者的差异（事务上没有
+ * `$client`、`batch` 等）一并抹掉了。
+ */
+export type DbOrTx =
+  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
  * 读出来的时刻统一成 ISO 8601 UTC，和写侧的 `new Date().toISOString()` 同形状。
  *
  * drizzle 的 `construct()`（`drizzle-orm/postgres-js/driver.js`）把 1184(timestamptz) 等
