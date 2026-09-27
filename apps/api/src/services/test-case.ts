@@ -77,6 +77,38 @@ function collectSqlScripts(names: Set<string>) {
   return scripts
 }
 
+/**
+ * 解压**之前**按条目头拦大小。原来是先 `unzipSync` 整包解进内存、再逐个查大小 ——
+ * 一个几十 KB 的 zip bomb 在检查之前就能把 512MB 的容器撑爆。
+ *
+ * 条目头里的 `originalSize` 是压缩包自己声明的，可以造假，但 fflate 按这个值分配
+ * 输出缓冲、不会扩容（`inflateSync(..., { out: new u8(su) })`，解多了只会截断），
+ * 所以按它限额就是按实际内存限额。顺带只解需要的文件名，压缩包里别的东西一律不解。
+ */
+function wantedEntry(file: { name: string }) {
+  const match = /^(\d+)\.(in|out|sql)$/.exec(file.name)
+  return !!match && Number(match[1]) >= 1 && Number(match[1]) <= MAX_CASES
+}
+
+function entryFilter() {
+  let total = 0
+  return (file: { name: string; originalSize: number }) => {
+    if (!wantedEntry(file)) return false
+    if (file.originalSize > MAX_ENTRY_BYTES) {
+      throw new TestCaseError(
+        `测试点 ${file.name} 超过 ${MAX_ENTRY_BYTES / 1024 / 1024}MB`,
+      )
+    }
+    total += file.originalSize
+    if (total > MAX_TOTAL_BYTES) {
+      throw new TestCaseError(
+        `测试点总大小超过 ${MAX_TOTAL_BYTES / 1024 / 1024}MB`,
+      )
+    }
+    return true
+  }
+}
+
 export interface ProcessedTestCase {
   testCaseId: string
   info: TestCaseEntry[]
@@ -88,16 +120,19 @@ export async function processTestCaseZip(
 ): Promise<ProcessedTestCase> {
   let files: Record<string, Uint8Array>
   try {
-    files = unzipSync(archive)
-  } catch {
+    // 第一遍只读目录、一个字节都不解（filter 恒返回 false），超限就在这里抛；
+    // 第二遍才真解。否则 fflate 边过滤边解，超限之前已经解了上百 MB
+    const check = entryFilter()
+    unzipSync(archive, { filter: (file) => (check(file), false) })
+    files = unzipSync(archive, { filter: wantedEntry })
+  } catch (error) {
+    if (error instanceof TestCaseError) throw error
     throw new TestCaseError("压缩包损坏或不是 zip 格式")
   }
 
   // 只按「精确文件名」取内容，不遍历压缩包里的条目 ——
   // 条目名一律不参与路径拼接，zip slip（`../../etc/passwd` 这类条目名）从设计上就进不来。
-  const names = new Set(
-    Object.keys(files).filter((name) => /^\d+\.(in|out|sql)$/.test(name)),
-  )
+  const names = new Set(Object.keys(files))
 
   const selected = options.sql
     ? collectSqlScripts(names)
