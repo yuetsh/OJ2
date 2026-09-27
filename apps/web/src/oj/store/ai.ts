@@ -1,5 +1,5 @@
 import type { DetailsData, DurationData, SolvedProblem } from "utils/types"
-import { aiStreamError, consumeJSONEventStream } from "utils/stream"
+import { streamAI } from "utils/stream"
 import {
   getAIDetailData,
   getAIDurationData,
@@ -128,10 +128,10 @@ export const useAIStore = defineStore("ai", () => {
 
   let aiController: AbortController | null = null
 
+  // 不用 useAIStream：store 没有会卸载的作用域，而且 loading.ai 要和其它几个
+  // loading 放在同一个 reactive 里给页面用
   async function fetchAIAnalysis() {
-    if (aiController) {
-      aiController.abort()
-    }
+    aiController?.abort()
     const controller = new AbortController()
     aiController = controller
 
@@ -139,58 +139,25 @@ export const useAIStore = defineStore("ai", () => {
     mdContent.value = ""
 
     try {
-      const response = await fetch("/api/ai/analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await streamAI(
+        "ai/analysis",
+        {
           start: rangeStart.value,
           end: rangeEnd.value,
           duration: duration.value,
           username: targetUsername.value || undefined,
-        }),
-        signal: controller.signal,
-      })
-
-      if (!response.ok) {
-        throw await aiStreamError(response)
-      }
-
-      let hasStarted = false
-
-      await consumeJSONEventStream(response, {
-        signal: controller.signal,
-        onEvent(event) {
-          if (event === "end" && !hasStarted) {
-            loading.ai = false
-          }
         },
-        onMessage(payload) {
-          const parsed = payload as {
-            type?: string
-            content?: string
-            message?: string
-          }
-
-          if (parsed.type === "delta" && parsed.content) {
-            if (!hasStarted) {
-              hasStarted = true
-              loading.ai = false
-            }
-            mdContent.value += parsed.content
-          } else if (parsed.type === "error") {
-            throw new Error(parsed.message || "AI 服务异常")
-          } else if (parsed.type === "done" && !hasStarted) {
+        {
+          signal: controller.signal,
+          onDelta(content) {
             loading.ai = false
-          }
+            mdContent.value += content
+          },
         },
-      })
-    } catch (error: any) {
-      if (controller.signal.aborted) {
-        return
-      }
-      console.error("生成 AI 分析失败", error)
-      const message = error?.message || "生成失败，请稍后再试"
-      mdContent.value = `生成失败：${message}`
+      )
+    } catch (error) {
+      if (controller.signal.aborted) return
+      mdContent.value = `生成失败：${(error as Error).message}`
     } finally {
       if (aiController === controller) {
         aiController = null

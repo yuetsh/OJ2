@@ -12,7 +12,7 @@ import { Bar, Radar } from "vue-chartjs"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import { aiStreamError, consumeJSONEventStream } from "utils/stream"
+import { useAIStream } from "shared/composables/aiStream"
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -55,10 +55,10 @@ const duration = ref<string>("")
 const loading = ref(false)
 const hasTimeRange = ref(false)
 
-const aiLoading = ref(false)
+const aiStream = useAIStream()
+const aiLoading = aiStream.waiting
 const aiContent = ref("")
 const showAIModal = ref(false)
-let aiController: AbortController | null = null
 
 // 长时段和榜单页同一份（LONG_DURATION_OPTIONS），外加一个「全部时间」
 const timeRangeOptions: SelectOption[] = [
@@ -120,65 +120,20 @@ async function compare() {
 }
 
 async function analyzeWithAI() {
-  if (aiController) {
-    aiController.abort()
-  }
-  const controller = new AbortController()
-  aiController = controller
-
   const timeRangeLabel =
     timeRangeOptions.find((o) => o.value === duration.value)?.label ??
     "全部时间"
 
   showAIModal.value = true
   aiContent.value = ""
-  aiLoading.value = true
-
   try {
-    const response = await fetch("/api/ai/class-pk-analysis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        comparisons: comparisons.value,
-        timeRangeLabel,
-      }),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) throw await aiStreamError(response)
-
-    let hasStarted = false
-
-    await consumeJSONEventStream(response, {
-      signal: controller.signal,
-      onEvent(event) {
-        if (event === "end" && !hasStarted) aiLoading.value = false
-      },
-      onMessage(payload) {
-        const parsed = payload as {
-          type?: string
-          content?: string
-          message?: string
-        }
-        if (parsed.type === "delta" && parsed.content) {
-          if (!hasStarted) {
-            hasStarted = true
-            aiLoading.value = false
-          }
-          aiContent.value += parsed.content
-        } else if (parsed.type === "error") {
-          throw new Error(parsed.message || "AI 服务异常")
-        } else if (parsed.type === "done" && !hasStarted) {
-          aiLoading.value = false
-        }
-      },
-    })
-  } catch (error: any) {
-    if (controller.signal.aborted) return
-    message.error(error?.message || "AI 分析失败，请稍后再试")
-    aiLoading.value = false
-  } finally {
-    if (aiController === controller) aiController = null
+    await aiStream.run(
+      "ai/class-pk-analysis",
+      { comparisons: comparisons.value, timeRangeLabel },
+      { onDelta: (content) => (aiContent.value += content) },
+    )
+  } catch (error) {
+    message.error((error as Error).message)
   }
 }
 

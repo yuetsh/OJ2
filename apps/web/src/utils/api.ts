@@ -27,6 +27,29 @@ interface ApiClient {
   delete<T>(url: string, config?: AxiosRequestConfig): Promise<T>
 }
 
+/**
+ * 这几种错误全站都是同样的处理，不放在这里的话每个调用点都得自己 catch，
+ * 漏一个就是「点了没反应」。需要分支处理的调用方一律判 `err.error` 里的
+ * 错误码，**不要**去 match `err.data` 的文案 —— 文案是后端可以随时改的。
+ *
+ * 导出给不走 axios 的请求用（AI 的流式接口是裸 fetch，见 utils/stream.ts）——
+ * 同一个错误码从两条路进来，学生看到的结果不该有两个样子。
+ */
+export function handleGlobalApiError(code: string, message?: string) {
+  if (code === "login-required") {
+    storage.remove(STORAGE_KEY.AUTHED)
+    useAuthModalStore().openLoginModal()
+  } else if (code === "account-disabled") {
+    // 这里**不能**弹登录框：账号已经被禁用，登进去还是会被拒，
+    // 学生会陷入「弹框 → 登录 → 又弹框」的死循环，且看不出发生了什么。
+    // 清掉登录态并明确告知，会话在中途被禁用时也走这一支。
+    storage.remove(STORAGE_KEY.AUTHED)
+    toast.error("账号已被禁用，请联系老师")
+  } else if (code === "permission-denied") {
+    toast.error(message || "权限不足")
+  }
+}
+
 const instance = axios.create({
   baseURL: "/api",
   withCredentials: true,
@@ -55,22 +78,7 @@ instance.interceptors.response.use(
     const code = payload?.error?.code ?? "network-error"
     const message = payload?.error?.message ?? "Request failed"
 
-    // 这几种错误全站都是同样的处理，不放在这里的话每个调用点都得自己 catch，
-    // 漏一个就是「点了没反应」。需要分支处理的调用方一律判 `err.error` 里的
-    // 错误码，**不要**去 match `err.data` 的文案 —— 文案是后端可以随时改的。
-    if (code === "login-required") {
-      storage.remove(STORAGE_KEY.AUTHED)
-      useAuthModalStore().openLoginModal()
-    } else if (code === "account-disabled") {
-      // 这里**不能**弹登录框：账号已经被禁用，登进去还是会被拒，
-      // 学生会陷入「弹框 → 登录 → 又弹框」的死循环，且看不出发生了什么。
-      // 清掉登录态并明确告知，会话在中途被禁用时也走这一支。
-      storage.remove(STORAGE_KEY.AUTHED)
-      toast.error("账号已被禁用，请联系老师")
-    } else if (code === "permission-denied") {
-      toast.error(message || "权限不足")
-    }
-
+    handleGlobalApiError(code, message)
     return Promise.reject({ error: code, data: message })
   },
 )

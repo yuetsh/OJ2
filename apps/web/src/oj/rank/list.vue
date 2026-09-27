@@ -29,7 +29,7 @@ import { useUserStore } from "shared/store/user"
 import { Icon } from "@iconify/vue"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import { aiStreamError, consumeJSONEventStream } from "utils/stream"
+import { useAIStream } from "shared/composables/aiStream"
 
 const GRADES = [20, 25]
 
@@ -102,10 +102,10 @@ const showClassDetailModal = ref(false)
 const classDetailData = ref<ClassComparison | null>(null)
 const classDetailLoading = ref(false)
 
-const classDetailAiLoading = ref(false)
+const classDetailAiStream = useAIStream()
+const classDetailAiLoading = classDetailAiStream.waiting
 const classDetailAiContent = ref("")
 const showClassDetailAiModal = ref(false)
-let classDetailAiController: AbortController | null = null
 
 async function loadClassDetail(className: string) {
   showClassDetailModal.value = true
@@ -123,55 +123,17 @@ async function loadClassDetail(className: string) {
 
 async function analyzeSingleClassWithAI() {
   if (!classDetailData.value) return
-  if (classDetailAiController) classDetailAiController.abort()
-  const controller = new AbortController()
-  classDetailAiController = controller
-
   showClassDetailModal.value = false
   showClassDetailAiModal.value = true
   classDetailAiContent.value = ""
-  classDetailAiLoading.value = true
-
   try {
-    const response = await fetch("/api/ai/class-analysis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ comparison: classDetailData.value }),
-      signal: controller.signal,
-    })
-    if (!response.ok) throw await aiStreamError(response)
-
-    let hasStarted = false
-    await consumeJSONEventStream(response, {
-      signal: controller.signal,
-      onEvent(event) {
-        if (event === "end" && !hasStarted) classDetailAiLoading.value = false
-      },
-      onMessage(payload) {
-        const parsed = payload as {
-          type?: string
-          content?: string
-          message?: string
-        }
-        if (parsed.type === "delta" && parsed.content) {
-          if (!hasStarted) {
-            hasStarted = true
-            classDetailAiLoading.value = false
-          }
-          classDetailAiContent.value += parsed.content
-        } else if (parsed.type === "error") {
-          throw new Error(parsed.message || "AI 服务异常")
-        } else if (parsed.type === "done" && !hasStarted) {
-          classDetailAiLoading.value = false
-        }
-      },
-    })
-  } catch (error: any) {
-    if (controller.signal.aborted) return
-    message.error(error?.message || "AI 分析失败，请稍后再试")
-    classDetailAiLoading.value = false
-  } finally {
-    if (classDetailAiController === controller) classDetailAiController = null
+    await classDetailAiStream.run(
+      "ai/class-analysis",
+      { comparison: classDetailData.value },
+      { onDelta: (content) => (classDetailAiContent.value += content) },
+    )
+  } catch (error) {
+    message.error((error as Error).message)
   }
 }
 

@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { HINT_MIN_FAILURES, hintLevelLabel } from "@oj2/contract"
-import type { JudgeCaseResult } from "@oj2/contract"
+import type { AiHintDone, JudgeCaseResult } from "@oj2/contract"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
   submissionCaseResults,
@@ -14,7 +14,7 @@ import {
 import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
-import { aiStreamError, consumeJSONEventStream } from "utils/stream"
+import { useAIStream } from "shared/composables/aiStream"
 import { submitHintFeedback } from "oj/api"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
@@ -34,7 +34,9 @@ const theme = useThemeVars()
 // 逐字显示改在这边模拟。
 const hintTarget = ref("")
 const hintContent = ref("")
-const hintLoading = ref(false)
+const hintStream = useAIStream()
+// 整条流跑完才算结束：提示是一次推全文，没有「第一个字到了」的中间态
+const hintLoading = hintStream.running
 const hintError = ref("")
 // 这条提示在 ai_hint 里的 id，生成完由 done 事件带回来；后端落库失败时没有，就不出评价按钮
 const hintId = ref<number | null>(null)
@@ -147,51 +149,34 @@ const showAIHint = computed(() => {
 watch(
   () => props.submission?.id,
   () => {
+    // 上一次提交的提示还在生成的话掐掉，不然它会写进新提交的面板里
+    hintStream.abort()
     resetHint()
-    hintLoading.value = false
   },
 )
 
 // more = 学生点的是「再多一点提示」。升级只能由学生主动发起，而且后端还要看
 // 「上次开出这一级之后有没有再交过」，所以点了也未必真升 —— 以 done 里的 level 为准
 async function fetchHint(submissionId: string, more = false) {
-  hintLoading.value = true
   resetHint()
-
   try {
-    const response = await fetch("/api/ai/hint", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ submissionId, more }),
-    })
-
-    if (!response.ok) throw await aiStreamError(response)
-
-    await consumeJSONEventStream(response, {
-      onMessage: (data: {
-        type: string
-        content?: string
-        message?: string
-        hintId?: number | null
-        level?: number
-        canEscalate?: boolean
-      }) => {
-        if (data.type === "delta" && data.content) {
-          hintTarget.value += data.content
+    await hintStream.run<AiHintDone>(
+      "ai/hint",
+      { submissionId, more },
+      {
+        onDelta(content) {
+          hintTarget.value += content
           startTyping()
-        } else if (data.type === "done") {
+        },
+        onDone(data) {
           hintId.value = data.hintId ?? null
           hintLevel.value = data.level ?? null
           hintCanEscalate.value = data.canEscalate === true
-        } else if (data.type === "error") {
-          hintError.value = data.message || "AI 提示生成失败"
-        }
+        },
       },
-    })
-  } catch (e: any) {
-    hintError.value = e.message || "请求失败"
-  } finally {
-    hintLoading.value = false
+    )
+  } catch (error) {
+    hintError.value = (error as Error).message
   }
 }
 
