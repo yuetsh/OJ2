@@ -59,7 +59,7 @@ export const activityBucketSchema = z.object({
 })
 
 export const aiDetailSchema = z.object({
-  user: z.string(),
+  username: z.string(),
   className: z.string().nullable(),
   start: z.string(),
   end: z.string(),

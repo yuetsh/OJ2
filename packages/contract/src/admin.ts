@@ -421,9 +421,9 @@ export const updateProblemSetStatusRequestSchema = z.object({
 
 export const adminProblemSetProblemSchema = z.object({
   id: z.number().int(),
-  problemsetId: z.number().int(),
+  problemSetId: z.number().int(),
   problemId: z.number().int(),
-  displayId: z.string(),
+  problemDisplayId: z.string(),
   title: z.string(),
   difficulty: z.string(),
   order: z.number().int(),
@@ -450,7 +450,7 @@ export const updateProblemInSetRequestSchema = z.object({
 
 export const adminProblemSetBadgeSchema = z.object({
   id: z.number().int(),
-  problemsetId: z.number().int(),
+  problemSetId: z.number().int(),
   name: z.string(),
   description: z.string(),
   icon: z.string(),

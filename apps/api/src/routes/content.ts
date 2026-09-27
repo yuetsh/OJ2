@@ -169,7 +169,7 @@ contentRoutes.get("/messages", requireAuth, async (c) => {
             language: submission.language,
             statisticInfo: asRecord(submission.statisticInfo),
             // 展示用题号而非数字主键，站内信页面拿它拼 /problem/<题号>
-            problem: displayId,
+            problemDisplayId: displayId,
             showLink: true,
           } satisfies EmbeddedSubmission,
         }) satisfies Message,

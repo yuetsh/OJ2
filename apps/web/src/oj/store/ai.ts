@@ -16,7 +16,7 @@ export const useAIStore = defineStore("ai", () => {
   const rangeEnd = ref("")
   const durationData = ref<DurationData[]>([])
   const detailsData = reactive<DetailsData>({
-    user: "",
+    username: "",
     start: "",
     end: "",
     grade: "",

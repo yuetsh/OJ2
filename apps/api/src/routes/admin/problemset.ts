@@ -293,9 +293,9 @@ adminProblemSetRoutes.get(
         ({ item, problem }) =>
           ({
             id: item.id,
-            problemsetId: item.problemsetId,
+            problemSetId: item.problemsetId,
             problemId: item.problemId,
-            displayId: problem.displayId,
+            problemDisplayId: problem.displayId,
             title: problem.title,
             difficulty: problem.difficulty,
             order: item.order,
@@ -456,7 +456,7 @@ async function badgesWithCount(badges: BadgeRow[]) {
     (badge) =>
       ({
         id: badge.id,
-        problemsetId: badge.problemsetId,
+        problemSetId: badge.problemsetId,
         name: badge.name,
         description: badge.description,
         icon: badge.icon,

@@ -172,7 +172,7 @@
                 </template>
                 <n-flex vertical size="small">
                   <n-text depth="3">
-                    最近一次：{{ item.failure?.problem }} ·
+                    最近一次：{{ item.failure?.problemDisplayId }} ·
                     {{ statusName(item.failure?.result) }}
                   </n-text>
                   <pre v-if="item.failure?.error" class="failure-error">{{
@@ -252,17 +252,17 @@ function groupByProblem(list: SubmissionStatisticsItems["items"]) {
   const groups = new Map<
     string,
     {
-      problem: string
+      problemDisplayId: string
       problemTitle: string
       items: SubmissionStatisticsItems["items"]
     }
   >()
   for (const item of list) {
-    const group = groups.get(item.problem)
+    const group = groups.get(item.problemDisplayId)
     if (group) group.items.push(item)
     else
-      groups.set(item.problem, {
-        problem: item.problem,
+      groups.set(item.problemDisplayId, {
+        problemDisplayId: item.problemDisplayId,
         problemTitle: item.problemTitle,
         items: [item],
       })
@@ -313,7 +313,7 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
                 h(
                   NTag,
                   { size: "small", bordered: false },
-                  () => group.problem,
+                  () => group.problemDisplayId,
                 ),
                 h(
                   NText,

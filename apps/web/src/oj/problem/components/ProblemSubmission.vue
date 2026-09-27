@@ -126,7 +126,7 @@ async function listSubmissions() {
     ...query,
     myself: "1",
     offset,
-    problemId: (route.params.problemID as string) ?? "",
+    problemDisplayId: (route.params.problemID as string) ?? "",
     contestId: (route.params.contestID as string) ?? "",
   })
   submissions.value = res.results

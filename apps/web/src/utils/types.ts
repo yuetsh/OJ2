@@ -275,7 +275,7 @@ export interface SubmissionListPayload {
   result?: string
   username?: string
   contestId?: string
-  problemId?: string
+  problemDisplayId?: string
   language: LANGUAGE | ""
   today?: "1" | "0"
   page: number

@@ -17,9 +17,9 @@
           <n-button
             text
             type="info"
-            @click="router.push('/problem/' + item.submission.problem)"
+            @click="router.push('/problem/' + item.submission.problemDisplayId)"
           >
-            {{ item.submission.problem }}
+            {{ item.submission.problemDisplayId }}
           </n-button>
           <n-text :type="JUDGE_STATUS[item.submission.result]['type']">
             {{ JUDGE_STATUS[item.submission.result]["name"] }}

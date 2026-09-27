@@ -314,7 +314,7 @@ export async function buildDetail(user: AuthUser, start: string, end: string) {
   const problemIds = firstAc.map((item) => item.problemId)
   if (!problemIds.length)
     return {
-      user: user.username,
+      username: user.username,
       className: user.className,
       start,
       end,
@@ -415,7 +415,7 @@ export async function buildDetail(user: AuthUser, start: string, end: string) {
       b.latestSubmissionTime.localeCompare(a.latestSubmissionTime),
     )
   return {
-    user: user.username,
+    username: user.username,
     className: user.className,
     start,
     end,

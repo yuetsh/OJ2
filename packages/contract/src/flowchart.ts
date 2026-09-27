@@ -45,7 +45,7 @@ export const flowchartSubmissionSchema = z.object({
 export const flowchartListItemSchema = z.object({
   id: z.string(),
   username: z.string(),
-  problem: z.string(),
+  problemDisplayId: z.string(),
   problemTitle: z.string(),
   status: flowchartStatusSchema,
   createTime: z.string(),

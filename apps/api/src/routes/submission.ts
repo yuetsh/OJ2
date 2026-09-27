@@ -627,7 +627,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   ) {
     return success(c, { results: [], total: 0 } satisfies SubmissionList)
   }
-  const displayId = c.req.query("problemId")?.trim()
+  const displayId = c.req.query("problemDisplayId")?.trim()
   const myself = c.req.query("myself") === "1" ? user : null
   // 「只看自己」盖过用户名
   const username = myself ? undefined : c.req.query("username")?.trim()
@@ -673,7 +673,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
       ({ submission, problem }) =>
         ({
           id: submission.id,
-          problem: problem.displayId,
+          problemDisplayId: problem.displayId,
           problemTitle: problem.title,
           showLink: user
             ? canViewSubmission(user, submission, problem, null, joinTimes)
@@ -708,7 +708,7 @@ submissionRoutes.get(
     const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
     const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
     const user = c.get("user")
-    const displayId = c.req.query("problemId")?.trim()
+    const displayId = c.req.query("problemDisplayId")?.trim()
     const myself = c.req.query("myself") === "1" ? user : null
     const username = myself ? undefined : c.req.query("username")?.trim()
     const result = c.req.query("result")
@@ -757,7 +757,7 @@ submissionRoutes.get(
         ({ submission, problem }) =>
           ({
             id: submission.id,
-            problem: problem.displayId,
+            problemDisplayId: problem.displayId,
             problemTitle: problem.title,
             showLink: user
               ? canViewSubmission(user, submission, problem, contest)

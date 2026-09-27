@@ -148,14 +148,18 @@ onMounted(async () => {
       <template v-if="stats.problems.length">
         <n-divider style="margin: 16px 0">今天最热的题</n-divider>
         <div class="rows">
-          <div class="row" v-for="row in stats.problems" :key="row.problem">
+          <div
+            class="row"
+            v-for="row in stats.problems"
+            :key="row.problemDisplayId"
+          >
             <n-button
               class="problem"
               text
               type="info"
-              @click="emit('openProblem', row.problem)"
+              @click="emit('openProblem', row.problemDisplayId)"
             >
-              {{ row.problem }} {{ row.problemTitle }}
+              {{ row.problemDisplayId }} {{ row.problemTitle }}
             </n-button>
             <n-text class="row-count" depth="3">
               {{ row.count }} 条 / 正确 {{ row.acceptedCount }}

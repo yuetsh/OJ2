@@ -134,7 +134,7 @@ async function viewSubmission(item: HelperItem) {
     // 查询该用户在该竞赛该题目的 AC 提交
     const res = await getSubmissions({
       username: item.username,
-      problemId: item.problemDisplayId,
+      problemDisplayId: item.problemDisplayId,
       contestId: props.contestID,
       result: "0", // ACCEPTED
       language: "",

@@ -27,7 +27,7 @@ defineEmits<Emits>()
     </n-flex>
     <n-data-table
       :columns="[
-        { title: '题目ID', key: 'displayId', width: 80 },
+        { title: '题目ID', key: 'problemDisplayId', width: 80 },
         { title: '题目标题', key: 'title', minWidth: 200 },
         { title: '顺序', key: 'order', width: 80 },
         {

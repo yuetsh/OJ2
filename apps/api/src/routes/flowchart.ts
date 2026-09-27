@@ -244,7 +244,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   const user = c.get("user")!
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const displayId = c.req.query("problemId")?.trim()
+  const displayId = c.req.query("problemDisplayId")?.trim()
   const username = c.req.query("username")?.trim()
   const grade = c.req.query("grade")
   // 与代码提交列表同一套口径（submission.ts 的 GET /submissions）：关掉
@@ -298,7 +298,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
         ({
           id: flowchart.id,
           username,
-          problem: problem.displayId,
+          problemDisplayId: problem.displayId,
           problemTitle: problem.title,
           status: flowchart.status,
           createTime: flowchart.createTime,
@@ -349,7 +349,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   if (start)
     filters.push(sql`${schema.flowchartSubmission.createTime} >= ${start}`)
 
-  const displayId = c.req.query("problemId")?.trim()
+  const displayId = c.req.query("problemDisplayId")?.trim()
   if (displayId) {
     const [problem] = await db
       .select({ id: schema.problem.id })

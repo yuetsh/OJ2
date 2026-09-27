@@ -81,7 +81,7 @@ function badgeData(
 ) {
   return {
     id: badge.id,
-    problemsetId: badge.problemsetId,
+    problemSetId: badge.problemsetId,
     name: badge.name,
     description: badge.description,
     icon: badge.icon,
@@ -306,7 +306,7 @@ problemsetRoutes.get("/problem-sets/:id/problems", optionalAuth, async (c) => {
       ({ link, problemId, displayId, title, difficulty }) =>
         ({
           id: link.id,
-          problemsetId: link.problemsetId,
+          problemSetId: link.problemsetId,
           problem: { id: problemId, _id: displayId, title, difficulty },
           order: link.order,
           isRequired: link.isRequired,
@@ -435,7 +435,7 @@ problemsetRoutes.get("/users/:username/badges", optionalAuth, async (c) => {
           userId: userBadge.userId,
           badge: badgeData(badge),
           earnedTime: userBadge.earnedTime,
-          problemset: { id: problemSet.id, title: problemSet.title },
+          problemSet: { id: problemSet.id, title: problemSet.title },
         }) satisfies UserBadge,
     ),
   )
@@ -572,7 +572,7 @@ problemsetRoutes.get(
       ({ progress, user: progressUser, realName }) =>
         ({
           id: progress.id,
-          problemsetId: progress.problemsetId,
+          problemSetId: progress.problemsetId,
           user: sampleUser(progressUser, realName),
           joinTime: progress.joinTime,
           completeTime: progress.completeTime,

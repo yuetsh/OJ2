@@ -161,15 +161,15 @@ watch(name, load)
                     object-fit="contain"
                   />
                 </template>
-                <n-text v-if="b.problemset" depth="3" class="source">
+                <n-text v-if="b.problemSet" depth="3" class="source">
                   来自题单
                   <router-link
                     :to="{
                       name: 'problemset',
-                      params: { problemSetId: b.problemset.id },
+                      params: { problemSetId: b.problemSet.id },
                     }"
                   >
-                    {{ b.problemset.title }}
+                    {{ b.problemSet.title }}
                   </router-link>
                 </n-text>
               </n-thing>

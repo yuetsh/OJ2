@@ -191,20 +191,14 @@ export const submissionDetailSchema = z.object({
  * 将来有人「顺手」把空值改成真值就不会变成泄露，因为这里压根没有这些字段。
  */
 export const embeddedSubmissionSchema = submissionDetailSchema
-  // problemDisplayId 也要去掉：下面的 problem 就是它，同一个值留两份，
-  // 而路由只填了 problem —— 这里漏 omit 的那阵子，凡是收到过站内信的人
-  // 打开消息页都是 500（parse 抛在缺失的 problemDisplayId 上，列表为空时才碰巧不炸）。
+  // 留下 problemDisplayId（展示用题号）而不是数字主键：站内信页面拿它拼
+  // `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。
   .omit({
     info: true,
     contestId: true,
     problemId: true,
-    problemDisplayId: true,
     caseSummary: true,
   })
-  // 旧 SubmissionSafeModelSerializer 里 problem 是
-  // `SlugRelatedField(slug_field="_id")`，即**展示用题号**而非数字主键。
-  // 站内信页面拿它拼 `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。
-  .extend({ problem: z.string() })
 
 /**
  * 判题进度推送。**只带前端真正要用的东西**：靠 submissionId 认领、靠 result /
@@ -224,7 +218,7 @@ export const submissionUpdateSchema = z.object({
 
 export const submissionListItemSchema = z.object({
   id: z.string(),
-  problem: z.string(),
+  problemDisplayId: z.string(),
   problemTitle: z.string(),
   showLink: z.boolean(),
   createTime: z.string(),
@@ -277,7 +271,7 @@ export const attemptedStudentSchema = unacceptedStudentSchema.extend({
     .object({
       id: z.string(),
       /** 题目的展示编号，用来告诉老师错在哪道题 */
-      problem: z.string(),
+      problemDisplayId: z.string(),
       result: judgeStatusSchema,
       error: z.string().nullable(),
     })
@@ -325,7 +319,7 @@ export const submissionStatisticsItemsSchema = z.object({
    * 展开某个学生时列出他这段时间的提交。**带上题目**：一节课里学生往往在好几道题
    * 之间来回跳，一串只有编号的按钮看不出他卡在哪一道 —— 前端按题目分组展示。
    *
-   * 字段名沿用 submissionListItemSchema 的口径：`problem` 是展示用题号（problem._id），
+   * 字段名沿用 submissionListItemSchema 的口径：`problemDisplayId` 是展示用题号（problem._id），
    * `problemTitle` 是标题。
    */
   items: z.array(
@@ -333,7 +327,7 @@ export const submissionStatisticsItemsSchema = z.object({
       id: z.string(),
       result: judgeStatusSchema,
       createTime: z.string(),
-      problem: z.string(),
+      problemDisplayId: z.string(),
       problemTitle: z.string(),
     }),
   ),
@@ -405,7 +399,7 @@ export const todaySubmissionStatisticsSchema = z.object({
    */
   problems: z.array(
     z.object({
-      problem: z.string(),
+      problemDisplayId: z.string(),
       problemTitle: z.string(),
       count: z.number().int(),
       acceptedCount: z.number().int(),

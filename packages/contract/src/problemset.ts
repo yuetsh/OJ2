@@ -13,7 +13,7 @@ export const problemSetUserProgressSummarySchema = z.object({
 
 export const problemSetBadgeSchema = z.object({
   id: z.number().int(),
-  problemsetId: z.number().int(),
+  problemSetId: z.number().int(),
   name: z.string(),
   description: z.string(),
   icon: z.string(),
@@ -58,7 +58,7 @@ export const problemSetProblemItemSchema = z.object({
 
 export const problemSetProblemSchema = z.object({
   id: z.number().int(),
-  problemsetId: z.number().int(),
+  problemSetId: z.number().int(),
   problem: problemSetProblemItemSchema,
   order: z.number().int(),
   isRequired: z.boolean(),
@@ -79,7 +79,7 @@ export const completedProblemSchema = z.object({
 
 export const problemSetProgressSchema = z.object({
   id: z.number().int(),
-  problemsetId: z.number().int(),
+  problemSetId: z.number().int(),
   user: sampleUserSchema,
   joinTime: z.string(),
   completeTime: z.string().nullable(),
@@ -107,7 +107,7 @@ export const userBadgeSchema = z.object({
   userId: z.number().int(),
   badge: problemSetBadgeSchema,
   earnedTime: z.string(),
-  problemset: z.object({ id: z.number().int(), title: z.string() }),
+  problemSet: z.object({ id: z.number().int(), title: z.string() }),
 })
 
 export type ProblemSet = z.infer<typeof problemSetSchema>

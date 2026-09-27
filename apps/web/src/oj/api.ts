@@ -174,20 +174,20 @@ export function adminRejudge(id: string) {
 export function getSubmissionStatisticsItems(
   duration: { start?: string; end: string },
   username: string,
-  problemID?: string,
+  problemDisplayId?: string,
 ) {
   return api.get<SubmissionStatisticsItems>("submissions/statistics/items", {
-    params: { ...duration, problemId: problemID, username },
+    params: { ...duration, problemDisplayId, username },
   })
 }
 
 export function getSubmissionStatistics(
   duration: { start?: string; end: string },
-  problemID?: string,
+  problemDisplayId?: string,
   username?: string,
 ) {
   return api.get<SubmissionStatistics>("submissions/statistics", {
-    params: { ...duration, problemId: problemID, username },
+    params: { ...duration, problemDisplayId, username },
   })
 }
 
@@ -410,7 +410,7 @@ export function getFlowchartSubmission(id: string) {
 
 export function getFlowchartSubmissions(params: {
   username?: string
-  problemId?: string
+  problemDisplayId?: string
   myself?: string
   offset?: number
   limit?: number
@@ -422,11 +422,11 @@ export function getFlowchartSubmissions(params: {
 
 export function getFlowchartStatistics(
   duration: { start?: string; end: string },
-  problemID?: string,
+  problemDisplayId?: string,
   username?: string,
 ) {
   return api.get<FlowchartStatistics>("flowcharts/statistics", {
-    params: { ...duration, problemId: problemID, username },
+    params: { ...duration, problemDisplayId, username },
   })
 }
 

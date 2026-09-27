@@ -160,7 +160,7 @@ async function listSubmissions() {
     if (query.language === "Flowchart") {
       const res = await getFlowchartSubmissions({
         username: query.username,
-        problemId: query.problem,
+        problemDisplayId: query.problem,
         myself: query.myself,
         offset,
         limit: query.limit,
@@ -173,7 +173,7 @@ async function listSubmissions() {
       const res = await getSubmissions({
         ...query,
         offset,
-        problemId: query.problem,
+        problemDisplayId: query.problem,
         contestId: (route.params.contestID as string) ?? "",
         language: query.language,
         today: query.today,
@@ -239,12 +239,12 @@ function problemClicked(row: SubmissionListItem | FlowchartSubmissionListItem) {
     const path = router.resolve({
       name: "contest problem",
       params: {
-        problemID: row.problem,
+        problemID: row.problemDisplayId,
       },
     })
     window.open(path.href, "_blank")
   } else {
-    window.open("/problem/" + row.problem, "_blank")
+    window.open("/problem/" + row.problemDisplayId, "_blank")
   }
 }
 
@@ -289,7 +289,7 @@ function consumePendingJump() {
     message.info("这一页没有可以查看的代码")
     return
   }
-  showCodePanel(row.id, row.problem)
+  showCodePanel(row.id, row.problemDisplayId)
 }
 
 function moveCodePanel(step: 1 | -1) {
@@ -297,7 +297,7 @@ function moveCodePanel(step: 1 | -1) {
   if (index === -1) return
   const next = viewableSubmissions.value[index + step]
   if (next) {
-    showCodePanel(next.id, next.problem)
+    showCodePanel(next.id, next.problemDisplayId)
     return
   }
   const page = query.page + step
@@ -390,7 +390,7 @@ const columns = computed(() => {
       render: (row) =>
         h(SubmissionLink, {
           submission: row,
-          onShowCode: () => showCodePanel(row.id, row.problem),
+          onShowCode: () => showCodePanel(row.id, row.problemDisplayId),
         }),
     },
     {
@@ -409,9 +409,9 @@ const columns = computed(() => {
           {
             type: "题目",
             onClick: () => problemClicked(row),
-            onSearch: () => (query.problem = row.problem),
+            onSearch: () => (query.problem = row.problemDisplayId),
           },
-          () => `${row.problem} ${row.problemTitle}`,
+          () => `${row.problemDisplayId} ${row.problemTitle}`,
         )
         // 从题单入口做出来的提交才有这个标记（后端只在提交时记来源），
         // 同一道题从普通题库刷的不会带。老提交里只有当年首次 AC 那条有
@@ -507,9 +507,9 @@ const flowchartColumns = computed(() => {
           {
             type: "题目",
             onClick: () => problemClicked(row),
-            onSearch: () => (query.problem = row.problem),
+            onSearch: () => (query.problem = row.problemDisplayId),
           },
-          () => `${row.problem} ${row.problemTitle}`,
+          () => `${row.problemDisplayId} ${row.problemTitle}`,
         ),
     },
     {

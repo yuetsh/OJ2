@@ -151,7 +151,7 @@ submissionStatisticsRoutes.get(
         count: row.value,
       })),
       problems: problemRows.map((row) => ({
-        problem: row.displayId,
+        problemDisplayId: row.displayId,
         problemTitle: row.title,
         count: row.value,
         acceptedCount: row.accepted,
@@ -240,7 +240,7 @@ async function lastFailureByUser(where: SQL | undefined, userIds: number[]) {
     number,
     {
       id: string
-      problem: string
+      problemDisplayId: string
       result: JudgeStatusValue
       error: string | null
     }
@@ -276,7 +276,7 @@ async function lastFailureByUser(where: SQL | undefined, userIds: number[]) {
   for (const row of rows) {
     byUser.set(row.user_id, {
       id: row.id,
-      problem: row.problem,
+      problemDisplayId: row.problem,
       result: row.result,
       error: row.error,
     })
@@ -412,7 +412,7 @@ async function statisticsScope(c: {
   if (range.start)
     filters.push(sql`${schema.submission.createTime} >= ${range.start}`)
 
-  const displayIds = parseDisplayIds(c.req.query("problemId") ?? "")
+  const displayIds = parseDisplayIds(c.req.query("problemDisplayId") ?? "")
   if (displayIds.length > STATISTICS_MAX_PROBLEMS) {
     return {
       ok: false,
@@ -682,7 +682,7 @@ submissionStatisticsRoutes.get(
         id: schema.submission.id,
         result: schema.submission.result,
         createTime: schema.submission.createTime,
-        problem: schema.problem.displayId,
+        problemDisplayId: schema.problem.displayId,
         problemTitle: schema.problem.title,
       })
       .from(schema.submission)

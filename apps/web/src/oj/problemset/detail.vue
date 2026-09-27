@@ -49,7 +49,7 @@ async function loadUserBadges() {
 
   const res = await getUserBadges()
   userBadges.value = res.filter(
-    (badge: UserBadgeType) => badge.badge.problemsetId === problemSetId.value,
+    (badge: UserBadgeType) => badge.badge.problemSetId === problemSetId.value,
   )
 }
 
