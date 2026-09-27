@@ -63,12 +63,11 @@ const router = useRouter()
 
 const userStore = useUserStore()
 
-const { isDesktop } = useBreakpoints()
+const { isDesktop, isMobile } = useBreakpoints()
 
 const problems = ref<ProblemRow[]>([])
 const total = ref(0)
 const tags = ref<Tag[]>([])
-const [showTag, toggleShowTag] = useToggle(isDesktop.value)
 
 // 使用分页 composable
 const { query, clearQuery } = usePagination<ProblemQuery>({
@@ -78,6 +77,10 @@ const { query, clearQuery } = usePagination<ProblemQuery>({
   author: useRouteQuery("author", "").value,
   sort: useRouteQuery("sort", "").value,
 })
+
+// 标签默认收起：四十多个标签在桌面上要占三行，把题目表格顶到半屏以下。
+// 从带 ?tag= 的链接进来时展开，让人看得见是哪个标签在起作用
+const [showTag, toggleShowTag] = useToggle(!!query.tag)
 
 async function listProblems() {
   if (query.page < 1) query.page = 1
@@ -208,8 +211,21 @@ const baseColumns: DataTableColumn<ProblemRow>[] = [
   },
 ]
 
+// 手机上只留判断「做不做这题」要的几列，其余的挤进 390 宽的屏幕只会横向溢出
+const MOBILE_WIDTHS: Record<string, { width?: number; minWidth?: number }> = {
+  status: { width: 60 },
+  _id: { width: 72 },
+  title: { minWidth: 120 },
+  difficulty: { width: 72 },
+}
+
 const columns = computed(() =>
-  userStore.isAuthed ? baseColumns : baseColumns.filter((c: any) => c.key !== "status"),
+  baseColumns
+    .filter((c: any) => {
+      if (c.key === "status" && !userStore.isAuthed) return false
+      return !isMobile.value || c.key in MOBILE_WIDTHS
+    })
+    .map((c: any) => (isMobile.value ? { ...c, ...MOBILE_WIDTHS[c.key] } : c)),
 )
 
 function rowProps(row: ProblemRow) {
@@ -263,11 +279,14 @@ function rowProps(row: ProblemRow) {
           <n-form-item>
             <n-button @click="toggleShowTag()" quaternary icon-placement="right">
               <template #icon>
-                <Icon v-if="showTag" icon="ph:caret-down"></Icon>
-                <Icon v-else icon="ph:caret-up"></Icon>
+                <Icon v-if="showTag" icon="ph:caret-up"></Icon>
+                <Icon v-else icon="ph:caret-down"></Icon>
               </template>
               标签
             </n-button>
+          </n-form-item>
+          <n-form-item v-if="query.tag && !showTag">
+            <n-tag type="success" closable @close="query.tag = ''">{{ query.tag }}</n-tag>
           </n-form-item>
         </n-form>
       </n-space>

@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
-import { NH2, NH3 } from "naive-ui"
 import { getProfile } from "shared/api"
-import { useBreakpoints } from "shared/composables/breakpoints"
 import { durationToDays, parseTime } from "utils/functions"
 import type { AchievementSummary, Profile } from "utils/types"
 import { getAchievementSummary } from "oj/achievement/api"
@@ -22,8 +20,6 @@ const learnDuration = ref("")
 const achievementSummary = ref<AchievementSummary | null>(null)
 const [loading, toggle] = useToggle()
 const [show, toggleShow] = useToggle(false)
-
-const { isDesktop } = useBreakpoints()
 
 const isDefaultAvatar = computed(() => profile.value?.avatar.endsWith("default.png") ?? true)
 
@@ -95,40 +91,44 @@ async function loadAchievementSummary() {
   }
 }
 
+// 六项一格一项、三列两行。日期比数字长得多，字号单独压小一档（.stat-value.date），
+// 不然「2026年9月14日」会把格子撑破
 const metrics = computed(() => {
   if (loading.value) return []
   return [
     {
-      icon: "fluent-emoji:face-with-peeking-eye",
-      title: learnDuration.value,
-      content: "总共学习天数",
-    },
-    {
-      icon: "fluent-emoji:cheese-wedge",
-      title: toLatestAt.value,
-      content: "距离上次提交",
-    },
-    {
-      icon: "fluent-emoji:dog-face",
-      title: latestSubmissionAt.value,
-      content: "最新一次提交时间",
-    },
-    {
-      icon: "fluent-emoji:cat-with-wry-smile",
-      title: firstSubmissionAt.value,
-      content: "第一次提交时间",
-    },
-    {
       icon: "fluent-emoji:candy",
       title: profile.value?.acceptedNumber ?? 0,
-      content: "已解决的题目数量",
+      content: "已解决",
       animate: true,
     },
     {
       icon: "fluent-emoji:thinking-face",
       title: profile.value?.submissionNumber ?? 0,
-      content: "总提交数量",
+      content: "总提交",
       animate: true,
+    },
+    {
+      icon: "fluent-emoji:face-with-peeking-eye",
+      title: learnDuration.value,
+      content: "学习天数",
+    },
+    {
+      icon: "fluent-emoji:cheese-wedge",
+      title: toLatestAt.value,
+      content: "距上次提交",
+    },
+    {
+      icon: "fluent-emoji:dog-face",
+      title: latestSubmissionAt.value,
+      content: "最新一次提交时间",
+      date: true,
+    },
+    {
+      icon: "fluent-emoji:cat-with-wry-smile",
+      title: firstSubmissionAt.value,
+      content: "第一次提交时间",
+      date: true,
     },
   ]
 })
@@ -141,8 +141,8 @@ onMounted(() => {
 <template>
   <n-flex class="wrapper" vertical justify="center" align="center" v-if="!loading && profile">
     <n-image
-      :width="140"
-      :height="140"
+      :width="96"
+      :height="96"
       :src="profile.avatar"
       :preview-disabled="isDefaultAvatar"
       object-fit="cover"
@@ -169,30 +169,18 @@ onMounted(() => {
     </n-button>
   </n-flex>
 
-  <n-grid
-    v-if="profile && profile.submissionNumber > 0"
-    class="wrapper"
-    :cols="isDesktop ? 2 : 1"
-    :x-gap="10"
-    :y-gap="10"
-  >
-    <n-gi v-for="item in metrics" :key="item.content">
-      <n-card hoverable>
-        <n-flex align="center">
-          <Icon :icon="item.icon" :width="isDesktop ? 50 : 40" />
-          <div>
-            <Component :is="isDesktop ? NH2 : NH3" class="number">
-              <n-number-animation v-if="item.animate" :to="item.title" />
-              <template v-else>
-                {{ item.title }}
-              </template>
-            </Component>
-            <n-h4 class="number-label">{{ item.content }}</n-h4>
-          </div>
-        </n-flex>
-      </n-card>
-    </n-gi>
-  </n-grid>
+  <div v-if="profile && profile.submissionNumber > 0" class="wrapper">
+    <div class="stats">
+      <div v-for="item in metrics" :key="item.content" class="stat">
+        <Icon :icon="item.icon" :width="28" />
+        <div class="stat-value" :class="{ date: item.date }">
+          <n-number-animation v-if="item.animate" :to="Number(item.title)" />
+          <template v-else>{{ item.title }}</template>
+        </div>
+        <n-text depth="3" class="stat-label">{{ item.content }}</n-text>
+      </div>
+    </div>
+  </div>
 
   <!-- 成就摘要 -->
   <n-card v-if="!loading && profile && achievementSummary" class="wrapper" hoverable>
@@ -262,13 +250,42 @@ onMounted(() => {
   margin: 16px auto 0;
 }
 
-.number {
-  margin-bottom: 0;
-  font-weight: bold;
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
-.number-label {
-  margin: 0;
+@media (max-width: 600px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 13px;
+}
+
+.stat-value.date {
+  font-size: 16px;
+  padding: 3px 0;
+  white-space: nowrap;
 }
 
 h2 {

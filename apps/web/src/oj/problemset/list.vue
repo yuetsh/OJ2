@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
 import { useRouteQuery } from "@vueuse/router"
 import { getProblemSetList } from "../api"
-import { parseTime } from "utils/functions"
 import type { ProblemSet } from "utils/types"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
-import { useBreakpoints } from "shared/composables/breakpoints"
 
 const router = useRouter()
-const { isDesktop } = useBreakpoints()
 
 const total = ref(0)
 const problemSets = ref<ProblemSet[]>([])
@@ -61,12 +57,6 @@ function getConditionText(conditionType: string, conditionValue: number): string
   return conditionMap[conditionType] || "未知条件"
 }
 
-function getProgressColor(percentage: number) {
-  if (percentage >= 80) return "#18a058" // 绿色
-  if (percentage >= 50) return "#f0a020" // 橙色
-  return "#d03050" // 红色
-}
-
 onMounted(listProblemSets)
 
 // 监听搜索关键词变化（防抖）
@@ -94,79 +84,99 @@ watch(() => [query.page, query.limit], listProblemSets)
       />
     </n-space>
 
-    <n-grid v-if="problemSets.length > 0" :cols="isDesktop ? 3 : 1" :x-gap="16" :y-gap="16">
-      <n-grid-item v-for="problemSet in problemSets" :key="problemSet.id">
-        <n-card hoverable @click="goToProblemSet(problemSet.id)" style="cursor: pointer">
-          <template #header>
-            <n-flex justify="space-between" align="center">
-              <n-text strong>{{ problemSet.title }}</n-text>
-              <n-tag :type="getDifficultyTag(problemSet.difficulty).type">
-                {{ getDifficultyTag(problemSet.difficulty).text }}
-              </n-tag>
-            </n-flex>
-          </template>
-          <n-flex vertical size="large">
-            <n-flex justify="space-between" align="center">
-              <n-flex>
-                <Icon width="20" icon="streamline-emojis:blossom" />
-                <n-text>{{ problemSet.problemsCount }} 道题目</n-text>
-              </n-flex>
+    <div v-if="problemSets.length > 0" class="set-grid">
+      <div
+        v-for="problemSet in problemSets"
+        :key="problemSet.id"
+        class="set-card"
+        :class="{ completed: problemSet.userProgress?.isCompleted }"
+        @click="goToProblemSet(problemSet.id)"
+      >
+        <n-flex justify="space-between" align="center" :wrap="false" :size="8">
+          <span class="set-title">{{ problemSet.title }}</span>
+          <n-tag v-if="problemSet.userProgress?.isCompleted" type="success" size="small" round>
+            已完成
+          </n-tag>
+          <n-tag v-else-if="problemSet.userProgress?.isJoined" type="info" size="small" round>
+            进行中
+          </n-tag>
+        </n-flex>
 
-              <n-flex align="center" style="height: 28px">
-                <!-- 用户进度显示 -->
-                <n-progress
-                  v-if="problemSet.userProgress?.isJoined && !problemSet.userProgress?.isCompleted"
-                  type="line"
-                  :percentage="Math.round(problemSet.userProgress.progressPercentage)"
-                  :height="4"
-                  :border-radius="2"
-                  style="width: 100px"
-                  :color="getProgressColor(problemSet.userProgress.progressPercentage)"
-                />
-                <n-tag type="warning" v-if="problemSet.status === 'archived'"> 已归档 </n-tag>
-                <n-tag
-                  v-if="problemSet.userProgress?.isJoined && !problemSet.userProgress?.isCompleted"
-                  type="warning"
-                >
-                  已加入
-                </n-tag>
-                <n-tag v-if="problemSet.userProgress?.isCompleted" type="error"> 已完成 </n-tag>
-              </n-flex>
-            </n-flex>
+        <!-- 简介大多就是把标题再抄一遍，一样的就不重复显示 -->
+        <n-text
+          v-if="problemSet.description && problemSet.description !== problemSet.title"
+          depth="3"
+          class="set-desc"
+        >
+          {{ problemSet.description }}
+        </n-text>
 
-            <!-- 奖章显示 -->
-            <n-flex align="center" justify="space-between">
-              <n-text depth="3">
-                创建于
-                {{ parseTime(problemSet.createTime, "YYYY-MM-DD") }}
-              </n-text>
-              <n-flex>
-                <n-tooltip v-for="badge in problemSet.badges" :key="badge.id" trigger="hover">
-                  <template #trigger>
-                    <n-image
-                      :src="badge.icon"
-                      :alt="badge.name"
-                      width="24"
-                      height="24"
-                      object-fit="cover"
-                      :class="{ 'earned-badge': badge.isEarned }"
-                    />
-                  </template>
-                  <n-flex vertical size="small">
-                    <span style="font-weight: bold"> 徽章: {{ badge.name }} </span>
-                    <span>
-                      获取条件:
-                      {{ getConditionText(badge.conditionType, badge.conditionValue) }}
-                    </span>
-                    <n-text type="primary" v-if="badge.isEarned"> ✓ 已获得 </n-text>
-                  </n-flex>
-                </n-tooltip>
-              </n-flex>
-            </n-flex>
+        <div class="set-progress">
+          <n-flex justify="space-between" align="center" class="set-progress-text">
+            <n-text depth="3">
+              <!-- 进度是加入/完成时存下的快照，分母用快照自己的 totalCount：题单后来
+                   加了题的话，拿现在的 problemsCount 去除，就会出现「已完成」却是 5 / 6 -->
+              <template v-if="problemSet.userProgress?.isJoined">
+                已完成 {{ problemSet.userProgress.completedCount }} /
+                {{ problemSet.userProgress.totalCount }} 题
+                <template v-if="problemSet.problemsCount > problemSet.userProgress.totalCount">
+                  · 新加了
+                  {{ problemSet.problemsCount - problemSet.userProgress.totalCount }} 题
+                </template>
+              </template>
+              <template v-else>共 {{ problemSet.problemsCount }} 题 · 还没开始</template>
+            </n-text>
+            <!-- 线上题单全是简单难度，只有不是简单时才值得标出来 -->
+            <n-tag
+              v-if="problemSet.difficulty !== 'Easy'"
+              :type="getDifficultyTag(problemSet.difficulty).type"
+              size="small"
+              :bordered="false"
+            >
+              {{ getDifficultyTag(problemSet.difficulty).text }}
+            </n-tag>
+            <n-tag v-if="problemSet.status === 'archived'" size="small" :bordered="false">
+              已归档
+            </n-tag>
           </n-flex>
-        </n-card>
-      </n-grid-item>
-    </n-grid>
+          <n-progress
+            type="line"
+            :percentage="Math.round(problemSet.userProgress?.progressPercentage ?? 0)"
+            :show-indicator="false"
+            :height="6"
+            status="success"
+          />
+        </div>
+
+        <n-flex v-if="problemSet.badges?.length" align="center" :size="6" class="set-badges">
+          <n-text depth="3" class="set-badges-label">
+            徽章 {{ problemSet.badges.filter((b) => b.isEarned).length }} /
+            {{ problemSet.badges.length }}
+          </n-text>
+          <n-tooltip v-for="badge in problemSet.badges" :key="badge.id" trigger="hover">
+            <template #trigger>
+              <n-image
+                :src="badge.icon"
+                :alt="badge.name"
+                width="24"
+                height="24"
+                object-fit="cover"
+                preview-disabled
+                :class="badge.isEarned ? 'earned-badge' : 'locked-badge'"
+              />
+            </template>
+            <n-flex vertical size="small">
+              <span style="font-weight: bold"> 徽章: {{ badge.name }} </span>
+              <span>
+                获取条件:
+                {{ getConditionText(badge.conditionType, badge.conditionValue) }}
+              </span>
+              <n-text type="primary" v-if="badge.isEarned"> ✓ 已获得 </n-text>
+            </n-flex>
+          </n-tooltip>
+        </n-flex>
+      </div>
+    </div>
 
     <Pagination
       v-if="problemSets.length > 0"
@@ -179,9 +189,75 @@ watch(() => [query.page, query.limit], listProblemSets)
 </template>
 
 <style scoped>
+.set-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.set-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.set-card:hover {
+  border-color: #18a058;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.set-card.completed {
+  background-color: rgba(24, 160, 88, 0.05);
+}
+
+.set-title {
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.set-desc {
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.set-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.set-progress-text {
+  font-size: 13px;
+}
+
+.set-badges-label {
+  font-size: 12px;
+  margin-right: 2px;
+}
+
 .earned-badge {
   border: 2px solid #ffd700;
   border-radius: 50%;
   box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+/* 没拿到的徽章压成灰色：原来拿没拿到只差一圈金边，一排看下去分不清 */
+.locked-badge {
+  filter: grayscale(1);
+  opacity: 0.45;
 }
 </style>
