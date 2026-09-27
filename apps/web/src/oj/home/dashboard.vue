@@ -3,6 +3,7 @@ import { Icon } from "@iconify/vue"
 import {
   getAnnouncement,
   getAnnouncementList,
+  getClassActivity,
   getContestList,
   getLearnProgress,
   getSubmissions,
@@ -11,10 +12,18 @@ import {
 } from "oj/api"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useProblemJump } from "shared/composables/problemJump"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, CONTEST_STATUS } from "utils/constants"
 import { duration, parseTime, zonedParts } from "utils/functions"
-import type { AnnouncementListItem, Contest, SubmissionListItem, WeeklyRank } from "utils/types"
+import type {
+  AnnouncementListItem,
+  ClassActivity,
+  ClassActivityProblem,
+  Contest,
+  SubmissionListItem,
+  WeeklyRank,
+} from "utils/types"
 
 type TutorialType = "python" | "c"
 
@@ -39,6 +48,7 @@ const contests = ref<Contest[]>([])
 const submissions = ref<SubmissionListItem[]>([])
 const announcements = ref<AnnouncementListItem[]>([])
 const weekly = ref<WeeklyRank | null>(null)
+const classActivity = ref<ClassActivity | null>(null)
 const loaded = ref(false)
 const keyword = ref("")
 
@@ -111,6 +121,30 @@ async function loadAnnouncements() {
   announcements.value = res.results
 }
 
+async function loadClassActivity() {
+  classActivity.value = await getClassActivity()
+}
+
+/** 今天的就叫「今天」，往前找到的那天标出日期 —— 周一早上看到的是上周五的课 */
+const classActivityTitle = computed(() => {
+  const day = classActivity.value?.day
+  if (!day) return ""
+  const now = zonedParts(new Date())!
+  const today = `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`
+  if (day === today) return "今天班里在做"
+  const [, month, date] = day.split("-").map(Number)
+  return `${month}月${date}日班里做了`
+})
+
+const MY_STATUS: Record<
+  ClassActivityProblem["myStatus"],
+  { label: string; type: "success" | "warning" | "default" }
+> = {
+  accepted: { label: "已通过", type: "success" },
+  tried: { label: "未通过", type: "warning" },
+  none: { label: "没做", type: "default" },
+}
+
 async function loadWeekly() {
   weekly.value = await getWeeklyRank(userStore.user?.className ? "class" : "global")
 }
@@ -123,6 +157,7 @@ async function load() {
     loadSubmissions(),
     loadAnnouncements(),
     loadWeekly(),
+    loadClassActivity(),
   ])
   loaded.value = true
 }
@@ -137,10 +172,7 @@ function learnLink(track: Track) {
   return `/learn/${track.type}/${track.step.toString().padStart(2, "0")}`
 }
 
-function searchProblem() {
-  const value = keyword.value.trim()
-  router.push({ path: "/problem", query: value ? { keyword: value } : {} })
-}
+const { jump, jumping } = useProblemJump()
 
 function openSubmission(row: SubmissionListItem) {
   if (row.showLink) router.push(`/submission/${row.id}`)
@@ -198,14 +230,41 @@ async function openAnnouncement(item: AnnouncementListItem) {
           v-model:value="keyword"
           placeholder="题号或题目名"
           clearable
-          @keyup.enter="searchProblem"
+          @keyup.enter="jump(keyword)"
         />
-        <n-button type="primary" @click="searchProblem">找题</n-button>
+        <n-button type="primary" :loading="jumping" @click="jump(keyword)">找题</n-button>
       </n-input-group>
     </section>
 
     <div class="grid">
       <div class="column">
+        <!-- 只在有的时候出现：没班级、最近一周班里没一起做过题的，这块不占位置 -->
+        <n-card
+          v-if="classActivity?.problems.length"
+          :title="classActivityTitle"
+          size="small"
+          :bordered="false"
+          class="card"
+        >
+          <template #header-extra>
+            <n-text depth="3" class="row-meta">{{ classActivity.className }} 班</n-text>
+          </template>
+          <router-link
+            v-for="item in classActivity.problems"
+            :key="item.problemDisplayId"
+            :to="`/problem/${item.problemDisplayId}`"
+            class="row"
+          >
+            <n-tag :type="MY_STATUS[item.myStatus].type" size="small" :bordered="false">
+              {{ MY_STATUS[item.myStatus].label }}
+            </n-tag>
+            <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
+            <n-text depth="3" class="row-meta">
+              {{ item.acceptedCount }}/{{ item.userCount }} 人通过
+            </n-text>
+          </router-link>
+        </n-card>
+
         <n-card title="继续学习" size="small" :bordered="false" class="card">
           <n-flex vertical :size="12">
             <router-link

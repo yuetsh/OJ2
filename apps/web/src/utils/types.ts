@@ -287,6 +287,9 @@ export type { WeeklyRank, WeeklyRankItem } from "@oj2/contract"
 
 export type { ClassComparison, ClassRankItem, ClassUserRank } from "@oj2/contract"
 
+/** 班里最近一次一起做的题（课上老师点的那几道），见后端 `/me/class-activity` */
+export type { ClassActivity, ClassActivityProblem } from "@oj2/contract"
+
 /**
  * 学生侧的比赛：不含 password / visible。后台用 `AdminContest` ——
  * oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生）

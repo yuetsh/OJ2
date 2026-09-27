@@ -8,6 +8,7 @@ import {
   type FormatCodeResponse,
   type Metrics,
   type TutorialSummary,
+  type ClassActivity,
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
@@ -214,6 +215,10 @@ export function getActivityRank(start: string) {
  */
 export function getWeeklyRank(scope: "global" | "class") {
   return api.get<WeeklyRank>("rankings/weekly", { params: { scope } })
+}
+
+export function getClassActivity() {
+  return api.get<ClassActivity>("me/class-activity")
 }
 
 export function getClassRank(grade?: number | null) {

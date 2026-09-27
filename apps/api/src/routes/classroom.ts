@@ -1,18 +1,21 @@
 import {
   classComparisonRequestSchema,
   STUDENT_ROLES,
+  type ClassActivity,
+  type ClassActivityProblem,
   type ClassComparison,
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
 } from "@oj2/contract"
-import { and, eq, gte, inArray, like, lte, sql } from "drizzle-orm"
+import { and, eq, gte, inArray, isNull, like, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
+import { dayStart, localTime } from "../time"
 import { queryInteger, rounded } from "./helpers"
 
 export const classroomRoutes = new Hono<AppEnv>()
@@ -139,6 +142,127 @@ classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
     total: ranks.length,
     ranks: selected,
   } satisfies ClassUserRank)
+})
+
+/**
+ * 同班同一天有这么多人做过，就算「班里在做」。2025 秋的实测分布是两极的：
+ * (班级, 日, 题) 要么只有 1 个人（自己在刷），要么 13 人以上（老师点的题），
+ * 5 落在中间的空档里，最小的那几个班（十来个人）也够得着。
+ */
+const CLASS_ACTIVITY_MIN_USERS = 5
+/** 往回找几天：上完课第二天在家补作业、请假回来的学生，都还能看到上一次课做了什么 */
+const CLASS_ACTIVITY_LOOKBACK_DAYS = 7
+const CLASS_ACTIVITY_LIMIT = 8
+/** AST_CHECK_FAILED 也是答案对了，与周榜同口径 */
+const SOLVED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
+
+/**
+ * 班里最近一次「一起做」的那几道题。课上老师报题号、全班去找 —— 这是 2025 秋
+ * 七成非比赛提交的来路，但界面上原本没有它的入口，没听清题号的只能问同桌。
+ *
+ * 只取最近的**一天**，不把 7 天摊平：摊平了就是一张越来越长的旧题单，
+ * 「现在该做哪道」反而看不出来。题按那天第一次有人提交的时间排，大致就是老师点题的顺序。
+ */
+classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
+  const user = c.get("user")!
+  if (!user.className) {
+    return success(c, { className: null, day: null, problems: [] } satisfies ClassActivity)
+  }
+
+  const since = dayStart(Date.now() - (CLASS_ACTIVITY_LOOKBACK_DAYS - 1) * 86_400_000)
+  const day = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
+  const userCount = sql<number>`count(distinct ${schema.submission.userId})::int`
+  const groups = await db
+    .select({
+      day,
+      problemId: schema.submission.problemId,
+      firstAt: sql<string>`min(${schema.submission.createTime})`,
+      userCount,
+      acceptedCount: sql<number>`count(distinct ${schema.submission.userId}) filter (where ${inArray(schema.submission.result, SOLVED_RESULTS)})::int`,
+    })
+    .from(schema.submission)
+    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .where(
+      and(
+        isNull(schema.submission.contestId),
+        gte(schema.submission.createTime, since),
+        eq(schema.user.className, user.className),
+        eq(schema.user.isDisabled, false),
+        inArray(schema.user.adminType, [...STUDENT_ROLES]),
+      ),
+    )
+    .groupBy(day, schema.submission.problemId)
+    .having(sql`${userCount} >= ${CLASS_ACTIVITY_MIN_USERS}`)
+
+  const latest = groups.reduce<string | null>(
+    (acc, row) => (!acc || row.day > acc ? row.day : acc),
+    null,
+  )
+  const picked = groups
+    .filter((row) => row.day === latest)
+    .sort((a, b) => a.firstAt.localeCompare(b.firstAt))
+    .slice(0, CLASS_ACTIVITY_LIMIT)
+  if (!picked.length) {
+    return success(c, {
+      className: user.className,
+      day: null,
+      problems: [],
+    } satisfies ClassActivity)
+  }
+
+  const ids = picked.map((row) => row.problemId)
+  const [problems, mine] = await Promise.all([
+    // 题目后来被藏起来的就不列了，点进去也是 404
+    db
+      .select({
+        id: schema.problem.id,
+        displayId: schema.problem.displayId,
+        title: schema.problem.title,
+      })
+      .from(schema.problem)
+      .where(
+        and(
+          inArray(schema.problem.id, ids),
+          eq(schema.problem.visible, true),
+          isNull(schema.problem.contestId),
+        ),
+      ),
+    db
+      .select({
+        problemId: schema.submission.problemId,
+        accepted: sql<boolean>`bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`,
+      })
+      .from(schema.submission)
+      .where(
+        and(
+          eq(schema.submission.userId, user.id),
+          inArray(schema.submission.problemId, ids),
+          isNull(schema.submission.contestId),
+        ),
+      )
+      .groupBy(schema.submission.problemId),
+  ])
+  const problemById = new Map(problems.map((row) => [row.id, row]))
+  const mineById = new Map(mine.map((row) => [row.problemId, row.accepted]))
+
+  return success(c, {
+    className: user.className,
+    day: latest,
+    problems: picked.flatMap((row) => {
+      const problem = problemById.get(row.problemId)
+      if (!problem) return []
+      const accepted = mineById.get(row.problemId)
+      return [
+        {
+          problemDisplayId: problem.displayId,
+          title: problem.title,
+          userCount: row.userCount,
+          acceptedCount: row.acceptedCount,
+          myStatus: accepted === undefined ? "none" : accepted ? "accepted" : "tried",
+        } satisfies ClassActivityProblem,
+      ]
+    }),
+  } satisfies ClassActivity)
 })
 
 classroomRoutes.post("/classes/comparison", async (c) => {

@@ -4,6 +4,7 @@ import { RouterLink } from "vue-router"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useDarkTransition } from "shared/composables/darkTransition"
 import { useLearnProgress } from "shared/composables/learnProgress"
+import { useProblemJump } from "shared/composables/problemJump"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
 import { useScreenModeStore } from "shared/store/screenMode"
@@ -61,6 +62,18 @@ function getRandomAvatar() {
 }
 
 const avatar = ref(getRandomAvatar())
+
+/**
+ * 顶栏的题号框：老师报完题号，学生在哪一页都能直接敲，不用先回首页或题目列表。
+ * 只给桌面端 —— 窄屏顶栏已经挤满了，手机上从首页的搜索框走同一套逻辑。
+ */
+const { jump, jumping } = useProblemJump()
+const jumpKeyword = ref("")
+
+async function handleJump() {
+  await jump(jumpKeyword.value)
+  jumpKeyword.value = ""
+}
 
 const envVersion = computed(() => {
   if (import.meta.env.PUBLIC_ENV === "test") {
@@ -263,6 +276,18 @@ function goHome() {
           <span style="padding-left: 8px">菜单</span>
         </n-button>
       </n-dropdown>
+      <n-input
+        v-if="isDesktop"
+        v-model:value="jumpKeyword"
+        class="jump"
+        placeholder="输入题号直达"
+        :loading="jumping"
+        @keyup.enter="handleJump"
+      >
+        <template #prefix>
+          <Icon icon="ph:magnifying-glass" />
+        </template>
+      </n-input>
       <n-button
         v-if="isDesktop && (route.name === 'problem' || route.name === 'contest problem')"
         @click="() => screenModeStore.switchScreenMode()"
@@ -304,5 +329,9 @@ function goHome() {
 <style scoped>
 .title {
   font-size: 18px;
+}
+
+.jump {
+  width: 160px;
 }
 </style>
