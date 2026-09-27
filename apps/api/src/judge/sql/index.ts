@@ -177,7 +177,8 @@ async function runJob<T>(
 
   try {
     const parsed = JSON.parse(stdout) as
-      { ok: true; case?: CaseResult; display?: unknown } | SqlJobFailure
+      | { ok: true; case?: CaseResult; display?: unknown }
+      | SqlJobFailure
     if (!parsed.ok) return parsed
     return { ok: true, value: (parsed.case ?? parsed.display) as T }
   } catch {

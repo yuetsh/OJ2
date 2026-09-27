@@ -112,7 +112,8 @@ const POLL_INTERVAL = 3000
 const POLL_TIMEOUT = 3 * 60 * 1000
 
 type Outcome =
-  { ok: true; score: number; grade: string } | { ok: false; error?: string }
+  | { ok: true; score: number; grade: string }
+  | { ok: false; error?: string }
 
 const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
   async () => {
