@@ -19,10 +19,28 @@ function requestBody(messages: ChatMessage[], stream: boolean, json = false) {
 
 /**
  * 非流式调用的超时。fetch 默认不超时，AI 侧一挂就会把 worker 的并发位一直占着，
- * 学生那边的按钮也就一直转。流式调用不设：那边超时会把正在推的长回答直接掐断，
- * 客户端断开本来就能收尾。
+ * 学生那边的按钮也就一直转。
  */
 const COMPLETE_TIMEOUT_MS = 60_000
+
+/**
+ * 流式调用的**空闲**超时：连续这么久没收到一个字节就放弃。不用总时长超时 —— 那会把
+ * 正在推的长回答直接掐断；空闲超时每收到一块就重新计时，只拦「provider 卡住不动」。
+ * 首字节也算在内（DeepSeek 首 token 通常几秒，给足余量）。
+ */
+const STREAM_IDLE_TIMEOUT_MS = 45_000
+
+/**
+ * 推给前端的错误文案。真实原因（provider 的 HTTP 响应体、数据库报错……）只进日志和
+ * `onError` 留痕，**不下发**：学生看不懂，也不该看到上游的响应内容。
+ */
+const CLIENT_ERROR_MESSAGE = "AI 服务暂时不可用，请稍后再试"
+const MISSING_KEY_MESSAGE = "AI 功能未开启"
+
+/** 给客户端的错误事件；原因另行记日志 */
+function errorEvent(message: string) {
+  return `data: ${JSON.stringify({ type: "error", message })}\n\n`
+}
 
 export async function completeChat(
   system: string,
@@ -81,23 +99,42 @@ export function streamChat(
     hooks.onError?.(message).catch((error) => {
       console.error("streamChat onError hook failed", error)
     })
+  // 客户端断开（cancel）和空闲超时都走这一个 controller，把上游的 fetch / read 一起停掉。
+  // 原来客户端走了之后这里还在把 provider 的回答一块块读完，白烧 token
+  const upstream = new AbortController()
+  let closed = false
+  let idleTimer: ReturnType<typeof setTimeout> | undefined
+  const touch = () => {
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(
+      () => upstream.abort(new Error("AI provider stream idle timeout")),
+      STREAM_IDLE_TIMEOUT_MS,
+    )
+  }
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (value: string) => controller.enqueue(encoder.encode(value))
+      const send = (value: string) => {
+        if (closed) return
+        try {
+          controller.enqueue(encoder.encode(value))
+        } catch {
+          closed = true
+        }
+      }
       if (!config.aiKey) {
         await reportError("缺少 AI_KEY")
-        send(
-          `data: ${JSON.stringify({ type: "error", message: "缺少 AI_KEY" })}\n\n`,
-        )
+        send(errorEvent(MISSING_KEY_MESSAGE))
         send("event: end\n\n")
-        controller.close()
+        if (!closed) controller.close()
         return
       }
       try {
+        touch()
         const response = await fetch(
           new URL("/chat/completions", config.aiBaseUrl),
           {
             method: "POST",
+            signal: upstream.signal,
             headers: {
               "content-type": "application/json",
               authorization: `Bearer ${config.aiKey}`,
@@ -123,6 +160,7 @@ export function streamChat(
         let buffer = ""
         const chunks: string[] = []
         while (true) {
+          touch()
           const { done, value } = await reader.read()
           buffer += decoder.decode(value, { stream: !done })
           const lines = buffer.split("\n")
@@ -157,14 +195,24 @@ export function streamChat(
           : undefined
         send(`data: ${JSON.stringify({ ...extra, type: "done" })}\n\n`)
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        // 先留痕再回前端：客户端已经断开的话下面这个 send 自己也会抛
+        // 客户端主动走掉不算 AI 失败，但照样留痕：这条分析没有落库
+        const message = closed
+          ? "客户端已断开"
+          : error instanceof Error
+            ? error.message
+            : String(error)
+        if (!closed) console.error("streamChat failed", error)
         await reportError(message)
-        send(`data: ${JSON.stringify({ type: "error", message })}\n\n`)
+        send(errorEvent(CLIENT_ERROR_MESSAGE))
       } finally {
+        clearTimeout(idleTimer)
         send("event: end\n\n")
-        controller.close()
+        if (!closed) controller.close()
       }
+    },
+    cancel() {
+      closed = true
+      upstream.abort(new Error("client disconnected"))
     },
   })
   return new Response(body, {
@@ -222,11 +270,18 @@ export function streamWhole(
         send(`data: ${JSON.stringify({ ...extra, type: "done" })}\n\n`)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        // 先留痕再回前端
+        console.error("streamWhole failed", error)
+        // 先留痕再回前端；前端只拿固定文案，原因见 CLIENT_ERROR_MESSAGE
         await hooks.onError?.(message).catch((e) => {
           console.error("streamWhole onError hook failed", e)
         })
-        send(`data: ${JSON.stringify({ type: "error", message })}\n\n`)
+        send(
+          errorEvent(
+            message === "缺少 AI_KEY"
+              ? MISSING_KEY_MESSAGE
+              : CLIENT_ERROR_MESSAGE,
+          ),
+        )
       } finally {
         clearInterval(heartbeat)
         send("event: end\n\n")
