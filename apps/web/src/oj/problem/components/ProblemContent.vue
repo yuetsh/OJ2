@@ -240,15 +240,17 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
     </section>
 
     <template v-if="!isSQL">
-      <section v-for="(sample, index) of samples" :key="index" class="sample">
+      <!--
+        例子是一张表：例子 N | 输入 | 输出。原来每个例子各占一个小标题加两个框，三个例子
+        就占掉大半屏；Python 的例子大多一两行，摆成表一眼能对上「这个输入 → 这个输出」
+      -->
+      <section v-if="samples.length" class="sample">
         <n-flex align="center" justify="space-between" class="sample-head">
           <h3 class="title">
             <Icon icon="streamline-emojis:microscope"></Icon>
-            例子 {{ index + 1 }}
+            例子
           </h3>
-          <!-- 只在第一个例子旁放一个入口：每个都放就成了一排一样的链接 -->
           <n-button
-            v-if="index === 0"
             text
             type="primary"
             size="small"
@@ -257,20 +259,22 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
             自己输入数据试试 ›
           </n-button>
         </n-flex>
-        <div class="sample-grid">
-          <div class="sample-box">
-            <n-flex align="center" justify="space-between" class="sample-label">
-              <span>输入</span>
-              <Copy :value="sample.input" />
-            </n-flex>
-            <pre class="testcase">{{ sample.input }}</pre>
+        <div class="sample-table" role="table" aria-label="例子">
+          <div class="sample-row sample-header" role="row">
+            <span role="columnheader"></span>
+            <span role="columnheader">输入</span>
+            <span role="columnheader">输出</span>
           </div>
-          <div class="sample-box">
-            <n-flex align="center" justify="space-between" class="sample-label">
-              <span>输出</span>
-              <Copy :value="sample.output" />
-            </n-flex>
-            <pre class="testcase">{{ sample.output }}</pre>
+          <div v-for="(sample, index) of samples" :key="index" class="sample-row" role="row">
+            <span class="sample-no" role="rowheader">{{ index + 1 }}</span>
+            <div class="sample-cell" role="cell">
+              <pre class="testcase">{{ sample.input }}</pre>
+              <span class="sample-copy"><Copy :value="sample.input" /></span>
+            </div>
+            <div class="sample-cell" role="cell">
+              <pre class="testcase">{{ sample.output }}</pre>
+              <span class="sample-copy"><Copy :value="sample.output" /></span>
+            </div>
           </div>
         </div>
       </section>
@@ -471,23 +475,59 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   margin: 0;
 }
 
-.sample-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 8px;
-}
-
-.sample-box {
-  min-width: 0;
+.sample-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(128, 128, 128, 0.2);
   border-radius: 6px;
-  background-color: rgba(128, 128, 128, 0.08);
-  padding: 6px 10px 10px;
+  overflow: hidden;
 }
 
-.sample-label {
+.sample-row {
+  display: grid;
+  grid-template-columns: 2.2em minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.sample-row + .sample-row {
+  border-top: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.sample-header {
   font-size: 12px;
   opacity: 0.7;
-  margin-bottom: 4px;
+  background-color: rgba(128, 128, 128, 0.06);
+}
+
+.sample-header > span {
+  padding: 4px 10px;
+}
+
+.sample-no {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  background-color: rgba(128, 128, 128, 0.06);
+}
+
+.sample-cell {
+  position: relative;
+  min-width: 0;
+  padding: 6px 30px 6px 10px;
+}
+
+.sample-cell + .sample-cell {
+  border-left: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+/* Copy 的根是 n-tooltip，class 挂不上去，所以外面包一层 span 来定位 */
+.sample-copy {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  display: flex;
 }
 
 .testcase {
