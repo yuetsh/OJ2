@@ -136,10 +136,21 @@ const toggleHelp = () => {
     collabStore.requestHelp(problem.value!._id, codeStore.code.language)
 }
 
+/**
+ * 右栏窄于 600px（学生把左栏拖宽看长题面、宽 SQL 表时）：工具栏折成两行会把编辑器往下挤，
+ * 所以次要的按钮收进「更多」、「写代码 / 画流程图」缩短一点（设计文档 5.4）。语言下拉不收：
+ * 窄于 120px 时图标和「Python」会被挤成两行
+ */
+const toolbarRef = useTemplateRef<{ $el: HTMLElement }>("toolbarRef")
+const { width: toolbarWidth } = useElementSize(() => toolbarRef.value?.$el)
+const narrow = computed(() => isDesktop.value && toolbarWidth.value > 0 && toolbarWidth.value < 600)
+/** 「课堂统计」常驻在工具栏上：桌面、而且放得下 */
+const statisticsInline = computed(() => isDesktop.value && !narrow.value)
+
 const menuOptions = computed<DropdownOption[]>(() => {
   const options: DropdownOption[] = []
-  // 移动端额外收纳桌面端常驻的「课堂统计」。「本题提交」挪到了「我的提交」抽屉的底部
-  if (!isDesktop.value && userStore.isTeacherOrAbove) {
+  // 放不下时（手机、右栏太窄）收进来的「课堂统计」。「本题提交」挪到了「我的提交」抽屉的底部
+  if (!statisticsInline.value && userStore.isTeacherOrAbove) {
     options.push({
       label: "课堂统计",
       key: "statistics",
@@ -261,11 +272,11 @@ const goEdit = () => {
 </script>
 
 <template>
-  <n-flex align="center">
+  <n-flex ref="toolbarRef" align="center" :size="narrow ? 8 : 12">
     <!-- 协作中的老师不会落到画图：求助入口本身就排掉了流程图 -->
     <n-radio-group v-if="canDraw && !showCollabBar" v-model:value="mode" :size="buttonSize">
-      <n-radio-button value="code">写代码</n-radio-button>
-      <n-radio-button value="draw">画流程图</n-radio-button>
+      <n-radio-button value="code">{{ narrow ? "代码" : "写代码" }}</n-radio-button>
+      <n-radio-button value="draw">{{ narrow ? "流程图" : "画流程图" }}</n-radio-button>
     </n-radio-group>
 
     <!-- 协作中编辑器的语言跟着学生走，这个选择器改了也不会生效，索性禁掉 -->
@@ -295,21 +306,23 @@ const goEdit = () => {
     <SubmitCode v-else-if="isDesktop" />
 
     <n-button
-      v-if="isDesktop && userStore.isTeacherOrAbove"
+      v-if="statisticsInline && userStore.isTeacherOrAbove"
       :size="buttonSize"
       @click="statisticPanel = true"
     >
       课堂统计
     </n-button>
 
-    <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；移动端再加上课堂统计 -->
+    <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；放不下时再加上课堂统计 -->
     <n-dropdown
       v-if="menuOptions.length"
       trigger="click"
       :options="menuOptions"
       @select="handleMenuSelect"
     >
-      <n-button :size="buttonSize">更多</n-button>
+      <n-button :size="buttonSize" :title="narrow ? '更多' : undefined">
+        {{ narrow ? "⋯" : "更多" }}
+      </n-button>
     </n-dropdown>
 
     <n-button
