@@ -133,12 +133,23 @@ const msg = computed(() => {
         "程序运行到一半出错，停下来了。检查一下输入是怎么读的、下标有没有越界、除数是不是 0。\n\n"
     }
   }
+  // 题面不写时间、内存限制（学生看了只会迷糊），判出来时就得在这里说清楚是怎么回事
+  if (
+    result === SubmissionStatus.cpu_time_limit_exceeded ||
+    result === SubmissionStatus.real_time_limit_exceeded
+  ) {
+    msg +=
+      "程序跑了太久还没结束。看看是不是有死循环（条件一直成立、循环变量忘了改），或者在等一个没有给的输入（多写了一个 input）。\n\n"
+  } else if (result === SubmissionStatus.memory_limit_exceeded) {
+    msg +=
+      "程序占的内存太多了。通常是列表、数组开得太大，或者在循环里不停地往里加东西、停不下来。\n\n"
+  }
 
   if (result !== SubmissionStatus.ast_check_failed && props.submission.statisticInfo?.err_info) {
     msg += stripJudgePath(props.submission.statisticInfo.err_info)
   }
 
-  return msg
+  return msg.trim()
 })
 
 // 部分测试点通过时的进度。学生拿不到 info，那张测试点表格只有管理员看得见，
@@ -453,7 +464,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
 }
 
 .msg {
-  white-space: pre;
+  white-space: pre-wrap;
   word-break: break-all;
   line-height: 1.5;
 }
