@@ -516,8 +516,44 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           .groupBy(schema.submission.userId)
       : [],
   ])
+  /**
+   * 流程图作业：画到 A / S 也算这道题做完，和学生首页的课堂条同一个口径（/me/class-activity）。
+   * 有的题这节课整个班都在画流程图，只数代码提交的话，看板上满屏「没开始」
+   */
+  const drawn =
+    ids.length && userIds.length
+      ? await db
+          .select({
+            userId: schema.flowchartSubmission.userId,
+            problemId: schema.flowchartSubmission.problemId,
+            attempts: sql<number>`count(*) filter (where ${gte(schema.flowchartSubmission.createTime, start)})::int`,
+            firstPassedAt: sql<
+              string | null
+            >`min(${schema.flowchartSubmission.createTime}) filter (where ${and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, FLOWCHART_PASS_GRADES))})`,
+            lastAt: sql<
+              string | null
+            >`max(${schema.flowchartSubmission.createTime}) filter (where ${gte(schema.flowchartSubmission.createTime, start)})`,
+          })
+          .from(schema.flowchartSubmission)
+          .where(
+            and(
+              inArray(schema.flowchartSubmission.userId, userIds),
+              inArray(schema.flowchartSubmission.problemId, ids),
+            ),
+          )
+          .groupBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId)
+      : []
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
+  const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
+  // 今天只画了流程图的学生，「最后一次提交」也得算上画图，不然他在看板上是一直没动手
+  for (const row of drawn) {
+    if (!row.lastAt) continue
+    const known = lastByUser.get(row.userId)
+    if (!known || Date.parse(row.lastAt) > Date.parse(known)) lastByUser.set(row.userId, row.lastAt)
+  }
+  const earliest = (a: string | null | undefined, b: string | null | undefined) =>
+    !a ? (b ?? null) : !b ? a : Date.parse(a) <= Date.parse(b) ? a : b
   const attendedByUser = new Map(attendance.map((row) => [row.userId, row.days]))
 
   return success(c, {
@@ -536,11 +572,14 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           username: student.username,
           realName: student.realName ?? null,
           cells: ids.map((id) => {
-            const cell = cellByKey.get(`${student.userId}:${id}`)
+            const key = `${student.userId}:${id}`
+            const cell = cellByKey.get(key)
+            const flow = drawnByKey.get(key)
+            const acceptedAt = earliest(cell?.firstAcceptedAt, flow?.firstPassedAt)
             return {
-              status: !cell ? "none" : cell.firstAcceptedAt ? "accepted" : "tried",
-              attempts: cell?.attempts ?? 0,
-              acceptedAt: cell?.firstAcceptedAt ?? null,
+              status: !cell && !flow ? "none" : acceptedAt ? "accepted" : "tried",
+              attempts: (cell?.attempts ?? 0) + (flow?.attempts ?? 0),
+              acceptedAt,
             }
           }),
           lastSubmitAt: lastByUser.get(student.userId) ?? null,
