@@ -12,6 +12,9 @@ import { useUserStore } from "shared/store/user"
  * 这个组件在编辑器的工具栏里，编辑器卸载时它也跟着卸载，所以什么都不能只存在这里。
  */
 
+/** 手机底部那条操作栏里用大号、占满半宽 */
+const props = defineProps<{ size?: "small" | "medium" | "large"; block?: boolean }>()
+
 const userStore = useUserStore()
 const codeStore = useCodeStore()
 const submissionStore = useSubmissionStore()
@@ -41,7 +44,8 @@ function submit() {
 
 <template>
   <n-button
-    :size="isDesktop ? 'medium' : 'small'"
+    :size="props.size ?? (isDesktop ? 'medium' : 'small')"
+    :block="props.block"
     type="primary"
     :disabled="buttonState.disabled"
     @click="submit"

@@ -269,8 +269,9 @@ const goEdit = () => {
       @update:value="changeLanguage"
     />
 
+    <!-- 手机上「运行例子」「提交」在屏幕底部那条（MobileActionBar），三个页签都在 -->
     <n-button
-      v-if="canRunSamples"
+      v-if="canRunSamples && isDesktop"
       :size="buttonSize"
       :loading="samplesRunning"
       :disabled="!codeStore.code.value.trim()"
@@ -281,7 +282,7 @@ const goEdit = () => {
 
     <SubmitFlowchart v-if="codeStore.code.language === 'Flowchart'" />
 
-    <SubmitCode v-else />
+    <SubmitCode v-else-if="isDesktop" />
 
     <n-button
       v-if="isDesktop && userStore.isTeacherOrAbove"

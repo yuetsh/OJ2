@@ -30,6 +30,7 @@ const ProblemEditor = defineAsyncComponent(loadProblemEditor)
 const ProblemContent = defineAsyncComponent(() => import("./components/ProblemContent.vue"))
 const ProblemDrawer = defineAsyncComponent(() => import("./components/ProblemDrawer.vue"))
 const ResultPane = defineAsyncComponent(() => import("./components/ResultPane.vue"))
+const MobileActionBar = defineAsyncComponent(() => import("./components/MobileActionBar.vue"))
 
 interface Props {
   problemID: string
@@ -256,14 +257,18 @@ onBeforeUnmount(() => {
       </template>
     </n-split>
 
-    <!-- Mobile -->
-    <template v-else>
+    <!-- Mobile：底部固定「运行例子 / 提交」，内容底下留出它的高度 -->
+    <div v-else class="mobile">
       <ContextBar />
       <n-tabs v-model:value="currentTab" type="segment">
         <n-tab-pane name="content" tab="题目">
           <ProblemContent />
         </n-tab-pane>
-        <n-tab-pane name="editor" tab="代码">
+        <!--
+          编辑器一直挂着（show，不是默认的 if）：底部的「提交」在三个页签下都能点，
+          没切到过「代码」页签的话草稿就没读进来、按钮是灰的；切走就卸载还会丢掉撤销历史
+        -->
+        <n-tab-pane name="editor" tab="代码" display-directive="show">
           <ProblemEditor />
         </n-tab-pane>
         <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
@@ -276,12 +281,17 @@ onBeforeUnmount(() => {
         </template>
       </n-tabs>
       <ProblemDrawer v-model="drawer" />
-    </template>
+      <MobileActionBar />
+    </div>
   </template>
   <n-empty v-else :description="errMsg"></n-empty>
 </template>
 
 <style scoped>
+.mobile {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
 .left-pane {
   position: relative;
   height: 100%;

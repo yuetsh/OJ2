@@ -98,9 +98,10 @@ const storageKey = computed(() =>
     : `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
 )
 
-// 协作条 40px + 和工具栏之间的 12px 间距，要从编辑器里让出来，不然页面底下多出一截滚动条
+// 协作条 40px + 和工具栏之间的 12px 间距，要从编辑器里让出来，不然页面底下多出一截滚动条。
+// 手机上：顶栏两行 + 课堂条 + 页签 + 工具栏约 236px，底部还有「运行例子 / 提交」那条约 64px
 const editorHeight = computed(() => {
-  const base = isDesktop.value ? 133 : 172
+  const base = isDesktop.value ? 133 : 300
   return `calc(100vh - ${base + (teacherCollab.value ? 52 : 0)}px)`
 })
 
