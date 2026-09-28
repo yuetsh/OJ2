@@ -56,7 +56,7 @@ const suggestions = computed(() =>
 )
 
 function gradeType(grade: string) {
-  if (grade === "S" || grade === "A") return "success"
+  if (isFlowchartPass(grade)) return "success"
   if (grade === "B") return "warning"
   return "error"
 }

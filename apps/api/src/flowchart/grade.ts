@@ -9,13 +9,3 @@ export function gradeForScore(score: number) {
   if (score >= 70) return "B"
   return "C"
 }
-
-/**
- * 画到这两档算这道题做完：题单进度、课堂条、「你画的流程图」都按它
- * （设计文档 2026-09-28-problem-page-redesign 第 3 节决定 4、6）
- */
-export const FLOWCHART_PASS_GRADES = ["S", "A"]
-
-export function isFlowchartPass(grade: string | null | undefined) {
-  return grade === "S" || grade === "A"
-}

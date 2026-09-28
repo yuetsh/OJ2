@@ -14,6 +14,7 @@ import { NFlex } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import { statisticsOpen, useEditorMenu } from "../composables/editorMenu"
+import { useTeacherCollab } from "../composables/teacherCollab"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
 
@@ -73,14 +74,10 @@ const showHelpButton = computed(
 )
 
 /**
- * 教师端：协作就开在这道题上。接单后直接跳到题目页协作（原来是 CollabModal 弹框），
- * 所以状态和「结束协作」得摆在题目页的工具栏上 —— 也只有这一个按钮能结束，
- * 不像弹框那样按一下 Esc 就把协作关掉了。
+ * 教师正在这道题上协作：编辑器里是学生的代码。协作状态和「结束协作」在工具栏上面那条
+ * 协作条里（CollabBar）；工具栏这边禁掉语言选择、不给「写代码 / 画流程图」切换
  */
-const collabHere = computed(
-  () => collabStore.room !== null && collabStore.room.problemId === problem.value?._id,
-)
-const showCollabBar = computed(() => collabHere.value && userStore.isTeacherOrAbove)
+const showCollabBar = useTeacherCollab()
 
 /**
  * 状态全塞进按钮本身。原来旁边还挂一个 n-tag 说明排队情况，一行工具栏

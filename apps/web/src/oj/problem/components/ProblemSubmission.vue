@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { getRankOfProblem, getSubmission, getSubmissions } from "oj/api"
 import { useCodeStore } from "oj/store/code"
+import { useProblemStore } from "oj/store/problem"
 import Pagination from "shared/components/Pagination.vue"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useCollabStore } from "shared/store/collab"
@@ -22,6 +23,7 @@ import { useTeacherCollab } from "../composables/teacherCollab"
 
 const userStore = useUserStore()
 const codeStore = useCodeStore()
+const problemStore = useProblemStore()
 const collabStore = useCollabStore()
 const ctx = useProblemPageContext()
 const route = useRoute()
@@ -139,11 +141,22 @@ function loadedOf(id: string): Loaded | null {
   return value && typeof value === "object" ? value : null
 }
 
-function putBack(id: string) {
+/** 这道题现在还收不收那次提交的语言（0020 从题目里摘掉了 Java / JS / Go，老提交还在） */
+function canPutBack(id: string) {
   const loaded = loadedOf(id)
-  if (!loaded) return
+  return !!loaded && problemStore.codeLanguages.some((language) => language === loaded.language)
+}
+
+async function putBack(id: string) {
+  const loaded = loadedOf(id)
+  if (!loaded || !canPutBack(id)) return
+  // 语言不一样就先按正常的路子切过去（存语言偏好、读那门语言的草稿；画流程图时切回代码编辑器），
+  // 等编辑器切完再放代码 —— 直接改 codeStore 的语言会绕过这些，草稿存错地方
+  if (codeStore.code.language !== loaded.language) {
+    problemStore.switchLanguage(loaded.language)
+    await nextTick()
+  }
   // 同一个编辑器里 dispatch 一次整段替换，CodeMirror 的历史记着它，Ctrl+Z 能撤回
-  codeStore.setLanguage(loaded.language)
   codeStore.setCode(loaded.code)
   message.success("已放回编辑器，按 Ctrl+Z 可以撤回")
 }
@@ -233,6 +246,12 @@ watch(query, () => {
                 size="small"
                 type="primary"
                 secondary
+                :disabled="!canPutBack(row.id)"
+                :title="
+                  canPutBack(row.id)
+                    ? undefined
+                    : `这道题现在不收 ${LANGUAGE_SHOW_VALUE[loadedOf(row.id)!.language]} 了，只能复制`
+                "
                 @click="putBack(row.id)"
               >
                 放回编辑器

@@ -243,7 +243,7 @@ export async function recordSolvedProblem(
   /**
    * 做出来的那次代码提交。流程图画到 A/S 算完成时传 null：problemset_submission.submission_id
    * 外键指向代码提交表，流程图提交的 id 进不去。不影响「解锁加入题单之前的提交」——
-   * 那道闸看的是 progress_detail（routes/submission.ts 的 problemSetJoinTimes）
+   * 那道闸看的是 progress_detail（本文件下面的 problemSetJoinTimes）
    */
   submissionId: string | null,
   solvedAt: string,

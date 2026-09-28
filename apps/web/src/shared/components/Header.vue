@@ -28,8 +28,6 @@ const { isDark, toggleDark } = useDarkTransition()
  */
 const pendingHelpCount = computed(() => (collabStore.isTeacher ? collabStore.pendingCount : 0))
 
-// 从 store 中获取屏幕模式状态
-
 const names = [
   "man-with-chinese-cap-1",
   "cat-face",

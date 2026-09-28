@@ -1,4 +1,4 @@
-import type { FlowchartUpdate } from "@oj2/contract"
+import { isFlowchartPass, type FlowchartUpdate } from "@oj2/contract"
 import { eq } from "drizzle-orm"
 
 import { config } from "../config"
@@ -6,7 +6,7 @@ import { db, schema } from "../db"
 import { publishFlowchartUpdate } from "../events"
 import { completeChat } from "../services/ai"
 import { recordSolvedAndNotify } from "../services/problemset"
-import { gradeForScore, isFlowchartPass } from "./grade"
+import { gradeForScore } from "./grade"
 import type { FlowchartJobData } from "./job"
 
 function evaluationPrompt(problem: typeof schema.problem.$inferSelect) {

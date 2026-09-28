@@ -10,6 +10,7 @@ import {
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
+  FLOWCHART_PASS_GRADES,
 } from "@oj2/contract"
 import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lte, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -17,7 +18,6 @@ import { Hono } from "hono"
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
-import { FLOWCHART_PASS_GRADES } from "../flowchart/grade"
 import { JudgeStatus } from "../judge/status"
 import { calendarDay, dayStart, localTime } from "../time"
 import { queryInteger, rounded } from "./helpers"
@@ -309,43 +309,45 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
 
   const lesson = await classLessonProblems(user.className, CLASS_ACTIVITY_LOOKBACK_DAYS)
   const ids = lesson.problems.map((problem) => problem.id)
-  const mine = ids.length
-    ? await db
-        .select({
-          problemId: schema.submission.problemId,
-          accepted: sql<boolean>`bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`,
-        })
-        .from(schema.submission)
-        .where(
-          and(
-            eq(schema.submission.userId, user.id),
-            inArray(schema.submission.problemId, ids),
-            isNull(schema.submission.contestId),
-          ),
-        )
-        .groupBy(schema.submission.problemId)
-    : []
+  // 代码提交和流程图提交两张表，互不依赖，一起查
+  const [mine, drawn] = await Promise.all([
+    ids.length
+      ? db
+          .select({
+            problemId: schema.submission.problemId,
+            accepted: sql<boolean>`bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`,
+          })
+          .from(schema.submission)
+          .where(
+            and(
+              eq(schema.submission.userId, user.id),
+              inArray(schema.submission.problemId, ids),
+              isNull(schema.submission.contestId),
+            ),
+          )
+          .groupBy(schema.submission.problemId)
+      : [],
+    // 流程图作业：画到 A / S 也算做完（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 6）。
+    // 有的题流程图交了几百次、代码个位数，只看代码提交的话，这些学生在课堂条上永远是「没做」
+    ids.length
+      ? db
+          .select({
+            problemId: schema.flowchartSubmission.problemId,
+            passed: sql<boolean>`bool_or(${inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES])})`,
+          })
+          .from(schema.flowchartSubmission)
+          .where(
+            and(
+              eq(schema.flowchartSubmission.userId, user.id),
+              inArray(schema.flowchartSubmission.problemId, ids),
+              // 只数评完了的：评分中、评失败的那次不算「做过」
+              eq(schema.flowchartSubmission.status, 2),
+            ),
+          )
+          .groupBy(schema.flowchartSubmission.problemId)
+      : [],
+  ])
   const mineById = new Map(mine.map((row) => [row.problemId, row.accepted]))
-
-  // 流程图作业：画到 A / S 也算做完（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 6）。
-  // 有的题流程图交了几百次、代码个位数，只看代码提交的话，这些学生在课堂条上永远是「没做」
-  const drawn = ids.length
-    ? await db
-        .select({
-          problemId: schema.flowchartSubmission.problemId,
-          passed: sql<boolean>`bool_or(${inArray(schema.flowchartSubmission.aiGrade, FLOWCHART_PASS_GRADES)})`,
-        })
-        .from(schema.flowchartSubmission)
-        .where(
-          and(
-            eq(schema.flowchartSubmission.userId, user.id),
-            inArray(schema.flowchartSubmission.problemId, ids),
-            // 只数评完了的：评分中、评失败的那次不算「做过」
-            eq(schema.flowchartSubmission.status, 2),
-          ),
-        )
-        .groupBy(schema.flowchartSubmission.problemId)
-    : []
   for (const row of drawn) {
     mineById.set(row.problemId, (mineById.get(row.problemId) ?? false) || row.passed)
   }
@@ -462,7 +464,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     .slice(-RECENT_LESSONS)
 
   const localDay = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
-  const [cells, lastSubmits, attendance] = await Promise.all([
+  const [cells, lastSubmits, attendance, drawn] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -515,21 +517,19 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           )
           .groupBy(schema.submission.userId)
       : [],
-  ])
-  /**
-   * 流程图作业：画到 A / S 也算这道题做完，和学生首页的课堂条同一个口径（/me/class-activity）。
-   * 有的题这节课整个班都在画流程图，只数代码提交的话，看板上满屏「没开始」
-   */
-  const drawn =
+    /**
+     * 流程图作业：画到 A / S 也算这道题做完，和学生首页的课堂条同一个口径（/me/class-activity）。
+     * 有的题这节课整个班都在画流程图，只数代码提交的话，看板上满屏「没开始」
+     */
     ids.length && userIds.length
-      ? await db
+      ? db
           .select({
             userId: schema.flowchartSubmission.userId,
             problemId: schema.flowchartSubmission.problemId,
             attempts: sql<number>`count(*) filter (where ${gte(schema.flowchartSubmission.createTime, start)})::int`,
             firstPassedAt: sql<
               string | null
-            >`min(${schema.flowchartSubmission.createTime}) filter (where ${and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, FLOWCHART_PASS_GRADES))})`,
+            >`min(${schema.flowchartSubmission.createTime}) filter (where ${and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]))})`,
             lastAt: sql<
               string | null
             >`max(${schema.flowchartSubmission.createTime}) filter (where ${gte(schema.flowchartSubmission.createTime, start)})`,
@@ -539,10 +539,13 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             and(
               inArray(schema.flowchartSubmission.userId, userIds),
               inArray(schema.flowchartSubmission.problemId, ids),
+              // 只数评完了的：评分中、评失败的那次不算「做过」，和 /me/class-activity 一致
+              eq(schema.flowchartSubmission.status, 2),
             ),
           )
           .groupBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId)
-      : []
+      : [],
+  ])
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))

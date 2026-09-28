@@ -1,7 +1,7 @@
 import { createDiscreteApi } from "naive-ui"
 import { defineStore } from "pinia"
 import { errorCode } from "utils/api"
-import type { FlowchartScores, FlowchartSubmission } from "@oj2/contract"
+import { isFlowchartPass, type FlowchartScores, type FlowchartSubmission } from "@oj2/contract"
 import type { Edge, Node } from "@vue-flow/core"
 import { getFlowchartScores, getFlowchartSubmission, submitFlowchart } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
@@ -9,6 +9,8 @@ import { useSubmissionStore } from "oj/store/submission"
 import { useFlowchartWebSocket, type FlowchartEvaluationUpdate } from "shared/composables/websocket"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
+import { useAchievementStore } from "shared/store/achievement"
+import type { QueuedAchievement } from "utils/types"
 
 // store 里没有组件上下文，useMessage() 拿不到，和 utils/api.ts 一样用独立的一份
 const { message } = createDiscreteApi(["message"])
@@ -26,10 +28,8 @@ export interface FlowchartEditorInstance {
   setFlowchartData: (data: { nodes: Node[]; edges: Edge[] }) => void
 }
 
-/** 画到这两档算这道题做完（后端 flowchart/grade.ts 的 FLOWCHART_PASS_GRADES） */
-export function isFlowchartPass(grade: string | null | undefined) {
-  return grade === "S" || grade === "A"
-}
+// 「A / S 算做完」的规则在契约里，前后端一份；这里转出去，组件照旧从 flowchart store 引
+export { isFlowchartPass }
 
 /**
  * 这一页上最近一次交的图走到哪了。idle = 这一页还没交过（历史分数照样有）
@@ -175,6 +175,14 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   }
 
   const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
+    // 流程图画到 A/S 算完成之后，后端会在同一条用户通道上推题单徽章、成就（flowchart/run.ts 的
+    // recordSolvedAndNotify）。原来这里只认评分那两种，交代码的监视器又不一定开着，要等下次
+    // 换路由拉 pending 才弹。队列按 id 去重，两条连接各收一遍也只弹一次
+    const frame = data as unknown as { type: string; achievements?: QueuedAchievement[] }
+    if (frame.type === "achievement_unlocked") {
+      useAchievementStore().enqueue(frame.achievements ?? [])
+      return
+    }
     if (data.type === "flowchart_evaluation_completed") {
       settle(data.submissionId, {
         ok: true,

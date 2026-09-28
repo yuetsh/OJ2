@@ -140,9 +140,19 @@ watch(
  */
 const collabStore = useCollabStore()
 const dialog = useDialog()
+/**
+ * 已经同意过要去的地方。通过之后 1.5 秒内点「下一题」：这里先问一次，接着被强制点评拦下
+ * （SubmissionEffects 的 holdForReview），评完再 push 同一个地址 —— 不记着的话会再问一遍，
+ * 第二次点「留在这道题」就成了同意换题之后又被留下
+ */
+let approvedTarget: string | null = null
 function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNormalized) {
   if (collabStore.isTeacher || collabStore.helpStatus === "idle") return true
   if (to.name === from.name && to.params.problemID === from.params.problemID) return true
+  if (approvedTarget === to.fullPath) {
+    approvedTarget = null
+    return true
+  }
   const active = collabStore.helpStatus === "active"
   return new Promise<boolean>((resolve) => {
     dialog.warning({
@@ -152,7 +162,10 @@ function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNorm
         : "换题之后这次举手就撤掉了，要在新的题目里重新举手。确定要换吗？",
       positiveText: "换题",
       negativeText: "留在这道题",
-      onPositiveClick: () => resolve(true),
+      onPositiveClick: () => {
+        approvedTarget = to.fullPath
+        resolve(true)
+      },
       onNegativeClick: () => resolve(false),
       onClose: () => resolve(false),
       onMaskClick: () => resolve(false),
@@ -161,6 +174,13 @@ function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNorm
 }
 onBeforeRouteUpdate(confirmLeavingHelp)
 onBeforeRouteLeave(confirmLeavingHelp)
+// 到了就作废：没被点评拦下、一次就换过去的，不能留着让下次去同一道题时不再问
+watch(
+  () => route.fullPath,
+  (path) => {
+    if (path === approvedTarget) approvedTarget = null
+  },
+)
 
 // 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
 const resultTab = () => h(ResultTabLabel)

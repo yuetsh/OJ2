@@ -12,6 +12,7 @@ import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import EditorToolbar from "./EditorToolbar.vue"
 import { useDraftKey } from "../composables/draftKey"
+import { useTeacherCollab } from "../composables/teacherCollab"
 import CollabBar from "./CollabBar.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
 
@@ -39,7 +40,7 @@ const collabHere = computed(
 )
 
 /** 协作中的教师：编辑器里是学生的代码，不是他自己的 */
-const teacherCollab = computed(() => collabHere.value && collabStore.isTeacher)
+const teacherCollab = useTeacherCollab()
 
 /** 教师接单前自己选的语言，协作结束后连同草稿一起还原 */
 let teacherLanguageBefore: LANGUAGE | null = null

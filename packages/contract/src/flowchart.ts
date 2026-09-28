@@ -73,6 +73,16 @@ export const flowchartDetailSchema = z.object({
   count: z.number().int(),
 })
 
+/**
+ * 流程图画到这两档算这道题做完：题单进度、课堂条、课堂看板、「你画的流程图」、结果页签的 ✓
+ * 都按它（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 4、6）。前后端只有这一份
+ */
+export const FLOWCHART_PASS_GRADES = ["S", "A"] as const
+
+export function isFlowchartPass(grade: string | null | undefined) {
+  return (FLOWCHART_PASS_GRADES as readonly string[]).includes(grade ?? "")
+}
+
 /** 自己在一道题上评完的历次分数，早的在前；hidden = 被题单闸门藏起来的次数 */
 export const flowchartScoresSchema = z.object({
   scores: z.array(

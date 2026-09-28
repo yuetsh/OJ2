@@ -43,6 +43,9 @@ const commentPanel = ref(false)
 const reviewOwed = ref(false)
 let reviewChecking = false
 let navigationAfterReview: string | null = null
+// navigationAfterReview 是普通变量（守卫里改，不需要触发渲染），弹窗按钮的文案（「继续」）
+// 要一个响应式的影子：拦下的那一刻就记上，点评读不出来、交不上时按钮也得写对
+const navigationAfterReviewShown = ref(false)
 
 async function openReview() {
   if (reviewChecking) return
@@ -67,6 +70,7 @@ function settleReview() {
   reviewOwed.value = false
   const target = navigationAfterReview
   navigationAfterReview = null
+  navigationAfterReviewShown.value = false
   if (target) router.push(target)
 }
 
@@ -86,9 +90,6 @@ const reviewed = ref(false)
 const continueButton = useTemplateRef<{ $el: HTMLElement }>("continueButton")
 const lessonStore = useLessonStore()
 
-// navigationAfterReview 是普通变量（守卫里改，不需要触发渲染），按钮文案要一个响应式的影子
-const navigationAfterReviewShown = ref(false)
-
 /** 题目名中位 7 字、最长 33 字，按钮里放不下那么长的 */
 const shortTitle = (title: string) => (title.length > 14 ? `${title.slice(0, 13)}…` : title)
 
@@ -106,7 +107,6 @@ const continueAction = computed(() => {
 
 async function onReviewed() {
   reviewed.value = true
-  navigationAfterReviewShown.value = navigationAfterReview !== null
   await nextTick()
   continueButton.value?.$el.focus()
 }
@@ -132,6 +132,7 @@ function holdForReview(to: RouteLocationNormalized, from: RouteLocationNormalize
   if (!reviewOwed.value || commentPanel.value) return true
   if (to.name === from.name && to.params.problemID === from.params.problemID) return true
   navigationAfterReview = to.fullPath
+  navigationAfterReviewShown.value = true
   cancelCommentPanel()
   openReview()
   return false
@@ -167,6 +168,7 @@ watch(
     cancelCommentPanel()
     reviewOwed.value = false
     navigationAfterReview = null
+    navigationAfterReviewShown.value = false
     cancelGoToProblemSet()
   },
 )

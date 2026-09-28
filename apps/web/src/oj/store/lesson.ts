@@ -16,19 +16,27 @@ export const useLessonStore = defineStore("lesson", () => {
   const activity = ref<ClassActivity | null>(null)
   let loadedAt = 0
   let loading: Promise<void> | null = null
+  /**
+   * 只认最后发出去的那次。进页面那次还在路上时学生就交对了：先就地标成做完、再强制重拉 ——
+   * 先发的那次要是后到，会把「做完」盖回去，「下一题」又指回刚做完的这道
+   */
+  let sequence = 0
 
   /** 没拉过或者旧了才拉；force 用在刚通过一道题之后 */
   function load(force = false) {
     if (!force && activity.value && Date.now() - loadedAt < STALE_MS) return loading
+    if (!force && loading) return loading
+    const mine = ++sequence
     loading = getClassActivity()
       .then((res) => {
+        if (mine !== sequence) return
         activity.value = res
         loadedAt = Date.now()
       })
       // 拉不到就没有课堂条，不影响做题
       .catch(() => {})
       .finally(() => {
-        loading = null
+        if (mine === sequence) loading = null
       })
     return loading
   }

@@ -347,7 +347,14 @@ function sectorAriaLabel(index: number) {
     </div>
 
     <p v-if="submitFailed" class="error">没记上，再点一次</p>
-    <div v-if="state === 'results' && $slots.after" class="after">
+    <!--
+      强制弹窗关不掉，这个插槽（「下一题 / 继续」）是唯一的出口：读不出点评、交点评失败时也得给，
+      不能把学生关在弹窗里（设计文档第 7 节：接口出错时不能把学生卡住）
+    -->
+    <div
+      v-if="(state === 'results' || state === 'failed' || submitFailed) && $slots.after"
+      class="after"
+    >
       <slot name="after" />
     </div>
   </section>
