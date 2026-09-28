@@ -1,6 +1,5 @@
 <script lang="ts" setup>
-import { errorCode } from "utils/api"
-import { toRefs } from "vue"
+import { storeToRefs } from "pinia"
 
 // 工具函数
 import { decompressFromBase64, compressToBase64 } from "utils/functions"
@@ -10,25 +9,22 @@ import { sortFlowchartCriteria } from "utils/constants"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useMermaid } from "shared/composables/useMermaid"
 import { useMermaidConverter } from "../composables/useMermaidConverter"
-import { useFlowchartWebSocket, type FlowchartEvaluationUpdate } from "shared/composables/websocket"
-import { useMyFlowchartStore } from "shared/store/myFlowchart"
 
 // API 和状态管理
-import {
-  getCurrentProblemFlowchartSubmission,
-  getFlowchartSubmission,
-  getFlowchartSubmissionDetail,
-  submitFlowchart,
-} from "oj/api"
+import { getFlowchartSubmissionDetail } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
+import { useFlowchartStore, type FlowchartRating } from "oj/store/flowchart"
+
+/**
+ * 「提交流程图」按钮、分数按钮和评分详情弹框。
+ *
+ * 提交和评分（WebSocket + 轮询 + 超时、评完的提示、A/S 亮到「我的流程图」）都在
+ * flowchart store：这个组件只在语言选成 Flowchart 时才挂载，切去写代码它就卸载，
+ * 正在评的那次不能跟着没。这里只剩从编辑器里取图、以及翻看历次评分的弹框。
+ */
 
 // ==================== 类型定义 ====================
-interface Rating {
-  score: number
-  grade: string
-}
-
-interface Evaluation extends Rating {
+interface Evaluation extends FlowchartRating {
   feedback: string
   suggestions: string
   criteria_details: {
@@ -36,7 +32,6 @@ interface Evaluation extends Rating {
   }
 }
 
-// ==================== 组合式函数和响应式变量 ====================
 interface FlowchartEditorInstance {
   getFlowchartData: () => { nodes: unknown[]; edges: unknown[] }
   setFlowchartData: (data: { nodes: unknown[]; edges: unknown[] }) => void
@@ -49,18 +44,16 @@ const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 // 基础组合式函数
 const message = useMessage()
 const problemStore = useProblemStore()
-const { problem } = toRefs(problemStore)
+const { problem } = storeToRefs(problemStore)
+const flowchartStore = useFlowchartStore()
+const { loading, latestRating, submissionCount } = storeToRefs(flowchartStore)
 const { isDesktop } = useBreakpoints()
-const myFlowchartStore = useMyFlowchartStore()
 const { convertToMermaid } = useMermaidConverter()
 const { renderError, renderFlowchart } = useMermaid()
 
-// 状态管理
+// 评分详情弹框
 const rendering = ref(false)
-const loading = ref(false)
-const latestRating = ref<Rating>({ score: 0, grade: "" })
-const modalRating = ref<Rating>({ score: 0, grade: "" })
-const submissionCount = ref(0)
+const modalRating = ref<FlowchartRating>({ score: 0, grade: "" })
 const myFlowchartZippedStr = ref("")
 const myMermaidCode = ref("")
 const showDetailModal = ref(false)
@@ -72,7 +65,6 @@ const evaluation = ref<Evaluation>({
   criteria_details: {},
 })
 const page = ref(1)
-const lastSubmittedMermaidCode = ref("")
 const suggestionLines = computed(() => splitSuggestionLines(evaluation.value.suggestions))
 
 // jsonb 不保留键序，直接遍历会把 40 分的「逻辑正确性」排到最后
@@ -87,127 +79,8 @@ function splitSuggestionLines(suggestions?: string | null) {
     : []
 }
 
-// ==================== 评分结果监听 ====================
-/**
- * 评分结果有两条路进来：WebSocket 推送（快）和轮询（稳）。谁先到谁结算，
- * 靠 monitoringId 去重 —— 结算时清空，另一条路后到就直接跳过。
- *
- * 之所以必须有轮询兜底：Redis pub/sub 是发完不管的，worker 推的那一刻只要这条
- * 连接不在（重连空窗、页面刚从后台切回来），这条消息就永远丢了。判题那边一直
- * 有兜底轮询，流程图这边没有，丢一次消息按钮就一直转圈转到用户自己刷新。
- */
-const monitoringId = ref("")
-
-/** AI 评分比判题慢得多，轮询放缓一点 */
-const POLL_INTERVAL = 3000
-/** 到点还没结果就收手，别无限轮询下去 */
-const POLL_TIMEOUT = 3 * 60 * 1000
-
-type Outcome = { ok: true; score: number; grade: string } | { ok: false; error?: string }
-
-const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
-  async () => {
-    if (!monitoringId.value) {
-      pausePolling()
-      return
-    }
-    try {
-      const data = await getFlowchartSubmission(monitoringId.value)
-      if (data.status === 2) {
-        settle(data.id, {
-          ok: true,
-          score: data.aiScore ?? 0,
-          grade: data.aiGrade ?? "",
-        })
-      } else if (data.status === 3) {
-        settle(data.id, { ok: false })
-      }
-    } catch (error) {
-      console.error("[Flowchart] 轮询失败:", error)
-      pausePolling()
-    }
-  },
-  POLL_INTERVAL,
-  { immediate: false },
-)
-
-// WebSocket 正常时压根用不上轮询，先给它 5 秒，到点还没结果才开始拉
-const { start: startPollingFallback, stop: stopPollingFallback } = useTimeoutFn(
-  () => {
-    if (monitoringId.value) resumePolling()
-  },
-  5000,
-  { immediate: false },
-)
-
-const { start: startPollingDeadline, stop: stopPollingDeadline } = useTimeoutFn(
-  () => {
-    if (!monitoringId.value) return
-    monitoringId.value = ""
-    unsubscribe()
-    pausePolling()
-    loading.value = false
-    message.warning("评分等待超时，请稍后刷新页面查看结果")
-  },
-  POLL_TIMEOUT,
-  { immediate: false },
-)
-
-/** 不再跟这一次评分：结算完、或者换了题 */
-function stopMonitoring() {
-  monitoringId.value = ""
-  unsubscribe()
-  pausePolling()
-  stopPollingFallback()
-  stopPollingDeadline()
-  loading.value = false
-}
-
-function settle(submissionId: string, outcome: Outcome) {
-  // 一个学生可能同时开着几道题的页面，每条连接都订在同一个用户 topic 上，
-  // 别的页面的评分结果照样会推到这里来 —— 必须认 id，不然会张冠李戴
-  if (!submissionId || submissionId !== monitoringId.value) return
-  stopMonitoring()
-
-  if (!outcome.ok) {
-    message.error(outcome.error ? `流程图评分失败: ${outcome.error}` : "流程图评分失败，请稍后重试")
-    return
-  }
-  latestRating.value = { score: outcome.score, grade: outcome.grade }
-  message.success(`流程图评分完成！得分: ${outcome.score}分 (${outcome.grade}级)`)
-  if ((outcome.grade === "A" || outcome.grade === "S") && lastSubmittedMermaidCode.value) {
-    myFlowchartStore.show(lastSubmittedMermaidCode.value)
-  }
-}
-
-// ==================== WebSocket 相关函数 ====================
-const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
-  if (data.type === "flowchart_evaluation_completed") {
-    settle(data.submissionId, {
-      ok: true,
-      score: data.score ?? 0,
-      grade: data.grade || "",
-    })
-  } else if (data.type === "flowchart_evaluation_failed") {
-    settle(data.submissionId, { ok: false, error: data.error })
-  }
-}
-
-// 创建 WebSocket 连接
-const { connect, disconnect, subscribe, unsubscribe } =
-  useFlowchartWebSocket(handleWebSocketMessage)
-
-// 订阅提交更新，同时开启轮询兜底
-function subscribeToSubmission(submissionId: string) {
-  monitoringId.value = submissionId
-  subscribe(submissionId)
-  startPollingFallback()
-  startPollingDeadline()
-}
-
-// ==================== 提交相关函数 ====================
-// 提交流程图
-async function submitFlowchartData() {
+// ==================== 提交 ====================
+function submit() {
   if (!flowchartEditorRef?.value) return
 
   // 获取流程图的JSON数据
@@ -218,66 +91,13 @@ async function submitFlowchartData() {
     return
   }
 
-  const mermaidCode = convertToMermaid(flowchartData)
-  lastSubmittedMermaidCode.value = mermaidCode
-  const compressed = compressToBase64(JSON.stringify(flowchartData))
-
-  loading.value = true
-  latestRating.value = { score: 0, grade: "" }
-
-  try {
-    const response = await submitFlowchart({
-      problemId: problem.value!.id,
-      mermaidCode,
-      flowchartData: {
-        compressed: true,
-        data: compressed,
-      },
-    })
-
-    // 获取提交ID并订阅更新
-    const submissionId = response.submissionId
-
-    if (submissionId) {
-      subscribeToSubmission(submissionId)
-    }
-
-    message.success("流程图已提交，请耐心等待评分")
-  } catch (error) {
-    loading.value = false
-    // 按错误码分支（见 utils/api.ts 的约定）。限流是最容易撞上的一种：
-    // 只说「提交失败」的话，学生会以为是自己的图有问题，然后反复点，越点越久
-    if (errorCode(error) === "too-many-submissions") {
-      message.warning("提交太频繁了，缓一会儿再交")
-    } else if (errorCode(error) === "flowchart-not-allowed") {
-      message.error("这道题不接受流程图提交")
-    } else {
-      message.error("流程图提交失败")
-    }
-    console.error("提交流程图失败:", error)
-  }
+  flowchartStore.submit(
+    convertToMermaid(flowchartData),
+    compressToBase64(JSON.stringify(flowchartData)),
+  )
 }
 
-// 提交函数
-function submit() {
-  submitFlowchartData()
-}
-
-// ==================== 数据获取和处理函数 ====================
-
-async function getCurrentSubmission() {
-  const problemId = problem.value?.id
-  if (!problemId) return
-  const data = await getCurrentProblemFlowchartSubmission(problemId)
-  // 换题之后才回来的是上一道题的分数，别盖掉新题的
-  if (problem.value?.id !== problemId) return
-  submissionCount.value = data.count
-  latestRating.value = {
-    score: data.score,
-    grade: data.grade,
-  }
-}
-
+// ==================== 评分详情 ====================
 async function getSubmission(submissionPage = 0) {
   const problemId = problem.value?.id
   if (!problemId) return
@@ -304,11 +124,11 @@ async function getSubmission(submissionPage = 0) {
   myMermaidCode.value = submission.mermaidCode || ""
   modalRating.value = {
     score: submission.aiScore ?? 0,
-    grade: (submission.aiGrade ?? "") as Rating["grade"],
+    grade: submission.aiGrade ?? "",
   }
   evaluation.value = {
     score: submission.aiScore ?? 0,
-    grade: (submission.aiGrade ?? "") as Rating["grade"],
+    grade: submission.aiGrade ?? "",
     feedback: submission.aiFeedback ?? "",
     suggestions: submission.aiSuggestions ?? "",
     criteria_details: submission.aiCriteriaDetails as Evaluation["criteria_details"],
@@ -333,7 +153,6 @@ async function updatePage(val: number) {
   }
 }
 
-// ==================== 模态框相关函数 ====================
 async function openDetailModal() {
   showDetailModal.value = true
   rendering.value = true
@@ -389,51 +208,20 @@ const getPercentType = (percent: number) => {
   return "error"
 }
 
-// ==================== 生命周期钩子 ====================
-/** 这道题最近一次的评分；画到了 A/S 的话，把那张图亮到「我的流程图」 */
-async function loadLatest() {
-  const problemId = problem.value?.id
-  await getCurrentSubmission()
-  page.value = submissionCount.value
-  const grade = latestRating.value.grade
-  if ((grade === "A" || grade === "S") && submissionCount.value > 0) {
-    await getSubmission(submissionCount.value)
-    // 查的这一会儿又换了题，这张图不是新题的
-    if (problem.value?.id !== problemId) return
-    if (myMermaidCode.value) {
-      myFlowchartStore.show(myMermaidCode.value)
-    }
-  }
-}
+// ==================== 生命周期 ====================
+onMounted(flowchartStore.ensureLoaded)
 
-onMounted(() => {
-  connect()
-  loadLatest()
-})
-
-/**
- * 换题。题目页换题是同一个组件复用（只换路由参数），两道题都能画流程图、语言又停在
- * Flowchart 的时候，这个组件连卸载都不会：分数按钮和评分弹框还是上一道题的，
- * 上一道还在评的那次评完，还会把它的图挂到新题的「我的流程图」上。
- */
+// 换题：分数和还在评的那次由 store 自己收（见 flowchart store 的 reset），
+// 这里只关掉弹框，再拉新题的最近一次分数
 watch(
   () => problem.value?.id,
   (next, previous) => {
     if (!previous || next === previous) return
-    stopMonitoring()
     showDetailModal.value = false
-    latestRating.value = { score: 0, grade: "" }
-    submissionCount.value = 0
     page.value = 1
-    lastSubmittedMermaidCode.value = ""
-    loadLatest()
+    flowchartStore.ensureLoaded()
   },
 )
-
-// 组件卸载时断开连接
-onUnmounted(() => {
-  disconnect()
-})
 </script>
 
 <template>

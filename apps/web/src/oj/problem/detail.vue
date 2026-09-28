@@ -8,6 +8,7 @@ import { useScreenModeStore } from "shared/store/screenMode"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 import { useSubmissionStore } from "oj/store/submission"
+import { useFlowchartStore } from "oj/store/flowchart"
 // 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
 import SubmissionEffects from "./components/SubmissionEffects.vue"
 
@@ -137,6 +138,8 @@ onBeforeUnmount(() => {
   // 提交状态在 store 里、离开页面也不会自己没：不清的话回到题目页（哪怕换了一道题），
   // 结果面板里还是上一次的那条
   useSubmissionStore().reset()
+  // 流程图那边同理，还在评的那次不再跟（照常评完落库）
+  useFlowchartStore().reset()
   problem.value = null
   errMsg.value = "无数据"
   screenModeStore.resetScreenMode()
