@@ -642,6 +642,11 @@ async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
   return { visible, hidden: rows.length - visible.length }
 }
 
+/*
+ * current / history：前端从 2026-09-28 起改用下面的 scores + GET /flowcharts/:id，不再调这两个。
+ * 先留着给上线那一刻还开着旧页面的浏览器（机房里一节课都不刷新是常态），下一次清理时删掉，
+ * 连同契约里的 flowchartCurrentSchema / flowchartDetailSchema。
+ */
 flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
   const { visible } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
