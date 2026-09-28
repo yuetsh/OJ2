@@ -1,8 +1,6 @@
 <script lang="ts" setup>
-import { storeToRefs } from "pinia"
 import { getRankOfProblem, getSubmission, getSubmissions } from "oj/api"
 import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
 import Pagination from "shared/components/Pagination.vue"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useCollabStore } from "shared/store/collab"
@@ -12,6 +10,7 @@ import { copyToClipboard, parseTime } from "utils/functions"
 import type { ProblemRank } from "@oj2/contract"
 import type { LANGUAGE, SubmissionListItem } from "utils/types"
 import { useProblemPageContext } from "../composables/problemPageContext"
+import { useTeacherCollab } from "../composables/teacherCollab"
 
 /**
  * 「我的提交」抽屉：这道题自己交过的每一次。
@@ -24,7 +23,6 @@ import { useProblemPageContext } from "../composables/problemPageContext"
 const userStore = useUserStore()
 const codeStore = useCodeStore()
 const collabStore = useCollabStore()
-const { problem } = storeToRefs(useProblemStore())
 const ctx = useProblemPageContext()
 const route = useRoute()
 const router = useRouter()
@@ -36,12 +34,10 @@ const problemDisplayId = computed(() => String(route.params.problemID ?? ""))
  * 协作中的教师：编辑器里是学生的代码，「放回编辑器」会经 Yjs 直接盖掉学生正在写的
  * 那一份，所以不给（设计文档第 9 节）。
  */
-const teacherCollab = computed(
-  () =>
-    userStore.isTeacherOrAbove &&
-    collabStore.room !== null &&
-    collabStore.room.problemId === problem.value?._id,
-)
+const teacherCollab = useTeacherCollab()
+
+/** 协作中看的是学生的提交（设计文档第 9 节）：房间里的 peerName 就是学生的用户名 */
+const peer = computed(() => (teacherCollab.value ? (collabStore.room?.peerName ?? null) : null))
 
 // ==================== 班上第几个做对的 ====================
 // 只在题库入口给：比赛有自己的排名，题单里整个抽屉都不出现
@@ -98,7 +94,9 @@ const blocked = computed(() => {
 async function listSubmissions() {
   const res = await getSubmissions({
     ...query,
-    myself: "1",
+    ...(peer.value
+      ? { username: peer.value, exactUsername: "1" as const }
+      : { myself: "1" as const }),
     offset: query.limit * (query.page - 1),
     problemDisplayId: problemDisplayId.value,
     contestId: ctx.value.contestId,
@@ -165,7 +163,8 @@ function openDetail(id: string) {
 onMounted(() => {
   if (blocked.value) return
   listSubmissions()
-  if (ctx.value.entry === "problem") {
+  // 排名是按当前登录的人算的，协作中那是老师自己的，不给
+  if (ctx.value.entry === "problem" && !peer.value) {
     getRankOfProblem(problemDisplayId.value)
       .then((res) => {
         rank.value = res
@@ -190,7 +189,11 @@ watch(query, () => {
       </n-button>
     </div>
 
-    <n-empty v-if="listed && !submissions.length" class="empty" description="这道题你还没有交过" />
+    <n-empty
+      v-if="listed && !submissions.length"
+      class="empty"
+      :description="peer ? '他还没有交过这道题' : '这道题你还没有交过'"
+    />
 
     <ul v-else class="list">
       <li v-for="(row, index) in submissions" :key="row.id" class="item">

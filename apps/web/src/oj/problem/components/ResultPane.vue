@@ -3,6 +3,7 @@ import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { useCodeStore } from "oj/store/code"
+import { useTeacherCollab } from "../composables/teacherCollab"
 
 /**
  * 左栏「结果」页签：三段 —— 提交结果 / 运行例子 / 自己输入。
@@ -19,11 +20,15 @@ const PythonErrorExplain = defineAsyncComponent(() => import("./PythonErrorExpla
 const SampleRunResult = defineAsyncComponent(() => import("./SampleRunResult.vue"))
 const CustomRun = defineAsyncComponent(() => import("./CustomRun.vue"))
 const FlowchartResult = defineAsyncComponent(() => import("./FlowchartResult.vue"))
+const PeerLatest = defineAsyncComponent(() => import("./PeerLatest.vue"))
 
 const submissionStore = useSubmissionStore()
 const { submission, syntaxErrorInfo, resultSegment } = storeToRefs(submissionStore)
 const { problem } = storeToRefs(useProblemStore())
 const codeStore = useCodeStore()
+
+/** 协作中的老师自己还没交过：先摆学生最近一次交的 */
+const teacherCollab = useTeacherCollab()
 
 /** 正在画流程图：结果就是 AI 的点评，没有例子可跑 */
 const drawing = computed(() => codeStore.code.language === "Flowchart")
@@ -51,6 +56,7 @@ const canTrial = computed(() => {
         <PythonErrorExplain :err-info="syntaxErrorInfo" />
       </n-flex>
       <SubmissionResult v-else-if="submission" :submission="submission" />
+      <PeerLatest v-else-if="teacherCollab" />
       <n-empty
         v-else
         class="empty"

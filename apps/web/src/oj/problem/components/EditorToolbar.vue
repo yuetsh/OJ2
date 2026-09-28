@@ -108,14 +108,14 @@ const showCollabBar = computed(() => collabHere.value && userStore.isTeacherOrAb
 const helpButtonText = computed(() => {
   if (collabStore.helpStatus === "active") {
     const name = collabStore.teacherName
-    return name ? `${name} 老师帮你中` : "老师正在帮你"
+    return name ? `${name} 老师在帮你` : "老师正在帮你"
   }
   if (collabStore.helpStatus === "pending") {
     return collabStore.queueAhead > 0
-      ? `已求助 · 前面 ${collabStore.queueAhead} 人`
-      : "已求助 · 待接入"
+      ? `已举手 · 前面 ${collabStore.queueAhead} 人`
+      : "已举手 · 老师马上来"
   }
-  return "求助"
+  return "举手求助"
 })
 
 const helpButtonType = computed(() => {
@@ -300,18 +300,6 @@ const goEdit = () => {
     >
       <n-button :size="buttonSize">更多</n-button>
     </n-dropdown>
-
-    <template v-if="showCollabBar">
-      <n-tag type="success" :size="buttonSize">
-        正在帮 {{ collabStore.room!.peerName }} ·
-        {{ LANGUAGE_SHOW_VALUE[collabStore.room!.language] }}
-      </n-tag>
-      <!-- 显式的「结束」：求助记录一并清掉。跳走页面发的是 leave("left")，
-           那边只是退回排队 —— 见 store 里 leave 的注释 -->
-      <n-button :size="buttonSize" type="primary" @click="collabStore.leave('done')">
-        结束协作
-      </n-button>
-    </template>
 
     <n-button
       v-if="showHelpButton"

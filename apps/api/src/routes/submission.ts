@@ -32,7 +32,12 @@ import { problemSetJoinTimes } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { dayStart } from "../time"
 import { asFilterValue, asRecord, isAdminRole, queryInteger } from "./helpers"
-import { problemFilter, submissionStatisticsRoutes, usernameFilter } from "./submission-statistics"
+import {
+  exactUsernameFilter,
+  problemFilter,
+  submissionStatisticsRoutes,
+  usernameFilter,
+} from "./submission-statistics"
 
 export const submissionRoutes = new Hono<ContestEnv>()
 
@@ -489,7 +494,11 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   filters.push(
     ...(await Promise.all([
       displayId ? problemFilter(displayId, null) : undefined,
-      username ? usernameFilter(username) : undefined,
+      username
+        ? c.req.query("exactUsername") === "1"
+          ? exactUsernameFilter(username)
+          : usernameFilter(username)
+        : undefined,
     ])),
   )
   if (myself) filters.push(eq(schema.submission.userId, myself.id))

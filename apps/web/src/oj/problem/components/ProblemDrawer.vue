@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
-import { useCollabStore } from "shared/store/collab"
 import { useUserStore } from "shared/store/user"
 import {
   DRAWER_TITLE,
   useProblemPageContext,
   type ProblemDrawer,
 } from "../composables/problemPageContext"
+import { useTeacherCollab } from "../composables/teacherCollab"
 
 /**
  * 统计 / 点评 / 我的提交。原来是左栏的三个页签，课上几乎没人点，却和「题目」挤在一排；
@@ -30,7 +30,6 @@ const ctx = useProblemPageContext()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const collabStore = useCollabStore()
 const { problem } = storeToRefs(useProblemStore())
 
 const show = computed({
@@ -55,6 +54,14 @@ watch(
   },
 )
 
+// 协作中的老师看的是学生的提交（ProblemSubmission 里按学生用户名查）
+const teacherCollab = useTeacherCollab()
+const drawerTitle = computed(() =>
+  lastOpened.value === "submission" && teacherCollab.value
+    ? "他的提交"
+    : DRAWER_TITLE[lastOpened.value],
+)
+
 /**
  * 「看这道题所有人的提交」，原来是工具栏上的「本题提交」。可见条件照旧：
  * 比赛里总给（看的是这场比赛的提交），题库里要管理员或者开着提交列表。
@@ -72,11 +79,7 @@ function goAllSubmissions() {
   // 协作中走新标签：教师端「页面即协作现场」，跳走这一页协作就结束了
   // （求助会退回排队，但老师还得再接一次）。而「看看这学生都交了什么」恰好是
   // 协作时最常点的一个
-  const collabHere =
-    collabStore.room !== null &&
-    collabStore.room.problemId === problem.value?._id &&
-    userStore.isTeacherOrAbove
-  if (collabHere) {
+  if (teacherCollab.value) {
     window.open(router.resolve(target).href, "_blank")
     return
   }
@@ -94,7 +97,7 @@ function goAllSubmissions() {
     :trap-focus="false"
     :block-scroll="!props.to"
   >
-    <n-drawer-content :title="DRAWER_TITLE[lastOpened]" closable :native-scrollbar="false">
+    <n-drawer-content :title="drawerTitle" closable :native-scrollbar="false">
       <ProblemInfo v-if="lastOpened === 'info'" />
       <ProblemReaction v-else-if="lastOpened === 'reaction'" />
       <template v-else>

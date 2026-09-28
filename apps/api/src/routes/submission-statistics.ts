@@ -296,6 +296,19 @@ async function astOnlyByUser(where: SQL | undefined, userIds: number[]) {
  * 快照实测 count 65ms → 0.6ms。`ks2` 这种匹配上千个账号的宽前缀退回扫表，30~50ms，
  * 和原来持平。
  */
+/**
+ * 用户名**精确**匹配。usernameFilter 是「包含」，学号互相包含是常态（ks24a1 包含在 ks24a10 里），
+ * 协作中老师看「这个学生」的提交时不能把别人的也捞进来。查无此人留恒假条件
+ */
+export async function exactUsernameFilter(username: string) {
+  const [row] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.username, username))
+    .limit(1)
+  return row ? eq(schema.submission.userId, row.id) : sql`false`
+}
+
 export async function usernameFilter(username: string) {
   const like = `%${username}%`
   const users = await db

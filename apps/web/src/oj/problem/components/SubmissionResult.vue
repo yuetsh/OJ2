@@ -26,6 +26,11 @@ import { useDark } from "@vueuse/core"
 
 const props = defineProps<{
   submission?: Submission
+  /**
+   * 看的是别人的提交（协作中的老师看学生最近一次交的）：不给 AI 提示 —— 那是按登录的人
+   * 自己的失败次数解锁的 —— 也不给「这节课的下一题」
+   */
+  peer?: boolean
 }>()
 
 const isDark = useDark()
@@ -89,7 +94,8 @@ const sampleCheck = computed(() => {
  */
 const ctx = useProblemPageContext()
 const showLessonNext = computed(
-  () => props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext,
+  () =>
+    !props.peer && props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext,
 )
 
 const msg = computed(() => {
@@ -130,7 +136,7 @@ const partialCases = computed(() => submissionPartialCases(props.submission))
 // system_error 也要排掉：那是判题机自己崩了，学生代码没毛病，让 AI 去分析
 // 只会瞎编一通，后端的失败计数同样不认这个状态。
 const showAIHint = computed(() => {
-  if (!props.submission) return false
+  if (!props.submission || props.peer) return false
   // 比赛题不给提示，和「求助」按钮一致。用 problem.contestId 而不是路由参数：
   // 带 contestId 的题目只可能从比赛入口进来（题库列表按 contest_id is null 过滤）。
   if (problemStore.problem?.contestId != null) return false

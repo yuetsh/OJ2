@@ -266,6 +266,8 @@ export interface SubmissionListPayload {
   myself?: "1" | "0"
   result?: string
   username?: string
+  /** "1" = username 精确匹配（默认是「包含」）。协作中老师看某个学生的提交用 */
+  exactUsername?: "1"
   contestId?: string
   problemDisplayId?: string
   language: LANGUAGE | ""

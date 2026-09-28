@@ -8,6 +8,8 @@ import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 import { useSubmissionStore } from "oj/store/submission"
 import { useFlowchartStore } from "oj/store/flowchart"
+import { useCollabStore } from "shared/store/collab"
+import type { RouteLocationNormalized } from "vue-router"
 // 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
 import SubmissionEffects from "./components/SubmissionEffects.vue"
 import ResultTabLabel from "./components/ResultTabLabel.vue"
@@ -17,6 +19,7 @@ import {
   useProblemPageContext,
   type ProblemDrawer as DrawerKey,
 } from "./composables/problemPageContext"
+import { useTeacherCollab } from "./composables/teacherCollab"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
@@ -88,12 +91,17 @@ watch(
 
 const drawer = ref<DrawerKey | null>(null)
 
+// 协作中的老师看的是学生的提交
+const teacherCollab = useTeacherCollab()
+const drawerLabel = (key: DrawerKey) =>
+  key === "submission" && teacherCollab.value ? "他的提交" : DRAWER_TITLE[key]
+
 function toggleDrawer(key: DrawerKey) {
   drawer.value = drawer.value === key ? null : key
 }
 
 const drawerMenu = computed<DropdownOption[]>(() =>
-  ctx.value.drawers.map((key) => ({ label: DRAWER_TITLE[key], key })),
+  ctx.value.drawers.map((key) => ({ label: drawerLabel(key), key })),
 )
 
 // 交上去、或者语法检查没过：切到「结果」，抽屉开着就先关掉。提交按钮在编辑器那边，页签归这一页管
@@ -105,6 +113,35 @@ watch(
     currentTab.value = "result"
   },
 )
+
+/**
+ * 学生正在排队求助、或者老师正在帮他时换题：协作是开在这道题上的，换题就断了
+ * （SyncCodeEditor 的 detach），排队的求助也跟着撤掉。先问一句，别让他一点「下一题」
+ * 就把正在帮他的老师踢出去。只拦「离开这道题」，切页签改 `?tab=` 不算
+ */
+const collabStore = useCollabStore()
+const dialog = useDialog()
+function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNormalized) {
+  if (collabStore.isTeacher || collabStore.helpStatus === "idle") return true
+  if (to.name === from.name && to.params.problemID === from.params.problemID) return true
+  const active = collabStore.helpStatus === "active"
+  return new Promise<boolean>((resolve) => {
+    dialog.warning({
+      title: active ? "老师正在帮你看这道题" : "你正在排队等老师",
+      content: active
+        ? "换题之后，老师那边的协作就断了。确定要换吗？"
+        : "换题之后这次举手就撤掉了，要在新的题目里重新举手。确定要换吗？",
+      positiveText: "换题",
+      negativeText: "留在这道题",
+      onPositiveClick: () => resolve(true),
+      onNegativeClick: () => resolve(false),
+      onClose: () => resolve(false),
+      onMaskClick: () => resolve(false),
+    })
+  })
+}
+onBeforeRouteUpdate(confirmLeavingHelp)
+onBeforeRouteLeave(confirmLeavingHelp)
 
 // 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
 const resultTab = () => h(ResultTabLabel)
@@ -187,7 +224,7 @@ onBeforeUnmount(() => {
                 :secondary="drawer === key"
                 @click="toggleDrawer(key)"
               >
-                {{ DRAWER_TITLE[key] }}
+                {{ drawerLabel(key) }}
               </n-button>
             </n-flex>
           </div>

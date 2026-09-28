@@ -11,6 +11,7 @@ import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import EditorToolbar from "./EditorToolbar.vue"
+import CollabBar from "./CollabBar.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
 
 const FlowchartEditor = defineAsyncComponent(
@@ -97,9 +98,11 @@ const storageKey = computed(() =>
     : `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
 )
 
-const editorHeight = computed(() =>
-  isDesktop.value ? "calc(100vh - 133px)" : "calc(100vh - 172px)",
-)
+// 协作条 40px + 和工具栏之间的 12px 间距，要从编辑器里让出来，不然页面底下多出一截滚动条
+const editorHeight = computed(() => {
+  const base = isDesktop.value ? 133 : 172
+  return `calc(100vh - ${base + (teacherCollab.value ? 52 : 0)}px)`
+})
 
 function loadCode() {
   codeStore.code.language = problemStore.supportedLanguage(codeStore.code.language)
@@ -166,6 +169,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
 
 <template>
   <n-flex vertical>
+    <CollabBar v-if="teacherCollab" />
     <EditorToolbar :storage-key="storageKey" @change-language="changeLanguage" />
     <!--
       协作中教师这边不会落到流程图分支：上面那个 watch 已经把他的语言换成了学生的，
