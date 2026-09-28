@@ -24,7 +24,10 @@ import { zonedYear } from "utils/functions"
 
 const route = useRoute()
 const { isMobile } = useBreakpoints()
-const hiddenICP = computed(() => ["problem", "contest problem"].includes(route.name as string))
+// 题目页两栏顶满整屏，三种入口都不放页脚（原来漏了题单入口，页脚压在编辑器底下）
+const hiddenICP = computed(() =>
+  ["problem", "contest problem", "problemset problem"].includes(route.name as string),
+)
 
 // 版权年份也走东八区：站内不留任何一处按浏览器时区取时间部件的代码，
 // 免得下一个人照着抄

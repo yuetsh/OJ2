@@ -618,16 +618,23 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
 /**
  * 自己在这道题上评完的每一次，按时间从早到晚，已经滤掉加入题单之前的（题单闸门）。
  * current / history / scores 三个接口都从这一份出。
+ *
+ * 只取分数和闸门要的几列：整行带着画布 JSON 和 mermaid 源码（一条约 5KB），画了几十次
+ * 的学生每切一次题就要搬几百 KB，而结果页签只要分数。要整行的 history 自己按 id 再取。
+ * userId / problemId / createTime 三列是 hiddenByProblemSet 要的，别删。
  */
 async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
   const [rows, joinTimes] = await Promise.all([
     db
       .select({
-        flowchart: schema.flowchartSubmission,
-        username: schema.user.username,
+        id: schema.flowchartSubmission.id,
+        userId: schema.flowchartSubmission.userId,
+        problemId: schema.flowchartSubmission.problemId,
+        createTime: schema.flowchartSubmission.createTime,
+        aiScore: schema.flowchartSubmission.aiScore,
+        aiGrade: schema.flowchartSubmission.aiGrade,
       })
       .from(schema.flowchartSubmission)
-      .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
       .where(
         and(
           eq(schema.flowchartSubmission.userId, user.id),
@@ -638,7 +645,7 @@ async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
       .orderBy(asc(schema.flowchartSubmission.createTime)),
     joinTimesFor(user, [{ userId: user.id, problemId }]),
   ])
-  const visible = rows.filter((row) => !hiddenByProblemSet(user, row.flowchart, joinTimes))
+  const visible = rows.filter((row) => !hiddenByProblemSet(user, row, joinTimes))
   return { visible, hidden: rows.length - visible.length }
 }
 
@@ -650,7 +657,7 @@ async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
 flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
   const { visible } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
-  const latest = visible.at(-1)?.flowchart
+  const latest = visible.at(-1)
   return success(c, {
     count: visible.length,
     score: latest?.aiScore ?? 0,
@@ -661,11 +668,20 @@ flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) =>
 flowchartRoutes.get("/problems/:id/flowchart/history", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
   const page = queryInteger(c.req.query("page"), 0, { min: 0 })
-  const { visible: rows } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
+  const user = c.get("user")!
+  const { visible: rows } = await myEvaluatedFlowcharts(user, problemId)
   const selected = page === 0 ? rows.at(-1) : rows[page - 1]
   if (page > rows.length) return failure(c, 400, "page-out-of-range", "Page out of range")
+  // 列表只带了分数，选中的那一条再按 id 取整行。都是本人的提交，用户名就是自己的
+  const [full] = selected
+    ? await db
+        .select()
+        .from(schema.flowchartSubmission)
+        .where(eq(schema.flowchartSubmission.id, selected.id))
+        .limit(1)
+    : []
   return success(c, {
-    submission: selected ? flowchartData(selected.flowchart, selected.username) : null,
+    submission: full ? flowchartData(full, user.username) : null,
     count: rows.length,
   } satisfies FlowchartDetail)
 })
@@ -678,7 +694,7 @@ flowchartRoutes.get("/problems/:id/flowchart/scores", requireAuth, async (c) => 
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
   const { visible, hidden } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
   return success(c, {
-    scores: visible.map(({ flowchart }) => ({
+    scores: visible.map((flowchart) => ({
       id: flowchart.id,
       score: flowchart.aiScore ?? 0,
       grade: flowchart.aiGrade ?? "",

@@ -71,6 +71,11 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   /** 看过的几次的完整评语，按 id 缓存（评完就不会再变） */
   const details = ref<Record<string, FlowchartSubmission>>({})
   const detailLoading = ref(false)
+  /**
+   * 进题时历次分数没读出来。原来读失败就当没交过，结果页签写着「还没交过流程图」——
+   * 学生明明交过五次，会以为记录丢了
+   */
+  const scoresFailed = ref(false)
 
   /** 画布本身。结果页签要拿当前画布和某一版比一比、把那一版载回去 */
   const editor = shallowRef<FlowchartEditorInstance | null>(null)
@@ -81,6 +86,11 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   const lastSubmittedMermaidCode = ref("")
   /** 最近一次分数是哪道题的；换题后置空，下次挂载时重新拉 */
   let loadedFor: number | null = null
+  /**
+   * 换一次题（reset）加一。每个 await 回来都要对一下：请求在路上时学生换了题，
+   * 回来的是上一道题的东西，不能落到这一道上
+   */
+  let generation = 0
 
   // ==================== 评分结果监听 ====================
   /**
@@ -92,6 +102,8 @@ export const useFlowchartStore = defineStore("flowchart", () => {
    * 有兜底轮询，流程图这边没有，丢一次消息按钮就一直转圈转到用户自己刷新。
    */
   let monitoringId = ""
+  /** 正在跟的那一次是哪道题的，结算时再对一遍 */
+  let monitoringProblemId: number | null = null
 
   const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
     async () => {
@@ -141,20 +153,26 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   /** 不再跟这一次评分：结算完、超时、或者换了题 */
   function stopMonitoring() {
     monitoringId = ""
+    monitoringProblemId = null
     unsubscribe()
     pausePolling()
     stopPollingFallback()
     stopPollingDeadline()
     loading.value = false
+    // 连接挂在 store 上，离开题目页也不会跟着组件断。不立刻断：接着还可能再交一次，
+    // A/S 之后的成就也走这条连接推过来。和判题那边一样，闲 15 分钟再断
+    scheduleDisconnect(15 * 60 * 1000)
   }
 
   function settle(submissionId: string, outcome: Outcome) {
     // 一个学生可能同时开着几道题的页面，每条连接都订在同一个用户 topic 上，
     // 别的页面的评分结果照样会推到这里来 —— 必须认 id，不然会张冠李戴
     if (!submissionId || submissionId !== monitoringId) return
+    // 换题时 reset 已经把 monitoringId 清了，这里再对一遍题号：别的题评完的分数、烟花、
+    // 「这节课做完」、A/S 那张图，都不能落到眼前这道题上
+    const problemId = monitoringProblemId
     stopMonitoring()
-    // 评完了就不急着断：接着还可能再交一次。和判题那边一样，闲 15 分钟再断
-    scheduleDisconnect(15 * 60 * 1000)
+    if (!problemId || problemStore.problem?.id !== problemId) return
 
     if (!outcome.ok) {
       phase.value = "failed"
@@ -170,8 +188,22 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     if (isFlowchartPass(outcome.grade) && lastSubmittedMermaidCode.value) {
       myFlowchartStore.show(lastSubmittedMermaidCode.value)
     }
-    const problemId = problemStore.problem?.id
-    if (problemId) loadScores(problemId)
+    // 先把这一次记进历次分数，再去拉全量：拉失败的话，结果页签照样看得到这次的分数，
+    // 不会还停在上一次（第一次交时则是「还没交过流程图」）
+    if (!scores.value.some((row) => row.id === submissionId)) {
+      scores.value = [
+        ...scores.value,
+        {
+          id: submissionId,
+          score: outcome.score,
+          grade: outcome.grade,
+          createTime: new Date().toISOString(),
+        },
+      ]
+    }
+    loadScores(problemId).catch((error) => {
+      console.error("[Flowchart] 刷新历次评分失败:", error)
+    })
   }
 
   const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
@@ -208,6 +240,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
       return
     }
 
+    const gen = generation
     lastSubmittedMermaidCode.value = mermaidCode
     loading.value = true
     phase.value = "evaluating"
@@ -226,16 +259,21 @@ export const useFlowchartStore = defineStore("flowchart", () => {
         },
       })
 
+      // 请求在路上时换了题：这一次照常评完落库，回到那道题时在历次分数里看得到；
+      // 但不能再跟它 —— 评完会把分数、烟花、「做完了」都落到新题上
+      if (gen !== generation) return
       if (response.submissionId) {
         // 订阅提交更新，同时开启轮询兜底。connect() 幂等；没连上时 subscribe 会先记着
         cancelScheduledDisconnect()
         connect()
         monitoringId = response.submissionId
+        monitoringProblemId = problem.id
         subscribe(response.submissionId)
         startPollingFallback()
         startPollingDeadline()
       }
     } catch (error) {
+      if (gen !== generation) return
       loading.value = false
       phase.value = "idle"
       // 按错误码分支（见 utils/api.ts 的约定）。限流是最容易撞上的一种：
@@ -272,9 +310,11 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     const problemId = problemStore.problem?.id
     if (!problemId || loadedFor === problemId) return
     loadedFor = problemId
+    const gen = generation
     try {
       await loadScores(problemId)
       if (problemStore.problem?.id !== problemId) return
+      scoresFailed.value = false
       const passed = scores.value.filter((row) => isFlowchartPass(row.grade)).at(-1)
       if (passed) {
         const detail = await fetchDetail(passed.id)
@@ -283,17 +323,22 @@ export const useFlowchartStore = defineStore("flowchart", () => {
         if (detail?.mermaidCode) myFlowchartStore.show(detail.mermaidCode)
       }
     } catch (error) {
-      // 拉不到就当没交过；下次挂载再试
-      loadedFor = null
       console.error("[Flowchart] 读取历次评分失败:", error)
+      // 换过题了：这是上一道题的失败，别把新题的状态改掉
+      if (gen !== generation) return
+      // 下次挂载、或者结果页签里点「再读一次」时重试
+      loadedFor = null
+      if (!scores.value.length) scoresFailed.value = true
     }
   }
 
   async function fetchDetail(id: string) {
     const cached = details.value[id]
     if (cached) return cached
+    const gen = generation
     const detail = await getFlowchartSubmission(id)
-    details.value[id] = detail
+    // 换过题就不进缓存：reset 刚清过，别把上一道题的塞回去
+    if (gen === generation) details.value[id] = detail
     return detail
   }
 
@@ -302,13 +347,14 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     selectedId.value = id
     const target = id ?? scores.value.at(-1)?.id
     if (!target || details.value[target]) return
+    const gen = generation
     detailLoading.value = true
     try {
       await fetchDetail(target)
     } catch {
-      message.error("这一次的评语读不出来，过一会儿再试")
+      if (gen === generation) message.error("这一次的评语读不出来，过一会儿再试")
     } finally {
-      detailLoading.value = false
+      if (gen === generation) detailLoading.value = false
     }
   }
 
@@ -318,6 +364,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
    * 连卸载都不会 —— 不收的话上一道还在评的那次评完，会把它的图挂到新题上。
    */
   function reset() {
+    generation++
     stopMonitoring()
     latestRating.value = { score: 0, grade: "" }
     phase.value = "idle"
@@ -325,6 +372,8 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     hiddenCount.value = 0
     selectedId.value = null
     details.value = {}
+    detailLoading.value = false
+    scoresFailed.value = false
     lastSubmittedMermaidCode.value = ""
     loadedFor = null
   }
@@ -348,6 +397,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     selectedId,
     details,
     detailLoading,
+    scoresFailed,
     editor,
     attachEditor,
     submit,

@@ -29,11 +29,13 @@ const { addEdges, removeNodes, removeEdges, fitView, onNodesInitialized } = useV
 /**
  * 进页面读回草稿、载回旧版之后缩放到正好装下整张图。原来画布停在默认的位置和缩放上，
  * 图大一点就有一半在外面，学生以为草稿丢了。只在这两种时候缩：拖进一个新节点时也会
- * 触发 nodes-initialized，那时候跟着缩放会让画布跳一下
+ * 触发 nodes-initialized，那时候跟着缩放会让画布跳一下。
+ * 画布是空的就不挂：空画布不会触发 nodes-initialized，挂着的这一下会一直留到学生拖进
+ * 第一个节点，正好把画布拉近、对准那一个节点 —— 就是上面要躲开的那一跳
  */
 let fitPending = false
 function fitSoon() {
-  fitPending = true
+  fitPending = nodes.value.length > 0
 }
 onNodesInitialized(() => {
   if (!fitPending) return

@@ -226,7 +226,7 @@ const changeLanguage = (v: LANGUAGE) => {
     </n-button>
 
     <n-button
-      v-if="statisticsInline && userStore.isTeacherOrAbove"
+      v-if="ctx.classStats && statisticsInline && userStore.isTeacherOrAbove"
       :size="buttonSize"
       @click="statisticsOpen = true"
     >

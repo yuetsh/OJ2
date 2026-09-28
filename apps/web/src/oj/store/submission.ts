@@ -89,6 +89,10 @@ export const useSubmissionStore = defineStore("submission", () => {
   async function submit(entry: { contestId: string; problemSetId: string }) {
     const problem = problemStore.problem
     if (!problem) return
+    // 格式化、提交都要等请求回来，这中间学生可能已经点了「下一题」或课堂条上的别的题。
+    // 换了题就什么都别再写：不然 A 格式化好的代码会盖掉 B 的编辑器（连带 B 的草稿），
+    // 或者开始跟 A 的那条提交，A 判对了却把 B 标成已解决、弹 B 的点评
+    const stale = () => problemStore.problem?.id !== problem.id
     syntaxErrorInfo.value = ""
     formattedBeforeSubmit.value = false
 
@@ -102,11 +106,13 @@ export const useSubmissionStore = defineStore("submission", () => {
           code: codeStore.code.value,
           language: formatLang,
         })
+        if (stale()) return
         if (res.code !== codeStore.code.value) {
           codeStore.setCode(res.code)
           formattedBeforeSubmit.value = true
         }
       } catch (e) {
+        if (stale()) return
         if (errorCode(e) === "syntax-error") {
           // 仅 Python 会出现：message 是 CPython 的报错原文，交给 PythonErrorExplain 翻译
           syntaxErrorInfo.value = errorMessage(e)
@@ -124,9 +130,10 @@ export const useSubmissionStore = defineStore("submission", () => {
       problemId: problem.id,
       language: codeStore.code.language,
       code: codeStore.code.value,
-      // 编辑过程信号，见 utils/editTrace.ts。协作的判断和 ProblemEditor 的 collabHere 同一个口径
+      // 编辑过程信号，见 utils/editTrace.ts。协作的判断和 ProblemEditor 的 collabHere
+      // （teacherCollab.ts 的 useCollabHere）同一个口径：比赛入口不算协作
       trace: snapshotEditTrace(
-        collabStore.room !== null && collabStore.room.problemId === problem._id,
+        !entry.contestId && collabStore.room !== null && collabStore.room.problemId === problem._id,
       ),
     }
     if (entry.contestId) {
@@ -142,6 +149,8 @@ export const useSubmissionStore = defineStore("submission", () => {
     try {
       const res = await submitCode(data)
       console.log(`[Submit] 代码已提交: ID=${res.submissionId}`)
+      // 这条照常判完落库、题库里查得到，只是这一页已经换了题，不再跟
+      if (stale()) return
       // 交上了才清零；被限流 / 网络失败的话这一段接着记，下次提交一起报
       restartEditTrace(codeStore.code.value.length)
 

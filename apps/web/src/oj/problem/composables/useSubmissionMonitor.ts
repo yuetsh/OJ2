@@ -18,10 +18,14 @@ export function useSubmissionMonitor() {
   // ==================== 轮询机制 ====================
   const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
     async () => {
-      if (!submissionId.value) return
+      const id = submissionId.value
+      if (!id) return
 
       try {
-        const res = await getSubmission(submissionId.value)
+        const res = await getSubmission(id)
+        // 请求在路上时换了题（reset）或者又交了一次：回来的是上一条，扔掉。
+        // 不扔的话上一道题判对了，会把新题标成已解决、弹点评
+        if (id !== submissionId.value) return
         submission.value = res
 
         const result = res.result
@@ -76,7 +80,9 @@ export function useSubmissionMonitor() {
       // 结果已经到手，别让重连再去重放这条早就判完的订阅
       unsubscribe()
 
-      getSubmission(submissionId.value).then((res) => {
+      const id = submissionId.value
+      getSubmission(id).then((res) => {
+        if (id !== submissionId.value) return // 同上面轮询：换过题就扔掉
         submission.value = res
         // 15分钟无新提交则断开WebSocket（节省资源）
         scheduleDisconnect(15 * 60 * 1000)
@@ -137,6 +143,9 @@ export function useSubmissionMonitor() {
   const reset = () => {
     pausePolling()
     unsubscribe()
+    // 连接由 store 持有，离开题目页组件卸了它也还在。和判完之后一样，空闲 15 分钟断开；
+    // 不在这里立刻断，是因为刚交的那条判完之后还可能推成就过来
+    scheduleDisconnect(15 * 60 * 1000)
     submissionId.value = ""
     submission.value = undefined
   }

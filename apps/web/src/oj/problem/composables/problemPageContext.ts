@@ -32,6 +32,22 @@ interface EntryRules {
   backToProblemSet: boolean
   /** 举手求助 */
   help: boolean
+  /**
+   * 老师协作绑在这一页的编辑器上。房间只记了题号（`room.problemId` 是 displayId），
+   * 比赛题的编号常是 1、2、3 —— 老师帮着学生做公开题 1 的时候打开比赛题 1，会绑上
+   * 学生的文档、挂出协作条、禁掉语言选择
+   */
+  collab: boolean
+  /**
+   * 教师的「课堂统计」。统计接口按 displayId 在公开题库里找题（`submission-statistics.ts`），
+   * 比赛题号拿过去查到的是另一道公开题，或者 404
+   */
+  classStats: boolean
+  /**
+   * 「看这道题所有人的提交」放进「⋯」（只给管理员角色）。它平时在「我的提交」抽屉底部，
+   * 题单入口没有抽屉，老师就没地方点了
+   */
+  allSubmissionsInMenu: boolean
 }
 
 const RULES: Record<ProblemEntry, EntryRules> = {
@@ -43,6 +59,9 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     reviewAfterAccepted: true,
     backToProblemSet: false,
     help: true,
+    collab: true,
+    classStats: true,
+    allSubmissionsInMenu: false,
   },
   // 题单里什么「以前的」都不给看：加入题单之前的提交、统计、点评都能拿来抄答案
   problemset: {
@@ -55,6 +74,9 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     reviewAfterAccepted: false,
     backToProblemSet: true,
     help: true,
+    collab: true,
+    classStats: true,
+    allSubmissionsInMenu: true,
   },
   contest: {
     drawers: ["info", "submission"],
@@ -66,6 +88,9 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     reviewAfterAccepted: false,
     backToProblemSet: false,
     help: false,
+    collab: false,
+    classStats: false,
+    allSubmissionsInMenu: false,
   },
 }
 

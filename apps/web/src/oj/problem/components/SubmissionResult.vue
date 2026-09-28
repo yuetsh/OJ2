@@ -14,6 +14,7 @@ import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
+import { markdownToText } from "oj/problem/utils/plainText"
 import PythonErrorExplain from "./PythonErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
@@ -219,7 +220,9 @@ const customRunHint = computed(() => {
       (sample) => `${sample.input} ${sample.output}`.match(/-?\d+(?:\.\d+)?/g) ?? [],
     ),
   )
-  const numbers = [...new Set(problem.description.match(/-?\d+(?:\.\d+)?/g) ?? [])]
+  // 先摊成纯文字：题面是 HTML，446 道题带着 style="color: rgb(51, 51, 51)"，直接取数会建议「拿 51 试试」
+  const description = markdownToText(problem.description, Infinity)
+  const numbers = [...new Set(description.match(/-?\d+(?:\.\d+)?/g) ?? [])]
     .filter((value) => !inSamples.has(value))
     .slice(0, 2)
   return numbers.length

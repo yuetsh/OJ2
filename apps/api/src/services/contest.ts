@@ -86,7 +86,7 @@ export async function canAccessContest<E extends AppEnv>(
       return {
         ok: false as const,
         code: "wrong-password",
-        message: "Wrong password or password expired",
+        message: "比赛密码不对，或者已经过期了，请重新输入",
       }
     }
   }
@@ -94,7 +94,7 @@ export async function canAccessContest<E extends AppEnv>(
     return {
       ok: false as const,
       code: "contest-not-started",
-      message: "Contest has not started yet.",
+      message: "比赛还没有开始",
     }
   }
   return { ok: true as const }
@@ -119,7 +119,7 @@ export function requireContestAccess(
     const id = Number(c.req.param(paramName))
     const contest =
       Number.isInteger(id) && id > 0 ? await findAccessibleContest(c.get("user"), id) : null
-    if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
+    if (!contest) return failure(c, 404, "contest-not-found", "比赛不存在")
     const access = await canAccessContest(c, contest, checkType)
     if (!access.ok) {
       return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)

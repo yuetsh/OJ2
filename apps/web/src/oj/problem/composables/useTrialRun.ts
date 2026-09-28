@@ -16,16 +16,27 @@ const JUDGE0_COMPILE_ERROR = 6
 const isJudge0RuntimeError = (status: number) => status >= 7 && status <= 12
 
 /**
- * 把 Judge0 的状态换成判题机那套码，好直接交给 WrongAnswerExplain 和 JUDGE_STATUS。
- * 跑完、只是输出对不上的，按答案错误算。
+ * Python 的语法错误。Judge0 的 Python 没有编译这一步，SyntaxError 回来的是运行时错误
+ * （status 11），得看回溯的最后一行才认得出来
  */
-export function trialStatus(status: number | null, passed: boolean) {
+const PYTHON_SYNTAX_ERROR = /^(SyntaxError|IndentationError|TabError): /m
+
+/**
+ * 把 Judge0 的状态换成判题机那套码，好直接交给 WrongAnswerExplain 和 JUDGE_STATUS。
+ * 跑完、只是输出对不上的，按答案错误算。Python 的语法错误按编译失败算：
+ * 学生最常犯的中文冒号、中文括号，原来在这里被说成「程序运行到一半出错……下标有没有越界」
+ */
+export function trialStatus(status: number | null, passed: boolean, output: string) {
   if (status === JUDGE0_ACCEPTED) {
     return passed ? SubmissionStatus.accepted : SubmissionStatus.wrong_answer
   }
   if (status === JUDGE0_TIME_LIMIT) return SubmissionStatus.real_time_limit_exceeded
   if (status === JUDGE0_COMPILE_ERROR) return SubmissionStatus.compile_error
-  if (status !== null && isJudge0RuntimeError(status)) return SubmissionStatus.runtime_error
+  if (status !== null && isJudge0RuntimeError(status)) {
+    return PYTHON_SYNTAX_ERROR.test(output)
+      ? SubmissionStatus.compile_error
+      : SubmissionStatus.runtime_error
+  }
   return SubmissionStatus.system_error
 }
 
@@ -88,7 +99,7 @@ export function useTrialRun() {
         input: sample.input,
         expected: sample.output,
         output: run.output,
-        result: trialStatus(run.status, passed),
+        result: trialStatus(run.status, passed, run.output),
       }
     })
     samplesRunAt.value = new Date().toISOString()
@@ -103,7 +114,7 @@ export function useTrialRun() {
     if (mine !== customGeneration) return
     customOutput.value = run.output
     // 自己输入的没有标准答案，跑完就算「对」，只看有没有出错
-    customResult.value = trialStatus(run.status, true)
+    customResult.value = trialStatus(run.status, true, run.output)
     customRunning.value = false
   }
 

@@ -15,7 +15,7 @@ const message = computed(() => {
   switch (props.result) {
     case SubmissionStatus.compile_error:
       return props.language === "Python"
-        ? "代码没能跑起来，写法有错误。按「提交代码」会先检查一遍，告诉你错在哪一行。"
+        ? "代码有语法错误，程序一行都没跑。最常见的是用了中文标点（，：（）“”）。按「提交」会先检查一遍，告诉你错在哪一行，中文标点能一键换成英文。"
         : "代码没能编译通过，写法有错误。看看是不是漏了分号、括号没配对、变量没声明。"
     case SubmissionStatus.runtime_error:
       return "程序运行到一半出错，停下来了。检查一下输入是怎么读的、下标有没有越界、除数是不是 0。"

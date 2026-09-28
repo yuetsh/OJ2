@@ -4,6 +4,7 @@ import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useProblemStore } from "oj/store/problem"
+import { useUserStore } from "shared/store/user"
 import { sortFlowchartCriteria } from "utils/constants"
 import { decompressFromBase64, parseTime } from "utils/functions"
 
@@ -12,13 +13,29 @@ import { decompressFromBase64, parseTime } from "utils/functions"
  *
  * 原来评分详情是提交按钮旁一个 1000px 的弹框：盖住画布，学生没法一边看改进建议一边改图；
  * 翻历次评分要一页一页点分页器。现在摆在左栏，画布整列都在右边（设计文档第 6 节）。
+ *
+ * viewOnly：手机上只能看、不能画（设计文档 5.6），不给「照着它写代码」「载回画布」。
  */
+const { viewOnly = false } = defineProps<{ viewOnly?: boolean }>()
+
+const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
 const flowchartStore = useFlowchartStore()
-const { phase, scores, hiddenCount, selectedId, details, detailLoading, editor } =
+const { phase, scores, hiddenCount, selectedId, details, detailLoading, scoresFailed, editor } =
   storeToRefs(flowchartStore)
 const problemStore = useProblemStore()
 const codeStore = useCodeStore()
+const userStore = useUserStore()
+
+// 历次分数原来只由题面（ProblemContent）去读。手机上题面是另一个页签、不切过去就不挂载，
+// 直接打开 ?tab=result 的话「流程图点评」一条都没有。这里自己也读一次（同一道题只读一次）
+watch(
+  () => [problemStore.problem?.id, userStore.isAuthed] as const,
+  ([id, authed]) => {
+    if (id && authed) flowchartStore.ensureLoaded()
+  },
+  { immediate: true },
+)
 const message = useMessage()
 const theme = useThemeVars()
 // 暗色主题的成功色是浅薄荷绿，上面的白字看不清
@@ -32,6 +49,23 @@ const current = computed(() => {
 })
 const detail = computed(() => (current.value ? details.value[current.value.id] : undefined))
 const viewingLatest = computed(() => selectedId.value === null)
+
+// ==================== 这一版的图 ====================
+/**
+ * 点历史分数条上的哪一次，就摆哪一次交上去的图（只读的 Mermaid 渲染，不动画布）。
+ * 原来的评分弹框左边就是这张图；挪进结果页签时丢了，学生翻到「第 2 次 C 42」
+ * 只看得到评语，想不起来那一版画成什么样。图从评语同一个详情接口来，随评语一起现拉。
+ */
+const versionIndex = computed(() =>
+  current.value ? scores.value.findIndex((row) => row.id === current.value!.id) : -1,
+)
+const versionTitle = computed(() => {
+  if (!current.value) return ""
+  return `第 ${versionIndex.value + 1} 次画的图 · ${parseTime(current.value.createTime, "MM-DD HH:mm")}`
+})
+/** 收起来之后翻别的次也保持收着：左栏在机房屏上只有六百来像素高 */
+const versionOpen = ref(true)
+const versionZoom = ref(false)
 
 // 评完的那次、点到的那次，评语都要现拉（历次分数里只有分数）
 watch(
@@ -162,10 +196,18 @@ function goCode() {
 <template>
   <!-- 设计稿「画流程图：画布占满右栏，AI 点评在左边」「流程图评分中」 -->
   <div class="flowchart-result">
+    <div v-if="scoresFailed && !scores.length && phase !== 'evaluating'" class="failed load-failed">
+      <span>以前交过的流程图评分没读出来，可能是网络断了一下</span>
+      <n-button size="small" secondary @click="flowchartStore.ensureLoaded()">再读一次</n-button>
+    </div>
     <n-empty
-      v-if="!scores.length && phase !== 'evaluating'"
+      v-else-if="!scores.length && phase !== 'evaluating'"
       class="empty"
-      description="还没交过流程图。画好之后点「交给 AI 点评」，评分和建议会出现在这里"
+      :description="
+        viewOnly
+          ? '还没交过流程图。流程图要在电脑上画（手机上拖不动），交给 AI 点评之后，评分和建议在这里也看得到'
+          : '还没交过流程图。画好之后点「交给 AI 点评」，评分和建议会出现在这里'
+      "
     />
 
     <!-- 历次分数连成一条：一眼看出是不是越改越好；正在评的那次是虚线框 -->
@@ -229,6 +271,35 @@ function goCode() {
       </n-flex>
 
       <template v-if="detail">
+        <div v-if="detail.mermaidCode" class="version">
+          <div class="version-head">
+            <span class="version-title">{{ versionTitle }}</span>
+            <n-button text type="primary" size="small" @click="versionZoom = true">
+              放大看
+            </n-button>
+            <n-button text size="small" @click="versionOpen = !versionOpen">
+              {{ versionOpen ? "收起" : "展开" }}
+            </n-button>
+          </div>
+          <div
+            v-if="versionOpen"
+            class="version-chart"
+            role="button"
+            :aria-label="`放大看${versionTitle}`"
+            @click="versionZoom = true"
+          >
+            <MyFlowchart compact :code="detail.mermaidCode" />
+          </div>
+          <n-modal
+            v-model:show="versionZoom"
+            preset="card"
+            :title="versionTitle"
+            :style="{ maxWidth: '900px' }"
+          >
+            <MyFlowchart :code="detail.mermaidCode" />
+          </n-modal>
+        </div>
+
         <div v-if="criteria.length" class="criteria">
           <div v-for="[name, item] in criteria" :key="name" class="criterion">
             <div class="criterion-head">
@@ -254,7 +325,7 @@ function goCode() {
           </div>
         </div>
 
-        <div class="actions">
+        <div v-if="!viewOnly" class="actions">
           <n-button
             v-if="isFlowchartPass(current.grade) && canCode"
             type="primary"
@@ -367,6 +438,41 @@ function goCode() {
   border-radius: 6px;
   background-color: rgba(240, 160, 32, 0.1);
   border: 1px solid rgba(240, 160, 32, 0.35);
+}
+
+.load-failed {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+/* 这一版的图：和题面里「你画的流程图」同一个样子，点一下放大 */
+.version {
+  margin-bottom: 14px;
+}
+
+.version-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.version-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.version-chart {
+  cursor: zoom-in;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.06);
+  padding: 8px;
+}
+
+.version-chart :deep(.flowchart-container.compact) {
+  height: 180px;
 }
 
 .score-line {

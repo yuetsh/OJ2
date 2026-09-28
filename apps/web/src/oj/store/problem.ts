@@ -2,6 +2,7 @@ import { defineStore } from "pinia"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import type { LANGUAGE, ProblemDetail } from "utils/types"
 import { problemEntryOf } from "oj/problem/composables/problemPageContext"
+import { useCodeStore } from "oj/store/code"
 
 export const useProblemStore = defineStore("problem", () => {
   const problem = ref<ProblemDetail | null>(null)
@@ -59,12 +60,17 @@ export const useProblemStore = defineStore("problem", () => {
   }
 
   /**
-   * 这道题收不收当前语言，不收就退到它支持的第一种（SQL 题只有 "SQL"，硬编码的
+   * 这道题收不收当前语言，不收就退到学生习惯的那门、再退到它支持的第一种（SQL 题只有 "SQL"，硬编码的
    * Python 会被后端拒绝）。编辑器每次载入代码之前都要过一遍：草稿的键里带着语言，
    * 先载入再改语言，编辑器里摆的就是另一种语言的模板。
    */
   function supportedLanguage(current: LANGUAGE): LANGUAGE {
     if (languages.value.includes(current)) return current
+    // 当前这门这道题不给，先回到学生习惯用的那门。current 是 Flowchart 时最要紧：
+    // 在能画图的题上画着图换到不能画的题，直接取第一项会把偏好 C 的学生扔到 Python，
+    // 而且 code store 的 watch 会把 Python 记成新的偏好
+    const preferred = useCodeStore().preferredLanguage()
+    if (preferred !== "Flowchart" && languages.value.includes(preferred)) return preferred
     // 兜底落在编程语言上：languages 的第一项可能是 Flowchart，不能默认把人扔到画布上
     return codeLanguages.value[0] ?? languages.value[0] ?? "Python"
   }

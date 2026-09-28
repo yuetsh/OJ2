@@ -109,6 +109,25 @@ async function listSubmissions() {
   listed.value = true
 }
 
+/**
+ * 「我的提交统计」：这一页里各种结果各几次（「答案错误 × 3」「答案正确 × 1」），和原来一样
+ * 只数当前这一页。被题单闸门锁住的那几次不数 —— 它们在列表里只露一行说明，这里也不该露出结果
+ */
+const statusDistribution = computed(() => {
+  const counts = new Map<number, number>()
+  for (const row of submissions.value) {
+    if (row.showLink) counts.set(row.result, (counts.get(row.result) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([result, count]) => ({
+      result,
+      name: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.name ?? "未知",
+      type: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.type ?? "info",
+      count,
+    }))
+})
+
 /** 列表是新的在前；「第几次」从最早那次数起 */
 function attemptNo(index: number) {
   return total.value - (query.page - 1) * query.limit - index
@@ -218,6 +237,19 @@ watch(query, () => {
       <n-button v-if="userStore.showSubmissions" text type="primary" @click="goAccepted">
         看看他们的写法 ›
       </n-button>
+    </div>
+
+    <div v-if="statusDistribution.length" class="distribution">
+      <n-tag
+        v-for="item in statusDistribution"
+        :key="item.result"
+        :type="item.type"
+        size="small"
+        round
+        :bordered="false"
+      >
+        {{ item.name }} × {{ item.count }}
+      </n-tag>
     </div>
 
     <n-empty
@@ -333,6 +365,13 @@ watch(query, () => {
 </template>
 
 <style scoped>
+.distribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
 .rank {
   display: flex;
   flex-wrap: wrap;

@@ -76,8 +76,10 @@ function settleReview() {
 
 function closeCommentPanel() {
   commentPanel.value = false
-  // 「下一题」在结果页签里（LessonNext），评价完回到那里 —— 学生点评之前可能切去看了题目
-  submissionStore.revealResult()
+  // 「下一题」在结果页签里（LessonNext），评价完回到那里 —— 学生点评之前可能切去看了题目。
+  // 接着要换题的就别切：切页签会 router.replace 改 `?tab=`，排在下面那次 push 前头，
+  // 把 push 当成被新导航取消，人就停在原题
+  if (!navigationAfterReview) submissionStore.revealResult()
   settleReview()
 }
 

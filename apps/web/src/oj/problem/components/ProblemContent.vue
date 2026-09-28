@@ -150,10 +150,14 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false">
           已解决
         </n-tag>
-        <n-tag v-else-if="myStatus === 'tried'" size="small" type="warning" :bordered="false">
-          做过，还没对
-        </n-tag>
-        <n-tag v-else-if="myStatus === 'none'" size="small" :bordered="false">还没交过</n-tag>
+        <!-- 流程图画到 A / S 就算做完了（决定 4）：别在「流程图 A 级」旁边再写「还没交过」
+             「做过，还没对」—— 那两个说的是代码 -->
+        <template v-else-if="!flowchartGrade">
+          <n-tag v-if="myStatus === 'tried'" size="small" type="warning" :bordered="false">
+            做过，还没对
+          </n-tag>
+          <n-tag v-else-if="myStatus === 'none'" size="small" :bordered="false">还没交过</n-tag>
+        </template>
         <n-tag v-if="flowchartGrade" size="small" type="success" :bordered="false">
           流程图 {{ flowchartGrade }} 级
         </n-tag>

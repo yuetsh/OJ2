@@ -23,7 +23,8 @@ function openHisSubmissions() {
   if (!room || !problem.value) return
   const target = router.resolve({
     name: "submissions",
-    query: { problem: problem.value._id, username: room.peerName },
+    // exactUsername：整名匹配，不然学号相近的同学（ks24a1 / ks24a10…）会混进来
+    query: { problem: problem.value._id, username: room.peerName, exactUsername: "1" },
   })
   window.open(target.href, "_blank")
 }

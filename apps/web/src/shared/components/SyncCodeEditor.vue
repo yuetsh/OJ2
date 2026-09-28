@@ -34,6 +34,11 @@ interface Props {
    * 切到别的题，接通了也不该把这道题的代码交出去。
    */
   problemId?: string
+  /**
+   * 这个入口接不接协作。比赛入口传 false：房间只记题号，比赛题号 1、2、3 和公开题撞号，
+   * 光比对题号挡不住（见 problemPageContext 的 `collab`）
+   */
+  collab?: boolean
 }
 
 const {
@@ -44,6 +49,7 @@ const {
   placeholder = "",
   extraExtensions = [],
   problemId = "",
+  collab = true,
 } = defineProps<Props>()
 const code = defineModel<string>("value")
 
@@ -74,7 +80,8 @@ const editorView = shallowRef<EditorView | null>(null)
 
 /** 房间开着，而且开的就是这道题 */
 const roomIsHere = computed(
-  () => collabStore.room !== null && (!problemId || collabStore.room.problemId === problemId),
+  () =>
+    collab && collabStore.room !== null && (!problemId || collabStore.room.problemId === problemId),
 )
 
 /**

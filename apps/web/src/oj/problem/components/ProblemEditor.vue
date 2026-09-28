@@ -12,7 +12,8 @@ import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import EditorToolbar from "./EditorToolbar.vue"
 import { useDraftKey } from "../composables/draftKey"
-import { useTeacherCollab } from "../composables/teacherCollab"
+import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
+import { useProblemPageContext } from "../composables/problemPageContext"
 import CollabBar from "./CollabBar.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
 
@@ -27,6 +28,7 @@ const codeStore = useCodeStore()
 const problemStore = useProblemStore()
 const collabStore = useCollabStore()
 const { problem } = storeToRefs(problemStore)
+const ctx = useProblemPageContext()
 
 /**
  * 课堂求助的协作就开在这道题上。
@@ -35,9 +37,7 @@ const { problem } = storeToRefs(problemStore)
  * 直接跳到题目页、就在页面这一个编辑器里协作 —— 顺带治好了「按一下 Esc 弹框就关、
  * 协作跟着结束」：页面上没有弹框可关，结束协作只有工具栏那个按钮和离开这一页两条路。
  */
-const collabHere = computed(
-  () => collabStore.room !== null && collabStore.room.problemId === problem.value?._id,
-)
+const collabHere = useCollabHere()
 
 /** 协作中的教师：编辑器里是学生的代码，不是他自己的 */
 const teacherCollab = useTeacherCollab()
@@ -151,6 +151,20 @@ watch(
   },
 )
 
+/**
+ * 画着流程图时忽然不让画了：工具栏的「写代码 / 画流程图」和语言下拉都跟着 canDraw 藏起来，
+ * 编辑器要是还停在画布上，学生就回不去写代码了。拖窄到手机宽度时页面会换一套布局、编辑器
+ * 重新挂载，loadCode 自己会把语言改掉；但同一道题重新拉题面（登录后补拉）时老师刚好关掉了
+ * 流程图，编辑器不重挂，只能靠这里。和工具栏的「写代码」走同一条路，回到他习惯的那门语言
+ */
+watch(
+  () => problemStore.canDraw,
+  (canDraw) => {
+    if (canDraw || codeStore.code.language !== "Flowchart") return
+    problemStore.switchLanguage(problemStore.supportedLanguage(codeStore.preferredLanguage()))
+  },
+)
+
 // 流程图编辑器交给 store：结果页签（在左栏，不在编辑器底下）要拿当前画布比一比、
 // 把旧版本载回去。子组件 SubmitFlowchart 还是从 inject 拿
 const flowchartStore = useFlowchartStore()
@@ -172,12 +186,17 @@ provide("flowchartEditorRef", flowchartEditorRef)
       学生自己切到流程图就是不写代码了，编辑器卸载、协作正常结束（SyncCodeEditor
       的 detach），这是原来就有的语义。
     -->
-    <FlowchartEditor v-if="codeStore.code.language === 'Flowchart'" ref="flowchartEditorRef" />
+    <FlowchartEditor
+      v-if="codeStore.code.language === 'Flowchart'"
+      ref="flowchartEditorRef"
+      :height="editorHeight"
+    />
     <SyncCodeEditor
       v-else
       v-model:value="codeStore.code.value"
       :language="codeStore.code.language"
       :problem-id="problem!._id"
+      :collab="ctx.collab"
       :height="editorHeight"
       :extra-extensions="editorExtensions"
       @update:model-value="changeCode"

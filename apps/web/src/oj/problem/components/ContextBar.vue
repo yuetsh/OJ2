@@ -9,6 +9,7 @@ import { useProblemStore } from "oj/store/problem"
 import { useUserStore } from "shared/store/user"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useThemeVars } from "naive-ui"
+import { ContestStatus } from "utils/constants"
 import type { ProblemSet, ProblemSetProblem } from "utils/types"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import ProblemChips, { type ChipItem } from "./ProblemChips.vue"
@@ -213,6 +214,8 @@ const contestBar = computed(() => {
     title: contest.title,
     chips,
     remaining: contestStore.remaining,
+    // 不在进行中的两种：管理员赛前看题是「还没开始」，不能一律写「已结束」
+    notStarted: contestStore.contestStatus === ContestStatus.not_started,
     home: { name: "contest problems", params: { contestID: ctx.value.contestId } },
     rank: { name: "contest rank", params: { contestID: ctx.value.contestId } },
   }
@@ -352,7 +355,7 @@ onSolvedHere(() => {
       <span class="meta">还剩</span>
       <span class="countdown">{{ contestBar.remaining }}</span>
     </template>
-    <span v-else class="meta">已结束</span>
+    <span v-else class="meta">{{ contestBar.notStarted ? "还没开始" : "已结束" }}</span>
     <router-link :to="contestBar.rank" class="contest-rank">排名</router-link>
   </div>
 </template>

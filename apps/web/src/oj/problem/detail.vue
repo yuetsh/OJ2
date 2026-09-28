@@ -98,6 +98,13 @@ const drawer = ref<DrawerKey | null>(null)
 const leftPane = useTemplateRef<HTMLElement>("leftPane")
 const theme = useThemeVars()
 
+/**
+ * 分隔条两头按像素卡，不按比例：左栏窄于 360 时题单条的「下一题」箭头被裁掉、三个抽屉按钮
+ * 折成两行；右栏窄于 460 时工具栏收进「⋯」之后也放不下、语言下拉被挤成两行（原来 0.8 在 1280 屏上只给右栏 256）
+ */
+const { width: windowWidth } = useWindowSize()
+const splitMax = computed(() => `${Math.max(360, windowWidth.value - 460)}px`)
+
 // 协作中的老师看的是学生的提交
 const teacherCollab = useTeacherCollab()
 const drawerLabel = (key: DrawerKey) =>
@@ -151,8 +158,14 @@ const dialog = useDialog()
  */
 let approvedTarget: string | null = null
 function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNormalized) {
-  if (collabStore.isTeacher || collabStore.helpStatus === "idle") return true
   if (to.name === from.name && to.params.problemID === from.params.problemID) return true
+  // 协作中的老师：「页面即协作现场」，跳走这一页协作就断了、求助退回排队。所以上下文条、
+  // 相似题、下一题这些站内链接一律开新标签，这一页留着（设计文档第 9 节）
+  if (teacherCollab.value) {
+    window.open(router.resolve(to).href, "_blank")
+    return false
+  }
+  if (collabStore.isTeacher || collabStore.helpStatus === "idle") return true
   if (approvedTarget === to.fullPath) {
     approvedTarget = null
     return true
@@ -187,9 +200,12 @@ watch(
 )
 
 // 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
-const resultTab = () => h(ResultTabLabel)
+const resultTab = () => h(ResultTabLabel, { active: currentTab.value === "result" })
 
+// 连着换了几次题，先发的请求后回来的话，地址栏是 C、页面却是 B：只认最后一次
+let initSeq = 0
 async function init() {
+  const mine = ++initSeq
   // 「我的流程图」是上一道题的。这道题也画到了 A/S 的话，SubmitFlowchart 查完会再亮出来
   myFlowchartStore.hide()
   // 并行预取右侧编辑器 chunk（CodeMirror ~370K+），
@@ -197,8 +213,10 @@ async function init() {
   loadProblemEditor()
   try {
     const res = await getProblem(problemID, contestID)
+    if (mine !== initSeq) return
     problem.value = res
   } catch (err) {
+    if (mine !== initSeq) return
     problem.value = null
     if (errorCode(err) === "contest-not-started") {
       errMsg.value = "比赛还没有开始"
@@ -247,8 +265,8 @@ onBeforeUnmount(() => {
       class="problem-split"
       direction="horizontal"
       :default-size="0.43"
-      :min="0.2"
-      :max="0.8"
+      min="360px"
+      :max="splitMax"
       :resize-trigger-size="1"
     >
       <template #1>
@@ -274,7 +292,7 @@ onBeforeUnmount(() => {
                 :aria-selected="currentTab === 'result'"
                 @click="currentTab = 'result'"
               >
-                <ResultTabLabel />
+                <ResultTabLabel :active="currentTab === 'result'" />
               </button>
             </div>
             <div v-if="ctx.drawers.length" class="drawer-buttons">

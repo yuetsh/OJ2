@@ -5,15 +5,17 @@ import { useMermaid } from "shared/composables/useMermaid"
 /**
  * 学生自己画到 A/S 的那张流程图。题面里是缩略的一小块（compact），点「放大看」弹出整张。
  * 原来是左栏单独一个「我的流程图」页签，评到 A/S 时还会把学生强行切过去。
+ *
+ * 结果页签里翻历次评分时也用它摆「这一版的图」，那时由 code 传进来，不读 store。
  */
-const props = defineProps<{ compact?: boolean }>()
+const props = defineProps<{ compact?: boolean; code?: string }>()
 
 const store = useMyFlowchartStore()
 const { renderError, renderFlowchart } = useMermaid()
 const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 
 watch(
-  () => store.mermaidCode,
+  () => props.code ?? store.mermaidCode,
   async (code) => {
     if (!code) return
     await nextTick()

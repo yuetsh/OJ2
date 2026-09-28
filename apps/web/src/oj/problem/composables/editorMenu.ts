@@ -9,6 +9,7 @@ import { compressToBase64, copyToClipboard } from "utils/functions"
 import storage from "utils/storage"
 import { useDraftKey } from "./draftKey"
 import { useTeacherCollab } from "./teacherCollab"
+import { useProblemPageContext } from "./problemPageContext"
 
 /**
  * 「课堂统计」弹窗开着没有。弹窗挂在题目页上（StatisticsModal），菜单可能在工具栏里、
@@ -34,11 +35,15 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
   const { isDesktop } = useBreakpoints()
   const teacherCollab = useTeacherCollab()
   const draftKey = useDraftKey()
+  const ctx = useProblemPageContext()
 
   const options = computed<DropdownOption[]>(() => {
     const items: DropdownOption[] = []
-    // 「本题提交」挪到了「我的提交」抽屉的底部
-    if (!statisticsInline.value && userStore.isTeacherOrAbove) {
+    // 「本题提交」挪到了「我的提交」抽屉的底部；题单入口没有抽屉，给管理员角色留在这里
+    if (ctx.value.allSubmissionsInMenu && userStore.isAdminRole) {
+      items.push({ label: "本题提交", key: "allSubmissions" })
+    }
+    if (ctx.value.classStats && !statisticsInline.value && userStore.isTeacherOrAbove) {
       items.push({ label: "课堂统计", key: "statistics" })
     }
     if (codeStore.code.language !== "Flowchart") {
@@ -92,6 +97,16 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
     window.open(router.resolve(url).href, "_blank")
   }
 
+  function goAllSubmissions() {
+    const href = router.resolve({
+      name: "submissions",
+      query: { problem: problem.value!._id },
+    }).href
+    // 协作中走新标签，跳走这一页协作就断了（设计文档第 9 节）
+    if (teacherCollab.value) window.open(href, "_blank")
+    else router.push(href)
+  }
+
   /** 菜单项被点了；不是这张菜单里的 key 返回 false，调用方自己处理（页签行的抽屉） */
   function select(key: string) {
     switch (key) {
@@ -109,6 +124,9 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
         return true
       case "edit":
         goEdit()
+        return true
+      case "allSubmissions":
+        goAllSubmissions()
         return true
     }
     return false

@@ -34,10 +34,17 @@ export async function createTestSubmission(code: Code, input: string) {
     params: { base64_encoded: true, wait: true },
   })
   const data = response.data
+  const status: number | null = data.status?.id ?? null
+  const stdout = base64DecodeUtf8(data.stdout)
+  // 跑通了（3 = Accepted）就只要程序自己的输出，而且只去掉末尾的空白：
+  // - C 有警告（隐式声明 sqrt、用了 gets）时 Judge0 跑通了也带回 compile_output，拼进来
+  //   就成了「你的输出」的一部分，例子永远对不上；后台生成测试点时还会写进 .out
+  // - 开头的空格是输出的一部分（打印菱形、三角形），原来整体 trim() 会把它削掉，
+  //   对的代码被判成「只是空格不一样」
+  if (status === 3) return { status, output: stdout.trimEnd() }
+  // 没跑通：报错原文给人看，两段拼起来
   return {
-    status: data.status && data.status.id,
-    output: [base64DecodeUtf8(data.compile_output), base64DecodeUtf8(data.stdout)]
-      .join("\n")
-      .trim(),
+    status,
+    output: [base64DecodeUtf8(data.compile_output), stdout].join("\n").trim(),
   }
 }

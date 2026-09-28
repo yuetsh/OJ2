@@ -106,6 +106,13 @@ const { query, clearQuery } = usePagination<SubmissionQuery>({
   language: useRouteQuery("language", "").value,
   today: "0",
 })
+/**
+ * 从题目页协作条「看他交过什么」点进来时带着 `exactUsername=1`：用户名按整名匹配。
+ * 默认是「包含」，而学号互相包含是常态（帮 ks24a1 时会混进 ks24a10–ks24a19）。
+ * 只对带进来的那个用户名生效，老师在输入框里改了名字就回到原来的包含匹配
+ */
+const exactUsernameFor =
+  useRouteQuery<string>("exactUsername", "").value === "1" ? query.username : ""
 const submissionID = ref("")
 const problemDisplayID = ref("")
 const [statisticPanel, toggleStatisticPanel] = useToggle(false)
@@ -168,6 +175,9 @@ async function listSubmissions() {
         contestId: (route.params.contestID as string) ?? "",
         language: query.language,
         today: query.today,
+        ...(exactUsernameFor && query.username === exactUsernameFor
+          ? { exactUsername: "1" as const }
+          : {}),
       })
       submissions.value = res.results
       total.value = res.total

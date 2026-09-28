@@ -114,7 +114,7 @@ contestRoutes.get("/contests/:id", optionalAuth, async (c) => {
     c.get("user"),
     queryInteger(c.req.param("id"), 0, { min: 1 }),
   )
-  if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!contest) return failure(c, 404, "contest-not-found", "比赛不存在")
   const byId = await creators([contest.createdById])
   return success(
     c,
@@ -133,9 +133,8 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
     c.get("user"),
     queryInteger(c.req.param("id"), 0, { min: 1 }),
   )
-  if (!contest || !contest.password)
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
-  const parsed = await parseBody(c, contestPasswordRequestSchema, "Password is required")
+  if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "比赛不存在")
+  const parsed = await parseBody(c, contestPasswordRequestSchema, "请输入比赛密码")
   if (!parsed.success) return parsed.response
   // 比赛密码往往就是几位数字，不限的话一个脚本几分钟就能扫完。
   // 按「人 × 比赛」计失败次数：猜错的是自己，锁的也只是自己进这一场。
@@ -151,7 +150,7 @@ contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
   }
   if (!checkContestPassword(parsed.data.password, contest.password)) {
     await countAttempt(attemptKey, CONTEST_PASSWORD_RULE)
-    return failure(c, 403, "wrong-password", "Wrong password or password expired")
+    return failure(c, 403, "wrong-password", "比赛密码不对，或者已经过期了，请重新输入")
   }
   await setContestPassword(c, contest.id, parsed.data.password)
   return success(c, true)
@@ -162,8 +161,7 @@ contestRoutes.get("/contests/:id/access", requireAuth, async (c) => {
     c.get("user"),
     queryInteger(c.req.param("id"), 0, { min: 1 }),
   )
-  if (!contest || !contest.password)
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "比赛不存在")
   const access = await canAccessContest(c, contest, "details")
   return success(c, { access: access.ok } satisfies ContestAccess)
 })
@@ -276,7 +274,7 @@ contestRoutes.get(
         ),
       )
       .limit(1)
-    if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
+    if (!row) return failure(c, 404, "problem-not-found", "题目不存在")
     const tags = await contestProblemTags([row.problem.id])
     const allowed = contestDetailsAllowed(c.get("user"), contest)
     const statuses = await contestProblemStatuses(c.get("user")?.id)

@@ -52,8 +52,11 @@ const requirement = computed(() => {
 const TEXT_LIMIT = 2000
 
 const onSample = computed(() => props.check.result === SubmissionStatus.wrong_answer)
+// plain（比赛）连差异类型都不算：把空格画成「·」、把不一样的那段标红，和提示句一样是格式线索
 const kind = computed(() =>
-  onSample.value ? classifyDiff(props.check.expected ?? "", props.check.output ?? "") : null,
+  onSample.value && !props.plain
+    ? classifyDiff(props.check.expected ?? "", props.check.output ?? "")
+    : null,
 )
 const hint = computed(() => {
   if (props.check.passed) return ""
@@ -95,7 +98,7 @@ function splitDiff(expected: string, output: string) {
 }
 
 const diffParts = computed(() => {
-  if (!onSample.value || diffLine.value < 0) return null
+  if (!onSample.value || props.plain || diffLine.value < 0) return null
   const expected = lines(props.check.expected ?? "")[diffLine.value] ?? ""
   const output = lines(props.check.output ?? "")[diffLine.value] ?? ""
   return splitDiff(expected, output)

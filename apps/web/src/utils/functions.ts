@@ -224,13 +224,11 @@ export function durationToDays(start: Date | string, end: Date | string): string
 }
 
 export function secondsToDuration(seconds: number): string {
-  const duration = intervalToDuration({
-    start: 0,
-    end: seconds * 1000,
-  })
-  const hours = (duration.days ?? 0) * 24 + (duration.hours ?? 0)
+  // 直接算，不走 date-fns 的 intervalToDuration：那个会拆出年、月，原来只把天和小时
+  // 折回小时，超过一个月就把月丢了（剩 40 天 1 小时显示成 217:00:00）
+  const total = Math.max(0, Math.floor(seconds))
   const pad = (n: number) => String(n).padStart(2, "0")
-  return [hours, pad(duration.minutes ?? 0), pad(duration.seconds ?? 0)].join(":")
+  return [Math.floor(total / 3600), pad(Math.floor(total / 60) % 60), pad(total % 60)].join(":")
 }
 
 export function submissionMemoryFormat(memory: number | string | undefined) {
