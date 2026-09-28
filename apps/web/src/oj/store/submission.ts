@@ -12,7 +12,7 @@ import type { SubmitCodePayload } from "utils/types"
 
 /**
  * 题目页上「这一次提交」的全部状态：正在跟的那条提交、判题跟踪（WebSocket + 轮询）、
- * 提交前语法检查的错误、结果面板开没开、5 秒冷却、AI 提示。
+ * 提交前语法检查的错误、5 秒冷却、AI 提示。
  *
  * 原来它们都长在提交按钮那个组件（SubmitCode）里，而那个组件在编辑器的工具栏里 ——
  * 手机上交完切到「描述」页签（Naive 的页签默认切走即卸载）、桌面切到「题目 / 自测」
@@ -30,8 +30,14 @@ export const useSubmissionStore = defineStore("submission", () => {
   const monitor = useSubmissionMonitor()
   const hint = useSubmissionHint()
 
-  /** 结果面板开着没有。放 store 里是为了按钮组件卸了再挂回来，面板还是原来的开合 */
-  const showResult = ref(false)
+  /**
+   * 有新结果要给学生看了（交上去、或者语法检查没过）就 +1。题目页看着它把左栏切到
+   * 「结果」页签 —— store 不管页签，只说「该看结果了」。
+   */
+  const resultSeq = ref(0)
+  function revealResult() {
+    resultSeq.value++
+  }
   const isFormatting = ref(false)
   const isSubmittingRequest = ref(false)
 
@@ -73,7 +79,7 @@ export const useSubmissionStore = defineStore("submission", () => {
         if (errorCode(e) === "syntax-error") {
           // 仅 Python 会出现：message 是 CPython 的报错原文，交给 PythonErrorExplain 翻译
           syntaxErrorInfo.value = errorMessage(e)
-          showResult.value = true
+          revealResult()
           return
         }
         // server-error / 网络异常：格式化工具问题，静默降级，提交原代码
@@ -111,19 +117,18 @@ export const useSubmissionStore = defineStore("submission", () => {
       // 3. 启动冷却 + 监控
       startCooldown()
       monitor.startMonitoring(res.submissionId)
-      showResult.value = true
+      revealResult()
     } finally {
       isSubmittingRequest.value = false
     }
   }
 
   /**
-   * 收掉这一道题的所有东西：结果面板、语法错误、还在跟的那条提交、AI 提示。
+   * 收掉这一道题的所有东西：语法错误、还在跟的那条提交、AI 提示。
    * 提交本身照常判完落库，只是这边不再跟 —— 不然上一道还在判的那条判完，
    * 会把**新题**标成已解决。
    */
   function reset() {
-    showResult.value = false
     syntaxErrorInfo.value = ""
     monitor.reset()
     hint.clearHint()
@@ -147,7 +152,8 @@ export const useSubmissionStore = defineStore("submission", () => {
     judging: monitor.judging,
     pending: monitor.pending,
     submitting: monitor.submitting,
-    showResult,
+    resultSeq,
+    revealResult,
     isFormatting,
     isSubmittingRequest,
     syntaxErrorInfo,

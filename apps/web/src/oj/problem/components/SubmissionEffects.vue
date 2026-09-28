@@ -73,9 +73,8 @@ function settleReview() {
 
 function closeCommentPanel() {
   commentPanel.value = false
-  // 点评价弹窗时，结果面板会当成「点了外面」收起来 —— 而「下一题」就在面板里
-  // （LessonNext），评价完得把它重新打开
-  submissionStore.showResult = true
+  // 「下一题」在结果页签里（LessonNext），评价完回到那里 —— 学生点评之前可能切去看了题目
+  submissionStore.revealResult()
   settleReview()
 }
 

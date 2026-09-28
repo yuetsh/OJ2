@@ -11,6 +11,7 @@ import { useSubmissionStore } from "oj/store/submission"
 import { useFlowchartStore } from "oj/store/flowchart"
 // 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
 import SubmissionEffects from "./components/SubmissionEffects.vue"
+import ResultTabLabel from "./components/ResultTabLabel.vue"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
@@ -25,6 +26,7 @@ const ProblemSubmission = defineAsyncComponent(() => import("./components/Proble
 const ProblemReaction = defineAsyncComponent(() => import("./components/ProblemReaction.vue"))
 const ProblemFlowchart = defineAsyncComponent(() => import("./components/ProblemFlowchart.vue"))
 const MyFlowchartTab = defineAsyncComponent(() => import("./components/MyFlowchartTab.vue"))
+const ResultPane = defineAsyncComponent(() => import("./components/ResultPane.vue"))
 
 interface Props {
   problemID: string
@@ -55,13 +57,15 @@ const canShowFlowchart = computed(
 )
 
 const tabOptions = computed(() => {
+  // 桌面上「结果」紧跟在「题目」后面；手机上编辑器也是一个页签，「结果」排在「代码」后面
   const options: string[] = ["content"]
+  if (!isMobile.value) options.push("result")
   if (canShowFlowchart.value) {
     options.push("flowchart")
   }
 
   if (isMobile.value) {
-    options.push("editor")
+    options.push("editor", "result")
   }
   options.push("info")
   if (!contestID) {
@@ -92,6 +96,18 @@ watch(currentTab, (tab) => {
     query: { ...route.query, tab },
   })
 })
+
+// 交上去、或者语法检查没过：切到「结果」。提交按钮在编辑器那边，页签归这一页管
+const submissionStore = useSubmissionStore()
+watch(
+  () => submissionStore.resultSeq,
+  () => {
+    currentTab.value = "result"
+  },
+)
+
+// 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
+const resultTab = () => h(ResultTabLabel)
 
 watch(
   () => myFlowchartStore.showing,
@@ -175,8 +191,12 @@ watch(
       <template #1>
         <n-scrollbar style="height: 100%">
           <n-tabs v-model:value="currentTab" type="segment">
-            <n-tab-pane name="content" tab="题目描述">
+            <n-tab-pane name="content" tab="题目">
               <ProblemContent />
+            </n-tab-pane>
+            <!-- 切走也不卸载：挂着的错误说明在编辑器里标着红，AI 提示也在渲染 -->
+            <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
+              <ResultPane />
             </n-tab-pane>
             <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程图表">
               <ProblemFlowchart />
@@ -210,8 +230,11 @@ watch(
     <template v-else-if="isDesktop && shouldShowProblem">
       <n-scrollbar style="max-height: calc(100vh - 92px)">
         <n-tabs v-model:value="currentTab" type="segment">
-          <n-tab-pane name="content" tab="题目描述">
+          <n-tab-pane name="content" tab="题目">
             <ProblemContent />
+          </n-tab-pane>
+          <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
+            <ResultPane />
           </n-tab-pane>
           <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程图表">
             <ProblemFlowchart />
@@ -234,7 +257,7 @@ watch(
 
     <!-- Mobile -->
     <n-tabs v-else v-model:value="currentTab" type="segment">
-      <n-tab-pane name="content" tab="描述">
+      <n-tab-pane name="content" tab="题目">
         <ProblemContent />
       </n-tab-pane>
       <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程">
@@ -242,6 +265,9 @@ watch(
       </n-tab-pane>
       <n-tab-pane name="editor" tab="代码">
         <ProblemEditor />
+      </n-tab-pane>
+      <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
+        <ResultPane />
       </n-tab-pane>
       <n-tab-pane name="info" tab="统计" :disabled="!!problemSetId">
         <ProblemInfo />
