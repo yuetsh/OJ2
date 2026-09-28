@@ -5,7 +5,7 @@ import { getReaction } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { useFireworks } from "oj/problem/composables/useFireworks"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import { useLessonStore } from "oj/store/lesson"
 import { SubmissionStatus } from "utils/constants"
 import { useProblemPageContext } from "../composables/problemPageContext"
 
@@ -28,10 +28,9 @@ const { submission } = storeToRefs(submissionStore)
 const router = useRouter()
 const ctx = useProblemPageContext()
 
-const { isDesktop } = useBreakpoints()
 const { celebrate } = useFireworks()
 
-// ==================== AC 后弹出点评轮盘 ====================
+// ==================== AC 后弹出点评 ====================
 // 只对已经能评价、且还没评过的人弹：后端要求先有 AC 才收评价，这里刚 AC 完正好；
 // mine 非 null 说明早就评过了，别再打扰。
 //
@@ -50,6 +49,7 @@ async function openReview() {
   try {
     const res = await getReaction(problem.value!.id)
     if (res.mine === null) {
+      reviewed.value = false
       commentPanel.value = true
       return
     }
@@ -74,6 +74,46 @@ function closeCommentPanel() {
   // 「下一题」在结果页签里（LessonNext），评价完回到那里 —— 学生点评之前可能切去看了题目
   submissionStore.revealResult()
   settleReview()
+}
+
+/**
+ * 评完不马上关：弹窗里换成大家怎么选的，下面只有一个按钮，焦点落在它上面。
+ * 按钮去哪：刚才点「下一题」之类被拦下的，就接着去那里；否则是这节课的下一题
+ * （和结果页签里 LessonNext 同一个算法）；都没有就是「好的」，关掉回到结果页签。
+ */
+const reviewed = ref(false)
+const continueButton = useTemplateRef<{ $el: HTMLElement }>("continueButton")
+const lessonStore = useLessonStore()
+
+// navigationAfterReview 是普通变量（守卫里改，不需要触发渲染），按钮文案要一个响应式的影子
+const navigationAfterReviewShown = ref(false)
+
+/** 题目名中位 7 字、最长 33 字，按钮里放不下那么长的 */
+const shortTitle = (title: string) => (title.length > 14 ? `${title.slice(0, 13)}…` : title)
+
+const continueAction = computed(() => {
+  if (navigationAfterReviewShown.value) return { label: "继续", target: null }
+  const lesson = problem.value ? lessonStore.nextAfter(problem.value._id) : null
+  const next = ctx.value.lessonNext ? lesson?.next : null
+  if (next)
+    return {
+      label: `下一题：${next.problemDisplayId} ${shortTitle(next.title)}`,
+      target: `/problem/${next.problemDisplayId}`,
+    }
+  return { label: "好的", target: null }
+})
+
+async function onReviewed() {
+  reviewed.value = true
+  navigationAfterReviewShown.value = navigationAfterReview !== null
+  await nextTick()
+  continueButton.value?.$el.focus()
+}
+
+function continueAfterReview() {
+  const target = continueAction.value.target
+  if (target && !navigationAfterReview) navigationAfterReview = target
+  closeCommentPanel()
 }
 
 const { start: showCommentPanelDelayed, stop: cancelCommentPanel } = useTimeoutFn(
@@ -188,15 +228,25 @@ watch(
 </script>
 
 <template>
+  <!-- 原来的标题是「恭喜你成功提交」：交上去不等于做对。auto-focus 关掉：不预选任何一项 -->
   <n-modal
+    v-model:show="commentPanel"
     preset="card"
-    title="恭喜你成功提交，说说你对这道题的感受吧"
+    :title="reviewed ? '大家是这样觉得的' : '做对了！说说你对这道题的感受吧'"
     :mask-closable="false"
     :closable="false"
     :close-on-esc="false"
-    :style="{ maxWidth: isDesktop && '50vw', maxHeight: '80vh' }"
-    v-model:show="commentPanel"
+    :auto-focus="false"
+    style="width: min(600px, calc(100vw - 32px))"
   >
-    <ProblemReaction @submitted="closeCommentPanel" />
+    <ProblemReaction guard @submitted="onReviewed">
+      <template #after>
+        <n-flex justify="end">
+          <n-button ref="continueButton" type="primary" @click="continueAfterReview">
+            {{ continueAction.label }}
+          </n-button>
+        </n-flex>
+      </template>
+    </ProblemReaction>
   </n-modal>
 </template>

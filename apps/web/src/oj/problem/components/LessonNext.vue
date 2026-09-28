@@ -8,9 +8,7 @@ import { useLessonStore } from "oj/store/lesson"
  * 这节课的题就是首页「班里在做」那几道，和左栏顶上的课堂条读同一份（lesson store）；
  * 通过的那一刻课堂条已经把这道标成做完、并且重拉了一次。
  *
- * 「下一道」是按列表顺序排在这道**后面**、还没通过的第一道，后面都做完了再从头找 ——
- * 学生常常跳着做，先做完了第 3 道再回头做第 1 道。当前这道本身不看它的 myStatus：
- * 重拉回来之前，它还是通过之前那一刻的状态。
+ * 「下一道」怎么算见 lesson store 的 nextAfter，AC 后的点评弹窗里那个「下一题」也用它。
  *
  * 这道题不在这节课的列表里（学生在做别的）就什么都不显示。
  */
@@ -24,16 +22,7 @@ const lessonStore = useLessonStore()
 // 一般课堂条早就拉过了，这里只是兜底（旧了才拉）
 onMounted(() => lessonStore.load())
 
-const lesson = computed(() => {
-  const list = lessonStore.activity?.problems ?? []
-  const current = props.problemDisplayId.toLowerCase()
-  const index = list.findIndex((item) => item.problemDisplayId.toLowerCase() === current)
-  if (index < 0) return null
-  const rest = [...list.slice(index + 1), ...list.slice(0, index)].filter(
-    (item) => item.myStatus !== "accepted",
-  )
-  return { total: list.length, next: rest[0] ?? null, remaining: rest.length }
-})
+const lesson = computed(() => lessonStore.nextAfter(props.problemDisplayId))
 
 const label = computed(() => lessonStore.label)
 </script>

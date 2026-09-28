@@ -49,10 +49,27 @@ export const useLessonStore = defineStore("lesson", () => {
     return !!find(problemDisplayId)
   }
 
+  /**
+   * 通过这道之后该去哪一道：按列表顺序排在这道**后面**、还没通过的第一道，后面都做完了
+   * 再从头找 —— 学生常常跳着做，先做完了第 3 道再回头做第 1 道。当前这道本身不看它的
+   * myStatus：重拉回来之前，它还是通过之前那一刻的状态。
+   * 这道不在这节课里返回 null；在，但别的都做完了，next 为 null。
+   */
+  function nextAfter(problemDisplayId: string) {
+    const list = activity.value?.problems ?? []
+    const id = problemDisplayId.toLowerCase()
+    const index = list.findIndex((item) => item.problemDisplayId.toLowerCase() === id)
+    if (index < 0) return null
+    const rest = [...list.slice(index + 1), ...list.slice(0, index)].filter(
+      (item) => item.myStatus !== "accepted",
+    )
+    return { total: list.length, next: rest[0] ?? null, remaining: rest.length }
+  }
+
   /** 老师布置的叫「老师布置的题」，推断出来的叫「这节课的题」 */
   const label = computed(() =>
     activity.value?.source === "teacher" ? "老师布置的题" : "这节课的题",
   )
 
-  return { activity, label, load, markAccepted, includes }
+  return { activity, label, load, markAccepted, includes, nextAfter }
 })
