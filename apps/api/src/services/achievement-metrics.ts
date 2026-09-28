@@ -40,6 +40,13 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
     name: "最长连续 AC 天数",
     helpText: "连续每天至少 AC 一题的最长天数",
   },
+  // 按周不按天：学生跟着课表来，2025 秋最长连续交题天数的中位数是 1 天、连续 7 天的
+  // 只有 3 人，按天的「坚持一周」基本拿不到；按周的连续 2/4/8 周分别约 73%/49%/8%
+  {
+    key: "max_ac_week_streak",
+    name: "最长连续新通过周数",
+    helpText: "连续几个自然周（周一起）每周都至少新通过一道题（不含比赛）",
+  },
   { key: "languages_used", name: "使用语言数", helpText: "用过多少种编程语言" },
   {
     key: "contest_joined",

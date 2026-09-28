@@ -13,7 +13,7 @@ import {
 
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
-import { calendarDay, dayNumber, localHour } from "../time"
+import { calendarDay, dayNumber, localHour, localTime, weekStart } from "../time"
 import { findMetric } from "./achievement-metrics"
 import { isAccepted, JudgeStatus } from "../judge/status"
 import { asRecord } from "../routes/helpers"
@@ -21,6 +21,27 @@ import { asRecord } from "../routes/helpers"
 function numberMetric(metrics: Record<string, unknown>, key: string) {
   const value = metrics[key]
   return typeof value === "number" ? value : 0
+}
+
+/**
+ * 「连续几周都有新通过」：`week` 是这次新通过所在那周的周一（东八区日历日）。
+ * 和上一次新通过同一周不变；正好下一周就接上；隔了一周以上从 1 重来。
+ *
+ * 比「坚持三天」那段多一道判断：这次的周比记下的还早（重判了一条很早以前的提交）
+ * 就什么都不动 —— 否则会把「当前连续」错误地重置成 1、还把 `_last_ac_week` 拨回过去。
+ */
+function nextWeekStreak(value: Record<string, unknown>, week: string) {
+  const last = typeof value._last_ac_week === "string" ? value._last_ac_week : null
+  if (last && week <= last) return {}
+  const current =
+    last && dayNumber(week) - dayNumber(last) === 7
+      ? numberMetric(value, "_current_ac_week_streak") + 1
+      : 1
+  return {
+    _last_ac_week: week,
+    _current_ac_week_streak: current,
+    max_ac_week_streak: Math.max(numberMetric(value, "max_ac_week_streak"), current),
+  }
 }
 
 async function unlockAchievements(
@@ -138,6 +159,7 @@ export async function updateAchievementsForSubmission(submissionId: string) {
       value.max_ac_in_one_day = Math.max(
         ...Object.values(perDay).filter((item): item is number => typeof item === "number"),
       )
+      Object.assign(value, nextWeekStreak(value, calendarDay(weekStart(row.submission.createTime))))
     }
     const activeDates = Array.isArray(value._active_dates)
       ? value._active_dates.filter((item): item is string => typeof item === "string")
@@ -281,6 +303,8 @@ export async function rescanAchievement(achievementId: number) {
 
   // contest_joined 不由判题结算维护，扫之前先把它刷新一遍，否则永远读到旧值（或没有值）
   if (achievement.metric === "contest_joined") await refreshContestJoinedForAll()
+  // max_ac_week_streak 是后加的指标，判题结算只从上线那天起累计，存量用户要从提交记录补算
+  if (achievement.metric === "max_ac_week_streak") await refreshAcWeekStreakForAll()
 
   const already = new Set(
     (
@@ -436,6 +460,9 @@ async function refreshContestJoinedForAll() {
       value: countDistinct(schema.submission.contestId),
     })
     .from(schema.submission)
+    // 只算还在的用户，理由同 refreshAcWeekStreakForAll：库里有 11 个已不存在的用户
+    // 留下了比赛提交，不关联的话这里 upsert 撞外键，比赛类成就的重扫一直是失败的
+    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
     .where(isNotNull(schema.submission.contestId))
     .groupBy(schema.submission.userId)
   const now = new Date().toISOString()
@@ -450,6 +477,63 @@ async function refreshContestJoinedForAll() {
           updateTime: now,
         })),
       )
+      .onConflictDoUpdate({
+        target: schema.userStat.userId,
+        set: {
+          metrics: sql`${schema.userStat.metrics} || excluded.metrics`,
+          updateTime: sql`excluded.update_time`,
+        },
+      })
+  }
+}
+
+/**
+ * 从提交记录重算所有人的「最长连续新通过周数」，连同接着累计要用的
+ * `_last_ac_week` / `_current_ac_week_streak` 一起写回 user_stat（jsonb 浅合并，
+ * 其余指标不动，写法同 refreshContestJoinedForAll）。
+ *
+ * 「新通过」= 这道题（不含比赛）第一次通过的那次，和判题结算里 firstAc 同一个口径；
+ * 周按东八区自然周（周一起），SQL 里用 localTime 取墙上时间再 date_trunc。
+ */
+async function refreshAcWeekStreakForAll() {
+  const firstAccepted = db
+    .select({
+      userId: schema.submission.userId,
+      firstAt: sql<string>`min(${schema.submission.createTime})`.as("first_at"),
+    })
+    .from(schema.submission)
+    // 只算还在的用户：库里有提交的 user_id 已经对不上任何用户（submission.user_id 上没有
+    // 外键，是历史遗留），直接写 user_stat 会撞 user_stat 的外键，整次重算失败
+    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .where(
+      and(
+        isNull(schema.submission.contestId),
+        inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
+      ),
+    )
+    .groupBy(schema.submission.userId, schema.submission.problemId)
+    .as("first_accepted")
+  const week = sql<string>`to_char(date_trunc('week', ${localTime(firstAccepted.firstAt)}), 'YYYY-MM-DD')`
+  const rows = await db
+    .select({ userId: firstAccepted.userId, week })
+    .from(firstAccepted)
+    .groupBy(firstAccepted.userId, week)
+    .orderBy(firstAccepted.userId, week)
+
+  const byUser = new Map<number, Record<string, unknown>>()
+  for (const row of rows) {
+    const value = byUser.get(row.userId) ?? {}
+    Object.assign(value, nextWeekStreak(value, row.week))
+    byUser.set(row.userId, value)
+  }
+
+  const entries = [...byUser]
+  const now = new Date().toISOString()
+  for (let start = 0; start < entries.length; start += STAT_UPSERT_CHUNK) {
+    const chunk = entries.slice(start, start + STAT_UPSERT_CHUNK)
+    await db
+      .insert(schema.userStat)
+      .values(chunk.map(([userId, metrics]) => ({ userId, metrics, updateTime: now })))
       .onConflictDoUpdate({
         target: schema.userStat.userId,
         set: {
