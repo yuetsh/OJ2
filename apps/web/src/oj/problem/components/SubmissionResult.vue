@@ -8,7 +8,6 @@ import {
   submissionCaseResults,
   submissionMemoryFormat,
   submissionPartialCases,
-  submissionResultTitle,
   submissionTimeFormat,
 } from "utils/functions"
 import type { Submission } from "utils/types"
@@ -19,6 +18,7 @@ import PythonErrorExplain from "./PythonErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
+import ResultHeader from "./ResultHeader.vue"
 import SimilarProblems from "./SimilarProblems.vue"
 import { useLessonStore } from "oj/store/lesson"
 import { useProblemPageContext } from "../composables/problemPageContext"
@@ -151,34 +151,70 @@ const failedOnSample = computed(() =>
 )
 
 /**
- * 结果标题（设计文档第 6 节）。比「答案错误 · 通过 1/3 个测试点」多走一步：
- * 例子上就错了的说「在例子 N 上就错了」，例子都对的才报测试点；做对了说全对了。
+ * 结果标题（设计文档第 6 节、设计稿「答案错误 / 答案正确 / 错在隐藏测试点」）：
+ * 大字是判题结果，灰色小字说清楚错在哪 —— 例子上就错了的说「在例子 N 上就错了」、不挂进度；
+ * 其余照旧报「通过 x/y 个测试点」（一个都没过就不报）；做对了说全对了。
  * 提交详情页还用通用的 submissionResultTitle
  */
-const title = computed(() => {
+const header = computed(() => {
   const submission = props.submission
-  if (!submission) return ""
-  if (submission.result === SubmissionStatus.accepted) return "答案正确 · 所有测试点都对了"
-  if (failedOnSample.value) {
-    return `答案错误 · 在例子 ${(failedOnSample.value.index ?? 0) + 1} 上就错了`
+  if (!submission) return null
+  const status = JUDGE_STATUS[submission.result]
+  if (
+    submission.result === SubmissionStatus.pending ||
+    submission.result === SubmissionStatus.judging ||
+    submission.result === SubmissionStatus.submitting
+  ) {
+    return { kind: "pending" as const, title: status.title, sub: "", progress: null }
   }
-  const cases = hiddenCases.value
-  if (cases) return `答案错误 · 通过 ${cases.passed}/${cases.total} 个测试点`
-  return submissionResultTitle(submission)
+  if (submission.result === SubmissionStatus.accepted) {
+    return {
+      kind: "success" as const,
+      title: status.title,
+      sub: "所有测试点都对了",
+      progress: null,
+    }
+  }
+  if (failedOnSample.value) {
+    return {
+      kind: status.type,
+      title: status.title,
+      sub: `在例子 ${(failedOnSample.value.index ?? 0) + 1} 上就错了`,
+      progress: null,
+    }
+  }
+  const cases = partialCases.value
+  return {
+    kind: status.type,
+    title: status.title,
+    sub: cases ? `通过 ${cases.passed}/${cases.total} 个测试点` : "",
+    progress: cases,
+  }
 })
 
 /**
- * 例子都对了、错在隐藏的测试点上：一个都没过也要报「通过 0/5」—— 那正说明例子之外的全错了。
- * 其余情况沿用 submissionPartialCases（一个都没过就不报）
+ * 例子都对了、错在隐藏测试点：「去『自己输入』拿 90、80 这些数试试」。数取题目描述里出现的、
+ * 例子里没有的头两个 —— 分段、判断一类题的边界多半就写在描述里（设计稿「错在隐藏测试点」）。
+ * SQL 题、比赛里没有「自己输入」
  */
-const hiddenCases = computed(() => {
-  const summary = props.submission?.caseSummary
-  if (!sampleCheck.value?.passed || !summary || summary.passed >= summary.total) return null
-  return summary
+const submissionStore = useSubmissionStore()
+const customRunHint = computed(() => {
+  if (!sampleCheck.value?.passed || props.peer) return ""
+  const problem = problemStore.problem
+  if (!problem || problem.sqlConfig) return ""
+  // 例子里出现过的数不算：例子已经对了，拿它们再试一遍没用
+  const inSamples = new Set(
+    problem.samples.flatMap(
+      (sample) => `${sample.input} ${sample.output}`.match(/-?\d+(?:\.\d+)?/g) ?? [],
+    ),
+  )
+  const numbers = [...new Set(problem.description.match(/-?\d+(?:\.\d+)?/g) ?? [])]
+    .filter((value) => !inSamples.has(value))
+    .slice(0, 2)
+  return numbers.length
+    ? `去「自己输入」拿 ${numbers.join("、")} 这些数试试 ›`
+    : "去「自己输入」拿特殊的数试试 ›"
 })
-const progressCases = computed(
-  () => hiddenCases.value ?? (failedOnSample.value ? null : partialCases.value),
-)
 
 // 是否显示AI提示区域。
 // 阈值和后端 POST /ai/hint 共用契约里的 HINT_MIN_FAILURES，别在这里写死数字；
@@ -249,16 +285,13 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
 
 <template>
   <div v-if="submission">
-    <n-alert :type="JUDGE_STATUS[submission.result]['type']" :title="title" class="mb-3">
-      <template v-if="progressCases" #default>
-        <n-progress
-          type="line"
-          status="success"
-          :percentage="(progressCases.passed / progressCases.total) * 100"
-          :show-indicator="false"
-        />
-      </template>
-    </n-alert>
+    <ResultHeader
+      v-if="header"
+      :kind="header.kind"
+      :title="header.title"
+      :sub="header.sub"
+      :progress="header.progress"
+    />
     <LessonNext
       v-if="showLessonNext && problemStore.problem"
       :problem-display-id="problemStore.problem._id"
@@ -310,18 +343,33 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       <n-data-table v-if="infoTable.length" striped :data="infoTable" :columns="columns" />
     </n-flex>
 
-    <!-- AI 提示区域 -->
-    <template v-if="showAIHint">
-      <n-card size="small" style="margin-top: 12px; max-width: 480px">
-        <n-alert v-if="hintError" type="error" :title="hintError" class="mb-3" />
-        <n-button
-          v-if="!hintTarget && !hintLoading"
-          type="primary"
-          @click="fetchHint(submission.id)"
-        >
-          让 AI 分析我的代码
-        </n-button>
-        <n-spin v-else-if="hintLoading && !hintTarget" size="small" />
+    <!--
+      设计稿：还没问过 AI 时只是一个描边按钮；错在隐藏测试点时旁边给「去自己输入试试」。
+      问过之后，AI 的回答才放进卡片
+    -->
+    <div v-if="(showAIHint && !hintTarget) || customRunHint" class="actions">
+      <n-button
+        v-if="showAIHint && !hintTarget"
+        type="primary"
+        ghost
+        :loading="hintLoading"
+        @click="fetchHint(submission.id)"
+      >
+        让 AI 分析我的代码
+      </n-button>
+      <n-button
+        v-if="customRunHint"
+        text
+        type="primary"
+        @click="submissionStore.revealResult('custom')"
+      >
+        {{ customRunHint }}
+      </n-button>
+    </div>
+    <n-alert v-if="showAIHint && hintError" type="error" :title="hintError" class="hint-error" />
+    <template v-if="showAIHint && hintTarget">
+      <n-card size="small" class="hint-card">
+        <n-spin v-if="hintLoading && !hintContent" size="small" />
         <MdPreview
           v-if="hintContent"
           :model-value="hintContent"
@@ -379,6 +427,23 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
 </template>
 
 <style scoped>
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.hint-error {
+  margin-top: 12px;
+}
+
+.hint-card {
+  margin-top: 12px;
+  max-width: 560px;
+}
+
 .msg {
   white-space: pre;
   word-break: break-all;

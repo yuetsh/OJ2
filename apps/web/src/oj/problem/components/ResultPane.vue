@@ -4,6 +4,9 @@ import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { useCodeStore } from "oj/store/code"
 import { useTeacherCollab } from "../composables/teacherCollab"
+import { useThemeVars } from "naive-ui"
+import { parseTime } from "utils/functions"
+import ResultHeader from "./ResultHeader.vue"
 
 /**
  * 左栏「结果」页签：三段 —— 提交结果 / 运行例子 / 自己输入。
@@ -31,6 +34,28 @@ const codeStore = useCodeStore()
 /** 协作中的老师自己还没交过：先摆学生最近一次交的 */
 const teacherCollab = useTeacherCollab()
 
+const theme = useThemeVars()
+const { samplesRunAt } = submissionStore.trial
+
+type Segment = "submit" | "samples" | "custom"
+const segments = computed<{ value: Segment; label: string; time: string }[]>(() => [
+  {
+    value: "submit",
+    // 语法没过就没交上去：那一段不叫「提交结果」
+    label: syntaxErrorInfo.value ? "交之前检查" : "提交结果",
+    time:
+      !syntaxErrorInfo.value && submission.value?.createTime
+        ? parseTime(submission.value.createTime, "HH:mm")
+        : "",
+  },
+  {
+    value: "samples",
+    label: "运行例子",
+    time: samplesRunAt.value ? parseTime(samplesRunAt.value, "HH:mm") : "",
+  },
+  { value: "custom", label: "自己输入", time: "" },
+])
+
 /** 正在画流程图：结果就是 AI 的点评，没有例子可跑 */
 const drawing = computed(() => codeStore.code.language === "Flowchart")
 
@@ -44,21 +69,28 @@ const canTrial = computed(() => {
 <template>
   <FlowchartResult v-if="drawing" />
   <div v-show="!drawing" class="result-pane">
-    <n-radio-group v-if="canTrial" v-model:value="resultSegment" size="small" class="segments">
-      <!-- 语法没过就没交上去：那一段不叫「提交结果」 -->
-      <n-radio-button value="submit">{{
-        syntaxErrorInfo ? "交之前检查" : "提交结果"
-      }}</n-radio-button>
-      <n-radio-button value="samples">运行例子</n-radio-button>
-      <n-radio-button value="custom">自己输入</n-radio-button>
-    </n-radio-group>
+    <!-- 设计稿：三个胶囊，选中的深色实心，带上那次结果的时间 -->
+    <div v-if="canTrial" class="segments" role="tablist" aria-label="结果">
+      <button
+        v-for="segment in segments"
+        :key="segment.value"
+        type="button"
+        role="tab"
+        class="segment"
+        :class="{ active: resultSegment === segment.value }"
+        :aria-selected="resultSegment === segment.value"
+        @click="resultSegment = segment.value"
+      >
+        {{ segment.label }}<template v-if="segment.time"> · {{ segment.time }}</template>
+      </button>
+    </div>
 
     <!-- 提交结果用 v-show：切去看运行例子时不卸载，挂着的错误说明在编辑器里标着红 -->
     <div v-show="resultSegment === 'submit' || !canTrial">
-      <n-flex v-if="syntaxErrorInfo" vertical>
-        <n-alert type="warning" title="代码有语法错误，还没有交上去" />
+      <template v-if="syntaxErrorInfo">
+        <ResultHeader kind="warning" title="代码有语法错误，还没有交上去" />
         <PythonErrorExplain :err-info="syntaxErrorInfo" />
-      </n-flex>
+      </template>
       <template v-else-if="submission">
         <p v-if="formattedBeforeSubmit" class="formatted">
           提交之前自动整理了代码格式（缩进、空格），编辑器里的代码也跟着变了，按 Ctrl+Z 能撤回
@@ -69,7 +101,7 @@ const canTrial = computed(() => {
       <n-empty
         v-else
         class="empty"
-        description="还没有提交过。写完代码按「提交代码」，结果会出现在这里"
+        description="还没有提交过。写完代码按「提交」，结果会出现在这里"
       />
     </div>
     <template v-if="canTrial">
@@ -81,11 +113,31 @@ const canTrial = computed(() => {
 
 <style scoped>
 .result-pane {
-  padding: 4px 0 16px;
+  padding-bottom: 16px;
 }
 
 .segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
+}
+
+.segment {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 15px;
+  background-color: rgba(128, 128, 128, 0.12);
+  color: v-bind("theme.textColor2");
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.segment.active {
+  background-color: v-bind("theme.textColor1");
+  color: v-bind("theme.cardColor");
 }
 
 .formatted {

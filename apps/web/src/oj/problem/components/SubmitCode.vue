@@ -52,14 +52,17 @@ function submit() {
 </script>
 
 <template>
+  <!-- 刚交对：降成绿色描边，让结果页签里的「下一题」是唯一的主按钮（设计稿「答案正确」） -->
   <n-button
     :size="props.size ?? (isDesktop ? 'medium' : 'small')"
     :block="props.block"
-    :type="justAccepted ? 'default' : 'primary'"
+    type="primary"
+    :ghost="justAccepted"
     :disabled="buttonState.disabled"
+    class="submit"
     @click="submit"
   >
-    <template #icon>
+    <template v-if="buttonState.icon" #icon>
       <n-icon>
         <Icon :icon="buttonState.icon" />
       </n-icon>
@@ -67,3 +70,10 @@ function submit() {
     {{ buttonState.label }}
   </n-button>
 </template>
+
+<style scoped>
+.submit {
+  min-width: 72px;
+  font-weight: 600;
+}
+</style>

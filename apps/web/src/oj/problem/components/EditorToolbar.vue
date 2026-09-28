@@ -10,7 +10,7 @@ import { useUserStore } from "shared/store/user"
 import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
 import { Icon } from "@iconify/vue"
-import { NFlex } from "naive-ui"
+import { NFlex, useThemeVars } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import { statisticsOpen, useEditorMenu } from "../composables/editorMenu"
@@ -44,6 +44,7 @@ const mode = computed({
 })
 
 const { isDesktop } = useBreakpoints()
+const theme = useThemeVars()
 
 /**
  * 「运行例子」：用题目里的例子试跑（Judge0），结果在左栏「结果」页签。顶替原来题面里
@@ -119,8 +120,8 @@ const toggleHelp = () => {
  * 所以次要的按钮收进「更多」、「写代码 / 画流程图」缩短一点（设计文档 5.4）。语言下拉不收：
  * 窄于 120px 时图标和「Python」会被挤成两行
  */
-const toolbarRef = useTemplateRef<{ $el: HTMLElement }>("toolbarRef")
-const { width: toolbarWidth } = useElementSize(() => toolbarRef.value?.$el)
+const toolbarRef = useTemplateRef<HTMLElement>("toolbarRef")
+const { width: toolbarWidth } = useElementSize(toolbarRef)
 const narrow = computed(() => isDesktop.value && toolbarWidth.value > 0 && toolbarWidth.value < 600)
 /** 「课堂统计」常驻在工具栏上：桌面、而且放得下 */
 const statisticsInline = computed(() => isDesktop.value && !narrow.value)
@@ -152,7 +153,8 @@ const changeLanguage = (v: LANGUAGE) => {
 </script>
 
 <template>
-  <n-flex ref="toolbarRef" align="center" :size="narrow ? 8 : 12">
+  <!-- 设计稿：语言、运行例子、提交靠左；求助、课堂统计、⋯ 推到最右 -->
+  <div ref="toolbarRef" class="toolbar" :class="{ narrow }">
     <!-- 协作中的老师不会落到画图：求助入口本身就排掉了流程图 -->
     <n-radio-group v-if="canDraw && !showCollabBar" v-model:value="mode" :size="buttonSize">
       <n-radio-button value="code">{{ narrow ? "代码" : "写代码" }}</n-radio-button>
@@ -174,6 +176,8 @@ const changeLanguage = (v: LANGUAGE) => {
     <n-button
       v-if="canRunSamples && isDesktop"
       :size="buttonSize"
+      type="primary"
+      ghost
       :loading="samplesRunning"
       :disabled="!codeStore.code.value.trim()"
       @click="submissionStore.runSamples()"
@@ -184,6 +188,22 @@ const changeLanguage = (v: LANGUAGE) => {
     <SubmitFlowchart v-if="codeStore.code.language === 'Flowchart'" />
 
     <SubmitCode v-else-if="isDesktop" />
+
+    <div class="spacer" />
+
+    <n-button
+      v-if="showHelpButton"
+      :size="buttonSize"
+      :type="helpButtonType"
+      :secondary="collabStore.helpStatus !== 'idle'"
+      :disabled="collabStore.helpStatus === 'active'"
+      :title="helpButtonTitle"
+      class="help"
+      @click="toggleHelp"
+    >
+      <span v-if="collabStore.helpStatus === 'active'" class="dot" aria-hidden="true" />
+      {{ helpButtonText }}
+    </n-button>
 
     <n-button
       v-if="statisticsInline && userStore.isTeacherOrAbove"
@@ -200,20 +220,44 @@ const changeLanguage = (v: LANGUAGE) => {
       :options="menuOptions"
       @select="handleMenuSelect"
     >
-      <n-button :size="buttonSize" :title="narrow ? '更多' : undefined">
-        {{ narrow ? "⋯" : "更多" }}
+      <n-button :size="buttonSize" class="more" aria-label="更多：去自测猫、复制代码、重置代码……">
+        ⋯
       </n-button>
     </n-dropdown>
-
-    <n-button
-      v-if="showHelpButton"
-      :size="buttonSize"
-      :type="helpButtonType"
-      :disabled="collabStore.helpStatus === 'active'"
-      :title="helpButtonTitle"
-      @click="toggleHelp"
-    >
-      {{ helpButtonText }}
-    </n-button>
-  </n-flex>
+  </div>
 </template>
+
+<style scoped>
+.toolbar {
+  height: 48px;
+  flex: none;
+  box-sizing: border-box;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.toolbar.narrow {
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.more {
+  width: 34px;
+  padding: 0;
+}
+
+.help .dot {
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background-color: v-bind("theme.successColor");
+}
+</style>

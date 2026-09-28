@@ -1,12 +1,12 @@
 <script lang="ts" setup>
+import { useThemeVars } from "naive-ui"
 import { getRankOfProblem, getSubmission, getSubmissions } from "oj/api"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import Pagination from "shared/components/Pagination.vue"
-import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useCollabStore } from "shared/store/collab"
 import { useUserStore } from "shared/store/user"
-import { LANGUAGE_SHOW_VALUE } from "utils/constants"
+import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { copyToClipboard, parseTime } from "utils/functions"
 import type { ProblemRank } from "@oj2/contract"
 import type { LANGUAGE, SubmissionListItem } from "utils/types"
@@ -29,6 +29,7 @@ const ctx = useProblemPageContext()
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+const theme = useThemeVars()
 
 const problemDisplayId = computed(() => String(route.params.problemID ?? ""))
 
@@ -136,6 +137,23 @@ async function toggle(row: SubmissionListItem) {
   }
 }
 
+/** 这一页里被题单闸门藏起来的次数 */
+const lockedCount = computed(() => submissions.value.filter((row) => !row.showLink).length)
+
+/** 展开的代码先只露 5 行，「一共 11 行」点一下再全摆出来（设计稿） */
+const PREVIEW_LINES = 5
+const fullCode = reactive<Record<string, boolean>>({})
+function preview(id: string) {
+  const code = loadedOf(id)?.code ?? ""
+  const lines = code.replace(/\s+$/, "").split("\n")
+  const more = !fullCode[id] && lines.length > PREVIEW_LINES + 1
+  return {
+    text: more ? `${lines.slice(0, PREVIEW_LINES).join("\n")}\n` : code,
+    more,
+    total: lines.length,
+  }
+}
+
 function loadedOf(id: string): Loaded | null {
   const value = details[id]
   return value && typeof value === "object" ? value : null
@@ -208,63 +226,102 @@ watch(query, () => {
       :description="peer ? '他还没有交过这道题' : '这道题你还没有交过'"
     />
 
-    <ul v-else class="list">
-      <li v-for="(row, index) in submissions" :key="row.id" class="item">
-        <button
-          type="button"
-          class="row"
-          :class="{ open: expanded === row.id, locked: !row.showLink }"
-          :disabled="!row.showLink"
-          :aria-expanded="row.showLink ? expanded === row.id : undefined"
-          @click="toggle(row)"
-        >
-          <span class="attempt">第 {{ attemptNo(index) }} 次</span>
-          <SubmissionResultTag :result="row.result" />
-          <span class="meta">{{ LANGUAGE_SHOW_VALUE[row.language] }}</span>
-          <span class="meta time">{{ parseTime(row.createTime, "MM-DD HH:mm") }}</span>
-          <span v-if="row.showLink" class="caret" aria-hidden="true">
-            {{ expanded === row.id ? "▾" : "▸" }}
-          </span>
-        </button>
+    <!-- 设计稿「我的提交 / 统计 / 点评：抽屉盖住左栏」：一整块带框的列表，行间一条细线 -->
+    <div v-else-if="submissions.length" class="list">
+      <template v-for="(row, index) in submissions" :key="row.id">
+        <div v-if="row.showLink" class="item" :class="{ open: expanded === row.id }">
+          <button
+            type="button"
+            class="row"
+            :aria-expanded="expanded === row.id"
+            @click="toggle(row)"
+          >
+            <span class="attempt">第 {{ attemptNo(index) }} 次</span>
+            <span class="verdict" :class="JUDGE_STATUS[row.result]?.type">
+              {{ JUDGE_STATUS[row.result]?.name ?? "未知" }}
+            </span>
+            <span class="meta">
+              {{ LANGUAGE_SHOW_VALUE[row.language] }} ·
+              {{ parseTime(row.createTime, "MM-DD HH:mm") }}
+            </span>
+            <svg
+              class="caret"
+              :class="{ up: expanded === row.id }"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
 
-        <p v-if="!row.showLink" class="locked-note">
-          🔒 这是加入题单之前交的，先藏起来了：在题单里做出这道题就解锁，题单过了截止时间也会解锁
-        </p>
-
-        <div v-else-if="expanded === row.id" class="detail">
-          <n-flex v-if="details[row.id] === 'loading'" justify="center" class="pad">
-            <n-spin size="small" />
-          </n-flex>
-          <n-text v-else-if="details[row.id] === 'failed'" type="error">
-            代码读不出来，收起来再点开试试
-          </n-text>
-          <template v-else-if="loadedOf(row.id)">
-            <pre class="code">{{ loadedOf(row.id)!.code }}</pre>
-            <n-flex :size="8" align="center">
-              <n-button
-                v-if="!teacherCollab"
-                size="small"
-                type="primary"
-                secondary
-                :disabled="!canPutBack(row.id)"
-                :title="
-                  canPutBack(row.id)
-                    ? undefined
-                    : `这道题现在不收 ${LANGUAGE_SHOW_VALUE[loadedOf(row.id)!.language]} 了，只能复制`
-                "
-                @click="putBack(row.id)"
-              >
-                放回编辑器
-              </n-button>
-              <n-button size="small" @click="copy(row.id)">复制</n-button>
-              <n-button size="small" text class="more" @click="openDetail(row.id)">
-                完整详情 ›
-              </n-button>
+          <div v-if="expanded === row.id" class="detail">
+            <n-flex v-if="details[row.id] === 'loading'" justify="center" class="pad">
+              <n-spin size="small" />
             </n-flex>
-          </template>
+            <n-text v-else-if="details[row.id] === 'failed'" type="error">
+              代码读不出来，收起来再点开试试
+            </n-text>
+            <template v-else-if="loadedOf(row.id)">
+              <pre class="code">{{ preview(row.id).text
+                }}<button
+                  v-if="preview(row.id).more"
+                  type="button"
+                  class="code-more"
+                  @click="fullCode[row.id] = true"
+                >…… 一共 {{ preview(row.id).total }} 行，点开看全部</button></pre>
+              <div class="detail-actions">
+                <n-button
+                  v-if="!teacherCollab"
+                  size="small"
+                  type="primary"
+                  ghost
+                  :disabled="!canPutBack(row.id)"
+                  :title="
+                    canPutBack(row.id)
+                      ? undefined
+                      : `这道题现在不收 ${LANGUAGE_SHOW_VALUE[loadedOf(row.id)!.language]} 了，只能复制`
+                  "
+                  @click="putBack(row.id)"
+                >
+                  放回编辑器
+                </n-button>
+                <n-button size="small" @click="copy(row.id)">复制</n-button>
+                <n-button size="small" text class="more" @click="openDetail(row.id)">
+                  完整详情 ›
+                </n-button>
+              </div>
+            </template>
+          </div>
         </div>
-      </li>
-    </ul>
+      </template>
+      <!-- 加入题单之前交的那几次：合成一行，点不开（后端也不给代码） -->
+      <div v-if="lockedCount" class="locked">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V8a4 4 0 018 0v3" />
+        </svg>
+        <span>
+          加入题单之前的
+          {{ lockedCount }} 次提交先藏起来了，在题单里做出这道题就能看（题单过了截止时间也会解锁）
+        </span>
+      </div>
+    </div>
 
     <Pagination
       v-if="total > query.limit"
@@ -297,78 +354,86 @@ watch(query, () => {
 }
 
 .list {
-  list-style: none;
   margin: 0 0 12px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.item {
-  border: 1px solid rgba(128, 128, 128, 0.2);
+  border: 1px solid v-bind("theme.dividerColor");
   border-radius: 6px;
   overflow: hidden;
 }
 
+.item + .item,
+.item + .locked {
+  border-top: 1px solid v-bind("theme.dividerColor");
+}
+
 .row {
   width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: 12px;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
 
-.row:hover:not(:disabled),
-.row.open {
-  background-color: rgba(128, 128, 128, 0.08);
-}
-
-.row.locked {
-  cursor: default;
-  opacity: 0.7;
+.row:hover,
+.item.open .row {
+  background-color: rgba(128, 128, 128, 0.06);
 }
 
 .attempt {
   flex: none;
-  min-width: 4.5em;
-  font-weight: 600;
+  width: 4em;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
   font-variant-numeric: tabular-nums;
 }
 
-.meta {
+.verdict {
   flex: none;
-  opacity: 0.7;
+  min-width: 5em;
 }
 
-.time {
-  margin-left: auto;
+.verdict.success {
+  color: v-bind("theme.successColorPressed");
+  font-weight: 600;
+}
+
+.verdict.error {
+  color: v-bind("theme.errorColorPressed");
+}
+
+.verdict.warning {
+  color: v-bind("theme.warningColorPressed");
+}
+
+.meta {
+  font-size: 13px;
+  color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
 }
 
 .caret {
+  margin-left: auto;
   flex: none;
-  width: 1em;
-  opacity: 0.6;
+  color: v-bind("theme.textColor3");
+  transition: transform 0.15s;
 }
 
-.locked-note {
-  margin: 0;
-  padding: 0 12px 8px;
-  font-size: 13px;
-  opacity: 0.7;
+.caret.up {
+  transform: rotate(180deg);
 }
 
 .detail {
-  padding: 4px 12px 12px;
-  border-top: 1px solid rgba(128, 128, 128, 0.15);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .pad {
@@ -376,16 +441,46 @@ watch(query, () => {
 }
 
 .code {
-  margin: 8px 0 10px;
-  padding: 10px 12px;
-  max-height: 320px;
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 360px;
   overflow: auto;
-  border-radius: 6px;
-  background-color: rgba(128, 128, 128, 0.08);
-  font-family: Monaco, Consolas, monospace;
-  font-size: 14px;
-  line-height: 1.5;
+  border-radius: 4px;
+  background-color: rgba(128, 128, 128, 0.06);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+  line-height: 20px;
   white-space: pre;
+}
+
+.code-more {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: v-bind("theme.textColor3");
+  cursor: pointer;
+}
+
+.code-more:hover {
+  color: v-bind("theme.primaryColor");
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.locked {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: v-bind("theme.textColor3");
 }
 
 .more {

@@ -31,47 +31,85 @@ function openHisSubmissions() {
 
 <template>
   <div v-if="collabStore.room" class="collab-bar" role="status">
+    <span class="dot" aria-hidden="true" />
     <span class="who">
-      正在帮 <b>{{ collabStore.room.peerName }}</b> ·
+      正在帮 {{ collabStore.room.peerName }} ·
       {{ LANGUAGE_SHOW_VALUE[collabStore.room.language] }}
     </span>
-    <n-button text class="link" @click="openHisSubmissions">看他交过什么 ↗</n-button>
+    <span class="note">你改的他马上能看到</span>
+    <span class="spacer" />
+    <button type="button" class="ghost" @click="openHisSubmissions">看他交过什么</button>
     <!-- 显式的「结束」：求助记录一并清掉。跳走页面发的是 leave("left")，
          那边只是退回排队 —— 见 store 里 leave 的注释 -->
-    <n-button size="small" class="end" @click="collabStore.leave('done')">结束协作</n-button>
+    <button type="button" class="end" @click="collabStore.leave('done')">结束协作</button>
   </div>
 </template>
 
 <style scoped>
+/* 设计稿「上下文条与协作状态」：深蓝一条，顶在工具栏上面 */
 .collab-bar {
   height: 40px;
   flex: none;
+  box-sizing: border-box;
+  padding: 0 10px 0 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 12px;
-  border-radius: 6px;
-  background-color: #2080f0;
+  gap: 10px;
+  background-color: #1d4f9c;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #7fe0a8;
 }
 
 .who {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 600;
 }
 
-.link {
-  --n-text-color: #fff !important;
-  --n-text-color-hover: rgba(255, 255, 255, 0.85) !important;
-  --n-text-color-pressed: rgba(255, 255, 255, 0.7) !important;
-  --n-text-color-focus: #fff !important;
-  text-decoration: underline;
+.note {
+  color: #d5e2f6;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.ghost,
+.end {
+  flex: none;
+  height: 28px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ghost {
+  padding: 0 10px;
+  border: 1px solid #8fb0e0;
+  background: transparent;
+  color: #fff;
+}
+
+.ghost:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .end {
-  margin-left: auto;
+  padding: 0 12px;
+  border: 0;
+  background-color: #fff;
+  color: #1d4f9c;
+  font-weight: 600;
 }
 </style>

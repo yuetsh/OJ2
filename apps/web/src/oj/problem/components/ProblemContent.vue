@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
+import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { DIFFICULTY } from "utils/constants"
-import { getTagColor } from "utils/functions"
+import { copyToClipboard, getTagColor } from "utils/functions"
 import { useSubmissionStore } from "oj/store/submission"
-import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import SQLDataTable from "./SQLDataTable.vue"
 import SimilarProblems from "./SimilarProblems.vue"
-import { useFlowchartStore } from "oj/store/flowchart"
+import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 import { useProblemPageContext } from "../composables/problemPageContext"
@@ -20,6 +19,7 @@ const ProblemFlowchart = defineAsyncComponent(() => import("./ProblemFlowchart.v
 const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
 const isDark = useDark()
+const theme = useThemeVars()
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
 const ctx = useProblemPageContext()
@@ -46,16 +46,14 @@ const showSimilar = computed(
  * 通过」），占掉一屏里最值钱的那几行。题单里不给（入口差异表）。
  */
 const myStatus = computed(() => {
+  if (!ctx.value.statusTag || !userStore.isAuthed) return null
   const status = problem.value?.myStatus
-  if (!ctx.value.statusTag || status === undefined || status === null) return null
+  // 设计稿：没交过也写一个「还没交过」，状态这一格始终在
+  if (status === undefined || status === null) return "none"
   return status === 0 ? "solved" : "tried"
 })
 
-/** 「限时 1 秒」：学生不需要 ms / MB。1000 → 1，1500 → 1.5 */
-const timeLimitText = computed(() => {
-  const ms = problem.value?.timeLimit ?? 0
-  return `限时 ${Number((ms / 1000).toFixed(2))} 秒`
-})
+// 不写「限时 1 秒 / 内存 256MB」：中职学生看了只会犯迷糊，超时、超内存判出来时结果页签里自有说明
 
 // ==================== 流程图小节 ====================
 // 同一个位置二选一：老师给的参考图（showFlowchart，默认折叠），或者学生自己画到 A/S 的
@@ -68,6 +66,38 @@ const myFlowchartStore = useMyFlowchartStore()
 const flowchartStore = useFlowchartStore()
 const userStore = useUserStore()
 const myFlowchartZoom = ref(false)
+/** 参考流程图默认折叠；自己画的那张默认展开、可以收起（设计稿「流程图 A 级之后」） */
+const referenceOpen = ref(false)
+const myFlowchartOpen = ref(true)
+watch(
+  () => problem.value?._id,
+  () => {
+    referenceOpen.value = false
+    myFlowchartOpen.value = true
+  },
+)
+
+/** 流程图画到 A / S 了：标题下给个「流程图 A 级」 */
+const flowchartGrade = computed(() => {
+  const passed = flowchartStore.scores.filter((row) => isFlowchartPass(row.grade))
+  if (!passed.length) return ""
+  return passed.some((row) => row.grade === "S") ? "S" : "A"
+})
+
+// 例子旁的「复制」：点完变成「已复制」一秒
+const message = useMessage()
+const copiedKey = ref("")
+const { start: resetCopied } = useTimeoutFn(() => (copiedKey.value = ""), 1000, {
+  immediate: false,
+})
+async function copySample(key: string, text: string) {
+  if (await copyToClipboard(text)) {
+    copiedKey.value = key
+    resetCopied()
+  } else {
+    message.error("复制失败")
+  }
+}
 
 // 这道题能画流程图，就去查画到 A/S 没有 —— 原来要先切到「流程图」这门「语言」才查。
 // 不看 canDraw：手机上画不了，但以前在电脑上画好的那张照样该摆出来
@@ -104,11 +134,11 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 <template>
   <div v-if="problem">
     <header class="problem-head">
-      <n-flex align="center" :size="10" :wrap="false">
-        <n-tag :bordered="false">{{ problem._id }}</n-tag>
-        <h2 class="problemTitle">{{ problem.title }}</h2>
-      </n-flex>
-      <n-flex align="center" :size="8" class="problem-meta">
+      <div class="title-row">
+        <span class="pid">{{ problem._id }}</span>
+        <h1 class="problem-title">{{ problem.title }}</h1>
+      </div>
+      <div class="meta">
         <n-tag
           v-if="problem.difficulty"
           size="small"
@@ -117,88 +147,115 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         >
           {{ DIFFICULTY[problem.difficulty] }}
         </n-tag>
-        <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false" round>
-          ✓ 已解决
+        <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false">
+          已解决
         </n-tag>
-        <n-tag v-else-if="myStatus === 'tried'" size="small" type="warning" :bordered="false" round>
-          ! 尝试过，还没通过
+        <n-tag v-else-if="myStatus === 'tried'" size="small" type="warning" :bordered="false">
+          做过，还没对
         </n-tag>
-        <n-text depth="3" v-if="!isSQL">{{ timeLimitText }}</n-text>
-      </n-flex>
+        <n-tag v-else-if="myStatus === 'none'" size="small" :bordered="false">还没交过</n-tag>
+        <n-tag v-if="flowchartGrade" size="small" type="success" :bordered="false">
+          流程图 {{ flowchartGrade }} 级
+        </n-tag>
+      </div>
     </header>
 
     <!-- 代码要求（AST 规则）放在最前面：它是硬性的判定条件，写到一半才看见就晚了 -->
     <div v-if="astRequirements.length > 0" class="requirements">
-      <n-flex align="center" :size="6" class="requirements-head">
-        <Icon icon="streamline-ultimate-color:check-button" :width="18"></Icon>
-        <span>代码要求</span>
-        <n-text depth="3" class="requirements-note">提交时会逐条检查</n-text>
-      </n-flex>
-      <div v-for="[lang, rules] in astRequirements" :key="lang" class="requirements-lang">
+      <span class="requirements-head">代码要求</span>
+      <template v-for="[lang, rules] in astRequirements" :key="lang">
         <span v-if="astRequirements.length > 1" class="lang-label">{{ lang }}</span>
-        <n-flex :size="6">
-          <n-tag v-for="(rule, i) in rules" :key="i" :type="KIND_TAG_TYPE[rule.kind]" size="small">
-            {{ rule.description }}
-          </n-tag>
-        </n-flex>
-      </div>
+        <n-tag
+          v-for="(rule, i) in rules"
+          :key="`${lang}-${i}`"
+          :type="KIND_TAG_TYPE[rule.kind]"
+          size="small"
+          :bordered="false"
+        >
+          {{ rule.description }}
+        </n-tag>
+      </template>
+      <span class="requirements-note">提交时会逐条检查</span>
     </div>
 
-    <h3 class="title">
-      <Icon icon="streamline-ultimate-color:checklist"></Icon>
-      描述
-    </h3>
-    <MdPreview
-      preview-theme="vuepress"
-      :model-value="problem.description"
-      :theme="isDark ? 'dark' : 'light'"
-    />
-
-    <template v-if="!isSQL">
-      <h3 class="title">
-        <Icon icon="streamline-ultimate-color:envelope-back-front"></Icon>
-        输入
-      </h3>
+    <section class="block">
+      <h3 class="title">描述</h3>
       <MdPreview
         preview-theme="vuepress"
-        :model-value="problem.inputDescription"
+        :model-value="problem.description"
         :theme="isDark ? 'dark' : 'light'"
       />
+    </section>
 
-      <h3 class="title">
-        <Icon icon="streamline-ultimate-color:mailbox-post"></Icon>
-        输出
-      </h3>
-      <MdPreview
-        preview-theme="vuepress"
-        :model-value="problem.outputDescription"
-        :theme="isDark ? 'dark' : 'light'"
-      />
-    </template>
+    <!-- 输入、输出一般都只有一两句，左右摆开省半屏 -->
+    <div v-if="!isSQL" class="io">
+      <section class="block">
+        <h3 class="title">输入</h3>
+        <MdPreview
+          preview-theme="vuepress"
+          :model-value="problem.inputDescription"
+          :theme="isDark ? 'dark' : 'light'"
+        />
+      </section>
+      <section class="block">
+        <h3 class="title">输出</h3>
+        <MdPreview
+          preview-theme="vuepress"
+          :model-value="problem.outputDescription"
+          :theme="isDark ? 'dark' : 'light'"
+        />
+      </section>
+    </div>
 
-    <n-collapse v-if="canShowReferenceFlowchart" class="flowchart-section">
-      <n-collapse-item name="reference">
-        <template #header>
-          <span class="title collapse-title">
-            <Icon icon="vscode-icons:file-type-drawio"></Icon>
-            参考流程图
-          </span>
-        </template>
+    <!-- 老师给的参考流程图：一行可以点开的条，默认折叠 -->
+    <section v-if="canShowReferenceFlowchart" class="block">
+      <button
+        type="button"
+        class="fold"
+        :aria-expanded="referenceOpen"
+        @click="referenceOpen = !referenceOpen"
+      >
+        <svg
+          class="fold-caret"
+          :class="{ open: referenceOpen }"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+        <span class="fold-title">老师给的参考流程图</span>
+        <span class="fold-note">{{ referenceOpen ? "收起" : "点开看" }}</span>
+      </button>
+      <div v-if="referenceOpen" class="fold-body">
         <ProblemFlowchart />
-      </n-collapse-item>
-    </n-collapse>
+      </div>
+    </section>
 
-    <section v-else-if="myFlowchartStore.showing" class="flowchart-section">
-      <n-flex align="center" justify="space-between">
-        <h3 class="title">
-          <Icon icon="vscode-icons:file-type-drawio"></Icon>
-          你画的流程图
-        </h3>
+    <!-- 自己画到 A/S 的那张：默认展开一小块，可以放大、可以收起 -->
+    <section v-else-if="myFlowchartStore.showing" class="block">
+      <div class="block-head">
+        <h3 class="title">你画的流程图</h3>
         <n-button text type="primary" size="small" @click="myFlowchartZoom = true">
-          放大看 ›
+          放大看
         </n-button>
-      </n-flex>
-      <div class="my-flowchart" role="button" @click="myFlowchartZoom = true">
+        <n-button text size="small" @click="myFlowchartOpen = !myFlowchartOpen">
+          {{ myFlowchartOpen ? "收起" : "展开" }}
+        </n-button>
+      </div>
+      <div
+        v-if="myFlowchartOpen"
+        class="my-flowchart"
+        role="button"
+        aria-label="放大看你画的流程图"
+        @click="myFlowchartZoom = true"
+      >
         <MyFlowchart compact />
       </div>
       <n-modal
@@ -216,47 +273,48 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         例子是一张表：例子 N | 输入 | 输出。原来每个例子各占一个小标题加两个框，三个例子
         就占掉大半屏；Python 的例子大多一两行，摆成表一眼能对上「这个输入 → 这个输出」
       -->
-      <section v-if="samples.length" class="sample">
-        <n-flex align="center" justify="space-between" class="sample-head">
-          <h3 class="title">
-            <Icon icon="streamline-emojis:microscope"></Icon>
-            例子
-          </h3>
+      <section v-if="samples.length" class="block">
+        <div class="block-head">
+          <h3 class="title">例子</h3>
           <n-button
             text
             type="primary"
             size="small"
+            class="block-link"
             @click="submissionStore.revealResult('custom')"
           >
             自己输入数据试试 ›
           </n-button>
-        </n-flex>
+        </div>
         <div class="sample-table" role="table" aria-label="例子">
-          <div class="sample-row sample-header" role="row">
-            <span role="columnheader"></span>
-            <span role="columnheader">输入</span>
-            <span role="columnheader">输出</span>
-          </div>
-          <div v-for="(sample, index) of samples" :key="index" class="sample-row" role="row">
-            <span class="sample-no" role="rowheader">{{ index + 1 }}</span>
-            <div class="sample-cell" role="cell">
-              <pre class="testcase">{{ sample.input }}</pre>
-              <span class="sample-copy"><Copy :value="sample.input" /></span>
+          <span role="columnheader"></span>
+          <span role="columnheader" class="sample-label">输入</span>
+          <span role="columnheader" class="sample-label">输出</span>
+          <template v-for="(sample, index) of samples" :key="index">
+            <span class="sample-no" role="rowheader">例子 {{ index + 1 }}</span>
+            <div
+              v-for="side in ['input', 'output'] as const"
+              :key="side"
+              class="sample-cell"
+              role="cell"
+            >
+              <pre class="testcase">{{ sample[side] }}</pre>
+              <button
+                type="button"
+                class="sample-copy"
+                :aria-label="`复制例子 ${index + 1} 的${side === 'input' ? '输入' : '输出'}`"
+                @click="copySample(`${index}-${side}`, sample[side])"
+              >
+                {{ copiedKey === `${index}-${side}` ? "已复制" : "复制" }}
+              </button>
             </div>
-            <div class="sample-cell" role="cell">
-              <pre class="testcase">{{ sample.output }}</pre>
-              <span class="sample-copy"><Copy :value="sample.output" /></span>
-            </div>
-          </div>
+          </template>
         </div>
       </section>
     </template>
 
     <template v-if="isSQL && sqlDisplay">
-      <h3 class="title">
-        <Icon icon="devicon:sqlite"></Icon>
-        数据表
-      </h3>
+      <h3 class="title sql-title">数据表</h3>
       <div v-for="t in sqlDisplay.tables" :key="t.name">
         <p class="sqlTableName">{{ t.name }}</p>
         <SQLDataTable
@@ -267,10 +325,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         />
       </div>
 
-      <h3 class="title">
-        <Icon icon="streamline-ultimate-color:check-button"></Icon>
-        期望结果
-      </h3>
+      <h3 class="title sql-title">期望结果</h3>
       <template v-if="sqlExpectedQuery">
         <SQLDataTable
           :columns="sqlExpectedQuery.columns"
@@ -294,35 +349,30 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       </div>
     </template>
 
-    <div v-if="problem.hint">
-      <h3 class="title">
-        <Icon icon="streamline-emojis:man-tipping-hand-1"></Icon>
-        提示
-      </h3>
+    <section v-if="problem.hint" class="block">
+      <h3 class="title">提示</h3>
       <MdPreview
         preview-theme="preview"
         :model-value="problem.hint"
         :theme="isDark ? 'dark' : 'light'"
       />
-    </div>
+    </section>
 
-    <div v-if="problem.source">
-      <h3 class="title">
-        <Icon icon="streamline-ultimate-color:book-open-bookmark"></Icon>
-        来源
-      </h3>
+    <section v-if="problem.source" class="block">
+      <h3 class="title">来源</h3>
       <MdPreview
         preview-theme="vuepress"
         :model-value="problem.source"
         :theme="isDark ? 'dark' : 'light'"
       />
-    </div>
+    </section>
 
     <SimilarProblems v-if="showSimilar" title="相似题目推荐" />
   </div>
 </template>
 
 <style scoped>
+/* 设计稿「题目页签：还没运行过」 */
 .problem-head {
   display: flex;
   flex-direction: column;
@@ -330,26 +380,64 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   margin-bottom: 12px;
 }
 
-.problemTitle {
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pid {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background-color: rgba(128, 128, 128, 0.12);
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+}
+
+.problem-title {
   margin: 0;
   font-size: 22px;
   line-height: 1.3;
 }
 
-.problem-meta {
-  font-size: 13px;
-}
-
-.title {
+.meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  margin: 20px 0 4px;
 }
 
-/* md-editor 的预览自带一圈 padding 和段落外边距，放在小节标题下面显得很散 */
+.block {
+  margin-top: 14px;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.block-head .title {
+  margin: 0;
+}
+
+.block-link {
+  margin-left: auto;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+/* md-editor 的预览自带一圈 padding、白底和段落外边距，放在小节标题下面显得很散 */
+:deep(.md-editor) {
+  background: transparent;
+}
+
 :deep(.md-editor-preview-wrapper) {
   padding: 0;
 }
@@ -362,14 +450,23 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   margin-bottom: 0;
 }
 
+.io {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* 代码要求：一行的浅绿框，硬性的判定条件，放在最前面 */
 .requirements {
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 6px;
   border: 1px solid rgba(24, 160, 88, 0.3);
   background-color: rgba(24, 160, 88, 0.06);
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  font-size: 13px;
 }
 
 .requirements-head {
@@ -377,103 +474,55 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 }
 
 .requirements-note {
-  font-size: 12px;
-  font-weight: normal;
-}
-
-.requirements-lang {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  color: v-bind("theme.textColor3");
 }
 
 .lang-label {
   font-weight: 600;
-  font-size: 13px;
 }
 
-.sample {
-  margin-top: 20px;
-}
-
-.sample-head {
-  margin-bottom: 8px;
-}
-
-.sample-head .title {
-  margin: 0;
-}
-
-.sample-table {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid rgba(128, 128, 128, 0.2);
+/* 参考流程图：一行可以点开的条 */
+.fold {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid v-bind("theme.dividerColor");
   border-radius: 6px;
-  overflow: hidden;
-}
-
-.sample-row {
-  display: grid;
-  grid-template-columns: 2.2em minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.sample-row + .sample-row {
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-.sample-header {
-  font-size: 12px;
-  opacity: 0.7;
-  background-color: rgba(128, 128, 128, 0.06);
-}
-
-.sample-header > span {
-  padding: 4px 10px;
-}
-
-.sample-no {
+  background-color: rgba(128, 128, 128, 0.04);
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.fold:hover {
+  border-color: v-bind("theme.borderColor");
+}
+
+.fold-caret {
+  flex: none;
+  transition: transform 0.15s;
+}
+
+.fold-caret.open {
+  transform: rotate(90deg);
+}
+
+.fold-title {
+  font-weight: 600;
+}
+
+.fold-note {
   font-size: 13px;
-  opacity: 0.6;
-  font-variant-numeric: tabular-nums;
-  background-color: rgba(128, 128, 128, 0.06);
+  color: v-bind("theme.textColor3");
 }
 
-.sample-cell {
-  position: relative;
-  min-width: 0;
-  padding: 6px 30px 6px 10px;
-}
-
-.sample-cell + .sample-cell {
-  border-left: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-/* Copy 的根是 n-tooltip，class 挂不上去，所以外面包一层 span 来定位 */
-.sample-copy {
-  position: absolute;
-  top: 5px;
-  right: 6px;
-  display: flex;
-}
-
-.testcase {
-  margin: 0;
-  font-size: 14px;
-  white-space: pre;
-  overflow-x: auto;
-  font-family: Monaco, Consolas, monospace;
-}
-
-.flowchart-section {
-  margin-top: 20px;
-}
-
-.collapse-title {
-  margin: 0;
+.fold-body {
+  margin-top: 8px;
 }
 
 .my-flowchart {
@@ -481,6 +530,67 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.06);
   padding: 8px;
+}
+
+/* 例子：例子 N | 输入 | 输出，每格右边一个「复制」 */
+.sample-table {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: stretch;
+}
+
+.sample-label,
+.sample-no {
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+}
+
+.sample-no {
+  display: flex;
+  align-items: center;
+}
+
+.sample-cell {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 2px 4px 2px 10px;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.08);
+}
+
+.testcase {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 0;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 14px;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.sample-copy {
+  flex: none;
+  height: 24px;
+  margin-top: 2px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: v-bind("theme.primaryColorPressed");
+  cursor: pointer;
+}
+
+.sample-copy:hover {
+  background-color: rgba(24, 160, 88, 0.1);
+}
+
+.sql-title {
+  margin-top: 14px;
 }
 
 .sqlTableName {

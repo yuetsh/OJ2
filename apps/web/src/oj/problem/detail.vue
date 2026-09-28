@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useThemeVars } from "naive-ui"
 import { errorCode } from "utils/api"
 import { getProblem } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -93,6 +94,9 @@ watch(
 )
 
 const drawer = ref<DrawerKey | null>(null)
+// 抽屉挂进左栏：要等左栏这个元素挂上之后才能当 Teleport 的目标
+const leftPane = useTemplateRef<HTMLElement>("leftPane")
+const theme = useThemeVars()
 
 // 协作中的老师看的是学生的提交
 const teacherCollab = useTeacherCollab()
@@ -234,61 +238,70 @@ onBeforeUnmount(() => {
   <template v-if="problem">
     <SubmissionEffects />
     <StatisticsModal />
+    <!--
+      桌面：两栏顶满整个内容区（设计稿「机房（方案 B）」），中间一条 1px 分隔线、可拖动。
+      布局给内容区留了 16px 内边距，这里用负边距抵掉
+    -->
     <n-split
       v-if="isDesktop"
+      class="problem-split"
       direction="horizontal"
       :default-size="0.43"
       :min="0.2"
       :max="0.8"
-      style="height: calc(100vh - 92px)"
+      :resize-trigger-size="1"
     >
       <template #1>
-        <div class="left-pane">
+        <div id="problem-left-pane" ref="leftPane" class="left-pane">
           <ContextBar />
           <div class="tab-row">
-            <n-tabs
-              v-model:value="currentTab"
-              type="segment"
-              class="page-tabs"
-              @click="drawer = null"
-            >
-              <n-tab name="content">题目</n-tab>
-              <n-tab name="result"><ResultTabLabel /></n-tab>
-            </n-tabs>
-            <n-flex v-if="ctx.drawers.length" :size="6" :wrap="false">
-              <n-button
+            <div class="page-tabs" role="tablist" aria-label="题目 / 结果">
+              <button
+                type="button"
+                role="tab"
+                class="page-tab"
+                :class="{ active: currentTab === 'content' }"
+                :aria-selected="currentTab === 'content'"
+                @click="currentTab = 'content'"
+              >
+                题目
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="page-tab"
+                :class="{ active: currentTab === 'result' }"
+                :aria-selected="currentTab === 'result'"
+                @click="currentTab = 'result'"
+              >
+                <ResultTabLabel />
+              </button>
+            </div>
+            <div v-if="ctx.drawers.length" class="drawer-buttons">
+              <button
                 v-for="key in ctx.drawers"
                 :key="key"
-                size="small"
-                :type="drawer === key ? 'primary' : 'default'"
-                :secondary="drawer === key"
+                type="button"
+                class="drawer-button"
                 @click="toggleDrawer(key)"
               >
                 {{ drawerLabel(key) }}
-              </n-button>
-            </n-flex>
-          </div>
-          <!--
-            抽屉挂在页签行下面这一块（position: relative），盖住题面、编辑器不动。
-            页签行露在外面：同一个按钮再点一下就关、点另一个就换，点「题目 / 结果」也会关
-          -->
-          <div id="problem-pane-stack" class="pane-stack">
-            <!--
-              两个页签各滚各的：读题读到底下切去看结果，结果不该也停在底下。
-              v-show 挂在外面这层 div 上 —— 直接挂在 n-scrollbar 上不生效，它自己管根节点的 style
-            -->
-            <div v-show="currentTab === 'content'" class="pane-body">
-              <n-scrollbar content-style="padding-top: 8px">
-                <ProblemContent />
-              </n-scrollbar>
+              </button>
             </div>
-            <div v-if="resultMounted" v-show="currentTab === 'result'" class="pane-body">
-              <n-scrollbar content-style="padding-top: 8px">
-                <ResultPane />
-              </n-scrollbar>
-            </div>
-            <ProblemDrawer v-model="drawer" to="#problem-pane-stack" />
           </div>
+          <!-- 两个页签各滚各的：读题读到底下切去看结果，结果不该也停在底下 -->
+          <div v-show="currentTab === 'content'" class="pane-body">
+            <n-scrollbar content-style="padding: 16px 20px">
+              <ProblemContent />
+            </n-scrollbar>
+          </div>
+          <div v-if="resultMounted" v-show="currentTab === 'result'" class="pane-body">
+            <n-scrollbar content-style="padding: 14px 20px">
+              <ResultPane />
+            </n-scrollbar>
+          </div>
+          <!-- 抽屉盖住整个左栏（连上下文条和页签行），抽屉顶上有自己的页签可以互相切换；编辑器不动 -->
+          <ProblemDrawer v-if="leftPane" v-model="drawer" :to="leftPane" />
         </div>
       </template>
       <template #2>
@@ -335,48 +348,100 @@ onBeforeUnmount(() => {
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
-/*
- * 分隔条两边各留 12px：左栏页签行右端的「统计 / 点评 / 我的提交」和右栏工具栏最左的
- * 「写代码 / 画流程图」都是描边按钮、又在同一高度，原来紧贴着分隔条，看上去连成一排
- */
+.problem-split {
+  margin: -16px;
+  width: calc(100% + 32px);
+  height: calc(100vh - 60px);
+}
+
+/* 分隔线：看上去 1px，拖的时候热区宽一点 */
+.problem-split :deep(.n-split__resize-trigger) {
+  background-color: v-bind("theme.borderColor");
+}
+
+/* 热区挂在分隔线本身上：wrapper 不是定位元素，挂在它上面的 ::before 会盖住整个分栏 */
+.problem-split :deep(.n-split__resize-trigger-wrapper) {
+  position: relative;
+}
+
+.problem-split :deep(.n-split__resize-trigger-wrapper)::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+  cursor: col-resize;
+}
+
 .left-pane {
   position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding-right: 12px;
-  box-sizing: border-box;
 }
 
 .right-pane {
   height: 100%;
-  padding-left: 12px;
-  box-sizing: border-box;
 }
 
+/* 「题目 / 结果」：下划线式页签，右边是抽屉的三个胶囊按钮 */
 .tab-row {
   flex: none;
   height: 42px;
+  box-sizing: border-box;
+  padding: 0 20px 0 12px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 2px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
 .page-tabs {
-  width: 180px;
-  flex: none;
+  display: flex;
+  height: 100%;
 }
 
-.pane-stack {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+.page-tab {
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  color: v-bind("theme.textColor3");
+  cursor: pointer;
+}
+
+.page-tab.active {
+  border-bottom-color: v-bind("theme.primaryColor");
+  color: v-bind("theme.textColor1");
+  font-weight: 600;
+}
+
+.drawer-buttons {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.drawer-button {
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 16px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+  cursor: pointer;
+}
+
+.drawer-button:hover {
+  border-color: v-bind("theme.primaryColorHover");
+  color: v-bind("theme.primaryColor");
 }
 
 .pane-body {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 </style>

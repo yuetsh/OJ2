@@ -91,9 +91,11 @@ const contestID = route.params.contestID || null
 // 草稿存在哪个键下（题单入口单独一份），和「重置代码」共用一份算法
 const storageKey = useDraftKey()
 
+// 桌面：顶栏 60 + 工具栏 48，协作条再占 40（两栏顶满内容区，见 detail.vue 的 problem-split）。
+// 手机：顶栏两行 + 课堂条 + 页签 + 工具栏约 236px，底部还有「运行例子 / 提交」那条约 64px
 const editorHeight = computed(() => {
-  const base = isDesktop.value ? 133 : 300
-  return `calc(100vh - ${base + (teacherCollab.value ? 52 : 0)}px)`
+  const base = isDesktop.value ? 108 : 300
+  return `calc(100vh - ${base + (teacherCollab.value ? 40 : 0)}px)`
 })
 
 function loadCode() {
@@ -160,7 +162,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
 </script>
 
 <template>
-  <n-flex vertical>
+  <div class="problem-editor">
     <CollabBar v-if="teacherCollab" />
     <EditorToolbar @change-language="changeLanguage" />
     <!--
@@ -180,5 +182,5 @@ provide("flowchartEditorRef", flowchartEditorRef)
       :extra-extensions="editorExtensions"
       @update:model-value="changeCode"
     />
-  </n-flex>
+  </div>
 </template>
