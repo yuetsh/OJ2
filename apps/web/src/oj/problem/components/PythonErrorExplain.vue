@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { useCodeStore } from "oj/store/code"
 import { findChinesePunctuation } from "oj/problem/utils/chinesePunctuation"
-import { applyFixes, clearErrorMark, currentCode, showErrorMark } from "oj/problem/utils/errorMark"
+import {
+  applyFixes,
+  clearErrorMark,
+  currentCode,
+  showErrorMark,
+  showPunctuationMarks,
+} from "oj/problem/utils/errorMark"
 import { explainPythonCompileError } from "oj/problem/utils/pythonError"
 
 /**
@@ -55,6 +61,9 @@ watch(
     fixedCount.value = null
     if (ex?.line) showErrorMark(ex.line, ex.sourceLine, ex.caret)
     else clearErrorMark()
+    // 中文标点一处不漏地标出来，和按钮上的「N 处」对得上
+    const code = ex?.punctuation ? currentCode() : null
+    if (code !== null) showPunctuationMarks(findChinesePunctuation(code))
   },
   { immediate: true },
 )

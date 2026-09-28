@@ -45,7 +45,10 @@ const canTrial = computed(() => {
   <FlowchartResult v-if="drawing" />
   <div v-show="!drawing" class="result-pane">
     <n-radio-group v-if="canTrial" v-model:value="resultSegment" size="small" class="segments">
-      <n-radio-button value="submit">提交结果</n-radio-button>
+      <!-- 语法没过就没交上去：那一段不叫「提交结果」 -->
+      <n-radio-button value="submit">{{
+        syntaxErrorInfo ? "交之前检查" : "提交结果"
+      }}</n-radio-button>
       <n-radio-button value="samples">运行例子</n-radio-button>
       <n-radio-button value="custom">自己输入</n-radio-button>
     </n-radio-group>
@@ -53,7 +56,7 @@ const canTrial = computed(() => {
     <!-- 提交结果用 v-show：切去看运行例子时不卸载，挂着的错误说明在编辑器里标着红 -->
     <div v-show="resultSegment === 'submit' || !canTrial">
       <n-flex v-if="syntaxErrorInfo" vertical>
-        <n-alert type="warning" title="代码有语法错误，还没有提交" />
+        <n-alert type="warning" title="代码有语法错误，还没有交上去" />
         <PythonErrorExplain :err-info="syntaxErrorInfo" />
       </n-flex>
       <template v-else-if="submission">

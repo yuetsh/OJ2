@@ -33,6 +33,36 @@ function build(state: EditorState, mark: Mark): DecorationSet {
   return Decoration.set(ranges)
 }
 
+/**
+ * 中文标点的标记：报错只点名第一处，但「把中文标点都换成英文（N 处）」说的是 N 处 ——
+ * 编辑器里只看得到一处的话，学生对不上那个 N，也不知道一键替换会改哪里。
+ * 字符串和注释里的不标（那是合法的，见 chinesePunctuation.ts）
+ */
+const setPunctuation = StateEffect.define<PunctuationFix[]>()
+const punctuationDeco = Decoration.mark({ class: "cm-punctuation-mark" })
+
+const punctuationField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const effect of tr.effects) {
+      if (effect.is(setPunctuation)) {
+        const max = tr.state.doc.length
+        deco = Decoration.set(
+          effect.value
+            .filter((fix) => fix.to <= max && fix.to > fix.from)
+            .map((fix) => punctuationDeco.range(fix.from, fix.to)),
+          true,
+        )
+      }
+      // 清错误标记的时候（下一次提交、一键替换）一起清
+      if (effect.is(setMark) && effect.value === null) deco = Decoration.none
+    }
+    return deco
+  },
+  provide: (field) => EditorView.decorations.from(field),
+})
+
 const markField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(deco, tr) {
@@ -68,9 +98,19 @@ const theme = EditorView.baseTheme({
     textUnderlineOffset: "3px",
     backgroundColor: "rgba(208, 48, 80, 0.18)",
   },
+  ".cm-punctuation-mark": {
+    backgroundColor: "rgba(240, 160, 32, 0.35)",
+    outline: "1px solid rgba(240, 160, 32, 0.8)",
+    borderRadius: "2px",
+  },
 })
 
-export const errorMarkExtensions = [markField, tracker, theme]
+export const errorMarkExtensions = [markField, punctuationField, tracker, theme]
+
+/** 标出这些中文标点（位置是整篇代码里的偏移，来自 findChinesePunctuation） */
+export function showPunctuationMarks(fixes: PunctuationFix[]) {
+  current?.dispatch({ effects: setPunctuation.of(fixes) })
+}
 
 /**
  * 标出第 `line` 行并滚过去。`sourceLine` 是报错里打出来的那一行（去了行首空格），
