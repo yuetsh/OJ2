@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted } from "vue"
+import { ref, computed, getCurrentScope, onScopeDispose } from "vue"
 import { useIntervalFn, useTimeoutFn } from "@vueuse/core"
 import { getSubmission } from "oj/api"
 import { SubmissionStatus } from "utils/constants"
@@ -153,9 +153,9 @@ export function useSubmissionMonitor() {
   })
 
   // ==================== 清理 ====================
-  onUnmounted(() => {
-    pausePolling()
-  })
+  // 现在由 submission store 持有（见 oj/store/submission.ts），store 不销毁就一直在；
+  // 用 onScopeDispose 是为了在组件里调用时照样能收尾
+  if (getCurrentScope()) onScopeDispose(pausePolling)
 
   return {
     // 状态

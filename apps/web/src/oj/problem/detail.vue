@@ -7,6 +7,9 @@ import { useProblemStore } from "oj/store/problem"
 import { useScreenModeStore } from "shared/store/screenMode"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
+import { useSubmissionStore } from "oj/store/submission"
+// 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
+import SubmissionEffects from "./components/SubmissionEffects.vue"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
@@ -131,6 +134,9 @@ watch(
   },
 )
 onBeforeUnmount(() => {
+  // 提交状态在 store 里、离开页面也不会自己没：不清的话回到题目页（哪怕换了一道题），
+  // 结果面板里还是上一次的那条
+  useSubmissionStore().reset()
   problem.value = null
   errMsg.value = "无数据"
   screenModeStore.resetScreenMode()
@@ -154,6 +160,7 @@ watch(
 
 <template>
   <template v-if="problem">
+    <SubmissionEffects />
     <n-split
       v-if="isDesktop && screenModeStore.isBothMode"
       direction="horizontal"

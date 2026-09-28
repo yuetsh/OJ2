@@ -1,319 +1,56 @@
 <script setup lang="ts">
-import { errorCode, errorMessage } from "utils/api"
 import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
-import { formatCode, getReaction, submitCode } from "oj/api"
 import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import { useFireworks } from "oj/problem/composables/useFireworks"
-import { useSubmissionMonitor } from "oj/problem/composables/useSubmissionMonitor"
-import { LANGUAGE_FORMAT_VALUE, SubmissionStatus } from "utils/constants"
-import type { SubmitCodePayload } from "utils/types"
-import type { RouteLocationNormalized } from "vue-router"
+import { useSubmissionStore } from "oj/store/submission"
 import { getSubmitButtonState } from "./submitButtonState"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
-import { useCollabStore } from "shared/store/collab"
-import { restartEditTrace, snapshotEditTrace } from "oj/problem/utils/editTrace"
 
-// ==================== 异步组件 ====================
-const ProblemReaction = defineAsyncComponent(() => import("./ProblemReaction.vue"))
+/**
+ * 提交按钮 + 结果面板。只管显示和把点击交给 store：提交的状态在 submission store，
+ * 判完之后该发生的事（烟花、点评、回题单）在页面这一层的 SubmissionEffects ——
+ * 这个组件在编辑器的工具栏里，编辑器卸载时它也跟着卸载，所以什么都不能只存在这里。
+ */
+
 // 结果面板第一次弹出（也就是第一次提交）时才加载：它带着 DataTable，而判题要等
 // 好几秒，这点下载时间藏得住。进页面就加载的话，只看题不提交的人也要付这笔
 const SubmissionResult = defineAsyncComponent(() => import("./SubmissionResult.vue"))
 const PythonErrorExplain = defineAsyncComponent(() => import("./PythonErrorExplain.vue"))
 
-// ==================== 基础状态 ====================
 const userStore = useUserStore()
-const collabStore = useCollabStore()
 const codeStore = useCodeStore()
-const problemStore = useProblemStore()
-const { problem } = storeToRefs(problemStore)
+const submissionStore = useSubmissionStore()
+const { submission, showResult, syntaxErrorInfo } = storeToRefs(submissionStore)
 const route = useRoute()
-const contestID = (route.params.contestID as string) ?? ""
-const problemSetId = (route.params.problemSetId as string) ?? ""
-
-const router = useRouter()
-const [commentPanel] = useToggle()
-
-function closeCommentPanel() {
-  commentPanel.value = false
-  // 点评价弹窗时，结果面板会当成「点了外面」收起来 —— 而「下一题」就在面板里
-  // （LessonNext），评价完得把它重新打开
-  showResult.value = true
-  settleReview()
-}
 
 const { isDesktop } = useBreakpoints()
 
-// ==================== 烟花效果 ====================
-const { celebrate } = useFireworks()
-
-// ==================== 判题监控 ====================
-const {
-  submission,
-  judging,
-  pending,
-  submitting,
-  startMonitoring,
-  reset: resetSubmission,
-} = useSubmissionMonitor()
-
-const showResult = ref(false)
-const isFormatting = ref(false)
-const isSubmittingRequest = ref(false)
-
-/**
- * 提交前语法检查查出来的错误（CPython 的报错原文），有它时结果面板显示中文说明、
- * 不显示上一次的判题结果。这次没交上去，所以不是一条提交、也不数进失败次数。
- *
- * 检查在服务端做（`/code/format` 里先用 CPython 编译一遍），原来是浏览器里的 Skulpt：
- * 那个只能报「第 N 行有错」，而且要下载 ~226KB。
- */
-const syntaxErrorInfo = ref("")
-
-// ==================== 提交冷却 ====================
-const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
-  controls: true,
-  immediate: false,
-})
-
-// ==================== AC 后弹出点评轮盘 ====================
-// 只对已经能评价、且还没评过的人弹：后端要求先有 AC 才收评价，这里刚 AC 完正好；
-// mine 非 null 说明早就评过了，别再打扰。
-//
-// 点评是强制的，但从 AC 到弹窗出来有 1.5 秒（加上查一次「评过没有」），而换题会把
-// 定时器取消（见下面换题的 watch）—— 「下一题」在通过的那一刻就出现了，学生手快点
-// 下去，点评就跳过了。所以这段时间里欠着一次点评（reviewOwed），离开这道题的导航
-// 先拦下来：立刻弹点评，选完再去原来要去的地方。
-const reviewOwed = ref(false)
-let reviewChecking = false
-let navigationAfterReview: string | null = null
-
-async function openReview() {
-  if (reviewChecking) return
-  reviewChecking = true
-  try {
-    const res = await getReaction(problem.value!.id)
-    if (res.mine === null) {
-      commentPanel.value = true
-      return
-    }
-  } catch {
-    // 查不到就不拦：宁可少一条点评，也不能把学生卡在这道题上
-  } finally {
-    reviewChecking = false
-  }
-  settleReview()
-}
-
-/** 这次点评了结（评完了、原来就评过、或者查不到），接着去刚才被拦下的地方 */
-function settleReview() {
-  reviewOwed.value = false
-  const target = navigationAfterReview
-  navigationAfterReview = null
-  if (target) router.push(target)
-}
-
-const { start: showCommentPanelDelayed, stop: cancelCommentPanel } = useTimeoutFn(
-  openReview,
-  1500,
-  { immediate: false },
-)
-
-/**
- * 只拦「离开这道题」：换 query（左栏切页签会改 `?tab=`）不算。弹窗已经开着的时候
- * 不拦 —— 那时页面被遮罩盖住，还能走的只有浏览器后退，拦下来就等于把人关在这一页，
- * 点评接口一直失败时连退路都没有。
- */
-function holdForReview(to: RouteLocationNormalized, from: RouteLocationNormalized) {
-  if (!reviewOwed.value || commentPanel.value) return true
-  if (to.name === from.name && to.params.problemID === from.params.problemID) return true
-  navigationAfterReview = to.fullPath
-  cancelCommentPanel()
-  openReview()
-  return false
-}
-
-onBeforeRouteUpdate(holdForReview)
-onBeforeRouteLeave(holdForReview)
-
-const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutFn(
-  () => {
-    router.push({
-      name: "problemset",
-      params: {
-        problemSetId: problemSetId,
-      },
-    })
-  },
-  1500,
-  { immediate: false },
-)
-
-/**
- * 换题时把上一道题的东西全收掉：结果面板、提交前的语法错误、还在跟的那条提交，以及
- * 通过之后那两个 1.5 秒的定时器 —— 评价弹窗是按**当前**题目去查、去弹的，不取消的话
- * 就会给一道还没做的题弹评价。欠着的点评走不到这里：离开这道题的导航已经被
- * holdForReview 拦下、评完才放行；还能走到这里的只有弹窗开着时按了浏览器后退。
- *
- * 题目页换题是同一个组件复用（只换路由参数），以前几乎只有退回列表再点进来这一条路，
- * 有了顶栏题号直达和结果面板里的「下一题」之后，这成了常规操作。
- */
-watch(
-  () => problem.value?._id,
-  (next, previous) => {
-    if (!previous || next === previous) return
-    showResult.value = false
-    syntaxErrorInfo.value = ""
-    commentPanel.value = false
-    cancelCommentPanel()
-    reviewOwed.value = false
-    navigationAfterReview = null
-    cancelGoToProblemSet()
-    resetSubmission()
-  },
-)
-
-// ==================== 计算属性 ====================
 const buttonState = computed(() =>
   getSubmitButtonState({
     isAuthed: userStore.isAuthed,
     hasCode: codeStore.code.value.trim() !== "",
-    isFormatting: isFormatting.value,
-    isSubmitting: isSubmittingRequest.value || submitting.value,
-    isJudging: judging.value || pending.value,
-    isCooldown: isCooldown.value,
+    isFormatting: submissionStore.isFormatting,
+    isSubmitting: submissionStore.isSubmittingRequest || submissionStore.submitting,
+    isJudging: submissionStore.judging || submissionStore.pending,
+    isCooldown: submissionStore.isCooldown,
   }),
 )
 
-// ==================== 提交函数 ====================
-async function submit() {
+function submit() {
   if (buttonState.value.disabled) return
-
-  syntaxErrorInfo.value = ""
-
-  // 0. 提交前自动格式化（Python 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）。
-  //    Python 在格式化之前先由服务端的 CPython 查一遍语法，有错就不提交
-  const formatLang = LANGUAGE_FORMAT_VALUE[codeStore.code.language]
-  if (["python", "c", "cpp", "sql"].includes(formatLang)) {
-    isFormatting.value = true
-    try {
-      const res = await formatCode({
-        code: codeStore.code.value,
-        language: formatLang,
-      })
-      codeStore.setCode(res.code)
-    } catch (e) {
-      if (errorCode(e) === "syntax-error") {
-        // 仅 Python 会出现：message 是 CPython 的报错原文，交给 PythonErrorExplain 翻译
-        syntaxErrorInfo.value = errorMessage(e)
-        showResult.value = true
-        return
-      }
-      // server-error / 网络异常：格式化工具问题，静默降级，提交原代码
-    } finally {
-      isFormatting.value = false
-    }
-  }
-
-  // 1. 构建提交数据
-  const data: SubmitCodePayload = {
-    problemId: problem.value!.id,
-    language: codeStore.code.language,
-    code: codeStore.code.value,
-    // 编辑过程信号，见 utils/editTrace.ts。协作的判断和 ProblemEditor 的 collabHere 同一个口径
-    trace: snapshotEditTrace(
-      collabStore.room !== null && collabStore.room.problemId === problem.value!._id,
-    ),
-  }
-  if (contestID) {
-    data.contestId = parseInt(contestID)
-  }
-  // 从题单入口进来的，把来源题单一起报上去：提交列表要据此标出「来自题单」。
-  // 只是来源标记，题单进度仍由后端判完之后自己记账（见上面那段注释）
-  if (problemSetId) {
-    data.problemSetId = parseInt(problemSetId)
-  }
-  // 2. 提交代码到后端
-  isSubmittingRequest.value = true
-  try {
-    const res = await submitCode(data)
-    console.log(`[Submit] 代码已提交: ID=${res.submissionId}`)
-    // 交上了才清零；被限流 / 网络失败的话这一段接着记，下次提交一起报
-    restartEditTrace(codeStore.code.value.length)
-
-    // 3. 启动冷却 + 监控
-    startCooldown()
-    startMonitoring(res.submissionId)
-    showResult.value = true
-  } finally {
-    isSubmittingRequest.value = false
-  }
+  submissionStore.submit({
+    contestId: (route.params.contestID as string) ?? "",
+    problemSetId: (route.params.problemSetId as string) ?? "",
+  })
 }
-
-// ==================== 失败计数 ====================
-// 这里只数本次会话的增量，历史失败数由 problem.myFailedCount 带进来。
-// 排除的状态要和后端 judge/status.ts 的 NON_FAILURE_RESULTS 对齐，
-// 尤其是 system_error —— 判题机自己崩了不该推进 AI 提示的解锁进度。
-watch(
-  () => submission.value?.result,
-  (result) => {
-    if (result === undefined || result === null) return
-    if (
-      result === SubmissionStatus.pending ||
-      result === SubmissionStatus.judging ||
-      result === SubmissionStatus.submitting
-    )
-      return
-    if (
-      result !== SubmissionStatus.accepted &&
-      result !== SubmissionStatus.ast_check_failed &&
-      result !== SubmissionStatus.system_error
-    ) {
-      problemStore.incrementFailCount()
-    }
-  },
-)
-
-// ==================== AC庆祝效果 ====================
-watch(
-  () => submission.value?.result,
-  async (result) => {
-    if (result !== SubmissionStatus.accepted && result !== SubmissionStatus.ast_check_failed) return
-
-    // 1. 刷新题目状态
-    problem.value!.myStatus = 0
-
-    // 题单进度不在这里更新了。以前是 AC 之后回调 PUT /problem-set-progress，只认路由
-    // 参数里那一个题单：从普通题库入口做出同一道题不计进度，网络一抖、页面提前关掉进度
-    // 就静默丢失。现在判题那一路直接记账（judge/run.ts），而且是记进所有已加入且包含
-    // 这道题的题单；收到「判完了」的时候进度已经落库，跳回题单页看到的就是新数据。
-
-    if (result !== SubmissionStatus.accepted) return
-
-    // 3. 放烟花
-    celebrate()
-
-    // 4. 弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
-    if (!contestID && !problemSetId) {
-      reviewOwed.value = true
-      showCommentPanelDelayed()
-    }
-
-    if (problemSetId) {
-      // 延迟回到题单页面
-      goToProblemSetDelayed()
-    }
-  },
-)
 </script>
 
 <template>
   <!-- 提交按钮 + 结果弹窗。
-       display-directive 默认是 "if"：面板一收起来整个 SubmissionResult 就被卸载，
-       正在流式输出的 AI 提示连同已经生成的内容一起没了，那次 LLM 调用白花。
-       改成 "show" 之后内容留着，重新打开还是原样。 -->
+       display-directive 默认是 "if"：面板一收起来整个 SubmissionResult 就被卸载。
+       AI 提示的内容现在在 store 里，卸了也不丢，但重新挂载要重渲染 Markdown、
+       重新拉一次「这节课的下一题」，留着更省事。 -->
   <n-popover
     trigger="manual"
     display-directive="show"
@@ -340,7 +77,6 @@ watch(
       </n-button>
     </template>
 
-    <!-- 结果展示。SubmissionResult 用 v-show 留着：它身上可能挂着正在生成的 AI 提示 -->
     <n-flex v-if="syntaxErrorInfo" vertical style="max-width: 560px">
       <n-alert type="warning" title="代码有语法错误，还没有提交" />
       <PythonErrorExplain :err-info="syntaxErrorInfo" />
@@ -358,17 +94,4 @@ watch(
   >
     上次结果
   </n-button>
-
-  <!-- 评价弹窗 -->
-  <n-modal
-    preset="card"
-    title="恭喜你成功提交，说说你对这道题的感受吧"
-    :mask-closable="false"
-    :closable="false"
-    :close-on-esc="false"
-    :style="{ maxWidth: isDesktop && '50vw', maxHeight: '80vh' }"
-    v-model:show="commentPanel"
-  >
-    <ProblemReaction @submitted="closeCommentPanel" />
-  </n-modal>
 </template>

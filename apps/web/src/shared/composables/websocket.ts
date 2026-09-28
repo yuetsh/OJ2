@@ -1,5 +1,5 @@
 import { createDiscreteApi } from "naive-ui"
-import { ref, onUnmounted, type Ref } from "vue"
+import { ref, getCurrentScope, onScopeDispose, type Ref } from "vue"
 
 import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
@@ -467,7 +467,9 @@ export interface SubmissionUpdate extends WebSocketMessage {
  * 带二十五行示例注释的 `createWebSocketComposable` 工厂，示例里那条通知通道并不
  * 存在，三个真实的 composable 一个都没用它。现在只剩这一个。
  *
- * 每次调用都新建一条连接（和原来一致，不是单例），并在组件卸载时摘掉 handler、断开。
+ * 每次调用都新建一条连接（和原来一致，不是单例），并在作用域销毁时摘掉 handler、断开。
+ * 用的是 onScopeDispose 而不是 onUnmounted：组件卸载时它照样触发，而在 Pinia store
+ * 里调用时 onUnmounted 根本挂不上（没有组件实例，只报一条警告），连接就永远断不掉。
  */
 function useChannel<T extends WebSocketMessage>(path: string, handler?: MessageHandler<T>) {
   const ws = new BaseWebSocket<T>(path)
@@ -476,10 +478,12 @@ function useChannel<T extends WebSocketMessage>(path: string, handler?: MessageH
   // 中间那段窗口收到的广播没有任何 handler 接。窗口极小，但没有理由留着它。
   if (handler) ws.addHandler(handler)
 
-  onUnmounted(() => {
-    if (handler) ws.removeHandler(handler)
-    ws.disconnect()
-  })
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      if (handler) ws.removeHandler(handler)
+      ws.disconnect()
+    })
+  }
 
   return {
     connect: () => ws.connect(),

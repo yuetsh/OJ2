@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { HINT_MIN_FAILURES, hintLevelLabel } from "@oj2/contract"
-import type { AiHintDone, JudgeCaseResult } from "@oj2/contract"
+import type { JudgeCaseResult } from "@oj2/contract"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
   submissionCaseResults,
@@ -14,12 +14,11 @@ import {
 import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
+import { useSubmissionStore } from "oj/store/submission"
 import PythonErrorExplain from "./PythonErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
-import { useAIStream } from "shared/composables/aiStream"
-import { submitHintFeedback } from "oj/api"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { useDark } from "@vueuse/core"
@@ -32,61 +31,22 @@ const isDark = useDark()
 const problemStore = useProblemStore()
 const theme = useThemeVars()
 
-// AI 提示状态。
-// hintTarget 是后端发来的全文，hintContent 是已经"打"出来的那一截 ——
-// 后端从 2c 起整段生成、过滤通过才推（设计 2.6），一次就把全文发过来，
-// 逐字显示改在这边模拟。
-const hintTarget = ref("")
-const hintContent = ref("")
-const hintStream = useAIStream()
-// 整条流跑完才算结束：提示是一次推全文，没有「第一个字到了」的中间态
-const hintLoading = hintStream.running
-const hintError = ref("")
-// 这条提示在 ai_hint 里的 id，生成完由 done 事件带回来；后端落库失败时没有，就不出评价按钮
-const hintId = ref<number | null>(null)
-// 这条提示是哪一级（-1 = 编译错误那一档，不在阶梯上），以及还能不能再往上要一级。
-// 两个都由后端算好在 done 里给，前端不自己推阶梯
-const hintLevel = ref<number | null>(null)
-const hintCanEscalate = ref(false)
-const hintHelpful = ref<boolean | null>(null)
-const hintFeedbackSending = ref(false)
-
-// 打字机：每 24ms 吐 3 个字，约 125 字/秒。步子不敢迈太小 ——
-// 每一帧都要让 MdPreview 重渲染一次 Markdown，机房那批机器扛不住逐字
-const TYPE_STEP = 3
-const TYPE_INTERVAL = 24
-let typingTimer: ReturnType<typeof setInterval> | null = null
-const hintTyping = computed(() => hintContent.value.length < hintTarget.value.length)
-
-function stopTyping() {
-  if (typingTimer === null) return
-  clearInterval(typingTimer)
-  typingTimer = null
-}
-
-function startTyping() {
-  if (typingTimer !== null) return
-  typingTimer = setInterval(() => {
-    if (!hintTyping.value) {
-      stopTyping()
-      return
-    }
-    hintContent.value = hintTarget.value.slice(0, hintContent.value.length + TYPE_STEP)
-  }, TYPE_INTERVAL)
-}
-
-function resetHint() {
-  stopTyping()
-  hintTarget.value = ""
-  hintContent.value = ""
-  hintError.value = ""
-  hintId.value = null
-  hintLevel.value = null
-  hintCanEscalate.value = false
-  hintHelpful.value = null
-}
-
-onUnmounted(stopTyping)
+// AI 提示的状态在 submission store 里（见 oj/problem/composables/useSubmissionHint.ts）：
+// 这个组件在提交按钮那边，编辑器一卸载它就跟着卸载，已经生成的提示不能跟着没
+const {
+  hintTarget,
+  hintContent,
+  hintLoading,
+  hintError,
+  hintId,
+  hintLevel,
+  hintCanEscalate,
+  hintHelpful,
+  hintFeedbackSending,
+  hintTyping,
+  fetchHint,
+  sendHintFeedback,
+} = useSubmissionStore().hint
 
 /** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
 function stripJudgePath(text: string) {
@@ -187,59 +147,6 @@ const showAIHint = computed(() => {
     props.submission.result !== SubmissionStatus.submitting
   )
 })
-
-// 结果面板现在是 display-directive="show"，关掉不再销毁组件，提示内容能留到重新打开。
-// 代价是换了一次提交它也留着，所以这里按提交 id 手动清一次 —— 否则新结果底下挂着
-// 上一次提交的提示，而且按钮已经被 v-if 藏了，学生没法重新分析。
-watch(
-  () => props.submission?.id,
-  () => {
-    // 上一次提交的提示还在生成的话掐掉，不然它会写进新提交的面板里
-    hintStream.abort()
-    resetHint()
-  },
-)
-
-// more = 学生点的是「再多一点提示」。升级只能由学生主动发起，而且后端还要看
-// 「上次开出这一级之后有没有再交过」，所以点了也未必真升 —— 以 done 里的 level 为准
-async function fetchHint(submissionId: string, more = false) {
-  resetHint()
-  try {
-    await hintStream.run<AiHintDone>(
-      "ai/hint",
-      { submissionId, more },
-      {
-        onDelta(content) {
-          hintTarget.value += content
-          startTyping()
-        },
-        onDone(data) {
-          hintId.value = data.hintId ?? null
-          hintLevel.value = data.level ?? null
-          hintCanEscalate.value = data.canEscalate === true
-        },
-      },
-    )
-  } catch (error) {
-    hintError.value = (error as Error).message
-  }
-}
-
-// 可以改票：点另一个就覆盖。失败了不打扰学生，按钮恢复原样就行 ——
-// 评价是给我们看的，不值得为它弹一条报错
-async function sendHintFeedback(helpful: boolean) {
-  if (hintId.value === null || hintFeedbackSending.value) return
-  if (hintHelpful.value === helpful) return
-  hintFeedbackSending.value = true
-  try {
-    await submitHintFeedback(hintId.value, helpful)
-    hintHelpful.value = helpful
-  } catch {
-    // 静默
-  } finally {
-    hintFeedbackSending.value = false
-  }
-}
 
 // 测试用例表格数据（只在部分通过时显示）
 const infoTable = computed(() => {
