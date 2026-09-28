@@ -5,6 +5,8 @@ import { config } from "../config"
 import { db, schema } from "../db"
 import { publishFlowchartUpdate } from "../events"
 import { completeChat } from "../services/ai"
+import { recordSolvedAndNotify } from "../services/problemset"
+import { gradeForScore, isFlowchartPass } from "./grade"
 import type { FlowchartJobData } from "./job"
 
 function evaluationPrompt(problem: typeof schema.problem.$inferSelect) {
@@ -14,18 +16,6 @@ function evaluationPrompt(problem: typeof schema.problem.$inferSelect) {
 返回纯 JSON：{"score":85,"grade":"A","feedback":"...","suggestions":"...","criteria_details":{}}。
 等级：S=90-100，A=80-89，B=70-79，C=0-69。
 题目：${problem.title}\n${problem.description.slice(0, 2000)}`
-}
-
-/**
- * 等级一律由分数推出来，不采信模型自报的 grade。
- * 提示词里写死了这四档，但模型偶尔会给出 88 分配 S 级这种自相矛盾的结果，
- * 甚至直接吐「优秀」；脏值会一路串到等级分布图和「A/S 才展示流程图」的判断里。
- */
-function gradeForScore(score: number) {
-  if (score >= 90) return "S"
-  if (score >= 80) return "A"
-  if (score >= 70) return "B"
-  return "C"
 }
 
 function parseEvaluation(value: string) {
@@ -89,6 +79,17 @@ export async function evaluateFlowchart(
         evaluationTime: new Date().toISOString(),
       })
       .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+    // 画到 A / S 算这道题做完，记进所有已加入、且包含这道题的题单 —— 和判题那一路
+    // 同一个口径（不看是从哪个入口交的）。放在推「评完了」之前：前端收到的时候进度已经
+    // 落库，1.5 秒后跳回题单页看到的就是新数据。比赛题不进题单
+    if (isFlowchartPass(result.grade) && row.problem.contestId === null) {
+      await recordSolvedAndNotify(
+        row.flowchart.userId,
+        row.problem.id,
+        null,
+        new Date().toISOString(),
+      )
+    }
     await publishFlowchartUpdate(row.flowchart.userId, {
       type: "flowchart_evaluation_completed",
       submissionId: row.flowchart.id,

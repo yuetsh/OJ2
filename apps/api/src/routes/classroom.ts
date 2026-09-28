@@ -17,6 +17,7 @@ import { Hono } from "hono"
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
+import { FLOWCHART_PASS_GRADES } from "../flowchart/grade"
 import { JudgeStatus } from "../judge/status"
 import { calendarDay, dayStart, localTime } from "../time"
 import { queryInteger, rounded } from "./helpers"
@@ -325,6 +326,29 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
         .groupBy(schema.submission.problemId)
     : []
   const mineById = new Map(mine.map((row) => [row.problemId, row.accepted]))
+
+  // 流程图作业：画到 A / S 也算做完（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 6）。
+  // 有的题流程图交了几百次、代码个位数，只看代码提交的话，这些学生在课堂条上永远是「没做」
+  const drawn = ids.length
+    ? await db
+        .select({
+          problemId: schema.flowchartSubmission.problemId,
+          passed: sql<boolean>`bool_or(${inArray(schema.flowchartSubmission.aiGrade, FLOWCHART_PASS_GRADES)})`,
+        })
+        .from(schema.flowchartSubmission)
+        .where(
+          and(
+            eq(schema.flowchartSubmission.userId, user.id),
+            inArray(schema.flowchartSubmission.problemId, ids),
+            // 只数评完了的：评分中、评失败的那次不算「做过」
+            eq(schema.flowchartSubmission.status, 2),
+          ),
+        )
+        .groupBy(schema.flowchartSubmission.problemId)
+    : []
+  for (const row of drawn) {
+    mineById.set(row.problemId, (mineById.get(row.problemId) ?? false) || row.passed)
+  }
 
   return success(c, {
     className: user.className,

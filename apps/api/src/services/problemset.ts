@@ -1,7 +1,9 @@
-import { and, eq, notInArray, sql } from "drizzle-orm"
+import { and, eq, gt, inArray, isNull, notInArray, or, sql } from "drizzle-orm"
 
 import { db, schema } from "../db"
+import { publishAchievementNotification } from "../events"
 import { asRecord } from "../routes/helpers"
+import { updateAchievementsForProblemSet } from "./achievements"
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 type ProgressRow = typeof schema.problemsetProgress.$inferSelect
@@ -238,7 +240,12 @@ export async function resyncProgress(problemsetId: number) {
 export async function recordSolvedProblem(
   userId: number,
   problemId: number,
-  submissionId: string,
+  /**
+   * 做出来的那次代码提交。流程图画到 A/S 算完成时传 null：problemset_submission.submission_id
+   * 外键指向代码提交表，流程图提交的 id 进不去。不影响「解锁加入题单之前的提交」——
+   * 那道闸看的是 progress_detail（routes/submission.ts 的 problemSetJoinTimes）
+   */
+  submissionId: string | null,
   solvedAt: string,
 ) {
   const joined = await db
@@ -281,7 +288,7 @@ export async function recordSolvedProblem(
           ),
         )
         .limit(1)
-      if (!existing) {
+      if (!existing && submissionId !== null) {
         await tx
           .insert(schema.problemsetSubmission)
           .values({ problemsetId, userId, submissionId, problemId })
@@ -333,4 +340,100 @@ export async function recordSolvedProblem(
     earned.push(...hits)
   }
   return { updated, earned }
+}
+
+/**
+ * 记题单进度，并把这一下拿到的徽章、解锁的题单类成就推给学生。判题（judge/run.ts）和
+ * 流程图评分（flowchart/run.ts）两条路都在「这道题做完了」的那一刻调它。
+ * 记账失败不往外抛：判题 / 评分本身已经落库，不能因为进度没记上就把整次判题算失败。
+ */
+export async function recordSolvedAndNotify(
+  userId: number,
+  problemId: number,
+  submissionId: string | null,
+  solvedAt: string,
+) {
+  try {
+    const { updated, earned } = await recordSolvedProblem(userId, problemId, submissionId, solvedAt)
+    if (earned.length > 0) {
+      await publishAchievementNotification(
+        userId,
+        earned.map((badge) => ({
+          id: badge.id,
+          name: badge.name,
+          description: badge.description,
+          icon: badge.icon,
+          rarity: "bronze",
+          kind: "badge",
+        })),
+      )
+    }
+    if (updated > 0) {
+      const unlocked = await updateAchievementsForProblemSet(userId)
+      await publishAchievementNotification(
+        userId,
+        unlocked.map((achievement) => ({
+          id: achievement.id,
+          name: achievement.name,
+          description: achievement.description,
+          icon: achievement.icon,
+          rarity: achievement.rarity,
+          kind: "achievement",
+        })),
+      )
+    }
+  } catch (error) {
+    console.error(
+      `Failed to record problem set progress for user ${userId} problem ${problemId}`,
+      error,
+    )
+  }
+}
+
+/**
+ * 题单防作弊闸门：查出这些题目里，哪些题的旧提交要对该用户藏起来，返回 problemId → 加入时间。
+ * 代码提交（routes/submission.ts）和流程图提交（routes/flowchart.ts）共用这一道闸。
+ *
+ * 对齐旧后端 `submission/serializers.py:12` 的 `bulk_fetch_problemset_progress`。学生加入含
+ * 某道题的题单后，他在加入之前留下的 AC 代码还摆在提交列表里，复制粘贴就能把题单刷完。
+ * 备份快照里 1734 人次、188 名学生进过这个窗口（占已解题次的 22.5%），不是边角情况。
+ *
+ * 解锁的三条路全写在 where 里，任一成立就查不出来、也就不遮挡：
+ *   - 已经在题单里做出这道题（progress_detail 里有这道题的 key）
+ *   - 题单过了截止时间（end_time；为空表示不设期限，只能靠做出来解锁）
+ *   - 题单被归档（status 不是 active）
+ *
+ * 一道题可能同时落在多个已加入的题单里，取最晚的 join_time——「存在任一题单要求遮挡就遮挡」
+ * 等价于「提交时间早于最晚的那次加入」。旧后端这里用 `.first()` 取任意一条，一题多题单时
+ * 行为不确定，换成聚合顺手定死。
+ */
+export async function problemSetJoinTimes(userId: number, problemIds: number[]) {
+  const joinTimes = new Map<number, string>()
+  if (problemIds.length === 0) return joinTimes
+  const rows = await db
+    .select({
+      problemId: schema.problemsetProblem.problemId,
+      // 聚合表达式不走列的类型映射，但 OID 还是 1184 —— db/index.ts 给这个 OID 挂了
+      // 「转成 ISO 8601」的 parser，所以这里拿到的和 `mode:"string"` 的列同形状。
+      // 原来那个 `::text` 要撤掉：它的 OID 是 25、绕过那个 parser，反而会变成 PG 文本。
+      joinTime: sql<string>`max(${schema.problemsetProgress.joinTime})`,
+    })
+    .from(schema.problemsetProgress)
+    .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProgress.problemsetId))
+    .innerJoin(
+      schema.problemsetProblem,
+      eq(schema.problemsetProblem.problemsetId, schema.problemset.id),
+    )
+    .where(
+      and(
+        eq(schema.problemsetProgress.userId, userId),
+        inArray(schema.problemsetProblem.problemId, problemIds),
+        eq(schema.problemset.status, "active"),
+        or(isNull(schema.problemset.endTime), gt(schema.problemset.endTime, sql`now()`)),
+        sql`not jsonb_exists(${schema.problemsetProgress.progressDetail}, ${schema.problemsetProblem.problemId}::text)`,
+      ),
+    )
+    .groupBy(schema.problemsetProblem.problemId)
+  for (const row of rows) joinTimes.set(row.problemId, row.joinTime)
+  return joinTimes
 }

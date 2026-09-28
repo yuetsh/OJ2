@@ -5,6 +5,7 @@ import {
   type CreateFlowchartResponse,
   type FlowchartCurrent,
   type FlowchartDetail,
+  type FlowchartScores,
   type FlowchartList,
   type FlowchartListItem,
   type FlowchartStatistics,
@@ -14,11 +15,13 @@ import { and, asc, count, desc, eq, inArray, isNull, sql, type SQL } from "drizz
 import { Hono } from "hono"
 
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
+import type { AuthUser } from "../auth/session"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { failure, readJson, success } from "../http"
 import { flowchartQueue } from "../queue"
 import { getBooleanOption } from "../services/options"
+import { problemSetJoinTimes } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
 import { dayStart } from "../time"
@@ -38,12 +41,36 @@ function flowchartThrottleKey(userId: number) {
   return `flowchart:${userId}`
 }
 
-function canView(
-  user: import("../auth/session").AuthUser,
-  row: { userId: number },
-  problem: { createdById: number },
+/**
+ * 题单防抄：学生加入含这道题的题单之前画的图，先对他本人藏起来 —— 和代码提交同一道闸
+ * （routes/submission.ts 的 canViewSubmission，规则见 problemSetJoinTimes）。原来流程图
+ * 这边没有这一条，加入题单之前画到 A 的那张图点一下就能载回画布，交上去就是 A。
+ */
+function hiddenByProblemSet(
+  user: AuthUser,
+  row: { userId: number; problemId: number; createTime: string },
+  joinTimes: Map<number, string>,
 ) {
+  if (row.userId !== user.id || isAdminRole(user)) return false
+  const joinTime = joinTimes.get(row.problemId)
+  return joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)
+}
+
+function canView(
+  user: AuthUser,
+  row: { userId: number; problemId: number; createTime: string },
+  problem: { createdById: number },
+  joinTimes: Map<number, string>,
+) {
+  if (hiddenByProblemSet(user, row, joinTimes)) return false
   return row.userId === user.id || isAdminRole(user) || problem.createdById === user.id
+}
+
+/** 只有学生看自己的提交时才需要查题单；其余情况给一张空表，省一次查询 */
+function joinTimesFor(user: AuthUser, rows: Array<{ userId: number; problemId: number }>) {
+  if (isAdminRole(user)) return Promise.resolve(new Map<number, string>())
+  const own = rows.filter((row) => row.userId === user.id).map((row) => row.problemId)
+  return problemSetJoinTimes(user.id, [...new Set(own)])
 }
 
 function flowchartData(
@@ -188,8 +215,9 @@ async function flowchartUserFilter(username: string) {
 const flowchartListColumns = {
   flowchart: {
     id: schema.flowchartSubmission.id,
-    // showLink 判定要，序列化本身用不到
+    // showLink 判定要（本人 + 题单闸门），序列化本身用不到
     userId: schema.flowchartSubmission.userId,
+    problemId: schema.flowchartSubmission.problemId,
     status: schema.flowchartSubmission.status,
     createTime: schema.flowchartSubmission.createTime,
     aiScore: schema.flowchartSubmission.aiScore,
@@ -250,6 +278,10 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
       .limit(limit)
       .offset(offset),
   ])
+  const joinTimes = await joinTimesFor(
+    user,
+    rows.map((row) => row.flowchart),
+  )
   return success(c, {
     results: rows.map(
       ({ flowchart, username, problem }) =>
@@ -266,7 +298,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
           aiModel: flowchart.aiModel,
           processingTime: flowchart.processingTime,
           evaluationTime: flowchart.evaluationTime,
-          showLink: canView(user, flowchart, problem),
+          showLink: canView(user, flowchart, problem, joinTimes),
         }) satisfies FlowchartListItem,
     ),
     total: totalRows[0]?.value ?? 0,
@@ -514,7 +546,8 @@ flowchartRoutes.get("/flowcharts/:id", requireAuth, async (c) => {
     .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, c.req.param("id")))
     .limit(1)
-  if (!row || !canView(c.get("user")!, row.flowchart, row.problem))
+  const user = c.get("user")!
+  if (!row || !canView(user, row.flowchart, row.problem, await joinTimesFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
   return success(c, flowchartData(row.flowchart, row.username))
 })
@@ -527,7 +560,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
     .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, c.req.param("id")))
     .limit(1)
-  if (!row || !canView(user, row.flowchart, row.problem))
+  if (!row || !canView(user, row.flowchart, row.problem, await joinTimesFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
   if (![2, 3].includes(row.flowchart.status))
     return failure(c, 409, "retry-not-allowed", "Submission is not in a state that allows retry")
@@ -582,51 +615,70 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
   } satisfies CreateFlowchartResponse)
 })
 
+/**
+ * 自己在这道题上评完的每一次，按时间从早到晚，已经滤掉加入题单之前的（题单闸门）。
+ * current / history / scores 三个接口都从这一份出。
+ */
+async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
+  const [rows, joinTimes] = await Promise.all([
+    db
+      .select({
+        flowchart: schema.flowchartSubmission,
+        username: schema.user.username,
+      })
+      .from(schema.flowchartSubmission)
+      .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
+      .where(
+        and(
+          eq(schema.flowchartSubmission.userId, user.id),
+          eq(schema.flowchartSubmission.problemId, problemId),
+          eq(schema.flowchartSubmission.status, 2),
+        ),
+      )
+      .orderBy(asc(schema.flowchartSubmission.createTime)),
+    joinTimesFor(user, [{ userId: user.id, problemId }]),
+  ])
+  const visible = rows.filter((row) => !hiddenByProblemSet(user, row.flowchart, joinTimes))
+  return { visible, hidden: rows.length - visible.length }
+}
+
 flowchartRoutes.get("/problems/:id/flowchart/current", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const rows = await db
-    .select({
-      score: schema.flowchartSubmission.aiScore,
-      grade: schema.flowchartSubmission.aiGrade,
-    })
-    .from(schema.flowchartSubmission)
-    .where(
-      and(
-        eq(schema.flowchartSubmission.userId, c.get("user")!.id),
-        eq(schema.flowchartSubmission.problemId, problemId),
-        eq(schema.flowchartSubmission.status, 2),
-      ),
-    )
-    .orderBy(desc(schema.flowchartSubmission.createTime))
+  const { visible } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
+  const latest = visible.at(-1)?.flowchart
   return success(c, {
-    count: rows.length,
-    score: rows[0]?.score ?? 0,
-    grade: rows[0]?.grade ?? "",
+    count: visible.length,
+    score: latest?.aiScore ?? 0,
+    grade: latest?.aiGrade ?? "",
   } satisfies FlowchartCurrent)
 })
 
 flowchartRoutes.get("/problems/:id/flowchart/history", requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
   const page = queryInteger(c.req.query("page"), 0, { min: 0 })
-  const rows = await db
-    .select({
-      flowchart: schema.flowchartSubmission,
-      username: schema.user.username,
-    })
-    .from(schema.flowchartSubmission)
-    .innerJoin(schema.user, eq(schema.flowchartSubmission.userId, schema.user.id))
-    .where(
-      and(
-        eq(schema.flowchartSubmission.userId, c.get("user")!.id),
-        eq(schema.flowchartSubmission.problemId, problemId),
-        eq(schema.flowchartSubmission.status, 2),
-      ),
-    )
-    .orderBy(asc(schema.flowchartSubmission.createTime))
+  const { visible: rows } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
   const selected = page === 0 ? rows.at(-1) : rows[page - 1]
   if (page > rows.length) return failure(c, 400, "page-out-of-range", "Page out of range")
   return success(c, {
     submission: selected ? flowchartData(selected.flowchart, selected.username) : null,
     count: rows.length,
   } satisfies FlowchartDetail)
+})
+
+/**
+ * 历次分数：结果页签上那一排「第 N 次 xx 分」。原来 history 一次只给一条，
+ * 要看分数走势得一页一页翻。`hidden` 是被题单闸门藏起来的次数，界面上给一句说明。
+ */
+flowchartRoutes.get("/problems/:id/flowchart/scores", requireAuth, async (c) => {
+  const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const { visible, hidden } = await myEvaluatedFlowcharts(c.get("user")!, problemId)
+  return success(c, {
+    scores: visible.map(({ flowchart }) => ({
+      id: flowchart.id,
+      score: flowchart.aiScore ?? 0,
+      grade: flowchart.aiGrade ?? "",
+      createTime: flowchart.createTime,
+    })),
+    hidden,
+  } satisfies FlowchartScores)
 })

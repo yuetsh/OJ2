@@ -73,6 +73,19 @@ export const flowchartDetailSchema = z.object({
   count: z.number().int(),
 })
 
+/** 自己在一道题上评完的历次分数，早的在前；hidden = 被题单闸门藏起来的次数 */
+export const flowchartScoresSchema = z.object({
+  scores: z.array(
+    z.object({
+      id: z.string(),
+      score: z.number(),
+      grade: z.string(),
+      createTime: z.string(),
+    }),
+  ),
+  hidden: z.number().int(),
+})
+
 export const flowchartStatisticsSchema = z.object({
   totalCount: z.number().int(),
   avgScore: z.number(),
@@ -107,6 +120,7 @@ export type FlowchartListItem = z.infer<typeof flowchartListItemSchema>
 export type FlowchartList = z.infer<typeof flowchartListSchema>
 export type FlowchartCurrent = z.infer<typeof flowchartCurrentSchema>
 export type FlowchartDetail = z.infer<typeof flowchartDetailSchema>
+export type FlowchartScores = z.infer<typeof flowchartScoresSchema>
 export type CreateFlowchartResponse = z.infer<typeof createFlowchartResponseSchema>
 export type CreateFlowchartRequest = z.infer<typeof createFlowchartRequestSchema>
 
