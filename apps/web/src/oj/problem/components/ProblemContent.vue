@@ -413,7 +413,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 }
 
 .block {
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .block-head {
@@ -431,10 +431,17 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   margin-left: auto;
 }
 
+/*
+ * 小节标题（描述 / 输入 / 输出 / 例子 / 提示……）。画板上是 15px 半粗，比 14px 的正文只大一号，
+ * 一屏题面扫下来分不出哪是标题（用户 2026-09-29 提出）：加粗、大一号，左边一道主色竖条
+ */
 .title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0 0 6px;
+  padding-left: 9px;
+  border-left: 3px solid v-bind("theme.primaryColor");
 }
 
 /* md-editor 的预览自带一圈 padding、白底和段落外边距，放在小节标题下面显得很散 */
