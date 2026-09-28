@@ -272,7 +272,9 @@ onBeforeUnmount(() => {
         </div>
       </template>
       <template #2>
-        <ProblemEditor />
+        <div class="right-pane">
+          <ProblemEditor />
+        </div>
       </template>
     </n-split>
 
@@ -313,12 +315,24 @@ onBeforeUnmount(() => {
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
+/*
+ * 分隔条两边各留 12px：左栏页签行右端的「统计 / 点评 / 我的提交」和右栏工具栏最左的
+ * 「写代码 / 画流程图」都是描边按钮、又在同一高度，原来紧贴着分隔条，看上去连成一排
+ */
 .left-pane {
   position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+
+.right-pane {
+  height: 100%;
+  padding-left: 12px;
+  box-sizing: border-box;
 }
 
 .tab-row {
