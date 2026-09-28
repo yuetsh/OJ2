@@ -169,38 +169,107 @@ interface ClassDayGroup {
 }
 
 /**
+ * 流程图画到 A / S 算这道题做完（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 6）。
+ * 等级由分数推出（flowchart/grade.ts），重新评分会先把 grade 清空，所以 status = 2 其实
+ * 是冗余的，留着是把「评完了」写明。
+ */
+const FLOWCHART_PASSED = and(
+  eq(schema.flowchartSubmission.status, 2),
+  inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]),
+)!
+
+/** 这个班正常状态的学生，给下面的查询当 `user_id in (...)` 用 */
+function classMemberIds(className: string) {
+  return db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(
+      and(
+        eq(schema.user.className, className),
+        eq(schema.user.isDisabled, false),
+        inArray(schema.user.adminType, [...STUDENT_ROLES]),
+      ),
+    )
+}
+
+/**
+ * 做题记录：代码提交（不含比赛）和流程图提交并成一张，一次提交一行。课堂上的统计
+ * （这节课是哪几道题、班上几人做完、最近几节课来了几次、哪个班在上课）都从这里数，
+ * 口径和课堂条 / 看板的「做完」一致：
+ *
+ * - 交过就算「动过手」：代码提交不论结果，流程图不论评没评完、评没评失败；
+ * - `solved`：代码 AC / AST_CHECK_FAILED，流程图评到 A / S。
+ *
+ * 有的题一节课全班都在画流程图、代码提交个位数，只数代码的话这节课在统计里等于没上。
+ * 两边都按 `user_id in (...)` + `create_time >=` 走各自的 (user_id, create_time) 索引。
+ */
+function activityRows(options: {
+  since: string
+  users?: number[] | ReturnType<typeof classMemberIds>
+  problemIds?: number[]
+}) {
+  const { since, users, problemIds } = options
+  const code = db
+    .select({
+      userId: schema.submission.userId,
+      problemId: schema.submission.problemId,
+      createTime: schema.submission.createTime,
+      solved: sql<boolean>`${inArray(schema.submission.result, SOLVED_RESULTS)}`.as("solved"),
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        isNull(schema.submission.contestId),
+        gte(schema.submission.createTime, since),
+        users ? inArray(schema.submission.userId, users) : undefined,
+        problemIds ? inArray(schema.submission.problemId, problemIds) : undefined,
+      ),
+    )
+  const flowchart = db
+    .select({
+      userId: schema.flowchartSubmission.userId,
+      problemId: schema.flowchartSubmission.problemId,
+      createTime: schema.flowchartSubmission.createTime,
+      solved: sql<boolean>`${FLOWCHART_PASSED}`.as("solved"),
+    })
+    .from(schema.flowchartSubmission)
+    .where(
+      and(
+        gte(schema.flowchartSubmission.createTime, since),
+        users ? inArray(schema.flowchartSubmission.userId, users) : undefined,
+        problemIds ? inArray(schema.flowchartSubmission.problemId, problemIds) : undefined,
+      ),
+    )
+  return code.unionAll(flowchart).as("activity")
+}
+
+/**
  * 某个班从 `since` 起、按（东八区日, 题）分组的做题人数和通过人数。只算正常状态的学生，
- * 不含比赛提交。`minUsers` 是「班里在做」的门槛，给了 `problemIds`（老师布置的题）时
- * 不设门槛 —— 那几道题是确定的，一个人都没交也要列出来。
+ * 不含比赛提交，代码和流程图合起来数（见 activityRows）。`minUsers` 是「班里在做」的门槛，
+ * 给了 `problemIds`（老师布置的题）时不设门槛 —— 那几道题是确定的，一个人都没交也要列出来。
  */
 async function classDayGroups(
   className: string,
   since: string,
   options: { minUsers?: number; problemIds?: number[] } = {},
 ): Promise<ClassDayGroup[]> {
-  const day = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
-  const userCount = sql<number>`count(distinct ${schema.submission.userId})::int`
+  const activity = activityRows({
+    since,
+    users: classMemberIds(className),
+    problemIds: options.problemIds,
+  })
+  const day = sql<string>`to_char(${localTime(activity.createTime)}, 'YYYY-MM-DD')`
+  const userCount = sql<number>`count(distinct ${activity.userId})::int`
   const query = db
     .select({
       day,
-      problemId: schema.submission.problemId,
-      firstAt: sql<string>`min(${schema.submission.createTime})`,
+      problemId: activity.problemId,
+      firstAt: sql<string>`min(${activity.createTime})`,
       userCount,
-      acceptedCount: sql<number>`count(distinct ${schema.submission.userId}) filter (where ${inArray(schema.submission.result, SOLVED_RESULTS)})::int`,
+      acceptedCount: sql<number>`count(distinct ${activity.userId}) filter (where ${activity.solved})::int`,
     })
-    .from(schema.submission)
-    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(
-      and(
-        isNull(schema.submission.contestId),
-        gte(schema.submission.createTime, since),
-        eq(schema.user.className, className),
-        eq(schema.user.isDisabled, false),
-        inArray(schema.user.adminType, [...STUDENT_ROLES]),
-        options.problemIds ? inArray(schema.submission.problemId, options.problemIds) : undefined,
-      ),
-    )
-    .groupBy(day, schema.submission.problemId)
+    .from(activity)
+    .groupBy(day, activity.problemId)
   return options.minUsers ? query.having(sql`${userCount} >= ${options.minUsers}`) : query
 }
 
@@ -328,20 +397,19 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
           .groupBy(schema.submission.problemId)
       : [],
     // 流程图作业：画到 A / S 也算做完（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 6）。
-    // 有的题流程图交了几百次、代码个位数，只看代码提交的话，这些学生在课堂条上永远是「没做」
+    // 有的题流程图交了几百次、代码个位数，只看代码提交的话，这些学生在课堂条上永远是「没做」。
+    // 交过就算「做过」，评分中、评失败的也算 —— 和代码提交编译错误也算「做过」同一个口径
     ids.length
       ? db
           .select({
             problemId: schema.flowchartSubmission.problemId,
-            passed: sql<boolean>`bool_or(${inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES])})`,
+            passed: sql<boolean>`coalesce(bool_or(${FLOWCHART_PASSED}), false)`,
           })
           .from(schema.flowchartSubmission)
           .where(
             and(
               eq(schema.flowchartSubmission.userId, user.id),
               inArray(schema.flowchartSubmission.problemId, ids),
-              // 只数评完了的：评分中、评失败的那次不算「做过」
-              eq(schema.flowchartSubmission.status, 2),
             ),
           )
           .groupBy(schema.flowchartSubmission.problemId)
@@ -386,18 +454,17 @@ const ACTIVE_CLASS_WINDOW_MS = 2 * 60 * 60 * 1000
  * 的班悄悄留在框里，老师看的整个是别人的班，见 StatisticsPanel.vue 的注释）。
  */
 async function suggestActiveClass() {
-  const users = sql<number>`count(distinct ${schema.submission.userId})::int`
+  // 流程图也算：一节课全班都在画流程图时，只数代码提交就猜成了别的班
+  const activity = activityRows({
+    since: new Date(Date.now() - ACTIVE_CLASS_WINDOW_MS).toISOString(),
+  })
+  const users = sql<number>`count(distinct ${activity.userId})::int`
   const [row] = await db
     .select({ className: schema.user.className, users })
-    .from(schema.submission)
-    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .from(activity)
+    .innerJoin(schema.user, eq(schema.user.id, activity.userId))
     .where(
       and(
-        gte(
-          schema.submission.createTime,
-          new Date(Date.now() - ACTIVE_CLASS_WINDOW_MS).toISOString(),
-        ),
-        isNull(schema.submission.contestId),
         isNotNull(schema.user.className),
         eq(schema.user.isDisabled, false),
         inArray(schema.user.adminType, [...STUDENT_ROLES]),
@@ -463,8 +530,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     .sort()
     .slice(-RECENT_LESSONS)
 
-  const localDay = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
-  const [cells, lastSubmits, attendance, drawn] = await Promise.all([
+  // 「来了几次」代码和流程图合起来数：那天只画了流程图的也算来过，和 recentDays 同一个口径
+  const recentActivity = activityRows({ since: windowStart, users: userIds })
+  const localDay = sql<string>`to_char(${localTime(recentActivity.createTime)}, 'YYYY-MM-DD')`
+  const [cells, lastSubmits, lastDrawn, attendance, drawn] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -500,26 +569,37 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           )
           .groupBy(schema.submission.userId)
       : [],
+    // 今天只画了流程图的学生，「最后一次提交」也得算上画图，不然他在看板上是一直没动手。
+    // 和上面代码那条同一个范围：今天、所有题、不论评没评完
+    userIds.length
+      ? db
+          .select({
+            userId: schema.flowchartSubmission.userId,
+            lastAt: sql<string>`max(${schema.flowchartSubmission.createTime})`,
+          })
+          .from(schema.flowchartSubmission)
+          .where(
+            and(
+              inArray(schema.flowchartSubmission.userId, userIds),
+              gte(schema.flowchartSubmission.createTime, start),
+            ),
+          )
+          .groupBy(schema.flowchartSubmission.userId)
+      : [],
     recentDays.length && userIds.length
       ? db
           .select({
-            userId: schema.submission.userId,
+            userId: recentActivity.userId,
             days: sql<number>`count(distinct ${localDay})::int`,
           })
-          .from(schema.submission)
-          .where(
-            and(
-              isNull(schema.submission.contestId),
-              inArray(schema.submission.userId, userIds),
-              gte(schema.submission.createTime, windowStart),
-              inArray(localDay, recentDays),
-            ),
-          )
-          .groupBy(schema.submission.userId)
+          .from(recentActivity)
+          .where(inArray(localDay, recentDays))
+          .groupBy(recentActivity.userId)
       : [],
     /**
      * 流程图作业：画到 A / S 也算这道题做完，和学生首页的课堂条同一个口径（/me/class-activity）。
-     * 有的题这节课整个班都在画流程图，只数代码提交的话，看板上满屏「没开始」
+     * 有的题这节课整个班都在画流程图，只数代码提交的话，看板上满屏「没开始」。
+     * 和代码那条（cells）同一个范围：交过就算尝试，评分中、评失败的也算
      */
     ids.length && userIds.length
       ? db
@@ -529,18 +609,13 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             attempts: sql<number>`count(*) filter (where ${gte(schema.flowchartSubmission.createTime, start)})::int`,
             firstPassedAt: sql<
               string | null
-            >`min(${schema.flowchartSubmission.createTime}) filter (where ${and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]))})`,
-            lastAt: sql<
-              string | null
-            >`max(${schema.flowchartSubmission.createTime}) filter (where ${gte(schema.flowchartSubmission.createTime, start)})`,
+            >`min(${schema.flowchartSubmission.createTime}) filter (where ${FLOWCHART_PASSED})`,
           })
           .from(schema.flowchartSubmission)
           .where(
             and(
               inArray(schema.flowchartSubmission.userId, userIds),
               inArray(schema.flowchartSubmission.problemId, ids),
-              // 只数评完了的：评分中、评失败的那次不算「做过」，和 /me/class-activity 一致
-              eq(schema.flowchartSubmission.status, 2),
             ),
           )
           .groupBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId)
@@ -549,9 +624,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
-  // 今天只画了流程图的学生，「最后一次提交」也得算上画图，不然他在看板上是一直没动手
-  for (const row of drawn) {
-    if (!row.lastAt) continue
+  for (const row of lastDrawn) {
     const known = lastByUser.get(row.userId)
     if (!known || Date.parse(row.lastAt) > Date.parse(known)) lastByUser.set(row.userId, row.lastAt)
   }
