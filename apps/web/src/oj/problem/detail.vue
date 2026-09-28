@@ -8,11 +8,12 @@ import { useScreenModeStore } from "shared/store/screenMode"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 
-// 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk
+// 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
+// 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
+// 没有协作、也没有错误标记，于是题单里「求助」老师接不上、「把中文标点都换成英文」
+// 点了没反应（见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 10 节）
 const loadProblemEditor = () => import("./components/ProblemEditor.vue")
-const loadContestEditor = () => import("./components/BasicEditor.vue")
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
-const BasicEditor = defineAsyncComponent(loadContestEditor)
 const EditorForTest = defineAsyncComponent(() => import("./components/EditorForTest.vue"))
 const ProblemContent = defineAsyncComponent(() => import("./components/ProblemContent.vue"))
 const ProblemInfo = defineAsyncComponent(() => import("./components/ProblemInfo.vue"))
@@ -71,8 +72,6 @@ const tabOptions = computed(() => {
 
 const currentTab = ref("content")
 
-const isPublicProblemRoute = computed(() => route.name === "problem")
-
 watch(
   [() => route.query.tab, () => tabOptions.value],
   ([rawTab]) => {
@@ -103,7 +102,7 @@ async function init() {
   myFlowchartStore.hide()
   // 并行预取右侧编辑器 chunk（CodeMirror ~370K+），
   // 避免等 getProblem 返回后才串行下载，编辑器才迟迟出现
-  ;(isPublicProblemRoute.value ? loadProblemEditor : loadContestEditor)()
+  loadProblemEditor()
   try {
     const res = await getProblem(problemID, contestID)
     problem.value = res
@@ -188,7 +187,7 @@ watch(
         </n-scrollbar>
       </template>
       <template #2>
-        <component :is="isPublicProblemRoute ? ProblemEditor : BasicEditor" />
+        <ProblemEditor />
       </template>
     </n-split>
 
@@ -232,7 +231,7 @@ watch(
         <ProblemFlowchart />
       </n-tab-pane>
       <n-tab-pane name="editor" tab="代码">
-        <component :is="isPublicProblemRoute ? ProblemEditor : BasicEditor" />
+        <ProblemEditor />
       </n-tab-pane>
       <n-tab-pane name="info" tab="统计" :disabled="!!problemSetId">
         <ProblemInfo />
