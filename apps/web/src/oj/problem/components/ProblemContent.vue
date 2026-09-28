@@ -88,14 +88,25 @@ const hasTriedButNotPassed = computed(() => {
   )
 })
 
-const samples = ref<Sample[]>(
-  problem.value!.samples.map((sample, index) => ({
+function freshSamples(): Sample[] {
+  return (problem.value?.samples ?? []).map((sample, index) => ({
     ...sample,
     id: index,
     msg: "",
     status: "not_test",
     loading: false,
-  })),
+  }))
+}
+
+const samples = ref<Sample[]>(freshSamples())
+
+// 题目页换题是同一个组件复用（顶栏题号直达、「下一题」、相似题都是只换路由参数），
+// 不跟着重建的话，新题下面摆的还是上一道题的例子，「测试」也拿旧例子去比
+watch(
+  () => problem.value?._id,
+  () => {
+    samples.value = freshSamples()
+  },
 )
 
 // 文案和配色分类都由后端生成 —— 原来这里有一份 NODE_TARGET_LABELS +
@@ -116,7 +127,10 @@ async function test(sample: Sample, index: number) {
     }
     return sample
   })
+  const problemId = problem.value?._id
   const res = await createTestSubmission(codeStore.code, sample.input)
+  // 跑的这一会儿换了题：结果是上一道题的例子的，按下标写进去就串到新题上了
+  if (problem.value?._id !== problemId) return
   samples.value = samples.value.map((sample) => {
     if (sample.id === index) {
       const status = res.status === 3 && res.output.trim() === sample.output ? "passed" : "failed"
@@ -133,6 +147,7 @@ async function test(sample: Sample, index: number) {
 
   const id = setTimeout(() => {
     clearTimeout(id)
+    if (problem.value?._id !== problemId) return
     samples.value = samples.value.map((sample) => {
       if (sample.id === index) {
         return {

@@ -93,6 +93,7 @@ const editorHeight = computed(() =>
 )
 
 function loadCode() {
+  codeStore.code.language = problemStore.supportedLanguage(codeStore.code.language)
   const savedCode = storage.get(storageKey.value)
   codeStore.setCode(
     savedCode ||

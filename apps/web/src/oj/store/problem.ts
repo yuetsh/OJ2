@@ -32,6 +32,15 @@ export const useProblemStore = defineStore("problem", () => {
     return problem.value?.languages ?? []
   })
 
+  /**
+   * 这道题收不收当前语言，不收就退到它支持的第一种（SQL 题只有 "SQL"，硬编码的
+   * Python 会被后端拒绝）。编辑器每次载入代码之前都要过一遍：草稿的键里带着语言，
+   * 先载入再改语言，编辑器里摆的就是另一种语言的模板。
+   */
+  function supportedLanguage(current: LANGUAGE): LANGUAGE {
+    return languages.value.includes(current) ? current : (languages.value[0] ?? "Python")
+  }
+
   function incrementFailCount() {
     sessionFailCount.value++
   }
@@ -47,6 +56,7 @@ export const useProblemStore = defineStore("problem", () => {
     problem,
     failCount,
     languages,
+    supportedLanguage,
     incrementFailCount,
   }
 })

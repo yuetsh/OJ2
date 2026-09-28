@@ -99,6 +99,8 @@ watch(
 
 async function init() {
   screenModeStore.resetScreenMode()
+  // 「我的流程图」是上一道题的。这道题也画到了 A/S 的话，SubmitFlowchart 查完会再亮出来
+  myFlowchartStore.hide()
   // 并行预取右侧编辑器 chunk（CodeMirror ~370K+），
   // 避免等 getProblem 返回后才串行下载，编辑器才迟迟出现
   ;(isPublicProblemRoute.value ? loadProblemEditor : loadContestEditor)()

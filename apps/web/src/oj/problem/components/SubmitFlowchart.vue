@@ -153,16 +153,21 @@ const { start: startPollingDeadline, stop: stopPollingDeadline } = useTimeoutFn(
   { immediate: false },
 )
 
-function settle(submissionId: string, outcome: Outcome) {
-  // 一个学生可能同时开着几道题的页面，每条连接都订在同一个用户 topic 上，
-  // 别的页面的评分结果照样会推到这里来 —— 必须认 id，不然会张冠李戴
-  if (!submissionId || submissionId !== monitoringId.value) return
+/** 不再跟这一次评分：结算完、或者换了题 */
+function stopMonitoring() {
   monitoringId.value = ""
   unsubscribe()
   pausePolling()
   stopPollingFallback()
   stopPollingDeadline()
   loading.value = false
+}
+
+function settle(submissionId: string, outcome: Outcome) {
+  // 一个学生可能同时开着几道题的页面，每条连接都订在同一个用户 topic 上，
+  // 别的页面的评分结果照样会推到这里来 —— 必须认 id，不然会张冠李戴
+  if (!submissionId || submissionId !== monitoringId.value) return
+  stopMonitoring()
 
   if (!outcome.ok) {
     message.error(outcome.error ? `流程图评分失败: ${outcome.error}` : "流程图评分失败，请稍后重试")
@@ -261,8 +266,11 @@ function submit() {
 // ==================== 数据获取和处理函数 ====================
 
 async function getCurrentSubmission() {
-  if (!problem.value?.id) return
-  const data = await getCurrentProblemFlowchartSubmission(problem.value.id)
+  const problemId = problem.value?.id
+  if (!problemId) return
+  const data = await getCurrentProblemFlowchartSubmission(problemId)
+  // 换题之后才回来的是上一道题的分数，别盖掉新题的
+  if (problem.value?.id !== problemId) return
   submissionCount.value = data.count
   latestRating.value = {
     score: data.score,
@@ -271,8 +279,10 @@ async function getCurrentSubmission() {
 }
 
 async function getSubmission(submissionPage = 0) {
-  if (!problem.value?.id) return
-  const data = await getFlowchartSubmissionDetail(problem.value.id, submissionPage)
+  const problemId = problem.value?.id
+  if (!problemId) return
+  const data = await getFlowchartSubmissionDetail(problemId, submissionPage)
+  if (problem.value?.id !== problemId) return
   submissionCount.value = data.count
   const submission = data.submission
   // 翻到没有提交的页时后端返回 null（契约里 submission 是 nullable）——
@@ -380,18 +390,45 @@ const getPercentType = (percent: number) => {
 }
 
 // ==================== 生命周期钩子 ====================
-onMounted(async () => {
-  connect()
+/** 这道题最近一次的评分；画到了 A/S 的话，把那张图亮到「我的流程图」 */
+async function loadLatest() {
+  const problemId = problem.value?.id
   await getCurrentSubmission()
   page.value = submissionCount.value
   const grade = latestRating.value.grade
   if ((grade === "A" || grade === "S") && submissionCount.value > 0) {
     await getSubmission(submissionCount.value)
+    // 查的这一会儿又换了题，这张图不是新题的
+    if (problem.value?.id !== problemId) return
     if (myMermaidCode.value) {
       myFlowchartStore.show(myMermaidCode.value)
     }
   }
+}
+
+onMounted(() => {
+  connect()
+  loadLatest()
 })
+
+/**
+ * 换题。题目页换题是同一个组件复用（只换路由参数），两道题都能画流程图、语言又停在
+ * Flowchart 的时候，这个组件连卸载都不会：分数按钮和评分弹框还是上一道题的，
+ * 上一道还在评的那次评完，还会把它的图挂到新题的「我的流程图」上。
+ */
+watch(
+  () => problem.value?.id,
+  (next, previous) => {
+    if (!previous || next === previous) return
+    stopMonitoring()
+    showDetailModal.value = false
+    latestRating.value = { score: 0, grade: "" }
+    submissionCount.value = 0
+    page.value = 1
+    lastSubmittedMermaidCode.value = ""
+    loadLatest()
+  },
+)
 
 // 组件卸载时断开连接
 onUnmounted(() => {

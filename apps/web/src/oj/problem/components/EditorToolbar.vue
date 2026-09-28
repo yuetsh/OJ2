@@ -185,17 +185,20 @@ const handleMenuSelect = (key: string) => {
   }
 }
 
-const languageOptions: DropdownOption[] = languages.value.map((it) => ({
-  label: () =>
-    h(NFlex, { align: "center" }, () => [
-      h(Icon, {
-        icon: ICON_SET[it],
-        width: 16,
-      }),
-      LANGUAGE_SHOW_VALUE[it],
-    ]),
-  value: it,
-}))
+// computed：换题时组件复用，选项得跟着新题的语言走
+const languageOptions = computed<DropdownOption[]>(() =>
+  languages.value.map((it) => ({
+    label: () =>
+      h(NFlex, { align: "center" }, () => [
+        h(Icon, {
+          icon: ICON_SET[it],
+          width: 16,
+        }),
+        LANGUAGE_SHOW_VALUE[it],
+      ]),
+    value: it,
+  })),
+)
 
 const copy = async () => {
   const success = await copyToClipboard(codeStore.code.value)
@@ -247,12 +250,7 @@ const goEdit = () => {
   window.open(router.resolve(url).href, "_blank")
 }
 
-onMounted(() => {
-  if (!languages.value.includes(codeStore.code.language)) {
-    // 回退到题目支持的第一种语言（如 SQL 题只有 "SQL"，硬编码 Python 会被后端拒绝）
-    codeStore.code.language = languages.value[0] ?? "Python"
-  }
-})
+// 语言回退不在这里做：它得排在载入草稿之前，见 problem store 的 supportedLanguage
 </script>
 
 <template>

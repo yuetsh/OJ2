@@ -27,7 +27,8 @@ const editorHeight = computed(() =>
   isDesktop.value ? "calc(100vh - 133px)" : "calc(100vh - 172px)",
 )
 
-onMounted(() => {
+function loadCode() {
+  codeStore.code.language = problemStore.supportedLanguage(codeStore.code.language)
   const savedCode = storage.get(storageKey.value)
   codeStore.setCode(
     savedCode ||
@@ -35,7 +36,12 @@ onMounted(() => {
       SOURCES[codeStore.code.language],
   )
   beginEditTrace(`problem_${problem.value!._id}_contest_${contestID}`, codeStore.code.value.length)
-})
+}
+
+onMounted(loadCode)
+
+// 换题时组件复用、不重新挂载，和 ProblemEditor 一样得自己重新载入
+watch(() => problem.value?._id, loadCode)
 
 const changeCode = (v: string) => {
   storage.set(storageKey.value, v)
