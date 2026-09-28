@@ -1,17 +1,10 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia"
-import { copyToClipboard, compressToBase64 } from "utils/functions"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useCollabStore } from "shared/store/collab"
 import { useSubmissionStore } from "oj/store/submission"
-import {
-  ICON_SET,
-  LANGUAGE_FORMAT_VALUE,
-  LANGUAGE_SHOW_VALUE,
-  SOURCES,
-  STORAGE_KEY,
-} from "utils/constants"
+import { ICON_SET, LANGUAGE_SHOW_VALUE, STORAGE_KEY } from "utils/constants"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
 import storage from "utils/storage"
@@ -20,17 +13,9 @@ import { Icon } from "@iconify/vue"
 import { NFlex } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 import { useProblemPageContext } from "../composables/problemPageContext"
+import { statisticsOpen, useEditorMenu } from "../composables/editorMenu"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
-// 只有老师看得见（下面的弹框挂了 isTeacherOrAbove），静态 import 的话每个学生
-// 打开题目都要白拉一份 chart.js（~68KB gzip）
-const StatisticsPanel = defineAsyncComponent(() => import("shared/components/StatisticsPanel.vue"))
-
-interface Props {
-  storageKey: string
-}
-
-const { storageKey } = defineProps<Props>()
 
 const collabStore = useCollabStore()
 
@@ -38,8 +23,6 @@ const emit = defineEmits<{
   changeLanguage: [v: LANGUAGE]
 }>()
 
-const message = useMessage()
-const router = useRouter()
 const ctx = useProblemPageContext()
 const userStore = useUserStore()
 const codeStore = useCodeStore()
@@ -60,8 +43,6 @@ const mode = computed({
 })
 
 const { isDesktop } = useBreakpoints()
-
-const statisticPanel = ref(false)
 
 /**
  * 「运行例子」：用题目里的例子试跑（Judge0），结果在左栏「结果」页签。顶替原来题面里
@@ -147,63 +128,8 @@ const narrow = computed(() => isDesktop.value && toolbarWidth.value > 0 && toolb
 /** 「课堂统计」常驻在工具栏上：桌面、而且放得下 */
 const statisticsInline = computed(() => isDesktop.value && !narrow.value)
 
-const menuOptions = computed<DropdownOption[]>(() => {
-  const options: DropdownOption[] = []
-  // 放不下时（手机、右栏太窄）收进来的「课堂统计」。「本题提交」挪到了「我的提交」抽屉的底部
-  if (!statisticsInline.value && userStore.isTeacherOrAbove) {
-    options.push({
-      label: "课堂统计",
-      key: "statistics",
-    })
-  }
-  if (codeStore.code.language !== "Flowchart") {
-    if (codeStore.code.language !== "SQL") {
-      options.push({
-        label: "去自测猫",
-        key: "testcat",
-      })
-    }
-    options.push({
-      label: "复制代码",
-      key: "copy",
-    })
-    // 协作中的教师不给「重置代码」：那会儿编辑器里是**学生的**代码，而 v-model
-    // 一写回去就顺着 Yjs 同步过去，等于一键清空学生的作业，他还没法撤回
-    if (!showCollabBar.value) {
-      options.push({
-        label: "重置代码",
-        key: "reset",
-      })
-    }
-  }
-  if (isDesktop.value && userStore.isSuperAdmin) {
-    options.push({
-      label: "编辑题目",
-      key: "edit",
-    })
-  }
-  return options
-})
-
-const handleMenuSelect = (key: string) => {
-  switch (key) {
-    case "statistics":
-      statisticPanel.value = true
-      break
-    case "testcat":
-      goTestCat()
-      break
-    case "copy":
-      copy()
-      break
-    case "reset":
-      reset()
-      break
-    case "edit":
-      goEdit()
-      break
-  }
-}
+// 去自测猫 / 复制 / 重置 / 编辑题目。手机上整张菜单在页签行的「⋯」里，工具栏不放
+const { options: menuOptions, select: handleMenuSelect } = useEditorMenu(statisticsInline)
 
 // computed：换题时组件复用，选项得跟着新题的语言走
 const languageOptions = computed<DropdownOption[]>(() =>
@@ -220,52 +146,9 @@ const languageOptions = computed<DropdownOption[]>(() =>
   })),
 )
 
-const copy = async () => {
-  const success = await copyToClipboard(codeStore.code.value)
-  message[success ? "success" : "error"](`代码复制${success ? "成功" : "失败"}`)
-}
-
-// 重置会把编辑器里的代码换成模板、连本地草稿一起删掉，点错一下写了半节课的代码就没了，先问一句
-const dialog = useDialog()
-const reset = () => {
-  dialog.warning({
-    title: "重置代码",
-    content: "编辑器里的代码会换回题目给的模板，存着的草稿也会删掉。确定吗？",
-    positiveText: "重置",
-    negativeText: "再想想",
-    onPositiveClick: () => {
-      codeStore.setCode(
-        problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
-      )
-      storage.remove(storageKey)
-      message.success("已换回模板，按 Ctrl+Z 可以撤回")
-    },
-  })
-}
-
 const changeLanguage = (v: LANGUAGE) => {
   storage.set(STORAGE_KEY.LANGUAGE, v)
   emit("changeLanguage", v)
-}
-
-const goTestCat = () => {
-  const lang = LANGUAGE_FORMAT_VALUE[codeStore.code.language]
-  const data = {
-    lang,
-    code: codeStore.code.value,
-    // 没有例子的题原来在这里抛 TypeError，点了没反应
-    input: problemStore.problem?.samples[0]?.input ?? "",
-  }
-  const base64 = compressToBase64(JSON.stringify(data))
-  const url = `${import.meta.env.PUBLIC_CODE_URL}?share=${encodeURIComponent(base64)}`
-  window.open(url, "_blank")
-}
-
-const goEdit = () => {
-  const url = problem.value!.contestId
-    ? `/admin/contest/${problem.value!.contestId}/problem/edit/${problem.value!.id}`
-    : `/admin/problem/edit/${problem.value!.id}`
-  window.open(router.resolve(url).href, "_blank")
 }
 
 // 语言回退不在这里做：它得排在载入草稿之前，见 problem store 的 supportedLanguage
@@ -308,14 +191,14 @@ const goEdit = () => {
     <n-button
       v-if="statisticsInline && userStore.isTeacherOrAbove"
       :size="buttonSize"
-      @click="statisticPanel = true"
+      @click="statisticsOpen = true"
     >
       课堂统计
     </n-button>
 
     <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；放不下时再加上课堂统计 -->
     <n-dropdown
-      v-if="menuOptions.length"
+      v-if="isDesktop && menuOptions.length"
       trigger="click"
       :options="menuOptions"
       @select="handleMenuSelect"
@@ -336,15 +219,4 @@ const goEdit = () => {
       {{ helpButtonText }}
     </n-button>
   </n-flex>
-
-  <n-modal
-    v-if="userStore.isTeacherOrAbove"
-    v-model:show="statisticPanel"
-    preset="card"
-    title="提交记录的统计"
-    :style="{ maxWidth: isDesktop && '800px', maxHeight: '80vh' }"
-    :content-style="{ overflow: 'auto' }"
-  >
-    <StatisticsPanel :problem="problem!._id" username="" />
-  </n-modal>
 </template>

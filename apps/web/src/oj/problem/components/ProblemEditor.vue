@@ -11,6 +11,7 @@ import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import EditorToolbar from "./EditorToolbar.vue"
+import { useDraftKey } from "../composables/draftKey"
 import CollabBar from "./CollabBar.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
 
@@ -86,20 +87,9 @@ const { isDesktop } = useBreakpoints()
 const editorExtensions = [...editTraceExtensions, ...errorMarkExtensions]
 
 const contestID = route.params.contestID || null
-const problemSetId = route.params.problemSetId || null
-/**
- * 本地草稿的键。题单入口单独一份：原来题库和题单共用 `problem_题号_contest_null_语言`，
- * 加入题单之前在题库里写对的代码，一进题单就摆在编辑器里（设计文档第 11 节 4）。
- * 键的最后一段必须是语言，changeLanguage 靠它判断草稿是不是这门语言的。
- */
-const storageKey = computed(() =>
-  problemSetId
-    ? `problem_${problem.value!._id}_problemset_${problemSetId}_lang_${codeStore.code.language}`
-    : `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
-)
+// 草稿存在哪个键下（题单入口单独一份），和「重置代码」共用一份算法
+const storageKey = useDraftKey()
 
-// 协作条 40px + 和工具栏之间的 12px 间距，要从编辑器里让出来，不然页面底下多出一截滚动条。
-// 手机上：顶栏两行 + 课堂条 + 页签 + 工具栏约 236px，底部还有「运行例子 / 提交」那条约 64px
 const editorHeight = computed(() => {
   const base = isDesktop.value ? 133 : 300
   return `calc(100vh - ${base + (teacherCollab.value ? 52 : 0)}px)`
@@ -171,7 +161,7 @@ provide("flowchartEditorRef", flowchartEditorRef)
 <template>
   <n-flex vertical>
     <CollabBar v-if="teacherCollab" />
-    <EditorToolbar :storage-key="storageKey" @change-language="changeLanguage" />
+    <EditorToolbar @change-language="changeLanguage" />
     <!--
       协作中教师这边不会落到流程图分支：上面那个 watch 已经把他的语言换成了学生的，
       而求助入口本身就排掉了流程图（EditorToolbar.vue 的 showHelpButton、服务端的

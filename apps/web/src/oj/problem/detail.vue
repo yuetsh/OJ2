@@ -14,6 +14,8 @@ import type { RouteLocationNormalized } from "vue-router"
 import SubmissionEffects from "./components/SubmissionEffects.vue"
 import ResultTabLabel from "./components/ResultTabLabel.vue"
 import ContextBar from "./components/ContextBar.vue"
+import StatisticsModal from "./components/StatisticsModal.vue"
+import { useEditorMenu } from "./composables/editorMenu"
 import {
   DRAWER_TITLE,
   useProblemPageContext,
@@ -101,9 +103,25 @@ function toggleDrawer(key: DrawerKey) {
   drawer.value = drawer.value === key ? null : key
 }
 
-const drawerMenu = computed<DropdownOption[]>(() =>
-  ctx.value.drawers.map((key) => ({ label: drawerLabel(key), key })),
-)
+/**
+ * 手机页签行的「⋯」：统计 / 点评 / 我的提交，分隔线，再是编辑器的「更多」那几项
+ * （去自测猫、复制、重置……）。原来后面这几项在「代码」页签的工具栏里，得先切过去才点得到
+ */
+const editorMenu = useEditorMenu(computed(() => false))
+const drawerMenu = computed<DropdownOption[]>(() => {
+  const drawers: DropdownOption[] = ctx.value.drawers.map((key) => ({
+    label: drawerLabel(key),
+    key,
+  }))
+  const editor = editorMenu.options.value
+  if (drawers.length && editor.length) drawers.push({ type: "divider", key: "divider" })
+  return [...drawers, ...editor]
+})
+
+function onMobileMenu(key: string) {
+  if (editorMenu.select(key)) return
+  toggleDrawer(key as DrawerKey)
+}
 
 // 交上去、或者语法检查没过：切到「结果」，抽屉开着就先关掉。提交按钮在编辑器那边，页签归这一页管
 const submissionStore = useSubmissionStore()
@@ -195,6 +213,7 @@ onBeforeUnmount(() => {
 <template>
   <template v-if="problem">
     <SubmissionEffects />
+    <StatisticsModal />
     <n-split
       v-if="isDesktop"
       direction="horizontal"
@@ -275,8 +294,10 @@ onBeforeUnmount(() => {
           <ResultPane />
         </n-tab-pane>
         <template v-if="drawerMenu.length" #suffix>
-          <n-dropdown trigger="click" :options="drawerMenu" @select="toggleDrawer">
-            <n-button size="small" quaternary aria-label="统计、点评、我的提交"> ⋯ </n-button>
+          <n-dropdown trigger="click" :options="drawerMenu" @select="onMobileMenu">
+            <n-button size="small" quaternary aria-label="更多：统计、点评、我的提交、复制代码……">
+              ⋯
+            </n-button>
           </n-dropdown>
         </template>
       </n-tabs>
