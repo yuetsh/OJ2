@@ -9,6 +9,7 @@ import { useFireworks } from "oj/problem/composables/useFireworks"
 import { useSubmissionMonitor } from "oj/problem/composables/useSubmissionMonitor"
 import { LANGUAGE_FORMAT_VALUE, SubmissionStatus } from "utils/constants"
 import type { SubmitCodePayload } from "utils/types"
+import type { RouteLocationNormalized } from "vue-router"
 import { getSubmitButtonState } from "./submitButtonState"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
@@ -40,6 +41,7 @@ function closeCommentPanel() {
   // 点评价弹窗时，结果面板会当成「点了外面」收起来 —— 而「下一题」就在面板里
   // （LessonNext），评价完得把它重新打开
   showResult.value = true
+  settleReview()
 }
 
 const { isDesktop } = useBreakpoints()
@@ -79,16 +81,62 @@ const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
 // ==================== AC 后弹出点评轮盘 ====================
 // 只对已经能评价、且还没评过的人弹：后端要求先有 AC 才收评价，这里刚 AC 完正好；
 // mine 非 null 说明早就评过了，别再打扰。
-const { start: showCommentPanelDelayed, stop: cancelCommentPanel } = useTimeoutFn(
-  async () => {
+//
+// 点评是强制的，但从 AC 到弹窗出来有 1.5 秒（加上查一次「评过没有」），而换题会把
+// 定时器取消（见下面换题的 watch）—— 「下一题」在通过的那一刻就出现了，学生手快点
+// 下去，点评就跳过了。所以这段时间里欠着一次点评（reviewOwed），离开这道题的导航
+// 先拦下来：立刻弹点评，选完再去原来要去的地方。
+const reviewOwed = ref(false)
+let reviewChecking = false
+let navigationAfterReview: string | null = null
+
+async function openReview() {
+  if (reviewChecking) return
+  reviewChecking = true
+  try {
     const res = await getReaction(problem.value!.id)
     if (res.mine === null) {
       commentPanel.value = true
+      return
     }
-  },
+  } catch {
+    // 查不到就不拦：宁可少一条点评，也不能把学生卡在这道题上
+  } finally {
+    reviewChecking = false
+  }
+  settleReview()
+}
+
+/** 这次点评了结（评完了、原来就评过、或者查不到），接着去刚才被拦下的地方 */
+function settleReview() {
+  reviewOwed.value = false
+  const target = navigationAfterReview
+  navigationAfterReview = null
+  if (target) router.push(target)
+}
+
+const { start: showCommentPanelDelayed, stop: cancelCommentPanel } = useTimeoutFn(
+  openReview,
   1500,
   { immediate: false },
 )
+
+/**
+ * 只拦「离开这道题」：换 query（左栏切页签会改 `?tab=`）不算。弹窗已经开着的时候
+ * 不拦 —— 那时页面被遮罩盖住，还能走的只有浏览器后退，拦下来就等于把人关在这一页，
+ * 点评接口一直失败时连退路都没有。
+ */
+function holdForReview(to: RouteLocationNormalized, from: RouteLocationNormalized) {
+  if (!reviewOwed.value || commentPanel.value) return true
+  if (to.name === from.name && to.params.problemID === from.params.problemID) return true
+  navigationAfterReview = to.fullPath
+  cancelCommentPanel()
+  openReview()
+  return false
+}
+
+onBeforeRouteUpdate(holdForReview)
+onBeforeRouteLeave(holdForReview)
 
 const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutFn(
   () => {
@@ -105,8 +153,9 @@ const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutF
 
 /**
  * 换题时把上一道题的东西全收掉：结果面板、提交前的语法错误、还在跟的那条提交，以及
- * 通过之后那两个 1.5 秒的定时器 —— 评价弹窗是按**当前**题目去查、去弹的，学生通过后
- * 马上点了「下一题」，不取消的话就会给一道还没做的题弹评价。
+ * 通过之后那两个 1.5 秒的定时器 —— 评价弹窗是按**当前**题目去查、去弹的，不取消的话
+ * 就会给一道还没做的题弹评价。欠着的点评走不到这里：离开这道题的导航已经被
+ * holdForReview 拦下、评完才放行；还能走到这里的只有弹窗开着时按了浏览器后退。
  *
  * 题目页换题是同一个组件复用（只换路由参数），以前几乎只有退回列表再点进来这一条路，
  * 有了顶栏题号直达和结果面板里的「下一题」之后，这成了常规操作。
@@ -119,6 +168,8 @@ watch(
     syntaxErrorInfo.value = ""
     commentPanel.value = false
     cancelCommentPanel()
+    reviewOwed.value = false
+    navigationAfterReview = null
     cancelGoToProblemSet()
     resetSubmission()
   },
@@ -246,6 +297,7 @@ watch(
 
     // 4. 弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
     if (!contestID && !problemSetId) {
+      reviewOwed.value = true
       showCommentPanelDelayed()
     }
 
