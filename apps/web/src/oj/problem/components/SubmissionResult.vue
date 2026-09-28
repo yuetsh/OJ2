@@ -145,6 +145,41 @@ const msg = computed(() => {
 // 这是学生这边唯一能看出「比上次多过了几个点」的地方。
 const partialCases = computed(() => submissionPartialCases(props.submission))
 
+/** 在公开的例子上就错了：这时候「通过 x/y 个测试点」没意义，先说是哪个例子 */
+const failedOnSample = computed(() =>
+  sampleCheck.value && !sampleCheck.value.passed ? sampleCheck.value : null,
+)
+
+/**
+ * 结果标题（设计文档第 6 节）。比「答案错误 · 通过 1/3 个测试点」多走一步：
+ * 例子上就错了的说「在例子 N 上就错了」，例子都对的才报测试点；做对了说全对了。
+ * 提交详情页还用通用的 submissionResultTitle
+ */
+const title = computed(() => {
+  const submission = props.submission
+  if (!submission) return ""
+  if (submission.result === SubmissionStatus.accepted) return "答案正确 · 所有测试点都对了"
+  if (failedOnSample.value) {
+    return `答案错误 · 在例子 ${(failedOnSample.value.index ?? 0) + 1} 上就错了`
+  }
+  const cases = hiddenCases.value
+  if (cases) return `答案错误 · 通过 ${cases.passed}/${cases.total} 个测试点`
+  return submissionResultTitle(submission)
+})
+
+/**
+ * 例子都对了、错在隐藏的测试点上：一个都没过也要报「通过 0/5」—— 那正说明例子之外的全错了。
+ * 其余情况沿用 submissionPartialCases（一个都没过就不报）
+ */
+const hiddenCases = computed(() => {
+  const summary = props.submission?.caseSummary
+  if (!sampleCheck.value?.passed || !summary || summary.passed >= summary.total) return null
+  return summary
+})
+const progressCases = computed(
+  () => hiddenCases.value ?? (failedOnSample.value ? null : partialCases.value),
+)
+
 // 是否显示AI提示区域。
 // 阈值和后端 POST /ai/hint 共用契约里的 HINT_MIN_FAILURES，别在这里写死数字；
 // 编译失败不数次数，和后端同口径（理由见 HINT_MIN_FAILURES 的注释）；
@@ -214,16 +249,12 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
 
 <template>
   <div v-if="submission">
-    <n-alert
-      :type="JUDGE_STATUS[submission.result]['type']"
-      :title="submissionResultTitle(submission)"
-      class="mb-3"
-    >
-      <template v-if="partialCases" #default>
+    <n-alert :type="JUDGE_STATUS[submission.result]['type']" :title="title" class="mb-3">
+      <template v-if="progressCases" #default>
         <n-progress
           type="line"
           status="success"
-          :percentage="(partialCases.passed / partialCases.total) * 100"
+          :percentage="(progressCases.passed / progressCases.total) * 100"
           :show-indicator="false"
         />
       </template>
@@ -248,6 +279,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
       <WrongAnswerExplain
         v-if="sampleCheck"
+        full
         :check="sampleCheck"
         :code="submission.code"
         :language="submission.language"

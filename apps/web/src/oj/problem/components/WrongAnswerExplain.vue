@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { storeToRefs } from "pinia"
+import { useDark } from "@vueuse/core"
+import { MdPreview } from "md-editor-v3"
+import "md-editor-v3/lib/preview.css"
+import { useProblemStore } from "oj/store/problem"
+import { useSubmissionStore } from "oj/store/submission"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
   classifyDiff,
@@ -21,7 +27,23 @@ const props = defineProps<{
    * 前端试跑也不能绕过去
    */
   plain?: boolean
+  /**
+   * 提交结果里用：末尾摆出题目对输出的原话，例子都对时再给「去自己输入试试」。
+   * 格式错、漏了一行这类错误，对着题目原话一看就明白；运行例子那边不需要
+   */
+  full?: boolean
 }>()
+
+const isDark = useDark()
+const { problem } = storeToRefs(useProblemStore())
+const submissionStore = useSubmissionStore()
+
+/** 题目要求的输出（题面「输出」那一节的原文，Markdown）。SQL 题没有这一节 */
+const requirement = computed(() =>
+  props.full && !problem.value?.sqlConfig ? (problem.value?.outputDescription ?? "").trim() : "",
+)
+/** 自己输入走 Judge0，SQL 跑不了 */
+const canCustomRun = computed(() => props.full && !problem.value?.sqlConfig)
 
 /** 后端每段截到 2000 字，到了上限就是被截过 */
 const TEXT_LIMIT = 2000
@@ -62,9 +84,20 @@ function lines(text: string) {
 
 <template>
   <n-card embedded class="explain-card">
-    <div v-if="check.passed" class="explain">
-      题目里的例子都对了，没通过的是隐藏的测试点。想想特殊情况：最大的数、最小的数、0、负数，或者题目里专门提到的情况。
-    </div>
+    <n-flex v-if="check.passed" vertical :size="10">
+      <div class="explain">
+        题目里的例子都对了，没通过的是隐藏的测试点。想想特殊情况：最大的数、最小的数、0、负数，或者题目里专门提到的情况。
+      </div>
+      <n-button
+        v-if="canCustomRun"
+        text
+        type="primary"
+        class="custom"
+        @click="submissionStore.revealResult('custom')"
+      >
+        去自己输入试试 ›
+      </n-button>
+    </n-flex>
     <n-flex v-else vertical :size="12">
       <div class="explain">
         <b>例子 {{ (check.index ?? 0) + 1 }} 没有通过{{ plain ? "。" : "：" }}</b
@@ -112,12 +145,47 @@ function lines(text: string) {
         </div>
       </div>
     </n-flex>
+    <div v-if="requirement" class="requirement">
+      <div class="label">题目要求的输出</div>
+      <MdPreview
+        preview-theme="vuepress"
+        :model-value="requirement"
+        :theme="isDark ? 'dark' : 'light'"
+      />
+    </div>
   </n-card>
 </template>
 
 <style scoped>
 .explain-card {
   max-width: 560px;
+}
+
+.custom {
+  align-self: flex-start;
+}
+
+.requirement {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(128, 128, 128, 0.3);
+}
+
+/* md-editor 的预览自带白底、一圈 padding 和段落外边距，放在灰卡片里像一块补丁 */
+.requirement :deep(.md-editor) {
+  background: transparent;
+}
+
+.requirement :deep(.md-editor-preview-wrapper) {
+  padding: 0;
+}
+
+.requirement :deep(.md-editor-preview > :first-child) {
+  margin-top: 0;
+}
+
+.requirement :deep(.md-editor-preview > :last-child) {
+  margin-bottom: 0;
 }
 
 .explain {
