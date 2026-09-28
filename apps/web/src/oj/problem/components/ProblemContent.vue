@@ -5,13 +5,12 @@ import { useProblemStore } from "oj/store/problem"
 import { DIFFICULTY } from "utils/constants"
 import { getTagColor } from "utils/functions"
 import { useSubmissionStore } from "oj/store/submission"
-import type { ProblemRow } from "utils/types"
 import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import { getSimilarProblems } from "oj/api"
 import SQLDataTable from "./SQLDataTable.vue"
+import SimilarProblems from "./SimilarProblems.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
@@ -37,42 +36,9 @@ const sqlChangedTables = computed(() => {
   return exp && "changed_tables" in exp ? exp.changed_tables : []
 })
 
-const router = useRouter()
-
-// 相似题目推荐
-const similarProblems = ref<ProblemRow[]>([])
-const similarLoaded = ref(false)
-
-async function loadSimilarProblems() {
-  if (similarLoaded.value || !problem.value) return
-  // 比赛、题单里不推荐（理由见 problemPageContext 那张表）
-  if (!ctx.value.similar) return
-  try {
-    similarProblems.value = await getSimilarProblems(problem.value._id)
-  } catch {
-    similarProblems.value = []
-  }
-  similarLoaded.value = true
-}
-
-// 切换题目时重置相似推荐状态
-watch(
-  () => problem.value?._id,
-  () => {
-    similarProblems.value = []
-    similarLoaded.value = false
-  },
-)
-
-// AC 或失败次数 >= 3 时加载推荐
-watch(
-  () => [problem.value?._id, problem.value?.myStatus, problemStore.failCount],
-  ([, status, failCount]) => {
-    if (status === 0 || (failCount as number) >= 3) {
-      loadSimilarProblems()
-    }
-  },
-  { immediate: true },
+// 相似题推荐：做对了、或者错了 3 次以上才给（比赛、题单里不给，见 problemPageContext）
+const showSimilar = computed(
+  () => ctx.value.similar && (problem.value?.myStatus === 0 || problemStore.failCount >= 3),
 )
 
 /**
@@ -352,49 +318,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       />
     </div>
 
-    <!-- 相似题目推荐 -->
-    <div v-if="ctx.similar && similarProblems.length > 0">
-      <n-divider />
-      <h3 class="title">
-        <Icon icon="streamline-ultimate-color:like"></Icon>
-        相似题目推荐
-      </h3>
-      <n-list bordered>
-        <n-list-item v-for="sp in similarProblems" :key="sp._id">
-          <n-flex align="center" justify="space-between">
-            <n-flex align="center">
-              <n-tag size="small">{{ sp._id }}</n-tag>
-              <n-button
-                text
-                type="info"
-                @click="
-                  router.push({
-                    name: 'problem',
-                    params: { problemID: sp._id },
-                  })
-                "
-              >
-                {{ sp.title }}
-              </n-button>
-            </n-flex>
-            <!-- getSimilarProblems 已经过 toProblemRow，难度是中文，不是 Low/Mid/High -->
-            <n-tag
-              v-if="sp.difficulty"
-              size="small"
-              :type="
-                sp.difficulty === '简单'
-                  ? 'success'
-                  : sp.difficulty === '困难'
-                    ? 'error'
-                    : 'warning'
-              "
-            >
-              {{ sp.difficulty }}
-            </n-tag>
-          </n-flex>
-        </n-list-item>
-      </n-list>
-    </div>
+    <SimilarProblems v-if="showSimilar" title="相似题目推荐" />
   </div>
 </template>
 

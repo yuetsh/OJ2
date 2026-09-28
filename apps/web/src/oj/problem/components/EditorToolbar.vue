@@ -214,12 +214,22 @@ const copy = async () => {
   message[success ? "success" : "error"](`代码复制${success ? "成功" : "失败"}`)
 }
 
+// 重置会把编辑器里的代码换成模板、连本地草稿一起删掉，点错一下写了半节课的代码就没了，先问一句
+const dialog = useDialog()
 const reset = () => {
-  codeStore.setCode(
-    problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
-  )
-  storage.remove(storageKey)
-  message.success("代码重置成功")
+  dialog.warning({
+    title: "重置代码",
+    content: "编辑器里的代码会换回题目给的模板，存着的草稿也会删掉。确定吗？",
+    positiveText: "重置",
+    negativeText: "再想想",
+    onPositiveClick: () => {
+      codeStore.setCode(
+        problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
+      )
+      storage.remove(storageKey)
+      message.success("已换回模板，按 Ctrl+Z 可以撤回")
+    },
+  })
 }
 
 const changeLanguage = (v: LANGUAGE) => {

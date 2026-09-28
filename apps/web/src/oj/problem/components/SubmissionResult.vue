@@ -19,6 +19,8 @@ import PythonErrorExplain from "./PythonErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
+import SimilarProblems from "./SimilarProblems.vue"
+import { useLessonStore } from "oj/store/lesson"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
@@ -96,6 +98,20 @@ const ctx = useProblemPageContext()
 const showLessonNext = computed(
   () =>
     !props.peer && props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext,
+)
+
+/**
+ * 通过了、但这道题不在这节课里（没有「下一题」可给）：给几道相似题接着练。
+ * 原来相似题只在题面最底下，交完不会有人再滚回去看
+ */
+const lessonStore = useLessonStore()
+const showSimilar = computed(
+  () =>
+    !props.peer &&
+    props.submission?.result === SubmissionStatus.accepted &&
+    ctx.value.similar &&
+    !!problemStore.problem &&
+    !lessonStore.includes(problemStore.problem._id),
 )
 
 const msg = computed(() => {
@@ -216,6 +232,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       v-if="showLessonNext && problemStore.problem"
       :problem-display-id="problemStore.problem._id"
     />
+    <SimilarProblems v-if="showSimilar" title="再练几道相似的" />
     <n-flex
       vertical
       v-if="

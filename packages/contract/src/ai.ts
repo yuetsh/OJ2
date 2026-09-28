@@ -162,7 +162,8 @@ export const HINT_LEVEL_COMPILE = -1
 export function hintLevelLabel(level: number) {
   if (level === HINT_LEVEL_COMPILE) return "编译错误"
   const item = HINT_LEVELS.find((entry) => entry.level === level)
-  return item ? `L${item.level} ${item.name}` : `L${level}`
+  // 给学生看的，从 1 数起、不写「L0」：学生不知道 L 是什么，也不会从 0 数
+  return item ? `第 ${item.level + 1} 档 · ${item.name}` : `第 ${level + 1} 档`
 }
 
 /**

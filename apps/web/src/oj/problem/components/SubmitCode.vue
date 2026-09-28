@@ -5,6 +5,7 @@ import { useSubmissionStore } from "oj/store/submission"
 import { getSubmitButtonState } from "./submitButtonState"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
+import { SubmissionStatus } from "utils/constants"
 
 /**
  * 提交按钮。只把点击交给 store：提交的状态在 submission store，结果显示在左栏的
@@ -33,6 +34,14 @@ const buttonState = computed(() =>
   }),
 )
 
+/**
+ * 这道题刚交对了：「提交」降成描边按钮，让结果页签里的「下一题」是唯一的主按钮
+ * （设计文档 5.4）。改了代码想再交一次照样能交
+ */
+const justAccepted = computed(
+  () => submissionStore.submission?.result === SubmissionStatus.accepted,
+)
+
 function submit() {
   if (buttonState.value.disabled) return
   submissionStore.submit({
@@ -46,7 +55,7 @@ function submit() {
   <n-button
     :size="props.size ?? (isDesktop ? 'medium' : 'small')"
     :block="props.block"
-    type="primary"
+    :type="justAccepted ? 'default' : 'primary'"
     :disabled="buttonState.disabled"
     @click="submit"
   >

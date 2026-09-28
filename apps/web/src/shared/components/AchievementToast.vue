@@ -59,8 +59,9 @@ onUnmounted(() => {
 <style scoped>
 .toast {
   position: fixed;
+  /* 右上角、顶栏下面。原来在右下角，题目页上正好和结果、点评弹窗叠在一起 */
   right: 24px;
-  bottom: 24px;
+  top: 72px;
   z-index: 3000;
   display: flex;
   gap: 12px;

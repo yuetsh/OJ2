@@ -147,8 +147,38 @@ export function explainDiff(
     case "values":
       return "输出的格式对了，但算出来的数不对。拿这个例子的输入，自己一步一步算一遍，看看程序在哪一步和你想的不一样。"
     case "other":
-      return "对照一下你的输出和正确输出，找找从哪里开始不一样。"
+      return otherHint(check)
   }
+}
+
+/** 放进一句话里的值：太长的截断，免得一句提示撑满一屏 */
+function quote(text: string, max = 24) {
+  const flat = text.trim()
+  return `「${flat.length > max ? `${flat.slice(0, max)}…` : flat}」`
+}
+
+/**
+ * 「其他」：格式和内容都不一样（占样例错误的 44%）。原来只说「对照一下，找找从哪里开始
+ * 不一样」，对 D / E 这种整个值不同的情况没用 —— 学生看得出不一样，看不出为什么。
+ * 改成把具体的值说出来，再告诉他拿这个例子的输入去走一遍程序（设计文档第 6 节）。
+ */
+function otherHint(check: SampleCheck) {
+  const expected = (check.expected ?? "").replace(/\s+$/, "")
+  const output = (check.output ?? "").replace(/\s+$/, "")
+  const no = (check.index ?? 0) + 1
+  const input = (check.input ?? "").trim()
+  const walk =
+    input && !input.includes("\n") && input.length <= 24
+      ? `拿例子 ${no} 的输入${quote(input)}，一行一行走一遍你的程序，看它走进了哪个分支、算出了什么。`
+      : `拿例子 ${no} 的输入，一行一行走一遍你的程序，看它走进了哪个分支、算出了什么。`
+  if (!expected.includes("\n") && !output.includes("\n")) {
+    return `你的程序输出了${quote(output)}，正确的是${quote(expected)}。${walk}`
+  }
+  const line = firstDifferentLine(expected, output)
+  const want = expected.split("\n")[line] ?? ""
+  const got = output.split("\n")[line]
+  const gotText = got === undefined ? "什么都没有" : quote(got)
+  return `从第 ${line + 1} 行开始不一样：正确的是${quote(want)}，你输出的是${gotText}。${walk}`
 }
 
 /** 第一处不一样的行号，0 起；完全一样（只差结尾空白）时为 -1 */

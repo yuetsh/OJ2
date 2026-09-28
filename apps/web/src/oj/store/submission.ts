@@ -71,6 +71,12 @@ export const useSubmissionStore = defineStore("submission", () => {
    */
   const syntaxErrorInfo = ref("")
 
+  /**
+   * 这次提交之前自动排版改了代码。排版会直接改掉编辑器里的代码（缩进、空格、换行），
+   * 学生交完发现代码「变了样」却不知道为什么 —— 结果页签里提一句
+   */
+  const formattedBeforeSubmit = ref(false)
+
   const { start: startCooldown, isPending: isCooldown } = useTimeout(5000, {
     controls: true,
     immediate: false,
@@ -84,6 +90,7 @@ export const useSubmissionStore = defineStore("submission", () => {
     const problem = problemStore.problem
     if (!problem) return
     syntaxErrorInfo.value = ""
+    formattedBeforeSubmit.value = false
 
     // 0. 提交前自动格式化（Python 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）。
     //    Python 在格式化之前先由服务端的 CPython 查一遍语法，有错就不提交
@@ -95,7 +102,10 @@ export const useSubmissionStore = defineStore("submission", () => {
           code: codeStore.code.value,
           language: formatLang,
         })
-        codeStore.setCode(res.code)
+        if (res.code !== codeStore.code.value) {
+          codeStore.setCode(res.code)
+          formattedBeforeSubmit.value = true
+        }
       } catch (e) {
         if (errorCode(e) === "syntax-error") {
           // 仅 Python 会出现：message 是 CPython 的报错原文，交给 PythonErrorExplain 翻译
@@ -151,6 +161,7 @@ export const useSubmissionStore = defineStore("submission", () => {
    */
   function reset() {
     syntaxErrorInfo.value = ""
+    formattedBeforeSubmit.value = false
     resultSegment.value = "submit"
     monitor.reset()
     hint.clearHint()
@@ -183,6 +194,7 @@ export const useSubmissionStore = defineStore("submission", () => {
     isFormatting,
     isSubmittingRequest,
     syntaxErrorInfo,
+    formattedBeforeSubmit,
     isCooldown,
     submit,
     reset,

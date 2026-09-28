@@ -23,7 +23,8 @@ const FlowchartResult = defineAsyncComponent(() => import("./FlowchartResult.vue
 const PeerLatest = defineAsyncComponent(() => import("./PeerLatest.vue"))
 
 const submissionStore = useSubmissionStore()
-const { submission, syntaxErrorInfo, resultSegment } = storeToRefs(submissionStore)
+const { submission, syntaxErrorInfo, resultSegment, formattedBeforeSubmit } =
+  storeToRefs(submissionStore)
 const { problem } = storeToRefs(useProblemStore())
 const codeStore = useCodeStore()
 
@@ -55,7 +56,12 @@ const canTrial = computed(() => {
         <n-alert type="warning" title="代码有语法错误，还没有提交" />
         <PythonErrorExplain :err-info="syntaxErrorInfo" />
       </n-flex>
-      <SubmissionResult v-else-if="submission" :submission="submission" />
+      <template v-else-if="submission">
+        <p v-if="formattedBeforeSubmit" class="formatted">
+          提交之前自动整理了代码格式（缩进、空格），编辑器里的代码也跟着变了，按 Ctrl+Z 能撤回
+        </p>
+        <SubmissionResult :submission="submission" />
+      </template>
       <PeerLatest v-else-if="teacherCollab" />
       <n-empty
         v-else
@@ -77,6 +83,12 @@ const canTrial = computed(() => {
 
 .segments {
   margin-bottom: 14px;
+}
+
+.formatted {
+  margin: 0 0 10px;
+  font-size: 13px;
+  opacity: 0.7;
 }
 
 .empty {
