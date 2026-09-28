@@ -3,6 +3,7 @@ import { storeToRefs } from "pinia"
 import type { RouteLocationRaw } from "vue-router"
 import { getProblemSetDetail, getProblemSetProblems } from "oj/api"
 import { useContestStore } from "oj/store/contest"
+import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useLessonStore } from "oj/store/lesson"
 import { useProblemStore } from "oj/store/problem"
 import { useUserStore } from "shared/store/user"
@@ -30,12 +31,22 @@ const userStore = useUserStore()
 const { problem } = storeToRefs(useProblemStore())
 const currentId = computed(() => problem.value?._id ?? "")
 
-/** 刚在这一页上做出来（不是本来就做过）：换题时 id 跟着变，那一次不算 */
+/**
+ * 刚在这一页上做出来（不是本来就做过）：代码通过，或者流程图刚评到 A / S。
+ * 换题时 id 跟着变，那一次不算；流程图只认这一页上刚评完的（evaluatedSeq）
+ */
+const flowchartStore = useFlowchartStore()
 function onSolvedHere(callback: () => void) {
   watch(
     () => [problem.value?.id, problem.value?.myStatus] as const,
     ([id, status], [previousId, previousStatus]) => {
       if (id !== undefined && id === previousId && status === 0 && previousStatus !== 0) callback()
+    },
+  )
+  watch(
+    () => flowchartStore.evaluatedSeq,
+    () => {
+      if (isFlowchartPass(flowchartStore.latestRating.grade)) callback()
     },
   )
 }
@@ -124,13 +135,18 @@ const setBar = computed(() => {
           params: { problemSetId: ctx.value.problemSetId, problemID: item.problem._id },
         }
       : null
-  const done = list.filter((item) => item.isCompleted).length
+  // 进度只数必做题，和题单页的「完成进度 2 / 8（另有 3 道选做）」同一个口径；
+  // 一道必做都没有的题单才数全部
+  const required = list.some((item) => item.isRequired)
+    ? list.filter((item) => item.isRequired)
+    : list
+  const done = required.filter((item) => item.isCompleted).length
   return {
     title: problemSet.value.title,
     home: { name: "problemset", params: { problemSetId: ctx.value.problemSetId } },
     done,
-    total: list.length,
-    percentage: list.length ? (done / list.length) * 100 : 0,
+    total: required.length,
+    percentage: required.length ? (done / required.length) * 100 : 0,
     position: index >= 0 ? index + 1 : null,
     previous: index >= 0 ? link(list[index - 1]) : null,
     next: index >= 0 ? link(list[index + 1]) : null,

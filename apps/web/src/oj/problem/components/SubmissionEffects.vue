@@ -6,6 +6,7 @@ import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { useFireworks } from "oj/problem/composables/useFireworks"
 import { useLessonStore } from "oj/store/lesson"
+import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { SubmissionStatus } from "utils/constants"
 import { useProblemPageContext } from "../composables/problemPageContext"
 
@@ -223,6 +224,19 @@ watch(
       // 延迟回到题单页面
       goToProblemSetDelayed()
     }
+  },
+)
+
+// ==================== 流程图画到 A / S ====================
+// 题单里流程图作业拿到 A 或 S 就算这道题做完（后端评分那一路已经记了账），
+// 和代码通过一样 1.5 秒后回题单（设计文档第 3 节决定 4、5）。只认这一页上刚评完的那一次
+const flowchartStore = useFlowchartStore()
+watch(
+  () => flowchartStore.evaluatedSeq,
+  () => {
+    if (!isFlowchartPass(flowchartStore.latestRating.grade)) return
+    celebrate()
+    if (ctx.value.backToProblemSet) goToProblemSetDelayed()
   },
 )
 </script>

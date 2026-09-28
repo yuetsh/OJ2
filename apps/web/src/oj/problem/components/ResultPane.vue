@@ -2,6 +2,7 @@
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
+import { useCodeStore } from "oj/store/code"
 
 /**
  * 左栏「结果」页签：三段 —— 提交结果 / 运行例子 / 自己输入。
@@ -17,10 +18,15 @@ const SubmissionResult = defineAsyncComponent(() => import("./SubmissionResult.v
 const PythonErrorExplain = defineAsyncComponent(() => import("./PythonErrorExplain.vue"))
 const SampleRunResult = defineAsyncComponent(() => import("./SampleRunResult.vue"))
 const CustomRun = defineAsyncComponent(() => import("./CustomRun.vue"))
+const FlowchartResult = defineAsyncComponent(() => import("./FlowchartResult.vue"))
 
 const submissionStore = useSubmissionStore()
 const { submission, syntaxErrorInfo, resultSegment } = storeToRefs(submissionStore)
 const { problem } = storeToRefs(useProblemStore())
+const codeStore = useCodeStore()
+
+/** 正在画流程图：结果就是 AI 的点评，没有例子可跑 */
+const drawing = computed(() => codeStore.code.language === "Flowchart")
 
 // 试跑走 Judge0，它跑不了 SQL；流程图也没得跑。这两种只留「提交结果」
 const canTrial = computed(() => {
@@ -30,7 +36,8 @@ const canTrial = computed(() => {
 </script>
 
 <template>
-  <div class="result-pane">
+  <FlowchartResult v-if="drawing" />
+  <div v-show="!drawing" class="result-pane">
     <n-radio-group v-if="canTrial" v-model:value="resultSegment" size="small" class="segments">
       <n-radio-button value="submit">提交结果</n-radio-button>
       <n-radio-button value="samples">运行例子</n-radio-button>

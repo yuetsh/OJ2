@@ -22,7 +22,7 @@ const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
 const isDark = useDark()
 const problemStore = useProblemStore()
-const { problem, languages } = storeToRefs(problemStore)
+const { problem } = storeToRefs(problemStore)
 const ctx = useProblemPageContext()
 
 // SQL 题：隐藏输入/输出/例子，改为渲染数据表与期望结果
@@ -103,11 +103,17 @@ const flowchartStore = useFlowchartStore()
 const userStore = useUserStore()
 const myFlowchartZoom = ref(false)
 
-// 这道题能画流程图，就去查画到 A/S 没有 —— 原来要先切到「流程图」这门「语言」才查
+// 这道题能画流程图，就去查画到 A/S 没有 —— 原来要先切到「流程图」这门「语言」才查。
+// 不看 canDraw：手机上画不了，但以前在电脑上画好的那张照样该摆出来
 watch(
-  () => [problem.value?.id, languages.value.includes("Flowchart"), userStore.isAuthed] as const,
-  ([id, canDraw, authed]) => {
-    if (id && canDraw && authed) flowchartStore.ensureLoaded()
+  () =>
+    [
+      problem.value?.id,
+      !!problem.value?.allowFlowchart && ctx.value.entry !== "contest",
+      userStore.isAuthed,
+    ] as const,
+  ([id, drawable, authed]) => {
+    if (id && drawable && authed) flowchartStore.ensureLoaded()
   },
   { immediate: true },
 )

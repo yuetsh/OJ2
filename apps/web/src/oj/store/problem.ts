@@ -1,5 +1,7 @@
 import { defineStore } from "pinia"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import type { LANGUAGE, ProblemDetail } from "utils/types"
+import { problemEntryOf } from "oj/problem/composables/problemPageContext"
 
 export const useProblemStore = defineStore("problem", () => {
   const problem = ref<ProblemDetail | null>(null)
@@ -25,12 +27,36 @@ export const useProblemStore = defineStore("problem", () => {
    */
   const failCount = computed(() => (problem.value?.myFailedCount ?? 0) + sessionFailCount.value)
 
+  const { isDesktop } = useBreakpoints()
+
+  /**
+   * 这道题能不能画流程图。比赛里不给（入口差异表）；题单里原来也不给，现在给了，画到 A/S
+   * 算完成（设计文档第 3 节决定 4）。手机上不给：节点库是 HTML5 拖放，手机上拖不动。
+   */
+  const canDraw = computed(
+    () => !!problem.value?.allowFlowchart && problemEntryOf(route) !== "contest" && isDesktop.value,
+  )
+
+  /**
+   * 编辑器能切到的全部「语言」。流程图在内部仍是一门叫 Flowchart 的语言（提交、草稿、编辑器
+   * 切换都按它分支），但界面上不再混在语言下拉里 —— 那是工具栏最左边的「写代码 / 画流程图」。
+   */
   const languages = computed<LANGUAGE[]>(() => {
-    if (route.name === "problem" && problem.value?.allowFlowchart) {
-      return ["Flowchart", ...problem.value.languages]
-    }
-    return problem.value?.languages ?? []
+    const own = problem.value?.languages ?? []
+    return canDraw.value ? ["Flowchart", ...own] : own
   })
+
+  /** 语言下拉里的：真正的编程语言 */
+  const codeLanguages = computed(() => languages.value.filter((it) => it !== "Flowchart"))
+
+  /**
+   * 请编辑器换语言，并读回那门语言的草稿（没有就是模板）。只有编辑器（ProblemEditor）知道
+   * 草稿存在哪，所以这里只留一个请求，由它接住 —— 结果页签里的「照着它写代码」不在编辑器里。
+   */
+  const languageRequest = ref<LANGUAGE | null>(null)
+  function switchLanguage(language: LANGUAGE) {
+    languageRequest.value = language
+  }
 
   /**
    * 这道题收不收当前语言，不收就退到它支持的第一种（SQL 题只有 "SQL"，硬编码的
@@ -38,7 +64,9 @@ export const useProblemStore = defineStore("problem", () => {
    * 先载入再改语言，编辑器里摆的就是另一种语言的模板。
    */
   function supportedLanguage(current: LANGUAGE): LANGUAGE {
-    return languages.value.includes(current) ? current : (languages.value[0] ?? "Python")
+    if (languages.value.includes(current)) return current
+    // 兜底落在编程语言上：languages 的第一项可能是 Flowchart，不能默认把人扔到画布上
+    return codeLanguages.value[0] ?? languages.value[0] ?? "Python"
   }
 
   function incrementFailCount() {
@@ -55,7 +83,11 @@ export const useProblemStore = defineStore("problem", () => {
   return {
     problem,
     failCount,
+    canDraw,
     languages,
+    codeLanguages,
+    languageRequest,
+    switchLanguage,
     supportedLanguage,
     incrementFailCount,
   }

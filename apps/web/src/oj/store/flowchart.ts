@@ -1,13 +1,11 @@
 import { createDiscreteApi } from "naive-ui"
 import { defineStore } from "pinia"
 import { errorCode } from "utils/api"
-import {
-  getCurrentProblemFlowchartSubmission,
-  getFlowchartSubmission,
-  getFlowchartSubmissionDetail,
-  submitFlowchart,
-} from "oj/api"
+import type { FlowchartScores, FlowchartSubmission } from "@oj2/contract"
+import type { Edge, Node } from "@vue-flow/core"
+import { getFlowchartScores, getFlowchartSubmission, submitFlowchart } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
+import { useSubmissionStore } from "oj/store/submission"
 import { useFlowchartWebSocket, type FlowchartEvaluationUpdate } from "shared/composables/websocket"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
@@ -22,18 +20,35 @@ export interface FlowchartRating {
 
 type Outcome = { ok: true; score: number; grade: string } | { ok: false; error?: string }
 
+/** 编辑器对外的两个方法（FlowchartEditor 的 defineExpose） */
+export interface FlowchartEditorInstance {
+  getFlowchartData: () => { nodes: unknown[]; edges: unknown[] }
+  setFlowchartData: (data: { nodes: Node[]; edges: Edge[] }) => void
+}
+
+/** 画到这两档算这道题做完（后端 flowchart/grade.ts 的 FLOWCHART_PASS_GRADES） */
+export function isFlowchartPass(grade: string | null | undefined) {
+  return grade === "S" || grade === "A"
+}
+
+/**
+ * 这一页上最近一次交的图走到哪了。idle = 这一页还没交过（历史分数照样有）
+ */
+export type FlowchartPhase = "idle" | "evaluating" | "done" | "failed"
+
 /** AI 评分比判题慢得多，轮询放缓一点 */
 const POLL_INTERVAL = 3000
 /** 到点还没结果就收手，别无限轮询下去 */
 const POLL_TIMEOUT = 3 * 60 * 1000
 
 /**
- * 流程图提交与 AI 评分：正在评的那一次、最近一次的分数、提交次数。
+ * 流程图提交与 AI 评分：正在评的那一次、历次分数、结果页签正在看哪一次。
  *
  * 原来都在提交按钮那个组件（SubmitFlowchart）里，而它只在语言选成 Flowchart 时才挂载 ——
  * 交完切到写代码，组件一卸载就断开 WebSocket，正在评的那次结果就丢了（评分中位 4.8 秒、
  * 最长二十几秒，足够学生切走）。挪到 store 之后，切走了照样评完、照样提示、照样把
- * A/S 的图亮到「我的流程图」。评分详情弹框只是展示，还留在组件里。
+ * A/S 的图亮到「你画的流程图」。评分详情从 1000px 的弹框挪进了左栏「结果」页签
+ * （FlowchartResult），那边只管显示。
  */
 export const useFlowchartStore = defineStore("flowchart", () => {
   const problemStore = useProblemStore()
@@ -41,7 +56,27 @@ export const useFlowchartStore = defineStore("flowchart", () => {
 
   const loading = ref(false)
   const latestRating = ref<FlowchartRating>({ score: 0, grade: "" })
-  const submissionCount = ref(0)
+  const phase = ref<FlowchartPhase>("idle")
+  /**
+   * 这一页上**刚刚**评完一次就加一（不含进页面时读到的历史）。课堂条标做完、题单里
+   * 1.5 秒后跳回题单，都只认这一下 —— 进页面读到以前的 A 不该再跳一次
+   */
+  const evaluatedSeq = ref(0)
+  /** 这道题评完的每一次，早的在前；hidden = 加入题单之前、被藏起来的次数 */
+  const scores = ref<FlowchartScores["scores"]>([])
+  const hiddenCount = ref(0)
+  const submissionCount = computed(() => scores.value.length)
+  /** 结果页签正在看哪一次；null = 最新那次 */
+  const selectedId = ref<string | null>(null)
+  /** 看过的几次的完整评语，按 id 缓存（评完就不会再变） */
+  const details = ref<Record<string, FlowchartSubmission>>({})
+  const detailLoading = ref(false)
+
+  /** 画布本身。结果页签要拿当前画布和某一版比一比、把那一版载回去 */
+  const editor = shallowRef<FlowchartEditorInstance | null>(null)
+  function attachEditor(instance: FlowchartEditorInstance | null) {
+    editor.value = instance
+  }
   /** 最近一次交上去的那张图，评到 A/S 时亮到「我的流程图」 */
   const lastSubmittedMermaidCode = ref("")
   /** 最近一次分数是哪道题的；换题后置空，下次挂载时重新拉 */
@@ -122,16 +157,21 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     scheduleDisconnect(15 * 60 * 1000)
 
     if (!outcome.ok) {
-      message.error(
-        outcome.error ? `流程图评分失败: ${outcome.error}` : "流程图评分失败，请稍后重试",
-      )
+      phase.value = "failed"
+      message.error("AI 这次没评出来，再交一次试试")
       return
     }
     latestRating.value = { score: outcome.score, grade: outcome.grade }
-    message.success(`流程图评分完成！得分: ${outcome.score}分 (${outcome.grade}级)`)
-    if ((outcome.grade === "A" || outcome.grade === "S") && lastSubmittedMermaidCode.value) {
+    phase.value = "done"
+    selectedId.value = null
+    evaluatedSeq.value++
+    // 学生这会儿可能在看题目：只提示一句、页签上亮状态，不强行把他切过去（设计文档 5.3）
+    message.success(`AI 点评完了：${outcome.score} 分，${outcome.grade} 级`)
+    if (isFlowchartPass(outcome.grade) && lastSubmittedMermaidCode.value) {
       myFlowchartStore.show(lastSubmittedMermaidCode.value)
     }
+    const problemId = problemStore.problem?.id
+    if (problemId) loadScores(problemId)
   }
 
   const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
@@ -162,7 +202,9 @@ export const useFlowchartStore = defineStore("flowchart", () => {
 
     lastSubmittedMermaidCode.value = mermaidCode
     loading.value = true
-    latestRating.value = { score: 0, grade: "" }
+    phase.value = "evaluating"
+    // 交上去就切到「结果」页签，和交代码一样
+    useSubmissionStore().revealResult()
 
     try {
       const response = await submitFlowchart({
@@ -183,10 +225,9 @@ export const useFlowchartStore = defineStore("flowchart", () => {
         startPollingFallback()
         startPollingDeadline()
       }
-
-      message.success("流程图已提交，请耐心等待评分")
     } catch (error) {
       loading.value = false
+      phase.value = "idle"
       // 按错误码分支（见 utils/api.ts 的约定）。限流是最容易撞上的一种：
       // 只说「提交失败」的话，学生会以为是自己的图有问题，然后反复点，越点越久
       if (errorCode(error) === "too-many-submissions") {
@@ -200,32 +241,64 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     }
   }
 
-  // ==================== 最近一次的分数 ====================
+  // ==================== 历次分数 ====================
+  async function loadScores(problemId: number) {
+    const data = await getFlowchartScores(problemId)
+    // 换题之后才回来的是上一道题的，别盖掉新题的
+    if (problemStore.problem?.id !== problemId) return
+    scores.value = data.scores
+    hiddenCount.value = data.hidden
+    const latest = data.scores.at(-1)
+    if (latest && phase.value !== "evaluating") {
+      latestRating.value = { score: latest.score, grade: latest.grade }
+    }
+  }
+
   /**
-   * 这道题最近一次的分数；画到了 A/S 的话，把那张图亮到「我的流程图」。
-   * 同一道题只拉一次（组件卸了再挂回来不重拉），换题后 loadedFor 清空。
+   * 进这道题时读一次历次分数；画到过 A/S 的话，把最近那张 A/S 亮到题面的「你画的流程图」。
+   * 同一道题只读一次（组件卸了再挂回来不重读），换题后 loadedFor 清空。
    */
   async function ensureLoaded() {
     const problemId = problemStore.problem?.id
     if (!problemId || loadedFor === problemId) return
     loadedFor = problemId
     try {
-      const data = await getCurrentProblemFlowchartSubmission(problemId)
-      // 换题之后才回来的是上一道题的分数，别盖掉新题的
+      await loadScores(problemId)
       if (problemStore.problem?.id !== problemId) return
-      submissionCount.value = data.count
-      latestRating.value = { score: data.score, grade: data.grade }
-      const grade = data.grade
-      if ((grade === "A" || grade === "S") && data.count > 0) {
-        const detail = await getFlowchartSubmissionDetail(problemId, data.count)
+      const passed = scores.value.filter((row) => isFlowchartPass(row.grade)).at(-1)
+      if (passed) {
+        const detail = await fetchDetail(passed.id)
         // 查的这一会儿又换了题，这张图不是新题的
         if (problemStore.problem?.id !== problemId) return
-        if (detail.submission?.mermaidCode) myFlowchartStore.show(detail.submission.mermaidCode)
+        if (detail?.mermaidCode) myFlowchartStore.show(detail.mermaidCode)
       }
     } catch (error) {
       // 拉不到就当没交过；下次挂载再试
       loadedFor = null
-      console.error("[Flowchart] 读取最近一次评分失败:", error)
+      console.error("[Flowchart] 读取历次评分失败:", error)
+    }
+  }
+
+  async function fetchDetail(id: string) {
+    const cached = details.value[id]
+    if (cached) return cached
+    const detail = await getFlowchartSubmission(id)
+    details.value[id] = detail
+    return detail
+  }
+
+  /** 结果页签里点了某一次（null = 回到最新）：把那次的完整评语拉回来 */
+  async function select(id: string | null) {
+    selectedId.value = id
+    const target = id ?? scores.value.at(-1)?.id
+    if (!target || details.value[target]) return
+    detailLoading.value = true
+    try {
+      await fetchDetail(target)
+    } catch {
+      message.error("这一次的评语读不出来，过一会儿再试")
+    } finally {
+      detailLoading.value = false
     }
   }
 
@@ -237,7 +310,11 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   function reset() {
     stopMonitoring()
     latestRating.value = { score: 0, grade: "" }
-    submissionCount.value = 0
+    phase.value = "idle"
+    scores.value = []
+    hiddenCount.value = 0
+    selectedId.value = null
+    details.value = {}
     lastSubmittedMermaidCode.value = ""
     loadedFor = null
   }
@@ -253,9 +330,19 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   return {
     loading,
     latestRating,
+    phase,
+    evaluatedSeq,
+    scores,
+    hiddenCount,
     submissionCount,
+    selectedId,
+    details,
+    detailLoading,
+    editor,
+    attachEditor,
     submit,
     ensureLoaded,
+    select,
     reset,
   }
 })

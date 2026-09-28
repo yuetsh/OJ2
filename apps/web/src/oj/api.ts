@@ -23,8 +23,7 @@ import {
   type YearlyAc,
   type ProblemList,
   type CreateFlowchartResponse,
-  type FlowchartCurrent,
-  type FlowchartDetail,
+  type FlowchartScores,
   type FlowchartList,
   type FlowchartSubmission,
   type AiDetail,
@@ -437,14 +436,9 @@ export function retryFlowchartSubmission(submissionId: string) {
   return api.post<{ status: string }>(`flowcharts/${encodeURIComponent(submissionId)}/retry`)
 }
 
-export function getCurrentProblemFlowchartSubmission(problemId: number) {
-  return api.get<FlowchartCurrent>(`problems/${problemId}/flowchart/current`)
-}
-
-export function getFlowchartSubmissionDetail(problemId: number, page = 0) {
-  return api.get<FlowchartDetail>(`problems/${problemId}/flowchart/history`, {
-    params: { page },
-  })
+/** 自己在这道题上评完的每一次（早的在前），加入题单之前的已经滤掉 */
+export function getFlowchartScores(problemId: number) {
+  return api.get<FlowchartScores>(`problems/${problemId}/flowchart/scores`)
 }
 
 // ==================== 题单相关API ====================

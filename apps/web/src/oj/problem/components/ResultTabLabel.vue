@@ -3,6 +3,8 @@ import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useSubmissionStore } from "oj/store/submission"
+import { useCodeStore } from "oj/store/code"
+import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { SubmissionStatus } from "utils/constants"
 
 /**
@@ -14,7 +16,23 @@ const theme = useThemeVars()
 const { submission, syntaxErrorInfo, judging, pending, submitting } =
   storeToRefs(useSubmissionStore())
 
+const codeStore = useCodeStore()
+const flowchart = storeToRefs(useFlowchartStore())
+
+/** 画流程图时：评中转圈，A/S 打勾，B/C 是「还没过关」的 !，评失败是 ✕ */
+const flowchartStatus = computed(() => {
+  const phase = flowchart.phase.value
+  if (phase === "evaluating")
+    return { icon: "ph:circle-notch-bold", color: theme.value.infoColor, spin: true }
+  if (phase === "failed") return { icon: "ph:x-bold", color: theme.value.errorColor }
+  if (phase !== "done") return null
+  return isFlowchartPass(flowchart.latestRating.value.grade)
+    ? { icon: "ph:check-bold", color: theme.value.successColor }
+    : { icon: "ph:warning-bold", color: theme.value.warningColor }
+})
+
 const status = computed(() => {
+  if (codeStore.code.language === "Flowchart") return flowchartStatus.value
   if (syntaxErrorInfo.value) return { icon: "ph:warning-bold", color: theme.value.warningColor }
   if (!submission.value) return null
   if (judging.value || pending.value || submitting.value)

@@ -11,6 +11,7 @@ import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import EditorToolbar from "./EditorToolbar.vue"
+import { useFlowchartStore } from "oj/store/flowchart"
 
 const FlowchartEditor = defineAsyncComponent(
   () => import("shared/components/FlowchartEditor/index.vue"),
@@ -84,8 +85,16 @@ const { isDesktop } = useBreakpoints()
 const editorExtensions = [...editTraceExtensions, ...errorMarkExtensions]
 
 const contestID = route.params.contestID || null
-const storageKey = computed(
-  () => `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
+const problemSetId = route.params.problemSetId || null
+/**
+ * 本地草稿的键。题单入口单独一份：原来题库和题单共用 `problem_题号_contest_null_语言`，
+ * 加入题单之前在题库里写对的代码，一进题单就摆在编辑器里（设计文档第 11 节 4）。
+ * 键的最后一段必须是语言，changeLanguage 靠它判断草稿是不是这门语言的。
+ */
+const storageKey = computed(() =>
+  problemSetId
+    ? `problem_${problem.value!._id}_problemset_${problemSetId}_lang_${codeStore.code.language}`
+    : `problem_${problem.value!._id}_contest_${contestID}_lang_${codeStore.code.language}`,
 )
 
 const editorHeight = computed(() =>
@@ -130,7 +139,28 @@ const changeLanguage = (v: LANGUAGE) => {
   )
 }
 
-// 提供FlowchartEditor的ref给子组件
+/**
+ * 换语言的请求：工具栏的「写代码 / 画流程图」、结果页签里的「照着它写代码」。
+ * 和语言下拉走同一条路（存语言偏好 → 读那门语言的草稿）。
+ */
+watch(
+  () => problemStore.languageRequest,
+  (language) => {
+    if (!language) return
+    problemStore.languageRequest = null
+    if (language === codeStore.code.language) return
+    codeStore.setLanguage(language)
+    changeLanguage(language)
+  },
+)
+
+// 流程图编辑器交给 store：结果页签（在左栏，不在编辑器底下）要拿当前画布比一比、
+// 把旧版本载回去。子组件 SubmitFlowchart 还是从 inject 拿
+const flowchartStore = useFlowchartStore()
+watch(flowchartEditorRef, (editor) => flowchartStore.attachEditor(editor ?? null), {
+  immediate: true,
+})
+onBeforeUnmount(() => flowchartStore.attachEditor(null))
 provide("flowchartEditorRef", flowchartEditorRef)
 </script>
 

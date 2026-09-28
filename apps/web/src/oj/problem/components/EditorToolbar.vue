@@ -44,7 +44,20 @@ const ctx = useProblemPageContext()
 const userStore = useUserStore()
 const codeStore = useCodeStore()
 const problemStore = useProblemStore()
-const { problem, languages } = storeToRefs(problemStore)
+const { problem, codeLanguages, canDraw } = storeToRefs(problemStore)
+
+/**
+ * 「写代码 / 画流程图」是两种作业，不是两门语言。原来流程图藏在语言下拉里，叫一个名叫
+ * Flowchart 的「语言」—— 有的题流程图交了几百次、代码个位数，入口却在下拉的第一项里。
+ */
+const drawing = computed(() => codeStore.code.language === "Flowchart")
+const mode = computed({
+  get: () => (drawing.value ? "draw" : "code"),
+  set: (value: "draw" | "code") => {
+    if (value === "draw") problemStore.switchLanguage("Flowchart")
+    else problemStore.switchLanguage(problemStore.supportedLanguage(codeStore.preferredLanguage()))
+  },
+})
 
 const { isDesktop } = useBreakpoints()
 
@@ -183,7 +196,7 @@ const handleMenuSelect = (key: string) => {
 
 // computed：换题时组件复用，选项得跟着新题的语言走
 const languageOptions = computed<DropdownOption[]>(() =>
-  languages.value.map((it) => ({
+  codeLanguages.value.map((it) => ({
     label: () =>
       h(NFlex, { align: "center" }, () => [
         h(Icon, {
@@ -239,8 +252,15 @@ const goEdit = () => {
 
 <template>
   <n-flex align="center">
+    <!-- 协作中的老师不会落到画图：求助入口本身就排掉了流程图 -->
+    <n-radio-group v-if="canDraw && !showCollabBar" v-model:value="mode" :size="buttonSize">
+      <n-radio-button value="code">写代码</n-radio-button>
+      <n-radio-button value="draw">画流程图</n-radio-button>
+    </n-radio-group>
+
     <!-- 协作中编辑器的语言跟着学生走，这个选择器改了也不会生效，索性禁掉 -->
     <n-select
+      v-if="!drawing"
       v-model:value="codeStore.code.language"
       style="width: 120px"
       :size="buttonSize"

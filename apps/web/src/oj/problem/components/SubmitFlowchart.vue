@@ -1,346 +1,54 @@
 <script lang="ts" setup>
 import { storeToRefs } from "pinia"
-
-// 工具函数
-import { decompressFromBase64, compressToBase64 } from "utils/functions"
-import { sortFlowchartCriteria } from "utils/constants"
-
-// 组合式函数
+import { compressToBase64 } from "utils/functions"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { useMermaid } from "shared/composables/useMermaid"
 import { useMermaidConverter } from "../composables/useMermaidConverter"
-
-// API 和状态管理
-import { getFlowchartSubmissionDetail } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
-import { useFlowchartStore, type FlowchartRating } from "oj/store/flowchart"
+import { useFlowchartStore, type FlowchartEditorInstance } from "oj/store/flowchart"
 
 /**
- * 「提交流程图」按钮、分数按钮和评分详情弹框。
+ * 「交给 AI 点评」按钮。
  *
- * 提交和评分（WebSocket + 轮询 + 超时、评完的提示、A/S 亮到「我的流程图」）都在
- * flowchart store：这个组件只在语言选成 Flowchart 时才挂载，切去写代码它就卸载，
- * 正在评的那次不能跟着没。这里只剩从编辑器里取图、以及翻看历次评分的弹框。
+ * 提交和评分（WebSocket + 轮询 + 超时）在 flowchart store；评分结果、历次分数、载回旧版
+ * 都在左栏「结果」页签（FlowchartResult）。原来这里还有一个分数按钮和 1000px 的评分弹框，
+ * 弹框盖住画布，学生没法一边看改进建议一边改图。
  */
 
-// ==================== 类型定义 ====================
-interface Evaluation extends FlowchartRating {
-  feedback: string
-  suggestions: string
-  criteria_details: {
-    [key: string]: { score: number; max: number; comment: string }
-  }
-}
-
-interface FlowchartEditorInstance {
-  getFlowchartData: () => { nodes: unknown[]; edges: unknown[] }
-  setFlowchartData: (data: { nodes: unknown[]; edges: unknown[] }) => void
-}
-
-// 通过inject获取FlowchartEditor组件的引用
 const flowchartEditorRef = inject<Ref<FlowchartEditorInstance | null>>("flowchartEditorRef")
-const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
 
-// 基础组合式函数
 const message = useMessage()
-const problemStore = useProblemStore()
-const { problem } = storeToRefs(problemStore)
+const { problem } = storeToRefs(useProblemStore())
 const flowchartStore = useFlowchartStore()
-const { loading, latestRating, submissionCount } = storeToRefs(flowchartStore)
+const { loading } = storeToRefs(flowchartStore)
 const { isDesktop } = useBreakpoints()
 const { convertToMermaid } = useMermaidConverter()
-const { renderError, renderFlowchart } = useMermaid()
 
-// 评分详情弹框
-const rendering = ref(false)
-const modalRating = ref<FlowchartRating>({ score: 0, grade: "" })
-const myFlowchartZippedStr = ref("")
-const myMermaidCode = ref("")
-const showDetailModal = ref(false)
-const evaluation = ref<Evaluation>({
-  score: 0,
-  grade: "",
-  feedback: "",
-  suggestions: "",
-  criteria_details: {},
-})
-const page = ref(1)
-const suggestionLines = computed(() => splitSuggestionLines(evaluation.value.suggestions))
-
-// jsonb 不保留键序，直接遍历会把 40 分的「逻辑正确性」排到最后
-const sortedCriteria = computed(() => sortFlowchartCriteria(evaluation.value.criteria_details))
-
-function splitSuggestionLines(suggestions?: string | null) {
-  return suggestions
-    ? suggestions
-        .split("\n")
-        .map((suggestion) => suggestion.trim())
-        .filter(Boolean)
-    : []
-}
-
-// ==================== 提交 ====================
 function submit() {
-  if (!flowchartEditorRef?.value) return
-
-  // 获取流程图的JSON数据
-  const flowchartData = flowchartEditorRef.value.getFlowchartData()
-
+  const editor = flowchartEditorRef?.value
+  if (!editor) return
+  const flowchartData = editor.getFlowchartData()
   if (!flowchartData?.nodes?.length || !flowchartData?.edges?.length) {
-    message.error("流程图节点或边不能为空")
+    message.warning("画布上还没有图：从左边拖几个框进来，再用线连起来")
     return
   }
-
   flowchartStore.submit(
     convertToMermaid(flowchartData),
     compressToBase64(JSON.stringify(flowchartData)),
   )
 }
 
-// ==================== 评分详情 ====================
-async function getSubmission(submissionPage = 0) {
-  const problemId = problem.value?.id
-  if (!problemId) return
-  const data = await getFlowchartSubmissionDetail(problemId, submissionPage)
-  if (problem.value?.id !== problemId) return
-  submissionCount.value = data.count
-  const submission = data.submission
-  // 翻到没有提交的页时后端返回 null（契约里 submission 是 nullable）——
-  // 原来的 any 让这里看起来非空，真翻到那一页会直接抛
-  if (!submission) {
-    myFlowchartZippedStr.value = ""
-    myMermaidCode.value = ""
-    modalRating.value = { score: 0, grade: "" }
-    evaluation.value = {
-      score: 0,
-      grade: "",
-      feedback: "",
-      suggestions: "",
-      criteria_details: {},
-    }
-    return
-  }
-  myFlowchartZippedStr.value = String(submission.flowchartData.data ?? "")
-  myMermaidCode.value = submission.mermaidCode || ""
-  modalRating.value = {
-    score: submission.aiScore ?? 0,
-    grade: submission.aiGrade ?? "",
-  }
-  evaluation.value = {
-    score: submission.aiScore ?? 0,
-    grade: submission.aiGrade ?? "",
-    feedback: submission.aiFeedback ?? "",
-    suggestions: submission.aiSuggestions ?? "",
-    criteria_details: submission.aiCriteriaDetails as Evaluation["criteria_details"],
-  }
-}
-
-// 请求失败时 rendering 必须复位：拦截器对普通业务错误是静默 reject 的，
-// 少了这个 finally，弹框就会永远停在转圈状态，也没有任何提示
-async function updatePage(val: number) {
-  page.value = val
-  rendering.value = true
-  try {
-    await getSubmission(val)
-    // 等待 DOM 更新
-    await nextTick()
-    await renderFlowchart(mermaidContainer.value, myMermaidCode.value)
-  } catch (error) {
-    message.error("加载这次提交失败，请稍后重试")
-    console.error("加载流程图提交失败:", error)
-  } finally {
-    rendering.value = false
-  }
-}
-
-async function openDetailModal() {
-  showDetailModal.value = true
-  rendering.value = true
-  try {
-    await getSubmission()
-    page.value = submissionCount.value
-    // 等待 DOM 更新，确保弹框已经渲染
-    await nextTick()
-    await renderFlowchart(mermaidContainer.value, myMermaidCode.value)
-  } catch (error) {
-    message.error("加载评分详情失败，请稍后重试")
-    console.error("加载流程图评分详情失败:", error)
-  } finally {
-    rendering.value = false
-  }
-}
-
-function closeModal() {
-  showDetailModal.value = false
-}
-
-function loadToEditor() {
-  if (myFlowchartZippedStr.value) {
-    // 老提交的压缩数据可能是坏的（格式换过、存了一半），
-    // 不兜住的话 decompressFromBase64/JSON.parse 直接抛，按钮点了毫无反应
-    try {
-      const json = JSON.parse(decompressFromBase64(myFlowchartZippedStr.value))
-      flowchartEditorRef?.value?.setFlowchartData({
-        nodes: json.nodes || [],
-        edges: json.edges || [],
-      })
-    } catch (error) {
-      message.error("这份流程图数据已损坏，无法加载到编辑器")
-      console.error("解析流程图数据失败:", error)
-      return
-    }
-  }
-  closeModal()
-}
-
-// ==================== 工具函数 ====================
-const getGradeType = (grade: string) => {
-  if (grade === "S") return "primary"
-  if (grade === "A") return "info"
-  if (grade === "B") return "warning"
-  return "error"
-}
-
-const getPercentType = (percent: number) => {
-  if (percent >= 0.8) return "primary"
-  else if (percent >= 0.6) return "info"
-  else if (percent >= 0.4) return "warning"
-  return "error"
-}
-
-// ==================== 生命周期 ====================
-onMounted(flowchartStore.ensureLoaded)
-
-// 换题：分数和还在评的那次由 store 自己收（见 flowchart store 的 reset），
-// 这里只关掉弹框，再拉新题的最近一次分数
-watch(
-  () => problem.value?.id,
-  (next, previous) => {
-    if (!previous || next === previous) return
-    showDetailModal.value = false
-    page.value = 1
-    flowchartStore.ensureLoaded()
-  },
-)
+// 进题、换题都读一次历次分数（store 里同一道题只读一次）
+watch(() => problem.value?.id, flowchartStore.ensureLoaded, { immediate: true })
 </script>
 
 <template>
-  <!-- 主要操作区域 -->
-  <n-flex align="center">
-    <!-- 提交按钮 -->
-    <n-button
-      :size="isDesktop ? 'medium' : 'small'"
-      type="primary"
-      :loading="loading"
-      :disabled="loading"
-      @click="submit"
-    >
-      {{ loading ? "AI 点评中..." : "提交流程图" }}
-    </n-button>
-
-    <!-- 评分结果按钮 -->
-    <n-button
-      secondary
-      v-if="latestRating.grade"
-      @click="openDetailModal"
-      :type="getGradeType(latestRating.grade)"
-    >
-      {{ latestRating.score }}分 {{ latestRating.grade }}级
-    </n-button>
-
-    <!-- 流程图评分详情模态框 -->
-    <n-modal v-model:show="showDetailModal" preset="card" style="width: 1000px">
-      <template #header>
-        <n-flex align="center">
-          <n-text>流程图评分详情</n-text>
-          <n-text :type="getGradeType(modalRating.grade)">
-            {{ modalRating.score }}分 {{ modalRating.grade }}级
-          </n-text>
-        </n-flex>
-      </template>
-      <n-grid :cols="5" :x-gap="16">
-        <!-- 左侧：流程图预览区域 -->
-        <n-gi :span="3">
-          <div class="flowchart">
-            <n-spin :show="rendering">
-              <n-alert v-if="renderError" type="error" title="流程图渲染失败">
-                {{ renderError }}
-              </n-alert>
-              <div class="flowchart" v-show="!renderError" ref="mermaidContainer"></div>
-            </n-spin>
-          </div>
-          <!-- 加载到编辑器按钮 -->
-          <n-flex style="margin-top: 16px" justify="center">
-            <n-button @click="loadToEditor" type="primary"> 加载到流程图编辑器 </n-button>
-          </n-flex>
-        </n-gi>
-
-        <!-- 右侧：评分详情区域 -->
-        <n-gi :span="2" style="max-height: 550px; overflow: auto">
-          <!-- AI反馈 -->
-          <n-card
-            v-if="evaluation.feedback"
-            size="small"
-            title="AI反馈"
-            style="margin-bottom: 16px"
-          >
-            <n-text>{{ evaluation.feedback }}</n-text>
-          </n-card>
-
-          <!-- 改进建议 -->
-          <n-card
-            v-if="suggestionLines.length"
-            size="small"
-            title="改进建议"
-            style="margin-bottom: 16px"
-          >
-            <n-flex vertical :size="6">
-              <n-text
-                v-for="(suggestion, index) in suggestionLines"
-                :key="`${index}-${suggestion}`"
-              >
-                {{ suggestion }}
-              </n-text>
-            </n-flex>
-          </n-card>
-
-          <!-- 详细评分 -->
-          <n-card v-if="sortedCriteria.length" size="small" title="详细评分">
-            <div v-for="[key, detail] in sortedCriteria" :key="key" style="margin-bottom: 12px">
-              <!-- 评分项标题和分数 -->
-              <n-flex justify="space-between" align="center" style="margin-bottom: 4px">
-                <n-text strong>{{ key }}</n-text>
-                <n-tag :type="getPercentType(detail.score / detail.max)" size="small" round>
-                  {{ detail.score || 0 }}分 / {{ detail.max }}分
-                </n-tag>
-              </n-flex>
-              <!-- 评分项详细说明 -->
-              <n-text v-if="detail.comment" depth="3" style="font-size: 12px">
-                {{ detail.comment }}
-              </n-text>
-            </div>
-          </n-card>
-        </n-gi>
-      </n-grid>
-
-      <!-- 分页组件 -->
-      <n-flex justify="center" style="margin-top: 24px" v-if="submissionCount > 1">
-        <n-pagination v-model:page="page" :page-count="submissionCount" @update-page="updatePage" />
-      </n-flex>
-    </n-modal>
-  </n-flex>
+  <n-button
+    :size="isDesktop ? 'medium' : 'small'"
+    type="primary"
+    :loading="loading"
+    :disabled="loading"
+    @click="submit"
+  >
+    {{ loading ? "AI 正在看…" : "交给 AI 点评" }}
+  </n-button>
 </template>
-<style scoped>
-/* ==================== 流程图样式 ==================== */
-.flowchart {
-  height: 500px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* 确保 SVG 图表占满容器 */
-:deep(.flowchart > svg) {
-  height: 100%;
-}
-</style>

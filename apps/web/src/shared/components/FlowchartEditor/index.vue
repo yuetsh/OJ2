@@ -24,7 +24,22 @@ interface Props {
 const { height = "calc(100vh - 133px)" } = defineProps<Props>()
 
 // Vue Flow 实例
-const { addEdges, removeNodes, removeEdges } = useVueFlow()
+const { addEdges, removeNodes, removeEdges, fitView, onNodesInitialized } = useVueFlow()
+
+/**
+ * 进页面读回草稿、载回旧版之后缩放到正好装下整张图。原来画布停在默认的位置和缩放上，
+ * 图大一点就有一半在外面，学生以为草稿丢了。只在这两种时候缩：拖进一个新节点时也会
+ * 触发 nodes-initialized，那时候跟着缩放会让画布跳一下
+ */
+let fitPending = false
+function fitSoon() {
+  fitPending = true
+}
+onNodesInitialized(() => {
+  if (!fitPending) return
+  fitPending = false
+  fitView({ padding: 0.15, maxZoom: 1.2 })
+})
 
 // 节点和边的响应式数据
 // 显式标注成 Ref<Node[]>，不走 ref<T>() 的 UnwrapRef 推导 —— vue-flow 的
@@ -37,12 +52,18 @@ const { canUndo, canRedo, resetHistory, saveState, undo, redo } = useHistory()
 
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
-// 缓存管理：用 computed key 支持题目 ID 异步加载后自动切换到正确的 storage
-const cacheKey = computed(() =>
-  problem.value?._id
-    ? `flowchart-editor-data-problem-${problem.value!._id}`
-    : "flowchart-editor-data",
-)
+const route = useRoute()
+/**
+ * 缓存管理：用 computed key 支持题目 ID 异步加载后自动切换到正确的 storage。
+ * 题单入口单独一份草稿：加入题单之前在题库里画到 A 的那张，不能一进题单就摆在画布上
+ * （设计文档第 11 节 3，和代码草稿同理）
+ */
+const cacheKey = computed(() => {
+  if (!problem.value?._id) return "flowchart-editor-data"
+  const base = `flowchart-editor-data-problem-${problem.value._id}`
+  const problemSetId = route.params.problemSetId
+  return problemSetId ? `${base}-problemset-${problemSetId}` : base
+})
 const { isSaving, lastSaved, hasUnsavedChanges, saveToCache, loadFromCache, clearCache } = useCache(
   nodes,
   edges,
@@ -51,6 +72,7 @@ const { isSaving, lastSaved, hasUnsavedChanges, saveToCache, loadFromCache, clea
     // 换题后画布已经被换成新题的草稿，历史必须跟着重建，
     // 否则一次撤销就会把上一题的图还原到这一题里
     resetHistory(nodes.value, edges.value)
+    fitSoon()
   },
 )
 
@@ -152,6 +174,7 @@ onMounted(() => {
   // 否则第一步操作没有可回退的目标，撤销按钮一直是灰的
   loadFromCache()
   resetHistory(nodes.value, edges.value)
+  fitSoon()
 })
 
 onUnmounted(() => {
@@ -177,6 +200,7 @@ const setFlowchartData = (data: { nodes: Node[]; edges: Edge[] }) => {
     nodes.value = processedNodes
     edges.value = processedEdges
     saveState(nodes.value, edges.value)
+    fitSoon()
   }
 }
 
