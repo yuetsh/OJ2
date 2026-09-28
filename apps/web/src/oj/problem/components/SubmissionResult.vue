@@ -435,6 +435,14 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
   margin-top: 12px;
 }
 
+/* 手机上「让 AI 分析我的代码」占满一行、44px 高，好按 */
+@media (max-width: 768px) {
+  .actions :deep(.n-button:not(.n-button--text-type)) {
+    width: 100%;
+    height: 44px;
+  }
+}
+
 .hint-error {
   margin-top: 12px;
 }

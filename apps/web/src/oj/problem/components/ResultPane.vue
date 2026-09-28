@@ -83,6 +83,9 @@ const canTrial = computed(() => {
       >
         {{ segment.label }}<template v-if="segment.time"> · {{ segment.time }}</template>
       </button>
+      <span v-if="resultSegment === 'custom'" class="segment-note"
+        >自己编数据试试，这里不判对错</span
+      >
     </div>
 
     <!-- 提交结果用 v-show：切去看运行例子时不卸载，挂着的错误说明在编辑器里标着红 -->
@@ -133,6 +136,13 @@ const canTrial = computed(() => {
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+}
+
+.segment-note {
+  margin-left: auto;
+  align-self: center;
+  font-size: 13px;
+  color: v-bind("theme.textColor3");
 }
 
 .segment.active {

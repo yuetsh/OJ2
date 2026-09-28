@@ -344,8 +344,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* 手机：课堂条贴满屏宽（设计稿「手机：题目 / 代码 / 结果」），下面的内容照旧留 16px */
 .mobile {
+  margin: -16px -16px 0;
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+.mobile > :deep(.n-tabs) {
+  padding: 10px 16px 0;
+  box-sizing: border-box;
 }
 
 .problem-split {

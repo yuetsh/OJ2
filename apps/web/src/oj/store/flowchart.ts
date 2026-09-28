@@ -211,6 +211,8 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     lastSubmittedMermaidCode.value = mermaidCode
     loading.value = true
     phase.value = "evaluating"
+    // 结果页签回到最新这一次：刚才可能在翻以前的某一次，那样就看不到「AI 正在看你的图」
+    selectedId.value = null
     // 交上去就切到「结果」页签，和交代码一样
     useSubmissionStore().revealResult()
 

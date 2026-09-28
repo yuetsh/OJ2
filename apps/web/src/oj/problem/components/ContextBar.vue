@@ -427,7 +427,9 @@ onSolvedHere(() => {
   color: v-bind("tone.setText");
 }
 
+/* 比赛名不跟题号那段抢地方：题号多了本来就能横向滚，名字挤成两个字就认不出了 */
 .contest-back {
+  flex: none;
   max-width: 160px;
   color: v-bind("tone.contestText");
 }

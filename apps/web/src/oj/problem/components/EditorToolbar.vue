@@ -35,6 +35,10 @@ const { problem, codeLanguages, canDraw } = storeToRefs(problemStore)
  * Flowchart 的「语言」—— 有的题流程图交了几百次、代码个位数，入口却在下拉的第一项里。
  */
 const drawing = computed(() => codeStore.code.language === "Flowchart")
+const MODES = [
+  { value: "code", label: "写代码", short: "代码" },
+  { value: "draw", label: "画流程图", short: "流程图" },
+] as const
 const mode = computed({
   get: () => (drawing.value ? "draw" : "code"),
   set: (value: "draw" | "code") => {
@@ -156,10 +160,26 @@ const changeLanguage = (v: LANGUAGE) => {
   <!-- 设计稿：语言、运行例子、提交靠左；求助、课堂统计、⋯ 推到最右 -->
   <div ref="toolbarRef" class="toolbar" :class="{ narrow }">
     <!-- 协作中的老师不会落到画图：求助入口本身就排掉了流程图 -->
-    <n-radio-group v-if="canDraw && !showCollabBar" v-model:value="mode" :size="buttonSize">
-      <n-radio-button value="code">{{ narrow ? "代码" : "写代码" }}</n-radio-button>
-      <n-radio-button value="draw">{{ narrow ? "流程图" : "画流程图" }}</n-radio-button>
-    </n-radio-group>
+    <!-- 设计稿：灰底分段，选中的白底加粗 -->
+    <div
+      v-if="canDraw && !showCollabBar"
+      class="mode"
+      role="tablist"
+      aria-label="写代码 / 画流程图"
+    >
+      <button
+        v-for="item in MODES"
+        :key="item.value"
+        type="button"
+        role="tab"
+        class="mode-item"
+        :class="{ active: mode === item.value }"
+        :aria-selected="mode === item.value"
+        @click="mode = item.value"
+      >
+        {{ narrow ? item.short : item.label }}
+      </button>
+    </div>
 
     <!-- 协作中编辑器的语言跟着学生走，这个选择器改了也不会生效，索性禁掉 -->
     <n-select
@@ -246,6 +266,33 @@ const changeLanguage = (v: LANGUAGE) => {
 
 .spacer {
   flex: 1 1 0;
+}
+
+.mode {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.12);
+}
+
+.mode-item {
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  color: v-bind("theme.textColor2");
+  cursor: pointer;
+}
+
+.mode-item.active {
+  background-color: v-bind("theme.cardColor");
+  color: v-bind("theme.textColor1");
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .more {

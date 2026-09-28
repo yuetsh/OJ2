@@ -31,6 +31,8 @@ const canRunSamples = computed(
     <n-button
       v-if="canRunSamples"
       size="large"
+      type="primary"
+      ghost
       class="action"
       :loading="samplesRunning"
       :disabled="!codeStore.code.value.trim()"

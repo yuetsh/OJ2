@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
@@ -15,6 +16,7 @@ const submissionStore = useSubmissionStore()
 const { customInput, customOutput, customResult, customRunning } = submissionStore.trial
 const { problem } = storeToRefs(useProblemStore())
 const codeStore = useCodeStore()
+const theme = useThemeVars()
 
 function fillSample(input: string) {
   customInput.value = input
@@ -22,11 +24,9 @@ function fillSample(input: string) {
 </script>
 
 <template>
-  <n-flex vertical :size="10">
-    <n-flex align="center" justify="space-between">
-      <span class="label">输入</span>
-      <n-text depth="3" class="hint">自己编数据试试，这里不判对错、不算提交</n-text>
-    </n-flex>
+  <!-- 设计稿「自己输入：顶替原来的『自测』模式」；「这里不判对错」在分段那一行右边（ResultPane） -->
+  <div class="custom">
+    <span class="label">输入</span>
     <n-input
       v-model:value="customInput"
       type="textarea"
@@ -34,10 +34,10 @@ function fillSample(input: string) {
       placeholder="在这里写输入，和题目里的「输入」格式一样"
       class="mono"
     />
-    <n-flex align="center" :size="8">
+    <div class="actions">
       <n-button
         type="primary"
-        secondary
+        ghost
         :loading="customRunning"
         :disabled="!codeStore.code.value.trim()"
         @click="submissionStore.runCustom()"
@@ -47,49 +47,69 @@ function fillSample(input: string) {
       <n-button
         v-for="(sample, index) in problem?.samples ?? []"
         :key="index"
-        quaternary
-        size="small"
+        text
+        class="fill"
         @click="fillSample(sample.input)"
       >
         填入例子 {{ index + 1 }}
       </n-button>
-    </n-flex>
+    </div>
 
-    <template v-if="customResult !== null">
-      <span class="label">输出</span>
-      <TrialErrorNote
-        v-if="customResult !== SubmissionStatus.accepted"
-        :result="customResult"
-        :output="customOutput"
-        :language="codeStore.code.language"
-      />
-      <pre v-else-if="customOutput" class="output">{{ customOutput }}</pre>
-      <n-text v-else depth="3">（什么都没有输出）</n-text>
-    </template>
-  </n-flex>
+    <span class="label">输出</span>
+    <TrialErrorNote
+      v-if="customResult !== null && customResult !== SubmissionStatus.accepted"
+      :result="customResult"
+      :output="customOutput"
+      :language="codeStore.code.language"
+    />
+    <pre v-else class="output" :class="{ empty: !customOutput }">{{
+      customResult === null ? "" : customOutput || "（什么都没有输出）"
+    }}</pre>
+  </div>
 </template>
 
 <style scoped>
+.custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .label {
+  font-size: 13px;
   font-weight: 600;
 }
 
-.hint {
-  font-size: 13px;
+.mono :deep(textarea) {
+  font-family: Consolas, Monaco, monospace;
 }
 
-.mono :deep(textarea) {
-  font-family: Monaco, Consolas, monospace;
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 6px;
+}
+
+.fill {
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
 }
 
 .output {
   margin: 0;
-  padding: 8px 10px;
+  min-height: 88px;
+  box-sizing: border-box;
+  padding: 10px 10px;
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.08);
   white-space: pre-wrap;
   word-break: break-all;
-  font-family: Monaco, Consolas, monospace;
+  font-family: Consolas, Monaco, monospace;
   font-size: 14px;
+}
+
+.output.empty {
+  color: v-bind("theme.textColor3");
 }
 </style>

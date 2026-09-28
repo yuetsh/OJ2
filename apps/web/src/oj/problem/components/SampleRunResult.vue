@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { useSubmissionStore } from "oj/store/submission"
 import { SubmissionStatus } from "utils/constants"
-import { parseTime } from "utils/functions"
 import TrialErrorNote from "./TrialErrorNote.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
+import ResultHeader from "./ResultHeader.vue"
 
 /**
  * 「结果」页签里「运行例子」那一段：每个例子对没对上，点一个看细节。
  * 没对上的说明复用判完之后那一套（WrongAnswerExplain）；比赛里只摆输出、不给提示句。
  */
 
-const { sampleRuns, samplesRunning, samplesRunAt, samplesCode } = useSubmissionStore().trial
+const { sampleRuns, samplesRunning, samplesCode } = useSubmissionStore().trial
 const theme = useThemeVars()
 const route = useRoute()
 const inContest = computed(() => !!route.params.contestID)
@@ -43,38 +42,62 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
   />
 
   <n-flex v-else vertical :size="12">
-    <n-flex align="center" :size="10">
-      <n-icon :size="22" :color="failedCount ? theme.errorColor : theme.successColor">
-        <Icon :icon="failedCount ? 'ph:x-circle-fill' : 'ph:check-circle-fill'" />
-      </n-icon>
-      <span class="title" :style="{ color: failedCount ? theme.errorColor : theme.successColor }">
-        {{ failedCount ? `试跑：${failedCount} 个例子没对上` : "试跑：例子都对上了" }}
-      </span>
-      <n-text depth="3"
-        >（不算提交{{ samplesRunAt ? ` · ${parseTime(samplesRunAt, "HH:mm")}` : "" }}）</n-text
-      >
-    </n-flex>
-
-    <n-flex :size="6">
-      <n-button
-        v-for="run in sampleRuns"
-        :key="run.index"
-        size="small"
-        round
-        :type="run.result === SubmissionStatus.accepted ? 'success' : 'error'"
-        :secondary="selected !== run.index"
-        @click="selected = run.index"
-      >
-        <template #icon>
-          <Icon :icon="run.result === SubmissionStatus.accepted ? 'ph:check-bold' : 'ph:x-bold'" />
-        </template>
-        例子 {{ run.index + 1 }}
-      </n-button>
-    </n-flex>
+    <!-- 设计稿「运行例子：例子 2 没对上（不算提交）」：标题、「不算提交」、各例子的芯片在一行 -->
+    <ResultHeader
+      :kind="failedCount ? 'error' : 'success'"
+      :title="failedCount ? `试跑：${failedCount} 个例子没对上` : '试跑：例子都对上了'"
+      sub="（不算提交）"
+    >
+      <template #extra>
+        <div class="runs">
+          <button
+            v-for="run in sampleRuns"
+            :key="run.index"
+            type="button"
+            class="run"
+            :class="[
+              run.result === SubmissionStatus.accepted ? 'ok' : 'bad',
+              { active: selected === run.index },
+            ]"
+            :aria-pressed="selected === run.index"
+            @click="selected = run.index"
+          >
+            <svg
+              v-if="run.result === SubmissionStatus.accepted"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12l5 5 9-10" />
+            </svg>
+            <svg
+              v-else
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            例子 {{ run.index + 1 }}
+          </button>
+        </div>
+      </template>
+    </ResultHeader>
 
     <template v-if="current">
       <!-- 对上了：三栏摆出来就行 -->
-      <n-card v-if="current.result === SubmissionStatus.accepted" embedded size="small">
+      <div v-if="current.result === SubmissionStatus.accepted" class="passed-card">
         <div class="blocks">
           <div class="block">
             <div class="label">输入</div>
@@ -89,7 +112,7 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
             <pre>{{ current.output }}</pre>
           </div>
         </div>
-      </n-card>
+      </div>
       <!-- 跑完了、输出对不上：和判完之后同一套说明 -->
       <WrongAnswerExplain
         v-else-if="current.result === SubmissionStatus.wrong_answer"
@@ -114,9 +137,7 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
       />
     </template>
 
-    <n-text depth="3" class="note">
-      例子都对上了再按「提交代码」。例子对了也可能在别的测试点上错，提交才算数。
-    </n-text>
+    <p class="note">例子都对上了再按「提交」。例子对了也可能在别的测试点上错，提交才算数。</p>
   </n-flex>
 </template>
 
@@ -126,9 +147,55 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
   justify-content: center;
 }
 
-.title {
-  font-size: 17px;
-  font-weight: 700;
+.runs {
+  display: flex;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.run {
+  height: 26px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.run.ok {
+  border: 1px solid rgba(24, 160, 88, 0.35);
+  background-color: rgba(24, 160, 88, 0.1);
+  color: v-bind("theme.successColorPressed");
+}
+
+.run.bad {
+  border: 1px solid rgba(208, 48, 80, 0.4);
+  background-color: rgba(208, 48, 80, 0.07);
+  color: v-bind("theme.errorColorPressed");
+}
+
+.run.active {
+  font-weight: 600;
+  border-width: 1.5px;
+}
+
+.run.ok.active {
+  border-color: v-bind("theme.successColor");
+}
+
+.run.bad.active {
+  border-color: v-bind("theme.errorColor");
+}
+
+.passed-card {
+  padding: 12px 14px;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.06);
+  border: 1px solid v-bind("theme.dividerColor");
 }
 
 .blocks {
@@ -139,6 +206,10 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
 
 .block {
   min-width: 0;
+  padding: 6px 10px 8px;
+  border-radius: 5px;
+  background-color: v-bind("theme.cardColor");
+  border: 1px solid v-bind("theme.dividerColor");
 }
 
 .label {
@@ -156,6 +227,8 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
 }
 
 .note {
+  margin: 12px 0 0;
   font-size: 13px;
+  color: v-bind("theme.textColor3");
 }
 </style>

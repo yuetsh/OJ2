@@ -182,6 +182,7 @@ function lines(text: string) {
 <style scoped>
 /* 设计稿「答案错误」：一块浅灰卡片，三栏并排的白底小框 */
 .explain-card {
+  container-type: inline-size;
   padding: 12px 14px;
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.06);
@@ -200,6 +201,13 @@ function lines(text: string) {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+/* 窄的时候（手机）一栏一个往下排，三个窄框里什么都看不清 */
+@container (max-width: 440px) {
+  .blocks {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .block {

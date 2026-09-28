@@ -49,6 +49,6 @@ watch(() => problem.value?.id, flowchartStore.ensureLoaded, { immediate: true })
     :disabled="loading"
     @click="submit"
   >
-    {{ loading ? "AI 正在看…" : "交给 AI 点评" }}
+    {{ loading ? "AI 点评中…" : "交给 AI 点评" }}
   </n-button>
 </template>

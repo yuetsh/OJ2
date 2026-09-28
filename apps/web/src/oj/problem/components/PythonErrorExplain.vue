@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useThemeVars } from "naive-ui"
 import { useCodeStore } from "oj/store/code"
 import { findChinesePunctuation } from "oj/problem/utils/chinesePunctuation"
 import {
@@ -23,23 +24,28 @@ const props = defineProps<{
 }>()
 
 const codeStore = useCodeStore()
+const theme = useThemeVars()
 
 const explanation = computed(() => explainPythonCompileError(props.errInfo))
 
 /** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
 const rawError = computed(() => props.errInfo.replace(/\/judger\/run\/[^/"]+\//g, ""))
 
-/** 出错那一行拆成三段，中间那段是 `^` 标的地方 */
-const sourceParts = computed(() => {
+/**
+ * 报错只点名第一处。别的行也有中文标点的话，一句话带过（设计稿「语法没过」：
+ * 「第 4 行也有一个中文冒号，编辑器里都标出来了」）。原来这里还摆一段出错那行的代码摘录，
+ * 编辑器里已经标着红，设计稿里去掉了
+ */
+const otherPunctuationLines = computed(() => {
   const ex = explanation.value
-  if (!ex?.sourceLine) return null
-  const { sourceLine: text, caret } = ex
-  if (!caret) return { before: text, marked: "", after: "" }
-  return {
-    before: text.slice(0, caret.from),
-    marked: text.slice(caret.from, caret.to),
-    after: text.slice(caret.to),
+  if (!ex?.punctuation) return []
+  const code = codeStore.code.value
+  const lines = new Set<number>()
+  for (const fix of findChinesePunctuation(code)) {
+    lines.add(code.slice(0, fix.from).split("\n").length)
   }
+  lines.delete(ex.line ?? -1)
+  return [...lines].sort((a, b) => a - b)
 })
 
 // 数的是编辑器里**现在**的代码：学生可能已经自己改掉几处了
@@ -72,68 +78,63 @@ onUnmounted(clearErrorMark)
 </script>
 
 <template>
-  <n-card embedded class="explain-card">
-    <n-flex vertical :size="12">
-      <template v-if="explanation">
-        <div class="explain">
-          <b v-if="explanation.line">第 {{ explanation.line }} 行：</b>{{ explanation.message }}
-        </div>
-        <pre v-if="sourceParts" class="explain-code">{{ sourceParts.before
-          }}<mark>{{ sourceParts.marked }}</mark>{{ sourceParts.after }}</pre>
-        <n-flex v-if="explanation.punctuation" align="center">
-          <n-button v-if="punctuationFixCount" type="primary" size="small" @click="fixPunctuation">
-            把中文标点都换成英文（{{ punctuationFixCount }} 处）
-          </n-button>
-          <n-text v-else-if="fixedCount" type="success">
-            换好了 {{ fixedCount }} 处，再提交一次试试。
-          </n-text>
-        </n-flex>
-        <n-collapse>
-          <n-collapse-item title="原始报错（英文）" name="raw">
-            <div class="raw">{{ rawError }}</div>
-          </n-collapse-item>
-        </n-collapse>
-      </template>
-      <!-- 翻译表没覆盖到的句式（生产数据里约 0.3%）：照旧给原文 -->
-      <template v-else>
-        <div class="explain">请仔细检查，看看代码的格式是不是写错了！</div>
-        <div class="raw">{{ rawError }}</div>
-      </template>
-    </n-flex>
-  </n-card>
+  <div class="explain-card">
+    <template v-if="explanation">
+      <p class="explain">
+        <b v-if="explanation.line">第 {{ explanation.line }} 行：</b>{{ explanation.message }}
+      </p>
+      <p v-if="otherPunctuationLines.length" class="explain other">
+        第 {{ otherPunctuationLines.join("、") }} 行也有中文标点，编辑器里都标出来了。
+      </p>
+      <div v-if="explanation.punctuation">
+        <n-button v-if="punctuationFixCount" type="primary" @click="fixPunctuation">
+          把中文标点都换成英文（{{ punctuationFixCount }} 处）
+        </n-button>
+        <n-text v-else-if="fixedCount" type="success">
+          换好了 {{ fixedCount }} 处，再提交一次试试。
+        </n-text>
+      </div>
+      <n-collapse>
+        <n-collapse-item title="原始报错（英文）" name="raw">
+          <div class="raw">{{ rawError }}</div>
+        </n-collapse-item>
+      </n-collapse>
+    </template>
+    <!-- 翻译表没覆盖到的句式（生产数据里约 0.3%）：照旧给原文 -->
+    <template v-else>
+      <p class="explain">请仔细检查，看看代码的格式是不是写错了！</p>
+      <div class="raw">{{ rawError }}</div>
+    </template>
+  </div>
 </template>
 
 <style scoped>
-/* 结果弹窗不限宽，长句子不折行会把弹窗撑出屏幕 */
+/* 和答错的说明同一种浅灰卡片（设计稿「语法没过」） */
 .explain-card {
-  max-width: 560px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.06);
+  border: 1px solid v-bind("theme.dividerColor");
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .explain {
-  font-size: 16px;
+  margin: 0;
   line-height: 1.7;
 }
 
-.explain-code {
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 15px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  background-color: rgba(128, 128, 128, 0.1);
-}
-
-.explain-code mark {
-  color: inherit;
-  background-color: rgba(208, 48, 80, 0.25);
-  text-decoration: underline wavy #d03050;
-  text-underline-offset: 3px;
+.explain.other {
+  font-size: 14px;
+  color: v-bind("theme.textColor2");
 }
 
 .raw {
   white-space: pre;
   overflow-x: auto;
   line-height: 1.5;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
 }
 </style>
