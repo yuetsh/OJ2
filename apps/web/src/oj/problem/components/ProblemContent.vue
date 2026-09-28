@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { storeToRefs } from "pinia"
-import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { DIFFICULTY } from "utils/constants"
 import { getTagColor } from "utils/functions"
-import { createTestSubmission } from "utils/judge"
-import type { ProblemDetail, ProblemRow, ProblemStatus } from "utils/types"
+import { useSubmissionStore } from "oj/store/submission"
+import type { ProblemRow } from "utils/types"
 import Copy from "shared/components/Copy.vue"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
@@ -14,16 +13,8 @@ import "md-editor-v3/lib/preview.css"
 import { getSimilarProblems } from "oj/api"
 import SQLDataTable from "./SQLDataTable.vue"
 
-type Sample = ProblemDetail["samples"][number] & {
-  id: number
-  msg: string
-  status: ProblemStatus
-  loading: boolean
-}
-
 const isDark = useDark()
 const route = useRoute()
-const codeStore = useCodeStore()
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
 
@@ -88,26 +79,10 @@ const hasTriedButNotPassed = computed(() => {
   )
 })
 
-function freshSamples(): Sample[] {
-  return (problem.value?.samples ?? []).map((sample, index) => ({
-    ...sample,
-    id: index,
-    msg: "",
-    status: "not_test",
-    loading: false,
-  }))
-}
-
-const samples = ref<Sample[]>(freshSamples())
-
-// 题目页换题是同一个组件复用（顶栏题号直达、「下一题」、相似题都是只换路由参数），
-// 不跟着重建的话，新题下面摆的还是上一道题的例子，「测试」也拿旧例子去比
-watch(
-  () => problem.value?._id,
-  () => {
-    samples.value = freshSamples()
-  },
-)
+// 例子只是摆出来。原来每个例子旁有个「测试」按钮（结果只给通过 / 不通过、2 秒后复位），
+// 现在试跑统一走工具栏的「运行例子」和结果页签的「自己输入」
+const samples = computed(() => problem.value?.samples ?? [])
+const submissionStore = useSubmissionStore()
 
 // 文案和配色分类都由后端生成 —— 原来这里有一份 NODE_TARGET_LABELS +
 // ruleDescription + ruleTagType，和判题机那份几乎一模一样，见契约
@@ -119,66 +94,6 @@ const KIND_TAG_TYPE = {
 } as const
 
 const astRequirements = computed(() => Object.entries(problem.value?.astRequirements ?? {}))
-
-async function test(sample: Sample, index: number) {
-  samples.value = samples.value.map((sample) => {
-    if (sample.id === index) {
-      sample.loading = true
-    }
-    return sample
-  })
-  const problemId = problem.value?._id
-  const res = await createTestSubmission(codeStore.code, sample.input)
-  // 跑的这一会儿换了题：结果是上一道题的例子的，按下标写进去就串到新题上了
-  if (problem.value?._id !== problemId) return
-  samples.value = samples.value.map((sample) => {
-    if (sample.id === index) {
-      const status = res.status === 3 && res.output.trim() === sample.output ? "passed" : "failed"
-      return {
-        ...sample,
-        msg: res.output,
-        status: status,
-        loading: false,
-      }
-    } else {
-      return sample
-    }
-  })
-
-  const id = setTimeout(() => {
-    clearTimeout(id)
-    if (problem.value?._id !== problemId) return
-    samples.value = samples.value.map((sample) => {
-      if (sample.id === index) {
-        return {
-          ...sample,
-          msg: res.output,
-          status: "not_test",
-          loading: false,
-        }
-      } else {
-        return sample
-      }
-    })
-  }, 2000)
-}
-
-function label(status: ProblemStatus, loading: boolean) {
-  if (loading) return "测试中"
-  return {
-    not_test: "测试",
-    failed: "不通过",
-    passed: "通过",
-  }[status]
-}
-
-function type(status: ProblemStatus) {
-  return {
-    not_test: "",
-    failed: "error",
-    passed: "success",
-  }[status] as "warning" | "error" | "success"
-}
 </script>
 
 <template>
@@ -280,14 +195,15 @@ function type(status: ProblemStatus) {
             <Icon icon="streamline-emojis:microscope"></Icon>
             例子 {{ index + 1 }}
           </h3>
+          <!-- 只在第一个例子旁放一个入口：每个都放就成了一排一样的链接 -->
           <n-button
+            v-if="index === 0"
+            text
+            type="primary"
             size="small"
-            secondary
-            :type="type(sample.status) || 'default'"
-            :loading="sample.loading"
-            @click="test(sample, index)"
+            @click="submissionStore.revealResult('custom')"
           >
-            {{ label(sample.status, sample.loading) }}
+            自己输入数据试试 ›
           </n-button>
         </n-flex>
         <div class="sample-grid">
@@ -305,10 +221,6 @@ function type(status: ProblemStatus) {
             </n-flex>
             <pre class="testcase">{{ sample.output }}</pre>
           </div>
-        </div>
-        <div v-if="sample.msg" class="sample-box sample-result">
-          <div class="sample-label">运行结果</div>
-          <pre class="testcase">{{ sample.msg }}</pre>
         </div>
       </section>
     </template>
@@ -519,10 +431,6 @@ function type(status: ProblemStatus) {
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.08);
   padding: 6px 10px 10px;
-}
-
-.sample-result {
-  margin-top: 8px;
 }
 
 .sample-label {

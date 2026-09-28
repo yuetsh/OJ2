@@ -15,6 +15,12 @@ const props = defineProps<{
   check: SampleCheck
   code: string
   language: string
+  /**
+   * 只摆输入、正确输出、你的输出，不给中文提示句。比赛里的「运行例子」用：后端在比赛里
+   * 故意不做例子对比（judge/run.ts：比赛里有期末考试，格式提示在那里不该给），
+   * 前端试跑也不能绕过去
+   */
+  plain?: boolean
 }>()
 
 /** 后端每段截到 2000 字，到了上限就是被截过 */
@@ -61,7 +67,8 @@ function lines(text: string) {
     </div>
     <n-flex v-else vertical :size="12">
       <div class="explain">
-        <b>例子 {{ (check.index ?? 0) + 1 }} 没有通过：</b>{{ hint }}
+        <b>例子 {{ (check.index ?? 0) + 1 }} 没有通过{{ plain ? "。" : "：" }}</b
+        ><template v-if="!plain">{{ hint }}</template>
       </div>
       <div class="blocks">
         <div class="block input">

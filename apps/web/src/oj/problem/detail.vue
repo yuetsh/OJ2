@@ -4,7 +4,6 @@ import { getProblem } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
-import { useScreenModeStore } from "shared/store/screenMode"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 import { useSubmissionStore } from "oj/store/submission"
@@ -19,7 +18,6 @@ import ResultTabLabel from "./components/ResultTabLabel.vue"
 // 点了没反应（见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 10 节）
 const loadProblemEditor = () => import("./components/ProblemEditor.vue")
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
-const EditorForTest = defineAsyncComponent(() => import("./components/EditorForTest.vue"))
 const ProblemContent = defineAsyncComponent(() => import("./components/ProblemContent.vue"))
 const ProblemInfo = defineAsyncComponent(() => import("./components/ProblemInfo.vue"))
 const ProblemSubmission = defineAsyncComponent(() => import("./components/ProblemSubmission.vue"))
@@ -41,10 +39,8 @@ const route = useRoute()
 const router = useRouter()
 
 const problemStore = useProblemStore()
-const screenModeStore = useScreenModeStore()
 const myFlowchartStore = useMyFlowchartStore()
 const { problem } = storeToRefs(problemStore)
-const { shouldShowProblem } = storeToRefs(screenModeStore)
 
 const { isMobile, isDesktop } = useBreakpoints()
 
@@ -117,7 +113,6 @@ watch(
 )
 
 async function init() {
-  screenModeStore.resetScreenMode()
   // 「我的流程图」是上一道题的。这道题也画到了 A/S 的话，SubmitFlowchart 查完会再亮出来
   myFlowchartStore.hide()
   // 并行预取右侧编辑器 chunk（CodeMirror ~370K+），
@@ -138,7 +133,7 @@ watch(() => problemID, init)
 
 // 题目详情里的 myStatus / myFailedCount 是按当前用户算的，而登录不重新挂载这个页面 ——
 // 会话过期后直接在题目页登录的（机房里最常见的那条路）不补拉一次，AI 提示的解锁进度
-// 就还是匿名时的 0，等于白改。只换 problem，不走 init：那里还会重置分栏模式。
+// 就还是匿名时的 0，等于白改。只换 problem，不走 init：那里会把整页重来一遍。
 watch(
   () => useUserStore().isAuthed,
   async (authed) => {
@@ -158,30 +153,15 @@ onBeforeUnmount(() => {
   useFlowchartStore().reset()
   problem.value = null
   errMsg.value = "无数据"
-  screenModeStore.resetScreenMode()
   myFlowchartStore.hide()
 })
-
-watch(isMobile, (value) => {
-  if (value) screenModeStore.resetScreenMode()
-})
-
-// SQL 题不支持"自测"模式（外部代码运行器无法执行 SQL），切到该屏时自动跳到下一模式
-watch(
-  () => screenModeStore.isCodeOnlyMode,
-  (codeOnly) => {
-    if (codeOnly && problem.value?.languages.includes("SQL")) {
-      screenModeStore.switchScreenMode()
-    }
-  },
-)
 </script>
 
 <template>
   <template v-if="problem">
     <SubmissionEffects />
     <n-split
-      v-if="isDesktop && screenModeStore.isBothMode"
+      v-if="isDesktop"
       direction="horizontal"
       :default-size="0.43"
       :min="0.2"
@@ -220,40 +200,6 @@ watch(
         <ProblemEditor />
       </template>
     </n-split>
-
-    <!-- Desktop: code only mode -->
-    <template v-else-if="isDesktop && screenModeStore.isCodeOnlyMode">
-      <EditorForTest />
-    </template>
-
-    <!-- Desktop: problem only mode -->
-    <template v-else-if="isDesktop && shouldShowProblem">
-      <n-scrollbar style="max-height: calc(100vh - 92px)">
-        <n-tabs v-model:value="currentTab" type="segment">
-          <n-tab-pane name="content" tab="题目">
-            <ProblemContent />
-          </n-tab-pane>
-          <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
-            <ResultPane />
-          </n-tab-pane>
-          <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程图表">
-            <ProblemFlowchart />
-          </n-tab-pane>
-          <n-tab-pane name="info" tab="题目统计" :disabled="!!problemSetId">
-            <ProblemInfo />
-          </n-tab-pane>
-          <n-tab-pane v-if="!contestID" name="comment" tab="题目点评" :disabled="!!problemSetId">
-            <ProblemReaction />
-          </n-tab-pane>
-          <n-tab-pane v-if="myFlowchartStore.showing" name="my-flowchart" tab="我的流程图">
-            <MyFlowchartTab />
-          </n-tab-pane>
-          <n-tab-pane name="submission" tab="我的提交" :disabled="!!problemSetId">
-            <ProblemSubmission />
-          </n-tab-pane>
-        </n-tabs>
-      </n-scrollbar>
-    </template>
 
     <!-- Mobile -->
     <n-tabs v-else v-model:value="currentTab" type="segment">

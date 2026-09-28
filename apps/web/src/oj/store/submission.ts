@@ -5,6 +5,7 @@ import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionMonitor } from "oj/problem/composables/useSubmissionMonitor"
 import { useSubmissionHint } from "oj/problem/composables/useSubmissionHint"
+import { useTrialRun } from "oj/problem/composables/useTrialRun"
 import { restartEditTrace, snapshotEditTrace } from "oj/problem/utils/editTrace"
 import { useCollabStore } from "shared/store/collab"
 import { LANGUAGE_FORMAT_VALUE } from "utils/constants"
@@ -22,6 +23,8 @@ import type { SubmitCodePayload } from "utils/types"
  * 判完之后「该发生什么」（失败计数、标成已解决、烟花、点评、回题单）不在这里，
  * 在页面这一层的 SubmissionEffects —— 它们要路由守卫和弹窗，得挂在一直在的组件上。
  */
+export type ResultSegment = "submit" | "samples" | "custom"
+
 export const useSubmissionStore = defineStore("submission", () => {
   const problemStore = useProblemStore()
   const codeStore = useCodeStore()
@@ -29,14 +32,32 @@ export const useSubmissionStore = defineStore("submission", () => {
 
   const monitor = useSubmissionMonitor()
   const hint = useSubmissionHint()
+  const trial = useTrialRun()
 
   /**
    * 有新结果要给学生看了（交上去、或者语法检查没过）就 +1。题目页看着它把左栏切到
    * 「结果」页签 —— store 不管页签，只说「该看结果了」。
    */
   const resultSeq = ref(0)
-  function revealResult() {
+  /** 「结果」页签里看哪一段：提交结果 / 运行例子 / 自己输入 */
+  const resultSegment = ref<ResultSegment>("submit")
+  function revealResult(segment: ResultSegment = "submit") {
+    resultSegment.value = segment
     resultSeq.value++
+  }
+
+  /** 用题目里的例子试跑（Judge0），不算提交 */
+  function runSamples() {
+    const problem = problemStore.problem
+    if (!problem?.samples.length) return
+    revealResult("samples")
+    trial.runSamples({ ...codeStore.code }, problem.samples)
+  }
+
+  /** 用「自己输入」框里的数据跑一次 */
+  function runCustom() {
+    revealResult("custom")
+    trial.runCustom({ ...codeStore.code })
   }
   const isFormatting = ref(false)
   const isSubmittingRequest = ref(false)
@@ -130,8 +151,10 @@ export const useSubmissionStore = defineStore("submission", () => {
    */
   function reset() {
     syntaxErrorInfo.value = ""
+    resultSegment.value = "submit"
     monitor.reset()
     hint.clearHint()
+    trial.resetTrial()
   }
 
   // 题目页换题是同一个组件复用（顶栏题号直达、「下一题」都只换路由参数）
@@ -153,7 +176,10 @@ export const useSubmissionStore = defineStore("submission", () => {
     pending: monitor.pending,
     submitting: monitor.submitting,
     resultSeq,
+    resultSegment,
     revealResult,
+    runSamples,
+    runCustom,
     isFormatting,
     isSubmittingRequest,
     syntaxErrorInfo,
@@ -162,5 +188,6 @@ export const useSubmissionStore = defineStore("submission", () => {
     reset,
     // markRaw：不让 store 把它包成 reactive，组件解构出来的还是 ref
     hint: markRaw(hint),
+    trial: markRaw(trial),
   }
 })

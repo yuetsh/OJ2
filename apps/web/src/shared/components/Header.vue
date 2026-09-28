@@ -7,7 +7,6 @@ import { useLearnProgress } from "shared/composables/learnProgress"
 import { useProblemJump } from "shared/composables/problemJump"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
-import { useScreenModeStore } from "shared/store/screenMode"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
 
@@ -15,7 +14,6 @@ const userStore = useUserStore()
 const configStore = useConfigStore()
 const collabStore = useCollabStore()
 const authStore = useAuthModalStore()
-const screenModeStore = useScreenModeStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -31,7 +29,6 @@ const { isDark, toggleDark } = useDarkTransition()
 const pendingHelpCount = computed(() => (collabStore.isTeacher ? collabStore.pendingCount : 0))
 
 // 从 store 中获取屏幕模式状态
-const { screenMode } = storeToRefs(screenModeStore)
 
 const names = [
   "man-with-chinese-cap-1",
@@ -297,12 +294,6 @@ function goHome() {
           <Icon icon="ph:magnifying-glass" />
         </template>
       </n-input>
-      <n-button
-        v-if="isDesktop && (route.name === 'problem' || route.name === 'contest problem')"
-        @click="() => screenModeStore.switchScreenMode()"
-      >
-        {{ screenMode }}
-      </n-button>
       <div v-if="userStore.isFinished">
         <n-dropdown v-if="userStore.isAuthed" :options="options" size="large">
           <n-badge :value="pendingHelpCount" :max="99">

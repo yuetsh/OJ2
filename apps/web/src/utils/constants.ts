@@ -252,12 +252,6 @@ export const CODE_TEMPLATES = {
   SQL: blankTemplate,
 } as const
 
-export enum ScreenMode {
-  both = "双栏",
-  code = "自测",
-  problem = "题目",
-}
-
 export enum ChartType {
   Rank,
   Activity,

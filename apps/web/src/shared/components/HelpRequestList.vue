@@ -2,13 +2,11 @@
 import { Icon } from "@iconify/vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useCollabStore } from "shared/store/collab"
-import { useScreenModeStore } from "shared/store/screenMode"
 
 /** 由顶栏的姓名下拉菜单打开 */
 const show = defineModel<boolean>("show", { default: false })
 
 const collabStore = useCollabStore()
-const screenModeStore = useScreenModeStore()
 const router = useRouter()
 const route = useRoute()
 const message = useMessage()
@@ -69,11 +67,6 @@ const handleAccept = (studentId: number, problemId: string, status: string) => {
     return
   }
   collabStore.accept(studentId)
-  // 协作用的是右侧那个编辑器，而「题目」「自测」两种分屏模式下它根本没挂出来 ——
-  // 落进那样一个页面就是：学生显示「老师正在帮你」，老师这边什么都没有。
-  // 跳到另一道题时 detail.vue 的 init() 会重置分屏模式，**停在同一道题上接单
-  // 不会**（路由没变、组件不重建），所以这里显式重置一次。
-  screenModeStore.resetScreenMode()
   show.value = false
   // 已经在这道题的页面上就不跳了（老师正投影着这道题时就是这种）。
   // 重复导航在 vue-router 里是一个 rejected promise，不拦一下控制台会报
