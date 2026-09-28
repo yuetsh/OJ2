@@ -11,6 +11,12 @@ import { useFlowchartStore } from "oj/store/flowchart"
 // 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
 import SubmissionEffects from "./components/SubmissionEffects.vue"
 import ResultTabLabel from "./components/ResultTabLabel.vue"
+import ContextBar from "./components/ContextBar.vue"
+import {
+  DRAWER_TITLE,
+  useProblemPageContext,
+  type ProblemDrawer as DrawerKey,
+} from "./composables/problemPageContext"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
@@ -19,11 +25,7 @@ import ResultTabLabel from "./components/ResultTabLabel.vue"
 const loadProblemEditor = () => import("./components/ProblemEditor.vue")
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
 const ProblemContent = defineAsyncComponent(() => import("./components/ProblemContent.vue"))
-const ProblemInfo = defineAsyncComponent(() => import("./components/ProblemInfo.vue"))
-const ProblemSubmission = defineAsyncComponent(() => import("./components/ProblemSubmission.vue"))
-const ProblemReaction = defineAsyncComponent(() => import("./components/ProblemReaction.vue"))
-const ProblemFlowchart = defineAsyncComponent(() => import("./components/ProblemFlowchart.vue"))
-const MyFlowchartTab = defineAsyncComponent(() => import("./components/MyFlowchartTab.vue"))
+const ProblemDrawer = defineAsyncComponent(() => import("./components/ProblemDrawer.vue"))
 const ResultPane = defineAsyncComponent(() => import("./components/ResultPane.vue"))
 
 interface Props {
@@ -32,7 +34,7 @@ interface Props {
   problemSetId?: string
 }
 
-const { problemID, contestID = "", problemSetId = "" } = defineProps<Props>()
+const { problemID, contestID = "" } = defineProps<Props>()
 
 const errMsg = ref("无数据")
 const route = useRoute()
@@ -41,38 +43,18 @@ const router = useRouter()
 const problemStore = useProblemStore()
 const myFlowchartStore = useMyFlowchartStore()
 const { problem } = storeToRefs(problemStore)
+const ctx = useProblemPageContext()
 
 const { isMobile, isDesktop } = useBreakpoints()
 
-// tab 选项和面板必须用同一个条件。后端在 allowFlowchart 为真时会把 mermaidCode
-// 置成 null（不能把标准答案下发给正要自己画图的学生），只看 showFlowchart 的话，
-// 两个开关同时打开就会做出一个「选项存在、面板不存在」的 tab —— URL 里带
-// ?tab=flowchart 会选中一个渲染不出任何东西的页签。
-const canShowFlowchart = computed(
-  () => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode,
+/**
+ * 左栏只有「题目 / 结果」两个页签（手机上编辑器也是一个页签，排在中间）。
+ * 原来的六个页签里，流程图并进了「题目」，统计 / 点评 / 我的提交收进了抽屉 ——
+ * 见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 4 节。
+ */
+const tabOptions = computed(() =>
+  isMobile.value ? ["content", "editor", "result"] : ["content", "result"],
 )
-
-const tabOptions = computed(() => {
-  // 桌面上「结果」紧跟在「题目」后面；手机上编辑器也是一个页签，「结果」排在「代码」后面
-  const options: string[] = ["content"]
-  if (!isMobile.value) options.push("result")
-  if (canShowFlowchart.value) {
-    options.push("flowchart")
-  }
-
-  if (isMobile.value) {
-    options.push("editor", "result")
-  }
-  options.push("info")
-  if (!contestID) {
-    options.push("comment")
-  }
-  if (myFlowchartStore.showing) {
-    options.push("my-flowchart")
-  }
-  options.push("submission")
-  return options
-})
 
 const currentTab = ref("content")
 
@@ -93,24 +75,39 @@ watch(currentTab, (tab) => {
   })
 })
 
-// 交上去、或者语法检查没过：切到「结果」。提交按钮在编辑器那边，页签归这一页管
+// 「结果」第一次切过去才挂（它带着 DataTable 和 Markdown 渲染），挂上之后切走也不卸载：
+// 挂着的错误说明在编辑器里标着红，AI 提示也在渲染
+const resultMounted = ref(false)
+watch(
+  currentTab,
+  (tab) => {
+    if (tab === "result") resultMounted.value = true
+  },
+  { immediate: true },
+)
+
+const drawer = ref<DrawerKey | null>(null)
+
+function toggleDrawer(key: DrawerKey) {
+  drawer.value = drawer.value === key ? null : key
+}
+
+const drawerMenu = computed<DropdownOption[]>(() =>
+  ctx.value.drawers.map((key) => ({ label: DRAWER_TITLE[key], key })),
+)
+
+// 交上去、或者语法检查没过：切到「结果」，抽屉开着就先关掉。提交按钮在编辑器那边，页签归这一页管
 const submissionStore = useSubmissionStore()
 watch(
   () => submissionStore.resultSeq,
   () => {
+    drawer.value = null
     currentTab.value = "result"
   },
 )
 
 // 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
 const resultTab = () => h(ResultTabLabel)
-
-watch(
-  () => myFlowchartStore.showing,
-  (showing) => {
-    if (showing) currentTab.value = "my-flowchart"
-  },
-)
 
 async function init() {
   // 「我的流程图」是上一道题的。这道题也画到了 A/S 的话，SubmitFlowchart 查完会再亮出来
@@ -169,32 +166,53 @@ onBeforeUnmount(() => {
       style="height: calc(100vh - 92px)"
     >
       <template #1>
-        <n-scrollbar style="height: 100%">
-          <n-tabs v-model:value="currentTab" type="segment">
-            <n-tab-pane name="content" tab="题目">
-              <ProblemContent />
-            </n-tab-pane>
-            <!-- 切走也不卸载：挂着的错误说明在编辑器里标着红，AI 提示也在渲染 -->
-            <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
-              <ResultPane />
-            </n-tab-pane>
-            <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程图表">
-              <ProblemFlowchart />
-            </n-tab-pane>
-            <n-tab-pane name="info" tab="题目统计" :disabled="!!problemSetId">
-              <ProblemInfo />
-            </n-tab-pane>
-            <n-tab-pane v-if="!contestID" name="comment" tab="题目点评" :disabled="!!problemSetId">
-              <ProblemReaction />
-            </n-tab-pane>
-            <n-tab-pane v-if="myFlowchartStore.showing" name="my-flowchart" tab="我的流程图">
-              <MyFlowchartTab />
-            </n-tab-pane>
-            <n-tab-pane name="submission" tab="我的提交" :disabled="!!problemSetId">
-              <ProblemSubmission />
-            </n-tab-pane>
-          </n-tabs>
-        </n-scrollbar>
+        <div class="left-pane">
+          <ContextBar />
+          <div class="tab-row">
+            <n-tabs
+              v-model:value="currentTab"
+              type="segment"
+              class="page-tabs"
+              @click="drawer = null"
+            >
+              <n-tab name="content">题目</n-tab>
+              <n-tab name="result"><ResultTabLabel /></n-tab>
+            </n-tabs>
+            <n-flex v-if="ctx.drawers.length" :size="6" :wrap="false">
+              <n-button
+                v-for="key in ctx.drawers"
+                :key="key"
+                size="small"
+                :type="drawer === key ? 'primary' : 'default'"
+                :secondary="drawer === key"
+                @click="toggleDrawer(key)"
+              >
+                {{ DRAWER_TITLE[key] }}
+              </n-button>
+            </n-flex>
+          </div>
+          <!--
+            抽屉挂在页签行下面这一块（position: relative），盖住题面、编辑器不动。
+            页签行露在外面：同一个按钮再点一下就关、点另一个就换，点「题目 / 结果」也会关
+          -->
+          <div id="problem-pane-stack" class="pane-stack">
+            <!--
+              两个页签各滚各的：读题读到底下切去看结果，结果不该也停在底下。
+              v-show 挂在外面这层 div 上 —— 直接挂在 n-scrollbar 上不生效，它自己管根节点的 style
+            -->
+            <div v-show="currentTab === 'content'" class="pane-body">
+              <n-scrollbar content-style="padding-top: 8px">
+                <ProblemContent />
+              </n-scrollbar>
+            </div>
+            <div v-if="resultMounted" v-show="currentTab === 'result'" class="pane-body">
+              <n-scrollbar content-style="padding-top: 8px">
+                <ResultPane />
+              </n-scrollbar>
+            </div>
+            <ProblemDrawer v-model="drawer" to="#problem-pane-stack" />
+          </div>
+        </div>
       </template>
       <template #2>
         <ProblemEditor />
@@ -202,32 +220,61 @@ onBeforeUnmount(() => {
     </n-split>
 
     <!-- Mobile -->
-    <n-tabs v-else v-model:value="currentTab" type="segment">
-      <n-tab-pane name="content" tab="题目">
-        <ProblemContent />
-      </n-tab-pane>
-      <n-tab-pane v-if="canShowFlowchart" name="flowchart" tab="流程">
-        <ProblemFlowchart />
-      </n-tab-pane>
-      <n-tab-pane name="editor" tab="代码">
-        <ProblemEditor />
-      </n-tab-pane>
-      <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
-        <ResultPane />
-      </n-tab-pane>
-      <n-tab-pane name="info" tab="统计" :disabled="!!problemSetId">
-        <ProblemInfo />
-      </n-tab-pane>
-      <n-tab-pane v-if="!contestID" name="comment" tab="点评" :disabled="!!problemSetId">
-        <ProblemReaction />
-      </n-tab-pane>
-      <n-tab-pane v-if="myFlowchartStore.showing" name="my-flowchart" tab="我的流程图">
-        <MyFlowchartTab />
-      </n-tab-pane>
-      <n-tab-pane name="submission" tab="提交" :disabled="!!problemSetId">
-        <ProblemSubmission />
-      </n-tab-pane>
-    </n-tabs>
+    <template v-else>
+      <ContextBar />
+      <n-tabs v-model:value="currentTab" type="segment">
+        <n-tab-pane name="content" tab="题目">
+          <ProblemContent />
+        </n-tab-pane>
+        <n-tab-pane name="editor" tab="代码">
+          <ProblemEditor />
+        </n-tab-pane>
+        <n-tab-pane name="result" :tab="resultTab" display-directive="show:lazy">
+          <ResultPane />
+        </n-tab-pane>
+        <template v-if="drawerMenu.length" #suffix>
+          <n-dropdown trigger="click" :options="drawerMenu" @select="toggleDrawer">
+            <n-button size="small" quaternary aria-label="统计、点评、我的提交"> ⋯ </n-button>
+          </n-dropdown>
+        </template>
+      </n-tabs>
+      <ProblemDrawer v-model="drawer" />
+    </template>
   </template>
   <n-empty v-else :description="errMsg"></n-empty>
 </template>
+
+<style scoped>
+.left-pane {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tab-row {
+  flex: none;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-tabs {
+  width: 180px;
+  flex: none;
+}
+
+.pane-stack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pane-body {
+  height: 100%;
+}
+</style>

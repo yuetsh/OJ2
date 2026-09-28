@@ -19,6 +19,7 @@ import type { LANGUAGE } from "utils/types"
 import { Icon } from "@iconify/vue"
 import { NFlex } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
+import { useProblemPageContext } from "../composables/problemPageContext"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
 // 只有老师看得见（下面的弹框挂了 isTeacherOrAbove），静态 import 的话每个学生
@@ -38,8 +39,8 @@ const emit = defineEmits<{
 }>()
 
 const message = useMessage()
-const route = useRoute()
 const router = useRouter()
+const ctx = useProblemPageContext()
 const userStore = useUserStore()
 const codeStore = useCodeStore()
 const problemStore = useProblemStore()
@@ -63,8 +64,6 @@ const canRunSamples = computed(
     codeStore.code.language !== "SQL",
 )
 
-// 计算属性
-const isContestMode = computed(() => route.name === "contest problem")
 const buttonSize = computed(() => (isDesktop.value ? "medium" : "small"))
 // 可见条件沿用原来的 showSyncFeature，再加上「不是教师」——
 // 教师端的入口在顶栏，不在题目页
@@ -76,7 +75,7 @@ const showHelpButton = computed(
     // 演示模式下协作通道是断开的（见 App.vue），按钮点了也没人收
     !userStore.demoMode &&
     codeStore.code.language !== "Flowchart" &&
-    !isContestMode.value,
+    ctx.value.help,
 )
 
 /**
@@ -124,29 +123,14 @@ const toggleHelp = () => {
     collabStore.requestHelp(problem.value!._id, codeStore.code.language)
 }
 
-const showGoSubmissionButton = computed(() => {
-  if (isContestMode.value) return true
-  else if (userStore.isAdminRole) return true
-  else if (userStore.showSubmissions) return true
-  else return false
-})
-
 const menuOptions = computed<DropdownOption[]>(() => {
   const options: DropdownOption[] = []
-  // 移动端额外收纳桌面端常驻的两项
-  if (!isDesktop.value) {
-    if (showGoSubmissionButton.value) {
-      options.push({
-        label: "本题提交",
-        key: "submissions",
-      })
-    }
-    if (userStore.isTeacherOrAbove) {
-      options.push({
-        label: "课堂统计",
-        key: "statistics",
-      })
-    }
+  // 移动端额外收纳桌面端常驻的「课堂统计」。「本题提交」挪到了「我的提交」抽屉的底部
+  if (!isDesktop.value && userStore.isTeacherOrAbove) {
+    options.push({
+      label: "课堂统计",
+      key: "statistics",
+    })
   }
   if (codeStore.code.language !== "Flowchart") {
     if (codeStore.code.language !== "SQL") {
@@ -179,9 +163,6 @@ const menuOptions = computed<DropdownOption[]>(() => {
 
 const handleMenuSelect = (key: string) => {
   switch (key) {
-    case "submissions":
-      goSubmissions()
-      break
     case "statistics":
       statisticPanel.value = true
       break
@@ -238,24 +219,12 @@ const goTestCat = () => {
   const data = {
     lang,
     code: codeStore.code.value,
-    input: problemStore.problem?.samples[0].input,
+    // 没有例子的题原来在这里抛 TypeError，点了没反应
+    input: problemStore.problem?.samples[0]?.input ?? "",
   }
   const base64 = compressToBase64(JSON.stringify(data))
   const url = `${import.meta.env.PUBLIC_CODE_URL}?share=${encodeURIComponent(base64)}`
   window.open(url, "_blank")
-}
-
-const goSubmissions = () => {
-  const name = route.params.contestID ? "contest submissions" : "submissions"
-  const target = { name, query: { problem: problem.value!._id } }
-  // 协作中走新标签：教师端「页面即协作现场」，跳走这一页协作就结束了
-  // （求助会退回排队，但老师还得再接一次）。而「看看这学生都交了什么」恰好是
-  // 协作时最常点的一个按钮 —— 这是整条工具栏上唯一会跳路由的按钮
-  if (showCollabBar.value) {
-    window.open(router.resolve(target).href, "_blank")
-    return
-  }
-  router.push(target)
 }
 
 const goEdit = () => {
@@ -294,10 +263,6 @@ const goEdit = () => {
 
     <SubmitCode v-else />
 
-    <n-button v-if="isDesktop && showGoSubmissionButton" :size="buttonSize" @click="goSubmissions">
-      本题提交
-    </n-button>
-
     <n-button
       v-if="isDesktop && userStore.isTeacherOrAbove"
       :size="buttonSize"
@@ -306,7 +271,7 @@ const goEdit = () => {
       课堂统计
     </n-button>
 
-    <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；移动端再加上本题提交 / 课堂统计 -->
+    <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；移动端再加上课堂统计 -->
     <n-dropdown
       v-if="menuOptions.length"
       trigger="click"

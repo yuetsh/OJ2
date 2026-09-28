@@ -12,13 +12,18 @@ import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { getSimilarProblems } from "oj/api"
 import SQLDataTable from "./SQLDataTable.vue"
+import { useFlowchartStore } from "oj/store/flowchart"
+import { useMyFlowchartStore } from "shared/store/myFlowchart"
+import { useUserStore } from "shared/store/user"
+import { useProblemPageContext } from "../composables/problemPageContext"
+
+const ProblemFlowchart = defineAsyncComponent(() => import("./ProblemFlowchart.vue"))
+const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
 const isDark = useDark()
-const route = useRoute()
 const problemStore = useProblemStore()
-const { problem } = storeToRefs(problemStore)
-
-const problemSetId = computed(() => route.params.problemSetId)
+const { problem, languages } = storeToRefs(problemStore)
+const ctx = useProblemPageContext()
 
 // SQL 题：隐藏输入/输出/例子，改为渲染数据表与期望结果
 const isSQL = computed(() => !!problem.value?.sqlConfig)
@@ -40,9 +45,8 @@ const similarLoaded = ref(false)
 
 async function loadSimilarProblems() {
   if (similarLoaded.value || !problem.value) return
-  // 比赛题不推荐：接口按 displayId 在**公开题库**里找，比赛题的编号默认是 1/2/3，
-  // 一般白跑一趟 404，撞上同号公开题时反而会在比赛中把题库列给学生。
-  if (problem.value.contestId !== null) return
+  // 比赛、题单里不推荐（理由见 problemPageContext 那张表）
+  if (!ctx.value.similar) return
   try {
     similarProblems.value = await getSimilarProblems(problem.value._id)
   } catch {
@@ -71,13 +75,42 @@ watch(
   { immediate: true },
 )
 
-const hasTriedButNotPassed = computed(() => {
-  return (
-    problem.value?.myStatus !== undefined &&
-    problem.value?.myStatus !== null &&
-    problem.value?.myStatus !== 0
-  )
+/**
+ * 标题下的状态标签。原来是题面最上面两条整宽的提示（「本题已经被你解决啦」「尝试过但还没有
+ * 通过」），占掉一屏里最值钱的那几行。题单里不给（入口差异表）。
+ */
+const myStatus = computed(() => {
+  const status = problem.value?.myStatus
+  if (!ctx.value.statusTag || status === undefined || status === null) return null
+  return status === 0 ? "solved" : "tried"
 })
+
+/** 「限时 1 秒」：学生不需要 ms / MB。1000 → 1，1500 → 1.5 */
+const timeLimitText = computed(() => {
+  const ms = problem.value?.timeLimit ?? 0
+  return `限时 ${Number((ms / 1000).toFixed(2))} 秒`
+})
+
+// ==================== 流程图小节 ====================
+// 同一个位置二选一：老师给的参考图（showFlowchart，默认折叠），或者学生自己画到 A/S 的
+// 那张（allowFlowchart）。两个开关在后台是互斥的（admin/problem/detail.vue）；后端在
+// allowFlowchart 为真时会把 mermaidCode 置成 null，不能把标准答案下发给正要自己画图的学生。
+const canShowReferenceFlowchart = computed(
+  () => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode,
+)
+const myFlowchartStore = useMyFlowchartStore()
+const flowchartStore = useFlowchartStore()
+const userStore = useUserStore()
+const myFlowchartZoom = ref(false)
+
+// 这道题能画流程图，就去查画到 A/S 没有 —— 原来要先切到「流程图」这门「语言」才查
+watch(
+  () => [problem.value?.id, languages.value.includes("Flowchart"), userStore.isAuthed] as const,
+  ([id, canDraw, authed]) => {
+    if (id && canDraw && authed) flowchartStore.ensureLoaded()
+  },
+  { immediate: true },
+)
 
 // 例子只是摆出来。原来每个例子旁有个「测试」按钮（结果只给通过 / 不通过、2 秒后复位），
 // 现在试跑统一走工具栏的「运行例子」和结果页签的「自己输入」
@@ -98,27 +131,6 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
 <template>
   <div v-if="problem">
-    <template v-if="!problemSetId">
-      <!-- 已通过 -->
-      <n-alert
-        class="status-alert"
-        v-if="problem.myStatus === 0"
-        type="success"
-        title="🎉 本 题 已 经 被 你 解 决 啦"
-      >
-      </n-alert>
-
-      <!-- 尝试过但未通过 -->
-      <n-alert
-        class="status-alert"
-        v-else-if="hasTriedButNotPassed"
-        type="warning"
-        title="💪 你已经尝试过这道题，但还没有通过"
-      >
-        不要放弃！仔细检查代码逻辑，或者寻求 AI 的帮助获取灵感。
-      </n-alert>
-    </template>
-
     <header class="problem-head">
       <n-flex align="center" :size="10" :wrap="false">
         <n-tag :bordered="false">{{ problem._id }}</n-tag>
@@ -133,9 +145,13 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         >
           {{ DIFFICULTY[problem.difficulty] }}
         </n-tag>
-        <n-text depth="3" v-if="!isSQL">
-          时间限制 {{ problem.timeLimit }} ms · 内存限制 {{ problem.memoryLimit }} MB
-        </n-text>
+        <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false" round>
+          ✓ 已解决
+        </n-tag>
+        <n-tag v-else-if="myStatus === 'tried'" size="small" type="warning" :bordered="false" round>
+          ! 尝试过，还没通过
+        </n-tag>
+        <n-text depth="3" v-if="!isSQL">{{ timeLimitText }}</n-text>
       </n-flex>
     </header>
 
@@ -187,6 +203,41 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         :theme="isDark ? 'dark' : 'light'"
       />
     </template>
+
+    <n-collapse v-if="canShowReferenceFlowchart" class="flowchart-section">
+      <n-collapse-item name="reference">
+        <template #header>
+          <span class="title collapse-title">
+            <Icon icon="vscode-icons:file-type-drawio"></Icon>
+            参考流程图
+          </span>
+        </template>
+        <ProblemFlowchart />
+      </n-collapse-item>
+    </n-collapse>
+
+    <section v-else-if="myFlowchartStore.showing" class="flowchart-section">
+      <n-flex align="center" justify="space-between">
+        <h3 class="title">
+          <Icon icon="vscode-icons:file-type-drawio"></Icon>
+          你画的流程图
+        </h3>
+        <n-button text type="primary" size="small" @click="myFlowchartZoom = true">
+          放大看 ›
+        </n-button>
+      </n-flex>
+      <div class="my-flowchart" role="button" @click="myFlowchartZoom = true">
+        <MyFlowchart compact />
+      </div>
+      <n-modal
+        v-model:show="myFlowchartZoom"
+        preset="card"
+        title="你画的流程图"
+        :style="{ maxWidth: '900px' }"
+      >
+        <MyFlowchart />
+      </n-modal>
+    </section>
 
     <template v-if="!isSQL">
       <section v-for="(sample, index) of samples" :key="index" class="sample">
@@ -292,7 +343,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
     </div>
 
     <!-- 相似题目推荐 -->
-    <div v-if="similarProblems.length > 0">
+    <div v-if="ctx.similar && similarProblems.length > 0">
       <n-divider />
       <h3 class="title">
         <Icon icon="streamline-ultimate-color:like"></Icon>
@@ -447,8 +498,19 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   font-family: Monaco, Consolas, monospace;
 }
 
-.status-alert {
-  margin-bottom: 16px;
+.flowchart-section {
+  margin-top: 20px;
+}
+
+.collapse-title {
+  margin: 0;
+}
+
+.my-flowchart {
+  cursor: zoom-in;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.06);
+  padding: 8px;
 }
 
 .sqlTableName {

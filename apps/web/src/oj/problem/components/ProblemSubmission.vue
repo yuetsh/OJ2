@@ -88,6 +88,8 @@ const loading = ref(false)
 
 const submissions = ref<SubmissionListItem[]>([])
 const total = ref(0)
+// 拉回来之前别说「还没交过」
+const listed = ref(false)
 const query = reactive({
   limit: 10,
   page: 1,
@@ -127,6 +129,7 @@ async function listSubmissions() {
   })
   submissions.value = res.results
   total.value = res.total
+  listed.value = true
 }
 
 async function getRankOfThisProblem() {
@@ -288,6 +291,7 @@ watch(query, listSubmissions)
     </n-flex>
 
     <n-data-table v-if="submissions.length > 0" striped :columns="columns" :data="submissions" />
+    <n-empty v-else-if="listed" class="tip" description="这道题你还没有交过" />
     <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   </template>
 

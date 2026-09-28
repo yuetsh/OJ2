@@ -19,6 +19,7 @@ import PythonErrorExplain from "./PythonErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
+import { useProblemPageContext } from "../composables/problemPageContext"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { useDark } from "@vueuse/core"
@@ -84,14 +85,11 @@ const sampleCheck = computed(() => {
 
 /**
  * 通过之后给「这节课的下一题」。比赛有自己的题目列表；从题单入口进来的，通过后
- * 1.5 秒会自动跳回题单（SubmitCode 的 goToProblemSetDelayed），这两种都不给
+ * 1.5 秒会自动跳回题单（SubmissionEffects），这两种都不给
  */
-const route = useRoute()
+const ctx = useProblemPageContext()
 const showLessonNext = computed(
-  () =>
-    props.submission?.result === SubmissionStatus.accepted &&
-    problemStore.problem?.contestId == null &&
-    !route.params.problemSetId,
+  () => props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext,
 )
 
 const msg = computed(() => {
@@ -208,10 +206,8 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
         />
       </template>
     </n-alert>
-    <!-- key 用提交 id：同一道题再交一次、又通过了，要重新拉一遍「还剩几道」 -->
     <LessonNext
       v-if="showLessonNext && problemStore.problem"
-      :key="submission.id"
       :problem-display-id="problemStore.problem._id"
     />
     <n-flex

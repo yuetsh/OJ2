@@ -7,6 +7,7 @@ import { useSubmissionStore } from "oj/store/submission"
 import { useFireworks } from "oj/problem/composables/useFireworks"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { SubmissionStatus } from "utils/constants"
+import { useProblemPageContext } from "../composables/problemPageContext"
 
 /**
  * 判完之后「该发生什么」：失败计数、标成已解决、烟花、点评、回题单。
@@ -24,11 +25,8 @@ const submissionStore = useSubmissionStore()
 const { problem } = storeToRefs(problemStore)
 const { submission } = storeToRefs(submissionStore)
 
-const route = useRoute()
 const router = useRouter()
-// 题目页在题库 / 比赛 / 题单三条路由之间是复用的，所以跟着路由算，不在 setup 时取一次
-const contestID = computed(() => (route.params.contestID as string) ?? "")
-const problemSetId = computed(() => (route.params.problemSetId as string) ?? "")
+const ctx = useProblemPageContext()
 
 const { isDesktop } = useBreakpoints()
 const { celebrate } = useFireworks()
@@ -106,7 +104,7 @@ const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutF
     router.push({
       name: "problemset",
       params: {
-        problemSetId: problemSetId.value,
+        problemSetId: ctx.value.problemSetId,
       },
     })
   },
@@ -176,12 +174,12 @@ watch(
     celebrate()
 
     // 3. 弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
-    if (!contestID.value && !problemSetId.value) {
+    if (ctx.value.reviewAfterAccepted) {
       reviewOwed.value = true
       showCommentPanelDelayed()
     }
 
-    if (problemSetId.value) {
+    if (ctx.value.backToProblemSet) {
       // 延迟回到题单页面
       goToProblemSetDelayed()
     }

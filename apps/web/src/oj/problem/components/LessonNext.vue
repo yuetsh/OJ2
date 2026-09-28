@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { getClassActivity } from "oj/api"
-import type { ClassActivity } from "utils/types"
+import { useLessonStore } from "oj/store/lesson"
 
 /**
  * 通过之后告诉学生「这节课的下一题是哪道」。
  *
  * 72% 的提交一次就通过，每次通过之后学生都得回首页、或者再问一遍题号去找下一道。
- * 这节课的题就是首页「班里在做」那几道（老师在课堂看板布置的，或者从同班提交推断的），
- * 这里直接拿同一个接口，给出下一道没做完的。
+ * 这节课的题就是首页「班里在做」那几道，和左栏顶上的课堂条读同一份（lesson store）；
+ * 通过的那一刻课堂条已经把这道标成做完、并且重拉了一次。
  *
  * 「下一道」是按列表顺序排在这道**后面**、还没通过的第一道，后面都做完了再从头找 ——
  * 学生常常跳着做，先做完了第 3 道再回头做第 1 道。当前这道本身不看它的 myStatus：
- * 接口是通过之前那一刻的状态，这时候它刚刚才通过。
+ * 重拉回来之前，它还是通过之前那一刻的状态。
  *
  * 这道题不在这节课的列表里（学生在做别的）就什么都不显示。
  */
@@ -20,14 +19,13 @@ const props = defineProps<{
   problemDisplayId: string
 }>()
 
-const activity = ref<ClassActivity | null>(null)
+const lessonStore = useLessonStore()
 
-onMounted(async () => {
-  activity.value = await getClassActivity().catch(() => null)
-})
+// 一般课堂条早就拉过了，这里只是兜底（旧了才拉）
+onMounted(() => lessonStore.load())
 
 const lesson = computed(() => {
-  const list = activity.value?.problems ?? []
+  const list = lessonStore.activity?.problems ?? []
   const current = props.problemDisplayId.toLowerCase()
   const index = list.findIndex((item) => item.problemDisplayId.toLowerCase() === current)
   if (index < 0) return null
@@ -37,7 +35,7 @@ const lesson = computed(() => {
   return { total: list.length, next: rest[0] ?? null, remaining: rest.length }
 })
 
-const label = computed(() => (activity.value?.source === "teacher" ? "老师布置的题" : "这节课的题"))
+const label = computed(() => lessonStore.label)
 </script>
 
 <template>

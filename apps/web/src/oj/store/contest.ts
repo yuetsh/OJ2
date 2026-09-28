@@ -2,7 +2,7 @@ import { errorCode } from "utils/api"
 import { formatISO, getTime, parseISO } from "date-fns"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
-import { duration } from "utils/functions"
+import { duration, secondsToDuration } from "utils/functions"
 import type { Contest, ProblemRow } from "utils/types"
 import { checkContestPassword, getContest, getContestAccess, getContestProblems } from "../api"
 
@@ -38,6 +38,14 @@ export const useContestStore = defineStore("contest", () => {
       const d = duration(formatISO(now.value), contest.value!.endTime, true)
       return "距离比赛结束 " + d
     }
+  })
+
+  /** 进行中还剩多久，「38:12」「1:05:00」这种；不在进行中为空串。题目页上下文条用 */
+  const remaining = computed(() => {
+    if (contestStatus.value !== ContestStatus.underway) return ""
+    const end = getTime(parseISO(contest.value!.endTime.toString()))
+    const text = secondsToDuration(Math.max(0, Math.floor((end - now.value) / 1000)))
+    return text.startsWith("0:") ? text.slice(2) : text
   })
 
   const isContestAdmin = computed(
@@ -112,6 +120,7 @@ export const useContestStore = defineStore("contest", () => {
     problems,
     isPrivate,
     countdown,
+    remaining,
     init,
     clear,
     checkPassword,
