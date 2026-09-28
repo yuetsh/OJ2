@@ -22,6 +22,12 @@ const props = defineProps<{
 }>()
 
 const theme = useThemeVars()
+/**
+ * 「做完」的实心绿上用什么字色。暗色主题的成功色是浅薄荷绿，白字几乎看不见 ——
+ * 和 Naive 自己的主按钮一样，暗色下换深色字
+ */
+const isDark = useDark()
+const doneText = computed(() => (isDark.value ? "rgba(0, 0, 0, 0.85)" : "#fff"))
 
 const STATUS_TEXT = { done: "做完了", tried: "做过，还没对", none: "还没做" } as const
 
@@ -94,7 +100,7 @@ watch(
 }
 
 .chip.done {
-  color: #fff;
+  color: v-bind(doneText);
   background-color: v-bind("theme.successColor");
 }
 
