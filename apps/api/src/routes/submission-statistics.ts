@@ -9,7 +9,6 @@
 import {
   type SubmissionStatistics,
   type SubmissionStatisticsGrid,
-  type SubmissionStatisticsItems,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm"
@@ -18,11 +17,11 @@ import { Hono } from "hono"
 import { optionalAuth, requireTeacher } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
-import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
+import { JudgeStatus, UNJUDGED_RESULTS } from "../judge/status"
 import { type ContestEnv } from "../services/contest"
 import { getBooleanOption } from "../services/options"
 import { localTime, dayStart } from "../time"
-import { isAdminRole, matchedUsers, parseDisplayIds, rounded, stripClassPrefix } from "./helpers"
+import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from "./helpers"
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
@@ -158,107 +157,6 @@ async function findPublicProblemsByDisplayIds(displayIds: string[]) {
   const found = new Set(rows.map((row) => row.displayId.toLowerCase()))
   const missing = displayIds.find((id) => !found.has(id.toLowerCase()))
   return { ids: rows.map((row) => row.id), missing: missing ?? null }
-}
-
-/**
- * 展开行一次只看一个人（表格的 updateExpandedRowKeys 只留最后一个 key），所以明细
- * **按需拉**，不再随统计一起下发。
- *
- * 原来是随 data 一起给所有人各带一份：生产快照实测，「全部时段 + 不填条件」要搬
- * 49108 行（最早那版不截断是 105631 行），而其中真正被人看到的最多一个人的那几十条。
- */
-const STATISTICS_ITEMS_LIMIT = 200
-
-/** 错误摘要截断长度。编译错误能刷几十行，弹层里放不下，也没必要 */
-const FAILURE_MESSAGE_LIMIT = 400
-
-/**
- * 「交了没对」那一栏点开要看的：这个人**最近一条**提交错在哪。
- *
- * 有了它，老师看到「张三 12次」之后不用再切到提交列表、翻到这个人、点开代码 ——
- * 点一下名字就知道是编译错了还是答案错了、报的什么。err_info 是判题机塞进
- * statistic_info 的那一段，提交详情页读的也是它。
- */
-async function lastFailureByUser(where: SQL | undefined, userIds: number[]) {
-  // result 手写成 JudgeStatusValue：这条裸 SQL 读的就是 submission.result 那一列，
-  // 口径要和列上的 $type 一致
-  const byUser = new Map<
-    number,
-    {
-      id: string
-      problemDisplayId: string
-      result: JudgeStatusValue
-      error: string | null
-    }
-  >()
-  if (!userIds.length) return byUser
-
-  // 不给 submission 起别名：where 里的条件是 drizzle 拼的，引用的是 "submission"."x"
-  const rows = await db.execute<{
-    user_id: number
-    id: string
-    problem: string
-    result: JudgeStatusValue
-    error: string | null
-  }>(sql`
-    select user_id, id, problem, result, error from (
-      select
-        ${schema.submission.userId} as user_id,
-        ${schema.submission.id} as id,
-        ${schema.problem.displayId} as problem,
-        ${schema.submission.result} as result,
-        left(${schema.submission.statisticInfo}->>'err_info', ${FAILURE_MESSAGE_LIMIT}) as error,
-        row_number() over (
-          partition by ${schema.submission.userId}
-          order by ${schema.submission.createTime} desc
-        ) as rn
-      from ${schema.submission}
-      join ${schema.problem} on ${schema.problem.id} = ${schema.submission.problemId}
-      where ${and(where, inArray(schema.submission.userId, userIds))}
-    ) t
-    where rn = 1
-  `)
-
-  for (const row of rows) {
-    byUser.set(row.user_id, {
-      id: row.id,
-      problemDisplayId: row.problem,
-      result: row.result,
-      error: row.error,
-    })
-  }
-  return byUser
-}
-
-/**
- * 「答案对了，但没按要求的语法写」的题数（AST_CHECK_FAILED）。
- *
- * 只算**最后也没改对**的：同一道题上既有 AST_CHECK_FAILED 又有 ACCEPTED，说明学生后来
- * 改成要求的写法了，不该再拿这个提醒老师。所以要先按「人 × 题」聚一层，不能直接
- * `count(distinct problem_id) filter (result = 10)`。
- *
- * 口径本身不动 —— AST_CHECK_FAILED 仍然算通过（答案确实对了，全站一致）。这里只是
- * 让教师看得见「这几个人是绕过要求做出来的」，教学上那不算达标。
- */
-async function astOnlyByUser(where: SQL | undefined, userIds: number[]) {
-  const byUser = new Map<number, number>()
-  if (!userIds.length) return byUser
-
-  const rows = await db.execute<{ user_id: number; n: number }>(sql`
-    select user_id, count(*)::int as n from (
-      select
-        ${schema.submission.userId} as user_id,
-        bool_or(${schema.submission.result} = ${JudgeStatus.AST_CHECK_FAILED}) as has_ast,
-        bool_or(${schema.submission.result} = ${JudgeStatus.ACCEPTED}) as has_ac
-      from ${schema.submission}
-      where ${and(where, inArray(schema.submission.userId, userIds))}
-      group by ${schema.submission.userId}, ${schema.submission.problemId}
-    ) t
-    where has_ast and not has_ac
-    group by user_id
-  `)
-  for (const row of rows) byUser.set(row.user_id, row.n)
-  return byUser
 }
 
 /**
@@ -419,13 +317,15 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
   if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
   const filters = scope.filters
 
-  const username = c.req.query("username")?.trim()
-  // 用户名先解析成账号，再拿 user_id 去筛提交。这一趟查询挡在 Promise.all 前面，
+  const username = c.req.query("username")?.trim() || undefined
+  const className = c.req.query("className")?.trim() || undefined
+  // 用户名 / 班级先解析成账号，再拿 user_id 去筛提交。这一趟查询挡在 Promise.all 前面，
   // 但换掉的是下面**四条**语句各一次的 submission 全表扫：`ilike` 走不了索引，
   // 换成 `user_id in (...)` 之后四条全走索引（生产快照实测单条 18448 → 537
   // buffers；同一个快照上整个接口查一个班 120~250ms → 10ms 上下），多这一次往返是赚的。
-  const matched = username ? await matchedUsers(username) : []
-  if (username) {
+  const scoped = await scopedUsers(username, className)
+  const matched = scoped ?? []
+  if (scoped) {
     const matchedIds = matched.map((row) => row.id)
     // 一个账号都没匹配上时得留个恒假条件。少推一个 filter 的话过滤条件整个消失，
     // 「查无此班」会变成「全站统计」
@@ -512,16 +412,11 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
    * 「提交记录」那张表列的是**窗口里交过东西的所有人**，`done` 标出谁做完了 ——
    * 原来只给做完的人，于是一次没对的学生连同他的提交在这张表里根本不存在，
    * 教师想看「他到底错在哪」得切到提交列表再翻。展开一行拉的是那个人的全部
-   * 提交（GET /submissions/statistics/items 不按结果过滤），对错都在里面。
+   * 提交，对错都在里面。
    *
    * 「完成人数」这些数字跟着 `done` 算，不是 `data.length`。
    */
   const doneCount = perUser.filter(isDone).length
-  // 要等 perUser 回来才能查，所以进不了上面那个 Promise.all
-  const astOnlyByUserMap = await astOnlyByUser(
-    where,
-    perUser.map((row) => row.userId),
-  )
 
   const submittedUserIds = new Set(perUser.map((row) => row.userId))
 
@@ -531,7 +426,6 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
     submissionCount: row.submissionCount,
     acceptedCount: row.acceptedCount,
     solvedCount: row.solvedCount,
-    astOnlyCount: astOnlyByUserMap.get(row.userId) ?? 0,
     judgingCount: row.judgingCount,
     correctRate: judgedRate(row.acceptedCount, row.submissionCount - row.judgingCount),
     done: isDone(row),
@@ -560,14 +454,8 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
   const rosterIds = new Set(rosterRows.map((row) => row.id))
   const attemptedRows = perUser.filter((row) => {
     if (isDone(row)) return false
-    return username
-      ? rosterIds.has(row.userId)
-      : !row.isDisabled && row.adminType === "Regular User"
+    return scoped ? rosterIds.has(row.userId) : !row.isDisabled && row.adminType === "Regular User"
   })
-  const failureByUser = await lastFailureByUser(
-    where,
-    attemptedRows.map((row) => row.userId),
-  )
   const dataAttempted = attemptedRows.map((row) => ({
     username: row.username,
     /**
@@ -575,10 +463,9 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
      * 不传用户名的全站视图里各班混在一起，剥完只剩一串重名的名字，反而认不出谁，
      * 所以原样给完整用户名。班名取 perUser join 出来的那一列，和花名册同一份数据。
      */
-    realName: username ? stripClassPrefix(row.username, row.className) : row.username,
+    realName: scoped ? stripClassPrefix(row.username, row.className) : row.username,
     submissionCount: row.submissionCount,
     solvedCount: row.solvedCount,
-    lastFailure: failureByUser.get(row.userId) ?? null,
   }))
 
   // 「学生已删号但提交记录还在」时完成人数会大于花名册人数，分母兜到完成人数为止。
@@ -599,61 +486,6 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
   } satisfies SubmissionStatistics)
 })
 
-/**
- * 统计面板展开一行时拉这个人的提交明细。
- *
- * 用户名这里是**精确匹配**，不是统计接口那种 ilike —— 那边填 `ks251` 要圈出整个班，
- * 这边是「点开的这一行是谁」。时间窗和题号沿用同一个 scope，不然展开行看到的
- * 会是另一个范围的数据。
- */
-submissionStatisticsRoutes.get("/submissions/statistics/items", requireTeacher, async (c) => {
-  const username = c.req.query("username")?.trim()
-  if (!username) return failure(c, 400, "invalid-request", "username is required")
-
-  const scope = await statisticsScope(c)
-  if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
-
-  /**
-   * 展开的那一行给的是**当前**用户名，先换成 user_id 再查 —— 直接按
-   * `submission.username` 精确匹配的话，改过名的学生展开来是空的（他的提交
-   * 全挂在旧名字下）。
-   *
-   * 查不到账号才退回按提交里冻结的用户名匹配：已删号的学生仍然会出现在统计
-   * 表格里（那一行的名字取自提交），展开行不能因此空着。
-   */
-  const [account] = await db
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(eq(schema.user.username, username))
-    .limit(1)
-  const identity = account
-    ? eq(schema.submission.userId, account.id)
-    : eq(schema.submission.username, username)
-
-  // 多取一条，好知道是不是被截断了
-  // innerJoin 不会漏行：submission.problem_id 是 NOT NULL 且外键是 NO ACTION，
-  // 题目删不掉（真要删会被外键拦住并提示改为隐藏）
-  const rows = await db
-    .select({
-      id: schema.submission.id,
-      result: schema.submission.result,
-      createTime: schema.submission.createTime,
-      problemDisplayId: schema.problem.displayId,
-      problemTitle: schema.problem.title,
-    })
-    .from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
-    .where(and(...scope.filters, identity))
-    .orderBy(desc(schema.submission.createTime), desc(schema.submission.id))
-    .limit(STATISTICS_ITEMS_LIMIT + 1)
-
-  const truncated = rows.length > STATISTICS_ITEMS_LIMIT
-  return success(c, {
-    items: rows.slice(0, STATISTICS_ITEMS_LIMIT),
-    truncated,
-  } satisfies SubmissionStatisticsItems)
-})
-
 /** 方块串一次最多给多少条。一个班一个月七八百条，5000 是全年级查一周的量 */
 const GRID_LIMIT = 5000
 
@@ -666,9 +498,10 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
   if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
   const filters = [...scope.filters]
 
-  const username = c.req.query("username")?.trim()
-  if (username) {
-    const ids = (await matchedUsers(username)).map((row) => row.id)
+  const username = c.req.query("username")?.trim() || undefined
+  const scoped = await scopedUsers(username, c.req.query("className")?.trim() || undefined)
+  if (scoped) {
+    const ids = scoped.map((row) => row.id)
     filters.push(ids.length ? inArray(schema.submission.userId, ids) : sql`false`)
   }
 
@@ -759,7 +592,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
 
   // 按班级汇总时要知道每个班多少人，「一道没交」才算得出来
   const classSizes: Record<string, number> = {}
-  if (!username) {
+  if (!scoped) {
     const names = [...new Set(kept.map((row) => row.className).filter((name) => name !== null))]
     if (names.length) {
       const sizes = await db

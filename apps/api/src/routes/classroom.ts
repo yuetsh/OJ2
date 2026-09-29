@@ -452,7 +452,7 @@ const ACTIVE_CLASS_WINDOW_MS = 2 * 60 * 60 * 1000
 
 /**
  * 从实际提交猜正在上课的班，而**不是记住老师上次选的**：统计面板吃过那个亏（上一节课
- * 的班悄悄留在框里，老师看的整个是别人的班，见 StatisticsPanel.vue 的注释）。
+ * 的班悄悄留在框里，老师看的整个是别人的班）。
  */
 async function suggestActiveClass() {
   // 流程图也算：一节课全班都在画流程图时，只数代码提交就猜成了别的班
@@ -668,9 +668,8 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
 })
 
 /**
- * 老师给这个班布置今天的题。按展示题号给、不分大小写，存 problem.id 并保留输入顺序；
- * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉，
- * 学生那边退回推断。
+ * 提交列表「这节课」按钮：这个班这节课是哪几道题，取法同课堂看板（老师布置的优先，
+ * 否则按今天同班提交推断）。不传班级就猜最近两小时在交题的班
  */
 classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
   const className = c.req.query("className")?.trim() || (await suggestActiveClass())
@@ -688,6 +687,11 @@ classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
   } satisfies ClassLesson)
 })
 
+/**
+ * 老师给这个班布置今天的题。按展示题号给、不分大小写，存 problem.id 并保留输入顺序；
+ * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉，
+ * 学生那边退回推断。
+ */
 classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
   const parsed = await parseBody(c, classLessonRequestSchema, "题号格式不对")
   if (!parsed.success) return parsed.response

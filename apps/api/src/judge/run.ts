@@ -134,6 +134,8 @@ async function persistResult(
   statisticInfo: Record<string, unknown>,
   contestId: number | null,
   submissionCreateTime: string,
+  /** 重判之前**已经记过账**的结果；新提交、或原来没记过账（系统错误）时为 null */
+  counted: JudgeStatusValue | null,
 ) {
   return db.transaction(async (tx) => {
     const [currentSubmission] = await tx
@@ -174,17 +176,26 @@ async function persistResult(
       .set({ result, info, statisticInfo })
       .where(eq(schema.submission.id, submissionId))
 
+    /**
+     * 重判只做差量：提交数不动，旧结果那一格减一、新结果那一格加一，通过数按新旧结果
+     * 调整。原来重判一律当新提交记账，老师上课对一条连点三次重判，这道题的提交数和
+     * 通过数就各多三（旧栈的 update_problem_status_rejudge 也是只做差量）
+     */
     const problemStatistics = asRecord(problem.statisticInfo)
-    const resultKey = String(result)
-    const previousResultCount = problemStatistics[resultKey]
-    problemStatistics[resultKey] =
-      (typeof previousResultCount === "number" ? previousResultCount : 0) + 1
+    const bump = (key: string, delta: number) => {
+      const value = problemStatistics[key]
+      problemStatistics[key] = Math.max(0, (typeof value === "number" ? value : 0) + delta)
+    }
+    bump(String(result), 1)
+    if (counted !== null) bump(String(counted), -1)
+    const acceptedDelta =
+      (isAccepted(result) ? 1 : 0) - (counted !== null && isAccepted(counted) ? 1 : 0)
 
     await tx
       .update(schema.problem)
       .set({
-        submissionNumber: problem.submissionNumber + 1,
-        acceptedNumber: problem.acceptedNumber + (isAccepted(result) ? 1 : 0),
+        submissionNumber: problem.submissionNumber + (counted === null ? 1 : 0),
+        acceptedNumber: Math.max(0, problem.acceptedNumber + acceptedDelta),
         statisticInfo: problemStatistics,
       })
       .where(eq(schema.problem.id, problemId))
@@ -214,7 +225,10 @@ async function persistResult(
     await tx
       .update(schema.userProfile)
       .set({
-        submissionNumber: profile.submissionNumber + (contestId === null ? 1 : 0),
+        // 重判不是又交了一次。个人的通过数只在「第一次做对」时加，重判改错了也不收回
+        // （他可能别的提交也对了），和 acm_problems_status 同一个口径
+        submissionNumber:
+          profile.submissionNumber + (contestId === null && counted === null ? 1 : 0),
         acceptedNumber:
           profile.acceptedNumber + (contestId === null && acceptedNow && !wasAccepted ? 1 : 0),
         acmProblemsStatus: acmStatus,
@@ -452,6 +466,24 @@ async function checkSamples(
   }
 }
 
+/**
+ * 重判之前的结果**有没有记过账**。判完的结果都走过 persistResult、记过一次；
+ * 还在判的（卡在队列里被重判）和系统错误（markSystemError 只改结果、不动计数）没有，
+ * 重判时要当新提交记一次。判题机自己回的系统错误其实记过账，这里分不出来，按没记过算 ——
+ * 多记一次好过把别人的计数减掉
+ */
+function countedBefore(rejudgedFrom: number | undefined): JudgeStatusValue | null {
+  if (rejudgedFrom === undefined) return null
+  if (
+    rejudgedFrom === JudgeStatus.PENDING ||
+    rejudgedFrom === JudgeStatus.JUDGING ||
+    rejudgedFrom === JudgeStatus.SYSTEM_ERROR
+  ) {
+    return null
+  }
+  return rejudgedFrom as JudgeStatusValue
+}
+
 export async function judgeSubmission(job: JudgeJobData) {
   const [row] = await db
     .select({
@@ -583,6 +615,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       statisticInfo,
       row.submission.contestId,
       row.submission.createTime,
+      countedBefore(job.rejudgedFrom),
     )
     if (!saved) return
 

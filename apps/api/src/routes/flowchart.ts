@@ -31,6 +31,7 @@ import {
   asRecord,
   parseDisplayIds,
   queryInteger,
+  scopedUsers,
   rounded,
   stripClassPrefix,
 } from "./helpers"
@@ -215,8 +216,20 @@ async function flowchartClassFilter(className: string) {
     : sql`false`
 }
 
-async function flowchartUserFilter(username: string) {
-  const ids = (await matchedUsers(username)).map((row) => row.id)
+/**
+ * 用户名筛选。默认是「包含」；`exact` 时整名匹配（提交列表的「只看他」、协作条带进来的），
+ * 学号互相包含是常态，ks24a1 会混进 ks24a10–ks24a19
+ */
+async function flowchartUserFilter(username: string, exact = false) {
+  const ids = exact
+    ? (
+        await db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(eq(schema.user.username, username))
+          .limit(1)
+      ).map((row) => row.id)
+    : (await matchedUsers(username)).map((row) => row.id)
   return ids.length ? inArray(schema.flowchartSubmission.userId, ids) : sql`false`
 }
 
@@ -275,7 +288,9 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   filters.push(
     ...(await Promise.all([
       displayId ? flowchartProblemFilter(displayId) : undefined,
-      !onlyMyself && username ? flowchartUserFilter(username) : undefined,
+      !onlyMyself && username
+        ? flowchartUserFilter(username, c.req.query("exactUsername") === "1")
+        : undefined,
       !onlyMyself && className ? flowchartClassFilter(className) : undefined,
     ])),
   )
@@ -335,8 +350,8 @@ const FLOWCHART_COMPLETED = 2
  * 看到的完成率和均分就是错的，而且从界面上看不出来。
  *
  * 会随数据量线性变重的只剩词云：每条 feedback / suggestions / comment 都要走一遍
- * jieba，而前端的「全部时段」是不带 start 的（FlowchartStatisticsPanel.vue 那个
- * `duration === "all"`），攒一学年就得把所有评语重新 cut 一遍。词云是辅助性的，
+ * jieba，而前端的「全部时段」是不带 start 的（统计页 oj/statistics/ 的
+ * 「全部」时段），攒一学年就得把所有评语重新 cut 一遍。词云是辅助性的，
  * 看的是高频问题，取最近这些条足够。
  *
  * 这里**同时**卡了两道：SQL 侧 `order by create_time desc limit N` 只取最近 N 条提交，
@@ -346,6 +361,9 @@ const FLOWCHART_COMPLETED = 2
  * 可以接受。原来只有 JS 那道，行早就整批拉回内存了。
  */
 const WORDCLOUD_TEXT_LIMIT = 3000
+
+/** 「每人最好的一次」最多给多少人。快照里有流程图的学生一共 203 人 */
+const PEOPLE_LIMIT = 500
 
 flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const end = c.req.query("end")?.trim()
@@ -361,6 +379,8 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   // 可以一次查几道（统计页的题号框和代码统计同一个），有一道找不到就整体报错，
   // 不退化成「全部题目」—— 否则打错一个字看到的是全站数据
   const displayIds = parseDisplayIds(c.req.query("problemDisplayId") ?? "")
+  // 和代码统计同一个上限（submission-statistics.ts 的 STATISTICS_MAX_PROBLEMS）
+  if (displayIds.length > 20) return failure(c, 400, "invalid-request", "At most 20 problems")
   if (displayIds.length) {
     const lowered = displayIds.map((id) => id.toLowerCase())
     const problems = await db
@@ -384,11 +404,15 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     )
   }
 
-  const username = c.req.query("username")?.trim()
-  // 用户名先解析成账号，再拿 user_id 去筛 —— 理由同代码提交的统计接口
-  // （submission.ts 的 GET /submissions/statistics），顺带让下面这几条一个 join 都不用挂
-  const matched = username ? await matchedUsers(username) : []
-  if (username) {
+  // 用户名 / 班级先解析成账号，再拿 user_id 去筛 —— 理由同代码提交的统计接口
+  // （submission-statistics.ts 的 GET /submissions/statistics），顺带让下面这几条一个 join 都不用挂。
+  // 班级按 class_name 精确匹配（scopedUsers 的注释说了为什么不能拿 ks231 模糊匹配）
+  const scoped = await scopedUsers(
+    c.req.query("username")?.trim() || undefined,
+    c.req.query("className")?.trim() || undefined,
+  )
+  const matched = scoped ?? []
+  if (scoped) {
     const ids = matched.map((row) => row.id)
     // 一个账号都没匹配上时得留个恒假条件，否则「查无此班」变成「全站统计」
     filters.push(ids.length ? inArray(schema.flowchartSubmission.userId, ids) : sql`false`)
@@ -396,7 +420,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const where = and(...filters)
   // 花名册：只有指定了用户名才谈得上「班级人数」，不指定时分母无意义。
   // 未禁用的普通用户才进分母，教师和管理员不算
-  const roster = username
+  const roster = scoped
     ? matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
     : []
 
@@ -492,6 +516,9 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
           bestGrade: sql<string | null>`(array_agg(${schema.flowchartSubmission.aiGrade}
           order by ${schema.flowchartSubmission.aiScore} desc nulls last, ${schema.flowchartSubmission.createTime} desc))[1]`,
           count: count(),
+          // 拿到 A / S 的题数。查几道题时要每道都拿到才算完成，和代码统计「几道都做完」同口径
+          goodProblems: sql<number>`count(distinct ${schema.flowchartSubmission.problemId})
+            filter (where ${schema.flowchartSubmission.aiGrade} in ('S', 'A'))`.mapWith(Number),
         })
         .from(schema.flowchartSubmission)
         .innerJoin(schema.user, eq(schema.user.id, schema.flowchartSubmission.userId))
@@ -503,12 +530,14 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         .limit(500),
     ])
 
-  const people = peopleRows.map((row) => ({
+  const peopleTruncated = peopleRows.length > PEOPLE_LIMIT
+  const people = peopleRows.slice(0, PEOPLE_LIMIT).map((row) => ({
     username: row.username,
     realName: stripClassPrefix(row.username, row.className),
     bestScore: row.bestScore === null ? null : Number(row.bestScore),
     bestGrade: row.bestGrade,
     count: row.count,
+    goodProblems: row.goodProblems,
   }))
 
   if (!totals || totals.total === 0) {
@@ -527,6 +556,8 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         realName: stripClassPrefix(row.username, row.className),
       })),
       people: [],
+      peopleTruncated: false,
+      problemCount: displayIds.length,
     } satisfies FlowchartStatistics)
   }
 
@@ -591,6 +622,8 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         realName: stripClassPrefix(row.username, row.className),
       })),
     people,
+    peopleTruncated,
+    problemCount: displayIds.length,
   } satisfies FlowchartStatistics)
 })
 

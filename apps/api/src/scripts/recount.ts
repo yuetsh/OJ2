@@ -9,9 +9,10 @@ import { metaAchievements, refreshUnlockedCount, rescanAchievement } from "../se
  * 把反范式的计数列重算回与 submission 表一致。
  *
  * 这几个列不是缓存、是真值的副本：判题落库时由 `judge/run.ts` 的 persistResult 手工
- * 加减，谁都没在事后核对过。已知的漂移来源是**重判**——`routes/submission.ts` 的
- * rejudge 把 result 打回 PENDING 就重新入队，**不回退任何计数**，于是 persistResult
- * 再加一次：重判一条题目的 submission_number 就永久多一。删提交、直接改库同理。
+ * 加减，谁都没在事后核对过。已知的漂移来源是**重判**—— 2026-09-29 之前 rejudge 把
+ * result 打回 PENDING 就重新入队、不回退任何计数，persistResult 再加一次：重判一条题目
+ * 的 submission_number 就永久多一。现在 rejudge 带上旧结果、persistResult 只做差量，
+ * 这条不再新增漂移，存量靠这里订正。删提交、直接改库仍然会漂。
  *
  * 管的六个列：
  *   problem.submission_number / accepted_number / statistic_info

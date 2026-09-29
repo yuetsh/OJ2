@@ -314,20 +314,6 @@ export const attemptedStudentSchema = unacceptedStudentSchema.extend({
    * 差几道决定了老师先管谁 —— 所以名字后面要缀 `2/3`。
    */
   solvedCount: z.number().int(),
-  /**
-   * 最近一条提交错在哪。教师点名字就能看到「是编译错了还是答案错了」，
-   * 不必再切去提交列表翻这个人。`error` 是判题机写进 statistic_info 的 err_info，
-   * 已截断；没有错误文本（比如答案错误那种）时为 null。
-   */
-  lastFailure: z
-    .object({
-      id: z.string(),
-      /** 题目的展示编号，用来告诉老师错在哪道题 */
-      problemDisplayId: z.string(),
-      result: judgeStatusSchema,
-      error: z.string().nullable(),
-    })
-    .nullable(),
 })
 
 export const submissionStatisticsUserSchema = z.object({
@@ -341,11 +327,6 @@ export const submissionStatisticsUserSchema = z.object({
    * 不指定题号查「这节课全班」时，条数和题数能差出好几倍。
    */
   solvedCount: z.number().int(),
-  /**
-   * 「答案对了但语法没按要求写」且**最后也没改对**的题数。这些题算在 solvedCount 里
-   * （AST_CHECK_FAILED 全站都算通过），单列出来只是让教师看得见教学上没达标的那几个。
-   */
-  astOnlyCount: z.number().int(),
   /** 这个人还在判题队列里的条数。`submissionCount` 含它，`correctRate` 的分母不含 */
   judgingCount: z.number().int(),
   // 百分比数值，不带 %。旧后端返回 "85.5%" 字符串，展示格式化交给前端。
@@ -359,41 +340,6 @@ export const submissionStatisticsUserSchema = z.object({
   done: z.boolean(),
 })
 
-/**
- * 展开行的明细，**按需拉**（GET /submissions/statistics/items）。
- *
- * 原来是随统计一起给每个人各带一份，可表格一次只展开一行 —— 生产快照上那是
- * 4.9 万行没人看的数据。`truncated` 为真时前端要说明「只显示最近 N 条」，
- * 免得老师以为这人就交了这么多。
- */
-export const submissionStatisticsItemsSchema = z.object({
-  /**
-   * 展开某个学生时列出他这段时间的提交。**带上题目**：一节课里学生往往在好几道题
-   * 之间来回跳，一串只有编号的按钮看不出他卡在哪一道 —— 前端按题目分组展示。
-   *
-   * 字段名沿用 submissionListItemSchema 的口径：`problemDisplayId` 是展示用题号（problem._id），
-   * `problemTitle` 是标题。
-   */
-  items: z.array(
-    z.object({
-      id: z.string(),
-      result: judgeStatusSchema,
-      createTime: z.string(),
-      problemDisplayId: z.string(),
-      problemTitle: z.string(),
-    }),
-  ),
-  truncated: z.boolean(),
-})
-
-/**
- * 统计页的方块串（GET /submissions/statistics/grid）：范围内每个学生的每一次提交，
- * 前端按「人 × 题」排成方块串，并据此算每道题做完几人。计数口径（正确率、做完、没交）
- * 仍以 submissionStatisticsSchema 为准，这里只给「每一次交了什么结果」。
- *
- * 只含普通学生（老师试题留下的提交不混进来），最多 5000 条最近的，超了 `truncated`。
- * `classSizes` 只在没传用户名（从题目页进来、按班级汇总）时给：各班花名册人数。
- */
 export const submissionStatisticsGridSchema = z.object({
   /** 传了题号就按传的顺序；没传就是范围内出现过的题，按第一次有人交的时间排 */
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
@@ -559,7 +505,6 @@ export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
 export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
 export type TodaySubmissionStatistics = z.infer<typeof todaySubmissionStatisticsSchema>
 export type SubmissionStatisticsUser = z.infer<typeof submissionStatisticsUserSchema>
-export type SubmissionStatisticsItems = z.infer<typeof submissionStatisticsItemsSchema>
 export type SubmissionStatisticsGrid = z.infer<typeof submissionStatisticsGridSchema>
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
 export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>

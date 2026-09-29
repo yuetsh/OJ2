@@ -117,8 +117,14 @@ export const flowchartStatisticsSchema = z.object({
       bestScore: z.number().nullable(),
       bestGrade: z.string().nullable(),
       count: z.number().int(),
+      /** 拿到 A / S 的题数（查几道题时要每道都拿到才算完成） */
+      goodProblems: z.number().int(),
     }),
   ),
+  /** people 超过上限被截了（截掉的是成绩最好的那些） */
+  peopleTruncated: z.boolean(),
+  /** 查了几道题（没填题号为 0，此时拿到一道 A / S 就算完成） */
+  problemCount: z.number().int(),
 })
 
 export const flowchartUpdateSchema = z.object({

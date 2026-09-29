@@ -159,6 +159,32 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
  * 代码提交和流程图两条统计都走这里。流程图那张表连冻结用户名都没有（只有
  * `user_id`），更是只能从这儿拿 id。
  */
+/**
+ * 统计接口「圈哪些人」：班级按 `user.class_name` **精确**匹配，学生名按包含匹配，两个都给
+ * 就取交集，都没给返回 null（不圈人）。
+ *
+ * 原来统计只收一个 username、前端拼成 `ks231` 去做包含匹配 —— 231 班会连带 2311、2312 班
+ * （快照里 37 人变成 138 人），而提交列表的班级筛选是精确的，两边的人对不上
+ */
+export async function scopedUsers(username: string | undefined, className: string | undefined) {
+  if (!username && !className) return null
+  return db
+    .select({
+      id: schema.user.id,
+      username: schema.user.username,
+      className: schema.user.className,
+      isDisabled: schema.user.isDisabled,
+      adminType: schema.user.adminType,
+    })
+    .from(schema.user)
+    .where(
+      and(
+        className ? eq(schema.user.className, className) : undefined,
+        username ? ilike(schema.user.username, `%${username}%`) : undefined,
+      ),
+    )
+}
+
 export async function matchedUsers(username: string) {
   return db
     .select({

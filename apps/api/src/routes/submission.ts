@@ -216,22 +216,25 @@ submissionRoutes.post("/submissions/:id/rejudge", requireTeacher, async (c) => {
     .select({
       id: schema.submission.id,
       problemId: schema.submission.problemId,
+      result: schema.submission.result,
     })
     .from(schema.submission)
     .where(and(eq(schema.submission.id, c.req.param("id")), isNull(schema.submission.contestId)))
     .limit(1)
   if (!row) return failure(c, 404, "submission-not-found", "Submission does not exist")
 
+  // info 一起清：不清的话判题中那几秒，列表和详情按旧的逐点结果算出「通过 2/3」
   await db
     .update(schema.submission)
-    .set({ statisticInfo: {}, result: JudgeStatus.PENDING })
+    .set({ statisticInfo: {}, info: {}, result: JudgeStatus.PENDING })
     .where(eq(schema.submission.id, row.id))
 
   // jobId 必须带时间戳。队列保留最近 100 个已完成任务，沿用 submissionId 做 jobId 的话
   // BullMQ 会认为这个任务已经存在，重判静默变成空操作。与 flowcharts/:id/retry 同一处理。
   await judgeQueue.add(
     "judge",
-    { submissionId: row.id, problemId: row.problemId },
+    // 带上重判之前的结果，落库时只做差量（见 judge/run.ts 的 persistResult）
+    { submissionId: row.id, problemId: row.problemId, rejudgedFrom: row.result },
     { jobId: `${row.id}:rejudge:${Date.now()}` },
   )
   return success(c, null)
