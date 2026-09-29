@@ -30,39 +30,46 @@ const classes = computed(() => {
     const key = row.className ?? ""
     groups.set(key, [...(groups.get(key) ?? []), row])
   }
-  return [...groups.entries()]
-    .map(([className, rows]) => {
-      let submissions = 0
-      let accepted = 0
-      let last = ""
-      let done = 0
-      for (const row of rows) {
-        const solved = new Set(
-          row.submissions.filter((item) => isAc(item.result)).map((item) => item.problemDisplayId),
-        )
-        if (props.explicit ? need.every((pid) => solved.has(pid)) : solved.size > 0) done++
-        // 正确率的分母不算还在判的，和数字行一个口径
-        submissions += row.submissions.filter(
-          (item) =>
-            item.result !== SubmissionStatus.pending && item.result !== SubmissionStatus.judging,
-        ).length
-        accepted += row.submissions.filter((item) => isAc(item.result)).length
-        const lastTime = row.submissions.at(-1)?.createTime ?? ""
-        if (lastTime > last) last = lastTime
-      }
-      const size = props.grid.classSizes[className] ?? rows.length
-      return {
-        className,
-        label: className ? classLabel(className) : "没有班级",
-        size,
-        done,
-        tried: rows.length - done,
-        none: Math.max(0, size - rows.length),
-        rate: submissions ? `${Math.round((accepted / submissions) * 100)}%` : "—",
-        last,
-      }
-    })
-    .sort((a, b) => b.last.localeCompare(a.last))
+  return (
+    [...groups.entries()]
+      .map(([className, rows]) => {
+        let submissions = 0
+        let accepted = 0
+        let last = ""
+        let done = 0
+        for (const row of rows) {
+          const solved = new Set(
+            row.submissions
+              .filter((item) => isAc(item.result))
+              .map((item) => item.problemDisplayId),
+          )
+          if (props.explicit ? need.every((pid) => solved.has(pid)) : solved.size > 0) done++
+          // 正确率的分母不算还在判的，和数字行一个口径
+          submissions += row.submissions.filter(
+            (item) =>
+              item.result !== SubmissionStatus.pending && item.result !== SubmissionStatus.judging,
+          ).length
+          accepted += row.submissions.filter((item) => isAc(item.result)).length
+          const lastTime = row.submissions.at(-1)?.createTime ?? ""
+          if (lastTime > last) last = lastTime
+        }
+        const size = props.grid.classSizes[className] ?? rows.length
+        return {
+          className,
+          label: className ? classLabel(className) : "没有班级",
+          size,
+          done,
+          tried: rows.length - done,
+          none: Math.max(0, size - rows.length),
+          rate: submissions ? `${Math.round((accepted / submissions) * 100)}%` : "—",
+          last,
+          triedUsers: rows.length,
+        }
+      })
+      // 交过的人多的在前（和题目页「各班做得怎样」一个顺序）：按最近一次排的话，
+      // 零星一两个人补做的班会压在全班做过的班上面
+      .sort((a, b) => b.triedUsers - a.triedUsers || b.last.localeCompare(a.last))
+  )
 })
 </script>
 

@@ -203,20 +203,26 @@ async function classRows(problemId: number): Promise<NonNullable<ProblemStats["c
         )
         .groupBy(schema.user.className)
     : []
-  return rows
-    .map((row) => {
-      const classSize =
-        (row.class_name && sizes.find((item) => item.className === row.class_name)?.value) ||
-        row.tried
-      return {
-        className: row.class_name,
-        classSize,
-        solved: row.solved,
-        unsolved: row.tried - row.solved,
-        untouched: Math.max(0, classSize - row.tried),
-        correctRate: row.judged ? Math.round((row.accepted / row.judged) * 100) : null,
-        lastTime: row.last_time,
-      }
-    })
-    .sort((a, b) => b.lastTime.localeCompare(a.lastTime))
+  return (
+    rows
+      .map((row) => {
+        const classSize =
+          (row.class_name && sizes.find((item) => item.className === row.class_name)?.value) ||
+          row.tried
+        return {
+          className: row.class_name,
+          classSize,
+          solved: row.solved,
+          unsolved: row.tried - row.solved,
+          untouched: Math.max(0, classSize - row.tried),
+          correctRate: row.judged ? Math.round((row.accepted / row.judged) * 100) : null,
+          lastTime: row.last_time,
+        }
+      })
+      // 交过的人多的在前：按最近一次排的话，零星一两个人补做的班会压在全班做过的班上面
+      .sort(
+        (a, b) =>
+          b.solved + b.unsolved - (a.solved + a.unsolved) || b.lastTime.localeCompare(a.lastTime),
+      )
+  )
 }

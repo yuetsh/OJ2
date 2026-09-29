@@ -130,7 +130,7 @@ const stuck = computed(() => {
 
 // ---------- 老师：各班的表 ----------
 
-/** 班多的老题（1001 这种十几个班都做过）先给 6 个，最近做的在前 */
+/** 班多的老题（1001 这种十几个班都做过）先给 6 个，交过的人多的在前 */
 const allClasses = ref(false)
 const shownClasses = computed(() =>
   allClasses.value ? (stats.value?.classes ?? []) : (stats.value?.classes ?? []).slice(0, 6),
