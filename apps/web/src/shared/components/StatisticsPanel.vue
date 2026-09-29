@@ -18,6 +18,7 @@
     <n-select style="width: 120px" v-model:value="query.duration" :options="options" />
     <n-button type="primary" :loading="loading" @click="handleStatistics"> 统计 </n-button>
     <n-button v-if="route.name !== 'submissions'" @click="goSubmissions"> 前往提交列表 </n-button>
+    <n-text v-if="failed" type="error">统计没拉下来，15 秒后会自动再试</n-text>
   </n-flex>
 
   <n-empty v-if="!hasResult" description="暂无数据" style="margin: 40px 0" />
@@ -104,7 +105,11 @@
             恢复 {{ hiddenCount }} 位
           </n-button>
         </n-flex>
-        <n-gradient-text v-if="unfinishedGroups.length === 0" font-size="24" type="success">
+        <!-- 名单上的人全被「请假隐藏」了不等于全做完了，别让老师误以为全班过了 -->
+        <n-text v-if="unfinishedGroups.length === 0 && hiddenCount > 0" depth="3">
+          没完成的 {{ hiddenCount }} 位都隐藏了
+        </n-text>
+        <n-gradient-text v-else-if="unfinishedGroups.length === 0" font-size="24" type="success">
           全都完成了
         </n-gradient-text>
         <template v-for="group in unfinishedGroups" :key="group.title">
@@ -647,9 +652,10 @@ const pieChartOptions = {
   },
 }
 
-// 环形图数据 - 班级完成度
+// 环形图数据 - 班级完成度。「已完成」和上面数字行的「完成人数」是同一个数（做完的），
+// 原来这里用的是 list.length —— 那是所有交过的人，交了没对的也被画成了已完成
 const completionChartData = computed(() => {
-  const completedCount = list.value.length
+  const completedCount = doneList.value.length
   const uncompletedCount = Math.max(0, adjustedPersonCount.value - completedCount)
   return {
     labels: ["已完成", "未完成"],
@@ -703,12 +709,21 @@ function goSubmissions() {
 }
 const loading = ref(false)
 
+/**
+ * 上一次统计失败了。原来没 catch，请求一失败面板上什么都不说，老师看着的还是旧数字。
+ * 不弹 toast：每 15 秒自动刷新一次，断网时会一直弹
+ */
+const failed = ref(false)
+
 async function handleStatistics() {
   // 自动刷新和手点可能撞上，上一次没回来就跳过这一次
   if (loading.value) return
   loading.value = true
   try {
     await fetchStatistics()
+    failed.value = false
+  } catch {
+    failed.value = true
   } finally {
     loading.value = false
   }

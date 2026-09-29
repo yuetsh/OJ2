@@ -13,7 +13,8 @@
       clearable
     />
     <n-select style="width: 120px" v-model:value="query.duration" :options="durationOptions" />
-    <n-button type="primary" @click="handleStatistics">统计</n-button>
+    <n-button type="primary" :loading="loading" @click="handleStatistics">统计</n-button>
+    <n-text v-if="failed" type="error">统计没拉下来，稍后会自动再试</n-text>
   </n-flex>
 
   <n-empty v-if="!hasResult" description="暂无数据" style="margin: 40px 0" />
@@ -42,8 +43,9 @@
         </div>
         <div class="stat-item">
           <n-text>班级人数</n-text>
+          <!-- 减掉请假隐藏的，和下面完成度的分母、代码统计面板是同一个数 -->
           <n-gradient-text type="warning" font-size="28">
-            {{ data.personCount }}
+            {{ adjustedPersonCount }}
           </n-gradient-text>
         </div>
         <div class="stat-item">
@@ -102,8 +104,10 @@
         </n-grid>
       </n-tab-pane>
 
+      <!-- 有花名册就一直在（和代码统计面板一样）：原来人一做完这个页签就整个消失，
+           老师找不到「全都完成了」那句 -->
       <n-tab-pane
-        v-if="data.dataUnaccepted.length > 0"
+        v-if="data.personCount > 0 || data.dataUnaccepted.length > 0"
         name="unaccepted"
         :tab="`未完成（${visibleUnaccepted.length}）`"
       >
@@ -117,7 +121,10 @@
           </n-button>
         </n-flex>
         <n-flex size="large" align="center">
-          <n-gradient-text v-if="visibleUnaccepted.length === 0" font-size="24" type="success">
+          <n-text v-if="visibleUnaccepted.length === 0 && hiddenCount > 0" depth="3">
+            没完成的 {{ hiddenCount }} 位都隐藏了
+          </n-text>
+          <n-gradient-text v-else-if="visibleUnaccepted.length === 0" font-size="24" type="success">
             全都完成了
           </n-gradient-text>
           <template v-for="item in visibleUnaccepted" :key="item.username">
@@ -185,8 +192,6 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-
-const message = useMessage()
 
 const durationOptions: SelectOption[] = [...PANEL_DURATION_OPTIONS]
 
@@ -437,7 +442,14 @@ const subOptions = computed<Duration>(
   () => durationFromValue(query.duration) ?? durationFromValue(PANEL_DURATION_OPTIONS[0].value)!,
 )
 
+const loading = ref(false)
+/** 上一次统计失败了。不弹 toast：会自动刷新，断网时会一直弹 */
+const failed = ref(false)
+
 async function handleStatistics() {
+  // 自动刷新和手点可能撞上，上一次没回来就跳过这一次
+  if (loading.value) return
+  loading.value = true
   const current = Date.now()
   const end = formatISO(current)
   const duration =
@@ -446,14 +458,33 @@ async function handleStatistics() {
     const res = await getFlowchartStatistics(duration, query.problem, query.username)
     Object.assign(data, res)
     saveQuery()
+    failed.value = false
   } catch (error) {
-    message.error("获取流程图统计失败")
+    failed.value = true
     console.error("获取流程图统计失败:", error)
     return
+  } finally {
+    loading.value = false
   }
   await nextTick()
   renderWordCloud()
 }
+
+/**
+ * 和代码统计面板一样：打开就查、开着就刷（老师是投在屏幕上盯着看的）。
+ * 流程图统计要给词云分词，比代码统计重，所以 30 秒一次，而且只刷一天以内的时间段 ——
+ * 查一周、一学年的是回头看，不是盯课堂，不必反复重算
+ */
+onMounted(handleStatistics)
+
+const visibility = useDocumentVisibility()
+useIntervalFn(() => {
+  if (visibility.value !== "visible") return
+  if (query.duration === "all") return
+  const d = subOptions.value
+  if (d.weeks || d.months || d.years || (d.days ?? 0) > 1) return
+  handleStatistics()
+}, 30_000)
 
 onUnmounted(() => {
   if (wordcloudChart) {
