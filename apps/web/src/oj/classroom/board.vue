@@ -198,6 +198,24 @@ const GROUP_LABEL: Record<
   working: { text: "在做", type: "info" },
   done: { text: "做完了", type: "success" },
 }
+
+const router = useRouter()
+
+/**
+ * 点格子 / 名字到提交列表看他今天交的代码。新标签打开：看板多半正投在屏幕上，别把它顶掉。
+ * 用户名按整名匹配（学号互相包含是常态，ks24a1 会混进 ks24a10）
+ */
+function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) {
+  return router.resolve({
+    name: "submissions",
+    query: {
+      username: student.username,
+      exactUsername: "1",
+      today: "1",
+      ...(problemDisplayId ? { problem: problemDisplayId } : {}),
+    },
+  }).href
+}
 </script>
 
 <template>
@@ -331,7 +349,18 @@ const GROUP_LABEL: Record<
               </thead>
               <tbody>
                 <tr v-for="student in students" :key="student.userId">
-                  <td class="name">{{ nameOf(student) }}</td>
+                  <td class="name">
+                    <a
+                      v-if="student.lastSubmitAt"
+                      class="cell-link"
+                      :href="submissionsHref(student)"
+                      target="_blank"
+                      :title="`看 ${nameOf(student)} 今天交的全部`"
+                    >
+                      {{ nameOf(student) }}
+                    </a>
+                    <template v-else>{{ nameOf(student) }}</template>
+                  </td>
                   <td>
                     <n-tag
                       size="small"
@@ -350,7 +379,16 @@ const GROUP_LABEL: Record<
                     </n-tag>
                   </td>
                   <td v-for="(cell, i) in student.cells" :key="i" :class="cellClass(cell)">
-                    {{ cellText(cell) }}
+                    <a
+                      v-if="cell.attempts"
+                      class="cell-link"
+                      :href="submissionsHref(student, board.problems[i]!.problemDisplayId)"
+                      target="_blank"
+                      :title="`看 ${nameOf(student)} 今天在这道题上交的 ${cell.attempts} 次`"
+                    >
+                      {{ cellText(cell) }}
+                    </a>
+                    <template v-else>{{ cellText(cell) }}</template>
                   </td>
                   <td class="meta">
                     {{ student.lastSubmitAt ? parseTime(student.lastSubmitAt, "HH:mm") : "—" }}
@@ -371,6 +409,17 @@ const GROUP_LABEL: Record<
 </template>
 
 <style scoped>
+/* 格子、名字能点进提交列表，但别长得像一片蓝色链接 —— 投影上一眼看的是颜色 */
+.cell-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cell-link:hover {
+  text-decoration: underline;
+}
+
 .board {
   max-width: 1400px;
   margin: 0 auto;

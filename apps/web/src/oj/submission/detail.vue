@@ -8,13 +8,11 @@ import {
   submissionMemoryFormat,
   submissionResultTitle,
   submissionTimeFormat,
-  compressToBase64,
 } from "utils/functions"
 import type { Submission } from "utils/types"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { useCodeStore } from "oj/store/code"
-import storage from "utils/storage"
+import { useCopySubmission } from "./composables/copySubmission"
 
 const props = defineProps<{
   submissionID: string
@@ -25,10 +23,6 @@ const props = defineProps<{
 
 // 在弹框中使用时，父组件监听此事件关闭弹框，否则弹框会挡住已更新的编辑器
 const emit = defineEmits<{ copied: [] }>()
-
-const route = useRoute()
-const router = useRouter()
-const codeStore = useCodeStore()
 
 const { isMobile, isDesktop } = useBreakpoints()
 
@@ -69,51 +63,14 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
   },
 ]
 
+const { copyToCat: catCopy, copyToProblem: problemCopy } = useCopySubmission()
+
 function copyToCat() {
-  const lang = LANGUAGE_FORMAT_VALUE[submission.value!.language]
-  const data = {
-    lang,
-    code: submission.value!.code,
-    input: "",
-  }
-  const base64 = compressToBase64(JSON.stringify(data))
-  const url = `${import.meta.env.PUBLIC_CODE_URL}?share=${encodeURIComponent(base64)}`
-  window.open(url, "_blank")
+  catCopy(submission.value!)
 }
 
 function copyToProblem() {
-  const { code, language, contestId } = submission.value!
-  // 编辑器的 storageKey 用 display id（problem._id），不是 submission.problemId
-  // （内部数字 id）。**不能只靠 props.problemID** —— 独立的 /submission/:id 路由
-  // 只喂 submissionID，那个 prop 是 undefined，原来会一路带进 router.push 抛
-  // `Missing required param "problemID"`。响应里的 problemDisplayId 就是干这个的。
-  const problemID = props.problemID ?? submission.value!.problemDisplayId
-  const contestIDForKey = contestId || null
-  const storageKey = `problem_${problemID}_contest_${contestIDForKey}_lang_${language}`
-  storage.set(storageKey, code)
-  // 设置语言 + 代码：localStorage 覆盖全新挂载的编辑器，
-  // setCode 覆盖已挂载（同页 modal）的编辑器
-  codeStore.setLanguage(language)
-  codeStore.setCode(code)
-
-  const problemSetId = (route.params.problemSetId as string) ?? ""
-  if (contestId) {
-    router.push({
-      name: "contest problem",
-      params: { contestID: String(contestId), problemID },
-    })
-  } else if (problemSetId) {
-    router.push({
-      name: "problemset problem",
-      params: { problemSetId, problemID },
-    })
-  } else {
-    router.push({
-      name: "problem",
-      params: { problemID },
-    })
-  }
-
+  problemCopy(submission.value!)
   emit("copied")
 }
 

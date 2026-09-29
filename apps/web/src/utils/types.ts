@@ -268,6 +268,8 @@ export interface SubmissionListPayload {
   username?: string
   /** "1" = username 精确匹配（默认是「包含」）。协作中老师看某个学生的提交用 */
   exactUsername?: "1"
+  /** 班级（user.class_name，如 `253`），精确匹配；和 username 可以同时用 */
+  className?: string
   contestId?: string
   problemDisplayId?: string
   language: LANGUAGE | ""
@@ -293,7 +295,7 @@ export type { ClassComparison, ClassRankItem, ClassUserRank } from "@oj2/contrac
 export type { ClassActivity, ClassActivityProblem } from "@oj2/contract"
 
 /** 课堂看板：一个班今天这节课的题 × 全班学生 */
-export type { ClassBoard, ClassBoardStudent, ClassBoardCell } from "@oj2/contract"
+export type { ClassBoard, ClassBoardStudent, ClassBoardCell, ClassLesson } from "@oj2/contract"
 
 /** 知识点地图：每个知识点做对几道、在第几档，只给自己看 */
 export type { KnowledgeLevel, KnowledgeMap } from "@oj2/contract"

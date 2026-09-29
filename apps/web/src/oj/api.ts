@@ -10,6 +10,7 @@ import {
   type TutorialSummary,
   type ClassActivity,
   type ClassBoard,
+  type ClassLesson,
   type KnowledgeMap,
   type ClassComparisonResponse,
   type ClassRankItem,
@@ -223,6 +224,11 @@ export function getClassBoard(className?: string) {
   return api.get<ClassBoard>("classroom/board", { params: { className } })
 }
 
+/** 这个班「这节课」的题（提交列表那颗按钮用）。不传班级就猜正在上课的班，和看板一样 */
+export function getClassLesson(className?: string) {
+  return api.get<ClassLesson>("classroom/lesson", { params: { className } })
+}
+
 /** 给这个班布置今天的题，空数组 = 清掉 */
 export function setClassLesson(className: string, problemDisplayIds: string[]) {
   return api.put<null>("classroom/lesson", { className, problemDisplayIds })
@@ -412,6 +418,7 @@ export function getFlowchartSubmission(id: string) {
 
 export function getFlowchartSubmissions(params: {
   username?: string
+  className?: string
   problemDisplayId?: string
   myself?: string
   offset?: number
