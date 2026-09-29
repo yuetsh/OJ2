@@ -287,7 +287,13 @@ export const submissionListItemSchema = z.object({
   caseSummary: caseSummarySchema,
 })
 
-export const submissionListSchema = paginatedSchema(submissionListItemSchema)
+export const submissionListSchema = paginatedSchema(submissionListItemSchema).extend({
+  /**
+   * 题号框里填了、但查不到的题号（打错了，或不在这个范围里 —— 比赛列表只认本场的题）。
+   * 一次填好几道时，打错的那道原来被悄悄忽略，老师看到的列表少一道自己却不知道
+   */
+  unknownProblems: z.array(z.string()),
+})
 
 /**
  * **一条都没交**的学生。`realName` 是从用户名里剥掉 `ks<班级号>` 前缀后剩下的那一段，

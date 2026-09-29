@@ -96,6 +96,8 @@ const submissions = ref<SubmissionListItem[]>([])
 const flowcharts = ref<FlowchartSubmissionListItem[]>([])
 const total = ref(0)
 const todayCount = ref(0)
+/** 题号框里查不到的题号（打错了）。一次填好几道时打错的那道会被忽略，得告诉老师 */
+const unknownProblems = ref<string[]>([])
 const loading = ref(false)
 const loaded = ref(false)
 
@@ -162,6 +164,7 @@ async function listSubmissions() {
     if (mode) flowcharts.value = res.results as FlowchartSubmissionListItem[]
     else submissions.value = res.results as SubmissionListItem[]
     total.value = res.total
+    unknownProblems.value = res.unknownProblems
     newCount.value = 0
     loaded.value = true
     // 翻了页、换了条件就回到列表顶上（往回翻到上一页末尾的，settleSelection 会滚到那一条）
@@ -311,7 +314,8 @@ function move(step: 1 | -1) {
 
 const [todayPanel, toggleTodayPanel] = useToggle(false)
 
-onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
+// ← → 和 ↑ ↓ 一样（9 月加方向键时就是四个键都能翻，老师已经用惯了）
+onKeyStroke(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"], (e: KeyboardEvent) => {
   if (!isDesktop.value || todayPanel.value) return
   // 别的控件已经处理了这次按键（下拉框自己会开菜单、换选项）
   if (e.defaultPrevented) return
@@ -331,7 +335,7 @@ onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
   }
   if (!rows.value.length) return
   e.preventDefault()
-  move(e.key === "ArrowUp" ? -1 : 1)
+  move(e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1)
 })
 
 // 手机上没有右栏：点一行从右边滑出整屏的详情
@@ -723,6 +727,7 @@ function dayBreak(index: number) {
         size="small"
         clearable
         placeholder="题号"
+        :status="unknownProblems.length ? 'warning' : undefined"
       >
         <template #prefix><Icon icon="ph:hash" /></template>
       </n-input>
@@ -814,6 +819,10 @@ function dayBreak(index: number) {
     <div class="split">
       <!-- 左栏：列表 -->
       <section class="list">
+        <div v-if="unknownProblems.length" class="unknown-bar">
+          <Icon icon="ph:warning" :width="13" />
+          题号 {{ unknownProblems.join("、") }} 没有这道题，下面只有其余题号的提交
+        </div>
         <button v-if="newCount" class="new-bar" @click="showNew">
           <Icon icon="ph:arrow-up-bold" :width="13" />
           有 {{ newCount }}{{ newCountCapped ? "+" : "" }} 条新提交，点这里显示
@@ -1222,6 +1231,20 @@ function dayBreak(index: number) {
   justify-content: center;
   gap: 6px;
   cursor: pointer;
+}
+
+.unknown-bar {
+  height: 32px;
+  flex: none;
+  box-sizing: border-box;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: v-bind("tone('warning').color");
+  background: v-bind("tone('warning').background");
+  border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
 .rows {

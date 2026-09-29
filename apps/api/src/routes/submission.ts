@@ -37,6 +37,7 @@ import {
   exactUsernameFilter,
   problemFilter,
   submissionStatisticsRoutes,
+  unknownDisplayIds,
   usernameFilter,
 } from "./submission-statistics"
 
@@ -511,7 +512,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   // 「非管理员即受限」，不能写成「是普通用户才受限」——
   // 后者对匿名用户（user 为 null）会短路，匿名反而能看到全部提交，权限大于登录学生。
   if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
-    return success(c, { results: [], total: 0 } satisfies SubmissionList)
+    return success(c, { results: [], total: 0, unknownProblems: [] } satisfies SubmissionList)
   }
   const displayId = c.req.query("problemDisplayId")?.trim()
   const myself = c.req.query("myself") === "1" ? user : null
@@ -542,10 +543,11 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   const where = and(...filters)
   // count 不 join problem：无条件 join 会让计划器把 count 退化成 seq scan
   // （生产快照实测 7.5ms → 78ms）。题号已经解析成 problem_id，也用不着 join。
-  const [totalRows, rows] = await Promise.all([
+  const [totalRows, rows, unknownProblems] = await Promise.all([
     db.select({ value: count() }).from(schema.submission).where(where),
     // 班级和用户名一样是「圈一小撮人」，走同一条圈选路（见 paginateSubmissionRows）
     paginateSubmissionRows(where, limit, offset, Boolean(username || className)),
+    displayId ? unknownDisplayIds(displayId, null) : [],
   ])
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
   const [joinTimes, problemsetTitles] = await Promise.all([
@@ -587,6 +589,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
         }) satisfies SubmissionListItem,
     ),
     total: totalRows[0]?.value ?? 0,
+    unknownProblems,
   } satisfies SubmissionList)
 })
 
@@ -618,7 +621,7 @@ submissionRoutes.get(
     const where = and(...filters)
     // 一场比赛最多一两千条提交，按 contest_create_time_idx 定位之后怎么滤都不贵，
     // 所以不像公开列表那样分游标 / 圈选两条路
-    const [totalRows, rows] = await Promise.all([
+    const [totalRows, rows, unknownProblems] = await Promise.all([
       db.select({ value: count() }).from(schema.submission).where(where),
       db
         .select(submissionListColumns)
@@ -629,6 +632,7 @@ submissionRoutes.get(
         .orderBy(desc(schema.submission.createTime))
         .limit(limit)
         .offset(offset),
+      displayId ? unknownDisplayIds(displayId, contest.id) : [],
     ])
     // 这里不挂题单防作弊闸门（对比公开列表）：题单里的题必定是非比赛题——加题时卡了
     // `isNull(problem.contestId)`（admin/problemset.ts:232）——而这条列表只出比赛提交，
@@ -656,6 +660,7 @@ submissionRoutes.get(
           }) satisfies SubmissionListItem,
       ),
       total: totalRows[0]?.value ?? 0,
+      unknownProblems,
     } satisfies SubmissionList)
   },
 )

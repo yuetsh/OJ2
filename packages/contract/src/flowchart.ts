@@ -58,7 +58,10 @@ export const flowchartListItemSchema = z.object({
   showLink: z.boolean(),
 })
 
-export const flowchartListSchema = paginatedSchema(flowchartListItemSchema)
+export const flowchartListSchema = paginatedSchema(flowchartListItemSchema).extend({
+  /** 题号框里查不到的题号，口径同 submissionListSchema.unknownProblems */
+  unknownProblems: z.array(z.string()),
+})
 export const createFlowchartResponseSchema = z.object({
   submissionId: z.string(),
   status: z.literal("pending"),

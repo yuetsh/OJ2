@@ -25,6 +25,7 @@ import { problemSetJoinTimes } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
 import { dayStart } from "../time"
+import { unknownDisplayIds } from "./submission-statistics"
 import {
   isAdminRole,
   matchedUsers,
@@ -278,7 +279,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   // submission_list_show_all 时非管理员看不到列表。流程图这边一直漏了这道门，
   // 学生把语言切成「流程图」、用户名随便填一个字就能翻出全班的 AI 评分。
   if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
-    return success(c, { results: [], total: 0 } satisfies FlowchartList)
+    return success(c, { results: [], total: 0, unknownProblems: [] } satisfies FlowchartList)
   }
   // 「只看自己」盖过用户名；普通学生不填用户名时也只看自己
   const className = c.req.query("className")?.trim()
@@ -300,7 +301,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   if (["S", "A", "B", "C"].includes(grade ?? ""))
     filters.push(eq(schema.flowchartSubmission.aiGrade, grade!))
   const where = and(...filters)
-  const [totalRows, rows] = await Promise.all([
+  const [totalRows, rows, unknownProblems] = await Promise.all([
     // 筛条件已经全落在 flowchart_submission 自己的列上，count 不挂任何 join
     db.select({ value: count() }).from(schema.flowchartSubmission).where(where),
     db
@@ -312,6 +313,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
       .orderBy(desc(schema.flowchartSubmission.createTime))
       .limit(limit)
       .offset(offset),
+    displayId ? unknownDisplayIds(displayId, null) : [],
   ])
   const joinTimes = await joinTimesFor(
     user,
@@ -337,6 +339,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
         }) satisfies FlowchartListItem,
     ),
     total: totalRows[0]?.value ?? 0,
+    unknownProblems,
   } satisfies FlowchartList)
 })
 

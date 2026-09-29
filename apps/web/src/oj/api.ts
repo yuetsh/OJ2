@@ -150,10 +150,13 @@ export function getSubmissions(params: Partial<SubmissionListPayload>) {
     : "submissions"
   // 契约里 language 是 z.string()（语言是配置项，随时可能加，收紧成枚举会让
   // 新加的语言在后端 parse 时直接抛），前端在这一处收窄成 LANGUAGE
-  return api.get<{ results: SubmissionListItem[]; total: number }>(endpoint, {
-    // contestId 走的是路径，page 只有前端分页器用
-    params: { ...params, contestId: undefined, page: undefined },
-  })
+  return api.get<{ results: SubmissionListItem[]; total: number; unknownProblems: string[] }>(
+    endpoint,
+    {
+      // contestId 走的是路径，page 只有前端分页器用
+      params: { ...params, contestId: undefined, page: undefined },
+    },
+  )
 }
 
 export function getRankOfProblem(problemId: string) {

@@ -236,6 +236,31 @@ export async function classNameFilter(className: string) {
  * 和公开题撞号是常态），而公开提交从不指向比赛题（快照核过，0 条）。
  * 查无此题时留恒假条件，少推一个 filter 就成了「不筛」。
  */
+/**
+ * 题号框里查不到的那几个（范围同 problemFilter：公开列表只认公开题，比赛列表只认本场的题）。
+ * 列表把它们回给前端，打错一个字的时候老师能看到提示
+ */
+export async function unknownDisplayIds(displayId: string, contestId: number | null) {
+  const ids = parseDisplayIds(displayId)
+  if (!ids.length) return []
+  const rows = await db
+    .select({ displayId: schema.problem.displayId })
+    .from(schema.problem)
+    .where(
+      and(
+        inArray(
+          sql`lower(${schema.problem.displayId})`,
+          ids.map((id) => id.toLowerCase()),
+        ),
+        contestId === null
+          ? isNull(schema.problem.contestId)
+          : eq(schema.problem.contestId, contestId),
+      ),
+    )
+  const found = new Set(rows.map((row) => row.displayId.toLowerCase()))
+  return ids.filter((id) => !found.has(id.toLowerCase()))
+}
+
 export async function problemFilter(displayId: string, contestId: number | null) {
   // 一次可以筛几道（「这节课」那颗按钮一带就是五道），分隔符和统计面板同一套
   const lowered = parseDisplayIds(displayId).map((id) => id.toLowerCase())
