@@ -22,7 +22,7 @@ import {
   type CreateSubmissionResponse,
   type ProblemAuthor,
   type ProblemListItem,
-  type YearlyAc,
+  type ProblemStats,
   type ProblemList,
   type CreateFlowchartResponse,
   type FlowchartScores,
@@ -115,9 +115,14 @@ export async function getProblem(problemID: string, contestID: string) {
   return problem
 }
 
-// 未登录返回 "0"，登录后返回百分比字符串
-export function getProblemBeatRate(problemID: number) {
-  return api.get<string>(`problems/${problemID}/beat-count`)
+/**
+ * 题目页「统计」页签。problemID 是内部题号（problem.id），比赛题也能查。
+ * className 只有老师用：看哪个班的明细，不填就是最近做过这题的班
+ */
+export function getProblemStats(problemID: number, className?: string) {
+  return api.get<ProblemStats>(`problems/${problemID}/stats`, {
+    params: className ? { className } : {},
+  })
 }
 
 export async function getSubmission(id: string): Promise<Submission> {
@@ -403,12 +408,6 @@ export function getSimilarProblems(problemId: string) {
   return api
     .get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
     .then((response) => response.map(toProblemRow))
-}
-
-export type { YearlyAc as YearlyACData } from "@oj2/contract"
-
-export function getProblemYearlyAC(problemId: string) {
-  return api.get<YearlyAc[]>(`problems/${encodeURIComponent(problemId)}/yearly-ac`)
 }
 
 // ==================== 流程图相关API ====================

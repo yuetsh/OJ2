@@ -1,11 +1,4 @@
-import type {
-  ProblemAuthor,
-  ProblemDetail,
-  ProblemList,
-  ProblemListItem,
-  Tag,
-  YearlyAc,
-} from "@oj2/contract"
+import type { ProblemAuthor, ProblemDetail, ProblemList, ProblemListItem, Tag } from "@oj2/contract"
 import {
   and,
   asc,
@@ -13,7 +6,6 @@ import {
   countDistinct,
   desc,
   eq,
-  gte,
   ilike,
   inArray,
   isNull,
@@ -29,7 +21,6 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
-import { dayStart, localTime, shiftMonthsByCalendar } from "../time"
 import {
   asFilterValue,
   countFailedSubmissions,
@@ -245,47 +236,6 @@ problemRoutes.get("/problem-authors", async (c) => {
   return success(c, rows satisfies ProblemAuthor[])
 })
 
-problemRoutes.get("/problems/:id/beat-count", optionalAuth, async (c) => {
-  const user = c.get("user")
-  if (!user) return success(c, "0")
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const [mine] = await db
-    .select({ value: count() })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        eq(schema.submission.problemId, id),
-        inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
-      ),
-    )
-  if (!mine?.value) return success(c, "0")
-  // 「近两年」按东八区日历算到当天零点
-  const since = dayStart(shiftMonthsByCalendar(new Date(), -24))
-  const [active, accepted] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.user)
-      .where(and(eq(schema.user.isDisabled, false), gte(schema.user.lastLogin, since))),
-    db
-      .select({ value: countDistinct(schema.submission.userId) })
-      .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.problemId, id),
-          inArray(schema.submission.result, [0, 10]),
-          gte(schema.submission.createTime, since),
-        ),
-      ),
-  ])
-  const total = active[0]?.value ?? 0
-  const solved = accepted[0]?.value ?? 0
-  return success(
-    c,
-    total > 0 && solved < total ? (((total - solved) / total) * 100).toFixed(2) : "0",
-  )
-})
-
 problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
   const [target] = await db
     .select({ id: schema.problem.id })
@@ -357,48 +307,6 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
   return success(
     c,
     rows.map((row) => listItem(row, tags, statuses)),
-  )
-})
-
-problemRoutes.get("/problems/:displayId/yearly-ac", async (c) => {
-  const [problem] = await db
-    .select({ id: schema.problem.id })
-    .from(schema.problem)
-    .where(
-      and(
-        sql`lower(${schema.problem.displayId}) = lower(${c.req.param("displayId")})`,
-        isNull(schema.problem.contestId),
-        eq(schema.problem.visible, true),
-      ),
-    )
-    .limit(1)
-  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  const year = sql<number>`extract(year from ${localTime(schema.submission.createTime)})::int`
-  const rows = await db
-    .select({
-      year,
-      total: count(),
-      accepted: sql<number>`count(*) filter (where ${schema.submission.result} in (0, 10))::int`,
-    })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.problemId, problem.id),
-        isNull(schema.submission.contestId),
-        notInArray(schema.submission.result, [6, 7]),
-      ),
-    )
-    .groupBy(year)
-    .orderBy(year)
-  return success(
-    c,
-    rows.map(
-      (row) =>
-        ({
-          ...row,
-          acRate: row.total > 0 ? Math.round((row.accepted / row.total) * 10_000) / 100 : 0,
-        }) satisfies YearlyAc,
-    ),
   )
 })
 

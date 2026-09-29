@@ -15,6 +15,7 @@ import { achievementRoutes } from "./routes/achievement"
 import { aiRoutes } from "./routes/ai"
 import { flowchartRoutes } from "./routes/flowchart"
 import { problemRoutes } from "./routes/problem"
+import { problemStatsRoutes } from "./routes/problem-stats"
 import { submissionRoutes } from "./routes/submission"
 import { trialRunRoutes } from "./routes/trial-run"
 import { siteRoutes } from "./routes/site"
@@ -40,6 +41,7 @@ app.route("/api", achievementRoutes)
 app.route("/api", aiRoutes)
 app.route("/api", flowchartRoutes)
 app.route("/api", problemRoutes)
+app.route("/api", problemStatsRoutes)
 app.route("/api", submissionRoutes)
 app.route("/api", trialRunRoutes)
 app.route("/api", judgeServerRoutes)

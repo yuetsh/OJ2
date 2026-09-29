@@ -39,8 +39,9 @@ interface EntryRules {
    */
   collab: boolean
   /**
-   * 教师的「课堂统计」。统计接口按 displayId 在公开题库里找题（`submission-statistics.ts`），
-   * 比赛题号拿过去查到的是另一道公开题，或者 404
+   * 工具栏上教师的「课堂统计」（新标签开数据统计页）。题库入口已经并进「统计」页签的老师
+   * 视图（按班看谁没做对，带「在数据统计里看」），只剩没有抽屉的题单入口还要这个按钮。
+   * 比赛不给：统计接口按 displayId 在公开题库里找题，比赛题号查到的是另一道公开题，或者 404
    */
   classStats: boolean
   /**
@@ -60,7 +61,7 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     backToProblemSet: false,
     help: true,
     collab: true,
-    classStats: true,
+    classStats: false,
     allSubmissionsInMenu: false,
   },
   // 题单里什么「以前的」都不给看：加入题单之前的提交、统计、点评都能拿来抄答案

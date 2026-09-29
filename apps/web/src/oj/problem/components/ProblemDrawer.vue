@@ -142,7 +142,7 @@ function goAllSubmissions() {
           </button>
         </div>
       </template>
-      <ProblemInfo v-if="lastOpened === 'info'" />
+      <ProblemInfo v-if="lastOpened === 'info'" @open-submissions="open = 'submission'" />
       <ProblemReaction v-else-if="lastOpened === 'reaction'" />
       <template v-else>
         <ProblemSubmission />
