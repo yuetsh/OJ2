@@ -398,7 +398,7 @@ function openStandalone() {
     </template>
 
     <div v-if="!narrow" class="foot">
-      <span class="keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></span>
+      <span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span>
       <span>
         {{
           teacher

@@ -258,7 +258,7 @@ const canRetry = computed(
     </div>
 
     <div v-if="!narrow" class="foot">
-      <span class="keys"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd></span>
+      <span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span>
       <span>换上一张 / 下一张</span>
       <div class="spacer"></div>
       <span v-if="position">本页第 {{ position.index }} / {{ position.count }} 条</span>

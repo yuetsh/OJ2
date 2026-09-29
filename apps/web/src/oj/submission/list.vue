@@ -314,8 +314,8 @@ function move(step: 1 | -1) {
 
 const [todayPanel, toggleTodayPanel] = useToggle(false)
 
-// ← → 和 ↑ ↓ 一样（9 月加方向键时就是四个键都能翻，老师已经用惯了）
-onKeyStroke(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"], (e: KeyboardEvent) => {
+// 只用 ↑ ↓（用户定的，← → 不要）
+onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
   if (!isDesktop.value || todayPanel.value) return
   // 别的控件已经处理了这次按键（下拉框自己会开菜单、换选项）
   if (e.defaultPrevented) return
@@ -335,7 +335,7 @@ onKeyStroke(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"], (e: KeyboardEve
   }
   if (!rows.value.length) return
   e.preventDefault()
-  move(e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1)
+  move(e.key === "ArrowUp" ? -1 : 1)
 })
 
 // 手机上没有右栏：点一行从右边滑出整屏的详情
