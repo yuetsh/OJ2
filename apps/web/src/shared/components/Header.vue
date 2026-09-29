@@ -255,16 +255,18 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
     <div class="actions">
       <ProblemJumpBox v-if="isDesktop" :compact="compact" />
       <template v-if="isDesktop && collabStore.isTeacher">
-        <RouterLink
-          to="/classroom"
+        <!-- 和提交列表的「今日统计」「数据统计」同一种按钮：平时没底色，悬停出底色 -->
+        <n-button
+          quaternary
           class="tool-link"
-          :class="{ active: active === 'classroom' }"
+          :type="active === 'classroom' ? 'primary' : 'default'"
           title="课堂看板"
           aria-label="课堂看板"
+          @click="router.push('/classroom')"
         >
-          <Icon icon="ph:monitor" :width="16" />
-          <span v-if="!compact">课堂看板</span>
-        </RouterLink>
+          <template #icon><Icon icon="ph:monitor" /></template>
+          <template v-if="!compact">课堂看板</template>
+        </n-button>
         <span class="divider"></span>
       </template>
       <n-dropdown v-if="isMobile" :options="mobileMenus" size="large" @select="handleNavSelect">
@@ -388,17 +390,9 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
   flex: none;
 }
 
+/* 按钮左右自带的留白吃回去，和两边的间距不变 */
 .tool-link {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: v-bind("theme.textColor3");
-  text-decoration: none;
-}
-
-.tool-link:hover,
-.tool-link.active {
-  color: v-bind("theme.primaryColor");
+  margin: 0 -8px;
 }
 
 .divider {
