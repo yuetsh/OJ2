@@ -263,20 +263,6 @@ export const aiAnalysisRecordSchema = z.object({
   username: z.string().optional(),
 })
 
-export const loginSummarySchema = z.object({
-  summary: z.object({
-    start: z.string(),
-    end: z.string(),
-    newProblemCount: z.number().int(),
-    submissionCount: z.number().int(),
-    acceptedCount: z.number().int(),
-    solvedCount: z.number().int(),
-    flowchartSubmissionCount: z.number().int(),
-  }),
-  analysis: z.string(),
-  analysisError: z.string().optional(),
-})
-
 export type Grade = z.infer<typeof gradeSchema>
 export type DurationData = z.infer<typeof durationDataSchema>
 export type SolvedProblem = z.infer<typeof solvedProblemSchema>
@@ -286,7 +272,6 @@ export type AiDetail = z.infer<typeof aiDetailSchema>
 export type SolvedList = z.infer<typeof solvedListSchema>
 export type HeatmapItem = z.infer<typeof heatmapItemSchema>
 export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>
-export type LoginSummary = z.infer<typeof loginSummarySchema>
 
 export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>
 export type AiHintRequest = z.infer<typeof aiHintRequestSchema>

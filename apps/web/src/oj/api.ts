@@ -9,6 +9,7 @@ import {
   type Metrics,
   type TutorialSummary,
   type ClassActivity,
+  type LastVisit,
   type ClassBoard,
   type ClassLesson,
   type KnowledgeMap,
@@ -244,6 +245,11 @@ export function getKnowledgeMap() {
 
 export function getClassActivity() {
   return api.get<ClassActivity>("me/class-activity")
+}
+
+/** 首页「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对 */
+export function getLastVisit() {
+  return api.get<LastVisit>("me/last-visit")
 }
 
 export function getClassRank(grade?: number | null) {

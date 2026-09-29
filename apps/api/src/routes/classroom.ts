@@ -11,15 +11,31 @@ import {
   type ClassComparisonResponse,
   type ClassRankItem,
   type ClassUserRank,
+  type LastVisit,
   FLOWCHART_PASS_GRADES,
 } from "@oj2/contract"
-import { and, desc, eq, gte, inArray, isNotNull, isNull, like, lte, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  lte,
+  sql,
+} from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
+import { getLoginWindow } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
+import { accepted } from "../services/learning-stats"
 import { calendarDay, dayStart, localTime } from "../time"
 import { queryInteger, rounded } from "./helpers"
 
@@ -361,6 +377,119 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     }),
   }
 }
+
+/** 「上次来」超过这么多天就不提那次做了什么，只在问候里说一句隔了多久 */
+const LAST_VISIT_MAX_DAYS = 30
+
+/**
+ * 首页的「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对。
+ * 原来是登录后弹的「登录速报」，数字外加 AI 两句话 —— AI 只拿到那五个数，说的就是复述，
+ * 还要同步等模型（最长 60 秒）弹框才出来；现在拆进首页，没做对的题给「接着做」
+ */
+classroomRoutes.get("/me/last-visit", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const window = await getLoginWindow(c)
+  const previousLogin = window?.previousLogin ?? null
+  if (
+    !window ||
+    !previousLogin ||
+    Date.now() - new Date(previousLogin).getTime() > LAST_VISIT_MAX_DAYS * 864e5
+  ) {
+    return success(c, { previousLogin, summary: null } satisfies LastVisit)
+  }
+  const rows = await db
+    .select({
+      problemId: schema.submission.problemId,
+      problemDisplayId: schema.problem.displayId,
+      title: schema.problem.title,
+      result: schema.submission.result,
+      createTime: schema.submission.createTime,
+    })
+    .from(schema.submission)
+    .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
+    .where(
+      and(
+        eq(schema.submission.userId, user.id),
+        isNull(schema.submission.contestId),
+        gte(schema.submission.createTime, previousLogin),
+        lt(schema.submission.createTime, window.loginAt),
+      ),
+    )
+    .orderBy(asc(schema.submission.createTime))
+  if (!rows.length) return success(c, { previousLogin, summary: null } satisfies LastVisit)
+
+  // 按题归拢：rows 按时间正序，所以后来的覆盖 lastResult / lastTime，第一次 AC 的先进 solved
+  const byProblem = new Map<
+    number,
+    {
+      problemDisplayId: string
+      title: string
+      attempts: number
+      lastResult: (typeof rows)[number]["result"]
+      lastTime: string
+      solved: boolean
+    }
+  >()
+  const solved: { problemDisplayId: string; title: string }[] = []
+  for (const row of rows) {
+    const item = byProblem.get(row.problemId) ?? {
+      problemDisplayId: row.problemDisplayId,
+      title: row.title,
+      attempts: 0,
+      lastResult: row.result,
+      lastTime: row.createTime,
+      solved: false,
+    }
+    item.attempts++
+    item.lastResult = row.result
+    item.lastTime = row.createTime
+    if (!item.solved && accepted.includes(row.result)) {
+      item.solved = true
+      solved.push({ problemDisplayId: row.problemDisplayId, title: row.title })
+    }
+    byProblem.set(row.problemId, item)
+  }
+  // 那次没做对的，再看以前、以及这次登录之后有没有做对过 —— 做对过的就不再催「接着做」
+  const tried = [...byProblem].filter(([, item]) => !item.solved).map(([id]) => id)
+  const everSolved = tried.length
+    ? new Set(
+        (
+          await db
+            .selectDistinct({ problemId: schema.submission.problemId })
+            .from(schema.submission)
+            .where(
+              and(
+                eq(schema.submission.userId, user.id),
+                isNull(schema.submission.contestId),
+                inArray(schema.submission.problemId, tried),
+                inArray(schema.submission.result, accepted),
+              ),
+            )
+        ).map((row) => row.problemId),
+      )
+    : new Set<number>()
+  const unsolved = tried
+    .filter((id) => !everSolved.has(id))
+    .map((id) => byProblem.get(id)!)
+    .sort((a, b) => b.lastTime.localeCompare(a.lastTime))
+    .slice(0, 3)
+    .map(({ problemDisplayId, title, attempts, lastResult }) => ({
+      problemDisplayId,
+      title,
+      attempts,
+      lastResult,
+    }))
+  return success(c, {
+    previousLogin,
+    summary: {
+      submissionCount: rows.length,
+      solvedCount: solved.length,
+      lastSubmitTime: rows.at(-1)!.createTime,
+      unsolved,
+      solved: solved.slice(0, 12),
+    },
+  } satisfies LastVisit)
+})
 
 /**
  * 学生首页的「班里在做」。课上老师报题号、全班去找 —— 这是 2025 秋七成非比赛提交的

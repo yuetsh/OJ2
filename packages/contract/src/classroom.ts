@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { judgeStatusSchema } from "./judge-status"
+
 export const classRankItemSchema = z.object({
   className: z.string(),
   userCount: z.number().int(),
@@ -86,6 +88,40 @@ export const classActivitySchema = z.object({
   problems: z.array(classActivityProblemSchema),
 })
 
+/**
+ * 首页的「上次来」卡（原来登录后弹的「登录速报」并进了首页，AI 那两句不要了）。
+ * 窗口是**上次登录到这次登录之间**，不是到现在 —— 这次登录期间卡片内容不变，
+ * 今天做的题不会混进「上次」里。只算题库提交，比赛的题号在题库里点不开。
+ */
+export const lastVisitSchema = z.object({
+  /** 上次登录的时刻。null = 头一回登录（或会话早于这个字段） */
+  previousLogin: z.string().nullable(),
+  /** null = 上次来已经是 30 天以前，或那次一条代码都没交 */
+  summary: z
+    .object({
+      submissionCount: z.number().int(),
+      /** 那次做对的题数（去重） */
+      solvedCount: z.number().int(),
+      /** 那次最后一条提交的时刻，前端拿它和「班里那天」比是不是同一天 */
+      lastSubmitTime: z.string(),
+      /**
+       * 那次交过、**到现在都还没做对**的题（这次登录后补做对了的不算），
+       * 按最后一次提交倒序，最多 3 道
+       */
+      unsolved: z.array(
+        z.object({
+          problemDisplayId: z.string(),
+          title: z.string(),
+          attempts: z.number().int(),
+          lastResult: judgeStatusSchema,
+        }),
+      ),
+      /** 那次做对的题，按第一次做对的先后，最多 12 道（总数看 solvedCount） */
+      solved: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
+    })
+    .nullable(),
+})
+
 /** 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉 */
 export const classLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
@@ -165,6 +201,7 @@ export type ClassComparison = z.infer<typeof classComparisonSchema>
 export type ClassComparisonResponse = z.infer<typeof classComparisonResponseSchema>
 
 export type ClassActivity = z.infer<typeof classActivitySchema>
+export type LastVisit = z.infer<typeof lastVisitSchema>
 export type ClassLessonRequest = z.infer<typeof classLessonRequestSchema>
 export type ClassBoard = z.infer<typeof classBoardSchema>
 export type ClassLesson = z.infer<typeof classLessonSchema>

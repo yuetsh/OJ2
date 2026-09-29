@@ -3,7 +3,6 @@ import Beian from "../components/Beian.vue"
 import Header from "../components/Header.vue"
 import Login from "../components/Login.vue"
 import Signup from "../components/Signup.vue"
-import LoginSummaryModal from "../components/LoginSummaryModal.vue"
 import AchievementToast from "../components/AchievementToast.vue"
 import { useAchievementStore } from "shared/store/achievement"
 import { useUserStore } from "shared/store/user"
@@ -46,7 +45,6 @@ watch(
     </n-layout-content>
     <Login />
     <Signup />
-    <LoginSummaryModal />
     <AchievementToast />
     <Beian />
   </n-layout>

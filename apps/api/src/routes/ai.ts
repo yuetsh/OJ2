@@ -9,20 +9,18 @@ import {
   type AiHintDone,
   type HintDiagnosis,
   type HeatmapItem,
-  type LoginSummary,
 } from "@oj2/contract"
-import { and, count, countDistinct, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm"
+import { and, count, eq, gte, inArray, lte, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
-import { getPreviousLogin } from "../auth/session"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { JudgeStatus } from "../judge/status"
 import { failure, parseBody, readJson, success } from "../http"
-import { completeChat, streamChat, streamWhole } from "../services/ai"
+import { streamChat, streamWhole } from "../services/ai"
 import { generateFilteredHint } from "../services/hint-filter"
-import { accepted, buildDetail, buildDuration, listSolved } from "../services/learning-stats"
+import { buildDetail, buildDuration, listSolved } from "../services/learning-stats"
 import { decideHintLevel } from "../services/hint-level"
 import { hintDiagnosis, hintPrompt, referenceAnswer } from "../services/hint-diagnosis"
 import { consumeToken } from "../services/throttling"
@@ -133,102 +131,6 @@ aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
       return { timestamp: monday * 864e5, value } satisfies HeatmapItem
     }),
   )
-})
-
-aiRoutes.get("/ai/login-summary", requireAuth, async (c) => {
-  const user = c.get("user")!
-  const end = new Date()
-  const [userRow] = await db
-    .select({
-      createTime: schema.user.createTime,
-      lastLogin: schema.user.lastLogin,
-    })
-    .from(schema.user)
-    .where(eq(schema.user.id, user.id))
-    .limit(1)
-  const previous = await getPreviousLogin(c)
-  let start = new Date(
-    previous ?? userRow?.lastLogin ?? userRow?.createTime ?? end.getTime() - 7 * 864e5,
-  )
-  if (start >= end) start = new Date(end.getTime() - 864e5)
-  const range = and(
-    gte(schema.submission.createTime, start.toISOString()),
-    lte(schema.submission.createTime, end.toISOString()),
-  )
-  const [newProblems, submissions, acceptedRows, solvedRows, flowRows] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.problem)
-      .where(
-        and(
-          isNull(schema.problem.contestId),
-          eq(schema.problem.visible, true),
-          gte(schema.problem.createTime, start.toISOString()),
-          lte(schema.problem.createTime, end.toISOString()),
-        ),
-      ),
-    db
-      .select({ value: count() })
-      .from(schema.submission)
-      .where(and(eq(schema.submission.userId, user.id), range)),
-    db
-      .select({ value: count() })
-      .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.userId, user.id),
-          inArray(schema.submission.result, accepted),
-          range,
-        ),
-      ),
-    db
-      .select({ value: countDistinct(schema.submission.problemId) })
-      .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.userId, user.id),
-          inArray(schema.submission.result, accepted),
-          range,
-        ),
-      ),
-    db
-      .select({ value: count() })
-      .from(schema.flowchartSubmission)
-      .where(
-        and(
-          eq(schema.flowchartSubmission.userId, user.id),
-          gte(schema.flowchartSubmission.createTime, start.toISOString()),
-          lte(schema.flowchartSubmission.createTime, end.toISOString()),
-        ),
-      ),
-  ])
-  const summary = {
-    start: start.toISOString(),
-    end: end.toISOString(),
-    newProblemCount: newProblems[0]?.value ?? 0,
-    submissionCount: submissions[0]?.value ?? 0,
-    acceptedCount: acceptedRows[0]?.value ?? 0,
-    solvedCount: solvedRows[0]?.value ?? 0,
-    flowchartSubmissionCount: flowRows[0]?.value ?? 0,
-  }
-  let analysis = ""
-  let analysisError: string | undefined
-  // 这支是登录后自动触发的，没有用户点击 —— 更要过限流，否则反复刷新就是反复调模型。
-  // 被限住时安静跳过：analysis 本来就是可选的，弹窗里的统计数字照常显示。
-  if (
-    summary.submissionCount >= 3 &&
-    (await consumeToken("user", aiThrottleKey(user.id))).allowed
-  ) {
-    try {
-      analysis = await completeChat(
-        "你是 OnlineJudge 的学习助教。请根据统计数据给出简短分析(1-2句)，再给出一行以“结论：”开头的结论。",
-        JSON.stringify(summary),
-      )
-    } catch (error) {
-      analysisError = error instanceof Error ? error.message : String(error)
-    }
-  }
-  return success(c, { summary, analysis, analysisError } satisfies LoginSummary)
 })
 
 aiRoutes.get("/ai/pinned", requireAuth, async (c) => {

@@ -292,7 +292,7 @@ export type { WeeklyRank, WeeklyRankItem } from "@oj2/contract"
 export type { ClassComparison, ClassRankItem, ClassUserRank } from "@oj2/contract"
 
 /** 班里最近一次一起做的题（课上老师点的那几道），见后端 `/me/class-activity` */
-export type { ClassActivity, ClassActivityProblem } from "@oj2/contract"
+export type { ClassActivity, ClassActivityProblem, LastVisit } from "@oj2/contract"
 
 /** 课堂看板：一个班今天这节课的题 × 全班学生 */
 export type { ClassBoard, ClassBoardStudent, ClassBoardCell, ClassLesson } from "@oj2/contract"

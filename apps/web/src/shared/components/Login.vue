@@ -7,10 +7,8 @@ import { storeToRefs } from "pinia"
 import { useAuthModalStore } from "../store/authModal"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
-import { useLoginSummaryStore } from "../store/loginSummary"
 
 const userStore = useUserStore()
-const loginSummaryStore = useLoginSummaryStore()
 const configStore = useConfigStore()
 const authStore = useAuthModalStore()
 
@@ -142,10 +140,8 @@ function submit() {
         storage.set(STORAGE_KEY.LOGIN_CLASS, form.value.class)
       }
       authStore.closeLoginModal()
+      // 「上次登录以来」不再弹框，拆进了首页的「上次来」卡（/me/last-visit）
       await userStore.getMyProfile()
-      // 登录后弹「上次登录以来」的学情小结。移植时漏掉了这一行，
-      // LoginSummaryModal 一直挂在 layout 里但没人触发，整条链路等于死的
-      loginSummaryStore.open()
     }
   })
 }

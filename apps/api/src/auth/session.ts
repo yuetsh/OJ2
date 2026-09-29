@@ -300,7 +300,9 @@ export async function getContestPassword(c: Context, contestId: number) {
   return session?.value.contestPasswords[String(contestId)] ?? null
 }
 
-export async function getPreviousLogin(c: Context) {
+/** 上次登录、这次登录的时刻 —— 首页「上次来」卡的窗口就是这两个之间 */
+export async function getLoginWindow(c: Context) {
   const session = await getStoredSession(c)
-  return session?.value.previousLogin ?? null
+  if (!session) return null
+  return { previousLogin: session.value.previousLogin, loginAt: session.value.createdAt }
 }

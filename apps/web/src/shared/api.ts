@@ -1,4 +1,4 @@
-import type { LoginSummary, Quote, WebsiteConfig } from "@oj2/contract"
+import type { Quote, WebsiteConfig } from "@oj2/contract"
 import api from "utils/api"
 import { contractDeferred } from "utils/contract"
 import type { Profile, Tag } from "utils/types"
@@ -43,14 +43,10 @@ export function getClassUsernames(classroom: string) {
   return api.get<string[]>(`classes/${encodeURIComponent(classroom)}/usernames`)
 }
 
-// 下面两个是启动就要调的（config / loginSummary 两个 store），所以放在 shared 而不是
+// 下面这个是启动就要调的（config store），所以放在 shared 而不是
 // oj/api.ts：oj/api.ts 同步 import 了题目详情、提交详情两个 schema（它们的契约闸门必须
 // 同步，submissionDetailSchema 里有 `.catch()`，放行原文和解析结果不等价），入口一旦
 // 引到它，zod 整个就进了首屏包。
 export function getWebsiteConfig() {
   return api.get<WebsiteConfig>("site")
-}
-
-export function getAILoginSummary() {
-  return api.get<LoginSummary>("ai/login-summary")
 }
