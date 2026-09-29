@@ -224,16 +224,24 @@ const GROUP_LABEL: Record<
 const router = useRouter()
 
 /**
- * 点格子 / 名字到提交列表看他今天交的代码。新标签打开：看板多半正投在屏幕上，别把它顶掉。
- * 用户名按整名匹配（学号互相包含是常态，ks24a1 会混进 ks24a10）
+ * 点格子 / 名字到提交列表看他今天交的。新标签打开：看板多半正投在屏幕上，别把它顶掉。
+ * 用户名按整名匹配（学号互相包含是常态，ks24a1 会混进 ks24a10）。
+ *
+ * 今天只画了流程图、没写代码的，跳到列表的「流程图」那边 —— 不然这节课整班在画流程图时，
+ * 点进去是一片「没有符合条件的提交」
  */
-function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) {
+function submissionsHref(
+  student: ClassBoardStudent,
+  problemDisplayId: string | undefined,
+  flowchart: boolean,
+) {
   return router.resolve({
     name: "submissions",
     query: {
       username: student.username,
       exactUsername: "1",
       today: "1",
+      ...(flowchart ? { language: "Flowchart" } : {}),
       ...(problemDisplayId ? { problem: problemDisplayId } : {}),
     },
   }).href
@@ -401,9 +409,9 @@ function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) 
                 <tr v-for="student in students" :key="student.userId">
                   <td class="name">
                     <a
-                      v-if="student.lastSubmitAt"
+                      v-if="student.codeToday || student.drawnToday"
                       class="cell-link"
-                      :href="submissionsHref(student)"
+                      :href="submissionsHref(student, undefined, !student.codeToday)"
                       target="_blank"
                       :title="`看 ${nameOf(student)} 今天交的全部`"
                     >
@@ -432,9 +440,19 @@ function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) 
                     <a
                       v-if="cell.attempts"
                       class="cell-link"
-                      :href="submissionsHref(student, board.problems[i]!.problemDisplayId)"
+                      :href="
+                        submissionsHref(
+                          student,
+                          board.problems[i]!.problemDisplayId,
+                          !cell.codeAttempts,
+                        )
+                      "
                       target="_blank"
-                      :title="`看 ${nameOf(student)} 今天在这道题上交的 ${cell.attempts} 次`"
+                      :title="
+                        cell.codeAttempts
+                          ? `看 ${nameOf(student)} 今天在这道题上交的 ${cell.codeAttempts} 次代码`
+                          : `看 ${nameOf(student)} 今天在这道题上画的 ${cell.flowchartAttempts} 张流程图`
+                      "
                     >
                       {{ cellText(cell) }}
                     </a>

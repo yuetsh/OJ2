@@ -560,6 +560,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           .select({
             userId: schema.submission.userId,
             lastAt: sql<string>`max(${schema.submission.createTime})`,
+            // 非比赛的最后一次，给「点名字跳提交列表」判断用（列表只列非比赛的）
+            lastPublicAt: sql<
+              string | null
+            >`max(${schema.submission.createTime}) filter (where ${isNull(schema.submission.contestId)})`,
           })
           .from(schema.submission)
           .where(
@@ -625,6 +629,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
+  const codeTodayUsers = new Set(
+    lastSubmits.filter((row) => row.lastPublicAt).map((row) => row.userId),
+  )
+  const drawnTodayUsers = new Set(lastDrawn.map((row) => row.userId))
   for (const row of lastDrawn) {
     const known = lastByUser.get(row.userId)
     if (!known || Date.parse(row.lastAt) > Date.parse(known)) lastByUser.set(row.userId, row.lastAt)
@@ -656,10 +664,14 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             return {
               status: !cell && !flow ? "none" : acceptedAt ? "accepted" : "tried",
               attempts: (cell?.attempts ?? 0) + (flow?.attempts ?? 0),
+              codeAttempts: cell?.attempts ?? 0,
+              flowchartAttempts: flow?.attempts ?? 0,
               acceptedAt,
             }
           }),
           lastSubmitAt: lastByUser.get(student.userId) ?? null,
+          codeToday: codeTodayUsers.has(student.userId),
+          drawnToday: drawnTodayUsers.has(student.userId),
           recentAttended: attendedByUser.get(student.userId) ?? 0,
         }) satisfies ClassBoardStudent,
     ),

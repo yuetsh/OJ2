@@ -101,8 +101,14 @@ export const classBoardProblemSchema = z.object({
 export const classBoardCellSchema = z.object({
   /** accepted 看的是题库里（不含比赛）有没有通过过，不限今天 —— 以前做过的也算做完 */
   status: z.enum(["accepted", "tried", "none"]),
-  /** 今天在这道题上交了几次 */
+  /** 今天在这道题上交了几次（代码 + 流程图） */
   attempts: z.number().int(),
+  /**
+   * 上面那个数拆开：代码几次、流程图几次。点格子要知道该跳到提交列表的哪一边 ——
+   * 这节课整班在画流程图时，跳到代码那边是一片空
+   */
+  codeAttempts: z.number().int(),
+  flowchartAttempts: z.number().int(),
   /** 第一次通过的时刻；今天之前通过的，前端显示成「之前」 */
   acceptedAt: z.string().nullable(),
 })
@@ -115,6 +121,12 @@ export const classBoardStudentSchema = z.object({
   cells: z.array(classBoardCellSchema),
   /** 今天最后一次提交（任何题），没交过为 null */
   lastSubmitAt: z.string().nullable(),
+  /**
+   * 今天交过**非比赛**的代码 / 画过流程图没有。点名字跳提交列表用：lastSubmitAt 把比赛提交
+   * 也算进去了，而提交列表只列非比赛的，只看它会跳到一个空列表
+   */
+  codeToday: z.boolean(),
+  drawnToday: z.boolean(),
   /** 最近几节课（不含今天，个数见 ClassBoard.recentLessons）里交过题的有几节 */
   recentAttended: z.number().int(),
 })
