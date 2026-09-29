@@ -413,7 +413,16 @@ export const submissionStatisticsSchema = z.object({
  * 口径跟着那颗标签走：**东八区今天、非比赛提交、不分语言**（语言分布就是
  * `languages` 这张表本身）。
  */
+const todayFailureSchema = z.object({ result: judgeStatusSchema, count: z.number().int() })
+
+/**
+ * 「今日统计」（提交列表顶上那颗标签点开的）。一般是老师在看（设计稿「今日统计重设计」老师 B）：
+ * 今天哪几个班上了课、各在几点、错得最多的是哪几道。学生版从简：自己今天怎样、大家在做哪几道。
+ * 口径：东八区今天 + 非比赛提交。
+ */
 export const todaySubmissionStatisticsSchema = z.object({
+  /** 这份数据是几点算的 —— 标题上的「截至 19:40」 */
+  asOf: z.string(),
   total: z.number().int(),
   /** 通过的条数，含 AST_CHECK_FAILED（那也是答案对了） */
   accepted: z.number().int(),
@@ -425,24 +434,78 @@ export const todaySubmissionStatisticsSchema = z.object({
   correctRate: z.number(),
   /** 今天交过东西的人数，按 user_id 去重 */
   userCount: z.number().int(),
-  /** 按东八区钟点分的 24 个桶，**下标就是钟点**，没有提交的钟点是 0 */
-  hours: z.array(z.number().int()).length(24),
-  /** 按语言，提交数倒序。零提交的语言不在表里 */
+  /** 今天画了几张流程图，0 就不提 */
+  flowchartCount: z.number().int(),
+  /** 按语言，提交数倒序。只有一种语言时界面上缩成一句话 */
   languages: z.array(z.object({ language: problemLanguageSchema, count: z.number().int() })),
-  /** 按判题结果，条数倒序 */
-  results: z.array(z.object({ result: judgeStatusSchema, count: z.number().int() })),
+  /** 按判题结果，条数倒序 —— 画成底部那根结果条 */
+  results: z.array(todayFailureSchema),
+  /** 我今天交了几次、做对几道。没登录为 null */
+  me: z.object({ total: z.number().int(), solved: z.number().int() }).nullable(),
   /**
-   * 今天最热的几道题，提交数倒序，最多 10 道。
-   * **只含公开可见的题目** —— 这个接口不需要登录，不能拿它探未发布题目的标题。
+   * 学生版「今天大家都在做」：按做的人数倒序，最多 8 道。**只含公开可见的题目** ——
+   * 这个接口不需要登录，不能拿它探未发布题目的标题。「提交列表对学生全开」关掉时为空
    */
   problems: z.array(
     z.object({
       problemDisplayId: z.string(),
       problemTitle: z.string(),
-      count: z.number().int(),
-      acceptedCount: z.number().int(),
+      userCount: z.number().int(),
+      acceptedUsers: z.number().int(),
+      /** 我自己今天在这道题上：做对了 / 交了没对 / 没交；没登录为 null */
+      mine: z.enum(["accepted", "tried", "none"]).nullable(),
     }),
   ),
+  /**
+   * 老师：今天上了课的班（同班 5 人以上做了同一道题），按开始时间排。学生为 null。
+   * 时段是这个班今天第一条到最后一条提交，`live` = 最后一条在 15 分钟内（正在上课，
+   * 界面上引去课堂看板 —— 盯人是看板的活）
+   */
+  classes: z
+    .array(
+      z.object({
+        className: z.string(),
+        start: z.string(),
+        end: z.string(),
+        userCount: z.number().int(),
+        /** 班里的学生数 */
+        classSize: z.number().int(),
+        /** 这节课做的题数（班里 5 人以上做过的） */
+        problemCount: z.number().int(),
+        /** 多半是从题单里交的 —— 「题单 9 道」 */
+        fromProblemSet: z.boolean(),
+        total: z.number().int(),
+        correctRate: z.number(),
+        live: z.boolean(),
+      }),
+    )
+    .nullable(),
+  /** 老师：没上课的零星提交，按班（null = 没填班级的号） */
+  scattered: z
+    .array(
+      z.object({
+        className: z.string().nullable(),
+        userCount: z.number().int(),
+        total: z.number().int(),
+      }),
+    )
+    .nullable(),
+  /** 老师：错得最多的题，按没过的次数倒序，最多 6 道 */
+  hardProblems: z
+    .array(
+      z.object({
+        problemDisplayId: z.string(),
+        problemTitle: z.string(),
+        /** 这道题今天交得最多的那个班 */
+        className: z.string().nullable(),
+        total: z.number().int(),
+        accepted: z.number().int(),
+        failures: z.array(todayFailureSchema),
+        userCount: z.number().int(),
+        acceptedUsers: z.number().int(),
+      }),
+    )
+    .nullable(),
 })
 
 export const formatCodeRequestSchema = z.object({

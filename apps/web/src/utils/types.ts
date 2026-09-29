@@ -82,6 +82,7 @@ export type ProblemStatus = "passed" | "failed" | "not_test"
  */
 export type { Tag, TagCategory } from "@oj2/contract"
 export type { ProblemStats, ProblemClassDetail } from "@oj2/contract"
+export type { TodaySubmissionStatistics } from "@oj2/contract"
 
 export type {
   AdminTag,

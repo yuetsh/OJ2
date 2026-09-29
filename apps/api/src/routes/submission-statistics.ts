@@ -7,6 +7,7 @@
  */
 
 import {
+  type ProblemLanguage,
   type SubmissionStatistics,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
@@ -17,111 +18,226 @@ import { Hono } from "hono"
 import { optionalAuth, requireTeacher } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
-import { JudgeStatus, UNJUDGED_RESULTS } from "../judge/status"
+import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
 import { type ContestEnv } from "../services/contest"
 import { getBooleanOption } from "../services/options"
-import { localTime, dayStart } from "../time"
-import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from "./helpers"
+import { dayStart } from "../time"
+import {
+  isAdminRole,
+  isTeacherOrAbove,
+  parseDisplayIds,
+  rounded,
+  scopedUsers,
+  stripClassPrefix,
+} from "./helpers"
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
-const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
+const ACCEPTED_RESULTS: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 
 /** 正确率。分母是判完的条数，一条都还没判完时给 0 而不是 NaN */
 function judgedRate(accepted: number, judged: number) {
   return judged > 0 ? rounded((accepted / judged) * 100) : 0
 }
 
+/** 同班这么多人做了同一道题，才算这个班今天上了课（和首页「班里在做」同一个门槛） */
+const TODAY_LESSON_MIN_USERS = 5
+/** 最后一条提交在这么多分钟内，算「正在上课」 */
+const TODAY_LIVE_MINUTES = 15
+
+type TodayRow = {
+  class_name: string | null
+  problem_id: number
+  display_id: string
+  title: string
+  visible: boolean
+  problemset_id: number | null
+  user_id: number
+  result: JudgeStatusValue
+  language: ProblemLanguage
+  create_time: string
+}
+
 /**
- * 「今日提交数」标签点开的统计。**公开、只出聚合数**（没有用户名、没有代码，
- * 热门题只算公开可见的题），口径和那颗标签一致：东八区今天 + 非比赛提交。
+ * 「今日统计」（提交列表顶上那颗标签点开的）。一般是老师看：今天哪几个班上了课、几点到几点、
+ * 错得最多的是哪几道；学生版从简。口径和那颗标签一致：东八区今天 + 非比赛提交。
  *
- * 按钟点切用 `localTime()`，不能写 `extract(hour from create_time)` ——
- * 后者按数据库会话时区算，容器是 UTC，整张分布图会整体左移 8 小时。
+ * 今天的提交一天也就几百到一千来条，整批拉回来在进程里分组，比写五六条各自 group by 的
+ * SQL 好读，也只扫一遍 `create_time` 索引。
  */
 submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, async (c) => {
+  const user = c.get("user")
   /**
-   * 「提交列表对学生全开」关掉时（考试那种场合）不给热门题这张表 —— 总数、正确率
+   * 「提交列表对学生全开」关掉时（考试那种场合）不给题目这张表 —— 总数、正确率
    * 这些聚合数原本就从公开的 today-count 看得出来，但「哪几道题在被刷」已经贴近
    * 提交列表本身的内容了，得跟着同一个开关走。数字照给，不然标签说 21、弹框说 0。
    */
   const showProblems =
-    (await getBooleanOption("submission_list_show_all", true)) || isAdminRole(c.get("user"))
-  const where = and(
-    isNull(schema.submission.contestId),
-    sql`${schema.submission.createTime} >= ${dayStart()}`,
-  )
-  const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
-  const judgingFilter = sql`count(*) filter (where ${inArray(schema.submission.result, UNJUDGED_RESULTS)})`
-  const hour = sql<number>`extract(hour from ${localTime(schema.submission.createTime)})::int`
-
-  const [[totals], hourRows, languageRows, resultRows, problemRows] = await Promise.all([
+    (await getBooleanOption("submission_list_show_all", true)) || isAdminRole(user)
+  const teacher = isTeacherOrAbove(user)
+  const since = dayStart()
+  const [rows, [flow]] = await Promise.all([
+    db.execute<TodayRow>(sql`
+      select u.class_name, s.problem_id, p._id as display_id, p.title, p.visible,
+        s.problemset_id, s.user_id, s.result, s.language, s.create_time
+      from ${schema.submission} s
+      join ${schema.problem} p on p.id = s.problem_id
+      left join ${schema.user} u on u.id = s.user_id
+      where s.contest_id is null and s.create_time >= ${since}
+    `),
     db
-      .select({
-        total: count(),
-        accepted: acceptedFilter.mapWith(Number),
-        judging: judgingFilter.mapWith(Number),
-        userCount: sql<number>`count(distinct ${schema.submission.userId})`.mapWith(Number),
-      })
-      .from(schema.submission)
-      .where(where),
-    db.select({ hour, value: count() }).from(schema.submission).where(where).groupBy(hour),
-    db
-      .select({ language: schema.submission.language, value: count() })
-      .from(schema.submission)
-      .where(where)
-      .groupBy(schema.submission.language)
-      .orderBy(desc(count())),
-    db
-      .select({ result: schema.submission.result, value: count() })
-      .from(schema.submission)
-      .where(where)
-      .groupBy(schema.submission.result)
-      .orderBy(desc(count())),
-    showProblems
-      ? db
-          .select({
-            displayId: schema.problem.displayId,
-            title: schema.problem.title,
-            value: count(),
-            accepted: acceptedFilter.mapWith(Number),
-          })
-          .from(schema.submission)
-          .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
-          // 隐藏题目不出现在这张表里：接口不需要登录，标题本身就是不该外露的东西
-          .where(and(where, eq(schema.problem.visible, true)))
-          .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title)
-          .orderBy(desc(count()))
-          .limit(10)
-      : [],
+      .select({ value: count() })
+      .from(schema.flowchartSubmission)
+      .where(sql`${schema.flowchartSubmission.createTime} >= ${since}`),
   ])
 
-  const total = totals?.total ?? 0
-  const judging = totals?.judging ?? 0
-  const hours = Array.from({ length: 24 }, () => 0)
-  for (const row of hourRows) hours[row.hour] = row.value
+  const isAccepted = (row: TodayRow) => ACCEPTED_RESULTS.includes(row.result)
+  const isJudging = (row: TodayRow) => UNJUDGED_RESULTS.includes(row.result)
+  const rate = (list: TodayRow[]) => {
+    const judging = list.filter(isJudging).length
+    return judgedRate(list.filter(isAccepted).length, list.length - judging)
+  }
+  const distinctUsers = (list: TodayRow[]) => new Set(list.map((row) => row.user_id)).size
+  const acceptedUsers = (list: TodayRow[]) =>
+    new Set(list.filter(isAccepted).map((row) => row.user_id)).size
+  const groupBy = <K>(list: TodayRow[], key: (row: TodayRow) => K) => {
+    const map = new Map<K, TodayRow[]>()
+    for (const row of list) map.set(key(row), [...(map.get(key(row)) ?? []), row])
+    return map
+  }
+  const countBy = <K>(list: TodayRow[], key: (row: TodayRow) => K) =>
+    [...groupBy(list, key)]
+      .map(([value, group]) => ({ value, count: group.length }))
+      .sort((a, b) => b.count - a.count)
+
+  const judging = rows.filter(isJudging).length
+  const byProblem = groupBy(rows, (row) => row.problem_id)
+  const mineRows = user ? rows.filter((row) => row.user_id === user.id) : []
+
+  // ---------- 学生：大家都在做 ----------
+  const problems = showProblems
+    ? [...byProblem.values()]
+        .filter((list) => list[0]!.visible)
+        .map((list) => {
+          const mine = user ? list.filter((row) => row.user_id === user.id) : []
+          return {
+            problemDisplayId: list[0]!.display_id,
+            problemTitle: list[0]!.title,
+            userCount: distinctUsers(list),
+            acceptedUsers: acceptedUsers(list),
+            mine: !user
+              ? null
+              : mine.some(isAccepted)
+                ? ("accepted" as const)
+                : mine.length
+                  ? ("tried" as const)
+                  : ("none" as const),
+          }
+        })
+        .sort((a, b) => b.userCount - a.userCount)
+        .slice(0, 8)
+    : []
+
+  // ---------- 老师：哪几个班上了课、错得最多的题 ----------
+  let classes: TodaySubmissionStatistics["classes"] = null
+  let scattered: TodaySubmissionStatistics["scattered"] = null
+  let hardProblems: TodaySubmissionStatistics["hardProblems"] = null
+  if (teacher) {
+    const byClass = groupBy(rows, (row) => row.class_name)
+    const lessonClasses: { className: string; list: TodayRow[]; problemCount: number }[] = []
+    scattered = []
+    for (const [className, list] of byClass) {
+      const problemCount = className
+        ? [...groupBy(list, (row) => row.problem_id).values()].filter(
+            (group) => distinctUsers(group) >= TODAY_LESSON_MIN_USERS,
+          ).length
+        : 0
+      if (className && problemCount) lessonClasses.push({ className, list, problemCount })
+      else scattered.push({ className, userCount: distinctUsers(list), total: list.length })
+    }
+    scattered.sort((a, b) =>
+      a.className === null ? 1 : b.className === null ? -1 : b.total - a.total,
+    )
+    const sizes = lessonClasses.length
+      ? await db
+          .select({ className: schema.user.className, value: count() })
+          .from(schema.user)
+          .where(
+            and(
+              inArray(
+                schema.user.className,
+                lessonClasses.map((item) => item.className),
+              ),
+              eq(schema.user.adminType, "Regular User"),
+              eq(schema.user.isDisabled, false),
+            ),
+          )
+          .groupBy(schema.user.className)
+      : []
+    const liveSince = new Date(Date.now() - TODAY_LIVE_MINUTES * 60_000).toISOString()
+    classes = lessonClasses
+      .map(({ className, list, problemCount }) => {
+        const times = list.map((row) => row.create_time).sort()
+        return {
+          className,
+          start: times[0]!,
+          end: times.at(-1)!,
+          userCount: distinctUsers(list),
+          classSize: sizes.find((row) => row.className === className)?.value ?? 0,
+          problemCount,
+          fromProblemSet: list.filter((row) => row.problemset_id !== null).length * 2 > list.length,
+          total: list.length,
+          correctRate: rate(list),
+          live: times.at(-1)! >= liveSince,
+        }
+      })
+      .sort((a, b) => a.start.localeCompare(b.start))
+    const failedOf = (list: TodayRow[]) => list.filter((row) => !isAccepted(row) && !isJudging(row))
+    hardProblems = [...byProblem.values()]
+      .filter((list) => failedOf(list).length > 0)
+      .sort((a, b) => failedOf(b).length - failedOf(a).length)
+      .slice(0, 6)
+      .map((list) => ({
+        problemDisplayId: list[0]!.display_id,
+        problemTitle: list[0]!.title,
+        className: countBy(list, (row) => row.class_name)[0]?.value ?? null,
+        total: list.length,
+        accepted: list.filter(isAccepted).length,
+        failures: countBy(failedOf(list), (row) => row.result).map(({ value, count }) => ({
+          result: value,
+          count,
+        })),
+        userCount: distinctUsers(list),
+        acceptedUsers: acceptedUsers(list),
+      }))
+  }
 
   return success(c, {
-    total,
-    accepted: totals?.accepted ?? 0,
+    asOf: new Date().toISOString(),
+    total: rows.length,
+    accepted: rows.filter(isAccepted).length,
     judging,
-    correctRate: judgedRate(totals?.accepted ?? 0, total - judging),
-    userCount: totals?.userCount ?? 0,
-    hours,
-    languages: languageRows.map((row) => ({
-      language: row.language,
-      count: row.value,
+    correctRate: rate(rows),
+    userCount: distinctUsers(rows),
+    flowchartCount: flow?.value ?? 0,
+    languages: countBy(rows, (row) => row.language).map(({ value, count }) => ({
+      language: value,
+      count,
     })),
-    results: resultRows.map((row) => ({
-      result: row.result,
-      count: row.value,
+    results: countBy(rows, (row) => row.result).map(({ value, count }) => ({
+      result: value,
+      count,
     })),
-    problems: problemRows.map((row) => ({
-      problemDisplayId: row.displayId,
-      problemTitle: row.title,
-      count: row.value,
-      acceptedCount: row.accepted,
-    })),
+    me: user
+      ? {
+          total: mineRows.length,
+          solved: new Set(mineRows.filter(isAccepted).map((row) => row.problem_id)).size,
+        }
+      : null,
+    problems,
+    classes,
+    scattered,
+    hardProblems,
   } satisfies TodaySubmissionStatistics)
 })
 

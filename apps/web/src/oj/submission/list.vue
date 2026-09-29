@@ -1068,14 +1068,13 @@ function dayBreak(index: number) {
     </n-drawer-content>
   </n-drawer>
 
-  <n-modal
-    v-model:show="todayPanel"
-    preset="card"
-    :style="{ maxWidth: isDesktop && '700px', maxHeight: '80vh' }"
-    :content-style="{ overflow: 'auto' }"
-    title="今日提交统计"
-  >
-    <TodayStatistics @open-problem="(id: string) => openProblem({ problemDisplayId: id } as Row)" />
+  <!-- 标题栏在组件里：要写「截至几点」「判题中几条」，只有拉到数之后才知道 -->
+  <n-modal v-model:show="todayPanel">
+    <TodayStatistics
+      @close="todayPanel = false"
+      @loaded="(total: number) => (todayCount = total)"
+      @open-problem="(id: string) => openProblem({ problemDisplayId: id } as Row)"
+    />
   </n-modal>
 </template>
 
