@@ -7,10 +7,13 @@
 # 服务器自己编的能力**没有砍掉**：docker/deploy.sh 不带 --prebuilt 就是原来的
 # 行为（ARTIFACTS=build），只要机器上有 docker 就能手动部署，不依赖这个工作流。
 #
-# 触发的是 push 到 **github** 这个 remote（origin 是 git.xuyue.cc，平时那次
-# push 不会触发）：
+# 触发的是 push 到 **github** 这个 remote：
 #
 #   git push github main
+#
+# origin（git.xuyue.cc）是 Gitea，仓库里没有 .gitea/workflows 时它的 Actions 会退回来
+# 读这份 .github/workflows，每次 push origin 都会把部署再跑一遍 —— 那边不需要。
+# 所以下面 job 上卡了 server_url：只在 GitHub 上跑，Gitea 上直接跳过。
 #
 # 仓库 Settings → Secrets 需要两个：
 #   HOST  服务器地址
@@ -45,6 +48,7 @@ env:
 
 jobs:
   deploy:
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

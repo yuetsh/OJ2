@@ -64,7 +64,9 @@ cd OJ2 && docker/deploy.sh              # 马上重新部署，api / worker 带�
 
 `.github/workflows/deploy.yml` —— 在 runner 上编好产物、rsync 到服务器、在服务器上
 跑 `docker/deploy.sh --prebuilt`。触发的是 push 到 **github** 这个 remote
-（`origin` 是 `git.xuyue.cc`，平时那次 push 不触发）：
+（`origin` 是 `git.xuyue.cc`，平时那次 push 不触发 —— 那边是 Gitea，没有
+`.gitea/workflows` 时它的 Actions 会退回来读这份工作流，所以 job 上卡了
+`github.server_url == 'https://github.com'`，在 Gitea 上直接跳过）：
 
 ```bash
 git push github main
