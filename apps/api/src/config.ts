@@ -73,6 +73,7 @@ const envSchema = z.object({
     ? z.preprocess(blankAsUnset, z.string({ error: "编译形态下必须设置" }))
     : z.preprocess(blankAsUnset, z.string().optional()),
   JUDGE_CONCURRENCY: positiveInt(2),
+  TRIAL_CONCURRENCY: positiveInt(2),
   AVATAR_DIRECTORY: text("data/avatar"),
   TEST_CASE_DIRECTORY: text("data/test_case"),
   UPLOAD_DIRECTORY: text("data/upload"),
@@ -143,6 +144,8 @@ export const config = {
   judgeServerUrl: env.JUDGE_SERVER_URL,
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: env.JUDGE_CONCURRENCY,
+  /** 试运行（运行例子 / 自己输入）同时在判题机上跑几批，见 judge/trial.ts */
+  trialConcurrency: env.TRIAL_CONCURRENCY,
   avatarDirectory: repoPath(env.AVATAR_DIRECTORY),
   // 判题沙箱把这个目录挂成只读的 /test_case，两边必须指同一处
   testCaseDirectory: repoPath(env.TEST_CASE_DIRECTORY),

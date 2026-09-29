@@ -51,9 +51,9 @@ const { isDesktop } = useBreakpoints()
 const theme = useThemeVars()
 
 /**
- * 「运行例子」：用题目里的例子试跑（Judge0），结果在左栏「结果」页签。顶替原来题面里
+ * 「运行例子」：用题目里的例子试跑（本站判题机），结果在左栏「结果」页签。顶替原来题面里
  * 每个例子旁的「测试」按钮 —— 那个在左栏、离编辑器远，只给通过 / 不通过、2 秒后复位。
- * Judge0 跑不了 SQL，流程图也没得跑；没有例子的题不给。
+ * SQL 不走判题机，流程图也没得跑；没有例子的题不给。
  */
 const submissionStore = useSubmissionStore()
 const { samplesRunning } = submissionStore.trial

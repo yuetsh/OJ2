@@ -13,10 +13,21 @@ import TrialErrorNote from "./TrialErrorNote.vue"
  */
 
 const submissionStore = useSubmissionStore()
-const { customInput, customOutput, customResult, customRunning } = submissionStore.trial
+const {
+  customInput,
+  customOutput,
+  customResult,
+  customNote,
+  customRuntimeError,
+  customCode,
+  customRunning,
+} = submissionStore.trial
 const { problem } = storeToRefs(useProblemStore())
 const codeStore = useCodeStore()
 const theme = useThemeVars()
+const route = useRoute()
+// 比赛里出错只给按结果码的那一句，不说第几行、为什么（和「运行例子」一样）
+const inContest = computed(() => !!route.params.contestID)
 
 function fillSample(input: string) {
   customInput.value = input
@@ -61,6 +72,10 @@ function fillSample(input: string) {
       :result="customResult"
       :output="customOutput"
       :language="codeStore.code.language"
+      :note="customNote"
+      :runtime-error="customRuntimeError"
+      :code="customCode"
+      :plain="inContest"
     />
     <pre v-else class="output" :class="{ empty: !customOutput }">{{
       customResult === null ? "" : customOutput || "（什么都没有输出）"

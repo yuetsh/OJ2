@@ -37,7 +37,14 @@ export const judgeLanguageSchema = z.enum(["C", "C++", "Python", "Java", "JavaSc
  */
 export const problemLanguageSchema = z.enum([...judgeLanguageSchema.options, "SQL", "Flowchart"])
 
+/**
+ * 判题沙箱**现在**跑得了的语言，就是 `apps/api/src/judge/languages.ts` 里那三块。
+ * 试运行（`POST /trial-runs`）只收这几个：历史语言交上来只会在判题机那边报系统错误。
+ */
+export const runnableLanguageSchema = judgeLanguageSchema.extract(["C", "C++", "Python"])
+
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
+export type RunnableLanguage = z.infer<typeof runnableLanguageSchema>
 export type ProblemLanguage = z.infer<typeof problemLanguageSchema>
 
 /**

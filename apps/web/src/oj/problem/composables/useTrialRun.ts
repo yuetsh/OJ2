@@ -1,51 +1,96 @@
-import { createTestSubmission } from "utils/judge"
+import type { StatisticInfo, TrialRunResponse } from "@oj2/contract"
+import { errorMessage } from "utils/api"
 import { SubmissionStatus } from "utils/constants"
+import { isRunnableLanguage, trialRun } from "utils/judge"
 import type { Code } from "utils/types"
 
 /**
- * 试跑：「运行例子」和「自己输入」。走 Judge0（utils/judge.ts），不经过判题机、不算提交。
+ * 试跑：「运行例子」和「自己输入」。走本站判题机（utils/judge.ts → POST /trial-runs），
+ * 不算提交。和提交是同一台判题机、同一套编译命令、这道题的时间内存限制和代码模板，
+ * 所以例子上跑出来什么样，提交在这几个例子上就是什么样。
  *
- * 编译器版本和判题机不一样（Judge0 的 C 是 GCC 9，判题机是 gcc-14 加宽松参数），
- * 所以这里的结果偶尔会和提交不一致 —— 这是拍板过的取舍（设计文档第 3 节决定 3）。
+ * 结果码就是判题机那套（SubmissionStatus），直接交给 WrongAnswerExplain 和 JUDGE_STATUS。
+ * 对不对也是判题机比的（去掉末尾空白再比，和提交一样），这边不再自己比。
  */
 
-/** Judge0 的状态码（见 Judge0 的 /statuses）。同步调用（wait=true）只会拿到终态 */
-const JUDGE0_ACCEPTED = 3
-const JUDGE0_TIME_LIMIT = 5
-const JUDGE0_COMPILE_ERROR = 6
-const isJudge0RuntimeError = (status: number) => status >= 7 && status <= 12
-
-/**
- * Python 的语法错误。Judge0 的 Python 没有编译这一步，SyntaxError 回来的是运行时错误
- * （status 11），得看回溯的最后一行才认得出来
- */
-const PYTHON_SYNTAX_ERROR = /^(SyntaxError|IndentationError|TabError): /m
-
-/**
- * 把 Judge0 的状态换成判题机那套码，好直接交给 WrongAnswerExplain 和 JUDGE_STATUS。
- * 跑完、只是输出对不上的，按答案错误算。Python 的语法错误按编译失败算：
- * 学生最常犯的中文冒号、中文括号，原来在这里被说成「程序运行到一半出错……下标有没有越界」
- */
-export function trialStatus(status: number | null, passed: boolean, output: string) {
-  if (status === JUDGE0_ACCEPTED) {
-    return passed ? SubmissionStatus.accepted : SubmissionStatus.wrong_answer
-  }
-  if (status === JUDGE0_TIME_LIMIT) return SubmissionStatus.real_time_limit_exceeded
-  if (status === JUDGE0_COMPILE_ERROR) return SubmissionStatus.compile_error
-  if (status !== null && isJudge0RuntimeError(status)) {
-    return PYTHON_SYNTAX_ERROR.test(output)
-      ? SubmissionStatus.compile_error
-      : SubmissionStatus.runtime_error
-  }
-  return SubmissionStatus.system_error
+/** 试跑的是哪道题：按这道题的限制和模板跑 */
+export interface TrialTarget {
+  problemId: number
+  contestId: number | null
 }
 
+/** 一组跑下来的结果 */
+interface TrialOutcome {
+  result: SubmissionStatus
+  output: string
+  /** 没跑成、或者要换一种说法时给学生看的中文，有它就不用 TrialErrorNote 的默认说明 */
+  note?: string
+  /** 运行时错误的诊断（第几行、什么异常），和提交的同一套，交给 RuntimeErrorExplain */
+  runtimeError?: NonNullable<StatisticInfo["runtime_error"]>
+}
+
+const TOO_MUCH_OUTPUT =
+  "程序输出太多了，一直停不下来：多半是循环没有结束的条件（条件一直成立、循环变量忘了改），在不停地打印。"
+
 /**
- * 判题机比的是去掉末尾空白之后的输出（JudgeServer 的 stripped_output_md5），
- * 这里两边都去。原来题目页的「测试」按钮只 trim 了运行输出，样例输出末尾带个
- * 空格或换行，就永远显示「不通过」。
+ * 把一次试跑的回包摊成每组一条。编译没过就每组都是编译失败、带同一份报错；
+ * 输出太多的时候判题机回包被掐断了，分不出是哪一组，每组都挂上同一句说明。
  */
-const sameOutput = (output: string, expected: string) => output.trimEnd() === expected.trimEnd()
+function outcomes(response: TrialRunResponse, count: number): TrialOutcome[] {
+  if (response.status === "compile-error") {
+    return Array.from({ length: count }, () => ({
+      result: SubmissionStatus.compile_error,
+      output: response.message,
+    }))
+  }
+  if (response.status === "too-much-output") {
+    return Array.from({ length: count }, () => ({
+      result: SubmissionStatus.runtime_error,
+      output: "",
+      note: TOO_MUCH_OUTPUT,
+    }))
+  }
+  // 跑完了（对或错）只去掉末尾空白（print 带的那个换行），判题机比对时也不看它；
+  // 开头的空格是输出的一部分（打印菱形、三角形），不能动
+  return response.cases.map((item) => {
+    const result = item.result as SubmissionStatus
+    const finished =
+      result === SubmissionStatus.accepted || result === SubmissionStatus.wrong_answer
+    return {
+      result,
+      output: finished ? item.output.trimEnd() : item.output,
+      ...(item.runtimeError ? { runtimeError: item.runtimeError } : {}),
+    }
+  })
+}
+
+async function runCases(
+  code: Code,
+  target: TrialTarget,
+  cases: { input: string; output?: string }[],
+): Promise<TrialOutcome[]> {
+  if (!isRunnableLanguage(code.language)) {
+    return cases.map(() => ({
+      result: SubmissionStatus.system_error,
+      output: "",
+      note: `${code.language} 不能试运行`,
+    }))
+  }
+  try {
+    const response = await trialRun({
+      problemId: target.problemId,
+      contestId: target.contestId ?? undefined,
+      language: code.language,
+      code: code.value,
+      cases,
+    })
+    return outcomes(response, cases.length)
+  } catch (error) {
+    // 后端的文案是给学生看的（「上一次还没跑完」「试运行的人太多了」）
+    const note = errorMessage(error, "试跑的服务暂时连不上，稍后再试一次。")
+    return cases.map(() => ({ result: SubmissionStatus.system_error, output: "", note }))
+  }
+}
 
 export interface SampleRun {
   /** 第几个例子，0 起 */
@@ -53,8 +98,9 @@ export interface SampleRun {
   input: string
   expected: string
   output: string
-  /** 换算成判题机那套码之后的结果，见 trialStatus */
   result: SubmissionStatus
+  note?: string
+  runtimeError?: TrialOutcome["runtimeError"]
 }
 
 export function useTrialRun() {
@@ -68,6 +114,10 @@ export function useTrialRun() {
   const customInput = ref("")
   const customOutput = ref("")
   const customResult = ref<SubmissionStatus | null>(null)
+  const customNote = ref("")
+  const customRuntimeError = ref<TrialOutcome["runtimeError"] | null>(null)
+  /** 跑「自己输入」时用的那份代码：出错那一行要从它里面摆出来，编辑器里可能已经改了 */
+  const customCode = ref("")
   const customRunning = ref(false)
 
   /**
@@ -77,44 +127,37 @@ export function useTrialRun() {
   let samplesGeneration = 0
   let customGeneration = 0
 
-  async function runOne(code: Code, input: string) {
-    try {
-      return await createTestSubmission(code, input)
-    } catch {
-      return { status: null, output: "" }
-    }
-  }
-
-  async function runSamples(code: Code, samples: { input: string; output: string }[]) {
+  async function runSamples(
+    code: Code,
+    target: TrialTarget,
+    samples: { input: string; output: string }[],
+  ) {
     const mine = ++samplesGeneration
     samplesRunning.value = true
-    // 例子一般两三个，一起发
-    const outputs = await Promise.all(samples.map((sample) => runOne(code, sample.input)))
+    const runs = await runCases(code, target, samples)
     if (mine !== samplesGeneration) return
-    sampleRuns.value = samples.map((sample, index) => {
-      const run = outputs[index]!
-      const passed = run.status === JUDGE0_ACCEPTED && sameOutput(run.output, sample.output)
-      return {
-        index,
-        input: sample.input,
-        expected: sample.output,
-        output: run.output,
-        result: trialStatus(run.status, passed, run.output),
-      }
-    })
+    sampleRuns.value = samples.map((sample, index) => ({
+      index,
+      input: sample.input,
+      expected: sample.output,
+      ...runs[index]!,
+    }))
     samplesRunAt.value = new Date().toISOString()
     samplesCode.value = code
     samplesRunning.value = false
   }
 
-  async function runCustom(code: Code) {
+  async function runCustom(code: Code, target: TrialTarget) {
     const mine = ++customGeneration
     customRunning.value = true
-    const run = await runOne(code, customInput.value)
+    // 自己输入的没有标准答案，不给 output：跑完没出错就算「对」
+    const [run] = await runCases(code, target, [{ input: customInput.value }])
     if (mine !== customGeneration) return
-    customOutput.value = run.output
-    // 自己输入的没有标准答案，跑完就算「对」，只看有没有出错
-    customResult.value = trialStatus(run.status, true, run.output)
+    customOutput.value = run!.output
+    customResult.value = run!.result
+    customNote.value = run!.note ?? ""
+    customRuntimeError.value = run!.runtimeError ?? null
+    customCode.value = code.value
     customRunning.value = false
   }
 
@@ -129,6 +172,9 @@ export function useTrialRun() {
     customInput.value = ""
     customOutput.value = ""
     customResult.value = null
+    customNote.value = ""
+    customRuntimeError.value = null
+    customCode.value = ""
     customRunning.value = false
   }
 
@@ -140,6 +186,9 @@ export function useTrialRun() {
     customInput,
     customOutput,
     customResult,
+    customNote,
+    customRuntimeError,
+    customCode,
     customRunning,
     runSamples,
     runCustom,

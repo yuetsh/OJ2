@@ -2,7 +2,7 @@ import { z } from "zod"
 
 import { paginatedSchema } from "./common"
 import { judgeStatusSchema, type JudgeStatus } from "./judge-status"
-import { problemLanguageSchema } from "./language"
+import { problemLanguageSchema, runnableLanguageSchema } from "./language"
 
 /**
  * 判题机原始输出（`submission.info` 的 JSONB 原文）。**只是类型，不作运行时校验。**
@@ -454,6 +454,63 @@ export const formatCodeRequestSchema = z.object({
 
 export const formatCodeResponseSchema = z.object({ code: z.string() })
 
+/** 试运行一次最多几组。学生那边只有「运行例子」（一般两三个）和「自己输入」（一个） */
+export const TRIAL_MAX_CASES = 10
+/** 后台「生成测试点」一次跑的组数上限，只有管理员能用到 */
+export const TRIAL_ADMIN_MAX_CASES = 50
+
+/**
+ * 试运行：「运行例子」「自己输入」、后台「生成测试点」。走本站判题机，不落库、不算提交。
+ *
+ * - 带 `problemId`：按这道题的时间 / 内存限制和代码模板跑，和提交一个口径；
+ * - 不带：只有管理员能这么调（后台生成测试点时题目可能还没存）。
+ *
+ * `output` 是这组的正确输出，给了就由判题机比对（和提交一样去掉末尾空白再比），
+ * 结果是通过 / 答案错误；不给（「自己输入」、生成测试点）就只看有没有跑出错。
+ */
+export const trialRunRequestSchema = z.object({
+  problemId: z.number().int().positive().optional(),
+  contestId: z.number().int().positive().optional(),
+  language: runnableLanguageSchema,
+  code: z
+    .string()
+    .min(1)
+    .max(1024 * 1024),
+  cases: z
+    .array(
+      z.object({
+        input: z.string().max(1024 * 1024),
+        output: z
+          .string()
+          .max(1024 * 1024)
+          .optional(),
+      }),
+    )
+    .min(1)
+    .max(TRIAL_ADMIN_MAX_CASES),
+})
+
+/**
+ * - `done`：每组一条，顺序和请求里的 `cases` 一致。`result` 是判题机那套码；
+ *   没给正确输出的组，跑完没出错就是通过。`output` 里 stdout 和 stderr 是混在一起的
+ *   （判题机把两者写进同一个文件），Python 的报错原文就在这里。运行时错误的组另带
+ *   `runtimeError`：和提交的 `statistic_info.runtime_error` 同一个解析（第几行、什么异常），
+ *   解析不出来时没有这个字段。
+ * - `compile-error`：编译没过（Python 是语法错误），一组都没跑。
+ * - `too-much-output`：程序输出多到判题机回包超过上限，多半是死循环在不停打印。
+ */
+export type TrialRunResponse =
+  | {
+      status: "done"
+      cases: {
+        result: JudgeStatus
+        output: string
+        runtimeError?: NonNullable<StatisticInfo["runtime_error"]>
+      }[]
+    }
+  | { status: "compile-error"; message: string }
+  | { status: "too-much-output" }
+
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type SubmissionTrace = z.infer<typeof submissionTraceSchema>
 export type CreateSubmissionRequest = z.infer<typeof createSubmissionRequestSchema>
@@ -473,3 +530,4 @@ export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSc
 export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>
 
 export type FormatCodeRequest = z.infer<typeof formatCodeRequestSchema>
+export type TrialRunRequest = z.infer<typeof trialRunRequestSchema>

@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { TRIAL_ADMIN_MAX_CASES } from "@oj2/contract"
 import type { LANGUAGE, Testcase } from "utils/types"
+import { errorMessage } from "utils/api"
+import { SubmissionStatus } from "utils/constants"
 import { createZipBlob } from "utils/functions"
-import { createTestSubmission } from "utils/judge"
+import { isRunnableLanguage, trialRun } from "utils/judge"
 import { uploadTestcases } from "../../api"
 
 interface FileEntry {
@@ -146,25 +149,45 @@ async function run() {
   // 清空旧输出
   files.value = files.value.map((f) => ({ ...f, out: "", error: false }))
 
+  // 走本站判题机（和判题同一套编译命令），不带题号：题目可能还没存，按后端给管理员的默认限制跑。
+  // 一次最多 TRIAL_ADMIN_MAX_CASES 组，多了分几批
+  const language = selectedLanguage.value
+  if (!isRunnableLanguage(language)) {
+    message.error(`${language} 不能用来生成测试点`)
+    return
+  }
   isRunning.value = true
-  await Promise.all(
-    files.value.map(async (_, i) => {
-      try {
-        const result = await createTestSubmission(
-          { language: selectedLanguage.value, value: answer.code },
-          files.value[i].in,
-        )
-        files.value[i] = {
-          ...files.value[i],
-          out: result.output,
-          error: result.status !== 3,
+  try {
+    for (let start = 0; start < files.value.length; start += TRIAL_ADMIN_MAX_CASES) {
+      const batch = files.value.slice(start, start + TRIAL_ADMIN_MAX_CASES)
+      const response = await trialRun({
+        language,
+        code: answer.code,
+        cases: batch.map((f) => ({ input: f.in })),
+      })
+      batch.forEach((_, offset) => {
+        const i = start + offset
+        if (response.status === "compile-error") {
+          files.value[i] = { ...files.value[i], out: response.message, error: true }
+        } else if (response.status === "too-much-output") {
+          files.value[i] = { ...files.value[i], out: "输出太多，判题机回包超过上限", error: true }
+        } else {
+          const run = response.cases[offset]!
+          const ok = run.result === SubmissionStatus.accepted
+          files.value[i] = {
+            ...files.value[i],
+            out: ok ? run.output.trimEnd() : run.output,
+            error: !ok,
+          }
         }
-      } catch {
-        files.value[i] = { ...files.value[i], out: "", error: true }
-      }
-    }),
-  )
-  isRunning.value = false
+      })
+    }
+  } catch (err) {
+    message.error(errorMessage(err, "运行失败"))
+    files.value = files.value.map((f) => (f.out ? f : { ...f, error: true }))
+  } finally {
+    isRunning.value = false
+  }
 }
 
 async function upload() {

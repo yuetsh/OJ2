@@ -168,7 +168,6 @@ Env files: `.env`（本机）、`.env.production`（服务器）、`.env.staging
 |---|---|
 | `PUBLIC_ENV` | 环境角标：`test` → 「测试版」，`dev` → 「开发版」，其余不显示 |
 | `PUBLIC_CODE_URL` | 代码分享服务（提交详情、题目页的「分享」） |
-| `PUBLIC_JUDGE0_URL` | Judge0 API（`utils/judge.ts` 的在线运行） |
 | `PUBLIC_MAXKB_URL` | 知识库问答挂件 |
 | `PUBLIC_ICONIFY_URL` | 自建 Iconify 图标源，不设则走公共 CDN |
 

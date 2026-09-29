@@ -17,7 +17,7 @@ const submissionStore = useSubmissionStore()
 const { samplesRunning } = submissionStore.trial
 const { problem } = storeToRefs(useProblemStore())
 
-// 和工具栏同一个条件：Judge0 跑不了 SQL，流程图没得跑，没有例子的题不给
+// 和工具栏同一个条件：SQL 不走判题机、流程图没得跑，没有例子的题不给
 const canRunSamples = computed(
   () =>
     !!problem.value?.samples.length &&

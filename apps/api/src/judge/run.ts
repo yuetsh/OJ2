@@ -25,7 +25,7 @@ import { readInfo } from "../services/test-case"
 import { readFile } from "node:fs/promises"
 import { resolve as resolvePath } from "node:path"
 
-interface JudgeCase {
+export interface JudgeCase {
   cpu_time: number
   memory: number
   result: number
@@ -35,17 +35,17 @@ interface JudgeCase {
   [key: string]: unknown
 }
 
-interface JudgeResponse {
+export interface JudgeResponse {
   err: string | null
   data: JudgeCase[] | unknown
 }
 
-function statusValue(value: number): JudgeStatusValue {
+export function statusValue(value: number): JudgeStatusValue {
   const statuses = new Set<number>(Object.values(JudgeStatus))
   return statuses.has(value) ? (value as JudgeStatusValue) : JudgeStatus.SYSTEM_ERROR
 }
 
-function templateForLanguage(value: unknown, language: string) {
+export function templateForLanguage(value: unknown, language: string) {
   const template = asRecord(value)[language]
   return typeof template === "string" ? template : null
 }
@@ -67,16 +67,18 @@ function astRulesForLanguage(value: unknown, language: string): AstRule[] {
 
 /**
  * `testCase` 是测试点目录名（正常判题），或者内联的测试点（诊断重跑，见
- * diagnoseRuntimeError）。`output` 只在诊断时打开：它让判题机把每个测试点的
+ * diagnoseRuntimeError）。`output` 只在诊断和试运行时打开：它让判题机把每个测试点的
  * 程序输出原样带回来，正常判题开着的话，死循环打印能把 worker 内存撑爆。
+ *
+ * 只发请求、不读响应体：试运行（judge/trial.ts）要边读边数字节，超了就掐断。
  */
-async function requestJudge(
+export async function postJudge(
   language: string,
   code: string,
   timeLimit: number,
   memoryLimit: number,
   testCase: string | { input: string; output: string }[],
-  output = false,
+  { output = false, signal }: { output?: boolean; signal?: AbortSignal } = {},
 ) {
   const languageConfig = judgeConfigFor(language)
   if (!languageConfig) throw new Error(`Unsupported judge language: ${language}`)
@@ -84,6 +86,7 @@ async function requestJudge(
   const token = createHash("sha256").update(config.judgeServerToken).digest("hex")
   const response = await fetch(new URL("/judge", config.judgeServerUrl), {
     method: "POST",
+    signal,
     headers: {
       "content-type": "application/json",
       "X-Judge-Server-Token": token,
@@ -106,6 +109,18 @@ async function requestJudge(
   if (!response.ok) {
     throw new Error(`JudgeServer returned HTTP ${response.status}`)
   }
+  return response
+}
+
+async function requestJudge(
+  language: string,
+  code: string,
+  timeLimit: number,
+  memoryLimit: number,
+  testCase: string | { input: string; output: string }[],
+  output = false,
+) {
+  const response = await postJudge(language, code, timeLimit, memoryLimit, testCase, { output })
   return (await response.json()) as JudgeResponse
 }
 

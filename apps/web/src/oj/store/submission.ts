@@ -46,18 +46,24 @@ export const useSubmissionStore = defineStore("submission", () => {
     resultSeq.value++
   }
 
-  /** 用题目里的例子试跑（Judge0），不算提交 */
+  /** 用题目里的例子试跑（本站判题机），不算提交 */
   function runSamples() {
     const problem = problemStore.problem
     if (!problem?.samples.length) return
     revealResult("samples")
-    trial.runSamples({ ...codeStore.code }, problem.samples)
+    trial.runSamples(
+      { ...codeStore.code },
+      { problemId: problem.id, contestId: problem.contestId },
+      problem.samples,
+    )
   }
 
   /** 用「自己输入」框里的数据跑一次 */
   function runCustom() {
+    const problem = problemStore.problem
+    if (!problem) return
     revealResult("custom")
-    trial.runCustom({ ...codeStore.code })
+    trial.runCustom({ ...codeStore.code }, { problemId: problem.id, contestId: problem.contestId })
   }
   const isFormatting = ref(false)
   const isSubmittingRequest = ref(false)

@@ -80,7 +80,7 @@ const codeSegments = computed<{ value: Segment; label: string; time: string }[]>
 /** 正在画流程图：结果就是 AI 的点评，没有例子可跑 */
 const drawing = computed(() => codeStore.code.language === "Flowchart")
 
-// 试跑走 Judge0，它跑不了 SQL；流程图也没得跑。这两种只留「提交结果」
+// 试跑走判题机，SQL 题不走那里；流程图也没得跑。这两种只留「提交结果」
 const canTrial = computed(() => {
   const languages = problem.value?.languages ?? []
   return !languages.includes("SQL")

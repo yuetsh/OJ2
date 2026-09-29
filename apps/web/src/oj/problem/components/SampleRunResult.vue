@@ -20,6 +20,39 @@ const failedCount = computed(
   () => sampleRuns.value.filter((run) => run.result !== SubmissionStatus.accepted).length,
 )
 
+/**
+ * 一个例子都没跑起来：编译 / 语法没过，或者试跑服务本身没跑成（排队满了、判题机连不上）。
+ * 这时不能说「N 个例子没对上」—— 程序一行都没跑，每个例子也都是同一个原因，芯片不摆
+ */
+const header = computed(() => {
+  const runs = sampleRuns.value
+  const first = runs[0]
+  if (first && runs.every((run) => run.result === SubmissionStatus.compile_error)) {
+    return {
+      kind: "warning" as const,
+      title:
+        samplesCode.value?.language === "Python"
+          ? "试跑：代码有语法错误，一个例子都没跑"
+          : "试跑：编译没通过，一个例子都没跑",
+      chips: false,
+    }
+  }
+  if (first?.note && runs.every((run) => run.note === first.note)) {
+    // 输出太多是程序自己的问题（多半死循环），其余带 note 的都是没跑成
+    const ran = first.result === SubmissionStatus.runtime_error
+    return {
+      kind: ran ? ("error" as const) : ("warning" as const),
+      title: ran ? "试跑：程序一直在输出，停不下来" : "试跑没跑成",
+      chips: false,
+    }
+  }
+  return {
+    kind: failedCount.value ? ("error" as const) : ("success" as const),
+    title: failedCount.value ? `试跑：${failedCount.value} 个例子没对上` : "试跑：例子都对上了",
+    chips: true,
+  }
+})
+
 /** 看的是哪一个例子：默认第一个没对上的 */
 const selected = ref(0)
 watch(sampleRuns, (runs) => {
@@ -43,12 +76,8 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
 
   <n-flex v-else vertical :size="12">
     <!-- 设计稿「运行例子：例子 2 没对上（不算提交）」：标题、「不算提交」、各例子的芯片在一行 -->
-    <ResultHeader
-      :kind="failedCount ? 'error' : 'success'"
-      :title="failedCount ? `试跑：${failedCount} 个例子没对上` : '试跑：例子都对上了'"
-      sub="（不算提交）"
-    >
-      <template #extra>
+    <ResultHeader :kind="header.kind" :title="header.title" sub="（不算提交）">
+      <template v-if="header.chips" #extra>
         <div class="runs">
           <button
             v-for="run in sampleRuns"
@@ -134,6 +163,10 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
         :result="current.result"
         :output="current.output"
         :language="samplesCode?.language ?? ''"
+        :note="current.note"
+        :runtime-error="current.runtimeError"
+        :code="samplesCode?.value ?? ''"
+        :plain="inContest"
       />
     </template>
 

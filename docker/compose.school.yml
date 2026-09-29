@@ -82,6 +82,7 @@ services:
       JUDGE_SERVER_URL: http://oj-judge:8080
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-4}
+      TRIAL_CONCURRENCY: ${TRIAL_CONCURRENCY:-4}
       AI_KEY: ${AI_KEY:-}
       AI_HINT_DIAGNOSE: ${AI_HINT_DIAGNOSE:-}
       # 机房走 http 直连 IP，没有 TLS。带 Secure 的 Cookie 浏览器不会回传，
