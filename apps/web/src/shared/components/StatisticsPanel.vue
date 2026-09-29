@@ -156,14 +156,14 @@
 <script setup lang="ts">
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
-import { getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
-import { PANEL_DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
+import { getSubmission, getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
+import { LANGUAGE_FORMAT_VALUE, PANEL_DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
 import { useConfigStore } from "../store/config"
 import { useHiddenStudents } from "../composables/hiddenStudents"
 import { useStatisticsQuery } from "../composables/statisticsQuery"
 import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
-import { NFlex, NTag, NText, NTooltip, type DataTableRowKey } from "naive-ui"
+import { NCode, NFlex, NPopover, NTag, NText, type DataTableRowKey } from "naive-ui"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import { durationFromValue, parseTime } from "utils/functions"
 import type {
@@ -243,6 +243,50 @@ function groupByProblem(list: SubmissionStatisticsItems["items"]) {
     .sort((a, b) => Number(a.solved) - Number(b.solved) || b.items.length - a.items.length)
 }
 
+/**
+ * 悬停方块时看到的代码，按提交编号缓存。
+ *
+ * 原来悬停只有「状态 · 时间 · 编号」，想看学生写了什么非得点开新页面，老师在一排
+ * 红方块之间来回对比时要开一堆标签页。代码**悬停时才拉**、不随明细一起下发：
+ * 明细一次最多 200 条、展开着每 15 秒还要重拉，而真正会被悬停的只是其中几个。
+ * 代码交了就不会再变，所以缓存不随重新统计清空（和 items 不一样）。
+ */
+type CodeState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "done"; code: string; language: string }
+
+const codes = reactive<Record<string, CodeState>>({})
+
+async function loadCode(id: string) {
+  const cached = codes[id]
+  if (cached && cached.status !== "error") return
+  codes[id] = { status: "loading" }
+  try {
+    const submission = await getSubmission(id)
+    codes[id] = {
+      status: "done",
+      code: submission.code,
+      language: LANGUAGE_FORMAT_VALUE[submission.language],
+    }
+  } catch {
+    codes[id] = { status: "error" }
+  }
+}
+
+function renderCode(id: string) {
+  const cached = codes[id]
+  if (!cached || cached.status === "loading") return h(NText, { depth: 3 }, () => "代码加载中…")
+  if (cached.status === "error")
+    return h(NText, { type: "error" }, () => "代码没拉下来，点方块打开看")
+  return h(
+    "div",
+    // 太长就在浮层里滚：鼠标移进浮层它不会消失，可以接着往下翻
+    { style: "max-height: 360px; overflow: auto" },
+    h(NCode, { code: cached.code, language: cached.language, showLineNumbers: true }),
+  )
+}
+
 function openSubmission(id: string) {
   window.open(`/submission/${id}`, "_blank", "noopener")
 }
@@ -289,8 +333,15 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
             h(NFlex, { size: 4, wrap: true, style: "flex: 1; min-width: 0" }, () =>
               group.items.map((item) =>
                 h(
-                  NTooltip,
-                  { delay: 200 },
+                  NPopover,
+                  {
+                    delay: 200,
+                    // 代码比一行提示宽得多；限宽让长行在浮层里横向滚，不把浮层撑出屏幕
+                    style: "max-width: 560px",
+                    onUpdateShow: (show: boolean) => {
+                      if (show) loadCode(item.id)
+                    },
+                  },
                   {
                     trigger: () =>
                       h("button", {
@@ -311,9 +362,17 @@ const columns: DataTableColumn<SubmissionStatisticsUser>[] = [
                         },
                       }),
                     default: () =>
-                      `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
-                      `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
-                      `${item.id.toString().slice(0, 12)}`,
+                      h(NFlex, { vertical: true, size: "small" }, () => [
+                        h(
+                          NText,
+                          { depth: 3 },
+                          () =>
+                            `${JUDGE_STATUS[item.result]?.name ?? item.result} · ` +
+                            `${parseTime(item.createTime, "MM-DD HH:mm:ss")} · ` +
+                            `${item.id.toString().slice(0, 12)}`,
+                        ),
+                        renderCode(item.id),
+                      ]),
                   },
                 ),
               ),
