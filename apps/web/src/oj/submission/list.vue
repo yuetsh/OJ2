@@ -17,7 +17,7 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { usePagination } from "shared/composables/pagination"
 import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
-import { SubmissionStatus } from "utils/constants"
+import { LANGUAGE_SHOW_VALUE, SubmissionStatus } from "utils/constants"
 import { parseTime } from "utils/functions"
 import type {
   ClassLesson,
@@ -625,10 +625,12 @@ async function retryFlowchart(id: string) {
   lastPoll = 0
 }
 
-function caseText(row: SubmissionListItem) {
-  const summary = row.caseSummary
-  if (!summary) return null
-  return { text: `${summary.passed}/${summary.total}`, full: summary.passed >= summary.total }
+/**
+ * 列表上写语言，不写「通过 1/1」：学生把那个数当成了交了几次。
+ * 差几个测试点在右栏状态下面有整句「通过 x/y 个测试点」
+ */
+function languageText(row: SubmissionListItem) {
+  return LANGUAGE_SHOW_VALUE[row.language] ?? row.language
 }
 
 /** 学生看别人的那几行：名字淡一档、带一把锁（自己的看不了是题单那道闸，另说） */
@@ -915,16 +917,7 @@ function dayBreak(index: number) {
                       题单
                     </span>
                   </span>
-                  <span class="c-case">
-                    <span
-                      v-if="caseText(row)"
-                      :style="{
-                        color: caseText(row)!.full ? theme.textColor3 : tone('error').color,
-                      }"
-                    >
-                      {{ caseText(row)!.text }}
-                    </span>
-                  </span>
+                  <span class="c-lang">{{ languageText(row) }}</span>
                   <span class="c-state"><StatusPill :result="row.result" /></span>
                   <span v-if="!teacher" class="c-lock">
                     <!-- title 放在外层 span：挂在 svg 上 Chrome 不出提示 -->
@@ -947,7 +940,7 @@ function dayBreak(index: number) {
                     <span>{{ submissionClockText(row.createTime) }}</span>
                     <span class="title">{{ row.problemDisplayId }} {{ row.problemTitle }}</span>
                     <div class="spacer"></div>
-                    <span v-if="caseText(row)">{{ caseText(row)!.text }}</span>
+                    <span>{{ languageText(row) }}</span>
                   </div>
                 </template>
               </div>
@@ -1407,12 +1400,13 @@ function dayBreak(index: number) {
   background: v-bind("tone('info').background");
 }
 
-.c-case {
-  width: 34px;
+.c-lang {
+  width: 48px;
   flex: none;
   text-align: right;
   font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: v-bind("theme.textColor3");
 }
 
 .c-state {
