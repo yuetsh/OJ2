@@ -7,6 +7,7 @@ import {
   adminRejudge,
   getClassLesson,
   getFlowchartSubmissions,
+  getSubmissionClasses,
   getSubmissions,
   getTodaySubmissionCount,
   retryFlowchartSubmission,
@@ -444,11 +445,33 @@ const languageOptions = [
   { label: "SQL", value: "SQL" },
 ]
 
+// 配置里的班级列表是「注册时能选的班」，摘掉的老班还在交，得从提交里补出来
+const activeClasses = ref<string[]>([])
+watch(
+  teacher,
+  async (isTeacher) => {
+    if (!isTeacher || activeClasses.value.length) return
+    try {
+      activeClasses.value = await getSubmissionClasses()
+    } catch {
+      // 补不上就只有配置里那些，不打扰
+    }
+  },
+  { immediate: true },
+)
+
 const classOptions = computed(() => {
   const list = configStore.config?.classList ?? []
-  // 带进来的班级不在配置里（老班、手打的）也要显示得出来，不然框里是空的却在筛
-  const all = query.className && !list.includes(query.className) ? [query.className, ...list] : list
-  return all.map((item) => ({ label: classLabel(item), value: item }))
+  const others = activeClasses.value.filter((item) => !list.includes(item)).reverse()
+  // 带进来的班级哪边都没有（手打的）也要显示得出来，不然框里是空的却在筛
+  if (query.className && !list.includes(query.className) && !others.includes(query.className))
+    others.unshift(query.className)
+  const option = (item: string) => ({ label: classLabel(item), value: item })
+  if (!others.length) return list.map(option)
+  return [
+    { type: "group", label: "班级列表", key: "listed", children: list.map(option) },
+    { type: "group", label: "不在班级列表里", key: "others", children: others.map(option) },
+  ]
 })
 
 const contestProblemOptions = computed(() => [

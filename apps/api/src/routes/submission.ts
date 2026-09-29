@@ -208,6 +208,36 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
   return success(c, row?.value ?? 0)
 })
 
+/**
+ * 近半年交过代码或流程图的班级，给提交列表的班级下拉补上网站配置里没有的那些。
+ * 配置的班级列表管的是「注册时能选哪些班」，毕业、换届的班从里面摘掉之后
+ * 还在交（生产上 247 摘了之后四个月里交了三百多条），下拉里却选不到它。
+ * 只收 3~4 位数字的班级号，`user.class_name` 里有几个手填的名字不算班。
+ */
+submissionRoutes.get("/submissions/classes", requireTeacher, async (c) => {
+  const since = new Date(Date.now() - 180 * 24 * 3600 * 1000).toISOString()
+  const active = db
+    .selectDistinct({ userId: schema.submission.userId })
+    .from(schema.submission)
+    .where(
+      and(isNull(schema.submission.contestId), sql`${schema.submission.createTime} >= ${since}`),
+    )
+    .union(
+      db
+        .selectDistinct({ userId: schema.flowchartSubmission.userId })
+        .from(schema.flowchartSubmission)
+        .where(sql`${schema.flowchartSubmission.createTime} >= ${since}`),
+    )
+    .as("active")
+  const rows = await db
+    .selectDistinct({ className: schema.user.className })
+    .from(active)
+    .innerJoin(schema.user, eq(schema.user.id, active.userId))
+    .where(sql`${schema.user.className} ~ '^[0-9]{3,4}$'`)
+    .orderBy(schema.user.className)
+  return success(c, rows.map((row) => row.className!) satisfies string[])
+})
+
 submissionRoutes.route("/", submissionStatisticsRoutes)
 
 // 老师也能重判：旧栈只给超管，前端却一直给老师亮着按钮，老师点了只会「权限不足」。

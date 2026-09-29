@@ -167,6 +167,11 @@ export function getTodaySubmissionCount(language?: string) {
   return api.get<number>("submissions/today-count", { params: { language } })
 }
 
+/** 近半年有提交的班级（老师用），补上网站配置里已经摘掉的班 */
+export function getSubmissionClasses() {
+  return api.get<string[]>("submissions/classes")
+}
+
 /** 「今日提交数」标签点开的统计。公开接口，口径同那颗标签：今天 + 非比赛提交 */
 export function getTodaySubmissionStatistics() {
   return api.get<TodaySubmissionStatistics>("submissions/today-statistics")
