@@ -408,10 +408,12 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-/* 「题目 / 结果」：下划线式页签，右边是抽屉的三个胶囊按钮 */
+/* 「题目 / 结果」：下划线式页签，右边是抽屉的三个胶囊按钮。
+   高度和右栏工具栏、抽屉头部一样是 48（设计稿画的 42）：没有上下文条时两边并排，
+   差 6px 的话两条下边线在分隔线处错成一个台阶 */
 .tab-row {
   flex: none;
-  height: 42px;
+  height: 48px;
   box-sizing: border-box;
   padding: 0 20px 0 12px;
   display: flex;
@@ -426,7 +428,7 @@ onBeforeUnmount(() => {
 }
 
 .page-tab {
-  height: 42px;
+  height: 48px;
   padding: 0 12px;
   border: 0;
   border-bottom: 2px solid transparent;
