@@ -85,8 +85,10 @@ function learnLink(type: "python" | "c") {
  * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字，窄屏收进「菜单」下拉。
  * `key` 就是一级路径，用来判定高亮（见上面的 active）。
  *
- * 一级只放天天用的（题目、题单）和课上会被点名去看的（比赛、排名）。提交、公告收进
- * 「更多」：全站的提交列表学生很少翻，自己的在个人菜单里；公告一年没几条。
+ * 顺序是 自学 / 题目 / 提交 / 题单 / 比赛 / 排名。「自学」是下拉，单独渲染在最前面，
+ * 不在这张表里。提交留在一级：学生天天回来看自己交的结果，老师课上翻全班代码也走它。
+ * 公告不上顶栏 —— 一年五六条、基本是版本更新，首页有公告卡片和「全部」入口；
+ * 只有手机菜单里留一项（见 mobileMenus）。
  * 不用 n-menu：它横排每项固定占 100px，1280 宽的机房屏上会把顶栏挤成两行。
  */
 interface NavLink {
@@ -96,46 +98,34 @@ interface NavLink {
   show?: boolean
 }
 
-const navLinks: NavLink[] = [
-  { key: "problem", label: "题目", to: "/problem" },
-  { key: "problemset", label: "题单", to: "/problemset" },
-  { key: "contest", label: "比赛", to: "/contest" },
-  { key: "rank", label: "排名", to: "/rank" },
-]
-
-const moreLinks = computed<NavLink[]>(() =>
+const navLinks = computed<NavLink[]>(() =>
   [
+    { key: "problem", label: "题目", to: "/problem" },
     { key: "submission", label: "提交", to: "/submission", show: userStore.showSubmissions },
-    { key: "announcement", label: "公告", to: "/announcement" },
+    { key: "problemset", label: "题单", to: "/problemset" },
+    { key: "contest", label: "比赛", to: "/contest" },
+    { key: "rank", label: "排名", to: "/rank" },
   ].filter((link) => link.show !== false),
 )
 
-const moreActive = computed(() => moreLinks.value.some((link) => link.key === active.value))
+const announcementLink: NavLink = { key: "announcement", label: "公告", to: "/announcement" }
 
 const learnOptions: DropdownOption[] = [
   { label: "Python", key: "learn-python", icon: renderIcon("ph:book-open") },
   { label: "C 语言", key: "learn-c", icon: renderIcon("ph:book-open") },
 ]
 
-const moreOptions = computed<DropdownOption[]>(() =>
-  moreLinks.value.map((link) => ({
-    label: link.label,
-    key: link.key,
-    icon: renderIcon(link.key === "submission" ? "ph:tray" : "ph:megaphone"),
-  })),
-)
-
 const mobileMenus = computed<DropdownOption[]>(() => [
-  ...navLinks.map((link) => ({ label: link.label, key: link.key })),
   { label: "自学", key: "learn", children: learnOptions },
-  ...moreLinks.value.map((link) => ({ label: link.label, key: link.key })),
+  ...navLinks.value.map((link) => ({ label: link.label, key: link.key })),
+  { label: announcementLink.label, key: announcementLink.key },
 ])
 
 function handleNavSelect(key: string) {
   if (key === "learn-python") router.push(learnLink("python"))
   else if (key === "learn-c") router.push(learnLink("c"))
   else {
-    const link = [...navLinks, ...moreLinks.value].find((item) => item.key === key)
+    const link = [...navLinks.value, announcementLink].find((item) => item.key === key)
     if (link) router.push(link.to)
   }
 }
@@ -246,6 +236,11 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       </n-tag>
     </RouterLink>
     <nav v-if="isDesktop" class="nav">
+      <n-dropdown trigger="hover" :options="learnOptions" @select="handleNavSelect">
+        <button type="button" class="nav-link" :class="{ active: active === 'learn' }">
+          自学<Icon icon="ph:caret-down-bold" :width="11" />
+        </button>
+      </n-dropdown>
       <RouterLink
         v-for="link in navLinks"
         :key="link.key"
@@ -255,16 +250,6 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       >
         {{ link.label }}
       </RouterLink>
-      <n-dropdown trigger="hover" :options="learnOptions" @select="handleNavSelect">
-        <button type="button" class="nav-link" :class="{ active: active === 'learn' }">
-          自学<Icon icon="ph:caret-down-bold" :width="11" />
-        </button>
-      </n-dropdown>
-      <n-dropdown trigger="hover" :options="moreOptions" @select="handleNavSelect">
-        <button type="button" class="nav-link" :class="{ active: moreActive }">
-          更多<Icon icon="ph:caret-down-bold" :width="11" />
-        </button>
-      </n-dropdown>
     </nav>
     <div class="spacer"></div>
     <div class="actions">
