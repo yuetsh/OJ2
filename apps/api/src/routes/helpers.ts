@@ -171,3 +171,21 @@ export async function matchedUsers(username: string) {
     .from(schema.user)
     .where(ilike(schema.user.username, `%${username}%`))
 }
+
+/**
+ * 题号框允许一次填几道：`1001,1005,1010`。中英文逗号、空格、分号都当分隔符 ——
+ * 老师在投影前手敲，不该因为打了个全角逗号就查不出来。
+ */
+export function parseDisplayIds(raw: string) {
+  const seen = new Set<string>()
+  const ids: string[] = []
+  for (const part of raw.split(/[,，;；\s]+/)) {
+    const id = part.trim()
+    if (!id) continue
+    const key = id.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    ids.push(id)
+  }
+  return ids
+}

@@ -189,6 +189,21 @@ export const createSubmissionResponseSchema = z.object({
   submissionId: z.string(),
 })
 
+/**
+ * 通过了几个测试点，给学生看「离 AC 还差多远」。`info` 只给管理员（每个点带
+ * output_md5），所以这里只算出两个数下发，不放开原文。
+ *
+ * 为 null 的情形：比赛提交（ACM 只报对错，多给通过数等于变相放水，和 AI 提示同口径）、
+ * SQL 题（`judge/run.ts` 遇到被杀的测试点会 break，total 偏小）、没有逐点结果
+ * （待判、编译失败）。
+ */
+export const caseSummarySchema = z
+  .object({
+    passed: z.number().int(),
+    total: z.number().int(),
+  })
+  .nullable()
+
 export const submissionDetailSchema = z.object({
   id: z.string(),
   createTime: z.string(),
@@ -210,20 +225,8 @@ export const submissionDetailSchema = z.object({
    */
   problemDisplayId: z.string(),
   showLink: z.boolean(),
-  /**
-   * 通过了几个测试点，给学生看「离 AC 还差多远」。`info` 只给管理员（每个点带
-   * output_md5），所以这里只算出两个数下发，不放开原文。
-   *
-   * 为 null 的情形：比赛提交（ACM 只报对错，多给通过数等于变相放水，和 AI 提示同口径）、
-   * SQL 题（`judge/run.ts` 遇到被杀的测试点会 break，total 偏小）、没有逐点结果
-   * （待判、编译失败）。
-   */
-  caseSummary: z
-    .object({
-      passed: z.number().int(),
-      total: z.number().int(),
-    })
-    .nullable(),
+  /** 通过了几个测试点，口径见 caseSummarySchema */
+  caseSummary: caseSummarySchema,
 })
 
 /**
@@ -277,6 +280,11 @@ export const submissionListItemSchema = z.object({
    * 回填的就是这些，其余老提交无从判断入口，一律留空。
    */
   problemSet: z.object({ id: z.number().int(), title: z.string() }).nullable(),
+  /**
+   * 通过了几个测试点，和详情同一个口径（见 caseSummarySchema）。列表上老师一眼要分出
+   * 「差一个点」和「一个都没过」，不必逐条点开。
+   */
+  caseSummary: caseSummarySchema,
 })
 
 export const submissionListSchema = paginatedSchema(submissionListItemSchema)

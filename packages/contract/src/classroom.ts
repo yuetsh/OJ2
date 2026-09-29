@@ -136,6 +136,17 @@ export const classBoardSchema = z.object({
   recentLessons: z.number().int(),
 })
 
+/**
+ * 提交列表「这节课」那颗按钮要的：哪个班、这节课是哪几道题。和课堂看板同一套取法
+ * （老师布置过就用布置的，否则按今天同班提交推断），但不带花名册 —— 列表只拿它当筛选条件。
+ * className 为 null = 没指定、最近两小时也没有哪个班在交。
+ */
+export const classLessonSchema = z.object({
+  className: z.string().nullable(),
+  source: z.enum(["teacher", "inferred"]).nullable(),
+  problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
+})
+
 export type ClassRankItem = z.infer<typeof classRankItemSchema>
 export type ClassUserRank = z.infer<typeof classUserRankSchema>
 export type ClassComparison = z.infer<typeof classComparisonSchema>
@@ -144,6 +155,7 @@ export type ClassComparisonResponse = z.infer<typeof classComparisonResponseSche
 export type ClassActivity = z.infer<typeof classActivitySchema>
 export type ClassLessonRequest = z.infer<typeof classLessonRequestSchema>
 export type ClassBoard = z.infer<typeof classBoardSchema>
+export type ClassLesson = z.infer<typeof classLessonSchema>
 export type ClassBoardProblem = z.infer<typeof classBoardProblemSchema>
 export type ClassBoardStudent = z.infer<typeof classBoardStudentSchema>
 export type ClassBoardCell = z.infer<typeof classBoardCellSchema>

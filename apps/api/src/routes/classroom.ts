@@ -5,6 +5,7 @@ import {
   type ClassActivity,
   type ClassBoard,
   type ClassBoardStudent,
+  type ClassLesson,
   type ClassActivityProblem,
   type ClassComparison,
   type ClassComparisonResponse,
@@ -671,6 +672,22 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
  * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉，
  * 学生那边退回推断。
  */
+classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
+  const className = c.req.query("className")?.trim() || (await suggestActiveClass())
+  if (!className)
+    return success(c, { className: null, source: null, problems: [] } satisfies ClassLesson)
+  // 和看板一样只回看今天：「这节课」不该冒出昨天的题
+  const lesson = await classLessonProblems(className, 1)
+  return success(c, {
+    className,
+    source: lesson.source,
+    problems: lesson.problems.map((problem) => ({
+      problemDisplayId: problem.displayId,
+      title: problem.title,
+    })),
+  } satisfies ClassLesson)
+})
+
 classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
   const parsed = await parseBody(c, classLessonRequestSchema, "题号格式不对")
   if (!parsed.success) return parsed.response

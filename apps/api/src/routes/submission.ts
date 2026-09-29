@@ -13,7 +13,7 @@ import {
 import { and, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireAuth, requireSuperAdmin } from "../auth/middleware"
+import { optionalAuth, requireAuth, requireTeacher } from "../auth/middleware"
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
@@ -33,6 +33,7 @@ import { consumeToken } from "../services/throttling"
 import { dayStart } from "../time"
 import { asFilterValue, asRecord, isAdminRole, queryInteger } from "./helpers"
 import {
+  classNameFilter,
   exactUsernameFilter,
   problemFilter,
   submissionStatisticsRoutes,
@@ -208,7 +209,9 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
 
 submissionRoutes.route("/", submissionStatisticsRoutes)
 
-submissionRoutes.post("/submissions/:id/rejudge", requireSuperAdmin, async (c) => {
+// 老师也能重判：旧栈只给超管，前端却一直给老师亮着按钮，老师点了只会「权限不足」。
+// 流程图那边老师本来就能重新评分，两边对齐。比赛提交不在此列（下面 isNull(contestId)）
+submissionRoutes.post("/submissions/:id/rejudge", requireTeacher, async (c) => {
   const [row] = await db
     .select({
       id: schema.submission.id,
@@ -315,6 +318,19 @@ const submissionListColumns = {
     // 只取 id，题单标题按页单独查一次（见 /submissions）——把 problemset 一起 join 进来
     // 会动到下面那条调过的分页查询，而每页最多两三个不同的题单，PK 查一次更便宜
     problemsetId: schema.submission.problemsetId,
+    /**
+     * 通过的测试点数 / 总数，口径同 caseSummary()：只认 info.data 是数组、逐项 result 为 0。
+     * 在库里数完只回两个整数 —— info 带着每个点的 output_md5，整列拉回来只为数个数不值当
+     */
+    casesTotal: sql<
+      number | null
+    >`case when jsonb_typeof(${schema.submission.info} -> 'data') = 'array'
+      then jsonb_array_length(${schema.submission.info} -> 'data') end`,
+    casesPassed: sql<
+      number | null
+    >`case when jsonb_typeof(${schema.submission.info} -> 'data') = 'array'
+      then (select count(*)::int from jsonb_array_elements(${schema.submission.info} -> 'data') as item
+        where item ->> 'result' = '0') end`,
   },
   problem: {
     displayId: schema.problem.displayId,
@@ -333,6 +349,16 @@ function caseSummary(submission: typeof schema.submission.$inferSelect) {
   if (!Array.isArray(data) || data.length === 0) return null
   const passed = data.filter((item) => asRecord(item).result === JudgeStatus.ACCEPTED).length
   return { passed, total: data.length }
+}
+
+/** 列表行的 caseSummary：SQL 里数好的两个数，为 null 的情形和详情一致（SQL 题、没有逐点结果） */
+function listCaseSummary(row: {
+  language: string
+  casesTotal: number | null
+  casesPassed: number | null
+}) {
+  if (row.language === "SQL" || !row.casesTotal) return null
+  return { passed: row.casesPassed ?? 0, total: row.casesTotal }
 }
 
 async function submissionDetail(id: string, user: AuthUser) {
@@ -490,10 +516,13 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   const username = myself ? undefined : c.req.query("username")?.trim()
   const result = c.req.query("result")
   const language = c.req.query("language")?.trim()
+  // 班级（user.class_name），和用户名可以同时用：「25计算机3班里名字带『王』的」
+  const className = myself ? undefined : c.req.query("className")?.trim()
   const filters: Array<SQL | undefined> = [isNull(schema.submission.contestId)]
   filters.push(
     ...(await Promise.all([
       displayId ? problemFilter(displayId, null) : undefined,
+      className ? classNameFilter(className) : undefined,
       username
         ? c.req.query("exactUsername") === "1"
           ? exactUsernameFilter(username)
@@ -512,7 +541,8 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   // （生产快照实测 7.5ms → 78ms）。题号已经解析成 problem_id，也用不着 join。
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.submission).where(where),
-    paginateSubmissionRows(where, limit, offset, Boolean(username)),
+    // 班级和用户名一样是「圈一小撮人」，走同一条圈选路（见 paginateSubmissionRows）
+    paginateSubmissionRows(where, limit, offset, Boolean(username || className)),
   ])
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
   const [joinTimes, problemsetTitles] = await Promise.all([
@@ -550,6 +580,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
                   title: problemsetTitles.get(submission.problemsetId)!,
                 }
               : null,
+          caseSummary: listCaseSummary(submission),
         }) satisfies SubmissionListItem,
     ),
     total: totalRows[0]?.value ?? 0,
@@ -617,6 +648,8 @@ submissionRoutes.get(
             // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
             // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
             problemSet: null,
+            // 比赛只报对错，不给通过几个点（口径见契约 caseSummarySchema）
+            caseSummary: null,
           }) satisfies SubmissionListItem,
       ),
       total: totalRows[0]?.value ?? 0,

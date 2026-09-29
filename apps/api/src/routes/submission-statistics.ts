@@ -21,7 +21,7 @@ import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/s
 import { type ContestEnv } from "../services/contest"
 import { getBooleanOption } from "../services/options"
 import { localTime, dayStart } from "../time"
-import { isAdminRole, matchedUsers, rounded, stripClassPrefix } from "./helpers"
+import { isAdminRole, matchedUsers, parseDisplayIds, rounded, stripClassPrefix } from "./helpers"
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
@@ -137,24 +137,6 @@ function statisticsRange(c: { req: { query(name: string): string | undefined } }
 
 /** 一次最多查几道题。课堂上一节课布置三五道，20 是留足了余量的上限 */
 const STATISTICS_MAX_PROBLEMS = 20
-
-/**
- * 题号框允许一次填几道：`1001,1005,1010`。中英文逗号、空格、分号都当分隔符 ——
- * 老师在投影前手敲，不该因为打了个全角逗号就查不出来。
- */
-function parseDisplayIds(raw: string) {
-  const seen = new Set<string>()
-  const ids: string[] = []
-  for (const part of raw.split(/[,，;；\s]+/)) {
-    const id = part.trim()
-    if (!id) continue
-    const key = id.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    ids.push(id)
-  }
-  return ids
-}
 
 /**
  * 按题号（展示用的 _id）定位公开题目。**有一个找不到就整体报错**，不退化成「全部题目」——
@@ -328,7 +310,26 @@ export async function exactUsernameFilter(username: string) {
 }
 
 /**
+ * 按班级筛：`user.class_name` 精确匹配。原来列表只能拿用户名前缀（`ks253`）当班级，
+ * 那是「包含」匹配 —— ks253 会顺带捞进 ks2531 这类撞前缀的号，也要老师记得前缀怎么拼。
+ * 查无此班留恒假条件
+ */
+export async function classNameFilter(className: string) {
+  const users = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.className, className))
+  return users.length
+    ? inArray(
+        schema.submission.userId,
+        users.map((row) => row.id),
+      )
+    : sql`false`
+}
+
+/**
  * 两条提交列表的题号筛选：先把题号解析成 problem.id，再按 `submission.problem_id` 筛。
+ * 可以一次填几道（`1021,1022`），**任一道**对上就算。
  * 原来是 join problem 之后比 `lower(problem._id)`，条件落在 problem 表上，规划器只能
  * 顺着时间索引倒扫、逐行回表比对，走不上 submission_public_problem_time_idx。
  *
@@ -337,12 +338,15 @@ export async function exactUsernameFilter(username: string) {
  * 查无此题时留恒假条件，少推一个 filter 就成了「不筛」。
  */
 export async function problemFilter(displayId: string, contestId: number | null) {
+  // 一次可以筛几道（「这节课」那颗按钮一带就是五道），分隔符和统计面板同一套
+  const lowered = parseDisplayIds(displayId).map((id) => id.toLowerCase())
+  if (!lowered.length) return sql`false`
   const problems = await db
     .select({ id: schema.problem.id })
     .from(schema.problem)
     .where(
       and(
-        sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+        inArray(sql`lower(${schema.problem.displayId})`, lowered),
         contestId === null
           ? isNull(schema.problem.contestId)
           : eq(schema.problem.contestId, contestId),

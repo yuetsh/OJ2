@@ -29,6 +29,7 @@ import {
   isAdminRole,
   matchedUsers,
   asRecord,
+  parseDisplayIds,
   queryInteger,
   rounded,
   stripClassPrefix,
@@ -178,12 +179,15 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
  * 「查无此班」会变成「全站」。
  */
 async function flowchartProblemFilter(displayId: string) {
+  // 和代码提交列表一样可以一次筛几道
+  const lowered = parseDisplayIds(displayId).map((id) => id.toLowerCase())
+  if (!lowered.length) return sql`false`
   const problems = await db
     .select({ id: schema.problem.id })
     .from(schema.problem)
     .where(
       and(
-        sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+        inArray(sql`lower(${schema.problem.displayId})`, lowered),
         // 流程图题都是公开题（快照里那 12 道 contest_id 全为空），
         // 比赛题的 _id 撞号是常态，不该被筛进来
         isNull(schema.problem.contestId),
@@ -193,6 +197,20 @@ async function flowchartProblemFilter(displayId: string) {
     ? inArray(
         schema.flowchartSubmission.problemId,
         problems.map((row) => row.id),
+      )
+    : sql`false`
+}
+
+/** 按班级（user.class_name）筛，口径同 submission-statistics.ts 的 classNameFilter */
+async function flowchartClassFilter(className: string) {
+  const users = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.className, className))
+  return users.length
+    ? inArray(
+        schema.flowchartSubmission.userId,
+        users.map((row) => row.id),
       )
     : sql`false`
 }
@@ -250,13 +268,15 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
     return success(c, { results: [], total: 0 } satisfies FlowchartList)
   }
   // 「只看自己」盖过用户名；普通学生不填用户名时也只看自己
+  const className = c.req.query("className")?.trim()
   const onlyMyself =
-    c.req.query("myself") === "1" || (!username && user.adminType === "Regular User")
+    c.req.query("myself") === "1" || (!username && !className && user.adminType === "Regular User")
   const filters: Array<SQL | undefined> = []
   filters.push(
     ...(await Promise.all([
       displayId ? flowchartProblemFilter(displayId) : undefined,
       !onlyMyself && username ? flowchartUserFilter(username) : undefined,
+      !onlyMyself && className ? flowchartClassFilter(className) : undefined,
     ])),
   )
   if (onlyMyself) filters.push(eq(schema.flowchartSubmission.userId, user.id))
