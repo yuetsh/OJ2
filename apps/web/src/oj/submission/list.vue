@@ -11,6 +11,7 @@ import {
   getTodaySubmissionCount,
   retryFlowchartSubmission,
 } from "oj/api"
+import { DEFAULT_PERIOD, type Period } from "oj/statistics/period"
 import { useContestStore } from "oj/store/contest"
 import Pagination from "shared/components/Pagination.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -44,6 +45,10 @@ import { classLabel, submissionClockText, submissionDayText } from "./utils"
 const SubmissionPane = defineAsyncComponent(() => import("./components/SubmissionPane.vue"))
 const FlowchartPane = defineAsyncComponent(() => import("./components/FlowchartPane.vue"))
 const TodayStatistics = defineAsyncComponent(() => import("./components/TodayStatistics.vue"))
+// 统计带着 chart.js，只有老师点开才拉
+const StatisticsView = defineAsyncComponent(
+  () => import("oj/statistics/components/StatisticsView.vue"),
+)
 
 interface SubmissionQuery {
   username: string
@@ -313,10 +318,11 @@ function move(step: 1 | -1) {
 }
 
 const [todayPanel, toggleTodayPanel] = useToggle(false)
+const statsPanel = ref(false)
 
 // 只用 ↑ ↓（用户定的，← → 不要）
 onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
-  if (!isDesktop.value || todayPanel.value) return
+  if (!isDesktop.value || todayPanel.value || statsPanel.value) return
   // 别的控件已经处理了这次按键（下拉框自己会开菜单、换选项）
   if (e.defaultPrevented) return
   const target = e.target as HTMLElement | null
@@ -558,21 +564,44 @@ function filterUser(username: string) {
 }
 
 /**
- * 「数据统计」：新标签打开统计页，带上现在的班级 / 学生 / 题号 / 代码或流程图
- * （原来是这一页上的弹框）。「今天」带过去就是统计页的「今天」
+ * 「数据统计」弹框的查询条件。每次打开从这张列表现在的班级 / 学生 / 题号 / 代码或流程图
+ * 带进去（「今天」带过去就是统计的「今天」）；时间段沿用上次在弹框里选的
  */
-function openStatistics() {
-  const href = router.resolve({
-    name: "statistics",
-    query: {
-      ...(flowMode.value ? { tab: "flow" } : {}),
-      ...(query.className ? { className: query.className } : {}),
-      ...(query.username ? { username: query.username } : {}),
-      ...(query.problem ? { problem: query.problem } : {}),
-      ...(query.today === "1" ? { period: "today" } : {}),
-    },
-  }).href
-  window.open(href, "_blank")
+const statsQuery = reactive({
+  tab: "code",
+  className: "",
+  username: "",
+  problem: "",
+  period: DEFAULT_PERIOD as string,
+  from: "",
+  to: "",
+})
+
+function openStatistics(preset?: { className: string; period: Period }) {
+  todayPanel.value = false
+  Object.assign(statsQuery, {
+    tab: flowMode.value ? "flow" : "code",
+    className: preset ? preset.className : query.className,
+    username: preset ? "" : query.username,
+    problem: preset ? "" : query.problem,
+    ...(preset ? { period: preset.period } : query.today === "1" ? { period: "today" } : {}),
+  })
+  statsPanel.value = true
+}
+
+/** 统计里的「在提交列表里看」：直接改背后这张列表的筛选，关掉弹框 */
+function listFromStatistics(next: Record<string, string>) {
+  statsPanel.value = false
+  exactFor.value = ""
+  Object.assign(query, {
+    username: next.username ?? "",
+    className: next.className ?? "",
+    result: "",
+    myself: "0",
+    problem: next.problem ?? "",
+    language: next.language === "Flowchart" ? "Flowchart" : flowMode.value ? "" : query.language,
+    today: next.today === "1" ? "1" : "0",
+  })
 }
 
 /** 右栏「只看这个班」：从看一个人换成看他整个班 */
@@ -796,7 +825,13 @@ function dayBreak(index: number) {
         <template v-if="!(teacher && narrowBar)">今日统计</template>
         <span v-if="todayCount" class="count">{{ todayCount }}</span>
       </n-button>
-      <n-button v-if="teacher && route.name === 'submissions'" size="small" @click="openStatistics">
+      <n-button
+        v-if="teacher && route.name === 'submissions'"
+        size="small"
+        quaternary
+        title="数据统计：按班级、题号、时间段回头看"
+        @click="openStatistics()"
+      >
         <template #icon><Icon icon="ph:chart-pie-slice" /></template>
         数据统计
       </n-button>
@@ -1074,7 +1109,29 @@ function dayBreak(index: number) {
       @close="todayPanel = false"
       @loaded="(total: number) => (todayCount = total)"
       @open-problem="(id: string) => openProblem({ problemDisplayId: id } as Row)"
+      @open-class="(name: string) => openStatistics({ className: name, period: 'today' })"
     />
+  </n-modal>
+
+  <!--
+    包一层普通 div：n-modal 没有 preset 时把 class 和 ref 挂到直接子节点上，子节点是异步组件的话
+    里面下拉框的弹层插不进去（HierarchyRequestError，时间段、班级下拉点了没反应）
+  -->
+  <n-modal v-model:show="statsPanel">
+    <div>
+      <StatisticsView
+        v-model:tab="statsQuery.tab"
+        v-model:class-name="statsQuery.className"
+        v-model:username="statsQuery.username"
+        v-model:problem="statsQuery.problem"
+        v-model:period="statsQuery.period"
+        v-model:from="statsQuery.from"
+        v-model:to="statsQuery.to"
+        modal
+        @close="statsPanel = false"
+        @list="listFromStatistics"
+      />
+    </div>
   </n-modal>
 </template>
 

@@ -16,6 +16,8 @@ import { classLabel } from "../utils"
 const emit = defineEmits<{
   close: []
   openProblem: [problem: string]
+  /** 点班级名：在提交列表的数据统计弹框里看这个班今天 */
+  openClass: [className: string]
   /** 拉到数之后把总数报回去：按钮上的数只在进页面时拉过一次，停久了会对不上 */
   loaded: [total: number]
 }>()
@@ -131,14 +133,6 @@ const scatteredText = computed(() =>
     .join("、"),
 )
 
-function openClass(className: string) {
-  const href = router.resolve({
-    name: "statistics",
-    query: { className, period: "today" },
-  }).href
-  window.open(href, "_blank")
-}
-
 const judgedResults = computed(() => stats.value?.results ?? [])
 
 const languageText = computed(() => {
@@ -221,7 +215,7 @@ const meText = computed(() => {
           <div class="timeline">
             <div v-for="item in stats.classes" :key="item.className" class="lane">
               <div class="lane-label">
-                <a href="#" class="lane-name" @click.prevent="openClass(item.className)">
+                <a href="#" class="lane-name" @click.prevent="emit('openClass', item.className)">
                   {{ classLabel(item.className) }}
                 </a>
                 <n-text depth="3" class="tiny">
