@@ -419,10 +419,21 @@ const mode = computed({
   set: (value: string) => (query.language = value === "flow" ? "Flowchart" : ""),
 })
 
+const mine = computed(() => query.myself === "1")
 const scope = computed({
-  get: () => (query.myself === "1" ? "mine" : "all"),
-  set: (value: string) => (query.myself = value === "mine" ? "1" : "0"),
+  get: () => (mine.value ? "mine" : "all"),
+  set: (value: string) => {
+    // 「这节课」是看全班用的，切到「我的」就把它带的题号和「今天」一起放掉
+    if (value === "mine" && lessonActive.value) {
+      query.problem = ""
+      query.today = "0"
+    }
+    query.myself = value === "mine" ? "1" : "0"
+  },
 })
+
+/** 1366 以下（机房 1280 的屏）老师那排放不下：「今日统计」只留图标和数字 */
+const narrowBar = useMediaQuery("(max-width: 1365px)")
 
 const today = computed({
   get: () => query.today === "1",
@@ -580,10 +591,16 @@ function dayBreak(index: number) {
           <n-radio-button value="code">代码</n-radio-button>
           <n-radio-button value="flow">流程图</n-radio-button>
         </n-radio-group>
-        <span class="vsep"></span>
       </template>
+      <!-- 老师也有：从个人菜单「我的提交」进来的，原来只能靠「清空」退出去 -->
+      <n-radio-group v-if="userStore.isAuthed" v-model:value="scope" size="small">
+        <n-radio-button value="all">全部</n-radio-button>
+        <n-radio-button value="mine">我的</n-radio-button>
+      </n-radio-group>
+      <span v-if="userStore.isAuthed" class="vsep"></span>
 
-      <template v-if="teacher && !inContest">
+      <!-- 「我的」时这节课 / 班级 / 学生都用不上：后端只看自己时本来就不认它们 -->
+      <template v-if="teacher && !inContest && !mine">
         <button
           class="lesson"
           :class="{ on: lessonActive }"
@@ -612,17 +629,13 @@ function dayBreak(index: number) {
           @update:value="(v: string | null) => (query.className = v ?? '')"
         />
       </template>
-      <n-radio-group v-else-if="userStore.isAuthed" v-model:value="scope" size="small">
-        <n-radio-button value="all">全部</n-radio-button>
-        <n-radio-button value="mine">我的</n-radio-button>
-      </n-radio-group>
 
       <n-input
+        v-if="!mine"
         v-model:value="query.username"
         class="w-user"
         size="small"
         clearable
-        :disabled="query.myself === '1'"
         :placeholder="teacher ? '学生' : '用户'"
       >
         <template #prefix><Icon icon="ph:magnifying-glass" /></template>
@@ -672,10 +685,12 @@ function dayBreak(index: number) {
         v-if="route.name === 'submissions' && !flowMode"
         size="small"
         quaternary
+        :title="`今日统计：今天全站 ${todayCount} 条`"
         @click="toggleTodayPanel(true)"
       >
         <template #icon><Icon icon="ph:chart-bar" /></template>
-        今日统计<span v-if="todayCount" class="count">{{ todayCount }}</span>
+        <template v-if="!(teacher && narrowBar)">今日统计</template>
+        <span v-if="todayCount" class="count">{{ todayCount }}</span>
       </n-button>
       <n-button
         v-if="teacher && route.name === 'submissions'"
@@ -817,7 +832,13 @@ function dayBreak(index: number) {
           </template>
           <div v-if="loaded && !rows.length" class="empty">
             <span class="empty-title">
-              {{ lessonActive ? "这节课的题还没有人交" : "没有符合条件的提交" }}
+              {{
+                lessonActive
+                  ? "这节课的题还没有人交"
+                  : mine && activeFilters === 0
+                    ? "你还没有交过"
+                    : "没有符合条件的提交"
+              }}
             </span>
             <n-button v-if="activeFilters" size="small" @click="clear">清空筛选</n-button>
           </div>
@@ -1015,6 +1036,16 @@ function dayBreak(index: number) {
 }
 .w-lang {
   width: 104px;
+}
+
+/* 机房 1280 的屏上老师那排只剩几像素：学生、语言两个框各收一点，别让班级框被挤扁 */
+@media (max-width: 1365px) {
+  .w-user {
+    width: 108px;
+  }
+  .w-lang {
+    width: 96px;
+  }
 }
 
 .spacer {
