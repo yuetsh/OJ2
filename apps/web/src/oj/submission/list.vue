@@ -1224,11 +1224,12 @@ function dayBreak(index: number) {
   display: flex;
 }
 
-/* 列表占多一点：学生的代码大多十来行、一行几十个字，右边给多了是一片空白（用户看过定的）。
-   大屏上列表最宽 1000，再宽一行里全是空隙 */
+/* 列表比代码区窄一点（46 : 54，用户看过定的）：原来列表固定 560、代码占满，右边空一大片；
+   改成 56% 又嫌列表太宽。46% 在 1280 的屏上题目列约 215px，九成题目名放得下，长的看 title。
+   大屏上列表最宽 900 */
 .list {
-  flex: 0 0 56%;
-  max-width: 1000px;
+  flex: 0 0 46%;
+  max-width: 900px;
   box-sizing: border-box;
   border-right: 1px solid v-bind("theme.dividerColor");
   display: flex;
