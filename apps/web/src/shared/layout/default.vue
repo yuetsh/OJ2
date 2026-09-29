@@ -30,7 +30,7 @@ watch(
     position="absolute"
     content-style="display: flex; flex-direction: column; min-height: 100%"
   >
-    <n-layout-header bordered style="padding: 8px">
+    <n-layout-header bordered>
       <!-- 居中限宽套在外面，别用 class 传给 Header：那样 Header 就永远只能有
            一个根节点，多一个根就是 "Extraneous non-props attributes" 警告
            加样式静默丢失 -->

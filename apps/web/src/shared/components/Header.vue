@@ -9,6 +9,7 @@ import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
+import { useThemeVars } from "naive-ui"
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
@@ -20,6 +21,7 @@ const router = useRouter()
 const { isMobile, isDesktop } = useBreakpoints()
 const { learnStep } = useLearnProgress()
 const { isDark, toggleDark } = useDarkTransition()
+const theme = useThemeVars()
 
 /**
  * 求助的入口收进姓名下拉里，顶栏只留姓名按钮上的角标 —— 老师不用展开菜单
@@ -27,36 +29,6 @@ const { isDark, toggleDark } = useDarkTransition()
  * 确实只有桌面端好使，但「有没有人在等」是宽度多少都得知道的。
  */
 const pendingHelpCount = computed(() => (collabStore.isTeacher ? collabStore.pendingCount : 0))
-
-const names = [
-  "man-with-chinese-cap-1",
-  "cat-face",
-  "china",
-  "chicken",
-  "eyes",
-  "elephant",
-  "hear-no-evil-monkey",
-  "panda-face",
-  "penguin-1",
-  "rooster",
-  "star-struck-1",
-  "tomato",
-  "rocket",
-  "sparkles",
-  "money-bag",
-  "ghost",
-  "game-dice",
-  "ewe-1",
-  "artist-palette",
-  "baby-bottle",
-]
-
-function getRandomAvatar() {
-  const name = names[Math.floor(Math.random() * names.length)]
-  return `streamline-emojis:${name}`
-}
-
-const avatar = ref(getRandomAvatar())
 
 /**
  * 顶栏的题号框：老师报完题号，学生在哪一页都能直接敲，不用先回首页或题目列表。
@@ -70,6 +42,13 @@ async function handleJump() {
   jumpKeyword.value = ""
 }
 
+/**
+ * 站名后面的小标签：环境名、演示中。
+ *
+ * 演示模式除了下拉里那行「退出演示」再没有别的痕迹，而它是存在 localStorage 里
+ * 的，刷新、关标签页都还在，只有退出登录才清 —— 不在这儿常驻标一下，很容易
+ * 投屏完忘了退，第二天纳闷后台入口怎么没了。
+ */
 const envVersion = computed(() => {
   if (import.meta.env.PUBLIC_ENV === "test") {
     return "测试版"
@@ -78,17 +57,6 @@ const envVersion = computed(() => {
   }
   return ""
 })
-
-/**
- * 站名后面括号里的东西：环境名 + 演示中。
- *
- * 演示模式除了下拉里那行「退出演示」再没有别的痕迹，而它是存在 localStorage 里
- * 的，刷新、关标签页都还在，只有退出登录才清 —— 不在这儿常驻标一下，很容易
- * 投屏完忘了退，第二天纳闷后台入口怎么没了。
- */
-const titleTags = computed(() =>
-  [envVersion.value, userStore.demoMode ? "演示中" : ""].filter(Boolean),
-)
 
 // 一级路径就是菜单 key，对不上的页面（/user、/setting、/achievement 等）
 // 自然没有一项亮着。根路径没登录时就是题目列表，登录了是个人首页，不亮任何一项
@@ -118,65 +86,76 @@ function learnLink(type: "python" | "c") {
   return `/learn/${type}/${learnStep.value[type].toString().padStart(2, "0")}`
 }
 
-const menus = computed<MenuOption[]>(() => [
+/**
+ * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字链接，窄屏收进「菜单」下拉。
+ * `key` 就是一级路径，用来判定高亮（见上面的 active）。
+ *
+ * 桌面端不带图标、不用 n-menu：n-menu 横排每项固定占 100px，管理员 8 项在
+ * 1280 宽的机房屏上直接把顶栏挤成两行。图标只留给下拉菜单。
+ */
+interface NavLink {
+  key: string
+  label: string
+  to: string
+  icon: string
+  show?: boolean
+}
+
+const navLinks = computed<NavLink[]>(() =>
+  [
+    { key: "problem", label: "题目", to: "/problem", icon: "fluent-emoji:memo" },
+    { key: "problemset", label: "题单", to: "/problemset", icon: "fluent-emoji:clipboard" },
+    {
+      key: "submission",
+      label: "提交",
+      to: "/submission",
+      icon: "fluent-emoji:inbox-tray",
+      show: userStore.showSubmissions,
+    },
+    { key: "contest", label: "比赛", to: "/contest", icon: "fluent-emoji:chequered-flag" },
+    { key: "rank", label: "排名", to: "/rank", icon: "fluent-emoji:trophy" },
+    { key: "announcement", label: "公告", to: "/announcement", icon: "fluent-emoji:loudspeaker" },
+  ].filter((link) => link.show !== false),
+)
+
+const learnOptions: DropdownOption[] = [
+  { label: "Python", key: "learn-python" },
+  { label: "C语言", key: "learn-c" },
+]
+
+// 「后台」不和学生导航排在一起：桌面端放到右边那组的开头、弱化成灰字，
+// 老师和学生看到的顶栏前半截就是同一排
+const adminPath = computed(() => (userStore.isSuperAdmin ? "/admin" : "/admin/problem/list"))
+
+const mobileMenus = computed<DropdownOption[]>(() => [
   {
     label: "自学",
     key: "learn",
     icon: renderIcon("fluent-emoji:books"),
-    children: [
-      {
-        label: () => h(RouterLink, { to: learnLink("python") }, { default: () => "Python" }),
-        key: "learn-python",
-      },
-      {
-        label: () => h(RouterLink, { to: learnLink("c") }, { default: () => "C语言" }),
-        key: "learn-c",
-      },
-    ],
+    children: learnOptions,
   },
+  ...navLinks.value.map((link) => ({
+    label: link.label,
+    key: link.key,
+    icon: renderIcon(link.icon),
+  })),
   {
-    label: () => h(RouterLink, { to: "/problem" }, { default: () => "题目" }),
-    key: "problem",
-    icon: renderIcon("fluent-emoji:memo"),
-  },
-  {
-    label: () => h(RouterLink, { to: "/problemset" }, { default: () => "题单" }),
-    key: "problemset",
-    icon: renderIcon("fluent-emoji:clipboard"),
-  },
-  {
-    label: () => h(RouterLink, { to: "/submission" }, { default: () => "提交" }),
-    key: "submission",
-    icon: renderIcon("fluent-emoji:inbox-tray"),
-    show: userStore.showSubmissions,
-  },
-  {
-    label: () => h(RouterLink, { to: "/contest" }, { default: () => "比赛" }),
-    key: "contest",
-    icon: renderIcon("fluent-emoji:chequered-flag"),
-  },
-  {
-    label: () => h(RouterLink, { to: "/rank" }, { default: () => "排名" }),
-    key: "rank",
-    icon: renderIcon("fluent-emoji:trophy"),
-  },
-  {
-    label: () => h(RouterLink, { to: "/announcement" }, { default: () => "公告" }),
-    key: "announcement",
-    icon: renderIcon("fluent-emoji:loudspeaker"),
-  },
-  {
-    label: () =>
-      h(
-        RouterLink,
-        { to: userStore.isSuperAdmin ? "/admin" : "/admin/problem/list" },
-        { default: () => "后台" },
-      ),
-    show: userStore.isAdminRole,
+    label: "后台",
     key: "admin",
     icon: renderIcon("fluent-emoji:gear"),
+    show: userStore.isAdminRole,
   },
 ])
+
+function handleNavSelect(key: string) {
+  if (key === "learn-python") router.push(learnLink("python"))
+  else if (key === "learn-c") router.push(learnLink("c"))
+  else if (key === "admin") router.push(adminPath.value)
+  else {
+    const link = navLinks.value.find((item) => item.key === key)
+    if (link) router.push(link.to)
+  }
+}
 
 const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
   {
@@ -252,33 +231,43 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
     props: { onClick: handleLogout },
   },
 ])
-
-function goHome() {
-  router.push("/")
-}
 </script>
 
 <template>
-  <n-flex justify="space-between" align="center">
-    <n-flex align="center">
-      <!-- text 按钮而不是带 @click 的 div：站名要能 tab 到、回车能按 -->
-      <n-button text class="title" @click="goHome">
-        <n-flex align="center">
-          <Icon icon="streamline-emojis:dog" :height="30"></Icon>
-          <div>{{ configStore.config?.websiteName }}</div>
-          <div v-if="titleTags.length">({{ titleTags.join(" · ") }})</div>
-        </n-flex>
-      </n-button>
-      <div>
-        <n-menu v-if="isDesktop" mode="horizontal" :options="menus" :value="active" />
-      </div>
-    </n-flex>
-    <n-flex align="center">
-      <n-dropdown v-if="isMobile" :options="menus" size="large">
-        <n-button>
-          <Icon icon="fluent-emoji:artist-palette" height="20"></Icon>
-          <span style="padding-left: 8px">菜单</span>
-        </n-button>
+  <header class="bar" :class="{ mobile: isMobile }">
+    <RouterLink to="/" class="brand">
+      <Icon icon="streamline-emojis:dog" :height="26"></Icon>
+      <span>{{ configStore.config?.websiteName }}</span>
+      <n-tag v-if="envVersion" size="small" :bordered="false">{{ envVersion }}</n-tag>
+      <n-tag v-if="userStore.demoMode" size="small" :bordered="false" type="warning">
+        演示中
+      </n-tag>
+    </RouterLink>
+    <nav v-if="isDesktop" class="nav">
+      <n-dropdown trigger="hover" :options="learnOptions" @select="handleNavSelect">
+        <button type="button" class="nav-link" :class="{ active: active === 'learn' }">自学</button>
+      </n-dropdown>
+      <RouterLink
+        v-for="link in navLinks"
+        :key="link.key"
+        :to="link.to"
+        class="nav-link"
+        :class="{ active: active === link.key }"
+      >
+        {{ link.label }}
+      </RouterLink>
+    </nav>
+    <div class="spacer"></div>
+    <div class="actions">
+      <template v-if="isDesktop && userStore.isAdminRole">
+        <RouterLink :to="adminPath" class="admin-link">
+          <Icon icon="ph:gear-six" :width="15" />
+          <span>后台</span>
+        </RouterLink>
+        <span class="divider"></span>
+      </template>
+      <n-dropdown v-if="isMobile" :options="mobileMenus" size="large" @select="handleNavSelect">
+        <n-button>菜单</n-button>
       </n-dropdown>
       <n-input
         v-if="isDesktop"
@@ -292,18 +281,13 @@ function goHome() {
           <Icon icon="ph:magnifying-glass" />
         </template>
       </n-input>
-      <div v-if="userStore.isFinished">
+      <template v-if="userStore.isFinished">
         <n-dropdown v-if="userStore.isAuthed" :options="options" size="large">
           <n-badge :value="pendingHelpCount" :max="99">
-            <n-button>
-              <Icon :icon="avatar" height="20"></Icon>
-              <span style="padding-left: 8px">
-                {{ userStore.user!.username }}
-              </span>
-            </n-button>
+            <n-button>{{ userStore.user!.username }}</n-button>
           </n-badge>
         </n-dropdown>
-        <n-flex align="center" v-else>
+        <template v-else>
           <n-button secondary type="primary" @click="authStore.openLoginModal()"> 登录 </n-button>
           <n-button
             tertiary
@@ -312,24 +296,112 @@ function goHome() {
           >
             注册
           </n-button>
-        </n-flex>
-      </div>
-      <n-button :bordered="false" circle @click="toggleDark">
+        </template>
+      </template>
+      <n-button
+        quaternary
+        circle
+        :title="isDark ? '切换到亮色' : '切换到暗色'"
+        :aria-label="isDark ? '切换到亮色' : '切换到暗色'"
+        @click="toggleDark"
+      >
         <template #icon>
-          <Icon v-if="isDark" icon="fluent-emoji:sun"></Icon>
-          <Icon v-else icon="fluent-emoji:full-moon"></Icon>
+          <Icon :icon="isDark ? 'ph:sun' : 'ph:moon'" />
         </template>
       </n-button>
-    </n-flex>
-  </n-flex>
+    </div>
+  </header>
 </template>
 
 <style scoped>
-.title {
-  font-size: 18px;
+/* 加上 n-layout-header 的 1px 下边框正好 56，和题目页设计稿一致；
+   题目页、教程页、流程图页的 calc(100vh - …) 都按 56 算的，改高度要一起改 */
+.bar {
+  height: 55px;
+  box-sizing: border-box;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  white-space: nowrap;
+}
+
+/* 窄屏放不下一行：允许折行，高度跟着内容走 */
+.bar.mobile {
+  height: auto;
+  min-height: 55px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 17px;
+  font-weight: 700;
+  color: v-bind("theme.textColor1");
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex: none;
+}
+
+.nav-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  color: v-bind("theme.textColor2");
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  color: v-bind("theme.primaryColor");
+}
+
+.nav-link.active {
+  color: v-bind("theme.primaryColorPressed");
+  font-weight: 600;
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+.admin-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: v-bind("theme.textColor3");
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  color: v-bind("theme.primaryColor");
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  background-color: v-bind("theme.dividerColor");
 }
 
 .jump {
-  width: 160px;
+  width: 180px;
 }
 </style>

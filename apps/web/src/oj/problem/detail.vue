@@ -376,7 +376,7 @@ onBeforeUnmount(() => {
 .problem-split {
   margin: -16px;
   width: calc(100% + 32px);
-  height: calc(100vh - 60px);
+  height: calc(100vh - 56px);
 }
 
 /* 分隔线：看上去 1px，拖的时候热区宽一点 */

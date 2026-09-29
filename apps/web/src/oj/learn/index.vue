@@ -169,7 +169,7 @@ watch(traced, loadProgress)
 /* 桌面端固定高度，目录/正文/代码各自内部滚动；移动端交给页面整体滚动 */
 @media (min-width: 769px) {
   .learn-container {
-    height: calc(100vh - 138px);
+    height: calc(100vh - 134px);
   }
 }
 
