@@ -6,7 +6,7 @@ import { getProblemStats } from "oj/api"
 import { useContestStore } from "oj/store/contest"
 import { useProblemStore } from "oj/store/problem"
 import { useTone, type Tone } from "oj/submission/composables/tone"
-import { classLabel } from "oj/submission/utils"
+import { classLabel, submissionDayText } from "oj/submission/utils"
 import { DIFFICULTY, JUDGE_STATUS } from "utils/constants"
 import { getTagColor, parseTime } from "utils/functions"
 import type { ProblemStats, SUBMISSION_RESULT } from "utils/types"
@@ -130,6 +130,15 @@ const stuck = computed(() => {
 
 // ---------- 老师：各班的表 ----------
 
+/** 班多的老题（1001 这种十几个班都做过）先给 6 个，最近做的在前 */
+const allClasses = ref(false)
+const shownClasses = computed(() =>
+  allClasses.value ? (stats.value?.classes ?? []) : (stats.value?.classes ?? []).slice(0, 6),
+)
+const hiddenClasses = computed(
+  () => (stats.value?.classes?.length ?? 0) - shownClasses.value.length,
+)
+
 /** 点一个班、或者表下面那行：去提交页的「数据统计」按人看（新标签，题目页不动） */
 function openStatistics(className?: string) {
   const href = router.resolve({
@@ -137,12 +146,6 @@ function openStatistics(className?: string) {
     query: { problem: problem.value!._id, period: "all", ...(className ? { className } : {}) },
   }).href
   window.open(href, "_blank")
-}
-
-/** 「2025-12-05」→「2025年12月5日」。后端给的已经是东八区的日子，不用再换算 */
-function dayText(day: string) {
-  const [year, month, date] = day.split("-").map(Number)
-  return `${year}年${month}月${date}日`
 }
 
 function segmentWidth(value: number, total: number) {
@@ -270,60 +273,64 @@ function segmentWidth(value: number, total: number) {
         </div>
       </div>
 
-      <!-- 老师：各班一行，只到班级这一层；按人看去数据统计 -->
-      <div v-if="stats.classes" class="section">
-        <div class="line">
-          <b>各班做得怎样</b>
-          <span class="spacer"></span>
-          <n-text depth="3" class="small">同一天 5 人以上交过才算这个班做过</n-text>
-        </div>
-        <table v-if="stats.classes.length" class="classes">
+      <!-- 老师：各班一行，和数据统计「按班级汇总」同一份数；按人看去那边 -->
+      <div v-if="stats.classes?.length" class="section">
+        <b>各班做得怎样</b>
+        <table class="classes">
           <thead>
             <tr>
               <th>班级</th>
-              <th>哪天做的</th>
-              <th>做对 / 交过</th>
+              <th>做完</th>
+              <th>交了没对</th>
               <th>没交</th>
-              <th>错得最多</th>
+              <th>正确率</th>
+              <th>最近一次</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="item in stats.classes"
-              :key="item.className"
-              title="去数据统计看这个班的每个人"
-              @click="openStatistics(item.className)"
+              v-for="item in shownClasses"
+              :key="item.className ?? ''"
+              :class="{ pickable: item.className }"
+              :title="item.className ? '去数据统计看这个班的每个人' : undefined"
+              @click="item.className && openStatistics(item.className)"
             >
               <td>
-                <b>{{ classLabel(item.className) }}</b>
+                <b>{{ item.className ? classLabel(item.className) : "没有班级" }}</b>
               </td>
               <td>
-                <n-text depth="2">{{ dayText(item.day) }}</n-text>
-              </td>
-              <td>
-                <span
-                  :style="{
-                    color: item.solved < item.tried ? tone('error').color : undefined,
-                    fontWeight: 600,
-                  }"
-                  >{{ item.solved }}</span
-                >
-                / {{ item.tried }}
-              </td>
-              <td>
-                <n-text depth="2">{{ Math.max(0, item.classSize - item.tried) }}</n-text>
-              </td>
-              <td>
-                <span v-if="item.topFailure" :style="{ color: barColor(item.topFailure.result) }">
-                  {{ resultName(item.topFailure.result) }} {{ item.topFailure.count }}
+                <span class="done-bar">
+                  <span
+                    :style="{
+                      width: segmentWidth(item.solved, item.classSize),
+                      background: theme.successColor,
+                    }"
+                  ></span>
                 </span>
-                <n-text v-else depth="3">—</n-text>
+                {{ item.solved }}/{{ item.classSize }}
+              </td>
+              <td :style="{ color: item.unsolved ? tone('warning').color : undefined }">
+                {{ item.unsolved }}
+              </td>
+              <td :style="{ color: item.untouched ? tone('error').color : undefined }">
+                {{ item.untouched }}
+              </td>
+              <td>
+                <n-text depth="2">{{
+                  item.correctRate === null ? "—" : `${item.correctRate}%`
+                }}</n-text>
+              </td>
+              <td>
+                <n-text depth="2">{{ submissionDayText(item.lastTime) }}</n-text>
               </td>
             </tr>
           </tbody>
         </table>
-        <n-text v-else depth="3" class="small">还没有哪个班一起做过这道题</n-text>
         <div class="foot">
+          <a v-if="hiddenClasses" href="#" class="link small" @click.prevent="allClasses = true">
+            还有 {{ hiddenClasses }} 个班 ›
+          </a>
+          <span class="spacer"></span>
           <a href="#" class="link small" @click.prevent="openStatistics()">
             按人看谁没做对，去数据统计 <Icon icon="ph:arrow-square-out" :width="13" />
           </a>
@@ -575,6 +582,7 @@ function segmentWidth(value: number, total: number) {
 }
 
 .classes th {
+  white-space: nowrap;
   text-align: left;
   font-weight: normal;
   color: v-bind("theme.textColor3");
@@ -588,11 +596,22 @@ function segmentWidth(value: number, total: number) {
   white-space: nowrap;
 }
 
-.classes tbody tr {
+.classes tbody tr.pickable {
   cursor: pointer;
 }
 
-.classes tbody tr:hover {
+.done-bar {
+  display: inline-flex;
+  width: 60px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+  background: v-bind("theme.dividerColor");
+}
+
+.classes tbody tr.pickable:hover {
   background: v-bind("theme.hoverColor");
 }
 </style>

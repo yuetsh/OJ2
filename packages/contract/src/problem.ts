@@ -473,21 +473,26 @@ export const problemStatsSchema = z.object({
     .object({ className: z.string(), tried: z.number().int(), solved: z.number().int() })
     .nullable(),
   /**
-   * 老师：一起做过这题的班（同一天至少 5 个人交过 —— 零星几个人自己刷到、补做的不算），
-   * 按那天倒序。只到班级这一层：看谁没做对是提交页「数据统计」的活。学生、比赛里为 null
+   * 老师：各班做这道题的情况，和数据统计「按班级汇总」**同一个口径**（只算学生的提交；
+   * 做完 / 班级人数、交了没对、没交、正确率、最近一次），按最近一次倒序。
+   * 两边数字要一模一样 —— 老师从这里点过去，看到的数「变了」就不会再信任何一边。
+   * 学生、比赛里为 null
    */
   classes: z
     .array(
       z.object({
-        className: z.string(),
-        /** 这个班一起做这道题的那天（东八区 YYYY-MM-DD，交的人最多的那天） */
-        day: z.string(),
-        tried: z.number().int(),
-        solved: z.number().int(),
-        /** 班里的学生数（学生角色、没禁用），没交的 = classSize - tried */
+        /** null = 没有班级的号（数据统计那边写「没有班级」） */
+        className: z.string().nullable(),
+        /** 班里的学生数（学生角色、没禁用）；没有班级的那一行就是交过的人数 */
         classSize: z.number().int(),
-        /** 这个班错得最多的那种，一次没错过为 null */
-        topFailure: failureCountSchema.nullable(),
+        solved: z.number().int(),
+        /** 交了但没做对的人 */
+        unsolved: z.number().int(),
+        /** 班里还没交过的人 */
+        untouched: z.number().int(),
+        /** 提交正确率，分母不算还在判的；一条都没判完为 null */
+        correctRate: z.number().nullable(),
+        lastTime: z.string(),
       }),
     )
     .nullable(),

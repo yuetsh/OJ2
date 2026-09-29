@@ -1,5 +1,5 @@
 import { type ProblemStats } from "@oj2/contract"
-import { and, count, eq, inArray, isNotNull, sql } from "drizzle-orm"
+import { and, count, eq, inArray, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, type AppEnv } from "../auth/middleware"
@@ -8,16 +8,9 @@ import { failure, success } from "../http"
 import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
 import { canAccessContest, contestDetailsAllowed, findAccessibleContest } from "../services/contest"
 import { accepted } from "../services/learning-stats"
-import { localTime } from "../time"
 import { isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
 
 export const problemStatsRoutes = new Hono<AppEnv>()
-
-/**
- * 同一天班里至少这么多人交过，才算「这个班一起做过这题」。只看总人数不行：
- * 2079 有个班 2 月里零星补做了 6 个人，比 12 月全班 26 人做的那次还「近」，默认就选成了它
- */
-const CLASS_MIN_TRIED = 5
 
 const EMPTY: ProblemStats = {
   locked: false,
@@ -85,8 +78,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
     sql`, `,
   )
   // 每人一行：窗口函数先给每条提交标上这个人第一次做对的时刻，再按人数到那一刻为止交了几次
-  const day = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
-  const [users, failureRows, firstCase, classDays] = await Promise.all([
+  const [users, failureRows, firstCase] = await Promise.all([
     db.execute<UserRow>(sql`
       select s.user_id, u.username, u.class_name,
         count(*)::int as attempts,
@@ -121,17 +113,6 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
           where e->>'test_case' = '1' and (e->>'result')::int <> 0
         )
     `),
-    // 每个班每天几个人交过，取人最多的那天当「这个班做这题的那天」
-    db
-      .select({
-        className: schema.user.className,
-        day,
-        users: sql<number>`count(distinct ${schema.submission.userId})::int`,
-      })
-      .from(schema.submission)
-      .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-      .where(and(eq(schema.submission.problemId, problem.id), isNotNull(schema.user.className)))
-      .groupBy(schema.user.className, day),
   ])
 
   const solvedUsers = users.filter((row) => row.solved)
@@ -153,56 +134,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
   const classmates = myClassName ? users.filter((row) => row.class_name === myClassName) : []
 
   let classes: ProblemStats["classes"] = null
-  if (!inContest && isTeacherOrAbove(user)) {
-    const byClass = new Map<string, UserRow[]>()
-    for (const row of users) {
-      if (!row.class_name) continue
-      byClass.set(row.class_name, [...(byClass.get(row.class_name) ?? []), row])
-    }
-    const peak = new Map<string, { day: string; users: number }>()
-    for (const row of classDays) {
-      const current = peak.get(row.className!)
-      const later = current && row.users === current.users && row.day > current.day
-      if (!current || row.users > current.users || later) {
-        peak.set(row.className!, { day: row.day, users: row.users })
-      }
-    }
-    const lessonClasses = [...byClass].filter(
-      ([className]) => (peak.get(className)?.users ?? 0) >= CLASS_MIN_TRIED,
-    )
-    // 花名册只数学生：老师、助教也可能挂着班级
-    const sizes = lessonClasses.length
-      ? await db
-          .select({ className: schema.user.className, value: count() })
-          .from(schema.user)
-          .where(
-            and(
-              inArray(
-                schema.user.className,
-                lessonClasses.map(([className]) => className),
-              ),
-              eq(schema.user.adminType, "Regular User"),
-              eq(schema.user.isDisabled, false),
-            ),
-          )
-          .groupBy(schema.user.className)
-      : []
-    classes = lessonClasses
-      .map(([className, rows]) => {
-        const top = failureRows
-          .filter((row) => row.class_name === className)
-          .sort((a, b) => b.n - a.n)[0]
-        return {
-          className,
-          day: peak.get(className)!.day,
-          tried: rows.length,
-          solved: rows.filter((row) => row.solved).length,
-          classSize: sizes.find((row) => row.className === className)?.value ?? 0,
-          topFailure: top ? { result: top.result, count: top.n } : null,
-        }
-      })
-      .sort((a, b) => b.day.localeCompare(a.day))
-  }
+  if (!inContest && isTeacherOrAbove(user)) classes = await classRows(problem.id)
 
   return success(c, {
     locked: false,
@@ -222,3 +154,69 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
     classes,
   } satisfies ProblemStats)
 })
+
+/**
+ * 各班一行，和数据统计「按班级汇总」（statistics/components/ByClass.vue）同一个口径：
+ * 只算学生角色、没禁用的号，班级人数也这么数。那边是前端拿逐条提交现算的（最多 5000 条），
+ * 这里在库里直接聚合，数是一样的。
+ */
+async function classRows(problemId: number): Promise<NonNullable<ProblemStats["classes"]>> {
+  const acceptedList = sql.join(
+    accepted.map((value) => sql`${value}`),
+    sql`, `,
+  )
+  const unjudgedList = sql.join(
+    UNJUDGED_RESULTS.map((value) => sql`${value}`),
+    sql`, `,
+  )
+  const rows = await db.execute<{
+    class_name: string | null
+    tried: number
+    solved: number
+    accepted: number
+    judged: number
+    last_time: string
+  }>(sql`
+    select u.class_name,
+      count(distinct s.user_id)::int as tried,
+      count(distinct s.user_id) filter (where s.result in (${acceptedList}))::int as solved,
+      count(*) filter (where s.result in (${acceptedList}))::int as accepted,
+      count(*) filter (where s.result not in (${unjudgedList}))::int as judged,
+      max(s.create_time) as last_time
+    from ${schema.submission} s
+    join ${schema.user} u on u.id = s.user_id
+    where s.problem_id = ${problemId} and s.contest_id is null
+      and u.admin_type = 'Regular User' and u.is_disabled = false
+    group by u.class_name
+  `)
+  const names = rows.map((row) => row.class_name).filter((name) => name !== null)
+  const sizes = names.length
+    ? await db
+        .select({ className: schema.user.className, value: count() })
+        .from(schema.user)
+        .where(
+          and(
+            inArray(schema.user.className, names),
+            eq(schema.user.adminType, "Regular User"),
+            eq(schema.user.isDisabled, false),
+          ),
+        )
+        .groupBy(schema.user.className)
+    : []
+  return rows
+    .map((row) => {
+      const classSize =
+        (row.class_name && sizes.find((item) => item.className === row.class_name)?.value) ||
+        row.tried
+      return {
+        className: row.class_name,
+        classSize,
+        solved: row.solved,
+        unsolved: row.tried - row.solved,
+        untouched: Math.max(0, classSize - row.tried),
+        correctRate: row.judged ? Math.round((row.accepted / row.judged) * 100) : null,
+        lastTime: row.last_time,
+      }
+    })
+    .sort((a, b) => b.lastTime.localeCompare(a.lastTime))
+}
