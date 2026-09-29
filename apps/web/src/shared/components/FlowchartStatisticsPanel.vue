@@ -142,9 +142,10 @@
 import { formatISO, sub, type Duration } from "date-fns"
 import type { FlowchartStatistics } from "@oj2/contract"
 import { getFlowchartStatistics } from "oj/api"
-import { PANEL_DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER } from "utils/constants"
+import { PANEL_DURATION_OPTIONS, FLOWCHART_CRITERIA_ORDER, STORAGE_KEY } from "utils/constants"
 import { durationFromValue } from "utils/functions"
 import { useHiddenStudents } from "../composables/hiddenStudents"
+import { useStatisticsQuery } from "../composables/statisticsQuery"
 import { Doughnut, Radar, Bar } from "vue-chartjs"
 import {
   Chart as ChartJS,
@@ -189,11 +190,8 @@ const message = useMessage()
 
 const durationOptions: SelectOption[] = [...PANEL_DURATION_OPTIONS]
 
-const query = reactive({
-  username: props.username,
-  problem: props.problem,
-  duration: durationOptions[0].value,
-})
+// 班级、题号、时间段记一小时，理由见 useStatisticsQuery
+const { query, save: saveQuery } = useStatisticsQuery(STORAGE_KEY.FLOWCHART_STATISTICS_QUERY, props)
 
 const data = reactive<FlowchartStatistics>({
   totalCount: 0,
@@ -447,6 +445,7 @@ async function handleStatistics() {
   try {
     const res = await getFlowchartStatistics(duration, query.problem, query.username)
     Object.assign(data, res)
+    saveQuery()
   } catch (error) {
     message.error("获取流程图统计失败")
     console.error("获取流程图统计失败:", error)

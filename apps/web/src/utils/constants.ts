@@ -156,6 +156,8 @@ export const STORAGE_KEY = {
   ADMIN_SIDER_COLLAPSED: "adminSiderCollapsed",
   DEMO_MODE: "demoMode",
   LOGIN_CLASS: "loginClass",
+  STATISTICS_QUERY: "statisticsQuery",
+  FLOWCHART_STATISTICS_QUERY: "flowchartStatisticsQuery",
 }
 
 export const DIFFICULTY = {

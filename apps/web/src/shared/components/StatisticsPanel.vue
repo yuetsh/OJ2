@@ -157,9 +157,10 @@
 import { h } from "vue"
 import { formatISO, sub, type Duration } from "date-fns"
 import { getSubmissionStatistics, getSubmissionStatisticsItems } from "oj/api"
-import { PANEL_DURATION_OPTIONS } from "utils/constants"
+import { PANEL_DURATION_OPTIONS, STORAGE_KEY } from "utils/constants"
 import { useConfigStore } from "../store/config"
 import { useHiddenStudents } from "../composables/hiddenStudents"
+import { useStatisticsQuery } from "../composables/statisticsQuery"
 import { Doughnut } from "vue-chartjs"
 import { Chart as ChartJS, ArcElement, Title, Tooltip, Legend } from "chart.js"
 import { NFlex, NTag, NText, NTooltip, type DataTableRowKey } from "naive-ui"
@@ -385,19 +386,8 @@ const classOptions = computed<SelectOption[]>(
     })) ?? [],
 )
 
-/**
- * 班级/用户**不记本地**：这个选择框每次打开都从空的开始。
- *
- * 曾经把上次的班级写进 localStorage（statisticsClass），下次打开自动带上。但那正是
- * 最危险的地方 —— 下课换了班、或者换个人坐这台机器，上一个人查的班悄悄留在框里，
- * 老师没注意就按了「统计」，看到的整个是别人的班。宁可多选一次。
- * 登录框那份 LOGIN_CLASS 是另一回事：那记的是这台机器的身份，不是一次临时查询。
- */
-const query = reactive({
-  username: props.username,
-  problem: props.problem,
-  duration: options[0].value,
-})
+// 班级、题号、时间段记一小时，理由见 useStatisticsQuery
+const { query, save: saveQuery } = useStatisticsQuery(STORAGE_KEY.STATISTICS_QUERY, props)
 
 const count = reactive({
   total: 0,
@@ -675,6 +665,7 @@ async function fetchStatistics() {
     .map((item) => item.trim())
     .filter(Boolean)
   const res = await getSubmissionStatistics(duration, query.problem, query.username)
+  saveQuery()
   queriedProblemCount.value = new Set(problems.map((p) => p.toLowerCase())).size
   count.total = res.submissionCount
   count.accepted = res.acceptedCount
