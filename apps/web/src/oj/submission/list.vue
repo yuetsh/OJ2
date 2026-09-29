@@ -543,6 +543,14 @@ function clear() {
   query.language = keepMode
 }
 
+/** 现在是不是按整名只看一个人（输入框换成名字标签的时候） */
+const exactPerson = computed(() => !!exactFor.value && query.username === exactFor.value)
+
+function clearPerson() {
+  exactFor.value = ""
+  query.username = ""
+}
+
 function filterUser(username: string) {
   exactFor.value = username
   query.myself = "0"
@@ -703,8 +711,20 @@ function dayBreak(index: number) {
         />
       </template>
 
+      <!-- 按整名只看一个人（「只看他」、协作条、看板点进来）：用户名有八九个字，塞进 108px 的
+           输入框只剩半截，还被清除按钮压着 —— 换成一个带名字的标签，点 × 取消 -->
+      <button
+        v-if="!mine && exactPerson"
+        class="chip on person"
+        :title="`只看 ${query.username}（点一下取消）`"
+        @click="clearPerson"
+      >
+        <Icon icon="ph:user-bold" :width="12" />
+        <UserName :username="query.username" class="person-name" />
+        <Icon icon="ph:x-bold" :width="12" />
+      </button>
       <n-input
-        v-if="!mine"
+        v-else-if="!mine"
         v-model:value="query.username"
         class="w-user"
         size="small"
@@ -840,7 +860,7 @@ function dayBreak(index: number) {
                 <template v-if="isDesktop">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
                   <span class="c-user"><UserName :username="row.username" /></span>
-                  <span class="c-problem">
+                  <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
                     <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                   </span>
                   <span class="c-state">
@@ -883,7 +903,7 @@ function dayBreak(index: number) {
                   <span class="c-user">
                     <UserName :username="row.username" :muted="othersRow(row)" />
                   </span>
-                  <span class="c-problem">
+                  <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
                     <span class="title">
                       <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                     </span>
@@ -1180,6 +1200,15 @@ function dayBreak(index: number) {
   font-weight: 600;
 }
 
+.chip.person {
+  max-width: 180px;
+  padding: 0 10px;
+}
+
+.chip.person .person-name {
+  font-size: 13px;
+}
+
 .lesson b {
   font-weight: 600;
 }
@@ -1195,9 +1224,11 @@ function dayBreak(index: number) {
   display: flex;
 }
 
+/* 列表占多一点：学生的代码大多十来行、一行几十个字，右边给多了是一片空白（用户看过定的）。
+   大屏上列表最宽 1000，再宽一行里全是空隙 */
 .list {
-  width: 560px;
-  flex: none;
+  flex: 0 0 56%;
+  max-width: 1000px;
   box-sizing: border-box;
   border-right: 1px solid v-bind("theme.dividerColor");
   display: flex;
@@ -1205,14 +1236,9 @@ function dayBreak(index: number) {
   min-height: 0;
 }
 
-/* 1366 以下（机房 1280 的屏）左栏收窄一点，右边的代码多留几列 */
-@media (max-width: 1365px) {
-  .list {
-    width: 520px;
-  }
-}
-
 .mobile .list {
+  flex: 1 1 auto;
+  max-width: none;
   width: 100%;
   border-right: 0;
 }
@@ -1343,7 +1369,7 @@ function dayBreak(index: number) {
 }
 
 .c-user {
-  width: 132px;
+  width: 116px;
   flex: none;
   display: flex;
   overflow: hidden;

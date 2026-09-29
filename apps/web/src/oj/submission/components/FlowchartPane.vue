@@ -150,17 +150,32 @@ const canRetry = computed(
         >
           <UserName :username="row.username" />
         </a>
-        <button class="filter-pill" @click="emit('filterUser', row.username)">
-          <Icon icon="ph:funnel-simple-bold" :width="11" />只看他
+        <button
+          class="filter-pill"
+          title="只看他的提交"
+          aria-label="只看他的提交"
+          @click="emit('filterUser', row.username)"
+        >
+          <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
       </div>
       <span class="dot">·</span>
-      <a class="problem" href="#" @click.prevent="emit('openProblem', row)">
+      <a
+        class="problem"
+        href="#"
+        :title="`${row.problemDisplayId} ${row.problemTitle}`"
+        @click.prevent="emit('openProblem', row)"
+      >
         <span class="problem-id">{{ row.problemDisplayId }}</span>
         {{ row.problemTitle }}
       </a>
-      <button class="filter-pill" @click="emit('filterProblem', row.problemDisplayId)">
-        <Icon icon="ph:funnel-simple-bold" :width="11" />只看这题
+      <button
+        class="filter-pill"
+        title="只看这道题的提交"
+        aria-label="只看这道题的提交"
+        @click="emit('filterProblem', row.problemDisplayId)"
+      >
+        <Icon icon="ph:funnel-simple-bold" :width="12" />
       </button>
       <div class="spacer"></div>
       <n-button
@@ -274,6 +289,17 @@ const canRetry = computed(
   gap: 8px;
   white-space: nowrap;
   font-size: 15px;
+  min-width: 0;
+}
+
+/* 顶上固定一行：按方向键翻条时这一行高度不能变，不然下面的代码区跟着上下跳。
+   名字和按钮不缩，题目名太长时省略（全名在 title 里） */
+.head .who {
+  flex-shrink: 0;
+}
+
+.head .problem {
+  flex: 0 1 auto;
 }
 
 .narrow {
@@ -343,10 +369,13 @@ const canRetry = computed(
   text-overflow: ellipsis;
 }
 
+/* 只留漏斗图标（右栏六百来宽，带字的话名字、题目和按钮排不进一行），字在 title 里 */
 .filter-pill {
   flex: none;
+  width: 24px;
   height: 22px;
-  padding: 0 7px;
+  padding: 0;
+  justify-content: center;
   border: 1px solid v-bind("tone('success').background");
   border-radius: 11px;
   background: transparent;
