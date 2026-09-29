@@ -36,7 +36,6 @@ const router = useRouter()
 const configStore = useConfigStore()
 const theme = useThemeVars()
 const tone = useTone()
-const message = useMessage()
 
 const tab = useRouteQuery<string>("tab", "code", { mode: "replace" })
 const className = useRouteQuery<string>("className", "", { mode: "replace" })
@@ -52,9 +51,12 @@ const periodValue = computed<Period>(() =>
     : DEFAULT_PERIOD,
 )
 
-const custom = computed<[number, number] | null>(() =>
-  from.value && to.value ? [Number(from.value), Number(to.value)] : null,
-)
+/** 地址栏里的 from / to 是手改过、不是数字的话当没选（不然 toISOString 抛错整页空白） */
+const custom = computed<[number, number] | null>(() => {
+  const a = Number(from.value)
+  const b = Number(to.value)
+  return from.value && to.value && Number.isFinite(a) && Number.isFinite(b) ? [a, b] : null
+})
 
 /** n-date-picker 按浏览器时区渲染，存取都要平移到东八区（见 utils/functions 的注释） */
 const pickerValue = computed<[number, number] | null>(() =>
@@ -70,22 +72,8 @@ function pickDates(value: [number, number] | null) {
   to.value = String(fromPickerValue(value[1]))
 }
 
-/**
- * 统计接口的「用户名」是 ilike：填 `ks253` 圈一个班。选了班级又填了学生时按学生查，
- * 学生名字不带班级前缀的话补上，免得别的班重名的混进来
- */
-const usernameParam = computed(() => {
-  const name = username.value.trim()
-  if (name) {
-    return className.value && !name.toLowerCase().startsWith("ks")
-      ? `ks${className.value}${name}`
-      : name
-  }
-  return className.value ? `ks${className.value}` : ""
-})
-
-/** 没选班级、没填学生：先按班级汇总（多半是从题目页进来的） */
-const byClass = computed(() => !usernameParam.value)
+/** 学生框：包含匹配。班级另外单独传（按 class_name 精确匹配，见后端 scopedUsers） */
+const studentParam = computed(() => username.value.trim())
 
 const classOptions = computed(() => {
   const list = configStore.config?.classList ?? []
@@ -96,42 +84,64 @@ const classOptions = computed(() => {
 // ---------- 取数 ----------
 
 const loading = ref(false)
-const failed = ref(false)
+const failed = ref("")
 const stats = ref<SubmissionStatistics | null>(null)
 const grid = ref<SubmissionStatisticsGrid | null>(null)
 const flow = ref<FlowchartStatistics | null>(null)
-const rangeText = ref("")
-const withinToday = ref(false)
+
+/**
+ * 这一份数据是按什么条件查出来的。页面上的标签（按班级汇总还是看人、「做完」还是
+ * 「做对过题」、时间范围那句话）跟着它走，不跟着输入框 —— 老师边打字边看时，数据还是
+ * 上一次的，标签先变了就对不上
+ */
+const shown = ref({ byClass: true, explicit: false, rangeText: "", withinToday: false })
 let seq = 0
+
+const ERROR_TEXT: Record<string, string> = {
+  "problem-not-found": "有题号找不到，检查一下是不是打错了",
+  "invalid-request": "一次最多查 20 道题",
+}
 
 async function load() {
   const current = ++seq
   const range = periodRange(periodValue.value, custom.value)
-  rangeText.value = range.text
-  withinToday.value = range.withinToday
   const duration = { start: range.start, end: range.end }
+  const snapshot = {
+    byClass: !studentParam.value && !className.value,
+    explicit: !!problem.value.trim(),
+    rangeText: range.text,
+    withinToday: range.withinToday,
+  }
   loading.value = true
-  failed.value = false
+  failed.value = ""
   try {
     if (tab.value === "flow") {
-      const res = await getFlowchartStatistics(duration, problem.value, usernameParam.value)
+      const res = await getFlowchartStatistics(
+        duration,
+        problem.value,
+        studentParam.value,
+        className.value,
+      )
       if (current !== seq) return
       flow.value = res
     } else {
       const [s, g] = await Promise.all([
-        getSubmissionStatistics(duration, problem.value, usernameParam.value),
-        getSubmissionStatisticsGrid(duration, problem.value, usernameParam.value),
+        getSubmissionStatistics(duration, problem.value, studentParam.value, className.value),
+        getSubmissionStatisticsGrid(duration, problem.value, studentParam.value, className.value),
       ])
       if (current !== seq) return
       stats.value = s
       grid.value = g
     }
+    shown.value = snapshot
   } catch (error) {
     if (current !== seq) return
-    failed.value = true
-    // 题号打错是最常见的：后端 404 problem-not-found
-    const code = (error as { error?: string })?.error
-    if (code === "problem-not-found") message.warning("有题号找不到，检查一下是不是打错了")
+    // 失败了就别留着上一次的结果配这一次的条件 —— 清掉，说清楚为什么
+    stats.value = null
+    grid.value = null
+    flow.value = null
+    const code = (error as { error?: string })?.error ?? ""
+    failed.value = ERROR_TEXT[code] ?? "没拉下来，改一下条件再试"
   } finally {
     if (current === seq) loading.value = false
   }
@@ -146,9 +156,9 @@ watchDebounced([username, problem], load, { debounce: 600, maxWait: 1500 })
 const doneCount = computed(() => stats.value?.data.filter((row) => row.done).length ?? 0)
 /**
  * 没填题号时后端的「做完」是「至少做对一道」—— 一个月里零零散散几十道题，谈不上
- * 「全做完」。这时这一格叫「做对过题」，别和左边「全部 N 道 · 做完 0 人」打架
+ * 「全做完」。这时各处都叫「做对过题」（CodeStats、ByClass 同一个口径）
  */
-const hasProblems = computed(() => !!problem.value.trim())
+const hasProblems = computed(() => shown.value.explicit)
 const personCount = computed(() => stats.value?.personCount ?? 0)
 const judged = computed(() =>
   stats.value ? stats.value.submissionCount - stats.value.judgingCount : 0,
@@ -164,10 +174,10 @@ function openList() {
     name: "submissions",
     query: {
       ...(tab.value === "flow" ? { language: "Flowchart" } : {}),
-      ...(className.value && !username.value ? { className: className.value } : {}),
-      ...(username.value ? { username: usernameParam.value } : {}),
+      ...(className.value ? { className: className.value } : {}),
+      ...(studentParam.value ? { username: studentParam.value } : {}),
       ...(problem.value ? { problem: problem.value } : {}),
-      ...(withinToday.value ? { today: "1" } : {}),
+      ...(shown.value.withinToday ? { today: "1" } : {}),
     },
   }).href
   window.open(href, "_blank")
@@ -227,9 +237,12 @@ function pickClass(value: string) {
         clearable
         @update:value="pickDates"
       />
-      <span v-else class="range">{{ rangeText }}</span>
+      <span v-else class="range">{{ shown.rangeText }}</span>
       <n-spin v-if="loading" :size="14" />
-      <n-text v-if="failed" type="error" class="range">没拉下来，改一下条件再试</n-text>
+      <n-text v-if="failed" type="error" class="range">{{ failed }}</n-text>
+      <span v-if="periodValue === 'custom' && !custom" class="range"
+        >选一下开始和结束的日子，没选先按今天算</span
+      >
       <span class="spacer"></span>
       <n-button
         size="small"
@@ -256,7 +269,7 @@ function pickClass(value: string) {
         <StatItem label="提交" :value="stats.submissionCount" unit="条" />
         <StatItem
           label="正确率"
-          :value="`${Math.round(stats.correctRate)}%`"
+          :value="stats.submissionCount ? `${Math.round(stats.correctRate)}%` : '—'"
           :unit="stats.judgingCount ? `判题中 ${stats.judgingCount}` : ''"
         />
         <template v-if="personCount">
@@ -299,8 +312,8 @@ function pickClass(value: string) {
           <span class="ring-label">班级<br />完成度</span>
         </span>
       </div>
-      <ByClass v-if="byClass" :grid="grid" @pick="pickClass" />
-      <CodeStats v-else :stats="stats" :grid="grid" />
+      <ByClass v-if="shown.byClass" :grid="grid" :explicit="shown.explicit" @pick="pickClass" />
+      <CodeStats v-else :stats="stats" :grid="grid" :explicit="shown.explicit" />
     </template>
   </div>
 </template>
@@ -393,5 +406,42 @@ function pickClass(value: string) {
   font-size: 12px;
   line-height: 1.5;
   color: v-bind("theme.textColor3");
+}
+
+/* 手机：老师很少在手机上看统计，只保证不坏 —— 筛选和数字行折行，整页自然滚动 */
+@media (max-width: 767px) {
+  .page {
+    height: auto;
+    min-height: calc(100vh - 56px);
+  }
+
+  .filters,
+  .summary {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    row-gap: 10px;
+    white-space: normal;
+  }
+
+  .summary {
+    gap: 12px 24px;
+  }
+
+  .vsep,
+  .spacer {
+    display: none;
+  }
+
+  .w-class,
+  .w-user,
+  .w-period {
+    width: calc(50% - 4px);
+  }
+
+  .w-problem,
+  .w-dates {
+    width: 100%;
+  }
 }
 </style>

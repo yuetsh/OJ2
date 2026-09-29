@@ -35,11 +35,15 @@ function todayStart(now: number) {
   return dayStartOf(p.year, p.month, p.day)
 }
 
-/** 这学期从哪天起：9 月到次年 2 月算秋季学期（9 月 1 日起），3 到 8 月算春季（3 月 1 日起） */
+/**
+ * 这学期从哪天起：9 月到次年 1 月算秋季学期（9 月 1 日起），2 到 8 月算春季（2 月 1 日起）。
+ * 春季不从 3 月算：2 月下旬就开学了，按 3 月 1 日算的话开学头一两周「这学期」会把整个
+ * 上学期和寒假都带进来
+ */
 function termStart(now: number) {
   const p = zonedParts(new Date(now))!
   if (p.month >= 9) return dayStartOf(p.year, 9, 1)
-  if (p.month >= 3) return dayStartOf(p.year, 3, 1)
+  if (p.month >= 2) return dayStartOf(p.year, 2, 1)
   return dayStartOf(p.year - 1, 9, 1)
 }
 

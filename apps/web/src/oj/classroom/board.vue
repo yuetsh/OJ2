@@ -142,12 +142,19 @@ function nameOf(student: ClassBoardStudent) {
  * 请假隐藏（原来在「数据统计」弹框里，统计改成回头看之后挪到这儿 —— 盯这节课的是看板）。
  * 请假、转班、学号错了的那几个一直挂在「还没交过」里，会盖住真正要去看的人。
  * 藏两个小时（够一节课），下节课自动回来；只记在这台电脑上，换人换机器都不继承。
- * 键沿用统计弹框那份，老师上午藏的人这里接着藏着
+ * 键沿用统计弹框那份，老师上午藏的人这里接着藏着。
+ *
+ * **只藏「还没交过」的人**：一个学生只要今天交过、或者正在举手，就不算请假，照常显示、
+ * 照常算进人数。迟到的学生后来交了题、卡住了、举手了，老师得看得见
  */
-const { hideMode, hideStudent, showAll, isHidden } = useHiddenStudents("oj_hidden_students")
-const hiddenStudents = computed(() =>
-  (board.value?.students ?? []).filter((student) => isHidden(student.username)),
-)
+const { hideMode, hideStudent, unhide, isHidden } = useHiddenStudents("oj_hidden_students")
+function hiddenNow(student: ClassBoardStudent) {
+  return !student.lastSubmitAt && !helpOf(student) && isHidden(student.username)
+}
+const hiddenStudents = computed(() => (board.value?.students ?? []).filter(hiddenNow))
+function restoreHidden() {
+  unhide(hiddenStudents.value.map((student) => student.username))
+}
 
 const students = computed(() =>
   [...(board.value?.students ?? [])]
@@ -328,7 +335,7 @@ function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) 
           <n-alert
             v-if="idle.length || hiddenStudents.length"
             type="warning"
-            :title="`今天还没交过（${idle.length} 人）`"
+            :title="idle.length ? `今天还没交过（${idle.length} 人）` : '今天没交过的都隐藏了'"
             class="section"
           >
             <n-flex align="center" :size="10" class="hide-bar">
@@ -341,7 +348,7 @@ function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) 
                 size="tiny"
                 text
                 type="primary"
-                @click="showAll"
+                @click="restoreHidden"
               >
                 隐藏了 {{ hiddenStudents.length }} 位：{{ hiddenStudents.map(nameOf).join("、") }} ·
                 恢复

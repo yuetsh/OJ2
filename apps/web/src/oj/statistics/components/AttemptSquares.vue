@@ -9,6 +9,7 @@ const codeCache = new Map<string, Submission>()
 </script>
 
 <script setup lang="ts">
+import { useThemeVars } from "naive-ui"
 import { getSubmission } from "oj/api"
 import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, SubmissionStatus } from "utils/constants"
 import { parseTime } from "utils/functions"
@@ -28,6 +29,7 @@ const props = withDefaults(
 )
 
 const tone = useTone()
+const theme = useThemeVars()
 
 function toneOf(result: number): Tone {
   if (result === SubmissionStatus.accepted) return "success"
@@ -131,7 +133,8 @@ const cells = computed(() =>
 }
 
 .square:hover {
-  outline: 2px solid currentColor;
+  /* button 的 color 是浏览器默认的黑，暗色下 currentColor 描边会看不见 */
+  outline: 2px solid v-bind("theme.textColor2");
   outline-offset: 1px;
 }
 

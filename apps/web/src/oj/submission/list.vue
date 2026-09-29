@@ -40,8 +40,7 @@ import { classLabel, submissionClockText, submissionDayText } from "./utils"
  * 完成情况在课堂看板和「数据统计」里，这页不重复造一张表。
  */
 
-// 右栏和两个统计弹框都不在关键路径上：右栏要等选中一条才有内容，弹框默认关着
-// （光 chart.js 就 197KB）
+// 右栏和今日统计弹框都不在关键路径上：右栏要等选中一条才有内容，弹框默认关着
 const SubmissionPane = defineAsyncComponent(() => import("./components/SubmissionPane.vue"))
 const FlowchartPane = defineAsyncComponent(() => import("./components/FlowchartPane.vue"))
 const TodayStatistics = defineAsyncComponent(() => import("./components/TodayStatistics.vue"))
@@ -128,6 +127,9 @@ function fetchPage() {
       limit: query.limit,
       today: query.today,
       grade: query.result,
+      ...(exactFor.value && query.username === exactFor.value
+        ? { exactUsername: "1" as const }
+        : {}),
     })
   }
   return getSubmissions({
@@ -162,7 +164,13 @@ async function listSubmissions() {
     total.value = res.total
     newCount.value = 0
     loaded.value = true
+    // 翻了页、换了条件就回到列表顶上（往回翻到上一页末尾的，settleSelection 会滚到那一条）
+    const scroller = document.querySelector(".rows")
+    if (scroller) scroller.scrollTop = 0
     settleSelection()
+  } catch {
+    // 失败了别把「落地后停在哪一头」留给下一次不相干的加载
+    if (seq === requestSeq) pendingJump = null
   } finally {
     if (seq === requestSeq) loading.value = false
   }
@@ -201,8 +209,39 @@ watch(
     if (route.name === "submissions") getTodayCount()
   },
 )
-// 登录态一变，能看哪些代码就变了（showLink 是后端逐行算的）
-watch(() => userStore.isAuthed, listSubmissions)
+// 登录态一变，能看哪些代码就变了（showLink 是后端逐行算的）。掉了登录还停在流程图上的话
+// 退回代码：流程图列表要登录才能看，而没登录时那个切换按钮不显示，会卡在一片报错里出不去
+watch(
+  () => userStore.isAuthed,
+  (authed) => {
+    if (!authed && query.language === "Flowchart") query.language = ""
+    else listSubmissions()
+  },
+)
+
+/**
+ * 地址栏整个换掉时（顶栏「提交」「我的提交」、浏览器后退），地址里没写的筛选要回到默认值。
+ * usePagination 只同步地址里**有**的键 —— 在 `?myself=1` 上点顶栏「提交」，地址已经变成
+ * `/submission`，页面却还停在「我的」
+ */
+const QUERY_DEFAULTS: Record<string, string> = {
+  username: "",
+  className: "",
+  result: "",
+  myself: "0",
+  problem: "",
+  language: "",
+  today: "0",
+}
+watch(
+  () => route.query,
+  (next) => {
+    const writable = query as unknown as Record<string, string>
+    for (const [key, value] of Object.entries(QUERY_DEFAULTS)) {
+      if (next[key] === undefined && writable[key] !== value) writable[key] = value
+    }
+  },
+)
 
 // ==================== 选中与翻阅 ====================
 
@@ -254,6 +293,8 @@ const maxPage = computed(() => Math.max(1, Math.ceil(total.value / query.limit))
 function move(step: 1 | -1) {
   // 这一页一条能看的都没有（学生看全站时常见）：不翻页，不然按一下翻一页停不下来
   if (!navigable.value.length) return
+  // 上一次跨页还没回来：按住 ↓ 或者在页尾连按两下，不然会整页跳过
+  if (loading.value || pendingJump) return
   const all = rows.value
   const start = all.findIndex((row) => row.id === selectedId.value)
   for (let i = start + step; i >= 0 && i < all.length; i += step) {
@@ -272,16 +313,21 @@ const [todayPanel, toggleTodayPanel] = useToggle(false)
 
 onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
   if (!isDesktop.value || todayPanel.value) return
-  // 焦点在输入框、下拉框里时不抢方向键
+  // 别的控件已经处理了这次按键（下拉框自己会开菜单、换选项）
+  if (e.defaultPrevented) return
   const target = e.target as HTMLElement | null
-  if (
-    target &&
-    (target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
+  if (target) {
+    // 「代码 / 流程图」「全部 / 我的」是单选框：点过之后焦点停在上面，浏览器默认会拿方向键
+    // 切换选项 —— 老师想看下一条，结果模式被切了。单选框照常换条，下面的 preventDefault 挡掉切换
+    const radio = target.tagName === "INPUT" && (target as HTMLInputElement).type === "radio"
+    // 焦点在输入框、下拉框、弹框里时不抢方向键
+    if (
+      (!radio && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) ||
       target.isContentEditable ||
-      target.closest(".n-base-select-menu, .n-dropdown-menu, .n-modal"))
-  ) {
-    return
+      target.closest(".n-base-selection, .n-base-select-menu, .n-dropdown-menu, .n-modal")
+    ) {
+      return
+    }
   }
   if (!rows.value.length) return
   e.preventDefault()
@@ -613,6 +659,16 @@ function dayBreak(index: number) {
       <span v-if="userStore.isAuthed" class="vsep"></span>
 
       <!-- 「我的」时这节课 / 班级 / 学生都用不上：后端只看自己时本来就不认它们 -->
+      <!-- 学生界面没有班级下拉：地址里带着班级（比如从统计页、看板跳过来）就摆一个能点掉的标签，
+           不然一直被一个看不见的条件筛着 -->
+      <button
+        v-if="!teacher && query.className"
+        class="chip on"
+        title="点一下去掉班级筛选"
+        @click="query.className = ''"
+      >
+        {{ classLabel(query.className) }}<Icon icon="ph:x-bold" :width="12" />
+      </button>
       <template v-if="teacher && !inContest && !mine">
         <button
           class="lesson"
@@ -741,6 +797,12 @@ function dayBreak(index: number) {
         size="small"
         :options="flowMode ? gradeOptions : resultOptions"
       />
+      <n-select
+        v-if="!inContest && !flowMode"
+        v-model:value="query.language"
+        size="small"
+        :options="languageOptions"
+      />
       <n-flex align="center">
         <button v-if="!inContest" class="chip" :class="{ on: today }" @click="today = !today">
           <Icon v-if="today" icon="ph:check-bold" :width="12" />今天
@@ -762,18 +824,39 @@ function dayBreak(index: number) {
               <div v-if="dayBreak(index)" class="day">{{ dayBreak(index) }}</div>
               <div
                 class="row"
-                :class="{ on: row.id === selectedId && !isMobile }"
+                :class="{ on: row.id === selectedId && !isMobile, mobile: isMobile }"
                 :data-row-id="row.id"
                 @click="rowClicked(row)"
               >
-                <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
-                <span class="c-user"><UserName :username="row.username" /></span>
-                <span class="c-problem">
-                  <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
-                </span>
-                <span class="c-state">
-                  <FlowchartState :status="row.status" :grade="row.aiGrade" :score="row.aiScore" />
-                </span>
+                <template v-if="isDesktop">
+                  <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
+                  <span class="c-user"><UserName :username="row.username" /></span>
+                  <span class="c-problem">
+                    <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
+                  </span>
+                  <span class="c-state">
+                    <FlowchartState
+                      :status="row.status"
+                      :grade="row.aiGrade"
+                      :score="row.aiScore"
+                    />
+                  </span>
+                </template>
+                <template v-else>
+                  <div class="m-line">
+                    <UserName :username="row.username" />
+                    <div class="spacer"></div>
+                    <FlowchartState
+                      :status="row.status"
+                      :grade="row.aiGrade"
+                      :score="row.aiScore"
+                    />
+                  </div>
+                  <div class="m-line sub">
+                    <span>{{ submissionClockText(row.createTime) }}</span>
+                    <span class="title">{{ row.problemDisplayId }} {{ row.problemTitle }}</span>
+                  </div>
+                </template>
               </div>
             </template>
           </template>
@@ -815,12 +898,14 @@ function dayBreak(index: number) {
                   </span>
                   <span class="c-state"><StatusPill :result="row.result" /></span>
                   <span v-if="!teacher" class="c-lock">
-                    <Icon
+                    <!-- title 放在外层 span：挂在 svg 上 Chrome 不出提示 -->
+                    <span
                       v-if="!row.showLink"
-                      icon="ph:lock-simple"
-                      :width="13"
+                      class="lock-hint"
                       :title="othersRow(row) ? '别人的代码看不到' : '在题单里做完才能看'"
-                    />
+                    >
+                      <Icon icon="ph:lock-simple" :width="13" />
+                    </span>
                   </span>
                 </template>
                 <template v-else>
@@ -905,19 +990,25 @@ function dayBreak(index: number) {
         <FlowchartPane
           v-if="flowMode"
           :row="selectedRow as FlowchartSubmissionListItem"
-          :teacher="false"
+          :teacher="teacher"
           :position="null"
           narrow
+          @filter-user="(name: string) => ((mobilePane = false), filterUser(name))"
+          @filter-problem="(id: string) => ((mobilePane = false), filterProblem(id))"
           @open-problem="openProblem"
+          @retry="retryFlowchart"
         />
         <SubmissionPane
           v-else
           :row="selectedRow as SubmissionListItem"
-          :teacher="false"
+          :teacher="teacher"
           :contest="inContest"
           :position="null"
           narrow
+          @filter-user="(name: string) => ((mobilePane = false), filterUser(name))"
+          @filter-problem="(id: string) => ((mobilePane = false), filterProblem(id))"
           @open-problem="openProblem"
+          @rejudge="rejudge"
         />
       </div>
       <!-- 手机没有方向键：上一条 / 下一条换成按钮，走的是同一个 move() -->
@@ -932,7 +1023,12 @@ function dayBreak(index: number) {
           <span class="mobile-pos">{{
             position ? `${position.index} / ${position.count}` : ""
           }}</span>
-          <n-button @click="move(1)">下一条</n-button>
+          <n-button
+            :disabled="!position || (position.index >= position.count && query.page >= maxPage)"
+            @click="move(1)"
+          >
+            下一条
+          </n-button>
         </n-flex>
       </template>
     </n-drawer-content>
@@ -1157,6 +1253,11 @@ function dayBreak(index: number) {
   font-size: 14px;
 }
 
+/* 往上翻时选中那一行别被吸顶的日期行挡住 */
+.row {
+  scroll-margin-top: 28px;
+}
+
 .row:hover {
   background: v-bind("theme.hoverColor");
 }
@@ -1269,6 +1370,10 @@ function dayBreak(index: number) {
   flex: none;
   display: flex;
   justify-content: flex-end;
+}
+
+.lock-hint {
+  display: flex;
 }
 
 .c-lock {

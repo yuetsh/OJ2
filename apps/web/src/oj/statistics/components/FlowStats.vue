@@ -56,9 +56,11 @@ const gradeColor = computed(() => ({
 }))
 
 /** 拿到 A / S 算完成（和题单、课堂条的口径一致） */
-const goodCount = computed(
-  () => props.data.people.filter((row) => row.bestGrade === "S" || row.bestGrade === "A").length,
-)
+const goodCount = computed(() => {
+  // 查几道题就要每道都拿到 A / S；没填题号时拿到一道就算
+  const need = Math.max(1, props.data.problemCount)
+  return props.data.people.filter((row) => row.goodProblems >= need).length
+})
 const personCount = computed(() => props.data.personCount || props.data.people.length)
 
 const gradeData = computed(() => ({
@@ -285,6 +287,7 @@ function gradeStyle(grade: string | null) {
         </div>
         <div class="card people">
           <div class="card-title">每人最好的一次（没交的在前）</div>
+          <div v-if="data.peopleTruncated" class="muted">人太多，只列了成绩靠后的 500 位</div>
           <div class="people-list">
             <div v-for="row in people" :key="row.username" class="person">
               <b class="p-name" :title="row.username">{{ row.name }}</b>
@@ -446,5 +449,48 @@ function gradeStyle(grade: string | null) {
   padding: 60px 16px;
   text-align: center;
   color: v-bind("theme.textColor3");
+}
+
+/* 手机：卡片一张一行 */
+@media (max-width: 767px) {
+  .flow-stats {
+    flex: none;
+  }
+
+  .summary {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    padding: 10px 14px;
+  }
+
+  .body {
+    flex: none;
+    overflow: visible;
+    padding: 12px 14px;
+  }
+
+  .row-cards,
+  .row-cards.bottom {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .card.grade,
+  .card.radar,
+  .card.people {
+    width: 100%;
+  }
+
+  .card .chart,
+  .card .cloud {
+    flex: none;
+    height: 240px;
+  }
+
+  .card.people .people-list {
+    flex: none;
+    max-height: 360px;
+  }
 }
 </style>

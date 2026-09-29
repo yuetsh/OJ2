@@ -49,29 +49,41 @@ const evaluating = computed(
     props.row.status === FlowchartSubmissionStatus.PROCESSING,
 )
 
+/**
+ * 按 id 缓存，重新评分一开始（状态回到排队 / 评分中）就把这一条扔掉。原来按「id + 状态」
+ * 缓存，评完 → 排队 → 评分中 → 评完 转一圈回来正好命中重评之前的旧评语
+ */
+let loadSeq = 0
+
 async function load() {
   const row = props.row
+  const seq = ++loadSeq
   failed.value = false
   bigOpen.value = false
+  if (evaluating.value) cache.delete(row.id)
   if (!row.showLink) {
     detail.value = null
     return
   }
-  const key = `${row.id}:${row.status}`
-  let res = cache.get(key)
-  if (!res) {
+  let res = cache.get(row.id)
+  if (!res || res.status !== row.status) {
     loading.value = true
     try {
       res = await getFlowchartSubmission(row.id)
-      if (!evaluating.value) cache.set(key, res)
+      if (seq !== loadSeq) return
+      if (!evaluating.value && res.status === props.row.status) cache.set(row.id, res)
     } catch {
-      if (props.row.id === row.id) failed.value = true
+      if (seq !== loadSeq) return
+      failed.value = true
+      // 别让上一条的图留在那儿，旁边却写着「没拉下来」
+      detail.value = null
+      if (graph.value) graph.value.innerHTML = ""
       return
     } finally {
-      if (props.row.id === row.id) loading.value = false
+      if (seq === loadSeq) loading.value = false
     }
   }
-  if (props.row.id !== row.id) return
+  if (seq !== loadSeq) return
   detail.value = res
   await nextTick()
   await renderFlowchart(graph.value, res.mermaidCode)
@@ -131,8 +143,14 @@ const canRetry = computed(
   <section class="pane" :class="{ narrow }">
     <div class="head">
       <div class="who">
-        <UserName :username="row.username" />
-        <button v-if="teacher" class="filter-pill" @click="emit('filterUser', row.username)">
+        <a
+          class="user-link"
+          :href="`/user?name=${encodeURIComponent(row.username)}`"
+          target="_blank"
+        >
+          <UserName :username="row.username" />
+        </a>
+        <button class="filter-pill" @click="emit('filterUser', row.username)">
           <Icon icon="ph:funnel-simple-bold" :width="11" />只看他
         </button>
       </div>
@@ -141,11 +159,7 @@ const canRetry = computed(
         <span class="problem-id">{{ row.problemDisplayId }}</span>
         {{ row.problemTitle }}
       </a>
-      <button
-        v-if="teacher"
-        class="filter-pill"
-        @click="emit('filterProblem', row.problemDisplayId)"
-      >
+      <button class="filter-pill" @click="emit('filterProblem', row.problemDisplayId)">
         <Icon icon="ph:funnel-simple-bold" :width="11" />只看这题
       </button>
       <div class="spacer"></div>
@@ -171,13 +185,22 @@ const canRetry = computed(
 
     <div v-if="!row.showLink" class="locked">
       <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
-      <span class="locked-title">别人画的流程图看不到</span>
+      <!-- 列表项里没有 userId，分不出是别人的还是自己被题单挡住的，文案两种都说得通 -->
+      <span class="locked-title">这张流程图看不到</span>
+      <span class="muted">别人画的看不到；自己的在题单里做完这道题就能看到。</span>
     </div>
     <div v-else class="body">
       <div class="graph-box">
-        <n-alert v-if="renderError" type="error" title="流程图画不出来">
-          {{ renderError }}
-        </n-alert>
+        <!-- mermaid 的报错是英文，学生看自己的图也会碰到：先说中文，原文折起来 -->
+        <div v-if="renderError" class="render-error">
+          <b>这张流程图画不出来</b>
+          <span class="muted">可能是画的时候有框没连上，或者文字里有特殊符号。</span>
+          <n-collapse>
+            <n-collapse-item title="原始报错" name="raw">
+              <pre class="raw">{{ renderError }}</pre>
+            </n-collapse-item>
+          </n-collapse>
+        </div>
         <div v-show="!renderError" ref="graph" class="graph"></div>
         <n-spin v-if="loading && !shown" size="small" />
         <span v-if="failed" class="muted"
@@ -275,6 +298,29 @@ const canRetry = computed(
 .narrow .graph-box {
   flex: none;
   height: 320px;
+}
+
+.user-link {
+  display: flex;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.render-error {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  align-self: stretch;
+}
+
+.raw {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .who {

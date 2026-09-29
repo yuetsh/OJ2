@@ -9,7 +9,11 @@ import { classLabel, submissionDayText } from "oj/submission/utils"
  * 没选班级、也没填学生时（多半是从题目页进来，只带了题号）：先按班级列出来，
  * 点一个班再看人。「一道没交」要花名册人数，后端在这种情况下给 classSizes。
  */
-const props = defineProps<{ grid: SubmissionStatisticsGrid }>()
+const props = defineProps<{
+  grid: SubmissionStatisticsGrid
+  /** 题号是老师填的。没填时「做完」没法谈（范围里各班各做各的题），改成「做对过题」 */
+  explicit: boolean
+}>()
 const emit = defineEmits<{ pick: [className: string] }>()
 
 const theme = useThemeVars()
@@ -36,8 +40,12 @@ const classes = computed(() => {
         const solved = new Set(
           row.submissions.filter((item) => isAc(item.result)).map((item) => item.problemDisplayId),
         )
-        if (need.every((pid) => solved.has(pid))) done++
-        submissions += row.submissions.length
+        if (props.explicit ? need.every((pid) => solved.has(pid)) : solved.size > 0) done++
+        // 正确率的分母不算还在判的，和数字行一个口径
+        submissions += row.submissions.filter(
+          (item) =>
+            item.result !== SubmissionStatus.pending && item.result !== SubmissionStatus.judging,
+        ).length
         accepted += row.submissions.filter((item) => isAc(item.result)).length
         const lastTime = row.submissions.at(-1)?.createTime ?? ""
         if (lastTime > last) last = lastTime
@@ -62,8 +70,8 @@ const classes = computed(() => {
   <div class="by-class">
     <div class="cols">
       <span class="c-class">班级</span>
-      <span class="c-done">做完</span>
-      <span class="c-n">交了没对</span>
+      <span class="c-done">{{ explicit ? "做完" : "做对过题" }}</span>
+      <span class="c-n">{{ explicit ? "交了没对" : "一道没对" }}</span>
       <span class="c-n">没交</span>
       <span class="c-n">正确率</span>
       <span class="c-last">最近一次</span>
@@ -97,6 +105,9 @@ const classes = computed(() => {
         </n-button>
       </div>
       <div v-if="!classes.length" class="empty">这段时间没有人交</div>
+      <p v-if="grid.truncated" class="note warn" :style="{ color: tone('warning').color }">
+        范围太大，只取了最近的 5000 条提交，更早的班级可能少算或不在表里。缩短时间段就准了。
+      </p>
       <p class="note">没选班级，先按班级列出来；点一个班再看每个人。「做完」是这几道题都做对了。</p>
     </div>
   </div>
@@ -200,5 +211,23 @@ const classes = computed(() => {
   padding: 10px 20px;
   font-size: 12px;
   color: v-bind("theme.textColor3");
+}
+
+/* 手机：这张表列多，横着滑 */
+@media (max-width: 767px) {
+  .by-class {
+    flex: none;
+    overflow-x: auto;
+  }
+
+  .cols,
+  .row {
+    min-width: 820px;
+  }
+
+  .rows {
+    flex: none;
+    overflow: visible;
+  }
 }
 </style>

@@ -39,7 +39,6 @@ import {
   type UserBadge,
   type FlowchartStatistics,
   type SubmissionStatistics,
-  type SubmissionStatisticsItems,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
@@ -174,27 +173,15 @@ export function adminRejudge(id: string) {
   return api.post<{ ok: boolean }>(`submissions/${encodeURIComponent(id)}/rejudge`)
 }
 
-/**
- * 统计面板展开一行时拉这个人的明细。username 这里要**精确**到人，
- * 和上面那个按班级模糊匹配的不是一回事。
- */
-export function getSubmissionStatisticsItems(
-  duration: { start?: string; end: string },
-  username: string,
-  problemDisplayId?: string,
-) {
-  return api.get<SubmissionStatisticsItems>("submissions/statistics/items", {
-    params: { ...duration, problemDisplayId, username },
-  })
-}
-
 export function getSubmissionStatistics(
   duration: { start?: string; end: string },
   problemDisplayId?: string,
   username?: string,
+  /** 班级（user.class_name）精确匹配。别再拼 `ks231` 塞进 username —— 会连带 2311、2312 班 */
+  className?: string,
 ) {
   return api.get<SubmissionStatistics>("submissions/statistics", {
-    params: { ...duration, problemDisplayId, username },
+    params: { ...duration, problemDisplayId, username, className },
   })
 }
 
@@ -203,9 +190,10 @@ export function getSubmissionStatisticsGrid(
   duration: { start?: string; end: string },
   problemDisplayId?: string,
   username?: string,
+  className?: string,
 ) {
   return api.get<SubmissionStatisticsGrid>("submissions/statistics/grid", {
-    params: { ...duration, problemDisplayId, username },
+    params: { ...duration, problemDisplayId, username, className },
   })
 }
 
@@ -430,6 +418,8 @@ export function getFlowchartSubmission(id: string) {
 
 export function getFlowchartSubmissions(params: {
   username?: string
+  /** "1" = username 整名匹配，同代码提交列表 */
+  exactUsername?: "1"
   className?: string
   problemDisplayId?: string
   myself?: string
@@ -445,9 +435,10 @@ export function getFlowchartStatistics(
   duration: { start?: string; end: string },
   problemDisplayId?: string,
   username?: string,
+  className?: string,
 ) {
   return api.get<FlowchartStatistics>("flowcharts/statistics", {
-    params: { ...duration, problemDisplayId, username },
+    params: { ...duration, problemDisplayId, username, className },
   })
 }
 

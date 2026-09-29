@@ -30,7 +30,7 @@ import UserName from "./UserName.vue"
  */
 const props = defineProps<{
   row: SubmissionListItem
-  /** 老师那套：「只看他」「只看这题」、重新判题、逐个测试点 */
+  /** 老师那套：重新判题、逐个测试点、复制两项收进「⋯」 */
   teacher: boolean
   /** 在比赛的提交列表里（不能重判，题目链接走比赛） */
   contest: boolean
@@ -55,8 +55,9 @@ const tone = useTone()
 const { copyToCat, copyToProblem } = useCopySubmission()
 
 /**
- * 详情按「id + 结果」缓存：同一条判完之前结果会变，变了要重拉；判完的代码不会再变，
- * 老师在几行之间来回按方向键时不用每次都等网络。
+ * 详情按提交 id 缓存：判完的代码和结果不会再变，老师在几行之间来回按方向键时不用每次都等网络。
+ * 还在判的不进缓存；一条被重判（结果回到「等待评分」）就把它的缓存扔掉 —— 重判后结果
+ * 可能没变（答案错误还是答案错误），但测试点和报错是新的
  */
 const cache = new Map<string, Submission>()
 const detail = ref<Submission | null>(null)
@@ -68,30 +69,34 @@ const judging = computed(
     props.row.result === SubmissionStatus.pending || props.row.result === SubmissionStatus.judging,
 )
 
+// 每次加载一个序号：同一条先按「判题中」拉了一次、判完又拉一次时，晚回来的旧请求不能盖掉新的
+let loadSeq = 0
+
 async function load() {
   const row = props.row
+  const seq = ++loadSeq
   failed.value = false
+  if (judging.value) cache.delete(row.id)
   if (!row.showLink) {
     detail.value = null
     return
   }
-  const key = `${row.id}:${row.result}`
-  const hit = cache.get(key)
-  if (hit) {
+  const hit = cache.get(row.id)
+  if (hit && hit.result === row.result) {
     detail.value = hit
     return
   }
-  // 换行时先别清空：接口一般几十毫秒就回来，清了会闪一下白
   loading.value = true
   try {
     const res = await getSubmission(row.id)
-    if (props.row.id !== row.id) return
-    if (!judging.value) cache.set(key, res)
+    if (seq !== loadSeq) return
+    // 列表那边还在判、详情这边已经判完了（或反过来）都不缓存，等两边对上
+    if (!judging.value && res.result === props.row.result) cache.set(row.id, res)
     detail.value = res
   } catch {
-    if (props.row.id === row.id) failed.value = true
+    if (seq === loadSeq) failed.value = true
   } finally {
-    if (props.row.id === row.id) loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -222,9 +227,15 @@ function openStandalone() {
   <section class="pane" :class="{ narrow }">
     <div class="head">
       <div class="who">
-        <UserName :username="row.username" :muted="!!locked && locked !== 'problemset'" />
+        <!-- 点名字开个人主页（原来列表里的用户名就是这个链接） -->
+        <a
+          class="user-link"
+          :href="`/user?name=${encodeURIComponent(row.username)}`"
+          target="_blank"
+        >
+          <UserName :username="row.username" :muted="!!locked && locked !== 'problemset'" />
+        </a>
         <button
-          v-if="teacher"
           class="filter-pill"
           title="只看这个人的提交"
           @click="emit('filterUser', row.username)"
@@ -238,7 +249,6 @@ function openStandalone() {
         {{ row.problemTitle }}
       </a>
       <button
-        v-if="teacher"
         class="filter-pill"
         title="只看这道题的提交"
         @click="emit('filterProblem', row.problemDisplayId)"
@@ -255,12 +265,13 @@ function openStandalone() {
         题单 {{ row.problemSet.title }}
       </a>
       <div class="spacer"></div>
+      <!-- 重判不用等代码拉下来：代码拉不下来的那条，恰恰可能要重判 -->
+      <n-button v-if="canRejudge" size="small" @click="emit('rejudge', row.id)">
+        <template #icon><Icon icon="ph:arrow-clockwise" /></template>
+        重新判题
+      </n-button>
       <template v-if="shown">
         <template v-if="teacher">
-          <n-button v-if="canRejudge" size="small" @click="emit('rejudge', row.id)">
-            <template #icon><Icon icon="ph:arrow-clockwise" /></template>
-            重新判题
-          </n-button>
           <n-button
             size="small"
             quaternary
@@ -427,6 +438,16 @@ function openStandalone() {
 
 .narrow .head .spacer {
   flex-basis: 100%;
+}
+
+.user-link {
+  display: flex;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.user-link:hover :deep(.name) {
+  color: v-bind("theme.primaryColor");
 }
 
 .who {

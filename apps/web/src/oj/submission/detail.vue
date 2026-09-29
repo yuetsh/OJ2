@@ -16,7 +16,6 @@ import { useCopySubmission } from "./composables/copySubmission"
 
 const props = defineProps<{
   submissionID: string
-  problemID?: string
   submission?: Submission
   hideList?: boolean
 }>()

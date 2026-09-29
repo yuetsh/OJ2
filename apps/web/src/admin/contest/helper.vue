@@ -282,7 +282,6 @@ onMounted(loadData)
       <SubmissionDetail
         v-if="currentSubmission"
         :submission="currentSubmission"
-        :problemID="currentSubmission.problemDisplayId"
         :submissionID="currentSubmission.id"
         hideList
         @copied="toggleCodePanel(false)"
