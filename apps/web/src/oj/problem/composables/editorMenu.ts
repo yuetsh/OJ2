@@ -12,10 +12,12 @@ import { useTeacherCollab } from "./teacherCollab"
 import { useProblemPageContext } from "./problemPageContext"
 
 /**
- * 「课堂统计」弹窗开着没有。弹窗挂在题目页上（StatisticsModal），菜单可能在工具栏里、
- * 也可能在手机页签行的「⋯」里，所以这个开关放在模块级，大家共用一个
+ * 「课堂统计」：新标签打开数据统计页，带上这道题（原来是题目页上的弹框）。
+ * 工具栏按钮和手机页签行的「⋯」都走这一个。新标签是因为老师多半正开着这道题在看
  */
-export const statisticsOpen = ref(false)
+export function openStatistics(problemDisplayId: string) {
+  window.open(`/statistics?problem=${encodeURIComponent(problemDisplayId)}`, "_blank")
+}
 
 /**
  * 编辑器的「更多」菜单：去自测猫 / 复制代码 / 重置代码 / 编辑题目，放不下时再加上课堂统计。
@@ -111,7 +113,7 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
   function select(key: string) {
     switch (key) {
       case "statistics":
-        statisticsOpen.value = true
+        openStatistics(problem.value!._id)
         return true
       case "testcat":
         goTestCat()

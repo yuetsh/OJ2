@@ -13,7 +13,7 @@ import { Icon } from "@iconify/vue"
 import { NFlex, useThemeVars } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 import { useProblemPageContext } from "../composables/problemPageContext"
-import { statisticsOpen, useEditorMenu } from "../composables/editorMenu"
+import { openStatistics, useEditorMenu } from "../composables/editorMenu"
 import { useTeacherCollab } from "../composables/teacherCollab"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
@@ -228,7 +228,7 @@ const changeLanguage = (v: LANGUAGE) => {
     <n-button
       v-if="ctx.classStats && statisticsInline && userStore.isTeacherOrAbove"
       :size="buttonSize"
-      @click="statisticsOpen = true"
+      @click="openStatistics(problem!._id)"
     >
       课堂统计
     </n-button>

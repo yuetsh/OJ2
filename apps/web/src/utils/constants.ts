@@ -156,8 +156,6 @@ export const STORAGE_KEY = {
   ADMIN_SIDER_COLLAPSED: "adminSiderCollapsed",
   DEMO_MODE: "demoMode",
   LOGIN_CLASS: "loginClass",
-  STATISTICS_QUERY: "statisticsQuery",
-  FLOWCHART_STATISTICS_QUERY: "flowchartStatisticsQuery",
 }
 
 export const DIFFICULTY = {
@@ -326,23 +324,6 @@ export const DURATION_OPTIONS = [
   { label: "两个月内", value: "months:2" },
   { label: "半年内", value: "months:6" },
   { label: "一年内", value: "years:1" },
-] as const
-
-/**
- * 两个统计面板（提交统计、流程图统计）的时段下拉。
- *
- * 比通用的那份多了头尾：前面三档分钟级是给**上课当场**用的 —— 老师布置完一道题，
- * 想看的就是「刚才这十分钟谁交了」；末尾的 `all` 不是一个时长，`query.duration === "all"`
- * 会走各自的分支不带时间条件，所以它永远不会进 durationFromValue()。
- *
- * 原来这份列表在两个面板里逐字抄了两遍。
- */
-export const PANEL_DURATION_OPTIONS = [
-  { label: "10分钟内", value: "minutes:10" },
-  { label: "20分钟内", value: "minutes:20" },
-  { label: "30分钟内", value: "minutes:30" },
-  ...DURATION_OPTIONS,
-  { label: "全部时段", value: "all" },
 ] as const
 
 /**

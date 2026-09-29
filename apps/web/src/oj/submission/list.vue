@@ -44,10 +44,6 @@ import { classLabel, submissionClockText, submissionDayText } from "./utils"
 // （光 chart.js 就 197KB）
 const SubmissionPane = defineAsyncComponent(() => import("./components/SubmissionPane.vue"))
 const FlowchartPane = defineAsyncComponent(() => import("./components/FlowchartPane.vue"))
-const StatisticsPanel = defineAsyncComponent(() => import("shared/components/StatisticsPanel.vue"))
-const FlowchartStatisticsPanel = defineAsyncComponent(
-  () => import("shared/components/FlowchartStatisticsPanel.vue"),
-)
 const TodayStatistics = defineAsyncComponent(() => import("./components/TodayStatistics.vue"))
 
 interface SubmissionQuery {
@@ -272,11 +268,10 @@ function move(step: 1 | -1) {
   query.page = page
 }
 
-const [statisticPanel, toggleStatisticPanel] = useToggle(false)
 const [todayPanel, toggleTodayPanel] = useToggle(false)
 
 onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
-  if (!isDesktop.value || statisticPanel.value || todayPanel.value) return
+  if (!isDesktop.value || todayPanel.value) return
   // 焦点在输入框、下拉框里时不抢方向键
   const target = e.target as HTMLElement | null
   if (
@@ -504,6 +499,24 @@ function filterUser(username: string) {
   query.username = username
 }
 
+/**
+ * 「数据统计」：新标签打开统计页，带上现在的班级 / 学生 / 题号 / 代码或流程图
+ * （原来是这一页上的弹框）。「今天」带过去就是统计页的「今天」
+ */
+function openStatistics() {
+  const href = router.resolve({
+    name: "statistics",
+    query: {
+      ...(flowMode.value ? { tab: "flow" } : {}),
+      ...(query.className ? { className: query.className } : {}),
+      ...(query.username ? { username: query.username } : {}),
+      ...(query.problem ? { problem: query.problem } : {}),
+      ...(query.today === "1" ? { period: "today" } : {}),
+    },
+  }).href
+  window.open(href, "_blank")
+}
+
 function filterProblem(displayId: string) {
   query.problem = displayId
 }
@@ -692,11 +705,7 @@ function dayBreak(index: number) {
         <template v-if="!(teacher && narrowBar)">今日统计</template>
         <span v-if="todayCount" class="count">{{ todayCount }}</span>
       </n-button>
-      <n-button
-        v-if="teacher && route.name === 'submissions'"
-        size="small"
-        @click="toggleStatisticPanel(true)"
-      >
+      <n-button v-if="teacher && route.name === 'submissions'" size="small" @click="openStatistics">
         <template #icon><Icon icon="ph:chart-pie-slice" /></template>
         数据统计
       </n-button>
@@ -929,25 +938,6 @@ function dayBreak(index: number) {
     </n-drawer-content>
   </n-drawer>
 
-  <n-modal
-    v-if="teacher"
-    v-model:show="statisticPanel"
-    preset="card"
-    :style="{ maxWidth: isDesktop && '800px', maxHeight: '80vh' }"
-    :content-style="{ overflow: 'auto' }"
-    :title="flowMode ? '流程图提交的统计' : '提交记录的统计'"
-  >
-    <FlowchartStatisticsPanel
-      v-if="flowMode"
-      :problem="query.problem"
-      :username="query.className ? 'ks' + query.className : query.username"
-    />
-    <StatisticsPanel
-      v-else
-      :problem="query.problem"
-      :username="query.className ? 'ks' + query.className : query.username"
-    />
-  </n-modal>
   <n-modal
     v-model:show="todayPanel"
     preset="card"

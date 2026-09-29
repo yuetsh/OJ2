@@ -15,7 +15,6 @@ import type { RouteLocationNormalized } from "vue-router"
 import SubmissionEffects from "./components/SubmissionEffects.vue"
 import ResultTabLabel from "./components/ResultTabLabel.vue"
 import ContextBar from "./components/ContextBar.vue"
-import StatisticsModal from "./components/StatisticsModal.vue"
 import { useEditorMenu } from "./composables/editorMenu"
 import {
   DRAWER_TITLE,
@@ -255,7 +254,6 @@ onBeforeUnmount(() => {
 <template>
   <template v-if="problem">
     <SubmissionEffects />
-    <StatisticsModal />
     <!--
       桌面：两栏顶满整个内容区（设计稿「机房（方案 B）」），中间一条 1px 分隔线、可拖动。
       布局给内容区留了 16px 内边距，这里用负边距抵掉

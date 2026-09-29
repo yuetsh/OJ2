@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getClassBoard, setClassLesson } from "oj/api"
+import { useHiddenStudents } from "shared/composables/hiddenStudents"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
 import { errorMessage } from "utils/api"
@@ -14,7 +15,7 @@ import type { ClassBoard, ClassBoardCell, ClassBoardStudent } from "utils/types"
  * 没交过 → 卡住 → 在做 → 做完，没交过的名单还单独摆在最上面，老师扫一眼就能走过去。
  *
  * 班级**不记本地**，默认由后端猜最近两小时在交题的班 —— 记本地的话，上一节课的班会
- * 悄悄留在框里，老师看的整个是别人的班。（提交统计弹窗是记一小时的，见 composables/statisticsQuery.ts，
+ * 悄悄留在框里，老师看的整个是别人的班。（原来的提交统计弹窗是记一小时的，
  * 那边是老师自己手选的查询；这里后端本来就猜得出，没必要冒这个险。）
  */
 
@@ -137,14 +138,27 @@ function nameOf(student: ClassBoardStudent) {
   return student.realName || student.username
 }
 
+/**
+ * 请假隐藏（原来在「数据统计」弹框里，统计改成回头看之后挪到这儿 —— 盯这节课的是看板）。
+ * 请假、转班、学号错了的那几个一直挂在「还没交过」里，会盖住真正要去看的人。
+ * 藏两个小时（够一节课），下节课自动回来；只记在这台电脑上，换人换机器都不继承。
+ * 键沿用统计弹框那份，老师上午藏的人这里接着藏着
+ */
+const { hideMode, hideStudent, showAll, isHidden } = useHiddenStudents("oj_hidden_students")
+const hiddenStudents = computed(() =>
+  (board.value?.students ?? []).filter((student) => isHidden(student.username)),
+)
+
 const students = computed(() =>
-  [...(board.value?.students ?? [])].sort(
-    (a, b) =>
-      GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)] ||
-      // 同样是没交过，经常不动手的排前面
-      Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
-      nameOf(a).localeCompare(nameOf(b), "zh-CN"),
-  ),
+  [...(board.value?.students ?? [])]
+    .filter((student) => !isHidden(student.username))
+    .sort(
+      (a, b) =>
+        GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)] ||
+        // 同样是没交过，经常不动手的排前面
+        Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
+        nameOf(a).localeCompare(nameOf(b), "zh-CN"),
+    ),
 )
 
 const idle = computed(() => students.value.filter((student) => groupOf(student) === "idle"))
@@ -164,7 +178,8 @@ const stuckCount = computed(
 )
 
 const summary = computed(() => {
-  const all = board.value?.students ?? []
+  // 分母也减掉请假的，不然「做完 30/38」永远到不了头
+  const all = students.value
   return (board.value?.problems ?? []).map((problem, i) => ({
     ...problem,
     done: all.filter((student) => student.cells[i]?.status === "accepted").length,
@@ -311,20 +326,48 @@ function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) 
 
         <template v-if="!projector">
           <n-alert
-            v-if="idle.length"
+            v-if="idle.length || hiddenStudents.length"
             type="warning"
             :title="`今天还没交过（${idle.length} 人）`"
             class="section"
           >
-            <div v-if="idleOften.length">
-              <b>经常没交</b>（最近 {{ board.recentLessons }} 节课最多交过 1 节）：{{
-                idleOften.map(nameOf).join("、")
-              }}
-            </div>
-            <div v-if="idleOthers.length">
-              <template v-if="idleOften.length"><b>其他</b>：</template
-              >{{ idleOthers.map(nameOf).join("、") }}
-            </div>
+            <n-flex align="center" :size="10" class="hide-bar">
+              <n-switch v-model:value="hideMode" size="small">
+                <template #checked>请假隐藏中 · 点名字旁的 × 藏起来</template>
+                <template #unchecked>请假隐藏</template>
+              </n-switch>
+              <n-button
+                v-if="hiddenStudents.length"
+                size="tiny"
+                text
+                type="primary"
+                @click="showAll"
+              >
+                隐藏了 {{ hiddenStudents.length }} 位：{{ hiddenStudents.map(nameOf).join("、") }} ·
+                恢复
+              </n-button>
+            </n-flex>
+            <n-flex v-if="hideMode" :size="8">
+              <n-tag
+                v-for="student in idle"
+                :key="student.userId"
+                closable
+                @close="hideStudent(student.username)"
+              >
+                {{ nameOf(student) }}
+              </n-tag>
+            </n-flex>
+            <template v-else>
+              <div v-if="idleOften.length">
+                <b>经常没交</b>（最近 {{ board.recentLessons }} 节课最多交过 1 节）：{{
+                  idleOften.map(nameOf).join("、")
+                }}
+              </div>
+              <div v-if="idleOthers.length">
+                <template v-if="idleOften.length"><b>其他</b>：</template
+                >{{ idleOthers.map(nameOf).join("、") }}
+              </div>
+            </template>
           </n-alert>
 
           <n-text v-if="stuckCount" type="error" class="meta">
@@ -418,6 +461,10 @@ function submissionsHref(student: ClassBoardStudent, problemDisplayId?: string) 
 
 .cell-link:hover {
   text-decoration: underline;
+}
+
+.hide-bar {
+  margin-bottom: 6px;
 }
 
 .board {

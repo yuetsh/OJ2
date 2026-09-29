@@ -40,6 +40,7 @@ import {
   type FlowchartStatistics,
   type SubmissionStatistics,
   type SubmissionStatisticsItems,
+  type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
 import api from "utils/api"
@@ -193,6 +194,17 @@ export function getSubmissionStatistics(
   username?: string,
 ) {
   return api.get<SubmissionStatistics>("submissions/statistics", {
+    params: { ...duration, problemDisplayId, username },
+  })
+}
+
+/** 统计页的方块串：范围内每个学生的每一次提交（口径见契约 submissionStatisticsGridSchema） */
+export function getSubmissionStatisticsGrid(
+  duration: { start?: string; end: string },
+  problemDisplayId?: string,
+  username?: string,
+) {
+  return api.get<SubmissionStatisticsGrid>("submissions/statistics/grid", {
     params: { ...duration, problemDisplayId, username },
   })
 }
