@@ -358,21 +358,30 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   ]
   if (start) filters.push(sql`${schema.flowchartSubmission.createTime} >= ${start}`)
 
-  const displayId = c.req.query("problemDisplayId")?.trim()
-  if (displayId) {
-    const [problem] = await db
-      .select({ id: schema.problem.id })
+  // 可以一次查几道（统计页的题号框和代码统计同一个），有一道找不到就整体报错，
+  // 不退化成「全部题目」—— 否则打错一个字看到的是全站数据
+  const displayIds = parseDisplayIds(c.req.query("problemDisplayId") ?? "")
+  if (displayIds.length) {
+    const lowered = displayIds.map((id) => id.toLowerCase())
+    const problems = await db
+      .select({ id: schema.problem.id, displayId: schema.problem.displayId })
       .from(schema.problem)
       .where(
         and(
-          sql`lower(${schema.problem.displayId}) = lower(${displayId})`,
+          inArray(sql`lower(${schema.problem.displayId})`, lowered),
           isNull(schema.problem.contestId),
           eq(schema.problem.visible, true),
         ),
       )
-      .limit(1)
-    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-    filters.push(eq(schema.flowchartSubmission.problemId, problem.id))
+    const found = new Set(problems.map((row) => row.displayId.toLowerCase()))
+    const missing = displayIds.find((id) => !found.has(id.toLowerCase()))
+    if (missing) return failure(c, 404, "problem-not-found", `Problem ${missing} does not exist`)
+    filters.push(
+      inArray(
+        schema.flowchartSubmission.problemId,
+        problems.map((row) => row.id),
+      ),
+    )
   }
 
   const username = c.req.query("username")?.trim()
@@ -400,49 +409,52 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
    * （criteria 255 + suggestions 64 + feedback 47），现在 2134 条无感，5 万条就是一次
    * 点击 18MB，而老师是开着面板反复切时段、切班的。
    */
-  const [[totals], gradeRows, criteriaRows, textRows, submittedRows] = await Promise.all([
-    db
-      .select({
-        total: count(),
-        /**
-         * 均分拆成 sum / count 两项，不直接用 `avg()`：分母是**有分数的条数**而不是
-         * 总条数（对齐 Django 的 Avg()，它跳过 NULL），拆开之后这个口径在代码里是
-         * 写明的，也省掉 avg() 在空集上回 NULL 还要兜底。
-         */
-        scoreSum: sql<number>`coalesce(sum(${schema.flowchartSubmission.aiScore}), 0)`.mapWith(
-          Number,
-        ),
-        scoreCount: sql<number>`count(${schema.flowchartSubmission.aiScore})::int`.mapWith(Number),
-        // 完成人数。user_id 和 username 一一对应，按哪个 distinct 都一样，
-        // 按 user_id 就不必 join user
-        completedCount:
-          sql<number>`count(distinct ${schema.flowchartSubmission.userId})::int`.mapWith(Number),
-      })
-      .from(schema.flowchartSubmission)
-      .where(where),
-    db
-      .select({ grade: schema.flowchartSubmission.aiGrade, n: count() })
-      .from(schema.flowchartSubmission)
-      .where(where)
-      .groupBy(schema.flowchartSubmission.aiGrade),
-    /**
-     * 各项**平均分**。`ai_criteria_details` 是 `{ 项名: { score, max, comment } }`，
-     * 用 jsonb_each 展开之后按项名分组。分数不是数字的项整项跳过，和原来 JS 那句
-     * `typeof detail.score !== "number"` 的 continue 一致。
-     *
-     * **那道 `jsonb_typeof(...) = 'object'` 的闸不能省，而且要写在 jsonb_each 的参数里。**
-     * 不能省：撞上标量（历史脏数据）jsonb_each 直接抛错，整个面板 500 ——
-     * 拿 `'5'::jsonb` 和 `'[1,2]'::jsonb` 各插一行验过。
-     *
-     * 写在哪儿则纯是规划器的脸色：挪进 where 当基表过滤条件时，53350 行的探针上
-     * 实测 180ms → 360ms，因为计划从「并行 Partial HashAggregate」换成了「串行
-     * GroupAggregate + 21 万行外部归并排序、落盘 26MB」。两种写法都正确，选快的那个。
-     *
-     * 每项的**满分**不在这里取，见下面 criteriaMax 的注释：在这条 SQL 里按
-     * create_time 取「最新那条」要给 21 万行（4 项 × 5 万条）排序，同一个探针上
-     * 实测 254ms → 842ms，而满分本来就是几个常数。
-     */
-    db.execute<{ key: string; avg: number }>(sql`
+  const [[totals], gradeRows, criteriaRows, textRows, submittedRows, peopleRows] =
+    await Promise.all([
+      db
+        .select({
+          total: count(),
+          /**
+           * 均分拆成 sum / count 两项，不直接用 `avg()`：分母是**有分数的条数**而不是
+           * 总条数（对齐 Django 的 Avg()，它跳过 NULL），拆开之后这个口径在代码里是
+           * 写明的，也省掉 avg() 在空集上回 NULL 还要兜底。
+           */
+          scoreSum: sql<number>`coalesce(sum(${schema.flowchartSubmission.aiScore}), 0)`.mapWith(
+            Number,
+          ),
+          scoreCount: sql<number>`count(${schema.flowchartSubmission.aiScore})::int`.mapWith(
+            Number,
+          ),
+          // 完成人数。user_id 和 username 一一对应，按哪个 distinct 都一样，
+          // 按 user_id 就不必 join user
+          completedCount:
+            sql<number>`count(distinct ${schema.flowchartSubmission.userId})::int`.mapWith(Number),
+        })
+        .from(schema.flowchartSubmission)
+        .where(where),
+      db
+        .select({ grade: schema.flowchartSubmission.aiGrade, n: count() })
+        .from(schema.flowchartSubmission)
+        .where(where)
+        .groupBy(schema.flowchartSubmission.aiGrade),
+      /**
+       * 各项**平均分**。`ai_criteria_details` 是 `{ 项名: { score, max, comment } }`，
+       * 用 jsonb_each 展开之后按项名分组。分数不是数字的项整项跳过，和原来 JS 那句
+       * `typeof detail.score !== "number"` 的 continue 一致。
+       *
+       * **那道 `jsonb_typeof(...) = 'object'` 的闸不能省，而且要写在 jsonb_each 的参数里。**
+       * 不能省：撞上标量（历史脏数据）jsonb_each 直接抛错，整个面板 500 ——
+       * 拿 `'5'::jsonb` 和 `'[1,2]'::jsonb` 各插一行验过。
+       *
+       * 写在哪儿则纯是规划器的脸色：挪进 where 当基表过滤条件时，53350 行的探针上
+       * 实测 180ms → 360ms，因为计划从「并行 Partial HashAggregate」换成了「串行
+       * GroupAggregate + 21 万行外部归并排序、落盘 26MB」。两种写法都正确，选快的那个。
+       *
+       * 每项的**满分**不在这里取，见下面 criteriaMax 的注释：在这条 SQL 里按
+       * create_time 取「最新那条」要给 21 万行（4 项 × 5 万条）排序，同一个探针上
+       * 实测 254ms → 842ms，而满分本来就是几个常数。
+       */
+      db.execute<{ key: string; avg: number }>(sql`
       select e.key as key, avg((e.value->>'score')::double precision) as avg
       from ${schema.flowchartSubmission}
       cross join lateral jsonb_each(
@@ -453,25 +465,51 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
       where ${where} and jsonb_typeof(e.value->'score') = 'number'
       group by e.key
     `),
-    // 词云的原料。只有这条要读大列，所以只有它按时间倒序取最近的 N 条
-    db
-      .select({
-        criteria: schema.flowchartSubmission.aiCriteriaDetails,
-        feedback: schema.flowchartSubmission.aiFeedback,
-        suggestions: schema.flowchartSubmission.aiSuggestions,
-      })
-      .from(schema.flowchartSubmission)
-      .where(where)
-      .orderBy(desc(schema.flowchartSubmission.createTime))
-      .limit(WORDCLOUD_TEXT_LIMIT),
-    // 「谁没做」只在有花名册时算得出来，行数也就一个班
-    roster.length
-      ? db
-          .selectDistinct({ userId: schema.flowchartSubmission.userId })
-          .from(schema.flowchartSubmission)
-          .where(where)
-      : [],
-  ])
+      // 词云的原料。只有这条要读大列，所以只有它按时间倒序取最近的 N 条
+      db
+        .select({
+          criteria: schema.flowchartSubmission.aiCriteriaDetails,
+          feedback: schema.flowchartSubmission.aiFeedback,
+          suggestions: schema.flowchartSubmission.aiSuggestions,
+        })
+        .from(schema.flowchartSubmission)
+        .where(where)
+        .orderBy(desc(schema.flowchartSubmission.createTime))
+        .limit(WORDCLOUD_TEXT_LIMIT),
+      // 「谁没做」只在有花名册时算得出来，行数也就一个班
+      roster.length
+        ? db
+            .selectDistinct({ userId: schema.flowchartSubmission.userId })
+            .from(schema.flowchartSubmission)
+            .where(where)
+        : [],
+      // 每人最好的一次。等级取分数最高那张的等级（同分取最近的），只算普通学生
+      db
+        .select({
+          username: schema.user.username,
+          className: schema.user.className,
+          bestScore: sql<number | null>`max(${schema.flowchartSubmission.aiScore})`,
+          bestGrade: sql<string | null>`(array_agg(${schema.flowchartSubmission.aiGrade}
+          order by ${schema.flowchartSubmission.aiScore} desc nulls last, ${schema.flowchartSubmission.createTime} desc))[1]`,
+          count: count(),
+        })
+        .from(schema.flowchartSubmission)
+        .innerJoin(schema.user, eq(schema.user.id, schema.flowchartSubmission.userId))
+        .where(
+          and(where, eq(schema.user.adminType, "Regular User"), eq(schema.user.isDisabled, false)),
+        )
+        .groupBy(schema.user.id, schema.user.username, schema.user.className)
+        .orderBy(sql`max(${schema.flowchartSubmission.aiScore}) asc nulls first`)
+        .limit(500),
+    ])
+
+  const people = peopleRows.map((row) => ({
+    username: row.username,
+    realName: stripClassPrefix(row.username, row.className),
+    bestScore: row.bestScore === null ? null : Number(row.bestScore),
+    bestGrade: row.bestGrade,
+    count: row.count,
+  }))
 
   if (!totals || totals.total === 0) {
     return success(c, {
@@ -488,6 +526,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         username: row.username,
         realName: stripClassPrefix(row.username, row.className),
       })),
+      people: [],
     } satisfies FlowchartStatistics)
   }
 
@@ -551,6 +590,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         username: row.username,
         realName: stripClassPrefix(row.username, row.className),
       })),
+    people,
   } satisfies FlowchartStatistics)
 })
 

@@ -8,6 +8,7 @@
 
 import {
   type SubmissionStatistics,
+  type SubmissionStatisticsGrid,
   type SubmissionStatisticsItems,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
@@ -651,4 +652,135 @@ submissionStatisticsRoutes.get("/submissions/statistics/items", requireTeacher, 
     items: rows.slice(0, STATISTICS_ITEMS_LIMIT),
     truncated,
   } satisfies SubmissionStatisticsItems)
+})
+
+/** 方块串一次最多给多少条。一个班一个月七八百条，5000 是全年级查一周的量 */
+const GRID_LIMIT = 5000
+
+/**
+ * 统计页的方块串：范围内每个学生的每一次提交（口径见契约 submissionStatisticsGridSchema）。
+ * 用户名的匹配和统计接口同一套（ilike，填 `ks253` 圈一个班）。
+ */
+submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, async (c) => {
+  const scope = await statisticsScope(c)
+  if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
+  const filters = [...scope.filters]
+
+  const username = c.req.query("username")?.trim()
+  if (username) {
+    const ids = (await matchedUsers(username)).map((row) => row.id)
+    filters.push(ids.length ? inArray(schema.submission.userId, ids) : sql`false`)
+  }
+
+  const rows = await db
+    .select({
+      id: schema.submission.id,
+      userId: schema.submission.userId,
+      problemId: schema.submission.problemId,
+      result: schema.submission.result,
+      createTime: schema.submission.createTime,
+      username: schema.user.username,
+      className: schema.user.className,
+    })
+    .from(schema.submission)
+    // 只要普通学生：老师试题的提交不该出现在「谁做了几次」里
+    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .where(
+      and(...filters, eq(schema.user.adminType, "Regular User"), eq(schema.user.isDisabled, false)),
+    )
+    .orderBy(desc(schema.submission.createTime))
+    .limit(GRID_LIMIT + 1)
+  const truncated = rows.length > GRID_LIMIT
+  const kept = rows.slice(0, GRID_LIMIT).reverse()
+
+  // 题目：传了就按传的顺序，没传就按范围里第一次有人交的时间
+  const requested = parseDisplayIds(c.req.query("problemDisplayId") ?? "")
+  const problemIds = [...new Set(kept.map((row) => row.problemId))]
+  const problems = problemIds.length
+    ? await db
+        .select({
+          id: schema.problem.id,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+        })
+        .from(schema.problem)
+        .where(inArray(schema.problem.id, problemIds))
+    : []
+  const problemById = new Map(problems.map((row) => [row.id, row]))
+  const ordered = requested.length
+    ? requested.flatMap((id) => {
+        const hit = problems.find((row) => row.displayId.toLowerCase() === id.toLowerCase())
+        return hit ? [hit] : []
+      })
+    : problemIds.map((id) => problemById.get(id)!).filter(Boolean)
+  // 传了题号但这些题在范围里没人交：表头仍然要有它们
+  if (requested.length && ordered.length < requested.length) {
+    const missing = requested.filter(
+      (id) => !ordered.some((row) => row.displayId.toLowerCase() === id.toLowerCase()),
+    )
+    const { ids } = await findPublicProblemsByDisplayIds(missing)
+    if (ids.length) {
+      const extra = await db
+        .select({
+          id: schema.problem.id,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+        })
+        .from(schema.problem)
+        .where(inArray(schema.problem.id, ids))
+      ordered.push(...extra)
+      const rank = new Map(requested.map((id, i) => [id.toLowerCase(), i]))
+      ordered.sort(
+        (a, b) =>
+          (rank.get(a.displayId.toLowerCase()) ?? 0) - (rank.get(b.displayId.toLowerCase()) ?? 0),
+      )
+    }
+  }
+
+  const byUser = new Map<number, SubmissionStatisticsGrid["rows"][number]>()
+  for (const row of kept) {
+    let entry = byUser.get(row.userId)
+    if (!entry) {
+      entry = {
+        username: row.username,
+        realName: stripClassPrefix(row.username, row.className),
+        className: row.className,
+        submissions: [],
+      }
+      byUser.set(row.userId, entry)
+    }
+    entry.submissions.push({
+      id: row.id,
+      problemDisplayId: problemById.get(row.problemId)?.displayId ?? "",
+      result: row.result,
+      createTime: row.createTime,
+    })
+  }
+
+  // 按班级汇总时要知道每个班多少人，「一道没交」才算得出来
+  const classSizes: Record<string, number> = {}
+  if (!username) {
+    const names = [...new Set(kept.map((row) => row.className).filter((name) => name !== null))]
+    if (names.length) {
+      const sizes = await db
+        .select({ className: schema.user.className, value: count() })
+        .from(schema.user)
+        .where(
+          and(
+            inArray(schema.user.className, names as string[]),
+            eq(schema.user.adminType, "Regular User"),
+            eq(schema.user.isDisabled, false),
+          ),
+        )
+        .groupBy(schema.user.className)
+      for (const row of sizes) if (row.className) classSizes[row.className] = row.value
+    }
+  }
+
+  return success(c, {
+    problems: ordered.map((row) => ({ problemDisplayId: row.displayId, title: row.title })),
+    rows: [...byUser.values()],
+    classSizes,
+    truncated,
+  } satisfies SubmissionStatisticsGrid)
 })

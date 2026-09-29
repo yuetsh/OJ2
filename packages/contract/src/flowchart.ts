@@ -106,6 +106,19 @@ export const flowchartStatisticsSchema = z.object({
   wordFrequencies: z.array(z.object({ word: z.string(), count: z.number().int() })),
   // 与提交统计共用「未完成学生」的形状，见 submission.ts 的 unacceptedStudentSchema
   dataUnaccepted: z.array(z.object({ username: z.string(), realName: z.string() })),
+  /**
+   * 每人**最好的一次**（分数最高的那张），统计页的「每人最好的一次」表用。
+   * 只含普通学生；按最好成绩从低到高排，没拿到 A 的排前面 —— 老师要先看的是他们
+   */
+  people: z.array(
+    z.object({
+      username: z.string(),
+      realName: z.string(),
+      bestScore: z.number().nullable(),
+      bestGrade: z.string().nullable(),
+      count: z.number().int(),
+    }),
+  ),
 })
 
 export const flowchartUpdateSchema = z.object({

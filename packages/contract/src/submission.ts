@@ -386,6 +386,38 @@ export const submissionStatisticsItemsSchema = z.object({
   truncated: z.boolean(),
 })
 
+/**
+ * 统计页的方块串（GET /submissions/statistics/grid）：范围内每个学生的每一次提交，
+ * 前端按「人 × 题」排成方块串，并据此算每道题做完几人。计数口径（正确率、做完、没交）
+ * 仍以 submissionStatisticsSchema 为准，这里只给「每一次交了什么结果」。
+ *
+ * 只含普通学生（老师试题留下的提交不混进来），最多 5000 条最近的，超了 `truncated`。
+ * `classSizes` 只在没传用户名（从题目页进来、按班级汇总）时给：各班花名册人数。
+ */
+export const submissionStatisticsGridSchema = z.object({
+  /** 传了题号就按传的顺序；没传就是范围内出现过的题，按第一次有人交的时间排 */
+  problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
+  rows: z.array(
+    z.object({
+      username: z.string(),
+      /** 剥掉 `ks<班级号>` 前缀后的那段，同 unacceptedStudentSchema.realName */
+      realName: z.string(),
+      className: z.string().nullable(),
+      /** 从早到晚 */
+      submissions: z.array(
+        z.object({
+          id: z.string(),
+          problemDisplayId: z.string(),
+          result: judgeStatusSchema,
+          createTime: z.string(),
+        }),
+      ),
+    }),
+  ),
+  classSizes: z.record(z.string(), z.number().int()),
+  truncated: z.boolean(),
+})
+
 export const submissionStatisticsSchema = z.object({
   submissionCount: z.number().int(),
   acceptedCount: z.number().int(),
@@ -528,6 +560,7 @@ export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
 export type TodaySubmissionStatistics = z.infer<typeof todaySubmissionStatisticsSchema>
 export type SubmissionStatisticsUser = z.infer<typeof submissionStatisticsUserSchema>
 export type SubmissionStatisticsItems = z.infer<typeof submissionStatisticsItemsSchema>
+export type SubmissionStatisticsGrid = z.infer<typeof submissionStatisticsGridSchema>
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
 export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>
 
