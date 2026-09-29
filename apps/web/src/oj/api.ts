@@ -115,14 +115,9 @@ export async function getProblem(problemID: string, contestID: string) {
   return problem
 }
 
-/**
- * 题目页「统计」页签。problemID 是内部题号（problem.id），比赛题也能查。
- * className 只有老师用：看哪个班的明细，不填就是最近做过这题的班
- */
-export function getProblemStats(problemID: number, className?: string) {
-  return api.get<ProblemStats>(`problems/${problemID}/stats`, {
-    params: className ? { className } : {},
-  })
+/** 题目页「统计」页签。problemID 是内部题号（problem.id），比赛题也能查 */
+export function getProblemStats(problemID: number) {
+  return api.get<ProblemStats>(`problems/${problemID}/stats`)
 }
 
 export async function getSubmission(id: string): Promise<Submission> {

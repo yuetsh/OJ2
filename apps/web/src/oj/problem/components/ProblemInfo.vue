@@ -13,11 +13,10 @@ import type { ProblemStats, SUBMISSION_RESULT } from "utils/types"
 import { useProblemPageContext } from "../composables/problemPageContext"
 
 /**
- * 「统计」页签（设计稿「题目页统计重设计」：学生 A、老师 B）。
- *
- * 学生看的是「这题难不难 → 大家几次做对 → 常错在哪 → 你们班」，全部按人算；自己卡住了
- * 再多一张卡。老师看的是一个班：谁做对了、谁交了没对（卡在哪）、谁还没交 —— 原来工具栏上
- * 的「课堂统计」并进了这里。原来的描述表、击败用户、饼图、历年 AC 率都去掉了。
+ * 「统计」页签（设计稿「题目页统计重设计」学生 A）。讲的是**这道题**：难不难 → 大家几次
+ * 做对 → 常错在哪，全部按人算。学生多一行「你们班」、自己卡住了再多一张卡；老师多一张
+ * 各班的表（只到班级这一层，不选班、不列人 —— 按人看是提交页「数据统计」的活）。
+ * 原来的描述表、击败用户、饼图、历年 AC 率都去掉了。
  */
 const emit = defineEmits<{ openSubmissions: [] }>()
 
@@ -31,28 +30,18 @@ const tone = useTone()
 
 const stats = ref<ProblemStats | null>(null)
 const failed = ref(false)
-const className = ref<string | null>(null)
 
 async function load() {
   if (!problem.value) return
   failed.value = false
   try {
-    const res = await getProblemStats(problem.value.id, className.value ?? undefined)
-    stats.value = res
-    if (res.classDetail) className.value = res.classDetail.className
+    stats.value = await getProblemStats(problem.value.id)
   } catch {
     failed.value = true
   }
 }
 
 onMounted(load)
-
-function changeClass(value: string) {
-  className.value = value
-  load()
-}
-
-const teacherView = computed(() => stats.value?.classes != null)
 
 function resultName(result: number) {
   return JUDGE_STATUS[result as SUBMISSION_RESULT]?.name ?? "其他"
@@ -139,53 +128,13 @@ const stuck = computed(() => {
   return me && !me.solved && me.attempts >= 3 ? me.attempts : 0
 })
 
-// ---------- 老师 ----------
+// ---------- 老师：各班的表 ----------
 
-const detail = computed(() => stats.value?.classDetail ?? null)
-
-const classOptions = computed(() =>
-  (stats.value?.classes ?? []).map((item) => ({
-    label: `${classLabel(item.className)} · ${item.solved}/${item.tried}`,
-    value: item.className,
-  })),
-)
-
-const classSegments = computed(() => {
-  const d = detail.value
-  if (!d) return []
-  return [
-    { key: "solved", label: "做对", value: d.solved.length, color: theme.value.successColor },
-    { key: "unsolved", label: "交了没对", value: d.unsolved.length, color: theme.value.errorColor },
-    { key: "untouched", label: "没交", value: d.untouched.length, color: theme.value.dividerColor },
-  ]
-})
-
-const classFailedTotal = computed(() =>
-  (detail.value?.failures ?? []).reduce((sum, item) => sum + item.count, 0),
-)
-
-/** 这个班错得最多的和全站不一样时点出来：老师该看的就是这种差别 */
-const siteDiffers = computed(() => {
-  const site = stats.value?.failures[0]
-  const mine = detail.value?.failures[0]
-  return site && mine && site.result !== mine.result ? resultName(site.result) : ""
-})
-
-const showSolved = ref(false)
-const showUntouched = ref(false)
-
-function openStatistics() {
+/** 点一个班、或者表下面那行：去提交页的「数据统计」按人看（新标签，题目页不动） */
+function openStatistics(className?: string) {
   const href = router.resolve({
     name: "statistics",
-    query: { problem: problem.value!._id, className: className.value ?? "", period: "all" },
-  }).href
-  window.open(href, "_blank")
-}
-
-function openClassSubmissions() {
-  const href = router.resolve({
-    name: "submissions",
-    query: { problem: problem.value!._id, className: className.value ?? "" },
+    query: { problem: problem.value!._id, period: "all", ...(className ? { className } : {}) },
   }).href
   window.open(href, "_blank")
 }
@@ -251,105 +200,7 @@ function segmentWidth(value: number, total: number) {
       </router-link>
     </div>
 
-    <!-- ==================== 老师：看一个班 ==================== -->
-    <template v-else-if="teacherView">
-      <div v-if="!detail" class="empty">
-        <span class="empty-icon"><Icon icon="ph:users" :width="18" /></span>
-        <b>还没有班级做过这道题</b>
-        <n-text depth="3">布置到这节课之后，这里会按班显示谁做对了、谁还没交。</n-text>
-        <n-button type="primary" secondary @click="router.push('/classroom')">
-          去课堂看板布置 →
-        </n-button>
-      </div>
-      <template v-else>
-        <div class="class-head">
-          <n-select
-            :value="className"
-            :options="classOptions"
-            size="small"
-            class="class-select"
-            :consistent-menu-width="false"
-            @update:value="changeClass"
-          />
-          <n-text depth="3" class="small">{{ dayText(detail.day) }}做的</n-text>
-          <span class="spacer"></span>
-          <a href="#" class="link small" @click.prevent="openStatistics">
-            在数据统计里看 <Icon icon="ph:arrow-square-out" :width="13" />
-          </a>
-        </div>
-
-        <div class="bar">
-          <span
-            v-for="seg in classSegments"
-            :key="seg.key"
-            :style="{ width: segmentWidth(seg.value, detail.roster), background: seg.color }"
-          ></span>
-        </div>
-        <div class="legend">
-          <span v-for="seg in classSegments" :key="seg.key">
-            <i :style="{ background: seg.color }"></i>{{ seg.label }} <b>{{ seg.value }}</b>
-          </span>
-        </div>
-
-        <div v-if="classFailedTotal" class="line">
-          <b>没通过的 {{ classFailedTotal }} 次：</b>
-          <n-text depth="2">
-            {{
-              detail.failures
-                .slice(0, 3)
-                .map((item) => `${resultName(item.result)} ${item.count}`)
-                .join(" · ")
-            }}
-          </n-text>
-          <span class="spacer"></span>
-          <n-text v-if="siteDiffers" depth="3" class="small">全站是{{ siteDiffers }}最多</n-text>
-        </div>
-
-        <template v-if="detail.unsolved.length">
-          <div class="line">
-            <b>交了没对（{{ detail.unsolved.length }} 人）</b>
-            <span class="spacer"></span>
-            <n-text depth="3" class="small">次数多的在前</n-text>
-          </div>
-          <div class="people">
-            <div v-for="(item, index) in detail.unsolved" :key="index" class="person">
-              <b>{{ item.realName }}</b>
-              <n-text depth="3">{{ item.attempts }} 次</n-text>
-              <span :style="{ color: barColor(item.lastResult) }">
-                {{ resultName(item.lastResult) }}
-              </span>
-            </div>
-          </div>
-        </template>
-
-        <div v-if="detail.solved.length" class="fold">
-          <div class="fold-head" @click="showSolved = !showSolved">
-            <b>做对 {{ detail.solved.length }}</b>
-            <span class="fold-names">
-              {{ showSolved ? "" : detail.solved.join("、") }}
-            </span>
-            <span class="link small">{{ showSolved ? "收起" : "展开" }}</span>
-          </div>
-          <div v-if="showSolved" class="fold-body">{{ detail.solved.join("、") }}</div>
-        </div>
-        <div v-if="detail.untouched.length" class="fold">
-          <div class="fold-head" @click="showUntouched = !showUntouched">
-            <b>没交 {{ detail.untouched.length }}</b>
-            <span class="fold-names">{{ showUntouched ? "" : "展开看名单" }}</span>
-            <span class="link small">{{ showUntouched ? "收起" : "展开" }}</span>
-          </div>
-          <div v-if="showUntouched" class="fold-body">{{ detail.untouched.join("、") }}</div>
-        </div>
-
-        <div class="foot">
-          <a href="#" class="link small" @click.prevent="openClassSubmissions">
-            看这个班这道题的提交 ›
-          </a>
-        </div>
-      </template>
-    </template>
-
-    <!-- ==================== 学生 ==================== -->
+    <!-- ==================== 这道题（学生、老师都看） ==================== -->
     <div v-else-if="!stats.tried" class="empty">
       <span class="empty-icon"><Icon icon="ph:sparkle" :width="18" /></span>
       <b>还没有人交过这道题</b>
@@ -416,6 +267,66 @@ function segmentWidth(value: number, total: number) {
         >
           <Icon icon="ph:lightbulb" :width="15" class="tip-icon" />
           <span>{{ tip }}</span>
+        </div>
+      </div>
+
+      <!-- 老师：各班一行，只到班级这一层；按人看去数据统计 -->
+      <div v-if="stats.classes" class="section">
+        <div class="line">
+          <b>各班做得怎样</b>
+          <span class="spacer"></span>
+          <n-text depth="3" class="small">同一天 5 人以上交过才算这个班做过</n-text>
+        </div>
+        <table v-if="stats.classes.length" class="classes">
+          <thead>
+            <tr>
+              <th>班级</th>
+              <th>哪天做的</th>
+              <th>做对 / 交过</th>
+              <th>没交</th>
+              <th>错得最多</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in stats.classes"
+              :key="item.className"
+              title="去数据统计看这个班的每个人"
+              @click="openStatistics(item.className)"
+            >
+              <td>
+                <b>{{ classLabel(item.className) }}</b>
+              </td>
+              <td>
+                <n-text depth="2">{{ dayText(item.day) }}</n-text>
+              </td>
+              <td>
+                <span
+                  :style="{
+                    color: item.solved < item.tried ? tone('error').color : undefined,
+                    fontWeight: 600,
+                  }"
+                  >{{ item.solved }}</span
+                >
+                / {{ item.tried }}
+              </td>
+              <td>
+                <n-text depth="2">{{ Math.max(0, item.classSize - item.tried) }}</n-text>
+              </td>
+              <td>
+                <span v-if="item.topFailure" :style="{ color: barColor(item.topFailure.result) }">
+                  {{ resultName(item.topFailure.result) }} {{ item.topFailure.count }}
+                </span>
+                <n-text v-else depth="3">—</n-text>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <n-text v-else depth="3" class="small">还没有哪个班一起做过这道题</n-text>
+        <div class="foot">
+          <a href="#" class="link small" @click.prevent="openStatistics()">
+            按人看谁没做对，去数据统计 <Icon icon="ph:arrow-square-out" :width="13" />
+          </a>
         </div>
       </div>
 
@@ -652,65 +563,36 @@ function segmentWidth(value: number, total: number) {
   gap: 6px;
 }
 
-.class-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.class-select {
-  width: 190px;
-}
-
-.people {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 6px;
-}
-
-.person {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid v-bind("theme.dividerColor");
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.fold {
-  border-radius: 6px;
-  background: v-bind("theme.actionColor");
-  font-size: 13px;
-}
-
-.fold-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-.fold-names {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: v-bind("theme.textColor2");
-}
-
-.fold-body {
-  padding: 0 12px 10px;
-  line-height: 1.8;
-  color: v-bind("theme.textColor2");
-}
-
 .foot {
   display: flex;
   justify-content: flex-end;
+}
+
+.classes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.classes th {
+  text-align: left;
+  font-weight: normal;
+  color: v-bind("theme.textColor3");
+  padding: 4px 8px 6px 0;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.classes td {
+  padding: 8px 8px 8px 0;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+  white-space: nowrap;
+}
+
+.classes tbody tr {
+  cursor: pointer;
+}
+
+.classes tbody tr:hover {
+  background: v-bind("theme.hoverColor");
 }
 </style>

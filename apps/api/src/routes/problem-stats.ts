@@ -1,5 +1,5 @@
-import { type ProblemClassDetail, type ProblemStats } from "@oj2/contract"
-import { and, eq, isNotNull, sql } from "drizzle-orm"
+import { type ProblemStats } from "@oj2/contract"
+import { and, count, eq, inArray, isNotNull, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, type AppEnv } from "../auth/middleware"
@@ -9,7 +9,7 @@ import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/s
 import { canAccessContest, contestDetailsAllowed, findAccessibleContest } from "../services/contest"
 import { accepted } from "../services/learning-stats"
 import { localTime } from "../time"
-import { isAdminRole, isTeacherOrAbove, queryInteger, stripClassPrefix } from "./helpers"
+import { isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
 
 export const problemStatsRoutes = new Hono<AppEnv>()
 
@@ -29,7 +29,6 @@ const EMPTY: ProblemStats = {
   me: null,
   myClass: null,
   classes: null,
-  classDetail: null,
 }
 
 // type 而不是 interface：db.execute 的泛型约束是 Record<string, unknown>，interface 不带索引签名
@@ -41,14 +40,13 @@ type UserRow = {
   /** 做对之前（含做对那次）交了几次；没做对就是全部次数 */
   tries: number
   solved: boolean
-  last_result: JudgeStatusValue
-  last_time: string
 }
 
 /**
- * 题目页「统计」页签。id 是内部题号（problem.id）：比赛题的展示题号是 1、2、3，
- * 拿 displayId 查会撞上同号的公开题（原来的「历年 AC 率」就是这么查错的）。
- * `className` 只有老师用：选中哪个班看明细，不填就是最近做过这题的那个班。
+ * 题目页「统计」页签：讲的是**这道题**（难不难、几次做对、常错在哪），老师多一张各班的表。
+ * 看谁没做对是提交页「数据统计」的活，这里只到班级这一层。
+ * id 是内部题号（problem.id）：比赛题的展示题号是 1、2、3，拿 displayId 查会撞上
+ * 同号的公开题（原来的「历年 AC 率」就是这么查错的）。
  */
 problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
   const user = c.get("user")
@@ -93,9 +91,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
       select s.user_id, u.username, u.class_name,
         count(*)::int as attempts,
         count(*) filter (where s.first_ac is null or s.create_time <= s.first_ac)::int as tries,
-        (min(s.first_ac) is not null) as solved,
-        (array_agg(s.result order by s.create_time desc))[1] as last_result,
-        max(s.create_time) as last_time
+        (min(s.first_ac) is not null) as solved
       from (
         select user_id, result, create_time,
           min(create_time) filter (where result in (${acceptedList}))
@@ -157,7 +153,6 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
   const classmates = myClassName ? users.filter((row) => row.class_name === myClassName) : []
 
   let classes: ProblemStats["classes"] = null
-  let classDetail: ProblemClassDetail | null = null
   if (!inContest && isTeacherOrAbove(user)) {
     const byClass = new Map<string, UserRow[]>()
     for (const row of users) {
@@ -172,27 +167,41 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
         peak.set(row.className!, { day: row.day, users: row.users })
       }
     }
-    const lessonClasses = [...byClass]
-      .filter(([className]) => (peak.get(className)?.users ?? 0) >= CLASS_MIN_TRIED)
-      .map(([className, rows]) => ({
-        className,
-        tried: rows.length,
-        solved: rows.filter((row) => row.solved).length,
-        day: peak.get(className)!.day,
-      }))
-      .sort((a, b) => b.day.localeCompare(a.day))
+    const lessonClasses = [...byClass].filter(
+      ([className]) => (peak.get(className)?.users ?? 0) >= CLASS_MIN_TRIED,
+    )
+    // 花名册只数学生：老师、助教也可能挂着班级
+    const sizes = lessonClasses.length
+      ? await db
+          .select({ className: schema.user.className, value: count() })
+          .from(schema.user)
+          .where(
+            and(
+              inArray(
+                schema.user.className,
+                lessonClasses.map(([className]) => className),
+              ),
+              eq(schema.user.adminType, "Regular User"),
+              eq(schema.user.isDisabled, false),
+            ),
+          )
+          .groupBy(schema.user.className)
+      : []
     classes = lessonClasses
-    // 地址里指定的班不在列表里（零星几个人做过）也照样给明细
-    const wanted = c.req.query("className")?.trim()
-    const selected = wanted && byClass.has(wanted) ? wanted : lessonClasses[0]?.className
-    if (selected) {
-      classDetail = await buildClassDetail(
-        selected,
-        peak.get(selected)!.day,
-        byClass.get(selected)!,
-        failureRows,
-      )
-    }
+      .map(([className, rows]) => {
+        const top = failureRows
+          .filter((row) => row.class_name === className)
+          .sort((a, b) => b.n - a.n)[0]
+        return {
+          className,
+          day: peak.get(className)!.day,
+          tried: rows.length,
+          solved: rows.filter((row) => row.solved).length,
+          classSize: sizes.find((row) => row.className === className)?.value ?? 0,
+          topFailure: top ? { result: top.result, count: top.n } : null,
+        }
+      })
+      .sort((a, b) => b.day.localeCompare(a.day))
   }
 
   return success(c, {
@@ -211,49 +220,5 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
         }
       : null,
     classes,
-    classDetail,
   } satisfies ProblemStats)
 })
-
-async function buildClassDetail(
-  className: string,
-  day: string,
-  rows: UserRow[],
-  failureRows: { class_name: string | null; result: JudgeStatusValue; n: number }[],
-): Promise<ProblemClassDetail> {
-  // 花名册只数学生：老师、助教也可能挂着班级
-  const roster = await db
-    .select({ id: schema.user.id, username: schema.user.username })
-    .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.className, className),
-        eq(schema.user.adminType, "Regular User"),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
-  const triedIds = new Set(rows.map((row) => row.user_id))
-  const name = (username: string | null) => stripClassPrefix(username ?? "", className)
-  return {
-    className,
-    roster: roster.length,
-    day,
-    failures: failureRows
-      .filter((row) => row.class_name === className)
-      .map((row) => ({ result: row.result, count: row.n }))
-      .sort((a, b) => b.count - a.count),
-    unsolved: rows
-      .filter((row) => !row.solved)
-      .sort((a, b) => b.attempts - a.attempts)
-      .map((row) => ({
-        realName: name(row.username),
-        attempts: row.attempts,
-        lastResult: row.last_result,
-      })),
-    solved: rows
-      .filter((row) => row.solved)
-      .sort((a, b) => a.last_time.localeCompare(b.last_time))
-      .map((row) => name(row.username)),
-    untouched: roster.filter((row) => !triedIds.has(row.id)).map((row) => name(row.username)),
-  }
-}

@@ -449,23 +449,6 @@ export const problemAuthorSchema = z.object({
 
 const failureCountSchema = z.object({ result: judgeStatusSchema, count: z.number().int() })
 
-/** 老师选中一个班时的明细：谁做对了、谁交了没对（卡在哪）、谁还没交 */
-export const problemClassDetailSchema = z.object({
-  className: z.string(),
-  /** 班里的学生数（学生角色、没禁用） */
-  roster: z.number().int(),
-  /** 这个班一起做这道题的那天（东八区 YYYY-MM-DD，交的人最多的那天）—— 「2025年12月5日做的」 */
-  day: z.string(),
-  failures: z.array(failureCountSchema),
-  /** 交了没对，次数多的在前。名字是剥掉 ks<班级号> 前缀的那一段 */
-  unsolved: z.array(
-    z.object({ realName: z.string(), attempts: z.number().int(), lastResult: judgeStatusSchema }),
-  ),
-  solved: z.array(z.string()),
-  /** 班里还没交过的 */
-  untouched: z.array(z.string()),
-})
-
 /**
  * 题目页「统计」页签。全部**按人**算，不按提交条数 —— 原来的「通过数」是 AC 条数
  * （3092 是 219 条、202 个人），「通过率」是按提交算的，学生看了不知道这题难不难。
@@ -491,20 +474,23 @@ export const problemStatsSchema = z.object({
     .nullable(),
   /**
    * 老师：一起做过这题的班（同一天至少 5 个人交过 —— 零星几个人自己刷到、补做的不算），
-   * 按那天倒序。原来工具栏上的「课堂统计」并进了这里。学生、比赛里为 null
+   * 按那天倒序。只到班级这一层：看谁没做对是提交页「数据统计」的活。学生、比赛里为 null
    */
   classes: z
     .array(
       z.object({
         className: z.string(),
+        /** 这个班一起做这道题的那天（东八区 YYYY-MM-DD，交的人最多的那天） */
+        day: z.string(),
         tried: z.number().int(),
         solved: z.number().int(),
-        day: z.string(),
+        /** 班里的学生数（学生角色、没禁用），没交的 = classSize - tried */
+        classSize: z.number().int(),
+        /** 这个班错得最多的那种，一次没错过为 null */
+        topFailure: failureCountSchema.nullable(),
       }),
     )
     .nullable(),
-  /** 老师选中的那个班（默认 classes 第一个）的明细 */
-  classDetail: problemClassDetailSchema.nullable(),
 })
 
 export type AstRuleEngine = z.infer<typeof astRuleEngineSchema>
@@ -523,4 +509,3 @@ export type SqlDisplay = z.infer<typeof sqlDisplaySchema>
 export type SqlDisplayTable = z.infer<typeof sqlDisplayTableSchema>
 export type SqlDisplayColumn = z.infer<typeof sqlDisplayColumnSchema>
 export type ProblemStats = z.infer<typeof problemStatsSchema>
-export type ProblemClassDetail = z.infer<typeof problemClassDetailSchema>
