@@ -7,6 +7,7 @@ import { useDarkTransition } from "shared/composables/darkTransition"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import { useUserStore } from "../store/user"
+import HelpButton from "../components/HelpButton.vue"
 import type { MenuOption } from "naive-ui"
 
 const route = useRoute()
@@ -284,6 +285,9 @@ onMounted(async () => {
               <template v-if="!isMobile">{{ userStore.user.username }}</template>
             </n-button>
           </n-dropdown>
+          <!-- 老师在后台改题时也得知道有人举手（前台顶栏在这里是卸载的）。
+               和前台一样放最末尾，出现、消失时别的按钮不挪 -->
+          <HelpButton size="small" />
         </n-flex>
       </n-layout-header>
       <n-layout-content

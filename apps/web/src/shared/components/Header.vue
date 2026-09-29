@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
+import { NSwitch, useThemeVars } from "naive-ui"
 import { RouterLink } from "vue-router"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useDarkTransition } from "shared/composables/darkTransition"
 import { useLearnProgress } from "shared/composables/learnProgress"
-import { useProblemJump } from "shared/composables/problemJump"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "../store/config"
 import { useUserStore } from "../store/user"
-import { useThemeVars } from "naive-ui"
+import HelpButton from "./HelpButton.vue"
+import ProblemJumpBox from "./ProblemJumpBox.vue"
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
@@ -24,23 +25,17 @@ const { isDark, toggleDark } = useDarkTransition()
 const theme = useThemeVars()
 
 /**
- * 求助的入口收进姓名下拉里，顶栏只留姓名按钮上的角标 —— 老师不用展开菜单
- * 也能看见有没有人举手。窄屏同样给：接单之后要在弹框里替学生写代码，那件事
- * 确实只有桌面端好使，但「有没有人在等」是宽度多少都得知道的。
+ * 1280 以下（老师的笔记本）收一收：题号框变窄、「课堂看板」只留图标。
+ * 机房的两种屏是 1280 和 1366，都走完整那版 —— 老师也会用机房的电脑。
  */
-const pendingHelpCount = computed(() => (collabStore.isTeacher ? collabStore.pendingCount : 0))
+const compact = useMediaQuery("(max-width: 1279px)")
+// 再窄（769–1023，很少见）一行放不下老师那版，允许折行，只保证不坏
+const narrow = useMediaQuery("(max-width: 1023px)")
 
-/**
- * 顶栏的题号框：老师报完题号，学生在哪一页都能直接敲，不用先回首页或题目列表。
- * 只给桌面端 —— 窄屏顶栏已经挤满了，手机上从首页的搜索框走同一套逻辑。
- */
-const { jump, jumping } = useProblemJump()
-const jumpKeyword = ref("")
-
-async function handleJump() {
-  await jump(jumpKeyword.value)
-  jumpKeyword.value = ""
-}
+const tone = computed(() => ({
+  activeBg: isDark.value ? "rgba(99, 226, 183, 0.14)" : "#e7f5ed",
+  activeText: isDark.value ? theme.value.primaryColor : theme.value.primaryColorPressed,
+}))
 
 /**
  * 站名后面的小标签：环境名、演示中。
@@ -79,7 +74,7 @@ function handleToggleDemoMode() {
 }
 
 function renderIcon(icon: string) {
-  return () => h(Icon, { icon, width: 20 })
+  return () => h(Icon, { icon, width: 18 })
 }
 
 function learnLink(type: "python" | "c") {
@@ -87,154 +82,161 @@ function learnLink(type: "python" | "c") {
 }
 
 /**
- * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字链接，窄屏收进「菜单」下拉。
+ * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字，窄屏收进「菜单」下拉。
  * `key` 就是一级路径，用来判定高亮（见上面的 active）。
  *
- * 桌面端不带图标、不用 n-menu：n-menu 横排每项固定占 100px，管理员 8 项在
- * 1280 宽的机房屏上直接把顶栏挤成两行。图标只留给下拉菜单。
+ * 一级只放天天用的（题目、题单）和课上会被点名去看的（比赛、排名）。提交、公告收进
+ * 「更多」：全站的提交列表学生很少翻，自己的在个人菜单里；公告一年没几条。
+ * 不用 n-menu：它横排每项固定占 100px，1280 宽的机房屏上会把顶栏挤成两行。
  */
 interface NavLink {
   key: string
   label: string
   to: string
-  icon: string
   show?: boolean
 }
 
-const navLinks = computed<NavLink[]>(() =>
+const navLinks: NavLink[] = [
+  { key: "problem", label: "题目", to: "/problem" },
+  { key: "problemset", label: "题单", to: "/problemset" },
+  { key: "contest", label: "比赛", to: "/contest" },
+  { key: "rank", label: "排名", to: "/rank" },
+]
+
+const moreLinks = computed<NavLink[]>(() =>
   [
-    { key: "problem", label: "题目", to: "/problem", icon: "fluent-emoji:memo" },
-    { key: "problemset", label: "题单", to: "/problemset", icon: "fluent-emoji:clipboard" },
-    {
-      key: "submission",
-      label: "提交",
-      to: "/submission",
-      icon: "fluent-emoji:inbox-tray",
-      show: userStore.showSubmissions,
-    },
-    { key: "contest", label: "比赛", to: "/contest", icon: "fluent-emoji:chequered-flag" },
-    { key: "rank", label: "排名", to: "/rank", icon: "fluent-emoji:trophy" },
-    { key: "announcement", label: "公告", to: "/announcement", icon: "fluent-emoji:loudspeaker" },
+    { key: "submission", label: "提交", to: "/submission", show: userStore.showSubmissions },
+    { key: "announcement", label: "公告", to: "/announcement" },
   ].filter((link) => link.show !== false),
 )
 
+const moreActive = computed(() => moreLinks.value.some((link) => link.key === active.value))
+
 const learnOptions: DropdownOption[] = [
-  { label: "Python", key: "learn-python" },
-  { label: "C语言", key: "learn-c" },
+  { label: "Python", key: "learn-python", icon: renderIcon("ph:book-open") },
+  { label: "C 语言", key: "learn-c", icon: renderIcon("ph:book-open") },
 ]
 
-// 「后台」不和学生导航排在一起：桌面端放到右边那组的开头、弱化成灰字，
-// 老师和学生看到的顶栏前半截就是同一排
-const adminPath = computed(() => (userStore.isSuperAdmin ? "/admin" : "/admin/problem/list"))
-
-const mobileMenus = computed<DropdownOption[]>(() => [
-  {
-    label: "自学",
-    key: "learn",
-    icon: renderIcon("fluent-emoji:books"),
-    children: learnOptions,
-  },
-  ...navLinks.value.map((link) => ({
+const moreOptions = computed<DropdownOption[]>(() =>
+  moreLinks.value.map((link) => ({
     label: link.label,
     key: link.key,
-    icon: renderIcon(link.icon),
+    icon: renderIcon(link.key === "submission" ? "ph:tray" : "ph:megaphone"),
   })),
-  {
-    label: "后台",
-    key: "admin",
-    icon: renderIcon("fluent-emoji:gear"),
-    show: userStore.isAdminRole,
-  },
+)
+
+const mobileMenus = computed<DropdownOption[]>(() => [
+  ...navLinks.map((link) => ({ label: link.label, key: link.key })),
+  { label: "自学", key: "learn", children: learnOptions },
+  ...moreLinks.value.map((link) => ({ label: link.label, key: link.key })),
 ])
 
 function handleNavSelect(key: string) {
   if (key === "learn-python") router.push(learnLink("python"))
   else if (key === "learn-c") router.push(learnLink("c"))
-  else if (key === "admin") router.push(adminPath.value)
   else {
-    const link = navLinks.value.find((item) => item.key === key)
+    const link = [...navLinks, ...moreLinks.value].find((item) => item.key === key)
     if (link) router.push(link.to)
   }
 }
 
-const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
-  {
-    label: pendingHelpCount.value ? `课堂求助（${pendingHelpCount.value}）` : "课堂求助",
-    key: "help",
-    show: collabStore.isTeacher,
-    icon: renderIcon("streamline-emojis:raising-hands-2"),
-    props: {
-      onClick: () => (collabStore.helpPanelOpen = true),
+const adminPath = computed(() => (userStore.isSuperAdmin ? "/admin" : "/admin/problem/list"))
+
+/**
+ * 暗色开关放进个人菜单：顶栏右边留给老师的课堂工具。整行可点，开关只是显示状态
+ * （pointer-events 关掉，免得点在开关上切两次）。
+ */
+function renderThemeRow() {
+  return h(
+    "div",
+    {
+      class: "theme-row",
+      role: "switch",
+      "aria-checked": isDark.value,
+      tabindex: 0,
+      onClick: toggleDark,
+      onKeydown: (event: KeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          ;(event.currentTarget as HTMLElement).click()
+        }
+      },
     },
-  },
-  {
-    label: "课堂看板",
-    key: "classroom-board",
-    show: userStore.isTeacherOrAbove,
-    icon: renderIcon("fluent-emoji:school"),
-    props: {
-      onClick: () => router.push("/classroom"),
+    [
+      h(Icon, { icon: "ph:moon", width: 18 }),
+      h("span", { class: "theme-label" }, "暗色"),
+      h(NSwitch, { value: isDark.value, size: "small", style: "pointer-events: none" }),
+    ],
+  )
+}
+
+/**
+ * 个人菜单只放「自己的东西」+ 后台入口 + 暗色开关。
+ * 课堂求助、课堂看板挪到了顶栏上（HelpButton、下面的课堂看板链接），不在这里。
+ */
+const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
+  const work = userStore.isAdminRole || userStore.canToggleDemoMode
+  return [
+    {
+      label: "后台",
+      key: "admin",
+      show: userStore.isAdminRole,
+      icon: renderIcon("ph:toolbox"),
+      props: { onClick: () => router.push(adminPath.value) },
     },
-  },
-  {
-    label: "我的主页",
-    key: "home",
-    icon: renderIcon("streamline-ultimate-color:newspaper-fold"),
-    props: {
-      onClick: () => router.push("/user"),
+    {
+      label: userStore.demoMode ? "退出演示" : "进入演示",
+      key: "demo-mode",
+      show: userStore.canToggleDemoMode,
+      icon: renderIcon("ph:presentation"),
+      props: { onClick: handleToggleDemoMode },
     },
-  },
-  {
-    label: "我的成就",
-    key: "achievement",
-    icon: renderIcon("streamline-ultimate-color:award-medal-4"),
-    props: {
-      onClick: () => router.push("/achievement"),
+    { type: "divider", key: "work-divider", show: work },
+    {
+      label: "我的主页",
+      key: "home",
+      icon: renderIcon("ph:house"),
+      props: { onClick: () => router.push("/user") },
     },
-  },
-  {
-    label: "我的提交",
-    key: "status",
-    icon: renderIcon("streamline-ultimate-color:analytics-bars-3d"),
-    props: {
-      onClick: () => router.push("/submission?myself=1"),
+    {
+      label: "我的成就",
+      key: "achievement",
+      icon: renderIcon("ph:medal"),
+      props: { onClick: () => router.push("/achievement") },
     },
-  },
-  {
-    label: "我的设置",
-    key: "setting",
-    icon: renderIcon("streamline-emojis:musical-score"),
-    props: {
-      onClick: () => router.push("/setting"),
+    {
+      label: "我的提交",
+      key: "status",
+      icon: renderIcon("ph:list-checks"),
+      props: { onClick: () => router.push("/submission?myself=1") },
     },
-  },
-  {
-    label: "智能分析",
-    key: "ai-analysis",
-    icon: renderIcon("vscode-icons:file-type-gemini"),
-    props: {
-      onClick: () => router.push("/ai-analysis"),
+    {
+      label: "智能分析",
+      key: "ai-analysis",
+      icon: renderIcon("ph:sparkle"),
+      props: { onClick: () => router.push("/ai-analysis") },
     },
-  },
-  {
-    label: userStore.demoMode ? "退出演示" : "进入演示",
-    key: "demo-mode",
-    show: userStore.canToggleDemoMode,
-    icon: renderIcon("fluent-emoji:graduation-cap"),
-    props: { onClick: handleToggleDemoMode },
-  },
-  { type: "divider" },
-  {
-    label: "退出",
-    key: "logout",
-    icon: renderIcon("streamline-ultimate-color:coffee-cold"),
-    props: { onClick: handleLogout },
-  },
-])
+    {
+      label: "我的设置",
+      key: "setting",
+      icon: renderIcon("ph:gear-six"),
+      props: { onClick: () => router.push("/setting") },
+    },
+    { type: "divider", key: "theme-divider" },
+    { type: "render", key: "theme", render: renderThemeRow },
+    { type: "divider", key: "logout-divider" },
+    {
+      label: "退出",
+      key: "logout",
+      icon: renderIcon("ph:sign-out"),
+      props: { onClick: handleLogout },
+    },
+  ]
+})
 </script>
 
 <template>
-  <header class="bar" :class="{ mobile: isMobile }">
+  <header class="bar" :class="{ compact, wrap: isMobile || narrow }">
     <RouterLink to="/" class="brand">
       <Icon icon="streamline-emojis:dog" :height="26"></Icon>
       <span>{{ configStore.config?.websiteName }}</span>
@@ -244,9 +246,6 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
       </n-tag>
     </RouterLink>
     <nav v-if="isDesktop" class="nav">
-      <n-dropdown trigger="hover" :options="learnOptions" @select="handleNavSelect">
-        <button type="button" class="nav-link" :class="{ active: active === 'learn' }">自学</button>
-      </n-dropdown>
       <RouterLink
         v-for="link in navLinks"
         :key="link.key"
@@ -256,36 +255,42 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
       >
         {{ link.label }}
       </RouterLink>
+      <n-dropdown trigger="hover" :options="learnOptions" @select="handleNavSelect">
+        <button type="button" class="nav-link" :class="{ active: active === 'learn' }">
+          自学<Icon icon="ph:caret-down-bold" :width="11" />
+        </button>
+      </n-dropdown>
+      <n-dropdown trigger="hover" :options="moreOptions" @select="handleNavSelect">
+        <button type="button" class="nav-link" :class="{ active: moreActive }">
+          更多<Icon icon="ph:caret-down-bold" :width="11" />
+        </button>
+      </n-dropdown>
     </nav>
     <div class="spacer"></div>
     <div class="actions">
-      <template v-if="isDesktop && userStore.isAdminRole">
-        <RouterLink :to="adminPath" class="admin-link">
-          <Icon icon="ph:gear-six" :width="15" />
-          <span>后台</span>
+      <ProblemJumpBox v-if="isDesktop" :compact="compact" />
+      <template v-if="isDesktop && collabStore.isTeacher">
+        <RouterLink
+          to="/classroom"
+          class="tool-link"
+          :class="{ active: active === 'classroom' }"
+          title="课堂看板"
+          aria-label="课堂看板"
+        >
+          <Icon icon="ph:monitor" :width="16" />
+          <span v-if="!compact">课堂看板</span>
         </RouterLink>
         <span class="divider"></span>
       </template>
       <n-dropdown v-if="isMobile" :options="mobileMenus" size="large" @select="handleNavSelect">
         <n-button>菜单</n-button>
       </n-dropdown>
-      <n-input
-        v-if="isDesktop"
-        v-model:value="jumpKeyword"
-        class="jump"
-        placeholder="输入题号直达"
-        :loading="jumping"
-        @keyup.enter="handleJump"
-      >
-        <template #prefix>
-          <Icon icon="ph:magnifying-glass" />
-        </template>
-      </n-input>
       <template v-if="userStore.isFinished">
         <n-dropdown v-if="userStore.isAuthed" :options="options" size="large">
-          <n-badge :value="pendingHelpCount" :max="99">
-            <n-button>{{ userStore.user!.username }}</n-button>
-          </n-badge>
+          <n-button class="name" :title="userStore.user!.username">
+            <span class="name-text">{{ userStore.user!.username }}</span>
+            <Icon icon="ph:caret-down-bold" :width="11" class="caret" />
+          </n-button>
         </n-dropdown>
         <template v-else>
           <n-button secondary type="primary" @click="authStore.openLoginModal()"> 登录 </n-button>
@@ -296,19 +301,22 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
           >
             注册
           </n-button>
+          <!-- 没登录就没有个人菜单，暗色开关只能留在顶栏 -->
+          <n-button
+            quaternary
+            circle
+            :title="isDark ? '切换到亮色' : '切换到暗色'"
+            :aria-label="isDark ? '切换到亮色' : '切换到暗色'"
+            @click="toggleDark"
+          >
+            <template #icon>
+              <Icon :icon="isDark ? 'ph:sun' : 'ph:moon'" />
+            </template>
+          </n-button>
         </template>
       </template>
-      <n-button
-        quaternary
-        circle
-        :title="isDark ? '切换到亮色' : '切换到暗色'"
-        :aria-label="isDark ? '切换到亮色' : '切换到暗色'"
-        @click="toggleDark"
-      >
-        <template #icon>
-          <Icon :icon="isDark ? 'ph:sun' : 'ph:moon'" />
-        </template>
-      </n-button>
+      <!-- 放在最末尾：出现、消失时左边的东西都不挪 -->
+      <HelpButton />
     </div>
   </header>
 </template>
@@ -326,8 +334,12 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
   white-space: nowrap;
 }
 
+.bar.compact {
+  gap: 20px;
+}
+
 /* 窄屏放不下一行：允许折行，高度跟着内容走 */
-.bar.mobile {
+.bar.wrap {
   height: auto;
   min-height: 55px;
   padding: 8px 12px;
@@ -349,13 +361,18 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
 .nav {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 2px;
   flex: none;
 }
 
 .nav-link {
-  padding: 0;
+  height: 32px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   font: inherit;
   cursor: pointer;
@@ -364,11 +381,14 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
 }
 
 .nav-link:hover {
-  color: v-bind("theme.primaryColor");
+  background: v-bind("theme.hoverColor");
 }
 
+/* 当前页：浅绿底块（设计稿「顶栏重设计 · 定稿」）。字色在暗色下换浅一档，
+   深绿放在暗底上看不清 —— 和题目页课堂条同一个做法 */
 .nav-link.active {
-  color: v-bind("theme.primaryColorPressed");
+  background: v-bind("tone.activeBg");
+  color: v-bind("tone.activeText");
   font-weight: 600;
 }
 
@@ -379,11 +399,11 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex: none;
 }
 
-.admin-link {
+.tool-link {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -391,7 +411,8 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
   text-decoration: none;
 }
 
-.admin-link:hover {
+.tool-link:hover,
+.tool-link.active {
   color: v-bind("theme.primaryColor");
 }
 
@@ -401,7 +422,45 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => [
   background-color: v-bind("theme.dividerColor");
 }
 
-.jump {
-  width: 180px;
+/* 学生用户名最长有 25 个字符：按钮最宽 160，多出来的省略，全名在 title 里 */
+.name {
+  max-width: 160px;
+}
+
+/* 1024 宽、老师那版、名字按最长的算，160 会挤进右边距 */
+.bar.compact .name {
+  max-width: 120px;
+}
+
+.name :deep(.n-button__content) {
+  min-width: 0;
+  gap: 4px;
+}
+
+.name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.caret {
+  flex: none;
+}
+</style>
+
+<!-- 暗色开关那一行是 render 出来挂在 dropdown 里的（teleport 到 body），scoped 够不着 -->
+<style>
+.theme-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  cursor: pointer;
+}
+
+.theme-row .theme-label {
+  flex: 1 1 0;
+  font-size: 15px;
 }
 </style>

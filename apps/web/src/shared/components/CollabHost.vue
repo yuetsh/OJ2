@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import type { CollabRequestItem } from "shared/composables/websocket"
 import { useCollabStore } from "shared/store/collab"
 import HelpRequestList from "./HelpRequestList.vue"
 
 /**
- * 课堂求助的全局界面：一次性提示、新求助 toast、求助列表。
+ * 课堂求助的全局界面：一次性提示、求助列表。
+ *
+ * 新求助**不弹 toast**：原来每来一个就弹一条，一节课能弹十几次，讲台电脑投着屏时还弹在
+ * 全班面前。现在靠顶栏（前台、后台都有）的 HelpButton：没人等不显示，冒出来就是提醒，
+ * 人数再变多时闪一下。
  *
  * 教师端的协作**没有弹框**：接单会跳到那道题的页面，在页面自带的编辑器里协作
  * （见 HelpRequestList 的 handleAccept、ProblemEditor 的 collabHere）。
  * 原来这里还异步挂一个 CollabModal，那个弹框按一下 Esc 就关、协作跟着结束。
  *
  * 挂在 App.vue 而不是顶栏或 default.vue 布局里。这些东西跟着**连接**走，
- * 而连接是全局常驻的（App.vue 按登录态开关）—— 挂在顶栏里的时候，老师一进
- * /admin 就换成了 admin.vue 布局，顶栏连同这几个消费者一起卸载：求助照收，
- * 提示、角标、协作界面全都不出现，正好错过 collab.ts 里写的那句「老师可能
- * 正在后台改题时收到求助」。放在这里才真的全局。
+ * 而连接是全局常驻的（App.vue 按登录态开关）—— 挂在前台顶栏里的时候，老师一进
+ * /admin 就换成了 admin.vue 布局，顶栏连同这几个消费者一起卸载，正好错过
+ * collab.ts 里写的那句「老师可能正在后台改题时收到求助」。放在这里才真的全局；
+ * 后台那条顶栏自己也挂了一个 HelpButton。
  *
  * 位置要求：n-message-provider 的后代（useMessage 需要）。
  */
@@ -33,43 +36,6 @@ watch(
   () => {
     const text = collabStore.consumeNotice()
     if (text) message.info(text)
-  },
-)
-
-/**
- * 新求助进来只有角标默默 +1，上课走动的时候根本注意不到，补一条 toast。
- *
- * 只在数字**变大**时弹：老师自己接单、拒绝、别的老师接走都会让它变小，那些
- * 不该打扰人。断线重连后服务端会重推一份全量列表，队里还有人的话这里会再弹
- * 一次 —— 那正好是「你刚断过线，这些人还等着」，留着。
- */
-watch(
-  () => collabStore.pendingCount,
-  (count, previous) => {
-    if (count <= previous) return
-    let latest: CollabRequestItem | null = null
-    for (const item of collabStore.requests) {
-      if (item.status !== "pending") continue
-      if (!latest || item.createdAt > latest.createdAt) latest = item
-    }
-    const text = latest ? `${latest.studentName} 求助：${latest.problemTitle}` : "有新的求助"
-    // 内容传 render 函数（naive 的 content 支持），这样整条 toast 可点：
-    // 点一下直接开求助列表，省得再去点名字、再点菜单。
-    const notice = message.info(
-      () =>
-        h(
-          "span",
-          {
-            style: { cursor: "pointer" },
-            onClick: () => {
-              collabStore.helpPanelOpen = true
-              notice.destroy()
-            },
-          },
-          `${text} · 点击处理`,
-        ),
-      { duration: 5000 },
-    )
   },
 )
 </script>
