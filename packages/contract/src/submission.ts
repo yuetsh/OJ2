@@ -271,6 +271,12 @@ export const submissionListItemSchema = z.object({
   createTime: z.string(),
   userId: z.number().int(),
   username: z.string(),
+  /**
+   * 提交人现在的班级（user.class_name），没有班级、已删号的为 null。右栏的「只看这个班」
+   * 用它 —— 网站配置里的班级列表只有在读的班，摘掉的老班在下拉里选不到，从一条提交
+   * 点过去就能筛
+   */
+  className: z.string().nullable(),
   result: judgeStatusSchema,
   language: problemLanguageSchema,
   statisticInfo: statisticInfoSchema,

@@ -19,7 +19,7 @@ import {
 import type { Submission, SubmissionListItem } from "utils/types"
 import { useCopySubmission } from "../composables/copySubmission"
 import { useTone } from "../composables/tone"
-import { submissionTimeText } from "../utils"
+import { classLabel, submissionTimeText } from "../utils"
 import CodeView from "./CodeView.vue"
 import StatusPill from "./StatusPill.vue"
 import UserName from "./UserName.vue"
@@ -34,6 +34,8 @@ const props = defineProps<{
   teacher: boolean
   /** 在比赛的提交列表里（不能重判，题目链接走比赛） */
   contest: boolean
+  /** 列表现在筛的班级：已经在筛这个班就不再给「只看这个班」 */
+  className?: string
   /** 右下角的「本页第 i / n 条」 */
   position: { index: number; count: number } | null
   /** 手机上的整屏详情：头部折行、不提方向键 */
@@ -42,6 +44,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   filterUser: [username: string]
+  filterClass: [className: string]
   filterProblem: [displayId: string]
   openProblem: [row: SubmissionListItem]
   rejudge: [id: string]
@@ -242,6 +245,16 @@ function openStandalone() {
           @click="emit('filterUser', row.username)"
         >
           <Icon icon="ph:funnel-simple-bold" :width="12" />
+        </button>
+        <!-- 班级下拉只有网站配置里在读的班，摘掉的老班从这里筛 -->
+        <button
+          v-if="teacher && !contest && row.className && row.className !== className"
+          class="filter-pill wide"
+          :title="`只看${classLabel(row.className)}的提交`"
+          :aria-label="`只看${classLabel(row.className)}的提交`"
+          @click="emit('filterClass', row.className)"
+        >
+          {{ classLabel(row.className) }}<Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
       </div>
       <span class="dot">·</span>
@@ -524,6 +537,12 @@ function openStandalone() {
   align-items: center;
   gap: 3px;
   cursor: pointer;
+}
+
+.filter-pill.wide {
+  width: auto;
+  padding: 0 8px;
+  white-space: nowrap;
 }
 
 .filter-pill:hover {

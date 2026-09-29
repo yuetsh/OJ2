@@ -575,6 +575,14 @@ function openStatistics() {
   window.open(href, "_blank")
 }
 
+/** 右栏「只看这个班」：从看一个人换成看他整个班 */
+function filterClass(name: string) {
+  exactFor.value = ""
+  query.username = ""
+  query.myself = "0"
+  query.className = name
+}
+
 function filterProblem(displayId: string) {
   query.problem = displayId
 }
@@ -988,9 +996,11 @@ function dayBreak(index: number) {
           v-else
           :row="selectedRow as SubmissionListItem"
           :teacher="teacher"
+          :class-name="query.className"
           :contest="inContest"
           :position="position"
           @filter-user="filterUser"
+          @filter-class="filterClass"
           @filter-problem="filterProblem"
           @open-problem="openProblem"
           @rejudge="rejudge"
@@ -1024,10 +1034,12 @@ function dayBreak(index: number) {
           v-else
           :row="selectedRow as SubmissionListItem"
           :teacher="teacher"
+          :class-name="query.className"
           :contest="inContest"
           :position="null"
           narrow
           @filter-user="(name: string) => ((mobilePane = false), filterUser(name))"
+          @filter-class="(name: string) => ((mobilePane = false), filterClass(name))"
           @filter-problem="(id: string) => ((mobilePane = false), filterProblem(id))"
           @open-problem="openProblem"
           @rejudge="rejudge"

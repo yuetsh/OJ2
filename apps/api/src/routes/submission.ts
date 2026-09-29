@@ -316,6 +316,7 @@ const submissionListColumns = {
      * 已删号的学生 user 表里没有行，退回冻结的那份（否则整列空着）。
      */
     username: sql<string>`coalesce(${schema.user.username}, ${schema.submission.username})`,
+    className: schema.user.className,
     result: schema.submission.result,
     language: schema.submission.language,
     statisticInfo: schema.submission.statisticInfo,
@@ -574,6 +575,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
           createTime: submission.createTime,
           userId: submission.userId,
           username: submission.username,
+          className: submission.className || null,
           result: submission.result,
           language: submission.language,
           statisticInfo: asRecord(submission.statisticInfo),
@@ -649,6 +651,7 @@ submissionRoutes.get(
             createTime: submission.createTime,
             userId: submission.userId,
             username: submission.username,
+            className: submission.className || null,
             result: submission.result,
             language: submission.language,
             statisticInfo: asRecord(submission.statisticInfo),
