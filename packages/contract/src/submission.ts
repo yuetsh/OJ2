@@ -92,9 +92,9 @@ export const statisticInfoSchema = z.looseObject({
       type: z.string().optional(),
       /** 细分，如 int-parse / index / str-concat，见 runtime-diagnosis.ts 的 KINDS */
       kind: z.string().optional(),
-      /** NameError / AttributeError 点名的那个名字，只在它出现在学生代码里时才存 */
+      /** NameError / AttributeError / 部分 TypeError 点名的那个名字，只在它出现在学生代码里时才存 */
       name: z.string().optional(),
-      /** NameError 的「Did you mean」，Python 从作用域里的名字挑的，不来自输入 */
+      /** NameError / 参数名写错的「Did you mean」，Python 从作用域或参数表里挑的，不来自输入 */
       suggestion: z.string().optional(),
       /** C / C++：进程收到的信号（11 段错误、8 除零……）和退出码 */
       signal: z.number().int().optional(),

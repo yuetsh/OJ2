@@ -140,7 +140,7 @@ const explain = computed(() => {
     }
     case SubmissionStatus.runtime_error: {
       const rt = info?.runtime_error
-      if (rt) return { line: rt.line ?? null, text: explainRuntimeError(rt), raw: err }
+      if (rt) return { line: rt.line ?? null, text: explainRuntimeError(rt, s.code), raw: err }
       return { line: null, text: "程序运行到一半出错，停下来了。", raw: err }
     }
     case SubmissionStatus.cpu_time_limit_exceeded:

@@ -12,7 +12,7 @@ const props = defineProps<{
   code: string
 }>()
 
-const message = computed(() => explainRuntimeError(props.info))
+const message = computed(() => explainRuntimeError(props.info, props.code))
 
 const sourceLine = computed(() => {
   const line = props.info.line

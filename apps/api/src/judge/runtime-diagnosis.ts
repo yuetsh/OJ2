@@ -15,31 +15,105 @@ import type { StatisticInfo } from "@oj2/contract"
  * `invalid literal for int() with base 10: '1 2'`，给学生看就等于把隐藏数据放出去 ——
  * 故意写 `raise Exception(input())` 就能一个点一个点地套。所以只存：
  * - 异常类型和归好类的 `kind`（按消息的**句式**判，不取消息里的值）
- * - NameError / AttributeError 点名的名字，而且只在它**原样出现在学生代码里**时才存
+ * - NameError / AttributeError / 部分 TypeError 点名的名字，而且只在它**原样出现在
+ *   学生代码里**时才存
  */
 export type RuntimeErrorInfo = NonNullable<StatisticInfo["runtime_error"]>
 
 const IDENTIFIER = /^[A-Za-z_]\w*$/
 
-/** 按消息句式细分。键是异常类型，值是 [句式, kind]，从上往下取第一个对上的 */
+/**
+ * 值的类型比句式更能说明错在哪。消息里的类型名是 Python 按学生代码里的值报的，
+ * 不来自输入，所以可以拿来分类。三种在 TypeError 和 AttributeError 里都会出现，
+ * 句式五花八门（`int(input)`、`a, b = input`、`input[0]`、`input.split()`……），
+ * 按句式分会被说成「类型不对」「对数字用了下标」，其实全是同一个错：
+ */
+const VALUE_KINDS: [RegExp, string][] = [
+  // 函数名后面忘了写 ()，拿到的是函数本身
+  [/\bbuiltin_function_or_method\b/, "func-value"],
+  // print() / append() / sort() 的结果、没有 return 的函数的结果
+  [/'NoneType'/, "none-value"],
+  // 把 list 这个类型名当成了自己的列表变量：list[i]
+  [/\btypes\.GenericAlias\b/, "type-name"],
+  // map() 的结果不能直接 len()、下标
+  [/'map' object is not subscriptable|object of type 'map' has no len/, "map-value"],
+]
+
+/**
+ * 按消息句式细分。键是异常类型，值是 [句式, kind]，从上往下取第一个对上的。
+ *
+ * 表是照全库 9228 条 Python 运行时错误重跑出来的回溯定的（2026-09）：原来只有
+ * 12 种，TypeError 过半掉进兜底，被说成「把文字当成数字」，而代码里往往连 input()
+ * 都没有 —— 实际是参数个数不对、参数名拼错、`list.index(x)` 这类用法错误。
+ */
 const KINDS: Record<string, [RegExp, string][]> = {
   ValueError: [
     [/^invalid literal for int\(\)/, "int-parse"],
     [/^could not convert string to float/, "float-parse"],
     [/^(not enough|too many) values to unpack/, "unpack"],
     [/^math domain error/, "math-domain"],
+    [/^empty separator/, "empty-sep"],
+    [/(x not in list|is not in list)$/, "not-in-list"],
+    [
+      /^(unsupported format character|Format specifier missing precision|Invalid format specifier|Unknown format code|incomplete format)/,
+      "format-spec",
+    ],
   ],
   TypeError: [
+    ...VALUE_KINDS,
     [/^can only concatenate str/, "str-concat"],
     [/^unsupported operand type/, "operand"],
     [/cannot be interpreted as an integer/, "not-int"],
     [/not supported between instances of/, "compare"],
     [/object is not callable/, "not-callable"],
+    [/^type '\w+' is not subscriptable/, "type-subscript"],
     [/object is not subscriptable/, "not-subscriptable"],
     [/missing \d+ required positional argument/, "missing-arg"],
+    // s[2, 2]：逗号让下标变成了一组值
+    [/^(list|string|tuple) indices must be integers.*, not '?tuple'?$/, "index-comma"],
     [/^(list|string|tuple) indices must be integers/, "index-type"],
+    [/^slice indices must be integers/, "slice-type"],
+    [/unexpected keyword argument/, "keyword"],
+    [/takes no keyword arguments/, "no-keyword"],
+    [
+      /^(descriptor '\w+' for '\w+' objects doesn't apply|unbound method \w+\.\w+\(\) needs an argument)/,
+      "descriptor",
+    ],
+    [
+      /takes (exactly one|no|at most \d+|at least \d+|\d+)( positional)? arguments?|expected (at least |at most )?\d+ arguments?, got \d+/,
+      "arg-count",
+    ],
+    // 读进来的是文字，却拿去 % 取余、* 乘
+    [/^not all arguments converted during string formatting/, "str-mod"],
+    [/^can't multiply sequence by non-int/, "seq-mul"],
+    [/^bad operand type for unary [+-]: 'str'/, "unary"],
+    [/^cannot unpack non-iterable (int|float) object/, "unpack-number"],
+    [/^(int|float)\(\) argument must be/, "convert-arg"],
+    [/is not iterable/, "not-iterable"],
+    [/has no len\(\)/, "no-len"],
+  ],
+  AttributeError: [
+    ...VALUE_KINDS,
+    [/attribute '\w+' is read-only/, "read-only"],
+    // 数字没有 split() / count()：多半是先 int() 再 split()，顺序反了
+    [/^'(int|float)' object has no attribute/, "number-attr"],
   ],
   IndexError: [[/out of range/, "index"]],
+  // 程序本身编译过了，运行时的 SyntaxError 只可能来自 eval() / exec() 读到的内容
+  SyntaxError: [[/./, "eval-syntax"]],
+}
+
+/**
+ * TypeError 细分之后点名的名字：函数名（arg-count / no-keyword，消息开头的
+ * `list.append()` / `insert expected` 取最后一段）、写错的参数名（keyword）、
+ * 方法名（descriptor）、类型名（type-subscript）
+ */
+const TYPE_ERROR_NAMES: Record<string, RegExp> = {
+  "arg-count": /^(?:\w+\.)*(\w+)(?:\(\) takes| expected)/,
+  "no-keyword": /^(?:\w+\.)*(\w+)\(\) takes no keyword/,
+  keyword: /unexpected keyword argument '([^']+)'/,
+  descriptor: /^(?:descriptor '|unbound method \w+\.)(\w+)/,
+  "type-subscript": /^type '([^']+)'/,
 }
 
 /** 名字在学生自己的代码里原样出现过才算数，否则它可能来自输入（`eval(input())`） */
@@ -94,9 +168,21 @@ export function parsePythonTraceback(
     if (name) info.name = name
     const suggestion = message.match(/Did you mean: '([^']+)'\?/)?.[1]
     if (suggestion && IDENTIFIER.test(suggestion)) info.suggestion = suggestion
-  } else if (type === "AttributeError") {
-    const name = nameFromCode(message.match(/has no attribute '([^']+)'/)?.[1], code)
+    // 用了 math.sqrt 却没 import math。Python 同时给了「Did you mean」时也是这个优先
+    if (/Did you forget to import '/.test(message)) info.kind = "import"
+  } else if (type === "TypeError" && kind && TYPE_ERROR_NAMES[kind]) {
+    const name = nameFromCode(message.match(TYPE_ERROR_NAMES[kind])?.[1], code)
     if (name) info.name = name
+    // 「Did you mean 'end'?」是 Python 从函数的参数表里挑的，不来自输入
+    const suggestion = message.match(/Did you mean '([^']+)'\?/)?.[1]
+    if (kind === "keyword" && suggestion && IDENTIFIER.test(suggestion))
+      info.suggestion = suggestion
+  } else if (type === "AttributeError") {
+    const name = nameFromCode(message.match(/(?:has no attribute|attribute) '([^']+)'/)?.[1], code)
+    if (name) info.name = name
+    // 拼错方法名（spilt → split）占 AttributeError 的一半多，Python 从这个值的方法里挑的
+    const suggestion = message.match(/Did you mean: '([^']+)'\?/)?.[1]
+    if (suggestion && IDENTIFIER.test(suggestion)) info.suggestion = suggestion
   }
   return info
 }
