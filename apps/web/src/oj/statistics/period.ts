@@ -7,12 +7,13 @@ const DAY = 86_400_000
 
 /**
  * 统计页的时间段。课堂统计一般看一两节课（用户原话），所以这两档在最前面、
- * 默认「两节课」；后面几档是回头看。原来弹框里的 10 / 20 / 30 分钟是上课盯人用的，
+ * 默认「一节课」（用户定的）；后面几档是回头看。名字后面不写「1 小时内」：选框旁边
+ * 本来就写着具体几点到几点。原来弹框里的 10 / 20 / 30 分钟是上课盯人用的，
  * 那件事现在归课堂看板。
  */
 export const PERIOD_OPTIONS = [
-  { label: "这节课（1 小时内）", value: "1h" },
-  { label: "两节课（2 小时内）", value: "2h" },
+  { label: "一节课", value: "1h" },
+  { label: "两节课", value: "2h" },
   { label: "今天", value: "today" },
   { label: "最近 7 天", value: "7d" },
   { label: "最近 30 天", value: "30d" },
@@ -22,7 +23,7 @@ export const PERIOD_OPTIONS = [
 ] as const
 
 export type Period = (typeof PERIOD_OPTIONS)[number]["value"]
-export const DEFAULT_PERIOD: Period = "2h"
+export const DEFAULT_PERIOD: Period = "1h"
 
 /** 东八区某天 0 点对应的 UTC 时刻 */
 function dayStartOf(year: number, month: number, day: number) {
