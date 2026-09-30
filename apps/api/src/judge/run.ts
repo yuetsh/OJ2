@@ -538,10 +538,19 @@ export async function judgeSubmission(job: JudgeJobData) {
     if (response.err) {
       const errInfo =
         typeof response.data === "string" ? response.data : JSON.stringify(response.data)
-      result = JudgeStatus.COMPILE_ERROR
-      statisticInfo = {
-        err_info: shiftCompileLines(errInfo, template ? template.prepend.split("\n").length : 0),
-        score: 0,
+      // 只有 CompileError 是学生的错。别的（JudgeClientError 的「Test case not found」
+      // 这类）是题目或判题机的问题：原来一律记成编译错误，学生看到一句英文、以为自己写错了，
+      // 全库 337 条，最近一条就在 2026-09。
+      if (response.err === "CompileError") {
+        result = JudgeStatus.COMPILE_ERROR
+        statisticInfo = {
+          err_info: shiftCompileLines(errInfo, template ? template.prepend.split("\n").length : 0),
+          score: 0,
+        }
+      } else {
+        console.warn(`[judge] 判题机报错 ${row.submission.id}: ${response.err} ${errInfo}`)
+        result = JudgeStatus.SYSTEM_ERROR
+        statisticInfo = { err_info: errInfo, score: 0 }
       }
     } else {
       if (!Array.isArray(response.data)) {

@@ -146,6 +146,10 @@ const msg = computed(() => {
       "程序占的内存太多了。通常是列表、数组开得太大，或者在循环里不停地往里加东西、停不下来。\n\n"
   }
 
+  // 判题机的原文是英文（多半是「Test case not found」，题目缺测试数据），学生看了只会以为自己错了
+  if (result === SubmissionStatus.system_error)
+    return "判题出了问题，不是你的代码写错了。告诉老师看一下这道题。"
+
   if (result !== SubmissionStatus.ast_check_failed && props.submission.statisticInfo?.err_info) {
     msg += stripJudgePath(props.submission.statisticInfo.err_info)
   }
