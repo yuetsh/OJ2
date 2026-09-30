@@ -7,6 +7,7 @@
  */
 
 import {
+  NO_CLASS,
   type ProblemLanguage,
   type SubmissionLessons,
   type SubmissionStatistics,
@@ -23,7 +24,14 @@ import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/s
 import { type ContestEnv } from "../services/contest"
 import { getBooleanOption } from "../services/options"
 import { dayStart, localTime } from "../time"
-import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from "./helpers"
+import {
+  classCondition,
+  isAdminRole,
+  parseDisplayIds,
+  rounded,
+  scopedUsers,
+  stripClassPrefix,
+} from "./helpers"
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
@@ -240,7 +248,7 @@ export async function classNameFilter(className: string) {
   const users = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(eq(schema.user.className, className))
+    .where(classCondition(className))
   return users.length
     ? inArray(
         schema.submission.userId,
@@ -381,7 +389,7 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
   }
   const where = and(...filters)
   // 花名册：只有未禁用的普通用户算进班级人数和「谁没做」，教师和管理员不进分母
-  const rosterRows = matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
+  const enrolled = matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
 
   const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
   // 判题中的条数。要单独数出来，正确率的分母才能把它们摘掉
@@ -474,6 +482,13 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
   const doneCount = perUser.filter(isDone).length
 
   const submittedUserIds = new Set(perUser.map((row) => row.userId))
+  /**
+   * 「没填班级」不是一个真的班：两百来个夏令营、兴趣班、自己注册的号混在一起，「还没交」
+   * 列出来全是不相干的人，分母也跟着失真。花名册只取这段时间交过的人 —— 「交了没对」照常有，
+   * 「还没交」为空，和不选班时一样
+   */
+  const rosterRows =
+    className === NO_CLASS ? enrolled.filter((row) => submittedUserIds.has(row.id)) : enrolled
 
   const data = perUser.map((row) => ({
     username: row.username,
@@ -755,7 +770,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
       select class_name, day, sid
       from (
         select class_name, day, sid, problem_id, count(distinct user_id) as n
-        from seg where class_name is not null
+        from seg
         group by class_name, day, sid, problem_id
       ) p
       group by class_name, day, sid
@@ -765,7 +780,8 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
       select seg.*, (l.sid is not null) as lesson
       from seg
       left join lesson_seg l
-        on l.class_name = seg.class_name and l.day = seg.day and l.sid = seg.sid
+        -- 没填班级的号（class_name 为 null）合在一起当一个班切，= 会把它们全漏掉
+        on l.class_name is not distinct from seg.class_name and l.day = seg.day and l.sid = seg.sid
     )
     select grouping(class_name, day, sid, problem_id, result, lesson) as level,
       class_name, day, sid::int as sid, problem_id, result, lesson,
@@ -866,7 +882,9 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
     : []
   const problemById = new Map(problems.map((row) => [row.id, row]))
 
-  const lessonClasses = [...new Set(picked.map((row) => row.class_name!))]
+  const lessonClasses = [
+    ...new Set(picked.flatMap((row) => (row.class_name === null ? [] : [row.class_name]))),
+  ]
   const sizes = lessonClasses.length
     ? await db
         .select({ className: schema.user.className, value: count() })
@@ -889,12 +907,16 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
     const hardest = [...own].sort((a, b) => failedOf(b) - failedOf(a))[0]
     const hardestProblem = hardest ? problemById.get(hardest.problem_id!) : undefined
     return {
-      className: lesson.class_name!,
+      className: lesson.class_name,
       day: lesson.day!,
       start: lesson.first,
       end: lesson.last,
       userCount: lesson.users,
-      classSize: sizes.find((row) => row.className === lesson.class_name)?.value ?? 0,
+      // 没填班级的谈不上花名册，给 0（界面上就只写「几人」）
+      classSize:
+        lesson.class_name === null
+          ? 0
+          : (sizes.find((row) => row.className === lesson.class_name)?.value ?? 0),
       // 点进去就拿这几道去筛：统计接口只认公开题，一次最多 20 道
       problems: own
         .map((row) => problemById.get(row.problem_id!))

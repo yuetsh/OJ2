@@ -34,6 +34,12 @@ function dayStartOf(year: number, month: number, day: number) {
   return Date.UTC(year, month - 1, day) - OFFSET_MS
 }
 
+/** 东八区某天（`2026-09-29`）0 点的真实时刻，毫秒 —— 点零散提交时拿它当「自己选日子」的起止 */
+export function dayStartOfDate(day: string) {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number]
+  return dayStartOf(year, month, date)
+}
+
 /** 东八区「现在」这一天的 0 点 */
 function todayStart(now: number) {
   const p = zonedParts(new Date(now))!

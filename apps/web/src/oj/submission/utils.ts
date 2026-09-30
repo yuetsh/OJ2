@@ -1,3 +1,4 @@
+import { NO_CLASS } from "@oj2/contract"
 import { parseTime } from "utils/functions"
 
 /**
@@ -30,7 +31,20 @@ export function submissionDayText(time: string) {
   return parseTime(time, "YYYY年M月D日")
 }
 
-/** 班级下拉的标签：`253` → `25计算机3班`，和统计面板、班级 PK 同一个写法 */
-export function classLabel(className: string) {
+/**
+ * 班级下拉的标签：`253` → `25计算机3班`，和统计面板、班级 PK 同一个写法。
+ * null（接口里没填班级的号）和 NO_CLASS（筛选里的「没填班级」）都写成「没填班级」
+ */
+export function classLabel(className: string | null) {
+  if (className === null || className === NO_CLASS) return "没填班级"
   return `${className.slice(0, 2)}计算机${className.slice(2)}班`
+}
+
+/**
+ * 班级下拉的选项：配置里的班，最后一项「没填班级」（这批号也要能和普通班一样圈出来看）。
+ * 带进来的班不在配置里（老班、手打的）也要显示得出来，不然框里是空的却在筛
+ */
+export function classSelectOptions(list: string[], current: string) {
+  const all = current && current !== NO_CLASS && !list.includes(current) ? [current, ...list] : list
+  return [...all, NO_CLASS].map((item) => ({ label: classLabel(item), value: item }))
 }

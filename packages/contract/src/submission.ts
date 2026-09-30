@@ -406,11 +406,19 @@ export const submissionStatisticsSchema = z.object({
 })
 
 /**
+ * 班级筛选（统计、提交列表、流程图的 `className` 参数）里代表「没填班级」的取值：
+ * 这批号（夏令营、兴趣班、自己注册的）`user.class_name` 是 null，当成一个班来看。
+ * 真班名全是数字（`253`、`2511`），撞不上
+ */
+export const NO_CLASS = "none"
+
+/**
  * 统计「一行一节课」的总览（GET /submissions/statistics/lessons，设计稿「统计合二为一」B）。
  * 没选班、没填学生、没填题号时用它；原来「今日统计」老师那一版并进来了，换成任意时间段。
  *
  * **一节课怎么切**：只算普通学生（和方块串同一个口径），按「班 + 东八区哪一天」分组，
  * 相邻两条提交隔 30 分钟以上就切开；切出来的一段里有一道题 5 人以上做过，才算一节课。
+ * 没填班级的号合在一起当一个班切（`className` 为 null）。
  * 其余的是零散提交（补做、课后自己练）。这样 26计算机0班 9 月 29 日是 14:04–15:38，
  * 不会被 16:24、18:42 那两条课后提交拖成「14:04–18:42」。
  */
@@ -420,14 +428,15 @@ export const submissionLessonsSchema = z.object({
   /** 最近的 N 节课，按开始时间倒序（界面上按天分组，这节课在最上面） */
   lessons: z.array(
     z.object({
-      className: z.string(),
+      /** null = 没填班级的那批号，点进去按 NO_CLASS 筛 */
+      className: z.string().nullable(),
       /** 东八区的日子，`2026-09-29` */
       day: z.string(),
       /** 这一段第一条、最后一条提交 */
       start: z.string(),
       end: z.string(),
       userCount: z.number().int(),
-      /** 班里的学生数（未禁用的普通用户） */
+      /** 班里的学生数（未禁用的普通用户）。没填班级的谈不上花名册，给 0 */
       classSize: z.number().int(),
       /** 这节课做的题（这一段里 5 人以上做过的），做的人多的在前，最多 20 道 —— 点进去就筛这几道 */
       problems: z.array(z.string()),

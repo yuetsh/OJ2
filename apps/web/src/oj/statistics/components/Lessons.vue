@@ -8,6 +8,7 @@ import { classLabel } from "oj/submission/utils"
 import { resultName, useResultColor } from "../results"
 
 type Lesson = SubmissionLessons["lessons"][number]
+type Scattered = SubmissionLessons["scattered"][number]
 
 /**
  * 统计「一行一节课」的总览（设计稿「统计合二为一」B）。没选班、没填学生和题号时用它：
@@ -24,6 +25,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{
   pick: [lesson: Lesson]
+  /** 点某天的零散提交：那个班（或没填班级的）那一天 */
+  scattered: [item: Scattered]
   /** 点「错得最多的题」里的一道：只看这道（按班级汇总） */
   problem: [displayId: string]
   more: []
@@ -49,27 +52,23 @@ function dayText(day: string) {
 
 /** 按天分组，天和天里的课都是从近到远，零散提交挂在对应那天下面 */
 const days = computed(() => {
-  const map = new Map<string, { lessons: Lesson[]; scattered: string }>()
+  const map = new Map<string, Lesson[]>()
   for (const lesson of props.data.lessons) {
-    const entry = map.get(lesson.day) ?? { lessons: [], scattered: "" }
-    entry.lessons.push(lesson)
-    map.set(lesson.day, entry)
+    map.set(lesson.day, [...(map.get(lesson.day) ?? []), lesson])
   }
-  const scatteredByDay = new Map<string, string[]>()
+  const scatteredByDay = new Map<string, Scattered[]>()
   for (const item of props.data.scattered) {
-    const name = item.className ? classLabel(item.className) : "没填班级的"
-    const text = `${name} ${item.userCount} 人 ${item.total} 次`
-    scatteredByDay.set(item.day, [...(scatteredByDay.get(item.day) ?? []), text])
-    if (!map.has(item.day)) map.set(item.day, { lessons: [], scattered: "" })
+    scatteredByDay.set(item.day, [...(scatteredByDay.get(item.day) ?? []), item])
+    if (!map.has(item.day)) map.set(item.day, [])
   }
   return [...map.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([day, entry]) => ({
+    .map(([day, lessons]) => ({
       day,
       label: dayText(day),
       // 最近的一节在最上面（用户说的）：打开就看到这节课，往下是更早的
-      lessons: [...entry.lessons].sort((a, b) => b.start.localeCompare(a.start)),
-      scattered: (scatteredByDay.get(day) ?? []).join(" · "),
+      lessons: [...lessons].sort((a, b) => b.start.localeCompare(a.start)),
+      scattered: scatteredByDay.get(day) ?? [],
     }))
 })
 
@@ -157,7 +156,7 @@ function percent(value: number, total: number) {
       <div class="day">{{ group.label }}</div>
       <a
         v-for="lesson in group.lessons"
-        :key="lesson.className + lesson.start"
+        :key="`${lesson.className}|${lesson.start}`"
         href="#"
         class="row"
         @click.prevent="emit('pick', lesson)"
@@ -192,8 +191,14 @@ function percent(value: number, total: number) {
         </span>
         <span class="c-go">看这节课<Icon icon="ph:caret-right-bold" :width="12" /></span>
       </a>
-      <div v-if="group.scattered" class="scattered">
-        {{ group.lessons.length ? "另有零散提交：" : "零散提交：" }}{{ group.scattered }}
+      <div v-if="group.scattered.length" class="scattered">
+        {{ group.lessons.length ? "另有零散提交：" : "零散提交：" }}
+        <template v-for="(item, index) in group.scattered" :key="item.className ?? ''">
+          <template v-if="index"> · </template>
+          <a href="#" title="看这个班这一天的提交" @click.prevent="emit('scattered', item)"
+            >{{ classLabel(item.className) }} {{ item.userCount }} 人 {{ item.total }} 次</a
+          >
+        </template>
       </div>
     </template>
 
@@ -244,7 +249,7 @@ function percent(value: number, total: number) {
               </a>
             </td>
             <td>
-              <n-text depth="2">{{ item.className ? classLabel(item.className) : "—" }}</n-text>
+              <n-text depth="2">{{ classLabel(item.className) }}</n-text>
             </td>
             <td>{{ item.total }} 次</td>
             <td>
@@ -463,6 +468,16 @@ function percent(value: number, total: number) {
   font-size: 12px;
   color: v-bind("theme.textColor3");
   border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.scattered a {
+  color: v-bind("theme.textColor2");
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.scattered a:hover {
+  color: v-bind("theme.primaryColor");
 }
 
 .more {

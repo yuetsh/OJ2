@@ -31,7 +31,7 @@ import FlowchartState from "./components/FlowchartState.vue"
 import StatusPill from "./components/StatusPill.vue"
 import UserName from "./components/UserName.vue"
 import { useTone } from "./composables/tone"
-import { classLabel, submissionClockText, submissionDayText } from "./utils"
+import { classLabel, classSelectOptions, submissionClockText, submissionDayText } from "./utils"
 
 /**
  * 提交列表（设计稿「提交列表重设计 · 定稿」）：左边列表、右边常驻选中那条的代码。
@@ -448,12 +448,9 @@ const languageOptions = [
   { label: "SQL", value: "SQL" },
 ]
 
-const classOptions = computed(() => {
-  const list = configStore.config?.classList ?? []
-  // 带进来的班级不在配置里（老班、手打的）也要显示得出来，不然框里是空的却在筛
-  const all = query.className && !list.includes(query.className) ? [query.className, ...list] : list
-  return all.map((item) => ({ label: classLabel(item), value: item }))
-})
+const classOptions = computed(() =>
+  classSelectOptions(configStore.config?.classList ?? [], query.className),
+)
 
 const contestProblemOptions = computed(() => [
   { label: "全部题目", value: "" },

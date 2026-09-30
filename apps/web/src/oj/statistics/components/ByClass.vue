@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
-import type { SubmissionStatisticsGrid } from "@oj2/contract"
+import { NO_CLASS, type SubmissionStatisticsGrid } from "@oj2/contract"
 import { SubmissionStatus } from "utils/constants"
 import { useTone } from "oj/submission/composables/tone"
 import { classLabel, submissionDayText } from "oj/submission/utils"
@@ -27,7 +27,7 @@ const classes = computed(() => {
   const need = props.grid.problems.map((problem) => problem.problemDisplayId)
   const groups = new Map<string, SubmissionStatisticsGrid["rows"]>()
   for (const row of props.grid.rows) {
-    const key = row.className ?? ""
+    const key = row.className ?? NO_CLASS
     groups.set(key, [...(groups.get(key) ?? []), row])
   }
   return (
@@ -56,7 +56,7 @@ const classes = computed(() => {
         const size = props.grid.classSizes[className] ?? rows.length
         return {
           className,
-          label: className ? classLabel(className) : "没有班级",
+          label: classLabel(className),
           size,
           done,
           tried: rows.length - done,
@@ -101,13 +101,7 @@ const classes = computed(() => {
         <span class="c-n muted">{{ row.rate }}</span>
         <span class="c-last muted">{{ row.last ? submissionDayText(row.last) : "—" }}</span>
         <span class="spacer"></span>
-        <n-button
-          v-if="row.className"
-          size="small"
-          text
-          type="primary"
-          @click="emit('pick', row.className)"
-        >
+        <n-button size="small" text type="primary" @click="emit('pick', row.className)">
           看这个班 →
         </n-button>
       </div>

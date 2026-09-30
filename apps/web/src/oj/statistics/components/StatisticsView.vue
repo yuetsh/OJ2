@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
-import type {
-  FlowchartStatistics,
-  SubmissionLessons,
-  SubmissionStatistics,
-  SubmissionStatisticsGrid,
+import {
+  NO_CLASS,
+  type FlowchartStatistics,
+  type SubmissionLessons,
+  type SubmissionStatistics,
+  type SubmissionStatisticsGrid,
 } from "@oj2/contract"
 import {
   getFlowchartStatistics,
@@ -16,8 +17,8 @@ import {
 import { useConfigStore } from "shared/store/config"
 import { fromPickerValue, toPickerValue } from "utils/functions"
 import { useTone } from "oj/submission/composables/tone"
-import { classLabel } from "oj/submission/utils"
-import { DEFAULT_PERIOD, PERIOD_OPTIONS, periodRange, type Period } from "../period"
+import { classSelectOptions } from "oj/submission/utils"
+import { DEFAULT_PERIOD, PERIOD_OPTIONS, dayStartOfDate, periodRange, type Period } from "../period"
 import { resultName, useResultColor } from "../results"
 import ByClass from "./ByClass.vue"
 import CodeStats from "./CodeStats.vue"
@@ -106,11 +107,9 @@ function pickDates(value: [number, number] | null) {
 /** 学生框：包含匹配。班级另外单独传（按 class_name 精确匹配，见后端 scopedUsers） */
 const studentParam = computed(() => username.value.trim())
 
-const classOptions = computed(() => {
-  const list = configStore.config?.classList ?? []
-  const all = className.value && !list.includes(className.value) ? [className.value, ...list] : list
-  return all.map((item) => ({ label: classLabel(item), value: item }))
-})
+const classOptions = computed(() =>
+  classSelectOptions(configStore.config?.classList ?? [], className.value),
+)
 
 // ---------- 取数 ----------
 
@@ -306,12 +305,24 @@ function pickClass(value: string) {
 /** 点一节课：这个班、这节课的题、这节课第一条到最后一条（多留 1 秒：库里存到微秒，转成毫秒会截掉零头） */
 function pickLesson(lesson: SubmissionLessons["lessons"][number]) {
   remember()
-  className.value = lesson.className
+  className.value = lesson.className ?? NO_CLASS
   username.value = ""
   problem.value = lesson.problems.join(" ")
   from.value = String(Date.parse(lesson.start))
   to.value = String(Date.parse(lesson.end) + 1000)
   period.value = "lesson"
+}
+
+/** 点某天的零散提交：这个班（或没填班级的）那一整天，题号不限 —— 补做、课后练的都在里面 */
+function pickScattered(item: SubmissionLessons["scattered"][number]) {
+  remember()
+  className.value = item.className ?? NO_CLASS
+  username.value = ""
+  problem.value = ""
+  const day = String(dayStartOfDate(item.day))
+  from.value = day
+  to.value = day
+  period.value = "custom"
 }
 
 /** 点「错得最多的题」里的一道：只看这道，按班级汇总 */
@@ -478,6 +489,7 @@ function resultWidth(value: number) {
         :timeline="shown.withinToday"
         :loading-more="loadingMore"
         @pick="pickLesson"
+        @scattered="pickScattered"
         @problem="pickProblem"
         @more="loadMore"
       />

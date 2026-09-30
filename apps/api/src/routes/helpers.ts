@@ -1,6 +1,6 @@
-import { ADMIN_ROLES, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
+import { ADMIN_ROLES, NO_CLASS, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
 
-import { and, count, eq, ilike, notInArray, sql } from "drizzle-orm"
+import { and, count, eq, ilike, isNull, notInArray, sql } from "drizzle-orm"
 
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
@@ -160,6 +160,19 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
  * `user_id`），更是只能从这儿拿 id。
  */
 /**
+ * 「这个班的人」：`user.class_name` 精确匹配；NO_CLASS 是没填班级的学生（class_name 为 null）。
+ * 统计、提交列表、流程图按班级筛都走它，没填班级的才能和普通班一样被圈出来。
+ *
+ * NO_CLASS 只圈普通用户：老师、管理员的号本来就都不填班级，不挡的话老师自己试题的提交
+ * 会混进「没填班级」，还算进做完的人数里（切课那边也只算普通学生，两边口径一致）
+ */
+export function classCondition(className: string) {
+  return className === NO_CLASS
+    ? and(isNull(schema.user.className), eq(schema.user.adminType, "Regular User"))
+    : eq(schema.user.className, className)
+}
+
+/**
  * 统计接口「圈哪些人」：班级按 `user.class_name` **精确**匹配，学生名按包含匹配，两个都给
  * 就取交集，都没给返回 null（不圈人）。
  *
@@ -179,7 +192,7 @@ export async function scopedUsers(username: string | undefined, className: strin
     .from(schema.user)
     .where(
       and(
-        className ? eq(schema.user.className, className) : undefined,
+        className ? classCondition(className) : undefined,
         username ? ilike(schema.user.username, `%${username}%`) : undefined,
       ),
     )

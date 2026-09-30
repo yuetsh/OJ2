@@ -10,6 +10,7 @@ import {
   type FlowchartListItem,
   type FlowchartStatistics,
   type FlowchartSubmission,
+  NO_CLASS,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
@@ -27,6 +28,7 @@ import { buildWordFrequencies } from "../services/word-frequency"
 import { dayStart } from "../time"
 import { unknownDisplayIds } from "./submission-statistics"
 import {
+  classCondition,
   isAdminRole,
   matchedUsers,
   asRecord,
@@ -208,7 +210,7 @@ async function flowchartClassFilter(className: string) {
   const users = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(eq(schema.user.className, className))
+    .where(classCondition(className))
   return users.length
     ? inArray(
         schema.flowchartSubmission.userId,
@@ -422,10 +424,13 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   }
   const where = and(...filters)
   // 花名册：只有指定了用户名才谈得上「班级人数」，不指定时分母无意义。
-  // 未禁用的普通用户才进分母，教师和管理员不算
-  const roster = scoped
-    ? matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
-    : []
+  // 未禁用的普通用户才进分母，教师和管理员不算。
+  // 「没填班级」不是一个真的班（两百来个夏令营、自己注册的号混在一起），「谁没做」列出来全是
+  // 不相干的人，当没有花名册
+  const roster =
+    scoped && c.req.query("className")?.trim() !== NO_CLASS
+      ? matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
+      : []
 
   /**
    * 五条查询，每条的代价都和窗口里的行数脱钩（词云那条卡了 limit）。
