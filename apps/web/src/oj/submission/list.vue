@@ -1197,8 +1197,9 @@ function dayBreak(index: number) {
   background: v-bind("theme.dividerColor");
 }
 
+/* 最长的是「26计算机11班」：132px 时只剩两像素余量，字体稍宽的机器上就出省略号 */
 .w-class {
-  width: 132px;
+  width: 152px;
 }
 .w-user {
   width: 120px;
