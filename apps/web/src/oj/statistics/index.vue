@@ -4,7 +4,7 @@ import StatisticsView from "./components/StatisticsView.vue"
 import { DEFAULT_PERIOD } from "./period"
 
 /**
- * 数据统计的页面形态：课堂看板「回头看」、题目页统计页签、今日统计从别处进来时用。
+ * 统计的页面形态：课堂看板「回头看」、题目页统计页签这些从别处进来时用。
  * 提交列表里是弹框（用户定的），两边是同一个 StatisticsView。
  *
  * 查询条件都在地址栏里：带过来、刷新、转发给别的老师都还是这一份。

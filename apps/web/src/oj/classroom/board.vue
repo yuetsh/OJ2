@@ -269,7 +269,7 @@ function submissionsHref(
           >
         </n-text>
         <n-button :loading="loading" @click="load">刷新</n-button>
-        <!-- 看板只管今天；以前几节课的、任意时间段的去数据统计（带上这个班） -->
+        <!-- 看板只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
         <n-button
           v-if="!projector"
           @click="router.push({ name: 'statistics', query: className ? { className } : {} })"

@@ -22,7 +22,11 @@ export const PERIOD_OPTIONS = [
   { label: "自己选日子", value: "custom" },
 ] as const
 
-export type Period = (typeof PERIOD_OPTIONS)[number]["value"]
+/**
+ * `lesson`：从「一行一节课」点进某一节课，from / to 是那节课第一条、最后一条提交的时刻
+ * （精确到毫秒，不是「自己选日子」那种按天）。它不在下拉里 —— 选中时下拉临时多出一项「那节课」
+ */
+export type Period = (typeof PERIOD_OPTIONS)[number]["value"] | "lesson"
 export const DEFAULT_PERIOD: Period = "1h"
 
 /** 东八区某天 0 点对应的 UTC 时刻 */
@@ -74,6 +78,14 @@ export function periodRange(period: Period, custom: [number, number] | null, now
     case "term":
       start = termStart(now)
       break
+    case "lesson":
+      if (custom) {
+        start = custom[0]
+        end = custom[1]
+      } else {
+        start = now - HOUR
+      }
+      break
     case "custom":
       if (custom) {
         start = custom[0]
@@ -99,6 +111,9 @@ function describe(start: number | null, end: number, period: Period) {
   if (start === null) return ""
   if (period === "1h" || period === "2h") {
     return `${parseTime(new Date(start), "HH:mm")}–${parseTime(new Date(end), "HH:mm")}`
+  }
+  if (period === "lesson") {
+    return `${parseTime(new Date(start), "M月D日 HH:mm")}–${parseTime(new Date(end), "HH:mm")}`
   }
   const from = parseTime(new Date(start), "M月D日")
   const to = parseTime(new Date(end - 1), "M月D日")

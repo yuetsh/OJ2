@@ -40,6 +40,7 @@ import {
   type UserBadge,
   type FlowchartStatistics,
   type SubmissionStatistics,
+  type SubmissionLessons,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
@@ -186,6 +187,13 @@ export function getSubmissionStatistics(
 ) {
   return api.get<SubmissionStatistics>("submissions/statistics", {
     params: { ...duration, problemDisplayId, username, className },
+  })
+}
+
+/** 统计「一行一节课」的总览（没选班、没填学生和题号时）。limit 是列几节课，「再往前看」加它 */
+export function getSubmissionLessons(duration: { start?: string; end: string }, limit?: number) {
+  return api.get<SubmissionLessons>("submissions/statistics/lessons", {
+    params: { ...duration, limit },
   })
 }
 

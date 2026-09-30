@@ -15,7 +15,7 @@ import { useProblemPageContext } from "../composables/problemPageContext"
 /**
  * 「统计」页签（设计稿「题目页统计重设计」学生 A）。讲的是**这道题**：难不难 → 大家几次
  * 做对 → 常错在哪，全部按人算。学生多一行「你们班」、自己卡住了再多一张卡；老师多一张
- * 各班的表（只到班级这一层，不选班、不列人 —— 按人看是提交页「数据统计」的活）。
+ * 各班的表（只到班级这一层，不选班、不列人 —— 按人看是提交页「统计」的活）。
  * 原来的描述表、击败用户、饼图、历年 AC 率都去掉了。
  */
 const emit = defineEmits<{ openSubmissions: [] }>()
@@ -139,7 +139,7 @@ const hiddenClasses = computed(
   () => (stats.value?.classes?.length ?? 0) - shownClasses.value.length,
 )
 
-/** 点一个班、或者表下面那行：去提交页的「数据统计」按人看（新标签，题目页不动） */
+/** 点一个班、或者表下面那行：去「统计」按人看（新标签，题目页不动） */
 function openStatistics(className?: string) {
   const href = router.resolve({
     name: "statistics",
@@ -273,7 +273,7 @@ function segmentWidth(value: number, total: number) {
         </div>
       </div>
 
-      <!-- 老师：各班一行，和数据统计「按班级汇总」同一份数；按人看去那边 -->
+      <!-- 老师：各班一行，和统计「按班级汇总」同一份数；按人看去那边 -->
       <div v-if="stats.classes?.length" class="section">
         <b>各班做得怎样</b>
         <table class="classes">
@@ -292,7 +292,7 @@ function segmentWidth(value: number, total: number) {
               v-for="item in shownClasses"
               :key="item.className ?? ''"
               :class="{ pickable: item.className }"
-              :title="item.className ? '去数据统计看这个班的每个人' : undefined"
+              :title="item.className ? '新标签看这个班的每个人' : undefined"
               @click="item.className && openStatistics(item.className)"
             >
               <td>
@@ -332,7 +332,7 @@ function segmentWidth(value: number, total: number) {
           </a>
           <span class="spacer"></span>
           <a href="#" class="link small" @click.prevent="openStatistics()">
-            按人看谁没做对，去数据统计 <Icon icon="ph:arrow-square-out" :width="13" />
+            按人看谁没做对 <Icon icon="ph:arrow-square-out" :width="13" />
           </a>
         </div>
       </div>

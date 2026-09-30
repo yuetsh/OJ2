@@ -11,7 +11,7 @@ import {
   getTodaySubmissionCount,
   retryFlowchartSubmission,
 } from "oj/api"
-import { DEFAULT_PERIOD, type Period } from "oj/statistics/period"
+import { DEFAULT_PERIOD } from "oj/statistics/period"
 import { useContestStore } from "oj/store/contest"
 import Pagination from "shared/components/Pagination.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -38,7 +38,7 @@ import { classLabel, submissionClockText, submissionDayText } from "./utils"
  *
  * 老师课上的三种用法 —— 一条条翻全班的代码、看某一个学生、看完成情况 —— 前两种在
  * 这一页里做完：↑ ↓ 换条，右边跟着换，不再「点开弹框 → 关掉 → 点下一行」。
- * 完成情况在课堂看板和「数据统计」里，这页不重复造一张表。
+ * 完成情况在课堂看板和「统计」里，这页不重复造一张表。
  */
 
 // 右栏和今日统计弹框都不在关键路径上：右栏要等选中一条才有内容，弹框默认关着
@@ -190,7 +190,8 @@ async function getTodayCount() {
 
 onMounted(() => {
   listSubmissions()
-  if (route.name === "submissions") getTodayCount()
+  // 「今日统计 N」只给学生：老师那一版并进了「统计」
+  if (route.name === "submissions" && !teacher.value) getTodayCount()
 })
 
 watchDebounced(() => [query.username, query.problem], listSubmissions, {
@@ -483,9 +484,6 @@ const scope = computed({
   },
 })
 
-/** 1366 以下（机房 1280 的屏）老师那排放不下：「今日统计」只留图标和数字 */
-const narrowBar = useMediaQuery("(max-width: 1365px)")
-
 const today = computed({
   get: () => query.today === "1",
   set: (value: boolean) => (query.today = value ? "1" : "0"),
@@ -564,7 +562,7 @@ function filterUser(username: string) {
 }
 
 /**
- * 「数据统计」弹框的查询条件。每次打开从这张列表现在的班级 / 学生 / 题号 / 代码或流程图
+ * 「统计」弹框的查询条件。每次打开从这张列表现在的班级 / 学生 / 题号 / 代码或流程图
  * 带进去（「今天」带过去就是统计的「今天」）；时间段沿用上次在弹框里选的
  */
 const statsQuery = reactive({
@@ -577,14 +575,18 @@ const statsQuery = reactive({
   to: "",
 })
 
-function openStatistics(preset?: { className: string; period: Period }) {
-  todayPanel.value = false
+/**
+ * 老师的「统计」：带着这张列表现在的班级 / 学生 / 题号 / 代码或流程图打开。原来旁边还有一颗
+ * 「今日统计」，和「数据统计」名字分不清（用户说的），老师那一版并进来了 —— 什么都没筛时
+ * 打开就是「一行一节课」，选「今天」就是原来今日统计看的东西
+ */
+function openStatistics() {
   Object.assign(statsQuery, {
     tab: flowMode.value ? "flow" : "code",
-    className: preset ? preset.className : query.className,
-    username: preset ? "" : query.username,
-    problem: preset ? "" : query.problem,
-    ...(preset ? { period: preset.period } : query.today === "1" ? { period: "today" } : {}),
+    className: query.className,
+    username: query.username,
+    problem: query.problem,
+    ...(query.today === "1" ? { period: "today" } : {}),
   })
   statsPanel.value = true
 }
@@ -814,26 +816,27 @@ function dayBreak(index: number) {
       <n-button size="small" quaternary @click="clear">清空</n-button>
 
       <div class="spacer"></div>
+      <!-- 老师只有「统计」（今日统计并进去了）；学生看不到统计，仍是「今日统计」 -->
       <n-button
-        v-if="route.name === 'submissions' && !flowMode"
+        v-if="teacher && route.name === 'submissions'"
+        size="small"
+        quaternary
+        title="统计：这节课、今天，或者回头看以前的课"
+        @click="openStatistics()"
+      >
+        <template #icon><Icon icon="ph:chart-bar" /></template>
+        统计
+      </n-button>
+      <n-button
+        v-else-if="route.name === 'submissions' && !flowMode"
         size="small"
         quaternary
         :title="`今日统计：今天全站 ${todayCount} 条`"
         @click="toggleTodayPanel(true)"
       >
         <template #icon><Icon icon="ph:chart-bar" /></template>
-        <template v-if="!(teacher && narrowBar)">今日统计</template>
+        今日统计
         <span v-if="todayCount" class="count">{{ todayCount }}</span>
-      </n-button>
-      <n-button
-        v-if="teacher && route.name === 'submissions'"
-        size="small"
-        quaternary
-        title="数据统计：按班级、题号、时间段回头看"
-        @click="openStatistics()"
-      >
-        <template #icon><Icon icon="ph:chart-pie-slice" /></template>
-        数据统计
       </n-button>
     </div>
 
@@ -1109,7 +1112,6 @@ function dayBreak(index: number) {
       @close="todayPanel = false"
       @loaded="(total: number) => (todayCount = total)"
       @open-problem="(id: string) => openProblem({ problemDisplayId: id } as Row)"
-      @open-class="(name: string) => openStatistics({ className: name, period: 'today' })"
     />
   </n-modal>
 

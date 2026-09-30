@@ -255,7 +255,7 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
     <div class="actions">
       <ProblemJumpBox v-if="isDesktop" :compact="compact" />
       <template v-if="isDesktop && collabStore.isTeacher">
-        <!-- 和提交列表的「今日统计」「数据统计」同一种按钮：平时没底色，悬停出底色 -->
+        <!-- 和提交列表的「统计」同一种按钮：平时没底色，悬停出底色 -->
         <n-button
           quaternary
           class="tool-link"
