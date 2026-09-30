@@ -2,10 +2,10 @@
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { useCollabStore } from "shared/store/collab"
-import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 
 /**
- * 老师协作时右栏顶上的一条：正在帮谁、他用什么语言、看他交过什么、结束协作。
+ * 老师协作时右栏顶上的一条：正在帮谁、看他交过什么、结束协作。语言不写（用户说的）：
+ * 编辑器工具栏的语言下拉就摆在下面，这条短一点，长名字也放得下。
  *
  * 原来这几样挤在工具栏里（一个标签 + 一个按钮），和老师自己的「提交」「课堂统计」混在一行，
  * 一眼看不出「现在编辑器里是学生的代码」。学生那边不加横幅，省下编辑器的 40px。
@@ -33,10 +33,7 @@ function openHisSubmissions() {
 <template>
   <div v-if="collabStore.room" class="collab-bar" role="status">
     <span class="dot" aria-hidden="true" />
-    <span class="who">
-      正在帮 {{ collabStore.room.peerName }} ·
-      {{ LANGUAGE_SHOW_VALUE[collabStore.room.language] }}
-    </span>
+    <span class="who">正在帮 {{ collabStore.room.peerName }}</span>
     <span class="note">你改的他马上能看到</span>
     <span class="spacer" />
     <button type="button" class="ghost" @click="openHisSubmissions">看他交过什么</button>
