@@ -103,16 +103,17 @@ const failedTotal = computed(() =>
 )
 const topFailures = computed(() => (stats.value?.failures ?? []).slice(0, 3))
 
-/** 错得最多的那一种，给一句该怎么办。都指向「运行例子」：提交前自己就能看出来 */
+/**
+ * 错得最多的那一种，给一句该怎么办。都指向「运行例子」：提交前自己就能看出来。
+ *
+ * **答案错误最多时不给**：七成多的题错得最多的都是答案错误（快照 349 / 484），「卡在第 1 个
+ * 测试点」也是常态（320 道里 185 道过 60%），这句话几乎每道题都一样，等于没说（用户说的）。
+ * 具体错在哪，每次提交的结果里有「题目里的例子 N 就错了」和三栏对照。
+ * 运行时错误、编译失败排第一的题少，出现了才说明这题有特点
+ */
 const tip = computed(() => {
-  const s = stats.value
-  const top = s?.failures[0]
-  if (!s || !top) return ""
-  if (top.result === -1) {
-    return s.wrongAnswerFirstCase >= top.count * 0.6
-      ? "答案错误几乎都卡在第 1 个测试点：多半是例子都没对上。先点「运行例子」，把你的输出和例子一行一行对一对。"
-      : "答案错误最多：输出和标准答案对不上。留意空格、换行和标点，交之前先点「运行例子」对一对。"
-  }
+  const top = stats.value?.failures[0]
+  if (!top) return ""
   if (top.result === 4) {
     return "运行时错误最多：程序跑到一半出错了。交之前先点「运行例子」，看看有没有红色的报错。"
   }

@@ -464,8 +464,6 @@ export const problemStatsSchema = z.object({
   tries: z.object({ one: z.number().int(), few: z.number().int(), many: z.number().int() }),
   /** 没通过的提交按结果分，多的在前（不含判题中） */
   failures: z.array(failureCountSchema),
-  /** 答案错误里第 1 个测试点就没过的条数 —— 多半是例子都没对上，提示先点「运行例子」 */
-  wrongAnswerFirstCase: z.number().int(),
   /** 我自己：交了几次、做对没有。没登录为 null */
   me: z.object({ attempts: z.number().int(), solved: z.boolean() }).nullable(),
   /** 学生自己班这题 x / y 人做对（y 是班里交过的人）。没班级、比赛里为 null */

@@ -5,7 +5,7 @@ import { Hono } from "hono"
 import { optionalAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
-import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
+import { UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
 import { canAccessContest, contestDetailsAllowed, findAccessibleContest } from "../services/contest"
 import { accepted } from "../services/learning-stats"
 import { isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
@@ -18,7 +18,6 @@ const EMPTY: ProblemStats = {
   solved: 0,
   tries: { one: 0, few: 0, many: 0 },
   failures: [],
-  wrongAnswerFirstCase: 0,
   me: null,
   myClass: null,
   classes: null,
@@ -78,7 +77,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
     sql`, `,
   )
   // 每人一行：窗口函数先给每条提交标上这个人第一次做对的时刻，再按人数到那一刻为止交了几次
-  const [users, failureRows, firstCase] = await Promise.all([
+  const [users, failureRows] = await Promise.all([
     db.execute<UserRow>(sql`
       select s.user_id, u.username, u.class_name,
         count(*)::int as attempts,
@@ -102,16 +101,6 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
         and s.result not in (${acceptedList})
         and s.result not in (${unjudgedList})
       group by u.class_name, s.result
-    `),
-    // 判题机按测试点回一个数组，test_case 是 "1"、"2"……
-    db.execute<{ n: number }>(sql`
-      select count(*)::int as n from ${schema.submission}
-      where problem_id = ${problem.id} and result = ${JudgeStatus.WRONG_ANSWER}
-        and jsonb_typeof(info->'data') = 'array'
-        and exists (
-          select 1 from jsonb_array_elements(info->'data') e
-          where e->>'test_case' = '1' and (e->>'result')::int <> 0
-        )
     `),
   ])
 
@@ -142,7 +131,6 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
     solved: solvedUsers.length,
     tries,
     failures: sortFailures(siteFailures),
-    wrongAnswerFirstCase: firstCase[0]?.n ?? 0,
     me: user ? { attempts: mine?.attempts ?? 0, solved: mine?.solved ?? false } : null,
     myClass: myClassName
       ? {
