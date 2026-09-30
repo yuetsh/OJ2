@@ -15,7 +15,7 @@ import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { markdownToText } from "oj/problem/utils/plainText"
-import PythonErrorExplain from "./PythonErrorExplain.vue"
+import CompileErrorExplain from "./CompileErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
@@ -62,14 +62,11 @@ function stripJudgePath(text: string) {
   return text.replace(/\/judger\/run\/[^/"]+\//g, "")
 }
 
-/**
- * Python 的编译错误交给 PythonErrorExplain 翻成中文。只管 Python：C / C++ 的
- * gcc 报错另是一套句式，还没做。
- */
-const pythonCompileError = computed(() => {
+/** 编译错误交给 CompileErrorExplain 翻成中文：Python、C、C++ 各有一张翻译表 */
+const compileError = computed(() => {
   const submission = props.submission
   if (!submission || submission.result !== SubmissionStatus.compile_error) return ""
-  if (submission.language !== "Python") return ""
+  if (!["Python", "C", "C++"].includes(submission.language)) return ""
   return submission.statisticInfo?.err_info ?? ""
 })
 
@@ -117,8 +114,8 @@ const showSimilar = computed(
 
 const msg = computed(() => {
   if (!props.submission) return ""
-  // 走 PythonErrorExplain / RuntimeErrorExplain 那两张中文卡片
-  if (pythonCompileError.value || runtimeError.value) return ""
+  // 走 CompileErrorExplain / RuntimeErrorExplain 那两张中文卡片
+  if (compileError.value || runtimeError.value) return ""
 
   let msg = ""
   const result = props.submission.result
@@ -318,7 +315,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
     <n-flex
       vertical
       v-if="
-        pythonCompileError ||
+        compileError ||
         runtimeError ||
         sampleCheck ||
         msg ||
@@ -326,7 +323,11 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
         submission.statisticInfo?.ast_results?.length
       "
     >
-      <PythonErrorExplain v-if="pythonCompileError" :err-info="pythonCompileError" />
+      <CompileErrorExplain
+        v-if="compileError"
+        :err-info="compileError"
+        :language="submission.language"
+      />
       <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
       <WrongAnswerExplain
         v-if="sampleCheck"

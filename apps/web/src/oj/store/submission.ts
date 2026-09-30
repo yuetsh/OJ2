@@ -120,7 +120,7 @@ export const useSubmissionStore = defineStore("submission", () => {
       } catch (e) {
         if (stale()) return
         if (errorCode(e) === "syntax-error") {
-          // 仅 Python 会出现：message 是 CPython 的报错原文，交给 PythonErrorExplain 翻译
+          // 仅 Python 会出现：message 是 CPython 的报错原文，交给 CompileErrorExplain 翻译
           syntaxErrorInfo.value = errorMessage(e)
           revealResult()
           return

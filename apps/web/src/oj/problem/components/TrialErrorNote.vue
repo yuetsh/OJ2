@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { SubmissionStatus } from "utils/constants"
 import type { StatisticInfo } from "@oj2/contract"
-import PythonErrorExplain from "./PythonErrorExplain.vue"
+import CompileErrorExplain from "./CompileErrorExplain.vue"
 import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
 
 /**
  * 试跑没跑完时给学生看的中文说明。判题机回来的是英文原文（Traceback、gcc 的报错），
  * 学生读不懂，原文收进折叠区。Python 的语法错误是判题机上 CPython 的原文，和提交判出来的
- * 一样，直接交给 PythonErrorExplain（中文说明 + 编辑器里标出位置 + 一键换中文标点）。
+ * 一样，直接交给 CompileErrorExplain（中文说明 + 编辑器里标出位置 + 一键换中文标点），
+ * C / C++ 的 gcc 报错同理。
  */
 const props = defineProps<{
   result: SubmissionStatus
@@ -35,11 +36,11 @@ const runtimeExplain = computed(
     !!props.runtimeError,
 )
 
-const pythonSyntaxError = computed(
+const compileError = computed(
   () =>
     !props.note &&
     props.result === SubmissionStatus.compile_error &&
-    props.language === "Python" &&
+    ["Python", "C", "C++"].includes(props.language) &&
     !!props.output,
 )
 
@@ -67,7 +68,7 @@ const rawOutput = computed(() => props.output.replace(/\/judger\/run\/[^/"]+\//g
 </script>
 
 <template>
-  <PythonErrorExplain v-if="pythonSyntaxError" :err-info="output" />
+  <CompileErrorExplain v-if="compileError" :err-info="output" :language="language" />
   <n-flex v-else vertical :size="8">
     <RuntimeErrorExplain v-if="runtimeExplain" :info="runtimeError!" :code="code ?? ''" />
     <n-alert v-else type="error" :show-icon="false">{{ message }}</n-alert>

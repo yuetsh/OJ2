@@ -21,8 +21,12 @@ export interface PunctuationFix {
  * 不是完整的词法分析：只认引号、三引号、字符串前缀、反斜杠转义和 `#` 注释，
  * 这对学生代码够用。单引号字符串遇到换行就当它结束，免得一个没配对的引号把
  * 后面整篇都当成字符串。
+ *
+ * C / C++ 换一套注释：`//` 和 `/* *\/`，`#` 是预处理指令不是注释；没有三引号和前缀。
+ * 单引号的字符常量（`'，'`）和字符串一样原样留着。
  */
-export function findChinesePunctuation(code: string): PunctuationFix[] {
+export function findChinesePunctuation(code: string, language = "Python"): PunctuationFix[] {
+  const isC = language === "C" || language === "C++"
   const fixes: PunctuationFix[] = []
 
   function fix(at: number) {
@@ -68,15 +72,25 @@ export function findChinesePunctuation(code: string): PunctuationFix[] {
   let i = 0
   while (i < code.length) {
     const ch = code[i]!
-    if (ch === "#") {
+    if (isC && code.startsWith("//", i)) {
+      const end = code.indexOf("\n", i)
+      i = end === -1 ? code.length : end
+      continue
+    }
+    if (isC && code.startsWith("/*", i)) {
+      const end = code.indexOf("*/", i + 2)
+      i = end === -1 ? code.length : end + 2
+      continue
+    }
+    if (!isC && ch === "#") {
       const end = code.indexOf("\n", i)
       i = end === -1 ? code.length : end
       continue
     }
     if (ch === '"' || ch === "'") {
       // 前缀是紧挨着引号的 f / r / b / u 组合，前面不能再连着别的标识符字符
-      const prefix = code.slice(0, i).match(/(?<![\w])[rRbBfFuU]{1,2}$/)?.[0] ?? ""
-      const quote = code.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch
+      const prefix = isC ? "" : (code.slice(0, i).match(/(?<![\w])[rRbBfFuU]{1,2}$/)?.[0] ?? "")
+      const quote = !isC && code.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch
       i = skipString(i + quote.length, quote.length === 3, /f/i.test(prefix), [quote])
       continue
     }

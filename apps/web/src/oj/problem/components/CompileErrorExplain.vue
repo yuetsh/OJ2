@@ -9,24 +9,34 @@ import {
   showErrorMark,
   showPunctuationMarks,
 } from "oj/problem/utils/errorMark"
+import { explainCCompileError } from "oj/problem/utils/cError"
 import { explainPythonCompileError } from "oj/problem/utils/pythonError"
 
 /**
- * Python 语法错误的中文说明卡片。两处用它：提交前的语法检查（SubmitCode，报错来自
- * 服务端的 CPython）和判题回来的编译错误（SubmissionResult，来自判题机）。两边是
- * 同一个大版本的 CPython，报错原文一样，所以共用一张翻译表。
+ * 编译错误的中文说明卡片：Python 的语法错误走 pythonError.ts，C / C++ 的 gcc 报错走
+ * cError.ts，两张表给出同一种形状。Python 有两处来源：提交前的语法检查（SubmitCode，
+ * 报错来自服务端的 CPython）和判题回来的编译错误（来自判题机），同一个大版本的
+ * CPython，报错原文一样。
  *
  * 挂上就在编辑器里标出位置，卸掉就清掉。
  */
-const props = defineProps<{
-  /** CPython 的报错原文（判题机的 `err_info` 或 `/code/format` 的 syntax-error） */
-  errInfo: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** 编译器的报错原文（判题机的 `err_info`，或 `/code/format` 的 syntax-error） */
+    errInfo: string
+    language?: string
+  }>(),
+  { language: "Python" },
+)
 
 const codeStore = useCodeStore()
 const theme = useThemeVars()
 
-const explanation = computed(() => explainPythonCompileError(props.errInfo, codeStore.code.value))
+const explanation = computed(() =>
+  props.language === "Python"
+    ? explainPythonCompileError(props.errInfo, codeStore.code.value)
+    : explainCCompileError(props.errInfo, codeStore.code.value, props.language),
+)
 
 /** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
 const rawError = computed(() => props.errInfo.replace(/\/judger\/run\/[^/"]+\//g, ""))
@@ -41,7 +51,7 @@ const otherPunctuationLines = computed(() => {
   if (!ex?.punctuation) return []
   const code = codeStore.code.value
   const lines = new Set<number>()
-  for (const fix of findChinesePunctuation(code)) {
+  for (const fix of findChinesePunctuation(code, props.language)) {
     lines.add(code.slice(0, fix.from).split("\n").length)
   }
   lines.delete(ex.line ?? -1)
@@ -50,14 +60,16 @@ const otherPunctuationLines = computed(() => {
 
 // 数的是编辑器里**现在**的代码：学生可能已经自己改掉几处了
 const punctuationFixCount = computed(() =>
-  explanation.value?.punctuation ? findChinesePunctuation(codeStore.code.value).length : 0,
+  explanation.value?.punctuation
+    ? findChinesePunctuation(codeStore.code.value, props.language).length
+    : 0,
 )
 const fixedCount = ref<number | null>(null)
 
 function fixPunctuation() {
   const code = currentCode()
   if (code === null) return
-  const fixes = findChinesePunctuation(code)
+  const fixes = findChinesePunctuation(code, props.language)
   if (applyFixes(fixes)) fixedCount.value = fixes.length
 }
 
@@ -69,7 +81,7 @@ watch(
     else clearErrorMark()
     // 中文标点一处不漏地标出来，和按钮上的「N 处」对得上
     const code = ex?.punctuation ? currentCode() : null
-    if (code !== null) showPunctuationMarks(findChinesePunctuation(code))
+    if (code !== null) showPunctuationMarks(findChinesePunctuation(code, props.language))
   },
   { immediate: true },
 )

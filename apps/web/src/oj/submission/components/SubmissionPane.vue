@@ -2,6 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { getSubmission } from "oj/api"
+import { explainCCompileError } from "oj/problem/utils/cError"
 import { explainPythonCompileError } from "oj/problem/utils/pythonError"
 import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { useUserStore } from "shared/store/user"
@@ -125,7 +126,7 @@ function stripJudgePath(text: string) {
 
 /**
  * 编译失败 / 运行时错误说清楚「错在第几行、为什么」—— 翻译表和题目页结果区同一份
- * （pythonError.ts / runtimeError.ts）。原来的看代码弹框压根不显示报错。
+ * （pythonError.ts / cError.ts / runtimeError.ts）。原来的看代码弹框压根不显示报错。
  */
 const explain = computed(() => {
   const s = shown.value
@@ -134,7 +135,13 @@ const explain = computed(() => {
   const err = info?.err_info ? stripJudgePath(info.err_info) : ""
   switch (s.result) {
     case SubmissionStatus.compile_error: {
-      const ex = s.language === "Python" && err ? explainPythonCompileError(err, s.code) : null
+      const ex = !err
+        ? null
+        : s.language === "Python"
+          ? explainPythonCompileError(err, s.code)
+          : s.language === "C" || s.language === "C++"
+            ? explainCCompileError(err, s.code, s.language)
+            : null
       if (ex) return { line: ex.line, text: ex.message, raw: err }
       return { line: null, text: "编译没通过，看看下面的原始报错。", raw: err }
     }

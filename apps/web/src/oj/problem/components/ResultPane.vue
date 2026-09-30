@@ -21,7 +21,7 @@ import ResultHeader from "./ResultHeader.vue"
 
 // 第一次切到「结果」时才加载：它带着 DataTable 和 Markdown 渲染，只看题不提交的人不用付
 const SubmissionResult = defineAsyncComponent(() => import("./SubmissionResult.vue"))
-const PythonErrorExplain = defineAsyncComponent(() => import("./PythonErrorExplain.vue"))
+const CompileErrorExplain = defineAsyncComponent(() => import("./CompileErrorExplain.vue"))
 const SampleRunResult = defineAsyncComponent(() => import("./SampleRunResult.vue"))
 const CustomRun = defineAsyncComponent(() => import("./CustomRun.vue"))
 const FlowchartResult = defineAsyncComponent(() => import("./FlowchartResult.vue"))
@@ -136,7 +136,7 @@ function pick(segment: Segment) {
     <div v-show="!viewingFlowchart && (resultSegment === 'submit' || !canTrial)">
       <template v-if="syntaxErrorInfo">
         <ResultHeader kind="warning" title="代码有语法错误，还没有交上去" />
-        <PythonErrorExplain :err-info="syntaxErrorInfo" />
+        <CompileErrorExplain :err-info="syntaxErrorInfo" />
       </template>
       <template v-else-if="submission">
         <p v-if="formattedBeforeSubmit" class="formatted">
