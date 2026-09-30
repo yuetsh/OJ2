@@ -14,7 +14,7 @@ import { asRecord } from "../routes/helpers"
 import type { JudgeJobData } from "./job"
 import { judgeConfigFor } from "./languages"
 import { isAccepted, JudgeStatus, type JudgeStatusValue } from "./status"
-import { parseProblemTemplate } from "./template"
+import { parseProblemTemplate, shiftCompileLines } from "./template"
 import { runSqlCase } from "./sql"
 import {
   nativeRuntimeError,
@@ -536,9 +536,11 @@ export async function judgeSubmission(job: JudgeJobData) {
     let statisticInfo: Record<string, unknown> = {}
 
     if (response.err) {
+      const errInfo =
+        typeof response.data === "string" ? response.data : JSON.stringify(response.data)
       result = JudgeStatus.COMPILE_ERROR
       statisticInfo = {
-        err_info: typeof response.data === "string" ? response.data : JSON.stringify(response.data),
+        err_info: shiftCompileLines(errInfo, template ? template.prepend.split("\n").length : 0),
         score: 0,
       }
     } else {

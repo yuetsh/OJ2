@@ -134,7 +134,7 @@ const explain = computed(() => {
   const err = info?.err_info ? stripJudgePath(info.err_info) : ""
   switch (s.result) {
     case SubmissionStatus.compile_error: {
-      const ex = s.language === "Python" && err ? explainPythonCompileError(err) : null
+      const ex = s.language === "Python" && err ? explainPythonCompileError(err, s.code) : null
       if (ex) return { line: ex.line, text: ex.message, raw: err }
       return { line: null, text: "编译没通过，看看下面的原始报错。", raw: err }
     }

@@ -32,7 +32,8 @@ export interface PythonErrorExplanation {
   punctuation: string | null
 }
 
-const WHERE_RE = /^File "[^"]*", line (\d+)/m
+// 行首可能有空格：报错前面先打了一条 SyntaxWarning（比如 `3and`）时，File 那行是缩进的
+const WHERE_RE = /^\s*File "[^"]*", line (\d+)/m
 const SHORT_RE = /^Sorry: (\w+Error): (.*) \([^,()]*, line (\d+)\)\s*$/m
 
 /**
@@ -66,6 +67,7 @@ export const PUNCTUATION_MAP: Record<string, string> = {
   "‘": "'",
   "’": "'",
   "＂": '"',
+  "＃": "#",
   "×": "*",
   "÷": "/",
   [IDEOGRAPHIC_SPACE]: " ",
@@ -100,18 +102,52 @@ export const PUNCTUATION_NAMES: Record<string, string> = {
   "‘": "单引号",
   "’": "单引号",
   "＂": "引号",
+  "＃": "井号",
   [IDEOGRAPHIC_SPACE]: "空格",
 }
 
-type Rule = [RegExp, (match: RegExpMatchArray) => string]
+/**
+ * 规则除了报错原文，还能看出错的那一行（判题机打出来的，去掉了行首空格）。同一句报错
+ * 学生错法不同，要看那一行才分得开：`expected ':'` 九成是 `else a < 60:`，行尾明明有冒号；
+ * 「Maybe you meant '=='」只有 if / while 那行才是真想判断相等。返回 null 就接着往下找。
+ */
+type Rule = [RegExp, (match: RegExpMatchArray, source: string) => string | null]
+
+/** 去掉引号里的内容，只看代码本身的符号 */
+function stripStrings(source: string) {
+  return source.replace(/(["'])(?:\\.|(?!\1).)*\1/g, '""')
+}
+
+/** 括号外面的逗号：`if a > 9, a < 100:` 里有，`if x in (1, 2):` 里没有 */
+function hasTopLevelComma(source: string) {
+  let depth = 0
+  for (const ch of stripStrings(source)) {
+    if ("([{".includes(ch)) depth++
+    else if (")]}".includes(ch)) depth--
+    else if (ch === "," && depth === 0) return true
+  }
+  return false
+}
+
+const CONDITION_LINE = /^(if|elif|while)\b/
 
 const RULES: Rule[] = [
   [
-    /^invalid character '(.)'/,
+    // u：emoji 是两个 UTF-16 单元，不带 u 的 (.) 对不上
+    /^invalid character '(.)'/u,
     ([, char]) => {
       // 数学符号不是「中文的」，是写法不对：代码里乘除用 * 和 /
       if (char === "×") return "这里用了乘号「×」，代码里的乘法要写成星号「*」。"
       if (char === "÷") return "这里用了除号「÷」，代码里的除法要写成斜杠「/」。"
+      if (char === "√")
+        return "代码里没有根号「√」：开平方写成 x ** 0.5，或者 import math 之后用 math.sqrt(x)。"
+      if (char === "²" || char === "³")
+        return `代码里没有上标的「${char}」：平方写成 x ** 2，立方写成 x ** 3。`
+      if (char === "≤") return "代码里没有「≤」：小于等于要写成小于号加等号 <=。"
+      if (char === "≥") return "代码里没有「≥」：大于等于要写成大于号加等号 >=。"
+      if (char === "≠") return "代码里没有「≠」：不等于要写成感叹号加等号 !=。"
+      if (char === "、")
+        return "代码里不用顿号「、」：几样东西之间要用英文逗号隔开。写代码的时候先切换到英文输入法。"
       const name = PUNCTUATION_NAMES[char!]
       if (name) {
         return `这里的${name}是中文输入法打出来的，要换成英文的${name}。写代码的时候先切换到英文输入法。`
@@ -126,7 +162,10 @@ const RULES: Rule[] = [
   ],
   [
     /^expected ':'/,
-    () => "这一行末尾少了英文冒号「:」。if、elif、else、for、while、def 这些行的最后都要有冒号。",
+    (_, source) =>
+      /^else\b\s*[^\s:]/.test(source)
+        ? "else 后面不能写条件，它的意思是「上面的条件都不满足」。还要再判断一个条件，就用 elif 条件:。"
+        : "这一行末尾少了英文冒号「:」。if、elif、else、for、while、def 这些行的最后都要有冒号。",
   ],
   [
     /^expected an indented block after '(\w+)' statement on line (\d+)/,
@@ -152,12 +191,22 @@ const RULES: Rule[] = [
   ],
   [
     /^invalid syntax\. Perhaps you forgot a comma\?/,
-    () => "这里好像少了逗号。括号里的几样东西之间，要用英文逗号「,」隔开。",
+    // 抽样一半以上是拼文字漏了 +：print(a+"是"a+"岁")
+    () =>
+      "这里的几样东西之间少了连接的符号：要分开输出，用英文逗号「,」隔开；要把文字拼在一起，用加号「+」。",
   ],
   [
     /Maybe you meant '==' instead of '='|Maybe you meant '==' or ':=' instead of '='|perhaps you meant "=="/,
-    () =>
-      "判断「是不是相等」要用两个等号「==」。一个等号「=」的意思是「把右边的值存进左边的变量」。",
+    (_, source) => {
+      // 只有条件里才是真想判断相等；别的行是想赋值，写法错了
+      if (CONDITION_LINE.test(source))
+        return "判断「是不是相等」要用两个等号「==」。一个等号「=」的意思是「把右边的值存进左边的变量」。"
+      if (/^\w+\s*=[^=].*,\s*\w+\s*=[^=]/.test(stripStrings(source)))
+        return "一行里给几个变量赋值，要写成 a, b = 96, 92，或者分成几行，一行写一个。"
+      if (/^\w+\s*\(/.test(source))
+        return '括号里不能直接写等号「=」。要把等号显示出来，就把它放进引号里，比如 print(a, "+", b, "=", a + b)。'
+      return null
+    },
   ],
   [
     /^cannot assign to /,
@@ -211,27 +260,59 @@ const RULES: Rule[] = [
   ],
   [
     /^invalid syntax/,
+    (_, source) => {
+      if (/^elif\s*:/.test(source))
+        return "elif 后面要写条件，比如 elif a > 60:。不需要条件的话就用 else:。"
+      if (/^else\s+if\b/.test(source)) return "Python 里「否则如果」要写成 elif，不是 else if。"
+      if (/^(esle|eles|els|elese|esif|elsif|elseif|eilf|elfi)\b/.test(source))
+        return "这一行开头的关键字拼错了：「否则」是 else，「否则如果」是 elif。"
+      const code = stripStrings(source)
+      if (/=<|=>/.test(code)) return "小于等于要写成 <=，大于等于要写成 >=，等号放在后面。"
+      if (CONDITION_LINE.test(source) && hasTopLevelComma(source))
+        return "条件之间不能用逗号连：两个都要满足用 and，满足一个就行用 or，比如 if a > 9 and a < 100:。"
+      return null
+    },
+  ],
+  [
+    /^invalid syntax/,
     () =>
       "标出来的地方写法不对。对照教程检查这一行：括号、引号、冒号、运算符有没有写错、漏写或多写。",
   ],
 ]
 
-function translate(message: string) {
+function translate(message: string, source: string) {
   for (const [pattern, render] of RULES) {
     const match = message.match(pattern)
-    if (match) return render(match)
+    const text = match && render(match, source)
+    if (text) return text
   }
   return null
 }
 
-/** 翻不出来（判题机自己的报错、没见过的句式）就返回 null，界面照旧显示原文 */
-export function explainPythonCompileError(errInfo: string): PythonErrorExplanation | null {
+/**
+ * 选了 Python 却交了 C 代码：全库 310 条，报错各式各样（多半是 invalid syntax），
+ * 挨个解释毫无意义，该说的只有一句
+ */
+function looksLikeC(code: string) {
+  if (/^\s*#\s*include\b|\bint\s+main\s*\(/m.test(code)) return true
+  // 只凭 printf 不算：Python 代码里把 print 手误成 printf 的不少
+  return /\b(printf|scanf)\s*\(|\bcout\s*<</.test(code) && !/\b(print|input)\s*\(/.test(code)
+}
+
+/**
+ * 翻不出来（判题机自己的报错、没见过的句式）就返回 null，界面照旧显示原文。
+ * `code` 是学生的代码，用来认出「交的其实是 C」
+ */
+export function explainPythonCompileError(
+  errInfo: string,
+  code = "",
+): PythonErrorExplanation | null {
   const text = errInfo.trim()
 
   const short = text.match(SHORT_RE)
   if (short) {
     const [, , detail, line] = short
-    const message = translate(detail!)
+    const message = translate(detail!, "")
     if (!message) return null
     return {
       line: Number(line),
@@ -247,8 +328,6 @@ export function explainPythonCompileError(errInfo: string): PythonErrorExplanati
   const last = lines[lines.length - 1]!
   const detail = last.replace(/^\w+Error: /, "")
   if (detail === last) return null
-  const message = translate(detail)
-  if (!message) return null
 
   let sourceLine: string | null = null
   let caret: PythonErrorExplanation["caret"] = null
@@ -263,7 +342,12 @@ export function explainPythonCompileError(errInfo: string): PythonErrorExplanati
     }
   }
 
-  const char = detail.match(/^invalid character '(.)'/)?.[1]
+  const message = looksLikeC(code)
+    ? "这是 C 语言的代码，可提交时选的语言是 Python。把语言换成 C 再交。"
+    : translate(detail, sourceLine?.trim() ?? "")
+  if (!message) return null
+
+  const char = detail.match(/^invalid character '(.)'/u)?.[1]
   return {
     line: where ? Number(where[1]) : null,
     sourceLine,

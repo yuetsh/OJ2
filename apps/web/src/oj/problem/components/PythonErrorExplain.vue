@@ -26,7 +26,7 @@ const props = defineProps<{
 const codeStore = useCodeStore()
 const theme = useThemeVars()
 
-const explanation = computed(() => explainPythonCompileError(props.errInfo))
+const explanation = computed(() => explainPythonCompileError(props.errInfo, codeStore.code.value))
 
 /** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
 const rawError = computed(() => props.errInfo.replace(/\/judger\/run\/[^/"]+\//g, ""))

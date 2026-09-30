@@ -4,6 +4,7 @@ import { config } from "../config"
 import { postJudge, statusValue, type JudgeCase, type JudgeResponse } from "./run"
 import { nativeRuntimeError, parsePythonTraceback } from "./runtime-diagnosis"
 import { JudgeStatus, type JudgeStatusValue } from "./status"
+import { shiftCompileLines } from "./template"
 
 /**
  * 试运行：「运行例子」「自己输入」、后台「生成测试点」。
@@ -148,7 +149,10 @@ async function judgeTrial(options: Parameters<typeof runTrial>[0]): Promise<Tria
     if (parsed.err === "CompileError") {
       return {
         status: "compile-error",
-        message: typeof parsed.data === "string" ? parsed.data : "",
+        message:
+          typeof parsed.data === "string"
+            ? shiftCompileLines(parsed.data, options.prependLines)
+            : "",
       }
     }
     throw new Error(`JudgeServer error ${parsed.err}: ${JSON.stringify(parsed.data)}`)
