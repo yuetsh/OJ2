@@ -31,7 +31,7 @@ const props = defineProps<{
   teacher: boolean
   /** 在比赛的提交列表里（不能重判，题目链接走比赛） */
   contest: boolean
-  /** 列表现在筛的班级：已经在筛这个班就不再给「只看这个班」 */
+  /** 列表现在筛的班级：已经在筛这个班时「只看这个班」换成「取消」 */
   className?: string
   /** 右下角的「本页第 i / n 条」 */
   position: { index: number; count: number } | null
@@ -42,6 +42,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   filterUser: [username: string]
   filterClass: [className: string]
+  clearClass: []
   filterProblem: [displayId: string]
   openProblem: [row: SubmissionListItem]
   rejudge: [id: string]
@@ -256,9 +257,19 @@ function openStandalone() {
         >
           <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
-        <!-- 班级下拉只有网站配置里在读的班，摘掉的老班从这里筛 -->
+        <!-- 班级下拉只有网站配置里在读的班，摘掉的老班从这里筛。已经在筛这个班时原地变成「取消」，
+             不用再挪到上面班级下拉去点 × -->
         <button
-          v-if="teacher && !contest && row.className && row.className !== className"
+          v-if="teacher && !contest && row.className && row.className === className"
+          class="filter-pill wide active"
+          :title="`不再只看${classLabel(row.className)}，看全部班级`"
+          :aria-label="`不再只看${classLabel(row.className)}，看全部班级`"
+          @click="emit('clearClass')"
+        >
+          {{ classLabel(row.className) }}<Icon icon="ph:x-bold" :width="11" />
+        </button>
+        <button
+          v-else-if="teacher && !contest && row.className"
           class="filter-pill wide"
           :title="`只看${classLabel(row.className)}的提交`"
           :aria-label="`只看${classLabel(row.className)}的提交`"
@@ -381,8 +392,7 @@ function openStandalone() {
         <span class="muted">加入题单之前交的代码先藏起来，在题单里做完这道题就能看到。</span>
       </template>
       <template v-else>
-        <span class="locked-title">登录之后才能看自己的代码</span>
-        <span class="muted">谁交了什么题、对没对，不登录也能看。</span>
+        <span class="locked-title">登录之后才能看代码</span>
       </template>
     </div>
 
@@ -556,6 +566,17 @@ function openStandalone() {
 
 .filter-pill:hover {
   background: v-bind("tone('success').background");
+}
+
+.filter-pill.active {
+  border-color: v-bind("tone('success').solid");
+  background: v-bind("tone('success').background");
+}
+
+.filter-pill.active:hover {
+  border-color: v-bind("tone('error').solid");
+  background: v-bind("tone('error').background");
+  color: v-bind("tone('error').color");
 }
 
 .spacer {

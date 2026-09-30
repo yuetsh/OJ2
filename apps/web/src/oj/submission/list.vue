@@ -1037,6 +1037,7 @@ function dayBreak(index: number) {
           :position="position"
           @filter-user="filterUser"
           @filter-class="filterClass"
+          @clear-class="query.className = ''"
           @filter-problem="filterProblem"
           @open-problem="openProblem"
           @rejudge="rejudge"
@@ -1076,6 +1077,7 @@ function dayBreak(index: number) {
           narrow
           @filter-user="(name: string) => ((mobilePane = false), filterUser(name))"
           @filter-class="(name: string) => ((mobilePane = false), filterClass(name))"
+          @clear-class="() => ((mobilePane = false), (query.className = ''))"
           @filter-problem="(id: string) => ((mobilePane = false), filterProblem(id))"
           @open-problem="openProblem"
           @rejudge="rejudge"
