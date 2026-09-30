@@ -424,11 +424,11 @@ function showNew() {
 const resultOptions = [
   { label: "全部结果", value: "" },
   { label: "答案正确", value: String(SubmissionStatus.accepted) },
+  { label: "语法未通过", value: String(SubmissionStatus.ast_check_failed) },
   { label: "答案错误", value: String(SubmissionStatus.wrong_answer) },
   { label: "编译失败", value: String(SubmissionStatus.compile_error) },
   { label: "运行时错误", value: String(SubmissionStatus.runtime_error) },
   { label: "运行超时", value: String(SubmissionStatus.cpu_time_limit_exceeded) },
-  { label: "语法未通过", value: String(SubmissionStatus.ast_check_failed) },
 ]
 
 const gradeOptions = [
@@ -1211,7 +1211,7 @@ function dayBreak(index: number) {
   width: 160px;
 }
 .w-result {
-  width: 112px;
+  width: 128px;
 }
 .w-lang {
   width: 104px;
