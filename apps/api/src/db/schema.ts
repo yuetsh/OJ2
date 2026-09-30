@@ -50,6 +50,7 @@ import type {
   ProblemSetDifficulty,
   ProblemSetStatus,
   ReactionKey,
+  RunnableLanguage,
   SqlConfig,
   SqlDisplay,
   TagCategory,
@@ -1477,6 +1478,11 @@ export const classLesson = pgTable(
     className: text("class_name").notNull(),
     day: text().notNull(),
     problemIds: jsonb("problem_ids").notNull().$type<number[]>(),
+    /**
+     * 这份作业用什么语言做（Python / C / C++），老师布置时选。可空：加这一列之前布置的
+     * 没有它。写入侧在 PUT /classroom/lesson 按 runnableLanguageSchema 校验过
+     */
+    language: text().$type<RunnableLanguage>(),
     createdBy: integer("created_by").notNull(),
     updatedAt: timestamp("updated_at", {
       withTimezone: true,

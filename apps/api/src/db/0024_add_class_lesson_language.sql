@@ -1,0 +1,1 @@
+ALTER TABLE "class_lesson" ADD COLUMN "language" text;

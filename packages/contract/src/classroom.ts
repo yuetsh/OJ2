@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { judgeStatusSchema } from "./judge-status"
+import { runnableLanguageSchema } from "./language"
 
 export const classRankItemSchema = z.object({
   className: z.string(),
@@ -76,15 +77,25 @@ export const classActivityProblemSchema = z.object({
   userCount: z.number().int(),
   /** 其中那天通过了的人数 */
   acceptedCount: z.number().int(),
-  /** 我自己在题库里（不含比赛）做这道题的状态，不限那一天 */
+  /**
+   * 我自己在题库里（不含比赛）做这道题的状态，不限那一天。老师布置时选了语言的，
+   * 代码只认用那个语言交的（流程图照旧算）
+   */
   myStatus: z.enum(["accepted", "tried", "none"]),
 })
+
+/**
+ * 老师布置这节课时选的语言（Python / C / C++）。null = 没选：推断出来的课、加这一项之前
+ * 布置的课。选了之后这份作业「做完」只认这个语言交对的，学生打开这几道题编辑器默认就是它
+ */
+const lessonLanguageSchema = runnableLanguageSchema.nullable()
 
 export const classActivitySchema = z.object({
   className: z.string().nullable(),
   day: z.string().nullable(),
   /** teacher = 老师在课堂看板里布置的；inferred = 从同班提交记录推断的 */
   source: z.enum(["teacher", "inferred"]).nullable(),
+  language: lessonLanguageSchema,
   problems: z.array(classActivityProblemSchema),
 })
 
@@ -122,10 +133,14 @@ export const lastVisitSchema = z.object({
     .nullable(),
 })
 
-/** 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉 */
+/**
+ * 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉。
+ * `language` 是这份作业用什么语言做；不传当 null（上线时还开着的旧看板页面不带它）
+ */
 export const classLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
   problemDisplayIds: z.array(z.string().trim().min(1)).max(20),
+  language: lessonLanguageSchema.optional(),
 })
 
 export const classBoardProblemSchema = z.object({
@@ -135,7 +150,10 @@ export const classBoardProblemSchema = z.object({
 })
 
 export const classBoardCellSchema = z.object({
-  /** accepted 看的是题库里（不含比赛）有没有通过过，不限今天 —— 以前做过的也算做完 */
+  /**
+   * accepted 看的是题库里（不含比赛）有没有通过过，不限今天 —— 以前做过的也算做完。
+   * 布置时选了语言的，代码的次数和通过都只数那个语言（流程图照旧）
+   */
   status: z.enum(["accepted", "tried", "none"]),
   /** 今天在这道题上交了几次（代码 + 流程图） */
   attempts: z.number().int(),
@@ -175,6 +193,10 @@ export const classBoardSchema = z.object({
   className: z.string().nullable(),
   day: z.string(),
   source: z.enum(["teacher", "inferred"]).nullable(),
+  /** 今天布置的语言（见 lessonLanguageSchema） */
+  language: lessonLanguageSchema,
+  /** 这个班最近一次布置选的语言（含今天），给语言下拉当默认值；从没选过为 null */
+  lastLanguage: lessonLanguageSchema,
   problems: z.array(classBoardProblemSchema),
   students: z.array(classBoardStudentSchema),
   /**
@@ -192,6 +214,8 @@ export const classBoardSchema = z.object({
 export const classLessonSchema = z.object({
   className: z.string().nullable(),
   source: z.enum(["teacher", "inferred"]).nullable(),
+  /** 选了语言时，列表那边连语言一起筛 */
+  language: lessonLanguageSchema,
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
 })
 
