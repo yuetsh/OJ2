@@ -12,11 +12,7 @@ import {
   LANGUAGE_SHOW_VALUE,
   SubmissionStatus,
 } from "utils/constants"
-import {
-  submissionCaseResults,
-  submissionMemoryFormat,
-  submissionTimeFormat,
-} from "utils/functions"
+import { submissionCaseResults } from "utils/functions"
 import type { Submission, SubmissionListItem } from "utils/types"
 import { useCopySubmission } from "../composables/copySubmission"
 import { useTone } from "../composables/tone"
@@ -202,16 +198,6 @@ watch(
   () => (rawOpen.value = false),
 )
 
-const failedCaseText = computed(() => {
-  const bad = cases.value
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => item.result !== SubmissionStatus.accepted)
-  if (!bad.length) return ""
-  const names = bad.map(({ index }) => index + 1).join("、")
-  const kinds = new Set(bad.map(({ item }) => JUDGE_STATUS[item.result]?.name ?? ""))
-  return kinds.size === 1 ? `测试点 ${names} ${[...kinds][0]}` : `测试点 ${names} 没通过`
-})
-
 function caseColor(result: number) {
   if (result === SubmissionStatus.accepted) return tone("success").solid
   if (result === SubmissionStatus.runtime_error) return tone("warning").solid
@@ -368,7 +354,6 @@ function openStandalone() {
         >
           {{ index + 1 }}
         </span>
-        <span v-if="failedCaseText" class="muted">{{ failedCaseText }}</span>
       </span>
       <span
         v-else-if="row.caseSummary && row.caseSummary.passed < row.caseSummary.total"
@@ -379,10 +364,6 @@ function openStandalone() {
       </span>
       <span>{{ LANGUAGE_SHOW_VALUE[row.language] }}</span>
       <span>{{ submissionTimeText(row.createTime, true) }}</span>
-      <template v-if="row.statisticInfo?.time_cost !== undefined">
-        <span>耗时 {{ submissionTimeFormat(row.statisticInfo.time_cost) }}</span>
-        <span>内存 {{ submissionMemoryFormat(row.statisticInfo.memory_cost) }}</span>
-      </template>
     </div>
 
     <!-- 看不到代码的三种情况 -->
