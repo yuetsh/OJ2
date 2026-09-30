@@ -164,9 +164,11 @@ const explain = computed(() => {
     case SubmissionStatus.wrong_answer: {
       const check = info?.sample_check
       if (!check) return null
+      // 「题目里的」不能省：上面那排格子是测试点，也从 1 编号，只写「例子 1」时老师看到
+      // 格子 1 是绿的，以为说明写反了（例子 1 是题面样例，和测试点 1 不是一组数据）
       const text = check.passed
         ? "题目里的例子都对，错在没公开的测试点上。"
-        : `在例子 ${(check.index ?? 0) + 1} 上就错了。`
+        : `题目里的例子 ${(check.index ?? 0) + 1} 就错了。`
       return { line: null, text, raw: "" }
     }
     case SubmissionStatus.ast_check_failed: {

@@ -165,7 +165,7 @@ const failedOnSample = computed(() =>
 
 /**
  * 结果标题（设计文档第 6 节、设计稿「答案错误 / 答案正确 / 错在隐藏测试点」）：
- * 大字是判题结果，灰色小字说清楚错在哪 —— 例子上就错了的说「在例子 N 上就错了」、不挂进度；
+ * 大字是判题结果，灰色小字说清楚错在哪 —— 例子上就错了的说「题目里的例子 N 就错了」、不挂进度；
  * 其余照旧报「通过 x/y 个测试点」（一个都没过就不报）；做对了说全对了。
  * 提交详情页还用通用的 submissionResultTitle
  */
@@ -192,7 +192,8 @@ const header = computed(() => {
     return {
       kind: status.type,
       title: status.title,
-      sub: `在例子 ${(failedOnSample.value.index ?? 0) + 1} 上就错了`,
+      // 和提交列表右栏同一句，「题目里的」是为了和测试点的编号分开
+      sub: `题目里的例子 ${(failedOnSample.value.index ?? 0) + 1} 就错了`,
       progress: null,
     }
   }
