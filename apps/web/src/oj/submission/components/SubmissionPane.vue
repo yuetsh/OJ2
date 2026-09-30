@@ -210,12 +210,27 @@ function caseColor(result: number) {
 }
 
 const canRejudge = computed(() => props.teacher && !props.contest)
-const moreOptions = computed(() => [
-  { label: "复制回到题目", key: "problem" },
-  ...(shown.value?.language !== "SQL" ? [{ label: "复制到自测猫", key: "cat" }] : []),
-])
+/**
+ * 老师的「⋯」：复制两项 + 重新判题。重判不常用、点错了会真的重判，所以不放在外面当最显眼的
+ * 那个按钮。代码还没拉下来时只有重判一项 —— 代码拉不下来的那条，恰恰可能要重判
+ */
+const moreOptions = computed(() => {
+  const copy = shown.value
+    ? [
+        { label: "复制回到题目", key: "problem" },
+        ...(shown.value.language !== "SQL" ? [{ label: "复制到自测猫", key: "cat" }] : []),
+      ]
+    : []
+  if (!canRejudge.value) return copy
+  return [
+    ...copy,
+    ...(copy.length ? [{ type: "divider", key: "divider" }] : []),
+    { label: "重新判题", key: "rejudge" },
+  ]
+})
 
 function handleMore(key: string) {
+  if (key === "rejudge") return emit("rejudge", props.row.id)
   if (!shown.value) return
   if (key === "problem") copyToProblem(shown.value)
   else copyToCat(shown.value)
@@ -285,46 +300,50 @@ function openStandalone() {
         题单 {{ row.problemSet.title }}
       </a>
       <div class="spacer"></div>
-      <!-- 重判不用等代码拉下来：代码拉不下来的那条，恰恰可能要重判 -->
-      <n-button v-if="canRejudge" size="small" @click="emit('rejudge', row.id)">
-        <template #icon><Icon icon="ph:arrow-clockwise" /></template>
-        重新判题
-      </n-button>
-      <template v-if="shown">
-        <template v-if="teacher">
+      <template v-if="teacher">
+        <n-button
+          v-if="shown"
+          size="small"
+          quaternary
+          title="新页面打开（有测试点明细）"
+          aria-label="新页面打开"
+          @click="openStandalone"
+        >
+          <template #icon><Icon icon="ph:arrow-square-out" /></template>
+        </n-button>
+        <n-dropdown
+          v-if="moreOptions.length"
+          :options="moreOptions"
+          trigger="click"
+          @select="handleMore"
+        >
           <n-button
             size="small"
             quaternary
-            title="新页面打开（有测试点明细）"
-            aria-label="新页面打开"
-            @click="openStandalone"
+            aria-label="更多"
+            :title="moreOptions.flatMap((o) => ('label' in o ? [o.label] : [])).join('、')"
           >
-            <template #icon><Icon icon="ph:arrow-square-out" /></template>
+            <template #icon><Icon icon="ph:dots-three-bold" /></template>
           </n-button>
-          <n-dropdown :options="moreOptions" trigger="click" @select="handleMore">
-            <n-button size="small" quaternary aria-label="更多" title="复制回到题目、复制到自测猫">
-              <template #icon><Icon icon="ph:dots-three-bold" /></template>
-            </n-button>
-          </n-dropdown>
-        </template>
-        <template v-else>
-          <n-button size="small" type="primary" @click="copyToProblem(shown)">
-            <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
-            复制回到题目
-          </n-button>
-          <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
-            复制到自测猫
-          </n-button>
-          <n-button
-            size="small"
-            quaternary
-            title="新页面打开"
-            aria-label="新页面打开"
-            @click="openStandalone"
-          >
-            <template #icon><Icon icon="ph:arrow-square-out" /></template>
-          </n-button>
-        </template>
+        </n-dropdown>
+      </template>
+      <template v-else-if="shown">
+        <n-button size="small" type="primary" @click="copyToProblem(shown)">
+          <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
+          复制回到题目
+        </n-button>
+        <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
+          复制到自测猫
+        </n-button>
+        <n-button
+          size="small"
+          quaternary
+          title="新页面打开"
+          aria-label="新页面打开"
+          @click="openStandalone"
+        >
+          <template #icon><Icon icon="ph:arrow-square-out" /></template>
+        </n-button>
       </template>
     </div>
 
