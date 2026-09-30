@@ -428,10 +428,7 @@ const resultOptions = [
   { label: "编译失败", value: String(SubmissionStatus.compile_error) },
   { label: "运行时错误", value: String(SubmissionStatus.runtime_error) },
   { label: "运行超时", value: String(SubmissionStatus.cpu_time_limit_exceeded) },
-  { label: "内存超限", value: String(SubmissionStatus.memory_limit_exceeded) },
   { label: "语法未通过", value: String(SubmissionStatus.ast_check_failed) },
-  { label: "正在评分", value: String(SubmissionStatus.judging) },
-  { label: "系统错误", value: String(SubmissionStatus.system_error) },
 ]
 
 const gradeOptions = [
