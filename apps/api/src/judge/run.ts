@@ -371,7 +371,7 @@ export async function failAbandonedSubmission(submissionId: string, error: unkno
  *
  * 诊断失败（读不到测试点、判题机没回回溯）就不写这个字段，学生看到的和原来一样。
  */
-async function diagnoseRuntimeError(
+export async function diagnoseRuntimeError(
   row: {
     submission: typeof schema.submission.$inferSelect
     problem: typeof schema.problem.$inferSelect

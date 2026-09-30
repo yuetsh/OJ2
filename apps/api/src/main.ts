@@ -13,6 +13,7 @@
  *   oj2-api sql-child    # SQL 判题子进程，由服务自己 spawn，不该手动调
  *   oj2-api migrate      # 执行待办的数据库迁移，部署时由 docker/deploy.sh 调
  *   oj2-api recount      # 把题目/用户的计数列、成就的已解锁数重算回与明细一致，默认只读预演
+ *   oj2-api rediagnose   # 运行时错误的诊断按现在的规则重做，默认只读预演
  *
  * 用动态 import 而非顶层 import：这几个模块都有导入即执行的副作用
  * （Bun.serve、连 Redis 开消费者），静态导入会让 sql-child 也把整个服务拉起来。
@@ -40,6 +41,11 @@ switch (command) {
     const { recount } = await import("./scripts/recount")
     process.exit(await recount({ apply: process.argv.slice(3).includes("--apply") }))
   }
+  // 同上：诊断规则改了之后，把库里已有的诊断重做一遍（要连判题机和测试点，只能在线上跑）
+  case "rediagnose": {
+    const { rediagnose } = await import("./scripts/rediagnose")
+    process.exit(await rediagnose({ apply: process.argv.slice(3).includes("--apply") }))
+  }
   case "sql-child": {
     const { runSqlChild } = await import("./judge/sql/child")
     await runSqlChild()
@@ -61,7 +67,7 @@ switch (command) {
   }
   default:
     console.error(
-      `未知子命令：${command}\n可用：serve | worker | migrate | recount | healthcheck | sql-child`,
+      `未知子命令：${command}\n可用：serve | worker | migrate | recount | rediagnose | healthcheck | sql-child`,
     )
     process.exit(2)
 }
