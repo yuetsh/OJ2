@@ -134,7 +134,7 @@ export function submitCode(data: SubmitCodePayload) {
   return api.post<CreateSubmissionResponse>("submissions", data)
 }
 
-export function formatCode(data: { code: string; language: string }) {
+export function formatCode(data: { code: string; language: string; problemId: number }) {
   const languages: Record<string, string> = {
     Python: "python",
     C: "c",
@@ -144,6 +144,7 @@ export function formatCode(data: { code: string; language: string }) {
   return api.post<FormatCodeResponse>("code/format", {
     code: data.code,
     language: languages[data.language] ?? data.language.toLowerCase(),
+    problemId: data.problemId,
   })
 }
 

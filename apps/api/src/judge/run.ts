@@ -112,6 +112,27 @@ export async function postJudge(
   return response
 }
 
+/**
+ * 这份代码在判题机上编不编得过。给提交前的自动格式化用：clang-format 碰上编译不过的
+ * C 代码会把行并起来（`int n；` 和下一行、少了分号的两行），学生回头看到的就不是自己
+ * 写的代码了，报错的行号也对不上他记得的位置。api 容器里没有 gcc，而判题机的编译器、
+ * 编译参数本来就是判的标准，所以借它编一次。
+ *
+ * 判题机只有 /judge 一个入口，得带一组测试点：给一组空输入，跑的那一下限 1 秒。
+ * 判题机连不上、超时，一律当编得过 —— 那就和原来一样照常格式化。
+ */
+export async function compileFails(language: string, source: string) {
+  try {
+    const response = await postJudge(language, source, 1000, 256, [{ input: "", output: "" }], {
+      signal: AbortSignal.timeout(8000),
+    })
+    const body = (await response.json()) as JudgeResponse
+    return body.err === "CompileError"
+  } catch {
+    return false
+  }
+}
+
 async function requestJudge(
   language: string,
   code: string,

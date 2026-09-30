@@ -534,6 +534,8 @@ export const todaySubmissionStatisticsSchema = z.object({
 export const formatCodeRequestSchema = z.object({
   code: z.string().max(1024 * 1024),
   language: z.enum(["python", "c", "cpp", "sql"]),
+  /** C / C++ 格式化前要先编一遍，得套上这道题的模板才编得过 */
+  problemId: z.number().int().optional(),
 })
 
 export const formatCodeResponseSchema = z.object({ code: z.string() })
