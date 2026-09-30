@@ -16,6 +16,7 @@ import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import CollabBar from "./CollabBar.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
+import { useLessonStore } from "oj/store/lesson"
 
 const FlowchartEditor = defineAsyncComponent(
   () => import("shared/components/FlowchartEditor/index.vue"),
@@ -149,6 +150,30 @@ watch(
     codeStore.setLanguage(language)
     changeLanguage(language)
   },
+)
+
+/**
+ * 老师在课堂看板布置这节课时选了语言：打开这节课的题，编辑器默认就用它。学 C 的班，
+ * 编辑器停在默认的 Python（或者上一个用这台电脑的人留下的偏好）的话，学生交上去才发现
+ * 不算数。课堂条只在题库入口出现，这里同一个范围。
+ *
+ * 每道题只自动换一次：学生自己再切回别的语言，就按他的来。课堂状态可能比题面晚到
+ * （课堂条进页面才去拉），所以两边都等到了再判断；画着流程图时不动他。
+ */
+const lessonStore = useLessonStore()
+let lessonLanguageFor: string | null = null
+watch(
+  () => [problem.value?._id, lessonStore.activity] as const,
+  ([id, activity]) => {
+    if (!id || !activity || lessonLanguageFor === id) return
+    lessonLanguageFor = id
+    const language = activity.language
+    if (!language || ctx.value.entry !== "problem" || teacherCollab.value) return
+    if (!lessonStore.includes(id) || !problemStore.codeLanguages.includes(language)) return
+    if (codeStore.code.language === language || codeStore.code.language === "Flowchart") return
+    problemStore.switchLanguage(language)
+  },
+  { immediate: true },
 )
 
 /**

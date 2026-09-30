@@ -41,6 +41,7 @@ import {
   type FlowchartStatistics,
   type SubmissionStatistics,
   type SubmissionLessons,
+  type RunnableLanguage,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
@@ -242,8 +243,12 @@ export function getClassLesson(className?: string) {
 }
 
 /** 给这个班布置今天的题，空数组 = 清掉 */
-export function setClassLesson(className: string, problemDisplayIds: string[]) {
-  return api.put<null>("classroom/lesson", { className, problemDisplayIds })
+export function setClassLesson(
+  className: string,
+  problemDisplayIds: string[],
+  language: RunnableLanguage | null,
+) {
+  return api.put<null>("classroom/lesson", { className, problemDisplayIds, language })
 }
 
 /** 我的知识点地图（只有自己的，不能查别人） */

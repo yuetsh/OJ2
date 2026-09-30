@@ -3,7 +3,9 @@ import { getClassBoard, setClassLesson } from "oj/api"
 import { useHiddenStudents } from "shared/composables/hiddenStudents"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
+import type { RunnableLanguage } from "@oj2/contract"
 import { errorMessage } from "utils/api"
+import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
 import type { ClassBoard, ClassBoardCell, ClassBoardStudent } from "utils/types"
 
@@ -34,6 +36,16 @@ const updatedAt = ref<Date | null>(null)
 const projector = ref(false)
 
 const lessonInput = ref("")
+/**
+ * 这份作业用什么语言做，跟着这一次布置走（用户定的：不是给班级定死的设置）。默认是这个班
+ * 上一次布置时选的；选了之后看板和学生那边的「做完」都只认这个语言交对的
+ */
+const lessonLanguage = ref<RunnableLanguage>("Python")
+const LESSON_LANGUAGES: RunnableLanguage[] = ["Python", "C", "C++"]
+const languageOptions = LESSON_LANGUAGES.map((value) => ({
+  label: LANGUAGE_SHOW_VALUE[value],
+  value,
+}))
 const saving = ref(false)
 
 function classLabel(name: string) {
@@ -65,7 +77,7 @@ async function load() {
   }
 }
 
-// 换了班要把输入框换成那个班今天布置的题
+// 换了班要把输入框换成那个班今天布置的题、布置时选的语言（15 秒一次的刷新不动它们）
 watch(
   () => [board.value?.className, board.value?.source] as const,
   () => {
@@ -73,6 +85,7 @@ watch(
       board.value?.source === "teacher"
         ? board.value.problems.map((problem) => problem.problemDisplayId).join(" ")
         : ""
+    lessonLanguage.value = board.value?.language ?? board.value?.lastLanguage ?? "Python"
   },
 )
 
@@ -86,8 +99,12 @@ async function saveLesson() {
   const ids = lessonInput.value.split(/[\s,，、;；]+/).filter(Boolean)
   saving.value = true
   try {
-    await setClassLesson(className.value, ids)
-    message.success(ids.length ? "已布置，学生首页会显示这几道题" : "已清掉，学生那边改回自动推断")
+    await setClassLesson(className.value, ids, ids.length ? lessonLanguage.value : null)
+    message.success(
+      ids.length
+        ? `已布置（${LANGUAGE_SHOW_VALUE[lessonLanguage.value]}），学生首页会显示这几道题`
+        : "已清掉，学生那边改回自动推断",
+    )
     await load()
   } catch (error) {
     message.error(errorMessage(error))
@@ -241,7 +258,12 @@ function submissionsHref(
       username: student.username,
       exactUsername: "1",
       today: "1",
-      ...(flowchart ? { language: "Flowchart" } : {}),
+      // 布置时选了语言的，代码那边只看这个语言交的（和格子里数的一致）
+      ...(flowchart
+        ? { language: "Flowchart" }
+        : board.value?.language
+          ? { language: board.value.language }
+          : {}),
       ...(problemDisplayId ? { problem: problemDisplayId } : {}),
     },
   }).href
@@ -293,6 +315,12 @@ function submissionsHref(
       <n-card v-if="!projector" size="small" class="section">
         <n-flex align="center" :wrap="false">
           <n-text strong style="flex-shrink: 0">这节课的题</n-text>
+          <n-select
+            v-model:value="lessonLanguage"
+            :options="languageOptions"
+            aria-label="用什么语言做"
+            style="width: 110px; flex-shrink: 0"
+          />
           <n-input
             v-model:value="lessonInput"
             placeholder="输入题号，用空格隔开，比如 8019 8020 8021"
@@ -303,13 +331,15 @@ function submissionsHref(
         </n-flex>
         <n-text depth="3" class="meta">
           <template v-if="board.source === 'teacher'">
-            学生首页的「班里在做」显示的就是这几道。清空再点布置就改回自动推断。
+            学生首页的「班里在做」显示的就是这几道<template v-if="board.language"
+              >，用 {{ LANGUAGE_SHOW_VALUE[board.language] }} 交对才算做完</template
+            >。清空再点布置就改回自动推断。
           </template>
           <template v-else-if="board.source === 'inferred'">
             还没布置。下面这几道是按今天的提交记录推断的（同班 5 人以上做过的题）。
           </template>
           <template v-else>
-            布置之后，学生打开首页就能看到这几道题，没听清题号的也能找到。
+            布置之后，学生打开首页就能看到这几道题，没听清题号的也能找到；打开题目时编辑器默认就是左边选的语言。
           </template>
         </n-text>
       </n-card>

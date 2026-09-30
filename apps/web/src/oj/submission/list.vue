@@ -508,6 +508,8 @@ async function toggleLesson() {
   if (lessonActive.value) {
     query.problem = ""
     query.today = "0"
+    // 「这节课」顺带筛上的语言一起放掉；老师自己另选的别动
+    if (lesson.value?.language && query.language === lesson.value.language) query.language = ""
     return
   }
   lessonLoading.value = true
@@ -525,6 +527,8 @@ async function toggleLesson() {
     lesson.value = res
     query.problem = lessonIds.value
     query.today = "1"
+    // 老师布置时选了语言：看板上只数这个语言交的，列表也只列它（流程图那边不动）
+    if (res.language && !flowMode.value) query.language = res.language
   } finally {
     lessonLoading.value = false
   }

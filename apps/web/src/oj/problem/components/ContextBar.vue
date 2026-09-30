@@ -232,7 +232,10 @@ onSolvedHere(() => {
 <template>
   <!-- 课堂 -->
   <div v-if="lesson" class="context-bar lesson">
-    <span class="lead lesson-lead">这节课 做完 {{ lesson.done }}/{{ lesson.total }}</span>
+    <span class="lead lesson-lead"
+      >这节课<template v-if="lessonStore.languageText"> · {{ lessonStore.languageText }}</template>
+      做完 {{ lesson.done }}/{{ lesson.total }}</span
+    >
     <!-- 手机上放不下一排题号：只说是第几道，箭头做大（设计稿「手机：题目 / 代码 / 结果」） -->
     <span v-if="isMobile" class="meta">这是第 {{ lesson.position }} 道</span>
     <ProblemChips v-else :items="lesson.chips" :current="currentId" variant="lesson" />

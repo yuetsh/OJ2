@@ -17,7 +17,7 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { useProblemJump } from "shared/composables/problemJump"
 import { pickHeadline, type Headline } from "oj/user/knowledge"
 import { useUserStore } from "shared/store/user"
-import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS } from "utils/constants"
+import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { duration, parseTime, zonedParts, zonedYear } from "utils/functions"
 import type {
   AnnouncementListItem,
@@ -227,7 +227,10 @@ const classActivityTitle = computed(() => {
   const day = classActivity.value?.day
   if (!day) return ""
   // 老师在课堂看板布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
-  if (classActivity.value?.source === "teacher") return "今天老师布置的题"
+  if (classActivity.value?.source === "teacher") {
+    const language = classActivity.value.language
+    return `今天老师布置的题${language ? ` · 用${LANGUAGE_SHOW_VALUE[language]}做` : ""}`
+  }
   if (classToday.value) return "今天班里在做"
   const [, month, date] = day.split("-").map(Number)
   return `${month}月${date}日班里做了`

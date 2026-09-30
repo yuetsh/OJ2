@@ -1,5 +1,6 @@
 import { defineStore } from "pinia"
 import { getClassActivity } from "oj/api"
+import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import type { ClassActivity, ClassActivityProblem } from "utils/types"
 
 /** 同一节课里来回换题不用每次都重拉；过了这么久再进题目页就重拉一次 */
@@ -74,10 +75,18 @@ export const useLessonStore = defineStore("lesson", () => {
     return { total: list.length, next: rest[0] ?? null, remaining: rest.length }
   }
 
-  /** 老师布置的叫「老师布置的题」，推断出来的叫「这节课的题」 */
+  /** 老师布置时选的语言，给界面写「C语言」；没选（推断出来的课、以前布置的）为空 */
+  const languageText = computed(() => {
+    const language = activity.value?.language
+    return language ? LANGUAGE_SHOW_VALUE[language] : ""
+  })
+
+  /** 老师布置的叫「老师布置的题」（选了语言带上语言），推断出来的叫「这节课的题」 */
   const label = computed(() =>
-    activity.value?.source === "teacher" ? "老师布置的题" : "这节课的题",
+    activity.value?.source === "teacher"
+      ? `老师布置的题${languageText.value ? ` · ${languageText.value}` : ""}`
+      : "这节课的题",
   )
 
-  return { activity, label, load, markAccepted, includes, nextAfter }
+  return { activity, label, languageText, load, markAccepted, includes, nextAfter }
 })
