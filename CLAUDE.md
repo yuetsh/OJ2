@@ -147,7 +147,7 @@ QingdaoU/JudgeServer 停更在 2024-04（官方镜像的 `latest` 和 `1.6.1` �
   **服务器和机房各有各的判题沙箱，两边都要装。**
 - 改工具链就把末尾序号 +1（下一版 `oj2-judge-3`）。`up -d` 不带 `--pull`，名字没变会静默用旧镜像。
 - 编译/运行命令在 `apps/api/src/judge/languages.ts`，不在镜像里。gcc-14 把隐式函数
-  声明等提成了 error（`-w` 压不住），那边的 `cLooseErrors` 三个 `-Wno-error=` 就是
+  声明等提成了 error（`-w` 压不住），那边的 `cLooseErrors` 几个 `-Wno-error=` 就是
   为此加的 —— 删掉它们等于让一批历史题解和 C 教程示例集体 CE。
 - **判题沙箱只认 C / C++ / Python。** Java / JavaScript / Golang 连同镜像里的
   JDK / Node / Go 在 2026-09 一起砍了（前端本来就没给入口，12 万条提交里它们共 62 条），

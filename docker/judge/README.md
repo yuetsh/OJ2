@@ -71,7 +71,7 @@ compose 里三处，一起改）。`docker compose up -d` 不带 `--pull`，名�
 这些绝对路径挂到正确的版本上（Dockerfile 末尾的 `update-alternatives`）。
 
 gcc-14 把隐式函数声明、int↔指针互赋、不兼容指针类型从 warning 提成了 error，`-w`
-压不住。`languages.ts` 里的 `cLooseErrors` 三个 `-Wno-error=` 就是为此加的 ——
+压不住。`languages.ts` 里的 `cLooseErrors` 里的 `-Wno-error=` 就是为此加的 ——
 实测 1951 份历史 C 提交和 20 篇 C 教程的 93 个代码块，加了之后与 gcc-13 逐个文件
 结果完全一致；不加的话有一批会从能过变成 CE。
 

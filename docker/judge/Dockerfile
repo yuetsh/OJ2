@@ -19,7 +19,7 @@
 #
 # ⚠️ 语言的编译/运行命令**不在这个文件里**，在 apps/api/src/judge/languages.ts。
 #    升 gcc 大版本要同步看那边的开关（gcc-14 把 implicit-function-declaration
-#    等提成了 error，languages.ts 里有三个 -Wno-error 把它压回去）。
+#    等提成了 error，languages.ts 里有几个 -Wno-error 把它压回去）。
 
 # 镜像源。默认走国内镜像 —— 官方源在这边实测 197 KB/s，清华 3.9 MB/s，
 # 整个构建从 12 分钟掉到 2 分钟出头。出国内网络环境用 build.sh --no-mirror 关掉。

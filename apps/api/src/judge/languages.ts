@@ -19,17 +19,18 @@ import { normalizeLanguage } from "@oj2/contract"
 const defaultEnv = ["LANG=en_US.UTF-8", "LANGUAGE=en_US:en", "LC_ALL=en_US.UTF-8"]
 
 /**
- * gcc-14 起这三类老写法从 warning 提成了 error，而 `-w` 只关警告、压不住 error：
+ * gcc-14 起这四类老写法从 warning 提成了 error，而 `-w` 只关警告、压不住 error：
  * 隐式函数声明（忘了 `#include <stdio.h>` 就用 printf）、int 与指针互赋、
- * 不兼容的指针类型。判题机镜像 2026-09 从 gcc-13 升到 14（见 docker/judge/），
- * 不加这三个开关的话，**一批历史题解和 20 篇 C 教程的示例会突然全部 CE**。
+ * 不兼容的指针类型、`int main` 里写不带值的 `return;`（全库 4 条，gcc-13 下能跑，
+ * 放行后退出码不定，多半判运行时错误，说明会让补 return 0）。判题机镜像 2026-09 从 gcc-13 升到 14（见 docker/judge/），
+ * 不加这几个开关的话，**一批历史题解和 20 篇 C 教程的示例会突然全部 CE**。
  *
  * 只给 C 加：C++ 那边这些本来就是 error，g++ 升版不改判定。
- * 哪天决定「就是要学生写规范」，是删掉这三行，不是改镜像 —— 删之前先拿
+ * 哪天决定「就是要学生写规范」，是删掉这几个开关，不是改镜像 —— 删之前先拿
  * docs/c-tutorials/verify-code.sh 全量过一遍教程。
  */
 const cLooseErrors =
-  "-Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=incompatible-pointer-types"
+  "-Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=return-mismatch"
 
 export const languageConfigs: Record<string, Record<string, unknown>> = {
   C: {

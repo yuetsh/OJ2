@@ -54,7 +54,7 @@ int main(void) {
   },
   {
     // 这条是升 gcc 的主要风险点：gcc-14 起 implicit-function-declaration 是
-    // error，languages.ts 里的三个 -Wno-error 就是为它加的。这条挂了说明那些
+    // error，languages.ts 里的几个 -Wno-error 就是为它加的。这条挂了说明那些
     // 开关没生效 —— 后果是一批历史题解和 20 篇 C 教程的示例突然全 CE。
     language: "C",
     name: "C 忘了 #include 仍能过（gcc 宽松度）",
@@ -63,6 +63,23 @@ int main(void) {
   int a, b;
   scanf("%d %d", &a, &b);
   printf("%d\\n", a + b);
+  return 0;
+}`,
+  },
+  {
+    // gcc-14 把 int 函数里不带值的 return; 也提成了 error（-Wreturn-mismatch）
+    language: "C",
+    name: "C 不带值的 return; 仍能过（gcc 宽松度）",
+    expect: JudgeStatus.ACCEPTED,
+    code: `#include <stdio.h>
+int check(int a) {
+  if (a < 0) return;
+  return a;
+}
+int main(void) {
+  int a, b;
+  scanf("%d %d", &a, &b);
+  printf("%d\\n", check(a) + b);
   return 0;
 }`,
   },
