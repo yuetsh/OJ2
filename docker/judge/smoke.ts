@@ -67,16 +67,17 @@ int main(void) {
 }`,
   },
   {
-    // gcc-14 把 int 函数里不带值的 return; 也提成了 error（-Wreturn-mismatch）
+    // gcc-14 把 int 函数里不带值的 return;（-Wreturn-mismatch）、省略 int 的
+    // main()（-Wimplicit-int）也提成了 error
     language: "C",
-    name: "C 不带值的 return; 仍能过（gcc 宽松度）",
+    name: "C 不带值的 return;、省略 int 的 main() 仍能过（gcc 宽松度）",
     expect: JudgeStatus.ACCEPTED,
     code: `#include <stdio.h>
 int check(int a) {
   if (a < 0) return;
   return a;
 }
-int main(void) {
+main(void) {
   int a, b;
   scanf("%d %d", &a, &b);
   printf("%d\\n", check(a) + b);
