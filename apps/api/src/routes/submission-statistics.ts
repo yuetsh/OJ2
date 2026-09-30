@@ -8,6 +8,7 @@
 
 import {
   type ProblemLanguage,
+  type SubmissionLessons,
   type SubmissionStatistics,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
@@ -21,15 +22,8 @@ import { failure, success } from "../http"
 import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
 import { type ContestEnv } from "../services/contest"
 import { getBooleanOption } from "../services/options"
-import { dayStart } from "../time"
-import {
-  isAdminRole,
-  isTeacherOrAbove,
-  parseDisplayIds,
-  rounded,
-  scopedUsers,
-  stripClassPrefix,
-} from "./helpers"
+import { dayStart, localTime } from "../time"
+import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from "./helpers"
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
@@ -40,27 +34,19 @@ function judgedRate(accepted: number, judged: number) {
   return judged > 0 ? rounded((accepted / judged) * 100) : 0
 }
 
-/** 同班这么多人做了同一道题，才算这个班今天上了课（和首页「班里在做」同一个门槛） */
-const TODAY_LESSON_MIN_USERS = 5
-/** 最后一条提交在这么多分钟内，算「正在上课」 */
-const TODAY_LIVE_MINUTES = 15
-
 type TodayRow = {
-  class_name: string | null
   problem_id: number
   display_id: string
   title: string
   visible: boolean
-  problemset_id: number | null
   user_id: number
   result: JudgeStatusValue
   language: ProblemLanguage
-  create_time: string
 }
 
 /**
- * 「今日统计」（提交列表顶上那颗标签点开的）。一般是老师看：今天哪几个班上了课、几点到几点、
- * 错得最多的是哪几道；学生版从简。口径和那颗标签一致：东八区今天 + 非比赛提交。
+ * 「今日统计」（提交列表顶上那颗标签点开的），只剩学生版 —— 老师那一版并进了统计的
+ * 「一行一节课」（下面的 /submissions/statistics/lessons）。口径和那颗标签一致：东八区今天 + 非比赛提交。
  *
  * 今天的提交一天也就几百到一千来条，整批拉回来在进程里分组，比写五六条各自 group by 的
  * SQL 好读，也只扫一遍 `create_time` 索引。
@@ -74,15 +60,13 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
    */
   const showProblems =
     (await getBooleanOption("submission_list_show_all", true)) || isAdminRole(user)
-  const teacher = isTeacherOrAbove(user)
   const since = dayStart()
   const [rows, [flow]] = await Promise.all([
     db.execute<TodayRow>(sql`
-      select u.class_name, s.problem_id, p._id as display_id, p.title, p.visible,
-        s.problemset_id, s.user_id, s.result, s.language, s.create_time
+      select s.problem_id, p._id as display_id, p.title, p.visible,
+        s.user_id, s.result, s.language
       from ${schema.submission} s
       join ${schema.problem} p on p.id = s.problem_id
-      left join ${schema.user} u on u.id = s.user_id
       where s.contest_id is null and s.create_time >= ${since}
     `),
     db
@@ -114,7 +98,7 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
   const byProblem = groupBy(rows, (row) => row.problem_id)
   const mineRows = user ? rows.filter((row) => row.user_id === user.id) : []
 
-  // ---------- 学生：大家都在做 ----------
+  // 大家都在做
   const problems = showProblems
     ? [...byProblem.values()]
         .filter((list) => list[0]!.visible)
@@ -137,80 +121,6 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
         .sort((a, b) => b.userCount - a.userCount)
         .slice(0, 8)
     : []
-
-  // ---------- 老师：哪几个班上了课、错得最多的题 ----------
-  let classes: TodaySubmissionStatistics["classes"] = null
-  let scattered: TodaySubmissionStatistics["scattered"] = null
-  let hardProblems: TodaySubmissionStatistics["hardProblems"] = null
-  if (teacher) {
-    const byClass = groupBy(rows, (row) => row.class_name)
-    const lessonClasses: { className: string; list: TodayRow[]; problemCount: number }[] = []
-    scattered = []
-    for (const [className, list] of byClass) {
-      const problemCount = className
-        ? [...groupBy(list, (row) => row.problem_id).values()].filter(
-            (group) => distinctUsers(group) >= TODAY_LESSON_MIN_USERS,
-          ).length
-        : 0
-      if (className && problemCount) lessonClasses.push({ className, list, problemCount })
-      else scattered.push({ className, userCount: distinctUsers(list), total: list.length })
-    }
-    scattered.sort((a, b) =>
-      a.className === null ? 1 : b.className === null ? -1 : b.total - a.total,
-    )
-    const sizes = lessonClasses.length
-      ? await db
-          .select({ className: schema.user.className, value: count() })
-          .from(schema.user)
-          .where(
-            and(
-              inArray(
-                schema.user.className,
-                lessonClasses.map((item) => item.className),
-              ),
-              eq(schema.user.adminType, "Regular User"),
-              eq(schema.user.isDisabled, false),
-            ),
-          )
-          .groupBy(schema.user.className)
-      : []
-    const liveSince = new Date(Date.now() - TODAY_LIVE_MINUTES * 60_000).toISOString()
-    classes = lessonClasses
-      .map(({ className, list, problemCount }) => {
-        const times = list.map((row) => row.create_time).sort()
-        return {
-          className,
-          start: times[0]!,
-          end: times.at(-1)!,
-          userCount: distinctUsers(list),
-          classSize: sizes.find((row) => row.className === className)?.value ?? 0,
-          problemCount,
-          fromProblemSet: list.filter((row) => row.problemset_id !== null).length * 2 > list.length,
-          total: list.length,
-          correctRate: rate(list),
-          live: times.at(-1)! >= liveSince,
-        }
-      })
-      .sort((a, b) => a.start.localeCompare(b.start))
-    const failedOf = (list: TodayRow[]) => list.filter((row) => !isAccepted(row) && !isJudging(row))
-    hardProblems = [...byProblem.values()]
-      .filter((list) => failedOf(list).length > 0)
-      .sort((a, b) => failedOf(b).length - failedOf(a).length)
-      .slice(0, 6)
-      .map((list) => ({
-        problemDisplayId: list[0]!.display_id,
-        problemTitle: list[0]!.title,
-        className: countBy(list, (row) => row.class_name)[0]?.value ?? null,
-        total: list.length,
-        accepted: list.filter(isAccepted).length,
-        failures: countBy(failedOf(list), (row) => row.result).map(({ value, count }) => ({
-          result: value,
-          count,
-        })),
-        userCount: distinctUsers(list),
-        acceptedUsers: acceptedUsers(list),
-      }))
-  }
 
   return success(c, {
     asOf: new Date().toISOString(),
@@ -235,9 +145,6 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
         }
       : null,
     problems,
-    classes,
-    scattered,
-    hardProblems,
   } satisfies TodaySubmissionStatistics)
 })
 
@@ -486,7 +393,7 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
    */
   const solvedFilter = sql`count(distinct ${schema.submission.problemId}) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
 
-  const [[totals], perUser] = await Promise.all([
+  const [[totals], perUser, results] = await Promise.all([
     db
       .select({
         total: count(),
@@ -528,6 +435,13 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
         schema.user.isDisabled,
         schema.user.adminType,
       )
+      .orderBy(desc(count())),
+    // 数字行里那根结果条（原来今日统计底部那根，并进来之后哪个时间段都有）
+    db
+      .select({ result: schema.submission.result, count: count() })
+      .from(schema.submission)
+      .where(where)
+      .groupBy(schema.submission.result)
       .orderBy(desc(count())),
   ])
 
@@ -624,6 +538,7 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
     data,
     dataUnaccepted,
     dataAttempted,
+    results,
   } satisfies SubmissionStatistics)
 })
 
@@ -757,4 +672,296 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
     classSizes,
     truncated,
   } satisfies SubmissionStatisticsGrid)
+})
+
+/** 相邻两条提交隔这么久，就当下课了、后面的是另一段 */
+const LESSON_GAP_MINUTES = 30
+/** 一段里有一道题这么多人做过，才算一节课（和原来今日统计、首页「班里在做」同一个门槛） */
+const LESSON_MIN_USERS = 5
+/** 最后一条在这么多分钟内，算「还在上课」 */
+const LESSON_LIVE_MINUTES = 15
+/** 一次列多少节课。「一节课」「今天」一般一两行，「这学期」「全部」有几百节，先给最近的这些 */
+const LESSONS_DEFAULT = 50
+const LESSONS_MAX = 500
+
+type LessonAggRow = {
+  level: number
+  class_name: string | null
+  day: string | null
+  sid: number | null
+  problem_id: number | null
+  result: JudgeStatusValue | null
+  lesson: boolean | null
+  users: number
+  total: number
+  accepted: number
+  judging: number
+  from_ps: number
+  first: string
+  last: string
+  accepted_users: number
+}
+
+/**
+ * 统计「一行一节课」的总览（口径见契约 submissionLessonsSchema）。
+ *
+ * 切课、零散提交、错得最多的题全在一条 SQL 里：先按「班 + 东八区哪一天」隔 30 分钟切段，
+ * 再标出哪几段算课，最后用 grouping sets 一次聚合出下面五种粒度 —— 不走方块串那个明细
+ * 接口在前端切，是因为那边最多给 5000 条，「这学期」就不止这个数，截断之后课会少算。
+ */
+submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher, async (c) => {
+  const range = statisticsRange(c)
+  if (!range) return failure(c, 400, "invalid-request", "end is required")
+  const limit = Math.min(
+    LESSONS_MAX,
+    Math.max(1, Number.parseInt(c.req.query("limit") ?? "", 10) || LESSONS_DEFAULT),
+  )
+  const accepted = sql.join(
+    ACCEPTED_RESULTS.map((value) => sql`${value}`),
+    sql`, `,
+  )
+  const judging = sql.join(
+    UNJUDGED_RESULTS.map((value) => sql`${value}`),
+    sql`, `,
+  )
+
+  // grouping() 的位：class_name 32、day 16、sid 8、problem_id 4、result 2、lesson 1。
+  // 没参与分组的那几列记 1，所以每种粒度对应一个固定的 level
+  const rows = await db.execute<LessonAggRow>(sql`
+    with s as (
+      select u.class_name, s.user_id, s.problem_id, s.result, s.problemset_id, s.create_time,
+        to_char(${localTime(sql`s.create_time`)}, 'YYYY-MM-DD') as day
+      from ${schema.submission} s
+      join ${schema.user} u on u.id = s.user_id
+      where s.contest_id is null
+        and s.create_time <= ${range.end}
+        ${range.start ? sql`and s.create_time >= ${range.start}` : sql``}
+        -- 只算普通学生：老师试题的提交不该把一段拼成「一节课」
+        and u.admin_type = 'Regular User' and u.is_disabled = false
+    ),
+    g as (
+      select *,
+        case when create_time - lag(create_time) over w > ${`${LESSON_GAP_MINUTES} minutes`}::interval
+          then 1 else 0 end as brk
+      from s
+      window w as (partition by class_name, day order by create_time)
+    ),
+    seg as (
+      select *,
+        sum(brk) over (partition by class_name, day order by create_time rows unbounded preceding) as sid
+      from g
+    ),
+    lesson_seg as (
+      select class_name, day, sid
+      from (
+        select class_name, day, sid, problem_id, count(distinct user_id) as n
+        from seg where class_name is not null
+        group by class_name, day, sid, problem_id
+      ) p
+      group by class_name, day, sid
+      having max(n) >= ${LESSON_MIN_USERS}
+    ),
+    marked as (
+      select seg.*, (l.sid is not null) as lesson
+      from seg
+      left join lesson_seg l
+        on l.class_name = seg.class_name and l.day = seg.day and l.sid = seg.sid
+    )
+    select grouping(class_name, day, sid, problem_id, result, lesson) as level,
+      class_name, day, sid::int as sid, problem_id, result, lesson,
+      count(distinct user_id)::int as users,
+      count(*)::int as total,
+      (count(*) filter (where result in (${accepted})))::int as accepted,
+      (count(*) filter (where result in (${judging})))::int as judging,
+      (count(*) filter (where problemset_id is not null))::int as from_ps,
+      min(create_time) as first,
+      max(create_time) as last,
+      (count(distinct user_id) filter (where result in (${accepted})))::int as accepted_users
+    from marked
+    group by grouping sets (
+      (class_name, day, sid, problem_id),
+      (class_name, day, sid, lesson),
+      (problem_id, class_name),
+      (problem_id, result),
+      (lesson, class_name, day)
+    )
+  `)
+
+  const LEVEL = { segProblem: 3, segment: 6, problemClass: 27, problemResult: 57, dayClass: 14 }
+  const segKey = (row: LessonAggRow) => `${row.class_name}|${row.day}|${row.sid}`
+  const failedOf = (row: { total: number; accepted: number; judging: number }) =>
+    row.total - row.accepted - row.judging
+
+  const problemsOfSeg = new Map<string, LessonAggRow[]>()
+  for (const row of rows) {
+    if (row.level !== LEVEL.segProblem) continue
+    const key = segKey(row)
+    problemsOfSeg.set(key, [...(problemsOfSeg.get(key) ?? []), row])
+  }
+  const allLessons = rows
+    .filter((row) => row.level === LEVEL.segment && row.lesson)
+    .sort((a, b) => b.first.localeCompare(a.first))
+  const picked = allLessons.slice(0, limit)
+  const hasMore = allLessons.length > limit
+
+  // 题号、标题一次查齐：课的题、每节课错得最多的那道、整段时间错得最多的几道
+  const hardCandidates = new Map<number, { rows: LessonAggRow[]; failures: LessonAggRow[] }>()
+  for (const row of rows) {
+    if (row.problem_id === null) continue
+    if (row.level === LEVEL.problemClass || row.level === LEVEL.problemResult) {
+      const entry = hardCandidates.get(row.problem_id) ?? { rows: [], failures: [] }
+      if (row.level === LEVEL.problemClass) entry.rows.push(row)
+      else entry.failures.push(row)
+      hardCandidates.set(row.problem_id, entry)
+    }
+  }
+  const hardRanked = [...hardCandidates.entries()]
+    .map(([problemId, entry]) => {
+      const sum = (key: "total" | "accepted" | "judging" | "users" | "accepted_users") =>
+        entry.rows.reduce((acc, row) => acc + row[key], 0)
+      return {
+        problemId,
+        className: [...entry.rows].sort((a, b) => b.total - a.total)[0]?.class_name ?? null,
+        total: sum("total"),
+        accepted: sum("accepted"),
+        judging: sum("judging"),
+        userCount: sum("users"),
+        acceptedUsers: sum("accepted_users"),
+        failures: entry.failures
+          .filter(
+            (row) =>
+              row.result !== null &&
+              !ACCEPTED_RESULTS.includes(row.result) &&
+              !UNJUDGED_RESULTS.includes(row.result),
+          )
+          .sort((a, b) => b.total - a.total)
+          .map((row) => ({ result: row.result!, count: row.total })),
+      }
+    })
+    .filter((row) => failedOf(row) > 0)
+    .sort((a, b) => failedOf(b) - failedOf(a))
+    .slice(0, 6)
+
+  const lessonProblemRows = picked.map((lesson) =>
+    (problemsOfSeg.get(segKey(lesson)) ?? [])
+      .filter((row) => row.users >= LESSON_MIN_USERS)
+      .sort((a, b) => b.users - a.users),
+  )
+  const problemIds = [
+    ...new Set([
+      ...lessonProblemRows.flat().map((row) => row.problem_id!),
+      ...hardRanked.map((row) => row.problemId),
+    ]),
+  ]
+  const problems = problemIds.length
+    ? await db
+        .select({
+          id: schema.problem.id,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+          visible: schema.problem.visible,
+        })
+        .from(schema.problem)
+        .where(inArray(schema.problem.id, problemIds))
+    : []
+  const problemById = new Map(problems.map((row) => [row.id, row]))
+
+  const lessonClasses = [...new Set(picked.map((row) => row.class_name!))]
+  const sizes = lessonClasses.length
+    ? await db
+        .select({ className: schema.user.className, value: count() })
+        .from(schema.user)
+        .where(
+          and(
+            inArray(schema.user.className, lessonClasses),
+            eq(schema.user.adminType, "Regular User"),
+            eq(schema.user.isDisabled, false),
+          ),
+        )
+        .groupBy(schema.user.className)
+    : []
+
+  const sum = (list: LessonAggRow[], key: "total" | "accepted" | "judging") =>
+    list.reduce((acc, row) => acc + row[key], 0)
+  const liveSince = new Date(Date.now() - LESSON_LIVE_MINUTES * 60_000).toISOString()
+  const lessons = picked.map((lesson, index) => {
+    const own = lessonProblemRows[index]!
+    const hardest = [...own].sort((a, b) => failedOf(b) - failedOf(a))[0]
+    const hardestProblem = hardest ? problemById.get(hardest.problem_id!) : undefined
+    return {
+      className: lesson.class_name!,
+      day: lesson.day!,
+      start: lesson.first,
+      end: lesson.last,
+      userCount: lesson.users,
+      classSize: sizes.find((row) => row.className === lesson.class_name)?.value ?? 0,
+      // 点进去就拿这几道去筛：统计接口只认公开题，一次最多 20 道
+      problems: own
+        .map((row) => problemById.get(row.problem_id!))
+        .filter((row) => row?.visible)
+        .map((row) => row!.displayId)
+        .slice(0, STATISTICS_MAX_PROBLEMS),
+      fromProblemSet: lesson.from_ps * 2 > lesson.total,
+      // 次数和正确率只算这节课的题：点进去筛的就是这几道，两边的数才对得上
+      // （一段里零星一两个人顺手交的别的题不算）
+      total: sum(own, "total"),
+      correctRate: judgedRate(sum(own, "accepted"), sum(own, "total") - sum(own, "judging")),
+      live: lesson.last >= liveSince,
+      hardest:
+        hardest && hardestProblem && failedOf(hardest) > 0
+          ? {
+              problemDisplayId: hardestProblem.displayId,
+              problemTitle: hardestProblem.title,
+              failed: failedOf(hardest),
+            }
+          : null,
+    }
+  })
+
+  // 零散提交只给列出来的这些课覆盖到的日子（「这学期」只列了最近 50 节时，更早的零散不给）
+  const earliestDay = hasMore ? (picked.at(-1)?.day ?? null) : null
+  const scattered = rows
+    .filter(
+      (row) =>
+        row.level === LEVEL.dayClass &&
+        row.lesson === false &&
+        (earliestDay === null || row.day! >= earliestDay),
+    )
+    .sort((a, b) =>
+      a.day !== b.day
+        ? b.day!.localeCompare(a.day!)
+        : a.class_name === null
+          ? 1
+          : b.class_name === null
+            ? -1
+            : b.total - a.total,
+    )
+    .map((row) => ({
+      day: row.day!,
+      className: row.class_name,
+      userCount: row.users,
+      total: row.total,
+    }))
+
+  return success(c, {
+    lessons,
+    scattered,
+    hardProblems: hardRanked.flatMap((row) => {
+      const problem = problemById.get(row.problemId)
+      if (!problem) return []
+      return [
+        {
+          problemDisplayId: problem.displayId,
+          problemTitle: problem.title,
+          className: row.className,
+          total: row.total,
+          accepted: row.accepted,
+          failures: row.failures,
+          userCount: row.userCount,
+          acceptedUsers: row.acceptedUsers,
+        },
+      ]
+    }),
+    hasMore,
+  } satisfies SubmissionLessons)
 })

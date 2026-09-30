@@ -401,6 +401,79 @@ export const submissionStatisticsSchema = z.object({
    * 就像统计只认成功的提交。dataUnaccepted 没有花名册就真的算不出来，仍然为空。
    */
   dataAttempted: z.array(attemptedStudentSchema),
+  /** 按判题结果，条数倒序 —— 数字行里那根结果条（含还在判的） */
+  results: z.array(z.object({ result: judgeStatusSchema, count: z.number().int() })),
+})
+
+/**
+ * 统计「一行一节课」的总览（GET /submissions/statistics/lessons，设计稿「统计合二为一」B）。
+ * 没选班、没填学生、没填题号时用它；原来「今日统计」老师那一版并进来了，换成任意时间段。
+ *
+ * **一节课怎么切**：只算普通学生（和方块串同一个口径），按「班 + 东八区哪一天」分组，
+ * 相邻两条提交隔 30 分钟以上就切开；切出来的一段里有一道题 5 人以上做过，才算一节课。
+ * 其余的是零散提交（补做、课后自己练）。这样 26计算机0班 9 月 29 日是 14:04–15:38，
+ * 不会被 16:24、18:42 那两条课后提交拖成「14:04–18:42」。
+ */
+const lessonFailureSchema = z.object({ result: judgeStatusSchema, count: z.number().int() })
+
+export const submissionLessonsSchema = z.object({
+  /** 最近的 N 节课，按开始时间倒序（界面上按天分组，这节课在最上面） */
+  lessons: z.array(
+    z.object({
+      className: z.string(),
+      /** 东八区的日子，`2026-09-29` */
+      day: z.string(),
+      /** 这一段第一条、最后一条提交 */
+      start: z.string(),
+      end: z.string(),
+      userCount: z.number().int(),
+      /** 班里的学生数（未禁用的普通用户） */
+      classSize: z.number().int(),
+      /** 这节课做的题（这一段里 5 人以上做过的），做的人多的在前，最多 20 道 —— 点进去就筛这几道 */
+      problems: z.array(z.string()),
+      /** 多半是从题单里交的 —— 「题单 7 道」 */
+      fromProblemSet: z.boolean(),
+      /** 这节课的题（上面 problems）交了几次 —— 和点进去看到的对得上 */
+      total: z.number().int(),
+      /** 同上，判完的里面对了多少，百分数 */
+      correctRate: z.number(),
+      /** 最后一条在 15 分钟内：还在上课，界面上引去课堂看板 */
+      live: z.boolean(),
+      /** 这节课的题里没过次数最多的那道；一次都没错过为 null */
+      hardest: z
+        .object({
+          problemDisplayId: z.string(),
+          problemTitle: z.string(),
+          failed: z.number().int(),
+        })
+        .nullable(),
+    }),
+  ),
+  /** 零散提交，按天、按班（null = 没填班级的号）。只给列出来的这些课覆盖到的日子 */
+  scattered: z.array(
+    z.object({
+      day: z.string(),
+      className: z.string().nullable(),
+      userCount: z.number().int(),
+      total: z.number().int(),
+    }),
+  ),
+  /** 整个时间段里错得最多的题，按没过的次数倒序，最多 6 道 */
+  hardProblems: z.array(
+    z.object({
+      problemDisplayId: z.string(),
+      problemTitle: z.string(),
+      /** 这道题交得最多的那个班 */
+      className: z.string().nullable(),
+      total: z.number().int(),
+      accepted: z.number().int(),
+      failures: z.array(lessonFailureSchema),
+      userCount: z.number().int(),
+      acceptedUsers: z.number().int(),
+    }),
+  ),
+  /** 更早还有课没列出来（「这学期」「全部」那种），界面上给「再往前看」 */
+  hasMore: z.boolean(),
 })
 
 /**
@@ -416,9 +489,9 @@ export const submissionStatisticsSchema = z.object({
 const todayFailureSchema = z.object({ result: judgeStatusSchema, count: z.number().int() })
 
 /**
- * 「今日统计」（提交列表顶上那颗标签点开的）。一般是老师在看（设计稿「今日统计重设计」老师 B）：
- * 今天哪几个班上了课、各在几点、错得最多的是哪几道。学生版从简：自己今天怎样、大家在做哪几道。
- * 口径：东八区今天 + 非比赛提交。
+ * 「今日统计」（提交列表顶上那颗标签点开的），**只剩学生版**：自己今天怎样、大家在做哪几道。
+ * 老师那一版（今天哪几个班上了课、错得最多的题）2026-09 并进了统计（submissionLessonsSchema），
+ * 老师的提交列表上不再有这颗标签。口径：东八区今天 + 非比赛提交。
  */
 export const todaySubmissionStatisticsSchema = z.object({
   /** 这份数据是几点算的 —— 标题上的「截至 19:40」 */
@@ -456,56 +529,6 @@ export const todaySubmissionStatisticsSchema = z.object({
       mine: z.enum(["accepted", "tried", "none"]).nullable(),
     }),
   ),
-  /**
-   * 老师：今天上了课的班（同班 5 人以上做了同一道题），按开始时间排。学生为 null。
-   * 时段是这个班今天第一条到最后一条提交，`live` = 最后一条在 15 分钟内（正在上课，
-   * 界面上引去课堂看板 —— 盯人是看板的活）
-   */
-  classes: z
-    .array(
-      z.object({
-        className: z.string(),
-        start: z.string(),
-        end: z.string(),
-        userCount: z.number().int(),
-        /** 班里的学生数 */
-        classSize: z.number().int(),
-        /** 这节课做的题数（班里 5 人以上做过的） */
-        problemCount: z.number().int(),
-        /** 多半是从题单里交的 —— 「题单 9 道」 */
-        fromProblemSet: z.boolean(),
-        total: z.number().int(),
-        correctRate: z.number(),
-        live: z.boolean(),
-      }),
-    )
-    .nullable(),
-  /** 老师：没上课的零星提交，按班（null = 没填班级的号） */
-  scattered: z
-    .array(
-      z.object({
-        className: z.string().nullable(),
-        userCount: z.number().int(),
-        total: z.number().int(),
-      }),
-    )
-    .nullable(),
-  /** 老师：错得最多的题，按没过的次数倒序，最多 6 道 */
-  hardProblems: z
-    .array(
-      z.object({
-        problemDisplayId: z.string(),
-        problemTitle: z.string(),
-        /** 这道题今天交得最多的那个班 */
-        className: z.string().nullable(),
-        total: z.number().int(),
-        accepted: z.number().int(),
-        failures: z.array(todayFailureSchema),
-        userCount: z.number().int(),
-        acceptedUsers: z.number().int(),
-      }),
-    )
-    .nullable(),
 })
 
 export const formatCodeRequestSchema = z.object({
@@ -579,6 +602,7 @@ export type SubmissionDetail = z.infer<typeof submissionDetailSchema>
 export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
 export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
 export type TodaySubmissionStatistics = z.infer<typeof todaySubmissionStatisticsSchema>
+export type SubmissionLessons = z.infer<typeof submissionLessonsSchema>
 export type SubmissionStatisticsUser = z.infer<typeof submissionStatisticsUserSchema>
 export type SubmissionStatisticsGrid = z.infer<typeof submissionStatisticsGridSchema>
 export type UnacceptedStudent = z.infer<typeof unacceptedStudentSchema>
