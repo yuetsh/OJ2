@@ -384,7 +384,13 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const user = c.get("user")!
   const filters = [isNull(schema.problem.contestId)]
-  if (!canManageAll(user)) filters.push(eq(schema.problem.createdById, user.id))
+  // library=1 是比赛的「从题库中选择」：要列的是 from-public 实际放行的范围 —— 所有可见的
+  // 公开题，加上自己能改的。只按 created_by 过滤的话，「仅管理自己创建」的老师一道题都看不到
+  const library = c.req.query("library") === "1"
+  if (!canManageAll(user)) {
+    const own = eq(schema.problem.createdById, user.id)
+    filters.push(library ? or(eq(schema.problem.visible, true), own)! : own)
+  }
   const author = c.req.query("author")?.trim()
   const keyword = c.req.query("keyword")?.trim()
   const tagId = c.req.query("tagId")?.trim()

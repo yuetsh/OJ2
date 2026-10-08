@@ -74,6 +74,17 @@ export async function getProblemList(
   }
 }
 
+// 比赛「从题库中选择」用：列所有可见的公开题，不只是自己创建的
+export async function getLibraryProblemList(offset = 0, limit = 10, keyword: string) {
+  const res = await api.get<AdminProblemList>("admin/problems", {
+    params: { offset, limit, keyword, library: 1 },
+  })
+  return {
+    results: res.results.map(toAdminProblemRow),
+    total: res.total,
+  }
+}
+
 export function deleteProblem(id: number) {
   return api.delete(`admin/problems/${id}`)
 }
