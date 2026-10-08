@@ -5,7 +5,7 @@
         <n-h3 style="margin: 0">请选择时间范围，智能分析学习情况</n-h3>
         <n-flex align="center">
           <n-input
-            v-if="userStore.isSuperAdmin"
+            v-if="userStore.isTeacherOrAbove"
             v-model:value="urlUsername"
             placeholder="查看指定用户"
             clearable

@@ -165,7 +165,7 @@ onMounted(() => {
     <h2>{{ profile.user.username }}</h2>
     <p class="desc">{{ profile.mood }}</p>
     <n-button
-      v-if="userStore.isSuperAdmin"
+      v-if="userStore.isTeacherOrAbove"
       type="info"
       secondary
       @click="

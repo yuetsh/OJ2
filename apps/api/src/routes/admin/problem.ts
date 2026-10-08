@@ -52,7 +52,10 @@ function canManageAll(user: AuthUser) {
  * 对齐旧后端：`ensure_created_by(problem.contest, user)` vs `ensure_created_by(problem, user)`。
  * 一道比赛题的 created_by 可能是克隆时的操作人，跟谁有权改它没关系。
  */
-async function canEdit(user: AuthUser, problem: ProblemRow) {
+export async function canEdit(
+  user: AuthUser,
+  problem: Pick<ProblemRow, "contestId" | "createdById">,
+) {
   if (user.adminType === "Super Admin") return true
   if (problem.contestId === null) {
     return canManageAll(user) || problem.createdById === user.id

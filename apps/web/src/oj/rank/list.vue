@@ -843,7 +843,12 @@ watch(
           <n-tag type="success" size="large">
             综合分: {{ classDetailData.compositeScore.toFixed(1) }}
           </n-tag>
-          <n-button type="info" :loading="classDetailAiLoading" @click="analyzeSingleClassWithAI">
+          <n-button
+            v-if="userStore.isTeacherOrAbove"
+            type="info"
+            :loading="classDetailAiLoading"
+            @click="analyzeSingleClassWithAI"
+          >
             <template #icon>
               <Icon icon="ph:sparkle" />
             </template>

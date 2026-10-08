@@ -12,12 +12,16 @@ export const useUserStore = defineStore("user", () => {
   const user = computed<SessionUser | null>(() => profile.value?.user ?? null)
   const isAuthed = computed(() => !!user.value?.email)
 
-  // 演示模式：超管临时把界面伪装成普通学生，方便上课投屏
-  const demoMode = ref<boolean>(storage.get(STORAGE_KEY.DEMO_MODE) ?? false)
-
   // 不受伪装影响的真实身份，只用于判断能否切换演示模式。
   // 若这里用被伪装后的 isSuperAdmin，一进入演示模式入口就消失了，退不出来。
   const realIsSuperAdmin = computed(() => user.value?.adminType === USER_TYPE.SUPER_ADMIN)
+
+  // 演示模式：超管临时把界面伪装成普通学生，方便上课投屏。
+  // 开关存在 storage 里、只有主动退登才清，会话过期后换人登录它还在 —— 所以只对超管
+  // 生效。不然老师在超管用过的机房电脑上一登录，后台、看板、求助全没了，
+  // 而「退出演示」只给超管，他自己关不掉
+  const demoSwitch = ref<boolean>(storage.get(STORAGE_KEY.DEMO_MODE) ?? false)
+  const demoMode = computed(() => demoSwitch.value && realIsSuperAdmin.value)
 
   const isAdminRole = computed(
     () =>
@@ -46,8 +50,8 @@ export const useUserStore = defineStore("user", () => {
   const canToggleDemoMode = computed(() => realIsSuperAdmin.value)
 
   function toggleDemoMode() {
-    demoMode.value = !demoMode.value
-    storage.set(STORAGE_KEY.DEMO_MODE, demoMode.value)
+    demoSwitch.value = !demoSwitch.value
+    storage.set(STORAGE_KEY.DEMO_MODE, demoSwitch.value)
   }
 
   const showSubmissions = computed(() => {
@@ -90,7 +94,7 @@ export const useUserStore = defineStore("user", () => {
 
   function clearProfile() {
     profile.value = null
-    demoMode.value = false
+    demoSwitch.value = false
     // 登录框记的班级要跨退登活下来：机房一台机器对一个班，下课登出、下节课再来
     // 还是同一个班，清掉的话每个人都得重新选一遍。它是机器的属性，不是谁的隐私。
     const loginClass = storage.get(STORAGE_KEY.LOGIN_CLASS)

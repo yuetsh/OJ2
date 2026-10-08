@@ -30,6 +30,7 @@ import { unknownDisplayIds } from "./submission-statistics"
 import {
   classCondition,
   isAdminRole,
+  isTeacherOrAbove,
   matchedUsers,
   asRecord,
   parseDisplayIds,
@@ -663,11 +664,15 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
     .limit(1)
   if (!row || !canView(user, row.flowchart, row.problem, await joinTimesFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
+  // 看得见不等于能重评：canView 放进来的学生管理员、出题人只能看。重评会清掉原来的
+  // 评分再抽一次，别人的提交只有老师能动
+  if (row.flowchart.userId !== user.id && !isTeacherOrAbove(user))
+    return failure(c, 403, "permission-denied", "权限不足")
   if (![2, 3].includes(row.flowchart.status))
     return failure(c, 409, "retry-not-allowed", "Submission is not in a state that allows retry")
   // canView 允许本人重试自己的提交，不限流的话学生可以反复点着刷 AI 调用。
   // 教师放行：重新判题是他们的日常操作，成批点几十行是正常用法
-  if (!isAdminRole(user)) {
+  if (!isTeacherOrAbove(user)) {
     const throttle = await consumeToken("user", flowchartThrottleKey(user.id))
     if (!throttle.allowed) {
       return failure(

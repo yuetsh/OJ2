@@ -57,6 +57,9 @@ function classNameOf(
  * 旧 UserAdminAPI.put 按 admin_type 归一 problem_permission：
  * 超管恒为 All、普通用户恒为 None、两种管理员取传入值或兜底 Own。
  * 不这么做的话，把一个超管降级成普通用户后，他还留着 All 的题目权限。
+ *
+ * 老师比旧后端多一条：不能是 None。比赛归老师管，而比赛题的接口挂的是
+ * requireProblemPermission —— 老师设成 None 就是进得了比赛、点题目全是「权限不足」。
  */
 function normalizePermission(
   adminType: AdminType,
@@ -64,6 +67,7 @@ function normalizePermission(
 ): ProblemPermission {
   if (adminType === "Super Admin") return "All"
   if (adminType === "Regular User") return "None"
+  if (adminType === "Teacher Admin" && requested === "None") return "Own"
   return requested || "Own"
 }
 

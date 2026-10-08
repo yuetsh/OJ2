@@ -130,6 +130,8 @@ const problemPermissionOptions: SelectOption[] = [
   { label: "仅管理自己创建", value: PROBLEM_PERMISSION.OWN },
   { label: "管理全部题目", value: PROBLEM_PERMISSION.ALL },
 ]
+// 老师不给「无权限」：比赛题的接口要出题权限，设了就是比赛题目页全报权限不足，后端也会兜成「仅自己」
+const teacherPermissionOptions = problemPermissionOptions.slice(1)
 
 async function listUsers() {
   if (query.page < 1) query.page = 1
@@ -336,7 +338,11 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
         >
           <n-select
             v-model:value="userEditing.problemPermission"
-            :options="problemPermissionOptions"
+            :options="
+              userEditing.adminType === USER_TYPE.TEACHER_ADMIN
+                ? teacherPermissionOptions
+                : problemPermissionOptions
+            "
           />
         </n-form-item-gi>
 

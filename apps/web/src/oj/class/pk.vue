@@ -45,7 +45,7 @@ ChartJS.register(
 )
 
 const configStore = useConfigStore()
-const { isTeacherOrAbove } = useUserStore()
+const { isTeacherOrAbove } = storeToRefs(useUserStore())
 const message = useMessage()
 const { isDesktop } = useBreakpoints()
 

@@ -35,7 +35,7 @@ import { JudgeStatus } from "../../judge/status"
 import { completeChat } from "../../services/ai"
 import { localTime, localYear } from "../../time"
 import { queryInteger, rounded } from "../helpers"
-import { findTagsByName, normalizeTagNames } from "./problem"
+import { canEdit, findTagsByName, normalizeTagNames } from "./problem"
 
 export const adminTagRoutes = new Hono<AppEnv>()
 
@@ -252,6 +252,7 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
       id: schema.problem.id,
       visible: schema.problem.visible,
       createdById: schema.problem.createdById,
+      contestId: schema.problem.contestId,
     })
     .from(schema.problem)
     .where(eq(schema.problem.id, id))
@@ -260,7 +261,9 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
   // AttributeError（500）。这里正常返回 404。
   if (!problem) return failure(c, 404, "problem-not-found", "题目不存在")
   const user = c.get("user")!
-  if (!canManageAllProblems(user) && problem.createdById !== user.id) {
+  // 和编辑、删除同一个口径（canEdit）：比赛题看比赛的创建者。原来只看题目的创建者，
+  // 而从题库加进比赛的题保留原作者，老师在自己比赛里点「可见」一律 404
+  if (!(await canEdit(user, problem))) {
     return failure(c, 404, "problem-not-found", "题目不存在")
   }
   await db
