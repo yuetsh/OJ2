@@ -11,6 +11,7 @@ import {
   type FlowchartStatistics,
   type FlowchartSubmission,
   NO_CLASS,
+  STUDENT_ROLES,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
@@ -57,7 +58,7 @@ function hiddenByProblemSet(
   row: { userId: number; problemId: number; createTime: string },
   joinTimes: Map<number, string>,
 ) {
-  if (row.userId !== user.id || isAdminRole(user)) return false
+  if (row.userId !== user.id || isTeacherOrAbove(user)) return false
   const joinTime = joinTimes.get(row.problemId)
   return joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)
 }
@@ -69,12 +70,13 @@ function canView(
   joinTimes: Map<number, string>,
 ) {
   if (hiddenByProblemSet(user, row, joinTimes)) return false
-  return row.userId === user.id || isAdminRole(user) || problem.createdById === user.id
+  // 角色捷径只给老师：学生管理员算学生，不能看同学的流程图（同 submission.ts 的 canViewSubmission）
+  return row.userId === user.id || isTeacherOrAbove(user) || problem.createdById === user.id
 }
 
 /** 只有学生看自己的提交时才需要查题单；其余情况给一张空表，省一次查询 */
 function joinTimesFor(user: AuthUser, rows: Array<{ userId: number; problemId: number }>) {
-  if (isAdminRole(user)) return Promise.resolve(new Map<number, string>())
+  if (isTeacherOrAbove(user)) return Promise.resolve(new Map<number, string>())
   const own = rows.filter((row) => row.userId === user.id).map((row) => row.problemId)
   return problemSetJoinTimes(user.id, [...new Set(own)])
 }
@@ -287,7 +289,8 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
   // 「只看自己」盖过用户名；普通学生不填用户名时也只看自己
   const className = c.req.query("className")?.trim()
   const onlyMyself =
-    c.req.query("myself") === "1" || (!username && !className && user.adminType === "Regular User")
+    c.req.query("myself") === "1" ||
+    (!username && !className && STUDENT_ROLES.includes(user.adminType))
   const filters: Array<SQL | undefined> = []
   filters.push(
     ...(await Promise.all([
@@ -430,7 +433,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   // 不相干的人，当没有花名册
   const roster =
     scoped && c.req.query("className")?.trim() !== NO_CLASS
-      ? matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
+      ? matched.filter((row) => !row.isDisabled && STUDENT_ROLES.includes(row.adminType))
       : []
 
   /**
@@ -532,7 +535,11 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
         .from(schema.flowchartSubmission)
         .innerJoin(schema.user, eq(schema.user.id, schema.flowchartSubmission.userId))
         .where(
-          and(where, eq(schema.user.adminType, "Regular User"), eq(schema.user.isDisabled, false)),
+          and(
+            where,
+            inArray(schema.user.adminType, [...STUDENT_ROLES]),
+            eq(schema.user.isDisabled, false),
+          ),
         )
         .groupBy(schema.user.id, schema.user.username, schema.user.className)
         .orderBy(sql`max(${schema.flowchartSubmission.aiScore}) asc nulls first`)
@@ -664,7 +671,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
     .limit(1)
   if (!row || !canView(user, row.flowchart, row.problem, await joinTimesFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
-  // 看得见不等于能重评：canView 放进来的学生管理员、出题人只能看。重评会清掉原来的
+  // 看得见不等于能重评：canView 放进来的出题人只能看。重评会清掉原来的
   // 评分再抽一次，别人的提交只有老师能动
   if (row.flowchart.userId !== user.id && !isTeacherOrAbove(user))
     return failure(c, 403, "permission-denied", "权限不足")

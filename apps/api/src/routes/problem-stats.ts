@@ -1,4 +1,4 @@
-import { type ProblemStats } from "@oj2/contract"
+import { STUDENT_ROLES, type ProblemStats } from "@oj2/contract"
 import { and, count, eq, inArray, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
@@ -185,7 +185,7 @@ async function classRows(problemId: number): Promise<NonNullable<ProblemStats["c
         .where(
           and(
             inArray(schema.user.className, names),
-            eq(schema.user.adminType, "Regular User"),
+            inArray(schema.user.adminType, [...STUDENT_ROLES]),
             eq(schema.user.isDisabled, false),
           ),
         )

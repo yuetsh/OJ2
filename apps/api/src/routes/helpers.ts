@@ -1,6 +1,6 @@
-import { ADMIN_ROLES, NO_CLASS, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
+import { ADMIN_ROLES, NO_CLASS, STUDENT_ROLES, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
 
-import { and, count, eq, ilike, isNull, notInArray, sql } from "drizzle-orm"
+import { and, count, eq, ilike, inArray, isNull, notInArray, sql } from "drizzle-orm"
 
 import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
@@ -163,12 +163,12 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
  * 「这个班的人」：`user.class_name` 精确匹配；NO_CLASS 是没填班级的学生（class_name 为 null）。
  * 统计、提交列表、流程图按班级筛都走它，没填班级的才能和普通班一样被圈出来。
  *
- * NO_CLASS 只圈普通用户：老师、管理员的号本来就都不填班级，不挡的话老师自己试题的提交
- * 会混进「没填班级」，还算进做完的人数里（切课那边也只算普通学生，两边口径一致）
+ * NO_CLASS 只圈学生（含学生管理员，见 STUDENT_ROLES）：老师、管理员的号本来就都不填班级，不挡的话老师自己试题的提交
+ * 会混进「没填班级」，还算进做完的人数里（切课那边也只算学生，两边口径一致）
  */
 export function classCondition(className: string) {
   return className === NO_CLASS
-    ? and(isNull(schema.user.className), eq(schema.user.adminType, "Regular User"))
+    ? and(isNull(schema.user.className), inArray(schema.user.adminType, [...STUDENT_ROLES]))
     : eq(schema.user.className, className)
 }
 

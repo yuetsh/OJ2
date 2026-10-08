@@ -8,6 +8,7 @@
 
 import {
   NO_CLASS,
+  STUDENT_ROLES,
   type ProblemLanguage,
   type SubmissionLessons,
   type SubmissionStatistics,
@@ -388,8 +389,8 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
     filters.push(matchedIds.length ? inArray(schema.submission.userId, matchedIds) : sql`false`)
   }
   const where = and(...filters)
-  // 花名册：只有未禁用的普通用户算进班级人数和「谁没做」，教师和管理员不进分母
-  const enrolled = matched.filter((row) => !row.isDisabled && row.adminType === "Regular User")
+  // 花名册：只有未禁用的学生（含学生管理员）算进班级人数和「谁没做」，老师不进分母
+  const enrolled = matched.filter((row) => !row.isDisabled && STUDENT_ROLES.includes(row.adminType))
 
   const acceptedFilter = sql`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED_RESULTS)})`
   // 判题中的条数。要单独数出来，正确率的分母才能把它们摘掉
@@ -524,7 +525,8 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
   const rosterIds = new Set(rosterRows.map((row) => row.id))
   const attemptedRows = perUser.filter((row) => {
     if (isDone(row)) return false
-    return scoped ? rosterIds.has(row.userId) : !row.isDisabled && row.adminType === "Regular User"
+    if (scoped) return rosterIds.has(row.userId)
+    return !row.isDisabled && row.adminType !== null && STUDENT_ROLES.includes(row.adminType)
   })
   const dataAttempted = attemptedRows.map((row) => ({
     username: row.username,
@@ -587,10 +589,14 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
       className: schema.user.className,
     })
     .from(schema.submission)
-    // 只要普通学生：老师试题的提交不该出现在「谁做了几次」里
+    // 只要学生（含学生管理员）：老师试题的提交不该出现在「谁做了几次」里
     .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
     .where(
-      and(...filters, eq(schema.user.adminType, "Regular User"), eq(schema.user.isDisabled, false)),
+      and(
+        ...filters,
+        inArray(schema.user.adminType, [...STUDENT_ROLES]),
+        eq(schema.user.isDisabled, false),
+      ),
     )
     .orderBy(desc(schema.submission.createTime))
     .limit(GRID_LIMIT + 1)
@@ -672,7 +678,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
         .where(
           and(
             inArray(schema.user.className, names as string[]),
-            eq(schema.user.adminType, "Regular User"),
+            inArray(schema.user.adminType, [...STUDENT_ROLES]),
             eq(schema.user.isDisabled, false),
           ),
         )
@@ -892,7 +898,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
         .where(
           and(
             inArray(schema.user.className, lessonClasses),
-            eq(schema.user.adminType, "Regular User"),
+            inArray(schema.user.adminType, [...STUDENT_ROLES]),
             eq(schema.user.isDisabled, false),
           ),
         )

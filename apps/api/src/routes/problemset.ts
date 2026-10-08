@@ -399,10 +399,7 @@ problemsetRoutes.get("/problem-sets/:id/badges", async (c) => {
 problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
   const [problemSet] = await db
-    .select({
-      id: schema.problemset.id,
-      createdById: schema.problemset.createdById,
-    })
+    .select({ id: schema.problemset.id })
     .from(schema.problemset)
     .where(
       and(
@@ -412,11 +409,10 @@ problemsetRoutes.get("/problem-sets/:id/user-progress", requireTeacher, async (c
       ),
     )
     .limit(1)
-  // 归属校验，和后台那条同类接口（admin/problemset.ts 的 loadOwned）一致：超管放行，
-  // 其余老师只能看自己建的题单。少了这一道，任何 Teacher Admin 都能读到别人班的名单。
-  // 越权报「不存在」，不泄露题单存在与否。
-  const user = c.get("user")!
-  if (!problemSet || (user.adminType !== "Super Admin" && problemSet.createdById !== user.id)) {
+  // 所有老师都能看，不只是题单的创建者：系统里没有「班级归哪个老师」，课堂看板、数据统计
+  // 也是任何老师看任何班，这里和它们一致。后台那条（admin/problemset.ts 的 loadOwned）
+  // 能改能删，仍然只给创建者
+  if (!problemSet) {
     return failure(c, 404, "problem-set-not-found", "题单不存在")
   }
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })

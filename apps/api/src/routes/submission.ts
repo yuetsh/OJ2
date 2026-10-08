@@ -33,7 +33,7 @@ import { getBooleanOption } from "../services/options"
 import { problemSetJoinTimes } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { dayStart } from "../time"
-import { asFilterValue, asRecord, isAdminRole, queryInteger } from "./helpers"
+import { asFilterValue, asRecord, isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
 import {
   classNameFilter,
   exactUsernameFilter,
@@ -289,26 +289,22 @@ function canViewSubmission(
   user: AuthUser | null,
   row: { userId: number; problemId: number; createTime: string },
   problem: { createdById: number },
-  contest: typeof schema.contest.$inferSelect | null,
   problemSetJoinTime?: Map<number, string>,
 ) {
   if (!user) return false
-  // 题单防作弊，见 problemSetJoinTimes。只对学生自己的提交生效，管理员不受限，对齐旧后端
-  // `get_show_link` 里的 `obj.user_id == self.user.id and self.user.is_regular_user()`。
-  if (row.userId === user.id && !isAdminRole(user)) {
+  // 题单防作弊，见 problemSetJoinTimes。只对学生自己的提交生效，老师不受限。
+  // 学生管理员算学生，同样受限（旧后端 `is_regular_user()` 放过了他）。
+  if (row.userId === user.id && !isTeacherOrAbove(user)) {
     const joinTime = problemSetJoinTime?.get(row.problemId)
     if (joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)) return false
   }
-  // 比赛没结束时，学生管理员不吃「管理员看得到所有人代码」这条捷径：他自己也在排行榜里
-  // （contest.ts 的 rank 把 Student Admin 算作参赛者），既参赛又能读别人的提交就是开卷。
-  // 老师和超管不受影响 —— 他们不参赛。旧后端这里是 `not user.is_regular_user()`，
-  // 学生管理员同样放行，所以这条是 OJ2 相对旧栈**收紧**的一处，不是修回归。
+  // 看别人代码的角色捷径只给老师和超管。学生管理员算学生（STUDENT_ROLES）：他参赛、上榜、
+  // 和同学做同一份作业，能读别人的提交就是开卷。旧后端这里是 `not user.is_regular_user()`，
+  // 学生管理员同样放行；OJ2 先收紧到「比赛没结束时不给」，现在整条都不给。
   //
   // 只掐角色捷径，不掐 `problem.createdById === user.id`：那是这道题的作者本人，
   // 他早就知道答案了，挡他没有意义。
-  const elevated =
-    isAdminRole(user) &&
-    !(contest && contestStatus(contest) !== "-1" && user.adminType === "Student Admin")
+  const elevated = isTeacherOrAbove(user)
   // 这三条就是全部：别人的代码谁都看不到，比赛内外一样。
   // 分享功能（problem.share_submission 题目级 / submission.shared 单条）已经删掉，
   // 原来结尾的 `return problem.shareSubmission || row.shared` 随之消失；它上面那条
@@ -404,10 +400,10 @@ async function submissionDetail(id: string, user: AuthUser) {
   // 详情也要过闸门。旧后端只挡了列表里的链接，`SubmissionAPI.get`（views/oj.py:103）
   // 光走 check_user_permission——知道 submission id 直接访问照样拿得到代码，遮挡是虚的。
   const joinTimes =
-    isAdminRole(user) || row.submission.userId !== user.id
+    isTeacherOrAbove(user) || row.submission.userId !== user.id
       ? undefined
       : await problemSetJoinTimes(user.id, [row.submission.problemId])
-  if (!canViewSubmission(user, row.submission, row.problem, row.contest, joinTimes)) return null
+  if (!canViewSubmission(user, row.submission, row.problem, joinTimes)) return null
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
@@ -574,7 +570,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   ])
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
   const [joinTimes, problemsetTitles] = await Promise.all([
-    user && !isAdminRole(user)
+    user && !isTeacherOrAbove(user)
       ? problemSetJoinTimes(user.id, [
           ...new Set(
             rows
@@ -593,7 +589,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
           id: submission.id,
           problemDisplayId: problem.displayId,
           problemTitle: problem.title,
-          showLink: user ? canViewSubmission(user, submission, problem, null, joinTimes) : false,
+          showLink: user ? canViewSubmission(user, submission, problem, joinTimes) : false,
           createTime: submission.createTime,
           userId: submission.userId,
           username: submission.username,
@@ -669,7 +665,7 @@ submissionRoutes.get(
             id: submission.id,
             problemDisplayId: problem.displayId,
             problemTitle: problem.title,
-            showLink: user ? canViewSubmission(user, submission, problem, contest) : false,
+            showLink: user ? canViewSubmission(user, submission, problem) : false,
             createTime: submission.createTime,
             userId: submission.userId,
             username: submission.username,
