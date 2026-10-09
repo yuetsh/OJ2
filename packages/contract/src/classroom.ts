@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 import { judgeStatusSchema } from "./judge-status"
-import { runnableLanguageSchema } from "./language"
+import { lessonLanguageSchema as lessonLanguageValueSchema } from "./language"
 
 export const classRankItemSchema = z.object({
   className: z.string(),
@@ -85,10 +85,11 @@ export const classActivityProblemSchema = z.object({
 })
 
 /**
- * 老师布置这节课时选的语言（Python / C / C++）。null = 没选：推断出来的课、加这一项之前
- * 布置的课。选了之后这份作业「做完」只认这个语言交对的，学生打开这几道题编辑器默认就是它
+ * 老师布置这节课时选的语言（Python / C / C++ / SQL）。null = 没选：推断出来的课、加这一项之前
+ * 布置的课。选了之后这份作业「做完」只认这个语言交对的（SQL 题例外，交对 SQL 就算），
+ * 学生打开这几道题编辑器默认就是它
  */
-const lessonLanguageSchema = runnableLanguageSchema.nullable()
+const lessonLanguageSchema = lessonLanguageValueSchema.nullable()
 
 export const classActivitySchema = z.object({
   className: z.string().nullable(),
@@ -147,6 +148,8 @@ export const classBoardProblemSchema = z.object({
   problemId: z.number().int(),
   problemDisplayId: z.string(),
   title: z.string(),
+  /** SQL 题不受布置的语言限制：格子数的是 SQL 交的，点进提交列表也按 SQL 筛 */
+  isSql: z.boolean(),
 })
 
 export const classBoardCellSchema = z.object({
@@ -214,7 +217,10 @@ export const classBoardSchema = z.object({
 export const classLessonSchema = z.object({
   className: z.string().nullable(),
   source: z.enum(["teacher", "inferred"]).nullable(),
-  /** 选了语言时，列表那边连语言一起筛 */
+  /**
+   * 选了语言时，列表那边连语言一起筛。C / Python 的作业里夹了 SQL 题就是 null：
+   * 列表只能筛一种语言，按 C 筛会把 SQL 题交的全藏起来，宁可多列一些
+   */
   language: lessonLanguageSchema,
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
 })

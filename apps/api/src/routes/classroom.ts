@@ -12,7 +12,7 @@ import {
   type ClassRankItem,
   type ClassUserRank,
   type LastVisit,
-  type RunnableLanguage,
+  type LessonLanguage,
   FLOWCHART_PASS_GRADES,
 } from "@oj2/contract"
 import {
@@ -221,12 +221,21 @@ function classMemberIds(className: string) {
  * 有的题一节课全班都在画流程图、代码提交个位数，只数代码的话这节课在统计里等于没上。
  * 两边都按 `user_id in (...)` + `create_time >=` 走各自的 (user_id, create_time) 索引。
  */
+/**
+ * 老师布置时选了语言：代码只数这个语言交的。SQL 题例外 —— 它只收 SQL，按 C 去数的话，
+ * C 的作业里夹一道 SQL 题，学生怎么交都算不了做完。非 SQL 题交不进 SQL（提交接口按题目的
+ * 语言拦），所以一律放行 SQL 不会把别的题算宽
+ */
+function lessonLanguageFilter(language: LessonLanguage | null | undefined) {
+  return language ? inArray(schema.submission.language, [language, "SQL"]) : undefined
+}
+
 function activityRows(options: {
   since: string
   users?: number[] | ReturnType<typeof classMemberIds>
   problemIds?: number[]
-  /** 老师布置时选了语言：代码只数这个语言交的，流程图不受影响 */
-  language?: RunnableLanguage | null
+  /** 老师布置时选了语言：代码只数这个语言交的（见 lessonLanguageFilter），流程图不受影响 */
+  language?: LessonLanguage | null
 }) {
   const { since, users, problemIds, language } = options
   const code = db
@@ -243,7 +252,7 @@ function activityRows(options: {
         gte(schema.submission.createTime, since),
         users ? inArray(schema.submission.userId, users) : undefined,
         problemIds ? inArray(schema.submission.problemId, problemIds) : undefined,
-        language ? eq(schema.submission.language, language) : undefined,
+        lessonLanguageFilter(language),
       ),
     )
   const flowchart = db
@@ -272,7 +281,7 @@ function activityRows(options: {
 async function classDayGroups(
   className: string,
   since: string,
-  options: { minUsers?: number; problemIds?: number[]; language?: RunnableLanguage | null } = {},
+  options: { minUsers?: number; problemIds?: number[]; language?: LessonLanguage | null } = {},
 ): Promise<ClassDayGroup[]> {
   const activity = activityRows({
     since,
@@ -297,12 +306,14 @@ async function classDayGroups(
 
 /** 按 id 取题，只留学生看得见的（题库里、visible），被藏起来的点进去也是 404 */
 async function visibleProblems(ids: number[]) {
-  if (!ids.length) return new Map<number, { id: number; displayId: string; title: string }>()
+  if (!ids.length)
+    return new Map<number, { id: number; displayId: string; title: string; isSql: boolean }>()
   const rows = await db
     .select({
       id: schema.problem.id,
       displayId: schema.problem.displayId,
       title: schema.problem.title,
+      isSql: sql<boolean>`${schema.problem.languages} @> '["SQL"]'::jsonb`,
     })
     .from(schema.problem)
     .where(
@@ -533,7 +544,7 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
               inArray(schema.submission.problemId, ids),
               isNull(schema.submission.contestId),
               // 布置的是 C：以前用 Python 做对过不算这份作业做完
-              lesson.language ? eq(schema.submission.language, lesson.language) : undefined,
+              lessonLanguageFilter(lesson.language),
             ),
           )
           .groupBy(schema.submission.problemId)
@@ -706,7 +717,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
               isNull(schema.submission.contestId),
               inArray(schema.submission.userId, userIds),
               inArray(schema.submission.problemId, ids),
-              lesson.language ? eq(schema.submission.language, lesson.language) : undefined,
+              lessonLanguageFilter(lesson.language),
             ),
           )
           .groupBy(schema.submission.userId, schema.submission.problemId)
@@ -807,6 +818,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
       problemId: problem.id,
       problemDisplayId: problem.displayId,
       title: problem.title,
+      isSql: problem.isSql,
     })),
     students: roster.map(
       (student) =>
@@ -852,10 +864,12 @@ classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
     } satisfies ClassLesson)
   // 和看板一样只回看今天：「这节课」不该冒出昨天的题
   const lesson = await classLessonProblems(className, 1)
+  // C / Python 的作业夹了 SQL 题就不筛语言（见契约 classLessonSchema.language）
+  const mixed = lesson.problems.some((problem) => problem.isSql !== (lesson.language === "SQL"))
   return success(c, {
     className,
     source: lesson.source,
-    language: lesson.language,
+    language: mixed ? null : lesson.language,
     problems: lesson.problems.map((problem) => ({
       problemDisplayId: problem.displayId,
       title: problem.title,
@@ -911,10 +925,11 @@ classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
     return failure(c, 400, "problem-not-found", `这些题号不存在或没有公开：${missing.join("、")}`)
   }
 
-  // 选了语言就得每道都能用它交，不然学生点开才发现交不了（提交接口会拒：language-not-allowed）
+  // 选了语言就得每道都能用它交，不然学生点开才发现交不了（提交接口会拒：language-not-allowed）。
+  // SQL 题除外：它只收 SQL，C 的作业里夹一道也不会让人选错语言，计数那边也放行了 SQL
   if (language) {
     const unsupported = found
-      .filter((row) => !row.languages.includes(language))
+      .filter((row) => !row.languages.includes(language) && !row.languages.includes("SQL"))
       .map((row) => row.displayId)
     if (unsupported.length) {
       return failure(

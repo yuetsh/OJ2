@@ -3,11 +3,11 @@ import { getClassBoard, setClassLesson } from "oj/api"
 import { useLeaveStudents } from "shared/composables/leaveStudents"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
-import type { RunnableLanguage } from "@oj2/contract"
+import type { LessonLanguage } from "@oj2/contract"
 import { errorMessage } from "utils/api"
 import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
-import type { ClassBoard, ClassBoardCell, ClassBoardStudent } from "utils/types"
+import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from "utils/types"
 
 /**
  * 课堂看板（老师）：这个班、今天、这节课的几道题 × 全班学生。
@@ -40,8 +40,8 @@ const lessonInput = ref("")
  * 这份作业用什么语言做，跟着这一次布置走（用户定的：不是给班级定死的设置）。默认是这个班
  * 上一次布置时选的；选了之后看板和学生那边的「做完」都只认这个语言交对的
  */
-const lessonLanguage = ref<RunnableLanguage>("Python")
-const LESSON_LANGUAGES: RunnableLanguage[] = ["Python", "C", "C++"]
+const lessonLanguage = ref<LessonLanguage>("Python")
+const LESSON_LANGUAGES: LessonLanguage[] = ["Python", "C", "C++", "SQL"]
 const languageOptions = LESSON_LANGUAGES.map((value) => ({
   label: LANGUAGE_SHOW_VALUE[value],
   value,
@@ -291,9 +291,11 @@ const router = useRouter()
  */
 function submissionsHref(
   student: ClassBoardStudent,
-  problemDisplayId: string | undefined,
+  problem: ClassBoardProblem | undefined,
   flowchart: boolean,
 ) {
+  // SQL 题不受布置的语言限制，格子数的是 SQL 交的
+  const language = problem?.isSql ? "SQL" : board.value?.language
   return router.resolve({
     name: "submissions",
     query: {
@@ -301,12 +303,8 @@ function submissionsHref(
       exactUsername: "1",
       today: "1",
       // 布置时选了语言的，代码那边只看这个语言交的（和格子里数的一致）
-      ...(flowchart
-        ? { language: "Flowchart" }
-        : board.value?.language
-          ? { language: board.value.language }
-          : {}),
-      ...(problemDisplayId ? { problem: problemDisplayId } : {}),
+      ...(flowchart ? { language: "Flowchart" } : language ? { language } : {}),
+      ...(problem ? { problem: problem.problemDisplayId } : {}),
     },
   }).href
 }
@@ -388,7 +386,10 @@ function submissionsHref(
         <n-text depth="3" class="meta">
           <template v-if="board.source === 'teacher'">
             学生首页的「班里在做」显示的就是这几道<template v-if="board.language"
-              >，用 {{ LANGUAGE_SHOW_VALUE[board.language] }} 交对才算做完</template
+              >，用 {{ LANGUAGE_SHOW_VALUE[board.language] }} 交对才算做完<template
+                v-if="board.language !== 'SQL' && board.problems.some((p) => p.isSql)"
+                >（SQL 题交对 SQL 就算）</template
+              ></template
             >。清空再点布置就改回自动推断。
           </template>
           <template v-else-if="board.source === 'inferred'">
@@ -515,13 +516,7 @@ function submissionsHref(
                       <a
                         v-if="cell.attempts"
                         class="cell-link"
-                        :href="
-                          submissionsHref(
-                            student,
-                            board.problems[i]!.problemDisplayId,
-                            !cell.codeAttempts,
-                          )
-                        "
+                        :href="submissionsHref(student, board.problems[i], !cell.codeAttempts)"
                         target="_blank"
                         :title="
                           cell.codeAttempts

@@ -43,7 +43,14 @@ export const problemLanguageSchema = z.enum([...judgeLanguageSchema.options, "SQ
  */
 export const runnableLanguageSchema = judgeLanguageSchema.extract(["C", "C++", "Python"])
 
+/**
+ * 老师布置作业能选的语言：判题机跑得了的三种，加 SQL（数据库课一整节都是 SQL 题）。
+ * SQL 题只收 SQL，所以 C / Python 的作业里夹 SQL 题也行 —— 那几道不受作业语言限制
+ */
+export const lessonLanguageSchema = problemLanguageSchema.extract(["Python", "C", "C++", "SQL"])
+
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
+export type LessonLanguage = z.infer<typeof lessonLanguageSchema>
 export type RunnableLanguage = z.infer<typeof runnableLanguageSchema>
 export type ProblemLanguage = z.infer<typeof problemLanguageSchema>
 

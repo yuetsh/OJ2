@@ -42,7 +42,7 @@ import {
   type FlowchartStatistics,
   type SubmissionStatistics,
   type SubmissionLessons,
-  type RunnableLanguage,
+  type LessonLanguage,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
@@ -261,7 +261,7 @@ export function getClassLesson(className?: string) {
 export function setClassLesson(
   className: string,
   problemDisplayIds: string[],
-  language: RunnableLanguage | null,
+  language: LessonLanguage | null,
 ) {
   return api.put<null>("classroom/lesson", { className, problemDisplayIds, language })
 }
