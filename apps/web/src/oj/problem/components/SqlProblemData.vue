@@ -33,6 +33,11 @@ const changedTables = computed(() => {
   }))
 })
 
+/** 增删改题里不是题面那组的测试数据可以一行都不改（看学生会不会多改），出题页预览会碰到 */
+const noChange = computed(
+  () => "changed_tables" in props.display.expected && !props.display.expected.changed_tables.length,
+)
+
 const anyChanged = computed(() =>
   changedTables.value.some(
     ({ changes }) => changes && (changes.cells.size > 0 || changes.newRows.size > 0),
@@ -83,6 +88,7 @@ const anyChanged = computed(() =>
       </p>
     </template>
   </div>
+  <p v-if="noChange" class="sqlNote">执行后所有表都没有变化</p>
   <p v-if="anyChanged" class="sqlNote legend">
     <span class="swatch" aria-hidden="true"></span>执行后变了的格子
   </p>

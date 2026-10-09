@@ -34,6 +34,7 @@ export type SqlJob =
       initSql: string
       refSql: string
       mode: "query" | "modify"
+      requireChange: boolean
     }
 
 /**
@@ -76,7 +77,13 @@ export async function runSqlChild() {
   try {
     if (job.kind === "display") {
       markPhase("display")
-      const display = await buildDisplay(job.initSql, job.refSql, job.mode)
+      const display = await buildDisplay(
+        job.initSql,
+        job.refSql,
+        job.mode,
+        undefined,
+        job.requireChange,
+      )
       finish({ ok: true, display })
     }
     // 阶段由 runCase 内部回调标记：prepare（受信脚本）→ student（学生 SQL）

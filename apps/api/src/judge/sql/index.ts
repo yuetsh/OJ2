@@ -184,11 +184,17 @@ export function runSqlCase(job: Extract<SqlJob, { kind: "judge" }>) {
   })
 }
 
-export function buildSqlDisplay(initSql: string, refSql: string, mode: "query" | "modify") {
+/** `requireChange` 见 engine.ts 的 buildDisplay：只有题面上展示的那组必须改到行 */
+export function buildSqlDisplay(
+  initSql: string,
+  refSql: string,
+  mode: "query" | "modify",
+  requireChange = true,
+) {
   // 子进程产出的形状由 engine.ts 的 dumpDisplayTables / runDisplay 决定，就是契约里的
   // SqlDisplay —— 同一个仓库里的两端，不在这儿再 parse 一遍
   return runJob<SqlDisplay>(
-    { kind: "display", initSql, refSql, mode },
+    { kind: "display", initSql, refSql, mode, requireChange },
     { trustedMs: DISPLAY_BUDGET_MS, studentMs: null },
   )
 }

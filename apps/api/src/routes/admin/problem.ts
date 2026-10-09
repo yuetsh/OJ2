@@ -867,7 +867,12 @@ adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, as
 adminProblemRoutes.post("/sql-test-cases/preview", requireProblemPermission, async (c) => {
   const parsed = await parseBody(c, sqlPreviewRequestSchema)
   if (!parsed.success) return parsed.response
-  const outcome = await buildSqlDisplay(parsed.data.initSql, parsed.data.refSql, parsed.data.mode)
+  const outcome = await buildSqlDisplay(
+    parsed.data.initSql,
+    parsed.data.refSql,
+    parsed.data.mode,
+    parsed.data.shown,
+  )
   if (!outcome.ok) return failure(c, 400, "sql-preview-failed", outcome.message)
   return success(c, outcome.value)
 })

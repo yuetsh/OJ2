@@ -33,7 +33,7 @@ export function explainSqlError(message: string) {
     [/(\d+) values for (\d+) columns/, (m) => `一行给了 ${m[1]} 个值，但表有 ${m[2]} 列`],
   ]
   if (message.includes("标准答案未修改任何表数据")) {
-    return "标准答案在这组数据上一行都没改：增删改题的每组数据里都要有会被改到的行"
+    return "标准答案在这组数据上一行都没改：第 1 组是题面上给学生看的，里面要有会被改到的行"
   }
   for (const [pattern, say] of rules) {
     const match = message.match(pattern)

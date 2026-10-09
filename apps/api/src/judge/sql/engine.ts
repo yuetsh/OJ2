@@ -584,12 +584,19 @@ function queryResultColumns(names: string[], tables: DisplayTable[]) {
   return names.map((name) => ({ name, type: types.get(name) ?? "" }))
 }
 
-/** 生成题目页展示数据：初始数据表 + 期望结果。失败一律抛 SqlCaseError（出题配置问题） */
+/**
+ * 生成题目页展示数据：初始数据表 + 期望结果。失败一律抛 SqlCaseError（出题配置问题）。
+ *
+ * `requireChange`：增删改题的标准答案必须改到行。题面上展示的那组（第 1 组）必须 ——
+ * 学生要看着「执行后的表」知道该改什么；其余组可以一行都不改（看学生会不会多改），
+ * 这时 changed_tables 是空数组。判题（runCase）本来就不管这一条
+ */
 export async function buildDisplay(
   initSql: string,
   refSql: string,
   mode: "query" | "modify",
   memoryLimitMb = 64,
+  requireChange = true,
 ) {
   const SQL = await sqlEngine()
   const db = newDatabase(SQL, memoryLimitMb)
@@ -648,6 +655,7 @@ export async function buildDisplay(
       if (JSON.stringify(before[name]) !== JSON.stringify(after[name])) changed.add(name)
     }
     if (changed.size === 0) {
+      if (!requireChange) return { tables, expected: { changed_tables: [] } }
       throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, "标准答案未修改任何表数据，请检查题目配置")
     }
     const changedTables = dumpDisplayTables(db, changed)

@@ -221,8 +221,12 @@ function onTagsChange(tags: string[]) {
 
 // ---------------------------------------------------------------- 测试数据：自动重跑
 
-/** 一组数据跑出来的结果取决于这三样，任何一样变了，原来的结果就作废 */
-const signatureOf = (g: ScriptGroup) => JSON.stringify([form.answer, form.sqlConfig.mode, g.sql])
+/**
+ * 一组数据跑出来的结果取决于这几样，任何一样变了，原来的结果就作废。
+ * 排在第一也算：删掉第 1 组之后，原来的第 2 组成了题面展示的那组，增删改题得重查它改没改到行
+ */
+const signatureOf = (g: ScriptGroup) =>
+  JSON.stringify([form.answer, form.sqlConfig.mode, g.sql, groups.value[0] === g])
 
 function statusOf(g: ScriptGroup): GroupStatus {
   if (!g.sql.trim()) return "empty"
@@ -243,6 +247,7 @@ async function run(g: ScriptGroup) {
       initSql: g.sql,
       refSql: form.answer,
       mode: form.sqlConfig.mode,
+      shown: groups.value[0] === g,
     })
   } catch (err) {
     errorRaw =
@@ -261,7 +266,8 @@ function runAll() {
 }
 
 watchDebounced(
-  () => [form.answer, form.sqlConfig.mode, groups.value.map((g) => g.sql)] as const,
+  // 带上 key：删组、挪了谁排第一也要重跑（见 signatureOf）
+  () => [form.answer, form.sqlConfig.mode, groups.value.map((g) => `${g.key}:${g.sql}`)] as const,
   runAll,
   { debounce: 600, deep: true },
 )

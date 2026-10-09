@@ -819,6 +819,11 @@ export const sqlPreviewRequestSchema = z.object({
     .min(1)
     .max(1024 * 1024),
   mode: z.enum(["query", "modify"]),
+  /**
+   * 这组是不是题面上给学生看的那组（第 1 组）。增删改题只有这一组必须改到行 ——
+   * 其余组可以一行都不改，用来看学生会不会多改（比如 WHERE 写漏了）
+   */
+  shown: z.boolean().default(true),
 })
 
 export const generateSqlTestCaseRequestSchema = z.object({

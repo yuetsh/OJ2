@@ -236,6 +236,8 @@ export function previewSQLTestcase(data: {
   initSql: string
   refSql: string
   mode: "query" | "modify"
+  /** 是不是题面上展示的那组（第 1 组）：增删改题只有它必须改到行 */
+  shown: boolean
 }) {
   return api.post<SqlDisplay>("admin/sql-test-cases/preview", data)
 }
