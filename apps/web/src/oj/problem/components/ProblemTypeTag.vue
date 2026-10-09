@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import type { ProblemTypeFilter } from "@oj2/contract"
-import { useDark } from "@vueuse/core"
 import { useThemeVars } from "naive-ui"
 import { PROBLEM_TYPE_LABEL } from "../utils/problemType"
 
@@ -15,7 +14,6 @@ import { PROBLEM_TYPE_LABEL } from "../utils/problemType"
 const props = defineProps<{ kind: ProblemTypeFilter }>()
 
 const theme = useThemeVars()
-const isDark = useDark()
 
 const ICON: Record<ProblemTypeFilter, string> = {
   flowchart: "ph:pencil-simple-line-bold",
@@ -23,27 +21,19 @@ const ICON: Record<ProblemTypeFilter, string> = {
   reference: "ph:flow-arrow-bold",
 }
 
-const style = computed(() => {
-  const t = theme.value
-  if (props.kind === "flowchart") {
-    // 主题里没有紫色，两套手配的值，字都压到 4.5:1 以上
-    return isDark.value
-      ? { color: "#c4adf5", background: "rgba(160, 120, 240, 0.18)", borderColor: "transparent" }
-      : { color: "#5b2fa6", background: "#efe8fb", borderColor: "transparent" }
-  }
-  if (props.kind === "ast") {
-    return {
-      color: isDark.value ? t.infoColor : t.infoColorPressed,
-      background: "transparent",
-      borderColor: isDark.value ? "rgba(112, 192, 232, 0.45)" : "#b9cdee",
-    }
-  }
-  return { color: t.textColor3, background: "transparent", borderColor: t.borderColor }
-})
+// 明暗两套色都交给 CSS（html.dark），这里只递主题色。**别在这里调 useDark()**：
+// 每个实例都会往 <html> 上重写一遍 class、插一段禁用过渡的样式再强制整页重算样式，
+// 一页题目十几个标签，切一次知识点就白白重算十几遍（实测占了切换耗时的一大半）
+const vars = computed(() => ({
+  "--tag-info": theme.value.infoColorPressed,
+  "--tag-info-dark": theme.value.infoColor,
+  "--tag-muted": theme.value.textColor3,
+  "--tag-border": theme.value.borderColor,
+}))
 </script>
 
 <template>
-  <span class="type-tag" :class="kind" :style="style">
+  <span class="type-tag" :class="kind" :style="vars">
     <Icon :icon="ICON[props.kind]" :width="12" />{{ PROBLEM_TYPE_LABEL[props.kind] }}
   </span>
 </template>
@@ -64,7 +54,31 @@ const style = computed(() => {
   white-space: nowrap;
 }
 
+/* 主题里没有紫色，两套手配的值，字都压到 4.5:1 以上 */
 .type-tag.flowchart {
   font-weight: 600;
+  color: #5b2fa6;
+  background: #efe8fb;
+  border-color: transparent;
+}
+
+html.dark .type-tag.flowchart {
+  color: #c4adf5;
+  background: rgba(160, 120, 240, 0.18);
+}
+
+.type-tag.ast {
+  color: var(--tag-info);
+  border-color: #b9cdee;
+}
+
+html.dark .type-tag.ast {
+  color: var(--tag-info-dark);
+  border-color: rgba(112, 192, 232, 0.45);
+}
+
+.type-tag.reference {
+  color: var(--tag-muted);
+  border-color: var(--tag-border);
 }
 </style>

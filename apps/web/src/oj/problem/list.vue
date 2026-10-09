@@ -110,7 +110,9 @@ async function listProblems() {
   total.value = res.total
   problems.value = res.results
   loaded.value = true
+  // 左栏「全部题目」的题数：没筛的时候这一页的 total 就是；带着筛选进来的才单独数一次
   if (!query.tag && !hasExtraFilter.value && !undoneOn.value) allCount.value = res.total
+  else if (!allCount.value) allCount.value = (await getProblemList(0, 1, {})).total
 }
 
 async function loadSide() {
@@ -120,7 +122,6 @@ async function loadSide() {
   ])
   tags.value = tagRes
   progress.value = progressRes
-  if (!allCount.value) allCount.value = (await getProblemList(0, 1, {})).total
 }
 
 watchDebounced(() => query.keyword, listProblems, { debounce: 500, maxWait: 1000 })

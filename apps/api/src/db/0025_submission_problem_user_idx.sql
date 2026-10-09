@@ -1,0 +1,1 @@
+CREATE INDEX "submission_public_problem_user_idx" ON "submission" USING btree ("problem_id","user_id","result") WHERE "submission"."contest_id" is null;
