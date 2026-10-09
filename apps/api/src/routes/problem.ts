@@ -282,8 +282,10 @@ problemRoutes.get("/problems/random", optionalAuth, async (c) => {
           : undefined,
       ),
     )
+    // 没做对过题（没登录、新生）就不排这一项。别拿 sql`1` 占位：ORDER BY 里的整数常量是
+    // 「按第 1 列排」，会先按题号排、random() 形同虚设，每次都是同一道
     .orderBy(
-      solved.length ? asc(inArray(schema.problem.id, solved)) : sql`1`,
+      ...(solved.length ? [asc(inArray(schema.problem.id, solved))] : []),
       asc(sql`${schema.problem.difficulty} = 'High'`),
       sql`random()`,
     )
