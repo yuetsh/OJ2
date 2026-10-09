@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getClassBoard, setClassLesson } from "oj/api"
+import UserName from "shared/components/UserName.vue"
 import { useLeaveStudents } from "shared/composables/leaveStudents"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
@@ -159,8 +160,9 @@ const GROUP_ORDER: Record<Group, number> = {
   leave: 5,
 }
 
+/** 名字和别处一样用用户名（ks241XXX），不用真名 */
 function nameOf(student: ClassBoardStudent) {
-  return student.realName || student.username
+  return student.username
 }
 
 /**
@@ -491,9 +493,9 @@ function submissionsHref(
                         target="_blank"
                         :title="`看 ${nameOf(student)} 今天交的全部`"
                       >
-                        {{ nameOf(student) }}
+                        <UserName :username="student.username" />
                       </a>
-                      <template v-else>{{ nameOf(student) }}</template>
+                      <UserName v-else :username="student.username" />
                     </td>
                     <td>
                       <n-tag

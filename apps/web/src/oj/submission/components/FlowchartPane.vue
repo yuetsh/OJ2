@@ -9,7 +9,7 @@ import { FlowchartSubmissionStatus } from "utils/types"
 import { useTone } from "../composables/tone"
 import { submissionTimeText } from "../utils"
 import FlowchartState from "./FlowchartState.vue"
-import UserName from "./UserName.vue"
+import UserName from "shared/components/UserName.vue"
 
 /**
  * 流程图模式的右栏：左边画出来的图，右边四项评分和建议。原来要点编号再开一个

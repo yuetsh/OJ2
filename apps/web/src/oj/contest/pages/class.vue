@@ -4,6 +4,7 @@ import { useThemeVars } from "naive-ui"
 import { updateACMHelperChecked } from "admin/api"
 import { getContestClassView, getSubmission, getSubmissions } from "oj/api"
 import { useContestStore } from "oj/store/contest"
+import UserName from "shared/components/UserName.vue"
 import { useTone } from "oj/submission/composables/tone"
 import { classLabel } from "oj/submission/utils"
 import { useLeaveStudents } from "shared/composables/leaveStudents"
@@ -14,7 +15,8 @@ import type { Submission } from "utils/types"
 /**
  * 老师的「全班情况」，考完叫「成绩」（设计稿「比赛重设计」老师两块）。学生看不到这一页。
  *
- * 考试中：真名，卡在一道题（错 3 次以上）和 15 分钟以上没交的人放最上面，
+ * 名字和排行榜一样用用户名（ks241XXX），不用真名。
+ * 考试中：卡在一道题（错 3 次以上）和 15 分钟以上没交的人放最上面，
  * 没进来的人在最下面（看板里标了请假的写「请假」）。
  * 考完：按姓名一张表，点格子右边看代码、标「看过了」（代替原来后台的「审核」页），导出成绩。
  * 名单是推出来的：比赛不绑班，来了一半以上的班才算这场的班（后端 buildClassView）
@@ -270,7 +272,6 @@ function exportGrades() {
   const title = contestStore.contest?.title ?? "比赛"
   const head = [
     "用户名",
-    "姓名",
     "班级",
     "做对",
     "名次",
@@ -282,7 +283,6 @@ function exportGrades() {
   for (const row of byUsername) {
     lines.push([
       row.username,
-      row.realName ?? "",
       row.className ? classLabel(row.className) : "",
       String(row.solved),
       String(row.rank ?? ""),
@@ -296,7 +296,6 @@ function exportGrades() {
   for (const user of absent.value) {
     lines.push([
       user.username,
-      user.realName ?? "",
       user.className ? classLabel(user.className) : "",
       user.leave ? "请假" : "没考",
       "",
@@ -323,7 +322,7 @@ const warning = computed(() => tone("warning"))
 const liveColumns = computed(
   () => `116px 44px repeat(${problems.value.length}, minmax(64px, 92px)) 82px 1fr`,
 )
-const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value.length}, 46px)`)
+const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.value.length}, 46px)`)
 </script>
 
 <template>
@@ -385,10 +384,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
           class="tr"
           :style="{ gridTemplateColumns: liveColumns }"
         >
-          <span class="who">
-            <b class="ell">{{ row.realName || row.username }}</b>
-            <span class="ell muted tiny">{{ row.username }}</span>
-          </span>
+          <UserName :username="row.username" />
           <span class="num solved">{{ row.solved }}</span>
           <span v-for="p in problems" :key="p.id" class="lc">
             <template v-if="cellOf(row, p.id)">
@@ -418,10 +414,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
         class="tr"
         :style="{ gridTemplateColumns: liveColumns }"
       >
-        <span class="who">
-          <b class="ell">{{ row.realName || row.username }}</b>
-          <span class="ell muted tiny">{{ row.username }}</span>
-        </span>
+        <UserName :username="row.username" />
         <span class="num solved">{{ row.solved }}</span>
         <span v-for="p in problems" :key="p.id" class="lc">
           <template v-if="cellOf(row, p.id)">
@@ -449,10 +442,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
           class="tr absent"
           :style="{ gridTemplateColumns: liveColumns }"
         >
-          <span class="who">
-            <span class="ell">{{ user.realName || user.username }}</span>
-            <span class="ell tiny">{{ user.username }}</span>
-          </span>
+          <UserName :username="user.username" muted />
           <span></span>
           <span v-for="p in problems" :key="p.id"></span>
           <span></span>
@@ -510,7 +500,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
         <div class="sheet-scroll">
           <div class="tr th" :style="{ gridTemplateColumns: gradeColumns }">
             <span></span>
-            <span>姓名</span>
+            <span>学生</span>
             <span class="num">做对</span>
             <span class="num">名次</span>
             <span v-for="p in problems" :key="p.id" class="ph center" :title="p.title">
@@ -526,7 +516,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
             :style="{ gridTemplateColumns: gradeColumns }"
           >
             <span class="muted tiny num">{{ index + 1 }}</span>
-            <b class="ell" :title="row.username">{{ row.realName || row.username }}</b>
+            <UserName :username="row.username" />
             <span class="num solved">{{ row.solved }}</span>
             <span class="num muted tiny">{{ row.rank }}</span>
             <button
@@ -538,7 +528,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
                 no: cellOf(row, p.id) && !cellOf(row, p.id)!.isAc,
                 sel: selected?.userId === row.userId && selected.problemId === p.id,
               }"
-              :title="`${row.realName || row.username} · 第 ${p._id} 题`"
+              :title="`${row.username} · 第 ${p._id} 题`"
               @click="pick(row, p.id)"
             >
               <template v-if="cellOf(row, p.id)?.isAc">✓</template>
@@ -554,7 +544,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
             :style="{ gridTemplateColumns: gradeColumns }"
           >
             <span></span>
-            <span class="ell">{{ user.realName || user.username }}</span>
+            <UserName :username="user.username" muted />
             <span class="tiny">{{ user.leave ? "请假" : "没考" }}</span>
           </div>
         </div>
@@ -563,7 +553,7 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
       <section class="code-panel">
         <template v-if="selectedRow && selectedProblem">
           <div class="code-head">
-            <b>{{ selectedRow.realName || selectedRow.username }}</b>
+            <UserName :username="selectedRow.username" />
             <span class="muted">·</span>
             <span
               ><span class="muted">{{ selectedProblem._id }}</span>
@@ -733,13 +723,6 @@ const gradeColumns = computed(() => `22px 70px 36px 34px repeat(${problems.value
 
 .ph span {
   font-size: 11px;
-}
-
-.who {
-  display: flex;
-  flex-direction: column;
-  line-height: 16px;
-  min-width: 0;
 }
 
 .solved {

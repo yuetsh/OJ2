@@ -21,6 +21,7 @@ import { FLOWCHART_CRITERIA_ORDER } from "utils/constants"
 import { useTone } from "oj/submission/composables/tone"
 import RingChart from "./RingChart.vue"
 import StatItem from "./StatItem.vue"
+import UserName from "shared/components/UserName.vue"
 
 ChartJS.register(
   ArcElement,
@@ -198,14 +199,12 @@ onUnmounted(() => cloud?.destroy())
 const people = computed(() => [
   ...props.data.dataUnaccepted.map((row) => ({
     username: row.username,
-    name: row.realName,
     grade: null as string | null,
     score: null as number | null,
     count: 0,
   })),
   ...props.data.people.map((row) => ({
     username: row.username,
-    name: row.realName,
     grade: row.bestGrade,
     score: row.bestScore,
     count: row.count,
@@ -290,7 +289,7 @@ function gradeStyle(grade: string | null) {
           <div v-if="data.peopleTruncated" class="muted">人太多，只列了成绩靠后的 500 位</div>
           <div class="people-list">
             <div v-for="row in people" :key="row.username" class="person">
-              <b class="p-name" :title="row.username">{{ row.name }}</b>
+              <UserName :username="row.username" class="p-name" />
               <span class="grade-pill" :style="gradeStyle(row.grade)">
                 {{ row.grade ? `${row.grade} 级 ${row.score ?? 0} 分` : "没交" }}
               </span>
@@ -421,11 +420,8 @@ function gradeStyle(grade: string | null) {
 }
 
 .p-name {
-  width: 80px;
+  width: 110px;
   flex: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .grade-pill {

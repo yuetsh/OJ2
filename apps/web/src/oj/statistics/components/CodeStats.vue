@@ -6,6 +6,7 @@ import { SubmissionStatus } from "utils/constants"
 import { parseTime } from "utils/functions"
 import StatusPill from "oj/submission/components/StatusPill.vue"
 import { useTone } from "oj/submission/composables/tone"
+import UserName from "shared/components/UserName.vue"
 import AttemptSquares from "./AttemptSquares.vue"
 
 /**
@@ -42,7 +43,6 @@ function isPending(result: number) {
 
 interface Student {
   username: string
-  name: string
   /** 题号 → 这道题上的每一次，从早到晚 */
   byProblem: Map<string, Attempt[]>
   total: number
@@ -63,7 +63,6 @@ const students = computed<Student[]>(() => {
     }
     return {
       username: row.username,
-      name: row.realName || row.username,
       byProblem,
       total: row.submissions.length,
       accepted: row.submissions.filter((item) => isAc(item.result)).length,
@@ -76,7 +75,6 @@ const students = computed<Student[]>(() => {
     if (seen.has(row.username)) continue
     list.push({
       username: row.username,
-      name: row.realName || row.username,
       byProblem: new Map(),
       total: 0,
       accepted: 0,
@@ -168,7 +166,7 @@ const problemStudents = computed(() => {
       (a, b) =>
         rank(a) - rank(b) ||
         b.items.length - a.items.length ||
-        a.student.name.localeCompare(b.student.name, "zh-CN"),
+        a.student.username.localeCompare(b.student.username, "zh-CN"),
     )
 })
 
@@ -188,7 +186,7 @@ const allStudents = computed(() => {
       (a, b) =>
         rank(a) - rank(b) ||
         b.student.total - a.student.total ||
-        a.student.name.localeCompare(b.student.name, "zh-CN"),
+        a.student.username.localeCompare(b.student.username, "zh-CN"),
     )
 })
 
@@ -326,7 +324,7 @@ function pct(done: number, total: number) {
         </div>
         <div class="rows">
           <div v-for="row in problemStudents" :key="row.student.username" class="row">
-            <span class="c-name name" :title="row.student.username">{{ row.student.name }}</span>
+            <UserName :username="row.student.username" class="c-name" />
             <span class="c-last">
               <StatusPill v-if="row.items.length" :result="row.items.at(-1)!.result" />
               <b v-else class="none" :style="{ color: tone('error').color }">没交</b>
@@ -369,7 +367,7 @@ function pct(done: number, total: number) {
                   :width="12"
                 />
               </span>
-              <span class="c-name name" :title="row.student.username">{{ row.student.name }}</span>
+              <UserName :username="row.student.username" class="c-name" />
               <span
                 class="c-done done"
                 :style="{
@@ -686,13 +684,6 @@ function pct(done: number, total: number) {
 .c-grid {
   flex: 1 1 0;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.name {
-  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

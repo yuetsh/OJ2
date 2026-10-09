@@ -20,7 +20,7 @@ import { useTone } from "../composables/tone"
 import { classLabel, submissionTimeText } from "../utils"
 import CodeView from "./CodeView.vue"
 import StatusPill from "./StatusPill.vue"
-import UserName from "./UserName.vue"
+import UserName from "shared/components/UserName.vue"
 
 /**
  * 提交列表的右栏：选中那一条的代码和结果（设计稿「提交列表重设计 · 定稿」）。

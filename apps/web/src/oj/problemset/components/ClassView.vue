@@ -2,6 +2,7 @@
 import { useThemeVars } from "naive-ui"
 import { getProblemSetClassView } from "oj/api"
 import { useTone } from "oj/submission/composables/tone"
+import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
 import type { ProblemSetClassView } from "utils/types"
 
@@ -60,12 +61,8 @@ const beforeCount = computed(() =>
 )
 
 const columns = computed(
-  () => `22px 72px 44px repeat(${data.value?.problems.length ?? 1}, minmax(72px, 1fr))`,
+  () => `22px 110px 44px repeat(${data.value?.problems.length ?? 1}, minmax(72px, 1fr))`,
 )
-
-function name(student: { realName: string | null; username: string }) {
-  return student.realName || student.username
-}
 
 function cellLink(username: string, problemId: string) {
   return `/submission?username=${encodeURIComponent(username)}&problem=${encodeURIComponent(problemId)}`
@@ -105,8 +102,11 @@ const error = computed(() => tone("error"))
           ><span class="muted">做完</span> <b class="num big">{{ finished }}</b
           ><span class="muted"> 人</span></span
         >
-        <span v-if="absent.length" class="absent ell" :title="absent.map(name).join('、')"
-          >没加入：{{ absent.map(name).join("、") }}</span
+        <span
+          v-if="absent.length"
+          class="absent ell"
+          :title="absent.map((s) => s.username).join('、')"
+          >没加入：{{ absent.map((s) => s.username).join("、") }}</span
         >
         <div class="spacer"></div>
         <span v-if="beforeCount" class="legend-before"
@@ -117,7 +117,7 @@ const error = computed(() => tone("error"))
       <div class="scroll">
         <div class="grid" :style="{ gridTemplateColumns: columns }">
           <div class="head"></div>
-          <div class="head">姓名</div>
+          <div class="head">学生</div>
           <div class="head right">做对</div>
           <div v-for="(p, i) in data.problems" :key="p.id" class="head col" :title="p.title">
             <b class="ell">{{ i + 1 }} {{ p.title }}</b>
@@ -128,8 +128,8 @@ const error = computed(() => tone("error"))
 
           <template v-for="(s, idx) in joined" :key="s.userId">
             <div class="cell muted num tiny">{{ idx + 1 }}</div>
-            <div class="cell ell" :title="s.username">
-              <b>{{ name(s) }}</b>
+            <div class="cell ell">
+              <UserName :username="s.username" />
             </div>
             <div class="cell right num">
               <b>{{ s.completedCount }}</b>
@@ -141,7 +141,7 @@ const error = computed(() => tone("error"))
               target="_blank"
               class="box"
               :class="{ ok: c.solvedTime, bad: !c.solvedTime && c.wrongCount }"
-              :title="`${name(s)} · ${data.problems[i]!.title}${c.solvedBefore ? ' · 加入前就做对过' : ''}`"
+              :title="`${s.username} · ${data.problems[i]!.title}${c.solvedBefore ? ' · 加入前就做对过' : ''}`"
             >
               <template v-if="c.solvedTime"
                 >✓ <span class="num">{{ cellTime(c.solvedTime) }}</span></template

@@ -29,7 +29,7 @@ import type {
 import { FlowchartSubmissionStatus } from "utils/types"
 import FlowchartState from "./components/FlowchartState.vue"
 import StatusPill from "./components/StatusPill.vue"
-import UserName from "./components/UserName.vue"
+import UserName from "shared/components/UserName.vue"
 import { useTone } from "./composables/tone"
 import { classLabel, classSelectOptions, submissionClockText, submissionDayText } from "./utils"
 

@@ -7,7 +7,7 @@ import { useUserStore } from "shared/store/user"
 import { ContestStatus } from "utils/constants"
 import { secondsToDuration } from "utils/functions"
 import { classLabel } from "oj/submission/utils"
-import UserName from "../components/UserName.vue"
+import UserName from "shared/components/UserName.vue"
 
 /**
  * 比赛排名（设计稿「比赛重设计」排行榜两块）。竞争感是用户要的（「我需要竞争」）：
@@ -136,12 +136,7 @@ const columns = computed(
             <path d="M8 20h8" />
           </svg>
           <template v-if="podium[place - 1]">
-            <UserName
-              class="podium-name"
-              :username="podium[place - 1]!.username"
-              :class-name="podium[place - 1]!.className"
-              strong
-            />
+            <UserName class="podium-name" :username="podium[place - 1]!.username" />
             <span class="muted small">
               {{ classLabel(podium[place - 1]!.className) }} · {{ podium[place - 1]!.solved }} 道 ·
               {{ secondsToDuration(podium[place - 1]!.totalTime) }}
@@ -220,13 +215,7 @@ const columns = computed(
           <span v-if="move(row) > 0" class="up">↑{{ move(row) }}</span>
           <span v-else-if="move(row) < 0" class="down">↓{{ -move(row) }}</span>
         </span>
-        <UserName
-          class="pad"
-          :username="row.username"
-          :class-name="row.className"
-          :strong="row.userId === meId"
-          :title="row.realName ?? row.username"
-        />
+        <UserName class="pad" :username="row.username" />
         <span class="num solved">{{ row.solved }}</span>
         <span class="num time">{{ secondsToDuration(row.totalTime) }}</span>
         <span v-for="p in problems" :key="p.id" class="cell-wrap">

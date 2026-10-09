@@ -3,7 +3,7 @@ import type { ContestScoreRow } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { useTone } from "oj/submission/composables/tone"
 import { secondsToDuration } from "utils/functions"
-import UserName from "./UserName.vue"
+import UserName from "shared/components/UserName.vue"
 
 /**
  * 题目页右边的小榜：前三名，然后是我和我前后各两个人（中间隔一个「⋯」）。
@@ -42,12 +42,7 @@ function move(row: ContestScoreRow) {
             ><span class="down">↓{{ -move(row) }}</span></template
           >
         </span>
-        <UserName
-          class="who"
-          :username="row.username"
-          :class-name="row.className"
-          :strong="row.userId === me"
-        />
+        <UserName class="who" :username="row.username" />
         <span class="solved">{{ row.solved }} 道</span>
         <span class="time">{{ secondsToDuration(row.totalTime) }}</span>
       </div>
