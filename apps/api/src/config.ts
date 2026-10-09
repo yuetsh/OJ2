@@ -77,7 +77,7 @@ const envSchema = z.object({
   AVATAR_DIRECTORY: text("data/avatar"),
   TEST_CASE_DIRECTORY: text("data/test_case"),
   UPLOAD_DIRECTORY: text("data/upload"),
-  HITOKOTO_DIRECTORY: text("data/hitokoto"),
+  HITOKOTO_DIRECTORY: text("../sentences-bundle"),
   ALLOWED_WS_ORIGINS: text(""),
   UPLOAD_URI_PREFIX: text("/public/upload"),
   AVATAR_URI_PREFIX: text("/public/avatar"),
@@ -150,8 +150,8 @@ export const config = {
   // 判题沙箱把这个目录挂成只读的 /test_case，两边必须指同一处
   testCaseDirectory: repoPath(env.TEST_CASE_DIRECTORY),
   uploadDirectory: repoPath(env.UPLOAD_DIRECTORY),
-  // 一言数据集（hitokoto.cn 官方导出），和旧后端读同一份：容器里是 /data/hitokoto。
-  // 本机 dev 默认路径下没有这份数据，读不到就回落到内置的几条，不影响启动。
+  // 一言数据集（hitokoto.cn 官方的 sentences-bundle）。线上容器里是 /data/hitokoto（Dockerfile 写死，
+  // 这个默认值管不到）；本机默认读仓库旁边那份 ../sentences-bundle，读不到就回落到内置的几条，不影响启动。
   hitokotoDirectory: repoPath(env.HITOKOTO_DIRECTORY),
   /**
    * WebSocket 升级时额外放行的来源（逗号分隔的完整 origin，如 https://oj.example.com）。

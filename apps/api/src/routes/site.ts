@@ -34,7 +34,7 @@ siteRoutes.get("/site/online", async (c) => {
   return success(c, { count: await onlineCount() } satisfies OnlineCount)
 })
 
-// 数据集读不到时的兜底（本机 dev 没挂 data/hitokoto 就会走这里）
+// 数据集读不到时的兜底（本机旁边没有 sentences-bundle 就会走这里）
 const fallbackQuotes = [
   {
     hitokoto: "程序首先是写给人读的，其次才是让机器执行。",

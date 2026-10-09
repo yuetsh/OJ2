@@ -5,7 +5,8 @@ import { useThemeVars } from "naive-ui"
 import { getHitokoto } from "../api"
 
 /**
- * 一言（设计稿「一言重设计」A 版）：大引号 + 一行句子 + 「—— 谁《出处》· 分类」+ 一个看得见的「换一句」。
+ * 一言（设计稿「一言重设计」A 版）：大引号 + 一行句子 + 「—— 谁《出处》」+ 一个看得见的「换一句」。
+ * 分类（动画、诗词……）不显示；接口里的 type 只用来判断出处要不要加书名号。
  * 原来只能点句子换，没人知道；出处被截成「来自 Structure and Interpretatio…」。
  * 长句（数据集 p90 44 字、最长 255 字）一行放不下，点句子弹出全文。
  * 留着它是给学生一点「无聊的乐趣」，别去掉、别挪到看不见的地方。
@@ -56,22 +57,12 @@ const popVars = computed(() => ({
       <template #trigger>
         <div class="body" title="点一下看全文">
           <span class="sentence">{{ quote.hitokoto }}</span>
-          <span class="source">
-            <template v-if="source">—— {{ source }}</template>
-            <template v-if="quote.type">
-              <template v-if="source"> · </template><span class="type">{{ quote.type }}</span>
-            </template>
-          </span>
+          <span v-if="source" class="source">—— {{ source }}</span>
         </div>
       </template>
       <div class="full" :style="popVars">
         <div class="full-text">{{ quote.hitokoto }}</div>
-        <div class="full-source">
-          <template v-if="source">—— {{ source }}</template>
-          <template v-if="quote.type"
-            ><template v-if="source"> · </template>{{ quote.type }}</template
-          >
-        </div>
+        <div v-if="source" class="full-source">—— {{ source }}</div>
       </div>
     </n-popover>
     <button
@@ -128,10 +119,6 @@ const popVars = computed(() => ({
   font-size: 12px;
   line-height: 16px;
   color: v-bind("theme.textColor3");
-}
-
-.type {
-  color: v-bind("theme.primaryColor");
 }
 
 .refresh {
