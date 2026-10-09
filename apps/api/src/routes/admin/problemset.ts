@@ -1,18 +1,18 @@
 import {
-  addProblemToSetRequestSchema,
+  addProblemsToSetRequestSchema,
   createProblemSetBadgeRequestSchema,
   createProblemSetRequestSchema,
+  reorderProblemSetProblemsRequestSchema,
   updateProblemInSetRequestSchema,
   updateProblemSetBadgeRequestSchema,
   updateProblemSetRequestSchema,
-  updateProblemSetStatusRequestSchema,
+  type AddProblemsToSetResult,
   type AdminProblemSet,
   type AdminProblemSetBadge,
   type AdminProblemSetList,
   type AdminProblemSetProblem,
-  type AdminProblemSetProgress,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike, inArray, isNull, max, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
@@ -20,7 +20,7 @@ import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { recalculateBadge, resyncProgress } from "../../services/problemset"
-import { asFilterValue, queryInteger, sampleUser } from "../helpers"
+import { queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemSetRoutes = new Hono<AppEnv>()
 
@@ -49,11 +49,11 @@ async function serialize(row: typeof schema.problemset.$inferSelect) {
   return (await serializeMany([row]))[0]!
 }
 
-/** 批量版：列表接口走这个，固定 3 条查询，与行数无关（按行 serialize 就是 N+1） */
+/** 批量版：列表接口走这个，固定 4 条查询，与行数无关（按行 serialize 就是 N+1） */
 async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
   if (rows.length === 0) return []
   const ids = rows.map((row) => row.id)
-  const [problems, participants, creators] = await Promise.all([
+  const [problems, participants, badges, creators] = await Promise.all([
     db
       .select({
         problemsetId: schema.problemsetProblem.problemsetId,
@@ -66,10 +66,19 @@ async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
       .select({
         problemsetId: schema.problemsetProgress.problemsetId,
         value: count(),
+        completed: sql<number>`count(*) filter (where ${schema.problemsetProgress.isCompleted})::int`,
       })
       .from(schema.problemsetProgress)
       .where(inArray(schema.problemsetProgress.problemsetId, ids))
       .groupBy(schema.problemsetProgress.problemsetId),
+    db
+      .select({
+        problemsetId: schema.problemsetBadge.problemsetId,
+        value: count(),
+      })
+      .from(schema.problemsetBadge)
+      .where(inArray(schema.problemsetBadge.problemsetId, ids))
+      .groupBy(schema.problemsetBadge.problemsetId),
     db
       .select({
         id: schema.user.id,
@@ -81,25 +90,55 @@ async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
       .where(inArray(schema.user.id, [...new Set(rows.map((row) => row.createdById))])),
   ])
   const problemsBySet = new Map(problems.map((item) => [item.problemsetId, item.value]))
-  const participantsBySet = new Map(participants.map((item) => [item.problemsetId, item.value]))
+  const participantsBySet = new Map(participants.map((item) => [item.problemsetId, item]))
+  const badgesBySet = new Map(badges.map((item) => [item.problemsetId, item.value]))
   const creatorById = new Map(creators.map((item) => [item.id, item]))
+  const now = Date.now()
   return rows.map((row) => {
     const creator = creatorById.get(row.createdById)
     return {
       id: row.id,
       title: row.title,
       description: row.description,
-      difficulty: row.difficulty,
-      status: row.status,
-      endTime: row.endTime,
+      assignedUntil: row.assignedUntil,
+      assignedAt: row.assignedAt,
+      assigning:
+        row.assignedAt !== null &&
+        row.assignedUntil !== null &&
+        Date.parse(row.assignedUntil) > now,
       visible: row.visible,
       createdBy: sampleUser(creator ?? { id: row.createdById, username: "" }, creator?.realName),
       createTime: row.createTime,
       lastUpdateTime: row.lastUpdateTime,
       problemsCount: problemsBySet.get(row.id) ?? 0,
-      participantCount: participantsBySet.get(row.id) ?? 0,
+      participantCount: participantsBySet.get(row.id)?.value ?? 0,
+      completedCount: participantsBySet.get(row.id)?.completed ?? 0,
+      badgeCount: badgesBySet.get(row.id) ?? 0,
     } satisfies AdminProblemSet
   })
+}
+
+/**
+ * 布置期怎么落库。老师给的是「布置到哪天」（东八区当天结束的时刻），开始时刻由服务端定：
+ *   - 不布置 → 两个都清掉；
+ *   - 现在正在布置 → 只改结束，开始不动（延长、缩短都不该把「以前的代码」的分界挪到现在）；
+ *   - 没在布置（从没布置过，或者上一轮已经过期）→ 开始记成现在，这就是「再布置一次」。
+ */
+function assignment(
+  requested: string | null,
+  current: { assignedAt: string | null; assignedUntil: string | null } | null,
+) {
+  if (requested === null) return { assignedAt: null, assignedUntil: null }
+  const until = Date.parse(requested)
+  if (!Number.isFinite(until) || until <= Date.now()) return "past" as const
+  const running =
+    current?.assignedAt != null &&
+    current.assignedUntil != null &&
+    Date.parse(current.assignedUntil) > Date.now()
+  return {
+    assignedAt: running ? current.assignedAt : new Date().toISOString(),
+    assignedUntil: new Date(until).toISOString(),
+  }
 }
 
 // ---------------------------------------------------------------- 题单本体
@@ -114,8 +153,6 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
   // 再也没法在界面上改回来。后台必须能看见自己管的全部题单。
   if (user.adminType !== "Super Admin") filters.push(eq(schema.problemset.createdById, user.id))
   const keyword = c.req.query("keyword")?.trim()
-  const difficulty = c.req.query("difficulty")?.trim()
-  const status = c.req.query("status")?.trim()
   if (keyword) {
     filters.push(
       or(
@@ -124,8 +161,6 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
       )!,
     )
   }
-  if (difficulty) filters.push(eq(schema.problemset.difficulty, asFilterValue(difficulty)))
-  if (status) filters.push(eq(schema.problemset.status, asFilterValue(status)))
   const where = filters.length ? and(...filters) : undefined
 
   const [totalRows, rows] = await Promise.all([
@@ -147,12 +182,19 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
 adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
   const parsed = await parseBody(c, createProblemSetRequestSchema)
   if (!parsed.success) return parsed.response
+  const period = assignment(parsed.data.assignedUntil, null)
+  if (period === "past") return failure(c, 400, "assign-in-past", "布置到的日期已经过了")
   const now = new Date().toISOString()
   const [created] = await db
     .insert(schema.problemset)
     .values({
-      ...parsed.data,
-      endTime: parsed.data.endTime ? new Date(parsed.data.endTime).toISOString() : null,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      visible: parsed.data.visible,
+      ...period,
+      // 难度、状态两列还在表里、非空，但已经不用了（见契约 admin.ts 的说明）
+      difficulty: "Easy",
+      status: "active",
       createdById: c.get("user")!.id,
       createTime: now,
       lastUpdateTime: now,
@@ -172,11 +214,15 @@ adminProblemSetRoutes.put("/problem-sets/:id", requireTeacher, async (c) => {
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
   const parsed = await parseBody(c, updateProblemSetRequestSchema)
   if (!parsed.success) return parsed.response
+  const period = assignment(parsed.data.assignedUntil, row)
+  if (period === "past") return failure(c, 400, "assign-in-past", "布置到的日期已经过了")
   const [updated] = await db
     .update(schema.problemset)
     .set({
-      ...parsed.data,
-      endTime: parsed.data.endTime ? new Date(parsed.data.endTime).toISOString() : null,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      visible: parsed.data.visible,
+      ...period,
       lastUpdateTime: new Date().toISOString(),
     })
     .where(eq(schema.problemset.id, row.id))
@@ -191,22 +237,6 @@ adminProblemSetRoutes.put("/problem-sets/:id/visibility", requireTeacher, async 
   const [updated] = await db
     .update(schema.problemset)
     .set({ visible: !row.visible, lastUpdateTime: new Date().toISOString() })
-    .where(eq(schema.problemset.id, row.id))
-    .returning()
-  return success(c, await serialize(updated!))
-})
-
-adminProblemSetRoutes.put("/problem-sets/:id/status", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const parsed = await parseBody(c, updateProblemSetStatusRequestSchema, "status 不合法")
-  if (!parsed.success) return parsed.response
-  const [updated] = await db
-    .update(schema.problemset)
-    .set({
-      status: parsed.data.status,
-      lastUpdateTime: new Date().toISOString(),
-    })
     .where(eq(schema.problemset.id, row.id))
     .returning()
   return success(c, await serialize(updated!))
@@ -245,59 +275,97 @@ adminProblemSetRoutes.get("/problem-sets/:id/problems", requireTeacher, async (c
           difficulty: problem.difficulty,
           order: item.order,
           isRequired: item.isRequired,
-          score: item.score,
-          hint: item.hint,
         }) satisfies AdminProblemSetProblem,
     ),
   )
 })
 
+/**
+ * 加题：一次可以给好几个题号（后台搜索框里粘一串「3065 3066 3067」），按给的顺序接在最后。
+ * 找不到的、本来就在里面的不报错，分开报回去，前端告诉老师哪几个没加上。
+ */
 adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get("user")!)
   if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const parsed = await parseBody(c, addProblemToSetRequestSchema)
+  const parsed = await parseBody(c, addProblemsToSetRequestSchema)
   if (!parsed.success) return parsed.response
-  const [problem] = await db
-    .select({ id: schema.problem.id })
-    .from(schema.problem)
-    .where(
-      and(
-        sql`lower(${schema.problem.displayId}) = lower(${parsed.data.problemId})`,
-        eq(schema.problem.visible, true),
-        isNull(schema.problem.contestId),
+  const wanted = [...new Set(parsed.data.problemIds.map((id) => id.toLowerCase()))]
+  const [problems, existing, last] = await Promise.all([
+    db
+      .select({ id: schema.problem.id, displayId: schema.problem.displayId })
+      .from(schema.problem)
+      .where(
+        and(
+          inArray(sql<string>`lower(${schema.problem.displayId})`, wanted),
+          eq(schema.problem.visible, true),
+          isNull(schema.problem.contestId),
+        ),
       ),
-    )
-    .limit(1)
-  if (!problem) return failure(c, 404, "problem-not-found", "题目不存在或不可见")
+    db
+      .select({ problemId: schema.problemsetProblem.problemId })
+      .from(schema.problemsetProblem)
+      .where(eq(schema.problemsetProblem.problemsetId, row.id)),
+    db
+      .select({ value: max(schema.problemsetProblem.order) })
+      .from(schema.problemsetProblem)
+      .where(eq(schema.problemsetProblem.problemsetId, row.id)),
+  ])
+  const byDisplayId = new Map(problems.map((problem) => [problem.displayId.toLowerCase(), problem]))
+  const inSet = new Set(existing.map((item) => item.problemId))
+  const result: AddProblemsToSetResult = { added: [], missing: [], duplicate: [] }
+  const values: (typeof schema.problemsetProblem.$inferInsert)[] = []
+  let order = last[0]?.value ?? 0
+  for (const id of wanted) {
+    const problem = byDisplayId.get(id)
+    if (!problem) result.missing.push(id)
+    else if (inSet.has(problem.id)) result.duplicate.push(problem.displayId)
+    else {
+      inSet.add(problem.id)
+      order += 1
+      // 分数、提示两列还在表里但已经不用了：score 非空给 0
+      values.push({
+        problemsetId: row.id,
+        problemId: problem.id,
+        order,
+        isRequired: true,
+        score: 0,
+      })
+      result.added.push(problem.displayId)
+    }
+  }
+  if (values.length) {
+    await db.insert(schema.problemsetProblem).values(values)
+    // 题目集变了，已加入的人的分母、完成状态、奖章都得跟着变（旧栈靠 post_save 信号，
+    // 不在 views 里，别因为翻不到显式调用就以为它没做，见 services/problemset.ts）
+    await resyncProgress(row.id)
+  }
+  return success(c, result, values.length ? 201 : 200)
+})
 
-  const [duplicate] = await db
+// 必须注册在 /problems/:itemId 前面：Hono 按注册顺序匹配，order 会被当成 :itemId 吃掉
+adminProblemSetRoutes.put("/problem-sets/:id/problems/order", requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get("user")!)
+  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+  const parsed = await parseBody(c, reorderProblemSetProblemsRequestSchema)
+  if (!parsed.success) return parsed.response
+  const links = await db
     .select({ id: schema.problemsetProblem.id })
     .from(schema.problemsetProblem)
-    .where(
-      and(
-        eq(schema.problemsetProblem.problemsetId, row.id),
-        eq(schema.problemsetProblem.problemId, problem.id),
-      ),
-    )
-    .limit(1)
-  if (duplicate) return failure(c, 409, "problem-already-in-set", "题目已在该题单中")
-
-  const [created] = await db
-    .insert(schema.problemsetProblem)
-    .values({
-      problemsetId: row.id,
-      problemId: problem.id,
-      order: parsed.data.order,
-      isRequired: parsed.data.isRequired,
-      score: parsed.data.score,
-      hint: parsed.data.hint,
-    })
-    .returning({ id: schema.problemsetProblem.id })
-  // 题目集变了，已加入的人的 totalProblemsCount / 百分比都得跟着变，
-  // 否则学生看到的进度分母还是老的。旧栈是靠 ProblemSetProblem 的 post_save 信号做的，
-  // 不在 views 里，别因为翻不到显式调用就以为它没做（见 services/problemset.ts）。
-  await resyncProgress(row.id)
-  return success(c, { id: created!.id }, 201)
+    .where(eq(schema.problemsetProblem.problemsetId, row.id))
+  const have = new Set(links.map((link) => link.id))
+  const given = new Set(parsed.data.ids)
+  if (given.size !== have.size || [...given].some((id) => !have.has(id))) {
+    return failure(c, 409, "problems-changed", "题目列表变了，刷新一下再排")
+  }
+  await db.transaction(async (tx) => {
+    for (const [index, id] of parsed.data.ids.entries()) {
+      await tx
+        .update(schema.problemsetProblem)
+        .set({ order: index + 1 })
+        .where(eq(schema.problemsetProblem.id, id))
+    }
+  })
+  return success(c, null)
 })
 
 adminProblemSetRoutes.put("/problem-sets/:id/problems/:itemId", requireTeacher, async (c) => {
@@ -316,7 +384,8 @@ adminProblemSetRoutes.put("/problem-sets/:id/problems/:itemId", requireTeacher, 
     )
     .returning({ id: schema.problemsetProblem.id })
   if (updated.length === 0) return failure(c, 404, "problem-not-in-set", "题目不在该题单中")
-  if (parsed.data.score !== undefined) await resyncProgress(row.id)
+  // 必做 / 选做变了，分母和「做完」跟着变
+  await resyncProgress(row.id)
   return success(c, null)
 })
 
@@ -451,86 +520,5 @@ adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher
   if (!badge) return failure(c, 404, "badge-not-found", "奖章不存在")
   // 获奖记录随奖章一起没：user_badge.badge_id 是 CASCADE（0010）
   await db.delete(schema.problemsetBadge).where(eq(schema.problemsetBadge.id, badge.id))
-  return success(c, null)
-})
-
-// ---------------------------------------------------------------- 学生进度
-
-adminProblemSetRoutes.get("/problem-sets/:id/progress", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const rows = await db
-    .select({
-      progress: schema.problemsetProgress,
-      username: schema.user.username,
-      realName: schema.userProfile.realName,
-    })
-    .from(schema.problemsetProgress)
-    .innerJoin(schema.user, eq(schema.problemsetProgress.userId, schema.user.id))
-    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(eq(schema.problemsetProgress.problemsetId, row.id))
-    .orderBy(desc(schema.problemsetProgress.joinTime))
-  return success(
-    c,
-    rows.map(
-      ({ progress, username, realName }) =>
-        ({
-          id: progress.id,
-          userId: progress.userId,
-          username,
-          // 真名有意下发：这是老师看本班完成情况的页面，已由 requireTeacher + 归属校验把关
-          realName,
-          joinTime: progress.joinTime,
-          completeTime: progress.completeTime,
-          isCompleted: progress.isCompleted,
-          progressPercentage: progress.progressPercentage,
-          completedProblemsCount: progress.completedProblemsCount,
-          totalProblemsCount: progress.totalProblemsCount,
-          totalScore: progress.totalScore,
-        }) satisfies AdminProblemSetProgress,
-    ),
-  )
-})
-
-adminProblemSetRoutes.delete("/problem-sets/:id/progress/:userId", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const userId = queryInteger(c.req.param("userId"), 0, { min: 1 })
-  const deleted = await db.transaction(async (tx) => {
-    // 把人踢出题单，他基于这份题单拿到的奖章也该收回，否则奖章会悬空
-    const badges = await tx
-      .select({ id: schema.problemsetBadge.id })
-      .from(schema.problemsetBadge)
-      .where(eq(schema.problemsetBadge.problemsetId, row.id))
-    if (badges.length) {
-      await tx.delete(schema.userBadge).where(
-        and(
-          eq(schema.userBadge.userId, userId),
-          inArray(
-            schema.userBadge.badgeId,
-            badges.map((badge) => badge.id),
-          ),
-        ),
-      )
-    }
-    await tx
-      .delete(schema.problemsetSubmission)
-      .where(
-        and(
-          eq(schema.problemsetSubmission.problemsetId, row.id),
-          eq(schema.problemsetSubmission.userId, userId),
-        ),
-      )
-    return tx
-      .delete(schema.problemsetProgress)
-      .where(
-        and(
-          eq(schema.problemsetProgress.problemsetId, row.id),
-          eq(schema.problemsetProgress.userId, userId),
-        ),
-      )
-      .returning({ id: schema.problemsetProgress.id })
-  })
-  if (deleted.length === 0) return failure(c, 404, "progress-not-found", "用户未加入该题单")
   return success(c, null)
 })

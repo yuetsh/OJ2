@@ -23,7 +23,7 @@ import { db, schema } from "../db"
 import { failure, readJson, success } from "../http"
 import { flowchartQueue } from "../queue"
 import { getBooleanOption } from "../services/options"
-import { problemSetJoinTimes } from "../services/problemset"
+import { problemSetLockCutoffs } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
 import { dayStart } from "../time"
@@ -49,36 +49,36 @@ function flowchartThrottleKey(userId: number) {
 }
 
 /**
- * 题单防抄：学生加入含这道题的题单之前画的图，先对他本人藏起来 —— 和代码提交同一道闸
- * （routes/submission.ts 的 canViewSubmission，规则见 problemSetJoinTimes）。原来流程图
- * 这边没有这一条，加入题单之前画到 A 的那张图点一下就能载回画布，交上去就是 A。
+ * 题单防抄：题单布置期内，学生在布置开始之前画的图先对他本人藏起来 —— 和代码提交同一道闸
+ * （routes/submission.ts 的 canViewSubmission，规则见 problemSetLockCutoffs）。原来流程图
+ * 这边没有这一条，以前画到 A 的那张图点一下就能载回画布，交上去就是 A。
  */
 function hiddenByProblemSet(
   user: AuthUser,
   row: { userId: number; problemId: number; createTime: string },
-  joinTimes: Map<number, string>,
+  cutoffs: Map<number, string>,
 ) {
   if (row.userId !== user.id || isTeacherOrAbove(user)) return false
-  const joinTime = joinTimes.get(row.problemId)
-  return joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)
+  const cutoff = cutoffs.get(row.problemId)
+  return cutoff !== undefined && Date.parse(row.createTime) < Date.parse(cutoff)
 }
 
 function canView(
   user: AuthUser,
   row: { userId: number; problemId: number; createTime: string },
   problem: { createdById: number },
-  joinTimes: Map<number, string>,
+  cutoffs: Map<number, string>,
 ) {
-  if (hiddenByProblemSet(user, row, joinTimes)) return false
+  if (hiddenByProblemSet(user, row, cutoffs)) return false
   // 角色捷径只给老师：学生管理员算学生，不能看同学的流程图（同 submission.ts 的 canViewSubmission）
   return row.userId === user.id || isTeacherOrAbove(user) || problem.createdById === user.id
 }
 
 /** 只有学生看自己的提交时才需要查题单；其余情况给一张空表，省一次查询 */
-function joinTimesFor(user: AuthUser, rows: Array<{ userId: number; problemId: number }>) {
+function cutoffsFor(user: AuthUser, rows: Array<{ userId: number; problemId: number }>) {
   if (isTeacherOrAbove(user)) return Promise.resolve(new Map<number, string>())
   const own = rows.filter((row) => row.userId === user.id).map((row) => row.problemId)
-  return problemSetJoinTimes(user.id, [...new Set(own)])
+  return problemSetLockCutoffs(user.id, [...new Set(own)])
 }
 
 function flowchartData(
@@ -321,7 +321,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
       .offset(offset),
     displayId ? unknownDisplayIds(displayId, null) : [],
   ])
-  const joinTimes = await joinTimesFor(
+  const cutoffs = await cutoffsFor(
     user,
     rows.map((row) => row.flowchart),
   )
@@ -341,7 +341,7 @@ flowchartRoutes.get("/flowcharts", requireAuth, async (c) => {
           aiModel: flowchart.aiModel,
           processingTime: flowchart.processingTime,
           evaluationTime: flowchart.evaluationTime,
-          showLink: canView(user, flowchart, problem, joinTimes),
+          showLink: canView(user, flowchart, problem, cutoffs),
         }) satisfies FlowchartListItem,
     ),
     total: totalRows[0]?.value ?? 0,
@@ -656,7 +656,7 @@ flowchartRoutes.get("/flowcharts/:id", requireAuth, async (c) => {
     .where(eq(schema.flowchartSubmission.id, c.req.param("id")))
     .limit(1)
   const user = c.get("user")!
-  if (!row || !canView(user, row.flowchart, row.problem, await joinTimesFor(user, [row.flowchart])))
+  if (!row || !canView(user, row.flowchart, row.problem, await cutoffsFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
   return success(c, flowchartData(row.flowchart, row.username))
 })
@@ -669,7 +669,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
     .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
     .where(eq(schema.flowchartSubmission.id, c.req.param("id")))
     .limit(1)
-  if (!row || !canView(user, row.flowchart, row.problem, await joinTimesFor(user, [row.flowchart])))
+  if (!row || !canView(user, row.flowchart, row.problem, await cutoffsFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
   // 看得见不等于能重评：canView 放进来的出题人只能看。重评会清掉原来的
   // 评分再抽一次，别人的提交只有老师能动
@@ -737,7 +737,7 @@ flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {
  * userId / problemId / createTime 三列是 hiddenByProblemSet 要的，别删。
  */
 async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
-  const [rows, joinTimes] = await Promise.all([
+  const [rows, cutoffs] = await Promise.all([
     db
       .select({
         id: schema.flowchartSubmission.id,
@@ -756,9 +756,9 @@ async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
         ),
       )
       .orderBy(asc(schema.flowchartSubmission.createTime)),
-    joinTimesFor(user, [{ userId: user.id, problemId }]),
+    cutoffsFor(user, [{ userId: user.id, problemId }]),
   ])
-  const visible = rows.filter((row) => !hiddenByProblemSet(user, row, joinTimes))
+  const visible = rows.filter((row) => !hiddenByProblemSet(user, row, cutoffs))
   return { visible, hidden: rows.length - visible.length }
 }
 

@@ -6,6 +6,7 @@ import { achievementRaritySchema } from "./achievement"
 import { rankProfileSchema } from "./account"
 import { paginatedSchema, sampleUserSchema } from "./common"
 import { reactionKeySchema } from "./content"
+import { badgeConditionTypeSchema } from "./problemset"
 import { problemLanguageSchema, runnableLanguageSchema } from "./language"
 import {
   astRuleSchema,
@@ -358,17 +359,22 @@ export const updateAcmHelperRequestSchema = z.object({
 
 // ---------------------------------------------------------------- 题单管理
 
+// 难度、状态两列还留在表里（0026 没删列，删列要手工放行破坏性迁移），
+// 但界面和接口都不再用：线上 16 个题单全是 Easy / active，「状态 + 可见」两道闸合成了「公开」
 export const problemSetDifficultySchema = z.enum(["Easy", "Medium", "Hard"])
 export const problemSetStatusSchema = z.enum(["draft", "active", "archived"])
-export const badgeConditionTypeSchema = z.enum(["all_problems", "problem_count", "score"])
 
 export const adminProblemSetSchema = z.object({
   id: z.number().int(),
   title: z.string(),
   description: z.string(),
-  difficulty: problemSetDifficultySchema,
-  status: problemSetStatusSchema,
-  endTime: z.string().nullable(),
+  /** 布置到哪天（东八区当天结束）；null = 没布置 */
+  assignedUntil: z.string().nullable(),
+  /** 这一轮布置开始的时刻 */
+  assignedAt: z.string().nullable(),
+  /** 现在在不在布置期内（服务端的钟） */
+  assigning: z.boolean(),
+  /** 公开：学生能在题单列表里看到、能进 */
   visible: z.boolean(),
   createdBy: sampleUserSchema,
   createTime: z.string(),
@@ -376,23 +382,22 @@ export const adminProblemSetSchema = z.object({
   problemsCount: z.number().int(),
   /** 加入这份题单的人数，后台用来判断改动会影响多少人 */
   participantCount: z.number().int(),
+  /** 做完（必做题全对）的人数 */
+  completedCount: z.number().int(),
+  badgeCount: z.number().int(),
 })
 
 export const adminProblemSetListSchema = paginatedSchema(adminProblemSetSchema)
 
 export const createProblemSetRequestSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string(),
-  difficulty: problemSetDifficultySchema.default("Easy"),
-  status: problemSetStatusSchema.default("active"),
-  endTime: z.string().nullable().default(null),
+  description: z.string().default(""),
+  /** 布置到哪天；null = 不布置。从「没在布置」变成「布置到将来」时，服务端把布置开始记成现在 */
+  assignedUntil: z.string().nullable().default(null),
   visible: z.boolean().default(true),
 })
 
 export const updateProblemSetRequestSchema = createProblemSetRequestSchema
-export const updateProblemSetStatusRequestSchema = z.object({
-  status: problemSetStatusSchema,
-})
 
 export const adminProblemSetProblemSchema = z.object({
   id: z.number().int(),
@@ -403,24 +408,28 @@ export const adminProblemSetProblemSchema = z.object({
   difficulty: z.string(),
   order: z.number().int(),
   isRequired: z.boolean(),
-  score: z.number().int(),
-  hint: z.string().nullable(),
 })
 
-export const addProblemToSetRequestSchema = z.object({
-  /** 展示用题号（_id），不是自增主键 —— 老师手里只有题号 */
-  problemId: z.string().trim().min(1),
-  order: z.number().int().default(0),
-  isRequired: z.boolean().default(true),
-  score: z.number().int().default(0),
-  hint: z.string().default(""),
+export const addProblemsToSetRequestSchema = z.object({
+  /** 展示用题号（_id），不是自增主键 —— 老师手里只有题号。按给的顺序接在最后 */
+  problemIds: z.array(z.string().trim().min(1)).min(1).max(100),
+})
+
+export const addProblemsToSetResultSchema = z.object({
+  added: z.array(z.string()),
+  /** 题号不存在、不可见或是比赛题 */
+  missing: z.array(z.string()),
+  /** 本来就在题单里 */
+  duplicate: z.array(z.string()),
 })
 
 export const updateProblemInSetRequestSchema = z.object({
-  order: z.number().int().optional(),
-  isRequired: z.boolean().optional(),
-  score: z.number().int().optional(),
-  hint: z.string().optional(),
+  isRequired: z.boolean(),
+})
+
+/** 拖动排序：题单里题目的链接 id，按新顺序给全 */
+export const reorderProblemSetProblemsRequestSchema = z.object({
+  ids: z.array(z.number().int()).min(1),
 })
 
 export const adminProblemSetBadgeSchema = z.object({
@@ -438,26 +447,12 @@ export const adminProblemSetBadgeSchema = z.object({
 export const createProblemSetBadgeRequestSchema = z.object({
   name: z.string().trim().min(1).max(100),
   description: z.string(),
-  icon: z.string(),
+  icon: z.string().min(1),
   conditionType: badgeConditionTypeSchema,
   conditionValue: z.number().int().default(0),
 })
 
 export const updateProblemSetBadgeRequestSchema = createProblemSetBadgeRequestSchema
-
-export const adminProblemSetProgressSchema = z.object({
-  id: z.number().int(),
-  userId: z.number().int(),
-  username: z.string(),
-  realName: z.string().nullable(),
-  joinTime: z.string(),
-  completeTime: z.string().nullable(),
-  isCompleted: z.boolean(),
-  progressPercentage: z.number(),
-  completedProblemsCount: z.number().int(),
-  totalProblemsCount: z.number().int(),
-  totalScore: z.number().int(),
-})
 
 // ---------------------------------------------------------------- 标签与题目分析
 
@@ -927,7 +922,6 @@ export type AstCheckRequest = z.infer<typeof astCheckRequestSchema>
 export type AstCheckResponse = z.infer<typeof astCheckResponseSchema>
 export type GenerateTestInputsRequest = z.infer<typeof generateTestInputsRequestSchema>
 export type GenerateTestInputsResponse = z.infer<typeof generateTestInputsResponseSchema>
-export type AdminProblemSetProgress = z.infer<typeof adminProblemSetProgressSchema>
 
 export type AdminAnnouncementList = z.infer<typeof adminAnnouncementListSchema>
 export type CreateAnnouncementRequest = z.infer<typeof createAnnouncementRequestSchema>
@@ -959,14 +953,16 @@ export type UpdateContestRequest = z.infer<typeof updateContestRequestSchema>
 export type UpdateAcmHelperRequest = z.infer<typeof updateAcmHelperRequestSchema>
 export type ProblemSetDifficulty = z.infer<typeof problemSetDifficultySchema>
 export type ProblemSetStatus = z.infer<typeof problemSetStatusSchema>
-export type BadgeConditionType = z.infer<typeof badgeConditionTypeSchema>
 export type AdminProblemSet = z.infer<typeof adminProblemSetSchema>
 export type AdminProblemSetList = z.infer<typeof adminProblemSetListSchema>
 export type CreateProblemSetRequest = z.infer<typeof createProblemSetRequestSchema>
 export type UpdateProblemSetRequest = z.infer<typeof updateProblemSetRequestSchema>
-export type UpdateProblemSetStatusRequest = z.infer<typeof updateProblemSetStatusRequestSchema>
 export type AdminProblemSetProblem = z.infer<typeof adminProblemSetProblemSchema>
-export type AddProblemToSetRequest = z.infer<typeof addProblemToSetRequestSchema>
+export type AddProblemsToSetRequest = z.infer<typeof addProblemsToSetRequestSchema>
+export type AddProblemsToSetResult = z.infer<typeof addProblemsToSetResultSchema>
+export type ReorderProblemSetProblemsRequest = z.infer<
+  typeof reorderProblemSetProblemsRequestSchema
+>
 export type UpdateProblemInSetRequest = z.infer<typeof updateProblemInSetRequestSchema>
 export type AdminProblemSetBadge = z.infer<typeof adminProblemSetBadgeSchema>
 export type CreateProblemSetBadgeRequest = z.infer<typeof createProblemSetBadgeRequestSchema>

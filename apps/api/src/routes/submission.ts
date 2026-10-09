@@ -30,7 +30,7 @@ import {
 } from "../services/contest"
 import { CodeFormatError, formatCode } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
-import { problemSetJoinTimes } from "../services/problemset"
+import { problemSetLockCutoffs } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { dayStart } from "../time"
 import { asFilterValue, asRecord, isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
@@ -289,14 +289,14 @@ function canViewSubmission(
   user: AuthUser | null,
   row: { userId: number; problemId: number; createTime: string },
   problem: { createdById: number },
-  problemSetJoinTime?: Map<number, string>,
+  problemSetCutoffs?: Map<number, string>,
 ) {
   if (!user) return false
-  // 题单防作弊，见 problemSetJoinTimes。只对学生自己的提交生效，老师不受限。
+  // 题单防作弊，见 problemSetLockCutoffs。只对学生自己的提交生效，老师不受限。
   // 学生管理员算学生，同样受限（旧后端 `is_regular_user()` 放过了他）。
   if (row.userId === user.id && !isTeacherOrAbove(user)) {
-    const joinTime = problemSetJoinTime?.get(row.problemId)
-    if (joinTime !== undefined && Date.parse(row.createTime) < Date.parse(joinTime)) return false
+    const cutoff = problemSetCutoffs?.get(row.problemId)
+    if (cutoff !== undefined && Date.parse(row.createTime) < Date.parse(cutoff)) return false
   }
   // 看别人代码的角色捷径只给老师和超管。学生管理员算学生（STUDENT_ROLES）：他参赛、上榜、
   // 和同学做同一份作业，能读别人的提交就是开卷。旧后端这里是 `not user.is_regular_user()`，
@@ -399,11 +399,11 @@ async function submissionDetail(id: string, user: AuthUser) {
   if (!row) return null
   // 详情也要过闸门。旧后端只挡了列表里的链接，`SubmissionAPI.get`（views/oj.py:103）
   // 光走 check_user_permission——知道 submission id 直接访问照样拿得到代码，遮挡是虚的。
-  const joinTimes =
+  const cutoffs =
     isTeacherOrAbove(user) || row.submission.userId !== user.id
       ? undefined
-      : await problemSetJoinTimes(user.id, [row.submission.problemId])
-  if (!canViewSubmission(user, row.submission, row.problem, joinTimes)) return null
+      : await problemSetLockCutoffs(user.id, [row.submission.problemId])
+  if (!canViewSubmission(user, row.submission, row.problem, cutoffs)) return null
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
@@ -569,9 +569,9 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
     displayId ? unknownDisplayIds(displayId, null) : [],
   ])
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
-  const [joinTimes, problemsetTitles] = await Promise.all([
+  const [cutoffs, problemsetTitles] = await Promise.all([
     user && !isTeacherOrAbove(user)
-      ? problemSetJoinTimes(user.id, [
+      ? problemSetLockCutoffs(user.id, [
           ...new Set(
             rows
               .filter((row) => row.submission.userId === user.id)
@@ -589,7 +589,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
           id: submission.id,
           problemDisplayId: problem.displayId,
           problemTitle: problem.title,
-          showLink: user ? canViewSubmission(user, submission, problem, joinTimes) : false,
+          showLink: user ? canViewSubmission(user, submission, problem, cutoffs) : false,
           createTime: submission.createTime,
           userId: submission.userId,
           username: submission.username,

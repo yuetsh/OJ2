@@ -417,7 +417,17 @@ export const problemset = pgTable(
     difficulty: text().notNull().$type<ProblemSetDifficulty>(),
     status: text().notNull().$type<ProblemSetStatus>(),
     createdById: integer("created_by_id").notNull(),
-    endTime: timestamp("end_time", { withTimezone: true, mode: "string" }),
+    /**
+     * 布置期：assignedAt 是这一轮布置开始的时刻，assignedUntil 是布置到哪天（东八区当天结束）。
+     * 布置期内，题单里这几道题学生在 assignedAt 之前交的代码先藏起来（防抄），见
+     * services/problemset.ts 的 problemSetLockCutoffs。不拦做题，过期照样做、照样记进度。
+     * 两个都为空 = 没布置。
+     *
+     * 列名还是 end_time（以前叫「截止时间」，名不副实）：机房那套和服务器共用这个库、
+     * 不一定同时升级，改列名会让没升级的那边一查题单就报错，所以只改代码里的名字
+     */
+    assignedUntil: timestamp("end_time", { withTimezone: true, mode: "string" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
     index("problemset_created_by_id_01b5197f").using(
