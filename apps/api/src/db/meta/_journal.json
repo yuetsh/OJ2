@@ -204,6 +204,13 @@
       "when": 1791555181872,
       "tag": "0028_drop_problemset_leftovers",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791555848163,
+      "tag": "0029_regrant_problemset_badges",
+      "breakpoints": true
     }
   ]
 }

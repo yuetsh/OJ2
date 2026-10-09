@@ -391,9 +391,12 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
   background: v-bind("theme.dividerColor");
 }
 
+/* 窄屏时阶梯要能横向滚，可 overflow-x 一设，纵向也跟着被裁：下一个奖章的金圈画在图标外 2px，
+   上沿会被切掉一条。上下留出几像素给它 */
 .ladder-box {
   max-width: 100%;
   overflow-x: auto;
+  padding: 4px 2px;
 }
 
 .join {
