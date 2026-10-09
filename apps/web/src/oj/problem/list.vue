@@ -179,15 +179,12 @@ const countText = computed(() => {
   return { kind: "total" as const, n: total.value }
 })
 
-// ---- 排序：默认随知识点走（选了按题号，全部按最新创建），下拉里显示的是实际生效的那个 ----
-const sortOptions = computed(() => {
-  const byId = !!query.tag
-  return [
-    { label: byId ? "按题号" : "最新创建", value: "" },
-    { label: byId ? "最新创建" : "按题号", value: byId ? "new" : "id" },
-    { label: "最多人做对", value: "popular" },
-  ]
-})
+// ---- 排序：默认按最新创建（选了知识点也一样） ----
+const sortOptions = [
+  { label: "最新创建", value: "" },
+  { label: "按题号", value: "id" },
+  { label: "最多人做对", value: "popular" },
+]
 
 // ---- 出题者 ----
 const authorOptions = ref<{ label: string; value: string }[]>([])

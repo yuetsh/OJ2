@@ -439,7 +439,7 @@ export const problemListSchema = paginatedSchema(problemListItemSchema)
 /** 题目列表「全部类型」下拉：有参考图 / 画流程图 / 语法要求 */
 export const problemTypeFilterSchema = z.enum(["reference", "flowchart", "ast"])
 
-/** 题目列表的排序。空串是默认：选了知识点按题号，全部题目按最新创建 */
+/** 题目列表的排序。空串是默认：按最新创建 */
 export const problemListSortSchema = z.enum(["", "id", "new", "popular"])
 
 /**

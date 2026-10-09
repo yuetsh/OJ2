@@ -169,10 +169,10 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
     filters.push(notInArray(schema.problem.id, [...states.solved]))
 
   const where = and(...filters)
-  // 默认：选了知识点按题号（同一系列的题挨在一起），全部题目按最新创建。
-  // 旧的排序值（最多提交、画流程图……）落到默认 —— 类型已经拆成了单独的筛选
+  // 默认按最新创建（选了知识点也一样）。旧的排序值（最多提交、画流程图……）落到默认 ——
+  // 类型已经拆成了单独的筛选
   const sort = problemListSortSchema.safeParse(c.req.query("sort") ?? "").data ?? ""
-  const effective = sort || (tag ? "id" : "new")
+  const effective = sort || "new"
   const allCounts = effective === "popular" ? await problemUserCounts() : null
   const popularity = allCounts
     ? sql`case ${schema.problem.id} ${sql.join(
