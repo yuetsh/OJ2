@@ -49,6 +49,17 @@ export function newRow(input = "", output = "", example = false, saved: string |
   } satisfies CaseRow
 }
 
+/**
+ * 测试点文件读回来时的样子：CRLF 统一成 LF，输入去掉末尾那一个换行（文件里都有，摆在输入框里
+ * 就是多出来的一行空白；上传时 caseFiles 会补回去），输出去掉末尾空白（判题机比对时本来就不看）
+ */
+export function normalizeCase(input: string, output: string) {
+  return {
+    input: input.replace(/\r\n/g, "\n").replace(/\n$/, ""),
+    output: output.replace(/\r\n/g, "\n").trimEnd(),
+  }
+}
+
 /** 判题机比对时去掉的是整段输出末尾的空白（见 services/test-case.ts 的 rstrip），这里同一个口径 */
 export function sameOutput(a: string, b: string) {
   return a.replace(/\r\n/g, "\n").trimEnd() === b.replace(/\r\n/g, "\n").trimEnd()
@@ -171,7 +182,7 @@ export function readCaseZip(
       output.length > TEST_CASE_EDIT_MAX_FILE_BYTES
     )
       return { ok: false, reason: "too-large" }
-    cases.push({ input: strFromU8(input), output: strFromU8(output) })
+    cases.push(normalizeCase(strFromU8(input), strFromU8(output)))
   }
   if (!cases.length)
     return { ok: false, reason: "压缩包里没有从 1.in / 1.out 开始连续编号的测试点" }

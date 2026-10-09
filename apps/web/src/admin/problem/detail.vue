@@ -26,6 +26,7 @@ import {
   caseFiles,
   caseStatus,
   newRow,
+  normalizeCase,
   readCaseZip,
   sameOutput,
   useCaseRunner,
@@ -343,6 +344,8 @@ async function importZip({ file }: UploadCustomRequestOptions) {
     return
   }
   try {
+    // 先把现在的例子拿下来：big 一设上，examples 就改读 exampleRows 了
+    const keep = examples.value
     const res = await uploadTestcases(raw)
     setTestCase(res.id, res.info)
     big.value = {
@@ -350,7 +353,7 @@ async function importZip({ file }: UploadCustomRequestOptions) {
       totalBytes: res.info.reduce((sum, e) => sum + e.input_size + e.output_size, 0),
     }
     if (!exampleRows.value.length) {
-      exampleRows.value = examples.value.map((e) => newRow(e.input, e.output, true))
+      exampleRows.value = keep.map((e) => newRow(e.input, e.output, true))
     }
     rows.value = []
     loadedCases = null
@@ -604,8 +607,8 @@ async function loadProblem(data: AdminProblem) {
     exampleRows.value = data.samples.map((s) => newRow(s.input, s.output, true, s.output))
     return
   }
-  loadedCases = files.cases
-  rows.value = files.cases.map((c) => newRow(c.input, c.output, false, c.output))
+  loadedCases = files.cases.map((c) => normalizeCase(c.input, c.output))
+  rows.value = loadedCases.map((c) => newRow(c.input, c.output, false, c.output))
   // 例子对回测试数据：输入一样的那组勾上；对不上的（老题的例子多半不在测试数据里）补到最后
   let appended = 0
   for (const sample of data.samples) {
@@ -658,7 +661,12 @@ const blockers = computed<Blocker[]>(() => {
   if (!source.value && caseRows.some((r) => !r.output.trim()))
     list.push({ text: "补上没写的输出", section: "cases" })
   if (!examples.value.length)
-    list.push({ text: "勾一组当例子（题面上至少给学生一个）", section: "cases" })
+    list.push({
+      text: big.value
+        ? "加一个例子（题面上至少给学生一个）"
+        : "勾一组当例子（题面上至少给学生一个）",
+      section: "cases",
+    })
 
   for (const [lang, state] of Object.entries(astChecks.value)) {
     if (!form.languages.includes(lang as RunnableLanguage)) continue
@@ -1007,7 +1015,7 @@ onMounted(async () => {
               <n-button size="tiny" quaternary>导入 zip</n-button>
             </n-upload>
             <n-button
-              v-if="!big ? rows.length : !!initial"
+              v-if="!big ? rows.length : !!initial && testCase.id === initial.testCaseId"
               size="tiny"
               quaternary
               @click="downloadZip"
@@ -1276,6 +1284,7 @@ onMounted(async () => {
       :hint="form.hint"
       :examples="examples"
       :examples-note="examplesNote"
+      :big-data="!!big"
       :languages="form.languages"
       :templates="templatesForPreview"
       :ast-rules="form.astRules"

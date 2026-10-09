@@ -27,6 +27,8 @@ const props = defineProps<{
   examples: { input: string; output: string }[]
   /** 例子来自哪几组，比如「测试数据第 1–4 组」 */
   examplesNote: string
+  /** 测试数据太大不展开、例子单独写的时候 */
+  bigData?: boolean
   languages: LANGUAGE[]
   templates: Partial<Record<LANGUAGE, TemplateParts>>
   astRules: AstRules | null
@@ -196,7 +198,9 @@ onMounted(() => nextTick(render))
           <pre class="sampleCell" role="cell">{{ sample.output }}</pre>
         </template>
       </div>
-      <p v-else class="placeholder">在左边的测试数据里勾几组「当例子」</p>
+      <p v-else class="placeholder">
+        {{ bigData ? "在左边加一个例子" : "在左边的测试数据里勾几组「当例子」" }}
+      </p>
 
       <template v-if="!isBlankHtml(hint)">
         <h3 class="title">提示</h3>
