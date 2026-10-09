@@ -16,12 +16,13 @@ import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
 import { USERNAME_CLASS_RE } from "utils/constants"
 import { parseTime } from "utils/functions"
+import ChampionList from "./components/ChampionList.vue"
 import ClassBattle from "./components/ClassBattle.vue"
-import RankAvatar from "./components/RankAvatar.vue"
 import RankMe, { type MiniRank } from "./components/RankMe.vue"
 import RankPodium from "./components/RankPodium.vue"
 import RankTrack from "./components/RankTrack.vue"
 import RankTrend from "./components/RankTrend.vue"
+import WeekTop from "./components/WeekTop.vue"
 import { useRankPalette } from "./palette"
 import {
   groupTitle,
@@ -190,6 +191,14 @@ const subtitle = computed(() => {
       : ` · 只列前面 ${b.rows.length} 名`
   return `${head} · 一样多的，先做到的在前${part}`
 })
+/** 手机上标题旁边那句：只说从哪天起、跟什么时候比 */
+const shortRule = computed(() => {
+  const b = board.value
+  if (!b) return ""
+  const from = b.start ? `${parseTime(b.start, "M月D日")}起` : "全部历史"
+  return `${from} · ↑↓ 比${b.period === "week" ? "今天早上" : "周一"}`
+})
+
 const ruleText = computed(() => {
   const b = board.value
   if (!b) return ""
@@ -235,11 +244,6 @@ const teacherClassOptions = computed(() => {
 
 const myBattle = computed(() => battle.value.find((item) => item.className === classContext.value))
 
-/** 这周本班：前 5 名（做对过的） */
-const weekTop = computed(() =>
-  (weekBoard.value?.rows ?? []).filter((row) => row.solved > 0).slice(0, 5),
-)
-const weekScale = computed(() => weekTop.value[0]?.solved || 1)
 const daysLeft = computed(() => {
   const start = weekBoard.value?.start
   if (!start) return 0
@@ -261,6 +265,26 @@ const trendLines = computed(() => {
       : []),
     { userId: b.me.user.id, label: "你", color: palette.value.me, strong: true },
   ]
+})
+
+const weekTitle = computed(() =>
+  teacher.value && classContext.value ? `这周 · ${classLabel(classContext.value)}` : "这周本班",
+)
+
+/** 手机上的页签：没有班就只剩班级对抗，没有走势（这周 / 老师）就不给走势那页 */
+const phoneTabs = computed(() => [
+  { key: "battle", label: "班级对抗" },
+  ...(board.value?.trend && me.value ? [{ key: "trend", label: "名次走势" }] : []),
+  ...(classContext.value
+    ? [
+        { key: "week", label: teacher.value ? "这周" : "这周本班" },
+        { key: "champions", label: "每周冠军" },
+      ]
+    : []),
+])
+const phoneTab = ref("battle")
+watch(phoneTabs, (tabs) => {
+  if (!tabs.some((tab) => tab.key === phoneTab.value)) phoneTab.value = "battle"
 })
 
 function open(username: string) {
@@ -294,16 +318,15 @@ async function restore(userId: number) {
   load()
   loadBattle()
 }
-
-function weekLabel(start: string) {
-  return `${parseTime(start, "M月D日")}那周`
-}
 </script>
 
 <template>
   <div class="rank-page">
-    <div class="toolbar">
-      <h2>排名</h2>
+    <div class="toolbar" :class="{ single: !isDesktop }">
+      <div class="title">
+        <h2>排名</h2>
+        <span v-if="!isDesktop" class="rule">{{ shortRule }}</span>
+      </div>
       <div class="seg" role="group" aria-label="范围">
         <button
           v-for="option in SCOPE_OPTIONS"
@@ -335,8 +358,10 @@ function weekLabel(start: string) {
         placeholder="选班"
         :options="teacherClassOptions"
       />
-      <div class="spacer" />
-      <span class="rule">{{ ruleText }}</span>
+      <template v-if="isDesktop">
+        <div class="spacer" />
+        <span class="rule">{{ ruleText }}</span>
+      </template>
     </div>
 
     <div class="main" :class="{ single: !isDesktop }">
@@ -361,7 +386,9 @@ function weekLabel(start: string) {
             @open="open"
           />
           <RankTrack
+            :key="`${board.scope}|${board.period}|${board.className}`"
             :rows="trackRows"
+            :whole-label="board.scope === 'class' ? `看全班 ${board.total} 人` : undefined"
             :total="board.total"
             :complete="board.complete"
             :scale="scale"
@@ -392,6 +419,7 @@ function weekLabel(start: string) {
             :total="board.total"
             :label="`${scopeLabel(board.scope)} · ${periodLabel(board.period)}`"
             :minis="minis"
+            :compact="!isDesktop"
           />
           <div v-else-if="board.hidden" class="note-card">
             <b>你现在不计入排名</b>
@@ -432,10 +460,7 @@ function weekLabel(start: string) {
         <ClassBattle v-if="isDesktop" :items="battle" :mine="classContext" :teacher="teacher" />
       </aside>
     </div>
-    <!-- 手机上「你」那张卡提到赛道前面了，班级对抗放到赛道后面，别把赛道挤到第三屏 -->
-    <ClassBattle v-if="!isDesktop" :items="battle" :mine="classContext" :teacher="teacher" />
-
-    <div v-if="classContext" class="below" :class="{ single: !isDesktop }">
+    <div v-if="isDesktop && classContext" class="below">
       <div v-if="board?.trend && me" class="card">
         <div class="card-title">
           <b>我和对手的名次</b><span class="muted">每周日晚上 · 越高越好</span>
@@ -444,96 +469,64 @@ function weekLabel(start: string) {
       </div>
       <div class="card">
         <div class="card-title">
-          <b>{{ teacher && classContext ? `这周 · ${classLabel(classContext)}` : "这周本班" }}</b>
+          <b>{{ weekTitle }}</b>
           <span class="muted">还剩 {{ daysLeft }} 天 · 下周一清零</span>
         </div>
-        <div
-          v-for="row in weekTop"
-          :key="row.user.id"
-          class="week-row"
-          :class="{ me: row.user.id === meId }"
-        >
-          <span
-            class="medal"
-            :style="
-              row.rank <= 3
-                ? {
-                    color: palette.medal[row.rank - 1]!.color,
-                    background: palette.medal[row.rank - 1]!.background,
-                  }
-                : undefined
-            "
-            >{{ row.rank }}</span
-          >
-          <RankAvatar
-            :username="row.user.username"
-            :avatar="row.avatar"
-            :size="18"
-            :me="row.user.id === meId"
-          />
-          <button class="who" @click="open(row.user.username)">
-            <UserName :username="row.user.username" />
-          </button>
-          <span class="bar-box">
-            <span
-              class="bar"
-              :style="{
-                width: `${(row.solved / weekScale) * 100}%`,
-                background: row.user.id === meId ? palette.me : palette.bar,
-              }"
-            />
-          </span>
-          <b class="num">{{ row.solved }}</b>
-        </div>
-        <span v-if="weekBoard && !weekTop.length" class="muted">
-          这周还没人做对新题，现在做对 1 道就是第一
-        </span>
+        <WeekTop :rows="weekBoard?.rows ?? []" :me-id="meId" :loaded="!!weekBoard" @open="open" />
       </div>
       <div class="card">
         <div class="card-title">
           <b>每周冠军</b><span class="muted">本班 · 每周一清零后重新比</span>
         </div>
-        <div v-for="champion in champions" :key="champion.weekStart" class="champion">
-          <span class="muted week">{{ weekLabel(champion.weekStart) }}</span>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="#f2c94c"
-            stroke="#9a6700"
-            stroke-width="1.6"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
-          </svg>
-          <RankAvatar
-            :username="champion.user.username"
-            :avatar="champion.avatar"
-            :size="20"
-            :me="champion.user.id === meId"
-          />
-          <button class="who" @click="open(champion.user.username)">
-            <UserName :username="champion.user.username" />
-          </button>
-          <span class="muted num">{{ champion.solved }} 道</span>
-        </div>
-        <span v-if="!champions.length" class="muted">最近几周还没有冠军</span>
-        <div v-if="hot" class="champion hot-line">
-          <span class="hot-tag">冲得最猛</span>
-          <RankAvatar
-            :username="hot.user.username"
-            :avatar="hot.avatar"
-            :size="20"
-            :me="hot.user.id === meId"
-          />
-          <button class="who" @click="open(hot.user.username)">
-            <UserName :username="hot.user.username" />
-          </button>
-          <span class="muted"
-            >{{ period === "week" ? "今天" : "这周" }}升了 {{ hot.change }} 名</span
-          >
-        </div>
+        <ChampionList
+          :champions="champions"
+          :hot="hot"
+          :since="period === 'week' ? '今天' : '这周'"
+          :me-id="meId"
+          @open="open"
+        />
+      </div>
+    </div>
+
+    <!-- 手机：赛道下面四块收成一张页签卡（设计稿「手机版」），不然整页四屏多 -->
+    <div v-if="!isDesktop" class="card tabs-card">
+      <div class="tabs" role="tablist">
+        <button
+          v-for="tab in phoneTabs"
+          :key="tab.key"
+          role="tab"
+          :aria-selected="phoneTab === tab.key"
+          :class="{ on: phoneTab === tab.key }"
+          @click="phoneTab = tab.key"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+      <div class="tab-body">
+        <ClassBattle
+          v-if="phoneTab === 'battle'"
+          bare
+          :items="battle"
+          :mine="classContext"
+          :teacher="teacher"
+        />
+        <RankTrend
+          v-else-if="phoneTab === 'trend' && board?.trend"
+          :trend="board.trend"
+          :lines="trendLines"
+        />
+        <template v-else-if="phoneTab === 'week'">
+          <span class="muted">{{ weekTitle }} · 还剩 {{ daysLeft }} 天 · 下周一清零</span>
+          <WeekTop :rows="weekBoard?.rows ?? []" :me-id="meId" :loaded="!!weekBoard" @open="open" />
+        </template>
+        <ChampionList
+          v-else-if="phoneTab === 'champions'"
+          :champions="champions"
+          :hot="hot"
+          :since="period === 'week' ? '今天' : '这周'"
+          :me-id="meId"
+          @open="open"
+        />
       </div>
     </div>
   </div>
@@ -614,8 +607,7 @@ function weekLabel(start: string) {
   align-items: start;
 }
 
-.main.single,
-.below.single {
+.main.single {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -759,93 +751,66 @@ function weekLabel(start: string) {
   margin-bottom: 2px;
 }
 
-.week-row,
-.champion {
-  height: 26px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.week-row.me {
-  margin: 0 -8px;
-  padding: 0 8px;
-  border-radius: 4px;
-  background: rgba(24, 160, 88, 0.12);
-}
-
-.medal {
-  width: 22px;
-  height: 22px;
-  border-radius: 11px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-  color: v-bind("theme.textColor2");
-}
-
-.who {
+.tabs-card {
   padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.tabs button {
+  flex: 1;
+  height: 38px;
   border: 0;
+  border-bottom: 2px solid transparent;
   background: none;
   font: inherit;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
   cursor: pointer;
-  display: flex;
-  min-width: 0;
-  flex-shrink: 1;
 }
 
-.week-row .who {
-  width: 110px;
-  flex-shrink: 0;
-}
-
-.bar-box {
-  flex-grow: 1;
-  height: 9px;
-  position: relative;
-}
-
-.bar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 2px 5px 5px 2px;
-}
-
-.num {
-  font-variant-numeric: tabular-nums;
-}
-
-.week {
-  width: 78px;
-  flex-shrink: 0;
-}
-
-.champion .who {
-  flex-grow: 1;
-}
-
-.hot-line {
-  margin-top: 4px;
-  padding-top: 8px;
-  height: auto;
-  border-top: 1px solid v-bind("theme.dividerColor");
-}
-
-.hot-tag {
-  font-size: 11px;
+.tabs button.on {
+  color: #18a058;
   font-weight: 600;
-  color: #ffffff;
-  background: #c76a12;
-  border-radius: 3px;
-  padding: 0 5px;
-  line-height: 16px;
-  white-space: nowrap;
+  border-bottom-color: #18a058;
+}
+
+.tab-body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 手机：标题一行，两组开关各占满一行，手指好点 */
+.toolbar.single {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.toolbar.single .seg {
+  display: flex;
+  height: 34px;
+}
+
+.toolbar.single .seg button {
+  flex: 1;
+  font-size: 14px;
+}
+
+.toolbar.single .class-select {
+  width: 100%;
 }
 </style>

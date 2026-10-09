@@ -8,7 +8,13 @@ import { useRankPalette } from "../palette"
  * 班级对抗：全服各班这学期人均做对，绿字是这周人均涨了多少。按人均比，因为班级人数从
  * 十来个到五十几个都有。列前 7 个班，自己的班不在里面就补在最后。
  */
-const props = defineProps<{ items: ClassBattleItem[]; mine: string | null; teacher?: boolean }>()
+const props = defineProps<{
+  items: ClassBattleItem[]
+  mine: string | null
+  teacher?: boolean
+  /** 放在手机页签卡里：不要自己的边框和标题 */
+  bare?: boolean
+}>()
 
 const theme = useThemeVars()
 const palette = useRankPalette()
@@ -44,9 +50,9 @@ function shortLabel(className: string) {
 </script>
 
 <template>
-  <div class="battle">
+  <div class="battle" :class="{ bare }">
     <div class="title">
-      <b>班级对抗</b><span class="muted">人均做对 · 全服 · 绿字是这周涨的</span>
+      <b v-if="!bare">班级对抗</b><span class="muted">人均做对 · 全服 · 绿字是这周涨的</span>
     </div>
     <div
       v-for="item in shown"
@@ -82,6 +88,12 @@ function shortLabel(className: string) {
   border: 1px solid v-bind("theme.borderColor");
   border-radius: 6px;
   background: v-bind("theme.cardColor");
+}
+
+.battle.bare {
+  padding: 0;
+  border: 0;
+  background: none;
 }
 
 .title {

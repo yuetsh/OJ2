@@ -25,6 +25,8 @@ const props = defineProps<{
   total: number
   label: string
   minis: MiniRank[]
+  /** 手机：对手的说明换到名字下面一行，别被截断 */
+  compact?: boolean
 }>()
 
 const theme = useThemeVars()
@@ -58,7 +60,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 </script>
 
 <template>
-  <div class="me-card">
+  <div class="me-card" :class="{ compact }">
     <div class="head">
       <RankAvatar :username="me.user.username" :avatar="me.avatar" :size="46" me />
       <div class="place">
@@ -189,6 +191,18 @@ function threatNote(me: RankRow, behind: RankRow) {
   gap: 8px;
   font-size: 13px;
   min-width: 0;
+}
+
+.compact .rival {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  row-gap: 1px;
+}
+
+.compact .note {
+  grid-column: 3;
+  white-space: normal;
 }
 
 .rival-name {

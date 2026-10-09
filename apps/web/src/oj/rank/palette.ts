@@ -13,6 +13,14 @@ export function useRankPalette() {
     threat: "#c76a12",
     mate: isDark.value ? "#2f6b47" : "#a8dcbd",
     bar: isDark.value ? "#4a525c" : "#c9d3dc",
+    /** 手机上条是整行底色，要淡到字压在上面看得清 */
+    soft: {
+      me: isDark.value ? "rgba(24,160,88,0.32)" : "#cdebd9",
+      chase: isDark.value ? "rgba(47,111,208,0.32)" : "#d6e3f7",
+      threat: isDark.value ? "rgba(199,106,18,0.32)" : "#f7e0cb",
+      mate: isDark.value ? "rgba(24,160,88,0.16)" : "#e2f3e9",
+      bar: isDark.value ? "rgba(255,255,255,0.08)" : "#eef1f4",
+    },
     medal: [
       {
         color: isDark.value ? "#e2b33b" : "#9a6700",
