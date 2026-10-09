@@ -202,6 +202,7 @@ async function loadAuthors(show: boolean) {
 
 // ---- 类型 ----
 const showTypeMenu = ref(false)
+const [showMobileFilters, toggleMobileFilters] = useToggle(false)
 // 弹层被传送到 body 下面，样式里的 v-bind 变量挂在页面根上、够不着它，主题色只能就地给
 const menuVars = computed(() => ({
   "--menu-bg": theme.value.popoverColor,
@@ -213,12 +214,46 @@ const menuVars = computed(() => ({
   "--menu-check": theme.value.successColor,
 }))
 // 下拉里每类后面的题数：一共三十几道，第一次打开时数一下就行
-const typeCounts = ref<Partial<Record<ProblemTypeFilter, number>>>({})
-watch(showTypeMenu, async (open) => {
-  if (!open || Object.keys(typeCounts.value).length) return
-  const counts = await Promise.all(TYPES.map((type) => getProblemList(0, 1, { type })))
-  typeCounts.value = Object.fromEntries(TYPES.map((type, i) => [type, counts[i]!.total]))
+// 下拉里每类后面的题数，跟着左栏的知识点和其它筛选走（类型本身除外）：
+// 选了「条件判断」就说「条件判断」里有几道画流程图的题，不然一直是全站那个固定数，看着像没生效。
+// 只在下拉打开时数，条件没变就不重数
+type Counts = Partial<Record<ProblemTypeFilter | "all", number>>
+const typeCounts = ref<Counts>({})
+let countedFor = ""
+const countFilters = computed(() => ({
+  keyword: query.keyword,
+  tag: query.tag,
+  difficulty: query.difficulty,
+  author: query.author,
+  undone: undoneOn.value ? "1" : "",
+}))
+async function refreshTypeCounts() {
+  const key = JSON.stringify(countFilters.value)
+  if (key === countedFor) return
+  countedFor = key
+  const kinds = ["all", ...TYPES] as const
+  const results = await Promise.all(
+    kinds.map((kind) =>
+      getProblemList(0, 1, { ...countFilters.value, type: kind === "all" ? "" : kind }),
+    ),
+  )
+  // 数的过程中条件又变了：这一份已经过时，留给下一次
+  if (key !== JSON.stringify(countFilters.value)) return
+  typeCounts.value = Object.fromEntries(kinds.map((kind, i) => [kind, results[i]!.total]))
+}
+watch([showTypeMenu, () => showMobileFilters.value, countFilters], () => {
+  if (showTypeMenu.value || showMobileFilters.value) refreshTypeCounts()
 })
+
+const mobileTypeOptions = computed(() =>
+  TYPES.map((kind) => ({
+    label:
+      typeCounts.value[kind] === undefined
+        ? PROBLEM_TYPE_LABEL[kind]
+        : `${PROBLEM_TYPE_LABEL[kind]}（${typeCounts.value[kind]} 道）`,
+    value: kind,
+  })),
+)
 
 function pickType(value: string) {
   query.type = value
@@ -271,8 +306,6 @@ function difficultyStyle(row: ProblemRow) {
   const t = tone(DIFFICULTY_TONE[row.difficulty])
   return { color: t.color, background: t.background }
 }
-
-const [showMobileFilters, toggleMobileFilters] = useToggle(false)
 
 // 手机上知识点横着滑：带着 ?tag= 进来、或者点了靠后的知识点，把它滑到看得见的地方
 const chipsRef = ref<HTMLElement | null>(null)
@@ -367,7 +400,14 @@ const gridColumns = computed(() =>
             <div class="type-menu" :style="menuVars">
               <button :class="{ on: !query.type }" @click="pickType('')">
                 <span class="check"><Icon v-if="!query.type" icon="ph:check-bold" /></span>
-                <span class="body"><span class="label">全部类型</span></span>
+                <span class="body">
+                  <span class="label-line">
+                    <span class="label">全部类型</span>
+                    <span v-if="typeCounts.all !== undefined" class="n"
+                      >{{ typeCounts.all }} 道</span
+                    >
+                  </span>
+                </span>
               </button>
               <button
                 v-for="kind in TYPES"
@@ -543,7 +583,7 @@ const gridColumns = computed(() =>
           size="small"
           placeholder="全部类型"
           clearable
-          :options="TYPES.map((k) => ({ label: PROBLEM_TYPE_LABEL[k], value: k }))"
+          :options="mobileTypeOptions"
           @update:value="(v: string | null) => (query.type = v ?? '')"
         />
         <n-select
