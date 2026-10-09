@@ -183,7 +183,7 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
     title: "选项",
     key: "actions",
     fixed: "right",
-    width: 320,
+    width: 300,
     render: (row) =>
       h(Actions, {
         problemID: row.id,
