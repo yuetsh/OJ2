@@ -4,6 +4,7 @@ import type { ProblemProgress, ProblemTypeFilter, Tag } from "@oj2/contract"
 import { useRouteQuery } from "@vueuse/router"
 import { useThemeVars } from "naive-ui"
 import { getAuthors, getProblemList, getProblemProgress, getRandomProblem } from "oj/api"
+import { useCodeStore } from "oj/store/code"
 import { useTone } from "oj/submission/composables/tone"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
@@ -54,6 +55,7 @@ const userStore = useUserStore()
 const authStore = useAuthModalStore()
 const theme = useThemeVars()
 const tone = useTone()
+const codeStore = useCodeStore()
 const { isDesktop, isMobile } = useBreakpoints()
 
 const { query } = usePagination<ProblemQuery>(
@@ -69,11 +71,6 @@ const { query } = usePagination<ProblemQuery>(
   { defaultLimit: 30 },
 )
 
-const undoneOn = computed({
-  get: () => query.undone === "1",
-  set: (on: boolean) => (query.undone = on ? "1" : ""),
-})
-
 const problems = ref<ProblemRow[]>([])
 const total = ref(0)
 const loaded = ref(false)
@@ -85,6 +82,12 @@ const progress = ref<ProblemProgress | null>(null)
 const teacher = computed(() => userStore.isTeacherOrAbove)
 const showStatus = computed(() => userStore.isAuthed && !teacher.value)
 const mine = computed(() => (showStatus.value ? progress.value : null))
+
+// 老师那一版没有这个开关：没有状态列，开了也看不出藏了哪些题。带着 ?undone=1 进来也当没开
+const undoneOn = computed({
+  get: () => query.undone === "1" && !teacher.value,
+  set: (on: boolean) => (query.undone = on ? "1" : ""),
+})
 
 const tagByName = computed(() => new Map(tags.value.map((t) => [t.name, t])))
 const currentTag = computed(() => tagByName.value.get(query.tag) ?? null)
@@ -279,7 +282,12 @@ const picking = ref(false)
 async function pickRandom() {
   picking.value = true
   try {
-    const id = await getRandomProblem(query.tag)
+    const id = await getRandomProblem({
+      tag: query.tag,
+      type: query.type,
+      // 只挑能用自己的语言做的题：学生在编辑器里上次用的语言，没用过就是 Python
+      language: codeStore.preferredLanguage(),
+    })
     router.push("/problem/" + id)
   } finally {
     picking.value = false
@@ -511,8 +519,9 @@ const gridColumns = computed(() =>
             :consistent-menu-width="false"
             :options="sortOptions"
           />
-          <span class="vsep"></span>
+          <span v-if="!teacher" class="vsep"></span>
           <label
+            v-if="!teacher"
             class="undone"
             :class="{ disabled: !userStore.isAuthed }"
             :title="userStore.isAuthed ? '做对的题藏起来' : '登录后才能用'"
@@ -665,7 +674,7 @@ const gridColumns = computed(() =>
           @update:value="(v: string | null) => (query.author = v ?? '')"
         />
         <n-select v-model:value="query.sort" size="small" :options="sortOptions" />
-        <label class="undone" :class="{ disabled: !userStore.isAuthed }">
+        <label v-if="!teacher" class="undone" :class="{ disabled: !userStore.isAuthed }">
           <n-switch v-model:value="undoneOn" size="small" :disabled="!userStore.isAuthed" />
           只看没做完
         </label>

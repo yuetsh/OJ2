@@ -100,9 +100,12 @@ export function getProblemProgress() {
   return api.get<ProblemProgress | null>("problems/progress")
 }
 
-/** 「随便来一道」：当前知识点里先挑自己没做对的简单 / 中等题，返回题号 */
-export function getRandomProblem(tag: string) {
-  return api.get<string>("problems/random", { params: tag ? { tag } : {} })
+/**
+ * 「随便来一道」：当前知识点和类型里，先挑能用 language 做的、自己没做对的简单 / 中等题，
+ * 返回题号。空串的参数拦截器会去掉
+ */
+export function getRandomProblem(params: { tag: string; type: string; language: string }) {
+  return api.get<string>("problems/random", { params })
 }
 
 export function getAuthors(all = false) {

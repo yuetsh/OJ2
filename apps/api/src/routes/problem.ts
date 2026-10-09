@@ -1,4 +1,5 @@
 import {
+  normalizeLanguage,
   problemListSortSchema,
   problemTypeFilterSchema,
   type ProblemAuthor,
@@ -6,6 +7,7 @@ import {
   type ProblemList,
   type ProblemListItem,
   type ProblemProgress,
+  type ProblemTypeFilter,
   type Tag,
 } from "@oj2/contract"
 import {
@@ -79,6 +81,15 @@ async function getProblemTags(problemIds: number[]) {
   for (const row of rows)
     result.set(row.problemId, [...(result.get(row.problemId) ?? []), row.name])
   return result
+}
+
+/** 「全部类型」下拉的筛选条件，列表和「随便来一道」共用 */
+function typeFilter(type: ProblemTypeFilter | undefined) {
+  if (type === "reference") return eq(schema.problem.showFlowchart, true)
+  if (type === "flowchart") return eq(schema.problem.allowFlowchart, true)
+  if (type === "ast") return sql`${schema.problem.astRules} is not null`
+  if (type === "sql") return sql`${schema.problem.languages} @> '["SQL"]'::jsonb`
+  return undefined
 }
 
 type ProblemStates = Awaited<ReturnType<typeof problemStates>> | null
@@ -155,10 +166,8 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
       ),
     )
   }
-  if (type === "reference") filters.push(eq(schema.problem.showFlowchart, true))
-  if (type === "flowchart") filters.push(eq(schema.problem.allowFlowchart, true))
-  if (type === "ast") filters.push(sql`${schema.problem.astRules} is not null`)
-  if (type === "sql") filters.push(sql`${schema.problem.languages} @> '["SQL"]'::jsonb`)
+  const byType = typeFilter(type)
+  if (byType) filters.push(byType)
 
   const states = user ? await problemStates(user.id) : null
   if (undone && states && states.solved.size > 0)
@@ -254,12 +263,22 @@ problemRoutes.get("/problem-tags", async (c) => {
 })
 
 /**
- * 「随便来一道」：范围是当前知识点（不传就是全部），先挑自己还没做对的简单 / 中等题，
- * 没有就放宽到没做对的困难题，再没有就随便一道（全做对了也给一道，不让按钮落空）。
+ * 「随便来一道」：范围是当前知识点和类型（不传就是全部），先挑能用自己的语言做的、
+ * 还没做对的简单 / 中等题，没有就一档档放宽：没做对的困难题 → 做对过的
+ * （全做对了也给一道，不让按钮落空）→ 别的语言的题。
+ *
+ * 语言是前端记着的「上次用的语言」，没有就是 Python。不按语言挑的话，C 学生大约每
+ * 9 次就抽到 1 道没有 C 的题（Python 专用题和 SQL 题）。语言排在最前、而不是筛掉：
+ * 选了「SQL」知识点时没有一道能用 Python 做，照样得抽一道 SQL 题出来。
  */
 problemRoutes.get("/problems/random", optionalAuth, async (c) => {
   const user = c.get("user")
   const tag = c.req.query("tag")?.trim()
+  const type = problemTypeFilterSchema.safeParse(c.req.query("type")).data
+  // 上次用的是 SQL（刚做完一道 SQL 题）不算偏好：SQL 题一共 9 道，照它挑就成了「随便来一道
+  // SQL」。要 SQL 题的人会选「SQL」知识点或类型，那时按上面说的照样抽得到
+  const saved = normalizeLanguage(c.req.query("language"))
+  const language = saved && saved !== "SQL" && saved !== "Flowchart" ? saved : "Python"
   const states = user ? await problemStates(user.id) : null
   const solved = states ? [...states.solved] : []
   const [row] = await db
@@ -282,11 +301,13 @@ problemRoutes.get("/problems/random", optionalAuth, async (c) => {
                 .where(eq(schema.problemTag.name, tag)),
             )
           : undefined,
+        typeFilter(type),
       ),
     )
     // 没做对过题（没登录、新生）就不排这一项。别拿 sql`1` 占位：ORDER BY 里的整数常量是
     // 「按第 1 列排」，会先按题号排、random() 形同虚设，每次都是同一道
     .orderBy(
+      desc(sql`${schema.problem.languages} @> ${JSON.stringify([language])}::jsonb`),
       ...(solved.length ? [asc(inArray(schema.problem.id, solved))] : []),
       asc(sql`${schema.problem.difficulty} = 'High'`),
       sql`random()`,
@@ -337,11 +358,13 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
   // 「已 AC 的不再推荐」必须下推到 SQL。早先是先 limit(5) 再在内存里筛，刷题多的
   // 学生 5 条候选能被筛到只剩一两条、甚至清零（前端 v-if 一空整块就不渲染）——
   // 而这个接口恰好只在**刚 AC** 或**连挂三次**时才被调用，正是候选最容易全中的时候。
-  const statuses = await getProblemStatuses(c.get("user")?.id)
-  const solvedIds = Object.entries(statuses)
-    .filter(([, value]) => asRecord(value).status === JudgeStatus.ACCEPTED)
-    .map(([key]) => Number(key))
-    .filter((id) => Number.isInteger(id))
+  // 做对了的和题目列表同一个口径：画流程图的题，流程图评到 A / S 也算（problemStates）
+  const user = c.get("user")
+  const [statuses, states] = await Promise.all([
+    getProblemStatuses(user?.id),
+    user ? problemStates(user.id) : null,
+  ])
+  const solvedIds = states ? [...states.solved] : []
   // difficulty 是 text（Low / Mid / High），直接 order by 走的是字典序 ——
   // High 排在 Low 前面，「由易到难」会变成「最难的先上」。按语义显式排。
   const difficultyRank = sql`case ${schema.problem.difficulty} when 'Low' then 0 when 'Mid' then 1 else 2 end`
@@ -388,7 +411,7 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
   const [tags, counts] = await Promise.all([getProblemTags(ids), problemUserCounts(ids)])
   return success(
     c,
-    rows.map((row) => listItem(row, tags, statuses, null, counts)),
+    rows.map((row) => listItem(row, tags, statuses, states, counts)),
   )
 })
 
