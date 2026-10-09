@@ -22,6 +22,8 @@ import {
 import AstRulesEditor from "./components/AstRulesEditor.vue"
 import CaseTable from "./components/CaseTable.vue"
 import CodePreview from "./components/CodePreview.vue"
+import PreviewStrip from "./components/PreviewStrip.vue"
+import { usePreviewCollapsed } from "./components/previewCollapse"
 import {
   caseFiles,
   caseStatus,
@@ -458,6 +460,7 @@ const open = reactive({
   more: false,
 })
 const preview = ref<PreviewTab>("statement")
+const previewCollapsed = usePreviewCollapsed()
 
 watch(
   () => open.write,
@@ -842,7 +845,7 @@ onMounted(async () => {
     </template>
   </PageHeader>
 
-  <div v-if="ready" class="codeEditor">
+  <div v-if="ready" class="codeEditor" :class="{ collapsed: previewCollapsed }">
     <!-- 左：写 -->
     <div class="write">
       <div v-if="draftRestored" class="notice">上次没保存的草稿已经恢复</div>
@@ -1273,7 +1276,9 @@ onMounted(async () => {
     </div>
 
     <!-- 右：学生看到的 -->
+    <!-- 收起时用 v-show 不卸载：流程图渲染成没成功（mermaidOk）还要接着报给保存按钮 -->
     <CodePreview
+      v-show="!previewCollapsed"
       v-model:tab="preview"
       :display-id="form._id"
       :title="form.title"
@@ -1293,7 +1298,9 @@ onMounted(async () => {
       :mermaid-code="form.mermaidCode"
       :flowchart-hint="form.flowchartHint"
       @render-state="mermaidOk = $event"
+      @collapse="previewCollapsed = true"
     />
+    <PreviewStrip v-if="previewCollapsed" @expand="previewCollapsed = false" />
   </div>
 </template>
 
@@ -1314,16 +1321,22 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+/* 写的一边是主角，看的一边小一点（用户 2026-10-09：编辑区域要大）；右栏可以收起来 */
 .codeEditor {
   display: grid;
-  grid-template-columns: minmax(0, 600px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 20px;
   align-items: start;
 }
 
+.codeEditor.collapsed {
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+
 /* 窄屏（老师的小笔记本）放不下两栏：预览挪到下面 */
 @media (max-width: 1180px) {
-  .codeEditor {
+  .codeEditor,
+  .codeEditor.collapsed {
     grid-template-columns: minmax(0, 1fr);
   }
 }

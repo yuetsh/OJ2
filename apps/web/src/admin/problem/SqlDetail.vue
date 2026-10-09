@@ -14,6 +14,8 @@ import { errorCode, errorMessage, isApiError } from "utils/api"
 import { DIFFICULTY, STORAGE_KEY } from "utils/constants"
 import { createZipBlob, getTagColor, unique } from "utils/functions"
 import type { AdminProblem, BlankProblem, SqlConfig, Tag, Testcase } from "utils/types"
+import PreviewStrip from "./components/PreviewStrip.vue"
+import { usePreviewCollapsed } from "./components/previewCollapse"
 import {
   createContestProblem,
   createProblem,
@@ -53,6 +55,7 @@ const props = defineProps<{
 const message = useMessage()
 const router = useRouter()
 const theme = useThemeVars()
+const previewCollapsed = usePreviewCollapsed()
 const isDark = useDark()
 
 const isCreate = computed(() => !props.problemID)
@@ -445,7 +448,7 @@ onMounted(async () => {
     </template>
   </PageHeader>
 
-  <div v-if="ready" class="sqlEditor">
+  <div v-if="ready" class="sqlEditor" :class="{ collapsed: previewCollapsed }">
     <!-- 左：写 -->
     <div class="write">
       <section class="card">
@@ -634,7 +637,7 @@ onMounted(async () => {
     </div>
 
     <!-- 右：学生看到的 -->
-    <aside class="preview" aria-label="学生看到的样子">
+    <aside v-show="!previewCollapsed" class="preview" aria-label="学生看到的样子">
       <div class="previewHead">
         <b>学生看到的样子</b>
         <div class="grow"></div>
@@ -643,6 +646,9 @@ onMounted(async () => {
             第 {{ i + 1 }} 组<span v-if="statusOf(g) === 'error'" class="error"> ✗</span>
           </n-radio-button>
         </n-radio-group>
+        <n-button size="small" quaternary title="收起，专心写左边" @click="previewCollapsed = true">
+          收起 ›
+        </n-button>
       </div>
       <div class="page">
         <div class="titleRow">
@@ -703,6 +709,7 @@ onMounted(async () => {
         </template>
       </div>
     </aside>
+    <PreviewStrip v-if="previewCollapsed" @expand="previewCollapsed = false" />
   </div>
 </template>
 
@@ -711,16 +718,22 @@ onMounted(async () => {
   font-size: 12px;
 }
 
+/* 写的一边是主角，看的一边小一点（用户 2026-10-09：编辑区域要大）；右栏可以收起来 */
 .sqlEditor {
   display: grid;
-  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 20px;
   align-items: start;
 }
 
+.sqlEditor.collapsed {
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+
 /* 窄屏（老师的小笔记本）放不下两栏：预览挪到下面 */
 @media (max-width: 1180px) {
-  .sqlEditor {
+  .sqlEditor,
+  .sqlEditor.collapsed {
     grid-template-columns: minmax(0, 1fr);
   }
 }

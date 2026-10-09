@@ -39,7 +39,7 @@ const props = defineProps<{
 }>()
 
 const tab = defineModel<PreviewTab>("tab", { required: true })
-const emit = defineEmits<{ renderState: [ok: boolean] }>()
+const emit = defineEmits<{ renderState: [ok: boolean]; collapse: [] }>()
 
 const theme = useThemeVars()
 const isDark = useDark()
@@ -117,6 +117,9 @@ onMounted(() => nextTick(render))
           流程图
         </n-radio-button>
       </n-radio-group>
+      <n-button size="small" quaternary title="收起，专心写左边" @click="emit('collapse')">
+        收起 ›
+      </n-button>
     </div>
 
     <!-- 题面 -->
