@@ -244,6 +244,7 @@ contestRoutes.get(
             allowFlowchart: problem.allowFlowchart,
             showFlowchart: problem.showFlowchart,
             hasAstRules: problem.astRules !== null,
+            isSql: problem.languages.includes("SQL"),
             myStatus: myStatusOf(statuses, problem.id),
             // 按人数是公开题库列表的列；比赛题表看的是榜单，不下发
             solvedUsers: 0,

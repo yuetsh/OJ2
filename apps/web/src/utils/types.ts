@@ -167,6 +167,7 @@ export interface ProblemRow {
   allowFlowchart: boolean
   showFlowchart: boolean
   hasAstRules: boolean
+  isSql: boolean
   solvedUsers: number
   triedUsers: number
 }

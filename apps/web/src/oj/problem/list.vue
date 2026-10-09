@@ -44,7 +44,7 @@ const DIFFICULTIES = [
   { label: "困难", value: "High" },
 ]
 
-const TYPES: ProblemTypeFilter[] = ["reference", "flowchart", "ast"]
+const TYPES: ProblemTypeFilter[] = ["sql", "reference", "flowchart", "ast"]
 
 /** 新生一道还没做对时，顶行引去的知识点 */
 const START_TAG = "输出入门"

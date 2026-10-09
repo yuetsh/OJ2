@@ -5,7 +5,8 @@ import { useThemeVars } from "naive-ui"
 import { PROBLEM_TYPE_LABEL } from "../utils/problemType"
 
 /**
- * 三类特殊题的小标签（设计稿「题目列表重设计 · 改版」）。轻重按对学生意味着什么分：
+ * 几类特殊题的小标签（设计稿「题目列表重设计 · 改版」）。轻重按对学生意味着什么分：
+ * - SQL：和画流程图一样重（实心底）—— 写的根本不是 C / Python，点进去之前就得知道
  * - 画流程图：最醒目（浅紫底）—— 只有这类题能交流程图，要做的事和普通题不一样
  * - 语法要求：蓝描边 —— 判题时会检查写法，要看得见
  * - 有参考图：灰描边，最轻 —— 是帮助，不用提醒
@@ -16,6 +17,7 @@ const props = defineProps<{ kind: ProblemTypeFilter }>()
 const theme = useThemeVars()
 
 const ICON: Record<ProblemTypeFilter, string> = {
+  sql: "ph:database-bold",
   flowchart: "ph:pencil-simple-line-bold",
   ast: "ph:code-bold",
   reference: "ph:flow-arrow-bold",
@@ -67,12 +69,38 @@ html.dark .type-tag.flowchart {
   background: rgba(160, 120, 240, 0.18);
 }
 
+/* 青色：绿 / 橙 / 红是难度、紫是画流程图、蓝是语法要求，剩下它不和谁撞 */
+.type-tag.sql {
+  font-weight: 600;
+  color: #0b6470;
+  background: #dcf1f3;
+  border-color: transparent;
+}
+
+html.dark .type-tag.sql {
+  color: #8fd8e0;
+  background: rgba(60, 180, 195, 0.18);
+}
+
 .type-tag.ast {
   color: var(--tag-info);
   border-color: #b9cdee;
 }
 
-html.dark .type-tag.ast {
+html.dark /* 青色：绿 / 橙 / 红是难度、紫是画流程图、蓝是语法要求，剩下它不和谁撞 */
+.type-tag.sql {
+  font-weight: 600;
+  color: #0b6470;
+  background: #dcf1f3;
+  border-color: transparent;
+}
+
+html.dark .type-tag.sql {
+  color: #8fd8e0;
+  background: rgba(60, 180, 195, 0.18);
+}
+
+.type-tag.ast {
   color: var(--tag-info-dark);
   border-color: rgba(112, 192, 232, 0.45);
 }

@@ -110,6 +110,7 @@ function listItem(
     allowFlowchart: row.problem.allowFlowchart,
     showFlowchart: row.problem.showFlowchart,
     hasAstRules: row.problem.astRules !== null,
+    isSql: row.problem.languages.includes("SQL"),
     // 流程图评到 A / S 也打勾：problemStates 已经把它算进 solved
     myStatus: states?.solved.has(id)
       ? JudgeStatus.ACCEPTED
@@ -157,6 +158,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
   if (type === "reference") filters.push(eq(schema.problem.showFlowchart, true))
   if (type === "flowchart") filters.push(eq(schema.problem.allowFlowchart, true))
   if (type === "ast") filters.push(sql`${schema.problem.astRules} is not null`)
+  if (type === "sql") filters.push(sql`${schema.problem.languages} @> '["SQL"]'::jsonb`)
 
   const states = user ? await problemStates(user.id) : null
   if (undone && states && states.solved.size > 0)

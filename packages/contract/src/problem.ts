@@ -424,6 +424,8 @@ export const problemListItemSchema = z.object({
   allowFlowchart: z.boolean(),
   showFlowchart: z.boolean(),
   hasAstRules: z.boolean(),
+  /** SQL 题（可选语言里有 SQL）：写 SQL 语句查数据库，和写 C / Python 是两回事，列表里单独标出来 */
+  isSql: z.boolean(),
   /** 0 = 做对了。画流程图的题，流程图评到 A / S 也给 0（和题单、课堂条一个口径） */
   myStatus: z.number().int().nullable(),
   /**
@@ -436,8 +438,8 @@ export const problemListItemSchema = z.object({
 
 export const problemListSchema = paginatedSchema(problemListItemSchema)
 
-/** 题目列表「全部类型」下拉：有参考图 / 画流程图 / 语法要求 */
-export const problemTypeFilterSchema = z.enum(["reference", "flowchart", "ast"])
+/** 题目列表「全部类型」下拉：SQL / 有参考图 / 画流程图 / 语法要求 */
+export const problemTypeFilterSchema = z.enum(["sql", "reference", "flowchart", "ast"])
 
 /**
  * 题目列表的排序。值沿用原来的（旧链接照样能用）：空串 = 最新创建、create_time = 最早创建，
