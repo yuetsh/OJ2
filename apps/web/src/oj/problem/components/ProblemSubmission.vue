@@ -3,6 +3,7 @@ import { useThemeVars } from "naive-ui"
 import { getRankOfProblem, getSubmission, getSubmissions } from "oj/api"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
+import LockNote from "oj/problemset/components/LockNote.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { useCollabStore } from "shared/store/collab"
 import { useUserStore } from "shared/store/user"
@@ -139,7 +140,7 @@ type Loaded = { code: string; language: LANGUAGE }
 const details = reactive<Record<string, Loaded | "loading" | "failed">>({})
 
 async function toggle(row: SubmissionListItem) {
-  // 加入题单之前的提交被锁住，点不开（后端也不会给代码）
+  // 题单布置期内藏着的旧提交，点不开（后端也不会给代码）
   if (!row.showLink) return
   if (expanded.value === row.id) {
     expanded.value = null
@@ -332,7 +333,7 @@ watch(query, () => {
           </div>
         </div>
       </template>
-      <!-- 加入题单之前交的那几次：合成一行，点不开（后端也不给代码） -->
+      <!-- 题单布置期内藏着的那几次：合成一行，点不开（后端也不给代码） -->
       <div v-if="lockedCount" class="locked">
         <svg
           width="13"
@@ -349,8 +350,9 @@ watch(query, () => {
           <path d="M8 11V8a4 4 0 018 0v3" />
         </svg>
         <span>
-          加入题单之前的
-          {{ lockedCount }} 次提交先藏起来了，在题单里做出这道题就能看（题单过了截止时间也会解锁）
+          有 {{ lockedCount }} 次提交先藏起来了：<LockNote
+            :problem="{ displayId: problemDisplayId }"
+          />
         </span>
       </div>
     </div>

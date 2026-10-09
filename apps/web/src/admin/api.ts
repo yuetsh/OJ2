@@ -2,7 +2,6 @@ import api from "utils/api"
 import { toAdminProblemRow } from "admin/transforms"
 import type {
   AcTrend,
-  AdminProblemSetProgress,
   BatchProblemTagResponse,
   GenerateSqlTestCaseResponse,
   RenameTagResponse,
@@ -40,6 +39,7 @@ import type {
   AdminProblemSetList,
   AdminProblemSet,
   AdminProblemSetProblem,
+  AddProblemsToSetResult,
   TutorialListItem,
   TagCategory,
 } from "utils/types"
@@ -495,15 +495,9 @@ export function updateACMHelperChecked(
 }
 
 // 题单管理 API
-export function getProblemSetList(
-  offset = 0,
-  limit = 10,
-  keyword = "",
-  difficulty = "",
-  status = "",
-) {
+export function getProblemSetList(offset = 0, limit = 10, keyword = "") {
   return api.get<AdminProblemSetList>("admin/problem-sets", {
-    params: { offset, limit, keyword, difficulty, status },
+    params: { offset, limit, keyword },
   })
 }
 
@@ -511,33 +505,20 @@ export function getProblemSetDetail(id: number) {
   return api.get<AdminProblemSet>(`admin/problem-sets/${id}`)
 }
 
-interface ProblemSetBody {
-  title?: string
-  description?: string
-  difficulty?: AdminProblemSet["difficulty"]
-  status?: AdminProblemSet["status"]
-  // 表单里是 Date，出站要 ISO 串
-  endTime?: Date | null
-  visible?: boolean
-}
-
-function toProblemSetBody(data: ProblemSetBody) {
-  return {
-    title: data.title,
-    description: data.description ?? "",
-    difficulty: data.difficulty ?? "Easy",
-    status: data.status ?? "active",
-    endTime: data.endTime ? new Date(data.endTime).toISOString() : null,
-    visible: data.visible ?? true,
-  }
+export interface ProblemSetBody {
+  title: string
+  description: string
+  /** 布置到哪天（东八区当天结束的 ISO 时刻）；null = 不布置 */
+  assignedUntil: string | null
+  visible: boolean
 }
 
 export function createProblemSet(data: ProblemSetBody) {
-  return api.post<AdminProblemSet>("admin/problem-sets", toProblemSetBody(data))
+  return api.post<AdminProblemSet>("admin/problem-sets", data)
 }
 
-export function editProblemSet(data: ProblemSetBody & { id: number }) {
-  return api.put<AdminProblemSet>(`admin/problem-sets/${data.id}`, toProblemSetBody(data))
+export function editProblemSet(id: number, data: ProblemSetBody) {
+  return api.put<AdminProblemSet>(`admin/problem-sets/${id}`, data)
 }
 
 export function deleteProblemSet(id: number) {
@@ -548,49 +529,28 @@ export function toggleProblemSetVisible(id: number) {
   return api.put<AdminProblemSet>(`admin/problem-sets/${id}/visibility`)
 }
 
-export function updateProblemSetStatus(id: number, status: string) {
-  return api.put<AdminProblemSet>(`admin/problem-sets/${id}/status`, { status })
-}
-
 // 题单题目管理 API
 export function getProblemSetProblems(problemSetId: number) {
   return api.get<AdminProblemSetProblem[]>(`admin/problem-sets/${problemSetId}/problems`)
 }
 
-export function addProblemToSet(
-  problemSetId: number,
-  data: {
-    problemId: string
-    order?: number
-    isRequired?: boolean
-    score?: number
-    hint?: string
-  },
-) {
-  return api.post(`admin/problem-sets/${problemSetId}/problems`, {
-    problemId: data.problemId,
-    order: data.order ?? 0,
-    isRequired: data.isRequired ?? true,
-    score: data.score ?? 0,
-    hint: data.hint ?? "",
+/** 一次加好几道（题号），按给的顺序接在最后；找不到的、已经在里面的分开报回来 */
+export function addProblemsToSet(problemSetId: number, problemIds: string[]) {
+  return api.post<AddProblemsToSetResult>(`admin/problem-sets/${problemSetId}/problems`, {
+    problemIds,
   })
 }
 
-export function editProblemInSet(
-  problemSetId: number,
-  problemSetProblemId: number,
-  data: {
-    order?: number
-    isRequired?: boolean
-    score?: number
-    hint?: string
-  },
-) {
-  return api.put(`admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`, data)
+export function setProblemRequired(problemSetId: number, itemId: number, isRequired: boolean) {
+  return api.put(`admin/problem-sets/${problemSetId}/problems/${itemId}`, { isRequired })
 }
 
-export function removeProblemFromSet(problemSetId: number, problemSetProblemId: number) {
-  return api.delete(`admin/problem-sets/${problemSetId}/problems/${problemSetProblemId}`)
+export function reorderProblemSetProblems(problemSetId: number, ids: number[]) {
+  return api.put(`admin/problem-sets/${problemSetId}/problems/order`, { ids })
+}
+
+export function removeProblemFromSet(problemSetId: number, itemId: number) {
+  return api.delete(`admin/problem-sets/${problemSetId}/problems/${itemId}`)
 }
 
 // 题单奖章管理 API
@@ -598,50 +558,24 @@ export function getProblemSetBadges(problemSetId: number) {
   return api.get<AdminProblemSetBadge[]>(`admin/problem-sets/${problemSetId}/badges`)
 }
 
-interface BadgeBody {
-  name?: string
-  description?: string
-  icon?: string
-  conditionType?: AdminProblemSetBadge["conditionType"]
-  conditionValue?: number
-}
-
-function toBadgeBody(data: BadgeBody) {
-  return {
-    name: data.name,
-    description: data.description ?? "",
-    icon: data.icon ?? "",
-    conditionType: data.conditionType,
-    conditionValue: data.conditionValue ?? 0,
-  }
+export interface BadgeBody {
+  name: string
+  description: string
+  icon: string
+  conditionType: AdminProblemSetBadge["conditionType"]
+  conditionValue: number
 }
 
 export function createProblemSetBadge(problemSetId: number, data: BadgeBody) {
-  return api.post<AdminProblemSetBadge>(
-    `admin/problem-sets/${problemSetId}/badges`,
-    toBadgeBody(data),
-  )
+  return api.post<AdminProblemSetBadge>(`admin/problem-sets/${problemSetId}/badges`, data)
 }
 
 export function editProblemSetBadge(problemSetId: number, badgeId: number, data: BadgeBody) {
-  return api.put<AdminProblemSetBadge>(
-    `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
-    toBadgeBody(data),
-  )
+  return api.put<AdminProblemSetBadge>(`admin/problem-sets/${problemSetId}/badges/${badgeId}`, data)
 }
 
 export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
   return api.delete(`admin/problem-sets/${problemSetId}/badges/${badgeId}`)
-}
-
-// 题单进度管理 API
-// 注意：返回的是裸数组，不是分页信封 —— 和 oj 侧的 /user-progress 不同
-export function getProblemSetProgress(problemSetId: number) {
-  return api.get<AdminProblemSetProgress[]>(`admin/problem-sets/${problemSetId}/progress`)
-}
-
-export function removeUserFromProblemSet(problemSetId: number, userId: number) {
-  return api.delete(`admin/problem-sets/${problemSetId}/progress/${userId}`)
 }
 
 // 学生卡点分析

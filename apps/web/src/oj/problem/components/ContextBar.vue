@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia"
 import type { RouteLocationRaw } from "vue-router"
-import { getProblemSetDetail, getProblemSetProblems } from "oj/api"
+import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from "oj/api"
 import { useContestStore } from "oj/store/contest"
 import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useLessonStore } from "oj/store/lesson"
@@ -161,6 +161,7 @@ const setBar = computed(() => {
   const done = required.filter((item) => item.isCompleted).length
   return {
     title: problemSet.value.title,
+    joined: problemSet.value.userProgress.isJoined,
     home: { name: "problemset", params: { problemSetId: ctx.value.problemSetId } },
     done,
     total: required.length,
@@ -170,6 +171,22 @@ const setBar = computed(() => {
     next: index >= 0 ? link(list[index + 1]) : null,
   }
 })
+
+// 没加入就点进了题（直接打开的链接）：在条上给个「加入」，不然做对了也不记进度
+const joiningSet = ref(false)
+async function joinHere() {
+  const id = ctx.value.problemSetId
+  if (!id || joiningSet.value) return
+  joiningSet.value = true
+  try {
+    await joinProblemSet(Number(id))
+    problemSet.value = await getProblemSetDetail(Number(id))
+  } catch {
+    // 加入失败就还是那条提示，回题单页再点一次
+  } finally {
+    joiningSet.value = false
+  }
+}
 
 // 判题那一路已经记了账（judge/run.ts），这里只是把这一条就地改掉，不用重拉
 onSolvedHere(() => {
@@ -294,13 +311,19 @@ onSolvedHere(() => {
     <router-link :to="setBar.home" class="back set-back" :title="`回到题单：${setBar.title}`">
       ‹ {{ setBar.title }}
     </router-link>
-    <div class="set-progress" aria-hidden="true">
+    <div v-if="setBar.joined" class="set-progress" aria-hidden="true">
       <div class="set-progress-fill" :style="{ width: `${setBar.percentage}%` }" />
     </div>
-    <span class="meta">
+    <span v-if="setBar.joined" class="meta">
       做完 {{ setBar.done }}/{{ setBar.total }}
       <template v-if="setBar.position"> · 第 {{ setBar.position }} 题</template>
     </span>
+    <template v-else>
+      <span class="meta">还没加入，在这里做对了不算进度</span>
+      <n-button size="tiny" type="primary" :loading="joiningSet" @click="joinHere"
+        >加入题单</n-button
+      >
+    </template>
     <div class="spacer" />
     <component
       :is="setBar.previous ? 'router-link' : 'span'"

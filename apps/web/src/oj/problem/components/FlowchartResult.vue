@@ -236,7 +236,8 @@ function goCode() {
       </template>
     </div>
     <p v-if="hiddenCount" class="note">
-      另外 {{ hiddenCount }} 次是加入题单之前画的，先藏起来了：在题单里画到 A 或 S 就解锁
+      另外 {{ hiddenCount }} 次是题单布置之前画的，先藏起来了：在题单里画到 A 或
+      S，或者布置期结束就解锁
     </p>
 
     <!-- 正在评：评的是最新这一次，所以只在看最新时显示 -->

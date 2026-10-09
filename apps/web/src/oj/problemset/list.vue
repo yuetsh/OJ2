@@ -1,263 +1,404 @@
 <script setup lang="ts">
-import { useRouteQuery } from "@vueuse/router"
-import { getProblemSetList } from "../api"
+import { useThemeVars } from "naive-ui"
+import { getProblemSetList } from "oj/api"
+import { rgba, useTone } from "oj/submission/composables/tone"
+import { parseTime } from "utils/functions"
 import type { ProblemSet } from "utils/types"
-import Pagination from "shared/components/Pagination.vue"
-import { usePagination } from "shared/composables/pagination"
+import { badgeCondition, ladder, nextBadge } from "./badges"
 
+/**
+ * 题单列表（设计稿「题单重设计」列表 A）：老师正在布置的题单单独一排大卡片 —— 做对几道、
+ * 布置到哪天、再做对几道拿哪个奖章；其余题单一排排小卡片，加入过的在前。
+ *
+ * 题单一共十几个，一次全取回来在前端分组，不分页
+ */
 const router = useRouter()
+const theme = useThemeVars()
+const tone = useTone()
 
-const total = ref(0)
-const problemSets = ref<ProblemSet[]>([])
+const sets = ref<ProblemSet[]>([])
+const loaded = ref(false)
+const keyword = ref("")
 
-interface ProblemSetQuery {
-  keyword: string
-}
-
-// 使用分页 composable
-const { query, clearQuery } = usePagination<ProblemSetQuery>(
-  {
-    keyword: useRouteQuery("keyword", "").value,
-  },
-  {
-    defaultLimit: 30,
-  },
-)
-
-async function listProblemSets() {
-  if (query.page < 1) query.page = 1
-  const offset = (query.page - 1) * query.limit
-  const res = await getProblemSetList(offset, query.limit, query.keyword)
-  total.value = res.total
-  problemSets.value = res.results
-}
-
-function getDifficultyTag(difficulty: string) {
-  const difficultyMap: Record<
-    string,
-    { type: "success" | "warning" | "error" | "default"; text: string }
-  > = {
-    Easy: { type: "success", text: "简单" },
-    Medium: { type: "warning", text: "中等" },
-    Hard: { type: "error", text: "困难" },
+onMounted(async () => {
+  try {
+    sets.value = (await getProblemSetList(0, 250)).results
+  } finally {
+    loaded.value = true
   }
-  return difficultyMap[difficulty] || { type: "default", text: "未知" }
-}
-
-function goToProblemSet(problemSetId: number) {
-  router.push(`/problemset/${problemSetId}`)
-}
-
-function getConditionText(conditionType: string, conditionValue: number): string {
-  const conditionMap: Record<string, string> = {
-    all_problems: "完成所有题目",
-    problem_count: `完成 ${conditionValue} 道题目`,
-    score: `达到 ${conditionValue} 分`,
-  }
-  return conditionMap[conditionType] || "未知条件"
-}
-
-onMounted(listProblemSets)
-
-// 监听搜索关键词变化（防抖）
-watchDebounced(() => query.keyword, listProblemSets, {
-  debounce: 500,
-  maxWait: 1000,
 })
 
-// 监听其他查询条件变化
-watch(() => [query.page, query.limit], listProblemSets)
+const shown = computed(() => {
+  const word = keyword.value.trim().toLowerCase()
+  if (!word) return sets.value
+  return sets.value.filter(
+    (set) => set.title.toLowerCase().includes(word) || set.description.toLowerCase().includes(word),
+  )
+})
+
+/** 布置中的：快到期的在前 */
+const assigning = computed(() =>
+  shown.value
+    .filter((set) => set.assigning)
+    .sort((a, b) => Date.parse(a.assignedUntil!) - Date.parse(b.assignedUntil!)),
+)
+
+/** 其他：加入过的在前（最近加入的最前），再按新建排 */
+const others = computed(() =>
+  shown.value
+    .filter((set) => !set.assigning)
+    .sort((a, b) => {
+      const ja = a.userProgress.joinTime
+      const jb = b.userProgress.joinTime
+      if (ja && jb) return Date.parse(jb) - Date.parse(ja)
+      if (ja || jb) return ja ? -1 : 1
+      return Date.parse(b.createTime) - Date.parse(a.createTime)
+    }),
+)
+const joinedOthers = computed(() => others.value.filter((set) => set.userProgress.isJoined).length)
+
+function description(set: ProblemSet) {
+  // 简介大多就是把标题再抄一遍，一样的就不重复显示
+  return set.description && set.description !== set.title ? set.description : ""
+}
+
+function optional(set: ProblemSet) {
+  return set.problemsCount - set.requiredCount
+}
+
+function percent(set: ProblemSet) {
+  const progress = set.userProgress
+  return progress.isJoined && set.requiredCount
+    ? Math.min(100, (progress.completedCount / set.requiredCount) * 100)
+    : 0
+}
+
+function open(set: ProblemSet) {
+  router.push({ name: "problemset", params: { problemSetId: set.id } })
+}
+
+const info = computed(() => tone("info"))
+const success = computed(() => tone("success"))
+// 做完的卡片只淡淡地染一点绿（设计稿），用 success.background 那一档太抢眼
+const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 </script>
 
 <template>
-  <n-flex vertical size="large">
-    <!-- 难度和状态两个筛选器撤了：线上 16 个题单全是 Easy / active，选「中等」「困难」
-         「已归档」永远是空列表。接口那两个 query 参数还在，哪天真的用起这两个字段，
-         把 select 加回来即可。 -->
-    <n-space>
-      <n-input
-        v-model:value="query.keyword"
-        placeholder="搜索题单..."
-        clearable
-        @clear="clearQuery"
-        style="width: 200px"
-      />
-    </n-space>
-
-    <div v-if="problemSets.length > 0" class="set-grid">
-      <div
-        v-for="problemSet in problemSets"
-        :key="problemSet.id"
-        class="set-card"
-        :class="{ completed: problemSet.userProgress?.isCompleted }"
-        @click="goToProblemSet(problemSet.id)"
-      >
-        <n-flex justify="space-between" align="center" :wrap="false" :size="8">
-          <span class="set-title">{{ problemSet.title }}</span>
-          <n-tag v-if="problemSet.userProgress?.isCompleted" type="success" size="small" round>
-            已完成
-          </n-tag>
-          <n-tag v-else-if="problemSet.userProgress?.isJoined" type="info" size="small" round>
-            进行中
-          </n-tag>
-        </n-flex>
-
-        <!-- 简介大多就是把标题再抄一遍，一样的就不重复显示 -->
-        <n-text
-          v-if="problemSet.description && problemSet.description !== problemSet.title"
-          depth="3"
-          class="set-desc"
-        >
-          {{ problemSet.description }}
-        </n-text>
-
-        <div class="set-progress">
-          <n-flex justify="space-between" align="center" class="set-progress-text">
-            <n-text depth="3">
-              <!-- 进度是加入/完成时存下的快照，分母用快照自己的 totalCount：题单后来
-                   加了题的话，拿现在的 problemsCount 去除，就会出现「已完成」却是 5 / 6 -->
-              <template v-if="problemSet.userProgress?.isJoined">
-                已完成 {{ problemSet.userProgress.completedCount }} /
-                {{ problemSet.userProgress.totalCount }} 题
-                <template v-if="problemSet.problemsCount > problemSet.userProgress.totalCount">
-                  · 新加了
-                  {{ problemSet.problemsCount - problemSet.userProgress.totalCount }} 题
-                </template>
-              </template>
-              <template v-else>共 {{ problemSet.problemsCount }} 题 · 还没开始</template>
-            </n-text>
-            <!-- 线上题单全是简单难度，只有不是简单时才值得标出来 -->
-            <n-tag
-              v-if="problemSet.difficulty !== 'Easy'"
-              :type="getDifficultyTag(problemSet.difficulty).type"
-              size="small"
-              :bordered="false"
-            >
-              {{ getDifficultyTag(problemSet.difficulty).text }}
-            </n-tag>
-            <n-tag v-if="problemSet.status === 'archived'" size="small" :bordered="false">
-              已归档
-            </n-tag>
-          </n-flex>
-          <n-progress
-            type="line"
-            :percentage="Math.round(problemSet.userProgress?.progressPercentage ?? 0)"
-            :show-indicator="false"
-            :height="6"
-            status="success"
-          />
-        </div>
-
-        <n-flex v-if="problemSet.badges?.length" align="center" :size="6" class="set-badges">
-          <n-text depth="3" class="set-badges-label">
-            徽章 {{ problemSet.badges.filter((b) => b.isEarned).length }} /
-            {{ problemSet.badges.length }}
-          </n-text>
-          <n-tooltip v-for="badge in problemSet.badges" :key="badge.id" trigger="hover">
-            <template #trigger>
-              <n-image
-                :src="badge.icon"
-                :alt="badge.name"
-                width="24"
-                height="24"
-                object-fit="cover"
-                preview-disabled
-                :class="badge.isEarned ? 'earned-badge' : 'locked-badge'"
-              />
-            </template>
-            <n-flex vertical size="small">
-              <span style="font-weight: bold"> 徽章: {{ badge.name }} </span>
-              <span>
-                获取条件:
-                {{ getConditionText(badge.conditionType, badge.conditionValue) }}
-              </span>
-              <n-text type="primary" v-if="badge.isEarned"> ✓ 已获得 </n-text>
-            </n-flex>
-          </n-tooltip>
-        </n-flex>
-      </div>
+  <div class="page">
+    <div class="top">
+      <h2>题单</h2>
+      <div class="spacer"></div>
+      <n-input v-model:value="keyword" placeholder="搜题单" clearable class="search" />
     </div>
 
-    <Pagination
-      v-if="problemSets.length > 0"
-      :total="total"
-      v-model:limit="query.limit"
-      v-model:page="query.page"
+    <template v-if="assigning.length">
+      <div class="sect">
+        布置中<span class="muted">老师现在布置的 · {{ assigning.length }} 个</span>
+      </div>
+      <div class="big-grid">
+        <a
+          v-for="set in assigning"
+          :key="set.id"
+          :href="`/problemset/${set.id}`"
+          class="card big"
+          :class="{ done: set.userProgress.isCompleted }"
+          @click.prevent="open(set)"
+        >
+          <div class="row">
+            <b class="ell title">{{ set.title }}</b>
+            <span v-if="set.userProgress.isCompleted" class="pill done-pill">✓ 做完了</span>
+          </div>
+          <div class="muted ell desc">{{ description(set) }}</div>
+          <div class="row baseline">
+            <template v-if="set.userProgress.isJoined">
+              <span class="num count">{{ set.userProgress.completedCount }}</span>
+              <span class="muted num">/ {{ set.requiredCount }}</span>
+            </template>
+            <span v-else class="muted small">还没加入 · {{ set.requiredCount }} 道</span>
+            <span v-if="optional(set) > 0" class="muted tiny">另有 {{ optional(set) }} 道选做</span>
+            <div class="spacer"></div>
+            <span class="pill assign">布置到 {{ parseTime(set.assignedUntil!, "M月D日") }}</span>
+          </div>
+          <div class="bar"><div class="fill" :style="{ width: `${percent(set)}%` }"></div></div>
+          <div v-if="nextBadge(set)" class="row hint">
+            <img :src="nextBadge(set)!.badge.icon" alt="" class="icon locked" />
+            <span>
+              再做对 <b class="num">{{ nextBadge(set)!.left }}</b> 道拿「{{
+                nextBadge(set)!.badge.name
+              }}」
+            </span>
+          </div>
+          <div v-else-if="set.badges.length" class="row hint got">
+            <img
+              v-for="badge in ladder(set)"
+              :key="badge.id"
+              :src="badge.icon"
+              :alt="badge.name"
+              :title="badge.name"
+              class="icon"
+            />
+            <span>奖章全拿到了</span>
+          </div>
+          <div v-else class="muted hint">这个题单没有奖章</div>
+        </a>
+      </div>
+    </template>
+
+    <div v-if="others.length" class="sect">
+      {{ assigning.length ? "其他题单" : "题单" }}
+      <span class="muted"
+        >{{ others.length }} 个<template v-if="joinedOthers"> · 加入过的在前</template></span
+      >
+    </div>
+    <div class="small-grid">
+      <a
+        v-for="set in others"
+        :key="set.id"
+        :href="`/problemset/${set.id}`"
+        class="card small-card"
+        :class="{ done: set.userProgress.isCompleted }"
+        @click.prevent="open(set)"
+      >
+        <div class="row">
+          <b class="ell">{{ set.title }}</b>
+          <span v-if="set.userProgress.isCompleted" class="green tiny">✓</span>
+        </div>
+        <div class="row tiny">
+          <span v-if="set.userProgress.isJoined" class="num">
+            做对 <b>{{ set.userProgress.completedCount }}</b> / {{ set.requiredCount }}
+          </span>
+          <span v-else class="muted num"
+            >{{ set.problemsCount }} 道 · {{ set.joinedCount }} 人做过</span
+          >
+          <div class="spacer"></div>
+          <img
+            v-for="badge in ladder(set)"
+            :key="badge.id"
+            :src="badge.icon"
+            :alt="badge.name"
+            :title="`${badge.name} · ${badgeCondition(badge)}${badge.isEarned ? ' · 已拿到' : ''}`"
+            class="mini"
+            :class="{ locked: !badge.isEarned }"
+          />
+        </div>
+      </a>
+    </div>
+
+    <n-empty
+      v-if="loaded && !shown.length"
+      :description="keyword ? '没有找到这样的题单' : '还没有题单'"
     />
-  </n-flex>
-  <n-empty v-if="problemSets.length === 0"></n-empty>
+  </div>
 </template>
 
 <style scoped>
-.set-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
-}
-
-.set-card {
+.page {
   display: flex;
   flex-direction: column;
+  gap: 14px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.top h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.search {
+  width: 220px;
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.sect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: v-bind("theme.textColor2");
+}
+
+.sect .muted {
+  font-weight: 400;
+}
+
+.muted {
+  color: v-bind("theme.textColor3");
+}
+
+.green {
+  color: v-bind("success.color");
+}
+
+.small {
+  font-size: 13px;
+}
+
+.tiny {
+  font-size: 12px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.ell {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.row.baseline {
+  align-items: baseline;
+}
+
+.big-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.small-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 10px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.2);
-  cursor: pointer;
+}
+
+.card {
+  box-sizing: border-box;
+  min-width: 0;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  background: v-bind("theme.cardColor");
+  color: v-bind("theme.textColor1");
+  text-decoration: none;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
 }
 
-.set-card:hover {
-  border-color: #18a058;
+.card:hover {
+  border-color: v-bind("theme.primaryColor");
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
-.set-card.completed {
-  background-color: rgba(24, 160, 88, 0.05);
+.card.done {
+  background: v-bind("doneBackground");
 }
 
-.set-title {
-  font-size: 16px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.set-desc {
-  font-size: 13px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.set-progress {
+.big {
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: auto;
+  gap: 8px;
 }
 
-.set-progress-text {
-  font-size: 13px;
+.title {
+  flex-grow: 1;
+  font-size: 16px;
 }
 
-.set-badges-label {
+.desc {
+  height: 17px;
   font-size: 12px;
-  margin-right: 2px;
 }
 
-.earned-badge {
-  border: 2px solid #ffd700;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+.count {
+  font-size: 22px;
+  font-weight: 700;
 }
 
-/* 没拿到的徽章压成灰色：原来拿没拿到只差一圈金边，一排看下去分不清 */
-.locked-badge {
+.pill {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.assign {
+  color: v-bind("info.color");
+  background: v-bind("info.background");
+}
+
+.done-pill {
+  color: v-bind("success.color");
+  background: v-bind("success.background");
+  font-weight: 600;
+}
+
+.bar {
+  height: 6px;
+  border-radius: 3px;
+  background: v-bind("theme.actionColor");
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: v-bind("theme.successColor");
+}
+
+.hint {
+  height: 20px;
+  font-size: 12px;
+  color: v-bind("theme.textColor2");
+}
+
+.hint.got {
+  gap: 4px;
+  color: v-bind("success.color");
+}
+
+.hint.got span {
+  margin-left: 4px;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.mini {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.locked {
   filter: grayscale(1);
-  opacity: 0.45;
+  opacity: 0.4;
+}
+
+.small-card {
+  height: 74px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.small-card b {
+  font-size: 14px;
 }
 </style>

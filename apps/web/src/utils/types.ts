@@ -195,30 +195,11 @@ export type {
   ProblemSetList,
   ProblemSetBadge,
   ProblemSetProblem,
-  ProblemSetProgress,
-  ProblemSetProgressList,
+  ProblemSetClassView,
+  ProblemSetClassStudent,
+  ProblemSetLock,
   UserBadge,
 } from "@oj2/contract"
-
-export type { CompletedProblem } from "@oj2/contract"
-
-export interface CreateProblemSetData {
-  title: string
-  description: string
-  difficulty: "Easy" | "Medium" | "Hard"
-  status: "active" | "archived" | "draft"
-  endTime?: Date | null
-}
-
-export interface EditProblemSetData {
-  id: number
-  title?: string
-  description?: string
-  difficulty?: "Easy" | "Medium" | "Hard"
-  status?: "active" | "archived" | "draft"
-  endTime?: Date | null
-  visible?: boolean
-}
 
 export interface Code {
   language: LANGUAGE
@@ -339,12 +320,11 @@ export type {
   AdminUser,
   AdminUserList,
   AdminContestList,
-  AdminProblemSetProgress,
   AdminProblemSetProblem,
   AdminProblemSet,
   AdminProblemSetList,
   AdminProblemSetBadge,
-  AddProblemToSetRequest,
+  AddProblemsToSetResult,
   UpdateProblemInSetRequest,
   CreateProblemSetBadgeRequest,
   AdminAiReport,

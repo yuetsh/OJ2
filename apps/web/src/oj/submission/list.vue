@@ -968,7 +968,11 @@ function dayBreak(index: number) {
                     <span
                       v-if="!row.showLink"
                       class="lock-hint"
-                      :title="othersRow(row) ? '别人的代码看不到' : '在题单里做完才能看'"
+                      :title="
+                        othersRow(row)
+                          ? '别人的代码看不到'
+                          : '题单布置期内先藏着：在题单里做对，或者布置期结束就能看'
+                      "
                     >
                       <Icon icon="ph:lock-simple" :width="13" />
                     </span>

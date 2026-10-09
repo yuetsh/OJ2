@@ -202,7 +202,9 @@ const canRetry = computed(
       <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
       <!-- 列表项里没有 userId，分不出是别人的还是自己被题单挡住的，文案两种都说得通 -->
       <span class="locked-title">这张流程图看不到</span>
-      <span class="muted">别人画的看不到；自己的在题单里做完这道题就能看到。</span>
+      <span class="muted"
+        >别人画的看不到；自己以前画的在题单布置期内先藏着，在题单里做对或者布置期结束就能看到。</span
+      >
     </div>
     <div v-else class="body">
       <div class="graph-box">

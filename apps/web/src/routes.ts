@@ -337,12 +337,14 @@ export const admins: RouteRecordRaw = {
       props: true,
       meta: { requiresTeacherAdmin: true },
     },
+    // 原来的「详情」页（题目 / 奖章 / 进度三个页签）并进了一屏编辑，老链接转过去
     {
       path: "problemset/:problemSetId",
       name: "admin problemset detail",
-      component: () => import("admin/problemset/detail.vue"),
-      props: true,
-      meta: { requiresTeacherAdmin: true },
+      redirect: (to) => ({
+        name: "admin problemset edit",
+        params: { problemSetId: to.params.problemSetId },
+      }),
     },
     {
       path: "ai/reports",

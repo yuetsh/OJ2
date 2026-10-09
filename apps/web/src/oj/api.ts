@@ -36,10 +36,10 @@ import {
   type HeatmapItem,
   type SolvedList,
   type ProblemSet,
-  type ProblemSetBadge,
+  type ProblemSetClassView,
   type ProblemSetList,
+  type ProblemSetLock,
   type ProblemSetProblem,
-  type ProblemSetProgressList,
   type UserBadge,
   type FlowchartStatistics,
   type SubmissionStatistics,
@@ -482,23 +482,15 @@ export function retryFlowchartSubmission(submissionId: string) {
   return api.post<{ status: string }>(`flowcharts/${encodeURIComponent(submissionId)}/retry`)
 }
 
-/** 自己在这道题上评完的每一次（早的在前），加入题单之前的已经滤掉 */
+/** 自己在这道题上评完的每一次（早的在前），题单布置期内藏着的已经滤掉 */
 export function getFlowchartScores(problemId: number) {
   return api.get<FlowchartScores>(`problems/${problemId}/flowchart/scores`)
 }
 
 // ==================== 题单相关API ====================
 
-export function getProblemSetList(
-  offset = 0,
-  limit = 10,
-  keyword = "",
-  difficulty = "",
-  status = "",
-) {
-  return api.get<ProblemSetList>("problem-sets", {
-    params: { offset, limit, keyword, difficulty, status },
-  })
+export function getProblemSetList(offset = 0, limit = 10, keyword = "") {
+  return api.get<ProblemSetList>("problem-sets", { params: { offset, limit, keyword } })
 }
 
 export function getProblemSetDetail(id: number) {
@@ -517,20 +509,18 @@ export function getUserBadges(username?: string) {
   return api.get<UserBadge[]>(`users/${encodeURIComponent(username ?? "me")}/badges`)
 }
 
-export function getProblemSetBadges(problemSetId: number) {
-  return api.get<ProblemSetBadge[]>(`problem-sets/${problemSetId}/badges`)
+/** 老师看某个班在题单里的情况；不传班级就看服务端推断的那个班 */
+export function getProblemSetClassView(problemSetId: number, className = "") {
+  return api.get<ProblemSetClassView>(`problem-sets/${problemSetId}/class-view`, {
+    params: className ? { className } : {},
+  })
 }
 
-export function getProblemSetUserProgress(
-  problemSetId: number,
-  params?: {
-    limit?: number
-    offset?: number
-    className?: string
-    completionStatus?: "" | "completed" | "in_progress" | "not_started"
-  },
-) {
-  return api.get<ProblemSetProgressList>(`problem-sets/${problemSetId}/user-progress`, { params })
+/** 这道题以前的代码为什么藏着：落在哪些正在布置的题单里。传主键或题号都行 */
+export function getProblemSetLocks(problem: { id: number } | { displayId: string }) {
+  return api.get<ProblemSetLock[]>("problem-sets/locks", {
+    params: "id" in problem ? { problemId: problem.id } : { problemDisplayId: problem.displayId },
+  })
 }
 
 export function getExercises(tutorialId: number): Promise<Exercise[]> {

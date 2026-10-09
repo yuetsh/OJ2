@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LockNote from "oj/problemset/components/LockNote.vue"
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { getSubmission } from "oj/api"
@@ -388,8 +389,8 @@ function openStandalone() {
         </n-button>
       </template>
       <template v-else-if="locked === 'problemset'">
-        <span class="locked-title">这道题在你加入的题单里</span>
-        <span class="muted">加入题单之前交的代码先藏起来，在题单里做完这道题就能看到。</span>
+        <span class="locked-title">这份代码在题单布置期内先藏着</span>
+        <span class="muted"><LockNote :problem="{ displayId: row.problemDisplayId }" /></span>
       </template>
       <template v-else>
         <span class="locked-title">登录之后才能看代码</span>

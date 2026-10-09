@@ -62,7 +62,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
    * 1.5 秒后跳回题单，都只认这一下 —— 进页面读到以前的 A 不该再跳一次
    */
   const evaluatedSeq = ref(0)
-  /** 这道题评完的每一次，早的在前；hidden = 加入题单之前、被藏起来的次数 */
+  /** 这道题评完的每一次，早的在前；hidden = 题单布置期内被藏起来的次数 */
   const scores = ref<FlowchartScores["scores"]>([])
   const hiddenCount = ref(0)
   const submissionCount = computed(() => scores.value.length)

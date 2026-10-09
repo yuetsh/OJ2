@@ -1,155 +1,168 @@
 <script setup lang="ts">
+import { useThemeVars } from "naive-ui"
+import type { BadgeBody } from "admin/api"
 import type { AdminProblemSetBadge } from "utils/types"
 
-// 添加和编辑共用一个弹窗：传了 badge 就是编辑，null 就是添加。
-// 原来是两份八成相同的组件，改一处表单项另一处总要漏
-interface Props {
-  show: boolean
-  badge: AdminProblemSetBadge | null
-}
+/**
+ * 加奖章 / 改奖章共用一个弹窗：传了 badge 就是改，null 就是加。
+ * 条件只有两种：全部做完、做对 N 道（「总分达到 N」随分数一起拿掉了）。
+ * 「做对 N 道」数的是做对的全部题（含选做），和后端 eligibleForBadge 同一个口径。
+ */
+const props = defineProps<{ badge: AdminProblemSetBadge | null; problemsCount: number }>()
+const show = defineModel<boolean>("show", { required: true })
+const emit = defineEmits<{ save: [data: BadgeBody] }>()
+const theme = useThemeVars()
 
-type BadgeFormData = {
-  name: string
-  description: string
-  icon: string
-  conditionType: "all_problems" | "problem_count" | "score"
-  conditionValue?: number
-}
+const ICONS = [1, 2, 3, 4, 5, 6].map((i) => `/badge-${i}.png`)
 
-interface Emits {
-  (e: "update:show", value: boolean): void
-  (e: "create", data: BadgeFormData): void
-  (e: "update", data: BadgeFormData): void
-}
+const form = reactive<BadgeBody>({
+  name: "",
+  description: "",
+  icon: ICONS[0]!,
+  conditionType: "problem_count",
+  conditionValue: 1,
+})
 
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
+// 每次打开都按当前模式重新填表：改就填这枚奖章的值，加就清空
+watch(show, (open) => {
+  if (!open) return
+  Object.assign(form, {
+    name: props.badge?.name ?? "",
+    description: props.badge?.description ?? "",
+    icon: props.badge?.icon || ICONS[0]!,
+    conditionType: props.badge?.conditionType ?? "problem_count",
+    conditionValue: props.badge?.conditionValue || 1,
+  })
+})
 
-const badgeName = ref("")
-const badgeDescription = ref("")
-const badgeIcon = ref("")
-const badgeConditionType = ref<"all_problems" | "problem_count" | "score">("all_problems")
-const badgeConditionValue = ref(1)
+const valid = computed(
+  () =>
+    form.name.trim().length > 0 &&
+    (form.conditionType === "all_problems" || form.conditionValue >= 1),
+)
 
-// 预设奖章图标选项
-const BADGE_LEN = 6
-const badgeIconOptions = []
-for (let i = 1; i <= BADGE_LEN; i++) {
-  badgeIconOptions.push({
-    label: `奖章${i}`,
-    value: `/badge-${i}.png`,
-    icon: `/badge-${i}.png`,
+function save() {
+  if (!valid.value) return
+  emit("save", {
+    ...form,
+    name: form.name.trim(),
+    conditionValue: form.conditionType === "all_problems" ? 0 : form.conditionValue,
   })
 }
-
-const conditionTypeOptions = [
-  { label: "完成所有题目", value: "all_problems" },
-  { label: "完成指定数量题目", value: "problem_count" },
-  { label: "达到指定分数", value: "score" },
-]
-
-function handleConfirm() {
-  const data: BadgeFormData = {
-    name: badgeName.value,
-    description: badgeDescription.value,
-    icon: badgeIcon.value,
-    conditionType: badgeConditionType.value,
-    // 只有非"完成所有题目"时才带条件值
-    ...(badgeConditionType.value === "all_problems"
-      ? {}
-      : { conditionValue: badgeConditionValue.value }),
-  }
-  if (props.badge) emit("update", data)
-  else emit("create", data)
-}
-
-function handleCancel() {
-  emit("update:show", false)
-}
-
-// 每次打开都按当前模式重新填表：编辑就填这枚奖章的值，添加就清空。
-// 编辑取消后再打开同一枚，看到的是库里的值，而不是上次没保存的改动
-watch(
-  () => props.show,
-  (open) => {
-    if (!open) return
-    const badge = props.badge
-    badgeName.value = badge?.name ?? ""
-    badgeDescription.value = badge?.description ?? ""
-    badgeIcon.value = badge?.icon ?? ""
-    badgeConditionType.value = badge?.conditionType ?? "all_problems"
-    badgeConditionValue.value = badge?.conditionValue ?? 1
-  },
-  { immediate: true },
-)
 </script>
 
 <template>
   <n-modal
-    :show="show"
+    v-model:show="show"
     preset="card"
-    :title="badge ? '编辑奖章' : '添加奖章'"
-    style="width: 500px"
-    @update:show="emit('update:show', $event)"
+    :title="badge ? '改奖章' : '加奖章'"
+    style="width: 460px"
+    :mask-closable="false"
   >
-    <n-form>
-      <n-form-item label="奖章名称" required>
-        <n-input v-model:value="badgeName" placeholder="请输入奖章名称" />
-      </n-form-item>
-      <n-form-item label="描述">
-        <n-input v-model:value="badgeDescription" type="textarea" placeholder="奖章描述" required />
-      </n-form-item>
-      <n-form-item label="图标" required>
-        <n-flex align="center" gap="small">
-          <div
-            v-for="option in badgeIconOptions"
-            :key="option.value"
-            @click="badgeIcon = option.value"
-            :style="{
-              width: '60px',
-              height: '60px',
-              border: badgeIcon === option.value ? '2px solid #1890ff' : '1px solid #d9d9d9',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: badgeIcon === option.value ? '#f0f8ff' : 'transparent',
-            }"
+    <div class="form">
+      <div class="field">
+        <span class="label">图标</span>
+        <div class="icons">
+          <button
+            v-for="icon in ICONS"
+            :key="icon"
+            class="icon"
+            :class="{ on: form.icon === icon }"
+            :aria-label="`选这个图标`"
+            @click="form.icon = icon"
           >
-            <n-image
-              :src="option.icon"
-              width="50"
-              height="50"
-              object-fit="cover"
-              preview-disabled
-              style="border-radius: 2px"
-            />
-          </div>
-        </n-flex>
-      </n-form-item>
-      <n-flex align="center">
-        <n-form-item label="获得条件">
-          <n-select
-            style="width: 200px"
-            v-model:value="badgeConditionType"
-            :options="conditionTypeOptions"
-          />
-        </n-form-item>
-        <n-form-item label="条件值" v-if="badgeConditionType !== 'all_problems'">
-          <n-input-number
-            style="width: 120px"
-            v-model:value="badgeConditionValue"
-            placeholder="条件值"
-          />
-        </n-form-item>
-      </n-flex>
-    </n-form>
+            <img :src="icon" alt="" />
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label">名字</span>
+        <n-input v-model:value="form.name" placeholder="比如 人上人" maxlength="100" />
+      </div>
+      <div class="field">
+        <span class="label">说明</span>
+        <n-input v-model:value="form.description" placeholder="选填，学生拿到时看得到" />
+      </div>
+      <div class="field">
+        <span class="label">条件</span>
+        <n-radio-group v-model:value="form.conditionType">
+          <n-radio-button value="problem_count">做对几道</n-radio-button>
+          <n-radio-button value="all_problems">全部做完</n-radio-button>
+        </n-radio-group>
+        <n-input-number
+          v-if="form.conditionType === 'problem_count'"
+          v-model:value="form.conditionValue"
+          :min="1"
+          :max="Math.max(1, problemsCount)"
+          style="width: 110px"
+        >
+          <template #suffix>道</template>
+        </n-input-number>
+      </div>
+      <span class="hint">
+        {{
+          form.conditionType === "all_problems"
+            ? "必做题全部做对就发。"
+            : "做对的题（选做也算）够这个数就发。"
+        }}改了条件会按大家现在的进度重新发、收。
+      </span>
+    </div>
     <template #footer>
       <n-flex justify="end">
-        <n-button @click="handleCancel">取消</n-button>
-        <n-button type="primary" @click="handleConfirm">确认</n-button>
+        <n-button @click="show = false">取消</n-button>
+        <n-button type="primary" :disabled="!valid" @click="save">保存</n-button>
       </n-flex>
     </template>
   </n-modal>
 </template>
+
+<style scoped>
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  width: 36px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+}
+
+.icons {
+  display: flex;
+  gap: 6px;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon.on {
+  border-color: v-bind("theme.primaryColor");
+}
+
+.icon img {
+  width: 30px;
+  height: 30px;
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: v-bind("theme.textColor3");
+}
+</style>

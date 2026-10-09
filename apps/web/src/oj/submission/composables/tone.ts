@@ -3,7 +3,7 @@ import { useDark } from "@vueuse/core"
 
 export type Tone = "success" | "error" | "warning" | "info" | "default"
 
-function rgba(hex: string, alpha: number) {
+export function rgba(hex: string, alpha: number) {
   const value = hex.replace("#", "")
   const full =
     value.length === 3
