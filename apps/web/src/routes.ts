@@ -55,6 +55,14 @@ export const ojs: RouteRecordRaw = {
           meta: { requiresAuth: true },
           name: "contest rank",
         },
+        // 老师的「全班情况」，考完是「成绩」（代替原来后台的「审核」页）
+        {
+          path: "class",
+          component: () => import("oj/contest/pages/class.vue"),
+          props: true,
+          meta: { requiresAuth: true },
+          name: "contest class",
+        },
       ],
     },
     {
@@ -241,13 +249,6 @@ export const admins: RouteRecordRaw = {
       path: "contest/:contestID/problem/edit/:problemID",
       name: "admin contest problem edit",
       component: () => import("admin/problem/editor.vue"),
-      props: true,
-      meta: { requiresTeacherAdmin: true },
-    },
-    {
-      path: "contest/:contestID/helper",
-      name: "admin contest helper",
-      component: () => import("admin/contest/helper.vue"),
       props: true,
       meta: { requiresTeacherAdmin: true },
     },

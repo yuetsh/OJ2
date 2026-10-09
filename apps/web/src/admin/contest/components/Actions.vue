@@ -16,18 +16,9 @@ function goEdit() {
   })
 }
 
-function goEditProblems() {
-  router.push({
-    name: "admin contest problem list",
-    params: { contestID: props.contest.id },
-  })
-}
-
-function goACMHelper() {
-  router.push({
-    name: "admin contest helper",
-    params: { contestID: props.contest.id },
-  })
+// 原来的「审核」页并进了前台比赛页老师的「全班情况 / 成绩」：点格子看代码、标看过了
+function goClass() {
+  window.open(`/contest/${props.contest.id}/class`, "_blank")
 }
 
 async function clone() {
@@ -45,9 +36,10 @@ async function clone() {
 </script>
 <template>
   <n-flex>
-    <n-button size="small" type="primary" secondary @click="goEditProblems"> 题目 </n-button>
-    <n-button size="small" type="warning" secondary @click="goACMHelper"> 审核 </n-button>
-    <n-button size="small" type="info" secondary @click="goEdit"> 编辑 </n-button>
+    <n-button size="small" type="primary" secondary @click="goEdit"> 编辑 </n-button>
+    <n-button size="small" type="info" secondary @click="goClass">
+      {{ contest.status === "-1" ? "成绩" : "全班情况" }}
+    </n-button>
     <n-button size="small" secondary @click="clone"> 复制 </n-button>
   </n-flex>
 </template>

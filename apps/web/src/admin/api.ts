@@ -7,8 +7,6 @@ import type {
   GenerateSqlTestCaseResponse,
   RenameTagResponse,
   SqlTestCaseScript,
-  AcmHelperItem,
-  ContestSubmissionInfo,
   AdminAiReport,
   AdminAiReportList,
   StuckProblem,
@@ -357,6 +355,11 @@ export function addProblemForContest(contestID: string, problemID: number, displ
   })
 }
 
+/** 比赛题按这个顺序重新编号 1、2、3…（要给全这场比赛的题） */
+export function reorderContestProblems(contestID: string, problemIds: number[]) {
+  return api.put(`admin/contests/${contestID}/problems/order`, { problemIds })
+}
+
 export function getWebsite() {
   return api.get<WebsiteConfig>("admin/website")
 }
@@ -478,14 +481,6 @@ export function makeProblemPublic(id: number, displayId: string) {
 }
 
 // 比赛辅助检查
-export function getACMHelperList(contestId: number) {
-  // acInfo 在契约里是 Record<string, unknown>（acm_contest_rank 的 JSONB 原文），
-  // 组件侧按 ContestSubmissionInfo 读，收窄放在这里
-  return api.get<Array<Omit<AcmHelperItem, "acInfo"> & { acInfo: ContestSubmissionInfo }>>(
-    `admin/contests/${contestId}/acm-helper`,
-  )
-}
-
 export function updateACMHelperChecked(
   contest_id: number,
   rank_id: number,

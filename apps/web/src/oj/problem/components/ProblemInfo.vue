@@ -197,6 +197,7 @@ function segmentWidth(value: number, total: number) {
         现在只看得到你自己的提交，别人几次做对、错在哪，结束后一起公布。
       </n-text>
       <router-link
+        v-if="!contestStore.rankHidden"
         :to="{ name: 'contest rank', params: { contestID: route.params.contestID } }"
         class="link"
       >

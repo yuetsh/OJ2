@@ -1,247 +1,469 @@
 <script setup lang="ts">
 import { useRouteQuery } from "@vueuse/router"
-import { NTag } from "naive-ui"
+import { useThemeVars } from "naive-ui"
 import { getContestList } from "oj/api"
-import { duration, parseTime } from "utils/functions"
+import { useTone } from "oj/submission/composables/tone"
+import { contestLength, parseTime, secondsToDuration } from "utils/functions"
 import type { Contest } from "utils/types"
 import ContestTitle from "shared/components/ContestTitle.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { useAuthModalStore } from "shared/store/authModal"
 import { usePagination } from "shared/composables/pagination"
 import { useUserStore } from "shared/store/user"
-import { CONTEST_STATUS, ContestStatus, ContestType } from "utils/constants"
+import { ContestStatus } from "utils/constants"
+import ContestBadge from "./components/ContestBadge.vue"
 
+/**
+ * 比赛列表（设计稿「比赛重设计」）：进行中的单独一大块「接着比」，未开始的一行一个，
+ * 下面是全部比赛，每场写「我」第几名 / 做对几道 —— 进过前三的带奖杯
+ */
 const router = useRouter()
 const userStore = useUserStore()
 const authStore = useAuthModalStore()
+const theme = useThemeVars()
+const tone = useTone()
 
 interface ContestQuery {
   keyword: string
-  status: string
-  tag: string
+  /** "" 全部 / joined 我参加过的 / 练习 / 考试 */
+  scope: string
 }
 
-// 使用分页 composable
-const { query, clearQuery } = usePagination<ContestQuery>({
+const { query } = usePagination<ContestQuery>({
   keyword: useRouteQuery("keyword", "").value,
-  status: useRouteQuery("status", "").value,
-  tag: useRouteQuery("tag", "").value,
+  scope: useRouteQuery("scope", "").value,
 })
 
 const data = ref<Contest[]>([])
 const total = ref(0)
+const active = ref<Contest[]>([])
 
-const options: SelectOption[] = [
-  { label: "全部", value: "" },
-  { label: "未开始", value: "1" },
-  { label: "进行中", value: "0" },
-  { label: "已结束", value: "-1" },
-]
-
-const tags: SelectOption[] = [
-  { label: "全部", value: "" },
-  { label: "练习", value: "练习" },
-  { label: "期中", value: "期中" },
-  { label: "期末", value: "期末" },
-]
-
-const columns: DataTableColumn<Contest>[] = [
-  {
-    title: "状态",
-    key: "status",
-    width: 100,
-    render: (row) =>
-      h(
-        NTag,
-        { type: CONTEST_STATUS[row.status]["type"] },
-        () => CONTEST_STATUS[row.status]["name"],
-      ),
-  },
-  {
-    title: "比赛",
-    key: "title",
-    minWidth: 360,
-    render: (row) => h(ContestTitle, { contest: row }),
-  },
-  {
-    title: "标签",
-    key: "tag",
-    width: 100,
-    render: (row) => h(NTag, () => row.tag),
-  },
-  {
-    title: "开始时间",
-    key: "start_time",
-    width: 180,
-    render: (row) => parseTime(row.startTime),
-  },
-  {
-    title: "比赛时长",
-    key: "duration",
-    width: 180,
-    render: (row) => duration(row.startTime, row.endTime),
-  },
-]
+const scopes = computed(() => [
+  { value: "", label: "全部" },
+  ...(userStore.isAuthed ? [{ value: "joined", label: "我参加过的" }] : []),
+  { value: "练习", label: "练习" },
+  { value: "考试", label: "期中 · 期末" },
+])
 
 async function listContests() {
-  const offset = (query.page - 1) * query.limit
   const res = await getContestList({
-    offset,
+    offset: (query.page - 1) * query.limit,
     limit: query.limit,
     keyword: query.keyword,
-    status: query.status,
-    tag: query.tag,
+    status: "",
+    tag: query.scope === "joined" ? "" : query.scope,
+    joined: query.scope === "joined",
   })
   data.value = res.results
   total.value = res.total
 }
 
-function search(value: string) {
-  query.keyword = value
-}
-
-function clear() {
-  clearQuery()
-}
-
-onMounted(listContests)
-
-// 监听搜索关键词变化（防抖）
-watchDebounced(() => query.keyword, listContests, {
-  debounce: 500,
-  maxWait: 1000,
-})
-
-// 监听其他查询条件变化
-watch(() => [query.page, query.limit, query.status, query.tag], listContests)
-
-function openContest(row: Contest) {
-  if (!userStore.isAuthed && row.contestType === ContestType.private) {
-    authStore.openLoginModal()
-  } else {
-    router.push("/contest/" + row.id)
-  }
-}
-
-function rowProps(row: Contest) {
-  return {
-    style: "cursor: pointer",
-    onClick: () => openContest(row),
-  }
-}
-
-// 进行中 / 即将开始的比赛单独拎到最上面：表格按开始时间倒序，一场开了一周的
-// 练习赛会被后来建的比赛压到第二页去，学生找不着正在比的那一场
-const active = ref<Contest[]>([])
-const showActive = computed(
-  () =>
-    active.value.length > 0 && query.page === 1 && !query.keyword && !query.status && !query.tag,
-)
-
+// 进行中 / 即将开始的单独拎到最上面：表格按开始时间倒序，一场开了一周的练习赛
+// 会被后来建的比赛压到第二页去，学生找不着正在比的那一场
 async function listActive() {
   const base = { offset: 0, limit: 6, keyword: "", tag: "" }
   const [underway, upcoming] = await Promise.all([
     getContestList({ ...base, status: ContestStatus.underway }),
     getContestList({ ...base, status: ContestStatus.not_started }),
   ])
-  active.value = [...underway.results, ...upcoming.results].slice(0, 6)
+  active.value = [...underway.results, ...upcoming.results.reverse()]
 }
 
-onMounted(listActive)
+const plain = computed(() => query.page === 1 && !query.keyword && !query.scope)
+const running = computed(() =>
+  plain.value ? active.value.filter((c) => c.status === ContestStatus.underway) : [],
+)
+const upcoming = computed(() =>
+  plain.value ? active.value.filter((c) => c.status === ContestStatus.not_started) : [],
+)
+/** 上面单独列过的，下面表里不再重复 */
+const rows = computed(() => {
+  const shown = new Set([...running.value, ...upcoming.value].map((c) => c.id))
+  return data.value.filter((c) => !shown.has(c.id))
+})
 
-function activeTime(row: Contest) {
-  if (row.status === ContestStatus.underway) {
-    return `${parseTime(row.endTime, "M月D日 HH:mm")} 结束`
+onMounted(() => {
+  listContests()
+  listActive()
+})
+watchDebounced(() => query.keyword, listContests, { debounce: 500, maxWait: 1000 })
+watch(() => [query.page, query.limit, query.scope], listContests)
+
+const now = useNow({ interval: 1000 })
+function remaining(contest: Contest) {
+  const seconds = Math.floor((Date.parse(contest.endTime) - now.value.getTime()) / 1000)
+  const text = secondsToDuration(Math.max(0, seconds))
+  return text.startsWith("0:") ? text.slice(2) : text
+}
+function untilStart(contest: Contest) {
+  const ms = Date.parse(contest.startTime) - now.value.getTime()
+  const days = Math.floor(ms / 86_400_000)
+  if (days >= 1) return `还有 ${days} 天`
+  return `还有 ${secondsToDuration(Math.max(0, Math.floor(ms / 1000)))}`
+}
+function range(contest: Contest) {
+  const sameDay =
+    parseTime(contest.startTime, "YYYY-MM-DD") === parseTime(contest.endTime, "YYYY-MM-DD")
+  return `${parseTime(contest.startTime, "HH:mm")} – ${parseTime(contest.endTime, sameDay ? "HH:mm" : "M月D日 HH:mm")}`
+}
+
+function open(contest: Contest) {
+  if (!userStore.isAuthed) {
+    authStore.openLoginModal()
+    return
   }
-  return `${parseTime(row.startTime, "M月D日 HH:mm")} 开始`
+  // 老师直接进「全班情况」
+  router.push(
+    userStore.isTeacherOrAbove ? `/contest/${contest.id}/class` : `/contest/${contest.id}`,
+  )
 }
+
+function mineText(contest: Contest) {
+  const mine = contest.mine
+  if (!mine) return ""
+  const solved = `做对 ${mine.solved}/${contest.problemCount ?? "?"}`
+  return mine.rank ? `第 ${mine.rank} 名 / ${mine.total} · ${solved}` : solved
+}
+
+const success = computed(() => tone("success"))
+const warning = computed(() => tone("warning"))
 </script>
+
 <template>
-  <n-flex vertical size="large">
-    <n-space>
-      <n-form :show-feedback="false" label-placement="left" inline>
-        <n-form-item label="比赛状态">
-          <n-select style="width: 120px" :options="options" v-model:value="query.status" />
-        </n-form-item>
-        <n-form-item label="标签">
-          <n-select style="width: 120px" :options="tags" v-model:value="query.tag" />
-        </n-form-item>
-      </n-form>
-      <n-form :show-feedback="false" label-placement="left" inline>
-        <n-form-item>
-          <n-input
-            style="width: 180px"
-            clearable
-            v-model:value="query.keyword"
-            placeholder="比赛标题"
-          />
-        </n-form-item>
-        <n-form-item>
-          <n-flex :wrap="false">
-            <n-button @click="search(query.keyword)">搜索</n-button>
-            <n-button @click="clear" quaternary>重置</n-button>
-          </n-flex>
-        </n-form-item>
-      </n-form>
-    </n-space>
-    <div v-if="showActive" class="active-grid">
-      <div
-        v-for="contest in active"
-        :key="contest.id"
-        class="active-card"
-        :class="{ underway: contest.status === ContestStatus.underway }"
-        @click="openContest(contest)"
+  <div class="page">
+    <div class="top">
+      <h2>比赛</h2>
+      <div class="spacer"></div>
+      <button
+        v-for="item in scopes"
+        :key="item.value"
+        class="chip"
+        :class="{ on: query.scope === item.value }"
+        @click="query.scope = item.value"
       >
-        <n-flex align="center" :size="8">
-          <n-tag :type="CONTEST_STATUS[contest.status].type" size="small" :bordered="false">
-            {{ CONTEST_STATUS[contest.status].name }}
-          </n-tag>
-          <n-text depth="3" class="active-meta">{{ contest.tag }}</n-text>
-        </n-flex>
-        <ContestTitle :contest="contest" class="active-title" />
-        <n-text depth="3" class="active-meta">
-          {{ activeTime(contest) }} · 时长 {{ duration(contest.startTime, contest.endTime) }}
-        </n-text>
+        {{ item.label }}
+      </button>
+      <n-input v-model:value="query.keyword" clearable placeholder="比赛名" style="width: 200px" />
+    </div>
+
+    <div
+      v-for="contest in running"
+      :key="contest.id"
+      class="running"
+      role="link"
+      tabindex="0"
+      @click="open(contest)"
+      @keyup.enter="open(contest)"
+    >
+      <ContestBadge :status="ContestStatus.underway" />
+      <div class="running-main">
+        <div class="running-title">
+          <ContestTitle :contest="contest" />
+          <ContestBadge :tag="contest.tag" />
+        </div>
+        <span class="muted small">
+          {{ range(contest) }} · {{ contest.problemCount }} 道题 ·
+          {{ contest.participantCount }} 人在比
+        </span>
+      </div>
+      <div class="spacer"></div>
+      <div class="running-right">
+        <span v-if="contest.mine" class="small sec">
+          <template v-if="contest.mine.rank"
+            >你第 <b class="green">{{ contest.mine.rank }}</b> 名 · </template
+          >做对 {{ contest.mine.solved }} 道
+        </span>
+        <span class="countdown"
+          ><span class="small">还剩</span> <b>{{ remaining(contest) }}</b></span
+        >
+      </div>
+      <n-button type="primary" size="large" @click.stop="open(contest)">
+        {{ contest.mine ? "接着比 ›" : "进去比 ›" }}
+      </n-button>
+    </div>
+
+    <div
+      v-for="contest in upcoming"
+      :key="contest.id"
+      class="upcoming"
+      role="link"
+      tabindex="0"
+      @click="open(contest)"
+      @keyup.enter="open(contest)"
+    >
+      <ContestBadge :status="ContestStatus.not_started" />
+      <ContestTitle :contest="contest" class="upcoming-title" />
+      <ContestBadge :tag="contest.tag" />
+      <div class="spacer"></div>
+      <span class="small sec">
+        {{ parseTime(contest.startTime, "M月D日 HH:mm") }} 开始 · 比
+        {{ contestLength(contest.startTime, contest.endTime) }}
+      </span>
+      <span class="small amber">{{ untilStart(contest) }}</span>
+    </div>
+
+    <div class="table">
+      <div class="tr th">
+        <span>{{ plain ? "已结束" : "比赛" }}</span>
+        <span>类型</span>
+        <span>日期</span>
+        <span>时长</span>
+        <span>我</span>
+      </div>
+      <div
+        v-for="contest in rows"
+        :key="contest.id"
+        class="tr"
+        :class="{ done: contest.status === ContestStatus.finished }"
+        role="link"
+        tabindex="0"
+        @click="open(contest)"
+        @keyup.enter="open(contest)"
+      >
+        <span class="name">
+          <ContestBadge
+            v-if="contest.status !== ContestStatus.finished"
+            :status="contest.status as ContestStatus"
+          />
+          <ContestTitle :contest="contest" />
+        </span>
+        <span><ContestBadge :tag="contest.tag" /></span>
+        <span class="muted small num">{{ parseTime(contest.startTime, "YYYY-MM-DD") }}</span>
+        <span class="muted small">{{ contestLength(contest.startTime, contest.endTime) }}</span>
+        <span class="mine small">
+          <template v-if="contest.mine">
+            <svg
+              v-if="contest.mine.rank && contest.mine.rank <= 3"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="cup"
+            >
+              <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
+              <path d="M16 6h3v1a3 3 0 0 1-3 3" />
+              <path d="M8 6H5v1a3 3 0 0 0 3 3" />
+              <path d="M12 13v4" />
+              <path d="M8 20h8" />
+            </svg>
+            <span class="sec">{{ mineText(contest) }}</span>
+          </template>
+          <span
+            v-else-if="userStore.isAuthed && contest.status === ContestStatus.finished"
+            class="faint"
+            >没参加</span
+          >
+        </span>
+      </div>
+      <div v-if="!rows.length" class="empty muted">
+        {{ query.scope === "joined" ? "你还没参加过比赛" : "没有符合的比赛" }}
       </div>
     </div>
-    <n-data-table :bordered="false" :columns="columns" :data="data" :row-props="rowProps" />
-  </n-flex>
+  </div>
   <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
 </template>
 
 <style scoped>
-.active-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+.page {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.active-card {
+.top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.top h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.muted {
+  color: v-bind("theme.textColor3");
+}
+
+.faint {
+  color: v-bind("theme.textColor3");
+  opacity: 0.7;
+}
+
+.sec {
+  color: v-bind("theme.textColor2");
+}
+
+.small {
+  font-size: 13px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.green {
+  color: v-bind("success.color");
+}
+
+.amber {
+  color: v-bind("warning.color");
+}
+
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid v-bind("theme.borderColor");
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+  cursor: pointer;
+}
+
+.chip.on {
+  border-color: transparent;
+  background: v-bind("success.background");
+  color: v-bind("success.color");
+  font-weight: 600;
+}
+
+.running {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 20px;
+  border-radius: 6px;
+  border: 1px solid v-bind("theme.successColor");
+  background: v-bind("success.background");
+  cursor: pointer;
+}
+
+.running-main {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.running-title {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.2);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.running-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.countdown {
+  color: v-bind("warning.color");
+}
+
+.countdown b {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.upcoming {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid v-bind("theme.borderColor");
   cursor: pointer;
-  transition: border-color 0.2s;
 }
 
-.active-card.underway {
-  border-color: rgba(24, 160, 88, 0.5);
-  background-color: rgba(24, 160, 88, 0.06);
+.upcoming-title {
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.active-card:hover {
-  border-color: #18a058;
+.table {
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.active-title {
-  font-size: 16px;
-  font-weight: 500;
+.tr {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 70px 110px 130px minmax(160px, 260px);
+  align-items: center;
+  gap: 14px;
+  min-height: 38px;
+  padding: 0 20px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+  cursor: pointer;
 }
 
-.active-meta {
+.tr:last-child {
+  border-bottom: 0;
+}
+
+.tr:not(.th):hover {
+  background: v-bind("theme.hoverColor");
+}
+
+.th {
+  min-height: 32px;
   font-size: 12px;
+  color: v-bind("theme.textColor3");
+  background: v-bind("theme.actionColor");
+  cursor: default;
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tr.done .name {
+  color: v-bind("theme.textColor2");
+}
+
+.mine {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cup {
+  color: #b07d00;
+  flex-shrink: 0;
+}
+
+.empty {
+  padding: 24px 20px;
+}
+
+@media (max-width: 760px) {
+  .tr {
+    grid-template-columns: 1fr auto;
+  }
+
+  .tr > span:nth-child(3),
+  .tr > span:nth-child(4) {
+    display: none;
+  }
 }
 </style>

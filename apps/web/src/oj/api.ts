@@ -4,6 +4,8 @@ import {
   type Contest,
   type ContestAccess,
   type ContestList,
+  type ContestClassView,
+  type ContestScoreboard,
   type ActivityRankItem,
   type FormatCodeResponse,
   type Metrics,
@@ -52,7 +54,6 @@ import { toProblemRow } from "oj/transforms"
 import type {
   Announcement,
   AnnouncementListItem,
-  ContestRank,
   Profile,
   Message,
   SubmissionListItem,
@@ -303,9 +304,14 @@ export function getContestList(query: {
   limit: number
   keyword: string
   status: string
+  /** 练习 / 期中 / 期末，或「考试」= 期中和期末 */
   tag: string
+  /** 只看我交过题的 */
+  joined?: boolean
 }) {
-  return api.get<ContestList>("contests", { params: query })
+  return api.get<ContestList>("contests", {
+    params: { ...query, joined: query.joined ? "1" : undefined },
+  })
 }
 
 export function getContest(id: string) {
@@ -328,13 +334,12 @@ export async function getContestProblems(contestID: string) {
   return res.map(toProblemRow)
 }
 
-export function getContestRank(contestID: string, query: { limit: number; offset: number }) {
-  // submissionInfo 在契约里是 Record<string, unknown>（JSONB 原文），
-  // 前端在这里收窄成 ContestSubmissionInfo，见 utils/types 的 ContestRank
-  return api.get<{ results: ContestRank[]; total: number }>(
-    `contests/${encodeURIComponent(contestID)}/rank`,
-    { params: query },
-  )
+export function getContestScoreboard(contestID: string) {
+  return api.get<ContestScoreboard>(`contests/${encodeURIComponent(contestID)}/scoreboard`)
+}
+
+export function getContestClassView(contestID: string) {
+  return api.get<ContestClassView>(`contests/${encodeURIComponent(contestID)}/class-view`)
 }
 
 export function uploadAvatar(file: File) {

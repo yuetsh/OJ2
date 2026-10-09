@@ -1,334 +1,592 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { NButton, useThemeVars } from "naive-ui"
-import { getContestProblems, getContestRank } from "oj/api"
-import { secondsToDuration } from "utils/functions"
+import type { ContestScoreCell, ContestScoreRow } from "@oj2/contract"
+import { useThemeVars } from "naive-ui"
 import { useContestStore } from "oj/store/contest"
-import Pagination from "shared/components/Pagination.vue"
-import { usePagination } from "shared/composables/pagination"
+import { useTone } from "oj/submission/composables/tone"
+import { useUserStore } from "shared/store/user"
 import { ContestStatus } from "utils/constants"
-import type { ContestRank, ProblemRow } from "utils/types"
-import AcAndSubmission from "../components/AcAndSubmission.vue"
-import LineChart from "../components/LineChart.vue"
+import { secondsToDuration } from "utils/functions"
+import { classLabel } from "oj/submission/utils"
+import UserName from "../components/UserName.vue"
 
-interface Props {
-  contestID: string
-}
+/**
+ * 比赛排名（设计稿「比赛重设计」排行榜两块）。竞争感是用户要的（「我需要竞争」）：
+ * 名次变化箭头、这题最先做对的深绿格、按班筛、自己那行一直看得见；结束后前三名上领奖台。
+ * 原来的前十名排名曲线不要了（用户定的），学生的「导出数据」也拿掉了 —— 导出在老师的成绩页
+ */
+const props = defineProps<{ contestID: string }>()
 
-const props = defineProps<Props>()
-
-const route = useRoute()
 const router = useRouter()
-const theme = useThemeVars()
-
 const contestStore = useContestStore()
+const userStore = useUserStore()
+const theme = useThemeVars()
+const tone = useTone()
 
-const total = ref(0)
-const data = ref<ContestRank[]>([])
-const chart = ref<ContestRank[]>([])
-const problems = ref<ProblemRow[]>([])
-const [autoRefresh] = useToggle(true)
-const { resume, pause } = useIntervalFn(
-  () => {
-    query.page = 1
-    listRanks()
-  },
-  10000,
+const running = computed(() => contestStore.contestStatus === ContestStatus.underway)
+const ended = computed(() => contestStore.contestStatus === ContestStatus.finished)
+
+const autoRefresh = ref(true)
+const { pause, resume } = useIntervalFn(
+  () => contestStore.loadScoreboard(props.contestID),
+  10_000,
   {
     immediate: false,
   },
 )
-
-// 使用分页 composable
-const { query } = usePagination({}, { defaultLimit: 50 })
-
-const columns = ref<DataTableColumn<ContestRank>[]>([
-  {
-    title: "编号",
-    key: "id",
-    width: 80,
-    fixed: "left",
-    align: "center",
-    render: (_, index) => index + (query.page - 1) * query.limit + 1,
-  },
-  {
-    title: "用户",
-    key: "username",
-    width: 120,
-    fixed: "left",
-    align: "center",
-    render: (row) =>
-      h(
-        NButton,
-        {
-          text: true,
-          type: "info",
-          onClick: () => router.push("/user?name=" + row.user.username),
-        },
-        () => row.user.username,
-      ),
-  },
-  {
-    title: "正确数/总提交",
-    key: "submission",
-    width: 140,
-    align: "center",
-    render: (row) => h(AcAndSubmission, { rank: row }),
-  },
-  {
-    title: "总时间",
-    key: "total_time",
-    width: 120,
-    align: "center",
-    render: (row) => secondsToDuration(row.totalTime),
-  },
-])
-
-async function listRanks() {
-  const res = await getContestRank(props.contestID, {
-    limit: query.limit,
-    offset: query.limit * (query.page - 1),
-  })
-  total.value = res.total
-  data.value = res.results
-  if (query.page === 1) {
-    chart.value = data.value
-  }
-}
-
-async function addColumns() {
-  try {
-    problems.value = await getContestProblems(props.contestID)
-    problems.value.map((problem) => {
-      columns.value.push({
-        align: "center",
-        title: () =>
-          h(
-            NButton,
-            {
-              text: true,
-              type: "primary",
-              onClick: () => {
-                const data = router.resolve({
-                  name: "contest problem",
-                  params: {
-                    contestID: route.params.contestID,
-                    problemID: problem._id,
-                  },
-                })
-                window.open(data.href, "_blank")
-              },
-            },
-            () => problem.title,
-          ),
-        render: (row) => {
-          if (row.submissionInfo[problem.id]) {
-            const status = row.submissionInfo[problem.id]
-            let acTime
-            let errorNumber
-            if (status.is_ac) {
-              acTime = h("span", secondsToDuration(status.ac_time))
-            }
-            if (status.is_first_ac) {
-              acTime = [
-                h(Icon, {
-                  icon: "fluent-emoji:1st-place-medal",
-                  height: 20,
-                  width: 20,
-                }),
-                h("span", secondsToDuration(status.ac_time)),
-              ]
-            }
-            if (status.error_number) {
-              errorNumber = h("span", { style: "margin: 0" }, `(-${status.error_number})`)
-            }
-            return h("div", { class: "oj-time-with-modal" }, [acTime, errorNumber])
-          }
-        },
-        cellProps: (row) => {
-          let backgroundColor = ""
-          let color = theme.value.textColorBase
-          if (row.submissionInfo[problem.id]) {
-            const status = row.submissionInfo[problem.id]
-            if (status.is_first_ac) {
-              backgroundColor = theme.value.primaryColor
-              color = theme.value.baseColor
-            } else if (status.is_ac) {
-              const success = theme.value.successColor
-              backgroundColor = success + "50"
-              color = theme.value.textColorBase
-            } else {
-              const error = theme.value.errorColor
-              backgroundColor = error + "50"
-              color = theme.value.textColorBase
-            }
-          }
-          return { style: { backgroundColor, color } }
-        },
-        key: problem.id,
-        width: 150,
-        ellipsis: true,
-      })
-    })
-  } catch (err) {
-    problems.value = []
-  }
-}
-
-// 导出弹窗
-const showExportModal = ref(false)
-const exportLoading = ref(false)
-const exportForm = reactive({
-  first: 0,
-  second: 0,
-  third: 0,
-})
-
 watch(
-  () => total.value,
-  (val) => {
-    if (val > 0) {
-      exportForm.first = Math.round(val * 0.1)
-      exportForm.second = Math.round(val * 0.2)
-      exportForm.third = Math.round(val * 0.3)
-    }
+  () => [contestStore.canEnter, running.value, autoRefresh.value] as const,
+  ([enter, run, auto]) => {
+    if (!enter) return
+    if (!contestStore.scoreboard) contestStore.loadScoreboard(props.contestID)
+    if (run && auto) resume()
+    else pause()
   },
+  { immediate: true },
+)
+watch(autoRefresh, (on) => on && contestStore.loadScoreboard(props.contestID))
+
+const board = computed(() => contestStore.scoreboard)
+const allRows = computed(() => board.value?.rows ?? [])
+const problems = computed(() => board.value?.problems ?? [])
+const meId = computed(() => userStore.user?.id)
+const me = computed(() => allRows.value.find((row) => row.userId === meId.value))
+
+const classFilter = ref("")
+const classes = computed(() => {
+  const count = new Map<string, number>()
+  for (const row of allRows.value) {
+    if (row.className) count.set(row.className, (count.get(row.className) ?? 0) + 1)
+  }
+  return [...count.entries()].sort(([a], [b]) => a.localeCompare(b))
+})
+const rows = computed(() =>
+  classFilter.value
+    ? allRows.value.filter((row) => row.className === classFilter.value)
+    : allRows.value,
 )
 
-function openExportModal() {
-  if (total.value > 0) {
-    exportForm.first = Math.round(total.value * 0.1)
-    exportForm.second = Math.round(total.value * 0.2)
-    exportForm.third = Math.round(total.value * 0.3)
-  }
-  showExportModal.value = true
-}
-
-async function downloadExcel() {
-  exportLoading.value = true
-  try {
-    // 自己翻页凑齐全量：后端 limit 上限 250，而**超出上限不是截断、是静默回落到
-    // 默认的 10**（routes/helpers.ts 的 queryInteger）。原来这里传 total（或 10000）
-    // 想一次拉完，参赛超过 250 人时只会拿回 10 行，而下面的等级分档仍按真实总人数算 ——
-    // 老师拿到的是一份 10 个人、等级全错的名单，还不报错
-    const PAGE = 250
-    const allRanks: ContestRank[] = []
-    for (;;) {
-      const res = await getContestRank(props.contestID, {
-        limit: PAGE,
-        offset: allRanks.length,
-      })
-      allRanks.push(...res.results)
-      // 两个出口都要留：拿不满一页说明到底了；比对 total 是防着最后一页正好整除
-      if (res.results.length < PAGE || allRanks.length >= res.total) break
-    }
-
-    const rows = allRanks.map((rank, index) => {
-      const rank1 = index + 1
-      let level = ""
-      if (rank1 <= exportForm.first) {
-        level = "一等奖"
-      } else if (rank1 <= exportForm.first + exportForm.second) {
-        level = "二等奖"
-      } else if (rank1 <= exportForm.first + exportForm.second + exportForm.third) {
-        level = "三等奖"
-      } else {
-        level = "参与奖"
-      }
-      return { 用户名: rank.user.username, 等级: level }
-    })
-
-    const csv = "用户名,等级\n" + rows.map((r) => `${r.用户名},${r.等级}`).join("\n")
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `${contestStore.contest?.title ?? "contest"}获奖情况.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    showExportModal.value = false
-  } finally {
-    exportLoading.value = false
-  }
-}
-
-// 监听分页参数变化
-watch([() => query.page, () => query.limit], listRanks)
-
-// 自动刷新只在比赛进行中有意义（开关本身也只在这一档渲染），所以由「开关 + 比赛状态」
-// 一起驱动。原来只 watch(autoRefresh)：开关初值就是 true、进页面不产生变化，而
-// useIntervalFn 建的时候又传了 immediate: false，于是表从没启动过 —— 开关明明是开着的，
-// 排名却一直不刷新，得手动关一次再开。
-watchEffect(() => {
-  const running = contestStore.contestStatus === ContestStatus.underway
-  if (autoRefresh.value && running) resume()
-  else pause()
+const updatedAgo = computed(() => {
+  if (!contestStore.scoreboardAt) return ""
+  const seconds = Math.max(0, Math.floor((contestStore.now - contestStore.scoreboardAt) / 1000))
+  return seconds < 5 ? "刚刚" : `${seconds} 秒前`
 })
 
-onMounted(() => {
-  listRanks()
-  addColumns()
+const podium = computed(() => (ended.value ? allRows.value.slice(0, 3) : []))
+/** 我在自己班里第几 */
+const classPlace = computed(() => {
+  const row = me.value
+  if (!row?.className) return null
+  return allRows.value.filter((r) => r.className === row.className && r.rank! <= row.rank!).length
 })
+
+function move(row: ContestScoreRow) {
+  return running.value && row.rank && row.prevRank ? row.prevRank - row.rank : 0
+}
+
+function cellOf(row: ContestScoreRow, problemId: number): ContestScoreCell | undefined {
+  return row.cells[String(problemId)]
+}
+
+function openProblem(displayId: string) {
+  router.push(`/contest/${props.contestID}/problem/${displayId}`)
+}
+
+const success = computed(() => tone("success"))
+const meBackground = computed(
+  () =>
+    `linear-gradient(${success.value.background}, ${success.value.background}), ${theme.value.cardColor}`,
+)
+const danger = computed(() => tone("error"))
+const columns = computed(
+  () =>
+    `34px ${running.value ? "34px " : ""}150px 40px 70px repeat(${problems.value.length}, 58px)`,
+)
 </script>
 
 <template>
-  <!-- 排名变化图表 -->
-  <LineChart :ranks="chart" :problems="problems" v-if="chart.length > 0" />
+  <div v-if="contestStore.rankHidden" class="locked">
+    <b>{{ contestStore.contest?.tag }}考试，排名考完公布</b>
+    <span class="muted">考完回来就能看到全部名次和每道题的做对情况</span>
+  </div>
+  <div v-else-if="board" class="rank-page">
+    <div v-if="podium.length" class="podium-row">
+      <div class="podium">
+        <div
+          v-for="place in [2, 1, 3]"
+          v-show="podium[place - 1]"
+          :key="place"
+          class="step"
+          :class="`p${place}`"
+        >
+          <svg
+            :width="place === 1 ? 26 : 22"
+            :height="place === 1 ? 26 : 22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="cup"
+          >
+            <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
+            <path d="M16 6h3v1a3 3 0 0 1-3 3" />
+            <path d="M8 6H5v1a3 3 0 0 0 3 3" />
+            <path d="M12 13v4" />
+            <path d="M8 20h8" />
+          </svg>
+          <template v-if="podium[place - 1]">
+            <UserName
+              class="podium-name"
+              :username="podium[place - 1]!.username"
+              :class-name="podium[place - 1]!.className"
+              strong
+            />
+            <span class="muted small">
+              {{ classLabel(podium[place - 1]!.className) }} · {{ podium[place - 1]!.solved }} 道 ·
+              {{ secondsToDuration(podium[place - 1]!.totalTime) }}
+            </span>
+          </template>
+          <div class="block">{{ place }}</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div v-if="me" class="mine">
+        <span class="muted small">你的成绩</span>
+        <div class="mine-line">
+          <span class="mine-big">第 {{ me.rank }} 名</span
+          ><span class="muted">/ {{ allRows.length }} 人</span>
+        </div>
+        <span class="small sec">
+          做对 {{ me.solved }} 道 · 用时 {{ secondsToDuration(me.totalTime) }}
+          <template v-if="classPlace && classes.length > 1">
+            · {{ classLabel(me.className) }}里第 {{ classPlace }}</template
+          >
+        </span>
+      </div>
+    </div>
 
-  <!-- 排名表格 -->
-  <n-data-table striped :single-line="false" :scroll-x="1200" :columns="columns" :data="data" />
-  <n-space justify="end" align="center">
-    <n-form
-      label-placement="left"
-      inline
-      :show-feedback="false"
-      v-if="contestStore.contestStatus === ContestStatus.underway"
-    >
-      <n-form-item label="开启自动刷新">
-        <n-switch v-model:value="autoRefresh" />
-      </n-form-item>
-    </n-form>
-    <n-button
-      v-if="contestStore.contestStatus === ContestStatus.finished"
-      type="primary"
-      @click="openExportModal"
-    >
-      导出数据
-    </n-button>
-    <Pagination
-      :total="total"
-      :limit="query.limit"
-      :page="query.page"
-      @update:limit="(limit: number) => (query.limit = limit)"
-      @update:page="(page: number) => (query.page = page)"
-    />
-  </n-space>
+    <div class="tools">
+      <template v-if="classes.length > 1">
+        <button class="chip" :class="{ on: !classFilter }" @click="classFilter = ''">
+          全部 {{ allRows.length }}
+        </button>
+        <button
+          v-for="[name, n] in classes"
+          :key="name"
+          class="chip"
+          :class="{ on: classFilter === name }"
+          @click="classFilter = name"
+        >
+          {{ classLabel(name) }} {{ n }}
+        </button>
+      </template>
+      <span v-else class="muted small">{{ allRows.length }} 人</span>
+      <div class="spacer"></div>
+      <template v-if="running">
+        <n-switch v-model:value="autoRefresh" size="small" />
+        <span class="small">自动刷新</span>
+        <span v-if="autoRefresh" class="muted small">{{ updatedAgo }}</span>
+      </template>
+    </div>
 
-  <n-modal v-model:show="showExportModal" preset="dialog" title="导出获奖数据">
-    <n-form
-      label-placement="left"
-      label-width="auto"
-      :show-feedback="false"
-      style="margin-top: 16px"
-    >
-      <n-form-item label="一等奖人数" style="margin-bottom: 12px">
-        <n-input-number v-model:value="exportForm.first" :min="0" />
-      </n-form-item>
-      <n-form-item label="二等奖人数" style="margin-bottom: 12px">
-        <n-input-number v-model:value="exportForm.second" :min="0" />
-      </n-form-item>
-      <n-form-item label="三等奖人数">
-        <n-input-number v-model:value="exportForm.third" :min="0" />
-      </n-form-item>
-    </n-form>
-    <template #action>
-      <n-button @click="showExportModal = false">取消</n-button>
-      <n-button type="primary" :loading="exportLoading" @click="downloadExcel"> 下载 CSV </n-button>
-    </template>
-  </n-modal>
+    <div class="table">
+      <div class="tr th" :style="{ gridTemplateColumns: columns }">
+        <span class="num">名次</span>
+        <span v-if="running"></span>
+        <span class="pad">学生</span>
+        <span class="num">做对</span>
+        <span class="num">用时</span>
+        <button
+          v-for="p in problems"
+          :key="p.id"
+          class="ph"
+          :title="p.title"
+          @click="openProblem(p._id)"
+        >
+          <b>{{ p._id }}</b>
+          <span>{{ p.solvedUsers }} 人</span>
+        </button>
+      </div>
+      <div
+        v-for="row in rows"
+        :key="row.userId"
+        class="tr"
+        :class="{ me: row.userId === meId }"
+        :style="{ gridTemplateColumns: columns }"
+      >
+        <span class="num rank">{{ row.rank }}</span>
+        <span v-if="running" class="move">
+          <span v-if="move(row) > 0" class="up">↑{{ move(row) }}</span>
+          <span v-else-if="move(row) < 0" class="down">↓{{ -move(row) }}</span>
+        </span>
+        <UserName
+          class="pad"
+          :username="row.username"
+          :class-name="row.className"
+          :strong="row.userId === meId"
+          :title="row.realName ?? row.username"
+        />
+        <span class="num solved">{{ row.solved }}</span>
+        <span class="num time">{{ secondsToDuration(row.totalTime) }}</span>
+        <span v-for="p in problems" :key="p.id" class="cell-wrap">
+          <template v-if="cellOf(row, p.id)">
+            <span
+              v-if="cellOf(row, p.id)!.isAc"
+              class="cell ac"
+              :class="{ first: cellOf(row, p.id)!.firstAc }"
+              :title="cellOf(row, p.id)!.firstAc ? '这题最先做对' : undefined"
+            >
+              {{ Math.floor(cellOf(row, p.id)!.acTime / 60)
+              }}<small v-if="cellOf(row, p.id)!.errors">-{{ cellOf(row, p.id)!.errors }}</small>
+            </span>
+            <span v-else class="cell no">{{
+              cellOf(row, p.id)!.errors ? `-${cellOf(row, p.id)!.errors}` : "交过"
+            }}</span>
+          </template>
+        </span>
+      </div>
+      <div v-if="!rows.length" class="empty muted">还没有人交题</div>
+    </div>
+
+    <div class="legend">
+      <span><i class="sw first"></i>这题最先做对</span>
+      <span><i class="sw ac"></i>做对，格子里是第几分钟（-1 是错过 1 次）</span>
+      <span><i class="sw no"></i>还没对，错了几次</span>
+      <div class="spacer"></div>
+      <span>用时 = 每道做对题的分钟数相加，错一次多算 20 分钟</span>
+    </div>
+  </div>
 </template>
-<style>
-.oj-time-with-modal {
+
+<style scoped>
+.locked {
+  padding: 80px 20px;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+
+.rank-page {
+  display: flex;
+  flex-direction: column;
+}
+
+.muted {
+  color: v-bind("theme.textColor3");
+}
+
+.sec {
+  color: v-bind("theme.textColor2");
+}
+
+.small {
+  font-size: 13px;
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.podium-row {
+  padding: 12px 20px 0;
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.podium {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.step {
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.podium-name {
+  font-size: 15px;
+  max-width: 200px;
+}
+
+.p1 .podium-name {
+  font-size: 17px;
+}
+
+.block {
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: 6px;
+  border-radius: 6px 6px 0 0;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.p1 .cup,
+.p1 .block {
+  color: #9a6700;
+}
+
+.p1 .block {
+  height: 66px;
+  background: rgba(240, 180, 40, 0.2);
+}
+
+.p2 .cup,
+.p2 .block {
+  color: #5f6b7a;
+}
+
+.p2 .block {
+  height: 46px;
+  background: rgba(120, 135, 155, 0.18);
+}
+
+.p3 .cup,
+.p3 .block {
+  color: #8c5a3c;
+}
+
+.p3 .block {
+  height: 32px;
+  background: rgba(170, 110, 70, 0.16);
+}
+
+.mine {
+  width: 330px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 6px;
+  background: v-bind("success.background");
+}
+
+.mine-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mine-big {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  color: v-bind("success.color");
+}
+
+.tools {
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 13px;
+  border: 1px solid v-bind("theme.borderColor");
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chip.on {
+  border-color: transparent;
+  background: v-bind("success.background");
+  color: v-bind("success.color");
+  font-weight: 600;
+}
+
+.table {
+  max-height: calc(100vh - 230px);
+  overflow: auto;
+}
+
+.tr {
+  display: grid;
+  align-items: center;
+  column-gap: 6px;
+  min-width: max-content;
+  height: 32px;
+  padding: 0 20px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+  background: v-bind("theme.cardColor");
+}
+
+.th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 44px;
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+  background: v-bind("theme.actionColor");
+}
+
+.tr.me {
+  position: sticky;
+  bottom: 0;
+  top: 44px;
+  z-index: 1;
+  /* 浅绿是半透明的，钉住时底下的行会透上来，垫一层卡片底色 */
+  background: v-bind("meBackground");
+  box-shadow: inset 3px 0 0 v-bind("theme.successColor");
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pad {
+  padding-left: 6px;
+  min-width: 0;
+}
+
+.rank {
+  font-weight: 700;
+}
+
+.solved {
+  font-weight: 700;
+}
+
+.time {
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+  padding-right: 8px;
+}
+
+.move {
+  font-size: 11px;
+}
+
+.up {
+  color: v-bind("success.color");
+}
+
+.down {
+  color: v-bind("danger.color");
+}
+
+.ph {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 16px;
+  color: v-bind("theme.textColor3");
+  cursor: pointer;
+}
+
+.ph b {
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+}
+
+.ph span {
+  font-size: 11px;
+}
+
+.cell-wrap {
+  display: flex;
+}
+
+.cell {
+  width: 100%;
+  height: 26px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cell small {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.cell.ac {
+  font-weight: 600;
+  background: v-bind("success.background");
+  color: v-bind("success.color");
+}
+
+.cell.ac.first {
+  background: v-bind("theme.successColor");
+  color: #ffffff;
+}
+
+.cell.no {
+  background: v-bind("danger.background");
+  color: v-bind("danger.color");
+}
+
+.empty {
+  padding: 24px 20px;
+}
+
+.legend {
+  min-height: 34px;
+  padding: 6px 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+  border-top: 1px solid v-bind("theme.dividerColor");
+}
+
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sw {
+  width: 28px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+.sw.first {
+  background: v-bind("theme.successColor");
+}
+
+.sw.ac {
+  background: v-bind("success.background");
+}
+
+.sw.no {
+  background: v-bind("danger.background");
 }
 </style>

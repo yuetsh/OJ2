@@ -217,7 +217,10 @@ const contestBar = computed(() => {
     // 不在进行中的两种：管理员赛前看题是「还没开始」，不能一律写「已结束」
     notStarted: contestStore.contestStatus === ContestStatus.not_started,
     home: { name: "contest problems", params: { contestID: ctx.value.contestId } },
-    rank: { name: "contest rank", params: { contestID: ctx.value.contestId } },
+    // 期中期末进行中排名不公布，链接也不给
+    rank: contestStore.rankHidden
+      ? null
+      : { name: "contest rank", params: { contestID: ctx.value.contestId } },
   }
 })
 
@@ -359,7 +362,9 @@ onSolvedHere(() => {
       <span class="countdown">{{ contestBar.remaining }}</span>
     </template>
     <span v-else class="meta">{{ contestBar.notStarted ? "还没开始" : "已结束" }}</span>
-    <router-link :to="contestBar.rank" class="contest-rank">排名</router-link>
+    <router-link v-if="contestBar.rank" :to="contestBar.rank" class="contest-rank"
+      >排名</router-link
+    >
   </div>
 </template>
 

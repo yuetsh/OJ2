@@ -212,6 +212,24 @@ export function readableDuration(seconds: number): string {
   return rest ? `${hours} 小时 ${rest} 分` : `${hours} 小时`
 }
 
+/**
+ * 比赛有多长，给人看的：「40 分钟」「1 小时 30 分钟」「3 天」。
+ * `duration()` 会拆出「1月6天59分钟」这种，比赛列表里读不下去；一天以上只说几天
+ */
+export function contestLength(start: Date | string, end: Date | string): string {
+  const minutes = Math.round(
+    (normalizeDate(end).getTime() - normalizeDate(start).getTime()) / 60_000,
+  )
+  if (!Number.isFinite(minutes) || minutes <= 0) return ""
+  if (minutes < 60) return `${minutes} 分钟`
+  if (minutes < 24 * 60) {
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    return m ? `${h} 小时 ${m} 分钟` : `${h} 小时`
+  }
+  return `${Math.round(minutes / (24 * 60))} 天`
+}
+
 export function durationToDays(start: Date | string, end: Date | string): string {
   const durationObj = getDurationObject(start, end)
   const units = [

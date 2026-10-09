@@ -329,12 +329,6 @@ export type BlankContest = Omit<
  */
 export type { ContestSubmissionInfo } from "@oj2/contract"
 
-/**
- * 榜单行。`submissionInfo` 的收窄（JSONB 原文的 snake_case 形状）已经搬进
- * `contestRankItemSchema`，这里不再需要 Omit + 覆盖。
- */
-export type ContestRank = import("@oj2/contract").ContestRankItem
-
 export type { WebsiteConfig, OnlineCount } from "@oj2/contract"
 
 export type {
@@ -344,7 +338,6 @@ export type {
   OrphanTestCase,
   AdminUser,
   AdminUserList,
-  AcmHelperItem,
   AdminContestList,
   AdminProblemSetProgress,
   AdminProblemSetProblem,

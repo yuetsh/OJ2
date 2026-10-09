@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
 import { useContestStore } from "oj/store/contest"
 import { parseTime } from "utils/functions"
 import ContestAccessTag from "shared/components/ContestAccessTag.vue"
@@ -10,12 +9,7 @@ const contestStore = useContestStore()
 <template>
   <n-popover v-if="contestStore.contest" placement="bottom-end" :show-arrow="false">
     <template #trigger>
-      <n-button>
-        <template #icon>
-          <Icon icon="streamline-emojis:exclamation-mark"></Icon>
-        </template>
-        比赛信息
-      </n-button>
+      <n-button>比赛信息</n-button>
     </template>
     <div v-html="contestStore.contest.description"></div>
     <n-descriptions bordered label-placement="left" :column="1">

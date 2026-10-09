@@ -3,8 +3,15 @@ import { formatISO, getTime, parseISO } from "date-fns"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
 import { duration, secondsToDuration } from "utils/functions"
+import { isExamTag, type ContestScoreboard } from "@oj2/contract"
 import type { Contest, ProblemRow } from "utils/types"
-import { checkContestPassword, getContest, getContestAccess, getContestProblems } from "../api"
+import {
+  checkContestPassword,
+  getContest,
+  getContestAccess,
+  getContestProblems,
+  getContestScoreboard,
+} from "../api"
 
 export const useContestStore = defineStore("contest", () => {
   const userStore = useUserStore()
@@ -12,6 +19,10 @@ export const useContestStore = defineStore("contest", () => {
   const contest = ref<Contest | null>(null)
   const problems = ref<ProblemRow[]>([])
   const now = ref(0)
+  /** 整张榜（学生比赛页右边的名次、排名页共用），进行中由页面每 10 秒刷一次 */
+  const scoreboard = ref<ContestScoreboard | null>(null)
+  /** 上次拉到榜的时刻（本机时间），「8 秒前更新」用 */
+  const scoreboardAt = ref(0)
 
   let timer = 0
 
@@ -54,7 +65,36 @@ export const useContestStore = defineStore("contest", () => {
       (userStore.isAuthed && contest.value?.createdBy.id === userStore.user!.id),
   )
 
+  /** 老师（出题人、超管、其他老师）：看得到全班情况、真名，期中期末进行中也看得到排名 */
+  const isTeacher = computed(() => isContestAdmin.value || userStore.isTeacherOrAbove)
+
   const isPrivate = computed(() => contest.value!.contestType === ContestType.private)
+
+  /** 期中、期末进行中，学生看不到排名和每题做对人数（后端同样拦着，这里只管界面） */
+  const rankHidden = computed(
+    () =>
+      !!contest.value &&
+      isExamTag(contest.value.tag) &&
+      contestStatus.value === ContestStatus.underway &&
+      !isTeacher.value,
+  )
+
+  /** 能不能看题目（也就能看榜）：开始了、密码对了；老师 / 出题人随时 */
+  const canEnter = computed(() => {
+    if (!contest.value) return false
+    if (isContestAdmin.value) return true
+    if (contestStatus.value === ContestStatus.not_started) return false
+    return !isPrivate.value || access.value
+  })
+
+  async function loadScoreboard(contestID: string) {
+    try {
+      scoreboard.value = await getContestScoreboard(contestID)
+      scoreboardAt.value = Date.now()
+    } catch {
+      // 没开始 / 没密码时拉不到，界面按 canEnter 自己会挡住
+    }
+  }
 
   async function init(contestID: string) {
     problems.value = []
@@ -81,6 +121,7 @@ export const useContestStore = defineStore("contest", () => {
 
   function clear() {
     contest.value = null
+    scoreboard.value = null
     problems.value = []
     toggleAccess(false)
     now.value = 0
@@ -116,6 +157,13 @@ export const useContestStore = defineStore("contest", () => {
     contest,
     contestStatus,
     isContestAdmin,
+    isTeacher,
+    rankHidden,
+    canEnter,
+    scoreboard,
+    scoreboardAt,
+    loadScoreboard,
+    now,
     access,
     problems,
     isPrivate,
