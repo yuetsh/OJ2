@@ -350,16 +350,6 @@ export const createContestRequestSchema = z.object({
 
 export const updateContestRequestSchema = createContestRequestSchema
 
-export const acmHelperItemSchema = z.object({
-  id: z.number().int(),
-  username: z.string(),
-  realName: z.string().nullable(),
-  problemId: z.string(),
-  problemDisplayId: z.string(),
-  acInfo: z.record(z.string(), z.unknown()),
-  checked: z.boolean(),
-})
-
 export const updateAcmHelperRequestSchema = z.object({
   rankId: z.number().int().positive(),
   problemId: z.string().min(1),
@@ -788,6 +778,11 @@ export const addContestProblemRequestSchema = z.object({
   displayId: z.string().trim().min(1).max(32),
 })
 
+/** 比赛题排顺序：给出这场比赛**全部**题目的 id，按这个顺序把编号改成 1、2、3… */
+export const reorderContestProblemsRequestSchema = z.object({
+  problemIds: z.array(z.number().int().positive()).min(1).max(100),
+})
+
 export const testCaseEntrySchema = z.object({
   stripped_output_md5: z.string(),
   input_size: z.number().int(),
@@ -901,7 +896,6 @@ export type CreateProblemRequest = z.infer<typeof createProblemRequestSchema>
 
 export type AdminContest = z.infer<typeof adminContestSchema>
 export type AdminContestList = z.infer<typeof adminContestListSchema>
-export type AcmHelperItem = z.infer<typeof acmHelperItemSchema>
 export type AdminUser = z.infer<typeof adminUserSchema>
 export type AdminUserList = z.infer<typeof adminUserListSchema>
 export type JudgeServer = z.infer<typeof judgeServerSchema>

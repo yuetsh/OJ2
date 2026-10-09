@@ -1,5 +1,6 @@
 import {
   addContestProblemRequestSchema,
+  reorderContestProblemsRequestSchema,
   astCheckRequestSchema,
   generateTestInputsRequestSchema,
   isSqlProblem,
@@ -794,6 +795,61 @@ adminProblemRoutes.post(
       }),
     )
     return success(c, await serialize(created), 201)
+  },
+)
+
+/**
+ * 比赛题按给定顺序重新编号 1、2、3…（新建比赛页拖动排序用）。
+ * 榜单、提交、草稿都按题目 id 记，改编号不影响已经交的东西；比赛结束后就不让动了，
+ * 免得赛后对着「第 3 题」讲评时题号变了。
+ * 唯一约束是 (_id, contest_id)，直接改会和还没改的那道撞，所以先统一挪到临时编号再写回来
+ */
+adminProblemRoutes.put(
+  "/contests/:contestId/problems/order",
+  requireProblemPermission,
+  async (c) => {
+    const contestId = queryInteger(c.req.param("contestId"), 0, { min: 1 })
+    const parsed = await parseBody(c, reorderContestProblemsRequestSchema)
+    if (!parsed.success) return parsed.response
+    const [contest] = await db
+      .select()
+      .from(schema.contest)
+      .where(eq(schema.contest.id, contestId))
+      .limit(1)
+    const user = c.get("user")!
+    if (!contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)) {
+      return failure(c, 404, "contest-not-found", "Contest does not exist")
+    }
+    if (contestStatus(contest) === "-1")
+      return failure(c, 409, "contest-ended", "比赛已经结束，不能再改题号")
+    const existing = await db
+      .select({ id: schema.problem.id })
+      .from(schema.problem)
+      .where(eq(schema.problem.contestId, contestId))
+    const ids = parsed.data.problemIds
+    const all = new Set(existing.map((row) => row.id))
+    if (
+      new Set(ids).size !== ids.length ||
+      ids.length !== all.size ||
+      ids.some((id) => !all.has(id))
+    ) {
+      return failure(c, 400, "problem-list-mismatch", "题目列表和比赛里的对不上，请刷新后再排")
+    }
+    await db.transaction(async (tx) => {
+      for (const id of ids) {
+        await tx
+          .update(schema.problem)
+          .set({ displayId: `__${id}` })
+          .where(eq(schema.problem.id, id))
+      }
+      for (const [index, id] of ids.entries()) {
+        await tx
+          .update(schema.problem)
+          .set({ displayId: String(index + 1) })
+          .where(eq(schema.problem.id, id))
+      }
+    })
+    return success(c, null)
   },
 )
 

@@ -2,7 +2,6 @@ import {
   createContestRequestSchema,
   updateAcmHelperRequestSchema,
   updateContestRequestSchema,
-  type AcmHelperItem,
   type AdminContest,
   type AdminContestList,
 } from "@oj2/contract"
@@ -268,60 +267,9 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   return success(c, await serialize(row!), 201)
 })
 
-// ---------------------------------------------------------------- ACM 赛后核查
-
-adminContestRoutes.get("/contests/:id/acm-helper", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // 不卡 visible：赛后核查恰恰常发生在比赛已经收起来之后，而同一场比赛的
-  // PUT acm-helper 从来不卡这一条 —— 卡着就成了「标记还能改、页面打不开」
-  const [contest] = await db.select().from(schema.contest).where(eq(schema.contest.id, id)).limit(1)
-  if (!contest || !ownedBy(c.get("user")!, contest)) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
-  }
-
-  const [problems, ranks] = await Promise.all([
-    db
-      .select({ id: schema.problem.id, displayId: schema.problem.displayId })
-      .from(schema.problem)
-      .where(eq(schema.problem.contestId, id)),
-    db
-      .select({
-        id: schema.acmContestRank.id,
-        username: schema.user.username,
-        realName: schema.userProfile.realName,
-        submissionInfo: schema.acmContestRank.submissionInfo,
-        acceptedNumber: schema.acmContestRank.acceptedNumber,
-      })
-      .from(schema.acmContestRank)
-      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(eq(schema.acmContestRank.contestId, id)),
-  ])
-  const displayIds = new Map(problems.map((problem) => [String(problem.id), problem.displayId]))
-
-  const results = []
-  for (const rank of ranks) {
-    if (rank.acceptedNumber <= 0) continue
-    for (const [problemId, info] of Object.entries(rank.submissionInfo)) {
-      if (info.is_ac !== true) continue
-      results.push({
-        id: rank.id,
-        username: rank.username,
-        // 真名在这里是**有意下发**的：核查页就是老师对着名单一个个确认谁抄了。
-        // 接口已由 requireTeacher + ownedBy 双重把关。
-        realName: rank.realName,
-        problemId,
-        problemDisplayId: displayIds.get(problemId) ?? problemId,
-        acInfo: info,
-        checked: info.checked === true,
-        _acTime: typeof info.ac_time === "number" ? info.ac_time : 0,
-      })
-    }
-  }
-  // 按 AC 用时倒序：最后才做出来的排前面，那是最值得看的
-  results.sort((left, right) => right._acTime - left._acTime)
-  return success(c, results.map(({ _acTime, ...item }) => item) satisfies AcmHelperItem[])
-})
+// ---------------------------------------------------------------- 赛后核查
+// 「看过了」的标记。列表原来是后台单独一页（审核），2026-10 并进前台比赛页老师的「成绩」，
+// 数据从 GET /contests/:id/class-view 来，这里只剩写标记
 
 adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => {
   const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })

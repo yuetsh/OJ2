@@ -1,12 +1,11 @@
 import {
+  EXAM_TAGS,
   isSqlProblem,
   contestPasswordRequestSchema,
   STUDENT_ROLES,
   type Contest,
   type ContestAccess,
   type ContestList,
-  type ContestRank,
-  type ContestRankItem,
   type ProblemDetail,
   type ProblemListItem,
 } from "@oj2/contract"
@@ -23,8 +22,11 @@ import {
   checkContestPassword,
   contestDetailsAllowed,
   contestStatus,
+  buildClassView,
+  buildScoreboard,
   findAccessibleContest,
-  isContestAdmin,
+  isContestTeacher,
+  rankHiddenFor,
   requireContestAccess,
   type ContestEnv,
 } from "../services/contest"
@@ -71,7 +73,59 @@ function serializeContest(
   } satisfies Contest
 }
 
-contestRoutes.get("/contests", async (c) => {
+/**
+ * 列表上要的几个数：每场几道题、几个学生交过，以及「我」在每场的名次和做对数。
+ * 名次和榜单同一个口径（学生、没禁用、做对数 ↓ 罚时 ↑ id ↑），期中期末进行中不给名次
+ */
+async function listExtras(
+  rows: (typeof schema.contest.$inferSelect)[],
+  userId: number | undefined,
+) {
+  const ids = rows.map((row) => row.id)
+  if (ids.length === 0) return { problems: new Map(), people: new Map(), mine: new Map() }
+  const idList = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `,
+  )
+  const studentList = sql.join(
+    STUDENT_ROLES.map((role) => sql`${role}`),
+    sql`, `,
+  )
+  const [problemRows, peopleRows, mineRows] = await Promise.all([
+    db.execute<{ contest_id: number; n: number }>(sql`
+      select contest_id, count(*)::int as n from ${schema.problem}
+      where contest_id in (${idList}) and visible group by contest_id
+    `),
+    db.execute<{ contest_id: number; n: number }>(sql`
+      select r.contest_id, count(*)::int as n from ${schema.acmContestRank} r
+      join ${schema.user} u on u.id = r.user_id
+      where r.contest_id in (${idList}) and u.admin_type in (${studentList}) and not u.is_disabled
+      group by r.contest_id
+    `),
+    userId
+      ? db.execute<{ contest_id: number; solved: number; rank: number }>(sql`
+          select r.contest_id, r.accepted_number as solved,
+            1 + (select count(*)::int from ${schema.acmContestRank} o
+              join ${schema.user} ou on ou.id = o.user_id
+              where o.contest_id = r.contest_id and ou.admin_type in (${studentList})
+                and not ou.is_disabled and o.user_id <> r.user_id
+                and (o.accepted_number > r.accepted_number
+                  or (o.accepted_number = r.accepted_number and o.total_time < r.total_time)
+                  or (o.accepted_number = r.accepted_number and o.total_time = r.total_time
+                    and o.id < r.id))) as rank
+          from ${schema.acmContestRank} r
+          where r.user_id = ${userId} and r.contest_id in (${idList})
+        `)
+      : Promise.resolve([]),
+  ])
+  return {
+    problems: new Map(problemRows.map((row) => [row.contest_id, row.n])),
+    people: new Map(peopleRows.map((row) => [row.contest_id, row.n])),
+    mine: new Map(mineRows.map((row) => [row.contest_id, row])),
+  }
+}
+
+contestRoutes.get("/contests", optionalAuth, async (c) => {
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const keyword = c.req.query("keyword")?.trim()
@@ -80,7 +134,21 @@ contestRoutes.get("/contests", async (c) => {
   const now = new Date().toISOString()
   const filters = [eq(schema.contest.visible, true)]
   if (keyword) filters.push(ilike(schema.contest.title, `%${keyword}%`))
-  if (tag) filters.push(eq(schema.contest.tag, tag))
+  if (tag === "考试") filters.push(inArray(schema.contest.tag, [...EXAM_TAGS]))
+  else if (tag) filters.push(eq(schema.contest.tag, tag))
+  const user = c.get("user")
+  // 「我参加过的」：交过题的才算（榜单行是第一次交题时建的）
+  if (c.req.query("joined") === "1" && user) {
+    filters.push(
+      inArray(
+        schema.contest.id,
+        db
+          .select({ id: schema.acmContestRank.contestId })
+          .from(schema.acmContestRank)
+          .where(eq(schema.acmContestRank.userId, user.id)),
+      ),
+    )
+  }
   if (status === "1") filters.push(gte(schema.contest.startTime, now))
   else if (status === "-1") filters.push(lte(schema.contest.endTime, now))
   else if (status === "0")
@@ -96,14 +164,28 @@ contestRoutes.get("/contests", async (c) => {
       .limit(limit)
       .offset(offset),
   ])
-  const byId = await creators([...new Set(rows.map((row) => row.createdById))])
+  const [byId, extras] = await Promise.all([
+    creators([...new Set(rows.map((row) => row.createdById))]),
+    listExtras(rows, user?.id),
+  ])
   return success(c, {
-    results: rows.map((row) =>
-      serializeContest(
-        row,
-        byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
-      ),
-    ),
+    results: rows.map((row) => {
+      const mine = extras.mine.get(row.id)
+      const total = extras.people.get(row.id) ?? 0
+      return {
+        ...serializeContest(
+          row,
+          byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
+        ),
+        problemCount: extras.problems.get(row.id) ?? 0,
+        participantCount: total,
+        mine: !user
+          ? undefined
+          : mine
+            ? { rank: rankHiddenFor(user, row) ? null : mine.rank, total, solved: mine.solved }
+            : null,
+      } satisfies Contest
+    }),
     total: totalRow[0]?.value ?? 0,
   } satisfies ContestList)
 })
@@ -224,7 +306,8 @@ contestRoutes.get(
       .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(and(eq(schema.problem.contestId, contest.id), eq(schema.problem.visible, true)))
-      .orderBy(asc(schema.problem.displayId))
+      // 先按长度再按字面：编号是文本，直接排会变成 1、10、11…、2
+      .orderBy(sql`length(${schema.problem.displayId})`, asc(schema.problem.displayId))
     const tags = await contestProblemTags(rows.map((row) => row.problem.id))
     const allowed = contestDetailsAllowed(c.get("user"), contest)
     const statuses = await contestProblemStatuses(c.get("user")?.id)
@@ -323,58 +406,23 @@ contestRoutes.get(
   },
 )
 
-contestRoutes.get("/contests/:id/rank", optionalAuth, requireContestAccess("ranks"), async (c) => {
-  const contest = c.get("contest")!
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const where = and(
-    eq(schema.acmContestRank.contestId, contest.id),
-    inArray(schema.user.adminType, [...STUDENT_ROLES]),
-    eq(schema.user.isDisabled, false),
-  )
-  const [totalRows, rows] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.acmContestRank)
-      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
-      .where(where),
-    db
-      .select({
-        rank: schema.acmContestRank,
-        user: schema.user,
-        realName: schema.userProfile.realName,
-      })
-      .from(schema.acmContestRank)
-      .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(where)
-      // 末尾的 id 是给排序兜全序用的：同 AC 数同罚时前两列分不出先后，而这条列表是
-      // limit/offset 翻页的，行序不稳定就意味着同一个人在第 2 页出现两次、另一个人
-      // 从此消失。id 本身不参与名次，只保证同分的人每次都按同一个顺序排
-      .orderBy(
-        desc(schema.acmContestRank.acceptedNumber),
-        asc(schema.acmContestRank.totalTime),
-        asc(schema.acmContestRank.id),
-      )
-      .limit(limit)
-      .offset(offset),
-  ])
-  const admin = isContestAdmin(c.get("user"), contest)
-  return success(c, {
-    results: rows.map(
-      ({ rank, user, realName }) =>
-        ({
-          id: rank.id,
-          // 唯一显式打开真名的地方，对齐旧后端 contest/serializers.py:84
-          // `UsernameSerializer(obj.user, need_real_name=self.is_contest_admin)`
-          user: sampleUser(user, realName, { includeRealName: admin }),
-          submissionNumber: rank.submissionNumber,
-          acceptedNumber: rank.acceptedNumber,
-          totalTime: rank.totalTime,
-          submissionInfo: rank.submissionInfo,
-          contestId: rank.contestId,
-        }) satisfies ContestRankItem,
-    ),
-    total: totalRows[0]?.value ?? 0,
-  } satisfies ContestRank)
-})
+contestRoutes.get(
+  "/contests/:id/scoreboard",
+  optionalAuth,
+  requireContestAccess("ranks"),
+  async (c) => success(c, await buildScoreboard(c.get("contest")!, c.get("user"))),
+)
+
+contestRoutes.get(
+  "/contests/:id/class-view",
+  optionalAuth,
+  requireContestAccess("ranks"),
+  async (c) => {
+    const contest = c.get("contest")!
+    const user = c.get("user")
+    if (!user || !isContestTeacher(user, contest)) {
+      return failure(c, 403, "teacher-only", "只有老师能看全班情况")
+    }
+    return success(c, await buildClassView(contest, user))
+  },
+)
