@@ -179,11 +179,14 @@ const countText = computed(() => {
   return { kind: "total" as const, n: total.value }
 })
 
-// ---- 排序：默认按最新创建（选了知识点也一样） ----
+// ---- 排序：和原来同一套，「最多 / 最少」按人数（和最后一列「做对 / 做过」对得上） ----
 const sortOptions = [
   { label: "最新创建", value: "" },
-  { label: "按题号", value: "id" },
-  { label: "最多人做对", value: "popular" },
+  { label: "最早创建", value: "create_time" },
+  { label: "最多人做过", value: "-submission_number" },
+  { label: "最少人做过", value: "submission_number" },
+  { label: "最多人做对", value: "-accepted_number" },
+  { label: "最少人做对", value: "accepted_number" },
 ]
 
 // ---- 出题者 ----

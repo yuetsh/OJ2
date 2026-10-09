@@ -439,8 +439,18 @@ export const problemListSchema = paginatedSchema(problemListItemSchema)
 /** 题目列表「全部类型」下拉：有参考图 / 画流程图 / 语法要求 */
 export const problemTypeFilterSchema = z.enum(["reference", "flowchart", "ast"])
 
-/** 题目列表的排序。空串是默认：按最新创建 */
-export const problemListSortSchema = z.enum(["", "id", "new", "popular"])
+/**
+ * 题目列表的排序。值沿用原来的（旧链接照样能用）：空串 = 最新创建、create_time = 最早创建，
+ * ±submission_number / ±accepted_number 是做过 / 做对的**人数**，带 - 是从多到少
+ */
+export const problemListSortSchema = z.enum([
+  "",
+  "create_time",
+  "-submission_number",
+  "submission_number",
+  "-accepted_number",
+  "accepted_number",
+])
 
 /**
  * 题目列表顶上那行和左栏的进度。**只说做到了什么**：做对几道、这周新做对几道、

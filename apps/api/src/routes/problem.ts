@@ -121,12 +121,6 @@ function listItem(
   } satisfies ProblemListItem
 }
 
-/** 题号排序：先按长度再按字面，1001 < 1100 < P026 < SQL09，不会排成 1001、1100、11、2 */
-const displayIdOrder = [
-  asc(sql`length(${schema.problem.displayId})`),
-  asc(schema.problem.displayId),
-]
-
 problemRoutes.get("/problems", optionalAuth, async (c) => {
   const user = c.get("user")
   const limit = queryInteger(c.req.query("limit"), 20, { min: 1, max: 250 })
@@ -169,23 +163,26 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
     filters.push(notInArray(schema.problem.id, [...states.solved]))
 
   const where = and(...filters)
-  // 默认按最新创建（选了知识点也一样）。旧的排序值（最多提交、画流程图……）落到默认 ——
-  // 类型已经拆成了单独的筛选
+  // 排序值沿用原来的（地址栏里存着的旧链接照样能用），但「最多 / 最少」现在按**人数**排，
+  // 和列表最后一列「做对 / 做过」对得上：submission_number 是做过的人，accepted_number 是做对的人。
+  // 旧的「画流程图 / 语法检查」排序已经拆成类型筛选，传进来落到默认（最新创建）
   const sort = problemListSortSchema.safeParse(c.req.query("sort") ?? "").data ?? ""
-  const effective = sort || "new"
-  const allCounts = effective === "popular" ? await problemUserCounts() : null
-  const popularity = allCounts
+  const byPeople = sort.endsWith("submission_number") || sort.endsWith("accepted_number")
+  const allCounts = byPeople ? await problemUserCounts() : null
+  const people = allCounts
     ? sql`case ${schema.problem.id} ${sql.join(
-        [...allCounts].map(([id, n]) => sql`when ${id} then ${n.solved}`),
+        [...allCounts].map(
+          ([id, n]) =>
+            sql`when ${id} then ${sort.endsWith("accepted_number") ? n.solved : n.tried}`,
+        ),
         sql` `,
       )} else 0 end`
     : null
-  const order =
-    effective === "id"
-      ? displayIdOrder
-      : popularity
-        ? [desc(popularity), ...displayIdOrder]
-        : [desc(schema.problem.createTime)]
+  const order = people
+    ? [sort.startsWith("-") ? desc(people) : asc(people), desc(schema.problem.createTime)]
+    : sort === "create_time"
+      ? [asc(schema.problem.createTime)]
+      : [desc(schema.problem.createTime)]
   const [totalRow] = await db
     .select({ value: countDistinct(schema.problem.id) })
     .from(schema.problem)
