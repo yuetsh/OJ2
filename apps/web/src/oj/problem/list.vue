@@ -56,7 +56,7 @@ const theme = useThemeVars()
 const tone = useTone()
 const { isDesktop, isMobile } = useBreakpoints()
 
-const { query, clearQuery } = usePagination<ProblemQuery>(
+const { query } = usePagination<ProblemQuery>(
   {
     keyword: useRouteQuery("keyword", "").value,
     difficulty: useRouteQuery("difficulty", "").value,
@@ -299,7 +299,55 @@ const nextTag = computed(() => {
   }
   return best
 })
-const allDone = computed(() => loaded.value && undoneOn.value && total.value === 0 && !!mine.value)
+// 只在「只看没做完」是唯一的条件时才说「你都做对了」：带着类型、难度这些筛选空了，
+// 不能说成整个知识点都做对了
+const allDone = computed(
+  () =>
+    loaded.value && undoneOn.value && total.value === 0 && !!mine.value && !hasExtraFilter.value,
+)
+
+/**
+ * 筛空了：说清楚是哪些条件把题筛没了，每个条件一个按钮，只去掉那一个。
+ * 原来只有一个「清空筛选」，点了连左栏的知识点一起清掉，人又得重新找回来
+ */
+const emptyConditions = computed(() => {
+  const list: { label: string; action: string; clear: () => void }[] = []
+  if (query.type) {
+    const label = PROBLEM_TYPE_LABEL[query.type as ProblemTypeFilter]
+    list.push({ label: `「${label}」的`, action: "看全部类型", clear: () => (query.type = "") })
+  }
+  if (query.difficulty) {
+    const label = DIFFICULTIES.find((d) => d.value === query.difficulty)?.label ?? ""
+    list.push({ label, action: "看全部难度", clear: () => (query.difficulty = "") })
+  }
+  if (query.author)
+    list.push({
+      label: `${query.author} 出的`,
+      action: "看所有出题者",
+      clear: () => (query.author = ""),
+    })
+  if (query.keyword)
+    list.push({
+      label: `和「${query.keyword}」对得上的`,
+      action: "清掉搜索",
+      clear: () => (query.keyword = ""),
+    })
+  if (undoneOn.value)
+    list.push({
+      label: "没做完的",
+      action: "关掉只看没做完",
+      clear: () => (undoneOn.value = false),
+    })
+  return list
+})
+
+const emptyText = computed(() => {
+  const where = query.tag ? `「${query.tag}」里` : "题库里"
+  const conds = emptyConditions.value
+  if (conds.length === 0) return `${where}还没有题`
+  if (conds.length === 1) return `${where}没有${conds[0]!.label}题`
+  return `${where}没有同时符合这些条件的题`
+})
 
 function knowledgeOf(row: ProblemRow) {
   return row.tags.filter((name) => tagByName.value.get(name)?.category === "knowledge").join(" · ")
@@ -520,8 +568,12 @@ const gridColumns = computed(() =>
               </div>
             </div>
             <div v-else-if="loaded && !problems.length" class="empty">
-              <b>没有符合条件的题</b>
-              <n-button size="small" @click="clearQuery">清空筛选</n-button>
+              <b>{{ emptyText }}</b>
+              <div class="empty-actions">
+                <n-button v-for="c in emptyConditions" :key="c.action" @click="c.clear">
+                  {{ c.action }}
+                </n-button>
+              </div>
             </div>
           </div>
           <!-- Pagination 根上自带 width: 100%，内边距得加在外面一层，不然右边溢出被截掉 -->
@@ -637,8 +689,12 @@ const gridColumns = computed(() =>
           <n-button size="small" @click="undoneOn = false">关掉只看没做完</n-button>
         </div>
         <div v-else-if="loaded && !problems.length" class="empty">
-          <b>没有符合条件的题</b>
-          <n-button size="small" @click="clearQuery">清空筛选</n-button>
+          <b>{{ emptyText }}</b>
+          <div class="empty-actions">
+            <n-button v-for="c in emptyConditions" :key="c.action" size="small" @click="c.clear">
+              {{ c.action }}
+            </n-button>
+          </div>
         </div>
       </div>
       <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
@@ -1107,6 +1163,8 @@ const gridColumns = computed(() =>
 
 .empty-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   margin-top: 6px;
 }
