@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getClassBoard, setClassLesson } from "oj/api"
-import { useHiddenStudents } from "shared/composables/hiddenStudents"
+import { useLeaveStudents } from "shared/composables/leaveStudents"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
 import type { RunnableLanguage } from "@oj2/contract"
@@ -119,7 +119,7 @@ onUnmounted(pause)
 
 // ---------- 分组与排序 ----------
 
-type Group = "help" | "idle" | "stuck" | "working" | "done"
+type Group = "help" | "idle" | "stuck" | "working" | "done" | "leave"
 
 /**
  * 正在课堂求助的学生。列表是老师端 WebSocket 实时推的（collabStore，全局常驻连接），
@@ -140,6 +140,7 @@ function oftenIdle(student: ClassBoardStudent) {
 }
 
 function groupOf(student: ClassBoardStudent): Group {
+  if (absent(student)) return "leave"
   if (helpOf(student)) return "help"
   const cells = student.cells
   if (cells.length && cells.every((cell) => cell.status === "accepted")) return "done"
@@ -149,40 +150,80 @@ function groupOf(student: ClassBoardStudent): Group {
   return "working"
 }
 
-const GROUP_ORDER: Record<Group, number> = { help: 0, idle: 1, stuck: 2, working: 3, done: 4 }
+const GROUP_ORDER: Record<Group, number> = {
+  help: 0,
+  idle: 1,
+  stuck: 2,
+  working: 3,
+  done: 4,
+  leave: 5,
+}
 
 function nameOf(student: ClassBoardStudent) {
   return student.realName || student.username
 }
 
 /**
- * 请假隐藏（原来在「数据统计」弹框里，统计改成回头看之后挪到这儿 —— 盯这节课的是看板）。
- * 请假、转班、学号错了的那几个一直挂在「还没交过」里，会盖住真正要去看的人。
- * 藏两个小时（够一节课），下节课自动回来；只记在这台电脑上，换人换机器都不继承。
- * 键沿用统计弹框那份，老师上午藏的人这里接着藏着。
+ * 请假：老师在「请假」框里勾上今天不在的人，看板的人数、进度、「还没交过」都不算他们，
+ * 表格里变灰排到最后（不藏掉 —— 标了谁、标错没有，一眼看得见）。
+ * 今天有效，只记在这台电脑上（见 leaveStudents.ts）。
  *
- * **只藏「还没交过」的人**：一个学生只要今天交过、或者正在举手，就不算请假，照常显示、
- * 照常算进人数。迟到的学生后来交了题、卡住了、举手了，老师得看得见
+ * **只有今天还没交过的人能算请假**：请假的人一定在这里面。标过的人后来交了题、或者举手了，
+ * 就是来了（迟到），自动取消标记，回到正常的分组里 —— 老师得看得见他卡住、举手
  */
-const { hideMode, hideStudent, unhide, isHidden } = useHiddenStudents("oj_hidden_students")
-function hiddenNow(student: ClassBoardStudent) {
-  return !student.lastSubmitAt && !helpOf(student) && isHidden(student.username)
+const { onLeave, setLeave, cancelLeave } = useLeaveStudents("oj_leave_students")
+function canLeave(student: ClassBoardStudent) {
+  return !student.lastSubmitAt && !helpOf(student)
 }
-const hiddenStudents = computed(() => (board.value?.students ?? []).filter(hiddenNow))
-function restoreHidden() {
-  unhide(hiddenStudents.value.map((student) => student.username))
+function absent(student: ClassBoardStudent) {
+  return canLeave(student) && onLeave(student.username)
+}
+const boardStudents = computed(() => board.value?.students ?? [])
+const leaveStudents = computed(() => boardStudents.value.filter(absent).sort(byName))
+const leaveNames = computed(() => leaveStudents.value.map(nameOf).join("、"))
+
+// 标过请假、后来交了题或举手的：来了，把标记清掉（不然名单里一直挂着一个其实在的人）
+watchEffect(() => {
+  const arrived = boardStudents.value
+    .filter((student) => !canLeave(student) && onLeave(student.username))
+    .map((student) => student.username)
+  if (arrived.length) cancelLeave(arrived)
+})
+
+const leaveDialog = ref(false)
+/** 弹框里能勾的：今天还没交过的（刚上课时就是全班），按名字排 */
+const leaveCandidates = computed(() => boardStudents.value.filter(canLeave).sort(byName))
+const leaveSelected = ref<string[]>([])
+function openLeaveDialog() {
+  leaveSelected.value = leaveStudents.value.map((student) => student.username)
+  leaveDialog.value = true
+}
+function saveLeave() {
+  setLeave(
+    boardStudents.value.map((student) => student.username),
+    leaveSelected.value,
+  )
+  leaveDialog.value = false
+}
+
+function byName(a: ClassBoardStudent, b: ClassBoardStudent) {
+  return nameOf(a).localeCompare(nameOf(b), "zh-CN")
 }
 
 const students = computed(() =>
-  [...(board.value?.students ?? [])]
-    .filter((student) => !isHidden(student.username))
-    .sort(
-      (a, b) =>
-        GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)] ||
-        // 同样是没交过，经常不动手的排前面
-        Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
-        nameOf(a).localeCompare(nameOf(b), "zh-CN"),
-    ),
+  [...boardStudents.value].sort(
+    (a, b) =>
+      GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)] ||
+      // 同样是没交过，经常不动手的排前面
+      Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
+      byName(a, b),
+  ),
+)
+/** 到了的人：人数、进度都按这些算 */
+const present = computed(() => students.value.filter((student) => groupOf(student) !== "leave"))
+/** 表格里第一个请假的人，在他上面插一行说明 */
+const firstLeaveId = computed(
+  () => students.value.find((student) => groupOf(student) === "leave")?.userId,
 )
 
 const idle = computed(() => students.value.filter((student) => groupOf(student) === "idle"))
@@ -203,7 +244,7 @@ const stuckCount = computed(
 
 const summary = computed(() => {
   // 分母也减掉请假的，不然「做完 30/38」永远到不了头
-  const all = students.value
+  const all = present.value
   return (board.value?.problems ?? []).map((problem, i) => ({
     ...problem,
     done: all.filter((student) => student.cells[i]?.status === "accepted").length,
@@ -236,6 +277,7 @@ const GROUP_LABEL: Record<
   stuck: { text: "卡住了", type: "error" },
   working: { text: "在做", type: "info" },
   done: { text: "做完了", type: "success" },
+  leave: { text: "请假", type: "default" },
 }
 
 const router = useRouter()
@@ -283,6 +325,20 @@ function submissionsHref(
           style="width: 180px"
           @update:value="changeClass"
         />
+        <!-- 投影时不出名字，请假这个按钮也收起来 -->
+        <n-button
+          v-if="board?.className && !projector"
+          :type="leaveStudents.length ? 'warning' : 'default'"
+          :secondary="!!leaveStudents.length"
+          class="leave-button"
+          @click="openLeaveDialog"
+        >
+          <template v-if="leaveStudents.length">
+            <span class="leave-names">请假 {{ leaveStudents.length }} 人：{{ leaveNames }}</span>
+            <span class="leave-edit">修改</span>
+          </template>
+          <template v-else>请假</template>
+        </n-button>
       </n-flex>
       <n-flex align="center">
         <n-text depth="3" class="meta">
@@ -378,48 +434,23 @@ function submissionsHref(
 
         <template v-if="!projector">
           <n-alert
-            v-if="idle.length || hiddenStudents.length"
+            v-if="idle.length"
             type="warning"
-            :title="idle.length ? `今天还没交过（${idle.length} 人）` : '今天没交过的都隐藏了'"
+            :title="`今天还没交过（${idle.length} 人）`"
             class="section"
           >
-            <n-flex align="center" :size="10" class="hide-bar">
-              <n-switch v-model:value="hideMode" size="small">
-                <template #checked>请假隐藏中 · 点名字旁的 × 藏起来</template>
-                <template #unchecked>请假隐藏</template>
-              </n-switch>
-              <n-button
-                v-if="hiddenStudents.length"
-                size="tiny"
-                text
-                type="primary"
-                @click="restoreHidden"
-              >
-                隐藏了 {{ hiddenStudents.length }} 位：{{ hiddenStudents.map(nameOf).join("、") }} ·
-                恢复
-              </n-button>
-            </n-flex>
-            <n-flex v-if="hideMode" :size="8">
-              <n-tag
-                v-for="student in idle"
-                :key="student.userId"
-                closable
-                @close="hideStudent(student.username)"
-              >
-                {{ nameOf(student) }}
-              </n-tag>
-            </n-flex>
-            <template v-else>
-              <div v-if="idleOften.length">
-                <b>经常没交</b>（最近 {{ board.recentLessons }} 节课最多交过 1 节）：{{
-                  idleOften.map(nameOf).join("、")
-                }}
-              </div>
-              <div v-if="idleOthers.length">
-                <template v-if="idleOften.length"><b>其他</b>：</template
-                >{{ idleOthers.map(nameOf).join("、") }}
-              </div>
-            </template>
+            <n-text v-if="leaveStudents.length" depth="3" class="meta">
+              请假的 {{ leaveStudents.length }} 人不算在里面
+            </n-text>
+            <div v-if="idleOften.length">
+              <b>经常没交</b>（最近 {{ board.recentLessons }} 节课最多交过 1 节）：{{
+                idleOften.map(nameOf).join("、")
+              }}
+            </div>
+            <div v-if="idleOthers.length">
+              <template v-if="idleOften.length"><b>其他</b>：</template
+              >{{ idleOthers.map(nameOf).join("、") }}
+            </div>
           </n-alert>
 
           <n-text v-if="stuckCount" type="error" class="meta">
@@ -443,73 +474,132 @@ function submissionsHref(
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="student in students" :key="student.userId">
-                  <td class="name">
-                    <a
-                      v-if="student.codeToday || student.drawnToday"
-                      class="cell-link"
-                      :href="submissionsHref(student, undefined, !student.codeToday)"
-                      target="_blank"
-                      :title="`看 ${nameOf(student)} 今天交的全部`"
-                    >
-                      {{ nameOf(student) }}
-                    </a>
-                    <template v-else>{{ nameOf(student) }}</template>
-                  </td>
-                  <td>
-                    <n-tag
-                      size="small"
-                      :bordered="false"
-                      :type="GROUP_LABEL[groupOf(student)].type"
-                      :class="{ 'help-tag': helpOf(student) }"
-                      @click="helpOf(student) && (collabStore.helpPanelOpen = true)"
+                <template v-for="student in students" :key="student.userId">
+                  <tr v-if="student.userId === firstLeaveId" class="leave-sep">
+                    <td :colspan="board.problems.length + 4">
+                      请假 {{ leaveStudents.length }} 人 · 不算进上面的人数和进度 ·
+                      交了题或举手就自动回到上面
+                    </td>
+                  </tr>
+                  <tr :class="{ 'leave-row': groupOf(student) === 'leave' }">
+                    <td class="name">
+                      <a
+                        v-if="student.codeToday || student.drawnToday"
+                        class="cell-link"
+                        :href="submissionsHref(student, undefined, !student.codeToday)"
+                        target="_blank"
+                        :title="`看 ${nameOf(student)} 今天交的全部`"
+                      >
+                        {{ nameOf(student) }}
+                      </a>
+                      <template v-else>{{ nameOf(student) }}</template>
+                    </td>
+                    <td>
+                      <n-tag
+                        size="small"
+                        :bordered="false"
+                        :type="GROUP_LABEL[groupOf(student)].type"
+                        :class="{ 'help-tag': helpOf(student) }"
+                        @click="helpOf(student) && (collabStore.helpPanelOpen = true)"
+                      >
+                        {{
+                          helpOf(student)
+                            ? helpOf(student)!.status === "active"
+                              ? "老师在帮"
+                              : "举手了"
+                            : GROUP_LABEL[groupOf(student)].text
+                        }}
+                      </n-tag>
+                    </td>
+                    <td v-for="(cell, i) in student.cells" :key="i" :class="cellClass(cell)">
+                      <a
+                        v-if="cell.attempts"
+                        class="cell-link"
+                        :href="
+                          submissionsHref(
+                            student,
+                            board.problems[i]!.problemDisplayId,
+                            !cell.codeAttempts,
+                          )
+                        "
+                        target="_blank"
+                        :title="
+                          cell.codeAttempts
+                            ? `看 ${nameOf(student)} 今天在这道题上交的 ${cell.codeAttempts} 次代码`
+                            : `看 ${nameOf(student)} 今天在这道题上画的 ${cell.flowchartAttempts} 张流程图`
+                        "
+                      >
+                        {{ cellText(cell) }}
+                      </a>
+                      <template v-else>{{ cellText(cell) }}</template>
+                    </td>
+                    <td class="meta">
+                      {{ student.lastSubmitAt ? parseTime(student.lastSubmitAt, "HH:mm") : "—" }}
+                    </td>
+                    <td
+                      :class="{
+                        'cell-stuck': oftenIdle(student) && groupOf(student) !== 'leave',
+                      }"
                     >
                       {{
-                        helpOf(student)
-                          ? helpOf(student)!.status === "active"
-                            ? "老师在帮"
-                            : "举手了"
-                          : GROUP_LABEL[groupOf(student)].text
+                        board.recentLessons
+                          ? `${student.recentAttended}/${board.recentLessons}`
+                          : "—"
                       }}
-                    </n-tag>
-                  </td>
-                  <td v-for="(cell, i) in student.cells" :key="i" :class="cellClass(cell)">
-                    <a
-                      v-if="cell.attempts"
-                      class="cell-link"
-                      :href="
-                        submissionsHref(
-                          student,
-                          board.problems[i]!.problemDisplayId,
-                          !cell.codeAttempts,
-                        )
-                      "
-                      target="_blank"
-                      :title="
-                        cell.codeAttempts
-                          ? `看 ${nameOf(student)} 今天在这道题上交的 ${cell.codeAttempts} 次代码`
-                          : `看 ${nameOf(student)} 今天在这道题上画的 ${cell.flowchartAttempts} 张流程图`
-                      "
-                    >
-                      {{ cellText(cell) }}
-                    </a>
-                    <template v-else>{{ cellText(cell) }}</template>
-                  </td>
-                  <td class="meta">
-                    {{ student.lastSubmitAt ? parseTime(student.lastSubmitAt, "HH:mm") : "—" }}
-                  </td>
-                  <td :class="{ 'cell-stuck': oftenIdle(student) }">
-                    {{
-                      board.recentLessons ? `${student.recentAttended}/${board.recentLessons}` : "—"
-                    }}
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                </template>
               </tbody>
             </table>
           </div>
         </template>
       </template>
     </template>
+
+    <n-modal
+      v-model:show="leaveDialog"
+      preset="card"
+      :title="
+        leaveCandidates.length
+          ? `今天还没交过的 ${leaveCandidates.length} 人里，谁请假了？`
+          : '今天全班都交过题了'
+      "
+      style="width: 640px; max-width: calc(100vw - 32px)"
+    >
+      <template v-if="leaveCandidates.length">
+        <n-text depth="3" class="meta">
+          勾上不在的人，看板就不算他们。<template
+            v-if="boardStudents.length > leaveCandidates.length"
+            >其余
+            {{ boardStudents.length - leaveCandidates.length }} 人今天交过题，不用标。</template
+          >
+        </n-text>
+        <n-checkbox-group v-model:value="leaveSelected">
+          <div class="leave-grid">
+            <n-checkbox
+              v-for="student in leaveCandidates"
+              :key="student.userId"
+              :value="student.username"
+              :label="nameOf(student)"
+              class="leave-option"
+            />
+          </div>
+        </n-checkbox-group>
+      </template>
+      <n-text v-else depth="3">请假的人一定是没交过题的，现在没有人可以标。</n-text>
+      <template #footer>
+        <n-flex align="center" :wrap="false">
+          <n-text depth="3" class="meta" style="flex-grow: 1">
+            已选 {{ leaveSelected.length }} 人 · 只记在这台电脑上，今天有效
+          </n-text>
+          <n-button :disabled="!leaveSelected.length" @click="leaveSelected = []">
+            全部取消
+          </n-button>
+          <n-button @click="leaveDialog = false">取消</n-button>
+          <n-button type="primary" @click="saveLeave">确定</n-button>
+        </n-flex>
+      </template>
+    </n-modal>
   </div>
 </template>
 
@@ -525,8 +615,40 @@ function submissionsHref(
   text-decoration: underline;
 }
 
-.hide-bar {
-  margin-bottom: 6px;
+.leave-button {
+  max-width: 420px;
+}
+
+.leave-names {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leave-edit {
+  margin-left: 8px;
+  text-decoration: underline;
+}
+
+.leave-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px 8px;
+  margin-top: 12px;
+}
+
+.leave-option {
+  font-size: 15px;
+}
+
+.grid .leave-sep td {
+  text-align: left;
+  font-size: 12px;
+  opacity: 0.6;
+  padding-top: 12px;
+}
+
+.grid .leave-row td {
+  opacity: 0.45;
 }
 
 .board {
