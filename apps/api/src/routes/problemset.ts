@@ -368,7 +368,6 @@ problemsetRoutes.post("/problem-set-progress", requireAuth, async (c) => {
     const links = await tx
       .select({
         problemId: schema.problemsetProblem.problemId,
-        score: schema.problemsetProblem.score,
         isRequired: schema.problemsetProblem.isRequired,
       })
       .from(schema.problemsetProblem)

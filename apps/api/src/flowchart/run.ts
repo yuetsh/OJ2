@@ -83,12 +83,7 @@ export async function evaluateFlowchart(
     // 同一个口径（不看是从哪个入口交的）。放在推「评完了」之前：前端收到的时候进度已经
     // 落库，1.5 秒后跳回题单页看到的就是新数据。比赛题不进题单
     if (isFlowchartPass(result.grade) && row.problem.contestId === null) {
-      await recordSolvedAndNotify(
-        row.flowchart.userId,
-        row.problem.id,
-        null,
-        new Date().toISOString(),
-      )
+      await recordSolvedAndNotify(row.flowchart.userId, row.problem.id, new Date().toISOString())
     }
     await publishFlowchartUpdate(row.flowchart.userId, {
       type: "flowchart_evaluation_completed",

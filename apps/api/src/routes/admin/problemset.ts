@@ -192,9 +192,6 @@ adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
       description: parsed.data.description,
       visible: parsed.data.visible,
       ...period,
-      // 难度、状态两列还在表里、非空，但已经不用了（见契约 admin.ts 的说明）
-      difficulty: "Easy",
-      status: "active",
       createdById: c.get("user")!.id,
       createTime: now,
       lastUpdateTime: now,
@@ -322,14 +319,7 @@ adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (
     else {
       inSet.add(problem.id)
       order += 1
-      // 分数、提示两列还在表里但已经不用了：score 非空给 0
-      values.push({
-        problemsetId: row.id,
-        problemId: problem.id,
-        order,
-        isRequired: true,
-        score: 0,
-      })
+      values.push({ problemsetId: row.id, problemId: problem.id, order, isRequired: true })
       result.added.push(problem.displayId)
     }
   }
@@ -400,21 +390,8 @@ adminProblemSetRoutes.delete("/problem-sets/:id/problems/:itemId", requireTeache
         eq(schema.problemsetProblem.problemsetId, row.id),
       ),
     )
-    .returning({
-      id: schema.problemsetProblem.id,
-      problemId: schema.problemsetProblem.problemId,
-    })
+    .returning({ id: schema.problemsetProblem.id })
   if (deleted.length === 0) return failure(c, 404, "problem-not-in-set", "题目不在该题单中")
-  // 这道题在本题单里的提交记录也要清掉，对齐旧栈 problemset/signals.py 的 post_delete。
-  // 不清的话 problemset_submission 会一直攒指向已移出题单的孤儿行。
-  await db
-    .delete(schema.problemsetSubmission)
-    .where(
-      and(
-        eq(schema.problemsetSubmission.problemsetId, row.id),
-        eq(schema.problemsetSubmission.problemId, deleted[0]!.problemId),
-      ),
-    )
   await resyncProgress(row.id)
   return success(c, null)
 })

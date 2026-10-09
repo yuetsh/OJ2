@@ -657,12 +657,7 @@ export async function judgeSubmission(job: JudgeJobData) {
     // 进度已经落库，跳回题单页看到的就是新数据。
     // 比赛题不进题单（题单加题时卡了 contestId IS NULL），跳过。
     if (row.submission.contestId === null && isAccepted(result)) {
-      await recordSolvedAndNotify(
-        row.submission.userId,
-        row.problem.id,
-        row.submission.id,
-        row.submission.createTime,
-      )
+      await recordSolvedAndNotify(row.submission.userId, row.problem.id, row.submission.createTime)
     }
 
     try {

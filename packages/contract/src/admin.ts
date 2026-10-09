@@ -359,11 +359,6 @@ export const updateAcmHelperRequestSchema = z.object({
 
 // ---------------------------------------------------------------- 题单管理
 
-// 难度、状态两列还留在表里（0026 没删列，删列要手工放行破坏性迁移），
-// 但界面和接口都不再用：线上 16 个题单全是 Easy / active，「状态 + 可见」两道闸合成了「公开」
-export const problemSetDifficultySchema = z.enum(["Easy", "Medium", "Hard"])
-export const problemSetStatusSchema = z.enum(["draft", "active", "archived"])
-
 export const adminProblemSetSchema = z.object({
   id: z.number().int(),
   title: z.string(),
@@ -951,8 +946,6 @@ export type UploadImageResponse = z.infer<typeof uploadImageResponseSchema>
 export type CreateContestRequest = z.infer<typeof createContestRequestSchema>
 export type UpdateContestRequest = z.infer<typeof updateContestRequestSchema>
 export type UpdateAcmHelperRequest = z.infer<typeof updateAcmHelperRequestSchema>
-export type ProblemSetDifficulty = z.infer<typeof problemSetDifficultySchema>
-export type ProblemSetStatus = z.infer<typeof problemSetStatusSchema>
 export type AdminProblemSet = z.infer<typeof adminProblemSetSchema>
 export type AdminProblemSetList = z.infer<typeof adminProblemSetListSchema>
 export type CreateProblemSetRequest = z.infer<typeof createProblemSetRequestSchema>

@@ -7,7 +7,7 @@ import { updateAchievementsForProblemSet } from "./achievements"
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 type ProgressRow = typeof schema.problemsetProgress.$inferSelect
-type ProblemLink = { problemId: number; score: number; isRequired: boolean }
+type ProblemLink = { problemId: number; isRequired: boolean }
 type BadgeCheck = Pick<
   ProgressRow,
   "completedProblemsCount" | "totalProblemsCount" | "progressDetail"
@@ -16,10 +16,8 @@ type BadgeCheck = Pick<
 /**
  * 题单进度的唯一算法：学生做出一道题后的增量更新、后台改动题目后的批量重算，都走这一份。
  *
- * 以前两边各写一遍，于是各自漂了一段。后台那份（resyncProgress）只更新分母和百分比：
- *   - 改题目分值时调了它，可它根本不碰 total_score，score 类奖章按陈旧分数判定；
- *   - 不碰 is_completed，加一道题之后分母变大、百分比掉下来，人还标着「已完成」；
- *   - 不清理 progress_detail，删掉一道题之后 least(completed, total) 会把没做的题算成做了。
+ * 以前两边各写一遍，于是各自漂了一段：后台那份不碰 is_completed（加一道题之后分母变大，
+ * 人还标着「已完成」）、不清理 progress_detail（删掉一道题之后没做的题被算成做了）。
  * 两边不再分叉的唯一办法是只留一处算法，所以这里做成纯函数，两边都只是调用者。
  */
 export function computeProgress(
@@ -28,20 +26,16 @@ export function computeProgress(
   previousCompleteTime: string | null,
   now = new Date().toISOString(),
 ) {
-  const scoreByProblem = new Map(links.map((link) => [String(link.problemId), link.score]))
-  // 已经移出题单的题目要从 detail 里剔掉，留着它 completed 就会比实际做出的题还多
+  const inSet = new Set(links.map((link) => String(link.problemId)))
+  // 已经移出题单的题目要从 detail 里剔掉，留着它 completed 就会比实际做出的题还多。
+  // 老数据的每一项还带着 score（分数已经拿掉了），原样留着无害
   const kept: Record<string, unknown> = {}
-  let totalScore = 0
   for (const [key, value] of Object.entries(detail)) {
-    const score = scoreByProblem.get(key)
-    if (score === undefined) continue
-    totalScore += score
-    // 分值以题单当前的设置为准，detail 里存的是做出那一刻的快照
-    kept[key] = { ...asRecord(value), score }
+    if (inSet.has(key)) kept[key] = value
   }
   // 分母只算必做题。「（选做）」这个标签一直只是卡片上的一行字，进度分母和 all_problems
   // 奖章照样要求做完 —— 快照里 22 个人做完了全部必做题，界面却显示未完成、全通奖章也拿不到
-  // （题单 5/6/8/11）。选做题做了仍然计分（totalScore 把它算进去），只是不卡完成。
+  // （题单 5/6/8/11）。选做题做对了照样算进「做对 N 道」奖章，只是不卡完成。
   //
   // 一道必做都没标的题单退回「全部都算必做」：那种题单多半是没用这个字段，而不是
   // 真的整单选做；不兜住的话它永远完不成。
@@ -57,9 +51,6 @@ export function computeProgress(
     progressDetail: kept,
     totalProblemsCount: total,
     completedProblemsCount: completed,
-    totalScore,
-    // 乘 10000 四舍五入再除 100，保留两位小数
-    progressPercentage: total > 0 ? Math.round((completed / total) * 10000) / 100 : 0,
     isCompleted,
     // 只设不清，语义是「曾经完成于」，对齐旧栈 problemset/models.py:218。
     //
@@ -78,7 +69,7 @@ type ProgressWrite = ReturnType<typeof computeProgress> & { id: number }
  * 而每行要写的值都已经在内存里算好了，没有一个依赖数据库现有的值。
  */
 async function writeProgress(rows: ProgressWrite[]) {
-  // 每行 8 个参数，留足余量避开 Postgres 的 65535 个绑定参数上限
+  // 每行 6 个参数，留足余量避开 Postgres 的 65535 个绑定参数上限
   for (let start = 0; start < rows.length; start += 1000) {
     const chunk = rows.slice(start, start + 1000)
     const values = sql.join(
@@ -88,8 +79,6 @@ async function writeProgress(rows: ProgressWrite[]) {
         ${JSON.stringify(row.progressDetail)}::jsonb,
         ${row.totalProblemsCount}::int,
         ${row.completedProblemsCount}::int,
-        ${row.totalScore}::int,
-        ${row.progressPercentage}::double precision,
         ${row.isCompleted}::boolean,
         ${row.completeTime}::timestamptz
       )`,
@@ -101,12 +90,10 @@ async function writeProgress(rows: ProgressWrite[]) {
         progress_detail = v.detail,
         total_problems_count = v.total_count,
         completed_problems_count = v.completed_count,
-        total_score = v.total_score,
-        progress_percentage = v.percentage,
         is_completed = v.is_completed,
         complete_time = v.complete_time
       from (values ${values}) as v(
-        id, detail, total_count, completed_count, total_score, percentage, is_completed, complete_time
+        id, detail, total_count, completed_count, is_completed, complete_time
       )
       where pg.id = v.id
     `)
@@ -202,7 +189,6 @@ export async function resyncProgress(problemsetId: number) {
     db
       .select({
         problemId: schema.problemsetProblem.problemId,
-        score: schema.problemsetProblem.score,
         isRequired: schema.problemsetProblem.isRequired,
       })
       .from(schema.problemsetProblem)
@@ -237,17 +223,7 @@ export async function resyncProgress(problemsetId: number) {
  *
  * 不按 visible / status 过滤：进度是学生自己的记录，老师把题单藏起来不该让它停止累积。
  */
-export async function recordSolvedProblem(
-  userId: number,
-  problemId: number,
-  /**
-   * 做出来的那次代码提交。流程图画到 A/S 算完成时传 null：problemset_submission.submission_id
-   * 外键指向代码提交表，流程图提交的 id 进不去。不影响防抄闸门的解锁 ——
-   * 那道闸看的是 progress_detail（本文件下面的 problemSetLockCutoffs）
-   */
-  submissionId: string | null,
-  solvedAt: string,
-) {
+export async function recordSolvedProblem(userId: number, problemId: number, solvedAt: string) {
   const joined = await db
     .select({ problemsetId: schema.problemsetProgress.problemsetId })
     .from(schema.problemsetProgress)
@@ -276,37 +252,17 @@ export async function recordSolvedProblem(
         .limit(1)
       if (!progress) return []
 
-      // 提交记录先补上，即使这道题早就记过 —— 老数据里有记了进度没记提交的行
-      const [existing] = await tx
-        .select({ id: schema.problemsetSubmission.id })
-        .from(schema.problemsetSubmission)
-        .where(
-          and(
-            eq(schema.problemsetSubmission.problemsetId, problemsetId),
-            eq(schema.problemsetSubmission.userId, userId),
-            eq(schema.problemsetSubmission.problemId, problemId),
-          ),
-        )
-        .limit(1)
-      if (!existing && submissionId !== null) {
-        await tx
-          .insert(schema.problemsetSubmission)
-          .values({ problemsetId, userId, submissionId, problemId })
-      }
-
       const detail = asRecord(progress.progressDetail)
       if (String(problemId) in detail) return []
       const links = await tx
         .select({
           problemId: schema.problemsetProblem.problemId,
-          score: schema.problemsetProblem.score,
           isRequired: schema.problemsetProblem.isRequired,
         })
         .from(schema.problemsetProblem)
         .where(eq(schema.problemsetProblem.problemsetId, problemsetId))
-      const link = links.find((item) => item.problemId === problemId)
-      if (!link) return []
-      detail[String(problemId)] = { score: link.score, submit_time: solvedAt }
+      if (!links.some((item) => item.problemId === problemId)) return []
+      detail[String(problemId)] = { submit_time: solvedAt }
       const update = computeProgress(detail, links, progress.completeTime)
       await tx
         .update(schema.problemsetProgress)
@@ -347,14 +303,9 @@ export async function recordSolvedProblem(
  * 流程图评分（flowchart/run.ts）两条路都在「这道题做完了」的那一刻调它。
  * 记账失败不往外抛：判题 / 评分本身已经落库，不能因为进度没记上就把整次判题算失败。
  */
-export async function recordSolvedAndNotify(
-  userId: number,
-  problemId: number,
-  submissionId: string | null,
-  solvedAt: string,
-) {
+export async function recordSolvedAndNotify(userId: number, problemId: number, solvedAt: string) {
   try {
-    const { updated, earned } = await recordSolvedProblem(userId, problemId, submissionId, solvedAt)
+    const { updated, earned } = await recordSolvedProblem(userId, problemId, solvedAt)
     if (earned.length > 0) {
       await publishAchievementNotification(
         userId,

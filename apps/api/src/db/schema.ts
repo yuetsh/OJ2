@@ -48,8 +48,6 @@ import type {
   ProblemDifficulty,
   ProblemLanguage,
   ProblemPermission,
-  ProblemSetDifficulty,
-  ProblemSetStatus,
   ReactionKey,
   SqlConfig,
   SqlDisplay,
@@ -414,8 +412,8 @@ export const problemset = pgTable(
       mode: "string",
     }).notNull(),
     visible: boolean().notNull(),
-    difficulty: text().notNull().$type<ProblemSetDifficulty>(),
-    status: text().notNull().$type<ProblemSetStatus>(),
+    // difficulty / status 两列 0027 起代码不再读写（线上全是 Easy / active，「状态 + 可见」
+    // 合成了「公开」），等两个站点都换上新代码再删列
     createdById: integer("created_by_id").notNull(),
     /**
      * 布置期：assignedAt 是这一轮布置开始的时刻，assignedUntil 是布置到哪天（东八区当天结束）。
@@ -456,8 +454,7 @@ export const problemsetProblem = pgTable(
     }),
     order: integer().notNull(),
     isRequired: boolean("is_required").notNull(),
-    score: integer().notNull(),
-    hint: text(),
+    // score / hint 两列 0027 起不再读写（分数拿掉了，提示一条都没人填过），待删
     problemId: integer("problem_id").notNull(),
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
     problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
@@ -502,10 +499,9 @@ export const problemsetProgress = pgTable(
       mode: "string",
     }),
     isCompleted: boolean("is_completed").notNull(),
-    progressPercentage: doublePrecision("progress_percentage").notNull(),
+    // progress_percentage / total_score 两列 0027 起不再读写（百分比随用随算，分数拿掉了），待删
     completedProblemsCount: integer("completed_problems_count").notNull(),
     totalProblemsCount: integer("total_problems_count").notNull(),
-    totalScore: integer("total_score").notNull(),
     progressDetail: jsonb("progress_detail").notNull(),
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
     problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
@@ -530,69 +526,7 @@ export const problemsetProgress = pgTable(
   ],
 )
 
-export const problemsetSubmission = pgTable(
-  "problemset_submission",
-  {
-    // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-      name: "problemset_submission_id_seq",
-      startWith: 1,
-      increment: 1,
-      minValue: 1,
-      maxValue: "9223372036854775807",
-      cache: 1,
-    }),
-    problemId: integer("problem_id").notNull(),
-    // You can use { mode: "bigint" } if numbers are exceeding js number limitations
-    problemsetId: bigint("problemset_id", { mode: "number" }).notNull(),
-    submissionId: text("submission_id").notNull(),
-    userId: integer("user_id").notNull(),
-  },
-  (table) => [
-    index("problemset__problem_1f39fa_idx").using(
-      "btree",
-      table.problemsetId.asc().nullsLast().op("int4_ops"),
-      table.userId.asc().nullsLast().op("int4_ops"),
-    ),
-    index("problemset__problem_22f053_idx").using(
-      "btree",
-      table.problemsetId.asc().nullsLast().op("int8_ops"),
-      table.problemId.asc().nullsLast().op("int8_ops"),
-    ),
-    index("problemset__user_id_2f1501_idx").using(
-      "btree",
-      table.userId.asc().nullsLast().op("int4_ops"),
-    ),
-    index("problemset_submission_problem_id_5629b105").using(
-      "btree",
-      table.problemId.asc().nullsLast().op("int4_ops"),
-    ),
-    index("problemset_submission_submission_id_78e2b807").using(
-      "btree",
-      table.submissionId.asc().nullsLast().op("text_ops"),
-    ),
-    foreignKey({
-      columns: [table.problemId],
-      foreignColumns: [problem.id],
-      name: "problemset_submission_problem_id_5629b105_fk_problem_id",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.problemsetId],
-      foreignColumns: [problemset.id],
-      name: "problemset_submission_problemset_id_85290e17_fk_problemset_id",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.submissionId],
-      foreignColumns: [submission.id],
-      name: "problemset_submission_submission_id_78e2b807_fk_submission_id",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.userId],
-      foreignColumns: [user.id],
-      name: "problemset_submission_user_id_915fc9c6_fk_user_id",
-    }),
-  ],
-)
+// problemset_submission 表 0027 起不再读写（每次做对都往里写一行，从来没有地方读它），待删
 
 export const reaction = pgTable(
   "reaction",
@@ -784,7 +718,7 @@ export const submission = pgTable(
     // 来源题单：学生从题单入口（/problemset/:id/problem/:pid）提交时记下来，
     // 提交列表据此标出「这条来自题单」。**只是来源标记**，题单进度、奖章一概不看它，
     // 那些由判完之后的 recordSolvedProblem 按「已加入且含这道题的所有题单」记账。
-    // 老数据里只有迁移 0007 从 problemset_submission 回填的首次 AC 有值。
+    // 老数据里只有迁移 0007 从（已废弃的）problemset_submission 回填的首次 AC 有值。
     problemsetId: bigint("problemset_id", { mode: "number" }),
   },
   (table) => [
