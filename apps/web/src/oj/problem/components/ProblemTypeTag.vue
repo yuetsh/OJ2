@@ -87,20 +87,7 @@ html.dark .type-tag.sql {
   border-color: #b9cdee;
 }
 
-html.dark /* 青色：绿 / 橙 / 红是难度、紫是画流程图、蓝是语法要求，剩下它不和谁撞 */
-.type-tag.sql {
-  font-weight: 600;
-  color: #0b6470;
-  background: #dcf1f3;
-  border-color: transparent;
-}
-
-html.dark .type-tag.sql {
-  color: #8fd8e0;
-  background: rgba(60, 180, 195, 0.18);
-}
-
-.type-tag.ast {
+html.dark .type-tag.ast {
   color: var(--tag-info-dark);
   border-color: rgba(112, 192, 232, 0.45);
 }
