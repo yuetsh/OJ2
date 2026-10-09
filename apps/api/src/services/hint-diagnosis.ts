@@ -88,7 +88,7 @@ function errInfo(row: HintRow) {
  * 输出说明里的 `&lt;`、`&nbsp;` 恰恰可能就是格式要求本身，不解码模型会读歪。
  * 图片直接丢掉（模型看不到图），只留一个占位，让它知道那里原本有东西。
  */
-function plainText(html: string) {
+export function plainText(html: string) {
   return (
     html
       .replace(/<img\b[^>]*>/gi, "[图片]")

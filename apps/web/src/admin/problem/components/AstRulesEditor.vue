@@ -4,11 +4,17 @@ import {
   AST_OPERATOR_TARGETS_BY_LANGUAGE,
   AST_SUPPORTED_LANGUAGES,
 } from "@oj2/contract"
+import { useThemeVars } from "naive-ui"
+import { errorMessage } from "utils/api"
 import type { AstRule, AstRules, LANGUAGE } from "utils/types"
+import { checkAstRules } from "../../api"
+import type { AstCheckState } from "./editorTypes"
 
 interface Props {
   modelValue: AstRules | null
   languages: LANGUAGE[]
+  /** 各语言的标准答案（学生那段代码，不套模板）：拿来自测规则 */
+  answers: Partial<Record<LANGUAGE, string>>
 }
 
 const props = defineProps<Props>()
@@ -27,6 +33,54 @@ const unsupportedLanguages = computed(() =>
 )
 
 const activeTab = ref(supportedLanguages.value[0] || "Python")
+
+const theme = useThemeVars()
+
+// ---------------------------------------------------------------- 自测
+
+/**
+ * 规则配错（节点类型对不上）时完全静默：「必须使用 X」永远失败、「不能使用 X」永远通过。
+ * 拿标准答案先跑一遍，标准答案自己都过不了，多半是规则配错了。顺带拿到学生看到的那句话
+ */
+const checks = defineModel<AstCheckState>("checks", { default: () => ({}) })
+
+let generation = 0
+
+async function runChecks() {
+  const mine = ++generation
+  const next: AstCheckState = {}
+  for (const lang of supportedLanguages.value) {
+    const rules = getRulesForLang(lang)
+    if (!rules.length) continue
+    try {
+      next[lang] = await checkAstRules({
+        language: lang as "C" | "C++" | "Python",
+        code: props.answers[lang] ?? "",
+        rules,
+      })
+    } catch (err) {
+      next[lang] = { error: errorMessage(err, "这组规则检查不了") }
+    }
+  }
+  // 跑的过程中又改了：这一轮作废，新的那轮另有一次
+  if (mine === generation) checks.value = next
+}
+
+watchDebounced(() => [props.modelValue, props.answers, supportedLanguages.value], runChecks, {
+  debounce: 500,
+  deep: true,
+  immediate: true,
+})
+
+function checkOf(lang: string, index: number) {
+  const state = checks.value[lang]
+  if (!state || "error" in state) return null
+  return state.rules[index] ?? null
+}
+
+function countOf(lang: string) {
+  return getRulesForLang(lang).length
+}
 
 const ENGINE_OPTIONS: SelectOption[] = [
   {
@@ -107,7 +161,7 @@ function isCountEngine(engine: string) {
 }
 
 const COUNT_MODE_OPTIONS: SelectOption[] = [
-  { label: "精确", value: "exact" },
+  { label: "正好", value: "exact" },
   { label: "范围", value: "range" },
 ]
 
@@ -238,120 +292,258 @@ watch(supportedLanguages, (langs) => {
 </script>
 
 <template>
-  <n-collapse>
-    <n-collapse-item title="代码规则检查（选填）" name="ast-rules">
-      <n-alert
-        v-if="unsupportedLanguages.length"
-        type="info"
-        :bordered="false"
-        style="margin-bottom: 8px"
-      >
-        {{ unsupportedLanguages.join("、") }}
-        暂不支持代码规则检查，判题机只能检查
-        {{ AST_SUPPORTED_LANGUAGES.join(" / ") }}
-      </n-alert>
-      <n-tabs v-if="supportedLanguages.length" type="segment" v-model:value="activeTab">
-        <n-tab-pane v-for="lang in supportedLanguages" :key="lang" :name="lang" :tab="lang">
-          <n-flex vertical>
-            <div
-              v-for="(rule, index) in getRulesForLang(lang)"
-              :key="index"
-              style="margin-bottom: 8px"
-            >
-              <n-flex align="center" :wrap="false">
-                <n-select
-                  :options="ENGINE_OPTIONS"
-                  :value="rule.engine"
-                  @update:value="(v: string) => updateRule(lang, index, 'engine', v)"
-                  style="width: 150px"
+  <div class="astRules">
+    <div class="head">
+      <span class="label">语法要求</span>
+      <div v-if="supportedLanguages.length" class="langs" role="tablist" aria-label="语言">
+        <button
+          v-for="lang in supportedLanguages"
+          :key="lang"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === lang"
+          class="lang"
+          :class="{ on: activeTab === lang }"
+          @click="activeTab = lang"
+        >
+          {{ lang }} · {{ countOf(lang) ? `${countOf(lang)} 条` : "没有" }}
+        </button>
+      </div>
+      <div class="grow"></div>
+      <n-text depth="3" class="note">提交时逐条检查，不满足算错</n-text>
+    </div>
+    <n-text v-if="unsupportedLanguages.length" depth="3" class="note">
+      {{ unsupportedLanguages.join("、") }} 检查不了语法要求（判题机只认
+      {{ AST_SUPPORTED_LANGUAGES.join(" / ") }}）
+    </n-text>
+    <n-text v-if="!supportedLanguages.length" depth="3" class="note">先选能交的语言</n-text>
+    <template v-for="lang in supportedLanguages" :key="lang">
+      <div v-if="activeTab === lang" class="rules">
+        <div v-if="checks[lang] && 'error' in checks[lang]" class="ruleError">
+          {{ (checks[lang] as { error: string }).error }}
+        </div>
+        <div v-for="(rule, index) in getRulesForLang(lang)" :key="index" class="rule">
+          <div class="ruleRow">
+            <n-select
+              :options="ENGINE_OPTIONS"
+              :value="rule.engine"
+              size="small"
+              class="engine"
+              @update:value="(v: string) => updateRule(lang, index, 'engine', v)"
+            />
+            <n-select
+              v-if="needsTargetDropdown(rule.engine)"
+              :options="nodeTargetOptions(lang)"
+              :value="rule.target"
+              size="small"
+              class="target"
+              filterable
+              @update:value="(v: string) => updateRule(lang, index, 'target', v)"
+            />
+            <n-input
+              v-if="needsTargetInput(rule.engine)"
+              :value="rule.target"
+              size="small"
+              class="target"
+              placeholder="函数 / 方法名"
+              @update:value="(v: string) => updateRule(lang, index, 'target', v)"
+            />
+            <n-select
+              v-if="needsOperatorDropdown(rule.engine)"
+              :options="operatorTargetOptions(lang)"
+              :value="rule.target"
+              size="small"
+              class="target"
+              @update:value="(v: string) => updateRule(lang, index, 'target', v)"
+            />
+            <template v-if="isCountEngine(rule.engine)">
+              <n-select
+                :options="COUNT_MODE_OPTIONS"
+                :value="getCountMode(rule)"
+                size="small"
+                class="mode"
+                @update:value="(v: 'exact' | 'range') => updateCountMode(lang, index, v)"
+              />
+              <n-input-number
+                v-if="getCountMode(rule) === 'exact'"
+                :value="rule.exact ?? null"
+                size="small"
+                class="num"
+                placeholder="次数"
+                :min="1"
+                :show-button="false"
+                @update:value="(v: number | null) => updateExactCount(lang, index, v)"
+              />
+              <template v-else>
+                <n-input-number
+                  :value="rule.min ?? null"
                   size="small"
+                  class="num"
+                  placeholder="最少"
+                  :min="0"
+                  :show-button="false"
+                  @update:value="(v: number | null) => updateRule(lang, index, 'min', v)"
                 />
-                <n-select
-                  v-if="needsTargetDropdown(rule.engine)"
-                  :options="nodeTargetOptions(lang)"
-                  :value="rule.target"
-                  @update:value="(v: string) => updateRule(lang, index, 'target', v)"
-                  style="width: 150px"
+                <span>～</span>
+                <n-input-number
+                  :value="rule.max ?? null"
                   size="small"
-                  filterable
+                  class="num"
+                  placeholder="最多"
+                  :min="0"
+                  :show-button="false"
+                  @update:value="(v: number | null) => updateRule(lang, index, 'max', v)"
                 />
-                <n-input
-                  v-if="needsTargetInput(rule.engine)"
-                  :value="rule.target"
-                  @update:value="(v: string) => updateRule(lang, index, 'target', v)"
-                  placeholder="函数/方法名"
-                  style="width: 150px"
-                  size="small"
-                />
-                <n-select
-                  v-if="needsOperatorDropdown(rule.engine)"
-                  :options="operatorTargetOptions(lang)"
-                  :value="rule.target"
-                  @update:value="(v: string) => updateRule(lang, index, 'target', v)"
-                  style="width: 150px"
-                  size="small"
-                />
-                <template v-if="isCountEngine(rule.engine)">
-                  <n-select
-                    :options="COUNT_MODE_OPTIONS"
-                    :value="getCountMode(rule)"
-                    @update:value="(v: 'exact' | 'range') => updateCountMode(lang, index, v)"
-                    style="width: 80px"
-                    size="small"
-                  />
-                  <n-input-number
-                    v-if="getCountMode(rule) === 'exact'"
-                    :value="rule.exact ?? null"
-                    @update:value="(v: number | null) => updateExactCount(lang, index, v)"
-                    placeholder="次数"
-                    style="width: 100px"
-                    size="small"
-                    :min="1"
-                    clearable
-                  />
-                  <template v-else>
-                    <n-input-number
-                      :value="rule.min ?? null"
-                      @update:value="(v: number | null) => updateRule(lang, index, 'min', v)"
-                      placeholder="最少"
-                      style="width: 100px"
-                      size="small"
-                      :min="0"
-                      clearable
-                    />
-                    <n-input-number
-                      :value="rule.max ?? null"
-                      @update:value="(v: number | null) => updateRule(lang, index, 'max', v)"
-                      placeholder="最多"
-                      style="width: 100px"
-                      size="small"
-                      :min="0"
-                      clearable
-                    />
-                  </template>
-                </template>
-                <n-input
-                  :value="rule.message"
-                  @update:value="(v: string) => updateRule(lang, index, 'message', v)"
-                  placeholder="错误提示（选填）"
-                  style="flex: 1"
-                  size="small"
-                />
-                <n-button size="small" tertiary type="error" @click="removeRule(lang, index)">
-                  删除
-                </n-button>
-              </n-flex>
-            </div>
-            <n-button size="small" tertiary type="primary" @click="addRule(lang)">
-              添加规则
-            </n-button>
-          </n-flex>
-        </n-tab-pane>
-      </n-tabs>
-      <n-empty
-        v-else
-        :description="languages.length ? '当前语言不支持代码规则检查' : '请先选择编程语言'"
-      />
-    </n-collapse-item>
-  </n-collapse>
+              </template>
+              <span>次</span>
+            </template>
+            <div class="grow"></div>
+            <n-button quaternary size="tiny" @click="removeRule(lang, index)">删掉</n-button>
+          </div>
+          <div class="ruleRow sub">
+            <n-input
+              :value="rule.message"
+              size="tiny"
+              class="message"
+              :placeholder="
+                checkOf(lang, index)?.description
+                  ? `学生看到「${checkOf(lang, index)!.description}」，想换个说法写这里`
+                  : '学生看到的话（不填就按规则自动写）'
+              "
+              @update:value="(v: string) => updateRule(lang, index, 'message', v)"
+            />
+            <span v-if="checkOf(lang, index)?.passed === true" class="ok">✓ 标准答案过了</span>
+            <span v-else-if="checkOf(lang, index)?.passed === false" class="bad">
+              ✗ 标准答案自己没过{{
+                checkOf(lang, index)!.actual !== undefined
+                  ? `（数到 ${checkOf(lang, index)!.actual} 次）`
+                  : ""
+              }}
+            </span>
+            <n-text v-else-if="checkOf(lang, index)" depth="3">没有 {{ lang }} 的标准答案</n-text>
+          </div>
+        </div>
+        <div>
+          <n-button size="tiny" @click="addRule(lang)">+ 加一条</n-button>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
+
+<style scoped>
+.astRules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.head,
+.ruleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.label {
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+  width: 72px;
+  flex: none;
+}
+
+.langs {
+  display: flex;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lang {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+  cursor: pointer;
+}
+
+.lang + .lang {
+  border-left: 1px solid v-bind("theme.borderColor");
+}
+
+.lang.on {
+  background-color: rgba(24, 160, 88, 0.12);
+  color: v-bind("theme.primaryColorPressed");
+  font-weight: 600;
+}
+
+.grow {
+  flex: 1 1 auto;
+}
+
+.note {
+  font-size: 12px;
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rule {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid v-bind("theme.dividerColor");
+  border-radius: 4px;
+  background-color: rgba(128, 128, 128, 0.04);
+  font-size: 13px;
+}
+
+.ruleRow.sub {
+  font-size: 12px;
+  flex-wrap: nowrap;
+}
+
+.engine {
+  width: 130px;
+}
+
+.target {
+  width: 140px;
+}
+
+.mode {
+  width: 72px;
+}
+
+.num {
+  width: 64px;
+}
+
+.message {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ok {
+  color: v-bind("theme.successColor");
+  white-space: nowrap;
+}
+
+.bad {
+  color: v-bind("theme.errorColor");
+  white-space: nowrap;
+}
+
+.ruleError {
+  font-size: 12px;
+  color: v-bind("theme.errorColor");
+}
+</style>

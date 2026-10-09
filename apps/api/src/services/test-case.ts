@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { mkdir, chmod, readdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, chmod, readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 
 import { unzipSync, zipSync } from "fflate"
@@ -248,6 +248,43 @@ export async function readSqlScripts(testCaseId: string) {
     })
   }
   return scripts
+}
+
+/**
+ * 读回编程题测试点的原文（出题页回显、就地改）。超过 `limits` 的只报数量和大小，不读内容。
+ * 目录不存在时抛 TestCaseError。
+ */
+export async function readTestCaseFiles(
+  testCaseId: string,
+  limits: { maxCases: number; maxFileBytes: number },
+): Promise<
+  | { editable: true; cases: { input: string; output: string }[] }
+  | { editable: false; count: number; totalBytes: number }
+> {
+  const directory = resolve(config.testCaseDirectory, testCaseId)
+  let entries: string[]
+  try {
+    entries = await readdir(directory)
+  } catch {
+    throw new TestCaseError("Test case does not exist")
+  }
+  const pairs = collectPairs(new Set(entries))
+  let totalBytes = 0
+  let tooLarge = pairs.length > limits.maxCases
+  for (const name of pairs.flat()) {
+    const size = (await stat(resolve(directory, name))).size
+    totalBytes += size
+    if (size > limits.maxFileBytes) tooLarge = true
+  }
+  if (tooLarge) return { editable: false, count: pairs.length, totalBytes }
+  const cases: { input: string; output: string }[] = []
+  for (const [input, output] of pairs) {
+    cases.push({
+      input: await readFile(resolve(directory, input), "utf8"),
+      output: await readFile(resolve(directory, output), "utf8"),
+    })
+  }
+  return { editable: true, cases }
 }
 
 function randomId() {

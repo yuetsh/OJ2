@@ -7,13 +7,17 @@ import { uploadImage } from "../../admin/api"
 interface Props {
   title: string
   simple?: boolean
+  /** 一行放得下的那套：出题页左栏只有 600 宽，完整工具栏会折成三行 */
+  compact?: boolean
+  /** 最少的一套：出题页的输入 / 输出说明并排放，每个才 280 宽 */
+  mini?: boolean
   minHeight?: number
 }
 
 const rawHtml = defineModel<string>("value")
 type InsertFnType = (url: string, alt: string, href: string) => void
 
-const { title, minHeight = 0, simple = false } = defineProps<Props>()
+const { title, minHeight = 0, simple = false, compact = false, mini = false } = defineProps<Props>()
 
 const message = useMessage()
 
@@ -66,6 +70,30 @@ const toolbarConfigSimple: Partial<IToolbarConfig> = {
   ],
 }
 
+const toolbarConfigCompact: Partial<IToolbarConfig> = {
+  toolbarKeys: [
+    "bold",
+    "color",
+    "bgColor",
+    "|",
+    "bulletedList",
+    "numberedList",
+    "|",
+    "uploadImage",
+    "insertTable",
+    "insertLink",
+    "emotion",
+    "|",
+    "clearStyle",
+    "undo",
+    "redo",
+  ],
+}
+
+const toolbarConfigMini: Partial<IToolbarConfig> = {
+  toolbarKeys: ["bold", "color", "uploadImage", "insertLink", "undo", "redo"],
+}
+
 const editorConfig: Partial<IEditorConfig> = {
   scroll: false,
   MENU_CONF: {
@@ -110,7 +138,15 @@ async function customUpload(file: File, insertFn: InsertFnType) {
     <Toolbar
       class="toolbar"
       :editor="toolbarEditorRef"
-      :defaultConfig="simple ? toolbarConfigSimple : toolbarConfig"
+      :defaultConfig="
+        mini
+          ? toolbarConfigMini
+          : simple
+            ? toolbarConfigSimple
+            : compact
+              ? toolbarConfigCompact
+              : toolbarConfig
+      "
       mode="simple"
     />
     <Editor

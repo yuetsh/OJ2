@@ -6,8 +6,9 @@ import { achievementRaritySchema } from "./achievement"
 import { rankProfileSchema } from "./account"
 import { paginatedSchema, sampleUserSchema } from "./common"
 import { reactionKeySchema } from "./content"
-import { problemLanguageSchema } from "./language"
+import { problemLanguageSchema, runnableLanguageSchema } from "./language"
 import {
+  astRuleSchema,
   astRulesSchema,
   problemDifficultySchema,
   sqlConfigSchema,
@@ -836,6 +837,60 @@ export const generateSqlTestCaseRequestSchema = z.object({
 
 export const generateSqlTestCaseResponseSchema = z.object({ sql: z.string() })
 
+/**
+ * 编程题出题页回显已有的测试点（N.in / N.out 原文）。太大的不展开 —— 页面上要一组一组
+ * 摆出来、改了还要整包重跑一遍标准答案，几百组或者几 MB 的数据摆不下也跑不动，
+ * 这种只给数量和大小，老师走下载 / 导入 zip。
+ */
+export const TEST_CASE_EDIT_MAX_CASES = 100
+export const TEST_CASE_EDIT_MAX_FILE_BYTES = 32 * 1024
+
+export const testCaseFilesSchema = z.discriminatedUnion("editable", [
+  z.object({
+    editable: z.literal(true),
+    cases: z.array(z.object({ input: z.string(), output: z.string() })),
+  }),
+  z.object({
+    editable: z.literal(false),
+    count: z.number().int(),
+    totalBytes: z.number().int(),
+  }),
+])
+
+/**
+ * 出题页的语法要求：每条规则学生看到的那句话，以及标准答案自己过不过（规则配错时
+ * 标准答案也过不了）。`code` 给空串就只要那句话，`passed` 为 null
+ */
+export const astCheckRequestSchema = z.object({
+  language: runnableLanguageSchema,
+  code: z.string().max(1024 * 1024),
+  rules: z.array(astRuleSchema).min(1).max(50),
+})
+
+export const astCheckResponseSchema = z.object({
+  rules: z.array(
+    z.object({
+      description: z.string(),
+      passed: z.boolean().nullable(),
+      actual: z.number().int().optional(),
+    }),
+  ),
+})
+
+/** AI 按题面和标准答案想几组测试输入（输出由标准答案在判题机上跑，不让 AI 编） */
+export const generateTestInputsRequestSchema = z.object({
+  description: z.string().max(64 * 1024),
+  inputDescription: z.string().max(16 * 1024),
+  language: runnableLanguageSchema,
+  answer: z
+    .string()
+    .min(1)
+    .max(64 * 1024),
+  existing: z.array(z.string().max(4096)).max(100),
+})
+
+export const generateTestInputsResponseSchema = z.object({ inputs: z.array(z.string()) })
+
 export type AdminAchievement = z.infer<typeof adminAchievementSchema>
 export type AchievementMetric = z.infer<typeof achievementMetricSchema>
 
@@ -873,6 +928,11 @@ export type RenameTagResponse = z.infer<typeof renameTagResponseSchema>
 export type BatchProblemTagResponse = z.infer<typeof batchProblemTagResponseSchema>
 export type SqlTestCaseScript = z.infer<typeof sqlTestCaseScriptSchema>
 export type GenerateSqlTestCaseResponse = z.infer<typeof generateSqlTestCaseResponseSchema>
+export type TestCaseFiles = z.infer<typeof testCaseFilesSchema>
+export type AstCheckRequest = z.infer<typeof astCheckRequestSchema>
+export type AstCheckResponse = z.infer<typeof astCheckResponseSchema>
+export type GenerateTestInputsRequest = z.infer<typeof generateTestInputsRequestSchema>
+export type GenerateTestInputsResponse = z.infer<typeof generateTestInputsResponseSchema>
 export type AdminProblemSetProgress = z.infer<typeof adminProblemSetProgressSchema>
 
 export type AdminAnnouncementList = z.infer<typeof adminAnnouncementListSchema>

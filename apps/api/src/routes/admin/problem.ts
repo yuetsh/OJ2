@@ -1,6 +1,10 @@
 import {
   addContestProblemRequestSchema,
+  astCheckRequestSchema,
+  generateTestInputsRequestSchema,
   isSqlProblem,
+  TEST_CASE_EDIT_MAX_CASES,
+  TEST_CASE_EDIT_MAX_FILE_BYTES,
   createProblemRequestSchema,
   generateSqlTestCaseRequestSchema,
   makeProblemPublicRequestSchema,
@@ -9,11 +13,14 @@ import {
   type AdminProblem,
   type AdminProblemList,
   type AdminProblemListItem,
+  type AstCheckResponse,
   type AstRules,
+  type GenerateTestInputsResponse,
   type GenerateSqlTestCaseResponse,
   type SqlConfig,
   type SqlDisplay,
   type SqlTestCaseScript,
+  type TestCaseFiles,
   type UploadTestCaseResponse,
 } from "@oj2/contract"
 import { and, count, desc, eq, ilike, inArray, isNull, ne, not, or, sql } from "drizzle-orm"
@@ -23,15 +30,17 @@ import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema, type DbOrTx } from "../../db"
 import { failure, parseBody, success } from "../../http"
-import { astRulesError, pickAstRules } from "../../judge/ast"
+import { astRulesError, checkAst, describeAstRule, pickAstRules } from "../../judge/ast"
 import { buildSqlDisplay } from "../../judge/sql"
 import { completeChat } from "../../services/ai"
+import { plainText } from "../../services/hint-diagnosis"
 import { contestStatus } from "../../services/contest"
 import {
   packTestCaseZip,
   processTestCaseZip,
   readInfo,
   readSqlScripts,
+  readTestCaseFiles,
   TestCaseError,
 } from "../../services/test-case"
 import { config } from "../../config"
@@ -860,6 +869,95 @@ adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, as
   } catch (error) {
     console.error("Failed to read SQL test case scripts", error)
     return failure(c, 500, "test-case-error", "测试点脚本读取失败")
+  }
+})
+
+/**
+ * 回显编程题已有的测试点原文，出题页就地改。太大的（见契约 TEST_CASE_EDIT_*）只给数量和大小。
+ * SQL 题的测试点是脚本，走上面的 sql-scripts。
+ */
+adminProblemRoutes.get("/problems/:id/test-case-files", requireProblemPermission, async (c) => {
+  const [problem] = await db
+    .select()
+    .from(schema.problem)
+    .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .limit(1)
+  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!(await canEdit(c.get("user")!, problem))) {
+    return failure(c, 404, "problem-not-found", "Problem does not exist")
+  }
+  const info = await readInfo(problem.testCaseId)
+  if (info?.sql) return failure(c, 409, "sql-test-case", "该题的测试点是 SQL 脚本")
+  try {
+    const files = await readTestCaseFiles(problem.testCaseId, {
+      maxCases: TEST_CASE_EDIT_MAX_CASES,
+      maxFileBytes: TEST_CASE_EDIT_MAX_FILE_BYTES,
+    })
+    return success(c, files satisfies TestCaseFiles)
+  } catch (error) {
+    if (error instanceof TestCaseError)
+      return failure(c, 404, "test-case-not-found", "测试点文件不存在")
+    throw error
+  }
+})
+
+/** 语法要求：每条规则学生看到的那句话 + 标准答案过不过，和判题时同一个 checkAst */
+adminProblemRoutes.post("/ast-check", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, astCheckRequestSchema)
+  if (!parsed.success) return parsed.response
+  const { language, code, rules } = parsed.data
+  const error = astRulesError({ [language]: rules })
+  if (error) return failure(c, 400, "invalid-ast-rules", error)
+  const checked = []
+  for (const rule of rules) {
+    const description = describeAstRule(rule, language)
+    if (!code.trim()) {
+      checked.push({ description, passed: null })
+      continue
+    }
+    const [result] = (await checkAst(code, language, [rule])).results
+    checked.push({ description, passed: result?.passed ?? null, actual: result?.actual })
+  }
+  return success(c, { rules: checked } satisfies AstCheckResponse)
+})
+
+/**
+ * AI 按题面和标准答案想几组测试输入。只要输入：输出一律由标准答案在判题机上跑，
+ * AI 编的输出不可信。
+ */
+adminProblemRoutes.post("/test-inputs/generate", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, generateTestInputsRequestSchema)
+  if (!parsed.success) return parsed.response
+  const body = parsed.data
+  const existing = body.existing.length
+    ? body.existing.map((input, i) => `第 ${i + 1} 组：\n${input}`).join("\n\n")
+    : "（还没有）"
+  try {
+    const raw = await completeChat(
+      `你是编程题出题助手，帮老师补测试数据。老师会给你题目描述、输入说明、标准答案和已有的测试输入。
+请再想 5 组新的测试输入，要和已有的不重复，重点覆盖边界情况（最小值、最大值、0、负数、
+重复元素、只有一个元素、各个分支都要走到……），但必须严格符合输入说明的格式，标准答案要能正常处理。
+数据规模保持小，每组不超过 20 行。
+只回 json：{"inputs": ["第一组输入", "第二组输入", ...]}，每组输入是一个字符串，多行用 \\n 分隔。`,
+      [
+        `题目描述：${plainText(body.description).slice(0, 3000)}`,
+        `输入说明：${plainText(body.inputDescription).slice(0, 1000) || "无"}`,
+        `标准答案（${body.language}）：\n${body.answer}`,
+        `已有的测试输入：\n${existing.slice(0, 4000)}`,
+      ].join("\n\n"),
+      { json: true },
+    )
+    const value: unknown = JSON.parse(raw)
+    const list =
+      value && typeof value === "object" && Array.isArray((value as { inputs?: unknown }).inputs)
+        ? ((value as { inputs: unknown[] }).inputs.filter((x) => typeof x === "string") as string[])
+        : []
+    const known = new Set(body.existing.map((input) => input.trim()))
+    const inputs = list.filter((input) => !known.has(input.trim())).slice(0, 10)
+    return success(c, { inputs } satisfies GenerateTestInputsResponse)
+  } catch (error) {
+    console.error("Test input generation failed", error)
+    return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")
   }
 })
 

@@ -45,6 +45,13 @@ import type {
   TutorialListItem,
   TagCategory,
 } from "utils/types"
+import type {
+  AstCheckRequest,
+  AstCheckResponse,
+  GenerateTestInputsRequest,
+  GenerateTestInputsResponse,
+  TestCaseFiles,
+} from "@oj2/contract"
 
 export function getBaseInfo() {
   return api.get<DashboardInfo>("admin/dashboard")
@@ -250,6 +257,21 @@ export function getSQLTestcaseScripts(problemId: number) {
 // AI 根据标准答案生成一个 SQL 测试点初始化脚本
 export function generateSQLTestcase(data: { refSql: string; mode: "query" | "modify" }) {
   return api.post<GenerateSqlTestCaseResponse>("admin/sql-test-cases/generate", data)
+}
+
+// 编程题出题页：读回已有测试点的原文（太大的只给数量和大小）
+export function getTestCaseFiles(problemId: number) {
+  return api.get<TestCaseFiles>(`admin/problems/${problemId}/test-case-files`)
+}
+
+// 拿标准答案自测语法要求
+export function checkAstRules(data: AstCheckRequest) {
+  return api.post<AstCheckResponse>("admin/ast-check", data)
+}
+
+// AI 按题面和标准答案想几组测试输入（输出由标准答案跑）
+export function generateTestInputs(data: GenerateTestInputsRequest) {
+  return api.post<GenerateTestInputsResponse>("admin/test-inputs/generate", data)
 }
 
 /** 出站补默认值。字段名两边已经一致，不再做键名转换 */
