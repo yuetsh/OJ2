@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { achievementRaritySchema } from "./achievement"
 import { paginatedSchema, sampleUserSchema } from "./common"
 import { judgeStatusSchema } from "./judge-status"
 import { problemLanguageSchema } from "./language"
@@ -423,10 +424,51 @@ export const problemListItemSchema = z.object({
   allowFlowchart: z.boolean(),
   showFlowchart: z.boolean(),
   hasAstRules: z.boolean(),
+  /** 0 = 做对了。画流程图的题，流程图评到 A / S 也给 0（和题单、课堂条一个口径） */
   myStatus: z.number().int().nullable(),
+  /**
+   * 做对的人 / 交过的人，和题目页「统计」页签同一个口径（代码提交、不算还在判的）。
+   * 代替原来的提交数和按提交算的通过率：1044 按提交算只有 69%，按人算 817 / 826
+   */
+  solvedUsers: z.number().int(),
+  triedUsers: z.number().int(),
 })
 
 export const problemListSchema = paginatedSchema(problemListItemSchema)
+
+/** 题目列表「全部类型」下拉：有参考图 / 画流程图 / 语法要求 */
+export const problemTypeFilterSchema = z.enum(["reference", "flowchart", "ast"])
+
+/** 题目列表的排序。空串是默认：选了知识点按题号，全部题目按最新创建 */
+export const problemListSortSchema = z.enum(["", "id", "new", "popular"])
+
+/**
+ * 题目列表顶上那行和左栏的进度。**只说做到了什么**：做对几道、这周新做对几道、
+ * 离哪个成就最近；没做对的只给一个数（「有 n 道差一点」），不列出来。
+ */
+export const problemProgressSchema = z.object({
+  /** 做对的题数，和成就的「AC 题目数」同一个数（不含比赛），这样「再做对 n 道」加得上 */
+  solved: z.number().int(),
+  /** 本周（东八区周一起）新做对几道 */
+  weekSolved: z.number().int(),
+  /** 连续几周都有新做对（到本周或上周为止；断了就是 0） */
+  weekStreak: z.number().int(),
+  /** 交过、还没做对的公开题。只在点「有 n 道差一点」时弹出来看，不常驻在页面上 */
+  almost: z.array(z.object({ _id: z.string(), title: z.string() })),
+  /** 标签 id → 这个标签下做对了几道（只数公开可见的题） */
+  byTag: z.record(z.string(), z.number().int()),
+  /** 离得最近的下一个成就；全拿到了、或者没有能提示的为 null */
+  next: z
+    .object({
+      name: z.string(),
+      icon: z.string(),
+      rarity: achievementRaritySchema,
+      metric: z.string(),
+      threshold: z.number().int(),
+      progress: z.number().int(),
+    })
+    .nullable(),
+})
 
 /**
  * 标签分两类：`knowledge` 是知识点（循环结构、字符串……），`theme` 是题目的
@@ -504,6 +546,9 @@ export type AstRequirements = z.infer<typeof astRequirementsSchema>
 export type ProblemDifficulty = z.infer<typeof problemDifficultySchema>
 export type ProblemListItem = z.infer<typeof problemListItemSchema>
 export type ProblemList = z.infer<typeof problemListSchema>
+export type ProblemTypeFilter = z.infer<typeof problemTypeFilterSchema>
+export type ProblemListSort = z.infer<typeof problemListSortSchema>
+export type ProblemProgress = z.infer<typeof problemProgressSchema>
 export type Tag = z.infer<typeof tagSchema>
 export type TagCategory = z.infer<typeof tagCategorySchema>
 export type ProblemAuthor = z.infer<typeof problemAuthorSchema>

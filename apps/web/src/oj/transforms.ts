@@ -23,5 +23,7 @@ export function toProblemRow(result: ProblemListItem): ProblemRow {
     allowFlowchart: result.allowFlowchart,
     showFlowchart: result.showFlowchart,
     hasAstRules: result.hasAstRules,
+    solvedUsers: result.solvedUsers,
+    triedUsers: result.triedUsers,
   }
 }

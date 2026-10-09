@@ -164,9 +164,9 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       </div>
     </header>
 
-    <!-- 代码要求（AST 规则）放在最前面：它是硬性的判定条件，写到一半才看见就晚了 -->
+    <!-- 语法要求（AST 规则）放在最前面：它是硬性的判定条件，写到一半才看见就晚了 -->
     <div v-if="astRequirements.length > 0" class="requirements">
-      <span class="requirements-head">代码要求</span>
+      <span class="requirements-head">语法要求</span>
       <template v-for="[lang, rules] in astRequirements" :key="lang">
         <span v-if="astRequirements.length > 1" class="lang-label">{{ lang }}</span>
         <n-tag
@@ -467,7 +467,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   gap: 16px;
 }
 
-/* 代码要求：一行的浅绿框，硬性的判定条件，放在最前面 */
+/* 语法要求：一行的浅绿框，硬性的判定条件，放在最前面 */
 .requirements {
   padding: 8px 12px;
   border-radius: 6px;

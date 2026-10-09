@@ -24,6 +24,7 @@ import {
   type ProblemListItem,
   type ProblemStats,
   type ProblemList,
+  type ProblemProgress,
   type CreateFlowchartResponse,
   type FlowchartScores,
   type FlowchartList,
@@ -92,6 +93,16 @@ export async function getProblemList(
     results: res.results.map(toProblemRow),
     total: res.total,
   }
+}
+
+/** 题目列表顶上那行和左栏的进度；没登录是 null */
+export function getProblemProgress() {
+  return api.get<ProblemProgress | null>("problems/progress")
+}
+
+/** 「随便来一道」：当前知识点里先挑自己没做对的简单 / 中等题，返回题号 */
+export function getRandomProblem(tag: string) {
+  return api.get<string>("problems/random", { params: tag ? { tag } : {} })
 }
 
 export function getAuthors(all = false) {

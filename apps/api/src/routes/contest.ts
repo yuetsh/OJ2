@@ -245,6 +245,9 @@ contestRoutes.get(
             showFlowchart: problem.showFlowchart,
             hasAstRules: problem.astRules !== null,
             myStatus: myStatusOf(statuses, problem.id),
+            // 按人数是公开题库列表的列；比赛题表看的是榜单，不下发
+            solvedUsers: 0,
+            triedUsers: 0,
           }) satisfies ProblemListItem,
       ),
     )

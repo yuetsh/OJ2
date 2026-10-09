@@ -1,4 +1,13 @@
-import type { ProblemAuthor, ProblemDetail, ProblemList, ProblemListItem, Tag } from "@oj2/contract"
+import {
+  problemListSortSchema,
+  problemTypeFilterSchema,
+  type ProblemAuthor,
+  type ProblemDetail,
+  type ProblemList,
+  type ProblemListItem,
+  type ProblemProgress,
+  type Tag,
+} from "@oj2/contract"
 import {
   and,
   asc,
@@ -21,6 +30,11 @@ import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
+import {
+  buildProblemProgress,
+  problemStates,
+  problemUserCounts,
+} from "../services/problem-progress"
 import {
   asFilterValue,
   countFailedSubmissions,
@@ -67,6 +81,9 @@ async function getProblemTags(problemIds: number[]) {
   return result
 }
 
+type ProblemStates = Awaited<ReturnType<typeof problemStates>> | null
+type UserCounts = Awaited<ReturnType<typeof problemUserCounts>>
+
 function listItem(
   row: {
     problem: typeof schema.problem.$inferSelect
@@ -75,26 +92,43 @@ function listItem(
   },
   tags: Map<number, string[]>,
   statuses: Record<string, unknown>,
+  states: ProblemStates,
+  counts: UserCounts,
 ) {
   const status = asRecord(statuses[String(row.problem.id)]).status
+  const id = row.problem.id
   return {
-    id: row.problem.id,
+    id,
     _id: row.problem.displayId,
     title: row.problem.title,
     submissionNumber: row.problem.submissionNumber,
     acceptedNumber: row.problem.acceptedNumber,
     difficulty: row.problem.difficulty,
     createdBy: sampleUser(row.user, row.realName),
-    tags: tags.get(row.problem.id) ?? [],
+    tags: tags.get(id) ?? [],
     contestId: row.problem.contestId,
     allowFlowchart: row.problem.allowFlowchart,
     showFlowchart: row.problem.showFlowchart,
     hasAstRules: row.problem.astRules !== null,
-    myStatus: typeof status === "number" ? status : null,
+    // 流程图评到 A / S 也打勾：problemStates 已经把它算进 solved
+    myStatus: states?.solved.has(id)
+      ? JudgeStatus.ACCEPTED
+      : typeof status === "number"
+        ? status
+        : null,
+    solvedUsers: counts.get(id)?.solved ?? 0,
+    triedUsers: counts.get(id)?.tried ?? 0,
   } satisfies ProblemListItem
 }
 
+/** 题号排序：先按长度再按字面，1001 < 1100 < P026 < SQL09，不会排成 1001、1100、11、2 */
+const displayIdOrder = [
+  asc(sql`length(${schema.problem.displayId})`),
+  asc(schema.problem.displayId),
+]
+
 problemRoutes.get("/problems", optionalAuth, async (c) => {
+  const user = c.get("user")
   const limit = queryInteger(c.req.query("limit"), 20, { min: 1, max: 250 })
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const filters = [eq(schema.problem.visible, true), isNull(schema.problem.contestId)]
@@ -102,6 +136,9 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
   const keyword = c.req.query("keyword")?.trim()
   const difficulty = c.req.query("difficulty")?.trim()
   const tag = c.req.query("tag")?.trim()
+  const type = problemTypeFilterSchema.safeParse(c.req.query("type")).data
+  // 没登录时「只看没做完」在前端是灰的；直接拼地址来的就当没开
+  const undone = c.req.query("undone") === "1" && !!user
   if (author) filters.push(eq(schema.user.username, author))
   if (keyword)
     filters.push(
@@ -123,31 +160,32 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
       ),
     )
   }
+  if (type === "reference") filters.push(eq(schema.problem.showFlowchart, true))
+  if (type === "flowchart") filters.push(eq(schema.problem.allowFlowchart, true))
+  if (type === "ast") filters.push(sql`${schema.problem.astRules} is not null`)
+
+  const states = user ? await problemStates(user.id) : null
+  if (undone && states && states.solved.size > 0)
+    filters.push(notInArray(schema.problem.id, [...states.solved]))
 
   const where = and(...filters)
-  const sort = c.req.query("sort")
+  // 默认：选了知识点按题号（同一系列的题挨在一起），全部题目按最新创建。
+  // 旧的排序值（最多提交、画流程图……）落到默认 —— 类型已经拆成了单独的筛选
+  const sort = problemListSortSchema.safeParse(c.req.query("sort") ?? "").data ?? ""
+  const effective = sort || (tag ? "id" : "new")
+  const allCounts = effective === "popular" ? await problemUserCounts() : null
+  const popularity = allCounts
+    ? sql`case ${schema.problem.id} ${sql.join(
+        [...allCounts].map(([id, n]) => sql`when ${id} then ${n.solved}`),
+        sql` `,
+      )} else 0 end`
+    : null
   const order =
-    sort === "flowchart"
-      ? [
-          desc(schema.problem.allowFlowchart),
-          desc(schema.problem.showFlowchart),
-          desc(schema.problem.createTime),
-        ]
-      : sort === "ast"
-        ? [desc(sql`(${schema.problem.astRules} is not null)`), desc(schema.problem.createTime)]
-        : sort === "-accepted_number"
-          ? [desc(schema.problem.acceptedNumber)]
-          : sort === "accepted_number"
-            ? [asc(schema.problem.acceptedNumber)]
-            : sort === "-submission_number"
-              ? [desc(schema.problem.submissionNumber)]
-              : sort === "submission_number"
-                ? [asc(schema.problem.submissionNumber)]
-                : sort === "difficulty"
-                  ? [asc(schema.problem.difficulty)]
-                  : sort === "create_time"
-                    ? [asc(schema.problem.createTime)]
-                    : [desc(schema.problem.createTime)]
+    effective === "id"
+      ? displayIdOrder
+      : popularity
+        ? [desc(popularity), ...displayIdOrder]
+        : [desc(schema.problem.createTime)]
   const [totalRow] = await db
     .select({ value: countDistinct(schema.problem.id) })
     .from(schema.problem)
@@ -166,14 +204,26 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
     .orderBy(...order)
     .limit(limit)
     .offset(offset)
-  const [tags, statuses] = await Promise.all([
-    getProblemTags(rows.map((row) => row.problem.id)),
-    getProblemStatuses(c.get("user")?.id),
+  const ids = rows.map((row) => row.problem.id)
+  const [tags, statuses, counts] = await Promise.all([
+    getProblemTags(ids),
+    getProblemStatuses(user?.id),
+    allCounts ?? problemUserCounts(ids),
   ])
   return success(c, {
-    results: rows.map((row) => listItem(row, tags, statuses)),
+    results: rows.map((row) => listItem(row, tags, statuses, states, counts)),
     total: totalRow?.value ?? 0,
   } satisfies ProblemList)
+})
+
+/**
+ * 题目列表顶上那行和左栏的进度。没登录给 null（前端那行换成「登录以后……」）。
+ * 注册在 /problems/:displayId 前面，不然被它吃掉。
+ */
+problemRoutes.get("/problems/progress", optionalAuth, async (c) => {
+  const user = c.get("user")
+  if (!user) return success(c, null)
+  return success(c, (await buildProblemProgress(user.id)) satisfies ProblemProgress)
 })
 
 problemRoutes.get("/problem-tags", async (c) => {
@@ -204,12 +254,42 @@ problemRoutes.get("/problem-tags", async (c) => {
   return success(c, rows satisfies Tag[])
 })
 
-problemRoutes.get("/problems/random", async (c) => {
+/**
+ * 「随便来一道」：范围是当前知识点（不传就是全部），先挑自己还没做对的简单 / 中等题，
+ * 没有就放宽到没做对的困难题，再没有就随便一道（全做对了也给一道，不让按钮落空）。
+ */
+problemRoutes.get("/problems/random", optionalAuth, async (c) => {
+  const user = c.get("user")
+  const tag = c.req.query("tag")?.trim()
+  const states = user ? await problemStates(user.id) : null
+  const solved = states ? [...states.solved] : []
   const [row] = await db
     .select({ displayId: schema.problem.displayId })
     .from(schema.problem)
-    .where(and(eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
-    .orderBy(sql`random()`)
+    .where(
+      and(
+        eq(schema.problem.visible, true),
+        isNull(schema.problem.contestId),
+        tag
+          ? inArray(
+              schema.problem.id,
+              db
+                .select({ id: schema.problemTags.problemId })
+                .from(schema.problemTags)
+                .innerJoin(
+                  schema.problemTag,
+                  eq(schema.problemTags.problemtagId, schema.problemTag.id),
+                )
+                .where(eq(schema.problemTag.name, tag)),
+            )
+          : undefined,
+      ),
+    )
+    .orderBy(
+      solved.length ? asc(inArray(schema.problem.id, solved)) : sql`1`,
+      asc(sql`${schema.problem.difficulty} = 'High'`),
+      sql`random()`,
+    )
     .limit(1)
   if (!row) return failure(c, 404, "no-problems", "No problem to pick")
   return success(c, row.displayId)
@@ -303,10 +383,11 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
       asc(schema.problem.id),
     )
     .limit(5)
-  const tags = await getProblemTags(rows.map((row) => row.problem.id))
+  const ids = rows.map((row) => row.problem.id)
+  const [tags, counts] = await Promise.all([getProblemTags(ids), problemUserCounts(ids)])
   return success(
     c,
-    rows.map((row) => listItem(row, tags, statuses)),
+    rows.map((row) => listItem(row, tags, statuses, null, counts)),
   )
 })
 

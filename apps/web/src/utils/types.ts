@@ -167,6 +167,8 @@ export interface ProblemRow {
   allowFlowchart: boolean
   showFlowchart: boolean
   hasAstRules: boolean
+  solvedUsers: number
+  triedUsers: number
 }
 
 export interface AdminProblemRow {
