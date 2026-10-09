@@ -83,6 +83,18 @@ export function weekStart(now: Date | number | string = new Date()): string {
   return new Date((today - (weekday - 1)) * DAY_MS - OFFSET_MS).toISOString()
 }
 
+/**
+ * 「这学期」从哪天零点（东八区）算起：秋季学期 9 月 1 日起（到次年 1 月都算），春季学期
+ * 2 月 1 日起（7、8 月的暑假也归春季，开学前没人做题，不影响）。返回 ISO 字符串。
+ */
+export function termStart(now: Date | number | string = new Date()): string {
+  const wall = toWallClock(now)
+  const year = wall.getUTCFullYear()
+  const month = wall.getUTCMonth() + 1
+  const [termYear, termMonth] = month >= 9 ? [year, 9] : month >= 2 ? [year, 2] : [year - 1, 9]
+  return fromWallClock(new Date(Date.UTC(termYear, termMonth - 1, 1))).toISOString()
+}
+
 /** 按北京时间的日历做月份平移，日号超出目标月长度时截到月末，时分秒毫秒原样保留 */
 export function shiftMonthsByCalendar(instant: Date, months: number): Date {
   const wall = toWallClock(instant)

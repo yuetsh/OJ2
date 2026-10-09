@@ -60,7 +60,7 @@ const aiLoading = aiStream.waiting
 const aiContent = ref("")
 const showAIModal = ref(false)
 
-// 长时段和榜单页同一份（LONG_DURATION_OPTIONS），外加一个「全部时间」
+// 长时段选项（LONG_DURATION_OPTIONS），外加一个「全部时间」
 const timeRangeOptions: SelectOption[] = [
   { label: "全部时间", value: "" },
   ...LONG_DURATION_OPTIONS,

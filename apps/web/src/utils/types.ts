@@ -271,12 +271,11 @@ export type { SessionUser } from "@oj2/contract"
 export type Rank = RankProfile
 
 /** 榜单里「我」的位置：比 Rank 多一个全服名次 */
-export type { MyRank } from "@oj2/contract"
 
 /** 本周进步榜：`rank` 是周榜名次，跟存量总榜的名次没有关系 */
 export type { WeeklyRank, WeeklyRankItem } from "@oj2/contract"
 
-export type { ClassComparison, ClassRankItem, ClassUserRank } from "@oj2/contract"
+export type { ClassComparison } from "@oj2/contract"
 
 /** 班里最近一次一起做的题（课上老师点的那几道），见后端 `/me/class-activity` */
 export type { ClassActivity, ClassActivityProblem, LastVisit } from "@oj2/contract"
@@ -310,7 +309,7 @@ export type BlankContest = Omit<
  */
 export type { ContestSubmissionInfo } from "@oj2/contract"
 
-export type { WebsiteConfig, OnlineCount } from "@oj2/contract"
+export type { WebsiteConfig } from "@oj2/contract"
 
 export type {
   JudgeServer as Server,

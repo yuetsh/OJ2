@@ -1,9 +1,8 @@
-import type { OnlineCount, Quote, WebsiteConfig } from "@oj2/contract"
+import type { Quote, WebsiteConfig } from "@oj2/contract"
 import { asc, desc, eq } from "drizzle-orm"
 import { Hono } from "hono"
 import { resolve } from "node:path"
 
-import { onlineCount } from "../auth/presence"
 import { config } from "../config"
 import { db, schema } from "../db"
 import { failure, success } from "../http"
@@ -24,14 +23,6 @@ siteRoutes.get("/site", async (c) => {
     classList: options.class_list,
     enableMaxkb: options.enable_maxkb,
   } satisfies WebsiteConfig)
-})
-
-/**
- * 当前在线人数。匿名可读 —— 一个聚合数字不暴露任何人的身份，
- * 而榜单页本身就允许匿名看。谁在线是另一回事，只在 /rankings/users 里对老师下发。
- */
-siteRoutes.get("/site/online", async (c) => {
-  return success(c, { count: await onlineCount() } satisfies OnlineCount)
 })
 
 // 数据集读不到时的兜底（本机旁边没有 sentences-bundle 就会走这里）

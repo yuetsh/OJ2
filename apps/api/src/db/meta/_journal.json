@@ -211,6 +211,13 @@
       "when": 1791555848163,
       "tag": "0029_regrant_problemset_badges",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791587559546,
+      "tag": "0030_add_user_rank_hidden",
+      "breakpoints": true
     }
   ]
 }

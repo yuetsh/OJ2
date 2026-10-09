@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "rank_hidden_at" timestamp with time zone;

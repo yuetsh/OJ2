@@ -10,6 +10,7 @@ import { judgeServerRoutes } from "./routes/judge-server"
 import { contestRoutes } from "./routes/contest"
 import { contentRoutes } from "./routes/content"
 import { classroomRoutes } from "./routes/classroom"
+import { rankingRoutes } from "./routes/ranking"
 import { problemsetRoutes } from "./routes/problemset"
 import { achievementRoutes } from "./routes/achievement"
 import { aiRoutes } from "./routes/ai"
@@ -36,6 +37,7 @@ app.route("/api", siteRoutes)
 app.route("/api", contestRoutes)
 app.route("/api", contentRoutes)
 app.route("/api", classroomRoutes)
+app.route("/api", rankingRoutes)
 app.route("/api", problemsetRoutes)
 app.route("/api", achievementRoutes)
 app.route("/api", aiRoutes)

@@ -3,31 +3,6 @@ import { z } from "zod"
 import { judgeStatusSchema } from "./judge-status"
 import { lessonLanguageSchema as lessonLanguageValueSchema } from "./language"
 
-export const classRankItemSchema = z.object({
-  className: z.string(),
-  userCount: z.number().int(),
-  totalAc: z.number().int(),
-  totalSubmission: z.number().int(),
-  avgAc: z.number(),
-  acRate: z.number(),
-  rank: z.number().int(),
-})
-
-export const classUserRankItemSchema = z.object({
-  userId: z.number().int(),
-  username: z.string(),
-  acceptedNumber: z.number().int(),
-  submissionNumber: z.number().int(),
-  rank: z.number().int(),
-})
-
-export const classUserRankSchema = z.object({
-  className: z.string(),
-  myRank: z.number().int(),
-  total: z.number().int(),
-  ranks: z.array(classUserRankItemSchema),
-})
-
 export const classComparisonSchema = z.object({
   className: z.string(),
   userCount: z.number().int(),
@@ -225,8 +200,6 @@ export const classLessonSchema = z.object({
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
 })
 
-export type ClassRankItem = z.infer<typeof classRankItemSchema>
-export type ClassUserRank = z.infer<typeof classUserRankSchema>
 export type ClassComparison = z.infer<typeof classComparisonSchema>
 export type ClassComparisonResponse = z.infer<typeof classComparisonResponseSchema>
 
@@ -240,5 +213,4 @@ export type ClassBoardStudent = z.infer<typeof classBoardStudentSchema>
 export type ClassBoardCell = z.infer<typeof classBoardCellSchema>
 export type ClassActivityProblem = z.infer<typeof classActivityProblemSchema>
 
-export type ClassUserRankItem = z.infer<typeof classUserRankItemSchema>
 export type ClassComparisonRequest = z.infer<typeof classComparisonRequestSchema>

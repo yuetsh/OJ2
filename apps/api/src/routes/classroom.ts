@@ -10,8 +10,6 @@ import {
   type ClassActivityProblem,
   type ClassComparison,
   type ClassComparisonResponse,
-  type ClassRankItem,
-  type ClassUserRank,
   type LastVisit,
   type LessonLanguage,
   FLOWCHART_PASS_GRADES,
@@ -39,7 +37,7 @@ import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import { accepted } from "../services/learning-stats"
 import { calendarDay, dayStart, localTime } from "../time"
-import { queryInteger, rounded } from "./helpers"
+import { rounded } from "./helpers"
 
 export const classroomRoutes = new Hono<AppEnv>()
 
@@ -107,65 +105,6 @@ function sampleStdDev(values: number[]) {
     values.reduce((sum, value) => sum + (value - average) ** 2, 0) / (values.length - 1),
   )
 }
-
-classroomRoutes.get("/rankings/classes", async (c) => {
-  const grade = c.req.query("grade")?.trim()
-  if (!grade || !/^\d+$/.test(grade)) return failure(c, 400, "invalid-grade", "grade is required")
-  const users = await loadClassUsers(undefined, grade)
-  const groups = new Map<string, ClassUser[]>()
-  for (const user of users)
-    groups.set(user.className, [...(groups.get(user.className) ?? []), user])
-  const result = [...groups]
-    .map(([className, members]) => {
-      const totalAc = members.reduce((sum, member) => sum + member.acceptedNumber, 0)
-      const totalSubmission = members.reduce((sum, member) => sum + member.submissionNumber, 0)
-      return {
-        className,
-        userCount: members.length,
-        totalAc,
-        totalSubmission,
-        avgAc: rounded(totalAc / members.length),
-        acRate: totalSubmission > 0 ? rounded((totalAc / totalSubmission) * 100) : 0,
-      }
-    })
-    .sort((a, b) => b.totalAc - a.totalAc || a.totalSubmission - b.totalSubmission)
-  return success(
-    c,
-    result.map((item, index) => ({ ...item, rank: index + 1 }) satisfies ClassRankItem),
-  )
-})
-
-classroomRoutes.get("/me/class-rank", requireAuth, async (c) => {
-  const user = c.get("user")!
-  if (!user.className) return failure(c, 400, "class-missing", "用户没有班级信息")
-  const members = (await loadClassUsers([user.className])).sort(
-    (a, b) => b.acceptedNumber - a.acceptedNumber || a.submissionNumber - b.submissionNumber,
-  )
-  const ranks = members.map((member, index) => ({
-    userId: member.userId,
-    username: member.username,
-    acceptedNumber: member.acceptedNumber,
-    submissionNumber: member.submissionNumber,
-    rank: index + 1,
-  }))
-  const myRank = ranks.find((rank) => rank.userId === user.id)?.rank ?? -1
-  const showAll = c.req.query("scope") === "all"
-  let selected = ranks
-  if (showAll) {
-    const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-    const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-    selected = ranks.slice(offset, offset + limit)
-  } else if (myRank > 0 && ranks.length > 10) {
-    const start = Math.min(Math.max(0, myRank - 6), ranks.length - 10)
-    selected = ranks.slice(start, start + 10)
-  }
-  return success(c, {
-    className: user.className,
-    myRank,
-    total: ranks.length,
-    ranks: selected,
-  } satisfies ClassUserRank)
-})
 
 /**
  * 同班同一天有这么多人做过，就算「班里在做」。2025 秋的实测分布是两极的：

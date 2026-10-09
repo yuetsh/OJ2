@@ -5,25 +5,18 @@ import {
   registerRequestSchema,
   STUDENT_ROLES,
   updateProfileRequestSchema,
-  type ActivityRankItem,
   type KnowledgeLevel,
   type KnowledgeMap,
   type Metrics,
-  type MyRank,
   type ProblemRank,
-  type RankProfile,
-  type UserRank,
   type WeeklyRank,
   type WeeklyRankItem,
 } from "@oj2/contract"
 import {
   and,
-  asc,
   count,
   countDistinct,
-  desc,
   eq,
-  gt,
   gte,
   inArray,
   isNull,
@@ -31,7 +24,6 @@ import {
   lte,
   max,
   min,
-  ne,
   notExists,
   or,
   sql,
@@ -40,7 +32,6 @@ import { alias } from "drizzle-orm/pg-core"
 import { Hono } from "hono"
 
 import { hashPassword } from "../auth/password"
-import { onlineUserIds } from "../auth/presence"
 import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
@@ -51,7 +42,7 @@ import { sniffImageExtension } from "../services/image"
 import { getUserProfileById } from "../services/profile"
 import { clientIp, countAttempt, lockoutRemaining, type AttemptRule } from "../services/throttling"
 import { localTime, weekStart } from "../time"
-import { isTeacherOrAbove, asRecord, queryInteger, sampleUser } from "./helpers"
+import { asRecord, queryInteger, sampleUser } from "./helpers"
 
 export const accountRoutes = new Hono<AppEnv>()
 
@@ -134,7 +125,7 @@ accountRoutes.post("/users", async (c) => {
 accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
   // 对齐旧后端 account/views/oj.py 的 UserProfileAPI.get 首行：
   // `if not user.is_authenticated: return self.success()` —— 匿名一律返回空，
-  // 否则用户名可经 /rankings/users 公开枚举，进而无 cookie 批量收集全校学生的邮箱与最后登录时间。
+  // 否则用户名可经排名接口（/rankings/board）公开枚举，进而无 cookie 批量收集全校学生的邮箱与最后登录时间。
   if (!c.get("user")) return success(c, null)
   const [target] = await db
     .select({ id: schema.user.id })
@@ -209,199 +200,16 @@ accountRoutes.get("/users/:id/metrics", async (c) => {
 })
 
 /**
- * 全服榜单的大小。**写死在服务端，不接受调用方传** —— 上限是这个端点的属性，
- * 不是调用方的选择。
- *
- * 之前它是个 `top` 查询参数，三个调用方各传各的（100 / 10 / 0），
- * 而 top 又会覆盖 limit 与 offset，total 却按全量人数算 —— 于是分页器算出几十页、
- * 页页内容相同（36e4ac2）。「全服 Top10」不需要另一个上限，取 limit=10&offset=0 即可；
- * 后台那个「不限量」的用法搬去了 /admin/rankings/users。
- */
-const LEADERBOARD_SIZE = 100
-
-/** 入榜人群：正常状态的学生与学生管理员。教师和超管不参与排名。 */
-const leaderboardWhere = and(
-  inArray(schema.user.adminType, [...STUDENT_ROLES]),
-  eq(schema.user.isDisabled, false),
-)
-
-/**
- * 榜单排序：AC 多的在前 → 同 AC 时提交少的在前 → 再同就按 id。
- *
- * 第三档不是凑数：前两个键完全相同的学生在真实数据里成片存在（都是 0/0），
- * 没有稳定的兜底键时 postgres 每次返回的顺序可以不同，翻页会看到重复或漏掉的人。
- */
-const leaderboardOrder = [
-  desc(schema.userProfile.acceptedNumber),
-  asc(schema.userProfile.submissionNumber),
-  asc(schema.user.id),
-]
-
-accountRoutes.get("/rankings/users", optionalAuth, async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, {
-    min: 1,
-    max: LEADERBOARD_SIZE,
-  })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-
-  // 榜单封顶 100 名，所以这一页最多还能取几条只取决于 offset，**不取决于总人数** ——
-  // 真人不够时数据库自己会少返回。不拿 total 当上限，三段查询就能并发发出去，
-  // 端点延迟从「四个来回相加」变成「最慢的那个」。越界页一条不剩，直接不发 SQL。
-  const pageLimit = Math.max(0, Math.min(limit, LEADERBOARD_SIZE - offset))
-
-  // 谁在线只给老师看，学生那边整列都是 null（见 rankProfileSchema.isOnline）
-  const [totalRow, rows, me, online] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.userProfile)
-      .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-      .where(leaderboardWhere)
-      .then(([row]) => row),
-    pageLimit === 0
-      ? []
-      : db
-          .select({ profile: schema.userProfile, user: schema.user })
-          .from(schema.userProfile)
-          .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-          .where(leaderboardWhere)
-          .orderBy(...leaderboardOrder)
-          .limit(pageLimit)
-          .offset(offset),
-    myLeaderboardRank(c.get("user")?.id),
-    isTeacherOrAbove(c.get("user")) ? onlineUserIds() : null,
-  ])
-
-  return success(c, {
-    results: rows.map((row) => serializeRankRow(row, online)),
-    total: Math.min(totalRow?.value ?? 0, LEADERBOARD_SIZE),
-    me,
-  } satisfies UserRank)
-})
-
-function serializeRankRow(
-  {
-    profile,
-    user,
-  }: {
-    profile: typeof schema.userProfile.$inferSelect
-    user: typeof schema.user.$inferSelect
-  },
-  online: Set<number> | null = null,
-) {
-  return {
-    id: profile.id,
-    user: sampleUser(user, profile.realName),
-    acceptedNumber: profile.acceptedNumber,
-    submissionNumber: profile.submissionNumber,
-    mood: profile.mood,
-    isOnline: online ? online.has(user.id) : null,
-  } satisfies RankProfile
-}
-
-/**
- * 「我」的全服名次，登录且身份入榜时才有。
- *
- * 名次 = 排在我前面的人数 + 1，三个排序键**逐级**比较，与列表的 orderBy 逐字对应 ——
- * 少比一级就会出现「显示第 7 名、实际排在表格第 9 行」这种对不上的情况。
- * 三个键全等才算并列，此时名次相同。
- */
-async function myLeaderboardRank(userId: number | undefined) {
-  if (!userId) return null
-  const [mine] = await db
-    .select({ profile: schema.userProfile, user: schema.user })
-    .from(schema.userProfile)
-    .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-    .where(and(leaderboardWhere, eq(schema.user.id, userId)))
-    .limit(1)
-  if (!mine) return null
-
-  const { acceptedNumber, submissionNumber } = mine.profile
-  const [ahead] = await db
-    .select({ value: count() })
-    .from(schema.userProfile)
-    .innerJoin(schema.user, eq(schema.userProfile.userId, schema.user.id))
-    .where(
-      and(
-        leaderboardWhere,
-        or(
-          gt(schema.userProfile.acceptedNumber, acceptedNumber),
-          and(
-            eq(schema.userProfile.acceptedNumber, acceptedNumber),
-            lt(schema.userProfile.submissionNumber, submissionNumber),
-          ),
-          and(
-            eq(schema.userProfile.acceptedNumber, acceptedNumber),
-            eq(schema.userProfile.submissionNumber, submissionNumber),
-            lt(schema.user.id, userId),
-          ),
-        ),
-      ),
-    )
-
-  return {
-    ...serializeRankRow(mine),
-    rank: (ahead?.value ?? 0) + 1,
-  } satisfies MyRank
-}
-
-accountRoutes.get("/rankings/activity", async (c) => {
-  const start = c.req.query("start")
-  if (!start || Number.isNaN(Date.parse(start)))
-    return failure(c, 400, "invalid-start", "start time is required")
-  /**
-   * 按 **user_id** 聚合，名字从 user 表取。按 `submission.username` 分组的话，
-   * 改过名的学生会裂成新旧两条各算各的 AC 题数 —— 排名被拆低，运气不好还会以
-   * 两个名字同时挂在榜上。同 `/submissions/statistics` 那批。
-   *
-   * innerJoin user 顺带把已删号学生的孤儿提交挡在外面，不用再兜底名字。
-   */
-  const rows = await db
-    .select({
-      username: schema.user.username,
-      value: countDistinct(schema.submission.problemId),
-    })
-    .from(schema.submission)
-    .innerJoin(schema.user, eq(schema.submission.userId, schema.user.id))
-    .where(
-      and(
-        isNull(schema.submission.contestId),
-        gte(schema.submission.createTime, start),
-        inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
-        eq(schema.user.isDisabled, false),
-        ne(schema.user.adminType, "Super Admin"),
-      ),
-    )
-    .groupBy(schema.submission.userId, schema.user.username)
-    .orderBy(desc(countDistinct(schema.submission.problemId)))
-    .limit(10)
-  return success(
-    c,
-    rows.map(
-      (row) =>
-        ({
-          username: row.username,
-          count: row.value,
-        }) satisfies ActivityRankItem,
-    ),
-  )
-})
-
-/**
- * 周榜的榜面大小。**存量榜（`/rankings/users`）解决的是「谁最强」，周榜解决的是
- * 「这一周谁在往前走」** —— 后者每周一清零，所以榜面短一点更像「这周的头名」，
+ * 首页周榜的榜面大小。周榜解决的是「这一周谁在往前走」—— 每周一清零，所以榜面短一点更像「这周的头名」，
  * 长了反而又变成一张追不上的总表。榜外的人靠 `me` 单独看到自己的名次。
  */
 const WEEKLY_BOARD_SIZE = 10
 
-/** 算「解决」的两个状态：AST_CHECK_FAILED 也是答案对了，与 /rankings/activity 同口径 */
+/** 算「解决」的两个状态：AST_CHECK_FAILED 也是答案对了，与排名页（routes/ranking.ts）同口径 */
 const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 
 /**
  * 本周进步榜：按**本周首次 AC 的题目数**排名，每周一 0:00（东八区）清零。
- *
- * 和 `/rankings/users` 的区别不只是加了时间窗：那张榜排的是 `user_profile` 的存量
- * AC 总数，名次几乎不动，中位学生看一眼就知道追不上，等于负反馈。这张榜的分母是
- * 「这一周」，谁都可能进前十。
  *
  * 「首次 AC」是靠 NOT EXISTS 排掉本周之前已经通过过的 (user, problem) 对，不是简单
  * 数本周 AC 的去重题数 —— 后者把老题重交一遍也算成绩，一分钟能刷满一屏。
@@ -417,10 +225,12 @@ accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
 
   const start = weekStart()
 
-  // 入榜人群与全服榜一致（leaderboardWhere）：正常状态的学生与学生管理员
+  // 入榜人群与排名页一致（routes/ranking.ts 的 rankedStudents）：正常状态的学生与学生管理员，
+  // 老师设成不计入排名的不算
   const audience = and(
     inArray(schema.user.adminType, [...STUDENT_ROLES]),
     eq(schema.user.isDisabled, false),
+    isNull(schema.user.rankHiddenAt),
     className ? eq(schema.user.className, className) : undefined,
   )
   const thisWeek = and(

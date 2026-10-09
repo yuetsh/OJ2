@@ -254,11 +254,6 @@ export const CODE_TEMPLATES = {
   SQL: blankTemplate,
 } as const
 
-export enum ChartType {
-  Rank,
-  Activity,
-}
-
 // 成就稀有度
 export const RARITY_LABEL: Record<AchievementRarity, string> = {
   bronze: "青铜",
@@ -329,11 +324,10 @@ export const DURATION_OPTIONS = [
 ] as const
 
 /**
- * 榜单和班级对比用的长时段，一周起步。
+ * 班级对比用的长时段，一周起步。
  *
- * 这两个页面看的是长期趋势，「本节课内」这种窗口在那儿没有意义 —— 全班一小时内的
- * AC 数拉出来比不出什么。原来 rank/list.vue 和 class/pk.vue 各手抄了一份同样的五条，
- * pk.vue 里还留着「与 rank/list.vue 保持一致」的注释，现在从上面那份派生。
+ * 看的是长期趋势，「本节课内」这种窗口在那儿没有意义 —— 全班一小时内的
+ * AC 数拉出来比不出什么。从上面那份派生，不另抄一份。
  */
 export const LONG_DURATION_OPTIONS = DURATION_OPTIONS.filter(
   (option) => !["hours:1", "hours:2", "days:1"].includes(option.value),

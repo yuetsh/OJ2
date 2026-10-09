@@ -1259,6 +1259,11 @@ export const user = pgTable(
     problemPermission: text("problem_permission").notNull().$type<ProblemPermission>(),
     rawPassword: varchar("raw_password", { length: 20 }),
     className: text("class_name"),
+    /**
+     * 老师把这个学生「不计入排名」的时刻，null = 正常上榜。怀疑抄代码时用，随时能恢复
+     * （见 routes/ranking.ts）。只管排名页和首页周榜，比赛排名不受它影响
+     */
+    rankHiddenAt: timestamp("rank_hidden_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
     unique("user_username_key").on(table.username),

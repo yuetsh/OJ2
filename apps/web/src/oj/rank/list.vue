@@ -1,934 +1,851 @@
 <script setup lang="ts">
 import type {
-  ClassComparison,
-  ClassRankItem as ClassRank,
-  ClassUserRank,
-  MyRank,
-  Rank,
-  WeeklyRankItem,
-} from "utils/types"
-import { formatISO, sub, type Duration } from "date-fns"
-import { NButton, NFlex } from "naive-ui"
-import {
-  getActivityRank,
-  getClassRank,
-  getOnlineCount,
-  getRank,
-  getUserClassRank,
-  getClassPK,
-  getWeeklyRank,
-} from "oj/api"
+  ClassBattleItem,
+  RankBoard,
+  RankPeriod,
+  RankRow,
+  RankScope,
+  WeeklyChampion,
+} from "@oj2/contract"
+import { useThemeVars } from "naive-ui"
+import { getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from "oj/api"
+import { classLabel } from "oj/submission/utils"
+import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { durationFromValue, getACRate, parseTime } from "utils/functions"
-import Pagination from "shared/components/Pagination.vue"
-import { ChartType, LONG_DURATION_OPTIONS } from "utils/constants"
-import Chart from "./components/Chart.vue"
-import RankMedal from "./components/RankMedal.vue"
+import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
-import { Icon } from "@iconify/vue"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
-import { useAIStream } from "shared/composables/aiStream"
+import { USERNAME_CLASS_RE } from "utils/constants"
+import { parseTime } from "utils/functions"
+import ClassBattle from "./components/ClassBattle.vue"
+import RankAvatar from "./components/RankAvatar.vue"
+import RankMe, { type MiniRank } from "./components/RankMe.vue"
+import RankPodium from "./components/RankPodium.vue"
+import RankTrack from "./components/RankTrack.vue"
+import RankTrend from "./components/RankTrend.vue"
+import { useRankPalette } from "./palette"
+import {
+  groupTitle,
+  hottest,
+  PERIOD_OPTIONS,
+  periodLabel,
+  SCOPE_OPTIONS,
+  scopeLabel,
+} from "./utils"
 
-const GRADES = [20, 25]
-
-const gradeOptions = Array.from({ length: GRADES[1] - GRADES[0] + 1 }, (_, i) => ({
-  label: `${GRADES[1] - i}年级`,
-  value: GRADES[1] - i,
-}))
-
+/**
+ * 排名页（设计稿「排名重设计」G1–G3，用户要「激发竞争」「图多」「一眼看出排名」）。
+ *
+ * 第一屏（机房 1366×768）：领奖台 + 全班赛道，右边是「你」和班级对抗；往下是名次走势、
+ * 这周本班、每周冠军。老师不上榜，选班看，每行「⋯」能把怀疑抄代码的学生设成不计入排名。
+ */
 const router = useRouter()
-const userStore = useUserStore()
-const { isDesktop } = useBreakpoints()
-const data = ref<Rank[]>([])
-const total = ref(0)
-/** 我的全服名次；未登录、教师/超管不入榜时为 null */
-const me = ref<MyRank | null>(null)
-/** 我在前 100 名之外 —— 榜上高亮不到我，另起一行显示 */
-const meOffBoard = computed(() => !!me.value && me.value.rank > total.value)
-const query = reactive({
-  limit: 10,
-  page: 1,
-})
+const route = useRoute()
 const message = useMessage()
-const rankChart = ref<Rank[]>([])
-/** 全站在线人数。只是个聚合数字；「谁在线」是每行的 isOnline，服务端只对老师下发 */
-const onlineCount = ref(0)
-const activityChart = ref<Rank[]>([])
-const duration = ref("months:1")
-const classData = ref<ClassRank[]>([])
-const classQuery = reactive({
-  grade: gradeOptions[0].value,
-})
-const myClassData = ref<ClassUserRank["ranks"]>([])
-const myRank = ref(-1)
-const myClassName = ref("")
-const myClassScope = ref<"window" | "all">("window")
-const myClassTotal = ref(0)
-const myClassQuery = reactive({
-  page: 1,
-  limit: 10,
-})
+const dialog = useDialog()
+const theme = useThemeVars()
+const palette = useRankPalette()
+const userStore = useUserStore()
+const configStore = useConfigStore()
+const { isDesktop } = useBreakpoints()
 
-/**
- * 本周进步榜。默认落在**本班** —— 全服榜上中位学生仍然看不到自己，班内 30 个人的
- * 周榜才是「我这周排第几」有答案的那张。没有班级（教师、超管、没入班的账号）才退回全服。
- */
-const weeklyScope = ref<"global" | "class">("global")
-const weeklyData = ref<WeeklyRankItem[]>([])
-const weeklyMe = ref<WeeklyRankItem | null>(null)
-const weeklyTotal = ref(0)
-const weeklyStart = ref("")
-/**
- * 我入不入这张榜。教师/超管本来就不参与排名（服务端 me 恒为 null），未登录同理 ——
- * 这两种情况下 footer 那句「做出 1 题就能上榜」是说给不相干的人听的，不该出现。
- */
-const weeklyMeEligible = computed(() => userStore.isAuthed && !userStore.isTeacherOrAbove)
-/** 我在榜面之外（或本周还没做出题）—— 榜上高亮不到我，footer 另起一行 */
-const weeklyMeOffBoard = computed(
-  () =>
-    weeklyMeEligible.value &&
-    (!weeklyMe.value || !weeklyData.value.some((row) => row.rank === weeklyMe.value!.rank)),
-)
+const teacher = computed(() => userStore.isTeacherOrAbove)
+const myClass = computed(() => (teacher.value ? null : userStore.user?.className || null))
+/** 本班 / 本年级要有个班：学生看自己的，老师看选中的 */
+const canScopeClass = computed(() => teacher.value || !!myClass.value)
 
-const showClassDetailModal = ref(false)
-const classDetailData = ref<ClassComparison | null>(null)
-const classDetailLoading = ref(false)
+function pick<T extends string>(value: unknown, options: { value: T }[], fallback: T): T {
+  return options.some((option) => option.value === value) ? (value as T) : fallback
+}
 
-const classDetailAiStream = useAIStream()
-const classDetailAiLoading = classDetailAiStream.waiting
-const classDetailAiContent = ref("")
-const showClassDetailAiModal = ref(false)
+const scope = ref<RankScope>("all")
+const period = ref<RankPeriod>(pick(route.query.period, PERIOD_OPTIONS, "term"))
+/** 老师选的班；空 = 让后端挑最近上课的班，挑完回填 */
+const teacherClass = ref(typeof route.query.class === "string" ? route.query.class : "")
 
-async function loadClassDetail(className: string) {
-  showClassDetailModal.value = true
-  classDetailLoading.value = true
-  classDetailData.value = null
+const board = ref<RankBoard | null>(null)
+const loading = ref(false)
+const expanding = ref(false)
+const weekBoard = ref<RankBoard | null>(null)
+const battle = ref<ClassBattleItem[]>([])
+const champions = ref<WeeklyChampion[]>([])
+/** 「你」卡底下那几个小名次：别的范围同一时间段的榜，按 key 缓存 */
+const cache = reactive(new Map<string, RankBoard>())
+
+function keyOf(s: RankScope, p: RankPeriod) {
+  return `${s}|${p}|${s === "all" ? "" : teacherClass.value}`
+}
+
+async function fetchBoard(s: RankScope, p: RankPeriod, full = false) {
+  const result = await getRankBoard(s, p, { className: teacherClass.value, full })
+  if (!full) cache.set(keyOf(s, p), result)
+  return result
+}
+
+async function load() {
+  loading.value = true
   try {
-    const res = await getClassPK([className])
-    classDetailData.value = res.comparisons[0] ?? null
+    board.value = await fetchBoard(scope.value, period.value)
+    if (teacher.value && !teacherClass.value && board.value.scope !== "all")
+      teacherClass.value = board.value.scope === "class" ? (board.value.className ?? "") : ""
   } catch {
-    // ignore
+    board.value = null
   } finally {
-    classDetailLoading.value = false
+    loading.value = false
+  }
+  loadSide()
+}
+
+/** 班级相关的几块：这周本班、每周冠军；学生的小名次 */
+async function loadSide() {
+  const cls = classContext.value
+  if (cls) {
+    getRankBoard("class", "week", { className: teacherClass.value })
+      .then((result) => (weekBoard.value = result))
+      .catch(() => (weekBoard.value = null))
+    getWeeklyChampions(teacherClass.value)
+      .then((result) => (champions.value = result))
+      .catch(() => (champions.value = []))
+  } else {
+    weekBoard.value = null
+    champions.value = []
+  }
+  if (!board.value?.me) return
+  for (const s of miniScopes.value) {
+    if (!cache.has(keyOf(s, period.value))) fetchBoard(s, period.value).catch(() => {})
   }
 }
 
-async function analyzeSingleClassWithAI() {
-  if (!classDetailData.value) return
-  showClassDetailModal.value = false
-  showClassDetailAiModal.value = true
-  classDetailAiContent.value = ""
+function loadBattle() {
+  getClassBattle()
+    .then((result) => (battle.value = result))
+    .catch(() => {})
+}
+
+async function expand() {
+  expanding.value = true
   try {
-    await classDetailAiStream.run(
-      "ai/class-analysis",
-      { comparison: classDetailData.value },
-      { onDelta: (content) => (classDetailAiContent.value += content) },
-    )
-  } catch (error) {
-    message.error((error as Error).message)
+    board.value = await fetchBoard(scope.value, period.value, true)
+  } finally {
+    expanding.value = false
   }
 }
 
-async function init() {
-  const offset = (query.page - 1) * query.limit
-  const res = await getRank(offset, query.limit)
-  data.value = res.results
-  total.value = res.total
-  me.value = res.me
-  return res.results
-}
-
-function isMe(row: Rank) {
-  return !!me.value && row.user.id === me.value.user.id
-}
-
-// 高亮我那一行。用 id 比对而不是用户名：用户名会重名到大小写差异上，id 不会
-function rowClassName(row: Rank) {
-  return isMe(row) ? "me-row" : ""
-}
-
-const columns: DataTableColumn<Rank>[] = [
-  {
-    title: "排名",
-    key: "index",
-    width: 100,
-    align: "center",
-    render: (_, index) => h(RankMedal, { index, page: query.page, limit: query.limit }),
-  },
-  {
-    title: "用户",
-    key: "username",
-    width: 240,
-    render: (row) =>
-      h("div", { style: "display:flex;align-items:center;gap:6px" }, [
-        // isOnline 是三态：null 表示服务端没给（学生视角），只有 true 才点亮
-        row.isOnline
-          ? h("span", {
-              title: "在线（5 分钟内有活动）",
-              style: "width:8px;height:8px;border-radius:50%;background:#18a058;flex:none",
-            })
-          : null,
-        h(
-          NButton,
-          {
-            text: true,
-            type: "info",
-            onClick: () => router.push("/user?name=" + row.user.username),
-          },
-          () => row.user.username,
-        ),
-        isMe(row) ? h(Icon, { width: 20, icon: "fluent-emoji:person-raising-hand" }) : null,
-        h(
-          NButton,
-          {
-            text: true,
-            size: "tiny",
-            title: "查看成就",
-            onClick: () => router.push("/achievement?name=" + row.user.username),
-          },
-          () => "🏆",
-        ),
-      ]),
-  },
-  {
-    title: "个性签名",
-    key: "mood",
-    minWidth: 200,
-  },
-  {
-    title: "已解决",
-    key: "acceptedNumber",
-    width: 120,
-    align: "center",
-  },
-  {
-    title: "提交数",
-    key: "submissionNumber",
-    width: 120,
-    align: "center",
-  },
-  {
-    title: "正确率",
-    key: "rate",
-    width: 120,
-    align: "center",
-    render: (row) => getACRate(row.acceptedNumber, row.submissionNumber),
-  },
-]
-
-watch(() => query.page, init)
-// 改每页条数时，若当前不在第一页，把重新取数交给 page 的 watcher ——
-// 这里再自己取一次，就是两个一模一样的请求
-watch(
-  () => query.limit,
-  () => {
-    if (query.page === 1) init()
-    else query.page = 1
-  },
-)
-watch(duration, listActivity)
-
-async function listOnline() {
-  const res = await getOnlineCount()
-  onlineCount.value = res.count
-}
-
-async function listActivity() {
-  const current = Date.now()
-  const start = formatISO(sub(current, subOptions.value))
-  const res = await getActivityRank(start)
-  // 活动榜只有「用户名 + 做题数」，塞进榜单图表复用的 Rank 形状里
-  activityChart.value = res.map((d, index) => ({
-    id: index,
-    user: { id: index, username: d.username, realName: null },
-    acceptedNumber: d.count,
-    submissionNumber: 0,
-    mood: null,
-    isOnline: null,
-  }))
-}
-
-const options: SelectOption[] = [...LONG_DURATION_OPTIONS]
-
-// 认不出来退回 options[1]（一个月内），和 duration 的初值一致
-const subOptions = computed<Duration>(
-  () => durationFromValue(duration.value) ?? durationFromValue(LONG_DURATION_OPTIONS[1]!.value)!,
-)
-
-// 周榜占的是三栏里的一栏，列头不再重复「本周」（卡片标题已经写着），
-// 宽度也压到 1280 那一档能整张放下，不出横向滚动条
-const weeklyColumns: DataTableColumn<WeeklyRankItem>[] = [
-  {
-    title: "排名",
-    key: "rank",
-    width: 100,
-    align: "center",
-    // rank 是服务端给的周榜名次，不是行号 —— 换算回 RankMedal 要的 0 基下标
-    render: (row) => h(RankMedal, { index: row.rank - 1, page: 1, limit: 10 }),
-  },
-  {
-    title: "用户",
-    key: "username",
-    minWidth: 120,
-    ellipsis: { tooltip: true },
-    render: (row) =>
-      h(
-        NButton,
-        {
-          text: true,
-          type: "info",
-          onClick: () => router.push("/user?name=" + row.user.username),
-        },
-        () => row.user.username,
-      ),
-  },
-  {
-    title: "新解决",
-    key: "solvedCount",
-    width: 100,
-    align: "center",
-  },
-  {
-    title: "提交",
-    key: "submissionCount",
-    width: 90,
-    align: "center",
-  },
-]
-
-async function initWeeklyRank() {
-  if (!userStore.user) await userStore.getMyProfile()
-  // 有班级就默认看班内榜。改值会触发上面那个 watch 去取数，
-  // 这里再调一次 listWeeklyRank 就是重复发一次请求
-  if (userStore.user?.className) weeklyScope.value = "class"
-  else await listWeeklyRank()
-}
-
-onMounted(() => {
-  // 「全服 Top10」就是榜单第一页的前 10 条：挂载时 init() 取的正是 offset=0&limit=10，
-  // 再单发一次一模一样的 /rankings/users 只会让这张图排在日活后面出来。
-  // 图只在挂载时定一次，翻页/改每页条数不该动它。
-  init().then((results) => (rankChart.value = results.slice(0, 10)))
-  listOnline()
-  listActivity()
-  listClassRank()
-  listMyClassRank()
-  initWeeklyRank()
+watch([scope, period, teacherClass], () => {
+  router.replace({
+    query: {
+      ...route.query,
+      scope: scope.value,
+      period: period.value,
+      class: teacher.value && teacherClass.value ? teacherClass.value : undefined,
+    },
+  })
+})
+watch([scope, period], load)
+watch(teacherClass, (value, old) => {
+  // 后端回填的那一下（空 → 班号）不用再取一遍
+  if (old || !board.value || board.value.className !== value) {
+    cache.clear()
+    load()
+  }
 })
 
-const classColumns: DataTableColumn<ClassRank>[] = [
-  {
-    title: "排名",
-    key: "rank",
-    width: 60,
-    titleAlign: "center",
-    align: "center",
-  },
-  {
-    title: "班级",
-    key: "class_name",
-    render: (row) => `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
-    minWidth: 120,
-    titleAlign: "center",
-    align: "center",
-  },
-  {
-    title: "人数",
-    key: "userCount",
-    width: 80,
-    titleAlign: "center",
-    align: "center",
-  },
-  {
-    title: "总AC数",
-    key: "totalAc",
-    width: 90,
-    titleAlign: "center",
-    align: "center",
-  },
-  {
-    title: "提交数",
-    key: "totalSubmission",
-    width: 90,
-    titleAlign: "center",
-    align: "center",
-  },
-  {
-    title: "平均AC数",
-    key: "avgAc",
-    width: 100,
-    titleAlign: "center",
-    align: "center",
-  },
-  {
-    title: "正确率",
-    key: "ac_rate",
-    width: 90,
-    titleAlign: "center",
-    align: "center",
-    render: (row) => `${row.acRate}%`,
-  },
-  {
-    title: "详情",
-    key: "action",
-    width: 70,
-    titleAlign: "center",
-    align: "center",
-    render: (row) =>
-      h(
-        NButton,
-        {
-          text: true,
-          type: "info",
-          onClick: () => loadClassDetail(row.className),
-        },
-        () => "查看",
-      ),
-  },
-]
+onMounted(async () => {
+  if (!userStore.user) await userStore.getMyProfile().catch(() => {})
+  scope.value = pick(route.query.scope, SCOPE_OPTIONS, canScopeClass.value ? "class" : "all")
+  if (!canScopeClass.value && scope.value !== "all") scope.value = "all"
+  loadBattle()
+  // scope 从 "all" 改成别的会触发 watch 去取；没改就自己取
+  if (scope.value === "all") load()
+})
 
-const myClassColumns: DataTableColumn<ClassUserRank["ranks"][number]>[] = [
-  {
-    title: "排名",
-    key: "rank",
-    width: 100,
-    align: "center",
-  },
-  {
-    title: "用户名",
-    key: "username",
-    width: 240,
-    render: (row) =>
-      h("div", { style: "display:flex;align-items:center;gap:6px" }, [
-        h(
-          NButton,
-          {
-            text: true,
-            type: "info",
-            onClick: () => router.push("/user?name=" + row.username),
-          },
-          () =>
-            row.rank === myRank.value
-              ? h(
-                  NFlex,
-                  { align: "flex-end" },
-                  {
-                    default: () => [
-                      h("span", {}, row.username),
-                      h(Icon, {
-                        width: 20,
-                        icon: "fluent-emoji:person-raising-hand",
-                      }),
-                    ],
-                  },
-                )
-              : row.username,
-        ),
-        h(
-          NButton,
-          {
-            text: true,
-            size: "tiny",
-            title: "查看成就",
-            onClick: () => router.push("/achievement?name=" + row.username),
-          },
-          () => "🏆",
-        ),
-      ]),
-  },
-  {
-    title: "已解决",
-    key: "acceptedNumber",
-    width: 120,
-    align: "center",
-  },
-  {
-    title: "提交数",
-    key: "submissionNumber",
-    width: 120,
-    align: "center",
-  },
-]
+/** 班级那几块（走势、这周本班、每周冠军、班级对抗高亮）对的是哪个班 */
+const classContext = computed(() => (teacher.value ? teacherClass.value : myClass.value) || null)
 
-async function listClassRank() {
-  if (!userStore.user) {
-    await userStore.getMyProfile()
+const rows = computed(() => board.value?.rows ?? [])
+const podium = computed(() => rows.value.filter((row) => row.rank <= 3 && row.solved > 0))
+const trackRows = computed(() =>
+  rows.value.filter((row) => row.rank > 3 || (row.rank <= 3 && !row.solved)),
+)
+/** 条的满格：第 2 名的数。第 1 名常常一骑绝尘，按它算别人的条全挤在左边 */
+const scale = computed(() => rows.value[1]?.solved || rows.value[0]?.solved || 1)
+const hot = computed(() => hottest(rows.value))
+
+const me = computed(() => board.value?.me ?? null)
+const meId = computed(() => (teacher.value ? undefined : userStore.user?.id))
+const mateClass = computed(() => (board.value?.scope !== "class" ? classContext.value : null))
+
+const title = computed(() =>
+  board.value
+    ? `${groupTitle(board.value.scope, board.value.className)} · ${periodLabel(board.value.period)}`
+    : "",
+)
+const subtitle = computed(() => {
+  const b = board.value
+  if (!b) return ""
+  const head = b.scope === "class" ? `${b.total} 人` : `${b.total} 人做对过`
+  const part = b.complete
+    ? ""
+    : b.me
+      ? " · 前面一段 + 你附近一段"
+      : ` · 只列前面 ${b.rows.length} 名`
+  return `${head} · 一样多的，先做到的在前${part}`
+})
+const ruleText = computed(() => {
+  const b = board.value
+  if (!b) return ""
+  const from = b.start ? `${parseTime(b.start, "M月D日")}起` : "全部历史"
+  return `${from} · 每道题按第一次做对算 · ↑↓ 比${b.period === "week" ? "今天早上" : "周一"}`
+})
+
+const miniScopes = computed(() =>
+  SCOPE_OPTIONS.map((option) => option.value).filter(
+    (s) => s !== scope.value && (s === "all" || !!myClass.value),
+  ),
+)
+const minis = computed<MiniRank[]>(() => {
+  const list: MiniRank[] = []
+  if (period.value !== "week" && myClass.value && weekBoard.value)
+    list.push({
+      label: "这周 · 本班",
+      rank: weekBoard.value.me?.solved ? weekBoard.value.me.rank : null,
+      total: null,
+      go: () => {
+        scope.value = "class"
+        period.value = "week"
+      },
+    })
+  for (const s of miniScopes.value) {
+    const other = cache.get(keyOf(s, period.value))
+    list.push({
+      label: `${periodLabel(period.value)} · ${scopeLabel(s)}`,
+      rank: other?.me?.rank ?? null,
+      total: other ? other.total : null,
+      go: () => (scope.value = s),
+    })
   }
-  const className = userStore.user?.className
-  if (className) {
-    classQuery.grade = parseInt(className.slice(0, 2))
-  }
-  const res = await getClassRank(classQuery.grade)
-  classData.value = res
+  return list.slice(0, 3)
+})
+
+const teacherClassOptions = computed(() => {
+  const list = configStore.config?.classList ?? []
+  const all =
+    teacherClass.value && !list.includes(teacherClass.value) ? [teacherClass.value, ...list] : list
+  return all.map((name) => ({ label: classLabel(name), value: name }))
+})
+
+const myBattle = computed(() => battle.value.find((item) => item.className === classContext.value))
+
+/** 这周本班：前 5 名（做对过的） */
+const weekTop = computed(() =>
+  (weekBoard.value?.rows ?? []).filter((row) => row.solved > 0).slice(0, 5),
+)
+const weekScale = computed(() => weekTop.value[0]?.solved || 1)
+const daysLeft = computed(() => {
+  const start = weekBoard.value?.start
+  if (!start) return 0
+  return Math.max(1, Math.ceil((Date.parse(start) + 7 * 86_400_000 - Date.now()) / 86_400_000))
+})
+
+/** 走势图三条线：在追你的、你要追的、你（画在最上面） */
+const trendLines = computed(() => {
+  const b = board.value
+  if (!b?.me) return []
+  const short = (row: RankRow) =>
+    row.user.username.replace(USERNAME_CLASS_RE, "") || row.user.username
+  return [
+    ...(b.behind
+      ? [{ userId: b.behind.user.id, label: short(b.behind), color: palette.value.threat }]
+      : []),
+    ...(b.ahead
+      ? [{ userId: b.ahead.user.id, label: short(b.ahead), color: palette.value.chase }]
+      : []),
+    { userId: b.me.user.id, label: "你", color: palette.value.me, strong: true },
+  ]
+})
+
+function open(username: string) {
+  router.push({ path: "/user", query: { name: username } })
 }
 
-async function listMyClassRank() {
-  try {
-    const offset = myClassScope.value === "all" ? (myClassQuery.page - 1) * myClassQuery.limit : 0
-    const limit = myClassScope.value === "all" ? myClassQuery.limit : undefined
-    const res = await getUserClassRank(myClassScope.value, offset, limit)
-    myRank.value = res.myRank
-    myClassName.value = res.className
-    myClassData.value = res.ranks
-    myClassTotal.value = res.total ?? res.ranks.length
-    if (myClassScope.value === "window") {
-      myClassQuery.page = 1
-    }
-  } catch (err) {
-    console.error(err)
-  }
+function openSubmissions(username: string) {
+  router.push({ path: "/submission", query: { username, exactUsername: "1" } })
 }
 
-async function listWeeklyRank() {
-  try {
-    const res = await getWeeklyRank(weeklyScope.value)
-    weeklyData.value = res.results
-    weeklyMe.value = res.me
-    weeklyTotal.value = res.total
-    weeklyStart.value = res.start
-  } catch (err) {
-    console.error(err)
-  }
+function hide(row: RankRow) {
+  dialog.warning({
+    title: "不计入排名",
+    content: `${row.user.username} 会从所有排名里消失（本班、本年级、全服、首页周榜），他自己会看到「不计入排名」。比赛排名不受影响，随时能恢复。`,
+    positiveText: "不计入排名",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      await setRankHidden(row.user.id, true)
+      message.success("已不计入排名")
+      cache.clear()
+      load()
+      loadBattle()
+    },
+  })
 }
 
-watch(weeklyScope, listWeeklyRank)
+async function restore(userId: number) {
+  await setRankHidden(userId, false)
+  message.success("已恢复")
+  cache.clear()
+  load()
+  loadBattle()
+}
 
-watch(
-  () => classQuery.grade,
-  () => {
-    listClassRank()
-  },
-)
-
-watch(myClassScope, listMyClassRank)
-
-watch(
-  () => myClassQuery.page,
-  () => {
-    if (myClassScope.value === "all") {
-      listMyClassRank()
-    }
-  },
-)
-
-// 同上：page 改了自会触发下面那个 watcher，别重复取
-watch(
-  () => myClassQuery.limit,
-  () => {
-    if (myClassQuery.page !== 1) myClassQuery.page = 1
-    else if (myClassScope.value === "all") listMyClassRank()
-  },
-)
+function weekLabel(start: string) {
+  return `${parseTime(start, "M月D日")}那周`
+}
 </script>
 
 <template>
-  <n-flex vertical size="large">
-    <!--
-      两张榜并排：左边全服总榜（分母是历史全部 AC，名次几乎不动），右边本周进步榜
-      （分母只有这一周）。同一屏里对照着看，「追不上」和「这周还能进前十」是一眼的事。
-    -->
-    <n-grid :cols="isDesktop ? 3 : 1" :x-gap="20" :y-gap="20">
-      <n-gi :span="isDesktop ? 2 : 1">
-        <n-card :bordered="false">
-          <template #header>全服 Top100</template>
-          <template #header-extra>
-            <n-tag v-if="onlineCount > 0" round :bordered="false" type="success">
-              当前在线 {{ onlineCount }} 人
-            </n-tag>
-          </template>
-          <n-data-table :data="data" :columns="columns" :row-class-name="rowClassName" />
-          <template #footer>
-            <n-flex align="center" justify="space-between" :wrap="false">
-              <!-- 前 100 名之外的学生榜上找不到自己，这里单独给一行 -->
-              <n-tag v-if="meOffBoard" type="info" round :bordered="false">
-                <template #icon>
-                  <Icon width="18" icon="fluent-emoji:person-raising-hand" />
-                </template>
-                我的排名：第 {{ me!.rank }} 名 · 已解决 {{ me!.acceptedNumber }} · 提交
-                {{ me!.submissionNumber }} · 正确率
-                {{ getACRate(me!.acceptedNumber, me!.submissionNumber) }}
-              </n-tag>
-              <span v-else />
-              <Pagination :total="total" v-model:page="query.page" v-model:limit="query.limit" />
-            </n-flex>
-          </template>
-        </n-card>
-      </n-gi>
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>
-            <n-flex align="center" :size="8">
-              <span>本周进步榜</span>
-              <n-text depth="3" style="font-size: 13px">
-                {{ weeklyStart ? parseTime(weeklyStart, "M月D日") + "起" : "" }}
-                · 每周一清零
-              </n-text>
-            </n-flex>
-          </template>
-          <template #header-extra>
-            <n-select
-              v-if="userStore.user?.className"
-              style="width: 140px"
-              :options="[
-                { label: '本班', value: 'class' },
-                { label: '全服', value: 'global' },
-              ]"
-              v-model:value="weeklyScope"
-            />
-          </template>
-          <n-data-table
-            v-if="weeklyData.length"
-            :data="weeklyData"
-            :columns="weeklyColumns"
-            :row-class-name="
-              (row: WeeklyRankItem) => (weeklyMe && row.rank === weeklyMe.rank ? 'me-row' : '')
-            "
-          />
-          <n-empty
-            v-else
-            style="padding: 20px 0"
-            description="这周还没有人解决新题目 —— 现在做出一题就是第一名"
-          />
-          <!--
-            本周一题没做出来时 weeklyMe 是 null，这一行照样要出现：它是这张榜对
-            「还没上榜的人」说的话，而那恰好是最需要被推一把的那批学生。
-          -->
-          <template #footer v-if="weeklyMeOffBoard">
-            <n-tag type="info" round :bordered="false">
-              <template #icon>
-                <Icon width="18" icon="fluent-emoji:person-raising-hand" />
-              </template>
-              <template v-if="weeklyMe">
-                我这周第 {{ weeklyMe.rank }} 名（共 {{ weeklyTotal }} 人上榜）· 新解决
-                {{ weeklyMe.solvedCount }} 题
-              </template>
-              <template v-else> 我这周还没有解决新题目，做出 1 题就能上榜 </template>
-            </n-tag>
-          </template>
-        </n-card>
-      </n-gi>
-    </n-grid>
-    <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>
-            <n-flex align="center">
-              <span>班级排名</span>
-              <n-button
-                type="primary"
-                secondary
-                @click="router.push('/class')"
-                v-if="userStore.isAdminRole"
-              >
-                班级PK
-              </n-button>
-            </n-flex>
-          </template>
-          <template #header-extra>
-            <n-select
-              v-model:value="classQuery.grade"
-              placeholder="选择年级"
-              clearable
-              style="width: 180px"
-              :options="gradeOptions"
-            />
-          </template>
-          <n-data-table :data="classData" :columns="classColumns" />
-        </n-card>
-      </n-gi>
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>我在班级的排名</template>
-          <template #header-extra>
-            <n-select
-              style="width: 180px"
-              :options="[
-                { label: '我的位置', value: 'window' },
-                { label: '全班排名', value: 'all' },
-              ]"
-              v-model:value="myClassScope"
-            />
-          </template>
-          <n-data-table :data="myClassData" :columns="myClassColumns" />
-          <template #footer v-if="myClassScope === 'all'">
-            <Pagination
-              :total="myClassTotal"
-              v-model:page="myClassQuery.page"
-              v-model:limit="myClassQuery.limit"
-            />
-          </template>
-        </n-card>
-      </n-gi>
-    </n-grid>
-    <!-- 图表放最后：它和上面的榜单是同一份数据换个画法，放第一屏的话学生
-         得往下滚才看得到自己在哪 -->
-    <n-grid :cols="isDesktop ? 2 : 1" :x-gap="20" :y-gap="20">
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>
-            <div style="height: 34px">全服 Top10</div>
-          </template>
-          <Chart v-if="rankChart.length" :type="ChartType.Rank" :rank-data="rankChart" />
-          <n-empty v-else style="padding: 20px 0"></n-empty>
-        </n-card>
-      </n-gi>
-      <n-gi :span="1">
-        <n-card :bordered="false">
-          <template #header>日活 Top10</template>
-          <template #header-extra>
-            <n-select style="width: 120px" :options="options" v-model:value="duration" />
-          </template>
-          <Chart
-            v-if="activityChart.length"
-            :type="ChartType.Activity"
-            :rank-data="activityChart"
-          />
-          <n-empty v-else style="padding: 20px 0"></n-empty>
-        </n-card>
-      </n-gi>
-    </n-grid>
-  </n-flex>
-
-  <n-modal
-    v-model:show="showClassDetailModal"
-    preset="card"
-    :title="
-      classDetailData
-        ? `${classDetailData.className.slice(0, 2)}计算机${classDetailData.className.slice(2)}班`
-        : '班级详情'
-    "
-    :style="{ width: '700px', maxWidth: '95vw' }"
-  >
-    <n-spin :show="classDetailLoading" style="min-height: 200px">
-      <n-flex v-if="classDetailData" vertical :size="12">
-        <n-grid :cols="5" :x-gap="8" responsive="screen">
-          <n-gi>
-            <n-statistic
-              label="总AC数"
-              :value="classDetailData.totalAc"
-              size="large"
-              class="stat-total-ac"
-            >
-              <template #suffix>
-                <Icon icon="streamline-emojis:raised-fist-1" width="20" />
-              </template>
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic
-              label="平均AC数"
-              :value="classDetailData.avgAc.toFixed(2)"
-              size="large"
-              class="stat-avg-ac"
-            >
-              <template #suffix>
-                <Icon icon="streamline-ultimate-color:analytics-pie-2" width="20" />
-              </template>
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic
-              label="中位数AC数"
-              :value="classDetailData.medianAc.toFixed(2)"
-              size="large"
-              class="stat-median-ac"
-            >
-              <template #suffix>
-                <Icon icon="streamline-ultimate-color:cursor-target-1" width="20" />
-              </template>
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic
-              label="总提交数"
-              :value="classDetailData.totalSubmission"
-              size="large"
-              class="stat-total-submission"
-            >
-              <template #suffix>
-                <Icon icon="streamline-ultimate-color:common-file-text" width="20" />
-              </template>
-            </n-statistic>
-          </n-gi>
-          <n-gi>
-            <n-statistic
-              label="AC率"
-              :value="classDetailData.acRate.toFixed(1) + '%'"
-              size="large"
-              class="stat-ac-rate"
-            >
-              <template #suffix>
-                <Icon icon="fluent-emoji:check-mark-button" width="20" />
-              </template>
-            </n-statistic>
-          </n-gi>
-        </n-grid>
-
-        <n-divider style="margin: 12px 0" />
-
-        <n-descriptions bordered :column="2" size="small" label-placement="left">
-          <n-descriptions-item label="第一四分位数(Q1)">
-            <span style="color: #9254de; font-weight: 500">{{
-              classDetailData.q1Ac.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="第三四分位数(Q3)">
-            <span style="color: #f759ab; font-weight: 500">{{
-              classDetailData.q3Ac.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="四分位距(IQR)">
-            <span style="color: #13c2c2; font-weight: 500">{{
-              classDetailData.iqr.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="标准差">
-            <span style="color: #fa8c16; font-weight: 500">{{
-              classDetailData.stdDev.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="前10%均值">
-            <span style="color: #cf1322; font-weight: 600">{{
-              classDetailData.top10Avg.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="中间80%均值">
-            <span style="color: #389e0d; font-weight: 600">{{
-              classDetailData.middle80Avg.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="后10%均值">
-            <span style="color: #096dd9; font-weight: 500">{{
-              classDetailData.bottom10Avg.toFixed(2)
-            }}</span>
-          </n-descriptions-item>
-          <n-descriptions-item label="人数">
-            <span style="color: #1890ff; font-weight: 600">{{ classDetailData.userCount }}</span>
-          </n-descriptions-item>
-        </n-descriptions>
-
-        <n-card size="small" title="比率统计" embedded style="margin-top: 12px">
-          <n-space vertical :size="10">
-            <n-progress
-              type="line"
-              :percentage="classDetailData.excellentRate"
-              :show-indicator="true"
-              :border-radius="4"
-            >
-              <template #default>优秀率: {{ classDetailData.excellentRate.toFixed(1) }}%</template>
-            </n-progress>
-            <n-progress
-              type="line"
-              :percentage="classDetailData.passRate"
-              :show-indicator="true"
-              :border-radius="4"
-              status="success"
-            >
-              <template #default>及格率: {{ classDetailData.passRate.toFixed(1) }}%</template>
-            </n-progress>
-            <n-progress
-              type="line"
-              :percentage="classDetailData.activeRate"
-              :show-indicator="true"
-              :border-radius="4"
-              status="info"
-            >
-              <template #default>参与度: {{ classDetailData.activeRate.toFixed(1) }}%</template>
-            </n-progress>
-          </n-space>
-        </n-card>
-
-        <n-flex justify="center" align="center" :size="12" style="margin-top: 12px">
-          <n-tag type="success" size="large">
-            综合分: {{ classDetailData.compositeScore.toFixed(1) }}
-          </n-tag>
-          <n-button
-            v-if="userStore.isTeacherOrAbove"
-            type="info"
-            :loading="classDetailAiLoading"
-            @click="analyzeSingleClassWithAI"
-          >
-            <template #icon>
-              <Icon icon="ph:sparkle" />
-            </template>
-            AI分析
-          </n-button>
-        </n-flex>
-      </n-flex>
-      <n-empty v-else-if="!classDetailLoading" description="暂无数据" style="padding: 40px 0" />
-    </n-spin>
-  </n-modal>
-
-  <n-modal
-    v-model:show="showClassDetailAiModal"
-    preset="card"
-    title="AI 分析报告"
-    :style="{ width: '800px', maxWidth: '95vw' }"
-  >
-    <n-spin :show="classDetailAiLoading" :delay="50">
-      <div style="min-height: 200px">
-        <MdPreview v-if="classDetailAiContent" :model-value="classDetailAiContent" />
-        <n-flex
-          v-else-if="!classDetailAiLoading"
-          align="center"
-          justify="center"
-          style="min-height: 200px"
+  <div class="rank-page">
+    <div class="toolbar">
+      <h2>排名</h2>
+      <div class="seg" role="group" aria-label="范围">
+        <button
+          v-for="option in SCOPE_OPTIONS"
+          :key="option.value"
+          :class="{ on: scope === option.value }"
+          :disabled="option.value !== 'all' && !canScopeClass"
+          :title="option.value !== 'all' && !canScopeClass ? '没有班级，只能看全服' : undefined"
+          @click="scope = option.value"
         >
-          <n-empty description="暂无分析内容" />
-        </n-flex>
+          {{ option.label }}
+        </button>
       </div>
-    </n-spin>
-  </n-modal>
+      <div class="seg" role="group" aria-label="时间">
+        <button
+          v-for="option in PERIOD_OPTIONS"
+          :key="option.value"
+          :class="{ on: period === option.value }"
+          @click="period = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+      <n-select
+        v-if="teacher && scope !== 'all'"
+        v-model:value="teacherClass"
+        class="class-select"
+        size="small"
+        filterable
+        placeholder="选班"
+        :options="teacherClassOptions"
+      />
+      <div class="spacer" />
+      <span class="rule">{{ ruleText }}</span>
+    </div>
+
+    <div class="main" :class="{ single: !isDesktop }">
+      <n-spin :show="loading" class="track-card">
+        <template v-if="board">
+          <div class="card-head">
+            <b>{{ title }}</b>
+            <span class="muted">{{ subtitle }}</span>
+            <div class="spacer" />
+            <span v-if="!teacher && me" class="legend">
+              <span><i :style="{ background: palette.me }" />你</span>
+              <span v-if="board.ahead"><i :style="{ background: palette.chase }" />你要追的</span>
+              <span v-if="board.behind"><i :style="{ background: palette.threat }" />在追你的</span>
+              <span v-if="mateClass"><i :style="{ background: palette.mate }" />你们班</span>
+            </span>
+          </div>
+          <RankPodium
+            :rows="podium"
+            :me-id="meId"
+            :chase-id="board.ahead?.user.id"
+            :threat-id="board.behind?.user.id"
+            @open="open"
+          />
+          <RankTrack
+            :rows="trackRows"
+            :total="board.total"
+            :complete="board.complete"
+            :scale="scale"
+            :me-id="meId"
+            :chase-id="board.ahead?.user.id"
+            :threat-id="board.behind?.user.id"
+            :hot-id="hot?.user.id"
+            :mate-class="mateClass"
+            :teacher="teacher"
+            :expanding="expanding"
+            @open="open"
+            @expand="expand"
+            @submissions="openSubmissions"
+            @hide="hide"
+          />
+        </template>
+        <div v-else-if="!loading" class="empty">排名没取到，刷新一下试试</div>
+      </n-spin>
+
+      <aside class="side">
+        <template v-if="board">
+          <RankMe
+            v-if="me"
+            :me="me"
+            :ahead="board.ahead"
+            :behind="board.behind"
+            :third="me.rank > 3 ? (podium[2] ?? null) : null"
+            :total="board.total"
+            :label="`${scopeLabel(board.scope)} · ${periodLabel(board.period)}`"
+            :minis="minis"
+          />
+          <div v-else-if="board.hidden" class="note-card">
+            <b>你现在不计入排名</b>
+            <span class="muted">老师把你从排名里拿掉了，榜上看不到你。有疑问去问老师。</span>
+          </div>
+          <div v-else-if="teacher" class="note-card">
+            <b>{{ classContext ? classLabel(classContext) : "全服" }}</b>
+            <div v-if="myBattle" class="stats">
+              <div>
+                <span>人均做对</span><b>{{ myBattle.perCapita }}</b>
+              </div>
+              <div>
+                <span>班级对抗</span><b>第 {{ myBattle.rank }}</b>
+              </div>
+              <div>
+                <span>这周人均涨</span><b>+{{ myBattle.weekGain }}</b>
+              </div>
+            </div>
+            <div class="hidden-list">
+              <span class="hidden-title">不计入排名的人</span>
+              <template v-if="board.scope === 'class'">
+                <div v-for="user in board.hiddenUsers" :key="user.id" class="hidden-row">
+                  <UserName :username="user.username" />
+                  <n-button size="tiny" secondary @click="restore(user.id)">恢复</n-button>
+                </div>
+                <span v-if="!board.hiddenUsers.length" class="muted">
+                  还没有。怀疑抄代码的，在名单上点「⋯」拿掉。
+                </span>
+              </template>
+              <span v-else class="muted">切到「本班」看这个班拿掉了谁</span>
+            </div>
+          </div>
+          <div v-else-if="userStore.isAuthed" class="note-card">
+            <b>{{ periodLabel(board.period) }}你还没上榜</b>
+            <span class="muted">做对 1 道新题就能上榜</span>
+          </div>
+        </template>
+        <ClassBattle v-if="isDesktop" :items="battle" :mine="classContext" :teacher="teacher" />
+      </aside>
+    </div>
+    <!-- 手机上「你」那张卡提到赛道前面了，班级对抗放到赛道后面，别把赛道挤到第三屏 -->
+    <ClassBattle v-if="!isDesktop" :items="battle" :mine="classContext" :teacher="teacher" />
+
+    <div v-if="classContext" class="below" :class="{ single: !isDesktop }">
+      <div v-if="board?.trend && me" class="card">
+        <div class="card-title">
+          <b>我和对手的名次</b><span class="muted">每周日晚上 · 越高越好</span>
+        </div>
+        <RankTrend :trend="board.trend" :lines="trendLines" />
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <b>{{ teacher && classContext ? `这周 · ${classLabel(classContext)}` : "这周本班" }}</b>
+          <span class="muted">还剩 {{ daysLeft }} 天 · 下周一清零</span>
+        </div>
+        <div
+          v-for="row in weekTop"
+          :key="row.user.id"
+          class="week-row"
+          :class="{ me: row.user.id === meId }"
+        >
+          <span
+            class="medal"
+            :style="
+              row.rank <= 3
+                ? {
+                    color: palette.medal[row.rank - 1]!.color,
+                    background: palette.medal[row.rank - 1]!.background,
+                  }
+                : undefined
+            "
+            >{{ row.rank }}</span
+          >
+          <RankAvatar
+            :username="row.user.username"
+            :avatar="row.avatar"
+            :size="18"
+            :me="row.user.id === meId"
+          />
+          <button class="who" @click="open(row.user.username)">
+            <UserName :username="row.user.username" />
+          </button>
+          <span class="bar-box">
+            <span
+              class="bar"
+              :style="{
+                width: `${(row.solved / weekScale) * 100}%`,
+                background: row.user.id === meId ? palette.me : palette.bar,
+              }"
+            />
+          </span>
+          <b class="num">{{ row.solved }}</b>
+        </div>
+        <span v-if="weekBoard && !weekTop.length" class="muted">
+          这周还没人做对新题，现在做对 1 道就是第一
+        </span>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <b>每周冠军</b><span class="muted">本班 · 每周一清零后重新比</span>
+        </div>
+        <div v-for="champion in champions" :key="champion.weekStart" class="champion">
+          <span class="muted week">{{ weekLabel(champion.weekStart) }}</span>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="#f2c94c"
+            stroke="#9a6700"
+            stroke-width="1.6"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
+          </svg>
+          <RankAvatar
+            :username="champion.user.username"
+            :avatar="champion.avatar"
+            :size="20"
+            :me="champion.user.id === meId"
+          />
+          <button class="who" @click="open(champion.user.username)">
+            <UserName :username="champion.user.username" />
+          </button>
+          <span class="muted num">{{ champion.solved }} 道</span>
+        </div>
+        <span v-if="!champions.length" class="muted">最近几周还没有冠军</span>
+        <div v-if="hot" class="champion hot-line">
+          <span class="hot-tag">冲得最猛</span>
+          <RankAvatar
+            :username="hot.user.username"
+            :avatar="hot.avatar"
+            :size="20"
+            :me="hot.user.id === meId"
+          />
+          <button class="who" @click="open(hot.user.username)">
+            <UserName :username="hot.user.username" />
+          </button>
+          <span class="muted"
+            >{{ period === "week" ? "今天" : "这周" }}升了 {{ hot.change }} 名</span
+          >
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-:deep(.me-row > td) {
-  background-color: rgba(24, 160, 88, 0.12) !important;
+.rank-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.stat-total-ac :deep(.n-statistic-value),
-.stat-total-ac :deep(.n-statistic-value__content),
-.stat-total-ac :deep(.n-number-animation),
-.stat-total-ac :deep(.n-statistic-value > *),
-.stat-total-ac :deep(.n-statistic-value span) {
-  color: #ff4d4f !important;
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.seg {
+  display: inline-flex;
+  height: 30px;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.seg button {
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid v-bind("theme.borderColor");
+  background: v-bind("theme.cardColor");
+  color: v-bind("theme.textColor2");
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg button:first-child {
+  border-left: 0;
+}
+
+.seg button.on {
+  background: rgba(24, 160, 88, 0.12);
+  color: #18a058;
   font-weight: 600;
 }
 
-.stat-avg-ac :deep(.n-statistic-value),
-.stat-avg-ac :deep(.n-statistic-value__content),
-.stat-avg-ac :deep(.n-number-animation),
-.stat-avg-ac :deep(.n-statistic-value > *),
-.stat-avg-ac :deep(.n-statistic-value span) {
-  color: #52c41a !important;
+.seg button:disabled {
+  color: v-bind("theme.textColorDisabled");
+  cursor: not-allowed;
+}
+
+.class-select {
+  width: 150px;
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.rule,
+.muted {
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+}
+
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 16px;
+  align-items: start;
+}
+
+.main.single,
+.below.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 手机上「你」那张卡放到赛道前面，不然要划过全班才看得到自己 */
+.main.single .side {
+  order: -1;
+}
+
+.track-card,
+.card,
+.note-card {
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  background: v-bind("theme.cardColor");
+  min-width: 0;
+}
+
+.track-card {
+  min-height: 300px;
+}
+
+.card-head {
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.card-head b {
+  font-size: 14px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: v-bind("theme.textColor2");
+}
+
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend i {
+  width: 14px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.empty {
+  padding: 60px 0;
+  text-align: center;
+  color: v-bind("theme.textColor3");
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.note-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stats {
+  display: flex;
+  gap: 6px;
+}
+
+.stats div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: v-bind("theme.actionColor");
+}
+
+.stats span {
+  font-size: 11px;
+  color: v-bind("theme.textColor3");
+}
+
+.stats b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hidden-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid v-bind("theme.dividerColor");
+}
+
+.hidden-title {
+  font-size: 13px;
   font-weight: 600;
 }
 
-.stat-median-ac :deep(.n-statistic-value),
-.stat-median-ac :deep(.n-statistic-value__content),
-.stat-median-ac :deep(.n-number-animation),
-.stat-median-ac :deep(.n-statistic-value > *),
-.stat-median-ac :deep(.n-statistic-value span) {
-  color: #fa8c16 !important;
-  font-weight: 600;
+.hidden-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
 }
 
-.stat-total-submission :deep(.n-statistic-value),
-.stat-total-submission :deep(.n-statistic-value__content),
-.stat-total-submission :deep(.n-number-animation),
-.stat-total-submission :deep(.n-statistic-value > *),
-.stat-total-submission :deep(.n-statistic-value span) {
-  color: #805ad5 !important;
-  font-weight: 600;
+.below {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
-.stat-ac-rate :deep(.n-statistic-value),
-.stat-ac-rate :deep(.n-statistic-value__content),
-.stat-ac-rate :deep(.n-number-animation),
-.stat-ac-rate :deep(.n-statistic-value > *),
-.stat-ac-rate :deep(.n-statistic-value span) {
-  color: #00b894 !important;
+.card {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.week-row,
+.champion {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.week-row.me {
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: rgba(24, 160, 88, 0.12);
+}
+
+.medal {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  color: v-bind("theme.textColor2");
+}
+
+.who {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.week-row .who {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.bar-box {
+  flex-grow: 1;
+  height: 9px;
+  position: relative;
+}
+
+.bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px 5px 5px 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.week {
+  width: 78px;
+  flex-shrink: 0;
+}
+
+.champion .who {
+  flex-grow: 1;
+}
+
+.hot-line {
+  margin-top: 4px;
+  padding-top: 8px;
+  height: auto;
+  border-top: 1px solid v-bind("theme.dividerColor");
+}
+
+.hot-tag {
+  font-size: 11px;
   font-weight: 600;
+  color: #ffffff;
+  background: #c76a12;
+  border-radius: 3px;
+  padding: 0 5px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 </style>

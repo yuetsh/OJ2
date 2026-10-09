@@ -11,11 +11,6 @@ export const websiteConfigSchema = z.object({
   enableMaxkb: z.boolean(),
 })
 
-/** 当前在线人数。只有聚合值 —— 「某某在不在线」是个人状态，不往匿名接口放 */
-export const onlineCountSchema = z.object({
-  count: z.number().int().nonnegative(),
-})
-
 /**
  * 一言。`from` 是出处（作品），`fromWho` 是谁说的，`type` 是数据集的分类名（动画、诗词……，界面不显示，
  * 只拿来判断出处要不要加书名号），
@@ -31,4 +26,3 @@ export const quoteSchema = z.object({
 
 export type WebsiteConfig = z.infer<typeof websiteConfigSchema>
 export type Quote = z.infer<typeof quoteSchema>
-export type OnlineCount = z.infer<typeof onlineCountSchema>

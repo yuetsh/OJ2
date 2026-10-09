@@ -6,7 +6,6 @@ import {
   type ContestList,
   type ContestClassView,
   type ContestScoreboard,
-  type ActivityRankItem,
   type FormatCodeResponse,
   type Metrics,
   type TutorialSummary,
@@ -16,9 +15,11 @@ import {
   type ClassLesson,
   type KnowledgeMap,
   type ClassComparisonResponse,
-  type ClassRankItem,
-  type ClassUserRank,
-  type UserRank,
+  type ClassBattleItem,
+  type RankBoard,
+  type RankPeriod,
+  type RankScope,
+  type WeeklyChampion,
   type WeeklyRank,
   type ProblemRank,
   type CreateSubmissionResponse,
@@ -64,7 +65,6 @@ import type {
   Submission,
   SubmissionListPayload,
   SubmitCodePayload,
-  OnlineCount,
   Tutorial,
   TutorialProgress,
 } from "utils/types"
@@ -76,11 +76,6 @@ import type {
  * 放行原文和解析结果不等价，所以不能像 /me 那样改成 contractDeferred。
  */
 const loadDetailSchemas = () => import("./detailSchemas")
-
-/** 当前在线人数。只有聚合数字，「谁在线」在榜单接口里、且只对老师下发 */
-export function getOnlineCount() {
-  return api.get<OnlineCount>("site/online")
-}
 
 export async function getProblemList(
   offset = 0,
@@ -227,17 +222,39 @@ export function getSubmissionStatisticsGrid(
 }
 
 /**
- * 全服榜单。上限（100 名）由服务端定，调用方只管翻页 ——
- * 「全服 Top10」就是这个榜的第一页，取 limit=10 即可，不需要另一个上限参数。
+ * 排名页的榜：本班 / 本年级 / 全服 × 这周 / 这学期 / 全部。学生看自己的班和年级，
+ * 老师用 `className` 选班（不给就是最近上课的班）。`full` 把本年级 / 全服中间折起来的那段也要回来
  */
-export function getRank(offset: number, limit: number) {
-  return api.get<UserRank>("rankings/users", { params: { offset, limit } })
+export function getRankBoard(
+  scope: RankScope,
+  period: RankPeriod,
+  options: { className?: string; full?: boolean } = {},
+) {
+  return api.get<RankBoard>("rankings/board", {
+    params: {
+      scope,
+      period,
+      className: options.className || undefined,
+      full: options.full ? 1 : undefined,
+    },
+  })
 }
 
-export function getActivityRank(start: string) {
-  return api.get<ActivityRankItem[]>("rankings/activity", {
-    params: { start },
+/** 班级对抗：全服各班这学期人均做对，外加这周人均涨了多少 */
+export function getClassBattle() {
+  return api.get<ClassBattleItem[]>("rankings/classes")
+}
+
+/** 本班最近几周的每周冠军 */
+export function getWeeklyChampions(className?: string) {
+  return api.get<WeeklyChampion[]>("rankings/champions", {
+    params: { className: className || undefined },
   })
+}
+
+/** 老师把学生设成不计入排名 / 恢复 */
+export function setRankHidden(userId: number, hidden: boolean) {
+  return api.put<null>(`rankings/hidden/${userId}`, { hidden })
 }
 
 /**
@@ -279,16 +296,6 @@ export function getClassActivity() {
 /** 首页「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对 */
 export function getLastVisit() {
   return api.get<LastVisit>("me/last-visit")
-}
-
-export function getClassRank(grade?: number | null) {
-  return api.get<ClassRankItem[]>("rankings/classes", { params: { grade } })
-}
-
-export function getUserClassRank(scope?: "all" | "window", offset?: number, limit?: number) {
-  return api.get<ClassUserRank>("me/class-rank", {
-    params: { scope, offset, limit },
-  })
 }
 
 export function getClassPK(classNames: string[], startTime?: string, endTime?: string) {
