@@ -94,8 +94,11 @@ const hasExtraFilter = computed(
   () => !!(query.keyword || query.difficulty || query.author || query.type),
 )
 
+// 连着点几个知识点时，先发的请求可能后回来（按人数排序那条要慢一截），只认最后一次
+let listSeq = 0
 async function listProblems() {
   if (query.page < 1) query.page = 1
+  const seq = ++listSeq
   const offset = (query.page - 1) * query.limit
   const res = await getProblemList(offset, query.limit, {
     keyword: query.keyword,
@@ -107,6 +110,7 @@ async function listProblems() {
     // 不看 isAuthed：首屏请求发出时登录信息往往还没回来，后端对没登录的人自己会忽略它
     undone: undoneOn.value ? "1" : "",
   })
+  if (seq !== listSeq) return
   total.value = res.total
   problems.value = res.results
   loaded.value = true
