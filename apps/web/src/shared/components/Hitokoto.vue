@@ -8,7 +8,7 @@ import { getHitokoto } from "../api"
  * 一言（设计稿「一言重设计」A 版）：大引号 + 最多两行的句子、出处跟在第二行末尾 + 一个看得见的「换一句」。
  * 分类（动画、诗词……）不显示；接口里的 type 只用来判断出处要不要加书名号。
  * 原来只能点句子换，没人知道；出处被截成「来自 Structure and Interpretatio…」。
- * 长句（数据集 p90 44 字、最长 255 字）两行放不下，点句子弹出全文。
+ * 长句（数据集 p90 44 字、最长 255 字）两行放不下时，鼠标移上去弹出全文；放得下的不弹。
  * 留着它是给学生一点「无聊的乐趣」，别去掉、别挪到看不见的地方。
  */
 const theme = useThemeVars()
@@ -28,6 +28,17 @@ async function receive() {
 }
 
 onMounted(receive)
+
+// 两行放不下（被截了省略号）才给全文弹层，鼠标移上去就出来；放得下的句子什么都不弹。
+// 是否被截要等渲染完量：scrollHeight 比可见高度高就是截了。换句、窗口变宽变窄都重量一次
+const sentenceRef = ref<HTMLElement | null>(null)
+const clipped = ref(false)
+function measure() {
+  const el = sentenceRef.value
+  clipped.value = !!el && el.scrollHeight > el.clientHeight + 1
+}
+watch(quote, () => nextTick(measure))
+useResizeObserver(sentenceRef, measure)
 
 /** 数据集里拿来充数的出处：写出来没有信息量 */
 const FILLER = new Set(["佚名", "无", "原创", "网络", "其他", "互联网"])
@@ -53,11 +64,11 @@ const popVars = computed(() => ({
 <template>
   <div v-if="quote" class="hitokoto">
     <Icon icon="ph:quotes-fill" class="mark" :width="22" />
-    <n-popover trigger="click" placement="bottom-end" :width="420">
+    <n-popover trigger="hover" placement="bottom-end" :width="420" :disabled="!clipped">
       <template #trigger>
         <!-- 出处写在句子前面是为了浮动：它得先于文字出现，才能被 ::before 顶到第二行末尾 -->
-        <div class="body" title="点一下看全文">
-          <div class="sentence">
+        <div class="body">
+          <div ref="sentenceRef" class="sentence">
             <span v-if="source" class="source">—— {{ source }}</span
             >{{ quote.hitokoto }}
           </div>
@@ -107,7 +118,6 @@ const popVars = computed(() => ({
 .body {
   min-width: 0;
   display: flex;
-  cursor: pointer;
 }
 
 .sentence {
