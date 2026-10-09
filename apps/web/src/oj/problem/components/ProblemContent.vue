@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSqlProblem } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
@@ -8,7 +9,7 @@ import { useSubmissionStore } from "oj/store/submission"
 import { useDark } from "@vueuse/core"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
-import SQLDataTable from "./SQLDataTable.vue"
+import SqlProblemData from "./SqlProblemData.vue"
 import SimilarProblems from "./SimilarProblems.vue"
 import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
@@ -25,16 +26,7 @@ const { problem } = storeToRefs(problemStore)
 const ctx = useProblemPageContext()
 
 // SQL 题：隐藏输入/输出/例子，改为渲染数据表与期望结果
-const isSQL = computed(() => !!problem.value?.sqlConfig)
-const sqlDisplay = computed(() => problem.value?.sqlDisplay ?? null)
-const sqlExpectedQuery = computed(() => {
-  const exp = sqlDisplay.value?.expected
-  return exp && "columns" in exp ? exp : null
-})
-const sqlChangedTables = computed(() => {
-  const exp = sqlDisplay.value?.expected
-  return exp && "changed_tables" in exp ? exp.changed_tables : []
-})
+const isSQL = computed(() => !!problem.value && isSqlProblem(problem.value))
 
 // 相似题推荐：做对了、或者错了 3 次以上才给（比赛、题单里不给，见 problemPageContext）
 const showSimilar = computed(
@@ -317,41 +309,15 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       </section>
     </template>
 
-    <template v-if="isSQL && sqlDisplay">
-      <h3 class="title sql-title">数据表</h3>
-      <div v-for="t in sqlDisplay.tables" :key="t.name">
-        <p class="sqlTableName">{{ t.name }}</p>
-        <SQLDataTable
-          :columns="t.columns"
-          :rows="t.rows"
-          :total-rows="t.total_rows"
-          :truncated="t.truncated"
-        />
-      </div>
-
-      <h3 class="title sql-title">期望结果</h3>
-      <template v-if="sqlExpectedQuery">
-        <SQLDataTable
-          :columns="sqlExpectedQuery.columns"
-          :rows="sqlExpectedQuery.rows"
-          :total-rows="sqlExpectedQuery.total_rows"
-          :truncated="sqlExpectedQuery.truncated"
-        />
-        <p v-if="!problem.sqlConfig?.order_sensitive" class="sqlNote">结果顺序不限</p>
+    <SqlProblemData
+      v-if="isSQL && problem.sqlDisplay"
+      :display="problem.sqlDisplay"
+      :order-sensitive="!!problem.sqlConfig?.order_sensitive"
+    >
+      <template #title="{ text }">
+        <h3 class="title sql-title">{{ text }}</h3>
       </template>
-      <div v-for="t in sqlChangedTables" :key="t.name">
-        <p class="sqlTableName">
-          {{ t.dropped ? `${t.name} 表已被删除` : `执行后的 ${t.name} 表` }}
-        </p>
-        <SQLDataTable
-          v-if="!t.dropped"
-          :columns="t.columns"
-          :rows="t.rows"
-          :total-rows="t.total_rows"
-          :truncated="t.truncated"
-        />
-      </div>
-    </template>
+    </SqlProblemData>
 
     <section v-if="problem.hint" class="block">
       <h3 class="title">提示</h3>
@@ -602,17 +568,5 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
 .sql-title {
   margin-top: 14px;
-}
-
-.sqlTableName {
-  font-weight: 600;
-  margin: 8px 0 4px;
-  font-family: Monaco, Consolas, monospace;
-}
-
-.sqlNote {
-  font-size: 13px;
-  opacity: 0.65;
-  margin: 0 0 8px;
 }
 </style>

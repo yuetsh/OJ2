@@ -49,6 +49,14 @@ export const runnableLanguageSchema = judgeLanguageSchema.extract(["C", "C++", "
  */
 export const lessonLanguageSchema = problemLanguageSchema.extract(["Python", "C", "C++", "SQL"])
 
+/**
+ * SQL 题：可选语言里有 SQL（后端保存时强校验 SQL 只能单独出现）。题型只认这一条，
+ * 前后端一律走它，别再各自看 sqlConfig 或 languages
+ */
+export function isSqlProblem(problem: { languages: readonly string[] }) {
+  return problem.languages.includes("SQL")
+}
+
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
 export type LessonLanguage = z.infer<typeof lessonLanguageSchema>
 export type RunnableLanguage = z.infer<typeof runnableLanguageSchema>

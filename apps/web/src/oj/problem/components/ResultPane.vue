@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSqlProblem } from "@oj2/contract"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
@@ -81,10 +82,7 @@ const codeSegments = computed<{ value: Segment; label: string; time: string }[]>
 const drawing = computed(() => codeStore.code.language === "Flowchart")
 
 // 试跑走判题机，SQL 题不走那里；流程图也没得跑。这两种只留「提交结果」
-const canTrial = computed(() => {
-  const languages = problem.value?.languages ?? []
-  return !languages.includes("SQL")
-})
+const canTrial = computed(() => !problem.value || !isSqlProblem(problem.value))
 
 const segments = computed(() => {
   const list = canTrial.value ? codeSegments.value : codeSegments.value.slice(0, 1)

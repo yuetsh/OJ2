@@ -1,4 +1,5 @@
 import {
+  isSqlProblem,
   classComparisonRequestSchema,
   STUDENT_ROLES,
   classLessonRequestSchema,
@@ -929,7 +930,7 @@ classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
   // SQL 题除外：它只收 SQL，C 的作业里夹一道也不会让人选错语言，计数那边也放行了 SQL
   if (language) {
     const unsupported = found
-      .filter((row) => !row.languages.includes(language) && !row.languages.includes("SQL"))
+      .filter((row) => !row.languages.includes(language) && !isSqlProblem(row))
       .map((row) => row.displayId)
     if (unsupported.length) {
       return failure(

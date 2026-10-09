@@ -1,4 +1,5 @@
 import {
+  isSqlProblem,
   normalizeLanguage,
   problemListSortSchema,
   problemTypeFilterSchema,
@@ -121,7 +122,7 @@ function listItem(
     allowFlowchart: row.problem.allowFlowchart,
     showFlowchart: row.problem.showFlowchart,
     hasAstRules: row.problem.astRules !== null,
-    isSql: row.problem.languages.includes("SQL"),
+    isSql: isSqlProblem(row.problem),
     // 流程图评到 A / S 也打勾：problemStates 已经把它算进 solved
     myStatus: states?.solved.has(id)
       ? JudgeStatus.ACCEPTED

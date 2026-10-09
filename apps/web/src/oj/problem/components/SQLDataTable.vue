@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import type { SqlDisplayColumn } from "utils/types"
+import type { TableChanges } from "../utils/sqlChanges"
 
-defineProps<{
+const props = defineProps<{
   columns: SqlDisplayColumn[]
   rows: (string | number | null)[][]
   totalRows?: number
   truncated?: boolean
+  /** 增删改题执行后的表：变了的格子、新插的行标出来 */
+  changes?: TableChanges | null
 }>()
+
+const changed = (i: number, j: number) =>
+  !!props.changes && (props.changes.newRows.has(i) || props.changes.cells.has(`${i}:${j}`))
 </script>
 
 <template>
@@ -29,7 +35,11 @@ defineProps<{
           <td :colspan="columns.length" class="nullCell">（空表）</td>
         </tr>
         <tr v-for="(row, i) in rows" :key="i">
-          <td v-for="(v, j) in row" :key="j" :class="{ nullCell: v === null }">
+          <td
+            v-for="(v, j) in row"
+            :key="j"
+            :class="{ nullCell: v === null, changed: changed(i, j) }"
+          >
             {{ v === null ? "NULL" : v }}
           </td>
         </tr>
@@ -61,6 +71,18 @@ defineProps<{
   opacity: 0.55;
   margin-left: 4px;
   font-weight: normal;
+}
+
+/* 和图例同一个黄：浅底深字，暗色下压暗底、提亮字 */
+.sqlTable :deep(td.changed) {
+  background-color: #fff4d6;
+  color: #7a4b00;
+  font-weight: 600;
+}
+
+html.dark .sqlTable :deep(td.changed) {
+  background-color: rgba(240, 180, 40, 0.18);
+  color: #f5d38a;
 }
 
 .nullCell {

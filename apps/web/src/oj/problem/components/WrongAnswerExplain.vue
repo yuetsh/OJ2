@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isSqlProblem } from "@oj2/contract"
 import { storeToRefs } from "pinia"
 import { useThemeVars } from "naive-ui"
 import { useProblemStore } from "oj/store/problem"
@@ -41,7 +42,7 @@ const { problem } = storeToRefs(useProblemStore())
  * 例子都对了、错在隐藏测试点 —— 摆「描述」，边界条件多半写在那里。SQL 题两节都不摆
  */
 const requirement = computed(() => {
-  if (!props.full || !problem.value || problem.value.sqlConfig) return null
+  if (!props.full || !problem.value || isSqlProblem(problem.value)) return null
   const source = props.check.passed ? problem.value.description : problem.value.outputDescription
   const text = markdownToText(source ?? "", props.check.passed ? 160 : 120)
   if (!text) return null

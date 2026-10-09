@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
-import { HINT_MIN_FAILURES, hintLevelLabel } from "@oj2/contract"
+import { HINT_MIN_FAILURES, hintLevelLabel, isSqlProblem } from "@oj2/contract"
 import type { JudgeCaseResult } from "@oj2/contract"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import {
@@ -215,7 +215,7 @@ const submissionStore = useSubmissionStore()
 const customRunHint = computed(() => {
   if (!sampleCheck.value?.passed || props.peer) return ""
   const problem = problemStore.problem
-  if (!problem || problem.sqlConfig) return ""
+  if (!problem || isSqlProblem(problem)) return ""
   // 例子里出现过的数不算：例子已经对了，拿它们再试一遍没用
   const inSamples = new Set(
     problem.samples.flatMap(
