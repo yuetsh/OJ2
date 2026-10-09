@@ -5,10 +5,10 @@ import { useThemeVars } from "naive-ui"
 import { getHitokoto } from "../api"
 
 /**
- * 一言（设计稿「一言重设计」A 版）：大引号 + 一行句子 + 「—— 谁《出处》」+ 一个看得见的「换一句」。
+ * 一言（设计稿「一言重设计」A 版）：大引号 + 最多两行的句子、出处跟在第二行末尾 + 一个看得见的「换一句」。
  * 分类（动画、诗词……）不显示；接口里的 type 只用来判断出处要不要加书名号。
  * 原来只能点句子换，没人知道；出处被截成「来自 Structure and Interpretatio…」。
- * 长句（数据集 p90 44 字、最长 255 字）一行放不下，点句子弹出全文。
+ * 长句（数据集 p90 44 字、最长 255 字）两行放不下，点句子弹出全文。
  * 留着它是给学生一点「无聊的乐趣」，别去掉、别挪到看不见的地方。
  */
 const theme = useThemeVars()
@@ -55,9 +55,12 @@ const popVars = computed(() => ({
     <Icon icon="ph:quotes-fill" class="mark" :width="22" />
     <n-popover trigger="click" placement="bottom-end" :width="420">
       <template #trigger>
+        <!-- 出处写在句子前面是为了浮动：它得先于文字出现，才能被 ::before 顶到第二行末尾 -->
         <div class="body" title="点一下看全文">
-          <span class="sentence">{{ quote.hitokoto }}</span>
-          <span v-if="source" class="source">—— {{ source }}</span>
+          <div class="sentence">
+            <span v-if="source" class="source">—— {{ source }}</span
+            >{{ quote.hitokoto }}
+          </div>
         </div>
       </template>
       <div class="full" :style="popVars">
@@ -94,31 +97,48 @@ const popVars = computed(() => ({
   opacity: 0.3;
 }
 
+/*
+ * 句子最多两行，出处跟在第二行末尾、靠右（只有一行就在第一行末尾）。
+ * 做法是「浮动垫片」：::before 是一根右浮动、高度 100% 再往回收一行的空柱子，
+ * 出处右浮动并 clear 它，就被顶到最后一行的右边；超过两行时 line-clamp 截断的是句子，
+ * 出处始终露在外面。高度 100% 要有确定的高度可依，所以外面套一层 flex（伸展的 flex 子项高度是确定的）。
+ * 不用 color-mix / :has 这类新东西，Chrome 105 能跑
+ */
 .body {
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
   cursor: pointer;
-}
-
-.sentence,
-.source {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .sentence {
   font-size: 13px;
   line-height: 18px;
+  max-height: 36px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
   color: v-bind("theme.textColor1");
 }
 
+.sentence::before {
+  content: "";
+  float: right;
+  height: 100%;
+  margin-bottom: -18px;
+}
+
 .source {
+  float: right;
+  clear: both;
+  max-width: 60%;
+  margin-left: 10px;
   font-size: 12px;
-  line-height: 16px;
   color: v-bind("theme.textColor3");
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .refresh {
