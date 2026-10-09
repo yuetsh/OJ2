@@ -194,13 +194,13 @@ export const admins: RouteRecordRaw = {
     {
       path: "problem/create",
       name: "admin problem create",
-      component: () => import("admin/problem/detail.vue"),
+      component: () => import("admin/problem/editor.vue"),
       meta: { requiresProblemPermission: true },
     },
     {
       path: "problem/edit/:problemID",
       name: "admin problem edit",
-      component: () => import("admin/problem/detail.vue"),
+      component: () => import("admin/problem/editor.vue"),
       props: true,
       meta: { requiresProblemPermission: true },
     },
@@ -233,14 +233,14 @@ export const admins: RouteRecordRaw = {
     {
       path: "contest/:contestID/problem/create",
       name: "admin contest problem create",
-      component: () => import("admin/problem/detail.vue"),
+      component: () => import("admin/problem/editor.vue"),
       props: true,
       meta: { requiresTeacherAdmin: true },
     },
     {
       path: "contest/:contestID/problem/edit/:problemID",
       name: "admin contest problem edit",
-      component: () => import("admin/problem/detail.vue"),
+      component: () => import("admin/problem/editor.vue"),
       props: true,
       meta: { requiresTeacherAdmin: true },
     },

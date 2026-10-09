@@ -181,6 +181,7 @@ export interface AdminProblemRow {
   createTime: string
   difficulty: ProblemDifficulty
   tags: string[]
+  isSql: boolean
   hasAstRules: boolean
   allowFlowchart: boolean
   showFlowchart: boolean

@@ -63,10 +63,12 @@ export async function getProblemList(
   author?: string,
   contestID?: string,
   tagId?: number,
+  /** 题型：sql = SQL 题，code = 编程题；不传是全部（比赛题列表不认） */
+  kind?: "sql" | "code" | "",
 ) {
   const endpoint = contestID ? `admin/contests/${contestID}/problems` : "admin/problems"
   const res = await api.get<AdminProblemList>(endpoint, {
-    params: { offset, limit, keyword, author, tagId },
+    params: { offset, limit, keyword, author, tagId, kind: kind || undefined },
   })
   return {
     results: res.results.map(toAdminProblemRow),

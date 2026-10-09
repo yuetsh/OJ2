@@ -1,5 +1,6 @@
 import {
   addContestProblemRequestSchema,
+  isSqlProblem,
   createProblemRequestSchema,
   generateSqlTestCaseRequestSchema,
   makeProblemPublicRequestSchema,
@@ -15,7 +16,7 @@ import {
   type SqlTestCaseScript,
   type UploadTestCaseResponse,
 } from "@oj2/contract"
-import { and, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
+import { and, count, desc, eq, ilike, inArray, isNull, ne, not, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
@@ -216,7 +217,7 @@ function commonChecks(data: {
 }): { error: string } | { sql: boolean } {
   const astError = astRulesError(pickAstRules(data.astRules, data.languages))
   if (astError) return { error: astError }
-  if (data.languages.includes("SQL")) {
+  if (isSqlProblem(data)) {
     if (data.languages.length !== 1)
       return { error: "SQL problem cannot be mixed with other languages" }
     if (!data.sqlConfig) return { error: "SQL problem requires sql_config" }
@@ -397,6 +398,11 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
   const author = c.req.query("author")?.trim()
   const keyword = c.req.query("keyword")?.trim()
   const tagId = c.req.query("tagId")?.trim()
+  // 题型：sql = SQL 题，code = 编程题（C / C++ / Python）
+  const kind = c.req.query("kind")
+  const sqlOnly = sql`${schema.problem.languages} @> '["SQL"]'::jsonb`
+  if (kind === "sql") filters.push(sqlOnly)
+  else if (kind === "code") filters.push(not(sqlOnly))
   if (author) filters.push(eq(schema.user.username, author))
   if (keyword) {
     filters.push(
@@ -456,6 +462,7 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
           createTime: problem.createTime,
           difficulty: problem.difficulty,
           tags: tags.get(problem.id) ?? [],
+          isSql: isSqlProblem(problem),
           hasAstRules: problem.astRules !== null,
           allowFlowchart: problem.allowFlowchart,
           showFlowchart: problem.showFlowchart,
@@ -637,6 +644,7 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
           createTime: problem.createTime,
           difficulty: problem.difficulty,
           tags: tags.get(problem.id) ?? [],
+          isSql: isSqlProblem(problem),
           hasAstRules: problem.astRules !== null,
           allowFlowchart: problem.allowFlowchart,
           showFlowchart: problem.showFlowchart,

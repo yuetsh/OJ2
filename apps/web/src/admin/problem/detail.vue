@@ -5,12 +5,11 @@ import { PROBLEM_TAG_MAX_LENGTH } from "@oj2/contract"
 import { getProblemTagList } from "shared/api"
 import TextEditor from "shared/components/TextEditor.vue"
 import TestcaseGenerator from "./components/TestcaseGenerator.vue"
-import SQLTestcaseEditor from "./components/SQLTestcaseEditor.vue"
 import AstRulesEditor from "./components/AstRulesEditor.vue"
 import { CODE_TEMPLATES, LANGUAGE_SHOW_VALUE, STORAGE_KEY } from "utils/constants"
 import download from "utils/download"
 import { unique } from "utils/functions"
-import type { BlankProblem, LANGUAGE, Tag, Testcase } from "utils/types"
+import type { AdminProblem, BlankProblem, LANGUAGE, Tag, Testcase } from "utils/types"
 import {
   createContestProblem,
   createProblem,
@@ -24,9 +23,15 @@ const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEdit
 
 const MermaidEditor = defineAsyncComponent(() => import("shared/components/MermaidEditor.vue"))
 
+/**
+ * 编程题（C / C++ / Python）的出题页。SQL 题在 SqlDetail.vue，两种题由 editor.vue 分流：
+ * 新建看 `?type=sql`，编辑看题目本身
+ */
 interface Props {
   problemID?: string
   contestID?: string
+  /** 编辑时外层已经拉过一次题目（要靠它判断题型），直接给进来 */
+  initial?: AdminProblem | null
 }
 
 const message = useMessage()
@@ -166,12 +171,8 @@ const languageOptions = [
   { label: LANGUAGE_SHOW_VALUE["Python"], value: "Python" },
   { label: LANGUAGE_SHOW_VALUE["C"], value: "C" },
   { label: LANGUAGE_SHOW_VALUE["C++"], value: "C++" },
-  { label: LANGUAGE_SHOW_VALUE["SQL"], value: "SQL" },
 ]
 
-const isSQLProblem = computed(() => !!problem.value?.languages.includes("SQL"))
-
-// SQL 题联动：SQL 必须是唯一语言（后端强校验），不需要预制代码，自动初始化 sql_config
 // 两个流程图开关是互斥的：allowFlowchart 为真时后端不会把 mermaidCode 下发给
 // 学生，showFlowchart 就成了一个点进去什么都没有的 tab。UI 上已经把开关置灰，
 // 这里再把存量数据里两个都开着的情况纠正掉。
@@ -182,34 +183,6 @@ watch(
   },
 )
 
-watch(
-  () => problem.value?.languages,
-  (langs) => {
-    if (!langs) return
-    if (langs.includes("SQL")) {
-      if (langs.length > 1) {
-        problem.value.languages = ["SQL"]
-        return
-      }
-      needTemplate.value = false
-      if (!problem.value.sqlConfig) {
-        problem.value.sqlConfig = { mode: "query", order_sensitive: false }
-      }
-      currentActiveAnswer.value = "SQL"
-      // 代码规则检查基于 Python/C 的 AST 解析，对 SQL 没有意义，清空避免脏数据
-      if (problem.value.astRules) {
-        problem.value.astRules = null
-      }
-      // 流程图依赖 Python 答案生成，对 SQL 没有意义
-      problem.value.allowFlowchart = false
-      problem.value.showFlowchart = false
-    } else if (problem.value.sqlConfig) {
-      problem.value.sqlConfig = null
-    }
-  },
-  { immediate: true },
-)
-
 async function getProblemDetail() {
   if (!props.problemID) {
     // 草稿缓存和编辑页共用同一个 localStorage key：编辑页会把服务器数据连 id
@@ -217,12 +190,17 @@ async function getProblemDetail() {
     // 下的是那道旧题的包，SQL 测试点编辑器也会去回显那道旧题的脚本。
     // 新建页不存在 id，进来先摘掉。
     delete problem.value.id
+    // 以前 SQL 题也在这一页出，草稿里可能还留着 SQL：现在 SQL 题有自己的页
+    if (problem.value.languages.includes("SQL")) {
+      problem.value.languages = ["Python", "C"]
+      problem.value.sqlConfig = null
+    }
     syncTagInputsFromProblemTags()
     toggleReady(true)
     return
   }
   try {
-    const data = await getProblem(props.problemID)
+    const data = props.initial ?? (await getProblem(props.problemID))
     problem.value.id = data.id
     problem.value._id = data._id
     problem.value.title = data.title
@@ -300,7 +278,7 @@ async function handleUploadTestcases({ file }: UploadCustomRequestOptions) {
   try {
     // 失败走 catch —— 原来这里还有一句 `if (res.error)`（拿 { error, data }
     // 信封当返回值），被 @ts-ignore 压着，信封拆掉之后就是一段死代码了
-    const res = await uploadTestcases(file.file!, { sql: isSQLProblem.value })
+    const res = await uploadTestcases(file.file!)
     // score 不在上传响应里，前端按测试点数量平分补上
     const entries = res.info
     const testcases: Testcase[] = entries.map((entry) => ({
@@ -342,21 +320,19 @@ async function validateProblem() {
   // 题目
   else if (
     !problem.value.description ||
-    (!isSQLProblem.value && (!problem.value.inputDescription || !problem.value.outputDescription))
+    !problem.value.inputDescription ||
+    !problem.value.outputDescription
   ) {
     message.error("题目或输入或输出没有填写")
     hasErrors = true
   }
   // 样例
-  else if (!isSQLProblem.value && problem.value.samples.length == 0) {
+  else if (problem.value.samples.length == 0) {
     message.error("样例没有填写")
     hasErrors = true
   }
   // 样例是空的
-  else if (
-    !isSQLProblem.value &&
-    problem.value.samples.some((sample) => sample.output === "" || sample.input === "")
-  ) {
+  else if (problem.value.samples.some((sample) => sample.output === "" || sample.input === "")) {
     message.error("空样例没有删干净")
     hasErrors = true
   }
@@ -366,17 +342,6 @@ async function validateProblem() {
     hasErrors = true
   } else if (problem.value.languages.length === 0) {
     message.error("编程语言没有选择")
-    hasErrors = true
-  }
-  // SQL 题验证
-  else if (isSQLProblem.value && !problem.value.sqlConfig?.mode) {
-    message.error("SQL 题需要选择题型（查询题/增删改题）")
-    hasErrors = true
-  } else if (
-    isSQLProblem.value &&
-    !problem.value.answers.find((ans) => ans.language === "SQL" && ans.code.trim() !== "")
-  ) {
-    message.error("SQL 题必须填写标准答案（判题时用它生成期望结果）")
     hasErrors = true
   }
   // 流程图验证
@@ -421,18 +386,12 @@ function filterAnswers() {
   problem.value.answers = problem.value.answers.filter((ans) => ans.code.trim() !== "")
 }
 
-function filterSamplesForSQL() {
-  // SQL 题不展示样例；后端 CreateSampleSerializer 也不接受空字符串样例
-  if (isSQLProblem.value) problem.value.samples = []
-}
-
 async function submit() {
   const hasValidationErrors = await validateProblem()
   if (hasValidationErrors) return
   filterHint()
   getTemplate()
   filterAnswers()
-  filterSamplesForSQL()
   syncProblemTags()
   const api = {
     "admin problem create": createProblem,
@@ -584,43 +543,31 @@ watch(
     title="题目的描述"
     :min-height="300"
   />
-  <TextEditor
-    v-if="ready && !isSQLProblem"
-    v-model:value="problem.inputDescription"
-    title="输入的描述"
-  />
-  <TextEditor
-    v-if="ready && !isSQLProblem"
-    v-model:value="problem.outputDescription"
-    title="输出的描述"
-  />
-  <template v-if="!isSQLProblem">
-    <div class="box" v-for="(sample, index) in problem.samples" :key="index">
-      <n-flex justify="space-between" align="center">
-        <strong>测试样例 {{ index + 1 }}</strong>
-        <n-button tertiary type="warning" size="small" @click="removeSample(index)">
-          删除 {{ index + 1 }}
-        </n-button>
-      </n-flex>
-      <n-grid x-gap="20" cols="2">
-        <n-gi span="1">
-          <n-flex vertical>
-            <span>输入样例</span>
-            <n-input type="textarea" v-model:value="sample.input" />
-          </n-flex>
-        </n-gi>
-        <n-gi span="1">
-          <n-flex vertical>
-            <span>输出样例</span>
-            <n-input type="textarea" v-model:value="sample.output" />
-          </n-flex>
-        </n-gi>
-      </n-grid>
-    </div>
-    <n-button class="addSamples box" tertiary type="primary" @click="addSample">
-      添加用例
-    </n-button>
-  </template>
+  <TextEditor v-if="ready" v-model:value="problem.inputDescription" title="输入的描述" />
+  <TextEditor v-if="ready" v-model:value="problem.outputDescription" title="输出的描述" />
+  <div class="box" v-for="(sample, index) in problem.samples" :key="index">
+    <n-flex justify="space-between" align="center">
+      <strong>测试样例 {{ index + 1 }}</strong>
+      <n-button tertiary type="warning" size="small" @click="removeSample(index)">
+        删除 {{ index + 1 }}
+      </n-button>
+    </n-flex>
+    <n-grid x-gap="20" cols="2">
+      <n-gi span="1">
+        <n-flex vertical>
+          <span>输入样例</span>
+          <n-input type="textarea" v-model:value="sample.input" />
+        </n-flex>
+      </n-gi>
+      <n-gi span="1">
+        <n-flex vertical>
+          <span>输出样例</span>
+          <n-input type="textarea" v-model:value="sample.output" />
+        </n-flex>
+      </n-gi>
+    </n-grid>
+  </div>
+  <n-button class="addSamples box" tertiary type="primary" @click="addSample"> 添加用例 </n-button>
   <TextEditor v-if="ready" v-model:value="problem.hint" title="提示（选填）" />
   <n-form>
     <n-form-item label="题目的来源（选填）">
@@ -651,7 +598,7 @@ watch(
         </n-flex>
       </n-checkbox-group>
     </n-form-item>
-    <n-form-item v-if="!isSQLProblem">
+    <n-form-item>
       <n-checkbox v-model:checked="needTemplate" label="预制代码（显示在编辑器中，帮助快速上手）" />
     </n-form-item>
     <n-form-item>
@@ -667,31 +614,10 @@ watch(
     </n-form-item>
   </n-form>
 
-  <n-form v-if="isSQLProblem && problem.sqlConfig" inline label-placement="left">
-    <n-form-item label="SQL 题型">
-      <n-radio-group v-model:value="problem.sqlConfig.mode">
-        <n-radio-button value="query">查询题（比对查询结果）</n-radio-button>
-        <n-radio-button value="modify"> 增删改题（比对执行后的表数据） </n-radio-button>
-      </n-radio-group>
-    </n-form-item>
-    <n-form-item label="严格比对行顺序">
-      <n-switch v-model:value="problem.sqlConfig.order_sensitive" />
-      <n-text depth="3" style="margin-left: 12px">
-        题目要求 ORDER BY 时开启；关闭则按无序集合比对
-      </n-text>
-    </n-form-item>
-  </n-form>
-
   <n-grid :cols="2" x-gap="20">
     <n-gi>
       <n-form>
-        <n-form-item
-          :label="
-            isSQLProblem
-              ? '标准答案（必填，判题依据：每个测试点会运行它生成期望结果）'
-              : '本题参考答案（选填，用于 AI 分析，不会泄露）'
-          "
-        >
+        <n-form-item label="本题参考答案（选填，用于 AI 分析，不会泄露）">
           <n-tabs type="segment" default-value="Python" v-model:value="currentActiveAnswer">
             <n-tab-pane
               v-for="(answer, index) in problem.answers"
@@ -727,7 +653,7 @@ watch(
     </n-gi>
   </n-grid>
 
-  <n-grid v-if="!isSQLProblem" :cols="2">
+  <n-grid :cols="2">
     <n-gi :span="1">
       <AstRulesEditor v-model="problem.astRules!" :languages="problem.languages" />
     </n-gi>
@@ -737,7 +663,7 @@ watch(
 
   <h2 class="title">测试用例区域</h2>
 
-  <n-flex v-if="!isSQLProblem" align="center" style="margin-bottom: 12px">
+  <n-flex align="center" style="margin-bottom: 12px">
     <div>
       <n-button type="success" @click="showGeneratorModal = true"> （新）直接生成 </n-button>
     </div>
@@ -753,14 +679,6 @@ watch(
       【测试用例】最好要有10个，要考虑边界情况，且不要跟【测试样例】一模一样
     </n-tooltip>
   </n-flex>
-
-  <SQLTestcaseEditor
-    v-if="isSQLProblem"
-    :answers="problem.answers"
-    :mode="problem.sqlConfig?.mode ?? 'query'"
-    :problem-id="problem.id"
-    @uploaded="handleTestcasesGenerated"
-  />
 
   <n-alert class="box" v-if="problem.testCaseScore.length" :show-icon="false" type="info">
     <template #header>
@@ -792,49 +710,47 @@ watch(
     />
   </n-modal>
 
-  <template v-if="!isSQLProblem">
-    <n-divider />
+  <n-divider />
 
-    <h2 class="title">流程图区域</h2>
+  <h2 class="title">流程图区域</h2>
 
-    <!-- 流程图相关设置 -->
-    <n-form inline label-placement="left" :show-feedback="false">
-      <n-form-item label="根据上面的【Python答案】智能生成 Mermaid 代码">
-        <n-button
-          type="primary"
-          size="small"
-          :disabled="!problem.answers.filter((a) => a.language === 'Python')[0]?.code.length"
-          :loading="isAIGenerating"
-          @click="generateMermaid"
-        >
-          AI 生成
-        </n-button>
-      </n-form-item>
-      <n-form-item label="允许提交流程图">
-        <n-switch v-model:value="problem.allowFlowchart" />
-      </n-form-item>
-      <n-form-item label="显示标准流程图">
-        <n-flex align="center">
-          <n-switch v-model:value="problem.showFlowchart" :disabled="problem.allowFlowchart" />
-          <n-text v-if="problem.allowFlowchart" depth="3" style="font-size: 12px">
-            让学生自己画图时，标准流程图不会下发给学生，这个开关没有意义
-          </n-text>
-        </n-flex>
-      </n-form-item>
-    </n-form>
+  <!-- 流程图相关设置 -->
+  <n-form inline label-placement="left" :show-feedback="false">
+    <n-form-item label="根据上面的【Python答案】智能生成 Mermaid 代码">
+      <n-button
+        type="primary"
+        size="small"
+        :disabled="!problem.answers.filter((a) => a.language === 'Python')[0]?.code.length"
+        :loading="isAIGenerating"
+        @click="generateMermaid"
+      >
+        AI 生成
+      </n-button>
+    </n-form-item>
+    <n-form-item label="允许提交流程图">
+      <n-switch v-model:value="problem.allowFlowchart" />
+    </n-form-item>
+    <n-form-item label="显示标准流程图">
+      <n-flex align="center">
+        <n-switch v-model:value="problem.showFlowchart" :disabled="problem.allowFlowchart" />
+        <n-text v-if="problem.allowFlowchart" depth="3" style="font-size: 12px">
+          让学生自己画图时，标准流程图不会下发给学生，这个开关没有意义
+        </n-text>
+      </n-flex>
+    </n-form-item>
+  </n-form>
 
-    <n-form>
-      <n-form-item>
-        <MermaidEditor v-model="problem.mermaidCode" @render-state="onMermaidRenderState" />
-      </n-form-item>
-      <n-form-item label="流程图提示信息（选填）">
-        <n-input
-          v-model:value="problem.flowchartHint"
-          placeholder="请输入流程图相关的提示信息，帮助学生理解题目要求"
-        />
-      </n-form-item>
-    </n-form>
-  </template>
+  <n-form>
+    <n-form-item>
+      <MermaidEditor v-model="problem.mermaidCode" @render-state="onMermaidRenderState" />
+    </n-form-item>
+    <n-form-item label="流程图提示信息（选填）">
+      <n-input
+        v-model:value="problem.flowchartHint"
+        placeholder="请输入流程图相关的提示信息，帮助学生理解题目要求"
+      />
+    </n-form-item>
+  </n-form>
   <n-flex style="margin: 16px 0 120px" align="center" justify="end">
     <n-button type="primary" @click="submit">提交</n-button>
   </n-flex>

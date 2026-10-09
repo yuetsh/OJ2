@@ -13,7 +13,9 @@ import { useRouteQuery } from "@vueuse/router"
 import AuthorSelect from "shared/components/AuthorSelect.vue"
 import type { DataTableRowKey } from "naive-ui"
 import BatchTagModal from "./components/BatchTagModal.vue"
+import CreateProblemMenu from "./components/CreateProblemMenu.vue"
 import PageHeader from "admin/components/PageHeader.vue"
+import ProblemTypeTag from "oj/problem/components/ProblemTypeTag.vue"
 
 interface Props {
   contestID?: string
@@ -72,18 +74,31 @@ const nextDisplayID = computed(() => {
 interface ProblemQuery {
   keyword: string
   author: string
+  kind: "" | "code" | "sql"
 }
 
 // 使用分页 composable
 const { query, clearQuery } = usePagination<ProblemQuery>({
   keyword: useRouteQuery("keyword", "").value,
   author: useRouteQuery("author", "").value,
+  kind: useRouteQuery<ProblemQuery["kind"]>("kind", "").value,
 })
 
 const baseColumns: DataTableColumn<AdminProblemRow>[] = [
   { title: "ID", key: "id", width: 100 },
   { title: "显示编号", key: "_id", width: 100 },
-  { title: "标题", key: "title", minWidth: 200 },
+  {
+    title: "标题",
+    key: "title",
+    minWidth: 200,
+    render: (row) =>
+      row.isSql
+        ? h(NFlex, { size: 6, align: "center", wrap: false }, () => [
+            h("span", row.title),
+            h(ProblemTypeTag, { kind: "sql" }),
+          ])
+        : row.title,
+  },
   {
     title: "难度",
     key: "difficulty",
@@ -194,6 +209,8 @@ async function listProblems() {
     query.keyword,
     query.author,
     props.contestID,
+    undefined,
+    query.kind,
   )
   total.value = res.total
   problems.value = res.results
@@ -209,10 +226,17 @@ async function toggleVisible(problemID: number) {
   })
 }
 
-function createContestProblem() {
+const kindOptions = [
+  { label: "全部题型", value: "" },
+  { label: "编程题", value: "code" },
+  { label: "SQL 题", value: "sql" },
+]
+
+function createProblem(kind: string) {
   router.push({
-    name: "admin contest problem create",
-    params: { contestID: props.contestID },
+    name: isContestProblemList.value ? "admin contest problem create" : "admin problem create",
+    params: isContestProblemList.value ? { contestID: props.contestID } : {},
+    query: kind === "sql" ? { type: "sql" } : {},
   })
 }
 
@@ -230,7 +254,7 @@ watchDebounced(() => query.keyword, listProblems, {
 })
 
 // 监听其他查询条件变化
-watch(() => [query.page, query.limit, query.author], listProblems)
+watch(() => [query.page, query.limit, query.author, query.kind], listProblems)
 </script>
 
 <template>
@@ -246,12 +270,10 @@ watch(() => [query.page, query.limit, query.author], listProblems)
             添加标签（{{ selectedProblemIds.length }}）
           </n-button>
         </template>
-        <n-button type="primary" @click="$router.push({ name: 'admin problem create' })">
-          新建题目
-        </n-button>
+        <CreateProblemMenu label="新建题目" primary @select="createProblem" />
       </template>
       <template v-else>
-        <n-button @click="createContestProblem">新建比赛题目</n-button>
+        <CreateProblemMenu label="新建比赛题目" @select="createProblem" />
         <n-button type="primary" @click="selectProblems">从题库中选择</n-button>
       </template>
     </template>
@@ -262,6 +284,13 @@ watch(() => [query.page, query.limit, query.author], listProblems)
         clearable
         style="width: 220px"
         @clear="clearQuery"
+      />
+      <n-select
+        v-if="!props.contestID"
+        v-model:value="query.kind"
+        :options="kindOptions"
+        aria-label="题型"
+        style="width: 120px"
       />
       <n-flex v-if="!props.contestID" align="center" :size="8">
         <n-text depth="3">出题人</n-text>

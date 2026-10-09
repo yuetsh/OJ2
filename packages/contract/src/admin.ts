@@ -633,6 +633,8 @@ export const adminProblemListItemSchema = z.object({
   createTime: z.string(),
   difficulty: problemDifficultySchema,
   tags: z.array(z.string()),
+  /** SQL 题：列表里标题后面挂标签；编辑时进 SQL 出题页 */
+  isSql: z.boolean(),
   hasAstRules: z.boolean(),
   allowFlowchart: z.boolean(),
   showFlowchart: z.boolean(),

@@ -11,6 +11,7 @@ export function toAdminProblemRow(result: AdminProblemListItem): AdminProblemRow
     visible: result.visible,
     difficulty: result.difficulty,
     tags: result.tags,
+    isSql: result.isSql,
     hasAstRules: result.hasAstRules,
     allowFlowchart: result.allowFlowchart,
     showFlowchart: result.showFlowchart,
