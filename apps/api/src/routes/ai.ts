@@ -23,6 +23,7 @@ import { generateFilteredHint } from "../services/hint-filter"
 import { buildDetail, buildDuration, listSolved } from "../services/learning-stats"
 import { decideHintLevel } from "../services/hint-level"
 import { hintDiagnosis, hintPrompt, referenceAnswer } from "../services/hint-diagnosis"
+import { classDetail } from "../services/ranking"
 import { consumeToken } from "../services/throttling"
 import { calendarDay, dayNumber, dayText, localTime, localWeekday } from "../time"
 import { countFailedSubmissions, isTeacherOrAbove, asRecord, queryInteger } from "./helpers"
@@ -358,9 +359,18 @@ aiRoutes.post("/ai/class-analysis", requireAuth, async (c) => {
   if (!parsed.success) return parsed.response
   const limited = await throttleAi(c)
   if (limited) return limited
+  // 数字和抽屉里看到的是同一份（services/ranking.ts 的 classDetail），不再由前端整包传上来
+  const detail = await classDetail(parsed.data.className, true)
+  if (!detail.members) return failure(c, 404, "class-not-found", "这个班没有学生")
   return streamChat(
-    "你是编程教育数据分析专家。根据班级 OJ 数据，从整体水平、参与积极性、均衡性、梯队和改进建议五方面输出中文 Markdown 报告。",
-    JSON.stringify(parsed.data.comparison),
+    [
+      "你是编程课老师的助教。下面是一个班这学期在 OJ 上的做题数据（JSON，人名是用户名）。",
+      "用中文 Markdown 写一份给老师看的简短分析，分四段，每段一两句，段首加粗：",
+      "**整体**（人均和年级比、班级对抗第几）、**节奏**（每周人均的起伏，课上做还是课外也练）、",
+      "**分化**（前后 10%、人最多的那一档同分）、**建议**（点名 care 里的同学，给下节课能直接做的事）。",
+      "用大白话，不要出现四分位数、标准差、方差这类统计词，不要编数据里没有的数字。",
+    ].join(""),
+    JSON.stringify(detail),
   )
 })
 

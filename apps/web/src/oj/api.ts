@@ -16,6 +16,7 @@ import {
   type KnowledgeMap,
   type ClassComparisonResponse,
   type ClassBattleItem,
+  type ClassDetail,
   type RankBoard,
   type RankPeriod,
   type RankScope,
@@ -243,6 +244,11 @@ export function getRankBoard(
 /** 班级对抗：全服各班这学期人均做对，外加这周人均涨了多少 */
 export function getClassBattle() {
   return api.get<ClassBattleItem[]>("rankings/classes")
+}
+
+/** 班级详情（抽屉）：谁都能看，「要多关心的同学」只有老师拿得到 */
+export function getClassDetail(className: string) {
+  return api.get<ClassDetail>("rankings/class-detail", { params: { className } })
 }
 
 /** 本班最近几周的每周冠军 */

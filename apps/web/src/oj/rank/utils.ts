@@ -53,7 +53,7 @@ export function toPass(me: RankRow, target: RankRow) {
   return target.solved - me.solved + 1
 }
 
-/** 这张榜上升得最猛的人（至少升 3 名才算），给他挂「冲得最猛」 */
+/** 这张榜上升得最多的人（至少升 3 名才算），给他挂「进步最大」 */
 export function hottest(rows: RankRow[]) {
   let best: RankRow | null = null
   for (const row of rows) {

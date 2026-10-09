@@ -4,7 +4,7 @@ import { useThemeVars } from "naive-ui"
 import { parseTime } from "utils/functions"
 
 /**
- * 我和两个对手每周日晚上的名次。名次越小越好，所以纵轴倒过来（第 1 在最上面）。
+ * 我和前后一名每周日晚上的名次。名次越小越好，所以纵轴倒过来（第 1 在最上面）。
  * 线的末端直接写名字，不要图例 —— 三条线，看名字比对颜色快。
  */
 const props = defineProps<{
@@ -88,7 +88,7 @@ const ends = computed(() => {
 </script>
 
 <template>
-  <svg :viewBox="`0 0 ${W} ${H}`" class="chart" role="img" aria-label="我和对手每周的名次">
+  <svg :viewBox="`0 0 ${W} ${H}`" class="chart" role="img" aria-label="我和前后一名每周的名次">
     <g v-for="tick in ticks" :key="tick">
       <line :x1="PAD.left" :x2="W - PAD.right" :y1="y(tick)" :y2="y(tick)" class="grid" />
       <text :x="PAD.left - 6" :y="y(tick) + 4" text-anchor="end" class="axis">第 {{ tick }}</text>

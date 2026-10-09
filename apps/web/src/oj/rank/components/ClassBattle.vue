@@ -14,7 +14,10 @@ const props = defineProps<{
   teacher?: boolean
   /** 放在手机页签卡里：不要自己的边框和标题 */
   bare?: boolean
+  /** 显示「班级 PK」入口（原来排名页上那个按钮，管理员角色才有） */
+  pk?: boolean
 }>()
+const emit = defineEmits<{ pick: [className: string] }>()
 
 const theme = useThemeVars()
 const palette = useRankPalette()
@@ -52,7 +55,8 @@ function shortLabel(className: string) {
 <template>
   <div class="battle" :class="{ bare }">
     <div class="title">
-      <b v-if="!bare">班级对抗</b><span class="muted">人均做对 · 全服 · 绿字是这周涨的</span>
+      <b v-if="!bare">班级对抗</b><span class="muted">人均做对 · 全服 · 点班名看详情</span>
+      <router-link v-if="pk" to="/class" class="pk">班级 PK ›</router-link>
     </div>
     <div
       v-for="item in shown"
@@ -61,7 +65,9 @@ function shortLabel(className: string) {
       :class="{ mine: item.className === mine }"
     >
       <span class="rank">{{ item.rank }}</span>
-      <span class="name">{{ classLabel(item.className) }}</span>
+      <button class="name" title="看班级详情" @click="emit('pick', item.className)">
+        {{ classLabel(item.className) }}
+      </button>
       <span class="bar-box">
         <span
           class="bar"
@@ -132,6 +138,26 @@ function shortLabel(className: string) {
 
 .name {
   width: 86px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.name:hover {
+  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
+}
+
+.pk {
+  margin-left: auto;
+  font-size: 12px;
+  color: v-bind("theme.primaryColor");
+  text-decoration: none;
   white-space: nowrap;
 }
 

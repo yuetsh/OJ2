@@ -18,6 +18,7 @@ import { USERNAME_CLASS_RE } from "utils/constants"
 import { parseTime } from "utils/functions"
 import ChampionList from "./components/ChampionList.vue"
 import ClassBattle from "./components/ClassBattle.vue"
+import ClassDetailDrawer from "./components/ClassDetailDrawer.vue"
 import RankMe, { type MiniRank } from "./components/RankMe.vue"
 import RankPodium from "./components/RankPodium.vue"
 import RankTrack from "./components/RankTrack.vue"
@@ -86,8 +87,11 @@ async function load() {
   loading.value = true
   try {
     board.value = await fetchBoard(scope.value, period.value)
-    if (teacher.value && !teacherClass.value && board.value.scope !== "all")
-      teacherClass.value = board.value.scope === "class" ? (board.value.className ?? "") : ""
+    // 老师在「全部」时点了本班：后端挑了最近上课的班，回填到下拉框（这一下不用再取一遍）
+    if (teacher.value && !teacherClass.value && board.value.scope === "class") {
+      backfilling = true
+      teacherClass.value = board.value.className ?? ""
+    }
   } catch {
     board.value = null
   } finally {
@@ -131,6 +135,9 @@ async function expand() {
   }
 }
 
+let backfilling = false
+
+/** 范围、时间、老师选的班：三个一起变（下拉框选班会顺手改范围）也只取一次 */
 watch([scope, period, teacherClass], () => {
   router.replace({
     query: {
@@ -140,19 +147,15 @@ watch([scope, period, teacherClass], () => {
       class: teacher.value && teacherClass.value ? teacherClass.value : undefined,
     },
   })
-})
-watch([scope, period], load)
-watch(teacherClass, (value, old) => {
-  // 后端回填的那一下（空 → 班号）不用再取一遍
-  if (old || !board.value || board.value.className !== value) {
-    cache.clear()
-    load()
-  }
+  if (backfilling) backfilling = false
+  else load()
 })
 
 onMounted(async () => {
   if (!userStore.user) await userStore.getMyProfile().catch(() => {})
-  scope.value = pick(route.query.scope, SCOPE_OPTIONS, canScopeClass.value ? "class" : "all")
+  // 老师默认看全部（用户定的），要看哪个班自己在下拉框里选；学生默认看本班
+  const fallback = teacher.value ? "all" : canScopeClass.value ? "class" : "all"
+  scope.value = pick(route.query.scope, SCOPE_OPTIONS, fallback)
   if (!canScopeClass.value && scope.value !== "all") scope.value = "all"
   loadBattle()
   // scope 从 "all" 改成别的会触发 watch 去取；没改就自己取
@@ -160,7 +163,19 @@ onMounted(async () => {
 })
 
 /** 班级那几块（走势、这周本班、每周冠军、班级对抗高亮）对的是哪个班 */
-const classContext = computed(() => (teacher.value ? teacherClass.value : myClass.value) || null)
+const classContext = computed(
+  () => (teacher.value ? (scope.value === "all" ? "" : teacherClass.value) : myClass.value) || null,
+)
+
+/** 老师的班级下拉框：「全部」就是全服，选了班就切到本班（本年级时留在本年级） */
+const pickedClass = computed({
+  get: () => (scope.value === "all" ? "" : teacherClass.value),
+  set: (value: string) => {
+    teacherClass.value = value
+    if (!value) scope.value = "all"
+    else if (scope.value === "all") scope.value = "class"
+  },
+})
 
 const rows = computed(() => board.value?.rows ?? [])
 const podium = computed(() => rows.value.filter((row) => row.rank <= 3 && row.solved > 0))
@@ -239,7 +254,10 @@ const teacherClassOptions = computed(() => {
   const list = configStore.config?.classList ?? []
   const all =
     teacherClass.value && !list.includes(teacherClass.value) ? [teacherClass.value, ...list] : list
-  return all.map((name) => ({ label: classLabel(name), value: name }))
+  return [
+    { label: "全部", value: "" },
+    ...all.map((name) => ({ label: classLabel(name), value: name })),
+  ]
 })
 
 const myBattle = computed(() => battle.value.find((item) => item.className === classContext.value))
@@ -250,7 +268,7 @@ const daysLeft = computed(() => {
   return Math.max(1, Math.ceil((Date.parse(start) + 7 * 86_400_000 - Date.now()) / 86_400_000))
 })
 
-/** 走势图三条线：在追你的、你要追的、你（画在最上面） */
+/** 走势图三条线：后一名、前一名、你（画在最上面） */
 const trendLines = computed(() => {
   const b = board.value
   if (!b?.me) return []
@@ -287,8 +305,21 @@ watch(phoneTabs, (tabs) => {
   if (!tabs.some((tab) => tab.key === phoneTab.value)) phoneTab.value = "battle"
 })
 
+/** 班级详情（+ 老师的 AI 分析）：点班级对抗里的班名、或老师「这个班」卡上的按钮 */
+const detailClass = ref<string | null>(null)
+const showDetail = ref(false)
+function openDetail(className: string) {
+  detailClass.value = className
+  showDetail.value = true
+}
+
 function open(username: string) {
   router.push({ path: "/user", query: { name: username } })
+}
+
+/** 老师看某个学生的智能分析（那一页本来就支持 ?username=） */
+function openAnalysis(username: string) {
+  router.push({ path: "/ai-analysis", query: { username } })
 }
 
 function openSubmissions(username: string) {
@@ -350,8 +381,8 @@ async function restore(userId: number) {
         </button>
       </div>
       <n-select
-        v-if="teacher && scope !== 'all'"
-        v-model:value="teacherClass"
+        v-if="teacher"
+        v-model:value="pickedClass"
         class="class-select"
         size="small"
         filterable
@@ -373,8 +404,8 @@ async function restore(userId: number) {
             <div class="spacer" />
             <span v-if="!teacher && me" class="legend">
               <span><i :style="{ background: palette.me }" />你</span>
-              <span v-if="board.ahead"><i :style="{ background: palette.chase }" />你要追的</span>
-              <span v-if="board.behind"><i :style="{ background: palette.threat }" />在追你的</span>
+              <span v-if="board.ahead"><i :style="{ background: palette.chase }" />前一名</span>
+              <span v-if="board.behind"><i :style="{ background: palette.threat }" />后一名</span>
               <span v-if="mateClass"><i :style="{ background: palette.mate }" />你们班</span>
             </span>
           </div>
@@ -402,6 +433,7 @@ async function restore(userId: number) {
             @open="open"
             @expand="expand"
             @submissions="openSubmissions"
+            @analysis="openAnalysis"
             @hide="hide"
           />
         </template>
@@ -438,6 +470,18 @@ async function restore(userId: number) {
                 <span>这周人均涨</span><b>+{{ myBattle.weekGain }}</b>
               </div>
             </div>
+            <div class="actions">
+              <n-button
+                v-if="classContext"
+                size="small"
+                secondary
+                type="info"
+                @click="openDetail(classContext)"
+              >
+                班级详情 · AI 分析
+              </n-button>
+              <n-button size="small" secondary @click="router.push('/class')">班级 PK</n-button>
+            </div>
             <div class="hidden-list">
               <span class="hidden-title">不计入排名的人</span>
               <template v-if="board.scope === 'class'">
@@ -457,13 +501,20 @@ async function restore(userId: number) {
             <span class="muted">做对 1 道新题就能上榜</span>
           </div>
         </template>
-        <ClassBattle v-if="isDesktop" :items="battle" :mine="classContext" :teacher="teacher" />
+        <ClassBattle
+          v-if="isDesktop"
+          :items="battle"
+          :mine="classContext"
+          :teacher="teacher"
+          :pk="userStore.isAdminRole"
+          @pick="openDetail"
+        />
       </aside>
     </div>
     <div v-if="isDesktop && classContext" class="below">
       <div v-if="board?.trend && me" class="card">
         <div class="card-title">
-          <b>我和对手的名次</b><span class="muted">每周日晚上 · 越高越好</span>
+          <b>我和前后一名的名次</b><span class="muted">每周日晚上 · 越高越好</span>
         </div>
         <RankTrend :trend="board.trend" :lines="trendLines" />
       </div>
@@ -509,6 +560,8 @@ async function restore(userId: number) {
           :items="battle"
           :mine="classContext"
           :teacher="teacher"
+          :pk="userStore.isAdminRole"
+          @pick="openDetail"
         />
         <RankTrend
           v-else-if="phoneTab === 'trend' && board?.trend"
@@ -529,6 +582,12 @@ async function restore(userId: number) {
         />
       </div>
     </div>
+    <ClassDetailDrawer
+      v-model:show="showDetail"
+      :class-name="detailClass"
+      :teacher="teacher"
+      :pk="userStore.isAdminRole"
+    />
   </div>
 </template>
 
@@ -707,6 +766,11 @@ async function restore(userId: number) {
 .stats b {
   font-size: 18px;
   font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
 }
 
 .hidden-list {

@@ -29,7 +29,7 @@ export const rankRowSchema = z.object({
   change: z.number().int().nullable(),
 })
 
-/** 我和对手每周的名次，给「我和对手的名次」那张走势图 */
+/** 我和前后一名每周的名次，给「我和前后一名的名次」那张走势图 */
 export const rankTrendSchema = z.object({
   /** 每个点的时刻（周一零点，也就是上周日晚上），最后一个是现在 */
   points: z.array(z.string()),
@@ -101,3 +101,48 @@ export type RankBoard = z.infer<typeof rankBoardSchema>
 export type ClassBattleItem = z.infer<typeof classBattleItemSchema>
 export type WeeklyChampion = z.infer<typeof weeklyChampionSchema>
 export type RankHiddenRequest = z.infer<typeof rankHiddenRequestSchema>
+
+/**
+ * 班级详情（设计稿「班级详情 · 老师 / 学生」）。原来弹框里的四分位数、四分位距、标准差、
+ * 综合分都去掉了，只留一眼看得懂的数：人均、中间那位同学、做对过的人、前后 10%、全班分布、
+ * 每周人均和年级比。口径和排名页一样：这学期第一次做对的题，不计入排名的人不算。
+ */
+export const classDetailSchema = z.object({
+  className: z.string(),
+  /** 这学期从哪天算起 */
+  start: z.string(),
+  members: z.number().int().nonnegative(),
+  /** 班级对抗里第几、一共几个班；这学期还没做对过题的班没有名次 */
+  rank: z.number().int().positive().nullable(),
+  battleSize: z.number().int().nonnegative(),
+  perCapita: z.number(),
+  /** 同年级在用的班（这学期做对过题）的人均；没有为 null */
+  gradeAvg: z.number().nullable(),
+  /** 中间那位同学做对几道 */
+  median: z.number(),
+  /** 这学期做对过至少 1 道的人数 */
+  solvedMembers: z.number().int().nonnegative(),
+  top10Avg: z.number(),
+  bottom10Avg: z.number(),
+  /** 人最多的那一档同分（至少 5 人才算「停在这」），没有为 null */
+  plateau: z.object({ solved: z.number().int(), count: z.number().int() }).nullable(),
+  /** 每个同学这学期做对几道，画分布点阵用 */
+  distribution: z.array(z.number().int().nonnegative()),
+  /** 这学期每周（周一起）人均新做对，和同年级在用的班平均比 */
+  weeks: z.array(
+    z.object({ weekStart: z.string(), perCapita: z.number(), gradeAvg: z.number().nullable() }),
+  ),
+  /** 要多关心的同学（这学期做对不到 3 道），只给老师；学生拿到的是 null */
+  care: z
+    .array(
+      z.object({
+        user: sampleUserSchema,
+        avatar: z.string().nullable(),
+        solved: z.number().int().nonnegative(),
+        submissions: z.number().int().nonnegative(),
+      }),
+    )
+    .nullable(),
+})
+
+export type ClassDetail = z.infer<typeof classDetailSchema>

@@ -3,7 +3,6 @@ import {
   rankPeriodSchema,
   rankScopeSchema,
   STUDENT_ROLES,
-  type ClassBattleItem,
   type RankBoard,
   type RankPeriod,
   type RankRow,
@@ -11,28 +10,24 @@ import {
   type SampleUser,
   type WeeklyChampion,
 } from "@oj2/contract"
-import {
-  and,
-  countDistinct,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  like,
-  min,
-  ne,
-  type SQL,
-} from "drizzle-orm"
+import { and, countDistinct, desc, eq, gte, inArray, isNotNull, ne } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
-import { JudgeStatus } from "../judge/status"
 import { dayStart, termStart, weekStart } from "../time"
-import { isTeacherOrAbove, rounded, sampleUser } from "./helpers"
+import {
+  audienceWhere,
+  classBattle,
+  classDetail,
+  loadEntrants,
+  rankedStudents,
+  standings,
+  WEEK_MS,
+  type Standing,
+} from "../services/ranking"
+import { isTeacherOrAbove, sampleUser } from "./helpers"
 
 /**
  * 排名页（设计稿「排名重设计」G1–G3）。口径见契约 `ranking.ts` 的注释：
@@ -40,12 +35,9 @@ import { isTeacherOrAbove, rounded, sampleUser } from "./helpers"
  */
 export const rankingRoutes = new Hono<AppEnv>()
 
-/** AST_CHECK_FAILED 也是答案对了，与周榜、课堂条同口径 */
-const SOLVED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
-
 /** 本年级 / 全服的榜面：前面这么多人 + 我附近一段，中间折起来 */
 const BOARD_HEAD = 16
-/** 我附近一段：前面 5 个、后面 7 个（前面的人是要追的，多给后面几个看「谁在追我」） */
+/** 我附近一段：前面 5 个、后面 7 个（多给后面几个：看得到后面的人离自己多近） */
 const WINDOW_BEFORE = 5
 const WINDOW_AFTER = 7
 /** 没有「我」（老师、没上榜）时榜面给多少 */
@@ -54,130 +46,6 @@ const BOARD_HEAD_NO_ME = 30
 const TREND_WEEKS = 4
 /** 每周冠军列几周 */
 const CHAMPION_WEEKS = 3
-
-const WEEK_MS = 7 * 86_400_000
-
-/** 入榜人群：正常状态的学生与学生管理员，老师设成不计入排名的不算 */
-const rankedStudents = and(
-  inArray(schema.user.adminType, [...STUDENT_ROLES]),
-  eq(schema.user.isDisabled, false),
-  isNull(schema.user.rankHiddenAt),
-)!
-
-interface Entrant {
-  id: number
-  username: string
-  className: string | null
-  avatar: string | null
-  /** 每道题第一次做对的时刻，升序；毫秒数用来比较，原文留着给出参 */
-  times: number[]
-  stamps: string[]
-}
-
-interface Standing {
-  entrant: Entrant
-  rank: number
-  solved: number
-  reachedAt: string | null
-}
-
-function audienceWhere(scope: RankScope, className: string | null) {
-  if (scope === "class") return and(rankedStudents, eq(schema.user.className, className!))!
-  if (scope === "grade") return and(rankedStudents, like(schema.user.className, `${className}%`))!
-  return rankedStudents
-}
-
-function avatarOf(avatar: string | null) {
-  return !avatar || avatar.endsWith("/default.png") ? null : avatar
-}
-
-/**
- * 这群人、从 `since` 起每道题第一次做对的时刻。
- *
- * 先按 (人, 题) 取全部历史里的最早一次，再用 having 卡 `>= since` —— 这样「这学期」数的是
- * 这学期**第一次**做对的题，以前做对过的老题这学期重交一遍不算。比赛里的提交不算。
- * 走 `submission_public_metrics_idx`（user_id, problem_id, result, create_time，WHERE
- * contest_id IS NULL），全服全部历史实测 24ms。
- */
-async function loadEntrants(where: SQL, since: string | null): Promise<Entrant[]> {
-  const firstSolved = min(schema.submission.createTime)
-  const [people, solves] = await Promise.all([
-    db
-      .select({
-        id: schema.user.id,
-        username: schema.user.username,
-        className: schema.user.className,
-        avatar: schema.userProfile.avatar,
-      })
-      .from(schema.user)
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(where),
-    db
-      .select({ userId: schema.submission.userId, at: firstSolved })
-      .from(schema.submission)
-      .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-      .where(
-        and(
-          where,
-          isNull(schema.submission.contestId),
-          inArray(schema.submission.result, SOLVED_RESULTS),
-        ),
-      )
-      .groupBy(schema.submission.userId, schema.submission.problemId)
-      .having(since ? gte(firstSolved, since) : undefined),
-  ])
-
-  const byUser = new Map<number, string[]>()
-  for (const row of solves) {
-    if (!row.at) continue
-    const list = byUser.get(row.userId)
-    if (list) list.push(row.at)
-    else byUser.set(row.userId, [row.at])
-  }
-  return people.map((person) => {
-    const pairs = (byUser.get(person.id) ?? [])
-      .map((stamp) => [Date.parse(stamp), stamp] as const)
-      .sort((a, b) => a[0] - b[0])
-    return {
-      id: person.id,
-      username: person.username,
-      className: person.className,
-      avatar: avatarOf(person.avatar),
-      times: pairs.map(([time]) => time),
-      stamps: pairs.map(([, stamp]) => stamp),
-    }
-  })
-}
-
-/**
- * `cutoff` 那一刻的名次（不给就是现在）。一样多的先做到的在前，再一样按 id ——
- * 第三档不是凑数：同一秒做到的确实有（一节课的最后一道），没有稳定的兜底键名次会跳。
- * `includeZero`：本班把一道没做对的也排上（全班名单），本年级 / 全服不排。
- */
-function standings(entrants: Entrant[], cutoff: number | null, includeZero: boolean) {
-  const list = entrants
-    .map((entrant) => {
-      let solved = entrant.times.length
-      if (cutoff !== null) {
-        solved = 0
-        while (solved < entrant.times.length && entrant.times[solved]! < cutoff) solved++
-      }
-      return {
-        entrant,
-        solved,
-        reached: solved ? entrant.times[solved - 1]! : Number.POSITIVE_INFINITY,
-        reachedAt: solved ? entrant.stamps[solved - 1]! : null,
-      }
-    })
-    .filter((row) => includeZero || row.solved > 0)
-    .sort((a, b) => b.solved - a.solved || a.reached - b.reached || a.entrant.id - b.entrant.id)
-  return list.map((row, index): Standing => ({
-    entrant: row.entrant,
-    rank: index + 1,
-    solved: row.solved,
-    reachedAt: row.reachedAt,
-  }))
-}
 
 function toRow(standing: Standing, change: number | null): RankRow {
   const { entrant } = standing
@@ -311,7 +179,7 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
         )
       : null
 
-  // 一道没做对就不算上榜（本班的全班名单里也列着他，但没有名次可说，也没有对手）
+  // 一道没做对就不算上榜（本班的全班名单里也列着他，但没有名次可说，也没有前后一名）
   const meIndex = user ? now.findIndex((row) => row.entrant.id === user.id && row.solved > 0) : -1
   const me = meIndex >= 0 ? now[meIndex] : undefined
 
@@ -369,42 +237,19 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
 })
 
 /**
- * 班级对抗：全服每个班这学期人均做对几道，外加这周人均涨了多少。人均而不是总数 ——
- * 班级人数从 11 到 58 都有，比总数等于比人多。这学期一道没做对的班不列（还没开始用）。
- * 不计入排名的人分子分母都不算：抄来的题不该替全班加分。
+ * 班级对抗：全服每个班这学期人均做对几道，外加这周人均涨了多少（口径见 services/ranking.ts
+ * 的 classBattle）
  */
 rankingRoutes.get("/rankings/classes", async (c) => {
-  const where = and(
-    rankedStudents,
-    isNotNull(schema.user.className),
-    ne(schema.user.className, ""),
-  )!
-  const term = termStart()
-  const week = Date.parse(weekStart())
-  const entrants = await loadEntrants(where, term)
+  const { items } = await classBattle()
+  return success(c, items)
+})
 
-  const classes = new Map<string, { members: number; term: number; week: number }>()
-  for (const entrant of entrants) {
-    const entry = classes.get(entrant.className!) ?? { members: 0, term: 0, week: 0 }
-    entry.members++
-    entry.term += entrant.times.length
-    entry.week += entrant.times.filter((time) => time >= week).length
-    classes.set(entrant.className!, entry)
-  }
-
-  const result = [...classes]
-    .filter(([, entry]) => entry.term > 0)
-    .map(([className, entry]) => ({
-      className,
-      members: entry.members,
-      perCapita: rounded(entry.term / entry.members, 1),
-      weekGain: rounded(entry.week / entry.members, 1),
-    }))
-    .sort((a, b) => b.perCapita - a.perCapita || b.weekGain - a.weekGain)
-  return success(
-    c,
-    result.map((item, index) => ({ ...item, rank: index + 1 }) satisfies ClassBattleItem),
-  )
+/** 班级详情：谁都能看（原来的弹框就是），「要多关心的同学」只给老师 */
+rankingRoutes.get("/rankings/class-detail", optionalAuth, async (c) => {
+  const className = c.req.query("className")?.trim()
+  if (!className) return failure(c, 400, "class-missing", "没有班级")
+  return success(c, await classDetail(className, isTeacherOrAbove(c.get("user"))))
 })
 
 /** 本班每周冠军：最近几个已经结束的周，每周新做对最多的那个人（一样多先做到的） */

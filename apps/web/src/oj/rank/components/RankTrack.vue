@@ -36,6 +36,7 @@ const emit = defineEmits<{
   open: [username: string]
   expand: []
   submissions: [username: string]
+  analysis: [username: string]
   hide: [row: RankRow]
 }>()
 
@@ -130,11 +131,13 @@ function width(row: RankRow) {
 
 const menu: DropdownOption[] = [
   { label: "看他的提交", key: "submissions" },
+  { label: "看他的智能分析", key: "analysis" },
   { label: "不计入排名…", key: "hide" },
 ]
 
 function onMenu(key: string, row: RankRow) {
   if (key === "submissions") emit("submissions", row.user.username)
+  else if (key === "analysis") emit("analysis", row.user.username)
   else emit("hide", row)
 }
 </script>
@@ -165,9 +168,9 @@ function onMenu(key: string, row: RankRow) {
           <button class="who" @click="emit('open', item.row.user.username)">
             <UserName :username="item.row.user.username" />
           </button>
-          <span v-if="item.row.user.id === chaseId" class="tag chase">要追</span>
-          <span v-else-if="item.row.user.id === threatId" class="tag threat">追你</span>
-          <span v-else-if="item.row.user.id === hotId" class="tag hot">冲得最猛</span>
+          <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
+          <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
+          <span v-else-if="item.row.user.id === hotId" class="tag hot">进步最大</span>
           <span class="solved">{{ item.row.solved }}</span>
           <span class="change">
             <span v-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
@@ -208,9 +211,9 @@ function onMenu(key: string, row: RankRow) {
             <span v-else-if="item.row.change === 0" class="flat">—</span>
           </span>
           <span class="tag-box">
-            <span v-if="item.row.user.id === chaseId" class="tag chase">要追</span>
-            <span v-else-if="item.row.user.id === threatId" class="tag threat">追你</span>
-            <span v-else-if="item.row.user.id === hotId" class="tag hot">冲得最猛</span>
+            <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
+            <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
+            <span v-else-if="item.row.user.id === hotId" class="tag hot">进步最大</span>
           </span>
           <n-dropdown
             v-if="teacher"

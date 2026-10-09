@@ -14,7 +14,10 @@ export interface MiniRank {
 
 /**
  * 「你」那张卡：大字第几名、比周一升了几名，一句最能推人一把的话（离领奖台几道 / 升了几名），
- * 再是两个对手 —— 前面那个要追的、后面那个在追你的，差几秒、差几道都写出来。
+ * 再是前一名、后一名，差几秒、差几道都写出来。
+ *
+ * 用词只说位置（前一名 / 后一名 / 进步最大），不用「追」「对手」「冲」：用户指出
+ * 「要追的」「追你」会被中学生读成追求谁，「冲得最猛」也容易误会。
  */
 const props = defineProps<{
   me: RankRow
@@ -25,7 +28,7 @@ const props = defineProps<{
   total: number
   label: string
   minis: MiniRank[]
-  /** 手机：对手的说明换到名字下面一行，别被截断 */
+  /** 手机：前后一名的说明换到名字下面一行，别被截断 */
   compact?: boolean
 }>()
 
@@ -33,7 +36,7 @@ const theme = useThemeVars()
 
 const headline = computed(() => {
   const { me, ahead, third } = props
-  if (me.rank === 1) return "你是第一名，后面的人在追你"
+  if (me.rank === 1) return "你是第一名"
   if (me.rank <= 3 && ahead)
     return `你在领奖台上 · 再做对 ${toPass(me, ahead)} 道就是第 ${ahead.rank} 名`
   if (third) {
@@ -47,13 +50,13 @@ const headline = computed(() => {
 
 function chaseNote(me: RankRow, ahead: RankRow) {
   if (ahead.solved === me.solved && ahead.reachedAt && me.reachedAt)
-    return `早你 ${gapText(ahead.reachedAt, me.reachedAt)}做到 ${me.solved} 道`
+    return `比你早 ${gapText(ahead.reachedAt, me.reachedAt)}做到 ${me.solved} 道`
   return `比你多 ${ahead.solved - me.solved} 道`
 }
 
 function threatNote(me: RankRow, behind: RankRow) {
   if (behind.solved === me.solved && behind.reachedAt && me.reachedAt)
-    return `只比你晚 ${gapText(me.reachedAt, behind.reachedAt)}，再做对 1 道就超过你`
+    return `比你晚 ${gapText(me.reachedAt, behind.reachedAt)}做到 ${me.solved} 道`
   if (!behind.solved) return "还没做对"
   return `比你少 ${me.solved - behind.solved} 道`
 }
@@ -92,13 +95,13 @@ function threatNote(me: RankRow, behind: RankRow) {
       <b>{{ headline }}</b>
     </div>
     <div v-if="ahead" class="rival">
-      <span class="tag chase">要追</span>
+      <span class="tag chase">前一名</span>
       <RankAvatar :username="ahead.user.username" :avatar="ahead.avatar" :size="20" />
       <UserName :username="ahead.user.username" class="rival-name" />
       <span class="note">{{ chaseNote(me, ahead) }}</span>
     </div>
     <div v-if="behind" class="rival">
-      <span class="tag threat">追你</span>
+      <span class="tag threat">后一名</span>
       <RankAvatar :username="behind.user.username" :avatar="behind.avatar" :size="20" />
       <UserName :username="behind.user.username" class="rival-name" />
       <span class="note">{{ threatNote(me, behind) }}</span>
@@ -112,6 +115,22 @@ function threatNote(me: RankRow, behind: RankRow) {
         <b v-else class="none">没上榜</b>
       </button>
     </div>
+    <router-link to="/ai-analysis" class="analysis">
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+      </svg>
+      看我的智能分析：哪类题卡得多、哪段时间最常做题 ›
+    </router-link>
   </div>
 </template>
 
@@ -236,6 +255,21 @@ function threatNote(me: RankRow, behind: RankRow) {
 .tag.threat {
   color: #c76a12;
   background: rgba(199, 106, 18, 0.12);
+}
+
+.analysis {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(24, 160, 88, 0.3);
+  font-size: 13px;
+  color: #2f6fd0;
+  text-decoration: none;
+}
+
+.analysis:hover {
+  text-decoration: underline;
 }
 
 .minis {

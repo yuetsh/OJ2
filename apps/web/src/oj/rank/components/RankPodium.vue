@@ -7,7 +7,7 @@ import RankAvatar from "./RankAvatar.vue"
 
 /**
  * 领奖台：前三名站在台阶上，第一名戴皇冠。赛道从第 4 名接着排，前三不再出现第二遍。
- * 你要追的人站在台上时台阶描蓝边、挂「你要追的」，和赛道里的蓝条是一回事。
+ * 你的前一名站在台上时台阶描蓝边、挂「前一名」，和赛道里的蓝条是一回事。
  */
 const props = defineProps<{
   rows: RankRow[]
@@ -49,8 +49,8 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
         >
           <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
         </svg>
-        <span v-if="row.user.id === chaseId" class="tag chase">你要追的</span>
-        <span v-else-if="row.user.id === threatId" class="tag threat">在追你</span>
+        <span v-if="row.user.id === chaseId" class="tag chase">前一名</span>
+        <span v-else-if="row.user.id === threatId" class="tag threat">后一名</span>
         <span v-else-if="row.user.id === meId" class="tag me">你</span>
       </div>
       <RankAvatar

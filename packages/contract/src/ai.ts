@@ -232,8 +232,12 @@ export type HintDiagnosis = z.infer<typeof hintDiagnosisSchema>
  */
 export const aiHintFeedbackRequestSchema = z.object({ helpful: z.boolean() })
 
+/**
+ * 班级 AI 分析只传班号，数字在服务端按「班级详情」那一套现算 —— 原来是前端把弹框里的
+ * 统计值整包传上来，报告和抽屉里看到的数字可能对不上
+ */
 export const classAnalysisRequestSchema = z.object({
-  comparison: z.record(z.string(), z.unknown()),
+  className: z.string().trim().min(1).max(32),
 })
 
 export const classPkAnalysisRequestSchema = z.object({

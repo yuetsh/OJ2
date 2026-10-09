@@ -6,7 +6,7 @@ import { USERNAME_CLASS_RE } from "utils/constants"
 /**
  * 排名页的头像。九成以上的学生没换过头像（1797 个号是 default.png），一排一模一样的
  * 默认图分不出人，所以默认头像画成「名字最后一个字 + 彩色圆」，颜色按用户名固定 ——
- * 同一个人在领奖台、赛道、对手卡里是同一个颜色。自己是实心绿。
+ * 同一个人在领奖台、赛道、「你」那张卡里是同一个颜色。自己是实心绿。
  */
 const props = defineProps<{
   username: string

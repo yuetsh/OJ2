@@ -5,7 +5,7 @@ import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
 import RankAvatar from "./RankAvatar.vue"
 
-/** 本班最近几周的每周冠军，底下再挂这张榜上「冲得最猛」的那个人 */
+/** 本班最近几周的每周冠军，底下再挂这张榜上「进步最大」的那个人 */
 defineProps<{
   champions: WeeklyChampion[]
   hot: RankRow | null
@@ -51,7 +51,7 @@ function weekLabel(start: string) {
     </div>
     <span v-if="!champions.length" class="muted">最近几周还没有冠军</span>
     <div v-if="hot" class="row hot-line">
-      <span class="hot-tag">冲得最猛</span>
+      <span class="hot-tag">进步最大</span>
       <RankAvatar
         :username="hot.user.username"
         :avatar="hot.avatar"
