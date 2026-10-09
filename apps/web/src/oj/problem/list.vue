@@ -245,8 +245,18 @@ watch([showTypeMenu, () => showMobileFilters.value, countFilters], () => {
   if (showTypeMenu.value || showMobileFilters.value) refreshTypeCounts()
 })
 
+/**
+ * 当前条件下一道都没有的类型置灰：点了只会得到一个空列表。
+ * 已经选中的那一项除外 —— 选了「画流程图」再切到一个没有这类题的知识点，它变成 0 道，
+ * 置灰的话看着像没选中，人也不知道列表为什么空了
+ */
+function typeEmpty(kind: ProblemTypeFilter) {
+  return typeCounts.value[kind] === 0 && query.type !== kind
+}
+
 const mobileTypeOptions = computed(() =>
   TYPES.map((kind) => ({
+    disabled: typeEmpty(kind),
     label:
       typeCounts.value[kind] === undefined
         ? PROBLEM_TYPE_LABEL[kind]
@@ -413,6 +423,8 @@ const gridColumns = computed(() =>
                 v-for="kind in TYPES"
                 :key="kind"
                 :class="{ on: query.type === kind }"
+                :disabled="typeEmpty(kind)"
+                :title="typeEmpty(kind) ? '这里没有这类题' : undefined"
                 @click="pickType(kind)"
               >
                 <span class="check"><Icon v-if="query.type === kind" icon="ph:check-bold" /></span>
@@ -867,8 +879,14 @@ const gridColumns = computed(() =>
   color: var(--menu-text);
 }
 
-.type-menu button:hover {
+.type-menu button:hover:not(:disabled) {
   background: var(--menu-hover);
+}
+
+/* 没有这类题：整项淡下去（标签自己的颜色也一起），不能点 */
+.type-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .type-menu button.on {
