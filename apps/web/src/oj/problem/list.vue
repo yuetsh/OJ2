@@ -746,9 +746,8 @@ const gridColumns = computed(() =>
 }
 
 .hitokoto {
-  flex: 0 1 420px;
-  max-width: 420px;
-  font-size: 13px;
+  flex: 0 1 460px;
+  max-width: 460px;
 }
 
 .anon {

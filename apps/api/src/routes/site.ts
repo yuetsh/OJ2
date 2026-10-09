@@ -39,29 +39,40 @@ const fallbackQuotes = [
   {
     hitokoto: "程序首先是写给人读的，其次才是让机器执行。",
     from: "Structure and Interpretation of Computer Programs",
+    fromWho: null,
+    type: null,
   },
-  { hitokoto: "把大问题拆成足够小的问题，答案就会浮现。", from: "判题狗" },
-  { hitokoto: "一次没通过，只是多得到了一条线索。", from: "判题狗" },
-]
+  {
+    hitokoto: "把大问题拆成足够小的问题，答案就会浮现。",
+    from: "判题狗",
+    fromWho: null,
+    type: null,
+  },
+  { hitokoto: "一次没通过，只是多得到了一条线索。", from: "判题狗", fromWho: null, type: null },
+] satisfies Quote[]
 
 // categories.json 里的 path 形如 "./sentences/a.json"，12 个分类合计 20MB。
-// 按分类懒加载并常驻缓存，但**只留前端用得上的两个字段** —— 原样缓存的话，
-// 解析后的对象要占 60~100MB，而 api 容器只有 512m。裁完全量也就几 MB。
-let categoryPaths: string[] | null = null
+// 按分类懒加载并常驻缓存，但**只留前端用得上的几个字段**（句子、出处、谁说的、分类名）——
+// 原样缓存的话，解析后的对象要占 60~100MB，而 api 容器只有 512m。裁完全量也就几 MB。
+let categories: { path: string; name: string | null }[] | null = null
 const sentenceCache = new Map<string, Quote[]>()
 
-async function loadSentences(path: string) {
+async function loadSentences(path: string, type: string | null) {
   const cached = sentenceCache.get(path)
   if (cached) return cached
   const raw = (await Bun.file(resolve(config.hitokotoDirectory, path)).json()) as {
     hitokoto?: unknown
     from?: unknown
+    from_who?: unknown
   }[]
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null)
   const rows = (Array.isArray(raw) ? raw : [])
     .filter((it) => typeof it.hitokoto === "string" && it.hitokoto.length > 0)
     .map((it) => ({
       hitokoto: it.hitokoto as string,
-      from: typeof it.from === "string" ? it.from : "佚名",
+      from: text(it.from) ?? "佚名",
+      fromWho: text(it.from_who),
+      type,
     }))
   if (rows.length === 0) throw new Error(`empty hitokoto category: ${path}`)
   sentenceCache.set(path, rows)
@@ -69,18 +80,19 @@ async function loadSentences(path: string) {
 }
 
 async function randomQuote() {
-  if (!categoryPaths) {
-    const categories = (await Bun.file(
-      resolve(config.hitokotoDirectory, "categories.json"),
-    ).json()) as { path?: string }[]
-    const paths = categories
-      .map((it) => it.path)
-      .filter((it): it is string => typeof it === "string")
-    if (paths.length === 0) throw new Error("no hitokoto categories")
-    categoryPaths = paths
+  if (!categories) {
+    const list = (await Bun.file(resolve(config.hitokotoDirectory, "categories.json")).json()) as {
+      path?: unknown
+      name?: unknown
+    }[]
+    const parsed = list
+      .filter((it): it is { path: string; name?: unknown } => typeof it.path === "string")
+      .map((it) => ({ path: it.path, name: typeof it.name === "string" ? it.name : null }))
+    if (parsed.length === 0) throw new Error("no hitokoto categories")
+    categories = parsed
   }
-  const path = categoryPaths[Math.floor(Math.random() * categoryPaths.length)]!
-  const sentences = await loadSentences(path)
+  const category = categories[Math.floor(Math.random() * categories.length)]!
+  const sentences = await loadSentences(category.path, category.name)
   return sentences[Math.floor(Math.random() * sentences.length)]!
 }
 
