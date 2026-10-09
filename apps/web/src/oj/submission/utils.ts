@@ -15,9 +15,12 @@ export function submissionTimeText(time: string, withSeconds = false) {
   return `${parseTime(time, "YYYY年M月D日")} ${clock}`
 }
 
-/** 列表里每行只写钟点，日期在分隔行上（submissionDayText） */
+/**
+ * 列表里每行只写钟点，日期在分隔行上（submissionDayText）。带秒：同一分钟里一个人
+ * 连交好几次是常事，只写到分钟就分不清先后
+ */
 export function submissionClockText(time: string) {
-  return parseTime(time, "HH:mm")
+  return parseTime(time, "HH:mm:ss")
 }
 
 /** 分隔行上的日子：今天 / 昨天 / 9月28日（跨年带年份） */

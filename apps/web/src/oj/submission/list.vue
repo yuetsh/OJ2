@@ -1407,8 +1407,9 @@ function dayBreak(index: number) {
   white-space: nowrap;
 }
 
+/* 「23:59:59」8 个等宽数字 */
 .c-time {
-  width: 44px;
+  width: 60px;
   flex: none;
   font-size: 13px;
   color: v-bind("theme.textColor3");
