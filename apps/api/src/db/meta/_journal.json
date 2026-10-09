@@ -197,6 +197,13 @@
       "when": 1791554831341,
       "tag": "0027_problemset_retire_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791555181872,
+      "tag": "0028_drop_problemset_leftovers",
+      "breakpoints": true
     }
   ]
 }
