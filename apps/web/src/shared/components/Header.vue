@@ -427,15 +427,29 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
 }
 </style>
 
-<!-- 暗色开关那一行是 render 出来挂在 dropdown 里的（teleport 到 body），scoped 够不着 -->
+<!-- 暗色开关那一行是 render 出来挂在 dropdown 里的（teleport 到 body），scoped 够不着。
+     字色、悬停底色要自己取 dropdown 的变量：teleport 出去就不在主题的容器里了，继承到的是
+     body 的黑字，暗色下黑字压在深灰底上看不见 -->
 <style>
 .theme-row {
   display: flex;
   align-items: center;
   gap: 10px;
   height: 40px;
-  padding: 0 14px 0 12px;
+  margin: 0 4px;
+  padding: 0 10px 0 8px;
+  border-radius: var(--n-border-radius);
+  color: var(--n-option-text-color);
   cursor: pointer;
+}
+
+.theme-row:hover {
+  color: var(--n-option-text-color-hover);
+  background-color: var(--n-option-color-hover);
+}
+
+.theme-row > svg {
+  color: var(--n-prefix-color);
 }
 
 .theme-row .theme-label {
