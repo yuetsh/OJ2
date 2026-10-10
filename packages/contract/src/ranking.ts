@@ -19,6 +19,12 @@ export const rankRowSchema = z.object({
   /** 自己上传的头像；还是默认头像时为 null，前端画名字最后一个字 */
   avatar: z.string().nullable(),
   className: z.string().nullable(),
+  /**
+   * 个性签名，没写为 null。学生拿它展示个性、炫耀（用户 2026-10-10 定的要露出来）：
+   * 领奖台上、「你」卡、前后一名、赛道悬停都挂着。老规矩写到 256 字，现在限 30 字，
+   * 老的长签名前端只露两行、指上去看全文
+   */
+  mood: z.string().nullable(),
   solved: z.number().int().nonnegative(),
   /** 做到这个数的时刻（最后一道新做对的题）；一道没做对时为 null */
   reachedAt: z.string().nullable(),
@@ -58,7 +64,13 @@ export const rankBoardSchema = z.object({
    * 中间折起来，按名次断开的地方就是折叠处
    */
   rows: z.array(rankRowSchema),
+  /** `rows` 已经是能列的全部（本年级 = 全部；全服 = 前 `cap` 名） */
   complete: z.boolean(),
+  /**
+   * 名单最多列到第几名：全服 100（用户 2026-10-10 定的），本班 / 本年级 null。
+   * 全服一千五百多人，展开全量会把页面卡死；100 名以外不列，「你」卡上照样报名次
+   */
+  cap: z.number().int().positive().nullable(),
   /** 我在这张榜上的那一行。没登录、老师、不计入排名、或者这段时间一道没做对时为 null */
   me: rankRowSchema.nullable(),
   /** 名次紧挨在我前面、后面的人 */

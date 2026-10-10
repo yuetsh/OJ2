@@ -8,7 +8,7 @@ import type {
   WeeklyChampion,
 } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from "oj/api"
+import { clearMood, getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from "oj/api"
 import { classLabel } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -199,11 +199,14 @@ const subtitle = computed(() => {
   const b = board.value
   if (!b) return ""
   const head = b.scope === "class" ? `${b.total} 人` : `${b.total} 人做对过`
-  const part = b.complete
-    ? ""
-    : b.me
+  const capped = !!b.cap && b.total > b.cap
+  const part = !b.complete
+    ? b.me
       ? " · 前面一段 + 你附近一段"
       : ` · 只列前面 ${b.rows.length} 名`
+    : capped
+      ? ` · 只列前 ${b.cap} 名`
+      : ""
   return `${head} · 一样多的，先做到的在前${part}`
 })
 /** 手机上标题旁边那句：只说从哪天起、跟什么时候比 */
@@ -342,6 +345,32 @@ function hide(row: RankRow) {
   })
 }
 
+/** 签名改了 / 清了：榜上这个人的每一处（赛道、领奖台、「你」卡、前后一名）就地换掉，不重取 */
+function setMood(userId: number, mood: string | null) {
+  const b = board.value
+  if (!b) return
+  for (const row of [...b.rows, b.me, b.ahead, b.behind])
+    if (row?.user.id === userId) row.mood = mood
+}
+
+function onMoodSaved(mood: string | null) {
+  if (meId.value) setMood(meId.value, mood)
+}
+
+function confirmClearMood(row: RankRow) {
+  dialog.warning({
+    title: "清空个性签名",
+    content: `${row.user.username} 的签名「${row.mood}」会被清空。只清这一句，他之后还能重新写。`,
+    positiveText: "清空",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      await clearMood(row.user.id)
+      setMood(row.user.id, null)
+      message.success("签名已清空")
+    },
+  })
+}
+
 async function restore(userId: number) {
   await setRankHidden(userId, false)
   message.success("已恢复")
@@ -414,7 +443,9 @@ async function restore(userId: number) {
             :me-id="meId"
             :chase-id="board.ahead?.user.id"
             :threat-id="board.behind?.user.id"
+            :teacher="teacher"
             @open="open"
+            @clear-mood="confirmClearMood"
           />
           <RankTrack
             :key="`${board.scope}|${board.period}|${board.className}`"
@@ -422,6 +453,7 @@ async function restore(userId: number) {
             :whole-label="board.scope === 'class' ? `看全班 ${board.total} 人` : undefined"
             :total="board.total"
             :complete="board.complete"
+            :cap="board.cap"
             :scale="scale"
             :me-id="meId"
             :chase-id="board.ahead?.user.id"
@@ -435,6 +467,7 @@ async function restore(userId: number) {
             @submissions="openSubmissions"
             @analysis="openAnalysis"
             @hide="hide"
+            @clear-mood="confirmClearMood"
           />
         </template>
         <div v-else-if="!loading" class="empty">排名没取到，刷新一下试试</div>
@@ -452,6 +485,7 @@ async function restore(userId: number) {
             :label="`${scopeLabel(board.scope)} · ${periodLabel(board.period)}`"
             :minis="minis"
             :compact="!isDesktop"
+            @mood-saved="onMoodSaved"
           />
           <div v-else-if="board.hidden" class="note-card">
             <b>你现在不计入排名</b>

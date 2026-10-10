@@ -264,6 +264,11 @@ export function setRankHidden(userId: number, hidden: boolean) {
   return api.put<null>(`rankings/hidden/${userId}`, { hidden })
 }
 
+/** 老师清空一个学生的个性签名 */
+export function clearMood(userId: number) {
+  return api.delete<null>(`rankings/mood/${userId}`)
+}
+
 /**
  * 本周进步榜。`scope` 只有两个取值，服务端认不出的一律当 global ——
  * 班级榜要求调用者有班级，教师/超管拿到的是 400，所以别在没班级时切过去。
@@ -363,7 +368,7 @@ export function uploadAvatar(file: File) {
   })
 }
 
-export function updateProfile(data: { realName: string; mood: string }) {
+export function updateProfile(data: { realName?: string; mood?: string }) {
   return api.put<Profile>("me/profile", data)
 }
 

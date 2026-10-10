@@ -14,11 +14,16 @@ import RankAvatar from "./RankAvatar.vue"
  * 手机（设计稿「手机版」）：窄屏上条只剩几十像素宽，看不出谁多谁少，所以条改成每一行的
  * 底色；默认只列前几行和你附近几行，「看全班 N 人」点开。换范围 / 时间段时父组件换 key
  * 重新挂载，折叠状态跟着复位。
+ *
+ * 个性签名（设计稿「签名 A」）：桌面一行只有一百来像素的条，放不下一句话，所以有签名的
+ * 名字后面挂一个引号，指上去看；手机每行本来就有空，签名直接写在名字后面。
  */
 const props = defineProps<{
   rows: RankRow[]
   total: number
   complete: boolean
+  /** 名单最多列到第几名（全服 100），折叠处的「第 x–y 名」到此为止 */
+  cap?: number | null
   /** 条的满格是几道（第 2 名的数，第 1 名常常一骑绝尘） */
   scale: number
   meId?: number
@@ -38,6 +43,7 @@ const emit = defineEmits<{
   submissions: [username: string]
   analysis: [username: string]
   hide: [row: RankRow]
+  clearMood: [row: RankRow]
 }>()
 
 const theme = useThemeVars()
@@ -73,7 +79,9 @@ const items = computed<Item[]>(() => {
     list.push({ kind: "row", row })
     last = row.rank
   }
-  const end = props.complete ? (props.rows.at(-1)?.rank ?? last) : props.total
+  const end = props.complete
+    ? (props.rows.at(-1)?.rank ?? last)
+    : Math.min(props.total, props.cap ?? props.total)
   if (last < end) list.push({ kind: "gap", from: last + 1, to: end })
   return list
 })
@@ -129,15 +137,19 @@ function width(row: RankRow) {
   return `${Math.max(1.5, Math.min(100, (row.solved / Math.max(1, props.scale)) * 100))}%`
 }
 
-const menu: DropdownOption[] = [
-  { label: "看他的提交", key: "submissions" },
-  { label: "看他的智能分析", key: "analysis" },
-  { label: "不计入排名…", key: "hide" },
-]
+function menuOf(row: RankRow): DropdownOption[] {
+  return [
+    { label: "看他的提交", key: "submissions" },
+    { label: "看他的智能分析", key: "analysis" },
+    ...(row.mood ? [{ label: "清空他的签名…", key: "mood" }] : []),
+    { label: "不计入排名…", key: "hide" },
+  ]
+}
 
 function onMenu(key: string, row: RankRow) {
   if (key === "submissions") emit("submissions", row.user.username)
   else if (key === "analysis") emit("analysis", row.user.username)
+  else if (key === "mood") emit("clearMood", row)
   else emit("hide", row)
 }
 </script>
@@ -168,6 +180,7 @@ function onMenu(key: string, row: RankRow) {
           <button class="who" @click="emit('open', item.row.user.username)">
             <UserName :username="item.row.user.username" />
           </button>
+          <span class="mood">{{ item.row.mood }}</span>
           <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
           <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
           <span v-else-if="item.row.user.id === hotId" class="tag hot">进步最大</span>
@@ -182,7 +195,7 @@ function onMenu(key: string, row: RankRow) {
           <n-dropdown
             v-if="teacher"
             trigger="click"
-            :options="menu"
+            :options="menuOf(item.row)"
             @select="(key: string) => onMenu(key, item.row)"
           >
             <button class="more" aria-label="更多">⋯</button>
@@ -196,9 +209,28 @@ function onMenu(key: string, row: RankRow) {
             :size="16"
             :me="item.row.user.id === meId"
           />
-          <button class="who" @click="emit('open', item.row.user.username)">
-            <UserName :username="item.row.user.username" />
-          </button>
+          <n-tooltip :disabled="!item.row.mood" :style="{ maxWidth: '300px' }">
+            <template #trigger>
+              <button class="who" @click="emit('open', item.row.user.username)">
+                <UserName :username="item.row.user.username" />
+                <svg
+                  v-if="item.row.mood"
+                  class="quote"
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  role="img"
+                  aria-label="有个性签名"
+                >
+                  <path
+                    d="M4 18v-5c0-4 2-7 6-8l1 2c-2 1-3 2.5-3 4h3v7zm9 0v-5c0-4 2-7 6-8l1 2c-2 1-3 2.5-3 4h3v7z"
+                  />
+                </svg>
+              </button>
+            </template>
+            {{ item.row.mood }}
+          </n-tooltip>
           <span class="bar-box">
             <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
           </span>
@@ -218,7 +250,7 @@ function onMenu(key: string, row: RankRow) {
           <n-dropdown
             v-if="teacher"
             trigger="click"
-            :options="menu"
+            :options="menuOf(item.row)"
             @select="(key: string) => onMenu(key, item.row)"
           >
             <button class="more" aria-label="更多">⋯</button>
@@ -295,7 +327,18 @@ function onMenu(key: string, row: RankRow) {
 
 .prow .who {
   width: auto;
+  max-width: 120px;
+}
+
+/* 手机：签名跟在名字后面，一行放不下就省略 */
+.mood {
   flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prow .rank {
@@ -351,7 +394,14 @@ function onMenu(key: string, row: RankRow) {
   text-align: left;
   cursor: pointer;
   display: flex;
+  align-items: center;
+  gap: 3px;
   min-width: 0;
+}
+
+.quote {
+  flex-shrink: 0;
+  color: v-bind("theme.textColor3");
 }
 
 .bar-box {

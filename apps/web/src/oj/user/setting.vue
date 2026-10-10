@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { MOOD_MAX } from "@oj2/contract"
 import { updateProfile, uploadAvatar } from "oj/api"
 import { useUserStore } from "shared/store/user"
 
@@ -25,6 +26,12 @@ async function upload({ file }: UploadCustomRequestOptions) {
 }
 
 async function saveProfile() {
+  // 以前限 256 字，老的长签名还在库里：输入框挡不住已有的字，存之前先说清楚
+  const length = userStore.profile?.mood?.trim().length ?? 0
+  if (length > MOOD_MAX) {
+    message.warning(`个性签名最多 ${MOOD_MAX} 个字，现在有 ${length} 个，删短一点再保存`)
+    return
+  }
   try {
     await updateProfile({
       realName: userStore.profile?.realName ?? "",
@@ -55,7 +62,12 @@ async function saveProfile() {
         <n-input v-model:value="userStore.profile.realName" />
       </n-form-item> -->
       <n-form-item label="个性签名">
-        <n-input v-model:value="userStore.profile.mood" />
+        <n-input
+          v-model:value="userStore.profile.mood"
+          :maxlength="MOOD_MAX"
+          show-count
+          placeholder="会显示在排名和个人主页上"
+        />
       </n-form-item>
       <n-button @click="saveProfile">更改信息</n-button>
     </n-form>

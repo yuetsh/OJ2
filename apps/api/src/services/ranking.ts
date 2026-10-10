@@ -51,6 +51,7 @@ export interface Entrant {
   username: string
   className: string | null
   avatar: string | null
+  mood: string | null
   /** 每道题第一次做对的时刻，升序；毫秒数用来比较，原文留着给出参 */
   times: number[]
   stamps: string[]
@@ -90,6 +91,7 @@ export async function loadEntrants(where: SQL, since: string | null): Promise<En
         username: schema.user.username,
         className: schema.user.className,
         avatar: schema.userProfile.avatar,
+        mood: schema.userProfile.mood,
       })
       .from(schema.user)
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
@@ -125,6 +127,7 @@ export async function loadEntrants(where: SQL, since: string | null): Promise<En
       username: person.username,
       className: person.className,
       avatar: avatarOf(person.avatar),
+      mood: person.mood?.trim() || null,
       times: pairs.map(([time]) => time),
       stamps: pairs.map(([, stamp]) => stamp),
     }

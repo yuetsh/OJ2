@@ -46,6 +46,8 @@ const WINDOW_BEFORE = 5
 const WINDOW_AFTER = 7
 /** 没有「我」（老师、没上榜）时榜面给多少 */
 const BOARD_HEAD_NO_ME = 30
+/** 全服名单最多列到第几名，展开也到此为止（一千五百多人全摊开页面会卡死） */
+const ALL_CAP = 100
 /** 走势图往回看几周 */
 const TREND_WEEKS = 4
 /** 每周冠军列几周 */
@@ -58,6 +60,7 @@ function toRow(standing: Standing, change: number | null): RankRow {
     user: sampleUser(entrant, null),
     avatar: entrant.avatar,
     className: entrant.className,
+    mood: entrant.mood,
     solved: standing.solved,
     reachedAt: standing.reachedAt,
     change,
@@ -187,11 +190,13 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
   const meIndex = user ? now.findIndex((row) => row.entrant.id === user.id && row.solved > 0) : -1
   const me = meIndex >= 0 ? now[meIndex] : undefined
 
+  const cap = scope.data === "all" ? ALL_CAP : null
+  const listable = cap ? now.slice(0, cap) : now
   const full = includeZero || c.req.query("full") === "1"
-  let picked = now
+  let picked = listable
   if (!full) {
     const head = me ? BOARD_HEAD : BOARD_HEAD_NO_ME
-    picked = now.filter(
+    picked = listable.filter(
       (_, index) =>
         index < head || (me && index >= meIndex - WINDOW_BEFORE && index <= meIndex + WINDOW_AFTER),
     )
@@ -230,7 +235,8 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
     changeSince,
     total: now.length,
     rows: picked.map((row) => rowOf(row)!),
-    complete: picked.length === now.length,
+    complete: picked.length === listable.length,
+    cap,
     me: rowOf(me),
     ahead: rowOf(meIndex > 0 ? now[meIndex - 1] : undefined),
     behind: rowOf(meIndex >= 0 ? now[meIndex + 1] : undefined),
@@ -337,6 +343,34 @@ rankingRoutes.put("/rankings/hidden/:userId", requireTeacher, async (c) => {
     .set({ rankHiddenAt: body.data.hidden ? new Date().toISOString() : null })
     .where(and(eq(schema.user.id, userId), inArray(schema.user.adminType, [...STUDENT_ROLES])))
     .returning({ id: schema.user.id })
+  if (!updated.length) return failure(c, 404, "user-not-found", "没有这个学生")
+  return success(c, null)
+})
+
+/**
+ * 老师清空一个学生的个性签名。签名在排名上挂出来以后更显眼，拿同学开涮、留电话号码的
+ * 得有人能拿掉（用户 2026-10-10 定的）。只清这一句，他之后还能重新写。
+ */
+rankingRoutes.delete("/rankings/mood/:userId", requireTeacher, async (c) => {
+  const userId = Number(c.req.param("userId"))
+  if (!Number.isInteger(userId)) return failure(c, 400, "invalid-user", "用户不对")
+
+  const updated = await db
+    .update(schema.userProfile)
+    .set({ mood: null })
+    .where(
+      and(
+        eq(schema.userProfile.userId, userId),
+        inArray(
+          schema.userProfile.userId,
+          db
+            .select({ id: schema.user.id })
+            .from(schema.user)
+            .where(inArray(schema.user.adminType, [...STUDENT_ROLES])),
+        ),
+      ),
+    )
+    .returning({ id: schema.userProfile.userId })
   if (!updated.length) return failure(c, 404, "user-not-found", "没有这个学生")
   return success(c, null)
 })

@@ -3,6 +3,9 @@ import { z } from "zod"
 import { sampleUserSchema } from "./common"
 import { userProfileSchema } from "./auth"
 
+/** 个性签名最多几个字。以前是 256，排名上要露出来后改成 30（九成签名本来就不超过 26 字） */
+export const MOOD_MAX = 30
+
 export const registerRequestSchema = z.object({
   username: z.string().trim().min(1).max(32),
   email: z.email().max(64),
@@ -12,7 +15,8 @@ export const registerRequestSchema = z.object({
 export const updateProfileRequestSchema = z.object({
   realName: z.string().max(32).nullable().optional(),
   avatar: z.string().max(256).optional(),
-  mood: z.string().max(256).nullable().optional(),
+  /** 排名上要挂出来（`MOOD_MAX`），太长了榜上放不下 */
+  mood: z.string().trim().max(MOOD_MAX, `个性签名最多 ${MOOD_MAX} 个字`).nullable().optional(),
 })
 
 export const metricsSchema = z.object({
