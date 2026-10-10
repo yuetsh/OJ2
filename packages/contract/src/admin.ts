@@ -823,6 +823,13 @@ export const generateSqlTestCaseRequestSchema = z.object({
 export const generateSqlTestCaseResponseSchema = z.object({ sql: z.string() })
 
 /**
+ * 一道题最多几组测试数据（编程题的 N.in / N.out、SQL 题的 N.sql 都算）。
+ * 提交详情要把每组的结果一行行列出来，几百组的题截图截不下；
+ * 2026-10 线上超过 20 组的题已经全部缩到 20 组。
+ */
+export const TEST_CASE_MAX_CASES = 20
+
+/**
  * 编程题出题页回显已有的测试点（N.in / N.out 原文）。太大的不展开 —— 页面上要一组一组
  * 摆出来、改了还要整包重跑一遍标准答案，几百组或者几 MB 的数据摆不下也跑不动，
  * 这种只给数量和大小，老师走下载 / 导入 zip。

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { EditorView } from "@codemirror/view"
-import { PROBLEM_TAG_MAX_LENGTH } from "@oj2/contract"
+import { PROBLEM_TAG_MAX_LENGTH, TEST_CASE_MAX_CASES } from "@oj2/contract"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { StorageSerializers } from "@vueuse/core"
@@ -275,7 +275,11 @@ watchDebounced(
   { debounce: 600, deep: true },
 )
 
+/** 测试数据加满了（见契约 TEST_CASE_MAX_CASES） */
+const groupsFull = computed(() => groups.value.length >= TEST_CASE_MAX_CASES)
+
 function addGroup() {
+  if (groupsFull.value) return
   groups.value.push(newGroup())
   selected.value = groups.value.length - 1
 }
@@ -288,6 +292,7 @@ function removeGroup(index: number) {
 const generating = ref(false)
 
 async function generateGroup() {
+  if (groupsFull.value && groups.value.every((g) => g.sql.trim())) return
   generating.value = true
   try {
     const res = await generateSQLTestcase({ refSql: form.answer, mode: form.sqlConfig.mode })
@@ -318,6 +323,8 @@ const blocker = computed(() => {
   if (!form.tags.length) return "至少要有一个标签"
   if (!form.answer.trim()) return "标准答案还没写"
   if (groups.value.length < 2) return "测试数据至少要 2 组"
+  if (groups.value.length > TEST_CASE_MAX_CASES)
+    return `测试数据最多 ${TEST_CASE_MAX_CASES} 组，删掉 ${groups.value.length - TEST_CASE_MAX_CASES} 组`
   for (const [i, g] of groups.value.entries()) {
     if (!g.sql.trim()) return `第 ${i + 1} 组还是空的，写上或删掉`
   }
@@ -557,18 +564,30 @@ onMounted(async () => {
       <section class="card">
         <div class="cardHead">
           <h3>测试数据</h3>
-          <n-text depth="3" class="note">至少 2 组，数据要不一样</n-text>
+          <n-text depth="3" class="note">{{ `2～${TEST_CASE_MAX_CASES} 组，数据要不一样` }}</n-text>
           <div class="grow"></div>
           <n-button
             size="tiny"
             :loading="generating"
-            :disabled="!form.answer.trim()"
-            :title="form.answer.trim() ? '按标准答案用到的表，让 AI 编一组数据' : '先写标准答案'"
+            :disabled="!form.answer.trim() || (groupsFull && groups.every((g) => g.sql.trim()))"
+            :title="
+              groupsFull && groups.every((g) => g.sql.trim())
+                ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了`
+                : form.answer.trim()
+                  ? '按标准答案用到的表，让 AI 编一组数据'
+                  : '先写标准答案'
+            "
             @click="generateGroup"
           >
             AI 再写一组
           </n-button>
-          <n-button size="tiny" @click="addGroup">+ 加一组</n-button>
+          <n-button
+            size="tiny"
+            :disabled="groupsFull"
+            :title="groupsFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : undefined"
+            @click="addGroup"
+            >+ 加一组</n-button
+          >
         </div>
         <n-alert v-if="loadError" type="error" :show-icon="false">{{ loadError }}</n-alert>
         <div class="groups" role="listbox" aria-label="测试数据">

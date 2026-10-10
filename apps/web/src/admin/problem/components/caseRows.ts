@@ -1,4 +1,8 @@
-import { TEST_CASE_EDIT_MAX_CASES, TEST_CASE_EDIT_MAX_FILE_BYTES } from "@oj2/contract"
+import {
+  TEST_CASE_EDIT_MAX_CASES,
+  TEST_CASE_EDIT_MAX_FILE_BYTES,
+  TEST_CASE_MAX_CASES,
+} from "@oj2/contract"
 import type { RunnableLanguage } from "@oj2/contract"
 import { strFromU8, unzipSync } from "fflate"
 import type { Ref } from "vue"
@@ -186,6 +190,11 @@ export function readCaseZip(
   }
   if (!cases.length)
     return { ok: false, reason: "压缩包里没有从 1.in / 1.out 开始连续编号的测试点" }
+  if (cases.length > TEST_CASE_MAX_CASES)
+    return {
+      ok: false,
+      reason: `测试数据最多 ${TEST_CASE_MAX_CASES} 组，这个压缩包里有 ${cases.length} 组，挑有代表性的留下`,
+    }
   if (cases.length > TEST_CASE_EDIT_MAX_CASES) return { ok: false, reason: "too-large" }
   return { ok: true, cases }
 }

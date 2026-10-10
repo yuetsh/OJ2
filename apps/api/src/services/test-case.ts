@@ -4,6 +4,8 @@ import { resolve } from "node:path"
 
 import { unzipSync, zipSync } from "fflate"
 
+import { TEST_CASE_MAX_CASES } from "@oj2/contract"
+
 import { config } from "../config"
 
 /**
@@ -18,7 +20,7 @@ import { config } from "../config"
 const MAX_ENTRY_BYTES = 32 * 1024 * 1024
 /** 解压后总大小上限，防 zip bomb */
 const MAX_TOTAL_BYTES = 128 * 1024 * 1024
-/** 测试点数量上限 */
+/** 往后找连续编号最多找到几号。真正的上限是契约的 TEST_CASE_MAX_CASES，多出来的要报错而不是静默截掉 */
 const MAX_CASES = 500
 
 export class TestCaseError extends Error {}
@@ -132,6 +134,12 @@ export async function processTestCaseZip(
 
   const selected = options.sql ? collectSqlScripts(names) : collectPairs(names).flat()
   if (selected.length === 0) throw new TestCaseError("压缩包里没有找到从 1 开始连续编号的测试点")
+  const count = options.sql ? selected.length : selected.length / 2
+  if (count > TEST_CASE_MAX_CASES) {
+    throw new TestCaseError(
+      `测试数据最多 ${TEST_CASE_MAX_CASES} 组，这个压缩包里有 ${count} 组，挑有代表性的留下`,
+    )
+  }
   if (options.sql && selected.length < 2) {
     // 题目页会展示测试点 1 的期望结果，只有一个测试点时学生可以对照着硬编码 AC
     throw new TestCaseError("SQL 题至少需要 2 个数据不同的测试点，防止硬编码期望结果")

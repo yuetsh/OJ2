@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PROBLEM_TAG_MAX_LENGTH, type RunnableLanguage } from "@oj2/contract"
+import { PROBLEM_TAG_MAX_LENGTH, TEST_CASE_MAX_CASES, type RunnableLanguage } from "@oj2/contract"
 import { StorageSerializers } from "@vueuse/core"
 import { useThemeVars } from "naive-ui"
 import PageHeader from "admin/components/PageHeader.vue"
@@ -287,7 +287,11 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
 }
 
+/** 测试数据加满了（见契约 TEST_CASE_MAX_CASES） */
+const casesFull = computed(() => rows.value.length >= TEST_CASE_MAX_CASES)
+
 function addRow() {
+  if (casesFull.value) return
   // 空着的第一组（新建页）直接用掉；例子一组都还没勾时，新加的这组先勾上
   const noExample = !rows.value.some((r) => r.example)
   rows.value.push(newRow("", "", noExample))
@@ -311,14 +315,23 @@ async function aiInputs() {
       message.info("AI 没想出新的输入")
       return
     }
-    // 空着的行先填掉
+    // 空着的行先填掉，再往后加，加到上限为止
     const blanks = rows.value.filter((r) => !r.input.trim() && !r.output.trim())
-    for (const input of res.inputs) {
+    const inputs = res.inputs.slice(0, blanks.length + TEST_CASE_MAX_CASES - rows.value.length)
+    if (!inputs.length) {
+      message.info(`测试数据最多 ${TEST_CASE_MAX_CASES} 组，已经满了`)
+      return
+    }
+    for (const input of inputs) {
       const blank = blanks.shift()
       if (blank) blank.input = input
       else rows.value.push(newRow(input))
     }
-    message.success(`加了 ${res.inputs.length} 组，输出马上跑出来`)
+    message.success(
+      inputs.length < res.inputs.length
+        ? `加了 ${inputs.length} 组，到 ${TEST_CASE_MAX_CASES} 组的上限了`
+        : `加了 ${inputs.length} 组，输出马上跑出来`,
+    )
   } catch (err) {
     message.error(errorMessage(err, "AI 没想出来，稍后再试"))
   } finally {
@@ -651,6 +664,12 @@ const blockers = computed<Blocker[]>(() => {
 
   const caseRows = big.value ? exampleRows.value : rows.value
   if (!big.value && !rows.value.length) list.push({ text: "加一组测试数据", section: "cases" })
+  if (!big.value && rows.value.length > TEST_CASE_MAX_CASES)
+    list.push({
+      text: `删掉 ${rows.value.length - TEST_CASE_MAX_CASES} 组测试数据（最多 ${TEST_CASE_MAX_CASES} 组）`,
+      section: "cases",
+      severe: true,
+    })
   if (caseRows.some((r) => caseStatus(r, source.value) === "running"))
     list.push({ text: "等测试数据跑完", section: "cases" })
   caseRows.forEach((r, i) => {
@@ -997,13 +1016,25 @@ onMounted(async () => {
               <n-button
                 size="tiny"
                 :loading="generatingInputs"
-                :disabled="!source"
-                :title="source ? '按题面和标准答案，让 AI 想几组边界情况' : '先写标准答案'"
+                :disabled="!source || casesFull"
+                :title="
+                  casesFull
+                    ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了`
+                    : source
+                      ? '按题面和标准答案，让 AI 想几组边界情况'
+                      : '先写标准答案'
+                "
                 @click="aiInputs"
               >
                 AI 想几组输入
               </n-button>
-              <n-button size="tiny" @click="addRow">+ 加一组</n-button>
+              <n-button
+                size="tiny"
+                :disabled="casesFull"
+                :title="casesFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : undefined"
+                @click="addRow"
+                >+ 加一组</n-button
+              >
             </template>
             <span class="grow"></span>
             <n-button
