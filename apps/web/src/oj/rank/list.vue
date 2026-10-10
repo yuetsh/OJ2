@@ -432,7 +432,12 @@ async function restore(userId: number) {
             <b>{{ title }}</b>
             <span class="muted">{{ subtitle }}</span>
             <div class="spacer" />
-            <span v-if="(!teacher && me) || hot" class="legend">
+            <span v-if="isDesktop || (!teacher && me) || hot" class="legend">
+              <span v-if="isDesktop"
+                ><i class="bar-key" :style="{ background: palette.track }"
+                  ><i :style="{ background: palette.bar }" /></i
+                >做出的题数</span
+              >
               <template v-if="!teacher && me">
                 <span v-if="meListed"><i :style="{ background: palette.me }" />你</span>
                 <span v-if="board.ahead"><i :style="{ background: palette.chase }" />前一名</span>
@@ -776,6 +781,16 @@ async function restore(userId: number) {
   width: 14px;
   height: 8px;
   border-radius: 2px;
+}
+
+/* 条的图例：底槽里一截条，和赛道上的条同一个样子 */
+.legend .bar-key {
+  width: 24px;
+  display: flex;
+}
+
+.legend .bar-key i {
+  width: 10px;
 }
 
 .empty {

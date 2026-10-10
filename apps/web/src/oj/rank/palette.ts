@@ -13,6 +13,11 @@ export function useRankPalette() {
     threat: "#c76a12",
     mate: isDark.value ? "#2f6b47" : "#a8dcbd",
     bar: isDark.value ? "#4a525c" : "#c9d3dc",
+    /**
+     * 桌面上条后面那道满宽的底槽。没有它的话，大家题数一样时一列等长的灰色短条
+     * 像页面没加载完的占位块（2026-10 用户截图问「这是什么」）
+     */
+    track: isDark.value ? "rgba(255,255,255,0.05)" : "#f1f4f7",
     /** 手机上条是整行底色，要淡到字压在上面看得清 */
     soft: {
       me: isDark.value ? "rgba(24,160,88,0.32)" : "#cdebd9",

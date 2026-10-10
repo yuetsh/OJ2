@@ -239,7 +239,7 @@ function onMenu(key: string, row: RankRow) {
             </template>
             {{ item.row.mood }}
           </n-tooltip>
-          <span class="bar-box">
+          <span class="bar-box" :style="{ background: palette.track }">
             <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
           </span>
           <span class="solved">{{ item.row.solved }}</span>
@@ -414,6 +414,7 @@ function onMenu(key: string, row: RankRow) {
   height: 16px;
   position: relative;
   min-width: 40px;
+  border-radius: 2px 6px 6px 2px;
 }
 
 .bar {
