@@ -193,7 +193,6 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
         <n-button type="primary" size="large" :loading="joining" @click="join">
           加入题单，开始做
         </n-button>
-        <span class="muted tiny">加入以后，在题单里做对的题才算进度</span>
       </div>
     </section>
 
@@ -285,7 +284,6 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
         </section>
       </div>
       <n-empty v-else description="这个题单还没有题目" />
-      <div v-if="joined && problems.length" class="muted tiny foot">做对一道会自动回到这里</div>
     </template>
   </div>
 </template>
@@ -576,10 +574,6 @@ a.prow:hover {
   font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
   flex-shrink: 0;
-}
-
-.foot {
-  text-align: center;
 }
 
 .pill {

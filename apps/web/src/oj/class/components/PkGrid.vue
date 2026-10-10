@@ -90,7 +90,6 @@ const expanded = ref(false)
 const shownRows = computed(() =>
   props.compact && !expanded.value ? rows.value.slice(0, SHOW_MOBILE) : rows.value,
 )
-const soloCount = computed(() => props.pk.solo.length)
 
 const tab = ref<"race" | "lead">("race")
 const medal = (index: number) => palette.value.medal[index]
@@ -101,14 +100,9 @@ const medal = (index: number) => palette.value.medal[index]
     <div class="card table">
       <div class="card-title">
         <b>同一批题 · 一格一个班</b>
-        <span class="muted">
-          格子里是全班做对的人占几成，越深越多<template v-if="!compact">
-            · 皇冠 = 这道题做得最好的班（一样多就都算）</template
-          >
-        </span>
       </div>
       <div class="line heads">
-        <span v-if="!compact" class="name muted">至少两个班布置过的 {{ rows.length }} 道</span>
+        <span v-if="!compact" class="name muted">{{ rows.length }} 道</span>
         <span
           v-for="(item, index) in pk.classes"
           :key="item.className"
@@ -173,9 +167,6 @@ const medal = (index: number) => palette.value.medal[index]
       >
         {{ expanded ? "收起" : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
       </button>
-      <span v-if="!compact && soloCount" class="muted foot">
-        只有一个班做过的 {{ soloCount }} 道不在格子里 · 鼠标放到格子上看做对几个人、交了几次
-      </span>
     </div>
 
     <div class="side" :class="{ compact }">
@@ -457,10 +448,6 @@ const medal = (index: number) => palette.value.medal[index]
   background: rgba(24, 160, 88, 0.12);
   border-radius: 3px;
   padding: 0 5px;
-}
-
-.foot {
-  padding-top: 4px;
 }
 
 .side {

@@ -70,19 +70,6 @@ const steadier = computed(() => {
   return `${nameOf(firstLeft > firstRight ? 0 : 1)}更稳`
 })
 
-/** 只有一个班布置过的题：不比，列几道名字 */
-const soloText = computed(() => {
-  const { solo } = props.pk
-  if (!solo.length) return ""
-  const names = solo.slice(0, 2).map((item) => `「${item.title}」`)
-  const owners = new Set(solo.map((item) => item.className))
-  const who =
-    owners.size === 1
-      ? `只有${nameOf(props.pk.classes.findIndex((item) => item.className === solo[0]!.className))}做过的`
-      : "只有一个班做过的"
-  return `${who} ${solo.length} 道不比：${names.join("、")}${solo.length > 2 ? " 等" : ""}`
-})
-
 const SHOW_MOBILE = 7
 const expanded = ref(false)
 const shownRows = computed(() =>
@@ -136,7 +123,7 @@ const tab = ref<"weekly" | "dist">("weekly")
         </span>
       </div>
       <div class="mid">
-        <span class="muted">两个班都做过的 {{ rows.length }} 道题 · 谁做对的人多谁赢这道</span>
+        <span class="muted">{{ rows.length }} 道题</span>
         <span class="big">
           <b :style="{ color: colors[0] }">{{ score.left }}</b>
           <i>:</i>
@@ -154,13 +141,6 @@ const tab = ref<"weekly" | "dist">("weekly")
     <div class="card">
       <div class="card-head">
         <b>同一批题</b>
-        <span class="muted">
-          条 = 全班做对的人占几成<template v-if="!compact">
-            · 皇冠 = 这道赢了 · 按两班差距从大到小</template
-          >
-        </span>
-        <div class="spacer" />
-        <span v-if="soloText && !compact" class="muted">{{ soloText }}</span>
       </div>
 
       <template v-if="!compact">
@@ -288,7 +268,7 @@ const tab = ref<"weekly" | "dist">("weekly")
       </div>
       <div v-if="!compact || tab === 'weekly'" class="card pad">
         <div v-if="!compact" class="card-title">
-          <b>每周人均新做对</b><span class="muted">这学期，最近 {{ weeks.list.length }} 周</span>
+          <b>每周人均新做对</b>
         </div>
         <div class="weeks">
           <div v-for="week in weeks.list" :key="week.label" class="week">
@@ -310,7 +290,7 @@ const tab = ref<"weekly" | "dist">("weekly")
       </div>
       <div v-if="!compact || tab === 'dist'" class="card pad dist">
         <div v-if="!compact" class="card-title">
-          <b>全班分布</b><span class="muted">一根柱一档，横轴是做对几道 · 虚线是中间那位</span>
+          <b>全班分布</b>
         </div>
         <div v-for="(item, index) in [left, right]" :key="item.className" class="dist-one">
           <span class="dist-name" :style="{ color: colors[index] }">
@@ -449,10 +429,6 @@ const tab = ref<"weekly" | "dist">("weekly")
   align-items: baseline;
   gap: 8px;
   margin-bottom: 8px;
-}
-
-.spacer {
-  flex-grow: 1;
 }
 
 .row {

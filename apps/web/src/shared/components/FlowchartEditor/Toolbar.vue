@@ -85,7 +85,6 @@ const saveStatusTitle = computed(() => {
           <span v-else>✔</span>
         </div>
       </div>
-      <p class="description">拖拽节点到画布中</p>
     </div>
 
     <!-- 节点列表 -->
@@ -167,7 +166,6 @@ const saveStatusTitle = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
 }
 
 .toolbar-header h3 {
@@ -229,12 +227,6 @@ const saveStatusTitle = computed(() => {
   50% {
     opacity: 0.5;
   }
-}
-
-.description {
-  margin: 0;
-  font-size: 12px;
-  color: #6b7280;
 }
 
 /* 节点列表样式 */

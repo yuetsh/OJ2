@@ -237,14 +237,6 @@ const columns = computed(
       </div>
       <div v-if="!rows.length" class="empty muted">还没有人交题</div>
     </div>
-
-    <div class="legend">
-      <span><i class="sw first"></i>这题最先做对</span>
-      <span><i class="sw ac"></i>做对，格子里是第几分钟（-1 是错过 1 次）</span>
-      <span><i class="sw no"></i>还没对，错了几次</span>
-      <div class="spacer"></div>
-      <span>用时 = 每道做对题的分钟数相加，错一次多算 20 分钟</span>
-    </div>
   </div>
 </template>
 
@@ -541,42 +533,5 @@ const columns = computed(
 
 .empty {
   padding: 32px var(--oj-pad-x);
-}
-
-.legend {
-  min-height: 42px;
-  padding: 8px var(--oj-pad-x);
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  border-top: 1px solid v-bind("theme.dividerColor");
-}
-
-.legend span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.sw {
-  width: 28px;
-  height: 16px;
-  border-radius: 3px;
-}
-
-.sw.first {
-  background: v-bind("theme.successColor");
-}
-
-.sw.ac {
-  background: v-bind("success.background");
-}
-
-.sw.no {
-  background: v-bind("danger.background");
 }
 </style>

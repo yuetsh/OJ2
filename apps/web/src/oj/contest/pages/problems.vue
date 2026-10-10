@@ -131,8 +131,6 @@ const warning = computed(() => tone("warning"))
             · 你做对 {{ solvedCount }} 道</template
           >
         </span>
-        <div class="spacer"></div>
-        <span v-if="running && !contestStore.rankHidden" class="muted small">做对人数随时更新</span>
       </div>
       <RouterLink
         v-for="item in items"
@@ -253,9 +251,6 @@ const warning = computed(() => tone("warning"))
           </div>
           <RankMini :rows="rows" :me="me?.userId" />
           <div v-if="!rows.length" class="muted small empty">还没有人交题</div>
-        </div>
-        <div class="muted small rule">
-          先比做对几道；一样多的，比用时：每道题做对时是第几分钟，加起来；错一次多算 20 分钟。
         </div>
       </template>
     </aside>
@@ -531,11 +526,6 @@ const warning = computed(() => tone("warning"))
 
 .empty {
   padding: 8px 2px;
-}
-
-.rule {
-  line-height: 1.6;
-  font-size: var(--oj-fs-meta);
 }
 
 /* 手机：题目名要留得下，人数和「最先」只在右边的排名里看 */

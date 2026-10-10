@@ -150,12 +150,6 @@ const error = computed(() => tone("error"))
           </template>
         </div>
       </div>
-      <div class="foot muted">
-        <span>绿 = 在题单里做对（几点做对的）</span><span>黄 = 交过还没对</span
-        ><span>紫色角 = 加入前就做对过</span><span>点格子看这个学生这道题的提交</span>
-        <div class="spacer"></div>
-        <span>按学号排</span>
-      </div>
     </template>
     <div v-else class="empty"><n-spin size="small" /></div>
   </section>
@@ -301,18 +295,6 @@ const error = computed(() => tone("error"))
   height: 0;
   border-top: 8px solid #7a5fd0;
   border-left: 8px solid transparent;
-}
-
-.foot {
-  min-height: 36px;
-  box-sizing: border-box;
-  padding: 8px 20px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  font-size: var(--oj-fs-meta);
-  border-top: 1px solid v-bind("theme.dividerColor");
 }
 
 .spacer {

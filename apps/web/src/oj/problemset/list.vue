@@ -55,7 +55,6 @@ const others = computed(() =>
       return Date.parse(b.createTime) - Date.parse(a.createTime)
     }),
 )
-const joinedOthers = computed(() => others.value.filter((set) => set.userProgress.isJoined).length)
 
 function description(set: ProblemSet) {
   // 简介大多就是把标题再抄一遍，一样的就不重复显示
@@ -93,7 +92,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 
     <template v-if="assigning.length">
       <div class="sect">
-        布置中<span class="muted">老师现在布置的 · {{ assigning.length }} 个</span>
+        布置中<span class="muted">{{ assigning.length }} 个</span>
       </div>
       <div class="big-grid">
         <a
@@ -146,9 +145,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 
     <div v-if="others.length" class="sect">
       {{ assigning.length ? "其他题单" : "题单" }}
-      <span class="muted"
-        >{{ others.length }} 个<template v-if="joinedOthers"> · 加入过的在前</template></span
-      >
+      <span class="muted">{{ others.length }} 个</span>
     </div>
     <div class="small-grid">
       <a

@@ -289,7 +289,6 @@ async function analyze() {
               <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
             </svg>
             <b>AI 分析</b>
-            <span class="muted">根据上面这些数字写，仅供参考</span>
             <div class="spacer" />
             <n-button size="small" :loading="ai.running.value" @click="analyze">重新分析</n-button>
           </div>

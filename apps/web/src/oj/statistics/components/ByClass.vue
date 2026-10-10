@@ -109,7 +109,6 @@ const classes = computed(() => {
       <p v-if="grid.truncated" class="note warn" :style="{ color: tone('warning').color }">
         范围太大，只取了最近的 5000 条提交，更早的班级可能少算或不在表里。缩短时间段就准了。
       </p>
-      <p class="note">没选班级，先按班级列出来；点一个班再看每个人。「做完」是这几道题都做对了。</p>
     </div>
   </div>
 </template>

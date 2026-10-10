@@ -110,7 +110,6 @@ const cells = computed(() =>
         />
         <span v-else-if="code[cell.id] === 'failed'" class="muted">代码没拉下来，点方块打开看</span>
         <span v-else class="muted">代码加载中…</span>
-        <span class="muted small">点方块在新页面打开这一条</span>
       </div>
     </n-popover>
   </span>
@@ -158,9 +157,5 @@ const cells = computed(() =>
 
 .muted {
   opacity: 0.65;
-}
-
-.small {
-  font-size: 12px;
 }
 </style>

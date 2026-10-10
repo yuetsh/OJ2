@@ -358,8 +358,6 @@ const gradeColumns = computed(() => `24px 124px 40px 36px repeat(${problems.valu
         <b class="amber">{{ idleCount }}</b
         ><span>{{ IDLE_MINUTES }} 分钟以上没交</span>
       </div>
-      <div class="spacer"></div>
-      <span class="muted small">学生看不到这一页 · 15 秒刷新一次</span>
     </div>
 
     <div class="grid-wrap">
@@ -594,8 +592,6 @@ const gradeColumns = computed(() => `24px 124px 40px 36px repeat(${problems.valu
             <span v-if="code" class="muted tiny">
               {{ code.language }} · {{ parseTime(code.createTime, "M月D日 HH:mm:ss") }}
             </span>
-            <div class="spacer"></div>
-            <span class="muted tiny">点格子换人换题 · ← → ↑ ↓ 也行 · 看过的格子右上角有个点</span>
           </div>
         </template>
         <div v-else class="code-empty muted">
