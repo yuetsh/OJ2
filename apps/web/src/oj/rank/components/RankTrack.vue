@@ -8,7 +8,8 @@ import RankAvatar from "./RankAvatar.vue"
 
 /**
  * 赛道：每人一根条，条越长做对越多，一样长的先做到的排前面（设计稿 G1 / G2）。
- * 桌面两栏，机房 1366×768 一屏放得下一个班；本年级 / 全服只给前面一段 + 我附近一段，
+ * 桌面两栏，每行 28px（原来挤成 18px 想塞进机房一屏，用户嫌太矮：不必刻意一屏）；
+ * 本年级 / 全服只给前面一段 + 我附近一段，
  * 名次断开的地方折起来，点了再把中间那段要回来。
  *
  * 手机（设计稿「手机版」）：窄屏上条只剩几十像素宽，看不出谁多谁少，所以条改成每一行的
@@ -132,9 +133,32 @@ function fillColor(row: RankRow) {
   return soft.bar
 }
 
+function ratio(row: RankRow) {
+  if (!row.solved) return 0
+  return Math.max(1.5, Math.min(100, (row.solved / Math.max(1, props.scale)) * 100))
+}
+
 function width(row: RankRow) {
-  if (!row.solved) return "0"
-  return `${Math.max(1.5, Math.min(100, (row.solved / Math.max(1, props.scale)) * 100))}%`
+  return `${ratio(row)}%`
+}
+
+function tagOf(row: RankRow) {
+  const id = row.user.id
+  if (id === props.chaseId) return { kind: "chase", label: "前一名" }
+  if (id === props.threatId) return { kind: "threat", label: "后一名" }
+  if (id === props.hotId) return { kind: "hot", label: "进步最大" }
+  return null
+}
+
+/**
+ * 桌面：标签挂在条的末端（原来单占一列 58px，把条挤得只剩几十像素）。条短就挂在条后面，
+ * 条长了后面放不下，就收进条里靠右
+ */
+function tagPlace(row: RankRow) {
+  const r = ratio(row)
+  return r <= 60
+    ? { left: `calc(${r}% + 6px)` }
+    : { right: `calc(${100 - r}% + 4px)`, backgroundColor: theme.value.cardColor }
 }
 
 function menuOf(row: RankRow): DropdownOption[] {
@@ -206,7 +230,7 @@ function onMenu(key: string, row: RankRow) {
           <RankAvatar
             :username="item.row.user.username"
             :avatar="item.row.avatar"
-            :size="16"
+            :size="20"
             :me="item.row.user.id === meId"
           />
           <n-tooltip :disabled="!item.row.mood" :style="{ maxWidth: '300px' }">
@@ -233,6 +257,13 @@ function onMenu(key: string, row: RankRow) {
           </n-tooltip>
           <span class="bar-box">
             <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
+            <span
+              v-if="tagOf(item.row)"
+              class="tag"
+              :class="tagOf(item.row)!.kind"
+              :style="tagPlace(item.row)"
+              >{{ tagOf(item.row)!.label }}</span
+            >
           </span>
           <span class="solved">{{ item.row.solved }}</span>
           <span class="change">
@@ -241,11 +272,6 @@ function onMenu(key: string, row: RankRow) {
               >↓{{ -item.row.change! }}</span
             >
             <span v-else-if="item.row.change === 0" class="flat">—</span>
-          </span>
-          <span class="tag-box">
-            <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
-            <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
-            <span v-else-if="item.row.user.id === hotId" class="tag hot">进步最大</span>
           </span>
           <n-dropdown
             v-if="teacher"
@@ -277,16 +303,16 @@ function onMenu(key: string, row: RankRow) {
 .column {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
 .lane {
-  height: 18px;
+  height: 28px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 14px;
 }
 
 .single .column {
@@ -361,8 +387,7 @@ function onMenu(key: string, row: RankRow) {
 .lane.me {
   margin: 0 -8px;
   padding: 0 8px;
-  height: 20px;
-  border-radius: 4px;
+  border-radius: 6px;
   background: rgba(24, 160, 88, 0.12);
 }
 
@@ -373,7 +398,7 @@ function onMenu(key: string, row: RankRow) {
 .rank {
   width: 28px;
   text-align: right;
-  font-size: 12px;
+  font-size: 13px;
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -385,7 +410,7 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .who {
-  width: 108px;
+  width: 116px;
   flex-shrink: 0;
   padding: 0;
   border: 0;
@@ -406,7 +431,7 @@ function onMenu(key: string, row: RankRow) {
 
 .bar-box {
   flex-grow: 1;
-  height: 11px;
+  height: 14px;
   position: relative;
   min-width: 40px;
 }
@@ -420,7 +445,7 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .solved {
-  width: 26px;
+  width: 30px;
   text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -447,10 +472,10 @@ function onMenu(key: string, row: RankRow) {
   color: v-bind("theme.textColor3");
 }
 
-.tag-box {
-  width: 58px;
-  display: flex;
-  flex-shrink: 0;
+.bar-box .tag {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .tag {
@@ -488,7 +513,7 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .gap {
-  height: 22px;
+  height: 30px;
   margin: 4px 0;
   border: 0;
   border-top: 1px dashed v-bind("theme.borderColor");

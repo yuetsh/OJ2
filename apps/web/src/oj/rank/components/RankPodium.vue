@@ -33,8 +33,7 @@ const steps = computed(() =>
     .filter((step): step is { place: number; row: RankRow } => !!step.row),
 )
 
-/** 台阶比原来矮一截：台上多了签名气泡，矮下来赛道才放得进机房第一屏（41 人的班也够） */
-const HEIGHTS: Record<number, number> = { 1: 40, 2: 30, 3: 26 }
+const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
 </script>
 
 <template>
@@ -315,7 +314,7 @@ const HEIGHTS: Record<number, number> = { 1: 40, 2: 30, 3: 26 }
   align-items: flex-start;
   justify-content: center;
   gap: 10px;
-  padding-top: 3px;
+  padding-top: 5px;
 }
 
 .place {

@@ -37,7 +37,7 @@ import {
 /**
  * 排名页（设计稿「排名重设计」G1–G3，用户要「激发竞争」「图多」「一眼看出排名」）。
  *
- * 第一屏（机房 1366×768）：领奖台 + 全班赛道，右边是「你」和班级对抗；往下是名次走势、
+ * 上面：领奖台 + 全班赛道，右边是「你」和班级对抗（不必刻意塞进机房一屏，用户嫌行太矮）；往下是名次走势、
  * 这周本班、每周冠军。老师不上榜，选班看，每行「⋯」能把怀疑抄代码的学生设成不计入排名。
  */
 const router = useRouter()
@@ -187,6 +187,11 @@ const scale = computed(() => rows.value[1]?.solved || rows.value[0]?.solved || 1
 const hot = computed(() => hottest(rows.value))
 
 const me = computed(() => board.value?.me ?? null)
+/** 全服 100 名以外：「你」卡照样有，但名单上没有你这一行，图例和副标题别再提「你」 */
+const meListed = computed(() => {
+  const b = board.value
+  return !!b?.me && !(b.cap && b.me.rank > b.cap)
+})
 const meId = computed(() => (teacher.value ? undefined : userStore.user?.id))
 const mateClass = computed(() => (board.value?.scope !== "class" ? classContext.value : null))
 
@@ -201,7 +206,7 @@ const subtitle = computed(() => {
   const head = b.scope === "class" ? `${b.total} 人` : `${b.total} 人做对过`
   const capped = !!b.cap && b.total > b.cap
   const part = !b.complete
-    ? b.me
+    ? meListed.value
       ? " · 前面一段 + 你附近一段"
       : ` · 只列前面 ${b.rows.length} 名`
     : capped
@@ -247,6 +252,7 @@ const minis = computed<MiniRank[]>(() => {
       label: `${periodLabel(period.value)} · ${scopeLabel(s)}`,
       rank: other?.me?.rank ?? null,
       total: other ? other.total : null,
+      cap: other?.cap,
       go: () => (scope.value = s),
     })
   }
@@ -432,7 +438,7 @@ async function restore(userId: number) {
             <span class="muted">{{ subtitle }}</span>
             <div class="spacer" />
             <span v-if="!teacher && me" class="legend">
-              <span><i :style="{ background: palette.me }" />你</span>
+              <span v-if="meListed"><i :style="{ background: palette.me }" />你</span>
               <span v-if="board.ahead"><i :style="{ background: palette.chase }" />前一名</span>
               <span v-if="board.behind"><i :style="{ background: palette.threat }" />后一名</span>
               <span v-if="mateClass"><i :style="{ background: palette.mate }" />你们班</span>
@@ -482,6 +488,8 @@ async function restore(userId: number) {
             :behind="board.behind"
             :third="me.rank > 3 ? (podium[2] ?? null) : null"
             :total="board.total"
+            :cap="board.cap"
+            :last-listed="board.lastListed"
             :label="`${scopeLabel(board.scope)} · ${periodLabel(board.period)}`"
             :minis="minis"
             :compact="!isDesktop"

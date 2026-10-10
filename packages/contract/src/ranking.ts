@@ -71,6 +71,12 @@ export const rankBoardSchema = z.object({
    * 全服一千五百多人，展开全量会把页面卡死；100 名以外不列，「你」卡上照样报名次
    */
   cap: z.number().int().positive().nullable(),
+  /**
+   * 我排在 `cap` 名以外时：名单上最后那一位（第 `cap` 名），给「再做对几道进前 100」用。
+   * 这时 `ahead` / `behind` / `trend` 都是 null —— 100 名以外只说「100 名以外」，
+   * 不报具体名次，也就没有前一名、后一名可说（用户 2026-10-10 定的）。其余情况为 null
+   */
+  lastListed: rankRowSchema.nullable(),
   /** 我在这张榜上的那一行。没登录、老师、不计入排名、或者这段时间一道没做对时为 null */
   me: rankRowSchema.nullable(),
   /** 名次紧挨在我前面、后面的人 */

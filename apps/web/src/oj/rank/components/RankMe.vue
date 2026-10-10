@@ -11,6 +11,8 @@ export interface MiniRank {
   label: string
   rank: number | null
   total: number | null
+  /** 那张榜最多列到第几名（全服 100）；名次在这之外就只写「100 名以外」 */
+  cap?: number | null
   go: () => void
 }
 
@@ -31,6 +33,10 @@ const props = defineProps<{
   /** 领奖台第 3 名（我不在台上时用来算「再做对几道上领奖台」） */
   third: RankRow | null
   total: number
+  /** 名单最多列到第几名（全服 100）。我在这之外只写「100 名以外」，不报具体名次 */
+  cap?: number | null
+  /** 我在 cap 名以外时，名单上最后那一位：算「再做对几道进前 100」 */
+  lastListed?: RankRow | null
   label: string
   minis: MiniRank[]
   /** 手机：前后一名的说明换到名字下面一行，别被截断 */
@@ -70,8 +76,12 @@ async function saveMood() {
   }
 }
 
+const beyond = computed(() => !!props.cap && props.me.rank > props.cap)
+
 const headline = computed(() => {
   const { me, ahead, third } = props
+  if (beyond.value)
+    return props.lastListed ? `再做对 ${toPass(me, props.lastListed)} 道就进前 ${props.cap}` : ""
   if (me.rank === 1) return "你是第一名"
   if (me.rank <= 3 && ahead)
     return `你在领奖台上 · 再做对 ${toPass(me, ahead)} 道就是第 ${ahead.rank} 名`
@@ -105,9 +115,12 @@ function threatNote(me: RankRow, behind: RankRow) {
       <div class="place">
         <span class="label">{{ label }}</span>
         <div class="big">
-          <span>第</span><b>{{ me.rank }}</b
-          ><span>名</span>
-          <span class="total">/ {{ total }}</span>
+          <b v-if="beyond" class="beyond">{{ cap }} 名以外</b>
+          <template v-else>
+            <span>第</span><b>{{ me.rank }}</b
+            ><span>名</span>
+            <span class="total">/ {{ total }}</span>
+          </template>
           <span v-if="(me.change ?? 0) > 0" class="up">↑{{ me.change }}</span>
           <span v-else-if="(me.change ?? 0) < 0" class="down">↓{{ -me.change! }}</span>
         </div>
@@ -219,7 +232,8 @@ function threatNote(me: RankRow, behind: RankRow) {
     <div v-if="minis.length" class="minis">
       <button v-for="mini in minis" :key="mini.label" class="mini" @click="mini.go">
         <span class="mini-label">{{ mini.label }}</span>
-        <b v-if="mini.rank"
+        <b v-if="mini.rank && mini.cap && mini.rank > mini.cap">{{ mini.cap }} 名以外</b>
+        <b v-else-if="mini.rank"
           >第 {{ mini.rank }}<small v-if="mini.total"> / {{ mini.total }}</small></b
         >
         <b v-else class="none">没上榜</b>
@@ -283,6 +297,11 @@ function threatNote(me: RankRow, behind: RankRow) {
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+
+.big b.beyond {
+  font-size: 30px;
+  line-height: 1.1;
 }
 
 .total {

@@ -202,8 +202,11 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
     )
   }
 
+  // 全服 100 名以外：不报具体名次，前后一名、走势都不给，只给第 100 名算还差几道
+  const beyond = !!(cap && me && me.rank > cap)
+
   let trend: RankBoard["trend"] = null
-  if (me && period.data !== "week") {
+  if (me && !beyond && period.data !== "week") {
     const thisWeek = Date.parse(weekStart())
     const points = Array.from(
       { length: TREND_WEEKS },
@@ -237,9 +240,10 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
     rows: picked.map((row) => rowOf(row)!),
     complete: picked.length === listable.length,
     cap,
+    lastListed: beyond ? rowOf(listable.at(-1)) : null,
     me: rowOf(me),
-    ahead: rowOf(meIndex > 0 ? now[meIndex - 1] : undefined),
-    behind: rowOf(meIndex >= 0 ? now[meIndex + 1] : undefined),
+    ahead: beyond ? null : rowOf(meIndex > 0 ? now[meIndex - 1] : undefined),
+    behind: beyond ? null : rowOf(meIndex >= 0 ? now[meIndex + 1] : undefined),
     trend,
     hidden: !!mine?.rankHiddenAt,
     hiddenUsers: hiddenUsers.map((row): SampleUser => sampleUser(row, null)),
