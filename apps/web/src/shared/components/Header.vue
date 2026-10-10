@@ -168,7 +168,7 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
   const work = userStore.isAdminRole || userStore.canToggleDemoMode
   return [
     {
-      label: "后台",
+      label: "进入后台",
       key: "admin",
       show: userStore.isAdminRole,
       icon: renderIcon("ph:toolbox"),
