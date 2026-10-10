@@ -778,7 +778,6 @@ a.row:hover {
 
 .more {
   font-size: var(--oj-fs-sec);
-  opacity: 0.7;
 }
 
 .more:hover,
