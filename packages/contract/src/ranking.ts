@@ -146,3 +146,86 @@ export const classDetailSchema = z.object({
 })
 
 export type ClassDetail = z.infer<typeof classDetailSchema>
+
+/**
+ * 班级 PK（设计稿「班级 PK 重设计」定稿）。用户定的：**两个班按「同一批题」对决，三个班以上
+ * 按题对照，学生也能看**。
+ *
+ * 各班进度不同、布置的题不一样，比人均等于比谁开课早，所以主角是「同一批题」：
+ * 一个班过半的人交过这道题就算这个班**布置过**；至少两个班布置过的题才拿来比，
+ * 比的是**做对的人占全班几成**（整数百分比），高的那个班赢这道，显示一样就算平 ——
+ * 不然 37/39 和 38/40 都显示 95%，皇冠却只给一边。口径和排名页一样：比赛里的提交不算，
+ * 不计入排名的人分子分母都不算。
+ */
+export const classPkPeriodSchema = z.enum(["week", "term"])
+
+export const classPkCellSchema = z.object({
+  /** 这段时间交过这道题的人 */
+  tried: z.number().int().nonnegative(),
+  /** 这段时间做对了的人 */
+  solved: z.number().int().nonnegative(),
+  /** 第一次交就对的人 */
+  firstTry: z.number().int().nonnegative(),
+  submissions: z.number().int().nonnegative(),
+  /** 做对的人占全班几成（整数百分比），比输赢就比它 */
+  percent: z.number().int().nonnegative(),
+  /** 一次就对：交过的人里第一次交就对的占几成 */
+  firstPercent: z.number().int().nonnegative(),
+  /** 这道题做得最好的班（一样多就都算） */
+  best: z.boolean(),
+})
+
+export const classPkProblemSchema = z.object({
+  problemId: z.number().int(),
+  displayId: z.string(),
+  title: z.string(),
+  /** 和 `classes` 一一对应；null = 这个班没布置 */
+  cells: z.array(classPkCellSchema.nullable()),
+})
+
+export const classPkClassSchema = z.object({
+  className: z.string(),
+  members: z.number().int().nonnegative(),
+  /** 这段时间人均做对（这道题第一次做对落在这段时间里） */
+  perCapita: z.number(),
+  /** 中间那位同学做对几道 */
+  median: z.number(),
+  solvedMembers: z.number().int().nonnegative(),
+  /** 这段时间交过的题里第一次交就对的比例（整数百分比）；一道没交过为 null */
+  firstPercent: z.number().int().nonnegative().nullable(),
+  /** 同一批题里做得最好（含并列）的有几道 */
+  lead: z.number().int().nonnegative(),
+  /** 班级对抗里第几；这学期还没做对过题的班没有名次 */
+  battleRank: z.number().int().positive().nullable(),
+  /** 每个同学这段时间做对几道 */
+  distribution: z.array(z.number().int().nonnegative()),
+  /** 这学期每周人均新做对，和 `weeks` 一一对应（不随「这周 / 这学期」变） */
+  weekly: z.array(z.number()),
+})
+
+export const classPkSchema = z.object({
+  period: classPkPeriodSchema,
+  start: z.string(),
+  /** 这学期每周的周一零点（东八区），赛跑和每周人均的横轴 */
+  weeks: z.array(z.string()),
+  classes: z.array(classPkClassSchema),
+  /** 看的人自己的班（学生）；老师和没班级的为 null */
+  mine: z.string().nullable(),
+  /** 至少两个班布置过的题，按题号 */
+  problems: z.array(classPkProblemSchema),
+  /** 只有一个班布置过的题：不比，只列出来 */
+  solo: z.array(
+    z.object({
+      problemId: z.number().int(),
+      displayId: z.string(),
+      title: z.string(),
+      className: z.string(),
+    }),
+  ),
+})
+
+export type ClassPkPeriod = z.infer<typeof classPkPeriodSchema>
+export type ClassPkCell = z.infer<typeof classPkCellSchema>
+export type ClassPkProblem = z.infer<typeof classPkProblemSchema>
+export type ClassPkClass = z.infer<typeof classPkClassSchema>
+export type ClassPk = z.infer<typeof classPkSchema>

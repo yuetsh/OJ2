@@ -23,7 +23,7 @@ import { generateFilteredHint } from "../services/hint-filter"
 import { buildDetail, buildDuration, listSolved } from "../services/learning-stats"
 import { decideHintLevel } from "../services/hint-level"
 import { hintDiagnosis, hintPrompt, referenceAnswer } from "../services/hint-diagnosis"
-import { classDetail } from "../services/ranking"
+import { classDetail, classPk } from "../services/ranking"
 import { consumeToken } from "../services/throttling"
 import { calendarDay, dayNumber, dayText, localTime, localWeekday } from "../time"
 import { countFailedSubmissions, isTeacherOrAbove, asRecord, queryInteger } from "./helpers"
@@ -385,8 +385,46 @@ aiRoutes.post("/ai/class-pk-analysis", requireAuth, async (c) => {
   if (!parsed.success) return parsed.response
   const limited = await throttleAi(c)
   if (limited) return limited
+  // 数字和页面上的是同一份（services/ranking.ts 的 classPk），不再由前端整包传上来
+  const pk = await classPk([...new Set(parsed.data.classNames)], parsed.data.period, null)
+  const label = (name: string) => `${name.slice(0, 2)}计算机${name.slice(2)}班`
+  const facts = {
+    时间段: parsed.data.period === "week" ? "这周" : "这学期",
+    各班: pk.classes.map((item) => ({
+      班级: label(item.className),
+      人数: item.members,
+      人均做对: item.perCapita,
+      中间那位做对: item.median,
+      做对过题的人: item.solvedMembers,
+      一次就对百分比: item.firstPercent,
+      同一批题里领先几道: item.lead,
+      这学期每周人均新做对: item.weekly,
+    })),
+    同一批题: pk.problems.map((problem) => ({
+      题目: problem.title,
+      各班: problem.cells.map((cell, index) =>
+        cell
+          ? {
+              班级: label(pk.classes[index]!.className),
+              做对的人占全班百分比: cell.percent,
+              一次就对百分比: cell.firstPercent,
+              交过的人: cell.tried,
+              最好: cell.best,
+            }
+          : { 班级: label(pk.classes[index]!.className), 没布置: true },
+      ),
+    })),
+    只有一个班布置过的题数: pk.solo.length,
+  }
   return streamChat(
-    "你是编程教育数据分析专家。根据多个班级 OJ 对比数据，从排名、参与度、典型学生水平、均衡性、梯队、提交质量和教学建议七方面输出中文 Markdown 报告。",
-    `${parsed.data.timeRangeLabel}\n${JSON.stringify(parsed.data.comparisons)}`,
+    [
+      "你是编程课老师的助教。下面是几个班在 OJ 上的对比数据（JSON）。各班进度不同、布置的题不一样，",
+      "所以比较以「同一批题」（至少两个班都布置过的题）为主，人均做对只作参考。",
+      "用中文 Markdown 写一份给老师看的简短分析，分三到四段，每段一两句，段首加粗：",
+      "**整体**（人均和同一批题里各班领先几道，人均差距有多少是进度造成的）、",
+      "**差得最多的题**（点题目名，哪个班明显低）、**一次就对**（哪个班更稳、哪个班靠多交几次）、",
+      "**建议**（下节课能直接做的事）。用大白话，不要出现四分位数、标准差这类统计词，不要编数据里没有的数字。",
+    ].join(""),
+    JSON.stringify(facts),
   )
 })

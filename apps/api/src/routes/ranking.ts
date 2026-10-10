@@ -1,4 +1,5 @@
 import {
+  classPkPeriodSchema,
   rankHiddenRequestSchema,
   rankPeriodSchema,
   rankScopeSchema,
@@ -13,7 +14,7 @@ import {
 import { and, countDistinct, desc, eq, gte, inArray, isNotNull, ne } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireTeacher, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { dayStart, termStart, weekStart } from "../time"
@@ -21,7 +22,10 @@ import {
   audienceWhere,
   classBattle,
   classDetail,
+  classPk,
   loadEntrants,
+  PK_MAX_CLASSES,
+  pkPartner,
   rankedStudents,
   standings,
   WEEK_MS,
@@ -250,6 +254,38 @@ rankingRoutes.get("/rankings/class-detail", optionalAuth, async (c) => {
   const className = c.req.query("className")?.trim()
   if (!className) return failure(c, 400, "class-missing", "没有班级")
   return success(c, await classDetail(className, isTeacherOrAbove(c.get("user"))))
+})
+
+/**
+ * 班级 PK（设计稿「班级 PK 重设计」定稿）：`classes` 逗号分隔。谁登录了都能看 —— 只有班级
+ * 层面的数，没有点名到人。只给一个班（或者不给，用自己的班 / 老师默认的班）就配一个对手，
+ * 见 `pkPartner`。
+ */
+rankingRoutes.get("/rankings/pk", requireAuth, async (c) => {
+  const user = c.get("user")!
+  const period = classPkPeriodSchema.safeParse(c.req.query("period") ?? "term")
+  if (!period.success) return failure(c, 400, "invalid-query", "时间段不对")
+  const requested = [
+    ...new Set(
+      (c.req.query("classes") ?? "")
+        .split(",")
+        .map((name) => name.trim())
+        .filter((name) => name && name.length <= 32),
+    ),
+  ]
+  if (requested.length > PK_MAX_CLASSES)
+    return failure(c, 400, "too-many-classes", `一次最多比 ${PK_MAX_CLASSES} 个班`)
+
+  const isTeacher = isTeacherOrAbove(user)
+  const mine = isTeacher ? null : user.className || null
+  const classNames = requested.length
+    ? requested
+    : [isTeacher ? await defaultClassFor(user.id) : mine].filter((name): name is string => !!name)
+  if (classNames.length === 1) {
+    const partner = await pkPartner(classNames[0]!)
+    if (partner) classNames.push(partner)
+  }
+  return success(c, await classPk(classNames, period.data, mine))
 })
 
 /** 本班每周冠军：最近几个已经结束的周，每周新做对最多的那个人（一样多先做到的） */

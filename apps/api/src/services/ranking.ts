@@ -2,6 +2,10 @@ import {
   STUDENT_ROLES,
   type ClassBattleItem,
   type ClassDetail,
+  type ClassPk,
+  type ClassPkCell,
+  type ClassPkClass,
+  type ClassPkPeriod,
   type RankScope,
 } from "@oj2/contract"
 import {
@@ -15,6 +19,7 @@ import {
   like,
   min,
   ne,
+  sql,
   type SQL,
 } from "drizzle-orm"
 
@@ -307,4 +312,222 @@ export async function classDetail(className: string, withCare: boolean): Promise
     weeks: weeks.slice(-DETAIL_WEEKS),
     care,
   } satisfies ClassDetail
+}
+
+/** 一次最多比几个班（对照格再宽就放不下了） */
+export const PK_MAX_CLASSES = 8
+
+interface PkPair {
+  className: string
+  problemId: number
+  solved: boolean
+  firstSolved: boolean
+  submissions: number
+}
+
+/**
+ * 这几个班从 `since` 起每个人每道题：交了几次、做对没有、第一次交就对没有。比赛里的提交不算，
+ * 入榜人群和排名页一样（不计入排名的人不算）。「第一次」是这段时间里的第一次。
+ */
+async function pkPairs(classNames: string[], since: string): Promise<PkPair[]> {
+  const rows = await db
+    .select({
+      className: schema.user.className,
+      problemId: schema.submission.problemId,
+      submissions: count(),
+      solved: sql<boolean>`bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`,
+      first: sql<number>`(array_agg(${schema.submission.result} order by ${schema.submission.createTime}, ${schema.submission.id}))[1]`,
+    })
+    .from(schema.submission)
+    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .where(
+      and(
+        rankedStudents,
+        inArray(schema.user.className, classNames),
+        isNull(schema.submission.contestId),
+        gte(schema.submission.createTime, since),
+      ),
+    )
+    .groupBy(schema.user.className, schema.submission.userId, schema.submission.problemId)
+  return rows.map((row) => ({
+    className: row.className!,
+    problemId: row.problemId,
+    solved: row.solved,
+    firstSolved: (SOLVED_RESULTS as number[]).includes(row.first),
+    submissions: row.submissions,
+  }))
+}
+
+/** 每个班布置过哪些题：过半的人交过就算 */
+function assignedSets(pairs: PkPair[], members: Map<string, number>) {
+  const tried = new Map<string, Map<number, number>>()
+  for (const pair of pairs) {
+    const byProblem = tried.get(pair.className) ?? new Map<number, number>()
+    byProblem.set(pair.problemId, (byProblem.get(pair.problemId) ?? 0) + 1)
+    tried.set(pair.className, byProblem)
+  }
+  const sets = new Map<string, Set<number>>()
+  for (const [className, byProblem] of tried) {
+    const n = members.get(className) ?? 0
+    sets.set(
+      className,
+      new Set([...byProblem].filter(([, people]) => n > 0 && people * 2 >= n).map(([id]) => id)),
+    )
+  }
+  return sets
+}
+
+function memberCounts(entrants: Entrant[]) {
+  const members = new Map<string, number>()
+  for (const entrant of entrants)
+    members.set(entrant.className!, (members.get(entrant.className!) ?? 0) + 1)
+  return members
+}
+
+/**
+ * 只给了一个班（或者没给、用看的人自己的班）时，配一个对手：同年级在用的班里，和它一起
+ * 布置过的题最多的那个；一样多挑班级对抗里排得更前的（用户 2026-10-10 定的）。
+ * 同年级没有别的在用的班就不配。
+ */
+export async function pkPartner(className: string) {
+  const { term, entrants } = await classedEntrants()
+  const battle = battleFrom(entrants)
+  const grade = className.slice(0, 2)
+  const candidates = battle.filter(
+    (item) => item.className !== className && item.className.slice(0, 2) === grade,
+  )
+  if (!candidates.length) return null
+  const names = [className, ...candidates.map((item) => item.className)]
+  const sets = assignedSets(
+    await pkPairs(names, term),
+    memberCounts(entrants.filter((entrant) => names.includes(entrant.className!))),
+  )
+  const mine = sets.get(className) ?? new Set<number>()
+  const common = (name: string) => [...(sets.get(name) ?? [])].filter((id) => mine.has(id)).length
+  return candidates.sort((a, b) => common(b.className) - common(a.className) || a.rank - b.rank)[0]!
+    .className
+}
+
+/**
+ * 班级 PK 的全部数字（页面和 AI 分析共用）。人均、分布按 `period` 算；每周人均（赛跑）
+ * 一直按这学期，横轴才有东西。
+ */
+export async function classPk(
+  classNames: string[],
+  period: ClassPkPeriod,
+  mine: string | null,
+): Promise<ClassPk> {
+  const { term, entrants: all } = await classedEntrants()
+  const since = period === "week" ? weekStart() : term
+  const sinceMs = Date.parse(since)
+  const battle = battleFrom(all)
+  const entrants = all.filter((entrant) => classNames.includes(entrant.className!))
+  const members = memberCounts(entrants)
+  const pairs = await pkPairs(classNames, since)
+  const assigned = assignedSets(pairs, members)
+
+  const firstWeek = Date.parse(weekStart(term))
+  const thisWeek = Date.parse(weekStart())
+  const weeks: number[] = []
+  for (let from = firstWeek; from <= thisWeek; from += WEEK_MS) weeks.push(from)
+
+  // 每道题、每个班：交过 / 做对 / 一次就对 / 提交次数
+  const cells = new Map<
+    number,
+    Map<string, Omit<ClassPkCell, "percent" | "firstPercent" | "best">>
+  >()
+  for (const pair of pairs) {
+    if (!assigned.get(pair.className)?.has(pair.problemId)) continue
+    const byClass = cells.get(pair.problemId) ?? new Map()
+    const cell = byClass.get(pair.className) ?? { tried: 0, solved: 0, firstTry: 0, submissions: 0 }
+    cell.tried++
+    if (pair.solved) cell.solved++
+    if (pair.firstSolved) cell.firstTry++
+    cell.submissions += pair.submissions
+    byClass.set(pair.className, cell)
+    cells.set(pair.problemId, byClass)
+  }
+  const titles = cells.size
+    ? await db
+        .select({
+          id: schema.problem.id,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+        })
+        .from(schema.problem)
+        .where(inArray(schema.problem.id, [...cells.keys()]))
+    : []
+  const titleOf = new Map(titles.map((row) => [row.id, row]))
+
+  const lead = new Map<string, number>()
+  const problems: ClassPk["problems"] = []
+  const solo: ClassPk["solo"] = []
+  for (const [problemId, byClass] of [...cells].sort((a, b) => a[0] - b[0])) {
+    const meta = titleOf.get(problemId)
+    if (!meta) continue
+    if (byClass.size === 1) {
+      const [className] = byClass.keys()
+      solo.push({ problemId, displayId: meta.displayId, title: meta.title, className: className! })
+      continue
+    }
+    const row = classNames.map((className) => {
+      const cell = byClass.get(className)
+      if (!cell) return null
+      return {
+        ...cell,
+        percent: Math.round((cell.solved / members.get(className)!) * 100),
+        firstPercent: Math.round((cell.firstTry / cell.tried) * 100),
+        best: false,
+      }
+    })
+    const top = Math.max(...row.map((cell) => cell?.percent ?? -1))
+    row.forEach((cell, index) => {
+      if (!cell || cell.percent !== top) return
+      cell.best = true
+      lead.set(classNames[index]!, (lead.get(classNames[index]!) ?? 0) + 1)
+    })
+    problems.push({ problemId, displayId: meta.displayId, title: meta.title, cells: row })
+  }
+
+  const classes = classNames.map((className) => {
+    const people = entrants.filter((entrant) => entrant.className === className)
+    const solved = people.map((entrant) => entrant.times.filter((time) => time >= sinceMs).length)
+    const own = pairs.filter((pair) => pair.className === className)
+    return {
+      className,
+      members: people.length,
+      perCapita: people.length ? rounded(average(solved), 1) : 0,
+      median: median(solved),
+      solvedMembers: solved.filter((value) => value > 0).length,
+      firstPercent: own.length
+        ? Math.round((own.filter((pair) => pair.firstSolved).length / own.length) * 100)
+        : null,
+      lead: lead.get(className) ?? 0,
+      battleRank: battle.find((item) => item.className === className)?.rank ?? null,
+      distribution: solved,
+      weekly: weeks.map((from) =>
+        people.length
+          ? rounded(
+              average(
+                people.map(
+                  (entrant) =>
+                    entrant.times.filter((time) => time >= from && time < from + WEEK_MS).length,
+                ),
+              ),
+              1,
+            )
+          : 0,
+      ),
+    } satisfies ClassPkClass
+  })
+
+  return {
+    period,
+    start: since,
+    weeks: weeks.map((from) => new Date(from).toISOString()),
+    classes,
+    mine,
+    problems,
+    solo,
+  } satisfies ClassPk
 }

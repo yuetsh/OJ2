@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { classPkPeriodSchema } from "./ranking"
+
 /**
  * 评级。`grade()` 返回 S/A/B/C，`averageGrade()` 在没有可用数据时返回空串 ——
  * 空串是真会下发的值，别把它从这里去掉，前端要按「无评级」处理。
@@ -240,9 +242,10 @@ export const classAnalysisRequestSchema = z.object({
   className: z.string().trim().min(1).max(32),
 })
 
+/** 班级 PK 的 AI 分析同样只传班号和时间段，数字和页面上的是同一份（services/ranking.ts 的 classPk） */
 export const classPkAnalysisRequestSchema = z.object({
-  comparisons: z.array(z.record(z.string(), z.unknown())).min(2),
-  timeRangeLabel: z.string().default("全部时间"),
+  classNames: z.array(z.string().trim().min(1).max(32)).min(2).max(8),
+  period: classPkPeriodSchema,
 })
 
 /**
