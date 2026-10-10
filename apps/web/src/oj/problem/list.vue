@@ -402,8 +402,8 @@ watch(
 
 const gridColumns = computed(() =>
   showStatus.value
-    ? "40px 72px minmax(0, 1fr) 190px 72px 136px"
-    : "72px minmax(0, 1fr) 190px 72px 136px",
+    ? "40px 72px minmax(0, 1fr) 260px 72px 136px"
+    : "72px minmax(0, 1fr) 260px 72px 136px",
 )
 </script>
 
@@ -564,7 +564,7 @@ const gridColumns = computed(() =>
                 <span v-if="cCourse(row)" class="must course">C语言</span>
                 <ProblemTypeTag v-for="kind in problemTypes(row)" :key="kind" :kind="kind" />
               </div>
-              <div class="knowledge">{{ knowledgeOf(row) || "—" }}</div>
+              <div class="knowledge" :title="knowledgeOf(row)">{{ knowledgeOf(row) || "—" }}</div>
               <div>
                 <span v-if="row.difficulty" class="difficulty" :style="difficultyStyle(row)">
                   {{ row.difficulty }}
