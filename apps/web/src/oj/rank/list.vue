@@ -9,7 +9,7 @@ import type {
 } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { clearMood, getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from "oj/api"
-import { classLabel } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useConfigStore } from "shared/store/config"
@@ -261,12 +261,8 @@ const minis = computed<MiniRank[]>(() => {
 
 const teacherClassOptions = computed(() => {
   const list = configStore.config?.classList ?? []
-  const all =
-    teacherClass.value && !list.includes(teacherClass.value) ? [teacherClass.value, ...list] : list
-  return [
-    { label: "全部", value: "" },
-    ...all.map((name) => ({ label: classLabel(name), value: name })),
-  ]
+  const all = teacherClass.value ? [teacherClass.value, ...list] : list
+  return [{ label: "全部", value: "" }, ...groupClassOptions(all)]
 })
 
 const myBattle = computed(() => battle.value.find((item) => item.className === classContext.value))

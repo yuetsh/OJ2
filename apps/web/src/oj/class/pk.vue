@@ -4,7 +4,7 @@ import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
 import { useThemeVars } from "naive-ui"
 import { getClassBattle, getClassPk } from "oj/api"
-import { classLabel } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "oj/submission/utils"
 import { useAIStream } from "shared/composables/aiStream"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
@@ -102,25 +102,13 @@ function setPeriod(value: ClassPkPeriod) {
 }
 
 /** 「+ 加一个班」：这学期在用的班（班级对抗里有的），按年级分组，自己年级放最前 */
-const addOptions = computed(() => {
-  const grade = selected.value[0]?.slice(0, 2)
-  const groups = new Map<string, { label: string; value: string }[]>()
-  for (const item of battle.value) {
-    if (selected.value.includes(item.className)) continue
-    const key = item.className.slice(0, 2)
-    const list = groups.get(key) ?? []
-    list.push({ label: classLabel(item.className), value: item.className })
-    groups.set(key, list)
-  }
-  return [...groups]
-    .sort((a, b) => (a[0] === grade ? -1 : b[0] === grade ? 1 : b[0].localeCompare(a[0])))
-    .map(([key, children]) => ({
-      type: "group" as const,
-      label: `${key} 级`,
-      key,
-      children: children.sort((a, b) => a.value.localeCompare(b.value, "zh", { numeric: true })),
-    }))
-})
+const addOptions = computed(() =>
+  groupClassOptions(
+    battle.value.map((item) => item.className).filter((name) => !selected.value.includes(name)),
+    undefined,
+    selected.value[0]?.slice(0, 2),
+  ),
+)
 
 const mode = computed(() => {
   if (!pk.value || pk.value.classes.length < 2) return "empty"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getClassBoard, setClassLesson } from "oj/api"
+import { groupClassOptions } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
 import { useLeaveStudents } from "shared/composables/leaveStudents"
 import { useCollabStore } from "shared/store/collab"
@@ -49,17 +50,9 @@ const languageOptions = LESSON_LANGUAGES.map((value) => ({
 }))
 const saving = ref(false)
 
-function classLabel(name: string) {
-  return /^\d{3,}$/.test(name) ? `${name.slice(0, 2)}计算机${name.slice(2)}班` : name
-}
-
 const classOptions = computed(() => {
   const list = configStore.config?.classList ?? []
-  const names =
-    board.value?.className && !list.includes(board.value.className)
-      ? [board.value.className, ...list]
-      : list
-  return names.map((name) => ({ label: classLabel(name), value: name }))
+  return groupClassOptions(board.value?.className ? [board.value.className, ...list] : list)
 })
 
 async function load() {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { classLabel, groupClassOptions } from "oj/submission/utils"
 import { errorCode } from "utils/api"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
@@ -52,14 +53,13 @@ function filterClassUser(pattern: string, option: SelectOption) {
 // 空串是「没有我所在的班级」，null 才是没选 —— 往届的班级毕业后会从后台配置里删掉，
 // 这一项是他们唯一的入口，写完整用户名登录
 const OTHER_CLASS = ""
-const classList = computed<SelectOption[]>(() => {
-  const configs =
-    configStore.config?.classList.map((item) => ({
-      label: `${item.slice(0, 2)}计算机${item.slice(2)}班`,
-      value: `ks${item}`,
-    })) ?? []
-  return [...configs, { label: "没有我所在的班级", value: OTHER_CLASS }]
-})
+const classList = computed<SelectOption[]>(() => [
+  ...groupClassOptions(configStore.config?.classList ?? [], (item) => ({
+    label: classLabel(item),
+    value: `ks${item}`,
+  })),
+  { label: "没有我所在的班级", value: OTHER_CLASS },
+])
 // 选了具体班级就是「选姓名」，选了「没有我所在的班级」就是「写用户名」
 const isClassLogin = computed(() => Boolean(form.value.class))
 const passwordRule: FormItemRule[] = [
@@ -190,7 +190,8 @@ function onUsernamePicked() {
 function restoreLastClass() {
   if (form.value.class !== null) return
   const last = storage.get(STORAGE_KEY.LOGIN_CLASS)
-  if (typeof last === "string" && classList.value.some((item) => item.value === last)) {
+  const known = (configStore.config?.classList ?? []).map((item) => `ks${item}`)
+  if (typeof last === "string" && known.includes(last)) {
     form.value.class = last
   }
 }
