@@ -16,6 +16,9 @@ import RankAvatar from "./RankAvatar.vue"
  * 底色；默认只列前几行和你附近几行，「看全班 N 人」点开。换范围 / 时间段时父组件换 key
  * 重新挂载，折叠状态跟着复位。
  *
+ * 桌面的条只有百来像素（老师那边多一个「⋯」，七十来像素），压不下文字标签：「前一名」
+ * 「后一名」靠条的颜色和图例认，「进步最大」改成涨跌那一格的橙底徽章。手机每行有空，标签照旧。
+ *
  * 个性签名（设计稿「签名 A」）：桌面一行只有一百来像素的条，放不下一句话，所以有签名的
  * 名字后面挂一个引号，指上去看；手机每行本来就有空，签名直接写在名字后面。
  */
@@ -142,26 +145,6 @@ function width(row: RankRow) {
   return `${ratio(row)}%`
 }
 
-function tagOf(row: RankRow) {
-  const id = row.user.id
-  if (id === props.chaseId) return { kind: "chase", label: "前一名" }
-  if (id === props.threatId) return { kind: "threat", label: "后一名" }
-  if (id === props.hotId) return { kind: "hot", label: "进步最大" }
-  return null
-}
-
-/**
- * 桌面：标签挂在条的末端（原来单占一列 58px，把条挤得只剩几十像素）。条短就挂在条后面，
- * 条长了后面放不下，就收进条里靠右。收进条里时淡底的标签垫一层卡片底色，免得条的灰透上来；
- * 「进步最大」本来就是实心橙底白字，不能垫 —— 垫了就是白底白字，条上只剩一块白
- */
-function tagPlace(row: RankRow) {
-  const r = ratio(row)
-  if (r <= 60) return { left: `calc(${r}% + 6px)` }
-  const inside = { right: `calc(${100 - r}% + 4px)` }
-  return tagOf(row)?.kind === "hot" ? inside : { ...inside, backgroundColor: theme.value.cardColor }
-}
-
 function menuOf(row: RankRow): DropdownOption[] {
   return [
     { label: "看他的提交", key: "submissions" },
@@ -258,17 +241,13 @@ function onMenu(key: string, row: RankRow) {
           </n-tooltip>
           <span class="bar-box">
             <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
-            <span
-              v-if="tagOf(item.row)"
-              class="tag"
-              :class="tagOf(item.row)!.kind"
-              :style="tagPlace(item.row)"
-              >{{ tagOf(item.row)!.label }}</span
-            >
           </span>
           <span class="solved">{{ item.row.solved }}</span>
           <span class="change">
-            <span v-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
+            <span v-if="item.row.user.id === hotId" class="up hot" title="进步最大"
+              >↑{{ item.row.change }}</span
+            >
+            <span v-else-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
             <span v-else-if="(item.row.change ?? 0) < 0" class="down"
               >↓{{ -item.row.change! }}</span
             >
@@ -465,18 +444,21 @@ function onMenu(key: string, row: RankRow) {
   font-weight: 600;
 }
 
+.up.hot {
+  color: #ffffff;
+  background: #c76a12;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
 .down {
   color: v-bind("theme.errorColor");
 }
 
 .flat {
   color: v-bind("theme.textColor3");
-}
-
-.bar-box .tag {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .tag {

@@ -432,11 +432,14 @@ async function restore(userId: number) {
             <b>{{ title }}</b>
             <span class="muted">{{ subtitle }}</span>
             <div class="spacer" />
-            <span v-if="!teacher && me" class="legend">
-              <span v-if="meListed"><i :style="{ background: palette.me }" />你</span>
-              <span v-if="board.ahead"><i :style="{ background: palette.chase }" />前一名</span>
-              <span v-if="board.behind"><i :style="{ background: palette.threat }" />后一名</span>
-              <span v-if="mateClass"><i :style="{ background: palette.mate }" />你们班</span>
+            <span v-if="(!teacher && me) || hot" class="legend">
+              <template v-if="!teacher && me">
+                <span v-if="meListed"><i :style="{ background: palette.me }" />你</span>
+                <span v-if="board.ahead"><i :style="{ background: palette.chase }" />前一名</span>
+                <span v-if="board.behind"><i :style="{ background: palette.threat }" />后一名</span>
+                <span v-if="mateClass"><i :style="{ background: palette.mate }" />你们班</span>
+              </template>
+              <span v-if="hot"><b class="hot-chip">↑</b>进步最大</span>
             </span>
           </div>
           <RankPodium
@@ -757,6 +760,16 @@ async function restore(userId: number) {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 和赛道里涨跌那一格的徽章同一个样子 */
+.legend .hot-chip {
+  font-size: 12px;
+  color: #ffffff;
+  background: #c76a12;
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 16px;
 }
 
 .legend i {
