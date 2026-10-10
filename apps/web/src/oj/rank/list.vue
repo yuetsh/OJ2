@@ -480,7 +480,17 @@ async function restore(userId: number) {
               >
                 班级详情 · AI 分析
               </n-button>
-              <n-button size="small" secondary @click="router.push('/class')">班级 PK</n-button>
+              <n-button
+                size="small"
+                secondary
+                @click="
+                  router.push({
+                    path: '/class',
+                    query: classContext ? { classes: classContext } : {},
+                  })
+                "
+                >班级 PK</n-button
+              >
             </div>
             <div class="hidden-list">
               <span class="hidden-title">不计入排名的人</span>
@@ -506,7 +516,7 @@ async function restore(userId: number) {
           :items="battle"
           :mine="classContext"
           :teacher="teacher"
-          :pk="userStore.isAdminRole"
+          :pk="userStore.isAuthed"
           @pick="openDetail"
         />
       </aside>
@@ -560,7 +570,7 @@ async function restore(userId: number) {
           :items="battle"
           :mine="classContext"
           :teacher="teacher"
-          :pk="userStore.isAdminRole"
+          :pk="userStore.isAuthed"
           @pick="openDetail"
         />
         <RankTrend
@@ -586,7 +596,7 @@ async function restore(userId: number) {
       v-model:show="showDetail"
       :class-name="detailClass"
       :teacher="teacher"
-      :pk="userStore.isAdminRole"
+      :pk="userStore.isAuthed"
     />
   </div>
 </template>

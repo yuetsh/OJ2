@@ -1,915 +1,543 @@
 <script setup lang="ts">
-import type { ClassComparison } from "utils/types"
-import { LONG_DURATION_OPTIONS } from "utils/constants"
-import { durationFromValue } from "utils/functions"
-import { h } from "vue"
-import { formatISO, sub, type Duration } from "date-fns"
-import { getClassPK } from "oj/api"
-import { useConfigStore } from "shared/store/config"
-import { useUserStore } from "shared/store/user"
-import { Icon } from "@iconify/vue"
-import { Bar, Radar } from "vue-chartjs"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import type { ClassBattleItem, ClassPk, ClassPkPeriod } from "@oj2/contract"
 import { MdPreview } from "md-editor-v3"
 import "md-editor-v3/lib/preview.css"
+import { useThemeVars } from "naive-ui"
+import { getClassBattle, getClassPk } from "oj/api"
+import { classLabel } from "oj/submission/utils"
 import { useAIStream } from "shared/composables/aiStream"
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  RadialLinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Colors,
-  Filler,
-  type TooltipItem,
-} from "chart.js"
+import { useBreakpoints } from "shared/composables/breakpoints"
+import { useUserStore } from "shared/store/user"
+import PkDuel from "./components/PkDuel.vue"
+import PkGrid from "./components/PkGrid.vue"
+import PkRace from "./components/PkRace.vue"
+import { pkColor } from "./utils"
 
-// 注册Chart.js组件
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  RadialLinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Colors,
-  Filler,
-)
-
-const configStore = useConfigStore()
-const { isTeacherOrAbove } = storeToRefs(useUserStore())
+/**
+ * 班级 PK（设计稿「班级 PK 重设计」定稿）。用户定的：两个班按「同一批题」对决（B），
+ * 三个班以上按题对照（C），学生也能看。原来的综合分、雷达图、十张柱状图、四分位数都去掉了。
+ *
+ * 选了哪些班、看哪段时间都在地址栏里（`?classes=252,253&period=term`），从排名页、班级详情
+ * 进来可以直接带上；不带就用自己的班（老师用默认的班），后端再配一个同年级的对手。
+ */
+const router = useRouter()
+const route = useRoute()
 const message = useMessage()
+const theme = useThemeVars()
+const userStore = useUserStore()
 const { isDesktop } = useBreakpoints()
 
-const selectedClasses = ref<string[]>([])
-const comparisons = ref<ClassComparison[]>([])
-const duration = ref<string>("")
+const MAX_CLASSES = 8
+
+const teacher = computed(() => userStore.isTeacherOrAbove)
+const pk = ref<ClassPk | null>(null)
 const loading = ref(false)
-const hasTimeRange = ref(false)
+const battle = ref<ClassBattleItem[]>([])
 
-const aiStream = useAIStream()
-const aiLoading = aiStream.waiting
-const aiContent = ref("")
-const showAIModal = ref(false)
-
-// 长时段选项（LONG_DURATION_OPTIONS），外加一个「全部时间」
-const timeRangeOptions: SelectOption[] = [
-  { label: "全部时间", value: "" },
-  ...LONG_DURATION_OPTIONS,
-]
-
-// 「全部时间」的 value 是空串，解不出来就是 null —— 正是不带时间条件的意思
-const subOptions = computed<Duration | null>(() => durationFromValue(duration.value))
-
-// 根据时间段选项计算开始和结束时间
-function getTimeRange(): {
-  startTime?: string
-  endTime?: string
-} {
-  if (!duration.value || duration.value === "" || !subOptions.value) {
-    return {}
-  }
-
-  const current = Date.now()
-  const startTime = formatISO(sub(current, subOptions.value))
-  const endTime = formatISO(current)
-
-  return {
-    startTime,
-    endTime,
-  }
+function queryClasses() {
+  const raw = route.query.classes
+  return typeof raw === "string" && raw ? raw.split(",").filter(Boolean) : []
 }
+const period = computed<ClassPkPeriod>(() => (route.query.period === "week" ? "week" : "term"))
 
-const classOptions = computed(() => {
-  return (
-    configStore.config?.classList.map((item) => ({
-      label: `${item.slice(0, 2)}计算机${item.slice(2)}班`,
-      value: item,
-    })) ?? []
-  )
-})
-
-async function compare() {
-  if (selectedClasses.value.length < 2) {
-    message.warning("请至少选择2个班级")
-    return
-  }
-
+let seq = 0
+async function load() {
+  const mine = ++seq
   loading.value = true
   try {
-    const { startTime, endTime } = getTimeRange()
-
-    const res = await getClassPK(selectedClasses.value, startTime, endTime)
-    comparisons.value = res.comparisons
-    hasTimeRange.value = res.hasTimeRange || false
-  } catch (error) {
-    message.error("获取数据失败")
+    const data = await getClassPk(queryClasses(), period.value)
+    if (mine !== seq) return
+    pk.value = data
+    // 后端配好的班写回地址栏：刷新、分享出去看到的是同一组
+    const classes = data.classes.map((item) => item.className).join(",")
+    if (classes && classes !== route.query.classes)
+      router.replace({ query: { ...route.query, classes } })
+  } catch {
+    if (mine === seq) pk.value = null
   } finally {
-    loading.value = false
+    if (mine === seq) loading.value = false
   }
 }
 
-async function analyzeWithAI() {
-  const timeRangeLabel =
-    timeRangeOptions.find((o) => o.value === duration.value)?.label ?? "全部时间"
+watch(() => [route.query.classes, route.query.period], load, { immediate: true })
 
-  showAIModal.value = true
-  aiContent.value = ""
+onMounted(async () => {
   try {
-    await aiStream.run(
-      "ai/class-pk-analysis",
-      { comparisons: comparisons.value, timeRangeLabel },
-      { onDelta: (content) => (aiContent.value += content) },
-    )
-  } catch (error) {
-    message.error((error as Error).message)
-  }
-}
-
-// 计算排名颜色
-function getRankColor(index: number) {
-  if (index === 0) return { type: "success" as const, text: "1" }
-  if (index === 1) return { type: "info" as const, text: "2" }
-  if (index === 2) return { type: "warning" as const, text: "3" }
-  return { type: "default" as const, text: `${index + 1}` }
-}
-
-// 获取班级颜色
-function getClassColor(index: number) {
-  const colors = [
-    { bg: "rgba(24, 160, 88, 0.2)", border: "rgba(24, 160, 88, 0.8)" }, // success
-    { bg: "rgba(32, 128, 240, 0.2)", border: "rgba(32, 128, 240, 0.8)" }, // info
-    { bg: "rgba(240, 160, 32, 0.2)", border: "rgba(240, 160, 32, 0.8)" }, // warning
-    { bg: "rgba(208, 48, 80, 0.2)", border: "rgba(208, 48, 80, 0.8)" }, // error
-    { bg: "rgba(128, 90, 213, 0.2)", border: "rgba(128, 90, 213, 0.8)" }, // purple
-    { bg: "rgba(0, 184, 148, 0.2)", border: "rgba(0, 184, 148, 0.8)" }, // teal
-    { bg: "rgba(63, 81, 181, 0.2)", border: "rgba(63, 81, 181, 0.8)" }, // indigo
-    { bg: "rgba(0, 172, 193, 0.2)", border: "rgba(0, 172, 193, 0.8)" }, // cyan
-    { bg: "rgba(124, 179, 66, 0.2)", border: "rgba(124, 179, 66, 0.8)" }, // lime
-    { bg: "rgba(233, 30, 99, 0.2)", border: "rgba(233, 30, 99, 0.8)" }, // pink
-  ]
-  return colors[index % colors.length]
-}
-
-// 值一定是数字的那些指标（recent* 是可选字段，不在其列）
-type BarMetric = {
-  [K in keyof ClassComparison]-?: ClassComparison[K] extends number ? K : never
-}[keyof ClassComparison]
-
-// 十张柱状对比图只差标题和取哪一列：每个班级一种颜色，和雷达图用同一套配色
-function barChart(label: string, key: BarMetric) {
-  return computed(() => {
-    if (comparisons.value.length === 0) return null
-
-    const labels = comparisons.value.map((c) => c.className)
-    const datasets = [
-      {
-        label,
-        data: comparisons.value.map((c) => c[key]),
-        backgroundColor: comparisons.value.map((_, i) => getClassColor(i).bg),
-        borderColor: comparisons.value.map((_, i) => getClassColor(i).border),
-        borderWidth: 2,
-      },
-    ]
-
-    return { labels, datasets }
-  })
-}
-
-const compositeScoreChartData = barChart("综合分", "compositeScore")
-const totalAcChartData = barChart("总AC数", "totalAc")
-const avgAcChartData = barChart("平均AC数", "avgAc")
-const medianAcChartData = barChart("中位数AC数", "medianAc")
-const excellentRateChartData = barChart("优秀率", "excellentRate")
-const passRateChartData = barChart("及格率", "passRate")
-const activeRateChartData = barChart("参与度", "activeRate")
-const top10AvgChartData = barChart("前10%平均", "top10Avg")
-const bottom10AvgChartData = barChart("后10%平均", "bottom10Avg")
-const middle80AvgChartData = barChart("中间80%均值", "middle80Avg")
-
-// 雷达图数据 - 多维度综合对比
-const radarChartData = computed(() => {
-  if (comparisons.value.length === 0) return null
-
-  // 归一化数据到0-100范围
-  const normalize = (value: number, max: number, min: number) => {
-    if (max === min) return 50
-    return ((value - min) / (max - min)) * 100
-  }
-
-  const metrics = ["总AC数", "平均AC数", "中位数AC数", "优秀率", "及格率", "参与度"]
-
-  // 计算每个指标的最大最小值
-  const maxValues = [
-    Math.max(...comparisons.value.map((c) => c.totalAc)),
-    Math.max(...comparisons.value.map((c) => c.avgAc)),
-    Math.max(...comparisons.value.map((c) => c.medianAc)),
-    100, // 优秀率最大值
-    100, // 及格率最大值
-    100, // 参与度最大值
-  ]
-
-  const minValues = [
-    Math.min(...comparisons.value.map((c) => c.totalAc)),
-    Math.min(...comparisons.value.map((c) => c.avgAc)),
-    Math.min(...comparisons.value.map((c) => c.medianAc)),
-    0,
-    0,
-    0,
-  ]
-
-  const datasets = comparisons.value.map((c, index) => {
-    const color = getClassColor(index)
-    const rawData = [c.totalAc, c.avgAc, c.medianAc, c.excellentRate, c.passRate, c.activeRate]
-    return {
-      label: c.className,
-      data: [
-        normalize(c.totalAc, maxValues[0], minValues[0]),
-        normalize(c.avgAc, maxValues[1], minValues[1]),
-        normalize(c.medianAc, maxValues[2], minValues[2]),
-        c.excellentRate,
-        c.passRate,
-        c.activeRate,
-      ],
-      rawData,
-      backgroundColor: color.bg,
-      borderColor: color.border,
-      borderWidth: 2,
-      pointBackgroundColor: color.border,
-      pointBorderColor: "#fff",
-      pointHoverBackgroundColor: "#fff",
-      pointHoverBorderColor: color.border,
-    }
-  })
-
-  return {
-    labels: metrics,
-    datasets,
+    battle.value = await getClassBattle()
+  } catch {
+    battle.value = []
   }
 })
 
-// 图表配置 - 优化对比效果
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: "bottom" as const,
-      display: true,
-      labels: {
-        boxWidth: 0,
-        padding: 10,
-      },
-    },
-    tooltip: {
-      mode: "index" as const,
-      intersect: false,
-      callbacks: {
-        label: function (context: any) {
-          let label = context.dataset.label || ""
-          if (label) {
-            label += ": "
-          }
-          if (context.parsed.y !== null) {
-            label += context.parsed.y.toFixed(2)
-          }
-          return label
-        },
-      },
-    },
-    datalabels: {
-      display: false,
-    },
-  },
-  scales: {
-    y: {
-      beginAtZero: true,
-      grid: {
-        display: true,
-        color: "rgba(0, 0, 0, 0.05)",
-      },
-    },
-    x: {
-      grid: {
-        display: false,
-      },
-    },
-  },
+const selected = computed(() => pk.value?.classes.map((item) => item.className) ?? [])
+
+function setClasses(classes: string[]) {
+  report.value = ""
+  ai.abort()
+  router.push({ query: { ...route.query, classes: classes.join(",") || undefined } })
 }
 
-const compositeScoreChartOptions = {
-  ...chartOptions,
-  scales: {
-    ...chartOptions.scales,
-    y: {
-      ...chartOptions.scales.y,
-      max: 100,
-    },
-  },
+function remove(className: string) {
+  setClasses(selected.value.filter((name) => name !== className))
 }
 
-const tableColumns: DataTableColumn<ClassComparison>[] = [
-  {
-    title: "排名",
-    key: "rank",
-    render: (_, index) => getRankColor(index).text,
-    width: 80,
-  },
-  {
-    title: "综合分",
-    key: "composite_score",
-    width: 90,
-    render: (row) =>
-      h(
-        "span",
-        {
-          style: {
-            color: "#722ed1",
-            fontWeight: "700",
-            fontSize: "15px",
-          },
-        },
-        row.compositeScore.toFixed(1),
-      ),
-  },
-  {
-    title: "班级",
-    key: "class_name",
-    render: (row) => `${row.className.slice(0, 2)}计算机${row.className.slice(2)}班`,
-    width: 160,
-  },
-  {
-    title: "人数",
-    key: "user_count",
-    width: 80,
-    render: (row) => h("span", { style: { color: "#1890ff", fontWeight: "600" } }, row.userCount),
-  },
-  {
-    title: "总AC数",
-    key: "total_ac",
-    width: 100,
-    render: (row) => h("span", { style: { color: "#ff4d4f", fontWeight: "600" } }, row.totalAc),
-  },
-  {
-    title: "平均AC",
-    key: "avg_ac",
-    width: 100,
-    render: (row) =>
-      h("span", { style: { color: "#52c41a", fontWeight: "600" } }, row.avgAc.toFixed(2)),
-  },
-  {
-    title: "中位数AC",
-    key: "median_ac",
-    width: 100,
-    render: (row) =>
-      h("span", { style: { color: "#fa8c16", fontWeight: "600" } }, row.medianAc.toFixed(2)),
-  },
-  {
-    title: "前10%均值",
-    key: "top10_avg",
-    width: 100,
-    render: (row) =>
-      h("span", { style: { color: "#cf1322", fontWeight: "600" } }, row.top10Avg.toFixed(2)),
-  },
-  {
-    title: "中间80%均值",
-    key: "middle80_avg",
-    width: 110,
-    render: (row) =>
-      h("span", { style: { color: "#389e0d", fontWeight: "600" } }, row.middle80Avg.toFixed(2)),
-  },
-  {
-    title: "后10%均值",
-    key: "bottom10_avg",
-    width: 100,
-    render: (row) =>
-      h("span", { style: { color: "#096dd9", fontWeight: "500" } }, row.bottom10Avg.toFixed(2)),
-  },
-  {
-    title: "优秀率",
-    key: "excellent_rate",
-    width: 100,
-    render: (row) =>
-      h(
-        "span",
-        { style: { color: "#faad14", fontWeight: "600" } },
-        row.excellentRate.toFixed(1) + "%",
-      ),
-  },
-  {
-    title: "及格率",
-    key: "pass_rate",
-    width: 100,
-    render: (row) =>
-      h("span", { style: { color: "#52c41a", fontWeight: "600" } }, row.passRate.toFixed(1) + "%"),
-  },
-  {
-    title: "参与度",
-    key: "active_rate",
-    width: 100,
-    render: (row) =>
-      h(
-        "span",
-        { style: { color: "#1890ff", fontWeight: "600" } },
-        row.activeRate.toFixed(1) + "%",
-      ),
-  },
-]
+function replace(from: string, to: string) {
+  if (selected.value.includes(to)) return
+  setClasses(selected.value.map((name) => (name === from ? to : name)))
+}
 
-const radarChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: "bottom" as const,
-    },
-    tooltip: {
-      callbacks: {
-        label: function (context: TooltipItem<"radar">) {
-          // rawData 是我们自己塞进 dataset 的扩展字段，chart.js 的类型里没有
-          const dataset = context.dataset as typeof context.dataset & {
-            rawData?: (number | null)[]
-          }
-          const rawValue = dataset.rawData?.[context.dataIndex]
-          const metric = context.label || ""
-          const isRate = context.dataIndex >= 3
-          if (rawValue === undefined || rawValue === null) {
-            return `${dataset.label || ""}: ${context.parsed.r?.toFixed(2) ?? ""}`
-          }
-          const formatted = Number.isFinite(rawValue)
-            ? isRate
-              ? rawValue.toFixed(1)
-              : Number.isInteger(rawValue)
-                ? rawValue.toString()
-                : rawValue.toFixed(2)
-            : String(rawValue)
-          const suffix = isRate ? "%" : ""
-          return `${dataset.label || ""} - ${metric}: ${formatted}${suffix}`
-        },
-      },
-    },
-  },
-  scales: {
-    r: {
-      beginAtZero: true,
-      max: 100,
-      ticks: {
-        stepSize: 20,
-      },
-    },
-  },
+function chipLabel(className: string) {
+  return isDesktop.value ? classLabel(className) : `${className.slice(2)}班`
+}
+
+function add(className: string) {
+  if (selected.value.includes(className)) return
+  setClasses([...selected.value, className])
+}
+
+function setPeriod(value: ClassPkPeriod) {
+  report.value = ""
+  ai.abort()
+  router.push({ query: { ...route.query, period: value === "term" ? undefined : value } })
+}
+
+/** 「+ 加一个班」：这学期在用的班（班级对抗里有的），按年级分组，自己年级放最前 */
+const addOptions = computed(() => {
+  const grade = selected.value[0]?.slice(0, 2)
+  const groups = new Map<string, { label: string; value: string }[]>()
+  for (const item of battle.value) {
+    if (selected.value.includes(item.className)) continue
+    const key = item.className.slice(0, 2)
+    const list = groups.get(key) ?? []
+    list.push({ label: classLabel(item.className), value: item.className })
+    groups.set(key, list)
+  }
+  return [...groups]
+    .sort((a, b) => (a[0] === grade ? -1 : b[0] === grade ? 1 : b[0].localeCompare(a[0])))
+    .map(([key, children]) => ({
+      type: "group" as const,
+      label: `${key} 级`,
+      key,
+      children: children.sort((a, b) => a.value.localeCompare(b.value, "zh", { numeric: true })),
+    }))
+})
+
+const mode = computed(() => {
+  if (!pk.value || pk.value.classes.length < 2) return "empty"
+  return pk.value.classes.length === 2 ? "duel" : "grid"
+})
+
+const ruleText = computed(() =>
+  mode.value === "grid"
+    ? "三个班以上按题对照 · 过半的人交过算这个班布置过"
+    : "两个班只比都布置过的题 · 过半的人交过算布置过",
+)
+
+// ---------- AI 分析（只给老师） ----------
+const ai = useAIStream()
+const report = ref("")
+const showReport = ref(false)
+
+async function analyze() {
+  if (selected.value.length < 2) return
+  showReport.value = true
+  report.value = ""
+  try {
+    await ai.run(
+      "ai/class-pk-analysis",
+      { classNames: selected.value, period: period.value },
+      { onDelta: (content) => (report.value += content) },
+    )
+  } catch (error) {
+    if (!report.value) showReport.value = false
+    message.error((error as Error).message)
+  }
 }
 </script>
 
 <template>
-  <n-card>
-    <n-flex vertical :size="20">
-      <n-h2 style="margin-bottom: 0">班级PK</n-h2>
-
-      <n-flex :wrap="false" align="flex-start" :size="16">
-        <n-form-item label="选择班级（至少2个）" style="width: 300px; margin-bottom: 0">
-          <n-select
-            v-model:value="selectedClasses"
-            :options="classOptions"
-            multiple
-            placeholder="选择要比较的班级"
-          />
-        </n-form-item>
-
-        <n-form-item label="时间段（可选）" style="width: 200px; margin-bottom: 0">
-          <n-select
-            v-model:value="duration"
-            :options="timeRangeOptions"
-            clearable
-            placeholder="选择时间段"
-            style="width: 100%"
-          />
-        </n-form-item>
-
-        <n-button type="primary" @click="compare" :loading="loading" style="margin-top: 26px">
-          开始PK
-        </n-button>
+  <div class="pk-page" :class="{ compact: !isDesktop }">
+    <div class="toolbar">
+      <div class="title-line">
+        <router-link to="/rank" class="back">‹ 排名</router-link>
+        <h2>班级 PK</h2>
+        <span v-if="isDesktop" class="muted">{{ ruleText }}</span>
+        <div class="spacer" />
+        <div v-if="isDesktop" class="seg" role="group" aria-label="时间">
+          <button :class="{ on: period === 'week' }" @click="setPeriod('week')">这周</button>
+          <button :class="{ on: period === 'term' }" @click="setPeriod('term')">这学期</button>
+        </div>
         <n-button
-          v-if="isTeacherOrAbove"
+          v-if="teacher && isDesktop"
+          size="small"
+          secondary
           type="info"
-          @click="analyzeWithAI"
-          :loading="aiLoading"
-          :disabled="comparisons.length === 0"
-          style="margin-top: 26px"
+          :disabled="selected.length < 2"
+          :loading="ai.waiting.value"
+          @click="analyze"
         >
           <template #icon>
-            <Icon icon="ph:sparkle" />
-          </template>
-          AI分析
-        </n-button>
-      </n-flex>
-
-      <n-modal
-        v-model:show="showAIModal"
-        preset="card"
-        title="AI 分析报告"
-        :style="{ width: '800px', maxWidth: '95vw' }"
-      >
-        <n-spin :show="aiLoading" :delay="50">
-          <div style="min-height: 200px">
-            <MdPreview v-if="aiContent" :model-value="aiContent" />
-            <n-flex
-              v-else-if="!aiLoading"
-              align="center"
-              justify="center"
-              style="min-height: 200px"
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
             >
-              <n-empty description="暂无分析内容" />
-            </n-flex>
-          </div>
-        </n-spin>
-      </n-modal>
-
-      <!-- 班级对比卡片 -->
-      <n-grid v-if="comparisons.length > 0" :cols="2" :x-gap="16" :y-gap="16">
-        <n-gi
-          v-for="(classData, index) in comparisons"
-          :key="classData.className"
-          :span="isDesktop ? 1 : 2"
-        >
-          <n-card
-            :title="`${classData.className.slice(0, 2)}计算机${classData.className.slice(2)}班`"
-            :bordered="true"
-            hoverable
-            :style="{
-              borderTop: `4px solid ${getClassColor(index).border}`,
-            }"
+              <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+            </svg>
+          </template>
+          AI 分析
+        </n-button>
+      </div>
+      <div class="chips">
+        <template v-for="(className, index) in selected" :key="className">
+          <span v-if="index === 1 && selected.length === 2" class="vs">VS</span>
+          <span v-if="className === pk?.mine || selected.length > 2" class="chip">
+            <i :style="{ background: pkColor(index) }" />
+            {{ chipLabel(className) }}
+            <span v-if="className === pk?.mine" class="mine-tag">你们班</span>
+            <button
+              v-else
+              class="x"
+              :aria-label="`去掉${classLabel(className)}`"
+              @click="remove(className)"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </span>
+          <!-- 只剩两个班时不能删（删成一个班后端会再配一个），点它换成别的班 -->
+          <n-popselect
+            v-else
+            :options="addOptions"
+            scrollable
+            trigger="click"
+            :value="null"
+            @update:value="(value: string) => replace(className, value)"
           >
-            <template #header-extra>
-              <n-tag :type="getRankColor(index).type" size="large">
-                #{{ getRankColor(index).text }}
-                <span style="margin-left: 6px; font-size: 12px; opacity: 0.85">
-                  {{ classData.compositeScore }} 分
-                </span>
-              </n-tag>
-            </template>
+            <button class="chip" title="换一个班">
+              <i :style="{ background: pkColor(index) }" />
+              {{ chipLabel(className) }}
+              <svg
+                class="chev"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+          </n-popselect>
+        </template>
+        <n-popselect
+          v-if="selected.length < MAX_CLASSES"
+          :options="addOptions"
+          scrollable
+          trigger="click"
+          :value="null"
+          @update:value="add"
+        >
+          <button class="chip add">+ 加一个班</button>
+        </n-popselect>
+      </div>
+      <div v-if="!isDesktop" class="seg wide" role="group" aria-label="时间">
+        <button :class="{ on: period === 'week' }" @click="setPeriod('week')">这周</button>
+        <button :class="{ on: period === 'term' }" @click="setPeriod('term')">这学期</button>
+      </div>
+    </div>
 
-            <!-- 班级信息布局 -->
-            <n-flex vertical :size="12">
-              <!-- AC核心指标 -->
-              <n-grid :cols="5" :x-gap="8" responsive="screen">
-                <n-gi>
-                  <n-statistic
-                    label="总AC数"
-                    :value="classData.totalAc"
-                    size="large"
-                    class="stat-total-ac"
-                  >
-                    <template #suffix>
-                      <Icon icon="streamline-emojis:raised-fist-1" width="20" />
-                    </template>
-                  </n-statistic>
-                </n-gi>
-                <n-gi>
-                  <n-statistic
-                    label="平均AC数"
-                    :value="classData.avgAc.toFixed(2)"
-                    size="large"
-                    class="stat-avg-ac"
-                  >
-                    <template #suffix>
-                      <Icon icon="streamline-ultimate-color:analytics-pie-2" width="20" />
-                    </template>
-                  </n-statistic>
-                </n-gi>
-                <n-gi>
-                  <n-statistic
-                    label="中位数AC数"
-                    :value="classData.medianAc.toFixed(2)"
-                    size="large"
-                    class="stat-median-ac"
-                  >
-                    <template #suffix>
-                      <Icon icon="streamline-ultimate-color:cursor-target-1" width="20" />
-                    </template>
-                  </n-statistic>
-                </n-gi>
-                <n-gi>
-                  <n-statistic
-                    label="总提交数"
-                    :value="classData.totalSubmission"
-                    size="large"
-                    class="stat-total-submission"
-                  >
-                    <template #suffix>
-                      <Icon icon="streamline-ultimate-color:common-file-text" width="20" />
-                    </template>
-                  </n-statistic>
-                </n-gi>
-                <n-gi>
-                  <n-statistic
-                    label="AC率"
-                    :value="classData.acRate.toFixed(1) + '%'"
-                    size="large"
-                    class="stat-ac-rate"
-                  >
-                    <template #suffix>
-                      <Icon icon="fluent-emoji:check-mark-button" width="20" />
-                    </template>
-                  </n-statistic>
-                </n-gi>
-              </n-grid>
+    <n-spin :show="loading">
+      <template v-if="pk">
+        <div v-if="mode === 'empty'" class="card empty">
+          <b>再加一个班来比</b>
+          <span class="muted">
+            {{
+              pk.classes.length
+                ? "同年级没找到别的在用的班，点上面「+ 加一个班」挑一个"
+                : "你还没有班级，点上面「+ 加一个班」挑两个班来比"
+            }}
+          </span>
+        </div>
+        <template v-else>
+          <div v-if="!pk.problems.length" class="card empty">
+            <b>这几个班{{ period === "week" ? "这周" : "这学期" }}还没有一起布置过的题</b>
+            <span class="muted"
+              >一个班过半的人交过这道题才算布置过，至少两个班都布置过才能按题比</span
+            >
+            <PkRace v-if="period === 'term'" :pk="pk" :height="240" class="empty-race" />
+          </div>
+          <PkDuel v-else-if="mode === 'duel'" :pk="pk" :compact="!isDesktop" />
+          <PkGrid v-else :pk="pk" :compact="!isDesktop" />
+        </template>
 
-              <n-divider style="margin: 12px 0" />
-
-              <!-- 详细统计 - 紧凑布局，统一格式 -->
-              <n-descriptions bordered :column="2" size="small" label-placement="left">
-                <!-- 分位数统计 -->
-                <n-descriptions-item label="第一四分位数(Q1)">
-                  <span style="color: #9254de; font-weight: 500">{{
-                    classData.q1Ac.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-                <n-descriptions-item label="第三四分位数(Q3)">
-                  <span style="color: #f759ab; font-weight: 500">{{
-                    classData.q3Ac.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-                <n-descriptions-item label="四分位距(IQR)">
-                  <span style="color: #13c2c2; font-weight: 500">{{
-                    classData.iqr.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-                <n-descriptions-item label="标准差">
-                  <span style="color: #fa8c16; font-weight: 500">{{
-                    classData.stdDev.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-
-                <!-- 分层统计 -->
-                <n-descriptions-item label="前10%均值">
-                  <span style="color: #cf1322; font-weight: 600">{{
-                    classData.top10Avg.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-                <n-descriptions-item label="中间80%均值">
-                  <span style="color: #389e0d; font-weight: 600">{{
-                    classData.middle80Avg.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-                <n-descriptions-item label="后10%均值">
-                  <span style="color: #096dd9; font-weight: 500">{{
-                    classData.bottom10Avg.toFixed(2)
-                  }}</span>
-                </n-descriptions-item>
-
-                <!-- 人数 -->
-                <n-descriptions-item label="人数">
-                  <span style="color: #1890ff; font-weight: 600">{{ classData.userCount }}</span>
-                </n-descriptions-item>
-              </n-descriptions>
-
-              <!-- 比率统计 - 使用进度条图表 -->
-              <n-card size="small" title="比率统计" embedded style="margin-top: 12px">
-                <n-space vertical :size="10">
-                  <n-progress
-                    type="line"
-                    :percentage="classData.excellentRate"
-                    :show-indicator="true"
-                    :border-radius="4"
-                  >
-                    <template #default>
-                      优秀率: {{ classData.excellentRate.toFixed(1) }}%
-                    </template>
-                  </n-progress>
-                  <n-progress
-                    type="line"
-                    :percentage="classData.passRate"
-                    :show-indicator="true"
-                    :border-radius="4"
-                    status="success"
-                  >
-                    <template #default> 及格率: {{ classData.passRate.toFixed(1) }}% </template>
-                  </n-progress>
-                  <n-progress
-                    type="line"
-                    :percentage="classData.activeRate"
-                    :show-indicator="true"
-                    :border-radius="4"
-                    status="info"
-                  >
-                    <template #default> 参与度: {{ classData.activeRate.toFixed(1) }}% </template>
-                  </n-progress>
-                </n-space>
-              </n-card>
-
-              <!-- 时间段统计（如果有） -->
-              <template v-if="hasTimeRange && classData.recentTotalAc !== undefined">
-                <n-descriptions
-                  bordered
-                  :column="2"
-                  size="small"
-                  label-placement="left"
-                  style="margin-top: 12px"
-                >
-                  <n-descriptions-item label="时间段总AC">
-                    <span style="color: #ff7875; font-weight: 600">{{
-                      classData.recentTotalAc
-                    }}</span>
-                  </n-descriptions-item>
-                  <n-descriptions-item label="时间段平均AC">
-                    <span style="color: #73d13d; font-weight: 600">{{
-                      classData.recentAvgAc?.toFixed(2)
-                    }}</span>
-                  </n-descriptions-item>
-                  <n-descriptions-item label="时间段中位数AC">
-                    <span style="color: #ffc53d; font-weight: 600">{{
-                      classData.recentMedianAc?.toFixed(2)
-                    }}</span>
-                  </n-descriptions-item>
-                  <n-descriptions-item label="时间段前10名平均">
-                    <span style="color: #ff4d4f; font-weight: 600">{{
-                      classData.recentTop10Avg?.toFixed(2)
-                    }}</span>
-                  </n-descriptions-item>
-                  <n-descriptions-item label="活跃学生数" :span="2">
-                    <span style="color: #1890ff; font-weight: 600">{{
-                      classData.recentActiveCount
-                    }}</span>
-                  </n-descriptions-item>
-                </n-descriptions>
-              </template>
-            </n-flex>
-          </n-card>
-        </n-gi>
-      </n-grid>
-
-      <!-- 可视化图表 - 专注于对比 -->
-      <template v-if="comparisons.length > 0">
-        <!-- 综合分对比 + 多维度雷达图 同行 -->
-        <n-grid style="margin-top: 20px" :cols="2" :x-gap="16">
-          <n-gi>
-            <n-card title="综合分对比（满分100）" style="height: 100%">
-              <div style="height: 380px">
-                <Bar
-                  v-if="compositeScoreChartData"
-                  :data="compositeScoreChartData"
-                  :options="compositeScoreChartOptions"
-                />
-              </div>
-            </n-card>
-          </n-gi>
-          <n-gi>
-            <n-card title="多维度综合对比" style="height: 100%">
-              <div style="height: 380px">
-                <Radar v-if="radarChartData" :data="radarChartData" :options="radarChartOptions" />
-              </div>
-            </n-card>
-          </n-gi>
-        </n-grid>
-
-        <!-- AC核心指标对比 - 三个独立图表并排显示 -->
-        <n-card title="AC核心指标对比" style="margin-top: 20px">
-          <n-grid :cols="3" :x-gap="16" :y-gap="16">
-            <n-gi>
-              <div style="height: 300px">
-                <Bar v-if="totalAcChartData" :data="totalAcChartData" :options="chartOptions" />
-              </div>
-            </n-gi>
-            <n-gi>
-              <div style="height: 300px">
-                <Bar v-if="avgAcChartData" :data="avgAcChartData" :options="chartOptions" />
-              </div>
-            </n-gi>
-            <n-gi>
-              <div style="height: 300px">
-                <Bar v-if="medianAcChartData" :data="medianAcChartData" :options="chartOptions" />
-              </div>
-            </n-gi>
-          </n-grid>
-        </n-card>
-
-        <!-- 比率统计对比 - 三个独立图表并排显示 -->
-        <n-card title="比率统计对比" style="margin-top: 20px">
-          <n-grid :cols="3" :x-gap="16" :y-gap="16">
-            <n-gi>
-              <div style="height: 300px">
-                <Bar
-                  v-if="excellentRateChartData"
-                  :data="excellentRateChartData"
-                  :options="chartOptions"
-                />
-              </div>
-            </n-gi>
-            <n-gi>
-              <div style="height: 300px">
-                <Bar v-if="passRateChartData" :data="passRateChartData" :options="chartOptions" />
-              </div>
-            </n-gi>
-            <n-gi>
-              <div style="height: 300px">
-                <Bar
-                  v-if="activeRateChartData"
-                  :data="activeRateChartData"
-                  :options="chartOptions"
-                />
-              </div>
-            </n-gi>
-          </n-grid>
-        </n-card>
-
-        <!-- 分层统计对比 - 三个独立图表并排显示 -->
-        <n-card title="分层统计对比" style="margin-top: 20px">
-          <n-grid :cols="3" :x-gap="16" :y-gap="16">
-            <n-gi>
-              <div style="height: 300px">
-                <Bar v-if="top10AvgChartData" :data="top10AvgChartData" :options="chartOptions" />
-              </div>
-            </n-gi>
-            <n-gi>
-              <div style="height: 300px">
-                <Bar
-                  v-if="middle80AvgChartData"
-                  :data="middle80AvgChartData"
-                  :options="chartOptions"
-                />
-              </div>
-            </n-gi>
-            <n-gi>
-              <div style="height: 300px">
-                <Bar
-                  v-if="bottom10AvgChartData"
-                  :data="bottom10AvgChartData"
-                  :options="chartOptions"
-                />
-              </div>
-            </n-gi>
-          </n-grid>
-        </n-card>
+        <section v-if="teacher && showReport" class="ai">
+          <div class="ai-head">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+            </svg>
+            <b>AI 分析</b>
+            <span class="muted">根据上面这些数字写，仅供参考</span>
+            <div class="spacer" />
+            <n-button size="small" :loading="ai.running.value" @click="analyze">重新分析</n-button>
+          </div>
+          <span v-if="ai.waiting.value" class="muted">正在看这几个班的数据…</span>
+          <MdPreview v-if="report" class="report" :model-value="report" />
+        </section>
       </template>
-
-      <!-- 对比表格 -->
-      <n-card v-if="comparisons.length > 0" title="对比表格" style="margin-top: 20px">
-        <n-data-table :data="comparisons" :columns="tableColumns" />
-      </n-card>
-    </n-flex>
-  </n-card>
+      <div v-else-if="!loading" class="card empty">
+        <b>没取到数据</b><span class="muted">刷新一下试试</span>
+      </div>
+    </n-spin>
+  </div>
 </template>
 
 <style scoped>
-/* ==================== 统计数字颜色设置 ==================== */
-/* 覆盖 Naive UI n-statistic 组件的所有可能类名 */
+.pk-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-/* 总AC数 - 红色 */
-.stat-total-ac :deep(.n-statistic-value),
-.stat-total-ac :deep(.n-statistic-value__content),
-.stat-total-ac :deep(.n-number-animation),
-.stat-total-ac :deep(.n-statistic-value > *),
-.stat-total-ac :deep(.n-statistic-value span) {
-  color: #ff4d4f !important;
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title-line h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.back {
+  font-size: 13px;
+  color: v-bind("theme.primaryColor");
+  text-decoration: none;
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.muted {
+  font-size: 13px;
+  color: v-bind("theme.textColor3");
+}
+
+.seg {
+  display: inline-flex;
+  height: 30px;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.seg button {
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid v-bind("theme.borderColor");
+  background: v-bind("theme.cardColor");
+  color: v-bind("theme.textColor2");
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seg button:first-child {
+  border-left: 0;
+}
+
+.seg button.on {
+  background: rgba(24, 160, 88, 0.12);
+  color: #18a058;
   font-weight: 600;
 }
 
-/* 平均AC数 - 绿色 */
-.stat-avg-ac :deep(.n-statistic-value),
-.stat-avg-ac :deep(.n-statistic-value__content),
-.stat-avg-ac :deep(.n-number-animation),
-.stat-avg-ac :deep(.n-statistic-value > *),
-.stat-avg-ac :deep(.n-statistic-value span) {
-  color: #52c41a !important;
+.seg.wide button {
+  flex: 1;
+}
+
+.chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 8px 0 10px;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 14px;
+  background: v-bind("theme.cardColor");
+  color: v-bind("theme.textColor1");
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chip i {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+.chip.add {
+  padding: 0 10px;
+  border-style: dashed;
+  font-weight: 400;
+  color: v-bind("theme.textColor2");
+  cursor: pointer;
+}
+
+.x {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: v-bind("theme.textColor3");
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.x svg {
+  width: 12px;
+  height: 12px;
+}
+
+button.chip {
+  cursor: pointer;
+}
+
+.chev {
+  width: 12px;
+  height: 12px;
+  color: v-bind("theme.textColor3");
+}
+
+.x:hover {
+  color: v-bind("theme.textColor1");
+}
+
+.vs {
+  font-weight: 800;
+  font-size: 15px;
+  font-style: italic;
+  color: v-bind("theme.textColor3");
+}
+
+.mine-tag {
+  font-size: 11px;
+  background: rgba(24, 160, 88, 0.12);
+  color: #18a058;
+  border-radius: 3px;
+  padding: 0 5px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
   font-weight: 600;
 }
 
-/* 中位数AC数 - 橙色 */
-.stat-median-ac :deep(.n-statistic-value),
-.stat-median-ac :deep(.n-statistic-value__content),
-.stat-median-ac :deep(.n-number-animation),
-.stat-median-ac :deep(.n-statistic-value > *),
-.stat-median-ac :deep(.n-statistic-value span) {
-  color: #fa8c16 !important;
-  font-weight: 600;
+.card {
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  background: v-bind("theme.cardColor");
 }
 
-/* 总提交数 - 紫色 */
-.stat-total-submission :deep(.n-statistic-value),
-.stat-total-submission :deep(.n-statistic-value__content),
-.stat-total-submission :deep(.n-number-animation),
-.stat-total-submission :deep(.n-statistic-value > *),
-.stat-total-submission :deep(.n-statistic-value span) {
-  color: #805ad5 !important;
-  font-weight: 600;
+.empty {
+  min-height: 160px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
 }
 
-/* AC率 - 青色 */
-.stat-ac-rate :deep(.n-statistic-value),
-.stat-ac-rate :deep(.n-statistic-value__content),
-.stat-ac-rate :deep(.n-number-animation),
-.stat-ac-rate :deep(.n-statistic-value > *),
-.stat-ac-rate :deep(.n-statistic-value span) {
-  color: #00b894 !important;
-  font-weight: 600;
+.empty-race {
+  max-width: 700px;
+  margin-top: 12px;
+}
+
+.ai {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(47, 111, 208, 0.3);
+  background: rgba(47, 111, 208, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #2f6fd0;
+}
+
+.ai-head b {
+  color: v-bind("theme.textColor1");
+}
+
+.ai-head .muted {
+  font-size: 12px;
+}
+
+.report {
+  background: transparent;
+}
+
+.report :deep(.md-editor-preview-wrapper) {
+  padding: 0;
+}
+
+.compact .chip {
+  font-size: 12px;
 }
 </style>

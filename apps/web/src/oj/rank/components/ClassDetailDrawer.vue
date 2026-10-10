@@ -245,7 +245,7 @@ function go(path: string, query: Record<string, string>) {
             <MdPreview v-if="report" class="report" :model-value="report" />
           </section>
 
-          <a v-if="pk" href="#" class="pk" @click.prevent="go('/class', {})"
+          <a v-if="pk" href="#" class="pk" @click.prevent="go('/class', { classes: className! })"
             >和别的班比 → 班级 PK ›</a
           >
         </div>

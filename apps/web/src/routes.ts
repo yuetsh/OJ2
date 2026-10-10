@@ -93,6 +93,7 @@ export const ojs: RouteRecordRaw = {
       path: "class",
       name: "class",
       component: () => import("oj/class/pk.vue"),
+      meta: { requiresAuth: true },
     },
     {
       path: "announcement",

@@ -14,7 +14,7 @@ const props = defineProps<{
   teacher?: boolean
   /** 放在手机页签卡里：不要自己的边框和标题 */
   bare?: boolean
-  /** 显示「班级 PK」入口（原来排名页上那个按钮，管理员角色才有） */
+  /** 显示「班级 PK」入口（登录了就有：学生也能比） */
   pk?: boolean
 }>()
 const emit = defineEmits<{ pick: [className: string] }>()
@@ -56,7 +56,12 @@ function shortLabel(className: string) {
   <div class="battle" :class="{ bare }">
     <div class="title">
       <b v-if="!bare">班级对抗</b><span class="muted">人均做对 · 全服 · 点班名看详情</span>
-      <router-link v-if="pk" to="/class" class="pk">班级 PK ›</router-link>
+      <router-link
+        v-if="pk"
+        :to="{ path: '/class', query: mine ? { classes: mine } : {} }"
+        class="pk"
+        >班级 PK ›</router-link
+      >
     </div>
     <div
       v-for="item in shown"

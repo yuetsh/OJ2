@@ -14,9 +14,10 @@ import {
   type ClassBoard,
   type ClassLesson,
   type KnowledgeMap,
-  type ClassComparisonResponse,
   type ClassBattleItem,
   type ClassDetail,
+  type ClassPk,
+  type ClassPkPeriod,
   type RankBoard,
   type RankPeriod,
   type RankScope,
@@ -304,11 +305,10 @@ export function getLastVisit() {
   return api.get<LastVisit>("me/last-visit")
 }
 
-export function getClassPK(classNames: string[], startTime?: string, endTime?: string) {
-  return api.post<ClassComparisonResponse>("classes/comparison", {
-    classNames,
-    ...(startTime ? { startTime } : {}),
-    ...(endTime ? { endTime } : {}),
+/** 班级 PK：不给班就用自己的班（老师用默认的班），只给一个班就配一个同年级的对手 */
+export function getClassPk(classes: string[], period: ClassPkPeriod) {
+  return api.get<ClassPk>("rankings/pk", {
+    params: { period, ...(classes.length ? { classes: classes.join(",") } : {}) },
   })
 }
 
