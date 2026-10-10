@@ -152,13 +152,14 @@ function tagOf(row: RankRow) {
 
 /**
  * 桌面：标签挂在条的末端（原来单占一列 58px，把条挤得只剩几十像素）。条短就挂在条后面，
- * 条长了后面放不下，就收进条里靠右
+ * 条长了后面放不下，就收进条里靠右。收进条里时淡底的标签垫一层卡片底色，免得条的灰透上来；
+ * 「进步最大」本来就是实心橙底白字，不能垫 —— 垫了就是白底白字，条上只剩一块白
  */
 function tagPlace(row: RankRow) {
   const r = ratio(row)
-  return r <= 60
-    ? { left: `calc(${r}% + 6px)` }
-    : { right: `calc(${100 - r}% + 4px)`, backgroundColor: theme.value.cardColor }
+  if (r <= 60) return { left: `calc(${r}% + 6px)` }
+  const inside = { right: `calc(${100 - r}% + 4px)` }
+  return tagOf(row)?.kind === "hot" ? inside : { ...inside, backgroundColor: theme.value.cardColor }
 }
 
 function menuOf(row: RankRow): DropdownOption[] {
