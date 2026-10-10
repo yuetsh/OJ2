@@ -467,7 +467,7 @@ function pct(done: number, total: number) {
 }
 
 .problems {
-  width: 380px;
+  width: 404px; /* 380 + 放大一档后多出的留白和字宽，「求两门课程成绩总分(1)」在 1280 下要放得下 */
   flex: none;
   display: flex;
   flex-direction: column;
@@ -476,13 +476,13 @@ function pct(done: number, total: number) {
 }
 
 .col-head {
-  height: 36px;
+  height: 40px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 16px 0 20px;
+  padding: 0 16px 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
   border-bottom: 1px solid v-bind("theme.dividerColor");
@@ -496,9 +496,9 @@ function pct(done: number, total: number) {
 
 .problem {
   width: 100%;
-  height: 50px;
+  height: 56px;
   box-sizing: border-box;
-  padding: 0 16px 0 20px;
+  padding: 0 16px 0 var(--oj-pad-x);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -550,7 +550,7 @@ function pct(done: number, total: number) {
 
 .muted {
   color: v-bind("theme.textColor3");
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .spacer {
@@ -566,10 +566,10 @@ function pct(done: number, total: number) {
 }
 
 .s-head {
-  height: 44px;
+  height: 52px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -578,17 +578,17 @@ function pct(done: number, total: number) {
 }
 
 .s-title {
-  font-size: 15px;
+  font-size: var(--oj-fs-h2);
 }
 
 .chip {
-  height: 28px;
-  padding: 0 12px;
+  height: 32px;
+  padding: 0 14px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 14px;
+  border-radius: 16px;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
 }
@@ -606,14 +606,14 @@ function pct(done: number, total: number) {
 }
 
 .cols {
-  height: 32px;
+  height: 40px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
   border-bottom: 1px solid v-bind("theme.dividerColor");
@@ -626,9 +626,9 @@ function pct(done: number, total: number) {
 }
 
 .row {
-  min-height: 38px;
+  min-height: 46px;
   box-sizing: border-box;
-  padding: 6px 20px;
+  padding: 8px var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -695,7 +695,7 @@ function pct(done: number, total: number) {
 }
 
 .none {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .cells {
@@ -707,9 +707,9 @@ function pct(done: number, total: number) {
 
 .cell {
   width: 30px;
-  height: 18px;
+  height: 20px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -739,7 +739,7 @@ function pct(done: number, total: number) {
 .d-state {
   width: 100px;
   flex: none;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .empty {
@@ -749,8 +749,8 @@ function pct(done: number, total: number) {
 }
 
 .truncated {
-  padding: 8px 20px;
-  font-size: 12px;
+  padding: 10px var(--oj-pad-x);
+  font-size: var(--oj-fs-meta);
   color: v-bind("tone('warning').color");
   border-top: 1px solid v-bind("theme.dividerColor");
 }

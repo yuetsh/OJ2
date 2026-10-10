@@ -391,8 +391,8 @@ watch(
 
 const gridColumns = computed(() =>
   showStatus.value
-    ? "40px 64px minmax(0, 1fr) 190px 64px 128px"
-    : "64px minmax(0, 1fr) 190px 64px 128px",
+    ? "40px 72px minmax(0, 1fr) 190px 72px 136px"
+    : "72px minmax(0, 1fr) 190px 72px 136px",
 )
 </script>
 
@@ -436,7 +436,6 @@ const gridColumns = computed(() =>
           <n-input
             v-model:value="query.keyword"
             class="w-search"
-            size="small"
             clearable
             placeholder="题号或标题"
           >
@@ -503,7 +502,6 @@ const gridColumns = computed(() =>
           <n-select
             :value="query.author || null"
             class="w-author"
-            size="small"
             placeholder="出题者"
             clearable
             filterable
@@ -515,7 +513,6 @@ const gridColumns = computed(() =>
           <n-select
             v-model:value="query.sort"
             class="w-sort"
-            size="small"
             :consistent-menu-width="false"
             :options="sortOptions"
           />
@@ -730,9 +727,13 @@ const gridColumns = computed(() =>
   height: auto;
 }
 
+/* 1920 的屏上不限宽的话，题目名在最左、人数在最右，中间一大片空 */
 .split {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
   display: flex;
 }
 
@@ -783,10 +784,10 @@ const gridColumns = computed(() =>
 /* 1280 宽（机房 1280×1024）也要一行放下：左栏 224 之后只剩 1008，控件宽度是按它掐的，
    加东西之前先在 1280 下看一眼「只看没做完」还在不在 */
 .titlebar {
-  height: 56px;
+  height: 68px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 24px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -794,13 +795,13 @@ const gridColumns = computed(() =>
 }
 
 .titlebar h1 {
-  margin: 0;
-  font-size: 18px;
+  margin: 0 2px 0 0;
+  font-size: 22px;
   font-weight: 700;
 }
 
 .count {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
 }
 
@@ -814,16 +815,16 @@ const gridColumns = computed(() =>
 }
 
 .random {
-  height: 28px;
+  height: var(--oj-ctrl-h);
   flex: none;
   box-sizing: border-box;
   margin-left: 4px;
-  padding: 0 9px 0 7px;
+  padding: 0 12px 0 10px;
   border: 1px solid v-bind("theme.primaryColorSuppl");
-  border-radius: 14px;
+  border-radius: 17px;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("tone('success').color");
   display: inline-flex;
   align-items: center;
@@ -861,13 +862,13 @@ const gridColumns = computed(() =>
 }
 
 .segmented button {
-  height: 28px;
+  height: var(--oj-ctrl-h);
   padding: 0 10px;
   margin-left: -1px;
   border: 1px solid v-bind("theme.borderColor");
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
   white-space: nowrap;
@@ -890,8 +891,8 @@ const gridColumns = computed(() =>
 }
 
 .select {
-  width: 96px;
-  height: 28px;
+  width: 100px;
+  height: var(--oj-ctrl-h);
   flex: none;
   box-sizing: border-box;
   padding: 0 8px 0 10px;
@@ -899,7 +900,7 @@ const gridColumns = computed(() =>
   border-radius: 3px;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor1");
   display: flex;
   align-items: center;
@@ -1014,7 +1015,7 @@ const gridColumns = computed(() =>
   align-items: center;
   gap: 6px;
   flex: none;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
   white-space: nowrap;
@@ -1035,16 +1036,16 @@ const gridColumns = computed(() =>
 .thead,
 .row {
   box-sizing: border-box;
-  padding: 0 24px;
+  padding: 0 var(--oj-pad-x);
   display: grid;
   column-gap: 16px;
   align-items: center;
 }
 
 .thead {
-  height: 36px;
+  height: var(--oj-head-h);
   flex: none;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   color: v-bind("theme.textColor3");
   background: v-bind("theme.tableHeaderColor");
@@ -1058,7 +1059,8 @@ const gridColumns = computed(() =>
 }
 
 .row {
-  height: 40px;
+  height: var(--oj-row-h);
+  font-size: var(--oj-fs-body);
   border-bottom: 1px solid v-bind("theme.dividerColor");
   color: v-bind("theme.textColor1");
   text-decoration: none;
@@ -1106,7 +1108,7 @@ const gridColumns = computed(() =>
 }
 
 .knowledge {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   white-space: nowrap;
   overflow: hidden;
@@ -1114,16 +1116,16 @@ const gridColumns = computed(() =>
 }
 
 .difficulty {
-  height: 22px;
-  padding: 0 7px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   display: inline-flex;
   align-items: center;
 }
 
 .people {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1179,6 +1181,21 @@ const gridColumns = computed(() =>
   justify-content: center;
   gap: 8px;
   margin-top: 6px;
+}
+
+/* 1280 宽：控件放大一档以后一行差几十像素，筛选条这几样退回 13px 的字 */
+@media (max-width: 1365px) {
+  .count,
+  .random,
+  .segmented button,
+  .select,
+  .undone {
+    font-size: 13px;
+  }
+
+  .select {
+    width: 92px;
+  }
 }
 
 /* ---------- 手机 ---------- */

@@ -85,8 +85,8 @@ function hint(tag: KnowledgeLevel) {
 
 <style scoped>
 .knowledge {
-  max-width: 610px;
-  margin: 16px auto 0;
+  max-width: 760px;
+  margin: var(--oj-gap) auto 0;
 }
 
 .row {
@@ -125,11 +125,11 @@ function hint(tag: KnowledgeLevel) {
 }
 
 .level {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: #18a058;
 }
 
 .meta {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 </style>

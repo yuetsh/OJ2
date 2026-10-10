@@ -58,13 +58,14 @@ function move(row: ContestScoreRow) {
 }
 
 .line {
-  height: 30px;
+  height: 36px;
   box-sizing: border-box;
-  padding: 0 12px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   gap: 8px;
-  border-radius: 4px;
+  border-radius: 6px;
+  font-size: var(--oj-fs-sec);
   background: v-bind("theme.cardColor");
 }
 
@@ -86,7 +87,7 @@ function move(row: ContestScoreRow) {
 
 .move {
   width: 28px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .up {
@@ -112,7 +113,7 @@ function move(row: ContestScoreRow) {
 .time {
   width: 62px;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
 }

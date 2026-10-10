@@ -278,10 +278,10 @@ const canRetry = computed(
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
-  padding: 14px 20px 12px;
+  padding: 18px var(--oj-pad-x) 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   background: v-bind("theme.bodyColor");
 }
 
@@ -290,7 +290,7 @@ const canRetry = computed(
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: 16px;
   min-width: 0;
 }
 
@@ -398,7 +398,7 @@ const canRetry = computed(
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
 }
 

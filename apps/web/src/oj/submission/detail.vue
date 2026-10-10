@@ -77,7 +77,7 @@ onMounted(init)
 </script>
 
 <template>
-  <n-flex vertical v-if="submission" :size="24">
+  <n-flex vertical v-if="submission" class="oj-page" :size="24">
     <n-flex :vertical="isMobile" justify="space-between">
       <n-alert
         style="flex: 1"

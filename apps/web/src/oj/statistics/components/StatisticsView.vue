@@ -524,10 +524,10 @@ function resultWidth(value: number) {
 }
 
 .filters {
-  height: 52px;
+  height: 60px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -536,18 +536,18 @@ function resultWidth(value: number) {
 }
 
 .title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
-  margin-right: 6px;
+  margin-right: 8px;
 }
 
 .back {
-  height: 28px;
+  height: 32px;
   padding: 0 10px 0 6px;
   border: 0;
   border-radius: 4px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -578,7 +578,7 @@ function resultWidth(value: number) {
 .result-legend {
   display: flex;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   white-space: nowrap;
   color: v-bind("theme.textColor2");
 }
@@ -622,7 +622,7 @@ function resultWidth(value: number) {
 }
 
 .range {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
@@ -649,13 +649,13 @@ function resultWidth(value: number) {
 }
 
 .summary {
-  height: 72px;
+  height: 84px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
-  gap: 36px;
+  gap: 40px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
   background: v-bind("theme.actionColor");
 }
@@ -667,7 +667,7 @@ function resultWidth(value: number) {
 }
 
 .ring-label {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   line-height: 1.5;
   color: v-bind("theme.textColor3");
 }

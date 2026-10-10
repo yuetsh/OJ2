@@ -2,6 +2,37 @@ body {
   height: 100vh;
 }
 
+/* 前台页面的尺寸表。2026-10 整体放大了一档（原来行高 38～40、正文 14、页标题 20、
+   列表铺满 2000px 宽，用户嫌「太紧凑、不够大气」）。各页的 scoped 样式引用这里，
+   别再各写各的 px —— 上一轮就是二十几个页面各自定数，才会整体偏小还不一致。
+
+   机房屏 1366×768 的可用高度只有 640 左右，行高 48 是和用户商量过的：题目列表在
+   这个高度还能看到 8 行。题目详情页（编辑器）不吃这张表，它按 640 高逐像素排过。 */
+:root {
+  --oj-page-width: 1200px; /* 阅读型页面（比赛、题单、公告……）的限宽，居中 */
+  --oj-fs-title: 24px; /* 页标题 */
+  --oj-fs-h2: 17px; /* 区块标题 */
+  --oj-fs-body: 15px; /* 列表主文字：题目名、比赛名 */
+  --oj-fs-sec: 14px; /* 次要列：日期、知识点、人数 */
+  --oj-fs-meta: 13px; /* 表头、角注 */
+  --oj-row-h: 48px; /* 天天用的长列表：题目、提交 */
+  --oj-row-h-roomy: 56px; /* 条数少的列表：比赛、公告 */
+  --oj-head-h: 40px; /* 表头 */
+  --oj-ctrl-h: 34px; /* 筛选条里的自制按钮，和 Naive 的 medium 输入框等高 */
+  --oj-pad-x: 24px; /* 列表单元格左右留白 */
+  --oj-gap: 20px; /* 区块之间 */
+  --oj-radius: 10px;
+}
+
+/* 阅读型页面的外壳：限宽居中，上面多留一点 */
+.oj-page {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--oj-page-width);
+  margin: 0 auto;
+  padding-top: 8px;
+}
+
 .md-editor-dark {
   --md-bk-color: var(--n-body-color) !important;
 }

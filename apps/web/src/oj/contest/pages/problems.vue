@@ -266,7 +266,7 @@ const warning = computed(() => tone("warning"))
 .layout {
   display: flex;
   flex-wrap: wrap;
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 148px);
 }
 
 .problems {
@@ -279,10 +279,10 @@ const warning = computed(() => tone("warning"))
   flex: 1 1 400px;
   max-width: 100%;
   box-sizing: border-box;
-  padding: 16px 20px;
+  padding: 20px var(--oj-pad-x);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   background: v-bind("theme.actionColor");
 }
 
@@ -293,9 +293,10 @@ const warning = computed(() => tone("warning"))
 }
 
 .head {
-  height: 40px;
+  height: var(--oj-head-h);
   box-sizing: border-box;
-  padding: 0 16px;
+  padding: 0 var(--oj-pad-x);
+  font-size: var(--oj-fs-sec);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -316,16 +317,17 @@ const warning = computed(() => tone("warning"))
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-meta);
 }
 
 .row {
-  min-height: 34px;
+  min-height: var(--oj-row-h);
   box-sizing: border-box;
-  padding: 4px 16px;
+  padding: 4px var(--oj-pad-x);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  font-size: var(--oj-fs-body);
   border-bottom: 1px solid v-bind("theme.dividerColor");
   color: v-bind("theme.textColor1");
   text-decoration: none;
@@ -336,8 +338,8 @@ const warning = computed(() => tone("warning"))
 }
 
 .dot {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   box-sizing: border-box;
   border-radius: 50%;
@@ -365,7 +367,7 @@ const warning = computed(() => tone("warning"))
   width: 22px;
   text-align: right;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
 }
@@ -380,7 +382,7 @@ const warning = computed(() => tone("warning"))
 
 .mine {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
@@ -389,7 +391,7 @@ const warning = computed(() => tone("warning"))
 }
 
 .count {
-  width: 150px;
+  width: 160px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -411,15 +413,15 @@ const warning = computed(() => tone("warning"))
 }
 
 .count-num {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   font-variant-numeric: tabular-nums;
 }
 
 .first {
-  width: 180px;
+  width: 190px;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   white-space: nowrap;
   overflow: hidden;
@@ -427,12 +429,12 @@ const warning = computed(() => tone("warning"))
 }
 
 .card {
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
 }
 
@@ -452,10 +454,10 @@ const warning = computed(() => tone("warning"))
 
 .move {
   align-self: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 11px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -472,9 +474,9 @@ const warning = computed(() => tone("warning"))
 }
 
 .nudge {
-  padding: 8px 10px;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: var(--oj-fs-sec);
   background: v-bind("warning.background");
   color: v-bind("warning.color");
 }
@@ -522,7 +524,7 @@ const warning = computed(() => tone("warning"))
 }
 
 .link {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
   text-decoration: none;
 }
@@ -533,7 +535,7 @@ const warning = computed(() => tone("warning"))
 
 .rule {
   line-height: 1.6;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 /* 手机：题目名要留得下，人数和「最先」只在右边的排名里看 */

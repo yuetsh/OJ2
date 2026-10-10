@@ -156,7 +156,7 @@ async function analyze() {
 </script>
 
 <template>
-  <div class="pk-page" :class="{ compact: !isDesktop }">
+  <div class="pk-page oj-page" :class="{ compact: !isDesktop }">
     <div class="toolbar">
       <div class="title-line">
         <router-link to="/rank" class="back">‹ 排名</router-link>
@@ -317,16 +317,18 @@ async function analyze() {
 </template>
 
 <style scoped>
+/* 比别的阅读型页面宽：三个班以上是一张「题 × 班」的对照格，班多了格子会挤 */
 .pk-page {
+  max-width: 1440px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--oj-gap);
 }
 
 .toolbar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .title-line {
@@ -338,11 +340,11 @@ async function analyze() {
 
 .title-line h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--oj-fs-title);
 }
 
 .back {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
   text-decoration: none;
 }
@@ -352,26 +354,26 @@ async function analyze() {
 }
 
 .muted {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
 }
 
 .seg {
   display: inline-flex;
-  height: 30px;
+  height: var(--oj-ctrl-h);
   border: 1px solid v-bind("theme.borderColor");
   border-radius: 4px;
   overflow: hidden;
 }
 
 .seg button {
-  padding: 0 12px;
+  padding: 0 14px;
   border: 0;
   border-left: 1px solid v-bind("theme.borderColor");
   background: v-bind("theme.cardColor");
   color: v-bind("theme.textColor2");
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -398,15 +400,15 @@ async function analyze() {
 }
 
 .chip {
-  height: 28px;
+  height: var(--oj-ctrl-h);
   box-sizing: border-box;
-  padding: 0 8px 0 10px;
+  padding: 0 10px 0 12px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 14px;
+  border-radius: 17px;
   background: v-bind("theme.cardColor");
   color: v-bind("theme.textColor1");
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -422,7 +424,7 @@ async function analyze() {
 }
 
 .chip.add {
-  padding: 0 10px;
+  padding: 0 14px;
   border-style: dashed;
   font-weight: 400;
   color: v-bind("theme.textColor2");
@@ -463,18 +465,18 @@ button.chip {
 
 .vs {
   font-weight: 800;
-  font-size: 15px;
+  font-size: 16px;
   font-style: italic;
   color: v-bind("theme.textColor3");
 }
 
 .mine-tag {
-  font-size: 11px;
+  font-size: 12px;
   background: rgba(24, 160, 88, 0.12);
   color: #18a058;
   border-radius: 3px;
-  padding: 0 5px;
-  height: 16px;
+  padding: 0 6px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   font-weight: 600;
@@ -482,13 +484,13 @@ button.chip {
 
 .card {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
 }
 
 .empty {
-  min-height: 160px;
-  padding: 24px;
+  min-height: 200px;
+  padding: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -503,9 +505,9 @@ button.chip {
 }
 
 .ai {
-  margin-top: 14px;
-  padding: 12px 16px;
-  border-radius: 8px;
+  margin-top: 16px;
+  padding: 16px 20px;
+  border-radius: var(--oj-radius);
   border: 1px solid rgba(47, 111, 208, 0.3);
   background: rgba(47, 111, 208, 0.05);
   display: flex;
@@ -526,7 +528,7 @@ button.chip {
 }
 
 .ai-head .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .report {
@@ -538,6 +540,6 @@ button.chip {
 }
 
 .compact .chip {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 </style>

@@ -260,12 +260,12 @@ function threatNote(me: RankRow, behind: RankRow) {
 
 <style scoped>
 .me-card {
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   border: 1px solid rgba(24, 160, 88, 0.45);
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: rgba(24, 160, 88, 0.07);
 }
 
@@ -281,7 +281,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .label {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor2");
 }
 
@@ -305,7 +305,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .total {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   margin-left: 2px;
 }
@@ -325,19 +325,19 @@ function threatNote(me: RankRow, behind: RankRow) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 6px;
   border: 1px dashed rgba(24, 160, 88, 0.6);
   background: v-bind("theme.cardColor");
   color: #18a058;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 .rival {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   min-width: 0;
 }
 
@@ -371,7 +371,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .rival-mood {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   white-space: nowrap;
   overflow: hidden;
@@ -383,13 +383,13 @@ function threatNote(me: RankRow, behind: RankRow) {
   align-items: flex-start;
   gap: 6px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border: 1px solid rgba(24, 160, 88, 0.3);
   border-radius: 6px;
   background: v-bind("theme.cardColor");
   color: v-bind("theme.textColor1");
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   line-height: 1.45;
   text-align: left;
   cursor: pointer;
@@ -423,7 +423,7 @@ function threatNote(me: RankRow, behind: RankRow) {
   align-items: center;
   gap: 3px;
   padding-top: 1px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: #18a058;
   white-space: nowrap;
 }
@@ -435,12 +435,12 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .mood-label {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   font-weight: 600;
 }
 
 .mood-hint {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
@@ -456,7 +456,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .note {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   white-space: nowrap;
   overflow: hidden;
@@ -464,11 +464,11 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: 3px;
-  padding: 0 5px;
-  line-height: 16px;
+  padding: 0 6px;
+  line-height: 18px;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -487,9 +487,9 @@ function threatNote(me: RankRow, behind: RankRow) {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-top: 8px;
+  padding-top: 10px;
   border-top: 1px solid rgba(24, 160, 88, 0.3);
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: #2f6fd0;
   text-decoration: none;
 }
@@ -509,10 +509,10 @@ function threatNote(me: RankRow, behind: RankRow) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  padding: 6px 10px;
+  gap: 2px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: v-bind("theme.cardColor");
   color: v-bind("theme.textColor1");
   font: inherit;
@@ -524,18 +524,18 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .mini-label {
-  font-size: 11px;
+  font-size: 12px;
   color: v-bind("theme.textColor3");
   white-space: nowrap;
 }
 
 .mini b {
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
   font-variant-numeric: tabular-nums;
 }
 
 .mini small {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   color: v-bind("theme.textColor3");
 }

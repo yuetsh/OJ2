@@ -292,7 +292,7 @@ function percent(value: number, total: number) {
   min-height: 0;
   overflow: auto;
   padding-bottom: 20px;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 .live {
@@ -323,8 +323,8 @@ function percent(value: number, total: number) {
 }
 
 .note {
-  padding: 16px 20px 4px;
-  font-size: 13px;
+  padding: 20px var(--oj-pad-x) 6px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
 }
 
@@ -332,11 +332,11 @@ function percent(value: number, total: number) {
   position: sticky;
   top: 0;
   z-index: 1;
-  height: 28px;
+  height: 36px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  font-size: 12px;
+  padding: 0 var(--oj-pad-x);
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
@@ -344,10 +344,10 @@ function percent(value: number, total: number) {
 }
 
 .row {
-  height: 44px;
+  height: 52px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   border-bottom: 1px solid v-bind("theme.dividerColor");
   color: v-bind("theme.textColor1");
   text-decoration: none;
@@ -396,7 +396,7 @@ function percent(value: number, total: number) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .pid {
@@ -409,7 +409,7 @@ function percent(value: number, total: number) {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
 }
 
@@ -439,7 +439,7 @@ function percent(value: number, total: number) {
 
 .axis-row {
   display: flex;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   height: 20px;
 }
 
@@ -452,7 +452,7 @@ function percent(value: number, total: number) {
   top: 3px;
   transform: translateX(-50%);
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 12px;
   color: v-bind("theme.textColor3");
 }
 
@@ -464,8 +464,8 @@ function percent(value: number, total: number) {
 }
 
 .scattered {
-  padding: 7px 20px;
-  font-size: 12px;
+  padding: 8px var(--oj-pad-x);
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
@@ -481,25 +481,25 @@ function percent(value: number, total: number) {
 }
 
 .more {
-  padding: 12px 20px 0;
+  padding: 14px var(--oj-pad-x) 0;
 }
 
 .section-title {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 18px 20px 6px;
+  padding: 22px var(--oj-pad-x) 8px;
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .hard {
   width: calc(100% - 40px);
   margin: 0 20px;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .hard th {

@@ -33,7 +33,7 @@ const steps = computed(() =>
     .filter((step): step is { place: number; row: RankRow } => !!step.row),
 )
 
-const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
+const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
 </script>
 
 <template>
@@ -121,8 +121,8 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 6px;
-  margin: 0 16px;
+  gap: 8px;
+  margin: 4px 24px 0;
   border-bottom: 2px solid v-bind("theme.dividerColor");
   min-height: 60px;
 }
@@ -174,12 +174,12 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
 
 .bubble {
   position: relative;
-  padding: 3px 9px;
+  padding: 4px 10px;
   border: 1px solid v-bind("theme.dividerColor");
   border-radius: 8px;
   background: v-bind("theme.actionColor");
-  font-size: 12px;
-  line-height: 16px;
+  font-size: var(--oj-fs-meta);
+  line-height: 18px;
   color: v-bind("theme.textColor2");
   word-break: break-all;
 }
@@ -271,11 +271,11 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
 }
 
 .tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: 3px;
-  padding: 0 5px;
-  line-height: 16px;
+  padding: 0 6px;
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -300,7 +300,7 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
   border: 0;
   background: none;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   cursor: pointer;
   display: flex;
   min-width: 0;
@@ -318,7 +318,7 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
 }
 
 .place {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1;
 }
@@ -328,18 +328,18 @@ const HEIGHTS: Record<number, number> = { 1: 50, 2: 38, 3: 30 }
 }
 
 .solved b {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .solved small {
-  font-size: 11px;
+  font-size: 12px;
   color: v-bind("theme.textColor3");
   margin-left: 1px;
 }
 
 .empty {
-  padding: 18px 0;
+  padding: 24px 0;
   color: v-bind("theme.textColor3");
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 </style>

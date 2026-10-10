@@ -166,7 +166,7 @@ const error = computed(() => tone("error"))
 <style scoped>
 .card {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
   overflow: hidden;
 }
@@ -177,14 +177,14 @@ const error = computed(() => tone("error"))
 }
 
 .summary {
-  min-height: 52px;
+  min-height: 60px;
   box-sizing: border-box;
-  padding: 8px 16px;
+  padding: 10px 20px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 20px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
@@ -193,7 +193,7 @@ const error = computed(() => tone("error"))
 }
 
 .big {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .absent {
@@ -219,17 +219,17 @@ const error = computed(() => tone("error"))
 .grid {
   display: grid;
   column-gap: 6px;
-  padding: 0 16px 8px;
+  padding: 0 20px 10px;
 }
 
 .head {
   position: sticky;
   top: 0;
-  height: 44px;
+  height: 48px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   background: v-bind("theme.cardColor");
   border-bottom: 1px solid v-bind("theme.dividerColor");
@@ -255,10 +255,10 @@ const error = computed(() => tone("error"))
 }
 
 .cell {
-  height: 32px;
+  height: 38px;
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
   min-width: 0;
 }
 
@@ -268,14 +268,14 @@ const error = computed(() => tone("error"))
 
 .box {
   position: relative;
-  height: 26px;
-  margin: 3px 0;
-  border-radius: 3px;
+  height: 30px;
+  margin: 4px 0;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   text-decoration: none;
   background: v-bind("theme.actionColor");
   color: v-bind("theme.textColor3");
@@ -306,14 +306,14 @@ const error = computed(() => tone("error"))
 }
 
 .foot {
-  min-height: 30px;
+  min-height: 36px;
   box-sizing: border-box;
-  padding: 6px 16px;
+  padding: 8px 20px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 16px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   border-top: 1px solid v-bind("theme.dividerColor");
 }
 

@@ -165,7 +165,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
       </span>
       <span v-if="untilStart" class="gate-count">{{ untilStart }}</span>
     </div>
-    <router-view v-else></router-view>
+    <div v-else class="body"><router-view></router-view></div>
   </div>
 </template>
 
@@ -176,10 +176,18 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
   margin: -16px -16px 0;
 }
 
+.body {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 1920 的屏上铺满的话，领奖台在最左、「你的成绩」在最右，榜单只占左半边。
+   内容限宽 1400 居中；顶栏的分隔线照旧通栏，所以限宽用内边距做而不是 max-width */
 .bar {
-  min-height: 60px;
+  min-height: 68px;
   box-sizing: border-box;
-  padding: 10px 20px;
+  padding: 12px max(var(--oj-pad-x), calc((100% - 1400px) / 2 + var(--oj-pad-x)));
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -189,7 +197,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 
 .title {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
   min-width: 0;
 }
@@ -206,7 +214,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 }
 
 .countdown-label {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .countdown-num {
@@ -220,7 +228,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 }
 
 .range {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
 }
 
@@ -239,11 +247,11 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 }
 
 .tab {
-  height: 32px;
-  padding: 0 14px;
+  height: var(--oj-ctrl-h);
+  padding: 0 16px;
   display: flex;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   text-decoration: none;
 }

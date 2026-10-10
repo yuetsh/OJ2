@@ -331,13 +331,13 @@ const tab = ref<"weekly" | "dist">("weekly")
 .duel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--oj-gap);
 }
 
 .score {
-  padding: 18px 28px;
+  padding: 24px 32px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -418,21 +418,21 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 400;
   color: v-bind("theme.textColor3");
 }
 
 .card {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
-  padding: 12px 16px 4px;
+  padding: 16px var(--oj-pad-x) 6px;
   min-width: 0;
 }
 
 .card.pad {
-  padding: 12px 16px;
+  padding: 16px var(--oj-pad-x);
 }
 
 .card-head {
@@ -440,7 +440,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 8px;
-  padding-bottom: 6px;
+  padding-bottom: 10px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
@@ -456,7 +456,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .row {
-  min-height: 44px;
+  min-height: 52px;
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr) 210px minmax(0, 1fr) 168px;
   align-items: center;
@@ -481,7 +481,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: v-bind("theme.textColor3");
@@ -492,7 +492,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .sub {
-  font-size: 11px;
+  font-size: 12px;
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
 }
@@ -534,7 +534,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 .title a,
 .m-title a {
   max-width: 100%;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   font-weight: 600;
   color: v-bind("theme.textColor1");
   text-decoration: none;
@@ -555,21 +555,21 @@ const tab = ref<"weekly" | "dist">("weekly")
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .tags .muted {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .most {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #b54708;
 }
 
 .tie {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   color: v-bind("theme.textColor3");
@@ -584,7 +584,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 
 .bottom {
   display: flex;
-  gap: 16px;
+  gap: var(--oj-gap);
 }
 
 .bottom > .card {
@@ -607,7 +607,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .pair {
-  height: 130px;
+  height: 140px;
   display: flex;
   align-items: flex-end;
   gap: 4px;
@@ -621,7 +621,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .v {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -632,7 +632,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .axis {
-  font-size: 11px;
+  font-size: 12px;
   color: v-bind("theme.textColor3");
   white-space: nowrap;
 }
@@ -650,7 +650,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .dist-name {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
 }
 
@@ -752,7 +752,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   border: 0;
   background: none;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
   cursor: pointer;
 }

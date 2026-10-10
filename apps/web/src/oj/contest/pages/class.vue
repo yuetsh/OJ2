@@ -320,9 +320,9 @@ const success = computed(() => tone("success"))
 const danger = computed(() => tone("error"))
 const warning = computed(() => tone("warning"))
 const liveColumns = computed(
-  () => `116px 44px repeat(${problems.value.length}, minmax(64px, 92px)) 82px 1fr`,
+  () => `130px 48px repeat(${problems.value.length}, minmax(70px, 96px)) 90px 1fr`,
 )
-const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.value.length}, 46px)`)
+const gradeColumns = computed(() => `24px 124px 40px 36px repeat(${problems.value.length}, 50px)`)
 </script>
 
 <template>
@@ -622,11 +622,11 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .tiny {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .spacer {
@@ -645,9 +645,9 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .summary {
-  min-height: 70px;
+  min-height: 80px;
   box-sizing: border-box;
-  padding: 10px 20px;
+  padding: 12px var(--oj-pad-x);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -662,13 +662,13 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .stat b {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
 
 .stat span {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
@@ -693,15 +693,16 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
   align-items: center;
   column-gap: 6px;
   min-width: max-content;
-  min-height: 38px;
-  padding: 0 20px;
+  min-height: 46px;
+  padding: 0 var(--oj-pad-x);
+  font-size: var(--oj-fs-body);
   box-sizing: border-box;
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
 .th {
-  min-height: 46px;
-  font-size: 12px;
+  min-height: 50px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
 }
@@ -722,7 +723,7 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .ph span {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .solved {
@@ -736,18 +737,18 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 
 .cell {
   width: 100%;
-  height: 24px;
-  border-radius: 3px;
+  height: 30px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-variant-numeric: tabular-nums;
 }
 
 .cell small {
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.8;
 }
 
@@ -775,11 +776,11 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .group {
-  height: 26px;
-  padding: 0 20px;
+  height: 32px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
@@ -797,10 +798,10 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .flag {
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -829,9 +830,9 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 /* ---------- 成绩 ---------- */
 
 .grade-bar {
-  min-height: 64px;
+  min-height: 72px;
   box-sizing: border-box;
-  padding: 10px 20px;
+  padding: 12px var(--oj-pad-x);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -858,7 +859,7 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor2");
 }
 
@@ -886,8 +887,8 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .sort {
-  height: 40px;
-  padding: 0 20px;
+  height: 48px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -895,13 +896,13 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .chip {
-  height: 24px;
-  padding: 0 10px;
-  border-radius: 12px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 15px;
   border: 1px solid v-bind("theme.borderColor");
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
 }
@@ -914,20 +915,20 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .sheet-scroll {
-  max-height: calc(100vh - 260px);
+  max-height: calc(100vh - 284px);
   overflow: auto;
 }
 
 .sheet .tr {
-  min-height: 34px;
-  padding: 0 16px 0 20px;
+  min-height: 40px;
+  padding: 0 16px 0 var(--oj-pad-x);
 }
 
 .sheet .th {
   position: sticky;
   top: 0;
   z-index: 1;
-  min-height: 40px;
+  min-height: 46px;
 }
 
 .tr.picked {
@@ -936,12 +937,12 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 
 .gc {
   position: relative;
-  height: 24px;
+  height: 28px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 4px;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   cursor: pointer;
 }
@@ -974,10 +975,10 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
   flex: 1 1 480px;
   min-width: 0;
   box-sizing: border-box;
-  padding: 14px 20px 12px;
+  padding: 16px var(--oj-pad-x) 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   background: v-bind("theme.actionColor");
 }
 
@@ -989,10 +990,10 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 }
 
 .pill {
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
@@ -1011,11 +1012,11 @@ const gradeColumns = computed(() => `22px 110px 36px 34px repeat(${problems.valu
 .code-box {
   flex-grow: 1;
   min-height: 300px;
-  max-height: calc(100vh - 340px);
+  max-height: calc(100vh - 360px);
   overflow: auto;
   padding: 10px 12px;
   border: 1px solid v-bind("theme.dividerColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
   font-size: 15px;
 }

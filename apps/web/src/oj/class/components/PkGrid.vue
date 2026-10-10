@@ -159,7 +159,9 @@ const medal = (index: number) => palette.value.medal[index]
                 <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
               </svg>
               <b>{{ cell.percent }}{{ compact ? "" : "%" }}</b>
-              <span v-if="!compact" class="first">一次 {{ cell.firstPercent }}%</span>
+              <span v-if="!compact && pk.classes.length < 5" class="first"
+                >一次 {{ cell.firstPercent }}%</span
+              >
             </span>
           </template>
         </div>
@@ -226,7 +228,7 @@ const medal = (index: number) => palette.value.medal[index]
 <style scoped>
 .grid-pk {
   display: flex;
-  gap: 16px;
+  gap: var(--oj-gap);
   align-items: flex-start;
 }
 
@@ -238,21 +240,21 @@ const medal = (index: number) => palette.value.medal[index]
 
 .card {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
   min-width: 0;
 }
 
 .table {
   flex: 1.75;
-  padding: 12px 16px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .pad {
-  padding: 12px 16px;
+  padding: 16px 20px;
 }
 
 .card-title {
@@ -263,7 +265,7 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 400;
   color: v-bind("theme.textColor3");
 }
@@ -272,7 +274,7 @@ const medal = (index: number) => palette.value.medal[index]
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: 46px;
 }
 
 .line.heads {
@@ -280,7 +282,7 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .name {
-  width: 290px;
+  width: 250px;
   flex-shrink: 0;
   display: flex;
   align-items: baseline;
@@ -294,7 +296,7 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .name a {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   font-weight: 600;
   color: v-bind("theme.textColor1");
   text-decoration: none;
@@ -307,7 +309,7 @@ const medal = (index: number) => palette.value.medal[index]
 
 .id {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .ell {
@@ -346,7 +348,7 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .per {
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -356,12 +358,12 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .mine-tag {
-  font-size: 11px;
+  font-size: 12px;
   background: rgba(24, 160, 88, 0.12);
   color: #18a058;
   border-radius: 3px;
-  padding: 0 5px;
-  height: 16px;
+  padding: 0 6px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   font-weight: 600;
@@ -382,11 +384,13 @@ const medal = (index: number) => palette.value.medal[index]
 
 .cell {
   min-width: 0;
-  height: 34px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
+  padding: 0 4px;
+  overflow: hidden;
   border-radius: 4px;
   color: v-bind("theme.textColor1");
   font-variant-numeric: tabular-nums;
@@ -401,16 +405,22 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .cell b {
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
+/* 五个班起整个不显示（1280 宽只剩「一次 8…」，截了等于没写，鼠标悬停的提示里有）；
+   四个班在 1280 下刚好放得下，这里的截断只是兜底，别折行、别溢出格子 */
 .first {
-  font-size: 11px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
   opacity: 0.85;
 }
 
 .cell.none {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColorDisabled");
   background: repeating-linear-gradient(
     135deg,
@@ -436,7 +446,7 @@ const medal = (index: number) => palette.value.medal[index]
 
 .tie {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   color: v-bind("theme.textColor3");
@@ -458,11 +468,11 @@ const medal = (index: number) => palette.value.medal[index]
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--oj-gap);
 }
 
 .lead-row {
-  height: 34px;
+  height: 40px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -483,7 +493,7 @@ const medal = (index: number) => palette.value.medal[index]
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   flex-shrink: 0;
   color: v-bind("theme.textColor2");
 }
@@ -502,10 +512,10 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .insight {
-  margin-top: 8px;
-  font-size: 13px;
+  margin-top: 10px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: v-bind("theme.actionColor");
   border-radius: 6px;
 }
@@ -523,7 +533,7 @@ const medal = (index: number) => palette.value.medal[index]
   border: 0;
   background: none;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
   cursor: pointer;
 }

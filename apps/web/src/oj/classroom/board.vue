@@ -368,7 +368,7 @@ function submissionsHref(
 
     <template v-else-if="board">
       <!-- 布置题目：投影时收起来 -->
-      <n-card v-if="!projector" size="small" class="section">
+      <n-card v-if="!projector" class="section">
         <n-flex align="center" :wrap="false">
           <n-text strong style="flex-shrink: 0">这节课的题</n-text>
           <n-select
@@ -429,7 +429,7 @@ function submissionsHref(
               status="success"
               :percentage="problem.total ? Math.round((problem.done / problem.total) * 100) : 0"
               :show-indicator="false"
-              :height="projector ? 28 : 10"
+              :height="projector ? 28 : 12"
             />
             <div class="summary-count">{{ problem.done }} / {{ problem.total }} 人做完</div>
           </div>
@@ -654,40 +654,42 @@ function submissionsHref(
 }
 
 .toolbar {
-  margin-bottom: 16px;
+  margin: 8px 0 var(--oj-gap);
 }
 
 .title {
-  margin: 0;
-  font-size: 20px;
+  margin: 0 4px 0 0;
+  font-size: var(--oj-fs-title);
 }
 
 .section {
-  margin-bottom: 16px;
+  margin-bottom: var(--oj-gap);
 }
 
 .meta {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .summary {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px 24px;
-  margin-bottom: 16px;
+  gap: 20px 32px;
+  margin-bottom: 24px;
 }
 
 .summary-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: var(--oj-fs-body);
+  font-weight: 600;
 }
 
 .summary-count {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   opacity: 0.75;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .projector .summary {
@@ -702,24 +704,25 @@ function submissionsHref(
 
 .table-wrap {
   overflow-x: auto;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .grid {
   border-collapse: collapse;
   width: 100%;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 .grid th,
 .grid td {
-  padding: 6px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid rgba(128, 128, 128, 0.15);
   text-align: center;
   white-space: nowrap;
 }
 
 .grid th {
+  font-size: var(--oj-fs-sec);
   font-weight: 500;
   opacity: 0.8;
 }

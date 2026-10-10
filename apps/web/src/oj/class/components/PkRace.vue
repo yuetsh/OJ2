@@ -15,7 +15,8 @@ const props = withDefaults(defineProps<{ pk: ClassPk; width?: number; height?: n
 
 const theme = useThemeVars()
 
-const PAD = { left: 34, right: 92, top: 10, bottom: 26 }
+// 右边留给线尾的「26计算机0班 19.3」：12px 粗体量下来 105 左右，原来的 92 会把小数截掉
+const PAD = { left: 34, right: 112, top: 10, bottom: 26 }
 
 const series = computed(() =>
   props.pk.classes.map((item) => {

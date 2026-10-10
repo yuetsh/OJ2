@@ -151,8 +151,8 @@ onMounted(() => {
 <template>
   <n-flex class="wrapper" vertical justify="center" align="center" v-if="!loading && profile">
     <n-image
-      :width="96"
-      :height="96"
+      :width="112"
+      :height="112"
       :src="profile.avatar"
       :preview-disabled="isDefaultAvatar"
       object-fit="cover"
@@ -257,14 +257,14 @@ onMounted(() => {
 </template>
 <style scoped>
 .wrapper {
-  max-width: 610px;
-  margin: 16px auto 0;
+  max-width: 760px;
+  margin: var(--oj-gap) auto 0;
 }
 
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 16px;
 }
 
 @media (max-width: 600px) {
@@ -277,43 +277,46 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 14px 8px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 20px 12px;
+  border-radius: var(--oj-radius);
   border: 1px solid rgba(128, 128, 128, 0.2);
 }
 
 .stat-value {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .stat-value.date {
-  font-size: 16px;
+  font-size: 18px;
   padding: 3px 0;
   white-space: nowrap;
 }
 
 h2 {
-  margin: 0;
-  font-weight: normal;
+  margin: 4px 0 0;
+  font-weight: 600;
+  font-size: var(--oj-fs-title);
 }
 
 .desc {
   margin: 0 auto;
   word-wrap: break-word;
   max-width: 100%;
+  font-size: var(--oj-fs-body);
 }
 .achievement-title {
   font-weight: 600;
+  font-size: var(--oj-fs-h2);
 }
 .achievement-recent {
-  margin-top: 10px;
+  margin-top: 14px;
 }
 .achievement-icon {
   display: inline-flex;

@@ -84,7 +84,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 </script>
 
 <template>
-  <div class="page">
+  <div class="page oj-page">
     <div class="top">
       <h2>题单</h2>
       <div class="spacer"></div>
@@ -195,7 +195,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 .page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--oj-gap);
 }
 
 .top {
@@ -206,7 +206,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 
 .top h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--oj-fs-title);
 }
 
 .search {
@@ -221,12 +221,14 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  margin-bottom: -6px;
+  font-size: var(--oj-fs-h2);
   font-weight: 700;
-  color: v-bind("theme.textColor2");
+  color: v-bind("theme.textColor1");
 }
 
 .sect .muted {
+  font-size: var(--oj-fs-sec);
   font-weight: 400;
 }
 
@@ -239,11 +241,13 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
+  white-space: nowrap;
 }
 
 .tiny {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
+  white-space: nowrap;
 }
 
 .num {
@@ -268,23 +272,25 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
   align-items: baseline;
 }
 
+/* 1200 限宽下布置中是一行三张、其他题单一行四张；原来一行四张的大卡只有 280 宽，
+   「还没加入 · 9 道」和「另有 1 道选做」都被挤成两行 */
 .big-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
 }
 
 .small-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 14px;
 }
 
 .card {
   box-sizing: border-box;
   min-width: 0;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
   color: v-bind("theme.textColor1");
   text-decoration: none;
@@ -303,32 +309,32 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .big {
-  padding: 14px 16px;
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .title {
   flex-grow: 1;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .desc {
-  height: 17px;
-  font-size: 12px;
+  height: 20px;
+  font-size: var(--oj-fs-meta);
 }
 
 .count {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
 }
 
 .pill {
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -359,8 +365,8 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .hint {
-  height: 20px;
-  font-size: 12px;
+  height: 22px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor2");
 }
 
@@ -391,14 +397,14 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .small-card {
-  height: 74px;
-  padding: 10px 14px;
+  height: 88px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
 
 .small-card b {
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 </style>

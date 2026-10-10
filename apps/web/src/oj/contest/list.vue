@@ -130,7 +130,7 @@ const warning = computed(() => tone("warning"))
 </script>
 
 <template>
-  <div class="page">
+  <div class="page oj-page">
     <div class="top">
       <h2>比赛</h2>
       <div class="spacer"></div>
@@ -263,15 +263,15 @@ const warning = computed(() => tone("warning"))
         {{ query.scope === "joined" ? "你还没参加过比赛" : "没有符合的比赛" }}
       </div>
     </div>
+    <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
   </div>
-  <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
 </template>
 
 <style scoped>
 .page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--oj-gap);
 }
 
 .top {
@@ -283,7 +283,7 @@ const warning = computed(() => tone("warning"))
 
 .top h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--oj-fs-title);
 }
 
 .spacer {
@@ -304,7 +304,7 @@ const warning = computed(() => tone("warning"))
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .num {
@@ -320,13 +320,13 @@ const warning = computed(() => tone("warning"))
 }
 
 .chip {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 14px;
+  height: var(--oj-ctrl-h);
+  padding: 0 16px;
+  border-radius: 17px;
   border: 1px solid v-bind("theme.borderColor");
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
 }
@@ -339,12 +339,12 @@ const warning = computed(() => tone("warning"))
 }
 
 .running {
-  padding: 16px 20px;
+  padding: 20px var(--oj-pad-x);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px 20px;
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   border: 1px solid v-bind("theme.successColor");
   background: v-bind("success.background");
   cursor: pointer;
@@ -361,7 +361,7 @@ const warning = computed(() => tone("warning"))
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
 }
 
@@ -382,34 +382,35 @@ const warning = computed(() => tone("warning"))
 }
 
 .upcoming {
-  padding: 12px 20px;
+  padding: 16px var(--oj-pad-x);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   border: 1px solid v-bind("theme.borderColor");
   cursor: pointer;
 }
 
 .upcoming-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .table {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   overflow: hidden;
 }
 
 .tr {
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) 70px 110px 130px minmax(160px, 260px);
+  grid-template-columns: minmax(200px, 1fr) 70px 110px 130px minmax(160px, 240px);
   align-items: center;
   gap: 14px;
-  min-height: 38px;
-  padding: 0 20px;
+  min-height: var(--oj-row-h-roomy);
+  padding: 0 var(--oj-pad-x);
+  font-size: var(--oj-fs-body);
   border-bottom: 1px solid v-bind("theme.dividerColor");
   cursor: pointer;
 }
@@ -423,8 +424,8 @@ const warning = computed(() => tone("warning"))
 }
 
 .th {
-  min-height: 32px;
-  font-size: 12px;
+  min-height: var(--oj-head-h);
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
   cursor: default;
@@ -453,16 +454,31 @@ const warning = computed(() => tone("warning"))
 }
 
 .empty {
-  padding: 24px 20px;
+  padding: 32px var(--oj-pad-x);
 }
 
+/* 手机：只剩比赛名、类型、「我」三列。「我」放到比赛名下面一行当副标题，
+   不然它会按网格掉到下一行的第一格，看着像一行没对齐的新数据 */
 @media (max-width: 760px) {
   .tr {
     grid-template-columns: 1fr auto;
+    row-gap: 2px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .tr > span:nth-child(3),
-  .tr > span:nth-child(4) {
+  .tr > span:nth-child(4),
+  .th > span:nth-child(5) {
+    display: none;
+  }
+
+  .tr > .mine {
+    grid-column: 1 / -1;
+    font-size: var(--oj-fs-meta);
+  }
+
+  .tr > .mine:empty {
     display: none;
   }
 }

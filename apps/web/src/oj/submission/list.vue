@@ -697,13 +697,13 @@ function dayBreak(index: number) {
     <div v-if="isDesktop" class="filters">
       <!-- 流程图列表要登录才能看（GET /flowcharts 是 requireAuth），没登录就不给这个切换 -->
       <template v-if="!inContest && userStore.isAuthed">
-        <n-radio-group v-model:value="mode" size="small">
+        <n-radio-group v-model:value="mode">
           <n-radio-button value="code">代码</n-radio-button>
           <n-radio-button value="flow">流程图</n-radio-button>
         </n-radio-group>
       </template>
       <!-- 老师也有：从个人菜单「我的提交」进来的，原来只能靠「清空」退出去 -->
-      <n-radio-group v-if="userStore.isAuthed" v-model:value="scope" size="small">
+      <n-radio-group v-if="userStore.isAuthed" v-model:value="scope">
         <n-radio-button value="all">全部</n-radio-button>
         <n-radio-button value="mine">我的</n-radio-button>
       </n-radio-group>
@@ -741,7 +741,6 @@ function dayBreak(index: number) {
           v-if="!lessonActive"
           :value="query.className || null"
           class="w-class"
-          size="small"
           :options="classOptions"
           placeholder="全部班级"
           clearable
@@ -766,7 +765,6 @@ function dayBreak(index: number) {
         v-else-if="!mine"
         v-model:value="query.username"
         class="w-user"
-        size="small"
         clearable
         :placeholder="teacher ? '学生' : '用户'"
       >
@@ -776,14 +774,12 @@ function dayBreak(index: number) {
         v-if="inContest"
         v-model:value="query.problem"
         class="w-problem-select"
-        size="small"
         :options="contestProblemOptions"
       />
       <n-input
         v-else-if="!lessonActive"
         v-model:value="query.problem"
         class="w-problem"
-        size="small"
         clearable
         placeholder="题号"
         :status="unknownProblems.length ? 'warning' : undefined"
@@ -793,14 +789,12 @@ function dayBreak(index: number) {
       <n-select
         v-model:value="query.result"
         class="w-result"
-        size="small"
         :options="flowMode ? gradeOptions : resultOptions"
       />
       <n-select
         v-if="!inContest && !flowMode"
         v-model:value="query.language"
         class="w-lang"
-        size="small"
         :options="languageOptions"
       />
       <button
@@ -811,13 +805,12 @@ function dayBreak(index: number) {
       >
         <Icon v-if="today" icon="ph:check-bold" :width="12" />今天
       </button>
-      <n-button size="small" quaternary @click="clear">清空</n-button>
+      <n-button quaternary @click="clear">清空</n-button>
 
       <div class="spacer"></div>
       <!-- 老师只有「统计」（今日统计并进去了）；学生看不到统计，仍是「今日统计」 -->
       <n-button
         v-if="teacher && route.name === 'submissions'"
-        size="small"
         quaternary
         title="统计：这节课、今天，或者回头看以前的课"
         @click="openStatistics()"
@@ -827,7 +820,6 @@ function dayBreak(index: number) {
       </n-button>
       <n-button
         v-else-if="route.name === 'submissions' && !flowMode"
-        size="small"
         quaternary
         :title="`今日统计：今天全站 ${todayCount} 条`"
         @click="toggleTodayPanel(true)"
@@ -1171,10 +1163,10 @@ function dayBreak(index: number) {
 }
 
 .filters {
-  height: 52px;
+  height: 60px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1221,13 +1213,21 @@ function dayBreak(index: number) {
   width: 104px;
 }
 
-/* 机房 1280 的屏上老师那排只剩几像素：学生、语言两个框各收一点，别让班级框被挤扁 */
+/* 机房 1280 的屏上老师那排只剩几像素：学生、语言两个框各收一点，别让班级框被挤扁；
+   控件放大到 34 高以后再把两头留白和标签的字收回一点 */
 @media (max-width: 1365px) {
+  .filters {
+    padding: 0 16px;
+  }
   .w-user {
     width: 108px;
   }
   .w-lang {
     width: 96px;
+  }
+  .chip,
+  .lesson {
+    font-size: 13px;
   }
 }
 
@@ -1242,13 +1242,13 @@ function dayBreak(index: number) {
 
 .chip,
 .lesson {
-  height: 28px;
-  padding: 0 12px;
+  height: var(--oj-ctrl-h);
+  padding: 0 14px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 14px;
+  border-radius: 17px;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   display: inline-flex;
   align-items: center;
@@ -1274,7 +1274,7 @@ function dayBreak(index: number) {
 }
 
 .chip.person .person-name {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .lesson b {
@@ -1290,6 +1290,14 @@ function dayBreak(index: number) {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
+}
+
+/* 1920 的屏上和题目列表一样限宽 1600 居中，代码区不至于拉到两千像素宽 */
+.page:not(.contest):not(.mobile) > .filters,
+.page:not(.contest):not(.mobile) > .split {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
 /* 列表比代码区窄一点（46 : 54，用户看过定的）：原来列表固定 560、代码占满，右边空一大片；
@@ -1313,13 +1321,13 @@ function dayBreak(index: number) {
 }
 
 .new-bar {
-  height: 32px;
+  height: 36px;
   flex: none;
   border: 0;
   border-bottom: 1px solid v-bind("theme.dividerColor");
   background: v-bind("tone('success').background");
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("tone('success').color");
   display: flex;
   align-items: center;
@@ -1329,14 +1337,14 @@ function dayBreak(index: number) {
 }
 
 .unknown-bar {
-  height: 32px;
+  height: 36px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("tone('warning').color");
   background: v-bind("tone('warning').background");
   border-bottom: 1px solid v-bind("theme.dividerColor");
@@ -1360,20 +1368,20 @@ function dayBreak(index: number) {
 }
 
 .row {
-  height: 40px;
+  height: var(--oj-row-h);
   box-sizing: border-box;
-  padding: 0 16px 0 20px;
+  padding: 0 16px 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 10px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 /* 往上翻时选中那一行别被吸顶的日期行挡住 */
 .row {
-  scroll-margin-top: 28px;
+  scroll-margin-top: 34px;
 }
 
 .row:hover {
@@ -1401,7 +1409,7 @@ function dayBreak(index: number) {
 }
 
 .m-line.sub {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
@@ -1413,9 +1421,9 @@ function dayBreak(index: number) {
 
 /* 「23:59:59」8 个等宽数字 */
 .c-time {
-  width: 60px;
+  width: 64px;
   flex: none;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1426,12 +1434,12 @@ function dayBreak(index: number) {
   position: sticky;
   top: 0;
   z-index: 1;
-  height: 26px;
+  height: 32px;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
@@ -1477,10 +1485,10 @@ function dayBreak(index: number) {
 }
 
 .c-lang {
-  width: 48px;
+  width: 50px;
   flex: none;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   white-space: nowrap;
   color: v-bind("theme.textColor3");
 }
@@ -1514,16 +1522,16 @@ function dayBreak(index: number) {
 }
 
 .empty-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: v-bind("theme.textColor2");
 }
 
 .list-foot {
-  height: 44px;
+  height: 52px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 16px 0 20px;
+  padding: 0 16px 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1531,7 +1539,7 @@ function dayBreak(index: number) {
 }
 
 .total {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   white-space: nowrap;
 }

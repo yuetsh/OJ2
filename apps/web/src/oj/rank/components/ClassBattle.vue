@@ -92,12 +92,12 @@ function shortLabel(className: string) {
 
 <style scoped>
 .battle {
-  padding: 12px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
 }
 
@@ -111,20 +111,24 @@ function shortLabel(className: string) {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.title b {
+  font-size: var(--oj-fs-h2);
 }
 
 .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
 .row {
-  height: 22px;
+  height: 30px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .row.mine {
@@ -135,14 +139,14 @@ function shortLabel(className: string) {
 }
 
 .rank {
-  width: 14px;
-  font-size: 12px;
+  width: 16px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
 }
 
 .name {
-  width: 86px;
+  width: 96px;
   padding: 0;
   border: 0;
   background: none;
@@ -160,7 +164,7 @@ function shortLabel(className: string) {
 
 .pk {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.primaryColor");
   text-decoration: none;
   white-space: nowrap;
@@ -173,7 +177,7 @@ function shortLabel(className: string) {
 
 .bar-box {
   flex-grow: 1;
-  height: 10px;
+  height: 12px;
   position: relative;
 }
 
@@ -186,22 +190,22 @@ function shortLabel(className: string) {
 }
 
 .value {
-  width: 32px;
+  width: 36px;
   text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .gain {
-  width: 34px;
-  font-size: 11px;
+  width: 36px;
+  font-size: 12px;
   color: #18a058;
   font-variant-numeric: tabular-nums;
 }
 
 .summary {
-  margin-top: 6px;
-  font-size: 12px;
+  margin-top: 8px;
+  font-size: var(--oj-fs-meta);
   color: #18a058;
 }
 </style>

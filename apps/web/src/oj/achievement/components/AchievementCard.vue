@@ -53,13 +53,13 @@ const unlockDate = computed(() => {
 
 <template>
   <n-card
-    size="small"
+    class="card"
     :class="{ locked: !achievement.unlocked, rare: isRare }"
     :style="{ borderColor: RARITY_COLOR[achievement.rarity] }"
   >
     <n-thing>
       <template #avatar>
-        <AchievementIcon :icon="achievement.icon" :size="32" />
+        <AchievementIcon :icon="achievement.icon" :size="40" />
       </template>
 
       <template #header>
@@ -114,6 +114,11 @@ const unlockDate = computed(() => {
 </template>
 
 <style scoped>
+.card {
+  height: 100%;
+  border-radius: var(--oj-radius);
+}
+
 .nowrap {
   white-space: nowrap;
 }

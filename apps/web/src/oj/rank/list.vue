@@ -387,7 +387,7 @@ async function restore(userId: number) {
 </script>
 
 <template>
-  <div class="rank-page">
+  <div class="rank-page oj-page">
     <div class="toolbar" :class="{ single: !isDesktop }">
       <div class="title">
         <h2>排名</h2>
@@ -419,7 +419,6 @@ async function restore(userId: number) {
         v-if="teacher"
         v-model:value="pickedClass"
         class="class-select"
-        size="small"
         filterable
         placeholder="选班"
         :options="teacherClassOptions"
@@ -513,17 +512,10 @@ async function restore(userId: number) {
               </div>
             </div>
             <div class="actions">
-              <n-button
-                v-if="classContext"
-                size="small"
-                secondary
-                type="info"
-                @click="openDetail(classContext)"
-              >
+              <n-button v-if="classContext" secondary type="info" @click="openDetail(classContext)">
                 班级详情 · AI 分析
               </n-button>
               <n-button
-                size="small"
                 secondary
                 @click="
                   router.push({
@@ -539,7 +531,7 @@ async function restore(userId: number) {
               <template v-if="board.scope === 'class'">
                 <div v-for="user in board.hiddenUsers" :key="user.id" class="hidden-row">
                   <UserName :username="user.username" />
-                  <n-button size="tiny" secondary @click="restore(user.id)">恢复</n-button>
+                  <n-button size="small" secondary @click="restore(user.id)">恢复</n-button>
                 </div>
                 <span v-if="!board.hiddenUsers.length" class="muted">
                   还没有。怀疑抄代码的，在名单上点「⋯」拿掉。
@@ -644,10 +636,12 @@ async function restore(userId: number) {
 </template>
 
 <style scoped>
+/* 比别的阅读型页面宽一点：右栏 400 固定，左边赛道要排两列名字 */
 .rank-page {
+  max-width: 1280px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--oj-gap);
 }
 
 .toolbar {
@@ -659,25 +653,25 @@ async function restore(userId: number) {
 
 .toolbar h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--oj-fs-title);
 }
 
 .seg {
   display: inline-flex;
-  height: 30px;
+  height: var(--oj-ctrl-h);
   border: 1px solid v-bind("theme.borderColor");
   border-radius: 4px;
   overflow: hidden;
 }
 
 .seg button {
-  padding: 0 12px;
+  padding: 0 14px;
   border: 0;
   border-left: 1px solid v-bind("theme.borderColor");
   background: v-bind("theme.cardColor");
   color: v-bind("theme.textColor2");
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -707,14 +701,14 @@ async function restore(userId: number) {
 
 .rule,
 .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
 .main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 16px;
+  gap: var(--oj-gap);
   align-items: start;
 }
 
@@ -731,7 +725,7 @@ async function restore(userId: number) {
 .card,
 .note-card {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
   min-width: 0;
 }
@@ -741,25 +735,25 @@ async function restore(userId: number) {
 }
 
 .card-head {
-  min-height: 36px;
+  min-height: 52px;
   box-sizing: border-box;
-  padding: 6px 16px;
+  padding: 10px 24px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 10px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .card-head b {
-  font-size: 14px;
+  font-size: var(--oj-fs-h2);
 }
 
 .legend {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor2");
 }
 
@@ -784,15 +778,20 @@ async function restore(userId: number) {
 .side {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--oj-gap);
   min-width: 0;
 }
 
 .note-card {
-  padding: 14px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  font-size: var(--oj-fs-sec);
+}
+
+.note-card > b {
+  font-size: var(--oj-fs-h2);
 }
 
 .stats {
@@ -811,12 +810,12 @@ async function restore(userId: number) {
 }
 
 .stats span {
-  font-size: 11px;
+  font-size: 12px;
   color: v-bind("theme.textColor3");
 }
 
 .stats b {
-  font-size: 18px;
+  font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -834,7 +833,7 @@ async function restore(userId: number) {
 }
 
 .hidden-title {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   font-weight: 600;
 }
 
@@ -843,28 +842,33 @@ async function restore(userId: number) {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .below {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--oj-gap);
   align-items: start;
 }
 
 .card {
-  padding: 12px 16px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .card-title {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-bottom: 4px;
+}
+
+.card-title b {
+  font-size: var(--oj-fs-h2);
 }
 
 .tabs-card {
@@ -880,12 +884,12 @@ async function restore(userId: number) {
 
 .tabs button {
   flex: 1;
-  height: 38px;
+  height: 44px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
 }
@@ -897,7 +901,7 @@ async function restore(userId: number) {
 }
 
 .tab-body {
-  padding: 10px 12px 12px;
+  padding: 12px 14px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -918,7 +922,7 @@ async function restore(userId: number) {
 
 .toolbar.single .seg {
   display: flex;
-  height: 34px;
+  height: 36px;
 }
 
 .toolbar.single .seg button {

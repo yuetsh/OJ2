@@ -115,17 +115,17 @@ function percent(tag: Tag) {
 
 .switch {
   flex: none;
-  padding: 14px 14px 8px;
+  padding: 16px 14px 10px;
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
 
 .switch button {
-  height: 28px;
+  height: 32px;
   border: 1px solid v-bind("theme.borderColor");
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
   white-space: nowrap;
@@ -161,12 +161,12 @@ function percent(tag: Tag) {
   flex: none;
   box-sizing: border-box;
   width: 100%;
-  padding: 6px 10px 7px;
+  padding: 9px 10px 9px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   font: inherit;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
   text-align: left;
   color: v-bind("theme.textColor2");
   display: flex;
@@ -176,7 +176,7 @@ function percent(tag: Tag) {
 }
 
 .item.flat {
-  padding: 7px 10px;
+  padding: 10px 10px;
   flex-direction: row;
   justify-content: space-between;
   gap: 8px;
@@ -217,7 +217,7 @@ function percent(tag: Tag) {
 
 .count {
   flex: none;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
 }
@@ -232,7 +232,7 @@ function percent(tag: Tag) {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 600;
   color: v-bind("tone('success').color");
 }

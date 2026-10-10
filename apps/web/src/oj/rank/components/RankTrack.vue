@@ -291,8 +291,8 @@ function onMenu(key: string, row: RankRow) {
 .track {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0 36px;
-  padding: 10px 24px 14px;
+  gap: 0 40px;
+  padding: 12px 24px 20px;
 }
 
 .track.single {
@@ -308,11 +308,11 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .lane {
-  height: 28px;
+  height: 34px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 .single .column {
@@ -321,14 +321,14 @@ function onMenu(key: string, row: RankRow) {
 
 .prow {
   position: relative;
-  height: 32px;
+  height: 38px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 8px 0 4px;
   border-radius: 6px;
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 .prow > :not(.fill) {
@@ -360,7 +360,7 @@ function onMenu(key: string, row: RankRow) {
 .mood {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   white-space: nowrap;
   overflow: hidden;
@@ -376,11 +376,11 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .single .gap {
-  height: 34px;
+  height: 38px;
   margin: 2px 0 0;
   border: 1px dashed v-bind("theme.borderColor");
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: #0c7a43;
 }
 
@@ -398,7 +398,7 @@ function onMenu(key: string, row: RankRow) {
 .rank {
   width: 28px;
   text-align: right;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -410,7 +410,7 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .who {
-  width: 116px;
+  width: 126px;
   flex-shrink: 0;
   padding: 0;
   border: 0;
@@ -431,7 +431,7 @@ function onMenu(key: string, row: RankRow) {
 
 .bar-box {
   flex-grow: 1;
-  height: 14px;
+  height: 16px;
   position: relative;
   min-width: 40px;
 }
@@ -445,7 +445,7 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .solved {
-  width: 30px;
+  width: 34px;
   text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -453,8 +453,8 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .change {
-  width: 34px;
-  font-size: 12px;
+  width: 36px;
+  font-size: var(--oj-fs-meta);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
@@ -479,11 +479,11 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: 3px;
-  padding: 0 5px;
-  line-height: 16px;
+  padding: 0 6px;
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -513,14 +513,14 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .gap {
-  height: 30px;
-  margin: 4px 0;
+  height: 36px;
+  margin: 6px 0;
   border: 0;
   border-top: 1px dashed v-bind("theme.borderColor");
   border-bottom: 1px dashed v-bind("theme.borderColor");
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   cursor: pointer;
 }

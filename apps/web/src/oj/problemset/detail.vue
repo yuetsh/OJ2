@@ -144,7 +144,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
     </template>
   </n-result>
 
-  <div v-else-if="set" class="page">
+  <div v-else-if="set" class="page oj-page">
     <section class="band" :class="{ done: progress?.isCompleted }">
       <span v-if="progress?.isCompleted" class="done-mark" aria-hidden="true">✓</span>
       <div class="head">
@@ -251,7 +251,11 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
             <span class="muted num idx">{{ indexOf(item) }}</span>
             <span class="ell ptitle">{{ item.problem.title }}</span>
             <span v-if="!item.isRequired" class="opt">选做</span>
-            <span v-if="item.oldCodeHidden" class="old" :style="purple"
+            <span
+              v-if="item.oldCodeHidden"
+              class="old"
+              :style="purple"
+              title="以前做对过，旧代码在布置期内先藏着"
               ><svg
                 class="lock"
                 width="12"
@@ -266,7 +270,8 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
               >
                 <rect x="5" y="11" width="14" height="9" rx="2" />
                 <path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg
-              >以前做对过 · 旧代码先藏着</span
+              ><span class="old-long">以前做对过 · 旧代码先藏着</span
+              ><span class="old-short">做对过</span></span
             >
             <div class="spacer"></div>
             <span v-if="item.isCompleted && item.solvedTime" class="muted num tiny"
@@ -289,18 +294,18 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 .page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--oj-gap);
 }
 
 .band {
   box-sizing: border-box;
-  padding: 14px 20px 12px;
+  padding: 22px 24px 20px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px 24px;
+  gap: 16px 20px;
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
 }
 
@@ -324,22 +329,22 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 }
 
 .done-text {
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
   color: v-bind("success.color");
 }
 
 .head {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  width: 380px;
+  gap: 8px;
+  width: 360px;
   max-width: 100%;
   min-width: 0;
 }
 
 .head h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--oj-fs-title);
 }
 
 .desc {
@@ -360,12 +365,12 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 
 .back {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   text-decoration: none;
 }
 
 .count {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
 }
 
@@ -415,11 +420,16 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
   margin-right: 3px;
 }
 
+/* 手机上长文案会把题目名挤得只剩一两个字，换成短的；锁的图标还在，全文在悬停提示里 */
+.old-short {
+  display: none;
+}
+
 .notice {
   box-sizing: border-box;
-  padding: 10px 14px;
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 12px 18px;
+  border-radius: var(--oj-radius);
+  font-size: var(--oj-fs-sec);
 }
 
 .tabs {
@@ -428,12 +438,12 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 }
 
 .seg {
-  height: 30px;
-  padding: 0 14px;
+  height: var(--oj-ctrl-h);
+  padding: 0 16px;
   border: 1px solid v-bind("theme.borderColor");
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
 }
@@ -456,13 +466,13 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 .cols {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 12px;
+  gap: 16px;
   align-items: start;
 }
 
 .card {
   border: 1px solid v-bind("theme.borderColor");
-  border-radius: 6px;
+  border-radius: var(--oj-radius);
   background: v-bind("theme.cardColor");
   overflow: hidden;
 }
@@ -473,10 +483,10 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 }
 
 .prow {
-  height: 40px;
+  height: var(--oj-row-h);
   flex-shrink: 0;
   box-sizing: border-box;
-  padding: 0 16px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -498,8 +508,8 @@ a.prow:hover {
 }
 
 .dot {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -527,19 +537,19 @@ a.prow:hover {
 .idx {
   width: 20px;
   text-align: right;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   flex-shrink: 0;
 }
 
 .ptitle {
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
 }
 
 .opt {
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   border: 1px solid v-bind("theme.borderColor");
   color: v-bind("theme.textColor3");
   display: inline-flex;
@@ -548,10 +558,10 @@ a.prow:hover {
 }
 
 .old {
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -563,7 +573,7 @@ a.prow:hover {
 }
 
 .go {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.primaryColor");
   flex-shrink: 0;
 }
@@ -573,10 +583,10 @@ a.prow:hover {
 }
 
 .pill {
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 3px;
-  font-size: 12px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 4px;
+  font-size: var(--oj-fs-meta);
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -601,11 +611,11 @@ a.prow:hover {
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .tiny {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .num {
@@ -624,6 +634,15 @@ a.prow:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .band {
+    padding: 16px;
+  }
+
+  .prow {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
   .head {
     width: 100%;
   }
@@ -635,6 +654,14 @@ a.prow:hover {
   .join {
     align-items: stretch;
     width: 100%;
+  }
+
+  .old-long {
+    display: none;
+  }
+
+  .old-short {
+    display: inline;
   }
 }
 </style>

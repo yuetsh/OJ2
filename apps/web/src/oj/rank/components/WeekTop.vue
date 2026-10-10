@@ -64,11 +64,11 @@ const scale = computed(() => top.value[0]?.solved || 1)
 }
 
 .row {
-  height: 26px;
+  height: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .row.me {
@@ -79,8 +79,8 @@ const scale = computed(() => top.value[0]?.solved || 1)
 }
 
 .medal {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 11px;
   display: inline-flex;
   align-items: center;
@@ -92,7 +92,7 @@ const scale = computed(() => top.value[0]?.solved || 1)
 }
 
 .who {
-  width: 110px;
+  width: 120px;
   flex-shrink: 0;
   padding: 0;
   border: 0;
@@ -105,7 +105,7 @@ const scale = computed(() => top.value[0]?.solved || 1)
 
 .bar-box {
   flex-grow: 1;
-  height: 9px;
+  height: 10px;
   position: relative;
 }
 
@@ -122,7 +122,7 @@ const scale = computed(() => top.value[0]?.solved || 1)
 }
 
 .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 </style>

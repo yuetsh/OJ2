@@ -311,13 +311,13 @@ function gradeStyle(grade: string | null) {
 }
 
 .summary {
-  height: 72px;
+  height: 84px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 20px;
+  padding: 0 var(--oj-pad-x);
   display: flex;
   align-items: center;
-  gap: 36px;
+  gap: 40px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
   background: v-bind("theme.actionColor");
 }
@@ -333,7 +333,7 @@ function gradeStyle(grade: string | null) {
 }
 
 .ring-label {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   line-height: 1.5;
   color: v-bind("theme.textColor3");
 }
@@ -343,7 +343,7 @@ function gradeStyle(grade: string | null) {
   min-height: 0;
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 16px 20px;
+  padding: 20px var(--oj-pad-x);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -365,7 +365,7 @@ function gradeStyle(grade: string | null) {
   border: 1px solid v-bind("theme.dividerColor");
   border-radius: 8px;
   background: v-bind("theme.cardColor");
-  padding: 12px 14px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -392,7 +392,7 @@ function gradeStyle(grade: string | null) {
 }
 
 .card-title {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   font-weight: 600;
   color: v-bind("theme.textColor2");
 }
@@ -411,12 +411,12 @@ function gradeStyle(grade: string | null) {
 }
 
 .person {
-  height: 34px;
+  height: 40px;
   display: flex;
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .p-name {
@@ -427,9 +427,9 @@ function gradeStyle(grade: string | null) {
 .grade-pill {
   width: 100px;
   flex: none;
-  height: 22px;
+  height: 24px;
   border-radius: 11px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -438,7 +438,7 @@ function gradeStyle(grade: string | null) {
 
 .muted {
   color: v-bind("theme.textColor3");
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .empty {

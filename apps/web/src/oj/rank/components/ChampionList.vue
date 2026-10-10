@@ -73,20 +73,20 @@ function weekLabel(start: string) {
 }
 
 .row {
-  height: 26px;
+  height: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .muted {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
 .week {
-  width: 78px;
+  width: 86px;
   flex-shrink: 0;
 }
 
@@ -113,13 +113,13 @@ function weekLabel(start: string) {
 }
 
 .hot-tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #ffffff;
   background: #c76a12;
   border-radius: 3px;
-  padding: 0 5px;
-  line-height: 16px;
+  padding: 0 6px;
+  line-height: 18px;
   white-space: nowrap;
 }
 </style>

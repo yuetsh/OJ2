@@ -352,7 +352,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
       <div class="column">
         <!-- 「上次来」：上次登录到这次登录之间交过题才有。班里今天在做的时候让位给班里卡，
              只在那张卡底下留一句没做对的 -->
-        <n-card v-if="visit && !classToday" size="small" :bordered="false" class="card">
+        <n-card v-if="visit && !classToday" :bordered="false" class="card">
           <template #header>上次来 · {{ visitText(lastVisit!.previousLogin!) }}</template>
           <template #header-extra>
             <n-text depth="3" class="row-meta">
@@ -392,7 +392,6 @@ async function openAnnouncement(item: AnnouncementListItem) {
         <n-card
           v-if="classActivity?.problems.length && !visitCoversClass"
           :title="classActivityTitle"
-          size="small"
           :bordered="false"
           class="card"
         >
@@ -427,7 +426,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
           </div>
         </n-card>
 
-        <n-card title="继续学习" size="small" :bordered="false" class="card">
+        <n-card title="继续学习" :bordered="false" class="card">
           <n-flex vertical :size="12">
             <router-link
               v-for="track in tracks"
@@ -462,7 +461,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
           </n-flex>
         </n-card>
 
-        <n-card title="最近提交" size="small" :bordered="false" class="card">
+        <n-card title="最近提交" :bordered="false" class="card">
           <template #header-extra>
             <router-link to="/submission?myself=1" class="more">全部</router-link>
           </template>
@@ -485,7 +484,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
       </div>
 
       <div class="column">
-        <n-card title="比赛" size="small" :bordered="false" class="card">
+        <n-card title="比赛" :bordered="false" class="card">
           <template #header-extra>
             <router-link to="/contest" class="more">全部</router-link>
           </template>
@@ -508,7 +507,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
           </n-text>
         </n-card>
 
-        <n-card title="公告" size="small" :bordered="false" class="card">
+        <n-card title="公告" :bordered="false" class="card">
           <template #header-extra>
             <router-link to="/announcement" class="more">全部</router-link>
           </template>
@@ -524,7 +523,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
           </div>
         </n-card>
 
-        <n-card size="small" :bordered="false" class="card">
+        <n-card :bordered="false" class="card">
           <n-flex :size="8" class="shortcuts">
             <n-button secondary @click="router.push('/problem')">
               <template #icon><Icon icon="fluent-emoji:memo" /></template>
@@ -561,7 +560,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
 
 <style scoped>
 .home {
-  max-width: 1200px;
+  max-width: var(--oj-page-width);
   margin: 0 auto;
 }
 
@@ -571,13 +570,13 @@ async function openAnnouncement(item: AnnouncementListItem) {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  margin: 8px 0 20px;
+  margin: 16px 0 28px;
 }
 
 .hello {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
-  margin: 0 0 6px;
+  margin: 0 0 8px;
 }
 
 .knowledge-line {
@@ -596,14 +595,14 @@ async function openAnnouncement(item: AnnouncementListItem) {
 }
 
 .search {
-  width: 320px;
+  width: 340px;
   max-width: 100%;
 }
 
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 16px;
+  gap: var(--oj-gap);
 }
 
 @media (max-width: 900px) {
@@ -615,21 +614,29 @@ async function openAnnouncement(item: AnnouncementListItem) {
 .column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--oj-gap);
   min-width: 0;
 }
 
 .card {
-  border-radius: 8px;
+  border-radius: var(--oj-radius);
   background-color: var(--n-color-embedded, rgba(128, 128, 128, 0.06));
+}
+
+/* 卡片用回 Naive 默认的 medium（左右 24），手机上太费地方，收回 16 */
+@media (max-width: 600px) {
+  .card {
+    --n-padding-left: 16px !important;
+    --n-padding-right: 16px !important;
+  }
 }
 
 .track {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px;
-  border-radius: 6px;
+  gap: 20px;
+  padding: 16px 18px;
+  border-radius: 8px;
   color: inherit;
   text-decoration: none;
   background-color: rgba(128, 128, 128, 0.06);
@@ -645,17 +652,17 @@ async function openAnnouncement(item: AnnouncementListItem) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .track-label,
 .track-meta,
 .row-meta {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
 }
 
 .track-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -665,8 +672,11 @@ async function openAnnouncement(item: AnnouncementListItem) {
 .row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 4px;
+  gap: 10px;
+  min-height: 46px;
+  box-sizing: border-box;
+  padding: 8px 6px;
+  font-size: var(--oj-fs-body);
   border-radius: 4px;
   color: inherit;
   text-decoration: none;
@@ -709,9 +719,9 @@ a.row:hover {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  border-radius: 8px;
   border: 1px solid rgba(128, 128, 128, 0.18);
   background-color: var(--n-color, #fff);
   color: inherit;
@@ -737,7 +747,7 @@ a.row:hover {
   margin-top: 4px;
   padding: 10px 4px 2px;
   border-top: 1px solid rgba(128, 128, 128, 0.12);
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   opacity: 0.75;
 }
 
@@ -767,7 +777,7 @@ a.row:hover {
 }
 
 .more {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   opacity: 0.7;
 }
 

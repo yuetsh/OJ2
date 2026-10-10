@@ -1,8 +1,8 @@
 <template>
-  <n-spin :show="aiStore.loading.fetching" :delay="50">
-    <n-flex vertical size="large">
+  <n-spin class="oj-page" :show="aiStore.loading.fetching" :delay="50">
+    <n-flex vertical :size="20">
       <n-flex align="center" justify="space-between">
-        <n-h3 style="margin: 0">请选择时间范围，智能分析学习情况</n-h3>
+        <h2 class="title">请选择时间范围，智能分析学习情况</h2>
         <n-flex align="center">
           <n-input
             v-if="userStore.isTeacherOrAbove"
@@ -96,6 +96,11 @@ watch(
 )
 </script>
 <style scoped>
+.title {
+  margin: 0;
+  font-size: var(--oj-fs-title);
+}
+
 .pair > :deep(.n-card) {
   flex: 1 1 320px;
 }

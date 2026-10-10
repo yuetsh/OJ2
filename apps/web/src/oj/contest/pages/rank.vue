@@ -99,7 +99,7 @@ const meBackground = computed(
 const danger = computed(() => tone("error"))
 const columns = computed(
   () =>
-    `34px ${running.value ? "34px " : ""}150px 40px 70px repeat(${problems.value.length}, 58px)`,
+    `40px ${running.value ? "36px " : ""}170px 48px 80px repeat(${problems.value.length}, 64px)`,
 )
 </script>
 
@@ -272,7 +272,7 @@ const columns = computed(
 }
 
 .small {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
 }
 
 .spacer {
@@ -280,11 +280,11 @@ const columns = computed(
 }
 
 .podium-row {
-  padding: 12px 20px 0;
+  padding: 20px var(--oj-pad-x) 0;
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 24px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
@@ -303,12 +303,12 @@ const columns = computed(
 }
 
 .podium-name {
-  font-size: 15px;
+  font-size: 16px;
   max-width: 200px;
 }
 
 .p1 .podium-name {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .block {
@@ -352,14 +352,14 @@ const columns = computed(
 }
 
 .mine {
-  width: 330px;
-  margin-bottom: 16px;
-  padding: 14px 16px;
+  width: 340px;
+  margin-bottom: 20px;
+  padding: 18px 20px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  border-radius: 6px;
+  gap: 8px;
+  border-radius: var(--oj-radius);
   background: v-bind("success.background");
 }
 
@@ -370,31 +370,31 @@ const columns = computed(
 }
 
 .mine-big {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1;
   color: v-bind("success.color");
 }
 
 .tools {
-  min-height: 48px;
+  min-height: 56px;
   box-sizing: border-box;
-  padding: 8px 20px;
+  padding: 10px var(--oj-pad-x);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
 .chip {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 13px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
   border: 1px solid v-bind("theme.borderColor");
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
   cursor: pointer;
   white-space: nowrap;
@@ -408,7 +408,7 @@ const columns = computed(
 }
 
 .table {
-  max-height: calc(100vh - 230px);
+  max-height: calc(100vh - 246px);
   overflow: auto;
 }
 
@@ -417,8 +417,9 @@ const columns = computed(
   align-items: center;
   column-gap: 6px;
   min-width: max-content;
-  height: 32px;
-  padding: 0 20px;
+  height: 42px;
+  padding: 0 var(--oj-pad-x);
+  font-size: var(--oj-fs-body);
   border-bottom: 1px solid v-bind("theme.dividerColor");
   background: v-bind("theme.cardColor");
 }
@@ -427,8 +428,8 @@ const columns = computed(
   position: sticky;
   top: 0;
   z-index: 2;
-  height: 44px;
-  font-size: 12px;
+  height: 48px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   background: v-bind("theme.actionColor");
 }
@@ -436,7 +437,7 @@ const columns = computed(
 .tr.me {
   position: sticky;
   bottom: 0;
-  top: 44px;
+  top: 48px;
   z-index: 1;
   /* 浅绿是半透明的，钉住时底下的行会透上来，垫一层卡片底色 */
   background: v-bind("meBackground");
@@ -462,13 +463,13 @@ const columns = computed(
 }
 
 .time {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   padding-right: 8px;
 }
 
 .move {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .up {
@@ -493,12 +494,12 @@ const columns = computed(
 }
 
 .ph b {
-  font-size: 13px;
+  font-size: var(--oj-fs-sec);
   color: v-bind("theme.textColor2");
 }
 
 .ph span {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .cell-wrap {
@@ -507,18 +508,18 @@ const columns = computed(
 
 .cell {
   width: 100%;
-  height: 26px;
-  border-radius: 3px;
+  height: 30px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   font-variant-numeric: tabular-nums;
 }
 
 .cell small {
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.8;
 }
 
@@ -539,18 +540,18 @@ const columns = computed(
 }
 
 .empty {
-  padding: 24px 20px;
+  padding: 32px var(--oj-pad-x);
 }
 
 .legend {
-  min-height: 34px;
-  padding: 6px 20px;
+  min-height: 42px;
+  padding: 8px var(--oj-pad-x);
   box-sizing: border-box;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
   border-top: 1px solid v-bind("theme.dividerColor");
 }

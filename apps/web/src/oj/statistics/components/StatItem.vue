@@ -37,7 +37,7 @@ const color = computed(() => (props.tone ? toneOf(props.tone).color : theme.valu
 
 .label,
 .unit {
-  font-size: 12px;
+  font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
 }
 
@@ -48,7 +48,7 @@ const color = computed(() => (props.tone ? toneOf(props.tone).color : theme.valu
 }
 
 .value {
-  font-size: 22px;
+  font-size: 26px;
   font-variant-numeric: tabular-nums;
 }
 </style>

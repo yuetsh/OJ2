@@ -45,7 +45,7 @@ async function saveProfile() {
 </script>
 <template>
   <n-flex class="container" vertical v-if="userStore.profile">
-    <h3>个人信息设置</h3>
+    <h2>个人信息设置</h2>
     <n-form>
       <n-avatar round :size="120" :src="userStore.profile.avatar" alt="头像" />
       <n-form-item label="">
@@ -75,11 +75,14 @@ async function saveProfile() {
 </template>
 <style scoped>
 .container {
-  max-width: 600px;
+  max-width: 640px;
   margin: 0 auto;
+  padding-top: 8px;
+  gap: var(--oj-gap);
 }
 
-h3 {
-  font-weight: normal;
+h2 {
+  margin: 0;
+  font-size: var(--oj-fs-title);
 }
 </style>

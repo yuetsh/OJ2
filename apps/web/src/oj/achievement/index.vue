@@ -58,10 +58,11 @@ watch(name, load)
 </script>
 
 <template>
-  <div class="hall">
+  <div class="hall oj-page">
+    <h2 class="title">成就</h2>
     <!-- delay 50ms：缓存命中时数据几乎立刻回来，不闪一下转圈 -->
     <n-spin :show="loading" :delay="50" style="min-height: 240px">
-      <n-card v-if="summary">
+      <n-card v-if="summary" class="summary">
         <n-flex align="center" :wrap="false" :size="isDesktop ? 32 : 16">
           <n-flex vertical align="center" :size="6">
             <n-progress type="circle" :percentage="summary.percent" :stroke-width="8">
@@ -103,7 +104,7 @@ watch(name, load)
       </n-tabs>
 
       <template v-if="tab !== 'badges'">
-        <n-grid v-if="filtered.length" responsive="screen" cols="1 s:2 l:3" :x-gap="12" :y-gap="12">
+        <n-grid v-if="filtered.length" responsive="screen" cols="1 s:2 l:3" :x-gap="16" :y-gap="16">
           <n-gi v-for="a in filtered" :key="a.id">
             <AchievementCard :achievement="a" />
           </n-gi>
@@ -113,9 +114,9 @@ watch(name, load)
       </template>
 
       <template v-else>
-        <n-grid v-if="badges.length" responsive="screen" cols="1 s:2 l:3" :x-gap="12" :y-gap="12">
+        <n-grid v-if="badges.length" responsive="screen" cols="1 s:2 l:3" :x-gap="16" :y-gap="16">
           <n-gi v-for="b in badges" :key="b.id">
-            <n-card size="small">
+            <n-card class="badge-card">
               <n-thing :title="b.badge?.name" :description="b.badge?.description">
                 <template #avatar v-if="b.badge?.icon">
                   <n-avatar
@@ -147,10 +148,18 @@ watch(name, load)
 </template>
 
 <style scoped>
-.hall {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 16px;
+.title {
+  margin: 0 0 var(--oj-gap);
+  font-size: var(--oj-fs-title);
+}
+
+.summary,
+.badge-card {
+  border-radius: var(--oj-radius);
+}
+
+.badge-card {
+  height: 100%;
 }
 .rarity {
   flex: 1;
@@ -160,7 +169,7 @@ watch(name, load)
   white-space: nowrap;
 }
 .tabs {
-  margin: 16px 0;
+  margin: var(--oj-gap) 0;
 }
 .source {
   display: block;
