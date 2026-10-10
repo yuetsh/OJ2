@@ -361,8 +361,14 @@ const emptyText = computed(() => {
   return `${where}没有同时符合这些条件的题`
 })
 
+// 按左栏的顺序（题数多的在前）排，同样几个知识点在每道题上的先后才一致
 function knowledgeOf(row: ProblemRow) {
-  return row.tags.filter((name) => tagByName.value.get(name)?.category === "knowledge").join(" · ")
+  return row.tags
+    .map((name) => tagByName.value.get(name))
+    .filter((tag): tag is Tag => tag?.category === "knowledge")
+    .sort((a, b) => b.problemCount - a.problemCount)
+    .map((tag) => tag.name)
+    .join(" · ")
 }
 
 function mustDo(row: ProblemRow) {
