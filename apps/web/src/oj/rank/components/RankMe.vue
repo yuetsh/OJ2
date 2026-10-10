@@ -181,7 +181,6 @@ function threatNote(me: RankRow, behind: RankRow) {
           placeholder="写点什么，让大家认识你"
           autofocus
         />
-        <span class="mood-hint">排名、个人主页上都会显示</span>
         <div class="mood-actions">
           <n-button size="small" @click="editing = false">取消</n-button>
           <n-button size="small" type="primary" attr-type="submit" :loading="saving">
@@ -437,11 +436,6 @@ function threatNote(me: RankRow, behind: RankRow) {
 .mood-label {
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-}
-
-.mood-hint {
-  font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
 }
 
 .mood-actions {

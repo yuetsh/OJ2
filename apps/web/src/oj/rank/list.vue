@@ -15,7 +15,6 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
 import { USERNAME_CLASS_RE } from "utils/constants"
-import { parseTime } from "utils/functions"
 import ChampionList from "./components/ChampionList.vue"
 import ClassBattle from "./components/ClassBattle.vue"
 import ClassDetailDrawer from "./components/ClassDetailDrawer.vue"
@@ -187,11 +186,6 @@ const scale = computed(() => rows.value[1]?.solved || rows.value[0]?.solved || 1
 const hot = computed(() => hottest(rows.value))
 
 const me = computed(() => board.value?.me ?? null)
-/** 全服 100 名以外：「你」卡照样有，但名单上没有你这一行，图例和副标题别再提「你」 */
-const meListed = computed(() => {
-  const b = board.value
-  return !!b?.me && !(b.cap && b.me.rank > b.cap)
-})
 const meId = computed(() => (teacher.value ? undefined : userStore.user?.id))
 const mateClass = computed(() => (board.value?.scope !== "class" ? classContext.value : null))
 
@@ -200,35 +194,12 @@ const title = computed(() =>
     ? `${groupTitle(board.value.scope, board.value.className)} · ${periodLabel(board.value.period)}`
     : "",
 )
+/** 只报人数。同分怎么排、名单折在哪，赛道自己看得出来，不再写一遍（用户嫌解释太多） */
 const subtitle = computed(() => {
   const b = board.value
   if (!b) return ""
-  const head = b.scope === "class" ? `${b.total} 人` : `${b.total} 人做对过`
-  const capped = !!b.cap && b.total > b.cap
-  const part = !b.complete
-    ? meListed.value
-      ? " · 前面一段 + 你附近一段"
-      : ` · 只列前面 ${b.rows.length} 名`
-    : capped
-      ? ` · 只列前 ${b.cap} 名`
-      : ""
-  return `${head} · 一样多的，先做到的在前${part}`
+  return b.scope === "class" ? `${b.total} 人` : `${b.total} 人做对过`
 })
-/** 手机上标题旁边那句：只说从哪天起、跟什么时候比 */
-const shortRule = computed(() => {
-  const b = board.value
-  if (!b) return ""
-  const from = b.start ? `${parseTime(b.start, "M月D日")}起` : "全部历史"
-  return `${from} · ↑↓ 比${b.period === "week" ? "今天早上" : "周一"}`
-})
-
-const ruleText = computed(() => {
-  const b = board.value
-  if (!b) return ""
-  const from = b.start ? `${parseTime(b.start, "M月D日")}起` : "全部历史"
-  return `${from} · 每道题按第一次做对算 · ↑↓ 比${b.period === "week" ? "今天早上" : "周一"}`
-})
-
 const miniScopes = computed(() =>
   SCOPE_OPTIONS.map((option) => option.value).filter(
     (s) => s !== scope.value && (s === "all" || !!myClass.value),
@@ -387,7 +358,6 @@ async function restore(userId: number) {
     <div class="toolbar" :class="{ single: !isDesktop }">
       <div class="title">
         <h2>排名</h2>
-        <span v-if="!isDesktop" class="rule">{{ shortRule }}</span>
       </div>
       <div class="seg" role="group" aria-label="范围">
         <button
@@ -419,10 +389,6 @@ async function restore(userId: number) {
         placeholder="选班"
         :options="teacherClassOptions"
       />
-      <template v-if="isDesktop">
-        <div class="spacer" />
-        <span class="rule">{{ ruleText }}</span>
-      </template>
     </div>
 
     <div class="main" :class="{ single: !isDesktop }">
@@ -431,21 +397,6 @@ async function restore(userId: number) {
           <div class="card-head">
             <b>{{ title }}</b>
             <span class="muted">{{ subtitle }}</span>
-            <div class="spacer" />
-            <span v-if="isDesktop || (!teacher && me) || hot" class="legend">
-              <span v-if="isDesktop"
-                ><i class="bar-key" :style="{ background: palette.track }"
-                  ><i :style="{ background: palette.bar }" /></i
-                >做出的题数</span
-              >
-              <template v-if="!teacher && me">
-                <span v-if="meListed"><i :style="{ background: palette.me }" />你</span>
-                <span v-if="board.ahead"><i :style="{ background: palette.chase }" />前一名</span>
-                <span v-if="board.behind"><i :style="{ background: palette.threat }" />后一名</span>
-                <span v-if="mateClass"><i :style="{ background: palette.mate }" />你们班</span>
-              </template>
-              <span v-if="hot"><b class="hot-chip">↑</b>进步最大</span>
-            </span>
           </div>
           <RankPodium
             :rows="podium"
@@ -500,7 +451,7 @@ async function restore(userId: number) {
           />
           <div v-else-if="board.hidden" class="note-card">
             <b>你现在不计入排名</b>
-            <span class="muted">老师把你从排名里拿掉了，榜上看不到你。有疑问去问老师。</span>
+            <span class="muted">有疑问去问老师</span>
           </div>
           <div v-else-if="teacher" class="note-card">
             <b>{{ classContext ? classLabel(classContext) : "全服" }}</b>
@@ -530,18 +481,13 @@ async function restore(userId: number) {
                 >班级 PK</n-button
               >
             </div>
-            <div class="hidden-list">
+            <!-- 只在本班、且真拿掉过人时出现；怎么拿掉在名单每行的「⋯」里，不用再写一遍 -->
+            <div v-if="board.scope === 'class' && board.hiddenUsers.length" class="hidden-list">
               <span class="hidden-title">不计入排名的人</span>
-              <template v-if="board.scope === 'class'">
-                <div v-for="user in board.hiddenUsers" :key="user.id" class="hidden-row">
-                  <UserName :username="user.username" />
-                  <n-button size="small" secondary @click="restore(user.id)">恢复</n-button>
-                </div>
-                <span v-if="!board.hiddenUsers.length" class="muted">
-                  还没有。怀疑抄代码的，在名单上点「⋯」拿掉。
-                </span>
-              </template>
-              <span v-else class="muted">切到「本班」看这个班拿掉了谁</span>
+              <div v-for="user in board.hiddenUsers" :key="user.id" class="hidden-row">
+                <UserName :username="user.username" />
+                <n-button size="small" secondary @click="restore(user.id)">恢复</n-button>
+              </div>
             </div>
           </div>
           <div v-else-if="userStore.isAuthed" class="note-card">
@@ -562,20 +508,20 @@ async function restore(userId: number) {
     <div v-if="isDesktop && classContext" class="below">
       <div v-if="board?.trend && me" class="card">
         <div class="card-title">
-          <b>我和前后一名的名次</b><span class="muted">每周日晚上 · 越高越好</span>
+          <b>我和前后一名的名次</b>
         </div>
         <RankTrend :trend="board.trend" :lines="trendLines" />
       </div>
       <div class="card">
         <div class="card-title">
           <b>{{ weekTitle }}</b>
-          <span class="muted">还剩 {{ daysLeft }} 天 · 下周一清零</span>
+          <span class="muted">还剩 {{ daysLeft }} 天</span>
         </div>
         <WeekTop :rows="weekBoard?.rows ?? []" :me-id="meId" :loaded="!!weekBoard" @open="open" />
       </div>
       <div class="card">
         <div class="card-title">
-          <b>每周冠军</b><span class="muted">本班 · 每周一清零后重新比</span>
+          <b>每周冠军</b>
         </div>
         <ChampionList
           :champions="champions"
@@ -617,7 +563,7 @@ async function restore(userId: number) {
           :lines="trendLines"
         />
         <template v-else-if="phoneTab === 'week'">
-          <span class="muted">{{ weekTitle }} · 还剩 {{ daysLeft }} 天 · 下周一清零</span>
+          <span class="muted">{{ weekTitle }} · 还剩 {{ daysLeft }} 天</span>
           <WeekTop :rows="weekBoard?.rows ?? []" :me-id="meId" :loaded="!!weekBoard" @open="open" />
         </template>
         <ChampionList
@@ -699,11 +645,6 @@ async function restore(userId: number) {
   width: 150px;
 }
 
-.spacer {
-  flex-grow: 1;
-}
-
-.rule,
 .muted {
   font-size: var(--oj-fs-meta);
   color: v-bind("theme.textColor3");
@@ -751,46 +692,6 @@ async function restore(userId: number) {
 
 .card-head b {
   font-size: var(--oj-fs-h2);
-}
-
-.legend {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor2");
-}
-
-.legend span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* 和赛道里涨跌那一格的徽章同一个样子 */
-.legend .hot-chip {
-  font-size: 12px;
-  color: #ffffff;
-  background: #c76a12;
-  border-radius: 3px;
-  padding: 0 4px;
-  line-height: 16px;
-}
-
-.legend i {
-  width: 14px;
-  height: 8px;
-  border-radius: 2px;
-}
-
-/* 条的图例：底槽里一截条，和赛道上的条同一个样子 */
-.legend .bar-key {
-  width: 24px;
-  display: flex;
-}
-
-.legend .bar-key i {
-  width: 10px;
 }
 
 .empty {

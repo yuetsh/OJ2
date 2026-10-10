@@ -125,9 +125,7 @@ function go(path: string, query: Record<string, string>) {
           </div>
 
           <section>
-            <div class="sec-title">
-              全班分布<span class="muted">一个点一个同学，下面是这学期做对几道</span>
-            </div>
+            <div class="sec-title">全班分布</div>
             <div class="dots">
               <div v-for="column in columns" :key="column.solved" class="dot-col">
                 <div class="stack">
@@ -192,9 +190,7 @@ function go(path: string, query: Record<string, string>) {
           </section>
 
           <section v-if="detail.care">
-            <div class="sec-title">
-              要多关心的同学<span class="muted">这学期做对不到 3 道 · 只有老师看得到</span>
-            </div>
+            <div class="sec-title">要多关心的同学</div>
             <div v-for="row in detail.care" :key="row.user.id" class="care">
               <RankAvatar :username="row.user.username" :avatar="row.avatar" :size="20" />
               <UserName :username="row.user.username" />
@@ -230,7 +226,6 @@ function go(path: string, query: Record<string, string>) {
                 <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
               </svg>
               <b>AI 分析这个班</b>
-              <span class="muted">根据上面这些数字写，仅供参考</span>
               <div class="spacer" />
               <n-button
                 size="small"

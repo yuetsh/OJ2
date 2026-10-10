@@ -55,7 +55,7 @@ function shortLabel(className: string) {
 <template>
   <div class="battle" :class="{ bare }">
     <div class="title">
-      <b v-if="!bare">班级对抗</b><span class="muted">人均做对 · 全服 · 点班名看详情</span>
+      <b v-if="!bare">班级对抗</b><span class="muted">人均做对</span>
       <router-link
         v-if="pk"
         :to="{ path: '/class', query: mine ? { classes: mine } : {} }"
