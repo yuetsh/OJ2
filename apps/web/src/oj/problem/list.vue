@@ -369,6 +369,11 @@ function mustDo(row: ProblemRow) {
   return row.tags.includes("必会题")
 }
 
+// 「C语言」是主题标签，告诉学生这道题是 C 语言课专门用的，和「必会」一样挂在题目名后
+function cCourse(row: ProblemRow) {
+  return row.tags.includes("C语言")
+}
+
 const DIFFICULTY_TONE = { 简单: "success", 中等: "warning", 困难: "error" } as const
 
 function difficultyStyle(row: ProblemRow) {
@@ -550,6 +555,7 @@ const gridColumns = computed(() =>
               <div class="title">
                 <span class="text">{{ row.title }}</span>
                 <span v-if="mustDo(row)" class="must">必会</span>
+                <span v-if="cCourse(row)" class="must course">C语言</span>
                 <ProblemTypeTag v-for="kind in problemTypes(row)" :key="kind" :kind="kind" />
               </div>
               <div class="knowledge">{{ knowledgeOf(row) || "—" }}</div>
@@ -684,6 +690,7 @@ const gridColumns = computed(() =>
             <span class="m-name">
               <span class="text">{{ row.title }}</span>
               <span v-if="mustDo(row)" class="must">必会</span>
+              <span v-if="cCourse(row)" class="must course">C语言</span>
             </span>
             <span class="m-meta">
               <span v-if="row.difficulty" class="difficulty" :style="difficultyStyle(row)">
@@ -1105,6 +1112,11 @@ const gridColumns = computed(() =>
   font-size: 12px;
   line-height: 18px;
   color: v-bind("tone('warning').color");
+}
+
+.must.course {
+  border-color: v-bind("theme.infoColorSuppl");
+  color: v-bind("tone('info').color");
 }
 
 .knowledge {
