@@ -58,8 +58,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.startEnd ellipse,
 .oj-mermaid-flowchart g.node.startEnd circle,
 .oj-mermaid-flowchart g.node.startEnd path {
-  fill: #dcfce7 !important;
-  stroke: #16a34a !important;
+  fill: #eef8f2 !important;
+  stroke: #18a058 !important;
 }
 
 .oj-mermaid-flowchart g.node.endNode rect,
@@ -67,8 +67,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.endNode ellipse,
 .oj-mermaid-flowchart g.node.endNode circle,
 .oj-mermaid-flowchart g.node.endNode path {
-  fill: #fee2e2 !important;
-  stroke: #dc2626 !important;
+  fill: #eef8f2 !important;
+  stroke: #18a058 !important;
 }
 
 .oj-mermaid-flowchart g.node.input rect,
@@ -76,8 +76,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.input ellipse,
 .oj-mermaid-flowchart g.node.input circle,
 .oj-mermaid-flowchart g.node.input path {
-  fill: #dbeafe !important;
-  stroke: #2563eb !important;
+  fill: #eef4fd !important;
+  stroke: #2f6bc4 !important;
 }
 
 .oj-mermaid-flowchart g.node.output rect,
@@ -85,8 +85,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.output ellipse,
 .oj-mermaid-flowchart g.node.output circle,
 .oj-mermaid-flowchart g.node.output path {
-  fill: #ede9fe !important;
-  stroke: #7c3aed !important;
+  fill: #eef4fd !important;
+  stroke: #2f6bc4 !important;
 }
 
 .oj-mermaid-flowchart g.node.process rect,
@@ -94,8 +94,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.process ellipse,
 .oj-mermaid-flowchart g.node.process circle,
 .oj-mermaid-flowchart g.node.process path {
-  fill: #f0f9ff !important;
-  stroke: #0284c7 !important;
+  fill: #ffffff !important;
+  stroke: #7d828a !important;
 }
 
 .oj-mermaid-flowchart g.node.decision rect,
@@ -103,8 +103,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.decision ellipse,
 .oj-mermaid-flowchart g.node.decision circle,
 .oj-mermaid-flowchart g.node.decision path {
-  fill: #fef3c7 !important;
-  stroke: #d97706 !important;
+  fill: #fdf5e6 !important;
+  stroke: #d08a1c !important;
 }
 
 .oj-mermaid-flowchart g.node.loop rect,
@@ -112,8 +112,8 @@ const mermaidDisplayStyle = `
 .oj-mermaid-flowchart g.node.loop ellipse,
 .oj-mermaid-flowchart g.node.loop circle,
 .oj-mermaid-flowchart g.node.loop path {
-  fill: #fae8ff !important;
-  stroke: #c026d3 !important;
+  fill: #fdf5e6 !important;
+  stroke: #d08a1c !important;
 }
 
 .oj-mermaid-flowchart g.node.oj-node-palette-0 rect,

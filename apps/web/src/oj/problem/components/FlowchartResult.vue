@@ -7,6 +7,7 @@ import { useProblemStore } from "oj/store/problem"
 import { useUserStore } from "shared/store/user"
 import { sortFlowchartCriteria } from "utils/constants"
 import { decompressFromBase64, parseTime } from "utils/functions"
+import { parseDoc, signature } from "shared/components/FlowchartEditor/model"
 
 /**
  * 「结果」页签里流程图作业的那一块：AI 在评 / 评完了几分 / 历次分数 / 评语和改进建议。
@@ -104,63 +105,15 @@ function percentType(ratio: number) {
 }
 
 // ==================== 载回画布 ====================
-/** 这一版的画布数据（压缩前的 JSON 字符串）；老提交的压缩数据可能是坏的 */
-const versionJson = computed(() => {
+/**
+ * 这一版的图（结构树）。2026-10 换成插入式编辑器之前交的是 vue-flow 的格式，读不出来就是
+ * null：那些只能看上面的图，载不回画布。老提交的压缩数据也可能是坏的
+ */
+const versionDoc = computed(() => {
   const data = detail.value?.flowchartData?.data
   if (typeof data !== "string" || !data) return null
   try {
-    return decompressFromBase64(data)
-  } catch {
-    return null
-  }
-})
-
-/**
- * 一张图「长什么样」：节点的 id / 类型 / data（字写在里面）/ 位置，连线的两端和标签。不直接比 JSON 字符串 ——
- * 载回画布时编辑器会补上默认字段（sourceHandle: null 之类），老提交还带着 vue-flow 的运行时
- * 字段，字符串永远对不上，按钮就一直在。
- */
-type Shape = { nodes?: unknown[]; edges?: unknown[] }
-function signature(data: Shape) {
-  const nodes = (data.nodes ?? []).map((raw) => {
-    const node = raw as {
-      id?: string
-      type?: string
-      data?: unknown
-      position?: { x?: number; y?: number }
-    }
-    return [
-      node.id,
-      node.type,
-      // 节点上的字（customLabel）和原始类型都在 data 里，整个带上
-      JSON.stringify(node.data ?? {}),
-      Math.round(node.position?.x ?? 0),
-      Math.round(node.position?.y ?? 0),
-    ].join("|")
-  })
-  const edges = (data.edges ?? []).map((raw) => {
-    const edge = raw as {
-      source?: string
-      target?: string
-      sourceHandle?: string | null
-      targetHandle?: string | null
-      label?: unknown
-    }
-    return [
-      edge.source,
-      edge.target,
-      edge.sourceHandle ?? "",
-      edge.targetHandle ?? "",
-      edge.label ?? "",
-    ].join("|")
-  })
-  return JSON.stringify([nodes.sort(), edges.sort()])
-}
-
-const versionSignature = computed(() => {
-  if (!versionJson.value) return null
-  try {
-    return signature(JSON.parse(versionJson.value) as Shape)
+    return parseDoc(JSON.parse(decompressFromBase64(data)))
   } catch {
     return null
   }
@@ -168,22 +121,18 @@ const versionSignature = computed(() => {
 
 /**
  * 只有画布和这一版不一样时才给「载回画布」：刚交完、还没动过的时候，这个按钮点了什么
- * 都不会变，只会让人以为它坏了。读 getFlowchartData() 会顺带跟踪画布的节点和边。
+ * 都不会变，只会让人以为它坏了。比的是结构和字，不比 id。
+ * 读 getDoc() 会顺带跟踪画布的数据
  */
 const canvasDiffers = computed(() => {
-  if (!editor.value || !versionSignature.value) return false
-  return signature(editor.value.getFlowchartData()) !== versionSignature.value
+  if (!editor.value || !versionDoc.value) return false
+  return signature(editor.value.getDoc()) !== signature(versionDoc.value)
 })
 
 function loadToCanvas() {
-  if (!editor.value || !versionJson.value) return
-  try {
-    const json = JSON.parse(versionJson.value)
-    editor.value.setFlowchartData({ nodes: json.nodes || [], edges: json.edges || [] })
-    message.success("已载回画布，按 Ctrl+Z 可以撤回")
-  } catch {
-    message.error("这一版的图数据坏了，载不回画布")
-  }
+  if (!editor.value || !versionDoc.value) return
+  editor.value.setDoc(versionDoc.value)
+  message.success("已载回画布，按 Ctrl+Z 可以撤回")
 }
 
 /** A / S 之后：照着图写代码。切回学生习惯的那门语言 */

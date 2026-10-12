@@ -1,349 +1,1025 @@
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted } from "vue"
-import Toolbar from "./Toolbar.vue"
-import "@vue-flow/core/dist/style.css"
-import "@vue-flow/core/dist/theme-default.css"
-import "@vue-flow/controls/dist/style.css"
-import { useVueFlow, VueFlow, type Node, type Edge, MarkerType } from "@vue-flow/core"
-import { Controls } from "@vue-flow/controls"
-import { Background } from "@vue-flow/background"
-
-import { useDnD, currentDragNodeType } from "./useDnD"
-import { getNodeTypeConfig } from "./useNodeStyles"
-import { useHistory } from "./useHistory"
-import { useFlowOperations } from "./useFlowOperations"
-import { useCache } from "./useCache"
-import { toPortableEdges, toPortableNodes } from "./serialize"
-import CustomNode from "./CustomNode.vue"
+import { useThemeVars } from "naive-ui"
+import storage from "utils/storage"
 import { useProblemStore } from "oj/store/problem"
+import {
+  cloneDoc,
+  emptyDoc,
+  findStep,
+  insertStep,
+  parseDoc,
+  removeStep,
+  STEP_LABEL,
+  type FlowDoc,
+  type StepKind,
+} from "./model"
+import { layoutDoc, PLACEHOLDER, type LaidNode, type LaidSlot } from "./layout"
+
+/**
+ * 画流程图（插入式）。设计稿：画布「画流程图重设计」页的 FlowEdB / FlowEdBLoop。
+ *
+ * 没有拖拽：每根箭头上有个 +，点了选「输入 / 输出 / 处理 / 判断 / 循环」，新的一步就接在
+ * 那根箭头上；判断自动分出是 / 否两路再合回来，排版全自动。点一个框直接改字，旁边有「删除」。
+ * 原来的 vue-flow 编辑器要从节点库拖框、对准连接点拉线、自己摆位置，学生大半时间花在
+ * 理线上，还能画出断线和孤立的框。
+ *
+ * 画布本身只剩平移和缩放：按住空白处拖动、滚轮上下移、Ctrl + 滚轮缩放、左下角三个按钮。
+ */
 
 interface Props {
   height?: string
 }
-
 const { height = "calc(100vh - 134px)" } = defineProps<Props>()
 
-// Vue Flow 实例
-const { addEdges, removeNodes, removeEdges, fitView, onNodesInitialized } = useVueFlow()
+const message = useMessage()
+const theme = useThemeVars()
+const isDark = useDark()
 
-/**
- * 进页面读回草稿、载回旧版之后缩放到正好装下整张图。原来画布停在默认的位置和缩放上，
- * 图大一点就有一半在外面，学生以为草稿丢了。只在这两种时候缩：拖进一个新节点时也会
- * 触发 nodes-initialized，那时候跟着缩放会让画布跳一下。
- * 画布是空的就不挂：空画布不会触发 nodes-initialized，挂着的这一下会一直留到学生拖进
- * 第一个节点，正好把画布拉近、对准那一个节点 —— 就是上面要躲开的那一跳
- */
-let fitPending = false
-function fitSoon() {
-  fitPending = nodes.value.length > 0
+// ==================== 数据与历史 ====================
+
+const doc = ref<FlowDoc>(emptyDoc())
+
+/** 每一步改动之后的样子，撤销就是往回退一格。打字不进历史，改完（失焦 / 回车）才进 */
+const history = ref<string[]>([])
+const cursor = ref(-1)
+const HISTORY_LIMIT = 50
+const canUndo = computed(() => cursor.value > 0)
+const canRedo = computed(() => cursor.value < history.value.length - 1)
+
+function snapshot() {
+  const state = JSON.stringify(doc.value)
+  if (history.value[cursor.value] === state) return
+  history.value = [...history.value.slice(0, cursor.value + 1), state].slice(-HISTORY_LIMIT)
+  cursor.value = history.value.length - 1
 }
-onNodesInitialized(() => {
-  if (!fitPending) return
-  fitPending = false
-  fitView({ padding: 0.15, maxZoom: 1.2 })
-})
 
-// 节点和边的响应式数据
-// 显式标注成 Ref<Node[]>，不走 ref<T>() 的 UnwrapRef 推导 —— vue-flow 的
-// Node/Edge 嵌套很深，让 TS 去调和两种形态会直接撞上「实例化层级过深」
-const nodes = ref([]) as Ref<Node[]>
-const edges = ref([]) as Ref<Edge[]>
+function resetHistory() {
+  history.value = [JSON.stringify(doc.value)]
+  cursor.value = 0
+}
 
-// 历史记录管理
-const { canUndo, canRedo, resetHistory, saveState, undo, redo } = useHistory()
+function restore(index: number) {
+  const state = history.value[index]
+  if (state === undefined) return
+  cursor.value = index
+  doc.value = JSON.parse(state) as FlowDoc
+  deselect()
+}
+
+function undo() {
+  commitText()
+  if (canUndo.value) restore(cursor.value - 1)
+}
+
+function redo() {
+  commitText()
+  if (canRedo.value) restore(cursor.value + 1)
+}
+
+// ==================== 草稿 ====================
 
 const problemStore = useProblemStore()
-const { problem } = storeToRefs(problemStore)
 const route = useRoute()
 /**
- * 缓存管理：用 computed key 支持题目 ID 异步加载后自动切换到正确的 storage。
- * 题单入口单独一份草稿：加入题单之前在题库里画到 A 的那张，不能一进题单就摆在画布上
- * （设计文档第 11 节 3，和代码草稿同理）
+ * 每道题一份草稿；题单入口单独一份：加入题单之前在题库里画到 A 的那张，不能一进题单就
+ * 摆在画布上（设计文档第 11 节 3，和代码草稿同理）。
+ * 键名带 v2：2026-10 之前的草稿是 vue-flow 的格式，这里读不了，也不去覆盖它
  */
 const cacheKey = computed(() => {
-  if (!problem.value?._id) return "flowchart-editor-data"
-  const base = `flowchart-editor-data-problem-${problem.value._id}`
+  const id = problemStore.problem?._id
+  if (!id) return "flowchart-v2"
+  const base = `flowchart-v2-problem-${id}`
   const problemSetId = route.params.problemSetId
   return problemSetId ? `${base}-problemset-${problemSetId}` : base
 })
-const { isSaving, lastSaved, hasUnsavedChanges, saveToCache, loadFromCache, clearCache } = useCache(
-  nodes,
-  edges,
-  cacheKey,
+
+const savedAt = ref<Date | null>(null)
+
+function loadDraft() {
+  let saved: unknown = null
+  try {
+    saved = storage.get(cacheKey.value)
+  } catch {
+    saved = null
+  }
+  const record = saved as { doc?: unknown; savedAt?: string } | null
+  const parsed = parseDoc(record?.doc)
+  doc.value = parsed ?? emptyDoc()
+  savedAt.value = parsed && record?.savedAt ? new Date(record.savedAt) : null
+  deselect()
+  resetHistory()
+  fitSoon()
+}
+
+const saveDraft = useDebounceFn((key: string) => {
+  // 换题之后才到点的这一下是上一道题的，别写进新题的键
+  if (key !== cacheKey.value) return
+  try {
+    if (doc.value.steps.length) {
+      const now = new Date()
+      storage.set(key, { doc: doc.value, savedAt: now.toISOString() })
+      savedAt.value = now
+    } else {
+      storage.remove(key)
+      savedAt.value = null
+    }
+  } catch {
+    // 本地存储满了或者被禁用：画布照常能画，只是刷新会丢
+  }
+}, 400)
+
+let loading = false
+watch(
+  doc,
   () => {
-    // 换题后画布已经被换成新题的草稿，历史必须跟着重建，
-    // 否则一次撤销就会把上一题的图还原到这一题里
-    resetHistory(nodes.value, edges.value)
-    fitSoon()
+    if (loading) return
+    saveDraft(cacheKey.value)
   },
+  { deep: true },
 )
 
-// 拖拽处理
-const { onDragOver, onDragLeave, onDrop, isDragOver, screenDragPos } = useDnD()
+watch(cacheKey, () => {
+  loading = true
+  loadDraft()
+  nextTick(() => (loading = false))
+})
 
-const dragPreviewStyle = computed(() => {
-  if (!screenDragPos.value || !currentDragNodeType.value) return null
-  const config = getNodeTypeConfig(currentDragNodeType.value)
-  const type = currentDragNodeType.value
-  return {
-    left: `${screenDragPos.value.x}px`,
-    top: `${screenDragPos.value.y}px`,
-    background: config.color,
-    borderRadius: type === "start" || type === "end" ? "20px" : "8px",
+// ==================== 排版与视口 ====================
+
+const viewport = useTemplateRef<HTMLElement>("viewport")
+const { width: viewW, height: viewH } = useElementSize(viewport)
+
+/** 量字宽用的画布。字体跟着编辑器自己的（Naive 的全局字体），量出来和 SVG 里画的一致 */
+let measureCtx: CanvasRenderingContext2D | null = null
+const fontFamily = ref("")
+function measure(text: string) {
+  if (measureCtx) return measureCtx.measureText(text).width
+  let w = 0
+  for (const ch of text) w += ch.charCodeAt(0) > 0x2e80 ? 14 : 7.8
+  return w
+}
+
+const layout = computed(() => {
+  // 字体就位之后重排一次
+  void fontFamily.value
+  return layoutDoc(doc.value, measure)
+})
+
+const zoom = ref(1)
+const pan = ref({ x: 0, y: 0 })
+const MIN_ZOOM = 0.4
+const MAX_ZOOM = 1.6
+
+function clampZoom(value: number) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100))
+}
+
+/**
+ * 缩放到正好装下整张图（最多 100%），横向居中、靠上。
+ * 进页面、载回旧版时（auto）高度方向最多缩到 85%：机房 1366×768 的屏上画布只有五百来像素高，
+ * 十几个框的图（蜜橘分拣是 p90）整张塞进去字只剩 10px，宁可往下滚。左下角的按钮是真的整张装下
+ */
+function fit(auto = false) {
+  const vw = viewW.value
+  const vh = viewH.value
+  if (!vw || !vh) return
+  const { width, height: h } = layout.value
+  const byHeight = (vh - 16) / h
+  zoom.value = clampZoom(Math.min(1, (vw - 24) / width, auto ? Math.max(byHeight, 0.85) : byHeight))
+  pan.value = { x: (vw - width * zoom.value) / 2, y: 8 }
+}
+
+/** 进页面、换题、载回旧版：等视口量出尺寸再缩放 */
+let fitPending = false
+function fitSoon() {
+  fitPending = true
+  nextTick(() => {
+    if (fitPending && viewW.value && viewH.value) {
+      fitPending = false
+      fit(true)
+    }
+  })
+}
+watch([viewW, viewH], () => {
+  if (fitPending && viewW.value && viewH.value) {
+    fitPending = false
+    fit(true)
   }
 })
 
-// 流程操作
-const {
-  handleConnect,
-  handleEdgeClick,
-  handleNodeDelete,
-  handleNodeUpdate,
-  clearCanvas,
-  deleteSelected,
-} = useFlowOperations(nodes, edges, addEdges, removeNodes, removeEdges, saveState)
+/**
+ * 加了一步之后整张图会重排：左边长出一个分支，中线就往右挪。画布不跟着挪的话，
+ * 学生刚点的那个位置会在眼前跳走。这里把中线（开始那个框）钉在屏幕上原来的位置
+ */
+const startX = computed(() => {
+  const start = layout.value.nodes.find((n) => n.kind === "start")
+  return start ? start.x + start.w / 2 : 0
+})
+watch(startX, (next, prev) => {
+  if (fitPending || prev === undefined) return
+  pan.value = { ...pan.value, x: pan.value.x - (next - prev) * zoom.value }
+})
 
-const handleDrop = async (event: DragEvent) => {
-  const newNode = onDrop(event)
-  if (newNode) {
-    await nextTick()
-    saveState(nodes.value, edges.value)
-  }
+function zoomAt(next: number, sx: number, sy: number) {
+  const z = clampZoom(next)
+  const k = z / zoom.value
+  pan.value = { x: sx - (sx - pan.value.x) * k, y: sy - (sy - pan.value.y) * k }
+  zoom.value = z
 }
 
-// 撤销/重做处理
-const handleUndo = () => {
-  const state = undo()
-  if (state) {
-    nodes.value = state.nodes
-    edges.value = state.edges
-    saveToCache()
-  }
+function zoomBy(delta: number) {
+  zoomAt(zoom.value + delta, viewW.value / 2, viewH.value / 2)
 }
 
-const handleRedo = () => {
-  const state = redo()
-  if (state) {
-    nodes.value = state.nodes
-    edges.value = state.edges
-    saveToCache()
-  }
-}
-
-// 清空画布。工具栏那个按钮点一下就全没了，且 clearCache() 会连本题存着的草稿
-// 一起删掉，刷新也找不回来 —— 学生误点的代价太大，加一道确认
-const dialog = useDialog()
-const handleClear = () => {
-  if (nodes.value.length === 0 && edges.value.length === 0) return
-  dialog.warning({
-    title: "清空画布",
-    content: "画布上的内容会被清掉，这道题存着的草稿也会一起删除。确定吗？",
-    positiveText: "清空",
-    negativeText: "再想想",
-    onPositiveClick: () => {
-      clearCanvas()
-      clearCache()
-    },
-  })
-}
-
-// 键盘事件
-const handleKeyDown = (event: KeyboardEvent) => {
-  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
-    return
-
-  if (event.key === "Delete" || event.key === "Backspace") {
-    deleteSelected()
-  }
-
+function onWheel(event: WheelEvent) {
   if (event.ctrlKey || event.metaKey) {
-    const key = event.key.toLowerCase()
-    if (key === "z" && !event.shiftKey) {
-      event.preventDefault()
-      handleUndo()
-    } else if ((key === "z" && event.shiftKey) || key === "y") {
-      // 工具栏上的提示写的就是 Ctrl+Y，但原来只实现了 Ctrl+Shift+Z，按 Y 没反应
-      event.preventDefault()
-      handleRedo()
+    const rect = viewport.value!.getBoundingClientRect()
+    zoomAt(
+      zoom.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1),
+      event.clientX - rect.left,
+      event.clientY - rect.top,
+    )
+    return
+  }
+  const dx = event.shiftKey ? event.deltaY : event.deltaX
+  const dy = event.shiftKey ? 0 : event.deltaY
+  pan.value = { x: pan.value.x - dx, y: pan.value.y - dy }
+  menuSlot.value = null
+}
+
+/** 按住空白处拖动画布；没怎么动就算点了一下空白：取消选中、收起菜单 */
+let drag: { x: number; y: number; px: number; py: number; moved: boolean; id: number } | null = null
+const dragging = ref(false)
+function onPointerDown(event: PointerEvent) {
+  if (event.button !== 0) return
+  drag = {
+    x: event.clientX,
+    y: event.clientY,
+    px: pan.value.x,
+    py: pan.value.y,
+    moved: false,
+    id: event.pointerId,
+  }
+  viewport.value?.setPointerCapture(event.pointerId)
+}
+function onPointerMove(event: PointerEvent) {
+  if (!drag || drag.id !== event.pointerId) return
+  const dx = event.clientX - drag.x
+  const dy = event.clientY - drag.y
+  if (!drag.moved && Math.hypot(dx, dy) < 4) return
+  drag.moved = true
+  dragging.value = true
+  pan.value = { x: drag.px + dx, y: drag.py + dy }
+}
+function onPointerUp(event: PointerEvent) {
+  if (!drag || drag.id !== event.pointerId) return
+  const moved = drag.moved
+  drag = null
+  dragging.value = false
+  if (!moved) {
+    menuSlot.value = null
+    deselect()
+  }
+}
+
+/** 某个框在不在视口里，不在就挪到看得见 */
+function reveal(id: string) {
+  const node = layout.value.nodes.find((n) => n.id === id)
+  if (!node) return
+  const margin = 40
+  const z = zoom.value
+  const left = pan.value.x + node.x * z
+  const right = pan.value.x + (node.x + node.w) * z
+  const top = pan.value.y + node.y * z
+  const bottom = pan.value.y + (node.y + node.h) * z
+  let { x, y } = pan.value
+  if (bottom > viewH.value - margin) y -= bottom - (viewH.value - margin)
+  if (top < margin) y += margin - top
+  if (right > viewW.value - margin) x -= right - (viewW.value - margin)
+  if (left < margin) x += margin - left
+  pan.value = { x, y }
+}
+
+// ==================== 插一步 ====================
+
+const menuSlot = ref<LaidSlot | null>(null)
+const MENU: { kind: StepKind }[] = [
+  { kind: "input" },
+  { kind: "output" },
+  { kind: "process" },
+  { kind: "if" },
+  { kind: "while" },
+]
+const MENU_W = 300
+const MENU_H = 62
+
+const menuStyle = computed(() => {
+  const slot = menuSlot.value
+  if (!slot) return {}
+  const sx = pan.value.x + slot.x * zoom.value
+  const sy = pan.value.y + slot.y * zoom.value
+  let left = sx - MENU_W / 2
+  let top = sy + 16
+  left = Math.max(8, Math.min(left, viewW.value - MENU_W - 8))
+  if (top + MENU_H > viewH.value - 8) top = sy - 16 - MENU_H
+  return { left: `${left}px`, top: `${top}px`, width: `${MENU_W}px` }
+})
+
+function openMenu(slot: LaidSlot) {
+  commitText()
+  deselect()
+  menuSlot.value = menuSlot.value?.key === slot.key ? null : slot
+}
+
+function insert(kind: StepKind) {
+  const slot = menuSlot.value?.slot
+  menuSlot.value = null
+  if (!slot) return
+  const step = insertStep(doc.value, slot, kind)
+  if (!step) return
+  snapshot()
+  select(step.id)
+  justInserted = step.id
+  nextTick(() => reveal(step.id))
+}
+
+// ==================== 选中、改字、删除 ====================
+
+const selectedId = ref<string | null>(null)
+const selected = computed(() =>
+  selectedId.value ? (layout.value.nodes.find((n) => n.id === selectedId.value) ?? null) : null,
+)
+const textInput = useTemplateRef<HTMLInputElement>("textInput")
+/** 开始改字前的字，按 Esc 还原 */
+let textBefore = ""
+/** 刚从菜单里加上的那一步 */
+let justInserted: string | null = null
+
+function editable(node: LaidNode) {
+  return node.kind !== "start" && node.kind !== "end"
+}
+
+function select(id: string) {
+  commitText()
+  menuSlot.value = null
+  const found = findStep(doc.value.steps, id)
+  if (!found) return
+  selectedId.value = id
+  textBefore = found.step.text
+  nextTick(() => textInput.value?.focus())
+}
+
+function onNodeClick(node: LaidNode) {
+  if (!editable(node)) {
+    menuSlot.value = null
+    deselect()
+    return
+  }
+  if (selectedId.value !== node.id) select(node.id)
+}
+
+const selectedText = computed({
+  get: () =>
+    selectedId.value ? (findStep(doc.value.steps, selectedId.value)?.step.text ?? "") : "",
+  set: (value: string) => {
+    const found = selectedId.value ? findStep(doc.value.steps, selectedId.value) : null
+    if (found) found.step.text = value
+  },
+})
+
+/** 字改完了：进历史 */
+function commitText() {
+  if (!selectedId.value) return
+  const found = findStep(doc.value.steps, selectedId.value)
+  if (found && found.step.text !== textBefore) {
+    found.step.text = found.step.text.replace(/\s+/g, " ").trim()
+    textBefore = found.step.text
+    snapshot()
+  }
+}
+
+function deselect() {
+  commitText()
+  selectedId.value = null
+}
+
+function onTextKey(event: KeyboardEvent) {
+  if (event.key === "Enter") {
+    event.preventDefault()
+    deselect()
+  } else if (event.key === "Escape") {
+    // 刚加上、一个字没写就按 Esc：当它没加过（连历史那一格一起撤掉）
+    if (selectedId.value === justInserted && !selectedText.value.trim()) {
+      selectedId.value = null
+      restore(cursor.value - 1)
+      history.value = history.value.slice(0, cursor.value + 1)
+      return
     }
+    selectedText.value = textBefore
+    selectedId.value = null
+  }
+}
+
+function removeSelected() {
+  const id = selectedId.value
+  if (!id) return
+  commitText()
+  selectedId.value = null
+  const count = removeStep(doc.value, id)
+  if (!count) return
+  snapshot()
+  if (count > 1) message.info(`删掉了 ${count} 个框，按 Ctrl+Z 可以撤回`)
+}
+
+/** 判断 / 循环里的字框要比外框窄，免得打字时字跑出菱形 */
+function inputBox(node: LaidNode) {
+  const inset =
+    node.kind === "if" || node.kind === "while" ? node.w * 0.22 : node.kind === "process" ? 8 : 16
+  return {
+    left: `${node.x + inset}px`,
+    top: `${node.y}px`,
+    width: `${node.w - inset * 2}px`,
+    height: `${node.h}px`,
+  }
+}
+
+function clear() {
+  if (!doc.value.steps.length) return
+  doc.value = emptyDoc()
+  deselect()
+  snapshot()
+}
+
+// ==================== 键盘 ====================
+
+function onKeyDown(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target?.isContentEditable
+  )
+    return
+  if (event.key === "Escape" && menuSlot.value) {
+    menuSlot.value = null
+    return
+  }
+  if (!(event.ctrlKey || event.metaKey)) return
+  const key = event.key.toLowerCase()
+  if (key === "z" && !event.shiftKey) {
+    event.preventDefault()
+    undo()
+  } else if ((key === "z" && event.shiftKey) || key === "y") {
+    event.preventDefault()
+    redo()
   }
 }
 
 onMounted(() => {
-  document.addEventListener("keydown", handleKeyDown)
-
-  // 从缓存恢复数据，并把当前画布作为历史起点，
-  // 否则第一步操作没有可回退的目标，撤销按钮一直是灰的
-  loadFromCache()
-  resetHistory(nodes.value, edges.value)
-  fitSoon()
+  const family = getComputedStyle(viewport.value!).fontFamily
+  measureCtx = document.createElement("canvas").getContext("2d")
+  if (measureCtx) measureCtx.font = `14px ${family}`
+  fontFamily.value = family
+  loading = true
+  loadDraft()
+  nextTick(() => (loading = false))
+  document.addEventListener("keydown", onKeyDown)
 })
+onUnmounted(() => document.removeEventListener("keydown", onKeyDown))
 
-onUnmounted(() => {
-  document.removeEventListener("keydown", handleKeyDown)
-})
+// ==================== 颜色 ====================
 
-// 加载外部数据到编辑器
-const setFlowchartData = (data: { nodes: Node[]; edges: Edge[] }) => {
-  if (data && data.nodes && data.edges) {
-    // 确保节点数据包含必要的位置信息
-    const processedNodes = data.nodes.map((node) => ({
-      ...node,
-      position: node.position || { x: 0, y: 0 },
-    }))
+type Paint = { fill: string; stroke: string; text: string }
+const paints = computed<Record<string, Paint>>(() =>
+  isDark.value
+    ? {
+        terminal: { fill: "rgba(24,160,88,0.16)", stroke: "#3fbf7f", text: "#8fe0b4" },
+        io: { fill: "rgba(70,130,220,0.18)", stroke: "#5b8fdc", text: "#a9c6f2" },
+        process: { fill: "#26272b", stroke: "#8a8f98", text: "#e6e7ea" },
+        decision: { fill: "rgba(208,138,28,0.18)", stroke: "#e0a040", text: "#f2cd8c" },
+      }
+    : {
+        terminal: { fill: "#eef8f2", stroke: "#18a058", text: "#0c6b3b" },
+        io: { fill: "#eef4fd", stroke: "#2f6bc4", text: "#1d4f9c" },
+        process: { fill: "#ffffff", stroke: "#7d828a", text: "#1f2225" },
+        decision: { fill: "#fdf5e6", stroke: "#d08a1c", text: "#8a5200" },
+      },
+)
+function paint(kind: LaidNode["kind"]) {
+  if (kind === "start" || kind === "end") return paints.value.terminal!
+  if (kind === "input" || kind === "output") return paints.value.io!
+  if (kind === "if" || kind === "while") return paints.value.decision!
+  return paints.value.process!
+}
+const lineColor = computed(() => (isDark.value ? "#8a8f98" : "#7d828a"))
+const dotColor = computed(() => (isDark.value ? "#34363b" : "#e3e5e8"))
 
-    // 确保边数据包含必要的 handle 信息
-    const processedEdges = data.edges.map((edge) => ({
-      ...edge,
-      sourceHandle: edge.sourceHandle || null,
-      targetHandle: edge.targetHandle || null,
-    }))
-
-    nodes.value = processedNodes
-    edges.value = processedEdges
-    saveState(nodes.value, edges.value)
-    fitSoon()
-  }
+function shapePoints(node: LaidNode) {
+  const { x, y, w, h } = node
+  if (node.kind === "if" || node.kind === "while")
+    return `${x + w / 2},${y} ${x + w},${y + h / 2} ${x + w / 2},${y + h} ${x},${y + h / 2}`
+  const s = 10
+  return `${x + s},${y} ${x + w},${y} ${x + w - s},${y + h} ${x},${y + h}`
 }
 
-// 暴露节点和边数据给父组件
-defineExpose({
-  nodes,
-  edges,
-  // 提交出去的这份会压缩后长期存进数据库，同样裁掉运行时内部字段
-  getFlowchartData: () => ({
-    nodes: toPortableNodes(nodes.value),
-    edges: toPortableEdges(edges.value),
-  }),
-  setFlowchartData,
-})
+function nodeLabel(node: LaidNode) {
+  if (node.kind === "start" || node.kind === "end") return node.text
+  return node.text.trim() || PLACEHOLDER[node.kind]
+}
+
+/** 菜单里的小图标：和画布上同一套形状 */
+function miniPoints(kind: StepKind) {
+  if (kind === "input" || kind === "output") return "6,2 25,2 20,14 1,14"
+  if (kind === "if") return "13,1 25,8 13,15 1,8"
+  return "15,1 25,6 15,11 5,6"
+}
+
+// ==================== 对外 ====================
+
+/**
+ * 交出去 / 和某一版比：一份拷贝，外面改不到画布。不顺手 commitText —— 结果页签在 computed
+ * 里读它，读一下就往历史里塞一格是副作用；正在打的字本来就已经写进 doc 了
+ */
+function getDoc(): FlowDoc {
+  return cloneDoc(doc.value)
+}
+
+/** 载回某一版。进历史：载错了 Ctrl+Z 能回来 */
+function setDoc(next: FlowDoc) {
+  doc.value = cloneDoc(next)
+  deselect()
+  snapshot()
+  fitSoon()
+}
+
+defineExpose({ getDoc, setDoc, undo, redo, clear, canUndo, canRedo, savedAt })
 </script>
 
 <template>
-  <div class="container" :style="{ height }">
-    <!-- 拖拽时跟随鼠标的节点预览 -->
-    <Transition name="drag-preview">
-      <div
-        v-if="isDragOver && dragPreviewStyle && currentDragNodeType"
-        class="drag-node-preview"
-        :style="dragPreviewStyle"
-      >
-        <span class="preview-icon">{{ getNodeTypeConfig(currentDragNodeType).icon }}</span>
-        <span>{{ getNodeTypeConfig(currentDragNodeType).label }}</span>
-      </div>
-    </Transition>
-    <VueFlow
-      v-model:nodes="nodes"
-      v-model:edges="edges"
-      @dragover="onDragOver"
-      @dragleave="onDragLeave"
-      @drop="handleDrop"
-      @connect="handleConnect"
-      @edge-click="handleEdgeClick"
-      :default-edge-options="{
-        type: 'default',
-        style: {
-          stroke: '#6366f1',
-          strokeWidth: 2.5,
-          cursor: 'pointer',
-          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: '#6366f1',
-          width: 16,
-          height: 16,
-        },
+  <div
+    ref="viewport"
+    class="flow-editor"
+    :class="{ panning: dragging }"
+    :style="{ height }"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+    @wheel.prevent="onWheel"
+  >
+    <div
+      class="stage"
+      :style="{
+        width: `${layout.width}px`,
+        height: `${layout.height}px`,
+        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
       }"
-      :connection-line-style="{
-        stroke: '#6366f1',
-        strokeWidth: 2.5,
-        strokeDasharray: '8,4',
-        markerEnd: 'url(#connection-arrow)',
-        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-      }"
-      :fit-view-on-init="false"
-      :connect-on-click="false"
-      :multi-selection-key-code="null"
-      :delete-key-code="null"
     >
-      <!-- SVG 定义用于连接线箭头 -->
-      <defs>
-        <marker
-          id="connection-arrow"
-          markerWidth="12"
-          markerHeight="12"
-          refX="10"
-          refY="3"
-          orient="auto"
-          markerUnits="strokeWidth"
-        >
-          <path d="M0,0 L0,6 L10,3 z" fill="#6366f1" stroke="#6366f1" strokeWidth="0.5" />
-        </marker>
-      </defs>
-      <template #node-custom="{ data, id, type }">
-        <CustomNode
-          :id="id"
-          :type="type"
-          :data="data"
-          @delete="handleNodeDelete"
-          @update="handleNodeUpdate"
+      <svg
+        :width="layout.width"
+        :height="layout.height"
+        :viewBox="`0 0 ${layout.width} ${layout.height}`"
+        role="img"
+        aria-label="流程图"
+        class="chart"
+      >
+        <defs>
+          <marker
+            id="flow-arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="5.5"
+            markerHeight="5.5"
+            orient="auto-start-reverse"
+          >
+            <path d="M0 0L10 5L0 10z" :fill="lineColor" />
+          </marker>
+        </defs>
+        <path
+          v-for="(d, i) in layout.lines"
+          :key="`l${i}`"
+          :d="d"
+          fill="none"
+          :stroke="lineColor"
+          stroke-width="1.6"
         />
-      </template>
+        <path
+          v-for="(d, i) in layout.arrows"
+          :key="`a${i}`"
+          :d="d"
+          fill="none"
+          :stroke="lineColor"
+          stroke-width="1.6"
+          marker-end="url(#flow-arrow)"
+        />
+        <circle
+          v-for="(p, i) in layout.dots"
+          :key="`d${i}`"
+          :cx="p.x"
+          :cy="p.y"
+          r="2.6"
+          :fill="lineColor"
+        />
+        <text
+          v-for="(t, i) in layout.labels"
+          :key="`t${i}`"
+          :x="t.x"
+          :y="t.y"
+          :text-anchor="t.anchor"
+          class="branch-label"
+        >
+          {{ t.text }}
+        </text>
+        <g
+          v-for="node in layout.nodes"
+          :key="node.id"
+          class="node"
+          :class="{ editable: editable(node), selected: node.id === selectedId }"
+          @pointerdown.stop
+          @click.stop="onNodeClick(node)"
+        >
+          <rect
+            v-if="node.kind === 'start' || node.kind === 'end'"
+            :x="node.x"
+            :y="node.y"
+            :width="node.w"
+            :height="node.h"
+            :rx="node.h / 2"
+            :fill="paint(node.kind).fill"
+            :stroke="paint(node.kind).stroke"
+            stroke-width="1.6"
+          />
+          <rect
+            v-else-if="node.kind === 'process'"
+            :x="node.x"
+            :y="node.y"
+            :width="node.w"
+            :height="node.h"
+            rx="2"
+            :fill="paint(node.kind).fill"
+            :stroke="paint(node.kind).stroke"
+            stroke-width="1.6"
+          />
+          <polygon
+            v-else
+            :points="shapePoints(node)"
+            :fill="paint(node.kind).fill"
+            :stroke="paint(node.kind).stroke"
+            stroke-width="1.6"
+          />
+          <text
+            v-if="node.id !== selectedId"
+            :x="node.x + node.w / 2"
+            :y="node.y + node.h / 2 + 5"
+            text-anchor="middle"
+            :fill="paint(node.kind).text"
+            :class="{ placeholder: editable(node) && !node.text.trim() }"
+          >
+            {{ nodeLabel(node) }}
+          </text>
+        </g>
+      </svg>
 
-      <Background variant="lines" :gap="20" :size="1" />
-      <Controls />
-      <Toolbar
-        :can-undo="canUndo"
-        :can-redo="canRedo"
-        :is-saving="isSaving"
-        :last-saved="lastSaved"
-        :has-unsaved-changes="hasUnsavedChanges"
-        @clear="handleClear"
-        @undo="handleUndo"
-        @redo="handleRedo"
-        @deleteNode="handleNodeDelete"
-      />
-    </VueFlow>
+      <button
+        v-for="slot in layout.slots"
+        :key="slot.key"
+        type="button"
+        class="slot"
+        :class="{ active: menuSlot?.key === slot.key, lone: !doc.steps.length }"
+        :style="{ left: `${slot.x}px`, top: `${slot.y}px` }"
+        aria-label="在这里加一步"
+        @pointerdown.stop
+        @click.stop="openMenu(slot)"
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+          <path d="M1 5H9M5 1V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </svg>
+      </button>
+
+      <template v-if="selected">
+        <input
+          ref="textInput"
+          v-model="selectedText"
+          class="text-input"
+          :style="inputBox(selected)"
+          :placeholder="PLACEHOLDER[selected.kind as StepKind]"
+          :aria-label="`${STEP_LABEL[selected.kind as StepKind]}框里的字`"
+          maxlength="60"
+          @pointerdown.stop
+          @keydown="onTextKey"
+          @blur="commitText"
+        />
+        <div
+          class="node-bar"
+          :style="{
+            left: `${selected.x + selected.w - 24}px`,
+            top: `${selected.y - 4}px`,
+          }"
+          @pointerdown.stop
+        >
+          <button type="button" class="remove" @mousedown.prevent @click="removeSelected">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13" />
+            </svg>
+            删除
+          </button>
+        </div>
+      </template>
+    </div>
+
+    <div
+      v-if="menuSlot"
+      class="insert-menu"
+      :style="menuStyle"
+      role="menu"
+      aria-label="加一步"
+      @pointerdown.stop
+    >
+      <button
+        v-for="item in MENU"
+        :key="item.kind"
+        type="button"
+        role="menuitem"
+        class="insert-item"
+        @click="insert(item.kind)"
+      >
+        <svg width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+          <rect
+            v-if="item.kind === 'process'"
+            x="2"
+            y="2"
+            width="22"
+            height="12"
+            rx="1"
+            :fill="paint('process').fill"
+            :stroke="paint('process').stroke"
+            stroke-width="1.4"
+          />
+          <polygon
+            v-else
+            :points="miniPoints(item.kind)"
+            :fill="paint(item.kind).fill"
+            :stroke="paint(item.kind).stroke"
+            stroke-width="1.4"
+          />
+          <path
+            v-if="item.kind === 'while'"
+            d="M15 11v3H2V6h3"
+            fill="none"
+            :stroke="lineColor"
+            stroke-width="1.2"
+          />
+        </svg>
+        <span>{{ STEP_LABEL[item.kind] }}</span>
+      </button>
+    </div>
+
+    <div class="zoom" @pointerdown.stop>
+      <button type="button" aria-label="放大" @click="zoomBy(0.1)">+</button>
+      <button type="button" aria-label="缩小" @click="zoomBy(-0.1)">−</button>
+      <button type="button" aria-label="缩放到合适" @click="fit()">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.container {
-  width: 100%;
-  height: 100%;
+.flow-editor {
   position: relative;
-}
-
-.drag-node-preview {
-  position: fixed;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 9999;
-  padding: 8px 18px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  opacity: 0.55;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  white-space: nowrap;
-  border: 2px dashed rgba(255, 255, 255, 0.6);
+  width: 100%;
+  overflow: hidden;
+  background-color: v-bind("theme.cardColor");
+  background-image: radial-gradient(v-bind("dotColor") 1px, transparent 1px);
+  background-size: 16px 16px;
+  cursor: grab;
+  touch-action: none;
   user-select: none;
 }
 
-.preview-icon {
-  font-size: 16px;
+.flow-editor.panning {
+  cursor: grabbing;
 }
 
-.drag-preview-enter-active,
-.drag-preview-leave-active {
-  transition: opacity 0.1s ease;
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
 }
-.drag-preview-enter-from,
-.drag-preview-leave-to {
-  opacity: 0;
+
+.chart {
+  display: block;
+  font-family: inherit;
+  font-size: 14px;
+  overflow: visible;
+}
+
+.branch-label {
+  font-size: 13px;
+  fill: v-bind("theme.textColor2");
+}
+
+.node.editable {
+  cursor: pointer;
+}
+
+.node:not(.editable) {
+  cursor: default;
+}
+
+.node.editable:hover > rect,
+.node.editable:hover > polygon {
+  stroke-width: 2.4;
+}
+
+.node.selected > rect,
+.node.selected > polygon {
+  stroke: #18a058;
+  stroke-width: 2.6;
+}
+
+.placeholder {
+  opacity: 0.5;
+}
+
+.slot {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  padding: 0;
+  border: 1.2px solid v-bind("theme.borderColor");
+  border-radius: 50%;
+  background: v-bind("theme.cardColor");
+  color: v-bind("theme.textColor3");
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.slot:hover,
+.slot:focus-visible,
+.slot.lone {
+  border-color: #18a058;
+  color: #18a058;
+}
+
+.slot.lone {
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+}
+
+.slot.active {
+  border-color: #18a058;
+  background: #18a058;
+  color: #fff;
+}
+
+.text-input {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  text-align: center;
+  color: v-bind("theme.textColor1");
+  user-select: text;
+}
+
+.text-input::placeholder {
+  color: v-bind("theme.textColor3");
+}
+
+/* 浮在框的右上方：放右边会盖住判断的「否」，放正上方会盖住进来的那个 + */
+.node-bar {
+  position: absolute;
+  transform: translateY(-100%);
+  display: flex;
+  padding: 3px;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  background: v-bind("theme.cardColor");
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.remove {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  color: v-bind("theme.errorColor");
+  cursor: pointer;
+}
+
+.remove:hover {
+  background: rgba(208, 48, 80, 0.08);
+}
+
+.insert-menu {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  background: v-bind("theme.cardColor");
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  cursor: default;
+}
+
+.insert-item {
+  flex: 1;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: v-bind("theme.textColor1");
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.insert-item:hover,
+.insert-item:focus-visible {
+  background: rgba(24, 160, 88, 0.1);
+}
+
+.zoom {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 4px;
+  background: v-bind("theme.cardColor");
+  overflow: hidden;
+  cursor: default;
+}
+
+.zoom button {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: v-bind("theme.textColor2");
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.zoom button + button {
+  border-top: 1px solid v-bind("theme.dividerColor");
+}
+
+.zoom button:hover {
+  color: #18a058;
 }
 </style>

@@ -17,6 +17,7 @@ import { openStatistics, useEditorMenu } from "../composables/editorMenu"
 import { useTeacherCollab } from "../composables/teacherCollab"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
+const FlowchartControls = defineAsyncComponent(() => import("./FlowchartControls.vue"))
 
 const collabStore = useCollabStore()
 
@@ -210,6 +211,8 @@ const changeLanguage = (v: LANGUAGE) => {
     <SubmitCode v-else-if="isDesktop" />
 
     <div class="spacer" />
+
+    <FlowchartControls v-if="drawing && isDesktop" />
 
     <n-button
       v-if="showHelpButton"

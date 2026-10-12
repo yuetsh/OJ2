@@ -2,7 +2,7 @@ import { createDiscreteApi } from "naive-ui"
 import { defineStore } from "pinia"
 import { errorCode } from "utils/api"
 import { isFlowchartPass, type FlowchartScores, type FlowchartSubmission } from "@oj2/contract"
-import type { Edge, Node } from "@vue-flow/core"
+import type { FlowDoc } from "shared/components/FlowchartEditor/model"
 import { getFlowchartScores, getFlowchartSubmission, submitFlowchart } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
@@ -22,10 +22,16 @@ export interface FlowchartRating {
 
 type Outcome = { ok: true; score: number; grade: string } | { ok: false; error?: string }
 
-/** 编辑器对外的两个方法（FlowchartEditor 的 defineExpose） */
+/** 编辑器对外的东西（FlowchartEditor 的 defineExpose；ref 经组件实例读出来已经解包） */
 export interface FlowchartEditorInstance {
-  getFlowchartData: () => { nodes: unknown[]; edges: unknown[] }
-  setFlowchartData: (data: { nodes: Node[]; edges: Edge[] }) => void
+  getDoc: () => FlowDoc
+  setDoc: (doc: FlowDoc) => void
+  undo: () => void
+  redo: () => void
+  clear: () => void
+  canUndo: boolean
+  canRedo: boolean
+  savedAt: Date | null
 }
 
 // 「A / S 算做完」的规则在契约里，前后端一份；这里转出去，组件照旧从 flowchart store 引

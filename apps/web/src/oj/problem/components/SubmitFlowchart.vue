@@ -2,7 +2,7 @@
 import { storeToRefs } from "pinia"
 import { compressToBase64 } from "utils/functions"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { useMermaidConverter } from "../composables/useMermaidConverter"
+import { countBlank, toMermaid } from "shared/components/FlowchartEditor/model"
 import { useProblemStore } from "oj/store/problem"
 import { useFlowchartStore, type FlowchartEditorInstance } from "oj/store/flowchart"
 
@@ -21,20 +21,22 @@ const { problem } = storeToRefs(useProblemStore())
 const flowchartStore = useFlowchartStore()
 const { loading } = storeToRefs(flowchartStore)
 const { isDesktop } = useBreakpoints()
-const { convertToMermaid } = useMermaidConverter()
 
 function submit() {
   const editor = flowchartEditorRef?.value
   if (!editor) return
-  const flowchartData = editor.getFlowchartData()
-  if (!flowchartData?.nodes?.length || !flowchartData?.edges?.length) {
-    message.warning("画布上还没有图：从左边拖几个框进来，再用线连起来")
+  const doc = editor.getDoc()
+  if (!doc.steps.length) {
+    message.warning("画布上还没有图：点「开始」下面的 +，加第一步")
     return
   }
-  flowchartStore.submit(
-    convertToMermaid(flowchartData),
-    compressToBase64(JSON.stringify(flowchartData)),
-  )
+  // 空框交上去 AI 只能瞎猜，学生也不知道扣分是因为忘了写字
+  const blank = countBlank(doc.steps)
+  if (blank) {
+    message.warning(`有 ${blank} 个框还没写字，点一下框就能写`)
+    return
+  }
+  flowchartStore.submit(toMermaid(doc), compressToBase64(JSON.stringify(doc)))
 }
 
 // 进题、换题都读一次历次分数（store 里同一道题只读一次）

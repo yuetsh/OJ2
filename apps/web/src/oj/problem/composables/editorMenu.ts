@@ -9,6 +9,7 @@ import { compressToBase64, copyToClipboard } from "utils/functions"
 import storage from "utils/storage"
 import { useDraftKey } from "./draftKey"
 import { useTeacherCollab } from "./teacherCollab"
+import { useFlowchartStore } from "oj/store/flowchart"
 import { useProblemPageContext } from "./problemPageContext"
 
 /**
@@ -48,7 +49,9 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
     if (ctx.value.classStats && !statisticsInline.value && userStore.isTeacherOrAbove) {
       items.push({ label: "课堂统计", key: "statistics" })
     }
-    if (codeStore.code.language !== "Flowchart") {
+    if (codeStore.code.language === "Flowchart") {
+      items.push({ label: "清空画布", key: "clearFlowchart" })
+    } else {
       if (codeStore.code.language !== "SQL") items.push({ label: "去自测猫", key: "testcat" })
       items.push({ label: "复制代码", key: "copy" })
       // 协作中的教师不给「重置代码」：那会儿编辑器里是**学生的**代码，而 v-model
@@ -76,6 +79,23 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
         codeStore.setCode(problem.value!.template[language] || SOURCES[language])
         storage.remove(draftKey.value)
         message.success("已换回模板，按 Ctrl+Z 可以撤回")
+      },
+    })
+  }
+
+  // 清空会连这道题存着的草稿一起删掉（空图不留草稿），点错了只剩 Ctrl+Z
+  const flowchartStore = useFlowchartStore()
+  function clearFlowchart() {
+    const editor = flowchartStore.editor
+    if (!editor) return
+    dialog.warning({
+      title: "清空画布",
+      content: "画布上的图会全部清掉。确定吗？",
+      positiveText: "清空",
+      negativeText: "再想想",
+      onPositiveClick: () => {
+        editor.clear()
+        message.success("已清空，按 Ctrl+Z 可以撤回")
       },
     })
   }
@@ -123,6 +143,9 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
         return true
       case "reset":
         reset()
+        return true
+      case "clearFlowchart":
+        clearFlowchart()
         return true
       case "edit":
         goEdit()
