@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { EditorView } from "@codemirror/view"
 import { PROBLEM_TAG_MAX_LENGTH, TEST_CASE_MAX_CASES } from "@oj2/contract"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import { StorageSerializers } from "@vueuse/core"
 import { useThemeVars } from "naive-ui"
 import PageHeader from "admin/components/PageHeader.vue"
@@ -56,7 +55,6 @@ const message = useMessage()
 const router = useRouter()
 const theme = useThemeVars()
 const previewCollapsed = usePreviewCollapsed()
-const isDark = useDark()
 
 const isCreate = computed(() => !props.problemID)
 
@@ -680,11 +678,7 @@ onMounted(async () => {
           </n-tag>
         </div>
         <h3 class="title">描述</h3>
-        <MdPreview
-          preview-theme="vuepress"
-          :model-value="form.description"
-          :theme="isDark ? 'dark' : 'light'"
-        />
+        <Markdown html :content="form.description" />
         <p v-if="selected > 0" class="otherGroup">
           学生看到的是第 1 组，下面是第 {{ selected + 1 }} 组跑出来的样子
         </p>
@@ -720,11 +714,7 @@ onMounted(async () => {
         </template>
         <template v-if="!isBlankHtml(form.hint)">
           <h3 class="title sqlTitle">提示</h3>
-          <MdPreview
-            preview-theme="vuepress"
-            :model-value="form.hint"
-            :theme="isDark ? 'dark' : 'light'"
-          />
+          <Markdown html :content="form.hint" />
         </template>
       </div>
     </aside>
@@ -1001,14 +991,6 @@ onMounted(async () => {
 
 .sqlTitle {
   margin-top: 14px;
-}
-
-.page :deep(.md-editor) {
-  background: transparent;
-}
-
-.page :deep(.md-editor-preview-wrapper) {
-  padding: 0;
 }
 
 .otherGroup {

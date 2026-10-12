@@ -33,14 +33,6 @@ body {
   padding-top: 8px;
 }
 
-.md-editor-dark {
-  --md-bk-color: var(--n-body-color) !important;
-}
-
-.md-editor-dark div.vuepress-theme {
-  --md-theme-color: var(--n-text-color) !important;
-}
-
 .oj-mermaid-surface {
   box-sizing: border-box;
   padding: 18px;

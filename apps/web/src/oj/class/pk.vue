@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ClassBattleItem, ClassPk, ClassPkPeriod } from "@oj2/contract"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import { useThemeVars } from "naive-ui"
 import { getClassBattle, getClassPk } from "oj/api"
 import { classLabel, groupClassOptions } from "oj/submission/utils"
@@ -293,7 +292,7 @@ async function analyze() {
             <n-button size="small" :loading="ai.running.value" @click="analyze">重新分析</n-button>
           </div>
           <span v-if="ai.waiting.value" class="muted">正在看这几个班的数据…</span>
-          <MdPreview v-if="report" class="report" :model-value="report" />
+          <Markdown v-if="report" :content="report" />
         </section>
       </template>
       <div v-else-if="!loading" class="card empty">
@@ -516,14 +515,6 @@ button.chip {
 
 .ai-head .muted {
   font-size: var(--oj-fs-meta);
-}
-
-.report {
-  background: transparent;
-}
-
-.report :deep(.md-editor-preview-wrapper) {
-  padding: 0;
 }
 
 .compact .chip {

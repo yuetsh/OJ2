@@ -53,7 +53,7 @@
           </n-descriptions-item>
         </n-descriptions>
         <n-scrollbar style="max-height: 60vh; margin-top: 12px">
-          <MdPreview :model-value="detail.analysis" />
+          <Markdown :content="detail.analysis" />
         </n-scrollbar>
       </div>
     </n-spin>
@@ -62,8 +62,7 @@
 
 <script lang="ts" setup>
 import PageHeader from "admin/components/PageHeader.vue"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { parseTime } from "utils/functions"
 import { getAIReportList, getAIReportDetail, pinAIReport, getPinnedAIReports } from "../api"

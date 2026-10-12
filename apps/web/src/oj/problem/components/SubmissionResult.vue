@@ -23,9 +23,7 @@ import ResultHeader from "./ResultHeader.vue"
 import SimilarProblems from "./SimilarProblems.vue"
 import { useLessonStore } from "oj/store/lesson"
 import { useProblemPageContext } from "../composables/problemPageContext"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
-import { useDark } from "@vueuse/core"
+import Markdown from "shared/components/Markdown.vue"
 
 const props = defineProps<{
   submission?: Submission
@@ -36,7 +34,6 @@ const props = defineProps<{
   peer?: boolean
 }>()
 
-const isDark = useDark()
 const problemStore = useProblemStore()
 const theme = useThemeVars()
 
@@ -390,12 +387,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
     <template v-if="showAIHint && hintTarget">
       <n-card size="small" class="hint-card">
         <n-spin v-if="hintLoading && !hintContent" size="small" />
-        <MdPreview
-          v-if="hintContent"
-          :model-value="hintContent"
-          preview-theme="vuepress"
-          :theme="isDark ? 'dark' : 'light'"
-        />
+        <Markdown v-if="hintContent" :content="hintContent" />
         <!-- 等级和「再多一点提示」。按钮出不出由后端 done 里的 canEscalate 定，
              前端不自己推阶梯（要再交一次才升得动，规则在 services/hint-level.ts） -->
         <n-flex

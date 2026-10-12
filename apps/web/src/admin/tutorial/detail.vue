@@ -203,7 +203,7 @@ onMounted(init)
             <MarkdownEditor
               ref="editor"
               v-model:value="tutorial.content"
-              :preview="false"
+              :code-lang="tutorial.type"
               height="100%"
             />
           </div>
@@ -339,10 +339,6 @@ onMounted(init)
   flex: 0 0 50%;
   min-width: 0;
   border-right: 1px solid rgba(128, 128, 128, 0.22);
-}
-.source :deep(.md-editor) {
-  border: 0;
-  border-radius: 0;
 }
 .preview {
   flex: 0 0 50%;

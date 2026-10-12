@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import type { LessonSegment } from "../composables/useLessonParse"
 import CodeRunBlock from "./CodeRunBlock.vue"
 
@@ -16,9 +15,7 @@ defineProps<{
 }>()
 const emit = defineEmits<{ solved: [exerciseId: number] }>()
 
-const isDark = useDark()
-
-/** 学习目标那几行只有行内的 **加粗** 和 `代码`，先转义再换成标签，别为它拉一个 MdPreview */
+/** 学习目标那几行只有行内的 **加粗** 和 `代码`，先转义再换成标签，别为它拉一整个 Markdown 渲染 */
 function inline(text: string) {
   return text
     .replace(/&/g, "&amp;")
@@ -32,13 +29,7 @@ function inline(text: string) {
 <template>
   <div class="body">
     <template v-for="(seg, i) in segments" :key="i">
-      <MdPreview
-        v-if="seg.type === 'md'"
-        preview-theme="vuepress"
-        :theme="isDark ? 'dark' : 'light'"
-        :model-value="seg.content"
-        class="md"
-      />
+      <Markdown html v-if="seg.type === 'md'" :content="seg.content" />
       <h2 v-else-if="seg.type === 'heading'" :id="seg.id" class="h2">{{ seg.text }}</h2>
       <div v-else-if="seg.type === 'goals'" :id="seg.id" class="goals">
         <div class="goals-title">学完这课你能</div>
@@ -65,15 +56,8 @@ function inline(text: string) {
 
 <style scoped>
 .body {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.85;
-}
-.md :deep(.md-editor-preview) {
-  font-size: 15px;
-  padding: 0;
-}
-.md :deep(.md-editor-preview-wrapper) {
-  padding: 0;
 }
 .h2 {
   font-size: 20px;

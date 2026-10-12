@@ -1,4 +1,4 @@
-/* 练一练代码高亮配色（明 / 暗），由涉及代码高亮的题型组件统一引入 */
+/* 代码高亮配色（明 / 暗）：练一练的题型组件和 Markdown.vue 的代码块共用，见 shared/highlight.ts */
 .hljs-keyword,
 .hljs-operator,
 .hljs-selector-tag {

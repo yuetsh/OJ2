@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import { useThemeVars } from "naive-ui"
 import { useMermaid } from "shared/composables/useMermaid"
 import { DIFFICULTY, SOURCES } from "utils/constants"
@@ -42,7 +41,6 @@ const tab = defineModel<PreviewTab>("tab", { required: true })
 const emit = defineEmits<{ renderState: [ok: boolean]; collapse: [] }>()
 
 const theme = useThemeVars()
-const isDark = useDark()
 
 const isBlankHtml = (html: string) => !html.trim() || html === "<p><br></p>"
 
@@ -154,30 +152,17 @@ onMounted(() => nextTick(render))
       </div>
 
       <h3 class="title">描述</h3>
-      <MdPreview
-        v-if="!isBlankHtml(description)"
-        preview-theme="vuepress"
-        :model-value="description"
-        :theme="isDark ? 'dark' : 'light'"
-      />
+      <Markdown html v-if="!isBlankHtml(description)" :content="description" />
       <p v-else class="placeholder">（还没写描述）</p>
 
       <div class="io">
         <section>
           <h3 class="title">输入</h3>
-          <MdPreview
-            preview-theme="vuepress"
-            :model-value="inputDescription"
-            :theme="isDark ? 'dark' : 'light'"
-          />
+          <Markdown html :content="inputDescription" />
         </section>
         <section>
           <h3 class="title">输出</h3>
-          <MdPreview
-            preview-theme="vuepress"
-            :model-value="outputDescription"
-            :theme="isDark ? 'dark' : 'light'"
-          />
+          <Markdown html :content="outputDescription" />
         </section>
       </div>
 
@@ -207,11 +192,7 @@ onMounted(() => nextTick(render))
 
       <template v-if="!isBlankHtml(hint)">
         <h3 class="title">提示</h3>
-        <MdPreview
-          preview-theme="vuepress"
-          :model-value="hint"
-          :theme="isDark ? 'dark' : 'light'"
-        />
+        <Markdown html :content="hint" />
       </template>
     </div>
 
@@ -345,14 +326,6 @@ onMounted(() => nextTick(render))
   margin: 6px 0 0;
   padding-left: 9px;
   border-left: 3px solid v-bind("theme.primaryColor");
-}
-
-.page :deep(.md-editor) {
-  background: transparent;
-}
-
-.page :deep(.md-editor-preview-wrapper) {
-  padding: 0;
 }
 
 .io {

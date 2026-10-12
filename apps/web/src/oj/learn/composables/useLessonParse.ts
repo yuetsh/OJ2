@@ -8,7 +8,7 @@ import type { Exercise } from "utils/types"
  * - `code`：带语言的代码块（```python / ```c）换成能改、能运行的代码块；
  *   不带语言的（「输出结果」那种）留在 Markdown 里照常显示；
  * - `exercise`：`[[exercise:36]]` 占位符换成练一练；
- * - `md`：其余的交给 MdPreview。
+ * - `md`：其余的交给 Markdown.vue。
  *
  * 正文开头的「# 标题」「**所属项目：…**」和紧跟着的项目配图不渲染：标题和项目页面上方
  * 已经有了，每课都重复一张同样的项目图只是把正文往下推。

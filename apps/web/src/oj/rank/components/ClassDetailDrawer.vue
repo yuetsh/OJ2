@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ClassDetail } from "@oj2/contract"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import { useThemeVars } from "naive-ui"
 import { getClassDetail } from "oj/api"
 import { classLabel } from "oj/submission/utils"
@@ -237,7 +236,7 @@ function go(path: string, query: Record<string, string>) {
               </n-button>
             </div>
             <span v-if="ai.waiting.value" class="muted">正在看这个班的数据…</span>
-            <MdPreview v-if="report" class="report" :model-value="report" />
+            <Markdown v-if="report" :content="report" />
           </section>
 
           <a v-if="pk" href="#" class="pk" @click.prevent="go('/class', { classes: className! })"
@@ -460,13 +459,5 @@ section {
 
 .ai-head b {
   color: v-bind("theme.textColor1");
-}
-
-.report {
-  background: transparent;
-}
-
-.report :deep(.md-editor-preview-wrapper) {
-  padding: 0;
 }
 </style>

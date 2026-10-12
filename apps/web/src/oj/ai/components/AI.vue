@@ -19,15 +19,14 @@
           </template>
           开始分析
         </n-button>
-        <MdPreview v-else :model-value="aiStore.mdContent" />
+        <Markdown v-else :content="aiStore.mdContent" />
       </n-flex>
     </n-spin>
   </n-card>
 </template>
 <script setup lang="ts">
 import { useAIStore } from "oj/store/ai"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import { Icon } from "@iconify/vue"
 
 const aiStore = useAIStore()
@@ -85,9 +84,5 @@ onMounted(async () => {
    这里只是给加载中的 spin 一点地方 */
 .container {
   min-height: 120px;
-}
-
-:deep(.md-editor-preview h1) {
-  margin-top: 0;
 }
 </style>

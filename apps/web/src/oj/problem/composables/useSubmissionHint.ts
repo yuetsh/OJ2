@@ -30,7 +30,7 @@ export function useSubmissionHint() {
   const hintFeedbackSending = ref(false)
 
   // 打字机：每 24ms 吐 3 个字，约 125 字/秒。步子不敢迈太小 ——
-  // 每一帧都要让 MdPreview 重渲染一次 Markdown，机房那批机器扛不住逐字
+  // 每一帧都要让 Markdown 重渲染一次 Markdown，机房那批机器扛不住逐字
   const TYPE_STEP = 3
   const TYPE_INTERVAL = 24
   let typingTimer: ReturnType<typeof setInterval> | null = null

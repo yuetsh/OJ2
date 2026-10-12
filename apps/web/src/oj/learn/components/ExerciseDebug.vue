@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseDebugData } from "utils/types"
-import { highlightLines } from "../composables/useCodeHighlight"
-import "./exercise-highlight.css"
+import { highlightLines } from "shared/highlight"
+import "shared/highlight.css"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{

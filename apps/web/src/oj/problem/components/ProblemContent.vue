@@ -6,9 +6,7 @@ import { useProblemStore } from "oj/store/problem"
 import { DIFFICULTY } from "utils/constants"
 import { copyToClipboard, getTagColor } from "utils/functions"
 import { useSubmissionStore } from "oj/store/submission"
-import { useDark } from "@vueuse/core"
-import { MdPreview } from "md-editor-v3"
-import "md-editor-v3/lib/preview.css"
+import Markdown from "shared/components/Markdown.vue"
 import SqlProblemData from "./SqlProblemData.vue"
 import SimilarProblems from "./SimilarProblems.vue"
 import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
@@ -19,7 +17,6 @@ import { useProblemPageContext } from "../composables/problemPageContext"
 const ProblemFlowchart = defineAsyncComponent(() => import("./ProblemFlowchart.vue"))
 const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
-const isDark = useDark()
 const theme = useThemeVars()
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
@@ -234,30 +231,18 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
     <section class="block">
       <h3 class="title">描述</h3>
-      <MdPreview
-        preview-theme="vuepress"
-        :model-value="problem.description"
-        :theme="isDark ? 'dark' : 'light'"
-      />
+      <Markdown html :content="problem.description" />
     </section>
 
     <!-- 输入、输出一般都只有一两句，左右摆开省半屏 -->
     <div v-if="!isSQL" class="io">
       <section class="block">
         <h3 class="title">输入</h3>
-        <MdPreview
-          preview-theme="vuepress"
-          :model-value="problem.inputDescription"
-          :theme="isDark ? 'dark' : 'light'"
-        />
+        <Markdown html :content="problem.inputDescription" />
       </section>
       <section class="block">
         <h3 class="title">输出</h3>
-        <MdPreview
-          preview-theme="vuepress"
-          :model-value="problem.outputDescription"
-          :theme="isDark ? 'dark' : 'light'"
-        />
+        <Markdown html :content="problem.outputDescription" />
       </section>
     </div>
 
@@ -388,20 +373,12 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
     <section v-if="problem.hint" class="block">
       <h3 class="title">提示</h3>
-      <MdPreview
-        preview-theme="preview"
-        :model-value="problem.hint"
-        :theme="isDark ? 'dark' : 'light'"
-      />
+      <Markdown html :content="problem.hint" />
     </section>
 
     <section v-if="problem.source" class="block">
       <h3 class="title">来源</h3>
-      <MdPreview
-        preview-theme="vuepress"
-        :model-value="problem.source"
-        :theme="isDark ? 'dark' : 'light'"
-      />
+      <Markdown html :content="problem.source" />
     </section>
 
     <SimilarProblems v-if="showSimilar" title="相似题目推荐" />
@@ -475,23 +452,6 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   margin: 0 0 6px;
   padding-left: 9px;
   border-left: 3px solid v-bind("theme.primaryColor");
-}
-
-/* md-editor 的预览自带一圈 padding、白底和段落外边距，放在小节标题下面显得很散 */
-:deep(.md-editor) {
-  background: transparent;
-}
-
-:deep(.md-editor-preview-wrapper) {
-  padding: 0;
-}
-
-:deep(.md-editor-preview > :first-child) {
-  margin-top: 0;
-}
-
-:deep(.md-editor-preview > :last-child) {
-  margin-bottom: 0;
 }
 
 .io {
