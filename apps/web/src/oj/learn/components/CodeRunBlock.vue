@@ -36,7 +36,7 @@ const running = ref(false)
 
 type Outcome =
   | { kind: "output"; text: string }
-  | { kind: "error"; title: string; message: string; raw: string }
+  | { kind: "error"; title: string; message: string; raw: string; needInput?: boolean }
   | { kind: "busy"; message: string }
 const outcome = ref<Outcome | null>(null)
 
@@ -85,6 +85,26 @@ function runtimeOutcome(
   output: string,
   info: NonNullable<StatisticInfo["runtime_error"]> | undefined,
 ): Outcome {
+  // 读输入读到头了：题目页那句「input() 用的次数超过了输入的行数」是说程序写错了，
+  // 教程里多半是下面的输入框还空着，要说的是「先填输入」
+  if (result === SubmissionStatus.runtime_error && info?.type === "EOFError") {
+    return input.value.trim()
+      ? {
+          kind: "error",
+          title: "输入不够",
+          message:
+            "程序每执行一次 input() 就读一行。输入框里的行数比它要读的少，按一行一个再多填几行。",
+          raw: cleanRaw(output),
+          needInput: true,
+        }
+      : {
+          kind: "error",
+          title: "还没填输入",
+          message: "程序运行到 input() 在等你输入内容。先在上面的「输入」框里填好，再点运行。",
+          raw: cleanRaw(output),
+          needInput: true,
+        }
+  }
   if (result === SubmissionStatus.runtime_error) {
     return {
       kind: "error",
@@ -185,7 +205,11 @@ async function copyCode() {
     <div class="editor" :style="{ minHeight: `${lineCount * 22 + 16}px` }">
       <CodeEditor v-model:value="value" :language="language" :font-size="14" height="auto" />
     </div>
-    <div v-if="needsInput" class="pane input">
+    <div
+      v-if="needsInput"
+      class="pane input"
+      :class="{ ask: outcome?.kind === 'error' && outcome.needInput }"
+    >
       <div class="label">输入</div>
       <n-input
         v-model:value="input"
@@ -336,6 +360,14 @@ async function copyCode() {
 .busy-text {
   font-size: 14px;
   color: var(--learn-orange-text);
+}
+.ask :deep(.n-input) {
+  --n-border: 1px solid var(--learn-orange) !important;
+}
+.ask .label {
+  color: var(--learn-orange-text);
+  opacity: 1;
+  font-weight: 600;
 }
 .mono :deep(textarea) {
   font-family: var(--learn-code-font);
