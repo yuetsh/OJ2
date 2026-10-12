@@ -1,8 +1,7 @@
 <script lang="ts" setup>
 import { storeToRefs } from "pinia"
-import { compressToBase64 } from "utils/functions"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { countBlank, toMermaid } from "shared/components/FlowchartEditor/model"
+import { countBlank } from "shared/components/FlowchartEditor/model"
 import { useProblemStore } from "oj/store/problem"
 import { useFlowchartStore, type FlowchartEditorInstance } from "oj/store/flowchart"
 
@@ -19,7 +18,7 @@ const flowchartEditorRef = inject<Ref<FlowchartEditorInstance | null>>("flowchar
 const message = useMessage()
 const { problem } = storeToRefs(useProblemStore())
 const flowchartStore = useFlowchartStore()
-const { loading } = storeToRefs(flowchartStore)
+const { loading, unchanged } = storeToRefs(flowchartStore)
 const { isDesktop } = useBreakpoints()
 
 function submit() {
@@ -36,7 +35,7 @@ function submit() {
     message.warning(`有 ${blank} 个框还没写字，点一下框就能写`)
     return
   }
-  flowchartStore.submit(toMermaid(doc), compressToBase64(JSON.stringify(doc)))
+  flowchartStore.submit(doc)
 }
 
 // 进题、换题都读一次历次分数（store 里同一道题只读一次）
@@ -48,7 +47,8 @@ watch(() => problem.value?.id, flowchartStore.ensureLoaded, { immediate: true })
     :size="isDesktop ? 'medium' : 'small'"
     type="primary"
     :loading="loading"
-    :disabled="loading"
+    :disabled="loading || unchanged"
+    :title="unchanged && !loading ? '这一版已经点评过了，改一改再交' : undefined"
     @click="submit"
   >
     {{ loading ? "AI 点评中…" : "交给 AI 点评" }}

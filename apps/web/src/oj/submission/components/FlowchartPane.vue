@@ -10,6 +10,8 @@ import { useTone } from "../composables/tone"
 import { submissionTimeText } from "../utils"
 import FlowchartState from "./FlowchartState.vue"
 import UserName from "shared/components/UserName.vue"
+import FlowchartCases from "shared/components/FlowchartCases.vue"
+import { caseHeadline, caseReport } from "utils/flowchart"
 
 /**
  * 流程图模式的右栏：左边画出来的图，右边四项评分和建议。原来要点编号再开一个
@@ -124,6 +126,14 @@ function barColor(score: number, max: number) {
   return tone("error").solid
 }
 
+/** 2026-10 起的「走例子」报告；老提交是 null，照旧显示四项分 */
+const report = computed(() => caseReport(shown.value?.aiCriteriaDetails))
+const openCase = ref<number | null>(null)
+watch(
+  () => shown.value?.id,
+  () => (openCase.value = null),
+)
+
 const suggestions = computed(() =>
   (shown.value?.aiSuggestions ?? "")
     .split("\n")
@@ -193,7 +203,7 @@ const canRetry = computed(
     </div>
 
     <div class="meta">
-      <FlowchartState :status="row.status" :grade="row.aiGrade" :score="row.aiScore" />
+      <FlowchartState :status="row.status" :grade="row.aiGrade" />
       <span>{{ submissionTimeText(row.createTime, true) }}</span>
       <span v-if="row.processingTime">评分用时 {{ row.processingTime.toFixed(1) }} 秒</span>
     </div>
@@ -231,6 +241,15 @@ const canRetry = computed(
         </template>
         <template v-else-if="row.status === FlowchartSubmissionStatus.FAILED">
           <span class="muted">这次评分失败了{{ teacher ? "，可以点「重新评分」" : "" }}</span>
+        </template>
+        <template v-else-if="shown && report">
+          <b class="headline">{{ caseHeadline(report) }}</b>
+          <FlowchartCases v-model:selected="openCase" :report="report" />
+          <div v-if="shown.aiFeedback" class="note">{{ shown.aiFeedback }}</div>
+          <div v-if="shown.aiSuggestions" class="note">
+            <b>还可以更好：</b>
+            <div>{{ shown.aiSuggestions }}</div>
+          </div>
         </template>
         <template v-else-if="shown">
           <div v-for="[name, item] in criteria" :key="name" class="crit">
@@ -440,6 +459,10 @@ const canRetry = computed(
 .graph :deep(svg) {
   max-width: 100%;
   max-height: 100%;
+}
+
+.headline {
+  font-size: 16px;
 }
 
 .score-box {

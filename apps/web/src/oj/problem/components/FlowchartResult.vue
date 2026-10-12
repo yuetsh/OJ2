@@ -6,8 +6,10 @@ import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useProblemStore } from "oj/store/problem"
 import { useUserStore } from "shared/store/user"
 import { sortFlowchartCriteria } from "utils/constants"
-import { decompressFromBase64, parseTime } from "utils/functions"
-import { parseDoc, signature } from "shared/components/FlowchartEditor/model"
+import { parseTime } from "utils/functions"
+import { mermaidOrder, signature } from "shared/components/FlowchartEditor/model"
+import FlowchartCases from "shared/components/FlowchartCases.vue"
+import { caseHeadline, caseReport } from "utils/flowchart"
 
 /**
  * 「结果」页签里流程图作业的那一块：AI 在评 / 评完了几分 / 历次分数 / 评语和改进建议。
@@ -107,33 +109,68 @@ function percentType(ratio: number) {
 // ==================== 载回画布 ====================
 /**
  * 这一版的图（结构树）。2026-10 换成插入式编辑器之前交的是 vue-flow 的格式，读不出来就是
- * null：那些只能看上面的图，载不回画布。老提交的压缩数据也可能是坏的
+ * null：那些只能看上面的图，载不回画布
  */
-const versionDoc = computed(() => {
-  const data = detail.value?.flowchartData?.data
-  if (typeof data !== "string" || !data) return null
-  try {
-    return parseDoc(JSON.parse(decompressFromBase64(data)))
-  } catch {
-    return null
-  }
-})
+const versionDoc = computed(() => flowchartStore.versionDoc(detail.value))
+const versionSignature = computed(() => (versionDoc.value ? signature(versionDoc.value) : null))
 
 /**
- * 只有画布和这一版不一样时才给「载回画布」：刚交完、还没动过的时候，这个按钮点了什么
- * 都不会变，只会让人以为它坏了。比的是结构和字，不比 id。
- * 读 getDoc() 会顺带跟踪画布的数据
+ * 画布和这一版一样不一样。不一样才给「载回画布」（刚交完还没动过时点了什么都不会变，
+ * 只会让人以为它坏了）；一样才在画布上亮路径。读 getDoc() 会顺带跟踪画布的数据
  */
-const canvasDiffers = computed(() => {
-  if (!editor.value || !versionDoc.value) return false
-  return signature(editor.value.getDoc()) !== signature(versionDoc.value)
+const canvasSame = computed(() => {
+  if (!editor.value || !versionSignature.value) return false
+  return signature(editor.value.getDoc()) === versionSignature.value
 })
+const canvasDiffers = computed(
+  () => !!editor.value && !!versionSignature.value && !canvasSame.value,
+)
 
 function loadToCanvas() {
   if (!editor.value || !versionDoc.value) return
   editor.value.setDoc(versionDoc.value)
   message.success("已载回画布，按 Ctrl+Z 可以撤回")
 }
+
+// ==================== 走例子 ====================
+/** 2026-10 起的评法：逐组走一遍。老提交是 null，照旧显示四项分 */
+const report = computed(() => caseReport(detail.value?.aiCriteriaDetails))
+
+/** 点开的是哪一组；换一次提交就默认点开第一组没走对的（设计稿 FlowResFail） */
+const selectedCase = ref<number | null>(null)
+watch(
+  () => [current.value?.id, report.value] as const,
+  ([, next]) => {
+    const firstWrong = next?.cases.findIndex((row) => !row.ok) ?? -1
+    selectedCase.value = firstWrong >= 0 ? firstWrong : null
+  },
+  { immediate: true },
+)
+
+/**
+ * 点开的那一组在画布上走过的路。AI 报的是 Mermaid 的框号（n3），按交上去那一版的结构对回
+ * 画布上的框 —— 所以只在画布还是那一版时亮，改过了就不亮（载回画布之后又能亮）
+ */
+watch(
+  () => [selectedCase.value, report.value, canvasSame.value, editor.value] as const,
+  ([index, next, same, instance]) => {
+    if (!instance || viewOnly) return
+    const row = index === null ? undefined : next?.cases[index]
+    if (!row || !same || !versionDoc.value) {
+      instance.setHighlight(null)
+      return
+    }
+    const order = mermaidOrder(versionDoc.value)
+    const toStep = (id: string) => order[Number(id.slice(1))]
+    instance.setHighlight({
+      order: row.path.map(toStep).filter((id): id is string => !!id),
+      bad: row.wrongAt ? (toStep(row.wrongAt) ?? null) : null,
+    })
+  },
+  // 切回「结果」页签时组件重新挂载，这些值早就齐了，不会再变一次
+  { immediate: true },
+)
+onBeforeUnmount(() => editor.value?.setHighlight(null))
 
 /** A / S 之后：照着图写代码。切回学生习惯的那门语言 */
 const canCode = computed(() => problemStore.codeLanguages.length > 0)
@@ -176,7 +213,7 @@ function goCode() {
           :title="`第 ${index + 1} 次 · ${parseTime(row.createTime, 'MM-DD HH:mm')}`"
           @click="flowchartStore.select(index === scores.length - 1 ? null : row.id)"
         >
-          {{ row.grade }} {{ row.score }}
+          {{ row.grade }}
         </button>
       </template>
       <template v-if="phase === 'evaluating'">
@@ -206,7 +243,13 @@ function goCode() {
     </div>
 
     <section v-else-if="current" class="current">
-      <div class="score-line">
+      <!-- 设计稿 FlowResFail / FlowResPass：等级 + 几组走对，下面逐组 -->
+      <div v-if="report" class="headline">
+        <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
+        <span class="headline-text">{{ caseHeadline(report) }}</span>
+        <span v-if="isFlowchartPass(current.grade)" class="headline-note">这道题算做完了</span>
+      </div>
+      <div v-else class="score-line">
         <span class="score" :class="gradeType(current.grade)">{{ current.score }}</span>
         <span class="score-unit">分</span>
         <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
@@ -220,8 +263,17 @@ function goCode() {
         <n-spin size="small" />
       </n-flex>
 
+      <template v-if="detail && report">
+        <FlowchartCases v-model:selected="selectedCase" :report="report" class="block" />
+        <p v-if="detail.aiFeedback" class="tip">{{ detail.aiFeedback }}</p>
+        <div v-if="detail.aiSuggestions" class="better">
+          <div class="better-title">还可以更好</div>
+          <p>{{ detail.aiSuggestions }}</p>
+        </div>
+      </template>
+
       <template v-if="detail">
-        <div v-if="detail.mermaidCode" class="version">
+        <div v-if="detail.mermaidCode && (!report || canvasDiffers || viewOnly)" class="version">
           <div class="version-head">
             <span class="version-title">{{ versionTitle }}</span>
             <n-button text type="primary" size="small" @click="versionZoom = true">
@@ -250,7 +302,7 @@ function goCode() {
           </n-modal>
         </div>
 
-        <div v-if="criteria.length" class="criteria">
+        <div v-if="!report && criteria.length" class="criteria">
           <div v-for="[name, item] in criteria" :key="name" class="criterion">
             <div class="criterion-head">
               <b>{{ name }}</b>
@@ -267,7 +319,7 @@ function goCode() {
           </div>
         </div>
 
-        <div v-if="suggestions.length" class="suggestions">
+        <div v-if="!report && suggestions.length" class="suggestions">
           <div class="suggestions-title">还可以改进</div>
           <div v-for="(line, index) in suggestions" :key="index" class="suggestion">
             <span v-if="index === 0" class="tag">重点</span>
@@ -481,6 +533,58 @@ function goCode() {
   margin-left: 6px;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.headline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 12px;
+}
+
+.headline .grade {
+  font-size: 16px;
+  padding: 2px 10px;
+}
+
+.headline-text {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.headline-note {
+  font-size: 14px;
+  color: v-bind("theme.textColor2");
+}
+
+.block {
+  margin-bottom: 12px;
+}
+
+.tip {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background-color: rgba(128, 128, 128, 0.08);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.better {
+  margin-bottom: 14px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.better-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.better p {
+  margin: 0;
 }
 
 /* 四项得分：两列，每项一条进度 */

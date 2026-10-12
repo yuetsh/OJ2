@@ -9,3 +9,13 @@ export function gradeForScore(score: number) {
   if (score >= 70) return "B"
   return "C"
 }
+
+/**
+ * 走例子的等级：全走对才算过关（A），全对而且写法挑不出毛病是 S；没全对时走对一半以上 B，
+ * 否则 C。和 gradeForScore 一样不采信模型自报的等级
+ */
+export function gradeForCases(passed: number, total: number, hasStyleNote: boolean) {
+  if (total > 0 && passed === total) return hasStyleNote ? "A" : "S"
+  if (passed * 2 >= total) return "B"
+  return "C"
+}

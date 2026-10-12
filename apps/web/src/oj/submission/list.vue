@@ -902,22 +902,14 @@ function dayBreak(index: number) {
                     <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                   </span>
                   <span class="c-state">
-                    <FlowchartState
-                      :status="row.status"
-                      :grade="row.aiGrade"
-                      :score="row.aiScore"
-                    />
+                    <FlowchartState :status="row.status" :grade="row.aiGrade" />
                   </span>
                 </template>
                 <template v-else>
                   <div class="m-line">
                     <UserName :username="row.username" />
                     <div class="spacer"></div>
-                    <FlowchartState
-                      :status="row.status"
-                      :grade="row.aiGrade"
-                      :score="row.aiScore"
-                    />
+                    <FlowchartState :status="row.status" :grade="row.aiGrade" />
                   </div>
                   <div class="m-line sub">
                     <span>{{ submissionClockText(row.createTime) }}</span>

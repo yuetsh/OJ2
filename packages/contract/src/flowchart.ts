@@ -130,6 +130,33 @@ export const flowchartStatisticsSchema = z.object({
   problemCount: z.number().int(),
 })
 
+/**
+ * 2026-10 起流程图的评法：AI 拿题目的例子和几组测试数据，在学生的图上从「开始」走到「结束」，
+ * 逐组看输出对不对（不再打逻辑 40 / 完整 30 / 规范 20 / 清晰 10 四项分）。这份报告存在
+ * `ai_criteria_details` 里，靠 `version: 2` 和老的四项分区分开 —— 老提交照旧按四项分显示。
+ *
+ * path / wrongAt 里是 Mermaid 的节点编号（n0 是开始），前端按同一套顺序对回画布上的框。
+ */
+export interface FlowchartCaseResult {
+  /** 「例子 1」「测试 6」 */
+  name: string
+  input: string
+  expected: string
+  /** 照着图走出来的输出，多行用换行连起来 */
+  output: string
+  ok: boolean
+  path: string[]
+  wrongAt: string | null
+  why: string
+}
+
+export interface FlowchartCaseReport {
+  version: 2
+  passed: number
+  total: number
+  cases: FlowchartCaseResult[]
+}
+
 export const flowchartUpdateSchema = z.object({
   type: z.enum([
     "flowchart_evaluation_completed",

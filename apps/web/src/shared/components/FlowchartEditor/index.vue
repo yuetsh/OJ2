@@ -9,8 +9,10 @@ import {
   insertStep,
   parseDoc,
   removeStep,
+  signature,
   STEP_LABEL,
   type FlowDoc,
+  type FlowHighlight,
   type StepKind,
 } from "./model"
 import { layoutDoc, PLACEHOLDER, type LaidNode, type LaidSlot } from "./layout"
@@ -534,6 +536,40 @@ function miniPoints(kind: StepKind) {
   return "15,1 25,6 15,11 5,6"
 }
 
+// ==================== 走例子的路径 ====================
+
+/**
+ * 结果页签里点了某一组数据：亮出它在图上走过的框（按第一次经过的先后编号），最先出问题的
+ * 那个标红，没走到的变淡（设计稿 FlowResFail）。图一改就收掉 —— 路径是按交上去那一版走的
+ */
+const highlightSet = shallowRef<{ value: FlowHighlight; shape: string } | null>(null)
+/** 记下亮的时候图长什么样，之后不一样了就不亮（不用 watch 去清：进页面读草稿也会改 doc） */
+const highlight = computed(() =>
+  highlightSet.value && highlightSet.value.shape === signature(doc.value)
+    ? highlightSet.value.value
+    : null,
+)
+const stepNo = computed(() => new Map((highlight.value?.order ?? []).map((id, i) => [id, i + 1])))
+
+function setHighlight(next: FlowHighlight | null) {
+  highlightSet.value = next ? { value: next, shape: signature(doc.value) } : null
+  const target = next?.bad ?? next?.order.at(-1)
+  if (target) nextTick(() => reveal(target))
+}
+
+function nodeState(node: LaidNode) {
+  if (!highlight.value) return ""
+  if (node.id === highlight.value.bad) return "bad"
+  return stepNo.value.has(node.id) ? "onpath" : "dim"
+}
+
+/** 编号圆点的位置：方框贴在左上角，菱形挪到顶点右边（左边是「是」） */
+function badgeAt(node: LaidNode) {
+  if (node.kind === "if" || node.kind === "while")
+    return { x: node.x + node.w / 2 + 16, y: node.y + 2 }
+  return { x: node.x - 2, y: node.y + 2 }
+}
+
 // ==================== 对外 ====================
 
 /**
@@ -552,7 +588,7 @@ function setDoc(next: FlowDoc) {
   fitSoon()
 }
 
-defineExpose({ getDoc, setDoc, undo, redo, clear, canUndo, canRedo, savedAt })
+defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo, savedAt })
 </script>
 
 <template>
@@ -635,7 +671,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, canUndo, canRedo, savedAt })
           v-for="node in layout.nodes"
           :key="node.id"
           class="node"
-          :class="{ editable: editable(node), selected: node.id === selectedId }"
+          :class="[{ editable: editable(node), selected: node.id === selectedId }, nodeState(node)]"
           @pointerdown.stop
           @click.stop="onNodeClick(node)"
         >
@@ -679,6 +715,14 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, canUndo, canRedo, savedAt })
             {{ nodeLabel(node) }}
           </text>
         </g>
+        <template v-for="node in layout.nodes" :key="`b${node.id}`">
+          <g v-if="stepNo.has(node.id)" class="badge" aria-hidden="true">
+            <circle :cx="badgeAt(node).x" :cy="badgeAt(node).y" r="10" />
+            <text :x="badgeAt(node).x" :y="badgeAt(node).y + 4" text-anchor="middle">
+              {{ stepNo.get(node.id) }}
+            </text>
+          </g>
+        </template>
       </svg>
 
       <button
@@ -860,6 +904,33 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, canUndo, canRedo, savedAt })
 .node.selected > polygon {
   stroke: #18a058;
   stroke-width: 2.6;
+}
+
+.node.dim {
+  opacity: 0.35;
+}
+
+.node.onpath > rect,
+.node.onpath > polygon {
+  stroke: v-bind("theme.textColor1");
+  stroke-width: 2.4;
+}
+
+.node.bad > rect,
+.node.bad > polygon {
+  stroke: #d03050;
+  stroke-width: 2.6;
+  fill: rgba(208, 48, 80, 0.12);
+}
+
+.badge circle {
+  fill: v-bind("theme.textColor1");
+}
+
+.badge text {
+  font-size: 12px;
+  font-weight: 700;
+  fill: v-bind("theme.cardColor");
 }
 
 .placeholder {

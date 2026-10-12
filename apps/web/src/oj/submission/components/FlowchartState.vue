@@ -3,13 +3,12 @@ import { FlowchartSubmissionStatus } from "utils/types"
 import { useTone, type Tone } from "../composables/tone"
 
 /**
- * 流程图提交在列表里的那个胶囊：评完的直接是「A 级 86 分」，没评完的是
+ * 流程图提交在列表里的那个胶囊：评完的直接是「A 级」，没评完的是
  * 排队中 / 评分中 / 评分失败。原来等级、分数、状态分三列，老师要横着对。
  */
 const props = defineProps<{
   status: number
   grade: string | null
-  score: number | null
 }>()
 
 const tone = useTone()
@@ -35,7 +34,7 @@ const colors = computed(() => tone(view.value.tone))
 <template>
   <span class="pill" :style="{ color: colors.color, background: colors.background }">
     <template v-if="view.grade">
-      <b>{{ view.grade }} 级</b><span class="score">{{ score ?? 0 }} 分</span>
+      <b>{{ view.grade }} 级</b>
     </template>
     <template v-else>{{ view.text }}</template>
   </span>
@@ -53,9 +52,5 @@ const colors = computed(() => tone(view.value.tone))
   font-weight: 600;
   white-space: nowrap;
   flex: none;
-}
-
-.score {
-  font-weight: 400;
 }
 </style>

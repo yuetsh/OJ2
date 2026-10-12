@@ -1,4 +1,12 @@
-import type { Branch, FlowDoc, FlowStep, Slot, StepKind } from "./model"
+import {
+  END_ID,
+  START_ID,
+  type Branch,
+  type FlowDoc,
+  type FlowStep,
+  type Slot,
+  type StepKind,
+} from "./model"
 
 /**
  * 结构树 → 坐标。纯函数，每次改动整张重排（13 个框的图不到一毫秒）。
@@ -280,9 +288,9 @@ export function layoutDoc(doc: FlowDoc, measure: Measure): Layout {
   }
 
   const items: Item[] = [
-    { kind: "start", id: "__start", text: "开始" },
+    { kind: "start", id: START_ID, text: "开始" },
     ...doc.steps,
-    { kind: "end", id: "__end", text: "结束" },
+    { kind: "end", id: END_ID, text: "结束" },
   ]
   const ext = measureBlock(items)
   // 竖线和 + 的位置跟着 doc.steps 走：空图时开始和结束之间也要有一个 +

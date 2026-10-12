@@ -37,6 +37,16 @@ export interface Slot {
   index: number
 }
 
+/** 画布上亮出某一组数据走过的路：order 是按先后经过的框，bad 是最先出问题的那个 */
+export interface FlowHighlight {
+  order: string[]
+  bad: string | null
+}
+
+/** 开始、结束在画布上的 id（它们不进数据） */
+export const START_ID = "__start"
+export const END_ID = "__end"
+
 export const STEP_LABEL: Record<StepKind, string> = {
   input: "输入",
   output: "输出",
@@ -194,6 +204,23 @@ export function parseDoc(raw: unknown): FlowDoc | null {
  */
 function escapeLabel(raw: string) {
   return raw.replace(/#/g, "#35;").replace(/"/g, "#quot;").replace(/\r?\n/g, "<br/>")
+}
+
+/**
+ * Mermaid 里第 n 个框（nN）是画布上的哪一步：开始、各步按先序（判断先「是」再「否」）、结束。
+ * 和下面 toMermaid 建框的顺序一致 —— AI 走例子时报的是 nN，结果页签靠它在画布上亮出路径
+ */
+export function mermaidOrder(doc: FlowDoc): string[] {
+  const order = [START_ID]
+  const walk = (steps: FlowStep[]) => {
+    for (const step of steps) {
+      order.push(step.id)
+      for (const child of children(step)) walk(child)
+    }
+  }
+  walk(doc.steps)
+  order.push(END_ID)
+  return order
 }
 
 export function toMermaid(doc: FlowDoc): string {

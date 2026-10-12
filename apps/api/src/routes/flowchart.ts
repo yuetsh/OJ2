@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto"
 
 import {
   createFlowchartRequestSchema,
+  isFlowchartPass,
   type CreateFlowchartResponse,
   type FlowchartCurrent,
   type FlowchartDetail,
@@ -23,7 +24,7 @@ import { db, schema } from "../db"
 import { failure, readJson, success } from "../http"
 import { flowchartQueue } from "../queue"
 import { getBooleanOption } from "../services/options"
-import { problemSetLockCutoffs } from "../services/problemset"
+import { problemSetLockCutoffs, recordSolvedAndNotify } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
 import { dayStart } from "../time"
@@ -116,7 +117,11 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
     )
   }
   const [problem] = await db
-    .select({ id: schema.problem.id, allow: schema.problem.allowFlowchart })
+    .select({
+      id: schema.problem.id,
+      allow: schema.problem.allowFlowchart,
+      contestId: schema.problem.contestId,
+    })
     .from(schema.problem)
     .where(eq(schema.problem.id, parsed.data.problemId))
     .limit(1)
@@ -128,10 +133,52 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
       "flowchart-not-allowed",
       "This problem does not allow flowchart submission",
     )
+  const userId = c.get("user")!.id
+  /**
+   * 同一道题、一模一样的图，已经按走例子评过：直接照搬那一次的结果，不再问 AI。
+   * 原来同一张图连点几次能抽出不同的等级（有一张 C 再交变 S），22% 的提交和上一次一模一样。
+   * 前端在图没改过时已经不让交，这里兜住别的路子（另开一个页面、两个人画得一字不差）。
+   * 只认走例子的结果（version 2）：老的四项分本来就不稳，不值得照搬
+   */
+  const [previous] = await db
+    .select()
+    .from(schema.flowchartSubmission)
+    .where(
+      and(
+        eq(schema.flowchartSubmission.problemId, problem.id),
+        eq(schema.flowchartSubmission.mermaidCode, parsed.data.mermaidCode),
+        eq(schema.flowchartSubmission.status, 2),
+        sql`${schema.flowchartSubmission.aiCriteriaDetails}->>'version' = '2'`,
+      ),
+    )
+    .orderBy(desc(schema.flowchartSubmission.createTime))
+    .limit(1)
+  if (previous) {
+    const id = randomBytes(16).toString("hex")
+    const now = new Date().toISOString()
+    await db.insert(schema.flowchartSubmission).values({
+      ...previous,
+      id,
+      userId,
+      flowchartData: parsed.data.flowchartData,
+      createTime: now,
+      processingTime: 0,
+      evaluationTime: now,
+    })
+    if (isFlowchartPass(previous.aiGrade) && problem.contestId === null) {
+      await recordSolvedAndNotify(userId, problem.id, now)
+    }
+    // 前端订阅这一条时，WebSocket 那边按库里的状态回放「评完了」
+    return success(
+      c,
+      { submissionId: id, status: "pending" } satisfies CreateFlowchartResponse,
+      201,
+    )
+  }
   // 限流：每次提交都会触发一次外部 AI 调用，是和判题沙箱同级的有限资源。
   // 身份前缀单独开一个桶，**不能**直接用 user id —— 那是代码提交在用的桶，
   // 共用的话学生在机房连着交几次代码，流程图这边就会莫名其妙交不上去。
-  const throttle = await consumeToken("user", flowchartThrottleKey(c.get("user")!.id))
+  const throttle = await consumeToken("user", flowchartThrottleKey(userId))
   if (!throttle.allowed) {
     return failure(
       c,
@@ -143,7 +190,7 @@ flowchartRoutes.post("/flowcharts", requireAuth, async (c) => {
   const id = randomBytes(16).toString("hex")
   await db.insert(schema.flowchartSubmission).values({
     id,
-    userId: c.get("user")!.id,
+    userId,
     problemId: problem.id,
     mermaidCode: parsed.data.mermaidCode,
     flowchartData: parsed.data.flowchartData,

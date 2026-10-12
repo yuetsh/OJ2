@@ -9,10 +9,12 @@ import { parseTime } from "utils/functions"
  * 原来这几个和节点库挤在画布右上角的面板里，盖住画好的框；保存状态只是一个 20px 的圆点。
  * 「清空画布」收进了「⋯」。
  */
-const { editor } = storeToRefs(useFlowchartStore())
+const { editor, unchanged } = storeToRefs(useFlowchartStore())
 const theme = useThemeVars()
 
 const saved = computed(() => {
+  // 「交给 AI 点评」灰着的时候说一句为什么（设计稿 FlowResPass）
+  if (unchanged.value) return "这一版已点评"
   const at = editor.value?.savedAt
   return at ? `已保存 ${parseTime(at, "HH:mm")}` : ""
 })

@@ -2,7 +2,14 @@ import { createDiscreteApi } from "naive-ui"
 import { defineStore } from "pinia"
 import { errorCode } from "utils/api"
 import { isFlowchartPass, type FlowchartScores, type FlowchartSubmission } from "@oj2/contract"
-import type { FlowDoc } from "shared/components/FlowchartEditor/model"
+import {
+  parseDoc,
+  signature,
+  toMermaid,
+  type FlowDoc,
+  type FlowHighlight,
+} from "shared/components/FlowchartEditor/model"
+import { compressToBase64, decompressFromBase64 } from "utils/functions"
 import { getFlowchartScores, getFlowchartSubmission, submitFlowchart } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
@@ -29,6 +36,7 @@ export interface FlowchartEditorInstance {
   undo: () => void
   redo: () => void
   clear: () => void
+  setHighlight: (highlight: FlowHighlight | null) => void
   canUndo: boolean
   canRedo: boolean
   savedAt: Date | null
@@ -90,6 +98,28 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   }
   /** 最近一次交上去的那张图，评到 A/S 时亮到「我的流程图」 */
   const lastSubmittedMermaidCode = ref("")
+  /**
+   * 最近一次**评完**的那张图长什么样（signature）。画布和它一模一样时不让再交 ——
+   * 原来同一张图连点能抽出不同的等级，22% 的提交和上一次一模一样（后端也照搬上一次的结果）。
+   * 评失败的那次不算：那种得让学生原样再交一次
+   */
+  const lastSignature = ref<string | null>(null)
+  let pendingSignature: string | null = null
+  const unchanged = computed(() => {
+    if (!editor.value || !lastSignature.value) return false
+    return signature(editor.value.getDoc()) === lastSignature.value
+  })
+
+  /** 某一次交上去的图（结构树）；2026-10 之前的 vue-flow 格式读不出来 */
+  function versionDoc(detail: FlowchartSubmission | undefined): FlowDoc | null {
+    const data = detail?.flowchartData?.data
+    if (typeof data !== "string" || !data) return null
+    try {
+      return parseDoc(JSON.parse(decompressFromBase64(data)))
+    } catch {
+      return null
+    }
+  }
   /** 最近一次分数是哪道题的；换题后置空，下次挂载时重新拉 */
   let loadedFor: number | null = null
   /**
@@ -186,11 +216,12 @@ export const useFlowchartStore = defineStore("flowchart", () => {
       return
     }
     latestRating.value = { score: outcome.score, grade: outcome.grade }
+    lastSignature.value = pendingSignature
     phase.value = "done"
     selectedId.value = null
     evaluatedSeq.value++
     // 学生这会儿可能在看题目：只提示一句、页签上亮状态，不强行把他切过去（设计文档 5.3）
-    message.success(`AI 点评完了：${outcome.score} 分，${outcome.grade} 级`)
+    message.success(`AI 点评完了：${outcome.grade} 级`)
     if (isFlowchartPass(outcome.grade) && lastSubmittedMermaidCode.value) {
       myFlowchartStore.show(lastSubmittedMermaidCode.value)
     }
@@ -236,8 +267,10 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     useFlowchartWebSocket(handleWebSocketMessage)
 
   // ==================== 提交 ====================
-  /** 交一张图。图的两种形态（Mermaid 源码、压缩过的编辑器数据）由组件从编辑器里取出来给 */
-  async function submit(mermaidCode: string, compressedData: string) {
+  /** 交一张图：Mermaid 给 AI 看、给缩略图画，结构树压缩后存着（载回画布、亮路径用） */
+  async function submit(doc: FlowDoc) {
+    const mermaidCode = toMermaid(doc)
+    const compressedData = compressToBase64(JSON.stringify(doc))
     const problem = problemStore.problem
     if (!problem) return
     // 原来没有这一道：没登录也能点，请求发出去才被拦下，学生只看到一句「提交失败」
@@ -248,6 +281,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
 
     const gen = generation
     lastSubmittedMermaidCode.value = mermaidCode
+    pendingSignature = signature(doc)
     loading.value = true
     phase.value = "evaluating"
     // 结果页签回到最新这一次：刚才可能在翻以前的某一次，那样就看不到「AI 正在看你的图」
@@ -321,6 +355,13 @@ export const useFlowchartStore = defineStore("flowchart", () => {
       await loadScores(problemId)
       if (problemStore.problem?.id !== problemId) return
       scoresFailed.value = false
+      const latest = scores.value.at(-1)
+      if (latest) {
+        const doc = versionDoc(await fetchDetail(latest.id))
+        if (problemStore.problem?.id !== problemId) return
+        // 这一会儿学生已经交了新的一张，别拿旧的盖掉
+        if (doc && phase.value === "idle") lastSignature.value = signature(doc)
+      }
       const passed = scores.value.filter((row) => isFlowchartPass(row.grade)).at(-1)
       if (passed) {
         const detail = await fetchDetail(passed.id)
@@ -381,6 +422,8 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     detailLoading.value = false
     scoresFailed.value = false
     lastSubmittedMermaidCode.value = ""
+    lastSignature.value = null
+    pendingSignature = null
     loadedFor = null
   }
 
@@ -406,6 +449,8 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     scoresFailed,
     editor,
     attachEditor,
+    unchanged,
+    versionDoc,
     submit,
     ensureLoaded,
     select,
