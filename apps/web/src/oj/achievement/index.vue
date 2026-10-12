@@ -1,53 +1,60 @@
 <script setup lang="ts">
-import { getAchievements, getAchievementSummary } from "oj/achievement/api"
+import { useThemeVars } from "naive-ui"
+import { getAchievements } from "oj/achievement/api"
 import { getUserBadges } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { useRarityColor } from "shared/composables/rarity"
-import type { Achievement, AchievementRarity, AchievementSummary, UserBadge } from "utils/types"
-import AchievementCard from "./components/AchievementCard.vue"
+import UserName from "shared/components/UserName.vue"
+import { useUserStore } from "shared/store/user"
+import { RARITY_COLOR, RARITY_LABEL } from "utils/constants"
+import type { AchievementList, AchievementRarity, UserBadge } from "utils/types"
+import ClassCard from "./components/ClassCard.vue"
+import GroupCard from "./components/GroupCard.vue"
+import NearCard from "./components/NearCard.vue"
+import { buildGroups, nearest, type GroupName } from "./series"
 
+/**
+ * 我的成就（设计稿「我的成就重设计」定稿，画布 page ach）：
+ * 顶上「快拿到了」和「本班」并排，底下 38 个成就收成一条条线、分五组。
+ * 看别人的（排名、主页点进来，?name=）只有成就线 —— 「快拿到了」是给自己定目标的，
+ * 「本班」后端也只在看自己时给。
+ */
 const route = useRoute()
-const name = computed(() => (route.query.name as string) || undefined)
-
-// 标签和进度条同色，整行读作一个单位
-const rarityColor = useRarityColor()
-
-const achievements = ref<Achievement[]>([])
-const summary = ref<AchievementSummary | null>(null)
-
-// 白金排最前，青铜垫底：稀有的先亮相，接口给的顺序是反的
-const RARITY_RANK: Record<AchievementRarity, number> = {
-  platinum: 0,
-  gold: 1,
-  silver: 2,
-  bronze: 3,
-}
-
-const rarities = computed(() =>
-  [...(summary.value?.rarity ?? [])].sort((a, b) => RARITY_RANK[a.rarity] - RARITY_RANK[b.rarity]),
-)
-const badges = ref<UserBadge[]>([])
+const userStore = useUserStore()
+const theme = useThemeVars()
 const { isDesktop } = useBreakpoints()
-const tab = ref("all")
-const loading = ref(true)
 
-const filtered = computed(() => {
-  if (tab.value === "unlocked") return achievements.value.filter((a) => a.unlocked)
-  if (tab.value === "locked") return achievements.value.filter((a) => !a.unlocked)
-  return achievements.value
-})
+const name = computed(() => (route.query.name as string) || undefined)
+const data = ref<AchievementList | null>(null)
+const badges = ref<UserBadge[]>([])
+const loading = ref(true)
+const notFound = ref(false)
+
+const other = computed(() => !!data.value && data.value.username !== userStore.user?.username)
+const groups = computed(() => (data.value ? buildGroups(data.value.achievements) : []))
+const near = computed(() => (other.value ? [] : nearest(groups.value)))
+const got = computed(() => data.value?.achievements.filter((item) => item.unlocked) ?? [])
+const rarities: AchievementRarity[] = ["platinum", "gold", "silver", "bronze"]
+const countOf = (rarity: AchievementRarity) =>
+  got.value.filter((item) => item.rarity === rarity).length
+
+// 桌面两栏：左边做题、其他、彩蛋，右边坚持、题单和比赛 —— 两边差不多高
+const LEFT: GroupName[] = ["做题", "其他", "彩蛋"]
+const RIGHT: GroupName[] = ["坚持", "题单和比赛"]
+const pick = (names: GroupName[]) => groups.value.filter((group) => names.includes(group.name))
 
 async function load() {
   loading.value = true
+  notFound.value = false
   try {
-    const [list, sum, badgeRes] = await Promise.all([
+    const [list, badgeRes] = await Promise.all([
       getAchievements(name.value),
-      getAchievementSummary(name.value),
-      getUserBadges(name.value),
+      getUserBadges(name.value).catch(() => []),
     ])
-    achievements.value = list.achievements
-    summary.value = sum
+    data.value = list
     badges.value = badgeRes ?? []
+  } catch {
+    data.value = null
+    notFound.value = true
   } finally {
     loading.value = false
   }
@@ -58,90 +65,49 @@ watch(name, load)
 </script>
 
 <template>
-  <div class="hall oj-page">
-    <h2 class="title">成就</h2>
+  <div class="oj-page achievement-page">
     <!-- delay 50ms：缓存命中时数据几乎立刻回来，不闪一下转圈 -->
     <n-spin :show="loading" :delay="50" style="min-height: 240px">
-      <n-card v-if="summary" class="summary">
-        <n-flex align="center" :wrap="false" :size="isDesktop ? 32 : 16">
-          <n-flex vertical align="center" :size="6">
-            <n-progress type="circle" :percentage="summary.percent" :stroke-width="8">
-              <n-text strong :style="{ fontSize: isDesktop ? '20px' : '14px' }">
-                {{ summary.percent }}%
-              </n-text>
-            </n-progress>
-            <n-text depth="3" class="nowrap">
-              已获得 {{ summary.unlocked }} / {{ summary.total }}
-            </n-text>
-          </n-flex>
+      <n-empty v-if="notFound" description="没有这个用户" class="blank" />
+      <template v-else-if="data">
+        <div class="title">
+          <h2 v-if="other"><UserName :username="data.username" /> 的成就</h2>
+          <h2 v-else>我的成就</h2>
+          <span class="count">
+            拿到 <b>{{ got.length }}</b> 个
+          </span>
+          <span v-if="isDesktop" class="rarities">
+            <span v-for="r in rarities" :key="r" class="rarity">
+              <i :style="{ background: RARITY_COLOR[r] }"></i>{{ RARITY_LABEL[r] }}
+              <b>{{ countOf(r) }}</b>
+            </span>
+          </span>
+          <router-link v-if="other" to="/achievement" class="mine">看我的 ›</router-link>
+        </div>
 
-          <n-flex vertical :size="8" class="rarity">
-            <n-flex v-for="r in rarities" :key="r.rarity" align="center" :wrap="false" :size="10">
-              <n-text strong :style="{ color: rarityColor[r.rarity] }">
-                {{ r.label }}
-              </n-text>
-              <n-progress
-                style="flex: 1"
-                type="line"
-                :percentage="r.total ? (r.unlocked / r.total) * 100 : 0"
-                :height="6"
-                :border-radius="3"
-                :fill-border-radius="3"
-                :color="rarityColor[r.rarity]"
-                :show-indicator="false"
-              />
-              <n-text depth="3" class="nowrap"> {{ r.unlocked }} / {{ r.total }} </n-text>
-            </n-flex>
-          </n-flex>
-        </n-flex>
-      </n-card>
+        <!-- 只有一张（老师没有班级、或看别人）时也只占半边，别把进度条拉得一屏宽 -->
+        <div v-if="near.length || data.classBoard" class="top">
+          <NearCard v-if="near.length" :items="near" :compact="!isDesktop" />
+          <ClassCard
+            v-if="data.classBoard"
+            :board="data.classBoard"
+            :achievements="data.achievements"
+            :me="data.username"
+            :compact="!isDesktop"
+          />
+        </div>
 
-      <n-tabs v-model:value="tab" type="line" class="tabs">
-        <n-tab name="all">全部</n-tab>
-        <n-tab name="unlocked">已获得</n-tab>
-        <n-tab name="locked">未获得</n-tab>
-        <n-tab name="badges">题单奖章</n-tab>
-      </n-tabs>
-
-      <template v-if="tab !== 'badges'">
-        <n-grid v-if="filtered.length" responsive="screen" cols="1 s:2 l:3" :x-gap="16" :y-gap="16">
-          <n-gi v-for="a in filtered" :key="a.id">
-            <AchievementCard :achievement="a" />
-          </n-gi>
-        </n-grid>
-        <!-- 加载中不显示空态，不然首屏会闪一下"什么都没有" -->
-        <n-empty v-else-if="!loading" description="这里还什么都没有" />
-      </template>
-
-      <template v-else>
-        <n-grid v-if="badges.length" responsive="screen" cols="1 s:2 l:3" :x-gap="16" :y-gap="16">
-          <n-gi v-for="b in badges" :key="b.id">
-            <n-card class="badge-card">
-              <n-thing :title="b.badge?.name" :description="b.badge?.description">
-                <template #avatar v-if="b.badge?.icon">
-                  <n-avatar
-                    :size="40"
-                    :src="b.badge.icon"
-                    color="transparent"
-                    object-fit="contain"
-                  />
-                </template>
-                <n-text v-if="b.problemSet" depth="3" class="source">
-                  来自题单
-                  <router-link
-                    :to="{
-                      name: 'problemset',
-                      params: { problemSetId: b.problemSet.id },
-                    }"
-                  >
-                    {{ b.problemSet.title }}
-                  </router-link>
-                </n-text>
-              </n-thing>
-            </n-card>
-          </n-gi>
-        </n-grid>
-        <n-empty v-else-if="!loading" description="还没有获得任何题单奖章" />
+        <div v-if="isDesktop" class="columns">
+          <div class="column">
+            <GroupCard v-for="g in pick(LEFT)" :key="g.name" :group="g" :badges="badges" />
+          </div>
+          <div class="column">
+            <GroupCard v-for="g in pick(RIGHT)" :key="g.name" :group="g" :badges="badges" />
+          </div>
+        </div>
+        <div v-else class="column">
+          <GroupCard v-for="g in groups" :key="g.name" :group="g" :badges="badges" compact />
+        </div>
       </template>
     </n-spin>
   </div>
@@ -149,36 +115,94 @@ watch(name, load)
 
 <style scoped>
 .title {
-  margin: 0 0 var(--oj-gap);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: var(--oj-gap);
+}
+
+h2 {
+  margin: 0;
   font-size: var(--oj-fs-title);
 }
 
-.summary,
-.badge-card {
-  border-radius: var(--oj-radius);
+.count {
+  font-size: var(--oj-fs-body);
+  color: v-bind("theme.textColor2");
 }
 
-.badge-card {
-  height: 100%;
+.count b {
+  font-size: 18px;
+  color: v-bind("theme.textColor1");
+  font-variant-numeric: tabular-nums;
 }
+
+.rarities {
+  display: flex;
+  gap: 14px;
+  margin-left: 6px;
+}
+
 .rarity {
-  flex: 1;
-  max-width: 420px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--oj-fs-meta);
+  color: v-bind("theme.textColor2");
 }
-.nowrap {
-  white-space: nowrap;
+
+.rarity i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
-.tabs {
-  margin: var(--oj-gap) 0;
+
+.rarity b {
+  color: v-bind("theme.textColor1");
+  font-variant-numeric: tabular-nums;
 }
-.source {
-  display: block;
-  margin-top: 6px;
-  font-size: 13px;
+
+.mine {
+  margin-left: auto;
+  font-size: var(--oj-fs-sec);
+  color: v-bind("theme.primaryColor");
+  text-decoration: none;
 }
-.source a {
-  color: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+
+.top {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--oj-gap);
+  margin-bottom: var(--oj-gap);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--oj-gap);
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.blank {
+  padding: 80px 0;
+}
+
+@media (max-width: 768px) {
+  .top {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .column {
+    gap: 14px;
+  }
 }
 </style>

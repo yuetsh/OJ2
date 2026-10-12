@@ -474,8 +474,7 @@ export type {
   Achievement,
   AchievementList,
   AchievementRarity,
-  AchievementRarityStat,
-  AchievementSummary,
+  AchievementClassBoard,
   AchievementNotification,
   PendingAchievement,
 } from "@oj2/contract"
