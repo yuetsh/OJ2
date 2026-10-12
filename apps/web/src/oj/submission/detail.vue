@@ -28,7 +28,7 @@ import { classLabel, submissionTimeText } from "./utils"
 /**
  * 单独打开的一条提交（设计稿「提交详情重设计」B）：左边代码，右边为什么错 + 这道题交的几次。
  * 入口是提交列表右栏的「新页面打开」、统计页的方块、后台卡点分析 —— 多半是老师在看某个学生
- * 怎么一次次改对的，所以「这道题交了几次」常驻右栏，← → 一次次翻。
+ * 怎么一次次改对的，所以「这道题交了几次」常驻右栏，↑ ↓ 一次次翻。
  */
 const props = defineProps<{ submissionID: string }>()
 
@@ -126,12 +126,12 @@ function attemptTime(time: string) {
   return submissionTimeText(time)
 }
 
-/** 除了正在看的这次，还有别的能点开的才提 ← → */
+/** 除了正在看的这次，还有别的能点开的才提 ↑ ↓ */
 const canStep = computed(() =>
   attempts.value.some((item) => item.showLink && item.id !== shown.value?.id),
 )
 
-/** 「← →」一次次往前往后翻，跳过题单藏着的那几次 */
+/** 「↑ ↓」一次次往前往后翻，跳过题单藏着的那几次 */
 function step(delta: -1 | 1) {
   const list = attempts.value
   for (let i = attemptIndex.value + delta; i >= 0 && i < list.length; i += delta) {
@@ -148,11 +148,12 @@ function typing(event: KeyboardEvent) {
   return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)
 }
 
-onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
+// 和提交列表一样只用 ↑ ↓（用户定的）：这几次是竖着排的
+onKeyStroke(["ArrowUp", "ArrowDown"], (event) => {
   if (typing(event) || event.altKey || event.ctrlKey || event.metaKey || attempts.value.length < 2)
     return
   event.preventDefault()
-  step(event.key === "ArrowLeft" ? -1 : 1)
+  step(event.key === "ArrowUp" ? -1 : 1)
 })
 
 const problemLink = computed(() => {
@@ -344,7 +345,7 @@ function handleMore(key: string) {
             <div class="attempts-head">
               <h3>{{ who }}这道题交了 {{ attempts.length }} 次</h3>
               <div class="spacer"></div>
-              <span v-if="!isMobile && canStep" class="keys"><kbd>←</kbd><kbd>→</kbd> 换一次</span>
+              <span v-if="!isMobile && canStep" class="keys"><kbd>↑</kbd><kbd>↓</kbd> 换一次</span>
             </div>
             <a
               v-for="(item, index) in attempts"
