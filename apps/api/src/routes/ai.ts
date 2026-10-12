@@ -6,9 +6,12 @@ import {
   classPkAnalysisRequestSchema,
   HINT_MIN_FAILURES,
   type AiAnalysisRecord,
+  type AiDetail,
   type AiHintDone,
+  type DurationData,
   type HintDiagnosis,
   type HeatmapItem,
+  type SolvedProblem,
 } from "@oj2/contract"
 import { and, count, eq, gte, inArray, lte, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
@@ -16,7 +19,7 @@ import { Hono, type Context } from "hono"
 import { requireAuth, type AppEnv } from "../auth/middleware"
 import { config } from "../config"
 import { db, schema } from "../db"
-import { JudgeStatus } from "../judge/status"
+import { JudgeStatus, judgeStatusName } from "../judge/status"
 import { failure, parseBody, readJson, success } from "../http"
 import { streamChat, streamWhole } from "../services/ai"
 import { generateFilteredHint } from "../services/hint-filter"
@@ -156,6 +159,81 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
   } satisfies AiAnalysisRecord)
 })
 
+const ANALYSIS_RANGE: Record<string, string> = {
+  "hours:1": "这一节课",
+  "hours:2": "这两节课",
+  "days:1": "最近一天",
+  "weeks:1": "最近一周",
+  "months:1": "最近一个月",
+  "months:2": "最近两个月",
+  "months:6": "最近半年",
+  "years:1": "最近一年",
+}
+
+/**
+ * 喂给模型的学情数据，全部翻成中文、带单位。原来是 detail / duration 原样 JSON 进
+ * prompt，模型读不懂裸编码：「错误类型 -1」（答案错误）被说成编译错误，
+ * `period 1` 原样出现在报告里，用户名 xuyue 被猜成了真名。
+ *
+ * 时间活跃度不给：八成提交在课上，几点做题是课表定的，模型只会据此编出
+ * 「你是早起鸟」「改到工作日分散练」这类建议。名字和班级也不给，报告里一律称「你」。
+ */
+function analysisFacts(
+  range: string,
+  details: AiDetail,
+  periods: DurationData[],
+  solved: SolvedProblem[],
+) {
+  const scope = details.rankScope === "class" ? "班上" : "全站"
+  // 两个超时码合成一种说法；判题机自己崩的不算学生的错
+  const errors = new Map<string, number>()
+  for (const item of details.errors) {
+    if (item.result === JudgeStatus.SYSTEM_ERROR) continue
+    const name = judgeStatusName(item.result)
+    errors.set(name, (errors.get(name) ?? 0) + item.count)
+  }
+  const monthDay = (iso: string) => {
+    const [, month, day] = calendarDay(iso).split("-").map(Number)
+    return `${month}月${day}日`
+  }
+  // 一周以内的范围，buildDuration 给的是前四周，和「这段时间」对不上，不给
+  const showTrend = ["months:1", "months:2", "months:6", "years:1"].includes(range)
+  return {
+    时间段: ANALYSIS_RANGE[range] ?? "这段时间",
+    做对的题数: details.solvedCount,
+    一次就对的题数: details.attempts.filter((value) => value === 1).length,
+    难度: details.difficulty,
+    做得最多的知识点: details.tags,
+    总等级: details.grade || "无",
+    没通过的提交: [...errors].map(([结果, 次数]) => ({ 结果, 次数 })),
+    ...(showTrend && {
+      分段: periods.map((item) => ({
+        时间: `${monthDay(item.start)}起的一${item.unit === "weeks" ? "周" : "个月"}`,
+        做对几道题: item.problemCount,
+        提交次数: item.submissionCount,
+        等级: item.grade || "无",
+      })),
+    }),
+    ...(details.flowcharts.length && {
+      流程图: details.flowcharts.map((item) => ({
+        题目: item.problemTitle,
+        画了几次: item.submissionCount,
+        最好等级: item.bestGrade || "无",
+      })),
+    }),
+    做对的题: solved.map((item) => ({
+      题目: item.problem.title,
+      难度: item.difficulty,
+      交了几次才对: item.attempts,
+      ...(item.periodRank && {
+        第几个做对: `${scope}第 ${item.periodRank} 个（共 ${item.periodAcCount} 人做对）`,
+      }),
+      等级: item.grade || "无",
+      ...(item.problem.contestTitle && { 课堂测验: item.problem.contestTitle }),
+    })),
+  }
+}
+
 aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
   const parsed = await parseBody(c, aiAnalysisRequestSchema, "start, end and duration are required")
   if (!parsed.success) return parsed.response
@@ -175,9 +253,26 @@ aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
     buildDuration(user, parsed.data.end, parsed.data.duration),
     listSolved(user, parsed.data.start, parsed.data.end, 200, 0),
   ])
-  const system =
-    "你是一个风趣的编程老师。请根据学生的详细数据和每周数据给出学习建议，最后写一句鼓励的话。使用 Markdown，不要放在代码块中。"
-  const prompt = `详细数据: ${JSON.stringify({ ...details, solved: solved.results })}\n每周或每月数据: ${JSON.stringify(duration)}`
+  const system = [
+    "你是中职学校的编程课老师，在给自己班上的一位学生写学习小结，学生会在网站上自己读到。",
+    "下面是这位学生在判题网站上的做题数据（JSON）。页面上方已经有图表，不用把数字挨个复述一遍。",
+    "用中文 Markdown 写，总共 300 字以内，分四段，每段一到三句，段首加粗：",
+    "**这段时间**（做了多少、节奏怎么样，挑一两个最能说明问题的数字，节奏照「分段」里的数说）、",
+    "**做得好的**（点出具体题目名）、",
+    "**要注意的**（错得最多的是哪种，教一个具体的检查办法：答案错误就自己多想几组输入试，特别是最大最小的情况；",
+    "编译失败、运行时错误就先读报错信息，找到它指出的那一行和错误名；运行超时就看循环能不能停下来；交了好几次才对的题点出名字）、",
+    "**下一步**（一两件下节课就能做的事，比如把交了好几次才对的题重做一遍、在题目列表里按知识点找题练）。",
+    "最后另起一段，只写一句鼓励的话，要和这位学生的数据挂钩，不要空口号。",
+    "用「你」称呼学生，不要写名字。说大白话，不要英文和术语，不要「追」「对手」这类拿同学比的说法。",
+    "只用数据里有的数字和题目名，不要编；数据里没有的方面就不写（比如错误次数没按题目分，就别说错在哪类题上）。",
+    "不要表格、标题、代码块、字符画、分割线，不要 emoji。",
+    "数据说明：等级 S/A/B/C 看的是同一道题你是第几个做对的（前 10% 是 S、前 35% 是 A、前 75% 是 B），",
+    "说明做得快不快，不说明代码好不好。比赛是老师安排的课堂测验，不要建议学生多参加比赛。",
+    "如果这段时间一道题都没做对，就简短说说看到的情况，鼓励下节课先把老师布置的题做出来。",
+  ].join("")
+  const prompt = JSON.stringify(
+    analysisFacts(parsed.data.duration, details, duration, solved.results),
+  )
   return streamChat(system, prompt, {
     onComplete: async (analysis) => {
       // 报告归被分析的那个人，不归发起请求的人 —— 教师后台的 pin 和学生侧的
