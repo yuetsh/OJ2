@@ -111,6 +111,64 @@ watch(
 const samples = computed(() => problem.value?.samples ?? [])
 const submissionStore = useSubmissionStore()
 
+const SAMPLE_SIDES = ["input", "output"] as const
+const SAMPLE_SIDE_LABEL = { input: "输入", output: "输出" } as const
+
+/*
+ * 例子默认摆成「例子 N | 输入 | 输出」的表，可机房那两种屏上左栏只有 550px 左右，每格只放得下
+ * 二十来个字符，而例子输出最长那行的 p90 就有 28 个字符宽（中文按两个算）—— 一成的题会在
+ * 半格里横着滚。所以按这道题最长那行量一下：半格放得下就摆表，放不下这道题的例子就整体改成
+ * 上下排（输入一行、输出一行，各占满宽）。整宽还放不下的二十来道才横着滚。不自动折行：折出来
+ * 的行学生分不清是不是真换了行，照着它输出就错了。
+ * 下面几个尺寸 CSS 里也用（v-bind），量宽度和排版是同一套数。
+ */
+const SAMPLE_FONT = "14px Consolas, Monaco, monospace"
+const SAMPLE_NO_W = 56
+const SAMPLE_GAP = 8
+const SAMPLE_PAD_L = 10
+const SAMPLE_PAD_R = 4
+const SAMPLE_COPY_W = 44
+const sampleCss = {
+  font: SAMPLE_FONT,
+  noW: `${SAMPLE_NO_W}px`,
+  gap: `${SAMPLE_GAP}px`,
+  pad: `2px ${SAMPLE_PAD_R}px 2px ${SAMPLE_PAD_L}px`,
+  copyW: `${SAMPLE_COPY_W}px`,
+}
+
+let measureCtx: CanvasRenderingContext2D | null = null
+/** 例子里最长那一行排出来有多宽（px）。等宽字体里中文、表情照样比英文宽，所以按字体真量 */
+const sampleTextWidth = computed(() => {
+  measureCtx ??= document.createElement("canvas").getContext("2d")
+  if (!measureCtx) return 0
+  measureCtx.font = SAMPLE_FONT
+  let widest = 0
+  for (const sample of samples.value) {
+    for (const side of SAMPLE_SIDES) {
+      for (const line of sample[side].split("\n")) {
+        // <pre> 里 tab 按 8 列排
+        const width = measureCtx.measureText(line.replace(/\t/g, "        ")).width
+        if (width > widest) widest = width
+      }
+    }
+  }
+  return widest
+})
+
+const sampleTable = useTemplateRef<HTMLElement>("sampleTable")
+const { width: sampleTableWidth } = useElementSize(sampleTable)
+/** 摆成表时，半格里留给文字的宽度 */
+const sampleHalfWidth = computed(
+  () =>
+    (sampleTableWidth.value - SAMPLE_NO_W - SAMPLE_GAP * 2) / 2 -
+    SAMPLE_PAD_L -
+    SAMPLE_PAD_R -
+    SAMPLE_COPY_W,
+)
+const samplesStacked = computed(
+  () => sampleTableWidth.value > 0 && sampleTextWidth.value > sampleHalfWidth.value,
+)
+
 // 文案和配色分类都由后端生成 —— 原来这里有一份 NODE_TARGET_LABELS +
 // ruleDescription + ruleTagType，和判题机那份几乎一模一样，见契约
 // astRequirementSchema。规则原文（engine / target）不下发给学生。
@@ -282,29 +340,38 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
             自己输入数据试试 ›
           </n-button>
         </div>
-        <div class="sample-table" role="table" aria-label="例子">
-          <span role="columnheader"></span>
-          <span role="columnheader" class="sample-label">输入</span>
-          <span role="columnheader" class="sample-label">输出</span>
-          <template v-for="(sample, index) of samples" :key="index">
+        <!-- 半格放不下最长那行就整体改成上下排，见 samplesStacked -->
+        <div
+          ref="sampleTable"
+          class="sample-table"
+          :class="{ stacked: samplesStacked }"
+          role="table"
+          aria-label="例子"
+        >
+          <div v-if="!samplesStacked" class="sample-row" role="row">
+            <span role="columnheader"></span>
+            <span role="columnheader" class="sample-label">输入</span>
+            <span role="columnheader" class="sample-label">输出</span>
+          </div>
+          <div v-for="(sample, index) of samples" :key="index" class="sample-row" role="row">
             <span class="sample-no" role="rowheader">例子 {{ index + 1 }}</span>
-            <div
-              v-for="side in ['input', 'output'] as const"
-              :key="side"
-              class="sample-cell"
-              role="cell"
-            >
-              <pre class="testcase">{{ sample[side] }}</pre>
-              <button
-                type="button"
-                class="sample-copy"
-                :aria-label="`复制例子 ${index + 1} 的${side === 'input' ? '输入' : '输出'}`"
-                @click="copySample(`${index}-${side}`, sample[side])"
-              >
-                {{ copiedKey === `${index}-${side}` ? "已复制" : "复制" }}
-              </button>
-            </div>
-          </template>
+            <template v-for="side in SAMPLE_SIDES" :key="side">
+              <span v-if="samplesStacked" class="sample-label sample-side">
+                {{ SAMPLE_SIDE_LABEL[side] }}
+              </span>
+              <div class="sample-cell" role="cell">
+                <pre class="testcase">{{ sample[side] }}</pre>
+                <button
+                  type="button"
+                  class="sample-copy"
+                  :aria-label="`复制例子 ${index + 1} 的${SAMPLE_SIDE_LABEL[side]}`"
+                  @click="copySample(`${index}-${side}`, sample[side])"
+                >
+                  {{ copiedKey === `${index}-${side}` ? "已复制" : "复制" }}
+                </button>
+              </div>
+            </template>
+          </div>
         </div>
       </section>
     </template>
@@ -509,12 +576,29 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   padding: 8px;
 }
 
-/* 例子：例子 N | 输入 | 输出，每格右边一个「复制」 */
+/*
+ * 例子：例子 N | 输入 | 输出，每格右边一个「复制」。
+ * 放不下时（.stacked）每个例子两行：例子 N | 输入 | 那格，下一行 输出 | 那格
+ */
 .sample-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sample-table.stacked {
+  gap: 12px;
+}
+
+.sample-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr);
-  gap: 6px 8px;
+  grid-template-columns: v-bind("sampleCss.noW") minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px v-bind("sampleCss.gap");
   align-items: stretch;
+}
+
+.stacked .sample-row {
+  grid-template-columns: v-bind("sampleCss.noW") 32px minmax(0, 1fr);
 }
 
 .sample-label,
@@ -528,11 +612,23 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   align-items: center;
 }
 
+/* 上下排时「例子 N」竖跨输入、输出两行，和「输入」对齐在顶上 */
+.stacked .sample-no {
+  grid-row: span 2;
+  align-items: flex-start;
+}
+
+.stacked .sample-no,
+.sample-side {
+  padding-top: 8px;
+  line-height: 1.5;
+}
+
 .sample-cell {
   min-width: 0;
   display: flex;
   align-items: flex-start;
-  padding: 2px 4px 2px 10px;
+  padding: v-bind("sampleCss.pad");
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.08);
 }
@@ -542,17 +638,32 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   min-width: 0;
   margin: 0;
   padding: 4px 0;
-  font-family: Consolas, Monaco, monospace;
-  font-size: 14px;
+  font: v-bind("sampleCss.font");
+  line-height: 1.5;
   white-space: pre;
   overflow-x: auto;
 }
 
+/* 整宽也放不下、只好横着滚的那二十来道：Windows 上默认那根带箭头的粗滚动条比例子本身还显眼 */
+.testcase::-webkit-scrollbar {
+  height: 6px;
+}
+
+.testcase::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background-color: rgba(128, 128, 128, 0.35);
+}
+
+.testcase::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .sample-copy {
   flex: none;
+  width: v-bind("sampleCss.copyW");
   height: 24px;
   margin-top: 2px;
-  padding: 0 6px;
+  padding: 0;
   border: 0;
   border-radius: 4px;
   background: transparent;
