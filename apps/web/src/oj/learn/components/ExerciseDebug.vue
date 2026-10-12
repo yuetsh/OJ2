@@ -52,8 +52,8 @@ function lineStyle(i: number): Record<string, string> {
         ? "#d03050"
         : status === "selected"
           ? "#2080f0"
-          : "var(--n-border-color)"
-  const plain = color === "var(--n-border-color)"
+          : "var(--learn-control-line)"
+  const plain = color === "var(--learn-control-line)"
   return {
     display: "flex",
     alignItems: "center",
@@ -63,7 +63,7 @@ function lineStyle(i: number): Record<string, string> {
     border: `1.5px solid ${color}`,
     background: plain ? "transparent" : color + "14",
     cursor: locked.value ? "default" : "pointer",
-    fontFamily: "Monaco",
+    fontFamily: "var(--learn-code-font)",
     userSelect: "none",
   }
 }
@@ -88,7 +88,7 @@ function reset() {
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
-    <p style="color: var(--n-text-color-3); font-size: 13px; margin: 0 0 12px">
+    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
       点击你认为有错误的代码行（可多选）。
     </p>
 

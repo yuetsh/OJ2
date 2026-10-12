@@ -80,11 +80,11 @@ function inputWidth(idx: number): string {
 
     <pre
       :style="{
-        fontFamily: 'Monaco',
+        fontFamily: 'var(--learn-code-font)',
         fontSize: '16px',
         lineHeight: '1.6',
-        background: 'var(--n-color)',
-        border: '1px solid var(--n-border-color)',
+        background: 'var(--learn-soft)',
+        border: '1px solid var(--learn-line)',
         borderRadius: '6px',
         padding: '12px',
         overflowX: 'auto',
@@ -98,16 +98,16 @@ function inputWidth(idx: number): string {
         :disabled="allCorrect"
         :style="{
           width: inputWidth(seg.index),
-          fontFamily: 'Monaco',
+          fontFamily: 'var(--learn-code-font)',
           fontSize: '16px',
-          padding: '2px 6px',
+          padding: '0 6px',
           borderRadius: '3px',
           border: `1.5px solid ${
             allCorrect
               ? '#18a058'
               : wrongBlanks.has(seg.index)
                 ? '#d03050'
-                : 'var(--n-border-color)'
+                : 'var(--learn-control-line)'
           }`,
           background: allCorrect
             ? 'rgba(24,160,88,0.08)'

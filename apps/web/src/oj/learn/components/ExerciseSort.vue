@@ -92,7 +92,7 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
               ? '#18a058'
               : lineStatus(idx) === 'wrong'
                 ? '#d03050'
-                : 'var(--n-border-color)'
+                : 'var(--learn-control-line)'
           }`,
           background:
             lineStatus(idx) === 'correct'
@@ -101,7 +101,7 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
                 ? 'rgba(208,48,80,0.07)'
                 : 'transparent',
           cursor: 'grab',
-          fontFamily: 'Monaco',
+          fontFamily: 'var(--learn-code-font)',
           userSelect: 'none',
         }"
         @dragstart="onDragStart(idx)"

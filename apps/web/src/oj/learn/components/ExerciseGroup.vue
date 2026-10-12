@@ -54,13 +54,13 @@ function itemStatus(i: number): "correct" | "wrong" | "default" {
 function chipStyle(i: number): Record<string, string> {
   const status = itemStatus(i)
   const color =
-    status === "correct" ? "#18a058" : status === "wrong" ? "#d03050" : "var(--n-border-color)"
-  const plain = color === "var(--n-border-color)"
+    status === "correct" ? "#18a058" : status === "wrong" ? "#d03050" : "var(--learn-control-line)"
+  const plain = color === "var(--learn-control-line)"
   return {
     padding: "6px 12px",
     borderRadius: "6px",
     border: `1.5px solid ${color}`,
-    background: plain ? "var(--n-color)" : color + "14",
+    background: plain ? "var(--learn-pane)" : color + "14",
     cursor: locked.value ? "default" : "grab",
     userSelect: "none",
     fontSize: "15px",
@@ -85,7 +85,7 @@ function reset() {
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
-    <p style="color: var(--n-text-color-3); font-size: 13px; margin: 0 0 12px">
+    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
       把下面的项目拖到对应的分组里，可在分组间拖动调整。
     </p>
 
@@ -96,14 +96,14 @@ function reset() {
         gap: '8px',
         minHeight: '48px',
         padding: '10px',
-        border: '1.5px dashed var(--n-border-color)',
+        border: '1.5px dashed var(--learn-control-line)',
         borderRadius: '8px',
         marginBottom: '14px',
       }"
       @dragover.prevent
       @drop="dropTo(-1)"
     >
-      <span v-if="poolItems.length === 0" style="color: var(--n-text-color-3); font-size: 13px">
+      <span v-if="poolItems.length === 0" style="color: var(--learn-muted); font-size: 13px">
         （已全部归类）
       </span>
       <div
@@ -130,7 +130,7 @@ function reset() {
         :style="{
           minHeight: '88px',
           padding: '10px',
-          border: '1.5px solid var(--n-border-color)',
+          border: '1.5px solid var(--learn-control-line)',
           borderRadius: '8px',
         }"
         @dragover.prevent

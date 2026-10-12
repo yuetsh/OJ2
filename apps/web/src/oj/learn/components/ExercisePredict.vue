@@ -63,17 +63,17 @@ function reset() {
 
     <pre
       :style="{
-        fontFamily: 'Monaco',
+        fontFamily: 'var(--learn-code-font)',
         fontSize: '16px',
         lineHeight: '1.6',
-        background: 'var(--n-color)',
-        border: '1px solid var(--n-border-color)',
+        background: 'var(--learn-soft)',
+        border: '1px solid var(--learn-line)',
         borderRadius: '6px',
         padding: '12px',
         overflowX: 'auto',
         margin: 0,
       }"
-    ><code v-html="codeHtml" /></pre>
+    ><code style="font-family: inherit" v-html="codeHtml" /></pre>
 
     <p style="font-weight: 500; margin: 14px 0 8px">这段代码会输出什么？</p>
     <n-input
@@ -82,7 +82,7 @@ function reset() {
       :rows="3"
       :disabled="submitted && allCorrect"
       placeholder="在这里输入程序会打印的内容"
-      style="font-family: Monaco"
+      style="font-family: var(--learn-code-font)"
     />
 
     <ExerciseResult

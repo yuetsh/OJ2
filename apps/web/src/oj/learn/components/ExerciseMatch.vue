@@ -89,21 +89,21 @@ function leftColor(i: number): string {
   }
   if (selectedLeft.value === i) return "#2080f0"
   if (pairs.value[i] !== null) return PALETTE[i % PALETTE.length]
-  return "var(--n-border-color)"
+  return "var(--learn-control-line)"
 }
 
 function rightColor(rightIdx: number): string {
   const l = leftOf(rightIdx)
   if (submitted.value) {
-    if (l === -1) return "var(--n-border-color)"
+    if (l === -1) return "var(--learn-control-line)"
     return pairs.value[l] === data.value.answer[l] ? "#18a058" : "#d03050"
   }
-  if (l === -1) return "var(--n-border-color)"
+  if (l === -1) return "var(--learn-control-line)"
   return PALETTE[l % PALETTE.length]
 }
 
 function itemStyle(color: string, selected: boolean): Record<string, string> {
-  const plain = color === "var(--n-border-color)"
+  const plain = color === "var(--learn-control-line)"
   return {
     display: "flex",
     alignItems: "center",
@@ -134,7 +134,7 @@ function dotStyle(color: string): Record<string, string> {
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
-    <p style="color: var(--n-text-color-3); font-size: 13px; margin: 0 0 12px">
+    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
       先点左边一项，再点右边一项即可连线；点击已连线的项可取消。
     </p>
 

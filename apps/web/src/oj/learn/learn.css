@@ -10,6 +10,9 @@
   --learn-orange-bg: rgba(240, 160, 32, 0.14);
   --learn-red-text: #b0263c;
   --learn-line: rgba(128, 128, 128, 0.22);
+  /* 填空框、能拖能点的卡片：比 --learn-line 深一档，一眼看得出是能操作的 */
+  --learn-control-line: rgba(128, 128, 128, 0.45);
+  --learn-muted: #767c82;
   --learn-soft: rgba(128, 128, 128, 0.07);
   --learn-pane: #ffffff;
   --learn-todo: rgba(128, 128, 128, 0.22);
@@ -21,4 +24,5 @@ html.dark {
   --learn-orange-text: #f2c97d;
   --learn-red-text: #f08a9b;
   --learn-pane: rgba(255, 255, 255, 0.03);
+  --learn-muted: rgba(255, 255, 255, 0.45);
 }
