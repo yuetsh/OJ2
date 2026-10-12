@@ -41,6 +41,7 @@
       "version": "1.9.0",
       "dependencies": {
         "@codemirror/autocomplete": "^6.20.3",
+        "@codemirror/commands": "^6.10.4",
         "@codemirror/lang-cpp": "^6.0.3",
         "@codemirror/lang-markdown": "^6.5.2",
         "@codemirror/lang-python": "^6.2.1",
@@ -76,7 +77,6 @@
         "pinyin-pro": "^3.29.5",
         "vue": "^3.5.43",
         "vue-chartjs": "^5.3.4",
-        "vue-codemirror": "^6.1.1",
         "vue-router": "^5.4.0",
         "y-codemirror.next": "^0.3.6",
         "y-protocols": "1.0.7",
@@ -1564,8 +1564,6 @@
     "vue": ["vue@3.5.43", "https://registry.npmjs.com/vue/-/vue-3.5.43.tgz", { "dependencies": { "@vue/compiler-dom": "3.5.43", "@vue/compiler-sfc": "3.5.43", "@vue/runtime-dom": "3.5.43", "@vue/server-renderer": "3.5.43", "@vue/shared": "3.5.43" }, "peerDependencies": { "typescript": "*" }, "optionalPeers": ["typescript"] }, "sha512-o5qZoksdnjIKvW1srZ3ab7pcDNYAerBjRe54D0LBLfRdCYFrSgBHVXokMas35czQc0//lmx4/tuY4ZNQ+Rf2Ng=="],
 
     "vue-chartjs": ["vue-chartjs@5.3.4", "https://registry.npmjs.com/vue-chartjs/-/vue-chartjs-5.3.4.tgz", { "peerDependencies": { "chart.js": "^4.1.1", "vue": "^3.0.0-0 || ^2.7.0" } }, "sha512-x3Fqob8RQvrTdssfi9ecsCzEkFOd8JPmNwSkSQzdfKj/uBsRJs/Y88cZcZIEcPsTVfMGwMo4MOoihoDG2DoE/g=="],
-
-    "vue-codemirror": ["vue-codemirror@6.1.1", "https://registry.npmjs.com/vue-codemirror/-/vue-codemirror-6.1.1.tgz", { "dependencies": { "@codemirror/commands": "6.x", "@codemirror/language": "6.x", "@codemirror/state": "6.x", "@codemirror/view": "6.x" }, "peerDependencies": { "codemirror": "6.x", "vue": "3.x" } }, "sha512-rTAYo44owd282yVxKtJtnOi7ERAcXTeviwoPXjIc6K/IQYUsoDkzPvw/JDFtSP6T7Cz/2g3EHaEyeyaQCKoDMg=="],
 
     "vue-demi": ["vue-demi@0.14.10", "https://registry.npmjs.com/vue-demi/-/vue-demi-0.14.10.tgz", { "peerDependencies": { "@vue/composition-api": "^1.0.0-rc.1", "vue": "^3.0.0-0 || ^2.6.0" }, "optionalPeers": ["@vue/composition-api"], "bin": { "vue-demi-fix": "bin/vue-demi-fix.js", "vue-demi-switch": "bin/vue-demi-switch.js" } }, "sha512-nMZBOwuzabUO0nLgIcc6rycZEebF6eeUfaiQx9+WSk8e29IbLvPU9feI6tqW4kTo3hvoYAJkMh8n8D0fuISphg=="],
 

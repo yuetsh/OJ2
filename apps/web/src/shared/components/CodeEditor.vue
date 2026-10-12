@@ -3,7 +3,7 @@ import { cpp } from "@codemirror/lang-cpp"
 import { python } from "@codemirror/lang-python"
 import { sql, SQLite } from "@codemirror/lang-sql"
 import { bracketMatching } from "@codemirror/language"
-import { Codemirror } from "vue-codemirror"
+import CodeMirror from "./CodeMirror.vue"
 import type { Extension } from "@codemirror/state"
 import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
 import type { LANGUAGE } from "utils/types"
@@ -53,13 +53,13 @@ const extensions = computed(() => [
 </script>
 
 <template>
-  <Codemirror
+  <CodeMirror
     v-model="code"
-    indentWithTab
     :extensions="extensions"
     :disabled="readonly"
     :tab-size="4"
     :placeholder="placeholder"
-    :style="{ height, fontSize: `${fontSize}px` }"
+    :height="height"
+    :font-size="`${fontSize}px`"
   />
 </template>

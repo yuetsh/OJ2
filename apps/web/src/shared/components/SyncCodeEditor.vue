@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { bracketMatching } from "@codemirror/language"
-import { Codemirror } from "vue-codemirror"
+import CodeMirror from "./CodeMirror.vue"
 import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
 import type { EditorView } from "@codemirror/view"
 import type { Extension } from "@codemirror/state"
@@ -68,10 +68,6 @@ const extensions = computed(() => [
   ...extraExtensions,
 ])
 
-interface EditorReadyPayload {
-  view: EditorView
-}
-
 // shallowRef，不是 ref：CodeMirror 的 EditorView 是带 getter 的类实例，
 // Vue 的 UnwrapRef 深度展开会把它结构化成一个丢了原型方法的假类型，
 // vue-tsc 会报 "missing dispatchTransactions/_root/..." 这类莫名其妙的错。
@@ -123,11 +119,11 @@ const detach = () => {
   if (wasBound && collabStore.room) collabStore.leave("left")
 }
 
-const handleEditorReady = (payload: EditorReadyPayload) => {
-  editorView.value = payload.view
+const handleEditorReady = (view: EditorView) => {
+  editorView.value = view
   // 也从这里起：学生排队时切去看提交记录、老师在这期间接了单，
   // 等他切回来时 room 早就非空了，只靠下面的 watch 是等不到的
-  bind(payload.view)
+  bind(view)
 }
 
 /**
@@ -206,14 +202,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Codemirror
+  <CodeMirror
     v-model="code"
-    indentWithTab
     :extensions="extensions"
     :disabled="readonly"
     :tab-size="4"
     :placeholder="placeholder"
-    :style="{ height, fontSize: `${fontSize}px` }"
+    :height="height"
+    :font-size="`${fontSize}px`"
     @ready="handleEditorReady"
   />
 </template>

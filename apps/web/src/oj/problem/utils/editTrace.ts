@@ -11,7 +11,7 @@ import type { SubmissionTrace } from "@oj2/contract"
  * 直接失效。计数本身也不需要响应式。
  *
  * **只数带 userEvent 的事务。** 下面这些都不带，所以天然不会被算进去：
- * - `codeStore.setCode()` —— vue-codemirror 的 setDoc 只 dispatch 一个 changes：
+ * - `codeStore.setCode()` —— shared/components/CodeMirror.vue 同步 v-model 时只 dispatch 一个 changes：
  *   提交前的自动格式化、载入草稿 / 模板、切语言都走这条；
  * - 课堂协作里对方的改动 —— y-codemirror.next 应用远程更新时只挂 ySyncAnnotation。
  *

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/commands": "^6.10.4",
     "@codemirror/lang-cpp": "^6.0.3",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/lang-python": "^6.2.1",
@@ -47,7 +48,6 @@
     "pinyin-pro": "^3.29.5",
     "vue": "^3.5.43",
     "vue-chartjs": "^5.3.4",
-    "vue-codemirror": "^6.1.1",
     "vue-router": "^5.4.0",
     "y-codemirror.next": "^0.3.6",
     "y-protocols": "1.0.7",

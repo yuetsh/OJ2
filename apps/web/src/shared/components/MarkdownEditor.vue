@@ -3,7 +3,7 @@ import { markdown } from "@codemirror/lang-markdown"
 import { EditorSelection } from "@codemirror/state"
 import { EditorView, keymap } from "@codemirror/view"
 import { Icon } from "@iconify/vue"
-import { Codemirror } from "vue-codemirror"
+import CodeMirror from "./CodeMirror.vue"
 import { uploadImage } from "../../admin/api"
 import { styleTheme } from "../extensions/baseTheme"
 import { oneDark } from "../themes/oneDark"
@@ -196,12 +196,12 @@ const tools = computed(() => [
       <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="onPickImages" />
     </div>
     <div class="body">
-      <Codemirror
+      <CodeMirror
         v-model="modelValue"
         :extensions="extensions"
         :tab-size="4"
-        :style="{ height: '100%', fontSize: '14px' }"
-        @ready="view = $event.view"
+        font-size="14px"
+        @ready="view = $event"
       />
     </div>
   </div>
