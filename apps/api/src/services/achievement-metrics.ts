@@ -92,12 +92,12 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
   {
     key: "max_code_lines",
     name: "最长代码行数",
-    helpText: "提交过的最长代码有多少行",
+    helpText: "做对的提交里最长的代码有多少行（空行不算，不含比赛）",
   },
   {
     key: "achievement_unlocked_count",
     name: "已解锁成就数",
-    helpText: "已解锁的成就数量（不含白金档）",
+    helpText: "已解锁的成就数量（不含白金档和已下架的）",
     meta: true,
   },
 ]

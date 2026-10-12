@@ -225,6 +225,13 @@
       "when": 1791766110876,
       "tag": "0031_tutorial_project_and_problems",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791821976519,
+      "tag": "0032_achievement_cleanup",
+      "breakpoints": true
     }
   ]
 }

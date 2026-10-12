@@ -99,6 +99,19 @@ function numberOf(metrics: Record<string, unknown>, key: string) {
   return typeof value === "number" ? value : 0
 }
 
+/**
+ * 现在连着几周有新做对。`max_ac_week_streak` 是历史最长，要拿「锲而不舍」得从现在的连续数起；
+ * 只在最近一次新通过落在本周或上周时还作数，再早就已经断了。
+ */
+export function currentWeekStreak(metrics: Record<string, unknown>) {
+  const monday = calendarDay(weekStart())
+  const lastWeek = typeof metrics._last_ac_week === "string" ? metrics._last_ac_week : ""
+  const previousMonday = dayText(dayNumber(monday) - 7)
+  return lastWeek === monday || lastWeek === previousMonday
+    ? numberOf(metrics, "_current_ac_week_streak")
+    : 0
+}
+
 export async function buildProblemProgress(userId: number): Promise<ProblemProgress> {
   const [states, statRows, achievements, unlockedRows] = await Promise.all([
     problemStates(userId),
@@ -159,13 +172,7 @@ export async function buildProblemProgress(userId: number): Promise<ProblemProgr
   for (const [day, n] of Object.entries(asRecord(metrics._ac_per_day))) {
     if (day >= monday && typeof n === "number") weekSolved += n
   }
-  // 当前连续周数只在最近一次新通过落在本周或上周时还作数，再早就已经断了
-  const lastWeek = typeof metrics._last_ac_week === "string" ? metrics._last_ac_week : ""
-  const previousMonday = dayText(dayNumber(monday) - 7)
-  const weekStreak =
-    lastWeek === monday || lastWeek === previousMonday
-      ? numberOf(metrics, "_current_ac_week_streak")
-      : 0
+  const weekStreak = currentWeekStreak(metrics)
 
   const unlocked = new Set(unlockedRows.map((row) => row.id))
   let next: ProblemProgress["next"] = null

@@ -192,10 +192,12 @@ export async function updateAchievementsForSubmission(submissionId: string) {
       value.early_bird_submissions = numberMetric(value, "early_bird_submissions") + 1
     if (row.submission.result === JudgeStatus.COMPILE_ERROR)
       value.compile_error_count = numberMetric(value, "compile_error_count") + 1
-    value.max_code_lines = Math.max(
-      numberMetric(value, "max_code_lines"),
-      row.submission.code.split(/\r?\n/).length,
-    )
+    // 只算做对的、空行不算：原来交什么都算，贴一大段就拿到「长篇巨制」（0032 按这个口径重算过存量）
+    if (accepted)
+      value.max_code_lines = Math.max(
+        numberMetric(value, "max_code_lines"),
+        row.submission.code.split("\n").filter((line) => line.trim() !== "").length,
+      )
     await tx
       .update(schema.userStat)
       .set({ metrics: value, updateTime: new Date().toISOString() })
@@ -213,6 +215,7 @@ export async function updateAchievementsForSubmission(submissionId: string) {
       and(
         eq(schema.userAchievement.userId, row.submission.userId),
         ne(schema.achievement.rarity, "platinum"),
+        eq(schema.achievement.visible, true),
       ),
     )
   metrics.achievement_unlocked_count = meta?.value ?? 0
@@ -269,7 +272,11 @@ export async function updateAchievementsForProblemSet(userId: number) {
     .from(schema.userAchievement)
     .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
     .where(
-      and(eq(schema.userAchievement.userId, userId), ne(schema.achievement.rarity, "platinum")),
+      and(
+        eq(schema.userAchievement.userId, userId),
+        ne(schema.achievement.rarity, "platinum"),
+        eq(schema.achievement.visible, true),
+      ),
     )
   metrics.achievement_unlocked_count = meta?.value ?? 0
   await db
@@ -406,7 +413,7 @@ export function metaAchievements() {
 /**
  * 按 `user_achievement` 重算 `achievement_unlocked_count`，返回实际改动了的用户 id。
  *
- * 口径和判题结算一致：已解锁的**非白金**成就数。只 `jsonb_set` 这一个键、只写值变了的行，
+ * 口径和判题结算一致：已解锁的、还上架的**非白金**成就数（下架的不算，见 0032）。只 `jsonb_set` 这一个键、只写值变了的行，
  * 不整体覆盖 `metrics` —— 整体写回会和并发判题写的其它指标互相踩。
  * 不传 `userIds` 就是全体有 `user_stat` 的用户（`recount` 存量订正用）。
  */
@@ -423,7 +430,7 @@ export async function refreshUnlockedCount(userIds?: number[]) {
         select ua.user_id, count(*)::int as value
         from ${schema.userAchievement} ua
         join ${schema.achievement} a on a.id = ua.achievement_id
-        where a.rarity <> 'platinum'
+        where a.rarity <> 'platinum' and a.visible
         group by ua.user_id
       ) c on c.user_id = s.user_id
       where true ${scope}

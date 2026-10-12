@@ -15,13 +15,41 @@ export const achievementSchema = z.object({
   unlocked: z.boolean(),
   unlockTime: z.string().nullable(),
   backfilled: z.boolean(),
+  /** 连续几周那一串给的是「现在连着几周」，不是历史最长 —— 要拿下一档得从现在数起 */
   progress: z.number().nullable(),
-  unlockRate: z.number(),
+  /** 全站几人有 */
+  holders: z.number().int(),
+  /** 本班（被看的人的班）几人有；没有班级是 null */
+  classHolders: z.number().int().nullable(),
+})
+
+/** 「本班」那张卡：只在看自己、而且有班级时给 */
+export const achievementClassBoardSchema = z.object({
+  className: z.string(),
+  /** 本班最近拿到的（补发的不算），新的在前 */
+  recent: z.array(
+    z.object({
+      username: z.string(),
+      achievementId: z.number().int(),
+      unlockTime: z.string(),
+    }),
+  ),
+  /** 本班成就最多的前几名；一样多的名次相同，先拿到的排前面 */
+  most: z.array(
+    z.object({
+      username: z.string(),
+      count: z.number().int(),
+      rank: z.number().int(),
+    }),
+  ),
+  /** 自己不在 most 里时的名次；不计入排名的人是 null */
+  me: z.object({ rank: z.number().int(), count: z.number().int() }).nullable(),
 })
 
 export const achievementListSchema = z.object({
   username: z.string(),
   achievements: z.array(achievementSchema),
+  classBoard: achievementClassBoardSchema.nullable(),
 })
 
 export const pendingAchievementSchema = z.object({
@@ -32,28 +60,12 @@ export const pendingAchievementSchema = z.object({
   rarity: achievementRaritySchema,
 })
 
-export const achievementRarityStatSchema = z.object({
-  rarity: achievementRaritySchema,
-  label: z.string(),
-  total: z.number().int(),
-  unlocked: z.number().int(),
-})
-
 /**
  * WebSocket 推来的解锁通知。比 `/achievements/pending` 多一个 `kind` ——
  * 题单奖章和成就来自两张表、id 会重叠，前端靠它区分（见 events.ts 的 publishAchievementNotification）。
  */
 export const achievementNotificationSchema = pendingAchievementSchema.extend({
   kind: z.enum(["achievement", "badge"]),
-})
-
-export const achievementSummarySchema = z.object({
-  username: z.string(),
-  total: z.number().int(),
-  unlocked: z.number().int(),
-  percent: z.number(),
-  rarity: z.array(achievementRarityStatSchema),
-  recent: z.array(pendingAchievementSchema),
 })
 
 export const markAchievementsReadSchema = z.object({
@@ -63,9 +75,8 @@ export const markAchievementsReadSchema = z.object({
 export type Achievement = z.infer<typeof achievementSchema>
 export type AchievementList = z.infer<typeof achievementListSchema>
 export type PendingAchievement = z.infer<typeof pendingAchievementSchema>
-export type AchievementSummary = z.infer<typeof achievementSummarySchema>
+export type AchievementClassBoard = z.infer<typeof achievementClassBoardSchema>
 export type AchievementRarity = z.infer<typeof achievementRaritySchema>
-export type AchievementRarityStat = z.infer<typeof achievementRarityStatSchema>
 export type AchievementNotification = z.infer<typeof achievementNotificationSchema>
 
 export type MarkAchievementsRead = z.infer<typeof markAchievementsReadSchema>
