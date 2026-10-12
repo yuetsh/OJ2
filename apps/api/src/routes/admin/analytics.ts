@@ -1,5 +1,5 @@
 /**
- * 学情分析里的「卡点分析」和「历年概况」。
+ * 学情分析里的「卡点分析」和「年度趋势」（这届和往届比）。
  *
  * 两边共用一个口径：**人 × 题**。原来的卡点数的是「错过一次的人」，全部时间、不分班 ——
  * 阿福讲白搭显示 325 人卡住，交过的 782 人里其实 753 人后来做对了，排在前面的只是做的人多。
@@ -20,8 +20,7 @@ import {
   STUDENT_ROLES,
   type StuckProblem,
   type StuckProblemDetail,
-  type YearlyOverview,
-  type YearlySummary,
+  type GradeTrendProblem,
 } from "@oj2/contract"
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
@@ -30,7 +29,7 @@ import { requireTeacher, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
 import { JudgeStatus } from "../../judge/status"
-import { schoolYearOf, schoolYearStart, schoolYearStartOf, shiftMonthsByCalendar } from "../../time"
+import { schoolYearOf } from "../../time"
 import { queryInteger } from "../helpers"
 
 export const adminAnalyticsRoutes = new Hono<AppEnv>()
@@ -242,126 +241,47 @@ adminAnalyticsRoutes.get("/problem-analytics/stuck/:id", requireTeacher, async (
   } satisfies StuckProblemDetail)
 })
 
-// ---------------------------------------------------------------- 历年概况
+// ---------------------------------------------------------------- 年度趋势：这届和往届比
 
-/** 「在用的年级」：这段时间里至少这么多人交过题的年级才列 */
-const GRADE_MIN_USERS = 20
+/** 一个格子（题 × 届）至少这么多人做过才给，再少的前端也不会拿来比 */
+const GRADE_CELL_MIN_USERS = 5
 
-adminAnalyticsRoutes.get("/problem-analytics/yearly", requireTeacher, async (c) => {
-  const now = new Date()
-  const current = schoolYearStart(now)
-  const [first] = await db.execute<{ year: number | null }>(sql`
-    select ${schoolYearOf(sql`min(create_time)`)} as year
-    from ${schema.submission} where contest_id is null
-  `)
-  const firstYear = Math.min(first?.year ?? current.year, current.year)
-
-  // 每个完整学年、进行中的学年（到现在），外加去年同期（上一学年开学到去年的今天）
-  const ranges: { key: number; year: number; from: string; to: string }[] = []
-  for (let year = firstYear; year <= current.year; year += 1) {
-    const to = year === current.year ? now.toISOString() : schoolYearStartOf(year + 1)
-    ranges.push({ key: year, year, from: schoolYearStartOf(year), to })
-  }
-  const hasLastYear = current.year - 1 >= firstYear
-  if (hasLastYear)
-    ranges.push({
-      key: -1,
-      year: current.year - 1,
-      from: schoolYearStartOf(current.year - 1),
-      to: shiftMonthsByCalendar(now, -12).toISOString(),
-    })
-
-  const values = sql.join(
-    ranges.map(
-      (range) => sql`(${range.key}::int, ${range.from}::timestamptz, ${range.to}::timestamptz)`,
-    ),
-    sql`, `,
-  )
+/**
+ * 每道题每一届的「一次就对」。届 = 班号前两位（253 → 25 级），没有班级或班号不是数字的不算。
+ * 「第一次交」按这个人在这道题上的全部历史算，和卡点同一个口径。比哪届、门槛多少都在前端，
+ * 换选项不用再取一遍。
+ */
+adminAnalyticsRoutes.get("/problem-analytics/grades", requireTeacher, async (c) => {
   const rows = await db.execute<{
-    key: number
+    id: number
+    display_id: string
+    title: string
+    grade: string
     users: number
-    submissions: number
-    problems: number
-    c_submissions: number
-    solved_pairs: number
-    started_pairs: number
-    first_try_pairs: number
-    solved_started: number
-    solved_tries: number
-    grades: string[] | null
+    first_try: number
   }>(sql`
-    with ranges(key, f, t) as (values ${values}),
-    s as (${studentSubmissions([])}),
+    with s as (${studentSubmissions([sql`u.class_name ~ '^[0-9]{3,}$'`])}),
     pairs as (
-      select min(create_time) as first_at, min(ac_at) as ac_at,
-        bool_or(rn = 1 and result in (${ACCEPTED})) as first_try,
-        count(*) filter (where ac_at is null or create_time <= ac_at) as tries
+      select problem_id, left(min(class_name), 2) as grade,
+        bool_or(rn = 1 and result in (${ACCEPTED})) as first_try
       from s group by user_id, problem_id
-    ),
-    sub_stats as (
-      select r.key, count(distinct s.user_id)::int as users, count(*)::int as submissions,
-        count(distinct s.problem_id)::int as problems,
-        count(*) filter (where s.language in ('C', 'C++'))::int as c_submissions
-      from s join ranges r on s.create_time >= r.f and s.create_time < r.t
-      group by r.key
-    ),
-    pair_stats as (
-      select r.key,
-        count(*) filter (where p.ac_at >= r.f and p.ac_at < r.t)::int as solved_pairs,
-        count(*) filter (where p.first_at >= r.f and p.first_at < r.t)::int as started_pairs,
-        count(*) filter (where p.first_at >= r.f and p.first_at < r.t and p.first_try)::int
-          as first_try_pairs,
-        count(*) filter (where p.first_at >= r.f and p.first_at < r.t and p.ac_at is not null)::int
-          as solved_started,
-        coalesce(sum(p.tries) filter (
-          where p.first_at >= r.f and p.first_at < r.t and p.ac_at is not null
-        ), 0)::int as solved_tries
-      from pairs p join ranges r
-        on (p.first_at >= r.f and p.first_at < r.t) or (p.ac_at >= r.f and p.ac_at < r.t)
-      group by r.key
-    ),
-    grade_stats as (
-      select key, json_agg(grade order by grade) as grades from (
-        select r.key, left(s.class_name, 2) as grade
-        from s join ranges r on s.create_time >= r.f and s.create_time < r.t
-        where s.class_name ~ '^[0-9]{3,}$'
-        group by r.key, left(s.class_name, 2)
-        having count(distinct s.user_id) >= ${GRADE_MIN_USERS}
-      ) g group by key
     )
-    select r.key, coalesce(sub.users, 0) as users, coalesce(sub.submissions, 0) as submissions,
-      coalesce(sub.problems, 0) as problems, coalesce(sub.c_submissions, 0) as c_submissions,
-      coalesce(ps.solved_pairs, 0) as solved_pairs, coalesce(ps.started_pairs, 0) as started_pairs,
-      coalesce(ps.first_try_pairs, 0) as first_try_pairs,
-      coalesce(ps.solved_started, 0) as solved_started,
-      coalesce(ps.solved_tries, 0) as solved_tries, gs.grades
-    from ranges r
-    left join sub_stats sub on sub.key = r.key
-    left join pair_stats ps on ps.key = r.key
-    left join grade_stats gs on gs.key = r.key
+    select p.id, p._id as display_id, p.title, pairs.grade,
+      count(*)::int as users, count(*) filter (where first_try)::int as first_try
+    from pairs join ${schema.problem} p on p.id = pairs.problem_id
+    group by p.id, pairs.grade
+    having count(*) >= ${GRADE_CELL_MIN_USERS}
   `)
-
-  const byKey = new Map(rows.map((row) => [row.key, row]))
-  const summary = (range: (typeof ranges)[number]): YearlySummary => {
-    const row = byKey.get(range.key)
-    return {
-      year: range.year,
-      until: range.to,
-      grades: row?.grades ?? [],
-      users: row?.users ?? 0,
-      submissions: row?.submissions ?? 0,
-      problems: row?.problems ?? 0,
-      solvedPairs: row?.solved_pairs ?? 0,
-      startedPairs: row?.started_pairs ?? 0,
-      firstTryPairs: row?.first_try_pairs ?? 0,
-      solvedStarted: row?.solved_started ?? 0,
-      solvedTries: row?.solved_tries ?? 0,
-      cSubmissions: row?.c_submissions ?? 0,
+  const problems = new Map<number, GradeTrendProblem>()
+  for (const row of rows) {
+    const problem = problems.get(row.id) ?? {
+      id: row.id,
+      displayId: row.display_id,
+      title: row.title,
+      grades: [],
     }
+    problem.grades.push({ grade: row.grade, users: row.users, firstTry: row.first_try })
+    problems.set(row.id, problem)
   }
-  const lastYear = ranges.find((range) => range.key === -1)
-  return success(c, {
-    years: ranges.filter((range) => range.key !== -1).map(summary),
-    lastYearToDate: lastYear ? summary(lastYear) : null,
-  } satisfies YearlyOverview)
+  return success(c, [...problems.values()] satisfies GradeTrendProblem[])
 })

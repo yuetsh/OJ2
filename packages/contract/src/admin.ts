@@ -584,31 +584,14 @@ export const stuckProblemDetailSchema = z.object({
   ),
 })
 
-export const yearlySummarySchema = z.object({
-  /** 学年起始年，2025 = 25–26 学年 */
-  year: z.number().int(),
-  /** 统计到哪天为止（不含），进行中的学年和去年同期才有意义 */
-  until: z.string(),
-  grades: z.array(z.string()),
-  users: z.number().int(),
-  submissions: z.number().int(),
-  problems: z.number().int(),
-  /** 这段时间里第一次做对的人题对 */
-  solvedPairs: z.number().int(),
-  /** 第一次交在这段时间里的人题对，和其中第一次就对的 */
-  startedPairs: z.number().int(),
-  firstTryPairs: z.number().int(),
-  /** 上面那批里做对了的，以及它们做对那次及之前一共交了几次 */
-  solvedStarted: z.number().int(),
-  solvedTries: z.number().int(),
-  cSubmissions: z.number().int(),
-})
-
-export const yearlyOverviewSchema = z.object({
-  /** 从最早的学年到现在这个学年（最后一个是进行中的，只算到今天） */
-  years: z.array(yearlySummarySchema),
-  /** 去年同期：上一个学年开学到「去年的今天」 */
-  lastYearToDate: yearlySummarySchema.nullable(),
+/** 年度趋势：一道题在各届（班号前两位）的「一次就对」，只给至少 5 人做过的格子 */
+export const gradeTrendProblemSchema = z.object({
+  id: z.number().int(),
+  displayId: z.string(),
+  title: z.string(),
+  grades: z.array(
+    z.object({ grade: z.string(), users: z.number().int(), firstTry: z.number().int() }),
+  ),
 })
 
 // ---------------------------------------------------------------- 自学情况
@@ -1000,8 +983,7 @@ export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
 export type StuckProblem = z.infer<typeof stuckProblemSchema>
 export type StuckStudent = z.infer<typeof stuckStudentSchema>
 export type StuckProblemDetail = z.infer<typeof stuckProblemDetailSchema>
-export type YearlySummary = z.infer<typeof yearlySummarySchema>
-export type YearlyOverview = z.infer<typeof yearlyOverviewSchema>
+export type GradeTrendProblem = z.infer<typeof gradeTrendProblemSchema>
 export type LearnBoard = z.infer<typeof learnBoardSchema>
 export type LearnBoardStudent = z.infer<typeof learnBoardStudentSchema>
 export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>

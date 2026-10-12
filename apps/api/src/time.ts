@@ -95,21 +95,6 @@ export function termStart(now: Date | number | string = new Date()): string {
   return fromWallClock(new Date(Date.UTC(termYear, termMonth - 1, 1))).toISOString()
 }
 
-/**
- * 学年从哪天零点（东八区）算起：9 月 1 日。返回 `{ year, start }`，`year` 是起始年
- * （2025 = 25–26 学年），`start` 是 ISO 字符串。SQL 里按学年分组用 `schoolYearOf()`，两边同一个口径。
- */
-export function schoolYearStart(now: Date | number | string = new Date()) {
-  const wall = toWallClock(now)
-  const year = wall.getUTCMonth() + 1 >= 9 ? wall.getUTCFullYear() : wall.getUTCFullYear() - 1
-  return { year, start: schoolYearStartOf(year) }
-}
-
-/** 某个学年起始年的 9 月 1 日零点（东八区），ISO 字符串 */
-export function schoolYearStartOf(year: number): string {
-  return fromWallClock(new Date(Date.UTC(year, 8, 1))).toISOString()
-}
-
 /** 按北京时间的日历做月份平移，日号超出目标月长度时截到月末，时分秒毫秒原样保留 */
 export function shiftMonthsByCalendar(instant: Date, months: number): Date {
   const wall = toWallClock(instant)
@@ -137,7 +122,7 @@ export function localTime(column: SQLWrapper) {
   return sql`(${column} at time zone ${TIME_ZONE_SQL})`
 }
 
-/** 时刻所在学年的起始年（9 月起算），和 `schoolYearStart()` 同一个口径 */
+/** 时刻所在学年的起始年：9 月 1 日起算，2025 = 25–26 学年 */
 export function schoolYearOf(column: SQLWrapper) {
   return sql<number>`extract(year from ${localTime(column)} - interval '8 months')::int`
 }
