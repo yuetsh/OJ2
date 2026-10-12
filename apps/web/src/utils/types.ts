@@ -9,7 +9,6 @@ import type {
   UserProfile,
   EmbeddedSubmission as ContractEmbeddedSubmission,
   Message as ContractMessage,
-  Grade,
   ProblemDifficulty,
   JudgeStatus,
   AstRules,
@@ -465,16 +464,7 @@ export type Exercise = Omit<AdminExercise, "data"> & {
     | ExerciseGroupData
 }
 
-export type {
-  DurationData,
-  FlowchartSummary,
-  SolvedProblem,
-  SolvedList,
-  AiDetail as DetailsData,
-} from "@oj2/contract"
-
-// 评级。空串是「无评级」，后端在没有可用数据时真会下发，见契约 gradeSchema
-export type { Grade, ProblemDifficulty }
+export type { ProblemDifficulty }
 
 // ==================== 成就相关类型 ====================
 

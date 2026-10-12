@@ -171,7 +171,7 @@ onMounted(() => {
       @click="
         router.push({
           name: 'ai',
-          query: { username: profile.user.username, duration: 'months:6' },
+          query: { username: profile.user.username },
         })
       "
     >

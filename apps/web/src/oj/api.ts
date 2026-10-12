@@ -1,5 +1,7 @@
 import {
   type AiAnalysisRecord,
+  type LearningPeriod,
+  type LearningReport,
   type AiHintFeedbackRequest,
   type Contest,
   type ContestAccess,
@@ -35,10 +37,6 @@ import {
   type FlowchartScores,
   type FlowchartList,
   type FlowchartSubmission,
-  type AiDetail,
-  type DurationData,
-  type HeatmapItem,
-  type SolvedList,
   type ProblemSet,
   type ProblemSetClassView,
   type ProblemSetList,
@@ -409,36 +407,18 @@ export function getTutorials(type: "python" | "c") {
   return api.get<TutorialSummary[]>("tutorials", { params: { type } })
 }
 
-export function getAIDetailData(start: string, end: string, username?: string) {
-  return api.get<AiDetail>("ai/detail", { params: { start, end, username } })
-}
-
-export function getAISolved(
-  start: string,
-  end: string,
-  offset: number,
-  limit: number,
-  username?: string,
-) {
-  return api.get<SolvedList>("ai/solved", {
-    params: { start, end, offset, limit, username },
+/** 智能分析整页的数据。username 只有老师传才生效，学生传了也只会拿到自己 */
+export function getLearningReport(period: LearningPeriod, username?: string) {
+  return api.get<LearningReport>("ai/report", {
+    params: { period, username: username || undefined },
   })
 }
 
-export function getAIDurationData(end: string, duration: string, username?: string) {
-  return api.get<DurationData[]>("ai/duration", {
-    params: { end, duration, username },
+/** 这个时间段上次生成的 AI 小结（老师钉住的优先），没有为 null */
+export function getLatestAnalysis(period: LearningPeriod, username?: string) {
+  return api.get<AiAnalysisRecord | null>("ai/analysis/latest", {
+    params: { period, username: username || undefined },
   })
-}
-
-export function getAIHeatmapData(username?: string) {
-  return api.get<HeatmapItem[]>("ai/heatmap", {
-    params: username ? { username } : {},
-  })
-}
-
-export function getAIPinnedReport() {
-  return api.get<AiAnalysisRecord | null>("ai/pinned")
 }
 
 /** 学生评价一条 AI 提示。id 来自 /ai/hint 流的 done 事件，可以改票 */

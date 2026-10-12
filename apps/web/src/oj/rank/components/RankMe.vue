@@ -196,7 +196,7 @@ function threatNote(me: RankRow, behind: RankRow) {
       >
         <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
       </svg>
-      看我的智能分析：哪类题卡得多、哪段时间最常做题 ›
+      看我的智能分析：每节课做得怎样、哪几道还差一点 ›
     </router-link>
   </div>
 </template>
