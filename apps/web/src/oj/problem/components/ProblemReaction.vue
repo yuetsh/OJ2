@@ -270,7 +270,7 @@ function sectorAriaLabel(index: number) {
     aria-label="题目点评"
   >
     <p v-if="choosable" class="hint">
-      选一块最接近的，<b>每道题只能评一次</b>。选完就能看到大家是怎么选的
+      选一块最接近的，<b>每道题只能评一次</b>{{ guard ? "" : "。选完就能看到大家是怎么选的" }}
     </p>
 
     <div

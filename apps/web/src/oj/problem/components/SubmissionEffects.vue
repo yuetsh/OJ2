@@ -53,7 +53,6 @@ async function openReview() {
   try {
     const res = await getReaction(problem.value!.id)
     if (res.mine === null) {
-      reviewed.value = false
       commentPanel.value = true
       return
     }
@@ -84,12 +83,12 @@ function closeCommentPanel() {
 }
 
 /**
- * 评完不马上关：弹窗里换成大家怎么选的，下面只有一个按钮，焦点落在它上面。
- * 按钮去哪：刚才点「下一题」之类被拦下的，就接着去那里；否则是这节课的下一题
- * （和结果页签里 LessonNext 同一个算法）；都没有就是「好的」，关掉回到结果页签。
+ * 选完一块就关（点一次就够，大家怎么选的在抽屉里的「点评」能看）。
+ * 关掉之后去哪：刚才点「下一题」之类被拦下的，就接着去那里；否则回到结果页签。
+ *
+ * 读不出点评、交点评失败时弹窗关不掉，下面那个按钮是唯一出口：被拦下的写「继续」，
+ * 否则是这节课的下一题（和结果页签里 LessonNext 同一个算法），都没有就是「好的」。
  */
-const reviewed = ref(false)
-const continueButton = useTemplateRef<{ $el: HTMLElement }>("continueButton")
 const lessonStore = useLessonStore()
 
 /** 题目名中位 7 字、最长 33 字，按钮里放不下那么长的 */
@@ -106,12 +105,6 @@ const continueAction = computed(() => {
     }
   return { label: "好的", target: null }
 })
-
-async function onReviewed() {
-  reviewed.value = true
-  await nextTick()
-  continueButton.value?.$el.focus()
-}
 
 function continueAfterReview() {
   const target = continueAction.value.target
@@ -250,17 +243,17 @@ watch(
   <n-modal
     v-model:show="commentPanel"
     preset="card"
-    :title="reviewed ? '大家是这样觉得的' : '做对了！说说你对这道题的感受吧'"
+    title="做对了！说说你对这道题的感受吧"
     :mask-closable="false"
     :closable="false"
     :close-on-esc="false"
     :auto-focus="false"
     style="width: min(600px, calc(100vw - 32px))"
   >
-    <ProblemReaction guard @submitted="onReviewed">
+    <ProblemReaction guard @submitted="closeCommentPanel">
       <template #after>
         <n-flex justify="end">
-          <n-button ref="continueButton" type="primary" @click="continueAfterReview">
+          <n-button type="primary" @click="continueAfterReview">
             {{ continueAction.label }}
           </n-button>
         </n-flex>
