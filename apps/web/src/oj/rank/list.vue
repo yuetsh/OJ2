@@ -428,6 +428,7 @@ async function restore(userId: number) {
             @analysis="openAnalysis"
             @hide="hide"
             @clear-mood="confirmClearMood"
+            @mood-saved="onMoodSaved"
           />
         </template>
         <div v-else-if="!loading" class="empty">排名没取到，刷新一下试试</div>

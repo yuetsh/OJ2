@@ -4,6 +4,7 @@ import { useThemeVars, type DropdownOption } from "naive-ui"
 import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useRankPalette } from "../palette"
+import MoodPopover from "./MoodPopover.vue"
 import RankAvatar from "./RankAvatar.vue"
 
 /**
@@ -19,8 +20,10 @@ import RankAvatar from "./RankAvatar.vue"
  * 桌面的条只有百来像素（老师那边多一个「⋯」，七十来像素），压不下文字标签：「前一名」
  * 「后一名」靠条的颜色认（和右边「你」卡里两个标签同色），「进步最大」改成涨跌那一格的橙底徽章。手机每行有空，标签照旧。
  *
- * 个性签名（设计稿「签名 A」）：桌面一行只有一百来像素的条，放不下一句话，所以有签名的
- * 名字后面挂一个引号，指上去看；手机每行本来就有空，签名直接写在名字后面。
+ * 个性签名（设计稿「签名直接写在赛道上」T1）：写了签名的人名字下面多一行，直接写出来，
+ * 不再藏在引号后面指上去才看得到（用户：排名上看不出签名）。桌面这一行从名字底下一直伸到
+ * 本栏末尾，能露二十多个字；手机挪到名字下面一行。你还没写的话，你那行（桌面）挂一个
+ * 「写一句个性签名」，和「你」卡点开的是同一个框。
  */
 const props = defineProps<{
   rows: RankRow[]
@@ -48,6 +51,7 @@ const emit = defineEmits<{
   analysis: [username: string]
   hide: [row: RankRow]
   clearMood: [row: RankRow]
+  moodSaved: [mood: string | null]
 }>()
 
 const theme = useThemeVars()
@@ -109,11 +113,31 @@ function expandGap() {
   if (!props.complete) emit("expand")
 }
 
-/** 两栏：前一半、后一半。手机一栏 */
+/** 桌面每一项大约多高：带签名（或「写一句」）的行多一行，两栏按高度对半分，不按人数 */
+function heightOf(item: Item) {
+  if (item.kind === "gap") return 48
+  return hasSecondLine(item.row) ? 56 : 36
+}
+
+function hasSecondLine(row: RankRow) {
+  return !!row.mood || row.user.id === props.meId
+}
+
+/** 两栏：前一半、后一半（按高度）。手机一栏 */
 const columns = computed(() => {
   if (!isDesktop.value) return [items.value]
-  const half = Math.ceil(items.value.length / 2)
-  return [items.value.slice(0, half), items.value.slice(half)]
+  const total = items.value.reduce((sum, item) => sum + heightOf(item), 0)
+  let acc = 0
+  let cut = items.value.length
+  for (const [index, item] of items.value.entries()) {
+    const h = heightOf(item)
+    if (acc + h / 2 > total / 2) {
+      cut = index
+      break
+    }
+    acc += h
+  }
+  return [items.value.slice(0, cut), items.value.slice(cut)]
 })
 
 function barColor(row: RankRow) {
@@ -175,7 +199,7 @@ function onMenu(key: string, row: RankRow) {
         <div
           v-else-if="!isDesktop"
           class="prow"
-          :class="{ me: item.row.user.id === meId, zero: !item.row.solved }"
+          :class="{ me: item.row.user.id === meId, zero: !item.row.solved, tall: !!item.row.mood }"
         >
           <span class="fill" :style="{ width: width(item.row), background: fillColor(item.row) }" />
           <span class="rank">{{ item.row.solved ? item.row.rank : "—" }}</span>
@@ -185,13 +209,17 @@ function onMenu(key: string, row: RankRow) {
             :size="20"
             :me="item.row.user.id === meId"
           />
-          <button class="who" @click="emit('open', item.row.user.username)">
-            <UserName :username="item.row.user.username" />
-          </button>
-          <span class="mood">{{ item.row.mood }}</span>
-          <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
-          <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
-          <span v-else-if="item.row.user.id === hotId" class="tag hot">进步最大</span>
+          <div class="pmain">
+            <div class="pname">
+              <button class="who" @click="emit('open', item.row.user.username)">
+                <UserName :username="item.row.user.username" />
+              </button>
+              <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
+              <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
+              <span v-else-if="item.row.user.id === hotId" class="tag hot">进步最大</span>
+            </div>
+            <span v-if="item.row.mood" class="sig">“{{ item.row.mood }}”</span>
+          </div>
           <span class="solved">{{ item.row.solved }}</span>
           <span class="change">
             <span v-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
@@ -209,58 +237,73 @@ function onMenu(key: string, row: RankRow) {
             <button class="more" aria-label="更多">⋯</button>
           </n-dropdown>
         </div>
-        <div v-else class="lane" :class="{ me: item.row.user.id === meId, zero: !item.row.solved }">
-          <span class="rank">{{ item.row.solved ? item.row.rank : "—" }}</span>
-          <RankAvatar
-            :username="item.row.user.username"
-            :avatar="item.row.avatar"
-            :size="20"
-            :me="item.row.user.id === meId"
-          />
-          <n-tooltip :disabled="!item.row.mood" :style="{ maxWidth: '300px' }">
-            <template #trigger>
-              <button class="who" @click="emit('open', item.row.user.username)">
-                <UserName :username="item.row.user.username" />
+        <div
+          v-else
+          class="entry"
+          :class="{ me: item.row.user.id === meId, zero: !item.row.solved }"
+        >
+          <div class="lane">
+            <span class="rank">{{ item.row.solved ? item.row.rank : "—" }}</span>
+            <RankAvatar
+              :username="item.row.user.username"
+              :avatar="item.row.avatar"
+              :size="20"
+              :me="item.row.user.id === meId"
+            />
+            <button class="who" @click="emit('open', item.row.user.username)">
+              <UserName :username="item.row.user.username" />
+            </button>
+            <span class="bar-box" :style="{ background: palette.track }">
+              <span
+                class="bar"
+                :style="{ width: width(item.row), background: barColor(item.row) }"
+              />
+            </span>
+            <span class="solved">{{ item.row.solved }}</span>
+            <span class="change">
+              <span v-if="item.row.user.id === hotId" class="up hot" title="进步最大"
+                >↑{{ item.row.change }}</span
+              >
+              <span v-else-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
+              <span v-else-if="(item.row.change ?? 0) < 0" class="down"
+                >↓{{ -item.row.change! }}</span
+              >
+              <span v-else-if="item.row.change === 0" class="flat">—</span>
+            </span>
+            <n-dropdown
+              v-if="teacher"
+              trigger="click"
+              :options="menuOf(item.row)"
+              @select="(key: string) => onMenu(key, item.row)"
+            >
+              <button class="more" aria-label="更多">⋯</button>
+            </n-dropdown>
+          </div>
+          <div v-if="item.row.mood" class="sig line">
+            <n-ellipsis :tooltip="{ contentStyle: { maxWidth: '300px' } }"
+              >“{{ item.row.mood }}”</n-ellipsis
+            >
+          </div>
+          <div v-else-if="item.row.user.id === meId" class="line">
+            <MoodPopover :mood="null" @saved="emit('moodSaved', $event)">
+              <button class="write">
                 <svg
-                  v-if="item.row.mood"
-                  class="quote"
-                  width="11"
-                  height="11"
+                  width="12"
+                  height="12"
                   viewBox="0 0 24 24"
-                  fill="currentColor"
-                  role="img"
-                  aria-label="有个性签名"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
                 >
-                  <path
-                    d="M4 18v-5c0-4 2-7 6-8l1 2c-2 1-3 2.5-3 4h3v7zm9 0v-5c0-4 2-7 6-8l1 2c-2 1-3 2.5-3 4h3v7z"
-                  />
+                  <path d="M4 20h4L19 9l-4-4L4 16z" />
                 </svg>
+                写一句个性签名
               </button>
-            </template>
-            {{ item.row.mood }}
-          </n-tooltip>
-          <span class="bar-box" :style="{ background: palette.track }">
-            <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
-          </span>
-          <span class="solved">{{ item.row.solved }}</span>
-          <span class="change">
-            <span v-if="item.row.user.id === hotId" class="up hot" title="进步最大"
-              >↑{{ item.row.change }}</span
-            >
-            <span v-else-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
-            <span v-else-if="(item.row.change ?? 0) < 0" class="down"
-              >↓{{ -item.row.change! }}</span
-            >
-            <span v-else-if="item.row.change === 0" class="flat">—</span>
-          </span>
-          <n-dropdown
-            v-if="teacher"
-            trigger="click"
-            :options="menuOf(item.row)"
-            @select="(key: string) => onMenu(key, item.row)"
-          >
-            <button class="more" aria-label="更多">⋯</button>
-          </n-dropdown>
+            </MoodPopover>
+          </div>
         </div>
       </template>
     </div>
@@ -301,7 +344,8 @@ function onMenu(key: string, row: RankRow) {
 
 .prow {
   position: relative;
-  height: 38px;
+  min-height: 38px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -331,20 +375,67 @@ function onMenu(key: string, row: RankRow) {
   border-radius: 6px;
 }
 
-.prow .who {
-  width: auto;
-  max-width: 120px;
+.prow.tall {
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
 
-/* 手机：签名跟在名字后面，一行放不下就省略 */
-.mood {
+/* 手机：名字一行，签名在名字下面一行 */
+.pmain {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pname {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.prow .who {
+  width: auto;
+  min-width: 0;
+}
+
+.sig {
+  display: block;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  line-height: 18px;
+  color: v-bind("theme.textColor2");
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 桌面：签名那一行从名字底下（名次 28 + 头像 20 + 两个 8 的间距）伸到本栏末尾 */
+.line {
+  margin: -6px 0 4px 64px;
+}
+
+.line :deep(.n-ellipsis) {
+  max-width: 100%;
+}
+
+.write {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  border: 1px dashed rgba(24, 160, 88, 0.6);
+  border-radius: 11px;
+  background: v-bind("theme.cardColor");
+  color: #18a058;
+  font: inherit;
+  font-size: var(--oj-fs-meta);
+  cursor: pointer;
+}
+
+.write:hover {
+  border-style: solid;
 }
 
 .prow .rank {
@@ -364,14 +455,14 @@ function onMenu(key: string, row: RankRow) {
   color: #0c7a43;
 }
 
-.lane.me {
+.entry.me {
   margin: 0 -8px;
   padding: 0 8px;
   border-radius: 6px;
   background: rgba(24, 160, 88, 0.12);
 }
 
-.lane.zero {
+.entry.zero {
   opacity: 0.55;
 }
 
@@ -402,11 +493,6 @@ function onMenu(key: string, row: RankRow) {
   align-items: center;
   gap: 3px;
   min-width: 0;
-}
-
-.quote {
-  flex-shrink: 0;
-  color: v-bind("theme.textColor3");
 }
 
 .bar-box {

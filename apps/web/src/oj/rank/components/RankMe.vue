@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { MOOD_MAX, type RankRow } from "@oj2/contract"
+import type { RankRow } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { updateProfile } from "oj/api"
-import { useUserStore } from "shared/store/user"
 import UserName from "shared/components/UserName.vue"
 import { gapText, toPass } from "../utils"
+import MoodPopover from "./MoodPopover.vue"
 import RankAvatar from "./RankAvatar.vue"
 
 export interface MiniRank {
@@ -23,7 +22,7 @@ export interface MiniRank {
  * 用词只说位置（前一名 / 后一名 / 进步最大），不用「追」「对手」「冲」：用户指出
  * 「要追的」「追你」会被中学生读成追求谁，「冲得最猛」也容易误会。
  *
- * 个性签名（设计稿「签名 A」）：自己的签名挂在大字下面，「改」就地改，不用跳去设置页；
+ * 个性签名：自己的签名挂在大字下面，「改」就地改，不用跳去设置页；
  * 没写的给一句「写一句个性签名」。前一名、后一名的签名挂在他们名字下面。
  */
 const props = defineProps<{
@@ -45,36 +44,6 @@ const props = defineProps<{
 const emit = defineEmits<{ moodSaved: [mood: string | null] }>()
 
 const theme = useThemeVars()
-const message = useMessage()
-const userStore = useUserStore()
-
-const editing = ref(false)
-const draft = ref("")
-const saving = ref(false)
-
-watch(editing, (open) => {
-  if (open) draft.value = props.me.mood ?? ""
-})
-
-async function saveMood() {
-  const mood = draft.value.trim()
-  if (mood.length > MOOD_MAX) {
-    message.warning(`个性签名最多 ${MOOD_MAX} 个字`)
-    return
-  }
-  saving.value = true
-  try {
-    await updateProfile({ mood })
-    if (userStore.profile) userStore.profile.mood = mood || null
-    emit("moodSaved", mood || null)
-    editing.value = false
-    message.success(mood ? "签名改好了" : "签名清空了")
-  } catch {
-    message.error("没保存上，再试一次")
-  } finally {
-    saving.value = false
-  }
-}
 
 const beyond = computed(() => !!props.cap && props.me.rank > props.cap)
 
@@ -126,37 +95,14 @@ function threatNote(me: RankRow, behind: RankRow) {
         </div>
       </div>
     </div>
-    <n-popover
-      v-model:show="editing"
-      trigger="click"
-      placement="bottom-start"
-      :style="{ width: '300px' }"
-    >
-      <template #trigger>
-        <button v-if="me.mood" class="mood" aria-label="改个性签名">
-          <span class="quote-mark" aria-hidden="true">“</span>
-          <n-ellipsis class="mood-text" :line-clamp="2" :tooltip="false">{{ me.mood }}</n-ellipsis>
-          <span class="mood-edit">
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M4 20h4L19 9l-4-4L4 16z" />
-            </svg>
-            改
-          </span>
-        </button>
-        <button v-else class="mood empty">
+    <MoodPopover :mood="me.mood" @saved="emit('moodSaved', $event)">
+      <button v-if="me.mood" class="mood" aria-label="改个性签名">
+        <span class="quote-mark" aria-hidden="true">“</span>
+        <n-ellipsis class="mood-text" :line-clamp="2" :tooltip="false">{{ me.mood }}</n-ellipsis>
+        <span class="mood-edit">
           <svg
-            width="13"
-            height="13"
+            width="12"
+            height="12"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -167,28 +113,26 @@ function threatNote(me: RankRow, behind: RankRow) {
           >
             <path d="M4 20h4L19 9l-4-4L4 16z" />
           </svg>
-          写一句个性签名，上了领奖台全班都看得到
-        </button>
-      </template>
-      <form class="mood-form" @submit.prevent="saveMood">
-        <label class="mood-label" for="rank-mood-input">个性签名</label>
-        <n-input
-          v-model:value="draft"
-          :input-props="{ id: 'rank-mood-input' }"
-          :maxlength="MOOD_MAX"
-          show-count
-          clearable
-          placeholder="写点什么，让大家认识你"
-          autofocus
-        />
-        <div class="mood-actions">
-          <n-button size="small" @click="editing = false">取消</n-button>
-          <n-button size="small" type="primary" attr-type="submit" :loading="saving">
-            保存
-          </n-button>
-        </div>
-      </form>
-    </n-popover>
+          改
+        </span>
+      </button>
+      <button v-else class="mood empty">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M4 20h4L19 9l-4-4L4 16z" />
+        </svg>
+        写一句个性签名，全班都看得到
+      </button>
+    </MoodPopover>
     <div v-if="headline" class="headline">
       <svg
         width="18"
@@ -425,23 +369,6 @@ function threatNote(me: RankRow, behind: RankRow) {
   font-size: var(--oj-fs-meta);
   color: #18a058;
   white-space: nowrap;
-}
-
-.mood-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.mood-label {
-  font-size: var(--oj-fs-sec);
-  font-weight: 600;
-}
-
-.mood-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 .rival-name {
