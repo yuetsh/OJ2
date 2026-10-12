@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { sampleUserSchema } from "./common"
+import { achievementRaritySchema } from "./achievement"
 import { userProfileSchema } from "./auth"
 
 /** 个性签名最多几个字。以前是 256，排名上要露出来后改成 30（九成签名本来就不超过 26 字） */
@@ -17,14 +18,6 @@ export const updateProfileRequestSchema = z.object({
   avatar: z.string().max(256).optional(),
   /** 排名上要挂出来（`MOOD_MAX`），太长了榜上放不下 */
   mood: z.string().trim().max(MOOD_MAX, `个性签名最多 ${MOOD_MAX} 个字`).nullable().optional(),
-})
-
-export const metricsSchema = z.object({
-  now: z.string(),
-  latest: z.string(),
-  first: z.string(),
-  /** 有提交的日历天数（东八区），不是首末提交之间跨了多少天 */
-  activeDays: z.number().int(),
 })
 
 export const rankProfileSchema = z.object({
@@ -84,7 +77,6 @@ export type ProblemRank = z.infer<typeof problemRankSchema>
 export type RankProfile = z.infer<typeof rankProfileSchema>
 export type WeeklyRankItem = z.infer<typeof weeklyRankItemSchema>
 export type WeeklyRank = z.infer<typeof weeklyRankSchema>
-export type Metrics = z.infer<typeof metricsSchema>
 
 export type PublicProfile = z.infer<typeof publicProfileSchema>
 
@@ -120,3 +112,72 @@ export const knowledgeMapSchema = z.object({
 
 export type KnowledgeLevel = z.infer<typeof knowledgeLevelSchema>
 export type KnowledgeMap = z.infer<typeof knowledgeMapSchema>
+
+/**
+ * 个人主页（`/profiles/:username/overview`，设计稿「我的主页与设置」定稿）。
+ *
+ * 看自己、同学看、老师看是同一份接口，差别在后端按看的人裁：`unsolved` 和 `knowledge`
+ * 只给本人和老师（知识点不开放给同学 —— 开放了就成了另一张排行榜），同学拿到的是 null。
+ */
+export const profileSolvedSchema = z.object({
+  displayId: z.string(),
+  title: z.string(),
+  /** 第一次做对的时刻，按它分天 */
+  solvedAt: z.string(),
+  /** 知识点标签（category = knowledge），「按知识点」看时按它分组 */
+  tags: z.array(z.string()),
+})
+
+export const profileUnsolvedSchema = z.object({
+  displayId: z.string(),
+  title: z.string(),
+  attempts: z.number().int(),
+})
+
+export const profileAchievementSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  description: z.string(),
+  icon: z.string(),
+  rarity: achievementRaritySchema,
+  unlockTime: z.string(),
+})
+
+export const profileOverviewSchema = z.object({
+  /** 四个时间（用户 2026-10-12 要求保留）。一次没交过时前两个为 null、activeDays 为 0 */
+  firstSubmissionAt: z.string().nullable(),
+  latestSubmissionAt: z.string().nullable(),
+  /** 有提交的日历天数（东八区），比赛提交也算 */
+  activeDays: z.number().int(),
+  now: z.string(),
+  /** 这学期在本班第几（和排名页同口径）。没班级、一道没做对、不计入排名、不是学生时为 null */
+  classRank: z.object({ rank: z.number().int(), total: z.number().int() }).nullable(),
+  /** 被老师设成不计入排名。只告诉本人和老师，同学看到的恒为 false */
+  rankHidden: z.boolean(),
+  /** 做对的题，新的在前；比赛里的提交不算 */
+  solved: z.array(profileSolvedSchema),
+  /** 交过还没做对的题，最近交的在前；同学看时为 null */
+  unsolved: z.array(profileUnsolvedSchema).nullable(),
+  knowledge: knowledgeMapSchema.nullable(),
+  /**
+   * 同学看他时的「你和他」：你做对几道、其中几道他也做对了、你在本班第几（同班才有）。
+   * 本人、老师看时为 null
+   */
+  versus: z
+    .object({
+      solved: z.number().int(),
+      both: z.number().int(),
+      classRank: z.object({ rank: z.number().int(), total: z.number().int() }).nullable(),
+    })
+    .nullable(),
+  achievements: z.object({
+    total: z.number().int(),
+    /** 解锁了的，新的在前 */
+    unlocked: z.array(profileAchievementSchema),
+  }),
+})
+
+export type ProfileSolved = z.infer<typeof profileSolvedSchema>
+export type ProfileUnsolved = z.infer<typeof profileUnsolvedSchema>
+export type ProfileAchievement = z.infer<typeof profileAchievementSchema>
+export type ProfileOverview = z.infer<typeof profileOverviewSchema>

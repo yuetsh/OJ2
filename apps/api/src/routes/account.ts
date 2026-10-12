@@ -7,7 +7,7 @@ import {
   updateProfileRequestSchema,
   type KnowledgeLevel,
   type KnowledgeMap,
-  type Metrics,
+  type ProfileOverview,
   type ProblemRank,
   type WeeklyRank,
   type WeeklyRankItem,
@@ -16,6 +16,7 @@ import {
   and,
   count,
   countDistinct,
+  desc,
   eq,
   gte,
   inArray,
@@ -41,8 +42,9 @@ import { getBooleanOption } from "../services/options"
 import { sniffImageExtension } from "../services/image"
 import { getUserProfileById } from "../services/profile"
 import { clientIp, countAttempt, lockoutRemaining, type AttemptRule } from "../services/throttling"
-import { localTime, weekStart } from "../time"
-import { asRecord, queryInteger, sampleUser } from "./helpers"
+import { audienceWhere, loadEntrants, SOLVED_RESULTS, standings } from "../services/ranking"
+import { localTime, termStart, weekStart } from "../time"
+import { asRecord, isTeacherOrAbove, sampleUser } from "./helpers"
 
 export const accountRoutes = new Hono<AppEnv>()
 
@@ -143,6 +145,181 @@ accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
   return success(c, profile)
 })
 
+/**
+ * 个人主页那一页的数据（设计稿「我的主页与设置」定稿）。看的人是本人、同学还是老师，
+ * 由这里裁：交过没做对的题和知识点只给本人和老师；不计入排名只告诉本人和老师。
+ */
+accountRoutes.get("/profiles/:username/overview", requireAuth, async (c) => {
+  const viewer = c.get("user")!
+  const [target] = await db
+    .select({
+      id: schema.user.id,
+      className: schema.user.className,
+      adminType: schema.user.adminType,
+      rankHiddenAt: schema.user.rankHiddenAt,
+    })
+    .from(schema.user)
+    .where(
+      and(
+        sql`lower(${schema.user.username}) = lower(${c.req.param("username")})`,
+        eq(schema.user.isDisabled, false),
+      ),
+    )
+    .limit(1)
+  if (!target) return failure(c, 404, "user-not-found", "没有这个用户")
+  const privileged = target.id === viewer.id || isTeacherOrAbove(viewer)
+  const isStudent = (STUDENT_ROLES as readonly string[]).includes(target.adminType)
+
+  const firstSolved = min(schema.submission.createTime)
+  const lastTried = max(schema.submission.createTime)
+  const [times, solved, unsolved, knowledge, achievements, achievementTotal, classStandings] =
+    await Promise.all([
+      // 比赛提交也算：首末提交、学习天数一直是连比赛一起算的
+      db
+        .select({
+          first: min(schema.submission.createTime),
+          latest: max(schema.submission.createTime),
+          activeDays: countDistinct(sql`date(${localTime(schema.submission.createTime)})`),
+        })
+        .from(schema.submission)
+        .where(eq(schema.submission.userId, target.id)),
+      db
+        .select({
+          problemId: schema.submission.problemId,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+          solvedAt: firstSolved,
+        })
+        .from(schema.submission)
+        .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
+        .where(
+          and(
+            eq(schema.submission.userId, target.id),
+            isNull(schema.submission.contestId),
+            inArray(schema.submission.result, SOLVED_RESULTS),
+          ),
+        )
+        .groupBy(schema.submission.problemId, schema.problem.displayId, schema.problem.title)
+        .orderBy(desc(firstSolved), schema.problem.displayId),
+      privileged
+        ? db
+            .select({
+              displayId: schema.problem.displayId,
+              title: schema.problem.title,
+              attempts: count(),
+            })
+            .from(schema.submission)
+            .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
+            .where(
+              and(eq(schema.submission.userId, target.id), isNull(schema.submission.contestId)),
+            )
+            .groupBy(schema.submission.problemId, schema.problem.displayId, schema.problem.title)
+            .having(sql`not bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`)
+            .orderBy(desc(lastTried))
+        : null,
+      privileged ? knowledgeMapOf(target.id, target.className) : null,
+      db
+        .select({
+          id: schema.achievement.id,
+          name: schema.achievement.name,
+          description: schema.achievement.description,
+          icon: schema.achievement.icon,
+          rarity: schema.achievement.rarity,
+          unlockTime: schema.userAchievement.unlockTime,
+        })
+        .from(schema.userAchievement)
+        .innerJoin(
+          schema.achievement,
+          eq(schema.achievement.id, schema.userAchievement.achievementId),
+        )
+        .where(
+          and(eq(schema.userAchievement.userId, target.id), eq(schema.achievement.visible, true)),
+        )
+        .orderBy(desc(schema.userAchievement.unlockTime), schema.achievement.order),
+      db
+        .select({ total: count() })
+        .from(schema.achievement)
+        .where(eq(schema.achievement.visible, true)),
+      // 这学期本班第几，和排名页同口径（不计入排名的人不在 rankedStudents 里，自然查不到）
+      isStudent && target.className && !target.rankHiddenAt
+        ? loadEntrants(audienceWhere("class", target.className), termStart()).then((entrants) =>
+            standings(entrants, null, true),
+          )
+        : [],
+    ])
+
+  const tagRows = solved.length
+    ? await db
+        .select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name })
+        .from(schema.problemTags)
+        .innerJoin(schema.problemTag, eq(schema.problemTag.id, schema.problemTags.problemtagId))
+        .where(
+          and(
+            eq(schema.problemTag.category, "knowledge"),
+            inArray(
+              schema.problemTags.problemId,
+              solved.map((row) => row.problemId),
+            ),
+          ),
+        )
+        .orderBy(schema.problemTag.name)
+    : []
+  const tagsOf = new Map<number, string[]>()
+  for (const row of tagRows) {
+    const list = tagsOf.get(row.problemId)
+    if (list) list.push(row.name)
+    else tagsOf.set(row.problemId, [row.name])
+  }
+
+  const mine = classStandings.find((row) => row.entrant.id === target.id && row.solved > 0)
+
+  // 「你和他」：只有同学看同学才给
+  let versus: ProfileOverview["versus"] = null
+  if (!privileged) {
+    const viewerSolved = await db
+      .selectDistinct({ problemId: schema.submission.problemId })
+      .from(schema.submission)
+      .where(
+        and(
+          eq(schema.submission.userId, viewer.id),
+          isNull(schema.submission.contestId),
+          inArray(schema.submission.result, SOLVED_RESULTS),
+        ),
+      )
+    const theirs = new Set(solved.map((row) => row.problemId))
+    const me = classStandings.find((row) => row.entrant.id === viewer.id && row.solved > 0)
+    versus = {
+      solved: viewerSolved.length,
+      both: viewerSolved.filter((row) => theirs.has(row.problemId)).length,
+      classRank: me ? { rank: me.rank, total: classStandings.length } : null,
+    }
+  }
+  return success(c, {
+    firstSubmissionAt: times[0]?.first ?? null,
+    latestSubmissionAt: times[0]?.latest ?? null,
+    activeDays: times[0]?.activeDays ?? 0,
+    now: new Date().toISOString(),
+    classRank: mine ? { rank: mine.rank, total: classStandings.length } : null,
+    rankHidden: privileged && isStudent && !!target.rankHiddenAt,
+    solved: solved.flatMap((row) =>
+      row.solvedAt
+        ? [
+            {
+              displayId: row.displayId,
+              title: row.title,
+              solvedAt: row.solvedAt,
+              tags: tagsOf.get(row.problemId) ?? [],
+            },
+          ]
+        : [],
+    ),
+    unsolved,
+    knowledge,
+    versus,
+    achievements: { total: achievementTotal[0]?.total ?? 0, unlocked: achievements },
+  } satisfies ProfileOverview)
+})
+
 accountRoutes.put("/me/profile", requireAuth, async (c) => {
   const parsed = await parseBody(c, updateProfileRequestSchema, "Invalid profile payload")
   if (!parsed.success) return parsed.response
@@ -179,24 +356,14 @@ accountRoutes.post("/me/avatar", requireAuth, async (c) => {
   return success(c, { avatar })
 })
 
-accountRoutes.get("/users/:id/metrics", async (c) => {
-  const userId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  // 比赛提交也算：首末提交时间、学习天数都连比赛一起统计
-  const [row] = await db
-    .select({
-      first: min(schema.submission.createTime),
-      latest: max(schema.submission.createTime),
-      activeDays: countDistinct(sql`date(${localTime(schema.submission.createTime)})`),
-    })
-    .from(schema.submission)
-    .where(eq(schema.submission.userId, userId))
-  if (!row?.first || !row.latest) return failure(c, 404, "no-submissions", "暂无提交")
-  return success(c, {
-    now: new Date().toISOString(),
-    first: row.first,
-    latest: row.latest,
-    activeDays: row.activeDays,
-  } satisfies Metrics)
+/** 不用图片了，退回默认头像（前端画成名字最后一个字，见 RankAvatar.vue） */
+accountRoutes.delete("/me/avatar", requireAuth, async (c) => {
+  const avatar = `${config.avatarUriPrefix}/default.png`
+  await db
+    .update(schema.userProfile)
+    .set({ avatar })
+    .where(eq(schema.userProfile.userId, c.get("user")!.id))
+  return success(c, { avatar })
 })
 
 /**
@@ -342,6 +509,11 @@ function levelOf(solved: number, thresholds: number[]) {
  */
 accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
   const user = c.get("user")!
+  return success(c, await knowledgeMapOf(user.id, user.className))
+})
+
+/** 一个人的知识点地图：「我的知识点」和老师在个人主页上看学生共用 */
+async function knowledgeMapOf(userId: number, className: string | null): Promise<KnowledgeMap> {
   const tags = await db
     .select({
       id: schema.problemTag.id,
@@ -361,7 +533,7 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
     .groupBy(schema.problemTag.id, schema.problemTag.name)
     .having(sql`count(*) >= ${KNOWLEDGE_MIN_PROBLEMS}`)
   const tagIds = tags.map((tag) => tag.id)
-  if (!tagIds.length) return success(c, { tags: [], classTouched: [] } satisfies KnowledgeMap)
+  if (!tagIds.length) return { tags: [], classTouched: [] }
 
   const firstAccepted = db
     .select({
@@ -371,7 +543,7 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
     .from(schema.submission)
     .where(
       and(
-        eq(schema.submission.userId, user.id),
+        eq(schema.submission.userId, userId),
         isNull(schema.submission.contestId),
         inArray(schema.submission.result, ACCEPTED_RESULTS),
       ),
@@ -398,7 +570,7 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
         ),
       )
       .groupBy(schema.problemTags.problemtagId),
-    user.className
+    className
       ? db
           .select({
             tagId: schema.problemTags.problemtagId,
@@ -412,7 +584,7 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
           )
           .where(
             and(
-              eq(schema.user.className, user.className),
+              eq(schema.user.className, className),
               eq(schema.user.isDisabled, false),
               inArray(schema.user.adminType, [...STUDENT_ROLES]),
               isNull(schema.submission.contestId),
@@ -422,13 +594,13 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
           )
           .groupBy(schema.problemTags.problemtagId)
       : [],
-    user.className
+    className
       ? db
           .select({ total: count() })
           .from(schema.user)
           .where(
             and(
-              eq(schema.user.className, user.className),
+              eq(schema.user.className, className),
               eq(schema.user.isDisabled, false),
               inArray(schema.user.adminType, [...STUDENT_ROLES]),
             ),
@@ -444,7 +616,7 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
       .map((row) => row.tagId),
   )
 
-  return success(c, {
+  return {
     tags: tags
       .sort((a, b) => b.problemCount - a.problemCount)
       .map((tag) => {
@@ -461,8 +633,8 @@ accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
         } satisfies KnowledgeLevel
       }),
     classTouched: tags.filter((tag) => touchedIds.has(tag.id)).map((tag) => tag.name),
-  } satisfies KnowledgeMap)
-})
+  }
+}
 
 accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
   const user = c.get("user")!
