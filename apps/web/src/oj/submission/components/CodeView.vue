@@ -18,7 +18,7 @@ const props = withDefaults(
     fontSize?: number
     lineHeight?: number
   }>(),
-  { markLine: null, fontSize: 18, lineHeight: 30 },
+  { markLine: null, fontSize: 20, lineHeight: 32 },
 )
 
 const theme = useThemeVars()
