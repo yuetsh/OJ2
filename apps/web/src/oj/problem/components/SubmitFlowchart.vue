@@ -3,7 +3,7 @@ import { storeToRefs } from "pinia"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { countBlank } from "shared/components/FlowchartEditor/model"
 import { useProblemStore } from "oj/store/problem"
-import { useFlowchartStore, type FlowchartEditorInstance } from "oj/store/flowchart"
+import { useFlowchartStore } from "oj/store/flowchart"
 
 /**
  * 「交给 AI 点评」按钮。
@@ -13,16 +13,20 @@ import { useFlowchartStore, type FlowchartEditorInstance } from "oj/store/flowch
  * 弹框盖住画布，学生没法一边看改进建议一边改图。
  */
 
-const flowchartEditorRef = inject<Ref<FlowchartEditorInstance | null>>("flowchartEditorRef")
+/** 手机上它在屏幕底部那条（MobileActionBar），不在编辑器里面，所以画布从 store 拿 */
+const { size, block = false } = defineProps<{
+  size?: "small" | "medium" | "large"
+  block?: boolean
+}>()
 
 const message = useMessage()
 const { problem } = storeToRefs(useProblemStore())
 const flowchartStore = useFlowchartStore()
-const { loading, unchanged } = storeToRefs(flowchartStore)
+const { loading, unchanged, editor: canvas } = storeToRefs(flowchartStore)
 const { isDesktop } = useBreakpoints()
 
 function submit() {
-  const editor = flowchartEditorRef?.value
+  const editor = canvas.value
   if (!editor) return
   const doc = editor.getDoc()
   if (!doc.steps.length) {
@@ -44,7 +48,8 @@ watch(() => problem.value?.id, flowchartStore.ensureLoaded, { immediate: true })
 
 <template>
   <n-button
-    :size="isDesktop ? 'medium' : 'small'"
+    :size="size ?? (isDesktop ? 'medium' : 'small')"
+    :block="block"
     type="primary"
     :loading="loading"
     :disabled="loading || unchanged"

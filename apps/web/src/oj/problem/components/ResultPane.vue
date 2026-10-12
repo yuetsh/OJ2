@@ -5,8 +5,6 @@ import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { useCodeStore } from "oj/store/code"
 import { useTeacherCollab } from "../composables/teacherCollab"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import { useBreakpoints } from "shared/composables/breakpoints"
 import { useThemeVars } from "naive-ui"
 import { parseTime } from "utils/functions"
 import ResultHeader from "./ResultHeader.vue"
@@ -33,8 +31,6 @@ const { submission, syntaxErrorInfo, resultSegment, formattedBeforeSubmit } =
   storeToRefs(submissionStore)
 const { problem } = storeToRefs(useProblemStore())
 const codeStore = useCodeStore()
-const ctx = useProblemPageContext()
-const { isDesktop } = useBreakpoints()
 
 /** 协作中的老师自己还没交过：先摆学生最近一次交的 */
 const teacherCollab = useTeacherCollab()
@@ -42,24 +38,7 @@ const teacherCollab = useTeacherCollab()
 const theme = useThemeVars()
 const { samplesRunAt } = submissionStore.trial
 
-/**
- * 手机上流程图题只能看点评、不能画（设计文档 5.6）。画不了，语言也就落不到 Flowchart 上，
- * 下面的 drawing 永远是假 —— 原来学生在电脑上画过、AI 评过的，手机上一条都看不到。
- * 这时多给一段「流程图点评」，只读。
- */
-const flowchartReadable = computed(
-  () => !isDesktop.value && !!problem.value?.allowFlowchart && ctx.value.entry !== "contest",
-)
-/** 在看「流程图点评」那一段。只在这一页记着：点运行例子、提交时照常切回对应的分段 */
-const viewingFlowchart = ref(false)
-watch(
-  () => [submissionStore.resultSeq, problem.value?.id, flowchartReadable.value],
-  () => {
-    viewingFlowchart.value = false
-  },
-)
-
-type Segment = "submit" | "samples" | "custom" | "flowchart"
+type Segment = "submit" | "samples" | "custom"
 const codeSegments = computed<{ value: Segment; label: string; time: string }[]>(() => [
   {
     value: "submit",
@@ -84,25 +63,16 @@ const drawing = computed(() => codeStore.code.language === "Flowchart")
 // 试跑走判题机，SQL 题不走那里；流程图也没得跑。这两种只留「提交结果」
 const canTrial = computed(() => !problem.value || !isSqlProblem(problem.value))
 
-const segments = computed(() => {
-  const list = canTrial.value ? codeSegments.value : codeSegments.value.slice(0, 1)
-  return flowchartReadable.value
-    ? [...list, { value: "flowchart" as const, label: "流程图点评", time: "" }]
-    : list
-})
-/** 只有一段（SQL 题、又不是手机上的流程图题）就不摆分段了 */
+const segments = computed(() =>
+  canTrial.value ? codeSegments.value : codeSegments.value.slice(0, 1),
+)
+/** 只有一段（SQL 题）就不摆分段了 */
 const showSegments = computed(() => segments.value.length > 1)
 
 function isActive(segment: Segment) {
-  if (viewingFlowchart.value) return segment === "flowchart"
   return resultSegment.value === segment
 }
 function pick(segment: Segment) {
-  if (segment === "flowchart") {
-    viewingFlowchart.value = true
-    return
-  }
-  viewingFlowchart.value = false
   resultSegment.value = segment
 }
 </script>
@@ -124,14 +94,13 @@ function pick(segment: Segment) {
       >
         {{ segment.label }}<template v-if="segment.time"> · {{ segment.time }}</template>
       </button>
-      <span v-if="!viewingFlowchart && resultSegment === 'custom'" class="segment-note"
+      <span v-if="resultSegment === 'custom'" class="segment-note"
         >自己编数据试试，这里不判对错</span
       >
     </div>
 
-    <FlowchartResult v-if="viewingFlowchart && flowchartReadable" view-only />
     <!-- 提交结果用 v-show：切去看运行例子时不卸载，挂着的错误说明在编辑器里标着红 -->
-    <div v-show="!viewingFlowchart && (resultSegment === 'submit' || !canTrial)">
+    <div v-show="resultSegment === 'submit' || !canTrial">
       <template v-if="syntaxErrorInfo">
         <ResultHeader kind="warning" title="代码有语法错误，还没有交上去" />
         <CompileErrorExplain :err-info="syntaxErrorInfo" />
@@ -149,7 +118,7 @@ function pick(segment: Segment) {
         description="还没有提交过。写完代码按「提交」，结果会出现在这里"
       />
     </div>
-    <template v-if="canTrial && !viewingFlowchart">
+    <template v-if="canTrial">
       <SampleRunResult v-if="resultSegment === 'samples'" />
       <CustomRun v-else-if="resultSegment === 'custom'" />
     </template>

@@ -17,9 +17,7 @@ import { caseHeadline, caseReport } from "utils/flowchart"
  * 原来评分详情是提交按钮旁一个 1000px 的弹框：盖住画布，学生没法一边看改进建议一边改图；
  * 翻历次评分要一页一页点分页器。现在摆在左栏，画布整列都在右边（设计文档第 6 节）。
  *
- * viewOnly：手机上只能看、不能画（设计文档 5.6），不给「照着它写代码」「载回画布」。
  */
-const { viewOnly = false } = defineProps<{ viewOnly?: boolean }>()
 
 const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
@@ -154,7 +152,7 @@ watch(
 watch(
   () => [selectedCase.value, report.value, canvasSame.value, editor.value] as const,
   ([index, next, same, instance]) => {
-    if (!instance || viewOnly) return
+    if (!instance) return
     const row = index === null ? undefined : next?.cases[index]
     if (!row || !same || !versionDoc.value) {
       instance.setHighlight(null)
@@ -189,11 +187,7 @@ function goCode() {
     <n-empty
       v-else-if="!scores.length && phase !== 'evaluating'"
       class="empty"
-      :description="
-        viewOnly
-          ? '还没交过流程图。流程图要在电脑上画（手机上拖不动），交给 AI 点评之后，评分和建议在这里也看得到'
-          : '还没交过流程图。画好之后点「交给 AI 点评」，评分和建议会出现在这里'
-      "
+      description="还没交过流程图。画好之后点「交给 AI 点评」，评分和建议会出现在这里"
     />
 
     <!-- 历次分数连成一条：一眼看出是不是越改越好；正在评的那次是虚线框 -->
@@ -273,7 +267,7 @@ function goCode() {
       </template>
 
       <template v-if="detail">
-        <div v-if="detail.mermaidCode && (!report || canvasDiffers || viewOnly)" class="version">
+        <div v-if="detail.mermaidCode && (!report || canvasDiffers)" class="version">
           <div class="version-head">
             <span class="version-title">{{ versionTitle }}</span>
             <n-button text type="primary" size="small" @click="versionZoom = true">
@@ -327,7 +321,7 @@ function goCode() {
           </div>
         </div>
 
-        <div v-if="!viewOnly" class="actions">
+        <div class="actions">
           <n-button
             v-if="isFlowchartPass(current.grade) && canCode"
             type="primary"

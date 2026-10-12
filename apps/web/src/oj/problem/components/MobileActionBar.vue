@@ -6,6 +6,8 @@ import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import SubmitCode from "./SubmitCode.vue"
 
+const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
+
 /**
  * 手机上屏幕底部固定的「运行例子 / 提交」（设计文档 5.6）。原来这两个按钮在「代码」页签
  * 顶上，和语言、更多挤成两行；看着题面想交一次，还得先切回代码页签。
@@ -41,7 +43,8 @@ const canRunSamples = computed(
       运行例子
     </n-button>
     <div class="action">
-      <SubmitCode size="large" block />
+      <SubmitFlowchart v-if="codeStore.code.language === 'Flowchart'" size="large" block />
+      <SubmitCode v-else size="large" block />
     </div>
   </div>
 </template>

@@ -2,6 +2,7 @@
 import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useFlowchartStore } from "oj/store/flowchart"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
 
 /**
@@ -11,6 +12,8 @@ import { parseTime } from "utils/functions"
  */
 const { editor, unchanged } = storeToRefs(useFlowchartStore())
 const theme = useThemeVars()
+// 手机上工具栏挤，「已保存」那几个字不放
+const { isDesktop } = useBreakpoints()
 
 const saved = computed(() => {
   // 「交给 AI 点评」灰着的时候说一句为什么（设计稿 FlowResPass）
@@ -22,7 +25,7 @@ const saved = computed(() => {
 
 <template>
   <div v-if="editor" class="flowchart-controls">
-    <span v-if="saved" class="saved">{{ saved }}</span>
+    <span v-if="saved && isDesktop" class="saved">{{ saved }}</span>
     <n-button
       :disabled="!editor.canUndo"
       aria-label="撤销"

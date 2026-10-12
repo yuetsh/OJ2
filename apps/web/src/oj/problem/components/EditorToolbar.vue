@@ -206,13 +206,13 @@ const changeLanguage = (v: LANGUAGE) => {
       运行例子
     </n-button>
 
-    <SubmitFlowchart v-if="codeStore.code.language === 'Flowchart'" />
+    <SubmitFlowchart v-if="codeStore.code.language === 'Flowchart' && isDesktop" />
 
     <SubmitCode v-else-if="isDesktop" />
 
     <div class="spacer" />
 
-    <FlowchartControls v-if="drawing && isDesktop" />
+    <FlowchartControls v-if="drawing" />
 
     <n-button
       v-if="showHelpButton"

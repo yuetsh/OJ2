@@ -191,13 +191,12 @@ watch(
 )
 
 // 流程图编辑器交给 store：结果页签（在左栏，不在编辑器底下）要拿当前画布比一比、
-// 把旧版本载回去。子组件 SubmitFlowchart 还是从 inject 拿
+// 把旧版本载回去；「交给 AI 点评」在手机上挂在屏幕底部那条，也从 store 拿
 const flowchartStore = useFlowchartStore()
 watch(flowchartEditorRef, (editor) => flowchartStore.attachEditor(editor ?? null), {
   immediate: true,
 })
 onBeforeUnmount(() => flowchartStore.attachEditor(null))
-provide("flowchartEditorRef", flowchartEditorRef)
 </script>
 
 <template>

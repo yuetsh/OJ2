@@ -1,5 +1,4 @@
 import { defineStore } from "pinia"
-import { useBreakpoints } from "shared/composables/breakpoints"
 import type { LANGUAGE, ProblemDetail } from "utils/types"
 import { problemEntryOf } from "oj/problem/composables/problemPageContext"
 import { useCodeStore } from "oj/store/code"
@@ -28,14 +27,13 @@ export const useProblemStore = defineStore("problem", () => {
    */
   const failCount = computed(() => (problem.value?.myFailedCount ?? 0) + sessionFailCount.value)
 
-  const { isDesktop } = useBreakpoints()
-
   /**
    * 这道题能不能画流程图。比赛里不给（入口差异表）；题单里原来也不给，现在给了，画到 A/S
-   * 算完成（设计文档第 3 节决定 4）。手机上不给：节点库是 HTML5 拖放，手机上拖不动。
+   * 算完成（设计文档第 3 节决定 4）。手机上原来不给（节点库是 HTML5 拖放，拖不动），
+   * 2026-10 换成插入式编辑器之后只用点，手机上也能画
    */
   const canDraw = computed(
-    () => !!problem.value?.allowFlowchart && problemEntryOf(route) !== "contest" && isDesktop.value,
+    () => !!problem.value?.allowFlowchart && problemEntryOf(route) !== "contest",
   )
 
   /**
