@@ -85,9 +85,14 @@ watch(name, load)
           <router-link v-if="other" to="/achievement" class="mine">看我的 ›</router-link>
         </div>
 
-        <!-- 只有一张（老师没有班级、或看别人）时也只占半边，别把进度条拉得一屏宽 -->
-        <div v-if="near.length || data.classBoard" class="top">
-          <NearCard v-if="near.length" :items="near" :compact="!isDesktop" />
+        <!-- 没有班级（老师、自己注册的号）就没有「本班」，「快拿到了」三个横排占满整宽 -->
+        <div v-if="near.length || data.classBoard" class="top" :class="{ alone: !data.classBoard }">
+          <NearCard
+            v-if="near.length"
+            :items="near"
+            :compact="!isDesktop"
+            :wide="isDesktop && !data.classBoard"
+          />
           <ClassCard
             v-if="data.classBoard"
             :board="data.classBoard"
@@ -175,6 +180,10 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--oj-gap);
   margin-bottom: var(--oj-gap);
+}
+
+.top.alone {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .columns {

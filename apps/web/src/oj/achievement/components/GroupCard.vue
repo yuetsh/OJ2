@@ -35,7 +35,7 @@ const showBadges = computed(() => props.group.name === "题单和比赛" && !!pr
               :to="{ name: 'problemset', params: { problemSetId: b.problemSet.id } }"
               class="badge"
             >
-              <AchievementIcon :icon="b.badge.icon" :size="32" />
+              <AchievementIcon :icon="b.badge.icon" :size="24" />
               <span>{{ b.badge.name }}</span>
             </router-link>
           </template>
@@ -89,24 +89,19 @@ h3 small {
   gap: 8px;
 }
 
+/* 奖章名最长 9 个字（「有趣和无趣的观察者」），竖排在格子里放不下，横排写全 */
 .badge {
-  width: 72px;
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  line-height: 15px;
-  text-align: center;
-  color: v-bind("theme.textColor1");
-  text-decoration: none;
-}
-
-.badge span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px 0 6px;
+  border-radius: 6px;
+  font-size: var(--oj-fs-sec);
   white-space: nowrap;
+  color: v-bind("theme.textColor1");
+  background: v-bind("theme.actionColor");
+  text-decoration: none;
 }
 
 .compact {

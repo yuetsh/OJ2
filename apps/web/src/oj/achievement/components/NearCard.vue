@@ -5,8 +5,11 @@ import { useRarityColor } from "shared/composables/rarity"
 import type { Near } from "../series"
 import Medal from "./Medal.vue"
 
-/** 「快拿到了」：每个只说还差什么，进度条底下是现在几 / 要几、本班几人有 */
-defineProps<{ items: Near[]; compact?: boolean }>()
+/**
+ * 「快拿到了」：每个只说还差什么，进度条底下是现在几 / 要几、本班几人有。
+ * `wide`：旁边没有「本班」（没有班级的号）时三个横着排，占满整宽
+ */
+defineProps<{ items: Near[]; compact?: boolean; wide?: boolean }>()
 
 const theme = useThemeVars()
 const rarityText = useRarityColor()
@@ -22,38 +25,40 @@ const percent = (item: Near) => Math.round((item.series.value / item.achievement
 </script>
 
 <template>
-  <section class="card" :class="{ compact }">
+  <section class="card" :class="{ compact, wide }">
     <h3>快拿到了</h3>
-    <div v-for="item in items" :key="item.achievement.id" class="item">
-      <Medal
-        :icon="item.achievement.icon"
-        :rarity="item.achievement.rarity"
-        :size="compact ? 44 : 48"
-        state="off"
-        :ring="item.series.value / item.achievement.threshold!"
-      />
-      <div class="body">
-        <div class="head">
-          <b>{{ item.achievement.name }}</b>
-          <span class="tag" :style="{ color: rarityText[item.achievement.rarity] }">
-            {{ RARITY_LABEL[item.achievement.rarity] }}
-          </span>
-          <span class="remain">{{ item.remain }}</span>
-        </div>
-        <n-progress
-          type="line"
-          :percentage="percent(item)"
-          :height="6"
-          :show-indicator="false"
-          :color="theme.primaryColor"
-          :border-radius="3"
-          :fill-border-radius="3"
+    <div class="list">
+      <div v-for="item in items" :key="item.achievement.id" class="item">
+        <Medal
+          :icon="item.achievement.icon"
+          :rarity="item.achievement.rarity"
+          :size="compact ? 44 : 48"
+          state="off"
+          :ring="item.series.value / item.achievement.threshold!"
         />
-        <div class="foot">
-          <span>{{ now(item) }}</span>
-          <span v-if="item.achievement.classHolders !== null">
-            本班 {{ item.achievement.classHolders }} 人有
-          </span>
+        <div class="body">
+          <div class="head">
+            <b>{{ item.achievement.name }}</b>
+            <span class="tag" :style="{ color: rarityText[item.achievement.rarity] }">
+              {{ RARITY_LABEL[item.achievement.rarity] }}
+            </span>
+            <span class="remain">{{ item.remain }}</span>
+          </div>
+          <n-progress
+            type="line"
+            :percentage="percent(item)"
+            :height="6"
+            :show-indicator="false"
+            :color="theme.primaryColor"
+            :border-radius="3"
+            :fill-border-radius="3"
+          />
+          <div class="foot">
+            <span>{{ now(item) }}</span>
+            <span v-if="item.achievement.classHolders !== null">
+              本班 {{ item.achievement.classHolders }} 人有
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -114,6 +119,20 @@ h3 {
   font-size: 12px;
   color: v-bind("theme.textColor3");
   font-variant-numeric: tabular-nums;
+}
+
+.wide {
+  padding-bottom: 14px;
+}
+
+.wide .list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+}
+
+.wide .item {
+  border-top: 1px solid v-bind("theme.dividerColor");
 }
 
 /* 手机：「还差什么」换到名字下面一行 */
