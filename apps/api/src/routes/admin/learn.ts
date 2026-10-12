@@ -1,13 +1,10 @@
 import {
   STUDENT_ROLES,
-  TUTORIAL_READ_SECONDS,
+  isLessonDone,
+  type LearnBoard,
   type LearnExerciseAttempt,
   type LearnExerciseProgress,
   type LearnExerciseProgressList,
-  type LearnStudentProgress,
-  type LearnStudentProgressList,
-  type LearnTutorialProgress,
-  type LearnTutorialProgressList,
 } from "@oj2/contract"
 import { and, asc, count, desc, eq, inArray, like, sql } from "drizzle-orm"
 import { Hono } from "hono"
@@ -15,6 +12,8 @@ import { Hono } from "hono"
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
+import { defaultClassFor } from "../../services/ranking"
+import { exerciseCountColumn } from "../../services/tutorial"
 import { queryInteger, rounded } from "../helpers"
 
 /**
@@ -64,157 +63,117 @@ function studentCondition(value: string | null) {
   )
 }
 
-adminLearnRoutes.get("/learn-analytics/students", requireTeacher, async (c) => {
+/**
+ * 方块格：一个班的学生 × 这门课的每一课，打开过没有、学完没有（练一练全对）。
+ *
+ * 不选班就按排名页同一套规则猜老师在教哪个班（`defaultClassFor`）；也能传年级前缀，
+ * 但一个年级两三百行方块，页面上主要还是按班看。
+ */
+adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
   const type = tutorialTypeOf(c.req.query("type"))
-  const className = classFilter(c.req.query("className"))
-  if (!className.ok) return failure(c, 400, "invalid-class", "班级只能是数字")
+  const requested = classFilter(c.req.query("className"))
+  if (!requested.ok) return failure(c, 400, "invalid-class", "班级只能是数字")
+  const className = requested.value ?? (await defaultClassFor(c.get("user")!.id))
 
-  // 该语言下已公开的教程，既是分母，也是「哪些课算数」的白名单 ——
-  // 未公开的课学生本来就打不开，混进来会让读完的人显示成没读完
   const tutorials = await db
-    .select({ id: schema.tutorial.id })
-    .from(schema.tutorial)
-    .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
-  const tutorialIds = tutorials.map((row) => row.id)
-
-  // 学生表打底 left join 进度：没读过的人也要出现在结果里，这是这张表的重点
-  const progressJoin = tutorialIds.length
-    ? and(
-        eq(schema.tutorialProgress.userId, schema.user.id),
-        inArray(schema.tutorialProgress.tutorialId, tutorialIds),
-      )
-    : sql`false`
-
-  // 阅读和练习**分两条查**再在内存里拼。写成一条的话，一个学生读了 3 课、
-  // 做了 8 道练习，join 出来是 24 行，count 全是错的 —— 两个一对多挂在同一张表上
-  // 就是这个下场，用 filter 也救不回来
-  const [rows, exerciseRows] = await Promise.all([
-    db
-      .select({
-        userId: schema.user.id,
-        username: schema.user.username,
-        realName: schema.userProfile.realName,
-        className: schema.user.className,
-        // 「已读」按 TUTORIAL_READ_SECONDS 卡，不是「有这条记录」：点开一眼就退的不算。
-        // 累计时长不卡，那些秒数照样算 —— 「已读 0 课、累计 25 分钟」是要看见的一种情况
-        readCount:
-          sql<number>`count(${schema.tutorialProgress.tutorialId}) filter (where ${schema.tutorialProgress.totalSeconds} >= ${TUTORIAL_READ_SECONDS})`.mapWith(
-            Number,
-          ),
-        totalSeconds:
-          sql<number>`coalesce(sum(${schema.tutorialProgress.totalSeconds}), 0)`.mapWith(Number),
-        lastViewedAt: sql<string | null>`max(${schema.tutorialProgress.lastViewedAt})`,
-      })
-      .from(schema.user)
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .leftJoin(schema.tutorialProgress, progressJoin)
-      .where(studentCondition(className.value))
-      .groupBy(
-        schema.user.id,
-        schema.user.username,
-        schema.userProfile.realName,
-        schema.user.className,
-      )
-      // 前端默认按「已读」升序排，同分的一大批（尤其一堆 0）就落回这里的次序。
-      // 不给 orderBy 的话那是聚合吐出来的任意顺序，刷一次换一个样 —— 按班级、
-      // 学号排稳住它。className 为空的（推不出班级的）ASC 默认排在最后
-      .orderBy(asc(schema.user.className), asc(schema.user.username)),
-    db
-      .select({
-        userId: schema.exerciseAttempt.userId,
-        tried: count(),
-        solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
-          Number,
-        ),
-        attempts: sql<number>`coalesce(sum(${schema.exerciseAttempt.attempts}), 0)`.mapWith(Number),
-      })
-      .from(schema.exerciseAttempt)
-      .innerJoin(schema.exercise, eq(schema.exercise.id, schema.exerciseAttempt.exerciseId))
-      .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
-      .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
-      .groupBy(schema.exerciseAttempt.userId),
-  ])
-  const attempts = new Map(exerciseRows.map((row) => [row.userId, row]))
-
-  const [exerciseCountRow] = tutorialIds.length
-    ? await db
-        .select({ value: count() })
-        .from(schema.exercise)
-        .where(inArray(schema.exercise.tutorialId, tutorialIds))
-    : [{ value: 0 }]
-
-  return success(c, {
-    tutorialCount: tutorialIds.length,
-    exerciseCount: exerciseCountRow?.value ?? 0,
-    results: rows.map(
-      (row) =>
-        ({
-          ...row,
-          exerciseTried: attempts.get(row.userId)?.tried ?? 0,
-          exerciseSolved: attempts.get(row.userId)?.solved ?? 0,
-          exerciseAttempts: attempts.get(row.userId)?.attempts ?? 0,
-        }) satisfies LearnStudentProgress,
-    ),
-  } satisfies LearnStudentProgressList)
-})
-
-adminLearnRoutes.get("/learn-analytics/tutorials", requireTeacher, async (c) => {
-  const type = tutorialTypeOf(c.req.query("type"))
-  const className = classFilter(c.req.query("className"))
-  if (!className.ok) return failure(c, 400, "invalid-class", "班级只能是数字")
-
-  const [studentCountRow] = await db
-    .select({ value: count() })
-    .from(schema.user)
-    .where(studentCondition(className.value))
-  const studentCount = studentCountRow?.value ?? 0
-
-  // 进度行 join 回 user 是为了让班级筛选生效，同时把老师自己试读的记录挡在外面
-  const rows = await db
     .select({
-      tutorialId: schema.tutorial.id,
+      id: schema.tutorial.id,
       title: schema.tutorial.title,
-      order: schema.tutorial.order,
-      // 数的是 user.id 而不是 progress.user_id：join 不上的（老师自己试读的、
-      // 已禁用的、不在所选班级的）在这一列是 NULL，count(distinct) 正好不算它，
-      // 而 progress.user_id 那边永远非空，会把过滤当没发生
-      readers:
-        sql<number>`count(distinct ${schema.user.id}) filter (where ${schema.tutorialProgress.totalSeconds} >= ${TUTORIAL_READ_SECONDS})`.mapWith(
-          Number,
-        ),
-      totalSeconds:
-        sql<number>`coalesce(sum(${schema.tutorialProgress.totalSeconds}) filter (where ${schema.user.id} is not null), 0)`.mapWith(
-          Number,
-        ),
-      // 人均时长的分母是 readers（读满 3 分钟的人），分子就得是同一批人的时长，
-      // 否则拿全部时长去除达标人数，人均会被翻了一眼就走的人凭空抬高
-      readSeconds:
-        sql<number>`coalesce(sum(${schema.tutorialProgress.totalSeconds}) filter (where ${schema.tutorialProgress.totalSeconds} >= ${TUTORIAL_READ_SECONDS}), 0)`.mapWith(
-          Number,
-        ),
+      project: schema.tutorial.project,
+      exerciseTotal: exerciseCountColumn,
     })
     .from(schema.tutorial)
-    .leftJoin(schema.tutorialProgress, eq(schema.tutorialProgress.tutorialId, schema.tutorial.id))
-    .leftJoin(
-      schema.user,
-      and(eq(schema.user.id, schema.tutorialProgress.userId), studentCondition(className.value)),
-    )
-    // 学生条件写在 join 的 on 上而不是 where 上：写 where 会把没人读过的课整行滤掉，
-    // 而「一节课一个人都没读」恰恰是老师最需要看见的一行
     .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
-    .groupBy(schema.tutorial.id, schema.tutorial.title, schema.tutorial.order)
     .orderBy(asc(schema.tutorial.order))
+  const tutorialIds = tutorials.map((row) => row.id)
+  if (!className)
+    return success(c, { className: null, tutorials, students: [] } satisfies LearnBoard)
+
+  const students = await db
+    .select({
+      userId: schema.user.id,
+      username: schema.user.username,
+      realName: schema.userProfile.realName,
+      className: schema.user.className,
+    })
+    .from(schema.user)
+    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+    .where(studentCondition(className))
+    .orderBy(asc(schema.user.className), asc(schema.user.username))
+  const userIds = students.map((row) => row.userId)
+
+  // 阅读和练习分两条查再拼：两个一对多挂在同一张表上 join，count 全是错的
+  const [progressRows, solvedRows] =
+    userIds.length && tutorialIds.length
+      ? await Promise.all([
+          db
+            .select({
+              userId: schema.tutorialProgress.userId,
+              tutorialId: schema.tutorialProgress.tutorialId,
+              viewCount: schema.tutorialProgress.viewCount,
+              totalSeconds: schema.tutorialProgress.totalSeconds,
+              lastViewedAt: schema.tutorialProgress.lastViewedAt,
+            })
+            .from(schema.tutorialProgress)
+            .where(
+              and(
+                inArray(schema.tutorialProgress.userId, userIds),
+                inArray(schema.tutorialProgress.tutorialId, tutorialIds),
+              ),
+            ),
+          db
+            .select({
+              userId: schema.exerciseAttempt.userId,
+              tutorialId: schema.exercise.tutorialId,
+              solved: count(),
+            })
+            .from(schema.exerciseAttempt)
+            .innerJoin(schema.exercise, eq(schema.exercise.id, schema.exerciseAttempt.exerciseId))
+            .where(
+              and(
+                inArray(schema.exerciseAttempt.userId, userIds),
+                inArray(schema.exercise.tutorialId, tutorialIds),
+                eq(schema.exerciseAttempt.solved, true),
+              ),
+            )
+            .groupBy(schema.exerciseAttempt.userId, schema.exercise.tutorialId),
+        ])
+      : [[], []]
+
+  const progress = new Map<string, (typeof progressRows)[number]>()
+  for (const row of progressRows) progress.set(`${row.userId}:${row.tutorialId}`, row)
+  const solved = new Map<string, number>()
+  for (const row of solvedRows) solved.set(`${row.userId}:${row.tutorialId}`, row.solved)
 
   return success(c, {
-    studentCount,
-    results: rows.map(
-      ({ readSeconds, ...row }) =>
-        ({
-          ...row,
-          avgSeconds: row.readers ? Math.round(readSeconds / row.readers) : 0,
-        }) satisfies LearnTutorialProgress,
-    ),
-  } satisfies LearnTutorialProgressList)
+    className,
+    tutorials,
+    students: students.map((student) => {
+      const opened: number[] = []
+      const done: number[] = []
+      let exerciseSolved = 0
+      let totalSeconds = 0
+      let lastViewedAt: string | null = null
+      for (const tutorial of tutorials) {
+        const key = `${student.userId}:${tutorial.id}`
+        const row = progress.get(key)
+        const solvedHere = solved.get(key) ?? 0
+        exerciseSolved += solvedHere
+        if (row) {
+          opened.push(tutorial.id)
+          totalSeconds += row.totalSeconds
+          if (!lastViewedAt || row.lastViewedAt > lastViewedAt) lastViewedAt = row.lastViewedAt
+        }
+        const lesson = {
+          viewCount: row?.viewCount ?? 0,
+          exerciseTotal: tutorial.exerciseTotal,
+          exerciseSolved: solvedHere,
+        }
+        if (isLessonDone(lesson)) done.push(tutorial.id)
+      }
+      return { ...student, opened, done, exerciseSolved, totalSeconds, lastViewedAt }
+    }),
+  } satisfies LearnBoard)
 })
 
 /**

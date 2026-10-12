@@ -558,7 +558,8 @@ export const TRIAL_ADMIN_MAX_CASES = 50
  * 试运行：「运行例子」「自己输入」、后台「生成测试点」。走本站判题机，不落库、不算提交。
  *
  * - 带 `problemId`：按这道题的时间 / 内存限制和代码模板跑，和提交一个口径；
- * - 不带：只有管理员能这么调（后台生成测试点时题目可能还没存）。
+ * - 带 `tutorialId`：自学教程正文里的代码块「运行」，只能跑一组、限制用默认的；
+ * - 都不带：只有管理员能这么调（后台生成测试点时题目可能还没存）。
  *
  * `output` 是这组的正确输出，给了就由判题机比对（和提交一样去掉末尾空白再比），
  * 结果是通过 / 答案错误；不给（「自己输入」、生成测试点）就只看有没有跑出错。
@@ -566,6 +567,7 @@ export const TRIAL_ADMIN_MAX_CASES = 50
 export const trialRunRequestSchema = z.object({
   problemId: z.number().int().positive().optional(),
   contestId: z.number().int().positive().optional(),
+  tutorialId: z.number().int().positive().optional(),
   language: runnableLanguageSchema,
   code: z
     .string()

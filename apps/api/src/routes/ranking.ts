@@ -11,7 +11,7 @@ import {
   type SampleUser,
   type WeeklyChampion,
 } from "@oj2/contract"
-import { and, countDistinct, desc, eq, gte, inArray, isNotNull, ne } from "drizzle-orm"
+import { and, eq, inArray, isNotNull } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
@@ -23,10 +23,10 @@ import {
   classBattle,
   classDetail,
   classPk,
+  defaultClassFor,
   loadEntrants,
   PK_MAX_CLASSES,
   pkPartner,
-  rankedStudents,
   standings,
   WEEK_MS,
   type Standing,
@@ -71,48 +71,6 @@ function periodStart(period: RankPeriod) {
   if (period === "week") return weekStart()
   if (period === "term") return termStart()
   return null
-}
-
-/**
- * 老师打开排名页默认看哪个班：自己最近布置过作业的班 → 最近一周交题人数最多的班。
- * 不记老师上次选的：统计面板吃过那个亏（上一节课的班悄悄留在框里）。
- */
-async function defaultClassFor(teacherId: number) {
-  const [lesson] = await db
-    .select({ className: schema.classLesson.className })
-    .from(schema.classLesson)
-    .where(eq(schema.classLesson.createdBy, teacherId))
-    .orderBy(desc(schema.classLesson.day), desc(schema.classLesson.updatedAt))
-    .limit(1)
-  if (lesson) return lesson.className
-
-  const users = countDistinct(schema.submission.userId)
-  const [busiest] = await db
-    .select({ className: schema.user.className, users })
-    .from(schema.submission)
-    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(
-      and(
-        rankedStudents,
-        isNotNull(schema.user.className),
-        ne(schema.user.className, ""),
-        gte(schema.submission.createTime, new Date(Date.now() - WEEK_MS).toISOString()),
-      ),
-    )
-    .groupBy(schema.user.className)
-    .orderBy(desc(users))
-    .limit(1)
-  if (busiest?.className) return busiest.className
-
-  // 放假回来第一次打开：一周里没人交过题，就看最后一个交题的学生是哪个班
-  const [latest] = await db
-    .select({ className: schema.user.className })
-    .from(schema.submission)
-    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(and(rankedStudents, isNotNull(schema.user.className), ne(schema.user.className, "")))
-    .orderBy(desc(schema.submission.createTime))
-    .limit(1)
-  return latest?.className ?? null
 }
 
 /**

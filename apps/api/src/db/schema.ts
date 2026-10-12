@@ -1042,6 +1042,9 @@ export const tutorial = pgTable(
     createdById: integer("created_by_id").notNull(),
     code: text(),
     type: varchar({ length: 10 }).notNull().$type<TutorialType>(),
+    // 所属项目（「项目三 · 智慧农业·蜜橘园」），自学目录按它分组。0031 从正文第一段的
+    // 「**所属项目：…**」回填；发布脚本不传它，后端照样从正文里抽，见 admin/tutorial.ts
+    project: varchar({ length: 64 }).default("").notNull(),
   },
   (table) => [
     index("tutorial_created_by_id_07973cab").using(
@@ -1053,6 +1056,37 @@ export const tutorial = pgTable(
       foreignColumns: [user.id],
       name: "tutorial_created_by_id_07973cab_fk_user_id",
     }),
+  ],
+)
+
+/**
+ * 一课挂的「去做几道题」：老师在后台手挑的题目，按 `order` 排。
+ *
+ * 两头都 CASCADE：教程删了这串题就没意义了；题目删了，教程少挂一道题也不是学生的
+ * 做题证据（证据在 submission 那边，它对 problem 是拦住的）。
+ */
+export const tutorialProblem = pgTable(
+  "tutorial_problem",
+  {
+    tutorialId: integer("tutorial_id").notNull(),
+    problemId: integer("problem_id").notNull(),
+    order: integer().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.tutorialId, table.problemId],
+      name: "tutorial_problem_pkey",
+    }),
+    foreignKey({
+      columns: [table.tutorialId],
+      foreignColumns: [tutorial.id],
+      name: "tutorial_problem_tutorial_id_fk_tutorial_id",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.problemId],
+      foreignColumns: [problem.id],
+      name: "tutorial_problem_problem_id_fk_problem_id",
+    }).onDelete("cascade"),
   ],
 )
 

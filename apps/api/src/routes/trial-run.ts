@@ -16,6 +16,9 @@ export const trialRunRoutes = new Hono<AppEnv>()
 /** 后台生成测试点时题目可能还没存，没有题目的限制可用，按这两个跑 */
 const ADMIN_TIME_LIMIT = 3000
 const ADMIN_MEMORY_LIMIT = 256
+/** 自学教程里的代码块：都是几行的例子，给和普通题一样的限制，死循环早点停 */
+const TUTORIAL_TIME_LIMIT = 1000
+const TUTORIAL_MEMORY_LIMIT = 256
 
 /**
  * 试运行，见 judge/trial.ts。不落库、不算提交、不走令牌桶 ——
@@ -37,7 +40,22 @@ trialRunRoutes.post("/trial-runs", requireAuth, async (c) => {
   let memoryLimit = ADMIN_MEMORY_LIMIT
   let source = body.code
   let prependLines = 0
-  if (body.problemId === undefined) {
+  if (body.problemId === undefined && body.tutorialId !== undefined) {
+    // 教程正文里的代码块：只有一组输入（代码块下面那个输入框），教程得是公开的
+    if (body.cases.length !== 1) {
+      return failure(c, 400, "too-many-cases", "教程里的代码一次只能跑一组")
+    }
+    const [tutorial] = await db
+      .select({ isPublic: schema.tutorial.isPublic })
+      .from(schema.tutorial)
+      .where(eq(schema.tutorial.id, body.tutorialId))
+      .limit(1)
+    if (!tutorial || (!tutorial.isPublic && !admin)) {
+      return failure(c, 404, "tutorial-not-found", "教程不存在")
+    }
+    timeLimit = TUTORIAL_TIME_LIMIT
+    memoryLimit = TUTORIAL_MEMORY_LIMIT
+  } else if (body.problemId === undefined) {
     if (!admin) return failure(c, 403, "permission-denied", "请从题目页试运行")
   } else {
     let contestId: number | null = null

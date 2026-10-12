@@ -66,11 +66,22 @@ export type AdminAnnouncementListItem = z.infer<typeof adminAnnouncementListItem
 
 export const tutorialTypeSchema = z.enum(["python", "c"])
 
+/** 后台一课挂的一道「去做几道题」。按 tutorial_problem.order 排 */
+export const adminTutorialProblemSchema = z.object({
+  id: z.number().int(),
+  displayId: z.string(),
+  title: z.string(),
+  mustDo: z.boolean(),
+})
+
 export const adminTutorialSchema = z.object({
   id: z.number().int(),
   title: z.string(),
   content: z.string(),
+  // 「示例代码」字段界面上已经去掉（正文里的代码块能直接运行了），发布脚本还在传，照收照回
   code: z.string().nullable(),
+  project: z.string(),
+  problems: z.array(adminTutorialProblemSchema),
   isPublic: z.boolean(),
   order: z.number().int(),
   type: tutorialTypeSchema,
@@ -79,11 +90,19 @@ export const adminTutorialSchema = z.object({
   updatedAt: z.string(),
 })
 
-export const adminTutorialListItemSchema = adminTutorialSchema.omit({
-  // 教程正文是整篇 markdown，列表页只排序和切换可见性，不需要它
-  content: true,
-  code: true,
-})
+export const adminTutorialListItemSchema = adminTutorialSchema
+  .omit({
+    // 教程正文是整篇 markdown，列表页用不上
+    content: true,
+    code: true,
+    problems: true,
+  })
+  .extend({
+    exerciseCount: z.number().int(),
+    problemCount: z.number().int(),
+    /** 打开过这一课的学生数（全部时间），老师判断哪课没人看 */
+    readers: z.number().int(),
+  })
 
 /** 后台教程列表按语言分组返回，对齐旧 TutorialAdminAPI.get 的 `{python, c}` 形状 */
 export const adminTutorialGroupsSchema = z.object({
@@ -91,10 +110,15 @@ export const adminTutorialGroupsSchema = z.object({
   c: z.array(adminTutorialListItemSchema),
 })
 
+/**
+ * `project` 不传就从正文第一段的「**所属项目：…**」抽 —— 发布脚本（docs/*-tutorials/
+ * publish.js）不认识这个字段，更新时也不能因为它没传就把项目清空。
+ */
 export const createTutorialRequestSchema = z.object({
   title: z.string().trim().min(1).max(128),
   content: z.string(),
   code: z.string().nullable().default(null),
+  project: z.string().trim().max(64).optional(),
   isPublic: z.boolean().default(false),
   order: z.number().int().default(0),
   type: tutorialTypeSchema,
@@ -103,6 +127,29 @@ export const createTutorialRequestSchema = z.object({
 export const updateTutorialRequestSchema = createTutorialRequestSchema
 export const setTutorialVisibilityRequestSchema = z.object({
   isPublic: z.boolean(),
+})
+
+/** 一课挂哪几道题，整串替换，顺序就是数组顺序 */
+export const TUTORIAL_PROBLEM_MAX = 6
+export const setTutorialProblemsRequestSchema = z.object({
+  problemIds: z.array(z.number().int().positive()).max(TUTORIAL_PROBLEM_MAX),
+})
+
+/** 拖动排序：同一门课的教程 id 按新顺序排好整串交上来 */
+export const reorderTutorialsRequestSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(500),
+})
+
+/** 项目改名：这门课里所有挂在 `from` 下的教程一起改 */
+export const renameTutorialProjectRequestSchema = z.object({
+  type: tutorialTypeSchema,
+  from: z.string().max(64),
+  to: z.string().trim().min(1).max(64),
+})
+
+/** 后台给一课挑题时的候选：必会题排在前面 */
+export const tutorialProblemCandidateSchema = adminTutorialProblemSchema.extend({
+  tags: z.array(z.string()),
 })
 
 export const exerciseTypeSchema = z.enum([
@@ -512,29 +559,36 @@ export const acTrendSchema = z.object({
 // ---------------------------------------------------------------- 自学情况
 
 /**
- * 「自学情况」按学生的一行。**没读过任何一课的学生也要有一行**（readCount = 0）——
- * 这张表首要回答的问题是「谁还没开始」，只列有记录的人等于把该看的人筛掉了。
+ * 「自学情况」的方块格：一个班的学生 × 这门课的每一课。
+ *
+ * **没打开过任何一课的学生也要有一行**（`opened` 为空）—— 页面上把他们收成一串名单，
+ * 这张表首要回答的就是「谁还没开始」。`done` 是学完的课（练一练全对，见 `isLessonDone`），
+ * 一定也在 `opened` 里或者是没打开却把练一练做完了的（老链接直达练习的情况）。
  */
-export const learnStudentProgressSchema = z.object({
+export const learnBoardStudentSchema = z.object({
   userId: z.number().int(),
   username: z.string(),
   realName: z.string().nullable(),
   className: z.string().nullable(),
-  readCount: z.number().int(),
+  opened: z.array(z.number().int()),
+  done: z.array(z.number().int()),
+  exerciseSolved: z.number().int(),
   totalSeconds: z.number().int(),
   lastViewedAt: z.string().nullable(),
-  // 练一练：做过几道、做对几道、一共点了几次提交
-  exerciseTried: z.number().int(),
-  exerciseSolved: z.number().int(),
-  exerciseAttempts: z.number().int(),
 })
 
-export const learnStudentProgressListSchema = z.object({
-  // 分母：该语言下已公开的教程篇数，前端拿它显示 3/17
-  tutorialCount: z.number().int(),
-  // 分母：这些教程里一共有多少道练一练
-  exerciseCount: z.number().int(),
-  results: z.array(learnStudentProgressSchema),
+export const learnBoardSchema = z.object({
+  /** 实际看的是哪个班。老师没选时后端按排名页同一套规则猜，猜不出是 null */
+  className: z.string().nullable(),
+  tutorials: z.array(
+    z.object({
+      id: z.number().int(),
+      title: z.string(),
+      project: z.string(),
+      exerciseTotal: z.number().int(),
+    }),
+  ),
+  students: z.array(learnBoardStudentSchema),
 })
 
 /**
@@ -575,22 +629,6 @@ export const learnExerciseAttemptSchema = z.object({
   attemptsToSolve: z.number().int().nullable(),
   lastWrongAnswer: z.string().nullable(),
   lastAttemptAt: z.string(),
-})
-
-/** 「自学情况」按课的一行 */
-export const learnTutorialProgressSchema = z.object({
-  tutorialId: z.number().int(),
-  title: z.string(),
-  order: z.number().int(),
-  readers: z.number().int(),
-  totalSeconds: z.number().int(),
-  avgSeconds: z.number().int(),
-})
-
-export const learnTutorialProgressListSchema = z.object({
-  // 分母：统计范围内的学生数（受班级筛选影响）
-  studentCount: z.number().int(),
-  results: z.array(learnTutorialProgressSchema),
 })
 
 export const generateFlowchartRequestSchema = z.object({
@@ -905,10 +943,8 @@ export type AdminAiReportListItem = z.infer<typeof adminAiReportListItemSchema>
 export type AdminAiReport = z.infer<typeof adminAiReportSchema>
 export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
 export type StuckProblem = z.infer<typeof stuckProblemSchema>
-export type LearnStudentProgress = z.infer<typeof learnStudentProgressSchema>
-export type LearnStudentProgressList = z.infer<typeof learnStudentProgressListSchema>
-export type LearnTutorialProgress = z.infer<typeof learnTutorialProgressSchema>
-export type LearnTutorialProgressList = z.infer<typeof learnTutorialProgressListSchema>
+export type LearnBoard = z.infer<typeof learnBoardSchema>
+export type LearnBoardStudent = z.infer<typeof learnBoardStudentSchema>
 export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>
 export type LearnExerciseProgressList = z.infer<typeof learnExerciseProgressListSchema>
 export type LearnExerciseAttempt = z.infer<typeof learnExerciseAttemptSchema>
@@ -932,6 +968,11 @@ export type TutorialType = z.infer<typeof tutorialTypeSchema>
 export type AdminTutorial = z.infer<typeof adminTutorialSchema>
 export type AdminTutorialListItem = z.infer<typeof adminTutorialListItemSchema>
 export type AdminTutorialGroups = z.infer<typeof adminTutorialGroupsSchema>
+export type AdminTutorialProblem = z.infer<typeof adminTutorialProblemSchema>
+export type TutorialProblemCandidate = z.infer<typeof tutorialProblemCandidateSchema>
+export type SetTutorialProblemsRequest = z.infer<typeof setTutorialProblemsRequestSchema>
+export type ReorderTutorialsRequest = z.infer<typeof reorderTutorialsRequestSchema>
+export type RenameTutorialProjectRequest = z.infer<typeof renameTutorialProjectRequestSchema>
 export type CreateTutorialRequest = z.infer<typeof createTutorialRequestSchema>
 export type UpdateTutorialRequest = z.infer<typeof updateTutorialRequestSchema>
 export type SetTutorialVisibilityRequest = z.infer<typeof setTutorialVisibilityRequestSchema>

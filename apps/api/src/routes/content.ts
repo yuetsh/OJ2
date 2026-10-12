@@ -20,10 +20,12 @@ import {
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
+import { problemStates } from "../services/problem-progress"
+import { tutorialProblems } from "../services/tutorial"
 import { asRecord, queryInteger, sampleUser } from "./helpers"
 
 export const contentRoutes = new Hono<AppEnv>()
@@ -254,15 +256,20 @@ contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
 contentRoutes.get("/tutorials", async (c) => {
   const type = c.req.query("type") === "c" ? "c" : "python"
   const rows = await db
-    .select({ id: schema.tutorial.id, title: schema.tutorial.title })
+    .select({
+      id: schema.tutorial.id,
+      title: schema.tutorial.title,
+      project: schema.tutorial.project,
+    })
     .from(schema.tutorial)
     .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
     .orderBy(asc(schema.tutorial.order))
   return success(c, rows satisfies TutorialSummary[])
 })
 
-contentRoutes.get("/tutorials/:id", async (c) => {
+contentRoutes.get("/tutorials/:id", optionalAuth, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const user = c.get("user")
   const [row] = await db
     .select({
       tutorial: schema.tutorial,
@@ -275,11 +282,22 @@ contentRoutes.get("/tutorials/:id", async (c) => {
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
   if (!row) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  const [problems, states] = await Promise.all([
+    tutorialProblems([id], true),
+    user ? problemStates(user.id) : null,
+  ])
   return success(c, {
     id: row.tutorial.id,
     title: row.tutorial.title,
+    project: row.tutorial.project,
     content: row.tutorial.content,
-    code: row.tutorial.code,
+    problems: problems.map(({ id, displayId, title, mustDo }) => ({
+      id,
+      displayId,
+      title,
+      mustDo,
+      solved: states?.solved.has(id) ?? false,
+    })),
     isPublic: row.tutorial.isPublic,
     order: row.tutorial.order,
     type: row.tutorial.type,
@@ -475,8 +493,9 @@ contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
   return success(c, null)
 })
 
-contentRoutes.get("/tutorials/:id/exercises", async (c) => {
+contentRoutes.get("/tutorials/:id/exercises", optionalAuth, async (c) => {
   const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const user = c.get("user")
   const [tutorial] = await db
     .select({ id: schema.tutorial.id })
     .from(schema.tutorial)
@@ -484,19 +503,33 @@ contentRoutes.get("/tutorials/:id/exercises", async (c) => {
     .limit(1)
   if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
   const rows = await db
-    .select()
+    .select({
+      exercise: schema.exercise,
+      // 目录、大纲上标「做对过」，一课的练一练全对就算学完这课
+      solved: user
+        ? sql<boolean>`coalesce(${schema.exerciseAttempt.solved}, false)`
+        : sql<boolean>`false`,
+    })
     .from(schema.exercise)
+    .leftJoin(
+      schema.exerciseAttempt,
+      and(
+        eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
+        eq(schema.exerciseAttempt.userId, user?.id ?? 0),
+      ),
+    )
     .where(eq(schema.exercise.tutorialId, id))
     .orderBy(asc(schema.exercise.order))
   return success(
     c,
     rows.map(
-      (row) =>
+      ({ exercise: row, solved }) =>
         ({
           id: row.id,
           type: row.type,
           data: asRecord(row.data),
           order: row.order,
+          solved,
         }) satisfies Exercise,
     ),
   )

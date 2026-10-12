@@ -63,14 +63,31 @@ export const reactionStateSchema = z.object({
 
 export const setReactionRequestSchema = z.object({ type: reactionKeySchema })
 
+/**
+ * 目录里的一课。`title` 是「情境——知识点」（「蜜橘园环境预警——条件语句基础」），
+ * 前端拆成知识点在前、情境在后显示；`project` 是所属项目，目录按它分组，可能为空。
+ */
 export const tutorialSummarySchema = z.object({
   id: z.number().int(),
   title: z.string(),
+  project: z.string(),
+})
+
+/**
+ * 一课结尾「去做几道题」里的一道。`solved` 是当前学生做对过没有（未登录恒为 false），
+ * `mustDo` 是带不带「必会题」标签。
+ */
+export const tutorialProblemSchema = z.object({
+  id: z.number().int(),
+  displayId: z.string(),
+  title: z.string(),
+  mustDo: z.boolean(),
+  solved: z.boolean(),
 })
 
 export const tutorialSchema = tutorialSummarySchema.extend({
   content: z.string(),
-  code: z.string().nullable(),
+  problems: z.array(tutorialProblemSchema),
   isPublic: z.boolean(),
   order: z.number().int(),
   type: z.enum(["python", "c"]),
@@ -173,6 +190,8 @@ export const exerciseSchema = z.object({
   type: z.enum(["mcq", "sort", "fill", "match", "predict", "debug", "group"]),
   data: z.record(z.string(), z.unknown()),
   order: z.number().int(),
+  /** 当前学生做对过没有。未登录恒为 false；一课的练一练全做对就算学完这课 */
+  solved: z.boolean(),
 })
 
 export type Message = z.infer<typeof messageSchema>
@@ -188,20 +207,26 @@ export type ReactionCounts = z.infer<typeof reactionCountsSchema>
 export type ReactionState = z.infer<typeof reactionStateSchema>
 export type SetReactionRequest = z.infer<typeof setReactionRequestSchema>
 export type Tutorial = z.infer<typeof tutorialSchema>
+export type TutorialProblem = z.infer<typeof tutorialProblemSchema>
 export type Exercise = z.infer<typeof exerciseSchema>
 export type TutorialProgress = z.infer<typeof tutorialProgressSchema>
 export type TutorialProgressPing = z.infer<typeof tutorialProgressPingSchema>
 export type ExerciseAttemptRequest = z.infer<typeof exerciseAttemptRequestSchema>
 
 /**
- * 「已读」的门槛：累计停留满 3 分钟才算读过这一课。
+ * 「学完一课」的口径：**这课的练一练全做对**。没有练一练的课，打开过就算。
  *
- * 之前只要打开过（`viewCount > 0`）就记成已读，于是「点开看一眼就退」和「认真读完」
- * 在老师那张表上长得一模一样，「已读 17/17」并不说明他学了。3 分钟是按最短的一课
- * 定的下限——读不完还翻不动的课文，扫一眼是到不了这个数的。
+ * 原来按「累计停留满 3 分钟」算已读，学生看不见这条规则，只看见圆点变黄；而快照里
+ * 停留时长中位数是 0 秒 —— 一节课上十几分钟点开 17 课的大有人在。练一练是学生
+ * 自己做的、看得见的，「全对了」比「待够了」说得清。停留时长照样记，只给老师看。
  *
- * 门槛只管**「已读」这个口径**（学生端的 ✓、后台的已读课数与读过的人数），
- * 不动累计时长：时长记的是真实停留，不满 3 分钟的那些秒数照样算进去，
- * 「已读 0 课、累计 25 分钟」正是要让老师看见的一种情况。
+ * 前端目录、首页、后台「自学情况」都走这一个函数，别各写一份。
  */
-export const TUTORIAL_READ_SECONDS = 180
+export function isLessonDone(progress: {
+  viewCount: number
+  exerciseTotal: number
+  exerciseSolved: number
+}) {
+  if (progress.exerciseTotal > 0) return progress.exerciseSolved >= progress.exerciseTotal
+  return progress.viewCount > 0
+}
