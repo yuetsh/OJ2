@@ -4,7 +4,11 @@ import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import type { SUBMISSION_RESULT } from "utils/types"
 import { useTone, type Tone } from "../composables/tone"
 
-const props = defineProps<{ result: SUBMISSION_RESULT }>()
+const props = defineProps<{
+  result: SUBMISSION_RESULT
+  /** 只要带颜色的图标（提交详情「这道题交了几次」那一串），名字放到悬停提示里 */
+  bare?: boolean
+}>()
 
 const tone = useTone()
 
@@ -63,12 +67,13 @@ const colors = computed(() => tone(TONE[props.result] ?? "default"))
 <template>
   <span
     class="pill"
-    :style="{ color: colors.color, background: colors.background }"
-    :title="JUDGE_STATUS[result]?.title"
+    :class="{ bare }"
+    :style="{ color: colors.color, background: bare ? undefined : colors.background }"
+    :title="bare ? JUDGE_STATUS[result]?.name : JUDGE_STATUS[result]?.title"
   >
     <span v-if="judging" class="spinner" :style="{ borderTopColor: colors.color }"></span>
-    <Icon v-else :icon="icon" :width="12" />
-    {{ JUDGE_STATUS[result]?.name ?? "未知状态" }}
+    <Icon v-else :icon="icon" :width="bare ? 14 : 12" />
+    <template v-if="!bare">{{ JUDGE_STATUS[result]?.name ?? "未知状态" }}</template>
   </span>
 </template>
 
@@ -84,6 +89,11 @@ const colors = computed(() => tone(TONE[props.result] ?? "default"))
   font-weight: 600;
   white-space: nowrap;
   flex: none;
+}
+
+.pill.bare {
+  height: auto;
+  padding: 0;
 }
 
 .spinner {

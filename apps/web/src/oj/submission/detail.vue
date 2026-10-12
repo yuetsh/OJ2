@@ -26,9 +26,13 @@ import { useTone } from "./composables/tone"
 import { classLabel, submissionTimeText } from "./utils"
 
 /**
- * 单独打开的一条提交（设计稿「提交详情重设计」B）：左边代码，右边为什么错 + 这道题交的几次。
+ * 单独打开的一条提交（设计稿「提交详情重设计」A，用户改成代码在前、例子在后）：一栏到底 ——
+ * 名字和题目、结果、这道题交的几次（横排一串，← → 一次次翻）、代码、为什么错。
+ * 原来是 B（左代码右说明），右栏占掉 540px，机房屏上代码框只剩 640px 宽，一成的
+ * C 代码最长那行有 80 列，得左右滚。一栏到底代码占满整宽，字号不用缩。
+ *
  * 入口是提交列表右栏的「新页面打开」、统计页的方块、后台卡点分析 —— 多半是老师在看某个学生
- * 怎么一次次改对的，所以「这道题交了几次」常驻右栏，↑ ↓ 一次次翻。
+ * 怎么一次次改对的。
  */
 const props = defineProps<{ submissionID: string }>()
 
@@ -126,12 +130,12 @@ function attemptTime(time: string) {
   return submissionTimeText(time)
 }
 
-/** 除了正在看的这次，还有别的能点开的才提 ↑ ↓ */
+/** 除了正在看的这次，还有别的能点开的才提 ← → */
 const canStep = computed(() =>
   attempts.value.some((item) => item.showLink && item.id !== shown.value?.id),
 )
 
-/** 「↑ ↓」一次次往前往后翻，跳过题单藏着的那几次 */
+/** 「← →」一次次往前往后翻，跳过题单藏着的那几次 */
 function step(delta: -1 | 1) {
   const list = attempts.value
   for (let i = attemptIndex.value + delta; i >= 0 && i < list.length; i += delta) {
@@ -148,12 +152,12 @@ function typing(event: KeyboardEvent) {
   return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)
 }
 
-// 和提交列表一样只用 ↑ ↓（用户定的）：这几次是竖着排的
-onKeyStroke(["ArrowUp", "ArrowDown"], (event) => {
+// 这几次是横着排的一串，所以用 ← →（竖着排的列表才用 ↑ ↓，见提交列表）
+onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
   if (typing(event) || event.altKey || event.ctrlKey || event.metaKey || attempts.value.length < 2)
     return
   event.preventDefault()
-  step(event.key === "ArrowUp" ? -1 : 1)
+  step(event.key === "ArrowLeft" ? -1 : 1)
 })
 
 const problemLink = computed(() => {
@@ -313,58 +317,48 @@ function handleMore(key: string) {
         >
       </div>
 
-      <div class="body">
-        <div class="code-col">
-          <div v-if="!shown.showLink" class="locked">
-            <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
-            <span class="locked-title">这份代码在题单布置期内先藏着</span>
-            <span class="muted"><LockNote :problem="{ displayId: shown.problemDisplayId }" /></span>
-          </div>
-          <CodeView
-            v-else
-            :code="shown.code"
-            :language="LANGUAGE_FORMAT_VALUE[shown.language]"
-            :mark-line="explain?.line ?? null"
-            :font-size="isMobile ? 14 : 18"
-            :line-height="isMobile ? 24 : 30"
-          />
-        </div>
+      <section v-if="attempts.length > 1" class="attempts">
+        <span class="attempts-title">{{ who }}这道题交了 {{ attempts.length }} 次</span>
+        <a
+          v-for="(item, index) in attempts"
+          :key="item.id"
+          :href="item.showLink ? '/submission/' + item.id : undefined"
+          class="attempt"
+          :class="{ on: item.id === shown.id, off: !item.showLink }"
+          :title="`第 ${index + 1} 次`"
+          @click.prevent="item.showLink && openAttempt(item.id)"
+        >
+          <Icon v-if="!item.showLink" icon="ph:lock-simple" class="muted" />
+          <StatusPill v-else :result="item.result" bare />
+          <span class="t">{{ attemptTime(item.createTime) }}</span>
+        </a>
+        <span v-if="!isMobile && canStep" class="keys"><kbd>←</kbd><kbd>→</kbd> 换一次</span>
+      </section>
 
-        <div class="side">
-          <WrongAnswerExplain
-            v-if="sampleCheck"
-            :check="sampleCheck"
-            :code="shown.code"
-            :language="shown.language"
-            :plain="!!shown.contestId"
-            :peer="!own"
-          />
-          <ExplainNote v-else-if="explain" :explain="explain" :tone="explainTone" />
-
-          <section v-if="attempts.length > 1" class="attempts">
-            <div class="attempts-head">
-              <h3>{{ who }}这道题交了 {{ attempts.length }} 次</h3>
-              <div class="spacer"></div>
-              <span v-if="!isMobile && canStep" class="keys"><kbd>↑</kbd><kbd>↓</kbd> 换一次</span>
-            </div>
-            <a
-              v-for="(item, index) in attempts"
-              :key="item.id"
-              :href="item.showLink ? '/submission/' + item.id : undefined"
-              class="attempt"
-              :class="{ on: item.id === shown.id, off: !item.showLink }"
-              @click.prevent="item.showLink && openAttempt(item.id)"
-            >
-              <span class="n">第 {{ index + 1 }} 次</span>
-              <span class="t">{{ attemptTime(item.createTime) }}</span>
-              <StatusPill :result="item.result" />
-              <div class="spacer"></div>
-              <span v-if="item.id === shown.id" class="tag">正在看</span>
-              <Icon v-else-if="!item.showLink" icon="ph:lock-simple" class="muted" />
-            </a>
-          </section>
-        </div>
+      <div v-if="!shown.showLink" class="locked">
+        <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
+        <span class="locked-title">这份代码在题单布置期内先藏着</span>
+        <span class="muted"><LockNote :problem="{ displayId: shown.problemDisplayId }" /></span>
       </div>
+      <CodeView
+        v-else
+        :code="shown.code"
+        :language="LANGUAGE_FORMAT_VALUE[shown.language]"
+        :mark-line="explain?.line ?? null"
+        :font-size="isMobile ? 14 : 18"
+        :line-height="isMobile ? 24 : 30"
+        class="code"
+      />
+
+      <WrongAnswerExplain
+        v-if="sampleCheck"
+        :check="sampleCheck"
+        :code="shown.code"
+        :language="shown.language"
+        :plain="!!shown.contestId"
+        :peer="!own"
+      />
+      <ExplainNote v-else-if="explain" :explain="explain" :tone="explainTone" />
     </template>
 
     <div v-else-if="state === 'loading'" class="center">
@@ -510,60 +504,64 @@ function handleMore(key: string) {
   font-weight: 600;
 }
 
-.body {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-/* 代码占满左栏到屏幕底：机房 1366×640 的屏上也不被右边的说明挤下去，长的代码在框里滚 */
-.code-col {
-  flex: 1 1 0;
-  min-width: 0;
-  position: sticky;
-  top: 16px;
-  height: max(360px, calc(100vh - 200px));
-  display: flex;
-  flex-direction: column;
-}
-
-.side {
-  width: 540px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-
+/* 这道题交的几次：横排一串，点哪次换哪次（设计稿 A） */
 .attempts {
-  padding: 12px 10px 8px;
-  border: 1px solid v-bind("theme.dividerColor");
-  border-radius: 8px;
-  background: v-bind("theme.cardColor");
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.attempts-head {
   display: flex;
   align-items: center;
-  padding: 0 6px 6px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.attempts-head h3 {
-  margin: 0;
-  font-size: 15px;
+.attempts-title {
+  margin-right: 4px;
+  font-size: 14px;
+  color: v-bind("theme.textColor3");
+  white-space: nowrap;
+}
+
+.attempt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid v-bind("theme.dividerColor");
+  border-radius: 16px;
+  font-size: 13px;
+  color: v-bind("theme.textColor2");
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.attempt:hover {
+  background: v-bind("theme.hoverColor");
+}
+
+.attempt.on {
+  border-color: v-bind("theme.successColor");
+  background: v-bind("tone('success').background");
+  color: v-bind("theme.textColor1");
   font-weight: 600;
 }
 
+.attempt.off {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.attempt .t {
+  font-variant-numeric: tabular-nums;
+}
+
 .keys {
+  margin-left: auto;
   font-size: 12px;
   color: v-bind("theme.textColor3");
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  white-space: nowrap;
 }
 
 kbd {
@@ -581,50 +579,9 @@ kbd {
   justify-content: center;
 }
 
-.attempt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 38px;
-  padding: 0 10px;
-  border-radius: 6px;
-  font-size: 14px;
-  color: v-bind("theme.textColor1");
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.attempt:hover {
-  background: v-bind("theme.hoverColor");
-}
-
-.attempt.on {
-  background: v-bind("tone('success').background");
-}
-
-.attempt.off {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.attempt .n {
-  width: 48px;
-  flex-shrink: 0;
-  font-size: 13px;
-  color: v-bind("theme.textColor3");
-}
-
-.attempt .t {
-  min-width: 128px;
-  font-variant-numeric: tabular-nums;
-}
-
-.tag {
-  font-size: 12px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: v-bind("tone('success').color");
-  background: v-bind("theme.cardColor");
+/* 代码占满整宽、有多长画多长，不在框里上下滚（CodeView 自己默认是撑满父级的 flex 子项） */
+.detail .code {
+  flex: none;
 }
 
 .muted {
@@ -632,7 +589,7 @@ kbd {
 }
 
 .locked {
-  flex: 1 1 0;
+  min-height: 240px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -666,7 +623,7 @@ kbd {
   justify-content: center;
 }
 
-/* 手机：一栏往下排，为什么错在代码前面 */
+/* 手机：顺序和桌面一样，只是名字、题目一行排不下要折行 */
 .narrow .head {
   flex-wrap: wrap;
   white-space: normal;
@@ -686,38 +643,5 @@ kbd {
 
 .narrow .actions {
   order: 2;
-}
-
-.narrow .body {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-}
-
-/* 右栏拆开：说明 → 代码 → 交的几次（设计稿手机那块） */
-.narrow .side {
-  display: contents;
-}
-
-.narrow .side > * {
-  order: 1;
-}
-
-.narrow .code-col {
-  order: 2;
-  position: static;
-  height: auto;
-}
-
-.narrow .attempts {
-  order: 3;
-}
-
-.narrow .attempt .t {
-  min-width: 0;
-}
-
-.narrow .code-col :deep(.code-view) {
-  flex: none;
 }
 </style>
