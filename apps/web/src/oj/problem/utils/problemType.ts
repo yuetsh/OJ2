@@ -10,10 +10,10 @@ export const PROBLEM_TYPE_LABEL: Record<ProblemTypeFilter, string> = {
 
 /** 「全部类型」下拉里每项下面那句话 */
 export const PROBLEM_TYPE_HINT: Record<ProblemTypeFilter, string> = {
-  sql: "写 SQL 语句查数据库，不是写 C / Python 程序",
-  reference: "题目里附了老师画好的流程图，照着写代码",
-  flowchart: "除了写代码，也可以交流程图；评到 A 或 S 级算做对",
-  ast: "要求用（或者不能用）某种写法，交了会检查",
+  sql: "写 SQL 语句查数据库",
+  reference: "题目中有流程图，照着写代码",
+  flowchart: "绘制流程图；评到 A 级以上算做对",
+  ast: "按照要求用某种写法，提交时会检查",
 }
 
 /** 一道题挂哪几个标签，从醒目到轻：SQL → 画流程图 → 语法要求 → 有参考图 */
