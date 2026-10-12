@@ -66,7 +66,7 @@ function studentCondition(value: string | null) {
 /**
  * 方块格：一个班的学生 × 这门课的每一课，打开过没有、学完没有（练一练全对）。
  *
- * 不选班就按排名页同一套规则猜老师在教哪个班（`defaultClassFor`）；也能传年级前缀，
+ * 不选班就猜老师在教哪个班（`defaultClassFor`）；也能传年级前缀，
  * 但一个年级两三百行方块，页面上主要还是按班看。
  */
 adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {

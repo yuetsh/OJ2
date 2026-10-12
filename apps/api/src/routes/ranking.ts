@@ -24,6 +24,7 @@ import {
   classDetail,
   classPk,
   defaultClassFor,
+  lessonClassFor,
   loadEntrants,
   PK_MAX_CLASSES,
   pkPartner,
@@ -75,7 +76,7 @@ function periodStart(period: RankPeriod) {
 
 /**
  * 这次请求看的是哪个班 / 哪个年级。学生只能看自己的班和年级；老师用 `className` 选，
- * 不给就猜（`defaultClassFor`）。返回 undefined 表示该报「没有班级」。
+ * 不给就取最近布置过作业的班（`lessonClassFor`）。返回 undefined 表示该报「没有班级」。
  */
 async function resolveGroup(
   user: AppEnv["Variables"]["user"],
@@ -84,7 +85,7 @@ async function resolveGroup(
 ): Promise<string | null | undefined> {
   if (scope === "all") return null
   let className = user?.className || null
-  if (isTeacherOrAbove(user)) className = requested || (await defaultClassFor(user!.id))
+  if (isTeacherOrAbove(user)) className = requested || (await lessonClassFor(user!.id))
   if (!className) return undefined
   return scope === "class" ? className : className.slice(0, 2)
 }

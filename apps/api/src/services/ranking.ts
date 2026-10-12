@@ -538,17 +538,26 @@ export async function classPk(
 }
 
 /**
- * 老师打开排名页（和后台「自学情况」）默认看哪个班：自己最近布置过作业的班 → 最近一周交题人数最多的班。
- * 不记老师上次选的：统计面板吃过那个亏（上一节课的班悄悄留在框里）。
+ * 老师自己最近布置过作业的班。老师账号没有班级，这是唯一能说明「这是他的班」的数据；
+ * 排名页点「本班」只认这个，猜不出就交给前端（用上次选的班，没有就停在全部）。
  */
-export async function defaultClassFor(teacherId: number) {
+export async function lessonClassFor(teacherId: number) {
   const [lesson] = await db
     .select({ className: schema.classLesson.className })
     .from(schema.classLesson)
     .where(eq(schema.classLesson.createdBy, teacherId))
     .orderBy(desc(schema.classLesson.day), desc(schema.classLesson.updatedAt))
     .limit(1)
-  if (lesson) return lesson.className
+  return lesson?.className ?? null
+}
+
+/**
+ * 后台「自学情况」和班级 PK 默认看哪个班：自己最近布置过作业的班 → 最近一周交题人数最多的班。
+ * 不记老师上次选的：统计面板吃过那个亏（上一节课的班悄悄留在框里）。
+ */
+export async function defaultClassFor(teacherId: number) {
+  const lesson = await lessonClassFor(teacherId)
+  if (lesson) return lesson
 
   const users = countDistinct(schema.submission.userId)
   const [busiest] = await db

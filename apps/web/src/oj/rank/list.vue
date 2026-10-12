@@ -14,7 +14,9 @@ import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
-import { USERNAME_CLASS_RE } from "utils/constants"
+import { errorCode } from "utils/api"
+import { STORAGE_KEY, USERNAME_CLASS_RE } from "utils/constants"
+import storage from "utils/storage"
 import ChampionList from "./components/ChampionList.vue"
 import ClassBattle from "./components/ClassBattle.vue"
 import ClassDetailDrawer from "./components/ClassDetailDrawer.vue"
@@ -60,7 +62,7 @@ function pick<T extends string>(value: unknown, options: { value: T }[], fallbac
 
 const scope = ref<RankScope>("all")
 const period = ref<RankPeriod>(pick(route.query.period, PERIOD_OPTIONS, "term"))
-/** 老师选的班；空 = 让后端挑最近上课的班，挑完回填 */
+/** 老师选的班；空 = 让后端挑最近布置过作业的班，挑完回填 */
 const teacherClass = ref(typeof route.query.class === "string" ? route.query.class : "")
 
 const board = ref<RankBoard | null>(null)
@@ -86,13 +88,24 @@ async function load() {
   loading.value = true
   try {
     board.value = await fetchBoard(scope.value, period.value)
-    // 老师在「全部」时点了本班：后端挑了最近上课的班，回填到下拉框（这一下不用再取一遍）
+    // 老师在「全部」时点了本班：后端挑了最近布置过作业的班，回填到下拉框（这一下不用再取一遍）
     if (teacher.value && !teacherClass.value && board.value.scope === "class") {
       backfilling = true
       teacherClass.value = board.value.className ?? ""
     }
-  } catch {
+  } catch (err) {
     board.value = null
+    // 没布置过作业、后端猜不出：用上次在下拉框里选的班，没选过就回到全部（watch 会重取）
+    if (teacher.value && !teacherClass.value && errorCode(err) === "class-missing") {
+      loading.value = false
+      const saved = storage.get(STORAGE_KEY.RANK_CLASS)
+      if (typeof saved === "string" && saved) teacherClass.value = saved
+      else {
+        scope.value = "all"
+        message.info("先选一个班")
+      }
+      return
+    }
   } finally {
     loading.value = false
   }
@@ -171,6 +184,7 @@ const pickedClass = computed({
   get: () => (scope.value === "all" ? "" : teacherClass.value),
   set: (value: string) => {
     teacherClass.value = value
+    if (value) storage.set(STORAGE_KEY.RANK_CLASS, value)
     if (!value) scope.value = "all"
     else if (scope.value === "all") scope.value = "class"
   },

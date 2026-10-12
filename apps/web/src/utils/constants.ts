@@ -157,6 +157,7 @@ export const STORAGE_KEY = {
   ADMIN_SIDER_COLLAPSED: "adminSiderCollapsed",
   DEMO_MODE: "demoMode",
   LOGIN_CLASS: "loginClass",
+  RANK_CLASS: "rankClass",
 }
 
 export const DIFFICULTY = {
