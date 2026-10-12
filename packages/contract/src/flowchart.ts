@@ -97,6 +97,12 @@ export const flowchartStatisticsSchema = z.object({
   personCount: z.number().int(),
   completedCount: z.number().int(),
   wordFrequencies: z.array(z.object({ word: z.string(), count: z.number().int() })),
+  /**
+   * 2026-10 起「走例子」评的图里最常见的错：每张图取第一组没走对的原因（「『一级果』多输出了
+   * 一行『一级果』」），同一句话数一下，最多 8 条。新评法几乎没有评语，词云拼不出来，
+   * 而同一个错在一个班里往往原样出现几十次 —— 老师要看的就是它
+   */
+  commonMistakes: z.array(z.object({ text: z.string(), count: z.number().int() })),
   // 与提交统计共用「未完成学生」的形状，见 submission.ts 的 unacceptedStudentSchema
   dataUnaccepted: z.array(z.object({ username: z.string(), realName: z.string() })),
   /**

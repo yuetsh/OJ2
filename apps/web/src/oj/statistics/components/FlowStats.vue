@@ -200,13 +200,11 @@ const people = computed(() => [
   ...props.data.dataUnaccepted.map((row) => ({
     username: row.username,
     grade: null as string | null,
-    score: null as number | null,
     count: 0,
   })),
   ...props.data.people.map((row) => ({
     username: row.username,
     grade: row.bestGrade,
-    score: row.bestScore,
     count: row.count,
   })),
 ])
@@ -229,7 +227,6 @@ function gradeStyle(grade: string | null) {
   <div class="flow-stats">
     <div class="summary">
       <StatItem label="提交" :value="data.totalCount" unit="张" />
-      <StatItem label="平均分" :value="data.avgScore" />
       <StatItem
         label="拿到 A / S"
         :value="`${goodCount} / ${personCount}`"
@@ -267,31 +264,54 @@ function gradeStyle(grade: string | null) {
             <Doughnut :key="chartKey" :data="gradeData" :options="gradeOptions" />
           </div>
         </div>
-        <div v-if="criteria.length" class="card radar">
-          <div class="card-title">四项评分（平均得分率）</div>
-          <div class="chart">
-            <Radar :key="chartKey" :data="radarData" :options="radarOptions" />
+        <template v-if="criteria.length">
+          <div class="card radar">
+            <div class="card-title">四项评分（平均得分率）</div>
+            <div class="chart">
+              <Radar :key="chartKey" :data="radarData" :options="radarOptions" />
+            </div>
           </div>
-        </div>
-        <div v-if="criteria.length" class="card grow">
-          <div class="card-title">各项平均分</div>
-          <div class="chart"><Bar :key="chartKey" :data="barData" :options="barOptions" /></div>
+          <div class="card grow">
+            <div class="card-title">各项平均分</div>
+            <div class="chart"><Bar :key="chartKey" :data="barData" :options="barOptions" /></div>
+          </div>
+        </template>
+        <!-- 全是 2026-10 之后「走例子」评的图：没有四项分，这个位置给最常见的错 -->
+        <div v-else class="card grow">
+          <div class="card-title">最常见的错（最近交的图里）</div>
+          <ol v-if="data.commonMistakes.length" class="mistakes">
+            <li v-for="item in data.commonMistakes" :key="item.text">
+              <span class="mistake-text">{{ item.text }}</span>
+              <span class="muted">{{ item.count }} 张</span>
+            </li>
+          </ol>
+          <div v-else class="muted">交上来的图都走对了</div>
         </div>
       </div>
       <div class="row-cards bottom">
-        <div class="card grow">
+        <!-- 新老评法混着：有走例子的错就列错，只有老数据时照旧是词云 -->
+        <div v-if="criteria.length && data.commonMistakes.length" class="card grow">
+          <div class="card-title">最常见的错（最近交的图里）</div>
+          <ol class="mistakes">
+            <li v-for="item in data.commonMistakes" :key="item.text">
+              <span class="mistake-text">{{ item.text }}</span>
+              <span class="muted">{{ item.count }} 张</span>
+            </li>
+          </ol>
+        </div>
+        <div v-else-if="criteria.length" class="card grow">
           <div class="card-title">常见问题高频词（最近的评语里）</div>
           <div class="cloud"><canvas ref="cloudCanvas"></canvas></div>
           <div v-if="!data.wordFrequencies.length" class="muted">评语太少，还拼不出词云</div>
         </div>
-        <div class="card people">
+        <div class="card people" :class="{ wide: !criteria.length }">
           <div class="card-title">每人最好的一次（没交的在前）</div>
           <div v-if="data.peopleTruncated" class="muted">人太多，只列了成绩靠后的 500 位</div>
           <div class="people-list">
             <div v-for="row in people" :key="row.username" class="person">
               <UserName :username="row.username" class="p-name" />
               <span class="grade-pill" :style="gradeStyle(row.grade)">
-                {{ row.grade ? `${row.grade} 级 ${row.score ?? 0} 分` : "没交" }}
+                {{ row.grade ? `${row.grade} 级` : "没交" }}
               </span>
               <span class="muted">{{ row.count }} 次</span>
             </div>
@@ -488,5 +508,36 @@ function gradeStyle(grade: string | null) {
     flex: none;
     max-height: 360px;
   }
+}
+
+.mistakes {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.mistakes li {
+  padding-left: 2px;
+}
+
+.mistake-text {
+  margin-right: 8px;
+}
+
+/* 没有词云、四项分的时候，每人一格铺满一行 */
+.card.people.wide {
+  flex: 1 1 0;
+  width: auto;
+}
+
+.card.people.wide .people-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-content: start;
+  column-gap: 24px;
 }
 </style>

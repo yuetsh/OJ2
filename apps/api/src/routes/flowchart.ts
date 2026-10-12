@@ -610,6 +610,7 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
       personCount: roster.length,
       completedCount: 0,
       wordFrequencies: [],
+      commonMistakes: [],
       // 一条提交都没有时，花名册上的人**全都**是「没做」—— 原来这里写死空数组，
       // 于是一节课刚开始、最该点名的时候，教师面板反而一个名字都不给
       dataUnaccepted: roster.map((row) => ({
@@ -645,8 +646,16 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
   const pushText = (value: string) => {
     if (texts.length < WORDCLOUD_TEXT_LIMIT) texts.push(value)
   }
+  const mistakes = new Map<string, number>()
   for (const row of textRows) {
-    for (const [key, value] of Object.entries(asRecord(row.criteria))) {
+    const report = asRecord(row.criteria)
+    if (report.version === 2 && Array.isArray(report.cases)) {
+      const first = report.cases.map((item) => asRecord(item)).find((item) => item.ok === false)
+      if (typeof first?.why === "string" && first.why) {
+        mistakes.set(first.why, (mistakes.get(first.why) ?? 0) + 1)
+      }
+    }
+    for (const [key, value] of Object.entries(report)) {
       const detail = asRecord(value)
       // 和上面那条聚合同一道闸：分数不是数字的项当没配过，满分和评语也都不收
       if (typeof detail.score !== "number") continue
@@ -676,6 +685,10 @@ flowchartRoutes.get("/flowcharts/statistics", requireTeacher, async (c) => {
     personCount: roster.length,
     completedCount: totals.completedCount,
     wordFrequencies: await buildWordFrequencies(texts),
+    commonMistakes: [...mistakes]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([text, n]) => ({ text, count: n })),
     dataUnaccepted: roster
       .filter((row) => !submitted.has(row.id))
       .map((row) => ({
