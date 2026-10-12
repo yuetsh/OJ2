@@ -1,123 +1,362 @@
 <script lang="ts" setup>
-import PageHeader from "admin/components/PageHeader.vue"
+import { Icon } from "@iconify/vue"
+import type { AdminTutorialProblem } from "@oj2/contract"
 import { errorMessage } from "utils/api"
-import CodeEditor from "shared/components/CodeEditor.vue"
 import MarkdownEditor from "shared/components/MarkdownEditor.vue"
-import type { TutorialEdit } from "utils/types"
-import { createTutorial, getTutorial, updateTutorial } from "../api"
+import type { Exercise, TutorialEdit, TutorialListItem } from "utils/types"
+import { parseLesson } from "oj/learn/composables/useLessonParse"
+import { joinTitle, lessonPath, splitTitle } from "oj/learn/lesson"
+import LessonBody from "oj/learn/components/LessonBody.vue"
+import "oj/learn/learn.css"
+import {
+  createTutorial,
+  deleteTutorial,
+  getTutorial,
+  getTutorialList,
+  updateTutorial,
+} from "../api"
 import ExerciseManager from "./components/ExerciseManager.vue"
+import RelatedProblems from "./components/RelatedProblems.vue"
 
-interface Props {
-  tutorialID?: string
-}
+/**
+ * 编辑一课（设计稿「后台 · 编辑一课」）：知识点 / 情境 / 项目三个字段，正文左边写、
+ * 右边用学生端同一套组件预览（练一练、能运行的代码块都看得到），右栏是练一练和相关题。
+ * 「示例代码」字段去掉了：正文里的代码块直接能运行。
+ */
+const props = defineProps<{ tutorialID?: string }>()
 
 const route = useRoute()
+const router = useRouter()
 const message = useMessage()
-const props = defineProps<Props>()
+
+const isCreate = computed(() => route.name === "admin tutorial create")
 
 const tutorial = reactive<TutorialEdit>({
   id: 0,
   title: "",
   content: "",
-  code: "",
+  project: typeof route.query.project === "string" ? route.query.project : "",
   isPublic: false,
   order: 0,
-  type: "python", // 默认选择 Python
+  type: route.query.type === "c" ? "c" : "python",
 })
+const kp = ref("")
+const scene = ref("")
+const problems = ref<AdminTutorialProblem[]>([])
+const exercises = ref<Exercise[]>([])
+const allTutorials = ref<{ [key: string]: TutorialListItem[] }>({ python: [], c: [] })
+const saving = ref(false)
+const editor = useTemplateRef<InstanceType<typeof MarkdownEditor>>("editor")
 
 const typeOptions = [
   { label: "Python", value: "python" },
   { label: "C 语言", value: "c" },
 ]
 
+const siblings = computed(() => allTutorials.value[tutorial.type] ?? [])
+const projectOptions = computed(() => {
+  const names = [...new Set(siblings.value.map((item) => item.project).filter(Boolean))]
+  if (tutorial.project && !names.includes(tutorial.project)) names.push(tutorial.project)
+  return names.map((name) => ({ label: name, value: name }))
+})
+/** 学生那边是第几课：只数公开的 */
+const step = computed(() => {
+  const visible = siblings.value.filter((item) => item.isPublic)
+  const index = visible.findIndex((item) => item.id === tutorial.id)
+  return index >= 0 ? index + 1 : null
+})
+const heading = computed(() => {
+  if (isCreate.value) return "新建一课"
+  const label = tutorial.type === "c" ? "C 语言" : "Python"
+  return step.value ? `${label} 第 ${step.value} 课` : `${label} · 没公开`
+})
+const preview = computed(() => parseLesson(tutorial.content, exercises.value))
+
 async function init() {
+  allTutorials.value = await getTutorialList().catch(() => ({ python: [], c: [] }))
   if (!props.tutorialID) {
+    // 新建：顺序排在这门课最后
+    tutorial.order = Math.max(0, ...siblings.value.map((item) => item.order)) + 1
     return
   }
-  const id = parseInt(route.params.tutorialID as string)
-  const data = await getTutorial(id)
+  const data = await getTutorial(parseInt(props.tutorialID))
   tutorial.id = data.id
   tutorial.title = data.title
   tutorial.content = data.content
-  tutorial.code = data.code || ""
+  tutorial.project = data.project
   tutorial.isPublic = data.isPublic
   tutorial.order = data.order
-  tutorial.type = data.type || "python"
+  tutorial.type = data.type
+  problems.value = data.problems
+  const parts = splitTitle(data.title)
+  kp.value = parts.kp
+  scene.value = parts.scene
 }
 
 async function submit() {
-  if (!tutorial.title || !tutorial.content) {
-    message.error("标题和正文必填")
+  tutorial.title = joinTitle(kp.value, scene.value)
+  if (!kp.value.trim() || !tutorial.content.trim()) {
+    message.error("知识点和正文必填")
     return
   }
+  saving.value = true
   try {
-    if (route.name === "admin tutorial create") {
-      await createTutorial({
-        title: tutorial.title,
-        content: tutorial.content,
-        code: tutorial.code,
-        isPublic: tutorial.isPublic,
-        order: tutorial.order,
-        type: tutorial.type,
-      })
-      message.success("成功新建教程 💐")
+    if (isCreate.value) {
+      const created = await createTutorial(tutorial)
+      message.success("已新建，接着可以加练一练和相关题")
+      router.replace({ name: "admin tutorial edit", params: { tutorialID: created.id } })
     } else {
       await updateTutorial(tutorial)
-      message.success("修改已保存")
+      message.success("已保存")
+      allTutorials.value = await getTutorialList().catch(() => allTutorials.value)
     }
+  } catch (err) {
+    message.error(errorMessage(err))
+  } finally {
+    saving.value = false
+  }
+}
+
+async function remove() {
+  try {
+    await deleteTutorial(tutorial.id)
+    message.success("已删除")
+    router.push({ name: "admin tutorial list" })
   } catch (err) {
     message.error(errorMessage(err))
   }
 }
 
-onMounted(init)
-</script>
-<template>
-  <PageHeader
-    :title="route.name === 'admin tutorial create' ? '新建教程' : '编辑教程'"
-    :back="{ name: 'admin tutorial list' }"
-  />
-  <n-form inline>
-    <n-form-item label="标题">
-      <n-input class="contestTitle" v-model:value="tutorial.title" />
-    </n-form-item>
-    <n-form-item label="语言">
-      <n-select v-model:value="tutorial.type" :options="typeOptions" class="select" />
-    </n-form-item>
-    <n-form-item label="顺序">
-      <n-input-number style="width: 100px" v-model:value="tutorial.order" :min="0" />
-    </n-form-item>
-    <n-form-item label="可见">
-      <n-switch v-model:value="tutorial.isPublic" />
-    </n-form-item>
-    <n-form-item>
-      <n-button type="primary" @click="submit">保存</n-button>
-    </n-form-item>
-  </n-form>
-
-  <n-tabs type="line" animated>
-    <n-tab-pane name="content" tab="教程内容">
-      <MarkdownEditor v-model:value="tutorial.content" />
-    </n-tab-pane>
-    <n-tab-pane name="code" tab="示例代码">
-      <CodeEditor
-        v-model:value="tutorial.code"
-        :language="tutorial.type === 'python' ? 'Python' : 'C'"
-        height="400px"
-      />
-    </n-tab-pane>
-    <n-tab-pane name="exercises" tab="练习题" :disabled="!tutorial.id">
-      <ExerciseManager v-if="tutorial.id" :tutorial-id="tutorial.id" />
-      <n-empty v-else description="请先保存教程后再添加练习题" />
-    </n-tab-pane>
-  </n-tabs>
-</template>
-<style scoped>
-.select {
-  width: 100px;
+function insertExercise(id: number) {
+  editor.value?.insert(`[[exercise:${id}]]`)
 }
 
-.contestTitle {
-  width: 400px;
+function openStudentView() {
+  if (step.value) window.open(router.resolve(lessonPath(tutorial.type, step.value)).href, "_blank")
+}
+
+watch(() => props.tutorialID, init)
+onMounted(init)
+</script>
+
+<template>
+  <div class="page">
+    <div class="top">
+      <router-link :to="{ name: 'admin tutorial list' }" class="back">
+        <Icon icon="ph:caret-left-bold" :width="13" />教程
+      </router-link>
+      <span class="slash">/</span>
+      <span class="heading">{{ heading }}</span>
+      <span class="grow" />
+      <label class="public">
+        <n-switch v-model:value="tutorial.isPublic" size="small" />
+        公开
+      </label>
+      <n-button v-if="!isCreate" :disabled="!step" @click="openStudentView">
+        <template #icon><Icon icon="ph:eye" /></template>
+        看学生那边
+      </n-button>
+      <n-popconfirm v-if="!isCreate" @positive-click="remove">
+        <template #trigger>
+          <n-button quaternary type="error">删除</n-button>
+        </template>
+        这一课连同它的练一练、学生的进度一起删掉，确定吗？
+      </n-popconfirm>
+      <n-button type="primary" :loading="saving" @click="submit">保存</n-button>
+    </div>
+
+    <div class="fields">
+      <label class="field">
+        <span>知识点</span>
+        <n-input v-model:value="kp" placeholder="条件语句基础" style="width: 200px" />
+      </label>
+      <label class="field">
+        <span>情境</span>
+        <n-input v-model:value="scene" placeholder="蜜橘园环境预警" style="width: 200px" />
+      </label>
+      <label class="field">
+        <span>项目</span>
+        <n-select
+          v-model:value="tutorial.project"
+          :options="projectOptions"
+          filterable
+          tag
+          clearable
+          placeholder="选一个，或者打字新建"
+          style="width: 250px"
+        />
+      </label>
+      <label v-if="isCreate" class="field">
+        <span>语言</span>
+        <n-select v-model:value="tutorial.type" :options="typeOptions" style="width: 110px" />
+      </label>
+    </div>
+
+    <div class="work">
+      <section class="card editor-card">
+        <div class="card-head">
+          <span class="strong">正文</span>
+          <span class="muted">Markdown</span>
+        </div>
+        <div class="split">
+          <div class="source">
+            <MarkdownEditor
+              ref="editor"
+              v-model:value="tutorial.content"
+              :preview="false"
+              height="100%"
+            />
+          </div>
+          <div class="preview">
+            <LessonBody
+              :segments="preview.segments"
+              :lang="tutorial.type"
+              :tutorial-id="tutorial.id"
+              :exercise-count="preview.exerciseCount"
+              :solved-ids="new Set()"
+            />
+          </div>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="card pad">
+          <ExerciseManager
+            v-if="tutorial.id"
+            :tutorial-id="tutorial.id"
+            :content="tutorial.content"
+            @insert="insertExercise"
+            @change="exercises = $event"
+          />
+          <div v-else class="muted">保存之后就能加练一练</div>
+        </section>
+        <section class="card pad">
+          <RelatedProblems
+            v-if="tutorial.id"
+            :tutorial-id="tutorial.id"
+            :problems="problems"
+            @update="problems = $event"
+          />
+          <div v-else class="muted">保存之后就能挑相关题</div>
+        </section>
+      </aside>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: calc(100vh - 96px);
+  min-height: 600px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  color: #18a058;
+  text-decoration: none;
+}
+.slash {
+  opacity: 0.4;
+}
+.heading {
+  font-size: 18px;
+  font-weight: 700;
+}
+.grow {
+  flex: 1;
+}
+.public {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.fields {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.work {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+}
+.card {
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  border-radius: 8px;
+}
+.pad {
+  padding: 12px 14px;
+}
+.editor-card {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.card-head {
+  height: 38px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.22);
+  font-size: 13px;
+}
+.strong {
+  font-weight: 600;
+}
+.muted {
+  opacity: 0.6;
+  font-size: 13px;
+}
+.split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.source {
+  flex: 0 0 50%;
+  min-width: 0;
+  border-right: 1px solid rgba(128, 128, 128, 0.22);
+}
+.source :deep(.md-editor) {
+  border: 0;
+  border-radius: 0;
+}
+.preview {
+  flex: 0 0 50%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 20px;
+  overflow-y: auto;
+}
+.side {
+  width: 330px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
 }
 </style>

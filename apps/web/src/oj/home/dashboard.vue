@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { continueStep, doneCount, lessonPath, splitTitle, type TutorialType } from "oj/learn/lesson"
 import { Icon } from "@iconify/vue"
 import {
   getAnnouncement,
@@ -29,8 +30,6 @@ import type {
   WeeklyRank,
 } from "utils/types"
 
-type TutorialType = "python" | "c"
-
 interface Track {
   type: TutorialType
   label: string
@@ -38,8 +37,8 @@ interface Track {
   step: number
   title: string
   total: number
-  /** 打开过的课数 */
-  read: number
+  /** 学完的课数（练一练全对） */
+  done: number
   lastViewedAt: string | null
 }
 
@@ -107,27 +106,26 @@ const weeklyText = computed(() => {
 })
 
 /**
- * 接着学哪一课看的是**服务端留痕**里最近打开的那一课，不是导航栏用的
- * localStorage：机房一台电脑轮着好几个班用，本地记的是上一个人学到哪。
+ * 接着学哪一课看的是**服务端留痕**（和自学首页同一套，oj/learn/lesson.ts），不是本机记的：
+ * 机房一台电脑轮着好几个班用，本地记的是上一个人学到哪。
  */
 async function loadTrack(type: TutorialType, label: string): Promise<Track | null> {
-  const [titles, progress] = await Promise.all([getTutorials(type), getLearnProgress(type)])
+  const [titles, rows] = await Promise.all([getTutorials(type), getLearnProgress(type)])
   if (!titles.length) return null
-  const seen = progress.filter((p) => p.lastViewedAt)
-  const latest = seen.reduce<(typeof seen)[number] | null>(
-    (acc, p) => (!acc || p.lastViewedAt! > acc.lastViewedAt! ? p : acc),
+  const progress = Object.fromEntries(rows.map((row) => [row.tutorialId, row]))
+  const step = continueStep(titles, progress) ?? 1
+  const lastViewedAt = rows.reduce<string | null>(
+    (acc, row) => (row.lastViewedAt && (!acc || row.lastViewedAt > acc) ? row.lastViewedAt : acc),
     null,
   )
-  const index = latest ? titles.findIndex((t) => t.id === latest.tutorialId) : -1
-  const step = index >= 0 ? index + 1 : 1
   return {
     type,
     label,
     step,
-    title: titles[step - 1]!.title,
+    title: splitTitle(titles[step - 1]!.title).kp,
     total: titles.length,
-    read: seen.length,
-    lastViewedAt: latest?.lastViewedAt ?? null,
+    done: doneCount(titles, progress),
+    lastViewedAt,
   }
 }
 
@@ -271,7 +269,7 @@ watch(
 )
 
 function learnLink(track: Track) {
-  return `/learn/${track.type}/${track.step.toString().padStart(2, "0")}`
+  return lessonPath(track.type, track.step)
 }
 
 const { jump, jumping } = useProblemJump()
@@ -441,13 +439,13 @@ async function openAnnouncement(item: AnnouncementListItem) {
                 <div class="track-title">{{ track.title }}</div>
                 <n-progress
                   type="line"
-                  :percentage="Math.round((track.read / track.total) * 100)"
+                  :percentage="Math.round((track.done / track.total) * 100)"
                   status="success"
                   :show-indicator="false"
                   :height="6"
                 />
                 <n-text depth="3" class="track-meta">
-                  已打开 {{ track.read }} 课
+                  学完 {{ track.done }} 课
                   <template v-if="track.lastViewedAt">
                     · 上次 {{ relativeTime(track.lastViewedAt) }}
                   </template>

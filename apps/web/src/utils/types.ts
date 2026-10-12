@@ -329,10 +329,8 @@ export type {
   AdminAiReportList,
   StuckProblem,
   AcTrend,
-  LearnStudentProgress,
-  LearnStudentProgressList,
-  LearnTutorialProgress,
-  LearnTutorialProgressList,
+  LearnBoard,
+  LearnBoardStudent,
   LearnExerciseProgress,
   LearnExerciseProgressList,
   LearnExerciseAttempt,
@@ -390,13 +388,13 @@ import type { AdminExercise, AdminTutorial, CreateSubmissionRequest } from "@oj2
 
 /**
  * 教程编辑表单。只留可编辑字段 —— createdBy / createdAt / updatedAt 由后端产出，
- * 新建时压根不存在（对齐 BlankProblem / BlankContest 的写法）。
- *
- * `code` 收窄成 string：读回来时统一 `?? ""`，代码编辑器的 v-model 不接受 null。
+ * 新建时压根不存在（对齐 BlankProblem / BlankContest 的写法）。「示例代码」字段界面上
+ * 去掉了（正文里的代码块能直接运行），挂的题走单独的接口。
  */
-export type TutorialEdit = Omit<AdminTutorial, "createdBy" | "createdAt" | "updatedAt" | "code"> & {
-  code: string
-}
+export type TutorialEdit = Omit<
+  AdminTutorial,
+  "createdBy" | "createdAt" | "updatedAt" | "code" | "problems"
+>
 
 export interface ExerciseMcqData {
   question: string
@@ -448,6 +446,8 @@ export type { ExerciseType } from "@oj2/contract"
  * 前端按题型收窄成判别联合 —— 组件靠它区分七种题型的字段。
  */
 export type Exercise = Omit<AdminExercise, "data"> & {
+  /** 学生端才有：当前学生做对过没有（后台的练习列表不下发） */
+  solved?: boolean
   data:
     | ExerciseMcqData
     | ExerciseSortData

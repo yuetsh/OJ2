@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseMatchData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 
@@ -129,11 +130,7 @@ function dotStyle(color: string): Record<string, string> {
 </script>
 
 <template>
-  <n-card style="margin: 16px 0; border: 1.5px solid var(--n-border-color)">
-    <template #header>
-      <n-tag type="primary" :bordered="false">练一练 · 连线匹配</n-tag>
-    </template>
-
+  <div>
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
@@ -173,16 +170,15 @@ function dotStyle(color: string): Record<string, string> {
       </n-space>
     </div>
 
-    <n-alert
+    <ExerciseResult
       v-if="submitted"
       :type="allCorrect ? 'success' : 'error'"
       :title="allCorrect ? '全部匹配正确！' : '有匹配错误，红色项需要重新连线'"
-      style="margin-top: 12px"
     />
 
     <n-space style="margin-top: 12px" :size="8">
       <n-button type="primary" :disabled="!allPaired || locked" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
-  </n-card>
+  </div>
 </template>

@@ -4,7 +4,6 @@ import { NSwitch, useThemeVars } from "naive-ui"
 import { RouterLink } from "vue-router"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useDarkTransition } from "shared/composables/darkTransition"
-import { useLearnProgress } from "shared/composables/learnProgress"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "../store/config"
@@ -20,7 +19,6 @@ const route = useRoute()
 const router = useRouter()
 
 const { isMobile, isDesktop } = useBreakpoints()
-const { learnStep } = useLearnProgress()
 const { isDark, toggleDark } = useDarkTransition()
 const theme = useThemeVars()
 
@@ -77,16 +75,12 @@ function renderIcon(icon: string) {
   return () => h(Icon, { icon, width: 18 })
 }
 
-function learnLink(type: "python" | "c") {
-  return `/learn/${type}/${learnStep.value[type].toString().padStart(2, "0")}`
-}
-
 /**
  * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字，窄屏收进「菜单」下拉。
  * `key` 就是一级路径，用来判定高亮（见上面的 active）。
  *
- * 顺序是 自学 / 题目 / 提交 / 题单 / 比赛 / 排名。「自学」是下拉，单独渲染在最前面，
- * 不在这张表里。提交留在一级：学生天天回来看自己交的结果，老师课上翻全班代码也走它。
+ * 顺序是 自学 / 题目 / 提交 / 题单 / 比赛 / 排名。「自学」进自学首页（/learn），
+ * 两门课、接着学哪一课都在那儿挑，不再是下拉。提交留在一级：学生天天回来看自己交的结果，老师课上翻全班代码也走它。
  * 公告不上顶栏 —— 一年五六条、基本是版本更新，首页有公告卡片和「全部」入口；
  * 只有手机菜单里留一项（见 mobileMenus）。
  * 不用 n-menu：它横排每项固定占 100px，1280 宽的机房屏上会把顶栏挤成两行。
@@ -100,6 +94,7 @@ interface NavLink {
 
 const navLinks = computed<NavLink[]>(() =>
   [
+    { key: "learn", label: "自学", to: "/learn" },
     { key: "problem", label: "题目", to: "/problem" },
     { key: "submission", label: "提交", to: "/submission", show: userStore.showSubmissions },
     { key: "problemset", label: "题单", to: "/problemset" },
@@ -110,24 +105,14 @@ const navLinks = computed<NavLink[]>(() =>
 
 const announcementLink: NavLink = { key: "announcement", label: "公告", to: "/announcement" }
 
-const learnOptions: DropdownOption[] = [
-  { label: "Python", key: "learn-python", icon: renderIcon("ph:book-open") },
-  { label: "C 语言", key: "learn-c", icon: renderIcon("ph:book-open") },
-]
-
 const mobileMenus = computed<DropdownOption[]>(() => [
-  { label: "自学", key: "learn", children: learnOptions },
   ...navLinks.value.map((link) => ({ label: link.label, key: link.key })),
   { label: announcementLink.label, key: announcementLink.key },
 ])
 
 function handleNavSelect(key: string) {
-  if (key === "learn-python") router.push(learnLink("python"))
-  else if (key === "learn-c") router.push(learnLink("c"))
-  else {
-    const link = [...navLinks.value, announcementLink].find((item) => item.key === key)
-    if (link) router.push(link.to)
-  }
+  const link = [...navLinks.value, announcementLink].find((item) => item.key === key)
+  if (link) router.push(link.to)
 }
 
 const adminPath = computed(() => (userStore.isSuperAdmin ? "/admin" : "/admin/problem/list"))
@@ -236,11 +221,6 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       </n-tag>
     </RouterLink>
     <nav v-if="isDesktop" class="nav">
-      <n-dropdown trigger="hover" :options="learnOptions" @select="handleNavSelect">
-        <button type="button" class="nav-link" :class="{ active: active === 'learn' }">
-          自学<Icon icon="ph:caret-down-bold" :width="11" />
-        </button>
-      </n-dropdown>
       <RouterLink
         v-for="link in navLinks"
         :key="link.key"

@@ -9,8 +9,7 @@ import type {
   AdminAiReport,
   AdminAiReportList,
   StuckProblem,
-  LearnStudentProgressList,
-  LearnTutorialProgressList,
+  LearnBoard,
   LearnExerciseProgressList,
   LearnExerciseAttempt,
   AdminContestList,
@@ -41,9 +40,11 @@ import type {
   AdminProblemSetProblem,
   AddProblemsToSetResult,
   TutorialListItem,
+  TutorialEdit,
   TagCategory,
 } from "utils/types"
 import type {
+  TutorialProblemCandidate,
   AstCheckRequest,
   AstCheckResponse,
   GenerateTestInputsRequest,
@@ -416,23 +417,42 @@ export function getTutorial(id: number) {
   return api.get<Tutorial>(`admin/tutorials/${id}`)
 }
 
-function toTutorialBody(data: Partial<Tutorial>) {
+/** 「示例代码」界面上去掉了，`code` 不带：后端照原样留着发布脚本写进去的那份 */
+function toTutorialBody(data: TutorialEdit) {
   return {
     title: data.title,
     content: data.content,
-    code: data.code ?? null,
-    isPublic: data.isPublic ?? false,
-    order: data.order ?? 0,
+    project: data.project,
+    isPublic: data.isPublic,
+    order: data.order,
     type: data.type,
   }
 }
 
-export function createTutorial(data: Partial<Tutorial>) {
+export function createTutorial(data: TutorialEdit) {
   return api.post<Tutorial>("admin/tutorials", toTutorialBody(data))
 }
 
-export function updateTutorial(data: Partial<Tutorial>) {
+export function updateTutorial(data: TutorialEdit) {
   return api.put<Tutorial>(`admin/tutorials/${data.id}`, toTutorialBody(data))
+}
+
+export function setTutorialProblems(id: number, problemIds: number[]) {
+  return api.put<Tutorial>(`admin/tutorials/${id}/problems`, { problemIds })
+}
+
+export function getTutorialProblemCandidates(keyword: string) {
+  return api.get<TutorialProblemCandidate[]>("admin/tutorial-problem-candidates", {
+    params: keyword ? { keyword } : {},
+  })
+}
+
+export function reorderTutorials(ids: number[]) {
+  return api.put<null>("admin/tutorial-order", { ids })
+}
+
+export function renameTutorialProject(type: "python" | "c", from: string, to: string) {
+  return api.put<null>("admin/tutorial-projects", { type, from, to })
 }
 
 export function deleteTutorial(id: number) {
@@ -583,16 +603,8 @@ export function getStuckProblems() {
   return api.get<StuckProblem[]>("admin/problem-analytics/stuck")
 }
 
-export function getLearnStudents(params: { type: "python" | "c"; className?: string }) {
-  return api.get<LearnStudentProgressList>("admin/learn-analytics/students", {
-    params,
-  })
-}
-
-export function getLearnTutorials(params: { type: "python" | "c"; className?: string }) {
-  return api.get<LearnTutorialProgressList>("admin/learn-analytics/tutorials", {
-    params,
-  })
+export function getLearnBoard(params: { type: "python" | "c"; className?: string }) {
+  return api.get<LearnBoard>("admin/learn-analytics/board", { params })
 }
 
 export function getLearnExercises(params: { type: "python" | "c"; className?: string }) {

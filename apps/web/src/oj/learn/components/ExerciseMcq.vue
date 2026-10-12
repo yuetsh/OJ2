@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseMcqData } from "utils/types"
 
 const props = defineProps<{ exercise: Exercise }>()
@@ -8,6 +9,8 @@ const emit = defineEmits<{
 
 const data = computed(() => props.exercise.data as ExerciseMcqData)
 const isSingle = computed(() => data.value.answer.length === 1)
+// 选项都不长就排两列，省一半高度；有一条长的就一条一行，免得折成两三行
+const twoColumns = computed(() => data.value.options.every((opt) => opt.length <= 16))
 
 const selected = ref<Set<number>>(new Set())
 const correct = ref(false)
@@ -75,46 +78,29 @@ function optionType(idx: number): "default" | "primary" | "success" {
 </script>
 
 <template>
-  <n-card style="margin: 16px 0; border: 1.5px solid var(--n-border-color)">
-    <template #header>
-      <n-space align="center" :size="8">
-        <n-tag type="success" :bordered="false">
-          练一练 · {{ isSingle ? "单选题" : "多选题" }}
-        </n-tag>
-      </n-space>
-    </template>
-
-    <p style="font-weight: 500; font-size: 16px; margin-bottom: 12px">
+  <div>
+    <p class="question">
       {{ data.question }}
     </p>
 
-    <n-space vertical :size="8">
-      <n-button
+    <div class="opts" :class="{ wide: twoColumns }">
+      <button
         v-for="(opt, idx) in data.options"
         :key="idx"
-        :type="optionType(idx)"
-        :secondary="optionType(idx) !== 'default'"
-        :tertiary="optionType(idx) === 'default'"
-        :strong="selected.has(idx)"
-        :style="{
-          justifyContent: 'flex-start',
-          width: '100%',
-          textAlign: 'left',
-        }"
+        type="button"
+        class="opt"
+        :class="optionType(idx)"
         @click="select(idx)"
       >
-        <template #icon>
-          <span style="font-weight: 700">{{ String.fromCharCode(65 + idx) }}</span>
-        </template>
-        {{ opt }}
-      </n-button>
-    </n-space>
+        <span class="key">{{ String.fromCharCode(65 + idx) }}</span>
+        <span>{{ opt }}</span>
+      </button>
+    </div>
 
-    <n-alert
+    <ExerciseResult
       v-if="correct || wrong || partial"
       :type="correct ? 'success' : partial ? 'warning' : 'error'"
       :title="correct ? '正确！' : partial ? '部分正确，请重试' : '选择有误，请重试'"
-      style="margin-top: 12px"
     />
 
     <n-space style="margin-top: 12px" :size="8">
@@ -123,5 +109,73 @@ function optionType(idx: number): "default" | "primary" | "success" {
       </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
-  </n-card>
+  </div>
 </template>
+
+<style scoped>
+.question {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+.opts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.opts.wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 768px) {
+  .opts.wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.opt {
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.opt:hover {
+  border-color: #18a058;
+}
+.key {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 11px;
+  border: 1.5px solid rgba(128, 128, 128, 0.5);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  opacity: 0.85;
+}
+.opt.primary {
+  border-color: #18a058;
+  background: rgba(24, 160, 88, 0.08);
+}
+.opt.primary .key,
+.opt.success .key {
+  border-color: #18a058;
+  background: #18a058;
+  color: #fff;
+  opacity: 1;
+}
+.opt.success {
+  border-color: #18a058;
+  background: rgba(24, 160, 88, 0.12);
+}
+</style>

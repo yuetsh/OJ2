@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue"
 import { errorMessage } from "utils/api"
 import type {
   Exercise,
@@ -13,7 +14,17 @@ import type {
 } from "utils/types"
 import { getAdminExercises, createExercise, updateExercise, deleteExercise } from "admin/api"
 
-const props = defineProps<{ tutorialId: number }>()
+/**
+ * 编辑页右栏的「练一练」：一道一行，写着它在正文的哪一节；新建的直接插到正文光标处，
+ * 不用再「复制占位符」去粘。表单（七种题型）还是原来那个弹框。
+ */
+const props = defineProps<{ tutorialId: number; content: string }>()
+const emit = defineEmits<{
+  /** 把这道题的占位符插到正文光标处 */
+  insert: [exerciseId: number]
+  /** 列表变了（预览要跟着换） */
+  change: [exercises: Exercise[]]
+}>()
 const message = useMessage()
 const dialog = useDialog()
 
@@ -54,6 +65,19 @@ const debugLines = computed(() => (debugCode.value === "" ? [] : debugCode.value
 
 async function load() {
   exercises.value = await getAdminExercises(props.tutorialId)
+  emit("change", exercises.value)
+}
+
+/** 这道题在正文的哪一节：占位符前面最近的二级标题；没放进正文就是 null */
+function placeOf(id: number) {
+  const at = props.content.indexOf(`[[exercise:${id}]]`)
+  if (at < 0) return null
+  const before = props.content.slice(0, at).split("\n")
+  for (let i = before.length - 1; i >= 0; i--) {
+    const heading = before[i]!.match(/^##\s+(.+)$/)
+    if (heading) return heading[1]!.trim()
+  }
+  return "开头"
 }
 
 onMounted(load)
@@ -297,13 +321,14 @@ async function save() {
       })
       message.success("练习题已更新")
     } else {
-      await createExercise({
+      const created = await createExercise({
         tutorialId: props.tutorialId,
         type: formType.value,
         data,
         order: formOrder.value,
       })
-      message.success("练习题已创建")
+      message.success("已新建，插到了正文光标处")
+      emit("insert", created.id)
     }
     showForm.value = false
     await load()
@@ -325,76 +350,50 @@ function confirmDelete(id: number) {
   })
 }
 
-function copyPlaceholder(id: number) {
-  navigator.clipboard.writeText(`[[exercise:${id}]]`)
-  message.success(`已复制 [[exercise:${id}]]`)
-}
-
 const TYPE_NAMES: Record<ExerciseType, string> = {
-  mcq: "选择题",
-  sort: "代码排序",
-  fill: "代码填空",
-  match: "连线匹配",
-  predict: "输出预测",
-  debug: "代码找错",
-  group: "归类分组",
-}
-
-const TYPE_TAGS: Record<
-  ExerciseType,
-  "success" | "info" | "warning" | "error" | "primary" | "default"
-> = {
-  mcq: "success",
-  sort: "info",
-  fill: "warning",
-  match: "primary",
-  predict: "error",
-  debug: "info",
-  group: "warning",
+  mcq: "选择",
+  sort: "排序",
+  fill: "填空",
+  match: "连线",
+  predict: "预测输出",
+  debug: "找错",
+  group: "分组",
 }
 
 function typeName(type: ExerciseType) {
   return TYPE_NAMES[type] ?? type
 }
-
-function typeTagType(type: ExerciseType) {
-  return TYPE_TAGS[type] ?? "default"
-}
 </script>
 
 <template>
   <div>
-    <n-flex justify="space-between" align="center" style="margin-bottom: 16px">
-      <n-text>共 {{ exercises.length }} 道练习题</n-text>
-      <n-button type="primary" size="small" @click="openCreate">+ 添加练习题</n-button>
-    </n-flex>
-
-    <n-empty v-if="exercises.length === 0" description="暂无练习题" />
-
-    <n-list v-else bordered>
-      <n-list-item v-for="ex in exercises" :key="ex.id">
-        <n-flex justify="space-between" align="center">
-          <div>
-            <n-tag size="small" :type="typeTagType(ex.type)" :bordered="false">
-              {{ typeName(ex.type) }}
-            </n-tag>
-            <n-text style="margin-left: 10px">
-              {{ (ex.data as { question?: string }).question }}
-            </n-text>
-          </div>
-          <n-space :size="8">
-            <n-tooltip trigger="hover">
-              <template #trigger>
-                <n-button size="small" @click="copyPlaceholder(ex.id)"> 复制占位符 </n-button>
-              </template>
-              将 [[exercise:{{ ex.id }}]] 粘贴到 Markdown 内容中
-            </n-tooltip>
-            <n-button size="small" @click="openEdit(ex)">编辑</n-button>
-            <n-button size="small" type="error" @click="confirmDelete(ex.id)"> 删除 </n-button>
-          </n-space>
-        </n-flex>
-      </n-list-item>
-    </n-list>
+    <div class="head">
+      <span class="title">练一练</span>
+      <span class="muted">{{ exercises.length }} 道</span>
+      <span class="grow" />
+      <n-button size="small" @click="openCreate">
+        <template #icon><Icon icon="ph:plus" /></template>
+        新建
+      </n-button>
+    </div>
+    <div v-if="exercises.length === 0" class="muted empty">还没有练一练</div>
+    <div v-for="(ex, index) in exercises" :key="ex.id" class="item">
+      <div class="line">
+        <span class="muted num">{{ index + 1 }}</span>
+        <span class="type">{{ typeName(ex.type) }}</span>
+        <span class="question">{{ (ex.data as { question?: string }).question }}</span>
+      </div>
+      <div class="line sub">
+        <span v-if="placeOf(ex.id)" class="muted">在「{{ placeOf(ex.id) }}」</span>
+        <template v-else>
+          <span class="warn">还没放进正文</span>
+          <a href="#" @click.prevent="emit('insert', ex.id)">插到光标处</a>
+        </template>
+        <span class="grow" />
+        <a href="#" @click.prevent="openEdit(ex)">编辑</a>
+        <a href="#" class="danger" @click.prevent="confirmDelete(ex.id)">删除</a>
+      </div>
+    </div>
 
     <n-modal
       v-model:show="showForm"
@@ -628,3 +627,75 @@ function typeTagType(type: ExerciseType) {
     </n-modal>
   </div>
 </template>
+
+<style scoped>
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.title {
+  font-weight: 700;
+}
+.muted {
+  opacity: 0.6;
+  font-size: 13px;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.grow {
+  flex: 1;
+}
+.empty {
+  padding: 8px 0;
+}
+.item {
+  padding: 9px 0;
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sub {
+  font-size: 12px;
+  padding-left: 16px;
+}
+.type {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(128, 128, 128, 0.12);
+  flex-shrink: 0;
+}
+.question {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.warn {
+  color: #c77c02;
+}
+.sub a {
+  color: #18a058;
+  text-decoration: none;
+}
+.sub a.danger {
+  color: #d03050;
+  opacity: 0.8;
+}
+</style>

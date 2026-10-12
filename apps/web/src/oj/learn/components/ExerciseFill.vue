@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseFillData } from "utils/types"
 import { highlight } from "../composables/useCodeHighlight"
 import "./exercise-highlight.css"
@@ -72,11 +73,7 @@ function inputWidth(idx: number): string {
 </script>
 
 <template>
-  <n-card style="margin: 16px 0; border: 1.5px solid var(--n-border-color)">
-    <template #header>
-      <n-tag type="warning" :bordered="false">练一练 · 代码填空</n-tag>
-    </template>
-
+  <div>
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 12px">
       {{ data.question }}
     </p>
@@ -124,7 +121,7 @@ function inputWidth(idx: number): string {
         @input="userInputs[seg.index] = ($event.target as HTMLInputElement).value"
       /></template></pre>
 
-    <n-alert
+    <ExerciseResult
       v-if="wrongBlanks.size > 0 || allCorrect"
       :type="allCorrect ? 'success' : 'error'"
       :title="allCorrect ? '全部正确！' : '有填写错误，请检查红色标注的空位'"
@@ -132,8 +129,8 @@ function inputWidth(idx: number): string {
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="warning" :disabled="allCorrect" @click="submit"> 提交 </n-button>
+      <n-button type="primary" :disabled="allCorrect" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
-  </n-card>
+  </div>
 </template>

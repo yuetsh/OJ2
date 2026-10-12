@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseGroupData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 
@@ -80,11 +81,7 @@ function reset() {
 </script>
 
 <template>
-  <n-card style="margin: 16px 0; border: 1.5px solid var(--n-border-color)">
-    <template #header>
-      <n-tag type="warning" :bordered="false">练一练 · 归类分组</n-tag>
-    </template>
-
+  <div>
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
@@ -156,16 +153,15 @@ function reset() {
       </div>
     </div>
 
-    <n-alert
+    <ExerciseResult
       v-if="submitted"
       :type="allCorrect ? 'success' : 'error'"
       :title="allCorrect ? '归类全部正确！' : '有归类错误，红色项需要调整'"
-      style="margin-top: 12px"
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="warning" :disabled="!allPlaced || locked" @click="submit"> 提交 </n-button>
+      <n-button type="primary" :disabled="!allPlaced || locked" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
-  </n-card>
+  </div>
 </template>

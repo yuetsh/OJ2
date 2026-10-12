@@ -9,6 +9,7 @@ import {
   type FormatCodeResponse,
   type Metrics,
   type TutorialSummary,
+  type Tutorial,
   type ClassActivity,
   type LastVisit,
   type ClassBoard,
@@ -67,7 +68,6 @@ import type {
   Submission,
   SubmissionListPayload,
   SubmitCodePayload,
-  Tutorial,
   TutorialProgress,
 } from "utils/types"
 

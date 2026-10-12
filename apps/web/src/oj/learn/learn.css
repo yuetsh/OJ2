@@ -1,0 +1,24 @@
+/* 自学模块的几个颜色。深色模式下深绿、深橙的字在暗底上读不出来，换成亮一档的。
+   设计稿在「自学重设计」画布页（Learn*.dc.html）。 */
+:root {
+  --learn-green: #18a058;
+  --learn-green-text: #0c7a43;
+  --learn-green-bg: rgba(24, 160, 88, 0.1);
+  --learn-green-line: rgba(24, 160, 88, 0.35);
+  --learn-orange: #f0a020;
+  --learn-orange-text: #8a5200;
+  --learn-orange-bg: rgba(240, 160, 32, 0.14);
+  --learn-red-text: #b0263c;
+  --learn-line: rgba(128, 128, 128, 0.22);
+  --learn-soft: rgba(128, 128, 128, 0.07);
+  --learn-pane: #ffffff;
+  --learn-todo: rgba(128, 128, 128, 0.22);
+  --learn-code-font: Consolas, Monaco, "Microsoft YaHei", monospace;
+}
+
+html.dark {
+  --learn-green-text: #63e2b7;
+  --learn-orange-text: #f2c97d;
+  --learn-red-text: #f08a9b;
+  --learn-pane: rgba(255, 255, 255, 0.03);
+}

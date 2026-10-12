@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseSortData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 import { highlightLines } from "../composables/useCodeHighlight"
@@ -70,11 +71,7 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
 </script>
 
 <template>
-  <n-card style="margin: 16px 0; border: 1.5px solid var(--n-border-color)">
-    <template #header>
-      <n-tag type="info" :bordered="false">练一练 · 代码排序</n-tag>
-    </template>
-
+  <div>
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 12px">
       {{ data.question }}
     </p>
@@ -116,16 +113,15 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
       </div>
     </n-space>
 
-    <n-alert
+    <ExerciseResult
       v-if="submitted"
       :type="allCorrect ? 'success' : 'error'"
       :title="allCorrect ? '顺序正确！' : '顺序有误，红色行需要调整'"
-      style="margin-top: 12px"
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="info" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>
+      <n-button type="primary" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
-  </n-card>
+  </div>
 </template>

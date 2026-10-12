@@ -1,17 +1,25 @@
 <script setup lang="ts">
-import PageHeader from "admin/components/PageHeader.vue"
-import { TUTORIAL_READ_SECONDS } from "@oj2/contract"
-import { NProgress, NTag, NText } from "naive-ui"
-import { getLearnStudents, getLearnTutorials, getLearnExercises } from "admin/api"
-import { readableDuration, parseTime } from "utils/functions"
-import type {
-  LearnStudentProgress,
-  LearnTutorialProgress,
-  LearnExerciseProgress,
-} from "utils/types"
+import { Icon } from "@iconify/vue"
+import type { LearnBoard, LearnBoardStudent, LearnExerciseProgress } from "utils/types"
+import { getLearnBoard, getLearnExercises } from "admin/api"
+import { parseTime, readableDuration } from "utils/functions"
+import { useConfigStore } from "shared/store/config"
+import UserName from "shared/components/UserName.vue"
+import { groupClassOptions } from "oj/submission/utils"
+import { groupByProject, splitTitle, type TutorialType } from "oj/learn/lesson"
+import "oj/learn/learn.css"
 import ExerciseAttempts from "./ExerciseAttempts.vue"
 
-const EXERCISE_TYPE_LABEL: Record<string, string> = {
+/**
+ * 自学情况（设计稿「后台 · 自学情况」）：一个班学到哪了。
+ *
+ * 中间是学生 × 课的方块格（浅绿 = 打开过，绿 = 学完，也就是练一练全对），一课没打开过的
+ * 学生收成一串名单；右边按课看练一练做对了多少，点一道看每个人最后错在哪。
+ * 不选班就按排名页同一套规则猜老师在教哪个班。
+ */
+const configStore = useConfigStore()
+
+const KIND: Record<string, string> = {
   mcq: "选择",
   sort: "排序",
   fill: "填空",
@@ -21,458 +29,570 @@ const EXERCISE_TYPE_LABEL: Record<string, string> = {
   group: "分组",
 }
 
-const type = ref<"python" | "c">("python")
-// 3-4 位是具体班级，1-2 位当年级前缀（后端 classFilter 分的岔）
-const className = ref("")
-const tab = ref("students")
-// 按学生那张表的姓名/学号搜索，纯前端过滤（整表本来就一次拉完）
-const keyword = ref("")
-
-const loading = ref(false)
-const students = ref<LearnStudentProgress[]>([])
-const tutorials = ref<LearnTutorialProgress[]>([])
+const type = ref<TutorialType>("python")
+const className = ref<string | null>(null)
+const board = ref<LearnBoard | null>(null)
 const exercises = ref<LearnExerciseProgress[]>([])
-const tutorialCount = ref(0)
-const exerciseCount = ref(0)
-const studentCount = ref(0)
-// 展开明细的那一行；一次只展开一道题，免得几十个请求一起打出去
-const expanded = ref<number[]>([])
+const lessonId = ref<number | null>(null)
+const expanded = ref<number | null>(null)
+const loading = ref(false)
 
-const typeOptions = [
-  { label: "Python", value: "python" },
-  { label: "C 语言", value: "c" },
-]
-
-type StudentStatus = "idle" | "stalled" | "noPractice" | "going" | "done"
-
-const STALL_DAYS = 7
-const STATUS_META: Record<
-  StudentStatus,
-  { label: string; type: "default" | "error" | "warning" | "info" | "success" }
-> = {
-  idle: { label: "未开始", type: "error" },
-  stalled: { label: `${STALL_DAYS} 天没学`, type: "warning" },
-  noPractice: { label: "只读不练", type: "info" },
-  going: { label: "进行中", type: "default" },
-  done: { label: "已学完", type: "success" },
-}
-
-// 一个学生只落进一个状态，按「最需要老师看一眼」的顺序判：
-// 没开始 > 学完了 > 停滞 > 只读不练 > 正常推进
-function statusOf(row: LearnStudentProgress): StudentStatus {
-  if (row.readCount === 0 && row.totalSeconds === 0 && !row.exerciseTried) {
-    return "idle"
+const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
+const groups = computed(() =>
+  groupByProject(
+    (board.value?.tutorials ?? []).map(({ id, title, project }) => ({ id, title, project })),
+  ),
+)
+const started = computed(() =>
+  (board.value?.students ?? [])
+    .filter((row) => row.opened.length || row.exerciseSolved)
+    .sort(
+      (a, b) =>
+        b.done.length - a.done.length ||
+        b.opened.length - a.opened.length ||
+        (b.lastViewedAt ?? "").localeCompare(a.lastViewedAt ?? ""),
+    ),
+)
+const idle = computed(() =>
+  (board.value?.students ?? []).filter((row) => !row.opened.length && !row.exerciseSolved),
+)
+const finishedOne = computed(() => started.value.filter((row) => row.done.length > 0).length)
+const avgSeconds = computed(() => {
+  const rows = started.value
+  return rows.length
+    ? Math.round(rows.reduce((n, row) => n + row.totalSeconds, 0) / rows.length)
+    : 0
+})
+const openedCount = computed(() => {
+  const counts = new Map<number, number>()
+  for (const row of board.value?.students ?? []) {
+    for (const id of row.opened) counts.set(id, (counts.get(id) ?? 0) + 1)
   }
-  if (tutorialCount.value && row.readCount >= tutorialCount.value) return "done"
-  if (row.lastViewedAt) {
-    // 只比两个时刻相差多少毫秒，不涉及「哪一天」，所以不必走 time.ts 的日历口径
-    const days = (Date.now() - Date.parse(row.lastViewedAt)) / 86_400_000
-    if (days > STALL_DAYS) return "stalled"
-  }
-  if (exerciseCount.value && row.readCount > 0 && row.exerciseTried === 0) {
-    return "noPractice"
-  }
-  return "going"
-}
-
-const statusFilter = ref<StudentStatus | "all">("all")
-
-const statusCounts = computed(() => {
-  const counts: Record<StudentStatus, number> = {
-    idle: 0,
-    stalled: 0,
-    noPractice: 0,
-    going: 0,
-    done: 0,
-  }
-  for (const row of students.value) counts[statusOf(row)]++
   return counts
 })
-
-const startedCount = computed(() => students.value.length - statusCounts.value.idle)
-
-const avgRead = computed(() =>
-  students.value.length
-    ? (students.value.reduce((n, row) => n + row.readCount, 0) / students.value.length).toFixed(1)
-    : "0",
+const maxOpened = computed(() => Math.max(1, ...openedCount.value.values()))
+const lessonOptions = computed(() =>
+  groups.value.flatMap((group) =>
+    group.lessons.map((lesson) => ({
+      label: `第 ${lesson.step} 课 ${splitTitle(lesson.title).kp}`,
+      value: lesson.id,
+    })),
+  ),
+)
+const lessonExercises = computed(() =>
+  exercises.value.filter((row) => row.tutorialId === lessonId.value),
 )
 
-// 全班做题的总体正确口径：做对的题数 / 做过的题数
-const solveRate = computed(() => {
-  const tried = students.value.reduce((n, row) => n + row.exerciseTried, 0)
-  const solved = students.value.reduce((n, row) => n + row.exerciseSolved, 0)
-  return tried ? Math.round((solved / tried) * 100) : null
-})
-
-function lastSeen(value: string | null) {
-  if (!value) return "-"
-  const days = Math.floor((Date.now() - Date.parse(value)) / 86_400_000)
-  const absolute = parseTime(value, "M月D日 HH:mm")
-  return days >= 1 ? `${absolute}（${days} 天前）` : absolute
+function cellOf(row: LearnBoardStudent, id: number) {
+  if (row.done.includes(id)) return "done"
+  if (row.opened.includes(id)) return "opened"
+  return ""
 }
 
-// 姓名和学号都已经在手里，不再打接口。学号是纯数字，姓名是中文，
-// 一个框同时匹配两列就够了 —— 老师要么记得学号要么记得名字
-const filteredStudents = computed(() => {
-  const value = keyword.value.trim().toLowerCase()
-  return students.value.filter(
-    (row) =>
-      (statusFilter.value === "all" || statusOf(row) === statusFilter.value) &&
-      (!value ||
-        row.username.toLowerCase().includes(value) ||
-        (row.realName ?? "").toLowerCase().includes(value)),
-  )
-})
+function cellTitle(row: LearnBoardStudent, step: number, title: string, id: number) {
+  const state = cellOf(row, id)
+  return `第 ${step} 课 ${splitTitle(title).kp}：${state === "done" ? "学完了" : state === "opened" ? "打开过" : "没打开"}`
+}
 
-const studentColumns = computed<DataTableColumn<LearnStudentProgress>[]>(() => [
-  { title: "班级", key: "className", width: 90, sorter: "default" },
-  { title: "学号", key: "username", width: 140 },
-  {
-    title: "姓名",
-    key: "realName",
-    width: 110,
-    render: (row) => row.realName || "-",
-  },
-  {
-    title: "状态",
-    key: "status",
-    width: 110,
-    render: (row) => {
-      const meta = STATUS_META[statusOf(row)]
-      return h(NTag, { size: "small", type: meta.type, bordered: false }, () => meta.label)
-    },
-  },
-  {
-    title: `已读（共 ${tutorialCount.value} 课）`,
-    key: "readCount",
-    width: 170,
-    sorter: "default",
-    // 默认把读得最少的排在最前面：这张表要回答的是「谁还没开始」，
-    // 按读得多的排在前面，需要盯的人全在最后一页
-    defaultSortOrder: "ascend",
-    render: (row) =>
-      h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
-        h("span", `${row.readCount} / ${tutorialCount.value}`),
-        h(NProgress, {
-          type: "line",
-          percentage: tutorialCount.value
-            ? Math.round((row.readCount / tutorialCount.value) * 100)
-            : 0,
-          showIndicator: false,
-          status: row.readCount === 0 ? "error" : "success",
-          style: "width: 70px",
-        }),
-      ]),
-  },
-  {
-    title: `练一练（共 ${exerciseCount.value} 道）`,
-    key: "exerciseSolved",
-    width: 190,
-    sorter: "default",
-    render: (row) =>
-      h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
-        h("span", `${row.exerciseSolved} / ${exerciseCount.value}`),
-        // 做过但没做对的题，和提交总次数，一起说明「他在硬啃还是没碰」
-        row.exerciseTried > row.exerciseSolved
-          ? h(
-              NText,
-              { depth: 3, style: "font-size: 12px" },
-              () => `错 ${row.exerciseTried - row.exerciseSolved} 道`,
-            )
-          : null,
-        row.exerciseAttempts
-          ? h(NText, { depth: 3, style: "font-size: 12px" }, () => `共 ${row.exerciseAttempts} 次`)
-          : null,
-      ]),
-  },
-  {
-    title: "累计时长",
-    key: "totalSeconds",
-    width: 130,
-    sorter: "default",
-    render: (row) => readableDuration(row.totalSeconds),
-  },
-  {
-    title: "最后学习",
-    key: "lastViewedAt",
-    width: 210,
-    sorter: "default",
-    render: (row) => lastSeen(row.lastViewedAt),
-  },
-])
-
-const tutorialColumns = computed<DataTableColumn<LearnTutorialProgress>[]>(() => [
-  {
-    title: "#",
-    key: "order",
-    width: 60,
-    render: (_, index) => index + 1,
-  },
-  { title: "课程", key: "title", minWidth: 200 },
-  {
-    title: `读过的人（共 ${studentCount.value} 人）`,
-    key: "readers",
-    width: 200,
-    sorter: "default",
-    render: (row) =>
-      h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
-        h("span", `${row.readers} / ${studentCount.value}`),
-        h(NProgress, {
-          type: "line",
-          percentage: studentCount.value ? Math.round((row.readers / studentCount.value) * 100) : 0,
-          showIndicator: false,
-          status: row.readers === 0 ? "error" : "success",
-          style: "width: 70px",
-        }),
-      ]),
-  },
-  {
-    title: "人均时长",
-    key: "avgSeconds",
-    width: 130,
-    sorter: "default",
-    render: (row) => readableDuration(row.avgSeconds),
-  },
-  {
-    title: "累计时长",
-    key: "totalSeconds",
-    width: 130,
-    sorter: "default",
-    render: (row) => readableDuration(row.totalSeconds),
-  },
-])
-
-const exerciseColumns = computed<DataTableColumn<LearnExerciseProgress>[]>(() => [
-  {
-    type: "expand",
-    renderExpand: (row) =>
-      h(ExerciseAttempts, {
-        exerciseId: row.exerciseId,
-        className: className.value.trim(),
-      }),
-  },
-  {
-    title: "课",
-    key: "tutorialOrder",
-    width: 160,
-    ellipsis: { tooltip: true },
-    render: (row) => `${row.tutorialOrder}. ${row.tutorialTitle}`,
-  },
-  {
-    title: "题型",
-    key: "type",
-    width: 90,
-    render: (row) => EXERCISE_TYPE_LABEL[row.type] ?? row.type,
-  },
-  {
-    title: "题干",
-    key: "question",
-    minWidth: 220,
-    ellipsis: { tooltip: true },
-    render: (row) => row.question || "（无题干）",
-  },
-  {
-    // 试的人不少、却没人一次做对，或者一半以上的人没做对 —— 多半是题有坑，
-    // 老师应该先去看展开里全班「最后一次错在」是不是同一个干扰项
-    title: "提示",
-    key: "flag",
-    width: 100,
-    render: (row) => {
-      if (row.triedUsers < 3) return null
-      if (row.firstTryUsers === 0 && row.solvedUsers > 0) {
-        return h(NTag, { size: "small", type: "warning", bordered: false }, () => "没人一次对")
-      }
-      if (row.solvedUsers / row.triedUsers < 0.5) {
-        return h(NTag, { size: "small", type: "error", bordered: false }, () => "多数人卡住")
-      }
-      return null
-    },
-  },
-  {
-    title: "做对 / 做过",
-    key: "solvedUsers",
-    width: 150,
-    sorter: "default",
-    render: (row) =>
-      h("div", { style: "display: flex; align-items: center; gap: 8px" }, [
-        h("span", `${row.solvedUsers} / ${row.triedUsers}`),
-        h(NProgress, {
-          type: "line",
-          percentage: row.triedUsers ? Math.round((row.solvedUsers / row.triedUsers) * 100) : 0,
-          showIndicator: false,
-          status: row.triedUsers === 0 ? "error" : "success",
-          style: "width: 60px",
-        }),
-      ]),
-  },
-  {
-    title: "一次做对",
-    key: "firstTryUsers",
-    width: 110,
-    sorter: "default",
-    render: (row) => `${row.firstTryUsers} 人`,
-  },
-  {
-    // 做对的人平均试了几次。它和「一次做对」一起看才分得清难题和歧义题：
-    // 平均 3 次但没人一次对 → 题目本身有坑
-    title: "平均试几次",
-    key: "avgAttemptsToSolve",
-    width: 120,
-    sorter: "default",
-    defaultSortOrder: "descend",
-    render: (row) => (row.solvedUsers ? `${row.avgAttemptsToSolve} 次` : "-"),
-  },
-  {
-    title: "提交总次数",
-    key: "attempts",
-    width: 120,
-    sorter: "default",
-  },
-])
+function flag(row: LearnExerciseProgress) {
+  if (row.triedUsers < 3) return ""
+  if (row.firstTryUsers === 0 && row.solvedUsers > 0) return "没人一次对"
+  if (row.solvedUsers / row.triedUsers < 0.5) return "多数人卡住"
+  return ""
+}
 
 async function load() {
   loading.value = true
-  expanded.value = []
-  statusFilter.value = "all"
-  const params = { type: type.value, className: className.value.trim() }
+  expanded.value = null
   try {
-    // 三张表一起拉：切 tab 是纯前端的事，不该再等一次网络
-    const [studentRes, tutorialRes, exerciseRes] = await Promise.all([
-      getLearnStudents(params),
-      getLearnTutorials(params),
-      getLearnExercises(params),
-    ])
-    students.value = studentRes.results
-    tutorialCount.value = studentRes.tutorialCount
-    exerciseCount.value = studentRes.exerciseCount
-    tutorials.value = tutorialRes.results
-    studentCount.value = tutorialRes.studentCount
-    exercises.value = exerciseRes.results
+    const params = { type: type.value, ...(className.value ? { className: className.value } : {}) }
+    const data = await getLearnBoard(params)
+    board.value = data
+    className.value = data.className
+    const ex = data.className
+      ? await getLearnExercises({ type: type.value, className: data.className })
+      : { results: [] }
+    exercises.value = ex.results
+    // 练一练默认看大家打开得最多的那课
+    const busiest = [...openedCount.value.entries()].sort((a, b) => b[1] - a[1])[0]
+    lessonId.value = busiest?.[0] ?? data.tutorials[0]?.id ?? null
   } finally {
     loading.value = false
   }
 }
 
-watch(type, load)
+function pickType(value: TutorialType) {
+  type.value = value
+  load()
+}
+
+watch(className, (value, old) => {
+  if (old !== null && value !== old) load()
+})
 onMounted(load)
 </script>
 
 <template>
-  <!-- 口径写在表上方，免得老师对着「已读 0 课 / 累计 25 分钟」猜是不是坏了 -->
-  <PageHeader
-    title="自学情况"
-    :description="`「已读」按累计停留满 ${TUTORIAL_READ_SECONDS / 60} 分钟算，不足的只计时长`"
-  >
-    <template #filters>
-      <n-radio-group v-model:value="type" size="small">
-        <n-radio-button
-          v-for="item in typeOptions"
-          :key="item.value"
-          :value="item.value"
-          :label="item.label"
-        />
-      </n-radio-group>
-      <n-input
+  <div class="page">
+    <div class="top">
+      <span class="title">自学情况</span>
+      <span class="grow" />
+      <div class="seg">
+        <button type="button" :class="{ on: type === 'python' }" @click="pickType('python')">
+          Python
+        </button>
+        <button type="button" :class="{ on: type === 'c' }" @click="pickType('c')">C 语言</button>
+      </div>
+      <n-select
         v-model:value="className"
-        placeholder="班级或年级，如 241 / 24"
-        clearable
-        style="width: 200px"
-        @keyup.enter="load"
-        @clear="load"
+        :options="classOptions"
+        filterable
+        placeholder="选班级"
+        style="width: 170px"
       />
-      <n-button type="primary" secondary @click="load">查询</n-button>
-    </template>
-  </PageHeader>
+    </div>
 
-  <n-grid cols="2 s:3 m:5" :x-gap="12" :y-gap="12" responsive="screen" style="margin-bottom: 16px">
-    <n-gi>
-      <n-card size="small" :bordered="true">
-        <n-statistic label="学生" :value="studentCount" />
-      </n-card>
-    </n-gi>
-    <n-gi>
-      <n-card size="small">
-        <n-statistic label="已开始" :value="startedCount">
-          <template #suffix>/ {{ students.length }}</template>
-        </n-statistic>
-      </n-card>
-    </n-gi>
-    <n-gi>
-      <n-card size="small">
-        <n-statistic label="人均已读课数" :value="avgRead">
-          <template #suffix>/ {{ tutorialCount }}</template>
-        </n-statistic>
-      </n-card>
-    </n-gi>
-    <n-gi>
-      <n-card size="small">
-        <n-statistic label="练一练做对率" :value="solveRate === null ? '-' : `${solveRate}%`" />
-      </n-card>
-    </n-gi>
-    <n-gi>
-      <n-card size="small">
-        <n-statistic label="停滞（7 天没学）" :value="statusCounts.stalled">
-          <template #suffix>人</template>
-        </n-statistic>
-      </n-card>
-    </n-gi>
-  </n-grid>
+    <n-spin :show="loading">
+      <n-empty v-if="board && !board.className" description="选一个班看看" style="margin: 60px 0" />
+      <template v-else-if="board">
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">打开过教程</div>
+            <div class="stat-value">
+              {{ started.length }}<span class="unit"> / {{ board.students.length }} 人</span>
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">学完过至少一课</div>
+            <div class="stat-value">{{ finishedOne }}<span class="unit"> 人</span></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">人均停留</div>
+            <div class="stat-value">{{ readableDuration(avgSeconds) }}</div>
+          </div>
+        </div>
 
-  <n-tabs v-model:value="tab" type="line" animated>
-    <n-tab-pane name="students" tab="按学生">
-      <n-flex align="center" style="margin-bottom: 12px">
-        <n-input
-          v-model:value="keyword"
-          placeholder="搜索姓名或学号"
-          clearable
-          style="width: 200px"
-        />
-        <n-text v-if="keyword.trim()" depth="3"> 找到 {{ filteredStudents.length }} 人 </n-text>
-      </n-flex>
-      <n-flex :size="8" style="margin-bottom: 12px">
-        <n-tag checkable :checked="statusFilter === 'all'" @update:checked="statusFilter = 'all'">
-          全部 {{ students.length }}
-        </n-tag>
-        <n-tag
-          v-for="(meta, key) in STATUS_META"
-          :key="key"
-          checkable
-          :type="meta.type"
-          :checked="statusFilter === key"
-          @update:checked="statusFilter = statusFilter === key ? 'all' : key"
-        >
-          {{ meta.label }} {{ statusCounts[key] }}
-        </n-tag>
-      </n-flex>
-      <n-data-table
-        :loading="loading"
-        :columns="studentColumns"
-        :data="filteredStudents"
-        :row-key="(row: LearnStudentProgress) => row.userId"
-        striped
-        :pagination="{ pageSize: 20 }"
+        <div class="main">
+          <section class="card grid-card">
+            <div class="grid-scroll">
+              <div class="line head">
+                <span class="c-name strong">学到哪了</span>
+                <div class="cells-head">
+                  <div v-for="group in groups" :key="group.lessons[0]!.id" class="group-head">
+                    <span class="group-no" :title="group.project">{{
+                      group.no || group.name
+                    }}</span>
+                    <span class="group-steps">
+                      <span
+                        v-for="lesson in group.lessons"
+                        :key="lesson.id"
+                        class="step"
+                        :title="splitTitle(lesson.title).kp"
+                      >
+                        {{ lesson.step }}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <span class="c-num muted">练一练</span>
+                <span class="c-stay muted">停留</span>
+                <span class="c-last muted">最后学习</span>
+              </div>
+              <div v-for="row in started" :key="row.userId" class="line">
+                <span class="c-name"><UserName :username="row.username" /></span>
+                <div class="cells">
+                  <div v-for="group in groups" :key="group.lessons[0]!.id" class="group-cells">
+                    <span
+                      v-for="lesson in group.lessons"
+                      :key="lesson.id"
+                      class="cell"
+                      :class="cellOf(row, lesson.id)"
+                      :title="cellTitle(row, lesson.step, lesson.title, lesson.id)"
+                    />
+                  </div>
+                </div>
+                <span class="c-num num">{{ row.exerciseSolved || "-" }}</span>
+                <span class="c-stay num">{{ readableDuration(row.totalSeconds) }}</span>
+                <span class="c-last num muted">{{
+                  row.lastViewedAt ? parseTime(row.lastViewedAt, "M月D日 HH:mm") : "-"
+                }}</span>
+              </div>
+              <div v-if="!started.length" class="none muted">这个班还没人打开过</div>
+              <div v-else class="line foot">
+                <span class="c-name muted small">每课打开过</span>
+                <div class="cells bars">
+                  <div v-for="group in groups" :key="group.lessons[0]!.id" class="group-cells">
+                    <span v-for="lesson in group.lessons" :key="lesson.id" class="bar-col">
+                      <span class="bar-num num">{{ openedCount.get(lesson.id) || "" }}</span>
+                      <span
+                        class="bar"
+                        :class="{ zero: !openedCount.get(lesson.id) }"
+                        :style="{
+                          height: `${Math.max(2, ((openedCount.get(lesson.id) ?? 0) / maxOpened) * 40)}px`,
+                        }"
+                      />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-if="idle.length" class="idle">
+              <div class="idle-head">
+                <span class="strong">还没打开过</span>
+                <span class="muted num">{{ idle.length }} 人</span>
+              </div>
+              <div class="chips">
+                <span v-for="row in idle" :key="row.userId" class="chip"
+                  ><UserName :username="row.username"
+                /></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card side">
+            <div class="side-head">
+              <span class="strong">练一练</span>
+              <span class="grow" />
+              <n-select
+                v-model:value="lessonId"
+                :options="lessonOptions"
+                size="small"
+                style="width: 170px"
+              />
+            </div>
+            <div v-if="!lessonExercises.length" class="muted none">这课没有练一练</div>
+            <div v-for="row in lessonExercises" :key="row.exerciseId" class="ex">
+              <button type="button" class="ex-main" @click="expanded = row.exerciseId">
+                <span class="ex-line">
+                  <span class="kind">{{ KIND[row.type] ?? row.type }}</span>
+                  <span class="question">{{ row.question || "（没有题干）" }}</span>
+                  <Icon icon="ph:caret-right-bold" :width="12" class="muted" />
+                </span>
+                <span class="ex-line small num">
+                  <span>做对 {{ row.solvedUsers }} / 做过 {{ row.triedUsers }}</span>
+                  <span class="muted">一次就对 {{ row.firstTryUsers }}</span>
+                  <span v-if="flag(row)" class="flag">{{ flag(row) }}</span>
+                </span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </template>
+    </n-spin>
+
+    <!-- 点一道练一练：每个人做了几次、最后一次错在哪 -->
+    <n-modal
+      :show="expanded !== null"
+      preset="card"
+      :title="exercises.find((row) => row.exerciseId === expanded)?.question || '练一练'"
+      style="width: 820px; max-width: 95vw"
+      @update:show="(show: boolean) => !show && (expanded = null)"
+    >
+      <ExerciseAttempts
+        v-if="expanded !== null"
+        :exercise-id="expanded"
+        :class-name="board?.className ?? ''"
       />
-    </n-tab-pane>
-    <n-tab-pane name="exercises" tab="按练习">
-      <n-data-table
-        :loading="loading"
-        :columns="exerciseColumns"
-        :data="exercises"
-        :row-key="(row: LearnExerciseProgress) => row.exerciseId"
-        v-model:expanded-row-keys="expanded"
-        striped
-        :pagination="{ pageSize: 20 }"
-      />
-    </n-tab-pane>
-    <n-tab-pane name="tutorials" tab="按课程">
-      <n-data-table
-        :loading="loading"
-        :columns="tutorialColumns"
-        :data="tutorials"
-        :row-key="(row: LearnTutorialProgress) => row.tutorialId"
-        striped
-        :pagination="{ pageSize: 20 }"
-      />
-    </n-tab-pane>
-  </n-tabs>
+    </n-modal>
+  </div>
 </template>
+
+<style scoped>
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 700;
+}
+.grow {
+  flex: 1;
+}
+.muted {
+  opacity: 0.6;
+}
+.small {
+  font-size: 12px;
+}
+.strong {
+  font-weight: 700;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.seg {
+  display: flex;
+}
+.seg button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.seg button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.seg button:last-child {
+  border-radius: 0 4px 4px 0;
+  margin-left: -1px;
+}
+.seg button.on {
+  border-color: #18a058;
+  color: var(--learn-green-text);
+  font-weight: 600;
+  position: relative;
+}
+.card {
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  border-radius: 8px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.stat {
+  border: 1px solid rgba(128, 128, 128, 0.22);
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+.stat-label {
+  font-size: 13px;
+  opacity: 0.6;
+}
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.unit {
+  font-size: 15px;
+  font-weight: 400;
+  opacity: 0.6;
+}
+.main {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.grid-card {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.grid-scroll {
+  overflow-x: auto;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 16px;
+  border-top: 1px solid rgba(128, 128, 128, 0.1);
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+.line.head {
+  align-items: flex-end;
+  padding-top: 12px;
+  padding-bottom: 6px;
+  border-top: 0;
+}
+.c-name {
+  width: 118px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+.cells,
+.cells-head {
+  display: flex;
+  gap: 8px;
+}
+.group-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.group-no {
+  font-size: 11px;
+  opacity: 0.6;
+  text-align: center;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+.group-steps,
+.group-cells {
+  display: flex;
+  gap: 2px;
+}
+.step {
+  width: 18px;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+.cell {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: rgba(128, 128, 128, 0.12);
+}
+.cell.opened {
+  background: rgba(24, 160, 88, 0.3);
+}
+.cell.done {
+  background: #18a058;
+}
+.c-num {
+  width: 52px;
+  text-align: right;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.c-stay {
+  width: 80px;
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.c-last {
+  width: 92px;
+  text-align: right;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.foot {
+  align-items: flex-end;
+  padding-top: 10px;
+  padding-bottom: 12px;
+  border-top-color: rgba(128, 128, 128, 0.22);
+}
+.bars {
+  align-items: flex-end;
+}
+.bars .group-cells {
+  align-items: flex-end;
+}
+.bar-col {
+  width: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.bar-num {
+  font-size: 11px;
+  opacity: 0.8;
+}
+.bar {
+  width: 12px;
+  border-radius: 2px;
+  background: rgba(24, 160, 88, 0.45);
+}
+.bar.zero {
+  background: rgba(128, 128, 128, 0.2);
+}
+.none {
+  padding: 16px;
+  font-size: 13px;
+}
+.idle {
+  padding: 14px 16px 16px;
+  border-top: 1px solid rgba(128, 128, 128, 0.22);
+}
+.idle-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+}
+.side {
+  width: 270px;
+  flex-shrink: 0;
+  padding: 14px 16px;
+}
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ex {
+  border-top: 1px solid rgba(128, 128, 128, 0.12);
+}
+.ex-main {
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+.ex-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.kind {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(128, 128, 128, 0.12);
+  flex-shrink: 0;
+}
+.question {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flag {
+  color: var(--learn-orange-text);
+}
+</style>

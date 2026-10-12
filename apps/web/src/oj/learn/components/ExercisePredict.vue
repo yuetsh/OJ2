@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExercisePredictData } from "utils/types"
 import { highlight } from "../composables/useCodeHighlight"
 import "./exercise-highlight.css"
@@ -55,11 +56,7 @@ function reset() {
 </script>
 
 <template>
-  <n-card style="margin: 16px 0; border: 1.5px solid var(--n-border-color)">
-    <template #header>
-      <n-tag type="error" :bordered="false">练一练 · 输出预测</n-tag>
-    </template>
-
+  <div>
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 12px">
       {{ data.question }}
     </p>
@@ -88,16 +85,15 @@ function reset() {
       style="font-family: Monaco"
     />
 
-    <n-alert
+    <ExerciseResult
       v-if="submitted"
       :type="allCorrect ? 'success' : 'error'"
       :title="allCorrect ? '输出正确！' : '输出不正确，再读读代码看看'"
-      style="margin-top: 12px"
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="error" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>
+      <n-button type="primary" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
-  </n-card>
+  </div>
 </template>
