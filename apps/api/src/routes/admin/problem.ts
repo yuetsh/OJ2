@@ -1,4 +1,6 @@
 import {
+  flowToMermaid,
+  parseFlowDoc,
   addContestProblemRequestSchema,
   reorderContestProblemsRequestSchema,
   astCheckRequestSchema,
@@ -206,6 +208,7 @@ async function serialize(row: ProblemRow) {
     allowFlowchart: row.allowFlowchart,
     showFlowchart: row.showFlowchart,
     mermaidCode: row.mermaidCode,
+    flowchartData: asRecord(row.flowchartData),
     flowchartHint: row.flowchartHint,
     astRules: row.astRules,
     answers: Array.isArray(row.answers) ? row.answers : [],
@@ -276,6 +279,17 @@ async function generateSqlDisplay(
   return { display: outcome.value }
 }
 
+/**
+ * 参考流程图：画布画的（结构树）以它为准，Mermaid 照它生成 —— 题面里给学生看的、评分退回
+ * 老办法时拿来比的都是这份，和学生交的图同一套形状。只有手写 Mermaid 的老题原样存
+ */
+function referenceFlowchart(raw: Record<string, unknown> | null, mermaidCode: string | null) {
+  const doc = parseFlowDoc(raw)
+  return doc && doc.steps.length
+    ? { flowchartData: doc, mermaidCode: flowToMermaid(doc) }
+    : { flowchartData: {}, mermaidCode }
+}
+
 function problemValues(data: ReturnType<typeof createProblemRequestSchema.parse>, isSql: boolean) {
   return {
     displayId: data._id,
@@ -296,7 +310,7 @@ function problemValues(data: ReturnType<typeof createProblemRequestSchema.parse>
     source: data.source,
     allowFlowchart: data.allowFlowchart,
     showFlowchart: data.showFlowchart,
-    mermaidCode: data.mermaidCode,
+    ...referenceFlowchart(data.flowchartData, data.mermaidCode),
     flowchartHint: data.flowchartHint,
     astRules: pickAstRules(data.astRules, data.languages),
     answers: data.answers,

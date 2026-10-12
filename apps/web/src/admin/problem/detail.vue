@@ -42,8 +42,17 @@ import {
   type TemplateParts,
 } from "./components/codeTemplate"
 import type { AstCheckState, FlowchartMode, PreviewTab } from "./components/editorTypes"
+import {
+  emptyDoc,
+  parseDoc,
+  toMermaid,
+  type FlowDoc,
+} from "shared/components/FlowchartEditor/model"
 
 const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
+const FlowchartEditor = defineAsyncComponent(
+  () => import("shared/components/FlowchartEditor/index.vue"),
+)
 
 /**
  * 编程题（C / C++ / Python）的出题页，设计稿「编程题出题页」方案 B：左边写，右边是学生
@@ -93,6 +102,8 @@ interface CodeForm {
   astRules: AstRules | null
   flowchartMode: FlowchartMode
   mermaidCode: string
+  /** 画布画的参考流程图；null 是老题（只有手写的 Mermaid）或者还没画 */
+  flowchartDoc: FlowDoc | null
   flowchartHint: string
 }
 
@@ -118,6 +129,7 @@ const blankForm = (): CodeForm => ({
   astRules: null,
   flowchartMode: "none",
   mermaidCode: "",
+  flowchartDoc: null,
   flowchartHint: "",
 })
 
@@ -437,13 +449,26 @@ const FLOWCHART_LABEL: Record<FlowchartMode, string> = {
 }
 
 const mermaidOk = ref(false)
+
+/**
+ * 老题的参考图是手写的 Mermaid（没有结构树）：照旧给代码框；新画的、或者点了「改用画布画」
+ * 的用画布。保存时画布的图以它为准，后端照它重新生成 Mermaid
+ */
+const legacyMermaid = computed(() => !form.flowchartDoc && !!form.mermaidCode.trim())
+/** 右边预览画的那张：画布有图就照画布生成，不然是老的代码 */
+const previewMermaid = computed(() => {
+  if (!form.flowchartDoc) return form.mermaidCode
+  return form.flowchartDoc.steps.length ? toMermaid(form.flowchartDoc) : ""
+})
 const aiDrawing = ref(false)
 
 async function aiFlowchart() {
   aiDrawing.value = true
   try {
     const res = await generateFlowchartFromPythonCode(form.answers.Python)
-    form.mermaidCode = res.flowchart
+    const doc = parseDoc(res.doc)
+    if (!doc) throw new Error("AI 画出来的图读不了")
+    form.flowchartDoc = doc
     preview.value = "flowchart"
   } catch (err) {
     message.error(errorMessage(err, "生成失败，请稍后再试"))
@@ -599,6 +624,7 @@ async function loadProblem(data: AdminProblem) {
     astRules: data.astRules ?? null,
     flowchartMode: data.allowFlowchart ? "draw" : data.showFlowchart ? "show" : "none",
     mermaidCode: data.mermaidCode ?? "",
+    flowchartDoc: parseDoc(data.flowchartData),
     flowchartHint: data.flowchartHint ?? "",
   } satisfies CodeForm)
   answerTab.value = RUNNABLE.find((l) => languages.includes(l) && answers[l].trim()) ?? "Python"
@@ -703,10 +729,17 @@ const blockers = computed<Blocker[]>(() => {
           })
       })
   }
-  if (form.flowchartMode !== "none") {
-    if (!form.mermaidCode.trim()) list.push({ text: "写流程图的代码", section: "flowchart" })
-    else if (!mermaidOk.value)
-      list.push({ text: "改好流程图的代码（画不出来）", section: "flowchart", severe: true })
+  if (form.flowchartMode === "show") {
+    if (legacyMermaid.value) {
+      if (!mermaidOk.value)
+        list.push({ text: "改好流程图的代码（画不出来）", section: "flowchart", severe: true })
+    } else if (!form.flowchartDoc?.steps.length) {
+      list.push({ text: "画参考流程图", section: "flowchart" })
+    }
+  }
+  // 学生画的图拼成程序拿例子和测试数据跑（flowchart/program.ts），一组例子都没有就没得评
+  if (form.flowchartMode === "draw" && !examples.value.length) {
+    list.push({ text: "勾至少一组测试数据当例子（流程图照例子评）", section: "cases" })
   }
   return list
 })
@@ -775,6 +808,10 @@ async function save() {
       allowFlowchart: form.flowchartMode === "draw",
       showFlowchart: form.flowchartMode === "show",
       mermaidCode: form.flowchartMode === "none" ? form.mermaidCode : form.mermaidCode.trim(),
+      flowchartData:
+        form.flowchartMode === "show" && form.flowchartDoc?.steps.length
+          ? { ...form.flowchartDoc }
+          : null,
       flowchartHint: form.flowchartHint.trim(),
       astRules: form.astRules,
       sqlConfig: null,
@@ -1196,15 +1233,27 @@ onMounted(async () => {
             <label class="mode" :class="{ on: form.flowchartMode === 'draw' }">
               <n-radio value="draw" />
               <span>
-                <b>让学生自己画，按这张图打分</b>
-                <small>这张图学生看不到，只拿来给学生画的图打分；画到 A / S 级算做完</small>
+                <b>让学生自己画</b>
+                <small>按例子和测试数据评；画到 A / S 级算做完</small>
               </span>
             </label>
           </n-radio-group>
-          <template v-if="form.flowchartMode !== 'none'">
+          <!-- 学生画：按例子和测试数据评（拼成程序跑），不再需要参考图 -->
+          <n-text v-if="form.flowchartMode === 'draw'" depth="3" class="note">
+            学生画的图会拼成程序，拿这道题的例子和测试数据跑一遍，逐组看输出对不对，不用准备参考图。
+          </n-text>
+          <template v-if="form.flowchartMode === 'show'">
             <div class="inlineRow">
-              <span class="label">图的代码（Mermaid）</span>
+              <span class="label">{{ legacyMermaid ? "图的代码（Mermaid）" : "参考流程图" }}</span>
               <span class="grow"></span>
+              <n-button
+                v-if="legacyMermaid"
+                size="tiny"
+                quaternary
+                @click="form.flowchartDoc = emptyDoc()"
+              >
+                改用画布画
+              </n-button>
               <n-button
                 size="tiny"
                 :loading="aiDrawing"
@@ -1215,25 +1264,20 @@ onMounted(async () => {
                 AI 照 Python 答案画一张
               </n-button>
             </div>
-            <n-input
-              v-model:value="form.mermaidCode"
-              type="textarea"
-              class="mono"
-              :autosize="{ minRows: 6, maxRows: 18 }"
-              placeholder="graph TD&#10;    A[开始] --> B[输入 n]"
-            />
-            <n-text
-              v-if="form.mermaidCode.trim()"
-              :type="mermaidOk ? 'success' : 'error'"
-              class="note"
-            >
-              {{ mermaidOk ? "✓ 画得出来（右边就是）" : "✗ 还画不出来，看右边的报错" }}
-            </n-text>
-            <n-input
-              v-if="form.flowchartMode === 'draw'"
-              v-model:value="form.flowchartHint"
-              placeholder="给学生的提示（选填），比如：先判断门是不是开着"
-            />
+            <template v-if="legacyMermaid">
+              <n-input
+                v-model:value="form.mermaidCode"
+                type="textarea"
+                class="mono"
+                :autosize="{ minRows: 6, maxRows: 18 }"
+              />
+              <n-text :type="mermaidOk ? 'success' : 'error'" class="note">
+                {{ mermaidOk ? "✓ 画得出来（右边就是）" : "✗ 还画不出来，看右边的报错" }}
+              </n-text>
+            </template>
+            <div v-else class="flowCanvas">
+              <FlowchartEditor v-model:value="form.flowchartDoc" :draft="false" height="460px" />
+            </div>
           </template>
         </template>
       </section>
@@ -1326,8 +1370,7 @@ onMounted(async () => {
       :ast-rules="form.astRules"
       :ast-checks="astChecks"
       :flowchart-mode="form.flowchartMode"
-      :mermaid-code="form.mermaidCode"
-      :flowchart-hint="form.flowchartHint"
+      :mermaid-code="previewMermaid"
       @render-state="mermaidOk = $event"
       @collapse="previewCollapsed = true"
     />
@@ -1657,5 +1700,11 @@ onMounted(async () => {
 
 .blocker:hover {
   text-decoration: underline;
+}
+
+.flowCanvas {
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 6px;
+  overflow: hidden;
 }
 </style>

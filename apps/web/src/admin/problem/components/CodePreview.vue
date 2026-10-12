@@ -34,7 +34,6 @@ const props = defineProps<{
   astChecks: AstCheckState
   flowchartMode: FlowchartMode
   mermaidCode: string
-  flowchartHint: string
 }>()
 
 const tab = defineModel<PreviewTab>("tab", { required: true })
@@ -248,18 +247,15 @@ onMounted(() => nextTick(render))
     <!-- 流程图：一直挂着，改了图的代码随时知道画不画得出来 -->
     <div v-show="tab === 'flowchart'" class="page">
       <p v-if="flowchartMode === 'none'" class="placeholder">这道题不用流程图</p>
-      <p v-else-if="flowchartMode === 'draw'" class="muted small">
-        学生自己画，这张图<b>学生看不到</b>，只拿来给学生画的图打分。
-        <template v-if="flowchartHint.trim()">学生看到的提示：{{ flowchartHint }}</template>
+      <p v-else-if="flowchartMode === 'draw'" class="placeholder">
+        学生在题目页右边自己画，交上去按例子和测试数据评
       </p>
-      <p v-else class="muted small">学生在题面里点开「老师给的参考流程图」看到的是：</p>
-      <p v-if="flowchartMode !== 'none' && !mermaidCode.trim()" class="placeholder">
-        还没写图的代码
-      </p>
-      <div v-if="renderError && flowchartMode !== 'none'" class="chartError">
-        画不出来：{{ renderError }}
-      </div>
-      <div v-show="flowchartMode !== 'none'" ref="chart" class="chart"></div>
+      <template v-else>
+        <p class="muted small">学生在题面里点开「老师给的参考流程图」看到的是：</p>
+        <p v-if="!mermaidCode.trim()" class="placeholder">还没画</p>
+        <div v-if="renderError" class="chartError">画不出来：{{ renderError }}</div>
+      </template>
+      <div v-show="flowchartMode === 'show'" ref="chart" class="chart"></div>
     </div>
   </aside>
 </template>

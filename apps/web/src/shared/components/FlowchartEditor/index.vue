@@ -30,8 +30,14 @@ import { layoutDoc, PLACEHOLDER, type LaidNode, type LaidSlot } from "./layout"
 
 interface Props {
   height?: string
+  /**
+   * 题目页（默认）：每道题一份本地草稿，自动存。
+   * false：图交给外面管（后台出题页的参考流程图，v-model:value），不存草稿
+   */
+  draft?: boolean
 }
-const { height = "calc(100vh - 134px)" } = defineProps<Props>()
+const { height = "calc(100vh - 134px)", draft = true } = defineProps<Props>()
+const model = defineModel<FlowDoc | null>("value", { default: null })
 
 const message = useMessage()
 const theme = useThemeVars()
@@ -98,6 +104,13 @@ const cacheKey = computed(() => {
 const savedAt = ref<Date | null>(null)
 
 function loadDraft() {
+  if (!draft) {
+    doc.value = model.value ? cloneDoc(model.value) : emptyDoc()
+    deselect()
+    resetHistory()
+    fitSoon()
+    return
+  }
   let saved: unknown = null
   try {
     saved = storage.get(cacheKey.value)
@@ -135,12 +148,20 @@ watch(
   doc,
   () => {
     if (loading) return
-    saveDraft(cacheKey.value)
+    if (draft) saveDraft(cacheKey.value)
+    else model.value = cloneDoc(doc.value)
   },
   { deep: true },
 )
 
+/** 外面换了一张图（后台点了「AI 照答案画一张」）：摆上来，进历史，Ctrl+Z 能回去 */
+watch(model, (next) => {
+  if (draft || !next || signature(next) === signature(doc.value)) return
+  setDoc(next)
+})
+
 watch(cacheKey, () => {
+  if (!draft) return
   loading = true
   loadDraft()
   nextTick(() => (loading = false))

@@ -143,7 +143,10 @@ type ExcludeKeys =
   | "isPublic"
   | "contestId"
 
-export type BlankProblem = Omit<AdminProblem, ExcludeKeys | "hint" | "mermaidCode"> & {
+export type BlankProblem = Omit<
+  AdminProblem,
+  ExcludeKeys | "hint" | "mermaidCode" | "flowchartData"
+> & {
   id?: number
   // 新建比赛题时由 detail.vue 在提交前写进来
   contestId?: number | null
@@ -151,6 +154,8 @@ export type BlankProblem = Omit<AdminProblem, ExcludeKeys | "hint" | "mermaidCod
   // v-model 要的是 lvalue，模板里没法 ?? 兜底，所以在类型上就收掉 null
   hint: string
   mermaidCode: string
+  /** 画布画的参考流程图（FlowDoc）；不给就照存 mermaidCode（老题手写的 Mermaid） */
+  flowchartData?: Record<string, unknown> | null
 }
 
 export interface ProblemRow {

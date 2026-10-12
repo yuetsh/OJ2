@@ -675,8 +675,9 @@ export const generateFlowchartRequestSchema = z.object({
     .min(1)
     .max(64 * 1024),
 })
+/** AI 照 Python 答案画的参考流程图：结构树（FlowDoc），后台画布直接摆上去接着改 */
 export const generateFlowchartResponseSchema = z.object({
-  flowchart: z.string(),
+  doc: z.record(z.string(), z.unknown()),
 })
 
 // ---------------------------------------------------------------- 题目管理
@@ -771,6 +772,8 @@ export const adminProblemSchema = z.object({
   allowFlowchart: z.boolean(),
   showFlowchart: z.boolean(),
   mermaidCode: z.string().nullable(),
+  /** 参考流程图的结构树（FlowDoc）；2026-10 之前出的题只有 mermaidCode，这里是空对象 */
+  flowchartData: z.record(z.string(), z.unknown()),
   flowchartHint: z.string().nullable(),
   astRules: astRulesSchema.nullable(),
   answers: z.array(problemAnswerSchema),
@@ -823,6 +826,11 @@ export const createProblemRequestSchema = z.object({
   allowFlowchart: z.boolean().default(false),
   showFlowchart: z.boolean().default(false),
   mermaidCode: z.string().nullable().default(null),
+  /**
+   * 用画布画的参考流程图（FlowDoc）。给了就以它为准，mermaidCode 由后端照它重新生成；
+   * 不给（老题只有手写的 Mermaid）就原样存 mermaidCode
+   */
+  flowchartData: z.record(z.string(), z.unknown()).nullable().default(null),
   flowchartHint: z.string().nullable().default(null),
   astRules: astRulesSchema.nullable().default(null),
   // order_sensitive 缺省补 false —— 与旧后端 SQLConfigSerializer 的

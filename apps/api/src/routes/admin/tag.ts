@@ -1,4 +1,5 @@
 import {
+  parseFlowDoc,
   batchProblemTagRequestSchema,
   generateFlowchartRequestSchema,
   renameTagRequestSchema,
@@ -16,7 +17,7 @@ import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { completeChat } from "../../services/ai"
-import { queryInteger } from "../helpers"
+import { asRecord, queryInteger } from "../helpers"
 import { canEdit, findTagsByName, normalizeTagNames } from "./problem"
 
 export const adminTagRoutes = new Hono<AppEnv>()
@@ -254,18 +255,32 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
 
 // ---------------------------------------------------------------- Python → 流程图
 
+/**
+ * 照标准答案画参考流程图。原来让 AI 直接写 Mermaid，老师拿到的是一段代码，要改只能改代码；
+ * 现在出结构树，后台画布直接摆上去，和学生画图是同一个编辑器
+ */
+const PYTHON_TO_FLOWCHART = `把下面这段 Python 标准答案画成流程图，给中职学生看。只返回 JSON：{"steps":[…]}
+每一步是下面五种之一（开始、结束不用写）：
+{"kind":"input","text":"输入 n"}
+{"kind":"output","text":"输出 a（保留两位小数）"}
+{"kind":"process","text":"i = i + 1"}
+{"kind":"if","text":"a > b","yes":[…],"no":[…]}
+{"kind":"while","text":"i < 365","body":[…]}
+- 框里写中文和简单的式子，像课本上那样；不要写 input、print、int、range 这些函数名
+- for 循环改成计数变量 + while：先一个处理框给变量赋初值，while 写条件，循环体最后一个处理框让变量加一
+- elif 写成 else 里再套一个 if
+- break、continue、函数定义尽量改写成等价的顺序 / 判断 / 循环；实在改不了就用一个处理框写一句说明`
+
 adminTagRoutes.post("/problems/flowchart", requireProblemPermission, async (c) => {
   const parsed = await parseBody(c, generateFlowchartRequestSchema, "python 代码不能为空")
   if (!parsed.success) return parsed.response
   try {
-    const flowchart = await completeChat(
-      `你是一个可以将Python代码转换为mermaid的助手。
-请将用户提供的Python代码转换为 Mermaid 纯文本。
-注意括号内的内容用引号包裹，如果本身就有引号，请注意双引号和单引号的问题。
-请只返回 mermaid 代码，连 \`\`\` 都不需要。`,
-      parsed.data.python,
+    const reply = asRecord(
+      JSON.parse(await completeChat(PYTHON_TO_FLOWCHART, parsed.data.python, { json: true })),
     )
-    return success(c, { flowchart } satisfies GenerateFlowchartResponse)
+    const doc = parseFlowDoc({ version: 2, steps: reply.steps })
+    if (!doc || !doc.steps.length) throw new Error("AI returned no flowchart steps")
+    return success(c, { doc: { ...doc } } satisfies GenerateFlowchartResponse)
   } catch (error) {
     console.error("Flowchart generation failed", error)
     return failure(c, 502, "ai-unavailable", "生成失败，请稍后再试")

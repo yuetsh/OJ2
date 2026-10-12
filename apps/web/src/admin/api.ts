@@ -117,7 +117,7 @@ export function toggleProblemVisible(problemID: number) {
 }
 
 export function generateFlowchartFromPythonCode(python: string) {
-  return api.post<{ flowchart: string }>("admin/problems/flowchart", {
+  return api.post<{ doc: Record<string, unknown> }>("admin/problems/flowchart", {
     python,
   })
 }
@@ -276,7 +276,9 @@ export function generateTestInputs(data: GenerateTestInputsRequest) {
 
 /** 出站补默认值。字段名两边已经一致，不再做键名转换 */
 function toProblemBody(problem: AdminProblem | BlankProblem) {
-  const p = problem as Partial<AdminProblem>
+  const p = problem as Partial<Omit<AdminProblem, "flowchartData">> & {
+    flowchartData?: Record<string, unknown> | null
+  }
   return {
     _id: p._id,
     title: p.title,
@@ -300,6 +302,7 @@ function toProblemBody(problem: AdminProblem | BlankProblem) {
     allowFlowchart: p.allowFlowchart ?? false,
     showFlowchart: p.showFlowchart ?? false,
     mermaidCode: p.mermaidCode ?? null,
+    flowchartData: p.flowchartData ?? null,
     flowchartHint: p.flowchartHint ?? null,
     astRules: p.astRules ?? null,
     sqlConfig: p.sqlConfig ?? null,
