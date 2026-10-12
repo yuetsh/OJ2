@@ -51,7 +51,7 @@ const envVersion = computed(() => {
   return ""
 })
 
-// 一级路径就是菜单 key，对不上的页面（/user、/setting、/achievement 等）
+// 一级路径就是菜单 key，对不上的页面（/user、/achievement 等）
 // 自然没有一项亮着。根路径没登录时就是题目列表，登录了是个人首页，不亮任何一项
 const active = computed(() => route.path.split("/")[1] || (userStore.isAuthed ? "" : "problem"))
 
