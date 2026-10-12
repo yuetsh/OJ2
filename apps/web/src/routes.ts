@@ -310,13 +310,11 @@ export const admins: RouteRecordRaw = {
       meta: { requiresTeacherAdmin: true },
     },
     {
-      path: "problem/yearly",
-      name: "admin yearly overview",
-      component: () => import("admin/problem/Yearly.vue"),
+      path: "problem/trend",
+      name: "admin grade trend",
+      component: () => import("admin/problem/Trend.vue"),
       meta: { requiresTeacherAdmin: true },
     },
-    // 「年度趋势」改名「历年概况」之前的地址，收藏夹里可能还有
-    { path: "problem/top_ac_trend", redirect: "/admin/problem/yearly" },
     // 题单管理路由
     {
       path: "problemset/list",

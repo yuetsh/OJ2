@@ -9,7 +9,7 @@ import type {
   AdminAiReportList,
   StuckProblem,
   StuckProblemDetail,
-  YearlyOverview,
+  GradeTrendProblem,
   LearnBoard,
   LearnExerciseProgressList,
   LearnExerciseAttempt,
@@ -624,8 +624,8 @@ export function getLearnExerciseAttempts(exerciseId: number, params: { className
   })
 }
 
-export function getYearlyOverview() {
-  return api.get<YearlyOverview>("admin/problem-analytics/yearly")
+export function getGradeTrend() {
+  return api.get<GradeTrendProblem[]>("admin/problem-analytics/grades")
 }
 
 // AI 学习分析报告
