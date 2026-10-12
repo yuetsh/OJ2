@@ -9,7 +9,7 @@ import {
   type ContestClassView,
   type ContestScoreboard,
   type FormatCodeResponse,
-  type Metrics,
+  type ProfileOverview,
   type TutorialSummary,
   type Tutorial,
   type ClassActivity,
@@ -395,8 +395,14 @@ export function setReaction(problemID: number, type: ReactionKey) {
   return api.post<ReactionState>(`problems/${problemID}/reaction`, { type })
 }
 
-export function getMetrics(userid: number) {
-  return api.get<Metrics>(`users/${userid}/metrics`)
+/** 个人主页那一页的数据：做对的题、四个时间、本班第几、成就，本人和老师多拿知识点和没做对的题 */
+export function getProfileOverview(username: string) {
+  return api.get<ProfileOverview>(`profiles/${encodeURIComponent(username)}/overview`)
+}
+
+/** 不用图片了，退回默认头像（名字的字） */
+export function resetAvatar() {
+  return api.delete<{ avatar: string }>("me/avatar")
 }
 
 export function getTutorial(id: number) {

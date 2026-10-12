@@ -191,12 +191,6 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       icon: renderIcon("ph:sparkle"),
       props: { onClick: () => router.push("/ai-analysis") },
     },
-    {
-      label: "我的设置",
-      key: "setting",
-      icon: renderIcon("ph:gear-six"),
-      props: { onClick: () => router.push("/setting") },
-    },
     { type: "divider", key: "theme-divider" },
     { type: "render", key: "theme", render: renderThemeRow },
     { type: "divider", key: "logout-divider" },
