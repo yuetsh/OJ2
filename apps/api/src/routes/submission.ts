@@ -384,48 +384,99 @@ function listCaseSummary(row: {
   return { passed: row.casesPassed ?? 0, total: row.casesTotal }
 }
 
-async function submissionDetail(id: string, user: AuthUser) {
+/**
+ * 提交详情。三种结局：没有这条（404）、别人的代码看不到（403）、能看 —— 能看里又分自己的
+ * 代码在题单布置期内藏着（showLink: false，代码不给、别的照给，页面摆出是谁哪道题什么结果）。
+ */
+async function submissionDetail(id: string, user: AuthUser, withAttempts: boolean) {
   const [row] = await db
     .select({
       submission: schema.submission,
       problem: schema.problem,
-      contest: schema.contest,
+      // 当前用户名 / 班级，和提交列表同口径；已删号的学生 user 表里没有行
+      currentUsername: schema.user.username,
+      className: schema.user.className,
+      problemSetTitle: schema.problemset.title,
     })
     .from(schema.submission)
     .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-    .leftJoin(schema.contest, eq(schema.submission.contestId, schema.contest.id))
+    .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .leftJoin(schema.problemset, eq(schema.problemset.id, schema.submission.problemsetId))
     .where(eq(schema.submission.id, id))
     .limit(1)
-  if (!row) return null
+  if (!row) return { status: "not-found" } as const
+  const own = row.submission.userId === user.id
   // 详情也要过闸门。旧后端只挡了列表里的链接，`SubmissionAPI.get`（views/oj.py:103）
   // 光走 check_user_permission——知道 submission id 直接访问照样拿得到代码，遮挡是虚的。
   const cutoffs =
-    isTeacherOrAbove(user) || row.submission.userId !== user.id
+    isTeacherOrAbove(user) || !own
       ? undefined
       : await problemSetLockCutoffs(user.id, [row.submission.problemId])
-  if (!canViewSubmission(user, row.submission, row.problem, cutoffs)) return null
+  const visible = canViewSubmission(user, row.submission, row.problem, cutoffs)
+  // 走到这里还看不了、又是自己的，只剩题单布置期这一种（见 canViewSubmission）
+  if (!visible && !own) return { status: "forbidden" } as const
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
-  const full = isAdminRole(user)
+  const full = isAdminRole(user) && visible
+  const attempts = withAttempts
+    ? await db
+        .select({
+          id: schema.submission.id,
+          createTime: schema.submission.createTime,
+          userId: schema.submission.userId,
+          problemId: schema.submission.problemId,
+          result: schema.submission.result,
+        })
+        .from(schema.submission)
+        .where(
+          and(
+            eq(schema.submission.userId, row.submission.userId),
+            eq(schema.submission.problemId, row.submission.problemId),
+            row.submission.contestId === null
+              ? isNull(schema.submission.contestId)
+              : eq(schema.submission.contestId, row.submission.contestId),
+          ),
+        )
+        .orderBy(schema.submission.createTime, schema.submission.id)
+        .limit(200)
+    : null
   return {
-    id: row.submission.id,
-    createTime: row.submission.createTime,
-    userId: row.submission.userId,
-    username: row.submission.username,
-    code: row.submission.code,
-    result: row.submission.result,
-    info: full ? row.submission.info : {},
-    language: row.submission.language,
-    statisticInfo: asRecord(row.submission.statisticInfo),
-    // contest 也在旧后端的排除名单里，同样只给管理员
-    contestId: full ? row.submission.contestId : null,
-    problemId: row.submission.problemId,
-    // problem 表本来就 join 了，不额外查库
-    problemDisplayId: row.problem.displayId,
-    showLink: true,
-    caseSummary: caseSummary(row.submission),
-  } satisfies SubmissionDetail
+    status: "ok",
+    data: {
+      id: row.submission.id,
+      createTime: row.submission.createTime,
+      userId: row.submission.userId,
+      username: row.currentUsername ?? row.submission.username,
+      code: visible ? row.submission.code : "",
+      result: row.submission.result,
+      info: full ? row.submission.info : {},
+      language: row.submission.language,
+      statisticInfo: visible ? asRecord(row.submission.statisticInfo) : {},
+      // contest 也在旧后端的排除名单里，同样只给管理员。提交者本人例外：他知道自己在哪场比赛
+      // 里交的，不给的话独立页面上「复制回到题目」「题目链接」只能拼出题库的
+      // /problem/<题号> —— 比赛里的题号是比赛自己的，指到的是另一道题
+      contestId: full || own ? row.submission.contestId : null,
+      problemId: row.submission.problemId,
+      // problem 表本来就 join 了，不额外查库
+      problemDisplayId: row.problem.displayId,
+      problemTitle: row.problem.title,
+      className: row.className,
+      problemSet:
+        row.submission.problemsetId !== null && row.problemSetTitle !== null
+          ? { id: row.submission.problemsetId, title: row.problemSetTitle }
+          : null,
+      showLink: visible,
+      caseSummary: visible ? caseSummary(row.submission) : null,
+      attempts:
+        attempts?.map((item) => ({
+          id: item.id,
+          createTime: item.createTime,
+          result: item.result,
+          showLink: canViewSubmission(user, item, row.problem, cutoffs),
+        })) ?? null,
+    } satisfies SubmissionDetail,
+  } as const
 }
 
 /**
@@ -688,9 +739,13 @@ submissionRoutes.get(
 
 submissionRoutes.get("/submissions/:id", requireAuth, async (c) => {
   const user = c.get("user")!
-  const data = await submissionDetail(c.req.param("id"), user)
-  if (!data) {
+  const detail = await submissionDetail(c.req.param("id"), user, c.req.query("attempts") === "1")
+  if (detail.status === "not-found") {
     return failure(c, 404, "submission-not-found", "Submission does not exist")
   }
-  return success(c, data)
+  // 原来看不到也回 404，独立页面分不清「链接不对」和「别人的」，只能一直转圈
+  if (detail.status === "forbidden") {
+    return failure(c, 403, "submission-forbidden", "No permission to view this submission")
+  }
+  return success(c, detail.data)
 })

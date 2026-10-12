@@ -31,6 +31,11 @@ const props = defineProps<{
    * 格式错、漏了一行这类错误，对着题目原话一看就明白；运行例子那边不需要
    */
   full?: boolean
+  /**
+   * 看的是别人的提交（老师在独立的提交详情页看学生的）：「你的输出」「你的程序」都换成「他」。
+   * 提示句全是对学生说的第二人称，整句换掉人称就读得通
+   */
+  peer?: boolean
 }>()
 
 const theme = useThemeVars()
@@ -63,9 +68,10 @@ const hint = computed(() => {
   if (props.check.passed) return ""
   if (!kind.value) {
     const name = JUDGE_STATUS[props.check.result as keyof typeof JUDGE_STATUS]?.name ?? "出错了"
-    return `你的程序在这个例子上就「${name}」了，先让它在例子上跑通。`
+    return `${props.peer ? "他" : "你"}的程序在这个例子上就「${name}」了，先让它在例子上跑通。`
   }
-  return explainDiff(kind.value, props.check, props.code, props.language)
+  const text = explainDiff(kind.value, props.check, props.code, props.language)
+  return props.peer ? text.replace(/你/g, "他") : text
 })
 const diffLine = computed(() =>
   firstDifferentLine(props.check.expected ?? "", props.check.output ?? ""),
@@ -160,7 +166,7 @@ function lines(text: string) {
           </div>
         </div>
         <div class="block">
-          <div class="label">你的输出</div>
+          <div class="label">{{ peer ? "他" : "你" }}的输出</div>
           <div v-if="check.output" class="text">
             <template v-for="(line, i) in lines(check.output)" :key="i">
               <div v-if="i === diffLine && diffParts?.output" class="line">

@@ -131,10 +131,13 @@ export function getProblemStats(problemID: number) {
   return api.get<ProblemStats>(`problems/${problemID}/stats`)
 }
 
-export async function getSubmission(id: string): Promise<Submission> {
+/** `attempts`：带上这个人这道题交过的每一次（独立的提交详情页用，见契约 attempts） */
+export async function getSubmission(id: string, attempts = false): Promise<Submission> {
   const [{ submissionDetailSchema }, response] = await Promise.all([
     loadDetailSchemas(),
-    api.get<unknown>(`submissions/${encodeURIComponent(id)}`),
+    api.get<unknown>(`submissions/${encodeURIComponent(id)}`, {
+      params: attempts ? { attempts: "1" } : undefined,
+    }),
   ])
   return contract("GET /submissions/:id", submissionDetailSchema, response)
 }

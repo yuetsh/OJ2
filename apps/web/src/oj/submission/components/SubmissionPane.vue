@@ -3,9 +3,6 @@ import LockNote from "oj/problemset/components/LockNote.vue"
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { getSubmission } from "oj/api"
-import { explainCCompileError } from "oj/problem/utils/cError"
-import { explainPythonCompileError } from "oj/problem/utils/pythonError"
-import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { useUserStore } from "shared/store/user"
 import {
   JUDGE_STATUS,
@@ -16,9 +13,11 @@ import {
 import { submissionCaseResults } from "utils/functions"
 import type { Submission, SubmissionListItem } from "utils/types"
 import { useCopySubmission } from "../composables/copySubmission"
+import { useSubmissionExplain } from "../composables/explain"
 import { useTone } from "../composables/tone"
 import { classLabel, submissionTimeText } from "../utils"
 import CodeView from "./CodeView.vue"
+import ExplainNote from "./ExplainNote.vue"
 import StatusPill from "./StatusPill.vue"
 import UserName from "shared/components/UserName.vue"
 
@@ -118,87 +117,7 @@ const locked = computed(() => {
 /** 逐个测试点。只有管理员拿得到 info（每个点带 output_md5），学生只有 caseSummary 两个数 */
 const cases = computed(() => submissionCaseResults(shown.value?.info))
 
-function stripJudgePath(text: string) {
-  return text.replace(/\/judger\/run\/[^/"]+\//g, "")
-}
-
-/**
- * 编译失败 / 运行时错误说清楚「错在第几行、为什么」—— 翻译表和题目页结果区同一份
- * （pythonError.ts / cError.ts / runtimeError.ts）。原来的看代码弹框压根不显示报错。
- */
-const explain = computed(() => {
-  const s = shown.value
-  if (!s) return null
-  const info = s.statisticInfo
-  const err = info?.err_info ? stripJudgePath(info.err_info) : ""
-  switch (s.result) {
-    case SubmissionStatus.compile_error: {
-      const ex = !err
-        ? null
-        : s.language === "Python"
-          ? explainPythonCompileError(err, s.code)
-          : s.language === "C" || s.language === "C++"
-            ? explainCCompileError(err, s.code, s.language)
-            : null
-      if (ex) return { line: ex.line, text: ex.message, raw: err }
-      return { line: null, text: "编译没通过，看看下面的原始报错。", raw: err }
-    }
-    case SubmissionStatus.runtime_error: {
-      const rt = info?.runtime_error
-      if (rt) return { line: rt.line ?? null, text: explainRuntimeError(rt, s.code), raw: err }
-      return { line: null, text: "程序运行到一半出错，停下来了。", raw: err }
-    }
-    case SubmissionStatus.cpu_time_limit_exceeded:
-    case SubmissionStatus.real_time_limit_exceeded:
-      return {
-        line: null,
-        text: "程序跑了太久还没结束：可能有死循环，或者在等一个没有给的输入。",
-        raw: "",
-      }
-    case SubmissionStatus.memory_limit_exceeded:
-      return { line: null, text: "程序占的内存太多了。", raw: "" }
-    case SubmissionStatus.system_error:
-      return { line: null, text: "判题机出错了，不是代码的问题。", raw: err }
-    case SubmissionStatus.wrong_answer: {
-      const check = info?.sample_check
-      if (!check) return null
-      // 「题目里的」不能省：上面那排格子是测试点，也从 1 编号，只写「例子 1」时老师看到
-      // 格子 1 是绿的，以为说明写反了（例子 1 是题面样例，和测试点 1 不是一组数据）
-      const text = check.passed
-        ? "题目里的例子都对，错在没公开的测试点上。"
-        : `题目里的例子 ${(check.index ?? 0) + 1} 就错了。`
-      return { line: null, text, raw: "" }
-    }
-    case SubmissionStatus.ast_check_failed: {
-      const failedRules = (info?.ast_results ?? []).filter((rule) => !rule.passed)
-      const text = failedRules.length
-        ? `答案对了，但没按要求写：${failedRules.map((rule) => rule.description).join("；")}`
-        : "答案对了，但没按题目要求的写法写。"
-      return { line: null, text, raw: "" }
-    }
-    default:
-      return null
-  }
-})
-
-const explainTone = computed(() => {
-  const r = props.row.result
-  return tone(
-    r === SubmissionStatus.compile_error ||
-      r === SubmissionStatus.runtime_error ||
-      r === SubmissionStatus.ast_check_failed
-      ? "warning"
-      : r === SubmissionStatus.system_error
-        ? "default"
-        : "error",
-  )
-})
-
-const rawOpen = ref(false)
-watch(
-  () => props.row.id,
-  () => (rawOpen.value = false),
-)
+const { explain, explainTone } = useSubmissionExplain(shown)
 
 function caseColor(result: number) {
   if (result === SubmissionStatus.accepted) return tone("success").solid
@@ -312,7 +231,7 @@ function openStandalone() {
           v-if="shown"
           size="small"
           quaternary
-          title="新页面打开（有测试点明细）"
+          title="新页面打开（看他这道题交的每一次）"
           aria-label="新页面打开"
           @click="openStandalone"
         >
@@ -398,23 +317,7 @@ function openStandalone() {
     </div>
 
     <template v-else>
-      <div
-        v-if="explain"
-        class="explain"
-        :style="{ background: explainTone.background, borderColor: explainTone.background }"
-      >
-        <div class="explain-line">
-          <b :style="{ color: explainTone.color }">
-            <template v-if="explain.line">第 {{ explain.line }} 行：</template>{{ explain.text }}
-          </b>
-          <div class="spacer"></div>
-          <a v-if="explain.raw" href="#" class="raw-toggle" @click.prevent="rawOpen = !rawOpen">
-            原始报错
-            <Icon :icon="rawOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" :width="11" />
-          </a>
-        </div>
-        <pre v-if="rawOpen && explain.raw" class="raw">{{ explain.raw }}</pre>
-      </div>
+      <ExplainNote v-if="explain" :explain="explain" :tone="explainTone" />
       <CodeView
         v-if="shown"
         :code="shown.code"
@@ -622,43 +525,6 @@ function openStandalone() {
 
 .muted {
   color: v-bind("theme.textColor3");
-}
-
-.explain {
-  padding: 10px 14px;
-  border-radius: 6px;
-  border: 1px solid;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.explain-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  line-height: 1.6;
-}
-
-.raw-toggle {
-  flex: none;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: v-bind("theme.textColor3");
-  text-decoration: none;
-}
-
-.raw {
-  margin: 0;
-  max-height: 140px;
-  overflow: auto;
-  font-family: Consolas, Monaco, monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 
 .locked,

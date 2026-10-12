@@ -1,124 +1,722 @@
 <script setup lang="ts">
-import { getSubmission } from "oj/api"
-import type { JudgeCaseResult } from "@oj2/contract"
-import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, LANGUAGE_SHOW_VALUE } from "utils/constants"
-import {
-  parseTime,
-  submissionCaseResults,
-  submissionMemoryFormat,
-  submissionResultTitle,
-  submissionTimeFormat,
-} from "utils/functions"
-import type { Submission } from "utils/types"
-import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
+import { Icon } from "@iconify/vue"
+import { onKeyStroke } from "@vueuse/core"
+import { useThemeVars } from "naive-ui"
+import { adminRejudge, getSubmission } from "oj/api"
+import LockNote from "oj/problemset/components/LockNote.vue"
+import WrongAnswerExplain from "oj/problem/components/WrongAnswerExplain.vue"
+import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useUserStore } from "shared/store/user"
+import { errorCode } from "utils/api"
+import {
+  JUDGE_STATUS,
+  LANGUAGE_FORMAT_VALUE,
+  LANGUAGE_SHOW_VALUE,
+  SubmissionStatus,
+} from "utils/constants"
+import { parseTime, submissionCaseResults } from "utils/functions"
+import type { Submission } from "utils/types"
+import CodeView from "./components/CodeView.vue"
+import ExplainNote from "./components/ExplainNote.vue"
+import StatusPill from "./components/StatusPill.vue"
 import { useCopySubmission } from "./composables/copySubmission"
-
-const props = defineProps<{
-  submissionID: string
-  submission?: Submission
-  hideList?: boolean
-}>()
-
-// 在弹框中使用时，父组件监听此事件关闭弹框，否则弹框会挡住已更新的编辑器
-const emit = defineEmits<{ copied: [] }>()
-
-const { isMobile, isDesktop } = useBreakpoints()
-
-const submission = ref<Submission>()
-const loading = ref(false)
+import { useSubmissionExplain } from "./composables/explain"
+import { useTone } from "./composables/tone"
+import { classLabel, submissionTimeText } from "./utils"
 
 /**
- * 测试点明细。`info` 在契约里是「完整形状或空对象」的联合（非管理员拿到的是空对象），
- * `data` 本身也可能为 null —— 两种情况都由这个访问器归成空数组，模板里不再直接取。
+ * 单独打开的一条提交（设计稿「提交详情重设计」B）：左边代码，右边为什么错 + 这道题交的几次。
+ * 入口是提交列表右栏的「新页面打开」、统计页的方块、后台卡点分析 —— 多半是老师在看某个学生
+ * 怎么一次次改对的，所以「这道题交了几次」常驻右栏，← → 一次次翻。
  */
-const caseResults = computed(() => submissionCaseResults(submission.value?.info))
+const props = defineProps<{ submissionID: string }>()
 
-async function init() {
-  submission.value = props.submission
-  if (submission.value) return
-  loading.value = true
-  const res = await getSubmission(props.submissionID)
-  submission.value = res
-  loading.value = false
+const router = useRouter()
+const message = useMessage()
+const theme = useThemeVars()
+const isDark = useDark()
+const tone = useTone()
+const userStore = useUserStore()
+const { isMobile } = useBreakpoints()
+const { copyToCat, copyToProblem } = useCopySubmission()
+
+const detail = ref<Submission | null>(null)
+/** forbidden：别人的代码；missing：链接不对 / 已删掉 */
+const state = ref<"loading" | "ok" | "forbidden" | "missing" | "failed">("loading")
+
+const judging = computed(
+  () =>
+    detail.value?.result === SubmissionStatus.pending ||
+    detail.value?.result === SubmissionStatus.judging,
+)
+
+// 还在判的每 2 秒拉一次：这一页不在提交列表的轮询里，刚交完或刚重判时不刷新就一直是「等待评分」
+let timer: ReturnType<typeof setTimeout> | undefined
+// 翻得快的时候，晚回来的上一条不能盖掉这一条
+let loadSeq = 0
+
+async function load(quiet = false) {
+  const seq = ++loadSeq
+  clearTimeout(timer)
+  if (!quiet) state.value = "loading"
+  try {
+    const res = await getSubmission(props.submissionID, true)
+    if (seq !== loadSeq) return
+    detail.value = res
+    state.value = "ok"
+    if (judging.value) timer = setTimeout(() => load(true), 2000)
+  } catch (err) {
+    if (seq !== loadSeq) return
+    const code = errorCode(err)
+    state.value =
+      code === "submission-forbidden"
+        ? "forbidden"
+        : code === "submission-not-found"
+          ? "missing"
+          : "failed"
+  }
 }
 
-const columns: DataTableColumn<JudgeCaseResult>[] = [
-  { title: "测试用例", key: "test_case" },
-  {
-    title: "测试状态",
-    key: "result",
-    render: (row) => h(SubmissionResultTag, { result: row.result }),
-  },
-  {
-    title: "占用内存",
-    key: "memory",
-    render: (row) => submissionMemoryFormat(row.memory),
-  },
-  {
-    title: "执行耗时",
-    key: "real_time",
-    render: (row) => submissionTimeFormat(row.real_time),
-  },
-]
+watch(
+  () => props.submissionID,
+  () => load(),
+  { immediate: true },
+)
+onBeforeUnmount(() => clearTimeout(timer))
 
-const { copyToCat: catCopy, copyToProblem: problemCopy } = useCopySubmission()
+const shown = computed(() => (state.value === "ok" ? detail.value : null))
+const own = computed(() => !!shown.value && shown.value.userId === userStore.user?.id)
+const teacher = computed(() => userStore.isTeacherOrAbove)
+const who = computed(() => (own.value ? "你" : "他"))
 
-function copyToCat() {
-  catCopy(submission.value!)
+const { explain, explainTone } = useSubmissionExplain(shown)
+
+/** 答案错误、后端在例子上对比过：摆出输入 / 正确输出 / 他的输出（和题目页结果区同一块） */
+const sampleCheck = computed(() => {
+  const s = shown.value
+  if (!s?.showLink || s.result !== SubmissionStatus.wrong_answer) return null
+  return s.statisticInfo?.sample_check ?? null
+})
+
+/** 逐个测试点。只有管理员拿得到 info，学生只有 caseSummary 两个数 */
+const cases = computed(() => submissionCaseResults(shown.value?.info))
+
+function caseColor(result: number) {
+  if (result === SubmissionStatus.accepted) return tone("success").solid
+  if (result === SubmissionStatus.runtime_error) return tone("warning").solid
+  return tone("error").solid
 }
 
-function copyToProblem() {
-  problemCopy(submission.value!)
-  emit("copied")
+function caseTitle(item: (typeof cases.value)[number], index: number) {
+  const name = JUDGE_STATUS[item.result as keyof typeof JUDGE_STATUS]?.name ?? ""
+  const memory = item.memory === undefined ? "" : ` · ${(item.memory / 1048576).toFixed(1)}MB`
+  const time = item.real_time === undefined ? "" : ` · ${item.real_time}ms`
+  return `测试点 ${index + 1}：${name}${time}${memory}`
 }
 
-onMounted(init)
+const attempts = computed(() => shown.value?.attempts ?? [])
+const attemptIndex = computed(() => attempts.value.findIndex((a) => a.id === shown.value?.id))
+
+/** 和正在看的这次同一天的只写钟点（一节课里连交好几次是常态），别的天带上日期 */
+function attemptTime(time: string) {
+  const current = shown.value?.createTime
+  if (current && parseTime(time, "YYYY-MM-DD") === parseTime(current, "YYYY-MM-DD"))
+    return parseTime(time, "HH:mm:ss")
+  return submissionTimeText(time)
+}
+
+/** 除了正在看的这次，还有别的能点开的才提 ← → */
+const canStep = computed(() =>
+  attempts.value.some((item) => item.showLink && item.id !== shown.value?.id),
+)
+
+/** 「← →」一次次往前往后翻，跳过题单藏着的那几次 */
+function step(delta: -1 | 1) {
+  const list = attempts.value
+  for (let i = attemptIndex.value + delta; i >= 0 && i < list.length; i += delta) {
+    if (list[i]!.showLink) return openAttempt(list[i]!.id)
+  }
+}
+
+function openAttempt(id: string) {
+  if (id !== shown.value?.id) router.replace("/submission/" + id)
+}
+
+function typing(event: KeyboardEvent) {
+  const el = event.target as HTMLElement | null
+  return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)
+}
+
+onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
+  if (typing(event) || event.altKey || event.ctrlKey || event.metaKey || attempts.value.length < 2)
+    return
+  event.preventDefault()
+  step(event.key === "ArrowLeft" ? -1 : 1)
+})
+
+const problemLink = computed(() => {
+  const s = shown.value
+  if (!s) return "/"
+  if (s.contestId) {
+    return router.resolve({
+      name: "contest problem",
+      params: { contestID: String(s.contestId), problemID: s.problemDisplayId },
+    }).href
+  }
+  return "/problem/" + s.problemDisplayId
+})
+
+const allSubmissionsLink = computed(() => {
+  const s = shown.value
+  if (!s) return "/submission"
+  return router.resolve({
+    name: "submissions",
+    query: { username: s.username, exactUsername: "1" },
+  }).href
+})
+
+const canRejudge = computed(() => teacher.value && !!shown.value && !shown.value.contestId)
+
+/** 老师的「⋯」：和提交列表右栏一样，复制两项 + 重新判题 */
+const moreOptions = computed(() => {
+  const s = shown.value
+  if (!s) return []
+  const copy = s.showLink
+    ? [
+        { label: "复制回到题目", key: "problem" },
+        ...(s.language !== "SQL" ? [{ label: "复制到自测猫", key: "cat" }] : []),
+      ]
+    : []
+  // 手机上名字、班级和这个按钮排不进一行，收进「⋯」
+  const all = !own.value && isMobile.value ? [{ label: "他的全部提交", key: "all" }] : []
+  if (!canRejudge.value) return [...all, ...copy]
+  return [
+    ...all,
+    ...copy,
+    ...(copy.length ? [{ type: "divider", key: "divider" }] : []),
+    { label: "重新判题", key: "rejudge" },
+  ]
+})
+
+async function rejudge() {
+  const s = shown.value
+  if (!s) return
+  try {
+    await adminRejudge(s.id)
+  } catch {
+    message.error("重新判题没成功")
+    return
+  }
+  message.success("已重新判题，结果出来会自己更新")
+  load(true)
+}
+
+function handleMore(key: string) {
+  const s = shown.value
+  if (!s) return
+  if (key === "all") router.push(allSubmissionsLink.value)
+  else if (key === "rejudge") rejudge()
+  else if (key === "problem") copyToProblem(s)
+  else copyToCat(s)
+}
 </script>
 
 <template>
-  <n-flex vertical v-if="submission" class="oj-page" :size="24">
-    <n-flex :vertical="isMobile" justify="space-between">
-      <n-alert
-        style="flex: 1"
-        :type="JUDGE_STATUS[submission.result]['type']"
-        :title="submissionResultTitle(submission)"
-      >
-        <n-flex>
-          <span>提交时间：{{ parseTime(submission.createTime) }}</span>
-          <span>编程语言：{{ LANGUAGE_SHOW_VALUE[submission.language] }}</span>
-          <span>用户：{{ submission.username }}</span>
-        </n-flex>
-      </n-alert>
-      <n-flex :vertical="isDesktop" justify="center">
-        <n-button v-if="submission.language !== 'SQL'" secondary @click="copyToCat">
-          复制到自测猫
-        </n-button>
-        <n-button secondary @click="copyToProblem">复制回到题目</n-button>
-      </n-flex>
-    </n-flex>
-    <n-card embedded>
-      <n-code
-        class="code"
-        :language="LANGUAGE_FORMAT_VALUE[submission.language]"
-        :code="submission.code"
-        show-line-numbers
-      />
-    </n-card>
-    <n-data-table v-if="!hideList && caseResults.length" :columns="columns" :data="caseResults" />
-  </n-flex>
-  <n-spin v-else :show="loading" class="loading-container"> </n-spin>
+  <div class="oj-page detail" :class="{ narrow: isMobile }">
+    <template v-if="shown">
+      <div class="head">
+        <div class="who">
+          <a
+            class="user-link"
+            :href="`/user?name=${encodeURIComponent(shown.username)}`"
+            target="_blank"
+          >
+            <UserName :username="shown.username" />
+          </a>
+          <span v-if="teacher && shown.className" class="cls">
+            {{ classLabel(shown.className) }}
+          </span>
+        </div>
+        <span v-if="!isMobile" class="dot">·</span>
+        <a
+          class="problem"
+          :href="problemLink"
+          :title="`${shown.problemDisplayId} ${shown.problemTitle}`"
+        >
+          <span class="problem-id">{{ shown.problemDisplayId }}</span>
+          {{ shown.problemTitle }}
+        </a>
+        <a
+          v-if="shown.problemSet"
+          class="problemset"
+          :href="'/problemset/' + shown.problemSet.id"
+          :title="'从题单「' + shown.problemSet.title + '」交的'"
+        >
+          题单 {{ shown.problemSet.title }}
+        </a>
+        <div class="spacer"></div>
+        <div class="actions">
+          <template v-if="teacher">
+            <n-button v-if="!own && !isMobile" tag="a" :href="allSubmissionsLink">
+              他的全部提交
+            </n-button>
+            <n-dropdown
+              v-if="moreOptions.length"
+              :options="moreOptions"
+              trigger="click"
+              placement="bottom-end"
+              @select="handleMore"
+            >
+              <n-button quaternary aria-label="更多" title="复制、重新判题">
+                <template #icon><Icon icon="ph:dots-three-bold" /></template>
+              </n-button>
+            </n-dropdown>
+          </template>
+          <template v-else-if="shown.showLink">
+            <n-button type="primary" @click="copyToProblem(shown)">
+              <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
+              复制回到题目
+            </n-button>
+            <n-button v-if="shown.language !== 'SQL'" @click="copyToCat(shown)"
+              >复制到自测猫</n-button
+            >
+          </template>
+        </div>
+      </div>
+
+      <div class="meta">
+        <StatusPill :result="shown.result" />
+        <span v-if="cases.length" class="cases">
+          <span
+            v-for="(item, index) in cases"
+            :key="index"
+            class="case"
+            :style="{ background: caseColor(item.result), color: isDark ? '#18181c' : '#ffffff' }"
+            :title="caseTitle(item, index)"
+          >
+            {{ index + 1 }}
+          </span>
+        </span>
+        <span
+          v-else-if="shown.caseSummary && shown.caseSummary.passed < shown.caseSummary.total"
+          class="partial"
+          :style="{ color: tone('error').color }"
+        >
+          通过 {{ shown.caseSummary.passed }}/{{ shown.caseSummary.total }} 个测试点
+        </span>
+        <span>{{ LANGUAGE_SHOW_VALUE[shown.language] }}</span>
+        <span>{{ submissionTimeText(shown.createTime, true) }}</span>
+        <span v-if="attemptIndex >= 0 && attempts.length > 1"
+          >第 {{ attemptIndex + 1 }} 次提交</span
+        >
+      </div>
+
+      <div class="body">
+        <div class="code-col">
+          <div v-if="!shown.showLink" class="locked">
+            <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
+            <span class="locked-title">这份代码在题单布置期内先藏着</span>
+            <span class="muted"><LockNote :problem="{ displayId: shown.problemDisplayId }" /></span>
+          </div>
+          <CodeView
+            v-else
+            :code="shown.code"
+            :language="LANGUAGE_FORMAT_VALUE[shown.language]"
+            :mark-line="explain?.line ?? null"
+            :font-size="isMobile ? 14 : 18"
+            :line-height="isMobile ? 24 : 30"
+          />
+        </div>
+
+        <div class="side">
+          <WrongAnswerExplain
+            v-if="sampleCheck"
+            :check="sampleCheck"
+            :code="shown.code"
+            :language="shown.language"
+            :plain="!!shown.contestId"
+            :peer="!own"
+          />
+          <ExplainNote v-else-if="explain" :explain="explain" :tone="explainTone" />
+
+          <section v-if="attempts.length > 1" class="attempts">
+            <div class="attempts-head">
+              <h3>{{ who }}这道题交了 {{ attempts.length }} 次</h3>
+              <div class="spacer"></div>
+              <span v-if="!isMobile && canStep" class="keys"><kbd>←</kbd><kbd>→</kbd> 换一次</span>
+            </div>
+            <a
+              v-for="(item, index) in attempts"
+              :key="item.id"
+              :href="item.showLink ? '/submission/' + item.id : undefined"
+              class="attempt"
+              :class="{ on: item.id === shown.id, off: !item.showLink }"
+              @click.prevent="item.showLink && openAttempt(item.id)"
+            >
+              <span class="n">第 {{ index + 1 }} 次</span>
+              <span class="t">{{ attemptTime(item.createTime) }}</span>
+              <StatusPill :result="item.result" />
+              <div class="spacer"></div>
+              <span v-if="item.id === shown.id" class="tag">正在看</span>
+              <Icon v-else-if="!item.showLink" icon="ph:lock-simple" class="muted" />
+            </a>
+          </section>
+        </div>
+      </div>
+    </template>
+
+    <div v-else-if="state === 'loading'" class="center">
+      <n-spin />
+    </div>
+
+    <div v-else class="locked full">
+      <Icon icon="ph:lock-simple" :width="34" class="lock-icon" />
+      <template v-if="state === 'forbidden'">
+        <span class="locked-title">别人的代码看不到</span>
+        <span class="muted">自己动手做出来，才是自己的。</span>
+      </template>
+      <template v-else-if="state === 'missing'">
+        <span class="locked-title">这条提交不存在</span>
+        <span class="muted">可能是链接复制错了，或者它已经被删掉。</span>
+      </template>
+      <template v-else>
+        <span class="locked-title">没拉下来</span>
+        <n-button @click="load()">再试一次</n-button>
+      </template>
+      <n-button v-if="state !== 'failed'" tag="a" href="/submission">去提交列表</n-button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.code {
-  font-size: 20px;
-  overflow: auto;
-}
-.loading-container {
-  min-height: 200px;
+.detail {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.head {
+  display: flex;
   align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  font-size: 18px;
+  min-width: 0;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.user-link {
+  display: flex;
+  text-decoration: none;
+}
+
+.user-link:hover :deep(.name) {
+  color: v-bind("theme.primaryColor");
+}
+
+.cls {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  color: v-bind("tone('success').color");
+  border: 1px solid v-bind("tone('success').background");
+}
+
+.dot {
+  color: v-bind("theme.textColor3");
+}
+
+.problem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: v-bind("theme.textColor1");
+  text-decoration: none;
+}
+
+.problem:hover {
+  color: v-bind("theme.primaryColor");
+}
+
+.problem-id {
+  color: v-bind("theme.textColor3");
+  font-weight: 400;
+}
+
+.problemset {
+  flex: none;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: v-bind("tone('info').color");
+  background: v-bind("tone('info').background");
+}
+
+.spacer {
+  flex: 1 1 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  row-gap: 6px;
+  flex-wrap: wrap;
+  font-size: var(--oj-fs-sec);
+  color: v-bind("theme.textColor3");
+  white-space: nowrap;
+}
+
+.cases {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.case {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.partial {
+  font-weight: 600;
+}
+
+.body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* 代码占满左栏到屏幕底：机房 1366×640 的屏上也不被右边的说明挤下去，长的代码在框里滚 */
+.code-col {
+  flex: 1 1 0;
+  min-width: 0;
+  position: sticky;
+  top: 16px;
+  height: max(360px, calc(100vh - 200px));
+  display: flex;
+  flex-direction: column;
+}
+
+.side {
+  width: 540px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.attempts {
+  padding: 12px 10px 8px;
+  border: 1px solid v-bind("theme.dividerColor");
+  border-radius: 8px;
+  background: v-bind("theme.cardColor");
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.attempts-head {
+  display: flex;
+  align-items: center;
+  padding: 0 6px 6px;
+}
+
+.attempts-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.keys {
+  font-size: 12px;
+  color: v-bind("theme.textColor3");
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+kbd {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 1px solid v-bind("theme.borderColor");
+  border-radius: 3px;
+  background: v-bind("theme.cardColor");
+  font: inherit;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attempt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: v-bind("theme.textColor1");
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.attempt:hover {
+  background: v-bind("theme.hoverColor");
+}
+
+.attempt.on {
+  background: v-bind("tone('success').background");
+}
+
+.attempt.off {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.attempt .n {
+  width: 48px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: v-bind("theme.textColor3");
+}
+
+.attempt .t {
+  min-width: 128px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag {
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: v-bind("tone('success').color");
+  background: v-bind("theme.cardColor");
+}
+
+.muted {
+  color: v-bind("theme.textColor3");
+}
+
+.locked {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  border: 1px dashed v-bind("theme.borderColor");
+  border-radius: 8px;
+  background: v-bind("theme.cardColor");
+}
+
+.locked.full {
+  min-height: 320px;
+}
+
+.lock-icon {
+  color: v-bind("theme.textColor3");
+  opacity: 0.7;
+}
+
+.locked-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.center {
+  min-height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 手机：一栏往下排，为什么错在代码前面 */
+.narrow .head {
+  flex-wrap: wrap;
+  white-space: normal;
+  font-size: 16px;
+  row-gap: 6px;
+}
+
+.narrow .problem {
+  flex-basis: 100%;
+  order: 3;
+  white-space: normal;
+}
+
+.narrow .problemset {
+  order: 4;
+}
+
+.narrow .actions {
+  order: 2;
+}
+
+.narrow .body {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+/* 右栏拆开：说明 → 代码 → 交的几次（设计稿手机那块） */
+.narrow .side {
+  display: contents;
+}
+
+.narrow .side > * {
+  order: 1;
+}
+
+.narrow .code-col {
+  order: 2;
+  position: static;
+  height: auto;
+}
+
+.narrow .attempts {
+  order: 3;
+}
+
+.narrow .attempt .t {
+  min-width: 0;
+}
+
+.narrow .code-col :deep(.code-view) {
+  flex: none;
 }
 </style>

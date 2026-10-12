@@ -224,9 +224,34 @@ export const submissionDetailSchema = z.object({
    * `Missing required param "problemID"`。
    */
   problemDisplayId: z.string(),
+  problemTitle: z.string(),
+  /** 提交者**现在**的班级（和提交列表同口径）；已删号的为 null */
+  className: z.string().nullable(),
+  /** 从哪个题单交的，同列表的 problemSet */
+  problemSet: z.object({ id: z.number().int(), title: z.string() }).nullable(),
+  /**
+   * false = 自己的这份代码在题单布置期内先藏着（见后端 problemSetLockCutoffs）：code 为空串、
+   * statisticInfo / info 为空对象，其余照给，页面照样摆出是谁、哪道题、什么结果。
+   * 别人的代码看不到时不走这里，直接 403
+   */
   showLink: z.boolean(),
   /** 通过了几个测试点，口径见 caseSummarySchema */
   caseSummary: caseSummarySchema,
+  /**
+   * 同一个人在同一道题、同一场比赛（或都不在比赛里）交过的每一次，按时间先后。只有带
+   * `?attempts=1` 时才给（独立的提交详情页用），否则为 null —— 题目页每判完一次都要拉一遍
+   * 详情，用不着这一串。showLink 的口径同上，题单藏着的那几次点不进去
+   */
+  attempts: z
+    .array(
+      z.object({
+        id: z.string(),
+        createTime: z.string(),
+        result: judgeStatusSchema,
+        showLink: z.boolean(),
+      }),
+    )
+    .nullable(),
 })
 
 /**
