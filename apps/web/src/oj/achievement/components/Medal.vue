@@ -24,6 +24,14 @@ const color = computed(() => RARITY_COLOR[props.rarity])
 const r = computed(() => props.size / 2 + 3)
 const box = computed(() => props.size + 8)
 const circumference = computed(() => 2 * Math.PI * r.value)
+// 底色都是半透明的，下面垫一层卡片底色 —— 不然成就线的进度线会从徽章中间透出来
+const onBg = computed(
+  () => `linear-gradient(${color.value}26, ${color.value}26), ${theme.value.cardColor}`,
+)
+const offBg = computed(
+  () =>
+    `linear-gradient(${theme.value.actionColor}, ${theme.value.actionColor}), ${theme.value.cardColor}`,
+)
 </script>
 
 <template>
@@ -55,7 +63,7 @@ const circumference = computed(() => 2 * Math.PI * r.value)
       v-else
       class="disc"
       :class="state"
-      :style="state === 'on' ? { borderColor: color, background: `${color}26` } : undefined"
+      :style="state === 'on' ? { borderColor: color, background: onBg } : undefined"
     >
       <AchievementIcon :icon="icon" :size="Math.round(size * 0.56)" />
     </span>
@@ -98,7 +106,7 @@ const circumference = computed(() => 2 * Math.PI * r.value)
 
 .disc.off {
   border-color: v-bind("theme.borderColor");
-  background: v-bind("theme.actionColor");
+  background: v-bind(offBg);
 }
 
 .disc.off :deep(svg),
@@ -110,7 +118,7 @@ const circumference = computed(() => 2 * Math.PI * r.value)
 
 .disc.unknown {
   border: 1.5px dashed v-bind("theme.borderColor");
-  background: v-bind("theme.actionColor");
+  background: v-bind(offBg);
   color: v-bind("theme.textColor3");
   font-weight: 700;
 }
