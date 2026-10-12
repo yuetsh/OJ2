@@ -15,10 +15,28 @@ const { content, html = false } = defineProps<{
 
 const theme = useThemeVars()
 const rendered = computed(() => renderMarkdown(content ?? "", html))
+
+// 点图片看大图（原来 MdPreview 自带）。包在链接里的图片照旧走链接
+const zoomed = ref("")
+
+function onClick(e: MouseEvent) {
+  const target = e.target
+  if (!(target instanceof HTMLImageElement) || target.closest("a")) return
+  zoomed.value = target.currentSrc || target.src
+}
+
+onKeyStroke("Escape", () => {
+  zoomed.value = ""
+})
 </script>
 
 <template>
-  <div class="oj-markdown" v-html="rendered" />
+  <div class="oj-markdown" v-html="rendered" @click="onClick" />
+  <Teleport to="body">
+    <div v-if="zoomed" class="oj-markdown-zoom" @click="zoomed = ''">
+      <img :src="zoomed" alt="" />
+    </div>
+  </Teleport>
 </template>
 
 <!-- 不加 scoped：v-html 进来的节点不带 scoped 的属性，靠 .oj-markdown 前缀收住范围 -->
@@ -95,10 +113,36 @@ const rendered = computed(() => renderMarkdown(content ?? "", html))
   text-decoration: underline;
 }
 
+/* 富文本存的图片带行内 style="width; height"，宽被 max-width 压窄时高还是原值，
+   图片就被压扁 —— 行内样式只有 !important 盖得住 */
 .oj-markdown img {
   max-width: 100%;
-  height: auto;
+  height: auto !important;
   vertical-align: middle;
+  cursor: zoom-in;
+}
+
+.oj-markdown a img {
+  cursor: pointer;
+}
+
+.oj-markdown-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: rgba(0, 0, 0, 0.8);
+  cursor: zoom-out;
+}
+
+.oj-markdown-zoom img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background-color: #fff;
 }
 
 .oj-markdown hr {
