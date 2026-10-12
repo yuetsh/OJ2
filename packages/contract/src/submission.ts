@@ -230,24 +230,6 @@ export const submissionDetailSchema = z.object({
 })
 
 /**
- * 内嵌在别处（目前只有站内信）的提交对象。对齐旧后端的
- * `SubmissionSafeModelSerializer(exclude=("info", "contest", "ip"))` ——
- * 这些键**根本不出现**，而不是出现但值为空。（`ip` 已随 IP 功能整体删除。）
- *
- * 独立成一个 schema 而不是复用 submissionDetailSchema 传空值：形状一致了，
- * 将来有人「顺手」把空值改成真值就不会变成泄露，因为这里压根没有这些字段。
- */
-export const embeddedSubmissionSchema = submissionDetailSchema
-  // 留下 problemDisplayId（展示用题号）而不是数字主键：站内信页面拿它拼
-  // `/problem/<题号>` 链接，给数字 id 会拼出打不开的地址。
-  .omit({
-    info: true,
-    contestId: true,
-    problemId: true,
-    caseSummary: true,
-  })
-
-/**
  * 判题进度推送。**只带前端真正要用的东西**：靠 submissionId 认领、靠 result /
  * status 决定是继续等还是去拉详情。
  *
@@ -623,7 +605,6 @@ export type AttemptedStudent = z.infer<typeof attemptedStudentSchema>
 
 export type SubmissionListItem = z.infer<typeof submissionListItemSchema>
 export type SubmissionList = z.infer<typeof submissionListSchema>
-export type EmbeddedSubmission = z.infer<typeof embeddedSubmissionSchema>
 export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>
 export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>
 

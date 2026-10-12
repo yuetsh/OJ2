@@ -1,7 +1,6 @@
 import { z } from "zod"
 
 import { paginatedSchema, sampleUserSchema } from "./common"
-import { embeddedSubmissionSchema } from "./submission"
 
 export const announcementSchema = z.object({
   id: z.number().int(),
@@ -25,25 +24,6 @@ export const announcementListItemSchema = announcementSchema.omit({
 })
 
 export const announcementListSchema = paginatedSchema(announcementListItemSchema)
-
-export const messageSchema = z.object({
-  id: z.number().int(),
-  sender: sampleUserSchema,
-  createTime: z.string(),
-  message: z.string(),
-  submission: embeddedSubmissionSchema,
-})
-
-export const messageListSchema = paginatedSchema(messageSchema)
-
-export const createMessageRequestSchema = z.object({
-  recipientId: z.number().int().positive(),
-  submissionId: z.string().min(1),
-  message: z
-    .string()
-    .min(1)
-    .max(1024 * 1024),
-})
 
 export const reactionKeySchema = z.enum([
   "too_easy",
@@ -194,14 +174,11 @@ export const exerciseSchema = z.object({
   solved: z.boolean(),
 })
 
-export type Message = z.infer<typeof messageSchema>
-export type MessageList = z.infer<typeof messageListSchema>
 export type Announcement = z.infer<typeof announcementSchema>
 export type AnnouncementListItem = z.infer<typeof announcementListItemSchema>
 export type TutorialSummary = z.infer<typeof tutorialSummarySchema>
 
 export type AnnouncementList = z.infer<typeof announcementListSchema>
-export type CreateMessageRequest = z.infer<typeof createMessageRequestSchema>
 export type ReactionKey = z.infer<typeof reactionKeySchema>
 export type ReactionCounts = z.infer<typeof reactionCountsSchema>
 export type ReactionState = z.infer<typeof reactionStateSchema>

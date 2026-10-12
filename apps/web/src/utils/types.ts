@@ -7,8 +7,6 @@ import type {
   RankProfile,
   SessionUser,
   UserProfile,
-  EmbeddedSubmission as ContractEmbeddedSubmission,
-  Message as ContractMessage,
   ProblemDifficulty,
   JudgeStatus,
   AstRules,
@@ -245,12 +243,6 @@ export type Submission = Omit<SubmissionDetail, "result"> & {
   result: SUBMISSION_RESULT
 }
 
-/**
- * 站内信里嵌的提交：problem 是展示题号而非数字 id，且不含 info / ip / contestId。
- * 契约里已经窄化好了（`embeddedSubmissionSchema`），这里不再重复 Omit + 增补。
- */
-export type EmbeddedSubmission = ContractEmbeddedSubmission
-
 export type SubmissionListItem = ContractSubmissionListItem
 
 export interface SubmissionListPayload {
@@ -357,14 +349,6 @@ export type {
 
 /** 后台编辑表单：请求体 + id（新建时填 0，提交前由 api 层剥掉） */
 export type AnnouncementEdit = CreateAnnouncementRequest & { id: number }
-
-/**
- * 站内信。**直接取契约** —— 原来这里把 `submission` 换成前端窄化过的
- * `EmbeddedSubmission`，但那个窄化已经搬进 `embeddedSubmissionSchema`
- * （statisticInfo / language 在契约里不再是 unknown），两者双向可赋值、
- * 完全等价，这层 Omit 已经没有内容。
- */
-export type Message = ContractMessage
 
 /**
  * 题目表情。三个类型都直接取自契约 —— 语义 key 必须与后端 reaction/models.py

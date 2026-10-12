@@ -57,7 +57,6 @@ import type {
   Announcement,
   AnnouncementListItem,
   Profile,
-  Message,
   SubmissionListItem,
   Exercise,
   ProblemDetail,
@@ -378,13 +377,6 @@ export function getAnnouncementList(offset = 0, limit = 10) {
 
 export function getAnnouncement(id: number) {
   return api.get<Announcement>(`announcements/${id}`)
-}
-
-export function getMessageList(offset = 0, limit = 10) {
-  // language 的收窄同 getSubmissions，见那里的说明
-  return api.get<{ results: Message[]; total: number }>("messages", {
-    params: { limit, offset },
-  })
 }
 
 export function getReaction(problemID: number) {

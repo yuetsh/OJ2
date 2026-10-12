@@ -1,5 +1,4 @@
 import {
-  createMessageRequestSchema,
   exerciseAttemptRequestSchema,
   reactionKeySchema,
   setReactionRequestSchema,
@@ -7,10 +6,7 @@ import {
   type Announcement,
   type AnnouncementList,
   type AnnouncementListItem,
-  type EmbeddedSubmission,
   type Exercise,
-  type Message,
-  type MessageList,
   type ReactionCounts,
   type ReactionState,
   type Tutorial,
@@ -20,7 +16,7 @@ import {
 import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, requireAuth, requireSuperAdmin, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
@@ -93,98 +89,6 @@ contentRoutes.get("/announcements/:id", async (c) => {
     createTime: row.announcement.createTime,
     lastUpdateTime: row.announcement.lastUpdateTime,
   } satisfies Announcement)
-})
-
-contentRoutes.get("/messages", requireAuth, async (c) => {
-  const user = c.get("user")!
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const [totalRows, rows] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.message)
-      .where(eq(schema.message.recipientId, user.id)),
-    db
-      .select({
-        message: schema.message,
-        sender: schema.user,
-        realName: schema.userProfile.realName,
-        submission: schema.submission,
-        displayId: schema.problem.displayId,
-      })
-      .from(schema.message)
-      .innerJoin(schema.user, eq(schema.message.senderId, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .innerJoin(schema.submission, eq(schema.message.submissionId, schema.submission.id))
-      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-      .where(eq(schema.message.recipientId, user.id))
-      .orderBy(desc(schema.message.createTime))
-      .limit(limit)
-      .offset(offset),
-  ])
-  return success(c, {
-    results: rows.map(
-      ({ message, sender, realName, submission, displayId }) =>
-        ({
-          id: message.id,
-          sender: sampleUser(sender, realName),
-          createTime: message.createTime,
-          message: message.message,
-          submission: {
-            id: submission.id,
-            createTime: submission.createTime,
-            userId: submission.userId,
-            username: submission.username,
-            code: submission.code,
-            result: submission.result,
-            // info / ip / contestId 三个字段不在 embeddedSubmissionSchema 里，故不传 ——
-            // 对齐旧后端 SubmissionSafeModelSerializer 的 exclude，这三个键不出现在响应中
-            language: submission.language,
-            statisticInfo: asRecord(submission.statisticInfo),
-            // 展示用题号而非数字主键，站内信页面拿它拼 /problem/<题号>
-            problemDisplayId: displayId,
-            showLink: true,
-          } satisfies EmbeddedSubmission,
-        }) satisfies Message,
-    ),
-    total: totalRows[0]?.value ?? 0,
-  } satisfies MessageList)
-})
-
-/**
- * 发站内信。**目前没有任何前端在调用它** —— 后台那个页面
- * （apps/web/src/admin/communication/messages.vue）两代前端都只是一句
- * 「未完待续」的占位，ojnext 里定义过一个 createMessage 但同样零调用，
- * 已在前端删掉。端点本身是完整实现的，要接 UI 从这里开始。
- */
-contentRoutes.post("/messages", requireSuperAdmin, async (c) => {
-  const user = c.get("user")!
-  const parsed = await parseBody(c, createMessageRequestSchema, "Invalid message payload")
-  if (!parsed.success) return parsed.response
-  if (parsed.data.recipientId === user.id)
-    return failure(c, 400, "invalid-recipient", "Can not send a message to yourself")
-  const [[recipient], [submission]] = await Promise.all([
-    db
-      .select({ id: schema.user.id })
-      .from(schema.user)
-      .where(and(eq(schema.user.id, parsed.data.recipientId), eq(schema.user.isDisabled, false)))
-      .limit(1),
-    db
-      .select({ id: schema.submission.id })
-      .from(schema.submission)
-      .where(eq(schema.submission.id, parsed.data.submissionId))
-      .limit(1),
-  ])
-  if (!recipient) return failure(c, 404, "user-not-found", "User does not exist")
-  if (!submission) return failure(c, 404, "submission-not-found", "Submission does not exist")
-  await db.insert(schema.message).values({
-    message: parsed.data.message,
-    createTime: new Date().toISOString(),
-    recipientId: recipient.id,
-    senderId: user.id,
-    submissionId: submission.id,
-  })
-  return success(c, null, 201)
 })
 
 async function reactionState(problemId: number, userId: number) {

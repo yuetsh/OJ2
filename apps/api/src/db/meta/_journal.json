@@ -232,6 +232,13 @@
       "when": 1791821976519,
       "tag": "0032_achievement_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791823809856,
+      "tag": "0033_drop_message",
+      "breakpoints": true
     }
   ]
 }

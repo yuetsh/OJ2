@@ -273,58 +273,6 @@ export const flowchartSubmission = pgTable(
   ],
 )
 
-export const message = pgTable(
-  "message",
-  {
-    id: integer().primaryKey().generatedByDefaultAsIdentity({
-      name: "message_id_seq",
-      startWith: 1,
-      increment: 1,
-      minValue: 1,
-      maxValue: 2147483647,
-      cache: 1,
-    }),
-    message: text().notNull(),
-    createTime: timestamp("create_time", {
-      withTimezone: true,
-      mode: "string",
-    }).notNull(),
-    recipientId: integer("recipient_id").notNull(),
-    senderId: integer("sender_id").notNull(),
-    submissionId: text("submission_id").notNull(),
-  },
-  (table) => [
-    index("message_recipient_time_idx").using(
-      "btree",
-      table.recipientId.asc().nullsLast().op("timestamptz_ops"),
-      table.createTime.asc().nullsLast().op("int4_ops"),
-    ),
-    index("message_sender_id_a2a2e825").using(
-      "btree",
-      table.senderId.asc().nullsLast().op("int4_ops"),
-    ),
-    index("message_submission_id_2fdf8a47").using(
-      "btree",
-      table.submissionId.asc().nullsLast().op("text_ops"),
-    ),
-    foreignKey({
-      columns: [table.recipientId],
-      foreignColumns: [user.id],
-      name: "message_recipient_id_2aa5dd76_fk_user_id",
-    }),
-    foreignKey({
-      columns: [table.senderId],
-      foreignColumns: [user.id],
-      name: "message_sender_id_a2a2e825_fk_user_id",
-    }),
-    foreignKey({
-      columns: [table.submissionId],
-      foreignColumns: [submission.id],
-      name: "message_submission_id_2fdf8a47_fk_submission_id",
-    }).onDelete("cascade"),
-  ],
-)
-
 export const judgeServer = pgTable("judge_server", {
   id: serial().primaryKey().notNull(),
   hostname: text().notNull(),
@@ -903,7 +851,7 @@ export const submission = pgTable(
  * - `since_prev_ms` 是唯一由**服务端**算的一列（距同一用户同一道题上一次提交），
  *   客户端伪造不了；这道题的第一次提交为 null。
  * - CASCADE 挂在 submission 上、不挂 user：它是提交的附属，提交没了它没有意义，
- *   人是谁顺着 submission 就能查到。同表的 message / problemset_submission 也是这一档。
+ *   人是谁顺着 submission 就能查到。同表的 problemset_submission 也是这一档。
  */
 export const submissionTrace = pgTable(
   "submission_trace",

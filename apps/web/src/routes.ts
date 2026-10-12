@@ -112,11 +112,6 @@ export const ojs: RouteRecordRaw = {
       meta: { requiresAuth: true },
     },
     {
-      path: "message",
-      component: () => import("oj/user/message.vue"),
-      meta: { requiresAuth: true },
-    },
-    {
       path: "learn",
       name: "learn home",
       component: () => import("oj/learn/home.vue"),
@@ -266,12 +261,6 @@ export const admins: RouteRecordRaw = {
       name: "admin announcement edit",
       component: () => import("admin/announcement/detail.vue"),
       props: true,
-      meta: { requiresSuperAdmin: true },
-    },
-    {
-      path: "message/list",
-      name: "admin message list",
-      component: () => import("admin/communication/messages.vue"),
       meta: { requiresSuperAdmin: true },
     },
     {
