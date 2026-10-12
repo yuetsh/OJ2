@@ -66,16 +66,6 @@ export const createFlowchartResponseSchema = z.object({
   submissionId: z.string(),
   status: z.literal("pending"),
 })
-export const flowchartCurrentSchema = z.object({
-  count: z.number().int(),
-  score: z.number(),
-  grade: z.string(),
-})
-export const flowchartDetailSchema = z.object({
-  submission: flowchartSubmissionSchema.nullable(),
-  count: z.number().int(),
-})
-
 /**
  * 流程图画到这两档算这道题做完：题单进度、课堂条、课堂看板、「你画的流程图」、结果页签的 ✓
  * 都按它（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 4、6）。前后端只有这一份
@@ -177,8 +167,6 @@ export type FlowchartStatistics = z.infer<typeof flowchartStatisticsSchema>
 export type FlowchartSubmission = z.infer<typeof flowchartSubmissionSchema>
 export type FlowchartListItem = z.infer<typeof flowchartListItemSchema>
 export type FlowchartList = z.infer<typeof flowchartListSchema>
-export type FlowchartCurrent = z.infer<typeof flowchartCurrentSchema>
-export type FlowchartDetail = z.infer<typeof flowchartDetailSchema>
 export type FlowchartScores = z.infer<typeof flowchartScoresSchema>
 export type CreateFlowchartResponse = z.infer<typeof createFlowchartResponseSchema>
 export type CreateFlowchartRequest = z.infer<typeof createFlowchartRequestSchema>
