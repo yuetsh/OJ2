@@ -413,12 +413,14 @@ function jumpExercise(id: number) {
   margin-top: 80px;
 }
 
-/* 桌面端固定高度，三栏各自滚动 */
+/* 桌面端固定高度，三栏各自滚动。72 = 顶栏 56 + 外框上内边距 16；
+   底下的 16 内边距用负外边距吃掉，上一课 / 下一课那条贴着屏幕底 */
 .layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr) 220px;
   grid-template-rows: minmax(0, 1fr);
-  height: calc(100vh - 134px);
+  height: calc(100vh - 72px);
+  margin-bottom: -16px;
 }
 @media (max-width: 1180px) {
   .layout {

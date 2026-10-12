@@ -17,6 +17,16 @@ defineProps<{
 const emit = defineEmits<{ solved: [exerciseId: number] }>()
 
 const isDark = useDark()
+
+/** 学习目标那几行只有行内的 **加粗** 和 `代码`，先转义再换成标签，别为它拉一个 MdPreview */
+function inline(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/`([^`]+)`/g, '<code class="ic">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+}
 </script>
 
 <template>
@@ -32,7 +42,7 @@ const isDark = useDark()
       <h2 v-else-if="seg.type === 'heading'" :id="seg.id" class="h2">{{ seg.text }}</h2>
       <div v-else-if="seg.type === 'goals'" :id="seg.id" class="goals">
         <div class="goals-title">学完这课你能</div>
-        <div v-for="item in seg.items" :key="item">· {{ item.replace(/`/g, "") }}</div>
+        <div v-for="item in seg.items" :key="item">· <span v-html="inline(item)" /></div>
       </div>
       <CodeRunBlock
         v-else-if="seg.type === 'code'"
@@ -79,6 +89,17 @@ const isDark = useDark()
   font-size: 14px;
   line-height: 1.8;
   scroll-margin-top: 16px;
+}
+.goals :deep(.ic) {
+  font-family: var(--learn-code-font);
+  font-size: 13px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--learn-soft);
+  color: #c7254e;
+}
+html.dark .goals :deep(.ic) {
+  color: #f08a9b;
 }
 .goals-title {
   font-weight: 700;
