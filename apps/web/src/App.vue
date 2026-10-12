@@ -43,47 +43,15 @@ watch(
   { immediate: true },
 )
 
-// 延迟加载 highlight.js，避免阻塞首屏
-const hljsInstance = ref<any>(null)
-const loadHighlightJS = async () => {
-  if (hljsInstance.value) return hljsInstance.value
-
-  // 逐个取 .default，不要在 Promise.all 后面 map —— 那样元组会塌成
-  // (HLJSApi | LanguageFn)[]，每个元素都变成联合类型，hljs 上就找不到方法了
-  const [core, c, cpp, python, java, javascript, go, sql] = await Promise.all([
-    import("highlight.js/lib/core"),
-    import("highlight.js/lib/languages/c"),
-    import("highlight.js/lib/languages/cpp"),
-    import("highlight.js/lib/languages/python"),
-    import("highlight.js/lib/languages/java"),
-    import("highlight.js/lib/languages/javascript"),
-    import("highlight.js/lib/languages/go"),
-    import("highlight.js/lib/languages/sql"),
-  ])
-  const hljs = core.default
-
-  hljs.registerLanguage("c", c.default)
-  hljs.registerLanguage("python", python.default)
-  hljs.registerLanguage("cpp", cpp.default)
-  hljs.registerLanguage("java", java.default)
-  hljs.registerLanguage("javascript", javascript.default)
-  hljs.registerLanguage("go", go.default)
-  hljs.registerLanguage("sql", sql.default)
-
-  hljsInstance.value = hljs
-  return hljs
-}
-
-// 在空闲时预加载
+// n-code（提交详情、看代码的弹框）用的 highlight.js，空闲时再加载，不挡首屏
+const hljsInstance = shallowRef<typeof import("shared/highlight").hljs>()
 onMounted(() => {
-  if ("requestIdleCallback" in window) {
-    requestIdleCallback(() => loadHighlightJS())
-  } else {
-    setTimeout(() => loadHighlightJS(), 1000)
+  const load = async () => {
+    hljsInstance.value = (await import("shared/highlight")).hljs
   }
+  if ("requestIdleCallback" in window) requestIdleCallback(load)
+  else setTimeout(load, 1000)
 })
-
-provide("hljs", hljsInstance)
 </script>
 
 <template>

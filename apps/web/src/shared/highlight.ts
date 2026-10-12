@@ -1,5 +1,6 @@
 /**
- * 代码高亮：自学的练一练、以及 Markdown.vue 里的代码块共用这一份（配色在 highlight.css）。
+ * 代码高亮：自学的练一练、Markdown.vue 里的代码块、以及 App.vue 交给 n-code 的都是这一份
+ * （配色在 highlight.css）。
  * 只注册判题机认的几种语言，别的语言和不标语言的代码块按原文显示。
  */
 import hljs from "highlight.js/lib/core"
@@ -12,6 +13,8 @@ hljs.registerLanguage("python", python)
 hljs.registerLanguage("c", c)
 hljs.registerLanguage("cpp", cpp)
 hljs.registerLanguage("sql", sql)
+
+export { hljs }
 
 const LANGUAGE_ALIASES: Record<string, string> = {
   python: "python",
