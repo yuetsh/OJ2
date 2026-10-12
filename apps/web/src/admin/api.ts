@@ -1,7 +1,6 @@
 import api from "utils/api"
 import { toAdminProblemRow } from "admin/transforms"
 import type {
-  AcTrend,
   BatchProblemTagResponse,
   GenerateSqlTestCaseResponse,
   RenameTagResponse,
@@ -9,6 +8,8 @@ import type {
   AdminAiReport,
   AdminAiReportList,
   StuckProblem,
+  StuckProblemDetail,
+  YearlyOverview,
   LearnBoard,
   LearnExerciseProgressList,
   LearnExerciseAttempt,
@@ -598,9 +599,13 @@ export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
   return api.delete(`admin/problem-sets/${problemSetId}/badges/${badgeId}`)
 }
 
-// 学生卡点分析
-export function getStuckProblems() {
-  return api.get<StuckProblem[]>("admin/problem-analytics/stuck")
+// 卡点分析：start 是时间段的起点（ISO），不给就是全部时间
+export function getStuckProblems(params: { className?: string; start?: string }) {
+  return api.get<StuckProblem[]>("admin/problem-analytics/stuck", { params })
+}
+
+export function getStuckProblemDetail(id: number, params: { className?: string; start?: string }) {
+  return api.get<StuckProblemDetail>(`admin/problem-analytics/stuck/${id}`, { params })
 }
 
 export function getLearnBoard(params: { type: "python" | "c"; className?: string }) {
@@ -619,12 +624,8 @@ export function getLearnExerciseAttempts(exerciseId: number, params: { className
   })
 }
 
-export function getTopACTrend(params: {
-  sinceYear: number
-  untilYear: number
-  minPerYear: number
-}) {
-  return api.get<AcTrend[]>("admin/problem-analytics/ac-trend", { params })
+export function getYearlyOverview() {
+  return api.get<YearlyOverview>("admin/problem-analytics/yearly")
 }
 
 // AI 学习分析报告

@@ -85,9 +85,9 @@ const NAV: NavGroup[] = [
         role: "teacher",
       },
       {
-        label: "年度趋势",
+        label: "历年概况",
         icon: "ph:chart-line-up",
-        path: "/admin/problem/top_ac_trend",
+        path: "/admin/problem/yearly",
         role: "teacher",
       },
       { label: "自学情况", icon: "ph:student", path: "/admin/learn", role: "teacher" },
