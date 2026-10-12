@@ -3,44 +3,23 @@ import {
   generateFlowchartRequestSchema,
   renameTagRequestSchema,
   setTagCategoryRequestSchema,
-  type AcTrend,
   type AdminTag,
   type BatchProblemTagResponse,
   type GenerateFlowchartResponse,
   type RenameTagResponse,
-  type StuckProblem,
 } from "@oj2/contract"
-import {
-  and,
-  asc,
-  countDistinct,
-  count,
-  desc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  isNull,
-  lte,
-  ne,
-  sql,
-} from "drizzle-orm"
+import { and, asc, countDistinct, desc, eq, ilike, inArray, isNull, ne, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { requireProblemPermission, requireTeacher, type AppEnv } from "../../auth/middleware"
+import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
 import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
-import { JudgeStatus } from "../../judge/status"
 import { completeChat } from "../../services/ai"
-import { localTime, localYear } from "../../time"
-import { queryInteger, rounded } from "../helpers"
+import { queryInteger } from "../helpers"
 import { canEdit, findTagsByName, normalizeTagNames } from "./problem"
 
 export const adminTagRoutes = new Hono<AppEnv>()
-
-const ACCEPTED = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
-const FAILED = [JudgeStatus.WRONG_ANSWER, JudgeStatus.COMPILE_ERROR, JudgeStatus.RUNTIME_ERROR]
 
 /** 能管所有题目：超管，或 problemPermission 为 All */
 function canManageAllProblems(user: AuthUser) {
@@ -271,132 +250,6 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
     .set({ visible: !problem.visible })
     .where(eq(schema.problem.id, id))
   return success(c, { visible: !problem.visible })
-})
-
-// ---------------------------------------------------------------- 卡点题目 / AC 趋势
-
-// 路径特意不放在 /problems 下：Hono 按**注册顺序**匹配（不是静态优先），
-// 而 problem.ts 的 `GET /problems/:id` 先注册，会把 `/problems/stuck` 整个吃掉 ——
-// 这两个 handler 曾经从未执行过，生效的还是那边的 requireProblemPermission 而非这里的
-// requireTeacher，而且完全没有报错。换个前缀，结构上就不可能再被遮蔽。
-adminTagRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
-  const failedFilter = sql`filter (where ${inArray(schema.submission.result, FAILED)})`
-  const rows = await db
-    .select({
-      displayId: schema.problem.displayId,
-      title: schema.problem.title,
-      total: count(),
-      accepted:
-        sql<number>`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED)})`.mapWith(
-          Number,
-        ),
-      failed: sql<number>`count(*) ${failedFilter}`.mapWith(Number),
-      failedUsers: sql<number>`count(distinct ${schema.submission.userId}) ${failedFilter}`.mapWith(
-        Number,
-      ),
-    })
-    .from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-    /**
-     * 只看公共题，和隔壁 ac-trend 同一个口径。原来这里一个 where 都没有，比赛题
-     * 也进榜 —— 而比赛题的题号是每场比赛各自从 1 开始编的（快照里 61 道不同的题
-     * 都叫「1」），一旦挤进前 40，那一行显示的题号会指向一道根本不存在的公共题。
-     *
-     * 眼下还没发生：前 40 的门槛是 97 人卡住，比赛题最多的一道是 59 人。但两个班
-     * 一起考的场次有 95 人，撞上一道难题就够得着了。
-     *
-     * 加了这条对公共题的数字**没有任何影响**：比赛提交挂的是比赛自己的 problem 行
-     * （快照实测两个方向的交叉都是 0 条），公共题那一行本来就只统计自己的提交。
-     * 顺带让这条查询能用上 0013 的 submission_public_metrics_idx，173ms → 82ms。
-     */
-    .where(isNull(schema.submission.contestId))
-    .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title)
-    .having(sql`count(distinct ${schema.submission.userId}) ${failedFilter} > 0`)
-    .orderBy(desc(sql`count(distinct ${schema.submission.userId}) ${failedFilter}`))
-    .limit(40)
-  return success(
-    c,
-    rows.map(
-      (row) =>
-        ({
-          problemId: row.displayId,
-          problemTitle: row.title,
-          total: row.total,
-          failed: row.failed,
-          failedUsers: row.failedUsers,
-          acRate: row.total ? rounded((row.accepted / row.total) * 100, 1) : 0,
-        }) satisfies StuckProblem,
-    ),
-  )
-})
-
-adminTagRoutes.get("/problem-analytics/ac-trend", requireTeacher, async (c) => {
-  const currentYear = localYear()
-  // 参数按旧后端的口径夹逼：越界一律回落到默认值，不报错
-  let sinceYear = queryInteger(c.req.query("sinceYear"), 2023)
-  if (sinceYear < 2022 || sinceYear > currentYear) sinceYear = 2023
-  let untilYear = queryInteger(c.req.query("untilYear"), currentYear)
-  if (untilYear < sinceYear || untilYear > currentYear) untilYear = currentYear - 1
-  let minPerYear = queryInteger(c.req.query("minPerYear"), 100)
-  if (![50, 100, 200].includes(minPerYear)) minPerYear = 100
-
-  // 年份按东八区切，和上面 `currentYear` 的夹逼同口径
-  const year = sql<number>`extract(year from ${localTime(schema.submission.createTime)})`.mapWith(
-    Number,
-  )
-  const rows = await db
-    .select({
-      problemId: schema.problem.id,
-      displayId: schema.problem.displayId,
-      title: schema.problem.title,
-      year,
-      total: count(),
-      accepted:
-        sql<number>`count(*) filter (where ${inArray(schema.submission.result, ACCEPTED)})`.mapWith(
-          Number,
-        ),
-    })
-    .from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-    .where(and(isNull(schema.submission.contestId), gte(year, sinceYear), lte(year, untilYear)))
-    .groupBy(schema.problem.id, schema.problem.displayId, schema.problem.title, year)
-    .orderBy(asc(schema.problem.id), asc(year))
-
-  const required = new Set<number>()
-  for (let y = sinceYear; y <= untilYear; y += 1) required.add(y)
-
-  const grouped = new Map<number, { displayId: string; title: string; yearly: typeof rows }>()
-  for (const row of rows) {
-    const bucket = grouped.get(row.problemId)
-    if (bucket) bucket.yearly.push(row)
-    else
-      grouped.set(row.problemId, {
-        displayId: row.displayId,
-        title: row.title,
-        yearly: [row],
-      })
-  }
-
-  const result = []
-  for (const entry of grouped.values()) {
-    const years = new Set(entry.yearly.map((row) => row.year))
-    // 每一年都得有数据，且每年提交量都超过门槛 —— 否则趋势没有可比性
-    if (![...required].every((y) => years.has(y))) continue
-    if (!entry.yearly.every((row) => row.total > minPerYear)) continue
-    result.push({
-      problemId: entry.displayId,
-      problemTitle: entry.title,
-      yearly: entry.yearly
-        .map((row) => ({
-          year: row.year,
-          total: row.total,
-          accepted: row.accepted,
-          acRate: row.total ? rounded((row.accepted / row.total) * 100, 1) : 0,
-        }))
-        .sort((left, right) => left.year - right.year),
-    } satisfies AcTrend)
-  }
-  return success(c, result)
 })
 
 // ---------------------------------------------------------------- Python → 流程图

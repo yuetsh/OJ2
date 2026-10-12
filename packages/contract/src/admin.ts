@@ -534,26 +534,81 @@ export const batchProblemTagResponseSchema = z.object({
   tagCount: z.number().int(),
 })
 
+/**
+ * 卡点分析的一道题（一行）。口径是「人 × 题」：只算**第一次交**落在所选时间段里的那些
+ * 人题对，指标按这对的全部历史算（做没做对、交了几次才对）。比率由前端按人数算，
+ * 这样知识点的汇总能按所选门槛过滤后再加权。
+ */
 export const stuckProblemSchema = z.object({
-  problemId: z.string(),
-  problemTitle: z.string(),
-  total: z.number().int(),
-  failed: z.number().int(),
-  failedUsers: z.number().int(),
-  acRate: z.number(),
+  id: z.number().int(),
+  displayId: z.string(),
+  title: z.string(),
+  /** 知识点（category = knowledge 的标签） */
+  tags: z.array(z.string()),
+  /** 做过的人 */
+  users: z.number().int(),
+  /** 第一次交就对的人 */
+  firstTry: z.number().int(),
+  /** 做对了的人 */
+  solved: z.number().int(),
+  /** 做对的人「做对那次及之前」一共交了几次，加总 —— 除以 solved 就是平均 */
+  solvedTries: z.number().int(),
 })
 
-export const acTrendYearSchema = z.object({
+export const stuckStudentSchema = z.object({
+  username: z.string(),
+  className: z.string().nullable(),
+  firstTry: z.boolean(),
+  solved: z.boolean(),
+  /** 做对了：做对那次及之前交了几次；没做对：一共交了几次 */
+  tries: z.number().int(),
+  /** 第一次交到做对隔了几分钟，没做对是 null */
+  minutes: z.number().int().nullable(),
+  lastResult: z.number().int(),
+  lastSubmissionId: z.string(),
+})
+
+export const stuckProblemDetailSchema = z.object({
+  problem: z.object({
+    id: z.number().int(),
+    displayId: z.string(),
+    title: z.string(),
+    tags: z.array(z.string()),
+  }),
+  students: z.array(stuckStudentSchema),
+  /** 这些人错的那些次，按判题结果分 */
+  errors: z.array(z.object({ result: z.number().int(), count: z.number().int() })),
+  /** 全站历年（学年按 9 月起算，`year` 是起始年），不受班级和时间段影响 */
+  history: z.array(
+    z.object({ year: z.number().int(), users: z.number().int(), firstTry: z.number().int() }),
+  ),
+})
+
+export const yearlySummarySchema = z.object({
+  /** 学年起始年，2025 = 25–26 学年 */
   year: z.number().int(),
-  total: z.number().int(),
-  accepted: z.number().int(),
-  acRate: z.number(),
+  /** 统计到哪天为止（不含），进行中的学年和去年同期才有意义 */
+  until: z.string(),
+  grades: z.array(z.string()),
+  users: z.number().int(),
+  submissions: z.number().int(),
+  problems: z.number().int(),
+  /** 这段时间里第一次做对的人题对 */
+  solvedPairs: z.number().int(),
+  /** 第一次交在这段时间里的人题对，和其中第一次就对的 */
+  startedPairs: z.number().int(),
+  firstTryPairs: z.number().int(),
+  /** 上面那批里做对了的，以及它们做对那次及之前一共交了几次 */
+  solvedStarted: z.number().int(),
+  solvedTries: z.number().int(),
+  cSubmissions: z.number().int(),
 })
 
-export const acTrendSchema = z.object({
-  problemId: z.string(),
-  problemTitle: z.string(),
-  yearly: z.array(acTrendYearSchema),
+export const yearlyOverviewSchema = z.object({
+  /** 从最早的学年到现在这个学年（最后一个是进行中的，只算到今天） */
+  years: z.array(yearlySummarySchema),
+  /** 去年同期：上一个学年开学到「去年的今天」 */
+  lastYearToDate: yearlySummarySchema.nullable(),
 })
 
 // ---------------------------------------------------------------- 自学情况
@@ -943,12 +998,15 @@ export type AdminAiReportListItem = z.infer<typeof adminAiReportListItemSchema>
 export type AdminAiReport = z.infer<typeof adminAiReportSchema>
 export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
 export type StuckProblem = z.infer<typeof stuckProblemSchema>
+export type StuckStudent = z.infer<typeof stuckStudentSchema>
+export type StuckProblemDetail = z.infer<typeof stuckProblemDetailSchema>
+export type YearlySummary = z.infer<typeof yearlySummarySchema>
+export type YearlyOverview = z.infer<typeof yearlyOverviewSchema>
 export type LearnBoard = z.infer<typeof learnBoardSchema>
 export type LearnBoardStudent = z.infer<typeof learnBoardStudentSchema>
 export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>
 export type LearnExerciseProgressList = z.infer<typeof learnExerciseProgressListSchema>
 export type LearnExerciseAttempt = z.infer<typeof learnExerciseAttemptSchema>
-export type AcTrend = z.infer<typeof acTrendSchema>
 
 export type AdminTag = z.infer<typeof adminTagSchema>
 export type RenameTagResponse = z.infer<typeof renameTagResponseSchema>
@@ -1010,7 +1068,6 @@ export type CreateProblemSetBadgeRequest = z.infer<typeof createProblemSetBadgeR
 export type UpdateProblemSetBadgeRequest = z.infer<typeof updateProblemSetBadgeRequestSchema>
 export type RenameTagRequest = z.infer<typeof renameTagRequestSchema>
 export type BatchProblemTagRequest = z.infer<typeof batchProblemTagRequestSchema>
-export type AcTrendYear = z.infer<typeof acTrendYearSchema>
 export type GenerateFlowchartRequest = z.infer<typeof generateFlowchartRequestSchema>
 export type GenerateFlowchartResponse = z.infer<typeof generateFlowchartResponseSchema>
 export type UpdateProblemRequest = z.infer<typeof updateProblemRequestSchema>
