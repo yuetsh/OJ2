@@ -3,114 +3,97 @@ import { z } from "zod"
 import { classPkPeriodSchema } from "./ranking"
 
 /**
- * 评级。`grade()` 返回 S/A/B/C，`averageGrade()` 在没有可用数据时返回空串 ——
- * 空串是真会下发的值，别把它从这里去掉，前端要按「无评级」处理。
+ * 智能分析看哪段时间。全按东八区日历切（同排名页）：这周 = 本周一零点起，这个月 = 本月 1 日
+ * 零点起，这学期 = `termStart()`（9 月 1 日 / 2 月 1 日），全部 = 不设下限。
  */
-export const gradeSchema = z.enum(["S", "A", "B", "C", ""])
+export const learningPeriodSchema = z.enum(["week", "month", "term", "all"])
 
-export const durationDataSchema = z.object({
-  unit: z.string(),
-  index: z.number().int(),
-  start: z.string(),
-  end: z.string(),
-  grade: gradeSchema,
-  problemCount: z.number().int(),
-  /** 该周期内判为通过的提交数。problemCount 是去重后的题数，两者不能互相代替 */
-  acceptedCount: z.number().int(),
-  submissionCount: z.number().int(),
-})
+export const LEARNING_PERIOD_LABELS = {
+  week: "这周",
+  month: "这个月",
+  term: "这学期",
+  all: "全部",
+} as const satisfies Record<z.infer<typeof learningPeriodSchema>, string>
 
-export const solvedProblemSchema = z.object({
-  problem: z.object({
-    title: z.string(),
-    displayId: z.string(),
-    contestTitle: z.string(),
-    contestId: z.number().int().nullable(),
-  }),
-  acTime: z.string(),
-  rank: z.number().int().nullable(),
-  acCount: z.number().int(),
-  grade: gradeSchema,
-  periodRank: z.number().int().nullable(),
-  periodAcCount: z.number().int(),
-  difficulty: z.string(),
-  /** 到首次通过为止在这道题上提交了几次（含通过那次）。1 就是一次过 */
+/**
+ * 一道题在这段时间里的结果。代码提交和流程图合起来算，口径同课堂看板：代码 AC /
+ * AST_CHECK_FAILED、流程图评到 A / S 都算做对。
+ *
+ * - `first`：第一次交就对了
+ * - `tries`：交了 `attempts` 次才对（含做对那次）
+ * - `fail`：交了 `attempts` 次，还没做对
+ * - `none`：班上这节课做了，这个学生一次没交
+ */
+export const learningItemSchema = z.object({
+  displayId: z.string(),
+  title: z.string(),
+  status: z.enum(["first", "tries", "fail", "none"]),
   attempts: z.number().int(),
-})
-
-export const flowchartSummarySchema = z.object({
-  problemId: z.string(),
-  problemTitle: z.string(),
-  submissionCount: z.number().int(),
-  bestScore: z.number(),
-  bestGrade: z.string(),
-  latestSubmissionTime: z.string(),
-  avgScore: z.number(),
+  /** 班上第几个做对（只数这段时间里做对的同班同学）；没做对、没有班级时为 null */
+  rank: z.number().int().nullable(),
+  /** 这段时间班上几人做对；没有班级时为 null */
+  classSolved: z.number().int().nullable(),
+  /** 没做对时最后一次代码提交的判题状态；只交过流程图时为 null */
+  lastResult: z.number().int().nullable(),
 })
 
 /**
- * 时间活跃度的一个格子。星期和时段都按东八区切，和热力图同一个口径 ——
- * 别让容器或数据库的 TZ 决定「学生周几晚上做题多」。
+ * 一天一行。`lesson` 是班上这节课的题：老师在课堂看板布置过就用布置的，否则同班同一天
+ * ≥ 5 人做过的题（同「班里在做」的推断）；一道题只归到一天。`own` 是这个学生这天自己练的、
+ * 不属于任何一节课的题，按他第一次交的那天归。
  */
-export const activityBucketSchema = z.object({
-  /** 0=周日 … 6=周六 */
-  weekday: z.number().int().min(0).max(6),
-  /** 0=凌晨(0-6) 1=上午(6-12) 2=下午(12-18) 3=晚上(18-24) */
-  period: z.number().int().min(0).max(3),
-  count: z.number().int(),
+export const learningDaySchema = z.object({
+  /** 东八区日历日 `YYYY-MM-DD` */
+  day: z.string(),
+  lesson: z.array(learningItemSchema),
+  own: z.array(learningItemSchema),
 })
 
-export const aiDetailSchema = z.object({
+export const learningReportSchema = z.object({
   username: z.string(),
   className: z.string().nullable(),
-  start: z.string(),
+  period: learningPeriodSchema,
+  start: z.string().nullable(),
   end: z.string(),
+  solved: z.number().int(),
+  firstTry: z.number().int(),
+  /** 这段时间班上上了几节课（有 `lesson` 的天数） */
+  lessonCount: z.number().int(),
+  /** 代码 + 流程图提交次数 */
+  submissionCount: z.number().int(),
+  /** 交过还没做对的题，交得多的在前 */
+  unsolved: z.array(learningItemSchema),
   /**
-   * 区间内做出来的题数。逐题明细走 `GET /ai/solved` 分页拿 ——
-   * 一个活跃学生一年能做几百道，整份塞进这个响应没有必要。
+   * 和班上比。「班上」= 这段时间交过题的同班学生（同排名口径的学生角色），没有班级时为 null。
+   * `rank` 是按做对题数排第几（比他多的人数 + 1）。
    */
-  solvedCount: z.number().int(),
-  /** 每道做出来的题「到首次通过为止提交了几次」，分档放在前端 */
-  attempts: z.array(z.number().int()),
-  flowcharts: z.array(flowchartSummarySchema),
-  grade: gradeSchema,
-  tags: z.record(z.string(), z.number().int()),
-  difficulty: z.record(z.string(), z.number().int()),
-  contestCount: z.number().int(),
-  /** 时间活跃度：按**全部提交**统计，不是只统计 AC */
-  activity: z.array(activityBucketSchema),
-  /**
-   * 判完的失败提交按状态码分组，多的在前。状态码是落库的值，
-   * 前端用 utils/constants 的 JUDGE_STATUS 翻成中文，两边必须一致。
-   */
-  errors: z.array(
-    z.object({
-      result: z.number().int(),
-      count: z.number().int(),
-    }),
+  classStats: z
+    .object({
+      size: z.number().int(),
+      medianSolved: z.number(),
+      medianFirstPercent: z.number().int(),
+      rank: z.number().int(),
+    })
+    .nullable(),
+  /** 新的在前 */
+  days: z.array(learningDaySchema),
+  /** 没通过的代码提交按判题状态分组，多的在前；系统错误、还没判完的不算 */
+  errors: z.array(z.object({ result: z.number().int(), count: z.number().int() })),
+  /** 全部知识点（tag 的 knowledge 类），按题库里题数从多到少；没碰过的 solved = tried = 0 */
+  knowledge: z.array(
+    z.object({ name: z.string(), solved: z.number().int(), tried: z.number().int() }),
   ),
-  /**
-   * solved 里的 rank/acCount 是在哪个范围里排的。班里只有一个人时后端会回退到全服，
-   * 前端不能只看 className 有没有值就写「班级排名」。
-   */
-  rankScope: z.enum(["class", "global"]),
+  /** 老师看学生时，同班按用户名排的前一个 / 后一个；学生看自己时为 null */
+  neighbors: z.object({ prev: z.string().nullable(), next: z.string().nullable() }).nullable(),
 })
 
 /**
- * 请求只说「看谁、哪段时间、按什么粒度」，学情数据由服务端自己算。
+ * 请求只说「看谁、哪段时间」，学情数据由服务端自己算。
  * 以前是 `details: z.unknown()` / `duration: z.unknown()` —— 前端算好的整包 POST 回去，
  * 原样进 prompt 又原样写进 ai_analysis 表，等于让任何登录用户决定喂给模型什么。
  */
-/** GET /ai/solved 的分页响应 */
-export const solvedListSchema = z.object({
-  results: z.array(solvedProblemSchema),
-  total: z.number().int(),
-})
-
 export const aiAnalysisRequestSchema = z.object({
-  start: z.string().min(1),
-  end: z.string().min(1),
-  duration: z.string().min(1),
+  period: learningPeriodSchema,
   username: z.string().optional(),
 })
 
@@ -248,17 +231,6 @@ export const classPkAnalysisRequestSchema = z.object({
   period: classPkPeriodSchema,
 })
 
-/**
- * 热力图的一格 = **一周**（不是一天）。timestamp 是那一周（按东八区日历）周一的 UTC 零点，
- * 前端按东八区取年月日（`zonedParts`），不要用浏览器本地部件。
- * value 是整周的提交次数。按天切的话一年 365 格里三百多格是空的，
- * 中职学生一年也就在二三十天有提交，整张图看着像没用过。
- */
-export const heatmapItemSchema = z.object({
-  timestamp: z.number(),
-  value: z.number().int(),
-})
-
 export const aiAnalysisRecordSchema = z.object({
   id: z.number().int(),
   provider: z.string(),
@@ -270,14 +242,10 @@ export const aiAnalysisRecordSchema = z.object({
   username: z.string().optional(),
 })
 
-export type Grade = z.infer<typeof gradeSchema>
-export type DurationData = z.infer<typeof durationDataSchema>
-export type SolvedProblem = z.infer<typeof solvedProblemSchema>
-export type FlowchartSummary = z.infer<typeof flowchartSummarySchema>
-export type ActivityBucket = z.infer<typeof activityBucketSchema>
-export type AiDetail = z.infer<typeof aiDetailSchema>
-export type SolvedList = z.infer<typeof solvedListSchema>
-export type HeatmapItem = z.infer<typeof heatmapItemSchema>
+export type LearningPeriod = z.infer<typeof learningPeriodSchema>
+export type LearningItem = z.infer<typeof learningItemSchema>
+export type LearningDay = z.infer<typeof learningDaySchema>
+export type LearningReport = z.infer<typeof learningReportSchema>
 export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>
 
 export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>

@@ -95,6 +95,14 @@ export function termStart(now: Date | number | string = new Date()): string {
   return fromWallClock(new Date(Date.UTC(termYear, termMonth - 1, 1))).toISOString()
 }
 
+/** 「东八区本月 1 日」的零点，返回 ISO 字符串 */
+export function monthStart(now: Date | number | string = new Date()): string {
+  const wall = toWallClock(now)
+  return fromWallClock(
+    new Date(Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), 1)),
+  ).toISOString()
+}
+
 /** 按北京时间的日历做月份平移，日号超出目标月长度时截到月末，时分秒毫秒原样保留 */
 export function shiftMonthsByCalendar(instant: Date, months: number): Date {
   const wall = toWallClock(instant)

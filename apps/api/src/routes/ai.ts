@@ -5,15 +5,15 @@ import {
   classAnalysisRequestSchema,
   classPkAnalysisRequestSchema,
   HINT_MIN_FAILURES,
+  LEARNING_PERIOD_LABELS,
+  learningPeriodSchema,
   type AiAnalysisRecord,
-  type AiDetail,
   type AiHintDone,
-  type DurationData,
   type HintDiagnosis,
-  type HeatmapItem,
-  type SolvedProblem,
+  type LearningItem,
+  type LearningReport,
 } from "@oj2/contract"
-import { and, count, eq, gte, inArray, lte, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm"
 import { Hono, type Context } from "hono"
 
 import { requireAuth, type AppEnv } from "../auth/middleware"
@@ -23,12 +23,12 @@ import { JudgeStatus, judgeStatusName } from "../judge/status"
 import { failure, parseBody, readJson, success } from "../http"
 import { streamChat, streamWhole } from "../services/ai"
 import { generateFilteredHint } from "../services/hint-filter"
-import { buildDetail, buildDuration, listSolved } from "../services/learning-stats"
+import { buildReport } from "../services/learning-stats"
 import { decideHintLevel } from "../services/hint-level"
 import { hintDiagnosis, hintPrompt, referenceAnswer } from "../services/hint-diagnosis"
 import { classDetail, classPk } from "../services/ranking"
 import { consumeToken } from "../services/throttling"
-import { calendarDay, dayNumber, dayText, localTime, localWeekday } from "../time"
+import { dayNumber, localWeekday } from "../time"
 import { countFailedSubmissions, isTeacherOrAbove, asRecord, queryInteger } from "./helpers"
 
 export const aiRoutes = new Hono<AppEnv>()
@@ -68,83 +68,41 @@ async function targetUser(c: Context<AppEnv>, override?: string) {
   return target ?? null
 }
 
-aiRoutes.get("/ai/detail", requireAuth, async (c) => {
-  const start = c.req.query("start")
-  const end = c.req.query("end")
-  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
-    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
-  }
+aiRoutes.get("/ai/report", requireAuth, async (c) => {
+  const period = learningPeriodSchema.safeParse(c.req.query("period") ?? "term")
+  if (!period.success)
+    return failure(c, 400, "invalid-period", "period must be week, month, term or all")
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
-  return success(c, await buildDetail(user, start, end))
+  // 老师看别人时给出同班前后一个人，好在页面上 ‹ › 翻
+  const viewingOther = user.id !== c.get("user")!.id
+  return success(c, await buildReport(user, period.data, { neighbors: viewingOther }))
 })
 
-aiRoutes.get("/ai/solved", requireAuth, async (c) => {
-  const start = c.req.query("start")
-  const end = c.req.query("end")
-  if (!start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
-    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
-  }
+/**
+ * 页面上「AI 帮你分析」那张卡要显示的小结：老师在后台钉住的那份优先（不分时间段），
+ * 否则是这个时间段最近生成的一份。都没有就是 null，前端出「AI 帮我分析」按钮。
+ */
+aiRoutes.get("/ai/analysis/latest", requireAuth, async (c) => {
+  const period = learningPeriodSchema.safeParse(c.req.query("period") ?? "term")
+  if (!period.success)
+    return failure(c, 400, "invalid-period", "period must be week, month, term or all")
   const user = await targetUser(c)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
-  const limit = queryInteger(c.req.query("limit"), 20, { min: 1, max: 100 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  return success(c, await listSolved(user, start, end, limit, offset))
-})
-
-aiRoutes.get("/ai/duration", requireAuth, async (c) => {
-  const endText = c.req.query("end")
-  if (!endText || Number.isNaN(Date.parse(endText)))
-    return failure(c, 400, "invalid-end", "end must be an ISO timestamp")
-  const user = await targetUser(c)
-  if (!user) return failure(c, 404, "user-not-found", "User not found")
-  return success(c, await buildDuration(user, endText, c.req.query("duration") ?? "months:1"))
-})
-
-aiRoutes.get("/ai/heatmap", requireAuth, async (c) => {
-  const user = await targetUser(c)
-  if (!user) return failure(c, 404, "user-not-found", "User not found")
-  const end = new Date()
-  // 一格一周，共 53 格，最后一格是「本周」。周一算一周的开头（不用 GitHub 的周日）。
-  // 整段以东八区的**日历日序号**为单位算（`dayNumber` / `dayText`），不构造本地 Date。
-  const today = dayNumber(calendarDay(end))
-  const mondayOffset = (localWeekday(today) + 6) % 7
-  const firstMonday = today - mondayOffset - 52 * 7
-  // SQL 两端各放宽一天：范围只用来少拉行，精确匹配靠下面按日历日 key 查表
-  const date = sql<string>`date(${localTime(schema.submission.createTime)})::text`
-  const rows = await db
-    .select({ date, value: count() })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        gte(schema.submission.createTime, new Date((firstMonday - 1) * 864e5).toISOString()),
-        lte(schema.submission.createTime, new Date(end.getTime() + 864e5).toISOString()),
-      ),
-    )
-    .groupBy(date)
-    .orderBy(date)
-  const counts = new Map(rows.map((row) => [row.date, row.value]))
-  return success(
-    c,
-    Array.from({ length: 53 }, (_, week) => {
-      const monday = firstMonday + week * 7
-      let value = 0
-      for (let offset = 0; offset < 7; offset++) value += counts.get(dayText(monday + offset)) ?? 0
-      // timestamp 是该周周一的 UTC 零点，前端按东八区只取年月日部件
-      return { timestamp: monday * 864e5, value } satisfies HeatmapItem
-    }),
-  )
-})
-
-aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
   const [row] = await db
     .select({ analysis: schema.aiAnalysis, username: schema.user.username })
     .from(schema.aiAnalysis)
     .innerJoin(schema.user, eq(schema.aiAnalysis.userId, schema.user.id))
     .where(
-      and(eq(schema.aiAnalysis.userId, c.get("user")!.id), eq(schema.aiAnalysis.isPinned, true)),
+      and(
+        eq(schema.aiAnalysis.userId, user.id),
+        or(
+          eq(schema.aiAnalysis.isPinned, true),
+          sql`${schema.aiAnalysis.data}->>'period' = ${period.data}`,
+        ),
+      ),
     )
+    .orderBy(desc(schema.aiAnalysis.isPinned), desc(schema.aiAnalysis.createTime))
     .limit(1)
   if (!row) return success(c, null)
   return success(c, {
@@ -159,130 +117,98 @@ aiRoutes.get("/ai/pinned", requireAuth, async (c) => {
   } satisfies AiAnalysisRecord)
 })
 
-const ANALYSIS_RANGE: Record<string, string> = {
-  "hours:1": "这一节课",
-  "hours:2": "这两节课",
-  "days:1": "最近一天",
-  "weeks:1": "最近一周",
-  "months:1": "最近一个月",
-  "months:2": "最近两个月",
-  "months:6": "最近半年",
-  "years:1": "最近一年",
-}
+const WEEKDAY = "日一二三四五六"
 
 /**
- * 喂给模型的学情数据，全部翻成中文、带单位。原来是 detail / duration 原样 JSON 进
- * prompt，模型读不懂裸编码：「错误类型 -1」（答案错误）被说成编译错误，
- * `period 1` 原样出现在报告里，用户名 xuyue 被猜成了真名。
+ * 喂给模型的学情数据，全部翻成中文、带单位，和页面同一份（buildReport）。原来是
+ * detail / duration 原样 JSON 进 prompt，模型读不懂裸编码：「错误类型 -1」（答案错误）
+ * 被说成编译错误，`period 1` 原样出现在报告里，用户名 xuyue 被猜成了真名。
  *
- * 时间活跃度不给：八成提交在课上，几点做题是课表定的，模型只会据此编出
- * 「你是早起鸟」「改到工作日分散练」这类建议。名字和班级也不给，报告里一律称「你」。
+ * 节奏按「每节课」给，不再按从现在往回推的一周一周切 —— 那样切出来的桶边界在半夜，
+ * 标签写「9月23日起」其实是 24 日起，模型据此说「23 日那周一道没做」，而那天做对了两道。
+ * 名字和班级不给，报告里一律称「你」。
  */
-function analysisFacts(
-  range: string,
-  details: AiDetail,
-  periods: DurationData[],
-  solved: SolvedProblem[],
-) {
-  const scope = details.rankScope === "class" ? "班上" : "全站"
-  // 两个超时码合成一种说法；判题机自己崩的不算学生的错
+function analysisFacts(report: LearningReport) {
+  const result = (item: LearningItem) =>
+    item.status === "first"
+      ? "一次就对"
+      : item.status === "tries"
+        ? `交了 ${item.attempts} 次才对`
+        : item.status === "fail"
+          ? `交了 ${item.attempts} 次还没做对`
+          : "没交"
+  const problem = (item: LearningItem) => ({ 题目: item.title, 结果: result(item) })
+  const date = (day: string) => {
+    const [, month, date] = day.split("-").map(Number)
+    return `${month}月${date}日 周${WEEKDAY[localWeekday(dayNumber(day))]}`
+  }
+  // 两个超时码合成一种说法
   const errors = new Map<string, number>()
-  for (const item of details.errors) {
-    if (item.result === JudgeStatus.SYSTEM_ERROR) continue
+  for (const item of report.errors) {
     const name = judgeStatusName(item.result)
     errors.set(name, (errors.get(name) ?? 0) + item.count)
   }
-  const monthDay = (iso: string) => {
-    const [, month, day] = calendarDay(iso).split("-").map(Number)
-    return `${month}月${day}日`
-  }
-  // 一周以内的范围，buildDuration 给的是前四周，和「这段时间」对不上，不给
-  const showTrend = ["months:1", "months:2", "months:6", "years:1"].includes(range)
   return {
-    时间段: ANALYSIS_RANGE[range] ?? "这段时间",
-    做对的题数: details.solvedCount,
-    一次就对的题数: details.attempts.filter((value) => value === 1).length,
-    难度: details.difficulty,
-    做得最多的知识点: details.tags,
-    总等级: details.grade || "无",
+    时间段: LEARNING_PERIOD_LABELS[report.period],
+    做对的题数: report.solved,
+    一次就对的题数: report.firstTry,
+    提交次数: report.submissionCount,
+    ...(report.classStats && {
+      班上中间那位做对的题数: report.classStats.medianSolved,
+      班上中间那位一次就对的百分比: report.classStats.medianFirstPercent,
+    }),
     没通过的提交: [...errors].map(([结果, 次数]) => ({ 结果, 次数 })),
-    ...(showTrend && {
-      分段: periods.map((item) => ({
-        时间: `${monthDay(item.start)}起的一${item.unit === "weeks" ? "周" : "个月"}`,
-        做对几道题: item.problemCount,
-        提交次数: item.submissionCount,
-        等级: item.grade || "无",
-      })),
-    }),
-    ...(details.flowcharts.length && {
-      流程图: details.flowcharts.map((item) => ({
-        题目: item.problemTitle,
-        画了几次: item.submissionCount,
-        最好等级: item.bestGrade || "无",
-      })),
-    }),
-    做对的题: solved.map((item) => ({
-      题目: item.problem.title,
-      难度: item.difficulty,
-      交了几次才对: item.attempts,
-      ...(item.periodRank && {
-        第几个做对: `${scope}第 ${item.periodRank} 个（共 ${item.periodAcCount} 人做对）`,
-      }),
-      等级: item.grade || "无",
-      ...(item.problem.contestTitle && { 课堂测验: item.problem.contestTitle }),
+    做过的知识点: report.knowledge
+      .filter((item) => item.tried)
+      .map((item) => ({ 知识点: item.name, 做对几道: item.solved })),
+    // 新的在前；「全部」可能有上百天，只给最近 30 天，够模型说节奏
+    每天: report.days.slice(0, 30).map((day) => ({
+      日期: date(day.day),
+      ...(day.lesson.length && { 课上的题: day.lesson.map(problem) }),
+      ...(day.own.length && { 自己练的题: day.own.map(problem) }),
     })),
   }
 }
 
 aiRoutes.post("/ai/analysis", requireAuth, async (c) => {
-  const parsed = await parseBody(c, aiAnalysisRequestSchema, "start, end and duration are required")
+  const parsed = await parseBody(c, aiAnalysisRequestSchema, "period is required")
   if (!parsed.success) return parsed.response
-  if (Number.isNaN(Date.parse(parsed.data.start)) || Number.isNaN(Date.parse(parsed.data.end))) {
-    return failure(c, 400, "invalid-range", "start and end must be ISO 8601 timestamps")
-  }
   // 传 username 的鉴权走 targetUser：非教师传了也只会拿到自己
   const user = await targetUser(c, parsed.data.username)
   if (!user) return failure(c, 404, "user-not-found", "User not found")
   const limited = await throttleAi(c)
   if (limited) return limited
   // 学情数据一律服务端重算，客户端只说看谁、哪段时间
-  // detail 现在只带聚合，逐题明细单独取一页给模型看。顺带把喂进 prompt 的条数
-  // 卡在 200 —— 以前是整份 solved 无上限塞进去，题做得多的学生一次调用能顶好几倍 token
-  const [details, duration, solved] = await Promise.all([
-    buildDetail(user, parsed.data.start, parsed.data.end),
-    buildDuration(user, parsed.data.end, parsed.data.duration),
-    listSolved(user, parsed.data.start, parsed.data.end, 200, 0),
-  ])
+  const report = await buildReport(user, parsed.data.period, { neighbors: false })
   const system = [
     "你是中职学校的编程课老师，在给自己班上的一位学生写学习小结，学生会在网站上自己读到。",
-    "下面是这位学生在判题网站上的做题数据（JSON）。页面上方已经有图表，不用把数字挨个复述一遍。",
+    "下面是这位学生在判题网站上的做题数据（JSON）。页面上已经按天列出了每道题，不用把数字挨个复述一遍。",
     "用中文 Markdown 写，总共 300 字以内，分四段，每段一到三句，段首加粗：",
-    "**这段时间**（做了多少、节奏怎么样，挑一两个最能说明问题的数字，节奏照「分段」里的数说）、",
-    "**做得好的**（点出具体题目名）、",
+    "**这段时间**（做了多少、节奏怎么样，挑一两个最能说明问题的数字，节奏照「每天」里的说）、",
+    "**做得好的**（点出具体题目名，挑一次就对的题；交了好几次才对的不算做得好）、",
     "**要注意的**（错得最多的是哪种，教一个具体的检查办法：答案错误就自己多想几组输入试，特别是最大最小的情况；",
-    "编译失败、运行时错误就先读报错信息，找到它指出的那一行和错误名；运行超时就看循环能不能停下来；交了好几次才对的题点出名字）、",
-    "**下一步**（一两件下节课就能做的事，比如把交了好几次才对的题重做一遍、在题目列表里按知识点找题练）。",
+    "编译失败、运行时错误就先读报错信息，找到它指出的那一行和错误名；运行超时就看循环能不能停下来；",
+    "交了好几次才对、还没做对、课上没交的题点出名字）、",
+    "**下一步**（一两件下节课就能做的事，比如把还没做对的题接着做完、把交了好几次才对的题重做一遍、在题目列表里按知识点找题练）。",
     "最后另起一段，只写一句鼓励的话，要和这位学生的数据挂钩，不要空口号。",
     "用「你」称呼学生，不要写名字。说大白话，不要英文和术语，不要「追」「对手」这类拿同学比的说法。",
     "只用数据里有的数字和题目名，不要编；数据里没有的方面就不写（比如错误次数没按题目分，就别说错在哪类题上）。",
     "不要表格、标题、代码块、字符画、分割线，不要 emoji。",
-    "数据说明：等级 S/A/B/C 看的是同一道题你是第几个做对的（前 10% 是 S、前 35% 是 A、前 75% 是 B），",
-    "说明做得快不快，不说明代码好不好。比赛是老师安排的课堂测验，不要建议学生多参加比赛。",
+    "数据说明：「课上的题」是班上那天一起做的题，「没交」是班上做了、这位学生一次没交；「自己练的题」是课外自己找来做的。",
     "如果这段时间一道题都没做对，就简短说说看到的情况，鼓励下节课先把老师布置的题做出来。",
   ].join("")
-  const prompt = JSON.stringify(
-    analysisFacts(parsed.data.duration, details, duration, solved.results),
-  )
+  const prompt = JSON.stringify(analysisFacts(report))
   return streamChat(system, prompt, {
     onComplete: async (analysis) => {
       // 报告归被分析的那个人，不归发起请求的人 —— 教师后台的 pin 和学生侧的
-      // GET /ai/pinned 都是按 user_id 找报告的，记在教师名下学生就永远看不到
+      // GET /ai/analysis/latest 都是按 user_id 找报告的，记在教师名下学生就永远看不到
       await db.insert(schema.aiAnalysis).values({
         provider: config.aiProvider,
         model: config.aiModel,
-        data: { details, duration, solved: solved.results },
+        // period 是 /ai/analysis/latest 按时间段找回这份小结的依据
+        data: { period: report.period, report },
         systemPrompt: system,
-        userPrompt: "学习详情与周期数据",
+        userPrompt: prompt,
         analysis,
         createTime: new Date().toISOString(),
         userId: user.id,

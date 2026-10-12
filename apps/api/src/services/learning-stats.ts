@@ -1,507 +1,391 @@
 /**
- * 学情统计：AI 学情分析页（/ai/detail、/ai/duration、/ai/solved）和喂给模型的
- * 数据都从这里算。原来整段放在 routes/ai.ts 里，占了那个文件六成；它们只是查询，
- * 不碰 Context，挪出来 route 文件只剩「鉴权 → 取参 → 调这里 → 回包」。
+ * 智能分析：页面（GET /ai/report）和喂给 AI 小结的学情数据都从这里算。
+ *
+ * 主线是「每节课」：中职的课八成提交在课上，学生回想自己学了什么，记得的是「周三那节课」，
+ * 不是某一周、某个月。所以按天排开，每天分成「班上这节课的题」和「自己练的题」两组。
+ * 一节课的题怎么定，和课堂看板 / 首页「班里在做」同一个口径（routes/classroom.ts）：
+ * 老师在看板布置过就用布置的，否则同班同一天 ≥ 5 人做过的题。
+ *
+ * 做对的口径也同看板：代码 AC / AST_CHECK_FAILED、流程图评到 A / S；比赛提交不算
+ * （比赛是课堂测验，题目也不在题库里）。
  */
 import {
-  type AiDetail,
-  type DurationData,
-  type Grade,
-  type SolvedList,
-  type SolvedProblem,
+  FLOWCHART_PASS_GRADES,
+  STUDENT_ROLES,
+  type LearningDay,
+  type LearningItem,
+  type LearningPeriod,
+  type LearningReport,
 } from "@oj2/contract"
-import { and, asc, count, countDistinct, eq, gte, inArray, lte, min, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, gte, inArray, isNull } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 
-import type { AuthUser } from "../auth/session"
 import { db, schema } from "../db"
 import { JudgeStatus, type JudgeStatusValue } from "../judge/status"
-import { rounded } from "../routes/helpers"
-import { localTime, shiftMonthsByCalendar } from "../time"
+import { calendarDay, monthStart, termStart, weekStart } from "../time"
 
 export const accepted: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
-const difficultyNames: Record<string, string> = {
-  Low: "简单",
-  Mid: "中等",
-  High: "困难",
+
+/** 同 routes/classroom.ts 的 CLASS_ACTIVITY_MIN_USERS：同班同一天几个人做过，才算这节课的题 */
+const LESSON_MIN_USERS = 5
+
+/** 不算进「错在哪」的状态：判题机自己崩的、还没判完的 */
+const NOT_STUDENT_ERRORS: number[] = [
+  JudgeStatus.SYSTEM_ERROR,
+  JudgeStatus.PENDING,
+  JudgeStatus.JUDGING,
+]
+
+export function periodStart(period: LearningPeriod, now = new Date()): string | null {
+  if (period === "week") return weekStart(now)
+  if (period === "month") return monthStart(now)
+  if (period === "term") return termStart(now)
+  return null
 }
 
-function grade(rank: number | null, count: number, reference = count): Grade {
-  if (!rank || count <= 0) return "C"
-  const percentile = ((rank - 1) / count) * 100
-  let value: Grade = percentile < 10 ? "S" : percentile < 35 ? "A" : percentile < 75 ? "B" : "C"
-  if (reference < 10) value = value === "S" ? "A" : value === "A" ? "B" : value
-  return value
+interface Row {
+  userId: number
+  problemId: number
+  time: number
+  solved: boolean
+  /** 代码提交的判题状态；流程图为 null */
+  result: number | null
 }
 
-function averageGrade(grades: Grade[]): Grade {
-  const weights: Record<string, number> = { S: 4, A: 3, B: 2, C: 1 }
-  const values = grades.flatMap((item) => weights[item] ?? [])
-  if (!values.length) return ""
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length
-  return average >= 3.5 ? "S" : average >= 2.5 ? "A" : average >= 1.5 ? "B" : "C"
-}
-
-type FirstAcRow = { problemId: number; first: string | null }
-
-/** 区间内首次 AC 的题，按通过时间升序。limit/offset 给分页用，不传就是全部 */
-function firstAcQuery(user: AuthUser, start: string, end: string, limit?: number, offset?: number) {
-  const first = min(schema.submission.createTime)
-  const query = db
-    .select({ problemId: schema.submission.problemId, first })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        inArray(schema.submission.result, accepted),
-        gte(schema.submission.createTime, start),
-        lte(schema.submission.createTime, end),
-      ),
-    )
-    .groupBy(schema.submission.problemId)
-    .orderBy(asc(first))
-  return limit === undefined ? query : query.limit(limit).offset(offset ?? 0)
-}
-
-/**
- * 把一批「首次 AC」的题算成逐题明细（排名、等级、尝试次数）。
- * 排名只跟这批题有关，所以分页那支只需要给一页的 problemIds，不必把整年算一遍。
- */
-export async function buildSolved(
-  user: AuthUser,
-  start: string,
-  end: string,
-  firstAc: FirstAcRow[],
-) {
-  const problemIds = firstAc.map((item) => item.problemId)
-  if (!problemIds.length)
-    return {
-      solved: [],
-      problems: [] as {
-        problem: typeof schema.problem.$inferSelect
-        contestTitle: string | null
-      }[],
-      scopeIds: null as number[] | null,
-    }
-  const classUsers = user.className
-    ? await db
-        .select({ id: schema.user.id })
-        .from(schema.user)
-        .where(eq(schema.user.className, user.className))
-    : []
-  const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
-  const [problems, rankRows, periodRows, attemptRows] = await Promise.all([
-    db
-      .select({ problem: schema.problem, contestTitle: schema.contest.title })
-      .from(schema.problem)
-      .leftJoin(schema.contest, eq(schema.problem.contestId, schema.contest.id))
-      .where(inArray(schema.problem.id, problemIds)),
+/** 代码提交（不含比赛）和流程图提交并成一张，按时间先后 */
+async function activity(userIds: number[], start: string | null): Promise<Row[]> {
+  const epoch = (column: typeof schema.submission.createTime) =>
+    sql<number>`extract(epoch from ${column}) * 1000`.mapWith(Number)
+  const [code, flow] = await Promise.all([
     db
       .select({
         userId: schema.submission.userId,
         problemId: schema.submission.problemId,
-        first: min(schema.submission.createTime),
+        time: epoch(schema.submission.createTime),
+        result: schema.submission.result,
       })
       .from(schema.submission)
       .where(
         and(
-          inArray(schema.submission.result, accepted),
-          inArray(schema.submission.problemId, problemIds),
-          scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
-        ),
-      )
-      .groupBy(schema.submission.userId, schema.submission.problemId),
-    db
-      .select({
-        userId: schema.submission.userId,
-        problemId: schema.submission.problemId,
-        first: min(schema.submission.createTime),
-      })
-      .from(schema.submission)
-      .where(
-        and(
-          inArray(schema.submission.result, accepted),
-          inArray(schema.submission.problemId, problemIds),
-          gte(schema.submission.createTime, start),
-          lte(schema.submission.createTime, end),
-          scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
-        ),
-      )
-      .groupBy(schema.submission.userId, schema.submission.problemId),
-    db
-      .select({
-        problemId: schema.submission.problemId,
-        time: schema.submission.createTime,
-      })
-      .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.userId, user.id),
-          inArray(schema.submission.problemId, problemIds),
-          gte(schema.submission.createTime, start),
-          lte(schema.submission.createTime, end),
+          inArray(schema.submission.userId, userIds),
+          isNull(schema.submission.contestId),
+          start ? gte(schema.submission.createTime, start) : undefined,
         ),
       ),
-  ])
-  const byProblem = new Map(problems.map((item) => [item.problem.id, item]))
-  // 到首次通过为止提交了几次：只数首次 AC 那一刻（含）之前的提交
-  const firstAcTime = new Map(
-    firstAc.flatMap((item) =>
-      item.first ? ([[item.problemId, Date.parse(item.first)]] as const) : [],
-    ),
-  )
-  const attemptsByProblem = new Map<number, number>()
-  for (const row of attemptRows) {
-    const deadline = firstAcTime.get(row.problemId)
-    if (deadline === undefined || Date.parse(row.time) > deadline) continue
-    attemptsByProblem.set(row.problemId, (attemptsByProblem.get(row.problemId) ?? 0) + 1)
-  }
-  function ranks(rows: typeof rankRows, problemId: number) {
-    return rows
-      .filter((item) => item.problemId === problemId)
-      .sort((a, b) => Date.parse(a.first ?? "") - Date.parse(b.first ?? "") || a.userId - b.userId)
-  }
-  const solved = firstAc
-    .flatMap((item) => {
-      const problem = byProblem.get(item.problemId)
-      if (!problem || !item.first) return []
-      const all = ranks(rankRows, item.problemId)
-      const period = ranks(periodRows, item.problemId)
-      const rank = all.findIndex((row) => row.userId === user.id) + 1 || null
-      const periodRank = period.findIndex((row) => row.userId === user.id) + 1 || null
-      return {
-        problem: {
-          title: problem.problem.title,
-          displayId: problem.problem.displayId,
-          contestTitle: problem.contestTitle ?? "",
-          contestId: problem.problem.contestId,
-        },
-        acTime: item.first,
-        rank,
-        acCount: all.length,
-        grade: grade(periodRank, period.length, all.length),
-        periodRank,
-        periodAcCount: period.length,
-        difficulty: difficultyNames[problem.problem.difficulty] ?? "中等",
-        attempts: attemptsByProblem.get(item.problemId) ?? 1,
-      } satisfies SolvedProblem
-    })
-    .sort((a, b) => Date.parse(a.acTime) - Date.parse(b.acTime))
-  return { solved, problems, scopeIds }
-}
-
-/** 分页版：只算这一页的题 */
-export async function listSolved(
-  user: AuthUser,
-  start: string,
-  end: string,
-  limit: number,
-  offset: number,
-) {
-  const [firstAc, totalRows] = await Promise.all([
-    firstAcQuery(user, start, end, limit, offset),
     db
-      .select({ value: countDistinct(schema.submission.problemId) })
-      .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.userId, user.id),
-          inArray(schema.submission.result, accepted),
-          gte(schema.submission.createTime, start),
-          lte(schema.submission.createTime, end),
+      .select({
+        userId: schema.flowchartSubmission.userId,
+        problemId: schema.flowchartSubmission.problemId,
+        time: sql<number>`extract(epoch from ${schema.flowchartSubmission.createTime}) * 1000`.mapWith(
+          Number,
         ),
-      ),
-  ])
-  const { solved } = await buildSolved(user, start, end, firstAc)
-  return {
-    results: solved,
-    total: totalRows[0]?.value ?? 0,
-  } satisfies SolvedList
-}
-
-export async function buildDetail(user: AuthUser, start: string, end: string) {
-  // 时间活跃度按**全部提交**统计，不是只按 AC。只看 AC 的话，一个学生两个月十来次
-  // 通过撒进 7×4 的格子里几乎全是空的，"高峰时段"根本看不出来。
-  // 星期和小时都按东八区取，和热力图同口径
-  const weekday =
-    sql<number>`extract(dow from ${localTime(schema.submission.createTime)})::int`.mapWith(Number)
-  const period =
-    sql<number>`floor(extract(hour from ${localTime(schema.submission.createTime)}) / 6)::int`.mapWith(
-      Number,
-    )
-  const activityRows = await db
-    .select({ weekday, period, value: count() })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        gte(schema.submission.createTime, start),
-        lte(schema.submission.createTime, end),
-      ),
-    )
-    .groupBy(weekday, period)
-  const activity = activityRows.map((row) => ({
-    weekday: row.weekday,
-    period: row.period,
-    count: row.value,
-  }))
-  // 区间内该用户的全部提交，一次拉回来喂两处：错题类型分布、每题到首次通过的尝试次数。
-  // 放在 problemIds 的空判断之前 —— 一道题都没做出来的学生，错题分布照样有意义
-  const submissions = await db
-    .select({
-      problemId: schema.submission.problemId,
-      time: schema.submission.createTime,
-      result: schema.submission.result,
-    })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        gte(schema.submission.createTime, start),
-        lte(schema.submission.createTime, end),
-      ),
-    )
-  const settledFail = (result: JudgeStatusValue) =>
-    !accepted.includes(result) && result !== JudgeStatus.PENDING && result !== JudgeStatus.JUDGING
-  const errorCounts = new Map<number, number>()
-  for (const row of submissions) {
-    if (!settledFail(row.result)) continue
-    errorCounts.set(row.result, (errorCounts.get(row.result) ?? 0) + 1)
-  }
-  const errors = [...errorCounts]
-    .map(([result, count]) => ({ result, count }))
-    .sort((a, b) => b.count - a.count || a.result - b.result)
-  const firstAc = await firstAcQuery(user, start, end)
-  const problemIds = firstAc.map((item) => item.problemId)
-  if (!problemIds.length)
-    return {
-      username: user.username,
-      className: user.className,
-      start,
-      end,
-      solvedCount: 0,
-      attempts: [],
-      flowcharts: [],
-      grade: "",
-      tags: {},
-      difficulty: {},
-      contestCount: 0,
-      activity,
-      errors,
-      rankScope: "global",
-    } satisfies AiDetail
-  const [{ solved, problems, scopeIds }, tagRows, flowRows] = await Promise.all([
-    buildSolved(user, start, end, firstAc),
-    db
-      .select({
-        problemId: schema.problemTags.problemId,
-        name: schema.problemTag.name,
-      })
-      .from(schema.problemTags)
-      .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
-      .where(inArray(schema.problemTags.problemId, problemIds)),
-    db
-      .select({
-        flow: schema.flowchartSubmission,
-        displayId: schema.problem.displayId,
-        title: schema.problem.title,
+        status: schema.flowchartSubmission.status,
+        grade: schema.flowchartSubmission.aiGrade,
       })
       .from(schema.flowchartSubmission)
-      .innerJoin(schema.problem, eq(schema.flowchartSubmission.problemId, schema.problem.id))
       .where(
         and(
-          eq(schema.flowchartSubmission.userId, user.id),
-          eq(schema.flowchartSubmission.status, 2),
-          gte(schema.flowchartSubmission.createTime, start),
-          lte(schema.flowchartSubmission.createTime, end),
+          inArray(schema.flowchartSubmission.userId, userIds),
+          start ? gte(schema.flowchartSubmission.createTime, start) : undefined,
         ),
       ),
   ])
-  const tags: Record<string, number> = {}
-  for (const tag of tagRows) tags[tag.name] = (tags[tag.name] ?? 0) + 1
-  const topTags = Object.fromEntries(
-    Object.entries(tags)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5),
-  )
-  const difficulty: Record<string, number> = { 简单: 0, 中等: 0, 困难: 0 }
-  for (const item of problems) {
-    const name = difficultyNames[item.problem.difficulty] ?? "中等"
-    difficulty[name] = (difficulty[name] ?? 0) + 1
-  }
-  const flowGroups = new Map<string, typeof flowRows>()
-  for (const flow of flowRows)
-    flowGroups.set(flow.displayId, [...(flowGroups.get(flow.displayId) ?? []), flow])
-  const flowcharts = [...flowGroups]
-    .map(([displayId, rows]) => {
-      const scores = rows.flatMap((row) => row.flow.aiScore ?? [])
-      // 直接留住得分最高的那一次，等级读它。原来是拿 max 回头 find 分数相等的行 ——
-      // ai_score 是 double，相等比较本就不可靠；全是 null 时 max 退成 0，更是谁都匹配不上
-      const top = rows.reduce(
-        (best, row) => ((row.flow.aiScore ?? -1) > (best.flow.aiScore ?? -1) ? row : best),
-        rows[0]!,
-      )
-      return {
-        problemId: displayId,
-        problemTitle: rows[0]?.title ?? "",
-        submissionCount: rows.length,
-        bestScore: Math.max(0, top.flow.aiScore ?? 0),
-        bestGrade: top.flow.aiGrade ?? "",
-        latestSubmissionTime:
-          rows
-            .map((row) => row.flow.createTime)
-            .sort()
-            .at(-1) ?? start,
-        avgScore: rounded(
-          scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0,
-          0,
-        ),
-      }
-    })
-    .sort((a, b) => b.latestSubmissionTime.localeCompare(a.latestSubmissionTime))
-  return {
-    username: user.username,
-    className: user.className,
-    start,
-    end,
-    flowcharts,
-    solvedCount: solved.length,
-    attempts: solved.map((item) => item.attempts),
-    grade: averageGrade(solved.map((item) => item.grade)),
-    tags: topTags,
-    difficulty,
-    contestCount: new Set(solved.flatMap((item) => item.problem.contestId ?? [])).size,
-    activity,
-    errors,
-    rankScope: scopeIds ? "class" : "global",
-  } satisfies AiDetail
+  const pass: readonly string[] = FLOWCHART_PASS_GRADES
+  return [
+    ...code.map((row) => ({ ...row, solved: accepted.includes(row.result) })),
+    ...flow.map((row) => ({
+      userId: row.userId,
+      problemId: row.problemId,
+      time: row.time,
+      solved: row.status === 2 && pass.includes(row.grade ?? ""),
+      result: null,
+    })),
+  ].sort((a, b) => a.time - b.time)
 }
 
-export async function buildDuration(user: AuthUser, endText: string, duration: string) {
-  const config =
-    duration === "months:2"
-      ? {
-          count: 8,
-          unit: "weeks",
-          rewind: (date: Date) => new Date(date.getTime() - 9 * 7 * 864e5),
-          advance: (date: Date) => new Date(date.getTime() + 7 * 864e5),
-        }
-      : duration === "months:6"
-        ? {
-            count: 6,
-            unit: "months",
-            rewind: (date: Date) => shiftMonthsByCalendar(date, -7),
-            advance: (date: Date) => shiftMonthsByCalendar(date, 1),
-          }
-        : duration === "years:1"
-          ? {
-              count: 12,
-              unit: "months",
-              rewind: (date: Date) => shiftMonthsByCalendar(date, -13),
-              advance: (date: Date) => shiftMonthsByCalendar(date, 1),
-            }
-          : {
-              count: 4,
-              unit: "weeks",
-              rewind: (date: Date) => new Date(date.getTime() - 5 * 7 * 864e5),
-              advance: (date: Date) => new Date(date.getTime() + 7 * 864e5),
-            }
-  // 先把 count 个时间桶算出来，再一条查询把整段区间的提交拉回来在内存里分桶。
-  // 以前是每个桶两条查询、桶之间还是串行的，一年 12 个桶就是 24 次往返。
-  // 相邻桶首尾相接、两端都是闭区间（end_i == start_{i+1}），落在边界上的提交
-  // 两个桶都算 —— 这是旧行为，照搬，不要「顺手」改成半开区间。
-  let cursor = config.rewind(new Date(endText))
-  const buckets: { start: Date; end: Date }[] = []
-  for (let index = 0; index < config.count; index++) {
-    const start = config.advance(cursor)
-    buckets.push({ start, end: config.advance(start) })
-    cursor = start
-  }
-  // 时间戳取 epoch 毫秒回来，比较在 JS 里做，和原来在 SQL 里比 timestamptz 等价，
-  // 不受 pg 那个「空格分隔 + +00 偏移」字符串格式能否被 Date.parse 认的影响
-  const rows = await db
-    .select({
-      time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(Number),
-      problemId: schema.submission.problemId,
-      result: schema.submission.result,
-    })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
-        lte(schema.submission.createTime, buckets.at(-1)!.end.toISOString()),
-      ),
-    )
-  // 每个桶的等级 = 桶内解出的每道题各算一个等级再取平均，排名按「同班同学在这个桶里
-  // 解出该题的先后」。和旧后端 OnlineJudge/ai/views/oj.py:484 一条一条对齐，包括这里
-  // 不传 reference（不打小规模折扣）—— 那个折扣只在 /ai/detail 那支用。
-  // 迁移时这里被写死成 `solved ? "B" : ""`，DurationChart 上那条等级折线因此恒定在 B。
-  const solvedIds = [
-    ...new Set(rows.filter((row) => accepted.includes(row.result)).map((row) => row.problemId)),
-  ]
-  const classUsers = user.className
+/** 一个人在一道题上：第一次交的时刻、做对的时刻、到做对为止交了几次、没做对时最后一次的结果 */
+interface Track {
+  first: number
+  solvedAt: number | null
+  attempts: number
+  last: number | null
+}
+
+function median(values: number[]) {
+  if (!values.length) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+}
+
+export async function buildReport(
+  target: { id: number; username: string; className: string | null },
+  period: LearningPeriod,
+  options: { neighbors: boolean },
+): Promise<LearningReport> {
+  const now = new Date()
+  const start = periodStart(period, now)
+  const members = target.className
     ? await db
-        .select({ id: schema.user.id })
+        .select({ id: schema.user.id, username: schema.user.username })
         .from(schema.user)
-        .where(eq(schema.user.className, user.className))
-    : []
-  const scopeIds = classUsers.length > 1 ? classUsers.map((item) => item.id) : null
-  const peers = solvedIds.length
-    ? await db
-        .select({
-          time: sql<number>`extract(epoch from ${schema.submission.createTime}) * 1000`.mapWith(
-            Number,
-          ),
-          userId: schema.submission.userId,
-          problemId: schema.submission.problemId,
-        })
-        .from(schema.submission)
         .where(
           and(
-            inArray(schema.submission.result, accepted),
-            inArray(schema.submission.problemId, solvedIds),
-            gte(schema.submission.createTime, buckets[0]!.start.toISOString()),
-            lte(schema.submission.createTime, buckets.at(-1)!.end.toISOString()),
-            scopeIds ? inArray(schema.submission.userId, scopeIds) : undefined,
+            eq(schema.user.className, target.className),
+            eq(schema.user.isDisabled, false),
+            inArray(schema.user.adminType, [...STUDENT_ROLES]),
           ),
         )
+        .orderBy(asc(schema.user.username))
     : []
-  // 一次查回来在内存里按题分组再按桶切，别在循环里发查询：一年 12 个桶 × 几十道题
-  const peersByProblem = new Map<number, typeof peers>()
-  for (const row of peers)
-    peersByProblem.set(row.problemId, [...(peersByProblem.get(row.problemId) ?? []), row])
+  const memberIds = new Set(members.map((item) => item.id))
+  const [rows, plans] = await Promise.all([
+    activity([...new Set([target.id, ...memberIds])], start),
+    target.className
+      ? db
+          .select({ day: schema.classLesson.day, problemIds: schema.classLesson.problemIds })
+          .from(schema.classLesson)
+          .where(
+            and(
+              eq(schema.classLesson.className, target.className),
+              start ? gte(schema.classLesson.day, calendarDay(start)) : undefined,
+            ),
+          )
+      : [],
+  ])
 
-  function bucketGrade(problemIds: number[], from: number, to: number) {
-    return averageGrade(
-      problemIds.map((problemId) => {
-        const firstAc = new Map<number, number>()
-        for (const row of peersByProblem.get(problemId) ?? []) {
-          if (row.time < from || row.time > to) continue
-          const seen = firstAc.get(row.userId)
-          if (seen === undefined || row.time < seen) firstAc.set(row.userId, row.time)
-        }
-        const ordered = [...firstAc].sort((a, b) => a[1] - b[1] || a[0] - b[0])
-        const rank = ordered.findIndex(([id]) => id === user.id) + 1 || null
-        return grade(rank, ordered.length)
-      }),
+  // 每人每题的轨迹，和同班「某天某题」的人数、最早时刻（推断这节课、排题目顺序用）
+  const tracks = new Map<number, Map<number, Track>>()
+  const dayUsers = new Map<string, Set<number>>()
+  const dayFirst = new Map<string, number>()
+  const mine: Row[] = []
+  for (const row of rows) {
+    if (row.userId === target.id) mine.push(row)
+    let byProblem = tracks.get(row.userId)
+    if (!byProblem) tracks.set(row.userId, (byProblem = new Map()))
+    let track = byProblem.get(row.problemId)
+    if (!track)
+      byProblem.set(
+        row.problemId,
+        (track = { first: row.time, solvedAt: null, attempts: 0, last: null }),
+      )
+    if (track.solvedAt === null) {
+      track.attempts += 1
+      if (row.solved) track.solvedAt = row.time
+      else if (row.result !== null) track.last = row.result
+    }
+    if (!memberIds.has(row.userId)) continue
+    const key = `${calendarDay(row.time)}|${row.problemId}`
+    let users = dayUsers.get(key)
+    if (!users) dayUsers.set(key, (users = new Set()))
+    users.add(row.userId)
+    if (!dayFirst.has(key)) dayFirst.set(key, row.time)
+  }
+  const usersOn = (day: string, problemId: number) => dayUsers.get(`${day}|${problemId}`)?.size ?? 0
+
+  // 一道题只归到一天：老师布置过的归布置的那天（布置了好几天就挑人最多的），
+  // 否则在 ≥ 5 人的那些天里挑人最多的，打平取晚的
+  const lessonDay = new Map<number, string>()
+  const planOrder = new Map<string, number>()
+  for (const plan of plans) {
+    plan.problemIds.forEach((problemId, index) => {
+      planOrder.set(`${plan.day}|${problemId}`, index)
+      const current = lessonDay.get(problemId)
+      if (!current || usersOn(plan.day, problemId) >= usersOn(current, problemId))
+        lessonDay.set(problemId, plan.day)
+    })
+  }
+  const planned = new Set(lessonDay.keys())
+  for (const [key, users] of dayUsers) {
+    if (users.size < LESSON_MIN_USERS) continue
+    const [day, id] = key.split("|") as [string, string]
+    const problemId = Number(id)
+    if (planned.has(problemId)) continue
+    const current = lessonDay.get(problemId)
+    if (
+      !current ||
+      users.size > usersOn(current, problemId) ||
+      (users.size === usersOn(current, problemId) && day > current)
     )
+      lessonDay.set(problemId, day)
   }
 
-  return buckets.map((bucket, index) => {
-    const from = bucket.start.getTime()
-    const to = bucket.end.getTime()
-    const inRange = rows.filter((row) => row.time >= from && row.time <= to)
-    const acceptedRows = inRange.filter((row) => accepted.includes(row.result))
-    const solved = [...new Set(acceptedRows.map((row) => row.problemId))]
+  const myTracks = tracks.get(target.id) ?? new Map<number, Track>()
+  const problemIds = [...new Set([...lessonDay.keys(), ...myTracks.keys()])]
+  const [problems, knowledgeTags, myTags] = await Promise.all([
+    problemIds.length
+      ? db
+          .select({
+            id: schema.problem.id,
+            displayId: schema.problem.displayId,
+            title: schema.problem.title,
+            visible: schema.problem.visible,
+            contestId: schema.problem.contestId,
+          })
+          .from(schema.problem)
+          .where(inArray(schema.problem.id, problemIds))
+      : [],
+    db
+      .select({ name: schema.problemTag.name, total: count() })
+      .from(schema.problemTag)
+      .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
+      .innerJoin(schema.problem, eq(schema.problem.id, schema.problemTags.problemId))
+      .where(
+        and(
+          eq(schema.problemTag.category, "knowledge"),
+          eq(schema.problem.visible, true),
+          isNull(schema.problem.contestId),
+        ),
+      )
+      .groupBy(schema.problemTag.name)
+      .orderBy(desc(count()), asc(schema.problemTag.name)),
+    myTracks.size
+      ? db
+          .select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name })
+          .from(schema.problemTags)
+          .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
+          .where(
+            and(
+              eq(schema.problemTag.category, "knowledge"),
+              inArray(schema.problemTags.problemId, [...myTracks.keys()]),
+            ),
+          )
+      : [],
+  ])
+  const problemById = new Map(problems.map((item) => [item.id, item]))
+  // 被藏起来的题、比赛题不当「这节课的题」—— 学生点进去是 404
+  for (const problemId of lessonDay.keys()) {
+    const problem = problemById.get(problemId)
+    if (!problem?.visible || problem.contestId !== null) lessonDay.delete(problemId)
+  }
+
+  function item(problemId: number): LearningItem {
+    const problem = problemById.get(problemId)
+    const track = myTracks.get(problemId)
+    let rank: number | null = null
+    let classSolved: number | null = null
+    if (memberIds.size) {
+      const solvedAt: [number, number][] = []
+      for (const id of memberIds) {
+        const at = tracks.get(id)?.get(problemId)?.solvedAt
+        if (at != null) solvedAt.push([at, id])
+      }
+      solvedAt.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      classSolved = solvedAt.length
+      const index = solvedAt.findIndex(([, id]) => id === target.id)
+      rank = index >= 0 ? index + 1 : null
+    }
+    const status = !track
+      ? "none"
+      : track.solvedAt === null
+        ? "fail"
+        : track.attempts === 1
+          ? "first"
+          : "tries"
     return {
-      unit: config.unit,
-      index: config.count - 1 - index,
-      start: bucket.start.toISOString(),
-      end: bucket.end.toISOString(),
-      grade: solved.length ? bucketGrade(solved, from, to) : "",
-      problemCount: solved.length,
-      acceptedCount: acceptedRows.length,
-      submissionCount: inRange.length,
-    } satisfies DurationData
-  })
+      displayId: problem?.displayId ?? "",
+      title: problem?.title ?? "",
+      status,
+      attempts: track?.attempts ?? 0,
+      rank,
+      classSolved,
+      lastResult: track && track.solvedAt === null ? track.last : null,
+    }
+  }
+
+  const byDay = new Map<string, { lesson: number[]; own: number[] }>()
+  const slot = (day: string) => {
+    let entry = byDay.get(day)
+    if (!entry) byDay.set(day, (entry = { lesson: [], own: [] }))
+    return entry
+  }
+  for (const [problemId, day] of lessonDay) slot(day).lesson.push(problemId)
+  for (const [problemId, track] of myTracks)
+    if (!lessonDay.has(problemId)) slot(calendarDay(track.first)).own.push(problemId)
+  const order = (day: string, problemId: number) =>
+    planOrder.get(`${day}|${problemId}`) ?? 1e6 + (dayFirst.get(`${day}|${problemId}`) ?? 0) / 1e3
+  const days: LearningDay[] = [...byDay]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([day, entry]) => ({
+      day,
+      lesson: entry.lesson.sort((a, b) => order(day, a) - order(day, b)).map(item),
+      own: entry.own.sort((a, b) => myTracks.get(a)!.first - myTracks.get(b)!.first).map(item),
+    }))
+
+  const solvedIds = [...myTracks].filter(([, track]) => track.solvedAt !== null)
+  const solved = solvedIds.length
+  let classStats: LearningReport["classStats"] = null
+  if (memberIds.size) {
+    const counts: number[] = []
+    const firstPercents: number[] = []
+    for (const id of memberIds) {
+      const byProblem = tracks.get(id)
+      if (!byProblem) continue
+      let done = 0
+      let first = 0
+      for (const track of byProblem.values()) {
+        if (track.solvedAt === null) continue
+        done += 1
+        if (track.attempts === 1) first += 1
+      }
+      counts.push(done)
+      if (done) firstPercents.push((first / done) * 100)
+    }
+    if (counts.length)
+      classStats = {
+        size: counts.length,
+        medianSolved: median(counts),
+        medianFirstPercent: Math.round(median(firstPercents)),
+        rank: 1 + counts.filter((value) => value > solved).length,
+      }
+  }
+
+  const errorCounts = new Map<number, number>()
+  for (const row of mine) {
+    if (row.solved || row.result === null || NOT_STUDENT_ERRORS.includes(row.result)) continue
+    errorCounts.set(row.result, (errorCounts.get(row.result) ?? 0) + 1)
+  }
+  const tagCounts = new Map<string, { solved: number; tried: number }>()
+  for (const tag of myTags) {
+    const entry = tagCounts.get(tag.name) ?? { solved: 0, tried: 0 }
+    entry.tried += 1
+    if (myTracks.get(tag.problemId)?.solvedAt != null) entry.solved += 1
+    tagCounts.set(tag.name, entry)
+  }
+
+  let neighbors: LearningReport["neighbors"] = null
+  if (options.neighbors && members.length) {
+    const index = members.findIndex((item) => item.id === target.id)
+    if (index >= 0)
+      neighbors = {
+        prev: members[index - 1]?.username ?? null,
+        next: members[index + 1]?.username ?? null,
+      }
+  }
+
+  return {
+    username: target.username,
+    className: target.className,
+    period,
+    start,
+    end: now.toISOString(),
+    solved,
+    firstTry: solvedIds.filter(([, track]) => track.attempts === 1).length,
+    lessonCount: days.filter((day) => day.lesson.length).length,
+    submissionCount: mine.length,
+    unsolved: [...myTracks]
+      .filter(([, track]) => track.solvedAt === null)
+      .sort((a, b) => b[1].attempts - a[1].attempts)
+      .map(([problemId]) => item(problemId)),
+    classStats,
+    days,
+    errors: [...errorCounts]
+      .map(([result, value]) => ({ result, count: value }))
+      .sort((a, b) => b.count - a.count || a.result - b.result),
+    knowledge: knowledgeTags.map((tag) => ({
+      name: tag.name,
+      ...(tagCounts.get(tag.name) ?? { solved: 0, tried: 0 }),
+    })),
+    neighbors,
+  } satisfies LearningReport
 }
