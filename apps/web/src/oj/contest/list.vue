@@ -89,7 +89,8 @@ onMounted(() => {
 watchDebounced(() => query.keyword, listContests, { debounce: 500, maxWait: 1000 })
 watch(() => [query.page, query.limit, query.scope], listContests)
 
-const now = useNow({ interval: 1000 })
+// VueUse 15 起 useNow 不收 interval 了，不传 scheduler 默认是逐帧刷新
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) })
 function remaining(contest: Contest) {
   const seconds = Math.floor((Date.parse(contest.endTime) - now.value.getTime()) / 1000)
   const text = secondsToDuration(Math.max(0, seconds))

@@ -61,7 +61,8 @@ const customDuration = ref(false)
 const pickedStart = ref(toPickerValue(Date.now() + 10 * 60_000))
 
 // 「10 分钟后」跟着钟走：老师在这页磨蹭几分钟再保存，开始时间也还是保存时的 10 分钟后
-const now = useNow({ interval: 15_000 })
+// VueUse 15 起 useNow 不收 interval 了，不传 scheduler 默认是逐帧刷新
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 15_000) })
 function roundedNow() {
   const ms = now.value.getTime()
   return ms - (ms % 60_000)

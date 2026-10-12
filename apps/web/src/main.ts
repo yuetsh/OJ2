@@ -26,13 +26,13 @@ import { useUserStore } from "./shared/store/user"
 
 const authStore = useAuthModalStore()
 
-router.beforeEach(async (to, _from, next) => {
+// vue-router 5.4 起 next() 回调已弃用，改成返回值：返回 "/" 就是跳回首页，什么都不返回就是放行
+router.beforeEach(async (to) => {
   // 检查是否需要认证
   if (to.matched.some((record) => record.meta.requiresAuth)) {
     if (!storage.get(STORAGE_KEY.AUTHED)) {
       authStore.openLoginModal()
-      next("/")
-      return
+      return "/"
     }
   }
 
@@ -47,8 +47,7 @@ router.beforeEach(async (to, _from, next) => {
   ) {
     if (!storage.get(STORAGE_KEY.AUTHED)) {
       authStore.openLoginModal()
-      next("/")
-      return
+      return "/"
     }
 
     const userStore = useUserStore()
@@ -56,29 +55,23 @@ router.beforeEach(async (to, _from, next) => {
       try {
         await userStore.getMyProfile()
       } catch {
-        next("/")
-        return
+        return "/"
       }
     }
     if (to.matched.some((record) => record.meta.requiresSuperAdmin)) {
       if (!userStore.isSuperAdmin) {
-        next("/")
-        return
+        return "/"
       }
     } else if (to.matched.some((record) => record.meta.requiresTeacherAdmin)) {
       if (!userStore.isTeacherOrAbove) {
-        next("/")
-        return
+        return "/"
       }
     } else if (to.matched.some((record) => record.meta.requiresProblemPermission)) {
       if (!userStore.hasProblemPermission) {
-        next("/")
-        return
+        return "/"
       }
     }
   }
-
-  next()
 })
 
 app.mount("#app")

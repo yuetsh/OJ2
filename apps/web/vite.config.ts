@@ -9,7 +9,7 @@ import { NaiveUiResolver } from "unplugin-vue-components/resolvers"
 // 但比 vite 8 的默认构建 target（chrome111）低。所以这个插件必须留着：它同时管两件事
 // —— 把 build.target 压到 chrome105/es2020，再给现代产物补 core-js 的 API polyfill。
 //
-// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 50 项，抄下来写死：自动探测要
+// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 52 项，抄下来写死：自动探测要
 // 对每个产物跑一遍 Babel 扫描，构建从 3 秒涨到 12 秒。**升级前端依赖后重新审计一次**：
 //   DEBUG=vite:legacy bun run build   # 会打印 modern polyfills 的全集
 // 少一项就是老机器上一个静默的 TypeError（这批缺的大多是 Chrome 110+ 的
@@ -39,6 +39,7 @@ const polyfills = [
   "es.json.stringify",
   "es.map.get-or-insert",
   "es.map.get-or-insert-computed",
+  "es.object.group-by",
   "es.regexp.escape",
   "es.regexp.flags",
   "es.set.difference.v2",
@@ -65,6 +66,7 @@ const polyfills = [
   "web.url-search-params.has",
   "web.url-search-params.size",
   "web.url.can-parse",
+  "web.url.parse",
 ]
 
 // MaxKB 脚本**不要**在这里注入 index.html。
