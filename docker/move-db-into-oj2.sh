@@ -90,14 +90,13 @@ old_pg=$(docker ps --filter publish=5445 --format '{{.Names}}' | head -1)
 old_redis=$(docker ps --filter publish=5446 --format '{{.Names}}' | head -1)
 [ -n "$old_pg" ] || die "没找到发布 5445 的容器（旧的 postgres）。它没在跑？"
 [ -n "$old_redis" ] || die "没找到发布 5446 的容器（旧的 redis）。它没在跑？"
-for c in "$old_pg" "$old_redis"; do
-  files=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$c")
-  [[ "$files" != *compose.debian.yml* ]] || die "$c 已经是 OJ2 的 compose 起的 —— 已经搬过了"
-done
+# 「已经搬过了」靠这里的 16 和上面 postgresql/ 不存在来判断，不看容器是哪个 compose 起的：
+# 旧栈那份文件原名 docker-compose.debian.yml，按文件名认会把它当成本栈的（线上撞过）
 pgver=$(docker exec "$old_pg" psql -U onlinejudge -d onlinejudge -tAc 'show server_version_num')
 [ "${pgver:0:2}" = 16 ] || die "$old_pg 是 PostgreSQL $pgver，这个脚本只认 16"
-ok "旧 postgres：$old_pg（$(docker inspect -f '{{.Config.Image}}' "$old_pg")）"
-ok "旧 redis：$old_redis（$(docker inspect -f '{{.Config.Image}}' "$old_redis")）"
+from() { docker inspect -f '{{.Config.Image}}，{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$1"; }
+ok "旧 postgres：$old_pg（$(from "$old_pg")）"
+ok "旧 redis：$old_redis（$(from "$old_redis")）"
 
 redis_src=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Source}}{{end}}{{end}}' "$old_redis")
 [ -n "$redis_src" ] || die "$old_redis 的 /data 没挂到宿主机目录上，会话和队列搬不过来"
