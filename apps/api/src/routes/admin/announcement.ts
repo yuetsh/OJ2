@@ -60,7 +60,8 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
       .from(schema.announcement)
       .innerJoin(schema.user, eq(schema.announcement.createdById, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .orderBy(desc(schema.announcement.createTime))
+      // 置顶的在最前，和学生在首页看到的顺序一样
+      .orderBy(desc(schema.announcement.top), desc(schema.announcement.createTime))
       .limit(limit)
       .offset(offset),
   ])
