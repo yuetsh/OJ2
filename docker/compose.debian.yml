@@ -32,14 +32,17 @@
 
 services:
   oj-postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: oj-postgres
     restart: always
     # 只在「自带数据」形态下启动。用旧栈的库时不启动它 —— 否则 5445 端口会和
     # 旧的 postgres 撞，而且两个进程开同一个数据目录本来也起不来。
     profiles: ["local-data"]
+    # 18 起镜像的数据目录是 /var/lib/postgresql/18/docker，挂载点要是上一级，
+    # 还挂 .../data 的话 18 直接拒绝启动。宿主机目录也换了名：`postgres/` 是 16 的老库，
+    # 18 读不了，分开放才能留着它做回退（升级步骤见 docs/deploy.md「PostgreSQL 升级」）
     volumes:
-      - ${DATA_DIR:-../data}/postgres:/var/lib/postgresql/data
+      - ${DATA_DIR:-../data}/postgresql:/var/lib/postgresql
     environment:
       POSTGRES_DB: onlinejudge
       POSTGRES_USER: onlinejudge
@@ -54,7 +57,7 @@ services:
       retries: 10
 
   oj-redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: oj-redis
     restart: always
     # 同上：旧栈的 redis 也发布了 5446，两个一起跑会撞端口。

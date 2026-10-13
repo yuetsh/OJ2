@@ -164,6 +164,59 @@ WebSocket）→ 后台判题机列表在线 → 后台题目列表翻页 → 带
 > **旧栈已经不可逆地下线**（`0002_drop_django_leftovers` 删掉了 Django 的框架表并已在
 > 生产库执行完毕），所以「停新栈起旧栈」不再是退路，**唯一退路是从数据库备份恢复**。
 
+## PostgreSQL 升级（16 → 18）与 Redis（7 → 8）
+
+仓库里的 compose 已经是 `postgres:18-alpine` / `redis:8-alpine`，但**线上的库和服务器的
+Redis 不归这几份 compose 管**，由 `/root/OJDeploy/docker-compose.yml` 起，得到服务器上
+手工换。机房的 Redis 是 `compose.school.yml` 起的，部署时自己就换了。
+
+大版本不能原地换镜像：18 读不了 16 的数据目录。走「备份 → 新目录起 18 → 恢复」，
+本机拿 2026-10-13 的生产备份完整演练过（13 万条提交，恢复 6 秒）。**两个站点共用这个库**，
+所以要挑没课的时候，机房那套也一起停。
+
+```bash
+# 1. 两边都停应用（机房那台上同样停 oj-api oj-worker）
+cd /root/OJDeploy/OJ2
+docker compose -f docker/compose.debian.yml --env-file docker/.env stop oj-api oj-worker
+docker exec oj-postgres psql -U onlinejudge -d onlinejudge -tAc 'select count(*) from submission'  # 记下来
+
+# 2. 全量备份（会打印文件路径）
+docker/backup-db.sh
+
+# 3. 停 16，改 /root/OJDeploy/docker-compose.yml 的 oj-postgres 和 oj-redis：
+#      oj-postgres  image: postgres:18-alpine
+#                   volumes: - ./data/postgresql:/var/lib/postgresql   ← 新目录、挂载点少一级
+#      oj-redis     image: redis:8-alpine                               ← 别的不动，口令那行留着
+docker compose -f /root/OJDeploy/docker-compose.yml stop oj-postgres
+docker compose -f /root/OJDeploy/docker-compose.yml up -d oj-postgres oj-redis
+
+# 4. 恢复。只会有两条 ERROR：current user cannot be dropped / role already exists，正常
+gzip -cd <备份文件> | docker exec -i oj-postgres psql -q -U onlinejudge -d postgres
+
+# 5. 口令重新存一遍（输入 docker/.env 里的 POSTGRES_PASSWORD），再收集统计信息
+docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password onlinejudge'
+docker exec oj-postgres vacuumdb -U onlinejudge --all --analyze-in-stages
+docker exec oj-postgres psql -U onlinejudge -d onlinejudge -tAc 'select count(*) from submission'  # 和第 1 步对上
+
+# 6. 起应用（机房那台同样 up -d）
+docker compose -f docker/compose.debian.yml --env-file docker/.env up -d oj-api oj-worker
+```
+
+**第 5 步的改口令不能省。** 生产库的口令是 md5 哈希存的（老库从 Django 时代沿用下来），
+dump 原样带过去；而 18 的镜像新建的库 `pg_hba.conf` 只认 `scram-sha-256`，md5 存的口令
+**永远验不过**，报 `password authentication failed`。容器里 `docker exec psql` 走本地
+socket 是 trust，一切正常，只有 api 和机房从网络连进来才炸 —— 演练时就是这么发现的。
+`\password` 让 psql 在本地算好 SCRAM 哈希再发过去，明文不进服务端日志。
+
+**第 5 步的 `vacuumdb` 也别省**：dump 恢复不带统计信息，不跑的话查询计划全靠瞎猜，
+排名、统计这类大查询会慢一阵，直到 autovacuum 自己补上。
+
+**Redis 8 直接读 7 留下的 `dump.rdb`**（实测），会话和判题队列都在，学生不用重新登录。
+
+**回退**：`./data/postgres` 那个 16 的老目录没动过。把 compose 改回 `postgres:16-alpine`
++ `./data/postgres:/var/lib/postgresql/data`，`up -d oj-postgres` 就回去了 —— 升级之后
+写进 18 的数据不会跟着回去。确认 18 稳了再删老目录。
+
 ## 镜像体积
 
 | 镜像 | 体积 | |

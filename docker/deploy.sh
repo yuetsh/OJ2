@@ -132,19 +132,23 @@ docker/.env 里 DB_PORT / REDIS_PORT 是不是也得一并清空？"
 fi
 ok "库指向 $(grep -m1 'DATABASE_URL:' <<<"$cfg" | sed 's|.*@||; s|/onlinejudge.*||')"
 
-# ②b 自带形态下数据目录必须已经是一个 16 版本的库。
+# ②b 自带形态下数据目录必须已经是一个 18 版本的库。
 #     这是整个部署里唯一会**静默**走歪的地方：目录不对的话 postgres 当成全新部署，
 #     在空目录上初始化一个空库 —— 站点起得来、能注册能登录，就是一道题都没有。
 if [ "$LOCAL_DATA" -eq 1 ]; then
   data_dir=$(grep -E '^DATA_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
   [ -n "$data_dir" ] || die "自带数据形态必须显式设 DATA_DIR。
 默认值 ../data 解析出来是 OJ2/data，那是个空目录，postgres 会在上面初始化一个全新的空库，而且不报任何错。"
-  pgver_file="$data_dir/postgres/PG_VERSION"
+  pgver_file="$data_dir/postgresql/18/docker/PG_VERSION"
+  if [ ! -f "$pgver_file" ] && [ -f "$data_dir/postgres/PG_VERSION" ]; then
+    die "$data_dir 下只有 postgres/（PostgreSQL $(cat "$data_dir/postgres/PG_VERSION") 的老库），没有 postgresql/18/docker。
+compose 里已经是 postgres:18-alpine，老库要先倒过去，见 docs/deploy.md「PostgreSQL 升级」。"
+  fi
   [ -f "$pgver_file" ] || die "找不到 $pgver_file —— DATA_DIR 指的不是一个已有的 postgres 数据目录。
 就这么起下去会得到一个空库。确认 DATA_DIR=$data_dir 对不对。"
   pgver=$(cat "$pgver_file")
-  [ "$pgver" = 16 ] || die "$data_dir/postgres 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:16-alpine，起不来。"
-  ok "数据目录 $data_dir/postgres（PostgreSQL $pgver）"
+  [ "$pgver" = 18 ] || die "$data_dir/postgresql 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:18-alpine，起不来。"
+  ok "数据目录 $data_dir/postgresql（PostgreSQL $pgver）"
 fi
 
 # ③ 判题机运行目录必须和旧栈分开，否则两个 judger 往同一个目录里写

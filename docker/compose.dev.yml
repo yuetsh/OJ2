@@ -12,8 +12,8 @@
 # 以前这里挂一份 schema dump 当 initdb，现在不需要了 —— 0000 就是完整的建表迁移，
 # 而且和「灌 dump + 打基线 + 跑迁移」跑出来的结构实测零差异（见 docs/database.md）。
 #
-# PostgreSQL 固定 16，与生产版本（16.10）一致 —— 别图新换 17/18，
-# 开发环境用了生产不支持的特性，要到切换那天才炸。
+# PostgreSQL 的大版本跟生产走（现在是 18）—— 别图新单独换本机的，
+# 开发环境用了生产不支持的特性，要到上线那天才炸。
 #
 # 判题机 token 必须自己生成，仓库里不留默认值。第一次起服务前：
 #
@@ -27,7 +27,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: oj2-postgres
     restart: unless-stopped
     environment:
@@ -37,7 +37,10 @@ services:
     ports:
       - "127.0.0.1:5433:5432" # 5433 避开可能存在的本机 5432
     volumes:
-      - oj2-pgdata:/var/lib/postgresql/data
+      # 18 起镜像把数据目录挪到了 /var/lib/postgresql/18/docker，挂载点要是上一级。
+      # 还挂 .../data 的话 18 直接拒绝启动。卷名带版本号：16 的旧卷 oj2-pgdata 不认得，
+      # 换卷才不会撞（docker volume rm docker_oj2-pgdata 可以清掉）
+      - oj2-pgdata18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U onlinejudge -d onlinejudge"]
       interval: 5s
@@ -45,7 +48,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: oj2-redis
     restart: unless-stopped
     ports:
@@ -91,4 +94,4 @@ services:
     mem_limit: 512m
 
 volumes:
-  oj2-pgdata:
+  oj2-pgdata18:
