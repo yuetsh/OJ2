@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { NFlex, NSwitch, NTag, NTooltip } from "naive-ui"
-import { Icon } from "@iconify/vue"
+import { NSwitch, useThemeVars } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
-import { getTagColor, parseTime } from "utils/functions"
+import { parseTime } from "utils/functions"
 import type { AdminProblemRow } from "utils/types"
-import { DIFFICULTY, REACTIONS } from "utils/constants"
-import { getProblemList, toggleProblemVisible } from "../api"
+import { errorMessage } from "utils/api"
+import { batchSetProblemVisible, getProblemList, toggleProblemVisible } from "../api"
 import Actions from "./components/Actions.vue"
 import AddFromLibraryModal from "./components/AddFromLibraryModal.vue"
 import { useRouteQuery } from "@vueuse/router"
@@ -17,6 +16,14 @@ import CreateProblemMenu from "./components/CreateProblemMenu.vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import ProblemTypeTag from "oj/problem/components/ProblemTypeTag.vue"
 
+/**
+ * 后台题目列表（设计稿「后台题目列表」PlA / PlB）。一行一道题：题号、题目（点了就是编辑）、
+ * 知识点、做对 / 做过的人数、出题人、创建日期、「学生看得到」开关，最右「编辑」+ ⋯。
+ *
+ * 原来 1366 宽的屏上「可见」开关和创建时间要横滚才看得到，出题人被截成三个字；
+ * 内部 ID 和显示编号两列、难度、看不懂的「功能」图标列、反馈表情列都拿掉了。
+ * 比赛题目列表（contestID）也用这一页，没有勾选、人数和「全部 / 看得到 / 藏着的」
+ */
 interface Props {
   contestID?: string
 }
@@ -24,6 +31,7 @@ interface Props {
 const props = defineProps<Props>()
 const route = useRoute()
 const router = useRouter()
+const theme = useThemeVars()
 
 const title = computed(
   () =>
@@ -75,6 +83,8 @@ interface ProblemQuery {
   keyword: string
   author: string
   kind: "" | "code" | "sql"
+  /** 1 = 学生看得到的，0 = 藏着的 */
+  visible: "" | "1" | "0"
 }
 
 // 使用分页 composable
@@ -82,95 +92,88 @@ const { query, clearQuery } = usePagination<ProblemQuery>({
   keyword: useRouteQuery("keyword", "").value,
   author: useRouteQuery("author", "").value,
   kind: useRouteQuery<ProblemQuery["kind"]>("kind", "").value,
+  visible: useRouteQuery<ProblemQuery["visible"]>("visible", "").value,
 })
 
+const counts = ref<{ all: number; visible: number; hidden: number } | null>(null)
+const visibleTabs = computed(() => [
+  { value: "" as const, label: "全部", count: counts.value?.all },
+  { value: "1" as const, label: "学生看得到", count: counts.value?.visible },
+  { value: "0" as const, label: "藏着的", count: counts.value?.hidden },
+])
+
+/** 知识点只摆前两个，多的写 +N，鼠标放上去看全部（P073 这类题挂了六个） */
+function renderTags(tags: string[]) {
+  if (!tags.length) return h("span", { class: "muted" }, "—")
+  return h("span", { class: "tags", title: tags.join("、") }, [
+    ...tags.slice(0, 2).map((tag) => h("span", { class: "tag", key: tag }, tag)),
+    tags.length > 2 ? h("span", { class: "muted more" }, `+${tags.length - 2}`) : null,
+  ])
+}
+
+function renderTitle(row: AdminProblemRow) {
+  const kinds = [
+    row.isSql ? h(ProblemTypeTag, { kind: "sql" }) : null,
+    row.allowFlowchart ? h(ProblemTypeTag, { kind: "flowchart" }) : null,
+    row.hasAstRules ? h(ProblemTypeTag, { kind: "ast" }) : null,
+  ]
+  return h("span", { class: "title-cell" }, [
+    h(
+      "a",
+      {
+        class: "title-link",
+        href: router.resolve(editRoute(row.id)).href,
+        onClick: (event: MouseEvent) => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey) return
+          event.preventDefault()
+          router.push(editRoute(row.id))
+        },
+      },
+      row.title,
+    ),
+    ...kinds,
+  ])
+}
+
+function editRoute(problemID: number) {
+  return {
+    name: isContestProblemList.value ? "admin contest problem edit" : "admin problem edit",
+    params: isContestProblemList.value ? { contestID: props.contestID, problemID } : { problemID },
+  }
+}
+
 const baseColumns: DataTableColumn<AdminProblemRow>[] = [
-  { title: "ID", key: "id", width: 100 },
-  { title: "显示编号", key: "_id", width: 100 },
   {
-    title: "标题",
-    key: "title",
-    minWidth: 200,
+    title: "题号",
+    key: "_id",
+    width: 84,
+    render: (row) => h("span", { class: "did", title: `内部编号 ${row.id}` }, row._id),
+  },
+  { title: "题目", key: "title", minWidth: 220, ellipsis: false, render: renderTitle },
+  { title: "知识点", key: "tags", width: 190, render: (row) => renderTags(row.tags) },
+  {
+    title: "做对 / 做过",
+    key: "users",
+    width: 100,
     render: (row) =>
-      row.isSql
-        ? h(NFlex, { size: 6, align: "center", wrap: false }, () => [
-            h("span", row.title),
-            h(ProblemTypeTag, { kind: "sql" }),
+      row.triedUsers
+        ? h("span", { class: "num" }, [
+            String(row.solvedUsers),
+            h("span", { class: "muted" }, ` / ${row.triedUsers}`),
           ])
-        : row.title,
+        : h("span", { class: "muted" }, "没人做过"),
   },
+  { title: "出题人", key: "username", width: 100, ellipsis: { tooltip: true } },
   {
-    title: "难度",
-    key: "difficulty",
-    width: 80,
-    render: (row) =>
-      h(
-        NTag,
-        { type: getTagColor(row.difficulty), size: "small" },
-        () => DIFFICULTY[row.difficulty],
-      ),
-  },
-  {
-    title: "标签",
-    key: "tags",
-    minWidth: 120,
-    render: (row) =>
-      h(NFlex, { size: 4 }, () => row.tags.map((t) => h(NTag, { key: t, size: "small" }, () => t))),
-  },
-  {
-    title: "功能",
-    key: "features",
-    width: 80,
-    render: (row) =>
-      h(NFlex, { size: 4, align: "center" }, () => [
-        row.allowFlowchart
-          ? h(Icon, {
-              width: 18,
-              icon: "vscode-icons:file-type-drawio",
-              title: "绘图",
-            })
-          : row.showFlowchart
-            ? h(Icon, {
-                width: 18,
-                icon: "vscode-icons:file-type-graphql",
-                title: "流程图",
-              })
-            : null,
-        row.hasAstRules
-          ? h(Icon, {
-              width: 18,
-              icon: "vscode-icons:file-type-light-todo",
-              title: "AST",
-            })
-          : null,
-      ]),
-  },
-  {
-    title: "反馈",
-    key: "topReaction",
-    width: 60,
-    render: (row) => {
-      const top = row.topReaction
-      if (!top) return null
-      const reaction = REACTIONS.find((it) => it.key === top.type)
-      if (!reaction) return null
-      return h(NTooltip, null, {
-        trigger: () => h(Icon, { width: 18, icon: reaction.icon }),
-        default: () => `${reaction.label} ${top.count} 人`,
-      })
-    },
-  },
-  { title: "出题人", key: "username", width: 120 },
-  {
-    title: "创建时间",
+    title: "创建",
     key: "create_time",
-    width: 200,
-    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
+    width: 96,
+    render: (row) => h("span", { class: "num muted" }, parseTime(row.createTime, "YYYY-MM-DD")),
   },
   {
-    title: "可见",
+    title: "学生看得到",
     key: "visible",
-    minWidth: 100,
+    width: 96,
     render: (row) =>
       h(NSwitch, {
         value: row.visible,
@@ -180,23 +183,22 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
       }),
   },
   {
-    title: "选项",
+    title: "",
     key: "actions",
-    fixed: "right",
-    width: 300,
+    width: 104,
     render: (row) =>
       h(Actions, {
         problemID: row.id,
         problemDisplayID: row._id,
+        triedUsers: row.triedUsers,
         onUpdated: listProblems,
       }),
   },
 ]
 
-// 比赛题目接口不返回 top_reaction，这一列只在普通题目列表里显示
 const columns = computed<DataTableColumn<AdminProblemRow>[]>(() =>
   isContestProblemList.value
-    ? baseColumns.filter((it) => !("key" in it) || it.key !== "topReaction")
+    ? baseColumns.filter((it) => !("key" in it) || it.key !== "users")
     : [{ type: "selection" }, ...baseColumns],
 )
 
@@ -211,9 +213,24 @@ async function listProblems() {
     props.contestID,
     undefined,
     query.kind,
+    props.contestID ? "" : query.visible,
   )
   total.value = res.total
   problems.value = res.results
+  counts.value = res.counts
+}
+
+/** 勾了几道，一次让学生看得到 / 藏起来（lwp0201 一批 P0xx 题出完一起放出来就是这么用） */
+const message = useMessage()
+async function batchVisible(visible: boolean) {
+  try {
+    const { problemCount } = await batchSetProblemVisible(selectedProblemIds.value, visible)
+    message.success(`${problemCount} 道题${visible ? "学生看得到了" : "藏起来了"}`)
+    selectedRowKeys.value = []
+    listProblems()
+  } catch (error) {
+    message.error(errorMessage(error))
+  }
 }
 
 async function toggleVisible(problemID: number) {
@@ -224,6 +241,15 @@ async function toggleVisible(problemID: number) {
     }
     return it
   })
+  // 三个按钮上的数跟着变；停在「藏着的」时这道题也该从列表里走掉，但当场消失会让人以为没点上，下次刷新再说
+  if (counts.value) {
+    const now = problems.value.find((it) => it.id === problemID)?.visible
+    counts.value = {
+      ...counts.value,
+      visible: counts.value.visible + (now ? 1 : -1),
+      hidden: counts.value.hidden + (now ? -1 : 1),
+    }
+  }
 }
 
 const kindOptions = [
@@ -254,7 +280,7 @@ watchDebounced(() => query.keyword, listProblems, {
 })
 
 // 监听其他查询条件变化
-watch(() => [query.page, query.limit, query.author, query.kind], listProblems)
+watch(() => [query.page, query.limit, query.author, query.kind, query.visible], listProblems)
 </script>
 
 <template>
@@ -264,12 +290,6 @@ watch(() => [query.page, query.limit, query.author, query.kind], listProblems)
   >
     <template #actions>
       <template v-if="!isContestProblemList">
-        <template v-if="selectedProblemIds.length">
-          <n-button @click="openBatchTag('remove')">移除标签</n-button>
-          <n-button secondary type="primary" @click="openBatchTag('add')">
-            添加标签（{{ selectedProblemIds.length }}）
-          </n-button>
-        </template>
         <CreateProblemMenu label="新建题目" primary @select="createProblem" />
       </template>
       <template v-else>
@@ -280,7 +300,7 @@ watch(() => [query.page, query.limit, query.author, query.kind], listProblems)
     <template #filters>
       <n-input
         v-model:value="query.keyword"
-        placeholder="输入标题关键字"
+        placeholder="题号或题目名"
         clearable
         style="width: 220px"
         @clear="clearQuery"
@@ -296,13 +316,35 @@ watch(() => [query.page, query.limit, query.author, query.kind], listProblems)
         <n-text depth="3">出题人</n-text>
         <AuthorSelect v-model:value="query.author" all />
       </n-flex>
+      <n-button-group v-if="!props.contestID">
+        <n-button
+          v-for="tab in visibleTabs"
+          :key="tab.value"
+          :type="query.visible === tab.value ? 'primary' : 'default'"
+          :secondary="query.visible === tab.value"
+          @click="query.visible = tab.value"
+        >
+          {{ tab.label }}
+          <span v-if="tab.count !== undefined" class="tab-count">{{ tab.count }}</span>
+        </n-button>
+      </n-button-group>
     </template>
   </PageHeader>
+  <div v-if="selectedProblemIds.length" class="batch-bar">
+    <b>已选 {{ selectedProblemIds.length }} 道</b>
+    <n-button size="small" @click="batchVisible(true)">让学生看得到</n-button>
+    <n-button size="small" @click="batchVisible(false)">藏起来</n-button>
+    <n-button size="small" @click="openBatchTag('add')">加知识点</n-button>
+    <n-button size="small" @click="openBatchTag('remove')">去掉知识点</n-button>
+    <div class="spacer"></div>
+    <n-button size="small" quaternary @click="selectedRowKeys = []">取消选择</n-button>
+  </div>
   <n-data-table
-    striped
+    class="problem-table"
     :columns="columns"
     :data="problems"
     :row-key="rowKey"
+    :checked-row-keys="selectedRowKeys"
     @update:checked-row-keys="chooseProblems"
   />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
@@ -319,3 +361,79 @@ watch(() => [query.page, query.limit, query.author, query.kind], listProblems)
     @done="onBatchTagDone"
   />
 </template>
+
+<style scoped>
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid v-bind("theme.successColorSuppl");
+  background: v-bind("theme.hoverColor");
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.tab-count {
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.problem-table :deep(.did) {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.problem-table :deep(.title-cell) {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.problem-table :deep(.title-link) {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.problem-table :deep(.title-link:hover) {
+  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
+}
+
+.problem-table :deep(.tags) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.problem-table :deep(.tag) {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 3px;
+  background: v-bind("theme.actionColor");
+  font-size: 12px;
+}
+
+.problem-table :deep(.muted) {
+  color: v-bind("theme.textColor3");
+}
+
+.problem-table :deep(.more) {
+  font-size: 12px;
+}
+
+.problem-table :deep(.num) {
+  font-variant-numeric: tabular-nums;
+}
+</style>

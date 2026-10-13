@@ -16,5 +16,7 @@ export function toAdminProblemRow(result: AdminProblemListItem): AdminProblemRow
     allowFlowchart: result.allowFlowchart,
     showFlowchart: result.showFlowchart,
     topReaction: result.topReaction,
+    solvedUsers: result.solvedUsers,
+    triedUsers: result.triedUsers,
   }
 }

@@ -189,6 +189,9 @@ export interface AdminProblemRow {
   showFlowchart: boolean
   // 比赛题目列表恒为 null —— 只有公开题列表下发最高票评价
   topReaction: { type: ReactionKey; count: number } | null
+  /** 做对 / 做过的人数（题库里的代码提交）；比赛题列表恒为 0 */
+  solvedUsers: number
+  triedUsers: number
 }
 
 // 题单相关类型

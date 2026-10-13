@@ -72,15 +72,34 @@ export async function getProblemList(
   tagId?: number,
   /** 题型：sql = SQL 题，code = 编程题；不传是全部（比赛题列表不认） */
   kind?: "sql" | "code" | "",
+  /** 1 = 学生看得到的，0 = 藏着的；不传是全部（比赛题列表不认） */
+  visible?: "1" | "0" | "",
 ) {
   const endpoint = contestID ? `admin/contests/${contestID}/problems` : "admin/problems"
   const res = await api.get<AdminProblemList>(endpoint, {
-    params: { offset, limit, keyword, author, tagId, kind: kind || undefined },
+    params: {
+      offset,
+      limit,
+      keyword,
+      author,
+      tagId,
+      kind: kind || undefined,
+      visible: visible || undefined,
+    },
   })
   return {
     results: res.results.map(toAdminProblemRow),
     total: res.total,
+    counts: res.counts ?? null,
   }
+}
+
+/** 勾了几道，一次让学生看得到 / 藏起来 */
+export function batchSetProblemVisible(problemIds: number[], visible: boolean) {
+  return api.post<{ problemCount: number }>("admin/problems/batch-visible", {
+    problemIds,
+    visible,
+  })
 }
 
 // 比赛「从题库中选择」用：列所有可见的公开题，不只是自己创建的

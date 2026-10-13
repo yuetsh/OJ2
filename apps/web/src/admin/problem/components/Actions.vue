@@ -1,13 +1,22 @@
 <script lang="ts" setup>
+import { Icon } from "@iconify/vue"
 import { errorCode, errorMessage } from "utils/api"
 import { deleteContestProblem, deleteProblem, makeProblemPublic } from "admin/api"
 import download from "utils/download"
 
+/**
+ * 题目列表一行的操作（设计稿「后台题目列表」PlA）：常用的「编辑」常驻，其余收进 ⋯ ——
+ * 原来是四颗彩色按钮（编辑 / 查看 / 删除 / 下载）并排，1366 宽的屏上把「可见」开关挤出了屏幕。
+ * 有人交过的题删不掉（服务端也拦），「删除」直接灰掉并写明为什么，不用点了才知道
+ */
 interface Props {
   problemID: number
   problemDisplayID: string
+  /** 做过这道题的人数，> 0 就删不掉 */
+  triedUsers?: number
 }
 const props = defineProps<Props>()
+const dialog = useDialog()
 const emit = defineEmits(["updated"])
 
 const route = useRoute()
@@ -60,6 +69,31 @@ function goCheck() {
   window.open(data.href, "_blank")
 }
 
+const menuOptions = computed<DropdownOption[]>(() => [
+  { label: "在前台看", key: "view" },
+  { label: "下载测试数据", key: "download" },
+  ...(isContestProblem.value ? [{ label: "转成公开题", key: "public" }] : []),
+  { type: "divider", key: "divider" },
+  props.triedUsers
+    ? { label: `删除（有 ${props.triedUsers} 人交过）`, key: "delete", disabled: true }
+    : { label: "删除", key: "delete" },
+])
+
+function onMenu(key: string) {
+  if (key === "view") goCheck()
+  else if (key === "download") downloads()
+  else if (key === "public") openMakePublicModal()
+  else if (key === "delete") {
+    dialog.warning({
+      title: `删除 ${props.problemDisplayID}？`,
+      content: "删掉就找不回来了。",
+      positiveText: "删除",
+      negativeText: "不删",
+      onPositiveClick: handleDeleteProblem,
+    })
+  }
+}
+
 function openMakePublicModal() {
   newDisplayID.value = ""
   showMakePublicModal.value = true
@@ -88,29 +122,13 @@ async function handleMakePublic() {
 }
 </script>
 <template>
-  <n-flex>
-    <n-button size="small" secondary type="primary" @click="goEdit"> 编辑 </n-button>
-    <n-button size="small" secondary type="info" @click="goCheck"> 查看 </n-button>
-    <n-tooltip v-if="isContestProblem">
-      <template #trigger>
-        <n-button size="small" secondary type="warning" @click="openMakePublicModal">
-          公开
-        </n-button>
-      </template>
-      将此竞赛题目转为公开题目
-    </n-tooltip>
-    <n-popconfirm @positive-click="handleDeleteProblem">
-      <template #trigger>
-        <n-button secondary size="small" type="error">删除</n-button>
-      </template>
-      确定删除这道题目吗？相关的提交也会被相应删除哦 😯
-    </n-popconfirm>
-    <n-tooltip>
-      <template #trigger>
-        <n-button size="small" secondary @click="downloads">下载</n-button>
-      </template>
-      下载测试用例
-    </n-tooltip>
+  <n-flex :size="4" justify="end" :wrap="false">
+    <n-button size="small" @click="goEdit">编辑</n-button>
+    <n-dropdown trigger="click" placement="bottom-end" :options="menuOptions" @select="onMenu">
+      <n-button size="small" quaternary aria-label="更多">
+        <template #icon><Icon icon="ph:dots-three-bold" /></template>
+      </n-button>
+    </n-dropdown>
   </n-flex>
 
   <n-modal
