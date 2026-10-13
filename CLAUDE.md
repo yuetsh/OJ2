@@ -264,8 +264,10 @@ drizzle-kit 的坑，全在 `docs/database.md`。
 **机房那套没有 postgres，连的是服务器的库。** 两个站点共用一个数据库，但各有各的 Redis
 和判题沙箱 —— 所以涉及两边的变更要一起做。
 
-`compose.debian.yml` 靠 env 切形态：设 `DATA_DIR` / `DB_HOST` / `REDIS_HOST` 就是接现有的库
-（线上就是这个），留空并加 `--profile local-data` 就是自带 postgres / redis。
+**服务器上的全部容器（含 postgres / redis）都由 `compose.debian.yml` 起**，升级哪个都只改
+仓库里的文件。以前库和 redis 归旧栈那份 `/root/OJDeploy/docker-compose.yml`、这边外接过去，
+那种形态已经删了（搬家脚本 `docker/move-db-into-oj2.sh`，一次性的）。库是 PostgreSQL 18，
+数据在 `$DATA_DIR/postgresql`；本机 dev 用同一个大版本，别单独换。
 
 ⚠️ **`DATA_DIR` 默认值 `../data` 是 `OJ2/data`，不是部署目录的 `data/`。** 沿用旧数据却忘了
 设它，会静默起一套空数据（空库、没测试点、图片 404），而且**不报错** —— 这是整个部署里

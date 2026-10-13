@@ -4,14 +4,10 @@
 #
 # ## 为什么不走 docker compose exec
 #
-# 线上是**外接形态**：postgres 容器由 /root/OJDeploy/docker-compose.yml 起，不归
-# OJ2 这套 compose 管。compose.debian.yml 里虽然也定义了 oj-postgres，但它挂着
-# `profiles: ["local-data"]`，只在「自带数据」形态下才启动。所以在 OJ2 目录里跑
-#
-#   docker compose exec -T oj-postgres pg_dumpall ...
-#
-# 会报 `service "oj-postgres" is not running` —— 容器明明在跑，只是属于另一个
-# compose 项目。这里直接按容器名 `docker exec`，跟谁起的无关，两种形态都能用。
+# 按容器名 `docker exec`，跟容器是谁起的无关：以前线上的 postgres 由旧栈那份
+# /root/OJDeploy/docker-compose.yml 起，在 OJ2 目录里 `docker compose exec` 会报
+# `service "oj-postgres" is not running`。现在它归 compose.debian.yml 了，但按名字找
+# 照样能用，move-db-into-oj2.sh 搬家时也靠这一点去备份旧容器（CONTAINER=旧容器名）。
 #
 # ## 用法
 #
@@ -104,9 +100,8 @@ human() {
 say "自检"
 
 docker ps --filter "name=^/${CONTAINER}\$" --filter status=running -q | grep -q . \
-  || die "容器 $CONTAINER 没在跑。用 CONTAINER=... 指定容器名；外接形态下它由
-   /root/OJDeploy/docker-compose.yml 起：
-   docker compose -f /root/OJDeploy/docker-compose.yml up -d $CONTAINER"
+  || die "容器 $CONTAINER 没在跑。用 CONTAINER=... 指定容器名；服务器上它由本栈起：
+   docker compose -f docker/compose.debian.yml --env-file docker/.env up -d $CONTAINER"
 
 # 用 psql 真连一次，不用 pg_isready：后者只探「服务在不在」，DB_USER 写错照样说 OK，
 # 要等到 pg_dumpall 那步才炸出一句 role does not exist

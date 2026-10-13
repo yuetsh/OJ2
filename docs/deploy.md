@@ -9,7 +9,7 @@
 |---|---|---|
 | compose | `docker/compose.debian.yml` | `docker/compose.school.yml` |
 | env | `docker/.env` | `docker/.env.school` |
-| 库 | 本机 postgres（旧栈起的，原地没动） | **没有，连服务器那台的 5445** |
+| 库 | 本栈的 `oj-postgres`（PostgreSQL 18） | **没有，连服务器那台的 5445** |
 | Redis / 判题沙箱 | 各自一套 | 各自一套 |
 | 对外 | NPM 反代 → `WEB_PORT` | http 直连 IP，端口 81 |
 
@@ -20,41 +20,35 @@ Redis）和 WebSocket 推送（本地 pub/sub）是每站独立的 —— 学生
 机房那套 `COOKIE_SECURE=false`：走 http 直连 IP，带 `Secure` 的 Cookie 浏览器不回传，
 表现是「登录成功又立刻变未登录」。
 
-## 三种数据形态
+## 全部容器都归 OJ2
 
-`compose.debian.yml` 靠 env 切换，判据是 `DB_HOST`：
+服务器上 postgres / redis / 判题沙箱 / api / worker / web **全由 `compose.debian.yml` 起**，
+升级哪个都只改仓库里的文件。
 
-- **外接数据**（线上就是这个）：设 `DATA_DIR` / `DB_HOST` / `REDIS_HOST`，
-  沿用已经在跑的 postgres 和 redis，本栈只起 api / worker / web / judge。
-- **自带数据**（本机、演练）：那几个变量留空，起栈时加 `--profile local-data`。
-- 试跑形态额外要 `WEB_PORT` 和 `JUDGE_STATE_DIR`（两个判题机不能共用运行目录）。
+2026-10 以前库和 redis 是旧栈那份 `/root/OJDeploy/docker-compose.yml` 起的，OJ2 通过
+`DB_HOST` / `REDIS_HOST` 外接过去，升个版本就得去服务器上改那份文件。这种「外接」形态
+已经删掉了，搬家见下面「把库搬进 OJ2」。
 
 ⚠️ **`DATA_DIR` 默认值 `../data` 是 `OJ2/data`，不是部署目录的 `data/`。**
-沿用旧数据却忘了设它，会静默挂上一堆空目录：空库、没测试点、题面图片 404，
-**而且不报错**。这是整个部署里唯一会静默走歪的地方，`deploy.sh` 专门为它设了一道自检。
+忘了设它，postgres 会在空目录上初始化一个空库，测试点和题面图片也都不在，
+**而且不报错**。这是整个部署里唯一会静默走歪的地方，`deploy.sh` 专门为它设了自检
+（`$DATA_DIR/postgresql/18/docker` 必须已经是一个库）。
 
-## Redis 口令
+## 口令
 
 **会话存在 Redis 里**（`session:<token>` → 用户 id），谁能连上它，谁就能写一条会话
-冒充任意用户，包括超管。所以服务器那台的 Redis **必须带口令**：`compose.debian.yml`
-的 `REDIS_URL` 用 `${REDIS_PASSWORD:?}` 强制要求，`deploy.sh` 在外接形态下还会实测
-「不带口令连不上、带 `docker/.env` 的口令连得上」，两条有一条不满足就中止部署。
+冒充任意用户，包括超管。所以服务器那台的 Redis **必须带口令**（`REDIS_PASSWORD`，
+compose 里 `:?` 强制要求），端口也只发布在 127.0.0.1。2026-09-27 以前它发布在
+`0.0.0.0:5446`、不带口令，从公网直接 PING 得通（实测过）。
 
-2026-09-27 以前，旧栈 compose 起的那个 `oj-redis` 发布在 `0.0.0.0:5446`、不带口令，
-**从公网直接 PING 得通**（实测过）。给它加口令的一次性步骤，在服务器上：
+**数据库口令同理**：`onlinejudge` 是超级用户，5445 对公网开着（机房要连），2026-10 以前
+口令就是默认的 `onlinejudge`。搬进 OJ2 时用 `openssl rand -hex 32` 生成的新口令重建，
+`move-db-into-oj2.sh` 不接受弱口令。`POSTGRES_PASSWORD` 只在库初始化时生效一次，以后要换：
 
 ```bash
-cd /root/OJDeploy
-PW=$(openssl rand -hex 32)
-echo "REDIS_PASSWORD=$PW" >> OJ2/docker/.env
-# 编辑 docker-compose.yml 的 oj-redis，加一行（$PW 换成上面的值，别提交到任何仓库）：
-#   command: ["redis-server", "--requirepass", "<PW>"]
-docker compose up -d oj-redis           # 重建 redis，此刻起旧口令（无）的连接全部失败
-cd OJ2 && docker/deploy.sh              # 马上重新部署，api / worker 带上口令
+docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password onlinejudge'
+# 再改 docker/.env 和机房 docker/.env.school 的 POSTGRES_PASSWORD，两边都重新 up -d
 ```
-
-两步之间 api 连不上 Redis，站点会 500 一两分钟，挑没人用的时候做。
-会话会保留（redis 退出时落盘 RDB），学生不用重新登录。
 
 机房那台的 `oj-redis` 不发布端口、只在 compose 网络里，不需要口令。
 
@@ -87,9 +81,9 @@ docker/deploy.sh --no-build   # 只改了 env / compose 时跳过构建
 
 代码怎么上到服务器不归它管（rsync 命令在脚本头部注释里）。
 
-脚本起栈前有一串自检，**每一条都是真撞到过的**：compose 版本 ≥ 2.20、`DATA_DIR`
-有没有生效、库指向和形态是否自洽、判题机运行目录有没有和旧栈分开、外接的
-postgres / redis 是否活着。起完再跑四条冒烟，**题目数是 0 也中止** —— 那意味着连错库了。
+脚本起栈前有一串自检，**每一条都是真撞到过的**：`DATA_DIR` 有没有生效、数据目录是不是
+一个 18 的库、判题机运行目录、判题镜像在不在。起完再跑四条冒烟，**题目数是 0 也中止**
+—— 那意味着连错库了。
 
 ### 判题镜像是自建的，不在 registry 上
 
@@ -130,8 +124,8 @@ curl -s -o /dev/null -w '未登录进后台  %{http_code}\n' $BASE/api/admin/das
 
 两个失败模式的症状别搞混：
 
-- **题目列表 `"total":0`** → 连错库了（`DB_HOST` 没设，或误加了 `--profile local-data`
-  起了个自带的空 postgres）。立刻停下来查。
+- **题目列表 `"total":0`** → 连错库了（`DATA_DIR` 指到了一个新初始化的空库）。
+  立刻停下来查。
 - **库是对的，但判题全错、题面图片 404** → `DATA_DIR` 指错了。
 
 命令测不到、必须手点的：登录 → 提交一道题看结果**实时刷出来**（这一步同时验证
@@ -164,58 +158,57 @@ WebSocket）→ 后台判题机列表在线 → 后台题目列表翻页 → 带
 > **旧栈已经不可逆地下线**（`0002_drop_django_leftovers` 删掉了 Django 的框架表并已在
 > 生产库执行完毕），所以「停新栈起旧栈」不再是退路，**唯一退路是从数据库备份恢复**。
 
-## PostgreSQL 升级（16 → 18）与 Redis（7 → 8）
+## 把库搬进 OJ2（一次性，顺带 PostgreSQL 16 → 18、Redis 7 → 8）
 
-仓库里的 compose 已经是 `postgres:18-alpine` / `redis:8-alpine`，但**线上的库和服务器的
-Redis 不归这几份 compose 管**，由 `/root/OJDeploy/docker-compose.yml` 起，得到服务器上
-手工换。机房的 Redis 是 `compose.school.yml` 起的，部署时自己就换了。
+`docker/move-db-into-oj2.sh` 把服务器上旧栈 compose 起的 postgres / redis 换成本栈的。
+大版本不能原地换镜像（18 读不了 16 的目录），所以走「备份 → 新目录起 18 → 恢复」。
+本机用 10-13 的生产备份搭了一套和线上一样的「之前」状态完整演练过：13 万条提交恢复
+5 秒，行数一致，登录态保住，提交照常判题，机房那样从外面连 5445 新口令能进、旧口令被拒。
 
-大版本不能原地换镜像：18 读不了 16 的数据目录。走「备份 → 新目录起 18 → 恢复」，
-本机拿 2026-10-13 的生产备份完整演练过（13 万条提交，恢复 6 秒）。**两个站点共用这个库**，
-所以要挑没课的时候，机房那套也一起停。
+**挑没课的时候做**，两个站点共用这个库，中间两边都用不了（镜像在停机前编好，真正停机
+的那段不到一分钟）。
 
 ```bash
-# 1. 两边都停应用（机房那台上同样停 oj-api oj-worker）
+# 0. 代码先推上去。CI 会照常 rsync，然后在 deploy.sh 自检停下（数据目录还不是 18）、
+#    工作流判红 —— 这是预期的，容器一个没动，旧栈照常服务。
+
+# 1. 机房：停应用
+docker compose -f docker/compose.school.yml --env-file docker/.env.school stop oj-api oj-worker
+
+# 2. 服务器：docker/.env 的 POSTGRES_PASSWORD 换成新生成的强口令（openssl rand -hex 32）
+
+# 3. 服务器：搬家（CI 已经把产物 rsync 过来了，所以用 --prebuilt）
 cd /root/OJDeploy/OJ2
-docker compose -f docker/compose.debian.yml --env-file docker/.env stop oj-api oj-worker
-docker exec oj-postgres psql -U onlinejudge -d onlinejudge -tAc 'select count(*) from submission'  # 记下来
+docker/move-db-into-oj2.sh --prebuilt
 
-# 2. 全量备份（会打印文件路径）
-docker/backup-db.sh
-
-# 3. 停 16，改 /root/OJDeploy/docker-compose.yml 的 oj-postgres 和 oj-redis：
-#      oj-postgres  image: postgres:18-alpine
-#                   volumes: - ./data/postgresql:/var/lib/postgresql   ← 新目录、挂载点少一级
-#      oj-redis     image: redis:8-alpine                               ← 别的不动，口令那行留着
-docker compose -f /root/OJDeploy/docker-compose.yml stop oj-postgres
-docker compose -f /root/OJDeploy/docker-compose.yml up -d oj-postgres oj-redis
-
-# 4. 恢复。只会有两条 ERROR：current user cannot be dropped / role already exists，正常
-gzip -cd <备份文件> | docker exec -i oj-postgres psql -q -U onlinejudge -d postgres
-
-# 5. 口令重新存一遍（输入 docker/.env 里的 POSTGRES_PASSWORD），再收集统计信息
-docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password onlinejudge'
-docker exec oj-postgres vacuumdb -U onlinejudge --all --analyze-in-stages
-docker exec oj-postgres psql -U onlinejudge -d onlinejudge -tAc 'select count(*) from submission'  # 和第 1 步对上
-
-# 6. 起应用（机房那台同样 up -d）
-docker compose -f docker/compose.debian.yml --env-file docker/.env up -d oj-api oj-worker
+# 4. 机房：docker/.env.school 的 POSTGRES_PASSWORD 改成同一个新值，然后（顺带换上 Redis 8）
+docker compose -f docker/compose.school.yml --env-file docker/.env.school up -d --build
 ```
 
-**第 5 步的改口令不能省。** 生产库的口令是 md5 哈希存的（老库从 Django 时代沿用下来），
-dump 原样带过去；而 18 的镜像新建的库 `pg_hba.conf` 只认 `scram-sha-256`，md5 存的口令
-**永远验不过**，报 `password authentication failed`。容器里 `docker exec psql` 走本地
-socket 是 trust，一切正常，只有 api 和机房从网络连进来才炸 —— 演练时就是这么发现的。
-`\password` 让 psql 在本地算好 SCRAM 哈希再发过去，明文不进服务端日志。
+脚本每一步都有自检：机房没停（还有客户端连着旧库）会报出 IP 并中止，口令弱也中止，
+恢复后行数对不上、新口令从网络登不上也中止。做完按「部署后验证」两边各点一遍。
 
-**第 5 步的 `vacuumdb` 也别省**：dump 恢复不带统计信息，不跑的话查询计划全靠瞎猜，
-排名、统计这类大查询会慢一阵，直到 autovacuum 自己补上。
+之后：`/root/OJDeploy/docker-compose.yml` 里的 `oj-postgres` / `oj-redis` 删掉（留着的话
+哪天有人 `up` 一下会和本栈抢端口）；`docker/.env` 里的 `DB_HOST` / `DB_PORT` /
+`REDIS_HOST` / `REDIS_PORT` 也删掉（`deploy.sh` 会提醒）。
 
-**Redis 8 直接读 7 留下的 `dump.rdb`**（实测），会话和判题队列都在，学生不用重新登录。
+**恢复时为什么剥掉 dump 里的口令**：旧库的口令是 md5 哈希存的，dump 原样带着；而 18 的
+镜像新建的库 `pg_hba.conf` 只认 `scram-sha-256`，md5 存的口令**永远验不过**。容器里
+`docker exec psql` 走本地 socket 是 trust，一切看着正常，只有 api 和机房从网络连进来才报
+`password authentication failed` —— 演练时就是这么发现的。剥掉之后库里留的是初始化时按
+`POSTGRES_PASSWORD` 存的 SCRAM 哈希。
 
-**回退**：`./data/postgres` 那个 16 的老目录没动过。把 compose 改回 `postgres:16-alpine`
-+ `./data/postgres:/var/lib/postgresql/data`，`up -d oj-postgres` 就回去了 —— 升级之后
-写进 18 的数据不会跟着回去。确认 18 稳了再删老目录。
+**中途失败**：停旧容器之前失败的，`docker start oj-api oj-worker` 就回去了。之后失败的，
+旧库目录 `$DATA_DIR/postgres` 一个字节没动：
+
+```bash
+docker rm -f oj-postgres oj-redis                                     # 本栈的 18 / 8
+docker compose -f /root/OJDeploy/docker-compose.yml up -d oj-postgres oj-redis   # 旧的 16 / 7
+# docker/.env 的 POSTGRES_PASSWORD 改回旧口令、DB_HOST 那四个变量填回去，
+# 代码退回搬家之前那个提交再 docker/deploy.sh
+```
+
+搬家之后写进 18 的数据回退时会丢。跑稳一两周再删 `$DATA_DIR/postgres`。
 
 ## 镜像体积
 

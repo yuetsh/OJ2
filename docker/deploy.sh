@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# 在**服务器上**起 OJ2 新栈（并行试跑形态：旧栈的 postgres/redis 继续跑，
-# 这里只起 api / worker / web / judge，旧站一个容器都不用停）。
+# 在**服务器上**起整套 OJ2：postgres / redis / 判题沙箱 / api / worker / web，
+# 全部由 docker/compose.debian.yml 管。
 #
 #   cd /root/OJDeploy/OJ2
 #   docker/deploy.sh              # 自检 → 构建 → 起栈 → 冒烟
@@ -61,28 +61,12 @@ say "自检"
 
 [ -f docker/.env ] || die "docker/.env 不存在。内容见手册第三节，别用 .env.example 直接改名（里面的值全是空的）"
 
-# 部署形态。判据用 DB_HOST 而不是另加一个开关：它本来就决定了 DATABASE_URL 指向谁，
-# 两个变量各说各话的话，迟早会出现「起了自带的库、却连到别处」这种自相矛盾的状态。
-#
-#   DB_HOST 为空 → 自带数据：本栈起 oj-postgres / oj-redis（compose 里挂在 local-data profile 下）
-#   DB_HOST 非空 → 外接数据：连别处的库，试跑期间连的是旧栈那两个容器
-db_host=$(grep -E '^DB_HOST=' docker/.env | tail -1 | cut -d= -f2- || true)
-if [ -z "$db_host" ]; then
-  LOCAL_DATA=1
-  COMPOSE+=(--profile local-data)
-  ok "形态：自带数据（postgres / redis 由本栈起）"
-else
-  LOCAL_DATA=0
-  ok "形态：外接数据（库在 $db_host）"
-fi
-
-# compose 版本：depends_on.required 是 v2.20 才有的字段，老版本会解析失败
-ver=$(docker compose version --short 2>/dev/null || echo 0)
-# 取 min(2.20, ver)：等于 2.20 就说明 ver 不低于它。别用 `sort -V -C`，
-# 那个判的是「这两行本来就有序」，对 ver 更新的情况会反过来判成太老（写错过一次）。
-[ "$(printf '2.20\n%s\n' "$ver" | sort -V | head -1)" = "2.20" ] \
-  || die "docker compose 版本太老（$ver），需要 ≥ 2.20（depends_on.required 是那个版本才有的字段）"
-ok "docker compose $ver"
+# 以前库和 redis 是外接旧栈的，靠这几个变量指过去；现在 compose 不再读它们。
+# 留在 .env 里不碍事，但会让人以为还在生效
+for v in DB_HOST DB_PORT REDIS_HOST REDIS_PORT; do
+  [ -z "$(grep -E "^$v=." docker/.env || true)" ] \
+    || warn "docker/.env 里的 $v 已经不用了（库和 redis 由本栈起），可以删掉"
+done
 
 # --prebuilt 时产物就是构建输入。缺了的话 docker 只会甩一句 COPY 找不到文件，
 # 这里提前拦下并说清楚该怎么办。
@@ -118,38 +102,22 @@ $bad
 检查 docker/.env 里的 DATA_DIR（注意：DATA_DIR= 空值等于没设，等号两边不能有空格）"
 ok "数据卷都在 $(grep 'source:' <<<"$cfg" | head -1 | sed 's|.*source: ||; s|/backend.*||')"
 
-# ② 库指向必须和形态一致，两个方向都要查
-if [ "$LOCAL_DATA" -eq 0 ]; then
-  # 外接：DB_HOST 不生效会静默回落成 oj-postgres，而这形态下本栈不起那个容器
-  ! grep -q 'DATABASE_URL: postgres://[^@]*@oj-postgres' <<<"$cfg" \
-    || die "DB_HOST 没生效，DATABASE_URL 还指着 oj-postgres —— 外接形态下本栈不起它，必然连不上库"
-else
-  # 自带：反过来必须指向服务名 + 容器内端口。连 :5432 一起查，是因为清了 DB_HOST 却
-  # 忘了清 DB_PORT 的话会拼出 oj-postgres:5445 —— 那是宿主机映射端口，容器网络里不通。
-  grep -q 'DATABASE_URL: postgres://[^@]*@oj-postgres:5432/' <<<"$cfg" \
-    || die "自带数据形态（DB_HOST 为空），但 DATABASE_URL 指向 $(grep -m1 'DATABASE_URL:' <<<"$cfg" | sed 's|.*@||; s|/onlinejudge.*||')。
-docker/.env 里 DB_PORT / REDIS_PORT 是不是也得一并清空？"
-fi
-ok "库指向 $(grep -m1 'DATABASE_URL:' <<<"$cfg" | sed 's|.*@||; s|/onlinejudge.*||')"
-
-# ②b 自带形态下数据目录必须已经是一个 18 版本的库。
-#     这是整个部署里唯一会**静默**走歪的地方：目录不对的话 postgres 当成全新部署，
-#     在空目录上初始化一个空库 —— 站点起得来、能注册能登录，就是一道题都没有。
-if [ "$LOCAL_DATA" -eq 1 ]; then
-  data_dir=$(grep -E '^DATA_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
-  [ -n "$data_dir" ] || die "自带数据形态必须显式设 DATA_DIR。
+# ② 数据目录必须已经是一个 18 版本的库。
+#    这是整个部署里唯一会**静默**走歪的地方：目录不对的话 postgres 当成全新部署，
+#    在空目录上初始化一个空库 —— 站点起得来、能注册能登录，就是一道题都没有。
+data_dir=$(grep -E '^DATA_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
+[ -n "$data_dir" ] || die "必须显式设 DATA_DIR。
 默认值 ../data 解析出来是 OJ2/data，那是个空目录，postgres 会在上面初始化一个全新的空库，而且不报任何错。"
-  pgver_file="$data_dir/postgresql/18/docker/PG_VERSION"
-  if [ ! -f "$pgver_file" ] && [ -f "$data_dir/postgres/PG_VERSION" ]; then
-    die "$data_dir 下只有 postgres/（PostgreSQL $(cat "$data_dir/postgres/PG_VERSION") 的老库），没有 postgresql/18/docker。
-compose 里已经是 postgres:18-alpine，老库要先倒过去，见 docs/deploy.md「PostgreSQL 升级」。"
-  fi
-  [ -f "$pgver_file" ] || die "找不到 $pgver_file —— DATA_DIR 指的不是一个已有的 postgres 数据目录。
-就这么起下去会得到一个空库。确认 DATA_DIR=$data_dir 对不对。"
-  pgver=$(cat "$pgver_file")
-  [ "$pgver" = 18 ] || die "$data_dir/postgresql 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:18-alpine，起不来。"
-  ok "数据目录 $data_dir/postgresql（PostgreSQL $pgver）"
+pgver_file="$data_dir/postgresql/18/docker/PG_VERSION"
+if [ ! -e "$data_dir/postgresql" ] && [ -d "$data_dir/postgres" ]; then
+  die "$data_dir 下只有 postgres/（PostgreSQL 16 的老库，旧栈 compose 起的），
+还没有 postgresql/18/docker。先把库搬进本栈：docker/move-db-into-oj2.sh（一次性的，见 docs/deploy.md）"
 fi
+[ -f "$pgver_file" ] || die "找不到 $pgver_file —— DATA_DIR 指的不是一个已有的 postgres 数据目录。
+就这么起下去会得到一个空库。确认 DATA_DIR=$data_dir 对不对。"
+pgver=$(cat "$pgver_file")
+[ "$pgver" = 18 ] || die "$data_dir/postgresql 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:18-alpine，起不来。"
+ok "数据目录 $data_dir/postgresql（PostgreSQL $pgver）"
 
 # ③ 判题机运行目录必须和旧栈分开，否则两个 judger 往同一个目录里写
 judge_dir=$(grep -E '^JUDGE_STATE_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
@@ -171,29 +139,6 @@ if [ -n "$judge_image" ]; then
   ok "判题镜像 $judge_image 在本机"
 fi
 
-# ⑤ 外接形态才需要预检：库不归本栈管，得确认它已经活着。
-#    自带形态下这两个容器就是本栈自己起的，起栈那步会拉起来，这里没什么可查。
-if [ "$LOCAL_DATA" -eq 0 ]; then
-  for c in oj-postgres oj-redis; do
-    docker ps --filter "name=$c" --filter status=running -q | grep -q . \
-      || die "外接形态依赖的 $c 没在跑 —— 先 docker compose -f /root/OJDeploy/docker-compose.yml up -d $c"
-  done
-  ok "外接的 postgres / redis 都在跑"
-
-  # 外接的 redis 不归本栈管，口令是否真的生效只能在这里查。旧栈那份 compose 的 redis
-  # 原本没有口令、端口发布在公网上 —— 会话存在里面，等于人人可以伪造超管登录态。
-  # 不带口令能 PING 通就说明那边还没加 --requirepass，这种状态不许上线。
-  redis_pw=$(grep -E '^REDIS_PASSWORD=' docker/.env | tail -1 | cut -d= -f2- || true)
-  [ -n "$redis_pw" ] || die "docker/.env 里没有 REDIS_PASSWORD（openssl rand -hex 32 生成）"
-  [ "$(docker exec -e REDISCLI_AUTH= oj-redis redis-cli ping 2>/dev/null)" != PONG ] \
-    || die "外接的 oj-redis 不带口令也能连上 —— 先给它加 --requirepass，见 docs/deploy.md「Redis 口令」"
-  [ "$(docker exec -e REDISCLI_AUTH="$redis_pw" oj-redis redis-cli ping 2>/dev/null)" = PONG ] \
-    || die "用 docker/.env 的 REDIS_PASSWORD 连不上外接的 oj-redis —— 两边口令不一致"
-  ok "外接的 redis 要求口令，且和 docker/.env 一致"
-else
-  ok "postgres / redis 由本栈起，不预检"
-fi
-
 port=$(grep -E '^WEB_PORT=' docker/.env | tail -1 | cut -d= -f2- || true)
 port=${port:-8080}
 ok "对外端口 $port"
@@ -212,12 +157,9 @@ fi
 # 在起栈**之前**跑：schema 先就位，新代码再启动。
 #
 # **不要加 --no-deps。** `run` 只会拉起被点名服务的依赖，而 oj-api 的依赖恰好就是
-# oj-postgres / oj-redis：
-#   · 自带数据形态 —— 必须靠它把 postgres 起来，否则这一步连不上库（加过 --no-deps，
-#     踩过这个坑）。depends_on 的 condition: service_healthy 还顺带保证了库真的就绪。
-#   · 外接形态 —— 那两个服务不在启用的 profile 里，depends_on 上的 required: false
-#     让 compose 直接跳过，不会多起任何东西。
-# 两种形态下 worker / web 都不会被带起来，它们不是 api 的依赖。
+# oj-postgres / oj-redis：必须靠它把 postgres 起来，否则这一步连不上库（加过 --no-deps，
+# 踩过这个坑）。depends_on 的 condition: service_healthy 还顺带保证了库真的就绪。
+# worker / web 不会被带起来，它们不是 api 的依赖。
 #
 # 含 DROP TABLE 这类破坏性语句的迁移会被拦下并退出 4，需要显式放行：
 #   OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
@@ -230,7 +172,7 @@ say "数据库迁移"
 它对每种情况都打印了具体该做什么，别照搬下面这几条猜。常见的三种：
   · 破坏性语句被拦    → 确认备份后 OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
   · 缺迁移基线记录    → 按它打印的 SQL 插一行
-  · 连不上库          → 自带数据形态下 postgres 是否起来了、DATA_DIR 对不对"
+  · 连不上库          → oj-postgres 是否起来了（docker logs oj-postgres）、DATA_DIR 对不对"
 
 say "起栈"
 "${COMPOSE[@]}" up -d
@@ -254,13 +196,13 @@ printf '    未登录进后台  %s  (期望 401)\n' "$(code /api/admin/dashboard
 
 total=$(curl -s "http://localhost:$port/api/problems" | grep -oE '"total":[0-9]+' | head -1 | cut -d: -f2 || true)
 printf '    题目总数      %s\n' "${total:-读不出来}"
-[ "${total:-0}" -gt 0 ] || die "题目数是 0 —— 连的不是生产库。查 DB_HOST / POSTGRES_PASSWORD"
+[ "${total:-0}" -gt 0 ] || die "题目数是 0 —— 连的不是生产库。查 DATA_DIR"
 
 cat <<EOF
 
 $(printf '\033[1;32m✅ 起来了\033[0m')
 
-  https://oj2.xuyue.cc  （NPM 反代已配好，指向宿主机:$port）
+  https://oj.xuyue.cc  （NPM 反代已配好，指向宿主机:$port）
 
 NPM 那边是一次性的，只有改了 WEB_PORT 才要回去动 proxy host 的端口。另外两项
 别关：Websockets Support（关了学生那边「判题中…」永远不动）、
