@@ -21,7 +21,7 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 | `docs/timezone.md` | 动日历口径、动时间出参格式 |
 | `docs/contract.md` | 动 zod 契约、想给某个字段加校验 |
 | `docs/ast-rules.md` | 动 AST 代码规则、升级 tree-sitter |
-| `docker/judge/README.md` | 换判题沙箱镜像、升语言版本（gcc / Python / Node …） |
+| `docker/judge/README.md` | 换判题沙箱镜像、升语言版本（gcc / Python …） |
 | `docs/specs/` | 三份设计文档：后端重写、课堂求助与协作编辑、题目详情页重设计（动题目页之前必读） |
 
 ## 仓库结构
@@ -29,7 +29,7 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 | 目录 | 作用 |
 |---|---|
 | `apps/api/` | 后端。Hono + Drizzle + BullMQ，编译成单二进制 |
-| `apps/web/` | 前端。从 ojnext 原样搬来的 Vue 3 SPA |
+| `apps/web/` | 前端。Vue 3 SPA，起点是 ojnext 的代码，之后大部分已重写 |
 | `packages/contract/` | 前后端共用的 Zod 契约 |
 | `docker/` | Dockerfile + 三套 compose（dev / debian / school）+ 部署与运维脚本 |
 | `docs/` | 上面那几份专题文档 + `specs/` 里的设计文档 |
@@ -64,11 +64,10 @@ cd apps/web && bun run build                  # 前端构建（不在 verify 里
 ```
 
 **格式化、lint、任务编排都走 Vite+**（`vite-plus`，`vp` 命令），配置只有根目录的
-`vite.config.ts` 一份：`fmt` 块（Oxfmt，`semi: false`、`printWidth: 80`）、`lint` 块
+`vite.config.ts` 一份：`fmt` 块（Oxfmt，`semi: false`，行宽用默认的 100）、`lint` 块
 （Oxlint，`denyWarnings`）、`run.tasks`（`verify` 和它依赖的四个检查）。前端自己的构建
 配置在 `apps/web/vite.config.ts`，和根目录那份无关。
 
-- **Oxfmt 在 Vite+ 下默认 100 列**，根配置显式写了 80，别删 —— 删了就是几百个文件的 diff。
 - 格式化只管代码：`.md` / `.yml` / `.json` / `.toml` 在 `fmt.ignorePatterns` 里排掉了
   （文档的中文表格、compose 的逐行注释是手排的），`src/db/meta/` 快照和 unplugin 的两个
   `.d.ts` 也排掉了。
@@ -164,7 +163,7 @@ QingdaoU/JudgeServer 停更在 2024-04（官方镜像的 `latest` 和 `1.6.1` �
 拼出来的字面量，TS 已经在编译期校验过；再 parse 一遍拿不到任何新信息，唯一可能失败的输入是
 **库里的历史数据**，而失败的代价是 500 —— 这条规矩是被四次这样的线上故障换来的。
 
-**闸设在写入侧**：入参 `safeParse`（58 处）、`db/schema.ts` 的 `.$type<>()` 列收窄、
+**闸设在写入侧**：入参 `safeParse`、`db/schema.ts` 的 `.$type<>()` 列收窄、
 语义校验函数（`astRulesError()` / `exerciseDataError`）。JSONB 原文
 （`submission.info` / `statistic_info` / `exercise.data`）一律放行，它们的形状真相在判题机
 那边。query 的筛选值走 `routes/helpers.ts` 的 `asFilterValue()`，那是纯类型交接、不加校验。
@@ -211,7 +210,7 @@ SQL 里要按日历切，用 `localTime(列)`（生成 `列 at time zone 'Asia/S
 
 **分层：存 UTC 时刻 → 后端判定按东八区 → 出参 ISO UTC → 前端按东八区渲染。**
 
-- **存**：35 个时间列全是 `timestamptz`，写侧一律 `new Date().toISOString()`。
+- **存**：时间列全是 `timestamptz`，写侧一律 `new Date().toISOString()`。
 - **判定**：日历语义走 `time.ts`，SQL 用 `localTime()`。
 - **出参**：`db/index.ts` 给 OID 1184 挂了 parser，读出来的时刻统一成 ISO 8601 UTC，
   **微秒必须保留**（截成毫秒会让翻页每页丢一条、班级 AC 排名少 1）。

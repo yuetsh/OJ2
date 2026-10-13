@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**OJ2 的前端**（`OJ2/apps/web`），代码从上一代 `ojnext/` 原样搬来、只替换了 API 层
+**OJ2 的前端**（`OJ2/apps/web`），起点是上一代 `ojnext/` 的代码，之后大部分页面已重写
 （`ojnext` 与 `../OnlineJudge` 都已下线且**完全冻结，一行都不改**）。Vue 3 + TypeScript，
 Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
 
@@ -59,7 +59,7 @@ API 调用不按模块分：学生端全在 `oj/api.ts`、后台全在 `admin/ap
 
 Shared logic lives in `shared/`:
 - `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `collab` (help-request queue + collab room), `achievement` (解锁弹窗队列), `myFlowchart` (题面「你画的流程图」那张 A/S 图的 mermaid 源码)
-- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `leaveStudents` (课堂看板的「请假」), `chartTheme`, `breakpoints`, `rarity`
+- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `leaveStudents` (课堂看板的「请假」), `problemJump` (按题号直达), `teacherHelp` (老师接单 / 打开学生编辑器), `chartTheme`, `breakpoints`, `rarity`
 - `layout/` — `default.vue` and `admin.vue` layout wrappers
 - `api.ts` — shared API calls (auth, profile, tags, captcha)
 
@@ -178,6 +178,7 @@ proxy 转给 3000，线上由 Caddy 同源伺服。
 Routes are defined in `src/routes.ts` with two root routes: `ojs` (user-facing) and `admins` (admin panel). Route meta fields used:
 - `requiresAuth` — redirect to login if not authenticated
 - `requiresSuperAdmin` — super admin only
+- `requiresTeacherAdmin` — 老师及以上（`isTeacherOrAbove`）
 - `requiresProblemPermission` — problem management access
 
 ### Real-time Features
