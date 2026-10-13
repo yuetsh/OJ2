@@ -190,6 +190,8 @@ export const updateExerciseRequestSchema = createExerciseRequestSchema.omit({
 export const adminAiReportListItemSchema = z.object({
   id: z.number().int(),
   username: z.string(),
+  /** 列表里名字旁边写是哪个班的 */
+  className: z.string().nullable(),
   createTime: z.string(),
   analysisExcerpt: z.string(),
   isPinned: z.boolean(),

@@ -24,6 +24,7 @@ function excerpt(analysis: string | null) {
 function listItem(row: {
   id: number
   username: string
+  className: string | null
   createTime: string
   analysis: string
   isPinned: boolean
@@ -31,6 +32,7 @@ function listItem(row: {
   return {
     id: row.id,
     username: row.username,
+    className: row.className,
     createTime: row.createTime,
     analysisExcerpt: excerpt(row.analysis),
     isPinned: row.isPinned,
@@ -40,6 +42,7 @@ function listItem(row: {
 const listColumns = {
   id: schema.aiAnalysis.id,
   username: schema.user.username,
+  className: schema.user.className,
   createTime: schema.aiAnalysis.createTime,
   analysis: schema.aiAnalysis.analysis,
   isPinned: schema.aiAnalysis.isPinned,
