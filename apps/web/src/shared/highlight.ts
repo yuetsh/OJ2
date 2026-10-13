@@ -16,19 +16,13 @@ import type { ConfigProviderProps } from "naive-ui"
 
 /** 词的种类 → 类名。编辑器在 shared/themes/codeTheme.ts 里挂的也是它 */
 export const codeHighlighter = tagHighlighter([
-  // `int` 这类基本类型和关键字一个颜色，自定义的类型（struct 名）才是类型色
-  {
-    tag: [
-      t.keyword,
-      t.modifier,
-      t.operator,
-      t.processingInstruction,
-      t.escape,
-      t.standard(t.typeName),
-    ],
-    class: "tok-keyword",
-  },
+  // 分法照 VS Code：if / return / #include 这类管流程的词单独一色，`int` / `struct` 是普通关键字，
+  // 自定义的类型（struct 名）才是类型色；运算符不上色，变量名上色
+  { tag: [t.controlKeyword, t.moduleKeyword, t.processingInstruction], class: "tok-control" },
+  { tag: [t.keyword, t.modifier, t.standard(t.typeName)], class: "tok-keyword" },
+  { tag: t.escape, class: "tok-escape" },
   { tag: [t.function(t.variableName), t.function(t.propertyName)], class: "tok-function" },
+  { tag: [t.variableName, t.propertyName], class: "tok-variable" },
   { tag: t.string, class: "tok-string" },
   { tag: [t.number, t.bool, t.null, t.atom, t.self], class: "tok-number" },
   { tag: [t.typeName, t.className, t.namespace, t.standard(t.name)], class: "tok-type" },
