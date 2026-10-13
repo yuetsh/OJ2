@@ -17,13 +17,13 @@ import {
 } from "utils/constants"
 import { parseTime, submissionCaseResults } from "utils/functions"
 import type { Submission } from "utils/types"
-import CodeView from "./components/CodeView.vue"
-import ExplainNote from "./components/ExplainNote.vue"
-import StatusPill from "./components/StatusPill.vue"
-import { useCopySubmission } from "./composables/copySubmission"
-import { useSubmissionExplain } from "./composables/explain"
-import { useTone } from "./composables/tone"
-import { classLabel, submissionTimeText } from "./utils"
+import { useCopySubmission } from "../composables/copySubmission"
+import { useSubmissionExplain } from "../composables/explain"
+import { useTone } from "../composables/tone"
+import { classLabel, submissionTimeText } from "../utils"
+import CodeView from "./CodeView.vue"
+import ExplainNote from "./ExplainNote.vue"
+import StatusPill from "./StatusPill.vue"
 
 /**
  * 单独打开的一条提交（设计稿「提交详情重设计」A，用户改成代码在前、例子在后）：一栏到底 ——
@@ -33,8 +33,12 @@ import { classLabel, submissionTimeText } from "./utils"
  *
  * 入口是提交列表右栏的「新页面打开」、统计页的方块、后台卡点分析 —— 多半是老师在看某个学生
  * 怎么一次次改对的。
+ *
+ * 独立的提交详情页（detail.vue）和课堂看板「讲错误」的弹层共用这一个。`embedded`（弹层里）：
+ * 不出名字和题目那一行（弹层顶上有一排人名），不占 ← →（弹层拿它换人），
+ * 点「第几次」就地换、不改地址栏。
  */
-const props = defineProps<{ submissionID: string }>()
+const props = defineProps<{ id: string; embedded?: boolean }>()
 
 const router = useRouter()
 const message = useMessage()
@@ -44,6 +48,13 @@ const tone = useTone()
 const userStore = useUserStore()
 const { isMobile } = useBreakpoints()
 const { copyToCat, copyToProblem } = useCopySubmission()
+
+/** 正在看的那一条：页面里跟着地址栏走，弹层里点「第几次」就地换 */
+const currentId = ref(props.id)
+watch(
+  () => props.id,
+  (id) => (currentId.value = id),
+)
 
 const detail = ref<Submission | null>(null)
 /** forbidden：别人的代码；missing：链接不对 / 已删掉 */
@@ -65,7 +76,7 @@ async function load(quiet = false) {
   clearTimeout(timer)
   if (!quiet) state.value = "loading"
   try {
-    const res = await getSubmission(props.submissionID, true)
+    const res = await getSubmission(currentId.value, true)
     if (seq !== loadSeq) return
     detail.value = res
     state.value = "ok"
@@ -82,11 +93,7 @@ async function load(quiet = false) {
   }
 }
 
-watch(
-  () => props.submissionID,
-  () => load(),
-  { immediate: true },
-)
+watch(currentId, () => load(), { immediate: true })
 onBeforeUnmount(() => clearTimeout(timer))
 
 const shown = computed(() => (state.value === "ok" ? detail.value : null))
@@ -144,7 +151,9 @@ function step(delta: -1 | 1) {
 }
 
 function openAttempt(id: string) {
-  if (id !== shown.value?.id) router.replace("/submission/" + id)
+  if (id === shown.value?.id) return
+  if (props.embedded) currentId.value = id
+  else router.replace("/submission/" + id)
 }
 
 function typing(event: KeyboardEvent) {
@@ -154,6 +163,7 @@ function typing(event: KeyboardEvent) {
 
 // 这几次是横着排的一串，所以用 ← →（竖着排的列表才用 ↑ ↓，见提交列表）
 onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
+  if (props.embedded) return
   if (typing(event) || event.altKey || event.ctrlKey || event.metaKey || attempts.value.length < 2)
     return
   event.preventDefault()
@@ -228,9 +238,9 @@ function handleMore(key: string) {
 </script>
 
 <template>
-  <div class="oj-page detail" :class="{ narrow: isMobile }">
+  <div class="detail" :class="{ 'oj-page': !embedded, narrow: isMobile }">
     <template v-if="shown">
-      <div class="head">
+      <div v-if="!embedded" class="head">
         <div class="who">
           <a
             class="user-link"
@@ -332,7 +342,9 @@ function handleMore(key: string) {
           <StatusPill v-else :result="item.result" bare />
           <span class="t">{{ attemptTime(item.createTime) }}</span>
         </a>
-        <span v-if="!isMobile && canStep" class="keys"><kbd>←</kbd><kbd>→</kbd> 换一次</span>
+        <span v-if="!isMobile && !embedded && canStep" class="keys"
+          ><kbd>←</kbd><kbd>→</kbd> 换一次</span
+        >
       </section>
 
       <div v-if="!shown.showLink" class="locked">
