@@ -146,6 +146,14 @@ export const ojs: RouteRecordRaw = {
       name: "problemset problem",
       meta: { requiresAuth: true },
     },
+    // 兜底：没有它，打错地址是一整页空白，连顶栏都没有。vue-router 按路径具体程度排序，
+    // 不按注册顺序，所以它吃不掉别的路由；/admin 下打错的也落到这里
+    {
+      path: ":pathMatch(.*)*",
+      name: "not found",
+      component: () => import("shared/components/NotFound.vue"),
+      props: { title: "这个页面不存在", hint: "可能是地址打错了，或者这个页面已经下线" },
+    },
   ],
 }
 

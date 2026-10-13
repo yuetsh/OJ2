@@ -3,6 +3,8 @@ import { useThemeVars } from "naive-ui"
 import { useTone } from "oj/submission/composables/tone"
 import { ContestStatus } from "utils/constants"
 import { parseTime, secondsToDuration } from "utils/functions"
+import NotFound from "shared/components/NotFound.vue"
+import { errorCode } from "utils/api"
 import { useContestStore } from "../store/contest"
 import ContestBadge from "./components/ContestBadge.vue"
 import ContestInfo from "./components/ContestInfo.vue"
@@ -34,18 +36,27 @@ async function check() {
   }
 }
 
+/** 拉比赛失败：原来没接，链接不对就是一整页空白 */
+const failure = ref<null | "missing" | "failed">(null)
+
+async function load() {
+  failure.value = null
+  try {
+    await contestStore.init(props.contestID)
+  } catch (err) {
+    if (contestStore.contest) return
+    failure.value = errorCode(err) === "contest-not-found" ? "missing" : "failed"
+  }
+}
+
 watch(
   () => contestStore.contestStatus,
   (nv, ov) => {
-    if (nv === ContestStatus.underway && ov == ContestStatus.not_started) {
-      contestStore.init(props.contestID)
-    }
+    if (nv === ContestStatus.underway && ov == ContestStatus.not_started) load()
   },
 )
 
-onMounted(() => {
-  contestStore.init(props.contestID)
-})
+onMounted(load)
 
 onBeforeUnmount(contestStore.clear)
 
@@ -95,7 +106,17 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 </script>
 
 <template>
-  <div v-if="contest" class="contest-page">
+  <NotFound
+    v-if="failure === 'missing'"
+    title="这场比赛不存在"
+    hint="可能是链接复制错了，或者这场比赛还没公开"
+    to="/contest"
+    to-label="去比赛列表"
+  />
+  <NotFound v-else-if="failure === 'failed'" icon="ph:wifi-slash" title="比赛没拉下来">
+    <n-button type="primary" @click="load()">再试一次</n-button>
+  </NotFound>
+  <div v-else-if="contest" class="contest-page">
     <header class="bar">
       <ContestBadge :status="status" />
       <h2 class="title">{{ contest.title }}</h2>

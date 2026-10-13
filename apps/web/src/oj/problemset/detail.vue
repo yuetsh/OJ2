@@ -9,6 +9,7 @@ import type { ProblemSet, ProblemSetProblem } from "utils/types"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
 import { useFireworks } from "../problem/composables/useFireworks"
+import NotFound from "shared/components/NotFound.vue"
 import BadgeLadder from "./components/BadgeLadder.vue"
 import ClassView from "./components/ClassView.vue"
 
@@ -133,16 +134,13 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 </script>
 
 <template>
-  <n-result
+  <NotFound
     v-if="missing"
-    status="404"
-    title="题单不存在"
-    description="可能还没公开，或者已经删掉了"
-  >
-    <template #footer>
-      <n-button @click="router.push({ name: 'problemsets' })">回到题单列表</n-button>
-    </template>
-  </n-result>
+    title="这个题单不存在"
+    hint="可能还没公开，或者已经删掉了"
+    to="/problemset"
+    to-label="回到题单列表"
+  />
 
   <div v-else-if="set" class="page oj-page">
     <section class="band" :class="{ done: progress?.isCompleted }">

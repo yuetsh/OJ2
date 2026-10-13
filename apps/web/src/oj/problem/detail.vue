@@ -11,6 +11,7 @@ import { useSubmissionStore } from "oj/store/submission"
 import { useFlowchartStore } from "oj/store/flowchart"
 import { useCollabStore } from "shared/store/collab"
 import type { RouteLocationNormalized } from "vue-router"
+import NotFound from "shared/components/NotFound.vue"
 // 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
 import SubmissionEffects from "./components/SubmissionEffects.vue"
 import ResultTabLabel from "./components/ResultTabLabel.vue"
@@ -40,9 +41,10 @@ interface Props {
   problemSetId?: string
 }
 
-const { problemID, contestID = "" } = defineProps<Props>()
+const { problemID, contestID = "", problemSetId = "" } = defineProps<Props>()
 
-const errMsg = ref("无数据")
+/** 拉题面失败的原因：null 是还在拉（或拉到了），别的就整页换成 NotFound */
+const failure = ref<null | "missing" | "not-started" | "failed">(null)
 const route = useRoute()
 const router = useRouter()
 
@@ -226,6 +228,7 @@ async function init() {
   // 并行预取右侧编辑器 chunk（CodeMirror ~370K+），
   // 避免等 getProblem 返回后才串行下载，编辑器才迟迟出现
   loadProblemEditor()
+  failure.value = null
   try {
     const res = await getProblem(problemID, contestID)
     if (mine !== initSeq) return
@@ -233,12 +236,25 @@ async function init() {
   } catch (err) {
     if (mine !== initSeq) return
     problem.value = null
-    if (errorCode(err) === "contest-not-started") {
-      errMsg.value = "比赛还没有开始"
-    }
+    const code = errorCode(err)
+    failure.value =
+      code === "contest-not-started"
+        ? "not-started"
+        : code === "problem-not-found"
+          ? "missing"
+          : "failed"
   }
 }
 onMounted(init)
+
+/** 题不存在时回哪：比赛里回比赛，题单里回题单，否则回题目列表 */
+const backTo = computed(() =>
+  contestID
+    ? { to: `/contest/${contestID}`, toLabel: "回到比赛" }
+    : problemSetId
+      ? { to: `/problemset/${problemSetId}`, toLabel: "回到题单" }
+      : { to: "/problem", toLabel: "去题目列表" },
+)
 watch(() => problemID, init)
 
 // 题目详情里的 myStatus / myFailedCount 是按当前用户算的，而登录不重新挂载这个页面 ——
@@ -262,7 +278,7 @@ onBeforeUnmount(() => {
   // 流程图那边同理，还在评的那次不再跟（照常评完落库）
   useFlowchartStore().reset()
   problem.value = null
-  errMsg.value = "无数据"
+  failure.value = null
   myFlowchartStore.hide()
 })
 </script>
@@ -372,7 +388,23 @@ onBeforeUnmount(() => {
       <MobileActionBar />
     </div>
   </template>
-  <n-empty v-else :description="errMsg"></n-empty>
+  <NotFound
+    v-else-if="failure === 'not-started'"
+    icon="ph:clock"
+    title="比赛还没有开始"
+    hint="开始以后才能看题"
+    :to="`/contest/${contestID}`"
+    to-label="回到比赛"
+  />
+  <NotFound v-else-if="failure === 'failed'" icon="ph:wifi-slash" title="题目没拉下来">
+    <n-button type="primary" @click="init()">再试一次</n-button>
+  </NotFound>
+  <NotFound
+    v-else-if="failure === 'missing'"
+    title="这道题不存在"
+    hint="可能是题号打错了，或者这道题还没公开"
+    v-bind="backTo"
+  />
 </template>
 
 <style scoped>
