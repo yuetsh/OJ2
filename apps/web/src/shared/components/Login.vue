@@ -51,14 +51,14 @@ function filterClassUser(pattern: string, option: SelectOption) {
     : false
 }
 // 空串是「没有我所在的班级」，null 才是没选 —— 往届的班级毕业后会从后台配置里删掉，
-// 这一项是他们唯一的入口，写完整用户名登录
+// 这一项是他们唯一的入口，写完整用户名登录。放在最前：班级一多它沉在底下，要翻到底才找得到
 const OTHER_CLASS = ""
 const classList = computed<SelectOption[]>(() => [
+  { label: "没有我所在的班级", value: OTHER_CLASS },
   ...groupClassOptions(configStore.config?.classList ?? [], (item) => ({
     label: classLabel(item),
     value: `ks${item}`,
   })),
-  { label: "没有我所在的班级", value: OTHER_CLASS },
 ])
 // 选了具体班级就是「选姓名」，选了「没有我所在的班级」就是「写用户名」
 const isClassLogin = computed(() => Boolean(form.value.class))
