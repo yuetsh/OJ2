@@ -485,6 +485,9 @@ function shortTitle(title: string, size: number) {
         <span v-for="problem in board.problems" :key="problem.problemId" class="chip">
           {{ problem.problemDisplayId }}
         </span>
+        <span v-if="board.assignedAt" class="assigned">
+          {{ parseTime(board.assignedAt, "HH:mm") }} 布置
+        </span>
         <n-button text class="edit" @click="startEdit">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
           {{ board.source === "teacher" ? "改" : "布置" }}
@@ -852,6 +855,14 @@ function shortTitle(title: string, size: number) {
   background: v-bind("tone('success').background");
   color: v-bind("tone('success').color");
   font-weight: 600;
+}
+
+.assigned {
+  margin-left: 4px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: v-bind("theme.textColor3");
+  white-space: nowrap;
 }
 
 .edit {

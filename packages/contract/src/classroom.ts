@@ -151,6 +151,8 @@ export const classBoardSchema = z.object({
   source: z.enum(["teacher", "inferred"]).nullable(),
   /** 今天布置的语言（见 lessonLanguageSchema） */
   language: lessonLanguageSchema,
+  /** 今天第一次布置的时刻，之后改题不变；推断出来的课为 null */
+  assignedAt: z.string().nullable(),
   /** 这个班最近一次布置选的语言（含今天），给语言下拉当默认值；从没选过为 null */
   lastLanguage: lessonLanguageSchema,
   problems: z.array(classBoardProblemSchema),

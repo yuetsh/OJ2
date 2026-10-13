@@ -185,14 +185,18 @@ async function visibleProblems(ids: number[]) {
   return new Map(rows.map((row) => [row.id, row]))
 }
 
-/** 老师给这个班今天布置的题（problem.id，按输入顺序）和选的语言；没布置为 null */
+/** 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言和布置时刻；没布置为 null */
 async function lessonPlan(className: string, day: string) {
   const [row] = await db
-    .select({ problemIds: schema.classLesson.problemIds, language: schema.classLesson.language })
+    .select({
+      problemIds: schema.classLesson.problemIds,
+      language: schema.classLesson.language,
+      createdAt: schema.classLesson.createdAt,
+    })
     .from(schema.classLesson)
     .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
     .limit(1)
-  return row?.problemIds.length ? { problemIds: row.problemIds, language: row.language } : null
+  return row?.problemIds.length ? row : null
 }
 
 /**
@@ -217,6 +221,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
       source: "teacher" as const,
       day: today,
       language: plan.language ?? null,
+      assignedAt: plan.createdAt,
       problems: planned.flatMap((id) => {
         const problem = problems.get(id)
         if (!problem) return []
@@ -248,6 +253,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     day: picked.length ? latest : null,
     // 推断出来的课不知道老师要的是哪种语言，不限
     language: null,
+    assignedAt: null,
     problems: picked.flatMap((row) => {
       const problem = problems.get(row.problemId)
       return problem
@@ -503,6 +509,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
       day,
       source: null,
       language: null,
+      assignedAt: null,
       lastLanguage: null,
       problems: [],
       students: [],
@@ -707,6 +714,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     day,
     source: lesson.source,
     language: lesson.language,
+    assignedAt: lesson.assignedAt,
     lastLanguage: last?.language ?? null,
     problems: lesson.problems.map((problem) => ({
       problemId: problem.id,
@@ -848,7 +856,15 @@ classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
   const now = new Date().toISOString()
   await db
     .insert(schema.classLesson)
-    .values({ className, day, problemIds, language, createdBy: user.id, updatedAt: now })
+    .values({
+      className,
+      day,
+      problemIds,
+      language,
+      createdBy: user.id,
+      createdAt: now,
+      updatedAt: now,
+    })
     .onConflictDoUpdate({
       target: [schema.classLesson.className, schema.classLesson.day],
       set: { problemIds, language, createdBy: user.id, updatedAt: now },

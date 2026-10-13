@@ -239,6 +239,13 @@
       "when": 1791823809856,
       "tag": "0033_drop_message",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791858070886,
+      "tag": "0034_add_class_lesson_created_at",
+      "breakpoints": true
     }
   ]
 }
