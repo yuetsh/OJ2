@@ -96,7 +96,9 @@ const columns: DataTableColumn<AdminUserForm>[] = [
   {
     title: "用户名",
     key: "username",
-    minWidth: 200,
+    // 定宽：用户名一般就 ks + 班号 + 两三个字，原来 minWidth 让它把整行剩下的空都吃掉了（用户嫌空太多）。
+    // 剩下的宽度给最后的操作列，操作直接摆出来
+    width: 230,
     render: (row) => h(UserNameCell, { user: row }),
   },
   {
@@ -133,7 +135,7 @@ const columns: DataTableColumn<AdminUserForm>[] = [
   {
     key: "actions",
     title: "",
-    width: 130,
+    minWidth: 300,
     render: (row) =>
       h(Actions, {
         user: row,

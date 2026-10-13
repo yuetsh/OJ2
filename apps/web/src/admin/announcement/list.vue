@@ -18,7 +18,7 @@ const announcements = ref<AdminAnnouncementListItem[]>([])
 
 /**
  * 后台公告列表（设计稿「后台公告」AnnAdmin）：一行一条，标题（置顶挂标，公告 / 更新淡淡写在后面）、
- * 发布、改过、学生看得到；「编辑」常驻，置顶 / 删除收进 ⋯。ID、作者（都是同一个人）、
+ * 发布、改过、学生看得到；编辑、置顶、删除直接摆出来。ID、作者（都是同一个人）、
  * 精确到秒的两列时间拿掉
  */
 const theme = useThemeVars()
@@ -27,7 +27,7 @@ const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
   {
     title: "标题",
     key: "title",
-    minWidth: 300,
+    width: 360,
     render: (row) =>
       h("span", { class: "title-cell" }, [
         h(
@@ -73,7 +73,7 @@ const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
   {
     title: "",
     key: "actions",
-    width: 110,
+    minWidth: 240,
     render: (row) =>
       h(Actions, {
         announcementID: row.id,

@@ -102,12 +102,18 @@ const visibleTabs = computed(() => [
   { value: "0" as const, label: "藏着的", count: counts.value?.hidden },
 ])
 
-/** 知识点只摆前两个，多的写 +N，鼠标放上去看全部（P073 这类题挂了六个） */
+/**
+ * 知识点：两个以内全摆，多了只摆第一个 + 「+N」，鼠标放上去看全部（P073 这类题挂了六个）。
+ * 列宽只放得下两个，摆两个再加 +N 的话 +N 会被截掉
+ */
 function renderTags(tags: string[]) {
   if (!tags.length) return h("span", { class: "muted" }, "—")
+  const shown = tags.length > 2 ? tags.slice(0, 1) : tags
   return h("span", { class: "tags", title: tags.join("、") }, [
-    ...tags.slice(0, 2).map((tag) => h("span", { class: "tag", key: tag }, tag)),
-    tags.length > 2 ? h("span", { class: "muted more" }, `+${tags.length - 2}`) : null,
+    ...shown.map((tag) => h("span", { class: "tag", key: tag }, tag)),
+    tags.length > shown.length
+      ? h("span", { class: "muted more" }, `+${tags.length - shown.length}`)
+      : null,
   ])
 }
 
@@ -146,15 +152,17 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
   {
     title: "题号",
     key: "_id",
-    width: 84,
+    width: 70,
     render: (row) => h("span", { class: "did", title: `内部编号 ${row.id}` }, row._id),
   },
-  { title: "题目", key: "title", minWidth: 220, ellipsis: false, render: renderTitle },
-  { title: "知识点", key: "tags", width: 190, render: (row) => renderTags(row.tags) },
+  // 题目定宽：p90 也就 12 个字加一两个类型标签。原来 minWidth 让它吃掉整行剩余空间（用户嫌空太多），
+  // 剩下的宽度给最后的操作列
+  { title: "题目", key: "title", width: 196, ellipsis: false, render: renderTitle },
+  { title: "知识点", key: "tags", width: 158, render: (row) => renderTags(row.tags) },
   {
     title: "做对 / 做过",
     key: "users",
-    width: 100,
+    width: 96,
     render: (row) =>
       row.triedUsers
         ? h("span", { class: "num" }, [
@@ -163,11 +171,11 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
           ])
         : h("span", { class: "muted" }, "没人做过"),
   },
-  { title: "出题人", key: "username", width: 100, ellipsis: { tooltip: true } },
+  { title: "出题人", key: "username", width: 86, ellipsis: { tooltip: true } },
   {
     title: "创建",
     key: "create_time",
-    width: 96,
+    width: 100,
     render: (row) => h("span", { class: "num muted" }, parseTime(row.createTime, "YYYY-MM-DD")),
   },
   {
@@ -185,7 +193,7 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
   {
     title: "",
     key: "actions",
-    width: 104,
+    minWidth: 240,
     render: (row) =>
       h(Actions, {
         problemID: row.id,
@@ -385,6 +393,11 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
   opacity: 0.7;
 }
 
+/* 表头不折行：「做对 / 做过」「学生看得到」折成两行时整张表头变高 */
+.problem-table :deep(.n-data-table-th) {
+  white-space: nowrap;
+}
+
 .problem-table :deep(.did) {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -409,10 +422,11 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
 }
 
 .problem-table :deep(.tags) {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+  overflow: hidden;
 }
 
 .problem-table :deep(.tag) {
@@ -435,5 +449,6 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
 
 .problem-table :deep(.num) {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>

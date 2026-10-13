@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { Icon } from "@iconify/vue"
 import type { AdminContest } from "utils/types"
 import { cloneContest } from "../../api"
 
@@ -22,14 +21,8 @@ function goClass() {
   window.open(`/contest/${props.contest.id}/class`, "_blank")
 }
 
-const menuOptions: DropdownOption[] = [
-  { label: "复制一份", key: "clone" },
-  { label: "在前台看", key: "view" },
-]
-
-function onMenu(key: string) {
-  if (key === "clone") clone()
-  else if (key === "view") window.open(`/contest/${props.contest.id}`, "_blank")
+function openFront() {
+  window.open(`/contest/${props.contest.id}`, "_blank")
 }
 
 async function clone() {
@@ -46,16 +39,14 @@ async function clone() {
 }
 </script>
 <template>
-  <n-flex :size="4" justify="end" :wrap="false">
+  <!-- 操作直接摆出来，不收进 ⋯（用户说的） -->
+  <n-flex :size="4" :wrap="false">
     <n-button size="small" @click="goEdit">编辑</n-button>
     <n-button size="small" @click="goClass">
       {{ contest.status === "-1" ? "成绩" : "全班情况" }}
     </n-button>
-    <n-dropdown trigger="click" placement="bottom-end" :options="menuOptions" @select="onMenu">
-      <n-button size="small" quaternary aria-label="更多">
-        <template #icon><Icon icon="ph:dots-three-bold" /></template>
-      </n-button>
-    </n-dropdown>
+    <n-button size="small" @click="clone">复制一份</n-button>
+    <n-button size="small" title="在前台打开这场比赛" @click="openFront">前台看</n-button>
   </n-flex>
 </template>
 <style scoped></style>

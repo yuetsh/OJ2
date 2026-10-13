@@ -12,7 +12,7 @@ import Actions from "./components/Actions.vue"
 /**
  * 后台比赛列表（设计稿「比赛重设计」CtAdminList）。一行一场：比赛名（期中 / 期末挂标，
  * 要密码的带锁）、开始时间和多长、状态、几道题、几人参加、出卷人、学生看得到；
- * 操作「编辑」「成绩 / 全班情况」+ ⋯。按开始时间排 —— 原来按创建时间，复制出来的旧比赛
+ * 操作「编辑」「成绩 / 全班情况」「复制一份」「在前台看」直接摆出来。按开始时间排 —— 原来按创建时间，复制出来的旧比赛
  * 会跑到最前面。ID、标签、类型三列拿掉（标签只在期中 / 期末时挂出来，类型就是那把锁）
  */
 const theme = useThemeVars()
@@ -47,7 +47,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: "比赛",
     key: "title",
-    minWidth: 220,
+    width: 260,
     render: (row) =>
       h("span", { class: "title-cell" }, [
         h(ContestTitle, { contest: row }),
@@ -57,7 +57,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: "开始 · 多长",
     key: "start_time",
-    width: 220,
+    width: 200,
     render: (row) =>
       h("span", { class: "num" }, [
         parseTime(row.startTime, "YYYY-MM-DD HH:mm"),
@@ -67,7 +67,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: "状态",
     key: "status",
-    width: 80,
+    width: 72,
     render: (row) =>
       h(
         "span",
@@ -89,7 +89,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: "出卷",
     key: "created_by",
-    width: 96,
+    width: 84,
     ellipsis: { tooltip: true },
     render: (row) => row.createdBy.username,
   },
@@ -108,7 +108,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: "",
     key: "actions",
-    width: 190,
+    minWidth: 270,
     render: (row) => h(Actions, { contest: row }),
   },
 ]

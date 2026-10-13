@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import { useThemeVars } from "naive-ui"
 import type { AdminTag, TagCategory } from "utils/types"
@@ -30,7 +29,8 @@ function openTagProblems(tag: AdminTag) {
 /**
  * 两栏：知识点 / 主题（设计稿「后台标签」TagA）。原来是一张宽表，每行一组单选按钮切分类、
  * 两颗按钮，ID 一列、页头一段说明。现在一行一个标签 + 挂了几道题（条的长短看出哪个用得多），
- * 点名字看这个标签下的题，改名 / 换分类 / 删除收进 ⋯。还没归类的单独一条放最上面
+ * 点名字看这个标签下的题，改名 / 换分类 / 删除直接摆在行尾（用户说的：不要收进 ⋯）。
+ * 还没归类的单独一条放最上面
  */
 const columnsOf = computed(() => {
   const confirmed = visibleTags.value.filter((t) => t.categoryConfirmed)
@@ -48,25 +48,6 @@ const columnsOf = computed(() => {
   }))
 })
 const pendingTags = computed(() => visibleTags.value.filter((t) => !t.categoryConfirmed))
-
-function menuOf(tag: AdminTag): DropdownOption[] {
-  return [
-    { label: "改名（同名就合并）", key: "rename" },
-    { label: tag.category === "theme" ? "改成知识点" : "改成主题", key: "move" },
-    { type: "divider", key: "divider" },
-    {
-      label: tag.problemCount ? `删除（${tag.problemCount} 道题会摘掉它）` : "删除",
-      key: "delete",
-      props: { style: `color: ${theme.value.errorColor}` },
-    },
-  ]
-}
-
-function onMenu(tag: AdminTag, key: string) {
-  if (key === "rename") startEdit(tag)
-  else if (key === "move") changeCategory(tag, tag.category === "theme" ? "knowledge" : "theme")
-  else if (key === "delete") confirmDelete(tag)
-}
 
 async function listTags() {
   const res = await getTagAdminList(keyword.value)
@@ -177,16 +158,17 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
               ><i :style="{ width: `${(tag.problemCount / col.max) * 100}%` }"></i
             ></span>
             <span class="count">{{ tag.problemCount }} 道</span>
-            <n-dropdown
-              trigger="click"
-              placement="bottom-end"
-              :options="menuOf(tag)"
-              @select="(key: string) => onMenu(tag, key)"
+            <n-button size="tiny" quaternary @click="startEdit(tag)">改名</n-button>
+            <n-button
+              size="tiny"
+              quaternary
+              @click="changeCategory(tag, tag.category === 'theme' ? 'knowledge' : 'theme')"
             >
-              <n-button size="small" quaternary aria-label="更多">
-                <template #icon><Icon icon="ph:dots-three-bold" /></template>
-              </n-button>
-            </n-dropdown>
+              {{ tag.category === "theme" ? "改成知识点" : "改成主题" }}
+            </n-button>
+            <n-button size="tiny" quaternary type="error" @click="confirmDelete(tag)"
+              >删除</n-button
+            >
           </template>
         </div>
       </div>
@@ -259,7 +241,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
 }
 
 .name {
-  flex: 0 0 140px;
+  flex: 0 0 120px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

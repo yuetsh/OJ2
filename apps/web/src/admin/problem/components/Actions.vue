@@ -1,13 +1,12 @@
 <script lang="ts" setup>
-import { Icon } from "@iconify/vue"
 import { errorCode, errorMessage } from "utils/api"
 import { deleteContestProblem, deleteProblem, makeProblemPublic } from "admin/api"
 import download from "utils/download"
 
 /**
- * 题目列表一行的操作（设计稿「后台题目列表」PlA）：常用的「编辑」常驻，其余收进 ⋯ ——
- * 原来是四颗彩色按钮（编辑 / 查看 / 删除 / 下载）并排，1366 宽的屏上把「可见」开关挤出了屏幕。
- * 有人交过的题删不掉（服务端也拦），「删除」直接灰掉并写明为什么，不用点了才知道
+ * 题目列表一行的操作：编辑、在前台看、下载测试数据、删除直接摆出来（用户说的：不要收进 ⋯）。
+ * 原来是四颗彩色按钮，现在一律素色，删除用浅色的危险按钮。
+ * 有人交过的题删不掉（服务端也拦），「删除」直接灰掉、鼠标放上去写明为什么
  */
 interface Props {
   problemID: number
@@ -69,29 +68,14 @@ function goCheck() {
   window.open(data.href, "_blank")
 }
 
-const menuOptions = computed<DropdownOption[]>(() => [
-  { label: "在前台看", key: "view" },
-  { label: "下载测试数据", key: "download" },
-  ...(isContestProblem.value ? [{ label: "转成公开题", key: "public" }] : []),
-  { type: "divider", key: "divider" },
-  props.triedUsers
-    ? { label: `删除（有 ${props.triedUsers} 人交过）`, key: "delete", disabled: true }
-    : { label: "删除", key: "delete" },
-])
-
-function onMenu(key: string) {
-  if (key === "view") goCheck()
-  else if (key === "download") downloads()
-  else if (key === "public") openMakePublicModal()
-  else if (key === "delete") {
-    dialog.warning({
-      title: `删除 ${props.problemDisplayID}？`,
-      content: "删掉就找不回来了。",
-      positiveText: "删除",
-      negativeText: "不删",
-      onPositiveClick: handleDeleteProblem,
-    })
-  }
+function confirmDelete() {
+  dialog.warning({
+    title: `删除 ${props.problemDisplayID}？`,
+    content: "删掉就找不回来了。",
+    positiveText: "删除",
+    negativeText: "不删",
+    onPositiveClick: handleDeleteProblem,
+  })
 }
 
 function openMakePublicModal() {
@@ -122,13 +106,24 @@ async function handleMakePublic() {
 }
 </script>
 <template>
-  <n-flex :size="4" justify="end" :wrap="false">
+  <n-flex :size="6" :wrap="false">
     <n-button size="small" @click="goEdit">编辑</n-button>
-    <n-dropdown trigger="click" placement="bottom-end" :options="menuOptions" @select="onMenu">
-      <n-button size="small" quaternary aria-label="更多">
-        <template #icon><Icon icon="ph:dots-three-bold" /></template>
+    <n-button size="small" title="在前台打开这道题" @click="goCheck">前台看</n-button>
+    <n-button size="small" title="下载测试数据" @click="downloads">测试数据</n-button>
+    <n-button v-if="isContestProblem" size="small" @click="openMakePublicModal">
+      转成公开题
+    </n-button>
+    <span :title="props.triedUsers ? `有 ${props.triedUsers} 人交过，删不掉` : undefined">
+      <n-button
+        size="small"
+        quaternary
+        type="error"
+        :disabled="!!props.triedUsers"
+        @click="confirmDelete"
+      >
+        删除
       </n-button>
-    </n-dropdown>
+    </span>
   </n-flex>
 
   <n-modal
