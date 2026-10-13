@@ -1,175 +1,254 @@
-<template>
-  <PageHeader title="AI 学习分析报告">
-    <template #filters>
-      <n-input
-        v-model:value="query.username"
-        clearable
-        placeholder="输入用户名筛选"
-        style="width: 220px"
-      />
-    </template>
-  </PageHeader>
-  <n-alert
-    v-if="pinnedReports.length > 0"
-    type="warning"
-    :show-icon="true"
-    style="margin-bottom: 12px"
-  >
-    以下 <strong>{{ pinnedReports.length }}</strong> 位用户的 AI
-    分析报告已被锁定，前台将固定显示该报告：
-    <n-flex style="margin-top: 8px" :wrap="true" :size="[8, 6]">
-      <n-tag
-        v-for="r in pinnedReports"
-        :key="r.id"
-        type="warning"
-        size="small"
-        closable
-        @close="togglePin(r)"
-      >
-        {{ r.username }}
-      </n-tag>
-    </n-flex>
-  </n-alert>
-  <n-data-table striped :columns="columns" :data="reports" />
-  <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
-
-  <n-modal
-    v-model:show="showModal"
-    preset="card"
-    title="分析报告详情"
-    style="width: 800px; max-width: 95vw"
-  >
-    <n-spin :show="loadingDetail">
-      <div v-if="detail" class="detail">
-        <n-descriptions :column="3" bordered size="small" class="meta">
-          <n-descriptions-item label="用户">
-            {{ detail.username }}
-          </n-descriptions-item>
-          <n-descriptions-item label="班级">
-            {{ detail.className || "-" }}
-          </n-descriptions-item>
-          <n-descriptions-item label="时间">
-            {{ parseTime(detail.createTime, "YYYY-MM-DD HH:mm:ss") }}
-          </n-descriptions-item>
-        </n-descriptions>
-        <n-scrollbar style="max-height: 60vh; margin-top: 12px">
-          <Markdown :content="detail.analysis" />
-        </n-scrollbar>
-      </div>
-    </n-spin>
-  </n-modal>
-</template>
-
 <script lang="ts" setup>
 import PageHeader from "admin/components/PageHeader.vue"
+import { useThemeVars } from "naive-ui"
+import { classLabel } from "oj/submission/utils"
 import Markdown from "shared/components/Markdown.vue"
 import Pagination from "shared/components/Pagination.vue"
+import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
-import { getAIReportList, getAIReportDetail, pinAIReport, getPinnedAIReports } from "../api"
-import { NButton, NTag } from "naive-ui"
 import type { AdminAiReport, AdminAiReportListItem } from "utils/types"
+import { getAIReportDetail, getAIReportList, pinAIReport } from "../api"
 
-type ReportItem = AdminAiReportListItem
-type ReportDetail = AdminAiReport
+/**
+ * 后台 AI 报告（设计稿「智能分析重设计」AiAdmin）：左边一份一行（用户名、班级、时间、
+ * 两行摘要），点哪份右边就是全文。原来是表格 + 弹框，看一份要点「查看」、关框、再点下一份。
+ *
+ * 「PIN」（固定让这个学生在前台看这一份）线上 697 份里一次都没用过，从每行的按钮和页头那条
+ * 锁定名单，收成正文右上角一个开关「固定给他看这份」。后端是切换语义：钉一份会顺手把这个学生
+ * 别的那份取消，所以切完重拉列表
+ */
+const theme = useThemeVars()
 
-const reports = ref<ReportItem[]>([])
+const reports = ref<AdminAiReportListItem[]>([])
 const total = ref(0)
 const query = reactive({ limit: 10, page: 1, username: "" })
-const pinnedReports = ref<ReportItem[]>([])
 
-const showModal = ref(false)
+const selectedId = ref<number | null>(null)
+const detail = ref<AdminAiReport | null>(null)
 const loadingDetail = ref(false)
-const detail = ref<ReportDetail | null>(null)
-
-const columns: DataTableColumn<ReportItem>[] = [
-  { title: "ID", key: "id", width: 80 },
-  {
-    title: "用户名",
-    key: "username",
-    width: 150,
-    render: (row) => h("span", { style: row.isPinned ? "font-weight:600" : "" }, row.username),
-  },
-  {
-    title: "AI 分析内容",
-    key: "analysis_excerpt",
-    render: (row) => row.analysisExcerpt || "-",
-  },
-  {
-    title: "生成时间",
-    key: "create_time",
-    width: 200,
-    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
-  },
-  {
-    title: "PIN 状态",
-    key: "is_pinned",
-    width: 100,
-    render: (row) =>
-      row.isPinned ? h(NTag, { type: "warning", size: "small" }, () => "已锁定") : null,
-  },
-  {
-    title: "操作",
-    key: "action",
-    width: 160,
-    render: (row) =>
-      h("span", { style: "display:flex;gap:8px" }, [
-        h(
-          NButton,
-          { size: "small", type: "primary", onClick: () => openDetail(row.id) },
-          () => "查看",
-        ),
-        h(
-          NButton,
-          {
-            size: "small",
-            type: row.isPinned ? "error" : "default",
-            onClick: () => togglePin(row),
-          },
-          () => (row.isPinned ? "取消 PIN" : "PIN"),
-        ),
-      ]),
-  },
-]
-
-async function loadPinnedReports() {
-  const res = await getPinnedAIReports()
-  pinnedReports.value = res.results
-}
-
-async function togglePin(row: ReportItem) {
-  await pinAIReport(row.id)
-  await Promise.all([listReports(), loadPinnedReports()])
-}
+const selected = computed(() => reports.value.find((r) => r.id === selectedId.value) ?? null)
 
 async function listReports() {
   const offset = (query.page - 1) * query.limit
   const res = await getAIReportList(offset, query.limit, query.username)
   reports.value = res.results
   total.value = res.total
+  // 第一次进来、或者翻页 / 搜索之后选中的那份不在这一页了：默认看第一份
+  if (!res.results.some((r) => r.id === selectedId.value)) open(res.results[0]?.id ?? null)
 }
 
-async function openDetail(id: number) {
-  showModal.value = true
-  loadingDetail.value = true
+async function open(id: number | null) {
+  selectedId.value = id
   detail.value = null
+  if (id === null) return
+  loadingDetail.value = true
   try {
     const res = await getAIReportDetail(id)
-    detail.value = res
+    if (selectedId.value === id) detail.value = res
   } finally {
     loadingDetail.value = false
   }
 }
 
-onMounted(() => Promise.all([listReports(), loadPinnedReports()]))
+async function togglePin() {
+  if (!selected.value) return
+  await pinAIReport(selected.value.id)
+  await listReports()
+}
+
+/** 摘要里去掉 Markdown 的记号：粗体星号、标题井号，还有表格的竖线和分隔线 */
+function excerpt(text: string) {
+  return text
+    .replace(/[*#>`|]+/g, " ")
+    .replace(/-{2,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+onMounted(listReports)
 watch(() => [query.page, query.limit], listReports)
-watchDebounced(() => query.username, listReports, {
-  debounce: 500,
-  maxWait: 1000,
-})
+watchDebounced(
+  () => query.username,
+  () => {
+    query.page = 1
+    listReports()
+  },
+  { debounce: 500, maxWait: 1000 },
+)
 </script>
 
+<template>
+  <PageHeader title="AI 报告">
+    <template #filters>
+      <n-input v-model:value="query.username" clearable placeholder="用户名" style="width: 200px" />
+      <n-text depth="3">共 {{ total }} 份</n-text>
+    </template>
+  </PageHeader>
+
+  <n-empty v-if="!reports.length" description="没有报告" style="margin-top: 60px" />
+  <div v-else class="layout">
+    <div class="list-col">
+      <div class="list">
+        <button
+          v-for="r in reports"
+          :key="r.id"
+          type="button"
+          class="item"
+          :class="{ on: r.id === selectedId }"
+          @click="open(r.id)"
+        >
+          <span class="item-head">
+            <UserName :username="r.username" />
+            <span class="muted small">{{ r.className ? classLabel(r.className) : "" }}</span>
+            <span v-if="r.isPinned" class="pinned">固定</span>
+            <span class="spacer"></span>
+            <span class="muted small num">{{ parseTime(r.createTime, "MM-DD HH:mm") }}</span>
+          </span>
+          <span class="item-text">{{ excerpt(r.analysisExcerpt) }}</span>
+        </button>
+      </div>
+      <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" simple />
+    </div>
+
+    <div class="detail">
+      <n-spin :show="loadingDetail">
+        <template v-if="selected">
+          <div class="detail-head">
+            <UserName :username="selected.username" />
+            <span class="muted">
+              {{ selected.className ? classLabel(selected.className) + " · " : ""
+              }}{{ parseTime(selected.createTime, "YYYY-MM-DD HH:mm") }}
+            </span>
+            <span class="spacer"></span>
+            <label class="pin">
+              固定给他看这份
+              <n-switch :value="selected.isPinned" size="small" @update:value="togglePin" />
+            </label>
+          </div>
+          <div class="body">
+            <Markdown v-if="detail" :content="detail.analysis" />
+          </div>
+        </template>
+      </n-spin>
+    </div>
+  </div>
+</template>
+
 <style scoped>
-.detail .meta {
-  margin-bottom: 0;
+.layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.list-col {
+  width: 340px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.list {
+  border: 1px solid v-bind("theme.dividerColor");
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.item:hover {
+  background: v-bind("theme.hoverColor");
+}
+
+.item.on {
+  background: v-bind("theme.hoverColor");
+  box-shadow: inset 3px 0 0 v-bind("theme.primaryColor");
+}
+
+.item-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.item-text {
+  font-size: 13px;
+  line-height: 20px;
+  color: v-bind("theme.textColor3");
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pinned {
+  font-size: 12px;
+  color: v-bind("theme.warningColor");
+}
+
+.detail {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+.pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.body {
+  padding-top: 14px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.muted {
+  color: v-bind("theme.textColor3");
+  font-size: 14px;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>
