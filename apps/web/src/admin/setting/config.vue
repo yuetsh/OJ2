@@ -18,7 +18,8 @@ import {
 
 /**
  * 后台设置（设计稿「后台首页」页的 ConfAdmin）：网站 / 班级 / 开关 / 判题机，有无效测试用例时
- * 再多一块。保存在右上角。
+ * 再多一块。**改了就存**（用户要的实时保存）：开关一拨、班级一加一删立刻存，网站名停手半秒再存，
+ * 右上角写「已保存」。
  *
  * 2026-10-13 用户定的：网址、简称、页脚三项删了（前后端从来没读过），AI 小助手连同挂件一起删了；
  * 注册、「学生能看到所有人的提交」两个开关留着。班级不再拖动排序 —— 全站的班级下拉早就按年级
@@ -35,15 +36,37 @@ const websiteConfig = reactive<WebsiteConfig>({
   classList: [],
 })
 
+/**
+ * 上一次存进去（或刚读回来）的内容。和它一样就不存 —— 读回配置本身也是一次改动，
+ * 只看「读完没有」的话，那次改动的延迟保存会在读完之后照样发出去
+ */
+let savedSnapshot = ""
+const saveState = ref<"idle" | "saving" | "saved" | "failed">("idle")
+
 async function getWebsiteConfig() {
   const res = await getWebsite()
   websiteConfig.websiteName = res.websiteName
   websiteConfig.allowRegister = res.allowRegister
   websiteConfig.submissionListShowAll = res.submissionListShowAll
   websiteConfig.classList = res.classList
+  savedSnapshot = JSON.stringify(websiteConfig)
 }
 
+// 改了就存。网站名打字时一个字一存没意义，停手半秒再存；开关、班级本来就是一下一下的
+watchDebounced(
+  () => JSON.stringify(websiteConfig),
+  (now) => {
+    if (savedSnapshot && now !== savedSnapshot) saveWebsiteConfig()
+  },
+  { debounce: 500 },
+)
+
 async function saveWebsiteConfig() {
+  if (!websiteConfig.websiteName.trim()) {
+    saveState.value = "failed"
+    message.error("网站名不能空着")
+    return
+  }
   // 班级号要和用户名里 ks 后面那段对得上，位数不对登录页会查不到该班学生。后端也会拦
   const invalid = websiteConfig.classList.filter((c) => !CLASS_NAME_RE.test(c))
   if (invalid.length) {
@@ -52,14 +75,17 @@ async function saveWebsiteConfig() {
     )
     return
   }
+  saveState.value = "saving"
+  const snapshot = JSON.stringify(websiteConfig)
   try {
     await editWebsite(websiteConfig)
+    savedSnapshot = snapshot
   } catch (err) {
+    saveState.value = "failed"
     message.error("没保存上：" + errorMessage(err))
     return
   }
-  message.success("保存好了")
-  getWebsiteConfig()
+  saveState.value = "saved"
   // 广播由后端在 POST /admin/website 里做，开着页面的人不用刷新
   configStore.getConfig()
 }
@@ -163,7 +189,9 @@ onMounted(() => {
 <template>
   <PageHeader title="设置">
     <template #actions>
-      <n-button type="primary" @click="saveWebsiteConfig">保存</n-button>
+      <n-text v-if="saveState === 'saving'" depth="3">正在保存…</n-text>
+      <n-text v-else-if="saveState === 'saved'" type="success">已保存</n-text>
+      <n-text v-else-if="saveState === 'failed'" type="error">没保存上</n-text>
     </template>
   </PageHeader>
 
