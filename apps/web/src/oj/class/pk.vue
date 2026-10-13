@@ -156,7 +156,6 @@ async function analyze() {
         </div>
         <n-button
           v-if="teacher && isDesktop"
-          size="small"
           secondary
           type="info"
           :disabled="selected.length < 2"
