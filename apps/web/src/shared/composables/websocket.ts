@@ -5,6 +5,9 @@ import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
+import type { ClassBoardCell } from "utils/types"
+
+type BoardLatest = NonNullable<ClassBoardCell["latest"]>
 
 // 全站唯一一处，脱离 n-message-provider 也能弹 —— 强制登出跟当前挂着哪个组件无关。
 // utils/api.ts 里也是这么做的
@@ -564,6 +567,8 @@ export interface CollabRequestItem {
   className: string | null
   problemId: string
   problemTitle: string
+  /** 他这道题最后一次代码提交（和看板格子的 latest 同形），面板按它写错法；没交过为 null */
+  latest: BoardLatest | null
   createdAt: number
   status: "pending" | "active"
   teacherName: string | null

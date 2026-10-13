@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { useCollabStore } from "shared/store/collab"
-import HelpRequestList from "./HelpRequestList.vue"
 
 /**
- * 课堂求助的全局界面：一次性提示、求助列表。
+ * 课堂求助的全局界面：一次性提示、老师接单后跳到那道题。
  *
  * 新求助**不弹 toast**：原来每来一个就弹一条，一节课能弹十几次，讲台电脑投着屏时还弹在
  * 全班面前。现在靠顶栏（前台、后台都有）的 HelpButton：没人等不显示，冒出来就是提醒，
  * 人数再变多时闪一下。
  *
- * 教师端的协作**没有弹框**：接单会跳到那道题的页面，在页面自带的编辑器里协作
- * （见 HelpRequestList 的 handleAccept、ProblemEditor 的 collabHere）。
+ * 教师端的协作**没有弹框**：房间开好就跳到那道题的页面，在页面自带的编辑器里协作
+ * （ProblemEditor 的 collabHere）。用户选的方案 A：演示学生的错误时题目和代码要并排。
  * 原来这里还异步挂一个 CollabModal，那个弹框按一下 Esc 就关、协作跟着结束。
  *
  * 挂在 App.vue 而不是顶栏或 default.vue 布局里。这些东西跟着**连接**走，
@@ -38,8 +37,24 @@ watch(
     if (text) message.info(text)
   },
 )
+
+/**
+ * 老师这边房间开好了（「帮他」、看板上点「在写」、协作条的「下一个」）：跳到那道题。
+ * 等 room_open 到了才跳，不在点的那一刻跳 —— 服务端可能拒了（别的老师先接走、学生刚走），
+ * 那时候跳过去就是对着一个空编辑器。已经在这道题上就不跳（同一道题换下一个人）
+ */
+const router = useRouter()
+const route = useRoute()
+watch(
+  () => collabStore.room,
+  (room) => {
+    if (!room || !collabStore.isTeacher) return
+    const target = `/problem/${room.problemId}`
+    if (route.path !== target) router.push(target)
+  },
+)
 </script>
 
 <template>
-  <HelpRequestList v-if="collabStore.isTeacher" v-model:show="collabStore.helpPanelOpen" />
+  <span hidden></span>
 </template>

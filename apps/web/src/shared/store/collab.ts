@@ -9,8 +9,16 @@ import type { LANGUAGE } from "utils/types"
 export type HelpStatus = "idle" | "pending" | "active"
 
 export interface RoomInfo {
+  /**
+   * help = 学生举手、老师接的；peek = 老师在看板上主动打开的（学生没举手）。
+   * 学生那边按钮写「在帮你」还是「在看你的代码」、结束时说「帮完了」还是「看完了」看它
+   */
+  mode: "help" | "peek"
   peerName: string
   peerRole: "student" | "teacher"
+  /** 教师端才有：学生的 id（协作条按它在列表里找他举手多久了）和班级（「帮完了」回哪个班的看板） */
+  peerId: number | null
+  peerClassName: string | null
   problemId: string
   /** 学生编辑器的语言。教师端的弹框按它选高亮和补全 */
   language: LANGUAGE
@@ -38,8 +46,7 @@ export const useCollabStore = defineStore("collab", () => {
   /** 一次性提示，由 CollabHost 统一消费后清空 */
   const notice = ref("")
   /**
-   * 求助列表弹框开着没有。放在 store 里而不是组件内部：打开它的入口（顶栏的
-   * 姓名下拉、新求助 toast）和弹框本身已经不在同一棵子树里了。
+   * 顶栏「N 人举手」的面板开着没有。放在 store 里：面板里点了「帮他」「讲这道题」要把它收起来
    */
   const helpPanelOpen = ref(false)
   /**
@@ -57,6 +64,14 @@ export const useCollabStore = defineStore("collab", () => {
   }
 
   const pendingCount = computed(() => requests.value.filter((it) => it.status === "pending").length)
+
+  /** 下一个该帮的：还在排队的里面等得最久的 */
+  const nextRequest = computed(
+    () =>
+      requests.value
+        .filter((it) => it.status === "pending")
+        .sort((a, b) => a.createdAt - b.createdAt)[0] ?? null,
+  )
 
   /** 按题目聚合，同题多人时老师能一眼看出该停下来全班讲 */
   const groupedRequests = computed(() => {
@@ -89,8 +104,13 @@ export const useCollabStore = defineStore("collab", () => {
    * 自己干的是 `done` / `self_left`，对面才是 `peer_left` / `peer_offline`。
    * 所以这里既要看 reason 也要看角色。
    */
-  function closedNotice(reason: unknown) {
+  function closedNotice(reason: unknown, closed: RoomInfo | null) {
     const teacher = userStore.isTeacherOrAbove
+    const peek = closed?.mode === "peek"
+    // 学生那边：老师点了「帮完了 / 看完了」，或者老师主动看完走开了
+    if (!teacher && closed && (reason === "done" || (peek && reason === "peer_left"))) {
+      return `${closed.peerName} ${peek ? "看完了" : "帮完了"}`
+    }
     switch (reason) {
       case "peer_offline":
         return "对方已断开连接"
@@ -101,9 +121,9 @@ export const useCollabStore = defineStore("collab", () => {
       // 自己离开了这道题（跳走页面、把语言切成流程图）
       case "self_left":
         return teacher ? "你已离开这道题，求助退回队列了" : "你已离开这道题，协作结束"
-      // done：有人点了「结束协作」
+      // done：老师自己点的「帮完了」，页面跟着回看板或者去下一个，不用再说一句
       default:
-        return teacher ? "已结束这次协作" : "老师已结束这次帮忙"
+        return teacher ? "" : "老师已结束这次帮忙"
     }
   }
 
@@ -125,12 +145,21 @@ export const useCollabStore = defineStore("collab", () => {
         } else if (data.status === "no_teacher") {
           helpStatus.value = "idle"
           setNotice("当前没有老师在线")
+        } else if (data.status === "dismissed") {
+          // 同一道题好几个人举手，老师全班讲完了，一次放下
+          helpStatus.value = "idle"
+          setNotice(
+            `${String(data.teacherName ?? "老师")} 讲了 ${String(data.problemId ?? "这道题")}，还不会就再举手`,
+          )
         }
         return
       case "room_open":
         room.value = {
+          mode: data.mode === "peek" ? "peek" : "help",
           peerName: String(data.peer?.name ?? ""),
           peerRole: data.peer?.role === "teacher" ? "teacher" : "student",
+          peerId: typeof data.peer?.id === "number" ? data.peer.id : null,
+          peerClassName: typeof data.peer?.className === "string" ? data.peer.className : null,
           problemId: String(data.problemId ?? ""),
           language: (data.language as LANGUAGE) ?? "C",
         }
@@ -147,9 +176,13 @@ export const useCollabStore = defineStore("collab", () => {
         // help_status:pending——teardownRoom 里 room_closed 先发、
         // requeueAfterTeacherGone 后发，同一条连接上消息严格按发送顺序到达，
         // 这里先归零，那条 pending 补发会立刻把它纠正回来，不会被这次重置盖掉
-        room.value = null
-        helpStatus.value = "idle"
-        setNotice(closedNotice(data.reason))
+        {
+          const closed = room.value
+          room.value = null
+          helpStatus.value = "idle"
+          const text = closedNotice(data.reason, closed)
+          if (text) setNotice(text)
+        }
         return
       case "error":
         setNotice(String(data.message ?? ""))
@@ -170,7 +203,12 @@ export const useCollabStore = defineStore("collab", () => {
     queueAhead.value = 0
     teacherName.value = ""
     room.value = null
+    // 服务端的「在写」随连接清掉了，重连后补报一次
+    if (presence) ws.send({ type: "presence", ...presence })
   })
+
+  /** 学生此刻开着哪道题的编辑器，重连时补报用 */
+  let presence: { problemId: string; language: LANGUAGE } | null = null
 
   function connect() {
     ws.connect()
@@ -209,6 +247,26 @@ export const useCollabStore = defineStore("collab", () => {
     ws.send({ type: "accept", studentId })
   }
 
+  /** 老师在看板上主动打开一个学生正在写的代码（他没举手也行；举着手就等于接单） */
+  function peek(studentId: number) {
+    ws.send({ type: "peek", studentId })
+  }
+
+  /** 「讲完了，都放下」：这道题还在排队的手一次放下 */
+  function dismiss(problemId: string) {
+    ws.send({ type: "dismiss", problemId })
+  }
+
+  /**
+   * 学生报告他开着哪道题的编辑器（null = 离开了），老师看板「在写」那一列用。
+   * 老师不报：老师的编辑器不会被别人打开
+   */
+  function reportPresence(problemId: string | null, language: LANGUAGE = "Python") {
+    if (userStore.isTeacherOrAbove) return
+    presence = problemId ? { problemId, language } : null
+    ws.send({ type: "presence", problemId, language })
+  }
+
   function reject(studentId: number) {
     ws.send({ type: "reject", studentId })
   }
@@ -242,6 +300,7 @@ export const useCollabStore = defineStore("collab", () => {
   return {
     requests,
     pendingCount,
+    nextRequest,
     groupedRequests,
     helpStatus,
     queueAhead,
@@ -257,6 +316,9 @@ export const useCollabStore = defineStore("collab", () => {
     updateLanguage,
     cancelHelp,
     accept,
+    peek,
+    dismiss,
+    reportPresence,
     reject,
     leave,
     sendBinary,

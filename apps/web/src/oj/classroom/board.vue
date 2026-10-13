@@ -6,6 +6,7 @@ import { useTone } from "oj/submission/composables/tone"
 import { groupClassOptions } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
 import { useLeaveStudents } from "shared/composables/leaveStudents"
+import { useTeacherHelp } from "shared/composables/teacherHelp"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
 import type { LessonLanguage } from "@oj2/contract"
@@ -40,9 +41,18 @@ const message = useMessage()
 const theme = useThemeVars()
 const tone = useTone()
 const router = useRouter()
+const route = useRoute()
+const { help, peek } = useTeacherHelp()
 
 const board = ref<ClassBoard | null>(null)
-const className = ref<string | null>(null)
+/**
+ * 带着 ?className= 进来的（协作条「帮完了」回来、举手面板「讲这道题」）就看那个班，
+ * 否则第一次由后端猜
+ */
+const queryText = (value: unknown) => (typeof value === "string" && value ? value : null)
+const className = ref<string | null>(queryText(route.query.className))
+/** ?problem= 带来的题号：加载完选中那道题，下面展开它的错法（「讲这道题」） */
+let wantedProblem = queryText(route.query.problem)
 
 const classOptions = computed(() => {
   const list = configStore.config?.classList ?? []
@@ -56,6 +66,12 @@ async function load() {
     board.value = data
     // 第一次由后端猜，之后就固定在这个班上，别每次刷新都换
     className.value = data.className
+    if (wantedProblem) {
+      const wanted = wantedProblem.toLowerCase()
+      const hit = data.problems.find((item) => item.problemDisplayId.toLowerCase() === wanted)
+      if (hit) selectedId.value = hit.problemId
+      wantedProblem = null
+    }
   } catch (error) {
     message.error(errorMessage(error))
   }
@@ -69,6 +85,26 @@ function changeClass(value: string) {
 }
 
 onMounted(load)
+// 已经停在看板上时又从举手面板点了「讲这道题」：同一条路由只换 query，组件不重建
+watch(
+  () => route.query,
+  (query) => {
+    wantedProblem = queryText(query.problem)
+    const next = queryText(query.className)
+    if (next && next !== className.value) {
+      className.value = next
+      editing.value = false
+    }
+    load()
+  },
+)
+
+/** 举手多久了，每秒走一格 */
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) })
+function waitedText(createdAt: number) {
+  const seconds = Math.max(0, Math.floor((now.value.getTime() - createdAt) / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+}
 const { pause } = useIntervalFn(load, REFRESH_MS)
 onUnmounted(pause)
 
@@ -637,6 +673,7 @@ function shortTitle(title: string, size: number) {
           <thead>
             <tr>
               <th class="name">学生</th>
+              <th class="narrow-col where-col">在写</th>
               <th
                 v-for="(stat, i) in problemStats"
                 :key="stat.problem.problemId"
@@ -662,7 +699,7 @@ function shortTitle(title: string, size: number) {
           <tbody>
             <template v-for="student in students" :key="student.userId">
               <tr v-if="groupStarts.has(student.userId)" class="group-row">
-                <td :colspan="board.problems.length + 3">
+                <td :colspan="board.problems.length + 4">
                   {{ GROUP_LABEL[groupOf(student)] }}
                   <span class="muted">{{ groupCount[groupOf(student)] }}</span>
                 </td>
@@ -679,16 +716,34 @@ function shortTitle(title: string, size: number) {
                     <UserName :username="student.username" />
                   </a>
                   <UserName v-else :username="student.username" />
-                  <n-tag
-                    v-if="helpOf(student)"
-                    size="small"
-                    :bordered="false"
-                    type="warning"
-                    class="help-tag"
-                    @click="collabStore.helpPanelOpen = true"
+                  <span v-if="helpOf(student)?.status === 'pending'" class="waited">
+                    举手 {{ waitedText(helpOf(student)!.createdAt) }}
+                  </span>
+                </td>
+                <!-- 在写：举手的「帮他」；别人在帮的写谁在帮；开着题目的点题号直接打开他正在写的
+                     代码（他没举手也行，他那边会显示「xxx 在看你的代码」） -->
+                <td class="where-col">
+                  <n-button
+                    v-if="helpOf(student)?.status === 'pending'"
+                    type="primary"
+                    size="tiny"
+                    @click="help(student.userId)"
                   >
-                    {{ helpOf(student)!.status === "active" ? "老师在帮" : "举手了" }}
-                  </n-tag>
+                    帮他 · {{ helpOf(student)!.problemId }}
+                  </n-button>
+                  <span v-else-if="helpOf(student)" class="helping">
+                    {{ helpOf(student)!.teacherName }} 在帮
+                  </span>
+                  <button
+                    v-else-if="student.editing"
+                    type="button"
+                    class="where"
+                    :title="`打开 ${student.username} 正在写的 ${student.editing}`"
+                    @click="peek(student.userId)"
+                  >
+                    {{ student.editing }}
+                  </button>
+                  <span v-else class="muted">—</span>
                 </td>
                 <td
                   v-for="(cell, i) in student.cells"
@@ -1202,9 +1257,48 @@ a.cell {
   text-decoration: underline;
 }
 
-.help-tag {
+.waited {
   margin-left: 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: v-bind("tone('error').color");
+}
+
+.grid .where-col {
+  width: 100px;
+  text-align: left;
+}
+
+.where {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: v-bind("tone('success').color");
   cursor: pointer;
+}
+
+.where::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.where:hover {
+  text-decoration: underline;
+}
+
+.helping {
+  font-size: 13px;
+  font-weight: 600;
+  color: v-bind("tone('info').color");
 }
 
 .leave-grid {

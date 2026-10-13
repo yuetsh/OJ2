@@ -66,9 +66,17 @@ export function useCollabDoc() {
     const ytext = doc.getText("codemirror")
     awareness = new awarenessProtocol.Awareness(doc)
 
-    // ★ 顺序不能反：先把内容写进 ytext，再挂 yCollab。
-    // yCollab 挂上去时会用 ytext 覆盖编辑器内容，先挂就会把学生的代码清空。
+    // ★ 先把内容写进 ytext，再挂 yCollab。yCollab 挂上去**不会**拿 ytext 覆盖编辑器，
+    // 只同步此后的改动 —— 所以两边挂之前编辑器里的内容必须和 ytext 一致：
+    // 学生端 ytext = 编辑器内容（种子）；教师端 ytext 是空的，编辑器也得清空。
     if (seedContent) ytext.insert(0, seedContent)
+    // 教师端编辑器里原本是老师自己这道题的草稿或模板。不清的话它一直留在老师那边，学生的代码
+    // 同步过来插在它前面，两边从此不一致（实测：老师看到两行一样的 input()，学生只有一行）。
+    // 清空会顺着 v-model 写回 codeStore，但协作中的老师不存草稿（ProblemEditor 的 persistCode），
+    // 结束后 loadCode 会把他的草稿读回来
+    if (seedContent === null && editorView.state.doc.length) {
+      editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: "" } })
+    }
 
     const send = (build: (encoder: any) => void) => {
       const encoder = encoding.createEncoder()

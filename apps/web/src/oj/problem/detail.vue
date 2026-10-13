@@ -21,7 +21,7 @@ import {
   useProblemPageContext,
   type ProblemDrawer as DrawerKey,
 } from "./composables/problemPageContext"
-import { useTeacherCollab } from "./composables/teacherCollab"
+import { useCollabHere, useTeacherCollab } from "./composables/teacherCollab"
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
@@ -106,6 +106,21 @@ const splitMax = computed(() => `${Math.max(360, windowWidth.value - 460)}px`)
 
 // 协作中的老师看的是学生的提交
 const teacherCollab = useTeacherCollab()
+const collabHere = useCollabHere()
+const collabStore = useCollabStore()
+
+// 老师刚接上（或下一个人）：左栏先切到「结果」，那里是他最后一次交的为什么错。
+// 要演示时老师自己点回「题目」，题目和代码就并排了
+watch(
+  () => teacherCollab.value && collabStore.room,
+  (room) => {
+    if (room) {
+      drawer.value = null
+      currentTab.value = "result"
+      submissionStore.resultSegment = "submit"
+    }
+  },
+)
 const drawerLabel = (key: DrawerKey) =>
   key === "submission" && teacherCollab.value ? "他的提交" : DRAWER_TITLE[key]
 
@@ -148,7 +163,6 @@ watch(
  * （SyncCodeEditor 的 detach），排队的求助也跟着撤掉。先问一句，别让他一点「下一题」
  * 就把正在帮他的老师踢出去。只拦「离开这道题」，切页签改 `?tab=` 不算
  */
-const collabStore = useCollabStore()
 const dialog = useDialog()
 /**
  * 已经同意过要去的地方。通过之后 1.5 秒内点「下一题」：这里先问一次，接着被强制点评拦下
@@ -164,17 +178,19 @@ function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNorm
     window.open(router.resolve(to).href, "_blank")
     return false
   }
-  if (collabStore.isTeacher || collabStore.helpStatus === "idle") return true
+  // 老师在看板上主动打开了他的代码（没举手）：helpStatus 是 idle，但老师在
+  const peeked = collabHere.value && collabStore.room?.mode === "peek"
+  if (collabStore.isTeacher || (collabStore.helpStatus === "idle" && !peeked)) return true
   if (approvedTarget === to.fullPath) {
     approvedTarget = null
     return true
   }
-  const active = collabStore.helpStatus === "active"
+  const active = collabStore.helpStatus === "active" || peeked
   return new Promise<boolean>((resolve) => {
     dialog.warning({
-      title: active ? "老师正在帮你看这道题" : "你正在排队等老师",
+      title: peeked ? "老师正在看你的代码" : active ? "老师正在帮你看这道题" : "你正在排队等老师",
       content: active
-        ? "换题之后，老师那边的协作就断了。确定要换吗？"
+        ? "换题之后，老师那边就断了。确定要换吗？"
         : "换题之后这次举手就撤掉了，要在新的题目里重新举手。确定要换吗？",
       positiveText: "换题",
       negativeText: "留在这道题",

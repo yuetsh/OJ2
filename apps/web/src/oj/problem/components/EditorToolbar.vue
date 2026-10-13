@@ -14,7 +14,7 @@ import { NFlex, useThemeVars } from "naive-ui"
 import SubmitCode from "./SubmitCode.vue"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import { openStatistics, useEditorMenu } from "../composables/editorMenu"
-import { useTeacherCollab } from "../composables/teacherCollab"
+import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
 const FlowchartControls = defineAsyncComponent(() => import("./FlowchartControls.vue"))
@@ -89,10 +89,21 @@ const showCollabBar = useTeacherCollab()
  * 状态全塞进按钮本身。原来旁边还挂一个 n-tag 说明排队情况，一行工具栏
  * （语言 / 提交 / 本题提交 / 课堂统计 / 更多 / 求助）在 1280 的机房屏上放不下。
  */
+const collabHere = useCollabHere()
+/**
+ * 老师在看板上主动打开了他的代码（他没举手）。用户定的：学生不能拒绝，但必须看得到 ——
+ * 按钮就写「xuyue 在看你的代码」，和「在帮你」一样亮着、点不了
+ */
+const peeked = computed(
+  () => collabHere.value && collabStore.room?.mode === "peek" && collabStore.helpStatus === "idle",
+)
+/** 老师在他的编辑器里：举手接上了，或者被主动打开了 */
+const teacherIn = computed(() => collabStore.helpStatus === "active" || peeked.value)
+
 const helpButtonText = computed(() => {
+  if (peeked.value) return `${collabStore.room?.peerName ?? "老师"} 在看你的代码`
   if (collabStore.helpStatus === "active") {
-    const name = collabStore.teacherName
-    return name ? `${name} 老师在帮你` : "老师正在帮你"
+    return `${collabStore.teacherName || "老师"} 在帮你`
   }
   if (collabStore.helpStatus === "pending") {
     return collabStore.queueAhead > 0
@@ -103,7 +114,7 @@ const helpButtonText = computed(() => {
 })
 
 const helpButtonType = computed(() => {
-  if (collabStore.helpStatus === "active") return "success"
+  if (teacherIn.value) return "info"
   if (collabStore.helpStatus === "pending") return "warning"
   return "default"
 })
@@ -114,7 +125,9 @@ const helpButtonTitle = computed(() =>
   collabStore.helpStatus === "pending" ? "点击取消求助" : undefined,
 )
 
+// 老师在的时候不是 disabled（灰掉就看不清了，学生得看得见老师在），点了什么也不做
 const toggleHelp = () => {
+  if (teacherIn.value) return
   if (collabStore.helpStatus === "pending") collabStore.cancelHelp()
   else if (collabStore.helpStatus === "idle")
     collabStore.requestHelp(problem.value!._id, codeStore.code.language)
@@ -218,13 +231,13 @@ const changeLanguage = (v: LANGUAGE) => {
       v-if="showHelpButton"
       :size="buttonSize"
       :type="helpButtonType"
-      :secondary="collabStore.helpStatus !== 'idle'"
-      :disabled="collabStore.helpStatus === 'active'"
+      :secondary="teacherIn || collabStore.helpStatus !== 'idle'"
       :title="helpButtonTitle"
       class="help"
+      :class="{ busy: teacherIn }"
       @click="toggleHelp"
     >
-      <span v-if="collabStore.helpStatus === 'active'" class="dot" aria-hidden="true" />
+      <span v-if="teacherIn" class="dot" aria-hidden="true" />
       {{ helpButtonText }}
     </n-button>
 
@@ -301,6 +314,10 @@ const changeLanguage = (v: LANGUAGE) => {
 .more {
   width: 34px;
   padding: 0;
+}
+
+.help.busy {
+  cursor: default;
 }
 
 .help .dot {

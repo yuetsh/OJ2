@@ -1,140 +1,227 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
+import { errorKind } from "oj/classroom/errorKind"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useTeacherHelp } from "shared/composables/teacherHelp"
 import { useCollabStore } from "shared/store/collab"
+import type { CollabRequestItem } from "shared/composables/websocket"
+import { SubmissionStatus } from "utils/constants"
+import UserName from "./UserName.vue"
 
-/** 由顶栏的姓名下拉菜单打开 */
-const show = defineModel<boolean>("show", { default: false })
+/**
+ * 顶栏「N 人举手」点开的面板（设计稿「举手与协作」HcPanel），挂在按钮下面，不是弹框。
+ *
+ * 按题分组，每人写错法（和课堂看板同一套 errorKind）和等了多久。同一道题两人以上举手，
+ * 用户的做法是**停下来全班讲**：组头给「讲这道题」（去看板、选中这道题看错法）和
+ * 「讲完了，都放下」（这道题还在排队的手一次放下）。
+ */
+const emit = defineEmits<{ close: [] }>()
 
 const collabStore = useCollabStore()
 const router = useRouter()
-const route = useRoute()
-const message = useMessage()
-
-// 接单之后要在题目页的编辑器里替学生写代码，那个编辑器窄屏上没法用 —— 所以窄屏
-// 只让看「谁在等」（角标、toast、这张列表照常给），接单留到桌面端
+const { help } = useTeacherHelp()
+// 接单之后要在题目页的编辑器里替学生写代码，那个编辑器窄屏上没法用 —— 窄屏只让看
 const { isDesktop } = useBreakpoints()
 
-// 等待时长要每秒走一格，所以自己转一个 now。
-// 只在弹框开着时转 —— 这个组件跟着顶栏常驻，关着的时候没人看这个数。
-const now = ref(Date.now())
-let timer: number | null = null
-
-function stopTimer() {
-  if (timer === null) return
-  window.clearInterval(timer)
-  timer = null
+// 等待时长每秒走一格。面板只在打开时挂着，关着不转
+const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) })
+function waited(createdAt: number) {
+  const seconds = Math.max(0, Math.floor((now.value.getTime() - createdAt) / 1000))
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+}
+/** 等了三分钟以上标红 */
+function waitedLong(createdAt: number) {
+  return now.value.getTime() - createdAt >= 180_000
 }
 
-watch(show, (opened) => {
-  if (!opened) {
-    stopTimer()
-    return
-  }
-  now.value = Date.now()
-  if (timer === null) {
-    timer = window.setInterval(() => (now.value = Date.now()), 1000)
-  }
-})
-
-onUnmounted(stopTimer)
-
-const waited = (createdAt: number) => {
-  const seconds = Math.max(0, Math.floor((now.value - createdAt) / 1000))
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${String(s).padStart(2, "0")}`
+function kindOf(item: CollabRequestItem) {
+  if (!item.latest) return "还没交过"
+  if (item.latest.result === SubmissionStatus.accepted) return "已经做对了"
+  return errorKind(item.latest).label
 }
 
-/**
- * 接单 = 跳到那道题的页面，在页面自带的编辑器里协作。
- *
- * 原来是接单后弹一个 CollabModal（弹框里再挂一个 CodeMirror + 一份只读题面），
- * 那个弹框按一下 Esc 就关、协作跟着结束，上课时太容易误触；题面也只能看不能用。
- * 直接跳题目页之后，老师看到的就是学生看到的那一页。
- *
- * 求助入口在比赛里是关掉的（EditorToolbar.vue 的 showHelpButton），problemId 一定是公开
- * 题目的展示 ID，走 /problem/:id 就行。
- */
-const handleAccept = (studentId: number, problemId: string, status: string) => {
-  // 已被别的老师接走的不能点
-  if (status === "active" || !isDesktop.value) return
-  // 一个老师同时只能在一个房间里（服务端也拦，见 handler 的「请先退出当前协作」）。
-  // 这里先拦一道：不拦的话服务端拒了、前端却已经跳到新那道题上，
-  // 反而把手上正在进行的那场协作断掉（对老师来说「跳走」就等于结束协作）
-  if (collabStore.room) {
-    message.warning("请先结束当前协作")
-    return
-  }
-  collabStore.accept(studentId)
-  show.value = false
-  // 已经在这道题的页面上就不跳了（老师正投影着这道题时就是这种）。
-  // 重复导航在 vue-router 里是一个 rejected promise，不拦一下控制台会报
-  const target = `/problem/${problemId}`
-  if (route.path !== target) router.push(target)
+function pendingOf(items: CollabRequestItem[]) {
+  return items.filter((item) => item.status === "pending")
+}
+
+function onHelp(item: CollabRequestItem) {
+  if (help(item.studentId)) emit("close")
+}
+
+/** 「讲这道题」：去这个班的看板、选中这道题，下面展开错着的人按错法归堆，点人就是讲错误弹层 */
+function explain(items: CollabRequestItem[], problemId: string) {
+  const className = items.find((item) => item.className)?.className
+  emit("close")
+  router.push({
+    name: "classroom board",
+    query: { ...(className ? { className } : {}), problem: problemId },
+  })
 }
 </script>
 
 <template>
-  <n-modal v-model:show="show" preset="card" title="课堂求助" :style="{ width: '420px' }">
-    <div style="max-height: 60vh; overflow: auto">
-      <n-alert v-if="!isDesktop" type="info" :bordered="false" style="margin-bottom: 8px">
-        接单要在电脑上打开
-      </n-alert>
-
-      <n-empty v-if="collabStore.groupedRequests.length === 0" description="暂无求助" />
-
-      <div v-for="group in collabStore.groupedRequests" :key="group.problemId">
-        <!-- 同题多人是个教学信号：该停下来全班讲，而不是挨个救 -->
-        <n-flex align="center" justify="space-between" style="padding: 6px 4px">
-          <n-text depth="3" style="font-size: 12px">
-            {{ group.problemId }} · {{ group.problemTitle }}
-          </n-text>
-          <n-tag v-if="group.items.length > 1" size="small" type="warning">
-            {{ group.items.length }} 人
-          </n-tag>
-        </n-flex>
-
-        <n-flex
-          v-for="item in group.items"
-          :key="item.studentId"
-          align="center"
-          justify="space-between"
-          :style="{
-            padding: '6px 8px',
-            borderRadius: '4px',
-            opacity: item.status === 'active' ? 0.5 : 1,
-            cursor: item.status === 'active' || !isDesktop ? 'default' : 'pointer',
-          }"
-          @click="handleAccept(item.studentId, group.problemId, item.status)"
-        >
-          <n-flex vertical :size="2">
-            <n-text>
-              {{ item.studentName }}
-              <n-text depth="3" v-if="item.className">（{{ item.className }}）</n-text>
-            </n-text>
-            <n-text depth="3" style="font-size: 12px">
-              {{
-                item.status === "active"
-                  ? `${item.teacherName} 处理中`
-                  : `等了 ${waited(item.createdAt)}`
-              }}
-            </n-text>
-          </n-flex>
-
+  <div class="panel">
+    <div class="title">
+      <b>举手 {{ collabStore.requests.length }} 人</b>
+    </div>
+    <n-alert v-if="!isDesktop" type="info" :bordered="false">接单要在电脑上打开</n-alert>
+    <n-empty v-if="collabStore.groupedRequests.length === 0" description="没有人举手" />
+    <div
+      v-for="group in collabStore.groupedRequests"
+      :key="group.problemId"
+      class="group"
+      :class="{ many: pendingOf(group.items).length >= 2 }"
+    >
+      <div class="group-head">
+        <span class="group-title">
+          <b class="num">{{ group.problemId }}</b>
+          <span class="muted">{{ group.problemTitle }}</span>
+        </span>
+        <b class="group-count">{{ group.items.length }} 人</b>
+        <template v-if="pendingOf(group.items).length >= 2">
+          <n-button size="small" @click="explain(group.items, group.problemId)">讲这道题</n-button>
+          <n-button size="small" @click="collabStore.dismiss(group.problemId)">
+            讲完了，都放下
+          </n-button>
+        </template>
+      </div>
+      <div v-for="item in group.items" :key="item.studentId" class="row">
+        <div class="who">
+          <UserName :username="item.studentName" />
+          <span class="kind">{{ kindOf(item) }}</span>
+        </div>
+        <template v-if="item.status === 'active'">
+          <n-text type="info" strong class="helping">{{ item.teacherName }} 在帮</n-text>
+        </template>
+        <template v-else>
+          <span class="waited" :class="{ long: waitedLong(item.createdAt) }">
+            等了 {{ waited(item.createdAt) }}
+          </span>
+          <n-button v-if="isDesktop" type="primary" size="small" @click="onHelp(item)">
+            帮他
+          </n-button>
           <n-button
-            v-if="item.status === 'pending'"
             quaternary
             circle
             size="small"
-            @click.stop="collabStore.reject(item.studentId)"
+            aria-label="放下他的手"
+            title="放下他的手"
+            @click="collabStore.reject(item.studentId)"
           >
             <Icon icon="mdi:close" height="16" />
           </n-button>
-        </n-flex>
-
-        <n-divider style="margin: 4px 0" />
+        </template>
       </div>
     </div>
-  </n-modal>
+  </div>
 </template>
+
+<style scoped>
+.panel {
+  width: 440px;
+  max-width: calc(100vw - 32px);
+  max-height: 70vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.title {
+  font-size: 15px;
+}
+
+.group {
+  border: 1px solid var(--n-divider-color, #e6e7eb);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.group.many {
+  border-color: #f3d6dd;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(128, 128, 128, 0.08);
+  white-space: nowrap;
+}
+
+.group.many .group-head {
+  background: rgba(208, 48, 80, 0.07);
+}
+
+.group-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.group-title .muted {
+  margin-left: 6px;
+}
+
+.group-count {
+  font-size: 14px;
+}
+
+.group.many .group-count {
+  color: #c0304e;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 8px 0 12px;
+  border-top: 1px solid rgba(128, 128, 128, 0.12);
+}
+
+.who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 15px;
+}
+
+.kind {
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.waited {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.waited.long {
+  color: #c0304e;
+  opacity: 1;
+}
+
+.helping {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.muted {
+  opacity: 0.6;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+</style>

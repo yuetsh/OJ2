@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useCollabStore } from "shared/store/collab"
+import HelpRequestList from "./HelpRequestList.vue"
 
 /**
  * 老师顶栏上的「N 人举手」：前台顶栏和后台顶栏共用这一个。
@@ -9,7 +10,8 @@ import { useCollabStore } from "shared/store/collab"
  * 按钮闪一下（约 1 秒、没声音、不挡内容），代替原来每来一个就弹一条的 toast：
  * 那条 toast 一节课能弹十几次，讲台电脑投着屏的时候还弹在全班面前。
  *
- * 求助列表另有一个入口在课堂看板上，没人等的时候真想看「谁在处理」从那边进。
+ * 点开是挂在按钮下面的举手面板（HelpRequestList），不是弹框。课堂看板的表里举手的人
+ * 排最前、行里就有「帮他」，在看板上不用点这里。
  */
 const props = withDefaults(defineProps<{ size?: "medium" | "small" }>(), { size: "medium" })
 
@@ -46,18 +48,26 @@ const tone = computed(() =>
 </script>
 
 <template>
-  <button
+  <n-popover
     v-if="count > 0"
-    :key="flashKey"
-    type="button"
-    class="help"
-    :class="[props.size, { flash: flashKey > 0 }]"
-    title="打开求助列表"
-    @click="collabStore.helpPanelOpen = true"
+    v-model:show="collabStore.helpPanelOpen"
+    trigger="click"
+    placement="bottom-end"
+    :show-arrow="false"
   >
-    <Icon icon="ph:hand" :width="props.size === 'small' ? 14 : 15" />
-    <span>{{ count }} 人举手</span>
-  </button>
+    <template #trigger>
+      <button
+        :key="flashKey"
+        type="button"
+        class="help"
+        :class="[props.size, { flash: flashKey > 0 }]"
+      >
+        <Icon icon="ph:hand" :width="props.size === 'small' ? 14 : 15" />
+        <span>{{ count }} 人举手</span>
+      </button>
+    </template>
+    <HelpRequestList @close="collabStore.helpPanelOpen = false" />
+  </n-popover>
 </template>
 
 <style scoped>

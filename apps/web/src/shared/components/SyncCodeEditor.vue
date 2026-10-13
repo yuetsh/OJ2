@@ -191,7 +191,19 @@ watch(
   },
 )
 
+/**
+ * 学生开着这道题的编辑器：报给服务端，老师看板「在写」那一列就是它，点了能直接打开他的
+ * 代码（不用等他举手）。换题、换语言重报一次，编辑器卸载（切走、切成流程图）报 null。
+ * 比赛入口不报（collab = false）：比赛题号和公开题撞号，老师打开的会是另一道题
+ */
+watch(
+  () => [collab ? problemId : "", language] as const,
+  ([id, lang]) => collabStore.reportPresence(id || null, lang),
+  { immediate: true },
+)
+
 onUnmounted(() => {
+  collabStore.reportPresence(null)
   cancelPendingIfLeaving()
   // 卸载意味着编辑器没了（切走整个页面、或者把语言切成流程图），CRDT 会话没法
   // 接着用：回来时只能新建 Y.Doc，再拿编辑器内容当种子就会和对方那份合并成重复
