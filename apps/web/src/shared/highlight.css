@@ -83,6 +83,10 @@ html.dark {
 .tok-builtin-type * {
   color: var(--code-type);
 }
+.tok-sql-function,
+.tok-sql-function * {
+  color: var(--code-function);
+}
 .tok-fullwidth,
 .tok-fullwidth * {
   color: var(--code-invalid);

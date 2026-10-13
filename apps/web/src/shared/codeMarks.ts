@@ -12,12 +12,14 @@
  *   不标的话 `“你好”` 会被认成变量名，看着和正常代码一样。
  * - Python 的内置类型（int、str、list…）：照 VS Code 一律是类型色。lezer 只按位置分，
  *   `int(input())` 里是函数、`map(int, …)` 里是变量，同一行两个颜色。
+ * - SQL 的函数（COUNT、AVG、ROUND…，后面跟着括号的）：照 VS Code 是函数色。lezer 的 SQL 解析器
+ *   把 COUNT 当关键字、把 avg 当普通名字，同是聚合函数一个蓝一个没颜色。
  */
 import type { syntaxTree } from "@codemirror/language"
 
 type Tree = ReturnType<typeof syntaxTree>
 
-export type CodeFamily = "c" | "python"
+export type CodeFamily = "c" | "python" | "sql"
 
 export interface Mark {
   from: number
@@ -25,7 +27,7 @@ export interface Mark {
   cls: string
 }
 
-const FORMAT: Record<CodeFamily, RegExp> = {
+const FORMAT: Partial<Record<CodeFamily, RegExp>> = {
   c: /%(\d+\$)?[#0\- +']*(-?\d+|\*)?(\.(-?\d+|\*)?)?(hh|h|ll|l|j|t|z|L)?[diouxXeEfFgGaAcspn%]/g,
   python: /%(\([\w\s]*\))?[-+#0 ]*(\d+|\*)?(\.(\d+|\*)?)?[hlL]?[diouxXeEfFgGcrsa%]/g,
 }
@@ -33,6 +35,7 @@ const FORMAT: Record<CodeFamily, RegExp> = {
 const FORMAT_CLASS: Record<CodeFamily, string> = {
   c: "tok-format",
   python: "tok-format-py",
+  sql: "",
 }
 
 // 全角的 ASCII（！（），：；？ａ１…）、全角空格、、。〈〉《》「」【】、中文引号
@@ -61,21 +64,55 @@ const PY_BUILTIN_TYPES = new Set([
   "type",
 ])
 
+// VS Code 的 SQL 语法里 support.function 的那批（SQLite 认的）
+const SQL_FUNCTIONS = new Set([
+  "abs",
+  "avg",
+  "coalesce",
+  "count",
+  "date",
+  "datetime",
+  "group_concat",
+  "ifnull",
+  "instr",
+  "length",
+  "lower",
+  "ltrim",
+  "max",
+  "min",
+  "nullif",
+  "random",
+  "replace",
+  "round",
+  "rtrim",
+  "strftime",
+  "substr",
+  "sum",
+  "time",
+  "total",
+  "trim",
+  "upper",
+])
+
 function matches(text: string, re: RegExp, cls: string): Mark[] {
   return [...text.matchAll(re)].map((m) => ({ from: m.index, to: m.index + m[0].length, cls }))
 }
 
 /**
  * 一个词（lezer 吐出的一段文字和它的类名）上要补的标记，位置相对 text 开头。
- * prev 是这段文字前面那个字符，用来排除 `obj.int` 这种属性
+ * prev 是这段文字前面那个字符（排除 `obj.int` 这种属性），after 是后面紧跟的一小截（看是不是 `(`）
  */
 export function extraMarks(
   text: string,
   classes: string,
   family: CodeFamily,
   prev: string,
+  after: string,
 ): Mark[] {
-  if (classes.includes("tok-string")) return matches(text, FORMAT[family], FORMAT_CLASS[family])
+  if (classes.includes("tok-string")) {
+    const re = FORMAT[family]
+    return re ? matches(text, re, FORMAT_CLASS[family]) : []
+  }
   if (classes.includes("tok-comment")) return []
   if (
     family === "python" &&
@@ -85,7 +122,18 @@ export function extraMarks(
   ) {
     return [{ from: 0, to: text.length, cls: "tok-builtin-type" }]
   }
-  return matches(text, FULL_WIDTH, "tok-fullwidth")
+  const marks = matches(text, FULL_WIDTH, "tok-fullwidth")
+  // 没类名的部分是一长截（`), round(avg(score), `），所以在里面逐个找词
+  if (family === "sql" && (classes === "" || classes === "tok-keyword")) {
+    for (const m of text.matchAll(/(?<!\w)[A-Za-z_]\w*/g)) {
+      const end = m.index + m[0].length
+      if (SQL_FUNCTIONS.has(m[0].toLowerCase()) && /^\s*\(/.test(text.slice(end) + after)) {
+        marks.push({ from: m.index, to: end, cls: "tok-sql-function" })
+      }
+    }
+    marks.sort((a, b) => a.from - b.from)
+  }
+  return marks
 }
 
 /**
@@ -120,10 +168,11 @@ export function splitMarks(
   marksFor: string,
   family: CodeFamily,
   prev: string,
+  after: string,
   put: (text: string, classes: string) => void,
 ) {
   let at = 0
-  for (const m of extraMarks(text, marksFor, family, prev)) {
+  for (const m of extraMarks(text, marksFor, family, prev, after)) {
     if (m.from > at) put(text.slice(at, m.from), classes)
     put(text.slice(m.from, m.to), classes ? `${classes} ${m.cls}` : m.cls)
     at = m.to

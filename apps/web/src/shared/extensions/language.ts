@@ -14,7 +14,8 @@ import { ojPythonLanguage } from "./pythonLanguage"
  * Java / Golang / JavaScript 没有单独的包，落到 cpp()，是既有行为，不是遗漏。
  */
 export function languageExtension(language: LANGUAGE): Extension {
-  if (language === "SQL") return sql({ dialect: SQLite, upperCaseKeywords: true })
+  if (language === "SQL")
+    return [sql({ dialect: SQLite, upperCaseKeywords: true }), codeMarks("sql")]
   if (language === "Python") {
     return [new LanguageSupport(ojPythonLanguage, python().support), codeMarks("python")]
   }

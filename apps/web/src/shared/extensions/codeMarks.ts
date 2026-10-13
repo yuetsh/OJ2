@@ -6,7 +6,7 @@ import { type CodeFamily, extraMarks, fakeStrings } from "../codeMarks"
 import { codeHighlighter } from "../highlight"
 
 /**
- * 编辑器里补的标记（%d、全角标点、Python 内置类型），规则见 shared/codeMarks.ts。
+ * 编辑器里补的标记（%d、全角标点、Python 内置类型、SQL 函数），规则见 shared/codeMarks.ts。
  * 和静态代码一样按 codeHighlighter 分出来的词逐个过 extraMarks()；只扫看得见的部分。
  */
 export function codeMarks(family: CodeFamily): Extension {
@@ -31,6 +31,7 @@ export function codeMarks(family: CodeFamily): Extension {
           classes,
           family,
           prev(start),
+          view.state.doc.sliceString(end, end + 20),
         )) {
           ranges.push(deco(m.cls).range(start + m.from, start + m.to))
         }
