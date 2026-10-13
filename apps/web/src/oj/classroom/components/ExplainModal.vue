@@ -15,11 +15,15 @@ import { useThemeVars } from "naive-ui"
 import SubmissionView from "oj/submission/components/SubmissionView.vue"
 import UserName from "shared/components/UserName.vue"
 import type { ClassBoardProblem } from "utils/types"
+import ProblemBrief from "./ProblemBrief.vue"
 
 /**
  * 课堂看板「讲错误」（设计稿 BdOpen）：点一个红格子或错法堆里的名字打开。老师在讲台上
  * 一个个讲这道题错着的人，所以顶上是这几个人，← → 换人；下面和独立的提交详情页同一块
  * （代码占满宽、为什么错在后），只是不出名字那一行、点「第几次」就地换。
+ *
+ * 「题目」按钮：演示错误时题目和代码要并排（用户要的），点了左边出题目，再点收起。
+ * 平时收着，代码照样占满宽。开没开记在这台电脑上，讲下一个人、下一道题还是那样
  */
 const props = defineProps<{
   problem: ClassBoardProblem | null
@@ -44,6 +48,7 @@ const vars = computed(() => ({
   "--hover": theme.value.hoverColor,
 }))
 const current = computed(() => props.people[index.value] ?? null)
+const showProblem = useStorage("oj_explain_show_problem", false)
 
 function step(delta: -1 | 1) {
   const next = index.value + delta
@@ -88,6 +93,14 @@ onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
         <span v-if="people.length > 1" class="keys"><kbd>←</kbd><kbd>→</kbd> 换人</span>
         <div class="spacer"></div>
         <n-button
+          v-if="problem"
+          :type="showProblem ? 'primary' : 'default'"
+          :secondary="showProblem"
+          @click="showProblem = !showProblem"
+        >
+          题目
+        </n-button>
+        <n-button
           v-if="current"
           tag="a"
           :href="'/submission/' + current.submissionId"
@@ -99,7 +112,14 @@ onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
           <template #icon><Icon icon="ph:x-bold" /></template>
         </n-button>
       </div>
-      <SubmissionView v-if="current" :id="current.submissionId" embedded />
+      <div class="body" :class="{ split: showProblem && problem }">
+        <aside v-if="showProblem && problem" class="statement">
+          <ProblemBrief :display-id="problem.problemDisplayId" />
+        </aside>
+        <div class="main">
+          <SubmissionView v-if="current" :id="current.submissionId" embedded />
+        </div>
+      </div>
     </div>
   </n-modal>
 </template>
@@ -196,5 +216,26 @@ kbd {
 
 .spacer {
   flex: 1 1 0;
+}
+
+.body.split {
+  display: grid;
+  grid-template-columns: minmax(300px, 2fr) minmax(0, 3fr);
+  gap: 20px;
+  align-items: start;
+}
+
+/* 题目自己滚：讲到代码后半段时题目还在旁边 */
+.statement {
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+  padding-right: 8px;
+  color: var(--text1);
+}
+
+.main {
+  min-width: 0;
 }
 </style>
