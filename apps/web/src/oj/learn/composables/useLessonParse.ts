@@ -7,6 +7,7 @@ import type { Exercise } from "utils/types"
  * - `goals`：「## 学习目标」那一节画成「学完这课你能」的方框；
  * - `code`：带语言的代码块（```python / ```c）换成能改、能运行的代码块；
  *   不带语言的（「输出结果」那种）留在 Markdown 里照常显示；
+ *   ```c main 是没写 main 的片段，由代码块套上灰色的 main 再运行（见 CodeRunBlock）；
  * - `exercise`：`[[exercise:36]]` 占位符换成练一练；
  * - `md`：其余的交给 Markdown.vue。
  *
@@ -17,7 +18,7 @@ export type LessonSegment =
   | { type: "md"; content: string }
   | { type: "heading"; id: string; text: string }
   | { type: "goals"; id: string; items: string[] }
-  | { type: "code"; lang: "python" | "c"; code: string; index: number }
+  | { type: "code"; lang: "python" | "c"; code: string; index: number; wrapMain: boolean }
   | { type: "exercise"; exercise: Exercise; index: number }
 
 /** 大纲里的一项：一个二级标题，挂着它这一节里的练一练 */
@@ -75,7 +76,7 @@ export function parseLesson(content: string, exercises: Exercise[]) {
   let i = 0
   while (i < lines.length) {
     const line = lines[i]!
-    const fence = line.match(/^(\s*)(```+|~~~+)\s*([\w+#-]*)\s*$/)
+    const fence = line.match(/^(\s*)(```+|~~~+)\s*([\w+#-]*)(\s+main)?\s*$/)
     if (fence) {
       const marker = fence[2]!
       const lang = CODE_LANGS[fence[3]!.toLowerCase()]
@@ -84,7 +85,13 @@ export function parseLesson(content: string, exercises: Exercise[]) {
       while (j < lines.length && !lines[j]!.trim().startsWith(marker)) body.push(lines[j++]!)
       if (lang) {
         flush()
-        segments.push({ type: "code", lang, code: body.join("\n"), index: codeIndex++ })
+        segments.push({
+          type: "code",
+          lang,
+          code: body.join("\n"),
+          index: codeIndex++,
+          wrapMain: lang === "c" && !!fence[4],
+        })
       } else {
         md.push(line, ...body, lines[j] ?? marker)
       }

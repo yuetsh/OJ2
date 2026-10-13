@@ -9,6 +9,7 @@ import { explainPythonCompileError } from "oj/problem/utils/pythonError"
 import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
+import { mainWrapExtensions, wrapMain } from "../wrapMain"
 
 const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
 
@@ -18,11 +19,14 @@ const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEdit
  * 运行走题目页同一台判题机（POST /trial-runs，带 tutorialId），不算提交。
  * 报错用题目页那套中文解释（pythonError / cError / runtimeError），原文收在下面。
  * 代码里读输入（input() / scanf）才出输入框。
+ * C 的片段（原文没有 main，只是讲一两行写法）跑不起来，不给「运行」按钮；
+ * 教程里标了 ```c main 的片段套上灰色的 main 再给（见 wrapMain.ts）。
  */
 const props = defineProps<{
   code: string
   lang: "python" | "c"
   tutorialId: number
+  wrapMain?: boolean
 }>()
 
 const userStore = useUserStore()
@@ -30,7 +34,9 @@ const authModal = useAuthModalStore()
 const message = useMessage()
 const { copy } = useClipboard({ legacy: true })
 
-const value = ref(props.code)
+const original = computed(() => (props.wrapMain ? wrapMain(props.code) : props.code))
+const extensions = computed(() => (props.wrapMain ? mainWrapExtensions : []))
+const value = ref(original.value)
 const input = ref("")
 const running = ref(false)
 
@@ -41,16 +47,15 @@ type Outcome =
 const outcome = ref<Outcome | null>(null)
 
 // 换课时组件实例可能被复用（v-for 的 key 是段落序号），跟着原文重置
-watch(
-  () => props.code,
-  (code) => {
-    value.value = code
-    input.value = ""
-    outcome.value = null
-  },
-)
+watch(original, (code) => {
+  value.value = code
+  input.value = ""
+  outcome.value = null
+})
 
-const edited = computed(() => value.value !== props.code)
+const edited = computed(() => value.value !== original.value)
+// 看原文不看改过的：学生把 main 删了，按钮还在，点了才知道错在哪
+const runnable = computed(() => props.lang === "python" || /\bmain\s*\(/.test(original.value))
 const needsInput = computed(() =>
   props.lang === "python"
     ? /\binput\s*\(/.test(value.value)
@@ -173,7 +178,7 @@ async function run() {
 }
 
 function restore() {
-  value.value = props.code
+  value.value = original.value
   outcome.value = null
 }
 
@@ -194,7 +199,14 @@ async function copyCode() {
           <Icon icon="ph:arrow-counter-clockwise" :width="14" />还原
         </button>
       </template>
-      <button type="button" class="run" :class="{ busy: running }" :disabled="running" @click="run">
+      <button
+        v-if="runnable"
+        type="button"
+        class="run"
+        :class="{ busy: running }"
+        :disabled="running"
+        @click="run"
+      >
         <template v-if="running">运行中…</template>
         <template v-else><Icon icon="ph:play-fill" :width="12" />运行</template>
       </button>
@@ -203,10 +215,16 @@ async function copyCode() {
       </button>
     </div>
     <div class="editor" :style="{ minHeight: `${lineCount * 22 + 16}px` }">
-      <CodeEditor v-model:value="value" :language="language" :font-size="14" height="auto" />
+      <CodeEditor
+        v-model:value="value"
+        :language="language"
+        :font-size="14"
+        height="auto"
+        :extra-extensions="extensions"
+      />
     </div>
     <div
-      v-if="needsInput"
+      v-if="runnable && needsInput"
       class="pane input"
       :class="{ ask: outcome?.kind === 'error' && outcome.needInput }"
     >
@@ -314,6 +332,9 @@ async function copyCode() {
 .editor :deep(.cm-gutters) {
   background: transparent;
   border-right: 0;
+}
+.editor :deep(.cm-main-wrap) {
+  opacity: 0.4;
 }
 .editor :deep(.cm-scroller) {
   font-family: var(--learn-code-font);

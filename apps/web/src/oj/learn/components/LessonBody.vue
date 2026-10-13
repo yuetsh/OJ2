@@ -39,6 +39,7 @@ function inline(text: string) {
         v-else-if="seg.type === 'code'"
         :code="seg.code"
         :lang="seg.lang"
+        :wrap-main="seg.wrapMain"
         :tutorial-id="tutorialId"
       />
       <ExerciseWidget
