@@ -15,7 +15,6 @@ import {
 } from "oj/api"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { useProblemJump } from "shared/composables/problemJump"
 import { pickHeadline, type Headline } from "oj/user/knowledge"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
@@ -56,7 +55,6 @@ const lastVisit = ref<LastVisit | null>(null)
 /** 知识点地图挑出来的那一句（本周升级 / 再做几道升档 / 去点亮一个），见 oj/user/knowledge.ts */
 const knowledgeHeadline = ref<Headline | null>(null)
 const loaded = ref(false)
-const keyword = ref("")
 
 /** 头一回登录、还没交过：问候换成「欢迎」，告诉他题在哪找 */
 const firstVisit = computed(
@@ -151,9 +149,10 @@ async function loadSubmissions() {
   submissions.value = res.results
 }
 
+/** 首页只放置顶的公告（用户定的），其余从顶栏「公告」进 */
 async function loadAnnouncements() {
-  const res = await getAnnouncementList(0, 4)
-  announcements.value = res.results
+  const res = await getAnnouncementList(0, 10)
+  announcements.value = res.results.filter((item) => item.top)
 }
 
 async function loadKnowledge() {
@@ -216,6 +215,24 @@ const classSummaryText = computed(() => {
     : `那天班里一起做了 ${problems.length} 道，你做对了 ${done} 道`
 })
 
+/**
+ * 「上次还有 N 道没过」那一句：上次来就是今天（上午上课、下午又登录）时不说 ——
+ * 原来照样写「上次（10月13日）」，和今天是同一天
+ */
+const visitBeforeToday = computed(
+  () =>
+    !!lastVisit.value?.previousLogin &&
+    dayKey(lastVisit.value.previousLogin) !== dayKey(new Date()),
+)
+
+/** 这节课下一道没做对的：卡底「接着做」那个大按钮 */
+const nextProblem = computed(
+  () => classActivity.value?.problems.find((item) => item.myStatus !== "accepted") ?? null,
+)
+const doneInClass = computed(
+  () => classActivity.value?.problems.filter((item) => item.myStatus === "accepted").length ?? 0,
+)
+
 const solvedText = computed(() =>
   (visit.value?.solved ?? []).map((item) => `${item.problemDisplayId} ${item.title}`).join("、"),
 )
@@ -227,9 +244,9 @@ const classActivityTitle = computed(() => {
   // 老师在课堂看板布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
   if (classActivity.value?.source === "teacher") {
     const language = classActivity.value.language
-    return `今天老师布置的题${language ? ` · 用${LANGUAGE_SHOW_VALUE[language]}做` : ""}`
+    return `这节课${language ? ` · 用${LANGUAGE_SHOW_VALUE[language]}做` : ""}`
   }
-  if (classToday.value) return "今天班里在做"
+  if (classToday.value) return "这节课"
   const [, month, date] = day.split("-").map(Number)
   return `${month}月${date}日班里做了`
 })
@@ -238,9 +255,9 @@ const MY_STATUS: Record<
   ClassActivityProblem["myStatus"],
   { label: string; type: "success" | "warning" | "default" }
 > = {
-  accepted: { label: "已通过", type: "success" },
-  tried: { label: "未通过", type: "warning" },
-  none: { label: "没做", type: "default" },
+  accepted: { label: "已做对", type: "success" },
+  tried: { label: "没做对", type: "warning" },
+  none: { label: "还没做", type: "default" },
 }
 
 async function loadWeekly() {
@@ -271,8 +288,6 @@ watch(
 function learnLink(track: Track) {
   return lessonPath(track.type, track.step)
 }
-
-const { jump, jumping } = useProblemJump()
 
 function openSubmission(row: SubmissionListItem) {
   if (row.showLink) router.push(`/submission/${row.id}`)
@@ -313,45 +328,87 @@ async function openAnnouncement(item: AnnouncementListItem) {
 
 <template>
   <div class="home">
+    <!-- 中间原来还有一个「题号或题目名 找题」框，和顶栏右上角那个重复，拿掉了 -->
     <section class="hero">
-      <div>
-        <h1 v-if="firstVisit" class="hello">欢迎来到判题狗，{{ userStore.user?.username }}</h1>
-        <h1 v-else class="hello">{{ greeting }}，{{ userStore.user?.username }}</h1>
-        <n-text v-if="firstVisit" depth="3">老师报了题号，在右边的框里输入就能找到题</n-text>
-        <n-text v-else depth="3">
-          <template v-if="longAway">{{ awayText }} · </template>
-          已解决 {{ userStore.profile?.acceptedNumber ?? 0 }} 题 · 共提交
-          {{ userStore.profile?.submissionNumber ?? 0 }} 次
-          <template v-if="weeklyText">
-            ·
-            <router-link to="/rank" class="plain-link">{{ weeklyText }}</router-link>
-          </template>
-        </n-text>
-        <div v-if="knowledgeHeadline" class="knowledge-line">
+      <h1 v-if="firstVisit" class="hello">欢迎来到判题狗，{{ userStore.user?.username }}</h1>
+      <h1 v-else class="hello">{{ greeting }}，{{ userStore.user?.username }}</h1>
+      <n-text v-if="firstVisit" depth="3">老师报了题号，在右上角的框里输入就能找到题</n-text>
+      <n-text v-else depth="3">
+        <template v-if="longAway">{{ awayText }} · </template>
+        已解决 {{ userStore.profile?.acceptedNumber ?? 0 }} 题
+        <template v-if="weeklyText">
+          ·
+          <router-link to="/rank" class="plain-link">{{ weeklyText }}</router-link>
+        </template>
+        <template v-if="knowledgeHeadline">
+          ·
           <router-link v-if="knowledgeHeadline.to" :to="knowledgeHeadline.to" class="plain-link">
             {{ knowledgeHeadline.text }}
           </router-link>
           <span v-else>{{ knowledgeHeadline.text }}</span>
-          <router-link to="/user" class="more">我的知识点</router-link>
-        </div>
-      </div>
-      <n-input-group class="search">
-        <n-input
-          v-model:value="keyword"
-          placeholder="题号或题目名"
-          clearable
-          @keyup.enter="jump(keyword)"
-        />
-        <n-button type="primary" :loading="jumping" @click="jump(keyword)">找题</n-button>
-      </n-input-group>
+        </template>
+      </n-text>
     </section>
 
     <div class="grid">
       <div class="column">
-        <!-- 「上次来」：上次登录到这次登录之间交过题才有。班里今天在做的时候让位给班里卡，
-             只在那张卡底下留一句没做对的 -->
+        <!-- 上课时最上面是这节课（设计稿 HomeStuClass）：几道题做没做对，底下一个「接着做」 -->
+        <n-card
+          v-if="classToday && classActivity?.problems.length"
+          :bordered="false"
+          class="card lesson"
+        >
+          <template #header>{{ classActivityTitle }}</template>
+          <template #header-extra>
+            <n-text depth="3" class="row-meta">
+              {{ classActivity.problems.length }} 道做对了 {{ doneInClass }} 道
+            </n-text>
+          </template>
+          <router-link
+            v-for="item in classActivity.problems"
+            :key="item.problemDisplayId"
+            :to="`/problem/${item.problemDisplayId}`"
+            class="row"
+          >
+            <n-tag :type="MY_STATUS[item.myStatus].type" size="small" :bordered="false">
+              {{ MY_STATUS[item.myStatus].label }}
+            </n-tag>
+            <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
+            <!-- 老师刚布置、还没人交的时候不显示「0/0」 -->
+            <n-text v-if="item.userCount" depth="3" class="row-meta">
+              {{ item.acceptedCount }}/{{ item.userCount }} 人做对
+            </n-text>
+          </router-link>
+          <div class="lesson-foot">
+            <n-button
+              v-if="nextProblem"
+              type="primary"
+              size="large"
+              @click="router.push(`/problem/${nextProblem.problemDisplayId}`)"
+            >
+              接着做 {{ nextProblem.problemDisplayId }} {{ nextProblem.title }} →
+            </n-button>
+            <n-text v-else type="success">这节课的题都做对了</n-text>
+          </div>
+          <div v-if="visitBeforeToday && visit?.unsolved.length" class="visit-foot warn">
+            <span class="dot"></span>
+            <span class="row-title">
+              上次（{{ dateText(lastVisit!.previousLogin!) }}）还有
+              {{ visit.unsolved.length }} 道没做对：{{ visit.unsolved[0]!.problemDisplayId }}
+              {{ visit.unsolved[0]!.title }}
+            </span>
+            <router-link :to="`/problem/${visit.unsolved[0]!.problemDisplayId}`" class="go">
+              接着做 ›
+            </router-link>
+          </div>
+        </n-card>
+
+        <!-- 不在上课：上次没做完的排最前（设计稿 HomeStuAfter） -->
         <n-card v-if="visit && !classToday" :bordered="false" class="card">
-          <template #header>上次来 · {{ visitText(lastVisit!.previousLogin!) }}</template>
+          <template #header>
+            {{ visit.unsolved.length ? "上次没做完" : "上次来" }} ·
+            {{ visitText(lastVisit!.previousLogin!) }}
+          </template>
           <template #header-extra>
             <n-text depth="3" class="row-meta">
               做对 {{ visit.solvedCount }} 道 · 交了 {{ visit.submissionCount }} 次
@@ -363,7 +420,7 @@ async function openAnnouncement(item: AnnouncementListItem) {
             :to="`/problem/${item.problemDisplayId}`"
             class="unsolved"
           >
-            <n-tag type="warning" size="small" :bordered="false">未通过</n-tag>
+            <n-tag type="warning" size="small" :bordered="false">没做对</n-tag>
             <div class="unsolved-main">
               <span class="row-title">
                 <n-text depth="3">{{ item.problemDisplayId }}</n-text> {{ item.title }}
@@ -375,20 +432,17 @@ async function openAnnouncement(item: AnnouncementListItem) {
             <n-button type="primary" tag="span">接着做</n-button>
           </router-link>
           <div v-if="visit.solvedCount" class="row">
-            <n-tag type="success" size="small" :bordered="false">已通过</n-tag>
+            <n-tag type="success" size="small" :bordered="false">已做对</n-tag>
             <span class="row-title">{{ visit.solvedCount }} 道：{{ solvedText }}</span>
-            <router-link to="/submission?myself=1" class="more">
-              看这 {{ visit.solvedCount }} 道 ›
-            </router-link>
           </div>
           <div v-if="visitCoversClass" class="visit-foot">
             <Icon icon="ph:check-bold" :width="14" />{{ classSummaryText }}
           </div>
         </n-card>
 
-        <!-- 只在有的时候出现：没班级、最近一周班里没一起做过题的，这块不占位置 -->
+        <!-- 前几天班里一起做的（不是今天、也不是上次来那天）：只在有的时候出现 -->
         <n-card
-          v-if="classActivity?.problems.length && !visitCoversClass"
+          v-if="!classToday && classActivity?.problems.length && !visitCoversClass"
           :title="classActivityTitle"
           :bordered="false"
           class="card"
@@ -406,59 +460,28 @@ async function openAnnouncement(item: AnnouncementListItem) {
               {{ MY_STATUS[item.myStatus].label }}
             </n-tag>
             <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
-            <!-- 老师刚布置、还没人交的时候不显示「0/0 人通过」 -->
             <n-text v-if="item.userCount" depth="3" class="row-meta">
-              {{ item.acceptedCount }}/{{ item.userCount }} 人通过
+              {{ item.acceptedCount }}/{{ item.userCount }} 人做对
             </n-text>
           </router-link>
-          <div v-if="classToday && visit?.unsolved.length" class="visit-foot warn">
-            <span class="dot"></span>
-            <span class="row-title">
-              上次（{{ dateText(lastVisit!.previousLogin!) }}）还有
-              {{ visit.unsolved.length }} 道没过： {{ visit.unsolved[0]!.problemDisplayId }}
-              {{ visit.unsolved[0]!.title }}
-            </span>
-            <router-link :to="`/problem/${visit.unsolved[0]!.problemDisplayId}`" class="go">
-              接着做 ›
-            </router-link>
-          </div>
         </n-card>
 
+        <!-- 继续学习：一门一行 -->
         <n-card title="继续学习" :bordered="false" class="card">
-          <n-flex vertical :size="12">
-            <router-link
-              v-for="track in tracks"
-              :key="track.type"
-              :to="learnLink(track)"
-              class="track"
-            >
-              <div class="track-main">
-                <n-text depth="3" class="track-label">
-                  {{ track.label }} · 第 {{ track.step }} / {{ track.total }} 课
-                </n-text>
-                <div class="track-title">{{ track.title }}</div>
-                <n-progress
-                  type="line"
-                  :percentage="Math.round((track.done / track.total) * 100)"
-                  status="success"
-                  :show-indicator="false"
-                  :height="6"
-                />
-                <n-text depth="3" class="track-meta">
-                  学完 {{ track.done }} 课
-                  <template v-if="track.lastViewedAt">
-                    · 上次 {{ relativeTime(track.lastViewedAt) }}
-                  </template>
-                </n-text>
-              </div>
-              <n-button :type="track.lastViewedAt ? 'primary' : 'default'" tag="span">
-                {{ track.lastViewedAt ? "继续" : "开始" }}
-              </n-button>
-            </router-link>
-            <n-empty v-if="loaded && !tracks.length" description="还没有公开的教程" />
-          </n-flex>
+          <router-link v-for="track in tracks" :key="track.type" :to="learnLink(track)" class="row">
+            <n-text depth="3" class="track-label">{{ track.label }}</n-text>
+            <span class="row-title">
+              第 {{ track.step }} / {{ track.total }} 课 · {{ track.title }}
+            </span>
+            <n-button :type="track.lastViewedAt ? 'primary' : 'default'" tag="span" size="small">
+              {{ track.lastViewedAt ? "继续" : "开始" }}
+            </n-button>
+          </router-link>
+          <n-empty v-if="loaded && !tracks.length" description="还没有公开的教程" />
         </n-card>
+      </div>
 
+      <div class="column">
         <n-card title="最近提交" :bordered="false" class="card">
           <template #header-extra>
             <router-link to="/submission?myself=1" class="more">全部</router-link>
@@ -479,10 +502,9 @@ async function openAnnouncement(item: AnnouncementListItem) {
             </template>
           </n-empty>
         </n-card>
-      </div>
 
-      <div class="column">
-        <n-card title="比赛" :bordered="false" class="card">
+        <!-- 比赛只在有进行中 / 快开始的时候出现（这学期一场都没办，原来常年一块空卡） -->
+        <n-card v-if="contests.length" title="比赛" :bordered="false" class="card">
           <template #header-extra>
             <router-link to="/contest" class="more">全部</router-link>
           </template>
@@ -500,47 +522,22 @@ async function openAnnouncement(item: AnnouncementListItem) {
             </n-flex>
             <n-text depth="3" class="row-meta">{{ contestTime(contest) }}</n-text>
           </router-link>
-          <n-text v-if="loaded && !contests.length" depth="3">
-            现在没有进行中或即将开始的比赛
-          </n-text>
         </n-card>
 
-        <n-card title="公告" :bordered="false" class="card">
-          <template #header-extra>
-            <router-link to="/announcement" class="more">全部</router-link>
-          </template>
-          <div
-            v-for="item in announcements"
-            :key="item.id"
-            class="row clickable"
-            @click="openAnnouncement(item)"
-          >
-            <n-tag v-if="item.top" type="error" size="small" :bordered="false">置顶</n-tag>
-            <span class="row-title">{{ item.title }}</span>
-            <n-text depth="3" class="row-meta">{{ parseTime(item.createTime, "M月D日") }}</n-text>
-          </div>
-        </n-card>
-
-        <n-card :bordered="false" class="card">
-          <n-flex :size="8" class="shortcuts">
-            <n-button secondary @click="router.push('/problem')">
-              <template #icon><Icon icon="fluent-emoji:memo" /></template>
-              题库
-            </n-button>
-            <n-button secondary @click="router.push('/problemset')">
-              <template #icon><Icon icon="fluent-emoji:clipboard" /></template>
-              题单
-            </n-button>
-            <n-button secondary @click="router.push('/achievement')">
-              <template #icon><Icon icon="fluent-emoji:sports-medal" /></template>
-              成就
-            </n-button>
-            <n-button secondary @click="router.push('/ai-analysis')">
-              <template #icon><Icon icon="fluent-emoji:crystal-ball" /></template>
-              智能分析
-            </n-button>
-          </n-flex>
-        </n-card>
+        <!-- 公告只放置顶的；别的从顶栏「公告」进 -->
+        <div
+          v-for="item in announcements"
+          :key="item.id"
+          class="card pinned"
+          role="button"
+          tabindex="0"
+          @click="openAnnouncement(item)"
+          @keyup.enter="openAnnouncement(item)"
+        >
+          <n-tag type="warning" size="small" :bordered="false">置顶</n-tag>
+          <span class="row-title">{{ item.title }}</span>
+          <router-link to="/announcement" class="more" @click.stop>公告 →</router-link>
+        </div>
       </div>
     </div>
 
@@ -564,37 +561,32 @@ async function openAnnouncement(item: AnnouncementListItem) {
 
 .hero {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin: 16px 0 28px;
+  flex-direction: column;
+  gap: 6px;
+  margin: 16px 0 24px;
 }
 
 .hello {
   font-size: 28px;
   font-weight: 600;
-  margin: 0 0 8px;
+  margin: 0;
 }
 
-.knowledge-line {
-  margin-top: 6px;
+/* 这节课：卡片描一圈主色，底下一个大按钮 */
+.lesson {
+  box-shadow: inset 0 0 0 1px rgba(24, 160, 88, 0.35);
+}
+
+.lesson-foot {
+  padding-top: 12px;
+}
+
+.pinned {
   display: flex;
-  gap: 12px;
-  align-items: baseline;
-  color: #18a058;
-}
-
-/* 这一行本身就是链接（去按知识点筛的题目列表），下划线说明它能点 */
-.knowledge-line .plain-link {
-  color: #18a058;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.search {
-  width: 340px;
-  max-width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
 }
 
 .grid {
@@ -629,42 +621,14 @@ async function openAnnouncement(item: AnnouncementListItem) {
   }
 }
 
-.track {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  color: inherit;
-  text-decoration: none;
-  background-color: rgba(128, 128, 128, 0.06);
-  transition: background-color 0.2s;
-}
-
-.track:hover {
-  background-color: rgba(24, 160, 88, 0.1);
-}
-
-.track-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.track-label,
-.track-meta,
-.row-meta {
+.track-label {
+  flex: none;
+  width: 64px;
   font-size: var(--oj-fs-meta);
 }
 
-.track-title {
-  font-size: 17px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.row-meta {
+  font-size: var(--oj-fs-meta);
 }
 
 .row {

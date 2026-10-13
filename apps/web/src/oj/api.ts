@@ -13,6 +13,7 @@ import {
   type TutorialSummary,
   type Tutorial,
   type ClassActivity,
+  type ClassToday,
   type LastVisit,
   type ClassBoard,
   type ClassLesson,
@@ -303,6 +304,11 @@ export function getKnowledgeMap() {
 
 export function getClassActivity() {
   return api.get<ClassActivity>("me/class-activity")
+}
+
+/** 老师首页「今天的课」：今天在上课的每个班 */
+export function getClassToday() {
+  return api.get<ClassToday>("classroom/today")
 }
 
 /** 首页「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对 */
