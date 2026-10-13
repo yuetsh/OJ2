@@ -345,6 +345,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
     </template>
   </PageHeader>
   <n-data-table
+    striped
     class="user-table"
     :data="users"
     :columns="columns"

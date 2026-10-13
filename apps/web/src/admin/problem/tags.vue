@@ -240,6 +240,11 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   border-bottom: 0;
 }
 
+/* 斑马底纹，和后台其它列表一样（用户要的） */
+.row:nth-child(even) {
+  background: v-bind("theme.tableColorStriped");
+}
+
 .name {
   flex: 0 0 120px;
   min-width: 0;

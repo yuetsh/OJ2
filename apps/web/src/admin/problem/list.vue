@@ -348,6 +348,7 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
     <n-button size="small" quaternary @click="selectedRowKeys = []">取消选择</n-button>
   </div>
   <n-data-table
+    striped
     class="problem-table"
     :columns="columns"
     :data="problems"

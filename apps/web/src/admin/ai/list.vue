@@ -174,6 +174,11 @@ watchDebounced(
   border-bottom: 0;
 }
 
+/* 斑马底纹，和后台其它列表一样 */
+.item:nth-child(even) {
+  background: v-bind("theme.tableColorStriped");
+}
+
 .item:hover {
   background: v-bind("theme.hoverColor");
 }

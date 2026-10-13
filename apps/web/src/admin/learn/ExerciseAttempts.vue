@@ -58,6 +58,7 @@ onMounted(async () => {
 
 <template>
   <n-data-table
+    striped
     :loading="loading"
     :columns="columns"
     :data="rows"

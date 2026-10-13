@@ -138,7 +138,7 @@ watchDebounced(() => query.keyword, listContests, {
       <n-input v-model:value="query.keyword" placeholder="比赛名" clearable style="width: 220px" />
     </template>
   </PageHeader>
-  <n-data-table class="contest-table" :columns="columns" :data="contests" />
+  <n-data-table striped class="contest-table" :columns="columns" :data="contests" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 

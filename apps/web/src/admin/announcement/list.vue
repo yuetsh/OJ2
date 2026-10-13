@@ -123,7 +123,7 @@ watch(query, listAnnouncements, { deep: true })
       </n-button>
     </template>
   </PageHeader>
-  <n-data-table class="ann-table" :columns="columns" :data="announcements" />
+  <n-data-table striped class="ann-table" :columns="columns" :data="announcements" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 

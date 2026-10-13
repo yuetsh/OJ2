@@ -141,11 +141,16 @@ onMounted(load)
   flex-direction: column;
 }
 
+/* 斑马底纹，和后台其它列表一样 */
+.group:nth-child(even) {
+  background: v-bind("theme.tableColorStriped");
+}
+
 .group {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
+  padding: 8px 10px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
 }
 
