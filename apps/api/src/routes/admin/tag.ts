@@ -1,6 +1,7 @@
 import {
   parseFlowDoc,
   batchProblemTagRequestSchema,
+  batchProblemVisibleRequestSchema,
   generateFlowchartRequestSchema,
   renameTagRequestSchema,
   setTagCategoryRequestSchema,
@@ -251,6 +252,28 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
     .set({ visible: !problem.visible })
     .where(eq(schema.problem.id, id))
   return success(c, { visible: !problem.visible })
+})
+
+/**
+ * 勾了几道，一次让学生看得到 / 藏起来（后台题目列表「已选 N 道」那一条）。
+ * 和批量加标签同一个范围：只认公开题，不是全部题目管理员就只认自己出的
+ */
+adminTagRoutes.post("/problems/batch-visible", requireProblemPermission, async (c) => {
+  const parsed = await parseBody(c, batchProblemVisibleRequestSchema)
+  if (!parsed.success) return parsed.response
+  const user = c.get("user")!
+  const filters = [
+    inArray(schema.problem.id, parsed.data.problemIds),
+    isNull(schema.problem.contestId),
+  ]
+  if (!canManageAllProblems(user)) filters.push(eq(schema.problem.createdById, user.id))
+  const updated = await db
+    .update(schema.problem)
+    .set({ visible: parsed.data.visible })
+    .where(and(...filters))
+    .returning({ id: schema.problem.id })
+  if (updated.length === 0) return failure(c, 404, "no-problems", "没有可操作的题目")
+  return success(c, { problemCount: updated.length })
 })
 
 // ---------------------------------------------------------------- Python → 流程图

@@ -529,6 +529,12 @@ export const batchProblemTagRequestSchema = z.object({
   action: z.enum(["add", "remove"]),
 })
 
+/** 勾了几道题，一次让学生看得到 / 藏起来。只认公开题、只认自己能改的 */
+export const batchProblemVisibleRequestSchema = z.object({
+  problemIds: z.array(z.number().int().positive()).min(1),
+  visible: z.boolean(),
+})
+
 export const batchProblemTagResponseSchema = z.object({
   problemCount: z.number().int(),
   tagCount: z.number().int(),
@@ -699,9 +705,23 @@ export const adminProblemListItemSchema = z.object({
   // 最高票评价 {type, count}。**只有公开题列表下发**，比赛题列表恒传 null ——
   // 与旧后端 reaction/services.py:get_top_reactions 的口径一致。
   topReaction: z.object({ type: reactionKeySchema, count: z.number().int() }).nullable(),
+  /**
+   * 做对 / 做过的人数（代码提交，和前台题目列表同一口径）。比赛题列表恒为 0 ——
+   * 那个口径只数题库里交的。做过的人数 > 0 就删不掉（有提交），列表里「删除」据此灰掉
+   */
+  solvedUsers: z.number().int(),
+  triedUsers: z.number().int(),
 })
 
-export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema)
+export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema).extend({
+  /**
+   * 「全部 / 学生看得到 / 藏着的」三个按钮上的数：除了可见性，筛选条件和列表一样。
+   * 只有公开题列表给，比赛题列表没有这组按钮
+   */
+  counts: z
+    .object({ all: z.number().int(), visible: z.number().int(), hidden: z.number().int() })
+    .optional(),
+})
 
 /**
  * 题面样例 / 标准答案 / 测试点分值。这三个旧后端都是逐字段校验的
@@ -1058,6 +1078,7 @@ export type CreateProblemSetBadgeRequest = z.infer<typeof createProblemSetBadgeR
 export type UpdateProblemSetBadgeRequest = z.infer<typeof updateProblemSetBadgeRequestSchema>
 export type RenameTagRequest = z.infer<typeof renameTagRequestSchema>
 export type BatchProblemTagRequest = z.infer<typeof batchProblemTagRequestSchema>
+export type BatchProblemVisibleRequest = z.infer<typeof batchProblemVisibleRequestSchema>
 export type GenerateFlowchartRequest = z.infer<typeof generateFlowchartRequestSchema>
 export type GenerateFlowchartResponse = z.infer<typeof generateFlowchartResponseSchema>
 export type UpdateProblemRequest = z.infer<typeof updateProblemRequestSchema>

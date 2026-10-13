@@ -50,6 +50,7 @@ import { config } from "../../config"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { getTopReactions } from "../../services/reaction"
+import { problemUserCounts } from "../../services/problem-progress"
 import { asRecord, queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
@@ -447,8 +448,13 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
       ),
     )
   }
+  // 「全部 / 学生看得到 / 藏着的」：三个按钮上的数按除可见性以外的条件数，列表再按它筛
+  const beforeVisible = and(...filters)
+  const visibleQuery = c.req.query("visible")
+  if (visibleQuery === "1") filters.push(eq(schema.problem.visible, true))
+  else if (visibleQuery === "0") filters.push(eq(schema.problem.visible, false))
   const where = and(...filters)
-  const [totalRow, rows] = await Promise.all([
+  const [totalRow, rows, visibleRows] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.problem)
@@ -467,13 +473,24 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
       .orderBy(desc(schema.problem.createTime))
       .limit(limit)
       .offset(offset),
+    library
+      ? []
+      : db
+          .select({ visible: schema.problem.visible, value: count() })
+          .from(schema.problem)
+          .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
+          .where(beforeVisible)
+          .groupBy(schema.problem.visible),
   ])
   // 只有公开题列表下发最高票评价，比赛题列表不下发 —— 与旧后端一致
   const problemIds = rows.map(({ problem }) => problem.id)
-  const [topReactions, tags] = await Promise.all([
+  const [topReactions, tags, userCounts] = await Promise.all([
     getTopReactions(problemIds),
     tagNamesFor(problemIds),
+    problemUserCounts(problemIds),
   ])
+  const visibleCount = visibleRows.find((row) => row.visible)?.value ?? 0
+  const hiddenCount = visibleRows.find((row) => !row.visible)?.value ?? 0
   return success(c, {
     results: rows.map(
       ({ problem, user: creator, realName }) =>
@@ -491,9 +508,14 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
           allowFlowchart: problem.allowFlowchart,
           showFlowchart: problem.showFlowchart,
           topReaction: topReactions.get(problem.id) ?? null,
+          solvedUsers: userCounts.get(problem.id)?.solved ?? 0,
+          triedUsers: userCounts.get(problem.id)?.tried ?? 0,
         }) satisfies AdminProblemListItem,
     ),
     total: totalRow[0]?.value ?? 0,
+    counts: library
+      ? undefined
+      : { all: visibleCount + hiddenCount, visible: visibleCount, hidden: hiddenCount },
   } satisfies AdminProblemList)
 })
 
@@ -637,7 +659,15 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
   const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
   const filters = [eq(schema.problem.contestId, contestId)]
   const keyword = c.req.query("keyword")?.trim()
-  if (keyword) filters.push(ilike(schema.problem.title, `%${keyword}%`))
+  // 和公开题列表一样，题号也能搜（搜索框写的是「题号或题目名」）
+  if (keyword) {
+    filters.push(
+      or(
+        ilike(schema.problem.title, `%${keyword}%`),
+        ilike(schema.problem.displayId, `%${keyword}%`),
+      )!,
+    )
+  }
   const where = and(...filters)
   const [totalRow, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.problem).where(where),
@@ -673,6 +703,8 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
           allowFlowchart: problem.allowFlowchart,
           showFlowchart: problem.showFlowchart,
           topReaction: null,
+          solvedUsers: 0,
+          triedUsers: 0,
         }) satisfies AdminProblemListItem,
     ),
     total: totalRow[0]?.value ?? 0,
