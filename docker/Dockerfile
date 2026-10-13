@@ -142,9 +142,13 @@ RUN sed -i "s|deb.debian.org|${APT_MIRROR}|g" /etc/apt/sources.list.d/debian.sou
   && apt-get install -y --no-install-recommends clang-format python3-minimal \
   && rm -rf /var/lib/apt/lists/*
 
-# ruff 给 Python 代码格式化用。旧后端是 pip 装的 ruff==0.15.12，这里取同版本的
-# 官方静态二进制（上面那个 python3-minimal 没有 pip，也不该为 ruff 装）。
-COPY --from=ghcr.io/astral-sh/ruff:0.15.12 /ruff /usr/local/bin/ruff
+# ruff 给 Python 代码格式化用：学生每次提交前自动排版，排好的代码会写回编辑器。
+# 取官方静态二进制（上面那个 python3-minimal 没有 pip，也不该为 ruff 装）。
+#
+# 版本钉死，别写 latest：排版规则一变，学生交同样的代码就会被排成另一个样子。
+# 升级前拿生产库全部 Python 提交（去重后 6 万多份）用新旧两版各排一遍，逐个文件比：
+# 0.15.12 → 0.17.0 输出一字不差，解析失败的也是同一批。
+COPY --from=ghcr.io/astral-sh/ruff:0.17.0 /ruff /usr/local/bin/ruff
 
 COPY --from=artifacts /artifacts/oj2-api /usr/local/bin/oj2-api
 
