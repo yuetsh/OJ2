@@ -26,29 +26,28 @@ const limit = ref(10)
 const keyword = ref("")
 
 const columns: DataTableColumn<AdminProblemRow>[] = [
-  { title: "显示编号", key: "_id", width: 100 },
+  { title: "题号", key: "_id", width: 90 },
   {
-    title: "标题",
+    title: "题目",
     key: "title",
     minWidth: 200,
-    render: (row) =>
-      h(NButton, { text: true, type: "primary", onClick: () => goEdit(row) }, () => row.title),
+    render: (row) => h(NButton, { text: true, onClick: () => goEdit(row) }, () => row.title),
   },
   {
-    title: "可见",
+    title: "学生看得到",
     key: "visible",
-    width: 80,
+    width: 100,
     render: (row) =>
-      h(NTag, { size: "small", type: row.visible ? "success" : "default" }, () =>
-        row.visible ? "公开" : "隐藏",
+      h(NTag, { size: "small", bordered: false, type: row.visible ? "success" : "default" }, () =>
+        row.visible ? "看得到" : "藏着",
       ),
   },
   {
-    title: "选项",
+    title: "",
     key: "actions",
-    width: 110,
+    width: 90,
     render: (row) =>
-      h(NButton, { size: "small", type: "error", onClick: () => removeTag(row) }, () => "移除标签"),
+      h(NButton, { size: "small", quaternary: true, onClick: () => removeTag(row) }, () => "摘掉"),
   },
 ]
 
@@ -119,7 +118,7 @@ watchDebounced(
         <n-input
           v-model:value="keyword"
           style="width: 220px"
-          placeholder="输入标题关键字"
+          placeholder="题号或题目名"
           clearable
         />
       </n-flex>
