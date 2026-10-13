@@ -101,7 +101,7 @@ function reset() {
         <span style="color: #bbb; width: 22px; text-align: right; flex-shrink: 0">
           {{ idx + 1 }}
         </span>
-        <span v-html="lineHtml[idx]" style="white-space: pre" />
+        <span v-html="lineHtml[idx]" style="white-space: pre; min-width: 0; overflow-x: auto" />
       </div>
     </n-space>
 

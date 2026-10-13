@@ -13,12 +13,15 @@ const data = computed(() => props.exercise.data as ExerciseGroupData)
 const order = ref<number[]>([]) // item 的稳定展示顺序（初始乱序）
 const placement = ref<number[]>([]) // placement[itemIdx] = 桶下标，-1 表示在池中
 const dragIdx = ref<number | null>(null)
+// 手机上没有 HTML5 拖放（触屏不触发 dragstart），所以再给一条点选的路：先点项目、再点分组
+const pickedIdx = ref<number | null>(null)
 const submitted = ref(false)
 
 function init() {
   order.value = shuffle(data.value.items.map((_, i) => i))
   placement.value = Array(data.value.items.length).fill(-1)
   dragIdx.value = null
+  pickedIdx.value = null
   submitted.value = false
 }
 
@@ -32,12 +35,32 @@ const locked = computed(() => submitted.value && allCorrect.value)
 function onDragStart(i: number) {
   if (locked.value) return
   dragIdx.value = i
+  pickedIdx.value = null
 }
 
 function dropTo(bucket: number) {
   if (locked.value || dragIdx.value === null) return
   placement.value[dragIdx.value] = bucket
   dragIdx.value = null
+  submitted.value = false
+}
+
+// 手机上分组框不大，点分组时多半点在框里已有的项目上 —— 这时算「放进它所在的分组」，
+// 只有点同一区域里的另一项才是换选
+function onItemClick(i: number) {
+  if (locked.value) return
+  const picked = pickedIdx.value
+  if (picked !== null && picked !== i && placement.value[picked] !== placement.value[i]) {
+    onAreaClick(placement.value[i])
+    return
+  }
+  pickedIdx.value = picked === i ? null : i
+}
+
+function onAreaClick(bucket: number) {
+  if (locked.value || pickedIdx.value === null) return
+  placement.value[pickedIdx.value] = bucket
+  pickedIdx.value = null
   submitted.value = false
 }
 
@@ -56,6 +79,17 @@ function chipStyle(i: number): Record<string, string> {
   const color =
     status === "correct" ? "#18a058" : status === "wrong" ? "#d03050" : "var(--learn-control-line)"
   const plain = color === "var(--learn-control-line)"
+  if (pickedIdx.value === i) {
+    return {
+      padding: "5.5px 11.5px",
+      borderRadius: "6px",
+      border: "2px solid #2080f0",
+      background: "rgba(32,128,240,0.08)",
+      cursor: "pointer",
+      userSelect: "none",
+      fontSize: "15px",
+    }
+  }
   return {
     padding: "6px 12px",
     borderRadius: "6px",
@@ -86,7 +120,7 @@ function reset() {
       {{ data.question }}
     </p>
     <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
-      把下面的项目拖到对应的分组里，可在分组间拖动调整。
+      把下面的项目拖到对应的分组里，也可以先点项目、再点分组。
     </p>
 
     <div
@@ -102,6 +136,7 @@ function reset() {
       }"
       @dragover.prevent
       @drop="dropTo(-1)"
+      @click="onAreaClick(-1)"
     >
       <span v-if="poolItems.length === 0" style="color: var(--learn-muted); font-size: 13px">
         （已全部归类）
@@ -112,6 +147,7 @@ function reset() {
         draggable="true"
         :style="chipStyle(i)"
         @dragstart="onDragStart(i)"
+        @click.stop="onItemClick(i)"
       >
         {{ data.items[i] }}
       </div>
@@ -135,6 +171,7 @@ function reset() {
         }"
         @dragover.prevent
         @drop="dropTo(b)"
+        @click="onAreaClick(b)"
       >
         <p style="font-weight: 600; margin: 0 0 8px; text-align: center; font-size: 14px">
           {{ bucket }}
@@ -146,6 +183,7 @@ function reset() {
             draggable="true"
             :style="chipStyle(i)"
             @dragstart="onDragStart(i)"
+            @click.stop="onItemClick(i)"
           >
             {{ data.items[i] }}
           </div>

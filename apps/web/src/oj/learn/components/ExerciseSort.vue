@@ -24,6 +24,7 @@ function init() {
     ;[shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]]
   }
   lines.value = shuffled
+  pickedIdx.value = null
   submitted.value = false
 }
 
@@ -31,19 +32,37 @@ onMounted(init)
 watch(() => props.exercise.id, init)
 
 const dragIdx = ref<number | null>(null)
+// 手机上没有 HTML5 拖放（触屏不触发 dragstart），所以再给一条点选的路：先点一行、再点它该去的位置
+const pickedIdx = ref<number | null>(null)
 
 function onDragStart(idx: number) {
   dragIdx.value = idx
+  pickedIdx.value = null
+}
+
+function moveLine(from: number, to: number) {
+  if (from === to) return
+  const newLines = [...lines.value]
+  const [moved] = newLines.splice(from, 1)
+  newLines.splice(to, 0, moved)
+  lines.value = newLines
+  submitted.value = false
 }
 
 function onDrop(targetIdx: number) {
-  if (dragIdx.value === null || dragIdx.value === targetIdx) return
-  const newLines = [...lines.value]
-  const [moved] = newLines.splice(dragIdx.value, 1)
-  newLines.splice(targetIdx, 0, moved)
-  lines.value = newLines
+  if (dragIdx.value === null) return
+  moveLine(dragIdx.value, targetIdx)
   dragIdx.value = null
-  submitted.value = false
+}
+
+function onLineClick(idx: number) {
+  if (submitted.value && allCorrect.value) return
+  if (pickedIdx.value === null) {
+    pickedIdx.value = idx
+    return
+  }
+  moveLine(pickedIdx.value, idx)
+  pickedIdx.value = null
 }
 
 function lineStatus(idx: number): "correct" | "wrong" | "default" {
@@ -86,19 +105,24 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
           gap: '10px',
           padding: '8px 12px',
           borderRadius: '6px',
-          border: `1.5px ${submitted ? 'solid' : 'dashed'} ${
-            lineStatus(idx) === 'correct'
-              ? '#18a058'
-              : lineStatus(idx) === 'wrong'
-                ? '#d03050'
-                : 'var(--learn-control-line)'
-          }`,
+          border:
+            pickedIdx === idx
+              ? '2px solid #2080f0'
+              : `1.5px ${submitted ? 'solid' : 'dashed'} ${
+                  lineStatus(idx) === 'correct'
+                    ? '#18a058'
+                    : lineStatus(idx) === 'wrong'
+                      ? '#d03050'
+                      : 'var(--learn-control-line)'
+                }`,
           background:
-            lineStatus(idx) === 'correct'
-              ? 'rgba(24,160,88,0.08)'
-              : lineStatus(idx) === 'wrong'
-                ? 'rgba(208,48,80,0.07)'
-                : 'transparent',
+            pickedIdx === idx
+              ? 'rgba(32,128,240,0.08)'
+              : lineStatus(idx) === 'correct'
+                ? 'rgba(24,160,88,0.08)'
+                : lineStatus(idx) === 'wrong'
+                  ? 'rgba(208,48,80,0.07)'
+                  : 'transparent',
           cursor: 'grab',
           fontFamily: 'var(--learn-code-font)',
           userSelect: 'none',
@@ -106,9 +130,13 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
         @dragstart="onDragStart(idx)"
         @dragover.prevent
         @drop="onDrop(idx)"
+        @click="onLineClick(idx)"
       >
         <span style="color: #bbb; cursor: grab">⠿</span>
-        <span v-html="lineHtml[line.originalIdx]" style="white-space: pre" />
+        <span
+          v-html="lineHtml[line.originalIdx]"
+          style="white-space: pre; min-width: 0; overflow-x: auto"
+        />
       </div>
     </n-space>
 

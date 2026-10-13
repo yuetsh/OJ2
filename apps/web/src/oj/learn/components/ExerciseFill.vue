@@ -96,6 +96,10 @@ function inputWidth(idx: number): string {
         v-else
         :value="userInputs[seg.index]"
         :disabled="allCorrect"
+        autocapitalize="off"
+        autocorrect="off"
+        autocomplete="off"
+        spellcheck="false"
         :style="{
           width: inputWidth(seg.index),
           fontFamily: 'var(--learn-code-font)',

@@ -81,6 +81,7 @@ function reset() {
       :rows="3"
       :disabled="submitted && allCorrect"
       placeholder="在这里输入程序会打印的内容"
+      :input-props="{ autocapitalize: 'off', autocorrect: 'off', spellcheck: false }"
       style="font-family: var(--learn-code-font)"
     />
 
