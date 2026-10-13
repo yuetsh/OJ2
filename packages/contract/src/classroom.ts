@@ -2,6 +2,7 @@ import { z } from "zod"
 
 import { judgeStatusSchema } from "./judge-status"
 import { lessonLanguageSchema as lessonLanguageValueSchema } from "./language"
+import { statisticInfoSchema } from "./submission"
 
 /**
  * 「班里在做」：同班同一天有好几个人做的题，基本就是老师在课上点名的那几道。
@@ -105,6 +106,21 @@ export const classBoardCellSchema = z.object({
   flowchartAttempts: z.number().int(),
   /** 第一次通过的时刻；今天之前通过的，前端显示成「之前」 */
   acceptedAt: z.string().nullable(),
+  /**
+   * 还没做对时，今天最后一次**代码**提交：点格子打开它讲错误，题卡片下面按错法归堆。
+   * 做对了、今天没交代码（只画了流程图）的为 null。
+   *
+   * 只带归类要用的那几样（runtime_error / sample_check 和提交里存的同一份），
+   * 不带代码和原始报错 —— 一班四五十人，真要看代码的时候按 submissionId 再拉
+   */
+  latest: z
+    .object({
+      submissionId: z.string(),
+      result: judgeStatusSchema,
+      runtimeError: statisticInfoSchema.shape.runtime_error,
+      sampleCheck: statisticInfoSchema.shape.sample_check,
+    })
+    .nullable(),
 })
 
 export const classBoardStudentSchema = z.object({

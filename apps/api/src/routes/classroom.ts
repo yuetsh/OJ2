@@ -9,6 +9,7 @@ import {
   type ClassActivityProblem,
   type LastVisit,
   type LessonLanguage,
+  type StatisticInfo,
   FLOWCHART_PASS_GRADES,
 } from "@oj2/contract"
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm"
@@ -558,7 +559,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   // 「来了几次」代码和流程图合起来数：那天只画了流程图的也算来过，和 recentDays 同一个口径
   const recentActivity = activityRows({ since: windowStart, users: userIds })
   const localDay = sql<string>`to_char(${localTime(recentActivity.createTime)}, 'YYYY-MM-DD')`
-  const [cells, lastSubmits, lastDrawn, attendance, drawn] = await Promise.all([
+  const [cells, lastSubmits, lastDrawn, attendance, drawn, latests] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -650,7 +651,42 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           )
           .groupBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId)
       : [],
+    /**
+     * 每人每题今天最后一次代码提交：没做对的格子靠它点开讲错误、按错法归堆。
+     * 范围和 cells 一样（非比赛、布置的语言），只多一个「今天」
+     */
+    ids.length && userIds.length
+      ? db
+          .selectDistinctOn([schema.submission.userId, schema.submission.problemId], {
+            userId: schema.submission.userId,
+            problemId: schema.submission.problemId,
+            id: schema.submission.id,
+            result: schema.submission.result,
+            runtimeError: sql<
+              StatisticInfo["runtime_error"] | null
+            >`${schema.submission.statisticInfo}->'runtime_error'`,
+            sampleCheck: sql<
+              StatisticInfo["sample_check"] | null
+            >`${schema.submission.statisticInfo}->'sample_check'`,
+          })
+          .from(schema.submission)
+          .where(
+            and(
+              isNull(schema.submission.contestId),
+              inArray(schema.submission.userId, userIds),
+              inArray(schema.submission.problemId, ids),
+              gte(schema.submission.createTime, start),
+              lessonLanguageFilter(lesson.language),
+            ),
+          )
+          .orderBy(
+            schema.submission.userId,
+            schema.submission.problemId,
+            desc(schema.submission.createTime),
+          )
+      : [],
   ])
+  const latestByKey = new Map(latests.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
@@ -689,12 +725,21 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             const cell = cellByKey.get(key)
             const flow = drawnByKey.get(key)
             const acceptedAt = earliest(cell?.firstAcceptedAt, flow?.firstPassedAt)
+            const latest = acceptedAt ? undefined : latestByKey.get(key)
             return {
               status: !cell && !flow ? "none" : acceptedAt ? "accepted" : "tried",
               attempts: (cell?.attempts ?? 0) + (flow?.attempts ?? 0),
               codeAttempts: cell?.attempts ?? 0,
               flowchartAttempts: flow?.attempts ?? 0,
               acceptedAt,
+              latest: latest
+                ? {
+                    submissionId: latest.id,
+                    result: latest.result,
+                    runtimeError: latest.runtimeError ?? undefined,
+                    sampleCheck: latest.sampleCheck ?? undefined,
+                  }
+                : null,
             }
           }),
           lastSubmitAt: lastByUser.get(student.userId) ?? null,
