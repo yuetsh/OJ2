@@ -272,7 +272,18 @@ export const adminUserSchema = z.object({
   className: z.string().nullable(),
 })
 
-export const adminUserListSchema = paginatedSchema(adminUserSchema)
+export const adminUserListSchema = paginatedSchema(adminUserSchema).extend({
+  /** 同样筛选条件下从没登录过的人数（列表顶上「48 人 · 1 人从没登录」） */
+  neverLoggedIn: z.number().int(),
+})
+
+/** 批量建号之前查重：这几个用户名哪些已经有了 */
+export const checkUsernamesRequestSchema = z.object({
+  usernames: z.array(z.string().trim().min(1).max(32)).min(1).max(500),
+})
+export const checkUsernamesResponseSchema = z.object({
+  existing: z.array(z.object({ username: z.string(), createTime: z.string().nullable() })),
+})
 
 export const updateUserRequestSchema = z.object({
   username: z.string().trim().min(1).max(32),
@@ -999,6 +1010,7 @@ export type AdminContest = z.infer<typeof adminContestSchema>
 export type AdminContestList = z.infer<typeof adminContestListSchema>
 export type AdminUser = z.infer<typeof adminUserSchema>
 export type AdminUserList = z.infer<typeof adminUserListSchema>
+export type CheckUsernamesResponse = z.infer<typeof checkUsernamesResponseSchema>
 export type JudgeServer = z.infer<typeof judgeServerSchema>
 export type DashboardInfo = z.infer<typeof dashboardInfoSchema>
 export type JudgeServerList = z.infer<typeof judgeServerListSchema>

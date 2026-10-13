@@ -1,6 +1,9 @@
 import {
   adminTypeSchema,
+  checkUsernamesRequestSchema,
   deleteUsersRequestSchema,
+  NO_CLASS,
+  type CheckUsernamesResponse,
   importUsersRequestSchema,
   STUDENT_ROLES,
   updateUserRequestSchema,
@@ -14,7 +17,7 @@ import {
 } from "@oj2/contract"
 import { randomInt } from "node:crypto"
 import { z } from "zod"
-import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { hashPassword } from "../../auth/password"
@@ -24,6 +27,8 @@ import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { classPrefixCondition, queryInteger, sampleUser } from "../helpers"
+import { publishConfigUpdate } from "../../events"
+import { getWebsiteOptions } from "../../services/options"
 
 export const adminAccountRoutes = new Hono<AppEnv>()
 
@@ -186,6 +191,13 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
       )!,
     )
   }
+  // 班级：和全站班级下拉同一套值，NO_CLASS 是「没填班级」
+  const className = c.req.query("className")?.trim()
+  if (className) {
+    filters.push(
+      className === NO_CLASS ? isNull(schema.user.className) : eq(schema.user.className, className),
+    )
+  }
   const where = filters.length ? and(...filters) : undefined
   // 在线状态每行都要下发（列表里显示），所以不管怎么排都先取一次
   const online = await onlineUserIds()
@@ -205,11 +217,18 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
         ]
       : orderBy === "-lastLogin"
         ? [sql`${schema.user.lastLogin} desc nulls last`]
-        : [desc(schema.user.createTime)]
+        : // 按用户名：选了一个班看名单时最顺手（和点名册一个顺序）
+          orderBy === "username"
+          ? [asc(schema.user.username)]
+          : [desc(schema.user.createTime)]
 
   const [totalRows, rows] = await Promise.all([
     db
-      .select({ value: count() })
+      .select({
+        value: count(),
+        neverLoggedIn:
+          sql<number>`count(*) filter (where ${schema.user.lastLogin} is null)`.mapWith(Number),
+      })
       .from(schema.user)
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where),
@@ -225,7 +244,23 @@ adminAccountRoutes.get("/users", requireSuperAdmin, async (c) => {
   return success(c, {
     results: rows.map((row) => serialize(row, online.has(row.user.id))),
     total: totalRows[0]?.value ?? 0,
+    neverLoggedIn: totalRows[0]?.neverLoggedIn ?? 0,
   } satisfies AdminUserList)
+})
+
+/**
+ * 批量建号之前查重（批量建号页边粘名单边查）：哪些用户名已经有了、哪天建的。
+ * 比较时归一成小写，和导入、登录同一个口径
+ */
+adminAccountRoutes.post("/users/check", requireSuperAdmin, async (c) => {
+  const parsed = await parseBody(c, checkUsernamesRequestSchema)
+  if (!parsed.success) return parsed.response
+  const names = [...new Set(parsed.data.usernames.map((name) => name.toLowerCase()))]
+  const rows = await db
+    .select({ username: schema.user.username, createTime: schema.user.createTime })
+    .from(schema.user)
+    .where(inArray(sql`lower(${schema.user.username})`, names))
+  return success(c, { existing: rows } satisfies CheckUsernamesResponse)
 })
 
 adminAccountRoutes.get("/users/:id", requireSuperAdmin, async (c) => {
@@ -451,7 +486,23 @@ adminAccountRoutes.post("/users", requireSuperAdmin, async (c) => {
     )
     return users.length
   })
-  return success(c, { imported: created }, 201)
+
+  // 新班级顺手加进班级列表：不加的话全站的班级下拉（看板、提交列表、排名……）里都找不到它，
+  // 原来要再去设置页手动加，经常忘
+  const classes = [...new Set(prepared.map((item) => item.className).filter((name) => !!name))]
+  const options = await getWebsiteOptions()
+  const missing = classes.filter((name) => !options.class_list.includes(name!)) as string[]
+  if (missing.length) {
+    const next = [...options.class_list, ...missing].sort((a, b) =>
+      a.localeCompare(b, "zh-CN", { numeric: true }),
+    )
+    await db
+      .insert(schema.optionsSysoptions)
+      .values({ key: "class_list", value: next })
+      .onConflictDoUpdate({ target: schema.optionsSysoptions.key, set: { value: next } })
+    await publishConfigUpdate("classList", next)
+  }
+  return success(c, { imported: created, addedClasses: missing }, 201)
 })
 
 /**
