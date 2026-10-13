@@ -2,7 +2,6 @@
 import { continueStep, doneCount, lessonPath, splitTitle, type TutorialType } from "oj/learn/lesson"
 import { Icon } from "@iconify/vue"
 import {
-  getAnnouncement,
   getAnnouncementList,
   getClassActivity,
   getKnowledgeMap,
@@ -14,7 +13,6 @@ import {
   getWeeklyRank,
 } from "oj/api"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
 import { pickHeadline, type Headline } from "oj/user/knowledge"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
@@ -43,7 +41,6 @@ interface Track {
 
 const router = useRouter()
 const userStore = useUserStore()
-const { isDesktop } = useBreakpoints()
 
 const tracks = ref<Track[]>([])
 const contests = ref<Contest[]>([])
@@ -313,17 +310,6 @@ function contestTime(contest: Contest) {
   }
   return `${parseTime(contest.startTime, "M月D日 HH:mm")} 开始 · 时长 ${duration(contest.startTime, contest.endTime)}`
 }
-
-const announcementShow = ref(false)
-const announcementTitle = ref("")
-const announcementContent = ref("")
-
-async function openAnnouncement(item: AnnouncementListItem) {
-  const res = await getAnnouncement(item.id)
-  announcementTitle.value = item.title
-  announcementContent.value = res.content
-  announcementShow.value = true
-}
 </script>
 
 <template>
@@ -528,32 +514,19 @@ async function openAnnouncement(item: AnnouncementListItem) {
           <template #header-extra>
             <router-link to="/announcement" class="more">全部</router-link>
           </template>
-          <div
+          <router-link
             v-for="item in announcements"
             :key="item.id"
-            class="row clickable"
-            role="button"
-            tabindex="0"
-            @click="openAnnouncement(item)"
-            @keyup.enter="openAnnouncement(item)"
+            :to="{ path: '/announcement', query: { id: item.id } }"
+            class="row"
           >
             <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
             <span class="row-title">{{ item.title }}</span>
             <n-text depth="3" class="row-meta">{{ dateText(item.createTime) }}</n-text>
-          </div>
+          </router-link>
         </n-card>
       </div>
     </div>
-
-    <n-modal
-      v-model:show="announcementShow"
-      preset="card"
-      :style="{ maxWidth: isDesktop ? '70vw' : undefined, maxHeight: '80vh' }"
-      :content-style="{ overflow: 'auto' }"
-      :title="announcementTitle"
-    >
-      <div v-html="announcementContent"></div>
-    </n-modal>
   </div>
 </template>
 

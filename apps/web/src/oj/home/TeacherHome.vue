@@ -2,37 +2,36 @@
 import type { ClassToday } from "@oj2/contract"
 import type { AnnouncementListItem } from "utils/types"
 import { useThemeVars } from "naive-ui"
-import { getAnnouncement, getAnnouncementList, getClassToday } from "oj/api"
+import { getAnnouncementList, getClassToday } from "oj/api"
 import { classLabel } from "oj/submission/utils"
 import { useUserStore } from "shared/store/user"
-import { parseTime, zonedParts } from "utils/functions"
+import { parseTime, zonedParts, zonedYear } from "utils/functions"
 
 /**
  * 老师的首页（设计稿「首页重设计」HomeTeacher）。原来老师看到的和学生一样（继续学习、最近提交），
  * 对老师没用。现在最上面是「今天的课」：今天在上课的每个班一行 —— 正在上课 / 几点下课了、
  * 布置了几道、几人交过、全做对几人，每道题一根小条，点「课堂看板」进那个班。
- * 下面是常用入口和置顶的公告
+ * 下面是常用入口和最新三条公告（和学生首页一样，置顶的排最前）
  */
 const theme = useThemeVars()
 const router = useRouter()
 const userStore = useUserStore()
 
 const today = ref<ClassToday | null>(null)
-const pinned = ref<AnnouncementListItem[]>([])
+const announcements = ref<AnnouncementListItem[]>([])
 
 /** 最后一次有人交题在这么久以内，算「正在上课」 */
 const LIVE_MS = 15 * 60 * 1000
 
 onMounted(async () => {
-  const [classes, announcements] = await Promise.allSettled([
-    getClassToday(),
-    getAnnouncementList(0, 10),
-  ])
+  const [classes, latest] = await Promise.allSettled([getClassToday(), getAnnouncementList(0, 3)])
   if (classes.status === "fulfilled") today.value = classes.value
-  if (announcements.status === "fulfilled") {
-    pinned.value = announcements.value.results.filter((item) => item.top)
-  }
+  if (latest.status === "fulfilled") announcements.value = latest.value.results
 })
+
+function dateText(value: string) {
+  return parseTime(value, zonedParts(value)!.year === zonedYear() ? "M月D日" : "YYYY年M月D日")
+}
 
 const greeting = computed(() => {
   const hour = zonedParts(new Date())!.hour
@@ -74,16 +73,6 @@ const shortcuts = computed(() =>
     { label: "后台", to: userStore.isSuperAdmin ? "/admin" : "/admin/problem/list", show: true },
   ].filter((it) => it.show),
 )
-
-const announcementShow = ref(false)
-const announcementTitle = ref("")
-const announcementContent = ref("")
-async function openAnnouncement(item: AnnouncementListItem) {
-  const res = await getAnnouncement(item.id)
-  announcementTitle.value = item.title
-  announcementContent.value = res.content
-  announcementShow.value = true
-}
 </script>
 
 <template>
@@ -141,30 +130,23 @@ async function openAnnouncement(item: AnnouncementListItem) {
       </n-button>
     </div>
 
-    <div
-      v-for="item in pinned"
-      :key="item.id"
-      class="card pinned"
-      role="button"
-      tabindex="0"
-      @click="openAnnouncement(item)"
-      @keyup.enter="openAnnouncement(item)"
-    >
-      <n-tag type="warning" size="small" :bordered="false">置顶</n-tag>
-      <b>{{ item.title }}</b>
-      <span class="spacer"></span>
-      <router-link to="/announcement" class="muted" @click.stop>公告 →</router-link>
-    </div>
-
-    <n-modal
-      v-model:show="announcementShow"
-      preset="card"
-      :style="{ maxWidth: '70vw', maxHeight: '80vh' }"
-      :content-style="{ overflow: 'auto' }"
-      :title="announcementTitle"
-    >
-      <div v-html="announcementContent"></div>
-    </n-modal>
+    <section v-if="announcements.length" class="card">
+      <div class="card-head">
+        <h3>公告</h3>
+        <span class="spacer"></span>
+        <router-link to="/announcement" class="muted">全部</router-link>
+      </div>
+      <router-link
+        v-for="item in announcements"
+        :key="item.id"
+        :to="{ path: '/announcement', query: { id: item.id } }"
+        class="ann-row"
+      >
+        <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
+        <span class="ann-title">{{ item.title }}</span>
+        <span class="muted num">{{ dateText(item.createTime) }}</span>
+      </router-link>
+    </section>
   </div>
 </template>
 
@@ -299,15 +281,36 @@ async function openAnnouncement(item: AnnouncementListItem) {
   gap: 10px;
 }
 
-.pinned {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  cursor: pointer;
+.card-head {
+  display: flex;
+  align-items: baseline;
 }
 
-.pinned:hover {
-  border-color: v-bind("theme.primaryColor");
+.ann-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 6px;
+  border-top: 1px solid v-bind("theme.dividerColor");
+  border-radius: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.ann-row:first-of-type {
+  border-top: 0;
+}
+
+.ann-row:hover {
+  background: v-bind("theme.hoverColor");
+}
+
+.ann-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
