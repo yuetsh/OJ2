@@ -3,14 +3,10 @@ import { inArray } from "drizzle-orm"
 import { db, schema } from "../db"
 
 export const websiteOptionDefaults = {
-  website_base_url: "http://127.0.0.1",
   website_name: "Online Judge",
-  website_name_shortcut: "oj",
-  website_footer: "Online Judge Footer",
   allow_register: true,
   submission_list_show_all: true,
   class_list: [] as string[],
-  enable_maxkb: true,
 }
 
 export async function getOptions<const T extends readonly string[]>(keys: T) {

@@ -52,27 +52,19 @@ function isAlive(lastHeartbeat: string) {
 
 /** camelCase 契约 ←→ options 表里的 snake_case key */
 const OPTION_KEYS = {
-  websiteBaseUrl: "website_base_url",
   websiteName: "website_name",
-  websiteNameShortcut: "website_name_shortcut",
-  websiteFooter: "website_footer",
   allowRegister: "allow_register",
   submissionListShowAll: "submission_list_show_all",
   classList: "class_list",
-  enableMaxkb: "enable_maxkb",
 } as const
 
 adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
   const options = await getWebsiteOptions()
   return success(c, {
-    websiteBaseUrl: options.website_base_url,
     websiteName: options.website_name,
-    websiteNameShortcut: options.website_name_shortcut,
-    websiteFooter: options.website_footer,
     allowRegister: options.allow_register,
     submissionListShowAll: options.submission_list_show_all,
     classList: options.class_list,
-    enableMaxkb: options.enable_maxkb,
   } satisfies WebsiteConfig)
 })
 

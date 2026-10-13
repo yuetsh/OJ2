@@ -14,14 +14,10 @@ export const siteRoutes = new Hono()
 siteRoutes.get("/site", async (c) => {
   const options = await getWebsiteOptions()
   return success(c, {
-    websiteBaseUrl: options.website_base_url,
     websiteName: options.website_name,
-    websiteNameShortcut: options.website_name_shortcut,
-    websiteFooter: options.website_footer,
     allowRegister: options.allow_register,
     submissionListShowAll: options.submission_list_show_all,
     classList: options.class_list,
-    enableMaxkb: options.enable_maxkb,
   } satisfies WebsiteConfig)
 })
 

@@ -1,14 +1,14 @@
 import { z } from "zod"
 
+/**
+ * 站点配置。网址、简称、页脚三项 2026-10-13 删了（前后端从来没读过，改了也看不到变化），
+ * AI 小助手（MaxKB 挂件）连同开关一起删了。options 表里那几行旧值留着，没人读
+ */
 export const websiteConfigSchema = z.object({
-  websiteBaseUrl: z.string(),
   websiteName: z.string(),
-  websiteNameShortcut: z.string(),
-  websiteFooter: z.string(),
   allowRegister: z.boolean(),
   submissionListShowAll: z.boolean(),
   classList: z.array(z.string()),
-  enableMaxkb: z.boolean(),
 })
 
 /**

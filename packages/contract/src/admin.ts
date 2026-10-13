@@ -314,14 +314,10 @@ export const resetPasswordResponseSchema = z.object({ password: z.string() })
 // ---------------------------------------------------------------- 站点配置 / 运维
 
 export const updateWebsiteConfigRequestSchema = z.object({
-  websiteBaseUrl: z.string().max(256),
   websiteName: z.string().trim().min(1).max(64),
-  websiteNameShortcut: z.string().trim().min(1).max(32),
-  websiteFooter: z.string().max(1024 * 64),
   allowRegister: z.boolean(),
   submissionListShowAll: z.boolean(),
   classList: z.array(z.string()),
-  enableMaxkb: z.boolean(),
 })
 
 export const judgeServerSchema = z.object({
