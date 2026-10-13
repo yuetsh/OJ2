@@ -78,10 +78,13 @@ const tags = ref<Tag[]>([])
 const allCount = ref(0)
 const progress = ref<ProblemProgress | null>(null)
 
-/** 老师看的是题库，没有状态列、没有个人进度（定稿「老师」那块） */
+/**
+ * 老师看的是题库，没有个人进度（定稿「老师」那块）。状态列（做对打勾、做过没对一道杠）
+ * 老师也有：2026-10-13 用户要的，自己做过哪些题也想一眼看到
+ */
 const teacher = computed(() => userStore.isTeacherOrAbove)
-const showStatus = computed(() => userStore.isAuthed && !teacher.value)
-const mine = computed(() => (showStatus.value ? progress.value : null))
+const showStatus = computed(() => userStore.isAuthed)
+const mine = computed(() => (showStatus.value && !teacher.value ? progress.value : null))
 
 // 老师那一版没有这个开关：没有状态列，开了也看不出藏了哪些题。带着 ?undone=1 进来也当没开
 const undoneOn = computed({
