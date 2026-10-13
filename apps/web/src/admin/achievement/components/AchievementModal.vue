@@ -6,6 +6,7 @@ import {
   updateAchievement,
   type AdminAchievement,
   type MetricOption,
+  deleteAchievement,
 } from "admin/api"
 import AchievementIcon from "shared/components/AchievementIcon.vue"
 import { RARITY_LABEL } from "utils/constants"
@@ -20,6 +21,27 @@ const props = defineProps<{
   editing: AdminAchievement | null
 }>()
 const emit = defineEmits<{ "update:show": [boolean]; saved: [] }>()
+const dialog = useDialog()
+
+/** 删除放在编辑框左下角（列表改成阶梯之后，每一档上只留「点了就编辑」） */
+function confirmDelete() {
+  const target = props.editing
+  if (!target) return
+  dialog.warning({
+    title: `删除「${target.name}」？`,
+    content: target.unlockCount
+      ? `${target.unlockCount} 人已经拿到了，删掉会连他们的记录一起删。只是不想再发，关掉「上架」就行。`
+      : "删掉就找不回来了。",
+    positiveText: "删除",
+    negativeText: "不删",
+    onPositiveClick: async () => {
+      await deleteAchievement(target.id)
+      message.success("删掉了")
+      emit("update:show", false)
+      emit("saved")
+    },
+  })
+}
 
 const message = useMessage()
 const metrics = ref<MetricOption[]>([])
@@ -42,9 +64,7 @@ function emptyForm() {
 
 const form = ref(emptyForm())
 
-const metricOptions = computed(() =>
-  metrics.value.map((m) => ({ label: `${m.name}（${m.key}）`, value: m.key })),
-)
+const metricOptions = computed(() => metrics.value.map((m) => ({ label: m.name, value: m.key })))
 
 const metricHelp = computed(
   () => metrics.value.find((m) => m.key === form.value.metric)?.helpText ?? "",
@@ -155,6 +175,9 @@ async function save() {
     </n-form>
     <template #footer>
       <n-flex justify="end">
+        <n-button v-if="editing" quaternary type="error" class="delete" @click="confirmDelete">
+          删除
+        </n-button>
         <n-button @click="emit('update:show', false)">取消</n-button>
         <n-button type="primary" :loading="saving" @click="save"> 保存 </n-button>
       </n-flex>
@@ -163,6 +186,10 @@ async function save() {
 </template>
 
 <style scoped>
+.delete {
+  margin-right: auto;
+}
+
 .icon-preview {
   display: flex;
   align-items: center;
