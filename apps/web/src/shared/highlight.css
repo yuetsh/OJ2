@@ -67,6 +67,19 @@ html.dark {
   color: var(--code-invalid);
 }
 
+/* 字符串里的 %d，见 shared/formatPlaceholder.ts。静态代码是同一个 span 上的两个类名，
+   编辑器里是两层 span、谁包谁不一定，所以三种写法都要 */
+.tok-format,
+.tok-format .tok-string,
+.tok-string .tok-format {
+  color: var(--code-variable);
+}
+.tok-format-py,
+.tok-format-py .tok-string,
+.tok-string .tok-format-py {
+  color: var(--code-keyword);
+}
+
 /* 以下只有 Markdown 编辑器用得到 */
 .tok-heading {
   color: var(--code-heading);

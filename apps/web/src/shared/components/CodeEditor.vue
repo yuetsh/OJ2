@@ -1,7 +1,4 @@
 <script lang="ts" setup>
-import { cpp } from "@codemirror/lang-cpp"
-import { python } from "@codemirror/lang-python"
-import { sql, SQLite } from "@codemirror/lang-sql"
 import { bracketMatching } from "@codemirror/language"
 import CodeMirror from "./CodeMirror.vue"
 import type { Extension } from "@codemirror/state"
@@ -10,6 +7,7 @@ import type { LANGUAGE } from "utils/types"
 import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
 import { styleTheme } from "shared/extensions/baseTheme"
 import { enhanceCompletion } from "shared/extensions/autocompletion"
+import { languageExtension } from "shared/extensions/language"
 
 interface Props {
   language?: LANGUAGE
@@ -33,10 +31,7 @@ const code = defineModel<string>("value")
 
 const isDark = useDark()
 
-const langExtension = computed(() => {
-  if (language === "SQL") return sql({ dialect: SQLite, upperCaseKeywords: true })
-  return language === "Python" ? python() : cpp()
-})
+const langExtension = computed(() => languageExtension(language))
 
 const extensions = computed(() => [
   styleTheme,

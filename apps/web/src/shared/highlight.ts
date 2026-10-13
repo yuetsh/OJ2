@@ -9,10 +9,11 @@
  * 只认判题机认的几种语言，别的语言和不标语言的代码块按原文显示。
  */
 import { cppLanguage } from "@codemirror/lang-cpp"
-import { pythonLanguage } from "@codemirror/lang-python"
 import { SQLite } from "@codemirror/lang-sql"
 import { highlightCode, tagHighlighter, tags as t } from "@lezer/highlight"
 import type { ConfigProviderProps } from "naive-ui"
+import { ojPythonLanguage } from "./extensions/language"
+import { FORMAT_CLASS, type FormatFamily, formatSpans } from "./formatPlaceholder"
 
 /** 词的种类 → 类名。编辑器在 shared/themes/codeTheme.ts 里挂的也是它 */
 export const codeHighlighter = tagHighlighter([
@@ -41,9 +42,9 @@ type Parser = typeof cppLanguage.parser
 
 // C 和编辑器一样用 C++ 的解析器
 const PARSERS: Record<string, Parser> = {
-  python: pythonLanguage.parser,
-  py: pythonLanguage.parser,
-  python3: pythonLanguage.parser,
+  python: ojPythonLanguage.parser,
+  py: ojPythonLanguage.parser,
+  python3: ojPythonLanguage.parser,
   c: cppLanguage.parser,
   cpp: cppLanguage.parser,
   "c++": cppLanguage.parser,
@@ -52,6 +53,13 @@ const PARSERS: Record<string, Parser> = {
 
 function parserFor(lang?: string): Parser | null {
   return PARSERS[lang?.toLowerCase() ?? ""] ?? null
+}
+
+function formatFamilyFor(lang?: string): FormatFamily | null {
+  const parser = parserFor(lang)
+  if (parser === cppLanguage.parser) return "c"
+  if (parser === ojPythonLanguage.parser) return "python"
+  return null
 }
 
 export function escapeHtml(text: string): string {
@@ -74,7 +82,19 @@ function walk(
     put(code, "")
     return
   }
-  highlightCode(code, parser.parse(code), codeHighlighter, put, () => put("\n", ""))
+  // 字符串里的 %d 这类占位符再拆出来，见 shared/formatPlaceholder.ts
+  const family = formatFamilyFor(lang)
+  const emit = (text: string, classes: string) => {
+    if (!family || !classes.includes("tok-string")) return put(text, classes)
+    let at = 0
+    for (const s of formatSpans(text, family)) {
+      if (s.from > at) put(text.slice(at, s.from), classes)
+      put(text.slice(s.from, s.to), `${classes} ${FORMAT_CLASS[family]}`)
+      at = s.to
+    }
+    if (at < text.length) put(text.slice(at), classes)
+  }
+  highlightCode(code, parser.parse(code), codeHighlighter, emit, () => put("\n", ""))
 }
 
 /** 逐行高亮，返回每行的 HTML，每行的标签自己闭合 */
