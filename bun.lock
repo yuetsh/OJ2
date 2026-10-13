@@ -63,7 +63,6 @@
         "copy-text-to-clipboard": "^3.2.2",
         "date-fns": "^4.4.0",
         "fflate": "^0.8.3",
-        "highlight.js": "^11.12.0",
         "lib0": "0.2.119",
         "markdown-it": "^14.3.0",
         "mermaid": "^12.1.0",

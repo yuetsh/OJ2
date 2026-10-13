@@ -11,7 +11,7 @@ import { useDark } from "@vueuse/core"
 const props = withDefaults(
   defineProps<{
     code: string
-    /** highlight.js 的语言名（LANGUAGE_FORMAT_VALUE） */
+    /** 高亮用的语言名（LANGUAGE_FORMAT_VALUE），见 shared/highlight.ts */
     language: string
     /** 要标红的行，1 起 */
     markLine?: number | null

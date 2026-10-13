@@ -1,50 +1,74 @@
-/* 代码高亮配色（明 / 暗）：练一练的题型组件和 Markdown.vue 的代码块共用，见 shared/highlight.ts */
-.hljs-keyword,
-.hljs-operator,
-.hljs-selector-tag {
-  color: #d73a49;
-}
-.hljs-string,
-.hljs-regexp,
-.hljs-template-literal {
-  color: #032f62;
-}
-.hljs-comment,
-.hljs-quote {
-  color: #6a737d;
-  font-style: italic;
-}
-.hljs-number,
-.hljs-literal {
-  color: #005cc5;
-}
-.hljs-built_in,
-.hljs-title.function_,
-.hljs-class .hljs-title {
-  color: #6f42c1;
+/* 全站代码配色：亮色 Alucard、暗色 Dracula（https://draculatheme.com/spec，Alucard 是它的官方浅色版）。
+   编辑器（CodeMirror）、正文代码块、练一练、n-code 都用 shared/highlight.ts 的 codeHighlighter
+   给词打 tok-* 类名，颜色只在这里写一份。App.vue 全局引入。 */
+:root {
+  --code-fg: #1f1f1f;
+  --code-comment: #6c664b;
+  --code-cyan: #036a96;
+  --code-green: #14710a;
+  --code-orange: #a34d14;
+  --code-pink: #a3144d;
+  --code-purple: #644ac9;
+  --code-red: #cb3a2a;
+  --code-yellow: #846e15;
 }
 
-.dark .hljs-keyword,
-.dark .hljs-operator,
-.dark .hljs-selector-tag {
-  color: #c678dd;
+html.dark {
+  --code-fg: #f8f8f2;
+  --code-comment: #6272a4;
+  --code-cyan: #8be9fd;
+  --code-green: #50fa7b;
+  --code-orange: #ffb86c;
+  --code-pink: #ff79c6;
+  --code-purple: #bd93f9;
+  --code-red: #ff5555;
+  --code-yellow: #f1fa8c;
 }
-.dark .hljs-string,
-.dark .hljs-regexp,
-.dark .hljs-template-literal {
-  color: #98c379;
+
+.tok-keyword {
+  color: var(--code-pink);
 }
-.dark .hljs-comment,
-.dark .hljs-quote {
-  color: #7f848e;
+.tok-function {
+  color: var(--code-green);
+}
+.tok-string {
+  color: var(--code-yellow);
+}
+.tok-number {
+  color: var(--code-purple);
+}
+.tok-type {
+  color: var(--code-cyan);
+}
+.tok-comment {
+  color: var(--code-comment);
+}
+.tok-invalid {
+  color: var(--code-red);
+}
+
+/* 以下只有 Markdown 编辑器用得到 */
+.tok-heading {
+  color: var(--code-purple);
+  font-weight: bold;
+}
+.tok-strong {
+  color: var(--code-orange);
+  font-weight: bold;
+}
+.tok-emphasis {
+  color: var(--code-yellow);
   font-style: italic;
 }
-.dark .hljs-number,
-.dark .hljs-literal {
-  color: #e5c07b;
+.tok-link {
+  color: var(--code-cyan);
 }
-.dark .hljs-built_in,
-.dark .hljs-title.function_,
-.dark .hljs-class .hljs-title {
-  color: #61afef;
+.tok-monospace {
+  color: var(--code-green);
+}
+.tok-quote {
+  color: var(--code-yellow);
+}
+.tok-strikethrough {
+  text-decoration: line-through;
 }

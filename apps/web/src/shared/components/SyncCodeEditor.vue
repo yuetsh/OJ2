@@ -5,8 +5,7 @@ import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/auto
 import type { EditorView } from "@codemirror/view"
 import type { Extension } from "@codemirror/state"
 import type { LANGUAGE } from "utils/types"
-import { oneDark } from "../themes/oneDark"
-import { smoothy } from "../themes/smoothy"
+import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
 import { styleTheme } from "shared/extensions/baseTheme"
 import { enhanceCompletion } from "shared/extensions/autocompletion"
 import { languageExtension } from "shared/extensions/language"
@@ -60,7 +59,7 @@ const extensions = computed(() => [
   langExtension.value,
   bracketMatching(),
   closeBrackets(),
-  isDark.value ? oneDark : smoothy,
+  isDark.value ? darkCodeTheme : lightCodeTheme,
   autocompletion({
     override: [enhanceCompletion(language), completeAnyWord],
   }),

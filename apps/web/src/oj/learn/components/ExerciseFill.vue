@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseFillData } from "utils/types"
-import { highlight } from "shared/highlight"
-import "shared/highlight.css"
+import { highlightWithHoles } from "shared/highlight"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -16,25 +15,26 @@ type BlankSeg = { type: "blank"; answers: string[]; index: number }
 type Segment = CodeSeg | BlankSeg
 
 const segments = computed<Segment[]>(() => {
+  // 空里先填上第一个答案再解析，免得空把语法搅乱；答案本身不输出，见 highlightWithHoles
   const blanks: string[][] = []
-  const markedCode = data.value.code.replace(/\{\{([^}]+)\}\}/g, (_, inner) => {
-    blanks.push(inner.split("|"))
-    return `____${blanks.length - 1}____`
-  })
-
-  const highlighted = highlight(markedCode, props.lang)
-
-  const parts = highlighted.split(/____(\d+)____/)
-  const result: Segment[] = []
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      if (parts[i]) result.push({ type: "code", html: parts[i] })
-    } else {
-      const idx = parseInt(parts[i])
-      result.push({ type: "blank", answers: blanks[idx], index: idx })
-    }
+  const holes: { from: number; to: number }[] = []
+  let code = ""
+  let last = 0
+  for (const m of data.value.code.matchAll(/\{\{([^}]+)\}\}/g)) {
+    const answers = m[1].split("|")
+    code += data.value.code.slice(last, m.index)
+    holes.push({ from: code.length, to: code.length + answers[0].length })
+    code += answers[0]
+    blanks.push(answers)
+    last = m.index + m[0].length
   }
-  return result
+  code += data.value.code.slice(last)
+
+  return highlightWithHoles(code, holes, props.lang).map((part) =>
+    typeof part === "string"
+      ? { type: "code", html: part }
+      : { type: "blank", answers: blanks[part], index: part },
+  )
 })
 
 const blankCount = computed(() => segments.value.filter((s) => s.type === "blank").length)

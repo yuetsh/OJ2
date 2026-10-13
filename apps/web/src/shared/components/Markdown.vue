@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
 import { renderMarkdown } from "shared/markdown"
-import "shared/highlight.css"
 
 /**
  * 显示一段 Markdown / HTML 正文：题面、教程、AI 的提示和报告。

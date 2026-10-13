@@ -6,8 +6,7 @@ import { Icon } from "@iconify/vue"
 import CodeMirror from "./CodeMirror.vue"
 import { uploadImage } from "../../admin/api"
 import { styleTheme } from "../extensions/baseTheme"
-import { oneDark } from "../themes/oneDark"
-import { smoothy } from "../themes/smoothy"
+import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
 
 /**
  * 后台教程正文的 Markdown 编辑器：左边写，右边由教程编辑页用学生端同一套组件预览。
@@ -145,7 +144,7 @@ const extensions = computed(() => [
   EditorView.lineWrapping,
   imageEvents,
   shortcuts,
-  isDark.value ? oneDark : smoothy,
+  isDark.value ? darkCodeTheme : lightCodeTheme,
 ])
 
 const tools = computed(() => [

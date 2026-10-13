@@ -7,8 +7,7 @@ import CodeMirror from "./CodeMirror.vue"
 import type { Extension } from "@codemirror/state"
 import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
 import type { LANGUAGE } from "utils/types"
-import { oneDark } from "../themes/oneDark"
-import { smoothy } from "../themes/smoothy"
+import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
 import { styleTheme } from "shared/extensions/baseTheme"
 import { enhanceCompletion } from "shared/extensions/autocompletion"
 
@@ -47,7 +46,7 @@ const extensions = computed(() => [
   autocompletion({
     override: [enhanceCompletion(language), completeAnyWord],
   }),
-  isDark.value ? oneDark : smoothy,
+  isDark.value ? darkCodeTheme : lightCodeTheme,
   ...extraExtensions,
 ])
 </script>
