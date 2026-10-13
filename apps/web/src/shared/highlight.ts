@@ -16,7 +16,7 @@ import type { ConfigProviderProps } from "naive-ui"
 
 /** 词的种类 → 类名。编辑器在 shared/themes/codeTheme.ts 里挂的也是它 */
 export const codeHighlighter = tagHighlighter([
-  // `int` 这类基本类型和关键字一个颜色（Dracula 的 storage.type），自定义的类型才是青色
+  // `int` 这类基本类型和关键字一个颜色，自定义的类型（struct 名）才是类型色
   {
     tag: [
       t.keyword,

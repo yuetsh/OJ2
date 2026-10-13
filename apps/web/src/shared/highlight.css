@@ -1,47 +1,48 @@
-/* 全站代码配色：亮色 Alucard、暗色 Dracula（https://draculatheme.com/spec，Alucard 是它的官方浅色版）。
+/* 全站代码配色：Catppuccin，亮色 Latte、暗色 Mocha。
+   色值照官方 palette.json（https://github.com/catppuccin/palette），哪类词用哪个色照官方 style guide 的
+   Language Defaults：关键字 mauve、字符串 green、数字 peach、函数 blue、类型 yellow、注释 overlay2。
    编辑器（CodeMirror）、正文代码块、练一练、n-code 都用 shared/highlight.ts 的 codeHighlighter
    给词打 tok-* 类名，颜色只在这里写一份。App.vue 全局引入。 */
 :root {
-  --code-fg: #1f1f1f;
-  --code-comment: #6c664b;
-  --code-cyan: #036a96;
-  --code-green: #14710a;
-  --code-orange: #a34d14;
-  --code-pink: #a3144d;
-  --code-purple: #644ac9;
-  --code-red: #cb3a2a;
-  --code-yellow: #846e15;
+  --code-fg: #4c4f69; /* text */
+  --code-comment: #7c7f93; /* overlay2 */
+  --code-blue: #1e66f5;
+  --code-green: #40a02b;
+  --code-mauve: #8839ef;
+  --code-peach: #fe640b;
+  --code-red: #d20f39;
+  --code-yellow: #df8e1d;
 }
 
 html.dark {
-  --code-fg: #f8f8f2;
-  --code-comment: #6272a4;
-  --code-cyan: #8be9fd;
-  --code-green: #50fa7b;
-  --code-orange: #ffb86c;
-  --code-pink: #ff79c6;
-  --code-purple: #bd93f9;
-  --code-red: #ff5555;
-  --code-yellow: #f1fa8c;
+  --code-fg: #cdd6f4;
+  --code-comment: #9399b2;
+  --code-blue: #89b4fa;
+  --code-green: #a6e3a1;
+  --code-mauve: #cba6f7;
+  --code-peach: #fab387;
+  --code-red: #f38ba8;
+  --code-yellow: #f9e2af;
 }
 
 .tok-keyword {
-  color: var(--code-pink);
+  color: var(--code-mauve);
 }
 .tok-function {
-  color: var(--code-green);
+  color: var(--code-blue);
 }
 .tok-string {
-  color: var(--code-yellow);
+  color: var(--code-green);
 }
 .tok-number {
-  color: var(--code-purple);
+  color: var(--code-peach);
 }
 .tok-type {
-  color: var(--code-cyan);
+  color: var(--code-yellow);
 }
 .tok-comment {
   color: var(--code-comment);
+  font-style: italic;
 }
 .tok-invalid {
   color: var(--code-red);
@@ -49,11 +50,11 @@ html.dark {
 
 /* 以下只有 Markdown 编辑器用得到 */
 .tok-heading {
-  color: var(--code-purple);
+  color: var(--code-mauve);
   font-weight: bold;
 }
 .tok-strong {
-  color: var(--code-orange);
+  color: var(--code-peach);
   font-weight: bold;
 }
 .tok-emphasis {
@@ -61,7 +62,7 @@ html.dark {
   font-style: italic;
 }
 .tok-link {
-  color: var(--code-cyan);
+  color: var(--code-blue);
 }
 .tok-monospace {
   color: var(--code-green);

@@ -6,7 +6,7 @@ import { codeHighlighter } from "../highlight"
 /**
  * 编辑器的外观：亮 / 暗两套只管底色、光标、选区、行号这些「框」，
  * 代码的颜色两套都是 codeHighlighter 打的 tok-* 类名，跟着 html.dark 在 highlight.css 里切。
- * 框沿用原来的 smoothy（亮）和 One Dark（暗），只把代码配色换成了 Alucard / Dracula。
+ * 框沿用原来的 smoothy（亮）和 One Dark（暗），只把代码配色换成了 Catppuccin Latte / Mocha。
  */
 const highlighting = syntaxHighlighting(codeHighlighter)
 
