@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
-import { DataTableRowKey, NFlex, NTag, SelectOption } from "naive-ui"
+import { DataTableRowKey, SelectOption, useThemeVars } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import { usePagination } from "shared/composables/pagination"
 import { parseTime } from "utils/functions"
@@ -12,14 +12,24 @@ import UserNameCell from "./components/UserNameCell.vue"
 import PasswordCell from "./components/PasswordCell.vue"
 import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { useRouteQuery } from "@vueuse/router"
-import TextCopy from "shared/components/TextCopy.vue"
+import { NO_CLASS } from "@oj2/contract"
+import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { useConfigStore } from "shared/store/config"
 
+/**
+ * 后台用户列表（设计稿「后台用户与批量建号」UsList）。老师进来多半是三件事：学生忘了密码、
+ * 看一个班的名单、开学建号。所以加了班级筛选，一行只摆 用户名 / 班级 / 密码 / 上次登录 / 建号，
+ * 「重置密码」常驻、其余收进 ⋯。ID、真名（名字就在用户名里）、占位邮箱不再单列，搜索照样搜得到
+ */
 const message = useMessage()
+const theme = useThemeVars()
+const configStore = useConfigStore()
 
 interface UserQuery {
   keyword: string
   type: string
   orderBy: string
+  className: string
 }
 
 // 使用分页 composable
@@ -27,21 +37,31 @@ const { query, clearQuery } = usePagination<UserQuery>({
   keyword: useRouteQuery("keyword", "").value,
   type: useRouteQuery("type", "").value,
   orderBy: useRouteQuery("orderBy", "").value,
+  className: useRouteQuery("className", "").value,
 })
+
+const classOptions = computed(() => [
+  { label: "全部班级", value: "" },
+  ...groupClassOptions(configStore.config?.classList ?? []),
+  { label: classLabel(NO_CLASS), value: NO_CLASS },
+])
+const neverLoggedIn = ref(0)
 
 const total = ref(0)
 const users = ref<AdminUserForm[]>([])
 const userEditing = ref<AdminUserForm | null>(null)
 
 const adminOptions = [
-  { label: "全部用户", value: "" },
+  { label: "全部角色", value: "" },
+  { label: "学生", value: USER_TYPE.REGULAR_USER },
   { label: "学生管理员", value: USER_TYPE.STUDENT_ADMIN },
   { label: "教师管理员", value: USER_TYPE.TEACHER_ADMIN },
   { label: "超级管理员", value: USER_TYPE.SUPER_ADMIN },
 ]
 
 const sortOptions = [
-  { label: "默认排序", value: "" },
+  { label: "最近建号", value: "" },
+  { label: "按用户名", value: "username" },
   { label: "最近登录", value: "-last_login" },
   { label: "在线优先", value: "-online" },
 ]
@@ -54,20 +74,41 @@ const userIDs = ref<DataTableRowKey[]>([])
 
 const rowKey = (row: AdminUserForm) => row.id
 
+/** 上次登录：今天的写「今天 13:02」，在线的前面一个绿点；今年的写到月日；从没登录的写出来 */
+function lastLoginText(row: AdminUserForm) {
+  if (!row.lastLogin) return h("span", { class: "muted" }, "从没登录")
+  const day = parseTime(row.lastLogin, "YYYY-MM-DD")
+  const today = parseTime(new Date().toISOString(), "YYYY-MM-DD")
+  const text =
+    day === today
+      ? `今天 ${parseTime(row.lastLogin, "HH:mm")}`
+      : day.slice(0, 4) === today.slice(0, 4)
+        ? parseTime(row.lastLogin, "MM-DD HH:mm")
+        : day
+  return h("span", { class: "num", title: parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss") }, [
+    row.isOnline ? h("span", { class: "online", title: "在线" }) : null,
+    text,
+  ])
+}
+
 const columns: DataTableColumn<AdminUserForm>[] = [
   { type: "selection" },
-  { title: "ID", key: "id", width: 80 },
   {
     title: "用户名",
     key: "username",
-    width: 220,
+    minWidth: 200,
     render: (row) => h(UserNameCell, { user: row }),
   },
   {
-    // 显示出来的密码后面还跟着「隐藏」按钮，150 挤得下点点、挤不下密码
+    title: "班级",
+    key: "className",
+    width: 130,
+    render: (row) => h("span", { class: "muted" }, row.className ? classLabel(row.className) : "—"),
+  },
+  {
     title: "密码",
     key: "raw_password",
-    width: 180,
+    width: 150,
     render: (row) =>
       h(PasswordCell, {
         user: row,
@@ -77,36 +118,22 @@ const columns: DataTableColumn<AdminUserForm>[] = [
         },
       }),
   },
+  { title: "上次登录", key: "last_login", width: 150, render: lastLoginText },
   {
-    title: "创建时间",
+    title: "建号",
     key: "create_time",
-    width: 200,
-    render: (row) => (row.createTime ? parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss") : ""),
-  },
-  {
-    title: "上次登录",
-    key: "last_login",
-    width: 240,
-    // 在线是 5 分钟内有过活动（后端 auth/presence.ts），不是「有会话」——
-    // 会话能留 7 天。上次登录时间照旧显示，在线的人前面多一个标记
+    width: 110,
     render: (row) =>
-      h(NFlex, { align: "center", size: "small" }, () => [
-        row.isOnline ? h(NTag, { type: "success", size: "small" }, () => "在线") : null,
-        row.lastLogin ? parseTime(row.lastLogin, "YYYY-MM-DD HH:mm:ss") : "从未登录",
-      ]),
+      h(
+        "span",
+        { class: "num muted" },
+        row.createTime ? parseTime(row.createTime, "YYYY-MM-DD") : "",
+      ),
   },
-  {
-    title: "真名",
-    key: "real_name",
-    width: 100,
-    render: (row) => h(TextCopy, () => row.realName),
-  },
-  { title: "邮箱", key: "email", width: 260 },
   {
     key: "actions",
-    title: "选项",
-    width: 280,
-    fixed: "right",
+    title: "",
+    width: 130,
     render: (row) =>
       h(Actions, {
         user: row,
@@ -136,8 +163,16 @@ const teacherPermissionOptions = problemPermissionOptions.slice(1)
 async function listUsers() {
   if (query.page < 1) query.page = 1
   const offset = (query.page - 1) * query.limit
-  const res = await getUserList(offset, query.limit, query.type, query.keyword, query.orderBy)
+  const res = await getUserList(
+    offset,
+    query.limit,
+    query.type,
+    query.keyword,
+    query.orderBy,
+    query.className,
+  )
   total.value = res.total
+  neverLoggedIn.value = res.neverLoggedIn
   users.value = res.results
   revealedPasswords.value.clear()
 }
@@ -146,8 +181,14 @@ function chooseUsers(rowKeys: DataTableRowKey[]) {
   userIDs.value = rowKeys
 }
 
-async function onDeleteUsers(userIDs: DataTableRowKey[] | Ref<number[]>) {
-  await deleteUsers(toRaw(userIDs) as number[])
+async function onDeleteUsers(ids: DataTableRowKey[] | Ref<number[]>) {
+  try {
+    await deleteUsers(toRaw(ids) as number[])
+    message.success("删掉了")
+    userIDs.value = []
+  } catch (err) {
+    message.error(errorMessage(err))
+  }
   listUsers()
 }
 
@@ -252,7 +293,7 @@ onMounted(listUsers)
 watchDebounced(() => query.keyword, listUsers, { debounce: 500, maxWait: 1000 })
 
 // 监听其他查询条件变化
-watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
+watch(() => [query.page, query.limit, query.type, query.orderBy, query.className], listUsers)
 </script>
 
 <template>
@@ -262,38 +303,51 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
         <template #trigger>
           <n-button type="error" secondary>删除选中（{{ userIDs.length }}）</n-button>
         </template>
-        确定删除选中的用户吗？删除后无法恢复！
+        删掉就找不回来了。交过题的账号删不掉，那种请改为禁用。
       </n-popconfirm>
-      <n-button @click="$router.push({ name: 'admin user generate' })">批量导入</n-button>
-      <n-button type="primary" @click="createNewUser">新建用户</n-button>
+      <n-button @click="createNewUser">新建一个</n-button>
+      <n-button type="primary" @click="$router.push({ name: 'admin user generate' })">
+        批量建号
+      </n-button>
     </template>
     <template #filters>
       <n-input
         style="width: 220px"
         v-model:value="query.keyword"
-        placeholder="用户名 / 真名 / 邮箱"
+        placeholder="用户名或名字"
         clearable
         @clear="clearQuery"
       />
       <n-select
+        v-model:value="query.className"
+        :options="classOptions"
+        filterable
+        aria-label="班级"
+        style="width: 150px"
+      />
+      <n-select
         v-model:value="query.type"
         :options="adminOptions"
-        placeholder="选择用户类型"
+        aria-label="角色"
         style="width: 120px"
       />
       <n-select
         v-model:value="query.orderBy"
         :options="sortOptions"
-        placeholder="排序方式"
+        aria-label="排序"
         style="width: 120px"
       />
+      <n-text depth="3">
+        {{ total }} 人<template v-if="neverLoggedIn"> · {{ neverLoggedIn }} 人从没登录</template>
+      </n-text>
     </template>
   </PageHeader>
   <n-data-table
+    class="user-table"
     :data="users"
     :columns="columns"
-    striped
     :row-key="rowKey"
+    :checked-row-keys="userIDs"
     @update:checked-row-keys="chooseUsers"
   />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
@@ -357,3 +411,24 @@ watch(() => [query.page, query.limit, query.type, query.orderBy], listUsers)
     </n-form>
   </n-modal>
 </template>
+
+<style scoped>
+.user-table :deep(.muted) {
+  color: v-bind("theme.textColor3");
+}
+
+.user-table :deep(.num) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.user-table :deep(.online) {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: v-bind("theme.successColor");
+  vertical-align: 1px;
+}
+</style>

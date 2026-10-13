@@ -51,6 +51,7 @@ import type {
   GenerateTestInputsRequest,
   GenerateTestInputsResponse,
   TestCaseFiles,
+  CheckUsernamesResponse,
 } from "@oj2/contract"
 
 export function getBaseInfo() {
@@ -182,7 +183,15 @@ export function getAdminUserRank(offset: number, limit: number, keyword: string)
 }
 
 // 用户列表
-export function getUserList(offset = 0, limit = 10, type = "", keyword: string, orderBy = "") {
+export function getUserList(
+  offset = 0,
+  limit = 10,
+  type = "",
+  keyword: string,
+  orderBy = "",
+  /** 班级，NO_CLASS 是「没填班级」 */
+  className = "",
+) {
   return api.get<AdminUserList>("admin/users", {
     // "-last_login" 是旧接口传下来的取值（路由 query 里可能还存着），改叫 "-lastLogin"；
     // "-online" 是新增的，原样透传
@@ -192,8 +201,14 @@ export function getUserList(offset = 0, limit = 10, type = "", keyword: string, 
       keyword,
       type,
       orderBy: orderBy === "-last_login" ? "-lastLogin" : orderBy,
+      className: className || undefined,
     },
   })
+}
+
+/** 批量建号之前查重：这些用户名哪些已经有了 */
+export function checkUsernames(usernames: string[]) {
+  return api.post<CheckUsernamesResponse>("admin/users/check", { usernames })
 }
 
 // 编辑用户
@@ -216,8 +231,9 @@ export async function resetPassword(userID: number) {
 }
 
 // 导入用户
+/** 批量建号。addedClasses：这批里的新班级，后端已经顺手加进了班级列表 */
 export function importUsers(users: string[][]) {
-  return api.post("admin/users", { users })
+  return api.post<{ imported: number; addedClasses: string[] }>("admin/users", { users })
 }
 
 // 批量删除用户
