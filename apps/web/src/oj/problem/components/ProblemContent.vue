@@ -154,10 +154,16 @@ const sampleTextWidth = computed(() => {
 
 const sampleTable = useTemplateRef<HTMLElement>("sampleTable")
 const { width: sampleTableWidth } = useElementSize(sampleTable)
+/**
+ * 窄（手机，或桌面左栏拖到最窄）：「例子 N」不占一列，改成每个例子头上一行小字。
+ * 390 宽的手机上那一列连同间距要吃掉 64px，框只剩一半多
+ */
+const sampleNarrow = computed(() => sampleTableWidth.value > 0 && sampleTableWidth.value < 480)
 /** 摆成表时，半格里留给文字的宽度 */
 const sampleHalfWidth = computed(
   () =>
-    (sampleTableWidth.value - SAMPLE_NO_W - SAMPLE_GAP * 2) / 2 -
+    (sampleTableWidth.value - (sampleNarrow.value ? 0 : SAMPLE_NO_W + SAMPLE_GAP) - SAMPLE_GAP) /
+      2 -
     SAMPLE_PAD_L -
     SAMPLE_PAD_R -
     SAMPLE_COPY_W,
@@ -179,7 +185,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 </script>
 
 <template>
-  <div v-if="problem">
+  <div v-if="problem" class="problem-content">
     <header class="problem-head">
       <div class="title-row">
         <span class="pid">{{ problem._id }}</span>
@@ -329,12 +335,12 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <div
           ref="sampleTable"
           class="sample-table"
-          :class="{ stacked: samplesStacked }"
+          :class="{ stacked: samplesStacked, narrow: sampleNarrow }"
           role="table"
           aria-label="例子"
         >
           <div v-if="!samplesStacked" class="sample-row" role="row">
-            <span role="columnheader"></span>
+            <span v-if="!sampleNarrow" role="columnheader"></span>
             <span role="columnheader" class="sample-label">输入</span>
             <span role="columnheader" class="sample-label">输出</span>
           </div>
@@ -437,6 +443,10 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   margin: 0;
 }
 
+.problem-content {
+  container: problem-content / inline-size;
+}
+
 .block-link {
   margin-left: auto;
 }
@@ -458,6 +468,13 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+/* 窄的时候输入、输出上下排：并排的话长一点的说明挤成一字两行的窄条，旁边一栏空着 */
+@container problem-content (max-width: 480px) {
+  .io {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* 语法要求：一行的浅绿框，硬性的判定条件，放在最前面 */
@@ -582,6 +599,26 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 .sample-side {
   padding-top: 8px;
   line-height: 1.5;
+}
+
+/* 窄：「例子 N」占满一行当小标题，下面输入、输出（并排或上下排） */
+.narrow .sample-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.narrow.stacked .sample-row {
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+
+.narrow .sample-no,
+.narrow.stacked .sample-no {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  padding-top: 4px;
+}
+
+.sample-table.narrow {
+  gap: 10px;
 }
 
 .sample-cell {

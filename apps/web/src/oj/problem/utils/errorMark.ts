@@ -107,6 +107,11 @@ const theme = EditorView.baseTheme({
 
 export const errorMarkExtensions = [markField, punctuationField, tracker, theme]
 
+/** 题目页主编辑器（没挂着就是 null）。手机上的符号键往它里面插字 */
+export function currentEditorView(): EditorView | null {
+  return current
+}
+
 /** 标出这些中文标点（位置是整篇代码里的偏移，来自 findChinesePunctuation） */
 export function showPunctuationMarks(fixes: PunctuationFix[]) {
   current?.dispatch({ effects: setPunctuation.of(fixes) })

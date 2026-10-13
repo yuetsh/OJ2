@@ -311,7 +311,8 @@ onSolvedHere(() => {
     <router-link :to="setBar.home" class="back set-back" :title="`回到题单：${setBar.title}`">
       ‹ {{ setBar.title }}
     </router-link>
-    <div v-if="setBar.joined" class="set-progress" aria-hidden="true">
+    <!-- 手机上一排放不下题单名 + 进度条 + 做完几道 + 两个大箭头，进度条让掉，「做完 x/y」还在 -->
+    <div v-if="setBar.joined && !isMobile" class="set-progress" aria-hidden="true">
       <div class="set-progress-fill" :style="{ width: `${setBar.percentage}%` }" />
     </div>
     <span v-if="setBar.joined" class="meta">
@@ -319,7 +320,9 @@ onSolvedHere(() => {
       <template v-if="setBar.position"> · 第 {{ setBar.position }} 题</template>
     </span>
     <template v-else>
-      <span class="meta">还没加入，在这里做对了不算进度</span>
+      <span class="meta">{{
+        isMobile ? "没加入，不算进度" : "还没加入，在这里做对了不算进度"
+      }}</span>
       <n-button size="tiny" type="primary" :loading="joiningSet" @click="joinHere"
         >加入题单</n-button
       >

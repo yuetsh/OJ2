@@ -10,6 +10,8 @@ import storage from "utils/storage"
 import type { LANGUAGE } from "utils/types"
 import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
 import { errorMarkExtensions } from "oj/problem/utils/errorMark"
+import { editorFocusTracker } from "oj/problem/utils/symbolKeys"
+import { hangWrapExtensions } from "shared/extensions/hangIndent"
 import EditorToolbar from "./EditorToolbar.vue"
 import { useDraftKey } from "../composables/draftKey"
 import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
@@ -85,8 +87,11 @@ watch(
 
 const { isDesktop } = useBreakpoints()
 
-// 拼一次、留同一个数组：每次渲染新建会让编辑器反复重配扩展
-const editorExtensions = [...editTraceExtensions, ...errorMarkExtensions]
+// 拼一次、留同一个数组：每次渲染新建会让编辑器反复重配扩展。
+// 手机上另加折行（20px 一行只放得下二十来个字，长行看不见右半截）
+const desktopExtensions = [...editTraceExtensions, ...errorMarkExtensions, editorFocusTracker]
+const mobileExtensions = [...desktopExtensions, ...hangWrapExtensions]
+const editorExtensions = computed(() => (isDesktop.value ? desktopExtensions : mobileExtensions))
 
 const contestID = route.params.contestID || null
 // 草稿存在哪个键下（题单入口单独一份），和「重置代码」共用一份算法
@@ -223,6 +228,7 @@ onBeforeUnmount(() => flowchartStore.attachEditor(null))
       :collab="ctx.collab"
       :height="editorHeight"
       :extra-extensions="editorExtensions"
+      :font-size="isDesktop ? 20 : 15"
       @update:model-value="changeCode"
     />
   </div>

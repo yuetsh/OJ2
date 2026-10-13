@@ -10,7 +10,7 @@ import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
 import { mainWrapExtensions, wrapMain } from "../wrapMain"
-import { hangWrapExtensions } from "../hangIndent"
+import { hangWrapExtensions } from "shared/extensions/hangIndent"
 import { useBreakpoints } from "shared/composables/breakpoints"
 
 const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))

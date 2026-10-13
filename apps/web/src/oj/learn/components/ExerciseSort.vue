@@ -4,7 +4,7 @@ import type { Exercise, ExerciseSortData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 import { highlightLines } from "shared/highlight"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { hangStyle } from "../hangIndent"
+import { hangStyle } from "shared/extensions/hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{

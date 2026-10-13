@@ -2,7 +2,7 @@
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseDebugData } from "utils/types"
 import { highlightLines } from "shared/highlight"
-import { hangStyle } from "../hangIndent"
+import { hangStyle } from "shared/extensions/hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{

@@ -5,6 +5,7 @@ import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import SubmitCode from "./SubmitCode.vue"
+import { editorFocused } from "../utils/symbolKeys"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
 
@@ -29,7 +30,8 @@ const canRunSamples = computed(
 </script>
 
 <template>
-  <div class="mobile-actions">
+  <!-- 写代码时（键盘弹着）让位给符号键：两条都贴底会叠在一起，安卓上还会被键盘顶上来 -->
+  <div v-show="!editorFocused" class="mobile-actions">
     <n-button
       v-if="canRunSamples"
       size="large"

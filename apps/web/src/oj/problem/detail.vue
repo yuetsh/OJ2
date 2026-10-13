@@ -34,6 +34,7 @@ const ProblemContent = defineAsyncComponent(() => import("./components/ProblemCo
 const ProblemDrawer = defineAsyncComponent(() => import("./components/ProblemDrawer.vue"))
 const ResultPane = defineAsyncComponent(() => import("./components/ResultPane.vue"))
 const MobileActionBar = defineAsyncComponent(() => import("./components/MobileActionBar.vue"))
+const SymbolKeys = defineAsyncComponent(() => import("./components/SymbolKeys.vue"))
 
 interface Props {
   problemID: string
@@ -386,6 +387,7 @@ onBeforeUnmount(() => {
       </n-tabs>
       <ProblemDrawer v-model="drawer" />
       <MobileActionBar />
+      <SymbolKeys />
     </div>
   </template>
   <NotFound
