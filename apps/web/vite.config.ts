@@ -69,16 +69,6 @@ const polyfills = [
   "web.url.parse",
 ]
 
-// MaxKB 脚本**不要**在这里注入 index.html。
-//
-// 原来有个 inject-maxkb 插件把 <script src> 写进 head，于是构建产物在 Vue 启动之前
-// 就把挂件拉下来执行了 —— 后台那个「启用 MaxKB」开关根本拦不住它，关掉也只是
-// 事后把标签和 DOM 删掉，代码早跑完了（表现之一：MaxKB 自带的性能上报在每个页面
-// 抛 `Cannot read properties of undefined (reading 'startTime')`，且关不掉）。
-//
-// 现在只走运行时那一条路：App.vue 的 useMaxKB() 等站点配置回来，
-// enableMaxkb 为真才建 script 标签。
-
 export default defineConfig(() => {
   // 开发时一律指向本机后端（apps/api，3000）。
   // **必须写 IP，不能写 localhost**：api 用 Bun.serve 起，只绑 IPv4 的

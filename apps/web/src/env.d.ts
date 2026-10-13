@@ -2,7 +2,6 @@
 
 interface ImportMetaEnv {
   readonly PUBLIC_ENV: string
-  readonly PUBLIC_MAXKB_URL: string
   readonly PUBLIC_CODE_URL: string
   readonly PUBLIC_ICONIFY_URL: string
 }

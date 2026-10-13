@@ -59,7 +59,7 @@ API 调用不按模块分：学生端全在 `oj/api.ts`、后台全在 `admin/ap
 
 Shared logic lives in `shared/`:
 - `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (login/signup form state), `collab` (help-request queue + collab room), `achievement` (解锁弹窗队列), `myFlowchart` (题面「你画的流程图」那张 A/S 图的 mermaid 源码)
-- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `leaveStudents` (课堂看板的「请假」), `chartTheme`, `breakpoints`, `maxkb`, `rarity`
+- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `leaveStudents` (课堂看板的「请假」), `chartTheme`, `breakpoints`, `rarity`
 - `layout/` — `default.vue` and `admin.vue` layout wrappers
 - `api.ts` — shared API calls (auth, profile, tags, captcha)
 
@@ -168,7 +168,6 @@ Env files: `.env`（本机）、`.env.production`（服务器）、`.env.staging
 |---|---|
 | `PUBLIC_ENV` | 环境角标：`test` → 「测试版」，`dev` → 「开发版」，其余不显示 |
 | `PUBLIC_CODE_URL` | 代码分享服务（提交详情、题目页的「分享」） |
-| `PUBLIC_MAXKB_URL` | 知识库问答挂件 |
 | `PUBLIC_ICONIFY_URL` | 自建 Iconify 图标源，不设则走公共 CDN |
 
 后端地址**不在这里**：`utils/api.ts` 写死 `baseURL: "/api"`，dev 由 `vite.config.ts` 的

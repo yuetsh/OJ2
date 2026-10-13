@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import PageHeader from "admin/components/PageHeader.vue"
+import { useThemeVars } from "naive-ui"
+import { classLabel } from "oj/submission/utils"
 import { errorMessage } from "utils/api"
-import { NButton, NTag } from "naive-ui"
 import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from "utils/constants"
-import { parseTime } from "utils/functions"
+import { copyToClipboard, parseTime } from "utils/functions"
 import type { OrphanTestCase, Server, WebsiteConfig } from "utils/types"
 import { useConfigStore } from "shared/store/config"
 import {
@@ -14,183 +15,36 @@ import {
   listInvalidTestcases,
   pruneInvalidTestcases,
 } from "../api"
-import { useUserStore } from "shared/store/user"
 
+/**
+ * 后台设置（设计稿「后台首页」页的 ConfAdmin）：网站 / 班级 / 开关 / 判题机，有无效测试用例时
+ * 再多一块。保存在右上角。
+ *
+ * 2026-10-13 用户定的：网址、简称、页脚三项删了（前后端从来没读过），AI 小助手连同挂件一起删了；
+ * 注册、「学生能看到所有人的提交」两个开关留着。班级不再拖动排序 —— 全站的班级下拉早就按年级
+ * 自动分组排序了，拖出来的顺序没有地方用上
+ */
 const message = useMessage()
+const theme = useThemeVars()
 const configStore = useConfigStore()
-const userStore = useUserStore()
-
-// 确保只有登录用户才能使用WebSocket
-watch(
-  () => userStore.isAuthed,
-  (isAuthed) => {
-    if (!isAuthed) {
-      // 如果用户未登录，禁用WebSocket功能
-      console.warn("用户未登录，WebSocket配置更新功能已禁用")
-    }
-  },
-  { immediate: true },
-)
-
-const testcaseColumns: DataTableColumn<OrphanTestCase>[] = [
-  { title: "测试用例 ID", key: "id" },
-  {
-    title: "选项",
-    key: "delete",
-    render: (row) =>
-      h(NButton, { size: "small", onClick: () => deleteTestcase(row.id) }, () => "删除"),
-  },
-]
-
-const statusMap: {
-  [key in "normal" | "abnormal"]: { color: "primary" | "error"; label: string }
-} = {
-  normal: { color: "primary", label: "正常" },
-  abnormal: { color: "error", label: "异常" },
-}
-
-const serverColumns: DataTableColumn<Server>[] = [
-  {
-    title: "状态",
-    key: "status",
-    width: 80,
-    render: (row) =>
-      h(
-        NTag,
-        { type: statusMap[row.status].color, size: "small" },
-        () => statusMap[row.status].label,
-      ),
-  },
-  {
-    title: "选项",
-    key: "options",
-    width: 80,
-    render: (row) =>
-      h(
-        NButton,
-        {
-          type: "primary",
-          size: "small",
-          disabled: row.status === "normal",
-          onClick: () => delJudgeServer(row.hostname),
-        },
-        () => "删除",
-      ),
-  },
-  { title: "主机", key: "hostname", width: 140 },
-  {
-    title: "内存占用",
-    key: "memory_usage",
-    render: (row) => row.memoryUsage + "%",
-    width: 100,
-  },
-  { title: "IP", key: "ip", width: 140 },
-  { title: "判题机版本", key: "judgerVersion", width: 100 },
-  { title: "服务器 URL", key: "serviceUrl", width: 200 },
-  {
-    title: "上一次心跳",
-    key: "lastHeartbeat",
-    render: (row) => parseTime(row.lastHeartbeat, "YYYY-MM-DD HH:mm:ss"),
-    width: 120,
-  },
-  {
-    title: "创建时间",
-    key: "createTime",
-    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
-    width: 120,
-  },
-]
-
-const testcases = ref<OrphanTestCase[]>([])
-const token = ref("")
-const servers = ref<Server[]>([])
-const abnormalServers = computed(() => servers.value.filter((item) => item.status === "abnormal"))
 
 const websiteConfig = reactive<WebsiteConfig>({
-  websiteBaseUrl: "",
   websiteName: "判题狗",
-  websiteNameShortcut: "判题狗",
-  websiteFooter: "所有权归属于徐越，感谢青岛大学开源 OJ 系统，感谢开源社区",
-  allowRegister: true,
+  allowRegister: false,
   submissionListShowAll: true,
   classList: [],
-  enableMaxkb: true,
 })
-
-// 班级列表的顺序就是登录页、班级 PK、统计面板下拉框里的顺序，数组原样存进 options 表，
-// 所以拖拽只改前端数组，点「保存」生效
-const dragFrom = ref<number | null>(null)
-const dragOver = ref<number | null>(null)
-
-function moveClass(from: number, to: number) {
-  const list = [...websiteConfig.classList]
-  const [moved] = list.splice(from, 1)
-  list.splice(to, 0, moved)
-  websiteConfig.classList = list
-}
-
-function renderClassTag(tag: string | { label: string }, index: number) {
-  const label = typeof tag === "string" ? tag : tag.label
-  return h(
-    NTag,
-    {
-      key: index,
-      closable: true,
-      draggable: true,
-      type: dragOver.value === index ? "primary" : "default",
-      style: {
-        cursor: "move",
-        opacity: dragFrom.value === index ? 0.4 : 1,
-      },
-      onClose: () => {
-        websiteConfig.classList = websiteConfig.classList.filter((_, i) => i !== index)
-      },
-      onDragstart: (e: DragEvent) => {
-        dragFrom.value = index
-        // Firefox 不 setData 就不会开始拖
-        e.dataTransfer?.setData("text/plain", label)
-        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"
-      },
-      onDragover: (e: DragEvent) => {
-        if (dragFrom.value === null) return
-        e.preventDefault()
-        dragOver.value = index
-      },
-      onDragleave: () => {
-        if (dragOver.value === index) dragOver.value = null
-      },
-      onDrop: (e: DragEvent) => {
-        e.preventDefault()
-        if (dragFrom.value !== null && dragFrom.value !== index) {
-          moveClass(dragFrom.value, index)
-        }
-        dragFrom.value = null
-        dragOver.value = null
-      },
-      onDragend: () => {
-        dragFrom.value = null
-        dragOver.value = null
-      },
-    },
-    () => label,
-  )
-}
 
 async function getWebsiteConfig() {
   const res = await getWebsite()
-  websiteConfig.websiteBaseUrl = res.websiteBaseUrl
   websiteConfig.websiteName = res.websiteName
-  websiteConfig.websiteNameShortcut = res.websiteNameShortcut
-  websiteConfig.websiteFooter = res.websiteFooter
   websiteConfig.allowRegister = res.allowRegister
   websiteConfig.submissionListShowAll = res.submissionListShowAll
   websiteConfig.classList = res.classList
-  websiteConfig.enableMaxkb = res.enableMaxkb
 }
 
 async function saveWebsiteConfig() {
-  // 班级号要和用户名里 ks 后面那段对得上，位数不对登录页会查不到该班学生。
-  // 后端 CreateEditWebsiteConfigSerializer 也会拦，这里先报更明确的错
+  // 班级号要和用户名里 ks 后面那段对得上，位数不对登录页会查不到该班学生。后端也会拦
   const invalid = websiteConfig.classList.filter((c) => !CLASS_NAME_RE.test(c))
   if (invalid.length) {
     message.error(
@@ -201,27 +55,58 @@ async function saveWebsiteConfig() {
   try {
     await editWebsite(websiteConfig)
   } catch (err) {
-    message.error("保存失败：" + errorMessage(err))
+    message.error("没保存上：" + errorMessage(err))
     return
   }
-  message.success("网站配置保存成功")
+  message.success("保存好了")
   getWebsiteConfig()
+  // 广播由后端在 POST /admin/website 里做，开着页面的人不用刷新
   configStore.getConfig()
-  // 广播由后端在 POST /admin/website 里做，八个键一个不落。
-  // 这里原来还从客户端往 /ws/config 推两个键 —— 那条连接从没 connect() 过、
-  // send() 直接返回 false，而且服务端只认 ping/subscribe，本来就收不下。
 }
 
-async function deleteTestcase(id?: string) {
-  await pruneInvalidTestcases(id)
-  message.success("删除成功")
-  getTestcases()
+// ---------------------------------------------------------------- 班级
+
+/** 按年级分组，新年级在上，组里按班号排（和全站班级下拉一样） */
+const classGroups = computed(() => {
+  const groups = new Map<string, string[]>()
+  for (const name of websiteConfig.classList) {
+    const grade = /^\d{3,}$/.test(name) ? name.slice(0, 2) : "其他"
+    groups.set(grade, [...(groups.get(grade) ?? []), name])
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([grade, list]) => ({
+      grade,
+      list: [...list].sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true })),
+    }))
+})
+
+const newClass = ref("")
+function addClass() {
+  const value = newClass.value.trim()
+  if (!value) return
+  if (!CLASS_NAME_RE.test(value)) {
+    message.error(`班级号要是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字，如 2613`)
+    return
+  }
+  if (websiteConfig.classList.includes(value)) {
+    message.info(`${classLabel(value)} 已经在里面了`)
+    return
+  }
+  websiteConfig.classList = [...websiteConfig.classList, value]
+  newClass.value = ""
 }
 
-async function getTestcases() {
-  const res = await listInvalidTestcases()
-  testcases.value = res
+function removeClass(name: string) {
+  websiteConfig.classList = websiteConfig.classList.filter((c) => c !== name)
 }
+
+// ---------------------------------------------------------------- 判题机
+
+const token = ref("")
+const tokenShown = ref(false)
+const servers = ref<Server[]>([])
+const abnormalServers = computed(() => servers.value.filter((item) => item.status === "abnormal"))
 
 async function getJudgeServerData() {
   const res = await getJudgeServer()
@@ -229,18 +114,43 @@ async function getJudgeServerData() {
   servers.value = res.servers
 }
 
+/** 上一次心跳：一分钟内写「刚刚还在」，否则「N 分钟 / 小时 / 天没动静了」 */
+function heartbeatText(server: Server) {
+  const seconds = Math.max(0, (Date.now() - Date.parse(server.lastHeartbeat)) / 1000)
+  if (seconds < 60) return "刚刚还在"
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟没动静了`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时没动静了`
+  return `${Math.floor(seconds / 86400)} 天没动静了`
+}
+
 async function delJudgeServer(hostname: string) {
   await deleteJudgeServer(hostname)
-  message.success("删除成功")
-  // 不刷新的话删掉的那行还挂在表里，得手动刷新页面才消失（批量删除那支一直是刷的）
+  message.success("删掉了")
   getJudgeServerData()
 }
 
 async function deleteAbnormalServers() {
-  const dels = abnormalServers.value.map((item) => deleteJudgeServer(item.hostname))
-  await Promise.all(dels)
-  message.success("删除成功")
+  await Promise.all(abnormalServers.value.map((item) => deleteJudgeServer(item.hostname)))
+  message.success("删掉了")
   getJudgeServerData()
+}
+
+async function copyToken() {
+  if (await copyToClipboard(token.value)) message.success("复制好了")
+}
+
+// ---------------------------------------------------------------- 无效的测试用例
+
+const testcases = ref<OrphanTestCase[]>([])
+
+async function getTestcases() {
+  testcases.value = await listInvalidTestcases()
+}
+
+async function deleteTestcase(id?: string) {
+  await pruneInvalidTestcases(id)
+  message.success("删掉了")
+  getTestcases()
 }
 
 onMounted(() => {
@@ -251,83 +161,232 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageHeader title="设置" />
-  <n-card class="box" title="网站">
-    <template #header-extra>
-      <n-button type="primary" size="small" @click="saveWebsiteConfig">保存</n-button>
+  <PageHeader title="设置">
+    <template #actions>
+      <n-button type="primary" @click="saveWebsiteConfig">保存</n-button>
     </template>
-    <n-form inline label-placement="left">
-      <n-form-item label="网站 URL">
-        <n-input class="url" v-model:value="websiteConfig.websiteBaseUrl" />
-      </n-form-item>
-      <n-form-item label="网站名">
-        <n-input v-model:value="websiteConfig.websiteName" />
-      </n-form-item>
-      <n-form-item label="网站简称">
-        <n-input v-model:value="websiteConfig.websiteNameShortcut" />
-      </n-form-item>
-    </n-form>
-    <n-form label-placement="left">
-      <n-form-item label="班级列表">
-        <n-flex vertical size="small">
-          <n-dynamic-tags v-model:value="websiteConfig.classList" :render-tag="renderClassTag" />
-          <n-text depth="3" style="font-size: 12px">
-            填 {{ CLASS_NAME_MIN_DIGITS }}~{{ CLASS_NAME_MAX_DIGITS }}
-            位数字，如 251、2510，要和用户名里 ks 后面那段一致；
-            拖动标签调整顺序（登录页等下拉框按此顺序），改完点保存
-          </n-text>
-        </n-flex>
-      </n-form-item>
-    </n-form>
-    <n-flex align="center">
-      <n-flex align="center">
-        <span>是否允许注册</span>
-        <n-switch v-model:value="websiteConfig.allowRegister" />
-      </n-flex>
-      <n-flex align="center">
-        <span>显示所有提交</span>
-        <n-switch v-model:value="websiteConfig.submissionListShowAll" />
-      </n-flex>
-      <n-flex align="center">
-        <span>启用AI小助手</span>
-        <n-switch v-model:value="websiteConfig.enableMaxkb" />
-      </n-flex>
-    </n-flex>
-  </n-card>
-  <n-card class="box" title="判题服务器">
-    <template #header-extra>
+  </PageHeader>
+
+  <section class="block">
+    <h3>网站</h3>
+    <div class="field">
+      <label for="site-name" class="field-label">网站名</label>
+      <n-input
+        v-model:value="websiteConfig.websiteName"
+        :input-props="{ id: 'site-name' }"
+        style="width: 240px"
+      />
+      <n-text depth="3" class="hint">顶栏左上角和浏览器标签页上显示的名字</n-text>
+    </div>
+  </section>
+
+  <section class="block">
+    <h3>
+      班级 <span class="count">{{ websiteConfig.classList.length }} 个</span>
+    </h3>
+    <div v-for="group in classGroups" :key="group.grade" class="grade">
+      <span class="grade-label">{{ group.grade === "其他" ? "其他" : `${group.grade} 级` }}</span>
+      <div class="chips">
+        <n-tag
+          v-for="name in group.list"
+          :key="name"
+          closable
+          :bordered="false"
+          @close="removeClass(name)"
+        >
+          {{ classLabel(name) }}
+        </n-tag>
+      </div>
+    </div>
+    <div class="grade">
+      <span class="grade-label"></span>
+      <n-input
+        v-model:value="newClass"
+        placeholder="加一个班，如 2613"
+        style="width: 180px"
+        @keyup.enter="addClass"
+      />
+      <n-button @click="addClass">加</n-button>
+      <n-text depth="3" class="hint">批量建号时新班级会自动加进来，这里主要是删掉毕业的班</n-text>
+    </div>
+  </section>
+
+  <section class="block">
+    <h3>开关</h3>
+    <label class="toggle">
+      <n-switch v-model:value="websiteConfig.allowRegister" />
+      学生可以自己注册账号
+    </label>
+    <label class="toggle">
+      <n-switch v-model:value="websiteConfig.submissionListShowAll" />
+      学生能看到所有人的提交
+    </label>
+  </section>
+
+  <section class="block">
+    <h3>
+      判题机
       <n-button
-        v-if="abnormalServers.length"
+        v-if="abnormalServers.length > 1"
         size="small"
-        type="warning"
+        style="margin-left: 8px"
         @click="deleteAbnormalServers"
       >
-        删除无效服务器
+        把断了的都删掉
       </n-button>
-    </template>
-    <div class="box">
-      接口凭证 <n-tag size="small">{{ token }}</n-tag>
+    </h3>
+    <n-empty v-if="!servers.length" description="一台都没有连上" />
+    <div v-for="server in servers" :key="server.hostname" class="server">
+      <span class="dot" :class="server.status === 'normal' ? 'ok' : 'bad'"></span>
+      <b>{{ server.hostname }}</b>
+      <span class="muted">
+        {{ server.cpuCore }} 核 · CPU {{ server.cpuUsage }}% · 内存 {{ server.memoryUsage }}% · 版本
+        {{ server.judgerVersion }}
+      </span>
+      <span
+        :class="server.status === 'normal' ? 'ok-text' : 'bad-text'"
+        :title="parseTime(server.lastHeartbeat, 'YYYY-MM-DD HH:mm:ss')"
+      >
+        {{ heartbeatText(server) }}
+      </span>
+      <n-button
+        v-if="server.status !== 'normal'"
+        size="small"
+        @click="delJudgeServer(server.hostname)"
+      >
+        删掉
+      </n-button>
     </div>
-    <n-data-table :single-line="false" striped :columns="serverColumns" :data="servers" />
-  </n-card>
-  <n-card class="box" v-if="testcases.length" title="无效的测试用例">
-    <template #header-extra>
-      <n-button size="small" type="warning" @click="() => deleteTestcase()">全部删除</n-button>
-    </template>
-    <n-data-table striped class="table" :columns="testcaseColumns" :data="testcases" />
-  </n-card>
+    <div class="server token">
+      <span class="muted">接口凭证</span>
+      <span class="mono">{{ tokenShown ? token : "••••••••••••" }}</span>
+      <n-button size="small" @click="tokenShown = !tokenShown">
+        {{ tokenShown ? "藏起来" : "显示" }}
+      </n-button>
+      <n-button size="small" @click="copyToken">复制</n-button>
+    </div>
+  </section>
+
+  <section v-if="testcases.length" class="block">
+    <h3>
+      没有题目用的测试数据 <span class="count">{{ testcases.length }} 份</span>
+      <n-button size="small" style="margin-left: 8px" @click="deleteTestcase()">都删掉</n-button>
+    </h3>
+    <n-text depth="3" class="hint">删题时测试数据留在了磁盘上（故意的，删错了还能捞回来）</n-text>
+    <div class="chips">
+      <n-tag
+        v-for="item in testcases"
+        :key="item.id"
+        closable
+        :bordered="false"
+        @close="deleteTestcase(item.id)"
+      >
+        {{ item.id }}
+      </n-tag>
+    </div>
+  </section>
 </template>
 
 <style scoped>
-.url {
-  width: 200px;
-}
-
-.box {
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 16px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid v-bind("theme.dividerColor");
 }
 
-.table {
-  width: 40%;
+h3 {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: 16px;
+}
+
+.count {
+  margin-left: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: v-bind("theme.textColor3");
+}
+
+.field,
+.grade,
+.server {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.field-label {
+  width: 60px;
+  font-size: 14px;
+  color: v-bind("theme.textColor3");
+}
+
+.hint {
+  font-size: 13px;
+}
+
+.grade-label {
+  width: 50px;
+  flex: none;
+  font-size: 13px;
+  color: v-bind("theme.textColor3");
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.server {
+  font-size: 14px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.ok {
+  background: v-bind("theme.successColor");
+}
+
+.dot.bad {
+  background: v-bind("theme.errorColor");
+}
+
+.ok-text {
+  color: v-bind("theme.successColor");
+}
+
+.bad-text {
+  color: v-bind("theme.errorColor");
+}
+
+.muted {
+  color: v-bind("theme.textColor3");
+}
+
+.token {
+  margin-top: 4px;
+}
+
+.mono {
+  font-family: Consolas, Monaco, monospace;
 }
 </style>
