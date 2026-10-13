@@ -11,7 +11,7 @@ import {
 import { randomInt } from "node:crypto"
 import { mkdir, readdir, rm, stat } from "node:fs/promises"
 import { resolve } from "node:path"
-import { count, desc, eq, gte, ilike, not, sql } from "drizzle-orm"
+import { count, countDistinct, desc, eq, gte, ilike, inArray, isNull, not, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAdmin, requireSuperAdmin, type AppEnv } from "../../auth/middleware"
@@ -21,7 +21,12 @@ import { publishConfigUpdate } from "../../events"
 import { failure, parseBody, success } from "../../http"
 import { sniffImageExtension } from "../../services/image"
 import { getWebsiteOptions } from "../../services/options"
-import { dayStart } from "../../time"
+import { calendarDay, dayStart, localTime, termStart, weekStart } from "../../time"
+import { STUDENT_ROLES } from "@oj2/contract"
+import { TEACHER_ROLES } from "../helpers"
+import { onlineUserIds } from "../../auth/presence"
+import { JudgeStatus } from "../../judge/status"
+import { suggestActiveClass } from "../classroom"
 import { classPrefixCondition, queryInteger } from "../helpers"
 
 export const adminConfRoutes = new Hono<AppEnv>()
@@ -191,10 +196,16 @@ adminConfRoutes.delete("/orphan-test-cases", requireSuperAdmin, async (c) => {
 
 adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
   const now = new Date().toISOString()
-  const [[users], [submissions], [contests], [servers]] = await Promise.all([
+  const [[users], [submissions], [contests], [servers], online, activeClass] = await Promise.all([
     db.select({ value: count() }).from(schema.user),
     db
-      .select({ value: count() })
+      .select({
+        value: count(),
+        systemErrors: sql<number>`count(*) filter (where ${eq(
+          schema.submission.result,
+          JudgeStatus.SYSTEM_ERROR,
+        )})`.mapWith(Number),
+      })
       .from(schema.submission)
       .where(gte(schema.submission.createTime, dayStart())),
     db
@@ -205,13 +216,76 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
       .select({ value: count() })
       .from(schema.judgeServer)
       .where(gte(schema.judgeServer.lastHeartbeat, aliveSince())),
+    onlineUserIds(),
+    suggestActiveClass(),
   ])
+  const thirtyDaysAgo = dayStart(Date.now() - 29 * 86_400_000)
+  const day = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
+  const [[roles], [problems], [subs], [contestTotal], [setTotal], [tutorialTotal], [week], daily] =
+    await Promise.all([
+      db
+        .select({
+          students: sql<number>`count(*) filter (where ${inArray(schema.user.adminType, [
+            ...STUDENT_ROLES,
+          ])})`.mapWith(Number),
+          teachers: sql<number>`count(*) filter (where ${inArray(schema.user.adminType, [
+            ...TEACHER_ROLES,
+          ])})`.mapWith(Number),
+        })
+        .from(schema.user),
+      db
+        .select({
+          total: count(),
+          visible: sql<number>`count(*) filter (where ${schema.problem.visible})`.mapWith(Number),
+        })
+        .from(schema.problem)
+        .where(isNull(schema.problem.contestId)),
+      db
+        .select({
+          total: count(),
+          term: sql<number>`count(*) filter (where ${gte(
+            schema.submission.createTime,
+            termStart(),
+          )})`.mapWith(Number),
+        })
+        .from(schema.submission),
+      db.select({ value: count() }).from(schema.contest),
+      db.select({ value: count() }).from(schema.problemset),
+      db.select({ value: count() }).from(schema.tutorial),
+      db
+        .select({ value: countDistinct(schema.submission.userId) })
+        .from(schema.submission)
+        .where(gte(schema.submission.createTime, weekStart())),
+      db
+        .select({ day, count: count() })
+        .from(schema.submission)
+        .where(gte(schema.submission.createTime, thirtyDaysAgo))
+        .groupBy(day),
+    ])
+  const byDay = new Map(daily.map((row) => [row.day, row.count]))
+  const days = Array.from({ length: 30 }, (_, i) => calendarDay(Date.now() - (29 - i) * 86_400_000))
   // 旧接口还回了 env.FORCE_HTTPS / STATIC_CDN_HOST，前端从未读过，不再下发
   return success(c, {
     userCount: users?.value ?? 0,
     todaySubmissionCount: submissions?.value ?? 0,
     recentContestCount: contests?.value ?? 0,
     judgeServerCount: servers?.value ?? 0,
+    todaySystemErrorCount: submissions?.systemErrors ?? 0,
+    onlineCount: online.size,
+    activeClass: activeClass ?? null,
+    site: {
+      students: roles?.students ?? 0,
+      teachers: roles?.teachers ?? 0,
+      problems: problems?.total ?? 0,
+      visibleProblems: problems?.visible ?? 0,
+      submissions: subs?.total ?? 0,
+      termSubmissions: subs?.term ?? 0,
+      contests: contestTotal?.value ?? 0,
+      problemSets: setTotal?.value ?? 0,
+      tutorials: tutorialTotal?.value ?? 0,
+      weekActive: week?.value ?? 0,
+    },
+    daily: days.map((d) => ({ day: d, count: byDay.get(d) ?? 0 })),
   } satisfies DashboardInfo)
 })
 

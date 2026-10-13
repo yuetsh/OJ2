@@ -473,7 +473,7 @@ const ACTIVE_CLASS_WINDOW_MS = 2 * 60 * 60 * 1000
  * 从实际提交猜正在上课的班，而**不是记住老师上次选的**：统计面板吃过那个亏（上一节课
  * 的班悄悄留在框里，老师看的整个是别人的班）。
  */
-async function suggestActiveClass() {
+export async function suggestActiveClass() {
   // 流程图也算：一节课全班都在画流程图时，只数代码提交就猜成了别的班
   const activity = activityRows({
     since: new Date(Date.now() - ACTIVE_CLASS_WINDOW_MS).toISOString(),

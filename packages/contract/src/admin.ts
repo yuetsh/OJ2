@@ -369,6 +369,28 @@ export const dashboardInfoSchema = z.object({
   recentContestCount: z.number().int(),
   todaySubmissionCount: z.number().int(),
   judgeServerCount: z.number().int(),
+  /** 今天判出系统错误的提交数：判题机出毛病时它先涨，比学生喊「交了没反应」早 */
+  todaySystemErrorCount: z.number().int(),
+  /** 现在在线的人数（5 分钟内有动静，auth/presence.ts） */
+  onlineCount: z.number().int(),
+  /** 正在上课的班（最近两小时同班在交题，和课堂看板猜班同一个办法）；没有为 null */
+  activeClass: z.string().nullable(),
+  /** 全站的数（看板那一排）。学生 = 普通用户 + 学生管理员，老师 = 教师管理员 + 超管 */
+  site: z.object({
+    students: z.number().int(),
+    teachers: z.number().int(),
+    problems: z.number().int(),
+    visibleProblems: z.number().int(),
+    submissions: z.number().int(),
+    termSubmissions: z.number().int(),
+    contests: z.number().int(),
+    problemSets: z.number().int(),
+    tutorials: z.number().int(),
+    /** 这周（周一起）交过题的人数 */
+    weekActive: z.number().int(),
+  }),
+  /** 最近 30 天每天交了几次（东八区日历日，含今天，没人交的那天是 0） */
+  daily: z.array(z.object({ day: z.string(), count: z.number().int() })),
 })
 
 export const uploadImageResponseSchema = z.object({
