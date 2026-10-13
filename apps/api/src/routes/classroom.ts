@@ -3,6 +3,7 @@ import {
   STUDENT_ROLES,
   classLessonRequestSchema,
   type ClassActivity,
+  type ClassToday,
   type ClassBoard,
   type ClassBoardStudent,
   type ClassLesson,
@@ -760,6 +761,100 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     ),
     recentLessons: recentDays.length,
   } satisfies ClassBoard)
+})
+
+/**
+ * 老师首页「今天的课」：今天在上课的每个班一行。在上课 = 同班 ≥5 人今天一起交过题（和「班里在做」
+ * 同一个门槛），或者老师今天在看板上布置过题（刚布置、还没人交也要列出来）。每个班的题和人数
+ * 和看板同一套取法（classLessonProblems），「全做对」看这几道题做没做对过，不限今天
+ */
+classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
+  const start = dayStart()
+  const today = calendarDay()
+  const activity = activityRows({ since: start })
+  const users = sql<number>`count(distinct ${activity.userId})::int`
+  const lastAt = sql<string>`max(${activity.createTime})`
+  const [active, lessons] = await Promise.all([
+    db
+      .select({ className: schema.user.className, users, lastAt })
+      .from(activity)
+      .innerJoin(schema.user, eq(schema.user.id, activity.userId))
+      .where(
+        and(
+          isNotNull(schema.user.className),
+          eq(schema.user.isDisabled, false),
+          inArray(schema.user.adminType, [...STUDENT_ROLES]),
+        ),
+      )
+      .groupBy(schema.user.className),
+    db
+      .select({ className: schema.classLesson.className })
+      .from(schema.classLesson)
+      .where(eq(schema.classLesson.day, today)),
+  ])
+  const activeByClass = new Map(
+    active
+      .filter((row) => row.className && row.users >= CLASS_ACTIVITY_MIN_USERS)
+      .map((row) => [row.className!, row]),
+  )
+  const names = [...new Set([...activeByClass.keys(), ...lessons.map((row) => row.className)])]
+
+  const classes = await Promise.all(
+    names.map(async (className) => {
+      const [lesson, [roster]] = await Promise.all([
+        classLessonProblems(className, 1),
+        db
+          .select({ value: sql<number>`count(*)::int` })
+          .from(schema.user)
+          .where(
+            and(
+              eq(schema.user.className, className),
+              eq(schema.user.isDisabled, false),
+              inArray(schema.user.adminType, [...STUDENT_ROLES]),
+            ),
+          ),
+      ])
+      const ids = lesson.problems.map((problem) => problem.id)
+      let allDoneCount = 0
+      if (ids.length) {
+        // 做没做对不限今天（和看板的格子一样：以前做对的也算做完），语言跟着布置走
+        const done = activityRows({
+          since: new Date(0).toISOString(),
+          users: classMemberIds(className),
+          problemIds: ids,
+          language: lesson.language,
+        })
+        const rows = await db
+          .select({
+            userId: done.userId,
+            solved: sql<number>`count(distinct ${done.problemId})::int`,
+          })
+          .from(done)
+          .where(sql`${done.solved}`)
+          .groupBy(done.userId)
+        allDoneCount = rows.filter((row) => row.solved >= ids.length).length
+      }
+      const today = activeByClass.get(className)
+      return {
+        className,
+        source: lesson.source,
+        assignedAt: lesson.assignedAt,
+        problems: lesson.problems.map((problem) => ({
+          problemDisplayId: problem.displayId,
+          title: problem.title,
+          userCount: problem.userCount,
+          acceptedCount: problem.acceptedCount,
+        })),
+        activeCount: today?.users ?? 0,
+        rosterCount: roster?.value ?? 0,
+        allDoneCount,
+        lastSubmitAt: today?.lastAt ? new Date(today.lastAt).toISOString() : null,
+      }
+    }),
+  )
+  // 正在交的在前，只布置了还没人交的放最后
+  classes.sort((a, b) => (b.lastSubmitAt ?? "").localeCompare(a.lastSubmitAt ?? ""))
+  return success(c, { classes } satisfies ClassToday)
 })
 
 /**

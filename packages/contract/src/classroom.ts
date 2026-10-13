@@ -185,7 +185,38 @@ export const classLessonSchema = z.object({
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
 })
 
+/**
+ * 老师首页「今天的课」：今天在上课的每个班一行（同班 ≥5 人一起交题，或者老师在看板上布置过）。
+ * 题目的人数是今天的（和看板同一套取法），「全做对」看的是这几道题有没有做对过，不限今天
+ */
+export const classTodaySchema = z.object({
+  classes: z.array(
+    z.object({
+      className: z.string(),
+      source: z.enum(["teacher", "inferred"]).nullable(),
+      /** 老师布置的时刻；推断出来的为 null */
+      assignedAt: z.string().nullable(),
+      problems: z.array(
+        z.object({
+          problemDisplayId: z.string(),
+          title: z.string(),
+          userCount: z.number().int(),
+          acceptedCount: z.number().int(),
+        }),
+      ),
+      /** 今天交过题的人数 / 全班人数 */
+      activeCount: z.number().int(),
+      rosterCount: z.number().int(),
+      /** 这节课的题全做对了的人数 */
+      allDoneCount: z.number().int(),
+      /** 今天最后一次有人交题；还没人交（只布置了）为 null */
+      lastSubmitAt: z.string().nullable(),
+    }),
+  ),
+})
+
 export type ClassActivity = z.infer<typeof classActivitySchema>
+export type ClassToday = z.infer<typeof classTodaySchema>
 export type LastVisit = z.infer<typeof lastVisitSchema>
 export type ClassLessonRequest = z.infer<typeof classLessonRequestSchema>
 export type ClassBoard = z.infer<typeof classBoardSchema>
