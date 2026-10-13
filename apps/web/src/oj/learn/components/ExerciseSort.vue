@@ -3,6 +3,7 @@ import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseSortData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 import { highlightLines } from "shared/highlight"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -10,6 +11,7 @@ const emit = defineEmits<{
 }>()
 
 const data = computed(() => props.exercise.data as ExerciseSortData)
+const { isDesktop } = useBreakpoints()
 
 type LineItem = { originalIdx: number; text: string }
 
@@ -90,8 +92,11 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
 
 <template>
   <div>
-    <p style="font-weight: 500; font-size: 16px; margin-bottom: 12px">
+    <p :style="{ fontWeight: 500, fontSize: '16px', marginBottom: isDesktop ? '12px' : '8px' }">
       {{ data.question }}
+    </p>
+    <p v-if="!isDesktop" style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
+      先点一行，再点它该去的位置。
     </p>
 
     <n-space vertical :size="6">
