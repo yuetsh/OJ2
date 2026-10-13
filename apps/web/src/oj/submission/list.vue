@@ -167,7 +167,7 @@ async function listSubmissions() {
     const res = await fetchPage()
     if (seq !== requestSeq) return
     if (mode) flowcharts.value = res.results as FlowchartSubmissionListItem[]
-    else submissions.value = res.results as SubmissionListItem[]
+    else submissions.value = asSeenByStudent(res.results as SubmissionListItem[])
     total.value = res.total
     unknownProblems.value = res.unknownProblems
     newCount.value = 0
@@ -671,6 +671,16 @@ function languageText(row: SubmissionListItem) {
 }
 
 /** 学生看别人的那几行：名字淡一档、带一把锁（自己的看不了是题单那道闸，另说） */
+/**
+ * 演示模式（超管把界面装成学生投屏）：后端认的还是超管，每一行都给了 showLink。
+ * 学生是看不到别人代码的，投屏时也不该露出来 —— 别人的行一律当成看不到
+ */
+function asSeenByStudent(rows: SubmissionListItem[]) {
+  if (!userStore.demoMode) return rows
+  const me = userStore.user?.id
+  return rows.map((row) => (row.userId === me ? row : { ...row, showLink: false }))
+}
+
 function othersRow(row: SubmissionListItem) {
   return !row.showLink && row.userId !== userStore.user?.id
 }

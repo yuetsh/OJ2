@@ -78,6 +78,12 @@ async function load(quiet = false) {
   try {
     const res = await getSubmission(currentId.value, true)
     if (seq !== loadSeq) return
+    // 演示模式（超管装成学生投屏）：后端照样给了别人的代码，学生是看不到的，这里也挡掉
+    if (userStore.demoMode && res.userId !== userStore.user?.id) {
+      detail.value = null
+      state.value = "forbidden"
+      return
+    }
     detail.value = res
     state.value = "ok"
     if (judging.value) timer = setTimeout(() => load(true), 2000)
