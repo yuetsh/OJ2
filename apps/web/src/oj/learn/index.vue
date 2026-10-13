@@ -138,7 +138,11 @@ async function init() {
   activeId.value = ""
   await nextTick()
   reader.value?.scrollTo({ top: 0 })
-  if (!isDesktop.value) window.scrollTo({ top: 0 })
+  // 手机上滚的是外层 n-layout 的容器，不是 window —— 原来 window.scrollTo 什么都没滚，
+  // 点「下一课」落在下一课的末尾
+  if (!isDesktop.value) scroller()?.scrollTo({ top: 0 })
+  pagerHidden.value = false
+  atEnd.value = false
 }
 
 watch(
@@ -177,6 +181,51 @@ function onSolved(exerciseId: number) {
   }
   progress.value = { ...progress.value, [id]: { ...row, exerciseSolved: solvedCount.value } }
 }
+
+// ------------------------------------------------------------------ 手机底栏
+// 往下读时收起上一课 / 目录 / 下一课，往回翻再出来；读到课末也收着 ——
+// 课末卡片里就有「下一课」，两个摆在一起是重复的
+const mobileRoot = ref<HTMLElement | null>(null)
+const endRef = ref<HTMLElement | null>(null)
+const pagerHidden = ref(false)
+const atEnd = ref(false)
+
+/** 往上找真正在滚的那层。n-layout-content 自己也带 .n-layout-scroll-container 类却不滚，按类名找会找错 */
+function scroller(): HTMLElement | null {
+  for (let el = mobileRoot.value?.parentElement; el; el = el.parentElement) {
+    const overflow = getComputedStyle(el).overflowY
+    if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight) {
+      return el
+    }
+  }
+  return null
+}
+
+let lastTop = 0
+function onMobileScroll(event: Event) {
+  const box = event.target as HTMLElement
+  const top = box.scrollTop
+  if (top < 60) pagerHidden.value = false
+  else if (top > lastTop + 6) pagerHidden.value = true
+  else if (top < lastTop - 6) pagerHidden.value = false
+  lastTop = top
+  const end = endRef.value?.getBoundingClientRect().top
+  atEnd.value = end !== undefined && end < box.getBoundingClientRect().bottom
+}
+
+// 滚动事件不冒泡，在 document 上用捕获拿，不用先找到容器再挂
+useEventListener(
+  document,
+  "scroll",
+  (event: Event) => {
+    const box = event.target
+    if (isDesktop.value || !(box instanceof HTMLElement)) return
+    // 只认包着本页的那层（目录抽屉、代码块里横着滚的不算）
+    if (!mobileRoot.value || !box.contains(mobileRoot.value)) return
+    onMobileScroll(event)
+  },
+  { capture: true, passive: true },
+)
 
 // ------------------------------------------------------------------ 读到哪一节
 const reader = ref<HTMLElement | null>(null)
@@ -234,7 +283,9 @@ function jumpExercise(id: number) {
 
       <main class="main">
         <div ref="reader" class="reader" @scroll.passive="onScroll">
-          <article v-if="tutorial" class="article">
+          <!-- 按课重建：复用的话正文里的编辑器是就地换内容，CodeMirror 会把光标滚进视野，
+               刚滚回顶上的页面又被拽到某个代码块那儿 -->
+          <article v-if="tutorial" :key="tutorial.id" class="article">
             <div class="crumb muted">
               <span v-if="tutorial.project">{{ tutorial.project }}</span>
               <span v-if="tutorial.project">·</span>
@@ -302,7 +353,7 @@ function jumpExercise(id: number) {
     </div>
 
     <!-- 手机 -->
-    <div v-else class="mobile">
+    <div v-else ref="mobileRoot" class="mobile">
       <div class="mbar">
         <n-button @click="menuOpen = true">
           <template #icon><Icon icon="ph:list" /></template>
@@ -322,7 +373,7 @@ function jumpExercise(id: number) {
           </span>
         </span>
       </div>
-      <article v-if="tutorial" class="marticle">
+      <article v-if="tutorial" :key="tutorial.id" class="marticle">
         <div v-if="tutorial.project" class="crumb muted">{{ tutorial.project }}</div>
         <h1 class="h1 small">{{ parts.kp }}</h1>
         <div v-if="parts.scene" class="scene">{{ parts.scene }}</div>
@@ -334,24 +385,26 @@ function jumpExercise(id: number) {
           :solved-ids="solvedIds"
           @solved="onSolved"
         />
-        <LessonEnd
-          :step="step"
-          :total="titles.length"
-          :course-label="courseLabel"
-          :exercise-count="parsed.exerciseCount"
-          :solved-count="solvedCount"
-          :first-unsolved="firstUnsolved"
-          :problems="tutorial.problems"
-          :next="next"
-          :groups="groups"
-          :state-of="stateOf"
-          :done-count="done"
-          compact
-          @jump="jumpExercise"
-        />
+        <div ref="endRef">
+          <LessonEnd
+            :step="step"
+            :total="titles.length"
+            :course-label="courseLabel"
+            :exercise-count="parsed.exerciseCount"
+            :solved-count="solvedCount"
+            :first-unsolved="firstUnsolved"
+            :problems="tutorial.problems"
+            :next="next"
+            :groups="groups"
+            :state-of="stateOf"
+            :done-count="done"
+            compact
+            @jump="jumpExercise"
+          />
+        </div>
       </article>
       <n-spin v-else-if="loading" class="spin" />
-      <nav class="mpager">
+      <nav class="mpager" :class="{ hidden: pagerHidden || atEnd }">
         <n-button v-if="prev" size="large" @click="router.push(prev.to)">
           <template #icon><Icon icon="ph:caret-left-bold" /></template>
           上一课
@@ -374,7 +427,14 @@ function jumpExercise(id: number) {
         </n-button>
       </nav>
 
-      <n-drawer v-model:show="menuOpen" placement="bottom" height="85%" class="sheet">
+      <!-- 不自动聚焦：一打开焦点框套在「自学首页」上，手机上看着像出了错 -->
+      <n-drawer
+        v-model:show="menuOpen"
+        placement="bottom"
+        height="85%"
+        class="sheet"
+        :auto-focus="false"
+      >
         <n-drawer-content :native-scrollbar="false" closable>
           <template #header>
             <span class="sheet-head">
@@ -582,6 +642,10 @@ function jumpExercise(id: number) {
   display: flex;
   align-items: center;
   background: v-bind("theme.bodyColor");
+  transition: transform 0.2s ease;
+}
+.mpager.hidden {
+  transform: translateY(100%);
 }
 .sheet-head {
   display: flex;

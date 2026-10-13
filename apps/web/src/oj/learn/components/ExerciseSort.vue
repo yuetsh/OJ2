@@ -4,6 +4,7 @@ import type { Exercise, ExerciseSortData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 import { highlightLines } from "shared/highlight"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { hangStyle } from "../hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -140,7 +141,7 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
         <span style="color: #bbb; cursor: grab">⠿</span>
         <span
           v-html="lineHtml[line.originalIdx]"
-          style="white-space: pre; min-width: 0; overflow-x: auto"
+          :style="{ minWidth: 0, ...hangStyle(line.text) }"
         />
       </div>
     </n-space>

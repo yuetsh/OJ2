@@ -2,6 +2,7 @@
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseFillData } from "utils/types"
 import { highlightWithHoles } from "shared/highlight"
+import { hangStyle } from "../hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -35,6 +36,32 @@ const segments = computed<Segment[]>(() => {
       ? { type: "code", html: part }
       : { type: "blank", answers: blanks[part], index: part },
   )
+})
+
+/**
+ * 按行切开，每行自己折行、悬挂缩进（见 hangIndent.ts）。原来整段 pre-wrap，
+ * 手机上行尾的注释折下来顶格，看着像另起了一行代码。
+ * 高亮的 HTML 在换行处是断开的（见 shared/highlight.ts 的 walk），按 "\n" 切不会切坏标签。
+ */
+const lines = computed(() => {
+  const rows: { indent: string; parts: Segment[] }[] = [{ indent: "", parts: [] }]
+  for (const seg of segments.value) {
+    if (seg.type === "blank") {
+      rows[rows.length - 1].parts.push(seg)
+      continue
+    }
+    seg.html.split("\n").forEach((html, i) => {
+      if (i > 0) rows.push({ indent: "", parts: [] })
+      if (html) rows[rows.length - 1].parts.push({ type: "code", html })
+    })
+  }
+  for (const row of rows) {
+    const first = row.parts[0]
+    if (first?.type === "code") {
+      row.indent = first.html.replace(/<[^>]*>/g, "").match(/^[ \t]*/)![0]
+    }
+  }
+  return rows
 })
 
 const blankCount = computed(() => segments.value.filter((s) => s.type === "blank").length)
@@ -78,52 +105,59 @@ function inputWidth(idx: number): string {
       {{ data.question }}
     </p>
 
-    <pre
+    <div
       :style="{
         fontFamily: 'var(--learn-code-font)',
         fontSize: '16px',
-        lineHeight: '1.6',
+        lineHeight: '1.9',
         background: 'var(--learn-soft)',
         border: '1px solid var(--learn-line)',
         borderRadius: '6px',
-        padding: '12px',
-        overflowX: 'auto',
-        whiteSpace: 'pre-wrap',
-        margin: 0,
+        padding: '10px 12px',
       }"
-    ><template v-for="(seg, i) in segments" :key="i"
-      ><span v-if="seg.type === 'code'" v-html="seg.html" /><input
-        v-else
-        :value="userInputs[seg.index]"
-        :disabled="allCorrect"
-        autocapitalize="off"
-        autocorrect="off"
-        autocomplete="off"
-        spellcheck="false"
-        :style="{
-          width: inputWidth(seg.index),
-          fontFamily: 'var(--learn-code-font)',
-          fontSize: '16px',
-          padding: '0 6px',
-          borderRadius: '3px',
-          border: `1.5px solid ${
-            allCorrect
-              ? '#18a058'
-              : wrongBlanks.has(seg.index)
-                ? '#d03050'
-                : 'var(--learn-control-line)'
-          }`,
-          background: allCorrect
-            ? 'rgba(24,160,88,0.08)'
-            : wrongBlanks.has(seg.index)
-              ? 'rgba(208,48,80,0.07)'
-              : 'transparent',
-          outline: 'none',
-          color: 'inherit',
-          minWidth: '4ch',
-        }"
-        @input="userInputs[seg.index] = ($event.target as HTMLInputElement).value"
-      /></template></pre>
+    >
+      <div
+        v-for="(row, r) in lines"
+        :key="r"
+        :style="{ minHeight: '1.9em', ...hangStyle(row.indent) }"
+      >
+        <template v-for="(seg, i) in row.parts" :key="i"
+          ><span v-if="seg.type === 'code'" v-html="seg.html" /><input
+            v-else
+            :value="userInputs[seg.index]"
+            :disabled="allCorrect"
+            autocapitalize="off"
+            autocorrect="off"
+            autocomplete="off"
+            spellcheck="false"
+            :style="{
+              width: inputWidth(seg.index),
+              fontFamily: 'var(--learn-code-font)',
+              fontSize: '16px',
+              lineHeight: '1.4',
+              padding: '2px 6px',
+              textIndent: 0,
+              borderRadius: '4px',
+              border: `1.5px solid ${
+                allCorrect
+                  ? '#18a058'
+                  : wrongBlanks.has(seg.index)
+                    ? '#d03050'
+                    : 'var(--learn-control-line)'
+              }`,
+              background: allCorrect
+                ? 'rgba(24,160,88,0.08)'
+                : wrongBlanks.has(seg.index)
+                  ? 'rgba(208,48,80,0.07)'
+                  : 'var(--learn-pane)',
+              outline: 'none',
+              color: 'inherit',
+              minWidth: '5ch',
+            }"
+            @input="userInputs[seg.index] = ($event.target as HTMLInputElement).value"
+        /></template>
+      </div>
+    </div>
 
     <ExerciseResult
       v-if="wrongBlanks.size > 0 || allCorrect"

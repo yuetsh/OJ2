@@ -2,6 +2,7 @@
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseDebugData } from "utils/types"
 import { highlightLines } from "shared/highlight"
+import { hangStyle } from "../hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -93,7 +94,7 @@ function reset() {
 
     <n-space vertical :size="6">
       <div
-        v-for="(_line, idx) in data.lines"
+        v-for="(line, idx) in data.lines"
         :key="idx"
         :style="lineStyle(idx)"
         @click="toggle(idx)"
@@ -101,7 +102,7 @@ function reset() {
         <span style="color: #bbb; width: 22px; text-align: right; flex-shrink: 0">
           {{ idx + 1 }}
         </span>
-        <span v-html="lineHtml[idx]" style="white-space: pre; min-width: 0; overflow-x: auto" />
+        <span v-html="lineHtml[idx]" :style="{ minWidth: 0, ...hangStyle(line) }" />
       </div>
     </n-space>
 

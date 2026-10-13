@@ -66,6 +66,15 @@ function inline(text: string) {
   margin: 28px 0 12px;
   scroll-margin-top: 16px;
 }
+/* 手机上四列的表会把每格挤成一两个字一行（「浮」「点」「数」）：给格子留个最小宽度、表头不折，
+   放不下就整张横着滚（Markdown.vue 已经让表格自己滚） */
+.body :deep(.oj-markdown th),
+.body :deep(.oj-markdown td) {
+  min-width: 4em;
+}
+.body :deep(.oj-markdown th) {
+  white-space: nowrap;
+}
 .goals {
   margin: 4px 0 8px;
   padding: 12px 16px;

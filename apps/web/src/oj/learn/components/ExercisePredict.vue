@@ -74,7 +74,11 @@ function reset() {
       }"
     ><code style="font-family: inherit" v-html="codeHtml" /></pre>
 
-    <p style="font-weight: 500; margin: 14px 0 8px">这段代码会输出什么？</p>
+    <!-- 题目本身多半就是这句，再写一遍就成了同一个问题问两次 -->
+    <p v-if="!data.question.includes('输出什么')" style="font-weight: 500; margin: 14px 0 8px">
+      这段代码会输出什么？
+    </p>
+    <div v-else style="height: 14px" />
     <n-input
       v-model:value="userInput"
       type="textarea"
