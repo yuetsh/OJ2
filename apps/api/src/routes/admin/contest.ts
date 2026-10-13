@@ -5,7 +5,7 @@ import {
   type AdminContest,
   type AdminContestList,
 } from "@oj2/contract"
-import { and, count, desc, eq, ilike, inArray } from "drizzle-orm"
+import { and, count, countDistinct, desc, eq, ilike, inArray } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
@@ -93,12 +93,39 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
       .innerJoin(schema.user, eq(schema.contest.createdById, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where)
-      .orderBy(desc(schema.contest.createTime))
+      // 按开始时间：原来按创建时间，「复制一份」出来的旧比赛会排到最前面
+      .orderBy(desc(schema.contest.startTime), desc(schema.contest.id))
       .limit(limit)
       .offset(offset),
   ])
+  const ids = rows.map((row) => row.contest.id)
+  const [problemCounts, participantCounts] = ids.length
+    ? await Promise.all([
+        db
+          .select({ contestId: schema.problem.contestId, value: count() })
+          .from(schema.problem)
+          .where(inArray(schema.problem.contestId, ids))
+          .groupBy(schema.problem.contestId),
+        db
+          .select({
+            contestId: schema.submission.contestId,
+            value: countDistinct(schema.submission.userId),
+          })
+          .from(schema.submission)
+          .where(inArray(schema.submission.contestId, ids))
+          .groupBy(schema.submission.contestId),
+      ])
+    : [[], []]
+  const problemsOf = new Map(problemCounts.map((row) => [row.contestId, row.value]))
+  const peopleOf = new Map(participantCounts.map((row) => [row.contestId, row.value]))
   return success(c, {
-    results: await Promise.all(rows.map(serialize)),
+    results: await Promise.all(
+      rows.map(async (row) => ({
+        ...(await serialize(row)),
+        problemCount: problemsOf.get(row.contest.id) ?? 0,
+        participantCount: peopleOf.get(row.contest.id) ?? 0,
+      })),
+    ),
     total: totalRows[0]?.value ?? 0,
   } satisfies AdminContestList)
 })

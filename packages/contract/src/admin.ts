@@ -394,7 +394,13 @@ export const adminContestSchema = z.object({
   contestType: z.enum(["Public", "Password Protected"]),
 })
 
-export const adminContestListSchema = paginatedSchema(adminContestSchema)
+/** 后台比赛列表的一行：比赛本身，加几道题、几人参加（交过题的人数） */
+export const adminContestListItemSchema = adminContestSchema.extend({
+  problemCount: z.number().int(),
+  participantCount: z.number().int(),
+})
+
+export const adminContestListSchema = paginatedSchema(adminContestListItemSchema)
 
 export const createContestRequestSchema = z.object({
   title: z.string().trim().min(1).max(128),
@@ -1008,6 +1014,7 @@ export type CreateProblemRequest = z.infer<typeof createProblemRequestSchema>
 
 export type AdminContest = z.infer<typeof adminContestSchema>
 export type AdminContestList = z.infer<typeof adminContestListSchema>
+export type AdminContestListItem = z.infer<typeof adminContestListItemSchema>
 export type AdminUser = z.infer<typeof adminUserSchema>
 export type AdminUserList = z.infer<typeof adminUserListSchema>
 export type CheckUsernamesResponse = z.infer<typeof checkUsernamesResponseSchema>
