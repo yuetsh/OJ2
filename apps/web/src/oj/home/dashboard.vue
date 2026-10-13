@@ -149,10 +149,10 @@ async function loadSubmissions() {
   submissions.value = res.results
 }
 
-/** 首页只放置顶的公告（用户定的），其余从顶栏「公告」进 */
+/** 首页放前三条公告（后端置顶在前、再按发布时间），其余从顶栏「公告」进 */
 async function loadAnnouncements() {
-  const res = await getAnnouncementList(0, 10)
-  announcements.value = res.results.filter((item) => item.top)
+  const res = await getAnnouncementList(0, 3)
+  announcements.value = res.results
 }
 
 async function loadKnowledge() {
@@ -524,20 +524,24 @@ async function openAnnouncement(item: AnnouncementListItem) {
           </router-link>
         </n-card>
 
-        <!-- 公告只放置顶的；别的从顶栏「公告」进 -->
-        <div
-          v-for="item in announcements"
-          :key="item.id"
-          class="card pinned"
-          role="button"
-          tabindex="0"
-          @click="openAnnouncement(item)"
-          @keyup.enter="openAnnouncement(item)"
-        >
-          <n-tag type="warning" size="small" :bordered="false">置顶</n-tag>
-          <span class="row-title">{{ item.title }}</span>
-          <router-link to="/announcement" class="more" @click.stop>公告 →</router-link>
-        </div>
+        <n-card v-if="announcements.length" title="公告" :bordered="false" class="card">
+          <template #header-extra>
+            <router-link to="/announcement" class="more">全部</router-link>
+          </template>
+          <div
+            v-for="item in announcements"
+            :key="item.id"
+            class="row clickable"
+            role="button"
+            tabindex="0"
+            @click="openAnnouncement(item)"
+            @keyup.enter="openAnnouncement(item)"
+          >
+            <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
+            <span class="row-title">{{ item.title }}</span>
+            <n-text depth="3" class="row-meta">{{ dateText(item.createTime) }}</n-text>
+          </div>
+        </n-card>
       </div>
     </div>
 
@@ -579,14 +583,6 @@ async function openAnnouncement(item: AnnouncementListItem) {
 
 .lesson-foot {
   padding-top: 12px;
-}
-
-.pinned {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  cursor: pointer;
 }
 
 .grid {
