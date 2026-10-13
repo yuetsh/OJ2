@@ -60,9 +60,9 @@ async function submit() {
   try {
     await api!(announcement)
     if (route.name === "admin announcement create") {
-      message.success("成功新建公告 💐")
+      message.success("发好了")
     } else {
-      message.success("修改已保存")
+      message.success("改好了")
     }
     router.push({ name: "admin announcement list" })
   } catch (err) {
@@ -74,34 +74,51 @@ onMounted(init)
 </script>
 <template>
   <PageHeader
-    :title="route.name === 'admin announcement create' ? '新建公告' : '编辑公告'"
+    :title="route.name === 'admin announcement create' ? '写一条公告' : '改公告'"
     :back="{ name: 'admin announcement list' }"
-  />
-  <n-form inline>
-    <n-form-item label="标题">
-      <n-input class="contestTitle" v-model:value="announcement.title" />
-    </n-form-item>
-    <n-form-item label="标签">
-      <n-select class="select" v-model:value="announcement.tag" :options="tags" />
-    </n-form-item>
-    <n-form-item label="可见">
-      <n-switch v-model:value="announcement.visible" />
-    </n-form-item>
-    <n-form-item label="置顶">
-      <n-switch v-model:value="announcement.top" />
-    </n-form-item>
-  </n-form>
-  <TextEditor v-if="ready" title="正文" v-model:value="announcement.content" :min-height="200" />
-  <n-flex style="margin-bottom: 100px" justify="end">
-    <n-button type="primary" @click="submit">保存</n-button>
-  </n-flex>
+  >
+    <template #actions>
+      <n-button type="primary" @click="submit">保存</n-button>
+    </template>
+  </PageHeader>
+  <!-- 标题、类型、置顶、学生看得到排一行；保存在右上角，不用滚到正文底下去点 -->
+  <div class="meta">
+    <n-input
+      v-model:value="announcement.title"
+      placeholder="标题"
+      size="large"
+      class="title"
+      aria-label="标题"
+    />
+    <n-radio-group v-model:value="announcement.tag" aria-label="类型">
+      <n-radio-button v-for="t in tags" :key="String(t.value)" :value="t.value">
+        {{ t.label }}
+      </n-radio-button>
+    </n-radio-group>
+    <label class="switch">置顶 <n-switch v-model:value="announcement.top" /></label>
+    <label class="switch">学生看得到 <n-switch v-model:value="announcement.visible" /></label>
+  </div>
+  <TextEditor v-if="ready" title="正文" v-model:value="announcement.content" :min-height="320" />
 </template>
 <style scoped>
-.select {
-  width: 100px;
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
-.contestTitle {
-  width: 400px;
+.title {
+  flex: 1 1 320px;
+  max-width: 560px;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  cursor: pointer;
 }
 </style>

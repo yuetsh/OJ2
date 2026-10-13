@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import PageHeader from "admin/components/PageHeader.vue"
-import { NSwitch } from "naive-ui"
+import { NSwitch, useThemeVars } from "naive-ui"
+import { RouterLink } from "vue-router"
 import Pagination from "shared/components/Pagination.vue"
 import { parseTime } from "utils/functions"
 import type { AdminAnnouncementListItem } from "utils/types"
@@ -15,57 +16,77 @@ const query = reactive({
 })
 const announcements = ref<AdminAnnouncementListItem[]>([])
 
+/**
+ * 后台公告列表（设计稿「后台公告」AnnAdmin）：一行一条，标题（置顶挂标，公告 / 更新淡淡写在后面）、
+ * 发布、改过、学生看得到；「编辑」常驻，置顶 / 删除收进 ⋯。ID、作者（都是同一个人）、
+ * 精确到秒的两列时间拿掉
+ */
+const theme = useThemeVars()
+
 const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
-  { title: "ID", key: "id", width: 60 },
-  { title: "标题", key: "title", minWidth: 300 },
-  { title: "标签", key: "tag", width: 80 },
   {
-    title: "置顶",
-    key: "top",
-    render: (row) => (row.top ? "置顶" : ""),
-    width: 80,
+    title: "标题",
+    key: "title",
+    minWidth: 300,
+    render: (row) =>
+      h("span", { class: "title-cell" }, [
+        h(
+          RouterLink,
+          {
+            class: "title-link",
+            to: { name: "admin announcement edit", params: { announcementID: row.id } },
+          },
+          () => row.title,
+        ),
+        row.top ? h("span", { class: "top" }, "置顶") : null,
+        h("span", { class: "muted small" }, row.tag),
+      ]),
   },
   {
-    title: "创建时间",
+    title: "发布",
     key: "createTime",
-    width: 180,
-    render: (row) => parseTime(row.createTime, "YYYY-MM-DD HH:mm:ss"),
+    width: 120,
+    render: (row) => h("span", { class: "num" }, parseTime(row.createTime, "YYYY-MM-DD")),
   },
   {
-    title: "上次更新时间",
+    title: "改过",
     key: "lastUpdateTime",
-    width: 180,
-    render: (row) => parseTime(row.lastUpdateTime, "YYYY-MM-DD HH:mm:ss"),
+    width: 120,
+    render: (row) => {
+      const created = parseTime(row.createTime, "YYYY-MM-DD")
+      const updated = parseTime(row.lastUpdateTime, "YYYY-MM-DD")
+      return h("span", { class: "num muted" }, updated === created ? "—" : updated)
+    },
   },
   {
-    title: "作者",
-    key: "createdBy",
-    render: (row) => row.createdBy.username,
-    width: 80,
-  },
-  {
-    title: "可见",
+    title: "学生看得到",
     key: "visible",
+    width: 100,
     render: (row) =>
       h(NSwitch, {
         value: row.visible,
         size: "small",
         rubberBand: false,
-        onUpdateValue: () => toggleVisible(row),
+        onUpdateValue: () => toggle(row, "visible"),
       }),
   },
   {
-    title: "选项",
+    title: "",
     key: "actions",
-    width: 140,
-    render: (row) => h(Actions, { announcementID: row.id, onDeleted: listAnnouncements }),
+    width: 110,
+    render: (row) =>
+      h(Actions, {
+        announcementID: row.id,
+        top: row.top,
+        onDeleted: listAnnouncements,
+        onToggleTop: () => toggle(row, "top"),
+      }),
   },
 ]
 
 // 列表响应不含 content（正文是 8MB 上限的富文本），而更新接口要求 content 必填 ——
 // 拿列表里那行直接回传会 400。所以先取回整条再改。
-async function toggleVisible(announcement: AdminAnnouncementListItem) {
-  const next = !announcement.visible
+async function toggle(announcement: AdminAnnouncementListItem, field: "visible" | "top") {
   try {
     const full = await getAnnouncement(announcement.id)
     await editAnnouncement({
@@ -73,12 +94,13 @@ async function toggleVisible(announcement: AdminAnnouncementListItem) {
       title: full.title,
       tag: full.tag,
       content: full.content,
-      visible: next,
-      top: full.top,
+      visible: field === "visible" ? !full.visible : full.visible,
+      top: field === "top" ? !full.top : full.top,
     })
-    announcement.visible = next
+    if (field === "top") listAnnouncements()
+    else announcement.visible = !full.visible
   } catch {
-    message.error("修改可见性失败")
+    message.error("没改成，刷新一下再试")
   }
 }
 
@@ -94,13 +116,52 @@ watch(query, listAnnouncements, { deep: true })
 </script>
 
 <template>
-  <PageHeader title="网站公告">
+  <PageHeader title="公告">
     <template #actions>
       <n-button type="primary" @click="$router.push({ name: 'admin announcement create' })">
-        新建公告
+        写一条公告
       </n-button>
     </template>
   </PageHeader>
-  <n-data-table striped :columns="columns" :data="announcements" />
+  <n-data-table class="ann-table" :columns="columns" :data="announcements" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
+
+<style scoped>
+.ann-table :deep(.title-cell) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ann-table :deep(.title-link) {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.ann-table :deep(.title-link:hover) {
+  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
+}
+
+.ann-table :deep(.top) {
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 3px;
+  color: v-bind("theme.warningColor");
+  background: v-bind("theme.actionColor");
+}
+
+.ann-table :deep(.muted) {
+  color: v-bind("theme.textColor3");
+}
+
+.ann-table :deep(.small) {
+  font-size: 12px;
+}
+
+.ann-table :deep(.num) {
+  font-variant-numeric: tabular-nums;
+}
+</style>
