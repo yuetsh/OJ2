@@ -14,6 +14,7 @@
   --code-type: #267f99;
   --code-comment: #008000;
   --code-invalid: #cd3131;
+  --code-invalid-bg: rgba(205, 49, 49, 0.12);
   --code-heading: #800000;
   --code-raw: #800000;
   --code-bold: #000080;
@@ -31,6 +32,7 @@ html.dark {
   --code-type: #4ec9b0;
   --code-comment: #6a9955;
   --code-invalid: #f44747;
+  --code-invalid-bg: rgba(244, 71, 71, 0.18);
   --code-heading: #569cd6;
   --code-raw: #ce9178;
   --code-bold: #569cd6;
@@ -67,17 +69,27 @@ html.dark {
   color: var(--code-invalid);
 }
 
-/* 字符串里的 %d，见 shared/formatPlaceholder.ts。静态代码是同一个 span 上的两个类名，
-   编辑器里是两层 span、谁包谁不一定，所以三种写法都要 */
+/* shared/codeMarks.ts 补的几种标记。静态代码是同一个 span 上的两个类名，编辑器里是两层 span、
+   谁包谁不一定，所以内外两种写法都要，并且要写在上面那些 tok-* 后面 */
 .tok-format,
-.tok-format .tok-string,
-.tok-string .tok-format {
+.tok-format * {
   color: var(--code-variable);
 }
 .tok-format-py,
-.tok-format-py .tok-string,
-.tok-string .tok-format-py {
+.tok-format-py * {
   color: var(--code-keyword);
+}
+.tok-builtin-type,
+.tok-builtin-type * {
+  color: var(--code-type);
+}
+.tok-fullwidth,
+.tok-fullwidth * {
+  color: var(--code-invalid);
+  background-color: var(--code-invalid-bg);
+  text-decoration: wavy underline var(--code-invalid);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
 }
 
 /* 以下只有 Markdown 编辑器用得到 */

@@ -12,8 +12,8 @@ import { cppLanguage } from "@codemirror/lang-cpp"
 import { SQLite } from "@codemirror/lang-sql"
 import { highlightCode, tagHighlighter, tags as t } from "@lezer/highlight"
 import type { ConfigProviderProps } from "naive-ui"
-import { ojPythonLanguage } from "./extensions/language"
-import { FORMAT_CLASS, type FormatFamily, formatSpans } from "./formatPlaceholder"
+import { type CodeFamily, fakeStrings, splitMarks } from "./codeMarks"
+import { ojPythonLanguage } from "./extensions/pythonLanguage"
 
 /** 词的种类 → 类名。编辑器在 shared/themes/codeTheme.ts 里挂的也是它 */
 export const codeHighlighter = tagHighlighter([
@@ -55,7 +55,7 @@ function parserFor(lang?: string): Parser | null {
   return PARSERS[lang?.toLowerCase() ?? ""] ?? null
 }
 
-function formatFamilyFor(lang?: string): FormatFamily | null {
+function familyFor(lang?: string): CodeFamily | null {
   const parser = parserFor(lang)
   if (parser === cppLanguage.parser) return "c"
   if (parser === ojPythonLanguage.parser) return "python"
@@ -82,19 +82,22 @@ function walk(
     put(code, "")
     return
   }
-  // 字符串里的 %d 这类占位符再拆出来，见 shared/formatPlaceholder.ts
-  const family = formatFamilyFor(lang)
+  // 再补 %d、全角标点、Python 内置类型这几种标记，见 shared/codeMarks.ts
+  const tree = parser.parse(code)
+  const family = familyFor(lang)
+  const fake = family ? fakeStrings(tree, (from, to) => code.slice(from, to)) : []
+  let pos = 0
   const emit = (text: string, classes: string) => {
-    if (!family || !classes.includes("tok-string")) return put(text, classes)
-    let at = 0
-    for (const s of formatSpans(text, family)) {
-      if (s.from > at) put(text.slice(at, s.from), classes)
-      put(text.slice(s.from, s.to), `${classes} ${FORMAT_CLASS[family]}`)
-      at = s.to
-    }
-    if (at < text.length) put(text.slice(at), classes)
+    if (family) {
+      const marks = fake.some((r) => pos >= r.from && pos < r.to) ? "" : classes
+      splitMarks(text, classes, marks, family, code[pos - 1] ?? "", put)
+    } else put(text, classes)
+    pos += text.length
   }
-  highlightCode(code, parser.parse(code), codeHighlighter, emit, () => put("\n", ""))
+  highlightCode(code, tree, codeHighlighter, emit, () => {
+    put("\n", "")
+    pos++
+  })
 }
 
 /** 逐行高亮，返回每行的 HTML，每行的标签自己闭合 */
