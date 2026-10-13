@@ -17,6 +17,7 @@ import { Hono } from "hono"
 
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
 import { getLoginWindow } from "../auth/session"
+import { presenceOf } from "../collab/state"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
 import { JudgeStatus } from "../judge/status"
@@ -754,6 +755,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           codeToday: codeTodayUsers.has(student.userId),
           drawnToday: drawnTodayUsers.has(student.userId),
           recentAttended: attendedByUser.get(student.userId) ?? 0,
+          editing: presenceOf(student.userId)?.problemId ?? null,
         }) satisfies ClassBoardStudent,
     ),
     recentLessons: recentDays.length,

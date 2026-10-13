@@ -139,6 +139,11 @@ export const classBoardStudentSchema = z.object({
   drawnToday: z.boolean(),
   /** 最近几节课（不含今天，个数见 ClassBoard.recentLessons）里交过题的有几节 */
   recentAttended: z.number().int(),
+  /**
+   * 他此刻开着哪道题的代码编辑器（展示题号），没开着为 null。老师点它就能打开他正在写的
+   * 代码，不用等他举手。只认连着**本站**的（和课堂求助一样，在 serve 进程的内存里）
+   */
+  editing: z.string().nullable(),
 })
 
 /**

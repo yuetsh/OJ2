@@ -7,6 +7,7 @@ import {
   handleCollabClose,
   handleCollabMessage,
   handleCollabOpen,
+  refreshRequestLatest,
 } from "./collab/handler"
 import { config } from "./config"
 import { db, schema } from "./db"
@@ -423,6 +424,12 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
     if (channel !== submissionUpdateChannel) return
     const event = parseSubmissionEvent(raw)
     if (!event) return
+    // 举着手的人又判完一次：老师举手面板上他那条的错法跟着刷新（没举手的直接返回，不查库）
+    if (event.data.status === "finished") {
+      refreshRequestLatest(event.userId).catch((error) => {
+        console.error("Failed to refresh help request", error)
+      })
+    }
     const topic = userSubmissionTopic(event.userId)
     if (server.subscriberCount(topic) === 0) return
     void (async () => {

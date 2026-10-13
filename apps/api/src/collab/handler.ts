@@ -1,13 +1,14 @@
-import { and, eq, isNull } from "drizzle-orm"
+import { and, desc, eq, isNull, sql } from "drizzle-orm"
 
 import { touchSession } from "../auth/session"
 import { db, schema } from "../db"
-import { toAdminType } from "@oj2/contract"
+import { toAdminType, type StatisticInfo } from "@oj2/contract"
 
 import { TEACHER_ROLES } from "../routes/helpers"
 import {
   addRequest,
   addTeacher,
+  clearPresence,
   closeRoom,
   getRequest,
   getRoom,
@@ -15,11 +16,14 @@ import {
   listRequests,
   normalizeCollabLanguage,
   openRoom,
+  presenceOf,
   queueAheadOf,
   removeRequest,
   removeTeacher,
   roomOf,
+  setPresence,
   teacherSockets,
+  type CollabLatest,
   type CollabSocket,
   type HelpRequest,
   type Room,
@@ -43,6 +47,7 @@ function serializeRequest(request: HelpRequest) {
     className: request.className,
     problemId: request.problemId,
     problemTitle: request.problemTitle,
+    latest: request.latest,
     createdAt: request.createdAt,
     status: request.status,
     teacherName: request.teacherName ?? null,
@@ -81,7 +86,7 @@ export function broadcastRequests() {
 
 function sendHelpStatus(
   ws: CollabSocket,
-  status: "pending" | "active" | "cancelled" | "no_teacher",
+  status: "pending" | "active" | "cancelled" | "no_teacher" | "dismissed",
   extra: Record<string, unknown> = {},
 ) {
   ws.send(JSON.stringify({ type: "help_status", status, ...extra }))
@@ -160,6 +165,7 @@ function requeueAfterTeacherGone(studentId: number) {
 
 export function handleCollabClose(ws: CollabSocket) {
   if (isTeacher(ws)) removeTeacher(ws)
+  clearPresence(ws.data.userId, ws)
 
   const room = roomOf(ws)
   if (room) {
@@ -237,6 +243,15 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
     case "reject":
       await handleReject(ws, message.studentId)
       return
+    case "presence":
+      handlePresence(ws, message.problemId, message.language)
+      return
+    case "peek":
+      await handlePeek(ws, message.studentId)
+      return
+    case "dismiss":
+      await handleDismiss(ws, message.problemId)
+      return
     case "leave":
       handleLeave(ws, message.reason)
       return
@@ -266,7 +281,7 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown, language:
 
   // 只认非比赛题：contest_id 为空的那条。比赛题不提供求助
   const [problem] = await db
-    .select({ title: schema.problem.title })
+    .select({ id: schema.problem.id, title: schema.problem.title })
     .from(schema.problem)
     .where(and(eq(schema.problem.displayId, problemId), isNull(schema.problem.contestId)))
     .limit(1)
@@ -279,23 +294,42 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown, language:
   // 已经在协作中就不重复登记，否则会把正在进行的房间挤掉
   if (existing?.status === "active") return
 
-  const [student] = await db
-    .select({ className: schema.user.className })
-    .from(schema.user)
-    .where(eq(schema.user.id, ws.data.userId))
-    .limit(1)
+  const [[student], latest] = await Promise.all([
+    db
+      .select({ className: schema.user.className })
+      .from(schema.user)
+      .where(eq(schema.user.id, ws.data.userId))
+      .limit(1),
+    latestSubmission(ws.data.userId, problem.id),
+  ])
 
-  addRequest({
+  const request: HelpRequest = {
     studentId: ws.data.userId,
     studentName: ws.data.username ?? "",
     className: student?.className ?? null,
     problemId,
+    problemPk: problem.id,
     problemTitle: problem.title,
+    latest,
     language: normalizeCollabLanguage(language),
     createdAt: Date.now(),
     status: "pending",
     socket: ws,
-  })
+  }
+  addRequest(request)
+
+  // 老师正主动看着他的代码时他举了手：不用再排队，就当这位老师接了
+  const room = getRoom(ws.data.userId)
+  if (room?.mode === "peek" && room.studentSocket === ws && room.problemId === problemId) {
+    room.mode = "help"
+    request.status = "active"
+    request.teacherId = room.teacherId
+    request.teacherName = room.teacherSocket.data.username ?? ""
+    sendHelpStatus(ws, "active", { teacherName: request.teacherName })
+    broadcastRequests()
+    return
+  }
+
   sendHelpStatus(ws, "pending", { queueAhead: queueAheadOf(ws.data.userId) })
   broadcastRequests()
 }
@@ -347,17 +381,7 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
     return
   }
 
-  // 握手时的 adminType 是那一刻的快照，接单前按库里的真实身份复核一次。
-  // 注意读的是库，不是前端传的任何东西 —— 前端的演示模式在这里没有意义
-  const [teacher] = await db
-    .select({ adminType: schema.user.adminType })
-    .from(schema.user)
-    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
-    .limit(1)
-  if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
-    ws.close(1008, "Permission revoked")
-    return
-  }
+  if (!(await stillTeacher(ws))) return
 
   // 上面这次查询是个 await 点，等待期间这条连接可能已经断开——断线时
   // handleCollabClose 已经把它从 teacherSockets 摘掉了，用它来判断这次 accept
@@ -383,33 +407,55 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
     )
     return
   }
+  acceptRequest(ws, request)
+}
 
+/** 接单：建房、两边发 room_open。调用方已经核过老师身份、老师不在别的房间、这条还在排队 */
+function acceptRequest(ws: CollabSocket, request: HelpRequest) {
+  const studentId = request.studentId
   request.status = "active"
   request.teacherId = ws.data.userId
   request.teacherName = ws.data.username ?? ""
 
   ws.data.roomOwnerId = studentId
   request.socket.data.roomOwnerId = studentId
-  openRoom({
+  const room: Room = {
     studentId,
+    mode: "help",
     teacherId: ws.data.userId,
     studentSocket: request.socket,
     teacherSocket: ws,
     problemId: request.problemId,
     language: request.language,
-  })
-
-  const openFrame = (peerName: string, peerRole: "student" | "teacher") =>
-    JSON.stringify({
-      type: "room_open",
-      peer: { name: peerName, role: peerRole },
-      problemId: request.problemId,
-      language: request.language,
-    })
-  request.socket.send(openFrame(request.teacherName, "teacher"))
-  ws.send(openFrame(request.studentName, "student"))
+  }
+  openRoom(room)
+  sendRoomOpen(room, request.studentName, request.teacherName, request.className)
   sendHelpStatus(request.socket, "active", { teacherName: request.teacherName })
   broadcastRequests()
+}
+
+/**
+ * 两边的 room_open。教师端多带学生的 id 和班级：协作条要知道他举手多久了（按 id 在列表里找），
+ * 「帮完了」要回到哪个班的看板
+ */
+function sendRoomOpen(
+  room: Room,
+  studentName: string,
+  teacherName: string,
+  className: string | null,
+) {
+  const frame = (peer: Record<string, unknown>) =>
+    JSON.stringify({
+      type: "room_open",
+      mode: room.mode,
+      peer,
+      problemId: room.problemId,
+      language: room.language,
+    })
+  room.studentSocket.send(frame({ name: teacherName, role: "teacher" }))
+  room.teacherSocket.send(
+    frame({ name: studentName, role: "student", id: room.studentId, className }),
+  )
 }
 
 async function handleReject(ws: CollabSocket, studentId: unknown) {
@@ -417,15 +463,7 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
 
   // reject 很少见，多这一次查询不心疼；不然握手快照挡不住"连接活着期间被降级
   // 或禁用"的老师继续掐掉排队中的求助
-  const [teacher] = await db
-    .select({ adminType: schema.user.adminType })
-    .from(schema.user)
-    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
-    .limit(1)
-  if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
-    ws.close(1008, "Permission revoked")
-    return
-  }
+  if (!(await stillTeacher(ws))) return
 
   const request = getRequest(studentId)
   // 已经在协作中的不能靠 reject 掐掉，那是 leave 的事
@@ -531,4 +569,169 @@ export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) 
     const offlineSide = peer === room.teacherSocket ? "teacher" : "student"
     teardownRoom(room, "peer_offline", offlineSide)
   }
+}
+
+/**
+ * 握手时的 adminType 是那一刻的快照，动手之前按库里的真实身份复核一次。
+ * 注意读的是库，不是前端传的任何东西 —— 前端的演示模式在这里没有意义。
+ * 不是老师了就断开连接，返回 false
+ */
+async function stillTeacher(ws: CollabSocket) {
+  if (!isTeacher(ws)) {
+    ws.send(JSON.stringify({ type: "error", message: "无权限" }))
+    return false
+  }
+  const [teacher] = await db
+    .select({ adminType: schema.user.adminType })
+    .from(schema.user)
+    .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
+    .limit(1)
+  if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
+    ws.close(1008, "Permission revoked")
+    return false
+  }
+  return true
+}
+
+/** 这个学生这道题（非比赛）最后一次代码提交，举手面板按它写错法 */
+async function latestSubmission(userId: number, problemPk: number): Promise<CollabLatest | null> {
+  const [row] = await db
+    .select({
+      id: schema.submission.id,
+      result: schema.submission.result,
+      runtimeError: sql<
+        StatisticInfo["runtime_error"] | null
+      >`${schema.submission.statisticInfo}->'runtime_error'`,
+      sampleCheck: sql<
+        StatisticInfo["sample_check"] | null
+      >`${schema.submission.statisticInfo}->'sample_check'`,
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        eq(schema.submission.userId, userId),
+        eq(schema.submission.problemId, problemPk),
+        isNull(schema.submission.contestId),
+      ),
+    )
+    .orderBy(desc(schema.submission.createTime))
+    .limit(1)
+  if (!row) return null
+  return {
+    submissionId: row.id,
+    result: row.result,
+    runtimeError: row.runtimeError ?? undefined,
+    sampleCheck: row.sampleCheck ?? undefined,
+  }
+}
+
+/**
+ * 判完了一条提交：这个人要是举着手，刷新他那条的错法 —— 举手之后又交了一次很常见，
+ * 不刷新的话面板上一直写着举手那一刻的错。由 websocket.ts 的判题事件桥调
+ */
+export async function refreshRequestLatest(userId: number) {
+  const request = getRequest(userId)
+  if (!request) return
+  const latest = await latestSubmission(userId, request.problemPk)
+  // 查库期间这条可能已经被放下、或者换成了另一道题的新求助
+  if (getRequest(userId) !== request) return
+  request.latest = latest
+  broadcastRequests()
+}
+
+/**
+ * 学生报告他此刻开着哪道题的编辑器（null = 离开了题目页 / 编辑器卸载了）。
+ * 只认学生：老师的编辑器不需要被别人打开。协作中换语言也走这里同步给老师
+ */
+function handlePresence(ws: CollabSocket, problemId: unknown, language: unknown) {
+  if (isTeacher(ws)) return
+  if (typeof problemId !== "string" || !problemId) {
+    clearPresence(ws.data.userId, ws)
+    return
+  }
+  const lang = normalizeCollabLanguage(language)
+  setPresence(ws.data.userId, { problemId, language: lang, socket: ws })
+
+  const room = getRoom(ws.data.userId)
+  if (room && room.studentSocket === ws && room.language !== lang) {
+    room.language = lang
+    room.teacherSocket.send(JSON.stringify({ type: "room_language", language: lang }))
+  }
+}
+
+/**
+ * 老师在看板上主动打开一个学生正在写的代码（学生没举手）。
+ *
+ * 用户定的：学生**不能拒绝**，但必须看得到 —— 他那边按钮变成「xuyue 在看你的代码」；
+ * 老师可以直接改。他正举着手的话就是接单，和「帮他」一样。
+ */
+async function handlePeek(ws: CollabSocket, studentId: unknown) {
+  if (typeof studentId !== "number") {
+    ws.send(JSON.stringify({ type: "error", message: "学生标识不对，请刷新页面重试" }))
+    return
+  }
+  if (!(await stillTeacher(ws))) return
+  if (!teacherSockets().has(ws)) return
+  if (roomOf(ws)) {
+    ws.send(JSON.stringify({ type: "error", message: "请先结束当前协作" }))
+    return
+  }
+
+  const busy = getRoom(studentId)
+  if (busy) {
+    const name = busy.teacherSocket.data.username ?? "别的老师"
+    ws.send(JSON.stringify({ type: "error", message: `${name} 正在看他的代码` }))
+    return
+  }
+  const request = getRequest(studentId)
+  if (request?.status === "pending") {
+    acceptRequest(ws, request)
+    return
+  }
+
+  const presence = presenceOf(studentId)
+  if (!presence) {
+    ws.send(JSON.stringify({ type: "error", message: "他现在没开着题目，打不开" }))
+    return
+  }
+  const [student] = await db
+    .select({ username: schema.user.username, className: schema.user.className })
+    .from(schema.user)
+    .where(eq(schema.user.id, studentId))
+    .limit(1)
+  // 查库是个 await 点：期间老师可能断了、学生可能走了、别的老师可能先打开了
+  if (!student || !teacherSockets().has(ws) || roomOf(ws) || getRoom(studentId)) return
+  if (presenceOf(studentId) !== presence) return
+
+  ws.data.roomOwnerId = studentId
+  presence.socket.data.roomOwnerId = studentId
+  const room: Room = {
+    studentId,
+    mode: "peek",
+    teacherId: ws.data.userId,
+    studentSocket: presence.socket,
+    teacherSocket: ws,
+    problemId: presence.problemId,
+    language: presence.language,
+  }
+  openRoom(room)
+  sendRoomOpen(room, student.username, ws.data.username ?? "", student.className)
+}
+
+/**
+ * 「讲完了，都放下」：同一道题好几个人举手，老师停下来全班讲完了，把这道题还在排队的手
+ * 一次放下。正在帮的那个不动。学生收到「xuyue 讲了 2020，还不会就再举手」
+ */
+async function handleDismiss(ws: CollabSocket, problemId: unknown) {
+  if (typeof problemId !== "string" || !problemId) return
+  if (!(await stillTeacher(ws))) return
+  const teacherName = ws.data.username ?? ""
+  let changed = false
+  for (const request of listRequests()) {
+    if (request.problemId !== problemId || request.status !== "pending") continue
+    removeRequest(request.studentId)
+    sendHelpStatus(request.socket, "dismissed", { teacherName, problemId })
+    changed = true
+  }
+  if (changed) broadcastRequests()
 }

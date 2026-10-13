@@ -39,13 +39,28 @@ export function normalizeCollabLanguage(value: unknown): CollabLanguage {
     : "C"
 }
 
+/**
+ * 学生这道题最后一次代码提交，老师的举手面板按它写错法（和课堂看板的格子同一份形状，
+ * 前端用同一个 errorKind 归类）。只带归类要用的几样，不带代码
+ */
+export interface CollabLatest {
+  submissionId: string
+  result: number
+  runtimeError?: unknown
+  sampleCheck?: unknown
+}
+
 export interface HelpRequest {
   studentId: number
   studentName: string
   className: string | null
   /** 题目的展示号（problem._id 列，前端一路用的都是它），不是自增主键 */
   problemId: string
+  /** problem.id，查他最后一次提交用 */
+  problemPk: number
   problemTitle: string
+  /** 他这道题最后一次代码提交；没交过为 null。判完新的一次会刷新（refreshRequestLatest） */
+  latest: CollabLatest | null
   /**
    * 学生编辑器当前的语言。决定教师端弹框用哪套高亮和补全 —— 求助时带上，
    * 协作期间学生切语言会用 help_language 更新这里
@@ -111,6 +126,11 @@ export function teacherSockets() {
 export interface Room {
   /** 房主 = 学生。房间以学生为键，因为学生的代码是内容源 */
   studentId: number
+  /**
+   * help = 学生举了手、老师接的；peek = 老师在看板上主动打开的（学生没举手）。
+   * 两边看到的字不一样（「在帮你」/「在看你的代码」），peek 没有求助记录要清
+   */
+  mode: "help" | "peek"
   teacherId: number
   studentSocket: CollabSocket
   teacherSocket: CollabSocket
@@ -137,4 +157,30 @@ export function closeRoom(studentId: number) {
 export function roomOf(ws: CollabSocket) {
   const ownerId = ws.data.roomOwnerId
   return ownerId === undefined ? undefined : rooms.get(ownerId)
+}
+
+/**
+ * 学生此刻开着哪道题的代码编辑器（题目页，非比赛）。老师在看板上「在写」那一列看它、
+ * 点它主动打开 —— 不用等学生举手。学生端编辑器挂上 / 换题 / 卸载时上报，
+ * 连接断了就清掉。同一账号开了两个标签页时，后报的算
+ */
+export interface Presence {
+  problemId: string
+  language: CollabLanguage
+  socket: CollabSocket
+}
+
+const presences = new Map<number, Presence>()
+
+export function setPresence(userId: number, presence: Presence) {
+  presences.set(userId, presence)
+}
+
+/** 只清这条连接报的：同账号另一个标签页报的那份不能被这边关页面顺手清掉 */
+export function clearPresence(userId: number, ws: CollabSocket) {
+  if (presences.get(userId)?.socket === ws) presences.delete(userId)
+}
+
+export function presenceOf(userId: number) {
+  return presences.get(userId)
 }
