@@ -88,6 +88,17 @@ function metaText(item: Announcement) {
     : `${created}发布 · ${dateText(item.lastUpdateTime)}改过`
 }
 
+/** 点正文里的图放大看：截图常常是整屏缩进正文栏的，字看不清 */
+const zoomSrc = ref<string | null>(null)
+
+function onContentClick(e: MouseEvent) {
+  if (e.target instanceof HTMLImageElement) zoomSrc.value = e.target.src
+}
+
+onKeyStroke("Escape", () => {
+  zoomSrc.value = null
+})
+
 const showList = computed(() => isDesktop.value || queryId.value === null)
 const showReader = computed(() => isDesktop.value || queryId.value !== null)
 </script>
@@ -139,12 +150,18 @@ const showReader = computed(() => isDesktop.value || queryId.value !== null)
               </h3>
               <span class="muted num">{{ detail.tag || "公告" }} · {{ metaText(detail) }}</span>
             </header>
-            <div class="content" v-html="detail.content"></div>
+            <div class="content" v-html="detail.content" @click="onContentClick"></div>
           </template>
           <div v-else class="placeholder"></div>
         </n-spin>
       </article>
     </div>
+
+    <Teleport to="body">
+      <div v-if="zoomSrc" class="zoom" @click="zoomSrc = null">
+        <img :src="zoomSrc" alt="" />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -274,13 +291,35 @@ h3 {
   margin: 0 0 8px;
 }
 
+/* 老编辑器把图的宽高写成了内联 style（width: 989px; height: 516px），
+   宽度被 max-width 压窄、高度却还是原像素，图就扁了 —— 高度只能 !important 压过内联 */
 .content :deep(img) {
   max-width: 100%;
-  height: auto;
+  height: auto !important;
+  cursor: zoom-in;
 }
 
 .content :deep(a) {
   color: v-bind("theme.primaryColor");
+}
+
+.zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.8);
+  cursor: zoom-out;
+}
+
+.zoom img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: #fff;
 }
 
 .placeholder {
