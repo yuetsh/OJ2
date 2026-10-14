@@ -176,14 +176,14 @@ export function useFireworks() {
       (progress) => {
         const eased = 1 - Math.pow(1 - progress, 2.2)
         fire({
-          particleCount: 2,
+          particleCount: 3,
           angle: 270,
           spread: 40,
           startVelocity: 3,
           gravity: 0.5,
           decay: 0.9,
-          ticks: 22,
-          scalar: 0.45,
+          ticks: 26,
+          scalar: 0.65,
           flat: true,
           shapes: ["circle"],
           colors: [COLORS.gold, COLORS.lightGold],
@@ -210,7 +210,7 @@ export function useFireworks() {
       particleCount: Math.round(70 * size),
       startVelocity: 26 * size,
       ticks: 80,
-      scalar: 0.75,
+      scalar: 1,
     })
     runLater(
       () =>
@@ -219,7 +219,7 @@ export function useFireworks() {
           particleCount: Math.round(40 * size),
           startVelocity: 18 * size,
           ticks: 70,
-          scalar: 0.55,
+          scalar: 0.7,
         }),
       60,
     )
@@ -306,17 +306,17 @@ export function useFireworks() {
     () => {
       rocket(0.5, 0.5, 0.34, () => {
         burst(0.5, 0.34, [COLORS.gold, COLORS.orange, COLORS.pink, COLORS.green], 1.8)
-        for (let i = 0; i < 14; i++) {
+        for (let i = 0; i < 22; i++) {
           runLater(
             () => {
               fire({
-                particleCount: 6,
+                particleCount: 10,
                 spread: 360,
                 startVelocity: 6,
                 decay: 0.9,
                 gravity: 0.4,
-                ticks: 25,
-                scalar: 0.4,
+                ticks: 30,
+                scalar: 0.6,
                 flat: true,
                 shapes: ["circle"],
                 colors: [COLORS.silver, COLORS.gold],
@@ -326,7 +326,7 @@ export function useFireworks() {
                 },
               })
             },
-            180 + i * 30,
+            180 + i * 25,
           )
         }
       })
@@ -347,7 +347,7 @@ export function useFireworks() {
               decay: 0.92,
               gravity: 0.3,
               ticks: 40,
-              scalar: 0.6,
+              scalar: 0.8,
               flat: true,
               shapes: ["circle"],
               colors: [arm ? COLORS.blue : COLORS.pink],
@@ -355,7 +355,7 @@ export function useFireworks() {
             })
           }
         },
-        () => burst(0.5, 0.3, [COLORS.gold, COLORS.pink, COLORS.blue, COLORS.green], 1.4),
+        () => burst(0.5, 0.3, [COLORS.gold, COLORS.pink, COLORS.blue, COLORS.green], 1.6),
       )
     },
 
@@ -394,17 +394,17 @@ export function useFireworks() {
       every(
         1300,
         (progress) => {
-          const base = progress * progress * 7 * 180
+          const base = progress * progress * 4 * 180
           for (let arm = 0; arm < 4; arm++) {
             fire({
-              particleCount: 2,
+              particleCount: 3,
               angle: base + arm * 90,
-              spread: 8,
-              startVelocity: 30,
-              decay: 0.9,
+              spread: 4,
+              startVelocity: 45,
+              decay: 0.93,
               gravity: 0.4,
               ticks: 50,
-              scalar: 0.7,
+              scalar: 0.9,
               flat: true,
               shapes: ["circle"],
               colors: [colors[arm]],
@@ -418,7 +418,7 @@ export function useFireworks() {
 
     // 效果9: 礼花瀑布 —— 顶上挂下一道金色火花帘
     () => {
-      every(1400, () => {
+      every(1200, () => {
         for (let i = 0; i < 5; i++) {
           fire({
             particleCount: 1,
@@ -426,9 +426,9 @@ export function useFireworks() {
             spread: 30,
             startVelocity: 3,
             decay: 0.95,
-            gravity: 0.9,
-            ticks: 90,
-            scalar: 0.6,
+            gravity: 1.4,
+            ticks: 110,
+            scalar: 0.8,
             flat: true,
             shapes: ["circle"],
             colors: [COLORS.gold, COLORS.gold, COLORS.silver, COLORS.orange],
