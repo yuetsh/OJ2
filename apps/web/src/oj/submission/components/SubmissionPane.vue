@@ -126,18 +126,6 @@ function caseColor(result: number) {
 }
 
 const canRejudge = computed(() => props.teacher && !props.contest)
-/**
- * 老师的「⋯」只剩重新判题：不常用、点错了会真的重判，所以不摆在外面。
- * 复制两项和学生一样摆出来（原来也收在这里，老师要多点一下）
- */
-const moreOptions = computed(() =>
-  canRejudge.value ? [{ label: "重新判题", key: "rejudge" }] : [],
-)
-
-function handleMore(key: string) {
-  if (key === "rejudge") emit("rejudge", props.row.id)
-}
-
 function openStandalone() {
   window.open("/submission/" + props.row.id, "_blank")
 }
@@ -242,16 +230,19 @@ function openStandalone() {
           >
             <template #icon><Icon icon="ph:arrow-square-out" /></template>
           </n-button>
-          <n-dropdown
-            v-if="moreOptions.length"
-            :options="moreOptions"
-            trigger="click"
-            @select="handleMore"
+          <!-- 原来收在「⋯」里，菜单里就剩这一项了，直接摆出来。和旁边「新页面打开」一样只给图标：
+               顶行再宽一点，1280 的屏上题目名就又被挤没了（现在只剩 124px） -->
+          <n-button
+            v-if="canRejudge"
+            size="small"
+            quaternary
+            :disabled="judging"
+            :title="judging ? '还在判，判完才能重新判题' : '重新判题'"
+            aria-label="重新判题"
+            @click="emit('rejudge', row.id)"
           >
-            <n-button size="small" quaternary aria-label="更多" title="重新判题">
-              <template #icon><Icon icon="ph:dots-three-bold" /></template>
-            </n-button>
-          </n-dropdown>
+            <template #icon><Icon icon="ph:arrow-clockwise" /></template>
+          </n-button>
         </template>
         <template v-else-if="shown">
           <n-button
@@ -427,10 +418,12 @@ function openStandalone() {
   white-space: normal;
 }
 
+/* 屏再窄（320）时折到下一行，别顶出去 */
 .narrow .actions {
   order: 4;
   flex-basis: 100%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
