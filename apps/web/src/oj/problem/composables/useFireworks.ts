@@ -53,28 +53,87 @@ function loadEmojiShapes(): Promise<confetti.Shape[]> {
   return emojiShapesPromise
 }
 
+const COLORS = {
+  green: "#18a058",
+  mint: "#2cc27a",
+  gold: "#f0a020",
+  lightGold: "#ffd36b",
+  orange: "#f06a1a",
+  pink: "#e8457f",
+  lightPink: "#ff7aa8",
+  blue: "#2080f0",
+  purple: "#7d50e8",
+  silver: "#8f99aa",
+}
+const PALETTES = [
+  [COLORS.green, COLORS.gold, COLORS.blue, COLORS.pink],
+  [COLORS.gold, COLORS.orange, COLORS.pink],
+  [COLORS.blue, COLORS.silver, COLORS.purple],
+  [COLORS.pink, COLORS.gold, COLORS.mint],
+]
+const RAINBOW = [COLORS.pink, COLORS.orange, COLORS.gold, COLORS.green, COLORS.blue, COLORS.purple]
+
+/**
+ * 盖在点评弹窗上面放：通过之后 1.5 秒点评弹窗就出来了，这十种要放 2～3 秒，
+ * 默认的 zIndex 100 在 Naive 弹层（2000 起）底下，后半段会被遮罩挡住。
+ * 画布本身 pointer-events: none，不挡点评的点击。
+ */
+const Z_INDEX = 3000
+
+function pick<T>(list: T[]): T {
+  return list[Math.floor(Math.random() * list.length)]
+}
+
+// 对勾、爱心当粒子形状。matrix 直接给：不给的话 shapeFromPath 要扫 1000×1000 个点去量边界。
+// 运行时它要的是数组（拿去 new DOMMatrix），类型声明写成了 DOMMatrix，只好转一下
+let pathShapes: { check: confetti.Shape; heart: confetti.Shape } | null = null
+
+function loadPathShapes() {
+  if (!pathShapes) {
+    const matrix = [0.5, 0, 0, 0.5, -5, -5] as unknown as DOMMatrix
+    pathShapes = {
+      check: confetti.shapeFromPath({ path: "M1 11 L4 8 L8 12 L16 3 L19 6 L8 17 Z", matrix }),
+      heart: confetti.shapeFromPath({
+        path: "M10 18 C2 12 0 7 3 4 C6 1 9 3 10 5 C11 3 14 1 17 4 C20 7 18 12 10 18 Z",
+        matrix,
+      }),
+    }
+  }
+  return pathShapes
+}
+
 /**
  * 随机烟花效果 Composable
- * 提供10种不同风格的烟花庆祝效果
+ * 十种彩纸风格的烟花，每次随机放一种（设计稿「做对了的庆祝」右边那块画板）
  */
 export function useFireworks() {
-  // 提前预加载表情包位图，避免首次触发效果8时出现解码延迟
+  // 提前预加载表情包位图，避免首次触发「表情包烟花」时出现解码延迟
   loadEmojiShapes()
 
   // 动画期间创建的定时器，组件卸载时统一清理，避免离开页面后动画继续
   const timers = new Set<ReturnType<typeof setTimeout>>()
   let disposed = false
 
-  function stopTimer(id: ReturnType<typeof setTimeout>) {
-    clearInterval(id)
-    timers.delete(id)
-  }
-
   function runLater(fn: () => void, ms: number) {
     const id = setTimeout(() => {
       timers.delete(id)
-      fn()
+      if (!disposed) fn()
     }, ms)
+    timers.add(id)
+  }
+
+  /** 每 16ms 调一次 fn(进度 0..1)，放满 ms 之后调 end */
+  function every(ms: number, fn: (progress: number) => void, end?: () => void) {
+    const start = performance.now()
+    const id = setInterval(() => {
+      const progress = Math.min(1, (performance.now() - start) / ms)
+      fn(progress)
+      if (progress >= 1) {
+        clearInterval(id)
+        timers.delete(id)
+        end?.()
+      }
+    }, 16)
     timers.add(id)
   }
 
@@ -86,281 +145,304 @@ export function useFireworks() {
     })
   }
 
+  function fire(options: confetti.Options) {
+    confetti({ zIndex: Z_INDEX, ...options })
+  }
+
+  /** 没有真火箭：沿上升路线一路撒往下掉的小火星，当作尾焰。x0 → x、从屏幕底到 y */
+  function rocket(x0: number, x: number, y: number, then: () => void) {
+    every(
+      380,
+      (progress) => {
+        const eased = 1 - Math.pow(1 - progress, 2.2)
+        fire({
+          particleCount: 2,
+          angle: 270,
+          spread: 40,
+          startVelocity: 3,
+          gravity: 0.5,
+          decay: 0.9,
+          ticks: 22,
+          scalar: 0.45,
+          flat: true,
+          shapes: ["circle"],
+          colors: [COLORS.gold, COLORS.lightGold],
+          origin: { x: x0 + (x - x0) * eased, y: 1.02 - (1.02 - y) * eased },
+        })
+      },
+      then,
+    )
+  }
+
+  /** 炸开：一大把，60ms 后再补一小把，看起来厚一点 */
+  function burst(x: number, y: number, colors: string[], size = 1) {
+    const base: confetti.Options = {
+      spread: 360,
+      decay: 0.92,
+      gravity: 0.55,
+      flat: true,
+      shapes: ["circle"],
+      colors,
+      origin: { x, y },
+    }
+    fire({
+      ...base,
+      particleCount: Math.round(70 * size),
+      startVelocity: 26 * size,
+      ticks: 80,
+      scalar: 0.75,
+    })
+    runLater(
+      () =>
+        fire({
+          ...base,
+          particleCount: Math.round(40 * size),
+          startVelocity: 18 * size,
+          ticks: 70,
+          scalar: 0.55,
+        }),
+      60,
+    )
+  }
+
+  /** 升一发再炸开。x0 不给就从正下方附近升 */
+  function shell(x: number, y: number, colors: string[], size = 1, x0?: number) {
+    rocket(x0 ?? x + (Math.random() - 0.5) * 0.04, x, y, () => burst(x, y, colors, size))
+  }
+
+  const fireworkTypes = [
+    // 效果1: 经典烟花秀 —— 左右两边轮流升起 7 发
+    () => {
+      for (let i = 0; i < 7; i++) {
+        runLater(() => {
+          const left = i % 2 === 0
+          shell(
+            left ? 0.08 + Math.random() * 0.3 : 0.62 + Math.random() * 0.3,
+            0.14 + Math.random() * 0.26,
+            pick(PALETTES),
+            0.9 + Math.random() * 0.3,
+          )
+        }, i * 240)
+      }
+    },
+
+    // 效果2: 星星雨 —— 从顶上落下一片星星
+    () => {
+      every(1200, () => {
+        fire({
+          particleCount: 2,
+          angle: 270,
+          spread: 20,
+          startVelocity: 8,
+          gravity: 0.7,
+          decay: 0.97,
+          ticks: 180,
+          scalar: 1.1,
+          shapes: ["star"],
+          colors: [COLORS.gold, COLORS.gold, COLORS.pink, COLORS.blue, COLORS.silver],
+          origin: { x: Math.random(), y: -0.05 },
+        })
+      })
+    },
+
+    // 效果3: 齐射 —— 从底部正中扇形射出 5 发，排成一道彩虹弧
+    () => {
+      for (let i = 0; i < 5; i++) {
+        runLater(() => {
+          shell(
+            0.14 + 0.18 * i,
+            0.38 - 0.2 * Math.sin((Math.PI * i) / 4),
+            [RAINBOW[i], COLORS.silver],
+            1,
+            0.5,
+          )
+        }, i * 170)
+      }
+    },
+
+    // 效果4: 彩虹喷泉 —— 两个下角往里喷，颜色按彩虹轮换
+    () => {
+      const start = performance.now()
+      every(1500, () => {
+        const color = RAINBOW[Math.floor((performance.now() - start) / 100) % RAINBOW.length]
+        const base: confetti.Options = {
+          particleCount: 3,
+          spread: 22,
+          startVelocity: 55,
+          gravity: 1,
+          decay: 0.92,
+          ticks: 120,
+          scalar: 0.8,
+          flat: true,
+          shapes: ["circle"],
+          colors: [color],
+        }
+        fire({ ...base, angle: 62, origin: { x: 0, y: 1 } })
+        fire({ ...base, angle: 118, origin: { x: 1, y: 1 } })
+      })
+    },
+
+    // 效果5: 炮竹齐鸣 —— 正中一发大的，接着四周噼里啪啦碎响
+    () => {
+      rocket(0.5, 0.5, 0.34, () => {
+        burst(0.5, 0.34, [COLORS.gold, COLORS.orange, COLORS.pink, COLORS.green], 1.8)
+        for (let i = 0; i < 14; i++) {
+          runLater(
+            () => {
+              fire({
+                particleCount: 6,
+                spread: 360,
+                startVelocity: 6,
+                decay: 0.9,
+                gravity: 0.4,
+                ticks: 25,
+                scalar: 0.4,
+                flat: true,
+                shapes: ["circle"],
+                colors: [COLORS.silver, COLORS.gold],
+                origin: {
+                  x: 0.5 + (Math.random() - 0.5) * 0.3,
+                  y: 0.34 + (Math.random() - 0.5) * 0.4,
+                },
+              })
+            },
+            180 + i * 30,
+          )
+        }
+      })
+    },
+
+    // 效果6: 螺旋上升 —— 两股火星绕成螺旋往上爬，到顶炸开
+    () => {
+      every(
+        950,
+        (progress) => {
+          const y = 1.02 - (1.02 - 0.3) * (1 - Math.pow(1 - progress, 1.6))
+          for (let arm = 0; arm < 2; arm++) {
+            const phase = progress * Math.PI * 6 + arm * Math.PI
+            fire({
+              particleCount: 2,
+              spread: 360,
+              startVelocity: 2,
+              decay: 0.92,
+              gravity: 0.3,
+              ticks: 40,
+              scalar: 0.6,
+              flat: true,
+              shapes: ["circle"],
+              colors: [arm ? COLORS.blue : COLORS.pink],
+              origin: { x: 0.5 + Math.sin(phase) * 0.05 * (1 - progress * 0.6), y },
+            })
+          }
+        },
+        () => burst(0.5, 0.3, [COLORS.gold, COLORS.pink, COLORS.blue, COLORS.green], 1.4),
+      )
+    },
+
+    // 效果7: 图案烟花 —— 三发分别炸出对勾、爱心、星星
+    () => {
+      const shapes = loadPathShapes()
+      const list = [
+        { x: 0.22, y: 0.36, shape: shapes.check, colors: [COLORS.green, COLORS.mint] },
+        { x: 0.5, y: 0.3, shape: shapes.heart, colors: [COLORS.pink, COLORS.lightPink] },
+        { x: 0.78, y: 0.36, shape: "star" as const, colors: [COLORS.gold, COLORS.orange] },
+      ]
+      list.forEach((item, i) => {
+        runLater(() => {
+          rocket(item.x, item.x, item.y, () => {
+            fire({
+              particleCount: 26,
+              spread: 360,
+              startVelocity: 24,
+              decay: 0.92,
+              gravity: 0.5,
+              ticks: 110,
+              scalar: 2.2,
+              flat: true,
+              shapes: [item.shape],
+              colors: item.colors,
+              origin: { x: item.x, y: item.y },
+            })
+          })
+        }, i * 280)
+      })
+    },
+
+    // 效果8: 风火轮 —— 屏幕中间四条火星臂越转越快，最后炸一下
+    () => {
+      const colors = [COLORS.pink, COLORS.gold, COLORS.green, COLORS.blue]
+      every(
+        1300,
+        (progress) => {
+          const base = progress * progress * 7 * 180
+          for (let arm = 0; arm < 4; arm++) {
+            fire({
+              particleCount: 2,
+              angle: base + arm * 90,
+              spread: 8,
+              startVelocity: 30,
+              decay: 0.9,
+              gravity: 0.4,
+              ticks: 50,
+              scalar: 0.7,
+              flat: true,
+              shapes: ["circle"],
+              colors: [colors[arm]],
+              origin: { x: 0.5, y: 0.42 },
+            })
+          }
+        },
+        () => burst(0.5, 0.42, [COLORS.gold, COLORS.silver]),
+      )
+    },
+
+    // 效果9: 礼花瀑布 —— 顶上挂下一道金色火花帘
+    () => {
+      every(1400, () => {
+        for (let i = 0; i < 5; i++) {
+          fire({
+            particleCount: 1,
+            angle: 270,
+            spread: 30,
+            startVelocity: 3,
+            decay: 0.95,
+            gravity: 0.9,
+            ticks: 90,
+            scalar: 0.6,
+            flat: true,
+            shapes: ["circle"],
+            colors: [COLORS.gold, COLORS.gold, COLORS.silver, COLORS.orange],
+            origin: { x: 0.06 + Math.random() * 0.88, y: 0.06 },
+          })
+        }
+      })
+    },
+
+    // 效果10: 表情包烟花 —— 一左一右炸出两团表情
+    () => {
+      loadEmojiShapes().then((emojiShapes) => {
+        if (disposed) return
+        const options: confetti.Options = {
+          shapes: emojiShapes,
+          flat: true,
+          scalar: 5,
+          particleCount: 16,
+          spread: 360,
+          startVelocity: 40,
+          gravity: 0.7,
+          ticks: 150,
+        }
+        fire({ ...options, origin: { x: 0.35, y: 0.5 } })
+        runLater(() => fire({ ...options, origin: { x: 0.68, y: 0.42 } }), 300)
+      })
+    },
+  ]
+
   /**
    * 触发随机烟花效果
    */
   function celebrate() {
-    const fireworkTypes = [
-      // 效果1: 经典烟花秀
-      () => {
-        const duration = 3000
-        const animationEnd = Date.now() + duration
-        const defaults = {
-          startVelocity: 30,
-          spread: 360,
-          ticks: 60,
-        }
-
-        const interval = setInterval(() => {
-          const timeLeft = animationEnd - Date.now()
-          if (timeLeft <= 0) return stopTimer(interval)
-
-          const particleCount = 50 * (timeLeft / duration)
-          confetti({
-            ...defaults,
-            particleCount,
-            origin: { x: Math.random() * 0.3 + 0.1, y: Math.random() - 0.2 },
-            colors: ["#ff6b6b", "#ffd93d", "#6bcf7f", "#4ecdc4", "#a29bfe"],
-          })
-          confetti({
-            ...defaults,
-            particleCount,
-            origin: { x: Math.random() * 0.3 + 0.7, y: Math.random() - 0.2 },
-            colors: ["#ff6b6b", "#ffd93d", "#6bcf7f", "#4ecdc4", "#a29bfe"],
-          })
-        }, 250)
-        timers.add(interval)
-      },
-
-      // 效果2: 星星雨
-      () => {
-        const animationEnd = Date.now() + 2000
-
-        const interval = setInterval(() => {
-          if (Date.now() >= animationEnd) return stopTimer(interval)
-
-          confetti({
-            particleCount: 12,
-            angle: 270,
-            spread: 100,
-            startVelocity: 12,
-            gravity: 0.6,
-            decay: 0.96,
-            ticks: 200,
-            scalar: 1.2,
-            shapes: ["star"],
-            origin: { x: Math.random(), y: 0 },
-            colors: ["#FFD700", "#FFA500", "#FFFF00", "#FF69B4", "#00CED1"],
-          })
-        }, 150)
-        timers.add(interval)
-      },
-
-      // 效果3: 爆炸波浪
-      () => {
-        function randomInRange(min: number, max: number) {
-          return Math.random() * (max - min) + min
-        }
-
-        for (let i = 0; i < 5; i++) {
-          runLater(() => {
-            confetti({
-              angle: randomInRange(55, 125),
-              spread: randomInRange(50, 70),
-              particleCount: randomInRange(50, 100),
-              origin: { y: 0.6 },
-              colors: ["#26ccff", "#a25afd", "#ff5e7e", "#88ff5a", "#fcff42"],
-            })
-          }, i * 200)
-        }
-      },
-
-      // 效果4: 彩虹喷泉
-      () => {
-        const end = Date.now() + 2000
-
-        const colors = ["#ff595e", "#ff924c", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93"]
-
-        const frame = () => {
-          confetti({
-            particleCount: 2,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 },
-            colors: colors,
-          })
-          confetti({
-            particleCount: 2,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 },
-            colors: colors,
-          })
-
-          if (Date.now() < end && !disposed) {
-            requestAnimationFrame(frame)
-          }
-        }
-
-        frame()
-      },
-
-      // 效果5: 烟花雨
-      () => {
-        const duration = 2500
-        const animationEnd = Date.now() + duration
-
-        const interval = setInterval(() => {
-          const timeLeft = animationEnd - Date.now()
-          if (timeLeft <= 0) return stopTimer(interval)
-
-          const particleCount = 50
-          confetti({
-            particleCount,
-            startVelocity: 30,
-            spread: 360,
-            ticks: 60,
-            origin: {
-              x: Math.random(),
-              y: Math.random() - 0.2,
-            },
-            colors: ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff"],
-          })
-        }, 200)
-        timers.add(interval)
-      },
-
-      // 效果6: 炮竹齐鸣
-      () => {
-        const count = 200
-        const defaults = {
-          origin: { y: 0.7 },
-        }
-
-        function fire(particleRatio: number, opts: any) {
-          confetti({
-            ...defaults,
-            ...opts,
-            particleCount: Math.floor(count * particleRatio),
-          })
-        }
-
-        fire(0.25, {
-          spread: 26,
-          startVelocity: 55,
-        })
-
-        fire(0.2, {
-          spread: 60,
-        })
-
-        fire(0.35, {
-          spread: 100,
-          decay: 0.91,
-          scalar: 0.8,
-        })
-
-        fire(0.1, {
-          spread: 120,
-          startVelocity: 25,
-          decay: 0.92,
-          scalar: 1.2,
-        })
-
-        fire(0.1, {
-          spread: 120,
-          startVelocity: 45,
-        })
-      },
-
-      // 效果7: 螺旋上升
-      () => {
-        const steps = 16
-        const colors = ["#a864fd", "#29cdff", "#78ff44", "#ff718d", "#fdff6a"]
-
-        for (let step = 0; step < steps; step++) {
-          runLater(() => {
-            const progress = step / (steps - 1)
-            const phase = step * (Math.PI / 4)
-
-            confetti({
-              particleCount: 7,
-              angle: 90 + Math.cos(phase) * 18,
-              spread: 25,
-              startVelocity: 16,
-              gravity: 0.25,
-              decay: 0.94,
-              ticks: 100,
-              scalar: 0.9,
-              shapes: ["circle", "square"],
-              origin: {
-                x: 0.5 + Math.sin(phase) * 0.14,
-                y: 0.85 - progress * 0.55,
-              },
-              colors,
-            })
-          }, step * 65)
-        }
-      },
-
-      // 效果8: 表情包烟花
-      () => {
-        loadEmojiShapes().then((emojiShapes) => {
-          confetti({
-            shapes: emojiShapes,
-            flat: true,
-            scalar: 6,
-            particleCount: 18,
-            spread: 360,
-            startVelocity: 45,
-            gravity: 0.7,
-            ticks: 150,
-            origin: { y: 0.6 },
-          })
-        })
-      },
-
-      // 效果9: 风车螺旋
-      () => {
-        const colors = ["#ff9a9e", "#fad0c4", "#fbc2eb", "#a18cd1", "#fad961"]
-
-        for (let angle = 0; angle < 360; angle += 30) {
-          runLater(
-            () => {
-              confetti({
-                particleCount: 15,
-                angle,
-                spread: 20,
-                startVelocity: 40,
-                origin: { x: 0.5, y: 0.5 },
-                colors,
-              })
-            },
-            (angle / 30) * 80,
-          )
-        }
-      },
-
-      // 效果10: 礼花瀑布
-      () => {
-        const animationEnd = Date.now() + 1800
-        const colors = ["#f6d365", "#fda085", "#fbc2eb", "#a6c1ee", "#84fab0"]
-
-        const interval = setInterval(() => {
-          if (Date.now() >= animationEnd) return stopTimer(interval)
-
-          for (let column = 0; column < 6; column++) {
-            confetti({
-              particleCount: 2,
-              angle: 270,
-              spread: 30,
-              startVelocity: 5,
-              gravity: 1,
-              decay: 0.96,
-              ticks: 240,
-              scalar: 1.1,
-              origin: { x: (column + Math.random()) / 6, y: 0 },
-              colors,
-            })
-          }
-        }, 120)
-        timers.add(interval)
-      },
-    ]
-
-    // 随机选择一种效果
-    const randomEffect = fireworkTypes[Math.floor(Math.random() * fireworkTypes.length)]
-    randomEffect()
+    pick(fireworkTypes)()
   }
 
   return {
