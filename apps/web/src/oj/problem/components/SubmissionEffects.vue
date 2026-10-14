@@ -40,6 +40,8 @@ const { celebrate } = useFireworks()
 // 下去，点评就跳过了。所以这段时间里欠着一次点评（reviewOwed），离开这道题的导航
 // 先拦下来：立刻弹点评，选完再去原来要去的地方。
 const commentPanel = ref(false)
+/** 选完了、弹窗正停着给他看大家怎么选的 */
+const reviewed = ref(false)
 const reviewOwed = ref(false)
 let reviewChecking = false
 let navigationAfterReview: string | null = null
@@ -53,6 +55,7 @@ async function openReview() {
   try {
     const res = await getReaction(problem.value!.id)
     if (res.mine === null) {
+      reviewed.value = false
       commentPanel.value = true
       return
     }
@@ -74,6 +77,7 @@ function settleReview() {
 }
 
 function closeCommentPanel() {
+  stopLingering()
   commentPanel.value = false
   // 「下一题」在结果页签里（LessonNext），评价完回到那里 —— 学生点评之前可能切去看了题目。
   // 接着要换题的就别切：切页签会 router.replace 改 `?tab=`，排在下面那次 push 前头，
@@ -83,7 +87,8 @@ function closeCommentPanel() {
 }
 
 /**
- * 选完一块就关（点一次就够，大家怎么选的在抽屉里的「点评」能看）。
+ * 选完一块不用再点：就地变成玫瑰图，停 2.5 秒给他看一眼大家怎么选的，然后自己关。
+ * 这段时间里按钮已经出来了，急着走的直接点。
  * 关掉之后去哪：刚才点「下一题」之类被拦下的，就接着去那里；否则回到结果页签。
  *
  * 读不出点评、交点评失败时弹窗关不掉，下面那个按钮是唯一出口：被拦下的写「继续」，
@@ -105,6 +110,17 @@ const continueAction = computed(() => {
     }
   return { label: "好的", target: null }
 })
+
+/** 选完停多久；按钮底边那条线按同一个时长缩完 */
+const LINGER_MS = 2500
+const { start: lingerThenClose, stop: stopLingering } = useTimeoutFn(closeCommentPanel, LINGER_MS, {
+  immediate: false,
+})
+
+function onReviewed() {
+  reviewed.value = true
+  lingerThenClose()
+}
 
 function continueAfterReview() {
   const target = continueAction.value.target
@@ -160,6 +176,7 @@ watch(
   (next, previous) => {
     if (!previous || next === previous) return
     commentPanel.value = false
+    stopLingering()
     cancelCommentPanel()
     reviewOwed.value = false
     navigationAfterReview = null
@@ -243,21 +260,57 @@ watch(
   <n-modal
     v-model:show="commentPanel"
     preset="card"
-    title="做对了！说说你对这道题的感受吧"
+    :title="reviewed ? '大家是这样觉得的' : '做对了！说说你对这道题的感受吧'"
     :mask-closable="false"
     :closable="false"
     :close-on-esc="false"
     :auto-focus="false"
     style="width: min(600px, calc(100vw - 32px))"
   >
-    <ProblemReaction guard @submitted="closeCommentPanel">
+    <ProblemReaction guard @submitted="onReviewed">
       <template #after>
-        <n-flex justify="end">
-          <n-button type="primary" @click="continueAfterReview">
-            {{ continueAction.label }}
-          </n-button>
-        </n-flex>
+        <!-- 在轮盘正下方居中，和轮盘一条中线；停着的那几秒底边一条线缩完就自己关 -->
+        <n-button
+          type="primary"
+          size="large"
+          class="continue"
+          :class="{ lingering: reviewed }"
+          :style="{ '--linger': `${LINGER_MS}ms` }"
+          @click="continueAfterReview"
+        >
+          {{ continueAction.label }}
+        </n-button>
       </template>
     </ProblemReaction>
   </n-modal>
 </template>
+
+<style scoped>
+.continue {
+  display: flex;
+  width: min(100%, 320px);
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.continue.lingering::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.7);
+  transform-origin: left;
+  animation: linger var(--linger) linear forwards;
+}
+
+@keyframes linger {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+</style>
