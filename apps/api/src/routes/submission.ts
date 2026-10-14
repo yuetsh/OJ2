@@ -28,7 +28,7 @@ import {
   requireContestAccess,
   type ContestEnv,
 } from "../services/contest"
-import { CodeFormatError, formatCode } from "../services/format-code"
+import { CodeFormatError, formatCode, mergesLines } from "../services/format-code"
 import { getBooleanOption } from "../services/options"
 import { problemSetLockCutoffs } from "../services/problemset"
 import { consumeToken } from "../services/throttling"
@@ -246,28 +246,30 @@ submissionRoutes.post("/submissions/:id/rejudge", requireTeacher, async (c) => {
 submissionRoutes.post("/code/format", requireAuth, async (c) => {
   const parsed = await parseBody(c, formatCodeRequestSchema, "Invalid format payload")
   if (!parsed.success) return parsed.response
-  // C / C++ 编不过就原样返回，不格式化（理由见 judge/run.ts 的 compileFails）。
-  // 代码照常提交、照常判成编译错误，只是不改动学生的代码
   const { code: source, language, problemId } = parsed.data
-  if (language === "c" || language === "cpp") {
-    const judgeLanguage = language === "c" ? "C" : "C++"
-    const [problem] =
-      problemId === undefined
-        ? []
-        : await db
-            .select({ template: schema.problem.template })
-            .from(schema.problem)
-            .where(eq(schema.problem.id, problemId))
-            .limit(1)
-    const rawTemplate = problem ? templateForLanguage(problem.template, judgeLanguage) : null
-    const template = rawTemplate ? parseProblemTemplate(rawTemplate) : null
-    const full = template ? `${template.prepend}\n${source}\n${template.append}` : source
-    if (await compileFails(judgeLanguage, full)) {
-      return success(c, { code: source } satisfies FormatCodeResponse)
-    }
-  }
   try {
     const code = await formatCode(source, language)
+    // C / C++ 编不过就原样返回，不格式化（理由见 judge/run.ts 的 compileFails）。
+    // 代码照常提交、照常判成编译错误，只是不改动学生的代码。
+    // 只有 clang-format 真把两行并成一行时才去判题机编：判题机和判题抢同一台机器的 CPU，
+    // 全班一起交 C++ 时每人都要排满 8 秒超时；而编得过的代码九成以上根本不并行
+    if ((language === "c" || language === "cpp") && mergesLines(source, code)) {
+      const judgeLanguage = language === "c" ? "C" : "C++"
+      const [problem] =
+        problemId === undefined
+          ? []
+          : await db
+              .select({ template: schema.problem.template })
+              .from(schema.problem)
+              .where(eq(schema.problem.id, problemId))
+              .limit(1)
+      const rawTemplate = problem ? templateForLanguage(problem.template, judgeLanguage) : null
+      const template = rawTemplate ? parseProblemTemplate(rawTemplate) : null
+      const full = template ? `${template.prepend}\n${source}\n${template.append}` : source
+      if (await compileFails(judgeLanguage, full)) {
+        return success(c, { code: source } satisfies FormatCodeResponse)
+      }
+    }
     return success(c, { code } satisfies FormatCodeResponse)
   } catch (error) {
     if (error instanceof CodeFormatError) {

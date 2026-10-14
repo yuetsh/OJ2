@@ -82,6 +82,41 @@ async function checkPythonSyntax(code: string): Promise<string | null | undefine
   return result.exitCode === 1 && result.stdout ? result.stdout : undefined
 }
 
+/** 去掉全部空白之后的字符流，以及原来每个换行落在流里的哪个位置（首尾的不算） */
+function lineBreaks(code: string) {
+  let stream = ""
+  const breaks = new Set<number>()
+  for (const char of code) {
+    if (char === "\n") breaks.add(stream.length)
+    else if (!/\s/.test(char)) stream += char
+  }
+  breaks.delete(0)
+  breaks.delete(stream.length)
+  return { stream, breaks }
+}
+
+/**
+ * clang-format 有没有把学生原来分开的两行并成一行。并了才值得怀疑代码编不过
+ * （`int n；` 和下一行、少了分号的两行，见 judge/run.ts 的 compileFails）。
+ *
+ * 风格本身就会并的两种不算：`{` 挪到上一行末尾（BreakBeforeBraces: Attach），
+ * `}` 和后面的 `else` / `while` 接上。别的差异（包括 clang-format 动了非空白字符，
+ * 比如排了 #include 的顺序）一律算可疑 —— 宁可多编一次，也不放过一次并行。
+ */
+export function mergesLines(original: string, formatted: string) {
+  const before = lineBreaks(original)
+  const after = lineBreaks(formatted)
+  if (before.stream !== after.stream) return true
+  for (const at of before.breaks) {
+    if (after.breaks.has(at)) continue
+    const next = before.stream.slice(at)
+    if (next.startsWith("{")) continue
+    if (before.stream[at - 1] === "}" && /^(else|while)/.test(next)) continue
+    return true
+  }
+  return false
+}
+
 export async function formatCode(code: string, language: "python" | "c" | "cpp" | "sql") {
   if (language === "sql") return formatSql(code)
 
@@ -101,11 +136,13 @@ export async function formatCode(code: string, language: "python" | "c" | "cpp" 
   }
 
   const filename = language === "c" ? "code.c" : "code.cpp"
+  // 不排 #include、不拆长字符串：学生的 printf("……") 被拆成 "……" "……" 两截看不懂；
+  // 这两样也是 mergesLines 唯一常见的误报来源（它们改了非空白字符）
   const result = await runFormatter(
     [
       config.clangFormatPath,
       `-assume-filename=${filename}`,
-      "-style={BasedOnStyle: LLVM, IndentWidth: 4, BreakBeforeBraces: Attach}",
+      "-style={BasedOnStyle: LLVM, IndentWidth: 4, BreakBeforeBraces: Attach, SortIncludes: Never, BreakStringLiterals: false}",
     ],
     code,
   )
