@@ -169,24 +169,27 @@ const canRetry = computed(
           <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
       </div>
-      <span class="dot">·</span>
-      <a
-        class="problem"
-        href="#"
-        :title="`${row.problemDisplayId} ${row.problemTitle}`"
-        @click.prevent="emit('openProblem', row)"
-      >
-        <span class="problem-id">{{ row.problemDisplayId }}</span>
-        {{ row.problemTitle }}
-      </a>
-      <button
-        class="filter-pill"
-        title="只看这道题的提交"
-        aria-label="只看这道题的提交"
-        @click="emit('filterProblem', row.problemDisplayId)"
-      >
-        <Icon icon="ph:funnel-simple-bold" :width="12" />
-      </button>
+      <span v-if="!narrow" class="dot">·</span>
+      <!-- display: contents 的壳：桌面上照旧一行，手机上题目整行另起 -->
+      <span class="problem-group">
+        <a
+          class="problem"
+          href="#"
+          :title="`${row.problemDisplayId} ${row.problemTitle}`"
+          @click.prevent="emit('openProblem', row)"
+        >
+          <span class="problem-id">{{ row.problemDisplayId }}</span>
+          {{ row.problemTitle }}
+        </a>
+        <button
+          class="filter-pill"
+          title="只看这道题的提交"
+          aria-label="只看这道题的提交"
+          @click="emit('filterProblem', row.problemDisplayId)"
+        >
+          <Icon icon="ph:funnel-simple-bold" :width="12" />
+        </button>
+      </span>
       <div class="spacer"></div>
       <n-button
         v-if="shown && !renderError && shown.mermaidCode"
@@ -333,8 +336,36 @@ const canRetry = computed(
   row-gap: 8px;
 }
 
+.problem-group {
+  display: contents;
+}
+
+/* 手机：第一行名字，第二行题目，第三行「查看大图」「重新评分」 */
 .narrow .head .spacer {
+  display: none;
+}
+
+.narrow .problem-group {
   flex-basis: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.narrow .problem {
+  white-space: normal;
+}
+
+.narrow .filter-pill {
+  width: 32px;
+  height: 28px;
+  border-radius: 14px;
+}
+
+.narrow .meta {
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 
 .narrow .body {
@@ -345,6 +376,19 @@ const canRetry = computed(
 .narrow .graph-box {
   flex: none;
   height: 320px;
+}
+
+/* 原来还是 flex: 1 1 0 + overflow: auto：外层不定高，评分那一栏被压成一条缝，只露出半行字 */
+.narrow .score-box {
+  flex: none;
+  overflow: visible;
+}
+
+.narrow .locked {
+  flex: 1 0 auto;
+  min-height: 280px;
+  padding: 16px;
+  text-align: center;
 }
 
 .user-link {

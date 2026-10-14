@@ -175,6 +175,8 @@ async function listSubmissions() {
     // 翻了页、换了条件就回到列表顶上（往回翻到上一页末尾的，settleSelection 会滚到那一条）
     const scroller = document.querySelector(".rows")
     if (scroller) scroller.scrollTop = 0
+    // 手机上整页滚，滚的是外层 n-layout 的容器：翻到下一页原来停在页尾
+    if (isMobile.value) pageScroller()?.scrollTo({ top: 0 })
     settleSelection()
   } catch {
     // 失败了别把「落地后停在哪一头」留给下一次不相干的加载
@@ -182,6 +184,19 @@ async function listSubmissions() {
   } finally {
     if (seq === requestSeq) loading.value = false
   }
+}
+
+const pageRoot = useTemplateRef<HTMLElement>("pageRoot")
+
+/** 往上找真正在滚的那层（同自学页：n-layout-content 也带 scroll-container 类却不滚） */
+function pageScroller(): HTMLElement | null {
+  for (let el = pageRoot.value?.parentElement; el; el = el.parentElement) {
+    const overflow = getComputedStyle(el).overflowY
+    if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight) {
+      return el
+    }
+  }
+  return null
 }
 
 async function getTodayCount() {
@@ -589,6 +604,20 @@ function openStatistics() {
   statsPanel.value = true
 }
 
+/** 手机上的「统计」：同样的条件，带去统计页 */
+function openStatisticsPage() {
+  router.push({
+    name: "statistics",
+    query: {
+      tab: flowMode.value ? "flow" : "code",
+      ...(query.className ? { className: query.className } : {}),
+      ...(query.username ? { username: query.username } : {}),
+      ...(query.problem ? { problem: query.problem } : {}),
+      ...(query.today === "1" ? { period: "today" } : {}),
+    },
+  })
+}
+
 /** 统计里的「在提交列表里看」：直接改背后这张列表的筛选，关掉弹框 */
 function listFromStatistics(next: Record<string, string>) {
   statsPanel.value = false
@@ -702,7 +731,7 @@ function dayBreak(index: number) {
 </script>
 
 <template>
-  <div class="page" :class="{ contest: inContest, mobile: isMobile }">
+  <div ref="pageRoot" class="page" :class="{ contest: inContest, mobile: isMobile }">
     <!-- 筛选栏 -->
     <div v-if="isDesktop" class="filters">
       <!-- 流程图列表要登录才能看（GET /flowcharts 是 requireAuth），没登录就不给这个切换 -->
@@ -840,48 +869,117 @@ function dayBreak(index: number) {
       </n-button>
     </div>
 
-    <!-- 手机：只留全部/我的，其余收进「筛选」 -->
+    <!-- 手机：只留全部/我的、统计，其余收进「筛选」 -->
     <div v-else class="filters mobile-filters">
-      <n-radio-group v-if="userStore.isAuthed" v-model:value="scope" size="small">
+      <n-radio-group v-if="userStore.isAuthed" v-model:value="scope">
         <n-radio-button value="all">全部</n-radio-button>
         <n-radio-button value="mine">我的</n-radio-button>
       </n-radio-group>
       <div class="spacer"></div>
-      <n-button size="small" @click="mobileFilters = !mobileFilters">
+      <!-- 统计那张大表在弹框里排不开，手机上老师直接去统计页（页面形态有手机排版） -->
+      <n-button
+        v-if="teacher && route.name === 'submissions'"
+        quaternary
+        @click="openStatisticsPage"
+      >
+        <template #icon><Icon icon="ph:chart-bar" /></template>
+        统计
+      </n-button>
+      <n-button
+        v-else-if="route.name === 'submissions' && !flowMode"
+        quaternary
+        @click="toggleTodayPanel(true)"
+      >
+        <template #icon><Icon icon="ph:chart-bar" /></template>
+        今日统计
+      </n-button>
+      <n-button
+        :type="mobileFilters || activeFilters ? 'primary' : 'default'"
+        :secondary="!mobileFilters && !!activeFilters"
+        @click="mobileFilters = !mobileFilters"
+      >
         <template #icon><Icon icon="ph:funnel-simple" /></template>
         筛选<template v-if="activeFilters"> · {{ activeFilters }}</template>
       </n-button>
     </div>
     <div v-if="isMobile && mobileFilters" class="mobile-panel">
-      <n-radio-group v-if="!inContest && userStore.isAuthed" v-model:value="mode" size="small">
+      <n-radio-group v-if="!inContest && userStore.isAuthed" v-model:value="mode">
         <n-radio-button value="code">代码</n-radio-button>
         <n-radio-button value="flow">流程图</n-radio-button>
       </n-radio-group>
+      <button v-if="!teacher && query.className" class="chip on" @click="query.className = ''">
+        {{ classLabel(query.className) }}<Icon icon="ph:x-bold" :width="12" />
+      </button>
+      <template v-if="teacher && !inContest && !mine">
+        <button
+          class="lesson"
+          :class="{ on: lessonActive }"
+          :disabled="lessonLoading"
+          @click="toggleLesson"
+        >
+          <Icon v-if="lessonActive" icon="ph:check-bold" :width="12" />
+          <b>这节课</b>
+          <template v-if="lessonActive && lesson?.className">
+            <span class="lesson-text">
+              {{ classLabel(lesson.className) }} · {{ lesson.problems.length }} 道题 · 今天
+            </span>
+            <Icon icon="ph:x-bold" :width="12" class="lesson-x" />
+          </template>
+        </button>
+        <n-select
+          v-if="!lessonActive"
+          :value="query.className || null"
+          :options="classOptions"
+          placeholder="全部班级"
+          clearable
+          filterable
+          @update:value="(v: string | null) => (query.className = v ?? '')"
+        />
+      </template>
+      <button v-if="!mine && exactPerson" class="chip on person" @click="clearPerson">
+        <Icon icon="ph:user-bold" :width="12" />
+        <UserName :username="query.username" class="person-name" />
+        <Icon icon="ph:x-bold" :width="12" />
+      </button>
       <n-input
+        v-else-if="!mine"
         v-model:value="query.username"
-        size="small"
         clearable
-        :disabled="query.myself === '1'"
-        placeholder="用户"
-      />
-      <n-input v-model:value="query.problem" size="small" clearable placeholder="题号" />
-      <n-select
-        v-model:value="query.result"
-        size="small"
-        :options="flowMode ? gradeOptions : resultOptions"
-      />
-      <n-select
-        v-if="!inContest && !flowMode"
-        v-model:value="query.language"
-        size="small"
-        :options="languageOptions"
-      />
-      <n-flex align="center">
-        <button v-if="!inContest" class="chip" :class="{ on: today }" @click="today = !today">
+        :placeholder="teacher ? '学生' : '用户'"
+      >
+        <template #prefix><Icon icon="ph:magnifying-glass" /></template>
+      </n-input>
+      <n-select v-if="inContest" v-model:value="query.problem" :options="contestProblemOptions" />
+      <n-input
+        v-else-if="!lessonActive"
+        v-model:value="query.problem"
+        clearable
+        placeholder="题号"
+        :status="unknownProblems.length ? 'warning' : undefined"
+      >
+        <template #prefix><Icon icon="ph:hash" /></template>
+      </n-input>
+      <div class="mobile-pair">
+        <n-select v-model:value="query.result" :options="flowMode ? gradeOptions : resultOptions" />
+        <n-select
+          v-if="!inContest && !flowMode"
+          v-model:value="query.language"
+          :options="languageOptions"
+        />
+      </div>
+      <div class="mobile-panel-foot">
+        <button
+          v-if="!inContest && !lessonActive"
+          class="chip"
+          :class="{ on: today }"
+          @click="today = !today"
+        >
           <Icon v-if="today" icon="ph:check-bold" :width="12" />今天
         </button>
-        <n-button size="small" quaternary @click="clear">清空</n-button>
-      </n-flex>
+        <n-button quaternary @click="clear">清空</n-button>
+        <div class="spacer"></div>
+        <n-button @click="mobileFilters = false">收起</n-button>
+      </div>
     </div>
 
     <div class="split">
@@ -922,8 +1020,10 @@ function dayBreak(index: number) {
                     <FlowchartState :status="row.status" :grade="row.aiGrade" />
                   </div>
                   <div class="m-line sub">
-                    <span>{{ submissionClockText(row.createTime) }}</span>
+                    <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
                     <span class="title">{{ row.problemDisplayId }} {{ row.problemTitle }}</span>
+                    <div class="spacer"></div>
+                    <Icon v-if="!row.showLink" icon="ph:lock-simple" :width="13" class="m-lock" />
                   </div>
                 </template>
               </div>
@@ -979,10 +1079,17 @@ function dayBreak(index: number) {
                     <StatusPill :result="row.result" />
                   </div>
                   <div class="m-line sub">
-                    <span>{{ submissionClockText(row.createTime) }}</span>
+                    <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
                     <span class="title">{{ row.problemDisplayId }} {{ row.problemTitle }}</span>
+                    <span v-if="row.problemSet" class="ps">题单</span>
                     <div class="spacer"></div>
-                    <span>{{ languageText(row) }}</span>
+                    <span class="m-lang">{{ languageText(row) }}</span>
+                    <Icon
+                      v-if="!teacher && !row.showLink"
+                      icon="ph:lock-simple"
+                      :width="13"
+                      class="m-lock"
+                    />
                   </div>
                 </template>
               </div>
@@ -1180,12 +1287,59 @@ function dayBreak(index: number) {
   padding: 0 14px;
 }
 
+.mobile-filters {
+  height: 56px;
+  gap: 4px;
+}
+
 .mobile-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px 14px;
   border-bottom: 1px solid v-bind("theme.dividerColor");
+  background: v-bind("theme.actionColor");
+}
+
+.mobile-panel > .n-radio-group,
+.mobile-panel > .chip {
+  align-self: flex-start;
+}
+
+.mobile-panel .lesson {
+  max-width: 100%;
+  min-width: 0;
+  align-self: flex-start;
+}
+
+.lesson-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-panel .chip.person {
+  max-width: 100%;
+  align-self: flex-start;
+}
+
+/* 结果、语言两个下拉并排：各占一半 */
+.mobile-pair {
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-pair > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mobile-panel-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .vsep {
@@ -1416,9 +1570,39 @@ function dayBreak(index: number) {
 }
 
 .m-line .title {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.m-time,
+.m-lang {
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-lock {
+  flex: none;
+  opacity: 0.7;
+}
+
+/* 手机上的 day 行和列表行一样贴两边 */
+.mobile .day {
+  padding: 0 14px;
+}
+
+/* 手机：「共 N 条」和翻页上下排，翻页按钮居中，不再顶出屏幕右边 */
+.mobile .list-foot {
+  height: auto;
+  padding: 12px 14px 16px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile .list-foot .spacer {
+  display: none;
 }
 
 /* 「23:59:59」8 个等宽数字 */

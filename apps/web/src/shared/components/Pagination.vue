@@ -42,7 +42,7 @@ watch(
     v-model:page-size="limit"
     :page-sizes="sizes"
     :page-slot="isDesktop ? 7 : 5"
-    show-size-picker
+    :show-size-picker="isDesktop"
   />
 </template>
 <style scoped>

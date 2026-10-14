@@ -127,29 +127,15 @@ function caseColor(result: number) {
 
 const canRejudge = computed(() => props.teacher && !props.contest)
 /**
- * 老师的「⋯」：复制两项 + 重新判题。重判不常用、点错了会真的重判，所以不放在外面当最显眼的
- * 那个按钮。代码还没拉下来时只有重判一项 —— 代码拉不下来的那条，恰恰可能要重判
+ * 老师的「⋯」只剩重新判题：不常用、点错了会真的重判，所以不摆在外面。
+ * 复制两项和学生一样摆出来（原来也收在这里，老师要多点一下）
  */
-const moreOptions = computed(() => {
-  const copy = shown.value
-    ? [
-        { label: "复制回到题目", key: "problem" },
-        ...(shown.value.language !== "SQL" ? [{ label: "复制到自测猫", key: "cat" }] : []),
-      ]
-    : []
-  if (!canRejudge.value) return copy
-  return [
-    ...copy,
-    ...(copy.length ? [{ type: "divider", key: "divider" }] : []),
-    { label: "重新判题", key: "rejudge" },
-  ]
-})
+const moreOptions = computed(() =>
+  canRejudge.value ? [{ label: "重新判题", key: "rejudge" }] : [],
+)
 
 function handleMore(key: string) {
-  if (key === "rejudge") return emit("rejudge", props.row.id)
-  if (!shown.value) return
-  if (key === "problem") copyToProblem(shown.value)
-  else copyToCat(shown.value)
+  if (key === "rejudge") emit("rejudge", props.row.id)
 }
 
 function openStandalone() {
@@ -198,79 +184,87 @@ function openStandalone() {
           {{ classLabel(row.className) }}<Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
       </div>
-      <span class="dot">·</span>
-      <a
-        class="problem"
-        href="#"
-        :title="`${row.problemDisplayId} ${row.problemTitle}`"
-        @click.prevent="emit('openProblem', row)"
-      >
-        <span class="problem-id">{{ row.problemDisplayId }}</span>
-        {{ row.problemTitle }}
-      </a>
-      <button
-        class="filter-pill"
-        title="只看这道题的提交"
-        aria-label="只看这道题的提交"
-        @click="emit('filterProblem', row.problemDisplayId)"
-      >
-        <Icon icon="ph:funnel-simple-bold" :width="12" />
-      </button>
-      <a
-        v-if="row.problemSet"
-        class="problemset"
-        :href="'/problemset/' + row.problemSet.id"
-        target="_blank"
-        :title="'从题单「' + row.problemSet.title + '」交的'"
-      >
-        题单 {{ row.problemSet.title }}
-      </a>
+      <span v-if="!narrow" class="dot">·</span>
+      <!-- 两层 display: contents 的壳：桌面上照旧排成一行，手机上题目整行另起、按钮挪到名字右边 -->
+      <span class="problem-group">
+        <a
+          class="problem"
+          href="#"
+          :title="`${row.problemDisplayId} ${row.problemTitle}`"
+          @click.prevent="emit('openProblem', row)"
+        >
+          <span class="problem-id">{{ row.problemDisplayId }}</span>
+          {{ row.problemTitle }}
+        </a>
+        <button
+          class="filter-pill"
+          title="只看这道题的提交"
+          aria-label="只看这道题的提交"
+          @click="emit('filterProblem', row.problemDisplayId)"
+        >
+          <Icon icon="ph:funnel-simple-bold" :width="12" />
+        </button>
+        <a
+          v-if="row.problemSet"
+          class="problemset"
+          :href="'/problemset/' + row.problemSet.id"
+          target="_blank"
+          :title="'从题单「' + row.problemSet.title + '」交的'"
+        >
+          题单 {{ row.problemSet.title }}
+        </a>
+      </span>
       <div class="spacer"></div>
-      <template v-if="teacher">
-        <n-button
-          v-if="shown"
-          size="small"
-          quaternary
-          title="新页面打开（看他这道题交的每一次）"
-          aria-label="新页面打开"
-          @click="openStandalone"
-        >
-          <template #icon><Icon icon="ph:arrow-square-out" /></template>
-        </n-button>
-        <n-dropdown
-          v-if="moreOptions.length"
-          :options="moreOptions"
-          trigger="click"
-          @select="handleMore"
-        >
+      <span class="actions">
+        <!-- 桌面上复制两项在底栏：顶上这一行再塞两个按钮，1280 的屏上老师的题目名一个字都不剩、
+             学生的也只剩六七个字（第二行测试点一多也排不下，底栏还空 250px 以上） -->
+        <template v-if="shown && narrow">
+          <n-button
+            size="small"
+            :type="teacher ? 'default' : 'primary'"
+            @click="copyToProblem(shown)"
+          >
+            <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
+            复制回到题目
+          </n-button>
+          <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
+            复制到自测猫
+          </n-button>
+        </template>
+        <template v-if="teacher">
+          <n-button
+            v-if="shown"
+            size="small"
+            quaternary
+            title="新页面打开（看他这道题交的每一次）"
+            aria-label="新页面打开"
+            @click="openStandalone"
+          >
+            <template #icon><Icon icon="ph:arrow-square-out" /></template>
+          </n-button>
+          <n-dropdown
+            v-if="moreOptions.length"
+            :options="moreOptions"
+            trigger="click"
+            @select="handleMore"
+          >
+            <n-button size="small" quaternary aria-label="更多" title="重新判题">
+              <template #icon><Icon icon="ph:dots-three-bold" /></template>
+            </n-button>
+          </n-dropdown>
+        </template>
+        <template v-else-if="shown">
           <n-button
             size="small"
             quaternary
-            aria-label="更多"
-            :title="moreOptions.flatMap((o) => ('label' in o ? [o.label] : [])).join('、')"
+            title="新页面打开"
+            aria-label="新页面打开"
+            @click="openStandalone"
           >
-            <template #icon><Icon icon="ph:dots-three-bold" /></template>
+            <template #icon><Icon icon="ph:arrow-square-out" /></template>
           </n-button>
-        </n-dropdown>
-      </template>
-      <template v-else-if="shown">
-        <n-button size="small" type="primary" @click="copyToProblem(shown)">
-          <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
-          复制回到题目
-        </n-button>
-        <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
-          复制到自测猫
-        </n-button>
-        <n-button
-          size="small"
-          quaternary
-          title="新页面打开"
-          aria-label="新页面打开"
-          @click="openStandalone"
-        >
-          <template #icon><Icon icon="ph:arrow-square-out" /></template>
-        </n-button>
-      </template>
+        </template>
+      </span>
     </div>
 
     <div class="meta">
@@ -323,6 +317,9 @@ function openStandalone() {
         :code="shown.code"
         :language="LANGUAGE_FORMAT_VALUE[shown.language]"
         :mark-line="explain?.line ?? null"
+        :font-size="narrow ? 14 : 20"
+        :line-height="narrow ? 24 : 32"
+        class="code"
       />
       <div v-else class="placeholder">
         <n-spin v-if="loading" size="small" />
@@ -335,14 +332,23 @@ function openStandalone() {
 
     <div v-if="!narrow" class="foot">
       <span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span>
-      <span>
-        {{
-          teacher
-            ? "换上一条 / 下一条，到本页头尾自动翻页"
-            : "换上一条 / 下一条（只在能看代码的提交之间走）"
-        }}
+      <span class="hint">
+        {{ teacher ? "换上一条 / 下一条，到本页头尾自动翻页" : "换上一条 / 下一条，锁着的会跳过" }}
       </span>
       <div class="spacer"></div>
+      <template v-if="shown">
+        <n-button
+          size="small"
+          :type="teacher ? 'default' : 'primary'"
+          @click="copyToProblem(shown)"
+        >
+          <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
+          复制回到题目
+        </n-button>
+        <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
+          复制到自测猫
+        </n-button>
+      </template>
       <span v-if="position">本页第 {{ position.index }} / {{ position.count }} 条</span>
     </div>
   </section>
@@ -380,17 +386,74 @@ function openStandalone() {
   flex: 0 1 auto;
 }
 
+.problem-group,
+.actions {
+  display: contents;
+}
+
+/* 手机整屏详情：第一行名字（+ 班级），第二行题目，第三行按钮。
+   整个面板一起滚，代码有多长画多长，不在框里再套一层上下滚 */
 .narrow {
-  padding: 12px 14px;
+  padding: 12px 14px 16px;
+  overflow-y: auto;
 }
 
 .narrow .head {
   flex-wrap: wrap;
-  row-gap: 8px;
+  row-gap: 10px;
+  white-space: normal;
+}
+
+.narrow .head .who {
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 
 .narrow .head .spacer {
+  order: 1;
+}
+
+.narrow .problem-group {
+  order: 3;
   flex-basis: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.narrow .problem {
+  white-space: normal;
+}
+
+.narrow .actions {
+  order: 4;
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 手指点的：漏斗按钮放大一圈 */
+.narrow .filter-pill {
+  width: 32px;
+  height: 28px;
+  border-radius: 14px;
+}
+
+.narrow .filter-pill.wide {
+  width: auto;
+  padding: 0 10px;
+}
+
+.narrow .code {
+  flex: none;
+}
+
+.narrow .locked {
+  flex: 1 0 auto;
+  min-height: 280px;
 }
 
 .user-link {
@@ -556,12 +619,26 @@ function openStandalone() {
   font-weight: 600;
 }
 
+/* 高度按按钮定死：代码还在拉、按钮没出来时这一栏不变矮，代码区不跟着上下跳 */
 .foot {
+  min-height: 28px;
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
   font-size: 12px;
   color: v-bind("theme.textColor3");
+}
+
+/* 1280 的屏上这一栏只剩几像素：字体宽一点的机器上让提示省略，别把按钮挤出去 */
+.hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.foot > :not(.hint) {
+  flex-shrink: 0;
 }
 
 .keys {
