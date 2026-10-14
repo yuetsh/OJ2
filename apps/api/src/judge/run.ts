@@ -120,16 +120,47 @@ export async function postJudge(
  *
  * 判题机只有 /judge 一个入口，得带一组测试点：给一组空输入，跑的那一下限 1 秒。
  * 判题机连不上、超时，一律当编得过 —— 那就和原来一样照常格式化。
+ *
+ * 这一下不进判题队列，所以自己排一道：同时最多 COMPILE_CHECK_CONCURRENCY 份在判题机上编，
+ * 其余等着。服务器只有两核，不排的话一个班 40 人一起交 C++ 能把判题机挤到每人 8 秒超时，
+ * 还拖慢正式判题。8 秒是连排队带编译的总预算，排不上也当编得过。
  */
+const COMPILE_CHECK_CONCURRENCY = 2
+let compileChecks = 0
+const compileCheckWaiting: (() => void)[] = []
+
 export async function compileFails(language: string, source: string) {
+  const deadline = AbortSignal.timeout(8000)
+  if (compileChecks < COMPILE_CHECK_CONCURRENCY) {
+    compileChecks++
+  } else {
+    const admitted = await new Promise<boolean>((resolve) => {
+      const giveUp = () => {
+        compileCheckWaiting.splice(compileCheckWaiting.indexOf(wake), 1)
+        resolve(false)
+      }
+      const wake = () => {
+        deadline.removeEventListener("abort", giveUp)
+        resolve(true)
+      }
+      deadline.addEventListener("abort", giveUp, { once: true })
+      compileCheckWaiting.push(wake)
+    })
+    // 被叫醒时名额是直接转交过来的，compileChecks 不用再加
+    if (!admitted) return false
+  }
   try {
     const response = await postJudge(language, source, 1000, 256, [{ input: "", output: "" }], {
-      signal: AbortSignal.timeout(8000),
+      signal: deadline,
     })
     const body = (await response.json()) as JudgeResponse
     return body.err === "CompileError"
   } catch {
     return false
+  } finally {
+    const next = compileCheckWaiting.shift()
+    if (next) next()
+    else compileChecks--
   }
 }
 
