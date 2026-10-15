@@ -17,6 +17,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "dr
 import { Hono } from "hono"
 
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
+import { seenToday } from "../auth/presence"
 import { getLoginWindow } from "../auth/session"
 import { presenceOf } from "../collab/state"
 import { db, schema } from "../db"
@@ -568,7 +569,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   // 「来了几次」代码和流程图合起来数：那天只画了流程图的也算来过，和 recentDays 同一个口径
   const recentActivity = activityRows({ since: windowStart, users: userIds })
   const localDay = sql<string>`to_char(${localTime(recentActivity.createTime)}, 'YYYY-MM-DD')`
-  const [cells, lastSubmits, lastDrawn, attendance, drawn, latests] = await Promise.all([
+  const [cells, lastSubmits, lastDrawn, attendance, drawn, latests, seen] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -694,6 +695,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             desc(schema.submission.createTime),
           )
       : [],
+    seenToday(userIds),
   ])
   const latestByKey = new Map(latests.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
@@ -757,6 +759,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           drawnToday: drawnTodayUsers.has(student.userId),
           recentAttended: attendedByUser.get(student.userId) ?? 0,
           editing: presenceOf(student.userId)?.problemId ?? null,
+          online: seen.get(student.userId)?.online ?? false,
+          seenAt: seen.has(student.userId)
+            ? new Date(seen.get(student.userId)!.at).toISOString()
+            : null,
         }) satisfies ClassBoardStudent,
     ),
     recentLessons: recentDays.length,

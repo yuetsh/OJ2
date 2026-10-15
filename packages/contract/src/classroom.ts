@@ -144,6 +144,13 @@ export const classBoardStudentSchema = z.object({
    * 代码，不用等他举手。只认连着**本站**的（和课堂求助一样，在 serve 进程的内存里）
    */
   editing: z.string().nullable(),
+  /**
+   * 此刻在线（5 分钟内有动静）、今天最后一次上线的时刻（今天没上过线为 null）。
+   * 机房两人共用一台电脑时同桌只有一个登着，所以「谁没来」看 seenAt，不看 online。
+   * 和 editing 一样只认**本站**：服务器和机房各记各的（在各自的 Redis 里）
+   */
+  online: z.boolean(),
+  seenAt: z.string().nullable(),
 })
 
 /**

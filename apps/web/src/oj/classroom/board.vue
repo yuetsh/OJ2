@@ -189,6 +189,20 @@ function oftenIdle(student: ClassBoardStudent) {
   return total >= 3 && student.recentAttended <= 1
 }
 
+/**
+ * 今天一次都没上过线。机房有两人共用一台电脑的，同桌只有一个登着，所以「谁没来」
+ * 看今天上没上过线，不看此刻在不在线（见契约 seenAt）
+ */
+function unseen(student: ClassBoardStudent) {
+  return !student.seenAt
+}
+
+/** 没在线的人最后一次上线是多久前，「在写」那格用 */
+function seenText(seenAt: string) {
+  const minutes = Math.max(0, Math.floor((now.value.getTime() - Date.parse(seenAt)) / 60_000))
+  return minutes < 60 ? `${minutes} 分钟前在` : `${Math.floor(minutes / 60)} 小时前在`
+}
+
 function doneCount(student: ClassBoardStudent) {
   return student.cells.filter((cell) => cell.status === "accepted").length
 }
@@ -251,7 +265,22 @@ watchEffect(() => {
 const leaveDialog = ref(false)
 /** 弹框里能勾的：今天还没交过的（刚上课时就是全班），按名字排 */
 const leaveCandidates = computed(() => boardStudents.value.filter(canLeave).sort(byName))
+/** 今天没上过线的分在前面一堆：请假的人基本在这里面，剩下的是和同桌共用电脑的 */
+const leaveSections = computed(() =>
+  [
+    { label: "今天没上线", students: leaveCandidates.value.filter(unseen) },
+    {
+      label: "今天上过线",
+      students: leaveCandidates.value.filter((student) => !unseen(student)),
+    },
+  ].filter((section) => section.students.length),
+)
 const leaveSelected = ref<string[]>([])
+function selectAll(list: ClassBoardStudent[]) {
+  leaveSelected.value = [
+    ...new Set([...leaveSelected.value, ...list.map((student) => student.username)]),
+  ]
+}
 function openLeaveDialog() {
   leaveSelected.value = leaveStudents.value.map((student) => student.username)
   leaveDialog.value = true
@@ -272,7 +301,8 @@ const students = computed(() =>
   [...boardStudents.value].sort(
     (a, b) =>
       GROUP_ORDER[groupOf(a)] - GROUP_ORDER[groupOf(b)] ||
-      // 同样是没交过，经常不动手的排前面
+      // 同样是没交过，今天没上过线的排最前（多半没来，好标请假），再是经常不动手的
+      Number(unseen(b)) - Number(unseen(a)) ||
       Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
       // 同样在做，做对得少的排前面（只做了一道的那几个）
       (groupOf(a) === "working" ? doneCount(a) - doneCount(b) : 0) ||
@@ -679,7 +709,7 @@ function shortTitle(title: string, size: number) {
           <thead>
             <tr>
               <th class="name">学生</th>
-              <th class="narrow-col where-col">在写</th>
+              <th class="narrow-col where-col">在线</th>
               <th
                 v-for="(stat, i) in problemStats"
                 :key="stat.problem.problemId"
@@ -728,8 +758,9 @@ function shortTitle(title: string, size: number) {
                     举手 {{ waitedText(helpOf(student)!.createdAt) }}
                   </span>
                 </td>
-                <!-- 在写：举手的「帮他」；别人在帮的写谁在帮；开着题目的点题号直接打开他正在写的
-                     代码（他没举手也行，他那边会显示「xxx 在看你的代码」） -->
+                <!-- 在线：举手的「帮他」；别人在帮的写谁在帮；开着题目的点题号直接打开他正在写的
+                     代码（他没举手也行，他那边会显示「xxx 在看你的代码」）；剩下的写在不在线、
+                     多久前在、今天没上过线 -->
                 <td class="where-col">
                   <n-button
                     v-if="helpOf(student)?.status === 'pending'"
@@ -751,7 +782,11 @@ function shortTitle(title: string, size: number) {
                   >
                     {{ student.editing }}
                   </button>
-                  <span v-else class="muted">—</span>
+                  <span v-else-if="student.online" class="present">在线</span>
+                  <span v-else-if="student.seenAt" class="seen">
+                    {{ seenText(student.seenAt) }}
+                  </span>
+                  <span v-else class="seen">今天没上线</span>
                 </td>
                 <td
                   v-for="(cell, i) in student.cells"
@@ -814,14 +849,30 @@ function shortTitle(title: string, size: number) {
       style="width: 640px; max-width: calc(100vw - 32px)"
     >
       <n-checkbox-group v-if="leaveCandidates.length" v-model:value="leaveSelected">
-        <div class="leave-grid">
-          <n-checkbox
-            v-for="student in leaveCandidates"
-            :key="student.userId"
-            :value="student.username"
-            :label="student.username"
-            class="leave-option"
-          />
+        <div v-for="section in leaveSections" :key="section.label" class="leave-section">
+          <div v-if="leaveSections.length > 1 || unseen(section.students[0])" class="leave-head">
+            {{ section.label }} {{ section.students.length }} 人
+            <n-button
+              v-if="unseen(section.students[0])"
+              text
+              type="primary"
+              :disabled="
+                section.students.every((student) => leaveSelected.includes(student.username))
+              "
+              @click="selectAll(section.students)"
+            >
+              全勾上
+            </n-button>
+          </div>
+          <div class="leave-grid">
+            <n-checkbox
+              v-for="student in section.students"
+              :key="student.userId"
+              :value="student.username"
+              :label="student.username"
+              class="leave-option"
+            />
+          </div>
         </div>
       </n-checkbox-group>
       <n-text v-else depth="3">请假的人一定是没交过题的，现在没有人可以标。</n-text>
@@ -1305,7 +1356,22 @@ a.cell {
   cursor: pointer;
 }
 
-.where::before {
+.present {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: v-bind("tone('success').color");
+}
+
+.seen {
+  font-size: 13px;
+  white-space: nowrap;
+  color: v-bind("theme.textColor3");
+}
+
+.where::before,
+.present::before {
   content: "";
   width: 7px;
   height: 7px;
@@ -1321,6 +1387,18 @@ a.cell {
   font-size: 13px;
   font-weight: 600;
   color: v-bind("tone('info').color");
+}
+
+.leave-section + .leave-section {
+  margin-top: 18px;
+}
+
+.leave-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-weight: 600;
 }
 
 .leave-grid {
