@@ -83,7 +83,12 @@ const spent = computed(() => {
   return `${Math.round(minutes / 1440)} 天`
 })
 
+// 两栏放得下（每栏 420 起）才拆；拆完在窄屏上叠起来，就成了两张没有标题的卡片，
+// 看着像题单分了两组
+const twoColumns = useMediaQuery("(min-width: 960px)")
+
 const columns = computed(() => {
+  if (!twoColumns.value) return [problems.value]
   const half = Math.ceil(problems.value.length / 2)
   return [problems.value.slice(0, half), problems.value.slice(half)].filter((col) => col.length)
 })
@@ -232,7 +237,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
     <ClassView v-if="userStore.isTeacherOrAbove && tab === 'class'" :problem-set-id="set.id" />
 
     <template v-else>
-      <div v-if="problems.length" class="cols">
+      <div v-if="problems.length" class="cols" :class="{ two: twoColumns }">
         <section v-for="(col, ci) in columns" :key="ci" class="card list">
           <component
             :is="canOpen ? 'router-link' : 'div'"
@@ -461,9 +466,13 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 
 .cols {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+}
+
+.cols.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .card {
@@ -622,10 +631,6 @@ a.prow:hover {
 }
 
 @media (max-width: 640px) {
-  .cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .band {
     padding: 16px;
   }

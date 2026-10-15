@@ -137,9 +137,13 @@ const columns = computed(
           </svg>
           <template v-if="podium[place - 1]">
             <UserName class="podium-name" :username="podium[place - 1]!.username" />
-            <span class="muted small">
-              {{ classLabel(podium[place - 1]!.className) }} · {{ podium[place - 1]!.solved }} 道 ·
-              {{ secondsToDuration(podium[place - 1]!.totalTime) }}
+            <span class="muted small podium-meta">
+              <span>{{ classLabel(podium[place - 1]!.className) }}</span
+              ><span class="sep"> · </span
+              ><span
+                >{{ podium[place - 1]!.solved }} 道 ·
+                {{ secondsToDuration(podium[place - 1]!.totalTime) }}</span
+              >
             </span>
           </template>
           <div class="block">{{ place }}</div>
@@ -533,5 +537,48 @@ const columns = computed(
 
 .empty {
   padding: 32px var(--oj-pad-x);
+}
+
+/* 手机：三级台阶一共 646px 宽，原样摆第一名就被挤到屏幕外了。三块平分一行，
+   名字截断、班级和用时折成两行 */
+@media (max-width: 640px) {
+  .podium-row {
+    gap: 16px;
+  }
+
+  .podium {
+    width: 100%;
+    gap: 6px;
+  }
+
+  .step {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+
+  .podium-name,
+  .p1 .podium-name {
+    font-size: 15px;
+    max-width: 100%;
+  }
+
+  .podium-meta {
+    font-size: var(--oj-fs-meta);
+    text-align: center;
+  }
+
+  .podium-meta > span {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .podium-meta > .sep {
+    display: none;
+  }
+
+  .mine {
+    width: 100%;
+  }
 }
 </style>

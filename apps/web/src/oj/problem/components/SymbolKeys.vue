@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
 import { useCodeStore } from "oj/store/code"
-import { editorFocused, SYMBOL_KEYS, typeSymbol } from "../utils/symbolKeys"
+import {
+  editorFocused,
+  measureKeyboard,
+  SYMBOL_KEYS,
+  typeSymbol,
+  typing,
+} from "../utils/symbolKeys"
 
 /**
  * 手机上贴着键盘顶的一排符号键，编辑器有焦点（键盘弹着）时才出来。
@@ -29,9 +35,19 @@ function place() {
   top.value = viewport ? viewport.offsetTop + viewport.height - BAR_HEIGHT : null
 }
 
-useEventListener(() => window.visualViewport, "resize", place)
+// 键盘弹起之前就得量出「没键盘时多高」，所以挂上就量
+onMounted(measureKeyboard)
+useEventListener("resize", measureKeyboard)
+useEventListener(
+  () => window.visualViewport,
+  "resize",
+  () => {
+    measureKeyboard()
+    place()
+  },
+)
 useEventListener(() => window.visualViewport, "scroll", place)
-watch(editorFocused, (focused) => focused && place(), { immediate: true })
+watch(typing, (on) => on && place(), { immediate: true })
 // 键盘弹着时点了别处换题、离开页面，编辑器直接卸载，不一定等得到失焦
 onBeforeUnmount(() => {
   editorFocused.value = false
@@ -40,7 +56,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    v-if="editorFocused && keys.length"
+    v-if="typing && keys.length"
     class="symbol-keys"
     :style="top === null ? { bottom: '0px' } : { top: `${top}px` }"
     role="toolbar"

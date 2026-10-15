@@ -123,7 +123,7 @@ watch(klass, (value) => {
   clearError()
   if (value) {
     loadNames(value)
-    focusLater(() => searchRef.value)
+    focusSearch()
   } else names.value = []
 })
 
@@ -137,6 +137,15 @@ function focusLater(target: () => { focus: () => void } | null | undefined) {
   nextTick(() => target()?.focus())
 }
 
+/**
+ * 手机上不替学生点搜索框：一聚焦键盘就弹出来，把下面的名单盖掉一半，
+ * 而手机上本来就是直接点名字更快。电脑上照旧聚焦，进来就能打拼音缩写。
+ */
+const touchScreen = useMediaQuery("(pointer: coarse)")
+function focusSearch() {
+  if (!touchScreen.value) focusLater(() => searchRef.value)
+}
+
 function pick(name: string) {
   picked.value = name
   password.value = ""
@@ -148,7 +157,7 @@ function unpick() {
   picked.value = null
   password.value = ""
   clearError()
-  focusLater(() => searchRef.value)
+  focusSearch()
 }
 
 /** 搜到只剩一个人，回车就是点他 */
@@ -163,7 +172,8 @@ function switchMode(next: Mode) {
   password.value = ""
   query.value = ""
   clearError()
-  focusLater(() => (next === "user" ? usernameRef.value : searchRef.value))
+  if (next === "user") focusLater(() => usernameRef.value)
+  else focusSearch()
 }
 
 function goSignup() {
@@ -249,7 +259,8 @@ watch(
     query.value = ""
     clearError()
     restoreLast()
-    focusLater(() => (mode.value === "user" ? usernameRef.value : searchRef.value))
+    if (mode.value === "user") focusLater(() => usernameRef.value)
+    else focusSearch()
   },
   { immediate: true },
 )

@@ -572,5 +572,16 @@ function percent(value: number, total: number) {
     display: block;
     overflow-x: auto;
   }
+  /* 表横着滑，表头别被挤成竖排（「提 / 交」） */
+  .hard th {
+    white-space: nowrap;
+  }
+  .section-title {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .section-title b {
+    flex: none;
+  }
 }
 </style>

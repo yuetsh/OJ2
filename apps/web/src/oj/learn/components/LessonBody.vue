@@ -75,6 +75,14 @@ function inline(text: string) {
 .body :deep(.oj-markdown th) {
   white-space: nowrap;
 }
+/* 360 宽的安卓机上四列表差三十来像素，最后一列被切掉、得横着滑才看得到：格子收窄一点 */
+@media (max-width: 480px) {
+  .body :deep(.oj-markdown th),
+  .body :deep(.oj-markdown td) {
+    min-width: 3.5em;
+    padding: 6px 8px;
+  }
+}
 .goals {
   margin: 4px 0 8px;
   padding: 12px 16px;

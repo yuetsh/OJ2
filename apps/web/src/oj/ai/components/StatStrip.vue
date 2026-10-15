@@ -20,7 +20,12 @@ const cells = computed(() => {
   const percent = r.solved ? Math.round((r.firstTry / r.solved) * 100) : 0
   const firstSub = `一次就对 · 占 ${percent}%`
   const list: Cell[] = [
-    { big: r.solved, unit: "道", sub: c ? `做对 · 班上中间那位 ${c.medianSolved} 道` : "做对" },
+    // 数和「道」之间用不换行空格：手机上两列挤，单个「道」会被甩到下一行
+    {
+      big: r.solved,
+      unit: "道",
+      sub: c ? `做对 · 班上中间那位 ${c.medianSolved}\u00a0道` : "做对",
+    },
     {
       big: r.firstTry,
       unit: "道",

@@ -53,13 +53,14 @@ const headline = computed(() => {
     return props.lastListed ? `再做对 ${toPass(me, props.lastListed)} 道就进前 ${props.cap}` : ""
   if (me.rank === 1) return "你是第一名"
   if (me.rank <= 3 && ahead)
-    return `你在领奖台上 · 再做对 ${toPass(me, ahead)} 道就是第 ${ahead.rank} 名`
+    // 「第 N 名」用不换行空格连住：手机上这一句正好折行，单个「名」会掉到下一行
+    return `你在领奖台上 · 再做对 ${toPass(me, ahead)} 道就是第\u00a0${ahead.rank}\u00a0名`
   if (third) {
     const need = toPass(me, third)
     if (need <= 3) return `再做对 ${need} 道，你就上领奖台`
   }
   if ((me.change ?? 0) >= 3) return `比周一升了 ${me.change} 名`
-  if (ahead) return `再做对 ${toPass(me, ahead)} 道就是第 ${ahead.rank} 名`
+  if (ahead) return `再做对 ${toPass(me, ahead)} 道就是第\u00a0${ahead.rank}\u00a0名`
   return ""
 })
 

@@ -5,7 +5,7 @@ import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import SubmitCode from "./SubmitCode.vue"
-import { editorFocused } from "../utils/symbolKeys"
+import { typing } from "../utils/symbolKeys"
 
 const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
 
@@ -30,8 +30,9 @@ const canRunSamples = computed(
 </script>
 
 <template>
-  <!-- 写代码时（键盘弹着）让位给符号键：两条都贴底会叠在一起，安卓上还会被键盘顶上来 -->
-  <div v-show="!editorFocused" class="mobile-actions">
+  <!-- 写代码时（键盘弹着）让位给符号键：两条都贴底会叠在一起，安卓上还会被键盘顶上来。
+       按返回键收了键盘、编辑器还有焦点时要回来，所以看 typing 不看焦点 -->
+  <div v-show="!typing" class="mobile-actions">
     <n-button
       v-if="canRunSamples"
       size="large"

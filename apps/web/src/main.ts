@@ -8,6 +8,20 @@ import storage from "utils/storage"
 import App from "./App.vue"
 import { admins, ojs } from "./routes"
 
+/**
+ * iPhone 上点进字号小于 16px 的输入框（Naive 的输入框是 14px、代码编辑器 15px），
+ * Safari 会自动把整页放大，而且退出输入也不缩回去，得学生自己双指缩。
+ * maximum-scale=1 能关掉这个自动放大；iOS 10 起照样允许双指缩放，所以只给 iOS 加 ——
+ * 安卓上这么写会真的禁掉双指放大，看题面图片、代码就没法放大了。
+ */
+const isIOS =
+  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+if (isIOS) {
+  const viewport = document.querySelector('meta[name="viewport"]')
+  viewport?.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1")
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [ojs, admins],

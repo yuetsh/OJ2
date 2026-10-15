@@ -68,12 +68,13 @@ export function filterEmptyValue<T extends Record<string, any>>(object: T): Part
 }
 
 export function getTagColor(tag: "Low" | "Mid" | "High" | "简单" | "中等" | "困难") {
-  return <"success" | "info" | "error">{
+  // 中等是橙色，和题目列表、相似题推荐一个颜色（原来这里是蓝，同一道题进了详情页就变色）
+  return <"success" | "warning" | "error">{
     Low: "success",
-    Mid: "info",
+    Mid: "warning",
     High: "error",
     简单: "success",
-    中等: "info",
+    中等: "warning",
     困难: "error",
   }[tag]
 }
