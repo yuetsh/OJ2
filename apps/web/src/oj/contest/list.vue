@@ -9,6 +9,8 @@ import ContestTitle from "shared/components/ContestTitle.vue"
 import Pagination from "shared/components/Pagination.vue"
 import { useAuthModalStore } from "shared/store/authModal"
 import { usePagination } from "shared/composables/pagination"
+import AdminLink from "shared/components/AdminLink.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus } from "utils/constants"
 import ContestBadge from "./components/ContestBadge.vue"
@@ -19,6 +21,7 @@ import ContestBadge from "./components/ContestBadge.vue"
  */
 const router = useRouter()
 const userStore = useUserStore()
+const { isDesktop } = useBreakpoints()
 const authStore = useAuthModalStore()
 const theme = useThemeVars()
 const tone = useTone()
@@ -145,6 +148,10 @@ const warning = computed(() => tone("warning"))
         {{ item.label }}
       </button>
       <n-input v-model:value="query.keyword" clearable placeholder="比赛名" style="width: 200px" />
+      <!-- 手机上一行放不下，也没人在手机上出题，只给电脑 -->
+      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/contest/create"
+        >新建比赛</AdminLink
+      >
     </div>
 
     <div

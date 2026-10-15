@@ -4,6 +4,7 @@ import type { TutorialProgress, TutorialSummary } from "@oj2/contract"
 import { getLearnProgress, getTutorials } from "../api"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useAuthModalStore } from "shared/store/authModal"
+import AdminLink from "shared/components/AdminLink.vue"
 import { useUserStore } from "shared/store/user"
 import {
   COURSES,
@@ -251,6 +252,16 @@ onMounted(load)
         >
           登录后记下学到哪
         </button>
+        <div v-if="isDesktop && userStore.isTeacherOrAbove" class="admin-links">
+          <AdminLink to="/admin/learn" size="small">自学情况</AdminLink>
+          <AdminLink
+            v-if="userStore.isSuperAdmin"
+            :to="{ path: '/admin/tutorial/list', query: { type: tab } }"
+            size="small"
+          >
+            管理教程
+          </AdminLink>
+        </div>
       </div>
 
       <div v-if="current && isDesktop" class="map">
@@ -482,6 +493,11 @@ onMounted(load)
   font-size: 13px;
   font-weight: 400;
   opacity: 0.6;
+}
+.admin-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .login {
   border: 0;

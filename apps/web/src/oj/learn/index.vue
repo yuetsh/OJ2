@@ -8,6 +8,7 @@ import { parseLesson } from "./composables/useLessonParse"
 import { useLearnTrace } from "./composables/useLearnTrace"
 import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import AdminLink from "shared/components/AdminLink.vue"
 import { useUserStore } from "shared/store/user"
 import {
   COURSES,
@@ -293,6 +294,15 @@ function jumpExercise(id: number) {
               <span v-if="tutorial.project">{{ tutorial.project }}</span>
               <span v-if="tutorial.project">·</span>
               <span class="num">第 {{ step }} / {{ titles.length }} 课</span>
+              <template v-if="userStore.isSuperAdmin">
+                <span class="grow" />
+                <AdminLink
+                  :to="{ name: 'admin tutorial edit', params: { tutorialID: tutorial.id } }"
+                  size="tiny"
+                >
+                  编辑这一课
+                </AdminLink>
+              </template>
             </div>
             <h1 class="h1">{{ parts.kp }}</h1>
             <div v-if="parts.scene" class="scene">{{ parts.scene }}</div>
@@ -546,6 +556,7 @@ function jumpExercise(id: number) {
 }
 .crumb {
   display: flex;
+  align-items: center;
   gap: 8px;
   font-size: 13px;
   margin-bottom: 6px;

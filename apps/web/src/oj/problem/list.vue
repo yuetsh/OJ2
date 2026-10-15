@@ -15,6 +15,7 @@ import Pagination from "shared/components/Pagination.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { usePagination } from "shared/composables/pagination"
 import { useAuthModalStore } from "shared/store/authModal"
+import AdminLink from "shared/components/AdminLink.vue"
 import { useUserStore } from "shared/store/user"
 import ProblemStatus from "./components/ProblemStatus.vue"
 import ProblemTypeTag from "./components/ProblemTypeTag.vue"
@@ -430,6 +431,9 @@ const gridColumns = computed(() =>
           </div>
           <div class="spacer"></div>
           <Hitokoto class="hitokoto" />
+          <AdminLink v-if="userStore.hasProblemPermission" to="/admin/problem/create" size="small">
+            新建题目
+          </AdminLink>
         </div>
 
         <div class="titlebar">

@@ -8,6 +8,7 @@ import {
 import { useRouteQuery } from "@vueuse/router"
 import { useThemeVars } from "naive-ui"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import AdminLink from "shared/components/AdminLink.vue"
 import { useUserStore } from "shared/store/user"
 import UserName from "shared/components/UserName.vue"
 import { classLabel } from "oj/submission/utils"
@@ -137,6 +138,13 @@ function goStudent(username: string | null | undefined) {
       >
         看<UserName :username="viewing" />的提交 ›
       </router-link>
+      <AdminLink
+        v-if="userStore.isTeacherOrAbove && isDesktop"
+        :to="{ path: '/admin/ai/reports', query: viewing ? { username: viewing } : {} }"
+        size="small"
+      >
+        AI 报告
+      </AdminLink>
     </div>
 
     <n-spin :show="loading" :delay="150">

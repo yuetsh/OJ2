@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
+import AdminLink from "shared/components/AdminLink.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
+import { useUserStore } from "shared/store/user"
 import { getProblemSetList } from "oj/api"
 import { rgba, useTone } from "oj/submission/composables/tone"
 import { parseTime } from "utils/functions"
@@ -13,6 +16,8 @@ import { badgeCondition, ladder, nextBadge } from "./badges"
  * 题单一共十几个，一次全取回来在前端分组，不分页
  */
 const router = useRouter()
+const userStore = useUserStore()
+const { isDesktop } = useBreakpoints()
 const theme = useThemeVars()
 const tone = useTone()
 
@@ -88,6 +93,10 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
       <h2>题单</h2>
       <div class="spacer"></div>
       <n-input v-model:value="keyword" placeholder="搜题单" clearable class="search" />
+      <!-- 手机上一行放不下，也没人在手机上出题，只给电脑 -->
+      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/problemset/create"
+        >新建题单</AdminLink
+      >
     </div>
 
     <template v-if="assigning.length">

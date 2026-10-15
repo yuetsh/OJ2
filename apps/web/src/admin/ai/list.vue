@@ -21,7 +21,13 @@ const theme = useThemeVars()
 
 const reports = ref<AdminAiReportListItem[]>([])
 const total = ref(0)
-const query = reactive({ limit: 10, page: 1, username: "" })
+// 前台「智能分析」看某个学生时的「AI 报告」按钮带着 ?username= 过来，直接筛到他
+const route = useRoute()
+const query = reactive({
+  limit: 10,
+  page: 1,
+  username: typeof route.query.username === "string" ? route.query.username : "",
+})
 
 const selectedId = ref<number | null>(null)
 const detail = ref<AdminAiReport | null>(null)

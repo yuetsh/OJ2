@@ -4,6 +4,7 @@ import { getAchievements } from "oj/achievement/api"
 import { getUserBadges } from "oj/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import UserName from "shared/components/UserName.vue"
+import AdminLink from "shared/components/AdminLink.vue"
 import { useUserStore } from "shared/store/user"
 import { RARITY_COLOR, RARITY_LABEL } from "utils/constants"
 import type { AchievementList, AchievementRarity, UserBadge } from "utils/types"
@@ -83,6 +84,9 @@ watch(name, load)
             </span>
           </span>
           <router-link v-if="other" to="/achievement" class="mine">看我的 ›</router-link>
+          <div v-if="userStore.isSuperAdmin && isDesktop" class="admin-link">
+            <AdminLink to="/admin/achievement/list" size="small">管理成就</AdminLink>
+          </div>
         </div>
 
         <!-- 没有班级（老师、自己注册的号）就没有「本班」，「快拿到了」三个横排占满整宽 -->
@@ -166,6 +170,16 @@ h2 {
 .rarity b {
   color: v-bind("theme.textColor1");
   font-variant-numeric: tabular-nums;
+}
+
+/* 两个都在时「看我的」占着 auto，按钮跟在它后面 */
+.admin-link {
+  margin-left: auto;
+  align-self: center;
+}
+
+.mine + .admin-link {
+  margin-left: 0;
 }
 
 .mine {

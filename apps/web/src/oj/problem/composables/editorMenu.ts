@@ -58,7 +58,8 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
       // 一写回去就顺着 Yjs 同步过去，等于一键清空学生的作业，他还没法撤回
       if (!teacherCollab.value) items.push({ label: "重置代码", key: "reset" })
     }
-    if (isDesktop.value && userStore.isSuperAdmin) items.push({ label: "编辑题目", key: "edit" })
+    if (isDesktop.value && problem.value && userStore.canEditProblem(problem.value))
+      items.push({ label: "编辑题目", key: "edit" })
     return items
   })
 

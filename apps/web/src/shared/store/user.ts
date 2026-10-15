@@ -49,6 +49,22 @@ export const useUserStore = defineStore("user", () => {
 
   const canToggleDemoMode = computed(() => realIsSuperAdmin.value)
 
+  /**
+   * 前台「编辑题目」入口给谁看，对齐后端 admin/problem.ts 的 canEdit：
+   * 公开题看题目的创建者（或题目权限是「全部」），比赛题看比赛的创建者。
+   * 题目页拿不到比赛的创建者，比赛题就按题目的创建者估 —— 比赛题基本是出题老师
+   * 自己建或克隆的；估错了后台会拦，只是多一个点进去 404 的入口。
+   */
+  function canEditProblem(problem: { contestId: number | null; createdBy: { id: number } }) {
+    if (isSuperAdmin.value) return true
+    const mine = problem.createdBy.id === user.value?.id
+    if (problem.contestId !== null) return isTeacherOrAbove.value && mine
+    return (
+      hasProblemPermission.value &&
+      (mine || user.value?.problemPermission === PROBLEM_PERMISSION.ALL)
+    )
+  }
+
   function toggleDemoMode() {
     demoSwitch.value = !demoSwitch.value
     storage.set(STORAGE_KEY.DEMO_MODE, demoSwitch.value)
@@ -124,6 +140,7 @@ export const useUserStore = defineStore("user", () => {
     hasProblemPermission,
     demoMode,
     canToggleDemoMode,
+    canEditProblem,
     toggleDemoMode,
     isAuthed,
     showSubmissions,

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
 import { getAnnouncement, getAnnouncementList } from "oj/api"
+import AdminLink from "shared/components/AdminLink.vue"
 import NotFound from "shared/components/NotFound.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useUserStore } from "shared/store/user"
 import { errorCode } from "utils/api"
 import { parseTime, zonedParts, zonedYear } from "utils/functions"
 import type { Announcement, AnnouncementListItem } from "utils/types"
@@ -19,6 +21,7 @@ const LIMIT = 100
 const theme = useThemeVars()
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const { isDesktop } = useBreakpoints()
 
 const announcements = ref<AnnouncementListItem[]>([])
@@ -105,7 +108,19 @@ const showReader = computed(() => isDesktop.value || queryId.value !== null)
 
 <template>
   <div class="page oj-page">
-    <h2>公告</h2>
+    <div class="head">
+      <h2>公告</h2>
+      <template v-if="userStore.isSuperAdmin">
+        <span class="grow"></span>
+        <AdminLink
+          v-if="showReader && detail"
+          :to="{ name: 'admin announcement edit', params: { announcementID: detail.id } }"
+        >
+          编辑这条
+        </AdminLink>
+        <AdminLink to="/admin/announcement/create">发公告</AdminLink>
+      </template>
+    </div>
 
     <n-empty v-if="loaded && !announcements.length" description="还没有公告" class="blank" />
 
@@ -175,6 +190,16 @@ const showReader = computed(() => isDesktop.value || queryId.value !== null)
 h2 {
   margin: 0;
   font-size: var(--oj-fs-title);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.grow {
+  flex-grow: 1;
 }
 
 .blank {
