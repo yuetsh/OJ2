@@ -10,8 +10,6 @@ import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
 import { mainWrapExtensions, wrapMain } from "../wrapMain"
-import { hangWrapExtensions } from "shared/extensions/hangIndent"
-import { useBreakpoints } from "shared/composables/breakpoints"
 
 const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
 
@@ -37,12 +35,8 @@ const message = useMessage()
 const { copy } = useClipboard({ legacy: true })
 
 const original = computed(() => (props.wrapMain ? wrapMain(props.code) : props.code))
-const { isDesktop } = useBreakpoints()
-// 手机上折行（见 hangIndent.ts）；桌面正文 720 宽，长行少，照旧横着滚
-const extensions = computed(() => [
-  ...(props.wrapMain ? mainWrapExtensions : []),
-  ...(isDesktop.value ? [] : hangWrapExtensions),
-])
+// 手机上也不折行，长行横着滚：折下来的那截看着像另起了一行代码
+const extensions = computed(() => (props.wrapMain ? mainWrapExtensions : []))
 const value = ref(original.value)
 const input = ref("")
 const running = ref(false)

@@ -4,7 +4,6 @@ import type { Exercise, ExerciseSortData } from "utils/types"
 import { shuffle } from "../composables/useShuffle"
 import { highlightLines } from "shared/highlight"
 import { useBreakpoints } from "shared/composables/breakpoints"
-import { hangStyle } from "shared/extensions/hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -100,51 +99,53 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
       先点一行，再点它该去的位置。
     </p>
 
-    <n-space vertical :size="6">
+    <!-- 不折行：长行整组一起横着滚，每行一样宽（= 最长那行），和正文的代码块一样 -->
+    <div style="overflow-x: auto">
       <div
-        v-for="(line, idx) in lines"
-        :key="line.originalIdx"
-        draggable="true"
-        :style="{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '8px 12px',
-          borderRadius: '6px',
-          border:
-            pickedIdx === idx
-              ? '2px solid #2080f0'
-              : `1.5px ${submitted ? 'solid' : 'dashed'} ${
-                  lineStatus(idx) === 'correct'
-                    ? '#18a058'
-                    : lineStatus(idx) === 'wrong'
-                      ? '#d03050'
-                      : 'var(--learn-control-line)'
-                }`,
-          background:
-            pickedIdx === idx
-              ? 'rgba(32,128,240,0.08)'
-              : lineStatus(idx) === 'correct'
-                ? 'rgba(24,160,88,0.08)'
-                : lineStatus(idx) === 'wrong'
-                  ? 'rgba(208,48,80,0.07)'
-                  : 'transparent',
-          cursor: 'grab',
-          fontFamily: 'var(--learn-code-font)',
-          userSelect: 'none',
-        }"
-        @dragstart="onDragStart(idx)"
-        @dragover.prevent
-        @drop="onDrop(idx)"
-        @click="onLineClick(idx)"
+        style="display: flex; flex-direction: column; gap: 6px; width: max-content; min-width: 100%"
       >
-        <span style="color: #bbb; cursor: grab">⠿</span>
-        <span
-          v-html="lineHtml[line.originalIdx]"
-          :style="{ minWidth: 0, ...hangStyle(line.text) }"
-        />
+        <div
+          v-for="(line, idx) in lines"
+          :key="line.originalIdx"
+          draggable="true"
+          :style="{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border:
+              pickedIdx === idx
+                ? '2px solid #2080f0'
+                : `1.5px ${submitted ? 'solid' : 'dashed'} ${
+                    lineStatus(idx) === 'correct'
+                      ? '#18a058'
+                      : lineStatus(idx) === 'wrong'
+                        ? '#d03050'
+                        : 'var(--learn-control-line)'
+                  }`,
+            background:
+              pickedIdx === idx
+                ? 'rgba(32,128,240,0.08)'
+                : lineStatus(idx) === 'correct'
+                  ? 'rgba(24,160,88,0.08)'
+                  : lineStatus(idx) === 'wrong'
+                    ? 'rgba(208,48,80,0.07)'
+                    : 'transparent',
+            cursor: 'grab',
+            fontFamily: 'var(--learn-code-font)',
+            userSelect: 'none',
+          }"
+          @dragstart="onDragStart(idx)"
+          @dragover.prevent
+          @drop="onDrop(idx)"
+          @click="onLineClick(idx)"
+        >
+          <span style="color: #bbb; cursor: grab">⠿</span>
+          <span v-html="lineHtml[line.originalIdx]" style="white-space: pre" />
+        </div>
       </div>
-    </n-space>
+    </div>
 
     <ExerciseResult
       v-if="submitted"

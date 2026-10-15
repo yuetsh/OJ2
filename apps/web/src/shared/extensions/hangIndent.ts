@@ -8,9 +8,9 @@ import {
 } from "@codemirror/view"
 
 /**
- * 手机上代码折行（自学的代码块和练一练、题目页的编辑器）。原来是横着滚，可没有滚动条
- * 也看不出右边还有，自学综合练习那种长 print 整整半行看不见。折下来的那截缩到这一行的
- * 代码下面再进两格，一眼看得出还是同一行。
+ * 手机上代码折行（题目页的编辑器）。原来是横着滚，可没有滚动条也看不出右边还有。
+ * 折下来的那截缩到这一行的代码下面再进两格，一眼看得出还是同一行。
+ * 自学的代码块和练一练也这么折过，用户嫌不好看，又改回横着滚了。
  */
 
 /** 行首空白占几格，tab 按 4 */
@@ -22,19 +22,6 @@ function leadingWidth(text: string): number {
     else break
   }
   return width
-}
-
-/** 静态的代码行（练一练的排序、找错、填空）：折行，接着的那截悬挂缩进 */
-export function hangStyle(text: string): Record<string, string> {
-  const width = leadingWidth(text) + 2
-  return {
-    whiteSpace: "pre-wrap",
-    // 中文连着的一串别从中间断（「类」「型」各在一行），实在放不下才随便断
-    wordBreak: "keep-all",
-    overflowWrap: "anywhere",
-    paddingLeft: `${width}ch`,
-    textIndent: `-${width}ch`,
-  }
 }
 
 const glue = Decoration.mark({ attributes: { style: "white-space: nowrap" } })
@@ -82,5 +69,5 @@ const hangPlugin = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 )
 
-/** 编辑器（正文里能运行的代码块）：折行 + 悬挂缩进 */
+/** 编辑器：折行 + 悬挂缩进 */
 export const hangWrapExtensions = [EditorView.lineWrapping, hangPlugin]

@@ -2,7 +2,6 @@
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseFillData } from "utils/types"
 import { highlightWithHoles } from "shared/highlight"
-import { hangStyle } from "shared/extensions/hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -39,27 +38,20 @@ const segments = computed<Segment[]>(() => {
 })
 
 /**
- * 按行切开，每行自己折行、悬挂缩进（见 hangIndent.ts）。原来整段 pre-wrap，
- * 手机上行尾的注释折下来顶格，看着像另起了一行代码。
+ * 按行切开，一行一个块；不折行，长行整块横着滚（和正文的代码块一样）。
  * 高亮的 HTML 在换行处是断开的（见 shared/highlight.ts 的 walk），按 "\n" 切不会切坏标签。
  */
 const lines = computed(() => {
-  const rows: { indent: string; parts: Segment[] }[] = [{ indent: "", parts: [] }]
+  const rows: { parts: Segment[] }[] = [{ parts: [] }]
   for (const seg of segments.value) {
     if (seg.type === "blank") {
       rows[rows.length - 1].parts.push(seg)
       continue
     }
     seg.html.split("\n").forEach((html, i) => {
-      if (i > 0) rows.push({ indent: "", parts: [] })
+      if (i > 0) rows.push({ parts: [] })
       if (html) rows[rows.length - 1].parts.push({ type: "code", html })
     })
-  }
-  for (const row of rows) {
-    const first = row.parts[0]
-    if (first?.type === "code") {
-      row.indent = first.html.replace(/<[^>]*>/g, "").match(/^[ \t]*/)![0]
-    }
   }
   return rows
 })
@@ -114,13 +106,10 @@ function inputWidth(idx: number): string {
         border: '1px solid var(--learn-line)',
         borderRadius: '6px',
         padding: '10px 12px',
+        overflowX: 'auto',
       }"
     >
-      <div
-        v-for="(row, r) in lines"
-        :key="r"
-        :style="{ minHeight: '1.9em', ...hangStyle(row.indent) }"
-      >
+      <div v-for="(row, r) in lines" :key="r" style="min-height: 1.9em; white-space: pre">
         <template v-for="(seg, i) in row.parts" :key="i"
           ><span v-if="seg.type === 'code'" v-html="seg.html" /><input
             v-else
@@ -136,7 +125,6 @@ function inputWidth(idx: number): string {
               fontSize: '16px',
               lineHeight: '1.4',
               padding: '2px 6px',
-              textIndent: 0,
               borderRadius: '4px',
               border: `1.5px solid ${
                 allCorrect

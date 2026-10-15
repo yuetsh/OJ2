@@ -2,7 +2,6 @@
 import ExerciseResult from "./ExerciseResult.vue"
 import type { Exercise, ExerciseDebugData } from "utils/types"
 import { highlightLines } from "shared/highlight"
-import { hangStyle } from "shared/extensions/hangIndent"
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -92,19 +91,19 @@ function reset() {
       点击你认为有错误的代码行（可多选）。
     </p>
 
-    <n-space vertical :size="6">
+    <!-- 不折行：长行整组一起横着滚，每行一样宽（= 最长那行），和正文的代码块一样 -->
+    <div style="overflow-x: auto">
       <div
-        v-for="(line, idx) in data.lines"
-        :key="idx"
-        :style="lineStyle(idx)"
-        @click="toggle(idx)"
+        style="display: flex; flex-direction: column; gap: 6px; width: max-content; min-width: 100%"
       >
-        <span style="color: #bbb; width: 22px; text-align: right; flex-shrink: 0">
-          {{ idx + 1 }}
-        </span>
-        <span v-html="lineHtml[idx]" :style="{ minWidth: 0, ...hangStyle(line) }" />
+        <div v-for="(_, idx) in data.lines" :key="idx" :style="lineStyle(idx)" @click="toggle(idx)">
+          <span style="color: #bbb; width: 22px; text-align: right; flex-shrink: 0">
+            {{ idx + 1 }}
+          </span>
+          <span v-html="lineHtml[idx]" style="white-space: pre" />
+        </div>
       </div>
-    </n-space>
+    </div>
 
     <ExerciseResult
       v-if="submitted"
