@@ -506,11 +506,6 @@ function lastText(student: ClassBoardStudent) {
   }
   return "—"
 }
-
-function shortTitle(title: string, size: number) {
-  const chars = [...title]
-  return chars.length <= size ? title : chars.slice(0, size - 1).join("") + "…"
-}
 </script>
 
 <template>
@@ -715,11 +710,12 @@ function shortTitle(title: string, size: number) {
                 :key="stat.problem.problemId"
                 class="col"
                 :class="{ hl: i === selectedIndex }"
+                :style="{ width: `${100 / problemStats.length}%` }"
                 @click="toggleProblem(stat.problem.problemId)"
               >
                 <div class="col-id">{{ stat.problem.problemDisplayId }}</div>
                 <div class="col-title" :title="stat.problem.title">
-                  {{ shortTitle(stat.problem.title, 6) }}
+                  {{ stat.problem.title }}
                 </div>
                 <div class="col-count">{{ stat.done }}/{{ stat.total }}</div>
                 <div class="bar">
@@ -1210,9 +1206,12 @@ a.who {
   white-space: nowrap;
 }
 
+/* 名字、在线、做对、最后交这几列按内容收紧（width: 1% 是表格收到最窄的写法），
+   剩下的宽度题目列平分（模板里按题数给百分比），题名才写得开 */
 .grid .name {
-  width: 200px;
+  width: 1%;
   padding-left: 12px;
+  padding-right: 24px;
   text-align: left;
   font-size: 13px;
   color: v-bind("theme.textColor3");
@@ -1232,12 +1231,13 @@ a.who {
 }
 
 .grid th.col {
-  width: 96px;
+  min-width: 110px;
   cursor: pointer;
 }
 
 .grid th.narrow-col {
-  width: 80px;
+  width: 1%;
+  padding: 8px 12px;
   font-size: 13px;
   color: v-bind("theme.textColor3");
 }
@@ -1252,12 +1252,17 @@ a.who {
   font-variant-numeric: tabular-nums;
 }
 
+/* 题名写全，长的折成两行；题名中位 7 个字、九成在 13 个字以内，两行放得下 */
 .col-title {
-  max-width: 88px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 180px;
   margin: 0 auto;
   overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
+  white-space: normal;
+  line-height: 1.4;
+  font-size: 13px;
   color: v-bind("theme.textColor3");
 }
 
@@ -1268,7 +1273,8 @@ a.who {
 }
 
 .grid th .bar {
-  margin: 0 6px;
+  max-width: 160px;
+  margin: 0 auto;
 }
 
 .group-row td {
@@ -1338,7 +1344,8 @@ a.cell {
 }
 
 .grid .where-col {
-  width: 100px;
+  width: 1%;
+  padding-right: 24px;
   text-align: left;
 }
 
@@ -1458,9 +1465,12 @@ a.cell {
   }
 
   .grid .name {
-    width: auto;
     padding-left: 4px;
     padding-right: 8px;
+  }
+
+  .grid th.col {
+    min-width: 64px;
   }
 
   .cell {
