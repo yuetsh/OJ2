@@ -6,6 +6,7 @@ import type { Exercise } from "utils/types"
 import { getExercises, getLearnProgress, getTutorial, getTutorials } from "../api"
 import { parseLesson } from "./composables/useLessonParse"
 import { useLearnTrace } from "./composables/useLearnTrace"
+import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"
 import {
@@ -52,6 +53,8 @@ const solvedIds = ref(new Set<number>())
 const loading = ref(true)
 const isEmpty = ref(false)
 const menuOpen = ref(false)
+// 手机上的目录是大半屏的底部抽屉：按返回键收起它，不是退出这一课
+useBackClose(menuOpen, () => !isDesktop.value)
 
 const groups = computed(() => groupByProject(titles.value))
 const parsed = computed(() =>

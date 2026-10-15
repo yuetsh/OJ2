@@ -14,6 +14,7 @@ import { onKeyStroke } from "@vueuse/core"
 import { useThemeVars } from "naive-ui"
 import SubmissionView from "oj/submission/components/SubmissionView.vue"
 import UserName from "shared/components/UserName.vue"
+import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import type { ClassBoardProblem } from "utils/types"
 import ProblemBrief from "./ProblemBrief.vue"
@@ -38,6 +39,8 @@ const index = defineModel<number>("index", { required: true })
 
 const theme = useThemeVars()
 const { isMobile } = useBreakpoints()
+// 手机上是整屏的：按返回键关掉它回到看板，不是退出看板
+useBackClose(show, isMobile)
 /**
  * 颜色走内联的 CSS 变量，不用 <style> 里的 v-bind()：n-modal 把内容挂到 body 下面，
  * v-bind 的变量挂在组件根上，传不过去（弹层底色整个透明）

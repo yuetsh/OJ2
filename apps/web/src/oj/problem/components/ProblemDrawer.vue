@@ -2,6 +2,7 @@
 import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
+import { useBackClose } from "shared/composables/backClose"
 import { useUserStore } from "shared/store/user"
 import {
   DRAWER_TITLE,
@@ -52,6 +53,8 @@ const show = computed({
     if (!value) open.value = null
   },
 })
+// 手机上是大半屏的底部抽屉（没有 to）：按返回键收起它，不是退出题目
+useBackClose(show, () => !props.to)
 
 // 内容和标题都按最后一次打开的来：关的时候有一段滑出去的动画，那时 open 已经是 null 了。
 // 关完 n-drawer 自己把内容卸掉

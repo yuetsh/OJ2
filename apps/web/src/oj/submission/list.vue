@@ -14,6 +14,7 @@ import {
 import { DEFAULT_PERIOD } from "oj/statistics/period"
 import { useContestStore } from "oj/store/contest"
 import Pagination from "shared/components/Pagination.vue"
+import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { usePagination } from "shared/composables/pagination"
 import { useConfigStore } from "shared/store/config"
@@ -71,6 +72,17 @@ const tone = useTone()
 const { isMobile, isDesktop } = useBreakpoints()
 
 const inContest = computed(() => route.name === "contest submissions")
+
+/**
+ * 手机上点开的那一条，记在地址的 `?id=` 上：详情是从右边滑出的整屏，学生下意识按返回 ——
+ * 返回键归路由管，退一步就是关掉详情、回到列表；刷新、转发链接也还停在这一条。
+ * 列表在底下不卸载，滚到哪、上一条 / 下一条都还在
+ */
+const paneId = computed(() =>
+  isMobile.value && typeof route.query.id === "string" ? route.query.id : "",
+)
+/** 从详情里点了「只看他」这类筛选：这一下要连 ?id= 一起换掉，见 leavePane() */
+let leavingPane = false
 const teacher = computed(() => userStore.isTeacherOrAbove)
 
 // 一节课一个班要交一百来条，每页 10 条得翻十几页；30 条配上右栏的方向键正好
@@ -85,7 +97,13 @@ const { query, clearQuery } = usePagination<SubmissionQuery>(
     // 原来写死成 "0"，从别处带着 today=1 进来也不认
     today: useRouteQuery("today", "0").value,
   },
-  { defaultLimit: 30 },
+  {
+    defaultLimit: 30,
+    // 手机上开着详情：翻页、换条件时地址里的 ?id= 带着走，也不多压历史（返回键是关详情）
+    extraQuery: (): Record<string, string> =>
+      paneId.value && !leavingPane ? { id: paneId.value } : {},
+    replace: () => !!paneId.value && !leavingPane,
+  },
 )
 
 const flowMode = computed(() => !inContest.value && query.language === "Flowchart")
@@ -294,6 +312,14 @@ function settleSelection() {
     }
     message.info("这一页没有可以查看的代码")
   }
+  // 地址里带着 ?id= 的（手机上开着详情时刷新、别人发来的链接）就停在那一条
+  const wanted = typeof route.query.id === "string" ? route.query.id : ""
+  if (wanted && rows.value.some((row) => row.id === wanted)) {
+    selectedId.value = wanted
+    return
+  }
+  // 这一页上没有那一条：详情开不出来，把 ?id= 摘掉
+  if (paneId.value) router.replace({ query: queryWithoutId() })
   if (rows.value.some((row) => row.id === selectedId.value)) return
   // 手机上没有右栏，不用预先选一条
   if (isMobile.value) {
@@ -334,6 +360,7 @@ function move(step: 1 | -1) {
 }
 
 const [todayPanel, toggleTodayPanel] = useToggle(false)
+useBackClose(todayPanel, isMobile)
 const statsPanel = ref(false)
 
 // 只用 ↑ ↓（用户定的，← → 不要）
@@ -360,12 +387,62 @@ onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
   move(e.key === "ArrowUp" ? -1 : 1)
 })
 
-// 手机上没有右栏：点一行从右边滑出整屏的详情
-const mobilePane = ref(false)
+// 手机上没有右栏：点一行从右边滑出整屏的详情，地址带上 ?id=（见 paneId）
+const mobilePane = computed({
+  get: () => !!paneId.value,
+  set: (open) => {
+    if (!open) closePane()
+  },
+})
+
+function queryWithoutId() {
+  const { id: _, ...rest } = route.query
+  return rest
+}
+
 function rowClicked(row: Row) {
   select(row.id)
-  if (isMobile.value) mobilePane.value = true
+  if (isMobile.value) router.push({ query: { ...route.query, id: row.id } })
 }
+
+/**
+ * 点 × 关：从列表点开的就退一步（和按返回键一样，不留一条多余的历史）；
+ * 直接带着 ?id= 进来的（刷新过、别人发的链接）后面没有列表可退，把地址换掉
+ */
+function closePane() {
+  const back = history.state?.back
+  if (typeof back === "string" && router.resolve(back).name === route.name) router.back()
+  else router.replace({ query: queryWithoutId() })
+}
+
+/**
+ * 详情里点「只看他」「只看这道题」：先关详情（退回列表那一条），再改筛选。
+ * 反过来的话筛选压的那条历史在详情后面，按返回又回到详情。
+ * 等路由落地、再等分页把地址同步回 query 之后才改，不然改的值会被同步盖掉
+ */
+function leavePane(next: () => void) {
+  if (!paneId.value) return next()
+  leavingPane = true
+  const off = router.afterEach(() => {
+    off()
+    nextTick(() => {
+      leavingPane = false
+      next()
+    })
+  })
+  closePane()
+}
+
+// 上一条 / 下一条换了人：地址里的 ?id= 跟着换（replace，返回键照样是关详情）
+watch(selectedId, (id) => {
+  if (paneId.value && id && id !== paneId.value) {
+    router.replace({ query: { ...route.query, id } })
+  }
+})
+// 前进后退到另一条（或者刷新后列表回来之前地址就有了）：选中跟着地址走
+watch(paneId, (id) => {
+  if (id && rows.value.some((row) => row.id === id)) selectedId.value = id
+})
 
 // ==================== 实时更新 ====================
 
@@ -1167,8 +1244,8 @@ function dayBreak(index: number) {
           :teacher="teacher"
           :position="null"
           narrow
-          @filter-user="(name: string) => ((mobilePane = false), filterUser(name))"
-          @filter-problem="(id: string) => ((mobilePane = false), filterProblem(id))"
+          @filter-user="(name: string) => leavePane(() => filterUser(name))"
+          @filter-problem="(id: string) => leavePane(() => filterProblem(id))"
           @open-problem="openProblem"
           @retry="retryFlowchart"
         />
@@ -1180,10 +1257,10 @@ function dayBreak(index: number) {
           :contest="inContest"
           :position="null"
           narrow
-          @filter-user="(name: string) => ((mobilePane = false), filterUser(name))"
-          @filter-class="(name: string) => ((mobilePane = false), filterClass(name))"
-          @clear-class="() => ((mobilePane = false), (query.className = ''))"
-          @filter-problem="(id: string) => ((mobilePane = false), filterProblem(id))"
+          @filter-user="(name: string) => leavePane(() => filterUser(name))"
+          @filter-class="(name: string) => leavePane(() => filterClass(name))"
+          @clear-class="() => leavePane(() => (query.className = ''))"
+          @filter-problem="(id: string) => leavePane(() => filterProblem(id))"
           @open-problem="openProblem"
           @rejudge="rejudge"
         />

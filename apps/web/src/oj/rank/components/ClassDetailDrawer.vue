@@ -6,6 +6,7 @@ import { getClassDetail } from "oj/api"
 import { classLabel } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
 import { useAIStream } from "shared/composables/aiStream"
+import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
 import { useRankPalette } from "../palette"
@@ -24,6 +25,8 @@ const message = useMessage()
 const theme = useThemeVars()
 const palette = useRankPalette()
 const { isDesktop } = useBreakpoints()
+// 手机上占满一屏：按返回键关掉它回到排名
+useBackClose(show, () => !isDesktop.value)
 
 const detail = ref<ClassDetail | null>(null)
 const loading = ref(false)

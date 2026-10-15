@@ -1,4 +1,4 @@
-import { reactive, watch } from "vue"
+import { nextTick, reactive, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { filterEmptyValue } from "utils/functions"
 
@@ -15,6 +15,13 @@ export interface UsePaginationOptions {
   defaultPage?: number
   /** 当其他查询条件变化时是否重置页码 */
   resetPageOnChange?: boolean
+  /**
+   * 不归分页管、但同步地址时要带上的键。不给的话地址整个按 query 重写，别的键会被丢掉
+   * （提交列表手机上点开一条是 `?id=`，翻一页详情就关了）
+   */
+  extraQuery?: () => Record<string, string>
+  /** 返回 true 时同步地址一律 replace，不压历史（提交列表手机上开着详情时翻页） */
+  replace?: () => boolean
 }
 
 /**
@@ -27,7 +34,13 @@ export function usePagination<T extends Record<string, any>>(
   initialQuery: Omit<T, "page" | "limit"> = {} as Omit<T, "page" | "limit">,
   options: UsePaginationOptions = {},
 ) {
-  const { defaultLimit = 10, defaultPage = 1, resetPageOnChange = true } = options
+  const {
+    defaultLimit = 10,
+    defaultPage = 1,
+    resetPageOnChange = true,
+    extraQuery,
+    replace,
+  } = options
 
   const route = useRoute()
   const router = useRouter()
@@ -41,8 +54,18 @@ export function usePagination<T extends Record<string, any>>(
   // 键是运行时按 initialQuery 枚举出来的，静态类型写不出来；写入统一走这一个口子
   const writable = query as Record<string, unknown>
 
+  /**
+   * 正在从地址同步回来：这一拍里 query 的变化本来就是地址带来的，别再写回地址。
+   * 写回去的话（浏览器后退到第 1 页，地址没写默认的 today=0，比一下「不一样」）会压一条
+   * 新历史，把前进的那几条冲掉，返回键还得多按一次。
+   * 页面自己盯着 route.query 补默认值的（提交列表）也在同一拍里，一起算
+   */
+  let syncing = false
+
   // 同步 URL 查询参数到本地状态
   function syncFromRoute() {
+    syncing = true
+    nextTick(() => (syncing = false))
     writable.page = parseInt(<string>route.query.page) || defaultPage
     writable.limit = parseInt(<string>route.query.limit) || defaultLimit
 
@@ -71,7 +94,7 @@ export function usePagination<T extends Record<string, any>>(
 
   // 更新 URL
   function updateRoute() {
-    const newQuery = filterEmptyValue(query)
+    const newQuery = { ...filterEmptyValue(query), ...extraQuery?.() }
     // 和当前地址只差默认的 page / limit（后退到 /problem，同步完又补上 ?page=1&limit=30）：
     // 是同一个页面，用 replace，别多压一条历史、让人得多按一次后退
     const normalized = (q: Record<string, unknown>) =>
@@ -85,7 +108,8 @@ export function usePagination<T extends Record<string, any>>(
           .map(([key, value]) => [key, String(value)])
           .sort(),
       )
-    const navigate = normalized(route.query) === normalized(newQuery) ? router.replace : router.push
+    const navigate =
+      replace?.() || normalized(route.query) === normalized(newQuery) ? router.replace : router.push
     navigate({
       path: route.path,
       query: newQuery,
@@ -115,12 +139,18 @@ export function usePagination<T extends Record<string, any>>(
   }
 
   // 监听页码变化，同步到 URL
-  watch(() => query.page, updateRoute)
+  watch(
+    () => query.page,
+    () => {
+      if (!syncing) updateRoute()
+    },
+  )
 
   // 监听每页条数变化，重置页码并同步到 URL
   watch(
     () => query.limit,
     () => {
+      if (syncing) return
       if (resetPageOnChange) {
         resetPage()
       }
@@ -134,6 +164,7 @@ export function usePagination<T extends Record<string, any>>(
     watch(
       () => otherQueryKeys.map((key) => query[key]),
       () => {
+        if (syncing) return
         resetPage()
         updateRoute()
       },
