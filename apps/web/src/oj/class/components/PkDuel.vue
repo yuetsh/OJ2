@@ -80,7 +80,8 @@ const shownRows = computed(() =>
 const weeks = computed(() => {
   const from = Math.max(0, props.pk.weeks.length - 8)
   const list = props.pk.weeks.slice(from).map((week, k) => ({
-    label: parseTime(week, "M月D日"),
+    // 手机上八根柱挤在一行，「10月12日」只能用 10px 才放得下，太小；改短写法换大一号字
+    label: parseTime(week, props.compact ? "M/D" : "M月D日"),
     values: [left.value.weekly[from + k] ?? 0, right.value.weekly[from + k] ?? 0],
   }))
   const max = Math.max(1, ...list.flatMap((week) => week.values))
@@ -779,6 +780,6 @@ const tab = ref<"weekly" | "dist">("weekly")
 }
 
 .compact .axis {
-  font-size: 10px;
+  font-size: 12px;
 }
 </style>

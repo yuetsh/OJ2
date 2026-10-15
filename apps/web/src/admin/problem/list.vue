@@ -96,6 +96,8 @@ const { query, clearQuery } = usePagination<ProblemQuery>({
 })
 
 const counts = ref<{ all: number; visible: number; hidden: number } | null>(null)
+// 手机上后台左边还有一列图标，三个按钮放不下、「藏着的」被切掉：换小号，再不够就横着滑
+const narrow = useMediaQuery("(max-width: 640px)")
 const visibleTabs = computed(() => [
   { value: "" as const, label: "全部", count: counts.value?.all },
   { value: "1" as const, label: "学生看得到", count: counts.value?.visible },
@@ -324,10 +326,11 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
         <n-text depth="3">出题人</n-text>
         <AuthorSelect v-model:value="query.author" all />
       </n-flex>
-      <n-button-group v-if="!props.contestID">
+      <n-button-group v-if="!props.contestID" class="visible-tabs">
         <n-button
           v-for="tab in visibleTabs"
           :key="tab.value"
+          :size="narrow ? 'small' : 'medium'"
           :type="query.visible === tab.value ? 'primary' : 'default'"
           :secondary="query.visible === tab.value"
           @click="query.visible = tab.value"
@@ -386,6 +389,11 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
 
 .spacer {
   flex: 1 1 auto;
+}
+
+.visible-tabs {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .tab-count {

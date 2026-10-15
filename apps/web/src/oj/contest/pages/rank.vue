@@ -97,10 +97,16 @@ const meBackground = computed(
     `linear-gradient(${success.value.background}, ${success.value.background}), ${theme.value.cardColor}`,
 )
 const danger = computed(() => tone("error"))
-const columns = computed(
-  () =>
-    `40px ${running.value ? "36px " : ""}170px 48px 80px repeat(${problems.value.length}, 64px)`,
-)
+// 手机上照桌面的列宽，名字 + 做对 + 用时就占满一屏，每题的格子全在屏幕外，看不出能往右滑。
+// 收窄到第一两道题的格子露出半截
+const narrow = useMediaQuery("(max-width: 640px)")
+const columns = computed(() => {
+  const move = running.value ? "36px " : ""
+  const count = problems.value.length
+  return narrow.value
+    ? `28px ${move}112px 36px 70px repeat(${count}, 52px)`
+    : `40px ${move}170px 48px 80px repeat(${count}, 64px)`
+})
 </script>
 
 <template>
