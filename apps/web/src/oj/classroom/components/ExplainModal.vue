@@ -14,6 +14,7 @@ import { onKeyStroke } from "@vueuse/core"
 import { useThemeVars } from "naive-ui"
 import SubmissionView from "oj/submission/components/SubmissionView.vue"
 import UserName from "shared/components/UserName.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import type { ClassBoardProblem } from "utils/types"
 import ProblemBrief from "./ProblemBrief.vue"
 
@@ -24,6 +25,9 @@ import ProblemBrief from "./ProblemBrief.vue"
  *
  * 「题目」按钮：演示错误时题目和代码要并排（用户要的），点了左边出题目，再点收起。
  * 平时收着，代码照样占满宽。开没开记在这台电脑上，讲下一个人、下一道题还是那样
+ *
+ * 手机上（老师拿手机看看板）：顶上拆成三行 —— 题目和关闭、一排人（横着滑）、两个按钮；
+ * 没有键盘所以不写「← → 换人」；题目展开时叠在代码上面，不并排
  */
 const props = defineProps<{
   problem: ClassBoardProblem | null
@@ -33,6 +37,7 @@ const show = defineModel<boolean>("show", { required: true })
 const index = defineModel<number>("index", { required: true })
 
 const theme = useThemeVars()
+const { isMobile } = useBreakpoints()
 /**
  * 颜色走内联的 CSS 变量，不用 <style> 里的 v-bind()：n-modal 把内容挂到 body 下面，
  * v-bind 的变量挂在组件根上，传不过去（弹层底色整个透明）
@@ -49,6 +54,16 @@ const vars = computed(() => ({
 }))
 const current = computed(() => props.people[index.value] ?? null)
 const showProblem = useStorage("oj_explain_show_problem", false)
+
+/** 一排人横着滑的时候，换到的人要滑进来（← → 换人、或者点开的就是排在后面的） */
+const peopleRef = ref<HTMLElement | null>(null)
+watch([index, show], async () => {
+  if (!show.value) return
+  await nextTick()
+  peopleRef.value
+    ?.querySelector<HTMLElement>(".person.on")
+    ?.scrollIntoView({ block: "nearest", inline: "nearest" })
+})
 
 function step(delta: -1 | 1) {
   const next = index.value + delta
@@ -68,6 +83,7 @@ onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
     <!-- 无 preset 的 n-modal 直接子节点要是普通元素 -->
     <div
       class="sheet"
+      :class="{ narrow: isMobile }"
       :style="vars"
       role="dialog"
       :aria-label="problem ? `讲 ${problem.problemDisplayId} 的错误` : '讲错误'"
@@ -77,7 +93,7 @@ onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
           <b>{{ problem.problemDisplayId }}</b> {{ problem.title }}
           <template v-if="people.length > 1"> · 错着的</template>
         </span>
-        <div class="people">
+        <div ref="peopleRef" class="people">
           <button
             v-for="(person, i) in people"
             :key="person.userId"
@@ -90,25 +106,31 @@ onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
             <span class="kind">{{ person.label }}</span>
           </button>
         </div>
-        <span v-if="people.length > 1" class="keys"><kbd>←</kbd><kbd>→</kbd> 换人</span>
+        <span v-if="people.length > 1 && !isMobile" class="keys"
+          ><kbd>←</kbd><kbd>→</kbd> 换人</span
+        >
         <div class="spacer"></div>
-        <n-button
-          v-if="problem"
-          :type="showProblem ? 'primary' : 'default'"
-          :secondary="showProblem"
-          @click="showProblem = !showProblem"
-        >
-          题目
-        </n-button>
-        <n-button
-          v-if="current"
-          tag="a"
-          :href="'/submission/' + current.submissionId"
-          target="_blank"
-        >
-          在新页面打开
-        </n-button>
-        <n-button quaternary aria-label="关闭" @click="show = false">
+        <div class="buttons">
+          <n-button
+            v-if="problem"
+            :size="isMobile ? 'small' : 'medium'"
+            :type="showProblem ? 'primary' : 'default'"
+            :secondary="showProblem"
+            @click="showProblem = !showProblem"
+          >
+            题目
+          </n-button>
+          <n-button
+            v-if="current"
+            :size="isMobile ? 'small' : 'medium'"
+            tag="a"
+            :href="'/submission/' + current.submissionId"
+            target="_blank"
+          >
+            在新页面打开
+          </n-button>
+        </div>
+        <n-button quaternary class="close" aria-label="关闭" @click="show = false">
           <template #icon><Icon icon="ph:x-bold" /></template>
         </n-button>
       </div>
@@ -237,5 +259,71 @@ kbd {
 
 .main {
   min-width: 0;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---------- 手机 ---------- */
+
+.sheet.narrow {
+  width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  padding: 12px 14px 16px;
+  gap: 12px;
+}
+
+/* 第一行题目 + 关闭，第二行一排人（横着滑），第三行两个按钮 */
+.narrow .top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.narrow .problem {
+  grid-row: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.narrow .close {
+  grid-row: 1;
+  grid-column: 2;
+  margin-right: -6px;
+}
+
+.narrow .people {
+  grid-column: 1 / -1;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.narrow .person {
+  flex-shrink: 0;
+}
+
+.narrow .spacer {
+  display: none;
+}
+
+.narrow .buttons {
+  grid-column: 1 / -1;
+}
+
+/* 题目叠在代码上面，自己滚，别把代码顶出一屏 */
+.narrow .body.split {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.narrow .statement {
+  position: static;
+  max-height: 40vh;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--divider);
 }
 </style>

@@ -615,7 +615,13 @@ function shortTitle(title: string, size: number) {
             </span>
             <span class="muted">没做 {{ problemStats[selectedIndex]!.none }} 人</span>
             <div class="spacer"></div>
-            <n-button quaternary size="small" aria-label="收起" @click="selectedId = null">
+            <n-button
+              quaternary
+              size="small"
+              class="panel-close"
+              aria-label="收起"
+              @click="selectedId = null"
+            >
               <template #icon><Icon icon="ph:x-bold" /></template>
             </n-button>
           </div>
@@ -700,8 +706,10 @@ function shortTitle(title: string, size: number) {
             <template v-for="student in students" :key="student.userId">
               <tr v-if="groupStarts.has(student.userId)" class="group-row">
                 <td :colspan="board.problems.length + 4">
-                  {{ GROUP_LABEL[groupOf(student)] }}
-                  <span class="muted">{{ groupCount[groupOf(student)] }}</span>
+                  <span class="group-label">
+                    {{ GROUP_LABEL[groupOf(student)] }}
+                    <span class="muted">{{ groupCount[groupOf(student)] }}</span>
+                  </span>
                 </td>
               </tr>
               <tr :class="{ 'leave-row': groupOf(student) === 'leave' }">
@@ -1164,6 +1172,14 @@ a.who {
   color: inherit;
 }
 
+/* 题多了表格要横着滑，名字钉在左边，不然滑过去就不知道是谁的格子 */
+.grid .name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: v-bind("theme.cardColor");
+}
+
 .grid th.col {
   width: 96px;
   cursor: pointer;
@@ -1211,6 +1227,12 @@ a.who {
   font-size: 13px;
   font-weight: 600;
   background: v-bind("theme.actionColor");
+}
+
+/* 和名字一样钉在左边：横着滑过去也看得见这一组是什么 */
+.group-label {
+  position: sticky;
+  left: 12px;
 }
 
 .group-row .muted {
@@ -1313,5 +1335,58 @@ a.cell {
 
 .meta {
   font-size: var(--oj-fs-sec);
+}
+
+/* ---------- 手机 ---------- */
+
+@media (max-width: 768px) {
+  /* 题名占一行（收起钉在右边），人数挪到第二行，别把「人」挤到下一行去 */
+  .panel-head {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .panel-head > span {
+    order: 2;
+    white-space: nowrap;
+  }
+
+  .panel-title {
+    flex: 1 1 calc(100% - 50px);
+    min-width: 0;
+  }
+
+  .panel-head .spacer {
+    display: none;
+  }
+
+  .panel-close {
+    order: 1;
+  }
+
+  .err-group {
+    min-width: 0;
+    flex: 1 1 100%;
+    box-sizing: border-box;
+  }
+
+  .start-row {
+    flex-wrap: wrap;
+  }
+
+  .start-input {
+    flex-basis: 100%;
+    order: -1;
+  }
+
+  .grid .name {
+    width: auto;
+    padding-left: 4px;
+    padding-right: 8px;
+  }
+
+  .cell {
+    width: 48px;
+  }
 }
 </style>
