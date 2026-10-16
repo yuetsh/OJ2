@@ -36,6 +36,7 @@ import { JudgeStatus } from "../judge/status"
 import {
   buildProblemProgress,
   problemStates,
+  allProblemUserCounts,
   problemUserCounts,
 } from "../services/problem-progress"
 import {
@@ -180,7 +181,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
   // 旧的「画流程图 / 语法检查」排序已经拆成类型筛选，传进来落到默认（最新创建）
   const sort = problemListSortSchema.safeParse(c.req.query("sort") ?? "").data ?? ""
   const byPeople = sort.endsWith("submission_number") || sort.endsWith("accepted_number")
-  const allCounts = byPeople ? await problemUserCounts() : null
+  const allCounts = byPeople ? await allProblemUserCounts() : null
   const people = allCounts
     ? sql`case ${schema.problem.id} ${sql.join(
         [...allCounts].map(

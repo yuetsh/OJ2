@@ -29,6 +29,7 @@ import { db, schema } from "../db"
 import { JudgeStatus } from "../judge/status"
 import { sampleUser, rounded } from "../routes/helpers"
 import { termStart, weekStart } from "../time"
+import { cached } from "./cache"
 
 /**
  * 排名页和班级详情、班级 AI 分析共用的口径（routes/ranking.ts、routes/ai.ts）：
@@ -173,7 +174,20 @@ const PLATEAU_MIN = 5
 /** 班级详情的每周人均列最近几周 */
 const DETAIL_WEEKS = 6
 
-/** 有班级的学生，这学期的做对时刻 —— 班级对抗和班级详情都从这一份算 */
+/**
+ * 排名、班级对抗这些「谁来看都一样」的数据缓存多久（services/cache.ts）。10 秒：
+ * 一个班同时打开时只查一次；学生做对一道题马上去看排名，最多晚 10 秒看到。
+ */
+const SHARED_TTL = 10_000
+
+/** 排名榜面那群人的做对时刻：同一个范围、同一个时间段谁来看都一样，「我」的部分由调用方现算 */
+export function rankEntrants(scope: RankScope, group: string | null, since: string | null) {
+  return cached(`rank-entrants:${scope}:${group}:${since}`, SHARED_TTL, () =>
+    loadEntrants(audienceWhere(scope, group), since),
+  )
+}
+
+/** 有班级的学生，这学期的做对时刻 —— 班级对抗、班级详情、班级 PK 都从这一份算 */
 async function classedEntrants() {
   const term = termStart()
   const where = and(
@@ -181,7 +195,10 @@ async function classedEntrants() {
     isNotNull(schema.user.className),
     ne(schema.user.className, ""),
   )!
-  return { term, entrants: await loadEntrants(where, term) }
+  return {
+    term,
+    entrants: await cached(`classed-entrants:${term}`, SHARED_TTL, () => loadEntrants(where, term)),
+  }
 }
 
 function battleFrom(entrants: Entrant[]) {

@@ -6,6 +6,7 @@ import { isAccepted, UNJUDGED_RESULTS } from "../judge/status"
 import { asRecord } from "../routes/helpers"
 import { calendarDay, dayNumber, dayText, weekStart } from "../time"
 import { accepted } from "./learning-stats"
+import { cached } from "./cache"
 
 /**
  * 一个人在公开题库里的做题状态：做对了哪些、交过哪些。
@@ -47,6 +48,14 @@ export async function problemStates(userId: number) {
     if (row.passed) solved.add(row.problemId)
   }
   return { solved, tried }
+}
+
+/**
+ * 全部题的做对 / 交过人数，题目列表「按人数排」用。全表聚合，谁来排都一样，缓存 10 秒
+ * （见 services/cache.ts），列表上的人数最多晚 10 秒。
+ */
+export function allProblemUserCounts() {
+  return cached("problem-user-counts", 10_000, () => problemUserCounts())
 }
 
 /**

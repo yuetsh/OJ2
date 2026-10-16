@@ -28,6 +28,7 @@ import {
   loadEntrants,
   PK_MAX_CLASSES,
   pkPartner,
+  rankEntrants,
   standings,
   WEEK_MS,
   type Standing,
@@ -107,7 +108,7 @@ rankingRoutes.get("/rankings/board", optionalAuth, async (c) => {
   const isTeacher = isTeacherOrAbove(user)
 
   const [entrants, mine, hiddenUsers] = await Promise.all([
-    loadEntrants(audienceWhere(scope.data, group), start),
+    rankEntrants(scope.data, group, start),
     user && !isTeacher
       ? db
           .select({ rankHiddenAt: schema.user.rankHiddenAt })
