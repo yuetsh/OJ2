@@ -1,3 +1,4 @@
+import { ADMIN_ROLES, TEACHER_ROLES, type AdminType } from "@oj2/contract"
 import { PROBLEM_PERMISSION, STORAGE_KEY, USER_TYPE } from "utils/constants"
 import storage from "utils/storage"
 import type { Profile, SessionUser } from "utils/types"
@@ -23,25 +24,18 @@ export const useUserStore = defineStore("user", () => {
   const demoSwitch = ref<boolean>(storage.get(STORAGE_KEY.DEMO_MODE) ?? false)
   const demoMode = computed(() => demoSwitch.value && realIsSuperAdmin.value)
 
-  const isAdminRole = computed(
-    () =>
-      !demoMode.value &&
-      (user.value?.adminType === USER_TYPE.STUDENT_ADMIN ||
-        user.value?.adminType === USER_TYPE.TEACHER_ADMIN ||
-        user.value?.adminType === USER_TYPE.SUPER_ADMIN),
-  )
+  // 分组用契约里的白名单（roles.ts，全仓唯一的定义处），别在这里再列一遍角色
+  const hasRole = (roles: readonly AdminType[]) =>
+    !demoMode.value && !!user.value && (roles as readonly string[]).includes(user.value.adminType)
+
+  const isAdminRole = computed(() => hasRole(ADMIN_ROLES))
   const isStudentAdmin = computed(
     () => !demoMode.value && user.value?.adminType === USER_TYPE.STUDENT_ADMIN,
   )
   const isTeacherAdmin = computed(
     () => !demoMode.value && user.value?.adminType === USER_TYPE.TEACHER_ADMIN,
   )
-  const isTeacherOrAbove = computed(
-    () =>
-      !demoMode.value &&
-      (user.value?.adminType === USER_TYPE.TEACHER_ADMIN ||
-        user.value?.adminType === USER_TYPE.SUPER_ADMIN),
-  )
+  const isTeacherOrAbove = computed(() => hasRole(TEACHER_ROLES))
   const isSuperAdmin = computed(() => !demoMode.value && realIsSuperAdmin.value)
   const hasProblemPermission = computed(
     () => !demoMode.value && user.value?.problemPermission !== PROBLEM_PERMISSION.NONE,
