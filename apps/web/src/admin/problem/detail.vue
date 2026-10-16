@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { PROBLEM_TAG_MAX_LENGTH, TEST_CASE_MAX_CASES, type RunnableLanguage } from "@oj2/contract"
-import { StorageSerializers } from "@vueuse/core"
+import { TEST_CASE_MAX_CASES, type RunnableLanguage } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import PageHeader from "admin/components/PageHeader.vue"
 import { getProblemTagList } from "shared/api"
 import TextEditor from "shared/components/TextEditor.vue"
-import { errorCode, errorMessage } from "utils/api"
+import { errorMessage } from "utils/api"
 import { DIFFICULTY, STORAGE_KEY } from "utils/constants"
 import download from "utils/download"
 import { createZipBlob, parseTime, unique } from "utils/functions"
@@ -24,6 +23,15 @@ import CaseTable from "./components/CaseTable.vue"
 import CodePreview from "./components/CodePreview.vue"
 import PreviewStrip from "./components/PreviewStrip.vue"
 import { usePreviewCollapsed } from "./components/previewCollapse"
+import {
+  cleanTags,
+  difficultyOptions,
+  isBlankHtml,
+  problemListRoute,
+  saveErrorText,
+  tagTooLongText,
+  useCreateDraft,
+} from "./components/problemForm"
 import {
   caseFiles,
   caseStatus,
@@ -135,14 +143,6 @@ const blankForm = (): CodeForm => ({
 
 const form = reactive<CodeForm>(blankForm())
 
-/** 富文本编辑器清空之后留下的是一个空段落，不是空串 */
-const isBlankHtml = (html: string) => !html.trim() || html === "<p><br></p>"
-
-const difficultyOptions = (["Low", "Mid", "High"] as const).map((value) => ({
-  label: DIFFICULTY[value],
-  value,
-}))
-
 const NO_INPUT = "<p>没有输入</p>"
 
 // ---------------------------------------------------------------- 标签
@@ -176,13 +176,12 @@ function toggleKnowledge(name: string) {
 }
 
 function onOtherTagsChange(tags: string[]) {
-  const tooLong = tags.find((t) => t.length > PROBLEM_TAG_MAX_LENGTH)
-  if (tooLong) {
-    message.error(`标签最多 ${PROBLEM_TAG_MAX_LENGTH} 个字：${tooLong}`)
+  const cleaned = cleanTags(tags)
+  if ("tooLong" in cleaned) {
+    message.error(tagTooLongText(cleaned.tooLong))
     return
   }
-  const others = unique(tags.map((t) => t.trim()).filter(Boolean))
-  form.tags = unique([...form.tags.filter((t) => knowledgeSet.value.has(t)), ...others])
+  form.tags = unique([...form.tags.filter((t) => knowledgeSet.value.has(t)), ...cleaned.tags])
 }
 
 // ---------------------------------------------------------------- 标准答案
@@ -525,11 +524,6 @@ interface Draft {
   rows: { input: string; output: string; example: boolean }[]
 }
 
-// 新建时存草稿（编辑页不存：原来编辑页也往同一个 key 里写，没保存就离开的话，
-// 那道题的 id 会跟着草稿漂到新建页）。初值 null 时 VueUse 推不出类型，得显式指定
-const draft = useLocalStorage<Draft | null>(STORAGE_KEY.ADMIN_CODE_PROBLEM, null, {
-  serializer: StorageSerializers.object,
-})
 const ready = ref(false)
 const draftRestored = ref(false)
 
@@ -543,25 +537,21 @@ function snapshot() {
 }
 let baseline = ""
 
-watchDebounced(
-  () => [form, rows.value.map((r) => [r.input, r.output, r.example])] as const,
-  () => {
-    if (!ready.value || !isCreate.value) return
-    const empty =
-      !form._id &&
-      !form.title &&
-      isBlankHtml(form.description) &&
-      !RUNNABLE.some((l) => form.answers[l].trim()) &&
-      !rows.value.some((r) => r.input.trim() || r.output.trim())
-    draft.value = empty
-      ? null
-      : {
-          form: JSON.parse(JSON.stringify(form)),
-          rows: rows.value.map((r) => ({ input: r.input, output: r.output, example: r.example })),
-        }
-  },
-  { debounce: 800, deep: true },
-)
+// 新建时存草稿（编辑页不存，见 useCreateDraft）
+const draft = useCreateDraft<Draft>(STORAGE_KEY.ADMIN_CODE_PROBLEM, {
+  source: () => [form, rows.value.map((r) => [r.input, r.output, r.example])] as const,
+  enabled: () => ready.value && isCreate.value,
+  empty: () =>
+    !form._id &&
+    !form.title &&
+    isBlankHtml(form.description) &&
+    !RUNNABLE.some((l) => form.answers[l].trim()) &&
+    !rows.value.some((r) => r.input.trim() || r.output.trim()),
+  take: () => ({
+    form: JSON.parse(JSON.stringify(form)),
+    rows: rows.value.map((r) => ({ input: r.input, output: r.output, example: r.example })),
+  }),
+})
 
 function clearDraft() {
   draft.value = null
@@ -841,9 +831,7 @@ async function save() {
         : { name: "admin problem edit", params: { problemID: created.id } },
     )
   } catch (err) {
-    message.error(
-      errorCode(err) === "display-id-exists" ? "显示编号重复了，换一个" : errorMessage(err),
-    )
+    message.error(saveErrorText(err))
   } finally {
     saving.value = false
   }
@@ -866,11 +854,7 @@ onBeforeRouteLeave(() => {
   })
 })
 
-const backTo = computed(() =>
-  props.contestID
-    ? { name: "admin contest problem list", params: { contestID: props.contestID } }
-    : { name: "admin problem list" },
-)
+const backTo = computed(() => problemListRoute(props.contestID))
 
 const authorLine = computed(() =>
   props.initial

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { EditorView } from "@codemirror/view"
-import { PROBLEM_TAG_MAX_LENGTH, TEST_CASE_MAX_CASES } from "@oj2/contract"
+import { TEST_CASE_MAX_CASES } from "@oj2/contract"
 import Markdown from "shared/components/Markdown.vue"
-import { StorageSerializers } from "@vueuse/core"
 import { useThemeVars } from "naive-ui"
 import PageHeader from "admin/components/PageHeader.vue"
 import ProblemTypeTag from "oj/problem/components/ProblemTypeTag.vue"
@@ -24,6 +23,15 @@ import {
   previewSQLTestcase,
   uploadTestcases,
 } from "../api"
+import {
+  cleanTags,
+  difficultyOptions,
+  isBlankHtml,
+  problemListRoute,
+  saveErrorText,
+  tagTooLongText,
+  useCreateDraft,
+} from "./components/problemForm"
 import {
   explainSqlError,
   groupSummary,
@@ -94,13 +102,6 @@ const blankForm = (): SqlForm => ({
 
 const form = reactive<SqlForm>(blankForm())
 
-/** 富文本编辑器清空之后留下的是一个空段落，不是空串 */
-const isBlankHtml = (html: string) => !html.trim() || html === "<p><br></p>"
-
-const difficultyOptions = (["Low", "Mid", "High"] as const).map((value) => ({
-  label: DIFFICULTY[value],
-  value,
-}))
 const testCase = reactive({ id: "", score: [] as Testcase[] })
 
 let nextKey = 0
@@ -118,28 +119,17 @@ const showMore = ref(false)
 const ready = ref(false)
 
 // 新建时存草稿：出一道 SQL 题要写好几段脚本，误关页面全没了太亏
-// 初值是 null 时 VueUse 推不出类型，会拿 String() 存成 "[object Object]"，得显式指定
-const draft = useLocalStorage<{ form: SqlForm; scripts: string[] } | null>(
-  STORAGE_KEY.ADMIN_SQL_PROBLEM,
-  null,
-  { serializer: StorageSerializers.object },
-)
-
-watchDebounced(
-  () => [form, groups.value.map((g) => g.sql)] as const,
-  () => {
-    if (!ready.value || !isCreate.value) return
-    const scripts = groups.value.map((g) => g.sql)
-    const empty =
-      !form._id &&
-      !form.title &&
-      isBlankHtml(form.description) &&
-      !form.answer &&
-      !scripts.some(Boolean)
-    draft.value = empty ? null : { form: { ...form }, scripts }
-  },
-  { debounce: 800, deep: true },
-)
+const draft = useCreateDraft<{ form: SqlForm; scripts: string[] }>(STORAGE_KEY.ADMIN_SQL_PROBLEM, {
+  source: () => [form, groups.value.map((g) => g.sql)] as const,
+  enabled: () => ready.value && isCreate.value,
+  empty: () =>
+    !form._id &&
+    !form.title &&
+    isBlankHtml(form.description) &&
+    !form.answer &&
+    !groups.value.some((g) => g.sql),
+  take: () => ({ form: { ...form }, scripts: groups.value.map((g) => g.sql) }),
+})
 
 function clearDraft() {
   draft.value = null
@@ -212,12 +202,9 @@ const tagOptions = computed(() =>
 )
 
 function onTagsChange(tags: string[]) {
-  const tooLong = tags.find((t) => t.length > PROBLEM_TAG_MAX_LENGTH)
-  if (tooLong) {
-    message.error(`标签最多 ${PROBLEM_TAG_MAX_LENGTH} 个字：${tooLong}`)
-    return
-  }
-  form.tags = unique(tags.map((t) => t.trim()).filter(Boolean))
+  const cleaned = cleanTags(tags)
+  if ("tooLong" in cleaned) message.error(tagTooLongText(cleaned.tooLong))
+  else form.tags = cleaned.tags
 }
 
 // ---------------------------------------------------------------- 测试数据：自动重跑
@@ -415,25 +402,15 @@ async function save() {
     } else {
       message.success("保存好了")
     }
-    router.push(
-      props.contestID
-        ? { name: "admin contest problem list", params: { contestID: props.contestID } }
-        : { name: "admin problem list" },
-    )
+    router.push(problemListRoute(props.contestID))
   } catch (err) {
-    message.error(
-      errorCode(err) === "display-id-exists" ? "显示编号重复了，换一个" : errorMessage(err),
-    )
+    message.error(saveErrorText(err))
   } finally {
     saving.value = false
   }
 }
 
-const backTo = computed(() =>
-  props.contestID
-    ? { name: "admin contest problem list", params: { contestID: props.contestID } }
-    : { name: "admin problem list" },
-)
+const backTo = computed(() => problemListRoute(props.contestID))
 
 onMounted(async () => {
   getProblemTagList().then((res) => (tagList.value = res))

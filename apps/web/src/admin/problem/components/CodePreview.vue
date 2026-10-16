@@ -7,6 +7,7 @@ import { getTagColor } from "utils/functions"
 import type { AstRules, BlankProblem, LANGUAGE } from "utils/types"
 import type { AstCheckState, FlowchartMode, PreviewTab } from "./editorTypes"
 import type { TemplateParts } from "./codeTemplate"
+import { isBlankHtml } from "./problemForm"
 
 const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
 
@@ -40,8 +41,6 @@ const tab = defineModel<PreviewTab>("tab", { required: true })
 const emit = defineEmits<{ renderState: [ok: boolean]; collapse: [] }>()
 
 const theme = useThemeVars()
-
-const isBlankHtml = (html: string) => !html.trim() || html === "<p><br></p>"
 
 // ---------------------------------------------------------------- 语法要求
 
