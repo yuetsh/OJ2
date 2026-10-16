@@ -9,7 +9,7 @@ import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
 import { useRankPalette } from "../palette"
-import RankAvatar from "./RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 
 // Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
 const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))

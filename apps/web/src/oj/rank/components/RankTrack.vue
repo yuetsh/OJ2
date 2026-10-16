@@ -5,7 +5,7 @@ import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useRankPalette } from "../palette"
 import MoodPopover from "./MoodPopover.vue"
-import RankAvatar from "./RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 
 /**
  * 赛道：每人一根条，条越长做对越多，一样长的先做到的排前面（设计稿 G1 / G2）。

@@ -1,8 +1,16 @@
 import type { LoginRequest, RegisterRequest } from "@oj2/contract"
-import type { Quote, WebsiteConfig } from "@oj2/contract"
+import type {
+  ClassActivity,
+  MarkAchievementsRead,
+  ProblemAuthor,
+  ProblemList,
+  Quote,
+  WebsiteConfig,
+} from "@oj2/contract"
 import api from "utils/api"
 import { contractDeferred } from "utils/contract"
-import type { Profile, Tag } from "utils/types"
+import { toProblemRow } from "utils/transforms"
+import type { PendingAchievement, Profile, Tag } from "utils/types"
 
 export function login(data: { username: string; password: string }) {
   return api.post("auth/login", data satisfies LoginRequest)
@@ -50,4 +58,36 @@ export function getClassUsernames(classroom: string) {
 // 引到它，zod 整个就进了首屏包。
 export function getWebsiteConfig() {
   return api.get<WebsiteConfig>("site")
+}
+
+export async function getProblemList(
+  offset = 0,
+  limit = 10,
+  searchParams: Record<string, unknown> = {},
+) {
+  const res = await api.get<ProblemList>("problems", {
+    params: { paging: true, offset, limit, ...searchParams },
+  })
+  return {
+    results: res.results.map(toProblemRow),
+    total: res.total,
+  }
+}
+
+export function getAuthors(all = false) {
+  return api.get<ProblemAuthor[]>("problem-authors", {
+    params: { all: all ? "1" : "0" },
+  })
+}
+
+export function getClassActivity() {
+  return api.get<ClassActivity>("me/class-activity")
+}
+
+export function getPendingAchievements() {
+  return api.get<PendingAchievement[]>("achievements/pending")
+}
+
+export function markAchievementsRead(ids: number[]) {
+  return api.post("achievements/pending/read", { ids } satisfies MarkAchievementsRead)
 }

@@ -1,4 +1,4 @@
-import { getProblemList } from "oj/api"
+import { getProblemList } from "shared/api"
 
 /**
  * 按题号直达。课上老师报一个题号、全班去找，是非比赛提交最主要的来路，

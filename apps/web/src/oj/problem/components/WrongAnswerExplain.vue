@@ -5,12 +5,7 @@ import { useThemeVars } from "naive-ui"
 import { useProblemStore } from "oj/store/problem"
 import { markdownToText } from "oj/problem/utils/plainText"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
-import {
-  classifyDiff,
-  explainDiff,
-  firstDifferentLine,
-  type SampleCheck,
-} from "oj/problem/utils/wrongAnswer"
+import { classifyDiff, explainDiff, firstDifferentLine, type SampleCheck } from "utils/wrongAnswer"
 
 /**
  * 答案错误时的样例对比（数据见后端 judge/run.ts 的 checkSamples）。

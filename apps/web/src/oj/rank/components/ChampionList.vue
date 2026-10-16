@@ -3,7 +3,7 @@ import type { RankRow, WeeklyChampion } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
-import RankAvatar from "./RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 
 /** 本班最近几周的每周冠军，底下再挂这张榜上「进步最大」的那个人 */
 defineProps<{

@@ -9,7 +9,7 @@ import { batchSetProblemVisible, getProblemList, toggleProblemVisible } from "..
 import Actions from "./components/Actions.vue"
 import AddFromLibraryModal from "./components/AddFromLibraryModal.vue"
 import { useRouteQuery } from "@vueuse/router"
-import AuthorSelect from "shared/components/AuthorSelect.vue"
+import AuthorSelect from "admin/components/AuthorSelect.vue"
 import type { DataTableRowKey } from "naive-ui"
 import BatchTagModal from "./components/BatchTagModal.vue"
 import CreateProblemMenu from "./components/CreateProblemMenu.vue"

@@ -1,4 +1,4 @@
-import { getPendingAchievements, markAchievementsRead } from "oj/achievement/api"
+import { getPendingAchievements, markAchievementsRead } from "shared/api"
 import type { QueuedAchievement } from "utils/types"
 
 /**

@@ -23,7 +23,6 @@ import {
   type ProfileOverview,
   type TutorialSummary,
   type Tutorial,
-  type ClassActivity,
   type ClassToday,
   type LastVisit,
   type ClassBoard,
@@ -40,10 +39,8 @@ import {
   type WeeklyRank,
   type ProblemRank,
   type CreateSubmissionResponse,
-  type ProblemAuthor,
   type ProblemListItem,
   type ProblemStats,
-  type ProblemList,
   type ProblemProgress,
   type CreateFlowchartResponse,
   type FlowchartScores,
@@ -64,7 +61,7 @@ import {
 } from "@oj2/contract"
 import api from "utils/api"
 import { contract } from "utils/contract"
-import { toProblemRow } from "oj/transforms"
+import { toProblemRow } from "utils/transforms"
 import type {
   Announcement,
   AnnouncementListItem,
@@ -82,25 +79,11 @@ import type {
 
 /**
  * 题目详情 / 提交详情的 schema 按需加载，和请求并行发出。静态 import 会把 zod
- * 运行时带进首页 —— 题目列表的 getProblemList 也在这个文件里。
+ * 运行时带进首页 —— 首页、题目列表都 import 这个文件。
  * 闸门本身仍是同步的（等 schema 到了再返回），submissionDetailSchema 有 `.catch()`，
  * 放行原文和解析结果不等价，所以不能像 /me 那样改成 contractDeferred。
  */
 const loadDetailSchemas = () => import("./detailSchemas")
-
-export async function getProblemList(
-  offset = 0,
-  limit = 10,
-  searchParams: Record<string, unknown> = {},
-) {
-  const res = await api.get<ProblemList>("problems", {
-    params: { paging: true, offset, limit, ...searchParams },
-  })
-  return {
-    results: res.results.map(toProblemRow),
-    total: res.total,
-  }
-}
 
 /** 题目列表顶上那行和左栏的进度；没登录是 null */
 export function getProblemProgress() {
@@ -113,12 +96,6 @@ export function getProblemProgress() {
  */
 export function getRandomProblem(params: { tag: string; type: string; language: string }) {
   return api.get<string>("problems/random", { params })
-}
-
-export function getAuthors(all = false) {
-  return api.get<ProblemAuthor[]>("problem-authors", {
-    params: { all: all ? "1" : "0" },
-  })
 }
 
 export async function getProblem(problemID: string, contestID: string) {
@@ -314,10 +291,6 @@ export function setClassLesson(
 /** 我的知识点地图（只有自己的，不能查别人） */
 export function getKnowledgeMap() {
   return api.get<KnowledgeMap>("me/knowledge")
-}
-
-export function getClassActivity() {
-  return api.get<ClassActivity>("me/class-activity")
 }
 
 /** 老师首页「今天的课」：今天在上课的每个班 */

@@ -21,7 +21,7 @@ import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
 import ResultHeader from "./ResultHeader.vue"
 import SimilarProblems from "./SimilarProblems.vue"
-import { useLessonStore } from "oj/store/lesson"
+import { useLessonStore } from "shared/store/lesson"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import Markdown from "shared/components/Markdown.vue"
 

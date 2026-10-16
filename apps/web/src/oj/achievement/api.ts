@@ -1,17 +1,8 @@
-import type { MarkAchievementsRead } from "@oj2/contract"
 import api from "utils/api"
-import type { AchievementList, PendingAchievement } from "utils/types"
+import type { AchievementList } from "utils/types"
 
 export function getAchievements(name?: string) {
   return api.get<AchievementList>("achievements", {
     params: name ? { username: name } : {},
   })
-}
-
-export function getPendingAchievements() {
-  return api.get<PendingAchievement[]>("achievements/pending")
-}
-
-export function markAchievementsRead(ids: number[]) {
-  return api.post("achievements/pending/read", { ids } satisfies MarkAchievementsRead)
 }

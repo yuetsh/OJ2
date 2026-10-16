@@ -3,7 +3,7 @@ import type { RankRow } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import UserName from "shared/components/UserName.vue"
 import { useRankPalette } from "../palette"
-import RankAvatar from "./RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 
 /** 这周本班前 5 名（做对过新题的），每周一清零 */
 const props = defineProps<{ rows: RankRow[]; meId?: number; loaded: boolean }>()

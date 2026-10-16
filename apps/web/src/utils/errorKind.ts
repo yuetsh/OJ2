@@ -1,4 +1,4 @@
-import { classifyDiff, type DiffKind } from "oj/problem/utils/wrongAnswer"
+import { classifyDiff, type DiffKind } from "utils/wrongAnswer"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import type { ClassBoardCell } from "utils/types"
 

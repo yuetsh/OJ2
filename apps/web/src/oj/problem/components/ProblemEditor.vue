@@ -18,7 +18,7 @@ import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import CollabBar from "./CollabBar.vue"
 import { useFlowchartStore } from "oj/store/flowchart"
-import { useLessonStore } from "oj/store/lesson"
+import { useLessonStore } from "shared/store/lesson"
 
 const FlowchartEditor = defineAsyncComponent(
   () => import("shared/components/FlowchartEditor/index.vue"),

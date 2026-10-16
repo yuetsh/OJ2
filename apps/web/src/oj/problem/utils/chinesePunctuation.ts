@@ -1,4 +1,4 @@
-import { PUNCTUATION_MAP } from "./pythonError"
+import { PUNCTUATION_MAP } from "utils/pythonError"
 
 export interface PunctuationFix {
   from: number

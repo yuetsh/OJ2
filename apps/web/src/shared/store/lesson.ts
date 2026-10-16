@@ -1,5 +1,5 @@
 import { defineStore } from "pinia"
-import { getClassActivity } from "oj/api"
+import { getClassActivity } from "shared/api"
 import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import type { ClassActivity, ClassActivityProblem } from "utils/types"
 

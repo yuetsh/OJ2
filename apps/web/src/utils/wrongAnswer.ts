@@ -1,5 +1,5 @@
 import type { StatisticInfo } from "@oj2/contract"
-import { PUNCTUATION_MAP, PUNCTUATION_NAMES } from "./pythonError"
+import { PUNCTUATION_MAP, PUNCTUATION_NAMES } from "utils/pythonError"
 
 /**
  * 答案错误时，比较学生在**公开样例**上的输出和正确输出，归一类、给一句中文提示。

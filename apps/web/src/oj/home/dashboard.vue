@@ -3,7 +3,6 @@ import { continueStep, doneCount, lessonPath, splitTitle, type TutorialType } fr
 import { Icon } from "@iconify/vue"
 import {
   getAnnouncementList,
-  getClassActivity,
   getKnowledgeMap,
   getContestList,
   getLastVisit,
@@ -12,6 +11,7 @@ import {
   getTutorials,
   getWeeklyRank,
 } from "oj/api"
+import { getClassActivity } from "shared/api"
 import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
 import { pickHeadline, type Headline } from "oj/user/knowledge"
 import { useUserStore } from "shared/store/user"

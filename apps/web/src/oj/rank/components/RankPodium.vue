@@ -4,7 +4,7 @@ import { useThemeVars } from "naive-ui"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import UserName from "shared/components/UserName.vue"
 import { useRankPalette } from "../palette"
-import RankAvatar from "./RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 
 /**
  * 领奖台：前三名站在台阶上，第一名戴皇冠。赛道从第 4 名接着排，前三不再出现第二遍。

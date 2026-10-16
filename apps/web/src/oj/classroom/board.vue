@@ -15,7 +15,7 @@ import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
 import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from "utils/types"
 import ExplainModal, { type ExplainPerson } from "./components/ExplainModal.vue"
-import { errorKind, type ErrorKind } from "./errorKind"
+import { errorKind, type ErrorKind } from "utils/errorKind"
 
 /**
  * 课堂看板（老师，设计稿「课堂看板重设计」A+B）：这个班、今天、这节课的几道题 × 全班学生。

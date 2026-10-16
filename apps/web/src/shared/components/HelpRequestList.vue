@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
-import { errorKind } from "oj/classroom/errorKind"
+import { errorKind } from "utils/errorKind"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useTeacherHelp } from "shared/composables/teacherHelp"
 import { useCollabStore } from "shared/store/collab"

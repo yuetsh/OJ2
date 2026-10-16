@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
-import { useLessonStore } from "oj/store/lesson"
+import { useLessonStore } from "shared/store/lesson"
 
 /**
  * 通过之后告诉学生「这节课的下一题是哪道」。

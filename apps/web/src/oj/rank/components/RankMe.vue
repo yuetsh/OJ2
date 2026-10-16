@@ -4,7 +4,7 @@ import { useThemeVars } from "naive-ui"
 import UserName from "shared/components/UserName.vue"
 import { gapText, toPass } from "../utils"
 import MoodPopover from "./MoodPopover.vue"
-import RankAvatar from "./RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 
 export interface MiniRank {
   label: string

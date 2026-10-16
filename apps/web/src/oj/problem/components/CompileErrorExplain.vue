@@ -10,7 +10,7 @@ import {
   showPunctuationMarks,
 } from "oj/problem/utils/errorMark"
 import { explainCCompileError } from "oj/problem/utils/cError"
-import { explainPythonCompileError } from "oj/problem/utils/pythonError"
+import { explainPythonCompileError } from "utils/pythonError"
 
 /**
  * 编译错误的中文说明卡片：Python 的语法错误走 pythonError.ts，C / C++ 的 gcc 报错走

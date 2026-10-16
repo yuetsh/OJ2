@@ -1,5 +1,5 @@
 import { findChinesePunctuation } from "./chinesePunctuation"
-import { PUNCTUATION_NAMES, type PythonErrorExplanation } from "./pythonError"
+import { PUNCTUATION_NAMES, type PythonErrorExplanation } from "utils/pythonError"
 
 /**
  * 把 C / C++ 的编译错误（gcc 的原文）翻成中文，和 pythonError.ts 同一个思路：

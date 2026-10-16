@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
-import { useLessonStore } from "oj/store/lesson"
+import { useLessonStore } from "shared/store/lesson"
 import { useProblemJump } from "shared/composables/problemJump"
 import { useUserStore } from "shared/store/user"
 import type { ClassActivityProblem } from "utils/types"

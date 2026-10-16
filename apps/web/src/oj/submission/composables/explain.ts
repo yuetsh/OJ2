@@ -1,5 +1,5 @@
 import { explainCCompileError } from "oj/problem/utils/cError"
-import { explainPythonCompileError } from "oj/problem/utils/pythonError"
+import { explainPythonCompileError } from "utils/pythonError"
 import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { SubmissionStatus } from "utils/constants"
 import type { Submission } from "utils/types"

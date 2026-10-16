@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { resetAvatar, uploadAvatar } from "oj/api"
-import RankAvatar from "oj/rank/components/RankAvatar.vue"
+import RankAvatar from "shared/components/RankAvatar.vue"
 import { useUserStore } from "shared/store/user"
 
 /**
