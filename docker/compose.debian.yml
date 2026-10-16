@@ -31,6 +31,36 @@ services:
     # 机房那套要连这个端口，必须对外暴露
     ports:
       - "5445:5432"
+    # 这台机器 2 核 7.5G、没有 swap，和 gitea、judge0 等二十多个别的服务挤在一起（2026-10 实测
+    # 可用 3.5G）。所以这里的取舍是「别被挤死」而不是「吃满内存」：
+    # - 全库 249MB，shared_buffers 512MB 能整库常驻，work_mem 16MB 让统计页的聚合排序不落盘；
+    # - oom_score_adj 压低：内存真满了，内核先杀别的，不先杀库；
+    # - cpu_shares 加倍：上课一个班同时交题时，查库和网页比判题、比别的服务先拿到 CPU。
+    #   这是按比例分、不是封顶，闲的时候判题照样用满两个核；
+    # - 两个超时防机房断网：事务开着不动超过 60 秒就断，锁不会一直挂着；
+    #   TCP 保活把断掉的远端连接从默认两小时缩到两分钟左右才发现。
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - effective_cache_size=2GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - idle_in_transaction_session_timeout=60s
+      - -c
+      - tcp_keepalives_idle=60
+      - -c
+      - tcp_keepalives_interval=10
+      - -c
+      - tcp_keepalives_count=6
+    # 并行查询的工作区走 /dev/shm，docker 默认只给 64MB，大一点的并行哈希会直接报错
+    shm_size: 256m
+    oom_score_adj: -500
+    cpu_shares: 2048
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U onlinejudge -d onlinejudge"]
       interval: 5s
@@ -87,7 +117,10 @@ services:
       # 心跳路径跟着新后端改了：judge_server_heartbeat/ → judge-server/heartbeat
       BACKEND_URL: http://oj-api:3000/api/judge-server/heartbeat
       TOKEN: ${OJ2_JUDGE_TOKEN:?请在 docker/.env 里设置 OJ2_JUDGE_TOKEN}
-    mem_limit: 512m
+    # 同一时刻最多六份在编译（正式判题 2、试运行 2、提交前编译检查 2），g++ 编一份 iostream
+    # 峰值约 70MB、bits/stdc++.h 约 195MB，再加学生程序本身。512m 不够撑满，超了是容器里
+    # 随机杀进程、学生看到系统错误
+    mem_limit: 1g
 
   oj-api:
     build: &build
@@ -127,6 +160,8 @@ services:
       retries: 3
       start_period: 10s
     mem_limit: 512m
+    # 理由同 oj-postgres：上课时学生翻页、看结果要先于判题拿到 CPU
+    cpu_shares: 2048
 
   oj-worker:
     build: *build
@@ -140,7 +175,8 @@ services:
     environment: *api-env
     # 同一个镜像，换个子命令就是判题消费者
     command: ["oj2-api", "worker"]
-    mem_limit: 512m
+    # SQL 判题的子进程各允许 512MB 数据段（judge/sql 的 ulimit -d），两个并发就能顶满 512m
+    mem_limit: 1g
 
   oj-web:
     build:
