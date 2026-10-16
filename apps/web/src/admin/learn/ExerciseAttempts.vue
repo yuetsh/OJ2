@@ -11,6 +11,7 @@ const { isMobile } = useBreakpoints()
 
 const loading = ref(true)
 const rows = ref<LearnExerciseAttempt[]>([])
+const untried = ref<{ userId: number; username: string }[]>([])
 
 function renderResult(row: LearnExerciseAttempt) {
   return row.solved
@@ -19,13 +20,12 @@ function renderResult(row: LearnExerciseAttempt) {
 }
 
 const desktopColumns: DataTableColumn<LearnExerciseAttempt>[] = [
-  { title: "班级", key: "className", width: 80 },
-  { title: "学号", key: "username", width: 140 },
+  // 一个弹框只看一个班，班级列多余；用户名里本来就带名字，不再单列真名
   {
-    title: "姓名",
-    key: "realName",
-    width: 100,
-    render: (row) => row.realName || "-",
+    title: "学生",
+    key: "username",
+    width: 140,
+    render: (row) => h(UserName, { username: row.username }),
   },
   {
     title: "结果",
@@ -33,7 +33,7 @@ const desktopColumns: DataTableColumn<LearnExerciseAttempt>[] = [
     width: 130,
     render: renderResult,
   },
-  { title: "提交次数", key: "attempts", width: 100, sorter: "default" },
+  { title: "提交次数", key: "attempts", width: 110, sorter: "default" },
   {
     // 学生最后一次做错时提交的内容，前端拼好的一句人话。选择题看这一列
     // 就知道全班是不是都掉进同一个干扰项
@@ -46,12 +46,12 @@ const desktopColumns: DataTableColumn<LearnExerciseAttempt>[] = [
   {
     title: "最后作答",
     key: "lastAttemptAt",
-    width: 150,
+    width: 120,
     render: (row) => parseTime(row.lastAttemptAt, "M月D日 HH:mm"),
   },
 ]
 
-/** 手机上七列放不下：一个人一格，名字和结果一行，下面一行小字是交了几次、最后错在哪 */
+/** 手机上五列放不下：一个人一格，名字和结果一行，下面一行小字是交了几次、最后错在哪 */
 const mobileColumns: DataTableColumn<LearnExerciseAttempt>[] = [
   {
     title: "学生",
@@ -74,9 +74,11 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
 
 onMounted(async () => {
   try {
-    rows.value = await getLearnExerciseAttempts(props.exerciseId, {
+    const data = await getLearnExerciseAttempts(props.exerciseId, {
       className: props.className,
     })
+    rows.value = data.results
+    untried.value = data.untried
   } finally {
     loading.value = false
   }
@@ -98,9 +100,46 @@ onMounted(async () => {
     size="small"
     style="padding: 16px 0"
   />
+  <div v-if="untried.length" class="untried">
+    <div class="untried-head">
+      <span class="strong">读了这课还没做</span>
+      <n-text depth="3">{{ untried.length }} 人</n-text>
+    </div>
+    <div class="chips">
+      <span v-for="row in untried" :key="row.userId" class="chip"
+        ><UserName :username="row.username"
+      /></span>
+    </div>
+  </div>
 </template>
 
 <style scoped>
+.untried {
+  margin-top: 16px;
+}
+.untried-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.strong {
+  font-weight: 700;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+}
 :deep(.m-row) {
   display: flex;
   flex-direction: column;

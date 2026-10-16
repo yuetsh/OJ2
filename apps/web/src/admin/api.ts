@@ -12,7 +12,8 @@ import type {
   GradeTrendProblem,
   LearnBoard,
   LearnExerciseProgressList,
-  LearnExerciseAttempt,
+  LearnExerciseAttemptList,
+  LearnStudentDetail,
   AdminContestList,
   AdminUser,
   AdminUserList,
@@ -657,9 +658,14 @@ export function getLearnExercises(params: { type: "python" | "c"; className?: st
 }
 
 export function getLearnExerciseAttempts(exerciseId: number, params: { className?: string }) {
-  return api.get<LearnExerciseAttempt[]>(`admin/learn-analytics/exercises/${exerciseId}/attempts`, {
-    params,
-  })
+  return api.get<LearnExerciseAttemptList>(
+    `admin/learn-analytics/exercises/${exerciseId}/attempts`,
+    { params },
+  )
+}
+
+export function getLearnStudent(userId: number, params: { type: "python" | "c" }) {
+  return api.get<LearnStudentDetail>(`admin/learn-analytics/students/${userId}`, { params })
 }
 
 export function getGradeTrend() {

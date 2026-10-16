@@ -654,6 +654,18 @@ export const learnBoardStudentSchema = z.object({
   opened: z.array(z.number().int()),
   done: z.array(z.number().int()),
   exerciseSolved: z.number().int(),
+  /**
+   * 碰过练一练的课，一课一项（一道没做的课不在里面）。方块格靠它分出「做了一部分」，
+   * `wrongAttempts` 是这课所有练习错的次数加起来
+   */
+  lessons: z.array(
+    z.object({
+      tutorialId: z.number().int(),
+      tried: z.number().int(),
+      solved: z.number().int(),
+      wrongAttempts: z.number().int(),
+    }),
+  ),
   totalSeconds: z.number().int(),
   lastViewedAt: z.string().nullable(),
 })
@@ -710,6 +722,43 @@ export const learnExerciseAttemptSchema = z.object({
   attemptsToSolve: z.number().int().nullable(),
   lastWrongAnswer: z.string().nullable(),
   lastAttemptAt: z.string(),
+})
+
+export const learnExerciseAttemptListSchema = z.object({
+  results: z.array(learnExerciseAttemptSchema),
+  /** 打开过这一课、这道练习却一次没交的人 */
+  untried: z.array(z.object({ userId: z.number().int(), username: z.string() })),
+})
+
+/**
+ * 一个学生的自学明细（点方块格里的名字）：他碰过的每一课，每道练一练做到哪了。
+ * 一课没碰过的不下发；练习没做过的 `attempts` 为 0、其余字段为空。
+ */
+export const learnStudentDetailSchema = z.object({
+  userId: z.number().int(),
+  username: z.string(),
+  className: z.string().nullable(),
+  lessons: z.array(
+    z.object({
+      tutorialId: z.number().int(),
+      title: z.string(),
+      viewCount: z.number().int(),
+      totalSeconds: z.number().int(),
+      lastViewedAt: z.string().nullable(),
+      exercises: z.array(
+        z.object({
+          exerciseId: z.number().int(),
+          type: exerciseTypeSchema,
+          question: z.string(),
+          attempts: z.number().int(),
+          solved: z.boolean(),
+          attemptsToSolve: z.number().int().nullable(),
+          lastWrongAnswer: z.string().nullable(),
+          lastAttemptAt: z.string().nullable(),
+        }),
+      ),
+    }),
+  ),
 })
 
 export const generateFlowchartRequestSchema = z.object({
@@ -1056,6 +1105,8 @@ export type LearnBoardStudent = z.infer<typeof learnBoardStudentSchema>
 export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>
 export type LearnExerciseProgressList = z.infer<typeof learnExerciseProgressListSchema>
 export type LearnExerciseAttempt = z.infer<typeof learnExerciseAttemptSchema>
+export type LearnExerciseAttemptList = z.infer<typeof learnExerciseAttemptListSchema>
+export type LearnStudentDetail = z.infer<typeof learnStudentDetailSchema>
 
 export type AdminTag = z.infer<typeof adminTagSchema>
 export type RenameTagResponse = z.infer<typeof renameTagResponseSchema>

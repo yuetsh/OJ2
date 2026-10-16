@@ -335,6 +335,8 @@ export type {
   LearnExerciseProgress,
   LearnExerciseProgressList,
   LearnExerciseAttempt,
+  LearnExerciseAttemptList,
+  LearnStudentDetail,
 } from "@oj2/contract"
 
 /**

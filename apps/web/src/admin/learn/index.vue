@@ -10,26 +10,19 @@ import { groupClassOptions } from "oj/submission/utils"
 import { groupByProject, splitTitle, type TutorialType } from "oj/learn/lesson"
 import "oj/learn/learn.css"
 import ExerciseAttempts from "./ExerciseAttempts.vue"
+import StudentDrawer from "./StudentDrawer.vue"
+import { EXERCISE_KIND } from "./kinds"
 
 /**
  * 自学情况（设计稿「后台 · 自学情况」）：一个班学到哪了。
  *
- * 中间是学生 × 课的方块格（浅绿 = 打开过，绿 = 学完，也就是练一练全对），一课没打开过的
- * 学生收成一串名单；右边按课看练一练做对了多少，点一道看每个人最后错在哪。
+ * 中间是学生 × 课的方块格（浅绿 = 打开过，绿 = 学完，也就是练一练全对；练一练做了一部分的
+ * 按做对的比例从下往上涨绿，一道没做对的底下压一条橙），一课没打开过的学生收成一串名单。
+ * 点名字看这个人每课每道练一练的明细；右边按课看练一练做对了多少，点一道看每个人最后错在哪。
  * 不选班就按排名页同一套规则猜老师在教哪个班。
  */
 const configStore = useConfigStore()
 const theme = useThemeVars()
-
-const KIND: Record<string, string> = {
-  mcq: "选择",
-  sort: "排序",
-  fill: "填空",
-  match: "连线",
-  predict: "预测输出",
-  debug: "找错",
-  group: "分组",
-}
 
 const type = ref<TutorialType>("python")
 const className = ref<string | null>(null)
@@ -37,6 +30,8 @@ const board = ref<LearnBoard | null>(null)
 const exercises = ref<LearnExerciseProgress[]>([])
 const lessonId = ref<number | null>(null)
 const expanded = ref<number | null>(null)
+const studentId = ref<number | null>(null)
+const showStudent = ref(false)
 const loading = ref(false)
 
 const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
@@ -72,6 +67,15 @@ const openedCount = computed(() => {
   }
   return counts
 })
+const exerciseTotal = computed(
+  () => new Map((board.value?.tutorials ?? []).map((row) => [row.id, row.exerciseTotal])),
+)
+const steps = computed(
+  () =>
+    new Map(
+      groups.value.flatMap((group) => group.lessons.map((lesson) => [lesson.id, lesson.step])),
+    ),
+)
 const maxOpened = computed(() => Math.max(1, ...openedCount.value.values()))
 const lessonOptions = computed(() =>
   groups.value.flatMap((group) =>
@@ -85,15 +89,48 @@ const lessonExercises = computed(() =>
   exercises.value.filter((row) => row.tutorialId === lessonId.value),
 )
 
+function lessonOf(row: LearnBoardStudent, id: number) {
+  return row.lessons.find((lesson) => lesson.tutorialId === id)
+}
+
 function cellOf(row: LearnBoardStudent, id: number) {
   if (row.done.includes(id)) return "done"
+  const lesson = lessonOf(row, id)
+  if (lesson) return lesson.solved ? "partial" : "partial stuck"
   if (row.opened.includes(id)) return "opened"
   return ""
 }
 
+/** 做了一部分的格子：做对几成，绿就从下往上涨几成 */
+function cellStyle(row: LearnBoardStudent, id: number) {
+  const lesson = lessonOf(row, id)
+  const total = exerciseTotal.value.get(id) ?? 0
+  if (!lesson || !total || row.done.includes(id)) return undefined
+  return { "--fill": `${Math.round((lesson.solved / total) * 100)}%` }
+}
+
 function cellTitle(row: LearnBoardStudent, step: number, title: string, id: number) {
-  const state = cellOf(row, id)
-  return `第 ${step} 课 ${splitTitle(title).kp}：${state === "done" ? "学完了" : state === "opened" ? "打开过" : "没打开"}`
+  const head = `第 ${step} 课 ${splitTitle(title).kp}`
+  const total = exerciseTotal.value.get(id) ?? 0
+  const lesson = lessonOf(row, id)
+  const wrong = lesson?.wrongAttempts ? `，错了 ${lesson.wrongAttempts} 次` : ""
+  if (row.done.includes(id)) return `${head}：学完了${wrong}`
+  if (lesson) return `${head}：练一练 ${lesson.solved}/${total}${wrong}`
+  if (row.opened.includes(id)) return `${head}：${total ? "打开过，练一练没做" : "打开过"}`
+  return `${head}：没打开`
+}
+
+/** 应做 = 他打开过或做过练一练的那些课，练一练加起来几道 */
+function exerciseDue(row: LearnBoardStudent) {
+  const ids = new Set([...row.opened, ...row.lessons.map((lesson) => lesson.tutorialId)])
+  let due = 0
+  for (const id of ids) due += exerciseTotal.value.get(id) ?? 0
+  return due
+}
+
+function openStudent(row: LearnBoardStudent) {
+  studentId.value = row.userId
+  showStudent.value = true
 }
 
 function flag(row: LearnExerciseProgress) {
@@ -201,7 +238,9 @@ onMounted(load)
                 <span class="c-last muted">最后学习</span>
               </div>
               <div v-for="row in started" :key="row.userId" class="line">
-                <span class="c-name"><UserName :username="row.username" /></span>
+                <button type="button" class="c-name name-btn" @click="openStudent(row)">
+                  <UserName :username="row.username" />
+                </button>
                 <div class="cells">
                   <div v-for="group in groups" :key="group.lessons[0]!.id" class="group-cells">
                     <span
@@ -209,11 +248,18 @@ onMounted(load)
                       :key="lesson.id"
                       class="cell"
                       :class="cellOf(row, lesson.id)"
+                      :style="cellStyle(row, lesson.id)"
                       :title="cellTitle(row, lesson.step, lesson.title, lesson.id)"
                     />
                   </div>
                 </div>
-                <span class="c-num num">{{ row.exerciseSolved || "-" }}</span>
+                <span class="c-num num">
+                  <template v-if="exerciseDue(row)"
+                    >{{ row.exerciseSolved
+                    }}<span class="muted">/{{ exerciseDue(row) }}</span></template
+                  >
+                  <template v-else>-</template>
+                </span>
                 <span class="c-stay num">{{ readableDuration(row.totalSeconds) }}</span>
                 <span class="c-last num muted">{{
                   row.lastViewedAt ? parseTime(row.lastViewedAt, "M月D日 HH:mm") : "-"
@@ -266,7 +312,7 @@ onMounted(load)
             <div v-for="row in lessonExercises" :key="row.exerciseId" class="ex">
               <button type="button" class="ex-main" @click="expanded = row.exerciseId">
                 <span class="ex-line">
-                  <span class="kind">{{ KIND[row.type] ?? row.type }}</span>
+                  <span class="kind">{{ EXERCISE_KIND[row.type] ?? row.type }}</span>
                   <span class="question">{{ row.question || "（没有题干）" }}</span>
                   <Icon icon="ph:caret-right-bold" :width="12" class="muted" />
                 </span>
@@ -296,6 +342,8 @@ onMounted(load)
         :class-name="board?.className ?? ''"
       />
     </n-modal>
+
+    <StudentDrawer v-model:show="showStudent" :user-id="studentId" :type="type" :steps="steps" />
   </div>
 </template>
 
@@ -464,8 +512,26 @@ onMounted(load)
 .cell.done {
   background: #18a058;
 }
+.cell.partial {
+  background: linear-gradient(to top, #18a058 var(--fill), rgba(24, 160, 88, 0.3) var(--fill));
+}
+.cell.stuck {
+  box-shadow: inset 0 -4px 0 v-bind("theme.warningColor");
+}
+.name-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.name-btn:hover {
+  text-decoration: underline;
+}
 .c-num {
-  width: 52px;
+  width: 56px;
   text-align: right;
   font-size: 13px;
   flex-shrink: 0;

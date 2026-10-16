@@ -2,11 +2,13 @@ import {
   STUDENT_ROLES,
   isLessonDone,
   type LearnBoard,
-  type LearnExerciseAttempt,
+  type LearnBoardStudent,
+  type LearnExerciseAttemptList,
   type LearnExerciseProgress,
   type LearnExerciseProgressList,
+  type LearnStudentDetail,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, inArray, like, sql } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, like, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
@@ -125,7 +127,14 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
             .select({
               userId: schema.exerciseAttempt.userId,
               tutorialId: schema.exercise.tutorialId,
-              solved: count(),
+              tried: count(),
+              solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
+                Number,
+              ),
+              wrongAttempts:
+                sql<number>`coalesce(sum(${schema.exerciseAttempt.wrongAttempts}), 0)`.mapWith(
+                  Number,
+                ),
             })
             .from(schema.exerciseAttempt)
             .innerJoin(schema.exercise, eq(schema.exercise.id, schema.exerciseAttempt.exerciseId))
@@ -133,7 +142,6 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
               and(
                 inArray(schema.exerciseAttempt.userId, userIds),
                 inArray(schema.exercise.tutorialId, tutorialIds),
-                eq(schema.exerciseAttempt.solved, true),
               ),
             )
             .groupBy(schema.exerciseAttempt.userId, schema.exercise.tutorialId),
@@ -142,8 +150,8 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
 
   const progress = new Map<string, (typeof progressRows)[number]>()
   for (const row of progressRows) progress.set(`${row.userId}:${row.tutorialId}`, row)
-  const solved = new Map<string, number>()
-  for (const row of solvedRows) solved.set(`${row.userId}:${row.tutorialId}`, row.solved)
+  const attempted = new Map<string, (typeof solvedRows)[number]>()
+  for (const row of solvedRows) attempted.set(`${row.userId}:${row.tutorialId}`, row)
 
   return success(c, {
     className,
@@ -151,14 +159,20 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
     students: students.map((student) => {
       const opened: number[] = []
       const done: number[] = []
+      const lessons: LearnBoardStudent["lessons"] = []
       let exerciseSolved = 0
       let totalSeconds = 0
       let lastViewedAt: string | null = null
       for (const tutorial of tutorials) {
         const key = `${student.userId}:${tutorial.id}`
         const row = progress.get(key)
-        const solvedHere = solved.get(key) ?? 0
+        const exercises = attempted.get(key)
+        const solvedHere = exercises?.solved ?? 0
         exerciseSolved += solvedHere
+        if (exercises) {
+          const { tried, solved, wrongAttempts } = exercises
+          lessons.push({ tutorialId: tutorial.id, tried, solved, wrongAttempts })
+        }
         if (row) {
           opened.push(tutorial.id)
           totalSeconds += row.totalSeconds
@@ -171,7 +185,7 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
         }
         if (isLessonDone(lesson)) done.push(tutorial.id)
       }
-      return { ...student, opened, done, exerciseSolved, totalSeconds, lastViewedAt }
+      return { ...student, opened, done, exerciseSolved, lessons, totalSeconds, lastViewedAt }
     }),
   } satisfies LearnBoard)
 })
@@ -271,5 +285,121 @@ adminLearnRoutes.get("/learn-analytics/exercises/:id/attempts", requireTeacher, 
     // 没做对的排前面，错得最多的最前 —— 展开这一行的人是来找卡住的学生的
     .orderBy(asc(schema.exerciseAttempt.solved), desc(schema.exerciseAttempt.wrongAttempts))
 
-  return success(c, rows satisfies LearnExerciseAttempt[])
+  // 读过这课却没碰这道题的人：从这课的阅读记录出发，反连作答表取空
+  const untried = await db
+    .select({ userId: schema.user.id, username: schema.user.username })
+    .from(schema.exercise)
+    .innerJoin(
+      schema.tutorialProgress,
+      eq(schema.tutorialProgress.tutorialId, schema.exercise.tutorialId),
+    )
+    .innerJoin(schema.user, eq(schema.user.id, schema.tutorialProgress.userId))
+    .leftJoin(
+      schema.exerciseAttempt,
+      and(
+        eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
+        eq(schema.exerciseAttempt.userId, schema.user.id),
+      ),
+    )
+    .where(
+      and(
+        eq(schema.exercise.id, id),
+        isNull(schema.exerciseAttempt.userId),
+        studentCondition(className.value),
+      ),
+    )
+    .orderBy(asc(schema.user.username))
+
+  return success(c, { results: rows, untried } satisfies LearnExerciseAttemptList)
+})
+
+/**
+ * 一个学生的自学明细：他打开过或做过练一练的每一课，每道练习做到哪了。
+ *
+ * 不限班级、也不限学生角色 —— 老师从方块格点进来的一定是学生，
+ * 而按 id 查一个人的自学留痕本来就是老师能看的东西（方块格上全有）。
+ */
+adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const type = tutorialTypeOf(c.req.query("type"))
+
+  const [student] = await db
+    .select({
+      userId: schema.user.id,
+      username: schema.user.username,
+      className: schema.user.className,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, id))
+  if (!student) return failure(c, 404, "user-not-found", "用户不存在")
+
+  const visible = and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type))
+  const [tutorials, exercises] = await Promise.all([
+    db
+      .select({
+        tutorialId: schema.tutorial.id,
+        title: schema.tutorial.title,
+        viewCount: schema.tutorialProgress.viewCount,
+        totalSeconds: schema.tutorialProgress.totalSeconds,
+        lastViewedAt: schema.tutorialProgress.lastViewedAt,
+      })
+      .from(schema.tutorial)
+      .leftJoin(
+        schema.tutorialProgress,
+        and(
+          eq(schema.tutorialProgress.tutorialId, schema.tutorial.id),
+          eq(schema.tutorialProgress.userId, id),
+        ),
+      )
+      .where(visible)
+      .orderBy(asc(schema.tutorial.order)),
+    db
+      .select({
+        tutorialId: schema.exercise.tutorialId,
+        exerciseId: schema.exercise.id,
+        type: schema.exercise.type,
+        question: sql<string>`coalesce(${schema.exercise.data}->>'question', '')`,
+        attempts: schema.exerciseAttempt.attempts,
+        solved: schema.exerciseAttempt.solved,
+        attemptsToSolve: schema.exerciseAttempt.attemptsToSolve,
+        lastWrongAnswer: schema.exerciseAttempt.lastWrongAnswer,
+        lastAttemptAt: schema.exerciseAttempt.lastAttemptAt,
+      })
+      .from(schema.exercise)
+      .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
+      .leftJoin(
+        schema.exerciseAttempt,
+        and(
+          eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
+          eq(schema.exerciseAttempt.userId, id),
+        ),
+      )
+      .where(visible)
+      .orderBy(asc(schema.exercise.order)),
+  ])
+
+  const byLesson = new Map<number, LearnStudentDetail["lessons"][number]["exercises"]>()
+  for (const { tutorialId, ...row } of exercises) {
+    const list = byLesson.get(tutorialId) ?? []
+    list.push({
+      ...row,
+      attempts: row.attempts ?? 0,
+      solved: row.solved ?? false,
+    })
+    byLesson.set(tutorialId, list)
+  }
+
+  return success(c, {
+    ...student,
+    lessons: tutorials
+      .map((row) => ({
+        tutorialId: row.tutorialId,
+        title: row.title,
+        viewCount: row.viewCount ?? 0,
+        totalSeconds: row.totalSeconds ?? 0,
+        lastViewedAt: row.lastViewedAt,
+        exercises: byLesson.get(row.tutorialId) ?? [],
+      }))
+      .filter((row) => row.viewCount > 0 || row.exercises.some((ex) => ex.attempts > 0)),
+  } satisfies LearnStudentDetail)
 })
