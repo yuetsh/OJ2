@@ -175,6 +175,6 @@ export type FlowchartListItem = z.infer<typeof flowchartListItemSchema>
 export type FlowchartList = z.infer<typeof flowchartListSchema>
 export type FlowchartScores = z.infer<typeof flowchartScoresSchema>
 export type CreateFlowchartResponse = z.infer<typeof createFlowchartResponseSchema>
-export type CreateFlowchartRequest = z.infer<typeof createFlowchartRequestSchema>
+export type CreateFlowchartRequest = z.input<typeof createFlowchartRequestSchema>
 
 export type FlowchartStatus = z.infer<typeof flowchartStatusSchema>

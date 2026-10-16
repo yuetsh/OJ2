@@ -28,6 +28,6 @@ export const userProfileSchema = z.object({
   submissionNumber: z.number().int(),
 })
 
-export type LoginRequest = z.infer<typeof loginRequestSchema>
+export type LoginRequest = z.input<typeof loginRequestSchema>
 export type SessionUser = z.infer<typeof sessionUserSchema>
 export type UserProfile = z.infer<typeof userProfileSchema>

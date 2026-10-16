@@ -1,3 +1,14 @@
+import type {
+  ClassLessonRequest,
+  ContestPasswordRequest,
+  CreateFlowchartRequest,
+  CreateSubmissionRequest,
+  FormatCodeRequest,
+  JoinProblemSetRequest,
+  RankHiddenRequest,
+  SetReactionRequest,
+  UpdateProfileRequest,
+} from "@oj2/contract"
 import {
   type AiAnalysisRecord,
   type LearningPeriod,
@@ -144,21 +155,20 @@ export async function getSubmission(id: string, attempts = false): Promise<Submi
 }
 
 export function submitCode(data: SubmitCodePayload) {
-  return api.post<CreateSubmissionResponse>("submissions", data)
+  return api.post<CreateSubmissionResponse>("submissions", data satisfies CreateSubmissionRequest)
 }
 
-export function formatCode(data: { code: string; language: string; problemId: number }) {
-  const languages: Record<string, string> = {
-    Python: "python",
-    C: "c",
-    "C++": "cpp",
-    SQL: "sql",
-  }
+/** 后端格式化认的四种（ruff / clang-format / sqlparse），别的语言提交前不格式化 */
+export function isFormatLanguage(value: string): value is FormatCodeRequest["language"] {
+  return ["python", "c", "cpp", "sql"].includes(value)
+}
+
+export function formatCode(data: FormatCodeRequest & { problemId: number }) {
   return api.post<FormatCodeResponse>("code/format", {
     code: data.code,
-    language: languages[data.language] ?? data.language.toLowerCase(),
+    language: data.language,
     problemId: data.problemId,
-  })
+  } satisfies FormatCodeRequest)
 }
 
 export function getSubmissions(params: Partial<SubmissionListPayload>) {
@@ -262,7 +272,7 @@ export function getWeeklyChampions(className?: string) {
 
 /** 老师把学生设成不计入排名 / 恢复 */
 export function setRankHidden(userId: number, hidden: boolean) {
-  return api.put<null>(`rankings/hidden/${userId}`, { hidden })
+  return api.put<null>(`rankings/hidden/${userId}`, { hidden } satisfies RankHiddenRequest)
 }
 
 /** 老师清空一个学生的个性签名 */
@@ -294,7 +304,11 @@ export function setClassLesson(
   problemDisplayIds: string[],
   language: LessonLanguage | null,
 ) {
-  return api.put<null>("classroom/lesson", { className, problemDisplayIds, language })
+  return api.put<null>("classroom/lesson", {
+    className,
+    problemDisplayIds,
+    language,
+  } satisfies ClassLessonRequest)
 }
 
 /** 我的知识点地图（只有自己的，不能查别人） */
@@ -350,7 +364,7 @@ export function getContestAccess(id: string) {
 export function checkContestPassword(contestID: string, password: string) {
   return api.post<boolean>(`contests/${encodeURIComponent(contestID)}/access`, {
     password,
-  })
+  } satisfies ContestPasswordRequest)
 }
 
 export async function getContestProblems(contestID: string) {
@@ -375,7 +389,7 @@ export function uploadAvatar(file: File) {
 }
 
 export function updateProfile(data: { realName?: string; mood?: string }) {
-  return api.put<Profile>("me/profile", data)
+  return api.put<Profile>("me/profile", data satisfies UpdateProfileRequest)
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
@@ -393,7 +407,9 @@ export function getReaction(problemID: number) {
 }
 
 export function setReaction(problemID: number, type: ReactionKey) {
-  return api.post<ReactionState>(`problems/${problemID}/reaction`, { type })
+  return api.post<ReactionState>(`problems/${problemID}/reaction`, {
+    type,
+  } satisfies SetReactionRequest)
 }
 
 /** 个人主页那一页的数据：做对的题、四个时间、本班第几、成就，本人和老师多拿知识点和没做对的题 */
@@ -450,7 +466,7 @@ export function submitFlowchart(data: {
   mermaidCode: string
   flowchartData: Record<string, unknown> // 压缩之后的，元数据太长了
 }) {
-  return api.post<CreateFlowchartResponse>("flowcharts", data)
+  return api.post<CreateFlowchartResponse>("flowcharts", data satisfies CreateFlowchartRequest)
 }
 
 export function getFlowchartSubmission(id: string) {
@@ -507,7 +523,7 @@ export function getProblemSetProblems(problemSetId: number) {
 }
 
 export function joinProblemSet(problemSetId: number) {
-  return api.post("problem-set-progress", { problemSetId })
+  return api.post("problem-set-progress", { problemSetId } satisfies JoinProblemSetRequest)
 }
 
 export function getUserBadges(username?: string) {

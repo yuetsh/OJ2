@@ -152,5 +152,5 @@ export type ContestScoreboard = z.infer<typeof contestScoreboardSchema>
 export type ContestClassView = z.infer<typeof contestClassViewSchema>
 
 export type ContestStatus = z.infer<typeof contestStatusSchema>
-export type ContestPasswordRequest = z.infer<typeof contestPasswordRequestSchema>
+export type ContestPasswordRequest = z.input<typeof contestPasswordRequestSchema>
 export type ContestProblems = z.infer<typeof contestProblemsSchema>

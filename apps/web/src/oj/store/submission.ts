@@ -1,6 +1,6 @@
 import { defineStore } from "pinia"
 import { errorCode, errorMessage } from "utils/api"
-import { formatCode, submitCode } from "oj/api"
+import { formatCode, isFormatLanguage, submitCode } from "oj/api"
 import { useCodeStore } from "oj/store/code"
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionMonitor } from "oj/problem/composables/useSubmissionMonitor"
@@ -106,7 +106,7 @@ export const useSubmissionStore = defineStore("submission", () => {
     //    Python 在格式化之前先由服务端的 CPython 查一遍语法，有错就不提交；
     //    C / C++ 先在判题机上编一遍，编不过就原样交（格式化会把错的几行并成一行）
     const formatLang = LANGUAGE_FORMAT_VALUE[codeStore.code.language]
-    if (["python", "c", "cpp", "sql"].includes(formatLang)) {
+    if (isFormatLanguage(formatLang)) {
       isFormatting.value = true
       try {
         const res = await formatCode({

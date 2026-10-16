@@ -248,9 +248,9 @@ export type LearningDay = z.infer<typeof learningDaySchema>
 export type LearningReport = z.infer<typeof learningReportSchema>
 export type AiAnalysisRecord = z.infer<typeof aiAnalysisRecordSchema>
 
-export type AiAnalysisRequest = z.infer<typeof aiAnalysisRequestSchema>
-export type AiHintRequest = z.infer<typeof aiHintRequestSchema>
+export type AiAnalysisRequest = z.input<typeof aiAnalysisRequestSchema>
+export type AiHintRequest = z.input<typeof aiHintRequestSchema>
 export type AiHintDone = z.infer<typeof aiHintDoneSchema>
-export type AiHintFeedbackRequest = z.infer<typeof aiHintFeedbackRequestSchema>
-export type ClassAnalysisRequest = z.infer<typeof classAnalysisRequestSchema>
-export type ClassPkAnalysisRequest = z.infer<typeof classPkAnalysisRequestSchema>
+export type AiHintFeedbackRequest = z.input<typeof aiHintFeedbackRequestSchema>
+export type ClassAnalysisRequest = z.input<typeof classAnalysisRequestSchema>
+export type ClassPkAnalysisRequest = z.input<typeof classPkAnalysisRequestSchema>

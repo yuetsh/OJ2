@@ -1,3 +1,44 @@
+import { toAdminType, toProblemPermission } from "@oj2/contract"
+import type {
+  AddContestProblemRequest,
+  AddProblemsToSetRequest,
+  BatchProblemTagRequest,
+  BatchProblemVisibleRequest,
+  CheckUsernamesRequest,
+  CreateAchievementRequest,
+  CreateAnnouncementRequest,
+  CreateContestRequest,
+  CreateExerciseRequest,
+  CreateProblemRequest,
+  CreateProblemSetBadgeRequest,
+  CreateProblemSetRequest,
+  CreateTutorialRequest,
+  GenerateFlowchartRequest,
+  GenerateSqlTestCaseRequest,
+  ImportUsersRequest,
+  MakeProblemPublicRequest,
+  RenameTagRequest,
+  RenameTutorialProjectRequest,
+  ReorderContestProblemsRequest,
+  ReorderProblemSetProblemsRequest,
+  ReorderTutorialsRequest,
+  SetTagCategoryRequest,
+  SetTutorialProblemsRequest,
+  SetTutorialVisibilityRequest,
+  SqlPreviewRequest,
+  UpdateAchievementRequest,
+  UpdateAcmHelperRequest,
+  UpdateAnnouncementRequest,
+  UpdateContestRequest,
+  UpdateExerciseRequest,
+  UpdateProblemInSetRequest,
+  UpdateProblemRequest,
+  UpdateProblemSetBadgeRequest,
+  UpdateProblemSetRequest,
+  UpdateTutorialRequest,
+  UpdateUserRequest,
+  UpdateWebsiteConfigRequest,
+} from "@oj2/contract"
 import api from "utils/api"
 import { toAdminProblemRow } from "admin/transforms"
 import type {
@@ -101,7 +142,7 @@ export function batchSetProblemVisible(problemIds: number[], visible: boolean) {
   return api.post<{ problemCount: number }>("admin/problems/batch-visible", {
     problemIds,
     visible,
-  })
+  } satisfies BatchProblemVisibleRequest)
 }
 
 // 比赛「从题库中选择」用：列所有可见的公开题，不只是自己创建的
@@ -129,7 +170,7 @@ export function deleteContestProblem(id: number) {
 export function editProblem(problem: AdminProblem | BlankProblem) {
   return api.put<AdminProblem>(
     `admin/problems/${(problem as AdminProblem).id}`,
-    toProblemBody(problem),
+    toProblemBody(problem) satisfies Partial<UpdateProblemRequest>,
   )
 }
 
@@ -140,7 +181,7 @@ export function toggleProblemVisible(problemID: number) {
 export function generateFlowchartFromPythonCode(python: string) {
   return api.post<{ doc: Record<string, unknown> }>("admin/problems/flowchart", {
     python,
-  })
+  } satisfies GenerateFlowchartRequest)
 }
 
 export function getProblem(id: string | number) {
@@ -153,11 +194,13 @@ export function getTagAdminList(keyword = "") {
 }
 
 export function renameTag(id: number, name: string) {
-  return api.put<RenameTagResponse>(`admin/problem-tags/${id}`, { name })
+  return api.put<RenameTagResponse>(`admin/problem-tags/${id}`, { name } satisfies RenameTagRequest)
 }
 
 export function setTagCategory(id: number, category: TagCategory) {
-  return api.put<null>(`admin/problem-tags/${id}/category`, { category })
+  return api.put<null>(`admin/problem-tags/${id}/category`, {
+    category,
+  } satisfies SetTagCategoryRequest)
 }
 
 export function deleteTag(id: number) {
@@ -173,7 +216,7 @@ export function batchTagProblems(
     problemIds,
     tagNames,
     action,
-  })
+  } satisfies BatchProblemTagRequest)
 }
 
 // 用户排名（后台版，无 100 名上限；公开榜单是 oj/api.ts 的 getRank）
@@ -209,20 +252,23 @@ export function getUserList(
 
 /** 批量建号之前查重：这些用户名哪些已经有了 */
 export function checkUsernames(usernames: string[]) {
-  return api.post<CheckUsernamesResponse>("admin/users/check", { usernames })
+  return api.post<CheckUsernamesResponse>("admin/users/check", {
+    usernames,
+  } satisfies CheckUsernamesRequest)
 }
 
 // 编辑用户
 export function editUser(user: AdminUserForm) {
   return api.put<AdminUser>(`admin/users/${user.id}`, {
     username: user.username,
-    email: user.email,
-    adminType: user.adminType,
-    problemPermission: user.problemPermission,
+    // 库里 email 没有空的（2026-10 核过），响应类型是 nullable 只因为列可空
+    email: user.email ?? "",
+    adminType: toAdminType(user.adminType),
+    problemPermission: toProblemPermission(user.problemPermission),
     realName: user.realName ?? null,
     isDisabled: user.isDisabled,
     password: user.password ?? "",
-  })
+  } satisfies UpdateUserRequest)
 }
 
 // 重置用户密码，返回新密码
@@ -233,8 +279,10 @@ export async function resetPassword(userID: number) {
 
 // 导入用户
 /** 批量建号。addedClasses：这批里的新班级，后端已经顺手加进了班级列表 */
-export function importUsers(users: string[][]) {
-  return api.post<{ imported: number; addedClasses: string[] }>("admin/users", { users })
+export function importUsers(users: ImportUsersRequest["users"]) {
+  return api.post<{ imported: number; addedClasses: string[] }>("admin/users", {
+    users,
+  } satisfies ImportUsersRequest)
 }
 
 // 批量删除用户
@@ -282,7 +330,7 @@ export function previewSQLTestcase(data: {
   /** 是不是题面上展示的那组（第 1 组）：增删改题只有它必须改到行 */
   shown: boolean
 }) {
-  return api.post<SqlDisplay>("admin/sql-test-cases/preview", data)
+  return api.post<SqlDisplay>("admin/sql-test-cases/preview", data satisfies SqlPreviewRequest)
 }
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
@@ -292,7 +340,10 @@ export function getSQLTestcaseScripts(problemId: number) {
 
 // AI 根据标准答案生成一个 SQL 测试点初始化脚本
 export function generateSQLTestcase(data: { refSql: string; mode: "query" | "modify" }) {
-  return api.post<GenerateSqlTestCaseResponse>("admin/sql-test-cases/generate", data)
+  return api.post<GenerateSqlTestCaseResponse>(
+    "admin/sql-test-cases/generate",
+    data satisfies GenerateSqlTestCaseRequest,
+  )
 }
 
 // 编程题出题页：读回已有测试点的原文（太大的只给数量和大小）
@@ -302,12 +353,15 @@ export function getTestCaseFiles(problemId: number) {
 
 // 拿标准答案自测语法要求
 export function checkAstRules(data: AstCheckRequest) {
-  return api.post<AstCheckResponse>("admin/ast-check", data)
+  return api.post<AstCheckResponse>("admin/ast-check", data satisfies AstCheckRequest)
 }
 
 // AI 按题面和标准答案想几组测试输入（输出由标准答案跑）
 export function generateTestInputs(data: GenerateTestInputsRequest) {
-  return api.post<GenerateTestInputsResponse>("admin/test-inputs/generate", data)
+  return api.post<GenerateTestInputsResponse>(
+    "admin/test-inputs/generate",
+    data satisfies GenerateTestInputsRequest,
+  )
 }
 
 /** 出站补默认值。字段名两边已经一致，不再做键名转换 */
@@ -346,14 +400,17 @@ function toProblemBody(problem: AdminProblem | BlankProblem) {
 }
 
 export function createProblem(problem: BlankProblem) {
-  return api.post<AdminProblem>("admin/problems", toProblemBody(problem))
+  return api.post<AdminProblem>(
+    "admin/problems",
+    toProblemBody(problem) satisfies Partial<CreateProblemRequest>,
+  )
 }
 
 export function createContestProblem(problem: BlankProblem) {
   // contestId 由 detail.vue 在提交前写进 problem 对象
   return api.post<AdminProblem>(
     `admin/contests/${problem.contestId}/problems`,
-    toProblemBody(problem),
+    toProblemBody(problem) satisfies Partial<CreateProblemRequest>,
   )
 }
 
@@ -371,13 +428,16 @@ function toContestBody(contest: AdminContest | BlankContest) {
 }
 
 export function createContest(contest: BlankContest) {
-  return api.post<AdminContest>("admin/contests", toContestBody(contest))
+  return api.post<AdminContest>(
+    "admin/contests",
+    toContestBody(contest) satisfies CreateContestRequest,
+  )
 }
 
 export function editContest(contest: AdminContest | BlankContest) {
   return api.put<AdminContest>(
     `admin/contests/${(contest as AdminContest).id}`,
-    toContestBody(contest),
+    toContestBody(contest) satisfies UpdateContestRequest,
   )
 }
 
@@ -393,12 +453,14 @@ export function addProblemForContest(contestID: string, problemID: number, displ
   return api.post<AdminProblem>(`admin/contests/${contestID}/problems/from-public`, {
     problemId: problemID,
     displayId: displayID,
-  })
+  } satisfies AddContestProblemRequest)
 }
 
 /** 比赛题按这个顺序重新编号 1、2、3…（要给全这场比赛的题） */
 export function reorderContestProblems(contestID: string, problemIds: number[]) {
-  return api.put(`admin/contests/${contestID}/problems/order`, { problemIds })
+  return api.put(`admin/contests/${contestID}/problems/order`, {
+    problemIds,
+  } satisfies ReorderContestProblemsRequest)
 }
 
 export function getWebsite() {
@@ -406,7 +468,7 @@ export function getWebsite() {
 }
 
 export function editWebsite(data: WebsiteConfig) {
-  return api.post<WebsiteConfig>("admin/website", data)
+  return api.post<WebsiteConfig>("admin/website", data satisfies UpdateWebsiteConfigRequest)
 }
 
 export function listInvalidTestcases() {
@@ -441,12 +503,18 @@ export function deleteAnnouncement(id: number) {
 
 export function editAnnouncement(announcement: AnnouncementEdit) {
   const { id, ...body } = announcement
-  return api.put<AdminAnnouncement>(`admin/announcements/${id}`, body)
+  return api.put<AdminAnnouncement>(
+    `admin/announcements/${id}`,
+    body satisfies UpdateAnnouncementRequest,
+  )
 }
 
 export function createAnnouncement(announcement: AnnouncementEdit) {
   const { id: _id, ...body } = announcement
-  return api.post<AdminAnnouncement>("admin/announcements", body)
+  return api.post<AdminAnnouncement>(
+    "admin/announcements",
+    body satisfies CreateAnnouncementRequest,
+  )
 }
 
 export function getTutorialList() {
@@ -470,15 +538,20 @@ function toTutorialBody(data: TutorialEdit) {
 }
 
 export function createTutorial(data: TutorialEdit) {
-  return api.post<Tutorial>("admin/tutorials", toTutorialBody(data))
+  return api.post<Tutorial>("admin/tutorials", toTutorialBody(data) satisfies CreateTutorialRequest)
 }
 
 export function updateTutorial(data: TutorialEdit) {
-  return api.put<Tutorial>(`admin/tutorials/${data.id}`, toTutorialBody(data))
+  return api.put<Tutorial>(
+    `admin/tutorials/${data.id}`,
+    toTutorialBody(data) satisfies UpdateTutorialRequest,
+  )
 }
 
 export function setTutorialProblems(id: number, problemIds: number[]) {
-  return api.put<Tutorial>(`admin/tutorials/${id}/problems`, { problemIds })
+  return api.put<Tutorial>(`admin/tutorials/${id}/problems`, {
+    problemIds,
+  } satisfies SetTutorialProblemsRequest)
 }
 
 export function getTutorialProblemCandidates(keyword: string) {
@@ -488,11 +561,15 @@ export function getTutorialProblemCandidates(keyword: string) {
 }
 
 export function reorderTutorials(ids: number[]) {
-  return api.put<null>("admin/tutorial-order", { ids })
+  return api.put<null>("admin/tutorial-order", { ids } satisfies ReorderTutorialsRequest)
 }
 
 export function renameTutorialProject(type: "python" | "c", from: string, to: string) {
-  return api.put<null>("admin/tutorial-projects", { type, from, to })
+  return api.put<null>("admin/tutorial-projects", {
+    type,
+    from,
+    to,
+  } satisfies RenameTutorialProjectRequest)
 }
 
 export function deleteTutorial(id: number) {
@@ -500,7 +577,9 @@ export function deleteTutorial(id: number) {
 }
 
 export function setTutorialVisibility(id: number, isPublic: boolean) {
-  return api.put<Tutorial>(`admin/tutorials/${id}/visibility`, { isPublic })
+  return api.put<Tutorial>(`admin/tutorials/${id}/visibility`, {
+    isPublic,
+  } satisfies SetTutorialVisibilityRequest)
 }
 
 export function getAdminExercises(tutorialId: number) {
@@ -510,16 +589,16 @@ export function getAdminExercises(tutorialId: number) {
 export async function createExercise(data: {
   tutorialId: number
   type: ExerciseType
-  data: object
+  data: Record<string, unknown>
   order: number
 }) {
-  return api.post<Exercise>("admin/exercises", data)
+  return api.post<Exercise>("admin/exercises", data satisfies CreateExerciseRequest)
 }
 
 export async function updateExercise(data: {
   id: number
   type: ExerciseType
-  data: object
+  data: Record<string, unknown>
   order: number
   resetAttempts: boolean
 }) {
@@ -528,7 +607,7 @@ export async function updateExercise(data: {
     data: data.data,
     order: data.order,
     resetAttempts: data.resetAttempts,
-  })
+  } satisfies UpdateExerciseRequest)
 }
 
 export function deleteExercise(id: number) {
@@ -539,7 +618,7 @@ export function deleteExercise(id: number) {
 export function makeProblemPublic(id: number, displayId: string) {
   return api.post<AdminProblem>(`admin/problems/${id}/make-public`, {
     displayId,
-  })
+  } satisfies MakeProblemPublicRequest)
 }
 
 // 比赛辅助检查
@@ -553,7 +632,7 @@ export function updateACMHelperChecked(
     rankId: rank_id,
     problemId: problem_id,
     checked,
-  })
+  } satisfies UpdateAcmHelperRequest)
 }
 
 // 题单管理 API
@@ -576,11 +655,14 @@ export interface ProblemSetBody {
 }
 
 export function createProblemSet(data: ProblemSetBody) {
-  return api.post<AdminProblemSet>("admin/problem-sets", data)
+  return api.post<AdminProblemSet>("admin/problem-sets", data satisfies CreateProblemSetRequest)
 }
 
 export function editProblemSet(id: number, data: ProblemSetBody) {
-  return api.put<AdminProblemSet>(`admin/problem-sets/${id}`, data)
+  return api.put<AdminProblemSet>(
+    `admin/problem-sets/${id}`,
+    data satisfies UpdateProblemSetRequest,
+  )
 }
 
 export function deleteProblemSet(id: number) {
@@ -600,15 +682,19 @@ export function getProblemSetProblems(problemSetId: number) {
 export function addProblemsToSet(problemSetId: number, problemIds: string[]) {
   return api.post<AddProblemsToSetResult>(`admin/problem-sets/${problemSetId}/problems`, {
     problemIds,
-  })
+  } satisfies AddProblemsToSetRequest)
 }
 
 export function setProblemRequired(problemSetId: number, itemId: number, isRequired: boolean) {
-  return api.put(`admin/problem-sets/${problemSetId}/problems/${itemId}`, { isRequired })
+  return api.put(`admin/problem-sets/${problemSetId}/problems/${itemId}`, {
+    isRequired,
+  } satisfies UpdateProblemInSetRequest)
 }
 
 export function reorderProblemSetProblems(problemSetId: number, ids: number[]) {
-  return api.put(`admin/problem-sets/${problemSetId}/problems/order`, { ids })
+  return api.put(`admin/problem-sets/${problemSetId}/problems/order`, {
+    ids,
+  } satisfies ReorderProblemSetProblemsRequest)
 }
 
 export function removeProblemFromSet(problemSetId: number, itemId: number) {
@@ -629,11 +715,17 @@ export interface BadgeBody {
 }
 
 export function createProblemSetBadge(problemSetId: number, data: BadgeBody) {
-  return api.post<AdminProblemSetBadge>(`admin/problem-sets/${problemSetId}/badges`, data)
+  return api.post<AdminProblemSetBadge>(
+    `admin/problem-sets/${problemSetId}/badges`,
+    data satisfies CreateProblemSetBadgeRequest,
+  )
 }
 
 export function editProblemSetBadge(problemSetId: number, badgeId: number, data: BadgeBody) {
-  return api.put<AdminProblemSetBadge>(`admin/problem-sets/${problemSetId}/badges/${badgeId}`, data)
+  return api.put<AdminProblemSetBadge>(
+    `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
+    data satisfies UpdateProblemSetBadgeRequest,
+  )
 }
 
 export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
@@ -728,11 +820,17 @@ export function getMetricOptions() {
 }
 
 export function createAchievement(data: Partial<AdminAchievement>) {
-  return api.post<AdminAchievement>("admin/achievements", toAchievementBody(data))
+  return api.post<AdminAchievement>(
+    "admin/achievements",
+    toAchievementBody(data) satisfies Partial<CreateAchievementRequest>,
+  )
 }
 
 export function updateAchievement(data: Partial<AdminAchievement>) {
-  return api.put<AdminAchievement>(`admin/achievements/${data.id}`, toAchievementBody(data))
+  return api.put<AdminAchievement>(
+    `admin/achievements/${data.id}`,
+    toAchievementBody(data) satisfies Partial<UpdateAchievementRequest>,
+  )
 }
 
 export function deleteAchievement(id: number) {

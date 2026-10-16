@@ -164,4 +164,4 @@ export type UserBadge = z.infer<typeof userBadgeSchema>
 export type BadgeConditionType = z.infer<typeof badgeConditionTypeSchema>
 
 export type ProblemSetUserProgressSummary = z.infer<typeof problemSetUserProgressSummarySchema>
-export type JoinProblemSetRequest = z.infer<typeof joinProblemSetRequestSchema>
+export type JoinProblemSetRequest = z.input<typeof joinProblemSetRequestSchema>

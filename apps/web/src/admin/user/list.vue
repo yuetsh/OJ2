@@ -13,7 +13,7 @@ import UserNameCell from "./components/UserNameCell.vue"
 import PasswordCell from "./components/PasswordCell.vue"
 import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { useRouteQuery } from "@vueuse/router"
-import { NO_CLASS, STUDENT_ROLES } from "@oj2/contract"
+import { NO_CLASS, STUDENT_ROLES, type ImportUsersRequest } from "@oj2/contract"
 import { downloadAccountsCsv } from "./accountsCsv"
 import { classLabel, groupClassOptions } from "utils/classes"
 import { useConfigStore } from "shared/store/config"
@@ -338,7 +338,7 @@ async function handleEditUser() {
   // 其余业务错误（比如班级号位数不对）不接住就什么都不显示
   try {
     if (create.value) {
-      const newUser = [
+      const newUser: ImportUsersRequest["users"] = [
         [
           userEditing.value.username,
           password.value,

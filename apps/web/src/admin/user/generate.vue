@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ImportUsersRequest } from "@oj2/contract"
 import { downloadAccountsCsv } from "./accountsCsv"
 import PageHeader from "admin/components/PageHeader.vue"
 import { classLabel } from "utils/classes"
@@ -127,7 +128,7 @@ async function submit() {
   // 占位邮箱必须全站唯一：注册、编辑用户、导入三条路都查重。每批一段随机后缀错开，
   // 同一个班分两批导也不会撞。这个地址不发给任何人，纯占位
   const batch = Math.random().toString(36).slice(2, 8)
-  const payload = rows.value.map((row, i) => [
+  const payload: ImportUsersRequest["users"] = rows.value.map((row, i) => [
     row.username,
     row.password,
     `${prefix.value || "user"}.${batch}.${i + 1}@example.com`,

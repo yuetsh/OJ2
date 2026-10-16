@@ -71,8 +71,8 @@ export const problemRankSchema = z.object({
 
 export const publicProfileSchema = userProfileSchema
 
-export type RegisterRequest = z.infer<typeof registerRequestSchema>
-export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>
+export type RegisterRequest = z.input<typeof registerRequestSchema>
+export type UpdateProfileRequest = z.input<typeof updateProfileRequestSchema>
 export type ProblemRank = z.infer<typeof problemRankSchema>
 export type RankProfile = z.infer<typeof rankProfileSchema>
 export type WeeklyRankItem = z.infer<typeof weeklyRankItemSchema>

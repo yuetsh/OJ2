@@ -617,7 +617,7 @@ export type TrialRunResponse =
 
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type SubmissionTrace = z.infer<typeof submissionTraceSchema>
-export type CreateSubmissionRequest = z.infer<typeof createSubmissionRequestSchema>
+export type CreateSubmissionRequest = z.input<typeof createSubmissionRequestSchema>
 export type SubmissionDetail = z.infer<typeof submissionDetailSchema>
 export type SubmissionUpdate = z.infer<typeof submissionUpdateSchema>
 export type SubmissionStatistics = z.infer<typeof submissionStatisticsSchema>
@@ -633,5 +633,5 @@ export type SubmissionList = z.infer<typeof submissionListSchema>
 export type CreateSubmissionResponse = z.infer<typeof createSubmissionResponseSchema>
 export type FormatCodeResponse = z.infer<typeof formatCodeResponseSchema>
 
-export type FormatCodeRequest = z.infer<typeof formatCodeRequestSchema>
-export type TrialRunRequest = z.infer<typeof trialRunRequestSchema>
+export type FormatCodeRequest = z.input<typeof formatCodeRequestSchema>
+export type TrialRunRequest = z.input<typeof trialRunRequestSchema>

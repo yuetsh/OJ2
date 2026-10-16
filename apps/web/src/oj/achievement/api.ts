@@ -1,3 +1,4 @@
+import type { MarkAchievementsRead } from "@oj2/contract"
 import api from "utils/api"
 import type { AchievementList, PendingAchievement } from "utils/types"
 
@@ -12,5 +13,5 @@ export function getPendingAchievements() {
 }
 
 export function markAchievementsRead(ids: number[]) {
-  return api.post("achievements/pending/read", { ids })
+  return api.post("achievements/pending/read", { ids } satisfies MarkAchievementsRead)
 }

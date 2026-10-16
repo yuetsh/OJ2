@@ -182,13 +182,13 @@ export type AnnouncementList = z.infer<typeof announcementListSchema>
 export type ReactionKey = z.infer<typeof reactionKeySchema>
 export type ReactionCounts = z.infer<typeof reactionCountsSchema>
 export type ReactionState = z.infer<typeof reactionStateSchema>
-export type SetReactionRequest = z.infer<typeof setReactionRequestSchema>
+export type SetReactionRequest = z.input<typeof setReactionRequestSchema>
 export type Tutorial = z.infer<typeof tutorialSchema>
 export type TutorialProblem = z.infer<typeof tutorialProblemSchema>
 export type Exercise = z.infer<typeof exerciseSchema>
 export type TutorialProgress = z.infer<typeof tutorialProgressSchema>
 export type TutorialProgressPing = z.infer<typeof tutorialProgressPingSchema>
-export type ExerciseAttemptRequest = z.infer<typeof exerciseAttemptRequestSchema>
+export type ExerciseAttemptRequest = z.input<typeof exerciseAttemptRequestSchema>
 
 /**
  * 「学完一课」的口径：**这课的练一练全做对**。没有练一练的课，打开过就算。

@@ -118,7 +118,7 @@ export type RankTrend = z.infer<typeof rankTrendSchema>
 export type RankBoard = z.infer<typeof rankBoardSchema>
 export type ClassBattleItem = z.infer<typeof classBattleItemSchema>
 export type WeeklyChampion = z.infer<typeof weeklyChampionSchema>
-export type RankHiddenRequest = z.infer<typeof rankHiddenRequestSchema>
+export type RankHiddenRequest = z.input<typeof rankHiddenRequestSchema>
 
 /**
  * 班级详情（设计稿「班级详情 · 老师 / 学生」）。原来弹框里的四分位数、四分位距、标准差、

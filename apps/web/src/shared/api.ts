@@ -1,14 +1,15 @@
+import type { LoginRequest, RegisterRequest } from "@oj2/contract"
 import type { Quote, WebsiteConfig } from "@oj2/contract"
 import api from "utils/api"
 import { contractDeferred } from "utils/contract"
 import type { Profile, Tag } from "utils/types"
 
 export function login(data: { username: string; password: string }) {
-  return api.post("auth/login", data)
+  return api.post("auth/login", data satisfies LoginRequest)
 }
 
 export function signup(data: { username: string; email: string; password: string }) {
-  return api.post("users", data)
+  return api.post("users", data satisfies RegisterRequest)
 }
 
 export function logout() {
