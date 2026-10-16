@@ -5,13 +5,11 @@ import { useRouteQuery } from "@vueuse/router"
 import { errorCode } from "utils/api"
 import {
   adminRejudge,
-  getClassLesson,
   getFlowchartSubmissions,
   getSubmissions,
   getTodaySubmissionCount,
   retryFlowchartSubmission,
 } from "oj/api"
-import { DEFAULT_PERIOD } from "oj/statistics/period"
 import { useContestStore } from "oj/store/contest"
 import Pagination from "shared/components/Pagination.vue"
 import { useBackClose } from "shared/composables/backClose"
@@ -21,12 +19,7 @@ import { useConfigStore } from "shared/store/config"
 import { useUserStore } from "shared/store/user"
 import { LANGUAGE_SHOW_VALUE, SubmissionStatus } from "utils/constants"
 import { parseTime } from "utils/functions"
-import type {
-  ClassLesson,
-  FlowchartSubmissionListItem,
-  LANGUAGE,
-  SubmissionListItem,
-} from "utils/types"
+import type { FlowchartSubmissionListItem, LANGUAGE, SubmissionListItem } from "utils/types"
 import { FlowchartSubmissionStatus } from "utils/types"
 import FlowchartState from "./components/FlowchartState.vue"
 import StatusPill from "./components/StatusPill.vue"
@@ -34,6 +27,11 @@ import UserName from "shared/components/UserName.vue"
 import { useTone } from "shared/composables/tone"
 import { classLabel, classSelectOptions } from "utils/classes"
 import { submissionClockText, submissionDayText } from "./utils"
+import { useLessonFilter } from "./composables/lessonFilter"
+import { useListLive } from "./composables/listLive"
+import type { Row, SubmissionQuery } from "./composables/listQuery"
+import { useRowCursor } from "./composables/rowCursor"
+import { useStatsLink } from "./composables/statsLink"
 
 /**
  * 提交列表（设计稿「提交列表重设计 · 定稿」）：左边列表、右边常驻选中那条的代码。
@@ -51,16 +49,6 @@ const TodayStatistics = defineAsyncComponent(() => import("./components/TodaySta
 const StatisticsView = defineAsyncComponent(
   () => import("oj/statistics/components/StatisticsView.vue"),
 )
-
-interface SubmissionQuery {
-  username: string
-  className: string
-  result: string
-  myself: "0" | "1"
-  problem: string
-  language: LANGUAGE | "" | "Flowchart"
-  today: "0" | "1"
-}
 
 const route = useRoute()
 const router = useRouter()
@@ -87,7 +75,7 @@ let leavingPane = false
 const teacher = computed(() => userStore.isTeacherOrAbove)
 
 // 一节课一个班要交一百来条，每页 10 条得翻十几页；30 条配上右栏的方向键正好
-const { query, clearQuery } = usePagination<SubmissionQuery>(
+const { query, clearQuery } = usePagination<Omit<SubmissionQuery, "page" | "limit">>(
   {
     username: useRouteQuery("username", "").value,
     className: useRouteQuery("className", "").value,
@@ -138,7 +126,6 @@ watch(loading, (value) => {
 })
 onUnmounted(() => clearTimeout(loadingTimer))
 
-type Row = SubmissionListItem | FlowchartSubmissionListItem
 const rows = computed<Row[]>(() => (flowMode.value ? flowcharts.value : submissions.value))
 
 function fetchPage() {
@@ -199,7 +186,7 @@ async function listSubmissions() {
     settleSelection()
   } catch {
     // 失败了别把「落地后停在哪一头」留给下一次不相干的加载
-    if (seq === requestSeq) pendingJump = null
+    if (seq === requestSeq) forgetJump()
   } finally {
     if (seq === requestSeq) loading.value = false
   }
@@ -288,105 +275,25 @@ watch(
 
 // ==================== 选中与翻阅 ====================
 
-const selectedId = ref("")
-const selectedRow = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
-
-/** 方向键只在能看的行之间走：跳到一条看不了的上面只会看到一把锁 */
-const navigable = computed(() => rows.value.filter((row) => row.showLink))
-const position = computed(() => {
-  const index = navigable.value.findIndex((row) => row.id === selectedId.value)
-  return index === -1 ? null : { index: index + 1, count: navigable.value.length }
-})
-
-// 翻页是异步的，先记下「落地后停在哪一头」，新一页回来再选
-let pendingJump: "first" | "last" | null = null
-
-function settleSelection() {
-  const jump = pendingJump
-  pendingJump = null
-  const list = navigable.value
-  if (jump) {
-    const row = jump === "first" ? list[0] : list[list.length - 1]
-    if (row) {
-      select(row.id)
-      return
-    }
-    message.info("这一页没有可以查看的代码")
-  }
-  // 地址里带着 ?id= 的（手机上开着详情时刷新、别人发来的链接）就停在那一条
-  const wanted = typeof route.query.id === "string" ? route.query.id : ""
-  if (wanted && rows.value.some((row) => row.id === wanted)) {
-    selectedId.value = wanted
-    return
-  }
-  // 这一页上没有那一条：详情开不出来，把 ?id= 摘掉
-  if (paneId.value) router.replace({ query: queryWithoutId() })
-  if (rows.value.some((row) => row.id === selectedId.value)) return
-  // 手机上没有右栏，不用预先选一条
-  if (isMobile.value) {
-    selectedId.value = ""
-    return
-  }
-  selectedId.value = (list[0] ?? rows.value[0])?.id ?? ""
-}
-
-function select(id: string) {
-  selectedId.value = id
-  nextTick(() => {
-    document
-      .querySelector(`[data-row-id="${CSS.escape(id)}"]`)
-      ?.scrollIntoView({ block: "nearest" })
+const { selectedId, selectedRow, position, maxPage, select, move, settleSelection, forgetJump } =
+  useRowCursor({
+    rows,
+    total,
+    query,
+    loading,
+    isMobile,
+    isDesktop,
+    keysBlocked: () => todayPanel.value || statsPanel.value,
+    wantedId: () => (typeof route.query.id === "string" ? route.query.id : ""),
+    dropWanted: () => {
+      if (paneId.value) router.replace({ query: queryWithoutId() })
+    },
+    onNothingToShow: () => message.info("这一页没有可以查看的代码"),
   })
-}
-
-const maxPage = computed(() => Math.max(1, Math.ceil(total.value / query.limit)))
-
-function move(step: 1 | -1) {
-  // 这一页一条能看的都没有（学生看全站时常见）：不翻页，不然按一下翻一页停不下来
-  if (!navigable.value.length) return
-  // 上一次跨页还没回来：按住 ↓ 或者在页尾连按两下，不然会整页跳过
-  if (loading.value || pendingJump) return
-  const all = rows.value
-  const start = all.findIndex((row) => row.id === selectedId.value)
-  for (let i = start + step; i >= 0 && i < all.length; i += step) {
-    if (all[i]!.showLink) {
-      select(all[i]!.id)
-      return
-    }
-  }
-  const page = query.page + step
-  if (page < 1 || page > maxPage.value) return
-  pendingJump = step > 0 ? "first" : "last"
-  query.page = page
-}
 
 const [todayPanel, toggleTodayPanel] = useToggle(false)
 useBackClose(todayPanel, isMobile)
 const statsPanel = ref(false)
-
-// 只用 ↑ ↓（用户定的，← → 不要）
-onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
-  if (!isDesktop.value || todayPanel.value || statsPanel.value) return
-  // 别的控件已经处理了这次按键（下拉框自己会开菜单、换选项）
-  if (e.defaultPrevented) return
-  const target = e.target as HTMLElement | null
-  if (target) {
-    // 「代码 / 流程图」「全部 / 我的」是单选框：点过之后焦点停在上面，浏览器默认会拿方向键
-    // 切换选项 —— 老师想看下一条，结果模式被切了。单选框照常换条，下面的 preventDefault 挡掉切换
-    const radio = target.tagName === "INPUT" && (target as HTMLInputElement).type === "radio"
-    // 焦点在输入框、下拉框、弹框里时不抢方向键
-    if (
-      (!radio && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) ||
-      target.isContentEditable ||
-      target.closest(".n-base-selection, .n-base-select-menu, .n-dropdown-menu, .n-modal")
-    ) {
-      return
-    }
-  }
-  if (!rows.value.length) return
-  e.preventDefault()
-  move(e.key === "ArrowUp" ? -1 : 1)
-})
 
 // 手机上没有右栏：点一行从右边滑出整屏的详情，地址带上 ?id=（见 paneId）
 const mobilePane = computed({
@@ -447,64 +354,17 @@ watch(paneId, (id) => {
 
 // ==================== 实时更新 ====================
 
-/**
- * 两件事，一个定时器：
- * - 本页有「正在评分」的，3 秒拉一次，把结果原地换上；
- * - 第一页每 15 秒看一眼有没有新交的。**新的不直接插进来** —— 老师正看着第 5 行，
- *   上面突然塞进 3 行，选中的那行就跑了。顶上给一条「有 N 条新提交」，点了才换。
- * 页面切到后台就停。
- */
-const newCount = ref(0)
-const newCountCapped = computed(() => newCount.value >= query.limit)
-let lastPoll = Date.now()
-const visibility = useDocumentVisibility()
-
-function isPending(row: Row) {
-  if ("result" in row) {
-    return row.result === SubmissionStatus.pending || row.result === SubmissionStatus.judging
-  }
-  return (
-    row.status === FlowchartSubmissionStatus.PENDING ||
-    row.status === FlowchartSubmissionStatus.PROCESSING
-  )
-}
-
-const hasPending = computed(() => rows.value.some(isPending))
-
-useIntervalFn(async () => {
-  if (visibility.value !== "visible" || loading.value || !loaded.value) return
-  const interval = hasPending.value ? 3000 : 15000
-  if (Date.now() - lastPoll < interval) return
-  if (!hasPending.value && query.page !== 1) return
-  lastPoll = Date.now()
-  const seq = requestSeq
-  const mode = flowMode.value
-  let res
-  try {
-    res = await fetchPage()
-  } catch {
-    return
-  }
-  // 这期间筛选变了、翻页了，这份结果就作废
-  if (seq !== requestSeq || mode !== flowMode.value) return
-  const fresh = new Map<string, Row>(res.results.map((row) => [row.id, row]))
-  if (mode) {
-    flowcharts.value = flowcharts.value.map(
-      (row) => (fresh.get(row.id) as FlowchartSubmissionListItem | undefined) ?? row,
-    )
-  } else {
-    submissions.value = submissions.value.map(
-      (row) => (fresh.get(row.id) as SubmissionListItem | undefined) ?? row,
-    )
-  }
-  if (query.page === 1) {
-    const current = new Set(rows.value.map((row) => row.id))
-    const newest = rows.value[0]?.createTime ?? ""
-    newCount.value = res.results.filter(
-      (row) => !current.has(row.id) && row.createTime > newest,
-    ).length
-  }
-}, 1000)
+const { newCount, newCountCapped, pollSoon } = useListLive({
+  query,
+  flowMode,
+  rows,
+  submissions,
+  flowcharts,
+  loading,
+  loaded,
+  fetchPage,
+  requestSeq: () => requestSeq,
+})
 
 function showNew() {
   newCount.value = 0
@@ -576,50 +436,11 @@ const today = computed({
   set: (value: boolean) => (query.today = value ? "1" : "0"),
 })
 
-/** 「这节课」：一键筛到 班级 + 这节课的题 + 今天。班级和题的取法同课堂看板 */
-const lesson = ref<ClassLesson | null>(null)
-const lessonIds = computed(
-  () => lesson.value?.problems.map((problem) => problem.problemDisplayId).join(",") ?? "",
-)
-const lessonActive = computed(
-  () =>
-    !!lesson.value?.className &&
-    !!lesson.value.problems.length &&
-    query.className === lesson.value.className &&
-    query.problem === lessonIds.value &&
-    query.today === "1",
-)
-const lessonLoading = ref(false)
-
-async function toggleLesson() {
-  if (lessonActive.value) {
-    query.problem = ""
-    query.today = "0"
-    // 「这节课」顺带筛上的语言一起放掉；老师自己另选的别动
-    if (lesson.value?.language && query.language === lesson.value.language) query.language = ""
-    return
-  }
-  lessonLoading.value = true
-  try {
-    const res = await getClassLesson(query.className || undefined)
-    if (!res.className) {
-      message.info("猜不出是哪个班在上课，先在班级里选一个")
-      return
-    }
-    query.className = res.className
-    if (!res.problems.length) {
-      message.info(`${classLabel(res.className)}今天还没有布置题，也还没人交。可以先去课堂看板布置`)
-      return
-    }
-    lesson.value = res
-    query.problem = lessonIds.value
-    query.today = "1"
-    // 老师布置时选了语言：看板上只数这个语言交的，列表也只列它（流程图那边不动）
-    if (res.language && !flowMode.value) query.language = res.language
-  } finally {
-    lessonLoading.value = false
-  }
-}
+const { lesson, lessonActive, lessonLoading, toggleLesson } = useLessonFilter({
+  query,
+  flowMode,
+  info: (text) => message.info(text),
+})
 
 const activeFilters = computed(
   () =>
@@ -652,64 +473,12 @@ function filterUser(username: string) {
   query.username = username
 }
 
-/**
- * 「统计」弹框的查询条件。每次打开从这张列表现在的班级 / 学生 / 题号 / 代码或流程图
- * 带进去（「今天」带过去就是统计的「今天」）；时间段沿用上次在弹框里选的
- */
-const statsQuery = reactive({
-  tab: "code",
-  className: "",
-  username: "",
-  problem: "",
-  period: DEFAULT_PERIOD as string,
-  from: "",
-  to: "",
+const { statsQuery, openStatistics, openStatisticsPage, listFromStatistics } = useStatsLink({
+  query,
+  flowMode,
+  statsPanel,
+  exactFor,
 })
-
-/**
- * 老师的「统计」：带着这张列表现在的班级 / 学生 / 题号 / 代码或流程图打开。原来旁边还有一颗
- * 「今日统计」，和「数据统计」名字分不清（用户说的），老师那一版并进来了 —— 什么都没筛时
- * 打开就是「一行一节课」，选「今天」就是原来今日统计看的东西
- */
-function openStatistics() {
-  Object.assign(statsQuery, {
-    tab: flowMode.value ? "flow" : "code",
-    className: query.className,
-    username: query.username,
-    problem: query.problem,
-    ...(query.today === "1" ? { period: "today" } : {}),
-  })
-  statsPanel.value = true
-}
-
-/** 手机上的「统计」：同样的条件，带去统计页 */
-function openStatisticsPage() {
-  router.push({
-    name: "statistics",
-    query: {
-      tab: flowMode.value ? "flow" : "code",
-      ...(query.className ? { className: query.className } : {}),
-      ...(query.username ? { username: query.username } : {}),
-      ...(query.problem ? { problem: query.problem } : {}),
-      ...(query.today === "1" ? { period: "today" } : {}),
-    },
-  })
-}
-
-/** 统计里的「在提交列表里看」：直接改背后这张列表的筛选，关掉弹框 */
-function listFromStatistics(next: Record<string, string>) {
-  statsPanel.value = false
-  exactFor.value = ""
-  Object.assign(query, {
-    username: next.username ?? "",
-    className: next.className ?? "",
-    result: "",
-    myself: "0",
-    problem: next.problem ?? "",
-    language: next.language === "Flowchart" ? "Flowchart" : flowMode.value ? "" : query.language,
-    today: next.today === "1" ? "1" : "0",
-  })
-}
 
 /** 右栏「只看这个班」：从看一个人换成看他整个班 */
 function filterClass(name: string) {
@@ -747,7 +516,7 @@ async function rejudge(id: string) {
   message.success("已重新判题，结果出来会自己更新")
   const row = submissions.value.find((item) => item.id === id)
   if (row) row.result = SubmissionStatus.pending
-  lastPoll = 0
+  pollSoon()
 }
 
 async function retryFlowchart(id: string) {
@@ -766,7 +535,7 @@ async function retryFlowchart(id: string) {
   message.success("已重新评分，结果出来会自己更新")
   const row = flowcharts.value.find((item) => item.id === id)
   if (row) row.status = FlowchartSubmissionStatus.PENDING
-  lastPoll = 0
+  pollSoon()
 }
 
 /**
