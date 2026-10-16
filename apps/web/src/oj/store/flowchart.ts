@@ -14,6 +14,7 @@ import { getFlowchartScores, getFlowchartSubmission, submitFlowchart } from "oj/
 import { useProblemStore } from "oj/store/problem"
 import { useSubmissionStore } from "oj/store/submission"
 import { useFlowchartWebSocket, type FlowchartEvaluationUpdate } from "shared/composables/websocket"
+import { useFallbackPoll } from "shared/composables/fallbackPoll"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 import { useAchievementStore } from "shared/store/achievement"
@@ -50,8 +51,6 @@ export { isFlowchartPass }
  */
 export type FlowchartPhase = "idle" | "evaluating" | "done" | "failed"
 
-/** AI 评分比判题慢得多，轮询放缓一点 */
-const POLL_INTERVAL = 3000
 /** 到点还没结果就收手，别无限轮询下去 */
 const POLL_TIMEOUT = 3 * 60 * 1000
 
@@ -141,41 +140,6 @@ export const useFlowchartStore = defineStore("flowchart", () => {
   /** 正在跟的那一次是哪道题的，结算时再对一遍 */
   let monitoringProblemId: number | null = null
 
-  const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
-    async () => {
-      if (!monitoringId) {
-        pausePolling()
-        return
-      }
-      try {
-        const data = await getFlowchartSubmission(monitoringId)
-        if (data.status === 2) {
-          settle(data.id, {
-            ok: true,
-            score: data.aiScore ?? 0,
-            grade: data.aiGrade ?? "",
-          })
-        } else if (data.status === 3) {
-          settle(data.id, { ok: false })
-        }
-      } catch (error) {
-        console.error("[Flowchart] 轮询失败:", error)
-        pausePolling()
-      }
-    },
-    POLL_INTERVAL,
-    { immediate: false },
-  )
-
-  // WebSocket 正常时压根用不上轮询，先给它 5 秒，到点还没结果才开始拉
-  const { start: startPollingFallback, stop: stopPollingFallback } = useTimeoutFn(
-    () => {
-      if (monitoringId) resumePolling()
-    },
-    5000,
-    { immediate: false },
-  )
-
   const { start: startPollingDeadline, stop: stopPollingDeadline } = useTimeoutFn(
     () => {
       if (!monitoringId) return
@@ -191,8 +155,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     monitoringId = ""
     monitoringProblemId = null
     unsubscribe()
-    pausePolling()
-    stopPollingFallback()
+    fallback.stop()
     stopPollingDeadline()
     loading.value = false
     // 连接挂在 store 上，离开题目页也不会跟着组件断。不立刻断：接着还可能再交一次，
@@ -252,6 +215,8 @@ export const useFlowchartStore = defineStore("flowchart", () => {
       useAchievementStore().enqueue(frame.achievements ?? [])
       return
     }
+    // 订阅后服务端立刻回一帧当前状态（还在评也回 evaluation_update）：WebSocket 是通的
+    if (monitoringId && data.submissionId === monitoringId) fallback.confirm()
     if (data.type === "flowchart_evaluation_completed") {
       settle(data.submissionId, {
         ok: true,
@@ -263,8 +228,26 @@ export const useFlowchartStore = defineStore("flowchart", () => {
     }
   }
 
-  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect } =
+  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect, status } =
     useFlowchartWebSocket(handleWebSocketMessage)
+
+  // WebSocket 通的话 20 秒才问一次，不通才快拉（见 fallbackPoll.ts）
+  const fallback = useFallbackPoll({
+    status,
+    poll: async () => {
+      if (!monitoringId) return true
+      const data = await getFlowchartSubmission(monitoringId)
+      if (data.status === 2) {
+        settle(data.id, { ok: true, score: data.aiScore ?? 0, grade: data.aiGrade ?? "" })
+        return true
+      }
+      if (data.status === 3) {
+        settle(data.id, { ok: false })
+        return true
+      }
+      return false
+    },
+  })
 
   // ==================== 提交 ====================
   /** 交一张图：Mermaid 给 AI 看、给缩略图画，结构树压缩后存着（载回画布、亮路径用） */
@@ -309,7 +292,7 @@ export const useFlowchartStore = defineStore("flowchart", () => {
         monitoringId = response.submissionId
         monitoringProblemId = problem.id
         subscribe(response.submissionId)
-        startPollingFallback()
+        fallback.start()
         startPollingDeadline()
       }
     } catch (error) {

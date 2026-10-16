@@ -7,6 +7,7 @@ import { useUserStore } from "shared/store/user"
 import { ContestStatus } from "utils/constants"
 import { parseTime, secondsToDuration } from "utils/functions"
 import RankMini from "../components/RankMini.vue"
+import { useVisibleInterval } from "shared/composables/visibleInterval"
 
 /**
  * 比赛页「题目」（设计稿「比赛重设计」B，用户选的）：一页放下。
@@ -24,12 +25,9 @@ const tone = useTone()
 const running = computed(() => contestStore.contestStatus === ContestStatus.underway)
 const ended = computed(() => contestStore.contestStatus === ContestStatus.finished)
 
-const { pause, resume } = useIntervalFn(
+const { pause, resume } = useVisibleInterval(
   () => contestStore.loadScoreboard(props.contestID),
   10_000,
-  {
-    immediate: false,
-  },
 )
 watch(
   () => [contestStore.canEnter, contestStore.contestStatus] as const,

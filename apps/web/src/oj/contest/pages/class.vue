@@ -11,6 +11,7 @@ import { useLeaveStudents } from "shared/composables/leaveStudents"
 import { ContestStatus, LANGUAGE_FORMAT_VALUE } from "utils/constants"
 import { parseTime, secondsToDuration } from "utils/functions"
 import type { Submission } from "utils/types"
+import { useVisibleInterval } from "shared/composables/visibleInterval"
 
 /**
  * 老师的「全班情况」，考完叫「成绩」（设计稿「比赛重设计」老师两块）。学生看不到这一页。
@@ -43,7 +44,7 @@ async function load() {
 const running = computed(() => contestStore.contestStatus === ContestStatus.underway)
 const ended = computed(() => contestStore.contestStatus === ContestStatus.finished)
 
-const { pause, resume } = useIntervalFn(load, 15_000, { immediate: false })
+const { pause, resume } = useVisibleInterval(load, 15_000)
 watch(
   () => [contestStore.canEnter, running.value] as const,
   ([enter, run]) => {

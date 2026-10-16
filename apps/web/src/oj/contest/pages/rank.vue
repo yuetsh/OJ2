@@ -8,6 +8,7 @@ import { ContestStatus } from "utils/constants"
 import { secondsToDuration } from "utils/functions"
 import { classLabel } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
+import { useVisibleInterval } from "shared/composables/visibleInterval"
 
 /**
  * 比赛排名（设计稿「比赛重设计」排行榜两块）。竞争感是用户要的（「我需要竞争」）：
@@ -26,12 +27,9 @@ const running = computed(() => contestStore.contestStatus === ContestStatus.unde
 const ended = computed(() => contestStore.contestStatus === ContestStatus.finished)
 
 const autoRefresh = ref(true)
-const { pause, resume } = useIntervalFn(
+const { pause, resume } = useVisibleInterval(
   () => contestStore.loadScoreboard(props.contestID),
   10_000,
-  {
-    immediate: false,
-  },
 )
 watch(
   () => [contestStore.canEnter, running.value, autoRefresh.value] as const,

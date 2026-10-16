@@ -1,10 +1,10 @@
-import { ref, computed, getCurrentScope, onScopeDispose } from "vue"
-import { useIntervalFn, useTimeoutFn } from "@vueuse/core"
+import { ref, computed } from "vue"
 import { getSubmission } from "oj/api"
 import { SubmissionStatus } from "utils/constants"
 import type { PendingAchievement, Submission } from "utils/types"
 import { useAchievementStore } from "shared/store/achievement"
 import { useSubmissionWebSocket, type SubmissionUpdate } from "shared/composables/websocket"
+import { useFallbackPoll } from "shared/composables/fallbackPoll"
 
 /**
  * 判题监控 Composable
@@ -14,33 +14,6 @@ export function useSubmissionMonitor() {
   // ==================== 状态 ====================
   const submissionId = ref("")
   const submission = ref<Submission>()
-
-  // ==================== 轮询机制 ====================
-  const { pause: pausePolling, resume: resumePolling } = useIntervalFn(
-    async () => {
-      const id = submissionId.value
-      if (!id) return
-
-      try {
-        const res = await getSubmission(id)
-        // 请求在路上时换了题（reset）或者又交了一次：回来的是上一条，扔掉。
-        // 不扔的话上一道题判对了，会把新题标成已解决、弹点评
-        if (id !== submissionId.value) return
-        submission.value = res
-
-        const result = res.result
-        // 判题完成，停止轮询
-        if (result !== SubmissionStatus.judging && result !== SubmissionStatus.pending) {
-          pausePolling()
-        }
-      } catch (error) {
-        console.error("[SubmissionMonitor] 轮询失败:", error)
-        pausePolling()
-      }
-    },
-    2000,
-    { immediate: false },
-  )
 
   // ==================== WebSocket 处理 ====================
   const handleSubmissionUpdate = (data: SubmissionUpdate) => {
@@ -64,6 +37,8 @@ export function useSubmissionMonitor() {
       console.log("[SubmissionMonitor] 提交ID不匹配，忽略")
       return
     }
+    // 订阅后服务端立刻回的那一帧（还在排队也回）就算：WebSocket 是通的，轮询退到慢档
+    fallback.confirm()
 
     if (!submission.value) {
       submission.value = {} as Submission
@@ -76,7 +51,7 @@ export function useSubmissionMonitor() {
       console.log(`[SubmissionMonitor] 判题${data.status === "finished" ? "完成" : "出错"}`)
 
       // 停止轮询（WebSocket已成功）
-      pausePolling()
+      fallback.stop()
       // 结果已经到手，别让重连再去重放这条早就判完的订阅
       unsubscribe()
 
@@ -91,25 +66,23 @@ export function useSubmissionMonitor() {
   }
 
   // 初始化 WebSocket
-  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect } =
+  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect, status } =
     useSubmissionWebSocket(handleSubmissionUpdate)
 
-  // ==================== 轮询保底启动 ====================
-  const { start: startPollingFallback } = useTimeoutFn(
-    () => {
-      if (
-        submission.value &&
-        (submission.value.result === SubmissionStatus.judging ||
-          submission.value.result === SubmissionStatus.pending ||
-          submission.value.result === SubmissionStatus.submitting)
-      ) {
-        console.log("[SubmissionMonitor] WebSocket未及时响应，启动轮询保底")
-        resumePolling()
-      }
+  // ==================== 轮询兜底 ====================
+  const fallback = useFallbackPoll({
+    status,
+    poll: async () => {
+      const id = submissionId.value
+      if (!id) return true
+      const res = await getSubmission(id)
+      // 请求在路上时换了题（reset）或者又交了一次：回来的是上一条，扔掉。
+      // 不扔的话上一道题判对了，会把新题标成已解决、弹点评
+      if (id !== submissionId.value) return false
+      submission.value = res
+      return res.result !== SubmissionStatus.judging && res.result !== SubmissionStatus.pending
     },
-    5000,
-    { immediate: false },
-  )
+  })
 
   // ==================== 启动监控 ====================
   const startMonitoring = (id: string) => {
@@ -131,8 +104,8 @@ export function useSubmissionMonitor() {
     // 把各自那个早就判完的旧 submissionId 重新订阅一遍。
     subscribe(id)
 
-    // 5秒后启动轮询保底（防止WebSocket失败）
-    startPollingFallback()
+    // 轮询兜底：WebSocket 通的话 20 秒才问一次，不通才快拉（见 fallbackPoll.ts）
+    fallback.start()
   }
 
   /**
@@ -141,7 +114,7 @@ export function useSubmissionMonitor() {
    * 判完触发的「通过」处理会把**新题**标成已解决。提交本身照常判完落库，只是这边不再跟。
    */
   const reset = () => {
-    pausePolling()
+    fallback.stop()
     unsubscribe()
     // 连接由 store 持有，离开题目页组件卸了它也还在。和判完之后一样，空闲 15 分钟断开；
     // 不在这里立刻断，是因为刚交的那条判完之后还可能推成就过来
@@ -161,11 +134,6 @@ export function useSubmissionMonitor() {
     return judging.value || pending.value || submitting.value
   })
 
-  // ==================== 清理 ====================
-  // 现在由 submission store 持有（见 oj/store/submission.ts），store 不销毁就一直在；
-  // 用 onScopeDispose 是为了在组件里调用时照样能收尾
-  if (getCurrentScope()) onScopeDispose(pausePolling)
-
   return {
     // 状态
     submissionId,
@@ -179,7 +147,6 @@ export function useSubmissionMonitor() {
 
     // 方法
     startMonitoring,
-    pausePolling,
     reset,
   }
 }
