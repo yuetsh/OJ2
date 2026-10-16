@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { downloadAccountsCsv } from "./accountsCsv"
 import PageHeader from "admin/components/PageHeader.vue"
 import { classLabel } from "oj/submission/utils"
 import UserName from "shared/components/UserName.vue"
@@ -151,15 +152,9 @@ function again() {
   passwords.clear()
 }
 
-/** 下载名单：用户名、密码两列。开头带 BOM，Excel 打开中文才不乱码 */
 function download() {
   if (!done.value) return
-  const csv = "﻿用户名,密码\n" + done.value.map((it) => `${it.username},${it.password}`).join("\n")
-  const link = document.createElement("a")
-  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
-  link.download = `${prefix.value || "账号"}.csv`
-  link.click()
-  URL.revokeObjectURL(link.href)
+  downloadAccountsCsv(done.value, prefix.value || "账号")
 }
 
 /** 打印账号条：一人一张，一页四列，打出来剪开发下去 */

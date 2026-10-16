@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import { errorMessage } from "utils/api"
 import { DataTableRowKey, SelectOption, useThemeVars } from "naive-ui"
@@ -12,7 +13,8 @@ import UserNameCell from "./components/UserNameCell.vue"
 import PasswordCell from "./components/PasswordCell.vue"
 import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { useRouteQuery } from "@vueuse/router"
-import { NO_CLASS } from "@oj2/contract"
+import { NO_CLASS, STUDENT_ROLES } from "@oj2/contract"
+import { downloadAccountsCsv } from "./accountsCsv"
 import { classLabel, groupClassOptions } from "oj/submission/utils"
 import { useConfigStore } from "shared/store/config"
 import { useBreakpoints } from "shared/composables/breakpoints"
@@ -218,6 +220,39 @@ async function listUsers() {
   revealedPasswords.value.clear()
 }
 
+/**
+ * 选了一个班就能把全班的用户名、密码下成表格（发给班主任、打印）。只下学生，不管搜索和角色筛选；
+ * 一页最多 250 人，一个班 60 人以内，循环只是保险。老班级（23x 及更早）很多人没存明文密码，那格空着
+ */
+const downloadingClass = ref(false)
+async function downloadClassAccounts() {
+  const className = query.className
+  downloadingClass.value = true
+  try {
+    const rows: AdminUserForm[] = []
+    for (let offset = 0; ; offset += 250) {
+      const res = await getUserList(offset, 250, "", "", "username", className)
+      rows.push(...res.results)
+      if (!res.results.length || rows.length >= res.total) break
+    }
+    const students = rows.filter((it) =>
+      (STUDENT_ROLES as readonly string[]).includes(it.adminType),
+    )
+    if (!students.length) {
+      message.warning("这个班没有学生")
+      return
+    }
+    downloadAccountsCsv(
+      students.map((it) => ({ username: it.username, password: it.rawPassword ?? "" })),
+      `${classLabel(className)}账号`,
+    )
+  } catch (err) {
+    message.error(errorMessage(err))
+  } finally {
+    downloadingClass.value = false
+  }
+}
+
 function chooseUsers(rowKeys: DataTableRowKey[]) {
   userIDs.value = rowKeys
 }
@@ -366,6 +401,14 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
         aria-label="班级"
         style="width: 150px"
       />
+      <n-button
+        v-if="query.className && query.className !== NO_CLASS"
+        :loading="downloadingClass"
+        @click="downloadClassAccounts"
+      >
+        <template #icon><Icon icon="ph:download-simple" /></template>
+        下载这个班的账号
+      </n-button>
       <n-select
         v-model:value="query.type"
         :options="adminOptions"
