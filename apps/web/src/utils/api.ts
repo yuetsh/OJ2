@@ -67,6 +67,13 @@ interface ApiClient {
  * 导出给不走 axios 的请求用（AI 的流式接口是裸 fetch，见 utils/stream.ts）——
  * 同一个错误码从两条路进来，学生看到的结果不该有两个样子。
  */
+/** handleGlobalApiError 已经替调用方提示过的错误码，调用方别再弹第二遍 */
+export const GLOBALLY_HANDLED_CODES: readonly string[] = [
+  "login-required",
+  "account-disabled",
+  "permission-denied",
+]
+
 export function handleGlobalApiError(code: string, message?: string) {
   if (code === "login-required") {
     storage.remove(STORAGE_KEY.AUTHED)

@@ -7,6 +7,7 @@ import type { AdminProblemSet } from "utils/types"
 import { getProblemSetList, toggleProblemSetVisible } from "../api"
 import { NButton, NSwitch, NTag, useThemeVars } from "naive-ui"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useListLoader } from "shared/composables/listLoader"
 
 /**
  * 后台题单列表。难度、状态两列和筛选拿掉了（线上全是简单 / 活跃，「状态 + 可见」合成了「公开」），
@@ -115,10 +116,12 @@ const desktopColumns: DataTableColumn<AdminProblemSet>[] = [
 
 const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns))
 
+const { loading, track } = useListLoader()
 async function listProblemSets() {
   if (query.page < 1) query.page = 1
   const offset = (query.page - 1) * query.limit
-  const res = await getProblemSetList(offset, query.limit, query.keyword)
+  const res = await track(getProblemSetList(offset, query.limit, query.keyword))
+  if (!res) return
   total.value = res.total
   problemSets.value = res.results
 }
@@ -150,7 +153,13 @@ watch(() => [query.page, query.limit], listProblemSets)
       />
     </template>
   </PageHeader>
-  <n-data-table striped class="set-table" :columns="columns" :data="problemSets" />
+  <n-data-table
+    :loading="loading"
+    striped
+    class="set-table"
+    :columns="columns"
+    :data="problemSets"
+  />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 

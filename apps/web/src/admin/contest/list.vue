@@ -9,6 +9,7 @@ import { parseTime } from "utils/functions"
 import { editContest, getContestList } from "../api"
 import Actions from "./components/Actions.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useListLoader } from "shared/composables/listLoader"
 
 /**
  * 后台比赛列表（设计稿「比赛重设计」CtAdminList）。一行一场：比赛名（期中 / 期末挂标，
@@ -155,9 +156,11 @@ const desktopColumns: DataTableColumn<AdminContestListItem>[] = [
 
 const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns))
 
+const { loading, track } = useListLoader()
 async function listContests() {
   const offset = (query.page - 1) * query.limit
-  const res = await getContestList(offset, query.limit, query.keyword)
+  const res = await track(getContestList(offset, query.limit, query.keyword))
+  if (!res) return
   contests.value = res.results
   total.value = res.total
 }
@@ -185,7 +188,13 @@ watchDebounced(() => query.keyword, listContests, {
       />
     </template>
   </PageHeader>
-  <n-data-table striped class="contest-table" :columns="columns" :data="contests" />
+  <n-data-table
+    :loading="loading"
+    striped
+    class="contest-table"
+    :columns="columns"
+    :data="contests"
+  />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 

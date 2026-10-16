@@ -10,6 +10,7 @@ import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
 import type { AdminAiReport, AdminAiReportListItem } from "utils/types"
 import { getAIReportDetail, getAIReportList, pinAIReport } from "../api"
+import { useListLoader } from "shared/composables/listLoader"
 
 // Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
 const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
@@ -52,9 +53,11 @@ const detail = ref<AdminAiReport | null>(null)
 const loadingDetail = ref(false)
 const selected = computed(() => reports.value.find((r) => r.id === selectedId.value) ?? null)
 
+const { track } = useListLoader()
 async function listReports() {
   const offset = (query.page - 1) * query.limit
-  const res = await getAIReportList(offset, query.limit, query.username)
+  const res = await track(getAIReportList(offset, query.limit, query.username))
+  if (!res) return
   reports.value = res.results
   total.value = res.total
   // 第一次进来、或者翻页 / 搜索之后选中的那份不在这一页了：默认看第一份

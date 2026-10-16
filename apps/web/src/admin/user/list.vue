@@ -18,6 +18,7 @@ import { downloadAccountsCsv } from "./accountsCsv"
 import { classLabel, groupClassOptions } from "utils/classes"
 import { useConfigStore } from "shared/store/config"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useListLoader } from "shared/composables/listLoader"
 
 /**
  * 后台用户列表（设计稿「后台用户与批量建号」UsList）。老师进来多半是三件事：学生忘了密码、
@@ -203,17 +204,14 @@ const problemPermissionOptions: SelectOption[] = [
 // 老师不给「无权限」：比赛题的接口要出题权限，设了就是比赛题目页全报权限不足，后端也会兜成「仅自己」
 const teacherPermissionOptions = problemPermissionOptions.slice(1)
 
+const { loading, track } = useListLoader()
 async function listUsers() {
   if (query.page < 1) query.page = 1
   const offset = (query.page - 1) * query.limit
-  const res = await getUserList(
-    offset,
-    query.limit,
-    query.type,
-    query.keyword,
-    query.orderBy,
-    query.className,
+  const res = await track(
+    getUserList(offset, query.limit, query.type, query.keyword, query.orderBy, query.className),
   )
+  if (!res) return
   total.value = res.total
   neverLoggedIn.value = res.neverLoggedIn
   users.value = res.results
@@ -427,6 +425,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
     </template>
   </PageHeader>
   <n-data-table
+    :loading="loading"
     striped
     class="user-table"
     :data="users"

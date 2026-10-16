@@ -4,6 +4,7 @@ import Pagination from "shared/components/Pagination.vue"
 import type { AdminProblemRow } from "utils/types"
 import { batchTagProblems, getProblemList } from "admin/api"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useListLoader } from "shared/composables/listLoader"
 
 interface Props {
   show: boolean
@@ -63,10 +64,14 @@ const mobileColumns: DataTableColumn<AdminProblemRow>[] = [
 
 const columns = computed(() => (isMobile.value ? mobileColumns : allColumns))
 
+const { loading, track } = useListLoader()
 async function listProblems() {
   if (page.value < 1) page.value = 1
   const offset = (page.value - 1) * limit.value
-  const res = await getProblemList(offset, limit.value, keyword.value, "", undefined, props.tagId)
+  const res = await track(
+    getProblemList(offset, limit.value, keyword.value, "", undefined, props.tagId),
+  )
+  if (!res) return
   problems.value = res.results
   total.value = res.total
 }
@@ -134,7 +139,7 @@ watchDebounced(
           clearable
         />
       </n-flex>
-      <n-data-table striped :columns="columns" :data="problems" />
+      <n-data-table :loading="loading" striped :columns="columns" :data="problems" />
       <Pagination :total="total" v-model:limit="limit" v-model:page="page" />
     </n-flex>
   </n-modal>

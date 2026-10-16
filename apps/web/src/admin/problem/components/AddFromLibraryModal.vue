@@ -3,6 +3,7 @@ import { getLibraryProblemList } from "admin/api"
 import Pagination from "shared/components/Pagination.vue"
 import type { AdminProblemRow } from "utils/types"
 import AddButton from "./AddButton.vue"
+import { useListLoader } from "shared/composables/listLoader"
 
 interface Props {
   show: boolean
@@ -42,9 +43,11 @@ const columns: DataTableColumn<AdminProblemRow>[] = [
   },
 ]
 
+const { loading, track } = useListLoader()
 async function getList() {
   const offset = (query.page - 1) * query.limit
-  const res = await getLibraryProblemList(offset, query.limit, query.keyword)
+  const res = await track(getLibraryProblemList(offset, query.limit, query.keyword))
+  if (!res) return
   total.value = res.total
   problems.value = res.results
 }
@@ -74,7 +77,7 @@ watchDebounced(
     @close="$emit('update:show', false)"
   >
     <n-input class="search" v-model:value="query.keyword" clearable placeholder="搜索标题或编号" />
-    <n-data-table striped :columns="columns" :data="problems" />
+    <n-data-table :loading="loading" striped :columns="columns" :data="problems" />
     <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   </n-modal>
 </template>

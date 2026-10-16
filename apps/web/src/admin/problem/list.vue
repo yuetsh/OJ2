@@ -16,6 +16,7 @@ import CreateProblemMenu from "./components/CreateProblemMenu.vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import ProblemTypeTag from "oj/problem/components/ProblemTypeTag.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useListLoader } from "shared/composables/listLoader"
 
 /**
  * 后台题目列表（设计稿「后台题目列表」PlA / PlB）。一行一道题：题号、题目（点了就是编辑）、
@@ -265,19 +266,23 @@ const columns = computed<DataTableColumn<AdminProblemRow>[]>(() => {
     : [{ type: "selection" }, ...cols]
 })
 
+const { loading, track } = useListLoader()
 async function listProblems() {
   if (query.page < 1) query.page = 1
   const offset = (query.page - 1) * query.limit
-  const res = await getProblemList(
-    offset,
-    query.limit,
-    query.keyword,
-    query.author,
-    props.contestID,
-    undefined,
-    query.kind,
-    props.contestID ? "" : query.visible,
+  const res = await track(
+    getProblemList(
+      offset,
+      query.limit,
+      query.keyword,
+      query.author,
+      props.contestID,
+      undefined,
+      query.kind,
+      props.contestID ? "" : query.visible,
+    ),
   )
+  if (!res) return
   total.value = res.total
   problems.value = res.results
   counts.value = res.counts
@@ -404,6 +409,7 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
     <n-button size="small" quaternary @click="selectedRowKeys = []">取消选择</n-button>
   </div>
   <n-data-table
+    :loading="loading"
     striped
     class="problem-table"
     :columns="columns"

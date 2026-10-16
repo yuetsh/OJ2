@@ -8,6 +8,7 @@ import type { AdminAnnouncementListItem } from "utils/types"
 import { editAnnouncement, getAnnouncement, getAnnouncementList } from "../api"
 import Actions from "./components/Actions.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
+import { useListLoader } from "shared/composables/listLoader"
 
 const message = useMessage()
 const total = ref(0)
@@ -136,9 +137,11 @@ async function toggle(announcement: AdminAnnouncementListItem, field: "visible" 
   }
 }
 
+const { loading, track } = useListLoader()
 async function listAnnouncements() {
   const offset = (query.page - 1) * query.limit
-  const res = await getAnnouncementList(offset, query.limit)
+  const res = await track(getAnnouncementList(offset, query.limit))
+  if (!res) return
   announcements.value = res.results
   total.value = res.total
 }
@@ -155,7 +158,13 @@ watch(query, listAnnouncements, { deep: true })
       </n-button>
     </template>
   </PageHeader>
-  <n-data-table striped class="ann-table" :columns="columns" :data="announcements" />
+  <n-data-table
+    :loading="loading"
+    striped
+    class="ann-table"
+    :columns="columns"
+    :data="announcements"
+  />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
