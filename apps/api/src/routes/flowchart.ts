@@ -26,7 +26,7 @@ import { problemSetLockCutoffs, recordSolvedAndNotify } from "../services/proble
 import { consumeToken } from "../services/throttling"
 import { buildWordFrequencies } from "../services/word-frequency"
 import { dayStart } from "../time"
-import { unknownDisplayIds } from "./submission-statistics"
+import { unknownDisplayIds } from "../services/submission-filters"
 import {
   classCondition,
   isAdminRole,

@@ -30,7 +30,6 @@ import { and, count, desc, eq, ilike, inArray, isNull, ne, not, or, sql } from "
 import { Hono } from "hono"
 
 import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
-import type { AuthUser } from "../../auth/session"
 import { db, schema, type DbOrTx } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { astRulesError, checkAst, describeAstRule, pickAstRules } from "../../judge/ast"
@@ -50,37 +49,14 @@ import { config } from "../../config"
 import { readFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { getTopReactions } from "../../services/reaction"
+import { canEditProblem, canManageAllProblems, ownsOrSuper } from "../../services/permissions"
 import { problemUserCounts } from "../../services/problem-progress"
+import { findTagsByName, normalizeTagNames } from "../../services/problem-tags"
 import { asRecord, queryInteger, sampleUser } from "../helpers"
 
 export const adminProblemRoutes = new Hono<AppEnv>()
 
 type ProblemRow = typeof schema.problem.$inferSelect
-
-function canManageAll(user: AuthUser) {
-  return user.adminType === "Super Admin" || user.problemPermission === "All"
-}
-
-/**
- * 题目归属判断。比赛题看**比赛**的创建者，公开题看题目自己的创建者 ——
- * 对齐旧后端：`ensure_created_by(problem.contest, user)` vs `ensure_created_by(problem, user)`。
- * 一道比赛题的 created_by 可能是克隆时的操作人，跟谁有权改它没关系。
- */
-export async function canEdit(
-  user: AuthUser,
-  problem: Pick<ProblemRow, "contestId" | "createdById">,
-) {
-  if (user.adminType === "Super Admin") return true
-  if (problem.contestId === null) {
-    return canManageAll(user) || problem.createdById === user.id
-  }
-  const [contest] = await db
-    .select({ createdById: schema.contest.createdById })
-    .from(schema.contest)
-    .where(eq(schema.contest.id, problem.contestId))
-    .limit(1)
-  return Boolean(contest && contest.createdById === user.id)
-}
 
 async function tagNames(problemId: number) {
   return (await tagNamesFor([problemId])).get(problemId) ?? []
@@ -101,42 +77,6 @@ async function tagNamesFor(problemIds: number[]) {
   for (const row of rows)
     result.set(row.problemId, [...(result.get(row.problemId) ?? []), row.name])
   return result
-}
-
-/**
- * 把一批标签名去空格、去重（大小写不敏感），保留每个名字第一次出现时的原始大小写。
- * 解析和批量打标签两条路都用它，口径对齐旧 resolve_tags。
- */
-export function normalizeTagNames(names: string[]) {
-  const wanted: string[] = []
-  const seen = new Set<string>()
-  for (const raw of names) {
-    const name = raw.trim()
-    if (!name || seen.has(name.toLowerCase())) continue
-    seen.add(name.toLowerCase())
-    wanted.push(name)
-  }
-  return wanted
-}
-
-/**
- * 一条 `lower(name) in (...)` 把已有标签全查回来，按小写名建 Map。
- * 以前是每个名字一条 SELECT，一次改十个标签就是十次往返。
- */
-export async function findTagsByName(tx: DbOrTx, names: string[]) {
-  const map = new Map<string, number>()
-  if (names.length === 0) return map
-  const rows = await tx
-    .select({ id: schema.problemTag.id, name: schema.problemTag.name })
-    .from(schema.problemTag)
-    .where(
-      inArray(
-        sql`lower(${schema.problemTag.name})`,
-        names.map((name) => name.toLowerCase()),
-      ),
-    )
-  for (const row of rows) map.set(row.name.toLowerCase(), row.id)
-  return map
 }
 
 /** 把标签名解析成 id：去空格、大小写不敏感复用已有标签，没有才新建。对齐旧 resolve_tags */
@@ -416,7 +356,7 @@ adminProblemRoutes.get("/problems", requireProblemPermission, async (c) => {
   // library=1 是比赛的「从题库中选择」：要列的是 from-public 实际放行的范围 —— 所有可见的
   // 公开题，加上自己能改的。只按 created_by 过滤的话，「仅管理自己创建」的老师一道题都看不到
   const library = c.req.query("library") === "1"
-  if (!canManageAll(user)) {
+  if (!canManageAllProblems(user)) {
     const own = eq(schema.problem.createdById, user.id)
     filters.push(library ? or(eq(schema.problem.visible, true), own)! : own)
   }
@@ -526,7 +466,7 @@ adminProblemRoutes.get("/problems/:id", requireProblemPermission, async (c) => {
     .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .limit(1)
   if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!(await canEdit(c.get("user")!, row))) {
+  if (!(await canEditProblem(c.get("user")!, row))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   return success(c, await serialize(row))
@@ -562,7 +502,7 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
     .where(eq(schema.problem.id, id))
     .limit(1)
   if (!existing) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!(await canEdit(c.get("user")!, existing))) {
+  if (!(await canEditProblem(c.get("user")!, existing))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   const validated = await validateProblem(parsed.data)
@@ -611,7 +551,7 @@ adminProblemRoutes.delete("/problems/:id", requireProblemPermission, async (c) =
     .where(eq(schema.problem.id, id))
     .limit(1)
   if (!existing) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!(await canEdit(c.get("user")!, existing))) {
+  if (!(await canEditProblem(c.get("user")!, existing))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   return deleteProblem(c, id)
@@ -652,7 +592,7 @@ adminProblemRoutes.get("/contests/:contestId/problems", requireProblemPermission
     .where(eq(schema.contest.id, contestId))
     .limit(1)
   const user = c.get("user")!
-  if (!contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)) {
+  if (!contest || !ownsOrSuper(user, contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
   const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
@@ -719,7 +659,7 @@ adminProblemRoutes.post("/contests/:contestId/problems", requireProblemPermissio
     .where(eq(schema.contest.id, contestId))
     .limit(1)
   const user = c.get("user")!
-  if (!contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)) {
+  if (!contest || !ownsOrSuper(user, contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
   const parsed = await parseBody(c, createProblemRequestSchema)
@@ -754,7 +694,7 @@ adminProblemRoutes.post("/problems/:id/make-public", requireProblemPermission, a
   // 归属校验不能少：这个接口会把整道题（含 answers 标准答案）复制出来并回传，
   // 没有它，任何有出题权的人拿别人比赛题的 id 就能把题面和答案整份拿走。
   // 旧后端同样缺这个校验，但它只 `return self.success()` 不带数据，泄露面比这里小。
-  if (!(await canEdit(c.get("user")!, problem))) {
+  if (!(await canEditProblem(c.get("user")!, problem))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   if (!problem.contestId || problem.isPublic) {
@@ -804,8 +744,7 @@ adminProblemRoutes.post(
     // 「比赛不存在」和「比赛存在但不是你的」必须回同一个码。分开报的话，带一个已知有效的
     // problemId 就能靠错误码差异枚举出哪些 contestId 真实存在。全仓其余跨租户路径都是
     // 统一码（contest 系列一律 contest-not-found），这里对齐。
-    const denyContest =
-      !contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)
+    const denyContest = !contest || !ownsOrSuper(user, contest)
     if (denyContest) return failure(c, 404, "contest-not-found", "Contest does not exist")
     if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
     // 源题必须是**公开题**，且要么已可见、要么是自己的。旧后端只按 id 取，不校验任何东西 ——
@@ -813,7 +752,7 @@ adminProblemRoutes.post(
     if (problem.contestId !== null) {
       return failure(c, 400, "not-a-public-problem", "只能从公开题库添加题目")
     }
-    if (!problem.visible && !(await canEdit(user, problem))) {
+    if (!problem.visible && !(await canEditProblem(user, problem))) {
       return failure(c, 404, "problem-not-found", "Problem does not exist")
     }
     if (contestStatus(contest) === "-1")
@@ -863,7 +802,7 @@ adminProblemRoutes.put(
       .where(eq(schema.contest.id, contestId))
       .limit(1)
     const user = c.get("user")!
-    if (!contest || (user.adminType !== "Super Admin" && contest.createdById !== user.id)) {
+    if (!contest || !ownsOrSuper(user, contest)) {
       return failure(c, 404, "contest-not-found", "Contest does not exist")
     }
     if (contestStatus(contest) === "-1")
@@ -930,7 +869,7 @@ adminProblemRoutes.get("/problems/:id/test-cases", requireProblemPermission, asy
     .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .limit(1)
   if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!(await canEdit(c.get("user")!, problem))) {
+  if (!(await canEditProblem(c.get("user")!, problem))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   try {
@@ -959,7 +898,7 @@ adminProblemRoutes.get("/problems/:id/sql-scripts", requireProblemPermission, as
     .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .limit(1)
   if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!(await canEdit(c.get("user")!, problem))) {
+  if (!(await canEditProblem(c.get("user")!, problem))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   const info = await readInfo(problem.testCaseId)
@@ -985,7 +924,7 @@ adminProblemRoutes.get("/problems/:id/test-case-files", requireProblemPermission
     .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .limit(1)
   if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!(await canEdit(c.get("user")!, problem))) {
+  if (!(await canEditProblem(c.get("user")!, problem))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
   const info = await readInfo(problem.testCaseId)

@@ -26,7 +26,7 @@ import { STUDENT_ROLES } from "@oj2/contract"
 import { TEACHER_ROLES } from "../helpers"
 import { onlineUserIds } from "../../auth/presence"
 import { JudgeStatus } from "../../judge/status"
-import { suggestActiveClass } from "../classroom"
+import { suggestActiveClass } from "../../services/class-activity"
 import { classPrefixCondition, queryInteger } from "../helpers"
 
 export const adminConfRoutes = new Hono<AppEnv>()

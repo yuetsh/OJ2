@@ -38,10 +38,10 @@ import {
   classNameFilter,
   exactUsernameFilter,
   problemFilter,
-  submissionStatisticsRoutes,
   unknownDisplayIds,
   usernameFilter,
-} from "./submission-statistics"
+} from "../services/submission-filters"
+import { submissionStatisticsRoutes } from "./submission-statistics"
 
 export const submissionRoutes = new Hono<ContestEnv>()
 

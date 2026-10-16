@@ -14,19 +14,16 @@ import { and, asc, countDistinct, desc, eq, ilike, inArray, isNull, ne, sql } fr
 import { Hono } from "hono"
 
 import { requireProblemPermission, type AppEnv } from "../../auth/middleware"
-import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { completeChat } from "../../services/ai"
 import { asRecord, queryInteger } from "../helpers"
-import { canEdit, findTagsByName, normalizeTagNames } from "./problem"
+import { canEditProblem, canManageAllProblems } from "../../services/permissions"
+import { findTagsByName, normalizeTagNames } from "../../services/problem-tags"
 
 export const adminTagRoutes = new Hono<AppEnv>()
 
 /** 能管所有题目：超管，或 problemPermission 为 All */
-function canManageAllProblems(user: AuthUser) {
-  return user.adminType === "Super Admin" || user.problemPermission === "All"
-}
 
 // ---------------------------------------------------------------- 标签
 
@@ -244,7 +241,7 @@ adminTagRoutes.put("/problems/:id/visibility", requireProblemPermission, async (
   const user = c.get("user")!
   // 和编辑、删除同一个口径（canEdit）：比赛题看比赛的创建者。原来只看题目的创建者，
   // 而从题库加进比赛的题保留原作者，老师在自己比赛里点「可见」一律 404
-  if (!(await canEdit(user, problem))) {
+  if (!(await canEditProblem(user, problem))) {
     return failure(c, 404, "problem-not-found", "题目不存在")
   }
   await db

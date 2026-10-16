@@ -17,6 +17,7 @@ import type { AuthUser } from "../auth/session"
 import { getContestPassword } from "../auth/session"
 import { db, schema } from "../db"
 import { failure } from "../http"
+import { ownsOrSuper } from "./permissions"
 
 export type ContestRow = typeof schema.contest.$inferSelect
 
@@ -39,7 +40,7 @@ export function contestStatus(contest: ContestRow) {
 }
 
 export function isContestAdmin(user: AuthUser | null | undefined, contest: ContestRow) {
-  return Boolean(user && (user.id === contest.createdById || user.adminType === "Super Admin"))
+  return Boolean(user && ownsOrSuper(user, contest))
 }
 
 export function contestDetailsAllowed(user: AuthUser | null | undefined, contest: ContestRow) {

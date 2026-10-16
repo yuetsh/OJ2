@@ -21,15 +21,11 @@ import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { recalculateBadge, resyncProgress } from "../../services/problemset"
 import { queryInteger, sampleUser } from "../helpers"
+import { ownsOrSuper } from "../../services/permissions"
 
 export const adminProblemSetRoutes = new Hono<AppEnv>()
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
-
-/** 对齐旧 ensure_created_by：超管放行，其余人只能碰自己建的。越权报「不存在」 */
-function ownedBy(user: AuthUser, row: { createdById: number }) {
-  return user.adminType === "Super Admin" || row.createdById === user.id
-}
 
 /**
  * 取出题单并校验归属。所有嵌套资源（题目/奖章/进度）都先过这一关 ——
@@ -42,7 +38,7 @@ async function loadOwned(c: { req: { param(name: string): string } }, user: Auth
     .from(schema.problemset)
     .where(eq(schema.problemset.id, id))
     .limit(1)
-  return row && ownedBy(user, row) ? row : null
+  return row && ownsOrSuper(user, row) ? row : null
 }
 
 async function serialize(row: typeof schema.problemset.$inferSelect) {

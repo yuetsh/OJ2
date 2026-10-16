@@ -9,21 +9,13 @@ import { and, count, countDistinct, desc, eq, ilike, inArray } from "drizzle-orm
 import { Hono } from "hono"
 
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
-import type { AuthUser } from "../../auth/session"
 import { db, schema } from "../../db"
 import { failure, parseBody, success } from "../../http"
 import { contestStatus } from "../../services/contest"
 import { queryInteger, sampleUser } from "../helpers"
+import { ownsOrSuper } from "../../services/permissions"
 
 export const adminContestRoutes = new Hono<AppEnv>()
-
-/**
- * 「只能管自己建的」。对齐旧 `ensure_created_by`：超管放行，其余人只能碰自己创建的。
- * 越权时报的是**不存在**而不是无权限 —— 不泄露「有这么个东西但你看不到」。
- */
-function ownedBy(user: AuthUser, contest: { createdById: number }) {
-  return user.adminType === "Super Admin" || contest.createdById === user.id
-}
 
 async function serialize(row: {
   contest: typeof schema.contest.$inferSelect
@@ -132,7 +124,7 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
 
 adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
   const [row] = await selectContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!row || !ownedBy(c.get("user")!, row.contest)) {
+  if (!row || !ownsOrSuper(c.get("user")!, row.contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
   return success(c, await serialize(row))
@@ -170,7 +162,7 @@ adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
   const parsed = await parseBody(c, updateContestRequestSchema)
   if (!parsed.success) return parsed.response
   const [existing] = await selectContest(id)
-  if (!existing || !ownedBy(c.get("user")!, existing.contest)) {
+  if (!existing || !ownsOrSuper(c.get("user")!, existing.contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
   const error = validatePayload(parsed.data)
@@ -307,7 +299,7 @@ adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => 
     .from(schema.contest)
     .where(eq(schema.contest.id, contestId))
     .limit(1)
-  if (!contest || !ownedBy(c.get("user")!, contest)) {
+  if (!contest || !ownsOrSuper(c.get("user")!, contest)) {
     return failure(c, 404, "contest-not-found", "Contest does not exist")
   }
   // rank 必须属于这场比赛。旧后端只按 rank_id 取，不校验归属 ——
