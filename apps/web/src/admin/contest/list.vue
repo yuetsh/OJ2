@@ -8,6 +8,7 @@ import { CONTEST_STATUS } from "utils/constants"
 import { parseTime } from "utils/functions"
 import { editContest, getContestList } from "../api"
 import Actions from "./components/Actions.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 /**
  * 后台比赛列表（设计稿「比赛重设计」CtAdminList）。一行一场：比赛名（期中 / 期末挂标，
@@ -16,6 +17,7 @@ import Actions from "./components/Actions.vue"
  * 会跑到最前面。ID、标签、类型三列拿掉（标签只在期中 / 期末时挂出来，类型就是那把锁）
  */
 const theme = useThemeVars()
+const { isMobile } = useBreakpoints()
 const contests = ref<AdminContestListItem[]>([])
 const total = ref(0)
 const query = reactive({
@@ -43,16 +45,69 @@ function duration(row: AdminContestListItem) {
 
 const EXAM_TAGS = ["期中", "期末"]
 
-const columns: DataTableColumn<AdminContestListItem>[] = [
+function renderTitle(row: AdminContestListItem) {
+  return h("span", { class: "title-cell" }, [
+    h(ContestTitle, { contest: row }),
+    EXAM_TAGS.includes(row.tag) ? h("span", { class: "exam" }, row.tag) : null,
+  ])
+}
+
+function renderStatus(row: AdminContestListItem) {
+  return h(
+    "span",
+    { class: row.status === "0" ? "live" : row.status === "-1" ? "muted" : "" },
+    row.status === "-1"
+      ? "结束了"
+      : row.status === "0"
+        ? "进行中"
+        : CONTEST_STATUS[row.status].name,
+  )
+}
+
+function renderVisible(row: AdminContestListItem) {
+  return h(NSwitch, {
+    value: row.visible,
+    size: isMobile.value ? "medium" : "small",
+    rubberBand: false,
+    onUpdateValue: () => toggleVisible(row),
+  })
+}
+
+/**
+ * 手机上一场一张卡：比赛名一行；开始 · 多长 · 状态 · 题数 · 参加 · 出卷一行小字（每项不断开）；
+ * 操作按钮放不下就折行。「学生看得到」开关单独一列靠右
+ */
+function renderMobileCard(row: AdminContestListItem) {
+  const items = [
+    h("span", { class: "num" }, parseTime(row.startTime, "YYYY-MM-DD HH:mm")),
+    duration(row),
+    renderStatus(row),
+    `${row.problemCount} 题`,
+    row.participantCount ? `${row.participantCount} 人参加` : null,
+    row.createdBy.username,
+  ].filter((it) => it !== null)
+  return h("div", { class: "m-card" }, [
+    renderTitle(row),
+    h(
+      "div",
+      { class: "m-meta muted" },
+      items.map((it, i) => h("span", { class: "m-item", key: i }, i ? [" · ", it] : [it])),
+    ),
+    h(Actions, { contest: row }),
+  ])
+}
+
+const mobileColumns: DataTableColumn<AdminContestListItem>[] = [
+  { title: "比赛", key: "title", render: renderMobileCard },
+  { title: "看得到", key: "visible", width: 72, align: "center", render: renderVisible },
+]
+
+const desktopColumns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: "比赛",
     key: "title",
     width: 260,
-    render: (row) =>
-      h("span", { class: "title-cell" }, [
-        h(ContestTitle, { contest: row }),
-        EXAM_TAGS.includes(row.tag) ? h("span", { class: "exam" }, row.tag) : null,
-      ]),
+    render: renderTitle,
   },
   {
     title: "开始 · 多长",
@@ -68,16 +123,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
     title: "状态",
     key: "status",
     width: 72,
-    render: (row) =>
-      h(
-        "span",
-        { class: row.status === "0" ? "live" : row.status === "-1" ? "muted" : "" },
-        row.status === "-1"
-          ? "结束了"
-          : row.status === "0"
-            ? "进行中"
-            : CONTEST_STATUS[row.status].name,
-      ),
+    render: renderStatus,
   },
   { title: "题", key: "problemCount", width: 56 },
   {
@@ -97,13 +143,7 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
     title: "学生看得到",
     key: "visible",
     width: 96,
-    render: (row) =>
-      h(NSwitch, {
-        value: row.visible,
-        size: "small",
-        rubberBand: false,
-        onUpdateValue: () => toggleVisible(row),
-      }),
+    render: renderVisible,
   },
   {
     title: "",
@@ -112,6 +152,8 @@ const columns: DataTableColumn<AdminContestListItem>[] = [
     render: (row) => h(Actions, { contest: row }),
   },
 ]
+
+const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns))
 
 async function listContests() {
   const offset = (query.page - 1) * query.limit
@@ -135,7 +177,12 @@ watchDebounced(() => query.keyword, listContests, {
       </n-button>
     </template>
     <template #filters>
-      <n-input v-model:value="query.keyword" placeholder="比赛名" clearable style="width: 220px" />
+      <n-input
+        v-model:value="query.keyword"
+        placeholder="比赛名"
+        clearable
+        :style="{ width: isMobile ? '100%' : '220px' }"
+      />
     </template>
   </PageHeader>
   <n-data-table striped class="contest-table" :columns="columns" :data="contests" />
@@ -148,6 +195,28 @@ watchDebounced(() => query.keyword, listContests, {
   align-items: center;
   gap: 8px;
   font-weight: 500;
+}
+
+.contest-table :deep(.m-card) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.contest-table :deep(.m-card .title-cell) {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.contest-table :deep(.m-meta) {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.contest-table :deep(.m-item) {
+  white-space: nowrap;
 }
 
 .contest-table :deep(.exam) {

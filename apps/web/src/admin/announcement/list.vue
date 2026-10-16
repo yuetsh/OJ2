@@ -7,6 +7,7 @@ import { parseTime } from "utils/functions"
 import type { AdminAnnouncementListItem } from "utils/types"
 import { editAnnouncement, getAnnouncement, getAnnouncementList } from "../api"
 import Actions from "./components/Actions.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 const message = useMessage()
 const total = ref(0)
@@ -22,25 +23,66 @@ const announcements = ref<AdminAnnouncementListItem[]>([])
  * 精确到秒的两列时间拿掉
  */
 const theme = useThemeVars()
+const { isMobile } = useBreakpoints()
 
-const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
+function renderTitle(row: AdminAnnouncementListItem) {
+  return h("span", { class: "title-cell" }, [
+    h(
+      RouterLink,
+      {
+        class: "title-link",
+        to: { name: "admin announcement edit", params: { announcementID: row.id } },
+      },
+      () => row.title,
+    ),
+    row.top ? h("span", { class: "top" }, "置顶") : null,
+    h("span", { class: "muted small" }, row.tag),
+  ])
+}
+
+function renderVisible(row: AdminAnnouncementListItem) {
+  return h(NSwitch, {
+    value: row.visible,
+    size: isMobile.value ? "medium" : "small",
+    rubberBand: false,
+    onUpdateValue: () => toggle(row, "visible"),
+  })
+}
+
+function renderActions(row: AdminAnnouncementListItem) {
+  return h(Actions, {
+    announcementID: row.id,
+    top: row.top,
+    onDeleted: listAnnouncements,
+    onToggleTop: () => toggle(row, "top"),
+  })
+}
+
+/** 手机上一条一张卡：标题一行，发布 · 改过一行小字，操作一行；「学生看得到」单独一列靠右 */
+function renderMobileCard(row: AdminAnnouncementListItem) {
+  const created = parseTime(row.createTime, "YYYY-MM-DD")
+  const updated = parseTime(row.lastUpdateTime, "YYYY-MM-DD")
+  return h("div", { class: "m-card" }, [
+    renderTitle(row),
+    h("div", { class: "m-meta muted num" }, [
+      h("span", { class: "m-item" }, `${created} 发布`),
+      updated === created ? null : h("span", { class: "m-item" }, ` · ${updated} 改过`),
+    ]),
+    renderActions(row),
+  ])
+}
+
+const mobileColumns: DataTableColumn<AdminAnnouncementListItem>[] = [
+  { title: "标题", key: "title", render: renderMobileCard },
+  { title: "看得到", key: "visible", width: 72, align: "center", render: renderVisible },
+]
+
+const desktopColumns: DataTableColumn<AdminAnnouncementListItem>[] = [
   {
     title: "标题",
     key: "title",
     width: 360,
-    render: (row) =>
-      h("span", { class: "title-cell" }, [
-        h(
-          RouterLink,
-          {
-            class: "title-link",
-            to: { name: "admin announcement edit", params: { announcementID: row.id } },
-          },
-          () => row.title,
-        ),
-        row.top ? h("span", { class: "top" }, "置顶") : null,
-        h("span", { class: "muted small" }, row.tag),
-      ]),
+    render: renderTitle,
   },
   {
     title: "发布",
@@ -62,27 +104,17 @@ const columns: DataTableColumn<AdminAnnouncementListItem>[] = [
     title: "学生看得到",
     key: "visible",
     width: 100,
-    render: (row) =>
-      h(NSwitch, {
-        value: row.visible,
-        size: "small",
-        rubberBand: false,
-        onUpdateValue: () => toggle(row, "visible"),
-      }),
+    render: renderVisible,
   },
   {
     title: "",
     key: "actions",
     minWidth: 240,
-    render: (row) =>
-      h(Actions, {
-        announcementID: row.id,
-        top: row.top,
-        onDeleted: listAnnouncements,
-        onToggleTop: () => toggle(row, "top"),
-      }),
+    render: renderActions,
   },
 ]
+
+const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns))
 
 // 列表响应不含 content（正文是 8MB 上限的富文本），而更新接口要求 content 必填 ——
 // 拿列表里那行直接回传会 400。所以先取回整条再改。
@@ -132,6 +164,27 @@ watch(query, listAnnouncements, { deep: true })
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.ann-table :deep(.m-card) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ann-table :deep(.m-card .title-cell) {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.ann-table :deep(.m-meta) {
+  font-size: 13px;
+}
+
+.ann-table :deep(.m-item) {
+  white-space: nowrap;
 }
 
 .ann-table :deep(.title-link) {

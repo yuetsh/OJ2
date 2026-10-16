@@ -212,7 +212,7 @@ onMounted(() => {
     <h3>
       班级 <span class="count">{{ websiteConfig.classList.length }} 个</span>
     </h3>
-    <div v-for="group in classGroups" :key="group.grade" class="grade">
+    <div v-for="group in classGroups" :key="group.grade" class="grade listed">
       <span class="grade-label">{{ group.grade === "其他" ? "其他" : `${group.grade} 级` }}</span>
       <div class="chips">
         <n-tag
@@ -416,5 +416,22 @@ h3 {
 
 .mono {
   font-family: Consolas, Monaco, monospace;
+}
+
+/* 手机：班多的年级整排折到年级名下面去了，和班少的年级对不齐；班级在年级名右边自己折行 */
+@media (max-width: 768px) {
+  .grade.listed {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  .grade.listed .grade-label {
+    line-height: 28px;
+  }
+
+  .grade .chips {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 </style>

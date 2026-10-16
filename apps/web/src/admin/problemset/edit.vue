@@ -817,4 +817,20 @@ onMounted(load)
   padding: 16px 0;
   text-align: center;
 }
+
+/* 手机：奖章一行放不下说明，藏掉，名字吃剩下的宽度 */
+@media (max-width: 768px) {
+  .picker-head b {
+    flex-shrink: 0;
+  }
+
+  .item.badge .grow {
+    display: none;
+  }
+
+  .item.badge .badge-name {
+    flex: 1 1 auto;
+    width: auto;
+  }
+}
 </style>

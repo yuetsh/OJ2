@@ -3,6 +3,7 @@ import { NButton, NTag } from "naive-ui"
 import Pagination from "shared/components/Pagination.vue"
 import type { AdminProblemRow } from "utils/types"
 import { batchTagProblems, getProblemList } from "admin/api"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 interface Props {
   show: boolean
@@ -25,7 +26,9 @@ const page = ref(1)
 const limit = ref(10)
 const keyword = ref("")
 
-const columns: DataTableColumn<AdminProblemRow>[] = [
+const { isMobile } = useBreakpoints()
+
+const allColumns: DataTableColumn<AdminProblemRow>[] = [
   { title: "题号", key: "_id", width: 90 },
   {
     title: "题目",
@@ -50,6 +53,15 @@ const columns: DataTableColumn<AdminProblemRow>[] = [
       h(NButton, { size: "small", quaternary: true, onClick: () => removeTag(row) }, () => "摘掉"),
   },
 ]
+
+// 手机上放不下四列：不摆「学生看得到」，题号收窄，题目吃剩下的宽度
+const mobileColumns: DataTableColumn<AdminProblemRow>[] = [
+  { ...allColumns[0], width: 64 } as DataTableColumn<AdminProblemRow>,
+  { ...allColumns[1], minWidth: undefined } as DataTableColumn<AdminProblemRow>,
+  { ...allColumns[3], width: 64 } as DataTableColumn<AdminProblemRow>,
+]
+
+const columns = computed(() => (isMobile.value ? mobileColumns : allColumns))
 
 async function listProblems() {
   if (page.value < 1) page.value = 1
@@ -117,7 +129,7 @@ watchDebounced(
         <span>共 {{ total }} 道题</span>
         <n-input
           v-model:value="keyword"
-          style="width: 220px"
+          :style="{ width: isMobile ? '160px' : '220px' }"
           placeholder="题号或题目名"
           clearable
         />

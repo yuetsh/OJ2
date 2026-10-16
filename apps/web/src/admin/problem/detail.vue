@@ -1707,4 +1707,42 @@ onMounted(async () => {
   border-radius: 6px;
   overflow: hidden;
 }
+
+/* 手机：卡片收窄，挤在一行的东西折下去 */
+@media (max-width: 768px) {
+  .card {
+    padding: 12px;
+  }
+
+  /* 编号 + 题目一行，难度 + 可见折到第二行 */
+  .headRow {
+    flex-wrap: wrap;
+  }
+
+  .headRow .grow {
+    flex: 1 1 180px;
+  }
+
+  .io {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 老题面里的图片带着写死的像素宽（有 1118px 的），把整页撑出横向滚动 */
+  .card :deep(.w-e-image-container) {
+    max-width: 100%;
+    height: auto !important;
+  }
+
+  .card :deep(.w-e-image-container img) {
+    height: auto !important;
+  }
+
+  .inlineRow {
+    flex-wrap: wrap;
+  }
+
+  .blockers {
+    -webkit-line-clamp: 3;
+  }
+}
 </style>

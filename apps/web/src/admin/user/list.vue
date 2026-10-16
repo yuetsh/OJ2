@@ -15,6 +15,7 @@ import { useRouteQuery } from "@vueuse/router"
 import { NO_CLASS } from "@oj2/contract"
 import { classLabel, groupClassOptions } from "oj/submission/utils"
 import { useConfigStore } from "shared/store/config"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 /**
  * 后台用户列表（设计稿「后台用户与批量建号」UsList）。老师进来多半是三件事：学生忘了密码、
@@ -24,6 +25,7 @@ import { useConfigStore } from "shared/store/config"
 const message = useMessage()
 const theme = useThemeVars()
 const configStore = useConfigStore()
+const { isMobile } = useBreakpoints()
 
 interface UserQuery {
   keyword: string
@@ -91,7 +93,56 @@ function lastLoginText(row: AdminUserForm) {
   ])
 }
 
-const columns: DataTableColumn<AdminUserForm>[] = [
+function renderPassword(row: AdminUserForm) {
+  return h(PasswordCell, {
+    user: row,
+    revealed: revealedPasswords.value.has(row.id),
+    onToggle: (id: number) => {
+      if (!revealedPasswords.value.delete(id)) revealedPasswords.value.add(id)
+    },
+  })
+}
+
+function renderActions(row: AdminUserForm) {
+  return h(Actions, {
+    user: row,
+    onDeleteUser: onDeleteUsers,
+    onUserBanned,
+    onOpenEditModal,
+    onResetPassword,
+  })
+}
+
+/**
+ * 手机上一个人一张卡：用户名一行，班级 · 上次登录 · 建号一行小字（每项不断开），
+ * 密码单独一行（学生忘了密码是最常见的事，要一眼找到），操作按钮放不下就折行
+ */
+function renderMobileCard(row: AdminUserForm) {
+  return h("div", { class: "m-card" }, [
+    h(UserNameCell, { user: row }),
+    h("div", { class: "m-meta muted" }, [
+      h("span", { class: "m-item" }, row.className ? classLabel(row.className) : "没填班级"),
+      h("span", { class: "m-item" }, [" · ", lastLoginText(row)]),
+      row.createTime
+        ? h("span", { class: "m-item" }, ` · 建号 ${parseTime(row.createTime, "YYYY-MM-DD")}`)
+        : null,
+    ]),
+    row.rawPassword
+      ? h("div", { class: "m-password" }, [
+          h("span", { class: "muted" }, "密码"),
+          renderPassword(row),
+        ])
+      : null,
+    renderActions(row),
+  ])
+}
+
+const mobileColumns: DataTableColumn<AdminUserForm>[] = [
+  { type: "selection" },
+  { title: "用户", key: "username", render: renderMobileCard },
+]
+
+const desktopColumns: DataTableColumn<AdminUserForm>[] = [
   { type: "selection" },
   {
     title: "用户名",
@@ -111,14 +162,7 @@ const columns: DataTableColumn<AdminUserForm>[] = [
     title: "密码",
     key: "raw_password",
     width: 150,
-    render: (row) =>
-      h(PasswordCell, {
-        user: row,
-        revealed: revealedPasswords.value.has(row.id),
-        onToggle: (id: number) => {
-          if (!revealedPasswords.value.delete(id)) revealedPasswords.value.add(id)
-        },
-      }),
+    render: renderPassword,
   },
   { title: "上次登录", key: "last_login", width: 150, render: lastLoginText },
   {
@@ -136,16 +180,11 @@ const columns: DataTableColumn<AdminUserForm>[] = [
     key: "actions",
     title: "",
     minWidth: 300,
-    render: (row) =>
-      h(Actions, {
-        user: row,
-        onDeleteUser: onDeleteUsers,
-        onUserBanned,
-        onOpenEditModal,
-        onResetPassword,
-      }),
+    render: renderActions,
   },
 ]
+
+const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns))
 
 const options: SelectOption[] = [
   { label: "普通", value: USER_TYPE.REGULAR_USER },
@@ -314,7 +353,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
     </template>
     <template #filters>
       <n-input
-        style="width: 220px"
+        :style="{ width: isMobile ? '100%' : '220px' }"
         v-model:value="query.keyword"
         placeholder="用户名或名字"
         clearable
@@ -363,7 +402,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
     @close="onCloseEditModal"
   >
     <n-form label-placement="left" v-if="userEditing">
-      <n-grid :cols="2" :x-gap="16">
+      <n-grid :cols="isMobile ? 1 : 2" :x-gap="16">
         <n-form-item-gi :span="1" label="用户">
           <n-input v-model:value="userEditing.username" />
         </n-form-item-gi>
@@ -418,6 +457,29 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
 <style scoped>
 .user-table :deep(.muted) {
   color: v-bind("theme.textColor3");
+}
+
+.user-table :deep(.m-card) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.user-table :deep(.m-meta) {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.user-table :deep(.m-item) {
+  white-space: nowrap;
+}
+
+.user-table :deep(.m-password) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .user-table :deep(.num) {

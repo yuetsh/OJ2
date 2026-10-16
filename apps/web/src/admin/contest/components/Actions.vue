@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { AdminContest } from "utils/types"
 import { cloneContest } from "../../api"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 interface Props {
   contest: AdminContest
@@ -8,6 +9,8 @@ interface Props {
 const props = defineProps<Props>()
 const router = useRouter()
 const message = useMessage()
+// 手机上在卡片里，放不下一行就折下去
+const { isMobile } = useBreakpoints()
 
 function goEdit() {
   router.push({
@@ -40,7 +43,7 @@ async function clone() {
 </script>
 <template>
   <!-- 操作直接摆出来，不收进 ⋯（用户说的） -->
-  <n-flex :size="4" :wrap="false">
+  <n-flex :size="4" :wrap="isMobile">
     <n-button size="small" @click="goEdit">编辑</n-button>
     <n-button size="small" @click="goClass">
       {{ contest.status === "-1" ? "成绩" : "全班情况" }}

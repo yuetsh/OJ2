@@ -15,6 +15,7 @@ import BatchTagModal from "./components/BatchTagModal.vue"
 import CreateProblemMenu from "./components/CreateProblemMenu.vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import ProblemTypeTag from "oj/problem/components/ProblemTypeTag.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 /**
  * 后台题目列表（设计稿「后台题目列表」PlA / PlB）。一行一道题：题号、题目（点了就是编辑）、
@@ -32,6 +33,7 @@ const props = defineProps<Props>()
 const route = useRoute()
 const router = useRouter()
 const theme = useThemeVars()
+const { isMobile } = useBreakpoints()
 
 const title = computed(
   () =>
@@ -96,7 +98,7 @@ const { query, clearQuery } = usePagination<ProblemQuery>({
 })
 
 const counts = ref<{ all: number; visible: number; hidden: number } | null>(null)
-// 手机上后台左边还有一列图标，三个按钮放不下、「藏着的」被切掉：换小号，再不够就横着滑
+// 手机上三个按钮放不下、「藏着的」被切掉：换小号，再不够就横着滑
 const narrow = useMediaQuery("(max-width: 640px)")
 const visibleTabs = computed(() => [
   { value: "" as const, label: "全部", count: counts.value?.all },
@@ -206,11 +208,62 @@ const baseColumns: DataTableColumn<AdminProblemRow>[] = [
   },
 ]
 
-const columns = computed<DataTableColumn<AdminProblemRow>[]>(() =>
-  isContestProblemList.value
-    ? baseColumns.filter((it) => !("key" in it) || it.key !== "users")
-    : [{ type: "selection" }, ...baseColumns],
-)
+/**
+ * 手机上一道题一张卡：题号 + 题目一行，知识点 / 人数 / 出题人 / 日期一行小字，操作按钮一行；
+ * 「学生看得到」开关单独一列靠右，不用横着滑就能点到
+ */
+function renderMobileCard(row: AdminProblemRow) {
+  const meta = [
+    row.tags.length
+      ? row.tags.slice(0, 2).join("、") + (row.tags.length > 2 ? ` +${row.tags.length - 2}` : "")
+      : null,
+    isContestProblemList.value
+      ? null
+      : row.triedUsers
+        ? `做对 ${row.solvedUsers} / ${row.triedUsers}`
+        : "没人做过",
+    row.username,
+    parseTime(row.createTime, "YYYY-MM-DD"),
+  ].filter((it): it is string => !!it)
+  return h("div", { class: "m-card" }, [
+    h("div", { class: "m-head" }, [h("span", { class: "did" }, row._id), renderTitle(row)]),
+    // 每一项自己不断开（「做对 8 / 14」折成两半看不懂），放不下整项换行
+    h(
+      "div",
+      { class: "m-meta muted" },
+      meta.map((text, i) => h("span", { class: "m-item", key: i }, i ? ` · ${text}` : text)),
+    ),
+    h(Actions, {
+      problemID: row.id,
+      problemDisplayID: row._id,
+      triedUsers: row.triedUsers,
+      onUpdated: listProblems,
+    }),
+  ])
+}
+
+const mobileColumns: DataTableColumn<AdminProblemRow>[] = [
+  { title: "题目", key: "title", render: renderMobileCard },
+  {
+    title: "看得到",
+    key: "visible",
+    width: 72,
+    align: "center",
+    render: (row) =>
+      h(NSwitch, {
+        value: row.visible,
+        rubberBand: false,
+        onUpdateValue: () => toggleVisible(row.id),
+      }),
+  },
+]
+
+const columns = computed<DataTableColumn<AdminProblemRow>[]>(() => {
+  const cols = isMobile.value ? mobileColumns : baseColumns
+  return isContestProblemList.value
+    ? cols.filter((it) => !("key" in it) || it.key !== "users")
+    : [{ type: "selection" }, ...cols]
+})
 
 async function listProblems() {
   if (query.page < 1) query.page = 1
@@ -312,7 +365,7 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
         v-model:value="query.keyword"
         placeholder="题号或题目名"
         clearable
-        style="width: 220px"
+        :style="{ width: isMobile ? '100%' : '220px' }"
         @clear="clearQuery"
       />
       <n-select
@@ -385,6 +438,7 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
   border: 1px solid v-bind("theme.successColorSuppl");
   background: v-bind("theme.hoverColor");
   white-space: nowrap;
+  flex-wrap: wrap;
 }
 
 .spacer {
@@ -409,6 +463,7 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
 
 .problem-table :deep(.did) {
   font-weight: 600;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -454,6 +509,28 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
 
 .problem-table :deep(.more) {
   font-size: 12px;
+}
+
+.problem-table :deep(.m-card) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.problem-table :deep(.m-head) {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.problem-table :deep(.m-meta) {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.problem-table :deep(.m-item) {
+  white-space: nowrap;
 }
 
 .problem-table :deep(.num) {

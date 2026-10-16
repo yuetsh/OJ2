@@ -150,14 +150,14 @@ onMounted(async () => {
       <n-select
         :value="selected || null"
         :options="gradeOptions"
-        style="width: 100px"
+        class="grade-select"
         @update:value="pickGrade"
       />
       <span class="muted">和</span>
       <n-select
         :value="compare"
         :options="compareOptions"
-        style="width: 170px"
+        class="compare-select"
         @update:value="(value: string) => (compare = value)"
       />
     </div>
@@ -455,11 +455,91 @@ a.c-title:hover .ptitle {
   border-radius: 5px;
   background: var(--worse);
 }
+.grade-select {
+  width: 100px;
+}
+.compare-select {
+  width: 170px;
+}
 .dot-before {
   width: 10px;
   height: 10px;
   border-radius: 5px;
   box-sizing: border-box;
   border: 2px solid rgba(128, 128, 128, 0.8);
+}
+
+/* 手机上一道题两行：题名和两个百分比一行，下面一整行是轨道；人数藏掉 */
+@media (max-width: 768px) {
+  .top {
+    flex-wrap: wrap;
+  }
+  .top .title {
+    width: 100%;
+  }
+  .top .grow {
+    display: none;
+  }
+  .grade-select {
+    width: 90px;
+  }
+  .compare-select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stat {
+    padding: 12px 14px;
+  }
+  .value {
+    font-size: 22px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    column-gap: 10px;
+    row-gap: 4px;
+  }
+  .axis {
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .axis .c-title {
+    display: none;
+  }
+  .legend {
+    grid-row: 1;
+    margin-left: 0;
+  }
+  .item {
+    height: auto;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .c-title {
+    width: auto;
+  }
+  .c-track {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .item .c-track {
+    grid-row: 2;
+  }
+  .c-values {
+    grid-row: 1;
+    grid-column: 2;
+    width: auto;
+  }
+  .c-delta {
+    grid-row: 1;
+    grid-column: 3;
+  }
+  .c-users {
+    display: none;
+  }
 }
 </style>

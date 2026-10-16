@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
+import { useThemeVars } from "naive-ui"
 import type { LearnBoard, LearnBoardStudent, LearnExerciseProgress } from "utils/types"
 import { getLearnBoard, getLearnExercises } from "admin/api"
 import { parseTime, readableDuration } from "utils/functions"
@@ -18,6 +19,7 @@ import ExerciseAttempts from "./ExerciseAttempts.vue"
  * 不选班就按排名页同一套规则猜老师在教哪个班。
  */
 const configStore = useConfigStore()
+const theme = useThemeVars()
 
 const KIND: Record<string, string> = {
   mcq: "选择",
@@ -148,7 +150,7 @@ onMounted(load)
         :options="classOptions"
         filterable
         placeholder="选班级"
-        style="width: 170px"
+        class="class-select"
       />
     </div>
 
@@ -257,7 +259,7 @@ onMounted(load)
                 v-model:value="lessonId"
                 :options="lessonOptions"
                 size="small"
-                style="width: 170px"
+                class="lesson-select"
               />
             </div>
             <div v-if="!lessonExercises.length" class="muted none">这课没有练一练</div>
@@ -594,5 +596,64 @@ onMounted(load)
 }
 .flag {
   color: var(--learn-orange-text);
+}
+.class-select,
+.lesson-select {
+  width: 170px;
+}
+
+/* 手机上：方块格在自己的框里横着滑（名字列钉在左边），练一练排到下面 */
+@media (max-width: 768px) {
+  .top {
+    flex-wrap: wrap;
+  }
+  .top .title {
+    width: 100%;
+  }
+  .top .grow {
+    display: none;
+  }
+  .class-select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .stats {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stat {
+    padding: 10px 12px;
+  }
+  .stat-label {
+    font-size: 12px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .unit {
+    font-size: 13px;
+  }
+  .main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .c-name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 96px;
+    margin-left: -16px;
+    padding-left: 16px;
+    background: v-bind("theme.bodyColor");
+  }
+  .side {
+    width: auto;
+  }
+  .lesson-select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
 }
 </style>

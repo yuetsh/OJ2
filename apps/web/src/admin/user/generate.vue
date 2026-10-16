@@ -11,6 +11,7 @@ import {
 } from "utils/constants"
 import { parseTime } from "utils/functions"
 import { checkUsernames, importUsers } from "../api"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 /**
  * 批量建号（设计稿「后台用户与批量建号」UsGen / UsGenIssue / UsDone）。
@@ -21,6 +22,8 @@ import { checkUsernames, importUsers } from "../api"
  * 一个 CSV，Excel 打开中文还是乱码。新班级后端会顺手加进班级列表。
  */
 const message = useMessage()
+// 手机上左右两栏改成上下：先填班级和名单，预览排在下面
+const { isMobile } = useBreakpoints()
 
 const classNo = ref("")
 const rawInput = ref("")
@@ -237,7 +240,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
         v-model:value="rawInput"
         type="textarea"
         :input-props="{ id: 'names' }"
-        :rows="20"
+        :rows="isMobile ? 8 : 20"
         placeholder="一行一个名字"
       />
     </div>
@@ -303,7 +306,11 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
           </n-text>
         </div>
       </template>
-      <n-empty v-else description="左边粘进名单，这里就列出会建成的账号" style="margin-top: 80px" />
+      <n-empty
+        v-else
+        :description="`${isMobile ? '上面' : '左边'}粘进名单，这里就列出会建成的账号`"
+        :style="{ marginTop: isMobile ? '24px' : '80px' }"
+      />
     </div>
   </div>
 </template>
@@ -443,6 +450,26 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .left {
+    width: auto;
+  }
+
+  .done-bar {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .slips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .slip {

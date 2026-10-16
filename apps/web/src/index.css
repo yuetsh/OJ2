@@ -50,3 +50,8 @@ body {
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* 弹框各写各的定宽（420～820px），手机上一律收进屏幕里，左右各留 16px */
+.n-modal {
+  max-width: calc(100vw - 32px);
+}

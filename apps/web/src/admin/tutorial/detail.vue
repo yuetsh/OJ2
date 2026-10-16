@@ -17,6 +17,7 @@ import {
 } from "../api"
 import ExerciseManager from "./components/ExerciseManager.vue"
 import RelatedProblems from "./components/RelatedProblems.vue"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 /**
  * 编辑一课（设计稿「后台 · 编辑一课」）：知识点 / 情境 / 项目三个字段，正文左边写、
@@ -30,6 +31,10 @@ const router = useRouter()
 const message = useMessage()
 
 const isCreate = computed(() => route.name === "admin tutorial create")
+
+// 手机上左右分栏各剩一百多像素，改成正文「写 / 预览」切着看
+const { isMobile } = useBreakpoints()
+const pane = ref<"source" | "preview">("source")
 
 const tutorial = reactive<TutorialEdit>({
   id: 0,
@@ -197,8 +202,15 @@ onMounted(init)
         <div class="card-head">
           <span class="strong">正文</span>
           <span class="muted">Markdown</span>
+          <template v-if="isMobile">
+            <span class="grow" />
+            <n-radio-group v-model:value="pane" size="small">
+              <n-radio-button value="source">写</n-radio-button>
+              <n-radio-button value="preview">预览</n-radio-button>
+            </n-radio-group>
+          </template>
         </div>
-        <div class="split">
+        <div class="split" :class="isMobile ? `only-${pane}` : ''">
           <div class="source">
             <MarkdownEditor
               ref="editor"
@@ -354,5 +366,54 @@ onMounted(init)
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
+}
+
+/* 手机：整页跟着滚，正文一次只露写或预览，练一练和相关题排到下面 */
+@media (max-width: 768px) {
+  .page {
+    height: auto;
+    min-height: 0;
+  }
+  .top {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .field {
+    width: 100%;
+  }
+  .field > span {
+    width: 3em;
+    flex-shrink: 0;
+  }
+  .field > :deep(.n-input),
+  .field > :deep(.n-base-selection),
+  .field > :deep(.n-select) {
+    flex: 1;
+    width: auto !important;
+    min-width: 0;
+  }
+  .work {
+    flex-direction: column;
+  }
+  .editor-card {
+    flex: none;
+    height: 70vh;
+  }
+  .only-source .preview,
+  .only-preview .source {
+    display: none;
+  }
+  .split .source,
+  .split .preview {
+    flex-basis: 100%;
+    border-right: 0;
+  }
+  .preview {
+    padding: 12px;
+  }
+  .side {
+    width: auto;
+    overflow-y: visible;
+  }
 }
 </style>

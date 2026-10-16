@@ -2,6 +2,7 @@
 import { h } from "vue"
 import { Icon } from "@iconify/vue"
 import { RouterLink } from "vue-router"
+import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useDarkTransition } from "shared/composables/darkTransition"
 import { STORAGE_KEY } from "utils/constants"
@@ -153,9 +154,9 @@ function toOption(i: NavItem): MenuOption {
   }
 }
 
-// 收起时 64px 放不下分组标题（会折成两行），换成分隔线
+// 收起时 64px 放不下分组标题（会折成两行），换成分隔线。手机上菜单在抽屉里，总是展开的
 const options = computed<MenuOption[]>(() =>
-  siderCollapsed.value
+  collapsed.value && !isMobile.value
     ? groups.value.flatMap((g, idx) => [
         ...(idx ? [{ type: "divider", key: `divider-${g.label}` }] : []),
         ...g.items.map(toOption),
@@ -188,12 +189,12 @@ const current = computed(() => {
 
 const collapsed = ref<boolean>(storage.get(STORAGE_KEY.ADMIN_SIDER_COLLAPSED) ?? false)
 watch(collapsed, (v) => storage.set(STORAGE_KEY.ADMIN_SIDER_COLLAPSED, v))
-// 窄屏一律收起，不写回偏好 —— 手机上看一眼不该改掉桌面端的习惯
-const siderCollapsed = computed({
-  get: () => isMobile.value || collapsed.value,
-  set: (v) => {
-    if (!isMobile.value) collapsed.value = v
-  },
+// 手机上不留侧栏（64px 的图标条占了 390 宽屏的六分之一），菜单收进左边滑出的抽屉。
+// 按返回键先关抽屉；在抽屉里点了一项，useBackClose 会先关它再跳
+const menuOpen = ref(false)
+useBackClose(menuOpen, isMobile)
+watch(isMobile, (m) => {
+  if (!m) menuOpen.value = false
 })
 
 const userOptions: DropdownOption[] = [
@@ -227,22 +228,23 @@ onMounted(async () => {
 <template>
   <n-layout has-sider position="absolute">
     <n-layout-sider
+      v-if="!isMobile"
       bordered
       collapse-mode="width"
       :collapsed-width="64"
       :width="200"
       :native-scrollbar="false"
-      :show-trigger="isMobile ? false : 'bar'"
-      v-model:collapsed="siderCollapsed"
+      show-trigger="bar"
+      v-model:collapsed="collapsed"
     >
-      <RouterLink to="/" class="brand" :class="{ collapsed: siderCollapsed }" title="回到前台">
+      <RouterLink to="/" class="brand" :class="{ collapsed: collapsed }" title="回到前台">
         <Icon icon="streamline-emojis:dog" :height="28" />
-        <span v-if="!siderCollapsed" class="brandText">后台管理</span>
+        <span v-if="!collapsed" class="brandText">后台管理</span>
       </RouterLink>
       <n-menu
         :options="options"
         :value="current?.item.path ?? null"
-        :collapsed="siderCollapsed"
+        :collapsed="collapsed"
         :collapsed-width="64"
         :collapsed-icon-size="20"
         :indent="20"
@@ -250,8 +252,29 @@ onMounted(async () => {
       />
     </n-layout-sider>
 
+    <n-drawer v-if="isMobile" v-model:show="menuOpen" placement="left" :width="240">
+      <n-drawer-content :native-scrollbar="false" body-content-style="padding: 0">
+        <RouterLink to="/" class="brand" title="回到前台">
+          <Icon icon="streamline-emojis:dog" :height="28" />
+          <span class="brandText">后台管理</span>
+        </RouterLink>
+        <n-menu
+          :options="options"
+          :value="current?.item.path ?? null"
+          :indent="20"
+          :theme-overrides="{ itemHeight: '44px' }"
+        />
+      </n-drawer-content>
+    </n-drawer>
+
     <n-layout>
-      <n-layout-header bordered class="topbar">
+      <n-layout-header bordered class="topbar" :class="{ mobile: isMobile }">
+        <div v-if="isMobile" class="mobileTitle">
+          <n-button quaternary circle @click="menuOpen = true" title="菜单">
+            <template #icon><Icon icon="ph:list" :width="22" /></template>
+          </n-button>
+          <span class="mobileTitleText">{{ current?.item.label ?? "后台" }}</span>
+        </div>
         <n-breadcrumb v-if="!isMobile">
           <n-breadcrumb-item>后台</n-breadcrumb-item>
           <template v-if="current">
@@ -263,7 +286,6 @@ onMounted(async () => {
             </n-breadcrumb-item>
           </template>
         </n-breadcrumb>
-        <div v-if="isMobile" />
         <n-flex align="center" :size="8" :wrap="false">
           <n-button v-if="!isMobile" quaternary size="small" @click="router.push('/')">
             <template #icon><Icon icon="ph:arrow-square-out" /></template>
@@ -294,7 +316,7 @@ onMounted(async () => {
         position="absolute"
         style="top: 49px"
         :native-scrollbar="false"
-        content-style="padding: 20px 24px"
+        :content-style="isMobile ? 'padding: 16px' : 'padding: 20px 24px'"
       >
         <router-view></router-view>
       </n-layout-content>
@@ -318,6 +340,25 @@ onMounted(async () => {
 .brand.collapsed {
   justify-content: center;
   padding: 0;
+}
+
+.mobileTitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mobileTitleText {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar.mobile {
+  padding: 0 8px;
 }
 
 .brandText {

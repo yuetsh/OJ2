@@ -301,4 +301,34 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
 .empty {
   margin: 16px 0;
 }
+
+/* 手机：两栏上下排；题数条不画，名字吃剩下的宽度，三个按钮放得下 */
+@media (max-width: 768px) {
+  .columns {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .column {
+    flex: none;
+  }
+
+  .row {
+    gap: 6px;
+    padding: 0 0 0 6px;
+  }
+
+  .name {
+    flex: 1 1 auto;
+  }
+
+  .bar {
+    display: none;
+  }
+
+  .count {
+    width: auto;
+    white-space: nowrap;
+  }
+}
 </style>

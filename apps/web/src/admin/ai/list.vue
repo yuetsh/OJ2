@@ -1,8 +1,11 @@
 <script lang="ts" setup>
+import { Icon } from "@iconify/vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import { useThemeVars } from "naive-ui"
 import { classLabel } from "oj/submission/utils"
 import Markdown from "shared/components/Markdown.vue"
+import { useBackClose } from "shared/composables/backClose"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import Pagination from "shared/components/Pagination.vue"
 import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
@@ -18,6 +21,19 @@ import { getAIReportDetail, getAIReportList, pinAIReport } from "../api"
  * 别的那份取消，所以切完重拉列表
  */
 const theme = useThemeVars()
+const { isMobile } = useBreakpoints()
+
+// 手机上左右两栏放不下：只列报告，点一份全文盖满整屏，按返回键回到列表
+const detailOpen = ref(false)
+useBackClose(detailOpen, isMobile)
+watch(isMobile, (mobile) => {
+  if (!mobile) detailOpen.value = false
+})
+
+function pick(id: number) {
+  if (isMobile.value) detailOpen.value = true
+  open(id)
+}
 
 const reports = ref<AdminAiReportListItem[]>([])
 const total = ref(0)
@@ -86,7 +102,7 @@ watchDebounced(
 <template>
   <PageHeader title="AI 报告">
     <template #filters>
-      <n-input v-model:value="query.username" clearable placeholder="用户名" style="width: 200px" />
+      <n-input v-model:value="query.username" clearable placeholder="用户名" class="search" />
       <n-text depth="3">共 {{ total }} 份</n-text>
     </template>
   </PageHeader>
@@ -101,7 +117,7 @@ watchDebounced(
           type="button"
           class="item"
           :class="{ on: r.id === selectedId }"
-          @click="open(r.id)"
+          @click="pick(r.id)"
         >
           <span class="item-head">
             <UserName :username="r.username" />
@@ -116,7 +132,13 @@ watchDebounced(
       <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" simple />
     </div>
 
-    <div class="detail">
+    <div class="detail" :class="{ open: detailOpen }">
+      <div v-if="isMobile" class="detail-bar">
+        <n-button quaternary circle @click="detailOpen = false">
+          <template #icon><Icon icon="ph:arrow-left" /></template>
+        </n-button>
+        <span>AI 报告</span>
+      </div>
       <n-spin :show="loadingDetail">
         <template v-if="selected">
           <div class="detail-head">
@@ -261,5 +283,55 @@ watchDebounced(
 .num {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.search {
+  width: 200px;
+}
+
+@media (max-width: 768px) {
+  .search {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .list-col {
+    width: 100%;
+  }
+
+  .detail {
+    display: none;
+  }
+
+  .detail.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    overflow-y: auto;
+    padding: 0 16px 32px;
+    background: v-bind("theme.bodyColor");
+  }
+
+  .detail-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 48px;
+    margin: 0 -16px 12px;
+    padding: 0 8px;
+    font-weight: 600;
+    border-bottom: 1px solid v-bind("theme.dividerColor");
+    background: v-bind("theme.bodyColor");
+  }
+
+  .detail-head {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
 }
 </style>

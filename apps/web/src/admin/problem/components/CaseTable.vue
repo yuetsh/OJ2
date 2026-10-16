@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import { caseStatus, type AnswerSource, type CaseRow } from "./caseRows"
 
 /**
@@ -14,6 +15,8 @@ const props = defineProps<{
 }>()
 
 const theme = useThemeVars()
+// 手机上「当例子」那一列的表头藏了，勾选框自己带上字
+const { isMobile } = useBreakpoints()
 
 /** 输出最多先露这么多行，长了点开看全 */
 const CLIP_LINES = 6
@@ -106,26 +109,30 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
           </div>
         </template>
       </div>
-      <n-checkbox
-        v-if="!examplesOnly"
-        v-model:checked="row.example"
-        class="example"
-        :aria-label="`第 ${index + 1} 组当例子`"
-      />
-      <span class="mark" :class="status(row)">
-        <template v-if="status(row) === 'ok'">✓</template>
-        <template v-else-if="status(row) === 'error'">✗</template>
-        <template v-else-if="status(row) === 'changed'">●</template>
-      </span>
-      <n-button
-        quaternary
-        size="tiny"
-        class="remove"
-        :aria-label="`删掉第 ${index + 1} 组`"
-        @click="remove(index)"
-      >
-        删掉
-      </n-button>
+      <!-- 桌面上 display: contents，三样各占一格；手机上折到输入输出下面排成一行 -->
+      <div class="tools">
+        <n-checkbox
+          v-if="!examplesOnly"
+          v-model:checked="row.example"
+          class="example"
+          :aria-label="`第 ${index + 1} 组当例子`"
+          :label="isMobile ? '当例子' : undefined"
+        />
+        <span class="mark" :class="status(row)">
+          <template v-if="status(row) === 'ok'">✓</template>
+          <template v-else-if="status(row) === 'error'">✗</template>
+          <template v-else-if="status(row) === 'changed'">●</template>
+        </span>
+        <n-button
+          quaternary
+          size="tiny"
+          class="remove"
+          :aria-label="`删掉第 ${index + 1} 组`"
+          @click="remove(index)"
+        >
+          删掉
+        </n-button>
+      </div>
     </div>
   </div>
 </template>
@@ -253,5 +260,38 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
 .row:hover .remove,
 .remove:focus-visible {
   opacity: 1;
+}
+
+.tools {
+  display: contents;
+}
+
+/* 手机：一组占两行 —— 编号 / 输入 / 输出，下面一行 当例子 ✓ 删掉（没有悬停，删掉常显） */
+@media (max-width: 768px) {
+  .row,
+  .examplesOnly .row {
+    grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .row.head > :nth-child(n + 4) {
+    display: none;
+  }
+
+  .tools {
+    grid-column: 2 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .example {
+    margin-top: 0;
+  }
+
+  .remove {
+    margin-left: auto;
+    opacity: 1;
+  }
 }
 </style>

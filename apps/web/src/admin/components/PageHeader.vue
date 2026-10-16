@@ -71,6 +71,8 @@ const slots = defineSlots<{
 
 .title {
   margin: 0;
+  /* 手机上标题行挤不下时让右边的按钮折到下一行，标题自己别一个字一行 */
+  white-space: nowrap;
   font-size: 20px;
   font-weight: 600;
   line-height: 1.4;

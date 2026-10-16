@@ -169,7 +169,7 @@ onMounted(load)
         <span class="c-drag" />
         <span class="c-no">#</span>
         <span class="c-title">知识点 · 情境</span>
-        <span class="c-num">练一练</span>
+        <span class="c-num c-ex">练一练</span>
         <span class="c-num">相关题</span>
         <span class="c-num wide">打开过的人</span>
         <span class="c-switch">公开</span>
@@ -230,7 +230,7 @@ onMounted(load)
               <span class="kp">{{ splitTitle(item.title).kp }}</span>
               <span class="scene">{{ splitTitle(item.title).scene }}</span>
             </span>
-            <span class="c-num num">{{ item.exerciseCount || "-" }}</span>
+            <span class="c-num c-ex num">{{ item.exerciseCount || "-" }}</span>
             <span class="c-num num">
               <template v-if="item.problemCount">{{ item.problemCount }}</template>
               <span v-else class="warn">还没挑</span>
@@ -425,5 +425,50 @@ onMounted(load)
   font-size: 13px;
   color: #18a058;
   text-decoration: none;
+}
+
+/* 手机：拖动排序（触屏拖不动）、练一练数、打开过的人、情境都不摆，留 知识点 / 相关题 / 公开 / 编辑 */
+@media (max-width: 768px) {
+  .top {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .title,
+  .seg button {
+    white-space: nowrap;
+  }
+  .row {
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .grouprow {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+  .grouprow a {
+    white-space: nowrap;
+  }
+  .c-drag,
+  .c-ex,
+  .c-num.wide,
+  .scene {
+    display: none;
+  }
+  .kp {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .c-num {
+    width: 48px;
+  }
+  .c-switch {
+    width: 44px;
+  }
+  .c-edit {
+    width: auto;
+    white-space: nowrap;
+  }
 }
 </style>

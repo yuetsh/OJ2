@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useRouteQuery } from "@vueuse/router"
+import { Icon } from "@iconify/vue"
+import { useThemeVars } from "naive-ui"
 import { zonedParts } from "utils/functions"
 import type { StuckProblem, StuckProblemDetail, StuckStudent } from "utils/types"
 import { getStuckProblemDetail, getStuckProblems } from "admin/api"
@@ -8,6 +10,8 @@ import UserName from "shared/components/UserName.vue"
 import { classLabel, groupClassOptions } from "oj/submission/utils"
 import { periodRange, type Period } from "oj/statistics/period"
 import { resultName, useResultColor } from "oj/statistics/results"
+import { useBackClose } from "shared/composables/backClose"
+import { useBreakpoints } from "shared/composables/breakpoints"
 import "oj/learn/learn.css"
 
 /**
@@ -20,6 +24,8 @@ import "oj/learn/learn.css"
  */
 const router = useRouter()
 const configStore = useConfigStore()
+const { isMobile } = useBreakpoints()
+const theme = useThemeVars()
 const resultColor = useResultColor()
 
 const PERIODS: { label: string; value: Period }[] = [
@@ -143,6 +149,27 @@ async function loadDetail() {
   } finally {
     if (token === detailToken) detailLoading.value = false
   }
+}
+
+/**
+ * 手机上三栏放不下：知识点横着滑一排、题目列表占满一屏，点一道题，这道题的详情盖满整屏，
+ * 按返回键回到列表
+ */
+const detailOpen = ref(false)
+useBackClose(detailOpen, isMobile)
+watch(isMobile, (mobile) => {
+  if (!mobile) detailOpen.value = false
+})
+
+const route = useRoute()
+async function pick(row: StuckProblem) {
+  if (!isMobile.value) {
+    picked.value = String(row.id)
+    return
+  }
+  // 先把地址换好再打开：开着的时候 useBackClose 会拦下一切路由跳转（连 replace 也拦）
+  await router.replace({ query: { ...route.query, problem: String(row.id) } })
+  detailOpen.value = true
 }
 
 watch([className, period], load)
@@ -296,24 +323,26 @@ const links = computed(() => {
             <span class="grow" />
             <span class="muted small">一次就对</span>
           </div>
-          <button
-            v-for="row in knowledge"
-            :key="row.name"
-            type="button"
-            class="item"
-            :class="{ on: row.name === activeTag }"
-            @click="tag = row.name"
-          >
-            <span class="line">
-              <span class="name">{{ row.label }}</span>
-              <span class="grow" />
-              <span class="muted small num">{{ row.problems }} 道</span>
-            </span>
-            <span class="line">
-              <span class="track"><span :style="{ width: `${row.rate}%` }" /></span>
-              <span class="pct num">{{ row.rate }}%</span>
-            </span>
-          </button>
+          <div class="know-list">
+            <button
+              v-for="row in knowledge"
+              :key="row.name"
+              type="button"
+              class="item"
+              :class="{ on: row.name === activeTag }"
+              @click="tag = row.name"
+            >
+              <span class="line">
+                <span class="name">{{ row.label }}</span>
+                <span class="grow" />
+                <span class="muted small num">{{ row.problems }} 道</span>
+              </span>
+              <span class="line">
+                <span class="track"><span :style="{ width: `${row.rate}%` }" /></span>
+                <span class="pct num">{{ row.rate }}%</span>
+              </span>
+            </button>
+          </div>
         </section>
 
         <section class="card problems">
@@ -339,7 +368,7 @@ const links = computed(() => {
               type="button"
               class="item"
               :class="{ on: row.id === selected?.id }"
-              @click="picked = String(row.id)"
+              @click="pick(row)"
             >
               <span class="line">
                 <span class="pid muted num">{{ row.displayId }}</span>
@@ -359,7 +388,13 @@ const links = computed(() => {
           </div>
         </section>
 
-        <section v-if="list.length" class="card detail">
+        <section v-if="list.length" class="card detail" :class="{ open: detailOpen }">
+          <div v-if="isMobile" class="detail-bar">
+            <n-button quaternary circle @click="detailOpen = false">
+              <template #icon><Icon icon="ph:arrow-left" /></template>
+            </n-button>
+            <span class="strong">{{ activeTag || "全部" }}</span>
+          </div>
           <n-spin :show="detailLoading">
             <div v-if="detail && links" class="detail-body">
               <div class="line dhead">
@@ -859,5 +894,113 @@ const links = computed(() => {
 .hlabel {
   width: 96px;
   flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .top {
+    flex-wrap: wrap;
+  }
+  .top .grow {
+    display: none;
+  }
+  .title {
+    width: 100%;
+  }
+  .top .n-select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .seg {
+    width: 100%;
+  }
+  .seg button {
+    flex: 1;
+    padding: 0 4px;
+  }
+  .main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .know,
+  .problems {
+    width: auto;
+  }
+  /* 知识点横着一排滑 */
+  .know-list {
+    display: flex;
+    overflow-x: auto;
+    border-top: 1px solid var(--learn-line);
+  }
+  .know .item {
+    flex: 0 0 150px;
+    border-top: 0;
+    border-left: 1px solid var(--learn-line);
+  }
+  .know .item:first-child {
+    border-left: 0;
+  }
+  .know .item.on {
+    box-shadow: inset 0 -3px 0 var(--learn-green);
+  }
+  .know .track {
+    width: auto;
+    flex: 1;
+  }
+  .scroll {
+    max-height: none;
+  }
+  /* 一道题的详情盖满整屏 */
+  .detail {
+    display: none;
+  }
+  .detail.open {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    border: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    background: v-bind("theme.bodyColor");
+  }
+  .detail-bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 48px;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--learn-line);
+    background: v-bind("theme.bodyColor");
+  }
+  .detail-body {
+    padding: 14px 16px 32px;
+  }
+  .links {
+    margin-left: 0;
+    width: 100%;
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
+  }
+  .cavg {
+    display: none;
+  }
+  .cname {
+    width: 84px;
+  }
+  .track.mid {
+    width: 64px;
+  }
+  .dcol {
+    flex: 1;
+    width: auto;
+  }
+  .names {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

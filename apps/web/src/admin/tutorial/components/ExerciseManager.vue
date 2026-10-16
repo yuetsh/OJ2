@@ -693,6 +693,7 @@ function typeName(type: ExerciseType) {
 .sub a {
   color: #18a058;
   text-decoration: none;
+  white-space: nowrap;
 }
 .sub a.danger {
   color: #d03050;

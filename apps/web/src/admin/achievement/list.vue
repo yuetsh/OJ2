@@ -216,4 +216,32 @@ onMounted(load)
 .off-note {
   color: v-bind("theme.errorColor");
 }
+
+/* 手机上指标名放在一组上头，下面两档一行；箭头拿掉（折行之后箭头会单独落在行首） */
+@media (max-width: 768px) {
+  .group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px 10px;
+  }
+
+  .metric {
+    width: auto;
+    font-weight: 600;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arrow {
+    display: none;
+  }
+
+  .step {
+    min-width: 0;
+  }
+}
 </style>

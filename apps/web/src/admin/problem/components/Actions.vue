@@ -2,6 +2,7 @@
 import { errorCode, errorMessage } from "utils/api"
 import { deleteContestProblem, deleteProblem, makeProblemPublic } from "admin/api"
 import download from "utils/download"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 /**
  * 题目列表一行的操作：编辑、在前台看、下载测试数据、删除直接摆出来（用户说的：不要收进 ⋯）。
@@ -21,6 +22,10 @@ const emit = defineEmits(["updated"])
 const route = useRoute()
 const router = useRouter()
 const message = useMessage()
+
+// 手机上题目列表一道题一张卡，按钮在卡片里放不下一行就折下去；测试数据是 zip，手机上下了也没处用，
+// 转成公开题要想好新题号，也留给电脑，都不摆
+const { isMobile } = useBreakpoints()
 
 const isContestProblem = computed(() => route.name === "admin contest problem list")
 
@@ -106,11 +111,13 @@ async function handleMakePublic() {
 }
 </script>
 <template>
-  <n-flex :size="6" :wrap="false">
+  <n-flex :size="6" :wrap="isMobile">
     <n-button size="small" @click="goEdit">编辑</n-button>
     <n-button size="small" title="在前台打开这道题" @click="goCheck">前台看</n-button>
-    <n-button size="small" title="下载测试数据" @click="downloads">测试数据</n-button>
-    <n-button v-if="isContestProblem" size="small" @click="openMakePublicModal">
+    <n-button v-if="!isMobile" size="small" title="下载测试数据" @click="downloads">
+      测试数据
+    </n-button>
+    <n-button v-if="isContestProblem && !isMobile" size="small" @click="openMakePublicModal">
       转成公开题
     </n-button>
     <span :title="props.triedUsers ? `有 ${props.triedUsers} 人交过，删不掉` : undefined">

@@ -1029,4 +1029,21 @@ onMounted(async () => {
 .stale {
   opacity: 0.5;
 }
+
+/* 手机：编号 + 题目一行，难度 + 可见折到第二行；判题方式那行也折 */
+@media (max-width: 768px) {
+  .card {
+    padding: 12px;
+  }
+
+  .headRow,
+  .cardHead,
+  .moreRow {
+    flex-wrap: wrap;
+  }
+
+  .headRow .grow {
+    flex: 1 1 180px;
+  }
+}
 </style>

@@ -10,6 +10,7 @@ import {
 } from "admin/api"
 import AchievementIcon from "shared/components/AchievementIcon.vue"
 import { RARITY_LABEL } from "utils/constants"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 const rarityOptions = Object.entries(RARITY_LABEL).map(([value, label]) => ({
   label,
@@ -44,6 +45,7 @@ function confirmDelete() {
 }
 
 const message = useMessage()
+const { isMobile } = useBreakpoints()
 const metrics = ref<MetricOption[]>([])
 const saving = ref(false)
 
@@ -115,7 +117,8 @@ async function save() {
     :title="editing ? '编辑成就' : '新建成就'"
     @update:show="emit('update:show', $event)"
   >
-    <n-form label-placement="left" :label-width="80">
+    <!-- 手机上弹框只有 350 宽，标签放到上面，输入框才有地方 -->
+    <n-form :label-placement="isMobile ? 'top' : 'left'" :label-width="80">
       <n-form-item label="名称" required>
         <n-input v-model:value="form.name" placeholder="成就名称" />
       </n-form-item>
@@ -146,7 +149,7 @@ async function save() {
       <n-form-item label="指标" required>
         <n-select v-model:value="form.metric" :options="metricOptions" filterable />
       </n-form-item>
-      <n-form-item v-if="metricHelp" label=" ">
+      <n-form-item v-if="metricHelp" label=" " :show-label="!isMobile">
         <n-text depth="3">{{ metricHelp }}</n-text>
       </n-form-item>
       <n-form-item label="条件">

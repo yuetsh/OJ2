@@ -226,7 +226,7 @@ onUnmounted(stopRolling)
       filterable
       placeholder="选班级"
       aria-label="班级"
-      style="width: 160px"
+      class="lucky-select"
     />
     <span :key="pulseKey" class="lucky-name" :class="{ pulse: !isRolling && luckyGuy }">
       {{ luckyGuy }}
@@ -353,6 +353,10 @@ onUnmounted(stopRolling)
   border: 1px solid v-bind("theme.dividerColor");
 }
 
+.lucky-select {
+  width: 160px;
+}
+
 .lucky-title {
   font-size: 15px;
 }
@@ -384,6 +388,26 @@ onUnmounted(stopRolling)
   .tiles,
   .site {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 手机上一行放不下：标题 + 选班一行，抽到的名字和按钮各占一整行 */
+@media (max-width: 768px) {
+  .lucky {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .lucky-select {
+    width: 100%;
+  }
+
+  .lucky-name,
+  .lucky > .n-button {
+    grid-column: 1 / -1;
   }
 }
 </style>
