@@ -10,6 +10,7 @@ import {
   type JudgeResponse,
 } from "./run"
 import { nativeRuntimeError, parsePythonTraceback } from "./runtime-diagnosis"
+import { withJudgeSlot, type JudgePool } from "./slots"
 import { JudgeStatus, type JudgeStatusValue } from "./status"
 import { shiftCompileLines } from "./template"
 
@@ -25,8 +26,9 @@ import { shiftCompileLines } from "./template"
  * - 一个人同时最多两批（「运行例子」和「自己输入」可以同时点），再多直接拒；
  * - 等的人太多、或者等得太久，也直接拒，让学生过一会儿再点，别无限挂着。
  *
- * 队列在进程内：api 只有一个进程，机房和服务器各有各的 api 和判题机，
- * 各排各的正好。
+ * 这道队在进程内，管的是排队上限、每人两批和先来后到；判题机上真正同时跑几批由
+ * judge/slots.ts 的交互池管（和提交前的编译检查共用，跨 api / worker 两个进程）。
+ * 机房和服务器各有各的 api、Redis 和判题机，各排各的正好。
  */
 
 const MAX_WAITING = 60
@@ -91,6 +93,8 @@ export async function runTrial(options: {
   cases: { input: string; output?: string }[]
   /** 管理员生成测试点要完整输出 */
   fullOutput: boolean
+  /** 判题机名额从哪个池拿，默认交互池；流程图评分是后台的，走 judge */
+  pool?: JudgePool
 }): Promise<TrialRunResponse> {
   const inFlight = perUser.get(options.userId) ?? 0
   if (inFlight >= PER_USER_LIMIT) throw new TrialUserLimitError()
@@ -109,7 +113,26 @@ export async function runTrial(options: {
   }
 }
 
+/**
+ * 进程内那道队排到了，还要在判题机的名额池里拿到一个（judge/slots.ts）：
+ * 编译检查和这里共用交互池，流程图评分走后台池。等名额也算在 WAIT_TIMEOUT_MS 里，
+ * 等不到一样让学生过一会儿再点。
+ */
 async function judgeTrial(options: Parameters<typeof runTrial>[0]): Promise<TrialRunResponse> {
+  const wait = AbortSignal.timeout(WAIT_TIMEOUT_MS)
+  try {
+    return await withJudgeSlot(
+      options.pool ?? "interactive",
+      { holdMs: JUDGE_TIMEOUT_MS + 30_000, signal: wait },
+      () => judgeTrialNow(options),
+    )
+  } catch (error) {
+    if (wait.aborted && error === wait.reason) throw new TrialBusyError()
+    throw error
+  }
+}
+
+async function judgeTrialNow(options: Parameters<typeof runTrial>[0]): Promise<TrialRunResponse> {
   const response = await postJudge(
     options.language,
     options.source,

@@ -115,6 +115,8 @@ async function evaluateByRunning(
     memoryLimit: 256,
     cases: cases.map((item) => ({ input: item.input, output: item.expected })),
     fullOutput: true,
+    // 后台评分，别和学生「运行例子」抢交互池的名额
+    pool: "judge",
   })
 
   let results: FlowchartCaseResult[]
