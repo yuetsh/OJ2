@@ -3,7 +3,6 @@ import { Icon } from "@iconify/vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import { useThemeVars } from "naive-ui"
 import { classLabel } from "oj/submission/utils"
-import Markdown from "shared/components/Markdown.vue"
 import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import Pagination from "shared/components/Pagination.vue"
@@ -11,6 +10,9 @@ import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
 import type { AdminAiReport, AdminAiReportListItem } from "utils/types"
 import { getAIReportDetail, getAIReportList, pinAIReport } from "../api"
+
+// Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
+const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
 
 /**
  * 后台 AI 报告（设计稿「智能分析重设计」AiAdmin）：左边一份一行（用户名、班级、时间、

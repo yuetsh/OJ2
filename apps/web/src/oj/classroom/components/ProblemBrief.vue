@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { isSqlProblem } from "@oj2/contract"
 import { getProblem } from "oj/api"
-import Markdown from "shared/components/Markdown.vue"
 import { errorMessage } from "utils/api"
 import type { ProblemDetail } from "utils/types"
+
+// Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
+const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
 
 /**
  * 「讲错误」弹层左边的题目（用户要的：演示学生的错误时题目和代码要并排）。

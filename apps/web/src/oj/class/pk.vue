@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ClassBattleItem, ClassPk, ClassPkPeriod } from "@oj2/contract"
-import Markdown from "shared/components/Markdown.vue"
 import { useThemeVars } from "naive-ui"
 import { getClassBattle, getClassPk } from "oj/api"
 import { classLabel, groupClassOptions } from "oj/submission/utils"
@@ -11,6 +10,9 @@ import PkDuel from "./components/PkDuel.vue"
 import PkGrid from "./components/PkGrid.vue"
 import PkRace from "./components/PkRace.vue"
 import { pkColor } from "./utils"
+
+// Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
+const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
 
 /**
  * 班级 PK（设计稿「班级 PK 重设计」定稿）。用户定的：两个班按「同一批题」对决（B），

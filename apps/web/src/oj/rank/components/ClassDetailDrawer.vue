@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { ClassDetail } from "@oj2/contract"
-import Markdown from "shared/components/Markdown.vue"
 import { useThemeVars } from "naive-ui"
 import { getClassDetail } from "oj/api"
 import { classLabel } from "oj/submission/utils"
@@ -11,6 +10,9 @@ import { useBreakpoints } from "shared/composables/breakpoints"
 import { parseTime } from "utils/functions"
 import { useRankPalette } from "../palette"
 import RankAvatar from "./RankAvatar.vue"
+
+// Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
+const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
 
 /**
  * 班级详情（设计稿「班级详情 · 老师 / 学生」）：从右边滑出的抽屉，代替原来那个满是

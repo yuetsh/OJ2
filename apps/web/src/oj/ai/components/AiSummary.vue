@@ -2,10 +2,12 @@
 import type { LearningPeriod } from "@oj2/contract"
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
-import Markdown from "shared/components/Markdown.vue"
 import { parseTime } from "utils/functions"
 import { streamAI } from "utils/stream"
 import { getLatestAnalysis } from "../../api"
+
+// Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
+const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
 
 /**
  * AI 小结。进来先拿这个时间段上次生成的那份（老师钉住的优先），没有才出按钮 ——
