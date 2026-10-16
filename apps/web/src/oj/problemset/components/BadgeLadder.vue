@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { parseTime } from "utils/functions"
 import type { ProblemSet } from "utils/types"
 import { badgeCondition, badgeShortfall, ladder, nextBadge } from "../badges"

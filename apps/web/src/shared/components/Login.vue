@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import RankAvatar from "oj/rank/components/RankAvatar.vue"
-import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "utils/classes"
 import { errorCode } from "utils/api"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"

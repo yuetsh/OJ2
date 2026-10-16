@@ -2,7 +2,7 @@
 import type { ContestScoreRow } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { useContestStore } from "oj/store/contest"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus } from "utils/constants"
 import { parseTime, secondsToDuration } from "utils/functions"

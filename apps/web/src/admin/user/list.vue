@@ -15,7 +15,7 @@ import { PROBLEM_PERMISSION, USER_TYPE } from "utils/constants"
 import { useRouteQuery } from "@vueuse/router"
 import { NO_CLASS, STUDENT_ROLES } from "@oj2/contract"
 import { downloadAccountsCsv } from "./accountsCsv"
-import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "utils/classes"
 import { useConfigStore } from "shared/store/config"
 import { useBreakpoints } from "shared/composables/breakpoints"
 

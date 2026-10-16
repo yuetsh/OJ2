@@ -3,7 +3,7 @@ import type { ClassToday } from "@oj2/contract"
 import type { AnnouncementListItem } from "utils/types"
 import { useThemeVars } from "naive-ui"
 import { getAnnouncementList, getClassToday } from "oj/api"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import { useUserStore } from "shared/store/user"
 import { parseTime, zonedParts, zonedYear } from "utils/functions"
 

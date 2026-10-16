@@ -1,5 +1,5 @@
 import type { ClassPk, ClassPkCell } from "@oj2/contract"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 
 /**
  * 每个班一种颜色，按选班的顺序给。蓝 / 橙打头：两个班对决时最常见，这两个色盲也分得开；

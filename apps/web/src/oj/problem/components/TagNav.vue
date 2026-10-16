@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import type { Tag, TagCategory } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 
 /**
  * 题目列表左栏：知识点 / 主题，带自己的进度（设计稿「题目列表重设计 · 改版」）。

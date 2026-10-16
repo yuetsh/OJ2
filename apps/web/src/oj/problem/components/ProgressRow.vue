@@ -3,7 +3,7 @@ import { Icon } from "@iconify/vue"
 import type { ProblemProgress } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import AchievementIcon from "shared/components/AchievementIcon.vue"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 
 /**
  * 题目列表顶上那行的左半边：先说做到了什么（设计稿「题目列表重设计 · 改版」）。

@@ -14,7 +14,7 @@ import { getSubmission } from "oj/api"
 import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, SubmissionStatus } from "utils/constants"
 import { parseTime } from "utils/functions"
 import type { SUBMISSION_RESULT } from "utils/types"
-import { useTone, type Tone } from "oj/submission/composables/tone"
+import { useTone, type Tone } from "shared/composables/tone"
 
 /**
  * 一个人在一道题上的每一次提交，一格一次、从早到晚（设计稿「统计重设计」）。

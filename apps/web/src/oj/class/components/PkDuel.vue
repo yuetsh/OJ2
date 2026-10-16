@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ClassPk, ClassPkCell } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import { parseTime } from "utils/functions"
 import { needToTie, pkColor, plateau, shortLabels, tint } from "../utils"
 import PkHist from "./PkHist.vue"

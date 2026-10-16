@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useDark } from "@vueuse/core"
-import { rgba } from "oj/submission/composables/tone"
+import { rgba } from "shared/composables/tone"
 import { USERNAME_CLASS_RE } from "utils/constants"
 
 /**

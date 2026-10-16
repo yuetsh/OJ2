@@ -1,7 +1,7 @@
 import { useThemeVars } from "naive-ui"
 import { JUDGE_STATUS } from "utils/constants"
 import type { SUBMISSION_RESULT } from "utils/types"
-import { useTone, type Tone } from "oj/submission/composables/tone"
+import { useTone, type Tone } from "shared/composables/tone"
 
 export function resultName(result: number) {
   return JUDGE_STATUS[result as SUBMISSION_RESULT]?.name ?? "其他"

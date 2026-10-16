@@ -5,7 +5,7 @@ import type {
   CompletionSource,
 } from "@codemirror/autocomplete"
 import type { EditorView } from "@codemirror/view"
-import { useProblemStore } from "oj/store/problem"
+import type { SqlDisplay } from "@oj2/contract"
 import type { LANGUAGE } from "utils/types"
 import { c } from "./c"
 import { python } from "./python"
@@ -23,9 +23,10 @@ const chineseAnnotations: Record<string, ChineseCompletion[]> = {
   sql,
 }
 
+export type SqlTables = SqlDisplay["tables"]
+
 // SQL 题：当前题目的表名和字段名补全，数据来自 sql_display
-function sqlSchemaCompletions(): Completion[] {
-  const tables = useProblemStore().problem?.sqlDisplay?.tables ?? []
+function sqlSchemaCompletions(tables: SqlTables): Completion[] {
   return tables.flatMap((table) => [
     {
       label: table.name,
@@ -45,7 +46,14 @@ function sqlSchemaCompletions(): Completion[] {
   ])
 }
 
-export function enhanceCompletion(language: LANGUAGE): CompletionSource {
+/**
+ * `sqlTables` 由用编辑器的地方给（题目页给这道题的表）。原来是这里直接读题目页的 store：
+ * 自学页的 SQL 代码块会补出上一道看过的题的表名
+ */
+export function enhanceCompletion(
+  language: LANGUAGE,
+  sqlTables: () => SqlTables = () => [],
+): CompletionSource {
   return async function (context: CompletionContext): Promise<CompletionResult | null> {
     const word = context.matchBefore(/\w+/)
     if (!word && !context.explicit) return null
@@ -80,7 +88,7 @@ export function enhanceCompletion(language: LANGUAGE): CompletionSource {
     )
 
     if (trulyLanguage === "sql") {
-      completions.push(...sqlSchemaCompletions())
+      completions.push(...sqlSchemaCompletions(sqlTables()))
     }
 
     return {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { downloadAccountsCsv } from "./accountsCsv"
 import PageHeader from "admin/components/PageHeader.vue"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import UserName from "shared/components/UserName.vue"
 import { errorMessage } from "utils/api"
 import {

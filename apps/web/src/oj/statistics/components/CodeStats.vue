@@ -5,7 +5,7 @@ import type { SubmissionStatistics, SubmissionStatisticsGrid } from "@oj2/contra
 import { SubmissionStatus } from "utils/constants"
 import { parseTime } from "utils/functions"
 import StatusPill from "oj/submission/components/StatusPill.vue"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import UserName from "shared/components/UserName.vue"
 import AttemptSquares from "./AttemptSquares.vue"
 

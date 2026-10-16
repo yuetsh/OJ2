@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ClassPk } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import { useRankPalette } from "oj/rank/palette"
 import { needToTie, pkColor, shortLabels, tint } from "../utils"
 import PkRace from "./PkRace.vue"

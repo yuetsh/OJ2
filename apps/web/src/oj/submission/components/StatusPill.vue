@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
 import type { SUBMISSION_RESULT } from "utils/types"
-import { useTone, type Tone } from "../composables/tone"
+import { useTone, type Tone } from "shared/composables/tone"
 
 const props = defineProps<{
   result: SUBMISSION_RESULT

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { isExamTag } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { CONTEST_STATUS, ContestStatus } from "utils/constants"
 
 /**

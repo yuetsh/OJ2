@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { useThemeVars } from "naive-ui"
 import storage from "utils/storage"
-import { useProblemStore } from "oj/store/problem"
 import {
   cloneDoc,
   emptyDoc,
@@ -35,8 +34,17 @@ interface Props {
    * false：图交给外面管（后台出题页的参考流程图，v-model:value），不存草稿
    */
   draft?: boolean
+  /**
+   * 草稿存在哪个键下，由题目页给（见 ProblemEditor.vue 的 flowchartDraftKey）。原来是这里
+   * 自己读题目页的 store 和路由拼出来的，后台出题页也用这个组件，那边 store 是空的
+   */
+  draftKey?: string
 }
-const { height = "calc(100vh - 134px)", draft = true } = defineProps<Props>()
+const {
+  height = "calc(100vh - 134px)",
+  draft = true,
+  draftKey = "flowchart-v2",
+} = defineProps<Props>()
 const model = defineModel<FlowDoc | null>("value", { default: null })
 
 const message = useMessage()
@@ -86,20 +94,7 @@ function redo() {
 
 // ==================== 草稿 ====================
 
-const problemStore = useProblemStore()
-const route = useRoute()
-/**
- * 每道题一份草稿；题单入口单独一份：加入题单之前在题库里画到 A 的那张，不能一进题单就
- * 摆在画布上（设计文档第 11 节 3，和代码草稿同理）。
- * 键名带 v2：2026-10 之前的草稿是 vue-flow 的格式，这里读不了，也不去覆盖它
- */
-const cacheKey = computed(() => {
-  const id = problemStore.problem?._id
-  if (!id) return "flowchart-v2"
-  const base = `flowchart-v2-problem-${id}`
-  const problemSetId = route.params.problemSetId
-  return problemSetId ? `${base}-problemset-${problemSetId}` : base
-})
+const cacheKey = computed(() => draftKey)
 
 const savedAt = ref<Date | null>(null)
 

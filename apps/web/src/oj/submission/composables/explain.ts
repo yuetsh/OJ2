@@ -3,7 +3,7 @@ import { explainPythonCompileError } from "oj/problem/utils/pythonError"
 import { explainRuntimeError } from "oj/problem/utils/runtimeError"
 import { SubmissionStatus } from "utils/constants"
 import type { Submission } from "utils/types"
-import { useTone } from "./tone"
+import { useTone } from "shared/composables/tone"
 
 export interface SubmissionExplain {
   /** 错在第几行（编辑器里那一行标红），说不出来的为 null */

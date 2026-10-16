@@ -2,7 +2,7 @@
 import { useRouteQuery } from "@vueuse/router"
 import { useThemeVars } from "naive-ui"
 import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from "oj/api"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { errorMessage } from "utils/api"
 import { parseTime } from "utils/functions"
 import type { ProblemSet, ProblemSetProblem } from "utils/types"

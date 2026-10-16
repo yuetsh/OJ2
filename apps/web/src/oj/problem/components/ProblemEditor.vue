@@ -121,6 +121,19 @@ onMounted(loadCode)
 watch(() => problem.value?._id, loadCode)
 
 /**
+ * 流程图草稿：每道题一份；题单入口单独一份 —— 加入题单之前在题库里画到 A 的那张，不能一进
+ * 题单就摆在画布上（设计文档第 11 节 3，和代码草稿同理）。
+ * 键名带 v2：2026-10 之前的草稿是 vue-flow 的格式，读不了，也不去覆盖它
+ */
+const flowchartDraftKey = computed(() => {
+  const id = problem.value?._id
+  if (!id) return "flowchart-v2"
+  const base = `flowchart-v2-problem-${id}`
+  const problemSetId = route.params.problemSetId
+  return problemSetId ? `${base}-problemset-${problemSetId}` : base
+})
+
+/**
  * 存本地草稿。**协作中的教师不存** —— 那会儿编辑器里是学生的代码，存下去就把
  * 老师自己在这道题上的草稿盖掉了（他可能正开着自己的解法）。学生照存，那是他本人的。
  */
@@ -219,6 +232,7 @@ onBeforeUnmount(() => flowchartStore.attachEditor(null))
       v-if="codeStore.code.language === 'Flowchart'"
       ref="flowchartEditorRef"
       :height="editorHeight"
+      :draft-key="flowchartDraftKey"
     />
     <SyncCodeEditor
       v-else
@@ -226,6 +240,7 @@ onBeforeUnmount(() => flowchartStore.attachEditor(null))
       :language="codeStore.code.language"
       :problem-id="problem!._id"
       :collab="ctx.collab"
+      :sql-tables="problem?.sqlDisplay?.tables"
       :height="editorHeight"
       :extra-extensions="editorExtensions"
       :font-size="isDesktop ? 20 : 15"

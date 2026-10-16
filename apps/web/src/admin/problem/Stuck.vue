@@ -7,7 +7,7 @@ import type { StuckProblem, StuckProblemDetail, StuckStudent } from "utils/types
 import { getStuckProblemDetail, getStuckProblems } from "admin/api"
 import { useConfigStore } from "shared/store/config"
 import UserName from "shared/components/UserName.vue"
-import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "utils/classes"
 import { periodRange, type Period } from "oj/statistics/period"
 import { resultName, useResultColor } from "oj/statistics/results"
 import { useBackClose } from "shared/composables/backClose"

@@ -2,7 +2,7 @@
 import { Icon } from "@iconify/vue"
 import PageHeader from "admin/components/PageHeader.vue"
 import { useThemeVars } from "naive-ui"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import { useBackClose } from "shared/composables/backClose"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import Pagination from "shared/components/Pagination.vue"

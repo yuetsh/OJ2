@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PageHeader from "admin/components/PageHeader.vue"
 import { useThemeVars } from "naive-ui"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import { errorMessage } from "utils/api"
 import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from "utils/constants"
 import { copyToClipboard, parseTime } from "utils/functions"

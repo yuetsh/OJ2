@@ -2,11 +2,11 @@
 import type { ContestScoreCell, ContestScoreRow } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { useContestStore } from "oj/store/contest"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus } from "utils/constants"
 import { secondsToDuration } from "utils/functions"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import UserName from "shared/components/UserName.vue"
 import { useVisibleInterval } from "shared/composables/visibleInterval"
 

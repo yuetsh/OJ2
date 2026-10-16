@@ -2,7 +2,7 @@
 import type { ClassBattleItem, ClassPk, ClassPkPeriod } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { getClassBattle, getClassPk } from "oj/api"
-import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "utils/classes"
 import { useAIStream } from "shared/composables/aiStream"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useUserStore } from "shared/store/user"

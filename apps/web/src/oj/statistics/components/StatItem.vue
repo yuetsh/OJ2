@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
-import { useTone, type Tone } from "oj/submission/composables/tone"
+import { useTone, type Tone } from "shared/composables/tone"
 
 /** 数字行的一格：小字标签 + 大号数字 + 单位 */
 const props = defineProps<{

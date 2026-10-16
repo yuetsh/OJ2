@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ContestScoreRow } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { secondsToDuration } from "utils/functions"
 import UserName from "shared/components/UserName.vue"
 

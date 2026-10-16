@@ -2,8 +2,9 @@
 import { useThemeVars } from "naive-ui"
 import { NO_CLASS, type SubmissionStatisticsGrid } from "@oj2/contract"
 import { SubmissionStatus } from "utils/constants"
-import { useTone } from "oj/submission/composables/tone"
-import { classLabel, submissionDayText } from "oj/submission/utils"
+import { useTone } from "shared/composables/tone"
+import { classLabel } from "utils/classes"
+import { submissionDayText } from "oj/submission/utils"
 
 /**
  * 没选班级、也没填学生时（多半是从题目页进来，只带了题号）：先按班级列出来，

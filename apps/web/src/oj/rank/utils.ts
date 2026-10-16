@@ -1,5 +1,5 @@
 import type { RankPeriod, RankRow, RankScope } from "@oj2/contract"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 
 export const SCOPE_OPTIONS: { value: RankScope; label: string }[] = [
   { value: "class", label: "本班" },

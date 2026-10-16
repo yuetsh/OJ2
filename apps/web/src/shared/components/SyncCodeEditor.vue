@@ -7,7 +7,7 @@ import type { Extension } from "@codemirror/state"
 import type { LANGUAGE } from "utils/types"
 import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
 import { styleTheme } from "shared/extensions/baseTheme"
-import { enhanceCompletion } from "shared/extensions/autocompletion"
+import { enhanceCompletion, type SqlTables } from "shared/extensions/autocompletion"
 import { languageExtension } from "shared/extensions/language"
 import { useCollabDoc } from "../composables/collabDoc"
 import { useCollabStore } from "shared/store/collab"
@@ -38,6 +38,8 @@ interface Props {
    * 光比对题号挡不住（见 problemPageContext 的 `collab`）
    */
   collab?: boolean
+  /** SQL 题的表，给补全用（表名、字段名） */
+  sqlTables?: SqlTables
 }
 
 const {
@@ -49,6 +51,7 @@ const {
   extraExtensions = [],
   problemId = "",
   collab = true,
+  sqlTables = [],
 } = defineProps<Props>()
 const code = defineModel<string>("value")
 
@@ -61,7 +64,7 @@ const extensions = computed(() => [
   closeBrackets(),
   isDark.value ? darkCodeTheme : lightCodeTheme,
   autocompletion({
-    override: [enhanceCompletion(language), completeAnyWord],
+    override: [enhanceCompletion(language, () => sqlTables), completeAnyWord],
   }),
   getInitialExtension(),
   ...extraExtensions,

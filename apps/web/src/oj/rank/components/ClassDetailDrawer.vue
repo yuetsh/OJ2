@@ -2,7 +2,7 @@
 import type { ClassDetail } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { getClassDetail } from "oj/api"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import UserName from "shared/components/UserName.vue"
 import { useAIStream } from "shared/composables/aiStream"
 import { useBackClose } from "shared/composables/backClose"

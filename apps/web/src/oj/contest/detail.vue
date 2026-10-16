@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
-import { useTone } from "oj/submission/composables/tone"
+import { useTone } from "shared/composables/tone"
 import { ContestStatus } from "utils/constants"
 import { parseTime, secondsToDuration } from "utils/functions"
 import NotFound from "shared/components/NotFound.vue"

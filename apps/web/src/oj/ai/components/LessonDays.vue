@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LearningDay } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
-import { classLabel } from "oj/submission/utils"
+import { classLabel } from "utils/classes"
 import ProblemChip from "./ProblemChip.vue"
 import { dayLabel, isDone } from "../utils"
 

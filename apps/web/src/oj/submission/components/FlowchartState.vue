@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { FlowchartSubmissionStatus } from "utils/types"
-import { useTone, type Tone } from "../composables/tone"
+import { useTone, type Tone } from "shared/composables/tone"
 
 /**
  * 流程图提交在列表里的那个胶囊：评完的直接是「A 级」，没评完的是

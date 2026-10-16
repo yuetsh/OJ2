@@ -31,8 +31,9 @@ import { FlowchartSubmissionStatus } from "utils/types"
 import FlowchartState from "./components/FlowchartState.vue"
 import StatusPill from "./components/StatusPill.vue"
 import UserName from "shared/components/UserName.vue"
-import { useTone } from "./composables/tone"
-import { classLabel, classSelectOptions, submissionClockText, submissionDayText } from "./utils"
+import { useTone } from "shared/composables/tone"
+import { classLabel, classSelectOptions } from "utils/classes"
+import { submissionClockText, submissionDayText } from "./utils"
 
 /**
  * 提交列表（设计稿「提交列表重设计 · 定稿」）：左边列表、右边常驻选中那条的代码。

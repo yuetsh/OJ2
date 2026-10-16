@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
 import { getProblemSetClassView } from "oj/api"
-import { useTone } from "oj/submission/composables/tone"
-import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { useTone } from "shared/composables/tone"
+import { classLabel, groupClassOptions } from "utils/classes"
 import UserName from "shared/components/UserName.vue"
 import { parseTime } from "utils/functions"
 import type { ProblemSetClassView } from "utils/types"

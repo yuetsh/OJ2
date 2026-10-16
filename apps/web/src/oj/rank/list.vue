@@ -9,7 +9,7 @@ import type {
 } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { clearMood, getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from "oj/api"
-import { classLabel, groupClassOptions } from "oj/submission/utils"
+import { classLabel, groupClassOptions } from "utils/classes"
 import UserName from "shared/components/UserName.vue"
 import { useBreakpoints } from "shared/composables/breakpoints"
 import { useConfigStore } from "shared/store/config"

@@ -3,8 +3,8 @@ import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import type { SubmissionLessons } from "@oj2/contract"
 import { parseTime, zonedParts } from "utils/functions"
-import { useTone } from "oj/submission/composables/tone"
-import { classLabel } from "oj/submission/utils"
+import { useTone } from "shared/composables/tone"
+import { classLabel } from "utils/classes"
 import { resultName, useResultColor } from "../results"
 
 type Lesson = SubmissionLessons["lessons"][number]
