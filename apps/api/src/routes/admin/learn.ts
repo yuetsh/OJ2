@@ -1,4 +1,5 @@
 import {
+  FLOWCHART_PASS_GRADES,
   STUDENT_ROLES,
   isLessonDone,
   type LearnBoard,
@@ -14,8 +15,9 @@ import { Hono } from "hono"
 import { requireTeacher, type AppEnv } from "../../auth/middleware"
 import { db, schema } from "../../db"
 import { failure, success } from "../../http"
+import { accepted } from "../../services/learning-stats"
 import { defaultClassFor } from "../../services/ranking"
-import { exerciseCountColumn } from "../../services/tutorial"
+import { exerciseCountColumn, tutorialProblems } from "../../services/tutorial"
 import { queryInteger, rounded } from "../helpers"
 
 /**
@@ -66,6 +68,59 @@ function studentCondition(value: string | null) {
 }
 
 /**
+ * 这些人在这些题上交过几次、做对没有。代码提交（不含比赛）和流程图提交并起来数，
+ * 做对 = 代码 AC / AST_CHECK_FAILED 或流程图评到 A / S —— 和学生端课文里那个勾、
+ * 课堂看板（routes/classroom.ts 的 activityRows）同一个口径。不论早晚：读这课之前
+ * 在课上就做对的照样算。两边都按 `(problem_id, user_id)` 索引走。
+ */
+async function problemActivity(userIds: number[], problemIds: number[]) {
+  if (!userIds.length || !problemIds.length) return []
+  const code = db
+    .select({
+      userId: schema.submission.userId,
+      problemId: schema.submission.problemId,
+      createTime: schema.submission.createTime,
+      solved: sql<boolean>`${inArray(schema.submission.result, accepted)}`.as("solved"),
+    })
+    .from(schema.submission)
+    .where(
+      and(
+        isNull(schema.submission.contestId),
+        inArray(schema.submission.userId, userIds),
+        inArray(schema.submission.problemId, problemIds),
+      ),
+    )
+  const flowchart = db
+    .select({
+      userId: schema.flowchartSubmission.userId,
+      problemId: schema.flowchartSubmission.problemId,
+      createTime: schema.flowchartSubmission.createTime,
+      solved: sql<boolean>`${and(
+        eq(schema.flowchartSubmission.status, 2),
+        inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]),
+      )}`.as("solved"),
+    })
+    .from(schema.flowchartSubmission)
+    .where(
+      and(
+        inArray(schema.flowchartSubmission.userId, userIds),
+        inArray(schema.flowchartSubmission.problemId, problemIds),
+      ),
+    )
+  const activity = code.unionAll(flowchart).as("activity")
+  return db
+    .select({
+      userId: activity.userId,
+      problemId: activity.problemId,
+      solved: sql<boolean>`bool_or(${activity.solved})`,
+      submissions: count(),
+      lastSubmitAt: sql<string>`max(${activity.createTime})`,
+    })
+    .from(activity)
+    .groupBy(activity.userId, activity.problemId)
+}
+
+/**
  * 方块格：一个班的学生 × 这门课的每一课，打开过没有、学完没有（练一练全对）。
  *
  * 不选班就猜老师在教哪个班（`defaultClassFor`）；也能传年级前缀，
@@ -87,6 +142,18 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
     .from(schema.tutorial)
     .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
     .orderBy(asc(schema.tutorial.order))
+    .then(async (rows) => {
+      const problems = await tutorialProblems(
+        rows.map((row) => row.id),
+        true,
+      )
+      return rows.map((row) => ({
+        ...row,
+        problems: problems
+          .filter((problem) => problem.tutorialId === row.id)
+          .map(({ id, displayId, title }) => ({ id, displayId, title })),
+      }))
+    })
   const tutorialIds = tutorials.map((row) => row.id)
   if (!className)
     return success(c, { className: null, tutorials, students: [] } satisfies LearnBoard)
@@ -104,7 +171,15 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
     .orderBy(asc(schema.user.className), asc(schema.user.username))
   const userIds = students.map((row) => row.userId)
 
-  // 阅读和练习分两条查再拼：两个一对多挂在同一张表上 join，count 全是错的
+  // 阅读、练习、配套题分开查再拼：几个一对多挂在同一张表上 join，count 全是错的
+  const problemIds = [...new Set(tutorials.flatMap((row) => row.problems.map((p) => p.id)))]
+  const problemRows = await problemActivity(userIds, problemIds)
+  const problemsOf = new Map<number, LearnBoardStudent["problems"]>()
+  for (const { userId, ...row } of problemRows) {
+    const list = problemsOf.get(userId) ?? []
+    list.push(row)
+    problemsOf.set(userId, list)
+  }
   const [progressRows, solvedRows] =
     userIds.length && tutorialIds.length
       ? await Promise.all([
@@ -185,7 +260,16 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
         }
         if (isLessonDone(lesson)) done.push(tutorial.id)
       }
-      return { ...student, opened, done, exerciseSolved, lessons, totalSeconds, lastViewedAt }
+      return {
+        ...student,
+        opened,
+        done,
+        exerciseSolved,
+        lessons,
+        problems: problemsOf.get(student.userId) ?? [],
+        totalSeconds,
+        lastViewedAt,
+      }
     }),
   } satisfies LearnBoard)
 })
@@ -378,6 +462,19 @@ adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) 
       .orderBy(asc(schema.exercise.order)),
   ])
 
+  const related = await tutorialProblems(
+    tutorials.map((row) => row.tutorialId),
+    true,
+  )
+  const activity = new Map(
+    (
+      await problemActivity(
+        [id],
+        related.map((row) => row.id),
+      )
+    ).map((row) => [row.problemId, row]),
+  )
+
   const byLesson = new Map<number, LearnStudentDetail["lessons"][number]["exercises"]>()
   for (const { tutorialId, ...row } of exercises) {
     const list = byLesson.get(tutorialId) ?? []
@@ -399,6 +496,19 @@ adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) 
         totalSeconds: row.totalSeconds ?? 0,
         lastViewedAt: row.lastViewedAt,
         exercises: byLesson.get(row.tutorialId) ?? [],
+        problems: related
+          .filter((problem) => problem.tutorialId === row.tutorialId)
+          .map(({ id: problemId, displayId, title }) => {
+            const done = activity.get(problemId)
+            return {
+              id: problemId,
+              displayId,
+              title,
+              solved: done?.solved ?? false,
+              submissions: done?.submissions ?? 0,
+              lastSubmitAt: done?.lastSubmitAt ?? null,
+            }
+          }),
       }))
       .filter((row) => row.viewCount > 0 || row.exercises.some((ex) => ex.attempts > 0)),
   } satisfies LearnStudentDetail)

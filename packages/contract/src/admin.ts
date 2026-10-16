@@ -640,6 +640,18 @@ export const gradeTrendProblemSchema = z.object({
 // ---------------------------------------------------------------- 自学情况
 
 /**
+ * 一个学生在一道配套题上的状态。「做对」不论早晚 —— 读这课之前在课上就做对的也算，
+ * 口径同学生端课文里的勾：代码 AC（含 AST_CHECK_FAILED）或流程图评到 A / S
+ */
+const learnProblemStateSchema = z.object({
+  problemId: z.number().int(),
+  solved: z.boolean(),
+  /** 代码和流程图一共交了几次，比赛提交不算 */
+  submissions: z.number().int(),
+  lastSubmitAt: z.string(),
+})
+
+/**
  * 「自学情况」的方块格：一个班的学生 × 这门课的每一课。
  *
  * **没打开过任何一课的学生也要有一行**（`opened` 为空）—— 页面上把他们收成一串名单，
@@ -666,6 +678,8 @@ export const learnBoardStudentSchema = z.object({
       wrongAttempts: z.number().int(),
     }),
   ),
+  /** 交过的配套题（一次没交的不在里面），哪一课的题由 `tutorials[].problems` 对 */
+  problems: z.array(learnProblemStateSchema),
   totalSeconds: z.number().int(),
   lastViewedAt: z.string().nullable(),
 })
@@ -679,6 +693,10 @@ export const learnBoardSchema = z.object({
       title: z.string(),
       project: z.string(),
       exerciseTotal: z.number().int(),
+      /** 这课的配套题，按老师排的顺序；藏起来的题不算 */
+      problems: z.array(
+        z.object({ id: z.number().int(), displayId: z.string(), title: z.string() }),
+      ),
     }),
   ),
   students: z.array(learnBoardStudentSchema),
@@ -755,6 +773,17 @@ export const learnStudentDetailSchema = z.object({
           attemptsToSolve: z.number().int().nullable(),
           lastWrongAnswer: z.string().nullable(),
           lastAttemptAt: z.string().nullable(),
+        }),
+      ),
+      /** 配套题，没交过的 `submissions` 为 0、`lastSubmitAt` 为空 */
+      problems: z.array(
+        z.object({
+          id: z.number().int(),
+          displayId: z.string(),
+          title: z.string(),
+          solved: z.boolean(),
+          submissions: z.number().int(),
+          lastSubmitAt: z.string().nullable(),
         }),
       ),
     }),
