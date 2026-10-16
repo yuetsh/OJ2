@@ -31,6 +31,9 @@ const dialog = useDialog()
 const exercises = ref<Exercise[]>([])
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
+/** 编辑的这道有几个人做过；为 0 时不问要不要清空 */
+const editingAttempts = ref(0)
+const resetAttempts = ref(false)
 const formType = ref<ExerciseType>("mcq")
 const formOrder = ref(0)
 
@@ -107,6 +110,8 @@ function resetForms() {
 
 function openCreate() {
   editingId.value = null
+  editingAttempts.value = 0
+  resetAttempts.value = false
   formType.value = "mcq"
   formOrder.value = exercises.value.length
   resetForms()
@@ -115,6 +120,8 @@ function openCreate() {
 
 function openEdit(ex: Exercise) {
   editingId.value = ex.id
+  editingAttempts.value = ex.attemptUsers
+  resetAttempts.value = false
   formType.value = ex.type
   formOrder.value = ex.order
   resetForms()
@@ -318,8 +325,9 @@ async function save() {
         type: formType.value,
         data,
         order: formOrder.value,
+        resetAttempts: resetAttempts.value,
       })
-      message.success("练习题已更新")
+      message.success(resetAttempts.value ? "练习题已更新，学生的作答已清空" : "练习题已更新")
     } else {
       const created = await createExercise({
         tutorialId: props.tutorialId,
@@ -619,7 +627,12 @@ function typeName(type: ExerciseType) {
       </n-form>
 
       <template #footer>
-        <n-flex justify="end" :size="8">
+        <n-flex align="center" :size="8">
+          <!-- 改了答案或选项时勾上：按旧答案做对的人不该还算做对 -->
+          <n-checkbox v-if="editingId && editingAttempts" v-model:checked="resetAttempts">
+            同时清空学生的作答（{{ editingAttempts }} 人做过）
+          </n-checkbox>
+          <span style="flex: 1" />
           <n-button @click="showForm = false">取消</n-button>
           <n-button type="primary" @click="save">保存</n-button>
         </n-flex>

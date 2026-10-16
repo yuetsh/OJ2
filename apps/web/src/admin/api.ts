@@ -521,11 +521,13 @@ export async function updateExercise(data: {
   type: ExerciseType
   data: object
   order: number
+  resetAttempts: boolean
 }) {
   return api.put<Exercise>(`admin/exercises/${data.id}`, {
     type: data.type,
     data: data.data,
     order: data.order,
+    resetAttempts: data.resetAttempts,
   })
 }
 

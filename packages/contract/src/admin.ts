@@ -167,6 +167,8 @@ export const adminExerciseSchema = z.object({
   type: exerciseTypeSchema,
   data: z.record(z.string(), z.unknown()),
   order: z.number().int(),
+  /** 几个人做过（有作答记录）。编辑时据此决定要不要问「清空作答」 */
+  attemptUsers: z.number().int(),
 })
 
 export const createExerciseRequestSchema = z.object({
@@ -176,10 +178,18 @@ export const createExerciseRequestSchema = z.object({
   order: z.number().int().default(0),
 })
 
-export const updateExerciseRequestSchema = createExerciseRequestSchema.omit({
-  // 练习不支持改挂到别的教程下 —— 旧 EditExerciseSerializer 也没有 tutorial_id
-  tutorialId: true,
-})
+export const updateExerciseRequestSchema = createExerciseRequestSchema
+  .omit({
+    // 练习不支持改挂到别的教程下 —— 旧 EditExerciseSerializer 也没有 tutorial_id
+    tutorialId: true,
+  })
+  .extend({
+    /**
+     * 同时清空这道题所有人的作答。练习是原地改的，作答记录跟着题 id 走：
+     * 改了答案或选项，按旧答案做对的人仍然算做对、「最后错在」说的也是旧选项
+     */
+    resetAttempts: z.boolean().default(false),
+  })
 
 // ---------------------------------------------------------------- AI 报告
 

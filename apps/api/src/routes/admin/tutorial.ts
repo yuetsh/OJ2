@@ -14,7 +14,19 @@ import {
   type AdminTutorialListItem,
   type TutorialProblemCandidate,
 } from "@oj2/contract"
-import { and, asc, countDistinct, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
@@ -304,24 +316,32 @@ adminTutorialRoutes.delete("/tutorials/:id", requireSuperAdmin, async (c) => {
 
 // ---------------------------------------------------------------- 练习
 
-function serializeExercise(row: typeof schema.exercise.$inferSelect) {
+function serializeExercise(row: typeof schema.exercise.$inferSelect, attemptUsers: number) {
   return {
     id: row.id,
     type: row.type,
     data: asRecord(row.data),
     order: row.order,
+    attemptUsers,
   } satisfies AdminExercise
 }
+
+const attemptUsersColumn = sql<number>`(
+  select count(*) from "exercise_attempt" ea where ea."exercise_id" = "exercise"."id"
+)`.mapWith(Number)
 
 // 练习挂在教程下，路径嵌套 —— 旧后端是 ?tutorial_id= 查询参数，
 // 但它本来就是一对多的从属关系，嵌套路径更贴事实，也省掉「忘了传 tutorial_id」这类错误
 adminTutorialRoutes.get("/tutorials/:id/exercises", requireSuperAdmin, async (c) => {
   const rows = await db
-    .select()
+    .select({ exercise: schema.exercise, attemptUsers: attemptUsersColumn })
     .from(schema.exercise)
     .where(eq(schema.exercise.tutorialId, queryInteger(c.req.param("id"), 0, { min: 1 })))
     .orderBy(asc(schema.exercise.order), asc(schema.exercise.id))
-  return success(c, rows.map(serializeExercise))
+  return success(
+    c,
+    rows.map((row) => serializeExercise(row.exercise, row.attemptUsers)),
+  )
 })
 
 adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
@@ -345,7 +365,7 @@ adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
       createdAt: new Date().toISOString(),
     })
     .returning()
-  return success(c, serializeExercise(created!), 201)
+  return success(c, serializeExercise(created!, 0), 201)
 })
 
 adminTutorialRoutes.put("/exercises/:id", requireSuperAdmin, async (c) => {
@@ -353,17 +373,29 @@ adminTutorialRoutes.put("/exercises/:id", requireSuperAdmin, async (c) => {
   if (!parsed.success) return parsed.response
   const dataError = exerciseDataError(parsed.data.type, parsed.data.data)
   if (dataError) return failure(c, 400, "invalid-exercise", dataError)
-  const [updated] = await db
-    .update(schema.exercise)
-    .set({
-      type: parsed.data.type,
-      data: parsed.data.data,
-      order: parsed.data.order,
-    })
-    .where(eq(schema.exercise.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
-    .returning()
-  if (!updated) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
-  return success(c, serializeExercise(updated))
+  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  const result = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(schema.exercise)
+      .set({
+        type: parsed.data.type,
+        data: parsed.data.data,
+        order: parsed.data.order,
+      })
+      .where(eq(schema.exercise.id, id))
+      .returning()
+    if (!updated) return null
+    if (parsed.data.resetAttempts) {
+      await tx.delete(schema.exerciseAttempt).where(eq(schema.exerciseAttempt.exerciseId, id))
+    }
+    const [attempted] = await tx
+      .select({ value: count() })
+      .from(schema.exerciseAttempt)
+      .where(eq(schema.exerciseAttempt.exerciseId, id))
+    return serializeExercise(updated, attempted?.value ?? 0)
+  })
+  if (!result) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
+  return success(c, result)
 })
 
 adminTutorialRoutes.delete("/exercises/:id", requireSuperAdmin, async (c) => {
