@@ -6,12 +6,13 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   ne,
   notInArray,
   sql,
 } from "drizzle-orm"
 
-import { db, schema } from "../db"
+import { db, schema, type DbOrTx } from "../db"
 import { publishAchievementNotification } from "../events"
 import { calendarDay, dayNumber, localHour, localTime, weekStart } from "../time"
 import { findMetric } from "./achievement-metrics"
@@ -101,7 +102,58 @@ async function unlockAchievements(
   return hits.filter((achievement) => insertedIds.has(achievement.id))
 }
 
-export async function updateAchievementsForSubmission(submissionId: string) {
+const ACCEPTED_RESULTS = sql.join(
+  [sql`${JudgeStatus.ACCEPTED}`, sql`${JudgeStatus.AST_CHECK_FAILED}`],
+  sql`, `,
+)
+
+/**
+ * 「做对几道 / 中等几道 / 困难几道 / 一次就对几道」按定义从提交表现数，不再逐次 +1。
+ *
+ * 原来是读一遍这道题之前的提交、判断「是不是第一次做对」再 +1，两处漏：同一个人同一道题
+ * 两条提交挨着判完，两边都看见对方已经做对（都不加）或都还没做对（加两次）；重判一条
+ * 做对的提交又会再加一次。2026-10 的库里 372 人的做对题数比实际多 1–4 道。
+ * 现数是幂等的，怎么并发、怎么重判都是同一个答案。走 submission_public_metrics_idx，
+ * 一个人的提交也就几百条。
+ */
+async function solvedCounts(tx: DbOrTx, userId: number) {
+  const [row] = await tx.execute<{
+    accepted: number
+    mid: number
+    hard: number
+    first_try: number
+  }>(
+    sql`
+      with mine as (
+        select s.problem_id, s.result, s.create_time, s.id, p.difficulty
+        from ${schema.submission} s
+        join ${schema.problem} p on p.id = s.problem_id
+        where s.user_id = ${userId} and s.contest_id is null
+      )
+      select
+        count(distinct problem_id) filter (where result in (${ACCEPTED_RESULTS}))::int as accepted,
+        count(distinct problem_id) filter (where result in (${ACCEPTED_RESULTS}) and difficulty = 'Mid')::int as mid,
+        count(distinct problem_id) filter (where result in (${ACCEPTED_RESULTS}) and difficulty = 'High')::int as hard,
+        (
+          select count(*)::int from (
+            select distinct on (problem_id) result from mine order by problem_id, create_time, id
+          ) first where result in (${ACCEPTED_RESULTS})
+        ) as first_try
+      from mine
+    `,
+  )
+  return row ?? { accepted: 0, mid: 0, hard: 0, first_try: 0 }
+}
+
+/**
+ * `countedAs`：这条提交上次结算时的结果，重判时由判题传进来；新提交是 null。
+ * 重判不是又交了一次 —— 提交次数、凌晨/早起这类「每交一次 +1」的不能再加，
+ * 编译错误按前后差值改。
+ */
+export async function updateAchievementsForSubmission(
+  submissionId: string,
+  countedAs: number | null = null,
+) {
   const [row] = await db
     .select({ submission: schema.submission, problem: schema.problem })
     .from(schema.submission)
@@ -110,21 +162,8 @@ export async function updateAchievementsForSubmission(submissionId: string) {
     .limit(1)
   if (!row || row.submission.contestId !== null) return []
 
-  const priorRows = await db
-    .select({ result: schema.submission.result })
-    .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, row.submission.userId),
-        eq(schema.submission.problemId, row.submission.problemId),
-        isNull(schema.submission.contestId),
-        ne(schema.submission.id, row.submission.id),
-      ),
-    )
-  const priorAccepted = priorRows.some((item) => isAccepted(item.result))
+  const rejudged = countedAs !== null
   const accepted = isAccepted(row.submission.result)
-  const firstAc = accepted && !priorAccepted
-  const firstTry = accepted && priorRows.length === 0
   const date = calendarDay(row.submission.createTime)
   const hour = localHour(row.submission.createTime)
 
@@ -144,15 +183,29 @@ export async function updateAchievementsForSubmission(submissionId: string) {
       .for("update")
     if (!stat) throw new Error("User achievement stat could not be created")
     const value = asRecord(stat.metrics)
-    value.submission_count = numberMetric(value, "submission_count") + 1
+    // 在锁里数：同一个人的结算排成一队，后来的一定看得见先来的写进去的结果
+    const solved = await solvedCounts(tx, row.submission.userId)
+    // 这次让做对的题多了一道，才算「新做对」：每天做对几道、连续几周这些跟着它走
+    const firstAc = accepted && solved.accepted > numberMetric(value, "accepted_count")
+    value.accepted_count = solved.accepted
+    value.mid_ac_count = solved.mid
+    value.hard_ac_count = solved.hard
+    value.first_try_ac_count = solved.first_try
+    if (!rejudged) value.submission_count = numberMetric(value, "submission_count") + 1
     if (firstAc) {
-      value.accepted_count = numberMetric(value, "accepted_count") + 1
-      if (row.problem.difficulty === "Mid")
-        value.mid_ac_count = numberMetric(value, "mid_ac_count") + 1
-      if (row.problem.difficulty === "High")
-        value.hard_ac_count = numberMetric(value, "hard_ac_count") + 1
-      if (firstTry) value.first_try_ac_count = numberMetric(value, "first_try_ac_count") + 1
-      value.max_wa_before_ac = Math.max(numberMetric(value, "max_wa_before_ac"), priorRows.length)
+      // 只数这条之前的：重判一条老提交时，它后面的提交不算「做对之前错的」
+      const [prior] = await tx
+        .select({ value: count() })
+        .from(schema.submission)
+        .where(
+          and(
+            eq(schema.submission.userId, row.submission.userId),
+            eq(schema.submission.problemId, row.submission.problemId),
+            isNull(schema.submission.contestId),
+            lt(schema.submission.createTime, row.submission.createTime),
+          ),
+        )
+      value.max_wa_before_ac = Math.max(numberMetric(value, "max_wa_before_ac"), prior?.value ?? 0)
       const perDay = asRecord(value._ac_per_day)
       perDay[date] = (typeof perDay[date] === "number" ? perDay[date] : 0) + 1
       value._ac_per_day = perDay
@@ -169,7 +222,8 @@ export async function updateAchievementsForSubmission(submissionId: string) {
     value.active_days = activeDates.length
     if (accepted) {
       const last = typeof value._last_ac_date === "string" ? value._last_ac_date : null
-      if (last !== date) {
+      // 比记下的还早（重判了一条以前的提交）就不动，和 nextWeekStreak 一样
+      if (!last || date > last) {
         // 差一天要按日历日算，不能用 Date 相减：夏令时地区相邻两天差 23/25 小时，
         // 除 86400000 得到的不是 1，`=== 1` 会静默把连续打卡判成断掉。
         const current =
@@ -187,11 +241,19 @@ export async function updateAchievementsForSubmission(submissionId: string) {
     if (!languages.includes(row.submission.language)) languages.push(row.submission.language)
     value._languages = languages
     value.languages_used = languages.length
-    if (hour < 5) value.midnight_submissions = numberMetric(value, "midnight_submissions") + 1
-    else if (hour < 7)
-      value.early_bird_submissions = numberMetric(value, "early_bird_submissions") + 1
-    if (row.submission.result === JudgeStatus.COMPILE_ERROR)
-      value.compile_error_count = numberMetric(value, "compile_error_count") + 1
+    if (!rejudged) {
+      if (hour < 5) value.midnight_submissions = numberMetric(value, "midnight_submissions") + 1
+      else if (hour < 7)
+        value.early_bird_submissions = numberMetric(value, "early_bird_submissions") + 1
+    }
+    // 编译错误是从上线那天起逐次累计的（之前的历史没补），没法按定义重数，只能按差值改
+    const compileError = Number(row.submission.result === JudgeStatus.COMPILE_ERROR)
+    const wasCompileError = Number(countedAs === JudgeStatus.COMPILE_ERROR)
+    if (compileError !== wasCompileError)
+      value.compile_error_count = Math.max(
+        0,
+        numberMetric(value, "compile_error_count") + compileError - wasCompileError,
+      )
     // 只算做对的、空行不算：原来交什么都算，贴一大段就拿到「长篇巨制」（0032 按这个口径重算过存量）
     if (accepted)
       value.max_code_lines = Math.max(
@@ -218,12 +280,24 @@ export async function updateAchievementsForSubmission(submissionId: string) {
         eq(schema.achievement.visible, true),
       ),
     )
-  metrics.achievement_unlocked_count = meta?.value ?? 0
+  const unlockedCount = meta?.value ?? 0
+  metrics.achievement_unlocked_count = unlockedCount
+  await setUnlockedCount(row.submission.userId, unlockedCount)
+  return [...first, ...(await unlockAchievements(row.submission.userId, metrics, true))]
+}
+
+/**
+ * 只 `jsonb_set` 这一个键：这一步在锁外，整体写回 metrics 会把并发判题刚写的其它指标
+ * 冲掉（和 refreshUnlockedCount 同一个理由）。
+ */
+async function setUnlockedCount(userId: number, value: number) {
   await db
     .update(schema.userStat)
-    .set({ metrics, updateTime: new Date().toISOString() })
-    .where(eq(schema.userStat.userId, row.submission.userId))
-  return [...first, ...(await unlockAchievements(row.submission.userId, metrics, true))]
+    .set({
+      metrics: sql`jsonb_set(${schema.userStat.metrics}, '{achievement_unlocked_count}', to_jsonb(${value}::int))`,
+      updateTime: new Date().toISOString(),
+    })
+    .where(eq(schema.userStat.userId, userId))
 }
 
 export async function updateAchievementsForProblemSet(userId: number) {
@@ -278,11 +352,9 @@ export async function updateAchievementsForProblemSet(userId: number) {
         eq(schema.achievement.visible, true),
       ),
     )
-  metrics.achievement_unlocked_count = meta?.value ?? 0
-  await db
-    .update(schema.userStat)
-    .set({ metrics, updateTime: new Date().toISOString() })
-    .where(eq(schema.userStat.userId, userId))
+  const unlockedCount = meta?.value ?? 0
+  metrics.achievement_unlocked_count = unlockedCount
+  await setUnlockedCount(userId, unlockedCount)
   return [...first, ...(await unlockAchievements(userId, metrics, true))]
 }
 

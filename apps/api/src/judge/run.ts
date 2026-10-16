@@ -164,6 +164,42 @@ export async function compileFails(language: string, source: string) {
   }
 }
 
+/**
+ * 判题机回包的总上限。判题机给每组输出留 16MB（见镜像里 judge_client.py 的
+ * max_output_size），死循环打印能把每组都写满；api、worker 容器都只有 512MB，
+ * 几组全满读进来再 JSON.parse 一遍就是好几百 MB。超了就掐断。
+ */
+export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+
+/** 边读边数，超过上限就掐断连接，返回 null */
+export async function readCapped(response: Response, limit: number) {
+  if (!response.body) return ""
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > limit) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks).toString("utf8")
+}
+
+/**
+ * 判题机自己有编译、运行的限时，这里只防它卡死不回。不设的话一次卡死就永久占住一个
+ * worker（服务器上一共两个），而 BullMQ 会一直给它续锁、不当它卡住，全班停在「等待评分」。
+ * 判题机每组的墙钟上限是 CPU 时限的 3 倍、两组并行，现有题目全是 1 秒，二十组全超时
+ * 也就半分钟出头，两分钟足够；时限放宽的题按比例放宽。
+ */
+function judgeTimeoutMs(timeLimit: number) {
+  return Math.max(120_000, timeLimit * 60)
+}
+
 async function requestJudge(
   language: string,
   code: string,
@@ -172,8 +208,22 @@ async function requestJudge(
   testCase: string | { input: string; output: string }[],
   output = false,
 ) {
-  const response = await postJudge(language, code, timeLimit, memoryLimit, testCase, { output })
-  return (await response.json()) as JudgeResponse
+  const timeoutMs = judgeTimeoutMs(timeLimit)
+  try {
+    const response = await postJudge(language, code, timeLimit, memoryLimit, testCase, {
+      output,
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    const body = await readCapped(response, MAX_RESPONSE_BYTES)
+    if (body === null) throw new Error("判题机返回的内容太大")
+    return JSON.parse(body) as JudgeResponse
+  } catch (error) {
+    // 这句会写进 err_info，学生能看到，别把 "The operation timed out." 原样给他
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new Error(`判题机 ${timeoutMs / 1000} 秒没有回应`)
+    }
+    throw error
+  }
 }
 
 async function persistResult(
@@ -668,6 +718,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       }
     }
 
+    const counted = countedBefore(job.rejudgedFrom)
     const saved = await persistResult(
       row.submission.id,
       row.problem.id,
@@ -678,7 +729,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       statisticInfo,
       row.submission.contestId,
       row.submission.createTime,
-      countedBefore(job.rejudgedFrom),
+      counted,
     )
     if (!saved) return
 
@@ -692,7 +743,7 @@ export async function judgeSubmission(job: JudgeJobData) {
     }
 
     try {
-      const unlocked = await updateAchievementsForSubmission(row.submission.id)
+      const unlocked = await updateAchievementsForSubmission(row.submission.id, counted)
       await publishAchievementNotification(
         row.submission.userId,
         unlocked.map((achievement) => ({

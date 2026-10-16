@@ -1,7 +1,14 @@
 import type { TrialRunResponse } from "@oj2/contract"
 
 import { config } from "../config"
-import { postJudge, statusValue, type JudgeCase, type JudgeResponse } from "./run"
+import {
+  MAX_RESPONSE_BYTES,
+  postJudge,
+  readCapped,
+  statusValue,
+  type JudgeCase,
+  type JudgeResponse,
+} from "./run"
 import { nativeRuntimeError, parsePythonTraceback } from "./runtime-diagnosis"
 import { JudgeStatus, type JudgeStatusValue } from "./status"
 import { shiftCompileLines } from "./template"
@@ -27,13 +34,6 @@ const WAIT_TIMEOUT_MS = 30_000
 const PER_USER_LIMIT = 2
 /** 判题机本身有编译、运行的限时，这里只防它卡死不回 */
 const JUDGE_TIMEOUT_MS = 60_000
-
-/**
- * 判题机回包的总上限。判题机给每组输出留 16MB（见镜像里 judge_client.py 的
- * max_output_size），死循环打印能把每组都写满；api 容器只有 512MB，十组全满
- * 读进来再 JSON.parse 一遍就是好几百 MB。超了就掐断，告诉学生输出太多了。
- */
-const MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
 /** 回给学生的每组输出最多这么长。管理员生成测试点要原样的输出，不截 */
 const STUDENT_OUTPUT_LIMIT = 64 * 1024
@@ -70,25 +70,6 @@ async function acquire() {
     waiting.push(wake)
   })
   // 被 release() 叫醒时名额是直接转交过来的，active 不用再加
-}
-
-/** 边读边数，超过上限就掐断连接，返回 null */
-async function readCapped(response: Response, limit: number) {
-  if (!response.body) return ""
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > limit) {
-      await reader.cancel()
-      return null
-    }
-    chunks.push(value)
-  }
-  return Buffer.concat(chunks).toString("utf8")
 }
 
 function truncate(text: string) {
