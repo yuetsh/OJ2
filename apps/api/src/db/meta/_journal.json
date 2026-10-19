@@ -253,6 +253,13 @@
       "when": 1792130722120,
       "tag": "0035_recount_solved_metrics",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792415463343,
+      "tag": "0036_fix_flowchart_criteria_numbers",
+      "breakpoints": true
     }
   ]
 }

@@ -163,9 +163,34 @@ function evaluationPrompt(problem: Problem) {
   return `你是专业的编程教学助手，负责评估学生的 Mermaid 流程图。
 评分：逻辑正确性40分、完整性30分、规范性20分、清晰度10分。
 不要评价系统生成的节点ID。feedback不超过100字；suggestions最多3条且只针对真实问题。
-返回纯 JSON：{"score":85,"grade":"A","feedback":"...","suggestions":"...","criteria_details":{}}。
+返回纯 JSON：{"score":85,"grade":"A","feedback":"...","suggestions":"...","criteria_details":{"逻辑正确性":{"score":34,"max":40,"comment":"..."},"完整性":{"score":26,"max":30,"comment":"..."},"规范性":{"score":17,"max":20,"comment":"..."},"清晰度":{"score":8,"max":10,"comment":"..."}}}。
 等级：S=90-100，A=80-89，B=70-79，C=0-69。
 题目：${problem.title}\n${problem.description.slice(0, 2000)}`
+}
+
+const CRITERIA_MAX: Record<string, number> = { 逻辑正确性: 40, 完整性: 30, 规范性: 20, 清晰度: 10 }
+
+/**
+ * 四项明细收成 `{ 项名: { score, max, comment } }`，提交详情和统计都按这个形状读。
+ * 原来 prompt 里只写了 `"criteria_details":{}`，模型有时直接给 `"逻辑正确性": 34`，
+ * 存进去页面上四项全是「0 / 0」（2026-10 重新评分老提交时撞上的）。缺 max 的按满分表补
+ */
+function normalizeCriteria(raw: unknown) {
+  return Object.fromEntries(
+    Object.entries(asRecord(raw)).map(([key, value]) => {
+      const item = asRecord(value)
+      const score = typeof value === "number" ? value : Number(item.score)
+      const max = Number(item.max)
+      return [
+        key,
+        {
+          score: Number.isFinite(score) ? score : 0,
+          max: Number.isFinite(max) && max > 0 ? max : (CRITERIA_MAX[key] ?? 100),
+          comment: typeof item.comment === "string" ? item.comment : "",
+        },
+      ]
+    }),
+  )
 }
 
 function parseEvaluation(value: string): Evaluation {
@@ -181,7 +206,7 @@ function parseEvaluation(value: string): Evaluation {
     grade: gradeForScore(score),
     feedback: typeof data.feedback === "string" ? data.feedback : "",
     suggestions: typeof data.suggestions === "string" ? data.suggestions : "",
-    criteria: asRecord(data.criteria_details),
+    criteria: normalizeCriteria(data.criteria_details),
   }
 }
 
