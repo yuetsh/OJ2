@@ -708,6 +708,7 @@ function dayBreak(index: number) {
       <!-- 老师只有「统计」（今日统计并进去了）；学生看不到统计，仍是「今日统计」 -->
       <n-button
         v-if="teacher && route.name === 'submissions'"
+        class="stats-btn"
         quaternary
         title="统计：这节课、今天，或者回头看以前的课"
         @click="openStatistics()"
@@ -717,6 +718,7 @@ function dayBreak(index: number) {
       </n-button>
       <n-button
         v-else-if="route.name === 'submissions' && !flowMode"
+        class="stats-btn"
         quaternary
         :title="`今日统计：今天全站 ${todayCount} 条`"
         @click="toggleTodayPanel(true)"
@@ -1162,6 +1164,11 @@ function dayBreak(index: number) {
 /* 窗口窄（或浏览器放大）排不下时折成两行，各个框保持原宽，不再被压扁、「统计」不再被挤出去 */
 .filters:not(.mobile-filters) > * {
   flex-shrink: 0;
+}
+
+/* 「统计」单独折到第二行时，占位的 spacer 留在第一行，它自己靠右 */
+.stats-btn {
+  margin-left: auto;
 }
 
 .mobile-filters {
