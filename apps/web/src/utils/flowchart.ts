@@ -26,6 +26,7 @@ export function caseReport(details: Record<string, unknown> | null | undefined) 
     passed: cases.filter((row) => row.ok).length,
     total: cases.length,
     cases,
+    focus: typeof details.focus === "string" ? details.focus : null,
   } satisfies FlowchartCaseReport
 }
 

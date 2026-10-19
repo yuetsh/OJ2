@@ -24,6 +24,13 @@ import { flowchartCases, type FlowchartCase } from "./cases"
 import { buildProgram, describeDoc, flowBoxes, judgeCase, TRANSLATE_PROMPT } from "./program"
 import { gradeForCases, gradeForScore } from "./grade"
 import type { FlowchartJobData } from "./job"
+import {
+  flowchartAnswer,
+  parseReview,
+  REVIEW_PROMPT,
+  reviewInput,
+  type FlowchartReview,
+} from "./review"
 
 type Problem = typeof schema.problem.$inferSelect
 
@@ -43,7 +50,7 @@ interface Evaluation {
  * （有一张 C 再交变 S），学生学会了原样连点 —— 22% 的提交和上一次一模一样；评语里还写
  * node_9 这种学生看不到的编号。现在对不对由程序跑出来的输出决定，和模型的心情无关。
  */
-function translateInput(problem: Problem, doc: FlowDoc, cases: FlowchartCase[]) {
+function problemBrief(problem: Problem, cases: FlowchartCase[]) {
   const samples = cases.filter((item) => item.name.startsWith("例子")).slice(0, 3)
   return [
     `题目：${problem.title}`,
@@ -51,11 +58,37 @@ function translateInput(problem: Problem, doc: FlowDoc, cases: FlowchartCase[]) 
     `输入说明：${plainText(problem.inputDescription).slice(0, 400) || "无"}`,
     `输出说明：${plainText(problem.outputDescription).slice(0, 400) || "无"}`,
     ...samples.map((item) => `${item.name}的输入：\n${item.input}`),
-    "",
-    "<flowchart>",
-    describeDoc(doc),
-    "</flowchart>",
   ].join("\n")
+}
+
+function translateInput(problem: Problem, doc: FlowDoc, cases: FlowchartCase[]) {
+  return [problemBrief(problem, cases), "", "<flowchart>", describeDoc(doc), "</flowchart>"].join(
+    "\n",
+  )
+}
+
+/** 没走对时的点评（见 review.ts）。出什么错都只是没有点评，评分照常落库 */
+async function review(
+  problem: Problem,
+  doc: FlowDoc,
+  cases: FlowchartCase[],
+  code: Record<string, string | null>,
+  results: FlowchartCaseResult[],
+  texts: Map<string, string>,
+): Promise<FlowchartReview | null> {
+  try {
+    const input = reviewInput({
+      brief: problemBrief(problem, cases),
+      flowchart: describeDoc(doc),
+      code,
+      results,
+      answer: flowchartAnswer(problem.answers),
+    })
+    return parseReview(await completeChat(REVIEW_PROMPT, input, { json: true }), texts)
+  } catch (error) {
+    console.error(`Failed to review flowchart for problem ${problem.id}`, error)
+    return null
+  }
 }
 
 /** 交上来的结构树（压缩过的）；2026-10 之前的 vue-flow 格式读不出来，给 null */
@@ -144,13 +177,22 @@ async function evaluateByRunning(
 
   const passed = results.filter((row) => row.ok).length
   const grade = gradeForCases(passed, results.length, style !== "")
-  const report: FlowchartCaseReport = { version: 2, passed, total: results.length, cases: results }
+  // 全对时「还可以更好」用翻译那一步顺带给的写法建议；没全对才另外点评「错在哪、怎么改」
+  const advice =
+    passed < results.length ? await review(problem, doc, cases, code, results, texts) : null
+  const report: FlowchartCaseReport = {
+    version: 2,
+    passed,
+    total: results.length,
+    cases: results,
+    focus: advice?.at ?? null,
+  }
   return {
     // 分数只给统计和老的列表用：没全对时是走对的比例，全对时 A 90、S 100
     score: grade === "S" ? 100 : grade === "A" ? 90 : Math.round((passed / results.length) * 100),
     grade,
-    feedback: "",
-    suggestions: passed === results.length ? style : "",
+    feedback: advice?.wrong ?? "",
+    suggestions: passed === results.length ? style : (advice?.fix ?? ""),
     criteria: { ...report },
   }
 }

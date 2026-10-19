@@ -89,6 +89,14 @@ async function load() {
   detail.value = res
   await nextTick()
   await renderFlowchart(graph.value, res.mermaidCode)
+  markFocus(graph.value)
+}
+
+/** AI 指出的要改的那个框标红。pele 把 Mermaid 的框号放在节点 <g> 的 data-id 上 */
+function markFocus(el: HTMLElement | null) {
+  const focus = report.value?.focus
+  if (!el || !focus) return
+  el.querySelector(`.pele-node[data-id="${focus}"]`)?.classList.add("oj-focus")
 }
 
 // 分开写三个来源：列表每次轮询都换一批新的行对象，一个 getter 返回数组的话回调次次都跑
@@ -100,6 +108,7 @@ watch(bigOpen, async (open) => {
   if (!open || !detail.value) return
   await nextTick()
   await renderFlowchart(bigGraph.value, detail.value.mermaidCode)
+  markFocus(bigGraph.value)
 })
 
 const shown = computed(() => (detail.value?.id === props.row.id ? detail.value : null))
@@ -129,6 +138,7 @@ function barColor(score: number, max: number) {
 
 /** 2026-10 起的「走例子」报告；老提交是 null，照旧显示四项分 */
 const report = computed(() => caseReport(shown.value?.aiCriteriaDetails))
+const allPassed = computed(() => !!report.value && report.value.passed === report.value.total)
 const openCase = ref<number | null>(null)
 watch(
   () => shown.value?.id,
@@ -258,9 +268,19 @@ const canRetry = computed(
         </template>
         <template v-else-if="shown && report">
           <b class="headline">{{ caseHeadline(report) }}</b>
+          <!-- 没走对：AI 对着答案说的错在哪、怎么改，放在逐组结果前面（要改的框在左边图上标红） -->
+          <div v-if="!allPassed && (shown.aiFeedback || shown.aiSuggestions)" class="review">
+            <div v-if="shown.aiFeedback">
+              <b>哪里错了</b>
+              <p>{{ shown.aiFeedback }}</p>
+            </div>
+            <div v-if="shown.aiSuggestions">
+              <b>可以这样改</b>
+              <p>{{ shown.aiSuggestions }}</p>
+            </div>
+          </div>
           <FlowchartCases v-model:selected="openCase" :report="report" />
-          <div v-if="shown.aiFeedback" class="note">{{ shown.aiFeedback }}</div>
-          <div v-if="shown.aiSuggestions" class="note">
+          <div v-if="allPassed && shown.aiSuggestions" class="note">
             <b>还可以更好：</b>
             <div>{{ shown.aiSuggestions }}</div>
           </div>
@@ -519,6 +539,29 @@ const canRetry = computed(
 
 .headline {
   font-size: 16px;
+}
+
+/* 要改的框：压过 useMermaid 里按框类型上的色（那边也是 !important） */
+.graph :deep(.pele-node.oj-focus > :not(text)),
+.big-graph :deep(.pele-node.oj-focus > :not(text)) {
+  fill: v-bind("tone('error').background") !important;
+  stroke: v-bind("tone('error').solid") !important;
+  stroke-width: 3px !important;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: v-bind("tone('error').background");
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.review p {
+  margin: 2px 0 0;
 }
 
 .score-box {

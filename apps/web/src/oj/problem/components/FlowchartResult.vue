@@ -10,6 +10,7 @@ import { parseTime } from "utils/functions"
 import { mermaidOrder, signature } from "shared/components/FlowchartEditor/model"
 import FlowchartCases from "shared/components/FlowchartCases.vue"
 import { caseHeadline, caseReport } from "utils/flowchart"
+import { useTone } from "shared/composables/tone"
 
 /**
  * 「结果」页签里流程图作业的那一块：AI 在评 / 评完了几分 / 历次分数 / 评语和改进建议。
@@ -39,6 +40,7 @@ watch(
 )
 const message = useMessage()
 const theme = useThemeVars()
+const tone = useTone()
 // 暗色主题的成功色是浅薄荷绿，上面的白字看不清
 const isDark = useDark()
 const passText = computed(() => (isDark.value ? "rgba(0, 0, 0, 0.85)" : "#fff"))
@@ -160,9 +162,11 @@ watch(
     }
     const order = mermaidOrder(versionDoc.value)
     const toStep = (id: string) => order[Number(id.slice(1))]
+    // 没走对的组标红 AI 指出的要改的框（错的根子），没有才退回程序找到的出结果的那个框
+    const bad = row.ok ? null : (next?.focus ?? row.wrongAt)
     instance.setHighlight({
       order: row.path.map(toStep).filter((id): id is string => !!id),
-      bad: row.wrongAt ? (toStep(row.wrongAt) ?? null) : null,
+      bad: bad ? (toStep(bad) ?? null) : null,
     })
   },
   // 切回「结果」页签时组件重新挂载，这些值早就齐了，不会再变一次
@@ -258,9 +262,22 @@ function goCode() {
       </n-flex>
 
       <template v-if="detail && report">
+        <!-- 没走对：AI 对着答案说的错在哪、怎么改，放在逐组结果前面（要改的框在画布上标红） -->
+        <div
+          v-if="report.passed < report.total && (detail.aiFeedback || detail.aiSuggestions)"
+          class="review"
+        >
+          <div v-if="detail.aiFeedback">
+            <div class="review-title">哪里错了</div>
+            <p>{{ detail.aiFeedback }}</p>
+          </div>
+          <div v-if="detail.aiSuggestions">
+            <div class="review-title">可以这样改</div>
+            <p>{{ detail.aiSuggestions }}</p>
+          </div>
+        </div>
         <FlowchartCases v-model:selected="selectedCase" :report="report" class="block" />
-        <p v-if="detail.aiFeedback" class="tip">{{ detail.aiFeedback }}</p>
-        <div v-if="detail.aiSuggestions" class="better">
+        <div v-if="report.passed === report.total && detail.aiSuggestions" class="better">
           <div class="better-title">还可以更好</div>
           <p>{{ detail.aiSuggestions }}</p>
         </div>
@@ -556,13 +573,24 @@ function goCode() {
   margin-bottom: 12px;
 }
 
-.tip {
+.review {
   margin: 0 0 14px;
   padding: 10px 12px;
   border-radius: 6px;
-  background-color: rgba(128, 128, 128, 0.08);
+  background: v-bind("tone('error').background");
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   font-size: 14px;
   line-height: 1.7;
+}
+
+.review-title {
+  font-weight: 600;
+}
+
+.review p {
+  margin: 2px 0 0;
 }
 
 .better {

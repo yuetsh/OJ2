@@ -151,6 +151,12 @@ export interface FlowchartCaseReport {
   passed: number
   total: number
   cases: FlowchartCaseResult[]
+  /**
+   * 没走对时 AI 对着老师的答案指出的「真正要改的那个框」（Mermaid 编号）。和每组的 wrongAt
+   * 不同：wrongAt 是程序找到的出结果的框，错的根子常常在它前面（判断条件写反了之类）。
+   * 「哪里错 / 怎么改」两句存在提交的 ai_feedback / ai_suggestions 里。2026-10-19 之前的报告没有它
+   */
+  focus?: string | null
 }
 
 export const flowchartUpdateSchema = z.object({
