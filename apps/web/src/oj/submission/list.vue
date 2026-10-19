@@ -1147,15 +1147,21 @@ function dayBreak(index: number) {
 }
 
 .filters {
-  height: 60px;
+  min-height: 60px;
   flex: none;
   box-sizing: border-box;
-  padding: 0 var(--oj-pad-x);
+  padding: 12px var(--oj-pad-x);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
   border-bottom: 1px solid v-bind("theme.dividerColor");
+}
+
+/* 窗口窄（或浏览器放大）排不下时折成两行，各个框保持原宽，不再被压扁、「统计」不再被挤出去 */
+.filters:not(.mobile-filters) > * {
+  flex-shrink: 0;
 }
 
 .mobile-filters {
@@ -1164,6 +1170,8 @@ function dayBreak(index: number) {
 
 .mobile-filters {
   height: 56px;
+  min-height: 0;
+  flex-wrap: nowrap;
   gap: 4px;
 }
 
@@ -1248,7 +1256,8 @@ function dayBreak(index: number) {
    控件放大到 34 高以后再把两头留白和标签的字收回一点 */
 @media (max-width: 1365px) {
   .filters {
-    padding: 0 16px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
   .w-user {
     width: 108px;
