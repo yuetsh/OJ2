@@ -342,7 +342,9 @@ function openStandalone() {
           复制到自测猫
         </n-button>
       </template>
-      <span v-if="position">本页第 {{ position.index }} / {{ position.count }} 条</span>
+      <span v-if="position" class="position"
+        >本页第 {{ position.index }} / {{ position.count }} 条</span
+      >
     </div>
   </section>
 </template>
@@ -358,6 +360,7 @@ function openStandalone() {
   flex-direction: column;
   gap: 12px;
   background: v-bind("theme.bodyColor");
+  container: pane / inline-size;
 }
 
 .head {
@@ -654,5 +657,61 @@ kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 桌面右栏窄了（屏窄、浏览器放大、列表没收窄）：顶行一行排不下就固定拆成两行 ——
+   名字和按钮一行、题目一行。按宽度定、不按内容定，翻条时高度照样不变 */
+@container pane (max-width: 600px) {
+  .pane:not(.narrow) .head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .pane:not(.narrow) .dot {
+    display: none;
+  }
+
+  /* 名字这块占掉按钮左边的全部宽度、从 0 起算：再窄也只是名字被截，按钮不会掉到下一行 */
+  .pane:not(.narrow) .head .who {
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  .pane:not(.narrow) .head .spacer {
+    display: none;
+  }
+
+  /* 先截班级，名字留全 */
+  .pane:not(.narrow) .user-link {
+    flex-shrink: 0;
+  }
+
+  .pane:not(.narrow) .filter-pill.wide {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    justify-content: flex-start;
+  }
+
+  .pane:not(.narrow) .problem-group {
+    order: 3;
+    flex-basis: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pane:not(.narrow) .keys,
+  .pane:not(.narrow) .hint {
+    display: none;
+  }
+}
+
+/* 再窄连「本页第几条」也让给两个复制按钮 */
+@container pane (max-width: 440px) {
+  .pane:not(.narrow) .position {
+    display: none;
+  }
 }
 </style>

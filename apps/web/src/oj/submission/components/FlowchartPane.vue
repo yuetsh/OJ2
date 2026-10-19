@@ -284,7 +284,7 @@ const canRetry = computed(
 
     <div v-if="!narrow" class="foot">
       <span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span>
-      <span>换上一张 / 下一张</span>
+      <span class="hint">换上一张 / 下一张</span>
       <div class="spacer"></div>
       <span v-if="position">本页第 {{ position.index }} / {{ position.count }} 条</span>
     </div>
@@ -306,6 +306,7 @@ const canRetry = computed(
   flex-direction: column;
   gap: 12px;
   background: v-bind("theme.bodyColor");
+  container: pane / inline-size;
 }
 
 .head {
@@ -611,5 +612,46 @@ kbd {
   justify-content: center;
   overflow: auto;
   max-height: 80vh;
+}
+
+/* 桌面右栏窄了（屏窄、浏览器放大、列表没收窄）：顶行一行排不下就固定拆成两行 ——
+   名字和按钮一行、题目一行。按宽度定、不按内容定，翻条时高度照样不变 */
+@container pane (max-width: 600px) {
+  .pane:not(.narrow) .head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .pane:not(.narrow) .dot {
+    display: none;
+  }
+
+  /* 名字这块占掉按钮左边的全部宽度、从 0 起算：再窄也只是名字被截，按钮不会掉到下一行 */
+  .pane:not(.narrow) .head .who {
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  .pane:not(.narrow) .head .spacer {
+    display: none;
+  }
+
+  .pane:not(.narrow) .user-link {
+    flex-shrink: 0;
+  }
+
+  .pane:not(.narrow) .problem-group {
+    order: 3;
+    flex-basis: 100%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pane:not(.narrow) .keys,
+  .pane:not(.narrow) .hint {
+    display: none;
+  }
 }
 </style>
