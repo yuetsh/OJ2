@@ -55,15 +55,16 @@ watch(
 
 .flowchart-container.compact {
   min-height: 0;
-  height: 150px;
+  height: 260px;
   align-items: center;
   overflow: hidden;
 }
 
 /*
- * 缩略图按高度缩：流程图一般是竖长的，按宽度铺满的话 150px 里只看得见开头两个框。
+ * 缩略图按高度缩：流程图一般是竖长的，按宽度铺满的话只看得见开头两个框。
+ * 原来 150px 高，整张图放进去框里的字只剩三四像素，加到 260。
  * 要 !important：pele 在 <svg> 上写了内联的 max-width: 100%; height: auto，不压住的话图按原尺寸
- * （比大小那张 581px 高）塞进 150px 的框里，只露出中间一截
+ * （比大小那张 581px 高）塞进缩略图的框里，只露出中间一截
  */
 :deep(.flowchart-container.compact > svg) {
   width: auto !important;

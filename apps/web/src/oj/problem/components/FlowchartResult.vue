@@ -491,10 +491,6 @@ function goCode() {
   padding: 8px;
 }
 
-.version-chart :deep(.flowchart-container.compact) {
-  height: 180px;
-}
-
 .score-line {
   display: flex;
   align-items: baseline;
