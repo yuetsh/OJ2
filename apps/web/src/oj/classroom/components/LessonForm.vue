@@ -44,8 +44,10 @@ resetLessonInput()
 if (props.variant === "inline" && !lessonInput.value && props.board.problems.length) {
   lessonInput.value = props.board.problems.map((problem) => problem.problemDisplayId).join(" ")
 }
-// 换了班要把输入框换成那个班今天布置的题、布置时选的语言（15 秒一次的刷新不动它们）
-watch(() => [props.board.className, props.board.source] as const, resetLessonInput)
+// 换了班要把输入框换成那个班今天布置的题、布置时选的语言（15 秒一次的刷新不动它们）。
+// 必须写成两个来源：一个 getter 返回数组的话，每次刷新整个 board 换新，数组也是新的，
+// 回调次次都跑，老师打到一半的题号每 15 秒被清一次
+watch([() => props.board.className, () => props.board.source], resetLessonInput)
 
 async function saveLesson() {
   const ids = lessonInput.value.split(/[\s,，、;；]+/).filter(Boolean)
