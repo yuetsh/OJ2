@@ -40,6 +40,14 @@ export const flowchartSubmissionSchema = z.object({
   aiModel: z.string(),
   processingTime: z.number().nullable(),
   evaluationTime: z.string().nullable(),
+  /**
+   * 同一个人同一道题的上一次（评完了的）走对了几组，给「比上次多对了 n 组」用。
+   * 上一次不是走例子的评法（2026-10 之前的四项分）、或者没有上一次，给 null
+   */
+  previousCases: z
+    .object({ passed: z.number().int(), total: z.number().int() })
+    .nullable()
+    .optional(),
 })
 
 export const flowchartListItemSchema = z.object({

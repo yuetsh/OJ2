@@ -12,7 +12,7 @@ import {
   NO_CLASS,
   STUDENT_ROLES,
 } from "@oj2/contract"
-import { and, asc, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
+import { and, asc, count, desc, eq, inArray, isNull, lt, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
@@ -80,9 +80,31 @@ function cutoffsFor(user: AuthUser, rows: Array<{ userId: number; problemId: num
   return problemSetLockCutoffs(user.id, [...new Set(own)])
 }
 
+/** 上一次走对了几组（见契约 previousCases）：同一个人、同一道题、更早、评完了的那一次 */
+async function previousCases(flowchart: typeof schema.flowchartSubmission.$inferSelect) {
+  const [previous] = await db
+    .select({ details: schema.flowchartSubmission.aiCriteriaDetails })
+    .from(schema.flowchartSubmission)
+    .where(
+      and(
+        eq(schema.flowchartSubmission.userId, flowchart.userId),
+        eq(schema.flowchartSubmission.problemId, flowchart.problemId),
+        eq(schema.flowchartSubmission.status, 2),
+        lt(schema.flowchartSubmission.createTime, flowchart.createTime),
+      ),
+    )
+    .orderBy(desc(schema.flowchartSubmission.createTime))
+    .limit(1)
+  const details = asRecord(previous?.details)
+  if (details.version !== 2 || !Array.isArray(details.cases)) return null
+  const cases = details.cases.map((item) => asRecord(item))
+  return { passed: cases.filter((item) => item.ok === true).length, total: cases.length }
+}
+
 function flowchartData(
   flowchart: typeof schema.flowchartSubmission.$inferSelect,
   username: string,
+  previous: { passed: number; total: number } | null = null,
 ) {
   return {
     id: flowchart.id,
@@ -101,6 +123,7 @@ function flowchartData(
     aiModel: flowchart.aiModel,
     processingTime: flowchart.processingTime,
     evaluationTime: flowchart.evaluationTime,
+    previousCases: previous,
   } satisfies FlowchartSubmission
 }
 
@@ -716,7 +739,7 @@ flowchartRoutes.get("/flowcharts/:id", requireAuth, async (c) => {
   const user = c.get("user")!
   if (!row || !canView(user, row.flowchart, row.problem, await cutoffsFor(user, [row.flowchart])))
     return failure(c, 404, "flowchart-not-found", "Submission does not exist")
-  return success(c, flowchartData(row.flowchart, row.username))
+  return success(c, flowchartData(row.flowchart, row.username, await previousCases(row.flowchart)))
 })
 
 flowchartRoutes.post("/flowcharts/:id/retry", requireAuth, async (c) => {

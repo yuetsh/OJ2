@@ -9,7 +9,7 @@ import { sortFlowchartCriteria } from "utils/constants"
 import { parseTime } from "utils/functions"
 import { mermaidOrder, signature } from "shared/components/FlowchartEditor/model"
 import FlowchartNote from "shared/components/FlowchartNote.vue"
-import { caseReport } from "utils/flowchart"
+import { caseReport, flowchartVerdict } from "utils/flowchart"
 
 /**
  * 「结果」页签里流程图作业的那一块：AI 在评 / 评完了几分 / 历次分数 / 评语和改进建议。
@@ -252,9 +252,7 @@ function goCode() {
       <!-- 设计稿 FlowResFail / FlowResPass：等级 + 几组走对，下面逐组 -->
       <div v-if="report" class="headline">
         <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
-        <span class="headline-text">{{
-          report.passed === report.total ? "画对了" : "还没画对"
-        }}</span>
+        <span class="headline-text">{{ flowchartVerdict(report, current.grade) }}</span>
         <span v-if="isFlowchartPass(current.grade)" class="headline-note">这道题算做完了</span>
       </div>
       <div v-else class="score-line">
@@ -287,6 +285,7 @@ function goCode() {
           :report="report"
           :feedback="detail.aiFeedback"
           :suggestions="detail.aiSuggestions"
+          :previous="detail.previousCases"
           class="block"
         />
       </template>

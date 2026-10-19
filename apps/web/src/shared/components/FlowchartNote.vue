@@ -19,6 +19,8 @@ const props = defineProps<{
   report: FlowchartCaseReport
   feedback: string | null
   suggestions: string | null
+  /** 上一次走对了几组（详情接口的 previousCases） */
+  previous?: { passed: number; total: number } | null
   /** 提交列表右栏窄：字小一号 */
   compact?: boolean
 }>()
@@ -40,6 +42,24 @@ const better = computed(() => (passed.value ? (props.suggestions?.trim() ?? "") 
 
 /** 收起时连点开的那一组一起收掉（画布回到只标要改的框）。先算好再写：外面接着 v-model 时，
  * 写完马上读 open.value 读到的还是旧值 */
+/**
+ * 「比上次多对了 n 组」：只在这次没画对时说（画对了标题已经够了），一样多不说；
+ * 两次的组数不一样（老师中途改了例子）就没法比，也不说
+ */
+const compare = computed(() => {
+  const previous = props.previous
+  if (passed.value || !previous || previous.total !== props.report.total) return null
+  const diff = props.report.passed - previous.passed
+  if (diff > 0)
+    return { up: true, text: `比上次多对了 ${diff} 组${props.compact ? "" : "，接着改"}` }
+  if (diff < 0)
+    return {
+      up: false,
+      text: `比上次少对了 ${-diff} 组${props.compact ? "" : "，看看刚才改了哪里"}`,
+    }
+  return null
+})
+
 function toggle() {
   const next = !open.value
   open.value = next
@@ -49,6 +69,28 @@ function toggle() {
 
 <template>
   <div class="flowchart-note" :class="{ compact }">
+    <!-- 完成度：一组一段，走对几组亮几段（不写「组」，学生不关心是几组数据） -->
+    <div class="progress">
+      <div
+        class="segments"
+        role="img"
+        :aria-label="`完成度：${report.total} 段亮了 ${report.passed} 段`"
+      >
+        <!-- 从左往右亮，是条进度，不按哪一组对哪一组错排 -->
+        <span
+          v-for="index in report.total"
+          :key="index"
+          :class="{ lit: index <= report.passed }"
+        ></span>
+      </div>
+      <span
+        v-if="compare"
+        class="compare"
+        :style="{ color: tone(compare.up ? 'success' : 'warning').color }"
+      >
+        {{ compare.text }}
+      </span>
+    </div>
     <div v-if="wrong || fix || better" class="card">
       <div v-if="wrong">
         <div class="label" :style="{ color: tone('error').color }">
@@ -85,6 +127,46 @@ function toggle() {
   gap: 12px;
 }
 
+.progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.segments {
+  display: flex;
+  gap: 4px;
+}
+
+.segments span {
+  width: 36px;
+  height: 8px;
+  border-radius: 4px;
+  background: v-bind("theme.dividerColor");
+}
+
+.segments span.lit {
+  background: v-bind("theme.successColor");
+}
+
+.compact .segments {
+  gap: 3px;
+}
+
+.compact .segments span {
+  width: 22px;
+  height: 7px;
+}
+
+.compare {
+  font-size: 14px;
+}
+
+.compact .compare {
+  font-size: 13px;
+}
+
 .card {
   display: flex;
   flex-direction: column;
@@ -96,7 +178,7 @@ function toggle() {
 
 .compact .card {
   gap: 12px;
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .label {
@@ -120,8 +202,8 @@ function toggle() {
 
 .compact .card p {
   margin-top: 4px;
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .toggle {

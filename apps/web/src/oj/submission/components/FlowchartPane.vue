@@ -11,7 +11,7 @@ import { submissionTimeText } from "../utils"
 import FlowchartState from "./FlowchartState.vue"
 import UserName from "shared/components/UserName.vue"
 import FlowchartNote from "shared/components/FlowchartNote.vue"
-import { caseReport } from "utils/flowchart"
+import { caseReport, flowchartVerdict } from "utils/flowchart"
 
 /**
  * 流程图模式的右栏：左边画出来的图，右边四项评分和建议。原来要点编号再开一个
@@ -89,7 +89,24 @@ async function load() {
   detail.value = res
   await nextTick()
   await renderFlowchart(graph.value, res.mermaidCode)
+  fitGraph(graph.value)
   markFocus(graph.value)
+}
+
+/**
+ * 图填满图框：大图照旧缩小，小图也放大，但最多到原尺寸的 1.5 倍（再大字就粗笨了）。
+ * 原来只缩不放，比大小这种五六个框的图在一大块空白中间只占一小团
+ */
+function fitGraph(el: HTMLElement | null) {
+  const svg = el?.querySelector("svg")
+  const w = Number.parseFloat(svg?.getAttribute("width") ?? "")
+  const h = Number.parseFloat(svg?.getAttribute("height") ?? "")
+  if (!svg || !w || !h) return
+  if (!svg.getAttribute("viewBox")) svg.setAttribute("viewBox", `0 0 ${w} ${h}`)
+  svg.style.width = "100%"
+  svg.style.height = "100%"
+  svg.style.maxWidth = `${w * 1.5}px`
+  svg.style.maxHeight = `${h * 1.5}px`
 }
 
 /**
@@ -141,7 +158,6 @@ function barColor(score: number, max: number) {
 
 /** 2026-10 起的「走例子」报告；老提交是 null，照旧显示四项分 */
 const report = computed(() => caseReport(shown.value?.aiCriteriaDetails))
-const allPassed = computed(() => !!report.value && report.value.passed === report.value.total)
 const openCase = ref<number | null>(null)
 /** 逐组数据默认收着，老师和学生一样（设计稿 FlowNotePane）；翻到下一张收回去 */
 const casesOpen = ref(false)
@@ -275,13 +291,14 @@ const canRetry = computed(
           <span class="muted">这次评分失败了{{ teacher ? "，可以点「重新评分」" : "" }}</span>
         </template>
         <template v-else-if="shown && report">
-          <b class="headline">{{ allPassed ? "画对了" : "还没画对" }}</b>
+          <b class="headline">{{ flowchartVerdict(report, shown.aiGrade) }}</b>
           <FlowchartNote
             v-model:selected="openCase"
             v-model:open="casesOpen"
             :report="report"
             :feedback="shown.aiFeedback"
             :suggestions="shown.aiSuggestions"
+            :previous="shown.previousCases"
             compact
           />
         </template>
@@ -512,8 +529,9 @@ const canRetry = computed(
   background: v-bind("theme.cardColor");
 }
 
+/* 图占大头（设计稿 FlowNotePane）：42% 时蜜橘分拣这种宽图只剩三成大，框里的字看不清 */
 .graph-box {
-  flex: 0 0 42%;
+  flex: 0 0 62%;
   min-width: 0;
   display: flex;
   flex-direction: column;
