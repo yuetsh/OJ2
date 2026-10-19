@@ -5,9 +5,16 @@ interface Props {
   total: number
   limit: number
   page: number
+  /** 只要「‹ 页码 / 总页数 ›」：提交列表收窄以后底栏放不下一串页码 */
+  simple?: boolean
 }
 
-const { total, limit: initialLimit = 10, page: initialPage = 1 } = defineProps<Props>()
+const {
+  total,
+  limit: initialLimit = 10,
+  page: initialPage = 1,
+  simple = false,
+} = defineProps<Props>()
 
 const emit = defineEmits(["update:limit", "update:page"])
 
@@ -42,7 +49,8 @@ watch(
     v-model:page-size="limit"
     :page-sizes="sizes"
     :page-slot="isDesktop ? 7 : 5"
-    :show-size-picker="isDesktop"
+    :show-size-picker="isDesktop && !simple"
+    :simple="simple"
   />
 </template>
 <style scoped>

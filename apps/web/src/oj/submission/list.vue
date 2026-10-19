@@ -60,6 +60,13 @@ const theme = useThemeVars()
 const tone = useTone()
 const { isMobile, isDesktop } = useBreakpoints()
 
+/**
+ * 左栏收窄（底栏最左那个按钮）：屏窄、或者浏览器放大了一档时右边的代码看不全，
+ * 收窄后每条排成手机上那样的两行，什么都不丢。记在本机，下次打开还是收着的
+ */
+const narrowList = useStorage("oj2:submission-list-narrow", false)
+const twoLine = computed(() => isMobile.value || narrowList.value)
+
 const inContest = computed(() => route.name === "contest submissions")
 
 /**
@@ -578,7 +585,11 @@ function dayBreak(index: number) {
 </script>
 
 <template>
-  <div ref="pageRoot" class="page" :class="{ contest: inContest, mobile: isMobile }">
+  <div
+    ref="pageRoot"
+    class="page"
+    :class="{ contest: inContest, mobile: isMobile, 'narrow-list': isDesktop && narrowList }"
+  >
     <!-- 筛选栏 -->
     <div v-if="isDesktop" class="filters">
       <!-- 流程图列表要登录才能看（GET /flowcharts 是 requireAuth），没登录就不给这个切换 -->
@@ -846,11 +857,11 @@ function dayBreak(index: number) {
               <div v-if="dayBreak(index)" class="day">{{ dayBreak(index) }}</div>
               <div
                 class="row"
-                :class="{ on: row.id === selectedId && !isMobile, mobile: isMobile }"
+                :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }"
                 :data-row-id="row.id"
                 @click="rowClicked(row)"
               >
-                <template v-if="isDesktop">
+                <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
                   <span class="c-user"><UserName :username="row.username" /></span>
                   <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
@@ -868,7 +879,9 @@ function dayBreak(index: number) {
                   </div>
                   <div class="m-line sub">
                     <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
-                    <span class="title">{{ row.problemDisplayId }} {{ row.problemTitle }}</span>
+                    <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`">
+                      {{ row.problemDisplayId }} {{ row.problemTitle }}
+                    </span>
                     <div class="spacer"></div>
                     <Icon v-if="!row.showLink" icon="ph:lock-simple" :width="13" class="m-lock" />
                   </div>
@@ -881,11 +894,11 @@ function dayBreak(index: number) {
               <div v-if="dayBreak(index)" class="day">{{ dayBreak(index) }}</div>
               <div
                 class="row"
-                :class="{ on: row.id === selectedId && !isMobile, mobile: isMobile }"
+                :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }"
                 :data-row-id="row.id"
                 @click="rowClicked(row)"
               >
-                <template v-if="isDesktop">
+                <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
                   <span class="c-user">
                     <UserName :username="row.username" :muted="othersRow(row)" />
@@ -927,7 +940,9 @@ function dayBreak(index: number) {
                   </div>
                   <div class="m-line sub">
                     <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
-                    <span class="title">{{ row.problemDisplayId }} {{ row.problemTitle }}</span>
+                    <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`">
+                      {{ row.problemDisplayId }} {{ row.problemTitle }}
+                    </span>
                     <span v-if="row.problemSet" class="ps">题单</span>
                     <div class="spacer"></div>
                     <span class="m-lang">{{ languageText(row) }}</span>
@@ -957,11 +972,24 @@ function dayBreak(index: number) {
           <div v-if="!loaded" class="empty"><n-spin size="small" /></div>
         </div>
         <div class="list-foot">
-          <span v-if="total" class="total">共 {{ total }} 条</span>
+          <n-button
+            v-if="isDesktop"
+            size="small"
+            quaternary
+            :title="narrowList ? '列表放宽' : '列表收窄，右边的代码留宽一点'"
+            :aria-label="narrowList ? '列表放宽' : '列表收窄'"
+            @click="narrowList = !narrowList"
+          >
+            <template #icon>
+              <Icon :icon="narrowList ? 'ph:arrow-line-right' : 'ph:arrow-line-left'" />
+            </template>
+          </n-button>
+          <span v-if="total && !(isDesktop && narrowList)" class="total">共 {{ total }} 条</span>
           <div class="spacer"></div>
           <Pagination
             class="pager"
             :total="total"
+            :simple="isDesktop && narrowList"
             v-model:limit="query.limit"
             v-model:page="query.page"
           />
@@ -1316,6 +1344,11 @@ function dayBreak(index: number) {
   min-height: 0;
 }
 
+/* 收窄：两行的排法，名字 + 结果一行、时间 + 题目 + 语言一行，题名还能露出十来个字 */
+.narrow-list .list {
+  flex: 0 0 320px;
+}
+
 .mobile .list {
   flex: 1 1 auto;
   max-width: none;
@@ -1395,7 +1428,7 @@ function dayBreak(index: number) {
   background: v-bind("tone('success').background");
 }
 
-.row.mobile {
+.row.two-line {
   height: 60px;
   padding: 0 14px;
   flex-direction: column;
@@ -1435,8 +1468,9 @@ function dayBreak(index: number) {
   opacity: 0.7;
 }
 
-/* 手机上的 day 行和列表行一样贴两边 */
-.mobile .day {
+/* 两行排法的 day 行和列表行一样贴两边 */
+.mobile .day,
+.narrow-list .day {
   padding: 0 14px;
 }
 
