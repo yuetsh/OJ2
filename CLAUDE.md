@@ -197,7 +197,7 @@ bun run --filter '@oj2/api' check:ast     # 升级 tree-sitter-* 之后一定要
   这个插件同时把 `build.target` 压到 `es2020/chrome105`、给现代产物补 core-js polyfill
   （`toSorted` / `Set` 运算 / 迭代器辅助那批是 Chrome 110+ 才有的）。`modernTargets` 不写，
   用插件自带的基线（`chrome>=105`），正好是这一档。polyfill 清单写死在 `vite.config.ts`，
-  **升级前端依赖后重新审计**：`DEBUG=vite:legacy bun run build` 会打印探测到的全集。
+  **升级前端依赖后重新审计**：先临时把 `modernPolyfills` 改成 `true`，再跑 `DEBUG=vite:legacy bun run build` 才会打印探测到的全集（写死清单时它只回显清单）。
 - **View Transitions 要 111，105 没有**，`darkTransition.ts` 的降级分支是真在用的。
 
 ### 时间只有一个锚点：`apps/api/src/time.ts`

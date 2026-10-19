@@ -59,7 +59,7 @@ API 调用不按模块分：学生端全在 `oj/api.ts`、后台全在 `admin/ap
 
 Shared logic lives in `shared/`:
 - `store/` — Pinia stores: `user` (auth/roles), `config` (site-wide settings), `authModal` (登录框、注册框开没开), `collab` (help-request queue + collab room), `achievement` (解锁弹窗队列), `myFlowchart` (题面「你画的流程图」那张 A/S 图的 mermaid 源码)
-- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render), `darkTransition` (View Transitions，111 以下走降级分支), `leaveStudents` (课堂看板的「请假」), `problemJump` (按题号直达), `teacherHelp` (老师接单 / 打开学生编辑器), `chartTheme`, `breakpoints`, `rarity`
+- `composables/` — `aiStream`, `pagination` (URL-synced), `websocket` (reconnect + heartbeat), `collabDoc` (Yjs binding for the collab channel), `configUpdate` (WS-pushed config sync), `useMermaid` (lazy Mermaid render，渲染器是 pele 不是 mermaid), `darkTransition` (View Transitions，111 以下走降级分支), `leaveStudents` (课堂看板的「请假」), `problemJump` (按题号直达), `teacherHelp` (老师接单 / 打开学生编辑器), `chartTheme`, `breakpoints`, `rarity`
 - `layout/` — `default.vue` and `admin.vue` layout wrappers
 - `api.ts` — shared API calls (auth, profile, tags, captcha)
 

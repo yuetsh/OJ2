@@ -9,9 +9,10 @@ import { NaiveUiResolver } from "unplugin-vue-components/resolvers"
 // 但比 vite 8 的默认构建 target（chrome111）低。所以这个插件必须留着：它同时管两件事
 // —— 把 build.target 压到 chrome105/es2020，再给现代产物补 core-js 的 API polyfill。
 //
-// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 52 项，抄下来写死：自动探测要
+// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 50 项，抄下来写死：自动探测要
 // 对每个产物跑一遍 Babel 扫描，构建从 3 秒涨到 12 秒。**升级前端依赖后重新审计一次**：
-//   DEBUG=vite:legacy bun run build   # 会打印 modern polyfills 的全集
+//   临时把下面的 modernPolyfills 改成 true，再 DEBUG=vite:legacy bun run build
+//   （写死清单时它只回显这份清单，不会重新探测）
 // 少一项就是老机器上一个静默的 TypeError（这批缺的大多是 Chrome 110+ 的
 // Array.prototype.toSorted / Set 运算 / 迭代器辅助）。
 const polyfills = [
@@ -23,7 +24,6 @@ const polyfills = [
   "es.array.to-reversed",
   "es.array.to-sorted",
   "es.array.to-spliced",
-  "es.array.with",
   "es.iterator.constructor",
   "es.iterator.drop",
   "es.iterator.every",
@@ -34,12 +34,12 @@ const polyfills = [
   "es.iterator.map",
   "es.iterator.reduce",
   "es.iterator.some",
+  "es.iterator.take",
   "es.iterator.to-array",
   "es.json.parse",
   "es.json.stringify",
   "es.map.get-or-insert",
   "es.map.get-or-insert-computed",
-  "es.object.group-by",
   "es.regexp.escape",
   "es.regexp.flags",
   "es.set.difference.v2",
@@ -61,7 +61,6 @@ const polyfills = [
   "esnext.array.group",
   "web.dom-exception.stack",
   "web.immediate",
-  "web.structured-clone",
   "web.url-search-params.delete",
   "web.url-search-params.has",
   "web.url-search-params.size",
@@ -128,10 +127,11 @@ export default defineConfig(() => {
       tsconfigPaths: true,
     },
     build: {
-      // 超过 500 kB 的两个 chunk 都是懒加载的：wangeditor（后台富文本，TextEditor-*.js）、
-      // @mermaid-js/parser，各 660 kB 上下。默认阈值下这条警告每次构建都在报，真涨了
-      // 反而没人看，所以抬到比它们略高。首屏入口 index-*.js 在 175 kB 左右。
-      // （原来还有 Python 语法检查用的 skulpt，语法检查挪到服务端的 CPython 之后删了）
+      // 超过 500 kB 的 chunk 只有懒加载的 wangeditor（后台富文本，TextEditor-*.js），
+      // 640 kB 上下。默认阈值下这条警告每次构建都在报，真涨了反而没人看，所以抬到比它
+      // 略高。首屏入口 index-*.js 在 175 kB 左右。
+      // （原来还有 Python 语法检查用的 skulpt、mermaid 的 @mermaid-js/parser，前者挪到
+      // 服务端的 CPython、后者换成 pele 之后都没了）
       chunkSizeWarningLimit: 1000,
     },
     server: {
