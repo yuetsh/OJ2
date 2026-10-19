@@ -6,8 +6,6 @@
  * pele 的版本号锁死（不带 ^）：项目 2026-10 才开，小版本也在改排版。
  */
 
-import { normalizeLegacyFlowchart } from "utils/legacyFlowchart"
-
 const semanticNodeClasses = [
   "startNode",
   "endNode",
@@ -137,8 +135,7 @@ export function useMermaid() {
     try {
       // pele/lazy 按图的类型现拉对应的模块，题目里绝大多数是流程图，只拉那一块
       const { renderAsync } = await import("pele/lazy")
-      // 老师手写的老参考图一个框的种类都没标，先按标准符号重排（见 legacyFlowchart.ts）
-      const { svg } = await renderAsync(normalizeLegacyFlowchart(mermaidCode), {
+      const { svg } = await renderAsync(mermaidCode, {
         // 量字宽用页面真实的字体，否则框会比字窄或宽
         fontFamily: getComputedStyle(container).fontFamily,
         // 题目是老师写的、提交是学生写的，图里的链接和外链图片一律不画
