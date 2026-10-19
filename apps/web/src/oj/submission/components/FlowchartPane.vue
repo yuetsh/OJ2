@@ -192,15 +192,25 @@ const canRetry = computed(
         </button>
       </span>
       <div class="spacer"></div>
+      <!-- 右栏窄时这两个只剩图标（字在 title 里），把宽度让给题目名 -->
       <n-button
         v-if="shown && !renderError && shown.mermaidCode"
+        class="head-btn"
         size="small"
+        title="查看大图"
         @click="bigOpen = true"
       >
         <template #icon><Icon icon="ph:corners-out" /></template>
         查看大图
       </n-button>
-      <n-button v-if="teacher" size="small" :disabled="!canRetry" @click="emit('retry', row.id)">
+      <n-button
+        v-if="teacher"
+        class="head-btn"
+        size="small"
+        title="重新评分"
+        :disabled="!canRetry"
+        @click="emit('retry', row.id)"
+      >
         <template #icon><Icon icon="ph:arrow-clockwise" /></template>
         重新评分
       </n-button>
@@ -616,6 +626,20 @@ kbd {
 
 /* 桌面右栏窄了（屏窄、浏览器放大、列表没收窄）：顶行一行排不下就固定拆成两行 ——
    名字和按钮一行、题目一行。按宽度定、不按内容定，翻条时高度照样不变 */
+@container pane (max-width: 760px) {
+  .pane:not(.narrow) .head-btn {
+    padding: 0 7px;
+  }
+
+  .pane:not(.narrow) .head-btn :deep(.n-button__content) {
+    display: none;
+  }
+
+  .pane:not(.narrow) .head-btn :deep(.n-button__icon) {
+    margin: 0;
+  }
+}
+
 @container pane (max-width: 600px) {
   .pane:not(.narrow) .head {
     flex-wrap: wrap;
