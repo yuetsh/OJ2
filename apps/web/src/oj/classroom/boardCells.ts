@@ -15,8 +15,9 @@ export function acceptedToday(cell: ClassBoardCell, day: string | undefined) {
   return !!cell.acceptedAt && parseTime(cell.acceptedAt, "YYYY-MM-DD") === day
 }
 
+/** 做对了的写第几次做对：「✓ 9」是今天第 9 次才对，一次就对的、以前就对了的还是「✓」 */
 export function cellText(cell: ClassBoardCell) {
-  if (cell.status === "accepted") return "✓"
+  if (cell.status === "accepted") return (cell.acceptedTry ?? 1) > 1 ? `✓ ${cell.acceptedTry}` : "✓"
   if (cell.status === "tried") return cell.attempts ? `✗ ${cell.attempts}` : "✗"
   return ""
 }
@@ -61,4 +62,14 @@ export function cellTitle(
     return cell.attempts ? `今天画了 ${cell.flowchartAttempts} 张流程图` : "以前交过，没做对"
   }
   return ""
+}
+
+/** 点开做对的格子，方块串旁边那句 */
+export function trailSummary(cell: ClassBoardCell, day: string | undefined) {
+  const total = cell.trail.length
+  if (cell.acceptedTry === 1) return total === 1 ? "一次就做对" : `交了 ${total} 次，第 1 次就做对`
+  if (cell.acceptedTry) return `交了 ${total} 次，第 ${cell.acceptedTry} 次做对`
+  return acceptedToday(cell, day)
+    ? `今天交了 ${total} 次代码`
+    : `以前就做对了，今天又交了 ${total} 次`
 }

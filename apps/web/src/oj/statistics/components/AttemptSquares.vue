@@ -1,20 +1,10 @@
-<script lang="ts">
-import type { Submission } from "utils/types"
-
-/**
- * 代码按提交 id 缓存，整页共用：交了就不会再变，老师在一排方块之间来回对比时
- * 不用每次都等网络。失败的不进缓存，下次停上去再试。
- */
-const codeCache = new Map<string, Submission>()
-</script>
-
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
-import { getSubmission } from "oj/api"
-import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, SubmissionStatus } from "utils/constants"
+import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
-import type { SUBMISSION_RESULT } from "utils/types"
-import { useTone, type Tone } from "shared/composables/tone"
+import type { Submission, SUBMISSION_RESULT } from "utils/types"
+import { useTone } from "shared/composables/tone"
+import { attemptTone, cachedSubmission } from "../attempts"
 
 /**
  * 一个人在一道题上的每一次提交，一格一次、从早到晚（设计稿「统计重设计」）。
@@ -31,34 +21,13 @@ const props = withDefaults(
 const tone = useTone()
 const theme = useThemeVars()
 
-function toneOf(result: number): Tone {
-  if (result === SubmissionStatus.accepted) return "success"
-  if (
-    result === SubmissionStatus.compile_error ||
-    result === SubmissionStatus.runtime_error ||
-    result === SubmissionStatus.ast_check_failed ||
-    result === SubmissionStatus.partial_accepted
-  ) {
-    return "warning"
-  }
-  if (result === SubmissionStatus.pending || result === SubmissionStatus.judging) return "info"
-  return "error"
-}
-
 const code = reactive<Record<string, Submission | "loading" | "failed">>({})
 
 async function load(id: string) {
-  const hit = codeCache.get(id)
-  if (hit) {
-    code[id] = hit
-    return
-  }
-  if (code[id] === "loading") return
+  if (code[id] && code[id] !== "failed") return
   code[id] = "loading"
   try {
-    const res = await getSubmission(id)
-    codeCache.set(id, res)
-    code[id] = res
+    code[id] = await cachedSubmission(id)
   } catch {
     code[id] = "failed"
   }
@@ -72,7 +41,7 @@ const cells = computed(() =>
   props.items.map((item, index) => ({
     ...item,
     index: index + 1,
-    color: tone(toneOf(item.result)).solid,
+    color: tone(attemptTone(item.result)).solid,
   })),
 )
 </script>

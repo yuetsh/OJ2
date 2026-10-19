@@ -16,12 +16,14 @@ import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent }
 import ExplainModal, { type ExplainPerson } from "./components/ExplainModal.vue"
 import LeaveModal from "./components/LeaveModal.vue"
 import LessonForm from "./components/LessonForm.vue"
+import TrailPanel from "./components/TrailPanel.vue"
 import { errorKind, type ErrorKind } from "utils/errorKind"
 import {
   cellStyle as cellStyleOf,
   cellText,
   cellTitle as cellTitleOf,
   STUCK_ATTEMPTS,
+  trailSummary,
 } from "./boardCells"
 
 /**
@@ -379,6 +381,22 @@ const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) =>
   cellTitleOf(cell, student, board.value?.day)
 
 /**
+ * 点开着轨迹的那个格子（学生 id:第几道题）。做对了、今天交过代码的格子点了不再直接去提交列表，
+ * 先在格子下面看他是怎么一次次做对的，列表在弹出来的那块里
+ */
+const trailKey = ref<string | null>(null)
+
+function toggleTrail(key: string) {
+  trailKey.value = trailKey.value === key ? null : key
+}
+
+/** 点到别的格子时，那边自己会换过去；这里只管点到空白处收起 */
+function trailOutside(event: MouseEvent) {
+  if ((event.target as Element | null)?.closest(".cell")) return
+  trailKey.value = null
+}
+
+/**
  * 点格子 / 名字到提交列表看他今天交的。新标签打开：看板一般开着不关，别把它顶掉。
  * 用户名按整名匹配（学号互相包含是常态，ks24a1 会混进 ks24a10）。
  *
@@ -520,10 +538,19 @@ function lastText(student: ClassBoardStudent) {
 
         <section v-if="selectedIndex >= 0" class="panel">
           <div class="panel-head">
-            <b class="panel-title">
+            <a
+              class="panel-title"
+              :href="
+                router.resolve({
+                  name: 'problem',
+                  params: { problemID: board.problems[selectedIndex]!.problemDisplayId },
+                }).href
+              "
+              target="_blank"
+            >
               <span class="muted">{{ board.problems[selectedIndex]!.problemDisplayId }}</span>
               {{ board.problems[selectedIndex]!.title }}
-            </b>
+            </a>
             <span>
               错着的 <b class="wrong">{{ problemStats[selectedIndex]!.wrong }}</b> 人
             </span>
@@ -688,6 +715,35 @@ function lastText(student: ClassBoardStudent) {
                   >
                     {{ cellText(cell) }}
                   </button>
+                  <n-popover
+                    v-else-if="cell.trail.length"
+                    :show="trailKey === `${student.userId}:${i}`"
+                    trigger="manual"
+                    placement="bottom-start"
+                    :style="{ width: '620px', maxWidth: 'calc(100vw - 32px)' }"
+                    @clickoutside="trailOutside"
+                  >
+                    <template #trigger>
+                      <button
+                        type="button"
+                        class="cell"
+                        :class="{ picked: trailKey === `${student.userId}:${i}` }"
+                        :style="cellStyle(cell)"
+                        :title="cellTitle(cell, student)"
+                        @click="toggleTrail(`${student.userId}:${i}`)"
+                      >
+                        {{ cellText(cell) }}
+                      </button>
+                    </template>
+                    <TrailPanel
+                      :username="student.username"
+                      :problem="board.problems[i]!"
+                      :cell="cell"
+                      :summary="trailSummary(cell, board.day)"
+                      :list-href="submissionsHref(student, board.problems[i], false)"
+                      @close="trailKey = null"
+                    />
+                  </n-popover>
                   <a
                     v-else-if="cell.attempts"
                     class="cell"
@@ -941,6 +997,13 @@ function lastText(student: ClassBoardStudent) {
 
 .panel-title {
   font-size: 16px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.panel-title:hover {
+  color: v-bind("theme.primaryColor");
 }
 
 .groups {
@@ -1155,6 +1218,10 @@ a.who {
 button.cell,
 a.cell {
   cursor: pointer;
+}
+
+.cell.picked {
+  box-shadow: 0 0 0 2px v-bind("theme.textColor1");
 }
 
 .num {
