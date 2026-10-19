@@ -102,7 +102,8 @@ async function load() {
   }
 }
 
-watch(() => [props.row.id, props.row.result, props.row.showLink] as const, load, {
+// 分开写三个来源：列表每次轮询都换一批新的行对象，一个 getter 返回数组的话回调次次都跑
+watch([() => props.row.id, () => props.row.result, () => props.row.showLink], load, {
   immediate: true,
 })
 
