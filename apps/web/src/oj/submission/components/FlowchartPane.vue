@@ -10,8 +10,8 @@ import { useTone } from "shared/composables/tone"
 import { submissionTimeText } from "../utils"
 import FlowchartState from "./FlowchartState.vue"
 import UserName from "shared/components/UserName.vue"
-import FlowchartCases from "shared/components/FlowchartCases.vue"
-import { caseHeadline, caseReport } from "utils/flowchart"
+import FlowchartNote from "shared/components/FlowchartNote.vue"
+import { caseReport } from "utils/flowchart"
 
 /**
  * 流程图模式的右栏：左边画出来的图，右边四项评分和建议。原来要点编号再开一个
@@ -92,9 +92,12 @@ async function load() {
   markFocus(graph.value)
 }
 
-/** AI 指出的要改的那个框标红。pele 把 Mermaid 的框号放在节点 <g> 的 data-id 上 */
+/**
+ * 要改的那个框标红：AI 对着答案指出的，没有就退回程序找到的第一处出错的框。
+ * pele 把 Mermaid 的框号放在节点 <g> 的 data-id 上
+ */
 function markFocus(el: HTMLElement | null) {
-  const focus = report.value?.focus
+  const focus = report.value?.focus ?? report.value?.cases.find((row) => !row.ok)?.wrongAt
   if (!el || !focus) return
   el.querySelector(`.pele-node[data-id="${focus}"]`)?.classList.add("oj-focus")
 }
@@ -140,9 +143,14 @@ function barColor(score: number, max: number) {
 const report = computed(() => caseReport(shown.value?.aiCriteriaDetails))
 const allPassed = computed(() => !!report.value && report.value.passed === report.value.total)
 const openCase = ref<number | null>(null)
+/** 逐组数据默认收着，老师和学生一样（设计稿 FlowNotePane）；翻到下一张收回去 */
+const casesOpen = ref(false)
 watch(
   () => shown.value?.id,
-  () => (openCase.value = null),
+  () => {
+    openCase.value = null
+    casesOpen.value = false
+  },
 )
 
 const suggestions = computed(() =>
@@ -267,23 +275,15 @@ const canRetry = computed(
           <span class="muted">这次评分失败了{{ teacher ? "，可以点「重新评分」" : "" }}</span>
         </template>
         <template v-else-if="shown && report">
-          <b class="headline">{{ caseHeadline(report) }}</b>
-          <!-- 没走对：AI 对着答案说的错在哪、怎么改，放在逐组结果前面（要改的框在左边图上标红） -->
-          <div v-if="!allPassed && (shown.aiFeedback || shown.aiSuggestions)" class="review">
-            <div v-if="shown.aiFeedback">
-              <b>哪里错了</b>
-              <p>{{ shown.aiFeedback }}</p>
-            </div>
-            <div v-if="shown.aiSuggestions">
-              <b>可以这样改</b>
-              <p>{{ shown.aiSuggestions }}</p>
-            </div>
-          </div>
-          <FlowchartCases v-model:selected="openCase" :report="report" />
-          <div v-if="allPassed && shown.aiSuggestions" class="note">
-            <b>还可以更好：</b>
-            <div>{{ shown.aiSuggestions }}</div>
-          </div>
+          <b class="headline">{{ allPassed ? "画对了" : "还没画对" }}</b>
+          <FlowchartNote
+            v-model:selected="openCase"
+            v-model:open="casesOpen"
+            :report="report"
+            :feedback="shown.aiFeedback"
+            :suggestions="shown.aiSuggestions"
+            compact
+          />
         </template>
         <template v-else-if="shown">
           <div v-for="[name, item] in criteria" :key="name" class="crit">
@@ -538,7 +538,7 @@ const canRetry = computed(
 }
 
 .headline {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 /* 要改的框：压过 useMermaid 里按框类型上的色（那边也是 !important） */
@@ -547,21 +547,6 @@ const canRetry = computed(
   fill: v-bind("tone('error').background") !important;
   stroke: v-bind("tone('error').solid") !important;
   stroke-width: 3px !important;
-}
-
-.review {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: v-bind("tone('error').background");
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.review p {
-  margin: 2px 0 0;
 }
 
 .score-box {

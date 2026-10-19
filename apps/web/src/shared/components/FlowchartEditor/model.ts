@@ -41,6 +41,8 @@ export interface Slot {
 export interface FlowHighlight {
   order: string[]
   bad: string | null
+  /** 标红那个框旁边的小标签（「要改这个框」）；不给就不画 */
+  label?: string
 }
 
 export const STEP_LABEL: Record<StepKind, string> = {

@@ -576,8 +576,20 @@ function setHighlight(next: FlowHighlight | null) {
 function nodeState(node: LaidNode) {
   if (!highlight.value) return ""
   if (node.id === highlight.value.bad) return "bad"
+  // 只标一个框（没点开哪一组）时别的框照常，不变淡
+  if (!highlight.value.order.length) return ""
   return stepNo.value.has(node.id) ? "onpath" : "dim"
 }
+
+/** 标红那个框旁边的标签，贴在框的右边；判断、循环右顶点外写着「否」，再让开一点 */
+const badTag = computed(() => {
+  const label = highlight.value?.label
+  const node = label && layout.value.nodes.find((item) => item.id === highlight.value?.bad)
+  if (!label || !node) return null
+  const w = label.length * 12 + 20
+  const gap = node.kind === "if" || node.kind === "while" ? 26 : 8
+  return { label, x: node.x + node.w + gap, y: node.y + node.h / 2 - 11, w }
+})
 
 /** 编号圆点的位置：方框贴在左上角，菱形挪到顶点右边（左边是「是」） */
 function badgeAt(node: LaidNode) {
@@ -739,6 +751,12 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
             </text>
           </g>
         </template>
+        <g v-if="badTag" class="bad-tag" aria-hidden="true">
+          <rect :x="badTag.x" :y="badTag.y" :width="badTag.w" height="22" rx="11" />
+          <text :x="badTag.x + badTag.w / 2" :y="badTag.y + 15" text-anchor="middle">
+            {{ badTag.label }}
+          </text>
+        </g>
       </svg>
 
       <button
@@ -937,6 +955,15 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   stroke: #d03050;
   stroke-width: 2.6;
   fill: rgba(208, 48, 80, 0.12);
+}
+
+.bad-tag rect {
+  fill: #d03050;
+}
+
+.bad-tag text {
+  font-size: 12px;
+  fill: #ffffff;
 }
 
 .badge circle {

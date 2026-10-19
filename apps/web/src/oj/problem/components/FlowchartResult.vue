@@ -8,9 +8,8 @@ import { useUserStore } from "shared/store/user"
 import { sortFlowchartCriteria } from "utils/constants"
 import { parseTime } from "utils/functions"
 import { mermaidOrder, signature } from "shared/components/FlowchartEditor/model"
-import FlowchartCases from "shared/components/FlowchartCases.vue"
-import { caseHeadline, caseReport } from "utils/flowchart"
-import { useTone } from "shared/composables/tone"
+import FlowchartNote from "shared/components/FlowchartNote.vue"
+import { caseReport } from "utils/flowchart"
 
 /**
  * 「结果」页签里流程图作业的那一块：AI 在评 / 评完了几分 / 历次分数 / 评语和改进建议。
@@ -40,7 +39,6 @@ watch(
 )
 const message = useMessage()
 const theme = useThemeVars()
-const tone = useTone()
 // 暗色主题的成功色是浅薄荷绿，上面的白字看不清
 const isDark = useDark()
 const passText = computed(() => (isDark.value ? "rgba(0, 0, 0, 0.85)" : "#fff"))
@@ -136,37 +134,47 @@ function loadToCanvas() {
 /** 2026-10 起的评法：逐组走一遍。老提交是 null，照旧显示四项分 */
 const report = computed(() => caseReport(detail.value?.aiCriteriaDetails))
 
-/** 点开的是哪一组；换一次提交就默认点开第一组没走对的（设计稿 FlowResFail） */
+/**
+ * 逐组数据默认收着、一组也不点开（设计稿 FlowNoteFail：学生不关心过了几组，先看哪里错、怎么改）。
+ * 换一次提交就收回去
+ */
 const selectedCase = ref<number | null>(null)
+const casesOpen = ref(false)
 watch(
-  () => [current.value?.id, report.value] as const,
-  ([, next]) => {
-    const firstWrong = next?.cases.findIndex((row) => !row.ok) ?? -1
-    selectedCase.value = firstWrong >= 0 ? firstWrong : null
+  () => current.value?.id,
+  () => {
+    selectedCase.value = null
+    casesOpen.value = false
   },
-  { immediate: true },
 )
 
 /**
- * 点开的那一组在画布上走过的路。AI 报的是 Mermaid 的框号（n3），按交上去那一版的结构对回
+ * 画布上标什么。没点开哪一组：只把要改的那个框标红、旁边写「要改这个框」，别的框照常；
+ * 点开了一组：亮出它走过的路。AI 报的是 Mermaid 的框号（n3），按交上去那一版的结构对回
  * 画布上的框 —— 所以只在画布还是那一版时亮，改过了就不亮（载回画布之后又能亮）
  */
 watch(
   () => [selectedCase.value, report.value, canvasSame.value, editor.value] as const,
   ([index, next, same, instance]) => {
     if (!instance) return
-    const row = index === null ? undefined : next?.cases[index]
-    if (!row || !same || !versionDoc.value) {
+    if (!next || !same || !versionDoc.value) {
       instance.setHighlight(null)
       return
     }
     const order = mermaidOrder(versionDoc.value)
-    const toStep = (id: string) => order[Number(id.slice(1))]
-    // 没走对的组标红 AI 指出的要改的框（错的根子），没有才退回程序找到的出结果的那个框
-    const bad = row.ok ? null : (next?.focus ?? row.wrongAt)
+    const toStep = (id: string | null) => (id ? (order[Number(id.slice(1))] ?? null) : null)
+    // 要改的框：AI 对着答案指出的（错的根子），没有才退回程序找到的第一处出错的框
+    const focus = next.focus ?? next.cases.find((row) => !row.ok)?.wrongAt ?? null
+    const row = index === null ? undefined : next.cases[index]
+    if (!row) {
+      const bad = toStep(focus)
+      instance.setHighlight(bad ? { order: [], bad, label: "要改这个框" } : null)
+      return
+    }
+    const bad = row.ok ? null : toStep(focus)
     instance.setHighlight({
       order: row.path.map(toStep).filter((id): id is string => !!id),
-      bad: bad ? (toStep(bad) ?? null) : null,
+      bad,
     })
   },
   // 切回「结果」页签时组件重新挂载，这些值早就齐了，不会再变一次
@@ -244,7 +252,9 @@ function goCode() {
       <!-- 设计稿 FlowResFail / FlowResPass：等级 + 几组走对，下面逐组 -->
       <div v-if="report" class="headline">
         <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
-        <span class="headline-text">{{ caseHeadline(report) }}</span>
+        <span class="headline-text">{{
+          report.passed === report.total ? "画对了" : "还没画对"
+        }}</span>
         <span v-if="isFlowchartPass(current.grade)" class="headline-note">这道题算做完了</span>
       </div>
       <div v-else class="score-line">
@@ -262,25 +272,23 @@ function goCode() {
       </n-flex>
 
       <template v-if="detail && report">
-        <!-- 没走对：AI 对着答案说的错在哪、怎么改，放在逐组结果前面（要改的框在画布上标红） -->
-        <div
-          v-if="report.passed < report.total && (detail.aiFeedback || detail.aiSuggestions)"
-          class="review"
+        <n-button
+          v-if="isFlowchartPass(current.grade) && canCode"
+          class="code-btn"
+          type="primary"
+          size="large"
+          @click="goCode"
         >
-          <div v-if="detail.aiFeedback">
-            <div class="review-title">哪里错了</div>
-            <p>{{ detail.aiFeedback }}</p>
-          </div>
-          <div v-if="detail.aiSuggestions">
-            <div class="review-title">可以这样改</div>
-            <p>{{ detail.aiSuggestions }}</p>
-          </div>
-        </div>
-        <FlowchartCases v-model:selected="selectedCase" :report="report" class="block" />
-        <div v-if="report.passed === report.total && detail.aiSuggestions" class="better">
-          <div class="better-title">还可以更好</div>
-          <p>{{ detail.aiSuggestions }}</p>
-        </div>
+          照着它写代码 →
+        </n-button>
+        <FlowchartNote
+          v-model:selected="selectedCase"
+          v-model:open="casesOpen"
+          :report="report"
+          :feedback="detail.aiFeedback"
+          :suggestions="detail.aiSuggestions"
+          class="block"
+        />
       </template>
 
       <template v-if="detail">
@@ -340,7 +348,7 @@ function goCode() {
 
         <div class="actions">
           <n-button
-            v-if="isFlowchartPass(current.grade) && canCode"
+            v-if="!report && isFlowchartPass(current.grade) && canCode"
             type="primary"
             size="large"
             @click="goCode"
@@ -573,40 +581,8 @@ function goCode() {
   margin-bottom: 12px;
 }
 
-.review {
-  margin: 0 0 14px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: v-bind("tone('error').background");
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.review-title {
-  font-weight: 600;
-}
-
-.review p {
-  margin: 2px 0 0;
-}
-
-.better {
+.code-btn {
   margin-bottom: 14px;
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.better-title {
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 4px;
-}
-
-.better p {
-  margin: 0;
 }
 
 /* 四项得分：两列，每项一条进度 */
