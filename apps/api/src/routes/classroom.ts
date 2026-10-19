@@ -21,6 +21,7 @@ import { getLoginWindow } from "../auth/session"
 import { presenceOf } from "../collab/state"
 import { db, schema } from "../db"
 import { failure, parseBody, success } from "../http"
+import { isAccepted } from "../judge/status"
 import {
   activityRows,
   classMemberIds,
@@ -455,7 +456,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   // 「来了几次」代码和流程图合起来数：那天只画了流程图的也算来过，和 recentDays 同一个口径
   const recentActivity = activityRows({ since: windowStart, users: userIds })
   const localDay = sql<string>`to_char(${localTime(recentActivity.createTime)}, 'YYYY-MM-DD')`
-  const [cells, lastSubmits, lastDrawn, attendance, drawn, latests, seen] = await Promise.all([
+  const [cells, lastSubmits, lastDrawn, attendance, drawn, todays, seen] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -548,16 +549,17 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           .groupBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId)
       : [],
     /**
-     * 每人每题今天最后一次代码提交：没做对的格子靠它点开讲错误、按错法归堆。
-     * 范围和 cells 一样（非比赛、布置的语言），只多一个「今天」
+     * 每人每题今天交的每一次代码，从早到晚。最后一次给没做对的格子点开讲错误、按错法归堆，
+     * 整串给做对了的格子看轨迹。范围和 cells 一样（非比赛、布置的语言），只多一个「今天」
      */
     ids.length && userIds.length
       ? db
-          .selectDistinctOn([schema.submission.userId, schema.submission.problemId], {
+          .select({
             userId: schema.submission.userId,
             problemId: schema.submission.problemId,
             id: schema.submission.id,
             result: schema.submission.result,
+            createTime: schema.submission.createTime,
             runtimeError: sql<
               StatisticInfo["runtime_error"] | null
             >`${schema.submission.statisticInfo}->'runtime_error'`,
@@ -575,15 +577,11 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
               lessonLanguageFilter(lesson.language),
             ),
           )
-          .orderBy(
-            schema.submission.userId,
-            schema.submission.problemId,
-            desc(schema.submission.createTime),
-          )
+          .orderBy(schema.submission.createTime)
       : [],
     seenToday(userIds),
   ])
-  const latestByKey = new Map(latests.map((row) => [`${row.userId}:${row.problemId}`, row]))
+  const todayByKey = Map.groupBy(todays, (row) => `${row.userId}:${row.problemId}`)
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
@@ -623,7 +621,12 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             const cell = cellByKey.get(key)
             const flow = drawnByKey.get(key)
             const acceptedAt = earliest(cell?.firstAcceptedAt, flow?.firstPassedAt)
-            const latest = acceptedAt ? undefined : latestByKey.get(key)
+            const today = todayByKey.get(key) ?? []
+            const latest = acceptedAt ? undefined : today.at(-1)
+            const firstTry =
+              acceptedAt && Date.parse(acceptedAt) >= Date.parse(start)
+                ? today.findIndex((row) => isAccepted(row.result))
+                : -1
             return {
               status: !cell && !flow ? "none" : acceptedAt ? "accepted" : "tried",
               attempts: (cell?.attempts ?? 0) + (flow?.attempts ?? 0),
@@ -638,6 +641,14 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
                     sampleCheck: latest.sampleCheck ?? undefined,
                   }
                 : null,
+              trail: acceptedAt
+                ? today.map((row) => ({
+                    id: row.id,
+                    result: row.result,
+                    createTime: row.createTime,
+                  }))
+                : [],
+              acceptedTry: firstTry >= 0 ? firstTry + 1 : null,
             }
           }),
           lastSubmitAt: lastByUser.get(student.userId) ?? null,

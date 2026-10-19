@@ -121,6 +121,13 @@ export const classBoardCellSchema = z.object({
       sampleCheck: statisticInfoSchema.shape.sample_check,
     })
     .nullable(),
+  /**
+   * 做对了的格子：今天交的每一次代码，从早到晚（范围和 latest 一样）。点格子看他是怎么一次次
+   * 做对的，停在哪一次看哪次的代码。没做对的为空 —— 那边点开是讲错误，靠 latest
+   */
+  trail: z.array(z.object({ id: z.string(), result: judgeStatusSchema, createTime: z.string() })),
+  /** 今天第几次代码提交做对的，1 = 一次就对；今天之前就做对了、今天没靠代码做对的为 null */
+  acceptedTry: z.number().int().nullable(),
 })
 
 export const classBoardStudentSchema = z.object({
