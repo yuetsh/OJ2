@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
-import { getClassBoard, setClassLesson } from "oj/api"
+import { getClassBoard } from "oj/api"
 import { useTone } from "shared/composables/tone"
 import { groupClassOptions } from "utils/classes"
 import UserName from "shared/components/UserName.vue"
@@ -9,13 +9,20 @@ import { useLeaveStudents } from "shared/composables/leaveStudents"
 import { useTeacherHelp } from "shared/composables/teacherHelp"
 import { useCollabStore } from "shared/store/collab"
 import { useConfigStore } from "shared/store/config"
-import type { LessonLanguage } from "@oj2/contract"
 import { errorMessage } from "utils/api"
 import { LANGUAGE_SHOW_VALUE } from "utils/constants"
 import { parseTime } from "utils/functions"
 import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from "utils/types"
 import ExplainModal, { type ExplainPerson } from "./components/ExplainModal.vue"
+import LeaveModal from "./components/LeaveModal.vue"
+import LessonForm from "./components/LessonForm.vue"
 import { errorKind, type ErrorKind } from "utils/errorKind"
+import {
+  cellStyle as cellStyleOf,
+  cellText,
+  cellTitle as cellTitleOf,
+  STUCK_ATTEMPTS,
+} from "./boardCells"
 
 /**
  * 课堂看板（老师，设计稿「课堂看板重设计」A+B）：这个班、今天、这节课的几道题 × 全班学生。
@@ -31,8 +38,6 @@ import { errorKind, type ErrorKind } from "utils/errorKind"
  * 悄悄留在框里，老师看的整个是别人的班。
  */
 
-/** 同一道题今天交了这么多次还没过，算卡住 */
-const STUCK_ATTEMPTS = 3
 const REFRESH_MS = 15_000
 
 const configStore = useConfigStore()
@@ -110,61 +115,15 @@ onUnmounted(pause)
 
 // ---------- 这节课的题：上课时当场填 ----------
 
-/**
- * 这份作业用什么语言做，跟着这一次布置走（用户定的：不是给班级定死的设置）。默认是这个班
- * 上一次布置时选的；选了之后看板和学生那边的「做完」都只认这个语言交对的
- */
-const lessonLanguage = ref<LessonLanguage>("Python")
-const LESSON_LANGUAGES: LessonLanguage[] = ["Python", "C", "C++", "SQL"]
-const languageOptions = LESSON_LANGUAGES.map((value) => ({
-  label: LANGUAGE_SHOW_VALUE[value],
-  value,
-}))
-const lessonInput = ref("")
 const editing = ref(false)
-const saving = ref(false)
 
 /** 还没有题（没布置、今天也推断不出来）：填题号的框就是这页最大的东西 */
 const needLesson = computed(() => !!board.value?.className && !board.value.problems.length)
 
-// 换了班要把输入框换成那个班今天布置的题、布置时选的语言（15 秒一次的刷新不动它们）
-watch(
-  () => [board.value?.className, board.value?.source] as const,
-  () => resetLessonInput(),
-)
-
-function resetLessonInput() {
-  lessonInput.value =
-    board.value?.source === "teacher"
-      ? board.value.problems.map((problem) => problem.problemDisplayId).join(" ")
-      : ""
-  lessonLanguage.value = board.value?.language ?? board.value?.lastLanguage ?? "Python"
-}
-
-function startEdit() {
-  resetLessonInput()
-  // 推断出来的题也带进框里，老师多半只是确认一下
-  if (!lessonInput.value && board.value?.problems.length) {
-    lessonInput.value = board.value.problems.map((problem) => problem.problemDisplayId).join(" ")
-  }
-  editing.value = true
-}
-
-async function saveLesson() {
-  if (!className.value) return
-  const ids = lessonInput.value.split(/[\s,，、;；]+/).filter(Boolean)
-  saving.value = true
-  try {
-    await setClassLesson(className.value, ids, ids.length ? lessonLanguage.value : null)
-    message.success(ids.length ? "已布置，学生首页会显示这几道题" : "已清掉")
-    editing.value = false
-    selectedId.value = null
-    await load()
-  } catch (error) {
-    message.error(errorMessage(error))
-  } finally {
-    saving.value = false
-  }
+async function lessonSaved() {
+  editing.value = false
+  selectedId.value = null
+  await load()
 }
 
 // ---------- 分组与排序 ----------
@@ -265,32 +224,11 @@ watchEffect(() => {
 const leaveDialog = ref(false)
 /** 弹框里能勾的：今天还没交过的（刚上课时就是全班），按名字排 */
 const leaveCandidates = computed(() => boardStudents.value.filter(canLeave).sort(byName))
-/** 今天没上过线的分在前面一堆：请假的人基本在这里面，剩下的是和同桌共用电脑的 */
-const leaveSections = computed(() =>
-  [
-    { label: "今天没上线", students: leaveCandidates.value.filter(unseen) },
-    {
-      label: "今天上过线",
-      students: leaveCandidates.value.filter((student) => !unseen(student)),
-    },
-  ].filter((section) => section.students.length),
-)
-const leaveSelected = ref<string[]>([])
-function selectAll(list: ClassBoardStudent[]) {
-  leaveSelected.value = [
-    ...new Set([...leaveSelected.value, ...list.map((student) => student.username)]),
-  ]
-}
-function openLeaveDialog() {
-  leaveSelected.value = leaveStudents.value.map((student) => student.username)
-  leaveDialog.value = true
-}
-function saveLeave() {
+function saveLeave(selected: string[]) {
   setLeave(
     boardStudents.value.map((student) => student.username),
-    leaveSelected.value,
+    selected,
   )
-  leaveDialog.value = false
 }
 
 function byName(a: ClassBoardStudent, b: ClassBoardStudent) {
@@ -429,46 +367,16 @@ function openExplain(problemIndex: number, userId: number) {
   explainShow.value = true
 }
 
-// ---------- 格子 ----------
+// ---------- 格子（显示规则在 boardCells.ts） ----------
 
-/** 今天之前就通过了的，颜色淡一档 */
-function acceptedToday(cell: ClassBoardCell) {
-  return !!cell.acceptedAt && parseTime(cell.acceptedAt, "YYYY-MM-DD") === board.value?.day
-}
-
-function cellText(cell: ClassBoardCell) {
-  if (cell.status === "accepted") return "✓"
-  if (cell.status === "tried") return cell.attempts ? `✗ ${cell.attempts}` : "✗"
-  return ""
-}
-
-function cellStyle(cell: ClassBoardCell) {
-  if (cell.status === "accepted") {
-    const t = tone("success")
-    return acceptedToday(cell)
-      ? { background: t.background, color: t.color }
-      : { background: t.background, color: t.color, opacity: 0.5 }
-  }
-  if (cell.status === "tried") {
-    if (cell.attempts >= STUCK_ATTEMPTS) {
-      return { background: theme.value.errorColor, color: "#ffffff" }
-    }
-    const t = tone("warning")
-    return { background: t.background, color: t.color }
-  }
-  return { background: theme.value.actionColor }
-}
-
-function cellTitle(cell: ClassBoardCell, student: ClassBoardStudent) {
-  if (cell.status === "accepted") {
-    return acceptedToday(cell) ? `${parseTime(cell.acceptedAt!, "HH:mm")} 做对` : "以前就做对了"
-  }
-  if (cell.status === "tried") {
-    if (cell.latest) return `讲讲 ${student.username} 这道题的错`
-    return cell.attempts ? `今天画了 ${cell.flowchartAttempts} 张流程图` : "以前交过，没做对"
-  }
-  return ""
-}
+const cellColors = computed(() => ({
+  tone,
+  errorColor: theme.value.errorColor,
+  actionColor: theme.value.actionColor,
+}))
+const cellStyle = (cell: ClassBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value)
+const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) =>
+  cellTitleOf(cell, student, board.value?.day)
 
 /**
  * 点格子 / 名字到提交列表看他今天交的。新标签打开：看板一般开着不关，别把它顶掉。
@@ -521,23 +429,15 @@ function lastText(student: ClassBoardStudent) {
       />
 
       <!-- 这节课的题：当场填，填完收成一排小块 -->
-      <div v-if="editing" class="lesson-edit">
-        <n-select
-          v-model:value="lessonLanguage"
-          :options="languageOptions"
-          aria-label="用什么语言做"
-          class="lang-select"
-        />
-        <n-input
-          v-model:value="lessonInput"
-          placeholder="这节课的题号，用空格隔开"
-          clearable
-          autofocus
-          @keyup.enter="saveLesson"
-        />
-        <n-button type="primary" :loading="saving" @click="saveLesson">布置</n-button>
-        <n-button @click="editing = false">取消</n-button>
-      </div>
+      <LessonForm
+        v-if="editing && board && className"
+        :board="board"
+        :class-name="className"
+        variant="inline"
+        class="lesson-edit"
+        @saved="lessonSaved"
+        @cancel="editing = false"
+      />
       <div v-else-if="board?.problems.length" class="lesson">
         <span class="lesson-label">{{ board.source === "teacher" ? "这节课" : "今天在做" }}</span>
         <span v-if="board.language" class="chip lang">{{
@@ -549,7 +449,7 @@ function lastText(student: ClassBoardStudent) {
         <span v-if="board.assignedAt" class="assigned">
           {{ parseTime(board.assignedAt, "HH:mm") }} 布置
         </span>
-        <n-button text class="edit" @click="startEdit">
+        <n-button text class="edit" @click="editing = true">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
           {{ board.source === "teacher" ? "改" : "布置" }}
         </n-button>
@@ -560,7 +460,7 @@ function lastText(student: ClassBoardStudent) {
         v-if="board?.className"
         :type="leaveStudents.length ? 'warning' : 'default'"
         :secondary="!!leaveStudents.length"
-        @click="openLeaveDialog"
+        @click="leaveDialog = true"
       >
         {{ leaveStudents.length ? `请假 ${leaveStudents.length} 人` : "请假" }}
       </n-button>
@@ -580,25 +480,14 @@ function lastText(student: ClassBoardStudent) {
       <!-- 刚上课还没有题：填题号的框是这页最大的东西 -->
       <section v-if="needLesson" class="start">
         <div class="start-title">这节课做哪几道题？</div>
-        <div class="start-row">
-          <n-select
-            v-model:value="lessonLanguage"
-            :options="languageOptions"
-            aria-label="用什么语言做"
-            size="large"
-            class="lang-select"
-          />
-          <n-input
-            v-model:value="lessonInput"
-            size="large"
-            placeholder="输入题号，用空格隔开"
-            class="start-input"
-            @keyup.enter="saveLesson"
-          />
-          <n-button type="primary" size="large" :loading="saving" @click="saveLesson">
-            布置
-          </n-button>
-        </div>
+        <LessonForm
+          v-if="className"
+          :board="board"
+          :class-name="className"
+          variant="start"
+          class="start-row"
+          @saved="lessonSaved"
+        />
       </section>
 
       <template v-else>
@@ -834,57 +723,12 @@ function lastText(student: ClassBoardStudent) {
       :people="explainPeople"
     />
 
-    <n-modal
+    <LeaveModal
       v-model:show="leaveDialog"
-      preset="card"
-      :title="
-        leaveCandidates.length
-          ? `今天还没交过的 ${leaveCandidates.length} 人里，谁请假了？`
-          : '今天全班都交过题了'
-      "
-      style="width: 640px; max-width: calc(100vw - 32px)"
-    >
-      <n-checkbox-group v-if="leaveCandidates.length" v-model:value="leaveSelected">
-        <div v-for="section in leaveSections" :key="section.label" class="leave-section">
-          <div v-if="leaveSections.length > 1 || unseen(section.students[0])" class="leave-head">
-            {{ section.label }} {{ section.students.length }} 人
-            <n-button
-              v-if="unseen(section.students[0])"
-              text
-              type="primary"
-              :disabled="
-                section.students.every((student) => leaveSelected.includes(student.username))
-              "
-              @click="selectAll(section.students)"
-            >
-              全勾上
-            </n-button>
-          </div>
-          <div class="leave-grid">
-            <n-checkbox
-              v-for="student in section.students"
-              :key="student.userId"
-              :value="student.username"
-              :label="student.username"
-              class="leave-option"
-            />
-          </div>
-        </div>
-      </n-checkbox-group>
-      <n-text v-else depth="3">请假的人一定是没交过题的，现在没有人可以标。</n-text>
-      <template #footer>
-        <n-flex align="center" :wrap="false">
-          <n-text depth="3" class="meta" style="flex-grow: 1">
-            已选 {{ leaveSelected.length }} 人 · 只记在这台电脑上，今天有效
-          </n-text>
-          <n-button :disabled="!leaveSelected.length" @click="leaveSelected = []">
-            全部取消
-          </n-button>
-          <n-button @click="leaveDialog = false">取消</n-button>
-          <n-button type="primary" @click="saveLeave">确定</n-button>
-        </n-flex>
-      </template>
-    </n-modal>
+      :candidates="leaveCandidates"
+      :current="leaveStudents.map((student) => student.username)"
+      @save="saveLeave"
+    />
   </div>
 </template>
 
@@ -922,11 +766,6 @@ function lastText(student: ClassBoardStudent) {
 
 .class-select {
   width: 160px;
-}
-
-.lang-select {
-  width: 110px;
-  flex-shrink: 0;
 }
 
 .lesson,
@@ -1002,11 +841,6 @@ function lastText(student: ClassBoardStudent) {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.start-input {
-  flex: 1 1 0;
-  font-size: 18px;
 }
 
 /* ---------- 题卡片 ---------- */
@@ -1396,32 +1230,6 @@ a.cell {
   color: v-bind("tone('info').color");
 }
 
-.leave-section + .leave-section {
-  margin-top: 18px;
-}
-
-.leave-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-.leave-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px 8px;
-}
-
-.leave-option {
-  font-size: 15px;
-}
-
-.meta {
-  font-size: var(--oj-fs-sec);
-}
-
 /* ---------- 手机 ---------- */
 
 @media (max-width: 768px) {
@@ -1457,11 +1265,6 @@ a.cell {
 
   .start-row {
     flex-wrap: wrap;
-  }
-
-  .start-input {
-    flex-basis: 100%;
-    order: -1;
   }
 
   .grid .name {
