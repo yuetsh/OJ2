@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouteQuery } from "@vueuse/router"
-import type { GradeTrendProblem } from "utils/types"
+import type { GradeTrend } from "utils/types"
 import { getGradeTrend } from "admin/api"
 import "oj/learn/learn.css"
 
@@ -9,62 +9,27 @@ import "oj/learn/learn.css"
  * 逐题比「一次就对」，比往届差的排前面。
  *
  * 按届（班号前两位）比而不是按自然年：一个学年里同时有两三届在做题，按年切会把它们搅在一起。
- * 往届是把更早几届的人合在一起算（人多的届分量大），不是几个百分比再平均。
+ * 两边按同期比、每边至少几个人、默认挑哪届，都在后端（见 /problem-analytics/grades）。
  * 比输赢按显示出来的整数百分比，差 2 个点以内算差不多。
  */
 const router = useRouter()
 
-/** 每边至少这么多人做过，这道题才拿来比 */
+/** 和后端的 GRADE_MIN_USERS 一致，只用在空状态的文案里 */
 const MIN_USERS = 20
 const SAME = 2
 const PAST = "past"
 
-const problems = ref<GradeTrendProblem[]>([])
+const data = ref<GradeTrend | null>(null)
 const loading = ref(false)
 const grade = useRouteQuery<string>("grade", "", { mode: "replace" })
 const compare = useRouteQuery<string>("compare", PAST, { mode: "replace" })
 
-/** 有数据的届，新的在前 */
-const grades = computed(() =>
-  [...new Set(problems.value.flatMap((row) => row.grades.map((cell) => cell.grade)))].sort((a, b) =>
-    b.localeCompare(a),
-  ),
-)
-
-function side(row: GradeTrendProblem, pick: (g: string) => boolean) {
-  return row.grades
-    .filter((cell) => pick(cell.grade))
-    .reduce(
-      (sum, cell) => ({ users: sum.users + cell.users, firstTry: sum.firstTry + cell.firstTry }),
-      {
-        users: 0,
-        firstTry: 0,
-      },
-    )
-}
+const grades = computed(() => data.value?.grades ?? [])
+const selected = computed(() => data.value?.grade ?? "")
 
 function rate(part: number, whole: number) {
   return whole ? Math.round((part / whole) * 100) : 0
 }
-
-function compareRows(current: string, other: string) {
-  const isOther = other === PAST ? (g: string) => g < current : (g: string) => g === other
-  return problems.value
-    .map((row) => {
-      const mine = side(row, (g) => g === current)
-      const theirs = side(row, isOther)
-      const now = rate(mine.firstTry, mine.users)
-      const before = rate(theirs.firstTry, theirs.users)
-      return { row, mine, theirs, now, before, delta: now - before }
-    })
-    .filter((item) => item.mine.users >= MIN_USERS && item.theirs.users >= MIN_USERS)
-}
-
-/** 没选就挑最新的一届里能和往届比上至少 5 道题的 */
-const selected = computed(() => {
-  if (grades.value.includes(grade.value)) return grade.value
-  return grades.value.find((g) => compareRows(g, PAST).length >= 5) ?? grades.value[0] ?? ""
-})
 
 const pastGrades = computed(() => grades.value.filter((g) => g < selected.value))
 const pastLabel = computed(() => {
@@ -72,10 +37,11 @@ const pastLabel = computed(() => {
   if (!list.length) return "往届"
   return list.length === 1 ? `往届（${list[0]} 级）` : `往届（${list.at(-1)}–${list[0]} 级）`
 })
+const otherValue = computed(() => data.value?.compare ?? PAST)
 const otherLabel = computed(() =>
-  compare.value === PAST ? pastLabel.value : `${compare.value} 级`,
+  otherValue.value === PAST ? pastLabel.value : `${otherValue.value} 级`,
 )
-const shortOther = computed(() => (compare.value === PAST ? "往届" : `${compare.value} 级`))
+const shortOther = computed(() => (otherValue.value === PAST ? "往届" : `${otherValue.value} 级`))
 
 const gradeOptions = computed(() => grades.value.map((g) => ({ label: `${g} 级`, value: g })))
 const compareOptions = computed(() => [
@@ -83,7 +49,13 @@ const compareOptions = computed(() => [
   ...grades.value.filter((g) => g !== selected.value).map((g) => ({ label: `${g} 级`, value: g })),
 ])
 
-const rows = computed(() => (selected.value ? compareRows(selected.value, compare.value) : []))
+const rows = computed(() =>
+  (data.value?.problems ?? []).map((row) => {
+    const now = rate(row.mine.firstTry, row.mine.users)
+    const before = rate(row.theirs.firstTry, row.theirs.users)
+    return { row, mine: row.mine, theirs: row.theirs, now, before, delta: now - before }
+  }),
+)
 const worse = computed(() =>
   rows.value.filter((item) => item.delta < -SAME).sort((a, b) => a.delta - b.delta),
 )
@@ -131,14 +103,22 @@ function pickGrade(value: string) {
   if (compare.value === value) compare.value = PAST
 }
 
-onMounted(async () => {
+let token = 0
+async function load() {
+  const current = ++token
   loading.value = true
   try {
-    problems.value = await getGradeTrend()
+    const result = await getGradeTrend({
+      grade: grade.value || undefined,
+      compare: compare.value === PAST ? undefined : compare.value,
+    })
+    if (current === token) data.value = result
   } finally {
-    loading.value = false
+    if (current === token) loading.value = false
   }
-})
+}
+
+watch([grade, compare], load, { immediate: true })
 </script>
 
 <template>
@@ -155,7 +135,7 @@ onMounted(async () => {
       />
       <span class="muted">和</span>
       <n-select
-        :value="compare"
+        :value="otherValue"
         :options="compareOptions"
         class="compare-select"
         @update:value="(value: string) => (compare = value)"
@@ -170,7 +150,11 @@ onMounted(async () => {
             <div class="value num">{{ rows.length }}<span class="unit"> 道</span></div>
           </div>
           <div class="stat">
-            <div class="label">一次就对</div>
+            <div class="label">
+              一次就对<template v-if="data?.days !== null">
+                · 各自开始做题的头 {{ data?.days }} 天</template
+              >
+            </div>
             <div class="value num">
               {{ summary.now }}%<span class="unit"> / {{ shortOther }} {{ summary.before }}%</span>
             </div>

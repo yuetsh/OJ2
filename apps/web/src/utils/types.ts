@@ -330,7 +330,7 @@ export type {
   StuckProblem,
   StuckProblemDetail,
   StuckStudent,
-  GradeTrendProblem,
+  GradeTrend,
   LearnBoard,
   LearnBoardStudent,
   LearnExerciseProgress,

@@ -50,7 +50,7 @@ import type {
   AdminAiReportList,
   StuckProblem,
   StuckProblemDetail,
-  GradeTrendProblem,
+  GradeTrend,
   LearnBoard,
   LearnExerciseProgressList,
   LearnExerciseAttemptList,
@@ -768,8 +768,8 @@ export function getLearnStudent(userId: number, params: { type: "python" | "c" }
   return api.get<LearnStudentDetail>(`admin/learn-analytics/students/${userId}`, { params })
 }
 
-export function getGradeTrend() {
-  return api.get<GradeTrendProblem[]>("admin/problem-analytics/grades")
+export function getGradeTrend(params: { grade?: string; compare?: string }) {
+  return api.get<GradeTrend>("admin/problem-analytics/grades", { params })
 }
 
 // AI 学习分析报告

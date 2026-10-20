@@ -647,13 +647,27 @@ export const stuckProblemDetailSchema = z.object({
   ),
 })
 
-/** 年度趋势：一道题在各届（班号前两位）的「一次就对」，只给至少 5 人做过的格子 */
-export const gradeTrendProblemSchema = z.object({
-  id: z.number().int(),
-  displayId: z.string(),
-  title: z.string(),
-  grades: z.array(
-    z.object({ grade: z.string(), users: z.number().int(), firstTry: z.number().int() }),
+const gradeTrendSideSchema = z.object({ users: z.number().int(), firstTry: z.number().int() })
+
+/**
+ * 年度趋势：选中的一届（grade）和往届或另一届（compare）在两边都做过的题上逐题比「一次就对」。
+ * `days` 是同期窗口：两边都只算「第一次交这道题时，离他自己第一次交题不超过这么多天」的人题对；
+ * 两边的数据都没超出窗口时为 null（= 全部）。
+ */
+export const gradeTrendSchema = z.object({
+  /** 有数据的届，新的在前 */
+  grades: z.array(z.string()),
+  grade: z.string(),
+  compare: z.string(),
+  days: z.number().int().nullable(),
+  problems: z.array(
+    z.object({
+      id: z.number().int(),
+      displayId: z.string(),
+      title: z.string(),
+      mine: gradeTrendSideSchema,
+      theirs: gradeTrendSideSchema,
+    }),
   ),
 })
 
@@ -1149,7 +1163,7 @@ export type AdminAiReportList = z.infer<typeof adminAiReportListSchema>
 export type StuckProblem = z.infer<typeof stuckProblemSchema>
 export type StuckStudent = z.infer<typeof stuckStudentSchema>
 export type StuckProblemDetail = z.infer<typeof stuckProblemDetailSchema>
-export type GradeTrendProblem = z.infer<typeof gradeTrendProblemSchema>
+export type GradeTrend = z.infer<typeof gradeTrendSchema>
 export type LearnBoard = z.infer<typeof learnBoardSchema>
 export type LearnBoardStudent = z.infer<typeof learnBoardStudentSchema>
 export type LearnExerciseProgress = z.infer<typeof learnExerciseProgressSchema>

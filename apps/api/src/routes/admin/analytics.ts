@@ -20,7 +20,7 @@ import {
   STUDENT_ROLES,
   type StuckProblem,
   type StuckProblemDetail,
-  type GradeTrendProblem,
+  type GradeTrend,
 } from "@oj2/contract"
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm"
 import { Hono } from "hono"
@@ -243,45 +243,125 @@ adminAnalyticsRoutes.get("/problem-analytics/stuck/:id", requireTeacher, async (
 
 // ---------------------------------------------------------------- 年度趋势：这届和往届比
 
-/** 一个格子（题 × 届）至少这么多人做过才给，再少的前端也不会拿来比 */
-const GRADE_CELL_MIN_USERS = 5
+/** 每边至少这么多人做过，这道题才拿来比 */
+const GRADE_MIN_USERS = 20
+/** 没指定届时，挑最新一届里能和往届比上这么多道题的 */
+const GRADE_DEFAULT_MIN_PROBLEMS = 5
+const PAST = "past"
+
+type GradeSide = GradeTrend["problems"][number]["mine"]
 
 /**
- * 每道题每一届的「一次就对」。届 = 班号前两位（253 → 25 级），没有班级或班号不是数字的不算。
- * 「第一次交」按这个人在这道题上的全部历史算，和卡点同一个口径。比哪届、门槛多少都在前端，
- * 换选项不用再取一遍。
+ * 选一届，和往届（更早几届合在一起，人多的届分量大）或另一届，逐题比「一次就对」。
+ * 届 = 班号前两位（253 → 25 级），没有班级或班号不是数字的不算。
+ *
+ * **按同期比**：每个人以自己第一次交题为起点，两边都只算第一次交这道题时离起点不超过
+ * N 天的人题对，N = 两边里学得最短的那届已经学了多久（那届一半人开始做题到现在的天数）。
+ * 不这么卡的话，刚学一个月的 25 级会和学了一年多回头做同一道题的 24 级比 —— 本地数据里
+ * 同期两边 73% / 75%，全部记录一比成了 73% / 82%。起点按人不按日历：各届开始做题的时间
+ * 不一样（23 级入学就做、25 级第二年才做），对「去年同期」是对不上的。
  */
 adminAnalyticsRoutes.get("/problem-analytics/grades", requireTeacher, async (c) => {
-  const rows = await db.execute<{
-    id: number
-    display_id: string
-    title: string
-    grade: string
-    users: number
-    first_try: number
-  }>(sql`
-    with s as (${studentSubmissions([sql`u.class_name ~ '^[0-9]{3,}$'`])}),
-    pairs as (
-      select problem_id, left(min(class_name), 2) as grade,
-        bool_or(rn = 1 and result in (${ACCEPTED})) as first_try
-      from s group by user_id, problem_id
-    )
-    select p.id, p._id as display_id, p.title, pairs.grade,
-      count(*)::int as users, count(*) filter (where first_try)::int as first_try
-    from pairs join ${schema.problem} p on p.id = pairs.problem_id
-    group by p.id, pairs.grade
-    having count(*) >= ${GRADE_CELL_MIN_USERS}
-  `)
-  const problems = new Map<number, GradeTrendProblem>()
-  for (const row of rows) {
-    const problem = problems.get(row.id) ?? {
-      id: row.id,
-      displayId: row.display_id,
-      title: row.title,
-      grades: [],
+  const [cells, starts] = await Promise.all([
+    db.execute<{
+      problem_id: number
+      grade: string
+      days: number
+      users: number
+      first_try: number
+    }>(sql`
+      with s as (${studentSubmissions([sql`u.class_name ~ '^[0-9]{3,}$'`])}),
+      starts as (select user_id, min(create_time) as started_at from s group by user_id),
+      pairs as (
+        select problem_id, left(min(class_name), 2) as grade,
+          floor(extract(epoch from min(create_time) - min(started_at)) / 86400)::int as days,
+          bool_or(rn = 1 and result in (${ACCEPTED})) as first_try
+        from s join starts using (user_id)
+        group by user_id, problem_id
+      )
+      select problem_id, grade, days, count(*)::int as users,
+        count(*) filter (where first_try)::int as first_try
+      from pairs group by 1, 2, 3
+    `),
+    // 每届学了多久：一半人开始做题到现在的天数（几个提前注册的人拉不动它）
+    db.execute<{ grade: string; days: number }>(sql`
+      with starts as (
+        select left(min(u.class_name), 2) as grade, min(s.create_time) as started_at
+        from ${schema.submission} s join ${schema.user} u on u.id = s.user_id
+        where s.contest_id is null and s.result not in (${NOT_COUNTED})
+          and u.admin_type in (${STUDENTS}) and u.class_name ~ '^[0-9]{3,}$'
+        group by s.user_id
+      )
+      select grade, floor(extract(epoch from now()
+          - percentile_disc(0.5) within group (order by started_at)) / 86400)::int as days
+      from starts group by grade
+    `),
+  ])
+  const studied = new Map(starts.map((row) => [row.grade, row.days]))
+  const grades = [...new Set(cells.map((cell) => cell.grade))].sort((a, b) => b.localeCompare(a))
+
+  function compare(grade: string, other: string) {
+    const isOther = other === PAST ? (g: string) => g < grade : (g: string) => g === other
+    const involved = grades.filter((g) => g === grade || isOther(g))
+    const limit = Math.min(...involved.map((g) => studied.get(g) ?? Infinity))
+    const sides = new Map<number, { mine: GradeSide; theirs: GradeSide }>()
+    let trimmed = false
+    for (const cell of cells) {
+      const mine = cell.grade === grade
+      if (!mine && !isOther(cell.grade)) continue
+      if (cell.days > limit) {
+        trimmed = true
+        continue
+      }
+      const entry = sides.get(cell.problem_id) ?? {
+        mine: { users: 0, firstTry: 0 },
+        theirs: { users: 0, firstTry: 0 },
+      }
+      const side = mine ? entry.mine : entry.theirs
+      side.users += cell.users
+      side.firstTry += cell.first_try
+      sides.set(cell.problem_id, entry)
     }
-    problem.grades.push({ grade: row.grade, users: row.users, firstTry: row.first_try })
-    problems.set(row.id, problem)
+    const problems = [...sides]
+      .filter(([, e]) => e.mine.users >= GRADE_MIN_USERS && e.theirs.users >= GRADE_MIN_USERS)
+      .map(([id, e]) => ({ id, ...e }))
+    return { days: trimmed ? limit : null, problems }
   }
-  return success(c, [...problems.values()] satisfies GradeTrendProblem[])
+
+  const asked = c.req.query("grade") ?? ""
+  const grade = grades.includes(asked)
+    ? asked
+    : (grades.find((g) => compare(g, PAST).problems.length >= GRADE_DEFAULT_MIN_PROBLEMS) ??
+      grades[0] ??
+      "")
+  const askedCompare = c.req.query("compare") ?? PAST
+  const other = askedCompare !== grade && grades.includes(askedCompare) ? askedCompare : PAST
+  const result = grade ? compare(grade, other) : { days: null, problems: [] }
+
+  const titles = result.problems.length
+    ? await db
+        .select({
+          id: schema.problem.id,
+          displayId: schema.problem.displayId,
+          title: schema.problem.title,
+        })
+        .from(schema.problem)
+        .where(
+          inArray(
+            schema.problem.id,
+            result.problems.map((row) => row.id),
+          ),
+        )
+    : []
+  const byId = new Map(titles.map((row) => [row.id, row]))
+  return success(c, {
+    grades,
+    grade,
+    compare: other,
+    days: result.days,
+    problems: result.problems.flatMap((row) => {
+      const problem = byId.get(row.id)
+      return problem ? [{ ...problem, mine: row.mine, theirs: row.theirs }] : []
+    }),
+  } satisfies GradeTrend)
 })
