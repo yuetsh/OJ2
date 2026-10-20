@@ -9,7 +9,7 @@ import { NaiveUiResolver } from "unplugin-vue-components/resolvers"
 // 但比 vite 8 的默认构建 target（chrome111）低。所以这个插件必须留着：它同时管两件事
 // —— 把 build.target 压到 chrome105/es2020，再给现代产物补 core-js 的 API polyfill。
 //
-// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 50 项，抄下来写死：自动探测要
+// 下面这份清单是 `modernPolyfills: true` 自动探测出来的 49 项，抄下来写死：自动探测要
 // 对每个产物跑一遍 Babel 扫描，构建从 3 秒涨到 12 秒。**升级前端依赖后重新审计一次**：
 //   临时把下面的 modernPolyfills 改成 true，再 DEBUG=vite:legacy bun run build
 //   （写死清单时它只回显这份清单，不会重新探测）
@@ -60,7 +60,6 @@ const polyfills = [
   "es.weak-map.get-or-insert-computed",
   "esnext.array.group",
   "web.dom-exception.stack",
-  "web.immediate",
   "web.url-search-params.delete",
   "web.url-search-params.has",
   "web.url-search-params.size",
@@ -125,14 +124,6 @@ export default defineConfig(() => {
       // 别名（utils / oj / admin / shared）只在 tsconfig.app.json 的 paths 写一份，
       // 这里直接读它。tsconfig.json 是 references 空壳也没关系，会顺着找过去（实测）
       tsconfigPaths: true,
-    },
-    build: {
-      // 超过 500 kB 的 chunk 只有懒加载的 wangeditor（后台富文本，TextEditor-*.js），
-      // 640 kB 上下。默认阈值下这条警告每次构建都在报，真涨了反而没人看，所以抬到比它
-      // 略高。首屏入口 index-*.js 在 175 kB 左右。
-      // （原来还有 Python 语法检查用的 skulpt、mermaid 的 @mermaid-js/parser，前者挪到
-      // 服务端的 CPython、后者换成 pele 之后都没了）
-      chunkSizeWarningLimit: 1000,
     },
     server: {
       port: 5173,

@@ -103,6 +103,12 @@ onKeyStroke("Escape", () => {
   margin: 0.25em 0;
 }
 
+/* 后台富文本（Tiptap）存的表格，格子里的字包在 <p> 里；不收掉边距，每行都被撑高一截 */
+.oj-markdown td > p,
+.oj-markdown th > p {
+  margin: 0;
+}
+
 .oj-markdown a {
   color: v-bind("theme.primaryColor");
   text-decoration: none;

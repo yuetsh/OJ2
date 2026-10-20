@@ -1530,10 +1530,7 @@ onMounted(async () => {
   font-size: 13px;
 }
 
-/*
- * align-items: start 不能省：wangEditor 给内容区写死了 height: 100%，格子把 .field 拉伸成
- * 确定高度之后这个 100% 就按外框算，工具栏的高度被挤出去，编辑框盖到下面的知识点那行上
- */
+/* 输入、输出两格各按自己的内容长高，不互相拉齐 */
 .io {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1710,16 +1707,6 @@ onMounted(async () => {
 
   .io {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* 老题面里的图片带着写死的像素宽（有 1118px 的），把整页撑出横向滚动 */
-  .card :deep(.w-e-image-container) {
-    max-width: 100%;
-    height: auto !important;
-  }
-
-  .card :deep(.w-e-image-container img) {
-    height: auto !important;
   }
 
   .inlineRow {

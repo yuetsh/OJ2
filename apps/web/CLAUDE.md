@@ -168,6 +168,10 @@ Naive 的日期选择器按浏览器本地时区渲染、没有 `timezone` 属�
 - `utils/functions.ts` — `parseTime` / `zonedParts` / `zonedYear`（东八区时间口径，见上）、
   `duration`、压缩与剪贴板等杂项
 - `utils/judge.ts` — Judge-related utilities
+- `shared/richText.ts` — 后台富文本（`shared/components/TextEditor.vue`，Tiptap）的扩展配置。
+  库里是 wangEditor 时代的 HTML，Tiptap 认不出的东西打开再保存就悄悄没了 —— **动扩展之前
+  拿全量存量内容做一遍往返比对**（HTML → Tiptap → HTML，再过 markdown-it 比学生看到的），
+  图片尺寸、缩进那两个补丁就是这么比出来的
 
 ### Environment Variables
 
