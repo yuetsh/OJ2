@@ -172,6 +172,8 @@ export const classBoardSchema = z.object({
   language: lessonLanguageSchema,
   /** 今天第一次布置的时刻，之后改题不变；推断出来的课为 null */
   assignedAt: z.string().nullable(),
+  /** 第一次布置的老师（真名，没有真名用用户名）；推断出来的课为 null */
+  assignedBy: z.string().nullable(),
   /** 这个班最近一次布置选的语言（含今天），给语言下拉当默认值；从没选过为 null */
   lastLanguage: lessonLanguageSchema,
   problems: z.array(classBoardProblemSchema),
@@ -210,6 +212,8 @@ export const classTodaySchema = z.object({
       source: z.enum(["teacher", "inferred"]).nullable(),
       /** 老师布置的时刻；推断出来的为 null */
       assignedAt: z.string().nullable(),
+      /** 布置的老师；推断出来的为 null */
+      assignedBy: z.string().nullable(),
       problems: z.array(
         z.object({
           problemDisplayId: z.string(),

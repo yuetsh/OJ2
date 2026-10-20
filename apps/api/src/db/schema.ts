@@ -1431,6 +1431,7 @@ export const classLesson = pgTable(
      * 没有它。写入侧在 PUT /classroom/lesson 按 lessonLanguageSchema 校验过
      */
     language: text().$type<LessonLanguage>(),
+    /** 这天第一次布置的老师，别的老师「改」也不换（和 createdAt 一样）。看板上写「HH:mm 谁 布置」 */
     createdBy: integer("created_by").notNull(),
     /**
      * 这天第一次布置的时刻，之后「改」只动 updatedAt。清掉（删行）再布置算重新开始。

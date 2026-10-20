@@ -53,7 +53,7 @@ function stateOf(row: ClassRow) {
 function metaOf(row: ClassRow) {
   const parts = [
     row.source === "teacher" && row.assignedAt
-      ? `${parseTime(row.assignedAt, "HH:mm")} 布置了 ${row.problems.length} 道`
+      ? `${parseTime(row.assignedAt, "HH:mm")} ${row.assignedBy} 布置了 ${row.problems.length} 道`
       : `做了 ${row.problems.length} 道`,
   ]
   if (row.activeCount) parts.push(`${row.activeCount}/${row.rosterCount} 人交过`)

@@ -105,15 +105,21 @@ async function visibleProblems(ids: number[]) {
   return new Map(rows.map((row) => [row.id, row]))
 }
 
-/** 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言和布置时刻；没布置为 null */
+/**
+ * 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言、布置时刻和布置的老师；
+ * 没布置为 null。老师写真名：老师之间认的是名字，用户名（lwp0201、little）认不出是谁
+ */
 async function lessonPlan(className: string, day: string) {
   const [row] = await db
     .select({
       problemIds: schema.classLesson.problemIds,
       language: schema.classLesson.language,
       createdAt: schema.classLesson.createdAt,
+      createdBy: sql<string>`coalesce(nullif(${schema.userProfile.realName}, ''), ${schema.user.username})`,
     })
     .from(schema.classLesson)
+    .innerJoin(schema.user, eq(schema.user.id, schema.classLesson.createdBy))
+    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.classLesson.createdBy))
     .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
     .limit(1)
   return row?.problemIds.length ? row : null
@@ -142,6 +148,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
       day: today,
       language: plan.language ?? null,
       assignedAt: plan.createdAt,
+      assignedBy: plan.createdBy,
       problems: planned.flatMap((id) => {
         const problem = problems.get(id)
         if (!problem) return []
@@ -174,6 +181,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     // 推断出来的课不知道老师要的是哪种语言，不限
     language: null,
     assignedAt: null,
+    assignedBy: null,
     problems: picked.flatMap((row) => {
       const problem = problems.get(row.problemId)
       return problem
@@ -400,6 +408,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
       source: null,
       language: null,
       assignedAt: null,
+      assignedBy: null,
       lastLanguage: null,
       problems: [],
       students: [],
@@ -603,6 +612,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     source: lesson.source,
     language: lesson.language,
     assignedAt: lesson.assignedAt,
+    assignedBy: lesson.assignedBy,
     lastLanguage: last?.language ?? null,
     problems: lesson.problems.map((problem) => ({
       problemId: problem.id,
@@ -742,6 +752,7 @@ classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
         className,
         source: lesson.source,
         assignedAt: lesson.assignedAt,
+        assignedBy: lesson.assignedBy,
         problems: lesson.problems.map((problem) => ({
           problemDisplayId: problem.displayId,
           title: problem.title,
@@ -867,7 +878,8 @@ classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
     })
     .onConflictDoUpdate({
       target: [schema.classLesson.className, schema.classLesson.day],
-      set: { problemIds, language, createdBy: user.id, updatedAt: now },
+      // 「改」不换布置的人，和 createdAt 一样认第一次
+      set: { problemIds, language, updatedAt: now },
     })
   return success(c, null)
 })

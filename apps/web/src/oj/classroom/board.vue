@@ -465,7 +465,7 @@ function lastText(student: ClassBoardStudent) {
           {{ problem.problemDisplayId }}
         </span>
         <span v-if="board.assignedAt" class="assigned">
-          {{ parseTime(board.assignedAt, "HH:mm") }} 布置
+          {{ parseTime(board.assignedAt, "HH:mm") }} {{ board.assignedBy }} 布置
         </span>
         <n-button text class="edit" @click="editing = true">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
