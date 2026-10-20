@@ -361,6 +361,16 @@ export const orphanTestCaseSchema = z.object({
   createTime: z.number(),
 })
 
+/** 上传目录里、库里哪儿都没提到的图片：编辑器插的图（upload）和换下来的头像（avatar） */
+export const orphanImageSchema = z.object({
+  folder: z.enum(["upload", "avatar"]),
+  name: z.string(),
+  url: z.string(),
+  /** 字节 */
+  size: z.number(),
+  createTime: z.number(),
+})
+
 /**
  * 后台的用户排名列表。行的形状与 oj 侧榜单相同，但**没有 100 名的上限**：
  * 这里不是榜单，是老师按班级前缀翻全班学生的管理视图，要能一直翻到底。
@@ -1130,6 +1140,7 @@ export type JudgeServer = z.infer<typeof judgeServerSchema>
 export type DashboardInfo = z.infer<typeof dashboardInfoSchema>
 export type JudgeServerList = z.infer<typeof judgeServerListSchema>
 export type OrphanTestCase = z.infer<typeof orphanTestCaseSchema>
+export type OrphanImage = z.infer<typeof orphanImageSchema>
 export type AdminUserRank = z.infer<typeof adminUserRankSchema>
 
 export type AdminAiReportListItem = z.infer<typeof adminAiReportListItemSchema>

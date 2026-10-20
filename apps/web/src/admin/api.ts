@@ -60,6 +60,7 @@ import type {
   AdminUserList,
   DashboardInfo,
   JudgeServerList,
+  OrphanImage,
   OrphanTestCase,
   AdminProblem,
   AdminProblemList,
@@ -473,6 +474,15 @@ export function listInvalidTestcases() {
 
 export function pruneInvalidTestcases(id?: string) {
   return api.delete("admin/orphan-test-cases", { params: { id } })
+}
+
+export function listOrphanImages() {
+  return api.get<OrphanImage[]>("admin/orphan-images")
+}
+
+/** 不带参数是全删；带 folder 只删那个目录的，再带 name 只删一张 */
+export function pruneOrphanImages(target?: Pick<OrphanImage, "folder"> & { name?: string }) {
+  return api.delete<{ deleted: number }>("admin/orphan-images", { params: target })
 }
 
 export function getJudgeServer() {

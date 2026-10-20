@@ -5,7 +5,7 @@ import { classLabel } from "utils/classes"
 import { errorMessage } from "utils/api"
 import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from "utils/constants"
 import { copyToClipboard, parseTime } from "utils/functions"
-import type { OrphanTestCase, Server, WebsiteConfig } from "utils/types"
+import type { OrphanImage, OrphanTestCase, Server, WebsiteConfig } from "utils/types"
 import { useConfigStore } from "shared/store/config"
 import {
   deleteJudgeServer,
@@ -13,7 +13,9 @@ import {
   getJudgeServer,
   getWebsite,
   listInvalidTestcases,
+  listOrphanImages,
   pruneInvalidTestcases,
+  pruneOrphanImages,
 } from "../api"
 
 /**
@@ -179,6 +181,54 @@ async function deleteTestcase(id?: string) {
   getTestcases()
 }
 
+// ---------------------------------------------------------------- 没人用的图片
+
+/**
+ * 要扫遍整个库（包括十几万条提交），所以不在进页面时自动查，点了才查。
+ * null = 还没查过
+ */
+const orphanImages = ref<OrphanImage[] | null>(null)
+const scanningImages = ref(false)
+
+const IMAGE_GROUPS = [
+  { folder: "upload", label: "编辑器里删掉的图" },
+  { folder: "avatar", label: "换下来的头像" },
+] as const
+
+const imageGroups = computed(() =>
+  IMAGE_GROUPS.map((group) => {
+    const images = (orphanImages.value ?? []).filter((image) => image.folder === group.folder)
+    const bytes = images.reduce((sum, image) => sum + image.size, 0)
+    return { ...group, images, bytes }
+  }).filter((group) => group.images.length),
+)
+
+async function scanImages() {
+  scanningImages.value = true
+  try {
+    orphanImages.value = await listOrphanImages()
+  } catch (error) {
+    message.error(errorMessage(error))
+  } finally {
+    scanningImages.value = false
+  }
+}
+
+async function deleteImages(target: Parameters<typeof pruneOrphanImages>[0]) {
+  try {
+    const { deleted } = await pruneOrphanImages(target)
+    message.success(`删掉了 ${deleted} 张`)
+  } catch (error) {
+    message.error(errorMessage(error))
+  }
+  scanImages()
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`
+}
+
 onMounted(() => {
   getWebsiteConfig()
   getTestcases()
@@ -295,6 +345,49 @@ onMounted(() => {
     </div>
   </section>
 
+  <section class="block">
+    <h3>
+      没人用的图片
+      <n-button size="small" style="margin-left: 8px" :loading="scanningImages" @click="scanImages">
+        {{ orphanImages ? "再查一遍" : "查一下" }}
+      </n-button>
+    </h3>
+    <n-text v-if="orphanImages && !imageGroups.length" depth="3" class="hint">
+      都有地方在用
+    </n-text>
+    <div v-for="group in imageGroups" :key="group.folder" class="image-group">
+      <div class="image-group-head">
+        {{ group.label }}
+        <span class="count">{{ group.images.length }} 张 · {{ formatBytes(group.bytes) }}</span>
+        <n-popconfirm @positive-click="deleteImages({ folder: group.folder })">
+          <template #trigger>
+            <n-button size="small" style="margin-left: 8px">都删掉</n-button>
+          </template>
+          删掉这 {{ group.images.length }} 张，删了找不回来，确定吗？
+        </n-popconfirm>
+      </div>
+      <div class="thumbs">
+        <div v-for="image in group.images" :key="image.name" class="thumb">
+          <a
+            :href="image.url"
+            target="_blank"
+            :title="`${image.name} · ${parseTime(new Date(image.createTime * 1000), 'YYYY-MM-DD')}`"
+          >
+            <img :src="image.url" alt="" loading="lazy" />
+          </a>
+          <button
+            type="button"
+            class="thumb-delete"
+            title="删掉"
+            @click="deleteImages({ folder: image.folder, name: image.name })"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section v-if="testcases.length" class="block">
     <h3>
       没有题目用的测试数据 <span class="count">{{ testcases.length }} 份</span>
@@ -370,6 +463,57 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.image-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-group-head {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid v-bind("theme.dividerColor");
+  background: v-bind("theme.actionColor");
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
 }
 
 .toggle {

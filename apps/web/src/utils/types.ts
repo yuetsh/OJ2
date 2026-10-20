@@ -313,6 +313,7 @@ export type {
   JudgeServerList,
   DashboardInfo,
   OrphanTestCase,
+  OrphanImage,
   AdminUser,
   AdminUserList,
   AdminContestList,

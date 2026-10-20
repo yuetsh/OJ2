@@ -4,6 +4,7 @@ import {
   type DashboardInfo,
   type JudgeServer,
   type JudgeServerList,
+  type OrphanImage,
   type OrphanTestCase,
   type UploadImageResponse,
   type WebsiteConfig,
@@ -180,6 +181,112 @@ adminConfRoutes.delete("/orphan-test-cases", requireSuperAdmin, async (c) => {
       recursive: true,
       force: true,
     })
+  }
+  return success(c, { deleted: targets.length })
+})
+
+// ---------------------------------------------------------------- 没人用的图片
+
+/** 只认编辑器传上来的那几种。目录里别的东西（手工放进去的 mp4 之类）一律不碰 */
+const UPLOAD_IMAGE_RE = /^[\w-]+\.(?:png|jpe?g|gif|bmp)$/i
+const IMAGE_NAME_PATTERN = "([A-Za-z0-9_-]+\\.(?:png|jpe?g|gif|bmp))"
+/** 刚传的图可能还在编辑器里、题目还没保存，一天以内的不算 */
+const ORPHAN_IMAGE_GRACE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * 库里提到过的图片文件名（小写）。不去列「哪些列放富文本」—— 题面、提示、公告、教程里都有，
+ * 提交的代码里也有，以后还会有新表 —— 而是把每张表的每个文本列都扫一遍，并且只认文件名、
+ * 不认路径：老域名的绝对地址、markdown 的 `![](…)` 都算用着。宁可多留，不能错删
+ */
+async function referencedImageNames() {
+  const columns = await db.execute<{ table_name: string; column_name: string }>(sql`
+    select c.table_name, c.column_name
+    from information_schema.columns c
+    join information_schema.tables t
+      on t.table_schema = c.table_schema and t.table_name = c.table_name
+    where c.table_schema = current_schema() and t.table_type = 'BASE TABLE'
+      and c.udt_name in ('text', 'varchar', 'bpchar', 'json', 'jsonb', '_text', '_varchar')
+  `)
+  const tables = new Map<string, string[]>()
+  for (const { table_name, column_name } of columns) {
+    tables.set(table_name, [...(tables.get(table_name) ?? []), column_name])
+  }
+  const names = new Set<string>()
+  // 一张表一条、挨个来：要扫全部提交，别和上课的请求抢那两个核
+  for (const [table, columnNames] of tables) {
+    const text = sql.join(
+      columnNames.map((column) => sql`coalesce(${sql.identifier(column)}::text, '')`),
+      sql` || ' ' || `,
+    )
+    const rows = await db.execute<{ name: string }>(sql`
+      select distinct lower(m[1]) as name
+      from (select ${text} as t from ${sql.identifier(table)}) s,
+        regexp_matches(s.t, ${IMAGE_NAME_PATTERN}, 'gi') m
+    `)
+    for (const row of rows) names.add(row.name)
+  }
+  return names
+}
+
+/** 编辑器插图、头像各一个目录；头像换了、删了，旧文件同样留在盘上 */
+const IMAGE_FOLDERS = {
+  upload: { directory: config.uploadDirectory, prefix: config.uploadUriPrefix },
+  avatar: { directory: config.avatarDirectory, prefix: config.avatarUriPrefix },
+} as const
+
+type ImageFolder = keyof typeof IMAGE_FOLDERS
+
+async function orphanImages() {
+  const onDisk = await Promise.all(
+    (Object.keys(IMAGE_FOLDERS) as ImageFolder[]).map(async (folder) =>
+      (await readdir(IMAGE_FOLDERS[folder].directory).catch(() => [] as string[]))
+        .filter((name) => UPLOAD_IMAGE_RE.test(name))
+        .map((name) => ({ folder, name })),
+    ),
+  ).then((lists) => lists.flat())
+  if (onDisk.length === 0) return []
+  const referenced = await referencedImageNames()
+  // 一张都没提到，多半是连错了库（DATA_DIR 没设、起了一套空库），这时候全目录都会被当成没人用
+  if (referenced.size === 0) return []
+  const cutoff = Date.now() - ORPHAN_IMAGE_GRACE_MS
+  const rows = await Promise.all(
+    onDisk
+      .filter(({ name }) => !referenced.has(name.toLowerCase()))
+      .map(async ({ folder, name }) => {
+        const { directory, prefix } = IMAGE_FOLDERS[folder]
+        const info = await stat(resolve(directory, name)).catch(() => null)
+        if (!info?.isFile() || info.mtimeMs > cutoff) return null
+        return {
+          folder,
+          name,
+          url: `${prefix}/${name}`,
+          size: info.size,
+          createTime: info.mtimeMs / 1000,
+        } satisfies OrphanImage
+      }),
+  )
+  return rows
+    .filter((row): row is OrphanImage => row !== null)
+    .sort((a, b) => b.createTime - a.createTime)
+}
+
+adminConfRoutes.get("/orphan-images", requireSuperAdmin, async (c) => {
+  return success(c, await orphanImages())
+})
+
+adminConfRoutes.delete("/orphan-images", requireSuperAdmin, async (c) => {
+  const folder = c.req.query("folder")
+  const name = c.req.query("name")
+  // 删之前重新扫一遍：列表是刚才看的，这期间可能有人把图插回了题面、把头像换了回去
+  const orphans = await orphanImages()
+  const targets = orphans.filter(
+    (image) => (!folder || image.folder === folder) && (!name || image.name === name),
+  )
+  if (name && targets.length === 0) {
+    return failure(c, 404, "not-an-orphan", "这张图片不存在或还有地方在用，未删除")
+  }
+  for (const image of targets) {
+    await rm(resolve(IMAGE_FOLDERS[image.folder].directory, image.name), { force: true })
   }
   return success(c, { deleted: targets.length })
 })
