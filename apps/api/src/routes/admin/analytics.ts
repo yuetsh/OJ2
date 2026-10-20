@@ -245,8 +245,11 @@ adminAnalyticsRoutes.get("/problem-analytics/stuck/:id", requireTeacher, async (
 
 /** 每边至少这么多人做过，这道题才拿来比 */
 const GRADE_MIN_USERS = 20
-/** 没指定届时，挑最新一届里能和往届比上这么多道题的 */
-const GRADE_DEFAULT_MIN_PROBLEMS = 5
+/**
+ * 没指定届时，挑最新一届里能和往届比上这么多道题的。新一届还没正式上课时只有几个人零散
+ * 做过几道（26 级开课前是 6 道），默认停在上一届，等它上了一阵课再换过去。
+ */
+const GRADE_DEFAULT_MIN_PROBLEMS = 20
 const PAST = "past"
 
 type GradeSide = GradeTrend["problems"][number]["mine"]
