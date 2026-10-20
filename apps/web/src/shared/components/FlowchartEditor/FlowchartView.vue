@@ -10,8 +10,10 @@ import { nodeLabel, shapePoints, useFlowPaint } from "./paint"
  * 整张缩进左栏后字只剩十来像素。
  *
  * 宽度超过容器时整张按比例缩到正好放下（viewBox），不超过就按原大小居中。
+ * zoomed（点开放大的弹框里）：放大到 1.5 倍、放不下就缩回容器宽，但不小于原大小 ——
+ * 手机上宽图横着滚，不再缩成看不清的一团。
  */
-const { doc } = defineProps<{ doc: FlowDoc }>()
+const { doc, zoomed = false } = defineProps<{ doc: FlowDoc; zoomed?: boolean }>()
 
 const theme = useThemeVars()
 const { paint, lineColor } = useFlowPaint()
@@ -42,10 +44,14 @@ const markerId = `flow-view-arrow-${useId()}`
 </script>
 
 <template>
-  <div ref="root" class="flow-view">
+  <div ref="root" class="flow-view" :class="{ zoomed }">
     <svg
       :viewBox="`0 0 ${layout.width} ${layout.height}`"
-      :style="{ width: `${layout.width}px` }"
+      :style="
+        zoomed
+          ? { width: `${layout.width * 1.5}px`, minWidth: `${layout.width}px` }
+          : { width: `${layout.width}px` }
+      "
       role="img"
       aria-label="流程图"
       class="chart"
@@ -147,6 +153,11 @@ const markerId = `flow-view-arrow-${useId()}`
   justify-content: center;
 }
 
+.flow-view.zoomed {
+  display: block;
+  overflow-x: auto;
+}
+
 .chart {
   display: block;
   max-width: 100%;
@@ -154,6 +165,10 @@ const markerId = `flow-view-arrow-${useId()}`
   font-family: inherit;
   font-size: 14px;
   overflow: visible;
+}
+
+.zoomed .chart {
+  margin: 0 auto;
 }
 
 .branch-label {

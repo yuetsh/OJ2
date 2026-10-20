@@ -13,6 +13,8 @@ import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { useMyFlowchartStore } from "shared/store/myFlowchart"
 import { useUserStore } from "shared/store/user"
 import { useProblemPageContext } from "../composables/problemPageContext"
+import { useBackClose } from "shared/composables/backClose"
+import { useBreakpoints } from "shared/composables/breakpoints"
 
 const ProblemFlowchart = defineAsyncComponent(() => import("./ProblemFlowchart.vue"))
 const FlowchartView = defineAsyncComponent(
@@ -62,6 +64,10 @@ const referenceDoc = computed(() => {
   const doc = parseFlowDoc(problem.value?.flowchartData)
   return doc?.steps.length ? doc : null
 })
+/** 点开放大看。手机上弹框是整屏的，按返回先关它 */
+const referenceZoom = ref(false)
+const { isMobile } = useBreakpoints()
+useBackClose(referenceZoom, isMobile)
 const myFlowchartStore = useMyFlowchartStore()
 const flowchartStore = useFlowchartStore()
 const userStore = useUserStore()
@@ -358,11 +364,32 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       折成一条要点开 —— 摊开放前面的话，长图（1056 有一千来像素高）会把例子挤出第一屏
     -->
     <section v-if="canShowReferenceFlowchart" class="block">
-      <h3 class="title">参考流程图</h3>
-      <div class="reference-flowchart">
+      <div class="block-head">
+        <h3 class="title">参考流程图</h3>
+        <n-button text type="primary" size="small" class="block-link" @click="referenceZoom = true">
+          放大看
+        </n-button>
+      </div>
+      <div
+        class="reference-flowchart"
+        role="button"
+        tabindex="0"
+        aria-label="放大看参考流程图"
+        @click="referenceZoom = true"
+        @keydown.enter="referenceZoom = true"
+      >
         <FlowchartView v-if="referenceDoc" :doc="referenceDoc" />
         <ProblemFlowchart v-else />
       </div>
+      <n-modal
+        v-model:show="referenceZoom"
+        preset="card"
+        title="参考流程图"
+        :style="{ maxWidth: '1000px' }"
+      >
+        <FlowchartView v-if="referenceDoc" :doc="referenceDoc" zoomed />
+        <ProblemFlowchart v-else />
+      </n-modal>
     </section>
 
     <section v-if="problem.hint" class="block">
@@ -492,6 +519,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
 /* 参考流程图：和例子的格子同一种浅灰底 */
 .reference-flowchart {
+  cursor: zoom-in;
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.05);
   padding: 16px 12px;
