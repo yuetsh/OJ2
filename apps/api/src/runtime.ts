@@ -37,7 +37,7 @@ export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, ".
  * 迁移文件（`0000_*.sql` … + `meta/_journal.json`）所在目录。
  *
  * 这些文件**不内嵌进二进制**，而是随镜像一起装到一个固定绝对路径下。
- * 之所以能这么做、也应该这么做：CLAUDE.md 里「单二进制是有代价的」那条讲的是
+ * 之所以能这么做、也应该这么做：apps/api/CLAUDE.md 里「单二进制是有代价的」那条讲的是
  * 不能依赖 node_modules、不能拿 `import.meta.dir` 去推路径（编译后它恒为
  * `/$bunfs/root`，往上几级就跑到文件系统根）。按一个**显式给定的绝对路径**读一个
  * 数据目录不在此列。

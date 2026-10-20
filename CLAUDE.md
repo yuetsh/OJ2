@@ -24,16 +24,6 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 | `docker/judge/README.md` | 换判题沙箱镜像、升语言版本（gcc / Python …） |
 | `docs/specs/` | 三份设计文档：后端重写、课堂求助与协作编辑、题目详情页重设计（动题目页之前必读） |
 
-## 仓库结构
-
-| 目录 | 作用 |
-|---|---|
-| `apps/api/` | 后端。Hono + Drizzle + BullMQ，编译成单二进制 |
-| `apps/web/` | 前端。Vue 3 SPA，起点是 ojnext 的代码，之后大部分已重写 |
-| `packages/contract/` | 前后端共用的 Zod 契约 |
-| `docker/` | Dockerfile + 三套 compose（dev / debian / school）+ 部署与运维脚本 |
-| `docs/` | 上面那几份专题文档 + `specs/` 里的设计文档 |
-
 ## 本机环境
 
 **Docker 可用，全套依赖都能在本机跑起来**（PostgreSQL、Redis、判题沙箱），
@@ -89,7 +79,8 @@ references 的壳，真正的配置在 `tsconfig.app.json`），而 `vite build`
 ## 提交
 
 **直接在 `main` 上干活，不开特性分支。** 注意 push 到 `github` 这个 remote 的 `main`
-会触发 CI 部署（平时 push 的 `origin` 不会），见 `docs/deploy.md`。
+会触发 CI 部署；而 `origin` 会镜像到 `github`，**平时 push `origin` 通常几秒后也就部署了**
+（偶尔不跟，要 `git ls-remote github` 核实）。见 `docs/deploy.md`。
 
 提交信息用中文，格式 `type(范围): 从用户视角描述现象`，例如
 `fix(流程图): 「重新判题」从来没成功过，而且会把原来的评分清掉`。
@@ -97,37 +88,9 @@ references 的壳，真正的配置在 `tsconfig.app.json`），而 `vite build`
 
 ## 几件必须知道的事
 
-### 单二进制是有代价的
-
-`apps/api` 编译成 `bun build --compile` 的单二进制，所以**运行时不能依赖 node_modules**。
-任何 `require.resolve` / `Bun.resolveSync` / `__dirname` 去找文件的写法，本地都正常、编译后
-都会炸，而且**只在离开仓库目录后才炸**（在仓库里跑时它顺着 cwd 摸到了 node_modules，
-假装没事）。
-
-资源要用 `with { type: "file" }` 内嵌。`.node` 原生模块还要额外注意：这个写法只有打包器认、
-`bun run` 不认，所以必须按形态分叉 —— 见 `apps/api/src/vendor/jieba.ts` 的注释，
-那里把坑写全了。
-
-**改完这类代码，dev 和编译两种形态都要跑一遍。** 我吃过亏：只验了编译产物，dev 直接起不来。
-
-### 路径解析看 `runtime.ts`
-
-编译后 `import.meta.dir` 恒为 `/$bunfs/root`，往上三级就是文件系统根。
-相对路径一律走 `runtime.ts` 的 `pathBase`，别自己拼。
-
-### SQL 判题会 spawn「自己」
-
-`judge/sql/index.ts` 起的子进程是二进制自身 + `sql-child` 子命令（因为编译后磁盘上没有
-child.ts 可以 spawn）。所以**入口必须有 argv 分发**，否则「起自己」变成「把整个程序再跑
-一遍」→ 指数级 fork。这不是假想，开发时炸过一次开发机。`OJ2_SQL_CHILD` 那道递归闸不要删。
-
-### 加路由要防遮蔽
-
-**Hono 按注册顺序匹配，不是静态优先**（实测确认过，别凭直觉）。`/problems/:id` 注册在
-`/problems/random` 前面的话，后者永远进不去 —— 而且不报错、不警告，只是静默走进前一条的
-handler。阶段 4 真实发生过一次，两个教师用的分析端点被吃掉，一直到评审才发现。
-
-加完路由跑 `bun run --filter '@oj2/api' check:routes`。
+后端专属的坑 —— 单二进制不能依赖 node_modules、路径走 `runtime.ts`、SQL 判题 spawn 自己、
+路由遮蔽、出参用 `satisfies` 不用 `parse`、外键删除动作与迁移 —— 在 **`apps/api/CLAUDE.md`**，
+动 `apps/api` 的文件时会自动加载。下面是全仓通用的。
 
 ### 判题状态码不能改
 
@@ -142,9 +105,7 @@ QingdaoU/JudgeServer 停更在 2024-04（官方镜像的 `latest` 和 `1.6.1` �
 编译器停在 gcc-13），新工具链只能自己编。`docker/judge/` 里是只改版本的 Dockerfile
 分叉 + 构建脚本 + 冒烟测试，判题逻辑一行没动。
 
-- 新机器、换镜像：先 `docker/judge/build.sh --save` → scp → `docker load`，再部署。
-  **服务器和机房各有各的判题沙箱，两边都要装。**
-- 改工具链就把末尾序号 +1（下一版 `oj2-judge-3`）。`up -d` 不带 `--pull`，名字没变会静默用旧镜像。
+- 构建、分发、改名的步骤见 `docker/judge/README.md`。**服务器和机房各有各的判题沙箱，两边都要装。**
 - 编译/运行命令在 `apps/api/src/judge/languages.ts`，不在镜像里。gcc-14 把隐式函数
   声明等提成了 error（`-w` 压不住），那边的 `cLooseErrors` 几个 `-Wno-error=` 就是
   为此加的 —— 删掉它们等于让一批历史题解和 C 教程示例集体 CE。
@@ -156,20 +117,6 @@ QingdaoU/JudgeServer 停更在 2024-04（官方镜像的 `latest` 和 `1.6.1` �
   （不摘的话 84 道题的语言下拉还能选 Java，提交必 SYSTEM_ERROR）。查判题配置走
   `judgeConfigFor()`，它带旧值别名；**回滚要连数据一起回**，只滚代码会让 Python 提交全炸。
 - 换完镜像跑 `bun docker/judge/smoke.ts`：三种语言、六种状态码、gcc 宽松度一起核。
-
-### 出参不 `parse`，用 `satisfies`
-
-**后端的响应一律 `satisfies XxxType`，不要写 `xxxSchema.parse({...})`。** 出参是后端自己刚
-拼出来的字面量，TS 已经在编译期校验过；再 parse 一遍拿不到任何新信息，唯一可能失败的输入是
-**库里的历史数据**，而失败的代价是 500 —— 这条规矩是被四次这样的线上故障换来的。
-
-**闸设在写入侧**：入参 `safeParse`、`db/schema.ts` 的 `.$type<>()` 列收窄、
-语义校验函数（`astRulesError()` / `exerciseDataError`）。JSONB 原文
-（`submission.info` / `statistic_info` / `exercise.data`）一律放行，它们的形状真相在判题机
-那边。query 的筛选值走 `routes/helpers.ts` 的 `asFilterValue()`，那是纯类型交接、不加校验。
-
-四次故障的细节、`.$type<>()` 断言该怎么核，见 `docs/contract.md`；
-前端为什么只在三处挂运行时闸门，见 `apps/web/CLAUDE.md`。
 
 ### AST 代码规则：一张表，外加一个机器检查
 
@@ -192,13 +139,8 @@ bun run --filter '@oj2/api' check:ast     # 升级 tree-sitter-* 之后一定要
 ### 前端基线是 Chrome 105
 
 机房**部分**电脑是 Chrome 105，其余更新 —— 按最低那档定基线。
-
-- **`@vitejs/plugin-legacy` 留着，别删**：vite 8 的默认构建 target 是 `chrome111`，比 105 高。
-  这个插件同时把 `build.target` 压到 `es2020/chrome105`、给现代产物补 core-js polyfill
-  （`toSorted` / `Set` 运算 / 迭代器辅助那批是 Chrome 110+ 才有的）。`modernTargets` 不写，
-  用插件自带的基线（`chrome>=105`），正好是这一档。polyfill 清单写死在 `vite.config.ts`，
-  **升级前端依赖后重新审计**：先临时把 `modernPolyfills` 改成 `true`，再跑 `DEBUG=vite:legacy bun run build` 才会打印探测到的全集（写死清单时它只回显清单）。
-- **View Transitions 要 111，105 没有**，`darkTransition.ts` 的降级分支是真在用的。
+**`@vitejs/plugin-legacy` 和写死的 polyfill 清单别删**（vite 8 默认 target 是 `chrome111`）。
+升级前端依赖后要重新审计 polyfill 清单，步骤与 View Transitions 的降级见 `apps/web/CLAUDE.md`。
 
 ### 时间只有一个锚点：`apps/api/src/time.ts`
 
@@ -222,41 +164,6 @@ SQL 里要按日历切，用 `localTime(列)`（生成 `列 at time zone 'Asia/S
 **再动日历口径之前先读 `docs/timezone.md`**，那里有实测数据和核实方法；
 Dockerfile 的 `TZ` 和数据库连接的 `TimeZone` 是**刻意不设**的，别「顺手补上」。
 
-## 数据库
-
-Drizzle schema 最初是 `drizzle-kit pull` 从生产库拉出来的，所以它长得像 Django 建的表
-（表名、bigint/int4 混用），`schema.ts` 顶部记了哪些地方是手工修的。
-**schema 现在归 OJ2 独占**，结构变更走 migration 正常演进。
-
-**外键的删除动作从 0010 起是显式的**，不再是 Django 留下的一律 NO ACTION：
-
-- **CASCADE**：父行消失后子行必然无意义、且不构成「学生做过什么」的证据 —— 中间表
-  （problem_tags）、题单/教程/成就的组成部分、一对一附属（user_profile）与可重算的缓存
-  （user_stat）。
-- **NO ACTION（即拦住）**：需要人看见的删除 —— `submission.problem_id`、以及 `user` 的绝大
-  多数外键。删用户撞外键会被 handler 翻译成「请改为禁用账号」，这是有意的。
-
-**加新子表时必须回来想一遍该走哪一档**，别默认新外键会自己连坐 —— drizzle 不写
-`.onDelete()` 就是 NO ACTION，而 0010 只改了当时存在的那批。
-
-### 改 schema 走 drizzle migration
-
-`bun run db:generate`（造迁移文件）→ `bun run db:migrate`（按
-`drizzle.__drizzle_migrations` 增量执行），就是 Django `makemigrations` / `migrate` 的
-等价物。索引/结构变更走这条，不要再手写 SQL 往 `docs/` 里塞。
-
-- **执行器是自己的**（`db/migrate.ts`，一条迁移一个事务），不是 drizzle 那个，
-  `db:migrate` 和线上 `oj2-api migrate` 是同一条代码路径。
-- **部署时自动执行**：`docker/deploy.sh` 在构建镜像之后、起栈之前跑，失败就中止部署。
-- 迁移文件**不内嵌进二进制**，随镜像装在 `/usr/local/share/oj2/migrations`
-  （见 `runtime.ts` 的 `migrationsDir`），所以新增迁移不用改任何代码。
-- **破坏性迁移默认拦截**（`DROP TABLE` / `DROP COLUMN` / `ALTER COLUMN ... TYPE` /
-  `TRUNCATE`），退出 4，要显式放行：`OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh`。
-- **空库能自举**，直接从 `0000` 建起，新环境不需要先灌 schema dump。
-
-`CREATE INDEX CONCURRENTLY` 怎么写、给已有库打基线的 SQL、`.op()` 会吞掉索引方向这类
-drizzle-kit 的坑，全在 `docs/database.md`。
-
 ## 部署
 
 三套 compose 在 `docker/`：`dev`（本机）、`debian`（服务器）、`school`（机房）。
@@ -264,10 +171,8 @@ drizzle-kit 的坑，全在 `docs/database.md`。
 **机房那套没有 postgres，连的是服务器的库。** 两个站点共用一个数据库，但各有各的 Redis
 和判题沙箱 —— 所以涉及两边的变更要一起做。
 
-**服务器上的全部容器（含 postgres / redis）都由 `compose.debian.yml` 起**，升级哪个都只改
-仓库里的文件。以前库和 redis 归旧栈那份 `/root/OJDeploy/docker-compose.yml`、这边外接过去，
-那种形态已经删了（搬家脚本 `docker/move-db-into-oj2.sh`，一次性的）。库是 PostgreSQL 18，
-数据在 `$DATA_DIR/postgresql`；本机 dev 用同一个大版本，别单独换。
+库是 PostgreSQL 18，本机 dev 用同一个大版本，别单独换。迁移在部署时自动跑，**破坏性迁移
+默认拦截**，要 `OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh` 显式放行。
 
 ⚠️ **`DATA_DIR` 默认值 `../data` 是 `OJ2/data`，不是部署目录的 `data/`。** 沿用旧数据却忘了
 设它，会静默起一套空数据（空库、没测试点、图片 404），而且**不报错** —— 这是整个部署里

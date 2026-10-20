@@ -1,6 +1,6 @@
 # 契约：闸门设在写入侧的来龙去脉
 
-规矩在 `CLAUDE.md`「出参不 `parse`，用 `satisfies`」一节，前端那侧
+规矩在 `apps/api/CLAUDE.md`「出参不 `parse`，用 `satisfies`」一节，前端那侧
 （`utils/contract.ts` 为什么只挂三处）在 `apps/web/CLAUDE.md`。这里是证据。
 
 ## 读出侧校验自己造出来的四次故障

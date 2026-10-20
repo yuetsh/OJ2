@@ -8,10 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 （`ojnext` 与 `../OnlineJudge` 都已下线且**完全冻结，一行都不改**）。Vue 3 + TypeScript，
 Vite（Rolldown 内核）、Naive UI、Pinia、Vue Router。
 
-**浏览器基线是 Chrome 105**（机房部分电脑那一档）：
-`vite.config.ts` 的 `@vitejs/plugin-legacy` 和写死的 polyfill 清单不能删 —— vite 8
-默认 target 是 chrome111，比机房高。
-理由写在该文件的注释里，详见 `../../CLAUDE.md`。
+**浏览器基线是 Chrome 105**（机房部分电脑那一档，其余更新 —— 按最低那档定基线）：
+
+- **`@vitejs/plugin-legacy` 留着，别删**：vite 8 的默认构建 target 是 `chrome111`，比 105 高。
+  这个插件同时把 `build.target` 压到 `es2020/chrome105`、给现代产物补 core-js polyfill
+  （`toSorted` / `Set` 运算 / 迭代器辅助那批是 Chrome 110+ 才有的）。`modernTargets` 不写，
+  用插件自带的基线（`chrome>=105`），正好是这一档。polyfill 清单写死在 `vite.config.ts`，
+  **升级前端依赖后重新审计**：先临时把 `modernPolyfills` 改成 `true`，再跑
+  `DEBUG=vite:legacy bun run build` 才会打印探测到的全集（写死清单时它只回显清单）。
+- **View Transitions 要 111，105 没有**，`darkTransition.ts` 的降级分支是真在用的。
 
 ## Commands
 
@@ -127,7 +132,7 @@ return contract("GET /problems/:id", problemDetailSchema, value)
   一道闸，一行脏数据能让整条练习列表 500。
 
 **后端出参已经不 `parse` 了**（原来 136 处，全部改成 `satisfies`；撤的时候炸出两个
-一直存在的线上 500，见 `../../CLAUDE.md` 的「出参不 `parse`，用 `satisfies`」）。
+一直存在的线上 500，见 `../api/CLAUDE.md` 的「出参不 `parse`，用 `satisfies`」）。
 所以现在收紧一个字段的直接后果落在 **`tsc` 编译期**，而不再是运行时 500 —— 这是好事，
 但别因此就放心大胆收：契约里的形状仍然要对得上库里的存量数据，前端拿到对不上的值
 一样会渲染错。收紧任何字段之前，拿根目录那份生产备份把全量数据跑一遍，
