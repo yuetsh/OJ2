@@ -100,8 +100,8 @@ export async function consumeJSONEventStream<T = any>(
  * AI 端点的非 2xx 响应体是 JSON 不是 SSE，直接丢给上面的解析器只会抛
  * 「无法解析服务端事件数据: {...}」。后端 error.message 是英文的，按 code 换成中文。
  *
- * 登录失效 / 账号禁用走和 axios 拦截器同一套处理（弹登录框 / 提示禁用）——
- * 原来这里裸 fetch 绕过了拦截器，未登录时只显示一句「AI 分析生成失败」。
+ * 登录失效 / 账号禁用走和 utils/api 同一套处理（弹登录框 / 提示禁用）——
+ * 原来这里裸 fetch 绕过了那边，未登录时只显示一句「AI 分析生成失败」。
  */
 async function aiStreamError(response: Response) {
   const body = (await response.json().catch(() => null)) as {

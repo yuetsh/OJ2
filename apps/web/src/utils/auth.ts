@@ -86,7 +86,7 @@ async function runRefresh(stale?: string): Promise<RefreshOutcome> {
 
   let response: Response
   try {
-    // 裸 fetch：走 utils/api 的 axios 会再进它的拦截器，绕回这里
+    // 裸 fetch：走 authFetch / utils/api 会再来换 token，绕回这里
     response = await fetch("/api/auth/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -135,9 +135,11 @@ async function responseCode(response: Response) {
 }
 
 /**
- * 不走 axios 的请求（AI 流式接口、离开页面时的 keepalive 上报）用它代替 fetch：
- * 带上 token，后端回 `token-expired` 就换一张重试一次 —— 和 utils/api.ts 拦截器
- * 是同一套规矩。
+ * 带登录态的 fetch，所有发往后端的请求都从这里出门（utils/api 也是）：带上 token，
+ * 后端回 `token-expired` 就换一张重试一次。
+ *
+ * 换 token 那一步断了网就照 fetch 的样子 reject —— 这时候拿掉 token 重发，要登录的
+ * 接口会回 login-required，学生平白看到登录框，而真正的原因只是网络抖了一下。
  */
 export async function authFetch(input: string, init: RequestInit = {}) {
   const send = (token: string | null) =>
@@ -154,6 +156,7 @@ export async function authFetch(input: string, init: RequestInit = {}) {
   if ((await responseCode(response)) !== "token-expired") return response
 
   const outcome = await refreshAccessToken(token)
+  if (outcome.code === "network-error") throw new TypeError("换 token 时网络异常")
   // 账号被禁用：换 token 那一步就知道了，原请求不必再发。造一个和后端同形的响应，
   // 调用方按原样处理（弹「账号已被禁用」而不是登录框）
   if (outcome.code === "account-disabled") {

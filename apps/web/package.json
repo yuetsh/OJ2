@@ -26,7 +26,6 @@
     "@vueuse/router": "^15.0.0",
     "@wangeditor-next/editor": "^6.5.0",
     "@wangeditor-next/editor-for-vue": "^6.5.0",
-    "axios": "^1.20.0",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "chartjs-chart-wordcloud": "^4.4.5",

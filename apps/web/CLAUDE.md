@@ -95,13 +95,14 @@ shared →  ./src/shared
 
 ### HTTP Client
 
-`utils/api.ts` — Axios instance with interceptors (`baseURL: "/api"`). It unwraps both
-the axios envelope and the backend's `{ data }` envelope, so callers get the payload
-directly. All API calls proxy through the dev server (see `vite.config.ts`).
+`utils/api.ts` — 薄薄一层 fetch 封装（没有 axios），前缀 `/api`，get / post / put / delete
+四个方法。它剥掉后端的 `{ data }` 信封，调用方直接拿到业务数据；失败抛 `ApiError`。
+dev 下由 `vite.config.ts` 的 proxy 转给后端。
 
 登录态是 `Authorization: Bearer` 的 access token（15 分钟）+ refresh token，都在
-localStorage，换 token 的逻辑全在 `utils/auth.ts`。**不走 axios 的请求用 `authFetch`
-代替裸 `fetch`**，否则不带 token、也不会在 `token-expired` 时换一张重试。
+localStorage，换 token 的逻辑全在 `utils/auth.ts`。**所有请求都从 `authFetch` 出门**
+（`utils/api` 也是），要自己发 fetch（流式、`keepalive`、下载二进制）时用它代替裸
+`fetch`，否则不带 token、也不会在 `token-expired` 时换一张重试。
 WebSocket 的 token 借子协议带（浏览器设不了请求头），见契约 `WS_AUTH_PROTOCOL`。
 
 ### Contract guard (`utils/contract.ts`)
@@ -179,7 +180,7 @@ Env files: `.env`（本机）、`.env.production`（服务器）、`.env.staging
 | `PUBLIC_CODE_URL` | 代码分享服务（提交详情、题目页的「分享」） |
 | `PUBLIC_ICONIFY_URL` | 自建 Iconify 图标源，不设则走公共 CDN |
 
-后端地址**不在这里**：`utils/api.ts` 写死 `baseURL: "/api"`，dev 由 `vite.config.ts` 的
+后端地址**不在这里**：`utils/api.ts` 写死前缀 `/api`，dev 由 `vite.config.ts` 的
 proxy 转给 3000，线上由 Caddy 同源伺服。
 
 ### Routing

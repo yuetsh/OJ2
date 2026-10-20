@@ -93,7 +93,7 @@ export function getProblemProgress() {
 
 /**
  * 「随便来一道」：当前知识点和类型里，先挑能用 language 做的、自己没做对的简单 / 中等题，
- * 返回题号。空串的参数拦截器会去掉
+ * 返回题号。空串的参数 utils/api 会去掉
  */
 export function getRandomProblem(params: { tag: string; type: string; language: string }) {
   return api.get<string>("problems/random", { params })
@@ -357,9 +357,7 @@ export function getContestClassView(contestID: string) {
 export function uploadAvatar(file: File) {
   const form = new window.FormData()
   form.append("image", file)
-  return api.post("me/avatar", form, {
-    headers: { "content-type": "multipart/form-data" },
-  })
+  return api.post("me/avatar", form)
 }
 
 export function updateProfile(data: { realName?: string; mood?: string }) {
@@ -551,8 +549,8 @@ export function getLearnProgress(type: "python" | "c") {
 /**
  * 上报自学留痕。`opened` 为真表示刚进这一课，否则只是补停留时长。
  *
- * 走裸 fetch 而不是 axios，是为了 `keepalive`：离开页面那一下的最后一次上报，
- * axios 发出去也会随页面卸载被浏览器掐掉，学生每节课的最后一段时长就永远丢了。
+ * 直接走 authFetch 而不是 utils/api，是为了 `keepalive`：离开页面那一下的最后一次上报，
+ * 不带它会随页面卸载被浏览器掐掉，学生每节课的最后一段时长就永远丢了。
  * 失败一律吞掉 —— 留痕是旁路，不该让学生看到任何报错。
  */
 export function reportLearnProgress(

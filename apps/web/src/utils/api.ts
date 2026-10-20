@@ -1,11 +1,6 @@
-import axios, {
-  type AxiosRequestConfig,
-  type AxiosResponse,
-  type InternalAxiosRequestConfig,
-} from "axios"
 import { createDiscreteApi } from "naive-ui"
 import { useAuthModalStore } from "shared/store/authModal"
-import { getAccessToken, refreshAccessToken } from "./auth"
+import { authFetch } from "./auth"
 import { STORAGE_KEY } from "./constants"
 import storage from "./storage"
 
@@ -20,7 +15,7 @@ interface ErrorPayload {
 }
 
 /**
- * 拦截器 reject 出来的就是它：`error` 是错误码，`data` 是后端文案。
+ * 请求失败时抛的就是它：`error` 是错误码，`data` 是后端文案。
  *
  * 字段名沿用原来那个裸对象 `{ error, data }`，存量调用点读 `err.error` / `err.data`
  * 的语义不变；做成 Error 的子类是为了在 catch 里能和代码 bug（TypeError 之类）分开，
@@ -51,25 +46,11 @@ export function errorMessage(err: unknown, fallback = "未知错误") {
 }
 
 /**
- * 成功时直接拿到业务数据本身。后端成功响应是 `{ data }`（见 apps/api/src/http.ts
- * 的 success），拦截器把 axios 外层和这层信封一起剥掉。
- *
- * 失败走 reject，形状是 `{ error: 错误码, data: 文案 }` —— 和成功路径不对称是
- * 故意的：成功没有错误码可言。分支处理一律判 `err.error` 里的错误码。
- */
-interface ApiClient {
-  get<T>(url: string, config?: AxiosRequestConfig): Promise<T>
-  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
-  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>
-  delete<T>(url: string, config?: AxiosRequestConfig): Promise<T>
-}
-
-/**
  * 这几种错误全站都是同样的处理，不放在这里的话每个调用点都得自己 catch，
  * 漏一个就是「点了没反应」。需要分支处理的调用方一律判 `err.error` 里的
  * 错误码，**不要**去 match `err.data` 的文案 —— 文案是后端可以随时改的。
  *
- * 导出给不走 axios 的请求用（AI 的流式接口是裸 fetch，见 utils/stream.ts）——
+ * 导出给不走 api 客户端的请求用（AI 的流式接口，见 utils/stream.ts）——
  * 同一个错误码从两条路进来，学生看到的结果不该有两个样子。
  */
 /** handleGlobalApiError 已经替调用方提示过的错误码，调用方别再弹第二遍 */
@@ -94,68 +75,69 @@ export function handleGlobalApiError(code: string, message?: string) {
   }
 }
 
-const instance = axios.create({
-  baseURL: "/api",
-})
+const NETWORK_ERROR_MESSAGE = "网络异常，请检查网络后重试"
 
-/** 已经因为 token-expired 重试过一次的请求，别再进第二轮，也别再被请求拦截器换 token */
-type RetriableConfig = InternalAxiosRequestConfig & { authRetried?: boolean }
+interface RequestConfig {
+  /** 拼进 query string。值是 ""、null、undefined 的键直接丢掉，调用方不用自己挑 */
+  params?: Record<string, unknown>
+  /** 请求体，只给 delete 用：别的方法的请求体走第二个参数 */
+  data?: unknown
+}
 
-instance.interceptors.request.use(async (config: RetriableConfig) => {
-  if (!config.authRetried) {
-    const token = await getAccessToken()
-    if (token) config.headers.set("Authorization", `Bearer ${token}`)
+function withQuery(url: string, params?: Record<string, unknown>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== "" && value !== null && value !== undefined) query.append(key, String(value))
   }
-  if (config.params) {
-    config.params = Object.fromEntries(
-      Object.entries(config.params).filter(
-        ([, value]) => value !== "" && value !== null && value !== undefined,
-      ),
-    )
+  const search = query.toString()
+  return search ? `${url}?${search}` : url
+}
+
+async function request<T>(method: string, url: string, body: unknown, config: RequestConfig = {}) {
+  const init: RequestInit = { method }
+  // FormData 不能手动设 Content-Type：multipart 的 boundary 得让浏览器自己写进去
+  if (body instanceof FormData) {
+    init.body = body
+  } else if (body !== undefined) {
+    init.headers = { "Content-Type": "application/json" }
+    init.body = JSON.stringify(body)
   }
-  return config
-})
 
-instance.interceptors.response.use(
-  // 这里**故意**不返回 AxiosResponse：把 axios 的外层和后端的 { data } 信封一起
-  // 剥掉，让调用方直接拿到业务数据。类型上和 axios 的拦截器签名对不上（它期望原样
-  // 返回响应），文件末尾的 `as unknown as ApiClient` 就是为了把真实形状交出去。
-  ((response: AxiosResponse) => response.data.data) as unknown as (
-    response: AxiosResponse,
-  ) => AxiosResponse,
-  async (error) => {
-    const payload = error.response?.data as ErrorPayload | undefined
-    const code = payload?.error?.code ?? "network-error"
-    // 没有响应体 = 请求根本没到后端（断网、反代挂了、超时），学生看到的就是这一句
-    const message = payload?.error?.message ?? "网络异常，请检查网络后重试"
+  let response: Response
+  try {
+    response = await authFetch(withQuery(`/api/${url}`, config.params), init)
+  } catch {
+    // 请求根本没到后端（断网、反代挂了），学生看到的就是这一句
+    throw new ApiError("network-error", NETWORK_ERROR_MESSAGE)
+  }
+  const payload = (await response.json().catch(() => null)) as ({ data?: T } & ErrorPayload) | null
+  if (response.ok) return payload?.data as T
 
-    // access token 不能用了（过期、被吊销）：拿 refresh token 换一张，原请求重发一次。
-    // 重发的结果照样走这两个拦截器，调用方拿到的和一次成功没有区别
-    const config = error.config as RetriableConfig | undefined
-    if (code === "token-expired" && config && !config.authRetried) {
-      config.authRetried = true
-      const sent = String(config.headers.get("Authorization") ?? "").replace(/^Bearer /, "")
-      const outcome = await refreshAccessToken(sent)
-      if (outcome.token) {
-        config.headers.set("Authorization", `Bearer ${outcome.token}`)
-        return instance.request(config)
-      }
-      if (outcome.code === "network-error") {
-        return Promise.reject(new ApiError("network-error", "网络异常，请检查网络后重试"))
-      }
-      if (outcome.code === "account-disabled") {
-        handleGlobalApiError("account-disabled")
-        return Promise.reject(new ApiError("account-disabled", "账号已被禁用，请联系老师"))
-      }
-      // 登录真的过期了。拿掉 token 重发：要登录的接口回 login-required 弹登录框，
-      // 可选登录的（首页、题目列表……）照常当游客看，不平白弹框
-      config.headers.delete("Authorization")
-      return instance.request(config)
-    }
+  // 没有 JSON 信封 = 不是后端回的（网关的错误页之类），当网络问题
+  const code = payload?.error?.code ?? "network-error"
+  const message = payload?.error?.message ?? NETWORK_ERROR_MESSAGE
+  handleGlobalApiError(code, message)
+  throw new ApiError(code, message)
+}
 
-    handleGlobalApiError(code, message)
-    return Promise.reject(new ApiError(code, message))
-  },
-)
+/**
+ * 成功时直接拿到业务数据本身：后端成功响应是 `{ data }`（见 apps/api/src/http.ts
+ * 的 success），这层信封在这里剥掉。
+ *
+ * 失败抛 ApiError，`error` 是错误码、`data` 是文案 —— 和成功路径不对称是故意的：
+ * 成功没有错误码可言。分支处理一律判 `err.error` 里的错误码。
+ *
+ * token 过期换一张重发、换不到当游客重发，都在 authFetch 里，调用方拿到的和一次
+ * 成功没有区别。
+ */
+const api = {
+  get: <T>(url: string, config?: RequestConfig) => request<T>("GET", url, undefined, config),
+  post: <T>(url: string, data?: unknown, config?: RequestConfig) =>
+    request<T>("POST", url, data, config),
+  put: <T>(url: string, data?: unknown, config?: RequestConfig) =>
+    request<T>("PUT", url, data, config),
+  delete: <T>(url: string, config?: RequestConfig) =>
+    request<T>("DELETE", url, config?.data, config),
+}
 
-export default instance as unknown as ApiClient
+export default api

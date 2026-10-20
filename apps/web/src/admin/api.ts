@@ -304,9 +304,7 @@ export async function uploadImage(file: File): Promise<string> {
     success: boolean
     filePath: string
     msg: string
-  }>("admin/upload-image", form, {
-    headers: { "content-type": "multipart/form-data" },
-  })
+  }>("admin/upload-image", form)
   return res.success ? res.filePath : ""
 }
 
@@ -317,9 +315,7 @@ export function uploadTestcases(file: File, options: { sql?: boolean } = {}) {
   if (options.sql) {
     form.append("sql", "1")
   }
-  return api.post<UploadTestCaseResponse>("admin/test-cases", form, {
-    headers: { "content-type": "multipart/form-data" },
-  })
+  return api.post<UploadTestCaseResponse>("admin/test-cases", form)
 }
 
 // SQL 题测试点预览：后端跑一遍初始化脚本+标准答案，返回数据表和期望结果展示数据
