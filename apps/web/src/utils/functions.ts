@@ -1,12 +1,10 @@
 import { TIME_ZONE_OFFSET_MINUTES, toAdminType } from "@oj2/contract"
 import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
-import { getTime, intervalToDuration, parseISO, type Duration } from "date-fns"
 import { AdminUser, Submission } from "./types"
 import { JUDGE_STATUS, USER_TYPE } from "./constants"
 import { strFromU8, strToU8, unzlibSync, zipSync, zlibSync, type Zippable } from "fflate"
 import copyTextFallback from "copy-text-to-clipboard"
 import { normalizeDate } from "@vueuse/core"
-import { customAlphabet } from "nanoid"
 
 function calculateACRate(acCount: number, totalCount: number): string {
   if (totalCount === 0) return "0.00"
@@ -80,24 +78,6 @@ export function getTagColor(tag: "Low" | "Mid" | "High" | "简单" | "中等" | 
 }
 
 // 2023-04-03T02:43:28.673156Z
-/**
- * 把时段选项的 `value`（`"weeks:1"`、`"minutes:10"`）解成 date-fns 的 Duration。
- *
- * 认不出来返回 null —— 「全部时段」那个 `all` 走的就是这条，调用方本来就该在
- * `duration === "all"` 时不带时间条件。原来这段 `split(":")` 在五个组件里各写了一遍
- * （两个统计面板、AI 分析页、榜单页、班级对比页），每份的兜底还都不一样。
- */
-export function durationFromValue(
-  // 放宽到 SelectOption["value"] 那个形状：这些值直接来自 n-select 的绑定，
-  // Naive 那边的类型是 string | number | undefined。数字解不出来，照样回 null
-  value: string | number | null | undefined,
-): Duration | null {
-  const [unit, amount] = String(value ?? "").split(":")
-  const count = Number(amount)
-  if (!unit || !Number.isFinite(count)) return null
-  return { [unit]: count } as Duration
-}
-
 const OFFSET_MS = TIME_ZONE_OFFSET_MINUTES * 60_000
 
 const pad2 = (value: number) => String(value).padStart(2, "0")
@@ -169,11 +149,52 @@ export function fromPickerValue(value: number) {
   return value - OFFSET_MS - new Date(value).getTimezoneOffset() * 60_000
 }
 
-function getDurationObject(start: Date | string, end: Date | string) {
-  return intervalToDuration({
-    start: getTime(parseISO(start.toString())),
-    end: getTime(parseISO(end.toString())),
-  })
+interface Duration {
+  years: number
+  months: number
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+}
+
+/** 往后挪几个月，日子超出那个月就落到月底（1 月 31 日 + 1 个月 = 2 月 28/29 日） */
+function addMonthsUTC(date: Date, months: number) {
+  const day = date.getUTCDate()
+  const moved = new Date(date)
+  moved.setUTCDate(1)
+  moved.setUTCMonth(moved.getUTCMonth() + months)
+  const lastDay = new Date(
+    Date.UTC(moved.getUTCFullYear(), moved.getUTCMonth() + 1, 0),
+  ).getUTCDate()
+  moved.setUTCDate(Math.min(day, lastDay))
+  return moved
+}
+
+/**
+ * 两个时刻之间隔了几年几月几天几小时……年和月按**东八区**的日历数，口径和 zonedParts
+ * 一样（平移固定偏移再读 UTC 部件）。先数整月，剩下的不到一个月按毫秒拆 ——
+ * 东八区没有夏令时，一天恒为 24 小时。倒过来（end 早于 start）或无效日期一律全 0。
+ */
+function getDurationObject(start: Date | string, end: Date | string): Duration {
+  const from = normalizeDate(start).getTime()
+  const to = normalizeDate(end).getTime()
+  const zero = { years: 0, months: 0, days: 0, hours: 0, minutes: 0, seconds: 0 }
+  if (!(to > from)) return zero
+
+  const a = new Date(from + OFFSET_MS)
+  const b = new Date(to + OFFSET_MS)
+  let months = (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
+  if (addMonthsUTC(a, months) > b) months--
+  const seconds = Math.floor((b.getTime() - addMonthsUTC(a, months).getTime()) / 1000)
+  return {
+    years: Math.floor(months / 12),
+    months: months % 12,
+    days: Math.floor(seconds / 86400),
+    hours: Math.floor(seconds / 3600) % 24,
+    minutes: Math.floor(seconds / 60) % 60,
+    seconds: seconds % 60,
+  }
 }
 
 function formatDurationUnits(
@@ -243,7 +264,7 @@ export function durationToDays(start: Date | string, end: Date | string): string
 }
 
 export function secondsToDuration(seconds: number): string {
-  // 直接算，不走 date-fns 的 intervalToDuration：那个会拆出年、月，原来只把天和小时
+  // 直接算，不走 getDurationObject：那个会拆出年、月，原来只把天和小时
   // 折回小时，超过一个月就把月丢了（剩 40 天 1 小时显示成 217:00:00）
   const total = Math.max(0, Math.floor(seconds))
   const pad = (n: number) => String(n).padStart(2, "0")
@@ -382,9 +403,4 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     console.error("复制失败:", error)
     return false
   }
-}
-
-export function getRandomId() {
-  const nanoid = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz")
-  return nanoid()
 }

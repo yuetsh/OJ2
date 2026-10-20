@@ -311,31 +311,6 @@ export function sortFlowchartCriteria<T>(details: Record<string, T>): [string, T
   return Object.entries(details).sort(([a], [b]) => rank(a) - rank(b))
 }
 
-/**
- * 时段选项。`value` 是 `<date-fns 的单位>:<数量>`，由 `durationFromValue()` 解析 ——
- * 别在组件里再手写一遍 `split(":")`，那套解析原来散在五个文件里。
- */
-export const DURATION_OPTIONS = [
-  { label: "本节课内", value: "hours:1" },
-  { label: "两节课内", value: "hours:2" },
-  { label: "一天内", value: "days:1" },
-  { label: "一周内", value: "weeks:1" },
-  { label: "一个月内", value: "months:1" },
-  { label: "两个月内", value: "months:2" },
-  { label: "半年内", value: "months:6" },
-  { label: "一年内", value: "years:1" },
-] as const
-
-/**
- * 班级对比用的长时段，一周起步。
- *
- * 看的是长期趋势，「本节课内」这种窗口在那儿没有意义 —— 全班一小时内的
- * AC 数拉出来比不出什么。从上面那份派生，不另抄一份。
- */
-export const LONG_DURATION_OPTIONS = DURATION_OPTIONS.filter(
-  (option) => !["hours:1", "hours:2", "days:1"].includes(option.value),
-)
-
 // 班级号的位数范围。学生用户名形如 ks<班级号><姓名>，班级号还要跟
 // 网站配置里的班级列表对得上。
 // 后端 OnlineJudge/utils/shortcuts.py 的 CLASS_NAME_MIN/MAX_DIGITS

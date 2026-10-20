@@ -1,5 +1,4 @@
 import { errorCode } from "utils/api"
-import { formatISO, getTime, parseISO } from "date-fns"
 import { useUserStore } from "shared/store/user"
 import { ContestStatus, ContestType } from "utils/constants"
 import { duration, secondsToDuration } from "utils/functions"
@@ -28,8 +27,8 @@ export const useContestStore = defineStore("contest", () => {
 
   const contestStatus = computed<ContestStatus>(() => {
     if (!contest.value) return ContestStatus.initial
-    const start = getTime(parseISO(contest.value.startTime.toString()))
-    const end = getTime(parseISO(contest.value.endTime.toString()))
+    const start = new Date(contest.value.startTime).getTime()
+    const end = new Date(contest.value.endTime).getTime()
     if (start > now.value) {
       return ContestStatus.not_started
     } else if (end < now.value) {
@@ -43,10 +42,10 @@ export const useContestStore = defineStore("contest", () => {
     if (contestStatus.value === ContestStatus.finished) {
       return "已结束"
     } else if (contestStatus.value === ContestStatus.not_started) {
-      const d = duration(formatISO(now.value), contest.value!.startTime, true)
+      const d = duration(new Date(now.value), contest.value!.startTime, true)
       return "距离比赛开始 " + d
     } else {
-      const d = duration(formatISO(now.value), contest.value!.endTime, true)
+      const d = duration(new Date(now.value), contest.value!.endTime, true)
       return "距离比赛结束 " + d
     }
   })
@@ -54,7 +53,7 @@ export const useContestStore = defineStore("contest", () => {
   /** 进行中还剩多久，「38:12」「1:05:00」这种；不在进行中为空串。题目页上下文条用 */
   const remaining = computed(() => {
     if (contestStatus.value !== ContestStatus.underway) return ""
-    const end = getTime(parseISO(contest.value!.endTime.toString()))
+    const end = new Date(contest.value!.endTime).getTime()
     const text = secondsToDuration(Math.max(0, Math.floor((end - now.value) / 1000)))
     return text.startsWith("0:") ? text.slice(2) : text
   })
@@ -101,7 +100,7 @@ export const useContestStore = defineStore("contest", () => {
     const res = await getContest(contestID)
     contest.value = res
     // now 是学生侧比赛专有的服务器时间，用来对齐倒计时
-    now.value = getTime(parseISO(res.now ?? res.createTime))
+    now.value = new Date(res.now ?? res.createTime).getTime()
     // 先停掉上一轮的表。init() 会被调第二次：detail.vue 在「未开始 → 进行中」那一刻
     // 重新 init 一次（为了把开赛后才拿得到的题目捞回来），不清的话两个 setInterval
     // 一起给 now 加 1000，倒计时变两倍速 —— 学生赛前挂着页面就会中招，一场 60 分钟的
