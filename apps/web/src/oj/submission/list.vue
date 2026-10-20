@@ -61,10 +61,15 @@ const tone = useTone()
 const { isMobile, isDesktop } = useBreakpoints()
 
 /**
- * 左栏收窄（底栏最左那个按钮）：屏窄、或者浏览器放大了一档时右边的代码看不全，
- * 收窄后每条排成手机上那样的两行，什么都不丢。记在本机，下次打开还是收着的
+ * 左栏自动收窄：屏窄、或者浏览器放大了一档时，按 46 : 54 分右边的代码看不全
+ * （九成五的提交最长一行 52 个字符，代码区要 ~650），就把列表收到 320、每条排成手机上
+ * 那样的两行，什么都不丢。1280 的屏不放大正好不收；收不收只看分栏的宽，和列表自己无关，不会来回跳
  */
-const narrowList = useStorage("oj2:submission-list-narrow", false)
+const split = useTemplateRef<HTMLElement>("split")
+const { width: splitWidth } = useElementSize(split)
+const narrowList = computed(
+  () => isDesktop.value && splitWidth.value > 0 && splitWidth.value < 1200,
+)
 const twoLine = computed(() => isMobile.value || narrowList.value)
 
 const inContest = computed(() => route.name === "contest submissions")
@@ -588,7 +593,7 @@ function dayBreak(index: number) {
   <div
     ref="pageRoot"
     class="page"
-    :class="{ contest: inContest, mobile: isMobile, 'narrow-list': isDesktop && narrowList }"
+    :class="{ contest: inContest, mobile: isMobile, 'narrow-list': narrowList }"
   >
     <!-- 筛选栏 -->
     <div v-if="isDesktop" class="filters">
@@ -842,7 +847,7 @@ function dayBreak(index: number) {
       </div>
     </div>
 
-    <div class="split">
+    <div ref="split" class="split">
       <!-- 左栏：列表 -->
       <section class="list">
         <div v-if="unknownProblems.length" class="unknown-bar">
@@ -974,24 +979,12 @@ function dayBreak(index: number) {
           <div v-if="!loaded" class="empty"><n-spin size="small" /></div>
         </div>
         <div class="list-foot">
-          <n-button
-            v-if="isDesktop"
-            size="small"
-            quaternary
-            :title="narrowList ? '列表放宽' : '列表收窄，右边的代码留宽一点'"
-            :aria-label="narrowList ? '列表放宽' : '列表收窄'"
-            @click="narrowList = !narrowList"
-          >
-            <template #icon>
-              <Icon :icon="narrowList ? 'ph:arrow-line-right' : 'ph:arrow-line-left'" />
-            </template>
-          </n-button>
-          <span v-if="total && !(isDesktop && narrowList)" class="total">共 {{ total }} 条</span>
+          <span v-if="total && !narrowList" class="total">共 {{ total }} 条</span>
           <div class="spacer"></div>
           <Pagination
             class="pager"
             :total="total"
-            :simple="isDesktop && narrowList"
+            :simple="narrowList"
             v-model:limit="query.limit"
             v-model:page="query.page"
           />
