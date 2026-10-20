@@ -1211,7 +1211,7 @@ onMounted(async () => {
               <n-radio value="show" />
               <span>
                 <b>给学生看一张参考流程图</b>
-                <small>题面里多一条「老师给的参考流程图」，默认收着，学生点开才看</small>
+                <small>题面里例子下面摊开一张参考流程图</small>
               </span>
             </label>
             <label class="mode" :class="{ on: form.flowchartMode === 'draw' }">
@@ -1355,6 +1355,7 @@ onMounted(async () => {
       :ast-checks="astChecks"
       :flowchart-mode="form.flowchartMode"
       :mermaid-code="previewMermaid"
+      :flowchart-doc="form.flowchartDoc"
       @render-state="mermaidOk = $event"
       @collapse="previewCollapsed = true"
     />

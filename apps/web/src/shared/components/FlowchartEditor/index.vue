@@ -15,6 +15,7 @@ import {
   type StepKind,
 } from "./model"
 import { layoutDoc, PLACEHOLDER, type LaidNode, type LaidSlot } from "./layout"
+import { nodeLabel, shapePoints, useFlowPaint } from "./paint"
 
 /**
  * 画流程图（插入式）。设计稿：画布「画流程图重设计」页的 FlowEdB / FlowEdBLoop。
@@ -49,7 +50,7 @@ const model = defineModel<FlowDoc | null>("value", { default: null })
 
 const message = useMessage()
 const theme = useThemeVars()
-const isDark = useDark()
+const { isDark, paint, lineColor } = useFlowPaint()
 
 // ==================== 数据与历史 ====================
 
@@ -507,43 +508,7 @@ onUnmounted(() => document.removeEventListener("keydown", onKeyDown))
 
 // ==================== 颜色 ====================
 
-type Paint = { fill: string; stroke: string; text: string }
-const paints = computed<Record<string, Paint>>(() =>
-  isDark.value
-    ? {
-        terminal: { fill: "rgba(24,160,88,0.16)", stroke: "#3fbf7f", text: "#8fe0b4" },
-        io: { fill: "rgba(70,130,220,0.18)", stroke: "#5b8fdc", text: "#a9c6f2" },
-        process: { fill: "#26272b", stroke: "#8a8f98", text: "#e6e7ea" },
-        decision: { fill: "rgba(208,138,28,0.18)", stroke: "#e0a040", text: "#f2cd8c" },
-      }
-    : {
-        terminal: { fill: "#eef8f2", stroke: "#18a058", text: "#0c6b3b" },
-        io: { fill: "#eef4fd", stroke: "#2f6bc4", text: "#1d4f9c" },
-        process: { fill: "#ffffff", stroke: "#7d828a", text: "#1f2225" },
-        decision: { fill: "#fdf5e6", stroke: "#d08a1c", text: "#8a5200" },
-      },
-)
-function paint(kind: LaidNode["kind"]) {
-  if (kind === "start" || kind === "end") return paints.value.terminal!
-  if (kind === "input" || kind === "output") return paints.value.io!
-  if (kind === "if" || kind === "while") return paints.value.decision!
-  return paints.value.process!
-}
-const lineColor = computed(() => (isDark.value ? "#8a8f98" : "#7d828a"))
 const dotColor = computed(() => (isDark.value ? "#34363b" : "#e3e5e8"))
-
-function shapePoints(node: LaidNode) {
-  const { x, y, w, h } = node
-  if (node.kind === "if" || node.kind === "while")
-    return `${x + w / 2},${y} ${x + w},${y + h / 2} ${x + w / 2},${y + h} ${x},${y + h / 2}`
-  const s = 10
-  return `${x + s},${y} ${x + w},${y} ${x + w - s},${y + h} ${x},${y + h}`
-}
-
-function nodeLabel(node: LaidNode) {
-  if (node.kind === "start" || node.kind === "end") return node.text
-  return node.text.trim() || PLACEHOLDER[node.kind]
-}
 
 /** 菜单里的小图标：和画布上同一套形状 */
 function miniPoints(kind: StepKind) {

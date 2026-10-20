@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isSqlProblem } from "@oj2/contract"
+import { isSqlProblem, parseFlowDoc } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import { storeToRefs } from "pinia"
 import { useProblemStore } from "oj/store/problem"
@@ -15,6 +15,9 @@ import { useUserStore } from "shared/store/user"
 import { useProblemPageContext } from "../composables/problemPageContext"
 
 const ProblemFlowchart = defineAsyncComponent(() => import("./ProblemFlowchart.vue"))
+const FlowchartView = defineAsyncComponent(
+  () => import("shared/components/FlowchartEditor/FlowchartView.vue"),
+)
 const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
 
 const theme = useThemeVars()
@@ -45,25 +48,29 @@ const myStatus = computed(() => {
 // 不写「限时 1 秒 / 内存 256MB」：中职学生看了只会犯迷糊，超时、超内存判出来时结果页签里自有说明
 
 // ==================== 流程图小节 ====================
-// 同一个位置二选一：老师给的参考图（showFlowchart，默认折叠），或者学生自己画到 A/S 的
-// 那张（allowFlowchart）。两个开关在后台是互斥的（admin/problem/detail.vue）；后端在
-// allowFlowchart 为真时会把 mermaidCode 置成 null，不能把标准答案下发给正要自己画图的学生。
+// 老师给的参考图（showFlowchart）和学生自己画到 A/S 的那张（allowFlowchart）只会有一个：
+// 两个开关在后台是互斥的（admin/problem/detail.vue）；后端在 allowFlowchart 为真时会把
+// mermaidCode 置成 null，不能把标准答案下发给正要自己画图的学生。
 const canShowReferenceFlowchart = computed(
   () => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode,
 )
+/**
+ * 参考图用画流程图那套排法画（设计稿「参考流程图」C）。只有手写 Mermaid、没有结构树的老图
+ * （恢复老备份才会有）退回 Mermaid
+ */
+const referenceDoc = computed(() => {
+  const doc = parseFlowDoc(problem.value?.flowchartData)
+  return doc?.steps.length ? doc : null
+})
 const myFlowchartStore = useMyFlowchartStore()
 const flowchartStore = useFlowchartStore()
 const userStore = useUserStore()
 const myFlowchartZoom = ref(false)
-/** 参考流程图默认折叠；自己画的那张默认展开、可以收起（设计稿「流程图 A 级之后」） */
-const referenceOpen = ref(false)
+/** 自己画的那张默认展开、可以收起（设计稿「流程图 A 级之后」） */
 const myFlowchartOpen = ref(true)
 watch(
   () => problem.value?._id,
-  () => {
-    referenceOpen.value = false
-    myFlowchartOpen.value = true
-  },
+  () => (myFlowchartOpen.value = true),
 )
 
 /** 流程图画到 A / S 了：标题下给个「流程图 A 级」 */
@@ -252,39 +259,8 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       </section>
     </div>
 
-    <!-- 老师给的参考流程图：一行可以点开的条，默认折叠 -->
-    <section v-if="canShowReferenceFlowchart" class="block">
-      <button
-        type="button"
-        class="fold"
-        :aria-expanded="referenceOpen"
-        @click="referenceOpen = !referenceOpen"
-      >
-        <svg
-          class="fold-caret"
-          :class="{ open: referenceOpen }"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M9 6l6 6-6 6" />
-        </svg>
-        <span class="fold-title">老师给的参考流程图</span>
-        <span class="fold-note">{{ referenceOpen ? "收起" : "点开看" }}</span>
-      </button>
-      <div v-if="referenceOpen" class="fold-body">
-        <ProblemFlowchart />
-      </div>
-    </section>
-
     <!-- 自己画到 A/S 的那张：默认展开一小块，可以放大、可以收起 -->
-    <section v-else-if="myFlowchartStore.showing" class="block">
+    <section v-if="!canShowReferenceFlowchart && myFlowchartStore.showing" class="block">
       <div class="block-head">
         <h3 class="title">你画的流程图</h3>
         <n-button text type="primary" size="small" @click="myFlowchartZoom = true">
@@ -376,6 +352,18 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <h3 class="title sql-title">{{ text }}</h3>
       </template>
     </SqlProblemData>
+
+    <!--
+      老师给的参考流程图：默认摊开，放在例子后面（设计稿「参考流程图」C）。原来在例子前面、
+      折成一条要点开 —— 摊开放前面的话，长图（1056 有一千来像素高）会把例子挤出第一屏
+    -->
+    <section v-if="canShowReferenceFlowchart" class="block">
+      <h3 class="title">参考流程图</h3>
+      <div class="reference-flowchart">
+        <FlowchartView v-if="referenceDoc" :doc="referenceDoc" />
+        <ProblemFlowchart v-else />
+      </div>
+    </section>
 
     <section v-if="problem.hint" class="block">
       <h3 class="title">提示</h3>
@@ -502,48 +490,11 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   font-weight: 600;
 }
 
-/* 参考流程图：一行可以点开的条 */
-.fold {
-  width: 100%;
-  height: 38px;
-  box-sizing: border-box;
-  padding: 0 12px;
-  border: 1px solid v-bind("theme.dividerColor");
+/* 参考流程图：和例子的格子同一种浅灰底 */
+.reference-flowchart {
   border-radius: 6px;
-  background-color: rgba(128, 128, 128, 0.04);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.fold:hover {
-  border-color: v-bind("theme.borderColor");
-}
-
-.fold-caret {
-  flex: none;
-  transition: transform 0.15s;
-}
-
-.fold-caret.open {
-  transform: rotate(90deg);
-}
-
-.fold-title {
-  font-weight: 600;
-}
-
-.fold-note {
-  font-size: 13px;
-  color: v-bind("theme.textColor3");
-}
-
-.fold-body {
-  margin-top: 8px;
+  background-color: rgba(128, 128, 128, 0.05);
+  padding: 16px 12px;
 }
 
 .my-flowchart {

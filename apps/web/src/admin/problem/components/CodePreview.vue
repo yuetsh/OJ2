@@ -5,11 +5,15 @@ import { useMermaid } from "shared/composables/useMermaid"
 import { DIFFICULTY, SOURCES } from "utils/constants"
 import { getTagColor } from "utils/functions"
 import type { AstRules, BlankProblem, LANGUAGE } from "utils/types"
+import type { FlowDoc } from "shared/components/FlowchartEditor/model"
 import type { AstCheckState, FlowchartMode, PreviewTab } from "./editorTypes"
 import type { TemplateParts } from "./codeTemplate"
 import { isBlankHtml } from "./problemForm"
 
 const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
+const FlowchartView = defineAsyncComponent(
+  () => import("shared/components/FlowchartEditor/FlowchartView.vue"),
+)
 
 /**
  * 编程题出题页的右栏：学生打开这道题看到的样子（设计稿「编程题出题页」B）。
@@ -35,6 +39,8 @@ const props = defineProps<{
   astChecks: AstCheckState
   flowchartMode: FlowchartMode
   mermaidCode: string
+  /** 画布画的参考图；有就照学生题面那样画（FlowchartView），老题手写的 Mermaid 才走 mermaidCode */
+  flowchartDoc: FlowDoc | null
 }>()
 
 const tab = defineModel<PreviewTab>("tab", { required: true })
@@ -83,6 +89,8 @@ const editorCode = computed(() => {
 })
 
 // ---------------------------------------------------------------- 流程图
+
+const referenceDoc = computed(() => (props.flowchartDoc?.steps.length ? props.flowchartDoc : null))
 
 const container = useTemplateRef<HTMLElement>("chart")
 const { renderFlowchart, renderError, renderSuccess } = useMermaid()
@@ -164,11 +172,6 @@ onMounted(() => nextTick(render))
         </section>
       </div>
 
-      <button v-if="flowchartMode === 'show'" type="button" class="fold" @click="tab = 'flowchart'">
-        <span>›</span><b>老师给的参考流程图</b>
-        <span class="muted">学生点开才看到 · 在「流程图」里看</span>
-      </button>
-
       <div class="exampleHead">
         <h3 class="title">例子</h3>
         <div class="grow"></div>
@@ -187,6 +190,15 @@ onMounted(() => nextTick(render))
       <p v-else class="placeholder">
         {{ bigData ? "在左边加一个例子" : "在左边的测试数据里勾几组「当例子」" }}
       </p>
+
+      <template v-if="flowchartMode === 'show'">
+        <h3 class="title">参考流程图</h3>
+        <div v-if="referenceDoc" class="reference">
+          <FlowchartView :doc="referenceDoc" />
+        </div>
+        <p v-else-if="mermaidCode.trim()" class="muted small">老题手写的图，在「流程图」里看</p>
+        <p v-else class="placeholder">还没画</p>
+      </template>
 
       <template v-if="!isBlankHtml(hint)">
         <h3 class="title">提示</h3>
@@ -250,11 +262,15 @@ onMounted(() => nextTick(render))
         学生在题目页右边自己画，交上去按例子和测试数据评
       </p>
       <template v-else>
-        <p class="muted small">学生在题面里点开「老师给的参考流程图」看到的是：</p>
-        <p v-if="!mermaidCode.trim()" class="placeholder">还没画</p>
-        <div v-if="renderError" class="chartError">画不出来：{{ renderError }}</div>
+        <p class="muted small">学生在题面例子下面看到的是：</p>
+        <div v-if="referenceDoc" class="reference">
+          <FlowchartView :doc="referenceDoc" />
+        </div>
+        <p v-else-if="!mermaidCode.trim()" class="placeholder">还没画</p>
+        <div v-else-if="renderError" class="chartError">画不出来：{{ renderError }}</div>
       </template>
-      <div v-show="flowchartMode === 'show'" ref="chart" class="chart"></div>
+      <!-- 老题手写的 Mermaid 才露出来；有结构树时也照常渲染，保存按钮要它报「画得出来」 -->
+      <div v-show="flowchartMode === 'show' && !referenceDoc" ref="chart" class="chart"></div>
     </div>
   </aside>
 </template>
@@ -361,19 +377,11 @@ onMounted(() => nextTick(render))
   color: v-bind("theme.textColor3");
 }
 
-.fold {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 12px;
-  border: 1px solid v-bind("theme.borderColor");
+/* 参考流程图：和学生题面（ProblemContent.vue）同一种浅灰底 */
+.reference {
   border-radius: 6px;
-  background: transparent;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
+  background-color: rgba(128, 128, 128, 0.05);
+  padding: 16px 12px;
 }
 
 .exampleHead {
