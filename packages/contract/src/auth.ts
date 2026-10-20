@@ -23,12 +23,12 @@ export const WS_AUTH_PROTOCOL = "oj2.bearer"
  * `expiresIn` 是秒数而不是到期时刻：机房电脑的时钟不一定准，前端拿自己的时钟加上它
  * 算到期，才不会因为差了几分钟一直以为 token 已过期。
  *
- * `refreshToken` 为 null 只出现在换 token 的宽限期里（同一张 refresh token 刚被别的
- * 标签页换掉），这时沿用本地已经存着的那张，见 auth/session.ts 的 refreshTokens。
+ * 换 token 时 `refreshToken` 一般是新轮换出来的一张；同一张刚被别的标签页换掉的话，
+ * 回的是那个标签页拿到的那张，见 auth/session.ts 的 REFRESH_GRACE_MS。
  */
 export interface AuthTokens {
   accessToken: string
-  refreshToken: string | null
+  refreshToken: string
   expiresIn: number
 }
 

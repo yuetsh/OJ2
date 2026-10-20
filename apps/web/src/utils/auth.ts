@@ -26,8 +26,7 @@ export function saveTokens(tokens: AuthTokens) {
     token: tokens.accessToken,
     expiresAt: Date.now() + tokens.expiresIn * 1000,
   } satisfies StoredAccess)
-  // null = 换 token 的宽限期，沿用本地那张，见契约 AuthTokens 的注释
-  if (tokens.refreshToken) storage.set(STORAGE_KEY.REFRESH_TOKEN, tokens.refreshToken)
+  storage.set(STORAGE_KEY.REFRESH_TOKEN, tokens.refreshToken)
 }
 
 export function clearTokens() {

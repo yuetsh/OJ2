@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
+import { randomBytes, timingSafeEqual } from "node:crypto"
 
 import {
   toAdminType,
@@ -28,7 +28,7 @@ import { redis } from "../redis"
  *   每换一次 access token 就轮换一次，有效期跟着往后顺延 —— 和原来 cookie 会话
  *   「七天不来才过期」是同一个口径。
  *
- * 会话本体仍然在 Redis 的 `auth-session:<sid>` 里（refresh token 的哈希、上次登录时刻），所以这不是「无状态 JWT」：每个请求验完签名还要确认会话还在、
+ * 会话本体仍然在 Redis 的 `auth-session:<sid>` 里（refresh token、上次登录时刻），所以这不是「无状态 JWT」：每个请求验完签名还要确认会话还在、
  * token_version 没变。原因是这几件事必须**立刻**生效，等 access token 自然过期不行：
  *
  * - 退出登录 —— 删掉会话，同一张 access token 下一个请求就不认了；
@@ -52,8 +52,9 @@ export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60
  * 换 token 的宽限期。refresh token 每用一次就轮换，而同一个浏览器里几个标签页共用
  * localStorage 里的同一张：两个标签页前后脚去换，后到的那个拿着的已经是旧的了。
  * 机房走 http，没有安全上下文，`navigator.locks` 用不了，前端没法让它们排队，
- * 只能在这里放一手 —— 刚被换掉的上一张在这段时间里仍然能换出 access token。
- * 响应丢了（换成功了但前端没收到）也靠它兜住，不然学生会被莫名登出。
+ * 只能在这里放一手 —— 刚被换掉的上一张在这段时间里拿来换，回的是**当前那张**，
+ * 几个标签页最后落到同一张上。响应丢了（换成功了但前端没收到）、前端拿旧的重试，
+ * 也是这一支接住。
  */
 const REFRESH_GRACE_MS = 60_000
 
@@ -85,10 +86,14 @@ interface StoredSession {
    * 不然改完密码，旧会话拿 refresh token 照样能换出一张带新版本号的 access token
    */
   tokenVersion: number
-  /** 当前那张 refresh token 随机部分的 sha256 */
-  refreshHash: string
-  /** 上一张，宽限期内仍然认，见 REFRESH_GRACE_MS */
-  previousRefreshHash: string | null
+  /**
+   * 当前那张 refresh token 的随机部分。存原文而不是哈希：宽限期里要把它原样交给
+   * 后到的标签页（见 REFRESH_GRACE_MS）。这不比存哈希更危险 —— JWT 的签名密钥就在
+   * 同一个 Redis 里，读得到这里的人本来就能签出任何人的 access token。
+   */
+  refreshSecret: string
+  /** 上一张，宽限期内仍然认 */
+  previousRefreshSecret: string | null
   /** 上一次轮换的毫秒时刻 */
   rotatedAt: number
   createdAt: string
@@ -120,11 +125,8 @@ function sessionKey(sid: string) {
   return `${SESSION_PREFIX}${sid}`
 }
 
-function hashSecret(value: string) {
-  return createHash("sha256").update(value).digest("hex")
-}
-
-function sameHash(a: string, b: string | null) {
+/** 等长才比，比的时候不按字节提前退出 */
+function sameSecret(a: string, b: string | null) {
   if (b === null || a.length !== b.length) return false
   return timingSafeEqual(Buffer.from(a), Buffer.from(b))
 }
@@ -133,24 +135,50 @@ function sameHash(a: string, b: string | null) {
 function splitRefreshToken(token: string) {
   const dot = token.indexOf(".")
   if (dot <= 0 || dot === token.length - 1) return null
-  return { sid: token.slice(0, dot), secretHash: hashSecret(token.slice(dot + 1)) }
+  return { sid: token.slice(0, dot), secret: token.slice(dot + 1) }
 }
 
-async function readSession(sid: string) {
+/** 连原始 JSON 一起返回：轮换时拿它做比对再写入，见 refreshTokens */
+async function readSessionRaw(sid: string) {
   const raw = await redis.get(sessionKey(sid))
   if (!raw) return null
   try {
     const value = JSON.parse(raw) as StoredSession
     value.previousLogin ??= null
-    return value
+    return { raw, value }
   } catch {
     await redis.del(sessionKey(sid))
     return null
   }
 }
 
-function writeSession(sid: string, value: StoredSession) {
-  return redis.set(sessionKey(sid), JSON.stringify(value), "EX", config.sessionTtlSeconds)
+async function readSession(sid: string) {
+  return (await readSessionRaw(sid))?.value ?? null
+}
+
+/**
+ * 会话还是读出来时那一份才写入，被别人改过就不写、返回 false。
+ * GET 和 SET 之间隔着一次查库，两个标签页同时换 token 完全可能都读到同一份 ——
+ * 不拦的话两边各轮换出一张，后写的把先写的冲掉，手里拿着被冲掉那张的标签页
+ * 15 分钟后就换不动了。
+ */
+const COMPARE_AND_SET = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  redis.call("SET", KEYS[1], ARGV[2], "EX", ARGV[3])
+  return 1
+end
+return 0`
+
+async function compareAndSetSession(sid: string, expected: string, value: StoredSession) {
+  const result = await redis.eval(
+    COMPARE_AND_SET,
+    1,
+    sessionKey(sid),
+    expected,
+    JSON.stringify(value),
+    config.sessionTtlSeconds,
+  )
+  return result === 1
 }
 
 async function signAccessToken(claims: AccessClaims) {
@@ -198,8 +226,8 @@ export async function issueTokens(
   const value: StoredSession = {
     userId,
     tokenVersion,
-    refreshHash: hashSecret(refreshSecret),
-    previousRefreshHash: null,
+    refreshSecret,
+    previousRefreshSecret: null,
     rotatedAt: Date.now(),
     createdAt: new Date().toISOString(),
     previousLogin,
@@ -232,50 +260,65 @@ export type RefreshResult =
 export async function refreshTokens(refreshToken: string): Promise<RefreshResult> {
   const parts = splitRefreshToken(refreshToken)
   if (!parts) return { tokens: null, reason: "invalid" }
-  const session = await readSession(parts.sid)
-  if (!session) return { tokens: null, reason: "invalid" }
 
-  const current = sameHash(parts.secretHash, session.refreshHash)
-  const inGrace =
-    !current &&
-    sameHash(parts.secretHash, session.previousRefreshHash) &&
-    Date.now() - session.rotatedAt < REFRESH_GRACE_MS
-  if (!current && !inGrace) return { tokens: null, reason: "invalid" }
+  // 比对再写入失败（别的标签页抢先轮换了）就重读一遍，这时手里这张已经是「上一张」，
+  // 第二轮走宽限期。三轮还落不了地只可能是被刷，直接拒
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const stored = await readSessionRaw(parts.sid)
+    if (!stored) return { tokens: null, reason: "invalid" }
+    const session = stored.value
 
-  const user = await selectUser(session.userId)
-  if (!user || user.tokenVersion !== session.tokenVersion) {
-    await redis.del(sessionKey(parts.sid))
-    return { tokens: null, reason: "invalid" }
+    const current = sameSecret(parts.secret, session.refreshSecret)
+    const inGrace =
+      !current &&
+      sameSecret(parts.secret, session.previousRefreshSecret) &&
+      Date.now() - session.rotatedAt < REFRESH_GRACE_MS
+    if (!current && !inGrace) return { tokens: null, reason: "invalid" }
+
+    const user = await selectUser(session.userId)
+    if (!user || user.tokenVersion !== session.tokenVersion) {
+      await redis.del(sessionKey(parts.sid))
+      return { tokens: null, reason: "invalid" }
+    }
+    if (user.isDisabled) {
+      await redis.del(sessionKey(parts.sid))
+      return { tokens: null, reason: "disabled" }
+    }
+
+    const accessToken = await signAccessToken({
+      uid: user.id,
+      sid: parts.sid,
+      ver: user.tokenVersion,
+    })
+    // 宽限期：不再轮换，把当前那张交出去，几个标签页落到同一张上
+    if (inGrace) {
+      return {
+        tokens: {
+          accessToken,
+          refreshToken: `${parts.sid}.${session.refreshSecret}`,
+          expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+        },
+      }
+    }
+
+    const refreshSecret = randomBytes(32).toString("base64url")
+    const rotated = await compareAndSetSession(parts.sid, stored.raw, {
+      ...session,
+      refreshSecret,
+      previousRefreshSecret: session.refreshSecret,
+      rotatedAt: Date.now(),
+    })
+    if (rotated) {
+      return {
+        tokens: {
+          accessToken,
+          refreshToken: `${parts.sid}.${refreshSecret}`,
+          expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+        },
+      }
+    }
   }
-  if (user.isDisabled) {
-    await redis.del(sessionKey(parts.sid))
-    return { tokens: null, reason: "disabled" }
-  }
-
-  const accessToken = await signAccessToken({
-    uid: user.id,
-    sid: parts.sid,
-    ver: user.tokenVersion,
-  })
-  // 宽限期里只给 access token：当前那张 refresh token 已经发给先到的那个标签页了，
-  // 明文这里没有，前端沿用 localStorage 里那张
-  if (inGrace)
-    return { tokens: { accessToken, refreshToken: null, expiresIn: ACCESS_TOKEN_TTL_SECONDS } }
-
-  const refreshSecret = randomBytes(32).toString("base64url")
-  await writeSession(parts.sid, {
-    ...session,
-    refreshHash: hashSecret(refreshSecret),
-    previousRefreshHash: session.refreshHash,
-    rotatedAt: Date.now(),
-  })
-  return {
-    tokens: {
-      accessToken,
-      refreshToken: `${parts.sid}.${refreshSecret}`,
-      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
-    },
-  }
+  return { tokens: null, reason: "invalid" }
 }
 
 /**
@@ -290,8 +333,8 @@ export async function destroySession(refreshToken: string) {
   const session = await readSession(parts.sid)
   if (!session) return null
   if (
-    !sameHash(parts.secretHash, session.refreshHash) &&
-    !sameHash(parts.secretHash, session.previousRefreshHash)
+    !sameSecret(parts.secret, session.refreshSecret) &&
+    !sameSecret(parts.secret, session.previousRefreshSecret)
   ) {
     return null
   }
