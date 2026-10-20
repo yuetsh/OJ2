@@ -1,17 +1,13 @@
 #!/usr/bin/env bash
 #
-# 一次性运维动作：清掉所有会话，强制全员重新登录。
+# 运维动作：清掉所有会话，强制全员重新登录。
 #
-# ## 为什么要跑
+# 会话是 `auth-session:<sid>`（见 apps/api/src/auth/session.ts），删掉之后 access token
+# 下一个请求就不认、refresh token 也换不出新的，不用等 token 自然过期。
+# 顺带清掉 cookie 时代留下的 `session:*` / `user-sessions:*`（换成 token 之后没人读了，
+# 不清的话也会在 7 天内自己过期）。
 #
-# 会话的反向索引 `user-sessions:<uid>` 是 498fc1c 才加的。在那之前签发的会话不在索引
-# 里，revokeUserSessions 靠 SMEMBERS 找不到它们 —— 也就是说**改密码、重置密码、禁用
-# 账号对这批会话统统无效**，只能等最长一个 SESSION_TTL_SECONDS（默认 7 天）自然过期。
-#
-# 学生密码是明文存着给老师查的，改密码正是密码泄露之后唯一的补救手段，这个空窗不能留。
-# 代价只是所有人重新登录一次。
-#
-# 跑过一次就不用再跑了：此后签发的会话都带索引。
+# 只想让某一个人下线不用跑这个：后台改密码 / 禁用账号就会把他所有设备踢下线。
 #
 # ## 两个站点都要跑
 #
@@ -23,7 +19,7 @@
 # 同一个 Redis 里还装着 BullMQ 的判题队列（`bull:*`）。FLUSHALL 会把还在队列里的提交
 # 一起丢掉，那些 submission 会永远停在 PENDING，只能超管逐条重判 —— 而重判还会把
 # user_profile 的反范式计数带偏（见 apps/api/src/scripts/recount.ts）。
-# 这里只删 `session:*` 和 `user-sessions:*`。
+# 这里只删下面列出来的几种会话键。
 #
 # ## 用法
 #
@@ -70,13 +66,14 @@ purge() {
 
 count() { cli --scan --pattern "$1" 2>/dev/null | wc -l; }
 
+PATTERNS=('auth-session:*' 'auth-contest:*' 'session:*' 'user-sessions:*')
+
 say "容器 $CONTAINER"
-before_sessions=$(count 'session:*')
-before_index=$(count 'user-sessions:*')
+for pattern in "${PATTERNS[@]}"; do
+  printf '    %-16s %s\n' "$pattern" "$(count "$pattern")"
+done
 before_bull=$(count 'bull:*')
-printf '    session:*        %s\n' "$before_sessions"
-printf '    user-sessions:*  %s\n' "$before_index"
-printf '    bull:*           %s（不动）\n' "$before_bull"
+printf '    %-16s %s（不动）\n' 'bull:*' "$before_bull"
 
 if [ "${YES:-}" != "1" ]; then
   read -rp $'\n    删掉上面的会话、让所有人重新登录？[y/N] ' answer
@@ -84,8 +81,9 @@ if [ "${YES:-}" != "1" ]; then
 fi
 
 say "清理"
-ok "session:*        删掉 $(purge 'session:*') 个"
-ok "user-sessions:*  删掉 $(purge 'user-sessions:*') 个"
+for pattern in "${PATTERNS[@]}"; do
+  ok "$(printf '%-16s' "$pattern") 删掉 $(purge "$pattern") 个"
+done
 
 after_bull=$(count 'bull:*')
 [ "$after_bull" = "$before_bull" ] \

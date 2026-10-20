@@ -1,4 +1,5 @@
 import { handleGlobalApiError } from "./api"
+import { authFetch } from "./auth"
 
 export interface JSONEventStreamHandlers<T = any> {
   onMessage: (data: T, event?: string) => void
@@ -152,7 +153,7 @@ export async function streamAI<Done = Record<string, unknown>>(
   body: unknown,
   handlers: AIStreamHandlers<Done>,
 ) {
-  const response = await fetch(`/api/${path}`, {
+  const response = await authFetch(`/api/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

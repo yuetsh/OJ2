@@ -6,7 +6,7 @@ import { calendarDay } from "../time"
 /**
  * 「谁现在在线」。member = userId，score = 最后一次活动的毫秒时间戳。
  *
- * 会话本身判定不了在线：`session:<token>` 的 TTL 是 7 天且每次请求都续期，
+ * 会话本身判定不了在线：`auth-session:<sid>` 的 TTL 是 7 天且每次请求都续期，
  * 「有会话」只说明这人一周内来过。所以这里单独记一个活动时间戳 ——
  * 写入一律搭在已有的 pipeline 上（登录、每个带鉴权的请求、WebSocket 巡检），
  * 不多一趟往返。

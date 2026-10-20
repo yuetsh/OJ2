@@ -17,8 +17,10 @@
 Redis）和 WebSocket 推送（本地 pub/sub）是每站独立的 —— 学生在哪边提交就在哪边判、
 推送也只推得到连在本站的人。这和旧栈 Dramatiq + Channels 的拓扑一致，不是回归。
 
-机房那套 `COOKIE_SECURE=false`：走 http 直连 IP，带 `Secure` 的 Cookie 浏览器不回传，
-表现是「登录成功又立刻变未登录」。
+登录态是 access token + refresh token（见 `apps/api/src/auth/session.ts`），会话存在
+**本站的** Redis 里，所以在一个站点登录，到另一个站点还要再登一次。JWT 的签名密钥也存在
+本站 Redis（`auth:jwt-secret`，首次启动自动生成），部署不用配；删掉它再重启 api 等于让
+本站所有人重新登录。改密码、禁用账号走库里的 `user.token_version`，两个站点同时生效。
 
 ## 全部容器都归 OJ2
 
@@ -141,7 +143,7 @@ WebSocket）→ 后台判题机列表在线 → 后台题目列表翻页 → 带
 |---|---|---|
 | **Websockets Support** | 开 | 页面一切正常，唯独学生盯着的「判题中…」永远不动 |
 | `client_max_body_size` | `200M` | 后台上传测试用例压缩包失败（和 Caddyfile 的 `200MiB` 对齐） |
-| SSL | 签证书 | `COOKIE_SECURE=true` 依赖 https |
+| SSL | 签证书 | 登录 token 明文走公网；浏览器也只在 https 下给 `navigator.locks`，几个标签页换 token 会撞车（有宽限期兜着，但别依赖它） |
 
 ## 备份与灾难恢复
 

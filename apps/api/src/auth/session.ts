@@ -1,15 +1,17 @@
-import { randomBytes } from "node:crypto"
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 
 import {
   toAdminType,
   toProblemPermission,
   type AdminType,
+  type AuthTokens,
   type ProblemPermission,
+  WS_AUTH_PROTOCOL,
 } from "@oj2/contract"
 
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import type { Context } from "hono"
-import { deleteCookie, getCookie, setCookie } from "hono/cookie"
+import { sign, verify } from "hono/jwt"
 
 import { config } from "../config"
 import { db, schema } from "../db"
@@ -17,14 +19,86 @@ import { publishSessionRevoked, type SessionRevokedReason } from "../events"
 import { clearOnline, markOnline } from "./presence"
 import { redis } from "../redis"
 
-const SESSION_PREFIX = "session:"
-const USER_SESSIONS_PREFIX = "user-sessions:"
+/**
+ * 登录态是两张 token：
+ *
+ * - **access token**：JWT（HS256），走 `Authorization: Bearer`，15 分钟。
+ *   载荷是 `{ uid, sid, ver }`：用户 id、会话 id、签发时用户的 token_version。
+ * - **refresh token**：`<sid>.<随机串>`，不透明，7 天（`SESSION_TTL_SECONDS`），
+ *   每换一次 access token 就轮换一次，有效期跟着往后顺延 —— 和原来 cookie 会话
+ *   「七天不来才过期」是同一个口径。
+ *
+ * 会话本体仍然在 Redis 的 `auth-session:<sid>` 里（refresh token 的哈希、上次登录时刻），所以这不是「无状态 JWT」：每个请求验完签名还要确认会话还在、
+ * token_version 没变。原因是这几件事必须**立刻**生效，等 access token 自然过期不行：
+ *
+ * - 退出登录 —— 删掉会话，同一张 access token 下一个请求就不认了；
+ * - 改密码、重置密码、禁用账号 —— 学生密码是明文存着给老师查的，改密码是发现泄露
+ *   之后唯一的补救手段，晚 15 分钟生效等于给盗号的人留 15 分钟。
+ *
+ * 这两道检查本来就在每个请求的路上（原来就要查一次用户表看禁没禁用、一次 Redis
+ * 续会话），没有多出往返。
+ */
+
+const SESSION_PREFIX = "auth-session:"
+/**
+ * 输过的比赛密码，一张会话一个 hash（field = 比赛 id）。不塞进会话本体：
+ * 会话本体每换一次 token 就整份重写一次，两边一起读改写会互相冲掉。
+ */
+const CONTEST_PASSWORD_PREFIX = "auth-contest:"
+
+export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60
+
+/**
+ * 换 token 的宽限期。refresh token 每用一次就轮换，而同一个浏览器里几个标签页共用
+ * localStorage 里的同一张：两个标签页前后脚去换，后到的那个拿着的已经是旧的了。
+ * 机房走 http，没有安全上下文，`navigator.locks` 用不了，前端没法让它们排队，
+ * 只能在这里放一手 —— 刚被换掉的上一张在这段时间里仍然能换出 access token。
+ * 响应丢了（换成功了但前端没收到）也靠它兜住，不然学生会被莫名登出。
+ */
+const REFRESH_GRACE_MS = 60_000
+
+/**
+ * JWT 的签名密钥存在本站的 Redis 里，第一次启动时生成。
+ *
+ * 不走环境变量：两个站点各有各的 Redis，密钥自然各是各的；部署时不用往两台机器的
+ * env 文件里各补一行，漏了也不会起不来。要让全站所有人重新登录，删掉这个 key
+ * 再重启 api 即可。
+ */
+const JWT_SECRET_KEY = "auth:jwt-secret"
+let jwtSecret: string | null = null
+
+export async function loadJwtSecret() {
+  await redis.set(JWT_SECRET_KEY, randomBytes(48).toString("base64url"), "NX")
+  jwtSecret = await redis.get(JWT_SECRET_KEY)
+  if (!jwtSecret) throw new Error("JWT 密钥没能写进 Redis")
+}
+
+function secret() {
+  if (!jwtSecret) throw new Error("JWT 密钥还没加载，入口要先 await loadJwtSecret()")
+  return jwtSecret
+}
 
 interface StoredSession {
   userId: number
+  /**
+   * 登录那一刻用户的 token_version。换 token 时和库里比，对不上就不给换 ——
+   * 不然改完密码，旧会话拿 refresh token 照样能换出一张带新版本号的 access token
+   */
+  tokenVersion: number
+  /** 当前那张 refresh token 随机部分的 sha256 */
+  refreshHash: string
+  /** 上一张，宽限期内仍然认，见 REFRESH_GRACE_MS */
+  previousRefreshHash: string | null
+  /** 上一次轮换的毫秒时刻 */
+  rotatedAt: number
   createdAt: string
   previousLogin: string | null
-  contestPasswords: Record<string, string>
+}
+
+interface AccessClaims {
+  uid: number
+  sid: string
+  ver: number
 }
 
 /**
@@ -42,131 +116,61 @@ export interface AuthUser {
   className: string | null
 }
 
-function sessionKey(token: string) {
-  return `${SESSION_PREFIX}${token}`
+function sessionKey(sid: string) {
+  return `${SESSION_PREFIX}${sid}`
 }
 
-/**
- * 某个用户名下所有还活着的会话 token。
- *
- * 会话本体是 `session:<token>`，里面记着 userId —— 从 token 找人很快，从人找 token
- * 却只能 SCAN 整个 Redis。改密码、重置密码、禁用账号这三件事都要求「把这个人所有
- * 设备上的会话立刻作废」，所以额外维护这张反向索引。
- *
- * **它是索引，不是真相**：成员可能指向已经过期的 token（集合成员没有各自的 TTL），
- * 吊销时按成员逐个 DEL 即可，删到不存在的 key 没有代价。集合自己跟着会话续期，
- * 整个人不活动满一个 TTL 之后自然消失。
- */
-function userSessionsKey(userId: number) {
-  return `${USER_SESSIONS_PREFIX}${userId}`
+function hashSecret(value: string) {
+  return createHash("sha256").update(value).digest("hex")
 }
 
-export async function createSession(
-  c: Context,
-  userId: number,
-  previousLogin: string | null = null,
-) {
-  const token = randomBytes(32).toString("base64url")
-  const value: StoredSession = {
-    userId,
-    createdAt: new Date().toISOString(),
-    previousLogin,
-    contestPasswords: {},
-  }
-  // 三条写进一个 pipeline：一个班四十号人同时登录时，三趟往返和一趟的差别
-  // 全压在登录这一下上
-  const pipeline = redis
-    .pipeline()
-    .set(sessionKey(token), JSON.stringify(value), "EX", config.sessionTtlSeconds)
-    .sadd(userSessionsKey(userId), token)
-    .expire(userSessionsKey(userId), config.sessionTtlSeconds)
-  markOnline(pipeline, userId)
-  await pipeline.exec()
-  setCookie(c, config.sessionCookie, token, {
-    httpOnly: true,
-    sameSite: "Lax",
-    secure: config.secureCookies,
-    path: "/",
-    maxAge: config.sessionTtlSeconds,
-  })
+function sameHash(a: string, b: string | null) {
+  if (b === null || a.length !== b.length) return false
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b))
 }
 
-/** 返回被删掉的 token：调用方要拿它去广播会话吊销，好断掉同一浏览器里其他标签页的连接 */
-export async function destroySession(c: Context) {
-  const token = getCookie(c, config.sessionCookie)
-  if (token) {
-    // 先读出 userId 再删，否则反向索引里会留下一个永远清不掉的成员
-    const userId = await sessionUserId(token)
-    await redis.del(sessionKey(token))
-    if (userId !== null) {
-      await redis.srem(userSessionsKey(userId), token)
-      await clearOnline(userId)
-    }
-  }
-  deleteCookie(c, config.sessionCookie, { path: "/" })
-  return token ?? null
+/** `<sid>.<随机串>` 拆开。格式不对返回 null */
+function splitRefreshToken(token: string) {
+  const dot = token.indexOf(".")
+  if (dot <= 0 || dot === token.length - 1) return null
+  return { sid: token.slice(0, dot), secretHash: hashSecret(token.slice(dot + 1)) }
 }
 
-async function sessionUserId(token: string) {
-  const raw = await redis.get(sessionKey(token))
+async function readSession(sid: string) {
+  const raw = await redis.get(sessionKey(sid))
   if (!raw) return null
   try {
     const value = JSON.parse(raw) as StoredSession
-    return Number.isInteger(value.userId) ? value.userId : null
+    value.previousLogin ??= null
+    return value
+  } catch {
+    await redis.del(sessionKey(sid))
+    return null
+  }
+}
+
+function writeSession(sid: string, value: StoredSession) {
+  return redis.set(sessionKey(sid), JSON.stringify(value), "EX", config.sessionTtlSeconds)
+}
+
+async function signAccessToken(claims: AccessClaims) {
+  const now = Math.floor(Date.now() / 1000)
+  return sign({ ...claims, iat: now, exp: now + ACCESS_TOKEN_TTL_SECONDS }, secret(), "HS256")
+}
+
+/** 验签名和有效期，载荷形状不对也当无效。不碰 Redis 和库 */
+async function verifyAccessToken(token: string): Promise<AccessClaims | null> {
+  try {
+    const payload = await verify(token, secret(), "HS256")
+    const { uid, sid, ver } = payload
+    if (!Number.isInteger(uid) || typeof sid !== "string" || !Number.isInteger(ver)) return null
+    return { uid: uid as number, sid, ver: ver as number }
   } catch {
     return null
   }
 }
 
-/**
- * 把一个用户所有设备上的会话真的删掉，并广播给还挂着的 WebSocket。
- *
- * 光广播是不够的：`publishSessionRevoked` 只断 WebSocket，HTTP 请求照样能拿着
- * 那张 cookie 继续用。改密码之后旧密码登出来的会话必须立刻失效，否则「改密码」
- * 对已经被别人登着的账号毫无作用 —— 而学生密码是明文存着给老师查的，
- * 改密码正是发现密码泄露之后唯一的补救手段。
- */
-export async function revokeUserSessions(userId: number, reason: SessionRevokedReason) {
-  const tokens = await redis.smembers(userSessionsKey(userId))
-  if (tokens.length) await redis.del(...tokens.map(sessionKey))
-  await redis.del(userSessionsKey(userId))
-  await clearOnline(userId)
-  await publishSessionRevoked({ userId }, reason)
-  return tokens.length
-}
-
-function readCookie(request: Request, name: string) {
-  const header = request.headers.get("cookie")
-  if (!header) return undefined
-  for (const part of header.split(";")) {
-    const [key, ...value] = part.trim().split("=")
-    if (key === name) return decodeURIComponent(value.join("="))
-  }
-  return undefined
-}
-
-/**
- * 会话解析结果。之所以不只返回 `AuthUser | null`：拿不到用户有两种原因，
- * 而它们对应完全不同的前端行为 —— 未登录该弹登录框，已禁用该说「账号已禁用」。
- */
-export type SessionResult =
-  | { user: AuthUser; reason?: undefined }
-  | { user: null; reason: "anonymous" | "disabled" }
-
-async function authenticateToken(token: string | undefined): Promise<SessionResult> {
-  if (!token) return { user: null, reason: "anonymous" }
-
-  const raw = await redis.get(sessionKey(token))
-  if (!raw) return { user: null, reason: "anonymous" }
-
-  let session: StoredSession
-  try {
-    session = JSON.parse(raw) as StoredSession
-  } catch {
-    await redis.del(sessionKey(token))
-    return { user: null, reason: "anonymous" }
-  }
-
+async function selectUser(userId: number) {
   const [user] = await db
     .select({
       id: schema.user.id,
@@ -176,133 +180,264 @@ async function authenticateToken(token: string | undefined): Promise<SessionResu
       problemPermission: schema.user.problemPermission,
       isDisabled: schema.user.isDisabled,
       className: schema.user.className,
+      tokenVersion: schema.user.tokenVersion,
     })
     .from(schema.user)
-    .where(eq(schema.user.id, session.userId))
+    .where(eq(schema.user.id, userId))
     .limit(1)
+  return user ?? null
+}
 
-  if (!user) {
-    await redis.del(sessionKey(token))
-    await redis.srem(userSessionsKey(session.userId), token)
-    return { user: null, reason: "anonymous" }
+export async function issueTokens(
+  userId: number,
+  tokenVersion: number,
+  previousLogin: string | null = null,
+): Promise<AuthTokens> {
+  const sid = randomBytes(16).toString("base64url")
+  const refreshSecret = randomBytes(32).toString("base64url")
+  const value: StoredSession = {
+    userId,
+    tokenVersion,
+    refreshHash: hashSecret(refreshSecret),
+    previousRefreshHash: null,
+    rotatedAt: Date.now(),
+    createdAt: new Date().toISOString(),
+    previousLogin,
   }
-
-  if (user.isDisabled) {
-    // 会话照删（禁用要立即生效），但要把「是被禁用」这件事告诉调用方。
-    // 都返回 null 的话，中途被禁用的学生看到的是 401 login-required，
-    // 前端据此弹登录框，登进去又被弹 —— 死循环，而且看不出发生了什么。
-    await redis.del(sessionKey(token))
-    await redis.srem(userSessionsKey(session.userId), token)
-    return { user: null, reason: "disabled" }
-  }
-
-  // 反向索引跟着会话一起续期，否则活跃用户的索引会先于会话到期，
-  // 之后再吊销就找不到这张会话了。两条走一次 pipeline —— 这是全后端最热的 Redis
-  // 路径，每个带鉴权的请求都要走一趟，形状和 touchSession 里那对保持一致
-  const renew = redis
+  // 两条写进一个 pipeline：一个班四十号人同时登录时，两趟往返和一趟的差别
+  // 全压在登录这一下上
+  const pipeline = redis
     .pipeline()
-    .expire(sessionKey(token), config.sessionTtlSeconds)
-    .expire(userSessionsKey(session.userId), config.sessionTtlSeconds)
-  // 在线状态就是搭在这条 pipeline 上记的，见 presence.ts
-  markOnline(renew, session.userId)
-  await renew.exec()
-  // 唯一的收窄点。库里是 text 列，认不出来的值降成最低权限，见 toAdminType 的注释。
+    .set(sessionKey(sid), JSON.stringify(value), "EX", config.sessionTtlSeconds)
+  markOnline(pipeline, userId)
+  await pipeline.exec()
   return {
-    user: {
-      ...user,
-      adminType: toAdminType(user.adminType),
-      problemPermission: toProblemPermission(user.problemPermission),
+    accessToken: await signAccessToken({ uid: userId, sid, ver: tokenVersion }),
+    refreshToken: `${sid}.${refreshSecret}`,
+    expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+  }
+}
+
+export type RefreshResult =
+  | { tokens: AuthTokens; reason?: undefined }
+  | { tokens: null; reason: "invalid" | "disabled" }
+
+/**
+ * 拿 refresh token 换一张新的 access token，同时轮换 refresh token。
+ *
+ * 认不出来的（伪造的、已经轮换过且出了宽限期的）只是拒掉，**不**顺手删会话：
+ * 「旧 token 被重放 = 被盗，整个会话作废」是教科书做法，可这里旧 token 被重放
+ * 更常见的原因是网络慢、两个标签页撞车，为此把学生踢下线代价太大。
+ */
+export async function refreshTokens(refreshToken: string): Promise<RefreshResult> {
+  const parts = splitRefreshToken(refreshToken)
+  if (!parts) return { tokens: null, reason: "invalid" }
+  const session = await readSession(parts.sid)
+  if (!session) return { tokens: null, reason: "invalid" }
+
+  const current = sameHash(parts.secretHash, session.refreshHash)
+  const inGrace =
+    !current &&
+    sameHash(parts.secretHash, session.previousRefreshHash) &&
+    Date.now() - session.rotatedAt < REFRESH_GRACE_MS
+  if (!current && !inGrace) return { tokens: null, reason: "invalid" }
+
+  const user = await selectUser(session.userId)
+  if (!user || user.tokenVersion !== session.tokenVersion) {
+    await redis.del(sessionKey(parts.sid))
+    return { tokens: null, reason: "invalid" }
+  }
+  if (user.isDisabled) {
+    await redis.del(sessionKey(parts.sid))
+    return { tokens: null, reason: "disabled" }
+  }
+
+  const accessToken = await signAccessToken({
+    uid: user.id,
+    sid: parts.sid,
+    ver: user.tokenVersion,
+  })
+  // 宽限期里只给 access token：当前那张 refresh token 已经发给先到的那个标签页了，
+  // 明文这里没有，前端沿用 localStorage 里那张
+  if (inGrace)
+    return { tokens: { accessToken, refreshToken: null, expiresIn: ACCESS_TOKEN_TTL_SECONDS } }
+
+  const refreshSecret = randomBytes(32).toString("base64url")
+  await writeSession(parts.sid, {
+    ...session,
+    refreshHash: hashSecret(refreshSecret),
+    previousRefreshHash: session.refreshHash,
+    rotatedAt: Date.now(),
+  })
+  return {
+    tokens: {
+      accessToken,
+      refreshToken: `${parts.sid}.${refreshSecret}`,
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
     },
   }
 }
 
-/** 要区分「未登录」和「已被禁用」的用这个 —— 目前只有鉴权中间件需要 */
-export function resolveSession(c: Context) {
-  return authenticateToken(getCookie(c, config.sessionCookie))
-}
-
-/** 只关心「是谁」的调用方用这个 */
-export async function getSessionUser(c: Context) {
-  return (await resolveSession(c)).user
-}
-
-export async function getRequestSessionUser(request: Request) {
-  return (await authenticateToken(readCookie(request, config.sessionCookie))).user
-}
-
 /**
- * WebSocket 升级时把 token 一起存进连接，之后才能定期确认这个会话还有效
- * —— 握手时校验过一次，可这条连接能挂上好几个小时。
+ * 退出登录：删掉 refresh token 对应的那张会话。返回会话 id，调用方要拿它去广播吊销，
+ * 好断掉同一浏览器里其他标签页的 WebSocket。token 不对（伪造、已过期）返回 null。
+ *
+ * 要核对随机部分，不能只认 sid：sid 就写在 access token 的载荷里，谁都能解出来。
  */
-export function readRequestSessionToken(request: Request) {
-  return readCookie(request, config.sessionCookie) ?? ""
-}
-
-/**
- * 会话还在就续期并返回 true，已登出或已过期返回 false。
- *
- * 用 EXPIRE 同时完成「判断存在」和「续期」，比 GET + EXPIRE 少一趟往返；两条 EXPIRE
- * 走一次 pipeline，仍然只有一趟。
- *
- * 续期这件事本身是要的：HTTP 请求会走 authenticateToken 里的 redis.expire 续期，
- * 而只开着页面挂 WebSocket 的人一次请求都不发，不该因此被算成不活跃踢下线。
- *
- * **反向索引必须跟着一起续。** 走到这里的正是那种一次 HTTP 请求都不发的连接，
- * 它碰不到 authenticateToken 里那两条并排的 expire。只续会话不续索引的话，索引先到期、
- * 会话却被巡检一直续着，之后改密码 / 禁用账号走 revokeUserSessions 就 SMEMBERS
- * 不到这张 token —— WebSocket 那边还有 publishSessionRevoked 按 userId 兜底能断掉，
- * 但 HTTP 一侧拿着那张 cookie 照用不误，而改密码要的恰恰是让 HTTP 立刻失效。
- */
-export async function touchSession(token: string, userId: number) {
-  if (!token) return false
-  const pipeline = redis
-    .pipeline()
-    .expire(sessionKey(token), config.sessionTtlSeconds)
-    .expire(userSessionsKey(userId), config.sessionTtlSeconds)
-  // 只挂着 WebSocket 不发请求的人，在线状态全靠这里（sweepSessions 每 60 秒一轮）
-  markOnline(pipeline, userId)
-  const results = await pipeline.exec()
-  // 索引那条的返回值不看：存量会话（反向索引上线之前签发的）本来就没有索引键，
-  // 续不到很正常，不能因此判定会话已死
-  return results?.[0]?.[1] === 1
-}
-
-async function getStoredSession(c: Context) {
-  const token = getCookie(c, config.sessionCookie)
-  if (!token) return null
-  const raw = await redis.get(sessionKey(token))
-  if (!raw) return null
-  try {
-    const value = JSON.parse(raw) as StoredSession
-    value.contestPasswords ??= {}
-    value.previousLogin ??= null
-    return { token, value }
-  } catch {
+export async function destroySession(refreshToken: string) {
+  const parts = splitRefreshToken(refreshToken)
+  if (!parts) return null
+  const session = await readSession(parts.sid)
+  if (!session) return null
+  if (
+    !sameHash(parts.secretHash, session.refreshHash) &&
+    !sameHash(parts.secretHash, session.previousRefreshHash)
+  ) {
     return null
+  }
+  await redis.del(sessionKey(parts.sid), `${CONTEST_PASSWORD_PREFIX}${parts.sid}`)
+  await clearOnline(session.userId)
+  return parts.sid
+}
+
+/**
+ * 让一个用户所有设备上的登录立刻失效，并广播给还挂着的 WebSocket。
+ *
+ * 做法是把库里的 token_version 加一：每个请求、每次换 token 都会拿它和 access token
+ * 里签的 `ver` 比，对不上就不认。不去 Redis 里挨个删会话 —— 删得掉的只有本站的，
+ * 另一个站点的会话在它自己的 Redis 里。
+ *
+ * 光广播是不够的：`publishSessionRevoked` 只断 WebSocket，HTTP 请求照样能拿着
+ * 那张 token 继续用。改密码之后旧密码登出来的会话必须立刻失效，否则「改密码」
+ * 对已经被别人登着的账号毫无作用 —— 而学生密码是明文存着给老师查的，
+ * 改密码正是发现密码泄露之后唯一的补救手段。
+ */
+export async function revokeUserSessions(userId: number, reason: SessionRevokedReason) {
+  await db
+    .update(schema.user)
+    .set({ tokenVersion: sql`${schema.user.tokenVersion} + 1` })
+    .where(eq(schema.user.id, userId))
+  await clearOnline(userId)
+  await publishSessionRevoked({ userId }, reason)
+}
+
+/**
+ * 会话解析结果。之所以不只返回 `AuthUser | null`：拿不到用户有三种原因，
+ * 而它们对应完全不同的前端行为 ——
+ *
+ * - `anonymous`：根本没带 token，该当游客就当游客；
+ * - `expired`：带了 token 但不能用（过期、被吊销、伪造），前端该先拿 refresh token
+ *   换一张再重试，换不到才算没登录；
+ * - `disabled`：账号被禁用，该说「账号已禁用」，不能弹登录框。
+ */
+export type SessionResult =
+  | { user: AuthUser; sid: string; tokenVersion: number; reason?: undefined }
+  | { user: null; reason: "anonymous" | "expired" | "disabled" }
+
+async function authenticateToken(token: string | null): Promise<SessionResult> {
+  if (!token) return { user: null, reason: "anonymous" }
+  const claims = await verifyAccessToken(token)
+  if (!claims) return { user: null, reason: "expired" }
+
+  // 会话还在不在、用户还在不在，两件事并行问。EXPIRE 顺手给会话续期：
+  // 不发 refresh 的请求也该算活动
+  const [alive, user] = await Promise.all([
+    redis.expire(sessionKey(claims.sid), config.sessionTtlSeconds),
+    selectUser(claims.uid),
+  ])
+  if (alive !== 1 || !user || user.tokenVersion !== claims.ver) {
+    return { user: null, reason: "expired" }
+  }
+  if (user.isDisabled) return { user: null, reason: "disabled" }
+
+  // 在线状态就是搭在每个带鉴权的请求上记的，见 presence.ts
+  const online = redis.pipeline()
+  markOnline(online, user.id)
+  await online.exec()
+  // 唯一的收窄点。库里是 text 列，认不出来的值降成最低权限，见 toAdminType 的注释。
+  const { tokenVersion, ...rest } = user
+  return {
+    user: {
+      ...rest,
+      adminType: toAdminType(user.adminType),
+      problemPermission: toProblemPermission(user.problemPermission),
+    },
+    sid: claims.sid,
+    tokenVersion,
   }
 }
 
+function bearerToken(header: string | null | undefined) {
+  if (!header) return null
+  const match = /^Bearer\s+(\S+)$/i.exec(header)
+  return match?.[1] ?? null
+}
+
+/** 中间件用这个：要区分「没登录」「token 不能用」「已被禁用」 */
+export function resolveSession(c: Context) {
+  return authenticateToken(bearerToken(c.req.header("authorization")))
+}
+
+/** WebSocket 握手：access token 借子协议带过来，见契约里 WS_AUTH_PROTOCOL 的注释 */
+export async function authenticateWebSocket(request: Request) {
+  const protocols = (request.headers.get("sec-websocket-protocol") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+  if (protocols[0] !== WS_AUTH_PROTOCOL) return null
+  const result = await authenticateToken(protocols[1] || null)
+  return result.user ? result : null
+}
+
+/**
+ * 会话还在就续期、记一笔在线并返回 true，已登出或已过期返回 false。
+ *
+ * WebSocket 用：握手时校验过一次，可这条连接能挂上好几个小时。只开着页面挂 WebSocket
+ * 的人一次请求都不发，不该因此被算成不活跃踢下线，所以这里也续期。
+ *
+ * 只查 Redis 不查库：每条订阅消息都要过一遍，热路径。token_version 和禁用由
+ * websocket.ts 的 sweepSessions 每 60 秒统一对一次库。
+ */
+export async function touchSession(sid: string, userId: number) {
+  if (!sid) return false
+  const pipeline = redis.pipeline().expire(sessionKey(sid), config.sessionTtlSeconds)
+  // 只挂着 WebSocket 不发请求的人，在线状态全靠这里（sweepSessions 每 60 秒一轮）
+  markOnline(pipeline, userId)
+  const results = await pipeline.exec()
+  return results?.[0]?.[1] === 1
+}
+
+/** 当前请求那张 access token 的载荷，验不过返回 null */
+async function requestClaims(c: Context) {
+  const token = bearerToken(c.req.header("authorization"))
+  return token ? verifyAccessToken(token) : null
+}
+
+/**
+ * 比赛密码、上次登录时刻这几个读写点不一定挂了鉴权中间件，所以自己再验一遍
+ * access token（只是一次 HMAC，不碰库）。
+ */
 export async function setContestPassword(c: Context, contestId: number, password: string) {
-  const session = await getStoredSession(c)
-  if (!session) return false
-  session.value.contestPasswords[String(contestId)] = password
-  await redis.set(
-    sessionKey(session.token),
-    JSON.stringify(session.value),
-    "EX",
-    config.sessionTtlSeconds,
-  )
+  const claims = await requestClaims(c)
+  if (!claims) return false
+  const key = `${CONTEST_PASSWORD_PREFIX}${claims.sid}`
+  await redis
+    .pipeline()
+    .hset(key, String(contestId), password)
+    .expire(key, config.sessionTtlSeconds)
+    .exec()
   return true
 }
 
 export async function getContestPassword(c: Context, contestId: number) {
-  const session = await getStoredSession(c)
-  return session?.value.contestPasswords[String(contestId)] ?? null
+  const claims = await requestClaims(c)
+  if (!claims) return null
+  return redis.hget(`${CONTEST_PASSWORD_PREFIX}${claims.sid}`, String(contestId))
 }
 
 /** 上次登录、这次登录的时刻 —— 首页「上次来」卡的窗口就是这两个之间 */
 export async function getLoginWindow(c: Context) {
-  const session = await getStoredSession(c)
+  const claims = await requestClaims(c)
+  const session = claims && (await readSession(claims.sid))
   if (!session) return null
-  return { previousLogin: session.value.previousLogin, loginAt: session.value.createdAt }
+  return { previousLogin: session.previousLogin, loginAt: session.createdAt }
 }

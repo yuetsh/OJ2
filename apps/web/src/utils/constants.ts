@@ -149,6 +149,8 @@ export { USER_TYPE, PROBLEM_PERMISSION } from "@oj2/contract"
 
 export const STORAGE_KEY = {
   AUTHED: "authed",
+  ACCESS_TOKEN: "accessToken",
+  REFRESH_TOKEN: "refreshToken",
   LANGUAGE: "problemLanguage",
   ADMIN_PROBLEM: "adminProblem",
   ADMIN_SQL_PROBLEM: "adminSqlProblem",

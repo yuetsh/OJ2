@@ -60,6 +60,7 @@ import {
   type TodaySubmissionStatistics,
 } from "@oj2/contract"
 import api from "utils/api"
+import { authFetch } from "utils/auth"
 import { contract } from "utils/contract"
 import { toProblemRow } from "utils/transforms"
 import type {
@@ -532,9 +533,8 @@ export function reportExerciseAttempt(
   exerciseId: number,
   payload: { correct: boolean; answer?: string },
 ) {
-  return fetch(`/api/exercises/${exerciseId}/attempts`, {
+  return authFetch(`/api/exercises/${exerciseId}/attempts`, {
     method: "POST",
-    credentials: "include",
     keepalive: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -559,9 +559,8 @@ export function reportLearnProgress(
   tutorialId: number,
   payload: { seconds: number; opened: boolean },
 ) {
-  return fetch(`/api/tutorials/${tutorialId}/progress`, {
+  return authFetch(`/api/tutorials/${tutorialId}/progress`, {
     method: "POST",
-    credentials: "include",
     keepalive: true,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

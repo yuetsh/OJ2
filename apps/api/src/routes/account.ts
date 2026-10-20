@@ -127,7 +127,7 @@ accountRoutes.post("/users", async (c) => {
 accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
   // 对齐旧后端 account/views/oj.py 的 UserProfileAPI.get 首行：
   // `if not user.is_authenticated: return self.success()` —— 匿名一律返回空，
-  // 否则用户名可经排名接口（/rankings/board）公开枚举，进而无 cookie 批量收集全校学生的邮箱与最后登录时间。
+  // 否则用户名可经排名接口（/rankings/board）公开枚举，进而不登录就批量收集全校学生的邮箱与最后登录时间。
   if (!c.get("user")) return success(c, null)
   const [target] = await db
     .select({ id: schema.user.id })

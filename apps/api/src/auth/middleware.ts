@@ -2,7 +2,7 @@ import { ADMIN_ROLES, TEACHER_ROLES } from "@oj2/contract"
 import type { Context, MiddlewareHandler } from "hono"
 
 import { failure } from "../http"
-import { getSessionUser, resolveSession, type AuthUser } from "./session"
+import { resolveSession, type AuthUser } from "./session"
 
 export interface AppEnv {
   Variables: {
@@ -10,8 +10,16 @@ export interface AppEnv {
   }
 }
 
+/**
+ * 没带 token 当游客；带了 token 却不能用的**不能**当游客，要回 401 `token-expired`
+ * 让前端先去换一张。否则 access token 一过期，`/me` 这类可选登录的接口就回「没登录」，
+ * 前端据此把人当成已登出 —— 每 15 分钟掉一次线。禁用的账号照旧当游客，
+ * 和原来会话被删之后的表现一致。
+ */
 export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  c.set("user", await getSessionUser(c))
+  const session = await resolveSession(c)
+  if (session.reason === "expired") return denied(c, "expired")
+  c.set("user", session.user)
   await next()
 }
 
@@ -25,10 +33,11 @@ export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
  * 用 403 而不是 401：凭证是有效的，是这个账号不让用了，和 login 接口对禁用账号
  * 的回法（403 `account-disabled`）也一致。
  */
-function denied(c: Context, reason: "anonymous" | "disabled") {
-  return reason === "disabled"
-    ? failure(c, 403, "account-disabled", "账号已被禁用，请联系老师")
-    : failure(c, 401, "login-required", "请先登录")
+function denied(c: Context, reason: "anonymous" | "expired" | "disabled") {
+  if (reason === "disabled") return failure(c, 403, "account-disabled", "账号已被禁用，请联系老师")
+  // 前端见到这个码会拿 refresh token 换一张再重试，换不到才当没登录
+  if (reason === "expired") return failure(c, 401, "token-expired", "登录已过期，请重新登录")
+  return failure(c, 401, "login-required", "请先登录")
 }
 
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {

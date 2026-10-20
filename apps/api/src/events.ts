@@ -20,23 +20,23 @@ export async function publishConfigUpdate(key: string, value: unknown) {
  * 会话吊销广播。让还挂着的 WebSocket 立刻知道自己该下线了。
  *
  * 两种作用域，**不能混**：
- * - `{ token }` 用户登出。只该断这一张会话 —— 同一个人在别的设备上是另一张会话，
+ * - `{ sid }` 用户登出。只该断这一张会话 —— 同一个人在别的设备上是另一张会话，
  *   不该被牵连。
- * - `{ userId }` 账号被禁用。所有设备都得断。禁用只改数据库的 isDisabled 列、
- *   不动 Redis 里的会话，WebSocket 那边的会话巡检永远发现不了，只能靠这条主动通知。
+ * - `{ userId }` 账号被禁用。所有设备都得断。改密码同理。这两件事只改库、
+ *   不动 Redis 里的会话，WebSocket 那边要等最多 60 秒的巡检才发现，靠这条立刻通知。
  */
 export const sessionRevokedChannel = "session:revoked"
 
 export type SessionRevokedReason = "session-ended" | "account-disabled"
 
 export interface SessionRevoked {
-  token?: string
+  sid?: string
   userId?: number
   reason: SessionRevokedReason
 }
 
 export async function publishSessionRevoked(
-  target: { token: string } | { userId: number },
+  target: { sid: string } | { userId: number },
   reason: SessionRevokedReason,
 ) {
   await redis.publish(sessionRevokedChannel, JSON.stringify({ ...target, reason }))
@@ -45,7 +45,7 @@ export async function publishSessionRevoked(
 export function parseSessionRevoked(raw: string): SessionRevoked | null {
   try {
     const value = JSON.parse(raw) as SessionRevoked
-    if (typeof value.token !== "string" && !Number.isInteger(value.userId)) return null
+    if (typeof value.sid !== "string" && !Number.isInteger(value.userId)) return null
     if (value.reason !== "session-ended" && value.reason !== "account-disabled") return null
     return value
   } catch {

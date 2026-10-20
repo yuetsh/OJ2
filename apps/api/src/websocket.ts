@@ -1,5 +1,5 @@
 import { submissionUpdateSchema, type FlowchartUpdate } from "@oj2/contract"
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 
 import { touchSession } from "./auth/session"
 import {
@@ -31,11 +31,11 @@ const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"])
 /**
  * WebSocket 升级的来源校验。
  *
- * 会话 cookie 是 SameSite=Lax，而 WebSocket 握手不是导航，跨站页面本来就带不上
- * 这个 cookie —— 所以这里是防御纵深，不是唯一防线。
+ * 握手要带 access token（子协议），跨站页面拿不到别人 localStorage 里的 token，
+ * 所以这里是防御纵深，不是唯一防线。
  *
- * 不发 Origin 的一律放行：真正的攻击面是「带着受害者 cookie 的浏览器页面」，
- * 而浏览器一定会带 Origin；脚本客户端本来就能伪造任意请求头，拦它没有意义。
+ * 不发 Origin 的一律放行：浏览器一定会带 Origin；脚本客户端本来就能伪造任意请求头，
+ * 拦它没有意义。
  */
 export function isAllowedWebSocketOrigin(origin: string | null, url: URL) {
   if (!origin) return true
@@ -60,8 +60,10 @@ export interface SubmissionSocketData {
   userId: number
   /** 同一个 Bun.serve 只能挂一个 websocket handler，用它区分通道 */
   kind: "submissions" | "config" | "collab"
-  /** 握手时那张会话的 token，留着定期确认它还没被登出 / 过期，见 sweepSessions */
-  token: string
+  /** 握手时那张会话的 id，留着定期确认它还没被登出 / 过期，见 sweepSessions */
+  sid: string
+  /** 握手时 access token 里签的 token_version，巡检时和库里比，见 sweepSessions */
+  tokenVersion: number
   /** 文本控制帧的令牌桶，open 时初始化，见 allowMessage */
   rate?: RateBucket
   /**
@@ -156,37 +158,56 @@ function forceLogout(targets: Bun.ServerWebSocket<SubmissionSocketData>[], reaso
 /**
  * 定期把会话已经失效的连接断掉。
  *
- * 握手时校验过一次会话，但这条连接能挂几个小时 —— 期间用户可能在别的标签页登出，
- * 或者会话本身到期。只靠消息触发的校验不够：一条连接完全可能除了心跳什么都不发，
- * 而心跳是**故意**不查会话的（否则每客户端每 30 秒一趟 Redis 又回来了）。
+ * 握手时校验过一次，但这条连接能挂几个小时 —— 期间用户可能在别的标签页登出，
+ * 或者会话本身到期，或者在另一个站点被改了密码、禁用了。只靠消息触发的校验不够：
+ * 一条连接完全可能除了心跳什么都不发，而心跳是**故意**不查会话的
+ * （否则每客户端每 30 秒一趟 Redis 又回来了）。
  *
- * 注意这里不查 isDisabled：管理员禁用只改数据库列、不删会话，所以 token 校验
- * 覆盖不到它。禁用由推送路径上的 bridgeSubmissionEvents 挡着 —— 被禁用的学生
- * 收不到任何数据，socket 还挂着只是根空管子。
+ * 两步：Redis 里会话还在不在（顺带续期、记在线），库里 token_version 变没变、
+ * 禁没禁用。后者一轮只打一条 IN 查询。本站改密码、禁用会走 publishSessionRevoked
+ * 立刻断，这里兜的是另一个站点做的 —— 两边共用库、不共用 Redis 的 pub/sub。
  */
 export async function sweepSessions() {
   // 一个学生至少有配置和提交两条通道，多开几个标签页还会更多，而它们共用同一张
-  // 会话 —— 一轮里同一个 token 只查一次
+  // 会话 —— 一轮里同一个会话只查一次
   const checked = new Map<string, boolean>()
-  const dead: Bun.ServerWebSocket<SubmissionSocketData>[] = []
-  for (const ws of liveSockets) {
-    const token = ws.data.token
-    let alive = checked.get(token)
-    if (alive === undefined) {
-      try {
-        alive = await touchSession(token, ws.data.userId)
-      } catch (error) {
-        // Redis 抖一下不该把全班踢下线：这一轮直接放弃，下一轮再说
-        console.error("Failed to verify websocket sessions", error)
-        return
-      }
-      checked.set(token, alive)
+  const sockets = [...liveSockets]
+  let users: { id: number; tokenVersion: number; isDisabled: boolean }[]
+  try {
+    for (const ws of sockets) {
+      if (checked.has(ws.data.sid)) continue
+      checked.set(ws.data.sid, await touchSession(ws.data.sid, ws.data.userId))
     }
-    if (!alive) dead.push(ws)
+    const userIds = [...new Set(sockets.map((ws) => ws.data.userId))]
+    users = userIds.length
+      ? await db
+          .select({
+            id: schema.user.id,
+            tokenVersion: schema.user.tokenVersion,
+            isDisabled: schema.user.isDisabled,
+          })
+          .from(schema.user)
+          .where(inArray(schema.user.id, userIds))
+      : []
+  } catch (error) {
+    // Redis 或库抖一下不该把全班踢下线：这一轮直接放弃，下一轮再说
+    console.error("Failed to verify websocket sessions", error)
+    return
   }
-  // 会话没了有两种可能：在别的标签页登出了，或者会话自己到期。对用户都是
+  const byId = new Map(users.map((user) => [user.id, user]))
+  const ended: Bun.ServerWebSocket<SubmissionSocketData>[] = []
+  const disabled: Bun.ServerWebSocket<SubmissionSocketData>[] = []
+  for (const ws of sockets) {
+    const user = byId.get(ws.data.userId)
+    if (user?.isDisabled) disabled.push(ws)
+    else if (!checked.get(ws.data.sid) || user?.tokenVersion !== ws.data.tokenVersion) {
+      ended.push(ws)
+    }
+  }
+  // 会话没了有几种可能：在别的标签页登出、会话自己到期、改了密码。对用户都是
   // 「要重新登录」，走 session-ended 这一支
-  forceLogout(dead, "session-ended")
+  forceLogout(ended, "session-ended")
+  forceLogout(disabled, "account-disabled")
 }
 
 export function startSessionSweep() {
@@ -289,7 +310,7 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
 
   // 会话可能在连接期间就失效了：用户在别的标签页登出，或者会话自己到期。
   // 握手时校验过一次不算数 —— 这条连接能挂几个小时。
-  if (!(await touchSession(ws.data.token, ws.data.userId))) {
+  if (!(await touchSession(ws.data.sid, ws.data.userId))) {
     ws.close(1008, "Session expired")
     return
   }
@@ -390,11 +411,11 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
     if (channel === sessionRevokedChannel) {
       const revoked = parseSessionRevoked(raw)
       if (!revoked) return
-      // 按 token 还是按 userId，取决于是「这张会话登出了」还是「这个账号被禁用了」
+      // 按会话还是按 userId，取决于是「这张会话登出了」还是「这个账号被禁用 / 改密码了」
       forceLogout(
         [...liveSockets].filter((ws) =>
-          revoked.token !== undefined
-            ? ws.data.token === revoked.token
+          revoked.sid !== undefined
+            ? ws.data.sid === revoked.sid
             : ws.data.userId === revoked.userId,
         ),
         revoked.reason,

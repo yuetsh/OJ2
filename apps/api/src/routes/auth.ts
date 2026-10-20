@@ -1,9 +1,9 @@
-import { loginRequestSchema } from "@oj2/contract"
+import { loginRequestSchema, refreshTokenRequestSchema, type AuthTokens } from "@oj2/contract"
 import { eq, sql } from "drizzle-orm"
 import { Hono } from "hono"
 
 import { optionalAuth, type AppEnv } from "../auth/middleware"
-import { createSession, destroySession } from "../auth/session"
+import { destroySession, issueTokens, refreshTokens } from "../auth/session"
 import { publishSessionRevoked } from "../events"
 import { hashPassword, verifyPassword } from "../auth/password"
 import { db, schema } from "../db"
@@ -79,17 +79,35 @@ authRoutes.post("/auth/login", async (c) => {
     update.password = await hashPassword(parsed.data.password)
   }
   await db.update(schema.user).set(update).where(eq(schema.user.id, user.id))
-  await createSession(c, user.id, user.lastLogin)
+  const tokens = await issueTokens(user.id, user.tokenVersion, user.lastLogin)
 
-  return success(c, { ok: true })
+  return success(c, tokens satisfies AuthTokens)
 })
 
-authRoutes.delete("/auth/session", async (c) => {
-  const token = await destroySession(c)
+authRoutes.post("/auth/refresh", async (c) => {
+  const parsed = await parseBody(c, refreshTokenRequestSchema)
+  if (!parsed.success) return parsed.response
+  const result = await refreshTokens(parsed.data.refreshToken)
+  if (result.reason === "disabled") {
+    return failure(c, 403, "account-disabled", "账号已被禁用，请联系老师")
+  }
+  // 不回 login-required：前端拦截器见到它就弹登录框，而换不到 token 的那一刻
+  // 前端还要先拿掉 token 重试一次原请求，可选登录的页面照样能当游客看
+  if (!result.tokens) {
+    return failure(c, 401, "refresh-invalid", "登录已过期，请重新登录")
+  }
+  return success(c, result.tokens satisfies AuthTokens)
+})
+
+/** 退出登录。凭 refresh token 而不是 access token：后者可能刚好过期，退出不该因此失败 */
+authRoutes.post("/auth/logout", async (c) => {
+  const parsed = await parseBody(c, refreshTokenRequestSchema)
+  if (!parsed.success) return parsed.response
+  const sid = await destroySession(parsed.data.refreshToken)
   // 同一个浏览器的其他标签页还挂着 WebSocket，页面上仍显示着登录态。推一条让它们
   // 立刻清掉，不用等最多 60 秒的会话巡检。
-  // 按 token 而不是按用户：这个人在别的设备上的登录是另一张会话，不该被牵连。
-  if (token) await publishSessionRevoked({ token }, "session-ended")
+  // 按会话而不是按用户：这个人在别的设备上的登录是另一张会话，不该被牵连。
+  if (sid) await publishSessionRevoked({ sid }, "session-ended")
   return success(c, null)
 })
 

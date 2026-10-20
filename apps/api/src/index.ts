@@ -1,7 +1,9 @@
 import { Hono } from "hono"
 import { basename, resolve } from "node:path"
 
-import { getRequestSessionUser, readRequestSessionToken } from "./auth/session"
+import { WS_AUTH_PROTOCOL } from "@oj2/contract"
+
+import { authenticateWebSocket, loadJwtSecret } from "./auth/session"
 import { config } from "./config"
 import { adminRoutes } from "./routes/admin"
 import { authRoutes } from "./routes/auth"
@@ -88,6 +90,8 @@ async function serveUpload(pathname: string, prefix: string, directory: string) 
   return null
 }
 
+await loadJwtSecret()
+
 const server = Bun.serve<SubmissionSocketData>({
   port: config.port,
   // Bun 默认 10 秒没有字节往来就掐连接，而且不报任何错。AI 的 SSE 两条路都会静默
@@ -126,8 +130,9 @@ const server = Bun.serve<SubmissionSocketData>({
       if (!isAllowedWebSocketOrigin(request.headers.get("origin"), url)) {
         return new Response("Forbidden", { status: 403 })
       }
-      const user = await getRequestSessionUser(request)
-      if (!user) return new Response("Unauthorized", { status: 401 })
+      const session = await authenticateWebSocket(request)
+      if (!session) return new Response("Unauthorized", { status: 401 })
+      const { user } = session
       const kind =
         url.pathname === "/ws/config"
           ? "config"
@@ -136,10 +141,13 @@ const server = Bun.serve<SubmissionSocketData>({
             : "submissions"
       if (
         bunServer.upgrade(request, {
+          // 前端是借子协议带 token 来的，不回一个它传过的子协议 Chrome 就判握手失败
+          headers: { "Sec-WebSocket-Protocol": WS_AUTH_PROTOCOL },
           data: {
             userId: user.id,
             kind,
-            token: readRequestSessionToken(request),
+            sid: session.sid,
+            tokenVersion: session.tokenVersion,
             username: user.username,
             adminType: user.adminType,
           },

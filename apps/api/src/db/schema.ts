@@ -1246,6 +1246,14 @@ export const user = pgTable(
      * （见 routes/ranking.ts）。只管排名页和首页周榜，比赛排名不受它影响
      */
     rankHiddenAt: timestamp("rank_hidden_at", { withTimezone: true, mode: "string" }),
+    /**
+     * 签进 access token 的版本号。改密码、重置密码、禁用账号时加一，这个人所有设备上
+     * 签出去的 token 立刻作废（见 auth/session.ts 的 revokeUserSessions）。
+     *
+     * 放在库里而不是 Redis：机房和服务器共用这个库、各有各的 Redis，
+     * 在一边改了密码，另一边登着的也得一起下线。
+     */
+    tokenVersion: integer("token_version").default(0).notNull(),
   },
   (table) => [
     unique("user_username_key").on(table.username),

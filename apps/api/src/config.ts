@@ -66,7 +66,6 @@ const envSchema = z.object({
   ),
   REDIS_URL: requiredWhenCompiled("redis://localhost:6380"),
   SESSION_TTL_SECONDS: positiveInt(7 * 24 * 60 * 60),
-  COOKIE_SECURE: z.preprocess(blankAsUnset, z.enum(["true", "false"]).optional()),
   JUDGE_SERVER_URL: text("http://localhost:8081"),
   // dev 不设时生成一次性随机值，见 judgeServerToken()
   JUDGE_SERVER_TOKEN: isCompiled
@@ -138,9 +137,8 @@ export const config = {
   port: env.PORT,
   databaseUrl: env.DATABASE_URL,
   redisUrl: env.REDIS_URL,
-  sessionCookie: "oj2_session",
+  /** refresh token 的有效期，每换一次 access token 往后顺延，见 auth/session.ts */
   sessionTtlSeconds: env.SESSION_TTL_SECONDS,
-  secureCookies: env.COOKIE_SECURE === "true",
   judgeServerUrl: env.JUDGE_SERVER_URL,
   judgeServerToken: judgeServerToken(),
   judgeConcurrency: env.JUDGE_CONCURRENCY,

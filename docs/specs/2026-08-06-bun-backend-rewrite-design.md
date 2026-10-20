@@ -139,6 +139,10 @@ Projects/OJ/
 
 **选 Hono 而非 Elysia。** Elysia 类型推导更强、benchmark 更快，但生态小且绑定 Bun。本项目负载为机房数十名学生，框架性能不构成瓶颈；Hono 的生态成熟度、`@hono/zod-validator`、以及可将类型直接传递给前端的 `hc` RPC 客户端更有价值。
 
+> 2026-10 改成了 access token（JWT，Bearer）+ refresh token，封禁和改密码的即时生效靠
+> 每个请求核对 Redis 会话与库里的 `user.token_version`，见 `apps/api/src/auth/session.ts`。
+> 下面是当初的取舍，留作记录。
+
 **会话用 Redis opaque token 而非 JWT。** 理由是账号封禁需即时生效：`User.is_disabled` 一旦置位必须立刻踢人下线，JWT 做不到，得额外维护黑名单——那等于把 Redis 又加回来，白绕一圈。Redis 本就在架构内，直接用 opaque token 最省。
 
 > 更正（2026-08-06 盘点时发现）：本条最初的理由写的是"现有 `account/views/oj.py:214` 实现了查看并踢出其他登录会话"。核实后该功能实际是死的——`/api/sessions` 前端从不调用，`User.session_keys` 字段只写不读（`account/middleware.py:30` 每请求追加，无人读取）。结论不变，理由已换成上面成立的那条。新后端不要复刻 `session_keys`。

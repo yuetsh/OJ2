@@ -95,10 +95,14 @@ shared →  ./src/shared
 
 ### HTTP Client
 
-`utils/api.ts` — Axios instance with interceptors (`baseURL: "/api"`,
-`withCredentials`). It unwraps both the axios envelope and the backend's
-`{ data }` envelope, so callers get the payload directly. All API calls proxy
-through the dev server (see `vite.config.ts`).
+`utils/api.ts` — Axios instance with interceptors (`baseURL: "/api"`). It unwraps both
+the axios envelope and the backend's `{ data }` envelope, so callers get the payload
+directly. All API calls proxy through the dev server (see `vite.config.ts`).
+
+登录态是 `Authorization: Bearer` 的 access token（15 分钟）+ refresh token，都在
+localStorage，换 token 的逻辑全在 `utils/auth.ts`。**不走 axios 的请求用 `authFetch`
+代替裸 `fetch`**，否则不带 token、也不会在 `token-expired` 时换一张重试。
+WebSocket 的 token 借子协议带（浏览器设不了请求头），见契约 `WS_AUTH_PROTOCOL`。
 
 ### Contract guard (`utils/contract.ts`)
 

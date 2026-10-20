@@ -1,6 +1,11 @@
-import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios"
+import axios, {
+  type AxiosRequestConfig,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from "axios"
 import { createDiscreteApi } from "naive-ui"
 import { useAuthModalStore } from "shared/store/authModal"
+import { getAccessToken, refreshAccessToken } from "./auth"
 import { STORAGE_KEY } from "./constants"
 import storage from "./storage"
 
@@ -91,10 +96,16 @@ export function handleGlobalApiError(code: string, message?: string) {
 
 const instance = axios.create({
   baseURL: "/api",
-  withCredentials: true,
 })
 
-instance.interceptors.request.use((config) => {
+/** 已经因为 token-expired 重试过一次的请求，别再进第二轮，也别再被请求拦截器换 token */
+type RetriableConfig = InternalAxiosRequestConfig & { authRetried?: boolean }
+
+instance.interceptors.request.use(async (config: RetriableConfig) => {
+  if (!config.authRetried) {
+    const token = await getAccessToken()
+    if (token) config.headers.set("Authorization", `Bearer ${token}`)
+  }
   if (config.params) {
     config.params = Object.fromEntries(
       Object.entries(config.params).filter(
@@ -112,11 +123,35 @@ instance.interceptors.response.use(
   ((response: AxiosResponse) => response.data.data) as unknown as (
     response: AxiosResponse,
   ) => AxiosResponse,
-  (error) => {
+  async (error) => {
     const payload = error.response?.data as ErrorPayload | undefined
     const code = payload?.error?.code ?? "network-error"
     // 没有响应体 = 请求根本没到后端（断网、反代挂了、超时），学生看到的就是这一句
     const message = payload?.error?.message ?? "网络异常，请检查网络后重试"
+
+    // access token 不能用了（过期、被吊销）：拿 refresh token 换一张，原请求重发一次。
+    // 重发的结果照样走这两个拦截器，调用方拿到的和一次成功没有区别
+    const config = error.config as RetriableConfig | undefined
+    if (code === "token-expired" && config && !config.authRetried) {
+      config.authRetried = true
+      const sent = String(config.headers.get("Authorization") ?? "").replace(/^Bearer /, "")
+      const outcome = await refreshAccessToken(sent)
+      if (outcome.token) {
+        config.headers.set("Authorization", `Bearer ${outcome.token}`)
+        return instance.request(config)
+      }
+      if (outcome.code === "network-error") {
+        return Promise.reject(new ApiError("network-error", "网络异常，请检查网络后重试"))
+      }
+      if (outcome.code === "account-disabled") {
+        handleGlobalApiError("account-disabled")
+        return Promise.reject(new ApiError("account-disabled", "账号已被禁用，请联系老师"))
+      }
+      // 登录真的过期了。拿掉 token 重发：要登录的接口回 login-required 弹登录框，
+      // 可选登录的（首页、题目列表……）照常当游客看，不平白弹框
+      config.headers.delete("Authorization")
+      return instance.request(config)
+    }
 
     handleGlobalApiError(code, message)
     return Promise.reject(new ApiError(code, message))

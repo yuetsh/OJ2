@@ -115,8 +115,8 @@ export const useUserStore = defineStore("user", () => {
     for (const [key, value] of keep) if (value !== null) storage.set(key, value)
   }
 
-  // 退登的两步（吊销服务端会话、清本地状态）绑在一起：只清本地会留一个还活着
-  // 的 cookie，下次进站又被 /profile 认回来。跳转留给调用方，store 里不碰路由 ——
+  // 退登的两步（吊销服务端会话、清本地状态）绑在一起：只清本地的话，服务端那张
+  // 会话还活着，refresh token 被人拿走照样能用。跳转留给调用方，store 里不碰路由 ——
   // 调用方要**整页**跳走，别用 router：各个 store 里还留着这个人的数据。
   async function signOut() {
     await logout()

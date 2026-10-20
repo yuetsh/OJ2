@@ -1,4 +1,4 @@
-import type { LoginRequest, RegisterRequest } from "@oj2/contract"
+import type { AuthTokens, LoginRequest, RefreshTokenRequest, RegisterRequest } from "@oj2/contract"
 import type {
   ClassActivity,
   MarkAchievementsRead,
@@ -8,20 +8,23 @@ import type {
   WebsiteConfig,
 } from "@oj2/contract"
 import api from "utils/api"
+import { getRefreshToken, saveTokens } from "utils/auth"
 import { contractDeferred } from "utils/contract"
 import { toProblemRow } from "utils/transforms"
 import type { PendingAchievement, Profile, Tag } from "utils/types"
 
-export function login(data: { username: string; password: string }) {
-  return api.post("auth/login", data satisfies LoginRequest)
+export async function login(data: { username: string; password: string }) {
+  saveTokens(await api.post<AuthTokens>("auth/login", data satisfies LoginRequest))
 }
 
 export function signup(data: { username: string; email: string; password: string }) {
   return api.post("users", data satisfies RegisterRequest)
 }
 
-export function logout() {
-  return api.delete("auth/session")
+/** 吊销服务端那张会话。本地的 token 由调用方清（user store 的 clearProfile） */
+export async function logout() {
+  const refreshToken = getRefreshToken()
+  if (refreshToken) await api.post("auth/logout", { refreshToken } satisfies RefreshTokenRequest)
 }
 
 export async function getProfile(username: string = ""): Promise<Profile | null> {

@@ -1,12 +1,18 @@
 import axios from "axios"
 import { createDiscreteApi } from "naive-ui"
+import { getAccessToken } from "./auth"
 
 // 指向新后端的 /api/admin。响应是 zip 二进制，不走 { error, data } 信封，
 // 所以不能复用 utils/api 的拦截器（它会把 response.data.data 取出来）。
 const http = axios.create({
   baseURL: "/api/admin",
   responseType: "blob",
-  withCredentials: true,
+})
+
+http.interceptors.request.use(async (config) => {
+  const token = await getAccessToken()
+  if (token) config.headers.set("Authorization", `Bearer ${token}`)
+  return config
 })
 
 // 脱离 n-message-provider 也能弹，理由同 utils/api.ts

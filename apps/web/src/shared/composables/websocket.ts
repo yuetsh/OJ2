@@ -1,8 +1,10 @@
+import { WS_AUTH_PROTOCOL } from "@oj2/contract"
 import { createDiscreteApi } from "naive-ui"
 import { ref, getCurrentScope, onScopeDispose, type Ref } from "vue"
 
 import { useAuthModalStore } from "shared/store/authModal"
 import { useUserStore } from "shared/store/user"
+import { getAccessToken } from "utils/auth"
 import { STORAGE_KEY } from "utils/constants"
 import storage from "utils/storage"
 import type { ClassBoardCell } from "utils/types"
@@ -93,6 +95,8 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    */
   protected closedByUser = false
   protected reviveBound = false
+  /** 正在等 access token、连接还没建出来，见 connect() */
+  protected opening = false
 
   public status: Ref<ConnectionStatus> = ref<ConnectionStatus>("disconnected")
 
@@ -117,11 +121,27 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
 
     this.bindReviveListeners()
     this.status.value = "connecting"
+    if (this.opening) return
 
+    // 握手要带 access token，快过期了得先换一张 —— 所以真正建连接是异步的
+    this.opening = true
+    void getAccessToken()
+      .catch(() => null)
+      .then((token) => {
+        this.opening = false
+        // 等 token 的这段时间里被 disconnect() 了，就不建了
+        if (this.closedByUser) return
+        this.open(token)
+      })
+  }
+
+  /** 建连接、挂回调。只由 connect() 调 */
+  private open(token: string | null) {
     try {
       // 所有回调都闭包住这个局部 ws 而不是读 this.ws：一条被换掉的旧连接
-      // 迟到的 onclose / onerror 不该去改现在这条连接的状态
-      const ws = new WebSocket(this.url)
+      // 迟到的 onclose / onerror 不该去改现在这条连接的状态。
+      // 浏览器的 WebSocket 设不了请求头，token 借子协议带过去，见契约 WS_AUTH_PROTOCOL
+      const ws = new WebSocket(this.url, token ? [WS_AUTH_PROTOCOL, token] : undefined)
       this.ws = ws
       ws.binaryType = "arraybuffer"
 
