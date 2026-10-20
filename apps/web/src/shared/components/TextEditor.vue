@@ -692,6 +692,43 @@ const inTable = computed(() => isActive("table"))
   vertical-align: middle;
 }
 
+/* 图片外面那层可缩放的容器（richText.ts 的 StyledImage）：选中或悬停时四个角出把手 */
+.content :deep([data-resize-container]) {
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.content :deep([data-resize-wrapper]) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.content :deep([data-resize-handle]) {
+  display: none;
+  width: 9px;
+  height: 9px;
+  margin: -4px;
+  border: 1px solid #fff;
+  background: v-bind("theme.primaryColor");
+  z-index: 1;
+}
+
+.content :deep([data-resize-container]:hover [data-resize-handle]),
+.content :deep(.ProseMirror-selectednode [data-resize-handle]),
+.content :deep([data-resize-state="true"] [data-resize-handle]) {
+  display: block;
+}
+
+.content :deep([data-resize-handle="top-left"]),
+.content :deep([data-resize-handle="bottom-right"]) {
+  cursor: nwse-resize;
+}
+
+.content :deep([data-resize-handle="top-right"]),
+.content :deep([data-resize-handle="bottom-left"]) {
+  cursor: nesw-resize;
+}
+
 .content :deep(.ProseMirror-selectednode) {
   outline: 2px solid v-bind("theme.primaryColor");
 }

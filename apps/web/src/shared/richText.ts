@@ -1,4 +1,4 @@
-import { Extension } from "@tiptap/core"
+import { Extension, getRenderedAttributes, ResizableNodeView } from "@tiptap/core"
 import { Image } from "@tiptap/extension-image"
 import { TableKit } from "@tiptap/extension-table"
 import { TextAlign } from "@tiptap/extension-text-align"
@@ -25,6 +25,61 @@ const StyledImage = Image.extend({
         parseHTML: (element) => element.getAttribute("style"),
         renderHTML: (attributes) => (attributes.style ? { style: attributes.style } : {}),
       },
+    }
+  },
+
+  // 拖四个角缩放。Tiptap 自带的 resize 把尺寸写进 width / height 属性，可老图的尺寸在 style 里、
+  // 盖过属性，拖完存下来还是原来的大小 —— 所以自己接：宽写回 style，高去掉（学生端高一律 auto）
+  addNodeView() {
+    return ({ node, getPos, editor }) => {
+      const img = document.createElement("img")
+      const extensionAttributes = editor.extensionManager.attributes
+
+      /** 节点属性原样落到 <img> 上，编辑区和存下来的 HTML 是同一个样子 */
+      const render = (node: Parameters<typeof getRenderedAttributes>[0]) => {
+        const attributes = getRenderedAttributes(node, extensionAttributes)
+        for (const name of img.getAttributeNames()) {
+          if (attributes[name] == null) img.removeAttribute(name)
+        }
+        for (const [name, value] of Object.entries(attributes)) {
+          if (value != null) img.setAttribute(name, value)
+        }
+        // 拖动的是外面那层容器，图片自己不能被浏览器当成原生拖拽
+        img.draggable = false
+      }
+
+      render(node)
+      const view = new ResizableNodeView({
+        element: img,
+        editor,
+        node,
+        getPos,
+        onCommit: (width) => {
+          const pos = getPos()
+          if (pos === undefined) return
+          const { style } = document.createElement("img")
+          style.cssText = view.node.attrs.style ?? ""
+          style.removeProperty("height")
+          style.width = `${Math.round(width)}px`
+          editor
+            .chain()
+            .setNodeSelection(pos)
+            .updateAttributes(this.name, { style: style.cssText, width: null, height: null })
+            .run()
+        },
+        onUpdate: (node) => {
+          render(node)
+          return true
+        },
+        options: {
+          directions: ["top-left", "top-right", "bottom-left", "bottom-right"],
+          min: { width: 24, height: 24 },
+          preserveAspectRatio: true,
+        },
+      })
+      // 它会拿 width 属性往 style 里写一份，和 style 里原有的宽打架；以节点属性为准
+      render(node)
+      return view
     }
   },
 })
