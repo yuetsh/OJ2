@@ -98,14 +98,14 @@ function explain(items: CollabRequestItem[], problemId: string) {
             等了 {{ waited(item.createdAt) }}
           </span>
           <n-button v-if="isDesktop" type="primary" size="small" @click="onHelp(item)">
-            帮他
+            去帮
           </n-button>
           <n-button
             quaternary
             circle
             size="small"
-            aria-label="放下他的手"
-            title="放下他的手"
+            aria-label="放下举手"
+            title="放下举手"
             @click="collabStore.reject(item.studentId)"
           >
             <Icon icon="mdi:close" height="16" />

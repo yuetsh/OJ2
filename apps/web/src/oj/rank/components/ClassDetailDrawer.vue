@@ -113,7 +113,7 @@ function go(path: string, query: Record<string, string>) {
               <span v-if="detail.gradeAvg !== null">年级平均 {{ detail.gradeAvg }}</span>
             </div>
             <div class="big">
-              <span>中间那位同学做对</span><b>{{ detail.median }} 道</b><span>一半人比他多</span>
+              <span>中间那位同学做对</span><b>{{ detail.median }} 道</b><span>一半人比这多</span>
             </div>
             <div class="big">
               <span>做对过题的</span>
@@ -205,7 +205,7 @@ function go(path: string, query: Record<string, string>) {
                 @click.prevent="
                   go('/submission', { username: row.user.username, exactUsername: '1' })
                 "
-                >看他的提交 ›</a
+                >看提交 ›</a
               >
               <a href="#" @click.prevent="go('/ai-analysis', { username: row.user.username })"
                 >智能分析 ›</a

@@ -32,7 +32,7 @@ watch(
 )
 
 const shown = computed(() => (showAll.value ? props.days : props.days.slice(0, DAY_CAP)))
-const you = computed(() => (props.username ? "他" : "你"))
+const you = computed(() => (props.username ? "" : "你"))
 const subtitle = computed(() =>
   props.className
     ? `${classLabel(props.className)}课上做的题，加上${you.value}自己练的`

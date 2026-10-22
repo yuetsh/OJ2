@@ -125,7 +125,7 @@ watch(
   },
 )
 const drawerLabel = (key: DrawerKey) =>
-  key === "submission" && teacherCollab.value ? "他的提交" : DRAWER_TITLE[key]
+  key === "submission" && teacherCollab.value ? "学生的提交" : DRAWER_TITLE[key]
 
 function toggleDrawer(key: DrawerKey) {
   drawer.value = drawer.value === key ? null : key

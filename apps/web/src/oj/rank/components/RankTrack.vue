@@ -171,9 +171,9 @@ function width(row: RankRow) {
 
 function menuOf(row: RankRow): DropdownOption[] {
   return [
-    { label: "看他的提交", key: "submissions" },
-    { label: "看他的智能分析", key: "analysis" },
-    ...(row.mood ? [{ label: "清空他的签名…", key: "mood" }] : []),
+    { label: "看提交", key: "submissions" },
+    { label: "看智能分析", key: "analysis" },
+    ...(row.mood ? [{ label: "清空签名…", key: "mood" }] : []),
     { label: "不计入排名…", key: "hide" },
   ]
 }

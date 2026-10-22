@@ -256,7 +256,7 @@ watch(query, () => {
     <n-empty
       v-if="listed && !submissions.length"
       class="empty"
-      :description="peer ? '他还没有交过这道题' : '这道题你还没有交过'"
+      :description="peer ? '还没有交过这道题' : '这道题你还没有交过'"
     />
 
     <!-- 设计稿「我的提交 / 统计 / 点评：抽屉盖住左栏」：一整块带框的列表，行间一条细线 -->

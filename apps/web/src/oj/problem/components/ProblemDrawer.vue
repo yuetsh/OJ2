@@ -71,7 +71,7 @@ watch(
   },
 )
 
-// 协作中的老师看的是学生的提交（ProblemSubmission 里按学生用户名查），页签写「他的提交」
+// 协作中的老师看的是学生的提交（ProblemSubmission 里按学生用户名查），页签写「学生的提交」
 const teacherCollab = useTeacherCollab()
 
 /**
@@ -127,7 +127,7 @@ function goAllSubmissions() {
               :aria-selected="lastOpened === key"
               @click="open = key"
             >
-              {{ key === "submission" && teacherCollab ? "他的提交" : DRAWER_TITLE[key] }}
+              {{ key === "submission" && teacherCollab ? "学生的提交" : DRAWER_TITLE[key] }}
             </button>
           </div>
           <button type="button" class="drawer-close" aria-label="关闭" @click="open = null">

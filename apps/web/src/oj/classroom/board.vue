@@ -680,7 +680,7 @@ function lastText(student: ClassBoardStudent) {
                     size="tiny"
                     @click="help(student.userId)"
                   >
-                    帮他 · {{ helpOf(student)!.problemId }}
+                    去帮 · {{ helpOf(student)!.problemId }}
                   </n-button>
                   <span v-else-if="helpOf(student)" class="helping">
                     {{ helpOf(student)!.teacherName }} 在帮

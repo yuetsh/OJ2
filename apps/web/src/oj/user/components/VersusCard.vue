@@ -2,7 +2,7 @@
 import type { ProfileOverview } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 
-/** 同学看他的主页时的「你和他」：两根条比做对几道，下面一句你们重合多少、你在本班第几 */
+/** 同学看别人的主页时的「和你比」：两根条比做对几道，下面一句你们重合多少、你在本班第几 */
 const props = defineProps<{
   versus: NonNullable<ProfileOverview["versus"]>
   /** 他做对几道 */
@@ -19,8 +19,8 @@ const line = computed(() => {
   if (solved)
     parts.push(
       both === solved
-        ? `你做对的 ${solved} 道他都做对了`
-        : `你做对的 ${solved} 道里他做对了 ${both} 道`,
+        ? `你做对的 ${solved} 道对方都做对了`
+        : `你做对的 ${solved} 道里对方做对了 ${both} 道`,
     )
   if (classRank) parts.push(`你在本班第 ${classRank.rank} 名`)
   return parts.join(" · ")
@@ -29,9 +29,9 @@ const line = computed(() => {
 
 <template>
   <section class="card">
-    <h3>你和他</h3>
+    <h3>和你比</h3>
     <div class="bar-row">
-      <span class="who">他</span>
+      <span class="who">对方</span>
       <span class="lane"
         ><span class="bar his" :style="{ width: `${(theirs / top) * 100}%` }"></span
       ></span>

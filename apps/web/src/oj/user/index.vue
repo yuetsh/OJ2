@@ -49,8 +49,6 @@ async function load() {
 }
 
 watch(username, load, { immediate: true })
-
-const solvedTitle = computed(() => (isSelf.value || teacherView.value ? "做对的题" : "他做对的题"))
 </script>
 
 <template>
@@ -76,7 +74,7 @@ const solvedTitle = computed(() => (isSelf.value || teacherView.value ? "做对�
           <SolvedCard
             :solved="overview.solved"
             :unsolved="overview.unsolved"
-            :title="solvedTitle"
+            title="做对的题"
             :username="teacherView ? profile.user.username : undefined"
           />
           <div class="column">
@@ -109,7 +107,7 @@ const solvedTitle = computed(() => (isSelf.value || teacherView.value ? "做对�
               <SolvedCard
                 :solved="overview.solved"
                 :unsolved="overview.unsolved"
-                :title="solvedTitle"
+                title="做对的题"
                 :username="teacherView ? profile.user.username : undefined"
                 compact
               />

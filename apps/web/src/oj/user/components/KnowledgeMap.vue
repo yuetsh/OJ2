@@ -63,7 +63,7 @@ function hint(tag: KnowledgeLevel) {
     <div v-if="!learned.length && !untouched.length" class="meta empty">还没做对带知识点的题</div>
 
     <div v-if="untouched.length" class="untouched">
-      <span class="meta">班里在学、{{ teacher ? "他" : "你" }}还没碰过</span>
+      <span class="meta">班里在学、{{ teacher ? "" : "你" }}还没碰过</span>
       <div class="tags">
         <router-link v-for="tag in untouched" :key="tag.name" :to="tagLink(tag.name)" class="tag">
           {{ tag.name }}

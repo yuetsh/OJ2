@@ -12,12 +12,12 @@ const props = defineProps<{
   item: LearningItem
   /** 课上的题才说「班上第几个做对」；自己练的题同学大多没做，排第几没意义 */
   inLesson: boolean
-  /** 老师在看这个学生：称呼用「他」，点进去看他的提交 */
+  /** 老师在看这个学生：不称呼（分不出男女），点进去看这个学生的提交 */
   username?: string
 }>()
 
 const theme = useThemeVars()
-const you = computed(() => (props.username ? "他" : "你"))
+const you = computed(() => (props.username ? "" : "你"))
 
 const problemLink = computed(() => `/problem/${props.item.displayId}`)
 const submissionLink = computed(() => ({
@@ -67,7 +67,7 @@ const detail = computed(() => {
     <div class="tip">
       <span>{{ detail.filter(Boolean).join(" · ") }}</span>
       <router-link v-if="item.status !== 'none'" :to="submissionLink"
-        >看{{ you }}的提交 ›</router-link
+        >{{ username ? "看提交" : "看你的提交" }} ›</router-link
       >
       <router-link v-else-if="!username" :to="problemLink">去做 ›</router-link>
     </div>

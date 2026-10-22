@@ -58,9 +58,9 @@ watch([peer, () => problem.value?._id], load, { immediate: true })
       <n-button size="small" :loading="loading" @click="load">刷新</n-button>
     </n-flex>
 
-    <n-text v-if="failed" type="error">读不出他的提交，点「刷新」再试</n-text>
+    <n-text v-if="failed" type="error">读不出提交，点「刷新」再试</n-text>
     <SubmissionResult v-else-if="latest" :submission="latest" peer />
-    <n-empty v-else-if="checked" class="empty" description="他还没交过这道题" />
+    <n-empty v-else-if="checked" class="empty" description="还没交过这道题" />
   </div>
 </template>
 

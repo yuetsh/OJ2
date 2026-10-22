@@ -63,10 +63,10 @@ const hint = computed(() => {
   if (props.check.passed) return ""
   if (!kind.value) {
     const name = JUDGE_STATUS[props.check.result as keyof typeof JUDGE_STATUS]?.name ?? "出错了"
-    return `${props.peer ? "他" : "你"}的程序在这个例子上就「${name}」了，先让它在例子上跑通。`
+    return `${props.peer ? "学生" : "你"}的程序在这个例子上就「${name}」了，先让它在例子上跑通。`
   }
   const text = explainDiff(kind.value, props.check, props.code, props.language)
-  return props.peer ? text.replace(/你/g, "他") : text
+  return props.peer ? text.replace(/你/g, "学生") : text
 })
 const diffLine = computed(() =>
   firstDifferentLine(props.check.expected ?? "", props.check.output ?? ""),
@@ -161,7 +161,7 @@ function lines(text: string) {
           </div>
         </div>
         <div class="block">
-          <div class="label">{{ peer ? "他" : "你" }}的输出</div>
+          <div class="label">{{ peer ? "学生" : "你" }}的输出</div>
           <div v-if="check.output" class="text">
             <template v-for="(line, i) in lines(check.output)" :key="i">
               <div v-if="i === diffLine && diffParts?.output" class="line">

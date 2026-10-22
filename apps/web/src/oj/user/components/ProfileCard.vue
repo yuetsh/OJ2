@@ -20,7 +20,7 @@ const props = defineProps<{
   profile: Profile
   overview: ProfileOverview
   isSelf: boolean
-  /** 老师在看学生：三个数的最后一格换成「交过还没做对」，按钮换成看他的… */
+  /** 老师在看学生：三个数的最后一格换成「交过还没做对」，按钮换成看学生的… */
   teacherView: boolean
   compact?: boolean
 }>()
@@ -148,7 +148,7 @@ function onMenu(key: string) {
   } else if (key === "mood") {
     dialog.warning({
       title: "清空个性签名",
-      content: `「${props.profile.mood}」会被清掉，他之后还能重新写。`,
+      content: `「${props.profile.mood}」会被清掉，之后还能重新写。`,
       positiveText: "清空",
       negativeText: "取消",
       onPositiveClick: () =>
@@ -230,7 +230,7 @@ function onMenu(key: string) {
                 type="primary"
                 @click="router.push({ name: 'ai', query: { username } })"
               >
-                <template #icon><Icon icon="ph:sparkle" /></template>看他的智能分析
+                <template #icon><Icon icon="ph:sparkle" /></template>智能分析
               </n-button>
               <n-button
                 size="small"
@@ -238,7 +238,7 @@ function onMenu(key: string) {
                   router.push({ path: '/submission', query: { username, exactUsername: '1' } })
                 "
               >
-                <template #icon><Icon icon="ph:list-checks" /></template>看他的提交
+                <template #icon><Icon icon="ph:list-checks" /></template>提交记录
               </n-button>
               <n-dropdown v-if="menu.length" :options="menu" trigger="click" @select="onMenu">
                 <n-button size="small" aria-label="更多">
@@ -283,12 +283,12 @@ function onMenu(key: string) {
       </template>
       <template v-else>
         <n-button type="primary" @click="router.push({ name: 'ai', query: { username } })">
-          看他的智能分析
+          智能分析
         </n-button>
         <n-button
           @click="router.push({ path: '/submission', query: { username, exactUsername: '1' } })"
         >
-          看他的提交
+          提交记录
         </n-button>
       </template>
     </div>

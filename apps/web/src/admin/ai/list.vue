@@ -20,7 +20,7 @@ const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.v
  * 两行摘要），点哪份右边就是全文。原来是表格 + 弹框，看一份要点「查看」、关框、再点下一份。
  *
  * 「PIN」（固定让这个学生在前台看这一份）线上 697 份里一次都没用过，从每行的按钮和页头那条
- * 锁定名单，收成正文右上角一个开关「固定给他看这份」。后端是切换语义：钉一份会顺手把这个学生
+ * 锁定名单，收成正文右上角一个开关「固定给学生看这份」。后端是切换语义：钉一份会顺手把这个学生
  * 别的那份取消，所以切完重拉列表
  */
 const theme = useThemeVars()
@@ -154,7 +154,7 @@ watchDebounced(
             </span>
             <span class="spacer"></span>
             <label class="pin">
-              固定给他看这份
+              固定给学生看这份
               <n-switch :value="selected.isPinned" size="small" @update:value="togglePin" />
             </label>
           </div>

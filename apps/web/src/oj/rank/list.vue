@@ -319,7 +319,7 @@ function openSubmissions(username: string) {
 function hide(row: RankRow) {
   dialog.warning({
     title: "不计入排名",
-    content: `${row.user.username} 会从所有排名里消失（本班、本年级、全服、首页周榜），他自己会看到「不计入排名」。比赛排名不受影响，随时能恢复。`,
+    content: `${row.user.username} 会从所有排名里消失（本班、本年级、全服、首页周榜），本人会看到「不计入排名」。比赛排名不受影响，随时能恢复。`,
     positiveText: "不计入排名",
     negativeText: "取消",
     onPositiveClick: async () => {
@@ -347,7 +347,7 @@ function onMoodSaved(mood: string | null) {
 function confirmClearMood(row: RankRow) {
   dialog.warning({
     title: "清空个性签名",
-    content: `${row.user.username} 的签名「${row.mood}」会被清空。只清这一句，他之后还能重新写。`,
+    content: `${row.user.username} 的签名「${row.mood}」会被清空。只清这一句，之后还能重新写。`,
     positiveText: "清空",
     negativeText: "取消",
     onPositiveClick: async () => {

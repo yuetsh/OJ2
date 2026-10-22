@@ -106,11 +106,11 @@ onBeforeUnmount(() => clearTimeout(timer))
 const shown = computed(() => (state.value === "ok" ? detail.value : null))
 const own = computed(() => !!shown.value && shown.value.userId === userStore.user?.id)
 const teacher = computed(() => userStore.isTeacherOrAbove)
-const who = computed(() => (own.value ? "你" : "他"))
+const who = computed(() => (own.value ? "你" : ""))
 
 const { explain, explainTone } = useSubmissionExplain(shown)
 
-/** 答案错误、后端在例子上对比过：摆出输入 / 正确输出 / 他的输出（和题目页结果区同一块） */
+/** 答案错误、后端在例子上对比过：摆出输入 / 正确输出 / 学生的输出（和题目页结果区同一块） */
 const sampleCheck = computed(() => {
   const s = shown.value
   if (!s?.showLink || s.result !== SubmissionStatus.wrong_answer) return null
@@ -211,7 +211,7 @@ const moreOptions = computed(() => {
       ]
     : []
   // 手机上名字、班级和这个按钮排不进一行，收进「⋯」
-  const all = !own.value && isMobile.value ? [{ label: "他的全部提交", key: "all" }] : []
+  const all = !own.value && isMobile.value ? [{ label: "学生的全部提交", key: "all" }] : []
   if (!canRejudge.value) return [...all, ...copy]
   return [
     ...all,
@@ -281,7 +281,7 @@ function handleMore(key: string) {
         <div class="actions">
           <template v-if="teacher">
             <n-button v-if="!own && !isMobile" tag="a" :href="allSubmissionsLink">
-              他的全部提交
+              学生的全部提交
             </n-button>
             <n-dropdown
               v-if="moreOptions.length"

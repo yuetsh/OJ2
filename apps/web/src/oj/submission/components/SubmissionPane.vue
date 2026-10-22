@@ -147,8 +147,8 @@ function openStandalone() {
         </a>
         <button
           class="filter-pill"
-          title="只看他的提交"
-          aria-label="只看他的提交"
+          title="只看这个人的提交"
+          aria-label="只看这个人的提交"
           @click="emit('filterUser', row.username)"
         >
           <Icon icon="ph:funnel-simple-bold" :width="12" />
@@ -226,7 +226,7 @@ function openStandalone() {
             v-if="shown"
             size="small"
             quaternary
-            title="新页面打开（看他这道题交的每一次）"
+            title="新页面打开（看这道题交的每一次）"
             aria-label="新页面打开"
             @click="openStandalone"
           >

@@ -100,10 +100,10 @@ const folded = computed(() => props.compact && !expanded.value && !generating.va
       </div>
     </template>
     <n-spin v-else-if="waiting" size="small">
-      <div class="waiting">正在看{{ username ? "他" : "你" }}的做题记录…</div>
+      <div class="waiting">正在看{{ username ? "" : "你的" }}做题记录…</div>
     </n-spin>
     <div v-else class="empty">
-      <p>让 AI 按这些数据，写一段{{ username ? "给他" : "给你" }}的小结和下一步建议</p>
+      <p>让 AI 按这些数据，写一段{{ username ? "" : "给你的" }}小结和下一步建议</p>
       <n-button type="primary" @click="generate">
         <template #icon><Icon icon="ph:sparkle" /></template>
         AI 帮我分析

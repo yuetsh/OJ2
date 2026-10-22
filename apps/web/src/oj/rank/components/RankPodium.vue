@@ -83,8 +83,8 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
             <button
               v-if="teacher"
               class="clear"
-              aria-label="清空他的签名"
-              title="清空他的签名"
+              aria-label="清空签名"
+              title="清空签名"
               @click="$emit('clearMood', row)"
             >
               ×

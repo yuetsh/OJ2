@@ -35,7 +35,7 @@ const waited = computed(() => {
 const next = computed(() => collabStore.nextRequest)
 
 /**
- * 「看他交过什么」：只看这个学生、这道题。开新标签 —— 跳走这一页协作就断了。
+ * 「看学生交过什么」：只看这个学生、这道题。开新标签 —— 跳走这一页协作就断了。
  * exactUsername：整名匹配，不然学号相近的同学（ks24a1 / ks24a10…）会混进来
  */
 function openHisSubmissions() {
@@ -81,7 +81,7 @@ function finishAndNext() {
     </span>
     <span v-if="!peek && waited" class="note">举手 {{ waited }}</span>
     <span class="spacer" />
-    <button type="button" class="ghost" @click="openHisSubmissions">看他交过什么</button>
+    <button type="button" class="ghost" @click="openHisSubmissions">看学生交过什么</button>
     <!-- 显式的「结束」：求助记录一并清掉。跳走页面发的是 leave("left")，
          那边只是退回排队 —— 见 store 里 leave 的注释 -->
     <button type="button" :class="next ? 'ghost' : 'end'" @click="finish">

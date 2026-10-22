@@ -152,7 +152,7 @@ function goStudent(username: string | null | undefined) {
 
       <template v-else-if="report && !report.days.length">
         <section class="card blank">
-          <b>{{ LEARNING_PERIOD_LABELS[period] }}{{ viewing ? "他" : "" }}还没交过题</b>
+          <b>{{ LEARNING_PERIOD_LABELS[period] }}还没交过题</b>
           <span v-if="emptyHint" class="muted">{{ emptyHint }}</span>
           <div class="actions">
             <n-button v-for="[key, label] in longer" :key="key" @click="urlPeriod = key">
