@@ -53,9 +53,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # 版本跟着 package.json 的 packageManager 走。单二进制会把运行时一起打进去，
+      # 这里装的是哪个版本，线上跑的就是哪个版本 —— 不能是 latest。
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: package.json
 
       # 依赖装到 ~/.bun/install/cache，命中的话 install 只剩几秒。
       # v6 起跑在 node24 上（v4 还是 node20，GitHub 正在退役 node20 runtime），

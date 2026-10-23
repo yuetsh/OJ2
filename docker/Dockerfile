@@ -38,7 +38,8 @@ ARG ARTIFACTS=build
 # 也能单独看日志，少一层 supervisord 要维护。
 
 # ---------------------------------------------------------------- 构建
-FROM oven/bun:1 AS builder
+# 和 package.json 的 packageManager 保持一致：单二进制把运行时打进去，这里是几线上就是几
+FROM oven/bun:1.4.4 AS builder
 WORKDIR /build
 
 # 走国内镜像源。不是图快（总耗时差不多），是图能装上：

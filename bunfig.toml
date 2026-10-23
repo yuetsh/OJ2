@@ -1,3 +1,8 @@
 [install]
 # workspace 内部依赖走本地链接，不去 registry 找
 linker = "hoisted"
+
+# 新发布不满 3 天的版本不装：被投毒的包通常几小时到一两天内就会被发现并撤下。
+# @types/bun 例外：它跟着 package.json 的 packageManager 一起升，升 Bun 当天就要用上。
+minimumReleaseAge = "3d"
+minimumReleaseAgeExcludes = ["@types/bun", "bun-types"]

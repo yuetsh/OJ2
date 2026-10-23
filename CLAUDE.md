@@ -39,6 +39,11 @@ bun run dev            # api(3000) + worker + web(5173) 一起起
 首次要先建 `.env`（照 `.env.example`）。判题机 token 两边必须一致：
 `.env` 的 `JUDGE_SERVER_TOKEN` 和 `docker/.env` 的 `OJ2_JUDGE_TOKEN`。
 
+**Bun 版本是锁死的**：单二进制把运行时一起打进去，CI 装的是几、线上跑的就是几。
+升级要改三处 —— 根 `package.json` 的 `packageManager`（CI 的 setup-bun 读它）和
+`@types/bun`、`docker/Dockerfile` 的 `oven/bun:x.y.z` —— 然后 `bun install`。
+`bunfig.toml` 设了 `minimumReleaseAge = "3d"`，新发布不满 3 天的包装不上，`@types/bun` 除外。
+
 常用检查：
 
 ```bash

@@ -13,7 +13,7 @@
     "seed:dev": "bun src/scripts/seed-dev.ts",
     "recount": "bun --env-file=../../.env src/main.ts recount",
     "rediagnose": "bun --env-file=../../.env src/main.ts rediagnose",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun check",
     "check:routes": "bun src/scripts/check-route-shadowing.ts",
     "check:ast": "bun src/scripts/check-ast-targets.ts",
     "db:pull": "drizzle-kit pull",
