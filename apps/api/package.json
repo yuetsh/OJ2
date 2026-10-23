@@ -9,7 +9,7 @@
     "dev:worker": "bun --watch src/main.ts worker",
     "start": "bun src/main.ts serve",
     "worker": "bun src/main.ts worker",
-    "build": "bun build --compile --target=bun-linux-x64 src/main.ts --outfile ../../dist/oj2-api",
+    "build": "bun build --compile --bytecode --format=esm --target=bun-linux-x64 src/main.ts --outfile ../../dist/oj2-api",
     "seed:dev": "bun src/scripts/seed-dev.ts",
     "recount": "bun --env-file=../../.env src/main.ts recount",
     "rediagnose": "bun --env-file=../../.env src/main.ts rediagnose",

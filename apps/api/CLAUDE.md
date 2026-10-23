@@ -15,6 +15,10 @@ OJ2 的后端（`apps/api`）。这里只放后端专属的坑；全仓通用的
 
 **改完这类代码，dev 和编译两种形态都要跑一遍。** 我吃过亏：只验了编译产物，dev 直接起不来。
 
+`build` 带 `--bytecode --format=esm`：每道 SQL 题都要起一次 `sql-child`，预编译字节码让它
+从约 120ms 降到约 72ms（单核实测），`serve` 起服务从约 180ms 降到约 100ms，内存不变，
+代价是二进制大 8MB。去掉 `--format=esm` 会退回 CJS 输出，顶层 await 编不过。
+
 ## 路径解析看 `runtime.ts`
 
 编译后 `import.meta.dir` 恒为 `/$bunfs/root`，往上三级就是文件系统根。
