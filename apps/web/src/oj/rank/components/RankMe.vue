@@ -175,7 +175,7 @@ function threatNote(me: RankRow, behind: RankRow) {
     </div>
     <div v-if="minis.length" class="minis">
       <button v-for="mini in minis" :key="mini.label" class="mini" @click="mini.go">
-        <span class="mini-label">{{ mini.label }}</span>
+        <span class="mini-label">{{ mini.label }} ›</span>
         <b v-if="mini.rank && mini.cap && mini.rank > mini.cap">{{ mini.cap }} 名以外</b>
         <b v-else-if="mini.rank"
           >第 {{ mini.rank }}<small v-if="mini.total"> / {{ mini.total }}</small></b
@@ -412,7 +412,7 @@ function threatNote(me: RankRow, behind: RankRow) {
   padding-top: 10px;
   border-top: 1px solid rgba(24, 160, 88, 0.3);
   font-size: var(--oj-fs-sec);
-  color: #2f6fd0;
+  color: v-bind("theme.primaryColor");
   text-decoration: none;
 }
 

@@ -332,8 +332,11 @@ html.dark .page {
   color: inherit;
   text-decoration: none;
 }
-a.c-title:hover .ptitle {
+a.c-title .ptitle {
   color: var(--learn-green-text);
+}
+a.c-title:hover .ptitle {
+  text-decoration: underline;
 }
 .pid {
   width: 34px;

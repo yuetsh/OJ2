@@ -446,6 +446,14 @@ const canRetry = computed(
   text-decoration: none;
 }
 
+.user-link :deep(.name) {
+  color: v-bind("theme.primaryColor");
+}
+
+.user-link:hover :deep(.name) {
+  text-decoration: underline;
+}
+
 .render-error {
   display: flex;
   flex-direction: column;
@@ -477,10 +485,14 @@ const canRetry = computed(
 }
 
 .problem {
-  color: v-bind("theme.textColor1");
+  color: v-bind("theme.primaryColor");
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.problem:hover {
+  text-decoration: underline;
 }
 
 /* 只留漏斗图标（右栏六百来宽，带字的话名字、题目和按钮排不进一行），字在 title 里 */

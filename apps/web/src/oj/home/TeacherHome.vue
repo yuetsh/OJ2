@@ -134,7 +134,7 @@ const shortcuts = computed(() =>
       <div class="card-head">
         <h3>公告</h3>
         <span class="spacer"></span>
-        <router-link to="/announcement" class="muted">全部</router-link>
+        <router-link to="/announcement" class="more">全部</router-link>
       </div>
       <router-link
         v-for="item in announcements"
@@ -236,6 +236,16 @@ const shortcuts = computed(() =>
   flex: 1 1 auto;
 }
 
+.more {
+  font-size: 14px;
+  color: v-bind("theme.primaryColor");
+  text-decoration: none;
+}
+
+.more:hover {
+  text-decoration: underline;
+}
+
 .minis {
   display: flex;
   flex-wrap: wrap;
@@ -250,6 +260,14 @@ const shortcuts = computed(() =>
   font-size: 13px;
   color: inherit;
   text-decoration: none;
+}
+
+.mini b.num {
+  color: v-bind("theme.primaryColor");
+}
+
+.mini:hover b.num {
+  text-decoration: underline;
 }
 
 .mini i {

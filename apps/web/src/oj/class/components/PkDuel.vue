@@ -513,13 +513,13 @@ const tab = ref<"weekly" | "dist">("weekly")
   max-width: 100%;
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind("theme.textColor1");
+  color: v-bind("theme.primaryColor");
   text-decoration: none;
 }
 
 .title a:hover,
 .m-title a:hover {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .ell {

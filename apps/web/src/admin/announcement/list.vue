@@ -197,13 +197,12 @@ watch(query, listAnnouncements, { deep: true })
 }
 
 .ann-table :deep(.title-link) {
-  color: inherit;
+  color: v-bind("theme.primaryColor");
   font-weight: 500;
   text-decoration: none;
 }
 
 .ann-table :deep(.title-link:hover) {
-  color: v-bind("theme.primaryColor");
   text-decoration: underline;
 }
 

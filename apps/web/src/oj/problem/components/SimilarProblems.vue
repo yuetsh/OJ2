@@ -10,6 +10,7 @@ const cache = new Map<string, Promise<ProblemRow[]>>()
 
 <script setup lang="ts">
 import { storeToRefs } from "pinia"
+import { useThemeVars } from "naive-ui"
 import { getSimilarProblems } from "oj/api"
 import { useProblemStore } from "oj/store/problem"
 
@@ -18,6 +19,8 @@ import { useProblemStore } from "oj/store/problem"
  * 两处用：原来只在题面最底下，学生交完不会再滚回去看。什么时候出现由调用方的 v-if 决定。
  */
 const props = defineProps<{ title: string }>()
+
+const theme = useThemeVars()
 
 const { problem } = storeToRefs(useProblemStore())
 const list = ref<ProblemRow[]>([])
@@ -90,6 +93,7 @@ function difficultyType(difficulty: string) {
 }
 
 .name {
+  color: v-bind("theme.primaryColor");
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

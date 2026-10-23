@@ -169,11 +169,11 @@ const fresh = computed(() => props.progress.solved === 0)
 
 .next b {
   font-weight: 600;
-  color: v-bind("theme.textColor1");
+  color: v-bind("theme.primaryColor");
 }
 
 .next:hover b {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .almost {
@@ -181,7 +181,7 @@ const fresh = computed(() => props.progress.solved === 0)
   padding: 0;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.textColor3");
+  color: v-bind("theme.primaryColor");
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -189,7 +189,7 @@ const fresh = computed(() => props.progress.solved === 0)
 }
 
 .almost:hover {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .start {

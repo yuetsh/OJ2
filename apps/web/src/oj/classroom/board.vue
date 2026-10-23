@@ -467,7 +467,7 @@ function lastText(student: ClassBoardStudent) {
         <span v-if="board.assignedAt" class="assigned">
           {{ parseTime(board.assignedAt, "HH:mm") }} {{ board.assignedBy }} 布置
         </span>
-        <n-button text class="edit" @click="editing = true">
+        <n-button text type="primary" class="edit" @click="editing = true">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
           {{ board.source === "teacher" ? "改" : "布置" }}
         </n-button>
@@ -998,12 +998,12 @@ function lastText(student: ClassBoardStudent) {
 .panel-title {
   font-size: 16px;
   font-weight: 600;
-  color: inherit;
+  color: v-bind("theme.primaryColor");
   text-decoration: none;
 }
 
 .panel-title:hover {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .groups {

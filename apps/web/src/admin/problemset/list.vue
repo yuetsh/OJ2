@@ -26,7 +26,11 @@ function edit(row: AdminProblemSet) {
 }
 
 function renderTitle(row: AdminProblemSet) {
-  return h(NButton, { text: true, onClick: () => edit(row) }, { default: () => row.title })
+  return h(
+    NButton,
+    { text: true, type: "primary", onClick: () => edit(row) },
+    { default: () => row.title },
+  )
 }
 
 function renderAssigned(row: AdminProblemSet) {

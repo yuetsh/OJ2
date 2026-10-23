@@ -303,10 +303,12 @@ function percent(value: number, total: number) {
   border-radius: 8px;
 }
 
+/* 横幅本身就是绿的，字再绿也看不出能点，靠下划线 */
 .live-link {
   color: inherit;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -522,12 +524,12 @@ function percent(value: number, total: number) {
 }
 
 .hard-title a {
-  color: v-bind("theme.textColor1");
+  color: v-bind("theme.primaryColor");
   text-decoration: none;
 }
 
 .hard-title a:hover {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .mini {

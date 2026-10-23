@@ -297,7 +297,7 @@ function goCode() {
             <n-button text type="primary" size="small" @click="versionZoom = true">
               放大看
             </n-button>
-            <n-button text size="small" @click="versionOpen = !versionOpen">
+            <n-button text type="primary" size="small" @click="versionOpen = !versionOpen">
               {{ versionOpen ? "收起" : "展开" }}
             </n-button>
           </div>

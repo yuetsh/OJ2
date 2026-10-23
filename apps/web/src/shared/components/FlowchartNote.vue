@@ -214,7 +214,7 @@ function toggle() {
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind("theme.primaryColor");
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -222,7 +222,7 @@ function toggle() {
 }
 
 .toggle:hover {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .caret {

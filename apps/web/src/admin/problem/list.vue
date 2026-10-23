@@ -481,13 +481,12 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
 }
 
 .problem-table :deep(.title-link) {
-  color: inherit;
+  color: v-bind("theme.primaryColor");
   font-weight: 500;
   text-decoration: none;
 }
 
 .problem-table :deep(.title-link:hover) {
-  color: v-bind("theme.primaryColor");
   text-decoration: underline;
 }
 

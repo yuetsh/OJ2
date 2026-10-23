@@ -219,8 +219,12 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
   padding: 0;
   background: none;
   font: inherit;
-  color: v-bind("theme.textColor3");
+  color: v-bind("theme.primaryColor");
   cursor: pointer;
+}
+
+.more:hover {
+  text-decoration: underline;
 }
 
 .was {

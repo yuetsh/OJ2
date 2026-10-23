@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue"
 import { useThemeVars } from "naive-ui"
 import { getLearnStudent } from "admin/api"
 import { parseTime, readableDuration } from "utils/functions"
@@ -159,6 +160,14 @@ watch(
                   :class="stateOf(ex)"
                 />
               </span>
+              <Icon
+                v-if="lesson.exercises.length || lesson.problems.length"
+                :icon="
+                  expanded.has(lesson.tutorialId) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'
+                "
+                :width="12"
+                class="muted"
+              />
             </span>
             <span class="lesson-line small muted num">
               <template v-if="lesson.viewCount">

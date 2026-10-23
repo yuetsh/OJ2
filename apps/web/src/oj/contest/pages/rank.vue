@@ -495,7 +495,11 @@ const columns = computed(() => {
 
 .ph b {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind("theme.primaryColor");
+}
+
+.ph:hover b {
+  text-decoration: underline;
 }
 
 .ph span {

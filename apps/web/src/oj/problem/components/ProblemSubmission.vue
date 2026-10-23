@@ -325,7 +325,7 @@ watch(query, () => {
                   放回编辑器
                 </n-button>
                 <n-button size="small" @click="copy(row.id)">复制</n-button>
-                <n-button size="small" text class="more" @click="openDetail(row.id)">
+                <n-button size="small" text type="primary" class="more" @click="openDetail(row.id)">
                   完整详情 ›
                 </n-button>
               </div>
@@ -499,12 +499,12 @@ watch(query, () => {
   border: 0;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.textColor3");
+  color: v-bind("theme.primaryColor");
   cursor: pointer;
 }
 
 .code-more:hover {
-  color: v-bind("theme.primaryColor");
+  text-decoration: underline;
 }
 
 .detail-actions {

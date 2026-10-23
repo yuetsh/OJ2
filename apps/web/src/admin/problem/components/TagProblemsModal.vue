@@ -35,7 +35,8 @@ const allColumns: DataTableColumn<AdminProblemRow>[] = [
     title: "题目",
     key: "title",
     minWidth: 200,
-    render: (row) => h(NButton, { text: true, onClick: () => goEdit(row) }, () => row.title),
+    render: (row) =>
+      h(NButton, { text: true, type: "primary", onClick: () => goEdit(row) }, () => row.title),
   },
   {
     title: "学生看得到",

@@ -703,7 +703,7 @@ a.row:hover {
 
 .more,
 .plain-link {
-  color: inherit;
+  color: #18a058;
   text-decoration: none;
 }
 
@@ -713,6 +713,6 @@ a.row:hover {
 
 .more:hover,
 .plain-link:hover {
-  color: #18a058;
+  text-decoration: underline;
 }
 </style>

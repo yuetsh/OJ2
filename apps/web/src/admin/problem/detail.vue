@@ -1160,7 +1160,13 @@ onMounted(async () => {
                 :height="codeHeight(form.templates[lang].template, 4, 16)"
                 placeholder="不写就用全站默认的"
               />
-              <n-button text size="small" class="hiddenToggle" @click="showHidden = !showHidden">
+              <n-button
+                text
+                type="primary"
+                size="small"
+                class="hiddenToggle"
+                @click="showHidden = !showHidden"
+              >
                 {{ showHidden ? "▾" : "›" }} 藏在学生代码前面 / 后面一起运行的代码（学生看不到）
               </n-button>
               <template v-if="showHidden">
@@ -1671,7 +1677,7 @@ onMounted(async () => {
   border: 0;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.textColor1");
+  color: v-bind("theme.primaryColor");
   text-align: left;
   cursor: pointer;
 }

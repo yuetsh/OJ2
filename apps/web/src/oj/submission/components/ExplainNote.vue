@@ -65,8 +65,12 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: v-bind("theme.textColor3");
+  color: v-bind("theme.primaryColor");
   text-decoration: none;
+}
+
+.raw-toggle:hover {
+  text-decoration: underline;
 }
 
 .raw {

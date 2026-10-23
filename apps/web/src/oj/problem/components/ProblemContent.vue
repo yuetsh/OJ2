@@ -272,7 +272,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <n-button text type="primary" size="small" @click="myFlowchartZoom = true">
           放大看
         </n-button>
-        <n-button text size="small" @click="myFlowchartOpen = !myFlowchartOpen">
+        <n-button text type="primary" size="small" @click="myFlowchartOpen = !myFlowchartOpen">
           {{ myFlowchartOpen ? "收起" : "展开" }}
         </n-button>
       </div>

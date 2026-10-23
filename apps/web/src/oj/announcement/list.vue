@@ -284,7 +284,7 @@ h2 {
   display: inline-block;
   margin-bottom: 12px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind("theme.primaryColor");
   cursor: pointer;
 }
 

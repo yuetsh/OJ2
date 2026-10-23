@@ -122,7 +122,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   <div v-if="pendingTags.length" class="pending">
     <b>还没归类</b>
     <div v-for="tag in pendingTags" :key="tag.id" class="pending-item">
-      <n-button text @click="openTagProblems(tag)">{{ tag.name }}</n-button>
+      <n-button text type="primary" @click="openTagProblems(tag)">{{ tag.name }}</n-button>
       <span class="muted">{{ tag.problemCount }} 道</span>
       <n-button size="small" @click="changeCategory(tag, 'knowledge')">算知识点</n-button>
       <n-button size="small" @click="changeCategory(tag, 'theme')">算主题</n-button>
@@ -257,12 +257,11 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   font: inherit;
   font-size: 15px;
   text-align: left;
-  color: v-bind("theme.textColor1");
+  color: v-bind("theme.primaryColor");
   cursor: pointer;
 }
 
 .name:hover {
-  color: v-bind("theme.primaryColor");
   text-decoration: underline;
 }
 

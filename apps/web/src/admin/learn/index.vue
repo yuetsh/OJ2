@@ -650,7 +650,10 @@ onMounted(load)
   text-align: left;
   cursor: pointer;
 }
-.name-btn:hover {
+.name-btn :deep(.name) {
+  color: v-bind("theme.primaryColor");
+}
+.name-btn:hover :deep(.name) {
   text-decoration: underline;
 }
 .c-num {

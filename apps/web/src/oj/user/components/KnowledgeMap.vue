@@ -106,6 +106,10 @@ h3 small {
   text-decoration: none;
 }
 
+.row:hover .name {
+  text-decoration: underline;
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -114,6 +118,7 @@ h3 small {
 
 .name {
   width: 72px;
+  color: v-bind("theme.primaryColor");
   font-size: var(--oj-fs-sec);
   font-weight: 500;
   white-space: nowrap;

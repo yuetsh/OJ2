@@ -151,14 +151,13 @@ function shortLabel(className: string) {
   border: 0;
   background: none;
   font: inherit;
-  color: inherit;
+  color: v-bind("theme.primaryColor");
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
 }
 
 .name:hover {
-  color: v-bind("theme.primaryColor");
   text-decoration: underline;
 }
 
