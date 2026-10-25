@@ -161,6 +161,13 @@ WebSocket）→ 后台判题机列表在线 → 后台题目列表翻页 → 带
 > **旧栈已经不可逆地下线**（`0002_drop_django_leftovers` 删掉了 Django 的框架表并已在
 > 生产库执行完毕），所以「停新栈起旧栈」不再是退路，**唯一退路是从数据库备份恢复**。
 
+### 把线上数据拉到本机
+
+`docker/pull-prod.sh`（在本机跑）经 `ssh debian` 只导 `onlinejudge` 一个库（`pg_dump -Fc`，
+不带角色，所以不会踩上面的坑 1），先灌进 `onlinejudge_incoming`、对过行数再换名（不用停 dev，
+避开坑 2），换下来的旧库留作 `onlinejudge_prev`。`--files` 顺带同步测试点、题面图片、头像。
+对服务器只读；拉完本机的账号口令都是线上的。用法和刻意的做法在脚本头部。
+
 ## 把库搬进 OJ2（一次性，顺带 PostgreSQL 16 → 18、Redis 7 → 8）
 
 `docker/move-db-into-oj2.sh` 把服务器上旧栈 compose 起的 postgres / redis 换成本栈的。
