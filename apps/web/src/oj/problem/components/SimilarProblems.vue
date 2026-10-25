@@ -79,6 +79,11 @@ function difficultyType(difficulty: string) {
   margin: 0 0 8px;
 }
 
+/* 列表项的内容区默认按内容撑宽，长标题会把难度挤出屏幕，省略号也不出来 */
+.similar :deep(.n-list-item__main) {
+  min-width: 0;
+}
+
 .link {
   display: inline-flex;
   align-items: center;

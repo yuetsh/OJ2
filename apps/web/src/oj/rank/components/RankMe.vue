@@ -175,7 +175,8 @@ function threatNote(me: RankRow, behind: RankRow) {
     </div>
     <div v-if="minis.length" class="minis">
       <button v-for="mini in minis" :key="mini.label" class="mini" @click="mini.go">
-        <span class="mini-label">{{ mini.label }} ›</span>
+        <!-- 窄了就在空格处折成两行，「·」「›」用不折行空格粘在前一个词后面 -->
+        <span class="mini-label">{{ mini.label.replace(" · ", "\u00a0· ") }}&nbsp;›</span>
         <b v-if="mini.rank && mini.cap && mini.rank > mini.cap">{{ mini.cap }} 名以外</b>
         <b v-else-if="mini.rank"
           >第 {{ mini.rank }}<small v-if="mini.total"> / {{ mini.total }}</small></b
@@ -448,10 +449,13 @@ function threatNote(me: RankRow, behind: RankRow) {
 .mini-label {
   font-size: 12px;
   color: v-bind("theme.textColor3");
-  white-space: nowrap;
+  text-align: left;
+  word-break: keep-all;
 }
 
+/* 标签有的折两行有的一行，名次一律沉底，三张卡才对得齐 */
 .mini b {
+  margin-top: auto;
   font-size: var(--oj-fs-body);
   font-variant-numeric: tabular-nums;
 }

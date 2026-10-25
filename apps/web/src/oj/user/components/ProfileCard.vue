@@ -64,7 +64,10 @@ const stats = computed(() => {
     list.push({
       big: o.achievements.unlocked.length,
       unit: "个",
-      sub: `成就 · 一共 ${o.achievements.total} 个`,
+      // 手机上三格挤在一行，「成就 · 一共 38 个」会把「个」单独挤到第二行
+      sub: props.compact
+        ? `共 ${o.achievements.total} 个成就`
+        : `成就 · 一共 ${o.achievements.total} 个`,
     })
   return list
 })

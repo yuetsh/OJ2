@@ -638,7 +638,12 @@ watch(
   .box.pick,
   .box.user {
     width: 100vw;
+    /* 全站给 .n-modal 的「左右各留 16px」在这里不要 */
+    max-width: none;
+    /* 100vh 是浏览器工具栏收起时的高度，工具栏露着的时候底下那截被压住；
+       dvh 跟着工具栏变，Chrome 108 起才有，105 退回 100vh */
     height: 100vh;
+    height: 100dvh;
     max-height: none;
     border-radius: 0;
     padding: 12px 16px 16px;

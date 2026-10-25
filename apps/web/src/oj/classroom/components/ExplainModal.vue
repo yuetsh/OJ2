@@ -273,7 +273,10 @@ kbd {
 
 .sheet.narrow {
   width: calc(100vw - 16px);
+  /* 全站给 .n-modal 的「左右各留 16px」在这里不要 */
+  max-width: none;
   max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
   padding: 12px 14px 16px;
   gap: 12px;
 }

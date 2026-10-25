@@ -24,7 +24,8 @@ function leadingWidth(text: string): number {
   return width
 }
 
-const glue = Decoration.mark({ attributes: { style: "white-space: nowrap" } })
+// 不折行用 pre 而不是 nowrap：nowrap 会把空格合并掉，行首缩进整个没了
+const glue = Decoration.mark({ attributes: { style: "white-space: pre" } })
 
 function hangDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
