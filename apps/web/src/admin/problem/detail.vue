@@ -1494,8 +1494,10 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  padding: 0;
+  /* 吃掉卡片的内边距：收起时整张卡都能点，不只是中间那一行字 */
+  margin: -12px -16px;
+  padding: 12px 16px;
+  border-radius: 6px;
   border: 0;
   background: transparent;
   font: inherit;

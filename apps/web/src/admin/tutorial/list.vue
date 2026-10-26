@@ -176,12 +176,12 @@ onMounted(load)
         <span class="c-edit" />
       </div>
       <template v-for="group in groups" :key="group.key">
-        <div class="row grouprow">
+        <!-- 整行都能点开合；行里的改名、加一课自己拦住，不顺带开合 -->
+        <div class="row grouprow" @click="toggle(group.key)">
           <button
             type="button"
             class="fold"
             :aria-label="collapsed.has(group.key) ? '展开' : '收起'"
-            @click="toggle(group.key)"
           >
             <Icon
               :icon="collapsed.has(group.key) ? 'ph:caret-right-bold' : 'ph:caret-down-bold'"
@@ -189,7 +189,7 @@ onMounted(load)
             />
           </button>
           <ProjectTile :icon="group.icon" :tone="group.tone" :size="26" />
-          <template v-if="renaming === group.project && group.project">
+          <span v-if="renaming === group.project && group.project" class="rename" @click.stop>
             <n-input
               v-model:value="renameTo"
               size="small"
@@ -200,14 +200,16 @@ onMounted(load)
             />
             <n-button size="small" type="primary" @click="saveRename">保存</n-button>
             <n-button size="small" quaternary @click="renaming = null">取消</n-button>
-          </template>
+          </span>
           <template v-else>
             <span class="group-name">{{
               group.project || (group.hidden ? "没公开" : "没有项目")
             }}</span>
             <span class="muted">{{ group.items.length }} 课</span>
-            <a v-if="group.project" href="#" @click.prevent="startRename(group.project)">改名</a>
-            <a href="#" @click.prevent="createIn(group.project)">加一课</a>
+            <a v-if="group.project" href="#" @click.stop.prevent="startRename(group.project)"
+              >改名</a
+            >
+            <a href="#" @click.stop.prevent="createIn(group.project)">加一课</a>
           </template>
         </div>
         <template v-if="!collapsed.has(group.key)">
@@ -347,6 +349,7 @@ onMounted(load)
 }
 .grouprow {
   gap: 10px;
+  cursor: pointer;
   background: rgba(128, 128, 128, 0.06);
   border-top-color: rgba(128, 128, 128, 0.22);
 }
@@ -363,6 +366,12 @@ onMounted(load)
   padding: 2px;
   opacity: 0.55;
   cursor: pointer;
+}
+.rename {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: auto;
 }
 .group-name {
   font-weight: 700;
