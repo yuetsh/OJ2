@@ -1004,10 +1004,10 @@ export const createProblemRequestSchema = z.object({
   flowchartHint: z.string().nullable().default(null),
   astRules: astRulesSchema.nullable().default(null),
   /**
-   * 不带这个键 = 不动原来的挑战。上线那一刻浏览器里还开着旧版出题页，它保存时不带挑战，
-   * 给个默认 null 的话一保存就把挑战清了；null 才是「清空」
+   * 必须带：null 是「清空」。不给默认值是故意的 —— 前端漏传这个键的话，给默认 null
+   * 会一保存就把挑战清了，而「不带 = 不动」又会让出题页改的挑战静默存不上
    */
-  challenges: challengeInputsSchema.nullable().optional(),
+  challenges: challengeInputsSchema.nullable(),
   // order_sensitive 缺省补 false —— 与旧后端 SQLConfigSerializer 的
   // `BooleanField(default=False)` 一致
   sqlConfig: sqlConfigSchema

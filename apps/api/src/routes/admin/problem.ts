@@ -260,9 +260,7 @@ type ProblemInput = ReturnType<typeof createProblemRequestSchema.parse>
 async function validateProblem(data: ProblemInput, previousChallenges: ProblemChallenges | null = null): Promise<{ error: string } | Validated> {
   const checked = commonChecks(data)
   if ('error' in checked) return checked
-  // 不带挑战（旧版出题页）就原样留着，见契约 createProblemRequestSchema.challenges
-  const normalized =
-    data.challenges === undefined ? { challenges: previousChallenges } : normalizeChallenges(data.challenges, previousChallenges, data.languages)
+  const normalized = normalizeChallenges(data.challenges, previousChallenges, data.languages)
   if ('error' in normalized) return normalized
   const { challenges } = normalized
   if (!checked.sql) return { sql: false, sqlDisplay: null, challenges }

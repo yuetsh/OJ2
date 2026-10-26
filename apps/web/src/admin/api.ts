@@ -1,6 +1,7 @@
 import { toAdminType, toProblemPermission } from '@oj2/contract'
 import type {
   AddContestProblemRequest,
+  ChallengeInput,
   ChallengeSuggestionsResponse,
   AddProblemsToSetRequest,
   BatchProblemTagRequest,
@@ -358,8 +359,9 @@ export function generateTestInputs(data: GenerateTestInputsRequest) {
 
 /** 出站补默认值。字段名两边已经一致，不再做键名转换 */
 function toProblemBody(problem: AdminProblem | BlankProblem) {
-  const p = problem as Partial<Omit<AdminProblem, 'flowchartData'>> & {
+  const p = problem as Partial<Omit<AdminProblem, 'flowchartData' | 'challenges'>> & {
     flowchartData?: Record<string, unknown> | null
+    challenges?: Record<string, ChallengeInput[]> | null
   }
   return {
     _id: p._id,
@@ -387,6 +389,7 @@ function toProblemBody(problem: AdminProblem | BlankProblem) {
     flowchartData: p.flowchartData ?? null,
     flowchartHint: p.flowchartHint ?? null,
     astRules: p.astRules ?? null,
+    challenges: p.challenges ?? null,
     sqlConfig: p.sqlConfig ?? null,
   }
 }
