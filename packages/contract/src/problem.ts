@@ -355,6 +355,62 @@ export const astRequirementSchema = z.object({
 /** 按语言分组，与 astRulesSchema 同一套键 */
 export const astRequirementsSchema = z.record(z.string(), z.array(astRequirementSchema))
 
+/**
+ * 挑战：做对之后，同一道题加一条写法上的限制再做一遍（「整首歌只用 1 次 print」）。
+ * 判定沿用 AST 规则，几条规则同时满足才算做到 —— 单写「用 while」的话学生留着原来的
+ * for、再补一个空 while 就过了，所以常配成「用 while + 不用 for」。
+ *
+ * 和 astRules 一样按语言分组。`id` 是谁做到了（challenge_success）的记账键：
+ * 规则一改就换新 id，旧的做到记录跟着旧规则作废，只改说法不换。
+ * `scannedAt` 是后端记的「已经拿历史上做对的代码补过一遍记录」，见 services/challenge.ts。
+ */
+export const challengeSchema = z.object({
+  id: z.string(),
+  /** 给学生看的说法，例如「整首歌只用 1 次 print」 */
+  wording: z.string(),
+  rules: z.array(astRuleSchema),
+  scannedAt: z.string().optional(),
+})
+
+export const problemChallengesSchema = z.record(z.string(), z.array(challengeSchema))
+
+/** 挑战说法的长度上限：要在结果页签的一行里放得下 */
+export const CHALLENGE_WORDING_MAX = 24
+
+/** 一条挑战最多几条规则、一道题一种语言最多几条挑战 */
+export const CHALLENGE_RULES_MAX = 4
+export const CHALLENGES_PER_LANGUAGE_MAX = 4
+
+/** 我做到了一条挑战：本班、全站各是第几个做到的 */
+export const challengeMineSchema = z.object({
+  at: z.string(),
+  siteRank: z.number().int(),
+  /** 没有班级（老师、自己注册的号）时为 null */
+  classRank: z.number().int().nullable(),
+})
+
+/** 下发给学生的一条挑战：只有说法和人数，规则原文不出去（同 astRequirements） */
+export const challengeItemSchema = z.object({
+  id: z.string(),
+  wording: z.string(),
+  /** 全站做到的人数 */
+  doneCount: z.number().int(),
+  mine: challengeMineSchema.nullable(),
+})
+
+/** GET /challenges：几道题、某种语言下的挑战 */
+export const problemChallengeGroupSchema = z.object({
+  problemId: z.string(),
+  title: z.string(),
+  /** 这种语言做对过这道题的人数（「642 个做对的人里 62 人做到」的 642） */
+  acCount: z.number().int(),
+  /** 我用这种语言做对过没有：没做对的挑战不给接 */
+  solved: z.boolean(),
+  challenges: z.array(challengeItemSchema),
+})
+
+export const challengeListSchema = z.array(problemChallengeGroupSchema)
+
 export const problemDetailSchema = z.object({
   id: z.number().int(),
   _id: z.string(),
@@ -555,6 +611,12 @@ export type AstRule = z.infer<typeof astRuleSchema>
 export type AstRules = z.infer<typeof astRulesSchema>
 export type AstRequirement = z.infer<typeof astRequirementSchema>
 export type AstRequirements = z.infer<typeof astRequirementsSchema>
+export type Challenge = z.infer<typeof challengeSchema>
+export type ProblemChallenges = z.infer<typeof problemChallengesSchema>
+export type ChallengeMine = z.infer<typeof challengeMineSchema>
+export type ChallengeItem = z.infer<typeof challengeItemSchema>
+export type ProblemChallengeGroup = z.infer<typeof problemChallengeGroupSchema>
+export type ChallengeList = z.infer<typeof challengeListSchema>
 export type ProblemDifficulty = z.infer<typeof problemDifficultySchema>
 export type ProblemListItem = z.infer<typeof problemListItemSchema>
 export type ProblemList = z.infer<typeof problemListSchema>

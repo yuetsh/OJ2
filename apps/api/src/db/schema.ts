@@ -45,6 +45,7 @@ import type {
   HintDiagnosis,
   JudgeStatus,
   LessonLanguage,
+  ProblemChallenges,
   ProblemDifficulty,
   ProblemLanguage,
   ProblemPermission,
@@ -570,6 +571,8 @@ export const problem = pgTable(
     mermaidCode: text("mermaid_code"),
     showFlowchart: boolean("show_flowchart").default(false).notNull(),
     astRules: jsonb("ast_rules").$type<AstRules>(),
+    /** 做对之后的挑战，按语言分组。写入侧在 admin/problem.ts 校验，见契约 challengeSchema */
+    challenges: jsonb().$type<ProblemChallenges>(),
     sqlConfig: jsonb("sql_config").$type<SqlConfig>(),
     sqlDisplay: jsonb("sql_display").$type<SqlDisplay>(),
   },
@@ -1464,6 +1467,62 @@ export const classLesson = pgTable(
       columns: [table.createdBy],
       foreignColumns: [user.id],
       name: "class_lesson_created_by_fk_user_id",
+    }).onDelete("cascade"),
+  ],
+)
+
+/**
+ * 谁做到了哪条挑战（problem.challenges 里的 id）。一人一条挑战一行，记第一次做到的那份提交。
+ *
+ * 两条路写进来：判题时做对的提交顺手判一遍（judge/run.ts），以及新加一条挑战时拿历史上
+ * 做对的代码补一遍（services/challenge.ts）—— 后者的 created_at 也是那份提交的时刻，
+ * 所以「本班第几个、全站第几个做到」按它排，补的和新做的一个口径。
+ *
+ * 外键：提交、题目没了，从它算出来的这一行也就没意义了，CASCADE；
+ * user 跟着 submission 走（submission.user_id 是 NO ACTION，删不掉有提交的用户）。
+ */
+export const challengeSuccess = pgTable(
+  "challenge_success",
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: "challenge_success_id_seq",
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    userId: integer("user_id").notNull(),
+    problemId: integer("problem_id").notNull(),
+    challengeId: text("challenge_id").notNull(),
+    submissionId: text("submission_id").notNull(),
+    /** 做到的那份提交的时刻（不是写这一行的时刻） */
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+  },
+  (table) => [
+    unique("challenge_success_user_challenge_unique").on(
+      table.userId,
+      table.problemId,
+      table.challengeId,
+    ),
+    index("challenge_success_problem_idx").on(table.problemId, table.challengeId, table.createdAt),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [user.id],
+      name: "challenge_success_user_id_fk_user_id",
+    }),
+    foreignKey({
+      columns: [table.problemId],
+      foreignColumns: [problem.id],
+      name: "challenge_success_problem_id_fk_problem_id",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.submissionId],
+      foreignColumns: [submission.id],
+      name: "challenge_success_submission_id_fk_submission_id",
     }).onDelete("cascade"),
   ],
 )

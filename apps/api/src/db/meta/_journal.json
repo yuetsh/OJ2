@@ -267,6 +267,20 @@
       "when": 1792494707274,
       "tag": "0037_add_user_token_version",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792930010361,
+      "tag": "0038_add_challenges",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792930018504,
+      "tag": "0039_seed_challenges",
+      "breakpoints": true
     }
   ]
 }

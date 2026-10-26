@@ -11,6 +11,10 @@ import { problemLanguageSchema, runnableLanguageSchema } from "./language"
 import {
   astRuleSchema,
   astRulesSchema,
+  CHALLENGE_RULES_MAX,
+  CHALLENGE_WORDING_MAX,
+  CHALLENGES_PER_LANGUAGE_MAX,
+  problemChallengesSchema,
   problemDifficultySchema,
   sqlConfigSchema,
   sqlDisplaySchema,
@@ -945,6 +949,7 @@ export const adminProblemSchema = z.object({
   flowchartData: z.record(z.string(), z.unknown()),
   flowchartHint: z.string().nullable(),
   astRules: astRulesSchema.nullable(),
+  challenges: problemChallengesSchema.nullable(),
   answers: z.array(problemAnswerSchema),
   prompt: z.string().nullable(),
   sqlConfig: sqlConfigSchema.nullable(),
@@ -962,6 +967,21 @@ export const adminProblemSchema = z.object({
  * 出题页这一侧的数字挪到一处，没有改任何校验的松紧。
  */
 export const PROBLEM_TAG_MAX_LENGTH = 32
+
+/**
+ * 出题页提交的一条挑战。新加的不带 id，后端发；规则改过的后端也换新 id（见契约
+ * challengeSchema）。规则的语义校验（这种语言有没有这个语法）在后端 astRulesError，同 astRules
+ */
+export const challengeInputSchema = z.object({
+  id: z.string().max(32).optional(),
+  wording: z.string().trim().min(1).max(CHALLENGE_WORDING_MAX),
+  rules: z.array(astRuleSchema).min(1).max(CHALLENGE_RULES_MAX),
+})
+
+export const challengeInputsSchema = z.record(
+  z.string(),
+  z.array(challengeInputSchema).max(CHALLENGES_PER_LANGUAGE_MAX),
+)
 
 export const createProblemRequestSchema = z.object({
   _id: z.string().trim().min(1).max(32),
@@ -1002,6 +1022,11 @@ export const createProblemRequestSchema = z.object({
   flowchartData: z.record(z.string(), z.unknown()).nullable().default(null),
   flowchartHint: z.string().nullable().default(null),
   astRules: astRulesSchema.nullable().default(null),
+  /**
+   * 不带这个键 = 不动原来的挑战。上线那一刻浏览器里还开着旧版出题页，它保存时不带挑战，
+   * 给个默认 null 的话一保存就把挑战清了；null 才是「清空」
+   */
+  challenges: challengeInputsSchema.nullable().optional(),
   // order_sensitive 缺省补 false —— 与旧后端 SQLConfigSerializer 的
   // `BooleanField(default=False)` 一致
   sqlConfig: sqlConfigSchema
@@ -1122,6 +1147,33 @@ export const astCheckResponseSchema = z.object({
   ),
 })
 
+/**
+ * 出题页「挑战」的候选：拿这道题历史上做对的代码，找「一批人用另一种写法也做对了」的地方。
+ * 只是给老师挑的素材 —— 机械找出来的会有坏的（拆掉 elif 换成一串 if 也算「不用 elif」），
+ * 所以每条都带一份做到的人的真实代码，好不好老师看了再加
+ */
+export const challengeSuggestionsRequestSchema = z.object({
+  language: runnableLanguageSchema,
+})
+
+export const challengeSuggestionSchema = z.object({
+  /** 默认说法，老师加上之后可以改 */
+  wording: z.string(),
+  rules: z.array(astRuleSchema),
+  /** 这样做对过的人数 */
+  did: z.number().int(),
+  /** 第一次做对时就这样写的人占几成（%）；「少用 print」这类没有 */
+  firstShare: z.number().int().nullable(),
+  /** 一份做到的人的代码 */
+  example: z.string(),
+})
+
+export const challengeSuggestionsResponseSchema = z.object({
+  /** 这种语言做对过的人数 */
+  acCount: z.number().int(),
+  suggestions: z.array(challengeSuggestionSchema),
+})
+
 /** AI 按题面和标准答案想几组测试输入（输出由标准答案在判题机上跑，不让 AI 编） */
 export const generateTestInputsRequestSchema = z.object({
   description: z.string().max(64 * 1024),
@@ -1180,6 +1232,9 @@ export type GenerateSqlTestCaseResponse = z.infer<typeof generateSqlTestCaseResp
 export type TestCaseFiles = z.infer<typeof testCaseFilesSchema>
 export type AstCheckRequest = z.input<typeof astCheckRequestSchema>
 export type AstCheckResponse = z.infer<typeof astCheckResponseSchema>
+export type ChallengeInput = z.input<typeof challengeInputSchema>
+export type ChallengeSuggestion = z.infer<typeof challengeSuggestionSchema>
+export type ChallengeSuggestionsResponse = z.infer<typeof challengeSuggestionsResponseSchema>
 export type GenerateTestInputsRequest = z.input<typeof generateTestInputsRequestSchema>
 export type GenerateTestInputsResponse = z.infer<typeof generateTestInputsResponseSchema>
 

@@ -22,6 +22,7 @@ import { problemStatsRoutes } from "./routes/problem-stats"
 import { submissionRoutes } from "./routes/submission"
 import { trialRunRoutes } from "./routes/trial-run"
 import { siteRoutes } from "./routes/site"
+import { scanPendingChallenges } from "./services/challenge"
 import {
   bridgeSubmissionEvents,
   isAllowedWebSocketOrigin,
@@ -165,3 +166,6 @@ const server = Bun.serve<SubmissionSocketData>({
 await bridgeSubmissionEvents(server)
 startSessionSweep()
 console.log(`OJ2 API listening on http://localhost:${server.port}`)
+// 迁移刚灌进来、或者上次没补完的挑战：拿历史上做对的代码补一遍谁已经做到了。
+// 晚一点再跑，别和刚起来时涌进来的请求抢那两个核
+setTimeout(() => void scanPendingChallenges(), 20_000)

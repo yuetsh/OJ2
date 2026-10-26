@@ -51,6 +51,19 @@ export interface JudgeInfo {
   data: JudgeCaseResult[] | null
 }
 
+/** 一条 AST 规则的判定结果，judge/ast.ts 的 checkAst 产出 */
+export const astResultSchema = z.object({
+  description: z.string(),
+  passed: z.boolean(),
+  /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
+  actual: z.number().optional(),
+  /**
+   * 没过的「不能用 X」「X 最多 N 次」：X 出现在学生代码的第几行（1 起，已扣掉题目模板的
+   * 前置代码）。2026-10 加的，之前的提交没有
+   */
+  lines: z.array(z.number().int()).optional(),
+})
+
 /**
  * 判题产出的统计（`submission.statistic_info` 的 JSONB 原文）。
  *
@@ -67,13 +80,17 @@ export const statisticInfoSchema = z.looseObject({
   err_info: z.string().optional(),
   time_cost: z.number().optional(),
   memory_cost: z.number().optional(),
-  ast_results: z
+  ast_results: z.array(astResultSchema).optional(),
+  /**
+   * 做对的提交拿这道题的每条挑战（problem.challenges 里这种语言的）各判一遍，
+   * judge/run.ts 写。比赛提交不判。前端在挑战中时按 id 取它正在挑战的那条
+   */
+  challenges: z
     .array(
       z.object({
-        description: z.string(),
+        id: z.string(),
         passed: z.boolean(),
-        /** count_* 规则实际数到的次数，判题机只在这两个引擎上写 */
-        actual: z.number().optional(),
+        results: z.array(astResultSchema),
       }),
     )
     .optional(),
@@ -616,6 +633,7 @@ export type TrialRunResponse =
   | { status: "too-much-output" }
 
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
+export type AstResultInfo = z.infer<typeof astResultSchema>
 export type SubmissionTrace = z.infer<typeof submissionTraceSchema>
 export type CreateSubmissionRequest = z.input<typeof createSubmissionRequestSchema>
 export type SubmissionDetail = z.infer<typeof submissionDetailSchema>

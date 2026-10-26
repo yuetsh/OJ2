@@ -88,6 +88,8 @@ export const classBoardProblemSchema = z.object({
   title: z.string(),
   /** SQL 题不受布置的语言限制：格子数的是 SQL 交的，点进提交列表也按 SQL 筛 */
   isSql: z.boolean(),
+  /** 这道题配了挑战（见 problem.ts 的 challengeSchema）：题卡片写挑战成功几人 */
+  hasChallenges: z.boolean(),
 })
 
 export const classBoardCellSchema = z.object({
@@ -128,6 +130,11 @@ export const classBoardCellSchema = z.object({
   trail: z.array(z.object({ id: z.string(), result: judgeStatusSchema, createTime: z.string() })),
   /** 今天第几次代码提交做对的，1 = 一次就对；今天之前就做对了、今天没靠代码做对的为 null */
   acceptedTry: z.number().int().nullable(),
+  /**
+   * 挑战：done = 做到了这道题的一条挑战（不限今天）；doing = 做对之后今天又交了、还没做到 ——
+   * 做完了的学生是在挑战还是闲着，老师一眼看得出。没配挑战的题、没做对的格子为 null
+   */
+  challenge: z.enum(["done", "doing"]).nullable(),
 })
 
 export const classBoardStudentSchema = z.object({

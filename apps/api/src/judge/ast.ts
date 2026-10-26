@@ -30,6 +30,18 @@ export interface AstResult {
   passed: boolean
   /** count_* 引擎实际数到的次数。失败时前端拿它补一句「当前 N 次」 */
   actual?: number
+  /** 没过的「不能用 X」「X 太多」：X 在第几行（1 起），挑战没做到时编辑器里标出来 */
+  lines?: number[]
+}
+
+/** 节点所在的行，去重排序。submission.code 只是学生写的那段，不含题目模板，行号不用再扣 */
+function linesOf(nodes: Node[]) {
+  return [...new Set(nodes.map((node) => node.startPosition.row + 1))].sort((a, b) => a - b)
+}
+
+/** 没过才带行号：过了的规则不用标 */
+function withLines(result: AstResult, nodes: Node[]): AstResult {
+  return result.passed || nodes.length === 0 ? result : { ...result, lines: linesOf(nodes) }
 }
 
 let initPromise: Promise<void> | undefined
@@ -266,47 +278,60 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
         description: describeAstRule(rule, language),
         passed: hasNode(root, nodeType),
       }
-    case "must_not_exist_node":
-      return {
-        description: describeAstRule(rule, language),
-        passed: !hasNode(root, nodeType),
-      }
+    case "must_not_exist_node": {
+      const nodes = collectNodes(root, nodeType)
+      return withLines(
+        { description: describeAstRule(rule, language), passed: nodes.length === 0 },
+        nodes,
+      )
+    }
     case "count_node": {
-      const count = collectNodes(root, nodeType).length
-      return {
-        description: describeAstRule(rule, language),
-        passed: rangePassed(count, rule),
-        actual: count,
-      }
+      const nodes = collectNodes(root, nodeType)
+      return withLines(
+        {
+          description: describeAstRule(rule, language),
+          passed: rangePassed(nodes.length, rule),
+          actual: nodes.length,
+        },
+        // 次数太少时没有「哪几行」可标
+        rule.max !== undefined || rule.exact !== undefined ? nodes : [],
+      )
     }
     case "must_call_function":
       return {
         description: describeAstRule(rule, language),
         passed: functionCalls(root, target, language).length > 0,
       }
-    case "must_not_call_function":
-      return {
-        description: describeAstRule(rule, language),
-        passed: functionCalls(root, target, language).length === 0,
-      }
+    case "must_not_call_function": {
+      const calls = functionCalls(root, target, language)
+      return withLines(
+        { description: describeAstRule(rule, language), passed: calls.length === 0 },
+        calls,
+      )
+    }
     case "count_function_call": {
-      const count = functionCalls(root, target, language).length
-      return {
-        description: describeAstRule(rule, language),
-        passed: rangePassed(count, rule),
-        actual: count,
-      }
+      const calls = functionCalls(root, target, language)
+      return withLines(
+        {
+          description: describeAstRule(rule, language),
+          passed: rangePassed(calls.length, rule),
+          actual: calls.length,
+        },
+        rule.max !== undefined || rule.exact !== undefined ? calls : [],
+      )
     }
     case "must_call_method":
       return {
         description: describeAstRule(rule, language),
         passed: methodCalls(root, target, language).length > 0,
       }
-    case "must_not_call_method":
-      return {
-        description: describeAstRule(rule, language),
-        passed: methodCalls(root, target, language).length === 0,
-      }
+    case "must_not_call_method": {
+      const calls = methodCalls(root, target, language)
+      return withLines(
+        { description: describeAstRule(rule, language), passed: calls.length === 0 },
+        calls,
+      )
+    }
     case "must_use_operator":
       return {
         description: describeAstRule(rule, language),
@@ -353,6 +378,43 @@ export async function checkAst(
     }
   } catch {
     return { passed: true, results: [] }
+  } finally {
+    parser.delete()
+  }
+}
+
+/**
+ * 一份代码对着几组规则各判一遍，只解析一次。挑战用：一道题几条挑战各是一组，补历史记录时
+ * 一份代码要判全部挑战，每组 checkAst 一次就是把同一份代码解析好几遍。
+ *
+ * 和 checkAst 不同，**判不了时返回 null 而不是「通过」**：checkAst 是题目的硬要求，
+ * 判不了就放行、别冤枉学生；挑战判不了就是没做到，放行等于白送。
+ */
+export async function checkAstGroups(
+  code: string,
+  language: string,
+  groups: AstRule[][],
+): Promise<{ passed: boolean; results: AstResult[] }[] | null> {
+  const treeSitterLanguage = await loadLanguage(language)
+  if (!treeSitterLanguage) return null
+  const parser = new Parser()
+  try {
+    parser.setLanguage(treeSitterLanguage)
+    const tree = parser.parse(code)
+    if (!tree) return null
+    try {
+      return groups.map((rules) => {
+        const results = rules
+          .filter(astRuleIsMeaningful)
+          .map((rule) => evaluateRule(tree.rootNode, rule, language))
+          .filter((result): result is AstResult => result !== null)
+        return { passed: results.length > 0 && results.every((r) => r.passed), results }
+      })
+    } finally {
+      tree.delete()
+    }
+  } catch {
+    return null
   } finally {
     parser.delete()
   }

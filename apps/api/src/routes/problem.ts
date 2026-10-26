@@ -1,8 +1,10 @@
 import {
+  AST_SUPPORTED_LANGUAGES,
   isSqlProblem,
   normalizeLanguage,
   problemListSortSchema,
   problemTypeFilterSchema,
+  type ChallengeList,
   type ProblemAuthor,
   type ProblemDetail,
   type ProblemList,
@@ -28,9 +30,10 @@ import {
 } from "drizzle-orm"
 import { Hono } from "hono"
 
-import { optionalAuth, type AppEnv } from "../auth/middleware"
+import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
 import { db, schema } from "../db"
 import { astRequirements } from "../judge/ast"
+import { challengeList } from "../services/challenge"
 import { failure, success } from "../http"
 import { JudgeStatus } from "../judge/status"
 import {
@@ -338,6 +341,21 @@ problemRoutes.get("/problem-authors", async (c) => {
     .groupBy(schema.user.username)
     .orderBy(desc(count(schema.problem.id)))
   return success(c, rows satisfies ProblemAuthor[])
+})
+
+/**
+ * 几道题的挑战：`?problems=1080,2020,4077&language=Python`。课堂条「这节课都做完了」一次要
+ * 一节课的几道，题目页只要当前这道。挑战按语言分，语言是学生编辑器里选的那种
+ */
+problemRoutes.get("/challenges", requireAuth, async (c) => {
+  const language = c.req.query("language") ?? ""
+  if (!AST_SUPPORTED_LANGUAGES.includes(language)) return success(c, [] satisfies ChallengeList)
+  const ids = (c.req.query("problems") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .slice(0, 20)
+  return success(c, (await challengeList(c.get("user")!, ids, language)) satisfies ChallengeList)
 })
 
 problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {

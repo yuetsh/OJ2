@@ -20,6 +20,7 @@ import { seenToday } from "../auth/presence"
 import { getLoginWindow } from "../auth/session"
 import { presenceOf } from "../collab/state"
 import { db, schema } from "../db"
+import { challengeSuccessesOf } from "../services/challenge"
 import { failure, parseBody, success } from "../http"
 import { isAccepted } from "../judge/status"
 import {
@@ -465,6 +466,27 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   // 「来了几次」代码和流程图合起来数：那天只画了流程图的也算来过，和 recentDays 同一个口径
   const recentActivity = activityRows({ since: windowStart, users: userIds })
   const localDay = sql<string>`to_char(${localTime(recentActivity.createTime)}, 'YYYY-MM-DD')`
+  const [challengeConfigs, challengeDone] = await Promise.all([
+    ids.length
+      ? db
+          .select({ id: schema.problem.id, challenges: schema.problem.challenges })
+          .from(schema.problem)
+          .where(inArray(schema.problem.id, ids))
+      : [],
+    challengeSuccessesOf(userIds, ids),
+  ])
+  // 只认现在还配着的挑战：规则改过的旧 id 不算
+  const liveChallenges = new Map(
+    challengeConfigs.map((row) => [
+      row.id,
+      new Set(Object.values(row.challenges ?? {}).flatMap((list) => list.map((c) => c.id))),
+    ]),
+  )
+  const challengeDoneKeys = new Set(
+    challengeDone
+      .filter((row) => liveChallenges.get(row.problemId)?.has(row.challengeId))
+      .map((row) => `${row.userId}:${row.problemId}`),
+  )
   const [cells, lastSubmits, lastDrawn, attendance, drawn, todays, seen] = await Promise.all([
     ids.length && userIds.length
       ? db
@@ -619,6 +641,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
       problemDisplayId: problem.displayId,
       title: problem.title,
       isSql: problem.isSql,
+      hasChallenges: (liveChallenges.get(problem.id)?.size ?? 0) > 0,
     })),
     students: roster.map(
       (student) =>
@@ -659,6 +682,14 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
                   }))
                 : [],
               acceptedTry: firstTry >= 0 ? firstTry + 1 : null,
+              challenge:
+                !acceptedAt || !liveChallenges.get(id)?.size
+                  ? null
+                  : challengeDoneKeys.has(key)
+                    ? "done"
+                    : today.some((row) => Date.parse(row.createTime) > Date.parse(acceptedAt))
+                      ? "doing"
+                      : null,
             }
           }),
           lastSubmitAt: lastByUser.get(student.userId) ?? null,

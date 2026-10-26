@@ -7,6 +7,12 @@ import { config } from "../config"
 import { db, schema } from "../db"
 import { publishAchievementNotification } from "../events"
 import { updateAchievementsForSubmission } from "../services/achievements"
+import {
+  challengesFor,
+  judgeChallenges,
+  recordChallengeSuccesses,
+  type ChallengeVerdict,
+} from "../services/challenge"
 import { recordSolvedAndNotify } from "../services/problemset"
 import { checkAst, type AstRule } from "./ast"
 import { publishSubmissionUpdate } from "./events"
@@ -696,6 +702,19 @@ export async function judgeSubmission(job: JudgeJobData) {
           }
         }
       }
+
+      // 挑战：做对了就拿这道题的每条挑战各判一遍（比赛不判，同上）。结果全存下来，
+      // 前端在挑战中时按 id 取它正在挑战的那条；做到的下面落库
+      if (result === JudgeStatus.ACCEPTED && row.submission.contestId === null) {
+        const challenges = challengesFor(row.problem.challenges, row.submission.language)
+        if (challenges.length > 0) {
+          statisticInfo.challenges = await judgeChallenges(
+            row.submission.code,
+            row.submission.language,
+            challenges,
+          )
+        }
+      }
     }
 
     const counted = countedBefore(job.rejudgedFrom)
@@ -720,6 +739,22 @@ export async function judgeSubmission(job: JudgeJobData) {
     // 比赛题不进题单（题单加题时卡了 contestId IS NULL），跳过。
     if (row.submission.contestId === null && isAccepted(result)) {
       await recordSolvedAndNotify(row.submission.userId, row.problem.id, row.submission.createTime)
+    }
+
+    if (Array.isArray(statisticInfo.challenges)) {
+      await recordChallengeSuccesses(
+        (statisticInfo.challenges as ChallengeVerdict[])
+          .filter((verdict) => verdict.passed)
+          .map((verdict) => ({
+            userId: row.submission.userId,
+            problemId: row.problem.id,
+            challengeId: verdict.id,
+            submissionId: row.submission.id,
+            createdAt: row.submission.createTime,
+          })),
+      ).catch((error: unknown) =>
+        console.error(`[judge] 挑战记录失败 ${row.submission.id}:`, error),
+      )
     }
 
     try {

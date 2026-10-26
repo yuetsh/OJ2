@@ -4,6 +4,7 @@ import {
   addContestProblemRequestSchema,
   reorderContestProblemsRequestSchema,
   astCheckRequestSchema,
+  challengeSuggestionsRequestSchema,
   generateTestInputsRequestSchema,
   isSqlProblem,
   TEST_CASE_EDIT_MAX_CASES,
@@ -18,8 +19,10 @@ import {
   type AdminProblemListItem,
   type AstCheckResponse,
   type AstRules,
+  type ChallengeSuggestionsResponse,
   type GenerateTestInputsResponse,
   type GenerateSqlTestCaseResponse,
+  type ProblemChallenges,
   type SqlConfig,
   type SqlDisplay,
   type SqlTestCaseScript,
@@ -35,6 +38,12 @@ import { failure, parseBody, success } from "../../http"
 import { astRulesError, checkAst, describeAstRule, pickAstRules } from "../../judge/ast"
 import { buildSqlDisplay } from "../../judge/sql"
 import { completeChat } from "../../services/ai"
+import {
+  challengesFor,
+  challengeSuggestions,
+  normalizeChallenges,
+  scanPendingChallenges,
+} from "../../services/challenge"
 import { plainText } from "../../services/hint-diagnosis"
 import { contestStatus } from "../../services/contest"
 import {
@@ -152,6 +161,7 @@ async function serialize(row: ProblemRow) {
     flowchartData: asRecord(row.flowchartData),
     flowchartHint: row.flowchartHint,
     astRules: row.astRules,
+    challenges: row.challenges,
     answers: Array.isArray(row.answers) ? row.answers : [],
     prompt: row.prompt,
     sqlConfig: row.sqlConfig,
@@ -271,19 +281,34 @@ type ProblemInput = ReturnType<typeof createProblemRequestSchema.parse>
  */
 async function validateProblem(
   data: ProblemInput,
-): Promise<{ error: string } | { sql: boolean; sqlDisplay: SqlDisplay | null }> {
+  previousChallenges: ProblemChallenges | null = null,
+): Promise<{ error: string } | Validated> {
   const checked = commonChecks(data)
   if ("error" in checked) return checked
-  if (!checked.sql) return { sql: false, sqlDisplay: null }
+  // 不带挑战（旧版出题页）就原样留着，见契约 createProblemRequestSchema.challenges
+  const normalized =
+    data.challenges === undefined
+      ? { challenges: previousChallenges }
+      : normalizeChallenges(data.challenges, previousChallenges, data.languages)
+  if ("error" in normalized) return normalized
+  const { challenges } = normalized
+  if (!checked.sql) return { sql: false, sqlDisplay: null, challenges }
   const built = await generateSqlDisplay(data.testCaseId, data.answers, data.sqlConfig!)
   if ("error" in built) return built
-  return { sql: true, sqlDisplay: built.display }
+  return { sql: true, sqlDisplay: built.display, challenges }
+}
+
+interface Validated {
+  sql: boolean
+  sqlDisplay: SqlDisplay | null
+  /** 规则没变的沿用原来的 id，见 services/challenge.ts 的 normalizeChallenges */
+  challenges: ProblemChallenges | null
 }
 
 /** 新建一道题（公开题 contestId 为 null）连同标签，一个事务 */
 async function insertProblem(
   data: ProblemInput,
-  validated: { sql: boolean; sqlDisplay: SqlDisplay | null },
+  validated: Validated,
   owner: { contestId: number | null; createdById: number },
 ) {
   const now = new Date().toISOString()
@@ -292,6 +317,7 @@ async function insertProblem(
       .insert(schema.problem)
       .values({
         ...problemValues(data, validated.sql),
+        challenges: validated.challenges,
         ...owner,
         createTime: now,
         lastUpdateTime: now,
@@ -489,6 +515,7 @@ adminProblemRoutes.post("/problems", requireProblemPermission, async (c) => {
     contestId: null,
     createdById: c.get("user")!.id,
   })
+  void scanPendingChallenges()
   return success(c, await serialize(created), 201)
 })
 
@@ -505,7 +532,7 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
   if (!(await canEditProblem(c.get("user")!, existing))) {
     return failure(c, 404, "problem-not-found", "Problem does not exist")
   }
-  const validated = await validateProblem(parsed.data)
+  const validated = await validateProblem(parsed.data, existing.challenges)
   if ("error" in validated) return failure(c, 400, "invalid-problem", validated.error)
 
   // 题号唯一性的作用域跟着题目走：公开题在全部公开题里唯一，比赛题在本场比赛内唯一
@@ -529,6 +556,7 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
       .update(schema.problem)
       .set({
         ...problemValues(parsed.data, validated.sql),
+        challenges: validated.challenges,
         sqlDisplay: validated.sqlDisplay,
         lastUpdateTime: new Date().toISOString(),
       })
@@ -537,6 +565,8 @@ adminProblemRoutes.put("/problems/:id", requireProblemPermission, async (c) => {
     await setTags(tx, id, parsed.data.tags)
     return row!
   })
+  // 新加、改过的挑战拿历史上做对的代码补一遍谁已经做到了，不等它
+  void scanPendingChallenges()
   return success(c, await serialize(updated))
 })
 
@@ -961,6 +991,32 @@ adminProblemRoutes.post("/ast-check", requireProblemPermission, async (c) => {
   }
   return success(c, { rules: checked } satisfies AstCheckResponse)
 })
+
+/** 出题页「挑战」的候选：拿这道题历史上做对的代码挖，见 services/challenge.ts */
+adminProblemRoutes.post(
+  "/problems/:id/challenge-suggestions",
+  requireProblemPermission,
+  async (c) => {
+    const parsed = await parseBody(c, challengeSuggestionsRequestSchema)
+    if (!parsed.success) return parsed.response
+    const [problem] = await db
+      .select()
+      .from(schema.problem)
+      .where(eq(schema.problem.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+      .limit(1)
+    if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+    if (!(await canEditProblem(c.get("user")!, problem))) {
+      return failure(c, 404, "problem-not-found", "Problem does not exist")
+    }
+    const { language } = parsed.data
+    const result = await challengeSuggestions(
+      problem.id,
+      language,
+      challengesFor(problem.challenges, language),
+    )
+    return success(c, result satisfies ChallengeSuggestionsResponse)
+  },
+)
 
 /**
  * AI 按题面和标准答案想几组测试输入。只要输入：输出一律由标准答案在判题机上跑，
