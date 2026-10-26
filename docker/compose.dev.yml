@@ -21,9 +21,9 @@
 #   echo "OJ2_JUDGE_TOKEN=$TOKEN"    >> docker/.env   # docker compose 读这里
 #   echo "JUDGE_SERVER_TOKEN=$TOKEN" >> .env          # 后端读这里，两边必须一致
 #
-# 两个变量名不同但值必须相同：TOKEN 是判题机镜像认的名字，JUDGE_SERVER_TOKEN 是后端认的名字。
-# 忘了设 OJ2_JUDGE_TOKEN 的话 docker compose 会直接报错退出；忘了设 JUDGE_SERVER_TOKEN
-# 的话后端会随机生成一个并在启动日志里告警，判题机心跳会被 403 挡掉。
+# 两个变量名不同但值必须相同：ES_AUTH_TOKEN 是判题机（go-judge）认的名字，JUDGE_SERVER_TOKEN
+# 是后端认的名字。忘了设 OJ2_JUDGE_TOKEN 的话 docker compose 会直接报错退出；忘了设
+# JUDGE_SERVER_TOKEN 的话后端会随机生成一个并在启动日志里告警，判题请求会被 401 挡掉。
 
 services:
   postgres:
@@ -60,37 +60,25 @@ services:
       retries: 10
 
   judge:
-    # 自己构建的判题沙箱（上游 JudgeServer 1.6.1 + 新工具链，见 docker/judge/）。
-    # 上游停更在 2024-04，registry 上的 1.6.1 == latest，没有新版可拉。
+    # 自己构建的判题沙箱（go-judge + gcc / python，见 docker/judge/）。
     # ⚠️ 这个 tag 不在任何 registry 上：本机 docker/judge/build.sh 构建，
     #    服务器/机房用 docker load 装。镜像不在本地时 compose 会去 pull 然后报找不到。
-    image: oj2-judge-2
+    image: oj2-judge-3
     container_name: oj2-judge
     restart: unless-stopped
-    read_only: true
-    cap_drop:
-      - SETPCAP
-      - MKNOD
-      - NET_BIND_SERVICE
-      - SYS_CHROOT
-      - SETFCAP
-      - FSETID
+    # go-judge 要自己建 namespace 和 cgroup 来关学生程序，只能给特权，理由见 docker/judge/README.md
+    privileged: true
+    # go-judge 的文件存储（编译产物、程序输出）放这里，见 Dockerfile 的 -dir
     tmpfs:
       - /tmp
     ports:
       - "127.0.0.1:8081:8080"
     volumes:
       - ../data/test_case:/test_case:ro
-      - ../data/judge_server/log:/log
-      - ../data/judge_server/run:/judger
     environment:
-      SERVICE_URL: http://oj2-judge:8080
-      BACKEND_URL: http://host.docker.internal:3000/api/judge-server/heartbeat
       # 没有默认值是故意的：写死在仓库里的弱 token 等于没有 token。
       # 未设置时 docker compose 直接报错，不会静默起一个人人可连的判题机。
-      TOKEN: ${OJ2_JUDGE_TOKEN:?请先设置 OJ2_JUDGE_TOKEN，见本文件顶部注释}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      ES_AUTH_TOKEN: ${OJ2_JUDGE_TOKEN:?请先设置 OJ2_JUDGE_TOKEN，见本文件顶部注释}
     mem_limit: 512m
 
 volumes:

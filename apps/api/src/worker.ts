@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq'
 
 import { config } from './config'
+import { startJudgeHeartbeat } from './judge/heartbeat'
 import { judgeQueueName, type JudgeJobData } from './judge/job'
 import { failAbandonedSubmission, judgeSubmission } from './judge/run'
 import { flowchartQueueName, type FlowchartJobData } from './flowchart/job'
@@ -45,7 +46,10 @@ flowchartWorker.on('ready', () => console.log('Flowchart worker ready (concurren
 flowchartWorker.on('failed', (job, error) => console.error(`Flowchart job ${job?.id ?? 'unknown'} failed`, error))
 flowchartWorker.on('error', (error) => console.error('Flowchart worker error', error))
 
+const stopHeartbeat = startJudgeHeartbeat()
+
 async function shutdown() {
+  stopHeartbeat()
   await worker.close()
   await flowchartWorker.close()
   process.exit(0)

@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto'
-
 import { astRuleSchema, type ContestSubmissionInfo, type StatisticInfo } from '@oj2/contract'
 import { and, eq, inArray } from 'drizzle-orm'
 
@@ -13,30 +11,17 @@ import { checkAst, type AstRule } from './ast'
 import { publishSubmissionUpdate } from './events'
 import { asRecord } from '../routes/helpers'
 import type { JudgeJobData } from './job'
-import { judgeConfigFor } from './languages'
 import { isAccepted, JudgeStatus, type JudgeStatusValue } from './status'
 import { parseProblemTemplate, shiftCompileLines } from './template'
 import { withJudgeSlot } from './slots'
 import { runSqlCase } from './sql'
 import { nativeRuntimeError, parsePythonTraceback, type RuntimeErrorInfo } from './runtime-diagnosis'
+import { compileError, judge, type JudgeCase, type JudgeResponse } from './sandbox'
 import { readInfo } from '../services/test-case'
 import { readFile } from 'node:fs/promises'
 import { resolve as resolvePath } from 'node:path'
 
-export interface JudgeCase {
-  cpu_time: number
-  memory: number
-  result: number
-  test_case: string
-  /** SQL 判题会带上中文原因，沙箱判题没有这个字段 */
-  error_message?: string | null
-  [key: string]: unknown
-}
-
-export interface JudgeResponse {
-  err: string | null
-  data: JudgeCase[] | unknown
-}
+export type { JudgeCase, JudgeResponse }
 
 export function statusValue(value: number): JudgeStatusValue {
   const statuses = new Set<number>(Object.values(JudgeStatus))
@@ -64,59 +49,11 @@ function astRulesForLanguage(value: unknown, language: string): AstRule[] {
 }
 
 /**
- * `testCase` 是测试点目录名（正常判题），或者内联的测试点（诊断重跑，见
- * diagnoseRuntimeError）。`output` 只在诊断和试运行时打开：它让判题机把每个测试点的
- * 程序输出原样带回来，正常判题开着的话，死循环打印能把 worker 内存撑爆。
- *
- * 只发请求、不读响应体：试运行（judge/trial.ts）要边读边数字节，超了就掐断。
- */
-export async function postJudge(
-  language: string,
-  code: string,
-  timeLimit: number,
-  memoryLimit: number,
-  testCase: string | { input: string; output: string }[],
-  { output = false, signal }: { output?: boolean; signal?: AbortSignal } = {},
-) {
-  const languageConfig = judgeConfigFor(language)
-  if (!languageConfig) throw new Error(`Unsupported judge language: ${language}`)
-
-  const token = createHash('sha256').update(config.judgeServerToken).digest('hex')
-  const response = await fetch(new URL('/judge', config.judgeServerUrl), {
-    method: 'POST',
-    signal,
-    headers: {
-      'content-type': 'application/json',
-      'X-Judge-Server-Token': token,
-    },
-    body: JSON.stringify({
-      language_config: languageConfig,
-      src: code,
-      max_cpu_time: timeLimit,
-      max_memory: 1024 * 1024 * memoryLimit,
-      ...(typeof testCase === 'string' ? { test_case_id: testCase } : { test_case: testCase }),
-      output,
-      io_mode: {
-        io_mode: 'Standard IO',
-        input: 'input.txt',
-        output: 'output.txt',
-      },
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(`JudgeServer returned HTTP ${response.status}`)
-  }
-  return response
-}
-
-/**
  * 这份代码在判题机上编不编得过。给提交前的自动格式化用：clang-format 碰上编译不过的
  * C 代码会把行并起来（`int n；` 和下一行、少了分号的两行），学生回头看到的就不是自己
  * 写的代码了，报错的行号也对不上他记得的位置。api 容器里没有 gcc，而判题机的编译器、
  * 编译参数本来就是判的标准，所以借它编一次。
  *
- * 判题机只有 /judge 一个入口，得带一组测试点：给一组空输入，跑的那一下限 1 秒。
  * 判题机连不上、超时，一律当编得过 —— 那就和原来一样照常格式化。
  *
  * 这一下不进判题队列，但和运行例子共用交互池的名额（judge/slots.ts）：服务器只有两核，
@@ -126,42 +63,10 @@ export async function postJudge(
 export async function compileFails(language: string, source: string) {
   const deadline = AbortSignal.timeout(8000)
   try {
-    return await withJudgeSlot('interactive', { holdMs: 30_000, signal: deadline }, async () => {
-      const response = await postJudge(language, source, 1000, 256, [{ input: '', output: '' }], {
-        signal: deadline,
-      })
-      const body = (await response.json()) as JudgeResponse
-      return body.err === 'CompileError'
-    })
+    return await withJudgeSlot('interactive', { holdMs: 30_000, signal: deadline }, async () => (await compileError(language, source, deadline)) !== null)
   } catch {
     return false
   }
-}
-
-/**
- * 判题机回包的总上限。判题机给每组输出留 16MB（见镜像里 judge_client.py 的
- * max_output_size），死循环打印能把每组都写满；api、worker 容器都只有 512MB，
- * 几组全满读进来再 JSON.parse 一遍就是好几百 MB。超了就掐断。
- */
-export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024
-
-/** 边读边数，超过上限就掐断连接，返回 null */
-export async function readCapped(response: Response, limit: number) {
-  if (!response.body) return ''
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > limit) {
-      await reader.cancel()
-      return null
-    }
-    chunks.push(value)
-  }
-  return Buffer.concat(chunks).toString('utf8')
 }
 
 /**
@@ -185,15 +90,9 @@ async function requestJudge(
   const timeoutMs = judgeTimeoutMs(timeLimit)
   try {
     // 超时从拿到名额才开始算：排队等名额不算判题机没回应
-    return await withJudgeSlot('judge', { holdMs: timeoutMs + 30_000 }, async () => {
-      const response = await postJudge(language, code, timeLimit, memoryLimit, testCase, {
-        output,
-        signal: AbortSignal.timeout(timeoutMs),
-      })
-      const body = await readCapped(response, MAX_RESPONSE_BYTES)
-      if (body === null) throw new Error('判题机返回的内容太大')
-      return JSON.parse(body) as JudgeResponse
-    })
+    return await withJudgeSlot('judge', { holdMs: timeoutMs + 30_000 }, () =>
+      judge(language, code, timeLimit, memoryLimit, testCase, { output, signal: AbortSignal.timeout(timeoutMs) }),
+    )
   } catch (error) {
     // 这句会写进 err_info，学生能看到，别把 "The operation timed out." 原样给他
     if (error instanceof DOMException && error.name === 'TimeoutError') {
@@ -409,7 +308,7 @@ export async function failAbandonedSubmission(submissionId: string, error: unkno
  * 运行时错误的诊断，结果写进 `statistic_info.runtime_error`（字段说明见契约）。
  *
  * C / C++ 直接用失败测试点的信号和退出码。Python 要拿回溯，得**重跑那一个测试点**：
- * 主判题不开 output（理由见 requestJudge），所以这里读出第一个失败测试点的输入，
+ * 主判题不带回输出（每个点最多 16MB，见 sandbox.ts），所以这里读出第一个失败测试点的输入，
  * 以内联测试点的形式单独再跑一次、打开 output。同样的代码、同样的输入，抛的是
  * 同一个异常。只多跑一个点，而且只在 Python 判出运行时错误时才跑。
  *
@@ -566,7 +465,7 @@ export async function judgeSubmission(job: JudgeJobData) {
       }
     } else {
       if (!Array.isArray(response.data)) {
-        throw new Error('JudgeServer returned an invalid result payload')
+        throw new Error('判题机回的结果看不懂')
       }
       const cases = [...response.data].sort((left, right) => Number(left.test_case) - Number(right.test_case))
       info = { err: null, data: cases }

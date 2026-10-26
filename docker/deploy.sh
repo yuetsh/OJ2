@@ -108,14 +108,9 @@ pgver=$(cat "$pgver_file")
 [ "$pgver" = 18 ] || die "$data_dir/postgresql 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:18-alpine，起不来。"
 ok "数据目录 $data_dir/postgresql（PostgreSQL $pgver）"
 
-# ③ 判题机运行目录：不设就是 $DATA_DIR/judge_server
-judge_dir=$(grep -E '^JUDGE_STATE_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
-ok "判题机运行目录 ${judge_dir:-$data_dir/judge_server}"
-
-# ④ 判题镜像是自建的（上游 JudgeServer 停更，官方镜像的编译器停在 gcc-13），
+# ③ 判题镜像是自建的（go-judge 的二进制 + 我们要的 gcc / python），
 #    registry 上没有这个 tag。忘了 docker load 的话，要到「起栈」那步 compose 去 pull
 #    才失败 —— 不如在这里就把该跑的三条命令说清楚。
-#    回滚到官方镜像时这段自动跳过：那个 tag 是 pull 得到的。
 judge_image=$(grep -m1 -E '^[[:space:]]*image: oj2-judge' <<<"$cfg" | awk '{print $2}' || true)
 if [ -n "$judge_image" ]; then
   docker image inspect "$judge_image" >/dev/null 2>&1 \
@@ -134,7 +129,6 @@ ok "对外端口 $port"
 [ "$CHECK_ONLY" -eq 0 ] || { printf '\n\033[1;32m✅ 自检通过（--check，没动容器）\033[0m\n'; exit 0; }
 
 # ---------------------------------------------------------------- 起栈
-mkdir -p "$judge_dir/log" "$judge_dir/run"
 
 if [ "$BUILD" -eq 1 ]; then
   say "构建镜像（首次约 5 分钟，之后走缓存很快）"

@@ -3,7 +3,7 @@ import { Icon } from '@iconify/vue'
 import type { StatisticInfo, TrialRunResponse } from '@oj2/contract'
 import { errorMessage } from 'utils/api'
 import { SubmissionStatus } from 'utils/constants'
-import { trialRun } from 'utils/judge'
+import { stripJudgePath, trialRun } from 'utils/judge'
 import { explainCCompileError } from 'oj/problem/utils/cError'
 import { explainPythonCompileError } from 'utils/pythonError'
 import { explainRuntimeError } from 'oj/problem/utils/runtimeError'
@@ -63,9 +63,8 @@ const lineCount = computed(() => value.value.split('\n').length)
 
 const TOO_MUCH_OUTPUT = '程序输出太多了，一直停不下来：多半是循环没有结束的条件（条件一直成立、循环变量忘了改），在不停地打印。'
 
-/** 判题机的临时目录名对学生没有意义，只留文件名 */
 function cleanRaw(text: string) {
-  return text.replace(/\/judger\/run\/[^/"]+\//g, '').trim()
+  return stripJudgePath(text).trim()
 }
 
 function compileOutcome(raw: string): Outcome {

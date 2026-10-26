@@ -4,27 +4,24 @@
  *   bun docker/judge/smoke.ts                                   # 打 .env 里的 JUDGE_SERVER_URL
  *   JUDGE_SERVER_URL=http://localhost:8082 bun docker/judge/smoke.ts
  *
- * 直接打判题机的 /judge，不经过 api / worker / 队列，所以不需要起后端，也不需要
- * 库里有题 —— 测试点用 `test_case` 内联传进去，判题机会当场写进临时目录。
+ * 走的是线上那份判题代码（apps/api/src/judge/sandbox.ts 的 judge()），不经过 api / worker /
+ * 队列，所以不需要起后端，也不需要库里有题 —— 测试点内联传进去。
  *
- * 它核的是三件事：
+ * 它核的是四件事：
  *   1. 三种语言都能编译、运行、判对（languageConfigs 就是线上那份，不是另抄的）
  *   2. 六种结果状态的**整数值**没变（落库的值，见 packages/contract/src/judge-status.ts）
  *   3. gcc 的宽松度没变 —— 忘了 #include 的老代码照样能过（gcc-14 默认会把它判 CE）
+ *   4. 从 JudgeServer 照搬过来的几条口径：stderr 算进输出、死循环打印判运行时错误（信号 25）
  */
-import { createHash } from 'node:crypto'
-
 import { JudgeStatus } from '@oj2/contract'
 
-import { languageConfigs } from '../../apps/api/src/judge/languages'
+import { judge, sandboxVersion, type JudgeCase } from '../../apps/api/src/judge/sandbox'
 
 const url = process.env.JUDGE_SERVER_URL ?? 'http://localhost:8081'
-const rawToken = process.env.JUDGE_SERVER_TOKEN
-if (!rawToken) {
+if (!process.env.JUDGE_SERVER_TOKEN) {
   console.error('JUDGE_SERVER_TOKEN 没设 —— 在 OJ2 根目录跑，bun 会自己读 .env')
   process.exit(2)
 }
-const token = createHash('sha256').update(rawToken).digest('hex')
 
 interface Case {
   language: string
@@ -34,6 +31,8 @@ interface Case {
   /** 默认 3000ms / 128MB，跑得慢或要撑爆内存的用例自己改 */
   cpu?: number
   memory?: number
+  /** 再核一下第一个测试点的信号 */
+  signal?: number
 }
 
 const sumTestCase = [{ input: '1 2\n', output: '3\n' }]
@@ -114,12 +113,12 @@ int main(void) {
 }`,
   },
   {
-    // RLIMIT_AS 是 max_memory 的两倍，所以 malloc 会先成功一阵子再失败，
-    // 退出时 ru_maxrss 已经超过 max_memory → judger 判 MLE 而不是 RE。
+    // 地址空间限在内存限制的两倍，所以 malloc 会先成功一阵子再失败，
+    // 退出时峰值已经超过内存限制 → 判 MLE 而不是 RE（sandbox.ts 的 verdict）。
     language: 'C',
     name: 'C 内存超限',
     expect: JudgeStatus.MEMORY_LIMIT_EXCEEDED,
-    memory: 64 * 1024 * 1024,
+    memory: 64,
     code: `#include <stdlib.h>
 #include <string.h>
 int main(void) {
@@ -134,9 +133,35 @@ int main(void) {
     language: 'C',
     name: 'C 运行时错误',
     expect: JudgeStatus.RUNTIME_ERROR,
+    signal: 11,
     code: `int main(void) {
   int *p = 0;
   *p = 1;
+  return 0;
+}`,
+  },
+  {
+    // 写满 16MB 吃 SIGXFSZ。前端按信号 25 给「循环停不下来」的说明
+    language: 'C',
+    name: 'C 死循环打印判运行时错误',
+    expect: JudgeStatus.RUNTIME_ERROR,
+    signal: 25,
+    code: `#include <stdio.h>
+int main(void) {
+  for (;;) printf("hello world\\n");
+}`,
+  },
+  {
+    // JudgeServer 把 stdout 和 stderr 写进同一个文件再比，往 stderr 打东西就是答案错误
+    language: 'C',
+    name: 'C 往 stderr 打的也算输出',
+    expect: JudgeStatus.WRONG_ANSWER,
+    code: `#include <stdio.h>
+int main(void) {
+  int a, b;
+  scanf("%d %d", &a, &b);
+  fprintf(stderr, "debug\\n");
+  printf("%d\\n", a + b);
   return 0;
 }`,
   },
@@ -167,6 +192,14 @@ print(a + b)`,
     name: 'Python 运行时错误',
     expect: JudgeStatus.RUNTIME_ERROR,
     code: `print(1 / 0)`,
+  },
+  {
+    // 学生程序开不了进程（procLimit 1），subprocess 抛 OSError
+    language: 'Python',
+    name: 'Python 开不了子进程',
+    expect: JudgeStatus.RUNTIME_ERROR,
+    code: `import subprocess
+subprocess.run(['true'])`,
   },
   // ---------------------------------------------------------------- C++
   {
@@ -202,51 +235,22 @@ const names: Record<number, string> = {
 const label = (code: number) => `${names[code] ?? '?'}(${code})`
 
 async function runCase(item: Case) {
-  const response = await fetch(new URL('/judge', url), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'X-Judge-Server-Token': token,
-    },
-    body: JSON.stringify({
-      language_config: languageConfigs[item.language],
-      src: item.code,
-      max_cpu_time: item.cpu ?? 3000,
-      max_memory: item.memory ?? 128 * 1024 * 1024,
-      test_case: sumTestCase,
-      output: false,
-      io_mode: {
-        io_mode: 'Standard IO',
-        input: 'input.txt',
-        output: 'output.txt',
-      },
-    }),
-  })
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-  const body = (await response.json()) as {
-    err: string | null
-    data: unknown
-  }
+  const body = await judge(item.language, item.code, item.cpu ?? 3000, item.memory ?? 128, sumTestCase)
   // 编译失败走 err 通道，不会有逐测试点的结果
   if (body.err === 'CompileError') return { result: JudgeStatus.COMPILE_ERROR }
   if (body.err) throw new Error(`${body.err}: ${JSON.stringify(body.data)}`)
 
-  const results = body.data as { result: number; cpu_time: number }[]
+  const results = body.data as JudgeCase[]
   // 多个测试点取最坏的那个，和 run.ts 的口径一致
   const failed = results.find((r) => r.result !== JudgeStatus.ACCEPTED)
   return failed ?? results[0]!
 }
 
-/** 判题机刚重建时 gunicorn 还没起来，先等它 —— 否则整屏都是连接被关。 */
+/** 判题机刚重建时还没起来，先等它 —— 否则整屏都是连接被拒。 */
 async function waitReady() {
   for (let i = 0; i < 60; i++) {
     try {
-      const response = await fetch(new URL('/ping', url), {
-        method: 'POST',
-        headers: { 'X-Judge-Server-Token': token },
-      })
-      if (response.ok) return
+      return await sandboxVersion()
     } catch {
       // 还没起来，接着等
     }
@@ -256,18 +260,20 @@ async function waitReady() {
   process.exit(2)
 }
 
-await waitReady()
+const version = await waitReady()
 
 let failures = 0
-console.log(`判题机 ${url}\n`)
+console.log(`判题机 ${url}（go-judge ${version}）\n`)
 for (const item of cases) {
   try {
     const got = await runCase(item)
-    const pass = got.result === item.expect
+    const pass = got.result === item.expect && (item.signal === undefined || ('signal' in got && got.signal === item.signal))
     if (!pass) failures++
     const time = 'cpu_time' in got ? ` ${got.cpu_time}ms` : ''
+    const signal = item.signal !== undefined && 'signal' in got ? ` 信号 ${got.signal}` : ''
     console.log(
-      `${pass ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${item.name.padEnd(32)}` + ` 期望 ${label(item.expect).padEnd(10)} 实得 ${label(got.result)}${time}`,
+      `${pass ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${item.name.padEnd(32)}` +
+        ` 期望 ${label(item.expect).padEnd(10)} 实得 ${label(got.result)}${signal}${time}`,
     )
   } catch (error) {
     failures++

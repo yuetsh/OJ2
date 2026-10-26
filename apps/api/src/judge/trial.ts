@@ -1,8 +1,9 @@
 import type { TrialRunResponse } from '@oj2/contract'
 
 import { config } from '../config'
-import { MAX_RESPONSE_BYTES, postJudge, readCapped, statusValue, type JudgeCase, type JudgeResponse } from './run'
+import { statusValue } from './run'
 import { nativeRuntimeError, parsePythonTraceback } from './runtime-diagnosis'
+import { judge, TooMuchOutputError, type JudgeCase, type JudgeResponse } from './sandbox'
 import { withJudgeSlot, type JudgePool } from './slots'
 import { JudgeStatus, type JudgeStatusValue } from './status'
 import { shiftCompileLines } from './template'
@@ -120,22 +121,25 @@ async function judgeTrial(options: Parameters<typeof runTrial>[0]): Promise<Tria
 }
 
 async function judgeTrialNow(options: Parameters<typeof runTrial>[0]): Promise<TrialRunResponse> {
-  const response = await postJudge(
-    options.language,
-    options.source,
-    options.timeLimit,
-    options.memoryLimit,
-    // 输入补结尾换行，和 checkSamples 一样：题面上的例子常常没有，测试点文件都有
-    options.cases.map((item) => ({
-      input: item.input.endsWith('\n') || item.input === '' ? item.input : `${item.input}\n`,
-      output: item.output ?? '',
-    })),
-    { output: true, signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS) },
-  )
-  const body = await readCapped(response, MAX_RESPONSE_BYTES)
-  if (body === null) return { status: 'too-much-output' }
+  let parsed: JudgeResponse
+  try {
+    parsed = await judge(
+      options.language,
+      options.source,
+      options.timeLimit,
+      options.memoryLimit,
+      // 输入补结尾换行，和 checkSamples 一样：题面上的例子常常没有，测试点文件都有
+      options.cases.map((item) => ({
+        input: item.input.endsWith('\n') || item.input === '' ? item.input : `${item.input}\n`,
+        output: item.output ?? '',
+      })),
+      { output: true, signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS) },
+    )
+  } catch (error) {
+    if (error instanceof TooMuchOutputError) return { status: 'too-much-output' }
+    throw error
+  }
 
-  const parsed = JSON.parse(body) as JudgeResponse
   if (parsed.err) {
     if (parsed.err === 'CompileError') {
       return {
@@ -143,15 +147,15 @@ async function judgeTrialNow(options: Parameters<typeof runTrial>[0]): Promise<T
         message: typeof parsed.data === 'string' ? shiftCompileLines(parsed.data, options.prependLines) : '',
       }
     }
-    throw new Error(`JudgeServer error ${parsed.err}: ${JSON.stringify(parsed.data)}`)
+    throw new Error(`判题机报错 ${parsed.err}: ${JSON.stringify(parsed.data)}`)
   }
-  if (!Array.isArray(parsed.data)) throw new Error('JudgeServer returned an invalid result payload')
+  if (!Array.isArray(parsed.data)) throw new Error('判题机回的结果看不懂')
 
   const byIndex = new Map((parsed.data as JudgeCase[]).map((item) => [Number(item.test_case), item]))
   return {
     status: 'done',
     cases: options.cases.map((item, index) => {
-      // 判题机给内联测试点编号是从 1 起的（server.py 里 `index += 1`）
+      // 内联测试点的编号从 1 起（judge/sandbox.ts）
       const judged = byIndex.get(index + 1)
       if (!judged) return { result: JudgeStatus.SYSTEM_ERROR, output: '' }
       let result: JudgeStatusValue = statusValue(judged.result)

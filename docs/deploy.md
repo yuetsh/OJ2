@@ -84,22 +84,23 @@ docker/deploy.sh --no-build   # 只改了 env / compose 时跳过构建
 代码怎么上到服务器不归它管（rsync 命令在脚本头部注释里）。
 
 脚本起栈前有一串自检，**每一条都是真撞到过的**：`DATA_DIR` 有没有生效、数据目录是不是
-一个 18 的库、判题机运行目录、判题镜像在不在。起完再跑四条冒烟，**题目数是 0 也中止**
+一个 18 的库、判题镜像在不在。起完再跑四条冒烟，**题目数是 0 也中止**
 —— 那意味着连错库了。
 
 ### 判题镜像是自建的，不在 registry 上
 
-`compose.*.yml` 里的 `oj2-judge-2` 是本机构建的（上游 JudgeServer 停更在
-2024-04，官方镜像的编译器停在 gcc-13）。**新机器或换镜像之后，先把镜像 load 进去
-再部署**：
+`compose.*.yml` 里的 `oj2-judge-3` 是本机构建的（go-judge 的二进制 + 我们要的 gcc /
+python）。**新机器或换镜像之后，先把镜像 load 进去再部署**：
 
 ```bash
 # 本机
 docker/judge/build.sh --save
-scp dist/oj2-judge-2.tar root@服务器:/root/OJDeploy/
+scp dist/oj2-judge-3.tar root@服务器:/root/OJDeploy/
 # 服务器 / 机房各来一次（两个站点各有各的判题沙箱）
-docker load -i /root/OJDeploy/oj2-judge-2.tar
+docker load -i /root/OJDeploy/oj2-judge-3.tar
 ```
+
+判题机容器是 `privileged` 的（go-judge 要自己建 cgroup），理由见 `docker/judge/README.md`。
 
 忘了这一步，`deploy.sh` 起栈时会去 pull 一个不存在的镜像并失败（响亮地失败，
 不会静默降级）。构建、回滚和工具链版本表见 `docker/judge/README.md`。

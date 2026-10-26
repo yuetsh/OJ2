@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { hostname } from 'node:os'
 import { isAbsolute, resolve } from 'node:path'
 
 import { z } from 'zod'
@@ -61,6 +62,8 @@ const envSchema = z.object({
   REDIS_URL: requiredWhenCompiled('redis://localhost:6380'),
   SESSION_TTL_SECONDS: positiveInt(7 * 24 * 60 * 60),
   JUDGE_SERVER_URL: text('http://localhost:8081'),
+  // 后台「判题机列表」里这台叫什么，见 judge/heartbeat.ts。不设就用本机的主机名
+  JUDGE_SERVER_NAME: text(hostname()),
   // dev 不设时生成一次性随机值，见 judgeServerToken()
   JUDGE_SERVER_TOKEN: isCompiled ? z.preprocess(blankAsUnset, z.string({ error: '编译形态下必须设置' })) : z.preprocess(blankAsUnset, z.string().optional()),
   JUDGE_CONCURRENCY: positiveInt(2),
@@ -130,6 +133,7 @@ export const config = {
   sessionTtlSeconds: env.SESSION_TTL_SECONDS,
   judgeServerUrl: env.JUDGE_SERVER_URL,
   judgeServerToken: judgeServerToken(),
+  judgeServerName: env.JUDGE_SERVER_NAME,
   judgeConcurrency: env.JUDGE_CONCURRENCY,
   /** 试运行（运行例子 / 自己输入）同时在判题机上跑几批，见 judge/trial.ts */
   trialConcurrency: env.TRIAL_CONCURRENCY,

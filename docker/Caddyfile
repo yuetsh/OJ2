@@ -36,9 +36,8 @@
 		}
 	}
 
-	# 判题机心跳每秒一次；静态资源量大且带永久缓存。两者都不记访问日志。
-	# 路径跟着新后端改了：judge_server_heartbeat → judge-server/heartbeat
-	@nolog path /api/judge-server/heartbeat /api/judge-server/heartbeat/ /assets/* /emoji/*
+	# 静态资源量大且带永久缓存，不记访问日志
+	@nolog path /assets/* /emoji/*
 	log_skip @nolog
 
 	handle /api/* {

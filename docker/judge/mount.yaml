@@ -1,0 +1,81 @@
+# go-judge 沙箱里的文件系统：学生程序和编译器只看得到这些。
+# 照 go-judge 自带的 mount.yaml 删减的：只留 gcc / g++ / python3 要的，
+# fpc、mono、ghc、java 那几条（还有 MPI 的 /sys、/dev/shm）都去掉了。
+mount:
+  # 编译器、解释器和它们的库
+  - type: bind
+    source: /bin
+    target: /bin
+    readonly: true
+  - type: bind
+    source: /lib
+    target: /lib
+    readonly: true
+  - type: bind
+    source: /lib64
+    target: /lib64
+    readonly: true
+  - type: bind
+    source: /usr
+    target: /usr
+    readonly: true
+  - type: bind
+    source: /etc/ld.so.cache
+    target: /etc/ld.so.cache
+    readonly: true
+  # /usr/bin/gcc → /etc/alternatives/gcc → /usr/bin/gcc-14，少了这条编译器就找不到
+  - type: bind
+    source: /etc/alternatives
+    target: /etc/alternatives
+    readonly: true
+  - type: bind
+    source: /dev/null
+    target: /dev/null
+  - type: bind
+    source: /dev/urandom
+    target: /dev/urandom
+  - type: bind
+    source: /dev/random
+    target: /dev/random
+  - type: bind
+    source: /dev/zero
+    target: /dev/zero
+  - type: bind
+    source: /dev/full
+    target: /dev/full
+  # 工作目录：源码、编译产物、程序输出都在这里。输出上限 16MB（-output-limit），
+  # 加上可执行文件，128MB 绰绰有余
+  - type: tmpfs
+    target: /w
+    data: size=128m,nr_inodes=4k
+  # g++ 的中间文件写在 /tmp
+  - type: tmpfs
+    target: /tmp
+    data: size=128m,nr_inodes=4k
+proc: true
+symLink:
+  - linkPath: /dev/fd
+    target: /proc/self/fd
+  - linkPath: /dev/stdin
+    target: /proc/self/fd/0
+  - linkPath: /dev/stdout
+    target: /proc/self/fd/1
+  - linkPath: /dev/stderr
+    target: /proc/self/fd/2
+maskPath:
+  - /sys/firmware
+  - /sys/devices/virtual/powercap
+  - /proc/acpi
+  - /proc/asound
+  - /proc/kcore
+  - /proc/keys
+  - /proc/latency_stats
+  - /proc/timer_list
+  - /proc/timer_stats
+  - /proc/sched_debug
+  - /proc/scsi
+workDir: /w
+hostName: go-judge
+domainName: go-judge
+uid: 1536
+gid: 1536

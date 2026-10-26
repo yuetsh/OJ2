@@ -5,6 +5,7 @@ import { findChinesePunctuation } from 'oj/problem/utils/chinesePunctuation'
 import { applyFixes, clearErrorMark, currentCode, showErrorMark, showPunctuationMarks } from 'oj/problem/utils/errorMark'
 import { explainCCompileError } from 'oj/problem/utils/cError'
 import { explainPythonCompileError } from 'utils/pythonError'
+import { stripJudgePath } from 'utils/judge'
 
 /**
  * 编译错误的中文说明卡片：Python 的语法错误走 pythonError.ts，C / C++ 的 gcc 报错走
@@ -32,8 +33,7 @@ const explanation = computed(() =>
     : explainCCompileError(props.errInfo, codeStore.code.value, props.language),
 )
 
-/** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
-const rawError = computed(() => props.errInfo.replace(/\/judger\/run\/[^/"]+\//g, ''))
+const rawError = computed(() => stripJudgePath(props.errInfo))
 
 /**
  * 报错只点名第一处。别的行也有中文标点的话，一句话带过（设计稿「语法没过」：

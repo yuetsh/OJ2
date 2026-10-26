@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { SubmissionStatus } from 'utils/constants'
+import { stripJudgePath } from 'utils/judge'
 import type { StatisticInfo } from '@oj2/contract'
 import CompileErrorExplain from './CompileErrorExplain.vue'
 import RuntimeErrorExplain from './RuntimeErrorExplain.vue'
@@ -53,8 +54,7 @@ const message = computed(() => {
   }
 })
 
-/** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
-const rawOutput = computed(() => props.output.replace(/\/judger\/run\/[^/"]+\//g, ''))
+const rawOutput = computed(() => stripJudgePath(props.output))
 </script>
 
 <template>

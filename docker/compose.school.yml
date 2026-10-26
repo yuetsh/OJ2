@@ -29,32 +29,21 @@ services:
       retries: 10
 
   oj-judge:
-    # 自己构建的判题沙箱（上游 JudgeServer 1.6.1 + 新工具链，见 docker/judge/）。
-    # 上游停更在 2024-04，registry 上的 1.6.1 == latest，没有新版可拉。
+    # 自己构建的判题沙箱（go-judge + gcc / python，见 docker/judge/）。
     # ⚠️ 这个 tag 不在任何 registry 上：本机 docker/judge/build.sh 构建，
     #    服务器/机房用 docker load 装。镜像不在本地时 compose 会去 pull 然后报找不到。
-    image: oj2-judge-2
+    image: oj2-judge-3
     container_name: oj-judge
     restart: always
-    read_only: true
-    cap_drop:
-      - SETPCAP
-      - MKNOD
-      - NET_BIND_SERVICE
-      - SYS_CHROOT
-      - SETFCAP
-      - FSETID
+    # go-judge 要自己建 namespace 和 cgroup 来关学生程序，只能给特权，理由见 docker/judge/README.md
+    privileged: true
+    # go-judge 的文件存储（编译产物、程序输出）放这里，见 docker/judge/Dockerfile 的 -dir
     tmpfs:
       - /tmp
     volumes:
       - ${DATA_DIR:-../data}/backend/test_case:/test_case:ro
-      # 判题机的运行状态目录，默认跟着 DATA_DIR 走
-      - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/log:/log
-      - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/run:/judger
     environment:
-      SERVICE_URL: http://oj-judge:8080
-      BACKEND_URL: http://oj-api:3000/api/judge-server/heartbeat
-      TOKEN: ${OJ2_JUDGE_TOKEN:?请在 env 文件里设置 OJ2_JUDGE_TOKEN}
+      ES_AUTH_TOKEN: ${OJ2_JUDGE_TOKEN:?请在 env 文件里设置 OJ2_JUDGE_TOKEN}
     # 机房机器内存宽裕，判题给足
     mem_limit: 2g
 
@@ -81,6 +70,8 @@ services:
       REDIS_URL: redis://oj-redis:6379
       JUDGE_SERVER_URL: http://oj-judge:8080
       JUDGE_SERVER_TOKEN: ${OJ2_JUDGE_TOKEN:?}
+      # 后台「判题机列表」里这一台的名字（worker 替判题机记心跳，见 judge/heartbeat.ts）
+      JUDGE_SERVER_NAME: 机房
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-4}
       TRIAL_CONCURRENCY: ${TRIAL_CONCURRENCY:-4}
       AI_KEY: ${AI_KEY:-}

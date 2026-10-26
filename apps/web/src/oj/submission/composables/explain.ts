@@ -1,5 +1,6 @@
 import { explainCCompileError } from 'oj/problem/utils/cError'
 import { explainPythonCompileError } from 'utils/pythonError'
+import { stripJudgePath } from 'utils/judge'
 import { explainRuntimeError } from 'oj/problem/utils/runtimeError'
 import { SubmissionStatus } from 'utils/constants'
 import type { Submission } from 'utils/types'
@@ -11,10 +12,6 @@ export interface SubmissionExplain {
   text: string
   /** 判题机的原始报错，收在「原始报错」里；没有就是空串 */
   raw: string
-}
-
-function stripJudgePath(text: string) {
-  return text.replace(/\/judger\/run\/[^/"]+\//g, '')
 }
 
 /**

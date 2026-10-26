@@ -4,6 +4,7 @@ import { useThemeVars } from 'naive-ui'
 import { HINT_MIN_FAILURES, hintLevelLabel, isSqlProblem } from '@oj2/contract'
 import type { JudgeCaseResult } from '@oj2/contract'
 import { JUDGE_STATUS, SubmissionStatus } from 'utils/constants'
+import { stripJudgePath } from 'utils/judge'
 import { submissionCaseResults, submissionMemoryFormat, submissionPartialCases, submissionTimeFormat } from 'utils/functions'
 import type { Submission } from 'utils/types'
 import SubmissionResultTag from 'shared/components/SubmissionResultTag.vue'
@@ -51,11 +52,6 @@ const {
   fetchHint,
   sendHintFeedback,
 } = useSubmissionStore().hint
-
-/** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
-function stripJudgePath(text: string) {
-  return text.replace(/\/judger\/run\/[^/"]+\//g, '')
-}
 
 /** 编译错误交给 CompileErrorExplain 翻成中文：Python、C、C++ 各有一张翻译表 */
 const compileError = computed(() => {

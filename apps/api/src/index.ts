@@ -8,7 +8,6 @@ import { config } from './config'
 import { adminRoutes } from './routes/admin'
 import { authRoutes } from './routes/auth'
 import { accountRoutes } from './routes/account'
-import { judgeServerRoutes } from './routes/judge-server'
 import { contestRoutes } from './routes/contest'
 import { contentRoutes } from './routes/content'
 import { classroomRoutes } from './routes/classroom'
@@ -43,7 +42,6 @@ app.route('/api', problemRoutes)
 app.route('/api', problemStatsRoutes)
 app.route('/api', submissionRoutes)
 app.route('/api', trialRunRoutes)
-app.route('/api', judgeServerRoutes)
 app.route('/api/admin', adminRoutes)
 
 app.onError((error, c) => {

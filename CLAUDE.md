@@ -105,14 +105,18 @@ references 的壳，真正的配置在 `tsconfig.app.json`），而 `vite build`
 这些整数是**落库的值**：12 万条历史提交的 `submission.result` 就是它们，判题沙箱回的也是
 这套编码，所以只能新增、不能改已有的含义。题目表情 reaction 的语义 key 同理。
 
-### 判题镜像是自己构建的
+### 判题机是 go-judge，判题流程在后端
 
-`compose.*.yml` 里的 `oj2-judge-2` **不在任何 registry 上**：上游
-QingdaoU/JudgeServer 停更在 2024-04（官方镜像的 `latest` 和 `1.6.1` 是同一份，
-编译器停在 gcc-13），新工具链只能自己编。`docker/judge/` 里是只改版本的 Dockerfile
-分叉 + 构建脚本 + 冒烟测试，判题逻辑一行没动。
+`compose.*.yml` 里的 `oj2-judge-3` **不在任何 registry 上**：`docker/judge/` 把
+[go-judge](https://github.com/criyle/go-judge) 的二进制和 gcc / python 装进一个镜像，本机构建。
+go-judge 只管「在沙箱里跑一条命令」，**编译、逐个测试点运行、比对输出、定状态码都在
+`apps/api/src/judge/sandbox.ts`**，口径逐条照搬了 2026-10 之前的 QingdaoU/JudgeServer
+（输出 rstrip 后比 md5、stdout 和 stderr 合在一起比、地址空间限两倍内存、16MB 输出上限 …），
+出参也还是它的形状 —— 12 万条历史提交的 `info` 就是这个形状。动那个文件前先读它顶部的注释。
 
 - 构建、分发、改名的步骤见 `docker/judge/README.md`。**服务器和机房各有各的判题沙箱，两边都要装。**
+- 判题机容器是 `privileged` 的（go-judge 要自己建 cgroup 和 namespace），别「顺手」改回 `read_only` + `cap_drop`。
+- 判题机不再主动报心跳，后台「判题机列表」是 worker 每 5 秒去问一次记下的（`judge/heartbeat.ts`）。
 - 编译/运行命令在 `apps/api/src/judge/languages.ts`，不在镜像里。gcc-14 把隐式函数
   声明等提成了 error（`-w` 压不住），那边的 `cLooseErrors` 几个 `-Wno-error=` 就是
   为此加的 —— 删掉它们等于让一批历史题解和 C 教程示例集体 CE。

@@ -33,8 +33,8 @@ export interface TestCaseEntry {
   output_name: string
 }
 
-/** 等价于 Python 的 bytes.rstrip()：只剥尾部 ASCII 空白 */
-function rstrip(buffer: Uint8Array) {
+/** 等价于 Python 的 bytes.rstrip()：只剥尾部 ASCII 空白。判题比对输出也用它（judge/sandbox.ts） */
+export function rstrip(buffer: Uint8Array) {
   const whitespace = new Set([0x20, 0x09, 0x0a, 0x0d, 0x0b, 0x0c])
   let end = buffer.length
   while (end > 0 && whitespace.has(buffer[end - 1]!)) end -= 1
