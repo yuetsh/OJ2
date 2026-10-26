@@ -16,8 +16,8 @@
  *
  * 加路由时顺手跑一下，比事后靠人眼在 200 多条路由里看出顺序问题可靠。
  *
- * 局限：靠正则读源码，只认 `xxxRoutes.get("字面量", …)` 这种写法，
- * 以及 `xxxRoutes.route("字面量", 子路由)` 的嵌套挂载（按挂载位置展开）。
+ * 局限：靠正则读源码，只认 `xxxRoutes.get('字面量', …)` 这种写法（单双引号都认），
+ * 以及 `xxxRoutes.route('字面量', 子路由)` 的嵌套挂载（按挂载位置展开）。
  * 动态拼出来的路径看不见 —— 但本仓库没有那种写法，加的时候请保持。
  */
 
@@ -75,7 +75,10 @@ function collect(): Route[] {
     const text = readFileSync(file, 'utf8')
     // 直接注册的路由和嵌套挂载（`router.route("/", child)`）放在一起按出现位置排序：
     // 子路由挂在哪个位置，它的路由就在哪个位置参与匹配
-    const pattern = new RegExp(`${router}\\.(get|post|put|delete|patch)\\(\\s*"([^"]+)"|${router}\\.route\\(\\s*"([^"]*)"\\s*,\\s*(\\w+)\\s*\\)`, 'g')
+    const pattern = new RegExp(
+      `${router}\\.(get|post|put|delete|patch)\\(\\s*['"]([^'"]+)['"]|${router}\\.route\\(\\s*['"]([^'"]*)['"]\\s*,\\s*(\\w+)\\s*\\)`,
+      'g',
+    )
     return [...text.matchAll(pattern)].flatMap((m) => {
       if (m[4]) return routesOf(m[4], prefix + m[3]!)
       return [
@@ -91,10 +94,10 @@ function collect(): Route[] {
   // 挂载顺序就是匹配顺序，所以必须按 index.ts 里出现的先后来摊平
   const index = readFileSync(join(SRC, 'index.ts'), 'utf8')
   const adminIndex = readFileSync(join(SRC, 'routes/admin/index.ts'), 'utf8')
-  const adminMounts = [...adminIndex.matchAll(/\.route\(\s*"([^"]*)"\s*,\s*(\w+)\s*\)/g)]
+  const adminMounts = [...adminIndex.matchAll(/\.route\(\s*['"]([^'"]*)['"]\s*,\s*(\w+)\s*\)/g)]
 
   const all: Route[] = []
-  for (const m of index.matchAll(/app\.route\(\s*"([^"]+)"\s*,\s*(\w+)\s*\)/g)) {
+  for (const m of index.matchAll(/app\.route\(\s*['"]([^'"]+)['"]\s*,\s*(\w+)\s*\)/g)) {
     const [, prefix, router] = m
     if (router === 'adminRoutes') {
       for (const a of adminMounts) all.push(...routesOf(a[2]!, prefix! + a[1]!))
