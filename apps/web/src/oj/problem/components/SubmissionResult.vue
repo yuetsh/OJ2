@@ -21,6 +21,9 @@ import WrongAnswerExplain from "./WrongAnswerExplain.vue"
 import LessonNext from "./LessonNext.vue"
 import ResultHeader from "./ResultHeader.vue"
 import SimilarProblems from "./SimilarProblems.vue"
+import ChallengeList from "./ChallengeList.vue"
+import ChallengeOutcome from "./ChallengeOutcome.vue"
+import { useChallengeStore } from "oj/store/challenge"
 import { useLessonStore } from "shared/store/lesson"
 import { useProblemPageContext } from "../composables/problemPageContext"
 import Markdown from "shared/components/Markdown.vue"
@@ -108,6 +111,40 @@ const showSimilar = computed(
     !!problemStore.problem &&
     !lessonStore.includes(problemStore.problem._id),
 )
+
+/**
+ * 挑战中交的这一次：正在挑战的那条判出来的结果（设计稿 StkFail / StkPass）。只有做对的提交
+ * 才判挑战；进挑战之前那次做对的不算（见 challenge store 的 baselineSubmissionId）
+ */
+const challengeStore = useChallengeStore()
+const challengeVerdict = computed(() => {
+  const submission = props.submission
+  if (!submission || props.peer || !ctx.value.challenges) return null
+  if (submission.result !== SubmissionStatus.accepted) return null
+  const id = challengeStore.activeId
+  if (!id || submission.id === challengeStore.baselineSubmissionId) return null
+  return submission.statisticInfo?.challenges?.find((verdict) => verdict.id === id) ?? null
+})
+// 做到了：重拉一次，挑战条换成「挑战成功」、拿到本班 / 全站第几个
+watch(
+  () => (challengeVerdict.value?.passed ? props.submission?.id : null),
+  (id) => {
+    if (id) void challengeStore.load()
+  },
+)
+
+/**
+ * 「还能挑战」看哪几道：这道在这节课里就看这节课的几道（课堂条「这节课都做完了」之后），
+ * 不在就只看这一道
+ */
+const challengeProblemIds = computed(() => {
+  const problem = problemStore.problem
+  if (!problem) return []
+  const lesson = lessonStore.activity
+  return lessonStore.includes(problem._id) && lesson
+    ? lesson.problems.map((item) => item.problemDisplayId)
+    : [problem._id]
+})
 
 const msg = computed(() => {
   if (!props.submission) return ""
@@ -298,18 +335,44 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
 
 <template>
   <div v-if="submission">
-    <ResultHeader
-      v-if="header"
-      :kind="header.kind"
-      :title="header.title"
-      :sub="header.sub"
-      :progress="header.progress"
-    />
-    <LessonNext
-      v-if="showLessonNext && problemStore.problem"
-      :problem-display-id="problemStore.problem._id"
-    />
-    <SimilarProblems v-if="showSimilar" title="再练几道相似的" />
+    <!-- 挑战中：答案对了就只说挑战成没成，「下一题」「相似题」都不给，免得挤掉挑战 -->
+    <template v-if="challengeVerdict && challengeStore.active">
+      <ChallengeOutcome
+        :passed="challengeVerdict.passed"
+        :results="challengeVerdict.results"
+        :wording="challengeStore.active.wording"
+      />
+      <ChallengeList
+        v-if="challengeVerdict.passed"
+        :problem-ids="challengeProblemIds"
+        :language="submission.language"
+        :refresh-key="submission.id"
+      />
+    </template>
+    <template v-else>
+      <ResultHeader
+        v-if="header"
+        :kind="header.kind"
+        :title="header.title"
+        :sub="header.sub"
+        :progress="header.progress"
+      />
+      <LessonNext
+        v-if="showLessonNext && problemStore.problem"
+        :problem-display-id="problemStore.problem._id"
+        :language="submission.language"
+        :refresh-key="submission.id"
+        :challenges="ctx.challenges"
+      />
+      <!-- 不在这节课里（题库入口自己做的）：做对之后先给这道题的挑战，再给相似题 -->
+      <ChallengeList
+        v-if="showSimilar && ctx.challenges && problemStore.problem"
+        :problem-ids="[problemStore.problem._id]"
+        :language="submission.language"
+        :refresh-key="submission.id"
+      />
+      <SimilarProblems v-if="showSimilar" title="再练几道相似的" />
+    </template>
     <n-flex
       vertical
       v-if="

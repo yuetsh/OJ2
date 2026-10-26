@@ -1,6 +1,7 @@
 import { toAdminType, toProblemPermission } from "@oj2/contract"
 import type {
   AddContestProblemRequest,
+  ChallengeSuggestionsResponse,
   AddProblemsToSetRequest,
   BatchProblemTagRequest,
   BatchProblemVisibleRequest,
@@ -351,6 +352,16 @@ export function getTestCaseFiles(problemId: number) {
 // 拿标准答案自测语法要求
 export function checkAstRules(data: AstCheckRequest) {
   return api.post<AstCheckResponse>("admin/ast-check", data satisfies AstCheckRequest)
+}
+
+// 出题页「挑战」的候选：拿这道题历史上做对的代码挖
+export function getChallengeSuggestions(problemId: number, language: string) {
+  return api.post<ChallengeSuggestionsResponse>(
+    `admin/problems/${problemId}/challenge-suggestions`,
+    {
+      language,
+    },
+  )
 }
 
 // AI 按题面和标准答案想几组测试输入（输出由标准答案跑）

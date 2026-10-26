@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
 import { useLessonStore } from "shared/store/lesson"
+import ChallengeList from "./ChallengeList.vue"
 
 /**
  * 通过之后告诉学生「这节课的下一题是哪道」。
@@ -16,6 +17,12 @@ import { useLessonStore } from "shared/store/lesson"
 const props = defineProps<{
   /** 当前这道题的展示题号 */
   problemDisplayId: string
+  /** 刚做对用的语言：挑战按语言分 */
+  language: string
+  /** 刚做对的那次提交，换了就重拉「还能挑战」 */
+  refreshKey: string
+  /** 这个入口给不给挑战（见 problemPageContext） */
+  challenges: boolean
 }>()
 
 const lessonStore = useLessonStore()
@@ -31,6 +38,11 @@ const lesson = computed(() => lessonStore.nextAfter(props.problemDisplayId))
 
 // 设计稿和上下文条都叫「这节课」，不区分是老师布置的还是从同班提交推断的
 const label = "这节课"
+
+/** 这节课的几道题：都做完了以后，这几道里还能挑战的列出来（设计稿 StkDone） */
+const lessonProblemIds = computed(
+  () => lessonStore.activity?.problems.map((item) => item.problemDisplayId) ?? [],
+)
 </script>
 
 <template>
@@ -66,13 +78,18 @@ const label = "这节课"
     <template v-else>
       <div class="text">
         <span class="headline">{{ label }}都做完了，一共 {{ lesson.total }} 道</span>
-        <span class="detail">想接着练，可以去题单里挑一个</span>
+        <span v-if="!challenges" class="detail">想接着练，可以去题单里挑一个</span>
       </div>
-      <router-link to="/problemset" class="next secondary">
+      <router-link v-if="!challenges" to="/problemset" class="next secondary">
         <span class="next-label">去题单继续练</span>
       </router-link>
     </template>
   </div>
+  <!-- 做完了：先给这节课里还能挑战的，再给题单（设计稿 StkDone）。挑战一条都没有时只剩题单那句 -->
+  <template v-if="lesson && !lesson.next && challenges">
+    <ChallengeList :problem-ids="lessonProblemIds" :language="language" :refresh-key="refreshKey" />
+    <router-link to="/problemset" class="more">去题单继续练</router-link>
+  </template>
 </template>
 
 <style scoped>
@@ -127,6 +144,17 @@ const label = "这节课"
 .next:focus-visible {
   outline: 2px solid v-bind("theme.primaryColorPressed");
   outline-offset: 2px;
+}
+
+.more {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 14px;
+  color: v-bind("theme.primaryColor");
+}
+
+.more:hover {
+  text-decoration: underline;
 }
 
 .next.secondary {

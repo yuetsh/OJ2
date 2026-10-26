@@ -256,6 +256,17 @@ const groupCount = computed(() => {
   for (const student of students.value) count[groupOf(student)]++
   return count
 })
+/**
+ * 全做完了的人里有几个在挑战：做对之后又交了、还没做到（见契约 classBoardCellSchema.challenge）。
+ * 做完了又没在挑战的，就是空着的
+ */
+const challengingCount = computed(
+  () =>
+    students.value.filter(
+      (student) =>
+        groupOf(student) === "done" && student.cells.some((cell) => cell.challenge === "doing"),
+    ).length,
+)
 /** 每组第一个人，在他上面插一行组名 */
 const groupStarts = computed(() => {
   const starts = new Set<number>()
@@ -298,7 +309,11 @@ const problemStats = computed(() =>
     const done = present.value.filter((student) => student.cells[i]?.status === "accepted").length
     const wrong = present.value.filter((student) => student.cells[i]?.status === "tried").length
     const total = present.value.length
-    return { problem, done, wrong, none: total - done - wrong, total }
+    // 挑战成功几人：只有配了挑战的题才写
+    const challenged = problem.hasChallenges
+      ? present.value.filter((student) => student.cells[i]?.challenge === "done").length
+      : null
+    return { problem, done, wrong, none: total - done - wrong, total, challenged }
   }),
 )
 
@@ -532,6 +547,9 @@ function lastText(student: ClassBoardStudent) {
             <span class="card-foot">
               <span :class="stat.wrong ? 'wrong' : 'muted'">错着 {{ stat.wrong }}</span>
               <span class="muted">没做 {{ stat.none }}</span>
+              <span v-if="stat.challenged !== null" class="challenged">
+                挑战成功 {{ stat.challenged }}
+              </span>
             </span>
           </button>
         </div>
@@ -651,6 +669,9 @@ function lastText(student: ClassBoardStudent) {
                   <span class="group-label">
                     {{ GROUP_LABEL[groupOf(student)] }}
                     <span class="muted">{{ groupCount[groupOf(student)] }}</span>
+                    <span v-if="groupOf(student) === 'done' && challengingCount" class="challenged">
+                      在挑战 {{ challengingCount }}
+                    </span>
                   </span>
                 </td>
               </tr>
@@ -709,6 +730,7 @@ function lastText(student: ClassBoardStudent) {
                     v-if="cell.status === 'tried' && cell.latest"
                     type="button"
                     class="cell"
+                    :data-challenge="cell.challenge ?? undefined"
                     :style="cellStyle(cell)"
                     :title="cellTitle(cell, student)"
                     @click="openExplain(i, student.userId)"
@@ -727,6 +749,7 @@ function lastText(student: ClassBoardStudent) {
                       <button
                         type="button"
                         class="cell"
+                        :data-challenge="cell.challenge ?? undefined"
                         :class="{ picked: trailKey === `${student.userId}:${i}` }"
                         :style="cellStyle(cell)"
                         :title="cellTitle(cell, student)"
@@ -747,6 +770,7 @@ function lastText(student: ClassBoardStudent) {
                   <a
                     v-else-if="cell.attempts"
                     class="cell"
+                    :data-challenge="cell.challenge ?? undefined"
                     :style="cellStyle(cell)"
                     :href="submissionsHref(student, board.problems[i], !cell.codeAttempts)"
                     target="_blank"
@@ -757,6 +781,7 @@ function lastText(student: ClassBoardStudent) {
                   <span
                     v-else
                     class="cell"
+                    :data-challenge="cell.challenge ?? undefined"
                     :style="cellStyle(cell)"
                     :title="cellTitle(cell, student)"
                   >
@@ -1218,6 +1243,36 @@ a.who {
 button.cell,
 a.cell {
   cursor: pointer;
+}
+
+/* 挑战：做到了贴一枚紫色筹码，在挑战加一圈紫边（设计稿 StkBoard） */
+.cell[data-challenge="done"] {
+  position: relative;
+}
+
+.cell[data-challenge="done"]::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: #5b34c4;
+  border: 3px solid #b49cf5;
+  box-shadow: 0 0 0 2px v-bind("theme.cardColor");
+}
+
+.cell[data-challenge="doing"] {
+  box-shadow:
+    0 0 0 2px v-bind("theme.cardColor"),
+    0 0 0 4px #8f72e3;
+}
+
+.challenged {
+  color: #6a45d6;
+  font-weight: 600;
 }
 
 .cell.picked {

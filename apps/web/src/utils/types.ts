@@ -10,6 +10,7 @@ import type {
   ProblemDifficulty,
   JudgeStatus,
   AstRules,
+  ChallengeInput,
   CreateAnnouncementRequest,
   ProblemLanguage,
 } from "@oj2/contract"
@@ -142,8 +143,10 @@ type ExcludeKeys =
 
 export type BlankProblem = Omit<
   AdminProblem,
-  ExcludeKeys | "hint" | "mermaidCode" | "flowchartData"
+  ExcludeKeys | "hint" | "mermaidCode" | "flowchartData" | "challenges"
 > & {
+  /** 提交的挑战：新加的不带 id，后端发（见契约 challengeInputSchema） */
+  challenges?: Record<string, ChallengeInput[]> | null
   id?: number
   // 新建比赛题时由 detail.vue 在提交前写进来
   contestId?: number | null

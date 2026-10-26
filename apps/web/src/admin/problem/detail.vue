@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TEST_CASE_MAX_CASES, type RunnableLanguage } from "@oj2/contract"
+import { TEST_CASE_MAX_CASES, type ChallengeInput, type RunnableLanguage } from "@oj2/contract"
 import { useThemeVars } from "naive-ui"
 import PageHeader from "admin/components/PageHeader.vue"
 import { getProblemTagList } from "shared/api"
@@ -19,6 +19,7 @@ import {
   uploadTestcases,
 } from "../api"
 import AstRulesEditor from "./components/AstRulesEditor.vue"
+import ChallengeEditor from "./components/ChallengeEditor.vue"
 import CaseTable from "./components/CaseTable.vue"
 import CodePreview from "./components/CodePreview.vue"
 import PreviewStrip from "./components/PreviewStrip.vue"
@@ -108,6 +109,8 @@ interface CodeForm {
   answers: Record<RunnableLanguage, string>
   templates: Record<RunnableLanguage, TemplateParts>
   astRules: AstRules | null
+  /** 做对之后的挑战，按语言分组（见契约 challengeSchema） */
+  challenges: Record<string, ChallengeInput[]> | null
   flowchartMode: FlowchartMode
   mermaidCode: string
   /** 画布画的参考流程图；null 是老题（只有手写的 Mermaid）或者还没画 */
@@ -135,6 +138,7 @@ const blankForm = (): CodeForm => ({
   answers: { Python: "", C: "", "C++": "" },
   templates: { Python: blankParts(), C: blankParts(), "C++": blankParts() },
   astRules: null,
+  challenges: null,
   flowchartMode: "none",
   mermaidCode: "",
   flowchartDoc: null,
@@ -428,6 +432,14 @@ watch(
 const showHidden = ref(false)
 const astChecks = ref<AstCheckState>({})
 
+const challengeSummary = computed(() => {
+  const parts = form.languages
+    .map((lang) => [lang, form.challenges?.[lang]?.length ?? 0] as const)
+    .filter(([, n]) => n > 0)
+    .map(([lang, n]) => `${lang} ${n} 条`)
+  return parts.length ? parts.join(" · ") : "没有"
+})
+
 const answersForAst = computed(() => ({ ...form.answers }) as Partial<Record<LANGUAGE, string>>)
 const templatesForPreview = computed(
   () => ({ ...form.templates }) as Partial<Record<LANGUAGE, TemplateParts>>,
@@ -493,6 +505,7 @@ const open = reactive({
   answer: true,
   cases: true,
   write: false,
+  challenge: false,
   flowchart: false,
   more: false,
 })
@@ -612,6 +625,15 @@ async function loadProblem(data: AdminProblem) {
     answers,
     templates,
     astRules: data.astRules ?? null,
+    // scannedAt 是后端记账用的，表单里不带；id 带着，规则没改就沿用（做到记录跟着 id 走）
+    challenges: data.challenges
+      ? Object.fromEntries(
+          Object.entries(data.challenges).map(([lang, list]) => [
+            lang,
+            list.map(({ id, wording, rules }) => ({ id, wording, rules })),
+          ]),
+        )
+      : null,
     flowchartMode: data.allowFlowchart ? "draw" : data.showFlowchart ? "show" : "none",
     mermaidCode: data.mermaidCode ?? "",
     flowchartDoc: parseDoc(data.flowchartData),
@@ -719,6 +741,15 @@ const blockers = computed<Blocker[]>(() => {
           })
       })
   }
+  for (const lang of form.languages) {
+    form.challenges?.[lang]?.forEach((item, i) => {
+      if (!item.wording.trim() || !item.rules.length)
+        list.push({
+          text: `把挑战 ${lang} 第 ${i + 1} 条${item.wording.trim() ? "的规则" : "的说法"}写上`,
+          section: "challenge",
+        })
+    })
+  }
   if (form.flowchartMode === "show") {
     if (legacyMermaid.value) {
       if (!mermaidOk.value)
@@ -804,6 +835,7 @@ async function save() {
           : null,
       flowchartHint: form.flowchartHint.trim(),
       astRules: form.astRules,
+      challenges: form.challenges,
       sqlConfig: null,
       sqlDisplay: null,
       contestId: props.contestID ? Number(props.contestID) : null,
@@ -1195,6 +1227,24 @@ onMounted(async () => {
             :answers="answersForAst"
           />
         </template>
+      </section>
+
+      <!-- 挑战 -->
+      <section id="section-challenge" class="card">
+        <button type="button" class="cardHead" @click="open.challenge = !open.challenge">
+          <h3>挑战</h3>
+          <span v-if="!open.challenge" class="summary">{{ challengeSummary }}</span>
+          <n-text v-else depth="3" class="note">选填，学生做对以后才看得到</n-text>
+          <span class="grow"></span>
+          <span class="caret">{{ open.challenge ? "⌃" : "›" }}</span>
+        </button>
+        <ChallengeEditor
+          v-if="open.challenge"
+          v-model="form.challenges"
+          :languages="form.languages"
+          :answers="answersForAst"
+          :problem-id="props.initial?.id ?? null"
+        />
       </section>
 
       <!-- 流程图 -->

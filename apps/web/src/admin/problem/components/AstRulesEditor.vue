@@ -15,6 +15,11 @@ interface Props {
   languages: LANGUAGE[]
   /** 各语言的标准答案（学生那段代码，不套模板）：拿来自测规则 */
   answers: Partial<Record<LANGUAGE, string>>
+  /**
+   * 挑战的判定规则（ChallengeEditor 里一条挑战一个）。和语法要求是同一套规则，但口径不同：
+   * 不满足不算错、说法由挑战自己写、标准答案不这么写是常事（挑战就是另一种写法）
+   */
+  challenge?: boolean
 }
 
 const props = defineProps<Props>()
@@ -294,8 +299,13 @@ watch(supportedLanguages, (langs) => {
 <template>
   <div class="astRules">
     <div class="head">
-      <span class="label">语法要求</span>
-      <div v-if="supportedLanguages.length" class="langs" role="tablist" aria-label="语言">
+      <span class="label">{{ challenge ? "判定" : "语法要求" }}</span>
+      <div
+        v-if="supportedLanguages.length && !challenge"
+        class="langs"
+        role="tablist"
+        aria-label="语言"
+      >
         <button
           v-for="lang in supportedLanguages"
           :key="lang"
@@ -310,7 +320,8 @@ watch(supportedLanguages, (langs) => {
         </button>
       </div>
       <div class="grow"></div>
-      <n-text depth="3" class="note">提交时逐条检查，不满足算错</n-text>
+      <n-text v-if="!challenge" depth="3" class="note">提交时逐条检查，不满足算错</n-text>
+      <n-text v-else depth="3" class="note">几条都满足才算做到</n-text>
     </div>
     <n-text v-if="unsupportedLanguages.length" depth="3" class="note">
       {{ unsupportedLanguages.join("、") }} 检查不了语法要求（判题机只认
@@ -402,6 +413,7 @@ watch(supportedLanguages, (langs) => {
           </div>
           <div class="ruleRow sub">
             <n-input
+              v-if="!challenge"
               :value="rule.message"
               size="tiny"
               class="message"
@@ -412,7 +424,19 @@ watch(supportedLanguages, (langs) => {
               "
               @update:value="(v: string) => updateRule(lang, index, 'message', v)"
             />
-            <span v-if="checkOf(lang, index)?.passed === true" class="ok">✓ 标准答案过了</span>
+            <template v-if="challenge">
+              <n-text v-if="checkOf(lang, index)?.passed === true" depth="3" class="note">
+                标准答案这样写也满足
+              </n-text>
+              <n-text v-else-if="checkOf(lang, index)?.passed === false" depth="3" class="note">
+                标准答案不是这样写的{{
+                  checkOf(lang, index)!.actual !== undefined
+                    ? `（数到 ${checkOf(lang, index)!.actual} 次）`
+                    : ""
+                }}
+              </n-text>
+            </template>
+            <span v-else-if="checkOf(lang, index)?.passed === true" class="ok">✓ 标准答案过了</span>
             <span v-else-if="checkOf(lang, index)?.passed === false" class="bad">
               ✗ 标准答案自己没过{{
                 checkOf(lang, index)!.actual !== undefined

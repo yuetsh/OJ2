@@ -76,6 +76,30 @@ const markField = StateField.define<DecorationSet>({
 })
 
 /**
+ * 挑战没做到时标出是哪几行（「print 最多 1 次」→ 三个 print 所在的三行），紫底，和挑战
+ * 那条的颜色一致。和错误标记分开存：答案对了、挑战没做到时没有错误可标，两种也不会同时出现
+ */
+const setChallengeLines = StateEffect.define<number[]>()
+const challengeLineDeco = Decoration.line({ class: "cm-challenge-line" })
+
+const challengeField = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const effect of tr.effects) {
+      if (effect.is(setChallengeLines)) {
+        const lines = effect.value.filter((line) => line >= 1 && line <= tr.state.doc.lines)
+        deco = Decoration.set(
+          lines.map((line) => challengeLineDeco.range(tr.state.doc.line(line).from)),
+        )
+      }
+    }
+    return deco
+  },
+  provide: (field) => EditorView.decorations.from(field),
+})
+
+/**
  * 题目页当前那个编辑器。结果面板和编辑器是兄弟组件，隔着好几层，
  * 与其一路透传 ref，不如让编辑器挂载时自己登记。只挂在题目页主编辑器上
  * （ProblemEditor 的扩展数组），自测、流程图那些编辑器不登记。
@@ -98,6 +122,11 @@ const theme = EditorView.baseTheme({
     textUnderlineOffset: "3px",
     backgroundColor: "rgba(208, 48, 80, 0.18)",
   },
+  // 左边再压一道紫线：光标所在那行的底色会盖住行底色，线不会被盖
+  ".cm-challenge-line": {
+    backgroundColor: "rgba(91, 52, 196, 0.12)",
+    boxShadow: "inset 3px 0 0 #8f72e3",
+  },
   ".cm-punctuation-mark": {
     backgroundColor: "rgba(240, 160, 32, 0.35)",
     outline: "1px solid rgba(240, 160, 32, 0.8)",
@@ -105,7 +134,7 @@ const theme = EditorView.baseTheme({
   },
 })
 
-export const errorMarkExtensions = [markField, punctuationField, tracker, theme]
+export const errorMarkExtensions = [markField, punctuationField, challengeField, tracker, theme]
 
 /** 题目页主编辑器（没挂着就是 null）。手机上的符号键往它里面插字 */
 export function currentEditorView(): EditorView | null {
@@ -143,6 +172,15 @@ export function showErrorMark(
   view.dispatch({
     effects: [setMark.of(mark), EditorView.scrollIntoView(pos, { y: "center" })],
   })
+}
+
+/** 标出挑战没做到的那几行（行号来自判题时的 AST，学生之后改过代码的话会对不上，不滚过去） */
+export function showChallengeLines(lines: number[]) {
+  current?.dispatch({ effects: setChallengeLines.of(lines) })
+}
+
+export function clearChallengeLines() {
+  current?.dispatch({ effects: setChallengeLines.of([]) })
 }
 
 export function clearErrorMark() {

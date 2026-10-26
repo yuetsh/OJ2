@@ -1,4 +1,5 @@
 import type {
+  ChallengeList,
   ClassLessonRequest,
   ContestPasswordRequest,
   CreateFlowchartRequest,
@@ -429,6 +430,15 @@ export function getSimilarProblems(problemId: string) {
   return api
     .get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
     .then((response) => response.map(toProblemRow))
+}
+
+// ==================== 挑战 ====================
+
+/** 几道题、某种语言下的挑战（说法、几人做到、我做到没有），见契约 problemChallengeGroupSchema */
+export function getChallenges(problemIds: string[], language: string) {
+  return api.get<ChallengeList>("challenges", {
+    params: { problems: problemIds.join(","), language },
+  })
 }
 
 // ==================== 流程图相关API ====================

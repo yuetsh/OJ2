@@ -53,9 +53,12 @@ export function cellTitle(
   day: string | undefined,
 ) {
   if (cell.status === "accepted") {
-    return acceptedToday(cell, day)
+    const when = acceptedToday(cell, day)
       ? `${parseTime(cell.acceptedAt!, "HH:mm")} 做对`
       : "以前就做对了"
+    if (cell.challenge === "done") return `${when}，挑战也做到了`
+    if (cell.challenge === "doing") return `${when}，在挑战`
+    return when
   }
   if (cell.status === "tried") {
     if (cell.latest) return `讲讲 ${student.username} 这道题的错`

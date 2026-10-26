@@ -13,6 +13,8 @@ import { errorMarkExtensions } from "oj/problem/utils/errorMark"
 import { editorFocusTracker } from "oj/problem/utils/symbolKeys"
 import { hangWrapExtensions } from "shared/extensions/hangIndent"
 import EditorToolbar from "./EditorToolbar.vue"
+import ChallengeBar from "./ChallengeBar.vue"
+import { useChallengeStore } from "oj/store/challenge"
 import { useDraftKey } from "../composables/draftKey"
 import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
 import { useProblemPageContext } from "../composables/problemPageContext"
@@ -99,9 +101,14 @@ const storageKey = useDraftKey()
 
 // 桌面：顶栏 56 + 工具栏 48，协作条再占 40（两栏顶满内容区，见 detail.vue 的 problem-split）。
 // 手机：顶栏两行 + 课堂条 + 页签 + 工具栏约 236px，底部还有「运行例子 / 提交」那条约 64px
+// 挑战中编辑器顶上多一条 44 的挑战条（协作中的老师不显示，见模板）
+const challengeStore = useChallengeStore()
+const showChallengeBar = computed(
+  () => ctx.value.challenges && !teacherCollab.value && !!challengeStore.active,
+)
 const editorHeight = computed(() => {
   const base = isDesktop.value ? 104 : 300
-  return `calc(100vh - ${base + (teacherCollab.value ? 40 : 0)}px)`
+  return `calc(100vh - ${base + (teacherCollab.value ? 40 : 0) + (showChallengeBar.value ? 44 : 0)}px)`
 })
 
 function loadCode() {
@@ -220,6 +227,7 @@ onBeforeUnmount(() => flowchartStore.attachEditor(null))
 <template>
   <div class="problem-editor">
     <CollabBar v-if="teacherCollab" />
+    <ChallengeBar v-if="showChallengeBar" />
     <EditorToolbar @change-language="changeLanguage" />
     <!--
       协作中教师这边不会落到流程图分支：上面那个 watch 已经把他的语言换成了学生的，

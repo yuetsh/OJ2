@@ -26,6 +26,11 @@ interface EntryRules {
   similar: boolean
   /** 通过之后给「这节课的下一题」 */
   lessonNext: boolean
+  /**
+   * 做对之后的挑战（编辑器顶上的挑战条、结果里的「还能挑战」）。题单里通过后 1.5 秒就跳回去，
+   * 比赛提交不判挑战
+   */
+  challenges: boolean
   /** 通过之后 1.5 秒弹强制点评 */
   reviewAfterAccepted: boolean
   /** 通过之后 1.5 秒回题单 */
@@ -57,6 +62,7 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     statusTag: true,
     similar: true,
     lessonNext: true,
+    challenges: true,
     reviewAfterAccepted: true,
     backToProblemSet: false,
     help: true,
@@ -71,6 +77,7 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     // 点进相似题就离开了题单
     similar: false,
     lessonNext: false,
+    challenges: false,
     // 1.5 秒后要跳回题单页，弹了也会被冲掉
     reviewAfterAccepted: false,
     backToProblemSet: true,
@@ -86,6 +93,7 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     // 撞上同号公开题时反而会在比赛中把题库列给学生
     similar: false,
     lessonNext: false,
+    challenges: false,
     reviewAfterAccepted: false,
     backToProblemSet: false,
     help: false,
