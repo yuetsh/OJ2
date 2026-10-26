@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { errorMessage } from "utils/api"
+import { Icon } from '@iconify/vue'
+import { errorMessage } from 'utils/api'
 import type {
   Exercise,
   ExerciseType,
@@ -11,8 +11,8 @@ import type {
   ExercisePredictData,
   ExerciseDebugData,
   ExerciseGroupData,
-} from "utils/types"
-import { getAdminExercises, createExercise, updateExercise, deleteExercise } from "admin/api"
+} from 'utils/types'
+import { getAdminExercises, createExercise, updateExercise, deleteExercise } from 'admin/api'
 
 /**
  * 编辑页右栏的「练一练」：一道一行，写着它在正文的哪一节；新建的直接插到正文光标处，
@@ -34,85 +34,85 @@ const editingId = ref<number | null>(null)
 /** 编辑的这道有几个人做过；为 0 时不问要不要清空 */
 const editingAttempts = ref(0)
 const resetAttempts = ref(false)
-const formType = ref<ExerciseType>("mcq")
+const formType = ref<ExerciseType>('mcq')
 const formOrder = ref(0)
 
-const mcqQuestion = ref("")
-const mcqOptions = ref(["", ""])
+const mcqQuestion = ref('')
+const mcqOptions = ref(['', ''])
 const mcqAnswer = ref<number[]>([])
 
-const sortQuestion = ref("")
-const sortCode = ref("")
+const sortQuestion = ref('')
+const sortCode = ref('')
 
-const fillQuestion = ref("")
-const fillCode = ref("")
+const fillQuestion = ref('')
+const fillCode = ref('')
 
-const matchQuestion = ref("")
-const matchLeft = ref("")
-const matchRight = ref("")
+const matchQuestion = ref('')
+const matchLeft = ref('')
+const matchRight = ref('')
 
-const predictQuestion = ref("")
-const predictCode = ref("")
-const predictAnswer = ref("")
+const predictQuestion = ref('')
+const predictCode = ref('')
+const predictAnswer = ref('')
 
-const debugQuestion = ref("")
-const debugCode = ref("")
+const debugQuestion = ref('')
+const debugCode = ref('')
 const debugAnswer = ref<number[]>([])
-const debugExplanation = ref("")
+const debugExplanation = ref('')
 
-const groupQuestion = ref("")
-const groupBuckets = ref("")
-const groupItems = ref("")
+const groupQuestion = ref('')
+const groupBuckets = ref('')
+const groupItems = ref('')
 
-const debugLines = computed(() => (debugCode.value === "" ? [] : debugCode.value.split("\n")))
+const debugLines = computed(() => (debugCode.value === '' ? [] : debugCode.value.split('\n')))
 
 async function load() {
   exercises.value = await getAdminExercises(props.tutorialId)
-  emit("change", exercises.value)
+  emit('change', exercises.value)
 }
 
 /** 这道题在正文的哪一节：占位符前面最近的二级标题；没放进正文就是 null */
 function placeOf(id: number) {
   const at = props.content.indexOf(`[[exercise:${id}]]`)
   if (at < 0) return null
-  const before = props.content.slice(0, at).split("\n")
+  const before = props.content.slice(0, at).split('\n')
   for (let i = before.length - 1; i >= 0; i--) {
     const heading = before[i]!.match(/^##\s+(.+)$/)
     if (heading) return heading[1]!.trim()
   }
-  return "开头"
+  return '开头'
 }
 
 onMounted(load)
 
 function resetForms() {
-  mcqQuestion.value = ""
-  mcqOptions.value = ["", ""]
+  mcqQuestion.value = ''
+  mcqOptions.value = ['', '']
   mcqAnswer.value = []
-  sortQuestion.value = ""
-  sortCode.value = ""
-  fillQuestion.value = ""
-  fillCode.value = ""
-  matchQuestion.value = ""
-  matchLeft.value = ""
-  matchRight.value = ""
-  predictQuestion.value = ""
-  predictCode.value = ""
-  predictAnswer.value = ""
-  debugQuestion.value = ""
-  debugCode.value = ""
+  sortQuestion.value = ''
+  sortCode.value = ''
+  fillQuestion.value = ''
+  fillCode.value = ''
+  matchQuestion.value = ''
+  matchLeft.value = ''
+  matchRight.value = ''
+  predictQuestion.value = ''
+  predictCode.value = ''
+  predictAnswer.value = ''
+  debugQuestion.value = ''
+  debugCode.value = ''
   debugAnswer.value = []
-  debugExplanation.value = ""
-  groupQuestion.value = ""
-  groupBuckets.value = ""
-  groupItems.value = ""
+  debugExplanation.value = ''
+  groupQuestion.value = ''
+  groupBuckets.value = ''
+  groupItems.value = ''
 }
 
 function openCreate() {
   editingId.value = null
   editingAttempts.value = 0
   resetAttempts.value = false
-  formType.value = "mcq"
+  formType.value = 'mcq'
   formOrder.value = exercises.value.length
   resetForms()
   showForm.value = true
@@ -125,41 +125,41 @@ function openEdit(ex: Exercise) {
   formType.value = ex.type
   formOrder.value = ex.order
   resetForms()
-  if (ex.type === "mcq") {
+  if (ex.type === 'mcq') {
     const d = ex.data as ExerciseMcqData
     mcqQuestion.value = d.question
     mcqOptions.value = [...d.options]
     mcqAnswer.value = [...d.answer]
-  } else if (ex.type === "sort") {
+  } else if (ex.type === 'sort') {
     const d = ex.data as ExerciseSortData
     sortQuestion.value = d.question
-    sortCode.value = d.lines.join("\n")
-  } else if (ex.type === "fill") {
+    sortCode.value = d.lines.join('\n')
+  } else if (ex.type === 'fill') {
     const d = ex.data as ExerciseFillData
     fillQuestion.value = d.question
     fillCode.value = d.code
-  } else if (ex.type === "match") {
+  } else if (ex.type === 'match') {
     const d = ex.data as ExerciseMatchData
     matchQuestion.value = d.question
-    matchLeft.value = d.left.join("\n")
+    matchLeft.value = d.left.join('\n')
     // 按答案顺序还原右列，重存时识别答案保持为顺序对应
-    matchRight.value = d.answer.map((a) => d.right[a]).join("\n")
-  } else if (ex.type === "predict") {
+    matchRight.value = d.answer.map((a) => d.right[a]).join('\n')
+  } else if (ex.type === 'predict') {
     const d = ex.data as ExercisePredictData
     predictQuestion.value = d.question
     predictCode.value = d.code
-    predictAnswer.value = d.answer.join("\n===\n")
-  } else if (ex.type === "debug") {
+    predictAnswer.value = d.answer.join('\n===\n')
+  } else if (ex.type === 'debug') {
     const d = ex.data as ExerciseDebugData
     debugQuestion.value = d.question
-    debugCode.value = d.lines.join("\n")
+    debugCode.value = d.lines.join('\n')
     debugAnswer.value = [...d.answer]
-    debugExplanation.value = d.explanation ?? ""
-  } else if (ex.type === "group") {
+    debugExplanation.value = d.explanation ?? ''
+  } else if (ex.type === 'group') {
     const d = ex.data as ExerciseGroupData
     groupQuestion.value = d.question
-    groupBuckets.value = d.buckets.join("\n")
-    groupItems.value = d.items.map((it, i) => `${it} => ${d.buckets[d.answer[i]]}`).join("\n")
+    groupBuckets.value = d.buckets.join('\n')
+    groupItems.value = d.items.map((it, i) => `${it} => ${d.buckets[d.answer[i]]}`).join('\n')
   }
   showForm.value = true
 }
@@ -178,102 +178,102 @@ function toggleDebug(i: number) {
 
 function splitLines(text: string): string[] {
   return text
-    .split("\n")
+    .split('\n')
     .map((l) => l.trim())
-    .filter((l) => l !== "")
+    .filter((l) => l !== '')
 }
 
 function buildData(): Record<string, unknown> | null {
-  if (formType.value === "mcq") {
+  if (formType.value === 'mcq') {
     // 后端 exerciseDataError 也卡这三条，先在这儿报，省一次往返
     if (mcqOptions.value.length < 2) {
-      message.error("选择题至少要有 2 个选项")
+      message.error('选择题至少要有 2 个选项')
       return null
     }
     if (mcqOptions.value.some((option) => !option.trim())) {
-      message.error("选项不能留空")
+      message.error('选项不能留空')
       return null
     }
     if (mcqAnswer.value.length === 0) {
-      message.error("请至少勾选一个正确答案")
+      message.error('请至少勾选一个正确答案')
       return null
     }
     return {
-      question: mcqQuestion.value || "下面选项中正确是哪个？",
+      question: mcqQuestion.value || '下面选项中正确是哪个？',
       options: mcqOptions.value,
       answer: mcqAnswer.value,
     }
   }
-  if (formType.value === "sort") {
-    const lines = sortCode.value.split("\n").filter((l) => l.trim() !== "")
+  if (formType.value === 'sort') {
+    const lines = sortCode.value.split('\n').filter((l) => l.trim() !== '')
     if (lines.length < 2) {
-      message.error("排序题至少要有 2 行代码")
+      message.error('排序题至少要有 2 行代码')
       return null
     }
     return {
-      question: sortQuestion.value || "将下列代码行排列为正确顺序",
+      question: sortQuestion.value || '将下列代码行排列为正确顺序',
       lines,
     }
   }
-  if (formType.value === "fill") {
+  if (formType.value === 'fill') {
     if (!fillCode.value.trim()) {
-      message.error("请填写含空位的代码")
+      message.error('请填写含空位的代码')
       return null
     }
     // 学生端按 {{...}} 抠空位，没有标记就是一段谁也做不了的代码，
     // 而老师这边看不出任何异样 —— 这是这个编辑器以前唯一完全不校验的题型
     if (!/\{\{[^}]+\}\}/.test(fillCode.value)) {
-      message.error("代码里没有空位，用 {{答案}} 标记，多个合法答案用 | 分隔")
+      message.error('代码里没有空位，用 {{答案}} 标记，多个合法答案用 | 分隔')
       return null
     }
     return { question: fillQuestion.value, code: fillCode.value }
   }
-  if (formType.value === "match") {
+  if (formType.value === 'match') {
     const left = splitLines(matchLeft.value)
     const right = splitLines(matchRight.value)
     if (left.length < 2 || left.length !== right.length) {
-      message.error("左右两列需各至少 2 项且行数相等（按行一一对应）")
+      message.error('左右两列需各至少 2 项且行数相等（按行一一对应）')
       return null
     }
     return {
-      question: matchQuestion.value || "把左右两列正确连线",
+      question: matchQuestion.value || '把左右两列正确连线',
       left,
       right,
       answer: left.map((_, i) => i),
     }
   }
-  if (formType.value === "predict") {
-    if (predictCode.value.trim() === "") {
-      message.error("请填写代码")
+  if (formType.value === 'predict') {
+    if (predictCode.value.trim() === '') {
+      message.error('请填写代码')
       return null
     }
     const answer = predictAnswer.value
       .split(/\n===\n/)
-      .map((a) => a.replace(/\s+$/, ""))
-      .filter((a) => a.trim() !== "")
+      .map((a) => a.replace(/\s+$/, ''))
+      .filter((a) => a.trim() !== '')
     if (answer.length === 0) {
-      message.error("请填写至少一个正确输出")
+      message.error('请填写至少一个正确输出')
       return null
     }
     return {
-      question: predictQuestion.value || "这段代码会输出什么？",
+      question: predictQuestion.value || '这段代码会输出什么？',
       code: predictCode.value,
       answer,
     }
   }
-  if (formType.value === "debug") {
-    const lines = debugCode.value.split("\n")
+  if (formType.value === 'debug') {
+    const lines = debugCode.value.split('\n')
     const answer = debugAnswer.value.filter((i) => i < lines.length).sort((a, b) => a - b)
     if (lines.length === 0 || answer.length === 0) {
-      message.error("请填写代码并勾选至少一行错误")
+      message.error('请填写代码并勾选至少一行错误')
       return null
     }
     const data: Record<string, unknown> = {
-      question: debugQuestion.value || "下面代码哪几行有错？",
+      question: debugQuestion.value || '下面代码哪几行有错？',
       lines,
       answer,
     }
-    if (debugExplanation.value.trim() !== "") {
+    if (debugExplanation.value.trim() !== '') {
       data.explanation = debugExplanation.value.trim()
     }
     return data
@@ -281,21 +281,21 @@ function buildData(): Record<string, unknown> | null {
   // group
   const buckets = splitLines(groupBuckets.value)
   if (buckets.length < 2) {
-    message.error("请至少填写 2 个分组")
+    message.error('请至少填写 2 个分组')
     return null
   }
   const items: string[] = []
   const answer: number[] = []
-  for (const line of groupItems.value.split("\n")) {
-    if (line.trim() === "") continue
-    const parts = line.split("=>")
+  for (const line of groupItems.value.split('\n')) {
+    if (line.trim() === '') continue
+    const parts = line.split('=>')
     if (parts.length !== 2) {
       message.error(`项目格式应为「项目 => 分组名」：${line}`)
       return null
     }
     const item = parts[0].trim()
     const bucket = buckets.indexOf(parts[1].trim())
-    if (item === "" || bucket === -1) {
+    if (item === '' || bucket === -1) {
       message.error(`项目或分组名无效：${line}`)
       return null
     }
@@ -303,11 +303,11 @@ function buildData(): Record<string, unknown> | null {
     answer.push(bucket)
   }
   if (items.length === 0) {
-    message.error("请至少填写一个项目")
+    message.error('请至少填写一个项目')
     return null
   }
   return {
-    question: groupQuestion.value || "把下列项目归类到正确的分组",
+    question: groupQuestion.value || '把下列项目归类到正确的分组',
     buckets,
     items,
     answer,
@@ -327,7 +327,7 @@ async function save() {
         order: formOrder.value,
         resetAttempts: resetAttempts.value,
       })
-      message.success(resetAttempts.value ? "练习题已更新，学生的作答已清空" : "练习题已更新")
+      message.success(resetAttempts.value ? '练习题已更新，学生的作答已清空' : '练习题已更新')
     } else {
       const created = await createExercise({
         tutorialId: props.tutorialId,
@@ -335,37 +335,37 @@ async function save() {
         data,
         order: formOrder.value,
       })
-      message.success("已新建，插到了正文光标处")
-      emit("insert", created.id)
+      message.success('已新建，插到了正文光标处')
+      emit('insert', created.id)
     }
     showForm.value = false
     await load()
   } catch (e) {
-    message.error(errorMessage(e, "保存失败"))
+    message.error(errorMessage(e, '保存失败'))
   }
 }
 
 function confirmDelete(id: number) {
   dialog.warning({
-    title: "删除练习题",
-    content: "此操作不可撤销",
-    positiveText: "删除",
+    title: '删除练习题',
+    content: '此操作不可撤销',
+    positiveText: '删除',
     onPositiveClick: async () => {
       await deleteExercise(id)
-      message.success("已删除")
+      message.success('已删除')
       await load()
     },
   })
 }
 
 const TYPE_NAMES: Record<ExerciseType, string> = {
-  mcq: "选择",
-  sort: "排序",
-  fill: "填空",
-  match: "连线",
-  predict: "预测输出",
-  debug: "找错",
-  group: "分组",
+  mcq: '选择',
+  sort: '排序',
+  fill: '填空',
+  match: '连线',
+  predict: '预测输出',
+  debug: '找错',
+  group: '分组',
 }
 
 function typeName(type: ExerciseType) {
@@ -403,12 +403,7 @@ function typeName(type: ExerciseType) {
       </div>
     </div>
 
-    <n-modal
-      v-model:show="showForm"
-      :title="editingId ? '编辑练习题' : '新建练习题'"
-      preset="card"
-      style="width: 560px"
-    >
+    <n-modal v-model:show="showForm" :title="editingId ? '编辑练习题' : '新建练习题'" preset="card" style="width: 560px">
       <n-form label-placement="top">
         <n-form-item label="题型">
           <n-radio-group v-model:value="formType" :disabled="!!editingId">
@@ -428,22 +423,13 @@ function typeName(type: ExerciseType) {
 
         <template v-if="formType === 'mcq'">
           <n-form-item label="题目">
-            <n-input
-              v-model:value="mcqQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="下面选项中正确是哪个？"
-            />
+            <n-input v-model:value="mcqQuestion" type="textarea" :rows="2" placeholder="下面选项中正确是哪个？" />
           </n-form-item>
           <n-form-item label="选项（勾选所有正确答案）">
             <n-space vertical style="width: 100%">
               <n-flex v-for="(_opt, i) in mcqOptions" :key="i" align="center" :size="8">
                 <n-checkbox :checked="mcqAnswer.includes(i)" @update:checked="toggleAnswer(i)" />
-                <n-input
-                  v-model:value="mcqOptions[i]"
-                  :placeholder="`选项 ${String.fromCharCode(65 + i)}`"
-                  style="flex: 1"
-                />
+                <n-input v-model:value="mcqOptions[i]" :placeholder="`选项 ${String.fromCharCode(65 + i)}`" style="flex: 1" />
                 <n-button
                   size="small"
                   :disabled="mcqOptions.length <= 2"
@@ -464,12 +450,7 @@ function typeName(type: ExerciseType) {
 
         <template v-else-if="formType === 'sort'">
           <n-form-item label="题目">
-            <n-input
-              v-model:value="sortQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="将下列代码行排列为正确顺序"
-            />
+            <n-input v-model:value="sortQuestion" type="textarea" :rows="2" placeholder="将下列代码行排列为正确顺序" />
           </n-form-item>
           <n-form-item label="正确代码（每行将自动成为一道排序项）">
             <n-input
@@ -477,19 +458,14 @@ function typeName(type: ExerciseType) {
               type="textarea"
               :rows="10"
               placeholder="在此粘贴正确的代码，保存后将自动按行拆分并乱序"
-              style="font-family: &quot;Monaco&quot;"
+              style="font-family: 'Monaco'"
             />
           </n-form-item>
         </template>
 
         <template v-else-if="formType === 'fill'">
           <n-form-item label="题目说明">
-            <n-input
-              v-model:value="fillQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="例：补全下面的循环语句"
-            />
+            <n-input v-model:value="fillQuestion" type="textarea" :rows="2" placeholder="例：补全下面的循环语句" />
           </n-form-item>
           <n-form-item label="含空位的代码">
             <n-input
@@ -497,122 +473,62 @@ function typeName(type: ExerciseType) {
               type="textarea"
               :rows="10"
               placeholder="用 {{答案}} 标记空位，多个合法答案用 | 分隔，例如：for {{i|idx}} in range(10):"
-              style="font-family: &quot;Monaco&quot;"
+              style="font-family: 'Monaco'"
             />
           </n-form-item>
         </template>
 
         <template v-else-if="formType === 'match'">
           <n-form-item label="题目说明">
-            <n-input
-              v-model:value="matchQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="例：把函数和它的功能连起来"
-            />
+            <n-input v-model:value="matchQuestion" type="textarea" :rows="2" placeholder="例：把函数和它的功能连起来" />
           </n-form-item>
           <n-form-item label="左列（每行一项）">
-            <n-input
-              v-model:value="matchLeft"
-              type="textarea"
-              :rows="6"
-              placeholder="print&#10;len&#10;type"
-            />
+            <n-input v-model:value="matchLeft" type="textarea" :rows="6" placeholder="print&#10;len&#10;type" />
           </n-form-item>
           <n-form-item label="右列（与左列按行一一对应，保存后右列自动乱序）">
-            <n-input
-              v-model:value="matchRight"
-              type="textarea"
-              :rows="6"
-              placeholder="输出内容&#10;返回长度&#10;返回类型"
-            />
+            <n-input v-model:value="matchRight" type="textarea" :rows="6" placeholder="输出内容&#10;返回长度&#10;返回类型" />
           </n-form-item>
         </template>
 
         <template v-else-if="formType === 'predict'">
           <n-form-item label="题目说明">
-            <n-input
-              v-model:value="predictQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="例：这段代码会输出什么？"
-            />
+            <n-input v-model:value="predictQuestion" type="textarea" :rows="2" placeholder="例：这段代码会输出什么？" />
           </n-form-item>
           <n-form-item label="代码">
-            <n-input
-              v-model:value="predictCode"
-              type="textarea"
-              :rows="8"
-              placeholder="print(1 + 2)"
-              style="font-family: &quot;Monaco&quot;"
-            />
+            <n-input v-model:value="predictCode" type="textarea" :rows="8" placeholder="print(1 + 2)" style="font-family: 'Monaco'" />
           </n-form-item>
           <n-form-item label="正确输出（多个可接受答案之间用单独一行 === 分隔）">
-            <n-input
-              v-model:value="predictAnswer"
-              type="textarea"
-              :rows="4"
-              placeholder="3"
-              style="font-family: &quot;Monaco&quot;"
-            />
+            <n-input v-model:value="predictAnswer" type="textarea" :rows="4" placeholder="3" style="font-family: 'Monaco'" />
           </n-form-item>
         </template>
 
         <template v-else-if="formType === 'debug'">
           <n-form-item label="题目说明">
-            <n-input
-              v-model:value="debugQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="例：下面代码哪几行有错？"
-            />
+            <n-input v-model:value="debugQuestion" type="textarea" :rows="2" placeholder="例：下面代码哪几行有错？" />
           </n-form-item>
           <n-form-item label="代码（每行一项）">
-            <n-input
-              v-model:value="debugCode"
-              type="textarea"
-              :rows="8"
-              placeholder="在此粘贴含错误的代码"
-              style="font-family: &quot;Monaco&quot;"
-            />
+            <n-input v-model:value="debugCode" type="textarea" :rows="8" placeholder="在此粘贴含错误的代码" style="font-family: 'Monaco'" />
           </n-form-item>
           <n-form-item label="勾选错误行">
             <n-space vertical style="width: 100%">
               <n-empty v-if="debugLines.length === 0" description="先填写代码" size="small" />
               <n-flex v-for="(line, i) in debugLines" :key="i" align="center" :size="8">
                 <n-checkbox :checked="debugAnswer.includes(i)" @update:checked="toggleDebug(i)" />
-                <n-text style="font-family: Monaco; white-space: pre">
-                  {{ i + 1 }}. {{ line }}
-                </n-text>
+                <n-text style="font-family: Monaco; white-space: pre"> {{ i + 1 }}. {{ line }} </n-text>
               </n-flex>
             </n-space>
           </n-form-item>
           <n-form-item label="错误说明（可选，提交后展示）">
-            <n-input
-              v-model:value="debugExplanation"
-              type="textarea"
-              :rows="2"
-              placeholder="例：第 2 行少了冒号"
-            />
+            <n-input v-model:value="debugExplanation" type="textarea" :rows="2" placeholder="例：第 2 行少了冒号" />
           </n-form-item>
         </template>
 
         <template v-else-if="formType === 'group'">
           <n-form-item label="题目说明">
-            <n-input
-              v-model:value="groupQuestion"
-              type="textarea"
-              :rows="2"
-              placeholder="例：把下面的值归类到正确的类型"
-            />
+            <n-input v-model:value="groupQuestion" type="textarea" :rows="2" placeholder="例：把下面的值归类到正确的类型" />
           </n-form-item>
           <n-form-item label="分组（每行一个分组名）">
-            <n-input
-              v-model:value="groupBuckets"
-              type="textarea"
-              :rows="4"
-              placeholder="int&#10;float&#10;str"
-            />
+            <n-input v-model:value="groupBuckets" type="textarea" :rows="4" placeholder="int&#10;float&#10;str" />
           </n-form-item>
           <n-form-item label="项目（每行「项目 => 分组名」）">
             <n-input
@@ -620,7 +536,7 @@ function typeName(type: ExerciseType) {
               type="textarea"
               :rows="6"
               placeholder="3 => int&#10;3.14 => float&#10;hello => str"
-              style="font-family: &quot;Monaco&quot;"
+              style="font-family: 'Monaco'"
             />
           </n-form-item>
         </template>
@@ -629,9 +545,7 @@ function typeName(type: ExerciseType) {
       <template #footer>
         <n-flex align="center" :size="8">
           <!-- 改了答案或选项时勾上：按旧答案做对的人不该还算做对 -->
-          <n-checkbox v-if="editingId && editingAttempts" v-model:checked="resetAttempts">
-            同时清空学生的作答（{{ editingAttempts }} 人做过）
-          </n-checkbox>
+          <n-checkbox v-if="editingId && editingAttempts" v-model:checked="resetAttempts"> 同时清空学生的作答（{{ editingAttempts }} 人做过） </n-checkbox>
           <span style="flex: 1" />
           <n-button @click="showForm = false">取消</n-button>
           <n-button type="primary" @click="save">保存</n-button>

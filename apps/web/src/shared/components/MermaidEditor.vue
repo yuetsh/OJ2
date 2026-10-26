@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { copyToClipboard } from "utils/functions"
-import { useMermaid } from "shared/composables/useMermaid"
+import { copyToClipboard } from 'utils/functions'
+import { useMermaid } from 'shared/composables/useMermaid'
 
-const modelValue = defineModel<string>({ default: "" })
-const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
+const modelValue = defineModel<string>({ default: '' })
+const mermaidContainer = useTemplateRef<HTMLElement>('mermaidContainer')
 
 const { renderFlowchart, renderError, renderSuccess } = useMermaid()
 
@@ -15,7 +15,7 @@ const emit = defineEmits<{
 
 const renderMermaid = async () => {
   await renderFlowchart(mermaidContainer.value, modelValue.value)
-  emit("renderState", renderSuccess.value)
+  emit('renderState', renderSuccess.value)
 }
 
 onMounted(() => {
@@ -25,14 +25,14 @@ onMounted(() => {
 // 一改动就立刻把状态打回「未验证」，等防抖后的渲染真跑完再报结果。
 // 只挂防抖那一支的话，改完 300ms 内点保存，读到的还是上一次渲染的结论 ——
 // 刚改坏的代码会被当成校验通过。宁可让用户多等一下，也不能放脏数据进库。
-watch(modelValue, () => emit("renderState", false))
+watch(modelValue, () => emit('renderState', false))
 
 // 出题页是边敲边预览，不防抖的话每个字符都会触发一次完整的 mermaid 渲染，
 // 而中间态几乎全是语法错误
 watchDebounced(modelValue, renderMermaid, { debounce: 300, maxWait: 1000 })
 
 const clearCode = () => {
-  modelValue.value = ""
+  modelValue.value = ''
 }
 
 const copyCode = () => {
@@ -41,7 +41,7 @@ const copyCode = () => {
 
 onBeforeUnmount(() => {
   if (mermaidContainer.value) {
-    mermaidContainer.value.innerHTML = ""
+    mermaidContainer.value.innerHTML = ''
   }
 })
 </script>
@@ -56,12 +56,7 @@ onBeforeUnmount(() => {
           <n-button text @click="clearCode" type="error" size="small"> 清空 </n-button>
         </n-flex>
       </n-flex>
-      <n-input
-        class="code-editor"
-        v-model:value="modelValue"
-        type="textarea"
-        :autosize="{ minRows: 10, maxRows: 20 }"
-      />
+      <n-input class="code-editor" v-model:value="modelValue" type="textarea" :autosize="{ minRows: 10, maxRows: 20 }" />
     </n-flex>
     <n-flex vertical>
       <n-flex align="center" justify="space-between">

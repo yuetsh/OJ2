@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import type { RouteLocationRaw } from "vue-router"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import type { RouteLocationRaw } from 'vue-router'
 
 /**
  * 「找不到」的整页提示：地址打错、题目 / 比赛 / 题单不存在或没公开、比赛还没开始。
@@ -16,7 +16,7 @@ const props = withDefaults(
     to?: RouteLocationRaw
     toLabel?: string
   }>(),
-  { hint: "", icon: "ph:magnifying-glass", to: "/", toLabel: "回首页" },
+  { hint: '', icon: 'ph:magnifying-glass', to: '/', toLabel: '回首页' },
 )
 
 const theme = useThemeVars()
@@ -49,7 +49,7 @@ const router = useRouter()
 }
 
 .icon {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   opacity: 0.7;
 }
 
@@ -60,7 +60,7 @@ const router = useRouter()
 
 .hint {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .actions {

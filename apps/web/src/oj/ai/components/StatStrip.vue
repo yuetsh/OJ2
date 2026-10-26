@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { LearningReport } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
+import type { LearningReport } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
 
 /** 顶上一排数：做对几道、一次就对、上了几节课、差一点的；老师看时最前面多一格「班上第几」 */
 const props = defineProps<{ report: LearningReport; teacher: boolean; compact?: boolean }>()
@@ -23,20 +23,18 @@ const cells = computed(() => {
     // 数和「道」之间用不换行空格：手机上两列挤，单个「道」会被甩到下一行
     {
       big: r.solved,
-      unit: "道",
-      sub: c ? `做对 · 班上中间那位 ${c.medianSolved}\u00a0道` : "做对",
+      unit: '道',
+      sub: c ? `做对 · 班上中间那位 ${c.medianSolved}\u00a0道` : '做对',
     },
     {
       big: r.firstTry,
-      unit: "道",
+      unit: '道',
       sub: c && !props.compact ? `${firstSub}，班上中间那位 ${c.medianFirstPercent}%` : firstSub,
     },
-    { big: r.lessonCount, unit: "节课", sub: `交了 ${r.submissionCount} 次` },
+    { big: r.lessonCount, unit: '节课', sub: `交了 ${r.submissionCount} 次` },
   ]
-  if (r.unsolved.length)
-    list.push({ big: r.unsolved.length, unit: "道", sub: "差一点 · 交过还没做对", warn: true })
-  if (props.teacher && c)
-    list.unshift({ big: c.rank, unit: `/ ${c.size}`, sub: "班上按做对题数排第几" })
+  if (r.unsolved.length) list.push({ big: r.unsolved.length, unit: '道', sub: '差一点 · 交过还没做对', warn: true })
+  if (props.teacher && c) list.unshift({ big: c.rank, unit: `/ ${c.size}`, sub: '班上按做对题数排第几' })
   return list
 })
 </script>
@@ -56,16 +54,16 @@ const cells = computed(() => {
 <style scoped>
 .strip {
   display: flex;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .cell {
   flex: 1;
   min-width: 0;
   padding: 14px 20px;
-  border-left: 1px solid v-bind("theme.dividerColor");
+  border-left: 1px solid v-bind('theme.dividerColor');
 }
 
 .cell:first-child {
@@ -94,7 +92,7 @@ const cells = computed(() => {
 
 .sub {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .compact {

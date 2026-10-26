@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import ExerciseResult from "./ExerciseResult.vue"
-import type { Exercise, ExerciseMcqData } from "utils/types"
+import ExerciseResult from './ExerciseResult.vue'
+import type { Exercise, ExerciseMcqData } from 'utils/types'
 
 const props = defineProps<{ exercise: Exercise }>()
 const emit = defineEmits<{
@@ -37,7 +37,7 @@ function submit() {
   const answer = new Set(data.value.answer)
   const sel = selected.value
   const isEqual = sel.size === answer.size && [...sel].every((v) => answer.has(v))
-  emit("attempt", { correct: isEqual, answer: describe(sel) })
+  emit('attempt', { correct: isEqual, answer: describe(sel) })
   if (isEqual) {
     correct.value = true
     wrong.value = false
@@ -60,7 +60,7 @@ function describe(sel: Set<number>) {
   return `选了 ${[...sel]
     .sort((a, b) => a - b)
     .map((i) => String.fromCharCode(65 + i))
-    .join("、")}`
+    .join('、')}`
 }
 
 function reset() {
@@ -70,10 +70,10 @@ function reset() {
   partial.value = false
 }
 
-function optionType(idx: number): "default" | "primary" | "success" {
-  if (correct.value && data.value.answer.includes(idx)) return "success"
-  if (selected.value.has(idx)) return "primary"
-  return "default"
+function optionType(idx: number): 'default' | 'primary' | 'success' {
+  if (correct.value && data.value.answer.includes(idx)) return 'success'
+  if (selected.value.has(idx)) return 'primary'
+  return 'default'
 }
 </script>
 
@@ -84,14 +84,7 @@ function optionType(idx: number): "default" | "primary" | "success" {
     </p>
 
     <div class="opts" :class="{ wide: twoColumns }">
-      <button
-        v-for="(opt, idx) in data.options"
-        :key="idx"
-        type="button"
-        class="opt"
-        :class="optionType(idx)"
-        @click="select(idx)"
-      >
+      <button v-for="(opt, idx) in data.options" :key="idx" type="button" class="opt" :class="optionType(idx)" @click="select(idx)">
         <span class="key">{{ String.fromCharCode(65 + idx) }}</span>
         <span>{{ opt }}</span>
       </button>
@@ -104,9 +97,7 @@ function optionType(idx: number): "default" | "primary" | "success" {
     />
 
     <n-space style="margin-top: 12px" :size="8">
-      <n-button type="primary" :disabled="selected.size === 0 || correct" @click="submit">
-        提交
-      </n-button>
+      <n-button type="primary" :disabled="selected.size === 0 || correct" @click="submit"> 提交 </n-button>
       <n-button @click="reset">重置</n-button>
     </n-space>
   </div>

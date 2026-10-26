@@ -1,8 +1,8 @@
-import { FLOWCHART_PASS_GRADES, STUDENT_ROLES, type LessonLanguage } from "@oj2/contract"
-import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm"
+import { FLOWCHART_PASS_GRADES, STUDENT_ROLES, type LessonLanguage } from '@oj2/contract'
+import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { JudgeStatus } from "../judge/status"
+import { db, schema } from '../db'
+import { JudgeStatus } from '../judge/status'
 
 /**
  * 课堂上「谁做了哪道题」的取数口径：课堂条、看板、自学情况、后台首页「正在上课的班」
@@ -17,23 +17,14 @@ export const SOLVED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILE
  * 等级由分数推出（flowchart/grade.ts），重新评分会先把 grade 清空，所以 status = 2 其实
  * 是冗余的，留着是把「评完了」写明。
  */
-export const FLOWCHART_PASSED = and(
-  eq(schema.flowchartSubmission.status, 2),
-  inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]),
-)!
+export const FLOWCHART_PASSED = and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]))!
 
 /** 这个班正常状态的学生，给下面的查询当 `user_id in (...)` 用 */
 export function classMemberIds(className: string) {
   return db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(
-      and(
-        eq(schema.user.className, className),
-        eq(schema.user.isDisabled, false),
-        inArray(schema.user.adminType, [...STUDENT_ROLES]),
-      ),
-    )
+    .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
 }
 
 /**
@@ -53,7 +44,7 @@ export function classMemberIds(className: string) {
  * 语言拦），所以一律放行 SQL 不会把别的题算宽
  */
 export function lessonLanguageFilter(language: LessonLanguage | null | undefined) {
-  return language ? inArray(schema.submission.language, [language, "SQL"]) : undefined
+  return language ? inArray(schema.submission.language, [language, 'SQL']) : undefined
 }
 
 export function activityRows(options: {
@@ -69,7 +60,7 @@ export function activityRows(options: {
       userId: schema.submission.userId,
       problemId: schema.submission.problemId,
       createTime: schema.submission.createTime,
-      solved: sql<boolean>`${inArray(schema.submission.result, SOLVED_RESULTS)}`.as("solved"),
+      solved: sql<boolean>`${inArray(schema.submission.result, SOLVED_RESULTS)}`.as('solved'),
     })
     .from(schema.submission)
     .where(
@@ -86,7 +77,7 @@ export function activityRows(options: {
       userId: schema.flowchartSubmission.userId,
       problemId: schema.flowchartSubmission.problemId,
       createTime: schema.flowchartSubmission.createTime,
-      solved: sql<boolean>`${FLOWCHART_PASSED}`.as("solved"),
+      solved: sql<boolean>`${FLOWCHART_PASSED}`.as('solved'),
     })
     .from(schema.flowchartSubmission)
     .where(
@@ -96,7 +87,7 @@ export function activityRows(options: {
         problemIds ? inArray(schema.flowchartSubmission.problemId, problemIds) : undefined,
       ),
     )
-  return code.unionAll(flowchart).as("activity")
+  return code.unionAll(flowchart).as('activity')
 }
 
 /** 看板没指定班级时，猜「最近这么久里提交人数最多的班」—— 老师多半正在上这个班的课 */
@@ -116,13 +107,7 @@ export async function suggestActiveClass() {
     .select({ className: schema.user.className, users })
     .from(activity)
     .innerJoin(schema.user, eq(schema.user.id, activity.userId))
-    .where(
-      and(
-        isNotNull(schema.user.className),
-        eq(schema.user.isDisabled, false),
-        inArray(schema.user.adminType, [...STUDENT_ROLES]),
-      ),
-    )
+    .where(and(isNotNull(schema.user.className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
     .groupBy(schema.user.className)
     .orderBy(desc(users))
     .limit(1)

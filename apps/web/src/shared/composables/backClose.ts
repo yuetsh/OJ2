@@ -1,4 +1,4 @@
-import type { MaybeRefOrGetter, Ref } from "vue"
+import type { MaybeRefOrGetter, Ref } from 'vue'
 
 /**
  * 手机上整屏（或大半屏）的弹框、抽屉：按返回键先关它，而不是退出整页。
@@ -26,7 +26,7 @@ export function useBackClose(show: Ref<boolean>, enabled: MaybeRefOrGetter<boole
 
   watch(show, (open) => {
     if (open && !pushed && toValue(enabled)) {
-      history.pushState(history.state, "")
+      history.pushState(history.state, '')
       pushed = true
       router.listening = false
     } else if (!open && pushed) {
@@ -35,7 +35,7 @@ export function useBackClose(show: Ref<boolean>, enabled: MaybeRefOrGetter<boole
     }
   })
 
-  useEventListener(window, "popstate", () => {
+  useEventListener(window, 'popstate', () => {
     if (!pushed) return
     pushed = false
     // 按了返回键的：只管关（watch 里看到 pushed 已经是 false，不会再 back）

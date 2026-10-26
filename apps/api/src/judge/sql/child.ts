@@ -13,27 +13,27 @@
  * 只能让二进制自己按 argv 分发到这里。
  */
 
-import { writeSync } from "node:fs"
+import { writeSync } from 'node:fs'
 
-import { buildDisplay, runCase, SqlCaseError } from "./engine"
-import { JudgeStatus } from "../status"
+import { buildDisplay, runCase, SqlCaseError } from './engine'
+import { JudgeStatus } from '../status'
 
 export type SqlJob =
   | {
-      kind: "judge"
+      kind: 'judge'
       initSql: string
       refSql: string
       studentSql: string
-      mode: "query" | "modify"
+      mode: 'query' | 'modify'
       orderSensitive: boolean
       timeLimitMs: number
       memoryLimitMb: number
     }
   | {
-      kind: "display"
+      kind: 'display'
       initSql: string
       refSql: string
-      mode: "query" | "modify"
+      mode: 'query' | 'modify'
       requireChange: boolean
     }
 
@@ -66,8 +66,8 @@ function finish(payload: unknown): never {
   while (written < bytes.length) {
     written += writeSync(1, bytes, written, bytes.length - written)
   }
-  process.kill(process.pid, "SIGKILL")
-  throw new Error("unreachable")
+  process.kill(process.pid, 'SIGKILL')
+  throw new Error('unreachable')
 }
 
 /** 子进程入口。由 `src/main.ts` 的 `sql-child` 子命令调用，不在导入时自动执行 */
@@ -75,15 +75,9 @@ export async function runSqlChild() {
   const raw = await new Response(Bun.stdin.stream()).text()
   const job = JSON.parse(raw) as SqlJob
   try {
-    if (job.kind === "display") {
-      markPhase("display")
-      const display = await buildDisplay(
-        job.initSql,
-        job.refSql,
-        job.mode,
-        undefined,
-        job.requireChange,
-      )
+    if (job.kind === 'display') {
+      markPhase('display')
+      const display = await buildDisplay(job.initSql, job.refSql, job.mode, undefined, job.requireChange)
       finish({ ok: true, display })
     }
     // 阶段由 runCase 内部回调标记：prepare（受信脚本）→ student（学生 SQL）
@@ -102,11 +96,11 @@ export async function runSqlChild() {
     // WASM 堆触顶时 emscripten 抛的是普通 Error（"Aborted"/"out of memory"），
     // 到这里说明连引擎自身都没撑住，按内存超限报，不当成出题人的错
     const message = String((error as Error)?.message ?? error)
-    const memoryish = message.includes("out of memory") || message.includes("Aborted")
+    const memoryish = message.includes('out of memory') || message.includes('Aborted')
     finish({
       ok: false,
       result: memoryish ? JudgeStatus.MEMORY_LIMIT_EXCEEDED : JudgeStatus.SYSTEM_ERROR,
-      message: memoryish ? "内存超出限制" : message.slice(0, 200),
+      message: memoryish ? '内存超出限制' : message.slice(0, 200),
     })
   }
 }

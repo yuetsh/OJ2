@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { RankTrend } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { parseTime } from "utils/functions"
+import type { RankTrend } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { parseTime } from 'utils/functions'
 
 /**
  * 我和前后一名每周日晚上的名次。名次越小越好，所以纵轴倒过来（第 1 在最上面）。
@@ -54,17 +54,13 @@ function y(rank: number) {
 }
 
 /** 点是周一零点，说成前一天（周日晚上）；最后一个点是现在 */
-const labels = computed(() =>
-  props.trend.points.map((point, i) =>
-    i === n.value - 1 ? "现在" : parseTime(new Date(Date.parse(point) - 1), "M月D日"),
-  ),
-)
+const labels = computed(() => props.trend.points.map((point, i) => (i === n.value - 1 ? '现在' : parseTime(new Date(Date.parse(point) - 1), 'M月D日'))))
 
 function path(ranks: (number | null)[]) {
-  let d = ""
+  let d = ''
   ranks.forEach((rank, i) => {
     if (rank === null) return
-    d += `${d && ranks[i - 1] !== null ? "L" : "M"}${x(i).toFixed(1)},${y(rank).toFixed(1)} `
+    d += `${d && ranks[i - 1] !== null ? 'L' : 'M'}${x(i).toFixed(1)},${y(rank).toFixed(1)} `
   })
   return d
 }
@@ -74,9 +70,7 @@ const ends = computed(() => {
   const list = series.value
     .map((line) => {
       const last = line.ranks.at(-1)
-      return last == null
-        ? null
-        : { y: y(last), text: `${line.label} 第${last}`, color: line.color }
+      return last == null ? null : { y: y(last), text: `${line.label} 第${last}`, color: line.color }
     })
     .filter((end): end is { y: number; text: string; color: string } => !!end)
     .sort((a, b) => a.y - b.y)
@@ -93,44 +87,16 @@ const ends = computed(() => {
       <line :x1="PAD.left" :x2="W - PAD.right" :y1="y(tick)" :y2="y(tick)" class="grid" />
       <text :x="PAD.left - 6" :y="y(tick) + 4" text-anchor="end" class="axis">第 {{ tick }}</text>
     </g>
-    <text
-      v-for="(label, i) in labels"
-      :key="label"
-      :x="x(i)"
-      :y="H - 8"
-      text-anchor="middle"
-      class="axis"
-    >
+    <text v-for="(label, i) in labels" :key="label" :x="x(i)" :y="H - 8" text-anchor="middle" class="axis">
       {{ label }}
     </text>
     <g v-for="line in series" :key="line.userId">
-      <path
-        :d="path(line.ranks)"
-        fill="none"
-        :stroke="line.color"
-        :stroke-width="line.strong ? 3 : 1.8"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
+      <path :d="path(line.ranks)" fill="none" :stroke="line.color" :stroke-width="line.strong ? 3 : 1.8" stroke-linejoin="round" stroke-linecap="round" />
       <template v-for="(rank, i) in line.ranks" :key="i">
-        <circle
-          v-if="rank !== null"
-          :cx="x(i)"
-          :cy="y(rank)"
-          :r="line.strong ? 3.5 : 2.5"
-          class="dot"
-          :stroke="line.color"
-        />
+        <circle v-if="rank !== null" :cx="x(i)" :cy="y(rank)" :r="line.strong ? 3.5 : 2.5" class="dot" :stroke="line.color" />
       </template>
     </g>
-    <text
-      v-for="end in ends"
-      :key="end.text"
-      :x="W - PAD.right + 8"
-      :y="end.y + 4"
-      :fill="end.color"
-      class="end"
-    >
+    <text v-for="end in ends" :key="end.text" :x="W - PAD.right + 8" :y="end.y + 4" :fill="end.color" class="end">
       {{ end.text }}
     </text>
   </svg>
@@ -144,17 +110,17 @@ const ends = computed(() => {
 }
 
 .grid {
-  stroke: v-bind("theme.dividerColor");
+  stroke: v-bind('theme.dividerColor');
   stroke-width: 1;
 }
 
 .axis {
   font-size: 11px;
-  fill: v-bind("theme.textColor3");
+  fill: v-bind('theme.textColor3');
 }
 
 .dot {
-  fill: v-bind("theme.cardColor");
+  fill: v-bind('theme.cardColor');
   stroke-width: 2;
 }
 

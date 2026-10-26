@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { levelName, MAX_LEVEL, remainingToNext, tagLink } from "oj/user/knowledge"
-import type { KnowledgeLevel, KnowledgeMap } from "utils/types"
+import { useThemeVars } from 'naive-ui'
+import { levelName, MAX_LEVEL, remainingToNext, tagLink } from 'oj/user/knowledge'
+import type { KnowledgeLevel, KnowledgeMap } from 'utils/types'
 
 /**
  * 个人主页上的知识点地图：「学会了什么」，只和自己比。
@@ -18,11 +18,7 @@ const props = defineProps<{
 
 const theme = useThemeVars()
 
-const learned = computed(() =>
-  props.map.tags
-    .filter((tag) => tag.level >= 1)
-    .sort((a, b) => b.level - a.level || b.solved - a.solved),
-)
+const learned = computed(() => props.map.tags.filter((tag) => tag.level >= 1).sort((a, b) => b.level - a.level || b.solved - a.solved))
 
 /** 班里同学在学、他还没碰过的。别的（比如 Python 班的「C 语言」）不列 */
 const untouched = computed(() => {
@@ -45,7 +41,7 @@ function hint(tag: KnowledgeLevel) {
 <template>
   <section class="card" :class="{ compact }">
     <h3 v-if="!compact">
-      {{ teacher ? "知识点" : "我的知识点" }}
+      {{ teacher ? '知识点' : '我的知识点' }}
       <small v-if="!teacher">只有你和老师看得到</small>
     </h3>
     <router-link v-for="tag in learned" :key="tag.name" :to="tagLink(tag.name)" class="row">
@@ -63,7 +59,7 @@ function hint(tag: KnowledgeLevel) {
     <div v-if="!learned.length && !untouched.length" class="meta empty">还没做对带知识点的题</div>
 
     <div v-if="untouched.length" class="untouched">
-      <span class="meta">班里在学、{{ teacher ? "" : "你" }}还没碰过</span>
+      <span class="meta">班里在学、{{ teacher ? '' : '你' }}还没碰过</span>
       <div class="tags">
         <router-link v-for="tag in untouched" :key="tag.name" :to="tagLink(tag.name)" class="tag">
           {{ tag.name }}
@@ -78,9 +74,9 @@ function hint(tag: KnowledgeLevel) {
   padding: 14px 18px 12px;
   display: flex;
   flex-direction: column;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -94,7 +90,7 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .row {
@@ -118,7 +114,7 @@ h3 small {
 
 .name {
   width: 72px;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   font-size: var(--oj-fs-sec);
   font-weight: 500;
   white-space: nowrap;
@@ -136,7 +132,7 @@ h3 small {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .dots i.on {
@@ -160,7 +156,7 @@ h3 small {
   display: block;
   height: 6px;
   border-radius: 3px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
   overflow: hidden;
 }
 
@@ -173,7 +169,7 @@ h3 small {
 
 .meta {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .empty {
@@ -184,7 +180,7 @@ h3 small {
 .untouched {
   margin-top: 6px;
   padding-top: 10px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -201,10 +197,10 @@ h3 small {
   align-items: center;
   height: 26px;
   padding: 0 10px;
-  border: 1px dashed v-bind("theme.borderColor");
+  border: 1px dashed v-bind('theme.borderColor');
   border-radius: 13px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   text-decoration: none;
 }
 

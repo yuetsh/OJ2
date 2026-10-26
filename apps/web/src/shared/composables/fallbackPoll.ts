@@ -1,6 +1,6 @@
-import { getCurrentScope, onScopeDispose, watch, type Ref } from "vue"
-import { useDocumentVisibility } from "@vueuse/core"
-import type { ConnectionStatus } from "shared/composables/websocket"
+import { getCurrentScope, onScopeDispose, watch, type Ref } from 'vue'
+import { useDocumentVisibility } from '@vueuse/core'
+import type { ConnectionStatus } from 'shared/composables/websocket'
 
 /** 交上去之后先等 WebSocket 这么久，再开始兜底 */
 const GRACE = 5000
@@ -28,10 +28,7 @@ const MAX_ERRORS = 5
  * 常事，原来一次失败就永久停掉，之后要是又丢了推送就一直转圈），连着失败
  * MAX_ERRORS 次才放弃，别对着一个坏掉的接口一直刷。
  */
-export function useFallbackPoll(options: {
-  status: Ref<ConnectionStatus>
-  poll: () => Promise<boolean>
-}) {
+export function useFallbackPoll(options: { status: Ref<ConnectionStatus>; poll: () => Promise<boolean> }) {
   const visibility = useDocumentVisibility()
   let timer: ReturnType<typeof setTimeout> | undefined
   let active = false
@@ -40,7 +37,7 @@ export function useFallbackPoll(options: {
   let lastPolledAt = 0
   let errors = 0
 
-  const healthy = () => confirmed && options.status.value === "connected"
+  const healthy = () => confirmed && options.status.value === 'connected'
 
   function schedule(delay: number) {
     clearTimeout(timer)
@@ -49,7 +46,7 @@ export function useFallbackPoll(options: {
 
   async function tick() {
     if (!active) return
-    if (visibility.value === "hidden") {
+    if (visibility.value === 'hidden') {
       schedule(SLOW)
       return
     }
@@ -66,7 +63,7 @@ export function useFallbackPoll(options: {
       }
       errors = 0
     } catch (error) {
-      console.error("[FallbackPoll] 轮询失败:", error)
+      console.error('[FallbackPoll] 轮询失败:', error)
       if (++errors >= MAX_ERRORS) {
         stop()
         return
@@ -106,7 +103,7 @@ export function useFallbackPoll(options: {
   // 本来就没确认的不管：连不上时每次重连都要走一遍 connecting → error → disconnected，
   // 在这里重置的话退避永远退不上去
   watch(options.status, (status) => {
-    if (!active || !confirmed || status === "connected") return
+    if (!active || !confirmed || status === 'connected') return
     confirmed = false
     fastDelay = MIN_FAST
     schedule(MIN_FAST)
@@ -114,7 +111,7 @@ export function useFallbackPoll(options: {
 
   // 切回前台：WebSocket 还没确认的话别等满 20 秒
   watch(visibility, (value) => {
-    if (active && value === "visible" && !healthy()) schedule(MIN_FAST)
+    if (active && value === 'visible' && !healthy()) schedule(MIN_FAST)
   })
 
   if (getCurrentScope()) onScopeDispose(stop)

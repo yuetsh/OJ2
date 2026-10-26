@@ -14,18 +14,17 @@ export interface TemplateParts {
   append: string
 }
 
-const section = (raw: string, name: string) =>
-  raw.match(new RegExp(`//${name} BEGIN\\n([\\s\\S]+?)//${name} END`))?.[1] ?? ""
+const section = (raw: string, name: string) => raw.match(new RegExp(`//${name} BEGIN\\n([\\s\\S]+?)//${name} END`))?.[1] ?? ''
 
 /** 段落末尾那个换行是标记格式要的，不是内容，显示时去掉 */
-const strip = (text: string) => text.replace(/\n$/, "")
+const strip = (text: string) => text.replace(/\n$/, '')
 
 export function parseTemplate(raw: string | undefined): TemplateParts {
-  if (!raw) return { prepend: "", template: "", append: "" }
+  if (!raw) return { prepend: '', template: '', append: '' }
   return {
-    prepend: strip(section(raw, "PREPEND")),
-    template: strip(section(raw, "TEMPLATE")),
-    append: strip(section(raw, "APPEND")),
+    prepend: strip(section(raw, 'PREPEND')),
+    template: strip(section(raw, 'TEMPLATE')),
+    append: strip(section(raw, 'APPEND')),
   }
 }
 
@@ -40,7 +39,7 @@ export function buildTemplate(parts: TemplateParts): string | null {
     `//PREPEND BEGIN\n${body(parts.prepend)}//PREPEND END`,
     `//TEMPLATE BEGIN\n${body(parts.template)}//TEMPLATE END`,
     `//APPEND BEGIN\n${body(parts.append)}//APPEND END`,
-  ].join("\n\n")
+  ].join('\n\n')
 }
 
 /** 跑标准答案时套上前后两段，和判题时（routes/trial-run.ts、judgeSubmission）一个拼法 */
@@ -51,5 +50,5 @@ export function wrapWithTemplate(code: string, parts: TemplateParts) {
 
 /** 一段内容：非空时统一以一个换行结尾 */
 function body(text: string) {
-  return text.trim() ? `${text.replace(/\n*$/, "")}\n` : ""
+  return text.trim() ? `${text.replace(/\n*$/, '')}\n` : ''
 }

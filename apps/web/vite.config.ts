@@ -1,9 +1,9 @@
-import { defineConfig } from "vite"
-import vue from "@vitejs/plugin-vue"
-import legacy from "@vitejs/plugin-legacy"
-import AutoImport from "unplugin-auto-import/vite"
-import Components from "unplugin-vue-components/vite"
-import { NaiveUiResolver } from "unplugin-vue-components/resolvers"
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import legacy from '@vitejs/plugin-legacy'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
+import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 
 // 机房电脑的 Chrome 是 105 一档，比 plugin-legacy 的现代基线（chrome>=105）正好压线，
 // 但比 vite 8 的默认构建 target（chrome111）低。所以这个插件必须留着：它同时管两件事
@@ -16,55 +16,55 @@ import { NaiveUiResolver } from "unplugin-vue-components/resolvers"
 // 少一项就是老机器上一个静默的 TypeError（这批缺的大多是 Chrome 110+ 的
 // Array.prototype.toSorted / Set 运算 / 迭代器辅助）。
 const polyfills = [
-  "es.array-buffer.detached",
-  "es.array-buffer.transfer",
-  "es.array-buffer.transfer-to-fixed-length",
-  "es.array.includes",
-  "es.array.push",
-  "es.array.to-reversed",
-  "es.array.to-sorted",
-  "es.array.to-spliced",
-  "es.iterator.constructor",
-  "es.iterator.drop",
-  "es.iterator.every",
-  "es.iterator.filter",
-  "es.iterator.find",
-  "es.iterator.flat-map",
-  "es.iterator.for-each",
-  "es.iterator.map",
-  "es.iterator.reduce",
-  "es.iterator.some",
-  "es.iterator.take",
-  "es.iterator.to-array",
-  "es.json.parse",
-  "es.json.stringify",
-  "es.map.get-or-insert",
-  "es.map.get-or-insert-computed",
-  "es.regexp.escape",
-  "es.regexp.flags",
-  "es.set.difference.v2",
-  "es.set.intersection.v2",
-  "es.set.is-disjoint-from.v2",
-  "es.set.is-subset-of.v2",
-  "es.set.is-superset-of.v2",
-  "es.set.symmetric-difference.v2",
-  "es.set.union.v2",
-  "es.typed-array.to-reversed",
-  "es.typed-array.to-sorted",
-  "es.typed-array.with",
-  "es.uint8-array.set-from-base64",
-  "es.uint8-array.set-from-hex",
-  "es.uint8-array.to-base64",
-  "es.uint8-array.to-hex",
-  "es.weak-map.get-or-insert",
-  "es.weak-map.get-or-insert-computed",
-  "esnext.array.group",
-  "web.dom-exception.stack",
-  "web.url-search-params.delete",
-  "web.url-search-params.has",
-  "web.url-search-params.size",
-  "web.url.can-parse",
-  "web.url.parse",
+  'es.array-buffer.detached',
+  'es.array-buffer.transfer',
+  'es.array-buffer.transfer-to-fixed-length',
+  'es.array.includes',
+  'es.array.push',
+  'es.array.to-reversed',
+  'es.array.to-sorted',
+  'es.array.to-spliced',
+  'es.iterator.constructor',
+  'es.iterator.drop',
+  'es.iterator.every',
+  'es.iterator.filter',
+  'es.iterator.find',
+  'es.iterator.flat-map',
+  'es.iterator.for-each',
+  'es.iterator.map',
+  'es.iterator.reduce',
+  'es.iterator.some',
+  'es.iterator.take',
+  'es.iterator.to-array',
+  'es.json.parse',
+  'es.json.stringify',
+  'es.map.get-or-insert',
+  'es.map.get-or-insert-computed',
+  'es.regexp.escape',
+  'es.regexp.flags',
+  'es.set.difference.v2',
+  'es.set.intersection.v2',
+  'es.set.is-disjoint-from.v2',
+  'es.set.is-subset-of.v2',
+  'es.set.is-superset-of.v2',
+  'es.set.symmetric-difference.v2',
+  'es.set.union.v2',
+  'es.typed-array.to-reversed',
+  'es.typed-array.to-sorted',
+  'es.typed-array.with',
+  'es.uint8-array.set-from-base64',
+  'es.uint8-array.set-from-hex',
+  'es.uint8-array.to-base64',
+  'es.uint8-array.to-hex',
+  'es.weak-map.get-or-insert',
+  'es.weak-map.get-or-insert-computed',
+  'esnext.array.group',
+  'web.dom-exception.stack',
+  'web.url-search-params.delete',
+  'web.url-search-params.has',
+  'web.url-search-params.size',
+  'web.url.can-parse',
+  'web.url.parse',
 ]
 
 export default defineConfig(() => {
@@ -74,7 +74,7 @@ export default defineConfig(() => {
   // 一旦占着 [::1]:3000，两边端口不冲突（一个 v4 一个 v6，谁都不报错），
   // 浏览器发出的 /api/* 就整个落到那个站上 —— 表现是后台一进就被弹回首页。
   const backend = {
-    target: "http://127.0.0.1:3000",
+    target: 'http://127.0.0.1:3000',
     changeOrigin: true,
   }
 
@@ -89,37 +89,37 @@ export default defineConfig(() => {
       }),
       AutoImport({
         imports: [
-          "vue",
-          "vue-router",
-          "@vueuse/core",
-          "pinia",
+          'vue',
+          'vue-router',
+          '@vueuse/core',
+          'pinia',
           {
-            "naive-ui": ["useDialog", "useMessage", "useNotification", "useLoadingBar"],
+            'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar'],
           },
           {
-            from: "naive-ui",
+            from: 'naive-ui',
             imports: [
-              "DataTableColumn",
-              "FormRules",
-              "FormItemRule",
-              "SelectOption",
-              "UploadCustomRequestOptions",
-              "UploadFileInfo",
-              "MenuOption",
-              "DropdownDividerOption",
-              "DropdownOption",
+              'DataTableColumn',
+              'FormRules',
+              'FormItemRule',
+              'SelectOption',
+              'UploadCustomRequestOptions',
+              'UploadFileInfo',
+              'MenuOption',
+              'DropdownDividerOption',
+              'DropdownOption',
             ],
             type: true,
           },
         ],
-        dts: "./src/auto-imports.d.ts",
+        dts: './src/auto-imports.d.ts',
       }),
       Components({
         resolvers: [NaiveUiResolver()],
-        dts: "./src/components.d.ts",
+        dts: './src/components.d.ts',
       }),
     ],
-    envPrefix: "PUBLIC_",
+    envPrefix: 'PUBLIC_',
     resolve: {
       // 别名（utils / oj / admin / shared）只在 tsconfig.app.json 的 paths 写一份，
       // 这里直接读它。tsconfig.json 是 references 空壳也没关系，会顺着找过去（实测）
@@ -130,9 +130,9 @@ export default defineConfig(() => {
       proxy: {
         // 只有这三段过后端，和生产的 Caddy 认的是同一套（docker/Caddyfile），
         // 别在这里加代理规则而不同步改 Caddyfile。
-        "/api": backend,
-        "/public": backend,
-        "/ws": { ...backend, ws: true },
+        '/api': backend,
+        '/public': backend,
+        '/ws': { ...backend, ws: true },
       },
     },
   }

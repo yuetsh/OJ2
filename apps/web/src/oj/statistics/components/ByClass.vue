@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { NO_CLASS, type SubmissionStatisticsGrid } from "@oj2/contract"
-import { SubmissionStatus } from "utils/constants"
-import { useTone } from "shared/composables/tone"
-import { classLabel } from "utils/classes"
-import { submissionDayText } from "oj/submission/utils"
+import { useThemeVars } from 'naive-ui'
+import { NO_CLASS, type SubmissionStatisticsGrid } from '@oj2/contract'
+import { SubmissionStatus } from 'utils/constants'
+import { useTone } from 'shared/composables/tone'
+import { classLabel } from 'utils/classes'
+import { submissionDayText } from 'oj/submission/utils'
 
 /**
  * 没选班级、也没填学生时（多半是从题目页进来，只带了题号）：先按班级列出来，
@@ -26,7 +26,7 @@ function isAc(result: number) {
 
 const classes = computed(() => {
   const need = props.grid.problems.map((problem) => problem.problemDisplayId)
-  const groups = new Map<string, SubmissionStatisticsGrid["rows"]>()
+  const groups = new Map<string, SubmissionStatisticsGrid['rows']>()
   for (const row of props.grid.rows) {
     const key = row.className ?? NO_CLASS
     groups.set(key, [...(groups.get(key) ?? []), row])
@@ -36,22 +36,15 @@ const classes = computed(() => {
       .map(([className, rows]) => {
         let submissions = 0
         let accepted = 0
-        let last = ""
+        let last = ''
         let done = 0
         for (const row of rows) {
-          const solved = new Set(
-            row.submissions
-              .filter((item) => isAc(item.result))
-              .map((item) => item.problemDisplayId),
-          )
+          const solved = new Set(row.submissions.filter((item) => isAc(item.result)).map((item) => item.problemDisplayId))
           if (props.explicit ? need.every((pid) => solved.has(pid)) : solved.size > 0) done++
           // 正确率的分母不算还在判的，和数字行一个口径
-          submissions += row.submissions.filter(
-            (item) =>
-              item.result !== SubmissionStatus.pending && item.result !== SubmissionStatus.judging,
-          ).length
+          submissions += row.submissions.filter((item) => item.result !== SubmissionStatus.pending && item.result !== SubmissionStatus.judging).length
           accepted += row.submissions.filter((item) => isAc(item.result)).length
-          const lastTime = row.submissions.at(-1)?.createTime ?? ""
+          const lastTime = row.submissions.at(-1)?.createTime ?? ''
           if (lastTime > last) last = lastTime
         }
         const size = props.grid.classSizes[className] ?? rows.length
@@ -62,7 +55,7 @@ const classes = computed(() => {
           done,
           tried: rows.length - done,
           none: Math.max(0, size - rows.length),
-          rate: submissions ? `${Math.round((accepted / submissions) * 100)}%` : "—",
+          rate: submissions ? `${Math.round((accepted / submissions) * 100)}%` : '—',
           last,
           triedUsers: rows.length,
         }
@@ -78,8 +71,8 @@ const classes = computed(() => {
   <div class="by-class">
     <div class="cols">
       <span class="c-class">班级</span>
-      <span class="c-done">{{ explicit ? "做完" : "做对过题" }}</span>
-      <span class="c-n">{{ explicit ? "交了没对" : "一道没对" }}</span>
+      <span class="c-done">{{ explicit ? '做完' : '做对过题' }}</span>
+      <span class="c-n">{{ explicit ? '交了没对' : '一道没对' }}</span>
       <span class="c-n">没交</span>
       <span class="c-n">正确率</span>
       <span class="c-last">最近一次</span>
@@ -90,21 +83,16 @@ const classes = computed(() => {
         <b class="c-class">{{ row.label }}</b>
         <span class="c-done">
           <span class="bar">
-            <span
-              class="fill"
-              :style="{ width: `${row.size ? (row.done / row.size) * 100 : 0}%` }"
-            ></span>
+            <span class="fill" :style="{ width: `${row.size ? (row.done / row.size) * 100 : 0}%` }"></span>
           </span>
           <span class="num">{{ row.done }}/{{ row.size }}</span>
         </span>
         <span class="c-n" :style="{ color: tone('warning').color }">{{ row.tried }}</span>
         <span class="c-n" :style="{ color: tone('error').color }">{{ row.none }}</span>
         <span class="c-n muted">{{ row.rate }}</span>
-        <span class="c-last muted">{{ row.last ? submissionDayText(row.last) : "—" }}</span>
+        <span class="c-last muted">{{ row.last ? submissionDayText(row.last) : '—' }}</span>
         <span class="spacer"></span>
-        <n-button size="small" text type="primary" @click="emit('pick', row.className)">
-          看这个班 →
-        </n-button>
+        <n-button size="small" text type="primary" @click="emit('pick', row.className)"> 看这个班 → </n-button>
       </div>
       <div v-if="!classes.length" class="empty">这段时间没有人交</div>
       <p v-if="grid.truncated" class="note warn" :style="{ color: tone('warning').color }">
@@ -131,9 +119,9 @@ const classes = computed(() => {
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .rows {
@@ -149,7 +137,7 @@ const classes = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .c-class {
@@ -179,14 +167,14 @@ const classes = computed(() => {
   width: 150px;
   height: 6px;
   border-radius: 3px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
   overflow: hidden;
 }
 
 .fill {
   display: block;
   height: 6px;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .num {
@@ -194,7 +182,7 @@ const classes = computed(() => {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .spacer {
@@ -204,14 +192,14 @@ const classes = computed(() => {
 .empty {
   padding: 40px 16px;
   text-align: center;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .note {
   margin: 0;
   padding: 10px 20px;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 手机：这张表列多，横着滑 */

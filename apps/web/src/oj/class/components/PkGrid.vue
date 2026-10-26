@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { ClassPk } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { classLabel } from "utils/classes"
-import { useRankPalette } from "oj/rank/palette"
-import { needToTie, pkColor, shortLabels, tint } from "../utils"
-import PkRace from "./PkRace.vue"
+import type { ClassPk } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { classLabel } from 'utils/classes'
+import { useRankPalette } from 'oj/rank/palette'
+import { needToTie, pkColor, shortLabels, tint } from '../utils'
+import PkRace from './PkRace.vue'
 
 /**
  * 三个班以上（设计稿「班级 PK」C / 学生 · 三个班 / 手机 · 三个班以上）：题目对照格，一行
@@ -17,17 +17,14 @@ const theme = useThemeVars()
 const palette = useRankPalette()
 
 const shorts = computed(() => shortLabels(props.pk))
-const mineIndex = computed(() =>
-  props.pk.classes.findIndex((item) => item.className === props.pk.mine),
-)
+const mineIndex = computed(() => props.pk.classes.findIndex((item) => item.className === props.pk.mine))
 
 const rows = computed(() =>
   props.pk.problems.map((problem) => {
     const top = Math.max(...problem.cells.map((cell) => cell?.percent ?? -1))
     const winner = problem.cells.findIndex((cell) => cell?.best)
     const own = mineIndex.value >= 0 ? problem.cells[mineIndex.value] : null
-    const tie =
-      own && !own.best ? needToTie(own, props.pk.classes[mineIndex.value]!.members, top) : null
+    const tie = own && !own.best ? needToTie(own, props.pk.classes[mineIndex.value]!.members, top) : null
     return {
       problem,
       winner,
@@ -48,16 +45,14 @@ const rows = computed(() =>
 )
 
 const ranking = computed(() =>
-  props.pk.classes
-    .map((item, index) => ({ item, index }))
-    .sort((a, b) => b.item.lead - a.item.lead || b.item.perCapita - a.item.perCapita),
+  props.pk.classes.map((item, index) => ({ item, index })).sort((a, b) => b.item.lead - a.item.lead || b.item.perCapita - a.item.perCapita),
 )
 
 /** 右边那一句：学生看离领先最近的那道，老师看差得最多的那道 */
 const insight = computed(() => {
   if (mineIndex.value >= 0) {
     const close = rows.value.filter((row) => row.tie !== null).sort((a, b) => a.tie! - b.tie!)[0]
-    if (!close) return { mine: true, text: "同一批题你们班都做得最好" }
+    if (!close) return { mine: true, text: '同一批题你们班都做得最好' }
     return {
       mine: true,
       text: `离领先最近：「${close.problem.title}」再 ${close.tie} 人做对就和${shorts.value[close.winner]}打平`,
@@ -87,11 +82,9 @@ const insight = computed(() => {
 
 const SHOW_MOBILE = 8
 const expanded = ref(false)
-const shownRows = computed(() =>
-  props.compact && !expanded.value ? rows.value.slice(0, SHOW_MOBILE) : rows.value,
-)
+const shownRows = computed(() => (props.compact && !expanded.value ? rows.value.slice(0, SHOW_MOBILE) : rows.value))
 
-const tab = ref<"race" | "lead">("race")
+const tab = ref<'race' | 'lead'>('race')
 const medal = (index: number) => palette.value.medal[index]
 </script>
 
@@ -112,36 +105,25 @@ const medal = (index: number) => palette.value.medal[index]
         >
           <span class="head-name" :style="{ color: pkColor(index) }">
             {{ compact ? shorts[index] : classLabel(item.className) }}
-            <span v-if="index === mineIndex" class="mine-tag">{{
-              compact ? "你们" : "你们班"
-            }}</span>
+            <span v-if="index === mineIndex" class="mine-tag">{{ compact ? '你们' : '你们班' }}</span>
           </span>
           <span class="head-lead">
             <span v-if="!compact" class="muted">领先</span>
             <b :style="{ color: pkColor(index) }">{{ item.lead }}</b>
-            <span class="muted">{{ compact ? "道领先" : "道" }}</span>
+            <span class="muted">{{ compact ? '道领先' : '道' }}</span>
           </span>
           <span v-if="!compact" class="muted per">人均做对 {{ item.perCapita }}</span>
         </span>
       </div>
-      <div
-        v-for="row in shownRows"
-        :key="row.problem.problemId"
-        class="line"
-        :class="{ stacked: compact }"
-      >
+      <div v-for="row in shownRows" :key="row.problem.problemId" class="line" :class="{ stacked: compact }">
         <span class="name">
           <span v-if="!compact" class="muted id">#{{ row.problem.displayId }}</span>
-          <router-link class="ell" :to="`/problem/${row.problem.displayId}`">{{
-            row.problem.title
-          }}</router-link>
-          <span v-if="row.tie !== null" class="tie" :class="{ close: row.tie <= 2 }"
-            >再 {{ row.tie }} 人就平</span
-          >
+          <router-link class="ell" :to="`/problem/${row.problem.displayId}`">{{ row.problem.title }}</router-link>
+          <span v-if="row.tie !== null" class="tie" :class="{ close: row.tie <= 2 }">再 {{ row.tie }} 人就平</span>
         </span>
         <div class="cells">
           <template v-for="(cell, index) in row.cells" :key="index">
-            <span v-if="!cell" class="cell none">{{ compact ? "—" : "没布置" }}</span>
+            <span v-if="!cell" class="cell none">{{ compact ? '—' : '没布置' }}</span>
             <span
               v-else
               class="cell"
@@ -152,49 +134,26 @@ const medal = (index: number) => palette.value.medal[index]
               <svg v-if="cell.best" class="crown" viewBox="0 0 24 24" aria-label="这道做得最好">
                 <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
               </svg>
-              <b>{{ cell.percent }}{{ compact ? "" : "%" }}</b>
-              <span v-if="!compact && pk.classes.length < 5" class="first"
-                >一次 {{ cell.firstPercent }}%</span
-              >
+              <b>{{ cell.percent }}{{ compact ? '' : '%' }}</b>
+              <span v-if="!compact && pk.classes.length < 5" class="first">一次 {{ cell.firstPercent }}%</span>
             </span>
           </template>
         </div>
       </div>
-      <button
-        v-if="compact && rows.length > SHOW_MOBILE"
-        class="more"
-        @click="expanded = !expanded"
-      >
-        {{ expanded ? "收起" : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
+      <button v-if="compact && rows.length > SHOW_MOBILE" class="more" @click="expanded = !expanded">
+        {{ expanded ? '收起' : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
       </button>
     </div>
 
     <div class="side" :class="{ compact }">
       <div v-if="compact" class="tabs" role="tablist">
         <button :class="{ on: tab === 'race' }" role="tab" @click="tab = 'race'">赛跑</button>
-        <button :class="{ on: tab === 'lead' }" role="tab" @click="tab = 'lead'">
-          谁领先的题多
-        </button>
+        <button :class="{ on: tab === 'lead' }" role="tab" @click="tab = 'lead'">谁领先的题多</button>
       </div>
       <div v-if="!compact || tab === 'lead'" class="card pad">
-        <div v-if="!compact" class="card-title">
-          <b>谁领先的题多</b><span class="muted">同一批题里</span>
-        </div>
-        <div
-          v-for="({ item, index }, place) in ranking"
-          :key="item.className"
-          class="lead-row"
-          :class="{ mine: index === mineIndex }"
-        >
-          <span
-            class="medal"
-            :style="
-              medal(place)
-                ? { color: medal(place)!.color, background: medal(place)!.background }
-                : undefined
-            "
-            >{{ place + 1 }}</span
-          >
+        <div v-if="!compact" class="card-title"><b>谁领先的题多</b><span class="muted">同一批题里</span></div>
+        <div v-for="({ item, index }, place) in ranking" :key="item.className" class="lead-row" :class="{ mine: index === mineIndex }">
+          <span class="medal" :style="medal(place) ? { color: medal(place)!.color, background: medal(place)!.background } : undefined">{{ place + 1 }}</span>
           <span class="lead-name" :style="{ color: pkColor(index) }">
             {{ classLabel(item.className) }}
             <span v-if="index === mineIndex" class="mine-tag">你们班</span>
@@ -207,9 +166,7 @@ const medal = (index: number) => palette.value.medal[index]
         <div v-if="insight" class="insight" :class="{ mine: insight.mine }">{{ insight.text }}</div>
       </div>
       <div v-if="!compact || tab === 'race'" class="card pad">
-        <div v-if="!compact" class="card-title">
-          <b>赛跑</b><span class="muted">这学期累计人均做对</span>
-        </div>
+        <div v-if="!compact" class="card-title"><b>赛跑</b><span class="muted">这学期累计人均做对</span></div>
         <PkRace :pk="pk" :width="420" :height="compact ? 220 : 230" />
       </div>
     </div>
@@ -230,9 +187,9 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   min-width: 0;
 }
 
@@ -258,7 +215,7 @@ const medal = (index: number) => palette.value.medal[index]
 .muted {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .line {
@@ -289,7 +246,7 @@ const medal = (index: number) => palette.value.medal[index]
 .name a {
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   min-width: 0;
 }
@@ -383,7 +340,7 @@ const medal = (index: number) => palette.value.medal[index]
   padding: 0 4px;
   overflow: hidden;
   border-radius: 4px;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   font-variant-numeric: tabular-nums;
 }
 
@@ -412,12 +369,8 @@ const medal = (index: number) => palette.value.medal[index]
 
 .cell.none {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColorDisabled");
-  background: repeating-linear-gradient(
-    135deg,
-    v-bind("theme.actionColor") 0 6px,
-    v-bind("theme.hoverColor") 6px 12px
-  );
+  color: v-bind('theme.textColorDisabled');
+  background: repeating-linear-gradient(135deg, v-bind('theme.actionColor') 0 6px, v-bind('theme.hoverColor') 6px 12px);
 }
 
 .crown {
@@ -440,7 +393,7 @@ const medal = (index: number) => palette.value.medal[index]
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tie.close {
@@ -482,7 +435,7 @@ const medal = (index: number) => palette.value.medal[index]
   font-weight: 700;
   font-size: var(--oj-fs-sec);
   flex-shrink: 0;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .lead-name {
@@ -501,9 +454,9 @@ const medal = (index: number) => palette.value.medal[index]
 .insight {
   margin-top: 10px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   padding: 10px 12px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   border-radius: 6px;
 }
 
@@ -521,7 +474,7 @@ const medal = (index: number) => palette.value.medal[index]
   background: none;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
@@ -559,7 +512,7 @@ const medal = (index: number) => palette.value.medal[index]
   align-items: stretch;
   gap: 4px;
   padding: 6px 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .line.stacked .name {
@@ -587,7 +540,7 @@ const medal = (index: number) => palette.value.medal[index]
 
 .side.compact {
   gap: 0;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   padding: 0 12px 12px;
 }
@@ -600,7 +553,7 @@ const medal = (index: number) => palette.value.medal[index]
 .tabs {
   display: flex;
   gap: 18px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .tabs button {
@@ -610,7 +563,7 @@ const medal = (index: number) => palette.value.medal[index]
   background: none;
   font: inherit;
   font-size: 14px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 

@@ -1,16 +1,16 @@
-import { useThemeVars } from "naive-ui"
-import { useDark } from "@vueuse/core"
+import { useThemeVars } from 'naive-ui'
+import { useDark } from '@vueuse/core'
 
-export type Tone = "success" | "error" | "warning" | "info" | "default"
+export type Tone = 'success' | 'error' | 'warning' | 'info' | 'default'
 
 export function rgba(hex: string, alpha: number) {
-  const value = hex.replace("#", "")
+  const value = hex.replace('#', '')
   const full =
     value.length === 3
       ? value
-          .split("")
+          .split('')
           .map((c) => c + c)
-          .join("")
+          .join('')
       : value.slice(0, 6)
   const n = parseInt(full, 16)
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
@@ -43,7 +43,7 @@ export function useTone() {
     }[kind]
     return {
       color: isDark.value ? base : pressed,
-      background: kind === "default" ? t.actionColor : rgba(base, isDark.value ? 0.16 : 0.12),
+      background: kind === 'default' ? t.actionColor : rgba(base, isDark.value ? 0.16 : 0.12),
       solid: base,
     }
   }

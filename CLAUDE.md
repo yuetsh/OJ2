@@ -60,7 +60,7 @@ cd apps/web && bun run build                  # 前端构建（不在 verify 里
 
 **lint 和任务编排走 Vite+**（`vite-plus`，`vp` 命令），**格式化走 Bun 自带的 `bun fmt`**，
 配置都只在根目录的 `vite.config.ts` 一份：`fmt` 块（Oxfmt 的写法，`bun fmt` 直接读它；
-`semi: false`，行宽用默认的 100）、`lint` 块（Oxlint，`denyWarnings`）、`run.tasks`
+`semi: false`、`singleQuote: true`、`printWidth: 160`）、`lint` 块（Oxlint，`denyWarnings`）、`run.tasks`
 （`verify` 和它依赖的四个检查）。**别用 `vp fmt` / `vp check`**：Oxfmt 和 `bun fmt` 只在
 长 CSS 值列表的折行上不一样，混着跑会把 `apps/web/public/style.css` 来回改。前端自己的构建
 配置在 `apps/web/vite.config.ts`，和根目录那份无关。

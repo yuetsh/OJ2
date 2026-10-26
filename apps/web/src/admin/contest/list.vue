@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { AdminContestListItem } from "@oj2/contract"
-import PageHeader from "admin/components/PageHeader.vue"
-import { NSwitch, useThemeVars } from "naive-ui"
-import ContestTitle from "shared/components/ContestTitle.vue"
-import Pagination from "shared/components/Pagination.vue"
-import { CONTEST_STATUS } from "utils/constants"
-import { parseTime } from "utils/functions"
-import { editContest, getContestList } from "../api"
-import Actions from "./components/Actions.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useListLoader } from "shared/composables/listLoader"
+import type { AdminContestListItem } from '@oj2/contract'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { NSwitch, useThemeVars } from 'naive-ui'
+import ContestTitle from 'shared/components/ContestTitle.vue'
+import Pagination from 'shared/components/Pagination.vue'
+import { CONTEST_STATUS } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import { editContest, getContestList } from '../api'
+import Actions from './components/Actions.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useListLoader } from 'shared/composables/listLoader'
 
 /**
  * 后台比赛列表（设计稿「比赛重设计」CtAdminList）。一行一场：比赛名（期中 / 期末挂标，
@@ -24,7 +24,7 @@ const total = ref(0)
 const query = reactive({
   limit: 10,
   page: 1,
-  keyword: "",
+  keyword: '',
 })
 
 function toggleVisible(contest: AdminContestListItem) {
@@ -44,31 +44,24 @@ function duration(row: AdminContestListItem) {
   return `${Math.round(minutes / 1440)} 天`
 }
 
-const EXAM_TAGS = ["期中", "期末"]
+const EXAM_TAGS = ['期中', '期末']
 
 function renderTitle(row: AdminContestListItem) {
-  return h("span", { class: "title-cell" }, [
-    h(ContestTitle, { contest: row }),
-    EXAM_TAGS.includes(row.tag) ? h("span", { class: "exam" }, row.tag) : null,
-  ])
+  return h('span', { class: 'title-cell' }, [h(ContestTitle, { contest: row }), EXAM_TAGS.includes(row.tag) ? h('span', { class: 'exam' }, row.tag) : null])
 }
 
 function renderStatus(row: AdminContestListItem) {
   return h(
-    "span",
-    { class: row.status === "0" ? "live" : row.status === "-1" ? "muted" : "" },
-    row.status === "-1"
-      ? "结束了"
-      : row.status === "0"
-        ? "进行中"
-        : CONTEST_STATUS[row.status].name,
+    'span',
+    { class: row.status === '0' ? 'live' : row.status === '-1' ? 'muted' : '' },
+    row.status === '-1' ? '结束了' : row.status === '0' ? '进行中' : CONTEST_STATUS[row.status].name,
   )
 }
 
 function renderVisible(row: AdminContestListItem) {
   return h(NSwitch, {
     value: row.visible,
-    size: isMobile.value ? "medium" : "small",
+    size: isMobile.value ? 'medium' : 'small',
     rubberBand: false,
     onUpdateValue: () => toggleVisible(row),
   })
@@ -80,75 +73,71 @@ function renderVisible(row: AdminContestListItem) {
  */
 function renderMobileCard(row: AdminContestListItem) {
   const items = [
-    h("span", { class: "num" }, parseTime(row.startTime, "YYYY-MM-DD HH:mm")),
+    h('span', { class: 'num' }, parseTime(row.startTime, 'YYYY-MM-DD HH:mm')),
     duration(row),
     renderStatus(row),
     `${row.problemCount} 题`,
     row.participantCount ? `${row.participantCount} 人参加` : null,
     row.createdBy.username,
   ].filter((it) => it !== null)
-  return h("div", { class: "m-card" }, [
+  return h('div', { class: 'm-card' }, [
     renderTitle(row),
     h(
-      "div",
-      { class: "m-meta muted" },
-      items.map((it, i) => h("span", { class: "m-item", key: i }, i ? [" · ", it] : [it])),
+      'div',
+      { class: 'm-meta muted' },
+      items.map((it, i) => h('span', { class: 'm-item', key: i }, i ? [' · ', it] : [it])),
     ),
     h(Actions, { contest: row }),
   ])
 }
 
 const mobileColumns: DataTableColumn<AdminContestListItem>[] = [
-  { title: "比赛", key: "title", render: renderMobileCard },
-  { title: "看得到", key: "visible", width: 72, align: "center", render: renderVisible },
+  { title: '比赛', key: 'title', render: renderMobileCard },
+  { title: '看得到', key: 'visible', width: 72, align: 'center', render: renderVisible },
 ]
 
 const desktopColumns: DataTableColumn<AdminContestListItem>[] = [
   {
-    title: "比赛",
-    key: "title",
+    title: '比赛',
+    key: 'title',
     width: 260,
     render: renderTitle,
   },
   {
-    title: "开始 · 多长",
-    key: "start_time",
+    title: '开始 · 多长',
+    key: 'start_time',
     width: 200,
-    render: (row) =>
-      h("span", { class: "num" }, [
-        parseTime(row.startTime, "YYYY-MM-DD HH:mm"),
-        h("span", { class: "muted" }, ` · ${duration(row)}`),
-      ]),
+    render: (row) => h('span', { class: 'num' }, [parseTime(row.startTime, 'YYYY-MM-DD HH:mm'), h('span', { class: 'muted' }, ` · ${duration(row)}`)]),
   },
   {
-    title: "状态",
-    key: "status",
+    title: '状态',
+    key: 'status',
     width: 72,
     render: renderStatus,
   },
-  { title: "题", key: "problemCount", width: 56 },
+  { title: '题', key: 'problemCount', width: 56 },
   {
-    title: "参加",
-    key: "participantCount",
+    title: '参加',
+    key: 'participantCount',
     width: 64,
-    render: (row) => (row.participantCount ? String(row.participantCount) : "—"),
+    render: (row) => (row.participantCount ? String(row.participantCount) : '—'),
   },
   {
-    title: "出卷",
-    key: "created_by",
+    title: '出卷',
+    key: 'created_by',
     width: 84,
     ellipsis: { tooltip: true },
     render: (row) => row.createdBy.username,
   },
   {
-    title: "学生看得到",
-    key: "visible",
+    title: '学生看得到',
+    key: 'visible',
     width: 96,
     render: renderVisible,
   },
   {
-    title: "",
-    key: "actions",
+    title: '',
+    key: 'actions',
     minWidth: 270,
     render: (row) => h(Actions, { contest: row }),
   },
@@ -175,26 +164,13 @@ watchDebounced(() => query.keyword, listContests, {
 <template>
   <PageHeader title="比赛">
     <template #actions>
-      <n-button type="primary" @click="$router.push({ name: 'admin contest create' })">
-        新建比赛
-      </n-button>
+      <n-button type="primary" @click="$router.push({ name: 'admin contest create' })"> 新建比赛 </n-button>
     </template>
     <template #filters>
-      <n-input
-        v-model:value="query.keyword"
-        placeholder="比赛名"
-        clearable
-        :style="{ width: isMobile ? '100%' : '220px' }"
-      />
+      <n-input v-model:value="query.keyword" placeholder="比赛名" clearable :style="{ width: isMobile ? '100%' : '220px' }" />
     </template>
   </PageHeader>
-  <n-data-table
-    :loading="loading"
-    striped
-    class="contest-table"
-    :columns="columns"
-    :data="contests"
-  />
+  <n-data-table :loading="loading" striped class="contest-table" :columns="columns" :data="contests" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
@@ -236,8 +212,8 @@ watchDebounced(() => query.keyword, listContests, {
   border-radius: 3px;
   font-size: 12px;
   font-weight: 400;
-  color: v-bind("theme.errorColor");
-  background: v-bind("theme.actionColor");
+  color: v-bind('theme.errorColor');
+  background: v-bind('theme.actionColor');
 }
 
 .contest-table :deep(.num) {
@@ -246,11 +222,11 @@ watchDebounced(() => query.keyword, listContests, {
 }
 
 .contest-table :deep(.muted) {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .contest-table :deep(.live) {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
   font-weight: 600;
 }
 </style>

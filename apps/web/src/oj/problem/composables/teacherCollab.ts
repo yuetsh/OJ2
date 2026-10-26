@@ -1,7 +1,7 @@
-import { useProblemStore } from "oj/store/problem"
-import { useCollabStore } from "shared/store/collab"
-import { useUserStore } from "shared/store/user"
-import { useProblemPageContext } from "./problemPageContext"
+import { useProblemStore } from 'oj/store/problem'
+import { useCollabStore } from 'shared/store/collab'
+import { useUserStore } from 'shared/store/user'
+import { useProblemPageContext } from './problemPageContext'
 
 /**
  * 老师正在这道题上协作：编辑器里是**学生的**代码，「我的提交」看的是学生的，
@@ -21,10 +21,5 @@ export function useCollabHere() {
   const collabStore = useCollabStore()
   const problemStore = useProblemStore()
   const ctx = useProblemPageContext()
-  return computed(
-    () =>
-      ctx.value.collab &&
-      collabStore.room !== null &&
-      collabStore.room.problemId === problemStore.problem?._id,
-  )
+  return computed(() => ctx.value.collab && collabStore.room !== null && collabStore.room.problemId === problemStore.problem?._id)
 }

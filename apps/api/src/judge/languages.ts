@@ -1,4 +1,4 @@
-import { normalizeLanguage } from "@oj2/contract"
+import { normalizeLanguage } from '@oj2/contract'
 
 /**
  * 判题沙箱认得的语言，**只有 C / C++ / Python 这三种**。
@@ -16,7 +16,7 @@ import { normalizeLanguage } from "@oj2/contract"
  *
  * SQL 题不走这里，走 `judge/sql/`；流程图题走 AI 评分。
  */
-const defaultEnv = ["LANG=en_US.UTF-8", "LANGUAGE=en_US:en", "LC_ALL=en_US.UTF-8"]
+const defaultEnv = ['LANG=en_US.UTF-8', 'LANGUAGE=en_US:en', 'LC_ALL=en_US.UTF-8']
 
 /**
  * gcc-14 起这五类老写法从 warning 提成了 error，而 `-w` 只关警告、压不住 error：
@@ -31,55 +31,54 @@ const defaultEnv = ["LANG=en_US.UTF-8", "LANGUAGE=en_US:en", "LC_ALL=en_US.UTF-8
  * docs/c-tutorials/verify-code.sh 全量过一遍教程。
  */
 const cLooseErrors =
-  "-Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=return-mismatch -Wno-error=implicit-int"
+  '-Wno-error=implicit-function-declaration -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=return-mismatch -Wno-error=implicit-int'
 
 export const languageConfigs: Record<string, Record<string, unknown>> = {
   C: {
-    template: "",
+    template: '',
     compile: {
-      src_name: "main.c",
-      exe_name: "main",
+      src_name: 'main.c',
+      exe_name: 'main',
       max_cpu_time: 3000,
       max_real_time: 10000,
       max_memory: 256 * 1024 * 1024,
       compile_command: `/usr/bin/gcc -DONLINE_JUDGE -O2 -w -fmax-errors=3 -std=c17 ${cLooseErrors} {src_path} -lm -o {exe_path}`,
     },
     run: {
-      command: "{exe_path}",
-      seccomp_rule: { "Standard IO": "c_cpp", "File IO": "c_cpp_file_io" },
+      command: '{exe_path}',
+      seccomp_rule: { 'Standard IO': 'c_cpp', 'File IO': 'c_cpp_file_io' },
       env: defaultEnv,
     },
   },
-  "C++": {
-    template: "",
+  'C++': {
+    template: '',
     compile: {
-      src_name: "main.cpp",
-      exe_name: "main",
+      src_name: 'main.cpp',
+      exe_name: 'main',
       max_cpu_time: 10000,
       max_real_time: 20000,
       max_memory: 1024 * 1024 * 1024,
-      compile_command:
-        "/usr/bin/g++ -DONLINE_JUDGE -O2 -w -fmax-errors=3 -std=c++20 {src_path} -lm -o {exe_path}",
+      compile_command: '/usr/bin/g++ -DONLINE_JUDGE -O2 -w -fmax-errors=3 -std=c++20 {src_path} -lm -o {exe_path}',
     },
     run: {
-      command: "{exe_path}",
-      seccomp_rule: { "Standard IO": "c_cpp", "File IO": "c_cpp_file_io" },
+      command: '{exe_path}',
+      seccomp_rule: { 'Standard IO': 'c_cpp', 'File IO': 'c_cpp_file_io' },
       env: defaultEnv,
     },
   },
   Python: {
-    template: "",
+    template: '',
     compile: {
-      src_name: "solution.py",
-      exe_name: "solution.py",
+      src_name: 'solution.py',
+      exe_name: 'solution.py',
       max_cpu_time: 3000,
       max_real_time: 10000,
       max_memory: 128 * 1024 * 1024,
-      compile_command: "/usr/bin/python3 -m py_compile {src_path}",
+      compile_command: '/usr/bin/python3 -m py_compile {src_path}',
     },
     run: {
-      command: "/usr/bin/python3 -BS {exe_path}",
-      seccomp_rule: "general",
+      command: '/usr/bin/python3 -BS {exe_path}',
+      seccomp_rule: 'general',
       env: defaultEnv,
     },
   },
@@ -90,5 +89,5 @@ export const languageConfigs: Record<string, Record<string, unknown>> = {
  * 它先过 `normalizeLanguage()`，所以 `Python3` / `Python2` 这类旧值也能命中。
  */
 export function judgeConfigFor(language: string) {
-  return languageConfigs[language] ?? languageConfigs[normalizeLanguage(language) ?? ""] ?? null
+  return languageConfigs[language] ?? languageConfigs[normalizeLanguage(language) ?? ''] ?? null
 }

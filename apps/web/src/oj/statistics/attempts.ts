@@ -1,7 +1,7 @@
-import { getSubmission } from "oj/api"
-import { SubmissionStatus } from "utils/constants"
-import type { Submission } from "utils/types"
-import type { Tone } from "shared/composables/tone"
+import { getSubmission } from 'oj/api'
+import { SubmissionStatus } from 'utils/constants'
+import type { Submission } from 'utils/types'
+import type { Tone } from 'shared/composables/tone'
 
 /**
  * 一次提交一格的那串方块（统计页的 AttemptSquares、课堂看板做对格子的轨迹）共用的两样：
@@ -10,17 +10,17 @@ import type { Tone } from "shared/composables/tone"
 
 /** 对了绿；编译失败、运行时错误、语法规则没过、部分通过橙；判题中蓝；其余红 */
 export function attemptTone(result: number): Tone {
-  if (result === SubmissionStatus.accepted) return "success"
+  if (result === SubmissionStatus.accepted) return 'success'
   if (
     result === SubmissionStatus.compile_error ||
     result === SubmissionStatus.runtime_error ||
     result === SubmissionStatus.ast_check_failed ||
     result === SubmissionStatus.partial_accepted
   ) {
-    return "warning"
+    return 'warning'
   }
-  if (result === SubmissionStatus.pending || result === SubmissionStatus.judging) return "info"
-  return "error"
+  if (result === SubmissionStatus.pending || result === SubmissionStatus.judging) return 'info'
+  return 'error'
 }
 
 /**

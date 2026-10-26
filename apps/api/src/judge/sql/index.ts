@@ -1,9 +1,9 @@
-import type { SqlDisplay } from "@oj2/contract"
+import type { SqlDisplay } from '@oj2/contract'
 
-import { selfCommand } from "../../runtime"
-import { JudgeStatus, type JudgeStatusValue } from "../status"
-import { DISPLAY_BUDGET_MS, trustedBudgetMs, type CaseResult } from "./engine"
-import type { SqlJob } from "./child"
+import { selfCommand } from '../../runtime'
+import { JudgeStatus, type JudgeStatusValue } from '../status'
+import { DISPLAY_BUDGET_MS, trustedBudgetMs, type CaseResult } from './engine'
+import type { SqlJob } from './child'
 
 /**
  * SQL 作业的父进程侧：起一个短命子进程跑，到点 SIGKILL。
@@ -51,7 +51,7 @@ import type { SqlJob } from "./child"
  * 闸的逻辑很简单：父进程 spawn 时打上这个标记，带标记的进程一律拒绝再 spawn。
  * 递归最多一层就停在一条明确的 SYSTEM_ERROR 上，而不是吃光机器。
  */
-const CHILD_MARKER = "OJ2_SQL_CHILD"
+const CHILD_MARKER = 'OJ2_SQL_CHILD'
 /** 子进程数据段上限（KB）。低于 512MB Bun 自己起不来 */
 const CHILD_DATA_LIMIT_KB = 512 * 1024
 /** 进程启动 + WASM 初始化 + JSON 收发的余量 */
@@ -78,17 +78,17 @@ const PHASE_FAILURE: Record<string, SqlJobFailure> = {
   display: {
     ok: false,
     result: JudgeStatus.SYSTEM_ERROR,
-    message: "生成展示数据超时或内存超限，请检查初始化脚本与标准答案",
+    message: '生成展示数据超时或内存超限，请检查初始化脚本与标准答案',
   },
   prepare: {
     ok: false,
     result: JudgeStatus.SYSTEM_ERROR,
-    message: "初始化脚本或标准答案超时/内存超限，请检查题目配置",
+    message: '初始化脚本或标准答案超时/内存超限，请检查题目配置',
   },
   student: {
     ok: false,
     result: JudgeStatus.CPU_TIME_LIMIT_EXCEEDED,
-    message: "SQL 执行超时",
+    message: 'SQL 执行超时',
   },
 }
 
@@ -98,51 +98,48 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
     return {
       ok: false,
       result: JudgeStatus.SYSTEM_ERROR,
-      message: "SQL 判题子进程试图再起子进程，已阻断（入口子命令分发可能不正确）",
+      message: 'SQL 判题子进程试图再起子进程，已阻断（入口子命令分发可能不正确）',
     }
   }
 
   // 起的是「自己」：开发时是 bun + main.ts，编译后就是二进制自身，见 runtime.ts。
   // 不能写死 child.ts 的路径 —— 单二进制里那个文件根本不存在。
-  const self = selfCommand("sql-child")
+  const self = selfCommand('sql-child')
   // 经 sh 起是为了用 ulimit —— Bun.spawn 没有直接设 rlimit 的接口。
   // "$@" 原样透传，免得路径里有空格时被词法拆开。
-  const child = Bun.spawn(
-    ["sh", "-c", `ulimit -d ${CHILD_DATA_LIMIT_KB}; exec "$@"`, "sh", ...self],
-    {
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-      env: { ...process.env, [CHILD_MARKER]: "1" },
-    },
-  )
+  const child = Bun.spawn(['sh', '-c', `ulimit -d ${CHILD_DATA_LIMIT_KB}; exec "$@"`, 'sh', ...self], {
+    stdin: 'pipe',
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: { ...process.env, [CHILD_MARKER]: '1' },
+  })
   child.stdin.write(JSON.stringify(job))
   await child.stdin.end()
 
-  let timer = setTimeout(() => child.kill("SIGKILL"), budget.trustedMs + STARTUP_SLACK_MS)
-  let phase = ""
+  let timer = setTimeout(() => child.kill('SIGKILL'), budget.trustedMs + STARTUP_SLACK_MS)
+  let phase = ''
   // stderr 要边读边看：阶段标记一到就得马上换兜底时限，攒到进程结束再读就没意义了
   const readStderr = (async () => {
     const decoder = new TextDecoder()
     const reader = (child.stderr as ReadableStream<Uint8Array>).getReader()
-    let text = ""
+    let text = ''
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
       text += decoder.decode(value, { stream: true })
       const marks = text.match(/@phase:(\w+)/g)
-      const latest = marks?.[marks.length - 1]?.slice("@phase:".length)
+      const latest = marks?.[marks.length - 1]?.slice('@phase:'.length)
       if (latest && latest !== phase) {
         phase = latest
-        if (phase === "student" && budget.studentMs !== null) {
+        if (phase === 'student' && budget.studentMs !== null) {
           clearTimeout(timer)
-          timer = setTimeout(() => child.kill("SIGKILL"), budget.studentMs + STUDENT_SLACK_MS)
+          timer = setTimeout(() => child.kill('SIGKILL'), budget.studentMs + STUDENT_SLACK_MS)
         }
       }
     }
   })()
 
-  let stdout = ""
+  let stdout = ''
   try {
     ;[stdout] = await Promise.all([new Response(child.stdout).text(), readStderr])
     await child.exited
@@ -157,27 +154,25 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
       PHASE_FAILURE[phase] ?? {
         ok: false,
         result: JudgeStatus.SYSTEM_ERROR,
-        message: "SQL 判题子进程异常退出",
+        message: 'SQL 判题子进程异常退出',
       }
     )
   }
 
   try {
-    const parsed = JSON.parse(stdout) as
-      | { ok: true; case?: CaseResult; display?: unknown }
-      | SqlJobFailure
+    const parsed = JSON.parse(stdout) as { ok: true; case?: CaseResult; display?: unknown } | SqlJobFailure
     if (!parsed.ok) return parsed
     return { ok: true, value: (parsed.case ?? parsed.display) as T }
   } catch {
     return {
       ok: false,
       result: JudgeStatus.SYSTEM_ERROR,
-      message: "SQL 判题子进程返回了无法解析的结果",
+      message: 'SQL 判题子进程返回了无法解析的结果',
     }
   }
 }
 
-export function runSqlCase(job: Extract<SqlJob, { kind: "judge" }>) {
+export function runSqlCase(job: Extract<SqlJob, { kind: 'judge' }>) {
   return runJob<CaseResult>(job, {
     trustedMs: trustedBudgetMs(job.timeLimitMs),
     studentMs: job.timeLimitMs,
@@ -185,16 +180,8 @@ export function runSqlCase(job: Extract<SqlJob, { kind: "judge" }>) {
 }
 
 /** `requireChange` 见 engine.ts 的 buildDisplay：只有题面上展示的那组必须改到行 */
-export function buildSqlDisplay(
-  initSql: string,
-  refSql: string,
-  mode: "query" | "modify",
-  requireChange = true,
-) {
+export function buildSqlDisplay(initSql: string, refSql: string, mode: 'query' | 'modify', requireChange = true) {
   // 子进程产出的形状由 engine.ts 的 dumpDisplayTables / runDisplay 决定，就是契约里的
   // SqlDisplay —— 同一个仓库里的两端，不在这儿再 parse 一遍
-  return runJob<SqlDisplay>(
-    { kind: "display", initSql, refSql, mode, requireChange },
-    { trustedMs: DISPLAY_BUDGET_MS, studentMs: null },
-  )
+  return runJob<SqlDisplay>({ kind: 'display', initSql, refSql, mode, requireChange }, { trustedMs: DISPLAY_BUDGET_MS, studentMs: null })
 }

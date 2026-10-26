@@ -13,14 +13,14 @@ import type {
   ChallengeInput,
   CreateAnnouncementRequest,
   ProblemLanguage,
-} from "@oj2/contract"
+} from '@oj2/contract'
 
 /**
  * 个人主页数据。`acmProblemsStatus` 的**内容**保持 snake_case ——
  * 它是 user_profile.acm_problems_status 的 JSONB 原文，库里存量数据就是这套键名，
  * 改名等于要把全部历史行迁一遍。
  */
-export type Profile = Omit<UserProfile, "user" | "acmProblemsStatus"> & {
+export type Profile = Omit<UserProfile, 'user' | 'acmProblemsStatus'> & {
   user: SessionUser
   acmProblemsStatus: AcmProblemsStatus
 }
@@ -60,7 +60,7 @@ export type LANGUAGE = ProblemLanguage
  * 而契约那边是 `Record<string, unknown>`，等于渲染表格的那段代码全靠手抄件兜底。
  * 键名的 snake_case 是 JSONB 原文，见契约 sqlDisplaySchema 的注释。
  */
-export type { SqlConfig, SqlDisplay, SqlDisplayTable, SqlDisplayColumn } from "@oj2/contract"
+export type { SqlConfig, SqlDisplay, SqlDisplayTable, SqlDisplayColumn } from '@oj2/contract'
 
 /**
  * 判题状态码 + 前端本地的「正在提交」(9)。
@@ -72,30 +72,24 @@ export type { SqlConfig, SqlDisplay, SqlDisplayTable, SqlDisplayColumn } from "@
  */
 export type SUBMISSION_RESULT = JudgeStatus | 9
 
-export type ProblemStatus = "passed" | "failed" | "not_test"
+export type ProblemStatus = 'passed' | 'failed' | 'not_test'
 
 /**
  * 题目标签。用契约的 —— 它比手抄那份多一个 `problemCount`，
  * shared/api.ts 原来还得用 `Tag & { problemCount: number }` 把它补回来。
  */
-export type { Tag, TagCategory } from "@oj2/contract"
-export type { ProblemStats } from "@oj2/contract"
-export type { TodaySubmissionStatistics } from "@oj2/contract"
+export type { Tag, TagCategory } from '@oj2/contract'
+export type { ProblemStats } from '@oj2/contract'
+export type { TodaySubmissionStatistics } from '@oj2/contract'
 
-export type {
-  AdminTag,
-  RenameTagResponse,
-  BatchProblemTagResponse,
-  SqlTestCaseScript,
-  GenerateSqlTestCaseResponse,
-} from "@oj2/contract"
+export type { AdminTag, RenameTagResponse, BatchProblemTagResponse, SqlTestCaseScript, GenerateSqlTestCaseResponse } from '@oj2/contract'
 
 /**
  * 上传测试点的返回。取契约 —— 手抄那份少了三个字段
  * （stripped_output_md5 / input_size / output_size）。这套键名保持 snake_case
  * 是因为它会原样落进 problem.test_case_score 和判题沙箱读的 info 文件。
  */
-export type { UploadTestCaseResponse } from "@oj2/contract"
+export type { UploadTestCaseResponse } from '@oj2/contract'
 
 /**
  * 题目表单里的测试点。落库的只有 {input_name, output_name, score} 三个键 ——
@@ -103,26 +97,18 @@ export type { UploadTestCaseResponse } from "@oj2/contract"
  * 被剥掉（旧后端的 serializer 也是这么干的，见契约 problemTestCaseScoreSchema）。
  * score 不在上传响应里，是上传完成后按测试点数量平分补上去的。
  */
-export type { ProblemTestCaseScore as Testcase } from "@oj2/contract"
+export type { ProblemTestCaseScore as Testcase } from '@oj2/contract'
 
 /**
  * AST 代码要求。原来这里手抄的那份少了 label / exact / outer / inner ——
  * 编辑器写得出 label 和 exact，判题机也认，只有这个类型不认。形状在契约里。
  */
-export type { AstRule, AstRules, AstRuleEngine } from "@oj2/contract"
+export type { AstRule, AstRules, AstRuleEngine } from '@oj2/contract'
 
-export type {
-  ProblemDetail,
-  ProblemListItem,
-  AdminProblemListItem,
-  AdminProblemList,
-} from "@oj2/contract"
+export type { ProblemDetail, ProblemListItem, AdminProblemListItem, AdminProblemList } from '@oj2/contract'
 
 /** 后台题目详情：比 oj 侧多 answers / testCase* / astRules */
-export type AdminProblem = Omit<
-  ContractAdminProblem,
-  "languages" | "template" | "answers" | "astRules"
-> & {
+export type AdminProblem = Omit<ContractAdminProblem, 'languages' | 'template' | 'answers' | 'astRules'> & {
   languages: LANGUAGE[]
   template: { [key in LANGUAGE]?: string }
   // 契约里 answers[].language 是 string，这里收窄成 LANGUAGE
@@ -130,21 +116,9 @@ export type AdminProblem = Omit<
   astRules?: AstRules | null
 }
 
-type ExcludeKeys =
-  | "id"
-  | "createdBy"
-  | "createTime"
-  | "lastUpdateTime"
-  | "statisticInfo"
-  | "acceptedNumber"
-  | "submissionNumber"
-  | "isPublic"
-  | "contestId"
+type ExcludeKeys = 'id' | 'createdBy' | 'createTime' | 'lastUpdateTime' | 'statisticInfo' | 'acceptedNumber' | 'submissionNumber' | 'isPublic' | 'contestId'
 
-export type BlankProblem = Omit<
-  AdminProblem,
-  ExcludeKeys | "hint" | "mermaidCode" | "flowchartData" | "challenges"
-> & {
+export type BlankProblem = Omit<AdminProblem, ExcludeKeys | 'hint' | 'mermaidCode' | 'flowchartData' | 'challenges'> & {
   /** 提交的挑战：新加的不带 id，后端发（见契约 challengeInputSchema） */
   challenges?: Record<string, ChallengeInput[]> | null
   id?: number
@@ -163,11 +137,11 @@ export interface ProblemRow {
   id: number
   title: string
   // 比赛进行中难度不下发，见 contract 的 maskedProblemDifficultySchema
-  difficulty: "简单" | "中等" | "困难" | null
+  difficulty: '简单' | '中等' | '困难' | null
   tags: string[]
   submissionCount: number
   acRate: string
-  status: "not_test" | "passed" | "failed"
+  status: 'not_test' | 'passed' | 'failed'
   author: string
   allowFlowchart: boolean
   showFlowchart: boolean
@@ -207,7 +181,7 @@ export type {
   ProblemSetClassStudent,
   ProblemSetLock,
   UserBadge,
-} from "@oj2/contract"
+} from '@oj2/contract'
 
 export interface Code {
   language: LANGUAGE
@@ -215,7 +189,7 @@ export interface Code {
 }
 
 /** 提交代码的请求体。取契约的形状，只把 language 收窄成前端的 LANGUAGE 联合 */
-export type SubmitCodePayload = Omit<CreateSubmissionRequest, "language"> & {
+export type SubmitCodePayload = Omit<CreateSubmissionRequest, 'language'> & {
   language: LANGUAGE
 }
 
@@ -228,12 +202,9 @@ export const FlowchartSubmissionStatus = {
   FAILED: 3, // 评分失败
 } as const
 
-export type {
-  FlowchartSubmission,
-  FlowchartListItem as FlowchartSubmissionListItem,
-} from "@oj2/contract"
+export type { FlowchartSubmission, FlowchartListItem as FlowchartSubmissionListItem } from '@oj2/contract'
 
-export type { CreateFlowchartRequest as SubmitFlowchartPayload } from "@oj2/contract"
+export type { CreateFlowchartRequest as SubmitFlowchartPayload } from '@oj2/contract'
 
 /**
  * 提交详情。`statisticInfo` / `language` 的窄化在契约里
@@ -245,71 +216,62 @@ export type { CreateFlowchartRequest as SubmitFlowchartPayload } from "@oj2/cont
  * 伪状态，后端永远不会下发，见 constants.ts 的 SubmissionStatus.submitting。
  * 这是「前端自己造的状态」，不属于契约能描述的东西。
  */
-export type Submission = Omit<SubmissionDetail, "result"> & {
+export type Submission = Omit<SubmissionDetail, 'result'> & {
   result: SUBMISSION_RESULT
 }
 
 export type SubmissionListItem = ContractSubmissionListItem
 
 export interface SubmissionListPayload {
-  myself?: "1" | "0"
+  myself?: '1' | '0'
   result?: string
   username?: string
   /** "1" = username 精确匹配（默认是「包含」）。协作中老师看某个学生的提交用 */
-  exactUsername?: "1"
+  exactUsername?: '1'
   /** 班级（user.class_name，如 `253`），精确匹配；和 username 可以同时用 */
   className?: string
   contestId?: string
   problemDisplayId?: string
-  language: LANGUAGE | ""
-  today?: "1" | "0"
+  language: LANGUAGE | ''
+  today?: '1' | '0'
   page: number
   limit: number
   offset: number
 }
 
-export type { SessionUser } from "@oj2/contract"
+export type { SessionUser } from '@oj2/contract'
 
 export type Rank = RankProfile
 
 /** 榜单里「我」的位置：比 Rank 多一个全服名次 */
 
 /** 本周进步榜：`rank` 是周榜名次，跟存量总榜的名次没有关系 */
-export type { WeeklyRank, WeeklyRankItem } from "@oj2/contract"
+export type { WeeklyRank, WeeklyRankItem } from '@oj2/contract'
 
 /** 班里最近一次一起做的题（课上老师点的那几道），见后端 `/me/class-activity` */
-export type { ClassActivity, ClassActivityProblem, LastVisit } from "@oj2/contract"
+export type { ClassActivity, ClassActivityProblem, LastVisit } from '@oj2/contract'
 
 /** 课堂看板：一个班今天这节课的题 × 全班学生 */
-export type {
-  ClassBoard,
-  ClassBoardProblem,
-  ClassBoardStudent,
-  ClassBoardCell,
-  ClassLesson,
-} from "@oj2/contract"
+export type { ClassBoard, ClassBoardProblem, ClassBoardStudent, ClassBoardCell, ClassLesson } from '@oj2/contract'
 
 /** 知识点地图：每个知识点做对几道、在第几档，只给自己看 */
-export type { KnowledgeLevel, KnowledgeMap } from "@oj2/contract"
+export type { KnowledgeLevel, KnowledgeMap } from '@oj2/contract'
 
 /**
  * 学生侧的比赛：不含 password / visible。后台用 `AdminContest` ——
  * oj 侧的 contestSchema 永远不含 password，后台要能看到（告诉学生）
  */
-export type { Contest, AdminContest } from "@oj2/contract"
+export type { Contest, AdminContest } from '@oj2/contract'
 
-export type BlankContest = Omit<
-  AdminContest,
-  "id" | "createdBy" | "createTime" | "lastUpdateTime" | "status" | "contestType"
->
+export type BlankContest = Omit<AdminContest, 'id' | 'createdBy' | 'createTime' | 'lastUpdateTime' | 'status' | 'contestType'>
 
 /**
  * `acm_contest_rank.submission_info` 的 JSONB 内容，形状在契约
  * （`contestSubmissionInfoSchema`）。别和 `submission.info`（判题结果）混了。
  */
-export type { ContestSubmissionInfo } from "@oj2/contract"
+export type { ContestSubmissionInfo } from '@oj2/contract'
 
-export type { WebsiteConfig } from "@oj2/contract"
+export type { WebsiteConfig } from '@oj2/contract'
 
 export type {
   JudgeServer as Server,
@@ -341,7 +303,7 @@ export type {
   LearnExerciseAttempt,
   LearnExerciseAttemptList,
   LearnStudentDetail,
-} from "@oj2/contract"
+} from '@oj2/contract'
 
 /**
  * 公告。两侧形状**不同**，原来这里只手抄了后台那份、oj 侧也拿它当类型用：
@@ -349,12 +311,7 @@ export type {
  * （见 apps/api/src/routes/content.ts），于是类型声称有、实际是 undefined。
  * 现在各取各的契约类型。
  */
-export type {
-  Announcement,
-  AnnouncementListItem,
-  AdminAnnouncement,
-  AdminAnnouncementListItem,
-} from "@oj2/contract"
+export type { Announcement, AnnouncementListItem, AdminAnnouncement, AdminAnnouncementListItem } from '@oj2/contract'
 
 /** 后台编辑表单：请求体 + id（新建时填 0，提交前由 api 层剥掉） */
 export type AnnouncementEdit = CreateAnnouncementRequest & { id: number }
@@ -365,8 +322,8 @@ export type AnnouncementEdit = CreateAnnouncementRequest & { id: number }
  *
  * 注意 `ReactionCounts` 是 Partial 的：后端只下发有票的类型，没人投的键不出现。
  */
-export type { ReactionKey, ReactionCounts, ReactionState } from "@oj2/contract"
-import type { ReactionKey } from "@oj2/contract"
+export type { ReactionKey, ReactionCounts, ReactionState } from '@oj2/contract'
+import type { ReactionKey } from '@oj2/contract'
 
 /**
  * 教程。直接取契约 —— 手抄的那份把 `createdBy` 写成了可选的 `User`（后端下发的是
@@ -376,24 +333,18 @@ import type { ReactionKey } from "@oj2/contract"
  * 列表项也用契约的：它比 `Omit<Tutorial, "content">` **还少一个 code** ——
  * 后端列表接口连 code 一起省了，手抄那份声称它在。
  */
-export type {
-  AdminTutorial as Tutorial,
-  AdminTutorialListItem as TutorialListItem,
-} from "@oj2/contract"
+export type { AdminTutorial as Tutorial, AdminTutorialListItem as TutorialListItem } from '@oj2/contract'
 
 /** 学生自己的自学留痕，学习页的目录拿它打勾 */
-export type { TutorialProgress } from "@oj2/contract"
-import type { AdminExercise, AdminTutorial, CreateSubmissionRequest } from "@oj2/contract"
+export type { TutorialProgress } from '@oj2/contract'
+import type { AdminExercise, AdminTutorial, CreateSubmissionRequest } from '@oj2/contract'
 
 /**
  * 教程编辑表单。只留可编辑字段 —— createdBy / createdAt / updatedAt 由后端产出，
  * 新建时压根不存在（对齐 BlankProblem / BlankContest 的写法）。「示例代码」字段界面上
  * 去掉了（正文里的代码块能直接运行），挂的题走单独的接口。
  */
-export type TutorialEdit = Omit<
-  AdminTutorial,
-  "createdBy" | "createdAt" | "updatedAt" | "code" | "problems"
->
+export type TutorialEdit = Omit<AdminTutorial, 'createdBy' | 'createdAt' | 'updatedAt' | 'code' | 'problems'>
 
 export interface ExerciseMcqData {
   question: string
@@ -438,42 +389,28 @@ export interface ExerciseGroupData {
   answer: number[]
 }
 
-export type { ExerciseType } from "@oj2/contract"
+export type { ExerciseType } from '@oj2/contract'
 
 /**
  * 练习题。契约里 `data` 是 Record<string, unknown>（各题型结构不同，后端不校验），
  * 前端按题型收窄成判别联合 —— 组件靠它区分七种题型的字段。
  */
-export type Exercise = Omit<AdminExercise, "data"> & {
+export type Exercise = Omit<AdminExercise, 'data'> & {
   /** 学生端才有：当前学生做对过没有（后台的练习列表不下发） */
   solved?: boolean
-  data:
-    | ExerciseMcqData
-    | ExerciseSortData
-    | ExerciseFillData
-    | ExerciseMatchData
-    | ExercisePredictData
-    | ExerciseDebugData
-    | ExerciseGroupData
+  data: ExerciseMcqData | ExerciseSortData | ExerciseFillData | ExerciseMatchData | ExercisePredictData | ExerciseDebugData | ExerciseGroupData
 }
 
 export type { ProblemDifficulty }
 
 // ==================== 成就相关类型 ====================
 
-import type { AchievementNotification, PendingAchievement } from "@oj2/contract"
+import type { AchievementNotification, PendingAchievement } from '@oj2/contract'
 
-export type {
-  Achievement,
-  AchievementList,
-  AchievementRarity,
-  AchievementClassBoard,
-  AchievementNotification,
-  PendingAchievement,
-} from "@oj2/contract"
+export type { Achievement, AchievementList, AchievementRarity, AchievementClassBoard, AchievementNotification, PendingAchievement } from '@oj2/contract'
 
 /**
  * 弹窗队列里的条目。`/achievements/pending` 拉来的没有 kind，
  * WebSocket 推来的有 —— 两个来源会汇进同一个队列。
  */
-export type QueuedAchievement = PendingAchievement & Partial<Pick<AchievementNotification, "kind">>
+export type QueuedAchievement = PendingAchievement & Partial<Pick<AchievementNotification, 'kind'>>

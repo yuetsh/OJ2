@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { NButton, NTag } from "naive-ui"
-import Pagination from "shared/components/Pagination.vue"
-import type { AdminProblemRow } from "utils/types"
-import { batchTagProblems, getProblemList } from "admin/api"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useListLoader } from "shared/composables/listLoader"
+import { NButton, NTag } from 'naive-ui'
+import Pagination from 'shared/components/Pagination.vue'
+import type { AdminProblemRow } from 'utils/types'
+import { batchTagProblems, getProblemList } from 'admin/api'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useListLoader } from 'shared/composables/listLoader'
 
 interface Props {
   show: boolean
@@ -14,7 +14,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
-  "update:show": [value: boolean]
+  'update:show': [value: boolean]
   changed: []
 }>()
 
@@ -25,34 +25,29 @@ const problems = ref<AdminProblemRow[]>([])
 const total = ref(0)
 const page = ref(1)
 const limit = ref(10)
-const keyword = ref("")
+const keyword = ref('')
 
 const { isMobile } = useBreakpoints()
 
 const allColumns: DataTableColumn<AdminProblemRow>[] = [
-  { title: "题号", key: "_id", width: 90 },
+  { title: '题号', key: '_id', width: 90 },
   {
-    title: "题目",
-    key: "title",
+    title: '题目',
+    key: 'title',
     minWidth: 200,
-    render: (row) =>
-      h(NButton, { text: true, type: "primary", onClick: () => goEdit(row) }, () => row.title),
+    render: (row) => h(NButton, { text: true, type: 'primary', onClick: () => goEdit(row) }, () => row.title),
   },
   {
-    title: "学生看得到",
-    key: "visible",
+    title: '学生看得到',
+    key: 'visible',
     width: 100,
-    render: (row) =>
-      h(NTag, { size: "small", bordered: false, type: row.visible ? "success" : "default" }, () =>
-        row.visible ? "看得到" : "藏着",
-      ),
+    render: (row) => h(NTag, { size: 'small', bordered: false, type: row.visible ? 'success' : 'default' }, () => (row.visible ? '看得到' : '藏着')),
   },
   {
-    title: "",
-    key: "actions",
+    title: '',
+    key: 'actions',
     width: 90,
-    render: (row) =>
-      h(NButton, { size: "small", quaternary: true, onClick: () => removeTag(row) }, () => "摘掉"),
+    render: (row) => h(NButton, { size: 'small', quaternary: true, onClick: () => removeTag(row) }, () => '摘掉'),
   },
 ]
 
@@ -69,27 +64,25 @@ const { loading, track } = useListLoader()
 async function listProblems() {
   if (page.value < 1) page.value = 1
   const offset = (page.value - 1) * limit.value
-  const res = await track(
-    getProblemList(offset, limit.value, keyword.value, "", undefined, props.tagId),
-  )
+  const res = await track(getProblemList(offset, limit.value, keyword.value, '', undefined, props.tagId))
   if (!res) return
   problems.value = res.results
   total.value = res.total
 }
 
 function close() {
-  emit("update:show", false)
+  emit('update:show', false)
 }
 
 function goEdit(row: AdminProblemRow) {
   close()
-  router.push({ name: "admin problem edit", params: { problemID: row.id } })
+  router.push({ name: 'admin problem edit', params: { problemID: row.id } })
 }
 
 async function removeTag(row: AdminProblemRow) {
-  await batchTagProblems([row.id], [props.tagName], "remove")
+  await batchTagProblems([row.id], [props.tagName], 'remove')
   message.success(`已移除「${row.title}」的标签`)
-  emit("changed")
+  emit('changed')
   // 移掉本页最后一条时退回上一页，交给下面的 watcher 重新拉取
   if (problems.value.length === 1 && page.value > 1) {
     page.value -= 1
@@ -107,7 +100,7 @@ watch(
   (show) => {
     if (!show) return
     page.value = 1
-    keyword.value = ""
+    keyword.value = ''
   },
 )
 
@@ -123,22 +116,11 @@ watchDebounced(
 </script>
 
 <template>
-  <n-modal
-    :show="show"
-    preset="card"
-    :title="`标签「${tagName}」下的题目`"
-    style="width: 720px"
-    @close="close"
-  >
+  <n-modal :show="show" preset="card" :title="`标签「${tagName}」下的题目`" style="width: 720px" @close="close">
     <n-flex vertical size="large">
       <n-flex justify="space-between" align="center">
         <span>共 {{ total }} 道题</span>
-        <n-input
-          v-model:value="keyword"
-          :style="{ width: isMobile ? '160px' : '220px' }"
-          placeholder="题号或题目名"
-          clearable
-        />
+        <n-input v-model:value="keyword" :style="{ width: isMobile ? '160px' : '220px' }" placeholder="题号或题目名" clearable />
       </n-flex>
       <n-data-table :loading="loading" striped :columns="columns" :data="problems" />
       <Pagination :total="total" v-model:limit="limit" v-model:page="page" />

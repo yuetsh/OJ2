@@ -1,18 +1,18 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { classPkPeriodSchema } from "./ranking"
+import { classPkPeriodSchema } from './ranking'
 
 /**
  * 智能分析看哪段时间。全按东八区日历切（同排名页）：这周 = 本周一零点起，这个月 = 本月 1 日
  * 零点起，这学期 = `termStart()`（9 月 1 日 / 2 月 1 日），全部 = 不设下限。
  */
-export const learningPeriodSchema = z.enum(["week", "month", "term", "all"])
+export const learningPeriodSchema = z.enum(['week', 'month', 'term', 'all'])
 
 export const LEARNING_PERIOD_LABELS = {
-  week: "这周",
-  month: "这个月",
-  term: "这学期",
-  all: "全部",
+  week: '这周',
+  month: '这个月',
+  term: '这学期',
+  all: '全部',
 } as const satisfies Record<z.infer<typeof learningPeriodSchema>, string>
 
 /**
@@ -27,7 +27,7 @@ export const LEARNING_PERIOD_LABELS = {
 export const learningItemSchema = z.object({
   displayId: z.string(),
   title: z.string(),
-  status: z.enum(["first", "tries", "fail", "none"]),
+  status: z.enum(['first', 'tries', 'fail', 'none']),
   attempts: z.number().int(),
   /** 班上第几个做对（只数这段时间里做对的同班同学）；没做对、没有班级时为 null */
   rank: z.number().int().nullable(),
@@ -80,9 +80,7 @@ export const learningReportSchema = z.object({
   /** 没通过的代码提交按判题状态分组，多的在前；系统错误、还没判完的不算 */
   errors: z.array(z.object({ result: z.number().int(), count: z.number().int() })),
   /** 全部知识点（tag 的 knowledge 类），按题库里题数从多到少；没碰过的 solved = tried = 0 */
-  knowledge: z.array(
-    z.object({ name: z.string(), solved: z.number().int(), tried: z.number().int() }),
-  ),
+  knowledge: z.array(z.object({ name: z.string(), solved: z.number().int(), tried: z.number().int() })),
   /** 老师看学生时，同班按用户名排的前一个 / 后一个；学生看自己时为 null */
   neighbors: z.object({ prev: z.string().nullable(), next: z.string().nullable() }).nullable(),
 })
@@ -123,11 +121,11 @@ export const HINT_MIN_FAILURES = 1
  * 老师按班级 / 作业设最高等级还没做，现在所有题都开到 L4。
  */
 export const HINT_LEVELS = [
-  { level: 0, name: "反问", summary: "只反问，不给结论" },
-  { level: 1, name: "定位", summary: "只说问题在哪，不说为什么" },
-  { level: 2, name: "概念", summary: "讲清涉及的概念，不给改法" },
-  { level: 3, name: "思路", summary: "分步骤讲解题思路，不写代码" },
-  { level: 4, name: "示例", summary: "用相似的例子演示，或给出关键的一行" },
+  { level: 0, name: '反问', summary: '只反问，不给结论' },
+  { level: 1, name: '定位', summary: '只说问题在哪，不说为什么' },
+  { level: 2, name: '概念', summary: '讲清涉及的概念，不给改法' },
+  { level: 3, name: '思路', summary: '分步骤讲解题思路，不写代码' },
+  { level: 4, name: '示例', summary: '用相似的例子演示，或给出关键的一行' },
 ] as const
 
 export const HINT_MAX_LEVEL = 4
@@ -145,7 +143,7 @@ export const HINT_LEVEL_COMPILE = -1
 
 /** 给界面看的等级名。编译失败那一档不叫 L-1 */
 export function hintLevelLabel(level: number) {
-  if (level === HINT_LEVEL_COMPILE) return "编译错误"
+  if (level === HINT_LEVEL_COMPILE) return '编译错误'
   const item = HINT_LEVELS.find((entry) => entry.level === level)
   // 给学生看的，从 1 数起、不写「L0」：学生不知道 L 是什么，也不会从 0 数
   return item ? `第 ${item.level + 1} 档 · ${item.name}` : `第 ${level + 1} 档`
@@ -180,19 +178,19 @@ export const aiHintDoneSchema = z.object({
  * 全角冒号、多一个空格、小数位数，是这批学生最常见、也最冤的一类 WA。
  */
 export const HINT_ERROR_TAGS = {
-  syntax: "语法错误",
-  input_format: "输入读取方式不对（格式、分隔、个数）",
-  output_format: "输出格式不对（多余的输入提示语、全角/半角符号、多余空格或换行、小数位数）",
-  condition: "条件判断写错（比较符、漏了分支）",
-  loop_bound: "循环次数或边界不对（差一）",
-  integer_division: "整数除法或取余用错",
-  type_overflow: "数据类型不对或溢出（int 不够、浮点精度）",
-  uninitialized: "变量没初始化，或累加器没清零",
-  missing_case: "漏了特殊情况（0、负数、边界值）",
-  runtime_error: "运行时错误（下标越界、除以零）",
-  timeout: "超时（算法太慢或死循环）",
-  wrong_approach: "思路整体不对",
-  other: "其他，或者看不出来",
+  syntax: '语法错误',
+  input_format: '输入读取方式不对（格式、分隔、个数）',
+  output_format: '输出格式不对（多余的输入提示语、全角/半角符号、多余空格或换行、小数位数）',
+  condition: '条件判断写错（比较符、漏了分支）',
+  loop_bound: '循环次数或边界不对（差一）',
+  integer_division: '整数除法或取余用错',
+  type_overflow: '数据类型不对或溢出（int 不够、浮点精度）',
+  uninitialized: '变量没初始化，或累加器没清零',
+  missing_case: '漏了特殊情况（0、负数、边界值）',
+  runtime_error: '运行时错误（下标越界、除以零）',
+  timeout: '超时（算法太慢或死循环）',
+  wrong_approach: '思路整体不对',
+  other: '其他，或者看不出来',
 } as const
 
 export type HintErrorTag = keyof typeof HINT_ERROR_TAGS
@@ -206,7 +204,7 @@ export const hintDiagnosisSchema = z.object({
   tag: z.enum(Object.keys(HINT_ERROR_TAGS) as [HintErrorTag, ...HintErrorTag[]]),
   /** 问题所在的行号区间（从 1 起，含两端）；说不准就是 null */
   lines: z.tuple([z.number().int().min(1), z.number().int().min(1)]).nullable(),
-  confidence: z.enum(["high", "low"]),
+  confidence: z.enum(['high', 'low']),
 })
 
 export type HintDiagnosis = z.infer<typeof hintDiagnosisSchema>

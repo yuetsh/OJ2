@@ -1,5 +1,5 @@
-import { TIME_ZONE, TIME_ZONE_OFFSET_MINUTES } from "@oj2/contract"
-import { sql, type SQLWrapper } from "drizzle-orm"
+import { TIME_ZONE, TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
+import { sql, type SQLWrapper } from 'drizzle-orm'
 
 /**
  * 后端的日历换算全在这里，锚点是契约里的 `TIME_ZONE`（东八区，固定偏移）。
@@ -48,7 +48,7 @@ export function localYear(value: Date | number | string = new Date()): number {
  * 23 或 25 小时，除 86400000 得到的不是 1，`=== 1` 这种判据会静默失效。
  */
 export function dayNumber(day: string): number {
-  const [year, month, date] = day.split("-").map(Number)
+  const [year, month, date] = day.split('-').map(Number)
   return Date.UTC(year!, month! - 1, date!) / DAY_MS
 }
 
@@ -98,9 +98,7 @@ export function termStart(now: Date | number | string = new Date()): string {
 /** 「东八区本月 1 日」的零点，返回 ISO 字符串 */
 export function monthStart(now: Date | number | string = new Date()): string {
   const wall = toWallClock(now)
-  return fromWallClock(
-    new Date(Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), 1)),
-  ).toISOString()
+  return fromWallClock(new Date(Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), 1))).toISOString()
 }
 
 /** 按北京时间的日历做月份平移，日号超出目标月长度时截到月末，时分秒毫秒原样保留 */

@@ -1,9 +1,9 @@
-import { config } from "../config"
+import { config } from '../config'
 
 export class CodeFormatError extends Error {
   constructor(
     message: string,
-    readonly kind: "syntax" | "tool",
+    readonly kind: 'syntax' | 'tool',
   ) {
     super(message)
   }
@@ -14,11 +14,11 @@ async function runFormatter(command: string[], code: string) {
   try {
     process = Bun.spawn(command, {
       stdin: new Blob([code]),
-      stdout: "pipe",
-      stderr: "pipe",
+      stdout: 'pipe',
+      stderr: 'pipe',
     })
   } catch (error) {
-    throw new CodeFormatError(String(error), "tool")
+    throw new CodeFormatError(String(error), 'tool')
   }
 
   const timeout = setTimeout(() => process.kill(), 5_000)
@@ -34,7 +34,7 @@ async function runFormatter(command: string[], code: string) {
 function formatSql(code: string) {
   return (
     code
-      .split(";")
+      .split(';')
       .map((statement) => statement.trim())
       .filter(Boolean)
       .map((statement) =>
@@ -43,7 +43,7 @@ function formatSql(code: string) {
           (keyword) => keyword.toUpperCase(),
         ),
       )
-      .join(";\n\n") + (code.trim().endsWith(";") ? ";" : "")
+      .join(';\n\n') + (code.trim().endsWith(';') ? ';' : '')
   )
 }
 
@@ -73,7 +73,7 @@ except SyntaxError as error:
 async function checkPythonSyntax(code: string): Promise<string | null | undefined> {
   let result: Awaited<ReturnType<typeof runFormatter>>
   try {
-    result = await runFormatter([config.pythonPath, "-I", "-c", SYNTAX_CHECK_SCRIPT], code)
+    result = await runFormatter([config.pythonPath, '-I', '-c', SYNTAX_CHECK_SCRIPT], code)
   } catch {
     return undefined
   }
@@ -84,10 +84,10 @@ async function checkPythonSyntax(code: string): Promise<string | null | undefine
 
 /** 去掉全部空白之后的字符流，以及原来每个换行落在流里的哪个位置（首尾的不算） */
 function lineBreaks(code: string) {
-  let stream = ""
+  let stream = ''
   const breaks = new Set<number>()
   for (const char of code) {
-    if (char === "\n") breaks.add(stream.length)
+    if (char === '\n') breaks.add(stream.length)
     else if (!/\s/.test(char)) stream += char
   }
   breaks.delete(0)
@@ -110,44 +110,41 @@ export function mergesLines(original: string, formatted: string) {
   for (const at of before.breaks) {
     if (after.breaks.has(at)) continue
     const next = before.stream.slice(at)
-    if (next.startsWith("{")) continue
-    if (before.stream[at - 1] === "}" && /^(else|while)/.test(next)) continue
+    if (next.startsWith('{')) continue
+    if (before.stream[at - 1] === '}' && /^(else|while)/.test(next)) continue
     return true
   }
   return false
 }
 
-export async function formatCode(code: string, language: "python" | "c" | "cpp" | "sql") {
-  if (language === "sql") return formatSql(code)
+export async function formatCode(code: string, language: 'python' | 'c' | 'cpp' | 'sql') {
+  if (language === 'sql') return formatSql(code)
 
-  if (language === "python") {
+  if (language === 'python') {
     const syntaxError = await checkPythonSyntax(code)
-    if (syntaxError) throw new CodeFormatError(syntaxError, "syntax")
-    const result = await runFormatter(
-      [config.ruffPath, "format", "--stdin-filename", "code.py", "-"],
-      code,
-    )
+    if (syntaxError) throw new CodeFormatError(syntaxError, 'syntax')
+    const result = await runFormatter([config.ruffPath, 'format', '--stdin-filename', 'code.py', '-'], code)
     // CPython 都编译过了 ruff 还失败，是 ruff 的问题（比如还不认识新语法），
     // 不是学生的：按工具故障报，前端会原样提交
     if (result.exitCode !== 0) {
-      throw new CodeFormatError(result.stderr || "ruff format failed", "tool")
+      throw new CodeFormatError(result.stderr || 'ruff format failed', 'tool')
     }
     return result.stdout
   }
 
-  const filename = language === "c" ? "code.c" : "code.cpp"
+  const filename = language === 'c' ? 'code.c' : 'code.cpp'
   // 不排 #include、不拆长字符串：学生的 printf("……") 被拆成 "……" "……" 两截看不懂；
   // 这两样也是 mergesLines 唯一常见的误报来源（它们改了非空白字符）
   const result = await runFormatter(
     [
       config.clangFormatPath,
       `-assume-filename=${filename}`,
-      "-style={BasedOnStyle: LLVM, IndentWidth: 4, BreakBeforeBraces: Attach, SortIncludes: Never, BreakStringLiterals: false}",
+      '-style={BasedOnStyle: LLVM, IndentWidth: 4, BreakBeforeBraces: Attach, SortIncludes: Never, BreakStringLiterals: false}',
     ],
     code,
   )
   if (result.exitCode !== 0) {
-    throw new CodeFormatError(result.stderr || "Formatting failed", "tool")
+    throw new CodeFormatError(result.stderr || 'Formatting failed', 'tool')
   }
   return result.stdout
 }

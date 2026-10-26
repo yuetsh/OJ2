@@ -1,7 +1,7 @@
-import { reactive, type Ref } from "vue"
-import { useRouter } from "vue-router"
-import { DEFAULT_PERIOD } from "oj/statistics/period"
-import type { SubmissionQuery } from "./listQuery"
+import { reactive, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { DEFAULT_PERIOD } from 'oj/statistics/period'
+import type { SubmissionQuery } from './listQuery'
 
 /**
  * 提交列表和「统计」之间来回带条件：打开统计时带上列表现在的班级 / 学生 / 题号 /
@@ -22,13 +22,13 @@ export function useStatsLink(options: {
    * 带进去（「今天」带过去就是统计的「今天」）；时间段沿用上次在弹框里选的
    */
   const statsQuery = reactive({
-    tab: "code",
-    className: "",
-    username: "",
-    problem: "",
+    tab: 'code',
+    className: '',
+    username: '',
+    problem: '',
     period: DEFAULT_PERIOD as string,
-    from: "",
-    to: "",
+    from: '',
+    to: '',
   })
 
   /**
@@ -38,11 +38,11 @@ export function useStatsLink(options: {
    */
   function openStatistics() {
     Object.assign(statsQuery, {
-      tab: flowMode.value ? "flow" : "code",
+      tab: flowMode.value ? 'flow' : 'code',
       className: query.className,
       username: query.username,
       problem: query.problem,
-      ...(query.today === "1" ? { period: "today" } : {}),
+      ...(query.today === '1' ? { period: 'today' } : {}),
     })
     statsPanel.value = true
   }
@@ -50,13 +50,13 @@ export function useStatsLink(options: {
   /** 手机上的「统计」：同样的条件，带去统计页 */
   function openStatisticsPage() {
     router.push({
-      name: "statistics",
+      name: 'statistics',
       query: {
-        tab: flowMode.value ? "flow" : "code",
+        tab: flowMode.value ? 'flow' : 'code',
         ...(query.className ? { className: query.className } : {}),
         ...(query.username ? { username: query.username } : {}),
         ...(query.problem ? { problem: query.problem } : {}),
-        ...(query.today === "1" ? { period: "today" } : {}),
+        ...(query.today === '1' ? { period: 'today' } : {}),
       },
     })
   }
@@ -64,15 +64,15 @@ export function useStatsLink(options: {
   /** 统计里的「在提交列表里看」：直接改背后这张列表的筛选，关掉弹框 */
   function listFromStatistics(next: Record<string, string>) {
     statsPanel.value = false
-    options.exactFor.value = ""
+    options.exactFor.value = ''
     Object.assign(query, {
-      username: next.username ?? "",
-      className: next.className ?? "",
-      result: "",
-      myself: "0",
-      problem: next.problem ?? "",
-      language: next.language === "Flowchart" ? "Flowchart" : flowMode.value ? "" : query.language,
-      today: next.today === "1" ? "1" : "0",
+      username: next.username ?? '',
+      className: next.className ?? '',
+      result: '',
+      myself: '0',
+      problem: next.problem ?? '',
+      language: next.language === 'Flowchart' ? 'Flowchart' : flowMode.value ? '' : query.language,
+      today: next.today === '1' ? '1' : '0',
     })
   }
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { TutorialProgress } from "@oj2/contract"
-import { lessonPath, lessonState, type ProjectGroup, type TutorialType } from "../lesson"
-import LessonRow from "./LessonRow.vue"
-import ProjectTile from "./ProjectTile.vue"
+import { Icon } from '@iconify/vue'
+import type { TutorialProgress } from '@oj2/contract'
+import { lessonPath, lessonState, type ProjectGroup, type TutorialType } from '../lesson'
+import LessonRow from './LessonRow.vue'
+import ProjectTile from './ProjectTile.vue'
 
 /**
  * 目录：按项目折叠，默认只展开正在学的那个项目（设计稿 A 的左栏、手机的目录抽屉）。
@@ -43,7 +43,7 @@ function toggle(group: ProjectGroup) {
 }
 
 function doneIn(group: ProjectGroup) {
-  return group.lessons.filter((lesson) => lessonState(props.progress[lesson.id]) === "done").length
+  return group.lessons.filter((lesson) => lessonState(props.progress[lesson.id]) === 'done').length
 }
 </script>
 
@@ -53,10 +53,7 @@ function doneIn(group: ProjectGroup) {
       <button type="button" class="group" @click="toggle(group)">
         <ProjectTile v-if="big" :icon="group.icon" :tone="group.tone" :size="30" />
         <span v-else class="chev">
-          <Icon
-            :icon="open.has(keyOf(group)) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'"
-            :width="13"
-          />
+          <Icon :icon="open.has(keyOf(group)) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'" :width="13" />
         </span>
         <span class="name">
           <span v-if="big && group.no" class="no">{{ group.no }}</span>
@@ -70,10 +67,7 @@ function doneIn(group: ProjectGroup) {
         </span>
         <span v-else class="count">{{ doneIn(group) }}/{{ group.lessons.length }}</span>
         <span v-if="big" class="chev">
-          <Icon
-            :icon="open.has(keyOf(group)) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'"
-            :width="14"
-          />
+          <Icon :icon="open.has(keyOf(group)) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'" :width="14" />
         </span>
       </button>
       <div v-if="open.has(keyOf(group))" class="lessons">

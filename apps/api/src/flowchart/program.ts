@@ -1,12 +1,6 @@
-import {
-  JudgeStatus,
-  mermaidOrder,
-  type FlowchartCaseResult,
-  type FlowDoc,
-  type FlowStep,
-} from "@oj2/contract"
+import { JudgeStatus, mermaidOrder, type FlowchartCaseResult, type FlowDoc, type FlowStep } from '@oj2/contract'
 
-import type { FlowchartCase } from "./cases"
+import type { FlowchartCase } from './cases'
 
 /**
  * 「走例子」的程序这一半：把学生的图拼成一段 Python，拿去判题机跑。
@@ -19,7 +13,7 @@ import type { FlowchartCase } from "./cases"
  * 框号用 Mermaid 的 nN（mermaidOrder），和前端亮路径、缩略图是同一套。
  */
 
-const SENTINEL = "\u001fFLOW "
+const SENTINEL = '\u001fFLOW '
 
 /** 这张图里每个框的编号、种类、字，按 Mermaid 的顺序 */
 export function flowBoxes(doc: FlowDoc) {
@@ -28,28 +22,28 @@ export function flowBoxes(doc: FlowDoc) {
   return { order, nodeOf: (step: FlowStep) => index.get(step.id)! }
 }
 
-const KIND_NAME: Record<FlowStep["kind"], string> = {
-  input: "输入框",
-  output: "输出框",
-  process: "处理框",
-  if: "判断框",
-  while: "循环（判断框）",
+const KIND_NAME: Record<FlowStep['kind'], string> = {
+  input: '输入框',
+  output: '输出框',
+  process: '处理框',
+  if: '判断框',
+  while: '循环（判断框）',
 }
 
 /** 给 AI 看的图：带缩进的结构，每行一个框 */
 export function describeDoc(doc: FlowDoc) {
   const { order, nodeOf } = flowBoxes(doc)
-  const lines = ["n0 开始"]
+  const lines = ['n0 开始']
   const walk = (steps: FlowStep[], depth: number) => {
-    const pad = "  ".repeat(depth)
+    const pad = '  '.repeat(depth)
     for (const step of steps) {
-      lines.push(`${pad}${nodeOf(step)} ${KIND_NAME[step.kind]}：${step.text.trim() || "（空）"}`)
-      if (step.kind === "if") {
+      lines.push(`${pad}${nodeOf(step)} ${KIND_NAME[step.kind]}：${step.text.trim() || '（空）'}`)
+      if (step.kind === 'if') {
         lines.push(`${pad}  是：`)
         walk(step.yes, depth + 2)
         lines.push(`${pad}  否：`)
         walk(step.no, depth + 2)
-      } else if (step.kind === "while") {
+      } else if (step.kind === 'while') {
         lines.push(`${pad}  条件成立时反复做：`)
         walk(step.body, depth + 2)
       }
@@ -57,7 +51,7 @@ export function describeDoc(doc: FlowDoc) {
   }
   walk(doc.steps, 0)
   lines.push(`n${order.length - 1} 结束`)
-  return lines.join("\n")
+  return lines.join('\n')
 }
 
 export const TRANSLATE_PROMPT = `你是中职信息技术课的助教。学生画了一张流程图，结构（顺序、判断、循环）已经定好，
@@ -91,54 +85,46 @@ export function buildProgram(doc: FlowDoc, code: Record<string, string | null>) 
   const bodyNodes: (string | null)[] = []
   let current: string | null = null
   const emit = (depth: number, line: string) => {
-    body.push(`${"    ".repeat(depth)}${line}`)
+    body.push(`${'    '.repeat(depth)}${line}`)
     bodyNodes.push(current)
   }
   const lines = (text: string) =>
     text
-      .split("\n")
-      .map((line) => line.replace(/\s+$/, ""))
+      .split('\n')
+      .map((line) => line.replace(/\s+$/, ''))
       .filter((line) => line.trim())
   // 模型偶尔会把整句写成 if xxx: / while xxx: / print(xxx)，剥掉外壳
   const condition = (text: string) =>
     text
       .trim()
-      .replace(/^(if|while)\s+/, "")
-      .replace(/:\s*$/, "")
+      .replace(/^(if|while)\s+/, '')
+      .replace(/:\s*$/, '')
   const expression = (text: string) => {
     const trimmed = text.trim()
     const print = trimmed.match(/^print\(([\s\S]*)\)$/)
     return print ? print[1]! : trimmed
   }
   const walk = (steps: FlowStep[], depth: number) => {
-    if (!steps.length) emit(depth, "pass")
+    if (!steps.length) emit(depth, 'pass')
     for (const step of steps) {
       const node = nodeOf(step)
       current = node
       const text = code[node]
-      const unclear = typeof text !== "string" || !text.trim()
-      if (step.kind === "if") {
+      const unclear = typeof text !== 'string' || !text.trim()
+      if (step.kind === 'if') {
         emit(depth, `__v("${node}")`)
         emit(depth, unclear ? `if __unclear():` : `if ${condition(text!)}:`)
         walk(step.yes, depth + 1)
-        emit(depth, "else:")
+        emit(depth, 'else:')
         walk(step.no, depth + 1)
-      } else if (step.kind === "while") {
-        emit(
-          depth,
-          unclear
-            ? `while __v("${node}") or __unclear():`
-            : `while __v("${node}") or (${condition(text!)}):`,
-        )
+      } else if (step.kind === 'while') {
+        emit(depth, unclear ? `while __v("${node}") or __unclear():` : `while __v("${node}") or (${condition(text!)}):`)
         walk(step.body, depth + 1)
-      } else if (step.kind === "output") {
-        emit(
-          depth,
-          unclear ? `__v("${node}"); __unclear()` : `__o("${node}", ${expression(text!)})`,
-        )
+      } else if (step.kind === 'output') {
+        emit(depth, unclear ? `__v("${node}"); __unclear()` : `__o("${node}", ${expression(text!)})`)
       } else {
         emit(depth, `__v("${node}")`)
-        if (unclear) emit(depth, "__unclear()")
+        if (unclear) emit(depth, '__unclear()')
         else for (const line of lines(text!)) emit(depth, line)
       }
     }
@@ -192,9 +178,9 @@ sys.stdout.flush()
 print()
 print(${JSON.stringify(SENTINEL)} + json.dumps({"path": __path, "lines": __lines, "at": __at, "err": __err}))
 `
-  const headLines = head.split("\n").length - 1
+  const headLines = head.split('\n').length - 1
   return {
-    source: head + body.join("\n") + tail,
+    source: head + body.join('\n') + tail,
     /** 程序第几行（从 1 起）是哪个框的，拼出来的外壳给 null */
     nodeAtLine: (line: number) => bodyNodes[line - 1 - headLines] ?? null,
   }
@@ -203,18 +189,18 @@ print(${JSON.stringify(SENTINEL)} + json.dumps({"path": __path, "lines": __lines
 // ==================== 比输出 ====================
 
 const FULL_PUNCT: Record<string, string> = {
-  "，": ",",
-  "。": ".",
-  "：": ":",
-  "；": ";",
-  "（": "(",
-  "）": ")",
-  "“": '"',
-  "”": '"',
-  "‘": "'",
-  "’": "'",
-  "！": "!",
-  "？": "?",
+  '，': ',',
+  '。': '.',
+  '：': ':',
+  '；': ';',
+  '（': '(',
+  '）': ')',
+  '“': '"',
+  '”': '"',
+  '‘': "'",
+  '’': "'",
+  '！': '!',
+  '？': '?',
 }
 
 /**
@@ -225,8 +211,8 @@ function normalize(line: string) {
   return line
     .replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
     .replace(/[，。：；（）“”‘’！？、]/g, (ch) => FULL_PUNCT[ch] ?? ch)
-    .replace(/(?<!\d)\.|\.(?!\d)/g, "")
-    .replace(/[\s,:;!?"'()[\]{}、]/g, "")
+    .replace(/(?<!\d)\.|\.(?!\d)/g, '')
+    .replace(/[\s,:;!?"'()[\]{}、]/g, '')
 }
 
 /**
@@ -245,7 +231,7 @@ export function sameLine(got: string, want: string) {
 }
 
 function splitLines(text: string) {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n")
+  const lines = text.replace(/\r\n?/g, '\n').split('\n')
   while (lines.length && !lines.at(-1)!.trim()) lines.pop()
   return lines
 }
@@ -268,52 +254,43 @@ function readRun(raw: string): { output: string; info: RunInfo | null } {
     info = null
   }
   // 去掉哨兵前面那个空行，和程序最后一行自带的换行
-  return { output: raw.slice(0, at).replace(/\n$/, "").replace(/\n$/, ""), info }
+  return { output: raw.slice(0, at).replace(/\n$/, '').replace(/\n$/, ''), info }
 }
 
 /**
  * 一组数据的结果。why 是写给学生的话：提到框用框里的字，不写编号。
  * texts：nN → 框里的字
  */
-export function judgeCase(
-  item: FlowchartCase,
-  run: { result: number; output: string } | null,
-  texts: Map<string, string>,
-): FlowchartCaseResult {
-  const quote = (node: string | null) => `「${(node && texts.get(node)) || "这一步"}」`
+export function judgeCase(item: FlowchartCase, run: { result: number; output: string } | null, texts: Map<string, string>): FlowchartCaseResult {
+  const quote = (node: string | null) => `「${(node && texts.get(node)) || '这一步'}」`
   const base = { name: item.name, input: item.input, expected: item.expected }
-  if (!run)
-    return { ...base, output: "", ok: false, path: [], wrongAt: null, why: "这一组没跑出来" }
+  if (!run) return { ...base, output: '', ok: false, path: [], wrongAt: null, why: '这一组没跑出来' }
 
   const { output, info } = readRun(run.output)
   const path = info?.path ?? []
-  if (
-    run.result === JudgeStatus.CPU_TIME_LIMIT_EXCEEDED ||
-    run.result === JudgeStatus.REAL_TIME_LIMIT_EXCEEDED ||
-    info?.err === "toomuch"
-  ) {
+  if (run.result === JudgeStatus.CPU_TIME_LIMIT_EXCEEDED || run.result === JudgeStatus.REAL_TIME_LIMIT_EXCEEDED || info?.err === 'toomuch') {
     return {
       ...base,
-      output: splitLines(output).slice(0, 20).join("\n"),
+      output: splitLines(output).slice(0, 20).join('\n'),
       ok: false,
       path,
       wrongAt: info?.at ?? null,
-      why: "走不到结束：一直在循环里出不来。看看循环的条件，循环里有没有让条件变化的那一步",
+      why: '走不到结束：一直在循环里出不来。看看循环的条件，循环里有没有让条件变化的那一步',
     }
   }
   if (!info) {
-    return { ...base, output, ok: false, path, wrongAt: null, why: "这一组没跑完" }
+    return { ...base, output, ok: false, path, wrongAt: null, why: '这一组没跑完' }
   }
   if (info.err) {
     const where = quote(info.at)
     const why =
-      info.err === "unclear"
+      info.err === 'unclear'
         ? `${where}这一步写得看不明白，换个说法写清楚`
-        : info.err.startsWith("name:")
+        : info.err.startsWith('name:')
           ? `走到${where}时，「${info.err.slice(5)}」还没有值：前面没有输入它、也没有算过它`
-          : info.err === "zero"
+          : info.err === 'zero'
             ? `走到${where}时除以了 0`
-            : info.err === "input"
+            : info.err === 'input'
               ? `${where}读到的数据和想的不一样，看看是读几行、读成数还是读成文字`
               : `走到${where}这一步算不下去了`
     return { ...base, output, ok: false, path, wrongAt: info.at, why }
@@ -349,18 +326,12 @@ export function judgeCase(
   }
   for (let i = 0; i < Math.max(got.length, want.length); i++) {
     if (i >= got.length) {
-      return fail(
-        null,
-        got.length ? `只输出了 ${got.length} 行，少了「${want[i]}」` : "什么也没输出",
-      )
+      return fail(null, got.length ? `只输出了 ${got.length} 行，少了「${want[i]}」` : '什么也没输出')
     }
     if (i >= want.length) return fail(nodeOfLine(i), `${quote(nodeOfLine(i))}多输出了「${got[i]}」`)
     if (!sameLine(got[i]!, want[i]!)) {
-      return fail(
-        nodeOfLine(i),
-        `${quote(nodeOfLine(i))}输出的是「${got[i]}」，应该是「${want[i]}」`,
-      )
+      return fail(nodeOfLine(i), `${quote(nodeOfLine(i))}输出的是「${got[i]}」，应该是「${want[i]}」`)
     }
   }
-  return { ...base, output, ok: true, path, wrongAt: null, why: "" }
+  return { ...base, output, ok: true, path, wrongAt: null, why: '' }
 }

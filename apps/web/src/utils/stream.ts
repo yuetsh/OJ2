@@ -1,5 +1,5 @@
-import { handleGlobalApiError } from "./api"
-import { authFetch } from "./auth"
+import { handleGlobalApiError } from './api'
+import { authFetch } from './auth'
 
 export interface JSONEventStreamHandlers<T = any> {
   onMessage: (data: T, event?: string) => void
@@ -7,31 +7,28 @@ export interface JSONEventStreamHandlers<T = any> {
   signal?: AbortSignal | null
 }
 
-export async function consumeJSONEventStream<T = any>(
-  response: Response,
-  handlers: JSONEventStreamHandlers<T>,
-) {
+export async function consumeJSONEventStream<T = any>(response: Response, handlers: JSONEventStreamHandlers<T>) {
   if (!response.body) {
-    throw new Error("当前环境不支持可读流")
+    throw new Error('当前环境不支持可读流')
   }
 
   const reader = response.body.getReader()
-  const decoder = new TextDecoder("utf-8")
-  let buffer = ""
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
 
   const { onMessage, onEvent, signal } = handlers
 
   const handleEvent = (raw: string) => {
-    const lines = raw.split("\n")
+    const lines = raw.split('\n')
     let eventName: string | undefined
     const dataLines: string[] = []
 
     for (const line of lines) {
       const trimmed = line.trim()
       if (!trimmed) continue
-      if (trimmed.startsWith("event:")) {
+      if (trimmed.startsWith('event:')) {
         eventName = trimmed.slice(6).trim()
-      } else if (trimmed.startsWith("data:")) {
+      } else if (trimmed.startsWith('data:')) {
         dataLines.push(trimmed.slice(5).trim())
       }
     }
@@ -43,7 +40,7 @@ export async function consumeJSONEventStream<T = any>(
       return
     }
 
-    const payloadStr = dataLines.join("\n")
+    const payloadStr = dataLines.join('\n')
 
     let parsed: T
     try {
@@ -56,19 +53,19 @@ export async function consumeJSONEventStream<T = any>(
   }
 
   const processBuffer = (flush = false) => {
-    let idx = buffer.indexOf("\n\n")
+    let idx = buffer.indexOf('\n\n')
     while (idx !== -1) {
       const rawEvent = buffer.slice(0, idx)
       buffer = buffer.slice(idx + 2)
       if (rawEvent.trim()) {
         handleEvent(rawEvent)
       }
-      idx = buffer.indexOf("\n\n")
+      idx = buffer.indexOf('\n\n')
     }
 
     if (flush && buffer.trim()) {
       handleEvent(buffer.trim())
-      buffer = ""
+      buffer = ''
     }
   }
 
@@ -107,31 +104,28 @@ async function aiStreamError(response: Response) {
   const body = (await response.json().catch(() => null)) as {
     error?: { code?: string; message?: string }
   } | null
-  const code = body?.error?.code ?? "network-error"
+  const code = body?.error?.code ?? 'network-error'
   handleGlobalApiError(code, body?.error?.message)
   switch (code) {
-    case "login-required":
-      return new Error("请先登录")
-    case "account-disabled":
-      return new Error("账号已被禁用，请联系老师")
-    case "too-many-requests":
-      return new Error("AI 请求太频繁了，歇一会儿再试")
-    case "hint-locked":
-      return new Error("再多试几次，AI 提示会自动解锁")
-    case "contest-hint-disabled":
-      return new Error("比赛中不提供 AI 提示")
-    case "permission-denied":
-      return new Error("没有权限使用这个功能")
+    case 'login-required':
+      return new Error('请先登录')
+    case 'account-disabled':
+      return new Error('账号已被禁用，请联系老师')
+    case 'too-many-requests':
+      return new Error('AI 请求太频繁了，歇一会儿再试')
+    case 'hint-locked':
+      return new Error('再多试几次，AI 提示会自动解锁')
+    case 'contest-hint-disabled':
+      return new Error('比赛中不提供 AI 提示')
+    case 'permission-denied':
+      return new Error('没有权限使用这个功能')
     default:
-      return new Error("AI 分析生成失败")
+      return new Error('AI 分析生成失败')
   }
 }
 
 /** AI 流的事件形状，和 apps/api/src/services/ai.ts 的 streamChat / streamWhole 一致 */
-type AIStreamEvent =
-  | { type: "delta"; content?: string }
-  | { type: "error"; message?: string }
-  | ({ type: "done" } & Record<string, unknown>)
+type AIStreamEvent = { type: 'delta'; content?: string } | { type: 'error'; message?: string } | ({ type: 'done' } & Record<string, unknown>)
 
 export interface AIStreamHandlers<Done> {
   onDelta: (content: string) => void
@@ -148,14 +142,10 @@ export interface AIStreamHandlers<Done> {
  * 中文，见 services/ai.ts 的 CLIENT_ERROR_MESSAGE）。被 abort 时抛 AbortError，
  * 调用方一般用 `useAIStream` 就不用自己分辨。
  */
-export async function streamAI<Done = Record<string, unknown>>(
-  path: string,
-  body: unknown,
-  handlers: AIStreamHandlers<Done>,
-) {
+export async function streamAI<Done = Record<string, unknown>>(path: string, body: unknown, handlers: AIStreamHandlers<Done>) {
   const response = await authFetch(`/api/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: handlers.signal,
   })
@@ -163,11 +153,11 @@ export async function streamAI<Done = Record<string, unknown>>(
   await consumeJSONEventStream<AIStreamEvent>(response, {
     signal: handlers.signal,
     onMessage(event) {
-      if (event.type === "delta") {
+      if (event.type === 'delta') {
         if (event.content) handlers.onDelta(event.content)
-      } else if (event.type === "error") {
-        throw new Error(event.message || "AI 服务异常")
-      } else if (event.type === "done") {
+      } else if (event.type === 'error') {
+        throw new Error(event.message || 'AI 服务异常')
+      } else if (event.type === 'done') {
         handlers.onDone?.(event as Done)
       }
     },

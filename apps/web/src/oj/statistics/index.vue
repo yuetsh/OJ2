@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useRouteQuery } from "@vueuse/router"
-import StatisticsView from "./components/StatisticsView.vue"
-import { DEFAULT_PERIOD } from "./period"
+import { useRouteQuery } from '@vueuse/router'
+import StatisticsView from './components/StatisticsView.vue'
+import { DEFAULT_PERIOD } from './period'
 
 /**
  * 统计的页面形态：课堂看板「回头看」、题目页统计页签这些从别处进来时用。
@@ -11,16 +11,16 @@ import { DEFAULT_PERIOD } from "./period"
  */
 const router = useRouter()
 
-const tab = useRouteQuery<string>("tab", "code", { mode: "replace" })
-const className = useRouteQuery<string>("className", "", { mode: "replace" })
-const username = useRouteQuery<string>("username", "", { mode: "replace" })
-const problem = useRouteQuery<string>("problem", "", { mode: "replace" })
-const period = useRouteQuery<string>("period", DEFAULT_PERIOD, { mode: "replace" })
-const from = useRouteQuery<string>("from", "", { mode: "replace" })
-const to = useRouteQuery<string>("to", "", { mode: "replace" })
+const tab = useRouteQuery<string>('tab', 'code', { mode: 'replace' })
+const className = useRouteQuery<string>('className', '', { mode: 'replace' })
+const username = useRouteQuery<string>('username', '', { mode: 'replace' })
+const problem = useRouteQuery<string>('problem', '', { mode: 'replace' })
+const period = useRouteQuery<string>('period', DEFAULT_PERIOD, { mode: 'replace' })
+const from = useRouteQuery<string>('from', '', { mode: 'replace' })
+const to = useRouteQuery<string>('to', '', { mode: 'replace' })
 
 function openList(query: Record<string, string>) {
-  window.open(router.resolve({ name: "submissions", query }).href, "_blank")
+  window.open(router.resolve({ name: 'submissions', query }).href, '_blank')
 }
 </script>
 

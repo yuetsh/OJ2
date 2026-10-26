@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto"
-import { resolve } from "node:path"
+import { randomBytes } from 'node:crypto'
+import { resolve } from 'node:path'
 
 import {
   registerRequestSchema,
@@ -11,40 +11,24 @@ import {
   type ProblemRank,
   type WeeklyRank,
   type WeeklyRankItem,
-} from "@oj2/contract"
-import {
-  and,
-  count,
-  countDistinct,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lt,
-  lte,
-  max,
-  min,
-  notExists,
-  or,
-  sql,
-} from "drizzle-orm"
-import { alias } from "drizzle-orm/pg-core"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, count, countDistinct, desc, eq, gte, inArray, isNull, lt, lte, max, min, notExists, or, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
+import { Hono } from 'hono'
 
-import { hashPassword } from "../auth/password"
-import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
-import { config } from "../config"
-import { db, schema } from "../db"
-import { failure, parseBody, success } from "../http"
-import { JudgeStatus } from "../judge/status"
-import { getBooleanOption } from "../services/options"
-import { sniffImageExtension } from "../services/image"
-import { getUserProfileById } from "../services/profile"
-import { clientIp, countAttempt, lockoutRemaining, type AttemptRule } from "../services/throttling"
-import { audienceWhere, loadEntrants, SOLVED_RESULTS, standings } from "../services/ranking"
-import { localTime, termStart, weekStart } from "../time"
-import { asRecord, isTeacherOrAbove, sampleUser } from "./helpers"
+import { hashPassword } from '../auth/password'
+import { optionalAuth, requireAuth, type AppEnv } from '../auth/middleware'
+import { config } from '../config'
+import { db, schema } from '../db'
+import { failure, parseBody, success } from '../http'
+import { JudgeStatus } from '../judge/status'
+import { getBooleanOption } from '../services/options'
+import { sniffImageExtension } from '../services/image'
+import { getUserProfileById } from '../services/profile'
+import { clientIp, countAttempt, lockoutRemaining, type AttemptRule } from '../services/throttling'
+import { audienceWhere, loadEntrants, SOLVED_RESULTS, standings } from '../services/ranking'
+import { localTime, termStart, weekStart } from '../time'
+import { asRecord, isTeacherOrAbove, sampleUser } from './helpers'
 
 export const accountRoutes = new Hono<AppEnv>()
 
@@ -54,22 +38,17 @@ export const accountRoutes = new Hono<AppEnv>()
  */
 const REGISTER_PER_IP: AttemptRule = { limit: 100, windowSeconds: 60 * 60 }
 
-accountRoutes.post("/users", async (c) => {
-  const parsed = await parseBody(c, registerRequestSchema, "Invalid registration payload")
+accountRoutes.post('/users', async (c) => {
+  const parsed = await parseBody(c, registerRequestSchema, 'Invalid registration payload')
   if (!parsed.success) return parsed.response
-  if (!(await getBooleanOption("allow_register", true))) {
-    return failure(c, 403, "registration-disabled", "Register function has been disabled by admin")
+  if (!(await getBooleanOption('allow_register', true))) {
+    return failure(c, 403, 'registration-disabled', 'Register function has been disabled by admin')
   }
 
   const registerKey = `register:ip:${clientIp(c)}`
   const wait = await lockoutRemaining(registerKey, REGISTER_PER_IP)
   if (wait !== null) {
-    return failure(
-      c,
-      429,
-      "too-many-registrations",
-      `Too many registrations, please wait ${wait} seconds`,
-    )
+    return failure(c, 429, 'too-many-registrations', `Too many registrations, please wait ${wait} seconds`)
   }
 
   const username = parsed.data.username.toLowerCase()
@@ -77,18 +56,13 @@ accountRoutes.post("/users", async (c) => {
   const [duplicate] = await db
     .select({ username: schema.user.username, email: schema.user.email })
     .from(schema.user)
-    .where(
-      or(
-        sql`lower(${schema.user.username}) = ${username}`,
-        sql`lower(${schema.user.email}) = ${email}`,
-      ),
-    )
+    .where(or(sql`lower(${schema.user.username}) = ${username}`, sql`lower(${schema.user.email}) = ${email}`))
     .limit(1)
   if (duplicate?.username.toLowerCase() === username) {
-    return failure(c, 409, "username-exists", "Username already exists")
+    return failure(c, 409, 'username-exists', 'Username already exists')
   }
   if (duplicate?.email?.toLowerCase() === email) {
-    return failure(c, 409, "email-exists", "Email already exists")
+    return failure(c, 409, 'email-exists', 'Email already exists')
   }
 
   const now = new Date().toISOString()
@@ -103,13 +77,13 @@ accountRoutes.post("/users", async (c) => {
         rawPassword: parsed.data.password.slice(0, 20),
         lastLogin: null,
         createTime: now,
-        adminType: "Regular User",
+        adminType: 'Regular User',
         isDisabled: false,
-        problemPermission: "None",
+        problemPermission: 'None',
         className: null,
       })
       .returning({ id: schema.user.id })
-    if (!created) throw new Error("User insert did not return an id")
+    if (!created) throw new Error('User insert did not return an id')
     await tx.insert(schema.userProfile).values({
       userId: created.id,
       acmProblemsStatus: {},
@@ -124,24 +98,19 @@ accountRoutes.post("/users", async (c) => {
   return success(c, { ok: true }, 201)
 })
 
-accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
+accountRoutes.get('/profiles/:username', optionalAuth, async (c) => {
   // 对齐旧后端 account/views/oj.py 的 UserProfileAPI.get 首行：
   // `if not user.is_authenticated: return self.success()` —— 匿名一律返回空，
   // 否则用户名可经排名接口（/rankings/board）公开枚举，进而不登录就批量收集全校学生的邮箱与最后登录时间。
-  if (!c.get("user")) return success(c, null)
+  if (!c.get('user')) return success(c, null)
   const [target] = await db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(
-      and(
-        sql`lower(${schema.user.username}) = lower(${c.req.param("username")})`,
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(sql`lower(${schema.user.username}) = lower(${c.req.param('username')})`, eq(schema.user.isDisabled, false)))
     .limit(1)
-  if (!target) return failure(c, 404, "user-not-found", "User does not exist")
-  const profile = await getUserProfileById(target.id, c.get("user")?.id === target.id)
-  if (!profile) return failure(c, 404, "profile-not-found", "User profile does not exist")
+  if (!target) return failure(c, 404, 'user-not-found', 'User does not exist')
+  const profile = await getUserProfileById(target.id, c.get('user')?.id === target.id)
+  if (!profile) return failure(c, 404, 'profile-not-found', 'User profile does not exist')
   return success(c, profile)
 })
 
@@ -149,8 +118,8 @@ accountRoutes.get("/profiles/:username", optionalAuth, async (c) => {
  * 个人主页那一页的数据（设计稿「我的主页与设置」定稿）。看的人是本人、同学还是老师，
  * 由这里裁：交过没做对的题和知识点只给本人和老师；不计入排名只告诉本人和老师。
  */
-accountRoutes.get("/profiles/:username/overview", requireAuth, async (c) => {
-  const viewer = c.get("user")!
+accountRoutes.get('/profiles/:username/overview', requireAuth, async (c) => {
+  const viewer = c.get('user')!
   const [target] = await db
     .select({
       id: schema.user.id,
@@ -159,94 +128,70 @@ accountRoutes.get("/profiles/:username/overview", requireAuth, async (c) => {
       rankHiddenAt: schema.user.rankHiddenAt,
     })
     .from(schema.user)
-    .where(
-      and(
-        sql`lower(${schema.user.username}) = lower(${c.req.param("username")})`,
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(sql`lower(${schema.user.username}) = lower(${c.req.param('username')})`, eq(schema.user.isDisabled, false)))
     .limit(1)
-  if (!target) return failure(c, 404, "user-not-found", "没有这个用户")
+  if (!target) return failure(c, 404, 'user-not-found', '没有这个用户')
   const privileged = target.id === viewer.id || isTeacherOrAbove(viewer)
   const isStudent = (STUDENT_ROLES as readonly string[]).includes(target.adminType)
 
   const firstSolved = min(schema.submission.createTime)
   const lastTried = max(schema.submission.createTime)
-  const [times, solved, unsolved, knowledge, achievements, achievementTotal, classStandings] =
-    await Promise.all([
-      // 比赛提交也算：首末提交、学习天数一直是连比赛一起算的
-      db
-        .select({
-          first: min(schema.submission.createTime),
-          latest: max(schema.submission.createTime),
-          activeDays: countDistinct(sql`date(${localTime(schema.submission.createTime)})`),
-        })
-        .from(schema.submission)
-        .where(eq(schema.submission.userId, target.id)),
-      db
-        .select({
-          problemId: schema.submission.problemId,
-          displayId: schema.problem.displayId,
-          title: schema.problem.title,
-          solvedAt: firstSolved,
-        })
-        .from(schema.submission)
-        .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
-        .where(
-          and(
-            eq(schema.submission.userId, target.id),
-            isNull(schema.submission.contestId),
-            inArray(schema.submission.result, SOLVED_RESULTS),
-          ),
-        )
-        .groupBy(schema.submission.problemId, schema.problem.displayId, schema.problem.title)
-        .orderBy(desc(firstSolved), schema.problem.displayId),
-      privileged
-        ? db
-            .select({
-              displayId: schema.problem.displayId,
-              title: schema.problem.title,
-              attempts: count(),
-            })
-            .from(schema.submission)
-            .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
-            .where(
-              and(eq(schema.submission.userId, target.id), isNull(schema.submission.contestId)),
-            )
-            .groupBy(schema.submission.problemId, schema.problem.displayId, schema.problem.title)
-            .having(sql`not bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`)
-            .orderBy(desc(lastTried))
-        : null,
-      privileged ? knowledgeMapOf(target.id, target.className) : null,
-      db
-        .select({
-          id: schema.achievement.id,
-          name: schema.achievement.name,
-          description: schema.achievement.description,
-          icon: schema.achievement.icon,
-          rarity: schema.achievement.rarity,
-          unlockTime: schema.userAchievement.unlockTime,
-        })
-        .from(schema.userAchievement)
-        .innerJoin(
-          schema.achievement,
-          eq(schema.achievement.id, schema.userAchievement.achievementId),
-        )
-        .where(
-          and(eq(schema.userAchievement.userId, target.id), eq(schema.achievement.visible, true)),
-        )
-        .orderBy(desc(schema.userAchievement.unlockTime), schema.achievement.order),
-      db
-        .select({ total: count() })
-        .from(schema.achievement)
-        .where(eq(schema.achievement.visible, true)),
-      // 这学期本班第几，和排名页同口径（不计入排名的人不在 rankedStudents 里，自然查不到）
-      isStudent && target.className && !target.rankHiddenAt
-        ? loadEntrants(audienceWhere("class", target.className), termStart()).then((entrants) =>
-            standings(entrants, null, true),
-          )
-        : [],
-    ])
+  const [times, solved, unsolved, knowledge, achievements, achievementTotal, classStandings] = await Promise.all([
+    // 比赛提交也算：首末提交、学习天数一直是连比赛一起算的
+    db
+      .select({
+        first: min(schema.submission.createTime),
+        latest: max(schema.submission.createTime),
+        activeDays: countDistinct(sql`date(${localTime(schema.submission.createTime)})`),
+      })
+      .from(schema.submission)
+      .where(eq(schema.submission.userId, target.id)),
+    db
+      .select({
+        problemId: schema.submission.problemId,
+        displayId: schema.problem.displayId,
+        title: schema.problem.title,
+        solvedAt: firstSolved,
+      })
+      .from(schema.submission)
+      .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
+      .where(and(eq(schema.submission.userId, target.id), isNull(schema.submission.contestId), inArray(schema.submission.result, SOLVED_RESULTS)))
+      .groupBy(schema.submission.problemId, schema.problem.displayId, schema.problem.title)
+      .orderBy(desc(firstSolved), schema.problem.displayId),
+    privileged
+      ? db
+          .select({
+            displayId: schema.problem.displayId,
+            title: schema.problem.title,
+            attempts: count(),
+          })
+          .from(schema.submission)
+          .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
+          .where(and(eq(schema.submission.userId, target.id), isNull(schema.submission.contestId)))
+          .groupBy(schema.submission.problemId, schema.problem.displayId, schema.problem.title)
+          .having(sql`not bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`)
+          .orderBy(desc(lastTried))
+      : null,
+    privileged ? knowledgeMapOf(target.id, target.className) : null,
+    db
+      .select({
+        id: schema.achievement.id,
+        name: schema.achievement.name,
+        description: schema.achievement.description,
+        icon: schema.achievement.icon,
+        rarity: schema.achievement.rarity,
+        unlockTime: schema.userAchievement.unlockTime,
+      })
+      .from(schema.userAchievement)
+      .innerJoin(schema.achievement, eq(schema.achievement.id, schema.userAchievement.achievementId))
+      .where(and(eq(schema.userAchievement.userId, target.id), eq(schema.achievement.visible, true)))
+      .orderBy(desc(schema.userAchievement.unlockTime), schema.achievement.order),
+    db.select({ total: count() }).from(schema.achievement).where(eq(schema.achievement.visible, true)),
+    // 这学期本班第几，和排名页同口径（不计入排名的人不在 rankedStudents 里，自然查不到）
+    isStudent && target.className && !target.rankHiddenAt
+      ? loadEntrants(audienceWhere('class', target.className), termStart()).then((entrants) => standings(entrants, null, true))
+      : [],
+  ])
 
   const tagRows = solved.length
     ? await db
@@ -255,7 +200,7 @@ accountRoutes.get("/profiles/:username/overview", requireAuth, async (c) => {
         .innerJoin(schema.problemTag, eq(schema.problemTag.id, schema.problemTags.problemtagId))
         .where(
           and(
-            eq(schema.problemTag.category, "knowledge"),
+            eq(schema.problemTag.category, 'knowledge'),
             inArray(
               schema.problemTags.problemId,
               solved.map((row) => row.problemId),
@@ -274,18 +219,12 @@ accountRoutes.get("/profiles/:username/overview", requireAuth, async (c) => {
   const mine = classStandings.find((row) => row.entrant.id === target.id && row.solved > 0)
 
   // 「你和他」：只有同学看同学才给
-  let versus: ProfileOverview["versus"] = null
+  let versus: ProfileOverview['versus'] = null
   if (!privileged) {
     const viewerSolved = await db
       .selectDistinct({ problemId: schema.submission.problemId })
       .from(schema.submission)
-      .where(
-        and(
-          eq(schema.submission.userId, viewer.id),
-          isNull(schema.submission.contestId),
-          inArray(schema.submission.result, SOLVED_RESULTS),
-        ),
-      )
+      .where(and(eq(schema.submission.userId, viewer.id), isNull(schema.submission.contestId), inArray(schema.submission.result, SOLVED_RESULTS)))
     const theirs = new Set(solved.map((row) => row.problemId))
     const me = classStandings.find((row) => row.entrant.id === viewer.id && row.solved > 0)
     versus = {
@@ -320,31 +259,29 @@ accountRoutes.get("/profiles/:username/overview", requireAuth, async (c) => {
   } satisfies ProfileOverview)
 })
 
-accountRoutes.put("/me/profile", requireAuth, async (c) => {
-  const parsed = await parseBody(c, updateProfileRequestSchema, "Invalid profile payload")
+accountRoutes.put('/me/profile', requireAuth, async (c) => {
+  const parsed = await parseBody(c, updateProfileRequestSchema, 'Invalid profile payload')
   if (!parsed.success) return parsed.response
-  const values = Object.fromEntries(
-    Object.entries(parsed.data).map(([key, value]) => [key, value === "" ? null : value]),
-  )
+  const values = Object.fromEntries(Object.entries(parsed.data).map(([key, value]) => [key, value === '' ? null : value]))
   await db
     .update(schema.userProfile)
     .set(values)
-    .where(eq(schema.userProfile.userId, c.get("user")!.id))
-  const profile = await getUserProfileById(c.get("user")!.id, true)
-  if (!profile) return failure(c, 404, "profile-not-found", "User profile does not exist")
+    .where(eq(schema.userProfile.userId, c.get('user')!.id))
+  const profile = await getUserProfileById(c.get('user')!.id, true)
+  if (!profile) return failure(c, 404, 'profile-not-found', 'User profile does not exist')
   return success(c, profile)
 })
 
-accountRoutes.post("/me/avatar", requireAuth, async (c) => {
+accountRoutes.post('/me/avatar', requireAuth, async (c) => {
   const body: Record<string, string | File> = await c.req.parseBody().catch(() => ({}))
   const image = body.image
-  if (!(image instanceof File)) return failure(c, 400, "invalid-file", "Invalid file content")
-  if (image.size > 2 * 1024 * 1024) return failure(c, 400, "file-too-large", "Picture is too large")
+  if (!(image instanceof File)) return failure(c, 400, 'invalid-file', 'Invalid file content')
+  if (image.size > 2 * 1024 * 1024) return failure(c, 400, 'file-too-large', 'Picture is too large')
   const extension = await sniffImageExtension(image)
   if (!extension) {
-    return failure(c, 400, "unsupported-file", "Unsupported file format")
+    return failure(c, 400, 'unsupported-file', 'Unsupported file format')
   }
-  const filename = `${randomBytes(10).toString("hex")}${extension}`
+  const filename = `${randomBytes(10).toString('hex')}${extension}`
   const directory = resolve(config.avatarDirectory)
   await Bun.$`mkdir -p ${directory}`.quiet()
   await Bun.write(resolve(directory, filename), image)
@@ -352,17 +289,17 @@ accountRoutes.post("/me/avatar", requireAuth, async (c) => {
   await db
     .update(schema.userProfile)
     .set({ avatar })
-    .where(eq(schema.userProfile.userId, c.get("user")!.id))
+    .where(eq(schema.userProfile.userId, c.get('user')!.id))
   return success(c, { avatar })
 })
 
 /** 不用图片了，退回默认头像（前端画成名字最后一个字，见 RankAvatar.vue） */
-accountRoutes.delete("/me/avatar", requireAuth, async (c) => {
+accountRoutes.delete('/me/avatar', requireAuth, async (c) => {
   const avatar = `${config.avatarUriPrefix}/default.png`
   await db
     .update(schema.userProfile)
     .set({ avatar })
-    .where(eq(schema.userProfile.userId, c.get("user")!.id))
+    .where(eq(schema.userProfile.userId, c.get('user')!.id))
   return success(c, { avatar })
 })
 
@@ -384,11 +321,11 @@ const ACCEPTED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
  * （user_id, problem_id, result, create_time，WHERE contest_id IS NULL）的全部列，
  * 而且外层已经把行数收在「本周的 AC」这一小撮上，不会退化成按人全表回查。
  */
-accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
-  const user = c.get("user")
-  const scope = c.req.query("scope") === "class" ? "class" : "global"
-  const className = scope === "class" ? (user?.className ?? null) : null
-  if (scope === "class" && !className) return failure(c, 400, "class-missing", "用户没有班级信息")
+accountRoutes.get('/rankings/weekly', optionalAuth, async (c) => {
+  const user = c.get('user')
+  const scope = c.req.query('scope') === 'class' ? 'class' : 'global'
+  const className = scope === 'class' ? (user?.className ?? null) : null
+  if (scope === 'class' && !className) return failure(c, 400, 'class-missing', '用户没有班级信息')
 
   const start = weekStart()
 
@@ -400,13 +337,9 @@ accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
     isNull(schema.user.rankHiddenAt),
     className ? eq(schema.user.className, className) : undefined,
   )
-  const thisWeek = and(
-    isNull(schema.submission.contestId),
-    gte(schema.submission.createTime, start),
-    audience,
-  )
+  const thisWeek = and(isNull(schema.submission.contestId), gte(schema.submission.createTime, start), audience)
 
-  const earlier = alias(schema.submission, "earlier")
+  const earlier = alias(schema.submission, 'earlier')
   const [solvedRows, submittedRows] = await Promise.all([
     db
       .select({
@@ -452,12 +385,7 @@ accountRoutes.get("/rankings/weekly", optionalAuth, async (c) => {
    * postgres 每次返回的顺序可以不同，刷新一下名次就变了。
    */
   const ranked = solvedRows
-    .sort(
-      (a, b) =>
-        b.value - a.value ||
-        (submissions.get(a.userId) ?? 0) - (submissions.get(b.userId) ?? 0) ||
-        a.userId - b.userId,
-    )
+    .sort((a, b) => b.value - a.value || (submissions.get(a.userId) ?? 0) - (submissions.get(b.userId) ?? 0) || a.userId - b.userId)
     .map(
       (row, index) =>
         ({
@@ -491,12 +419,7 @@ const KNOWLEDGE_CLASS_TOUCHED_RATIO = 0.3
  * 26% 的学生一档都没升，其中一半做对过带标签的题、只是没到 3 道。
  */
 function levelThresholds(problemCount: number) {
-  return [
-    1,
-    3,
-    Math.max(4, Math.min(10, Math.round(problemCount * 0.4))),
-    Math.max(5, Math.min(20, Math.round(problemCount * 0.75))),
-  ]
+  return [1, 3, Math.max(4, Math.min(10, Math.round(problemCount * 0.4))), Math.max(5, Math.min(20, Math.round(problemCount * 0.75)))]
 }
 
 function levelOf(solved: number, thresholds: number[]) {
@@ -507,8 +430,8 @@ function levelOf(solved: number, thresholds: number[]) {
  * 我的知识点地图。「做对」按题目算（同一题只算一次），不含比赛提交，
  * 题目只算公开的题库题 —— 和 problemCount 同一个口径，不然会出现 12/10。
  */
-accountRoutes.get("/me/knowledge", requireAuth, async (c) => {
-  const user = c.get("user")!
+accountRoutes.get('/me/knowledge', requireAuth, async (c) => {
+  const user = c.get('user')!
   return success(c, await knowledgeMapOf(user.id, user.className))
 })
 
@@ -523,13 +446,7 @@ async function knowledgeMapOf(userId: number, className: string | null): Promise
     .from(schema.problemTag)
     .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .innerJoin(schema.problem, eq(schema.problem.id, schema.problemTags.problemId))
-    .where(
-      and(
-        eq(schema.problemTag.category, "knowledge"),
-        eq(schema.problem.visible, true),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(eq(schema.problemTag.category, 'knowledge'), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
     .groupBy(schema.problemTag.id, schema.problemTag.name)
     .having(sql`count(*) >= ${KNOWLEDGE_MIN_PROBLEMS}`)
   const tagIds = tags.map((tag) => tag.id)
@@ -538,18 +455,12 @@ async function knowledgeMapOf(userId: number, className: string | null): Promise
   const firstAccepted = db
     .select({
       problemId: schema.submission.problemId,
-      firstAt: min(schema.submission.createTime).as("first_at"),
+      firstAt: min(schema.submission.createTime).as('first_at'),
     })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, userId),
-        isNull(schema.submission.contestId),
-        inArray(schema.submission.result, ACCEPTED_RESULTS),
-      ),
-    )
+    .where(and(eq(schema.submission.userId, userId), isNull(schema.submission.contestId), inArray(schema.submission.result, ACCEPTED_RESULTS)))
     .groupBy(schema.submission.problemId)
-    .as("first_accepted")
+    .as('first_accepted')
 
   const start = weekStart()
   const [mine, classTouchedRows, classSize] = await Promise.all([
@@ -562,13 +473,7 @@ async function knowledgeMapOf(userId: number, className: string | null): Promise
       .from(firstAccepted)
       .innerJoin(schema.problemTags, eq(schema.problemTags.problemId, firstAccepted.problemId))
       .innerJoin(schema.problem, eq(schema.problem.id, firstAccepted.problemId))
-      .where(
-        and(
-          inArray(schema.problemTags.problemtagId, tagIds),
-          eq(schema.problem.visible, true),
-          isNull(schema.problem.contestId),
-        ),
-      )
+      .where(and(inArray(schema.problemTags.problemtagId, tagIds), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
       .groupBy(schema.problemTags.problemtagId),
     className
       ? db
@@ -578,10 +483,7 @@ async function knowledgeMapOf(userId: number, className: string | null): Promise
           })
           .from(schema.submission)
           .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-          .innerJoin(
-            schema.problemTags,
-            eq(schema.problemTags.problemId, schema.submission.problemId),
-          )
+          .innerJoin(schema.problemTags, eq(schema.problemTags.problemId, schema.submission.problemId))
           .where(
             and(
               eq(schema.user.className, className),
@@ -598,23 +500,13 @@ async function knowledgeMapOf(userId: number, className: string | null): Promise
       ? db
           .select({ total: count() })
           .from(schema.user)
-          .where(
-            and(
-              eq(schema.user.className, className),
-              eq(schema.user.isDisabled, false),
-              inArray(schema.user.adminType, [...STUDENT_ROLES]),
-            ),
-          )
+          .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
       : [],
   ])
 
   const mineByTag = new Map(mine.map((row) => [row.tagId, row]))
   const total = classSize[0]?.total ?? 0
-  const touchedIds = new Set(
-    classTouchedRows
-      .filter((row) => total > 0 && row.users / total >= KNOWLEDGE_CLASS_TOUCHED_RATIO)
-      .map((row) => row.tagId),
-  )
+  const touchedIds = new Set(classTouchedRows.filter((row) => total > 0 && row.users / total >= KNOWLEDGE_CLASS_TOUCHED_RATIO).map((row) => row.tagId))
 
   return {
     tags: tags
@@ -636,29 +528,22 @@ async function knowledgeMapOf(userId: number, className: string | null): Promise
   }
 }
 
-accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
-  const user = c.get("user")!
+accountRoutes.get('/problems/:displayId/rank', requireAuth, async (c) => {
+  const user = c.get('user')!
   const [problem] = await db
     .select({ id: schema.problem.id })
     .from(schema.problem)
     .where(
-      and(
-        sql`lower(${schema.problem.displayId}) = lower(${c.req.param("displayId")})`,
-        isNull(schema.problem.contestId),
-        eq(schema.problem.visible, true),
-      ),
+      and(sql`lower(${schema.problem.displayId}) = lower(${c.req.param('displayId')})`, isNull(schema.problem.contestId), eq(schema.problem.visible, true)),
     )
     .limit(1)
-  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  const accepted = and(
-    eq(schema.submission.problemId, problem.id),
-    inArray(schema.submission.result, [0, 10]),
-  )
+  if (!problem) return failure(c, 404, 'problem-not-found', 'Problem does not exist')
+  const accepted = and(eq(schema.submission.problemId, problem.id), inArray(schema.submission.result, [0, 10]))
   const [all] = await db
     .select({ value: countDistinct(schema.submission.userId) })
     .from(schema.submission)
     .where(accepted)
-  const className = user.className ?? ""
+  const className = user.className ?? ''
   const classWhere = className
     ? and(
         accepted,
@@ -709,8 +594,8 @@ accountRoutes.get("/problems/:displayId/rank", requireAuth, async (c) => {
  * 题目一旦被隐藏或删除，display_ids 就比 ids 短 —— 轻则把编号张冠李戴写进库，
  * 重则 `id_map[k]` KeyError。这里改成按 id 建 Map、查不到就不动。
  */
-accountRoutes.post("/me/problem-display-ids/refresh", requireAuth, async (c) => {
-  const user = c.get("user")!
+accountRoutes.post('/me/problem-display-ids/refresh', requireAuth, async (c) => {
+  const user = c.get('user')!
   const [profile] = await db
     .select({ value: schema.userProfile.acmProblemsStatus })
     .from(schema.userProfile)
@@ -732,10 +617,7 @@ accountRoutes.post("/me/problem-display-ids/refresh", requireAuth, async (c) => 
       problems[id] = item
     }
     status.problems = problems
-    await db
-      .update(schema.userProfile)
-      .set({ acmProblemsStatus: status })
-      .where(eq(schema.userProfile.userId, user.id))
+    await db.update(schema.userProfile).set({ acmProblemsStatus: status }).where(eq(schema.userProfile.userId, user.id))
   }
   return success(c, null)
 })

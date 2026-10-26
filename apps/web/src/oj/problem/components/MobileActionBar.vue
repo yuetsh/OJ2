@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import { useSubmissionStore } from "oj/store/submission"
-import SubmitCode from "./SubmitCode.vue"
-import { typing } from "../utils/symbolKeys"
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
+import { useSubmissionStore } from 'oj/store/submission'
+import SubmitCode from './SubmitCode.vue'
+import { typing } from '../utils/symbolKeys'
 
-const SubmitFlowchart = defineAsyncComponent(() => import("./SubmitFlowchart.vue"))
+const SubmitFlowchart = defineAsyncComponent(() => import('./SubmitFlowchart.vue'))
 
 /**
  * 手机上屏幕底部固定的「运行例子 / 提交」（设计文档 5.6）。原来这两个按钮在「代码」页签
@@ -21,12 +21,7 @@ const { samplesRunning } = submissionStore.trial
 const { problem } = storeToRefs(useProblemStore())
 
 // 和工具栏同一个条件：SQL 不走判题机、流程图没得跑，没有例子的题不给
-const canRunSamples = computed(
-  () =>
-    !!problem.value?.samples.length &&
-    codeStore.code.language !== "Flowchart" &&
-    codeStore.code.language !== "SQL",
-)
+const canRunSamples = computed(() => !!problem.value?.samples.length && codeStore.code.language !== 'Flowchart' && codeStore.code.language !== 'SQL')
 </script>
 
 <template>
@@ -62,7 +57,7 @@ const canRunSamples = computed(
   display: flex;
   gap: 10px;
   padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
-  background-color: v-bind("theme.bodyColor");
+  background-color: v-bind('theme.bodyColor');
   border-top: 1px solid rgba(128, 128, 128, 0.2);
   backdrop-filter: blur(8px);
 }

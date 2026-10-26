@@ -1,8 +1,8 @@
-import { defineStore } from "pinia"
+import { defineStore } from 'pinia'
 
-export const useMyFlowchartStore = defineStore("myFlowchart", () => {
+export const useMyFlowchartStore = defineStore('myFlowchart', () => {
   const showing = ref(false)
-  const mermaidCode = ref("")
+  const mermaidCode = ref('')
 
   function show(code: string) {
     mermaidCode.value = code
@@ -11,7 +11,7 @@ export const useMyFlowchartStore = defineStore("myFlowchart", () => {
 
   function hide() {
     showing.value = false
-    mermaidCode.value = ""
+    mermaidCode.value = ''
   }
 
   return { showing, mermaidCode, show, hide }

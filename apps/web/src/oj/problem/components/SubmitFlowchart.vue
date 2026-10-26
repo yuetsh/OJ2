@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import { storeToRefs } from "pinia"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { countBlank } from "shared/components/FlowchartEditor/model"
-import { useProblemStore } from "oj/store/problem"
-import { useFlowchartStore } from "oj/store/flowchart"
+import { storeToRefs } from 'pinia'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { countBlank } from 'shared/components/FlowchartEditor/model'
+import { useProblemStore } from 'oj/store/problem'
+import { useFlowchartStore } from 'oj/store/flowchart'
 
 /**
  * 「交给 AI 点评」按钮。
@@ -15,7 +15,7 @@ import { useFlowchartStore } from "oj/store/flowchart"
 
 /** 手机上它在屏幕底部那条（MobileActionBar），不在编辑器里面，所以画布从 store 拿 */
 const { size, block = false } = defineProps<{
-  size?: "small" | "medium" | "large"
+  size?: 'small' | 'medium' | 'large'
   block?: boolean
 }>()
 
@@ -30,7 +30,7 @@ function submit() {
   if (!editor) return
   const doc = editor.getDoc()
   if (!doc.steps.length) {
-    message.warning("画布上还没有图：点「开始」下面的 +，加第一步")
+    message.warning('画布上还没有图：点「开始」下面的 +，加第一步')
     return
   }
   // 空框交上去 AI 只能瞎猜，学生也不知道扣分是因为忘了写字
@@ -56,6 +56,6 @@ watch(() => problem.value?.id, flowchartStore.ensureLoaded, { immediate: true })
     :title="unchanged && !loading ? '这一版已经点评过了，改一改再交' : undefined"
     @click="submit"
   >
-    {{ loading ? "AI 点评中…" : "交给 AI 点评" }}
+    {{ loading ? 'AI 点评中…' : '交给 AI 点评' }}
   </n-button>
 </template>

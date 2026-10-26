@@ -1,6 +1,6 @@
-import type { Tone } from "shared/composables/tone"
-import { parseTime } from "utils/functions"
-import type { ClassBoardCell, ClassBoardStudent } from "utils/types"
+import type { Tone } from 'shared/composables/tone'
+import { parseTime } from 'utils/functions'
+import type { ClassBoardCell, ClassBoardStudent } from 'utils/types'
 
 /**
  * 课堂看板的格子：一个学生 × 一道题。显示什么字、什么颜色、悬停说什么，都是纯函数，
@@ -12,14 +12,14 @@ export const STUCK_ATTEMPTS = 3
 
 /** 今天之前就通过了的，颜色淡一档。`day` 是看板的「今天」（东八区日期） */
 export function acceptedToday(cell: ClassBoardCell, day: string | undefined) {
-  return !!cell.acceptedAt && parseTime(cell.acceptedAt, "YYYY-MM-DD") === day
+  return !!cell.acceptedAt && parseTime(cell.acceptedAt, 'YYYY-MM-DD') === day
 }
 
 /** 做对了的写第几次做对：「✓ 9」是今天第 9 次才对，一次就对的、以前就对了的还是「✓」 */
 export function cellText(cell: ClassBoardCell) {
-  if (cell.status === "accepted") return (cell.acceptedTry ?? 1) > 1 ? `✓ ${cell.acceptedTry}` : "✓"
-  if (cell.status === "tried") return cell.attempts ? `✗ ${cell.attempts}` : "✗"
-  return ""
+  if (cell.status === 'accepted') return (cell.acceptedTry ?? 1) > 1 ? `✓ ${cell.acceptedTry}` : '✓'
+  if (cell.status === 'tried') return cell.attempts ? `✗ ${cell.attempts}` : '✗'
+  return ''
 }
 
 export function cellStyle(
@@ -31,48 +31,38 @@ export function cellStyle(
     actionColor: string
   },
 ) {
-  if (cell.status === "accepted") {
-    const t = colors.tone("success")
-    return acceptedToday(cell, day)
-      ? { background: t.background, color: t.color }
-      : { background: t.background, color: t.color, opacity: 0.5 }
+  if (cell.status === 'accepted') {
+    const t = colors.tone('success')
+    return acceptedToday(cell, day) ? { background: t.background, color: t.color } : { background: t.background, color: t.color, opacity: 0.5 }
   }
-  if (cell.status === "tried") {
+  if (cell.status === 'tried') {
     if (cell.attempts >= STUCK_ATTEMPTS) {
-      return { background: colors.errorColor, color: "#ffffff" }
+      return { background: colors.errorColor, color: '#ffffff' }
     }
-    const t = colors.tone("warning")
+    const t = colors.tone('warning')
     return { background: t.background, color: t.color }
   }
   return { background: colors.actionColor }
 }
 
-export function cellTitle(
-  cell: ClassBoardCell,
-  student: ClassBoardStudent,
-  day: string | undefined,
-) {
-  if (cell.status === "accepted") {
-    const when = acceptedToday(cell, day)
-      ? `${parseTime(cell.acceptedAt!, "HH:mm")} 做对`
-      : "以前就做对了"
-    if (cell.challenge === "done") return `${when}，挑战也做到了`
-    if (cell.challenge === "doing") return `${when}，在挑战`
+export function cellTitle(cell: ClassBoardCell, student: ClassBoardStudent, day: string | undefined) {
+  if (cell.status === 'accepted') {
+    const when = acceptedToday(cell, day) ? `${parseTime(cell.acceptedAt!, 'HH:mm')} 做对` : '以前就做对了'
+    if (cell.challenge === 'done') return `${when}，挑战也做到了`
+    if (cell.challenge === 'doing') return `${when}，在挑战`
     return when
   }
-  if (cell.status === "tried") {
+  if (cell.status === 'tried') {
     if (cell.latest) return `讲讲 ${student.username} 这道题的错`
-    return cell.attempts ? `今天画了 ${cell.flowchartAttempts} 张流程图` : "以前交过，没做对"
+    return cell.attempts ? `今天画了 ${cell.flowchartAttempts} 张流程图` : '以前交过，没做对'
   }
-  return ""
+  return ''
 }
 
 /** 点开做对的格子，方块串旁边那句 */
 export function trailSummary(cell: ClassBoardCell, day: string | undefined) {
   const total = cell.trail.length
-  if (cell.acceptedTry === 1) return total === 1 ? "一次就做对" : `交了 ${total} 次，第 1 次就做对`
+  if (cell.acceptedTry === 1) return total === 1 ? '一次就做对' : `交了 ${total} 次，第 1 次就做对`
   if (cell.acceptedTry) return `交了 ${total} 次，第 ${cell.acceptedTry} 次做对`
-  return acceptedToday(cell, day)
-    ? `今天交了 ${total} 次代码`
-    : `以前就做对了，今天又交了 ${total} 次`
+  return acceptedToday(cell, day) ? `今天交了 ${total} 次代码` : `以前就做对了，今天又交了 ${total} 次`
 }

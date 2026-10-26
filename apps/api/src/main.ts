@@ -21,41 +21,41 @@
 
 export {} // 只有动态 import 的话 TS 不认这是模块，顶层 await 会报错
 
-const command = process.argv[2] ?? "serve"
+const command = process.argv[2] ?? 'serve'
 
 switch (command) {
-  case "serve":
-    await import("./index")
+  case 'serve':
+    await import('./index')
     break
-  case "worker":
-    await import("./worker")
+  case 'worker':
+    await import('./worker')
     break
-  case "migrate": {
-    const { runMigrations } = await import("./db/migrate")
+  case 'migrate': {
+    const { runMigrations } = await import('./db/migrate')
     await runMigrations()
     break
   }
   // 数据订正，跟着二进制走而不是留成源码脚本 —— 生产镜像里没有 bun 也没有源码。
   // 反范式计数列被重判等操作带偏之后拿它对账，默认只读预演，--apply 才写。
-  case "recount": {
-    const { recount } = await import("./scripts/recount")
-    process.exit(await recount({ apply: process.argv.slice(3).includes("--apply") }))
+  case 'recount': {
+    const { recount } = await import('./scripts/recount')
+    process.exit(await recount({ apply: process.argv.slice(3).includes('--apply') }))
   }
   // 同上：诊断规则改了之后，把库里已有的诊断重做一遍（要连判题机和测试点，只能在线上跑）
-  case "rediagnose": {
-    const { rediagnose } = await import("./scripts/rediagnose")
-    process.exit(await rediagnose({ apply: process.argv.slice(3).includes("--apply") }))
+  case 'rediagnose': {
+    const { rediagnose } = await import('./scripts/rediagnose')
+    process.exit(await rediagnose({ apply: process.argv.slice(3).includes('--apply') }))
   }
-  case "sql-child": {
-    const { runSqlChild } = await import("./judge/sql/child")
+  case 'sql-child': {
+    const { runSqlChild } = await import('./judge/sql/child')
     await runSqlChild()
     break
   }
   // 运行镜像是 debian-slim，没有 curl/wget，探活让二进制自己做。
   // 只打 /health，不碰库 —— 库挂了该由库自己的 healthcheck 报，
   // 不该让 api 容器跟着被判成不健康、进而被重启。
-  case "healthcheck": {
-    const { config } = await import("./config")
+  case 'healthcheck': {
+    const { config } = await import('./config')
     try {
       const response = await fetch(`http://127.0.0.1:${config.port}/health`, {
         signal: AbortSignal.timeout(3000),
@@ -66,8 +66,6 @@ switch (command) {
     }
   }
   default:
-    console.error(
-      `未知子命令：${command}\n可用：serve | worker | migrate | recount | rediagnose | healthcheck | sql-child`,
-    )
+    console.error(`未知子命令：${command}\n可用：serve | worker | migrate | recount | rediagnose | healthcheck | sql-child`)
     process.exit(2)
 }

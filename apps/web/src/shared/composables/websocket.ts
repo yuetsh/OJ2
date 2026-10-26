@@ -1,19 +1,19 @@
-import { WS_AUTH_PROTOCOL } from "@oj2/contract"
-import { createDiscreteApi } from "naive-ui"
-import { ref, getCurrentScope, onScopeDispose, type Ref } from "vue"
+import { WS_AUTH_PROTOCOL } from '@oj2/contract'
+import { createDiscreteApi } from 'naive-ui'
+import { ref, getCurrentScope, onScopeDispose, type Ref } from 'vue'
 
-import { useAuthModalStore } from "shared/store/authModal"
-import { useUserStore } from "shared/store/user"
-import { getAccessToken } from "utils/auth"
-import { STORAGE_KEY } from "utils/constants"
-import storage from "utils/storage"
-import type { ClassBoardCell } from "utils/types"
+import { useAuthModalStore } from 'shared/store/authModal'
+import { useUserStore } from 'shared/store/user'
+import { getAccessToken } from 'utils/auth'
+import { STORAGE_KEY } from 'utils/constants'
+import storage from 'utils/storage'
+import type { ClassBoardCell } from 'utils/types'
 
-type BoardLatest = NonNullable<ClassBoardCell["latest"]>
+type BoardLatest = NonNullable<ClassBoardCell['latest']>
 
 // 全站唯一一处，脱离 n-message-provider 也能弹 —— 强制登出跟当前挂着哪个组件无关。
 // utils/api.ts 里也是这么做的
-const { message: toast } = createDiscreteApi(["message"])
+const { message: toast } = createDiscreteApi(['message'])
 
 /**
  * 服务端要求下线。两种来源：账号被管理员禁用，或者这张会话没了（在别的标签页
@@ -29,9 +29,9 @@ function handleForceLogout(reason: string) {
   if (!userStore.isAuthed) return
   storage.remove(STORAGE_KEY.AUTHED)
   userStore.clearProfile()
-  if (reason === "account-disabled") {
+  if (reason === 'account-disabled') {
     // 不能弹登录框：账号已经禁用，登进去还是被拒，会陷进「弹框 → 登录 → 又弹框」
-    toast.error("账号已被禁用，请联系老师")
+    toast.error('账号已被禁用，请联系老师')
     return
   }
   useAuthModalStore().openLoginModal()
@@ -40,7 +40,7 @@ function handleForceLogout(reason: string) {
 /**
  * WebSocket 连接状态
  */
-export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error"
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 /**
  * WebSocket 消息类型
@@ -66,7 +66,7 @@ const HEARTBEAT_INTERVAL = 30_000
 
 /** 按当前页面的协议与 host 拼通道地址。后端只认 /ws/submissions、/ws/config、/ws/collab */
 function channelUrl(path: string) {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${window.location.host}${path}`
 }
 
@@ -98,7 +98,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   /** 正在等 access token、连接还没建出来，见 connect() */
   protected opening = false
 
-  public status: Ref<ConnectionStatus> = ref<ConnectionStatus>("disconnected")
+  public status: Ref<ConnectionStatus> = ref<ConnectionStatus>('disconnected')
 
   constructor(path: string) {
     this.url = channelUrl(path)
@@ -112,15 +112,12 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
     this.closedByUser = false
     this.clearReconnectTimer()
 
-    if (
-      this.ws &&
-      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
-    ) {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return
     }
 
     this.bindReviveListeners()
-    this.status.value = "connecting"
+    this.status.value = 'connecting'
     if (this.opening) return
 
     // 握手要带 access token，快过期了得先换一张 —— 所以真正建连接是异步的
@@ -143,11 +140,11 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       // 浏览器的 WebSocket 设不了请求头，token 借子协议带过去，见契约 WS_AUTH_PROTOCOL
       const ws = new WebSocket(this.url, token ? [WS_AUTH_PROTOCOL, token] : undefined)
       this.ws = ws
-      ws.binaryType = "arraybuffer"
+      ws.binaryType = 'arraybuffer'
 
       ws.onopen = () => {
         if (ws !== this.ws) return
-        this.status.value = "connected"
+        this.status.value = 'connected'
         this.reconnectAttempts = 0
         console.log(`[WebSocket] 连接成功: ${this.url}`)
         this.startHeartbeat()
@@ -159,7 +156,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
 
         // Yjs 这类二进制帧不是 JSON，交给子类。基类的 pong / force_logout 都是文本帧，
         // 不会走到这条路径上
-        if (typeof event.data !== "string") {
+        if (typeof event.data !== 'string') {
           this.onBinary(event.data as ArrayBuffer)
           return
         }
@@ -168,31 +165,31 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
           const data = JSON.parse(event.data) as T
 
           // 处理心跳响应
-          if (data.type === "pong") {
+          if (data.type === 'pong') {
             return
           }
 
           // 服务端要求下线。和 pong 一样是协议层的事，不该让每个业务 handler
           // 各自认一遍 —— 而且此刻多半根本没有能处理它的 handler 挂着
-          if (data.type === "force_logout") {
+          if (data.type === 'force_logout') {
             // 必须主动断，否则服务端断开后这条连接会照常自动重连，然后一路 401
             // 撞到退避上限 —— 正是这条机制要消掉的浪费
             this.disconnect()
-            handleForceLogout(String(data.reason ?? ""))
+            handleForceLogout(String(data.reason ?? ''))
             return
           }
 
           // 调用消息处理钩子
           this.onMessage(data)
         } catch (error) {
-          console.error("[WebSocket] 解析消息失败:", error)
+          console.error('[WebSocket] 解析消息失败:', error)
         }
       }
 
       ws.onerror = (error) => {
         if (ws !== this.ws) return
-        console.error("[WebSocket] 连接错误:", error)
-        this.status.value = "error"
+        console.error('[WebSocket] 连接错误:', error)
+        this.status.value = 'error'
         this.onError(error)
       }
 
@@ -202,14 +199,14 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
         if (ws !== this.ws) return
         this.ws = null
         console.log(`[WebSocket] 连接关闭: code=${event.code}, reason=${event.reason}`)
-        this.status.value = "disconnected"
+        this.status.value = 'disconnected'
         this.stopHeartbeat()
         this.onDisconnected(event)
         this.scheduleReconnect()
       }
     } catch (error) {
-      console.error("Failed to create WebSocket connection:", error)
-      this.status.value = "error"
+      console.error('Failed to create WebSocket connection:', error)
+      this.status.value = 'error'
       this.scheduleReconnect()
     }
   }
@@ -223,10 +220,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
     if (this.reconnectTimer !== null) return
 
     this.reconnectAttempts++
-    const base = Math.min(
-      RECONNECT_BASE_DELAY * 2 ** (this.reconnectAttempts - 1),
-      RECONNECT_MAX_DELAY,
-    )
+    const base = Math.min(RECONNECT_BASE_DELAY * 2 ** (this.reconnectAttempts - 1), RECONNECT_MAX_DELAY)
     const delay = Math.round(base * (0.5 + Math.random() * 0.5))
     console.log(`[WebSocket] 将在 ${delay}ms 后重连 (第 ${this.reconnectAttempts} 次)`)
     this.reconnectTimer = window.setTimeout(() => {
@@ -248,13 +242,10 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    */
   protected readonly revive = () => {
     if (this.closedByUser) return
-    if (
-      this.ws &&
-      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
-    ) {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return
     }
-    if (document.visibilityState === "hidden") return
+    if (document.visibilityState === 'hidden') return
     if (navigator.onLine === false) return
     this.clearReconnectTimer()
     this.reconnectAttempts = 0
@@ -264,15 +255,15 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
   protected bindReviveListeners() {
     if (this.reviveBound) return
     this.reviveBound = true
-    window.addEventListener("online", this.revive)
-    document.addEventListener("visibilitychange", this.revive)
+    window.addEventListener('online', this.revive)
+    document.addEventListener('visibilitychange', this.revive)
   }
 
   protected unbindReviveListeners() {
     if (!this.reviveBound) return
     this.reviveBound = false
-    window.removeEventListener("online", this.revive)
-    document.removeEventListener("visibilitychange", this.revive)
+    window.removeEventListener('online', this.revive)
+    document.removeEventListener('visibilitychange', this.revive)
   }
 
   /**
@@ -291,7 +282,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
     const ws = this.ws
     this.ws = null
     if (ws) ws.close()
-    this.status.value = "disconnected"
+    this.status.value = 'disconnected'
   }
 
   /**
@@ -379,7 +370,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    * 发送心跳包
    */
   protected sendHeartbeat() {
-    this.send({ type: "ping", timestamp: Date.now() })
+    this.send({ type: 'ping', timestamp: Date.now() })
   }
 
   /**
@@ -424,7 +415,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
    * 服务端收到 subscribe 会回一份当前状态，掉线期间错过的那条推送就是靠这次
    * 重放补回来的。不重新订阅，重连后就只收得到「将来」的事件，可结果已经是过去式了。
    */
-  private subscribedId = ""
+  private subscribedId = ''
 
   /**
    * 订阅特定提交的更新。连接没就绪也可以调，连上后会自动补发 ——
@@ -440,11 +431,11 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
 
   /** 结果已经拿到，重连后不必再问一遍 */
   unsubscribe() {
-    this.subscribedId = ""
+    this.subscribedId = ''
   }
 
   private sendSubscribe(submissionId: string) {
-    return this.send({ type: "subscribe", submissionId })
+    return this.send({ type: 'subscribe', submissionId })
   }
 
   /**
@@ -464,7 +455,7 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
       try {
         handler(data)
       } catch (error) {
-        console.error("Error in message handler:", error)
+        console.error('Error in message handler:', error)
       }
     })
   }
@@ -474,10 +465,10 @@ export class BaseWebSocket<T extends WebSocketMessage = WebSocketMessage> {
  * 提交状态更新的数据类型
  */
 export interface SubmissionUpdate extends WebSocketMessage {
-  type: "submission_update"
+  type: 'submission_update'
   submissionId: string
   result: number
-  status: "pending" | "judging" | "finished" | "error"
+  status: 'pending' | 'judging' | 'finished' | 'error'
   score?: number
 }
 
@@ -525,26 +516,23 @@ function useChannel<T extends WebSocketMessage>(path: string, handler?: MessageH
  * 提交状态更新的数据类型
  */
 export interface SubmissionUpdate extends WebSocketMessage {
-  type: "submission_update"
+  type: 'submission_update'
   submissionId: string
   result: number
-  status: "pending" | "judging" | "finished" | "error"
+  status: 'pending' | 'judging' | 'finished' | 'error'
   score?: number
 }
 
 /** 判题进度。subscribe(submissionId) 认领，断线重连会自动补订阅 */
 export function useSubmissionWebSocket(handler?: MessageHandler<SubmissionUpdate>) {
-  return useChannel<SubmissionUpdate>("/ws/submissions", handler)
+  return useChannel<SubmissionUpdate>('/ws/submissions', handler)
 }
 
 /**
  * 流程图评分更新消息类型
  */
 export interface FlowchartEvaluationUpdate extends WebSocketMessage {
-  type:
-    | "flowchart_evaluation_completed"
-    | "flowchart_evaluation_failed"
-    | "flowchart_evaluation_update"
+  type: 'flowchart_evaluation_completed' | 'flowchart_evaluation_failed' | 'flowchart_evaluation_update'
   submissionId: string
   score?: number
   grade?: string
@@ -559,14 +547,14 @@ export interface FlowchartEvaluationUpdate extends WebSocketMessage {
  * 服务端按 submissionId 分辨是代码提交还是流程图，这里只是换一套消息类型。
  */
 export function useFlowchartWebSocket(handler?: MessageHandler<FlowchartEvaluationUpdate>) {
-  return useChannel<FlowchartEvaluationUpdate>("/ws/submissions", handler)
+  return useChannel<FlowchartEvaluationUpdate>('/ws/submissions', handler)
 }
 
 /**
  * 配置更新消息类型
  */
 export interface ConfigUpdate extends WebSocketMessage {
-  type: "config_update"
+  type: 'config_update'
   key: string
   value: any
 }
@@ -578,7 +566,7 @@ export interface ConfigUpdate extends WebSocketMessage {
  * 由后端广播给所有人。
  */
 export function useConfigWebSocket(handler?: MessageHandler<ConfigUpdate>) {
-  return useChannel<ConfigUpdate>("/ws/config", handler)
+  return useChannel<ConfigUpdate>('/ws/config', handler)
 }
 
 export interface CollabRequestItem {
@@ -590,19 +578,19 @@ export interface CollabRequestItem {
   /** 他这道题最后一次代码提交（和看板格子的 latest 同形），面板按它写错法；没交过为 null */
   latest: BoardLatest | null
   createdAt: number
-  status: "pending" | "active"
+  status: 'pending' | 'active'
   teacherName: string | null
 }
 
 export interface CollabMessage extends WebSocketMessage {
   type:
-    | "requests"
-    | "help_status"
-    | "room_open"
+    | 'requests'
+    | 'help_status'
+    | 'room_open'
     // 协作期间学生换了语言，只发给教师端
-    | "room_language"
-    | "room_closed"
-    | "error"
+    | 'room_language'
+    | 'room_closed'
+    | 'error'
 }
 
 /**
@@ -629,7 +617,7 @@ export class CollabWebSocket extends BaseWebSocket<CollabMessage> {
   private pendingBinary: ArrayBuffer[] = []
 
   constructor() {
-    super("/ws/collab")
+    super('/ws/collab')
   }
 
   setBinaryHandler(handler: ((data: ArrayBuffer) => void) | null) {

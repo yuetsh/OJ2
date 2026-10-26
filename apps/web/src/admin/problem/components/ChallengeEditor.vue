@@ -7,11 +7,11 @@ import {
   type AstRules,
   type ChallengeInput,
   type ChallengeSuggestionsResponse,
-} from "@oj2/contract"
-import { errorMessage } from "utils/api"
-import type { LANGUAGE } from "utils/types"
-import { getChallengeSuggestions } from "../../api"
-import AstRulesEditor from "./AstRulesEditor.vue"
+} from '@oj2/contract'
+import { errorMessage } from 'utils/api'
+import type { LANGUAGE } from 'utils/types'
+import { getChallengeSuggestions } from '../../api'
+import AstRulesEditor from './AstRulesEditor.vue'
 
 /**
  * 出题页的「挑战」：做对之后，同一道题加一条写法上的限制再做一遍（设计稿 StkAdmin）。
@@ -29,15 +29,13 @@ const props = defineProps<{
   problemId: number | null
 }>()
 const emit = defineEmits<{
-  (e: "update:modelValue", value: Record<string, ChallengeInput[]> | null): void
+  (e: 'update:modelValue', value: Record<string, ChallengeInput[]> | null): void
 }>()
 
-const languages = computed(() =>
-  props.languages.filter((lang) => AST_SUPPORTED_LANGUAGES.includes(lang)),
-)
-const tab = ref<string>(languages.value[0] ?? "Python")
+const languages = computed(() => props.languages.filter((lang) => AST_SUPPORTED_LANGUAGES.includes(lang)))
+const tab = ref<string>(languages.value[0] ?? 'Python')
 watch(languages, (list) => {
-  if (!list.includes(tab.value as LANGUAGE)) tab.value = list[0] ?? "Python"
+  if (!list.includes(tab.value as LANGUAGE)) tab.value = list[0] ?? 'Python'
 })
 
 const list = computed(() => props.modelValue?.[tab.value] ?? [])
@@ -46,7 +44,7 @@ function update(next: ChallengeInput[]) {
   const value = { ...props.modelValue }
   if (next.length) value[tab.value] = next
   else delete value[tab.value]
-  emit("update:modelValue", Object.keys(value).length ? value : null)
+  emit('update:modelValue', Object.keys(value).length ? value : null)
 }
 
 function patch(index: number, change: Partial<ChallengeInput>) {
@@ -57,7 +55,7 @@ function remove(index: number) {
   update(list.value.filter((_, i) => i !== index))
 }
 
-function add(item: ChallengeInput = { wording: "", rules: [] }) {
+function add(item: ChallengeInput = { wording: '', rules: [] }) {
   update([...list.value, item])
 }
 
@@ -75,19 +73,19 @@ const full = computed(() => list.value.length >= CHALLENGES_PER_LANGUAGE_MAX)
 
 const suggestions = ref<Record<string, ChallengeSuggestionsResponse>>({})
 const loading = ref(false)
-const error = ref("")
+const error = ref('')
 
 async function findSuggestions() {
   if (!props.problemId) return
   loading.value = true
-  error.value = ""
+  error.value = ''
   try {
     suggestions.value = {
       ...suggestions.value,
       [tab.value]: await getChallengeSuggestions(props.problemId, tab.value),
     }
   } catch (err) {
-    error.value = errorMessage(err, "没找成")
+    error.value = errorMessage(err, '没找成')
   } finally {
     loading.value = false
   }
@@ -98,9 +96,7 @@ const current = computed(() => suggestions.value[tab.value] ?? null)
 /** 已经加上的不再列 */
 const shown = computed(() => {
   const taken = list.value.map((item) => JSON.stringify(item.rules))
-  return (current.value?.suggestions ?? []).filter(
-    (item) => !taken.includes(JSON.stringify(item.rules)),
-  )
+  return (current.value?.suggestions ?? []).filter((item) => !taken.includes(JSON.stringify(item.rules)))
 })
 </script>
 
@@ -108,7 +104,7 @@ const shown = computed(() => {
   <div class="challenge-editor">
     <n-radio-group v-if="languages.length > 1" v-model:value="tab" size="small">
       <n-radio-button v-for="lang in languages" :key="lang" :value="lang">
-        {{ lang }}{{ modelValue?.[lang]?.length ? ` ${modelValue[lang]!.length} 条` : "" }}
+        {{ lang }}{{ modelValue?.[lang]?.length ? ` ${modelValue[lang]!.length} 条` : '' }}
       </n-radio-button>
     </n-radio-group>
 
@@ -133,46 +129,26 @@ const shown = computed(() => {
       />
     </div>
 
-    <n-text v-if="!languages.length" depth="3" class="note">
-      只有 Python、C、C++ 能配挑战，先在「学生怎么写」里勾上其中一种。
-    </n-text>
+    <n-text v-if="!languages.length" depth="3" class="note"> 只有 Python、C、C++ 能配挑战，先在「学生怎么写」里勾上其中一种。 </n-text>
     <template v-else>
       <div class="actions">
         <n-button size="small" :disabled="full" @click="add()">+ 自己写一条</n-button>
-        <n-button
-          v-if="problemId"
-          size="small"
-          :loading="loading"
-          :disabled="full"
-          @click="findSuggestions"
-        >
-          从做对的代码里找
-        </n-button>
+        <n-button v-if="problemId" size="small" :loading="loading" :disabled="full" @click="findSuggestions"> 从做对的代码里找 </n-button>
       </div>
       <n-text v-if="error" type="error" class="note">{{ error }}</n-text>
 
       <div v-if="current" class="suggestions">
-        <n-text depth="3" class="note">
-          {{ current.acCount }} 个人用 {{ tab }} 做对过，下面是有一批人换了种写法也做对的地方
-        </n-text>
+        <n-text depth="3" class="note"> {{ current.acCount }} 个人用 {{ tab }} 做对过，下面是有一批人换了种写法也做对的地方 </n-text>
         <n-text v-if="!shown.length" depth="3" class="note">没找到别的写法</n-text>
         <div v-for="item in shown" :key="JSON.stringify(item.rules)" class="suggestion">
           <div class="suggestionHead">
             <div class="suggestionText">
               <b>{{ item.wording }}</b>
               <n-text depth="3" class="note">
-                {{ item.did }} 人这样做对<template v-if="item.firstShare !== null"
-                  >，第一次做对时 {{ item.firstShare }}% 这样写</template
-                >
+                {{ item.did }} 人这样做对<template v-if="item.firstShare !== null">，第一次做对时 {{ item.firstShare }}% 这样写</template>
               </n-text>
             </div>
-            <n-button
-              size="small"
-              :disabled="full"
-              @click="add({ wording: item.wording, rules: item.rules })"
-            >
-              加上
-            </n-button>
+            <n-button size="small" :disabled="full" @click="add({ wording: item.wording, rules: item.rules })"> 加上 </n-button>
           </div>
           <pre class="example">{{ item.example }}</pre>
         </div>
@@ -255,7 +231,7 @@ const shown = computed(() => {
   padding: 6px 10px;
   border: 1px solid rgba(128, 128, 128, 0.2);
   border-radius: 4px;
-  font-family: ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei', monospace;
   font-size: 12.5px;
   line-height: 1.6;
   white-space: pre;

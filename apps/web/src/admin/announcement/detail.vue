@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import PageHeader from "admin/components/PageHeader.vue"
-import { errorMessage } from "utils/api"
-import TextEditor from "shared/components/TextEditor.vue"
-import type { AnnouncementEdit } from "utils/types"
-import { createAnnouncement, editAnnouncement, getAnnouncement } from "../api"
+import PageHeader from 'admin/components/PageHeader.vue'
+import { errorMessage } from 'utils/api'
+import TextEditor from 'shared/components/TextEditor.vue'
+import type { AnnouncementEdit } from 'utils/types'
+import { createAnnouncement, editAnnouncement, getAnnouncement } from '../api'
 
 interface Props {
   announcementID?: string
@@ -17,16 +17,16 @@ const [ready, toggleReady] = useToggle()
 
 const announcement = reactive<AnnouncementEdit>({
   id: 0,
-  title: "",
-  tag: "公告",
-  content: "",
+  title: '',
+  tag: '公告',
+  content: '',
   visible: false,
   top: false,
 })
 
 const tags: SelectOption[] = [
-  { label: "公告", value: "公告" },
-  { label: "更新", value: "更新" },
+  { label: '公告', value: '公告' },
+  { label: '更新', value: '更新' },
 ]
 
 async function init() {
@@ -46,25 +46,25 @@ async function init() {
 }
 
 async function submit() {
-  if (announcement.content === "<p><br></p>") {
-    announcement.content = ""
+  if (announcement.content === '<p><br></p>') {
+    announcement.content = ''
   }
   if (!announcement.title || !announcement.content) {
-    message.error("标题和正文必填")
+    message.error('标题和正文必填')
     return
   }
   const api = {
-    "admin announcement create": createAnnouncement,
-    "admin announcement edit": editAnnouncement,
+    'admin announcement create': createAnnouncement,
+    'admin announcement edit': editAnnouncement,
   }[route.name as string]
   try {
     await api!(announcement)
-    if (route.name === "admin announcement create") {
-      message.success("发好了")
+    if (route.name === 'admin announcement create') {
+      message.success('发好了')
     } else {
-      message.success("改好了")
+      message.success('改好了')
     }
-    router.push({ name: "admin announcement list" })
+    router.push({ name: 'admin announcement list' })
   } catch (err) {
     message.error(errorMessage(err))
   }
@@ -73,23 +73,14 @@ async function submit() {
 onMounted(init)
 </script>
 <template>
-  <PageHeader
-    :title="route.name === 'admin announcement create' ? '写一条公告' : '改公告'"
-    :back="{ name: 'admin announcement list' }"
-  >
+  <PageHeader :title="route.name === 'admin announcement create' ? '写一条公告' : '改公告'" :back="{ name: 'admin announcement list' }">
     <template #actions>
       <n-button type="primary" @click="submit">保存</n-button>
     </template>
   </PageHeader>
   <!-- 标题、类型、置顶、学生看得到排一行；保存在右上角，不用滚到正文底下去点 -->
   <div class="meta">
-    <n-input
-      v-model:value="announcement.title"
-      placeholder="标题"
-      size="large"
-      class="title"
-      aria-label="标题"
-    />
+    <n-input v-model:value="announcement.title" placeholder="标题" size="large" class="title" aria-label="标题" />
     <n-radio-group v-model:value="announcement.tag" aria-label="类型">
       <n-radio-button v-for="t in tags" :key="String(t.value)" :value="t.value">
         {{ t.label }}

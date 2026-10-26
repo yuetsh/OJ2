@@ -1,18 +1,12 @@
-import { errorCode } from "utils/api"
-import { useUserStore } from "shared/store/user"
-import { ContestStatus, ContestType } from "utils/constants"
-import { duration, secondsToDuration } from "utils/functions"
-import { isExamTag, type ContestScoreboard } from "@oj2/contract"
-import type { Contest, ProblemRow } from "utils/types"
-import {
-  checkContestPassword,
-  getContest,
-  getContestAccess,
-  getContestProblems,
-  getContestScoreboard,
-} from "../api"
+import { errorCode } from 'utils/api'
+import { useUserStore } from 'shared/store/user'
+import { ContestStatus, ContestType } from 'utils/constants'
+import { duration, secondsToDuration } from 'utils/functions'
+import { isExamTag, type ContestScoreboard } from '@oj2/contract'
+import type { Contest, ProblemRow } from 'utils/types'
+import { checkContestPassword, getContest, getContestAccess, getContestProblems, getContestScoreboard } from '../api'
 
-export const useContestStore = defineStore("contest", () => {
+export const useContestStore = defineStore('contest', () => {
   const userStore = useUserStore()
   const [access, toggleAccess] = useToggle(false)
   const contest = ref<Contest | null>(null)
@@ -40,29 +34,25 @@ export const useContestStore = defineStore("contest", () => {
 
   const countdown = computed(() => {
     if (contestStatus.value === ContestStatus.finished) {
-      return "已结束"
+      return '已结束'
     } else if (contestStatus.value === ContestStatus.not_started) {
       const d = duration(new Date(now.value), contest.value!.startTime, true)
-      return "距离比赛开始 " + d
+      return '距离比赛开始 ' + d
     } else {
       const d = duration(new Date(now.value), contest.value!.endTime, true)
-      return "距离比赛结束 " + d
+      return '距离比赛结束 ' + d
     }
   })
 
   /** 进行中还剩多久，「38:12」「1:05:00」这种；不在进行中为空串。题目页上下文条用 */
   const remaining = computed(() => {
-    if (contestStatus.value !== ContestStatus.underway) return ""
+    if (contestStatus.value !== ContestStatus.underway) return ''
     const end = new Date(contest.value!.endTime).getTime()
     const text = secondsToDuration(Math.max(0, Math.floor((end - now.value) / 1000)))
-    return text.startsWith("0:") ? text.slice(2) : text
+    return text.startsWith('0:') ? text.slice(2) : text
   })
 
-  const isContestAdmin = computed(
-    () =>
-      userStore.isSuperAdmin ||
-      (userStore.isAuthed && contest.value?.createdBy.id === userStore.user!.id),
-  )
+  const isContestAdmin = computed(() => userStore.isSuperAdmin || (userStore.isAuthed && contest.value?.createdBy.id === userStore.user!.id))
 
   /** 老师（出题人、超管、其他老师）：看得到全班情况、真名，期中期末进行中也看得到排名 */
   const isTeacher = computed(() => isContestAdmin.value || userStore.isTeacherOrAbove)
@@ -70,13 +60,7 @@ export const useContestStore = defineStore("contest", () => {
   const isPrivate = computed(() => contest.value!.contestType === ContestType.private)
 
   /** 期中、期末进行中，学生看不到排名和每题做对人数（后端同样拦着，这里只管界面） */
-  const rankHidden = computed(
-    () =>
-      !!contest.value &&
-      isExamTag(contest.value.tag) &&
-      contestStatus.value === ContestStatus.underway &&
-      !isTeacher.value,
-  )
+  const rankHidden = computed(() => !!contest.value && isExamTag(contest.value.tag) && contestStatus.value === ContestStatus.underway && !isTeacher.value)
 
   /** 能不能看题目（也就能看榜）：开始了、密码对了；老师 / 出题人随时 */
   const canEnter = computed(() => {
@@ -139,7 +123,7 @@ export const useContestStore = defineStore("contest", () => {
       return null
     } catch (err) {
       toggleAccess(false)
-      return errorCode(err) ?? "unknown"
+      return errorCode(err) ?? 'unknown'
     }
   }
 

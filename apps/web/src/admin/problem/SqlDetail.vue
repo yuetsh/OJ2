@@ -1,45 +1,24 @@
 <script setup lang="ts">
-import { EditorView } from "@codemirror/view"
-import { TEST_CASE_MAX_CASES } from "@oj2/contract"
-import Markdown from "shared/components/Markdown.vue"
-import { useThemeVars } from "naive-ui"
-import PageHeader from "admin/components/PageHeader.vue"
-import ProblemTypeTag from "oj/problem/components/ProblemTypeTag.vue"
-import SqlProblemData from "oj/problem/components/SqlProblemData.vue"
-import { getProblemTagList } from "shared/api"
-import TextEditor from "shared/components/TextEditor.vue"
-import { errorCode, errorMessage, isApiError } from "utils/api"
-import { DIFFICULTY, STORAGE_KEY } from "utils/constants"
-import { createZipBlob, getTagColor, unique } from "utils/functions"
-import type { AdminProblem, BlankProblem, SqlConfig, Tag, Testcase } from "utils/types"
-import PreviewStrip from "./components/PreviewStrip.vue"
-import { usePreviewCollapsed } from "./components/previewCollapse"
-import {
-  createContestProblem,
-  createProblem,
-  editProblem,
-  generateSQLTestcase,
-  getSQLTestcaseScripts,
-  previewSQLTestcase,
-  uploadTestcases,
-} from "../api"
-import {
-  cleanTags,
-  difficultyOptions,
-  isBlankHtml,
-  problemListRoute,
-  saveErrorText,
-  tagTooLongText,
-  useCreateDraft,
-} from "./components/problemForm"
-import {
-  explainSqlError,
-  groupSummary,
-  type GroupStatus,
-  type ScriptGroup,
-} from "./components/sqlScript"
+import { EditorView } from '@codemirror/view'
+import { TEST_CASE_MAX_CASES } from '@oj2/contract'
+import Markdown from 'shared/components/Markdown.vue'
+import { useThemeVars } from 'naive-ui'
+import PageHeader from 'admin/components/PageHeader.vue'
+import ProblemTypeTag from 'oj/problem/components/ProblemTypeTag.vue'
+import SqlProblemData from 'oj/problem/components/SqlProblemData.vue'
+import { getProblemTagList } from 'shared/api'
+import TextEditor from 'shared/components/TextEditor.vue'
+import { errorCode, errorMessage, isApiError } from 'utils/api'
+import { DIFFICULTY, STORAGE_KEY } from 'utils/constants'
+import { createZipBlob, getTagColor, unique } from 'utils/functions'
+import type { AdminProblem, BlankProblem, SqlConfig, Tag, Testcase } from 'utils/types'
+import PreviewStrip from './components/PreviewStrip.vue'
+import { usePreviewCollapsed } from './components/previewCollapse'
+import { createContestProblem, createProblem, editProblem, generateSQLTestcase, getSQLTestcaseScripts, previewSQLTestcase, uploadTestcases } from '../api'
+import { cleanTags, difficultyOptions, isBlankHtml, problemListRoute, saveErrorText, tagTooLongText, useCreateDraft } from './components/problemForm'
+import { explainSqlError, groupSummary, type GroupStatus, type ScriptGroup } from './components/sqlScript'
 
-const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
+const CodeEditor = defineAsyncComponent(() => import('shared/components/CodeEditor.vue'))
 /** 标准答案常是一长行，出题页左栏才 560 宽：折行，别横着滚。给稳定的数组，见 CodeEditor 的注释 */
 const wrapLines = [EditorView.lineWrapping]
 
@@ -71,7 +50,7 @@ const isCreate = computed(() => !props.problemID)
 interface SqlForm {
   _id: string
   title: string
-  difficulty: BlankProblem["difficulty"]
+  difficulty: BlankProblem['difficulty']
   visible: boolean
   tags: string[]
   description: string
@@ -85,35 +64,35 @@ interface SqlForm {
 }
 
 const blankForm = (): SqlForm => ({
-  _id: "",
-  title: "",
-  difficulty: "Low",
+  _id: '',
+  title: '',
+  difficulty: 'Low',
   visible: false,
-  tags: ["SQL"],
-  description: "",
-  hint: "",
-  source: "",
-  prompt: "",
+  tags: ['SQL'],
+  description: '',
+  hint: '',
+  source: '',
+  prompt: '',
   memoryLimit: 64,
   timeLimit: 1000,
-  sqlConfig: { mode: "query", order_sensitive: false },
-  answer: "",
+  sqlConfig: { mode: 'query', order_sensitive: false },
+  answer: '',
 })
 
 const form = reactive<SqlForm>(blankForm())
 
-const testCase = reactive({ id: "", score: [] as Testcase[] })
+const testCase = reactive({ id: '', score: [] as Testcase[] })
 
 let nextKey = 0
-function newGroup(sql = ""): ScriptGroup {
-  return { key: nextKey++, sql, ranFor: "", display: null, error: "", errorRaw: "", running: "" }
+function newGroup(sql = ''): ScriptGroup {
+  return { key: nextKey++, sql, ranFor: '', display: null, error: '', errorRaw: '', running: '' }
 }
 const groups = ref<ScriptGroup[]>([])
 const selected = ref(0)
 /** 打开时库里那几份脚本：没改过就不用重新上传 */
 let savedScripts: string[] = []
 /** 已有的测试数据没读出来。空白编辑器和「本来就没有」长得一样，必须说出来 */
-const loadError = ref("")
+const loadError = ref('')
 
 const showMore = ref(false)
 const ready = ref(false)
@@ -122,12 +101,7 @@ const ready = ref(false)
 const draft = useCreateDraft<{ form: SqlForm; scripts: string[] }>(STORAGE_KEY.ADMIN_SQL_PROBLEM, {
   source: () => [form, groups.value.map((g) => g.sql)] as const,
   enabled: () => ready.value && isCreate.value,
-  empty: () =>
-    !form._id &&
-    !form.title &&
-    isBlankHtml(form.description) &&
-    !form.answer &&
-    !groups.value.some((g) => g.sql),
+  empty: () => !form._id && !form.title && isBlankHtml(form.description) && !form.answer && !groups.value.some((g) => g.sql),
   take: () => ({ form: { ...form }, scripts: groups.value.map((g) => g.sql) }),
 })
 
@@ -142,7 +116,7 @@ async function load() {
   if (isCreate.value) {
     // 草稿是本机存的，形状不对（旧版本、被别的页面写坏）就当没有，别让整页起不来
     const saved = draft.value
-    if (saved && typeof saved.form === "object" && Array.isArray(saved.scripts)) {
+    if (saved && typeof saved.form === 'object' && Array.isArray(saved.scripts)) {
       Object.assign(form, blankForm(), saved.form)
       groups.value = saved.scripts.map((sql) => newGroup(String(sql)))
     } else {
@@ -161,13 +135,13 @@ async function load() {
     visible: data.visible,
     tags: data.tags,
     description: data.description,
-    hint: data.hint ?? "",
-    source: data.source ?? "",
-    prompt: data.prompt ?? "",
+    hint: data.hint ?? '',
+    source: data.source ?? '',
+    prompt: data.prompt ?? '',
     memoryLimit: data.memoryLimit,
     timeLimit: data.timeLimit,
-    sqlConfig: data.sqlConfig ?? { mode: "query", order_sensitive: false },
-    answer: data.answers.find((a) => a.language === "SQL")?.code ?? "",
+    sqlConfig: data.sqlConfig ?? { mode: 'query', order_sensitive: false },
+    answer: data.answers.find((a) => a.language === 'SQL')?.code ?? '',
   } satisfies SqlForm)
   testCase.id = data.testCaseId
   testCase.score = data.testCaseScore
@@ -178,11 +152,9 @@ async function load() {
   } catch (err) {
     const code = errorCode(err)
     // 测试点是旧格式（不是 SQL 脚本）时后端回 not-sql-test-case，当作「还没有」就对了
-    if (code !== "problem-not-found" && code !== "not-sql-test-case") {
-      const detail = isApiError(err) && typeof err.data === "string" ? `（${err.data}）` : ""
-      loadError.value =
-        `已有的测试数据没读出来${detail}。下面是空白的，不是这道题真实的测试数据 —— ` +
-        `直接保存会把它换掉，先排查测试点文件再改。`
+    if (code !== 'problem-not-found' && code !== 'not-sql-test-case') {
+      const detail = isApiError(err) && typeof err.data === 'string' ? `（${err.data}）` : ''
+      loadError.value = `已有的测试数据没读出来${detail}。下面是空白的，不是这道题真实的测试数据 —— ` + `直接保存会把它换掉，先排查测试点文件再改。`
     }
   }
   if (groups.value.length < 2) {
@@ -203,7 +175,7 @@ const tagOptions = computed(() =>
 
 function onTagsChange(tags: string[]) {
   const cleaned = cleanTags(tags)
-  if ("tooLong" in cleaned) message.error(tagTooLongText(cleaned.tooLong))
+  if ('tooLong' in cleaned) message.error(tagTooLongText(cleaned.tooLong))
   else form.tags = cleaned.tags
 }
 
@@ -213,14 +185,13 @@ function onTagsChange(tags: string[]) {
  * 一组数据跑出来的结果取决于这几样，任何一样变了，原来的结果就作废。
  * 排在第一也算：删掉第 1 组之后，原来的第 2 组成了题面展示的那组，增删改题得重查它改没改到行
  */
-const signatureOf = (g: ScriptGroup) =>
-  JSON.stringify([form.answer, form.sqlConfig.mode, g.sql, groups.value[0] === g])
+const signatureOf = (g: ScriptGroup) => JSON.stringify([form.answer, form.sqlConfig.mode, g.sql, groups.value[0] === g])
 
 function statusOf(g: ScriptGroup): GroupStatus {
-  if (!g.sql.trim()) return "empty"
-  if (!form.answer.trim()) return "no-answer"
-  if (g.ranFor !== signatureOf(g)) return "running"
-  return g.error ? "error" : "ok"
+  if (!g.sql.trim()) return 'empty'
+  if (!form.answer.trim()) return 'no-answer'
+  if (g.ranFor !== signatureOf(g)) return 'running'
+  return g.error ? 'error' : 'ok'
 }
 
 async function run(g: ScriptGroup) {
@@ -228,8 +199,8 @@ async function run(g: ScriptGroup) {
   if (!g.sql.trim() || !form.answer.trim()) return
   if (g.ranFor === signature || g.running === signature) return
   g.running = signature
-  let display: ScriptGroup["display"] = null
-  let errorRaw = ""
+  let display: ScriptGroup['display'] = null
+  let errorRaw = ''
   try {
     display = await previewSQLTestcase({
       initSql: g.sql,
@@ -238,11 +209,10 @@ async function run(g: ScriptGroup) {
       shown: groups.value[0] === g,
     })
   } catch (err) {
-    errorRaw =
-      isApiError(err) && typeof err.data === "string" ? err.data : errorMessage(err, "跑不起来")
+    errorRaw = isApiError(err) && typeof err.data === 'string' ? err.data : errorMessage(err, '跑不起来')
   }
   // 跑的过程中又改了：这次的结果照样记下（ranFor 说明它对应哪一版），新的那版另有一次在跑
-  if (g.running === signature) g.running = ""
+  if (g.running === signature) g.running = ''
   g.ranFor = signature
   g.display = display
   g.error = errorRaw && explainSqlError(errorRaw)
@@ -291,7 +261,7 @@ async function generateGroup() {
       selected.value = groups.value.length - 1
     }
   } catch (err) {
-    message.error(errorMessage(err, "AI 没写出来，稍后再试"))
+    message.error(errorMessage(err, 'AI 没写出来，稍后再试'))
   } finally {
     generating.value = false
   }
@@ -303,13 +273,12 @@ const current = computed(() => groups.value[selected.value])
 
 /** 为什么还不能保存。按出题的顺序查，只说第一条 */
 const blocker = computed(() => {
-  if (!form._id.trim() || !form.title.trim()) return "编号和题目还没填"
-  if (isBlankHtml(form.description)) return "题目描述还没写"
-  if (!form.tags.length) return "至少要有一个标签"
-  if (!form.answer.trim()) return "标准答案还没写"
-  if (groups.value.length < 2) return "测试数据至少要 2 组"
-  if (groups.value.length > TEST_CASE_MAX_CASES)
-    return `测试数据最多 ${TEST_CASE_MAX_CASES} 组，删掉 ${groups.value.length - TEST_CASE_MAX_CASES} 组`
+  if (!form._id.trim() || !form.title.trim()) return '编号和题目还没填'
+  if (isBlankHtml(form.description)) return '题目描述还没写'
+  if (!form.tags.length) return '至少要有一个标签'
+  if (!form.answer.trim()) return '标准答案还没写'
+  if (groups.value.length < 2) return '测试数据至少要 2 组'
+  if (groups.value.length > TEST_CASE_MAX_CASES) return `测试数据最多 ${TEST_CASE_MAX_CASES} 组，删掉 ${groups.value.length - TEST_CASE_MAX_CASES} 组`
   for (const [i, g] of groups.value.entries()) {
     if (!g.sql.trim()) return `第 ${i + 1} 组还是空的，写上或删掉`
   }
@@ -321,17 +290,17 @@ const blocker = computed(() => {
   }
   for (const [i, g] of groups.value.entries()) {
     const status = statusOf(g)
-    if (status === "running") return "测试数据还在跑……"
-    if (status === "error") return `第 ${i + 1} 组还没跑通，改好或删掉才能保存`
+    if (status === 'running') return '测试数据还在跑……'
+    if (status === 'error') return `第 ${i + 1} 组还没跑通，改好或删掉才能保存`
   }
-  return ""
+  return ''
 })
 
 const saving = ref(false)
 
 async function uploadScripts(scripts: string[]) {
   const blob = createZipBlob(scripts.map((content, i) => ({ name: `${i + 1}.sql`, content })))
-  const res = await uploadTestcases(new File([blob], "testcase.zip", { type: "application/zip" }), {
+  const res = await uploadTestcases(new File([blob], 'testcase.zip', { type: 'application/zip' }), {
     sql: true,
   })
   // 分值平分，余数给最后一组；只留落库的三个键（见契约 problemTestCaseScoreSchema）
@@ -353,18 +322,15 @@ async function save() {
   saving.value = true
   try {
     const scripts = groups.value.map((g) => g.sql)
-    const changed =
-      !testCase.id ||
-      scripts.length !== savedScripts.length ||
-      scripts.some((sql, i) => sql !== savedScripts[i])
+    const changed = !testCase.id || scripts.length !== savedScripts.length || scripts.some((sql, i) => sql !== savedScripts[i])
     if (changed) await uploadScripts(scripts)
 
     const body: BlankProblem = {
       _id: form._id.trim(),
       title: form.title.trim(),
       description: form.description,
-      inputDescription: "",
-      outputDescription: "",
+      inputDescription: '',
+      outputDescription: '',
       samples: [],
       testCaseId: testCase.id,
       testCaseScore: testCase.score,
@@ -373,16 +339,16 @@ async function save() {
       difficulty: form.difficulty,
       visible: form.visible,
       tags: form.tags,
-      languages: ["SQL"],
+      languages: ['SQL'],
       template: {},
-      hint: isBlankHtml(form.hint) ? "" : form.hint,
+      hint: isBlankHtml(form.hint) ? '' : form.hint,
       source: form.source,
       prompt: form.prompt,
-      answers: [{ language: "SQL", code: form.answer }],
+      answers: [{ language: 'SQL', code: form.answer }],
       allowFlowchart: false,
       showFlowchart: false,
-      mermaidCode: "",
-      flowchartHint: "",
+      mermaidCode: '',
+      flowchartHint: '',
       astRules: null,
       sqlConfig: form.sqlConfig,
       sqlDisplay: null,
@@ -398,9 +364,9 @@ async function save() {
     savedScripts = scripts
     if (isCreate.value) {
       draft.value = null
-      message.success("SQL 题建好了")
+      message.success('SQL 题建好了')
     } else {
-      message.success("保存好了")
+      message.success('保存好了')
     }
     router.push(problemListRoute(props.contestID))
   } catch (err) {
@@ -436,43 +402,20 @@ onMounted(async () => {
       <section class="card">
         <div class="headRow">
           <n-input v-model:value="form._id" placeholder="编号" aria-label="显示编号" class="pid" />
-          <n-input
-            v-model:value="form.title"
-            placeholder="题目，比如：统计平均工资超过6000元的部门"
-            aria-label="题目"
-            class="grow"
-          />
-          <n-select
-            v-model:value="form.difficulty"
-            :options="difficultyOptions"
-            aria-label="难度"
-            class="difficulty"
-          />
+          <n-input v-model:value="form.title" placeholder="题目，比如：统计平均工资超过6000元的部门" aria-label="题目" class="grow" />
+          <n-select v-model:value="form.difficulty" :options="difficultyOptions" aria-label="难度" class="difficulty" />
           <label class="switch">
             <n-switch v-model:value="form.visible" size="small" />
             <span>可见</span>
           </label>
         </div>
         <TextEditor v-model:value="form.description" title="" simple :min-height="140" />
-        <n-text depth="3" class="note">
-          数据表和期望结果会自动接在描述后面给学生看（用第 1
-          组测试数据），描述里不用再抄一遍表结构。
-        </n-text>
+        <n-text depth="3" class="note"> 数据表和期望结果会自动接在描述后面给学生看（用第 1 组测试数据），描述里不用再抄一遍表结构。 </n-text>
         <div class="tagRow">
           <span class="label">标签</span>
-          <n-select
-            :value="form.tags"
-            :options="tagOptions"
-            multiple
-            filterable
-            tag
-            placeholder="选一个，或者打字建新的"
-            @update:value="onTagsChange"
-          />
+          <n-select :value="form.tags" :options="tagOptions" multiple filterable tag placeholder="选一个，或者打字建新的" @update:value="onTagsChange" />
         </div>
-        <n-button text type="primary" class="moreToggle" @click="showMore = !showMore">
-          提示 · 来源 · 内存限制 {{ showMore ? "▴" : "▾" }}
-        </n-button>
+        <n-button text type="primary" class="moreToggle" @click="showMore = !showMore"> 提示 · 来源 · 内存限制 {{ showMore ? '▴' : '▾' }} </n-button>
         <div v-if="showMore" class="more">
           <div class="label">提示（学生卡住时点开看）</div>
           <TextEditor v-model:value="form.hint" title="" simple :min-height="60" />
@@ -483,13 +426,7 @@ onMounted(async () => {
             </label>
             <label class="field">
               <span class="label">内存限制</span>
-              <n-input-number
-                v-model:value="form.memoryLimit"
-                :min="1"
-                :max="1024"
-                :show-button="false"
-                style="width: 110px"
-              >
+              <n-input-number v-model:value="form.memoryLimit" :min="1" :max="1024" :show-button="false" style="width: 110px">
                 <template #suffix>MB</template>
               </n-input-number>
             </label>
@@ -508,32 +445,15 @@ onMounted(async () => {
             <n-radio-button value="query">查询 · 比结果</n-radio-button>
             <n-radio-button value="modify">增删改 · 比执行完的表</n-radio-button>
           </n-radio-group>
-          <n-checkbox
-            v-if="form.sqlConfig.mode === 'query'"
-            v-model:checked="form.sqlConfig.order_sensitive"
-            size="small"
-          >
-            按顺序比
-          </n-checkbox>
+          <n-checkbox v-if="form.sqlConfig.mode === 'query'" v-model:checked="form.sqlConfig.order_sensitive" size="small"> 按顺序比 </n-checkbox>
         </div>
         <div class="subHead">
           <span class="label">标准答案</span>
           <n-text depth="3" class="note">
-            {{
-              form.sqlConfig.mode === "query"
-                ? "每组数据都拿它跑出期望结果，学生看不到"
-                : "执行完之后，被改过的表就是期望结果，学生看不到"
-            }}
+            {{ form.sqlConfig.mode === 'query' ? '每组数据都拿它跑出期望结果，学生看不到' : '执行完之后，被改过的表就是期望结果，学生看不到' }}
           </n-text>
         </div>
-        <CodeEditor
-          v-model:value="form.answer"
-          language="SQL"
-          :extra-extensions="wrapLines"
-          :font-size="14"
-          height="120px"
-          placeholder="SELECT ... FROM ..."
-        />
+        <CodeEditor v-model:value="form.answer" language="SQL" :extra-extensions="wrapLines" :font-size="14" height="120px" placeholder="SELECT ... FROM ..." />
       </section>
 
       <section class="card">
@@ -556,11 +476,7 @@ onMounted(async () => {
           >
             AI 再写一组
           </n-button>
-          <n-button
-            size="tiny"
-            :disabled="groupsFull"
-            :title="groupsFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : undefined"
-            @click="addGroup"
+          <n-button size="tiny" :disabled="groupsFull" :title="groupsFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : undefined" @click="addGroup"
             >+ 加一组</n-button
           >
         </div>
@@ -587,17 +503,8 @@ onMounted(async () => {
               <template v-else-if="g.display">{{ groupSummary(g.display) }}</template>
             </span>
             <span v-if="statusOf(g) === 'ok'" class="mark ok" aria-label="跑通了">✓</span>
-            <span v-else-if="statusOf(g) === 'error'" class="mark error" aria-label="没跑通"
-              >✗</span
-            >
-            <n-button
-              v-if="groups.length > 1"
-              size="tiny"
-              quaternary
-              class="remove"
-              :aria-label="`删掉第 ${i + 1} 组`"
-              @click.stop="removeGroup(i)"
-            >
+            <span v-else-if="statusOf(g) === 'error'" class="mark error" aria-label="没跑通">✗</span>
+            <n-button v-if="groups.length > 1" size="tiny" quaternary class="remove" :aria-label="`删掉第 ${i + 1} 组`" @click.stop="removeGroup(i)">
               删掉
             </n-button>
           </div>
@@ -620,9 +527,7 @@ onMounted(async () => {
       </section>
 
       <div class="saveBar">
-        <n-button type="primary" :loading="saving" :disabled="!!blocker" @click="save">
-          保存
-        </n-button>
+        <n-button type="primary" :loading="saving" :disabled="!!blocker" @click="save"> 保存 </n-button>
         <n-text v-if="blocker" :type="blocker.includes('没跑通') ? 'error' : 'default'" depth="2">
           {{ blocker }}
         </n-text>
@@ -640,14 +545,12 @@ onMounted(async () => {
             第 {{ i + 1 }} 组<span v-if="statusOf(g) === 'error'" class="error"> ✗</span>
           </n-radio-button>
         </n-radio-group>
-        <n-button size="small" quaternary title="收起，专心写左边" @click="previewCollapsed = true">
-          收起 ›
-        </n-button>
+        <n-button size="small" quaternary title="收起，专心写左边" @click="previewCollapsed = true"> 收起 › </n-button>
       </div>
       <div class="page">
         <div class="titleRow">
           <h2>
-            <span v-if="form._id">{{ form._id }}</span> {{ form.title || "（题目还没起名）" }}
+            <span v-if="form._id">{{ form._id }}</span> {{ form.title || '（题目还没起名）' }}
           </h2>
           <ProblemTypeTag kind="sql" />
           <n-tag size="small" :bordered="false" :type="getTagColor(form.difficulty)">
@@ -656,33 +559,18 @@ onMounted(async () => {
         </div>
         <h3 class="title">描述</h3>
         <Markdown html :content="form.description" />
-        <p v-if="selected > 0" class="otherGroup">
-          学生看到的是第 1 组，下面是第 {{ selected + 1 }} 组跑出来的样子
-        </p>
+        <p v-if="selected > 0" class="otherGroup">学生看到的是第 1 组，下面是第 {{ selected + 1 }} 组跑出来的样子</p>
         <template v-if="current">
-          <p v-if="statusOf(current) === 'no-answer'" class="placeholder">
-            写好标准答案，这里就跑出期望结果
-          </p>
-          <p v-else-if="statusOf(current) === 'empty'" class="placeholder">
-            第 {{ selected + 1 }} 组还没写脚本
-          </p>
-          <p v-else-if="statusOf(current) === 'running' && !current.display" class="placeholder">
-            在跑……
-          </p>
+          <p v-if="statusOf(current) === 'no-answer'" class="placeholder">写好标准答案，这里就跑出期望结果</p>
+          <p v-else-if="statusOf(current) === 'empty'" class="placeholder">第 {{ selected + 1 }} 组还没写脚本</p>
+          <p v-else-if="statusOf(current) === 'running' && !current.display" class="placeholder">在跑……</p>
           <div v-else-if="statusOf(current) === 'error'" class="errorBox">
             {{ current.error }}
-            <div v-if="current.error.startsWith('标准答案在这组数据上')" class="raw">
-              每组数据都要建齐标准答案用到的表和列。
-            </div>
-            <div v-if="current.error !== current.errorRaw" class="raw small">
-              原话：{{ current.errorRaw }}
-            </div>
+            <div v-if="current.error.startsWith('标准答案在这组数据上')" class="raw">每组数据都要建齐标准答案用到的表和列。</div>
+            <div v-if="current.error !== current.errorRaw" class="raw small">原话：{{ current.errorRaw }}</div>
           </div>
           <div v-else-if="current.display" :class="{ stale: statusOf(current) === 'running' }">
-            <SqlProblemData
-              :display="current.display"
-              :order-sensitive="form.sqlConfig.order_sensitive"
-            >
+            <SqlProblemData :display="current.display" :order-sensitive="form.sqlConfig.order_sensitive">
               <template #title="{ text }">
                 <h3 class="title sqlTitle">{{ text }}</h3>
               </template>
@@ -732,13 +620,13 @@ onMounted(async () => {
 }
 
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .card :deep(.editorWrapper) {
@@ -794,7 +682,7 @@ onMounted(async () => {
 
 .label {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   flex: none;
 }
 
@@ -848,12 +736,12 @@ onMounted(async () => {
 
 .group.on {
   background-color: rgba(24, 160, 88, 0.1);
-  box-shadow: inset 3px 0 0 v-bind("theme.primaryColor");
+  box-shadow: inset 3px 0 0 v-bind('theme.primaryColor');
 }
 
 .group.on.bad {
   background-color: rgba(208, 48, 80, 0.08);
-  box-shadow: inset 3px 0 0 v-bind("theme.errorColor");
+  box-shadow: inset 3px 0 0 v-bind('theme.errorColor');
 }
 
 .groupNo {
@@ -864,7 +752,7 @@ onMounted(async () => {
 .shown {
   flex: none;
   font-size: 12px;
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
 }
 
 .summary {
@@ -873,7 +761,7 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .mark {
@@ -882,15 +770,15 @@ onMounted(async () => {
 }
 
 .ok {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .error {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .summary.error {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .remove {
@@ -912,8 +800,8 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 10px 0 14px;
-  background: v-bind("theme.bodyColor");
-  border-top: 1px solid v-bind("theme.borderColor");
+  background: v-bind('theme.bodyColor');
+  border-top: 1px solid v-bind('theme.borderColor');
 }
 
 .preview {
@@ -936,10 +824,10 @@ onMounted(async () => {
 .page {
   max-height: calc(100vh - 170px);
   overflow: auto;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   padding: 18px 22px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .titleRow {
@@ -963,7 +851,7 @@ onMounted(async () => {
   line-height: 1.4;
   margin: 0 0 6px;
   padding-left: 9px;
-  border-left: 3px solid v-bind("theme.primaryColor");
+  border-left: 3px solid v-bind('theme.primaryColor');
 }
 
 .sqlTitle {
@@ -976,12 +864,12 @@ onMounted(async () => {
   border-radius: 4px;
   font-size: 13px;
   background-color: rgba(128, 128, 128, 0.08);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .placeholder {
   margin: 14px 0 0;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .errorBox {
@@ -989,13 +877,13 @@ onMounted(async () => {
   padding: 10px 12px;
   border-radius: 4px;
   background-color: rgba(208, 48, 80, 0.08);
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
   font-size: 13px;
   line-height: 1.7;
 }
 
 .errorBox .raw {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .errorBox .small {

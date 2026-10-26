@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { useThemeVars } from "naive-ui"
-import type { FlowDoc } from "./model"
-import { layoutDoc } from "./layout"
-import { nodeLabel, shapePoints, useFlowPaint } from "./paint"
+import { useThemeVars } from 'naive-ui'
+import type { FlowDoc } from './model'
+import { layoutDoc } from './layout'
+import { nodeLabel, shapePoints, useFlowPaint } from './paint'
 
 /**
  * 只看不改的流程图：和画流程图的画布同一套排版、形状、颜色（layoutDoc），没有 +、没有平移缩放。
@@ -18,9 +18,9 @@ const { doc, zoomed = false } = defineProps<{ doc: FlowDoc; zoomed?: boolean }>(
 const theme = useThemeVars()
 const { paint, lineColor } = useFlowPaint()
 
-const root = useTemplateRef<HTMLElement>("root")
+const root = useTemplateRef<HTMLElement>('root')
 let measureCtx: CanvasRenderingContext2D | null = null
-const fontFamily = ref("")
+const fontFamily = ref('')
 function measure(text: string) {
   if (measureCtx) return measureCtx.measureText(text).width
   let w = 0
@@ -29,7 +29,7 @@ function measure(text: string) {
 }
 onMounted(() => {
   const family = getComputedStyle(root.value!).fontFamily
-  measureCtx = document.createElement("canvas").getContext("2d")
+  measureCtx = document.createElement('canvas').getContext('2d')
   if (measureCtx) measureCtx.font = `14px ${family}`
   fontFamily.value = family
 })
@@ -47,61 +47,20 @@ const markerId = `flow-view-arrow-${useId()}`
   <div ref="root" class="flow-view" :class="{ zoomed }">
     <svg
       :viewBox="`0 0 ${layout.width} ${layout.height}`"
-      :style="
-        zoomed
-          ? { width: `${layout.width * 1.5}px`, minWidth: `${layout.width}px` }
-          : { width: `${layout.width}px` }
-      "
+      :style="zoomed ? { width: `${layout.width * 1.5}px`, minWidth: `${layout.width}px` } : { width: `${layout.width}px` }"
       role="img"
       aria-label="流程图"
       class="chart"
     >
       <defs>
-        <marker
-          :id="markerId"
-          viewBox="0 0 10 10"
-          refX="9"
-          refY="5"
-          markerWidth="5.5"
-          markerHeight="5.5"
-          orient="auto-start-reverse"
-        >
+        <marker :id="markerId" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
           <path d="M0 0L10 5L0 10z" :fill="lineColor" />
         </marker>
       </defs>
-      <path
-        v-for="(d, i) in layout.lines"
-        :key="`l${i}`"
-        :d="d"
-        fill="none"
-        :stroke="lineColor"
-        stroke-width="1.6"
-      />
-      <path
-        v-for="(d, i) in layout.arrows"
-        :key="`a${i}`"
-        :d="d"
-        fill="none"
-        :stroke="lineColor"
-        stroke-width="1.6"
-        :marker-end="`url(#${markerId})`"
-      />
-      <circle
-        v-for="(p, i) in layout.dots"
-        :key="`d${i}`"
-        :cx="p.x"
-        :cy="p.y"
-        r="2.6"
-        :fill="lineColor"
-      />
-      <text
-        v-for="(t, i) in layout.labels"
-        :key="`t${i}`"
-        :x="t.x"
-        :y="t.y"
-        :text-anchor="t.anchor"
-        class="branch-label"
-      >
+      <path v-for="(d, i) in layout.lines" :key="`l${i}`" :d="d" fill="none" :stroke="lineColor" stroke-width="1.6" />
+      <path v-for="(d, i) in layout.arrows" :key="`a${i}`" :d="d" fill="none" :stroke="lineColor" stroke-width="1.6" :marker-end="`url(#${markerId})`" />
+      <circle v-for="(p, i) in layout.dots" :key="`d${i}`" :cx="p.x" :cy="p.y" r="2.6" :fill="lineColor" />
+      <text v-for="(t, i) in layout.labels" :key="`t${i}`" :x="t.x" :y="t.y" :text-anchor="t.anchor" class="branch-label">
         {{ t.text }}
       </text>
       <g v-for="node in layout.nodes" :key="node.id">
@@ -127,19 +86,8 @@ const markerId = `flow-view-arrow-${useId()}`
           :stroke="paint(node.kind).stroke"
           stroke-width="1.6"
         />
-        <polygon
-          v-else
-          :points="shapePoints(node)"
-          :fill="paint(node.kind).fill"
-          :stroke="paint(node.kind).stroke"
-          stroke-width="1.6"
-        />
-        <text
-          :x="node.x + node.w / 2"
-          :y="node.y + node.h / 2 + 5"
-          text-anchor="middle"
-          :fill="paint(node.kind).text"
-        >
+        <polygon v-else :points="shapePoints(node)" :fill="paint(node.kind).fill" :stroke="paint(node.kind).stroke" stroke-width="1.6" />
+        <text :x="node.x + node.w / 2" :y="node.y + node.h / 2 + 5" text-anchor="middle" :fill="paint(node.kind).text">
           {{ nodeLabel(node) }}
         </text>
       </g>
@@ -173,6 +121,6 @@ const markerId = `flow-view-arrow-${useId()}`
 
 .branch-label {
   font-size: 13px;
-  fill: v-bind("theme.textColor2");
+  fill: v-bind('theme.textColor2');
 }
 </style>

@@ -1,19 +1,19 @@
-import type { FlowchartUpdate } from "@oj2/contract"
+import type { FlowchartUpdate } from '@oj2/contract'
 
-import { redis } from "./redis"
+import { redis } from './redis'
 
-export const userEventChannel = "user:events"
+export const userEventChannel = 'user:events'
 
 /**
  * 站点配置变更广播。旧后端的 `utils/websocket.push_config_update`：
  * 超管改了配置，所有开着页面的人立刻生效，不必刷新。
  * 这是全站广播，不分用户，所以是一个固定 topic 而不是 per-user。
  */
-export const configUpdateChannel = "config:updates"
-export const configTopic = "events:config"
+export const configUpdateChannel = 'config:updates'
+export const configTopic = 'events:config'
 
 export async function publishConfigUpdate(key: string, value: unknown) {
-  await redis.publish(configUpdateChannel, JSON.stringify({ type: "config_update", key, value }))
+  await redis.publish(configUpdateChannel, JSON.stringify({ type: 'config_update', key, value }))
 }
 
 /**
@@ -25,9 +25,9 @@ export async function publishConfigUpdate(key: string, value: unknown) {
  * - `{ userId }` 账号被禁用。所有设备都得断。改密码同理。这两件事只改库、
  *   不动 Redis 里的会话，WebSocket 那边要等最多 60 秒的巡检才发现，靠这条立刻通知。
  */
-export const sessionRevokedChannel = "session:revoked"
+export const sessionRevokedChannel = 'session:revoked'
 
-export type SessionRevokedReason = "session-ended" | "account-disabled"
+export type SessionRevokedReason = 'session-ended' | 'account-disabled'
 
 export interface SessionRevoked {
   sid?: string
@@ -35,18 +35,15 @@ export interface SessionRevoked {
   reason: SessionRevokedReason
 }
 
-export async function publishSessionRevoked(
-  target: { sid: string } | { userId: number },
-  reason: SessionRevokedReason,
-) {
+export async function publishSessionRevoked(target: { sid: string } | { userId: number }, reason: SessionRevokedReason) {
   await redis.publish(sessionRevokedChannel, JSON.stringify({ ...target, reason }))
 }
 
 export function parseSessionRevoked(raw: string): SessionRevoked | null {
   try {
     const value = JSON.parse(raw) as SessionRevoked
-    if (typeof value.sid !== "string" && !Number.isInteger(value.userId)) return null
-    if (value.reason !== "session-ended" && value.reason !== "account-disabled") return null
+    if (typeof value.sid !== 'string' && !Number.isInteger(value.userId)) return null
+    if (value.reason !== 'session-ended' && value.reason !== 'account-disabled') return null
     return value
   } catch {
     return null
@@ -64,7 +61,7 @@ interface AchievementNotification {
   description: string
   icon: string
   rarity: string
-  kind: "achievement" | "badge"
+  kind: 'achievement' | 'badge'
 }
 
 export function userEventTopic(userId: number) {
@@ -75,16 +72,13 @@ export async function publishFlowchartUpdate(userId: number, data: FlowchartUpda
   await redis.publish(userEventChannel, JSON.stringify({ userId, data }))
 }
 
-export async function publishAchievementNotification(
-  userId: number,
-  achievements: AchievementNotification[],
-) {
+export async function publishAchievementNotification(userId: number, achievements: AchievementNotification[]) {
   if (!achievements.length) return
   await redis.publish(
     userEventChannel,
     JSON.stringify({
       userId,
-      data: { type: "achievement_unlocked", achievements },
+      data: { type: 'achievement_unlocked', achievements },
     }),
   )
 }
@@ -92,8 +86,7 @@ export async function publishAchievementNotification(
 export function parseUserEvent(raw: string): UserEvent | null {
   try {
     const value = JSON.parse(raw) as UserEvent
-    if (!Number.isInteger(value.userId) || !value.data || typeof value.data !== "object")
-      return null
+    if (!Number.isInteger(value.userId) || !value.data || typeof value.data !== 'object') return null
     return value
   } catch {
     return null

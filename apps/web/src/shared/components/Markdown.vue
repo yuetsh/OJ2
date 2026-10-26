@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { renderMarkdown } from "shared/markdown"
+import { useThemeVars } from 'naive-ui'
+import { renderMarkdown } from 'shared/markdown'
 
 /**
  * 显示一段 Markdown / HTML 正文：题面、教程、AI 的提示和报告。
@@ -13,19 +13,19 @@ const { content, html = false } = defineProps<{
 }>()
 
 const theme = useThemeVars()
-const rendered = computed(() => renderMarkdown(content ?? "", html))
+const rendered = computed(() => renderMarkdown(content ?? '', html))
 
 // 点图片看大图（原来 MdPreview 自带）。包在链接里的图片照旧走链接
-const zoomed = ref("")
+const zoomed = ref('')
 
 function onClick(e: MouseEvent) {
   const target = e.target
-  if (!(target instanceof HTMLImageElement) || target.closest("a")) return
+  if (!(target instanceof HTMLImageElement) || target.closest('a')) return
   zoomed.value = target.currentSrc || target.src
 }
 
-onKeyStroke("Escape", () => {
-  zoomed.value = ""
+onKeyStroke('Escape', () => {
+  zoomed.value = ''
 })
 </script>
 
@@ -110,7 +110,7 @@ onKeyStroke("Escape", () => {
 }
 
 .oj-markdown a {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -153,14 +153,14 @@ onKeyStroke("Escape", () => {
 .oj-markdown hr {
   margin: 1.2em 0;
   border: 0;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .oj-markdown blockquote {
   margin: 0.8em 0;
   padding: 0.1em 1em;
-  border-left: 4px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor3");
+  border-left: 4px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor3');
 }
 
 .oj-markdown code {
@@ -201,7 +201,7 @@ onKeyStroke("Escape", () => {
 .oj-markdown th,
 .oj-markdown td {
   padding: 6px 12px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   text-align: left;
 }
 

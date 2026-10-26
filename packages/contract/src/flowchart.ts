@@ -1,13 +1,8 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { paginatedSchema } from "./common"
+import { paginatedSchema } from './common'
 
-export const flowchartStatusSchema = z.union([
-  z.literal(0),
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-])
+export const flowchartStatusSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)])
 
 export const createFlowchartRequestSchema = z.object({
   problemId: z.number().int().positive(),
@@ -16,10 +11,7 @@ export const createFlowchartRequestSchema = z.object({
     .trim()
     .min(1)
     .max(50_000)
-    .refine(
-      (value) => value.split("\n").filter((line) => line.trim()).length <= 200,
-      "Flowchart is too complex",
-    ),
+    .refine((value) => value.split('\n').filter((line) => line.trim()).length <= 200, 'Flowchart is too complex'),
   flowchartData: z.record(z.string(), z.unknown()).default({}),
 })
 
@@ -44,10 +36,7 @@ export const flowchartSubmissionSchema = z.object({
    * 同一个人同一道题的上一次（评完了的）走对了几组，给「比上次多对了 n 组」用。
    * 上一次不是走例子的评法（2026-10 之前的四项分）、或者没有上一次，给 null
    */
-  previousCases: z
-    .object({ passed: z.number().int(), total: z.number().int() })
-    .nullable()
-    .optional(),
+  previousCases: z.object({ passed: z.number().int(), total: z.number().int() }).nullable().optional(),
 })
 
 export const flowchartListItemSchema = z.object({
@@ -72,16 +61,16 @@ export const flowchartListSchema = paginatedSchema(flowchartListItemSchema).exte
 })
 export const createFlowchartResponseSchema = z.object({
   submissionId: z.string(),
-  status: z.literal("pending"),
+  status: z.literal('pending'),
 })
 /**
  * 流程图画到这两档算这道题做完：题单进度、课堂条、课堂看板、「你画的流程图」、结果页签的 ✓
  * 都按它（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 4、6）。前后端只有这一份
  */
-export const FLOWCHART_PASS_GRADES = ["S", "A"] as const
+export const FLOWCHART_PASS_GRADES = ['S', 'A'] as const
 
 export function isFlowchartPass(grade: string | null | undefined) {
-  return (FLOWCHART_PASS_GRADES as readonly string[]).includes(grade ?? "")
+  return (FLOWCHART_PASS_GRADES as readonly string[]).includes(grade ?? '')
 }
 
 /** 自己在一道题上评完的历次分数，早的在前；hidden = 被题单闸门藏起来的次数 */
@@ -168,11 +157,7 @@ export interface FlowchartCaseReport {
 }
 
 export const flowchartUpdateSchema = z.object({
-  type: z.enum([
-    "flowchart_evaluation_completed",
-    "flowchart_evaluation_failed",
-    "flowchart_evaluation_update",
-  ]),
+  type: z.enum(['flowchart_evaluation_completed', 'flowchart_evaluation_failed', 'flowchart_evaluation_update']),
   submissionId: z.string(),
   score: z.number().optional(),
   grade: z.string().optional(),

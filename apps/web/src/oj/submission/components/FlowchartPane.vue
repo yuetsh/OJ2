@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { getFlowchartSubmission } from "oj/api"
-import { useMermaid } from "shared/composables/useMermaid"
-import { sortFlowchartCriteria } from "utils/constants"
-import type { FlowchartSubmission, FlowchartSubmissionListItem } from "utils/types"
-import { FlowchartSubmissionStatus } from "utils/types"
-import { useTone } from "shared/composables/tone"
-import { submissionTimeText } from "../utils"
-import FlowchartState from "./FlowchartState.vue"
-import UserName from "shared/components/UserName.vue"
-import FlowchartNote from "shared/components/FlowchartNote.vue"
-import { caseReport, flowchartVerdict } from "utils/flowchart"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { getFlowchartSubmission } from 'oj/api'
+import { useMermaid } from 'shared/composables/useMermaid'
+import { sortFlowchartCriteria } from 'utils/constants'
+import type { FlowchartSubmission, FlowchartSubmissionListItem } from 'utils/types'
+import { FlowchartSubmissionStatus } from 'utils/types'
+import { useTone } from 'shared/composables/tone'
+import { submissionTimeText } from '../utils'
+import FlowchartState from './FlowchartState.vue'
+import UserName from 'shared/components/UserName.vue'
+import FlowchartNote from 'shared/components/FlowchartNote.vue'
+import { caseReport, flowchartVerdict } from 'utils/flowchart'
 
 /**
  * 流程图模式的右栏：左边画出来的图，右边四项评分和建议。原来要点编号再开一个
@@ -41,15 +41,11 @@ const loading = ref(false)
 const failed = ref(false)
 const cache = new Map<string, FlowchartSubmission>()
 
-const graph = useTemplateRef<HTMLElement>("graph")
-const bigGraph = useTemplateRef<HTMLElement>("bigGraph")
+const graph = useTemplateRef<HTMLElement>('graph')
+const bigGraph = useTemplateRef<HTMLElement>('bigGraph')
 const bigOpen = ref(false)
 
-const evaluating = computed(
-  () =>
-    props.row.status === FlowchartSubmissionStatus.PENDING ||
-    props.row.status === FlowchartSubmissionStatus.PROCESSING,
-)
+const evaluating = computed(() => props.row.status === FlowchartSubmissionStatus.PENDING || props.row.status === FlowchartSubmissionStatus.PROCESSING)
 
 /**
  * 按 id 缓存，重新评分一开始（状态回到排队 / 评分中）就把这一条扔掉。原来按「id + 状态」
@@ -79,7 +75,7 @@ async function load() {
       failed.value = true
       // 别让上一条的图留在那儿，旁边却写着「没拉下来」
       detail.value = null
-      if (graph.value) graph.value.innerHTML = ""
+      if (graph.value) graph.value.innerHTML = ''
       return
     } finally {
       if (seq === loadSeq) loading.value = false
@@ -98,13 +94,13 @@ async function load() {
  * 原来只缩不放，比大小这种五六个框的图在一大块空白中间只占一小团
  */
 function fitGraph(el: HTMLElement | null) {
-  const svg = el?.querySelector("svg")
-  const w = Number.parseFloat(svg?.getAttribute("width") ?? "")
-  const h = Number.parseFloat(svg?.getAttribute("height") ?? "")
+  const svg = el?.querySelector('svg')
+  const w = Number.parseFloat(svg?.getAttribute('width') ?? '')
+  const h = Number.parseFloat(svg?.getAttribute('height') ?? '')
   if (!svg || !w || !h) return
-  if (!svg.getAttribute("viewBox")) svg.setAttribute("viewBox", `0 0 ${w} ${h}`)
-  svg.style.width = "100%"
-  svg.style.height = "100%"
+  if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
+  svg.style.width = '100%'
+  svg.style.height = '100%'
   svg.style.maxWidth = `${w * 1.5}px`
   svg.style.maxHeight = `${h * 1.5}px`
 }
@@ -116,7 +112,7 @@ function fitGraph(el: HTMLElement | null) {
 function markFocus(el: HTMLElement | null) {
   const focus = report.value?.focus ?? report.value?.cases.find((row) => !row.ok)?.wrongAt
   if (!el || !focus) return
-  el.querySelector(`.pele-node[data-id="${focus}"]`)?.classList.add("oj-focus")
+  el.querySelector(`.pele-node[data-id="${focus}"]`)?.classList.add('oj-focus')
 }
 
 // 分开写三个来源：列表每次轮询都换一批新的行对象，一个 getter 返回数组的话回调次次都跑
@@ -142,7 +138,7 @@ const criteria = computed(() => {
   const parsed = Object.fromEntries(
     Object.entries(raw).map(([key, value]) => {
       const item = (value ?? {}) as Partial<{ score: number; max: number; comment: string }>
-      return [key, { score: item.score ?? 0, max: item.max ?? 0, comment: item.comment ?? "" }]
+      return [key, { score: item.score ?? 0, max: item.max ?? 0, comment: item.comment ?? '' }]
     }),
   )
   return sortFlowchartCriteria(parsed)
@@ -150,10 +146,10 @@ const criteria = computed(() => {
 
 function barColor(score: number, max: number) {
   const pct = max ? score / max : 0
-  if (pct >= 0.8) return tone("success").solid
-  if (pct >= 0.6) return tone("info").solid
-  if (pct >= 0.4) return tone("warning").solid
-  return tone("error").solid
+  if (pct >= 0.8) return tone('success').solid
+  if (pct >= 0.6) return tone('info').solid
+  if (pct >= 0.4) return tone('warning').solid
+  return tone('error').solid
 }
 
 /** 2026-10 起的「走例子」报告；老提交是 null，照旧显示四项分 */
@@ -170,17 +166,14 @@ watch(
 )
 
 const suggestions = computed(() =>
-  (shown.value?.aiSuggestions ?? "")
-    .split("\n")
+  (shown.value?.aiSuggestions ?? '')
+    .split('\n')
     .map((line) => line.trim())
     .filter(Boolean),
 )
 
 const canRetry = computed(
-  () =>
-    props.teacher &&
-    (props.row.status === FlowchartSubmissionStatus.COMPLETED ||
-      props.row.status === FlowchartSubmissionStatus.FAILED),
+  () => props.teacher && (props.row.status === FlowchartSubmissionStatus.COMPLETED || props.row.status === FlowchartSubmissionStatus.FAILED),
 )
 </script>
 
@@ -188,63 +181,31 @@ const canRetry = computed(
   <section class="pane" :class="{ narrow }">
     <div class="head">
       <div class="who">
-        <a
-          class="user-link"
-          :href="`/user?name=${encodeURIComponent(row.username)}`"
-          target="_blank"
-        >
+        <a class="user-link" :href="`/user?name=${encodeURIComponent(row.username)}`" target="_blank">
           <UserName :username="row.username" />
         </a>
-        <button
-          class="filter-pill"
-          title="只看这个人的提交"
-          aria-label="只看这个人的提交"
-          @click="emit('filterUser', row.username)"
-        >
+        <button class="filter-pill" title="只看这个人的提交" aria-label="只看这个人的提交" @click="emit('filterUser', row.username)">
           <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
       </div>
       <span v-if="!narrow" class="dot">·</span>
       <!-- display: contents 的壳：桌面上照旧一行，手机上题目整行另起 -->
       <span class="problem-group">
-        <a
-          class="problem"
-          href="#"
-          :title="`${row.problemDisplayId} ${row.problemTitle}`"
-          @click.prevent="emit('openProblem', row)"
-        >
+        <a class="problem" href="#" :title="`${row.problemDisplayId} ${row.problemTitle}`" @click.prevent="emit('openProblem', row)">
           <span class="problem-id">{{ row.problemDisplayId }}</span>
           {{ row.problemTitle }}
         </a>
-        <button
-          class="filter-pill"
-          title="只看这道题的提交"
-          aria-label="只看这道题的提交"
-          @click="emit('filterProblem', row.problemDisplayId)"
-        >
+        <button class="filter-pill" title="只看这道题的提交" aria-label="只看这道题的提交" @click="emit('filterProblem', row.problemDisplayId)">
           <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
       </span>
       <div class="spacer"></div>
       <!-- 右栏窄时这两个只剩图标（字在 title 里），把宽度让给题目名 -->
-      <n-button
-        v-if="shown && !renderError && shown.mermaidCode"
-        class="head-btn"
-        size="small"
-        title="查看大图"
-        @click="bigOpen = true"
-      >
+      <n-button v-if="shown && !renderError && shown.mermaidCode" class="head-btn" size="small" title="查看大图" @click="bigOpen = true">
         <template #icon><Icon icon="ph:corners-out" /></template>
         查看大图
       </n-button>
-      <n-button
-        v-if="teacher"
-        class="head-btn"
-        size="small"
-        title="重新评分"
-        :disabled="!canRetry"
-        @click="emit('retry', row.id)"
-      >
+      <n-button v-if="teacher" class="head-btn" size="small" title="重新评分" :disabled="!canRetry" @click="emit('retry', row.id)">
         <template #icon><Icon icon="ph:arrow-clockwise" /></template>
         重新评分
       </n-button>
@@ -260,9 +221,7 @@ const canRetry = computed(
       <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
       <!-- 列表项里没有 userId，分不出是别人的还是自己被题单挡住的，文案两种都说得通 -->
       <span class="locked-title">这张流程图看不到</span>
-      <span class="muted"
-        >别人画的看不到；自己以前画的在题单布置期内先藏着，在题单里做对或者布置期结束就能看到。</span
-      >
+      <span class="muted">别人画的看不到；自己以前画的在题单布置期内先藏着，在题单里做对或者布置期结束就能看到。</span>
     </div>
     <div v-else class="body">
       <div class="graph-box">
@@ -278,9 +237,7 @@ const canRetry = computed(
         </div>
         <div v-show="!renderError" ref="graph" class="graph"></div>
         <n-spin v-if="loading && !shown" size="small" />
-        <span v-if="failed" class="muted"
-          >没拉下来，<a href="#" @click.prevent="load">再试一次</a></span
-        >
+        <span v-if="failed" class="muted">没拉下来，<a href="#" @click.prevent="load">再试一次</a></span>
       </div>
       <div class="score-box">
         <template v-if="evaluating">
@@ -288,7 +245,7 @@ const canRetry = computed(
           <span class="muted">AI 正在评分，一般几秒钟</span>
         </template>
         <template v-else-if="row.status === FlowchartSubmissionStatus.FAILED">
-          <span class="muted">这次评分失败了{{ teacher ? "，可以点「重新评分」" : "" }}</span>
+          <span class="muted">这次评分失败了{{ teacher ? '，可以点「重新评分」' : '' }}</span>
         </template>
         <template v-else-if="shown && report">
           <b class="headline">{{ flowchartVerdict(report, shown.aiGrade) }}</b>
@@ -352,7 +309,7 @@ const canRetry = computed(
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: v-bind("theme.bodyColor");
+  background: v-bind('theme.bodyColor');
   container: pane / inline-size;
 }
 
@@ -447,7 +404,7 @@ const canRetry = computed(
 }
 
 .user-link :deep(.name) {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .user-link:hover :deep(.name) {
@@ -481,11 +438,11 @@ const canRetry = computed(
 .dot,
 .problem-id,
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .problem {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -523,7 +480,7 @@ const canRetry = computed(
   align-items: center;
   gap: 12px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .body {
@@ -536,9 +493,9 @@ const canRetry = computed(
 .graph-box,
 .score-box,
 .locked {
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 /* 图占大头（设计稿 FlowNotePane）：42% 时蜜橘分拣这种宽图只剩三成大，框里的字看不清 */
@@ -608,7 +565,7 @@ const canRetry = computed(
 .bar {
   height: 6px;
   border-radius: 3px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .bar-fill {
@@ -623,7 +580,7 @@ const canRetry = computed(
 .note {
   font-size: 13px;
   line-height: 1.6;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
   padding-top: 10px;
 }
 
@@ -638,7 +595,7 @@ const canRetry = computed(
 }
 
 .lock-icon {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   opacity: 0.7;
 }
 
@@ -652,7 +609,7 @@ const canRetry = computed(
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .keys {
@@ -665,9 +622,9 @@ kbd {
   height: 18px;
   padding: 0 4px;
   box-sizing: border-box;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 3px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   font: inherit;
   font-size: 11px;
   display: inline-flex;

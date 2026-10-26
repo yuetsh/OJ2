@@ -1,6 +1,6 @@
 // 不直接 import @node-rs/jieba：它的运行时平台探测和 __dirname 词典加载
 // 在 `bun build --compile` 之后都失效，原因见 vendor/jieba.ts
-import { withBuiltinDict, type JiebaInstance } from "../vendor/jieba"
+import { withBuiltinDict, type JiebaInstance } from '../vendor/jieba'
 
 /**
  * 流程图评语词云的分词。对齐旧后端 `flowchart/views/admin.py` 的
@@ -11,55 +11,55 @@ import { withBuiltinDict, type JiebaInstance } from "../vendor/jieba"
  */
 const STOPWORDS = new Set(
   (
-    "的 了 是 在 和 有 就 不 也 都 要 会 这 那 到 说 上 为 与 及 等 " +
-    "把 被 从 而 所 但 如 又 或 很 更 还 让 对 已 向 只 能 以 中 可以 " +
-    "可能 需要 没有 使用 进行 注意 建议 应该 考虑 整体 基本 部分 " +
-    "一个 一些 一下 一定 一种 这个 所有 其他 比较 存在 明确 " +
-    "正确 良好 清晰 合理 较好 不错 符合 标准 "
+    '的 了 是 在 和 有 就 不 也 都 要 会 这 那 到 说 上 为 与 及 等 ' +
+    '把 被 从 而 所 但 如 又 或 很 更 还 让 对 已 向 只 能 以 中 可以 ' +
+    '可能 需要 没有 使用 进行 注意 建议 应该 考虑 整体 基本 部分 ' +
+    '一个 一些 一下 一定 一种 这个 所有 其他 比较 存在 明确 ' +
+    '正确 良好 清晰 合理 较好 不错 符合 标准 '
   )
-    .split(" ")
+    .split(' ')
     .filter(Boolean),
 )
 
 const CUSTOM_WORDS = [
-  "循环结构",
-  "条件判断",
-  "判断条件",
-  "结束条件",
-  "循环条件",
-  "异常处理",
-  "边界条件",
-  "输入输出",
-  "输入验证",
-  "开始结束",
-  "结束节点",
-  "开始节点",
-  "判断节点",
-  "流程走向",
-  "逻辑错误",
-  "逻辑缺陷",
-  "逻辑不清",
-  "缺少分支",
-  "缺少步骤",
-  "缺少判断",
-  "缺少循环",
-  "死循环",
-  "无限循环",
-  "循环出口",
-  "循环体",
-  "条件分支",
-  "分支结构",
-  "分支不全",
-  "分支缺失",
-  "符号使用",
-  "符号不规范",
-  "连线混乱",
-  "变量初始化",
-  "赋值操作",
-  "累加操作",
-  "终止条件",
-  "退出条件",
-  "返回值",
+  '循环结构',
+  '条件判断',
+  '判断条件',
+  '结束条件',
+  '循环条件',
+  '异常处理',
+  '边界条件',
+  '输入输出',
+  '输入验证',
+  '开始结束',
+  '结束节点',
+  '开始节点',
+  '判断节点',
+  '流程走向',
+  '逻辑错误',
+  '逻辑缺陷',
+  '逻辑不清',
+  '缺少分支',
+  '缺少步骤',
+  '缺少判断',
+  '缺少循环',
+  '死循环',
+  '无限循环',
+  '循环出口',
+  '循环体',
+  '条件分支',
+  '分支结构',
+  '分支不全',
+  '分支缺失',
+  '符号使用',
+  '符号不规范',
+  '连线混乱',
+  '变量初始化',
+  '赋值操作',
+  '累加操作',
+  '终止条件',
+  '退出条件',
+  '返回值',
 ]
 
 /**
@@ -75,7 +75,7 @@ function jieba() {
     const built = await withBuiltinDict()
     // 对应旧后端的 jieba.add_word(w, freq=9999)。
     // @node-rs/jieba@2 没有导出 insertWord/addWord，改用用户词典缓冲区，格式为「词 词频」。
-    built.loadDict(Buffer.from(CUSTOM_WORDS.map((word) => `${word} 9999`).join("\n") + "\n"))
+    built.loadDict(Buffer.from(CUSTOM_WORDS.map((word) => `${word} 9999`).join('\n') + '\n'))
     return built
   })()
   return instance
@@ -85,7 +85,7 @@ export async function buildWordFrequencies(texts: string[], topN = 80) {
   const counter = new Map<string, number>()
   const cutter = await jieba()
   for (const raw of texts) {
-    const text = raw.replaceAll("【重点】", "")
+    const text = raw.replaceAll('【重点】', '')
     for (const token of cutter.cut(text)) {
       const word = token.trim()
       if (word.length < 2 || STOPWORDS.has(word)) continue

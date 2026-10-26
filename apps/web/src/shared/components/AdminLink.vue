@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterLink, type RouteLocationRaw } from "vue-router"
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 
 /**
  * 前台页面上直达后台对应功能的按钮（「编辑这一课」「新建比赛」……），和题单页的
@@ -7,8 +7,8 @@ import { RouterLink, type RouteLocationRaw } from "vue-router"
  * 一边改，中键 / Ctrl 点开新标签页得能用。给谁看由调用方用 v-if 管，要和
  * routes.ts 里目标路由的 meta 对齐，否则点下去被守卫静默踢回首页。
  */
-withDefaults(defineProps<{ to: RouteLocationRaw; size?: "tiny" | "small" | "medium" }>(), {
-  size: "medium",
+withDefaults(defineProps<{ to: RouteLocationRaw; size?: 'tiny' | 'small' | 'medium' }>(), {
+  size: 'medium',
 })
 </script>
 

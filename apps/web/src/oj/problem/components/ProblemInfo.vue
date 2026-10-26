@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { getProblemStats } from "oj/api"
-import { useContestStore } from "oj/store/contest"
-import { useProblemStore } from "oj/store/problem"
-import { useTone, type Tone } from "shared/composables/tone"
-import { classLabel } from "utils/classes"
-import { submissionDayText } from "oj/submission/utils"
-import { DIFFICULTY, JUDGE_STATUS } from "utils/constants"
-import { getTagColor, parseTime } from "utils/functions"
-import type { ProblemStats, SUBMISSION_RESULT } from "utils/types"
-import { useProblemPageContext } from "../composables/problemPageContext"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { getProblemStats } from 'oj/api'
+import { useContestStore } from 'oj/store/contest'
+import { useProblemStore } from 'oj/store/problem'
+import { useTone, type Tone } from 'shared/composables/tone'
+import { classLabel } from 'utils/classes'
+import { submissionDayText } from 'oj/submission/utils'
+import { DIFFICULTY, JUDGE_STATUS } from 'utils/constants'
+import { getTagColor, parseTime } from 'utils/functions'
+import type { ProblemStats, SUBMISSION_RESULT } from 'utils/types'
+import { useProblemPageContext } from '../composables/problemPageContext'
 
 /**
  * 「统计」页签（设计稿「题目页统计重设计」学生 A）。讲的是**这道题**：难不难 → 大家几次
@@ -45,18 +45,18 @@ async function load() {
 onMounted(load)
 
 function resultName(result: number) {
-  return JUDGE_STATUS[result as SUBMISSION_RESULT]?.name ?? "其他"
+  return JUDGE_STATUS[result as SUBMISSION_RESULT]?.name ?? '其他'
 }
 
 function resultTone(result: number): Tone {
-  return JUDGE_STATUS[result as SUBMISSION_RESULT]?.type ?? "default"
+  return JUDGE_STATUS[result as SUBMISSION_RESULT]?.type ?? 'default'
 }
 
 /** 条的颜色：运行时错误橙、答案错误红、编译失败灰 —— 和提交列表的胶囊一个配色 */
 function barColor(result: number) {
   const kind = resultTone(result)
   // 编译失败用灰：它和运行时错误都是 warning，都画成橙色就分不开了
-  if (result === -2 || kind === "default" || kind === "info") return theme.value.textColor3
+  if (result === -2 || kind === 'default' || kind === 'info') return theme.value.textColor3
   return tone(kind).color
 }
 
@@ -70,15 +70,15 @@ const verdict = computed(() => {
   const manyShare = s.solved ? s.tries.many / s.solved : 0
   const detail = `${s.tried} 人做过，${s.solved} 人做对了`
   if (rate >= 0.9 && firstShare >= 0.6) {
-    return { kind: "success" as const, text: "这题不难：大多数人第一次交就对了", detail }
+    return { kind: 'success' as const, text: '这题不难：大多数人第一次交就对了', detail }
   }
-  if (problem.value?.difficulty === "Low" && (rate < 0.9 || manyShare >= 0.15)) {
-    return { kind: "warning" as const, text: "标的是「简单」，但不少人卡住了", detail }
+  if (problem.value?.difficulty === 'Low' && (rate < 0.9 || manyShare >= 0.15)) {
+    return { kind: 'warning' as const, text: '标的是「简单」，但不少人卡住了', detail }
   }
   if (rate >= 0.75) {
-    return { kind: "info" as const, text: "多数人做对了，不少人要多试几次", detail }
+    return { kind: 'info' as const, text: '多数人做对了，不少人要多试几次', detail }
   }
-  return { kind: "warning" as const, text: "这题有点难：不少人还没做对", detail }
+  return { kind: 'warning' as const, text: '这题有点难：不少人还没做对', detail }
 })
 
 const triesSegments = computed(() => {
@@ -86,12 +86,12 @@ const triesSegments = computed(() => {
   if (!s) return []
   const green = theme.value.successColor
   return [
-    { key: "one", label: "1 次", value: s.tries.one, color: green, opacity: 1 },
-    { key: "few", label: "2–3 次", value: s.tries.few, color: green, opacity: 0.6 },
-    { key: "many", label: "4 次以上", value: s.tries.many, color: green, opacity: 0.3 },
+    { key: 'one', label: '1 次', value: s.tries.one, color: green, opacity: 1 },
+    { key: 'few', label: '2–3 次', value: s.tries.few, color: green, opacity: 0.6 },
+    { key: 'many', label: '4 次以上', value: s.tries.many, color: green, opacity: 0.3 },
     {
-      key: "none",
-      label: "没做对",
+      key: 'none',
+      label: '没做对',
       value: s.tried - s.solved,
       color: theme.value.dividerColor,
       opacity: 1,
@@ -99,9 +99,7 @@ const triesSegments = computed(() => {
   ]
 })
 
-const failedTotal = computed(() =>
-  (stats.value?.failures ?? []).reduce((sum, item) => sum + item.count, 0),
-)
+const failedTotal = computed(() => (stats.value?.failures ?? []).reduce((sum, item) => sum + item.count, 0))
 const topFailures = computed(() => (stats.value?.failures ?? []).slice(0, 3))
 
 /**
@@ -114,14 +112,14 @@ const topFailures = computed(() => (stats.value?.failures ?? []).slice(0, 3))
  */
 const tip = computed(() => {
   const top = stats.value?.failures[0]
-  if (!top) return ""
+  if (!top) return ''
   if (top.result === 4) {
-    return "运行时错误最多：程序跑到一半出错了。交之前先点「运行例子」，看看有没有红色的报错。"
+    return '运行时错误最多：程序跑到一半出错了。交之前先点「运行例子」，看看有没有红色的报错。'
   }
   if (top.result === -2) {
-    return "编译失败最多：代码有语法错误，程序根本没跑起来。交之前先点「运行例子」检查一下。"
+    return '编译失败最多：代码有语法错误，程序根本没跑起来。交之前先点「运行例子」检查一下。'
   }
-  return ""
+  return ''
 })
 
 /** 自己交了好几次还没对：比赛里没有举手，也不提「看别人」 */
@@ -134,24 +132,20 @@ const stuck = computed(() => {
 
 /** 班多的老题（1001 这种十几个班都做过）先给 6 个，交过的人多的在前 */
 const allClasses = ref(false)
-const shownClasses = computed(() =>
-  allClasses.value ? (stats.value?.classes ?? []) : (stats.value?.classes ?? []).slice(0, 6),
-)
-const hiddenClasses = computed(
-  () => (stats.value?.classes?.length ?? 0) - shownClasses.value.length,
-)
+const shownClasses = computed(() => (allClasses.value ? (stats.value?.classes ?? []) : (stats.value?.classes ?? []).slice(0, 6)))
+const hiddenClasses = computed(() => (stats.value?.classes?.length ?? 0) - shownClasses.value.length)
 
 /** 点一个班、或者表下面那行：去「统计」按人看（新标签，题目页不动） */
 function openStatistics(className?: string) {
   const href = router.resolve({
-    name: "statistics",
-    query: { problem: problem.value!._id, period: "all", ...(className ? { className } : {}) },
+    name: 'statistics',
+    query: { problem: problem.value!._id, period: 'all', ...(className ? { className } : {}) },
   }).href
-  window.open(href, "_blank")
+  window.open(href, '_blank')
 }
 
 function segmentWidth(value: number, total: number) {
-  return total ? `${(value / total) * 100}%` : "0"
+  return total ? `${(value / total) * 100}%` : '0'
 }
 </script>
 
@@ -161,23 +155,10 @@ function segmentWidth(value: number, total: number) {
     <div class="meta">
       <b class="meta-title">{{ problem._id }} {{ problem.title }}</b>
       <!-- 比赛进行中难度不下发（null），整个不显示 -->
-      <n-tag
-        v-if="problem.difficulty"
-        size="small"
-        round
-        :bordered="false"
-        :type="getTagColor(problem.difficulty)"
-      >
+      <n-tag v-if="problem.difficulty" size="small" round :bordered="false" :type="getTagColor(problem.difficulty)">
         {{ DIFFICULTY[problem.difficulty] }}
       </n-tag>
-      <n-tag
-        v-for="tag in problem.tags"
-        :key="tag"
-        size="small"
-        round
-        :bordered="false"
-        type="info"
-      >
+      <n-tag v-for="tag in problem.tags" :key="tag" size="small" round :bordered="false" type="info">
         {{ tag }}
       </n-tag>
       <span class="spacer"></span>
@@ -192,16 +173,10 @@ function segmentWidth(value: number, total: number) {
       <span class="empty-icon"><Icon icon="ph:lock-simple" :width="18" /></span>
       <b>比赛结束后才能看到大家的情况</b>
       <n-text depth="3">
-        <template v-if="contestStore.contest">
-          比赛 {{ parseTime(contestStore.contest.endTime, "HH:mm") }} 结束。
-        </template>
+        <template v-if="contestStore.contest"> 比赛 {{ parseTime(contestStore.contest.endTime, 'HH:mm') }} 结束。 </template>
         现在只看得到你自己的提交，别人几次做对、错在哪，结束后一起公布。
       </n-text>
-      <router-link
-        v-if="!contestStore.rankHidden"
-        :to="{ name: 'contest rank', params: { contestID: route.params.contestID } }"
-        class="link"
-      >
+      <router-link v-if="!contestStore.rankHidden" :to="{ name: 'contest rank', params: { contestID: route.params.contestID } }" class="link">
         去看比赛排名 ›
       </router-link>
     </div>
@@ -221,9 +196,7 @@ function segmentWidth(value: number, total: number) {
           borderColor: tone(verdict.kind).background,
         }"
       >
-        <b :style="{ color: tone(verdict.kind).color }">
-          <Icon icon="ph:gauge" :width="16" />{{ verdict.text }}
-        </b>
+        <b :style="{ color: tone(verdict.kind).color }"> <Icon icon="ph:gauge" :width="16" />{{ verdict.text }} </b>
         <n-text depth="2" class="small">{{ verdict.detail }}</n-text>
       </div>
 
@@ -266,11 +239,7 @@ function segmentWidth(value: number, total: number) {
           </span>
           <span class="fail-count">{{ item.count }} 次</span>
         </div>
-        <div
-          v-if="tip"
-          class="tip"
-          :style="{ background: tone('warning').background, color: tone('warning').color }"
-        >
+        <div v-if="tip" class="tip" :style="{ background: tone('warning').background, color: tone('warning').color }">
           <Icon icon="ph:lightbulb" :width="15" class="tip-icon" />
           <span>{{ tip }}</span>
         </div>
@@ -299,7 +268,7 @@ function segmentWidth(value: number, total: number) {
               @click="item.className && openStatistics(item.className)"
             >
               <td>
-                <b>{{ item.className ? classLabel(item.className) : "没有班级" }}</b>
+                <b>{{ item.className ? classLabel(item.className) : '没有班级' }}</b>
               </td>
               <td>
                 <span class="done-bar">
@@ -319,9 +288,7 @@ function segmentWidth(value: number, total: number) {
                 {{ item.untouched }}
               </td>
               <td>
-                <n-text depth="2">{{
-                  item.correctRate === null ? "—" : `${item.correctRate}%`
-                }}</n-text>
+                <n-text depth="2">{{ item.correctRate === null ? '—' : `${item.correctRate}%` }}</n-text>
               </td>
               <td>
                 <n-text depth="2">{{ submissionDayText(item.lastTime) }}</n-text>
@@ -330,13 +297,9 @@ function segmentWidth(value: number, total: number) {
           </tbody>
         </table>
         <div class="foot">
-          <a v-if="hiddenClasses" href="#" class="link small" @click.prevent="allClasses = true">
-            还有 {{ hiddenClasses }} 个班 ›
-          </a>
+          <a v-if="hiddenClasses" href="#" class="link small" @click.prevent="allClasses = true"> 还有 {{ hiddenClasses }} 个班 › </a>
           <span class="spacer"></span>
-          <a href="#" class="link small" @click.prevent="openStatistics()">
-            按人看谁没做对 <Icon icon="ph:arrow-square-out" :width="13" />
-          </a>
+          <a href="#" class="link small" @click.prevent="openStatistics()"> 按人看谁没做对 <Icon icon="ph:arrow-square-out" :width="13" /> </a>
         </div>
       </div>
 
@@ -359,15 +322,9 @@ function segmentWidth(value: number, total: number) {
         </div>
       </div>
 
-      <div
-        v-if="stuck && ctx.entry !== 'contest'"
-        class="stuck"
-        :style="{ borderColor: tone('warning').background, background: tone('warning').background }"
-      >
+      <div v-if="stuck && ctx.entry !== 'contest'" class="stuck" :style="{ borderColor: tone('warning').background, background: tone('warning').background }">
         <b>你交了 {{ stuck }} 次，还没对上</b>
-        <n-text depth="2" class="small">
-          卡了这么久，可以点右上角「举手求助」问老师；也可以去「我的提交」看看每一次错在哪。
-        </n-text>
+        <n-text depth="2" class="small"> 卡了这么久，可以点右上角「举手求助」问老师；也可以去「我的提交」看看每一次错在哪。 </n-text>
         <div>
           <n-button size="small" @click="emit('openSubmissions')">看我的提交</n-button>
         </div>
@@ -426,13 +383,13 @@ function segmentWidth(value: number, total: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: v-bind("theme.actionColor");
-  color: v-bind("theme.textColor2");
+  background: v-bind('theme.actionColor');
+  color: v-bind('theme.textColor2');
   margin-bottom: 4px;
 }
 
 .link {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -475,7 +432,7 @@ function segmentWidth(value: number, total: number) {
   overflow: hidden;
   display: flex;
   gap: 2px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .bar.thin {
@@ -491,7 +448,7 @@ function segmentWidth(value: number, total: number) {
   flex-wrap: wrap;
   gap: 4px 16px;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .legend i {
@@ -519,7 +476,7 @@ function segmentWidth(value: number, total: number) {
   flex: 1;
   height: 10px;
   border-radius: 5px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
@@ -553,7 +510,7 @@ function segmentWidth(value: number, total: number) {
 .class-box {
   padding: 12px 14px;
   border-radius: 8px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -561,7 +518,7 @@ function segmentWidth(value: number, total: number) {
 
 .big {
   font-size: 18px;
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .stuck {
@@ -588,14 +545,14 @@ function segmentWidth(value: number, total: number) {
   white-space: nowrap;
   text-align: left;
   font-weight: normal;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   padding: 4px 8px 6px 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .classes td {
   padding: 8px 8px 8px 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   white-space: nowrap;
 }
 
@@ -611,10 +568,10 @@ function segmentWidth(value: number, total: number) {
   border-radius: 3px;
   overflow: hidden;
   vertical-align: middle;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .classes tbody tr.pickable:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 </style>

@@ -4,10 +4,10 @@
  * 串到等级分布图和「A/S 才算过关」的判断里。
  */
 export function gradeForScore(score: number) {
-  if (score >= 90) return "S"
-  if (score >= 80) return "A"
-  if (score >= 70) return "B"
-  return "C"
+  if (score >= 90) return 'S'
+  if (score >= 80) return 'A'
+  if (score >= 70) return 'B'
+  return 'C'
 }
 
 /**
@@ -15,7 +15,7 @@ export function gradeForScore(score: number) {
  * 否则 C。和 gradeForScore 一样不采信模型自报的等级
  */
 export function gradeForCases(passed: number, total: number, hasStyleNote: boolean) {
-  if (total > 0 && passed === total) return hasStyleNote ? "A" : "S"
-  if (passed * 2 >= total) return "B"
-  return "C"
+  if (total > 0 && passed === total) return hasStyleNote ? 'A' : 'S'
+  if (passed * 2 >= total) return 'B'
+  return 'C'
 }

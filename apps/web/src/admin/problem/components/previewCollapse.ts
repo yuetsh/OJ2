@@ -3,5 +3,5 @@
  * 记在本机：老师想专心写的时候收起来，下次打开还是收着的
  */
 export function usePreviewCollapsed() {
-  return useStorage("oj2:admin-problem-preview-collapsed", false)
+  return useStorage('oj2:admin-problem-preview-collapsed', false)
 }

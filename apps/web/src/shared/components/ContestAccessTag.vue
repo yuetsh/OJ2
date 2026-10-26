@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ContestType } from "utils/constants"
-import type { AdminContest, Contest } from "utils/types"
+import { ContestType } from 'utils/constants'
+import type { AdminContest, Contest } from 'utils/types'
 
 interface Props {
   contest: AdminContest | Contest
-  size?: "small"
+  size?: 'small'
 }
 
 const props = defineProps<Props>()
@@ -14,6 +14,6 @@ const isPrivate = computed(() => props.contest.contestType === ContestType.priva
 
 <template>
   <n-tag :type="isPrivate ? 'error' : 'info'" :size="props.size">
-    {{ isPrivate ? "需要密码" : "公开" }}
+    {{ isPrivate ? '需要密码' : '公开' }}
   </n-tag>
 </template>

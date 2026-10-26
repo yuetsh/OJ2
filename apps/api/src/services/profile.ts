@@ -1,7 +1,7 @@
-import type { SessionUser, UserProfile } from "@oj2/contract"
-import { and, eq } from "drizzle-orm"
+import type { SessionUser, UserProfile } from '@oj2/contract'
+import { and, eq } from 'drizzle-orm'
 
-import { db, schema } from "../db"
+import { db, schema } from '../db'
 
 export async function getUserProfileById(userId: number, showRealName: boolean) {
   const [row] = await db

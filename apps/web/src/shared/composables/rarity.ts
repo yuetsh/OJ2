@@ -1,6 +1,6 @@
-import { useDark } from "@vueuse/core"
-import { computed } from "vue"
-import { RARITY_TEXT_COLOR } from "utils/constants"
+import { useDark } from '@vueuse/core'
+import { computed } from 'vue'
+import { RARITY_TEXT_COLOR } from 'utils/constants'
 
 /**
  * 成就稀有度的文字配色，跟随明暗主题切换。

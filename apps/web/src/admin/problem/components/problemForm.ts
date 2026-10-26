@@ -1,9 +1,9 @@
-import { PROBLEM_TAG_MAX_LENGTH } from "@oj2/contract"
-import { StorageSerializers, useLocalStorage, watchDebounced } from "@vueuse/core"
-import type { WatchSource } from "vue"
-import { errorCode, errorMessage } from "utils/api"
-import { DIFFICULTY } from "utils/constants"
-import { unique } from "utils/functions"
+import { PROBLEM_TAG_MAX_LENGTH } from '@oj2/contract'
+import { StorageSerializers, useLocalStorage, watchDebounced } from '@vueuse/core'
+import type { WatchSource } from 'vue'
+import { errorCode, errorMessage } from 'utils/api'
+import { DIFFICULTY } from 'utils/constants'
+import { unique } from 'utils/functions'
 
 /**
  * 编程题（detail.vue）、SQL 题（SqlDetail.vue）两个出题页共用的零件。两页要填的东西几乎
@@ -11,23 +11,21 @@ import { unique } from "utils/functions"
  */
 
 /** 富文本编辑器清空之后留下的是一个空段落，不是空串 */
-export const isBlankHtml = (html: string) => !html.trim() || html === "<p><br></p>"
+export const isBlankHtml = (html: string) => !html.trim() || html === '<p><br></p>'
 
-export const difficultyOptions = (["Low", "Mid", "High"] as const).map((value) => ({
+export const difficultyOptions = (['Low', 'Mid', 'High'] as const).map((value) => ({
   label: DIFFICULTY[value],
   value,
 }))
 
 /** 出题页的「返回」：比赛题回这场比赛的题目列表，公开题回题库 */
 export function problemListRoute(contestID: string | undefined) {
-  return contestID
-    ? { name: "admin contest problem list", params: { contestID } }
-    : { name: "admin problem list" }
+  return contestID ? { name: 'admin contest problem list', params: { contestID } } : { name: 'admin problem list' }
 }
 
 /** 保存失败给老师看的话。编号撞了是最常见的一种，单独说清楚 */
 export function saveErrorText(err: unknown) {
-  return errorCode(err) === "display-id-exists" ? "显示编号重复了，换一个" : errorMessage(err)
+  return errorCode(err) === 'display-id-exists' ? '显示编号重复了，换一个' : errorMessage(err)
 }
 
 /**
@@ -48,10 +46,7 @@ export const tagTooLongText = (tag: string) => `标签最多 ${PROBLEM_TAG_MAX_L
  *
  * `enabled` 在页面数据摆好之前要返回 false，不然加载时那一下会把空表单存进去。
  */
-export function useCreateDraft<T>(
-  key: string,
-  options: { source: WatchSource; enabled: () => boolean; empty: () => boolean; take: () => T },
-) {
+export function useCreateDraft<T>(key: string, options: { source: WatchSource; enabled: () => boolean; empty: () => boolean; take: () => T }) {
   // 初值是 null 时 VueUse 推不出类型，会拿 String() 存成 "[object Object]"，得显式指定
   const draft = useLocalStorage<T | null>(key, null, { serializer: StorageSerializers.object })
   watchDebounced(

@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import {
-  AST_NODE_TARGETS_BY_LANGUAGE,
-  AST_OPERATOR_TARGETS_BY_LANGUAGE,
-  AST_SUPPORTED_LANGUAGES,
-} from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { errorMessage } from "utils/api"
-import type { AstRule, AstRules, LANGUAGE } from "utils/types"
-import { checkAstRules } from "../../api"
-import type { AstCheckState } from "./editorTypes"
+import { AST_NODE_TARGETS_BY_LANGUAGE, AST_OPERATOR_TARGETS_BY_LANGUAGE, AST_SUPPORTED_LANGUAGES } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { errorMessage } from 'utils/api'
+import type { AstRule, AstRules, LANGUAGE } from 'utils/types'
+import { checkAstRules } from '../../api'
+import type { AstCheckState } from './editorTypes'
 
 interface Props {
   modelValue: AstRules | null
@@ -24,20 +20,16 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
-  (e: "update:modelValue", value: AstRules | null): void
+  (e: 'update:modelValue', value: AstRules | null): void
 }>()
 
 // 判题机只认 C / Python，别的语言配了规则也一条都不会跑（judge/ast.ts 的
 // loadLanguage 返回 null 就直接放行）。原来这里按题目的全部语言开 tab，老师给
 // C++ 配的规则存得下、题目页也照常显示成「要求」，判题却从不检查。
-const supportedLanguages = computed(() =>
-  props.languages.filter((lang) => AST_SUPPORTED_LANGUAGES.includes(lang)),
-)
-const unsupportedLanguages = computed(() =>
-  props.languages.filter((lang) => !AST_SUPPORTED_LANGUAGES.includes(lang)),
-)
+const supportedLanguages = computed(() => props.languages.filter((lang) => AST_SUPPORTED_LANGUAGES.includes(lang)))
+const unsupportedLanguages = computed(() => props.languages.filter((lang) => !AST_SUPPORTED_LANGUAGES.includes(lang)))
 
-const activeTab = ref(supportedLanguages.value[0] || "Python")
+const activeTab = ref(supportedLanguages.value[0] || 'Python')
 
 const theme = useThemeVars()
 
@@ -47,7 +39,7 @@ const theme = useThemeVars()
  * 规则配错（节点类型对不上）时完全静默：「必须使用 X」永远失败、「不能使用 X」永远通过。
  * 拿标准答案先跑一遍，标准答案自己都过不了，多半是规则配错了。顺带拿到学生看到的那句话
  */
-const checks = defineModel<AstCheckState>("checks", { default: () => ({}) })
+const checks = defineModel<AstCheckState>('checks', { default: () => ({}) })
 
 let generation = 0
 
@@ -59,12 +51,12 @@ async function runChecks() {
     if (!rules.length) continue
     try {
       next[lang] = await checkAstRules({
-        language: lang as "C" | "C++" | "Python",
-        code: props.answers[lang] ?? "",
+        language: lang as 'C' | 'C++' | 'Python',
+        code: props.answers[lang] ?? '',
         rules,
       })
     } catch (err) {
-      next[lang] = { error: errorMessage(err, "这组规则检查不了") }
+      next[lang] = { error: errorMessage(err, '这组规则检查不了') }
     }
   }
   // 跑的过程中又改了：这一轮作废，新的那轮另有一次
@@ -79,7 +71,7 @@ watchDebounced(() => [props.modelValue, props.answers, supportedLanguages.value]
 
 function checkOf(lang: string, index: number) {
   const state = checks.value[lang]
-  if (!state || "error" in state) return null
+  if (!state || 'error' in state) return null
   return state.rules[index] ?? null
 }
 
@@ -89,39 +81,39 @@ function countOf(lang: string) {
 
 const ENGINE_OPTIONS: SelectOption[] = [
   {
-    label: "节点检查",
-    type: "group",
-    key: "node_group",
+    label: '节点检查',
+    type: 'group',
+    key: 'node_group',
     children: [
-      { label: "必须存在", value: "must_exist_node" },
-      { label: "不能存在", value: "must_not_exist_node" },
-      { label: "出现次数", value: "count_node" },
+      { label: '必须存在', value: 'must_exist_node' },
+      { label: '不能存在', value: 'must_not_exist_node' },
+      { label: '出现次数', value: 'count_node' },
     ],
   },
   {
-    label: "函数调用",
-    type: "group",
-    key: "func_group",
+    label: '函数调用',
+    type: 'group',
+    key: 'func_group',
     children: [
-      { label: "必须调用函数", value: "must_call_function" },
-      { label: "不能调用函数", value: "must_not_call_function" },
-      { label: "函数调用次数", value: "count_function_call" },
+      { label: '必须调用函数', value: 'must_call_function' },
+      { label: '不能调用函数', value: 'must_not_call_function' },
+      { label: '函数调用次数', value: 'count_function_call' },
     ],
   },
   {
-    label: "方法调用",
-    type: "group",
-    key: "method_group",
+    label: '方法调用',
+    type: 'group',
+    key: 'method_group',
     children: [
-      { label: "必须调用方法", value: "must_call_method" },
-      { label: "不能调用方法", value: "must_not_call_method" },
+      { label: '必须调用方法', value: 'must_call_method' },
+      { label: '不能调用方法', value: 'must_not_call_method' },
     ],
   },
   {
-    label: "运算符",
-    type: "group",
-    key: "op_group",
-    children: [{ label: "必须使用运算符", value: "must_use_operator" }],
+    label: '运算符',
+    type: 'group',
+    key: 'op_group',
+    children: [{ label: '必须使用运算符', value: 'must_use_operator' }],
   },
 ]
 
@@ -143,11 +135,11 @@ function operatorTargetOptions(lang: string): SelectOption[] {
   }))
 }
 
-const NODE_ENGINES = ["must_exist_node", "must_not_exist_node", "count_node"]
-const FUNCTION_ENGINES = ["must_call_function", "must_not_call_function", "count_function_call"]
-const METHOD_ENGINES = ["must_call_method", "must_not_call_method"]
-const OPERATOR_ENGINES = ["must_use_operator"]
-const COUNT_ENGINES = ["count_node", "count_function_call"]
+const NODE_ENGINES = ['must_exist_node', 'must_not_exist_node', 'count_node']
+const FUNCTION_ENGINES = ['must_call_function', 'must_not_call_function', 'count_function_call']
+const METHOD_ENGINES = ['must_call_method', 'must_not_call_method']
+const OPERATOR_ENGINES = ['must_use_operator']
+const COUNT_ENGINES = ['count_node', 'count_function_call']
 
 function isNodeEngine(engine: string) {
   return NODE_ENGINES.includes(engine)
@@ -166,18 +158,18 @@ function isCountEngine(engine: string) {
 }
 
 const COUNT_MODE_OPTIONS: SelectOption[] = [
-  { label: "正好", value: "exact" },
-  { label: "范围", value: "range" },
+  { label: '正好', value: 'exact' },
+  { label: '范围', value: 'range' },
 ]
 
-function getCountMode(rule: AstRule): "exact" | "range" {
-  return rule.exact !== undefined ? "exact" : "range"
+function getCountMode(rule: AstRule): 'exact' | 'range' {
+  return rule.exact !== undefined ? 'exact' : 'range'
 }
 
-function updateCountMode(lang: string, index: number, mode: "exact" | "range") {
+function updateCountMode(lang: string, index: number, mode: 'exact' | 'range') {
   const rules = [...getRulesForLang(lang)]
   const rule = { ...rules[index] }
-  if (mode === "exact") {
+  if (mode === 'exact') {
     rule.exact = rule.min ?? 1
     delete rule.min
     delete rule.max
@@ -222,7 +214,7 @@ function updateRules(lang: string, rules: AstRule[]) {
   } else {
     current[lang] = rules
   }
-  emit("update:modelValue", Object.keys(current).length > 0 ? current : null)
+  emit('update:modelValue', Object.keys(current).length > 0 ? current : null)
 }
 
 function getTargetLabel(lang: string, engine: string, target: string): string | undefined {
@@ -235,10 +227,10 @@ function getTargetLabel(lang: string, engine: string, target: string): string | 
 function addRule(lang: string) {
   const rules = [...getRulesForLang(lang)]
   rules.push({
-    engine: "must_exist_node",
-    target: "for_loop",
-    label: getTargetLabel(lang, "must_exist_node", "for_loop"),
-    message: "",
+    engine: 'must_exist_node',
+    target: 'for_loop',
+    label: getTargetLabel(lang, 'must_exist_node', 'for_loop'),
+    message: '',
   })
   updateRules(lang, rules)
 }
@@ -253,16 +245,16 @@ function updateRule(lang: string, index: number, field: string, value: any) {
   const rules = [...getRulesForLang(lang)]
   const rule = { ...rules[index] }
 
-  if (field === "engine") {
+  if (field === 'engine') {
     rule.engine = value
     if (isNodeEngine(value)) {
-      rule.target = "for_loop"
-      rule.label = getTargetLabel(lang, value, "for_loop")
+      rule.target = 'for_loop'
+      rule.label = getTargetLabel(lang, value, 'for_loop')
     } else if (isOperatorEngine(value)) {
-      rule.target = "+"
+      rule.target = '+'
       delete rule.label
     } else {
-      rule.target = ""
+      rule.target = ''
       delete rule.label
     }
     delete rule.min
@@ -270,18 +262,18 @@ function updateRule(lang: string, index: number, field: string, value: any) {
     delete rule.exact
     // 次数引擎不给默认值的话，存下去就是一条恒真规则
     if (isCountEngine(value)) rule.exact = 1
-  } else if (field === "target") {
+  } else if (field === 'target') {
     rule.target = value
     const lbl = getTargetLabel(lang, rule.engine, value)
     if (lbl) rule.label = lbl
     else delete rule.label
-  } else if (field === "min") {
+  } else if (field === 'min') {
     if (value === null || value === undefined) delete rule.min
     else rule.min = value
-  } else if (field === "max") {
+  } else if (field === 'max') {
     if (value === null || value === undefined) delete rule.max
     else rule.max = value
-  } else if (field === "message") {
+  } else if (field === 'message') {
     rule.message = value
   }
 
@@ -299,13 +291,8 @@ watch(supportedLanguages, (langs) => {
 <template>
   <div class="astRules">
     <div class="head">
-      <span class="label">{{ challenge ? "判定" : "语法要求" }}</span>
-      <div
-        v-if="supportedLanguages.length && !challenge"
-        class="langs"
-        role="tablist"
-        aria-label="语言"
-      >
+      <span class="label">{{ challenge ? '判定' : '语法要求' }}</span>
+      <div v-if="supportedLanguages.length && !challenge" class="langs" role="tablist" aria-label="语言">
         <button
           v-for="lang in supportedLanguages"
           :key="lang"
@@ -316,7 +303,7 @@ watch(supportedLanguages, (langs) => {
           :class="{ on: activeTab === lang }"
           @click="activeTab = lang"
         >
-          {{ lang }} · {{ countOf(lang) ? `${countOf(lang)} 条` : "没有" }}
+          {{ lang }} · {{ countOf(lang) ? `${countOf(lang)} 条` : '没有' }}
         </button>
       </div>
       <div class="grow"></div>
@@ -324,8 +311,7 @@ watch(supportedLanguages, (langs) => {
       <n-text v-else depth="3" class="note">几条都满足才算做到</n-text>
     </div>
     <n-text v-if="unsupportedLanguages.length" depth="3" class="note">
-      {{ unsupportedLanguages.join("、") }} 检查不了语法要求（判题机只认
-      {{ AST_SUPPORTED_LANGUAGES.join(" / ") }}）
+      {{ unsupportedLanguages.join('、') }} 检查不了语法要求（判题机只认 {{ AST_SUPPORTED_LANGUAGES.join(' / ') }}）
     </n-text>
     <n-text v-if="!supportedLanguages.length" depth="3" class="note">先选能交的语言</n-text>
     <template v-for="lang in supportedLanguages" :key="lang">
@@ -418,31 +404,19 @@ watch(supportedLanguages, (langs) => {
               size="tiny"
               class="message"
               :placeholder="
-                checkOf(lang, index)?.description
-                  ? `学生看到「${checkOf(lang, index)!.description}」，想换个说法写这里`
-                  : '学生看到的话（不填就按规则自动写）'
+                checkOf(lang, index)?.description ? `学生看到「${checkOf(lang, index)!.description}」，想换个说法写这里` : '学生看到的话（不填就按规则自动写）'
               "
               @update:value="(v: string) => updateRule(lang, index, 'message', v)"
             />
             <template v-if="challenge">
-              <n-text v-if="checkOf(lang, index)?.passed === true" depth="3" class="note">
-                标准答案这样写也满足
-              </n-text>
+              <n-text v-if="checkOf(lang, index)?.passed === true" depth="3" class="note"> 标准答案这样写也满足 </n-text>
               <n-text v-else-if="checkOf(lang, index)?.passed === false" depth="3" class="note">
-                标准答案不是这样写的{{
-                  checkOf(lang, index)!.actual !== undefined
-                    ? `（数到 ${checkOf(lang, index)!.actual} 次）`
-                    : ""
-                }}
+                标准答案不是这样写的{{ checkOf(lang, index)!.actual !== undefined ? `（数到 ${checkOf(lang, index)!.actual} 次）` : '' }}
               </n-text>
             </template>
             <span v-else-if="checkOf(lang, index)?.passed === true" class="ok">✓ 标准答案过了</span>
             <span v-else-if="checkOf(lang, index)?.passed === false" class="bad">
-              ✗ 标准答案自己没过{{
-                checkOf(lang, index)!.actual !== undefined
-                  ? `（数到 ${checkOf(lang, index)!.actual} 次）`
-                  : ""
-              }}
+              ✗ 标准答案自己没过{{ checkOf(lang, index)!.actual !== undefined ? `（数到 ${checkOf(lang, index)!.actual} 次）` : '' }}
             </span>
             <n-text v-else-if="checkOf(lang, index)" depth="3">没有 {{ lang }} 的标准答案</n-text>
           </div>
@@ -472,14 +446,14 @@ watch(supportedLanguages, (langs) => {
 
 .label {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   width: 72px;
   flex: none;
 }
 
 .langs {
   display: flex;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 4px;
   overflow: hidden;
 }
@@ -491,17 +465,17 @@ watch(supportedLanguages, (langs) => {
   background: transparent;
   font: inherit;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   cursor: pointer;
 }
 
 .lang + .lang {
-  border-left: 1px solid v-bind("theme.borderColor");
+  border-left: 1px solid v-bind('theme.borderColor');
 }
 
 .lang.on {
   background-color: rgba(24, 160, 88, 0.12);
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
   font-weight: 600;
 }
 
@@ -524,7 +498,7 @@ watch(supportedLanguages, (langs) => {
   flex-direction: column;
   gap: 4px;
   padding: 6px 8px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 4px;
   background-color: rgba(128, 128, 128, 0.04);
   font-size: 13px;
@@ -557,17 +531,17 @@ watch(supportedLanguages, (langs) => {
 }
 
 .ok {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
   white-space: nowrap;
 }
 
 .bad {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
   white-space: nowrap;
 }
 
 .ruleError {
   font-size: 12px;
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 </style>

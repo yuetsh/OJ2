@@ -1,5 +1,5 @@
-import { pythonLanguage } from "@codemirror/lang-python"
-import { styleTags, tags as t } from "@lezer/highlight"
+import { pythonLanguage } from '@codemirror/lang-python'
+import { styleTags, tags as t } from '@lezer/highlight'
 
 /**
  * Python 的解析器在上色上补几处，向 VS Code 看齐。编辑器（extensions/language.ts）和
@@ -15,8 +15,8 @@ import { styleTags, tags as t } from "@lezer/highlight"
 export const ojPythonLanguage = pythonLanguage.configure({
   props: [
     styleTags({
-      "from as with": t.controlKeyword,
-      "FormatReplacement/{ FormatReplacement/} FormatSpec/:": t.modifier,
+      'from as with': t.controlKeyword,
+      'FormatReplacement/{ FormatReplacement/} FormatSpec/:': t.modifier,
       print: t.function(t.variableName),
     }),
   ],

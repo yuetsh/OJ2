@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useTone } from "shared/composables/tone"
-import { ContestStatus } from "utils/constants"
-import { parseTime, secondsToDuration } from "utils/functions"
-import NotFound from "shared/components/NotFound.vue"
-import { errorCode } from "utils/api"
-import { useContestStore } from "../store/contest"
-import ContestBadge from "./components/ContestBadge.vue"
-import ContestInfo from "./components/ContestInfo.vue"
+import { useThemeVars } from 'naive-ui'
+import { useTone } from 'shared/composables/tone'
+import { ContestStatus } from 'utils/constants'
+import { parseTime, secondsToDuration } from 'utils/functions'
+import NotFound from 'shared/components/NotFound.vue'
+import { errorCode } from 'utils/api'
+import { useContestStore } from '../store/contest'
+import ContestBadge from './components/ContestBadge.vue'
+import ContestInfo from './components/ContestInfo.vue'
 
 /**
  * 比赛页的外壳（设计稿「比赛重设计」）：一条顶栏 + 下面三个页之一。
@@ -23,21 +23,21 @@ const route = useRoute()
 const message = useMessage()
 const theme = useThemeVars()
 const tone = useTone()
-const success = computed(() => tone("success"))
+const success = computed(() => tone('success'))
 
-const password = ref("")
+const password = ref('')
 
 async function check() {
   const error = await contestStore.checkPassword(props.contestID, password.value)
-  if (error === "too-many-password-attempts") {
-    message.error("密码错误次数太多，请 10 分钟后再试")
+  if (error === 'too-many-password-attempts') {
+    message.error('密码错误次数太多，请 10 分钟后再试')
   } else if (!contestStore.access) {
-    message.error("密码不对")
+    message.error('密码不对')
   }
 }
 
 /** 拉比赛失败：原来没接，链接不对就是一整页空白 */
-const failure = ref<null | "missing" | "failed">(null)
+const failure = ref<null | 'missing' | 'failed'>(null)
 
 async function load() {
   failure.value = null
@@ -45,7 +45,7 @@ async function load() {
     await contestStore.init(props.contestID)
   } catch (err) {
     if (contestStore.contest) return
-    failure.value = errorCode(err) === "contest-not-found" ? "missing" : "failed"
+    failure.value = errorCode(err) === 'contest-not-found' ? 'missing' : 'failed'
   }
 }
 
@@ -63,56 +63,41 @@ onBeforeUnmount(contestStore.clear)
 const status = computed(() => contestStore.contestStatus)
 const contest = computed(() => contestStore.contest)
 
-const passwordFormVisible = computed(
-  () => contestStore.isPrivate && !contestStore.access && !contestStore.isContestAdmin,
-)
+const passwordFormVisible = computed(() => contestStore.isPrivate && !contestStore.access && !contestStore.isContestAdmin)
 /** 学生在开始前进来：题目和榜都还拿不到，整页就是「几点开始、还有多久」 */
-const waiting = computed(
-  () =>
-    status.value === ContestStatus.not_started &&
-    !contestStore.isContestAdmin &&
-    !passwordFormVisible.value,
-)
+const waiting = computed(() => status.value === ContestStatus.not_started && !contestStore.isContestAdmin && !passwordFormVisible.value)
 
 const untilStart = computed(() => {
-  if (!contest.value) return ""
+  if (!contest.value) return ''
   const seconds = Math.floor((Date.parse(contest.value.startTime) - contestStore.now) / 1000)
-  if (seconds <= 0) return ""
+  if (seconds <= 0) return ''
   if (seconds >= 86400) return `${Math.floor(seconds / 86400)} 天`
   return secondsToDuration(seconds)
 })
 
 const timeRange = computed(() => {
-  if (!contest.value) return ""
-  const start = parseTime(contest.value.startTime, "M月D日 HH:mm")
-  const sameDay =
-    parseTime(contest.value.startTime, "YYYY-MM-DD") ===
-    parseTime(contest.value.endTime, "YYYY-MM-DD")
-  const end = parseTime(contest.value.endTime, sameDay ? "HH:mm" : "M月D日 HH:mm")
+  if (!contest.value) return ''
+  const start = parseTime(contest.value.startTime, 'M月D日 HH:mm')
+  const sameDay = parseTime(contest.value.startTime, 'YYYY-MM-DD') === parseTime(contest.value.endTime, 'YYYY-MM-DD')
+  const end = parseTime(contest.value.endTime, sameDay ? 'HH:mm' : 'M月D日 HH:mm')
   return `${start} – ${end}`
 })
 
-const routeName = computed(() => String(route.name ?? ""))
+const routeName = computed(() => String(route.name ?? ''))
 const teacherTabs = computed(() => [
   {
-    name: "contest class",
-    label: status.value === ContestStatus.finished ? "成绩" : "全班情况",
+    name: 'contest class',
+    label: status.value === ContestStatus.finished ? '成绩' : '全班情况',
   },
-  { name: "contest rank", label: "排名" },
-  { name: "contest submissions", label: "提交" },
-  { name: "contest problems", label: "题目" },
+  { name: 'contest rank', label: '排名' },
+  { name: 'contest submissions', label: '提交' },
+  { name: 'contest problems', label: '题目' },
 ])
 const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 </script>
 
 <template>
-  <NotFound
-    v-if="failure === 'missing'"
-    title="这场比赛不存在"
-    hint="可能是链接复制错了，或者这场比赛还没公开"
-    to="/contest"
-    to-label="去比赛列表"
-  />
+  <NotFound v-if="failure === 'missing'" title="这场比赛不存在" hint="可能是链接复制错了，或者这场比赛还没公开" to="/contest" to-label="去比赛列表" />
   <NotFound v-else-if="failure === 'failed'" icon="ph:wifi-slash" title="比赛没拉下来">
     <n-button type="primary" @click="load()">再试一次</n-button>
   </NotFound>
@@ -127,37 +112,26 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
         <span class="countdown-num">{{ contestStore.remaining }}</span>
       </span>
       <span v-else-if="status === ContestStatus.not_started" class="countdown">
-        <span class="countdown-label">{{ parseTime(contest.startTime, "M月D日 HH:mm") }} 开始</span>
+        <span class="countdown-label">{{ parseTime(contest.startTime, 'M月D日 HH:mm') }} 开始</span>
         <span v-if="untilStart" class="countdown-num small">还有 {{ untilStart }}</span>
       </span>
       <span v-else class="range">{{ timeRange }}</span>
       <template v-if="contestStore.canEnter">
         <i class="divider"></i>
         <nav v-if="contestStore.isTeacher" class="tabs" aria-label="比赛">
-          <RouterLink
-            v-for="tab in teacherTabs"
-            :key="tab.name"
-            :to="to(tab.name)"
-            class="tab"
-            :class="{ on: routeName === tab.name }"
-            >{{ tab.label }}</RouterLink
-          >
+          <RouterLink v-for="tab in teacherTabs" :key="tab.name" :to="to(tab.name)" class="tab" :class="{ on: routeName === tab.name }">{{
+            tab.label
+          }}</RouterLink>
         </nav>
         <template v-else>
           <RouterLink v-if="routeName !== 'contest problems'" :to="to('contest problems')">
             <n-button>‹ 题目</n-button>
           </RouterLink>
-          <RouterLink
-            v-if="routeName !== 'contest submissions'"
-            :to="{ ...to('contest submissions'), query: { myself: '1' } }"
-          >
+          <RouterLink v-if="routeName !== 'contest submissions'" :to="{ ...to('contest submissions'), query: { myself: '1' } }">
             <n-button>我的提交</n-button>
           </RouterLink>
         </template>
-        <RouterLink
-          v-if="contestStore.isContestAdmin"
-          :to="{ name: 'admin contest edit', params: { contestID } }"
-        >
+        <RouterLink v-if="contestStore.isContestAdmin" :to="{ name: 'admin contest edit', params: { contestID } }">
           <n-button>比赛设置</n-button>
         </RouterLink>
       </template>
@@ -181,9 +155,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
     </div>
     <div v-else-if="waiting" class="gate">
       <b>比赛还没开始</b>
-      <span class="gate-sub">
-        {{ parseTime(contest.startTime, "M月D日 HH:mm") }} 开始，到时候题目会自己出来，不用刷新
-      </span>
+      <span class="gate-sub"> {{ parseTime(contest.startTime, 'M月D日 HH:mm') }} 开始，到时候题目会自己出来，不用刷新 </span>
       <span v-if="untilStart" class="gate-count">{{ untilStart }}</span>
     </div>
     <div v-else class="body"><router-view></router-view></div>
@@ -213,7 +185,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .title {
@@ -231,7 +203,7 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
   display: flex;
   align-items: baseline;
   gap: 6px;
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
 }
 
 .countdown-label {
@@ -250,19 +222,19 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 
 .range {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .divider {
   width: 1px;
   height: 24px;
   margin: 0 4px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .tabs {
   display: flex;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 4px;
   overflow: hidden;
 }
@@ -273,17 +245,17 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
   display: flex;
   align-items: center;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   text-decoration: none;
 }
 
 .tab + .tab {
-  border-left: 1px solid v-bind("theme.borderColor");
+  border-left: 1px solid v-bind('theme.borderColor');
 }
 
 .tab.on {
-  background: v-bind("success.background");
-  color: v-bind("success.color");
+  background: v-bind('success.background');
+  color: v-bind('success.color');
   font-weight: 600;
 }
 
@@ -298,13 +270,13 @@ const to = (name: string) => ({ name, params: { contestID: props.contestID } })
 
 .gate-sub {
   font-size: 14px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .gate-count {
   font-size: 40px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
 }
 </style>

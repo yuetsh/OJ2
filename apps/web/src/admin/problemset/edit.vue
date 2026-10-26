@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import PageHeader from "admin/components/PageHeader.vue"
-import { errorMessage } from "utils/api"
-import { fromPickerValue, parseTime, toPickerValue, zonedParts } from "utils/functions"
-import type { AdminProblemRow, AdminProblemSet, AdminProblemSetBadge } from "utils/types"
+import { useThemeVars } from 'naive-ui'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { errorMessage } from 'utils/api'
+import { fromPickerValue, parseTime, toPickerValue, zonedParts } from 'utils/functions'
+import type { AdminProblemRow, AdminProblemSet, AdminProblemSetBadge } from 'utils/types'
 import {
   addProblemsToSet,
   createProblemSet,
@@ -20,8 +20,8 @@ import {
   reorderProblemSetProblems,
   setProblemRequired,
   type BadgeBody,
-} from "../api"
-import BadgeModal from "./components/BadgeModal.vue"
+} from '../api'
+import BadgeModal from './components/BadgeModal.vue'
 
 /**
  * 新建 / 编辑题单，一屏做完（设计稿「题单重设计」后台那块）：左边名字、说明、布置期、公开；
@@ -43,18 +43,18 @@ const ready = ref(false)
 const saving = ref(false)
 const current = ref<AdminProblemSet | null>(null)
 
-const form = reactive({ title: "", description: "", visible: true })
+const form = reactive({ title: '', description: '', visible: true })
 
 // ---------------------------------------------------------------- 布置期
 
 const DAY = 86_400_000
 const OFFSET = 8 * 3_600_000
 const CHOICES = [
-  { days: 7, label: "一周" },
-  { days: 14, label: "两周" },
-  { days: 28, label: "四周" },
+  { days: 7, label: '一周' },
+  { days: 14, label: '两周' },
+  { days: 28, label: '四周' },
 ]
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"]
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
 /** 东八区某一天结束的时刻（23:59:59.999） */
 function endOfDay(ms: number) {
@@ -63,36 +63,32 @@ function endOfDay(ms: number) {
 }
 
 /** "none" 不布置 / 天数 / "pick" 自己选日期 */
-const choice = ref<"none" | "pick" | number>(14)
+const choice = ref<'none' | 'pick' | number>(14)
 const picked = ref(toPickerValue(Date.now() + 14 * DAY))
 
 const untilMs = computed(() => {
-  if (choice.value === "none") return null
-  if (choice.value === "pick") return endOfDay(fromPickerValue(picked.value))
+  if (choice.value === 'none') return null
+  if (choice.value === 'pick') return endOfDay(fromPickerValue(picked.value))
   return endOfDay(Date.now() + choice.value * DAY)
 })
 
 function dayText(ms: number) {
   const iso = new Date(ms).toISOString()
-  return `${parseTime(iso, "M月D日")} 周${WEEKDAYS[new Date(ms + OFFSET).getUTCDay()]}`
+  return `${parseTime(iso, 'M月D日')} 周${WEEKDAYS[new Date(ms + OFFSET).getUTCDay()]}`
 }
 
 const running = computed(() => !!current.value?.assigning)
-const expired = computed(
-  () => !!current.value && !current.value.assigning && !!current.value.assignedUntil,
-)
+const expired = computed(() => !!current.value && !current.value.assigning && !!current.value.assignedUntil)
 
 const assignHint = computed(() => {
   if (untilMs.value === null) {
-    return running.value
-      ? "保存后马上结束布置，以前的代码都放出来。"
-      : "不布置：学生照样能加入、做题，只是不藏以前的代码。"
+    return running.value ? '保存后马上结束布置，以前的代码都放出来。' : '不布置：学生照样能加入、做题，只是不藏以前的代码。'
   }
-  if (untilMs.value <= Date.now()) return "这一天已经过了，选个以后的日子。"
+  if (untilMs.value <= Date.now()) return '这一天已经过了，选个以后的日子。'
   const head = `布置到 ${dayText(untilMs.value)}。`
   return running.value
-    ? `${head}这一轮从 ${parseTime(current.value!.assignedAt!, "M月D日")} 开始，改日期只是延长或提前结束。`
-    : `${head}${expired.value ? "上一轮已经结束，保存就是再布置一次。" : ""}`
+    ? `${head}这一轮从 ${parseTime(current.value!.assignedAt!, 'M月D日')} 开始，改日期只是延长或提前结束。`
+    : `${head}${expired.value ? '上一轮已经结束，保存就是再布置一次。' : ''}`
 })
 
 const disabledDate = (ts: number) => fromPickerValue(ts) + DAY <= Date.now()
@@ -112,7 +108,7 @@ async function loadProblems() {
   }))
 }
 
-const keyword = ref("")
+const keyword = ref('')
 const results = ref<AdminProblemRow[]>([])
 const searching = ref(false)
 
@@ -142,8 +138,7 @@ watchDebounced(
   { debounce: 300 },
 )
 
-const added = (displayId: string) =>
-  items.value.some((item) => item.displayId.toLowerCase() === displayId.toLowerCase())
+const added = (displayId: string) => items.value.some((item) => item.displayId.toLowerCase() === displayId.toLowerCase())
 
 async function addMany(displayIds: string[], titles = new Map<string, string>()) {
   if (!editing.value) {
@@ -153,9 +148,7 @@ async function addMany(displayIds: string[], titles = new Map<string, string>())
       let displayId = typed
       let title = titles.get(typed)
       if (!title) {
-        const found = (await getLibraryProblemList(0, 5, typed)).results.find(
-          (row) => row._id.toLowerCase() === typed.toLowerCase(),
-        )
+        const found = (await getLibraryProblemList(0, 5, typed)).results.find((row) => row._id.toLowerCase() === typed.toLowerCase())
         if (!found) {
           message.warning(`题号 ${typed} 找不到（或者没公开）`)
           continue
@@ -165,17 +158,17 @@ async function addMany(displayIds: string[], titles = new Map<string, string>())
       }
       items.value.push({ id: 0, displayId, title, isRequired: true })
     }
-    keyword.value = ""
+    keyword.value = ''
     return
   }
   try {
     const res = await addProblemsToSet(id.value, displayIds)
     const notes = []
-    if (res.missing.length) notes.push(`找不到：${res.missing.join("、")}`)
-    if (res.duplicate.length) notes.push(`已经在里面：${res.duplicate.join("、")}`)
-    if (notes.length) message.warning(notes.join("；"))
+    if (res.missing.length) notes.push(`找不到：${res.missing.join('、')}`)
+    if (res.duplicate.length) notes.push(`已经在里面：${res.duplicate.join('、')}`)
+    if (notes.length) message.warning(notes.join('；'))
     else message.success(`加了 ${res.added.length} 道`)
-    keyword.value = ""
+    keyword.value = ''
     await Promise.all([loadProblems(), reloadSet()])
   } catch (err) {
     message.error(errorMessage(err))
@@ -203,10 +196,10 @@ function remove(item: Item) {
     return
   }
   dialog.warning({
-    title: "从题单里拿掉这道题？",
+    title: '从题单里拿掉这道题？',
     content: `「${item.title}」。已经加入的 ${current.value?.participantCount ?? 0} 个人的进度会重算，题目本身不受影响。`,
-    positiveText: "拿掉",
-    negativeText: "不拿",
+    positiveText: '拿掉',
+    negativeText: '不拿',
     onPositiveClick: async () => {
       try {
         await removeProblemFromSet(id.value, item.id)
@@ -256,7 +249,7 @@ const badgeModal = ref(false)
 const editingBadge = ref<AdminProblemSetBadge | null>(null)
 
 function badgeCondition(badge: AdminProblemSetBadge) {
-  return badge.conditionType === "all_problems" ? "全部做完" : `做对 ${badge.conditionValue} 道`
+  return badge.conditionType === 'all_problems' ? '全部做完' : `做对 ${badge.conditionValue} 道`
 }
 
 function openBadge(badge: AdminProblemSetBadge | null) {
@@ -278,11 +271,9 @@ async function saveBadge(data: BadgeBody) {
 function removeBadge(badge: AdminProblemSetBadge) {
   dialog.warning({
     title: `删掉奖章「${badge.name}」？`,
-    content: badge.earnedCount
-      ? `已经拿到它的 ${badge.earnedCount} 个人也会一起被收回。`
-      : "还没有人拿到它。",
-    positiveText: "删掉",
-    negativeText: "不删",
+    content: badge.earnedCount ? `已经拿到它的 ${badge.earnedCount} 个人也会一起被收回。` : '还没有人拿到它。',
+    positiveText: '删掉',
+    negativeText: '不删',
     onPositiveClick: async () => {
       try {
         await deleteProblemSetBadge(id.value, badge.id)
@@ -301,7 +292,7 @@ async function reloadSet() {
 }
 
 async function load() {
-  keyword.value = ""
+  keyword.value = ''
   if (!editing.value) {
     ready.value = true
     return
@@ -310,10 +301,10 @@ async function load() {
   const set = current.value!
   Object.assign(form, { title: set.title, description: set.description, visible: set.visible })
   if (set.assigning) {
-    choice.value = "pick"
+    choice.value = 'pick'
     picked.value = toPickerValue(Date.parse(set.assignedUntil!))
   } else {
-    choice.value = "none"
+    choice.value = 'none'
   }
   await Promise.all([loadProblems(), getProblemSetBadges(id.value).then((b) => (badges.value = b))])
   ready.value = true
@@ -321,11 +312,11 @@ async function load() {
 
 async function submit() {
   if (!form.title.trim()) {
-    message.error("题单还没起名字")
+    message.error('题单还没起名字')
     return
   }
   if (untilMs.value !== null && untilMs.value <= Date.now()) {
-    message.error("布置到的日期已经过了")
+    message.error('布置到的日期已经过了')
     return
   }
   const body = {
@@ -338,7 +329,7 @@ async function submit() {
   try {
     if (editing.value) {
       current.value = await editProblemSet(id.value, body)
-      message.success("改好了")
+      message.success('改好了')
       return
     }
     const created = await createProblemSet(body)
@@ -355,10 +346,8 @@ async function submit() {
         }
       }
     }
-    message.success(
-      items.value.length ? `题单建好了，${items.value.length} 道题都加进去了` : "题单建好了",
-    )
-    router.replace({ name: "admin problemset edit", params: { problemSetId: created.id } })
+    message.success(items.value.length ? `题单建好了，${items.value.length} 道题都加进去了` : '题单建好了')
+    router.replace({ name: 'admin problemset edit', params: { problemSetId: created.id } })
   } catch (err) {
     message.error(errorMessage(err))
   } finally {
@@ -372,13 +361,13 @@ function removeSet() {
     title: `删除题单「${set.title}」？`,
     content: set.participantCount
       ? `${set.participantCount} 个人的进度和他们拿到的奖章会一起删掉，找不回来。只是不想让学生看到的话，关掉「公开」就行。`
-      : "还没有人加入。删掉找不回来。",
-    positiveText: "删除",
-    negativeText: "不删",
+      : '还没有人加入。删掉找不回来。',
+    positiveText: '删除',
+    negativeText: '不删',
     onPositiveClick: async () => {
       try {
         await deleteProblemSet(set.id)
-        router.replace({ name: "admin problemset list" })
+        router.replace({ name: 'admin problemset list' })
       } catch (err) {
         message.error(errorMessage(err))
       }
@@ -393,9 +382,7 @@ onMounted(load)
 <template>
   <PageHeader :title="editing ? '编辑题单' : '新建题单'" :back="{ name: 'admin problemset list' }">
     <template v-if="editing" #actions>
-      <n-button tag="a" :href="`/problemset/${problemSetId}`" target="_blank">
-        到前台看这个题单
-      </n-button>
+      <n-button tag="a" :href="`/problemset/${problemSetId}`" target="_blank"> 到前台看这个题单 </n-button>
     </template>
   </PageHeader>
 
@@ -414,28 +401,12 @@ onMounted(load)
         <span class="label">布置</span>
         <div class="stack">
           <n-flex :size="6" align="center">
-            <button class="chip" :class="{ on: choice === 'none' }" @click="choice = 'none'">
-              不布置
-            </button>
-            <button
-              v-for="c in CHOICES"
-              :key="c.days"
-              class="chip"
-              :class="{ on: choice === c.days }"
-              @click="choice = c.days"
-            >
+            <button class="chip" :class="{ on: choice === 'none' }" @click="choice = 'none'">不布置</button>
+            <button v-for="c in CHOICES" :key="c.days" class="chip" :class="{ on: choice === c.days }" @click="choice = c.days">
               {{ c.label }}
             </button>
-            <button class="chip" :class="{ on: choice === 'pick' }" @click="choice = 'pick'">
-              选日期…
-            </button>
-            <n-date-picker
-              v-if="choice === 'pick'"
-              v-model:value="picked"
-              type="date"
-              :is-date-disabled="disabledDate"
-              style="width: 150px"
-            />
+            <button class="chip" :class="{ on: choice === 'pick' }" @click="choice = 'pick'">选日期…</button>
+            <n-date-picker v-if="choice === 'pick'" v-model:value="picked" type="date" :is-date-disabled="disabledDate" style="width: 150px" />
           </n-flex>
           <span class="hint">{{ assignHint }}</span>
           <span class="hint">
@@ -447,9 +418,7 @@ onMounted(load)
       <div class="field">
         <span class="label">公开</span>
         <n-switch v-model:value="form.visible" />
-        <span class="hint">{{
-          form.visible ? "学生能在题单列表里看到" : "藏起来，学生看不到也进不去"
-        }}</span>
+        <span class="hint">{{ form.visible ? '学生能在题单列表里看到' : '藏起来，学生看不到也进不去' }}</span>
       </div>
 
       <div v-if="current" class="stats">
@@ -461,8 +430,7 @@ onMounted(load)
       <div class="save">
         <n-button type="primary" :loading="saving" @click="submit">保存</n-button>
         <span class="hint"
-          >{{ items.length }} 道题<template v-if="optionalCount">
-            · {{ optionalCount }} 道选做</template
+          >{{ items.length }} 道题<template v-if="optionalCount"> · {{ optionalCount }} 道选做</template
           ><template v-if="editing"> · {{ badges.length }} 个奖章</template></span
         >
         <div class="spacer"></div>
@@ -485,7 +453,7 @@ onMounted(load)
         />
         <div v-if="pasted.length" class="results">
           <div class="result">
-            <span class="grow">粘贴了 {{ pasted.length }} 个题号：{{ pasted.join("、") }}</span>
+            <span class="grow">粘贴了 {{ pasted.length }} 个题号：{{ pasted.join('、') }}</span>
             <n-button size="small" type="primary" @click="addMany(pasted)">全部加进来</n-button>
           </div>
         </div>
@@ -520,11 +488,9 @@ onMounted(load)
               :title="item.isRequired ? '点一下改成选做' : '点一下改回必做'"
               @click="toggleRequired(item)"
             >
-              {{ item.isRequired ? "必做" : "选做" }}
+              {{ item.isRequired ? '必做' : '选做' }}
             </button>
-            <n-button size="small" text :aria-label="`拿掉 ${item.title}`" @click="remove(item)"
-              >✕</n-button
-            >
+            <n-button size="small" text :aria-label="`拿掉 ${item.title}`" @click="remove(item)">✕</n-button>
           </div>
         </div>
         <div v-else class="empty hint">还没加题。在上面输入题号，比如 3065</div>
@@ -546,13 +512,7 @@ onMounted(load)
             <span class="muted ell grow tiny">{{ badge.description }}</span>
             <span class="muted num tiny">{{ badge.earnedCount }} 人拿到</span>
             <n-button size="small" text type="primary" @click="openBadge(badge)">改</n-button>
-            <n-button
-              size="small"
-              text
-              :aria-label="`删掉 ${badge.name}`"
-              @click="removeBadge(badge)"
-              >✕</n-button
-            >
+            <n-button size="small" text :aria-label="`删掉 ${badge.name}`" @click="removeBadge(badge)">✕</n-button>
           </div>
         </div>
         <div v-else class="empty hint">还没有奖章。比如「做对 3 道」发一个、「全部做完」发一个</div>
@@ -560,12 +520,7 @@ onMounted(load)
     </div>
   </div>
 
-  <BadgeModal
-    v-model:show="badgeModal"
-    :badge="editingBadge"
-    :problems-count="items.length"
-    @save="saveBadge"
-  />
+  <BadgeModal v-model:show="badgeModal" :badge="editingBadge" :problems-count="items.length" @save="saveBadge" />
 </template>
 
 <style scoped>
@@ -582,9 +537,9 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 16px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .form {
@@ -632,7 +587,7 @@ onMounted(load)
   width: 40px;
   flex-shrink: 0;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .stack {
@@ -654,11 +609,11 @@ onMounted(load)
 .hint {
   font-size: 12px;
   line-height: 1.6;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tiny {
@@ -680,18 +635,18 @@ onMounted(load)
   height: 28px;
   padding: 0 12px;
   border-radius: 14px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
   white-space: nowrap;
 }
 
 .chip.on {
-  border-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.primaryColor');
   font-weight: 600;
 }
 
@@ -704,7 +659,7 @@ onMounted(load)
 
 .chip.dashed {
   border-style: dashed;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .chip.static {
@@ -716,14 +671,14 @@ onMounted(load)
   align-items: center;
   box-sizing: border-box;
   padding: 10px 12px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   font-size: 13px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .stats a {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -732,12 +687,12 @@ onMounted(load)
   align-items: center;
   gap: 10px;
   padding-top: 12px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .results {
   margin-top: -4px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   overflow: hidden;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
@@ -754,11 +709,11 @@ onMounted(load)
 }
 
 .result + .result {
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .list {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   overflow: hidden;
 }
@@ -771,11 +726,11 @@ onMounted(load)
   align-items: center;
   gap: 10px;
   font-size: 14px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .item + .item {
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .item.dragging {
@@ -788,7 +743,7 @@ onMounted(load)
 
 .grip {
   cursor: grab;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   letter-spacing: -3px;
   user-select: none;
 }

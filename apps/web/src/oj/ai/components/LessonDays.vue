@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { LearningDay } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { classLabel } from "utils/classes"
-import ProblemChip from "./ProblemChip.vue"
-import { dayLabel, isDone } from "../utils"
+import type { LearningDay } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { classLabel } from 'utils/classes'
+import ProblemChip from './ProblemChip.vue'
+import { dayLabel, isDone } from '../utils'
 
 /** 一天一行，新的在前：先是班上这节课的题，再是这天自己练的 */
 const props = defineProps<{
@@ -32,12 +32,8 @@ watch(
 )
 
 const shown = computed(() => (showAll.value ? props.days : props.days.slice(0, DAY_CAP)))
-const you = computed(() => (props.username ? "" : "你"))
-const subtitle = computed(() =>
-  props.className
-    ? `${classLabel(props.className)}课上做的题，加上${you.value}自己练的`
-    : `${you.value}做过的题`,
-)
+const you = computed(() => (props.username ? '' : '你'))
+const subtitle = computed(() => (props.className ? `${classLabel(props.className)}课上做的题，加上${you.value}自己练的` : `${you.value}做过的题`))
 
 function ownOf(day: LearningDay) {
   return openOwn.value.has(day.day) ? day.own : day.own.slice(0, OWN_CAP)
@@ -57,56 +53,34 @@ function expand(day: string) {
       <div class="when">
         <b>{{ dayLabel(day.day).date }}</b>
         <span>{{ dayLabel(day.day).weekday }}</span>
-        <span v-if="compact && day.lesson.length" class="done">
-          做对 {{ day.lesson.filter(isDone).length }}/{{ day.lesson.length }}
-        </span>
+        <span v-if="compact && day.lesson.length" class="done"> 做对 {{ day.lesson.filter(isDone).length }}/{{ day.lesson.length }} </span>
       </div>
       <div class="groups">
         <div v-if="day.lesson.length" class="chips">
-          <ProblemChip
-            v-for="item in day.lesson"
-            :key="item.displayId"
-            :item="item"
-            in-lesson
-            :username="username"
-          />
+          <ProblemChip v-for="item in day.lesson" :key="item.displayId" :item="item" in-lesson :username="username" />
         </div>
         <div v-if="day.own.length" class="chips">
           <span class="own">自己练</span>
-          <ProblemChip
-            v-for="item in ownOf(day)"
-            :key="item.displayId"
-            :item="item"
-            :in-lesson="false"
-            :username="username"
-          />
-          <button
-            v-if="day.own.length > OWN_CAP && !openOwn.has(day.day)"
-            class="more"
-            @click="expand(day.day)"
-          >
+          <ProblemChip v-for="item in ownOf(day)" :key="item.displayId" :item="item" :in-lesson="false" :username="username" />
+          <button v-if="day.own.length > OWN_CAP && !openOwn.has(day.day)" class="more" @click="expand(day.day)">
             还有 {{ day.own.length - OWN_CAP }} 道 ▾
           </button>
         </div>
       </div>
       <div v-if="!compact" class="done">
-        <template v-if="day.lesson.length">
-          做对 {{ day.lesson.filter(isDone).length }}/{{ day.lesson.length }}
-        </template>
+        <template v-if="day.lesson.length"> 做对 {{ day.lesson.filter(isDone).length }}/{{ day.lesson.length }} </template>
       </div>
     </div>
-    <button v-if="!showAll && days.length > DAY_CAP" class="earlier" @click="showAll = true">
-      更早的 {{ days.length - DAY_CAP }} 天 ▾
-    </button>
+    <button v-if="!showAll && days.length > DAY_CAP" class="earlier" @click="showAll = true">更早的 {{ days.length - DAY_CAP }} 天 ▾</button>
   </section>
 </template>
 
 <style scoped>
 .card {
   padding: 14px 20px 6px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -120,14 +94,14 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .day {
   display: flex;
   gap: 12px;
   padding: 10px 0;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .when {
@@ -144,7 +118,7 @@ h3 small {
 
 .when span {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .groups {
@@ -164,7 +138,7 @@ h3 small {
 
 .own {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   margin-right: 2px;
 }
 
@@ -174,7 +148,7 @@ h3 small {
   text-align: right;
   line-height: 30px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -182,7 +156,7 @@ h3 small {
 .earlier {
   height: 30px;
   padding: 0 12px;
-  border: 1px dashed v-bind("theme.borderColor");
+  border: 1px dashed v-bind('theme.borderColor');
   border-radius: 6px;
   background: transparent;
   color: #18a058;

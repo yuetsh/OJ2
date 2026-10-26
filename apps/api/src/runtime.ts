@@ -1,4 +1,4 @@
-import { resolve } from "node:path"
+import { resolve } from 'node:path'
 
 /**
  * 运行形态的判定：开发时是 `bun src/main.ts`，生产是 `bun build --compile` 出来的单二进制。
@@ -8,7 +8,7 @@ import { resolve } from "node:path"
  * 都会指到文件系统根：`data/test_case` 变成 `/data/test_case`。这种错误不会报错，
  * 只会安静地读写错地方，所以必须显式分叉，不能靠"相对路径反正差不多"。
  */
-export const isCompiled = import.meta.dir.startsWith("/$bunfs")
+export const isCompiled = import.meta.dir.startsWith('/$bunfs')
 
 /**
  * 起一个「自己」的子进程时该用的命令。SQL 判题要 fork 一个可被 SIGKILL 的子进程，
@@ -19,7 +19,7 @@ export const isCompiled = import.meta.dir.startsWith("/$bunfs")
  */
 export function selfCommand(subcommand: string): string[] {
   if (isCompiled) return [process.execPath, subcommand]
-  return [process.execPath, resolve(import.meta.dir, "main.ts"), subcommand]
+  return [process.execPath, resolve(import.meta.dir, 'main.ts'), subcommand]
 }
 
 /**
@@ -31,7 +31,7 @@ export function selfCommand(subcommand: string): string[] {
  *   而 docker/compose.dev.yml 挂给判题沙箱的是**仓库根**的 data/test_case —— 按 cwd 解析
  *   就会落到 apps/api/data/ 下，两边不是同一个目录，新传的测试点判题时报「找不到测试数据」。
  */
-export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, "../../..")
+export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, '../../..')
 
 /**
  * 迁移文件（`0000_*.sql` … + `meta/_journal.json`）所在目录。
@@ -46,6 +46,4 @@ export const pathBase = isCompiled ? process.cwd() : resolve(import.meta.dir, ".
  * 迁移，和 Django 扫 `migrations/` 是一回事。要是改成内嵌，就得为每条迁移手写一行
  * import，那是迟早会漏的账。
  */
-export const migrationsDir =
-  process.env.OJ2_MIGRATIONS_DIR ??
-  (isCompiled ? "/usr/local/share/oj2/migrations" : resolve(import.meta.dir, "db"))
+export const migrationsDir = process.env.OJ2_MIGRATIONS_DIR ?? (isCompiled ? '/usr/local/share/oj2/migrations' : resolve(import.meta.dir, 'db'))

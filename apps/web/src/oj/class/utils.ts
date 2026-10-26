@@ -1,20 +1,11 @@
-import type { ClassPk, ClassPkCell } from "@oj2/contract"
-import { classLabel } from "utils/classes"
+import type { ClassPk, ClassPkCell } from '@oj2/contract'
+import { classLabel } from 'utils/classes'
 
 /**
  * 每个班一种颜色，按选班的顺序给。蓝 / 橙打头：两个班对决时最常见，这两个色盲也分得开；
  * 后面几个亮度错开，对照格的深浅才看得出来。
  */
-const COLORS = [
-  "#2f6fd0",
-  "#e0702f",
-  "#18a058",
-  "#8e5bd0",
-  "#b8901a",
-  "#d0457a",
-  "#0f8f9f",
-  "#5f6b7a",
-]
+const COLORS = ['#2f6fd0', '#e0702f', '#18a058', '#8e5bd0', '#b8901a', '#d0457a', '#0f8f9f', '#5f6b7a']
 
 export function pkColor(index: number) {
   return COLORS[index % COLORS.length]!
@@ -31,9 +22,7 @@ export function tint(hex: string, alpha: number) {
 /** 同一个年级的几个班只说「3班」，跨年级说全名 */
 export function shortLabels(pk: ClassPk) {
   const grades = new Set(pk.classes.map((item) => item.className.slice(0, 2)))
-  return pk.classes.map((item) =>
-    grades.size === 1 ? `${item.className.slice(2)}班` : classLabel(item.className),
-  )
+  return pk.classes.map((item) => (grades.size === 1 ? `${item.className.slice(2)}班` : classLabel(item.className)))
 }
 
 /**
@@ -42,11 +31,7 @@ export function shortLabels(pk: ClassPk) {
  */
 export function needToTie(cell: ClassPkCell, members: number, target: number) {
   let more = 0
-  while (
-    Math.round(((cell.solved + more) / members) * 100) < target &&
-    cell.solved + more < members
-  )
-    more++
+  while (Math.round(((cell.solved + more) / members) * 100) < target && cell.solved + more < members) more++
   return more
 }
 

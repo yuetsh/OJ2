@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { registerRequestSchema } from "@oj2/contract"
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { errorCode } from "utils/api"
-import { login, signup } from "../api"
-import { useAuthModalStore } from "../store/authModal"
-import { useUserStore } from "../store/user"
+import { registerRequestSchema } from '@oj2/contract'
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { errorCode } from 'utils/api'
+import { login, signup } from '../api'
+import { useAuthModalStore } from '../store/authModal'
+import { useUserStore } from '../store/user'
 
 /**
  * 注册框。错在哪个框就标在哪个框下面，不攒成最底下一条；注册完直接登上，
  * 不用回登录框再输一遍。开关在后台设置里（allow_register），关着时顶栏没有入口。
  */
-type Field = "username" | "email" | "password" | "again"
+type Field = 'username' | 'email' | 'password' | 'again'
 
 const authStore = useAuthModalStore()
 const userStore = useUserStore()
@@ -21,55 +21,55 @@ const theme = useThemeVars()
 // n-modal 把内容传送到 body 底下，CSS 的 v-bind() 挂不上去（变量挂在组件根上，
 // 这个组件的根是 n-modal 自己）—— 颜色直接写到弹框根节点的 style 里
 const themeVars = computed(() => ({
-  "--t-box-shadow-3": theme.value.boxShadow3,
-  "--t-error-color": theme.value.errorColor,
-  "--t-hover-color": theme.value.hoverColor,
-  "--t-modal-color": theme.value.modalColor,
-  "--t-primary-color": theme.value.primaryColor,
-  "--t-primary-color-hover": theme.value.primaryColorHover,
-  "--t-text-color-1": theme.value.textColor1,
-  "--t-text-color-2": theme.value.textColor2,
+  '--t-box-shadow-3': theme.value.boxShadow3,
+  '--t-error-color': theme.value.errorColor,
+  '--t-hover-color': theme.value.hoverColor,
+  '--t-modal-color': theme.value.modalColor,
+  '--t-primary-color': theme.value.primaryColor,
+  '--t-primary-color-hover': theme.value.primaryColorHover,
+  '--t-text-color-1': theme.value.textColor1,
+  '--t-text-color-2': theme.value.textColor2,
 }))
 
-const form = reactive({ username: "", email: "", password: "", again: "" })
+const form = reactive({ username: '', email: '', password: '', again: '' })
 const errors = reactive<Partial<Record<Field, string>>>({})
 /** 不归哪个框的错（注册太频繁、网络） */
-const general = ref("")
+const general = ref('')
 const loading = ref(false)
 
-const usernameRef = useTemplateRef("usernameRef")
+const usernameRef = useTemplateRef('usernameRef')
 
 function check() {
   for (const key of Object.keys(errors) as Field[]) delete errors[key]
-  if (!form.username.trim()) errors.username = "写上用户名"
-  if (!form.email.trim()) errors.email = "写上邮箱"
+  if (!form.username.trim()) errors.username = '写上用户名'
+  if (!form.email.trim()) errors.email = '写上邮箱'
   else if (!registerRequestSchema.shape.email.safeParse(form.email.trim()).success) {
-    errors.email = "邮箱的样子不对，比如 zhangsan@qq.com"
+    errors.email = '邮箱的样子不对，比如 zhangsan@qq.com'
   }
-  if (form.password.length < 6 || form.password.length > 20) errors.password = "密码要 6 到 20 位"
-  if (!errors.password && form.again !== form.password) errors.again = "和上面的不一样"
+  if (form.password.length < 6 || form.password.length > 20) errors.password = '密码要 6 到 20 位'
+  if (!errors.password && form.again !== form.password) errors.again = '和上面的不一样'
   return Object.keys(errors).length === 0
 }
 
 function clearOne(field: Field) {
   delete errors[field]
-  general.value = ""
+  general.value = ''
 }
 
 async function submit() {
   if (loading.value || !check()) return
   loading.value = true
-  general.value = ""
+  general.value = ''
   const username = form.username.trim()
   try {
     await signup({ username, email: form.email.trim(), password: form.password })
   } catch (err) {
     const code = errorCode(err)
-    if (code === "username-exists") errors.username = "这个名字已经有人用了，换一个"
-    else if (code === "email-exists") errors.email = "这个邮箱已经注册过了"
-    else if (code === "too-many-registrations") general.value = "注册太频繁了，等一会儿再试"
-    else if (code === "registration-disabled") general.value = "现在不开放注册"
-    else general.value = "注册不了，等一会儿再试"
+    if (code === 'username-exists') errors.username = '这个名字已经有人用了，换一个'
+    else if (code === 'email-exists') errors.email = '这个邮箱已经注册过了'
+    else if (code === 'too-many-registrations') general.value = '注册太频繁了，等一会儿再试'
+    else if (code === 'registration-disabled') general.value = '现在不开放注册'
+    else general.value = '注册不了，等一会儿再试'
     loading.value = false
     return
   }
@@ -87,9 +87,9 @@ async function submit() {
 
 watch(signupModalOpen, (open) => {
   if (!open) return
-  Object.assign(form, { username: "", email: "", password: "", again: "" })
+  Object.assign(form, { username: '', email: '', password: '', again: '' })
   for (const key of Object.keys(errors) as Field[]) delete errors[key]
-  general.value = ""
+  general.value = ''
   nextTick(() => usernameRef.value?.focus())
 })
 </script>
@@ -165,13 +165,9 @@ watch(signupModalOpen, (open) => {
           <span v-if="errors.again" class="err">{{ errors.again }}</span>
         </label>
         <span v-if="general" class="err">{{ general }}</span>
-        <n-button type="primary" size="large" :loading="loading" @click="submit">
-          注册并登录
-        </n-button>
+        <n-button type="primary" size="large" :loading="loading" @click="submit"> 注册并登录 </n-button>
         <div class="links">
-          <button class="link" type="button" @click="authStore.switchToLogin()">
-            已经有账号了，去登录
-          </button>
+          <button class="link" type="button" @click="authStore.switchToLogin()">已经有账号了，去登录</button>
         </div>
       </div>
     </div>

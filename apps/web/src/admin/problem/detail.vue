@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { TEST_CASE_MAX_CASES, type ChallengeInput, type RunnableLanguage } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import PageHeader from "admin/components/PageHeader.vue"
-import { getProblemTagList } from "shared/api"
-import TextEditor from "shared/components/TextEditor.vue"
-import { errorMessage } from "utils/api"
-import { DIFFICULTY, STORAGE_KEY } from "utils/constants"
-import download from "utils/download"
-import { createZipBlob, parseTime, unique } from "utils/functions"
-import type { AdminProblem, AstRules, BlankProblem, LANGUAGE, Tag, Testcase } from "utils/types"
+import { TEST_CASE_MAX_CASES, type ChallengeInput, type RunnableLanguage } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { getProblemTagList } from 'shared/api'
+import TextEditor from 'shared/components/TextEditor.vue'
+import { errorMessage } from 'utils/api'
+import { DIFFICULTY, STORAGE_KEY } from 'utils/constants'
+import download from 'utils/download'
+import { createZipBlob, parseTime, unique } from 'utils/functions'
+import type { AdminProblem, AstRules, BlankProblem, LANGUAGE, Tag, Testcase } from 'utils/types'
 import {
   createContestProblem,
   createProblem,
@@ -17,51 +17,21 @@ import {
   generateTestInputs,
   getTestCaseFiles,
   uploadTestcases,
-} from "../api"
-import AstRulesEditor from "./components/AstRulesEditor.vue"
-import ChallengeEditor from "./components/ChallengeEditor.vue"
-import CaseTable from "./components/CaseTable.vue"
-import CodePreview from "./components/CodePreview.vue"
-import PreviewStrip from "./components/PreviewStrip.vue"
-import { usePreviewCollapsed } from "./components/previewCollapse"
-import {
-  cleanTags,
-  difficultyOptions,
-  isBlankHtml,
-  problemListRoute,
-  saveErrorText,
-  tagTooLongText,
-  useCreateDraft,
-} from "./components/problemForm"
-import {
-  caseFiles,
-  caseStatus,
-  newRow,
-  normalizeCase,
-  readCaseZip,
-  sameOutput,
-  useCaseRunner,
-  type AnswerSource,
-  type CaseRow,
-} from "./components/caseRows"
-import {
-  buildTemplate,
-  parseTemplate,
-  wrapWithTemplate,
-  type TemplateParts,
-} from "./components/codeTemplate"
-import type { AstCheckState, FlowchartMode, PreviewTab } from "./components/editorTypes"
-import {
-  emptyDoc,
-  parseDoc,
-  toMermaid,
-  type FlowDoc,
-} from "shared/components/FlowchartEditor/model"
+} from '../api'
+import AstRulesEditor from './components/AstRulesEditor.vue'
+import ChallengeEditor from './components/ChallengeEditor.vue'
+import CaseTable from './components/CaseTable.vue'
+import CodePreview from './components/CodePreview.vue'
+import PreviewStrip from './components/PreviewStrip.vue'
+import { usePreviewCollapsed } from './components/previewCollapse'
+import { cleanTags, difficultyOptions, isBlankHtml, problemListRoute, saveErrorText, tagTooLongText, useCreateDraft } from './components/problemForm'
+import { caseFiles, caseStatus, newRow, normalizeCase, readCaseZip, sameOutput, useCaseRunner, type AnswerSource, type CaseRow } from './components/caseRows'
+import { buildTemplate, parseTemplate, wrapWithTemplate, type TemplateParts } from './components/codeTemplate'
+import type { AstCheckState, FlowchartMode, PreviewTab } from './components/editorTypes'
+import { emptyDoc, parseDoc, toMermaid, type FlowDoc } from 'shared/components/FlowchartEditor/model'
 
-const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
-const FlowchartEditor = defineAsyncComponent(
-  () => import("shared/components/FlowchartEditor/index.vue"),
-)
+const CodeEditor = defineAsyncComponent(() => import('shared/components/CodeEditor.vue'))
+const FlowchartEditor = defineAsyncComponent(() => import('shared/components/FlowchartEditor/index.vue'))
 
 /**
  * 编程题（C / C++ / Python）的出题页，设计稿「编程题出题页」方案 B：左边写，右边是学生
@@ -87,14 +57,14 @@ const theme = useThemeVars()
 
 const isCreate = computed(() => !props.problemID)
 
-const RUNNABLE: RunnableLanguage[] = ["Python", "C", "C++"]
+const RUNNABLE: RunnableLanguage[] = ['Python', 'C', 'C++']
 
 // ---------------------------------------------------------------- 表单
 
 interface CodeForm {
   _id: string
   title: string
-  difficulty: BlankProblem["difficulty"]
+  difficulty: BlankProblem['difficulty']
   visible: boolean
   tags: string[]
   description: string
@@ -118,43 +88,43 @@ interface CodeForm {
   flowchartHint: string
 }
 
-const blankParts = (): TemplateParts => ({ prepend: "", template: "", append: "" })
+const blankParts = (): TemplateParts => ({ prepend: '', template: '', append: '' })
 
 const blankForm = (): CodeForm => ({
-  _id: "",
-  title: "",
-  difficulty: "Low",
+  _id: '',
+  title: '',
+  difficulty: 'Low',
   visible: false,
   tags: [],
-  description: "",
-  inputDescription: "",
-  outputDescription: "",
-  hint: "",
-  source: "",
-  prompt: "",
+  description: '',
+  inputDescription: '',
+  outputDescription: '',
+  hint: '',
+  source: '',
+  prompt: '',
   timeLimit: 1000,
   memoryLimit: 64,
-  languages: ["Python", "C"],
-  answers: { Python: "", C: "", "C++": "" },
-  templates: { Python: blankParts(), C: blankParts(), "C++": blankParts() },
+  languages: ['Python', 'C'],
+  answers: { Python: '', C: '', 'C++': '' },
+  templates: { Python: blankParts(), C: blankParts(), 'C++': blankParts() },
   astRules: null,
   challenges: null,
-  flowchartMode: "none",
-  mermaidCode: "",
+  flowchartMode: 'none',
+  mermaidCode: '',
   flowchartDoc: null,
-  flowchartHint: "",
+  flowchartHint: '',
 })
 
 const form = reactive<CodeForm>(blankForm())
 
-const NO_INPUT = "<p>没有输入</p>"
+const NO_INPUT = '<p>没有输入</p>'
 
 // ---------------------------------------------------------------- 标签
 
 const tagList = shallowRef<Tag[]>([])
 const knowledgeTags = computed(() =>
   tagList.value
-    .filter((t) => t.category === "knowledge")
+    .filter((t) => t.category === 'knowledge')
     .sort((a, b) => b.problemCount - a.problemCount)
     .map((t) => t.name),
 )
@@ -169,10 +139,7 @@ const visibleKnowledge = computed(() => {
 /** 主题和新建的标签走下拉（主题 25 个、还会越来越多，铺不开） */
 const otherTags = computed(() => form.tags.filter((t) => !knowledgeSet.value.has(t)))
 const themeOptions = computed(() =>
-  unique([
-    ...tagList.value.filter((t) => t.category === "theme").map((t) => t.name),
-    ...otherTags.value,
-  ]).map((name) => ({ label: name, value: name })),
+  unique([...tagList.value.filter((t) => t.category === 'theme').map((t) => t.name), ...otherTags.value]).map((name) => ({ label: name, value: name })),
 )
 
 function toggleKnowledge(name: string) {
@@ -181,7 +148,7 @@ function toggleKnowledge(name: string) {
 
 function onOtherTagsChange(tags: string[]) {
   const cleaned = cleanTags(tags)
-  if ("tooLong" in cleaned) {
+  if ('tooLong' in cleaned) {
     message.error(tagTooLongText(cleaned.tooLong))
     return
   }
@@ -190,7 +157,7 @@ function onOtherTagsChange(tags: string[]) {
 
 // ---------------------------------------------------------------- 标准答案
 
-const answerTab = ref<RunnableLanguage>("Python")
+const answerTab = ref<RunnableLanguage>('Python')
 watch(
   () => form.languages,
   (langs) => {
@@ -211,15 +178,15 @@ const source = computed<AnswerSource | null>(() => {
 
 /** 代码框跟着行数长：5 行的答案别占 260 高，长答案也别撑出一屏 */
 function codeHeight(code: string, minLines: number, maxLines: number) {
-  const lines = Math.min(Math.max(code.split("\n").length + 1, minLines), maxLines)
+  const lines = Math.min(Math.max(code.split('\n').length + 1, minLines), maxLines)
   return `${lines * 21 + 12}px`
 }
 
 const answerSummary = computed(() => {
   const written = form.languages.filter((l) => form.answers[l].trim())
-  if (!written.length) return "还没写"
-  const lines = form.answers[written[0]!].trim().split("\n").length
-  return `${written.join("、")} · ${lines} 行`
+  if (!written.length) return '还没写'
+  const lines = form.answers[written[0]!].trim().split('\n').length
+  return `${written.join('、')} · ${lines} 行`
 })
 
 // ---------------------------------------------------------------- 测试数据
@@ -229,11 +196,11 @@ const rows = ref<CaseRow[]>([])
 const big = ref<{ count: number; totalBytes: number } | null>(null)
 const exampleRows = ref<CaseRow[]>([])
 /** 现在挂在题目上的测试点 */
-const testCase = reactive({ id: "", score: [] as Testcase[] })
+const testCase = reactive({ id: '', score: [] as Testcase[] })
 /** 打开时读回来的那份（没改过就不用重传） */
 let loadedCases: { input: string; output: string }[] | null = null
 /** 页面顶上的说明：测试点读不出来、原来的例子补进了测试数据…… */
-const caseNotice = ref("")
+const caseNotice = ref('')
 
 const { running, runAll, rerunFailed } = useCaseRunner(rows, source)
 const examplesRunner = useCaseRunner(exampleRows, source)
@@ -258,42 +225,34 @@ const examples = computed(() =>
 
 /** 「测试数据第 1–4 组」 */
 const examplesNote = computed(() => {
-  if (big.value) return ""
+  if (big.value) return ''
   const picked = rows.value.flatMap((r, i) => (r.example ? [i + 1] : []))
-  if (!picked.length) return ""
+  if (!picked.length) return ''
   const contiguous = picked.every((n, i) => i === 0 || n === picked[i - 1]! + 1)
   if (picked.length === 1) return `测试数据第 ${picked[0]} 组`
-  return contiguous
-    ? `测试数据第 ${picked[0]}–${picked.at(-1)} 组`
-    : `测试数据第 ${picked.join("、")} 组`
+  return contiguous ? `测试数据第 ${picked[0]}–${picked.at(-1)} 组` : `测试数据第 ${picked.join('、')} 组`
 })
 
 const caseSummary = computed(() => {
   if (big.value) return `${big.value.count} 组 · ${formatBytes(big.value.totalBytes)}`
   const statuses = rows.value.map((r) => caseStatus(r, source.value))
   const examplesCount = rows.value.filter((r) => r.example).length
-  const failed = statuses.filter((s) => s === "error").length
-  const changed = statuses.filter((s) => s === "changed").length
+  const failed = statuses.filter((s) => s === 'error').length
+  const changed = statuses.filter((s) => s === 'changed').length
   const parts = [`${rows.value.length} 组`]
   if (failed) parts.push(`${failed} 组没跑通`)
   if (changed) parts.push(`${changed} 组输出变了`)
-  parts.push(examplesCount ? `${examplesCount} 组当例子` : "还没勾例子")
-  return parts.join(" · ")
+  parts.push(examplesCount ? `${examplesCount} 组当例子` : '还没勾例子')
+  return parts.join(' · ')
 })
 
-const changedCount = computed(
-  () => rows.value.filter((r) => caseStatus(r, source.value) === "changed").length,
-)
+const changedCount = computed(() => rows.value.filter((r) => caseStatus(r, source.value) === 'changed').length)
 
 const saveNote = computed(() => {
-  if (big.value) return "例子都跑通了"
+  if (big.value) return '例子都跑通了'
   const picked = rows.value.filter((r) => r.example).length
-  const base = source.value
-    ? `${rows.value.length} 组都跑通了，${picked} 组当例子`
-    : `${rows.value.length} 组，${picked} 组当例子`
-  return changedCount.value
-    ? `${base} · ${changedCount.value} 组的输出和原来不一样（保存后按新的判，交过的不会自动重判）`
-    : base
+  const base = source.value ? `${rows.value.length} 组都跑通了，${picked} 组当例子` : `${rows.value.length} 组，${picked} 组当例子`
+  return changedCount.value ? `${base} · ${changedCount.value} 组的输出和原来不一样（保存后按新的判，交过的不会自动重判）` : base
 })
 
 function formatBytes(bytes: number) {
@@ -309,7 +268,7 @@ function addRow() {
   if (casesFull.value) return
   // 空着的第一组（新建页）直接用掉；例子一组都还没勾时，新加的这组先勾上
   const noExample = !rows.value.some((r) => r.example)
-  rows.value.push(newRow("", "", noExample))
+  rows.value.push(newRow('', '', noExample))
 }
 
 const generatingInputs = ref(false)
@@ -327,7 +286,7 @@ async function aiInputs() {
       existing: rows.value.map((r) => r.input).slice(0, 100),
     })
     if (!res.inputs.length) {
-      message.info("AI 没想出新的输入")
+      message.info('AI 没想出新的输入')
       return
     }
     // 空着的行先填掉，再往后加，加到上限为止
@@ -343,12 +302,10 @@ async function aiInputs() {
       else rows.value.push(newRow(input))
     }
     message.success(
-      inputs.length < res.inputs.length
-        ? `加了 ${inputs.length} 组，到 ${TEST_CASE_MAX_CASES} 组的上限了`
-        : `加了 ${inputs.length} 组，输出马上跑出来`,
+      inputs.length < res.inputs.length ? `加了 ${inputs.length} 组，到 ${TEST_CASE_MAX_CASES} 组的上限了` : `加了 ${inputs.length} 组，输出马上跑出来`,
     )
   } catch (err) {
-    message.error(errorMessage(err, "AI 没想出来，稍后再试"))
+    message.error(errorMessage(err, 'AI 没想出来，稍后再试'))
   } finally {
     generatingInputs.value = false
   }
@@ -361,15 +318,13 @@ async function importZip({ file }: UploadCustomRequestOptions) {
   const parsed = readCaseZip(new Uint8Array(await raw.arrayBuffer()))
   if (parsed.ok) {
     const exampleInputs = new Set(examples.value.map((e) => e.input.trimEnd()))
-    rows.value = parsed.cases.map((c) =>
-      newRow(c.input, c.output, exampleInputs.has(c.input.trimEnd())),
-    )
+    rows.value = parsed.cases.map((c) => newRow(c.input, c.output, exampleInputs.has(c.input.trimEnd())))
     if (!rows.value.some((r) => r.example) && rows.value[0]) rows.value[0].example = true
     big.value = null
     message.success(`导入了 ${parsed.cases.length} 组`)
     return
   }
-  if (parsed.reason !== "too-large") {
+  if (parsed.reason !== 'too-large') {
     message.error(parsed.reason)
     return
   }
@@ -389,7 +344,7 @@ async function importZip({ file }: UploadCustomRequestOptions) {
     loadedCases = null
     message.success(`导入了 ${res.info.length} 组（太大，页面上不展开）`)
   } catch (err) {
-    message.error(errorMessage(err, "上传失败"))
+    message.error(errorMessage(err, '上传失败'))
   }
 }
 
@@ -400,9 +355,9 @@ function downloadZip() {
   }
   const blob = createZipBlob(caseFiles(rows.value))
   const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
+  const link = document.createElement('a')
   link.href = url
-  link.download = `${form._id || "problem"}_test_cases.zip`
+  link.download = `${form._id || 'problem'}_test_cases.zip`
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -421,7 +376,7 @@ function setTestCase(id: string, info: { input_name: string; output_name: string
 
 // ---------------------------------------------------------------- 学生怎么写 · 流程图
 
-const templateTab = ref<RunnableLanguage>("Python")
+const templateTab = ref<RunnableLanguage>('Python')
 watch(
   () => form.languages,
   (langs) => {
@@ -437,26 +392,24 @@ const challengeSummary = computed(() => {
     .map((lang) => [lang, form.challenges?.[lang]?.length ?? 0] as const)
     .filter(([, n]) => n > 0)
     .map(([lang, n]) => `${lang} ${n} 条`)
-  return parts.length ? parts.join(" · ") : "没有"
+  return parts.length ? parts.join(' · ') : '没有'
 })
 
 const answersForAst = computed(() => ({ ...form.answers }) as Partial<Record<LANGUAGE, string>>)
-const templatesForPreview = computed(
-  () => ({ ...form.templates }) as Partial<Record<LANGUAGE, TemplateParts>>,
-)
+const templatesForPreview = computed(() => ({ ...form.templates }) as Partial<Record<LANGUAGE, TemplateParts>>)
 
 const writeSummary = computed(() => {
-  const langs = form.languages.length ? `${form.languages.join("、")} 可交` : "还没选语言"
+  const langs = form.languages.length ? `${form.languages.join('、')} 可交` : '还没选语言'
   const withTemplate = form.languages.filter((l) => form.templates[l].template.trim())
-  const tpl = withTemplate.length ? `预制代码 ${withTemplate.join("、")}` : "没有预制代码"
+  const tpl = withTemplate.length ? `预制代码 ${withTemplate.join('、')}` : '没有预制代码'
   const ruleCount = form.languages.reduce((n, l) => n + (form.astRules?.[l]?.length ?? 0), 0)
-  return `${langs} · ${tpl} · ${ruleCount ? `${ruleCount} 条语法要求` : "没有语法要求"}`
+  return `${langs} · ${tpl} · ${ruleCount ? `${ruleCount} 条语法要求` : '没有语法要求'}`
 })
 
 const FLOWCHART_LABEL: Record<FlowchartMode, string> = {
-  none: "不用",
-  show: "给学生看参考流程图",
-  draw: "让学生自己画",
+  none: '不用',
+  show: '给学生看参考流程图',
+  draw: '让学生自己画',
 }
 
 const mermaidOk = ref(false)
@@ -469,7 +422,7 @@ const legacyMermaid = computed(() => !form.flowchartDoc && !!form.mermaidCode.tr
 /** 右边预览画的那张：画布有图就照画布生成，不然是老的代码 */
 const previewMermaid = computed(() => {
   if (!form.flowchartDoc) return form.mermaidCode
-  return form.flowchartDoc.steps.length ? toMermaid(form.flowchartDoc) : ""
+  return form.flowchartDoc.steps.length ? toMermaid(form.flowchartDoc) : ''
 })
 const aiDrawing = ref(false)
 
@@ -478,11 +431,11 @@ async function aiFlowchart() {
   try {
     const res = await generateFlowchartFromPythonCode(form.answers.Python)
     const doc = parseDoc(res.doc)
-    if (!doc) throw new Error("AI 画出来的图读不了")
+    if (!doc) throw new Error('AI 画出来的图读不了')
     form.flowchartDoc = doc
-    preview.value = "flowchart"
+    preview.value = 'flowchart'
   } catch (err) {
-    message.error(errorMessage(err, "生成失败，请稍后再试"))
+    message.error(errorMessage(err, '生成失败，请稍后再试'))
   } finally {
     aiDrawing.value = false
   }
@@ -490,12 +443,11 @@ async function aiFlowchart() {
 
 const moreSummary = computed(() => {
   const parts: string[] = []
-  if (!isBlankHtml(form.hint)) parts.push("有提示")
+  if (!isBlankHtml(form.hint)) parts.push('有提示')
   if (form.source.trim()) parts.push(`来源：${form.source.trim()}`)
-  if (form.timeLimit !== 1000 || form.memoryLimit !== 64)
-    parts.push(`${form.timeLimit} 毫秒 / ${form.memoryLimit}MB`)
-  if (form.prompt.trim()) parts.push("给 AI 的知识点")
-  return parts.length ? parts.join(" · ") : "提示、来源、时间 / 内存限制、给 AI 看的知识点"
+  if (form.timeLimit !== 1000 || form.memoryLimit !== 64) parts.push(`${form.timeLimit} 毫秒 / ${form.memoryLimit}MB`)
+  if (form.prompt.trim()) parts.push('给 AI 的知识点')
+  return parts.length ? parts.join(' · ') : '提示、来源、时间 / 内存限制、给 AI 看的知识点'
 })
 
 // ---------------------------------------------------------------- 折叠 · 右栏跟着走
@@ -509,25 +461,25 @@ const open = reactive({
   flowchart: false,
   more: false,
 })
-const preview = ref<PreviewTab>("statement")
+const preview = ref<PreviewTab>('statement')
 const previewCollapsed = usePreviewCollapsed()
 
 watch(
   () => open.write,
-  (v) => v && (preview.value = "editor"),
+  (v) => v && (preview.value = 'editor'),
 )
 watch(
   () => open.flowchart,
-  (v) => v && (preview.value = "flowchart"),
+  (v) => v && (preview.value = 'flowchart'),
 )
 watch(
   () => [form.templates, form.astRules],
-  () => open.write && (preview.value = "editor"),
+  () => open.write && (preview.value = 'editor'),
   { deep: true },
 )
 watch(
   () => [form.mermaidCode, form.flowchartMode],
-  () => open.flowchart && (preview.value = "flowchart"),
+  () => open.flowchart && (preview.value = 'flowchart'),
 )
 
 // ---------------------------------------------------------------- 加载 · 草稿
@@ -541,14 +493,9 @@ const ready = ref(false)
 const draftRestored = ref(false)
 
 function snapshot() {
-  return JSON.stringify([
-    form,
-    rows.value.map((r) => [r.input, r.output, r.example]),
-    exampleRows.value.map((r) => [r.input, r.output]),
-    testCase.id,
-  ])
+  return JSON.stringify([form, rows.value.map((r) => [r.input, r.output, r.example]), exampleRows.value.map((r) => [r.input, r.output]), testCase.id])
 }
-let baseline = ""
+let baseline = ''
 
 // 新建时存草稿（编辑页不存，见 useCreateDraft）
 const draft = useCreateDraft<Draft>(STORAGE_KEY.ADMIN_CODE_PROBLEM, {
@@ -569,7 +516,7 @@ const draft = useCreateDraft<Draft>(STORAGE_KEY.ADMIN_CODE_PROBLEM, {
 function clearDraft() {
   draft.value = null
   Object.assign(form, blankForm())
-  rows.value = [newRow("", "", true)]
+  rows.value = [newRow('', '', true)]
   draftRestored.value = false
 }
 
@@ -578,19 +525,17 @@ function loadDraft() {
   localStorage.removeItem(STORAGE_KEY.ADMIN_PROBLEM)
   const saved = draft.value
   // 草稿是本机存的，形状不对（旧版本、被别的页面写坏）就当没有，别让整页起不来
-  if (saved && typeof saved.form === "object" && Array.isArray(saved.rows)) {
+  if (saved && typeof saved.form === 'object' && Array.isArray(saved.rows)) {
     const merged = { ...blankForm(), ...saved.form }
     merged.answers = { ...blankForm().answers, ...saved.form.answers }
     merged.templates = { ...blankForm().templates, ...saved.form.templates }
     Object.assign(form, merged)
-    rows.value = saved.rows.map((r) =>
-      newRow(String(r.input ?? ""), String(r.output ?? ""), !!r.example),
-    )
+    rows.value = saved.rows.map((r) => newRow(String(r.input ?? ''), String(r.output ?? ''), !!r.example))
     draftRestored.value = true
   } else {
     draft.value = null
   }
-  if (!rows.value.length) rows.value = [newRow("", "", true)]
+  if (!rows.value.length) rows.value = [newRow('', '', true)]
 }
 
 function sameInput(a: string, b: string) {
@@ -616,30 +561,25 @@ async function loadProblem(data: AdminProblem) {
     description: data.description,
     inputDescription: data.inputDescription,
     outputDescription: data.outputDescription,
-    hint: data.hint ?? "",
-    source: data.source ?? "",
-    prompt: data.prompt ?? "",
+    hint: data.hint ?? '',
+    source: data.source ?? '',
+    prompt: data.prompt ?? '',
     timeLimit: data.timeLimit,
     memoryLimit: data.memoryLimit,
-    languages: languages.length ? languages : ["Python"],
+    languages: languages.length ? languages : ['Python'],
     answers,
     templates,
     astRules: data.astRules ?? null,
     // scannedAt 是后端记账用的，表单里不带；id 带着，规则没改就沿用（做到记录跟着 id 走）
     challenges: data.challenges
-      ? Object.fromEntries(
-          Object.entries(data.challenges).map(([lang, list]) => [
-            lang,
-            list.map(({ id, wording, rules }) => ({ id, wording, rules })),
-          ]),
-        )
+      ? Object.fromEntries(Object.entries(data.challenges).map(([lang, list]) => [lang, list.map(({ id, wording, rules }) => ({ id, wording, rules }))]))
       : null,
-    flowchartMode: data.allowFlowchart ? "draw" : data.showFlowchart ? "show" : "none",
-    mermaidCode: data.mermaidCode ?? "",
+    flowchartMode: data.allowFlowchart ? 'draw' : data.showFlowchart ? 'show' : 'none',
+    mermaidCode: data.mermaidCode ?? '',
     flowchartDoc: parseDoc(data.flowchartData),
-    flowchartHint: data.flowchartHint ?? "",
+    flowchartHint: data.flowchartHint ?? '',
   } satisfies CodeForm)
-  answerTab.value = RUNNABLE.find((l) => languages.includes(l) && answers[l].trim()) ?? "Python"
+  answerTab.value = RUNNABLE.find((l) => languages.includes(l) && answers[l].trim()) ?? 'Python'
   testCase.id = data.testCaseId
   testCase.score = data.testCaseScore
 
@@ -650,10 +590,9 @@ async function loadProblem(data: AdminProblem) {
     files = null
   }
   if (!files) {
-    caseNotice.value =
-      "这道题的测试点文件读不出来（可能被清理掉了）。下面是题面上的例子，补几组测试数据再保存，会换成新的一份。"
+    caseNotice.value = '这道题的测试点文件读不出来（可能被清理掉了）。下面是题面上的例子，补几组测试数据再保存，会换成新的一份。'
     rows.value = data.samples.map((s) => newRow(s.input, s.output, true))
-    testCase.id = ""
+    testCase.id = ''
     return
   }
   if (!files.editable) {
@@ -689,54 +628,47 @@ interface Blocker {
 
 const blockers = computed<Blocker[]>(() => {
   const list: Blocker[] = []
-  if (!form._id.trim() || !form.title.trim())
-    list.push({ text: "填编号和题目", section: "statement" })
-  if (isBlankHtml(form.description)) list.push({ text: "写描述", section: "statement" })
-  if (isBlankHtml(form.inputDescription))
-    list.push({ text: "写输入说明（没有输入就点「没有输入」）", section: "statement" })
-  if (isBlankHtml(form.outputDescription)) list.push({ text: "写输出说明", section: "statement" })
-  if (!form.tags.length) list.push({ text: "选一个知识点标签", section: "statement" })
-  if (!form.languages.length) list.push({ text: "选能交的语言", section: "write" })
-  if (!source.value && (isCreate.value || !rows.value.length))
-    list.push({ text: "写标准答案", section: "answer" })
+  if (!form._id.trim() || !form.title.trim()) list.push({ text: '填编号和题目', section: 'statement' })
+  if (isBlankHtml(form.description)) list.push({ text: '写描述', section: 'statement' })
+  if (isBlankHtml(form.inputDescription)) list.push({ text: '写输入说明（没有输入就点「没有输入」）', section: 'statement' })
+  if (isBlankHtml(form.outputDescription)) list.push({ text: '写输出说明', section: 'statement' })
+  if (!form.tags.length) list.push({ text: '选一个知识点标签', section: 'statement' })
+  if (!form.languages.length) list.push({ text: '选能交的语言', section: 'write' })
+  if (!source.value && (isCreate.value || !rows.value.length)) list.push({ text: '写标准答案', section: 'answer' })
 
   const caseRows = big.value ? exampleRows.value : rows.value
-  if (!big.value && !rows.value.length) list.push({ text: "加一组测试数据", section: "cases" })
+  if (!big.value && !rows.value.length) list.push({ text: '加一组测试数据', section: 'cases' })
   if (!big.value && rows.value.length > TEST_CASE_MAX_CASES)
     list.push({
       text: `删掉 ${rows.value.length - TEST_CASE_MAX_CASES} 组测试数据（最多 ${TEST_CASE_MAX_CASES} 组）`,
-      section: "cases",
+      section: 'cases',
       severe: true,
     })
-  if (caseRows.some((r) => caseStatus(r, source.value) === "running"))
-    list.push({ text: "等测试数据跑完", section: "cases" })
+  if (caseRows.some((r) => caseStatus(r, source.value) === 'running')) list.push({ text: '等测试数据跑完', section: 'cases' })
   caseRows.forEach((r, i) => {
-    if (caseStatus(r, source.value) === "error")
+    if (caseStatus(r, source.value) === 'error')
       list.push({
         text: `改好${big.value ? `例子 ${i + 1}` : `第 ${i + 1} 组`}（答案在这组上出错了）`,
-        section: "cases",
+        section: 'cases',
         severe: true,
       })
   })
-  if (!source.value && caseRows.some((r) => !r.output.trim()))
-    list.push({ text: "补上没写的输出", section: "cases" })
+  if (!source.value && caseRows.some((r) => !r.output.trim())) list.push({ text: '补上没写的输出', section: 'cases' })
   if (!examples.value.length)
     list.push({
-      text: big.value
-        ? "加一个例子（题面上至少给学生一个）"
-        : "勾一组当例子（题面上至少给学生一个）",
-      section: "cases",
+      text: big.value ? '加一个例子（题面上至少给学生一个）' : '勾一组当例子（题面上至少给学生一个）',
+      section: 'cases',
     })
 
   for (const [lang, state] of Object.entries(astChecks.value)) {
     if (!form.languages.includes(lang as RunnableLanguage)) continue
-    if ("error" in state) list.push({ text: state.error, section: "write", severe: true })
+    if ('error' in state) list.push({ text: state.error, section: 'write', severe: true })
     else
       state.rules.forEach((rule) => {
         if (rule.passed === false)
           list.push({
             text: `改好语法要求「${rule.description}」（标准答案自己没过）`,
-            section: "write",
+            section: 'write',
             severe: true,
           })
       })
@@ -745,49 +677,42 @@ const blockers = computed<Blocker[]>(() => {
     form.challenges?.[lang]?.forEach((item, i) => {
       if (!item.wording.trim() || !item.rules.length)
         list.push({
-          text: `把挑战 ${lang} 第 ${i + 1} 条${item.wording.trim() ? "的规则" : "的说法"}写上`,
-          section: "challenge",
+          text: `把挑战 ${lang} 第 ${i + 1} 条${item.wording.trim() ? '的规则' : '的说法'}写上`,
+          section: 'challenge',
         })
     })
   }
-  if (form.flowchartMode === "show") {
+  if (form.flowchartMode === 'show') {
     if (legacyMermaid.value) {
-      if (!mermaidOk.value)
-        list.push({ text: "改好流程图的代码（画不出来）", section: "flowchart", severe: true })
+      if (!mermaidOk.value) list.push({ text: '改好流程图的代码（画不出来）', section: 'flowchart', severe: true })
     } else if (!form.flowchartDoc?.steps.length) {
-      list.push({ text: "画参考流程图", section: "flowchart" })
+      list.push({ text: '画参考流程图', section: 'flowchart' })
     }
   }
   // 学生画的图拼成程序拿例子和测试数据跑（flowchart/program.ts），一组例子都没有就没得评
-  if (form.flowchartMode === "draw" && !examples.value.length) {
-    list.push({ text: "勾至少一组测试数据当例子（流程图照例子评）", section: "cases" })
+  if (form.flowchartMode === 'draw' && !examples.value.length) {
+    list.push({ text: '勾至少一组测试数据当例子（流程图照例子评）', section: 'cases' })
   }
   return list
 })
 
 function jump(blocker: Blocker) {
   open[blocker.section] = true
-  nextTick(() =>
-    document
-      .getElementById(`section-${blocker.section}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-  )
+  nextTick(() => document.getElementById(`section-${blocker.section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
 }
 
 const saving = ref(false)
 
 async function uploadRows() {
   const blob = createZipBlob(caseFiles(rows.value))
-  const res = await uploadTestcases(new File([blob], "testcase.zip", { type: "application/zip" }))
+  const res = await uploadTestcases(new File([blob], 'testcase.zip', { type: 'application/zip' }))
   setTestCase(res.id, res.info)
 }
 
 function casesChanged() {
   if (!testCase.id || !loadedCases) return true
   if (loadedCases.length !== rows.value.length) return true
-  return rows.value.some(
-    (r, i) => r.input !== loadedCases![i]!.input || !sameOutput(r.output, loadedCases![i]!.output),
-  )
+  return rows.value.some((r, i) => r.input !== loadedCases![i]!.input || !sameOutput(r.output, loadedCases![i]!.output))
 }
 
 async function save() {
@@ -820,19 +745,14 @@ async function save() {
       tags: form.tags,
       languages: form.languages,
       template,
-      hint: isBlankHtml(form.hint) ? "" : form.hint,
+      hint: isBlankHtml(form.hint) ? '' : form.hint,
       source: form.source.trim(),
       prompt: form.prompt.trim(),
-      answers: form.languages
-        .filter((lang) => form.answers[lang].trim())
-        .map((lang) => ({ language: lang, code: form.answers[lang] })),
-      allowFlowchart: form.flowchartMode === "draw",
-      showFlowchart: form.flowchartMode === "show",
-      mermaidCode: form.flowchartMode === "none" ? form.mermaidCode : form.mermaidCode.trim(),
-      flowchartData:
-        form.flowchartMode === "show" && form.flowchartDoc?.steps.length
-          ? { ...form.flowchartDoc }
-          : null,
+      answers: form.languages.filter((lang) => form.answers[lang].trim()).map((lang) => ({ language: lang, code: form.answers[lang] })),
+      allowFlowchart: form.flowchartMode === 'draw',
+      showFlowchart: form.flowchartMode === 'show',
+      mermaidCode: form.flowchartMode === 'none' ? form.mermaidCode : form.mermaidCode.trim(),
+      flowchartData: form.flowchartMode === 'show' && form.flowchartDoc?.steps.length ? { ...form.flowchartDoc } : null,
       flowchartHint: form.flowchartHint.trim(),
       astRules: form.astRules,
       challenges: form.challenges,
@@ -845,22 +765,22 @@ async function save() {
       // 存好了：现在这份就是基准
       loadedCases = rows.value.map((r) => ({ input: r.input, output: r.output }))
       rows.value.forEach((r) => (r.saved = r.output))
-      caseNotice.value = ""
+      caseNotice.value = ''
       baseline = snapshot()
-      message.success("保存好了")
+      message.success('保存好了')
       return
     }
     const created = props.contestID ? await createContestProblem(body) : await createProblem(body)
     draft.value = null
     baseline = snapshot()
-    message.success("题目建好了")
+    message.success('题目建好了')
     router.replace(
       props.contestID
         ? {
-            name: "admin contest problem edit",
+            name: 'admin contest problem edit',
             params: { contestID: props.contestID, problemID: created.id },
           }
-        : { name: "admin problem edit", params: { problemID: created.id } },
+        : { name: 'admin problem edit', params: { problemID: created.id } },
     )
   } catch (err) {
     message.error(saveErrorText(err))
@@ -874,10 +794,10 @@ onBeforeRouteLeave(() => {
   if (isCreate.value || !ready.value || snapshot() === baseline) return true
   return new Promise<boolean>((resolve) => {
     dialog.warning({
-      title: "还没保存",
-      content: "改的东西还没保存，离开就没了。",
-      positiveText: "不要了，离开",
-      negativeText: "留下来",
+      title: '还没保存',
+      content: '改的东西还没保存，离开就没了。',
+      positiveText: '不要了，离开',
+      negativeText: '留下来',
       onPositiveClick: () => resolve(true),
       onNegativeClick: () => resolve(false),
       onClose: () => resolve(false),
@@ -888,11 +808,7 @@ onBeforeRouteLeave(() => {
 
 const backTo = computed(() => problemListRoute(props.contestID))
 
-const authorLine = computed(() =>
-  props.initial
-    ? `${props.initial.createdBy.username} 出的 · ${parseTime(props.initial.createTime, "YYYY-MM-DD")}`
-    : "",
-)
+const authorLine = computed(() => (props.initial ? `${props.initial.createdBy.username} 出的 · ${parseTime(props.initial.createTime, 'YYYY-MM-DD')}` : ''))
 
 onMounted(async () => {
   getProblemTagList().then((res) => (tagList.value = res))
@@ -929,31 +845,16 @@ onMounted(async () => {
           <h3>题面</h3>
           <span v-if="!open.statement" class="summary">
             {{ form._id }} {{ form.title }} · {{ DIFFICULTY[form.difficulty] }} ·
-            {{ form.tags.join("、") || "没有标签" }}
+            {{ form.tags.join('、') || '没有标签' }}
           </span>
           <span class="grow"></span>
-          <span class="caret">{{ open.statement ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.statement ? '⌃' : '›' }}</span>
         </button>
         <template v-if="open.statement">
           <div class="headRow">
-            <n-input
-              v-model:value="form._id"
-              placeholder="编号"
-              aria-label="显示编号"
-              class="pid"
-            />
-            <n-input
-              v-model:value="form.title"
-              placeholder="题目，比如：星之卡比的复制能力"
-              aria-label="题目"
-              class="grow"
-            />
-            <n-select
-              v-model:value="form.difficulty"
-              :options="difficultyOptions"
-              aria-label="难度"
-              class="difficulty"
-            />
+            <n-input v-model:value="form._id" placeholder="编号" aria-label="显示编号" class="pid" />
+            <n-input v-model:value="form.title" placeholder="题目，比如：星之卡比的复制能力" aria-label="题目" class="grow" />
+            <n-select v-model:value="form.difficulty" :options="difficultyOptions" aria-label="难度" class="difficulty" />
             <label class="switch">
               <n-switch v-model:value="form.visible" size="small" />
               <span>可见</span>
@@ -965,13 +866,7 @@ onMounted(async () => {
               <div class="fieldHead">
                 <span class="label">输入</span>
                 <span class="grow"></span>
-                <n-button
-                  v-if="form.inputDescription !== NO_INPUT"
-                  size="tiny"
-                  @click="form.inputDescription = NO_INPUT"
-                >
-                  没有输入
-                </n-button>
+                <n-button v-if="form.inputDescription !== NO_INPUT" size="tiny" @click="form.inputDescription = NO_INPUT"> 没有输入 </n-button>
               </div>
               <TextEditor v-model:value="form.inputDescription" title="" mini :min-height="60" />
             </div>
@@ -994,13 +889,8 @@ onMounted(async () => {
               >
                 {{ name }}
               </button>
-              <button
-                v-if="knowledgeTags.length > 10"
-                type="button"
-                class="chip more"
-                @click="showAllKnowledge = !showAllKnowledge"
-              >
-                {{ showAllKnowledge ? "收起" : `更多 ${knowledgeTags.length - 10} 个 ▾` }}
+              <button v-if="knowledgeTags.length > 10" type="button" class="chip more" @click="showAllKnowledge = !showAllKnowledge">
+                {{ showAllKnowledge ? '收起' : `更多 ${knowledgeTags.length - 10} 个 ▾` }}
               </button>
             </div>
           </div>
@@ -1027,19 +917,18 @@ onMounted(async () => {
           <span v-if="!open.answer" class="summary">{{ answerSummary }}</span>
           <span class="grow"></span>
           <n-text v-if="open.answer" depth="3" class="note">学生看不到</n-text>
-          <span class="caret">{{ open.answer ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.answer ? '⌃' : '›' }}</span>
         </button>
         <template v-if="open.answer">
           <div class="subHead">
             <n-radio-group v-model:value="answerTab" size="small">
               <n-radio-button v-for="lang in form.languages" :key="lang" :value="lang">
-                {{ lang }}{{ form.answers[lang].trim() ? "" : " 没写" }}
+                {{ lang }}{{ form.answers[lang].trim() ? '' : ' 没写' }}
               </n-radio-button>
             </n-radio-group>
           </div>
           <n-text depth="3" class="note">
-            例子和测试数据的输出都由它跑出来；流程图、AI 分析也看它。写一种语言就够<template
-              v-if="source && source.language !== answerTab"
+            例子和测试数据的输出都由它跑出来；流程图、AI 分析也看它。写一种语言就够<template v-if="source && source.language !== answerTab"
               >，现在按 {{ source.language }} 的跑</template
             >。
           </n-text>
@@ -1061,7 +950,7 @@ onMounted(async () => {
           <h3>测试数据</h3>
           <span class="summary">{{ caseSummary }}</span>
           <span class="grow"></span>
-          <span class="caret">{{ open.cases ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.cases ? '⌃' : '›' }}</span>
         </button>
         <template v-if="open.cases">
           <div class="toolRow">
@@ -1070,59 +959,34 @@ onMounted(async () => {
                 size="tiny"
                 :loading="generatingInputs"
                 :disabled="!source || casesFull"
-                :title="
-                  casesFull
-                    ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了`
-                    : source
-                      ? '按题面和标准答案，让 AI 想几组边界情况'
-                      : '先写标准答案'
-                "
+                :title="casesFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : source ? '按题面和标准答案，让 AI 想几组边界情况' : '先写标准答案'"
                 @click="aiInputs"
               >
                 AI 想几组输入
               </n-button>
-              <n-button
-                size="tiny"
-                :disabled="casesFull"
-                :title="casesFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : undefined"
-                @click="addRow"
+              <n-button size="tiny" :disabled="casesFull" :title="casesFull ? `最多 ${TEST_CASE_MAX_CASES} 组，已经满了` : undefined" @click="addRow"
                 >+ 加一组</n-button
               >
             </template>
             <span class="grow"></span>
-            <n-button
-              v-if="rows.some((r) => r.error)"
-              size="tiny"
-              :disabled="running"
-              @click="rerunFailed"
-            >
-              重跑没跑通的
-            </n-button>
+            <n-button v-if="rows.some((r) => r.error)" size="tiny" :disabled="running" @click="rerunFailed"> 重跑没跑通的 </n-button>
             <n-upload :show-file-list="false" accept=".zip" :custom-request="importZip">
               <n-button size="tiny" quaternary>导入 zip</n-button>
             </n-upload>
-            <n-button
-              v-if="!big ? rows.length : !!initial && testCase.id === initial.testCaseId"
-              size="tiny"
-              quaternary
-              @click="downloadZip"
-            >
+            <n-button v-if="!big ? rows.length : !!initial && testCase.id === initial.testCaseId" size="tiny" quaternary @click="downloadZip">
               下载 zip
             </n-button>
           </div>
 
           <template v-if="big">
             <div class="notice">
-              有 {{ big.count }} 组、共 {{ formatBytes(big.totalBytes) }}，太大了，页面上不展开 ——
-              下载下来改、再导入。导入的 zip 里是 1.in 1.out 2.in 2.out ……
+              有 {{ big.count }} 组、共 {{ formatBytes(big.totalBytes) }}，太大了，页面上不展开 —— 下载下来改、再导入。导入的 zip 里是 1.in 1.out 2.in 2.out ……
             </div>
             <div class="subHead">
               <b class="small">例子</b>
               <n-text depth="3" class="note">单独写，输出照样由答案跑</n-text>
               <span class="grow"></span>
-              <n-button size="tiny" @click="exampleRows.push(newRow('', '', true))"
-                >+ 加一个</n-button
-              >
+              <n-button size="tiny" @click="exampleRows.push(newRow('', '', true))">+ 加一个</n-button>
             </div>
             <CaseTable v-model:rows="exampleRows" :source="source" examples-only />
           </template>
@@ -1130,26 +994,12 @@ onMounted(async () => {
             <div v-if="!source && !isCreate" class="notice">
               这道题没存标准答案，下面的输出是当初上传的文件，可以直接改。在上面写上答案，输出就改成跟着答案跑。
             </div>
-            <div
-              v-if="
-                !rows.length ||
-                (rows.length === 1 && !rows[0]!.input && !rows[0]!.output && isCreate)
-              "
-              class="empty"
-            >
-              {{
-                source
-                  ? "加几组输入，输出会自己跑出来。"
-                  : "先在上面写好标准答案，再加几组输入 —— 输出会自己跑出来。"
-              }}
+            <div v-if="!rows.length || (rows.length === 1 && !rows[0]!.input && !rows[0]!.output && isCreate)" class="empty">
+              {{ source ? '加几组输入，输出会自己跑出来。' : '先在上面写好标准答案，再加几组输入 —— 输出会自己跑出来。' }}
               例子之外最好再有几组边界情况（0、负数、最大值……）。
             </div>
             <CaseTable v-if="rows.length" v-model:rows="rows" :source="source" />
-            <n-text depth="3" class="note">
-              勾上「当例子」的几组按顺序写进题面的例子{{
-                source ? "；改了输入，输出马上重跑" : ""
-              }}。
-            </n-text>
+            <n-text depth="3" class="note"> 勾上「当例子」的几组按顺序写进题面的例子{{ source ? '；改了输入，输出马上重跑' : '' }}。 </n-text>
           </template>
         </template>
       </section>
@@ -1160,7 +1010,7 @@ onMounted(async () => {
           <h3>学生怎么写</h3>
           <span v-if="!open.write" class="summary">{{ writeSummary }}</span>
           <span class="grow"></span>
-          <span class="caret">{{ open.write ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.write ? '⌃' : '›' }}</span>
         </button>
         <template v-if="open.write">
           <div class="inlineRow">
@@ -1176,13 +1026,11 @@ onMounted(async () => {
             <span class="label rowLabel">预制代码</span>
             <n-radio-group v-model:value="templateTab" size="small">
               <n-radio-button v-for="lang in form.languages" :key="lang" :value="lang">
-                {{ lang }}{{ form.templates[lang].template.trim() ? "" : " 用默认的" }}
+                {{ lang }}{{ form.templates[lang].template.trim() ? '' : ' 用默认的' }}
               </n-radio-button>
             </n-radio-group>
           </div>
-          <n-text depth="3" class="note">
-            学生打开编辑器时里面已经有的代码，比如先把输入写好，让学生专心写判断。
-          </n-text>
+          <n-text depth="3" class="note"> 学生打开编辑器时里面已经有的代码，比如先把输入写好，让学生专心写判断。 </n-text>
           <template v-for="lang in form.languages" :key="lang">
             <template v-if="templateTab === lang">
               <CodeEditor
@@ -1192,40 +1040,19 @@ onMounted(async () => {
                 :height="codeHeight(form.templates[lang].template, 4, 16)"
                 placeholder="不写就用全站默认的"
               />
-              <n-button
-                text
-                type="primary"
-                size="small"
-                class="hiddenToggle"
-                @click="showHidden = !showHidden"
-              >
-                {{ showHidden ? "▾" : "›" }} 藏在学生代码前面 / 后面一起运行的代码（学生看不到）
+              <n-button text type="primary" size="small" class="hiddenToggle" @click="showHidden = !showHidden">
+                {{ showHidden ? '▾' : '›' }} 藏在学生代码前面 / 后面一起运行的代码（学生看不到）
               </n-button>
               <template v-if="showHidden">
                 <span class="label">前面</span>
-                <CodeEditor
-                  v-model:value="form.templates[lang].prepend"
-                  :language="lang"
-                  :font-size="13"
-                  height="80px"
-                />
+                <CodeEditor v-model:value="form.templates[lang].prepend" :language="lang" :font-size="13" height="80px" />
                 <span class="label">后面</span>
-                <CodeEditor
-                  v-model:value="form.templates[lang].append"
-                  :language="lang"
-                  :font-size="13"
-                  height="80px"
-                />
+                <CodeEditor v-model:value="form.templates[lang].append" :language="lang" :font-size="13" height="80px" />
               </template>
             </template>
           </template>
           <n-divider class="thin" />
-          <AstRulesEditor
-            v-model="form.astRules"
-            v-model:checks="astChecks"
-            :languages="form.languages"
-            :answers="answersForAst"
-          />
+          <AstRulesEditor v-model="form.astRules" v-model:checks="astChecks" :languages="form.languages" :answers="answersForAst" />
         </template>
       </section>
 
@@ -1236,7 +1063,7 @@ onMounted(async () => {
           <span v-if="!open.challenge" class="summary">{{ challengeSummary }}</span>
           <n-text v-else depth="3" class="note">选填，学生做对以后才看得到</n-text>
           <span class="grow"></span>
-          <span class="caret">{{ open.challenge ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.challenge ? '⌃' : '›' }}</span>
         </button>
         <ChallengeEditor
           v-if="open.challenge"
@@ -1251,18 +1078,14 @@ onMounted(async () => {
       <section id="section-flowchart" class="card">
         <button type="button" class="cardHead" @click="open.flowchart = !open.flowchart">
           <h3>流程图</h3>
-          <span v-if="!open.flowchart" class="summary">{{
-            FLOWCHART_LABEL[form.flowchartMode]
-          }}</span>
+          <span v-if="!open.flowchart" class="summary">{{ FLOWCHART_LABEL[form.flowchartMode] }}</span>
           <n-text v-else depth="3" class="note">选填，三选一</n-text>
           <span class="grow"></span>
-          <span class="caret">{{ open.flowchart ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.flowchart ? '⌃' : '›' }}</span>
         </button>
         <template v-if="open.flowchart">
           <n-radio-group v-model:value="form.flowchartMode" class="modes">
-            <label class="mode" :class="{ on: form.flowchartMode === 'none' }">
-              <n-radio value="none" /><b>不用</b>
-            </label>
+            <label class="mode" :class="{ on: form.flowchartMode === 'none' }"> <n-radio value="none" /><b>不用</b> </label>
             <label class="mode" :class="{ on: form.flowchartMode === 'show' }">
               <n-radio value="show" />
               <span>
@@ -1284,16 +1107,9 @@ onMounted(async () => {
           </n-text>
           <template v-if="form.flowchartMode === 'show'">
             <div class="inlineRow">
-              <span class="label">{{ legacyMermaid ? "图的代码（Mermaid）" : "参考流程图" }}</span>
+              <span class="label">{{ legacyMermaid ? '图的代码（Mermaid）' : '参考流程图' }}</span>
               <span class="grow"></span>
-              <n-button
-                v-if="legacyMermaid"
-                size="tiny"
-                quaternary
-                @click="form.flowchartDoc = emptyDoc()"
-              >
-                改用画布画
-              </n-button>
+              <n-button v-if="legacyMermaid" size="tiny" quaternary @click="form.flowchartDoc = emptyDoc()"> 改用画布画 </n-button>
               <n-button
                 size="tiny"
                 :loading="aiDrawing"
@@ -1305,14 +1121,9 @@ onMounted(async () => {
               </n-button>
             </div>
             <template v-if="legacyMermaid">
-              <n-input
-                v-model:value="form.mermaidCode"
-                type="textarea"
-                class="mono"
-                :autosize="{ minRows: 6, maxRows: 18 }"
-              />
+              <n-input v-model:value="form.mermaidCode" type="textarea" class="mono" :autosize="{ minRows: 6, maxRows: 18 }" />
               <n-text :type="mermaidOk ? 'success' : 'error'" class="note">
-                {{ mermaidOk ? "✓ 画得出来（右边就是）" : "✗ 还画不出来，看右边的报错" }}
+                {{ mermaidOk ? '✓ 画得出来（右边就是）' : '✗ 还画不出来，看右边的报错' }}
               </n-text>
             </template>
             <div v-else class="flowCanvas">
@@ -1329,7 +1140,7 @@ onMounted(async () => {
           <span v-if="!open.more" class="summary">{{ moreSummary }}</span>
           <n-text v-else depth="3" class="note">都是选填</n-text>
           <span class="grow"></span>
-          <span class="caret">{{ open.more ? "⌃" : "›" }}</span>
+          <span class="caret">{{ open.more ? '⌃' : '›' }}</span>
         </button>
         <template v-if="open.more">
           <span class="label">提示（学生卡住时点开看）</span>
@@ -1341,25 +1152,13 @@ onMounted(async () => {
             </label>
             <label class="inlineRow">
               <span class="label">时间限制</span>
-              <n-input-number
-                v-model:value="form.timeLimit"
-                :min="1"
-                :max="60000"
-                :show-button="false"
-                style="width: 110px"
-              >
+              <n-input-number v-model:value="form.timeLimit" :min="1" :max="60000" :show-button="false" style="width: 110px">
                 <template #suffix>毫秒</template>
               </n-input-number>
             </label>
             <label class="inlineRow">
               <span class="label">内存限制</span>
-              <n-input-number
-                v-model:value="form.memoryLimit"
-                :min="1"
-                :max="1024"
-                :show-button="false"
-                style="width: 96px"
-              >
+              <n-input-number v-model:value="form.memoryLimit" :min="1" :max="1024" :show-button="false" style="width: 96px">
                 <template #suffix>MB</template>
               </n-input-number>
             </label>
@@ -1372,9 +1171,7 @@ onMounted(async () => {
       </section>
 
       <div class="saveBar">
-        <n-button type="primary" :loading="saving" :disabled="!!blockers.length" @click="save">
-          保存
-        </n-button>
+        <n-button type="primary" :loading="saving" :disabled="!!blockers.length" @click="save"> 保存 </n-button>
         <div v-if="blockers.length" class="blockers">
           <span class="blockersHead">保存前还要：</span>
           <template v-for="(b, i) in blockers" :key="i">
@@ -1427,7 +1224,7 @@ onMounted(async () => {
   padding: 0 8px;
   border-radius: 3px;
   background-color: rgba(24, 160, 88, 0.12);
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
   font-size: 12px;
   font-weight: 600;
 }
@@ -1476,13 +1273,13 @@ onMounted(async () => {
 }
 
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   scroll-margin-top: 12px;
 }
 
@@ -1519,11 +1316,11 @@ onMounted(async () => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .caret {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .headRow,
@@ -1571,7 +1368,7 @@ onMounted(async () => {
 
 .label {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   flex: none;
 }
 
@@ -1617,23 +1414,23 @@ onMounted(async () => {
   height: 24px;
   padding: 0 9px;
   border-radius: 3px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: 12px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
 .chip.on {
   border-color: rgba(24, 160, 88, 0.5);
   background-color: rgba(24, 160, 88, 0.12);
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
   font-weight: 600;
 }
 
 .chip.more {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .empty {
@@ -1641,7 +1438,7 @@ onMounted(async () => {
   text-align: center;
   font-size: 13px;
   line-height: 1.7;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .thin {
@@ -1664,14 +1461,14 @@ onMounted(async () => {
   align-items: flex-start;
   gap: 8px;
   padding: 9px 12px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
 }
 
 .mode.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   background-color: rgba(24, 160, 88, 0.06);
 }
 
@@ -1683,11 +1480,11 @@ onMounted(async () => {
 
 .mode small {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .mono :deep(textarea) {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei', monospace;
   font-size: 13px;
 }
 
@@ -1699,8 +1496,8 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 10px 0 14px;
-  background: v-bind("theme.bodyColor");
-  border-top: 1px solid v-bind("theme.borderColor");
+  background: v-bind('theme.bodyColor');
+  border-top: 1px solid v-bind('theme.borderColor');
 }
 
 /* 一行放不下就折，最多两行：新建页一开始缺七八样，别把保存栏撑成半屏 */
@@ -1716,7 +1513,7 @@ onMounted(async () => {
 
 .blockersHead,
 .sep {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .sep {
@@ -1729,13 +1526,13 @@ onMounted(async () => {
   border: 0;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-align: left;
   cursor: pointer;
 }
 
 .blocker.severe {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .blocker:hover {
@@ -1743,7 +1540,7 @@ onMounted(async () => {
 }
 
 .flowCanvas {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   overflow: hidden;
 }

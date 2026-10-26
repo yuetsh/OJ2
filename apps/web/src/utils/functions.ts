@@ -1,14 +1,14 @@
-import { TIME_ZONE_OFFSET_MINUTES, toAdminType } from "@oj2/contract"
-import type { JudgeCaseResult, JudgeInfo } from "@oj2/contract"
-import { AdminUser, Submission } from "./types"
-import { JUDGE_STATUS, USER_TYPE } from "./constants"
-import { strFromU8, strToU8, unzlibSync, zipSync, zlibSync, type Zippable } from "fflate"
-import copyTextFallback from "copy-text-to-clipboard"
-import { normalizeDate } from "@vueuse/core"
+import { TIME_ZONE_OFFSET_MINUTES, toAdminType } from '@oj2/contract'
+import type { JudgeCaseResult, JudgeInfo } from '@oj2/contract'
+import { AdminUser, Submission } from './types'
+import { JUDGE_STATUS, USER_TYPE } from './constants'
+import { strFromU8, strToU8, unzlibSync, zipSync, zlibSync, type Zippable } from 'fflate'
+import copyTextFallback from 'copy-text-to-clipboard'
+import { normalizeDate } from '@vueuse/core'
 
 function calculateACRate(acCount: number, totalCount: number): string {
-  if (totalCount === 0) return "0.00"
-  if (acCount >= totalCount) return "100.00"
+  if (totalCount === 0) return '0.00'
+  if (acCount >= totalCount) return '100.00'
   return ((acCount / totalCount) * 100).toFixed(2)
 }
 
@@ -24,7 +24,7 @@ function calculateACRate(acCount: number, totalCount: number): string {
  * 直接信判题机（`JudgeCaseResult`）。
  */
 export function submissionCaseResults(info: unknown): JudgeCaseResult[] {
-  if (!info || typeof info !== "object" || !("data" in info)) return []
+  if (!info || typeof info !== 'object' || !('data' in info)) return []
   const data = (info as JudgeInfo).data
   return Array.isArray(data) ? data : []
 }
@@ -35,15 +35,15 @@ export function submissionCaseResults(info: unknown): JudgeCaseResult[] {
  * 一个都没过不给：「通过 0/8」只是把「答案错误」换个更刺眼的说法再说一遍。
  * 全过也不给：AC 用不着；AST_CHECK_FAILED 是测试点全过、语法规则没过，那边有自己的规则清单。
  */
-export function submissionPartialCases(submission: Pick<Submission, "caseSummary"> | undefined) {
+export function submissionPartialCases(submission: Pick<Submission, 'caseSummary'> | undefined) {
   const summary = submission?.caseSummary
   if (!summary || summary.passed === 0 || summary.passed >= summary.total) return null
   return summary
 }
 
 /** 结果标题：部分测试点通过时缀上「通过 x/y 个测试点」 */
-export function submissionResultTitle(submission: Pick<Submission, "result" | "caseSummary">) {
-  const title = JUDGE_STATUS[submission.result]["title"]
+export function submissionResultTitle(submission: Pick<Submission, 'result' | 'caseSummary'>) {
+  const title = JUDGE_STATUS[submission.result]['title']
   const partial = submissionPartialCases(submission)
   return partial ? `${title} · 通过 ${partial.passed}/${partial.total} 个测试点` : title
 }
@@ -58,29 +58,29 @@ export function getACRateNumber(acCount: number, totalCount: number): number {
 
 export function filterEmptyValue<T extends Record<string, any>>(object: T): Partial<T> {
   return Object.entries(object).reduce((query, [key, value]) => {
-    if (value != null && value !== "" && value !== undefined) {
+    if (value != null && value !== '' && value !== undefined) {
       query[key as keyof T] = value
     }
     return query
   }, {} as Partial<T>)
 }
 
-export function getTagColor(tag: "Low" | "Mid" | "High" | "简单" | "中等" | "困难") {
+export function getTagColor(tag: 'Low' | 'Mid' | 'High' | '简单' | '中等' | '困难') {
   // 中等是橙色，和题目列表、相似题推荐一个颜色（原来这里是蓝，同一道题进了详情页就变色）
-  return <"success" | "warning" | "error">{
-    Low: "success",
-    Mid: "warning",
-    High: "error",
-    简单: "success",
-    中等: "warning",
-    困难: "error",
+  return <'success' | 'warning' | 'error'>{
+    Low: 'success',
+    Mid: 'warning',
+    High: 'error',
+    简单: 'success',
+    中等: 'warning',
+    困难: 'error',
   }[tag]
 }
 
 // 2023-04-03T02:43:28.673156Z
 const OFFSET_MS = TIME_ZONE_OFFSET_MINUTES * 60_000
 
-const pad2 = (value: number) => String(value).padStart(2, "0")
+const pad2 = (value: number) => String(value).padStart(2, '0')
 
 /**
  * 取一个时刻在东八区的年月日时分秒（数字）。无效日期返回 null。
@@ -116,9 +116,9 @@ export function zonedYear() {
  * 长度不同的 token 靠正则的**顺序**区分：`YYYY` 必须排在 `M`/`D` 前面，
  * 否则 `MM` 会被拆成两个 `M`。
  */
-export function parseTime(utc: Date | string, format = "YYYY年M月D日") {
+export function parseTime(utc: Date | string, format = 'YYYY年M月D日') {
   const parts = zonedParts(utc)
-  if (!parts) return ""
+  if (!parts) return ''
   const table: Record<string, string> = {
     YYYY: String(parts.year),
     MM: pad2(parts.month),
@@ -164,9 +164,7 @@ function addMonthsUTC(date: Date, months: number) {
   const moved = new Date(date)
   moved.setUTCDate(1)
   moved.setUTCMonth(moved.getUTCMonth() + months)
-  const lastDay = new Date(
-    Date.UTC(moved.getUTCFullYear(), moved.getUTCMonth() + 1, 0),
-  ).getUTCDate()
+  const lastDay = new Date(Date.UTC(moved.getUTCFullYear(), moved.getUTCMonth() + 1, 0)).getUTCDate()
   moved.setUTCDate(Math.min(day, lastDay))
   return moved
 }
@@ -197,25 +195,22 @@ function getDurationObject(start: Date | string, end: Date | string): Duration {
   }
 }
 
-function formatDurationUnits(
-  duration: Duration,
-  units: Array<{ key: keyof Duration; suffix: string }>,
-): string {
+function formatDurationUnits(duration: Duration, units: Array<{ key: keyof Duration; suffix: string }>): string {
   return units
     .filter(({ key }) => duration[key])
     .map(({ key, suffix }) => duration[key] + suffix)
-    .join("")
+    .join('')
 }
 
 export function duration(start: Date | string, end: Date | string, showSeconds = false): string {
   const durationObj = getDurationObject(start, end)
   const units = [
-    { key: "years" as const, suffix: "年" },
-    { key: "months" as const, suffix: "月" },
-    { key: "days" as const, suffix: "天" },
-    { key: "hours" as const, suffix: "小时" },
-    { key: "minutes" as const, suffix: "分钟" },
-    ...(showSeconds ? [{ key: "seconds" as const, suffix: "秒" }] : []),
+    { key: 'years' as const, suffix: '年' },
+    { key: 'months' as const, suffix: '月' },
+    { key: 'days' as const, suffix: '天' },
+    { key: 'hours' as const, suffix: '小时' },
+    { key: 'minutes' as const, suffix: '分钟' },
+    ...(showSeconds ? [{ key: 'seconds' as const, suffix: '秒' }] : []),
   ]
   return formatDurationUnits(durationObj, units)
 }
@@ -225,8 +220,8 @@ export function duration(start: Date | string, end: Date | string, showSeconds =
  * 0 显示成短横线而不是「0 分钟」——「没学过」和「学了不到一分钟」不是一回事。
  */
 export function readableDuration(seconds: number): string {
-  if (seconds <= 0) return "-"
-  if (seconds < 60) return "不到 1 分钟"
+  if (seconds <= 0) return '-'
+  if (seconds < 60) return '不到 1 分钟'
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes} 分钟`
   const hours = Math.floor(minutes / 60)
@@ -239,10 +234,8 @@ export function readableDuration(seconds: number): string {
  * `duration()` 会拆出「1月6天59分钟」这种，比赛列表里读不下去；一天以上只说几天
  */
 export function contestLength(start: Date | string, end: Date | string): string {
-  const minutes = Math.round(
-    (normalizeDate(end).getTime() - normalizeDate(start).getTime()) / 60_000,
-  )
-  if (!Number.isFinite(minutes) || minutes <= 0) return ""
+  const minutes = Math.round((normalizeDate(end).getTime() - normalizeDate(start).getTime()) / 60_000)
+  if (!Number.isFinite(minutes) || minutes <= 0) return ''
   if (minutes < 60) return `${minutes} 分钟`
   if (minutes < 24 * 60) {
     const h = Math.floor(minutes / 60)
@@ -255,38 +248,35 @@ export function contestLength(start: Date | string, end: Date | string): string 
 export function durationToDays(start: Date | string, end: Date | string): string {
   const durationObj = getDurationObject(start, end)
   const units = [
-    { key: "years" as const, suffix: "年" },
-    { key: "months" as const, suffix: "月" },
-    { key: "days" as const, suffix: "天" },
+    { key: 'years' as const, suffix: '年' },
+    { key: 'months' as const, suffix: '月' },
+    { key: 'days' as const, suffix: '天' },
   ]
   const result = formatDurationUnits(durationObj, units)
-  return result || "一天以内"
+  return result || '一天以内'
 }
 
 export function secondsToDuration(seconds: number): string {
   // 直接算，不走 getDurationObject：那个会拆出年、月，原来只把天和小时
   // 折回小时，超过一个月就把月丢了（剩 40 天 1 小时显示成 217:00:00）
   const total = Math.max(0, Math.floor(seconds))
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return [Math.floor(total / 3600), pad(Math.floor(total / 60) % 60), pad(total % 60)].join(":")
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return [Math.floor(total / 3600), pad(Math.floor(total / 60) % 60), pad(total % 60)].join(':')
 }
 
 export function submissionMemoryFormat(memory: number | string | undefined) {
-  if (memory === undefined) return "--"
+  if (memory === undefined) return '--'
   // 1048576 = 1024 * 1024
-  let t = parseInt(memory + "") / 1048576
-  return String(t.toFixed(0)) + "MB"
+  let t = parseInt(memory + '') / 1048576
+  return String(t.toFixed(0)) + 'MB'
 }
 
 export function submissionTimeFormat(time: number | string | undefined) {
-  if (time === undefined) return "--"
-  return time + "ms"
+  if (time === undefined) return '--'
+  return time + 'ms'
 }
 
-export function debounce<T extends (...args: any[]) => any>(
-  fn: T,
-  delay = 100,
-): (...args: Parameters<T>) => void {
+export function debounce<T extends (...args: any[]) => any>(fn: T, delay = 100): (...args: Parameters<T>) => void {
   let timeoutId: ReturnType<typeof setTimeout>
   return (...args: Parameters<T>) => {
     clearTimeout(timeoutId)
@@ -294,26 +284,26 @@ export function debounce<T extends (...args: any[]) => any>(
   }
 }
 
-export function getUserRole(role: AdminUser["adminType"]): {
-  type: "default" | "info" | "warning" | "error"
-  label: "普通" | "生管" | "师管" | "超管"
+export function getUserRole(role: AdminUser['adminType']): {
+  type: 'default' | 'info' | 'warning' | 'error'
+  label: '普通' | '生管' | '师管' | '超管'
 } {
   const roleMap = {
     [USER_TYPE.REGULAR_USER]: {
-      type: "default" as const,
-      label: "普通" as const,
+      type: 'default' as const,
+      label: '普通' as const,
     },
     [USER_TYPE.STUDENT_ADMIN]: {
-      type: "info" as const,
-      label: "生管" as const,
+      type: 'info' as const,
+      label: '生管' as const,
     },
     [USER_TYPE.TEACHER_ADMIN]: {
-      type: "warning" as const,
-      label: "师管" as const,
+      type: 'warning' as const,
+      label: '师管' as const,
     },
     [USER_TYPE.SUPER_ADMIN]: {
-      type: "error" as const,
-      label: "超管" as const,
+      type: 'error' as const,
+      label: '超管' as const,
     },
   }
 
@@ -328,23 +318,21 @@ export function unique<T>(arr: T[]): T[] {
 
 export function base64EncodeUtf8(string?: string): string {
   try {
-    return btoa(String.fromCharCode(...new TextEncoder().encode(string ?? "")))
+    return btoa(String.fromCharCode(...new TextEncoder().encode(string ?? '')))
   } catch (error) {
-    console.error("编码失败:", error)
-    return ""
+    console.error('编码失败:', error)
+    return ''
   }
 }
 
 export function base64DecodeUtf8(bytes?: string): string {
   try {
-    if (!bytes) return ""
+    if (!bytes) return ''
     const latin = atob(bytes)
-    return new TextDecoder("utf-8").decode(
-      Uint8Array.from({ length: latin.length }, (_, index) => latin.charCodeAt(index)),
-    )
+    return new TextDecoder('utf-8').decode(Uint8Array.from({ length: latin.length }, (_, index) => latin.charCodeAt(index)))
   } catch (error) {
-    console.error("解码失败:", error)
-    return ""
+    console.error('解码失败:', error)
+    return ''
   }
 }
 
@@ -367,15 +355,12 @@ export function decompressFromBase64(base64: string): string {
  * @param files 文件名和文本内容
  * @param mtime 归档内的修改时间，默认当前时间
  */
-export function createZipBlob(
-  files: { name: string; content: string }[],
-  mtime: Date = new Date(),
-): Blob {
+export function createZipBlob(files: { name: string; content: string }[], mtime: Date = new Date()): Blob {
   const entries: Zippable = {}
   for (const f of files) {
     entries[f.name] = strToU8(f.content)
   }
-  return new Blob([zipSync(entries, { mtime })], { type: "application/zip" })
+  return new Blob([zipSync(entries, { mtime })], { type: 'application/zip' })
 }
 
 /**
@@ -391,7 +376,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       await navigator.clipboard.writeText(text)
       return true
     } catch (error) {
-      console.warn("Clipboard API 复制失败，尝试使用回退方法:", error)
+      console.warn('Clipboard API 复制失败，尝试使用回退方法:', error)
     }
   }
 
@@ -400,7 +385,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     const success = copyTextFallback(text)
     return success
   } catch (error) {
-    console.error("复制失败:", error)
+    console.error('复制失败:', error)
     return false
   }
 }

@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import type { ClassDetail } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { getClassDetail } from "oj/api"
-import { classLabel } from "utils/classes"
-import UserName from "shared/components/UserName.vue"
-import { useAIStream } from "shared/composables/aiStream"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { parseTime } from "utils/functions"
-import { useRankPalette } from "../palette"
-import RankAvatar from "shared/components/RankAvatar.vue"
+import type { ClassDetail } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { getClassDetail } from 'oj/api'
+import { classLabel } from 'utils/classes'
+import UserName from 'shared/components/UserName.vue'
+import { useAIStream } from 'shared/composables/aiStream'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { parseTime } from 'utils/functions'
+import { useRankPalette } from '../palette'
+import RankAvatar from 'shared/components/RankAvatar.vue'
 
 // Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
-const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
+const Markdown = defineAsyncComponent(() => import('shared/components/Markdown.vue'))
 
 /**
  * 班级详情（设计稿「班级详情 · 老师 / 学生」）：从右边滑出的抽屉，代替原来那个满是
@@ -20,7 +20,7 @@ const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.v
  * AI 报告直接在抽屉里出，不再关掉再弹第二个框。
  */
 const props = defineProps<{ className: string | null; teacher: boolean; pk: boolean }>()
-const show = defineModel<boolean>("show", { required: true })
+const show = defineModel<boolean>('show', { required: true })
 
 const router = useRouter()
 const message = useMessage()
@@ -32,7 +32,7 @@ useBackClose(show, () => !isDesktop.value)
 
 const detail = ref<ClassDetail | null>(null)
 const loading = ref(false)
-const report = ref("")
+const report = ref('')
 const ai = useAIStream()
 
 watch(
@@ -40,7 +40,7 @@ watch(
   async ([open, className]) => {
     if (!open || !className) return
     if (detail.value?.className !== className) {
-      report.value = ""
+      report.value = ''
       ai.abort()
     }
     loading.value = true
@@ -65,22 +65,13 @@ const dot = computed(() => {
   return Math.max(4, Math.min(10, Math.floor(172 / tallest) - 2))
 })
 
-const weekMax = computed(() =>
-  Math.max(
-    1,
-    ...(detail.value?.weeks ?? []).flatMap((week) => [week.perCapita, week.gradeAvg ?? 0]),
-  ),
-)
+const weekMax = computed(() => Math.max(1, ...(detail.value?.weeks ?? []).flatMap((week) => [week.perCapita, week.gradeAvg ?? 0])))
 
 async function analyze() {
   if (!props.className) return
-  report.value = ""
+  report.value = ''
   try {
-    await ai.run(
-      "ai/class-analysis",
-      { className: props.className },
-      { onDelta: (content) => (report.value += content) },
-    )
+    await ai.run('ai/class-analysis', { className: props.className }, { onDelta: (content) => (report.value += content) })
   } catch (error) {
     message.error((error as Error).message)
   }
@@ -97,9 +88,9 @@ function go(path: string, query: Record<string, string>) {
     <n-drawer-content closable :native-scrollbar="false">
       <template #header>
         <div class="head">
-          <span class="title">{{ className ? classLabel(className) : "班级详情" }}</span>
+          <span class="title">{{ className ? classLabel(className) : '班级详情' }}</span>
           <span v-if="detail" class="muted">
-            {{ detail.members }} 人 · 这学期（{{ parseTime(detail.start, "M月D日") }}起）
+            {{ detail.members }} 人 · 这学期（{{ parseTime(detail.start, 'M月D日') }}起）
             <template v-if="detail.rank"> · 班级对抗第 {{ detail.rank }}</template>
           </span>
         </div>
@@ -120,11 +111,7 @@ function go(path: string, query: Record<string, string>) {
               <b
                 >{{ detail.solvedMembers }} <small>/ {{ detail.members }} 人</small></b
               >
-              <span>{{
-                detail.members - detail.solvedMembers
-                  ? `${detail.members - detail.solvedMembers} 人还没做对`
-                  : "人人都做对过"
-              }}</span>
+              <span>{{ detail.members - detail.solvedMembers ? `${detail.members - detail.solvedMembers} 人还没做对` : '人人都做对过' }}</span>
             </div>
           </div>
 
@@ -148,11 +135,8 @@ function go(path: string, query: Record<string, string>) {
               </div>
             </div>
             <span class="line">
-              前 10% 平均 <b>{{ detail.top10Avg }}</b> 道 · 后 10% 平均
-              <b>{{ detail.bottom10Avg }}</b> 道
-              <template v-if="detail.plateau">
-                · {{ detail.plateau.count }} 个人停在 {{ detail.plateau.solved }} 道</template
-              >
+              前 10% 平均 <b>{{ detail.top10Avg }}</b> 道 · 后 10% 平均 <b>{{ detail.bottom10Avg }}</b> 道
+              <template v-if="detail.plateau"> · {{ detail.plateau.count }} 个人停在 {{ detail.plateau.solved }} 道</template>
             </span>
           </section>
 
@@ -160,9 +144,7 @@ function go(path: string, query: Record<string, string>) {
             <div class="sec-title">
               每周人均新做对
               <span class="key"><i :style="{ background: palette.me }" />本班</span>
-              <span v-if="detail.gradeAvg !== null" class="key"
-                ><i :style="{ background: palette.bar }" />年级平均</span
-              >
+              <span v-if="detail.gradeAvg !== null" class="key"><i :style="{ background: palette.bar }" />年级平均</span>
             </div>
             <div class="weeks">
               <div v-for="week in detail.weeks" :key="week.weekStart" class="week">
@@ -188,7 +170,7 @@ function go(path: string, query: Record<string, string>) {
                     />
                   </div>
                 </div>
-                <span class="axis">{{ parseTime(week.weekStart, "M月D日") }}那周</span>
+                <span class="axis">{{ parseTime(week.weekStart, 'M月D日') }}那周</span>
               </div>
             </div>
           </section>
@@ -200,16 +182,8 @@ function go(path: string, query: Record<string, string>) {
               <UserName :username="row.user.username" />
               <span class="muted">这学期 {{ row.solved }} 道 · 交过 {{ row.submissions }} 次</span>
               <div class="spacer" />
-              <a
-                href="#"
-                @click.prevent="
-                  go('/submission', { username: row.user.username, exactUsername: '1' })
-                "
-                >看提交 ›</a
-              >
-              <a href="#" @click.prevent="go('/ai-analysis', { username: row.user.username })"
-                >智能分析 ›</a
-              >
+              <a href="#" @click.prevent="go('/submission', { username: row.user.username, exactUsername: '1' })">看提交 ›</a>
+              <a href="#" @click.prevent="go('/ai-analysis', { username: row.user.username })">智能分析 ›</a>
             </div>
             <span v-if="!detail.care.length" class="muted">没有，这学期人人都做对 3 道以上</span>
           </section>
@@ -231,22 +205,15 @@ function go(path: string, query: Record<string, string>) {
               </svg>
               <b>AI 分析这个班</b>
               <div class="spacer" />
-              <n-button
-                size="small"
-                :type="report ? 'default' : 'info'"
-                :loading="ai.running.value"
-                @click="analyze"
-              >
-                {{ report ? "重新分析" : "开始分析" }}
+              <n-button size="small" :type="report ? 'default' : 'info'" :loading="ai.running.value" @click="analyze">
+                {{ report ? '重新分析' : '开始分析' }}
               </n-button>
             </div>
             <span v-if="ai.waiting.value" class="muted">正在看这个班的数据…</span>
             <Markdown v-if="report" :content="report" />
           </section>
 
-          <a v-if="pk" href="#" class="pk" @click.prevent="go('/class', { classes: className! })"
-            >和别的班比 → 班级 PK ›</a
-          >
+          <a v-if="pk" href="#" class="pk" @click.prevent="go('/class', { classes: className! })">和别的班比 → 班级 PK ›</a>
         </div>
         <div v-else-if="!loading" class="muted">这个班的数据没取到</div>
       </n-spin>
@@ -269,7 +236,7 @@ function go(path: string, query: Record<string, string>) {
 .muted {
   font-size: 12px;
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .body {
@@ -288,7 +255,7 @@ function go(path: string, query: Record<string, string>) {
   min-width: 0;
   padding: 10px 12px;
   border-radius: 6px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -302,12 +269,12 @@ function go(path: string, query: Record<string, string>) {
 .big b small {
   font-size: 13px;
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .big span {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 section {
@@ -323,7 +290,7 @@ section {
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .dots {
@@ -348,7 +315,7 @@ section {
   align-items: center;
   gap: 2px;
   padding-bottom: 4px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   width: 100%;
 }
 
@@ -359,14 +326,14 @@ section {
 
 .axis {
   font-size: 11px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .line {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .key {
@@ -418,7 +385,7 @@ section {
 
 .v {
   font-size: 11px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -438,7 +405,7 @@ section {
 .care a,
 .pk {
   font-size: 13px;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   white-space: nowrap;
 }
@@ -463,6 +430,6 @@ section {
 }
 
 .ai-head b {
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 </style>

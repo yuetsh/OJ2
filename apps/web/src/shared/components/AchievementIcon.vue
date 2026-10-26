@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
+import { Icon } from '@iconify/vue'
 
 // 成就图标统一走 iconify（noto 彩色 emoji 图标集），渲染出来是 SVG，
 // 老浏览器缺 emoji 字体也能正常显示。
@@ -12,10 +12,10 @@ const props = withDefaults(defineProps<{ icon: string; size?: number }>(), {
 })
 
 const kind = computed(() => {
-  const v = props.icon ?? ""
-  if (/^(https?:\/\/|\/|data:)/.test(v)) return "image"
-  if (v.includes(":")) return "iconify"
-  return "text"
+  const v = props.icon ?? ''
+  if (/^(https?:\/\/|\/|data:)/.test(v)) return 'image'
+  if (v.includes(':')) return 'iconify'
+  return 'text'
 })
 </script>
 

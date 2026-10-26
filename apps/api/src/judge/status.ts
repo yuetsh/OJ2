@@ -1,4 +1,4 @@
-import { JudgeStatus, type JudgeStatusValue } from "@oj2/contract"
+import { JudgeStatus, type JudgeStatusValue } from '@oj2/contract'
 
 // 状态码的唯一一份在 packages/contract/src/judge-status.ts，这里只再导出，
 // 省得二十几处 import 一起改
@@ -14,18 +14,18 @@ export function isAccepted(result: number) {
  * 模型根本不知道 -1 是「答案错误」还是别的什么，等于白给一条信息。
  */
 export const JUDGE_STATUS_NAME: Record<number, string> = {
-  [JudgeStatus.COMPILE_ERROR]: "编译失败",
-  [JudgeStatus.WRONG_ANSWER]: "答案错误",
-  [JudgeStatus.ACCEPTED]: "答案正确",
-  [JudgeStatus.CPU_TIME_LIMIT_EXCEEDED]: "运行超时",
-  [JudgeStatus.REAL_TIME_LIMIT_EXCEEDED]: "运行超时",
-  [JudgeStatus.MEMORY_LIMIT_EXCEEDED]: "内存超限",
-  [JudgeStatus.RUNTIME_ERROR]: "运行时错误",
-  [JudgeStatus.SYSTEM_ERROR]: "系统错误",
-  [JudgeStatus.PENDING]: "等待评分",
-  [JudgeStatus.JUDGING]: "正在评分",
-  [JudgeStatus.PARTIALLY_ACCEPTED]: "部分正确",
-  [JudgeStatus.AST_CHECK_FAILED]: "答案正确，但语法未通过",
+  [JudgeStatus.COMPILE_ERROR]: '编译失败',
+  [JudgeStatus.WRONG_ANSWER]: '答案错误',
+  [JudgeStatus.ACCEPTED]: '答案正确',
+  [JudgeStatus.CPU_TIME_LIMIT_EXCEEDED]: '运行超时',
+  [JudgeStatus.REAL_TIME_LIMIT_EXCEEDED]: '运行超时',
+  [JudgeStatus.MEMORY_LIMIT_EXCEEDED]: '内存超限',
+  [JudgeStatus.RUNTIME_ERROR]: '运行时错误',
+  [JudgeStatus.SYSTEM_ERROR]: '系统错误',
+  [JudgeStatus.PENDING]: '等待评分',
+  [JudgeStatus.JUDGING]: '正在评分',
+  [JudgeStatus.PARTIALLY_ACCEPTED]: '部分正确',
+  [JudgeStatus.AST_CHECK_FAILED]: '答案正确，但语法未通过',
 }
 
 export function judgeStatusName(result: number) {

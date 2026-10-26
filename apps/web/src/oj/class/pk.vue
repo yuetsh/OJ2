@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import type { ClassBattleItem, ClassPk, ClassPkPeriod } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { getClassBattle, getClassPk } from "oj/api"
-import { classLabel, groupClassOptions } from "utils/classes"
-import { useAIStream } from "shared/composables/aiStream"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useUserStore } from "shared/store/user"
-import PkDuel from "./components/PkDuel.vue"
-import PkGrid from "./components/PkGrid.vue"
-import PkRace from "./components/PkRace.vue"
-import { pkColor } from "./utils"
+import type { ClassBattleItem, ClassPk, ClassPkPeriod } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { getClassBattle, getClassPk } from 'oj/api'
+import { classLabel, groupClassOptions } from 'utils/classes'
+import { useAIStream } from 'shared/composables/aiStream'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useUserStore } from 'shared/store/user'
+import PkDuel from './components/PkDuel.vue'
+import PkGrid from './components/PkGrid.vue'
+import PkRace from './components/PkRace.vue'
+import { pkColor } from './utils'
 
 // Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
-const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
+const Markdown = defineAsyncComponent(() => import('shared/components/Markdown.vue'))
 
 /**
  * 班级 PK（设计稿「班级 PK 重设计」定稿）。用户定的：两个班按「同一批题」对决（B），
@@ -37,9 +37,9 @@ const battle = ref<ClassBattleItem[]>([])
 
 function queryClasses() {
   const raw = route.query.classes
-  return typeof raw === "string" && raw ? raw.split(",").filter(Boolean) : []
+  return typeof raw === 'string' && raw ? raw.split(',').filter(Boolean) : []
 }
-const period = computed<ClassPkPeriod>(() => (route.query.period === "week" ? "week" : "term"))
+const period = computed<ClassPkPeriod>(() => (route.query.period === 'week' ? 'week' : 'term'))
 
 let seq = 0
 async function load() {
@@ -50,9 +50,8 @@ async function load() {
     if (mine !== seq) return
     pk.value = data
     // 后端配好的班写回地址栏：刷新、分享出去看到的是同一组
-    const classes = data.classes.map((item) => item.className).join(",")
-    if (classes && classes !== route.query.classes)
-      router.replace({ query: { ...route.query, classes } })
+    const classes = data.classes.map((item) => item.className).join(',')
+    if (classes && classes !== route.query.classes) router.replace({ query: { ...route.query, classes } })
   } catch {
     if (mine === seq) pk.value = null
   } finally {
@@ -73,9 +72,9 @@ onMounted(async () => {
 const selected = computed(() => pk.value?.classes.map((item) => item.className) ?? [])
 
 function setClasses(classes: string[]) {
-  report.value = ""
+  report.value = ''
   ai.abort()
-  router.push({ query: { ...route.query, classes: classes.join(",") || undefined } })
+  router.push({ query: { ...route.query, classes: classes.join(',') || undefined } })
 }
 
 function remove(className: string) {
@@ -97,9 +96,9 @@ function add(className: string) {
 }
 
 function setPeriod(value: ClassPkPeriod) {
-  report.value = ""
+  report.value = ''
   ai.abort()
-  router.push({ query: { ...route.query, period: value === "term" ? undefined : value } })
+  router.push({ query: { ...route.query, period: value === 'term' ? undefined : value } })
 }
 
 /** 「+ 加一个班」：这学期在用的班（班级对抗里有的），按年级分组，自己年级放最前 */
@@ -112,31 +111,23 @@ const addOptions = computed(() =>
 )
 
 const mode = computed(() => {
-  if (!pk.value || pk.value.classes.length < 2) return "empty"
-  return pk.value.classes.length === 2 ? "duel" : "grid"
+  if (!pk.value || pk.value.classes.length < 2) return 'empty'
+  return pk.value.classes.length === 2 ? 'duel' : 'grid'
 })
 
-const ruleText = computed(() =>
-  mode.value === "grid"
-    ? "三个班以上按题对照 · 过半的人交过算这个班布置过"
-    : "两个班只比都布置过的题 · 过半的人交过算布置过",
-)
+const ruleText = computed(() => (mode.value === 'grid' ? '三个班以上按题对照 · 过半的人交过算这个班布置过' : '两个班只比都布置过的题 · 过半的人交过算布置过'))
 
 // ---------- AI 分析（只给老师） ----------
 const ai = useAIStream()
-const report = ref("")
+const report = ref('')
 const showReport = ref(false)
 
 async function analyze() {
   if (selected.value.length < 2) return
   showReport.value = true
-  report.value = ""
+  report.value = ''
   try {
-    await ai.run(
-      "ai/class-pk-analysis",
-      { classNames: selected.value, period: period.value },
-      { onDelta: (content) => (report.value += content) },
-    )
+    await ai.run('ai/class-pk-analysis', { classNames: selected.value, period: period.value }, { onDelta: (content) => (report.value += content) })
   } catch (error) {
     if (!report.value) showReport.value = false
     message.error((error as Error).message)
@@ -156,24 +147,9 @@ async function analyze() {
           <button :class="{ on: period === 'week' }" @click="setPeriod('week')">这周</button>
           <button :class="{ on: period === 'term' }" @click="setPeriod('term')">这学期</button>
         </div>
-        <n-button
-          v-if="teacher && isDesktop"
-          secondary
-          type="info"
-          :disabled="selected.length < 2"
-          :loading="ai.waiting.value"
-          @click="analyze"
-        >
+        <n-button v-if="teacher && isDesktop" secondary type="info" :disabled="selected.length < 2" :loading="ai.waiting.value" @click="analyze">
           <template #icon>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
             </svg>
           </template>
@@ -187,33 +163,14 @@ async function analyze() {
             <i :style="{ background: pkColor(index) }" />
             {{ chipLabel(className) }}
             <span v-if="className === pk?.mine" class="mine-tag">你们班</span>
-            <button
-              v-else
-              class="x"
-              :aria-label="`去掉${classLabel(className)}`"
-              @click="remove(className)"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                aria-hidden="true"
-              >
+            <button v-else class="x" :aria-label="`去掉${classLabel(className)}`" @click="remove(className)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
           </span>
           <!-- 只剩两个班时不能删（删成一个班后端会再配一个），点它换成别的班 -->
-          <n-popselect
-            v-else
-            :options="addOptions"
-            scrollable
-            trigger="click"
-            :value="null"
-            @update:value="(value: string) => replace(className, value)"
-          >
+          <n-popselect v-else :options="addOptions" scrollable trigger="click" :value="null" @update:value="(value: string) => replace(className, value)">
             <button class="chip" title="换一个班">
               <i :style="{ background: pkColor(index) }" />
               {{ chipLabel(className) }}
@@ -232,14 +189,7 @@ async function analyze() {
             </button>
           </n-popselect>
         </template>
-        <n-popselect
-          v-if="selected.length < MAX_CLASSES"
-          :options="addOptions"
-          scrollable
-          trigger="click"
-          :value="null"
-          @update:value="add"
-        >
+        <n-popselect v-if="selected.length < MAX_CLASSES" :options="addOptions" scrollable trigger="click" :value="null" @update:value="add">
           <button class="chip add">+ 加一个班</button>
         </n-popselect>
       </div>
@@ -254,19 +204,13 @@ async function analyze() {
         <div v-if="mode === 'empty'" class="card empty">
           <b>再加一个班来比</b>
           <span class="muted">
-            {{
-              pk.classes.length
-                ? "同年级没找到别的在用的班，点上面「+ 加一个班」挑一个"
-                : "你还没有班级，点上面「+ 加一个班」挑两个班来比"
-            }}
+            {{ pk.classes.length ? '同年级没找到别的在用的班，点上面「+ 加一个班」挑一个' : '你还没有班级，点上面「+ 加一个班」挑两个班来比' }}
           </span>
         </div>
         <template v-else>
           <div v-if="!pk.problems.length" class="card empty">
-            <b>这几个班{{ period === "week" ? "这周" : "这学期" }}还没有一起布置过的题</b>
-            <span class="muted"
-              >一个班过半的人交过这道题才算布置过，至少两个班都布置过才能按题比</span
-            >
+            <b>这几个班{{ period === 'week' ? '这周' : '这学期' }}还没有一起布置过的题</b>
+            <span class="muted">一个班过半的人交过这道题才算布置过，至少两个班都布置过才能按题比</span>
             <PkRace v-if="period === 'term'" :pk="pk" :height="240" class="empty-race" />
           </div>
           <PkDuel v-else-if="mode === 'duel'" :pk="pk" :compact="!isDesktop" />
@@ -296,9 +240,7 @@ async function analyze() {
           <Markdown v-if="report" :content="report" />
         </section>
       </template>
-      <div v-else-if="!loading" class="card empty">
-        <b>没取到数据</b><span class="muted">刷新一下试试</span>
-      </div>
+      <div v-else-if="!loading" class="card empty"><b>没取到数据</b><span class="muted">刷新一下试试</span></div>
     </n-spin>
   </div>
 </template>
@@ -332,7 +274,7 @@ async function analyze() {
 
 .back {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -342,13 +284,13 @@ async function analyze() {
 
 .muted {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .seg {
   display: inline-flex;
   height: var(--oj-ctrl-h);
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 4px;
   overflow: hidden;
 }
@@ -356,9 +298,9 @@ async function analyze() {
 .seg button {
   padding: 0 14px;
   border: 0;
-  border-left: 1px solid v-bind("theme.borderColor");
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor2");
+  border-left: 1px solid v-bind('theme.borderColor');
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor2');
   font: inherit;
   font-size: var(--oj-fs-sec);
   cursor: pointer;
@@ -390,10 +332,10 @@ async function analyze() {
   height: var(--oj-ctrl-h);
   box-sizing: border-box;
   padding: 0 10px 0 12px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 17px;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
   font: inherit;
   font-size: var(--oj-fs-sec);
   font-weight: 600;
@@ -414,7 +356,7 @@ async function analyze() {
   padding: 0 14px;
   border-style: dashed;
   font-weight: 400;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
@@ -424,7 +366,7 @@ async function analyze() {
   padding: 0;
   border: 0;
   background: none;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -443,18 +385,18 @@ button.chip {
 .chev {
   width: 12px;
   height: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .x:hover {
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 
 .vs {
   font-weight: 800;
   font-size: 16px;
   font-style: italic;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .mine-tag {
@@ -470,9 +412,9 @@ button.chip {
 }
 
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .empty {
@@ -511,7 +453,7 @@ button.chip {
 }
 
 .ai-head b {
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 
 .ai-head .muted {

@@ -1,18 +1,18 @@
-import { Hono } from "hono"
+import { Hono } from 'hono'
 
-import type { AppEnv } from "../../auth/middleware"
-import { adminAccountRoutes } from "./account"
-import { adminAchievementRoutes } from "./achievement"
-import { adminAiRoutes } from "./ai"
-import { adminAnalyticsRoutes } from "./analytics"
-import { adminConfRoutes } from "./conf"
-import { adminContestRoutes } from "./contest"
-import { adminLearnRoutes } from "./learn"
-import { adminProblemRoutes } from "./problem"
-import { adminProblemSetRoutes } from "./problemset"
-import { adminTagRoutes } from "./tag"
-import { adminAnnouncementRoutes } from "./announcement"
-import { adminTutorialRoutes } from "./tutorial"
+import type { AppEnv } from '../../auth/middleware'
+import { adminAccountRoutes } from './account'
+import { adminAchievementRoutes } from './achievement'
+import { adminAiRoutes } from './ai'
+import { adminAnalyticsRoutes } from './analytics'
+import { adminConfRoutes } from './conf'
+import { adminContestRoutes } from './contest'
+import { adminLearnRoutes } from './learn'
+import { adminProblemRoutes } from './problem'
+import { adminProblemSetRoutes } from './problemset'
+import { adminTagRoutes } from './tag'
+import { adminAnnouncementRoutes } from './announcement'
+import { adminTutorialRoutes } from './tutorial'
 
 /**
  * 后台路由总入口，挂在 `/api/admin` 下。
@@ -24,15 +24,15 @@ import { adminTutorialRoutes } from "./tutorial"
  */
 export const adminRoutes = new Hono<AppEnv>()
 
-adminRoutes.route("/", adminAccountRoutes)
-adminRoutes.route("/", adminAchievementRoutes)
-adminRoutes.route("/", adminAiRoutes)
-adminRoutes.route("/", adminAnalyticsRoutes)
-adminRoutes.route("/", adminConfRoutes)
-adminRoutes.route("/", adminContestRoutes)
-adminRoutes.route("/", adminLearnRoutes)
-adminRoutes.route("/", adminProblemRoutes)
-adminRoutes.route("/", adminProblemSetRoutes)
-adminRoutes.route("/", adminTagRoutes)
-adminRoutes.route("/", adminAnnouncementRoutes)
-adminRoutes.route("/", adminTutorialRoutes)
+adminRoutes.route('/', adminAccountRoutes)
+adminRoutes.route('/', adminAchievementRoutes)
+adminRoutes.route('/', adminAiRoutes)
+adminRoutes.route('/', adminAnalyticsRoutes)
+adminRoutes.route('/', adminConfRoutes)
+adminRoutes.route('/', adminContestRoutes)
+adminRoutes.route('/', adminLearnRoutes)
+adminRoutes.route('/', adminProblemRoutes)
+adminRoutes.route('/', adminProblemSetRoutes)
+adminRoutes.route('/', adminTagRoutes)
+adminRoutes.route('/', adminAnnouncementRoutes)
+adminRoutes.route('/', adminTutorialRoutes)

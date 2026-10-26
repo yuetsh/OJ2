@@ -1,10 +1,10 @@
-import { readFile } from "node:fs/promises"
-import { resolve } from "node:path"
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
-import { config } from "../config"
-import type { schema } from "../db"
-import { asRecord } from "../routes/helpers"
-import { readInfo } from "../services/test-case"
+import { config } from '../config'
+import type { schema } from '../db'
+import { asRecord } from '../routes/helpers'
+import { readInfo } from '../services/test-case'
 
 /** 拿来在图上走一遍的一组数据 */
 export interface FlowchartCase {
@@ -21,7 +21,7 @@ const MAX_CASES = 8
 const MAX_TEXT = 300
 
 function clean(text: string) {
-  return text.replace(/\r\n?/g, "\n").replace(/\s+$/, "")
+  return text.replace(/\r\n?/g, '\n').replace(/\s+$/, '')
 }
 
 /**
@@ -29,15 +29,13 @@ function clean(text: string) {
  * 不一样的。测试数据的输入和应该输出会出现在结果页签里 —— 流程图题都是几行输入的小题，
  * 学生看到一两组不构成泄露，而「这一组走错了」比「逻辑正确性 25 / 40」有用得多。
  */
-export async function flowchartCases(
-  problem: typeof schema.problem.$inferSelect,
-): Promise<FlowchartCase[]> {
+export async function flowchartCases(problem: typeof schema.problem.$inferSelect): Promise<FlowchartCase[]> {
   const cases: FlowchartCase[] = []
   const seen = new Set<string>()
   const samples = Array.isArray(problem.samples) ? problem.samples : []
   for (const raw of samples) {
     const item = asRecord(raw)
-    if (typeof item.input !== "string" || typeof item.output !== "string") continue
+    if (typeof item.input !== 'string' || typeof item.output !== 'string') continue
     const input = clean(item.input)
     const expected = clean(item.output)
     if (input.length > MAX_TEXT || expected.length > MAX_TEXT) continue
@@ -57,8 +55,8 @@ export async function flowchartCases(
     if (entry.input_size > MAX_TEXT || entry.output_size > MAX_TEXT) continue
     try {
       const directory = resolve(config.testCaseDirectory, problem.testCaseId)
-      const input = clean(await readFile(resolve(directory, entry.input_name), "utf8"))
-      const expected = clean(await readFile(resolve(directory, entry.output_name), "utf8"))
+      const input = clean(await readFile(resolve(directory, entry.input_name), 'utf8'))
+      const expected = clean(await readFile(resolve(directory, entry.output_name), 'utf8'))
       if (!input || seen.has(input)) continue
       seen.add(input)
       tests++

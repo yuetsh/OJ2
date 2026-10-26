@@ -8,17 +8,17 @@ import {
   type LearnExerciseProgress,
   type LearnExerciseProgressList,
   type LearnStudentDetail,
-} from "@oj2/contract"
-import { and, asc, count, desc, eq, inArray, isNull, like, sql } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, count, desc, eq, inArray, isNull, like, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireTeacher, type AppEnv } from "../../auth/middleware"
-import { db, schema } from "../../db"
-import { failure, success } from "../../http"
-import { accepted } from "../../services/learning-stats"
-import { defaultClassFor } from "../../services/ranking"
-import { exerciseCountColumn, tutorialProblems } from "../../services/tutorial"
-import { queryInteger, rounded } from "../helpers"
+import { requireTeacher, type AppEnv } from '../../auth/middleware'
+import { db, schema } from '../../db'
+import { failure, success } from '../../http'
+import { accepted } from '../../services/learning-stats'
+import { defaultClassFor } from '../../services/ranking'
+import { exerciseCountColumn, tutorialProblems } from '../../services/tutorial'
+import { queryInteger, rounded } from '../helpers'
 
 /**
  * 自学情况：教程读了没、读了多久。
@@ -29,7 +29,7 @@ import { queryInteger, rounded } from "../helpers"
 export const adminLearnRoutes = new Hono<AppEnv>()
 
 function tutorialTypeOf(value: string | undefined) {
-  return value === "c" ? "c" : "python"
+  return value === 'c' ? 'c' : 'python'
 }
 
 /**
@@ -49,9 +49,7 @@ function classFilter(className: string | undefined) {
  */
 function classCondition(value: string | null) {
   if (!value) return undefined
-  return value.length >= 3
-    ? eq(schema.user.className, value)
-    : like(schema.user.className, `${value}%`)
+  return value.length >= 3 ? eq(schema.user.className, value) : like(schema.user.className, `${value}%`)
 }
 
 /**
@@ -60,11 +58,7 @@ function classCondition(value: string | null) {
  * 在「谁没学」这张表上凭空消失 —— 班级榜可以只算入班的人，这里不行。
  */
 function studentCondition(value: string | null) {
-  return and(
-    eq(schema.user.isDisabled, false),
-    inArray(schema.user.adminType, [...STUDENT_ROLES]),
-    classCondition(value),
-  )
+  return and(eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES]), classCondition(value))
 }
 
 /**
@@ -80,34 +74,22 @@ async function problemActivity(userIds: number[], problemIds: number[]) {
       userId: schema.submission.userId,
       problemId: schema.submission.problemId,
       createTime: schema.submission.createTime,
-      solved: sql<boolean>`${inArray(schema.submission.result, accepted)}`.as("solved"),
+      solved: sql<boolean>`${inArray(schema.submission.result, accepted)}`.as('solved'),
     })
     .from(schema.submission)
-    .where(
-      and(
-        isNull(schema.submission.contestId),
-        inArray(schema.submission.userId, userIds),
-        inArray(schema.submission.problemId, problemIds),
-      ),
-    )
+    .where(and(isNull(schema.submission.contestId), inArray(schema.submission.userId, userIds), inArray(schema.submission.problemId, problemIds)))
   const flowchart = db
     .select({
       userId: schema.flowchartSubmission.userId,
       problemId: schema.flowchartSubmission.problemId,
       createTime: schema.flowchartSubmission.createTime,
-      solved: sql<boolean>`${and(
-        eq(schema.flowchartSubmission.status, 2),
-        inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]),
-      )}`.as("solved"),
+      solved: sql<boolean>`${and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]))}`.as(
+        'solved',
+      ),
     })
     .from(schema.flowchartSubmission)
-    .where(
-      and(
-        inArray(schema.flowchartSubmission.userId, userIds),
-        inArray(schema.flowchartSubmission.problemId, problemIds),
-      ),
-    )
-  const activity = code.unionAll(flowchart).as("activity")
+    .where(and(inArray(schema.flowchartSubmission.userId, userIds), inArray(schema.flowchartSubmission.problemId, problemIds)))
+  const activity = code.unionAll(flowchart).as('activity')
   return db
     .select({
       userId: activity.userId,
@@ -126,11 +108,11 @@ async function problemActivity(userIds: number[], problemIds: number[]) {
  * 不选班就猜老师在教哪个班（`defaultClassFor`）；也能传年级前缀，
  * 但一个年级两三百行方块，页面上主要还是按班看。
  */
-adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
-  const type = tutorialTypeOf(c.req.query("type"))
-  const requested = classFilter(c.req.query("className"))
-  if (!requested.ok) return failure(c, 400, "invalid-class", "班级只能是数字")
-  const className = requested.value ?? (await defaultClassFor(c.get("user")!.id))
+adminLearnRoutes.get('/learn-analytics/board', requireTeacher, async (c) => {
+  const type = tutorialTypeOf(c.req.query('type'))
+  const requested = classFilter(c.req.query('className'))
+  if (!requested.ok) return failure(c, 400, 'invalid-class', '班级只能是数字')
+  const className = requested.value ?? (await defaultClassFor(c.get('user')!.id))
 
   const tutorials = await db
     .select({
@@ -149,14 +131,11 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
       )
       return rows.map((row) => ({
         ...row,
-        problems: problems
-          .filter((problem) => problem.tutorialId === row.id)
-          .map(({ id, displayId, title }) => ({ id, displayId, title })),
+        problems: problems.filter((problem) => problem.tutorialId === row.id).map(({ id, displayId, title }) => ({ id, displayId, title })),
       }))
     })
   const tutorialIds = tutorials.map((row) => row.id)
-  if (!className)
-    return success(c, { className: null, tutorials, students: [] } satisfies LearnBoard)
+  if (!className) return success(c, { className: null, tutorials, students: [] } satisfies LearnBoard)
 
   const students = await db
     .select({
@@ -174,7 +153,7 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
   // 阅读、练习、配套题分开查再拼：几个一对多挂在同一张表上 join，count 全是错的
   const problemIds = [...new Set(tutorials.flatMap((row) => row.problems.map((p) => p.id)))]
   const problemRows = await problemActivity(userIds, problemIds)
-  const problemsOf = new Map<number, LearnBoardStudent["problems"]>()
+  const problemsOf = new Map<number, LearnBoardStudent['problems']>()
   for (const { userId, ...row } of problemRows) {
     const list = problemsOf.get(userId) ?? []
     list.push(row)
@@ -192,33 +171,18 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
               lastViewedAt: schema.tutorialProgress.lastViewedAt,
             })
             .from(schema.tutorialProgress)
-            .where(
-              and(
-                inArray(schema.tutorialProgress.userId, userIds),
-                inArray(schema.tutorialProgress.tutorialId, tutorialIds),
-              ),
-            ),
+            .where(and(inArray(schema.tutorialProgress.userId, userIds), inArray(schema.tutorialProgress.tutorialId, tutorialIds))),
           db
             .select({
               userId: schema.exerciseAttempt.userId,
               tutorialId: schema.exercise.tutorialId,
               tried: count(),
-              solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
-                Number,
-              ),
-              wrongAttempts:
-                sql<number>`coalesce(sum(${schema.exerciseAttempt.wrongAttempts}), 0)`.mapWith(
-                  Number,
-                ),
+              solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(Number),
+              wrongAttempts: sql<number>`coalesce(sum(${schema.exerciseAttempt.wrongAttempts}), 0)`.mapWith(Number),
             })
             .from(schema.exerciseAttempt)
             .innerJoin(schema.exercise, eq(schema.exercise.id, schema.exerciseAttempt.exerciseId))
-            .where(
-              and(
-                inArray(schema.exerciseAttempt.userId, userIds),
-                inArray(schema.exercise.tutorialId, tutorialIds),
-              ),
-            )
+            .where(and(inArray(schema.exerciseAttempt.userId, userIds), inArray(schema.exercise.tutorialId, tutorialIds)))
             .groupBy(schema.exerciseAttempt.userId, schema.exercise.tutorialId),
         ])
       : [[], []]
@@ -234,7 +198,7 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
     students: students.map((student) => {
       const opened: number[] = []
       const done: number[] = []
-      const lessons: LearnBoardStudent["lessons"] = []
+      const lessons: LearnBoardStudent['lessons'] = []
       let exerciseSolved = 0
       let totalSeconds = 0
       let lastViewedAt: string | null = null
@@ -280,15 +244,12 @@ adminLearnRoutes.get("/learn-analytics/board", requireTeacher, async (c) => {
  * 一道题一行，含做过/做对的人数、做对的人平均试了几次、一次就做对的人数。
  * 没人做过的题也在列表里（一行零）—— 「这道题全班没一个人碰」同样是要看见的。
  */
-adminLearnRoutes.get("/learn-analytics/exercises", requireTeacher, async (c) => {
-  const type = tutorialTypeOf(c.req.query("type"))
-  const className = classFilter(c.req.query("className"))
-  if (!className.ok) return failure(c, 400, "invalid-class", "班级只能是数字")
+adminLearnRoutes.get('/learn-analytics/exercises', requireTeacher, async (c) => {
+  const type = tutorialTypeOf(c.req.query('type'))
+  const className = classFilter(c.req.query('className'))
+  if (!className.ok) return failure(c, 400, 'invalid-class', '班级只能是数字')
 
-  const [studentCountRow] = await db
-    .select({ value: count() })
-    .from(schema.user)
-    .where(studentCondition(className.value))
+  const [studentCountRow] = await db.select({ value: count() }).from(schema.user).where(studentCondition(className.value))
 
   const rows = await db
     .select({
@@ -301,32 +262,17 @@ adminLearnRoutes.get("/learn-analytics/exercises", requireTeacher, async (c) => 
       // 题干在 jsonb 里，各题型的字段名都叫 question；取不到就给空串，别让整行挂掉
       question: sql<string>`coalesce(${schema.exercise.data}->>'question', '')`,
       triedUsers: sql<number>`count(distinct ${schema.user.id})`.mapWith(Number),
-      solvedUsers:
-        sql<number>`count(distinct ${schema.user.id}) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
-          Number,
-        ),
-      firstTryUsers:
-        sql<number>`count(distinct ${schema.user.id}) filter (where ${schema.exerciseAttempt.attemptsToSolve} = 1)`.mapWith(
-          Number,
-        ),
-      attempts:
-        sql<number>`coalesce(sum(${schema.exerciseAttempt.attempts}) filter (where ${schema.user.id} is not null), 0)`.mapWith(
-          Number,
-        ),
+      solvedUsers: sql<number>`count(distinct ${schema.user.id}) filter (where ${schema.exerciseAttempt.solved})`.mapWith(Number),
+      firstTryUsers: sql<number>`count(distinct ${schema.user.id}) filter (where ${schema.exerciseAttempt.attemptsToSolve} = 1)`.mapWith(Number),
+      attempts: sql<number>`coalesce(sum(${schema.exerciseAttempt.attempts}) filter (where ${schema.user.id} is not null), 0)`.mapWith(Number),
       // 只算做对的人：没做对的人「试了几次」还没停，混进平均值只会把它拉花
-      avgAttemptsToSolve:
-        sql<number>`coalesce(avg(${schema.exerciseAttempt.attemptsToSolve}) filter (where ${schema.user.id} is not null), 0)`.mapWith(
-          Number,
-        ),
+      avgAttemptsToSolve: sql<number>`coalesce(avg(${schema.exerciseAttempt.attemptsToSolve}) filter (where ${schema.user.id} is not null), 0)`.mapWith(Number),
     })
     .from(schema.exercise)
     .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
     .leftJoin(schema.exerciseAttempt, eq(schema.exerciseAttempt.exerciseId, schema.exercise.id))
     // 学生条件挂在 join 的 on 上，不是 where 上：写 where 会把没人做过的题整行滤掉
-    .leftJoin(
-      schema.user,
-      and(eq(schema.user.id, schema.exerciseAttempt.userId), studentCondition(className.value)),
-    )
+    .leftJoin(schema.user, and(eq(schema.user.id, schema.exerciseAttempt.userId), studentCondition(className.value)))
     .where(and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type)))
     .groupBy(schema.exercise.id, schema.tutorial.id, schema.tutorial.title, schema.tutorial.order)
     .orderBy(asc(schema.tutorial.order), asc(schema.exercise.order))
@@ -344,10 +290,10 @@ adminLearnRoutes.get("/learn-analytics/exercises", requireTeacher, async (c) => 
 })
 
 /** 单道练习的逐人明细。后台表格展开某一行时才拉，不跟着列表一起下发 */
-adminLearnRoutes.get("/learn-analytics/exercises/:id/attempts", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const className = classFilter(c.req.query("className"))
-  if (!className.ok) return failure(c, 400, "invalid-class", "班级只能是数字")
+adminLearnRoutes.get('/learn-analytics/exercises/:id/attempts', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const className = classFilter(c.req.query('className'))
+  if (!className.ok) return failure(c, 400, 'invalid-class', '班级只能是数字')
 
   const rows = await db
     .select({
@@ -373,25 +319,10 @@ adminLearnRoutes.get("/learn-analytics/exercises/:id/attempts", requireTeacher, 
   const untried = await db
     .select({ userId: schema.user.id, username: schema.user.username })
     .from(schema.exercise)
-    .innerJoin(
-      schema.tutorialProgress,
-      eq(schema.tutorialProgress.tutorialId, schema.exercise.tutorialId),
-    )
+    .innerJoin(schema.tutorialProgress, eq(schema.tutorialProgress.tutorialId, schema.exercise.tutorialId))
     .innerJoin(schema.user, eq(schema.user.id, schema.tutorialProgress.userId))
-    .leftJoin(
-      schema.exerciseAttempt,
-      and(
-        eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
-        eq(schema.exerciseAttempt.userId, schema.user.id),
-      ),
-    )
-    .where(
-      and(
-        eq(schema.exercise.id, id),
-        isNull(schema.exerciseAttempt.userId),
-        studentCondition(className.value),
-      ),
-    )
+    .leftJoin(schema.exerciseAttempt, and(eq(schema.exerciseAttempt.exerciseId, schema.exercise.id), eq(schema.exerciseAttempt.userId, schema.user.id)))
+    .where(and(eq(schema.exercise.id, id), isNull(schema.exerciseAttempt.userId), studentCondition(className.value)))
     .orderBy(asc(schema.user.username))
 
   return success(c, { results: rows, untried } satisfies LearnExerciseAttemptList)
@@ -403,9 +334,9 @@ adminLearnRoutes.get("/learn-analytics/exercises/:id/attempts", requireTeacher, 
  * 不限班级、也不限学生角色 —— 老师从方块格点进来的一定是学生，
  * 而按 id 查一个人的自学留痕本来就是老师能看的东西（方块格上全有）。
  */
-adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const type = tutorialTypeOf(c.req.query("type"))
+adminLearnRoutes.get('/learn-analytics/students/:id', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const type = tutorialTypeOf(c.req.query('type'))
 
   const [student] = await db
     .select({
@@ -415,7 +346,7 @@ adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) 
     })
     .from(schema.user)
     .where(eq(schema.user.id, id))
-  if (!student) return failure(c, 404, "user-not-found", "用户不存在")
+  if (!student) return failure(c, 404, 'user-not-found', '用户不存在')
 
   const visible = and(eq(schema.tutorial.isPublic, true), eq(schema.tutorial.type, type))
   const [tutorials, exercises] = await Promise.all([
@@ -428,13 +359,7 @@ adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) 
         lastViewedAt: schema.tutorialProgress.lastViewedAt,
       })
       .from(schema.tutorial)
-      .leftJoin(
-        schema.tutorialProgress,
-        and(
-          eq(schema.tutorialProgress.tutorialId, schema.tutorial.id),
-          eq(schema.tutorialProgress.userId, id),
-        ),
-      )
+      .leftJoin(schema.tutorialProgress, and(eq(schema.tutorialProgress.tutorialId, schema.tutorial.id), eq(schema.tutorialProgress.userId, id)))
       .where(visible)
       .orderBy(asc(schema.tutorial.order)),
     db
@@ -451,13 +376,7 @@ adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) 
       })
       .from(schema.exercise)
       .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
-      .leftJoin(
-        schema.exerciseAttempt,
-        and(
-          eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
-          eq(schema.exerciseAttempt.userId, id),
-        ),
-      )
+      .leftJoin(schema.exerciseAttempt, and(eq(schema.exerciseAttempt.exerciseId, schema.exercise.id), eq(schema.exerciseAttempt.userId, id)))
       .where(visible)
       .orderBy(asc(schema.exercise.order)),
   ])
@@ -475,7 +394,7 @@ adminLearnRoutes.get("/learn-analytics/students/:id", requireTeacher, async (c) 
     ).map((row) => [row.problemId, row]),
   )
 
-  const byLesson = new Map<number, LearnStudentDetail["lessons"][number]["exercises"]>()
+  const byLesson = new Map<number, LearnStudentDetail['lessons'][number]['exercises']>()
   for (const { tutorialId, ...row } of exercises) {
     const list = byLesson.get(tutorialId) ?? []
     list.push({

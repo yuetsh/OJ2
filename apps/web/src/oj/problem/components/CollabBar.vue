@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { storeToRefs } from "pinia"
-import { useProblemStore } from "oj/store/problem"
-import { useCollabStore } from "shared/store/collab"
-import UserName from "shared/components/UserName.vue"
+import { storeToRefs } from 'pinia'
+import { useProblemStore } from 'oj/store/problem'
+import { useCollabStore } from 'shared/store/collab'
+import UserName from 'shared/components/UserName.vue'
 
 /**
  * 老师协作时右栏顶上的一条（设计稿「举手与协作」HcPageA）：正在帮谁、举手多久了、
@@ -18,17 +18,15 @@ const { problem } = storeToRefs(useProblemStore())
 const router = useRouter()
 
 const room = computed(() => collabStore.room)
-const peek = computed(() => room.value?.mode === "peek")
+const peek = computed(() => room.value?.mode === 'peek')
 
 /** 他举手多久了：按 id 在举手列表里找他那条（已经是「在帮」了，列表里还留着） */
-const request = computed(() =>
-  collabStore.requests.find((item) => item.studentId === room.value?.peerId),
-)
+const request = computed(() => collabStore.requests.find((item) => item.studentId === room.value?.peerId))
 const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) })
 const waited = computed(() => {
-  if (!request.value) return ""
+  if (!request.value) return ''
   const seconds = Math.max(0, Math.floor((now.value.getTime() - request.value.createdAt) / 1000))
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 })
 
 /** 下一个：还在排队的里面等得最久的（不会是眼前这个，他已经是「在帮」了） */
@@ -41,10 +39,10 @@ const next = computed(() => collabStore.nextRequest)
 function openHisSubmissions() {
   if (!room.value || !problem.value) return
   const target = router.resolve({
-    name: "submissions",
-    query: { problem: problem.value._id, username: room.value.peerName, exactUsername: "1" },
+    name: 'submissions',
+    query: { problem: problem.value._id, username: room.value.peerName, exactUsername: '1' },
   })
-  window.open(target.href, "_blank")
+  window.open(target.href, '_blank')
 }
 
 /**
@@ -54,9 +52,9 @@ function openHisSubmissions() {
  */
 async function finish() {
   const className = room.value?.peerClassName
-  collabStore.leave("done")
+  collabStore.leave('done')
   await until(() => collabStore.room).toBe(null, { timeout: 3000 })
-  router.push({ name: "classroom board", query: className ? { className } : {} })
+  router.push({ name: 'classroom board', query: className ? { className } : {} })
 }
 
 /**
@@ -66,7 +64,7 @@ async function finish() {
 function finishAndNext() {
   const target = next.value
   if (!target) return
-  collabStore.leave("done")
+  collabStore.leave('done')
   collabStore.accept(target.studentId)
 }
 </script>
@@ -75,7 +73,7 @@ function finishAndNext() {
   <div v-if="room" class="collab-bar" role="status">
     <span class="dot" aria-hidden="true" />
     <span class="who">
-      {{ peek ? "正在看" : "正在帮" }}
+      {{ peek ? '正在看' : '正在帮' }}
       <UserName :username="room.peerName" />
       <template v-if="peek"> 的代码</template>
     </span>
@@ -85,11 +83,9 @@ function finishAndNext() {
     <!-- 显式的「结束」：求助记录一并清掉。跳走页面发的是 leave("left")，
          那边只是退回排队 —— 见 store 里 leave 的注释 -->
     <button type="button" :class="next ? 'ghost' : 'end'" @click="finish">
-      {{ peek ? "看完了" : "帮完了" }}
+      {{ peek ? '看完了' : '帮完了' }}
     </button>
-    <button v-if="next" type="button" class="end" @click="finishAndNext">
-      下一个：{{ next.studentName }} {{ next.problemId }} →
-    </button>
+    <button v-if="next" type="button" class="end" @click="finishAndNext">下一个：{{ next.studentName }} {{ next.problemId }} →</button>
   </div>
 </template>
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import ExerciseResult from "./ExerciseResult.vue"
-import type { Exercise, ExerciseGroupData } from "utils/types"
-import { shuffle } from "../composables/useShuffle"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import ExerciseResult from './ExerciseResult.vue'
+import type { Exercise, ExerciseGroupData } from 'utils/types'
+import { shuffle } from '../composables/useShuffle'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -71,43 +71,42 @@ function itemsIn(bucket: number): number[] {
   return order.value.filter((i) => placement.value[i] === bucket)
 }
 
-function itemStatus(i: number): "correct" | "wrong" | "default" {
-  if (!submitted.value || placement.value[i] === -1) return "default"
-  return placement.value[i] === data.value.answer[i] ? "correct" : "wrong"
+function itemStatus(i: number): 'correct' | 'wrong' | 'default' {
+  if (!submitted.value || placement.value[i] === -1) return 'default'
+  return placement.value[i] === data.value.answer[i] ? 'correct' : 'wrong'
 }
 
 function chipStyle(i: number): Record<string, string> {
   const status = itemStatus(i)
-  const color =
-    status === "correct" ? "#18a058" : status === "wrong" ? "#d03050" : "var(--learn-control-line)"
-  const plain = color === "var(--learn-control-line)"
+  const color = status === 'correct' ? '#18a058' : status === 'wrong' ? '#d03050' : 'var(--learn-control-line)'
+  const plain = color === 'var(--learn-control-line)'
   if (pickedIdx.value === i) {
     return {
-      padding: "5.5px 11.5px",
-      borderRadius: "6px",
-      border: "2px solid #2080f0",
-      background: "rgba(32,128,240,0.08)",
-      cursor: "pointer",
-      userSelect: "none",
-      fontSize: "15px",
+      padding: '5.5px 11.5px',
+      borderRadius: '6px',
+      border: '2px solid #2080f0',
+      background: 'rgba(32,128,240,0.08)',
+      cursor: 'pointer',
+      userSelect: 'none',
+      fontSize: '15px',
     }
   }
   return {
-    padding: "6px 12px",
-    borderRadius: "6px",
+    padding: '6px 12px',
+    borderRadius: '6px',
     border: `1.5px solid ${color}`,
-    background: plain ? "var(--learn-pane)" : color + "14",
-    cursor: locked.value ? "default" : "grab",
-    userSelect: "none",
-    fontSize: "15px",
+    background: plain ? 'var(--learn-pane)' : color + '14',
+    cursor: locked.value ? 'default' : 'grab',
+    userSelect: 'none',
+    fontSize: '15px',
   }
 }
 
 function submit() {
   submitted.value = true
-  emit("attempt", {
+  emit('attempt', {
     correct: allCorrect.value,
-    answer: `分组 ${placement.value.map((b, i) => `${i + 1}→${b === -1 ? "?" : b + 1}`).join("、")}`,
+    answer: `分组 ${placement.value.map((b, i) => `${i + 1}→${b === -1 ? '?' : b + 1}`).join('、')}`,
   })
 }
 
@@ -122,11 +121,7 @@ function reset() {
       {{ data.question }}
     </p>
     <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
-      {{
-        isDesktop
-          ? "把下面的项目拖到对应的分组里，可在分组间拖动调整。"
-          : "先点一个项目，再点它该去的分组。"
-      }}
+      {{ isDesktop ? '把下面的项目拖到对应的分组里，可在分组间拖动调整。' : '先点一个项目，再点它该去的分组。' }}
     </p>
 
     <div
@@ -144,17 +139,8 @@ function reset() {
       @drop="dropTo(-1)"
       @click="onAreaClick(-1)"
     >
-      <span v-if="poolItems.length === 0" style="color: var(--learn-muted); font-size: 13px">
-        （已全部归类）
-      </span>
-      <div
-        v-for="i in poolItems"
-        :key="i"
-        draggable="true"
-        :style="chipStyle(i)"
-        @dragstart="onDragStart(i)"
-        @click.stop="onItemClick(i)"
-      >
+      <span v-if="poolItems.length === 0" style="color: var(--learn-muted); font-size: 13px"> （已全部归类） </span>
+      <div v-for="i in poolItems" :key="i" draggable="true" :style="chipStyle(i)" @dragstart="onDragStart(i)" @click.stop="onItemClick(i)">
         {{ data.items[i] }}
       </div>
     </div>
@@ -183,25 +169,14 @@ function reset() {
           {{ bucket }}
         </p>
         <n-space :size="8">
-          <div
-            v-for="i in itemsIn(b)"
-            :key="i"
-            draggable="true"
-            :style="chipStyle(i)"
-            @dragstart="onDragStart(i)"
-            @click.stop="onItemClick(i)"
-          >
+          <div v-for="i in itemsIn(b)" :key="i" draggable="true" :style="chipStyle(i)" @dragstart="onDragStart(i)" @click.stop="onItemClick(i)">
             {{ data.items[i] }}
           </div>
         </n-space>
       </div>
     </div>
 
-    <ExerciseResult
-      v-if="submitted"
-      :type="allCorrect ? 'success' : 'error'"
-      :title="allCorrect ? '归类全部正确！' : '有归类错误，红色项需要调整'"
-    />
+    <ExerciseResult v-if="submitted" :type="allCorrect ? 'success' : 'error'" :title="allCorrect ? '归类全部正确！' : '有归类错误，红色项需要调整'" />
 
     <n-space style="margin-top: 12px" :size="8">
       <n-button type="primary" :disabled="!allPlaced || locked" @click="submit"> 提交 </n-button>

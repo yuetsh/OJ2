@@ -1,4 +1,4 @@
-import { useCollabStore } from "shared/store/collab"
+import { useCollabStore } from 'shared/store/collab'
 
 /**
  * 老师接单 / 主动打开学生的编辑器。两处入口（顶栏举手面板、课堂看板）共用。
@@ -15,7 +15,7 @@ export function useTeacherHelp() {
 
   function busy() {
     if (!collabStore.room) return false
-    message.warning("请先结束当前协作")
+    message.warning('请先结束当前协作')
     return true
   }
 

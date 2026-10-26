@@ -1,11 +1,11 @@
-import { ADMIN_ROLES, TEACHER_ROLES, type AdminType } from "@oj2/contract"
-import { PROBLEM_PERMISSION, STORAGE_KEY, USER_TYPE } from "utils/constants"
-import storage from "utils/storage"
-import type { Profile, SessionUser } from "utils/types"
-import { getProfile, logout } from "../api"
-import { useConfigStore } from "./config"
+import { ADMIN_ROLES, TEACHER_ROLES, type AdminType } from '@oj2/contract'
+import { PROBLEM_PERMISSION, STORAGE_KEY, USER_TYPE } from 'utils/constants'
+import storage from 'utils/storage'
+import type { Profile, SessionUser } from 'utils/types'
+import { getProfile, logout } from '../api'
+import { useConfigStore } from './config'
 
-export const useUserStore = defineStore("user", () => {
+export const useUserStore = defineStore('user', () => {
   const configStore = useConfigStore()
 
   const profile = ref<Profile | null>(null)
@@ -25,21 +25,14 @@ export const useUserStore = defineStore("user", () => {
   const demoMode = computed(() => demoSwitch.value && realIsSuperAdmin.value)
 
   // 分组用契约里的白名单（roles.ts，全仓唯一的定义处），别在这里再列一遍角色
-  const hasRole = (roles: readonly AdminType[]) =>
-    !demoMode.value && !!user.value && (roles as readonly string[]).includes(user.value.adminType)
+  const hasRole = (roles: readonly AdminType[]) => !demoMode.value && !!user.value && (roles as readonly string[]).includes(user.value.adminType)
 
   const isAdminRole = computed(() => hasRole(ADMIN_ROLES))
-  const isStudentAdmin = computed(
-    () => !demoMode.value && user.value?.adminType === USER_TYPE.STUDENT_ADMIN,
-  )
-  const isTeacherAdmin = computed(
-    () => !demoMode.value && user.value?.adminType === USER_TYPE.TEACHER_ADMIN,
-  )
+  const isStudentAdmin = computed(() => !demoMode.value && user.value?.adminType === USER_TYPE.STUDENT_ADMIN)
+  const isTeacherAdmin = computed(() => !demoMode.value && user.value?.adminType === USER_TYPE.TEACHER_ADMIN)
   const isTeacherOrAbove = computed(() => hasRole(TEACHER_ROLES))
   const isSuperAdmin = computed(() => !demoMode.value && realIsSuperAdmin.value)
-  const hasProblemPermission = computed(
-    () => !demoMode.value && user.value?.problemPermission !== PROBLEM_PERMISSION.NONE,
-  )
+  const hasProblemPermission = computed(() => !demoMode.value && user.value?.problemPermission !== PROBLEM_PERMISSION.NONE)
 
   const canToggleDemoMode = computed(() => realIsSuperAdmin.value)
 
@@ -53,10 +46,7 @@ export const useUserStore = defineStore("user", () => {
     if (isSuperAdmin.value) return true
     const mine = problem.createdBy.id === user.value?.id
     if (problem.contestId !== null) return isTeacherOrAbove.value && mine
-    return (
-      hasProblemPermission.value &&
-      (mine || user.value?.problemPermission === PROBLEM_PERMISSION.ALL)
-    )
+    return hasProblemPermission.value && (mine || user.value?.problemPermission === PROBLEM_PERMISSION.ALL)
   }
 
   function toggleDemoMode() {
@@ -108,9 +98,7 @@ export const useUserStore = defineStore("user", () => {
     // 登录框记的班级和登法要跨退登活下来：机房一台机器对一个班，下课登出、下节课再来
     // 还是同一个班，清掉的话每个人都得重新选一遍；老师的电脑同理，下次还是写用户名。
     // 它们是机器的属性，不是谁的隐私。
-    const keep = [STORAGE_KEY.LOGIN_CLASS, STORAGE_KEY.LOGIN_MODE].map(
-      (key) => [key, storage.get(key)] as const,
-    )
+    const keep = [STORAGE_KEY.LOGIN_CLASS, STORAGE_KEY.LOGIN_MODE].map((key) => [key, storage.get(key)] as const)
     storage.clear()
     for (const [key, value] of keep) if (value !== null) storage.set(key, value)
   }

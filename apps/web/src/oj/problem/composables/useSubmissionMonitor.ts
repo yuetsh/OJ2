@@ -1,10 +1,10 @@
-import { ref, computed } from "vue"
-import { getSubmission } from "oj/api"
-import { SubmissionStatus } from "utils/constants"
-import type { PendingAchievement, Submission } from "utils/types"
-import { useAchievementStore } from "shared/store/achievement"
-import { useSubmissionWebSocket, type SubmissionUpdate } from "shared/composables/websocket"
-import { useFallbackPoll } from "shared/composables/fallbackPoll"
+import { ref, computed } from 'vue'
+import { getSubmission } from 'oj/api'
+import { SubmissionStatus } from 'utils/constants'
+import type { PendingAchievement, Submission } from 'utils/types'
+import { useAchievementStore } from 'shared/store/achievement'
+import { useSubmissionWebSocket, type SubmissionUpdate } from 'shared/composables/websocket'
+import { useFallbackPoll } from 'shared/composables/fallbackPoll'
 
 /**
  * 判题监控 Composable
@@ -12,7 +12,7 @@ import { useFallbackPoll } from "shared/composables/fallbackPoll"
  */
 export function useSubmissionMonitor() {
   // ==================== 状态 ====================
-  const submissionId = ref("")
+  const submissionId = ref('')
   const submission = ref<Submission>()
 
   // ==================== WebSocket 处理 ====================
@@ -23,18 +23,18 @@ export function useSubmissionMonitor() {
       type: string
       achievements?: PendingAchievement[]
     }
-    if (frame.type === "achievement_unlocked") {
+    if (frame.type === 'achievement_unlocked') {
       useAchievementStore().enqueue(frame.achievements ?? [])
       return
     }
-    if (frame.type !== "submission_update") {
+    if (frame.type !== 'submission_update') {
       return
     }
 
-    console.log("[SubmissionMonitor] 收到WebSocket更新:", data)
+    console.log('[SubmissionMonitor] 收到WebSocket更新:', data)
 
     if (data.submissionId !== submissionId.value) {
-      console.log("[SubmissionMonitor] 提交ID不匹配，忽略")
+      console.log('[SubmissionMonitor] 提交ID不匹配，忽略')
       return
     }
     // 订阅后服务端立刻回的那一帧（还在排队也回）就算：WebSocket 是通的，轮询退到慢档
@@ -44,11 +44,11 @@ export function useSubmissionMonitor() {
       submission.value = {} as Submission
     }
 
-    submission.value.result = data.result as Submission["result"]
+    submission.value.result = data.result as Submission['result']
 
     // 判题完成或出错，获取完整详情
-    if (data.status === "finished" || data.status === "error") {
-      console.log(`[SubmissionMonitor] 判题${data.status === "finished" ? "完成" : "出错"}`)
+    if (data.status === 'finished' || data.status === 'error') {
+      console.log(`[SubmissionMonitor] 判题${data.status === 'finished' ? '完成' : '出错'}`)
 
       // 停止轮询（WebSocket已成功）
       fallback.stop()
@@ -66,8 +66,7 @@ export function useSubmissionMonitor() {
   }
 
   // 初始化 WebSocket
-  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect, status } =
-    useSubmissionWebSocket(handleSubmissionUpdate)
+  const { connect, subscribe, unsubscribe, scheduleDisconnect, cancelScheduledDisconnect, status } = useSubmissionWebSocket(handleSubmissionUpdate)
 
   // ==================== 轮询兜底 ====================
   const fallback = useFallbackPoll({
@@ -119,7 +118,7 @@ export function useSubmissionMonitor() {
     // 连接由 store 持有，离开题目页组件卸了它也还在。和判完之后一样，空闲 15 分钟断开；
     // 不在这里立刻断，是因为刚交的那条判完之后还可能推成就过来
     scheduleDisconnect(15 * 60 * 1000)
-    submissionId.value = ""
+    submissionId.value = ''
     submission.value = undefined
   }
 

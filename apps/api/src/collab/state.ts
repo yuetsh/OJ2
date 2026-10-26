@@ -6,23 +6,15 @@
  * 所以内存态够用，不需要 Redis 同步。进程重启丢掉全部状态，两端重连后回到干净状态。
  */
 
-import { normalizeLanguage } from "@oj2/contract"
+import { normalizeLanguage } from '@oj2/contract'
 
-export type CollabSocket = Bun.ServerWebSocket<import("../websocket").SubmissionSocketData>
+export type CollabSocket = Bun.ServerWebSocket<import('../websocket').SubmissionSocketData>
 
 /**
  * 协作支持的语言。和前端 utils/types.ts 里的 LANGUAGE 对齐，去掉 Flowchart ——
  * 流程图题没有代码编辑器，求助入口本身就是隐藏的。
  */
-export const COLLAB_LANGUAGES = [
-  "C",
-  "C++",
-  "Python",
-  "Java",
-  "JavaScript",
-  "Golang",
-  "SQL",
-] as const
+export const COLLAB_LANGUAGES = ['C', 'C++', 'Python', 'Java', 'JavaScript', 'Golang', 'SQL'] as const
 
 export type CollabLanguage = (typeof COLLAB_LANGUAGES)[number]
 
@@ -34,9 +26,7 @@ export type CollabLanguage = (typeof COLLAB_LANGUAGES)[number]
  */
 export function normalizeCollabLanguage(value: unknown): CollabLanguage {
   const normalized = normalizeLanguage(value) ?? value
-  return (COLLAB_LANGUAGES as readonly string[]).includes(normalized as string)
-    ? (normalized as CollabLanguage)
-    : "C"
+  return (COLLAB_LANGUAGES as readonly string[]).includes(normalized as string) ? (normalized as CollabLanguage) : 'C'
 }
 
 /**
@@ -67,7 +57,7 @@ export interface HelpRequest {
    */
   language: CollabLanguage
   createdAt: number
-  status: "pending" | "active"
+  status: 'pending' | 'active'
   teacherId?: number
   teacherName?: string
   socket: CollabSocket
@@ -102,7 +92,7 @@ export function queueAheadOf(studentId: number) {
   if (!self) return 0
   let ahead = 0
   for (const request of requests.values()) {
-    if (request.status === "pending" && request.createdAt < self.createdAt) ahead += 1
+    if (request.status === 'pending' && request.createdAt < self.createdAt) ahead += 1
   }
   return ahead
 }
@@ -130,7 +120,7 @@ export interface Room {
    * help = 学生举了手、老师接的；peek = 老师在看板上主动打开的（学生没举手）。
    * 两边看到的字不一样（「在帮你」/「在看你的代码」），peek 没有求助记录要清
    */
-  mode: "help" | "peek"
+  mode: 'help' | 'peek'
   teacherId: number
   studentSocket: CollabSocket
   teacherSocket: CollabSocket

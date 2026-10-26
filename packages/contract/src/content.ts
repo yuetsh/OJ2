@@ -1,6 +1,6 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { paginatedSchema, sampleUserSchema } from "./common"
+import { paginatedSchema, sampleUserSchema } from './common'
 
 export const announcementSchema = z.object({
   id: z.number().int(),
@@ -25,15 +25,7 @@ export const announcementListItemSchema = announcementSchema.omit({
 
 export const announcementListSchema = paginatedSchema(announcementListItemSchema)
 
-export const reactionKeySchema = z.enum([
-  "too_easy",
-  "too_hard",
-  "confusing",
-  "buggy",
-  "learned",
-  "interesting",
-  "want_explain",
-])
+export const reactionKeySchema = z.enum(['too_easy', 'too_hard', 'confusing', 'buggy', 'learned', 'interesting', 'want_explain'])
 
 export const reactionCountsSchema = z.record(reactionKeySchema, z.number().int())
 export const reactionStateSchema = z.object({
@@ -70,7 +62,7 @@ export const tutorialSchema = tutorialSummarySchema.extend({
   problems: z.array(tutorialProblemSchema),
   isPublic: z.boolean(),
   order: z.number().int(),
-  type: z.enum(["python", "c"]),
+  type: z.enum(['python', 'c']),
   createdBy: sampleUserSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -167,7 +159,7 @@ export const exerciseDataByType: Record<string, z.ZodType> = {
  */
 export const exerciseSchema = z.object({
   id: z.number().int(),
-  type: z.enum(["mcq", "sort", "fill", "match", "predict", "debug", "group"]),
+  type: z.enum(['mcq', 'sort', 'fill', 'match', 'predict', 'debug', 'group']),
   data: z.record(z.string(), z.unknown()),
   order: z.number().int(),
   /** 当前学生做对过没有。未登录恒为 false；一课的练一练全做对就算学完这课 */
@@ -199,11 +191,7 @@ export type ExerciseAttemptRequest = z.input<typeof exerciseAttemptRequestSchema
  *
  * 前端目录、首页、后台「自学情况」都走这一个函数，别各写一份。
  */
-export function isLessonDone(progress: {
-  viewCount: number
-  exerciseTotal: number
-  exerciseSolved: number
-}) {
+export function isLessonDone(progress: { viewCount: number; exerciseTotal: number; exerciseSolved: number }) {
   if (progress.exerciseTotal > 0) return progress.exerciseSolved >= progress.exerciseTotal
   return progress.viewCount > 0
 }

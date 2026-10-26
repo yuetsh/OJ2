@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { Exercise, ExerciseMcqData } from "utils/types"
-import { reportExerciseAttempt } from "oj/api"
-import { useUserStore } from "shared/store/user"
+import { Icon } from '@iconify/vue'
+import type { Exercise, ExerciseMcqData } from 'utils/types'
+import { reportExerciseAttempt } from 'oj/api'
+import { useUserStore } from 'shared/store/user'
 
-const ExerciseMcq = defineAsyncComponent(() => import("./ExerciseMcq.vue"))
-const ExerciseSort = defineAsyncComponent(() => import("./ExerciseSort.vue"))
-const ExerciseFill = defineAsyncComponent(() => import("./ExerciseFill.vue"))
-const ExerciseMatch = defineAsyncComponent(() => import("./ExerciseMatch.vue"))
-const ExercisePredict = defineAsyncComponent(() => import("./ExercisePredict.vue"))
-const ExerciseDebug = defineAsyncComponent(() => import("./ExerciseDebug.vue"))
-const ExerciseGroup = defineAsyncComponent(() => import("./ExerciseGroup.vue"))
+const ExerciseMcq = defineAsyncComponent(() => import('./ExerciseMcq.vue'))
+const ExerciseSort = defineAsyncComponent(() => import('./ExerciseSort.vue'))
+const ExerciseFill = defineAsyncComponent(() => import('./ExerciseFill.vue'))
+const ExerciseMatch = defineAsyncComponent(() => import('./ExerciseMatch.vue'))
+const ExercisePredict = defineAsyncComponent(() => import('./ExercisePredict.vue'))
+const ExerciseDebug = defineAsyncComponent(() => import('./ExerciseDebug.vue'))
+const ExerciseGroup = defineAsyncComponent(() => import('./ExerciseGroup.vue'))
 
 const props = defineProps<{
   exercise: Exercise
@@ -26,17 +26,17 @@ const emit = defineEmits<{ solved: [exerciseId: number] }>()
 const userStore = useUserStore()
 
 const KIND: Record<string, string> = {
-  sort: "代码排序",
-  fill: "代码填空",
-  match: "连线匹配",
-  predict: "输出预测",
-  debug: "代码找错",
-  group: "归类分组",
+  sort: '代码排序',
+  fill: '代码填空',
+  match: '连线匹配',
+  predict: '输出预测',
+  debug: '代码找错',
+  group: '归类分组',
 }
 
 const kind = computed(() => {
-  if (props.exercise.type !== "mcq") return KIND[props.exercise.type] ?? "练习"
-  return (props.exercise.data as ExerciseMcqData).answer.length === 1 ? "单选题" : "多选题"
+  if (props.exercise.type !== 'mcq') return KIND[props.exercise.type] ?? '练习'
+  return (props.exercise.data as ExerciseMcqData).answer.length === 1 ? '单选题' : '多选题'
 })
 
 /**
@@ -61,9 +61,9 @@ watch(
 
 function onAttempt(payload: { correct: boolean; answer?: string }) {
   // 做对了就告诉页面（目录、大纲、课末的进度跟着变），没登录也算 —— 只是不留痕
-  if (payload.correct) emit("solved", props.exercise.id)
+  if (payload.correct) emit('solved', props.exercise.id)
   if (!userStore.isAuthed || solved) return
-  const answer = payload.answer ?? ""
+  const answer = payload.answer ?? ''
   if (answer === lastAnswer) return
   lastAnswer = answer
   if (payload.correct) solved = true
@@ -81,40 +81,12 @@ function onAttempt(payload: { correct: boolean; answer?: string }) {
       <span class="num">第 {{ index }} 道 · 共 {{ total }} 道</span>
     </header>
     <ExerciseMcq v-if="exercise.type === 'mcq'" :exercise="exercise" @attempt="onAttempt" />
-    <ExerciseSort
-      v-else-if="exercise.type === 'sort'"
-      :exercise="exercise"
-      :lang="lang"
-      @attempt="onAttempt"
-    />
-    <ExerciseFill
-      v-else-if="exercise.type === 'fill'"
-      :exercise="exercise"
-      :lang="lang"
-      @attempt="onAttempt"
-    />
-    <ExerciseMatch
-      v-else-if="exercise.type === 'match'"
-      :exercise="exercise"
-      @attempt="onAttempt"
-    />
-    <ExercisePredict
-      v-else-if="exercise.type === 'predict'"
-      :exercise="exercise"
-      :lang="lang"
-      @attempt="onAttempt"
-    />
-    <ExerciseDebug
-      v-else-if="exercise.type === 'debug'"
-      :exercise="exercise"
-      :lang="lang"
-      @attempt="onAttempt"
-    />
-    <ExerciseGroup
-      v-else-if="exercise.type === 'group'"
-      :exercise="exercise"
-      @attempt="onAttempt"
-    />
+    <ExerciseSort v-else-if="exercise.type === 'sort'" :exercise="exercise" :lang="lang" @attempt="onAttempt" />
+    <ExerciseFill v-else-if="exercise.type === 'fill'" :exercise="exercise" :lang="lang" @attempt="onAttempt" />
+    <ExerciseMatch v-else-if="exercise.type === 'match'" :exercise="exercise" @attempt="onAttempt" />
+    <ExercisePredict v-else-if="exercise.type === 'predict'" :exercise="exercise" :lang="lang" @attempt="onAttempt" />
+    <ExerciseDebug v-else-if="exercise.type === 'debug'" :exercise="exercise" :lang="lang" @attempt="onAttempt" />
+    <ExerciseGroup v-else-if="exercise.type === 'group'" :exercise="exercise" @attempt="onAttempt" />
   </section>
 </template>
 

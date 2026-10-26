@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { RankRow } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import UserName from "shared/components/UserName.vue"
-import { useRankPalette } from "../palette"
-import RankAvatar from "shared/components/RankAvatar.vue"
+import type { RankRow } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import UserName from 'shared/components/UserName.vue'
+import { useRankPalette } from '../palette'
+import RankAvatar from 'shared/components/RankAvatar.vue'
 
 /**
  * 领奖台：前三名站在台阶上，第一名戴皇冠。赛道从第 4 名接着排，前三不再出现第二遍。
@@ -28,9 +28,7 @@ const { isDesktop } = useBreakpoints()
 
 /** 台阶从左到右是 2、1、3 */
 const steps = computed(() =>
-  [2, 1, 3]
-    .map((place) => ({ place, row: props.rows[place - 1] }))
-    .filter((step): step is { place: number; row: RankRow } => !!step.row),
+  [2, 1, 3].map((place) => ({ place, row: props.rows[place - 1] })).filter((step): step is { place: number; row: RankRow } => !!step.row),
 )
 
 const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
@@ -56,12 +54,7 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
           >
             <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
           </svg>
-          <RankAvatar
-            :username="row.user.username"
-            :avatar="row.avatar"
-            :size="place === 1 ? 34 : 28"
-            :me="row.user.id === meId"
-          />
+          <RankAvatar :username="row.user.username" :avatar="row.avatar" :size="place === 1 ? 34 : 28" :me="row.user.id === meId" />
         </span>
         <div class="words">
           <div class="name-line">
@@ -80,15 +73,7 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
             >
               {{ row.mood }}
             </n-ellipsis>
-            <button
-              v-if="teacher"
-              class="clear"
-              aria-label="清空签名"
-              title="清空签名"
-              @click="$emit('clearMood', row)"
-            >
-              ×
-            </button>
+            <button v-if="teacher" class="clear" aria-label="清空签名" title="清空签名" @click="$emit('clearMood', row)">×</button>
           </div>
         </div>
       </div>
@@ -97,12 +82,7 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
         :style="{
           height: `${HEIGHTS[place]}px`,
           background: palette.medal[place - 1]!.background,
-          boxShadow:
-            row.user.id === chaseId
-              ? `inset 0 0 0 2px ${palette.chase}`
-              : row.user.id === meId
-                ? `inset 0 0 0 2px ${palette.me}`
-                : undefined,
+          boxShadow: row.user.id === chaseId ? `inset 0 0 0 2px ${palette.chase}` : row.user.id === meId ? `inset 0 0 0 2px ${palette.me}` : undefined,
         }"
       >
         <span class="place" :style="{ color: palette.medal[place - 1]!.color }">{{ place }}</span>
@@ -123,7 +103,7 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
   justify-content: center;
   gap: 8px;
   margin: 4px 24px 0;
-  border-bottom: 2px solid v-bind("theme.dividerColor");
+  border-bottom: 2px solid v-bind('theme.dividerColor');
   min-height: 60px;
 }
 
@@ -175,12 +155,12 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
 .bubble {
   position: relative;
   padding: 4px 10px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 8px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   font-size: var(--oj-fs-meta);
   line-height: 18px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   word-break: break-all;
 }
 
@@ -191,10 +171,10 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
   width: 16px;
   height: 16px;
   padding: 0;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 8px;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor3");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor3');
   font-size: 12px;
   line-height: 13px;
   cursor: pointer;
@@ -207,8 +187,8 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
 }
 
 .clear:hover {
-  color: v-bind("theme.errorColor");
-  border-color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
+  border-color: v-bind('theme.errorColor');
 }
 
 /* 手机：台阶窄，气泡挪到头像上面，下面依次头像、名字 */
@@ -257,16 +237,16 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
 }
 
 .phone .bubble::after {
-  content: "";
+  content: '';
   position: absolute;
   left: 50%;
   bottom: -5px;
   width: 8px;
   height: 8px;
   margin-left: -4px;
-  background: v-bind("theme.actionColor");
-  border-right: 1px solid v-bind("theme.dividerColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  background: v-bind('theme.actionColor');
+  border-right: 1px solid v-bind('theme.dividerColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   transform: rotate(45deg);
 }
 
@@ -280,17 +260,17 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
 }
 
 .tag.chase {
-  color: v-bind("palette.chase");
+  color: v-bind('palette.chase');
   background: rgba(47, 111, 208, 0.12);
 }
 
 .tag.threat {
-  color: v-bind("palette.threat");
+  color: v-bind('palette.threat');
   background: rgba(199, 106, 18, 0.12);
 }
 
 .tag.me {
-  color: v-bind("palette.me");
+  color: v-bind('palette.me');
   background: rgba(24, 160, 88, 0.12);
 }
 
@@ -333,13 +313,13 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
 
 .solved small {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   margin-left: 1px;
 }
 
 .empty {
   padding: 24px 0;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-size: var(--oj-fs-sec);
 }
 </style>

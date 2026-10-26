@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import type { ImportUsersRequest } from "@oj2/contract"
-import { downloadAccountsCsv } from "./accountsCsv"
-import PageHeader from "admin/components/PageHeader.vue"
-import { classLabel } from "utils/classes"
-import UserName from "shared/components/UserName.vue"
-import { errorMessage } from "utils/api"
-import {
-  CLASS_NAME_MAX_DIGITS,
-  CLASS_NAME_MAX_VALUE,
-  CLASS_NAME_MIN_DIGITS,
-  CLASS_NAME_MIN_VALUE,
-} from "utils/constants"
-import { parseTime } from "utils/functions"
-import { checkUsernames, importUsers } from "../api"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import type { ImportUsersRequest } from '@oj2/contract'
+import { downloadAccountsCsv } from './accountsCsv'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { classLabel } from 'utils/classes'
+import UserName from 'shared/components/UserName.vue'
+import { errorMessage } from 'utils/api'
+import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MAX_VALUE, CLASS_NAME_MIN_DIGITS, CLASS_NAME_MIN_VALUE } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import { checkUsernames, importUsers } from '../api'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 /**
  * 批量建号（设计稿「后台用户与批量建号」UsGen / UsGenIssue / UsDone）。
@@ -27,25 +22,25 @@ const message = useMessage()
 // 手机上左右两栏改成上下：先填班级和名单，预览排在下面
 const { isMobile } = useBreakpoints()
 
-const classNo = ref("")
-const rawInput = ref("")
+const classNo = ref('')
+const rawInput = ref('')
 
 const classError = computed(() => {
   const value = classNo.value.trim()
-  if (!value) return ""
+  if (!value) return ''
   const n = Number(value)
   if (!/^\d+$/.test(value) || n < CLASS_NAME_MIN_VALUE || n > CLASS_NAME_MAX_VALUE) {
     return `班级号要是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字`
   }
-  return ""
+  return ''
 })
-const prefix = computed(() => (classNo.value.trim() ? `ks${classNo.value.trim()}` : ""))
+const prefix = computed(() => (classNo.value.trim() ? `ks${classNo.value.trim()}` : ''))
 
 /** 名单：一行一个，前后和中间的空格都去掉（从表格里复制常带空格），空行不算 */
 const names = computed(() =>
   rawInput.value
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, ""))
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ''))
     .filter(Boolean),
 )
 
@@ -54,8 +49,8 @@ const passwords = new Map<string, string>()
 function passwordOf(name: string) {
   let value = passwords.get(name)
   if (!value) {
-    value = ""
-    for (let j = 0; j < 6; j++) value += "123456789".charAt(Math.floor(Math.random() * 9))
+    value = ''
+    for (let j = 0; j < 6; j++) value += '123456789'.charAt(Math.floor(Math.random() * 9))
     passwords.set(name, value)
   }
   return value
@@ -86,7 +81,7 @@ const duplicates = computed(() => {
 const existing = ref<{ username: string; createTime: string | null }[]>([])
 const checking = ref(false)
 watchDebounced(
-  () => rows.value.map((row) => row.username).join("\n"),
+  () => rows.value.map((row) => row.username).join('\n'),
   async () => {
     const usernames = [...new Set(rows.value.map((row) => row.username))]
     if (!usernames.length || classError.value || usernames.length > 500) {
@@ -106,16 +101,8 @@ watchDebounced(
 )
 
 const tooMany = computed(() => rows.value.length > 500)
-const issueCount = computed(
-  () =>
-    (classError.value ? 1 : 0) +
-    duplicates.value.length +
-    existing.value.length +
-    (tooMany.value ? 1 : 0),
-)
-const canSubmit = computed(
-  () => rows.value.length > 0 && !issueCount.value && !checking.value && !!prefix.value,
-)
+const issueCount = computed(() => (classError.value ? 1 : 0) + duplicates.value.length + existing.value.length + (tooMany.value ? 1 : 0))
+const canSubmit = computed(() => rows.value.length > 0 && !issueCount.value && !checking.value && !!prefix.value)
 
 // ---------------------------------------------------------------- 建号
 
@@ -128,10 +115,10 @@ async function submit() {
   // 占位邮箱必须全站唯一：注册、编辑用户、导入三条路都查重。每批一段随机后缀错开，
   // 同一个班分两批导也不会撞。这个地址不发给任何人，纯占位
   const batch = Math.random().toString(36).slice(2, 8)
-  const payload: ImportUsersRequest["users"] = rows.value.map((row, i) => [
+  const payload: ImportUsersRequest['users'] = rows.value.map((row, i) => [
     row.username,
     row.password,
-    `${prefix.value || "user"}.${batch}.${i + 1}@example.com`,
+    `${prefix.value || 'user'}.${batch}.${i + 1}@example.com`,
     row.name,
   ])
   saving.value = true
@@ -140,7 +127,7 @@ async function submit() {
     addedClasses.value = res.addedClasses ?? []
     done.value = rows.value.map(({ username, password }) => ({ username, password }))
   } catch (err) {
-    message.error("没建成：" + errorMessage(err))
+    message.error('没建成：' + errorMessage(err))
   } finally {
     saving.value = false
   }
@@ -148,37 +135,30 @@ async function submit() {
 
 function again() {
   done.value = null
-  rawInput.value = ""
+  rawInput.value = ''
   addedClasses.value = []
   passwords.clear()
 }
 
 function download() {
   if (!done.value) return
-  downloadAccountsCsv(done.value, prefix.value || "账号")
+  downloadAccountsCsv(done.value, prefix.value || '账号')
 }
 
 /** 打印账号条：一人一张，一页四列，打出来剪开发下去 */
 function printSlips() {
   if (!done.value) return
-  const escape = (text: string) =>
-    text.replace(
-      /[&<>"]/g,
-      (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]!,
-    )
+  const escape = (text: string) => text.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!)
   const slips = done.value
-    .map(
-      (it) =>
-        `<div class="slip"><div class="u">${escape(it.username)}</div><div class="p">密码 ${escape(it.password)}</div></div>`,
-    )
-    .join("")
-  const win = window.open("", "_blank")
+    .map((it) => `<div class="slip"><div class="u">${escape(it.username)}</div><div class="p">密码 ${escape(it.password)}</div></div>`)
+    .join('')
+  const win = window.open('', '_blank')
   if (!win) {
-    message.warning("浏览器拦住了新窗口，允许弹出窗口后再点一次")
+    message.warning('浏览器拦住了新窗口，允许弹出窗口后再点一次')
     return
   }
   win.document.write(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${escape(
-    classLabel(classNo.value.trim()) || "账号条",
+    classLabel(classNo.value.trim()) || '账号条',
   )}</title><style>
 body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
@@ -198,9 +178,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
   <div v-if="done" class="done">
     <div class="done-bar">
       <b>建好了 {{ done.length }} 个账号</b>
-      <n-text v-if="addedClasses.length" depth="3">
-        {{ addedClasses.map((name) => classLabel(name)).join("、") }}已加进班级列表
-      </n-text>
+      <n-text v-if="addedClasses.length" depth="3"> {{ addedClasses.map((name) => classLabel(name)).join('、') }}已加进班级列表 </n-text>
       <div class="spacer"></div>
       <n-button @click="download">下载名单（表格）</n-button>
       <n-button type="primary" @click="printSlips">打印账号条</n-button>
@@ -219,51 +197,31 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
       <label class="label" for="class-no">班级号</label>
       <div class="class-row">
         <span class="ks">ks</span>
-        <n-input
-          v-model:value="classNo"
-          :input-props="{ id: 'class-no', inputmode: 'numeric' }"
-          placeholder="如 2612"
-          style="width: 120px"
-        />
+        <n-input v-model:value="classNo" :input-props="{ id: 'class-no', inputmode: 'numeric' }" placeholder="如 2612" style="width: 120px" />
         <span v-if="classNo.trim() && !classError" class="class-name">
           {{ classLabel(classNo.trim()) }}
         </span>
       </div>
-      <label class="label" for="names">
-        名单 <n-text depth="3" class="hint">从表格里整列复制过来，一行一个</n-text>
-      </label>
-      <n-input
-        v-model:value="rawInput"
-        type="textarea"
-        :input-props="{ id: 'names' }"
-        :rows="isMobile ? 8 : 20"
-        placeholder="一行一个名字"
-      />
+      <label class="label" for="names"> 名单 <n-text depth="3" class="hint">从表格里整列复制过来，一行一个</n-text> </label>
+      <n-input v-model:value="rawInput" type="textarea" :input-props="{ id: 'names' }" :rows="isMobile ? 8 : 20" placeholder="一行一个名字" />
     </div>
 
     <div class="right">
       <template v-if="rows.length">
         <div class="head">
           <b>会建这 {{ rows.length }} 个账号</b>
-          <n-tag v-if="!issueCount && !checking && prefix" type="success" :bordered="false" round>
-            没有重名
-          </n-tag>
-          <n-tag v-if="issueCount" type="warning" :bordered="false" round>
-            有 {{ issueCount }} 处要先改
-          </n-tag>
+          <n-tag v-if="!issueCount && !checking && prefix" type="success" :bordered="false" round> 没有重名 </n-tag>
+          <n-tag v-if="issueCount" type="warning" :bordered="false" round> 有 {{ issueCount }} 处要先改 </n-tag>
         </div>
 
         <div v-if="issueCount" class="issues">
           <div v-if="classError">{{ classError }}</div>
           <div v-if="tooMany">一次最多 500 个，分两批建</div>
           <div v-for="dup in duplicates" :key="dup.line">
-            第 {{ dup.line }} 行「{{ dup.name }}」和第 {{ dup.firstLine }} 行重名 ——
-            同班同名的，名字后面加个 1、2 区分
+            第 {{ dup.line }} 行「{{ dup.name }}」和第 {{ dup.firstLine }} 行重名 —— 同班同名的，名字后面加个 1、2 区分
           </div>
           <div v-for="it in existing" :key="it.username">
-            {{ it.username }} 已经有这个账号了<template v-if="it.createTime"
-              >（{{ parseTime(it.createTime, "YYYY-MM-DD") }} 建的）</template
-            >
+            {{ it.username }} 已经有这个账号了<template v-if="it.createTime">（{{ parseTime(it.createTime, 'YYYY-MM-DD') }} 建的）</template>
             —— 删掉这一行，或者换个名字
           </div>
         </div>
@@ -288,25 +246,13 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
         </div>
 
         <div>
-          <n-button
-            type="primary"
-            size="large"
-            :disabled="!canSubmit"
-            :loading="saving || checking"
-            @click="submit"
-          >
+          <n-button type="primary" size="large" :disabled="!canSubmit" :loading="saving || checking" @click="submit">
             建好这 {{ rows.length }} 个账号
           </n-button>
-          <n-text v-if="!prefix" depth="3" class="hint" style="margin-left: 12px">
-            先填班级号
-          </n-text>
+          <n-text v-if="!prefix" depth="3" class="hint" style="margin-left: 12px"> 先填班级号 </n-text>
         </div>
       </template>
-      <n-empty
-        v-else
-        :description="`${isMobile ? '上面' : '左边'}粘进名单，这里就列出会建成的账号`"
-        :style="{ marginTop: isMobile ? '24px' : '80px' }"
-      />
+      <n-empty v-else :description="`${isMobile ? '上面' : '左边'}粘进名单，这里就列出会建成的账号`" :style="{ marginTop: isMobile ? '24px' : '80px' }" />
     </div>
   </div>
 </template>

@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useCodeStore } from "oj/store/code"
-import { findChinesePunctuation } from "oj/problem/utils/chinesePunctuation"
-import {
-  applyFixes,
-  clearErrorMark,
-  currentCode,
-  showErrorMark,
-  showPunctuationMarks,
-} from "oj/problem/utils/errorMark"
-import { explainCCompileError } from "oj/problem/utils/cError"
-import { explainPythonCompileError } from "utils/pythonError"
+import { useThemeVars } from 'naive-ui'
+import { useCodeStore } from 'oj/store/code'
+import { findChinesePunctuation } from 'oj/problem/utils/chinesePunctuation'
+import { applyFixes, clearErrorMark, currentCode, showErrorMark, showPunctuationMarks } from 'oj/problem/utils/errorMark'
+import { explainCCompileError } from 'oj/problem/utils/cError'
+import { explainPythonCompileError } from 'utils/pythonError'
 
 /**
  * 编译错误的中文说明卡片：Python 的语法错误走 pythonError.ts，C / C++ 的 gcc 报错走
@@ -26,20 +20,20 @@ const props = withDefaults(
     errInfo: string
     language?: string
   }>(),
-  { language: "Python" },
+  { language: 'Python' },
 )
 
 const codeStore = useCodeStore()
 const theme = useThemeVars()
 
 const explanation = computed(() =>
-  props.language === "Python"
+  props.language === 'Python'
     ? explainPythonCompileError(props.errInfo, codeStore.code.value)
     : explainCCompileError(props.errInfo, codeStore.code.value, props.language),
 )
 
 /** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
-const rawError = computed(() => props.errInfo.replace(/\/judger\/run\/[^/"]+\//g, ""))
+const rawError = computed(() => props.errInfo.replace(/\/judger\/run\/[^/"]+\//g, ''))
 
 /**
  * 报错只点名第一处。别的行也有中文标点的话，一句话带过（设计稿「语法没过」：
@@ -52,18 +46,14 @@ const otherPunctuationLines = computed(() => {
   const code = codeStore.code.value
   const lines = new Set<number>()
   for (const fix of findChinesePunctuation(code, props.language)) {
-    lines.add(code.slice(0, fix.from).split("\n").length)
+    lines.add(code.slice(0, fix.from).split('\n').length)
   }
   lines.delete(ex.line ?? -1)
   return [...lines].sort((a, b) => a - b)
 })
 
 // 数的是编辑器里**现在**的代码：学生可能已经自己改掉几处了
-const punctuationFixCount = computed(() =>
-  explanation.value?.punctuation
-    ? findChinesePunctuation(codeStore.code.value, props.language).length
-    : 0,
-)
+const punctuationFixCount = computed(() => (explanation.value?.punctuation ? findChinesePunctuation(codeStore.code.value, props.language).length : 0))
 const fixedCount = ref<number | null>(null)
 
 function fixPunctuation() {
@@ -95,16 +85,10 @@ onUnmounted(clearErrorMark)
       <p class="explain">
         <b v-if="explanation.line">第 {{ explanation.line }} 行：</b>{{ explanation.message }}
       </p>
-      <p v-if="otherPunctuationLines.length" class="explain other">
-        第 {{ otherPunctuationLines.join("、") }} 行也有中文标点，编辑器里都标出来了。
-      </p>
+      <p v-if="otherPunctuationLines.length" class="explain other">第 {{ otherPunctuationLines.join('、') }} 行也有中文标点，编辑器里都标出来了。</p>
       <div v-if="explanation.punctuation">
-        <n-button v-if="punctuationFixCount" type="primary" @click="fixPunctuation">
-          把中文标点都换成英文（{{ punctuationFixCount }} 处）
-        </n-button>
-        <n-text v-else-if="fixedCount" type="success">
-          换好了 {{ fixedCount }} 处，再提交一次试试。
-        </n-text>
+        <n-button v-if="punctuationFixCount" type="primary" @click="fixPunctuation"> 把中文标点都换成英文（{{ punctuationFixCount }} 处） </n-button>
+        <n-text v-else-if="fixedCount" type="success"> 换好了 {{ fixedCount }} 处，再提交一次试试。 </n-text>
       </div>
       <n-collapse>
         <n-collapse-item title="原始报错（英文）" name="raw">
@@ -126,7 +110,7 @@ onUnmounted(clearErrorMark)
   padding: 12px 14px;
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.06);
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -139,7 +123,7 @@ onUnmounted(clearErrorMark)
 
 .explain.other {
   font-size: 14px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .raw {

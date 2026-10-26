@@ -1,9 +1,9 @@
-import { getWebsiteConfig } from "shared/api"
-import type { WebsiteConfig } from "utils/types"
+import { getWebsiteConfig } from 'shared/api'
+import type { WebsiteConfig } from 'utils/types'
 
-export const useConfigStore = defineStore("config", () => {
+export const useConfigStore = defineStore('config', () => {
   const config = ref<WebsiteConfig>({
-    websiteName: "",
+    websiteName: '',
     submissionListShowAll: true,
     allowRegister: false,
     classList: [],

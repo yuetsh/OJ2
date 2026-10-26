@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { ClassPk, ClassPkCell } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { classLabel } from "utils/classes"
-import { parseTime } from "utils/functions"
-import { needToTie, pkColor, plateau, shortLabels, tint } from "../utils"
-import PkHist from "./PkHist.vue"
+import type { ClassPk, ClassPkCell } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { classLabel } from 'utils/classes'
+import { parseTime } from 'utils/functions'
+import { needToTie, pkColor, plateau, shortLabels, tint } from '../utils'
+import PkHist from './PkHist.vue'
 
 /**
  * 两个班对决（设计稿「班级 PK」B / 学生 · 两个班 / 手机 · 两个班）：只比两个班都布置过的题，
@@ -19,30 +19,23 @@ const left = computed(() => props.pk.classes[0]!)
 const right = computed(() => props.pk.classes[1]!)
 const colors = [pkColor(0), pkColor(1)] as const
 const shorts = computed(() => shortLabels(props.pk))
-const mineIndex = computed(() =>
-  props.pk.classes.findIndex((item) => item.className === props.pk.mine),
-)
+const mineIndex = computed(() => props.pk.classes.findIndex((item) => item.className === props.pk.mine))
 
 function nameOf(index: number) {
-  return index === mineIndex.value ? "你们班" : shorts.value[index]!
+  return index === mineIndex.value ? '你们班' : shorts.value[index]!
 }
 
-type Side = "left" | "right" | "tie"
+type Side = 'left' | 'right' | 'tie'
 
 const rows = computed(() =>
   props.pk.problems
     .map((problem) => {
       const [a, b] = problem.cells as [ClassPkCell, ClassPkCell]
-      const winner: Side = a.best && b.best ? "tie" : a.best ? "left" : "right"
-      const first: Side =
-        a.firstPercent === b.firstPercent
-          ? "tie"
-          : a.firstPercent > b.firstPercent
-            ? "left"
-            : "right"
+      const winner: Side = a.best && b.best ? 'tie' : a.best ? 'left' : 'right'
+      const first: Side = a.firstPercent === b.firstPercent ? 'tie' : a.firstPercent > b.firstPercent ? 'left' : 'right'
       let tie: number | null = null
       const mine = mineIndex.value
-      if (mine >= 0 && winner !== "tie" && winner !== (mine === 0 ? "left" : "right")) {
+      if (mine >= 0 && winner !== 'tie' && winner !== (mine === 0 ? 'left' : 'right')) {
         const own = mine === 0 ? a : b
         const other = mine === 0 ? b : a
         tie = needToTie(own, props.pk.classes[mine]!.members, other.percent)
@@ -53,47 +46,41 @@ const rows = computed(() =>
 )
 
 const score = computed(() => {
-  const count = (key: "winner" | "first", side: Side) =>
-    rows.value.filter((row) => row[key] === side).length
+  const count = (key: 'winner' | 'first', side: Side) => rows.value.filter((row) => row[key] === side).length
   return {
-    left: count("winner", "left"),
-    right: count("winner", "right"),
-    tie: count("winner", "tie"),
-    firstLeft: count("first", "left"),
-    firstRight: count("first", "right"),
+    left: count('winner', 'left'),
+    right: count('winner', 'right'),
+    tie: count('winner', 'tie'),
+    firstLeft: count('first', 'left'),
+    firstRight: count('first', 'right'),
   }
 })
 
 const steadier = computed(() => {
   const { firstLeft, firstRight } = score.value
-  if (firstLeft === firstRight) return "两个班一样稳"
+  if (firstLeft === firstRight) return '两个班一样稳'
   return `${nameOf(firstLeft > firstRight ? 0 : 1)}更稳`
 })
 
 const SHOW_MOBILE = 7
 const expanded = ref(false)
-const shownRows = computed(() =>
-  props.compact && !expanded.value ? rows.value.slice(0, SHOW_MOBILE) : rows.value,
-)
+const shownRows = computed(() => (props.compact && !expanded.value ? rows.value.slice(0, SHOW_MOBILE) : rows.value))
 
 /** 每周人均：最近 8 周，两班并排的柱 */
 const weeks = computed(() => {
   const from = Math.max(0, props.pk.weeks.length - 8)
   const list = props.pk.weeks.slice(from).map((week, k) => ({
     // 手机上八根柱挤在一行，「10月12日」只能用 10px 才放得下，太小；改短写法换大一号字
-    label: parseTime(week, props.compact ? "M/D" : "M月D日"),
+    label: parseTime(week, props.compact ? 'M/D' : 'M月D日'),
     values: [left.value.weekly[from + k] ?? 0, right.value.weekly[from + k] ?? 0],
   }))
   const max = Math.max(1, ...list.flatMap((week) => week.values))
   return { list, max }
 })
 
-const plateaus = computed(() => [
-  plateau(left.value.distribution),
-  plateau(right.value.distribution),
-])
+const plateaus = computed(() => [plateau(left.value.distribution), plateau(right.value.distribution)])
 
-const tab = ref<"weekly" | "dist">("weekly")
+const tab = ref<'weekly' | 'dist'>('weekly')
 </script>
 
 <template>
@@ -104,12 +91,7 @@ const tab = ref<"weekly" | "dist">("weekly")
         background: `linear-gradient(90deg, ${tint(colors[0], 0.12)} 0%, transparent 38%, transparent 62%, ${tint(colors[1], 0.12)} 100%)`,
       }"
     >
-      <div
-        v-for="(item, index) in [left, right]"
-        :key="item.className"
-        class="side"
-        :class="{ end: index === 1 }"
-      >
+      <div v-for="(item, index) in [left, right]" :key="item.className" class="side" :class="{ end: index === 1 }">
         <span class="side-name" :style="{ color: colors[index] }">
           <template v-if="index === mineIndex">
             你们班<small>{{ compact ? shorts[index] : classLabel(item.className) }}</small>
@@ -118,9 +100,7 @@ const tab = ref<"weekly" | "dist">("weekly")
         </span>
         <span class="side-sub">
           {{ item.members }} 人 · 人均做对 <b>{{ item.perCapita }}</b>
-          <template v-if="!compact && item.firstPercent !== null">
-            · 一次就对 {{ item.firstPercent }}%</template
-          >
+          <template v-if="!compact && item.firstPercent !== null"> · 一次就对 {{ item.firstPercent }}%</template>
         </span>
       </div>
       <div class="mid">
@@ -131,8 +111,7 @@ const tab = ref<"weekly" | "dist">("weekly")
           <b :style="{ color: colors[1] }">{{ score.right }}</b>
         </span>
         <span class="mid-sub">
-          平 {{ score.tie }} 道 · 比一次就对：
-          <b :style="{ color: colors[0] }">{{ score.firstLeft }}</b> :
+          平 {{ score.tie }} 道 · 比一次就对： <b :style="{ color: colors[0] }">{{ score.firstLeft }}</b> :
           <b :style="{ color: colors[1] }">{{ score.firstRight }}</b
           >，{{ steadier }}
         </span>
@@ -148,19 +127,12 @@ const tab = ref<"weekly" | "dist">("weekly")
         <div v-for="row in shownRows" :key="row.problem.problemId" class="row">
           <span class="info left">
             <span class="value" :class="{ win: row.winner === 'left' }">
-              <svg
-                v-if="row.winner === 'left'"
-                class="crown"
-                viewBox="0 0 24 24"
-                aria-label="这道赢了"
-              >
+              <svg v-if="row.winner === 'left'" class="crown" viewBox="0 0 24 24" aria-label="这道赢了">
                 <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
               </svg>
               {{ row.a.percent }}%
             </span>
-            <span class="sub">
-              {{ row.a.solved }}/{{ left.members }} 人 · 一次就对 {{ row.a.firstPercent }}%
-            </span>
+            <span class="sub"> {{ row.a.solved }}/{{ left.members }} 人 · 一次就对 {{ row.a.firstPercent }}% </span>
           </span>
           <span class="bar-box left">
             <span
@@ -173,16 +145,12 @@ const tab = ref<"weekly" | "dist">("weekly")
             />
           </span>
           <span class="title">
-            <router-link class="ell" :to="`/problem/${row.problem.displayId}`">{{
-              row.problem.title
-            }}</router-link>
+            <router-link class="ell" :to="`/problem/${row.problem.displayId}`">{{ row.problem.title }}</router-link>
             <span class="tags">
               <span class="muted">#{{ row.problem.displayId }}</span>
               <span v-if="row.winner === 'tie'" class="muted">平</span>
               <span v-else-if="row === rows[0] && row.gap > 0" class="most">差得最多</span>
-              <span v-if="row.tie !== null" class="tie" :class="{ close: row.tie <= 2 }">
-                再 {{ row.tie }} 人做对就打平
-              </span>
+              <span v-if="row.tie !== null" class="tie" :class="{ close: row.tie <= 2 }"> 再 {{ row.tie }} 人做对就打平 </span>
             </span>
           </span>
           <span class="bar-box">
@@ -198,18 +166,11 @@ const tab = ref<"weekly" | "dist">("weekly")
           <span class="info">
             <span class="value" :class="{ win: row.winner === 'right' }">
               {{ row.b.percent }}%
-              <svg
-                v-if="row.winner === 'right'"
-                class="crown"
-                viewBox="0 0 24 24"
-                aria-label="这道赢了"
-              >
+              <svg v-if="row.winner === 'right'" class="crown" viewBox="0 0 24 24" aria-label="这道赢了">
                 <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
               </svg>
             </span>
-            <span class="sub">
-              {{ row.b.solved }}/{{ right.members }} 人 · 一次就对 {{ row.b.firstPercent }}%
-            </span>
+            <span class="sub"> {{ row.b.solved }}/{{ right.members }} 人 · 一次就对 {{ row.b.firstPercent }}% </span>
           </span>
         </div>
       </template>
@@ -217,12 +178,8 @@ const tab = ref<"weekly" | "dist">("weekly")
       <template v-else>
         <div v-for="row in shownRows" :key="row.problem.problemId" class="m-row">
           <div class="m-title">
-            <router-link class="ell" :to="`/problem/${row.problem.displayId}`">{{
-              row.problem.title
-            }}</router-link>
-            <span v-if="row.tie !== null" class="tie" :class="{ close: row.tie <= 2 }"
-              >再 {{ row.tie }} 人就平</span
-            >
+            <router-link class="ell" :to="`/problem/${row.problem.displayId}`">{{ row.problem.title }}</router-link>
+            <span v-if="row.tie !== null" class="tie" :class="{ close: row.tie <= 2 }">再 {{ row.tie }} 人就平</span>
             <span v-else-if="row.winner === 'tie'" class="muted">平</span>
           </div>
           <div v-for="(cell, index) in [row.a, row.b]" :key="index" class="m-line">
@@ -233,38 +190,26 @@ const tab = ref<"weekly" | "dist">("weekly")
                 :style="{
                   width: `${cell.percent}%`,
                   background: colors[index],
-                  opacity:
-                    row.winner !== 'tie' && row.winner !== (index === 0 ? 'left' : 'right')
-                      ? 0.45
-                      : 1,
+                  opacity: row.winner !== 'tie' && row.winner !== (index === 0 ? 'left' : 'right') ? 0.45 : 1,
                 }"
               />
             </span>
-            <span class="m-value" :class="{ win: cell.best && row.winner !== 'tie' }"
-              >{{ cell.percent }}%</span
-            >
-            <svg
-              v-if="cell.best && row.winner !== 'tie'"
-              class="crown"
-              viewBox="0 0 24 24"
-              aria-label="这道赢了"
-            >
+            <span class="m-value" :class="{ win: cell.best && row.winner !== 'tie' }">{{ cell.percent }}%</span>
+            <svg v-if="cell.best && row.winner !== 'tie'" class="crown" viewBox="0 0 24 24" aria-label="这道赢了">
               <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
             </svg>
             <span v-else class="crown" />
           </div>
         </div>
         <button v-if="rows.length > SHOW_MOBILE" class="more" @click="expanded = !expanded">
-          {{ expanded ? "收起" : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
+          {{ expanded ? '收起' : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
         </button>
       </template>
     </div>
 
     <div class="bottom" :class="{ compact }">
       <div v-if="compact" class="tabs" role="tablist">
-        <button :class="{ on: tab === 'weekly' }" role="tab" @click="tab = 'weekly'">
-          每周人均
-        </button>
+        <button :class="{ on: tab === 'weekly' }" role="tab" @click="tab = 'weekly'">每周人均</button>
         <button :class="{ on: tab === 'dist' }" role="tab" @click="tab = 'dist'">全班分布</button>
       </div>
       <div v-if="!compact || tab === 'weekly'" class="card pad">
@@ -295,11 +240,8 @@ const tab = ref<"weekly" | "dist">("weekly")
         </div>
         <div v-for="(item, index) in [left, right]" :key="item.className" class="dist-one">
           <span class="dist-name" :style="{ color: colors[index] }">
-            {{ index === mineIndex ? "你们班" : classLabel(item.className) }} · 中间那位
-            {{ item.median }} 道
-            <template v-if="plateaus[index]">
-              · {{ plateaus[index]!.count }} 个人停在 {{ plateaus[index]!.solved }} 道</template
-            >
+            {{ index === mineIndex ? '你们班' : classLabel(item.className) }} · 中间那位 {{ item.median }} 道
+            <template v-if="plateaus[index]"> · {{ plateaus[index]!.count }} 个人停在 {{ plateaus[index]!.solved }} 道</template>
           </span>
           <PkHist :values="item.distribution" :median="item.median" :color="colors[index]" />
         </div>
@@ -317,7 +259,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 
 .score {
   padding: 24px 32px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -350,12 +292,12 @@ const tab = ref<"weekly" | "dist">("weekly")
 .side-name small {
   font-size: 14px;
   font-weight: 600;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .side-sub {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .side-sub b {
@@ -390,24 +332,24 @@ const tab = ref<"weekly" | "dist">("weekly")
   font-style: normal;
   font-size: 28px;
   font-weight: 700;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .mid-sub {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .muted {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   padding: 16px var(--oj-pad-x) 6px;
   min-width: 0;
 }
@@ -422,7 +364,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   flex-wrap: wrap;
   gap: 4px 8px;
   padding-bottom: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .card-title {
@@ -438,7 +380,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   grid-template-columns: 168px minmax(0, 1fr) 210px minmax(0, 1fr) 168px;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .row:last-child {
@@ -461,16 +403,16 @@ const tab = ref<"weekly" | "dist">("weekly")
   font-size: var(--oj-fs-body);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .value.win {
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 
 .sub {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -487,7 +429,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 .bar-box {
   height: 16px;
   display: flex;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   border-radius: 3px;
   overflow: hidden;
 }
@@ -513,7 +455,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   max-width: 100%;
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -549,7 +491,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tie.close {
@@ -571,7 +513,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 .weeks {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .week {
@@ -610,7 +552,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 
 .axis {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
@@ -673,7 +615,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 
 .m-row {
   padding: 8px 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -730,14 +672,14 @@ const tab = ref<"weekly" | "dist">("weekly")
   background: none;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
 .bottom.compact {
   flex-direction: column;
   gap: 0;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   padding: 0 12px 12px;
 }
@@ -750,7 +692,7 @@ const tab = ref<"weekly" | "dist">("weekly")
 .tabs {
   display: flex;
   gap: 18px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .tabs button {
@@ -760,7 +702,7 @@ const tab = ref<"weekly" | "dist">("weekly")
   background: none;
   font: inherit;
   font-size: 14px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 

@@ -33,7 +33,7 @@
  * `Could not resolve`。代码既然真的直接 import 它，就该是直接依赖。
  */
 
-import { isCompiled } from "../runtime"
+import { isCompiled } from '../runtime'
 
 export interface JiebaInstance {
   cut(text: string, hmm?: boolean): string[]
@@ -43,19 +43,18 @@ export interface JiebaInstance {
 /** 内置词典建一个分词器。idf.txt 用不到，不内嵌，省二进制体积 */
 export async function withBuiltinDict(): Promise<JiebaInstance> {
   if (!isCompiled) {
-    const { Jieba } = await import("@node-rs/jieba")
-    const { dict } = await import("@node-rs/jieba/dict")
+    const { Jieba } = await import('@node-rs/jieba')
+    const { dict } = await import('@node-rs/jieba/dict')
     return Jieba.withDict(dict) as unknown as JiebaInstance
   }
 
-  const { readFileSync } = await import("node:fs")
+  const { readFileSync } = await import('node:fs')
   const addonPath = (
-    await import("@node-rs/jieba-linux-x64-gnu/jieba.linux-x64-gnu.node", {
-      with: { type: "file" },
+    await import('@node-rs/jieba-linux-x64-gnu/jieba.linux-x64-gnu.node', {
+      with: { type: 'file' },
     })
   ).default as unknown as string
-  const dictPath = (await import("@node-rs/jieba/dict.txt", { with: { type: "file" } }))
-    .default as unknown as string
+  const dictPath = (await import('@node-rs/jieba/dict.txt', { with: { type: 'file' } })).default as unknown as string
 
   let addon: { Jieba: { withDict(dict: Buffer): JiebaInstance } }
   try {

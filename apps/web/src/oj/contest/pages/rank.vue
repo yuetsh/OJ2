@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { ContestScoreCell, ContestScoreRow } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { useContestStore } from "oj/store/contest"
-import { useTone } from "shared/composables/tone"
-import { useUserStore } from "shared/store/user"
-import { ContestStatus } from "utils/constants"
-import { secondsToDuration } from "utils/functions"
-import { classLabel } from "utils/classes"
-import UserName from "shared/components/UserName.vue"
-import { useVisibleInterval } from "shared/composables/visibleInterval"
+import type { ContestScoreCell, ContestScoreRow } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { useContestStore } from 'oj/store/contest'
+import { useTone } from 'shared/composables/tone'
+import { useUserStore } from 'shared/store/user'
+import { ContestStatus } from 'utils/constants'
+import { secondsToDuration } from 'utils/functions'
+import { classLabel } from 'utils/classes'
+import UserName from 'shared/components/UserName.vue'
+import { useVisibleInterval } from 'shared/composables/visibleInterval'
 
 /**
  * 比赛排名（设计稿「比赛重设计」排行榜两块）。竞争感是用户要的（「我需要竞争」）：
@@ -27,10 +27,7 @@ const running = computed(() => contestStore.contestStatus === ContestStatus.unde
 const ended = computed(() => contestStore.contestStatus === ContestStatus.finished)
 
 const autoRefresh = ref(true)
-const { pause, resume } = useVisibleInterval(
-  () => contestStore.loadScoreboard(props.contestID),
-  10_000,
-)
+const { pause, resume } = useVisibleInterval(() => contestStore.loadScoreboard(props.contestID), 10_000)
 watch(
   () => [contestStore.canEnter, running.value, autoRefresh.value] as const,
   ([enter, run, auto]) => {
@@ -49,7 +46,7 @@ const problems = computed(() => board.value?.problems ?? [])
 const meId = computed(() => userStore.user?.id)
 const me = computed(() => allRows.value.find((row) => row.userId === meId.value))
 
-const classFilter = ref("")
+const classFilter = ref('')
 const classes = computed(() => {
   const count = new Map<string, number>()
   for (const row of allRows.value) {
@@ -57,16 +54,12 @@ const classes = computed(() => {
   }
   return [...count.entries()].sort(([a], [b]) => a.localeCompare(b))
 })
-const rows = computed(() =>
-  classFilter.value
-    ? allRows.value.filter((row) => row.className === classFilter.value)
-    : allRows.value,
-)
+const rows = computed(() => (classFilter.value ? allRows.value.filter((row) => row.className === classFilter.value) : allRows.value))
 
 const updatedAgo = computed(() => {
-  if (!contestStore.scoreboardAt) return ""
+  if (!contestStore.scoreboardAt) return ''
   const seconds = Math.max(0, Math.floor((contestStore.now - contestStore.scoreboardAt) / 1000))
-  return seconds < 5 ? "刚刚" : `${seconds} 秒前`
+  return seconds < 5 ? '刚刚' : `${seconds} 秒前`
 })
 
 const podium = computed(() => (ended.value ? allRows.value.slice(0, 3) : []))
@@ -89,21 +82,16 @@ function openProblem(displayId: string) {
   router.push(`/contest/${props.contestID}/problem/${displayId}`)
 }
 
-const success = computed(() => tone("success"))
-const meBackground = computed(
-  () =>
-    `linear-gradient(${success.value.background}, ${success.value.background}), ${theme.value.cardColor}`,
-)
-const danger = computed(() => tone("error"))
+const success = computed(() => tone('success'))
+const meBackground = computed(() => `linear-gradient(${success.value.background}, ${success.value.background}), ${theme.value.cardColor}`)
+const danger = computed(() => tone('error'))
 // 手机上照桌面的列宽，名字 + 做对 + 用时就占满一屏，每题的格子全在屏幕外，看不出能往右滑。
 // 收窄到第一两道题的格子露出半截
-const narrow = useMediaQuery("(max-width: 640px)")
+const narrow = useMediaQuery('(max-width: 640px)')
 const columns = computed(() => {
-  const move = running.value ? "36px " : ""
+  const move = running.value ? '36px ' : ''
   const count = problems.value.length
-  return narrow.value
-    ? `28px ${move}112px 36px 70px repeat(${count}, 52px)`
-    : `40px ${move}170px 48px 80px repeat(${count}, 64px)`
+  return narrow.value ? `28px ${move}112px 36px 70px repeat(${count}, 52px)` : `40px ${move}170px 48px 80px repeat(${count}, 64px)`
 })
 </script>
 
@@ -115,13 +103,7 @@ const columns = computed(() => {
   <div v-else-if="board" class="rank-page">
     <div v-if="podium.length" class="podium-row">
       <div class="podium">
-        <div
-          v-for="place in [2, 1, 3]"
-          v-show="podium[place - 1]"
-          :key="place"
-          class="step"
-          :class="`p${place}`"
-        >
+        <div v-for="place in [2, 1, 3]" v-show="podium[place - 1]" :key="place" class="step" :class="`p${place}`">
           <svg
             :width="place === 1 ? 26 : 22"
             :height="place === 1 ? 26 : 22"
@@ -143,11 +125,7 @@ const columns = computed(() => {
             <UserName class="podium-name" :username="podium[place - 1]!.username" />
             <span class="muted small podium-meta">
               <span>{{ classLabel(podium[place - 1]!.className) }}</span
-              ><span class="sep"> · </span
-              ><span
-                >{{ podium[place - 1]!.solved }} 道 ·
-                {{ secondsToDuration(podium[place - 1]!.totalTime) }}</span
-              >
+              ><span class="sep"> · </span><span>{{ podium[place - 1]!.solved }} 道 · {{ secondsToDuration(podium[place - 1]!.totalTime) }}</span>
             </span>
           </template>
           <div class="block">{{ place }}</div>
@@ -157,30 +135,19 @@ const columns = computed(() => {
       <div v-if="me" class="mine">
         <span class="muted small">你的成绩</span>
         <div class="mine-line">
-          <span class="mine-big">第 {{ me.rank }} 名</span
-          ><span class="muted">/ {{ allRows.length }} 人</span>
+          <span class="mine-big">第 {{ me.rank }} 名</span><span class="muted">/ {{ allRows.length }} 人</span>
         </div>
         <span class="small sec">
           做对 {{ me.solved }} 道 · 用时 {{ secondsToDuration(me.totalTime) }}
-          <template v-if="classPlace && classes.length > 1">
-            · {{ classLabel(me.className) }}里第 {{ classPlace }}</template
-          >
+          <template v-if="classPlace && classes.length > 1"> · {{ classLabel(me.className) }}里第 {{ classPlace }}</template>
         </span>
       </div>
     </div>
 
     <div class="tools">
       <template v-if="classes.length > 1">
-        <button class="chip" :class="{ on: !classFilter }" @click="classFilter = ''">
-          全部 {{ allRows.length }}
-        </button>
-        <button
-          v-for="[name, n] in classes"
-          :key="name"
-          class="chip"
-          :class="{ on: classFilter === name }"
-          @click="classFilter = name"
-        >
+        <button class="chip" :class="{ on: !classFilter }" @click="classFilter = ''">全部 {{ allRows.length }}</button>
+        <button v-for="[name, n] in classes" :key="name" class="chip" :class="{ on: classFilter === name }" @click="classFilter = name">
           {{ classLabel(name) }} {{ n }}
         </button>
       </template>
@@ -200,24 +167,12 @@ const columns = computed(() => {
         <span class="pad">学生</span>
         <span class="num">做对</span>
         <span class="num">用时</span>
-        <button
-          v-for="p in problems"
-          :key="p.id"
-          class="ph"
-          :title="p.title"
-          @click="openProblem(p._id)"
-        >
+        <button v-for="p in problems" :key="p.id" class="ph" :title="p.title" @click="openProblem(p._id)">
           <b>{{ p._id }}</b>
           <span>{{ p.solvedUsers }} 人</span>
         </button>
       </div>
-      <div
-        v-for="row in rows"
-        :key="row.userId"
-        class="tr"
-        :class="{ me: row.userId === meId }"
-        :style="{ gridTemplateColumns: columns }"
-      >
+      <div v-for="row in rows" :key="row.userId" class="tr" :class="{ me: row.userId === meId }" :style="{ gridTemplateColumns: columns }">
         <span class="num rank">{{ row.rank }}</span>
         <span v-if="running" class="move">
           <span v-if="move(row) > 0" class="up">↑{{ move(row) }}</span>
@@ -234,12 +189,9 @@ const columns = computed(() => {
               :class="{ first: cellOf(row, p.id)!.firstAc }"
               :title="cellOf(row, p.id)!.firstAc ? '这题最先做对' : undefined"
             >
-              {{ Math.floor(cellOf(row, p.id)!.acTime / 60)
-              }}<small v-if="cellOf(row, p.id)!.errors">-{{ cellOf(row, p.id)!.errors }}</small>
+              {{ Math.floor(cellOf(row, p.id)!.acTime / 60) }}<small v-if="cellOf(row, p.id)!.errors">-{{ cellOf(row, p.id)!.errors }}</small>
             </span>
-            <span v-else class="cell no">{{
-              cellOf(row, p.id)!.errors ? `-${cellOf(row, p.id)!.errors}` : "交过"
-            }}</span>
+            <span v-else class="cell no">{{ cellOf(row, p.id)!.errors ? `-${cellOf(row, p.id)!.errors}` : '交过' }}</span>
           </template>
         </span>
       </div>
@@ -264,11 +216,11 @@ const columns = computed(() => {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .sec {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .small {
@@ -285,7 +237,7 @@ const columns = computed(() => {
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 24px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .podium {
@@ -360,7 +312,7 @@ const columns = computed(() => {
   flex-direction: column;
   gap: 8px;
   border-radius: var(--oj-radius);
-  background: v-bind("success.background");
+  background: v-bind('success.background');
 }
 
 .mine-line {
@@ -373,7 +325,7 @@ const columns = computed(() => {
   font-size: 30px;
   font-weight: 800;
   line-height: 1;
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .tools {
@@ -384,26 +336,26 @@ const columns = computed(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .chip {
   height: 32px;
   padding: 0 14px;
   border-radius: 16px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
   white-space: nowrap;
 }
 
 .chip.on {
   border-color: transparent;
-  background: v-bind("success.background");
-  color: v-bind("success.color");
+  background: v-bind('success.background');
+  color: v-bind('success.color');
   font-weight: 600;
 }
 
@@ -420,8 +372,8 @@ const columns = computed(() => {
   height: 42px;
   padding: 0 var(--oj-pad-x);
   font-size: var(--oj-fs-body);
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.cardColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.cardColor');
 }
 
 .th {
@@ -430,8 +382,8 @@ const columns = computed(() => {
   z-index: 2;
   height: 48px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
 }
 
 .tr.me {
@@ -440,8 +392,8 @@ const columns = computed(() => {
   top: 48px;
   z-index: 1;
   /* 浅绿是半透明的，钉住时底下的行会透上来，垫一层卡片底色 */
-  background: v-bind("meBackground");
-  box-shadow: inset 3px 0 0 v-bind("theme.successColor");
+  background: v-bind('meBackground');
+  box-shadow: inset 3px 0 0 v-bind('theme.successColor');
 }
 
 .num {
@@ -464,7 +416,7 @@ const columns = computed(() => {
 
 .time {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   padding-right: 8px;
 }
 
@@ -473,11 +425,11 @@ const columns = computed(() => {
 }
 
 .up {
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .down {
-  color: v-bind("danger.color");
+  color: v-bind('danger.color');
 }
 
 .ph {
@@ -489,13 +441,13 @@ const columns = computed(() => {
   flex-direction: column;
   align-items: center;
   line-height: 16px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   cursor: pointer;
 }
 
 .ph b {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .ph:hover b {
@@ -529,18 +481,18 @@ const columns = computed(() => {
 
 .cell.ac {
   font-weight: 600;
-  background: v-bind("success.background");
-  color: v-bind("success.color");
+  background: v-bind('success.background');
+  color: v-bind('success.color');
 }
 
 .cell.ac.first {
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
   color: #ffffff;
 }
 
 .cell.no {
-  background: v-bind("danger.background");
-  color: v-bind("danger.color");
+  background: v-bind('danger.background');
+  color: v-bind('danger.color');
 }
 
 .empty {

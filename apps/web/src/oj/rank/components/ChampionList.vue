@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { RankRow, WeeklyChampion } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import UserName from "shared/components/UserName.vue"
-import { parseTime } from "utils/functions"
-import RankAvatar from "shared/components/RankAvatar.vue"
+import type { RankRow, WeeklyChampion } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import UserName from 'shared/components/UserName.vue'
+import { parseTime } from 'utils/functions'
+import RankAvatar from 'shared/components/RankAvatar.vue'
 
 /** 本班最近几周的每周冠军，底下再挂这张榜上「进步最大」的那个人 */
 defineProps<{
@@ -18,7 +18,7 @@ defineEmits<{ open: [username: string] }>()
 const theme = useThemeVars()
 
 function weekLabel(start: string) {
-  return `${parseTime(start, "M月D日")}那周`
+  return `${parseTime(start, 'M月D日')}那周`
 }
 </script>
 
@@ -26,24 +26,10 @@ function weekLabel(start: string) {
   <div class="champions">
     <div v-for="champion in champions" :key="champion.weekStart" class="row">
       <span class="muted week">{{ weekLabel(champion.weekStart) }}</span>
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="#f2c94c"
-        stroke="#9a6700"
-        stroke-width="1.6"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#f2c94c" stroke="#9a6700" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z" />
       </svg>
-      <RankAvatar
-        :username="champion.user.username"
-        :avatar="champion.avatar"
-        :size="20"
-        :me="champion.user.id === meId"
-      />
+      <RankAvatar :username="champion.user.username" :avatar="champion.avatar" :size="20" :me="champion.user.id === meId" />
       <button class="who" @click="$emit('open', champion.user.username)">
         <UserName :username="champion.user.username" />
       </button>
@@ -52,12 +38,7 @@ function weekLabel(start: string) {
     <span v-if="!champions.length" class="muted">最近几周还没有冠军</span>
     <div v-if="hot" class="row hot-line">
       <span class="hot-tag">进步最大</span>
-      <RankAvatar
-        :username="hot.user.username"
-        :avatar="hot.avatar"
-        :size="20"
-        :me="hot.user.id === meId"
-      />
+      <RankAvatar :username="hot.user.username" :avatar="hot.avatar" :size="20" :me="hot.user.id === meId" />
       <button class="who" @click="$emit('open', hot.user.username)">
         <UserName :username="hot.user.username" />
       </button>
@@ -82,7 +63,7 @@ function weekLabel(start: string) {
 
 .muted {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .week {
@@ -109,7 +90,7 @@ function weekLabel(start: string) {
   margin-top: 4px;
   padding-top: 8px;
   height: auto;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .hot-tag {

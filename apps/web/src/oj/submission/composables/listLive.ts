@@ -1,21 +1,14 @@
-import { computed, ref, type Ref } from "vue"
-import { useDocumentVisibility, useIntervalFn } from "@vueuse/core"
-import { SubmissionStatus } from "utils/constants"
-import {
-  FlowchartSubmissionStatus,
-  type FlowchartSubmissionListItem,
-  type SubmissionListItem,
-} from "utils/types"
-import type { Row, SubmissionQuery } from "./listQuery"
+import { computed, ref, type Ref } from 'vue'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
+import { SubmissionStatus } from 'utils/constants'
+import { FlowchartSubmissionStatus, type FlowchartSubmissionListItem, type SubmissionListItem } from 'utils/types'
+import type { Row, SubmissionQuery } from './listQuery'
 
 function isPending(row: Row) {
-  if ("result" in row) {
+  if ('result' in row) {
     return row.result === SubmissionStatus.pending || row.result === SubmissionStatus.judging
   }
-  return (
-    row.status === FlowchartSubmissionStatus.PENDING ||
-    row.status === FlowchartSubmissionStatus.PROCESSING
-  )
+  return row.status === FlowchartSubmissionStatus.PENDING || row.status === FlowchartSubmissionStatus.PROCESSING
 }
 
 /**
@@ -47,7 +40,7 @@ export function useListLive(options: {
   const hasPending = computed(() => rows.value.some(isPending))
 
   useIntervalFn(async () => {
-    if (visibility.value !== "visible" || options.loading.value || !options.loaded.value) return
+    if (visibility.value !== 'visible' || options.loading.value || !options.loaded.value) return
     const interval = hasPending.value ? 3000 : 15000
     if (Date.now() - lastPoll < interval) return
     if (!hasPending.value && query.page !== 1) return
@@ -64,20 +57,14 @@ export function useListLive(options: {
     if (seq !== options.requestSeq() || mode !== flowMode.value) return
     const fresh = new Map<string, Row>(res.results.map((row) => [row.id, row]))
     if (mode) {
-      flowcharts.value = flowcharts.value.map(
-        (row) => (fresh.get(row.id) as FlowchartSubmissionListItem | undefined) ?? row,
-      )
+      flowcharts.value = flowcharts.value.map((row) => (fresh.get(row.id) as FlowchartSubmissionListItem | undefined) ?? row)
     } else {
-      submissions.value = submissions.value.map(
-        (row) => (fresh.get(row.id) as SubmissionListItem | undefined) ?? row,
-      )
+      submissions.value = submissions.value.map((row) => (fresh.get(row.id) as SubmissionListItem | undefined) ?? row)
     }
     if (query.page === 1) {
       const current = new Set(rows.value.map((row) => row.id))
-      const newest = rows.value[0]?.createTime ?? ""
-      newCount.value = res.results.filter(
-        (row) => !current.has(row.id) && row.createTime > newest,
-      ).length
+      const newest = rows.value[0]?.createTime ?? ''
+      newCount.value = res.results.filter((row) => !current.has(row.id) && row.createTime > newest).length
     }
   }, 1000)
 

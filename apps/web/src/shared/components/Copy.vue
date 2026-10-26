@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { copyToClipboard } from "utils/functions"
+import { Icon } from '@iconify/vue'
+import { copyToClipboard } from 'utils/functions'
 
 defineProps<{ value: string }>()
 const [copied, toggle] = useToggle()
 const { start } = useTimeoutFn(() => toggle(false), 1000, { immediate: false })
 
-const COPY = h(Icon, { icon: "fluent-emoji:clipboard" })
-const OK = h(Icon, { icon: "fluent-emoji:check-mark-button" })
+const COPY = h(Icon, { icon: 'fluent-emoji:clipboard' })
+const OK = h(Icon, { icon: 'fluent-emoji:check-mark-button' })
 
 async function handleClick(value: string) {
   const success = await copyToClipboard(value)
@@ -24,7 +24,7 @@ async function handleClick(value: string) {
         <component :is="copied ? OK : COPY"></component>
       </n-icon>
     </template>
-    {{ copied ? "已复制" : "复制" }}
+    {{ copied ? '已复制' : '复制' }}
   </n-tooltip>
 </template>
 <style scoped>

@@ -11,17 +11,17 @@ import {
   type AdminProblemSetBadge,
   type AdminProblemSetList,
   type AdminProblemSetProblem,
-} from "@oj2/contract"
-import { and, asc, count, desc, eq, ilike, inArray, isNull, max, or, sql } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, count, desc, eq, ilike, inArray, isNull, max, or, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireTeacher, type AppEnv } from "../../auth/middleware"
-import type { AuthUser } from "../../auth/session"
-import { db, schema } from "../../db"
-import { failure, parseBody, success } from "../../http"
-import { recalculateBadge, resyncProgress } from "../../services/problemset"
-import { queryInteger, sampleUser } from "../helpers"
-import { ownsOrSuper } from "../../services/permissions"
+import { requireTeacher, type AppEnv } from '../../auth/middleware'
+import type { AuthUser } from '../../auth/session'
+import { db, schema } from '../../db'
+import { failure, parseBody, success } from '../../http'
+import { recalculateBadge, resyncProgress } from '../../services/problemset'
+import { queryInteger, sampleUser } from '../helpers'
+import { ownsOrSuper } from '../../services/permissions'
 
 export const adminProblemSetRoutes = new Hono<AppEnv>()
 
@@ -32,12 +32,8 @@ type BadgeRow = typeof schema.problemsetBadge.$inferSelect
  * 旧后端每个方法开头都手抄一遍这段 try/except，抄了 14 遍。
  */
 async function loadOwned(c: { req: { param(name: string): string } }, user: AuthUser) {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const [row] = await db
-    .select()
-    .from(schema.problemset)
-    .where(eq(schema.problemset.id, id))
-    .limit(1)
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const [row] = await db.select().from(schema.problemset).where(eq(schema.problemset.id, id)).limit(1)
   return row && ownsOrSuper(user, row) ? row : null
 }
 
@@ -98,12 +94,9 @@ async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
       description: row.description,
       assignedUntil: row.assignedUntil,
       assignedAt: row.assignedAt,
-      assigning:
-        row.assignedAt !== null &&
-        row.assignedUntil !== null &&
-        Date.parse(row.assignedUntil) > now,
+      assigning: row.assignedAt !== null && row.assignedUntil !== null && Date.parse(row.assignedUntil) > now,
       visible: row.visible,
-      createdBy: sampleUser(creator ?? { id: row.createdById, username: "" }, creator?.realName),
+      createdBy: sampleUser(creator ?? { id: row.createdById, username: '' }, creator?.realName),
       createTime: row.createTime,
       lastUpdateTime: row.lastUpdateTime,
       problemsCount: problemsBySet.get(row.id) ?? 0,
@@ -120,17 +113,11 @@ async function serializeMany(rows: (typeof schema.problemset.$inferSelect)[]) {
  *   - 现在正在布置 → 只改结束，开始不动（延长、缩短都不该把「以前的代码」的分界挪到现在）；
  *   - 没在布置（从没布置过，或者上一轮已经过期）→ 开始记成现在，这就是「再布置一次」。
  */
-function assignment(
-  requested: string | null,
-  current: { assignedAt: string | null; assignedUntil: string | null } | null,
-) {
+function assignment(requested: string | null, current: { assignedAt: string | null; assignedUntil: string | null } | null) {
   if (requested === null) return { assignedAt: null, assignedUntil: null }
   const until = Date.parse(requested)
-  if (!Number.isFinite(until) || until <= Date.now()) return "past" as const
-  const running =
-    current?.assignedAt != null &&
-    current.assignedUntil != null &&
-    Date.parse(current.assignedUntil) > Date.now()
+  if (!Number.isFinite(until) || until <= Date.now()) return 'past' as const
+  const running = current?.assignedAt != null && current.assignedUntil != null && Date.parse(current.assignedUntil) > Date.now()
   return {
     assignedAt: running ? current.assignedAt : new Date().toISOString(),
     assignedUntil: new Date(until).toISOString(),
@@ -139,35 +126,24 @@ function assignment(
 
 // ---------------------------------------------------------------- 题单本体
 
-adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const user = c.get("user")!
+adminProblemSetRoutes.get('/problem-sets', requireTeacher, async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
+  const user = c.get('user')!
   const filters = []
   // 注意：这里**不过滤 visible**。旧后端的列表写死了 visible=True，可它同时又提供
   // 「切换可见性」的接口 —— 一旦把题单设成不可见，它就从后台列表里消失，
   // 再也没法在界面上改回来。后台必须能看见自己管的全部题单。
-  if (user.adminType !== "Super Admin") filters.push(eq(schema.problemset.createdById, user.id))
-  const keyword = c.req.query("keyword")?.trim()
+  if (user.adminType !== 'Super Admin') filters.push(eq(schema.problemset.createdById, user.id))
+  const keyword = c.req.query('keyword')?.trim()
   if (keyword) {
-    filters.push(
-      or(
-        ilike(schema.problemset.title, `%${keyword}%`),
-        ilike(schema.problemset.description, `%${keyword}%`),
-      )!,
-    )
+    filters.push(or(ilike(schema.problemset.title, `%${keyword}%`), ilike(schema.problemset.description, `%${keyword}%`))!)
   }
   const where = filters.length ? and(...filters) : undefined
 
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.problemset).where(where),
-    db
-      .select()
-      .from(schema.problemset)
-      .where(where)
-      .orderBy(desc(schema.problemset.createTime))
-      .limit(limit)
-      .offset(offset),
+    db.select().from(schema.problemset).where(where).orderBy(desc(schema.problemset.createTime)).limit(limit).offset(offset),
   ])
   return success(c, {
     results: await serializeMany(rows),
@@ -175,11 +151,11 @@ adminProblemSetRoutes.get("/problem-sets", requireTeacher, async (c) => {
   } satisfies AdminProblemSetList)
 })
 
-adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
+adminProblemSetRoutes.post('/problem-sets', requireTeacher, async (c) => {
   const parsed = await parseBody(c, createProblemSetRequestSchema)
   if (!parsed.success) return parsed.response
   const period = assignment(parsed.data.assignedUntil, null)
-  if (period === "past") return failure(c, 400, "assign-in-past", "布置到的日期已经过了")
+  if (period === 'past') return failure(c, 400, 'assign-in-past', '布置到的日期已经过了')
   const now = new Date().toISOString()
   const [created] = await db
     .insert(schema.problemset)
@@ -188,7 +164,7 @@ adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
       description: parsed.data.description,
       visible: parsed.data.visible,
       ...period,
-      createdById: c.get("user")!.id,
+      createdById: c.get('user')!.id,
       createTime: now,
       lastUpdateTime: now,
     })
@@ -196,19 +172,19 @@ adminProblemSetRoutes.post("/problem-sets", requireTeacher, async (c) => {
   return success(c, await serialize(created!), 201)
 })
 
-adminProblemSetRoutes.get("/problem-sets/:id", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.get('/problem-sets/:id', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   return success(c, await serialize(row))
 })
 
-adminProblemSetRoutes.put("/problem-sets/:id", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.put('/problem-sets/:id', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const parsed = await parseBody(c, updateProblemSetRequestSchema)
   if (!parsed.success) return parsed.response
   const period = assignment(parsed.data.assignedUntil, row)
-  if (period === "past") return failure(c, 400, "assign-in-past", "布置到的日期已经过了")
+  if (period === 'past') return failure(c, 400, 'assign-in-past', '布置到的日期已经过了')
   const [updated] = await db
     .update(schema.problemset)
     .set({
@@ -223,9 +199,9 @@ adminProblemSetRoutes.put("/problem-sets/:id", requireTeacher, async (c) => {
   return success(c, await serialize(updated!))
 })
 
-adminProblemSetRoutes.put("/problem-sets/:id/visibility", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.put('/problem-sets/:id/visibility', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   // 旧接口是「取反」语义，前端只传 id 不传目标值。保持不变：前端按钮就是个开关
   const [updated] = await db
     .update(schema.problemset)
@@ -235,9 +211,9 @@ adminProblemSetRoutes.put("/problem-sets/:id/visibility", requireTeacher, async 
   return success(c, await serialize(updated!))
 })
 
-adminProblemSetRoutes.delete("/problem-sets/:id", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.delete('/problem-sets/:id', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   // 子表交给库级 CASCADE（0010）：problemset_{badge,problem,progress,submission} 直接连坐，
   // user_badge 经 problemset_badge 二级连坐。原先这里手抄五条 delete 并要求「顺序不能反」。
   await db.delete(schema.problemset).where(eq(schema.problemset.id, row.id))
@@ -246,9 +222,9 @@ adminProblemSetRoutes.delete("/problem-sets/:id", requireTeacher, async (c) => {
 
 // ---------------------------------------------------------------- 题单里的题目
 
-adminProblemSetRoutes.get("/problem-sets/:id/problems", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.get('/problem-sets/:id/problems', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const rows = await db
     .select({ item: schema.problemsetProblem, problem: schema.problem })
     .from(schema.problemsetProblem)
@@ -277,9 +253,9 @@ adminProblemSetRoutes.get("/problem-sets/:id/problems", requireTeacher, async (c
  * 加题：一次可以给好几个题号（后台搜索框里粘一串「3065 3066 3067」），按给的顺序接在最后。
  * 找不到的、本来就在里面的不报错，分开报回去，前端告诉老师哪几个没加上。
  */
-adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.post('/problem-sets/:id/problems', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const parsed = await parseBody(c, addProblemsToSetRequestSchema)
   if (!parsed.success) return parsed.response
   const wanted = [...new Set(parsed.data.problemIds.map((id) => id.toLowerCase()))]
@@ -287,17 +263,8 @@ adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (
     db
       .select({ id: schema.problem.id, displayId: schema.problem.displayId })
       .from(schema.problem)
-      .where(
-        and(
-          inArray(sql<string>`lower(${schema.problem.displayId})`, wanted),
-          eq(schema.problem.visible, true),
-          isNull(schema.problem.contestId),
-        ),
-      ),
-    db
-      .select({ problemId: schema.problemsetProblem.problemId })
-      .from(schema.problemsetProblem)
-      .where(eq(schema.problemsetProblem.problemsetId, row.id)),
+      .where(and(inArray(sql<string>`lower(${schema.problem.displayId})`, wanted), eq(schema.problem.visible, true), isNull(schema.problem.contestId))),
+    db.select({ problemId: schema.problemsetProblem.problemId }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, row.id)),
     db
       .select({ value: max(schema.problemsetProblem.order) })
       .from(schema.problemsetProblem)
@@ -329,19 +296,16 @@ adminProblemSetRoutes.post("/problem-sets/:id/problems", requireTeacher, async (
 })
 
 // 必须注册在 /problems/:itemId 前面：Hono 按注册顺序匹配，order 会被当成 :itemId 吃掉
-adminProblemSetRoutes.put("/problem-sets/:id/problems/order", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.put('/problem-sets/:id/problems/order', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const parsed = await parseBody(c, reorderProblemSetProblemsRequestSchema)
   if (!parsed.success) return parsed.response
-  const links = await db
-    .select({ id: schema.problemsetProblem.id })
-    .from(schema.problemsetProblem)
-    .where(eq(schema.problemsetProblem.problemsetId, row.id))
+  const links = await db.select({ id: schema.problemsetProblem.id }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, row.id))
   const have = new Set(links.map((link) => link.id))
   const given = new Set(parsed.data.ids)
   if (given.size !== have.size || [...given].some((id) => !have.has(id))) {
-    return failure(c, 409, "problems-changed", "题目列表变了，刷新一下再排")
+    return failure(c, 409, 'problems-changed', '题目列表变了，刷新一下再排')
   }
   await db.transaction(async (tx) => {
     for (const [index, id] of parsed.data.ids.entries()) {
@@ -354,40 +318,30 @@ adminProblemSetRoutes.put("/problem-sets/:id/problems/order", requireTeacher, as
   return success(c, null)
 })
 
-adminProblemSetRoutes.put("/problem-sets/:id/problems/:itemId", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const parsed = await parseBody(c, updateProblemInSetRequestSchema, "参数错误")
+adminProblemSetRoutes.put('/problem-sets/:id/problems/:itemId', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  const parsed = await parseBody(c, updateProblemInSetRequestSchema, '参数错误')
   if (!parsed.success) return parsed.response
   const updated = await db
     .update(schema.problemsetProblem)
     .set(parsed.data)
-    .where(
-      and(
-        eq(schema.problemsetProblem.id, queryInteger(c.req.param("itemId"), 0, { min: 1 })),
-        eq(schema.problemsetProblem.problemsetId, row.id),
-      ),
-    )
+    .where(and(eq(schema.problemsetProblem.id, queryInteger(c.req.param('itemId'), 0, { min: 1 })), eq(schema.problemsetProblem.problemsetId, row.id)))
     .returning({ id: schema.problemsetProblem.id })
-  if (updated.length === 0) return failure(c, 404, "problem-not-in-set", "题目不在该题单中")
+  if (updated.length === 0) return failure(c, 404, 'problem-not-in-set', '题目不在该题单中')
   // 必做 / 选做变了，分母和「做完」跟着变
   await resyncProgress(row.id)
   return success(c, null)
 })
 
-adminProblemSetRoutes.delete("/problem-sets/:id/problems/:itemId", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.delete('/problem-sets/:id/problems/:itemId', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const deleted = await db
     .delete(schema.problemsetProblem)
-    .where(
-      and(
-        eq(schema.problemsetProblem.id, queryInteger(c.req.param("itemId"), 0, { min: 1 })),
-        eq(schema.problemsetProblem.problemsetId, row.id),
-      ),
-    )
+    .where(and(eq(schema.problemsetProblem.id, queryInteger(c.req.param('itemId'), 0, { min: 1 })), eq(schema.problemsetProblem.problemsetId, row.id)))
     .returning({ id: schema.problemsetProblem.id })
-  if (deleted.length === 0) return failure(c, 404, "problem-not-in-set", "题目不在该题单中")
+  if (deleted.length === 0) return failure(c, 404, 'problem-not-in-set', '题目不在该题单中')
   await resyncProgress(row.id)
   return success(c, null)
 })
@@ -427,20 +381,16 @@ async function badgesWithCount(badges: BadgeRow[]) {
   )
 }
 
-adminProblemSetRoutes.get("/problem-sets/:id/badges", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const badges = await db
-    .select()
-    .from(schema.problemsetBadge)
-    .where(eq(schema.problemsetBadge.problemsetId, row.id))
-    .orderBy(asc(schema.problemsetBadge.id))
+adminProblemSetRoutes.get('/problem-sets/:id/badges', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  const badges = await db.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, row.id)).orderBy(asc(schema.problemsetBadge.id))
   return success(c, await badgesWithCount(badges))
 })
 
-adminProblemSetRoutes.post("/problem-sets/:id/badges", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.post('/problem-sets/:id/badges', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const parsed = await parseBody(c, createProblemSetBadgeRequestSchema)
   if (!parsed.success) return parsed.response
   const [created] = await db
@@ -455,30 +405,25 @@ adminProblemSetRoutes.post("/problem-sets/:id/badges", requireTeacher, async (c)
   return success(c, await badgeWithCount(created!), 201)
 })
 
-adminProblemSetRoutes.put("/problem-sets/:id/badges/:badgeId", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
+adminProblemSetRoutes.put('/problem-sets/:id/badges/:badgeId', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
   const parsed = await parseBody(c, updateProblemSetBadgeRequestSchema)
   if (!parsed.success) return parsed.response
   const [updated] = await db
     .update(schema.problemsetBadge)
     .set(parsed.data)
-    .where(
-      and(
-        eq(schema.problemsetBadge.id, queryInteger(c.req.param("badgeId"), 0, { min: 1 })),
-        eq(schema.problemsetBadge.problemsetId, row.id),
-      ),
-    )
+    .where(and(eq(schema.problemsetBadge.id, queryInteger(c.req.param('badgeId'), 0, { min: 1 })), eq(schema.problemsetBadge.problemsetId, row.id)))
     .returning()
-  if (!updated) return failure(c, 404, "badge-not-found", "奖章不存在")
+  if (!updated) return failure(c, 404, 'badge-not-found', '奖章不存在')
   await recalculateBadge(updated)
   return success(c, await badgeWithCount(updated))
 })
 
-adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher, async (c) => {
-  const row = await loadOwned(c, c.get("user")!)
-  if (!row) return failure(c, 404, "problem-set-not-found", "题单不存在")
-  const badgeId = queryInteger(c.req.param("badgeId"), 0, { min: 1 })
+adminProblemSetRoutes.delete('/problem-sets/:id/badges/:badgeId', requireTeacher, async (c) => {
+  const row = await loadOwned(c, c.get('user')!)
+  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  const badgeId = queryInteger(c.req.param('badgeId'), 0, { min: 1 })
   // 必须先确认这枚奖章确实属于本题单，再动 user_badge。
   // 早先的写法把 userBadge 的清理放在归属校验之前、且只按 badgeId 不限定题单，
   // 于是「自己的题单 id + 别人的奖章 id」会真删掉别人的获奖记录，
@@ -486,11 +431,9 @@ adminProblemSetRoutes.delete("/problem-sets/:id/badges/:badgeId", requireTeacher
   const [badge] = await db
     .select({ id: schema.problemsetBadge.id })
     .from(schema.problemsetBadge)
-    .where(
-      and(eq(schema.problemsetBadge.id, badgeId), eq(schema.problemsetBadge.problemsetId, row.id)),
-    )
+    .where(and(eq(schema.problemsetBadge.id, badgeId), eq(schema.problemsetBadge.problemsetId, row.id)))
     .limit(1)
-  if (!badge) return failure(c, 404, "badge-not-found", "奖章不存在")
+  if (!badge) return failure(c, 404, 'badge-not-found', '奖章不存在')
   // 获奖记录随奖章一起没：user_badge.badge_id 是 CASCADE（0010）
   await db.delete(schema.problemsetBadge).where(eq(schema.problemsetBadge.id, badge.id))
   return success(c, null)

@@ -7,5 +7,5 @@ export function rate(part: number, whole: number) {
 
 /** 做对的人平均交了几次（只数做对那次及之前的） */
 export function avgTries(row: { solved: number; solvedTries: number }) {
-  return row.solved ? (row.solvedTries / row.solved).toFixed(1) : "-"
+  return row.solved ? (row.solvedTries / row.solved).toFixed(1) : '-'
 }

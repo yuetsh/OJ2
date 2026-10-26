@@ -1,18 +1,18 @@
 <script lang="ts" setup>
-import { useThemeVars } from "naive-ui"
-import { getRankOfProblem, getSubmission, getSubmissions } from "oj/api"
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import LockNote from "oj/problemset/components/LockNote.vue"
-import Pagination from "shared/components/Pagination.vue"
-import { useCollabStore } from "shared/store/collab"
-import { useUserStore } from "shared/store/user"
-import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from "utils/constants"
-import { copyToClipboard, parseTime } from "utils/functions"
-import type { ProblemRank } from "@oj2/contract"
-import type { LANGUAGE, SubmissionListItem } from "utils/types"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import { useTeacherCollab } from "../composables/teacherCollab"
+import { useThemeVars } from 'naive-ui'
+import { getRankOfProblem, getSubmission, getSubmissions } from 'oj/api'
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
+import LockNote from 'oj/problemset/components/LockNote.vue'
+import Pagination from 'shared/components/Pagination.vue'
+import { useCollabStore } from 'shared/store/collab'
+import { useUserStore } from 'shared/store/user'
+import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from 'utils/constants'
+import { copyToClipboard, parseTime } from 'utils/functions'
+import type { ProblemRank } from '@oj2/contract'
+import type { LANGUAGE, SubmissionListItem } from 'utils/types'
+import { useProblemPageContext } from '../composables/problemPageContext'
+import { useTeacherCollab } from '../composables/teacherCollab'
 
 /**
  * 「我的提交」抽屉：这道题自己交过的每一次。
@@ -32,7 +32,7 @@ const router = useRouter()
 const message = useMessage()
 const theme = useThemeVars()
 
-const problemDisplayId = computed(() => String(route.params.problemID ?? ""))
+const problemDisplayId = computed(() => String(route.params.problemID ?? ''))
 
 /**
  * 协作中的教师：编辑器里是学生的代码，「放回编辑器」会经 Yjs 直接盖掉学生正在写的
@@ -51,15 +51,14 @@ const rankLine = computed(() => {
   const r = rank.value
   if (!r) return null
   const inClass = !!r.className
-  const scope = inClass ? "班上" : "全站"
+  const scope = inClass ? '班上' : '全站'
   const count = inClass ? r.classAcCount : r.allAcCount
   if (r.rank !== -1)
     return {
       text: `你是${scope}第 ${r.rank} 个做对的，${scope}一共 ${count} 人做对了`,
       solved: true,
     }
-  if (count > 0)
-    return { text: `${inClass ? "你们班" : "全站"}已经有 ${count} 人做对了`, solved: false }
+  if (count > 0) return { text: `${inClass ? '你们班' : '全站'}已经有 ${count} 人做对了`, solved: false }
   return null
 })
 
@@ -68,17 +67,17 @@ function goAccepted() {
   const r = rank.value
   if (!r) return
   const target = {
-    name: "submissions",
+    name: 'submissions',
     query: {
       problem: problemDisplayId.value,
-      result: "0",
+      result: '0',
       page: 1,
       limit: 10,
-      ...(r.className ? { username: "ks" + r.className } : {}),
+      ...(r.className ? { username: 'ks' + r.className } : {}),
     },
   }
   // 协作中跳走这一页协作就断了
-  if (teacherCollab.value) window.open(router.resolve(target).href, "_blank")
+  if (teacherCollab.value) window.open(router.resolve(target).href, '_blank')
   else router.push(target)
 }
 
@@ -90,17 +89,15 @@ const listed = ref(false)
 const query = reactive({ limit: 10, page: 1 })
 
 const blocked = computed(() => {
-  if (!userStore.isAuthed) return "登录之后才能看到自己的提交"
-  if (!userStore.showSubmissions) return "提交列表已被管理员关闭"
-  return ""
+  if (!userStore.isAuthed) return '登录之后才能看到自己的提交'
+  if (!userStore.showSubmissions) return '提交列表已被管理员关闭'
+  return ''
 })
 
 async function listSubmissions() {
   const res = await getSubmissions({
     ...query,
-    ...(peer.value
-      ? { username: peer.value, exactUsername: "1" as const }
-      : { myself: "1" as const }),
+    ...(peer.value ? { username: peer.value, exactUsername: '1' as const } : { myself: '1' as const }),
     offset: query.limit * (query.page - 1),
     problemDisplayId: problemDisplayId.value,
     contestId: ctx.value.contestId,
@@ -123,8 +120,8 @@ const statusDistribution = computed(() => {
     .sort((a, b) => a[0] - b[0])
     .map(([result, count]) => ({
       result,
-      name: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.name ?? "未知",
-      type: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.type ?? "info",
+      name: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.name ?? '未知',
+      type: JUDGE_STATUS[result as keyof typeof JUDGE_STATUS]?.type ?? 'info',
       count,
     }))
 })
@@ -137,7 +134,7 @@ function attemptNo(index: number) {
 // ==================== 行内展开 ====================
 const expanded = ref<string | null>(null)
 type Loaded = { code: string; language: LANGUAGE }
-const details = reactive<Record<string, Loaded | "loading" | "failed">>({})
+const details = reactive<Record<string, Loaded | 'loading' | 'failed'>>({})
 
 async function toggle(row: SubmissionListItem) {
   // 题单布置期内藏着的旧提交，点不开（后端也不会给代码）
@@ -147,13 +144,13 @@ async function toggle(row: SubmissionListItem) {
     return
   }
   expanded.value = row.id
-  if (details[row.id] && details[row.id] !== "failed") return
-  details[row.id] = "loading"
+  if (details[row.id] && details[row.id] !== 'failed') return
+  details[row.id] = 'loading'
   try {
     const res = await getSubmission(row.id)
     details[row.id] = { code: res.code, language: res.language }
   } catch {
-    details[row.id] = "failed"
+    details[row.id] = 'failed'
   }
 }
 
@@ -164,11 +161,11 @@ const lockedCount = computed(() => submissions.value.filter((row) => !row.showLi
 const PREVIEW_LINES = 5
 const fullCode = reactive<Record<string, boolean>>({})
 function preview(id: string) {
-  const code = loadedOf(id)?.code ?? ""
-  const lines = code.replace(/\s+$/, "").split("\n")
+  const code = loadedOf(id)?.code ?? ''
+  const lines = code.replace(/\s+$/, '').split('\n')
   const more = !fullCode[id] && lines.length > PREVIEW_LINES + 1
   return {
-    text: more ? `${lines.slice(0, PREVIEW_LINES).join("\n")}\n` : code,
+    text: more ? `${lines.slice(0, PREVIEW_LINES).join('\n')}\n` : code,
     more,
     total: lines.length,
   }
@@ -176,7 +173,7 @@ function preview(id: string) {
 
 function loadedOf(id: string): Loaded | null {
   const value = details[id]
-  return value && typeof value === "object" ? value : null
+  return value && typeof value === 'object' ? value : null
 }
 
 /** 这道题现在还收不收那次提交的语言（0020 从题目里摘掉了 Java / JS / Go，老提交还在） */
@@ -196,26 +193,26 @@ async function putBack(id: string) {
   }
   // 同一个编辑器里 dispatch 一次整段替换，CodeMirror 的历史记着它，Ctrl+Z 能撤回
   codeStore.setCode(loaded.code)
-  message.success("已放回编辑器，按 Ctrl+Z 可以撤回")
+  message.success('已放回编辑器，按 Ctrl+Z 可以撤回')
 }
 
 async function copy(id: string) {
   const loaded = loadedOf(id)
   if (!loaded) return
   const ok = await copyToClipboard(loaded.code)
-  message[ok ? "success" : "error"](ok ? "代码已复制" : "复制失败")
+  message[ok ? 'success' : 'error'](ok ? '代码已复制' : '复制失败')
 }
 
 /** 完整详情（测试点、自测猫、分享）开新标签：这一页的编辑器和结果还要留着 */
 function openDetail(id: string) {
-  window.open(router.resolve(`/submission/${id}`).href, "_blank")
+  window.open(router.resolve(`/submission/${id}`).href, '_blank')
 }
 
 onMounted(() => {
   if (blocked.value) return
   listSubmissions()
   // 排名是按当前登录的人算的，协作中那是老师自己的，不给
-  if (ctx.value.entry === "problem" && !peer.value) {
+  if (ctx.value.entry === 'problem' && !peer.value) {
     getRankOfProblem(problemDisplayId.value)
       .then((res) => {
         rank.value = res
@@ -235,47 +232,29 @@ watch(query, () => {
   <template v-else>
     <div v-if="rankLine" class="rank" :class="{ solved: rankLine.solved }">
       <span>{{ rankLine.text }}</span>
-      <n-button v-if="userStore.showSubmissions" text type="primary" @click="goAccepted">
-        看看他们的写法 ›
-      </n-button>
+      <n-button v-if="userStore.showSubmissions" text type="primary" @click="goAccepted"> 看看他们的写法 › </n-button>
     </div>
 
     <div v-if="statusDistribution.length" class="distribution">
-      <n-tag
-        v-for="item in statusDistribution"
-        :key="item.result"
-        :type="item.type"
-        size="small"
-        round
-        :bordered="false"
-      >
+      <n-tag v-for="item in statusDistribution" :key="item.result" :type="item.type" size="small" round :bordered="false">
         {{ item.name }} × {{ item.count }}
       </n-tag>
     </div>
 
-    <n-empty
-      v-if="listed && !submissions.length"
-      class="empty"
-      :description="peer ? '还没有交过这道题' : '这道题你还没有交过'"
-    />
+    <n-empty v-if="listed && !submissions.length" class="empty" :description="peer ? '还没有交过这道题' : '这道题你还没有交过'" />
 
     <!-- 设计稿「我的提交 / 统计 / 点评：抽屉盖住左栏」：一整块带框的列表，行间一条细线 -->
     <div v-else-if="submissions.length" class="list">
       <template v-for="(row, index) in submissions" :key="row.id">
         <div v-if="row.showLink" class="item" :class="{ open: expanded === row.id }">
-          <button
-            type="button"
-            class="row"
-            :aria-expanded="expanded === row.id"
-            @click="toggle(row)"
-          >
+          <button type="button" class="row" :aria-expanded="expanded === row.id" @click="toggle(row)">
             <span class="attempt">第 {{ attemptNo(index) }} 次</span>
             <span class="verdict" :class="JUDGE_STATUS[row.result]?.type">
-              {{ JUDGE_STATUS[row.result]?.name ?? "未知" }}
+              {{ JUDGE_STATUS[row.result]?.name ?? '未知' }}
             </span>
             <span class="meta">
               {{ LANGUAGE_SHOW_VALUE[row.language] }} ·
-              {{ parseTime(row.createTime, "MM-DD HH:mm") }}
+              {{ parseTime(row.createTime, 'MM-DD HH:mm') }}
             </span>
             <svg
               class="caret"
@@ -297,9 +276,7 @@ watch(query, () => {
             <n-flex v-if="details[row.id] === 'loading'" justify="center" class="pad">
               <n-spin size="small" />
             </n-flex>
-            <n-text v-else-if="details[row.id] === 'failed'" type="error">
-              代码读不出来，收起来再点开试试
-            </n-text>
+            <n-text v-else-if="details[row.id] === 'failed'" type="error"> 代码读不出来，收起来再点开试试 </n-text>
             <template v-else-if="loadedOf(row.id)">
               <pre class="code">{{ preview(row.id).text
                 }}<button
@@ -315,19 +292,13 @@ watch(query, () => {
                   type="primary"
                   ghost
                   :disabled="!canPutBack(row.id)"
-                  :title="
-                    canPutBack(row.id)
-                      ? undefined
-                      : `这道题现在不收 ${LANGUAGE_SHOW_VALUE[loadedOf(row.id)!.language]} 了，只能复制`
-                  "
+                  :title="canPutBack(row.id) ? undefined : `这道题现在不收 ${LANGUAGE_SHOW_VALUE[loadedOf(row.id)!.language]} 了，只能复制`"
                   @click="putBack(row.id)"
                 >
                   放回编辑器
                 </n-button>
                 <n-button size="small" @click="copy(row.id)">复制</n-button>
-                <n-button size="small" text type="primary" class="more" @click="openDetail(row.id)">
-                  完整详情 ›
-                </n-button>
+                <n-button size="small" text type="primary" class="more" @click="openDetail(row.id)"> 完整详情 › </n-button>
               </div>
             </template>
           </div>
@@ -349,20 +320,11 @@ watch(query, () => {
           <rect x="5" y="11" width="14" height="10" rx="2" />
           <path d="M8 11V8a4 4 0 018 0v3" />
         </svg>
-        <span>
-          有 {{ lockedCount }} 次提交先藏起来了：<LockNote
-            :problem="{ displayId: problemDisplayId }"
-          />
-        </span>
+        <span> 有 {{ lockedCount }} 次提交先藏起来了：<LockNote :problem="{ displayId: problemDisplayId }" /> </span>
       </div>
     </div>
 
-    <Pagination
-      v-if="total > query.limit"
-      :total="total"
-      v-model:limit="query.limit"
-      v-model:page="query.page"
-    />
+    <Pagination v-if="total > query.limit" :total="total" v-model:limit="query.limit" v-model:page="query.page" />
   </template>
 </template>
 
@@ -396,14 +358,14 @@ watch(query, () => {
 
 .list {
   margin: 0 0 12px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 6px;
   overflow: hidden;
 }
 
 .item + .item,
 .item + .locked {
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .row {
@@ -431,7 +393,7 @@ watch(query, () => {
   flex: none;
   width: 4em;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   font-variant-numeric: tabular-nums;
 }
 
@@ -441,28 +403,28 @@ watch(query, () => {
 }
 
 .verdict.success {
-  color: v-bind("theme.successColorPressed");
+  color: v-bind('theme.successColorPressed');
   font-weight: 600;
 }
 
 .verdict.error {
-  color: v-bind("theme.errorColorPressed");
+  color: v-bind('theme.errorColorPressed');
 }
 
 .verdict.warning {
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
 }
 
 .meta {
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
 .caret {
   margin-left: auto;
   flex: none;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   transition: transform 0.15s;
 }
 
@@ -499,7 +461,7 @@ watch(query, () => {
   border: 0;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
@@ -521,7 +483,7 @@ watch(query, () => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .more {

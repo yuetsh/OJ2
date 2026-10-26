@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { ContestScoreRow } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { useContestStore } from "oj/store/contest"
-import { useTone } from "shared/composables/tone"
-import { useUserStore } from "shared/store/user"
-import { ContestStatus } from "utils/constants"
-import { parseTime, secondsToDuration } from "utils/functions"
-import RankMini from "../components/RankMini.vue"
-import { useVisibleInterval } from "shared/composables/visibleInterval"
+import type { ContestScoreRow } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { useContestStore } from 'oj/store/contest'
+import { useTone } from 'shared/composables/tone'
+import { useUserStore } from 'shared/store/user'
+import { ContestStatus } from 'utils/constants'
+import { parseTime, secondsToDuration } from 'utils/functions'
+import RankMini from '../components/RankMini.vue'
+import { useVisibleInterval } from 'shared/composables/visibleInterval'
 
 /**
  * 比赛页「题目」（设计稿「比赛重设计」B，用户选的）：一页放下。
@@ -25,10 +25,7 @@ const tone = useTone()
 const running = computed(() => contestStore.contestStatus === ContestStatus.underway)
 const ended = computed(() => contestStore.contestStatus === ContestStatus.finished)
 
-const { pause, resume } = useVisibleInterval(
-  () => contestStore.loadScoreboard(props.contestID),
-  10_000,
-)
+const { pause, resume } = useVisibleInterval(() => contestStore.loadScoreboard(props.contestID), 10_000)
 watch(
   () => [contestStore.canEnter, contestStore.contestStatus] as const,
   ([enter, status]) => {
@@ -43,29 +40,27 @@ watch(
 const board = computed(() => contestStore.scoreboard)
 const rows = computed(() => board.value?.rows ?? [])
 const total = computed(() => rows.value.length)
-const me = computed<ContestScoreRow | undefined>(() =>
-  rows.value.find((row) => row.userId === userStore.user?.id),
-)
+const me = computed<ContestScoreRow | undefined>(() => rows.value.find((row) => row.userId === userStore.user?.id))
 /** 排名页、题目条都按题目 id 找格子；题目列表那边是 contestStore.problems（带我的状态） */
 const stats = computed(() => new Map((board.value?.problems ?? []).map((p) => [p.id, p])))
 
 function when(seconds: number) {
   const minute = Math.floor(seconds / 60)
-  return minute === 0 ? "1 分钟内做对" : `第 ${minute} 分钟做对`
+  return minute === 0 ? '1 分钟内做对' : `第 ${minute} 分钟做对`
 }
 
 const items = computed(() =>
   contestStore.problems.map((problem) => {
     const cell = me.value?.cells[String(problem.id)]
     const stat = stats.value.get(problem.id)
-    let mine = ""
-    if (cell?.isAc) mine = when(cell.acTime) + (cell.errors ? `，错 ${cell.errors} 次` : "")
-    else if (cell) mine = cell.errors ? `交了 ${cell.errors} 次，还没对` : "交过，还没对"
-    else if (problem.status === "failed") mine = "交过，还没对"
+    let mine = ''
+    if (cell?.isAc) mine = when(cell.acTime) + (cell.errors ? `，错 ${cell.errors} 次` : '')
+    else if (cell) mine = cell.errors ? `交了 ${cell.errors} 次，还没对` : '交过，还没对'
+    else if (problem.status === 'failed') mine = '交过，还没对'
     return {
       problem,
-      done: cell?.isAc || problem.status === "passed",
-      tried: !!cell || problem.status === "failed",
+      done: cell?.isAc || problem.status === 'passed',
+      tried: !!cell || problem.status === 'failed',
       mine,
       solved: stat?.solvedUsers ?? 0,
       first: stat?.firstSolver ?? null,
@@ -77,18 +72,11 @@ const solvedCount = computed(() => items.value.filter((item) => item.done).lengt
 /** 现在再做对一道，按此刻算用时，能排到第几 */
 const nextRank = computed(() => {
   if (!running.value) return null
-  const elapsed = Math.max(
-    0,
-    Math.floor((contestStore.now - Date.parse(contestStore.contest!.startTime)) / 1000),
-  )
+  const elapsed = Math.max(0, Math.floor((contestStore.now - Date.parse(contestStore.contest!.startTime)) / 1000))
   const solved = (me.value?.solved ?? 0) + 1
   if (solved > contestStore.problems.length) return null
   const time = (me.value?.totalTime ?? 0) + elapsed
-  const ahead = rows.value.filter(
-    (row) =>
-      row.userId !== userStore.user?.id &&
-      (row.solved > solved || (row.solved === solved && row.totalTime < time)),
-  ).length
+  const ahead = rows.value.filter((row) => row.userId !== userStore.user?.id && (row.solved > solved || (row.solved === solved && row.totalTime < time))).length
   const target = ahead + 1
   return me.value?.rank && target >= me.value.rank ? null : target
 })
@@ -100,23 +88,21 @@ const move = computed(() => {
 })
 
 const updatedAgo = computed(() => {
-  if (!contestStore.scoreboardAt) return ""
+  if (!contestStore.scoreboardAt) return ''
   const seconds = Math.max(0, Math.floor((contestStore.now - contestStore.scoreboardAt) / 1000))
-  return seconds < 5 ? "刚刚更新" : `${seconds} 秒前更新`
+  return seconds < 5 ? '刚刚更新' : `${seconds} 秒前更新`
 })
 
 function firstMinute(seconds: number) {
   const minute = Math.floor(seconds / 60)
-  return minute === 0 ? "不到 1 分" : `${minute} 分`
+  return minute === 0 ? '不到 1 分' : `${minute} 分`
 }
 
-const examLeft = computed(() =>
-  items.value.filter((item) => !item.done).map((item) => `第 ${item.problem._id} 题`),
-)
+const examLeft = computed(() => items.value.filter((item) => !item.done).map((item) => `第 ${item.problem._id} 题`))
 
 const to = (name: string) => ({ name, params: { contestID: props.contestID } })
-const success = computed(() => tone("success"))
-const warning = computed(() => tone("warning"))
+const success = computed(() => tone('success'))
+const warning = computed(() => tone('warning'))
 </script>
 
 <template>
@@ -125,28 +111,12 @@ const warning = computed(() => tone("warning"))
       <div class="head">
         <b>题目</b>
         <span class="muted">
-          {{ contestStore.problems.length }} 道<template v-if="me || solvedCount">
-            · 你做对 {{ solvedCount }} 道</template
-          >
+          {{ contestStore.problems.length }} 道<template v-if="me || solvedCount"> · 你做对 {{ solvedCount }} 道</template>
         </span>
       </div>
-      <RouterLink
-        v-for="item in items"
-        :key="item.problem.id"
-        :to="`/contest/${contestID}/problem/${item.problem._id}`"
-        class="row"
-      >
+      <RouterLink v-for="item in items" :key="item.problem.id" :to="`/contest/${contestID}/problem/${item.problem._id}`" class="row">
         <span v-if="item.done" class="dot done">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="3"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12l5 5 9-10" />
           </svg>
         </span>
@@ -157,18 +127,11 @@ const warning = computed(() => tone("warning"))
         <span class="mine" :class="{ warn: item.tried && !item.done }">{{ item.mine }}</span>
         <template v-if="!contestStore.rankHidden && board">
           <span class="count">
-            <span class="track"
-              ><span
-                class="fill"
-                :style="{ width: total ? `${(item.solved / total) * 100}%` : '0' }"
-              ></span
-            ></span>
+            <span class="track"><span class="fill" :style="{ width: total ? `${(item.solved / total) * 100}%` : '0' }"></span></span>
             <span class="count-num">{{ item.solved }} 人做对</span>
           </span>
           <span class="first">
-            <template v-if="item.first"
-              >最先：{{ item.first.username }} · {{ firstMinute(item.first.acTime) }}</template
-            >
+            <template v-if="item.first">最先：{{ item.first.username }} · {{ firstMinute(item.first.acTime) }}</template>
             <template v-else>还没人做对</template>
           </span>
         </template>
@@ -187,7 +150,7 @@ const warning = computed(() => tone("warning"))
           <div class="segments">
             <span v-for="item in items" :key="item.problem.id" :class="{ on: item.done }"></span>
           </div>
-          <div v-if="examLeft.length" class="small sec">还没做：{{ examLeft.join("、") }}</div>
+          <div v-if="examLeft.length" class="small sec">还没做：{{ examLeft.join('、') }}</div>
           <div v-else class="small sec">全做对了，可以再检查一遍</div>
         </div>
         <div class="card lock">
@@ -208,7 +171,7 @@ const warning = computed(() => tone("warning"))
           <div class="lock-text">
             <b>{{ contestStore.contest?.tag }}考试，排名考完公布</b>
             <span class="muted small">
-              {{ parseTime(contestStore.contest!.endTime, "HH:mm") }}
+              {{ parseTime(contestStore.contest!.endTime, 'HH:mm') }}
               结束后这里会出现排名，也能看到每道题有多少人做对。
             </span>
           </div>
@@ -218,7 +181,7 @@ const warning = computed(() => tone("warning"))
       <template v-else-if="board">
         <div v-if="me && me.rank" class="card">
           <div class="big-line">
-            <span class="muted small">{{ ended ? "最后" : "你现在" }}</span>
+            <span class="muted small">{{ ended ? '最后' : '你现在' }}</span>
             <span class="big">第 {{ me.rank }} 名</span>
             <span class="muted">/ {{ total }} 人</span>
             <div class="spacer"></div>
@@ -265,7 +228,7 @@ const warning = computed(() => tone("warning"))
 .problems {
   flex: 999 1 560px;
   min-width: 0;
-  border-right: 1px solid v-bind("theme.dividerColor");
+  border-right: 1px solid v-bind('theme.dividerColor');
 }
 
 .side {
@@ -276,7 +239,7 @@ const warning = computed(() => tone("warning"))
   display: flex;
   flex-direction: column;
   gap: 16px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 @media (min-width: 1100px) {
@@ -293,8 +256,8 @@ const warning = computed(() => tone("warning"))
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.actionColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.actionColor');
 }
 
 .spacer {
@@ -302,11 +265,11 @@ const warning = computed(() => tone("warning"))
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .sec {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .small {
@@ -321,13 +284,13 @@ const warning = computed(() => tone("warning"))
   align-items: center;
   gap: 14px;
   font-size: var(--oj-fs-body);
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor1");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
 }
 
 .row:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .dot {
@@ -336,7 +299,7 @@ const warning = computed(() => tone("warning"))
   flex-shrink: 0;
   box-sizing: border-box;
   border-radius: 50%;
-  border: 1.5px dashed v-bind("theme.borderColor");
+  border: 1.5px dashed v-bind('theme.borderColor');
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -344,14 +307,14 @@ const warning = computed(() => tone("warning"))
 
 .dot.done {
   border: 0;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
   color: #ffffff;
 }
 
 .dot.tried {
   border: 0;
-  background: v-bind("warning.background");
-  color: v-bind("warning.color");
+  background: v-bind('warning.background');
+  color: v-bind('warning.color');
   font-size: 13px;
   font-weight: 700;
 }
@@ -361,7 +324,7 @@ const warning = computed(() => tone("warning"))
   text-align: right;
   flex-shrink: 0;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -376,11 +339,11 @@ const warning = computed(() => tone("warning"))
 .mine {
   flex-shrink: 0;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .mine.warn {
-  color: v-bind("warning.color");
+  color: v-bind('warning.color');
 }
 
 .count {
@@ -397,17 +360,17 @@ const warning = computed(() => tone("warning"))
   border-radius: 3px;
   overflow: hidden;
   display: flex;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .fill {
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
   opacity: 0.6;
 }
 
 .count-num {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   font-variant-numeric: tabular-nums;
 }
 
@@ -415,7 +378,7 @@ const warning = computed(() => tone("warning"))
   width: 190px;
   flex-shrink: 0;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -426,9 +389,9 @@ const warning = computed(() => tone("warning"))
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .big-line {
@@ -442,7 +405,7 @@ const warning = computed(() => tone("warning"))
   font-size: 32px;
   font-weight: 800;
   line-height: 1;
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .move {
@@ -457,21 +420,21 @@ const warning = computed(() => tone("warning"))
 }
 
 .move.up {
-  background: v-bind("success.background");
-  color: v-bind("success.color");
+  background: v-bind('success.background');
+  color: v-bind('success.color');
 }
 
 .move.down {
-  background: v-bind("theme.actionColor");
-  color: v-bind("theme.textColor3");
+  background: v-bind('theme.actionColor');
+  color: v-bind('theme.textColor3');
 }
 
 .nudge {
   padding: 10px 12px;
   border-radius: 6px;
   font-size: var(--oj-fs-sec);
-  background: v-bind("warning.background");
-  color: v-bind("warning.color");
+  background: v-bind('warning.background');
+  color: v-bind('warning.color');
 }
 
 .segments {
@@ -483,11 +446,11 @@ const warning = computed(() => tone("warning"))
   flex-grow: 1;
   height: 10px;
   border-radius: 2px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .segments span.on {
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .lock {
@@ -518,7 +481,7 @@ const warning = computed(() => tone("warning"))
 
 .link {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 

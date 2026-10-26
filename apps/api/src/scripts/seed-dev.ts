@@ -1,24 +1,23 @@
-import { eq, sql } from "drizzle-orm"
+import { eq, sql } from 'drizzle-orm'
 
-import { hashPassword } from "../auth/password"
-import { db, schema } from "../db"
+import { hashPassword } from '../auth/password'
+import { db, schema } from '../db'
 
 /**
  * 本机开发用的账号。**只能对本地库跑** —— 它会重置账号密码并把明文写进
  * raw_password，其中一个还是超管。对着生产库跑一次就是把超管密码改掉，
  * 所以这里按 DATABASE_URL 的主机名拦一道，需要绕过时显式设 OJ2_SEED_FORCE=true。
  */
-const url =
-  process.env.DATABASE_URL ?? "postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge"
+const url = process.env.DATABASE_URL ?? 'postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge'
 const host = (() => {
   try {
     return new URL(url).hostname
   } catch {
-    return ""
+    return ''
   }
 })()
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", ""])
-if (!LOCAL_HOSTS.has(host) && process.env.OJ2_SEED_FORCE !== "true") {
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', ''])
+if (!LOCAL_HOSTS.has(host) && process.env.OJ2_SEED_FORCE !== 'true') {
   console.error(
     `[seed:dev] DATABASE_URL 指向 ${host}，不是本机。这个脚本会重置账号密码` +
       `（含一个超管）并写明文 raw_password，拒绝执行。\n` +
@@ -30,15 +29,13 @@ if (!LOCAL_HOSTS.has(host) && process.env.OJ2_SEED_FORCE !== "true") {
 const now = new Date().toISOString()
 
 // 阶段 1 是带着显式 id 导入的，PostgreSQL 的序列没跟着走，先对齐
-await db.execute(
-  sql`select setval(pg_get_serial_sequence('"user"', 'id'), coalesce(max(${schema.user.id}), 1), true) from ${schema.user}`,
-)
+await db.execute(sql`select setval(pg_get_serial_sequence('"user"', 'id'), coalesce(max(${schema.user.id}), 1), true) from ${schema.user}`)
 
 interface SeedAccount {
   username: string
   password: string
-  adminType: "Regular User" | "Super Admin"
-  problemPermission: "None" | "All"
+  adminType: 'Regular User' | 'Super Admin'
+  problemPermission: 'None' | 'All'
   realName: string
 }
 
@@ -79,17 +76,13 @@ async function seed(account: SeedAccount) {
 
   if (!user) throw new Error(`Failed to seed ${account.username}`)
 
-  const [profile] = await db
-    .select({ id: schema.userProfile.id })
-    .from(schema.userProfile)
-    .where(eq(schema.userProfile.userId, user.id))
-    .limit(1)
+  const [profile] = await db.select({ id: schema.userProfile.id }).from(schema.userProfile).where(eq(schema.userProfile.userId, user.id)).limit(1)
 
   if (!profile) {
     await db.insert(schema.userProfile).values({
       userId: user.id,
       acmProblemsStatus: { problems: {}, contest_problems: {} },
-      avatar: "/public/avatar/default.png",
+      avatar: '/public/avatar/default.png',
       realName: account.realName,
     })
   }
@@ -97,19 +90,19 @@ async function seed(account: SeedAccount) {
   console.log(`  ${account.adminType.padEnd(13)} ${user.username} / ${account.password}`)
 }
 
-console.log("Seeded development logins:")
+console.log('Seeded development logins:')
 await seed({
-  username: process.env.OJ2_DEV_USERNAME ?? "student",
-  password: process.env.OJ2_DEV_PASSWORD ?? "student123",
-  adminType: "Regular User",
-  problemPermission: "None",
-  realName: "开发用学生",
+  username: process.env.OJ2_DEV_USERNAME ?? 'student',
+  password: process.env.OJ2_DEV_PASSWORD ?? 'student123',
+  adminType: 'Regular User',
+  problemPermission: 'None',
+  realName: '开发用学生',
 })
 await seed({
-  username: process.env.OJ2_DEV_ADMIN_USERNAME ?? "devadmin",
-  password: process.env.OJ2_DEV_ADMIN_PASSWORD ?? "devadmin123",
-  adminType: "Super Admin",
-  problemPermission: "All",
-  realName: "开发用超管",
+  username: process.env.OJ2_DEV_ADMIN_USERNAME ?? 'devadmin',
+  password: process.env.OJ2_DEV_ADMIN_PASSWORD ?? 'devadmin123',
+  adminType: 'Super Admin',
+  problemPermission: 'All',
+  realName: '开发用超管',
 })
 process.exit(0)

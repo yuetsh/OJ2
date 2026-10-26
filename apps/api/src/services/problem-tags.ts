@@ -1,6 +1,6 @@
-import { inArray, sql } from "drizzle-orm"
+import { inArray, sql } from 'drizzle-orm'
 
-import { schema, type DbOrTx } from "../db"
+import { schema, type DbOrTx } from '../db'
 
 /**
  * 把一批标签名去空格、去重（大小写不敏感），保留每个名字第一次出现时的原始大小写。

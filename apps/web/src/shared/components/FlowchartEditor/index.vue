@@ -1,21 +1,9 @@
 <script lang="ts" setup>
-import { useThemeVars } from "naive-ui"
-import storage from "utils/storage"
-import {
-  cloneDoc,
-  emptyDoc,
-  findStep,
-  insertStep,
-  parseDoc,
-  removeStep,
-  signature,
-  STEP_LABEL,
-  type FlowDoc,
-  type FlowHighlight,
-  type StepKind,
-} from "./model"
-import { layoutDoc, PLACEHOLDER, type LaidNode, type LaidSlot } from "./layout"
-import { nodeLabel, shapePoints, useFlowPaint } from "./paint"
+import { useThemeVars } from 'naive-ui'
+import storage from 'utils/storage'
+import { cloneDoc, emptyDoc, findStep, insertStep, parseDoc, removeStep, signature, STEP_LABEL, type FlowDoc, type FlowHighlight, type StepKind } from './model'
+import { layoutDoc, PLACEHOLDER, type LaidNode, type LaidSlot } from './layout'
+import { nodeLabel, shapePoints, useFlowPaint } from './paint'
 
 /**
  * 画流程图（插入式）。设计稿：画布「画流程图重设计」页的 FlowEdB / FlowEdBLoop。
@@ -41,12 +29,8 @@ interface Props {
    */
   draftKey?: string
 }
-const {
-  height = "calc(100vh - 134px)",
-  draft = true,
-  draftKey = "flowchart-v2",
-} = defineProps<Props>()
-const model = defineModel<FlowDoc | null>("value", { default: null })
+const { height = 'calc(100vh - 134px)', draft = true, draftKey = 'flowchart-v2' } = defineProps<Props>()
+const model = defineModel<FlowDoc | null>('value', { default: null })
 
 const message = useMessage()
 const theme = useThemeVars()
@@ -165,12 +149,12 @@ watch(cacheKey, () => {
 
 // ==================== 排版与视口 ====================
 
-const viewport = useTemplateRef<HTMLElement>("viewport")
+const viewport = useTemplateRef<HTMLElement>('viewport')
 const { width: viewW, height: viewH } = useElementSize(viewport)
 
 /** 量字宽用的画布。字体跟着编辑器自己的（Naive 的全局字体），量出来和 SVG 里画的一致 */
 let measureCtx: CanvasRenderingContext2D | null = null
-const fontFamily = ref("")
+const fontFamily = ref('')
 function measure(text: string) {
   if (measureCtx) return measureCtx.measureText(text).width
   let w = 0
@@ -231,7 +215,7 @@ watch([viewW, viewH], () => {
  * 学生刚点的那个位置会在眼前跳走。这里把中线（开始那个框）钉在屏幕上原来的位置
  */
 const startX = computed(() => {
-  const start = layout.value.nodes.find((n) => n.kind === "start")
+  const start = layout.value.nodes.find((n) => n.kind === 'start')
   return start ? start.x + start.w / 2 : 0
 })
 watch(startX, (next, prev) => {
@@ -253,11 +237,7 @@ function zoomBy(delta: number) {
 function onWheel(event: WheelEvent) {
   if (event.ctrlKey || event.metaKey) {
     const rect = viewport.value!.getBoundingClientRect()
-    zoomAt(
-      zoom.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1),
-      event.clientX - rect.left,
-      event.clientY - rect.top,
-    )
+    zoomAt(zoom.value * (event.deltaY < 0 ? 1.1 : 1 / 1.1), event.clientX - rect.left, event.clientY - rect.top)
     return
   }
   const dx = event.shiftKey ? event.deltaY : event.deltaX
@@ -322,13 +302,7 @@ function reveal(id: string) {
 // ==================== 插一步 ====================
 
 const menuSlot = ref<LaidSlot | null>(null)
-const MENU: { kind: StepKind }[] = [
-  { kind: "input" },
-  { kind: "output" },
-  { kind: "process" },
-  { kind: "if" },
-  { kind: "while" },
-]
+const MENU: { kind: StepKind }[] = [{ kind: 'input' }, { kind: 'output' }, { kind: 'process' }, { kind: 'if' }, { kind: 'while' }]
 const MENU_W = 300
 const MENU_H = 62
 
@@ -365,17 +339,15 @@ function insert(kind: StepKind) {
 // ==================== 选中、改字、删除 ====================
 
 const selectedId = ref<string | null>(null)
-const selected = computed(() =>
-  selectedId.value ? (layout.value.nodes.find((n) => n.id === selectedId.value) ?? null) : null,
-)
-const textInput = useTemplateRef<HTMLInputElement>("textInput")
+const selected = computed(() => (selectedId.value ? (layout.value.nodes.find((n) => n.id === selectedId.value) ?? null) : null))
+const textInput = useTemplateRef<HTMLInputElement>('textInput')
 /** 开始改字前的字，按 Esc 还原 */
-let textBefore = ""
+let textBefore = ''
 /** 刚从菜单里加上的那一步 */
 let justInserted: string | null = null
 
 function editable(node: LaidNode) {
-  return node.kind !== "start" && node.kind !== "end"
+  return node.kind !== 'start' && node.kind !== 'end'
 }
 
 function select(id: string) {
@@ -398,8 +370,7 @@ function onNodeClick(node: LaidNode) {
 }
 
 const selectedText = computed({
-  get: () =>
-    selectedId.value ? (findStep(doc.value.steps, selectedId.value)?.step.text ?? "") : "",
+  get: () => (selectedId.value ? (findStep(doc.value.steps, selectedId.value)?.step.text ?? '') : ''),
   set: (value: string) => {
     const found = selectedId.value ? findStep(doc.value.steps, selectedId.value) : null
     if (found) found.step.text = value
@@ -411,7 +382,7 @@ function commitText() {
   if (!selectedId.value) return
   const found = findStep(doc.value.steps, selectedId.value)
   if (found && found.step.text !== textBefore) {
-    found.step.text = found.step.text.replace(/\s+/g, " ").trim()
+    found.step.text = found.step.text.replace(/\s+/g, ' ').trim()
     textBefore = found.step.text
     snapshot()
   }
@@ -423,10 +394,10 @@ function deselect() {
 }
 
 function onTextKey(event: KeyboardEvent) {
-  if (event.key === "Enter") {
+  if (event.key === 'Enter') {
     event.preventDefault()
     deselect()
-  } else if (event.key === "Escape") {
+  } else if (event.key === 'Escape') {
     // 刚加上、一个字没写就按 Esc：当它没加过（连历史那一格一起撤掉）
     if (selectedId.value === justInserted && !selectedText.value.trim()) {
       selectedId.value = null
@@ -452,8 +423,7 @@ function removeSelected() {
 
 /** 判断 / 循环里的字框要比外框窄，免得打字时字跑出菱形 */
 function inputBox(node: LaidNode) {
-  const inset =
-    node.kind === "if" || node.kind === "while" ? node.w * 0.22 : node.kind === "process" ? 8 : 16
+  const inset = node.kind === 'if' || node.kind === 'while' ? node.w * 0.22 : node.kind === 'process' ? 8 : 16
   return {
     left: `${node.x + inset}px`,
     top: `${node.y}px`,
@@ -473,22 +443,17 @@ function clear() {
 
 function onKeyDown(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target?.isContentEditable
-  )
-    return
-  if (event.key === "Escape" && menuSlot.value) {
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return
+  if (event.key === 'Escape' && menuSlot.value) {
     menuSlot.value = null
     return
   }
   if (!(event.ctrlKey || event.metaKey)) return
   const key = event.key.toLowerCase()
-  if (key === "z" && !event.shiftKey) {
+  if (key === 'z' && !event.shiftKey) {
     event.preventDefault()
     undo()
-  } else if ((key === "z" && event.shiftKey) || key === "y") {
+  } else if ((key === 'z' && event.shiftKey) || key === 'y') {
     event.preventDefault()
     redo()
   }
@@ -496,25 +461,25 @@ function onKeyDown(event: KeyboardEvent) {
 
 onMounted(() => {
   const family = getComputedStyle(viewport.value!).fontFamily
-  measureCtx = document.createElement("canvas").getContext("2d")
+  measureCtx = document.createElement('canvas').getContext('2d')
   if (measureCtx) measureCtx.font = `14px ${family}`
   fontFamily.value = family
   loading = true
   loadDraft()
   nextTick(() => (loading = false))
-  document.addEventListener("keydown", onKeyDown)
+  document.addEventListener('keydown', onKeyDown)
 })
-onUnmounted(() => document.removeEventListener("keydown", onKeyDown))
+onUnmounted(() => document.removeEventListener('keydown', onKeyDown))
 
 // ==================== 颜色 ====================
 
-const dotColor = computed(() => (isDark.value ? "#34363b" : "#e3e5e8"))
+const dotColor = computed(() => (isDark.value ? '#34363b' : '#e3e5e8'))
 
 /** 菜单里的小图标：和画布上同一套形状 */
 function miniPoints(kind: StepKind) {
-  if (kind === "input" || kind === "output") return "6,2 25,2 20,14 1,14"
-  if (kind === "if") return "13,1 25,8 13,15 1,8"
-  return "15,1 25,6 15,11 5,6"
+  if (kind === 'input' || kind === 'output') return '6,2 25,2 20,14 1,14'
+  if (kind === 'if') return '13,1 25,8 13,15 1,8'
+  return '15,1 25,6 15,11 5,6'
 }
 
 // ==================== 走例子的路径 ====================
@@ -525,11 +490,7 @@ function miniPoints(kind: StepKind) {
  */
 const highlightSet = shallowRef<{ value: FlowHighlight; shape: string } | null>(null)
 /** 记下亮的时候图长什么样，之后不一样了就不亮（不用 watch 去清：进页面读草稿也会改 doc） */
-const highlight = computed(() =>
-  highlightSet.value && highlightSet.value.shape === signature(doc.value)
-    ? highlightSet.value.value
-    : null,
-)
+const highlight = computed(() => (highlightSet.value && highlightSet.value.shape === signature(doc.value) ? highlightSet.value.value : null))
 const stepNo = computed(() => new Map((highlight.value?.order ?? []).map((id, i) => [id, i + 1])))
 
 function setHighlight(next: FlowHighlight | null) {
@@ -539,11 +500,11 @@ function setHighlight(next: FlowHighlight | null) {
 }
 
 function nodeState(node: LaidNode) {
-  if (!highlight.value) return ""
-  if (node.id === highlight.value.bad) return "bad"
+  if (!highlight.value) return ''
+  if (node.id === highlight.value.bad) return 'bad'
   // 只标一个框（没点开哪一组）时别的框照常，不变淡
-  if (!highlight.value.order.length) return ""
-  return stepNo.value.has(node.id) ? "onpath" : "dim"
+  if (!highlight.value.order.length) return ''
+  return stepNo.value.has(node.id) ? 'onpath' : 'dim'
 }
 
 /** 标红那个框旁边的标签，贴在框的右边；判断、循环右顶点外写着「否」，再让开一点 */
@@ -552,14 +513,13 @@ const badTag = computed(() => {
   const node = label && layout.value.nodes.find((item) => item.id === highlight.value?.bad)
   if (!label || !node) return null
   const w = label.length * 12 + 20
-  const gap = node.kind === "if" || node.kind === "while" ? 26 : 8
+  const gap = node.kind === 'if' || node.kind === 'while' ? 26 : 8
   return { label, x: node.x + node.w + gap, y: node.y + node.h / 2 - 11, w }
 })
 
 /** 编号圆点的位置：方框贴在左上角，菱形挪到顶点右边（左边是「是」） */
 function badgeAt(node: LaidNode) {
-  if (node.kind === "if" || node.kind === "while")
-    return { x: node.x + node.w / 2 + 16, y: node.y + 2 }
+  if (node.kind === 'if' || node.kind === 'while') return { x: node.x + node.w / 2 + 16, y: node.y + 2 }
   return { x: node.x - 2, y: node.y + 2 }
 }
 
@@ -604,60 +564,16 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
       }"
     >
-      <svg
-        :width="layout.width"
-        :height="layout.height"
-        :viewBox="`0 0 ${layout.width} ${layout.height}`"
-        role="img"
-        aria-label="流程图"
-        class="chart"
-      >
+      <svg :width="layout.width" :height="layout.height" :viewBox="`0 0 ${layout.width} ${layout.height}`" role="img" aria-label="流程图" class="chart">
         <defs>
-          <marker
-            id="flow-arrow"
-            viewBox="0 0 10 10"
-            refX="9"
-            refY="5"
-            markerWidth="5.5"
-            markerHeight="5.5"
-            orient="auto-start-reverse"
-          >
+          <marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse">
             <path d="M0 0L10 5L0 10z" :fill="lineColor" />
           </marker>
         </defs>
-        <path
-          v-for="(d, i) in layout.lines"
-          :key="`l${i}`"
-          :d="d"
-          fill="none"
-          :stroke="lineColor"
-          stroke-width="1.6"
-        />
-        <path
-          v-for="(d, i) in layout.arrows"
-          :key="`a${i}`"
-          :d="d"
-          fill="none"
-          :stroke="lineColor"
-          stroke-width="1.6"
-          marker-end="url(#flow-arrow)"
-        />
-        <circle
-          v-for="(p, i) in layout.dots"
-          :key="`d${i}`"
-          :cx="p.x"
-          :cy="p.y"
-          r="2.6"
-          :fill="lineColor"
-        />
-        <text
-          v-for="(t, i) in layout.labels"
-          :key="`t${i}`"
-          :x="t.x"
-          :y="t.y"
-          :text-anchor="t.anchor"
-          class="branch-label"
-        >
+        <path v-for="(d, i) in layout.lines" :key="`l${i}`" :d="d" fill="none" :stroke="lineColor" stroke-width="1.6" />
+        <path v-for="(d, i) in layout.arrows" :key="`a${i}`" :d="d" fill="none" :stroke="lineColor" stroke-width="1.6" marker-end="url(#flow-arrow)" />
+        <circle v-for="(p, i) in layout.dots" :key="`d${i}`" :cx="p.x" :cy="p.y" r="2.6" :fill="lineColor" />
+        <text v-for="(t, i) in layout.labels" :key="`t${i}`" :x="t.x" :y="t.y" :text-anchor="t.anchor" class="branch-label">
           {{ t.text }}
         </text>
         <g
@@ -690,13 +606,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
             :stroke="paint(node.kind).stroke"
             stroke-width="1.6"
           />
-          <polygon
-            v-else
-            :points="shapePoints(node)"
-            :fill="paint(node.kind).fill"
-            :stroke="paint(node.kind).stroke"
-            stroke-width="1.6"
-          />
+          <polygon v-else :points="shapePoints(node)" :fill="paint(node.kind).fill" :stroke="paint(node.kind).stroke" stroke-width="1.6" />
           <text
             v-if="node.id !== selectedId"
             :x="node.x + node.w / 2"
@@ -781,22 +691,8 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
       </template>
     </div>
 
-    <div
-      v-if="menuSlot"
-      class="insert-menu"
-      :style="menuStyle"
-      role="menu"
-      aria-label="加一步"
-      @pointerdown.stop
-    >
-      <button
-        v-for="item in MENU"
-        :key="item.kind"
-        type="button"
-        role="menuitem"
-        class="insert-item"
-        @click="insert(item.kind)"
-      >
+    <div v-if="menuSlot" class="insert-menu" :style="menuStyle" role="menu" aria-label="加一步" @pointerdown.stop>
+      <button v-for="item in MENU" :key="item.kind" type="button" role="menuitem" class="insert-item" @click="insert(item.kind)">
         <svg width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
           <rect
             v-if="item.kind === 'process'"
@@ -809,20 +705,8 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
             :stroke="paint('process').stroke"
             stroke-width="1.4"
           />
-          <polygon
-            v-else
-            :points="miniPoints(item.kind)"
-            :fill="paint(item.kind).fill"
-            :stroke="paint(item.kind).stroke"
-            stroke-width="1.4"
-          />
-          <path
-            v-if="item.kind === 'while'"
-            d="M15 11v3H2V6h3"
-            fill="none"
-            :stroke="lineColor"
-            stroke-width="1.2"
-          />
+          <polygon v-else :points="miniPoints(item.kind)" :fill="paint(item.kind).fill" :stroke="paint(item.kind).stroke" stroke-width="1.4" />
+          <path v-if="item.kind === 'while'" d="M15 11v3H2V6h3" fill="none" :stroke="lineColor" stroke-width="1.2" />
         </svg>
         <span>{{ STEP_LABEL[item.kind] }}</span>
       </button>
@@ -855,8 +739,8 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   position: relative;
   width: 100%;
   overflow: hidden;
-  background-color: v-bind("theme.cardColor");
-  background-image: radial-gradient(v-bind("dotColor") 1px, transparent 1px);
+  background-color: v-bind('theme.cardColor');
+  background-image: radial-gradient(v-bind('dotColor') 1px, transparent 1px);
   background-size: 16px 16px;
   cursor: grab;
   touch-action: none;
@@ -883,7 +767,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
 
 .branch-label {
   font-size: 13px;
-  fill: v-bind("theme.textColor2");
+  fill: v-bind('theme.textColor2');
 }
 
 .node.editable {
@@ -911,7 +795,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
 
 .node.onpath > rect,
 .node.onpath > polygon {
-  stroke: v-bind("theme.textColor1");
+  stroke: v-bind('theme.textColor1');
   stroke-width: 2.4;
 }
 
@@ -932,13 +816,13 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
 }
 
 .badge circle {
-  fill: v-bind("theme.textColor1");
+  fill: v-bind('theme.textColor1');
 }
 
 .badge text {
   font-size: 12px;
   font-weight: 700;
-  fill: v-bind("theme.cardColor");
+  fill: v-bind('theme.cardColor');
 }
 
 .placeholder {
@@ -951,10 +835,10 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   height: 18px;
   margin: -9px 0 0 -9px;
   padding: 0;
-  border: 1.2px solid v-bind("theme.borderColor");
+  border: 1.2px solid v-bind('theme.borderColor');
   border-radius: 50%;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor3");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor3');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -990,12 +874,12 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   font: inherit;
   font-size: 14px;
   text-align: center;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   user-select: text;
 }
 
 .text-input::placeholder {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 浮在框的右上方：放右边会盖住判断的「否」，放正上方会盖住进来的那个 + */
@@ -1004,9 +888,9 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   transform: translateY(-100%);
   display: flex;
   padding: 3px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -1022,7 +906,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   font: inherit;
   font-size: 13px;
   white-space: nowrap;
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
   cursor: pointer;
 }
 
@@ -1036,9 +920,9 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   display: flex;
   gap: 2px;
   padding: 4px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   cursor: default;
 }
@@ -1052,7 +936,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1072,9 +956,9 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   bottom: 12px;
   display: flex;
   flex-direction: column;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 4px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   overflow: hidden;
   cursor: default;
 }
@@ -1087,7 +971,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
   background: transparent;
   font: inherit;
   font-size: 16px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1095,7 +979,7 @@ defineExpose({ getDoc, setDoc, undo, redo, clear, setHighlight, canUndo, canRedo
 }
 
 .zoom button + button {
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .zoom button:hover {

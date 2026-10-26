@@ -1,7 +1,7 @@
-import { defineStore } from "pinia"
-import { getClassActivity } from "shared/api"
-import { LANGUAGE_SHOW_VALUE } from "utils/constants"
-import type { ClassActivity, ClassActivityProblem } from "utils/types"
+import { defineStore } from 'pinia'
+import { getClassActivity } from 'shared/api'
+import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
+import type { ClassActivity, ClassActivityProblem } from 'utils/types'
 
 /** 同一节课里来回换题不用每次都重拉；过了这么久再进题目页就重拉一次 */
 const STALE_MS = 2 * 60 * 1000
@@ -13,7 +13,7 @@ const STALE_MS = 2 * 60 * 1000
  * 原来「下一题」每次通过都自己拉一遍，现在两处读同一份，通过之后由判题那边
  * （SubmissionEffects）先把这道就地标成做完、再重拉一次。
  */
-export const useLessonStore = defineStore("lesson", () => {
+export const useLessonStore = defineStore('lesson', () => {
   const activity = ref<ClassActivity | null>(null)
   let loadedAt = 0
   let loading: Promise<void> | null = null
@@ -45,7 +45,7 @@ export const useLessonStore = defineStore("lesson", () => {
   /** 刚通过：不等重拉，先把这道标成做完，课堂条上的「做完 N/M」马上加一 */
   function markAccepted(problemDisplayId: string) {
     const item = find(problemDisplayId)
-    if (item) item.myStatus = "accepted"
+    if (item) item.myStatus = 'accepted'
   }
 
   function find(problemDisplayId: string): ClassActivityProblem | undefined {
@@ -69,24 +69,18 @@ export const useLessonStore = defineStore("lesson", () => {
     const id = problemDisplayId.toLowerCase()
     const index = list.findIndex((item) => item.problemDisplayId.toLowerCase() === id)
     if (index < 0) return null
-    const rest = [...list.slice(index + 1), ...list.slice(0, index)].filter(
-      (item) => item.myStatus !== "accepted",
-    )
+    const rest = [...list.slice(index + 1), ...list.slice(0, index)].filter((item) => item.myStatus !== 'accepted')
     return { total: list.length, next: rest[0] ?? null, remaining: rest.length }
   }
 
   /** 老师布置时选的语言，给界面写「C语言」；没选（推断出来的课、以前布置的）为空 */
   const languageText = computed(() => {
     const language = activity.value?.language
-    return language ? LANGUAGE_SHOW_VALUE[language] : ""
+    return language ? LANGUAGE_SHOW_VALUE[language] : ''
   })
 
   /** 老师布置的叫「老师布置的题」（选了语言带上语言），推断出来的叫「这节课的题」 */
-  const label = computed(() =>
-    activity.value?.source === "teacher"
-      ? `老师布置的题${languageText.value ? ` · ${languageText.value}` : ""}`
-      : "这节课的题",
-  )
+  const label = computed(() => (activity.value?.source === 'teacher' ? `老师布置的题${languageText.value ? ` · ${languageText.value}` : ''}` : '这节课的题'))
 
   return { activity, label, languageText, load, markAccepted, includes, nextAfter }
 })

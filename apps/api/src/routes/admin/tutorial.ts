@@ -13,26 +13,14 @@ import {
   type AdminTutorialGroups,
   type AdminTutorialListItem,
   type TutorialProblemCandidate,
-} from "@oj2/contract"
-import {
-  and,
-  asc,
-  count,
-  countDistinct,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, count, countDistinct, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
-import { db, schema } from "../../db"
-import { failure, parseBody, success } from "../../http"
-import { exerciseDataError } from "../../services/exercise"
+import { requireSuperAdmin, type AppEnv } from '../../auth/middleware'
+import { db, schema } from '../../db'
+import { failure, parseBody, success } from '../../http'
+import { exerciseDataError } from '../../services/exercise'
 import {
   MUST_DO_TAG,
   exerciseCountColumn,
@@ -41,16 +29,12 @@ import {
   problemTagNames,
   projectFromContent,
   tutorialProblems,
-} from "../../services/tutorial"
-import { asRecord, queryInteger, sampleUser } from "../helpers"
+} from '../../services/tutorial'
+import { asRecord, queryInteger, sampleUser } from '../helpers'
 
 export const adminTutorialRoutes = new Hono<AppEnv>()
 
-async function serializeTutorial(row: {
-  tutorial: typeof schema.tutorial.$inferSelect
-  user: typeof schema.user.$inferSelect
-  realName: string | null
-}) {
+async function serializeTutorial(row: { tutorial: typeof schema.tutorial.$inferSelect; user: typeof schema.user.$inferSelect; realName: string | null }) {
   const problems = await tutorialProblems([row.tutorial.id], false)
   return {
     id: row.tutorial.id,
@@ -87,7 +71,7 @@ function selectTutorial(id: number) {
     .limit(1)
 }
 
-adminTutorialRoutes.get("/tutorials", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.get('/tutorials', requireSuperAdmin, async (c) => {
   const [rows, readerRows] = await Promise.all([
     db
       .select({
@@ -132,8 +116,8 @@ adminTutorialRoutes.get("/tutorials", requireSuperAdmin, async (c) => {
   )
   // 分组返回，形状对齐旧 TutorialAdminAPI.get
   return success(c, {
-    python: all.filter((item) => item.type === "python"),
-    c: all.filter((item) => item.type === "c"),
+    python: all.filter((item) => item.type === 'python'),
+    c: all.filter((item) => item.type === 'c'),
   } satisfies AdminTutorialGroups)
 })
 
@@ -141,7 +125,7 @@ adminTutorialRoutes.get("/tutorials", requireSuperAdmin, async (c) => {
  * 拖动排序：把这一串 id 的 order 依次改成 1、2、3……
  * 路径不放在 `/tutorials/` 下，理由同 learn.ts 顶上那段：`/tutorials/:id` 会先吃掉它。
  */
-adminTutorialRoutes.put("/tutorial-order", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.put('/tutorial-order', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, reorderTutorialsRequestSchema)
   if (!parsed.success) return parsed.response
   const ids = parsed.data.ids
@@ -158,7 +142,7 @@ adminTutorialRoutes.put("/tutorial-order", requireSuperAdmin, async (c) => {
 })
 
 /** 项目改名：这门课里挂在旧名字下的教程一起改 */
-adminTutorialRoutes.put("/tutorial-projects", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.put('/tutorial-projects', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, renameTutorialProjectRequestSchema)
   if (!parsed.success) return parsed.response
   const { type, from, to } = parsed.data
@@ -173,8 +157,8 @@ adminTutorialRoutes.put("/tutorial-projects", requireSuperAdmin, async (c) => {
  * 给一课挑题的候选。不带关键字列出全部必会题；带关键字按题号、标题找，
  * 必会题排在前面。只给公开题库里的题（比赛题学生点不进去）。
  */
-adminTutorialRoutes.get("/tutorial-problem-candidates", requireSuperAdmin, async (c) => {
-  const keyword = c.req.query("keyword")?.trim() ?? ""
+adminTutorialRoutes.get('/tutorial-problem-candidates', requireSuperAdmin, async (c) => {
+  const keyword = c.req.query('keyword')?.trim() ?? ''
   const pattern = `%${keyword.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`
   const rows = await db
     .select({
@@ -189,16 +173,10 @@ adminTutorialRoutes.get("/tutorial-problem-candidates", requireSuperAdmin, async
       and(
         isNull(schema.problem.contestId),
         eq(schema.problem.visible, true),
-        keyword
-          ? or(eq(schema.problem.displayId, keyword), ilike(schema.problem.title, pattern))
-          : mustDoColumn,
+        keyword ? or(eq(schema.problem.displayId, keyword), ilike(schema.problem.title, pattern)) : mustDoColumn,
       ),
     )
-    .orderBy(
-      desc(sql`${schema.problem.displayId} = ${keyword}`),
-      desc(mustDoColumn),
-      asc(schema.problem.displayId),
-    )
+    .orderBy(desc(sql`${schema.problem.displayId} = ${keyword}`), desc(mustDoColumn), asc(schema.problem.displayId))
     .limit(keyword ? 20 : 60)
   return success(
     c,
@@ -212,7 +190,7 @@ adminTutorialRoutes.get("/tutorial-problem-candidates", requireSuperAdmin, async
   )
 })
 
-adminTutorialRoutes.post("/tutorials", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.post('/tutorials', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, createTutorialRequestSchema)
   if (!parsed.success) return parsed.response
   const now = new Date().toISOString()
@@ -224,21 +202,21 @@ adminTutorialRoutes.post("/tutorials", requireSuperAdmin, async (c) => {
       project: project ?? projectFromContent(data.content),
       createdAt: now,
       updatedAt: now,
-      createdById: c.get("user")!.id,
+      createdById: c.get('user')!.id,
     })
     .returning({ id: schema.tutorial.id })
   const [row] = await selectTutorial(created!.id)
   return success(c, await serializeTutorial(row!), 201)
 })
 
-adminTutorialRoutes.get("/tutorials/:id", requireSuperAdmin, async (c) => {
-  const [row] = await selectTutorial(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!row) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+adminTutorialRoutes.get('/tutorials/:id', requireSuperAdmin, async (c) => {
+  const [row] = await selectTutorial(queryInteger(c.req.param('id'), 0, { min: 1 }))
+  if (!row) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   return success(c, await serializeTutorial(row))
 })
 
-adminTutorialRoutes.put("/tutorials/:id", requireSuperAdmin, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminTutorialRoutes.put('/tutorials/:id', requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const parsed = await parseBody(c, updateTutorialRequestSchema)
   if (!parsed.success) return parsed.response
   const { project, ...data } = parsed.data
@@ -253,14 +231,14 @@ adminTutorialRoutes.put("/tutorials/:id", requireSuperAdmin, async (c) => {
     })
     .where(eq(schema.tutorial.id, id))
     .returning({ id: schema.tutorial.id })
-  if (updated.length === 0) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (updated.length === 0) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   const [row] = await selectTutorial(id)
   return success(c, await serializeTutorial(row!))
 })
 
-adminTutorialRoutes.put("/tutorials/:id/visibility", requireSuperAdmin, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(c, setTutorialVisibilityRequestSchema, "isPublic is required")
+adminTutorialRoutes.put('/tutorials/:id/visibility', requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const parsed = await parseBody(c, setTutorialVisibilityRequestSchema, 'isPublic is required')
   if (!parsed.success) return parsed.response
   // 只改可见性，不动 updatedAt —— 上下架不是内容修改，改了会打乱按更新时间排序的直觉
   const updated = await db
@@ -268,49 +246,44 @@ adminTutorialRoutes.put("/tutorials/:id/visibility", requireSuperAdmin, async (c
     .set({ isPublic: parsed.data.isPublic })
     .where(eq(schema.tutorial.id, id))
     .returning({ id: schema.tutorial.id })
-  if (updated.length === 0) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (updated.length === 0) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   const [row] = await selectTutorial(id)
   return success(c, await serializeTutorial(row!))
 })
 
 /** 一课挂哪几道题：整串替换，顺序就是数组顺序 */
-adminTutorialRoutes.put("/tutorials/:id/problems", requireSuperAdmin, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminTutorialRoutes.put('/tutorials/:id/problems', requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const parsed = await parseBody(c, setTutorialProblemsRequestSchema)
   if (!parsed.success) return parsed.response
   const problemIds = [...new Set(parsed.data.problemIds)]
   const [row] = await selectTutorial(id)
-  if (!row) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (!row) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   if (problemIds.length) {
     const found = await db
       .select({ id: schema.problem.id })
       .from(schema.problem)
       .where(and(inArray(schema.problem.id, problemIds), isNull(schema.problem.contestId)))
     if (found.length !== problemIds.length) {
-      return failure(c, 400, "problem-not-found", "有的题不存在，或者是比赛题")
+      return failure(c, 400, 'problem-not-found', '有的题不存在，或者是比赛题')
     }
   }
   await db.transaction(async (tx) => {
     await tx.delete(schema.tutorialProblem).where(eq(schema.tutorialProblem.tutorialId, id))
     if (problemIds.length) {
-      await tx
-        .insert(schema.tutorialProblem)
-        .values(problemIds.map((problemId, index) => ({ tutorialId: id, problemId, order: index })))
+      await tx.insert(schema.tutorialProblem).values(problemIds.map((problemId, index) => ({ tutorialId: id, problemId, order: index })))
     }
   })
   return success(c, await serializeTutorial(row))
 })
 
-adminTutorialRoutes.delete("/tutorials/:id", requireSuperAdmin, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminTutorialRoutes.delete('/tutorials/:id', requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   // 练习、学习留痕、挂的题都随教程一起没：exercise / tutorial_progress / tutorial_problem
   // 的 tutorial_id 都是库级 CASCADE。**加子表时要回来想一遍该 CASCADE 还是该拦住**，
   // 别默认新表会自己连坐 —— 0010 只改了当时存在的那批外键。
-  const deleted = await db
-    .delete(schema.tutorial)
-    .where(eq(schema.tutorial.id, id))
-    .returning({ id: schema.tutorial.id })
-  if (deleted.length === 0) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  const deleted = await db.delete(schema.tutorial).where(eq(schema.tutorial.id, id)).returning({ id: schema.tutorial.id })
+  if (deleted.length === 0) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   return success(c, null)
 })
 
@@ -332,11 +305,11 @@ const attemptUsersColumn = sql<number>`(
 
 // 练习挂在教程下，路径嵌套 —— 旧后端是 ?tutorial_id= 查询参数，
 // 但它本来就是一对多的从属关系，嵌套路径更贴事实，也省掉「忘了传 tutorial_id」这类错误
-adminTutorialRoutes.get("/tutorials/:id/exercises", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.get('/tutorials/:id/exercises', requireSuperAdmin, async (c) => {
   const rows = await db
     .select({ exercise: schema.exercise, attemptUsers: attemptUsersColumn })
     .from(schema.exercise)
-    .where(eq(schema.exercise.tutorialId, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .where(eq(schema.exercise.tutorialId, queryInteger(c.req.param('id'), 0, { min: 1 })))
     .orderBy(asc(schema.exercise.order), asc(schema.exercise.id))
   return success(
     c,
@@ -344,17 +317,13 @@ adminTutorialRoutes.get("/tutorials/:id/exercises", requireSuperAdmin, async (c)
   )
 })
 
-adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.post('/exercises', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, createExerciseRequestSchema)
   if (!parsed.success) return parsed.response
-  const [tutorial] = await db
-    .select({ id: schema.tutorial.id })
-    .from(schema.tutorial)
-    .where(eq(schema.tutorial.id, parsed.data.tutorialId))
-    .limit(1)
-  if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  const [tutorial] = await db.select({ id: schema.tutorial.id }).from(schema.tutorial).where(eq(schema.tutorial.id, parsed.data.tutorialId)).limit(1)
+  if (!tutorial) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   const dataError = exerciseDataError(parsed.data.type, parsed.data.data)
-  if (dataError) return failure(c, 400, "invalid-exercise", dataError)
+  if (dataError) return failure(c, 400, 'invalid-exercise', dataError)
   const [created] = await db
     .insert(schema.exercise)
     .values({
@@ -368,12 +337,12 @@ adminTutorialRoutes.post("/exercises", requireSuperAdmin, async (c) => {
   return success(c, serializeExercise(created!, 0), 201)
 })
 
-adminTutorialRoutes.put("/exercises/:id", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.put('/exercises/:id', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, updateExerciseRequestSchema)
   if (!parsed.success) return parsed.response
   const dataError = exerciseDataError(parsed.data.type, parsed.data.data)
-  if (dataError) return failure(c, 400, "invalid-exercise", dataError)
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+  if (dataError) return failure(c, 400, 'invalid-exercise', dataError)
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const result = await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(schema.exercise)
@@ -388,21 +357,18 @@ adminTutorialRoutes.put("/exercises/:id", requireSuperAdmin, async (c) => {
     if (parsed.data.resetAttempts) {
       await tx.delete(schema.exerciseAttempt).where(eq(schema.exerciseAttempt.exerciseId, id))
     }
-    const [attempted] = await tx
-      .select({ value: count() })
-      .from(schema.exerciseAttempt)
-      .where(eq(schema.exerciseAttempt.exerciseId, id))
+    const [attempted] = await tx.select({ value: count() }).from(schema.exerciseAttempt).where(eq(schema.exerciseAttempt.exerciseId, id))
     return serializeExercise(updated, attempted?.value ?? 0)
   })
-  if (!result) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
+  if (!result) return failure(c, 404, 'exercise-not-found', 'Exercise does not exist')
   return success(c, result)
 })
 
-adminTutorialRoutes.delete("/exercises/:id", requireSuperAdmin, async (c) => {
+adminTutorialRoutes.delete('/exercises/:id', requireSuperAdmin, async (c) => {
   const deleted = await db
     .delete(schema.exercise)
-    .where(eq(schema.exercise.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .where(eq(schema.exercise.id, queryInteger(c.req.param('id'), 0, { min: 1 })))
     .returning({ id: schema.exercise.id })
-  if (deleted.length === 0) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
+  if (deleted.length === 0) return failure(c, 404, 'exercise-not-found', 'Exercise does not exist')
   return success(c, null)
 })

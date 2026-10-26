@@ -1,8 +1,8 @@
-import { submissionUpdateSchema, type SubmissionUpdate } from "@oj2/contract"
+import { submissionUpdateSchema, type SubmissionUpdate } from '@oj2/contract'
 
-import { redis } from "../redis"
+import { redis } from '../redis'
 
-export const submissionUpdateChannel = "submission:updates"
+export const submissionUpdateChannel = 'submission:updates'
 
 interface SubmissionEvent {
   userId: number
@@ -21,7 +21,7 @@ export async function publishSubmissionUpdate(userId: number, data: SubmissionUp
 export function parseSubmissionEvent(raw: string): SubmissionEvent | null {
   try {
     const value = JSON.parse(raw) as { userId?: unknown; data?: unknown }
-    if (typeof value.userId !== "number") return null
+    if (typeof value.userId !== 'number') return null
     return {
       userId: value.userId,
       data: submissionUpdateSchema.parse(value.data),

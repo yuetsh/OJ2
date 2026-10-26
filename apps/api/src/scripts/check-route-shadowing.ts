@@ -21,10 +21,10 @@
  * 动态拼出来的路径看不见 —— 但本仓库没有那种写法，加的时候请保持。
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 
-const SRC = resolve(import.meta.dir, "..")
+const SRC = resolve(import.meta.dir, '..')
 
 interface Route {
   method: string
@@ -36,23 +36,23 @@ function walk(dir: string, out: string[] = []) {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry)
     if (statSync(path).isDirectory()) walk(path, out)
-    else if (entry.endsWith(".ts")) out.push(path)
+    else if (entry.endsWith('.ts')) out.push(path)
   }
   return out
 }
 
 /** 先注册的 pattern 会不会把后注册的 target 吃掉 */
 export function shadows(pattern: string, target: string) {
-  const a = pattern.split("/").filter(Boolean)
-  const b = target.split("/").filter(Boolean)
+  const a = pattern.split('/').filter(Boolean)
+  const b = target.split('/').filter(Boolean)
   if (a.length !== b.length) return false
   let usedParam = false
   for (let i = 0; i < a.length; i++) {
     const seg = a[i]!
     const other = b[i]!
-    if (seg.startsWith(":")) {
+    if (seg.startsWith(':')) {
       // 参数段吃得掉任何字面量段；两边都是参数说明本来就是同一条，不算遮蔽
-      if (other.startsWith(":")) continue
+      if (other.startsWith(':')) continue
       usedParam = true
       continue
     }
@@ -64,7 +64,7 @@ export function shadows(pattern: string, target: string) {
 function collect(): Route[] {
   const routerFile = new Map<string, string>()
   for (const file of walk(SRC)) {
-    for (const m of readFileSync(file, "utf8").matchAll(/export const (\w+) = new Hono/g)) {
+    for (const m of readFileSync(file, 'utf8').matchAll(/export const (\w+) = new Hono/g)) {
       routerFile.set(m[1]!, file)
     }
   }
@@ -72,34 +72,31 @@ function collect(): Route[] {
   const routesOf = (router: string, prefix: string): Route[] => {
     const file = routerFile.get(router)
     if (!file) return []
-    const text = readFileSync(file, "utf8")
+    const text = readFileSync(file, 'utf8')
     // 直接注册的路由和嵌套挂载（`router.route("/", child)`）放在一起按出现位置排序：
     // 子路由挂在哪个位置，它的路由就在哪个位置参与匹配
-    const pattern = new RegExp(
-      `${router}\\.(get|post|put|delete|patch)\\(\\s*"([^"]+)"|${router}\\.route\\(\\s*"([^"]*)"\\s*,\\s*(\\w+)\\s*\\)`,
-      "g",
-    )
+    const pattern = new RegExp(`${router}\\.(get|post|put|delete|patch)\\(\\s*"([^"]+)"|${router}\\.route\\(\\s*"([^"]*)"\\s*,\\s*(\\w+)\\s*\\)`, 'g')
     return [...text.matchAll(pattern)].flatMap((m) => {
       if (m[4]) return routesOf(m[4], prefix + m[3]!)
       return [
         {
           method: m[1]!.toUpperCase(),
-          path: (prefix + m[2]!).replace(/\/+/g, "/").replace(/\/$/, "") || "/",
-          file: file.replace(SRC + "/", ""),
+          path: (prefix + m[2]!).replace(/\/+/g, '/').replace(/\/$/, '') || '/',
+          file: file.replace(SRC + '/', ''),
         },
       ]
     })
   }
 
   // 挂载顺序就是匹配顺序，所以必须按 index.ts 里出现的先后来摊平
-  const index = readFileSync(join(SRC, "index.ts"), "utf8")
-  const adminIndex = readFileSync(join(SRC, "routes/admin/index.ts"), "utf8")
+  const index = readFileSync(join(SRC, 'index.ts'), 'utf8')
+  const adminIndex = readFileSync(join(SRC, 'routes/admin/index.ts'), 'utf8')
   const adminMounts = [...adminIndex.matchAll(/\.route\(\s*"([^"]*)"\s*,\s*(\w+)\s*\)/g)]
 
   const all: Route[] = []
   for (const m of index.matchAll(/app\.route\(\s*"([^"]+)"\s*,\s*(\w+)\s*\)/g)) {
     const [, prefix, router] = m
-    if (router === "adminRoutes") {
+    if (router === 'adminRoutes') {
       for (const a of adminMounts) all.push(...routesOf(a[2]!, prefix! + a[1]!))
     } else {
       all.push(...routesOf(router!, prefix!))
@@ -119,7 +116,7 @@ for (let i = 0; i < routes.length; i++) {
 
 console.log(`按注册顺序检查了 ${routes.length} 条路由`)
 if (hits.length === 0) {
-  console.log("✓ 没有路由被遮蔽")
+  console.log('✓ 没有路由被遮蔽')
   process.exit(0)
 }
 for (const [first, second] of hits) {

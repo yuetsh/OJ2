@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { useLessonStore } from "shared/store/lesson"
-import { useProblemJump } from "shared/composables/problemJump"
-import { useUserStore } from "shared/store/user"
-import type { ClassActivityProblem } from "utils/types"
-import { zonedParts } from "utils/functions"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { useLessonStore } from 'shared/store/lesson'
+import { useProblemJump } from 'shared/composables/problemJump'
+import { useUserStore } from 'shared/store/user'
+import type { ClassActivityProblem } from 'utils/types'
+import { zonedParts } from 'utils/functions'
 
 /**
  * 顶栏的题号框：老师报完题号，学生在哪一页都能直接敲，不用先回首页或题目列表。
@@ -27,17 +27,17 @@ const userStore = useUserStore()
 const lessonStore = useLessonStore()
 
 const { jump, jumping } = useProblemJump()
-const keyword = ref("")
+const keyword = ref('')
 const focused = ref(false)
-const input = useTemplateRef<{ blur: () => void }>("input")
+const input = useTemplateRef<{ blur: () => void }>('input')
 
 /** 题目页的三种入口（题库 / 比赛 / 题单）顶上都有自己的上下文条 */
-const PROBLEM_PAGES = new Set(["problem", "contest problem", "problemset problem"])
+const PROBLEM_PAGES = new Set(['problem', 'contest problem', 'problemset problem'])
 const onProblemPage = computed(() => PROBLEM_PAGES.has(String(route.name)))
 
 function todayKey() {
   const now = zonedParts(new Date())!
-  return `${now.year}-${String(now.month).padStart(2, "0")}-${String(now.day).padStart(2, "0")}`
+  return `${now.year}-${String(now.month).padStart(2, '0')}-${String(now.day).padStart(2, '0')}`
 }
 
 const lesson = computed(() => {
@@ -46,23 +46,16 @@ const lesson = computed(() => {
   return activity
 })
 
-const done = computed(
-  () => lesson.value?.problems.filter((item) => item.myStatus === "accepted").length ?? 0,
-)
+const done = computed(() => lesson.value?.problems.filter((item) => item.myStatus === 'accepted').length ?? 0)
 
 /** 「下一道」是第一道还没做对的 —— 不在题目页上，没有「当前这道」可以往后数 */
-const nextId = computed(
-  () => lesson.value?.problems.find((item) => item.myStatus !== "accepted")?.problemDisplayId,
-)
+const nextId = computed(() => lesson.value?.problems.find((item) => item.myStatus !== 'accepted')?.problemDisplayId)
 
 const filtered = computed(() => {
   const list = lesson.value?.problems ?? []
   const text = keyword.value.trim().toLowerCase()
   if (!text) return list
-  return list.filter(
-    (item) =>
-      item.problemDisplayId.toLowerCase().includes(text) || item.title.toLowerCase().includes(text),
-  )
+  return list.filter((item) => item.problemDisplayId.toLowerCase().includes(text) || item.title.toLowerCase().includes(text))
 })
 
 const open = computed(() => focused.value && !onProblemPage.value && filtered.value.length > 0)
@@ -75,7 +68,7 @@ function handleFocus() {
 
 function close() {
   input.value?.blur()
-  keyword.value = ""
+  keyword.value = ''
 }
 
 async function handleEnter() {
@@ -89,12 +82,12 @@ function openProblem(item: ClassActivityProblem) {
   router.push(`/problem/${item.problemDisplayId}`)
 }
 
-const STATUS_ICON: Record<ClassActivityProblem["myStatus"], string> = {
-  accepted: "ph:check-circle-fill",
-  tried: "ph:warning-circle-fill",
-  none: "ph:circle",
+const STATUS_ICON: Record<ClassActivityProblem['myStatus'], string> = {
+  accepted: 'ph:check-circle-fill',
+  tried: 'ph:warning-circle-fill',
+  none: 'ph:circle',
 }
-const statusColor = computed<Record<ClassActivityProblem["myStatus"], string>>(() => ({
+const statusColor = computed<Record<ClassActivityProblem['myStatus'], string>>(() => ({
   accepted: theme.value.successColor,
   tried: theme.value.warningColor,
   none: theme.value.textColor3,
@@ -102,8 +95,8 @@ const statusColor = computed<Record<ClassActivityProblem["myStatus"], string>>((
 
 const tone = computed(() => ({
   label: isDark.value ? theme.value.primaryColor : theme.value.primaryColorPressed,
-  nextBg: isDark.value ? "rgba(99, 226, 183, 0.10)" : "#f3f9f5",
-  tagBg: isDark.value ? "rgba(99, 226, 183, 0.16)" : "#e7f5ed",
+  nextBg: isDark.value ? 'rgba(99, 226, 183, 0.10)' : '#f3f9f5',
+  tagBg: isDark.value ? 'rgba(99, 226, 183, 0.16)' : '#e7f5ed',
 }))
 
 /**
@@ -111,17 +104,17 @@ const tone = computed(() => ({
  * 生成的 CSS 变量挂在根元素上，面板取不到（实测整块透明）。所以变量直接挂在面板上
  */
 const panelVars = computed(() => ({
-  "--jb-popoverColor": theme.value.popoverColor,
-  "--jb-borderRadius": theme.value.borderRadius,
-  "--jb-boxShadow2": theme.value.boxShadow2,
-  "--jb-dividerColor": theme.value.dividerColor,
-  "--jb-label": tone.value.label,
-  "--jb-textColor3": theme.value.textColor3,
-  "--jb-textColor1": theme.value.textColor1,
-  "--jb-hoverColor": theme.value.hoverColor,
-  "--jb-nextBg": tone.value.nextBg,
-  "--jb-textColor2": theme.value.textColor2,
-  "--jb-tagBg": tone.value.tagBg,
+  '--jb-popoverColor': theme.value.popoverColor,
+  '--jb-borderRadius': theme.value.borderRadius,
+  '--jb-boxShadow2': theme.value.boxShadow2,
+  '--jb-dividerColor': theme.value.dividerColor,
+  '--jb-label': tone.value.label,
+  '--jb-textColor3': theme.value.textColor3,
+  '--jb-textColor1': theme.value.textColor1,
+  '--jb-hoverColor': theme.value.hoverColor,
+  '--jb-nextBg': tone.value.nextBg,
+  '--jb-textColor2': theme.value.textColor2,
+  '--jb-tagBg': tone.value.tagBg,
 }))
 </script>
 
@@ -160,18 +153,13 @@ const panelVars = computed(() => ({
         :class="{ next: item.problemDisplayId === nextId, accepted: item.myStatus === 'accepted' }"
         @click.prevent="openProblem(item)"
       >
-        <Icon
-          :icon="STATUS_ICON[item.myStatus]"
-          :width="18"
-          :color="statusColor[item.myStatus]"
-          class="status"
-        />
+        <Icon :icon="STATUS_ICON[item.myStatus]" :width="18" :color="statusColor[item.myStatus]" class="status" />
         <span class="id">{{ item.problemDisplayId }}</span>
         <span class="title">{{ item.title }}</span>
         <span v-if="item.problemDisplayId === nextId" class="tag">下一道</span>
       </a>
       <div class="foot">
-        {{ keyword.trim() ? "回车按题号直达，对不上就去题库搜" : "也可以直接输入题号，回车打开" }}
+        {{ keyword.trim() ? '回车按题号直达，对不上就去题库搜' : '也可以直接输入题号，回车打开' }}
       </div>
     </div>
   </n-popover>

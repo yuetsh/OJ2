@@ -1,4 +1,4 @@
-import type { z } from "zod"
+import type { z } from 'zod'
 
 /**
  * 契约的运行时闸门。**只挂在三条路径上**：题目详情、提交详情、用户资料
@@ -21,23 +21,16 @@ import type { z } from "zod"
  * 面向学生的生产站点，少一个字段页面照样能用，整页崩掉不行。所以这里：
  * 记一条带端点和字段路径的 `console.error`，然后**返回原始数据**。
  */
-export function contract<T extends z.ZodType>(
-  endpoint: string,
-  schema: T,
-  value: unknown,
-): z.infer<T> {
+export function contract<T extends z.ZodType>(endpoint: string, schema: T, value: unknown): z.infer<T> {
   const result = schema.safeParse(value)
   if (result.success) return result.data
 
   const issues = result.error.issues
     .slice(0, 5)
-    .map((issue) => `${issue.path.join(".") || "(根)"}: ${issue.message}`)
-    .join("；")
-  const more = result.error.issues.length > 5 ? `；另有 ${result.error.issues.length - 5} 处` : ""
-  console.error(
-    `[契约] ${endpoint} 的响应不符合契约 —— ${issues}${more}\n` +
-      "  已放行原始数据（页面照常渲染）。契约在 packages/contract/src/。",
-  )
+    .map((issue) => `${issue.path.join('.') || '(根)'}: ${issue.message}`)
+    .join('；')
+  const more = result.error.issues.length > 5 ? `；另有 ${result.error.issues.length - 5} 处` : ''
+  console.error(`[契约] ${endpoint} 的响应不符合契约 —— ${issues}${more}\n` + '  已放行原始数据（页面照常渲染）。契约在 packages/contract/src/。')
   // 放行原始数据。断言在这里是**有意的**：形状确实可能不符，但调用方需要的是
   // 「能渲染的东西」而不是一个异常，分歧已经通过上面那条日志暴露出来了。
   return value as z.infer<T>
@@ -51,11 +44,7 @@ export function contract<T extends z.ZodType>(
  * default / transform 时，放行原文和放行解析结果只差 zod 剥掉的多余字段，前端用不上。
  * 给 schema 加 default / transform 之前，得先把调用方从这里挪回 `contract`。
  */
-export function contractDeferred<T extends z.ZodType>(
-  endpoint: string,
-  loadSchema: () => Promise<T>,
-  value: unknown,
-): z.infer<T> {
+export function contractDeferred<T extends z.ZodType>(endpoint: string, loadSchema: () => Promise<T>, value: unknown): z.infer<T> {
   loadSchema()
     .then((schema) => contract(endpoint, schema, value))
     .catch(() => {

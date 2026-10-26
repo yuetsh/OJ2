@@ -1,6 +1,6 @@
-import { DIFFICULTY } from "utils/constants"
-import { getACRate } from "utils/functions"
-import type { ProblemRow, ProblemListItem } from "utils/types"
+import { DIFFICULTY } from 'utils/constants'
+import { getACRate } from 'utils/functions'
+import type { ProblemRow, ProblemListItem } from 'utils/types'
 
 // 把后端的列表项塑形成列表页需要的形状，与请求逻辑解耦。
 export function toProblemRow(result: ProblemListItem): ProblemRow {
@@ -13,12 +13,7 @@ export function toProblemRow(result: ProblemListItem): ProblemRow {
     submissionCount: result.submissionNumber,
     acRate: getACRate(result.acceptedNumber, result.submissionNumber),
     // null / undefined 都表示「没做过」
-    status:
-      result.myStatus === null || result.myStatus === undefined
-        ? "not_test"
-        : result.myStatus === 0
-          ? "passed"
-          : "failed",
+    status: result.myStatus === null || result.myStatus === undefined ? 'not_test' : result.myStatus === 0 ? 'passed' : 'failed',
     author: result.createdBy.username,
     allowFlowchart: result.allowFlowchart,
     showFlowchart: result.showFlowchart,

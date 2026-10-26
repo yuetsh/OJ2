@@ -1,8 +1,8 @@
-import { ref } from "vue"
-import { createDiscreteApi } from "naive-ui"
-import { errorCode, errorMessage, GLOBALLY_HANDLED_CODES } from "utils/api"
+import { ref } from 'vue'
+import { createDiscreteApi } from 'naive-ui'
+import { errorCode, errorMessage, GLOBALLY_HANDLED_CODES } from 'utils/api'
 
-const { message } = createDiscreteApi(["message"])
+const { message } = createDiscreteApi(['message'])
 
 /**
  * 列表页的取数：转圈、出错提示、旧请求晚回来不盖新结果。
@@ -33,8 +33,7 @@ export function useListLoader() {
     } catch (error) {
       if (mine !== seq) return undefined
       // 登录过期、没权限这几种全局拦截器已经提示过了
-      if (!GLOBALLY_HANDLED_CODES.includes(errorCode(error) ?? ""))
-        message.error(errorMessage(error, "列表没加载出来，刷新一下再试"))
+      if (!GLOBALLY_HANDLED_CODES.includes(errorCode(error) ?? '')) message.error(errorMessage(error, '列表没加载出来，刷新一下再试'))
       return undefined
     } finally {
       if (mine === seq) loading.value = false

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { Quote } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { getHitokoto } from "../api"
+import { Icon } from '@iconify/vue'
+import type { Quote } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { getHitokoto } from '../api'
 
 /**
  * 一言（设计稿「一言重设计」A 版）：大引号 + 最多两行的句子、出处跟在第二行末尾 + 一个看得见的「换一句」。
@@ -41,13 +41,13 @@ watch(quote, () => nextTick(measure))
 useResizeObserver(sentenceRef, measure)
 
 /** 数据集里拿来充数的出处：写出来没有信息量 */
-const FILLER = new Set(["佚名", "无", "原创", "网络", "其他", "互联网"])
+const FILLER = new Set(['佚名', '无', '原创', '网络', '其他', '互联网'])
 
 const source = computed(() => {
   const q = quote.value
-  if (!q) return ""
-  const work = q.from && !FILLER.has(q.from) && q.from !== q.type ? q.from : ""
-  const who = q.fromWho && !FILLER.has(q.fromWho) && q.fromWho !== work ? q.fromWho : ""
+  if (!q) return ''
+  const work = q.from && !FILLER.has(q.from) && q.from !== q.type ? q.from : ''
+  const who = q.fromWho && !FILLER.has(q.fromWho) && q.fromWho !== work ? q.fromWho : ''
   // 内置的兜底句没有分类，出处（「判题狗」）不是作品名，不加书名号
   if (!q.type) return who || work
   if (who && work) return `${who}《${work}》`
@@ -56,8 +56,8 @@ const source = computed(() => {
 
 // 全文弹层在 body 下面，样式里的 v-bind 变量够不着，主题色就地给
 const popVars = computed(() => ({
-  "--pop-text": theme.value.textColor1,
-  "--pop-muted": theme.value.textColor3,
+  '--pop-text': theme.value.textColor1,
+  '--pop-muted': theme.value.textColor3,
 }))
 </script>
 
@@ -79,14 +79,7 @@ const popVars = computed(() => ({
         <div v-if="source" class="full-source">—— {{ source }}</div>
       </div>
     </n-popover>
-    <button
-      class="refresh"
-      :class="{ spinning: loading }"
-      :disabled="loading"
-      aria-label="换一句"
-      title="换一句"
-      @click="receive"
-    >
+    <button class="refresh" :class="{ spinning: loading }" :disabled="loading" aria-label="换一句" title="换一句" @click="receive">
       <Icon icon="ph:arrow-clockwise-bold" :width="14" />
     </button>
   </div>
@@ -104,7 +97,7 @@ const popVars = computed(() => ({
 
 .mark {
   flex: none;
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
   opacity: 0.3;
 }
 
@@ -129,11 +122,11 @@ const popVars = computed(() => ({
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow-wrap: anywhere;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 
 .sentence::before {
-  content: "";
+  content: '';
   float: right;
   height: 100%;
   margin-bottom: -18px;
@@ -145,7 +138,7 @@ const popVars = computed(() => ({
   max-width: 60%;
   margin-left: 10px;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -157,10 +150,10 @@ const popVars = computed(() => ({
   flex: none;
   box-sizing: border-box;
   padding: 0;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 14px;
   background: transparent;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,8 +161,8 @@ const popVars = computed(() => ({
 }
 
 .refresh:hover {
-  border-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.primaryColor');
 }
 
 .refresh.spinning svg {

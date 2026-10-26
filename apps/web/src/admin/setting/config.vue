@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import PageHeader from "admin/components/PageHeader.vue"
-import { useThemeVars } from "naive-ui"
-import { classLabel } from "utils/classes"
-import { errorMessage } from "utils/api"
-import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from "utils/constants"
-import { copyToClipboard, parseTime } from "utils/functions"
-import type { OrphanImage, OrphanTestCase, Server, WebsiteConfig } from "utils/types"
-import { useConfigStore } from "shared/store/config"
+import PageHeader from 'admin/components/PageHeader.vue'
+import { useThemeVars } from 'naive-ui'
+import { classLabel } from 'utils/classes'
+import { errorMessage } from 'utils/api'
+import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from 'utils/constants'
+import { copyToClipboard, parseTime } from 'utils/functions'
+import type { OrphanImage, OrphanTestCase, Server, WebsiteConfig } from 'utils/types'
+import { useConfigStore } from 'shared/store/config'
 import {
   deleteJudgeServer,
   editWebsite,
@@ -16,7 +16,7 @@ import {
   listOrphanImages,
   pruneInvalidTestcases,
   pruneOrphanImages,
-} from "../api"
+} from '../api'
 
 /**
  * 后台设置（设计稿「后台首页」页的 ConfAdmin）：网站 / 班级 / 开关 / 判题机，有无效测试用例时
@@ -32,7 +32,7 @@ const theme = useThemeVars()
 const configStore = useConfigStore()
 
 const websiteConfig = reactive<WebsiteConfig>({
-  websiteName: "判题狗",
+  websiteName: '判题狗',
   allowRegister: false,
   submissionListShowAll: true,
   classList: [],
@@ -42,8 +42,8 @@ const websiteConfig = reactive<WebsiteConfig>({
  * 上一次存进去（或刚读回来）的内容。和它一样就不存 —— 读回配置本身也是一次改动，
  * 只看「读完没有」的话，那次改动的延迟保存会在读完之后照样发出去
  */
-let savedSnapshot = ""
-const saveState = ref<"idle" | "saving" | "saved" | "failed">("idle")
+let savedSnapshot = ''
+const saveState = ref<'idle' | 'saving' | 'saved' | 'failed'>('idle')
 
 async function getWebsiteConfig() {
   const res = await getWebsite()
@@ -65,29 +65,27 @@ watchDebounced(
 
 async function saveWebsiteConfig() {
   if (!websiteConfig.websiteName.trim()) {
-    saveState.value = "failed"
-    message.error("网站名不能空着")
+    saveState.value = 'failed'
+    message.error('网站名不能空着')
     return
   }
   // 班级号要和用户名里 ks 后面那段对得上，位数不对登录页会查不到该班学生。后端也会拦
   const invalid = websiteConfig.classList.filter((c) => !CLASS_NAME_RE.test(c))
   if (invalid.length) {
-    message.error(
-      `班级号 ${invalid.join("、")} 必须是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字`,
-    )
+    message.error(`班级号 ${invalid.join('、')} 必须是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字`)
     return
   }
-  saveState.value = "saving"
+  saveState.value = 'saving'
   const snapshot = JSON.stringify(websiteConfig)
   try {
     await editWebsite(websiteConfig)
     savedSnapshot = snapshot
   } catch (err) {
-    saveState.value = "failed"
-    message.error("没保存上：" + errorMessage(err))
+    saveState.value = 'failed'
+    message.error('没保存上：' + errorMessage(err))
     return
   }
-  saveState.value = "saved"
+  saveState.value = 'saved'
   // 广播由后端在 POST /admin/website 里做，开着页面的人不用刷新
   configStore.getConfig()
 }
@@ -98,18 +96,18 @@ async function saveWebsiteConfig() {
 const classGroups = computed(() => {
   const groups = new Map<string, string[]>()
   for (const name of websiteConfig.classList) {
-    const grade = /^\d{3,}$/.test(name) ? name.slice(0, 2) : "其他"
+    const grade = /^\d{3,}$/.test(name) ? name.slice(0, 2) : '其他'
     groups.set(grade, [...(groups.get(grade) ?? []), name])
   }
   return [...groups.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([grade, list]) => ({
       grade,
-      list: [...list].sort((a, b) => a.localeCompare(b, "zh-CN", { numeric: true })),
+      list: [...list].sort((a, b) => a.localeCompare(b, 'zh-CN', { numeric: true })),
     }))
 })
 
-const newClass = ref("")
+const newClass = ref('')
 function addClass() {
   const value = newClass.value.trim()
   if (!value) return
@@ -122,7 +120,7 @@ function addClass() {
     return
   }
   websiteConfig.classList = [...websiteConfig.classList, value]
-  newClass.value = ""
+  newClass.value = ''
 }
 
 function removeClass(name: string) {
@@ -131,10 +129,10 @@ function removeClass(name: string) {
 
 // ---------------------------------------------------------------- 判题机
 
-const token = ref("")
+const token = ref('')
 const tokenShown = ref(false)
 const servers = ref<Server[]>([])
-const abnormalServers = computed(() => servers.value.filter((item) => item.status === "abnormal"))
+const abnormalServers = computed(() => servers.value.filter((item) => item.status === 'abnormal'))
 
 async function getJudgeServerData() {
   const res = await getJudgeServer()
@@ -145,7 +143,7 @@ async function getJudgeServerData() {
 /** 上一次心跳：一分钟内写「刚刚还在」，否则「N 分钟 / 小时 / 天没动静了」 */
 function heartbeatText(server: Server) {
   const seconds = Math.max(0, (Date.now() - Date.parse(server.lastHeartbeat)) / 1000)
-  if (seconds < 60) return "刚刚还在"
+  if (seconds < 60) return '刚刚还在'
   if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟没动静了`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时没动静了`
   return `${Math.floor(seconds / 86400)} 天没动静了`
@@ -153,18 +151,18 @@ function heartbeatText(server: Server) {
 
 async function delJudgeServer(hostname: string) {
   await deleteJudgeServer(hostname)
-  message.success("删掉了")
+  message.success('删掉了')
   getJudgeServerData()
 }
 
 async function deleteAbnormalServers() {
   await Promise.all(abnormalServers.value.map((item) => deleteJudgeServer(item.hostname)))
-  message.success("删掉了")
+  message.success('删掉了')
   getJudgeServerData()
 }
 
 async function copyToken() {
-  if (await copyToClipboard(token.value)) message.success("复制好了")
+  if (await copyToClipboard(token.value)) message.success('复制好了')
 }
 
 // ---------------------------------------------------------------- 无效的测试用例
@@ -177,7 +175,7 @@ async function getTestcases() {
 
 async function deleteTestcase(id?: string) {
   await pruneInvalidTestcases(id)
-  message.success("删掉了")
+  message.success('删掉了')
   getTestcases()
 }
 
@@ -191,8 +189,8 @@ const orphanImages = ref<OrphanImage[] | null>(null)
 const scanningImages = ref(false)
 
 const IMAGE_GROUPS = [
-  { folder: "upload", label: "编辑器里删掉的图" },
-  { folder: "avatar", label: "换下来的头像" },
+  { folder: 'upload', label: '编辑器里删掉的图' },
+  { folder: 'avatar', label: '换下来的头像' },
 ] as const
 
 const imageGroups = computed(() =>
@@ -249,11 +247,7 @@ onMounted(() => {
     <h3>网站</h3>
     <div class="field">
       <label for="site-name" class="field-label">网站名</label>
-      <n-input
-        v-model:value="websiteConfig.websiteName"
-        :input-props="{ id: 'site-name' }"
-        style="width: 240px"
-      />
+      <n-input v-model:value="websiteConfig.websiteName" :input-props="{ id: 'site-name' }" style="width: 240px" />
       <n-text depth="3" class="hint">顶栏左上角和浏览器标签页上显示的名字</n-text>
     </div>
   </section>
@@ -263,27 +257,16 @@ onMounted(() => {
       班级 <span class="count">{{ websiteConfig.classList.length }} 个</span>
     </h3>
     <div v-for="group in classGroups" :key="group.grade" class="grade listed">
-      <span class="grade-label">{{ group.grade === "其他" ? "其他" : `${group.grade} 级` }}</span>
+      <span class="grade-label">{{ group.grade === '其他' ? '其他' : `${group.grade} 级` }}</span>
       <div class="chips">
-        <n-tag
-          v-for="name in group.list"
-          :key="name"
-          closable
-          :bordered="false"
-          @close="removeClass(name)"
-        >
+        <n-tag v-for="name in group.list" :key="name" closable :bordered="false" @close="removeClass(name)">
           {{ classLabel(name) }}
         </n-tag>
       </div>
     </div>
     <div class="grade">
       <span class="grade-label"></span>
-      <n-input
-        v-model:value="newClass"
-        placeholder="加一个班，如 2613"
-        style="width: 180px"
-        @keyup.enter="addClass"
-      />
+      <n-input v-model:value="newClass" placeholder="加一个班，如 2613" style="width: 180px" @keyup.enter="addClass" />
       <n-button @click="addClass">加</n-button>
       <n-text depth="3" class="hint">批量建号时新班级会自动加进来，这里主要是删掉毕业的班</n-text>
     </div>
@@ -304,14 +287,7 @@ onMounted(() => {
   <section class="block">
     <h3>
       判题机
-      <n-button
-        v-if="abnormalServers.length > 1"
-        size="small"
-        style="margin-left: 8px"
-        @click="deleteAbnormalServers"
-      >
-        把断了的都删掉
-      </n-button>
+      <n-button v-if="abnormalServers.length > 1" size="small" style="margin-left: 8px" @click="deleteAbnormalServers"> 把断了的都删掉 </n-button>
     </h3>
     <n-empty v-if="!servers.length" description="一台都没有连上" />
     <div v-for="server in servers" :key="server.hostname" class="server">
@@ -321,25 +297,16 @@ onMounted(() => {
         {{ server.cpuCore }} 核 · CPU {{ server.cpuUsage }}% · 内存 {{ server.memoryUsage }}% · 版本
         {{ server.judgerVersion }}
       </span>
-      <span
-        :class="server.status === 'normal' ? 'ok-text' : 'bad-text'"
-        :title="parseTime(server.lastHeartbeat, 'YYYY-MM-DD HH:mm:ss')"
-      >
+      <span :class="server.status === 'normal' ? 'ok-text' : 'bad-text'" :title="parseTime(server.lastHeartbeat, 'YYYY-MM-DD HH:mm:ss')">
         {{ heartbeatText(server) }}
       </span>
-      <n-button
-        v-if="server.status !== 'normal'"
-        size="small"
-        @click="delJudgeServer(server.hostname)"
-      >
-        删掉
-      </n-button>
+      <n-button v-if="server.status !== 'normal'" size="small" @click="delJudgeServer(server.hostname)"> 删掉 </n-button>
     </div>
     <div class="server token">
       <span class="muted">接口凭证</span>
-      <span class="mono">{{ tokenShown ? token : "••••••••••••" }}</span>
+      <span class="mono">{{ tokenShown ? token : '••••••••••••' }}</span>
       <n-button size="small" @click="tokenShown = !tokenShown">
-        {{ tokenShown ? "藏起来" : "显示" }}
+        {{ tokenShown ? '藏起来' : '显示' }}
       </n-button>
       <n-button size="small" @click="copyToken">复制</n-button>
     </div>
@@ -349,12 +316,10 @@ onMounted(() => {
     <h3>
       没人用的图片
       <n-button size="small" style="margin-left: 8px" :loading="scanningImages" @click="scanImages">
-        {{ orphanImages ? "再查一遍" : "查一下" }}
+        {{ orphanImages ? '再查一遍' : '查一下' }}
       </n-button>
     </h3>
-    <n-text v-if="orphanImages && !imageGroups.length" depth="3" class="hint">
-      都有地方在用
-    </n-text>
+    <n-text v-if="orphanImages && !imageGroups.length" depth="3" class="hint"> 都有地方在用 </n-text>
     <div v-for="group in imageGroups" :key="group.folder" class="image-group">
       <div class="image-group-head">
         {{ group.label }}
@@ -368,21 +333,10 @@ onMounted(() => {
       </div>
       <div class="thumbs">
         <div v-for="image in group.images" :key="image.name" class="thumb">
-          <a
-            :href="image.url"
-            target="_blank"
-            :title="`${image.name} · ${parseTime(new Date(image.createTime * 1000), 'YYYY-MM-DD')}`"
-          >
+          <a :href="image.url" target="_blank" :title="`${image.name} · ${parseTime(new Date(image.createTime * 1000), 'YYYY-MM-DD')}`">
             <img :src="image.url" alt="" loading="lazy" />
           </a>
-          <button
-            type="button"
-            class="thumb-delete"
-            title="删掉"
-            @click="deleteImages({ folder: image.folder, name: image.name })"
-          >
-            ×
-          </button>
+          <button type="button" class="thumb-delete" title="删掉" @click="deleteImages({ folder: image.folder, name: image.name })">×</button>
         </div>
       </div>
     </div>
@@ -395,13 +349,7 @@ onMounted(() => {
     </h3>
     <n-text depth="3" class="hint">删题时测试数据留在了磁盘上（故意的，删错了还能捞回来）</n-text>
     <div class="chips">
-      <n-tag
-        v-for="item in testcases"
-        :key="item.id"
-        closable
-        :bordered="false"
-        @close="deleteTestcase(item.id)"
-      >
+      <n-tag v-for="item in testcases" :key="item.id" closable :bordered="false" @close="deleteTestcase(item.id)">
         {{ item.id }}
       </n-tag>
     </div>
@@ -416,7 +364,7 @@ onMounted(() => {
   margin-bottom: 16px;
   padding: 16px 18px;
   border-radius: 10px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
 }
 
 h3 {
@@ -430,7 +378,7 @@ h3 {
   margin-left: 8px;
   font-size: 13px;
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .field,
@@ -445,7 +393,7 @@ h3 {
 .field-label {
   width: 60px;
   font-size: 14px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .hint {
@@ -456,7 +404,7 @@ h3 {
   width: 50px;
   flex: none;
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .chips {
@@ -489,8 +437,8 @@ h3 {
   height: 72px;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.actionColor");
+  border: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.actionColor');
 }
 
 .thumb img {
@@ -535,23 +483,23 @@ h3 {
 }
 
 .dot.ok {
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .dot.bad {
-  background: v-bind("theme.errorColor");
+  background: v-bind('theme.errorColor');
 }
 
 .ok-text {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .bad-text {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .token {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useCollabStore } from "shared/store/collab"
+import { useCollabStore } from 'shared/store/collab'
 
 /**
  * 课堂求助的全局界面：一次性提示、老师接单后跳到那道题。

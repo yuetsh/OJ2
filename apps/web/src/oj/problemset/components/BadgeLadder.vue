@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useTone } from "shared/composables/tone"
-import { parseTime } from "utils/functions"
-import type { ProblemSet } from "utils/types"
-import { badgeCondition, badgeShortfall, ladder, nextBadge } from "../badges"
+import { useThemeVars } from 'naive-ui'
+import { useTone } from 'shared/composables/tone'
+import { parseTime } from 'utils/functions'
+import type { ProblemSet } from 'utils/types'
+import { badgeCondition, badgeShortfall, ladder, nextBadge } from '../badges'
 
 /**
  * 奖章阶梯（设计稿「题单重设计」详情 B）：一排奖章连成一条线，拿到的亮、写哪天拿的；
@@ -20,8 +20,8 @@ const steps = computed(() => {
     next: badge.id === next,
     sub: badge.isEarned
       ? badge.earnedTime
-        ? parseTime(badge.earnedTime, "M月D日")
-        : "拿到了"
+        ? parseTime(badge.earnedTime, 'M月D日')
+        : '拿到了'
       : badge.id === next && props.set.userProgress.isJoined
         ? `再做对 ${badgeShortfall(badge, props.set)} 道`
         : badgeCondition(badge),
@@ -34,7 +34,7 @@ const filled = computed(() => {
   return steps.value.length > 1 && last > 0 ? last / (steps.value.length - 1) : 0
 })
 
-const warning = computed(() => tone("warning"))
+const warning = computed(() => tone('warning'))
 </script>
 
 <template>
@@ -49,11 +49,7 @@ const warning = computed(() => tone("warning"))
       :title="`${step.badge.name} · ${badgeCondition(step.badge)}${step.badge.description ? `\n${step.badge.description}` : ''}`"
     >
       <span class="medal" :class="{ next: step.next }">
-        <img
-          :src="step.badge.icon"
-          :alt="step.badge.name"
-          :class="{ locked: !step.badge.isEarned }"
-        />
+        <img :src="step.badge.icon" :alt="step.badge.name" :class="{ locked: !step.badge.isEarned }" />
       </span>
       <b class="name" :class="{ dim: !step.badge.isEarned }">{{ step.badge.name }}</b>
       <span class="sub" :class="{ urge: step.next && !step.badge.isEarned }">{{ step.sub }}</span>
@@ -74,12 +70,12 @@ const warning = computed(() => tone("warning"))
   right: 46px;
   top: 21px;
   height: 3px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .track-fill {
   height: 100%;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .step {
@@ -96,7 +92,7 @@ const warning = computed(() => tone("warning"))
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -125,19 +121,19 @@ const warning = computed(() => tone("warning"))
 }
 
 .name.dim {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-weight: 400;
 }
 
 .sub {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
 .sub.urge {
-  color: v-bind("warning.color");
+  color: v-bind('warning.color');
   font-weight: 600;
 }
 </style>

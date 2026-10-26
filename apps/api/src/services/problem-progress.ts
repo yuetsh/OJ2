@@ -1,12 +1,12 @@
-import { FLOWCHART_PASS_GRADES, type ProblemProgress } from "@oj2/contract"
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { FLOWCHART_PASS_GRADES, type ProblemProgress } from '@oj2/contract'
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { isAccepted, UNJUDGED_RESULTS } from "../judge/status"
-import { asRecord } from "../routes/helpers"
-import { calendarDay, dayNumber, dayText, weekStart } from "../time"
-import { accepted } from "./learning-stats"
-import { cached } from "./cache"
+import { db, schema } from '../db'
+import { isAccepted, UNJUDGED_RESULTS } from '../judge/status'
+import { asRecord } from '../routes/helpers'
+import { calendarDay, dayNumber, dayText, weekStart } from '../time'
+import { accepted } from './learning-stats'
+import { cached } from './cache'
 
 /**
  * 一个人在公开题库里的做题状态：做对了哪些、交过哪些。
@@ -17,18 +17,11 @@ import { cached } from "./cache"
  */
 export async function problemStates(userId: number) {
   const [[profile], flowRows] = await Promise.all([
-    db
-      .select({ value: schema.userProfile.acmProblemsStatus })
-      .from(schema.userProfile)
-      .where(eq(schema.userProfile.userId, userId))
-      .limit(1),
+    db.select({ value: schema.userProfile.acmProblemsStatus }).from(schema.userProfile).where(eq(schema.userProfile.userId, userId)).limit(1),
     db
       .select({
         problemId: schema.flowchartSubmission.problemId,
-        passed: sql<boolean>`bool_or(${schema.flowchartSubmission.status} = 2 and ${inArray(
-          schema.flowchartSubmission.aiGrade,
-          [...FLOWCHART_PASS_GRADES],
-        )})`,
+        passed: sql<boolean>`bool_or(${schema.flowchartSubmission.status} = 2 and ${inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES])})`,
       })
       .from(schema.flowchartSubmission)
       .where(eq(schema.flowchartSubmission.userId, userId))
@@ -39,7 +32,7 @@ export async function problemStates(userId: number) {
   for (const [key, raw] of Object.entries(asRecord(asRecord(profile?.value).problems))) {
     const id = Number(key)
     const status = asRecord(raw).status
-    if (!Number.isInteger(id) || typeof status !== "number") continue
+    if (!Number.isInteger(id) || typeof status !== 'number') continue
     tried.add(id)
     if (isAccepted(status)) solved.add(id)
   }
@@ -55,7 +48,7 @@ export async function problemStates(userId: number) {
  * （见 services/cache.ts），列表上的人数最多晚 10 秒。
  */
 export function allProblemUserCounts() {
-  return cached("problem-user-counts", 10_000, () => problemUserCounts())
+  return cached('problem-user-counts', 10_000, () => problemUserCounts())
 }
 
 /**
@@ -68,10 +61,7 @@ export async function problemUserCounts(problemIds?: number[]) {
   const rows = await db
     .select({
       problemId: schema.submission.problemId,
-      solved: sql<number>`count(distinct ${schema.submission.userId}) filter (where ${inArray(
-        schema.submission.result,
-        accepted,
-      )})`.mapWith(Number),
+      solved: sql<number>`count(distinct ${schema.submission.userId}) filter (where ${inArray(schema.submission.result, accepted)})`.mapWith(Number),
       tried: sql<number>`count(distinct ${schema.submission.userId})`.mapWith(Number),
     })
     .from(schema.submission)
@@ -95,17 +85,11 @@ export async function problemUserCounts(problemIds?: number[]) {
  * 隐藏成就不提示（会泄露门槛），完成比例最高的那个；一样高按下面的先后挑 ——
  * 新生所有成就都是 0，不按先后的话会挑中「做对 1 道困难题」，把刚来的人往最难的题上引。
  */
-const HINT_METRICS = [
-  "accepted_count",
-  "mid_ac_count",
-  "hard_ac_count",
-  "active_days",
-  "max_ac_week_streak",
-]
+const HINT_METRICS = ['accepted_count', 'mid_ac_count', 'hard_ac_count', 'active_days', 'max_ac_week_streak']
 
 function numberOf(metrics: Record<string, unknown>, key: string) {
   const value = metrics[key]
-  return typeof value === "number" ? value : 0
+  return typeof value === 'number' ? value : 0
 }
 
 /**
@@ -114,21 +98,15 @@ function numberOf(metrics: Record<string, unknown>, key: string) {
  */
 export function currentWeekStreak(metrics: Record<string, unknown>) {
   const monday = calendarDay(weekStart())
-  const lastWeek = typeof metrics._last_ac_week === "string" ? metrics._last_ac_week : ""
+  const lastWeek = typeof metrics._last_ac_week === 'string' ? metrics._last_ac_week : ''
   const previousMonday = dayText(dayNumber(monday) - 7)
-  return lastWeek === monday || lastWeek === previousMonday
-    ? numberOf(metrics, "_current_ac_week_streak")
-    : 0
+  return lastWeek === monday || lastWeek === previousMonday ? numberOf(metrics, '_current_ac_week_streak') : 0
 }
 
 export async function buildProblemProgress(userId: number): Promise<ProblemProgress> {
   const [states, statRows, achievements, unlockedRows] = await Promise.all([
     problemStates(userId),
-    db
-      .select({ metrics: schema.userStat.metrics })
-      .from(schema.userStat)
-      .where(eq(schema.userStat.userId, userId))
-      .limit(1),
+    db.select({ metrics: schema.userStat.metrics }).from(schema.userStat).where(eq(schema.userStat.userId, userId)).limit(1),
     db
       .select()
       .from(schema.achievement)
@@ -136,14 +114,11 @@ export async function buildProblemProgress(userId: number): Promise<ProblemProgr
         and(
           eq(schema.achievement.visible, true),
           eq(schema.achievement.hidden, false),
-          eq(schema.achievement.operator, "gte"),
+          eq(schema.achievement.operator, 'gte'),
           inArray(schema.achievement.metric, HINT_METRICS),
         ),
       ),
-    db
-      .select({ id: schema.userAchievement.achievementId })
-      .from(schema.userAchievement)
-      .where(eq(schema.userAchievement.userId, userId)),
+    db.select({ id: schema.userAchievement.achievementId }).from(schema.userAchievement).where(eq(schema.userAchievement.userId, userId)),
   ])
   const metrics = asRecord(statRows[0]?.metrics)
 
@@ -171,28 +146,23 @@ export async function buildProblemProgress(userId: number): Promise<ProblemProgr
       .groupBy(schema.problemTags.problemtagId)
     for (const row of rows) byTag[String(row.tagId)] = row.n
   }
-  const almost = visibleRows
-    .filter((row) => states.tried.has(row.id) && !states.solved.has(row.id))
-    .map((row) => ({ _id: row.displayId, title: row.title }))
+  const almost = visibleRows.filter((row) => states.tried.has(row.id) && !states.solved.has(row.id)).map((row) => ({ _id: row.displayId, title: row.title }))
 
   // 这周：_ac_per_day 的键是东八区日历日，周一起算（和周榜、连续周数同一个口径）
   const monday = calendarDay(weekStart())
   let weekSolved = 0
   for (const [day, n] of Object.entries(asRecord(metrics._ac_per_day))) {
-    if (day >= monday && typeof n === "number") weekSolved += n
+    if (day >= monday && typeof n === 'number') weekSolved += n
   }
   const weekStreak = currentWeekStreak(metrics)
 
   const unlocked = new Set(unlockedRows.map((row) => row.id))
-  let next: ProblemProgress["next"] = null
+  let next: ProblemProgress['next'] = null
   let best = -1
   for (const achievement of achievements) {
     if (unlocked.has(achievement.id) || achievement.threshold <= 0) continue
     // 连续周数看的是「现在连着几周」，不是历史最长：断过的人从头数
-    const progress =
-      achievement.metric === "max_ac_week_streak"
-        ? weekStreak
-        : numberOf(metrics, achievement.metric)
+    const progress = achievement.metric === 'max_ac_week_streak' ? weekStreak : numberOf(metrics, achievement.metric)
     if (progress >= achievement.threshold) continue
     const ratio = progress / achievement.threshold
     // 一样高：先按指标先后，同一个指标挑门槛低的（「初出茅庐」而不是「渐入佳境」）
@@ -200,8 +170,7 @@ export async function buildProblemProgress(userId: number): Promise<ProblemProgr
     const tie =
       next !== null &&
       ratio === best &&
-      (order < HINT_METRICS.indexOf(next.metric) ||
-        (achievement.metric === next.metric && achievement.threshold < next.threshold))
+      (order < HINT_METRICS.indexOf(next.metric) || (achievement.metric === next.metric && achievement.threshold < next.threshold))
     if (ratio > best || tie) {
       best = ratio
       next = {
@@ -216,7 +185,7 @@ export async function buildProblemProgress(userId: number): Promise<ProblemProgr
   }
 
   return {
-    solved: numberOf(metrics, "accepted_count"),
+    solved: numberOf(metrics, 'accepted_count'),
     weekSolved,
     weekStreak,
     almost,

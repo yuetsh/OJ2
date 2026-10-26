@@ -1,4 +1,4 @@
-import { streamAI } from "utils/stream"
+import { streamAI } from 'utils/stream'
 
 /**
  * 组件里发 AI 流式请求：同一时刻只跑一条（再点一次会先掐掉上一条），组件卸载时

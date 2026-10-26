@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { OutlineItem } from "../composables/useLessonParse"
+import { Icon } from '@iconify/vue'
+import type { OutlineItem } from '../composables/useLessonParse'
 
 /**
  * 右边「这一课」：各节标题，有练一练的节后面挂一支笔（做对了再打个勾），
@@ -14,10 +14,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ jump: [id: string] }>()
 
-const solvedCount = computed(
-  () =>
-    props.items.flatMap((item) => item.exerciseIds).filter((id) => props.solvedIds.has(id)).length,
-)
+const solvedCount = computed(() => props.items.flatMap((item) => item.exerciseIds).filter((id) => props.solvedIds.has(id)).length)
 
 function allSolved(item: OutlineItem) {
   return item.exerciseIds.every((id) => props.solvedIds.has(id))
@@ -27,14 +24,7 @@ function allSolved(item: OutlineItem) {
 <template>
   <nav class="outline" aria-label="这一课">
     <div class="title">这一课</div>
-    <a
-      v-for="item in items"
-      :key="item.id"
-      :href="`#${item.id}`"
-      class="item"
-      :class="{ active: item.id === activeId }"
-      @click.prevent="emit('jump', item.id)"
-    >
+    <a v-for="item in items" :key="item.id" :href="`#${item.id}`" class="item" :class="{ active: item.id === activeId }" @click.prevent="emit('jump', item.id)">
       <span class="mark" />
       <span class="text">{{ item.text }}</span>
       <span v-if="item.exerciseIds.length" class="ex" :class="{ ok: allSolved(item) }">

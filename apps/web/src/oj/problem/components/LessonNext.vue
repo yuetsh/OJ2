@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useLessonStore } from "shared/store/lesson"
-import ChallengeList from "./ChallengeList.vue"
+import { useThemeVars } from 'naive-ui'
+import { useLessonStore } from 'shared/store/lesson'
+import ChallengeList from './ChallengeList.vue'
 
 /**
  * 通过之后告诉学生「这节课的下一题是哪道」。
@@ -29,7 +29,7 @@ const lessonStore = useLessonStore()
 const theme = useThemeVars()
 // 暗色主题的主色是浅薄荷绿，按钮上的白字看不清，换深色字（和 Naive 自己的主按钮一样）
 const isDark = useDark()
-const buttonText = computed(() => (isDark.value ? "rgba(0, 0, 0, 0.85)" : "#fff"))
+const buttonText = computed(() => (isDark.value ? 'rgba(0, 0, 0, 0.85)' : '#fff'))
 
 // 一般课堂条早就拉过了，这里只是兜底（旧了才拉）
 onMounted(() => lessonStore.load())
@@ -37,12 +37,10 @@ onMounted(() => lessonStore.load())
 const lesson = computed(() => lessonStore.nextAfter(props.problemDisplayId))
 
 // 设计稿和上下文条都叫「这节课」，不区分是老师布置的还是从同班提交推断的
-const label = "这节课"
+const label = '这节课'
 
 /** 这节课的几道题：都做完了以后，这几道里还能挑战的列出来（设计稿 StkDone） */
-const lessonProblemIds = computed(
-  () => lessonStore.activity?.problems.map((item) => item.problemDisplayId) ?? [],
-)
+const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item) => item.problemDisplayId) ?? [])
 </script>
 
 <template>
@@ -53,13 +51,11 @@ const lessonProblemIds = computed(
         <span class="headline">{{ label }}还剩 {{ lesson.remaining }} 道</span>
         <span class="detail">
           {{ lesson.next.problemDisplayId }}
-          {{ lesson.next.myStatus === "tried" ? "你做过，还没对" : "你还没做过" }}
+          {{ lesson.next.myStatus === 'tried' ? '你做过，还没对' : '你还没做过' }}
         </span>
       </div>
       <router-link :to="`/problem/${lesson.next.problemDisplayId}`" class="next">
-        <span class="next-label"
-          >下一题：{{ lesson.next.problemDisplayId }} {{ lesson.next.title }}</span
-        >
+        <span class="next-label">下一题：{{ lesson.next.problemDisplayId }} {{ lesson.next.title }}</span>
         <svg
           width="16"
           height="16"
@@ -117,7 +113,7 @@ const lessonProblemIds = computed(
 
 .detail {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .next {
@@ -130,19 +126,19 @@ const lessonProblemIds = computed(
   height: 44px;
   padding: 0 20px;
   border-radius: 6px;
-  background-color: v-bind("theme.primaryColor");
-  color: v-bind("buttonText");
+  background-color: v-bind('theme.primaryColor');
+  color: v-bind('buttonText');
   font-size: 15px;
   font-weight: 600;
   text-decoration: none;
 }
 
 .next:hover {
-  background-color: v-bind("theme.primaryColorHover");
+  background-color: v-bind('theme.primaryColorHover');
 }
 
 .next:focus-visible {
-  outline: 2px solid v-bind("theme.primaryColorPressed");
+  outline: 2px solid v-bind('theme.primaryColorPressed');
   outline-offset: 2px;
 }
 
@@ -150,7 +146,7 @@ const lessonProblemIds = computed(
   display: inline-block;
   margin-top: 12px;
   font-size: 14px;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .more:hover {
@@ -159,8 +155,8 @@ const lessonProblemIds = computed(
 
 .next.secondary {
   background-color: transparent;
-  border: 1px solid v-bind("theme.primaryColor");
-  color: v-bind("theme.primaryColorPressed");
+  border: 1px solid v-bind('theme.primaryColor');
+  color: v-bind('theme.primaryColorPressed');
 }
 
 /* 题目名可能很长（带 emoji 的、二十几个字的），按钮别把结果面板撑宽 */

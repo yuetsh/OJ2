@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { markdown } from "@codemirror/lang-markdown"
-import { EditorSelection } from "@codemirror/state"
-import { EditorView, keymap } from "@codemirror/view"
-import { Icon } from "@iconify/vue"
-import CodeMirror from "./CodeMirror.vue"
-import { uploadImage } from "../../admin/api"
-import { styleTheme } from "../extensions/baseTheme"
-import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
+import { markdown } from '@codemirror/lang-markdown'
+import { EditorSelection } from '@codemirror/state'
+import { EditorView, keymap } from '@codemirror/view'
+import { Icon } from '@iconify/vue'
+import CodeMirror from './CodeMirror.vue'
+import { uploadImage } from '../../admin/api'
+import { styleTheme } from '../extensions/baseTheme'
+import { darkCodeTheme, lightCodeTheme } from '../themes/codeTheme'
 
 /**
  * 后台教程正文的 Markdown 编辑器：左边写，右边由教程编辑页用学生端同一套组件预览。
@@ -14,13 +14,13 @@ import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
  * 而这里只需要一个能插格式、能传图的文本框，所以换成项目里已有的 CodeMirror。
  * 图片三种进法：工具栏按钮选文件、粘贴、拖进来，都是先传到服务器再插 ![](地址)。
  */
-const { height, codeLang = "python" } = defineProps<{
+const { height, codeLang = 'python' } = defineProps<{
   height?: string
   /** 「代码块」按钮插入的语言：教程里标了 python / c 的代码块在学生端是能运行的 */
   codeLang?: string
 }>()
 
-const modelValue = defineModel<string>("value")
+const modelValue = defineModel<string>('value')
 
 const isDark = useDark()
 const message = useMessage()
@@ -35,10 +35,7 @@ function wrap(before: string, after: string, placeholder: string) {
       const text = range.empty ? placeholder : v.state.sliceDoc(range.from, range.to)
       return {
         changes: { from: range.from, to: range.to, insert: before + text + after },
-        range: EditorSelection.range(
-          range.from + before.length,
-          range.from + before.length + text.length,
-        ),
+        range: EditorSelection.range(range.from + before.length, range.from + before.length + text.length),
       }
     }),
   )
@@ -68,7 +65,7 @@ function insertBlock(text: string, cursor = text.length) {
   if (!v) return
   const { from, to } = v.state.selection.main
   const line = v.state.doc.lineAt(from)
-  const lead = from === line.from ? "" : "\n"
+  const lead = from === line.from ? '' : '\n'
   const insert = `${lead}${text}\n`
   v.dispatch({
     changes: { from, to, insert },
@@ -85,17 +82,17 @@ function insert(text: string) {
 defineExpose({ insert })
 
 const uploading = ref(false)
-const fileInput = useTemplateRef<HTMLInputElement>("fileInput")
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 
 async function uploadAndInsert(files: File[]) {
-  const images = files.filter((file) => file.type.startsWith("image/"))
+  const images = files.filter((file) => file.type.startsWith('image/'))
   if (!images.length) return
   uploading.value = true
   try {
-    const paths = await Promise.all(images.map((file) => uploadImage(file).catch(() => "")))
-    if (paths.some((path) => !path)) message.error("有图片没传上去")
+    const paths = await Promise.all(images.map((file) => uploadImage(file).catch(() => '')))
+    if (paths.some((path) => !path)) message.error('有图片没传上去')
     const ok = paths.filter(Boolean)
-    if (ok.length) insertBlock(ok.map((path) => `![](${path})`).join("\n"))
+    if (ok.length) insertBlock(ok.map((path) => `![](${path})`).join('\n'))
   } finally {
     uploading.value = false
   }
@@ -104,20 +101,20 @@ async function uploadAndInsert(files: File[]) {
 function onPickImages(e: Event) {
   const input = e.target as HTMLInputElement
   void uploadAndInsert([...(input.files ?? [])])
-  input.value = ""
+  input.value = ''
 }
 
 const imageEvents = EditorView.domEventHandlers({
   paste(event) {
     const files = [...(event.clipboardData?.files ?? [])]
-    if (!files.some((file) => file.type.startsWith("image/"))) return false
+    if (!files.some((file) => file.type.startsWith('image/'))) return false
     event.preventDefault()
     void uploadAndInsert(files)
     return true
   },
   drop(event, v) {
     const files = [...(event.dataTransfer?.files ?? [])]
-    if (!files.some((file) => file.type.startsWith("image/"))) return false
+    if (!files.some((file) => file.type.startsWith('image/'))) return false
     event.preventDefault()
     // 插到松手的位置
     const pos = v.posAtCoords({ x: event.clientX, y: event.clientY })
@@ -128,13 +125,13 @@ const imageEvents = EditorView.domEventHandlers({
 })
 
 const shortcuts = keymap.of([
-  { key: "Mod-b", run: () => (wrap("**", "**", "加粗文字"), true) },
-  { key: "Mod-i", run: () => (wrap("*", "*", "斜体文字"), true) },
+  { key: 'Mod-b', run: () => (wrap('**', '**', '加粗文字'), true) },
+  { key: 'Mod-i', run: () => (wrap('*', '*', '斜体文字'), true) },
 ])
 
 /** styleTheme 只写了 Monaco，机房的 Windows 没有它；和 Markdown.vue 里代码的字体保持一致 */
 const fontTheme = EditorView.theme({
-  "& .cm-scroller": { fontFamily: "Consolas, Monaco, monospace" },
+  '& .cm-scroller': { fontFamily: 'Consolas, Monaco, monospace' },
 })
 
 const extensions = computed(() => [
@@ -148,60 +145,39 @@ const extensions = computed(() => [
 ])
 
 const tools = computed(() => [
-  { icon: "ph:text-h-two-bold", title: "标题", run: () => prefixLines(() => "## ") },
-  { icon: "ph:text-b-bold", title: "加粗（Ctrl+B）", run: () => wrap("**", "**", "加粗文字") },
-  { icon: "ph:code-bold", title: "行内代码", run: () => wrap("`", "`", "代码") },
+  { icon: 'ph:text-h-two-bold', title: '标题', run: () => prefixLines(() => '## ') },
+  { icon: 'ph:text-b-bold', title: '加粗（Ctrl+B）', run: () => wrap('**', '**', '加粗文字') },
+  { icon: 'ph:code-bold', title: '行内代码', run: () => wrap('`', '`', '代码') },
   {
-    icon: "ph:code-block-bold",
+    icon: 'ph:code-block-bold',
     title: `代码块（${codeLang}，学生那边能运行）`,
     run: () => insertBlock(`\`\`\`${codeLang}\n\n\`\`\``, codeLang.length + 4),
   },
-  { icon: "ph:list-bullets-bold", title: "无序列表", run: () => prefixLines(() => "- ") },
-  { icon: "ph:list-numbers-bold", title: "有序列表", run: () => prefixLines((i) => `${i + 1}. `) },
-  { icon: "ph:quotes-bold", title: "引用", run: () => prefixLines(() => "> ") },
+  { icon: 'ph:list-bullets-bold', title: '无序列表', run: () => prefixLines(() => '- ') },
+  { icon: 'ph:list-numbers-bold', title: '有序列表', run: () => prefixLines((i) => `${i + 1}. `) },
+  { icon: 'ph:quotes-bold', title: '引用', run: () => prefixLines(() => '> ') },
   {
-    icon: "ph:table-bold",
-    title: "表格",
-    run: () => insertBlock("| 列 1 | 列 2 |\n| --- | --- |\n|  |  |"),
+    icon: 'ph:table-bold',
+    title: '表格',
+    run: () => insertBlock('| 列 1 | 列 2 |\n| --- | --- |\n|  |  |'),
   },
-  { icon: "ph:link-bold", title: "链接", run: () => wrap("[", "](https://)", "链接文字") },
+  { icon: 'ph:link-bold', title: '链接', run: () => wrap('[', '](https://)', '链接文字') },
 ])
 </script>
 
 <template>
   <div class="editor-box" :style="height ? { height } : undefined">
     <div class="toolbar">
-      <button
-        v-for="tool in tools"
-        :key="tool.icon"
-        type="button"
-        class="tool"
-        :title="tool.title"
-        :aria-label="tool.title"
-        @click="tool.run"
-      >
+      <button v-for="tool in tools" :key="tool.icon" type="button" class="tool" :title="tool.title" :aria-label="tool.title" @click="tool.run">
         <Icon :icon="tool.icon" :width="16" />
       </button>
-      <button
-        type="button"
-        class="tool"
-        title="图片（也可以直接粘贴、拖进来）"
-        aria-label="插入图片"
-        :disabled="uploading"
-        @click="fileInput?.click()"
-      >
+      <button type="button" class="tool" title="图片（也可以直接粘贴、拖进来）" aria-label="插入图片" :disabled="uploading" @click="fileInput?.click()">
         <Icon icon="ph:image-bold" :width="16" />
       </button>
       <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="onPickImages" />
     </div>
     <div class="body">
-      <CodeMirror
-        v-model="modelValue"
-        :extensions="extensions"
-        :tab-size="4"
-        font-size="14px"
-        @ready="view = $event"
-      />
+      <CodeMirror v-model="modelValue" :extensions="extensions" :tab-size="4" font-size="14px" @ready="view = $event" />
     </div>
   </div>
 </template>

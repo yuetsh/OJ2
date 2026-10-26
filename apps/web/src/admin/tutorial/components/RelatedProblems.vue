@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import {
-  TUTORIAL_PROBLEM_MAX,
-  type AdminTutorialProblem,
-  type TutorialProblemCandidate,
-} from "@oj2/contract"
-import { errorMessage } from "utils/api"
-import { getTutorialProblemCandidates, setTutorialProblems } from "admin/api"
+import { Icon } from '@iconify/vue'
+import { TUTORIAL_PROBLEM_MAX, type AdminTutorialProblem, type TutorialProblemCandidate } from '@oj2/contract'
+import { errorMessage } from 'utils/api'
+import { getTutorialProblemCandidates, setTutorialProblems } from 'admin/api'
 
 /**
  * 一课结尾「去做几道题」挑哪几道（设计稿「后台 · 编辑一课」右栏）。
@@ -16,7 +12,7 @@ const props = defineProps<{ tutorialId: number; problems: AdminTutorialProblem[]
 const emit = defineEmits<{ update: [problems: AdminTutorialProblem[]] }>()
 const message = useMessage()
 
-const keyword = ref("")
+const keyword = ref('')
 const candidates = ref<TutorialProblemCandidate[]>([])
 const dragIndex = ref<number | null>(null)
 
@@ -38,14 +34,14 @@ onMounted(search)
 
 async function save(next: AdminTutorialProblem[]) {
   const before = props.problems
-  emit("update", next)
+  emit('update', next)
   try {
     await setTutorialProblems(
       props.tutorialId,
       next.map((item) => item.id),
     )
   } catch (err) {
-    emit("update", before)
+    emit('update', before)
     message.error(errorMessage(err))
   }
 }
@@ -89,9 +85,7 @@ function drop(target: number) {
       @dragover.prevent
       @drop="drop(index)"
     >
-      <span class="handle" aria-hidden="true"
-        ><Icon icon="ph:dots-six-vertical-bold" :width="14"
-      /></span>
+      <span class="handle" aria-hidden="true"><Icon icon="ph:dots-six-vertical-bold" :width="14" /></span>
       <span class="pid">{{ problem.displayId }}</span>
       <span class="name">{{ problem.title }}</span>
       <span v-if="problem.mustDo" class="must">必会</span>
@@ -107,7 +101,7 @@ function drop(target: number) {
       <span class="pid">{{ item.displayId }}</span>
       <span class="name">{{ item.title }}</span>
       <span v-if="item.mustDo" class="must">必会</span>
-      <span v-else class="tags">{{ item.tags.join(" · ") }}</span>
+      <span v-else class="tags">{{ item.tags.join(' · ') }}</span>
       <n-button size="tiny" @click="add(item)">
         <template #icon><Icon icon="ph:plus" /></template>
         加

@@ -1,5 +1,5 @@
-import { onMounted, ref } from "vue"
-import { parseTime } from "utils/functions"
+import { onMounted, ref } from 'vue'
+import { parseTime } from 'utils/functions'
 
 /**
  * 课堂看板的「请假」：老师手动标记今天不在的学生，看板的人数、进度、「还没交过」都不算他们。
@@ -21,12 +21,12 @@ export function useLeaveStudents(storageKey: string) {
   type Marks = Record<string, string>
 
   function today() {
-    return parseTime(new Date(), "YYYY-MM-DD")
+    return parseTime(new Date(), 'YYYY-MM-DD')
   }
 
   function load(): Marks {
     try {
-      return JSON.parse(localStorage.getItem(storageKey) ?? "{}")
+      return JSON.parse(localStorage.getItem(storageKey) ?? '{}')
     } catch {
       return {}
     }
@@ -53,9 +53,7 @@ export function useLeaveStudents(storageKey: string) {
   function setLeave(usernames: string[], selected: string[]) {
     const scope = new Set(usernames)
     const day = today()
-    const next = Object.fromEntries(
-      Object.entries(marks.value).filter(([name]) => !scope.has(name)),
-    )
+    const next = Object.fromEntries(Object.entries(marks.value).filter(([name]) => !scope.has(name)))
     for (const name of selected) next[name] = day
     marks.value = next
     save(next)
@@ -67,15 +65,13 @@ export function useLeaveStudents(storageKey: string) {
 
   onMounted(() => {
     try {
-      localStorage.removeItem("oj_hidden_students")
+      localStorage.removeItem('oj_hidden_students')
     } catch {
       // 读写不了 localStorage 的环境，没什么可清的
     }
     // 把不是今天的清掉再落一次盘，否则这张表只增不减
     const day = today()
-    const cleaned = Object.fromEntries(
-      Object.entries(marks.value).filter(([, marked]) => marked === day),
-    )
+    const cleaned = Object.fromEntries(Object.entries(marks.value).filter(([, marked]) => marked === day))
     marks.value = cleaned
     save(cleaned)
   })

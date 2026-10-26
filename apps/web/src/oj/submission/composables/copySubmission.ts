@@ -1,8 +1,8 @@
-import { LANGUAGE_FORMAT_VALUE } from "utils/constants"
-import { compressToBase64 } from "utils/functions"
-import type { Submission } from "utils/types"
-import { useCodeStore } from "oj/store/code"
-import storage from "utils/storage"
+import { LANGUAGE_FORMAT_VALUE } from 'utils/constants'
+import { compressToBase64 } from 'utils/functions'
+import type { Submission } from 'utils/types'
+import { useCodeStore } from 'oj/store/code'
+import storage from 'utils/storage'
 
 /**
  * 「复制到自测猫」「复制回到题目」。提交列表的右栏和独立的 /submission/:id 页面共用。
@@ -16,11 +16,11 @@ export function useCopySubmission() {
     const data = {
       lang: LANGUAGE_FORMAT_VALUE[submission.language],
       code: submission.code,
-      input: "",
+      input: '',
     }
     const base64 = compressToBase64(JSON.stringify(data))
     const url = `${import.meta.env.PUBLIC_CODE_URL}?share=${encodeURIComponent(base64)}`
-    window.open(url, "_blank")
+    window.open(url, '_blank')
   }
 
   /**
@@ -34,8 +34,7 @@ export function useCopySubmission() {
   function copyToProblem(submission: Submission) {
     const { code, language } = submission
     const problemID = submission.problemDisplayId
-    const contestId =
-      submission.contestId ?? (route.params.contestID ? Number(route.params.contestID) : null)
+    const contestId = submission.contestId ?? (route.params.contestID ? Number(route.params.contestID) : null)
     const storageKey = `problem_${problemID}_contest_${contestId || null}_lang_${language}`
     storage.set(storageKey, code)
     // 设置语言 + 代码：localStorage 覆盖全新挂载的编辑器，
@@ -43,16 +42,16 @@ export function useCopySubmission() {
     codeStore.setLanguage(language)
     codeStore.setCode(code)
 
-    const problemSetId = (route.params.problemSetId as string) ?? ""
+    const problemSetId = (route.params.problemSetId as string) ?? ''
     if (contestId) {
       router.push({
-        name: "contest problem",
+        name: 'contest problem',
         params: { contestID: String(contestId), problemID },
       })
     } else if (problemSetId) {
-      router.push({ name: "problemset problem", params: { problemSetId, problemID } })
+      router.push({ name: 'problemset problem', params: { problemSetId, problemID } })
     } else {
-      router.push({ name: "problem", params: { problemID } })
+      router.push({ name: 'problem', params: { problemID } })
     }
   }
 

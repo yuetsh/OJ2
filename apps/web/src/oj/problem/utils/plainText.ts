@@ -5,21 +5,21 @@
  */
 export function markdownToText(markdown: string, max = 120) {
   const text = markdown
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/\$\$?([^$]*)\$\$?/g, "$1")
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
-    .replace(/(\*\*|__|\*|_|~~)(.+?)\1/g, "$2")
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/\$\$?([^$]*)\$\$?/g, '$1')
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/(\*\*|__|\*|_|~~)(.+?)\1/g, '$2')
   // 题面是富文本编辑器存的 HTML：标签去掉之后还剩 &quot; &nbsp; 这些实体，得换回字
-  const decoded = decodeEntities(text).replace(/\s+/g, " ").trim()
+  const decoded = decodeEntities(text).replace(/\s+/g, ' ').trim()
   return decoded.length > max ? `${decoded.slice(0, max)}…` : decoded
 }
 
 /** 走浏览器自己的 HTML 解析，标签在前面已经去掉了，这里只剩实体 */
 function decodeEntities(text: string) {
-  if (!text.includes("&")) return text
-  return new DOMParser().parseFromString(text, "text/html").documentElement.textContent ?? text
+  if (!text.includes('&')) return text
+  return new DOMParser().parseFromString(text, 'text/html').documentElement.textContent ?? text
 }

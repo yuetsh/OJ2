@@ -1,30 +1,22 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import type { Tutorial, TutorialProgress, TutorialSummary } from "@oj2/contract"
-import type { Exercise } from "utils/types"
-import { getExercises, getLearnProgress, getTutorial, getTutorials } from "../api"
-import { parseLesson } from "./composables/useLessonParse"
-import { useLearnTrace } from "./composables/useLearnTrace"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import AdminLink from "shared/components/AdminLink.vue"
-import { useUserStore } from "shared/store/user"
-import {
-  COURSES,
-  doneCount,
-  groupByProject,
-  lessonPath,
-  lessonState,
-  splitTitle,
-  type TutorialType,
-} from "./lesson"
-import LessonBody from "./components/LessonBody.vue"
-import LessonEnd from "./components/LessonEnd.vue"
-import LessonOutline from "./components/LessonOutline.vue"
-import ProjectTree from "./components/ProjectTree.vue"
-import SegBar from "./components/SegBar.vue"
-import "./learn.css"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import type { Tutorial, TutorialProgress, TutorialSummary } from '@oj2/contract'
+import type { Exercise } from 'utils/types'
+import { getExercises, getLearnProgress, getTutorial, getTutorials } from '../api'
+import { parseLesson } from './composables/useLessonParse'
+import { useLearnTrace } from './composables/useLearnTrace'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useUserStore } from 'shared/store/user'
+import { COURSES, doneCount, groupByProject, lessonPath, lessonState, splitTitle, type TutorialType } from './lesson'
+import LessonBody from './components/LessonBody.vue'
+import LessonEnd from './components/LessonEnd.vue'
+import LessonOutline from './components/LessonOutline.vue'
+import ProjectTree from './components/ProjectTree.vue'
+import SegBar from './components/SegBar.vue'
+import './learn.css'
 
 /**
  * 读一课。设计稿「自学重设计」页的阅读页 A（选定）：左边目录按项目折叠、中间正文、
@@ -39,10 +31,10 @@ const theme = useThemeVars()
 // 未登录也能看教程，只是不留痕、不记进度
 const traced = computed(() => userStore.isAuthed)
 
-const type = computed<TutorialType>(() => (route.params.type === "c" ? "c" : "python"))
+const type = computed<TutorialType>(() => (route.params.type === 'c' ? 'c' : 'python'))
 const courseLabel = computed(() => COURSES.find((item) => item.type === type.value)!.label)
 const step = computed(() => {
-  const value = parseInt((route.params.step as string | undefined) ?? "1")
+  const value = parseInt((route.params.step as string | undefined) ?? '1')
   return Number.isFinite(value) && value > 0 ? value : 1
 })
 
@@ -58,18 +50,12 @@ const menuOpen = ref(false)
 useBackClose(menuOpen, () => !isDesktop.value)
 
 const groups = computed(() => groupByProject(titles.value))
-const parsed = computed(() =>
-  tutorial.value
-    ? parseLesson(tutorial.value.content, exercises.value)
-    : { segments: [], outline: [], exerciseCount: 0 },
-)
-const parts = computed(() => splitTitle(tutorial.value?.title ?? ""))
-const solvedCount = computed(
-  () => exercises.value.filter((item) => solvedIds.value.has(item.id)).length,
-)
+const parsed = computed(() => (tutorial.value ? parseLesson(tutorial.value.content, exercises.value) : { segments: [], outline: [], exerciseCount: 0 }))
+const parts = computed(() => splitTitle(tutorial.value?.title ?? ''))
+const solvedCount = computed(() => exercises.value.filter((item) => solvedIds.value.has(item.id)).length)
 const firstUnsolved = computed(() => {
   for (const seg of parsed.value.segments) {
-    if (seg.type === "exercise" && !solvedIds.value.has(seg.exercise.id)) {
+    if (seg.type === 'exercise' && !solvedIds.value.has(seg.exercise.id)) {
       return { id: seg.exercise.id, index: seg.index + 1 }
     }
   }
@@ -129,17 +115,13 @@ async function init() {
     return
   }
   const id = list[step.value - 1]!.id
-  const [lesson, exs] = await Promise.allSettled([
-    getTutorial(id),
-    getExercises(id),
-    loadProgress(),
-  ])
+  const [lesson, exs] = await Promise.allSettled([getTutorial(id), getExercises(id), loadProgress()])
   if (mine !== generation) return
-  tutorial.value = lesson.status === "fulfilled" ? lesson.value : null
-  exercises.value = exs.status === "fulfilled" ? exs.value : []
+  tutorial.value = lesson.status === 'fulfilled' ? lesson.value : null
+  exercises.value = exs.status === 'fulfilled' ? exs.value : []
   solvedIds.value = new Set(exercises.value.filter((item) => item.solved).map((item) => item.id))
   loading.value = false
-  activeId.value = ""
+  activeId.value = ''
   await nextTick()
   reader.value?.scrollTo({ top: 0 })
   // 手机上滚的是外层 n-layout 的容器，不是 window —— 原来 window.scrollTo 什么都没滚，
@@ -152,7 +134,7 @@ async function init() {
 watch(
   () => [route.params.type, route.params.step],
   () => {
-    if (route.name === "learn") init()
+    if (route.name === 'learn') init()
   },
   { immediate: true },
 )
@@ -163,10 +145,7 @@ watch(traced, async () => {
   if (!tutorial.value) return
   const exs = await getExercises(tutorial.value.id).catch(() => exercises.value)
   exercises.value = exs
-  solvedIds.value = new Set([
-    ...solvedIds.value,
-    ...exs.filter((item) => item.solved).map((item) => item.id),
-  ])
+  solvedIds.value = new Set([...solvedIds.value, ...exs.filter((item) => item.solved).map((item) => item.id)])
 })
 
 /** 刚做对一道：本课的进度就地加上，目录、进度条、课末跟着变，不用等刷新 */
@@ -198,7 +177,7 @@ const atEnd = ref(false)
 function scroller(): HTMLElement | null {
   for (let el = mobileRoot.value?.parentElement; el; el = el.parentElement) {
     const overflow = getComputedStyle(el).overflowY
-    if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight) {
+    if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) {
       return el
     }
   }
@@ -220,7 +199,7 @@ function onMobileScroll(event: Event) {
 // 滚动事件不冒泡，在 document 上用捕获拿，不用先找到容器再挂
 useEventListener(
   document,
-  "scroll",
+  'scroll',
   (event: Event) => {
     const box = event.target
     if (isDesktop.value || !(box instanceof HTMLElement)) return
@@ -233,13 +212,13 @@ useEventListener(
 
 // ------------------------------------------------------------------ 读到哪一节
 const reader = ref<HTMLElement | null>(null)
-const activeId = ref("")
+const activeId = ref('')
 
 function onScroll() {
   const box = reader.value
   if (!box) return
   const top = box.getBoundingClientRect().top + 160
-  let current = parsed.value.outline[0]?.id ?? ""
+  let current = parsed.value.outline[0]?.id ?? ''
   for (const item of parsed.value.outline) {
     const el = document.getElementById(item.id)
     if (el && el.getBoundingClientRect().top <= top) current = item.id
@@ -248,7 +227,7 @@ function onScroll() {
 }
 
 function jump(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function jumpExercise(id: number) {
@@ -263,23 +242,13 @@ function jumpExercise(id: number) {
     <!-- 桌面：目录 | 正文 | 这一课 -->
     <div v-else-if="isDesktop" class="layout">
       <aside class="rail">
-        <router-link to="/learn" class="back">
-          <Icon icon="ph:caret-left-bold" :width="13" />自学首页
-        </router-link>
+        <router-link to="/learn" class="back"> <Icon icon="ph:caret-left-bold" :width="13" />自学首页 </router-link>
         <div class="course">
           <div class="course-head">
             <span class="course-name">{{ courseLabel }}</span>
             <span v-if="traced" class="muted num">学完 {{ done }} / {{ titles.length }}</span>
           </div>
-          <SegBar
-            :groups="groups"
-            :state-of="stateOf"
-            :current="tutorial?.id"
-            :width="9"
-            :height="5"
-            :gap="2"
-            :group-gap="6"
-          />
+          <SegBar :groups="groups" :state-of="stateOf" :current="tutorial?.id" :width="9" :height="5" :gap="2" :group-gap="6" />
         </div>
         <ProjectTree :groups="groups" :progress="progress" :type="type" :current-step="step" />
         <div v-if="!traced" class="login-tip muted">登录后记下学到哪</div>
@@ -296,12 +265,7 @@ function jumpExercise(id: number) {
               <span class="num">第 {{ step }} / {{ titles.length }} 课</span>
               <template v-if="userStore.isSuperAdmin">
                 <span class="grow" />
-                <AdminLink
-                  :to="{ name: 'admin tutorial edit', params: { tutorialID: tutorial.id } }"
-                  size="tiny"
-                >
-                  编辑这一课
-                </AdminLink>
+                <AdminLink :to="{ name: 'admin tutorial edit', params: { tutorialID: tutorial.id } }" size="tiny"> 编辑这一课 </AdminLink>
               </template>
             </div>
             <h1 class="h1">{{ parts.kp }}</h1>
@@ -338,14 +302,7 @@ function jumpExercise(id: number) {
               上一课<span class="pager-name muted">{{ splitTitle(prev.title).kp }}</span>
             </n-button>
             <span class="grow" />
-            <n-button
-              v-if="next"
-              type="primary"
-              icon-placement="right"
-              tag="a"
-              :href="next.to"
-              @click.prevent="router.push(next.to)"
-            >
+            <n-button v-if="next" type="primary" icon-placement="right" tag="a" :href="next.to" @click.prevent="router.push(next.to)">
               <template #icon><Icon icon="ph:caret-right-bold" /></template>
               下一课<span class="pager-name next-name">{{ splitTitle(next.title).kp }}</span>
             </n-button>
@@ -377,12 +334,7 @@ function jumpExercise(id: number) {
         <span v-if="parsed.exerciseCount" class="mpractice">
           <span>练一练</span>
           <span class="mboxes">
-            <span
-              v-for="n in parsed.exerciseCount"
-              :key="n"
-              class="mbox"
-              :class="{ on: n <= solvedCount }"
-            />
+            <span v-for="n in parsed.exerciseCount" :key="n" class="mbox" :class="{ on: n <= solvedCount }" />
           </span>
         </span>
       </div>
@@ -428,26 +380,14 @@ function jumpExercise(id: number) {
           目录
         </n-button>
         <span class="grow" />
-        <n-button
-          v-if="next"
-          size="large"
-          type="primary"
-          icon-placement="right"
-          @click="router.push(next.to)"
-        >
+        <n-button v-if="next" size="large" type="primary" icon-placement="right" @click="router.push(next.to)">
           <template #icon><Icon icon="ph:caret-right-bold" /></template>
           下一课
         </n-button>
       </nav>
 
       <!-- 不自动聚焦：一打开焦点框套在「自学首页」上，手机上看着像出了错 -->
-      <n-drawer
-        v-model:show="menuOpen"
-        placement="bottom"
-        height="85%"
-        class="sheet"
-        :auto-focus="false"
-      >
+      <n-drawer v-model:show="menuOpen" placement="bottom" height="85%" class="sheet" :auto-focus="false">
         <n-drawer-content :native-scrollbar="false" closable>
           <template #header>
             <span class="sheet-head">
@@ -456,14 +396,7 @@ function jumpExercise(id: number) {
               <router-link to="/learn" class="sheet-home">自学首页</router-link>
             </span>
           </template>
-          <ProjectTree
-            :groups="groups"
-            :progress="progress"
-            :type="type"
-            :current-step="step"
-            big
-            @go="menuOpen = false"
-          />
+          <ProjectTree :groups="groups" :progress="progress" :type="type" :current-step="step" big @go="menuOpen = false" />
         </n-drawer-content>
       </n-drawer>
     </div>
@@ -614,7 +547,7 @@ function jumpExercise(id: number) {
   padding: 0 12px;
   box-sizing: border-box;
   border-bottom: 1px solid var(--learn-line);
-  background: v-bind("theme.bodyColor");
+  background: v-bind('theme.bodyColor');
   display: flex;
   align-items: center;
   gap: 8px;
@@ -655,7 +588,7 @@ function jumpExercise(id: number) {
   border-top: 1px solid var(--learn-line);
   display: flex;
   align-items: center;
-  background: v-bind("theme.bodyColor");
+  background: v-bind('theme.bodyColor');
   transition: transform 0.2s ease;
 }
 .mpager.hidden {

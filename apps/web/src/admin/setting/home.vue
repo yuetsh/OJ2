@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import type { DashboardInfo } from "@oj2/contract"
-import { BarElement, CategoryScale, Chart as ChartJS, LinearScale, Tooltip } from "chart.js"
-import { useThemeVars } from "naive-ui"
-import { Bar } from "vue-chartjs"
-import { useChartTheme } from "shared/composables/chartTheme"
-import { rgba } from "shared/composables/tone"
-import PageHeader from "admin/components/PageHeader.vue"
-import { classLabel, groupClassOptions } from "utils/classes"
-import { useConfigStore } from "shared/store/config"
-import { useUserStore } from "shared/store/user"
-import { SubmissionStatus } from "utils/constants"
-import { getBaseInfo, randomUser10 } from "../api"
+import type { DashboardInfo } from '@oj2/contract'
+import { BarElement, CategoryScale, Chart as ChartJS, LinearScale, Tooltip } from 'chart.js'
+import { useThemeVars } from 'naive-ui'
+import { Bar } from 'vue-chartjs'
+import { useChartTheme } from 'shared/composables/chartTheme'
+import { rgba } from 'shared/composables/tone'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { classLabel, groupClassOptions } from 'utils/classes'
+import { useConfigStore } from 'shared/store/config'
+import { useUserStore } from 'shared/store/user'
+import { SubmissionStatus } from 'utils/constants'
+import { getBaseInfo, randomUser10 } from '../api'
 
 /**
  * 后台首页（设计稿「后台首页」AdminHome）：一块看板。上面一排看「现在」—— 判题机在不在、
@@ -39,20 +39,20 @@ onMounted(async () => {
 const siteTiles = computed(() => {
   const site = info.value?.site
   if (!site) return []
-  const n = (value: number) => value.toLocaleString("zh-CN")
+  const n = (value: number) => value.toLocaleString('zh-CN')
   return [
-    { label: "学生", value: n(site.students), note: `老师 ${site.teachers} 人` },
+    { label: '学生', value: n(site.students), note: `老师 ${site.teachers} 人` },
     {
-      label: "题目",
+      label: '题目',
       value: n(site.problems),
       note: `学生看得到 ${n(site.visibleProblems)} 道`,
-      to: "/admin/problem/list",
+      to: '/admin/problem/list',
     },
-    { label: "提交", value: n(site.submissions), note: `这学期 ${n(site.termSubmissions)} 次` },
-    { label: "这周做题的人", value: n(site.weekActive), note: "周一起交过题的" },
-    { label: "比赛", value: n(site.contests), note: "", to: "/admin/contest/list" },
-    { label: "题单", value: n(site.problemSets), note: "", to: "/admin/problemset/list" },
-    { label: "自学", value: n(site.tutorials), note: "课", to: "/admin/tutorial/list" },
+    { label: '提交', value: n(site.submissions), note: `这学期 ${n(site.termSubmissions)} 次` },
+    { label: '这周做题的人', value: n(site.weekActive), note: '周一起交过题的' },
+    { label: '比赛', value: n(site.contests), note: '', to: '/admin/contest/list' },
+    { label: '题单', value: n(site.problemSets), note: '', to: '/admin/problemset/list' },
+    { label: '自学', value: n(site.tutorials), note: '课', to: '/admin/tutorial/list' },
   ]
 })
 
@@ -64,9 +64,7 @@ const dailyData = computed(() => {
     datasets: [
       {
         data: daily.map((d) => d.count),
-        backgroundColor: daily.map((_, i) =>
-          i === daily.length - 1 ? theme.value.primaryColor : rgba(theme.value.primaryColor, 0.4),
-        ),
+        backgroundColor: daily.map((_, i) => (i === daily.length - 1 ? theme.value.primaryColor : rgba(theme.value.primaryColor, 0.4))),
         borderRadius: 3,
         maxBarThickness: 22,
       },
@@ -89,21 +87,21 @@ const dailyOptions = {
 }
 
 function openSystemErrors() {
-  router.push({ name: "submissions", query: { result: String(SubmissionStatus.system_error) } })
+  router.push({ name: 'submissions', query: { result: String(SubmissionStatus.system_error) } })
 }
 
 const shortcuts = [
-  { label: "新建题目", to: "/admin/problem/create" },
-  { label: "新建比赛", to: "/admin/contest/create" },
-  { label: "批量建号", to: "/admin/user/generate" },
-  { label: "课堂看板", to: "/classroom" },
+  { label: '新建题目', to: '/admin/problem/create' },
+  { label: '新建比赛', to: '/admin/contest/create' },
+  { label: '批量建号', to: '/admin/user/generate' },
+  { label: '课堂看板', to: '/classroom' },
 ]
 
 // ---------------------------------------------------------------- 抽一个人
 
 const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 const luckyClass = ref<string | null>(null)
-const luckyGuy = ref("")
+const luckyGuy = ref('')
 const isRolling = ref(false)
 const pulseKey = ref(0)
 let rollingTimer: ReturnType<typeof setInterval> | null = null
@@ -123,7 +121,7 @@ async function draw() {
   const prefix = `ks${luckyClass.value}`
   const names = (await randomUser10(prefix)).map((name) => name.slice(prefix.length) || name)
   if (!names.length) {
-    luckyGuy.value = "这个班没有人"
+    luckyGuy.value = '这个班没有人'
     return
   }
   stopRolling()
@@ -142,7 +140,7 @@ async function draw() {
 
 watch(luckyClass, () => {
   stopRolling()
-  luckyGuy.value = ""
+  luckyGuy.value = ''
 })
 onUnmounted(stopRolling)
 </script>
@@ -159,12 +157,7 @@ onUnmounted(stopRolling)
     <div class="tile">
       <span class="label">今天提交</span>
       <b>{{ info.todaySubmissionCount }} 次</b>
-      <button
-        v-if="info.todaySystemErrorCount"
-        type="button"
-        class="link bad-note"
-        @click="openSystemErrors"
-      >
+      <button v-if="info.todaySystemErrorCount" type="button" class="link bad-note" @click="openSystemErrors">
         系统错误 {{ info.todaySystemErrorCount }} 次 →
       </button>
       <span v-else class="note">系统错误 0 次</span>
@@ -176,14 +169,8 @@ onUnmounted(stopRolling)
     </div>
     <div class="tile">
       <span class="label">正在上课</span>
-      <b>{{ info.activeClass ? classLabel(info.activeClass) : "没有" }}</b>
-      <router-link
-        v-if="info.activeClass"
-        class="link"
-        :to="{ name: 'classroom board', query: { className: info.activeClass } }"
-      >
-        去课堂看板 →
-      </router-link>
+      <b>{{ info.activeClass ? classLabel(info.activeClass) : '没有' }}</b>
+      <router-link v-if="info.activeClass" class="link" :to="{ name: 'classroom board', query: { className: info.activeClass } }"> 去课堂看板 → </router-link>
       <span v-else class="note">最近两小时没有哪个班在交题</span>
     </div>
   </div>
@@ -220,19 +207,12 @@ onUnmounted(stopRolling)
 
   <div class="lucky">
     <b class="lucky-title">抽一个人</b>
-    <n-select
-      v-model:value="luckyClass"
-      :options="classOptions"
-      filterable
-      placeholder="选班级"
-      aria-label="班级"
-      class="lucky-select"
-    />
+    <n-select v-model:value="luckyClass" :options="classOptions" filterable placeholder="选班级" aria-label="班级" class="lucky-select" />
     <span :key="pulseKey" class="lucky-name" :class="{ pulse: !isRolling && luckyGuy }">
       {{ luckyGuy }}
     </span>
     <n-button type="primary" :disabled="!luckyClass || isRolling" @click="draw">
-      {{ luckyGuy ? "再抽一个" : "抽" }}
+      {{ luckyGuy ? '再抽一个' : '抽' }}
     </n-button>
   </div>
 </template>
@@ -251,13 +231,13 @@ onUnmounted(stopRolling)
   gap: 4px;
   padding: 14px 16px;
   border-radius: 10px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
 }
 
 .label,
 .note {
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tile b {
@@ -266,12 +246,12 @@ onUnmounted(stopRolling)
 }
 
 .tile b.ok {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .tile b.bad,
 .bad-note {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .bad-note {
@@ -285,7 +265,7 @@ onUnmounted(stopRolling)
   background: none;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   cursor: pointer;
 }
@@ -307,7 +287,7 @@ onUnmounted(stopRolling)
   gap: 2px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   color: inherit;
   text-decoration: none;
 }
@@ -318,14 +298,14 @@ onUnmounted(stopRolling)
 }
 
 .site-tile.clickable:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .chart-card {
   margin-bottom: 18px;
   padding: 14px 16px;
   border-radius: 10px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
 }
 
 .chart-head {
@@ -350,7 +330,7 @@ onUnmounted(stopRolling)
   gap: 14px;
   padding: 16px 18px;
   border-radius: 10px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
 }
 
 .lucky-select {

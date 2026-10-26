@@ -1,26 +1,24 @@
 <script setup lang="ts">
-import { isSqlProblem, parseFlowDoc } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { useProblemStore } from "oj/store/problem"
-import { DIFFICULTY } from "utils/constants"
-import { copyToClipboard, getTagColor } from "utils/functions"
-import { useSubmissionStore } from "oj/store/submission"
-import Markdown from "shared/components/Markdown.vue"
-import SqlProblemData from "./SqlProblemData.vue"
-import SimilarProblems from "./SimilarProblems.vue"
-import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
-import { useMyFlowchartStore } from "shared/store/myFlowchart"
-import { useUserStore } from "shared/store/user"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import { isSqlProblem, parseFlowDoc } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { useProblemStore } from 'oj/store/problem'
+import { DIFFICULTY } from 'utils/constants'
+import { copyToClipboard, getTagColor } from 'utils/functions'
+import { useSubmissionStore } from 'oj/store/submission'
+import Markdown from 'shared/components/Markdown.vue'
+import SqlProblemData from './SqlProblemData.vue'
+import SimilarProblems from './SimilarProblems.vue'
+import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
+import { useMyFlowchartStore } from 'shared/store/myFlowchart'
+import { useUserStore } from 'shared/store/user'
+import { useProblemPageContext } from '../composables/problemPageContext'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
-const ProblemFlowchart = defineAsyncComponent(() => import("./ProblemFlowchart.vue"))
-const FlowchartView = defineAsyncComponent(
-  () => import("shared/components/FlowchartEditor/FlowchartView.vue"),
-)
-const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
+const ProblemFlowchart = defineAsyncComponent(() => import('./ProblemFlowchart.vue'))
+const FlowchartView = defineAsyncComponent(() => import('shared/components/FlowchartEditor/FlowchartView.vue'))
+const MyFlowchart = defineAsyncComponent(() => import('./MyFlowchart.vue'))
 
 const theme = useThemeVars()
 const problemStore = useProblemStore()
@@ -31,9 +29,7 @@ const ctx = useProblemPageContext()
 const isSQL = computed(() => !!problem.value && isSqlProblem(problem.value))
 
 // 相似题推荐：做对了、或者错了 3 次以上才给（比赛、题单里不给，见 problemPageContext）
-const showSimilar = computed(
-  () => ctx.value.similar && (problem.value?.myStatus === 0 || problemStore.failCount >= 3),
-)
+const showSimilar = computed(() => ctx.value.similar && (problem.value?.myStatus === 0 || problemStore.failCount >= 3))
 
 /**
  * 标题下的状态标签。原来是题面最上面两条整宽的提示（「本题已经被你解决啦」「尝试过但还没有
@@ -43,8 +39,8 @@ const myStatus = computed(() => {
   if (!ctx.value.statusTag || !userStore.isAuthed) return null
   const status = problem.value?.myStatus
   // 设计稿：没交过也写一个「还没交过」，状态这一格始终在
-  if (status === undefined || status === null) return "none"
-  return status === 0 ? "solved" : "tried"
+  if (status === undefined || status === null) return 'none'
+  return status === 0 ? 'solved' : 'tried'
 })
 
 // 不写「限时 1 秒 / 内存 256MB」：中职学生看了只会犯迷糊，超时、超内存判出来时结果页签里自有说明
@@ -53,9 +49,7 @@ const myStatus = computed(() => {
 // 老师给的参考图（showFlowchart）和学生自己画到 A/S 的那张（allowFlowchart）只会有一个：
 // 两个开关在后台是互斥的（admin/problem/detail.vue）；后端在 allowFlowchart 为真时会把
 // mermaidCode 置成 null，不能把标准答案下发给正要自己画图的学生。
-const canShowReferenceFlowchart = computed(
-  () => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode,
-)
+const canShowReferenceFlowchart = computed(() => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode)
 /**
  * 参考图用画流程图那套排法画（设计稿「参考流程图」C）。只有手写 Mermaid、没有结构树的老图
  * （恢复老备份才会有）退回 Mermaid
@@ -82,14 +76,14 @@ watch(
 /** 流程图画到 A / S 了：标题下给个「流程图 A 级」 */
 const flowchartGrade = computed(() => {
   const passed = flowchartStore.scores.filter((row) => isFlowchartPass(row.grade))
-  if (!passed.length) return ""
-  return passed.some((row) => row.grade === "S") ? "S" : "A"
+  if (!passed.length) return ''
+  return passed.some((row) => row.grade === 'S') ? 'S' : 'A'
 })
 
 // 例子旁的「复制」：点完变成「已复制」一秒
 const message = useMessage()
-const copiedKey = ref("")
-const { start: resetCopied } = useTimeoutFn(() => (copiedKey.value = ""), 1000, {
+const copiedKey = ref('')
+const { start: resetCopied } = useTimeoutFn(() => (copiedKey.value = ''), 1000, {
   immediate: false,
 })
 async function copySample(key: string, text: string) {
@@ -97,19 +91,14 @@ async function copySample(key: string, text: string) {
     copiedKey.value = key
     resetCopied()
   } else {
-    message.error("复制失败")
+    message.error('复制失败')
   }
 }
 
 // 这道题能画流程图，就去查画到 A/S 没有 —— 原来要先切到「流程图」这门「语言」才查。
 // 不看 canDraw：手机上画不了，但以前在电脑上画好的那张照样该摆出来
 watch(
-  () =>
-    [
-      problem.value?.id,
-      !!problem.value?.allowFlowchart && ctx.value.entry !== "contest",
-      userStore.isAuthed,
-    ] as const,
+  () => [problem.value?.id, !!problem.value?.allowFlowchart && ctx.value.entry !== 'contest', userStore.isAuthed] as const,
   ([id, drawable, authed]) => {
     if (id && drawable && authed) flowchartStore.ensureLoaded()
   },
@@ -121,8 +110,8 @@ watch(
 const samples = computed(() => problem.value?.samples ?? [])
 const submissionStore = useSubmissionStore()
 
-const SAMPLE_SIDES = ["input", "output"] as const
-const SAMPLE_SIDE_LABEL = { input: "输入", output: "输出" } as const
+const SAMPLE_SIDES = ['input', 'output'] as const
+const SAMPLE_SIDE_LABEL = { input: '输入', output: '输出' } as const
 
 /*
  * 例子默认摆成「例子 N | 输入 | 输出」的表，可机房那两种屏上左栏只有 550px 左右，每格只放得下
@@ -132,7 +121,7 @@ const SAMPLE_SIDE_LABEL = { input: "输入", output: "输出" } as const
  * 的行学生分不清是不是真换了行，照着它输出就错了。
  * 下面几个尺寸 CSS 里也用（v-bind），量宽度和排版是同一套数。
  */
-const SAMPLE_FONT = "14px Consolas, Monaco, monospace"
+const SAMPLE_FONT = '14px Consolas, Monaco, monospace'
 const SAMPLE_NO_W = 56
 const SAMPLE_GAP = 8
 const SAMPLE_PAD_L = 10
@@ -149,15 +138,15 @@ const sampleCss = {
 let measureCtx: CanvasRenderingContext2D | null = null
 /** 例子里最长那一行排出来有多宽（px）。等宽字体里中文、表情照样比英文宽，所以按字体真量 */
 const sampleTextWidth = computed(() => {
-  measureCtx ??= document.createElement("canvas").getContext("2d")
+  measureCtx ??= document.createElement('canvas').getContext('2d')
   if (!measureCtx) return 0
   measureCtx.font = SAMPLE_FONT
   let widest = 0
   for (const sample of samples.value) {
     for (const side of SAMPLE_SIDES) {
-      for (const line of sample[side].split("\n")) {
+      for (const line of sample[side].split('\n')) {
         // <pre> 里 tab 按 8 列排
-        const width = measureCtx.measureText(line.replace(/\t/g, "        ")).width
+        const width = measureCtx.measureText(line.replace(/\t/g, '        ')).width
         if (width > widest) widest = width
       }
     }
@@ -165,7 +154,7 @@ const sampleTextWidth = computed(() => {
   return widest
 })
 
-const sampleTable = useTemplateRef<HTMLElement>("sampleTable")
+const sampleTable = useTemplateRef<HTMLElement>('sampleTable')
 const { width: sampleTableWidth } = useElementSize(sampleTable)
 /**
  * 窄（手机，或桌面左栏拖到最窄）：「例子 N」不占一列，改成每个例子头上一行小字。
@@ -174,24 +163,17 @@ const { width: sampleTableWidth } = useElementSize(sampleTable)
 const sampleNarrow = computed(() => sampleTableWidth.value > 0 && sampleTableWidth.value < 480)
 /** 摆成表时，半格里留给文字的宽度 */
 const sampleHalfWidth = computed(
-  () =>
-    (sampleTableWidth.value - (sampleNarrow.value ? 0 : SAMPLE_NO_W + SAMPLE_GAP) - SAMPLE_GAP) /
-      2 -
-    SAMPLE_PAD_L -
-    SAMPLE_PAD_R -
-    SAMPLE_COPY_W,
+  () => (sampleTableWidth.value - (sampleNarrow.value ? 0 : SAMPLE_NO_W + SAMPLE_GAP) - SAMPLE_GAP) / 2 - SAMPLE_PAD_L - SAMPLE_PAD_R - SAMPLE_COPY_W,
 )
-const samplesStacked = computed(
-  () => sampleTableWidth.value > 0 && sampleTextWidth.value > sampleHalfWidth.value,
-)
+const samplesStacked = computed(() => sampleTableWidth.value > 0 && sampleTextWidth.value > sampleHalfWidth.value)
 
 // 文案和配色分类都由后端生成 —— 原来这里有一份 NODE_TARGET_LABELS +
 // ruleDescription + ruleTagType，和判题机那份几乎一模一样，见契约
 // astRequirementSchema。规则原文（engine / target）不下发给学生。
 const KIND_TAG_TYPE = {
-  require: "success",
-  forbid: "error",
-  count: "info",
+  require: 'success',
+  forbid: 'error',
+  count: 'info',
 } as const
 
 const astRequirements = computed(() => Object.entries(problem.value?.astRequirements ?? {}))
@@ -205,28 +187,17 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <h1 class="problem-title">{{ problem.title }}</h1>
       </div>
       <div class="meta">
-        <n-tag
-          v-if="problem.difficulty"
-          size="small"
-          :bordered="false"
-          :type="getTagColor(problem.difficulty)"
-        >
+        <n-tag v-if="problem.difficulty" size="small" :bordered="false" :type="getTagColor(problem.difficulty)">
           {{ DIFFICULTY[problem.difficulty] }}
         </n-tag>
-        <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false">
-          已解决
-        </n-tag>
+        <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false"> 已解决 </n-tag>
         <!-- 流程图画到 A / S 就算做完了（决定 4）：别在「流程图 A 级」旁边再写「还没交过」
              「做过，还没对」—— 那两个说的是代码 -->
         <template v-else-if="!flowchartGrade">
-          <n-tag v-if="myStatus === 'tried'" size="small" type="warning" :bordered="false">
-            做过，还没对
-          </n-tag>
+          <n-tag v-if="myStatus === 'tried'" size="small" type="warning" :bordered="false"> 做过，还没对 </n-tag>
           <n-tag v-else-if="myStatus === 'none'" size="small" :bordered="false">还没交过</n-tag>
         </template>
-        <n-tag v-if="flowchartGrade" size="small" type="success" :bordered="false">
-          流程图 {{ flowchartGrade }} 级
-        </n-tag>
+        <n-tag v-if="flowchartGrade" size="small" type="success" :bordered="false"> 流程图 {{ flowchartGrade }} 级 </n-tag>
       </div>
     </header>
 
@@ -235,13 +206,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       <span class="requirements-head">语法要求</span>
       <template v-for="[lang, rules] in astRequirements" :key="lang">
         <span v-if="astRequirements.length > 1" class="lang-label">{{ lang }}</span>
-        <n-tag
-          v-for="(rule, i) in rules"
-          :key="`${lang}-${i}`"
-          :type="KIND_TAG_TYPE[rule.kind]"
-          size="small"
-          :bordered="false"
-        >
+        <n-tag v-for="(rule, i) in rules" :key="`${lang}-${i}`" :type="KIND_TAG_TYPE[rule.kind]" size="small" :bordered="false">
           {{ rule.description }}
         </n-tag>
       </template>
@@ -269,28 +234,15 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
     <section v-if="!canShowReferenceFlowchart && myFlowchartStore.showing" class="block">
       <div class="block-head">
         <h3 class="title">你画的流程图</h3>
-        <n-button text type="primary" size="small" @click="myFlowchartZoom = true">
-          放大看
-        </n-button>
+        <n-button text type="primary" size="small" @click="myFlowchartZoom = true"> 放大看 </n-button>
         <n-button text type="primary" size="small" @click="myFlowchartOpen = !myFlowchartOpen">
-          {{ myFlowchartOpen ? "收起" : "展开" }}
+          {{ myFlowchartOpen ? '收起' : '展开' }}
         </n-button>
       </div>
-      <div
-        v-if="myFlowchartOpen"
-        class="my-flowchart"
-        role="button"
-        aria-label="放大看你画的流程图"
-        @click="myFlowchartZoom = true"
-      >
+      <div v-if="myFlowchartOpen" class="my-flowchart" role="button" aria-label="放大看你画的流程图" @click="myFlowchartZoom = true">
         <MyFlowchart compact />
       </div>
-      <n-modal
-        v-model:show="myFlowchartZoom"
-        preset="card"
-        title="你画的流程图"
-        :style="{ maxWidth: '900px' }"
-      >
+      <n-modal v-model:show="myFlowchartZoom" preset="card" title="你画的流程图" :style="{ maxWidth: '900px' }">
         <MyFlowchart />
       </n-modal>
     </section>
@@ -303,24 +255,10 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       <section v-if="samples.length" class="block">
         <div class="block-head">
           <h3 class="title">例子</h3>
-          <n-button
-            text
-            type="primary"
-            size="small"
-            class="block-link"
-            @click="submissionStore.revealResult('custom')"
-          >
-            自己输入数据试试 ›
-          </n-button>
+          <n-button text type="primary" size="small" class="block-link" @click="submissionStore.revealResult('custom')"> 自己输入数据试试 › </n-button>
         </div>
         <!-- 半格放不下最长那行就整体改成上下排，见 samplesStacked -->
-        <div
-          ref="sampleTable"
-          class="sample-table"
-          :class="{ stacked: samplesStacked, narrow: sampleNarrow }"
-          role="table"
-          aria-label="例子"
-        >
+        <div ref="sampleTable" class="sample-table" :class="{ stacked: samplesStacked, narrow: sampleNarrow }" role="table" aria-label="例子">
           <div v-if="!samplesStacked" class="sample-row" role="row">
             <span v-if="!sampleNarrow" role="columnheader"></span>
             <span role="columnheader" class="sample-label">输入</span>
@@ -340,7 +278,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
                   :aria-label="`复制例子 ${index + 1} 的${SAMPLE_SIDE_LABEL[side]}`"
                   @click="copySample(`${index}-${side}`, sample[side])"
                 >
-                  {{ copiedKey === `${index}-${side}` ? "已复制" : "复制" }}
+                  {{ copiedKey === `${index}-${side}` ? '已复制' : '复制' }}
                 </button>
               </div>
             </template>
@@ -349,11 +287,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       </section>
     </template>
 
-    <SqlProblemData
-      v-if="isSQL && problem.sqlDisplay"
-      :display="problem.sqlDisplay"
-      :order-sensitive="!!problem.sqlConfig?.order_sensitive"
-    >
+    <SqlProblemData v-if="isSQL && problem.sqlDisplay" :display="problem.sqlDisplay" :order-sensitive="!!problem.sqlConfig?.order_sensitive">
       <template #title="{ text }">
         <h3 class="title sql-title">{{ text }}</h3>
       </template>
@@ -366,9 +300,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
     <section v-if="canShowReferenceFlowchart" class="block">
       <div class="block-head">
         <h3 class="title">参考流程图</h3>
-        <n-button text type="primary" size="small" class="block-link" @click="referenceZoom = true">
-          放大看
-        </n-button>
+        <n-button text type="primary" size="small" class="block-link" @click="referenceZoom = true"> 放大看 </n-button>
       </div>
       <div
         class="reference-flowchart"
@@ -381,12 +313,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <FlowchartView v-if="referenceDoc" :doc="referenceDoc" />
         <ProblemFlowchart v-else />
       </div>
-      <n-modal
-        v-model:show="referenceZoom"
-        preset="card"
-        title="参考流程图"
-        :style="{ maxWidth: '1000px' }"
-      >
+      <n-modal v-model:show="referenceZoom" preset="card" title="参考流程图" :style="{ maxWidth: '1000px' }">
         <FlowchartView v-if="referenceDoc" :doc="referenceDoc" zoomed />
         <ProblemFlowchart v-else />
       </n-modal>
@@ -428,7 +355,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   border-radius: 3px;
   background-color: rgba(128, 128, 128, 0.12);
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .problem-title {
@@ -476,7 +403,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   line-height: 1.4;
   margin: 0 0 6px;
   padding-left: 9px;
-  border-left: 3px solid v-bind("theme.primaryColor");
+  border-left: 3px solid v-bind('theme.primaryColor');
 }
 
 .io {
@@ -510,7 +437,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 }
 
 .requirements-note {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .lang-label {
@@ -548,19 +475,19 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
 .sample-row {
   display: grid;
-  grid-template-columns: v-bind("sampleCss.noW") minmax(0, 1fr) minmax(0, 1fr);
-  gap: 6px v-bind("sampleCss.gap");
+  grid-template-columns: v-bind('sampleCss.noW') minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px v-bind('sampleCss.gap');
   align-items: stretch;
 }
 
 .stacked .sample-row {
-  grid-template-columns: v-bind("sampleCss.noW") 32px minmax(0, 1fr);
+  grid-template-columns: v-bind('sampleCss.noW') 32px minmax(0, 1fr);
 }
 
 .sample-label,
 .sample-no {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .sample-no {
@@ -604,7 +531,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   min-width: 0;
   display: flex;
   align-items: flex-start;
-  padding: v-bind("sampleCss.pad");
+  padding: v-bind('sampleCss.pad');
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.08);
 }
@@ -614,7 +541,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   min-width: 0;
   margin: 0;
   padding: 4px 0;
-  font: v-bind("sampleCss.font");
+  font: v-bind('sampleCss.font');
   line-height: 1.5;
   white-space: pre;
   overflow-x: auto;
@@ -636,7 +563,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 
 .sample-copy {
   flex: none;
-  width: v-bind("sampleCss.copyW");
+  width: v-bind('sampleCss.copyW');
   height: 24px;
   margin-top: 2px;
   padding: 0;
@@ -645,7 +572,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
   background: transparent;
   font: inherit;
   font-size: 12px;
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
   cursor: pointer;
 }
 

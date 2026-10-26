@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { getTodaySubmissionStatistics } from "oj/api"
-import { parseTime, zonedParts } from "utils/functions"
-import type { TodaySubmissionStatistics } from "utils/types"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { getTodaySubmissionStatistics } from 'oj/api'
+import { parseTime, zonedParts } from 'utils/functions'
+import type { TodaySubmissionStatistics } from 'utils/types'
 
 /**
  * 今日统计（设计稿「今日统计重设计」学生版），**只给学生**：自己今天怎样、大家在做哪几道。
@@ -25,25 +25,25 @@ const failed = ref(false)
 onMounted(async () => {
   try {
     stats.value = await getTodaySubmissionStatistics()
-    emit("loaded", stats.value.total)
+    emit('loaded', stats.value.total)
   } catch {
     failed.value = true
   }
 })
 
-const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
 const headText = computed(() => {
   const at = stats.value?.asOf ?? new Date().toISOString()
   const p = zonedParts(at)!
   const weekday = WEEKDAYS[new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay()]
-  return `${p.month}月${p.day}日 ${weekday} · 截至 ${parseTime(at, "HH:mm")}`
+  return `${p.month}月${p.day}日 ${weekday} · 截至 ${parseTime(at, 'HH:mm')}`
 })
 
 const meText = computed(() => {
   const me = stats.value?.me
-  if (!me) return ""
-  return me.total ? `交了 ${me.total} 次，做对 ${me.solved} 道` : "还没交过"
+  if (!me) return ''
+  return me.total ? `交了 ${me.total} 次，做对 ${me.solved} 道` : '还没交过'
 })
 </script>
 
@@ -90,23 +90,13 @@ const meText = computed(() => {
         <template v-if="stats.problems.length">
           <b class="section-title">今天大家都在做</b>
           <div class="rows">
-            <a
-              v-for="item in stats.problems"
-              :key="item.problemDisplayId"
-              href="#"
-              class="row"
-              @click.prevent="emit('openProblem', item.problemDisplayId)"
-            >
+            <a v-for="item in stats.problems" :key="item.problemDisplayId" href="#" class="row" @click.prevent="emit('openProblem', item.problemDisplayId)">
               <span class="row-title">
                 <n-text depth="3">{{ item.problemDisplayId }}</n-text> {{ item.problemTitle }}
               </span>
-              <n-text depth="3" class="small">
-                {{ item.userCount }} 人做 · {{ item.acceptedUsers }} 人对
-              </n-text>
-              <span v-if="item.mine === 'accepted'" class="mine done">
-                <Icon icon="ph:check-bold" :width="12" />做对了
-              </span>
-              <span v-else class="mine go">{{ item.mine === "tried" ? "接着做" : "去做" }} ›</span>
+              <n-text depth="3" class="small"> {{ item.userCount }} 人做 · {{ item.acceptedUsers }} 人对 </n-text>
+              <span v-if="item.mine === 'accepted'" class="mine done"> <Icon icon="ph:check-bold" :width="12" />做对了 </span>
+              <span v-else class="mine go">{{ item.mine === 'tried' ? '接着做' : '去做' }} ›</span>
             </a>
           </div>
         </template>
@@ -122,8 +112,8 @@ const meText = computed(() => {
   display: flex;
   flex-direction: column;
   border-radius: 12px;
-  background: v-bind("theme.cardColor");
-  box-shadow: v-bind("theme.boxShadow3");
+  background: v-bind('theme.cardColor');
+  box-shadow: v-bind('theme.boxShadow3');
   font-size: 14px;
   overflow: hidden;
 }
@@ -134,7 +124,7 @@ const meText = computed(() => {
   align-items: center;
   gap: 10px;
   padding: 16px 20px 14px 24px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .title {
@@ -145,8 +135,8 @@ const meText = computed(() => {
   font-size: 12px;
   padding: 1px 8px;
   border-radius: 10px;
-  background: v-bind("theme.actionColor");
-  color: v-bind("theme.textColor2");
+  background: v-bind('theme.actionColor');
+  color: v-bind('theme.textColor2');
 }
 
 .spacer {
@@ -159,7 +149,7 @@ const meText = computed(() => {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -167,7 +157,7 @@ const meText = computed(() => {
 }
 
 .close:hover {
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .body {
@@ -203,8 +193,8 @@ const meText = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: v-bind("theme.actionColor");
-  color: v-bind("theme.textColor2");
+  background: v-bind('theme.actionColor');
+  color: v-bind('theme.textColor2');
 }
 
 .numbers {
@@ -226,7 +216,7 @@ const meText = computed(() => {
 
 .numbers span {
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .section-title {
@@ -240,7 +230,7 @@ const meText = computed(() => {
   gap: 12px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .rows {
@@ -253,8 +243,8 @@ const meText = computed(() => {
   align-items: center;
   gap: 12px;
   padding: 9px 2px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor1");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
 }
 
@@ -276,10 +266,10 @@ const meText = computed(() => {
 }
 
 .mine.done {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .mine.go {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 </style>

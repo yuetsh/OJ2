@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import { useSubmissionStore } from "oj/store/submission"
-import { SubmissionStatus } from "utils/constants"
-import TrialErrorNote from "./TrialErrorNote.vue"
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
+import { useSubmissionStore } from 'oj/store/submission'
+import { SubmissionStatus } from 'utils/constants'
+import TrialErrorNote from './TrialErrorNote.vue'
 
 /**
  * 「结果」页签里「自己输入」那一段：自己编一组输入跑一下，看看输出。不判对错、不算提交。
@@ -13,15 +13,7 @@ import TrialErrorNote from "./TrialErrorNote.vue"
  */
 
 const submissionStore = useSubmissionStore()
-const {
-  customInput,
-  customOutput,
-  customResult,
-  customNote,
-  customRuntimeError,
-  customCode,
-  customRunning,
-} = submissionStore.trial
+const { customInput, customOutput, customResult, customNote, customRuntimeError, customCode, customRunning } = submissionStore.trial
 const { problem } = storeToRefs(useProblemStore())
 const codeStore = useCodeStore()
 const theme = useThemeVars()
@@ -46,22 +38,10 @@ function fillSample(input: string) {
       class="mono"
     />
     <div class="actions">
-      <n-button
-        type="primary"
-        ghost
-        :loading="customRunning"
-        :disabled="!codeStore.code.value.trim()"
-        @click="submissionStore.runCustom()"
-      >
+      <n-button type="primary" ghost :loading="customRunning" :disabled="!codeStore.code.value.trim()" @click="submissionStore.runCustom()">
         用这组数据运行
       </n-button>
-      <n-button
-        v-for="(sample, index) in problem?.samples ?? []"
-        :key="index"
-        text
-        class="fill"
-        @click="fillSample(sample.input)"
-      >
+      <n-button v-for="(sample, index) in problem?.samples ?? []" :key="index" text class="fill" @click="fillSample(sample.input)">
         填入例子 {{ index + 1 }}
       </n-button>
     </div>
@@ -77,9 +57,7 @@ function fillSample(input: string) {
       :code="customCode"
       :plain="inContest"
     />
-    <pre v-else class="output" :class="{ empty: !customOutput }">{{
-      customResult === null ? "" : customOutput || "（什么都没有输出）"
-    }}</pre>
+    <pre v-else class="output" :class="{ empty: !customOutput }">{{ customResult === null ? '' : customOutput || '（什么都没有输出）' }}</pre>
   </div>
 </template>
 
@@ -108,7 +86,7 @@ function fillSample(input: string) {
 
 .fill {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .output {
@@ -125,6 +103,6 @@ function fillSample(input: string) {
 }
 
 .output.empty {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

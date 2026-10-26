@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { getLearnStudent } from "admin/api"
-import { parseTime, readableDuration } from "utils/functions"
-import type { LearnStudentDetail } from "utils/types"
-import UserName from "shared/components/UserName.vue"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { splitTitle, type TutorialType } from "oj/learn/lesson"
-import { EXERCISE_KIND } from "./kinds"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { getLearnStudent } from 'admin/api'
+import { parseTime, readableDuration } from 'utils/functions'
+import type { LearnStudentDetail } from 'utils/types'
+import UserName from 'shared/components/UserName.vue'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { splitTitle, type TutorialType } from 'oj/learn/lesson'
+import { EXERCISE_KIND } from './kinds'
 
 /**
  * 一个学生的自学明细：点方块格里的名字从右边滑出来。
@@ -24,15 +24,15 @@ const props = defineProps<{
   /** 课 id → 第几课，跟方块格表头的编号一致 */
   steps: Map<number, number>
 }>()
-const show = defineModel<boolean>("show", { required: true })
+const show = defineModel<boolean>('show', { required: true })
 
 const theme = useThemeVars()
 const { isDesktop } = useBreakpoints()
 useBackClose(show, () => !isDesktop.value)
 
-type Lesson = LearnStudentDetail["lessons"][number]
-type Exercise = Lesson["exercises"][number]
-type Problem = Lesson["problems"][number]
+type Lesson = LearnStudentDetail['lessons'][number]
+type Exercise = Lesson['exercises'][number]
+type Problem = Lesson['problems'][number]
 
 const detail = ref<LearnStudentDetail | null>(null)
 const loading = ref(false)
@@ -58,20 +58,20 @@ function solvedOf(lesson: Lesson) {
 }
 
 function stateOf(ex: Exercise) {
-  if (ex.solved) return "solved"
-  return ex.attempts > 0 ? "wrong" : "todo"
+  if (ex.solved) return 'solved'
+  return ex.attempts > 0 ? 'wrong' : 'todo'
 }
 
 function problemStateOf(problem: Problem) {
-  if (problem.solved) return "solved"
-  return problem.submissions > 0 ? "wrong" : "todo"
+  if (problem.solved) return 'solved'
+  return problem.submissions > 0 ? 'wrong' : 'todo'
 }
 
 /** 提交列表按这个人、这道题筛好，新标签页打开 */
 function submissionsHref(problem: Problem) {
   return router.resolve({
-    path: "/submission",
-    query: { problem: problem.displayId, username: detail.value?.username, exactUsername: "1" },
+    path: '/submission',
+    query: { problem: problem.displayId, username: detail.value?.username, exactUsername: '1' },
   }).href
 }
 
@@ -95,8 +95,7 @@ watch(
         data.lessons
           .filter(
             (lesson) =>
-              (lesson.exercises.some((ex) => ex.attempts > 0) &&
-                lesson.exercises.some((ex) => !ex.solved)) ||
+              (lesson.exercises.some((ex) => ex.attempts > 0) && lesson.exercises.some((ex) => !ex.solved)) ||
               lesson.problems.some((p) => p.submissions > 0 && !p.solved),
           )
           .map((lesson) => lesson.tutorialId),
@@ -118,15 +117,9 @@ watch(
           <UserName :username="detail.username" class="head-name" />
           <span class="muted small num">
             打开过 {{ summary.opened }} 课
-            <template v-if="summary.seconds">
-              · 停留 {{ readableDuration(summary.seconds) }}</template
-            >
-            <template v-if="summary.total">
-              · 练一练 {{ summary.solved }}/{{ summary.total }}</template
-            >
-            <template v-if="summary.problemTotal">
-              · 配套题 {{ summary.problemSolved }}/{{ summary.problemTotal }}</template
-            >
+            <template v-if="summary.seconds"> · 停留 {{ readableDuration(summary.seconds) }}</template>
+            <template v-if="summary.total"> · 练一练 {{ summary.solved }}/{{ summary.total }}</template>
+            <template v-if="summary.problemTotal"> · 配套题 {{ summary.problemSolved }}/{{ summary.problemTotal }}</template>
           </span>
         </div>
         <span v-else>自学明细</span>
@@ -149,22 +142,13 @@ watch(
                 {{ splitTitle(lesson.title).kp }}
               </span>
               <span class="grow" />
-              <span v-if="lesson.exercises.length" class="small num">
-                {{ solvedOf(lesson) }}/{{ lesson.exercises.length }}
-              </span>
+              <span v-if="lesson.exercises.length" class="small num"> {{ solvedOf(lesson) }}/{{ lesson.exercises.length }} </span>
               <span class="squares">
-                <span
-                  v-for="ex in lesson.exercises"
-                  :key="ex.exerciseId"
-                  class="square"
-                  :class="stateOf(ex)"
-                />
+                <span v-for="ex in lesson.exercises" :key="ex.exerciseId" class="square" :class="stateOf(ex)" />
               </span>
               <Icon
                 v-if="lesson.exercises.length || lesson.problems.length"
-                :icon="
-                  expanded.has(lesson.tutorialId) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'
-                "
+                :icon="expanded.has(lesson.tutorialId) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'"
                 :width="12"
                 class="muted"
               />
@@ -172,35 +156,22 @@ watch(
             <span class="lesson-line small muted num">
               <template v-if="lesson.viewCount">
                 打开 {{ lesson.viewCount }} 次
-                <template v-if="lesson.totalSeconds">
-                  · 停留 {{ readableDuration(lesson.totalSeconds) }}</template
-                >
-                <template v-if="lesson.lastViewedAt">
-                  · {{ parseTime(lesson.lastViewedAt, "M月D日 HH:mm") }}</template
-                >
+                <template v-if="lesson.totalSeconds"> · 停留 {{ readableDuration(lesson.totalSeconds) }}</template>
+                <template v-if="lesson.lastViewedAt"> · {{ parseTime(lesson.lastViewedAt, 'M月D日 HH:mm') }}</template>
               </template>
               <template v-else>没打开过，直接做的练一练</template>
               <template v-if="!lesson.exercises.length"> · 这课没有练一练</template>
-              <template v-if="lesson.problems.length">
-                · 配套题 {{ lesson.problems.filter((p) => p.solved).length }}/{{
-                  lesson.problems.length
-                }}</template
-              >
+              <template v-if="lesson.problems.length"> · 配套题 {{ lesson.problems.filter((p) => p.solved).length }}/{{ lesson.problems.length }}</template>
             </span>
           </button>
 
-          <div
-            v-if="
-              expanded.has(lesson.tutorialId) && (lesson.exercises.length || lesson.problems.length)
-            "
-            class="ex-list"
-          >
+          <div v-if="expanded.has(lesson.tutorialId) && (lesson.exercises.length || lesson.problems.length)" class="ex-list">
             <div v-for="ex in lesson.exercises" :key="ex.exerciseId" class="ex">
               <span class="square" :class="stateOf(ex)" />
               <div class="ex-body">
                 <div class="ex-question">
                   <span class="kind">{{ EXERCISE_KIND[ex.type] ?? ex.type }}</span>
-                  {{ ex.question || "（没有题干）" }}
+                  {{ ex.question || '（没有题干）' }}
                 </div>
                 <div class="small num">
                   <span v-if="ex.solved" class="ok">做对了（第 {{ ex.attemptsToSolve }} 次）</span>
@@ -208,9 +179,7 @@ watch(
                     <span class="bad">还没做对，交了 {{ ex.attempts }} 次</span>
                   </template>
                   <span v-else class="muted">没做</span>
-                  <span v-if="ex.lastWrongAnswer" class="muted">
-                    · 最后错在 {{ ex.lastWrongAnswer }}</span
-                  >
+                  <span v-if="ex.lastWrongAnswer" class="muted"> · 最后错在 {{ ex.lastWrongAnswer }}</span>
                 </div>
               </div>
             </div>
@@ -224,14 +193,10 @@ watch(
                 </div>
                 <div class="small num">
                   <span v-if="problem.solved" class="ok">做对了</span>
-                  <span v-else-if="problem.submissions" class="bad"
-                    >交了 {{ problem.submissions }} 次还没对</span
-                  >
+                  <span v-else-if="problem.submissions" class="bad">交了 {{ problem.submissions }} 次还没对</span>
                   <span v-else class="muted">没交</span>
                   <template v-if="problem.lastSubmitAt">
-                    <span class="muted">
-                      · {{ parseTime(problem.lastSubmitAt, "YYYY年M月D日") }} ·
-                    </span>
+                    <span class="muted"> · {{ parseTime(problem.lastSubmitAt, 'YYYY年M月D日') }} · </span>
                     <a :href="submissionsHref(problem)" target="_blank" class="link">看提交</a>
                   </template>
                 </div>

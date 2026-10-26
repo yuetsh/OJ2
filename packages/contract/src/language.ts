@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from 'zod'
 
 /**
  * 判题沙箱认得的语言。**这是全仓唯一的语言集合定义处。**
@@ -22,7 +22,7 @@ import { z } from "zod"
  * 从别处冒出来（旧客户端的 localStorage、迁移之前排进队列的任务），走下面的
  * `normalizeLanguage()`，别直接 parse。
  */
-export const judgeLanguageSchema = z.enum(["C", "C++", "Python", "Java", "JavaScript", "Golang"])
+export const judgeLanguageSchema = z.enum(['C', 'C++', 'Python', 'Java', 'JavaScript', 'Golang'])
 
 /**
  * 题目可以挂的语言 = 沙箱语言 + 两种非沙箱题型。
@@ -35,26 +35,26 @@ export const judgeLanguageSchema = z.enum(["C", "C++", "Python", "Java", "JavaSc
  * 于是那 91 条提交的 `language` 在类型上是 `undefined` —— 这就是两份真相
  * 各自演进的代价，现在并成一份。
  */
-export const problemLanguageSchema = z.enum([...judgeLanguageSchema.options, "SQL", "Flowchart"])
+export const problemLanguageSchema = z.enum([...judgeLanguageSchema.options, 'SQL', 'Flowchart'])
 
 /**
  * 判题沙箱**现在**跑得了的语言，就是 `apps/api/src/judge/languages.ts` 里那三块。
  * 试运行（`POST /trial-runs`）只收这几个：历史语言交上来只会在判题机那边报系统错误。
  */
-export const runnableLanguageSchema = judgeLanguageSchema.extract(["C", "C++", "Python"])
+export const runnableLanguageSchema = judgeLanguageSchema.extract(['C', 'C++', 'Python'])
 
 /**
  * 老师布置作业能选的语言：判题机跑得了的三种，加 SQL（数据库课一整节都是 SQL 题）。
  * SQL 题只收 SQL，所以 C / Python 的作业里夹 SQL 题也行 —— 那几道不受作业语言限制
  */
-export const lessonLanguageSchema = problemLanguageSchema.extract(["Python", "C", "C++", "SQL"])
+export const lessonLanguageSchema = problemLanguageSchema.extract(['Python', 'C', 'C++', 'SQL'])
 
 /**
  * SQL 题：可选语言里有 SQL（后端保存时强校验 SQL 只能单独出现）。题型只认这一条，
  * 前后端一律走它，别再各自看 sqlConfig 或 languages
  */
 export function isSqlProblem(problem: { languages: readonly string[] }) {
-  return problem.languages.includes("SQL")
+  return problem.languages.includes('SQL')
 }
 
 export type JudgeLanguage = z.infer<typeof judgeLanguageSchema>
@@ -72,13 +72,13 @@ export type ProblemLanguage = z.infer<typeof problemLanguageSchema>
  *    别只滚代码。
  */
 const LANGUAGE_ALIASES: Record<string, ProblemLanguage> = {
-  Python2: "Python",
-  Python3: "Python",
+  Python2: 'Python',
+  Python3: 'Python',
 }
 
 /** 把可能是旧值的语言名归一化；认不出来返回 null，由调用方决定怎么兜底。 */
 export function normalizeLanguage(value: unknown): ProblemLanguage | null {
-  if (typeof value !== "string") return null
+  if (typeof value !== 'string') return null
   const parsed = problemLanguageSchema.safeParse(LANGUAGE_ALIASES[value] ?? value)
   return parsed.success ? parsed.data : null
 }

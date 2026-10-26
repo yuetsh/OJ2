@@ -1,10 +1,10 @@
-import { useThemeVars } from "naive-ui"
-import { JUDGE_STATUS } from "utils/constants"
-import type { SUBMISSION_RESULT } from "utils/types"
-import { useTone, type Tone } from "shared/composables/tone"
+import { useThemeVars } from 'naive-ui'
+import { JUDGE_STATUS } from 'utils/constants'
+import type { SUBMISSION_RESULT } from 'utils/types'
+import { useTone, type Tone } from 'shared/composables/tone'
 
 export function resultName(result: number) {
-  return JUDGE_STATUS[result as SUBMISSION_RESULT]?.name ?? "其他"
+  return JUDGE_STATUS[result as SUBMISSION_RESULT]?.name ?? '其他'
 }
 
 /**
@@ -18,8 +18,8 @@ export function useResultColor() {
     if (result === -2) return theme.value.textColor3
     // 等待评分 / 判题中：还没有结果，不该和运行时错误一样是橙色
     if (result === 6 || result === 7) return theme.value.borderColor
-    const kind: Tone = JUDGE_STATUS[result as SUBMISSION_RESULT]?.type ?? "default"
-    if (kind !== "success" && kind !== "error" && kind !== "warning") return theme.value.borderColor
+    const kind: Tone = JUDGE_STATUS[result as SUBMISSION_RESULT]?.type ?? 'default'
+    if (kind !== 'success' && kind !== 'error' && kind !== 'warning') return theme.value.borderColor
     return tone(kind).color
   }
 }

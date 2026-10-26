@@ -1,5 +1,5 @@
-import { EditorView } from "@codemirror/view"
-import type { SubmissionTrace } from "@oj2/contract"
+import { EditorView } from '@codemirror/view'
+import type { SubmissionTrace } from '@oj2/contract'
 
 /**
  * 编辑过程信号的采集，随提交一起报给后端（落进 `submission_trace`）。
@@ -88,8 +88,8 @@ function touch() {
 
 // 只数 hidden 这一个事件：切标签页时 window 的 blur 和 visibilitychange 会一起触发，
 // 两个都数就是一次记两下。代价是同屏切到别的窗口（页面仍可见）不计，这本来就只是辅助信号。
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "hidden") return
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return
   blurCount++
   // 切走的这段不算活跃，回来之后的第一下编辑重新起算
   lastEditAt = null
@@ -102,9 +102,9 @@ export const editTraceExtensions = [
     for (const tr of update.transactions) {
       if (!tr.docChanged) continue
       // 顺序要紧：isUserEvent("input") 也会匹配 "input.paste"
-      const pasted = tr.isUserEvent("input.paste") || tr.isUserEvent("input.drop")
-      const typed = !pasted && tr.isUserEvent("input")
-      const deleted = tr.isUserEvent("delete")
+      const pasted = tr.isUserEvent('input.paste') || tr.isUserEvent('input.drop')
+      const typed = !pasted && tr.isUserEvent('input')
+      const deleted = tr.isUserEvent('delete')
       if (!pasted && !typed && !deleted) continue
 
       let inserted = 0
@@ -113,8 +113,7 @@ export const editTraceExtensions = [
         // 原样替换不算：closeBrackets 越过已有的右括号 / 引号时，是把 `)` 替换成 `)`
         // 而不是只挪光标（@codemirror/autocomplete 的 handleClose），不排掉的话
         // 每敲一个右括号就多记一个键入加一个删除
-        if (toA - fromA === text.length && tr.startState.sliceDoc(fromA, toA) === text.toString())
-          return
+        if (toA - fromA === text.length && tr.startState.sliceDoc(fromA, toA) === text.toString()) return
         removed += toA - fromA
         inserted += text.length
       })

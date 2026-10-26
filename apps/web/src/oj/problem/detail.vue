@@ -1,40 +1,36 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { errorCode } from "utils/api"
-import { getProblem } from "oj/api"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { storeToRefs } from "pinia"
-import { useProblemStore } from "oj/store/problem"
-import { useMyFlowchartStore } from "shared/store/myFlowchart"
-import { useUserStore } from "shared/store/user"
-import { useSubmissionStore } from "oj/store/submission"
-import { useFlowchartStore } from "oj/store/flowchart"
-import { useCollabStore } from "shared/store/collab"
-import type { RouteLocationNormalized } from "vue-router"
-import NotFound from "shared/components/NotFound.vue"
+import { useThemeVars } from 'naive-ui'
+import { errorCode } from 'utils/api'
+import { getProblem } from 'oj/api'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { storeToRefs } from 'pinia'
+import { useProblemStore } from 'oj/store/problem'
+import { useMyFlowchartStore } from 'shared/store/myFlowchart'
+import { useUserStore } from 'shared/store/user'
+import { useSubmissionStore } from 'oj/store/submission'
+import { useFlowchartStore } from 'oj/store/flowchart'
+import { useCollabStore } from 'shared/store/collab'
+import type { RouteLocationNormalized } from 'vue-router'
+import NotFound from 'shared/components/NotFound.vue'
 // 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
-import SubmissionEffects from "./components/SubmissionEffects.vue"
-import ResultTabLabel from "./components/ResultTabLabel.vue"
-import ContextBar from "./components/ContextBar.vue"
-import { useEditorMenu } from "./composables/editorMenu"
-import {
-  DRAWER_TITLE,
-  useProblemPageContext,
-  type ProblemDrawer as DrawerKey,
-} from "./composables/problemPageContext"
-import { useCollabHere, useTeacherCollab } from "./composables/teacherCollab"
+import SubmissionEffects from './components/SubmissionEffects.vue'
+import ResultTabLabel from './components/ResultTabLabel.vue'
+import ContextBar from './components/ContextBar.vue'
+import { useEditorMenu } from './composables/editorMenu'
+import { DRAWER_TITLE, useProblemPageContext, type ProblemDrawer as DrawerKey } from './composables/problemPageContext'
+import { useCollabHere, useTeacherCollab } from './composables/teacherCollab'
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
 // 没有协作、也没有错误标记，于是题单里「求助」老师接不上、「把中文标点都换成英文」
 // 点了没反应（见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 10 节）
-const loadProblemEditor = () => import("./components/ProblemEditor.vue")
+const loadProblemEditor = () => import('./components/ProblemEditor.vue')
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
-const ProblemContent = defineAsyncComponent(() => import("./components/ProblemContent.vue"))
-const ProblemDrawer = defineAsyncComponent(() => import("./components/ProblemDrawer.vue"))
-const ResultPane = defineAsyncComponent(() => import("./components/ResultPane.vue"))
-const MobileActionBar = defineAsyncComponent(() => import("./components/MobileActionBar.vue"))
-const SymbolKeys = defineAsyncComponent(() => import("./components/SymbolKeys.vue"))
+const ProblemContent = defineAsyncComponent(() => import('./components/ProblemContent.vue'))
+const ProblemDrawer = defineAsyncComponent(() => import('./components/ProblemDrawer.vue'))
+const ResultPane = defineAsyncComponent(() => import('./components/ResultPane.vue'))
+const MobileActionBar = defineAsyncComponent(() => import('./components/MobileActionBar.vue'))
+const SymbolKeys = defineAsyncComponent(() => import('./components/SymbolKeys.vue'))
 
 interface Props {
   problemID: string
@@ -42,10 +38,10 @@ interface Props {
   problemSetId?: string
 }
 
-const { problemID, contestID = "", problemSetId = "" } = defineProps<Props>()
+const { problemID, contestID = '', problemSetId = '' } = defineProps<Props>()
 
 /** 拉题面失败的原因：null 是还在拉（或拉到了），别的就整页换成 NotFound */
-const failure = ref<null | "missing" | "not-started" | "failed">(null)
+const failure = ref<null | 'missing' | 'not-started' | 'failed'>(null)
 const route = useRoute()
 const router = useRouter()
 
@@ -61,17 +57,15 @@ const { isMobile, isDesktop } = useBreakpoints()
  * 原来的六个页签里，流程图并进了「题目」，统计 / 点评 / 我的提交收进了抽屉 ——
  * 见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 4 节。
  */
-const tabOptions = computed(() =>
-  isMobile.value ? ["content", "editor", "result"] : ["content", "result"],
-)
+const tabOptions = computed(() => (isMobile.value ? ['content', 'editor', 'result'] : ['content', 'result']))
 
-const currentTab = ref("content")
+const currentTab = ref('content')
 
 watch(
   [() => route.query.tab, () => tabOptions.value],
   ([rawTab]) => {
     const tabs = tabOptions.value
-    const fallback = tabs[0] ?? "content"
+    const fallback = tabs[0] ?? 'content'
     currentTab.value = tabs.includes(rawTab as string) ? (rawTab as string) : fallback
   },
   { immediate: true },
@@ -90,14 +84,14 @@ const resultMounted = ref(false)
 watch(
   currentTab,
   (tab) => {
-    if (tab === "result") resultMounted.value = true
+    if (tab === 'result') resultMounted.value = true
   },
   { immediate: true },
 )
 
 const drawer = ref<DrawerKey | null>(null)
 // 抽屉挂进左栏：要等左栏这个元素挂上之后才能当 Teleport 的目标
-const leftPane = useTemplateRef<HTMLElement>("leftPane")
+const leftPane = useTemplateRef<HTMLElement>('leftPane')
 const theme = useThemeVars()
 
 /**
@@ -119,13 +113,12 @@ watch(
   (room) => {
     if (room) {
       drawer.value = null
-      currentTab.value = "result"
-      submissionStore.resultSegment = "submit"
+      currentTab.value = 'result'
+      submissionStore.resultSegment = 'submit'
     }
   },
 )
-const drawerLabel = (key: DrawerKey) =>
-  key === "submission" && teacherCollab.value ? "学生的提交" : DRAWER_TITLE[key]
+const drawerLabel = (key: DrawerKey) => (key === 'submission' && teacherCollab.value ? '学生的提交' : DRAWER_TITLE[key])
 
 function toggleDrawer(key: DrawerKey) {
   drawer.value = drawer.value === key ? null : key
@@ -142,7 +135,7 @@ const drawerMenu = computed<DropdownOption[]>(() => {
     key,
   }))
   const editor = editorMenu.options.value
-  if (drawers.length && editor.length) drawers.push({ type: "divider", key: "divider" })
+  if (drawers.length && editor.length) drawers.push({ type: 'divider', key: 'divider' })
   return [...drawers, ...editor]
 })
 
@@ -157,7 +150,7 @@ watch(
   () => submissionStore.resultSeq,
   () => {
     drawer.value = null
-    currentTab.value = "result"
+    currentTab.value = 'result'
   },
 )
 
@@ -178,25 +171,23 @@ function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNorm
   // 协作中的老师：「页面即协作现场」，跳走这一页协作就断了、求助退回排队。所以上下文条、
   // 相似题、下一题这些站内链接一律开新标签，这一页留着（设计文档第 9 节）
   if (teacherCollab.value) {
-    window.open(router.resolve(to).href, "_blank")
+    window.open(router.resolve(to).href, '_blank')
     return false
   }
   // 老师在看板上主动打开了他的代码（没举手）：helpStatus 是 idle，但老师在
-  const peeked = collabHere.value && collabStore.room?.mode === "peek"
-  if (collabStore.isTeacher || (collabStore.helpStatus === "idle" && !peeked)) return true
+  const peeked = collabHere.value && collabStore.room?.mode === 'peek'
+  if (collabStore.isTeacher || (collabStore.helpStatus === 'idle' && !peeked)) return true
   if (approvedTarget === to.fullPath) {
     approvedTarget = null
     return true
   }
-  const active = collabStore.helpStatus === "active" || peeked
+  const active = collabStore.helpStatus === 'active' || peeked
   return new Promise<boolean>((resolve) => {
     dialog.warning({
-      title: peeked ? "老师正在看你的代码" : active ? "老师正在帮你看这道题" : "你正在排队等老师",
-      content: active
-        ? "换题之后，老师那边就断了。确定要换吗？"
-        : "换题之后这次举手就撤掉了，要在新的题目里重新举手。确定要换吗？",
-      positiveText: "换题",
-      negativeText: "留在这道题",
+      title: peeked ? '老师正在看你的代码' : active ? '老师正在帮你看这道题' : '你正在排队等老师',
+      content: active ? '换题之后，老师那边就断了。确定要换吗？' : '换题之后这次举手就撤掉了，要在新的题目里重新举手。确定要换吗？',
+      positiveText: '换题',
+      negativeText: '留在这道题',
       onPositiveClick: () => {
         approvedTarget = to.fullPath
         resolve(true)
@@ -218,7 +209,7 @@ watch(
 )
 
 // 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
-const resultTab = () => h(ResultTabLabel, { active: currentTab.value === "result" })
+const resultTab = () => h(ResultTabLabel, { active: currentTab.value === 'result' })
 
 // 连着换了几次题，先发的请求后回来的话，地址栏是 C、页面却是 B：只认最后一次
 let initSeq = 0
@@ -238,12 +229,7 @@ async function init() {
     if (mine !== initSeq) return
     problem.value = null
     const code = errorCode(err)
-    failure.value =
-      code === "contest-not-started"
-        ? "not-started"
-        : code === "problem-not-found"
-          ? "missing"
-          : "failed"
+    failure.value = code === 'contest-not-started' ? 'not-started' : code === 'problem-not-found' ? 'missing' : 'failed'
   }
 }
 onMounted(init)
@@ -251,10 +237,10 @@ onMounted(init)
 /** 题不存在时回哪：比赛里回比赛，题单里回题单，否则回题目列表 */
 const backTo = computed(() =>
   contestID
-    ? { to: `/contest/${contestID}`, toLabel: "回到比赛" }
+    ? { to: `/contest/${contestID}`, toLabel: '回到比赛' }
     : problemSetId
-      ? { to: `/problemset/${problemSetId}`, toLabel: "回到题单" }
-      : { to: "/problem", toLabel: "去题目列表" },
+      ? { to: `/problemset/${problemSetId}`, toLabel: '回到题单' }
+      : { to: '/problem', toLabel: '去题目列表' },
 )
 watch(() => problemID, init)
 
@@ -291,15 +277,7 @@ onBeforeUnmount(() => {
       桌面：两栏顶满整个内容区（设计稿「机房（方案 B）」），中间一条 1px 分隔线、可拖动。
       布局给内容区留了 16px 内边距，这里用负边距抵掉
     -->
-    <n-split
-      v-if="isDesktop"
-      class="problem-split"
-      direction="horizontal"
-      :default-size="0.43"
-      min="360px"
-      :max="splitMax"
-      :resize-trigger-size="1"
-    >
+    <n-split v-if="isDesktop" class="problem-split" direction="horizontal" :default-size="0.43" min="360px" :max="splitMax" :resize-trigger-size="1">
       <template #1>
         <div id="problem-left-pane" ref="leftPane" class="left-pane">
           <ContextBar />
@@ -327,13 +305,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <div v-if="ctx.drawers.length" class="drawer-buttons">
-              <button
-                v-for="key in ctx.drawers"
-                :key="key"
-                type="button"
-                class="drawer-button"
-                @click="toggleDrawer(key)"
-              >
+              <button v-for="key in ctx.drawers" :key="key" type="button" class="drawer-button" @click="toggleDrawer(key)">
                 {{ drawerLabel(key) }}
               </button>
             </div>
@@ -379,9 +351,7 @@ onBeforeUnmount(() => {
         </n-tab-pane>
         <template v-if="drawerMenu.length" #suffix>
           <n-dropdown trigger="click" :options="drawerMenu" @select="onMobileMenu">
-            <n-button size="small" quaternary aria-label="更多：统计、点评、我的提交、复制代码……">
-              ⋯
-            </n-button>
+            <n-button size="small" quaternary aria-label="更多：统计、点评、我的提交、复制代码……"> ⋯ </n-button>
           </n-dropdown>
         </template>
       </n-tabs>
@@ -401,12 +371,7 @@ onBeforeUnmount(() => {
   <NotFound v-else-if="failure === 'failed'" icon="ph:wifi-slash" title="题目没拉下来">
     <n-button type="primary" @click="init()">再试一次</n-button>
   </NotFound>
-  <NotFound
-    v-else-if="failure === 'missing'"
-    title="这道题不存在"
-    hint="可能是题号打错了，或者这道题还没公开"
-    v-bind="backTo"
-  />
+  <NotFound v-else-if="failure === 'missing'" title="这道题不存在" hint="可能是题号打错了，或者这道题还没公开" v-bind="backTo" />
 </template>
 
 <style scoped>
@@ -429,7 +394,7 @@ onBeforeUnmount(() => {
 
 /* 分隔线：看上去 1px，拖的时候热区宽一点 */
 .problem-split :deep(.n-split__resize-trigger) {
-  background-color: v-bind("theme.borderColor");
+  background-color: v-bind('theme.borderColor');
 }
 
 /* 热区挂在分隔线本身上：wrapper 不是定位元素，挂在它上面的 ::before 会盖住整个分栏 */
@@ -438,7 +403,7 @@ onBeforeUnmount(() => {
 }
 
 .problem-split :deep(.n-split__resize-trigger-wrapper)::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0 -4px;
   cursor: col-resize;
@@ -467,7 +432,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 2px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .page-tabs {
@@ -482,13 +447,13 @@ onBeforeUnmount(() => {
   border-bottom: 2px solid transparent;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   cursor: pointer;
 }
 
 .page-tab.active {
-  border-bottom-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.textColor1");
+  border-bottom-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.textColor1');
   font-weight: 600;
 }
 
@@ -501,18 +466,18 @@ onBeforeUnmount(() => {
 .drawer-button {
   height: 32px;
   padding: 0 11px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 16px;
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
 .drawer-button:hover {
-  border-color: v-bind("theme.primaryColorHover");
-  color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColorHover');
+  color: v-bind('theme.primaryColor');
 }
 
 .pane-body {

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { LearningReport } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { statusName } from "../utils"
+import type { LearningReport } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { statusName } from '../utils'
 
 /** 没通过的提交按结果分；错得最多的那种下面给一个检查办法 */
-const props = defineProps<{ errors: LearningReport["errors"] }>()
+const props = defineProps<{ errors: LearningReport['errors'] }>()
 
 const theme = useThemeVars()
 
@@ -12,7 +12,7 @@ const theme = useThemeVars()
 const rows = computed(() => {
   const merged = new Map<string, number>()
   for (const item of props.errors) {
-    const name = statusName(item.result) || "其他"
+    const name = statusName(item.result) || '其他'
     merged.set(name, (merged.get(name) ?? 0) + item.count)
   }
   return [...merged].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }))
@@ -20,15 +20,15 @@ const rows = computed(() => {
 const total = computed(() => rows.value.reduce((sum, row) => sum + row.count, 0))
 const top = computed(() => rows.value[0]?.count ?? 1)
 
-const COLORS: Record<string, string> = { 答案错误: "#d03050", 编译失败: "#e7a33e" }
+const COLORS: Record<string, string> = { 答案错误: '#d03050', 编译失败: '#e7a33e' }
 
 const TIPS: Record<string, string> = {
-  答案错误: "先拿题目里的例子自己跑一遍，输出要和例子一字不差",
-  编译失败: "看报错指的是第几行，多半是括号、冒号、引号没配对",
-  运行时错误: "看报错说的是第几行、什么错，再回到那一行",
-  运行超时: "看看循环能不能停下来",
+  答案错误: '先拿题目里的例子自己跑一遍，输出要和例子一字不差',
+  编译失败: '看报错指的是第几行，多半是括号、冒号、引号没配对',
+  运行时错误: '看报错说的是第几行、什么错，再回到那一行',
+  运行超时: '看看循环能不能停下来',
 }
-const tip = computed(() => TIPS[rows.value[0]?.name ?? ""])
+const tip = computed(() => TIPS[rows.value[0]?.name ?? ''])
 </script>
 
 <template>
@@ -59,9 +59,9 @@ const tip = computed(() => TIPS[rows.value[0]?.name ?? ""])
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -75,7 +75,7 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .row {
@@ -94,7 +94,7 @@ h3 small {
   flex: 1;
   height: 10px;
   border-radius: 2px 5px 5px 2px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
@@ -114,7 +114,7 @@ h3 small {
 .tip {
   padding: 8px 10px;
   border-radius: 6px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   font-size: var(--oj-fs-sec);
   line-height: 22px;
 }

@@ -15,9 +15,9 @@ import {
   type FlowDoc,
   type FlowStep,
   type StepKind,
-} from "@oj2/contract"
+} from '@oj2/contract'
 
-export type { BoxKind, FlowDoc, FlowStep, StepKind } from "@oj2/contract"
+export type { BoxKind, FlowDoc, FlowStep, StepKind } from '@oj2/contract'
 export {
   countBlankSteps as countBlank,
   flowSignature as signature,
@@ -29,7 +29,7 @@ export {
 }
 
 /** 一个步骤列表在树里的位置：主线，或者某个判断 / 循环的哪一支 */
-export type Branch = "main" | "yes" | "no" | "body"
+export type Branch = 'main' | 'yes' | 'no' | 'body'
 /** 可以插一步的地方：某个列表的第 index 个位置之前（index = 长度就是末尾） */
 export interface Slot {
   parent: string | null
@@ -46,11 +46,11 @@ export interface FlowHighlight {
 }
 
 export const STEP_LABEL: Record<StepKind, string> = {
-  input: "输入",
-  output: "输出",
-  process: "处理",
-  if: "判断",
-  while: "循环",
+  input: '输入',
+  output: '输出',
+  process: '处理',
+  if: '判断',
+  while: '循环',
 }
 
 export function emptyDoc(): FlowDoc {
@@ -64,9 +64,9 @@ function newId() {
 }
 
 export function newStep(kind: StepKind): FlowStep {
-  const base = { id: newId(), text: "" }
-  if (kind === "if") return { ...base, kind, yes: [], no: [] }
-  if (kind === "while") return { ...base, kind, body: [] }
+  const base = { id: newId(), text: '' }
+  if (kind === 'if') return { ...base, kind, yes: [], no: [] }
+  if (kind === 'while') return { ...base, kind, body: [] }
   return { ...base, kind }
 }
 
@@ -75,10 +75,7 @@ export function cloneDoc(doc: FlowDoc): FlowDoc {
 }
 
 /** 按 id 找一步，顺带带出它所在的列表 */
-export function findStep(
-  steps: FlowStep[],
-  id: string,
-): { step: FlowStep; list: FlowStep[]; index: number } | null {
+export function findStep(steps: FlowStep[], id: string): { step: FlowStep; list: FlowStep[]; index: number } | null {
   for (let index = 0; index < steps.length; index++) {
     const step = steps[index]!
     if (step.id === id) return { step, list: steps, index }
@@ -91,12 +88,12 @@ export function findStep(
 }
 
 function listAt(doc: FlowDoc, parent: string | null, branch: Branch): FlowStep[] | null {
-  if (parent === null) return branch === "main" ? doc.steps : null
+  if (parent === null) return branch === 'main' ? doc.steps : null
   const found = findStep(doc.steps, parent)
   if (!found) return null
   const step = found.step
-  if (step.kind === "if" && (branch === "yes" || branch === "no")) return step[branch]
-  if (step.kind === "while" && branch === "body") return step.body
+  if (step.kind === 'if' && (branch === 'yes' || branch === 'no')) return step[branch]
+  if (step.kind === 'while' && branch === 'body') return step.body
   return null
 }
 
@@ -118,8 +115,5 @@ export function removeStep(doc: FlowDoc, id: string): number {
 }
 
 export function countSteps(steps: FlowStep[]): number {
-  return steps.reduce(
-    (sum, step) => sum + 1 + flowChildren(step).reduce((n, c) => n + countSteps(c), 0),
-    0,
-  )
+  return steps.reduce((sum, step) => sum + 1 + flowChildren(step).reduce((n, c) => n + countSteps(c), 0), 0)
 }

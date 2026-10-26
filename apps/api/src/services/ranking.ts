@@ -7,29 +7,14 @@ import {
   type ClassPkClass,
   type ClassPkPeriod,
   type RankScope,
-} from "@oj2/contract"
-import {
-  and,
-  count,
-  countDistinct,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNotNull,
-  isNull,
-  like,
-  min,
-  ne,
-  sql,
-  type SQL,
-} from "drizzle-orm"
+} from '@oj2/contract'
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, isNull, like, min, ne, sql, type SQL } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { JudgeStatus } from "../judge/status"
-import { sampleUser, rounded } from "../routes/helpers"
-import { termStart, weekStart } from "../time"
-import { cached } from "./cache"
+import { db, schema } from '../db'
+import { JudgeStatus } from '../judge/status'
+import { sampleUser, rounded } from '../routes/helpers'
+import { termStart, weekStart } from '../time'
+import { cached } from './cache'
 
 /**
  * 排名页和班级详情、班级 AI 分析共用的口径（routes/ranking.ts、routes/ai.ts）：
@@ -43,11 +28,7 @@ export const SOLVED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILE
 export const WEEK_MS = 7 * 86_400_000
 
 /** 入榜人群：正常状态的学生与学生管理员，老师设成不计入排名的不算 */
-export const rankedStudents = and(
-  inArray(schema.user.adminType, [...STUDENT_ROLES]),
-  eq(schema.user.isDisabled, false),
-  isNull(schema.user.rankHiddenAt),
-)!
+export const rankedStudents = and(inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false), isNull(schema.user.rankHiddenAt))!
 
 export interface Entrant {
   id: number
@@ -68,13 +49,13 @@ export interface Standing {
 }
 
 export function audienceWhere(scope: RankScope, className: string | null) {
-  if (scope === "class") return and(rankedStudents, eq(schema.user.className, className!))!
-  if (scope === "grade") return and(rankedStudents, like(schema.user.className, `${className}%`))!
+  if (scope === 'class') return and(rankedStudents, eq(schema.user.className, className!))!
+  if (scope === 'grade') return and(rankedStudents, like(schema.user.className, `${className}%`))!
   return rankedStudents
 }
 
 export function avatarOf(avatar: string | null) {
-  return !avatar || avatar.endsWith("/default.png") ? null : avatar
+  return !avatar || avatar.endsWith('/default.png') ? null : avatar
 }
 
 /**
@@ -103,13 +84,7 @@ export async function loadEntrants(where: SQL, since: string | null): Promise<En
       .select({ userId: schema.submission.userId, at: firstSolved })
       .from(schema.submission)
       .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-      .where(
-        and(
-          where,
-          isNull(schema.submission.contestId),
-          inArray(schema.submission.result, SOLVED_RESULTS),
-        ),
-      )
+      .where(and(where, isNull(schema.submission.contestId), inArray(schema.submission.result, SOLVED_RESULTS)))
       .groupBy(schema.submission.userId, schema.submission.problemId)
       .having(since ? gte(firstSolved, since) : undefined),
   ])
@@ -122,9 +97,7 @@ export async function loadEntrants(where: SQL, since: string | null): Promise<En
     else byUser.set(row.userId, [row.at])
   }
   return people.map((person) => {
-    const pairs = (byUser.get(person.id) ?? [])
-      .map((stamp) => [Date.parse(stamp), stamp] as const)
-      .sort((a, b) => a[0] - b[0])
+    const pairs = (byUser.get(person.id) ?? []).map((stamp) => [Date.parse(stamp), stamp] as const).sort((a, b) => a[0] - b[0])
     return {
       id: person.id,
       username: person.username,
@@ -182,19 +155,13 @@ const SHARED_TTL = 10_000
 
 /** 排名榜面那群人的做对时刻：同一个范围、同一个时间段谁来看都一样，「我」的部分由调用方现算 */
 export function rankEntrants(scope: RankScope, group: string | null, since: string | null) {
-  return cached(`rank-entrants:${scope}:${group}:${since}`, SHARED_TTL, () =>
-    loadEntrants(audienceWhere(scope, group), since),
-  )
+  return cached(`rank-entrants:${scope}:${group}:${since}`, SHARED_TTL, () => loadEntrants(audienceWhere(scope, group), since))
 }
 
 /** 有班级的学生，这学期的做对时刻 —— 班级对抗、班级详情、班级 PK 都从这一份算 */
 async function classedEntrants() {
   const term = termStart()
-  const where = and(
-    rankedStudents,
-    isNotNull(schema.user.className),
-    ne(schema.user.className, ""),
-  )!
+  const where = and(rankedStudents, isNotNull(schema.user.className), ne(schema.user.className, ''))!
   return {
     term,
     entrants: await cached(`classed-entrants:${term}`, SHARED_TTL, () => loadEntrants(where, term)),
@@ -258,27 +225,20 @@ export async function classDetail(className: string, withCare: boolean): Promise
 
   // 同年级在用的班：班级对抗里列着的（这学期做对过题）、班号前两位相同
   const grade = className.slice(0, 2)
-  const gradeClasses = new Set(
-    battle.filter((item) => item.className.slice(0, 2) === grade).map((item) => item.className),
-  )
+  const gradeClasses = new Set(battle.filter((item) => item.className.slice(0, 2) === grade).map((item) => item.className))
   const gradeEntrants = entrants.filter((entrant) => gradeClasses.has(entrant.className!))
-  const gradeAvg = gradeEntrants.length
-    ? rounded(average(gradeEntrants.map((entrant) => entrant.times.length)), 1)
-    : null
+  const gradeAvg = gradeEntrants.length ? rounded(average(gradeEntrants.map((entrant) => entrant.times.length)), 1) : null
 
   const groups = new Map<number, number>()
   for (const value of solved) if (value > 0) groups.set(value, (groups.get(value) ?? 0) + 1)
-  const [plateau] = [...groups]
-    .filter(([, n]) => n >= PLATEAU_MIN)
-    .sort((a, b) => b[1] - a[1] || b[0] - a[0])
+  const [plateau] = [...groups].filter(([, n]) => n >= PLATEAU_MIN).sort((a, b) => b[1] - a[1] || b[0] - a[0])
 
   // 每周：周一零点起算，从这学期第一周到这周，只留最近几周
   const firstWeek = Date.parse(weekStart(term))
   const thisWeek = Date.parse(weekStart())
-  const weeks: ClassDetail["weeks"] = []
+  const weeks: ClassDetail['weeks'] = []
   for (let from = firstWeek; from <= thisWeek; from += WEEK_MS) {
-    const inWeek = (entrant: Entrant) =>
-      entrant.times.filter((time) => time >= from && time < from + WEEK_MS).length
+    const inWeek = (entrant: Entrant) => entrant.times.filter((time) => time >= from && time < from + WEEK_MS).length
     weeks.push({
       weekStart: new Date(from).toISOString(),
       perCapita: mine.length ? rounded(average(mine.map(inWeek)), 1) : 0,
@@ -286,11 +246,9 @@ export async function classDetail(className: string, withCare: boolean): Promise
     })
   }
 
-  let care: ClassDetail["care"] = null
+  let care: ClassDetail['care'] = null
   if (withCare) {
-    const low = mine
-      .filter((entrant) => entrant.times.length < CARE_BELOW)
-      .sort((a, b) => a.times.length - b.times.length || a.id - b.id)
+    const low = mine.filter((entrant) => entrant.times.length < CARE_BELOW).sort((a, b) => a.times.length - b.times.length || a.id - b.id)
     const submitted = low.length
       ? await db
           .select({ userId: schema.submission.userId, n: count() })
@@ -362,14 +320,7 @@ async function pkPairs(classNames: string[], since: string): Promise<PkPair[]> {
     })
     .from(schema.submission)
     .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(
-      and(
-        rankedStudents,
-        inArray(schema.user.className, classNames),
-        isNull(schema.submission.contestId),
-        gte(schema.submission.createTime, since),
-      ),
-    )
+    .where(and(rankedStudents, inArray(schema.user.className, classNames), isNull(schema.submission.contestId), gte(schema.submission.createTime, since)))
     .groupBy(schema.user.className, schema.submission.userId, schema.submission.problemId)
   return rows.map((row) => ({
     className: row.className!,
@@ -391,18 +342,14 @@ function assignedSets(pairs: PkPair[], members: Map<string, number>) {
   const sets = new Map<string, Set<number>>()
   for (const [className, byProblem] of tried) {
     const n = members.get(className) ?? 0
-    sets.set(
-      className,
-      new Set([...byProblem].filter(([, people]) => n > 0 && people * 2 >= n).map(([id]) => id)),
-    )
+    sets.set(className, new Set([...byProblem].filter(([, people]) => n > 0 && people * 2 >= n).map(([id]) => id)))
   }
   return sets
 }
 
 function memberCounts(entrants: Entrant[]) {
   const members = new Map<string, number>()
-  for (const entrant of entrants)
-    members.set(entrant.className!, (members.get(entrant.className!) ?? 0) + 1)
+  for (const entrant of entrants) members.set(entrant.className!, (members.get(entrant.className!) ?? 0) + 1)
   return members
 }
 
@@ -415,32 +362,22 @@ export async function pkPartner(className: string) {
   const { term, entrants } = await classedEntrants()
   const battle = battleFrom(entrants)
   const grade = className.slice(0, 2)
-  const candidates = battle.filter(
-    (item) => item.className !== className && item.className.slice(0, 2) === grade,
-  )
+  const candidates = battle.filter((item) => item.className !== className && item.className.slice(0, 2) === grade)
   if (!candidates.length) return null
   const names = [className, ...candidates.map((item) => item.className)]
-  const sets = assignedSets(
-    await pkPairs(names, term),
-    memberCounts(entrants.filter((entrant) => names.includes(entrant.className!))),
-  )
+  const sets = assignedSets(await pkPairs(names, term), memberCounts(entrants.filter((entrant) => names.includes(entrant.className!))))
   const mine = sets.get(className) ?? new Set<number>()
   const common = (name: string) => [...(sets.get(name) ?? [])].filter((id) => mine.has(id)).length
-  return candidates.sort((a, b) => common(b.className) - common(a.className) || a.rank - b.rank)[0]!
-    .className
+  return candidates.sort((a, b) => common(b.className) - common(a.className) || a.rank - b.rank)[0]!.className
 }
 
 /**
  * 班级 PK 的全部数字（页面和 AI 分析共用）。人均、分布按 `period` 算；每周人均（赛跑）
  * 一直按这学期，横轴才有东西。
  */
-export async function classPk(
-  classNames: string[],
-  period: ClassPkPeriod,
-  mine: string | null,
-): Promise<ClassPk> {
+export async function classPk(classNames: string[], period: ClassPkPeriod, mine: string | null): Promise<ClassPk> {
   const { term, entrants: all } = await classedEntrants()
-  const since = period === "week" ? weekStart() : term
+  const since = period === 'week' ? weekStart() : term
   const sinceMs = Date.parse(since)
   const battle = battleFrom(all)
   const entrants = all.filter((entrant) => classNames.includes(entrant.className!))
@@ -454,10 +391,7 @@ export async function classPk(
   for (let from = firstWeek; from <= thisWeek; from += WEEK_MS) weeks.push(from)
 
   // 每道题、每个班：交过 / 做对 / 一次就对 / 提交次数
-  const cells = new Map<
-    number,
-    Map<string, Omit<ClassPkCell, "percent" | "firstPercent" | "best">>
-  >()
+  const cells = new Map<number, Map<string, Omit<ClassPkCell, 'percent' | 'firstPercent' | 'best'>>>()
   for (const pair of pairs) {
     if (!assigned.get(pair.className)?.has(pair.problemId)) continue
     const byClass = cells.get(pair.problemId) ?? new Map()
@@ -482,8 +416,8 @@ export async function classPk(
   const titleOf = new Map(titles.map((row) => [row.id, row]))
 
   const lead = new Map<string, number>()
-  const problems: ClassPk["problems"] = []
-  const solo: ClassPk["solo"] = []
+  const problems: ClassPk['problems'] = []
+  const solo: ClassPk['solo'] = []
   for (const [problemId, byClass] of [...cells].sort((a, b) => a[0] - b[0])) {
     const meta = titleOf.get(problemId)
     if (!meta) continue
@@ -521,24 +455,12 @@ export async function classPk(
       perCapita: people.length ? rounded(average(solved), 1) : 0,
       median: median(solved),
       solvedMembers: solved.filter((value) => value > 0).length,
-      firstPercent: own.length
-        ? Math.round((own.filter((pair) => pair.firstSolved).length / own.length) * 100)
-        : null,
+      firstPercent: own.length ? Math.round((own.filter((pair) => pair.firstSolved).length / own.length) * 100) : null,
       lead: lead.get(className) ?? 0,
       battleRank: battle.find((item) => item.className === className)?.rank ?? null,
       distribution: solved,
       weekly: weeks.map((from) =>
-        people.length
-          ? rounded(
-              average(
-                people.map(
-                  (entrant) =>
-                    entrant.times.filter((time) => time >= from && time < from + WEEK_MS).length,
-                ),
-              ),
-              1,
-            )
-          : 0,
+        people.length ? rounded(average(people.map((entrant) => entrant.times.filter((time) => time >= from && time < from + WEEK_MS).length)), 1) : 0,
       ),
     } satisfies ClassPkClass
   })
@@ -585,7 +507,7 @@ export async function defaultClassFor(teacherId: number) {
       and(
         rankedStudents,
         isNotNull(schema.user.className),
-        ne(schema.user.className, ""),
+        ne(schema.user.className, ''),
         gte(schema.submission.createTime, new Date(Date.now() - WEEK_MS).toISOString()),
       ),
     )
@@ -599,7 +521,7 @@ export async function defaultClassFor(teacherId: number) {
     .select({ className: schema.user.className })
     .from(schema.submission)
     .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(and(rankedStudents, isNotNull(schema.user.className), ne(schema.user.className, "")))
+    .where(and(rankedStudents, isNotNull(schema.user.className), ne(schema.user.className, '')))
     .orderBy(desc(schema.submission.createTime))
     .limit(1)
   return latest?.className ?? null

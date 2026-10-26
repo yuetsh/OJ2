@@ -1,6 +1,6 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { sampleUserSchema } from "./common"
+import { sampleUserSchema } from './common'
 
 /**
  * 排名页（设计稿「排名重设计」G1–G3）。用户要的是**激发竞争、一眼看出排名**，所以：
@@ -10,8 +10,8 @@ import { sampleUserSchema } from "./common"
  *   按先后排，名次差的是「这节课谁先做完」。
  * - 「做对」= 这道题**第一次**做对落在这段时间里（比赛里的提交不算），老题重交不算成绩。
  */
-export const rankScopeSchema = z.enum(["class", "grade", "all"])
-export const rankPeriodSchema = z.enum(["week", "term", "all"])
+export const rankScopeSchema = z.enum(['class', 'grade', 'all'])
+export const rankPeriodSchema = z.enum(['week', 'term', 'all'])
 
 export const rankRowSchema = z.object({
   rank: z.number().int().positive(),
@@ -147,9 +147,7 @@ export const classDetailSchema = z.object({
   /** 每个同学这学期做对几道，画分布点阵用 */
   distribution: z.array(z.number().int().nonnegative()),
   /** 这学期每周（周一起）人均新做对，和同年级在用的班平均比 */
-  weeks: z.array(
-    z.object({ weekStart: z.string(), perCapita: z.number(), gradeAvg: z.number().nullable() }),
-  ),
+  weeks: z.array(z.object({ weekStart: z.string(), perCapita: z.number(), gradeAvg: z.number().nullable() })),
   /** 要多关心的同学（这学期做对不到 3 道），只给老师；学生拿到的是 null */
   care: z
     .array(
@@ -175,7 +173,7 @@ export type ClassDetail = z.infer<typeof classDetailSchema>
  * 不然 37/39 和 38/40 都显示 95%，皇冠却只给一边。口径和排名页一样：比赛里的提交不算，
  * 不计入排名的人分子分母都不算。
  */
-export const classPkPeriodSchema = z.enum(["week", "term"])
+export const classPkPeriodSchema = z.enum(['week', 'term'])
 
 export const classPkCellSchema = z.object({
   /** 这段时间交过这道题的人 */

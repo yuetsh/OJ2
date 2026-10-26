@@ -1,16 +1,9 @@
 <script setup lang="ts">
-import type { AchievementRarity } from "utils/types"
-import {
-  createAchievement,
-  getMetricOptions,
-  updateAchievement,
-  type AdminAchievement,
-  type MetricOption,
-  deleteAchievement,
-} from "admin/api"
-import AchievementIcon from "shared/components/AchievementIcon.vue"
-import { RARITY_LABEL } from "utils/constants"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import type { AchievementRarity } from 'utils/types'
+import { createAchievement, getMetricOptions, updateAchievement, type AdminAchievement, type MetricOption, deleteAchievement } from 'admin/api'
+import AchievementIcon from 'shared/components/AchievementIcon.vue'
+import { RARITY_LABEL } from 'utils/constants'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 const rarityOptions = Object.entries(RARITY_LABEL).map(([value, label]) => ({
   label,
@@ -21,7 +14,7 @@ const props = defineProps<{
   show: boolean
   editing: AdminAchievement | null
 }>()
-const emit = defineEmits<{ "update:show": [boolean]; saved: [] }>()
+const emit = defineEmits<{ 'update:show': [boolean]; saved: [] }>()
 const dialog = useDialog()
 
 /** 删除放在编辑框左下角（列表改成阶梯之后，每一档上只留「点了就编辑」） */
@@ -30,16 +23,14 @@ function confirmDelete() {
   if (!target) return
   dialog.warning({
     title: `删除「${target.name}」？`,
-    content: target.unlockCount
-      ? `${target.unlockCount} 人已经拿到了，删掉会连他们的记录一起删。只是不想再发，关掉「上架」就行。`
-      : "删掉就找不回来了。",
-    positiveText: "删除",
-    negativeText: "不删",
+    content: target.unlockCount ? `${target.unlockCount} 人已经拿到了，删掉会连他们的记录一起删。只是不想再发，关掉「上架」就行。` : '删掉就找不回来了。',
+    positiveText: '删除',
+    negativeText: '不删',
     onPositiveClick: async () => {
       await deleteAchievement(target.id)
-      message.success("删掉了")
-      emit("update:show", false)
-      emit("saved")
+      message.success('删掉了')
+      emit('update:show', false)
+      emit('saved')
     },
   })
 }
@@ -51,13 +42,13 @@ const saving = ref(false)
 
 function emptyForm() {
   return {
-    name: "",
-    description: "",
-    icon: "noto:trophy",
-    rarity: "bronze" as AchievementRarity,
+    name: '',
+    description: '',
+    icon: 'noto:trophy',
+    rarity: 'bronze' as AchievementRarity,
     hidden: false,
-    metric: "",
-    operator: "gte" as "gte" | "lte",
+    metric: '',
+    operator: 'gte' as 'gte' | 'lte',
     threshold: 1,
     visible: true,
     order: 0,
@@ -68,9 +59,7 @@ const form = ref(emptyForm())
 
 const metricOptions = computed(() => metrics.value.map((m) => ({ label: m.name, value: m.key })))
 
-const metricHelp = computed(
-  () => metrics.value.find((m) => m.key === form.value.metric)?.helpText ?? "",
-)
+const metricHelp = computed(() => metrics.value.find((m) => m.key === form.value.metric)?.helpText ?? '')
 
 watch(
   () => props.show,
@@ -83,14 +72,14 @@ watch(
     if (props.editing) {
       form.value = { ...emptyForm(), ...props.editing }
     } else {
-      form.value = { ...emptyForm(), metric: metrics.value[0]?.key ?? "" }
+      form.value = { ...emptyForm(), metric: metrics.value[0]?.key ?? '' }
     }
   },
 )
 
 async function save() {
   if (!form.value.name || !form.value.metric) {
-    message.error("名称和指标不能为空")
+    message.error('名称和指标不能为空')
     return
   }
   saving.value = true
@@ -100,9 +89,9 @@ async function save() {
     } else {
       await createAchievement(form.value)
     }
-    message.success("保存成功")
-    emit("update:show", false)
-    emit("saved")
+    message.success('保存成功')
+    emit('update:show', false)
+    emit('saved')
   } finally {
     saving.value = false
   }
@@ -110,24 +99,14 @@ async function save() {
 </script>
 
 <template>
-  <n-modal
-    :show="show"
-    preset="card"
-    style="width: 560px"
-    :title="editing ? '编辑成就' : '新建成就'"
-    @update:show="emit('update:show', $event)"
-  >
+  <n-modal :show="show" preset="card" style="width: 560px" :title="editing ? '编辑成就' : '新建成就'" @update:show="emit('update:show', $event)">
     <!-- 手机上弹框只有 350 宽，标签放到上面，输入框才有地方 -->
     <n-form :label-placement="isMobile ? 'top' : 'left'" :label-width="80">
       <n-form-item label="名称" required>
         <n-input v-model:value="form.name" placeholder="成就名称" />
       </n-form-item>
       <n-form-item label="描述" required>
-        <n-input
-          v-model:value="form.description"
-          type="textarea"
-          placeholder="达成条件的描述，展示给学生看"
-        />
+        <n-input v-model:value="form.description" type="textarea" placeholder="达成条件的描述，展示给学生看" />
       </n-form-item>
       <n-form-item label="图标">
         <n-flex vertical :size="4" style="flex: 1">
@@ -138,8 +117,7 @@ async function save() {
             <n-input v-model:value="form.icon" placeholder="iconify 图标名，例如 noto:owl" />
           </n-flex>
           <n-text depth="3" style="font-size: 12px">
-            填 iconify 图标名（推荐 noto: 开头的彩色 emoji 图标），左侧是实时
-            预览；预览不出来说明名字写错了。图标名可在 icon-sets.iconify.design 搜索。
+            填 iconify 图标名（推荐 noto: 开头的彩色 emoji 图标），左侧是实时 预览；预览不出来说明名字写错了。图标名可在 icon-sets.iconify.design 搜索。
           </n-text>
         </n-flex>
       </n-form-item>
@@ -178,9 +156,7 @@ async function save() {
     </n-form>
     <template #footer>
       <n-flex justify="end">
-        <n-button v-if="editing" quaternary type="error" class="delete" @click="confirmDelete">
-          删除
-        </n-button>
+        <n-button v-if="editing" quaternary type="error" class="delete" @click="confirmDelete"> 删除 </n-button>
         <n-button @click="emit('update:show', false)">取消</n-button>
         <n-button type="primary" :loading="saving" @click="save"> 保存 </n-button>
       </n-flex>

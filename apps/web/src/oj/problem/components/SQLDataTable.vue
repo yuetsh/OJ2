@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { SqlDisplayColumn } from "utils/types"
-import type { TableChanges } from "../utils/sqlChanges"
+import type { SqlDisplayColumn } from 'utils/types'
+import type { TableChanges } from '../utils/sqlChanges'
 
 const props = defineProps<{
   columns: SqlDisplayColumn[]
@@ -11,8 +11,7 @@ const props = defineProps<{
   changes?: TableChanges | null
 }>()
 
-const changed = (i: number, j: number) =>
-  !!props.changes && (props.changes.newRows.has(i) || props.changes.cells.has(`${i}:${j}`))
+const changed = (i: number, j: number) => !!props.changes && (props.changes.newRows.has(i) || props.changes.cells.has(`${i}:${j}`))
 </script>
 
 <template>
@@ -35,12 +34,8 @@ const changed = (i: number, j: number) =>
           <td :colspan="columns.length" class="nullCell">（空表）</td>
         </tr>
         <tr v-for="(row, i) in rows" :key="i">
-          <td
-            v-for="(v, j) in row"
-            :key="j"
-            :class="{ nullCell: v === null, changed: changed(i, j) }"
-          >
-            {{ v === null ? "NULL" : v }}
+          <td v-for="(v, j) in row" :key="j" :class="{ nullCell: v === null, changed: changed(i, j) }">
+            {{ v === null ? 'NULL' : v }}
           </td>
         </tr>
       </tbody>

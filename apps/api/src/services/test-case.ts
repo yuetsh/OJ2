@@ -1,12 +1,12 @@
-import { createHash } from "node:crypto"
-import { mkdir, chmod, readdir, readFile, stat, writeFile } from "node:fs/promises"
-import { resolve } from "node:path"
+import { createHash } from 'node:crypto'
+import { mkdir, chmod, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
-import { unzipSync, zipSync } from "fflate"
+import { unzipSync, zipSync } from 'fflate'
 
-import { TEST_CASE_MAX_CASES } from "@oj2/contract"
+import { TEST_CASE_MAX_CASES } from '@oj2/contract'
 
-import { config } from "../config"
+import { config } from '../config'
 
 /**
  * 测试点压缩包的解析与落盘。对齐旧 `problem/views/admin.py:TestCaseZipProcessor`。
@@ -112,10 +112,7 @@ export interface ProcessedTestCase {
   info: TestCaseEntry[]
 }
 
-export async function processTestCaseZip(
-  archive: Uint8Array,
-  options: { sql?: boolean } = {},
-): Promise<ProcessedTestCase> {
+export async function processTestCaseZip(archive: Uint8Array, options: { sql?: boolean } = {}): Promise<ProcessedTestCase> {
   let files: Record<string, Uint8Array>
   try {
     // 第一遍只读目录、一个字节都不解（filter 恒返回 false），超限就在这里抛；
@@ -125,7 +122,7 @@ export async function processTestCaseZip(
     files = unzipSync(archive, { filter: wantedEntry })
   } catch (error) {
     if (error instanceof TestCaseError) throw error
-    throw new TestCaseError("压缩包损坏或不是 zip 格式")
+    throw new TestCaseError('压缩包损坏或不是 zip 格式')
   }
 
   // 只按「精确文件名」取内容，不遍历压缩包里的条目 ——
@@ -133,16 +130,14 @@ export async function processTestCaseZip(
   const names = new Set(Object.keys(files))
 
   const selected = options.sql ? collectSqlScripts(names) : collectPairs(names).flat()
-  if (selected.length === 0) throw new TestCaseError("压缩包里没有找到从 1 开始连续编号的测试点")
+  if (selected.length === 0) throw new TestCaseError('压缩包里没有找到从 1 开始连续编号的测试点')
   const count = options.sql ? selected.length : selected.length / 2
   if (count > TEST_CASE_MAX_CASES) {
-    throw new TestCaseError(
-      `测试数据最多 ${TEST_CASE_MAX_CASES} 组，这个压缩包里有 ${count} 组，挑有代表性的留下`,
-    )
+    throw new TestCaseError(`测试数据最多 ${TEST_CASE_MAX_CASES} 组，这个压缩包里有 ${count} 组，挑有代表性的留下`)
   }
   if (options.sql && selected.length < 2) {
     // 题目页会展示测试点 1 的期望结果，只有一个测试点时学生可以对照着硬编码 AC
-    throw new TestCaseError("SQL 题至少需要 2 个数据不同的测试点，防止硬编码期望结果")
+    throw new TestCaseError('SQL 题至少需要 2 个数据不同的测试点，防止硬编码期望结果')
   }
 
   let total = 0
@@ -177,7 +172,7 @@ export async function processTestCaseZip(
     // output_name 复用同名、md5 置空，以兼容前端的测试点表格。
     selected.forEach((name, index) => {
       const entry: TestCaseEntry = {
-        stripped_output_md5: "",
+        stripped_output_md5: '',
         input_size: contents.get(name)!.length,
         output_size: 0,
         input_name: name,
@@ -190,7 +185,7 @@ export async function processTestCaseZip(
     collectPairs(names).forEach(([input, output], index) => {
       const outputContent = contents.get(output)!
       const entry: TestCaseEntry = {
-        stripped_output_md5: createHash("md5").update(rstrip(outputContent)).digest("hex"),
+        stripped_output_md5: createHash('md5').update(rstrip(outputContent)).digest('hex'),
         input_size: contents.get(input)!.length,
         output_size: outputContent.length,
         input_name: input,
@@ -203,8 +198,8 @@ export async function processTestCaseZip(
 
   const payload: Record<string, unknown> = { test_cases: testCases }
   if (options.sql) payload.sql = true
-  const infoPath = resolve(directory, "info")
-  await writeFile(infoPath, JSON.stringify(payload, null, 4), "utf8")
+  const infoPath = resolve(directory, 'info')
+  await writeFile(infoPath, JSON.stringify(payload, null, 4), 'utf8')
   await chmod(infoPath, 0o640)
 
   return { testCaseId, info }
@@ -217,7 +212,7 @@ export async function packTestCaseZip(testCaseId: string) {
   try {
     entries = await readdir(directory)
   } catch {
-    throw new TestCaseError("Test case does not exist")
+    throw new TestCaseError('Test case does not exist')
   }
   const names = new Set(entries)
   const isSql = await readInfo(testCaseId)
@@ -225,7 +220,7 @@ export async function packTestCaseZip(testCaseId: string) {
     .catch(() => false)
   const selected = isSql ? collectSqlScripts(names) : collectPairs(names).flat()
   const bundle: Record<string, Uint8Array> = {}
-  for (const name of [...selected, "info"]) {
+  for (const name of [...selected, 'info']) {
     if (!names.has(name)) continue
     bundle[name] = new Uint8Array(await readFile(resolve(directory, name)))
   }
@@ -233,9 +228,9 @@ export async function packTestCaseZip(testCaseId: string) {
 }
 
 export async function readInfo(testCaseId: string) {
-  const path = resolve(config.testCaseDirectory, testCaseId, "info")
+  const path = resolve(config.testCaseDirectory, testCaseId, 'info')
   try {
-    return JSON.parse(await readFile(path, "utf8")) as {
+    return JSON.parse(await readFile(path, 'utf8')) as {
       sql?: boolean
       test_cases?: Record<string, TestCaseEntry>
     }
@@ -252,7 +247,7 @@ export async function readSqlScripts(testCaseId: string) {
   for (const name of names) {
     scripts.push({
       name,
-      content: await readFile(resolve(directory, name), "utf8"),
+      content: await readFile(resolve(directory, name), 'utf8'),
     })
   }
   return scripts
@@ -265,16 +260,13 @@ export async function readSqlScripts(testCaseId: string) {
 export async function readTestCaseFiles(
   testCaseId: string,
   limits: { maxCases: number; maxFileBytes: number },
-): Promise<
-  | { editable: true; cases: { input: string; output: string }[] }
-  | { editable: false; count: number; totalBytes: number }
-> {
+): Promise<{ editable: true; cases: { input: string; output: string }[] } | { editable: false; count: number; totalBytes: number }> {
   const directory = resolve(config.testCaseDirectory, testCaseId)
   let entries: string[]
   try {
     entries = await readdir(directory)
   } catch {
-    throw new TestCaseError("Test case does not exist")
+    throw new TestCaseError('Test case does not exist')
   }
   const pairs = collectPairs(new Set(entries))
   let totalBytes = 0
@@ -288,16 +280,16 @@ export async function readTestCaseFiles(
   const cases: { input: string; output: string }[] = []
   for (const [input, output] of pairs) {
     cases.push({
-      input: await readFile(resolve(directory, input), "utf8"),
-      output: await readFile(resolve(directory, output), "utf8"),
+      input: await readFile(resolve(directory, input), 'utf8'),
+      output: await readFile(resolve(directory, output), 'utf8'),
     })
   }
   return { editable: true, cases }
 }
 
 function randomId() {
-  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
-  return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join("")
+  return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join('')
 }

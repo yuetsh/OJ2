@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto"
+import { randomBytes } from 'node:crypto'
 
 import {
   AST_SUPPORTED_LANGUAGES,
@@ -10,12 +10,12 @@ import {
   type ChallengeSuggestion,
   type ProblemChallenges,
   type ProblemLanguage,
-} from "@oj2/contract"
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+} from '@oj2/contract'
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { astRulesError, checkAstGroups, type AstResult } from "../judge/ast"
-import { JudgeStatus } from "../judge/status"
+import { db, schema } from '../db'
+import { astRulesError, checkAstGroups, type AstResult } from '../judge/ast'
+import { JudgeStatus } from '../judge/status'
 
 /**
  * 挑战：做对之后，同一道题加一条写法上的限制再做一遍。规则存在 problem.challenges，
@@ -27,7 +27,7 @@ import { JudgeStatus } from "../judge/status"
 
 /** problem.challenges 里某种语言的挑战。逐条过 schema，一条坏的不连累别的（同 run.ts 的 astRulesForLanguage） */
 export function challengesFor(value: unknown, language: string): Challenge[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return []
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return []
   const list = (value as Record<string, unknown>)[language]
   if (!Array.isArray(list)) return []
   return list.flatMap((item) => {
@@ -43,11 +43,7 @@ export interface ChallengeVerdict {
 }
 
 /** 一份代码对着几条挑战各判一遍（只解析一次）。判不了就当一条都没做到 */
-export async function judgeChallenges(
-  code: string,
-  language: string,
-  challenges: Challenge[],
-): Promise<ChallengeVerdict[]> {
+export async function judgeChallenges(code: string, language: string, challenges: Challenge[]): Promise<ChallengeVerdict[]> {
   if (challenges.length === 0) return []
   const groups = await checkAstGroups(
     code,
@@ -93,7 +89,7 @@ let scanning: Promise<void> | null = null
 export function scanPendingChallenges(): Promise<void> {
   if (!scanning) {
     scanning = scanAll()
-      .catch((error: unknown) => console.error("[challenge] 补做到记录失败", error))
+      .catch((error: unknown) => console.error('[challenge] 补做到记录失败', error))
       .finally(() => {
         scanning = null
       })
@@ -117,9 +113,7 @@ async function scanAll() {
         language,
         pending.map((c) => c.id),
       )
-      console.log(
-        `[challenge] 题 ${problem.id} ${language} 补了 ${pending.length} 条挑战、${found} 条做到，用时 ${Date.now() - started}ms`,
-      )
+      console.log(`[challenge] 题 ${problem.id} ${language} 补了 ${pending.length} 条挑战、${found} 条做到，用时 ${Date.now() - started}ms`)
     }
   }
 }
@@ -177,11 +171,7 @@ async function scanProblem(problemId: number, language: string, pending: Challen
 
 /** 补完记一笔。重新读一遍再写：补的这会儿老师可能刚存过，只给还在、id 没变的那几条打标记 */
 async function markScanned(problemId: number, language: string, ids: string[]) {
-  const [row] = await db
-    .select({ challenges: schema.problem.challenges })
-    .from(schema.problem)
-    .where(eq(schema.problem.id, problemId))
-    .limit(1)
+  const [row] = await db.select({ challenges: schema.problem.challenges }).from(schema.problem).where(eq(schema.problem.id, problemId)).limit(1)
   const current = row?.challenges
   if (!current?.[language]) return
   const now = new Date().toISOString()
@@ -218,11 +208,11 @@ export function normalizeChallenges(
       const error = astRulesError({ [language]: item.rules })
       if (error)
         return {
-          error: `挑战 ${language} 第 ${index + 1} 条：${error.replace(/^代码规则 \S+ /, "")}`,
+          error: `挑战 ${language} 第 ${index + 1} 条：${error.replace(/^代码规则 \S+ /, '')}`,
         }
       const kept = before.find((c) => c.id === item.id && sameRules(c.rules, item.rules))
       items.push({
-        id: kept?.id ?? randomBytes(4).toString("hex"),
+        id: kept?.id ?? randomBytes(4).toString('hex'),
         wording: item.wording,
         rules: item.rules,
         ...(kept?.scannedAt ? { scannedAt: kept.scannedAt } : {}),
@@ -239,11 +229,7 @@ export function normalizeChallenges(
  * 几道题、某种语言下的挑战：说法、全站几人做到、我做到没有（做到了是本班、全站第几个）。
  * 规则原文不下发，同 astRequirements。题号按传进来的顺序返回，没配挑战的题不返回。
  */
-export async function challengeList(
-  user: { id: number; className: string | null },
-  displayIds: string[],
-  language: string,
-): Promise<ChallengeList> {
+export async function challengeList(user: { id: number; className: string | null }, displayIds: string[], language: string): Promise<ChallengeList> {
   if (displayIds.length === 0) return []
   const problems = await db
     .select({
@@ -253,16 +239,8 @@ export async function challengeList(
       challenges: schema.problem.challenges,
     })
     .from(schema.problem)
-    .where(
-      and(
-        inArray(schema.problem.displayId, displayIds),
-        isNull(schema.problem.contestId),
-        sql`${schema.problem.challenges} is not null`,
-      ),
-    )
-  const configured = problems
-    .map((p) => ({ ...p, list: challengesFor(p.challenges, language) }))
-    .filter((p) => p.list.length > 0)
+    .where(and(inArray(schema.problem.displayId, displayIds), isNull(schema.problem.contestId), sql`${schema.problem.challenges} is not null`))
+  const configured = problems.map((p) => ({ ...p, list: challengesFor(p.challenges, language) })).filter((p) => p.list.length > 0)
   if (configured.length === 0) return []
   const ids = configured.map((p) => p.id)
 
@@ -297,12 +275,7 @@ export async function challengeList(
     db
       .select()
       .from(schema.challengeSuccess)
-      .where(
-        and(
-          inArray(schema.challengeSuccess.problemId, ids),
-          eq(schema.challengeSuccess.userId, user.id),
-        ),
-      ),
+      .where(and(inArray(schema.challengeSuccess.problemId, ids), eq(schema.challengeSuccess.userId, user.id))),
   ])
 
   // 第几个做到：比我早的有几个。同一时刻的按 id 排（补记录时同一批插入的 id 也是按时间顺的）
@@ -370,12 +343,7 @@ export async function challengeSuccessesOf(userIds: number[], problemIds: number
       challengeId: schema.challengeSuccess.challengeId,
     })
     .from(schema.challengeSuccess)
-    .where(
-      and(
-        inArray(schema.challengeSuccess.userId, userIds),
-        inArray(schema.challengeSuccess.problemId, problemIds),
-      ),
-    )
+    .where(and(inArray(schema.challengeSuccess.userId, userIds), inArray(schema.challengeSuccess.problemId, problemIds)))
 }
 
 // ---------------------------------------------------------------- 出题页的候选
@@ -389,21 +357,21 @@ interface Feature {
 
 /** 中文里夹的英文词两边留空格：「用 f-string 再写一遍」「用列表再写一遍」 */
 function phrases(label: string) {
-  const before = /^[A-Za-z.]/.test(label) ? " " : ""
-  const after = /[A-Za-z)]$/.test(label) ? " " : ""
+  const before = /^[A-Za-z.]/.test(label) ? ' ' : ''
+  const after = /[A-Za-z)]$/.test(label) ? ' ' : ''
   return { use: `用${before}${label}${after}再写一遍`, avoid: `不用${before}${label}，再写一遍` }
 }
 
 const node = (target: string, label: string): Feature => ({
-  rule: { engine: "must_exist_node", target },
+  rule: { engine: 'must_exist_node', target },
   ...phrases(label),
 })
 const call = (target: string): Feature => ({
-  rule: { engine: "must_call_function", target },
+  rule: { engine: 'must_call_function', target },
   ...phrases(`${target}()`),
 })
 const method = (target: string): Feature => ({
-  rule: { engine: "must_call_method", target },
+  rule: { engine: 'must_call_method', target },
   ...phrases(`.${target}()`),
 })
 
@@ -414,36 +382,36 @@ const method = (target: string): Feature => ({
  */
 const FEATURES: Record<string, Feature[]> = {
   Python: [
-    node("for_loop", "for 循环"),
-    node("while_loop", "while 循环"),
-    node("if_statement", "if"),
-    node("function_definition", "自定义函数"),
-    node("list_comprehension", "列表推导式"),
-    node("list_literal", "列表"),
-    node("dict_literal", "字典"),
-    node("f_string", "f-string"),
-    ...["max", "min", "sum", "len", "sorted", "abs", "round", "map", "enumerate", "zip"].map(call),
-    ...["join", "format", "count", "replace", "split", "upper", "lower", "find"].map(method),
+    node('for_loop', 'for 循环'),
+    node('while_loop', 'while 循环'),
+    node('if_statement', 'if'),
+    node('function_definition', '自定义函数'),
+    node('list_comprehension', '列表推导式'),
+    node('list_literal', '列表'),
+    node('dict_literal', '字典'),
+    node('f_string', 'f-string'),
+    ...['max', 'min', 'sum', 'len', 'sorted', 'abs', 'round', 'map', 'enumerate', 'zip'].map(call),
+    ...['join', 'format', 'count', 'replace', 'split', 'upper', 'lower', 'find'].map(method),
   ],
   C: [
-    node("for_loop", "for 循环"),
-    node("while_loop", "while 循环"),
-    node("do_while", "do-while 循环"),
-    node("if_statement", "if"),
-    node("switch_statement", "switch"),
-    node("function_definition", "自定义函数"),
-    ...["puts", "strlen", "abs", "pow", "sqrt"].map(call),
+    node('for_loop', 'for 循环'),
+    node('while_loop', 'while 循环'),
+    node('do_while', 'do-while 循环'),
+    node('if_statement', 'if'),
+    node('switch_statement', 'switch'),
+    node('function_definition', '自定义函数'),
+    ...['puts', 'strlen', 'abs', 'pow', 'sqrt'].map(call),
   ],
 }
-FEATURES["C++"] = FEATURES.C!
+FEATURES['C++'] = FEATURES.C!
 
-const PRINT: Record<string, string> = { Python: "print", C: "printf", "C++": "printf" }
+const PRINT: Record<string, string> = { Python: 'print', C: 'printf', 'C++': 'printf' }
 
 /** 「不用」能直接变成规则的引擎 */
-const NEGATE: Record<string, AstRule["engine"]> = {
-  must_exist_node: "must_not_exist_node",
-  must_call_function: "must_not_call_function",
-  must_call_method: "must_not_call_method",
+const NEGATE: Record<string, AstRule['engine']> = {
+  must_exist_node: 'must_not_exist_node',
+  must_call_function: 'must_not_call_function',
+  must_call_method: 'must_not_call_method',
 }
 
 /**
@@ -457,7 +425,7 @@ export async function challengeSuggestions(
   existing: Challenge[],
 ): Promise<{ acCount: number; suggestions: ChallengeSuggestion[] }> {
   const features = FEATURES[language] ?? []
-  const printName = PRINT[language] ?? "print"
+  const printName = PRINT[language] ?? 'print'
   const subs = await db
     .select({ userId: schema.submission.userId, code: schema.submission.code })
     .from(schema.submission)
@@ -471,10 +439,7 @@ export async function challengeSuggestions(
     )
     .orderBy(asc(schema.submission.createTime))
 
-  const groups = [
-    ...features.map((f) => [f.rule]),
-    [{ engine: "count_function_call", target: printName, min: 0 } satisfies AstRule],
-  ]
+  const groups = [...features.map((f) => [f.rule]), [{ engine: 'count_function_call', target: printName, min: 0 } satisfies AstRule]]
   interface Seen {
     code: string
     has: boolean[]
@@ -502,7 +467,7 @@ export async function challengeSuggestions(
   const example = (pick: (s: Seen) => boolean) => {
     const pool = users.flatMap((list) => list.filter(pick)).map((s) => s.code.trim())
     pool.sort((a, b) => a.length - b.length)
-    return pool[Math.floor(pool.length / 2)] ?? ""
+    return pool[Math.floor(pool.length / 2)] ?? ''
   }
   const suggestions: ChallengeSuggestion[] = []
   for (const [i, feature] of features.entries()) {
@@ -541,7 +506,7 @@ export async function challengeSuggestions(
     if (did < 5) continue
     suggestions.push({
       wording: `只用 ${level} 次 ${printName}`,
-      rules: [{ engine: "count_function_call", target: printName, max: level }],
+      rules: [{ engine: 'count_function_call', target: printName, max: level }],
       did,
       firstShare: null,
       example: example(ok),

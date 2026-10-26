@@ -1,4 +1,4 @@
-import { useDark } from "@vueuse/core"
+import { useDark } from '@vueuse/core'
 
 /**
  * 圆环从哪儿开始扩散。正常点击就用指针落点；键盘触发（Enter / 空格）时浏览器给的
@@ -29,10 +29,7 @@ export function useDarkTransition() {
     const { x, y } = revealOrigin(event)
     // 半径要取到**最远**那个角的距离。用 hypot(x, y) 只覆盖到左上角，
     // 点在偏左上时右下角会有一块旧画面等圆环扩过去，看着像是没刷新。
-    const radius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    )
+    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
     document
       .startViewTransition(() => {
         isDark.value = !isDark.value
@@ -44,8 +41,8 @@ export function useDarkTransition() {
           },
           {
             duration: 400,
-            easing: "ease-in-out",
-            pseudoElement: "::view-transition-new(root)",
+            easing: 'ease-in-out',
+            pseudoElement: '::view-transition-new(root)',
           },
         )
       })

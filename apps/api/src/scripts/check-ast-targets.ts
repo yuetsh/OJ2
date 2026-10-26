@@ -20,17 +20,17 @@
  * 这种，语法里两个都存在，机器看不出来）。语义那一层还是得靠实跑。
  */
 
-import { AST_NODE_TARGETS_BY_LANGUAGE } from "@oj2/contract"
-import { Language, Parser } from "web-tree-sitter"
+import { AST_NODE_TARGETS_BY_LANGUAGE } from '@oj2/contract'
+import { Language, Parser } from 'web-tree-sitter'
 
-import cWasmPath from "tree-sitter-c/tree-sitter-c.wasm" with { type: "file" }
-import cppWasmPath from "tree-sitter-cpp/tree-sitter-cpp.wasm" with { type: "file" }
-import pythonWasmPath from "tree-sitter-python/tree-sitter-python.wasm" with { type: "file" }
-import treeSitterWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" }
+import cWasmPath from 'tree-sitter-c/tree-sitter-c.wasm' with { type: 'file' }
+import cppWasmPath from 'tree-sitter-cpp/tree-sitter-cpp.wasm' with { type: 'file' }
+import pythonWasmPath from 'tree-sitter-python/tree-sitter-python.wasm' with { type: 'file' }
+import treeSitterWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' }
 
 const WASM_BY_LANGUAGE: Record<string, string> = {
   C: cWasmPath,
-  "C++": cppWasmPath,
+  'C++': cppWasmPath,
   Python: pythonWasmPath,
 }
 
@@ -61,7 +61,7 @@ for (const [language, table] of Object.entries(AST_NODE_TARGETS_BY_LANGUAGE)) {
 
 console.log(`检查了 ${checked} 个 AST target 的节点类型`)
 if (missing.length === 0) {
-  console.log("✓ 每个 target 的 node 都在对应语言的语法里真实存在")
+  console.log('✓ 每个 target 的 node 都在对应语言的语法里真实存在')
   process.exit(0)
 }
 for (const { language, target, node } of missing) {

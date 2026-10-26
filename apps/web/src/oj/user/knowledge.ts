@@ -1,11 +1,11 @@
-import type { KnowledgeLevel, KnowledgeMap } from "utils/types"
+import type { KnowledgeLevel, KnowledgeMap } from 'utils/types'
 
 /**
  * 知识点地图的档位名（后端 routes/account.ts 的 levelThresholds 定门槛）。
  * 用「会了」「熟练」这种学生听得懂的词，不用「Lv.3」—— 这张图要说的是「我会了什么」，
  * 不是又一套积分。
  */
-export const LEVEL_NAMES = ["没碰过", "入门", "会了", "熟练", "精通"] as const
+export const LEVEL_NAMES = ['没碰过', '入门', '会了', '熟练', '精通'] as const
 
 export const MAX_LEVEL = LEVEL_NAMES.length - 1
 
@@ -19,7 +19,7 @@ export function remainingToNext(tag: KnowledgeLevel) {
 }
 
 export function tagLink(name: string) {
-  return { path: "/problem", query: { tag: name } }
+  return { path: '/problem', query: { tag: name } }
 }
 
 export interface Headline {
@@ -36,26 +36,20 @@ export interface Headline {
  * 3. 一个都没点亮：挑一个班里同学在学的，让他去点亮
  */
 export function pickHeadline(map: KnowledgeMap): Headline | null {
-  const upgraded = map.tags
-    .filter((tag) => tag.level > tag.levelAtWeekStart)
-    .sort((a, b) => b.level - a.level)
+  const upgraded = map.tags.filter((tag) => tag.level > tag.levelAtWeekStart).sort((a, b) => b.level - a.level)
   if (upgraded.length === 1) {
     const tag = upgraded[0]!
     return { text: `本周升级：${tag.name} → ${levelName(tag.level)}`, to: tagLink(tag.name) }
   }
   if (upgraded.length > 1) {
-    const list = upgraded.map((tag) => `${tag.name}「${levelName(tag.level)}」`).join("、")
+    const list = upgraded.map((tag) => `${tag.name}「${levelName(tag.level)}」`).join('、')
     return { text: `本周升级了 ${upgraded.length} 个知识点：${list}` }
   }
 
   const touched = new Set(map.classTouched)
   const learning = map.tags
     .filter((tag) => tag.level >= 1 && tag.level < MAX_LEVEL)
-    .sort(
-      (a, b) =>
-        Number(touched.has(b.name)) - Number(touched.has(a.name)) ||
-        remainingToNext(a)! - remainingToNext(b)!,
-    )
+    .sort((a, b) => Number(touched.has(b.name)) - Number(touched.has(a.name)) || remainingToNext(a)! - remainingToNext(b)!)
   const next = learning[0]
   if (next) {
     return {

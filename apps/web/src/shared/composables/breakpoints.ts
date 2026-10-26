@@ -1,4 +1,4 @@
-import { breakpointsTailwind, useBreakpoints as useVueUseBreakpoints } from "@vueuse/core"
+import { breakpointsTailwind, useBreakpoints as useVueUseBreakpoints } from '@vueuse/core'
 
 /**
  * 响应式断点检测 composable
@@ -7,8 +7,8 @@ import { breakpointsTailwind, useBreakpoints as useVueUseBreakpoints } from "@vu
 export function useBreakpoints() {
   const breakpoints = useVueUseBreakpoints(breakpointsTailwind)
 
-  const isMobile = breakpoints.smallerOrEqual("md")
-  const isDesktop = breakpoints.greater("md")
+  const isMobile = breakpoints.smallerOrEqual('md')
+  const isDesktop = breakpoints.greater('md')
 
   return {
     isMobile,

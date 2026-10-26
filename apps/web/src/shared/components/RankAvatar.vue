@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useDark } from "@vueuse/core"
-import { rgba } from "shared/composables/tone"
-import { USERNAME_CLASS_RE } from "utils/constants"
+import { useDark } from '@vueuse/core'
+import { rgba } from 'shared/composables/tone'
+import { USERNAME_CLASS_RE } from 'utils/constants'
 
 /**
  * 排名页的头像。九成以上的学生没换过头像（1797 个号是 default.png），一排一模一样的
@@ -23,15 +23,15 @@ watch(
   () => (broken.value = false),
 )
 
-const PALETTE = ["#2f6fd0", "#c76a12", "#6a4bd8", "#0f7a6c", "#b4315f", "#4d5967", "#8a6a00"]
+const PALETTE = ['#2f6fd0', '#c76a12', '#6a4bd8', '#0f7a6c', '#b4315f', '#4d5967', '#8a6a00']
 
 const letter = computed(() => {
-  const name = props.username.replace(USERNAME_CLASS_RE, "") || props.username
-  return Array.from(name).at(-1) ?? "?"
+  const name = props.username.replace(USERNAME_CLASS_RE, '') || props.username
+  return Array.from(name).at(-1) ?? '?'
 })
 
 const colors = computed(() => {
-  if (props.me) return { background: "#18a058", color: "#ffffff" }
+  if (props.me) return { background: '#18a058', color: '#ffffff' }
   let hash = 0
   for (const char of props.username) hash = (hash * 31 + char.codePointAt(0)!) >>> 0
   const base = PALETTE[hash % PALETTE.length]!
@@ -40,14 +40,7 @@ const colors = computed(() => {
 </script>
 
 <template>
-  <img
-    v-if="avatar && !broken"
-    class="avatar"
-    :src="avatar"
-    alt=""
-    @error="broken = true"
-    :style="{ width: `${size}px`, height: `${size}px` }"
-  />
+  <img v-if="avatar && !broken" class="avatar" :src="avatar" alt="" @error="broken = true" :style="{ width: `${size}px`, height: `${size}px` }" />
   <span
     v-else
     class="avatar letter"

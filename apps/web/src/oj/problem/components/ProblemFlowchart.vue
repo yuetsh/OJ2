@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { useProblemStore } from "oj/store/problem"
-import { useMermaid } from "shared/composables/useMermaid"
+import { useProblemStore } from 'oj/store/problem'
+import { useMermaid } from 'shared/composables/useMermaid'
 
 const problemStore = useProblemStore()
 const { problem } = storeToRefs(problemStore)
-const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
+const mermaidContainer = useTemplateRef<HTMLElement>('mermaidContainer')
 
 const { renderError, renderFlowchart } = useMermaid()
 
 const renderProblemFlowchart = async () => {
-  await renderFlowchart(mermaidContainer.value, problem.value?.mermaidCode ?? "")
+  await renderFlowchart(mermaidContainer.value, problem.value?.mermaidCode ?? '')
 }
 
 onMounted(renderProblemFlowchart)

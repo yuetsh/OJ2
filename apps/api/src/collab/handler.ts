@@ -1,10 +1,10 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm"
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 
-import { touchSession } from "../auth/session"
-import { db, schema } from "../db"
-import { toAdminType, type StatisticInfo } from "@oj2/contract"
+import { touchSession } from '../auth/session'
+import { db, schema } from '../db'
+import { toAdminType, type StatisticInfo } from '@oj2/contract'
 
-import { TEACHER_ROLES } from "../routes/helpers"
+import { TEACHER_ROLES } from '../routes/helpers'
 import {
   addRequest,
   addTeacher,
@@ -27,7 +27,7 @@ import {
   type CollabSocket,
   type HelpRequest,
   type Room,
-} from "./state"
+} from './state'
 
 /**
  * `type: "error"` 的 message **会被前端原样弹成 toast**（store 的 case "error"
@@ -36,7 +36,7 @@ import {
  * 一句人话 —— 原来那几条是 "Invalid problemId" 这样的英文，直接糊在学生脸上。
  */
 function isTeacher(ws: CollabSocket) {
-  return TEACHER_ROLES.includes(toAdminType(ws.data.adminType ?? ""))
+  return TEACHER_ROLES.includes(toAdminType(ws.data.adminType ?? ''))
 }
 
 /** 推给老师的列表条目。不含 socket，也不含任何代码内容 */
@@ -62,8 +62,8 @@ function serializeRequest(request: HelpRequest) {
  */
 function broadcastQueuePositions() {
   for (const request of listRequests()) {
-    if (request.status !== "pending") continue
-    sendHelpStatus(request.socket, "pending", {
+    if (request.status !== 'pending') continue
+    sendHelpStatus(request.socket, 'pending', {
       queueAhead: queueAheadOf(request.studentId),
     })
   }
@@ -77,19 +77,15 @@ function broadcastQueuePositions() {
  */
 export function broadcastRequests() {
   const payload = JSON.stringify({
-    type: "requests",
+    type: 'requests',
     list: listRequests().map(serializeRequest),
   })
   for (const ws of teacherSockets()) ws.send(payload)
   broadcastQueuePositions()
 }
 
-function sendHelpStatus(
-  ws: CollabSocket,
-  status: "pending" | "active" | "cancelled" | "no_teacher" | "dismissed",
-  extra: Record<string, unknown> = {},
-) {
-  ws.send(JSON.stringify({ type: "help_status", status, ...extra }))
+function sendHelpStatus(ws: CollabSocket, status: 'pending' | 'active' | 'cancelled' | 'no_teacher' | 'dismissed', extra: Record<string, unknown> = {}) {
+  ws.send(JSON.stringify({ type: 'help_status', status, ...extra }))
 }
 
 export function handleCollabOpen(ws: CollabSocket) {
@@ -98,7 +94,7 @@ export function handleCollabOpen(ws: CollabSocket) {
     // 新上线的老师要立刻看到当前队列，不能等下一次变更
     ws.send(
       JSON.stringify({
-        type: "requests",
+        type: 'requests',
         list: listRequests().map(serializeRequest),
       }),
     )
@@ -135,17 +131,17 @@ export function handleCollabOpen(ws: CollabSocket) {
     closeRoom(room.studentId)
     room.studentSocket.data.roomOwnerId = undefined
     room.teacherSocket.data.roomOwnerId = undefined
-    room.teacherSocket.send(JSON.stringify({ type: "room_closed", reason: "peer_offline" }))
-    request.status = "pending"
+    room.teacherSocket.send(JSON.stringify({ type: 'room_closed', reason: 'peer_offline' }))
+    request.status = 'pending'
     request.teacherId = undefined
     request.teacherName = undefined
     broadcastRequests()
   }
 
-  if (request.status === "pending") {
-    sendHelpStatus(ws, "pending", { queueAhead: queueAheadOf(ws.data.userId) })
-  } else if (request.status === "active") {
-    sendHelpStatus(ws, "active", { teacherName: request.teacherName ?? "" })
+  if (request.status === 'pending') {
+    sendHelpStatus(ws, 'pending', { queueAhead: queueAheadOf(ws.data.userId) })
+  } else if (request.status === 'active') {
+    sendHelpStatus(ws, 'active', { teacherName: request.teacherName ?? '' })
   }
 }
 
@@ -154,10 +150,10 @@ export function handleCollabOpen(ws: CollabSocket) {
 function requeueAfterTeacherGone(studentId: number) {
   const request = getRequest(studentId)
   if (request) {
-    request.status = "pending"
+    request.status = 'pending'
     request.teacherId = undefined
     request.teacherName = undefined
-    sendHelpStatus(request.socket, "pending", {
+    sendHelpStatus(request.socket, 'pending', {
       queueAhead: queueAheadOf(studentId),
     })
   }
@@ -173,7 +169,7 @@ export function handleCollabClose(ws: CollabSocket) {
     room.studentSocket.data.roomOwnerId = undefined
     room.teacherSocket.data.roomOwnerId = undefined
     const peer = ws === room.teacherSocket ? room.studentSocket : room.teacherSocket
-    peer.send(JSON.stringify({ type: "room_closed", reason: "peer_offline" }))
+    peer.send(JSON.stringify({ type: 'room_closed', reason: 'peer_offline' }))
 
     if (ws === room.teacherSocket) {
       requeueAfterTeacherGone(room.studentId)
@@ -186,7 +182,7 @@ export function handleCollabClose(ws: CollabSocket) {
     // 标签页，另一个标签页可能已经把请求接成 active（甚至已经换了一拨新请求），
     // 不加 socket 归属和状态检查，这里会把活跃房间的请求记录连根拔起
     const request = getRequest(ws.data.userId)
-    if (request && request.socket === ws && request.status !== "active") {
+    if (request && request.socket === ws && request.status !== 'active') {
       removeRequest(ws.data.userId)
     }
   }
@@ -208,74 +204,74 @@ export async function handleCollabMessage(ws: CollabSocket, raw: string) {
   } catch {
     ws.send(
       JSON.stringify({
-        type: "error",
-        message: "消息格式不对，请刷新页面重试",
+        type: 'error',
+        message: '消息格式不对，请刷新页面重试',
       }),
     )
     return
   }
 
   // 心跳不查库，和 /ws/submissions 的处理一致
-  if (message.type === "ping") {
-    ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
+  if (message.type === 'ping') {
+    ws.send(JSON.stringify({ type: 'pong', timestamp: message.timestamp }))
     return
   }
 
   // 握手时校验过一次不算数 —— 这条连接能挂几个小时
   if (!(await touchSession(ws.data.sid, ws.data.userId))) {
-    ws.close(1008, "Session expired")
+    ws.close(1008, 'Session expired')
     return
   }
 
   switch (message.type) {
-    case "help_request":
+    case 'help_request':
       await handleHelpRequest(ws, message.problemId, message.language)
       return
-    case "help_language":
+    case 'help_language':
       handleHelpLanguage(ws, message.language)
       return
-    case "help_cancel":
+    case 'help_cancel':
       handleHelpCancel(ws)
       return
-    case "accept":
+    case 'accept':
       await handleAccept(ws, message.studentId)
       return
-    case "reject":
+    case 'reject':
       await handleReject(ws, message.studentId)
       return
-    case "presence":
+    case 'presence':
       handlePresence(ws, message.problemId, message.language)
       return
-    case "peek":
+    case 'peek':
       await handlePeek(ws, message.studentId)
       return
-    case "dismiss":
+    case 'dismiss':
       await handleDismiss(ws, message.problemId)
       return
-    case "leave":
+    case 'leave':
       handleLeave(ws, message.reason)
       return
     default:
       ws.send(
         JSON.stringify({
-          type: "error",
-          message: "不认识的操作，请刷新页面重试",
+          type: 'error',
+          message: '不认识的操作，请刷新页面重试',
         }),
       )
   }
 }
 
 async function handleHelpRequest(ws: CollabSocket, problemId: unknown, language: unknown) {
-  if (typeof problemId !== "string" || !problemId) {
-    ws.send(JSON.stringify({ type: "error", message: "题号不对，请刷新页面重试" }))
+  if (typeof problemId !== 'string' || !problemId) {
+    ws.send(JSON.stringify({ type: 'error', message: '题号不对，请刷新页面重试' }))
     return
   }
   if (isTeacher(ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "教师不能发起求助" }))
+    ws.send(JSON.stringify({ type: 'error', message: '教师不能发起求助' }))
     return
   }
   if (!hasTeacherOnline()) {
-    sendHelpStatus(ws, "no_teacher")
+    sendHelpStatus(ws, 'no_teacher')
     return
   }
 
@@ -286,26 +282,22 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown, language:
     .where(and(eq(schema.problem.displayId, problemId), isNull(schema.problem.contestId)))
     .limit(1)
   if (!problem) {
-    ws.send(JSON.stringify({ type: "error", message: "题目不存在或不支持求助" }))
+    ws.send(JSON.stringify({ type: 'error', message: '题目不存在或不支持求助' }))
     return
   }
 
   const existing = getRequest(ws.data.userId)
   // 已经在协作中就不重复登记，否则会把正在进行的房间挤掉
-  if (existing?.status === "active") return
+  if (existing?.status === 'active') return
 
   const [[student], latest] = await Promise.all([
-    db
-      .select({ className: schema.user.className })
-      .from(schema.user)
-      .where(eq(schema.user.id, ws.data.userId))
-      .limit(1),
+    db.select({ className: schema.user.className }).from(schema.user).where(eq(schema.user.id, ws.data.userId)).limit(1),
     latestSubmission(ws.data.userId, problem.id),
   ])
 
   const request: HelpRequest = {
     studentId: ws.data.userId,
-    studentName: ws.data.username ?? "",
+    studentName: ws.data.username ?? '',
     className: student?.className ?? null,
     problemId,
     problemPk: problem.id,
@@ -313,24 +305,24 @@ async function handleHelpRequest(ws: CollabSocket, problemId: unknown, language:
     latest,
     language: normalizeCollabLanguage(language),
     createdAt: Date.now(),
-    status: "pending",
+    status: 'pending',
     socket: ws,
   }
   addRequest(request)
 
   // 老师正主动看着他的代码时他举了手：不用再排队，就当这位老师接了
   const room = getRoom(ws.data.userId)
-  if (room?.mode === "peek" && room.studentSocket === ws && room.problemId === problemId) {
-    room.mode = "help"
-    request.status = "active"
+  if (room?.mode === 'peek' && room.studentSocket === ws && room.problemId === problemId) {
+    room.mode = 'help'
+    request.status = 'active'
     request.teacherId = room.teacherId
-    request.teacherName = room.teacherSocket.data.username ?? ""
-    sendHelpStatus(ws, "active", { teacherName: request.teacherName })
+    request.teacherName = room.teacherSocket.data.username ?? ''
+    sendHelpStatus(ws, 'active', { teacherName: request.teacherName })
     broadcastRequests()
     return
   }
 
-  sendHelpStatus(ws, "pending", { queueAhead: queueAheadOf(ws.data.userId) })
+  sendHelpStatus(ws, 'pending', { queueAhead: queueAheadOf(ws.data.userId) })
   broadcastRequests()
 }
 
@@ -352,7 +344,7 @@ function handleHelpLanguage(ws: CollabSocket, language: unknown) {
   const room = getRoom(ws.data.userId)
   if (!room) return
   room.language = next
-  room.teacherSocket.send(JSON.stringify({ type: "room_language", language: next }))
+  room.teacherSocket.send(JSON.stringify({ type: 'room_language', language: next }))
 }
 
 function handleHelpCancel(ws: CollabSocket) {
@@ -361,21 +353,21 @@ function handleHelpCancel(ws: CollabSocket) {
   // 合法——getRequest(ws.data.userId) 已经把范围锁在这一个用户上了，不是跨用户
   // 操作。这里和 handleCollabClose 的排队分支不是同一类问题：那边关闭事件是
   // 「顺带」触发的，必须认出是不是本人这条连接；这里是用户主动点了取消
-  if (!request || request.status === "active") return
+  if (!request || request.status === 'active') return
   removeRequest(ws.data.userId)
   broadcastRequests()
 }
 
 async function handleAccept(ws: CollabSocket, studentId: unknown) {
   if (!isTeacher(ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "无权限" }))
+    ws.send(JSON.stringify({ type: 'error', message: '无权限' }))
     return
   }
-  if (typeof studentId !== "number") {
+  if (typeof studentId !== 'number') {
     ws.send(
       JSON.stringify({
-        type: "error",
-        message: "学生标识不对，请刷新页面重试",
+        type: 'error',
+        message: '学生标识不对，请刷新页面重试',
       }),
     )
     return
@@ -390,18 +382,18 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
 
   // 老师同时只能在一个房间
   if (roomOf(ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "请先结束当前协作" }))
+    ws.send(JSON.stringify({ type: 'error', message: '请先结束当前协作' }))
     return
   }
 
   const request = getRequest(studentId)
-  if (!request || request.status === "active" || getRoom(studentId)) {
+  if (!request || request.status === 'active' || getRoom(studentId)) {
     // 被别人接走了、学生已经撤销，或者这个学生 id 名下已经有一个房间在挂着
     // （正常路径走不到，是两个标签页 + 断线重连缝隙的最后一道闸）——
     // 回一份最新列表让老师端自己纠正
     ws.send(
       JSON.stringify({
-        type: "requests",
+        type: 'requests',
         list: listRequests().map(serializeRequest),
       }),
     )
@@ -413,15 +405,15 @@ async function handleAccept(ws: CollabSocket, studentId: unknown) {
 /** 接单：建房、两边发 room_open。调用方已经核过老师身份、老师不在别的房间、这条还在排队 */
 function acceptRequest(ws: CollabSocket, request: HelpRequest) {
   const studentId = request.studentId
-  request.status = "active"
+  request.status = 'active'
   request.teacherId = ws.data.userId
-  request.teacherName = ws.data.username ?? ""
+  request.teacherName = ws.data.username ?? ''
 
   ws.data.roomOwnerId = studentId
   request.socket.data.roomOwnerId = studentId
   const room: Room = {
     studentId,
-    mode: "help",
+    mode: 'help',
     teacherId: ws.data.userId,
     studentSocket: request.socket,
     teacherSocket: ws,
@@ -430,7 +422,7 @@ function acceptRequest(ws: CollabSocket, request: HelpRequest) {
   }
   openRoom(room)
   sendRoomOpen(room, request.studentName, request.teacherName, request.className)
-  sendHelpStatus(request.socket, "active", { teacherName: request.teacherName })
+  sendHelpStatus(request.socket, 'active', { teacherName: request.teacherName })
   broadcastRequests()
 }
 
@@ -438,28 +430,21 @@ function acceptRequest(ws: CollabSocket, request: HelpRequest) {
  * 两边的 room_open。教师端多带学生的 id 和班级：协作条要知道他举手多久了（按 id 在列表里找），
  * 「帮完了」要回到哪个班的看板
  */
-function sendRoomOpen(
-  room: Room,
-  studentName: string,
-  teacherName: string,
-  className: string | null,
-) {
+function sendRoomOpen(room: Room, studentName: string, teacherName: string, className: string | null) {
   const frame = (peer: Record<string, unknown>) =>
     JSON.stringify({
-      type: "room_open",
+      type: 'room_open',
       mode: room.mode,
       peer,
       problemId: room.problemId,
       language: room.language,
     })
-  room.studentSocket.send(frame({ name: teacherName, role: "teacher" }))
-  room.teacherSocket.send(
-    frame({ name: studentName, role: "student", id: room.studentId, className }),
-  )
+  room.studentSocket.send(frame({ name: teacherName, role: 'teacher' }))
+  room.teacherSocket.send(frame({ name: studentName, role: 'student', id: room.studentId, className }))
 }
 
 async function handleReject(ws: CollabSocket, studentId: unknown) {
-  if (!isTeacher(ws) || typeof studentId !== "number") return
+  if (!isTeacher(ws) || typeof studentId !== 'number') return
 
   // reject 很少见，多这一次查询不心疼；不然握手快照挡不住"连接活着期间被降级
   // 或禁用"的老师继续掐掉排队中的求助
@@ -467,9 +452,9 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
 
   const request = getRequest(studentId)
   // 已经在协作中的不能靠 reject 掐掉，那是 leave 的事
-  if (!request || request.status === "active") return
+  if (!request || request.status === 'active') return
   removeRequest(studentId)
-  sendHelpStatus(request.socket, "cancelled")
+  sendHelpStatus(request.socket, 'cancelled')
   broadcastRequests()
 }
 
@@ -488,12 +473,12 @@ async function handleReject(ws: CollabSocket, studentId: unknown) {
 function handleLeave(ws: CollabSocket, reason: unknown) {
   const room = roomOf(ws)
   if (!room) return
-  if (reason !== "left") {
-    teardownRoom(room, "done")
+  if (reason !== 'left') {
+    teardownRoom(room, 'done')
     return
   }
-  const side = ws === room.teacherSocket ? "teacher" : "student"
-  teardownRoom(room, "peer_left", side, ws)
+  const side = ws === room.teacherSocket ? 'teacher' : 'student'
+  teardownRoom(room, 'peer_left', side, ws)
 }
 
 /**
@@ -510,31 +495,26 @@ function handleLeave(ws: CollabSocket, reason: unknown) {
  * 是 `done`，离开页面是 `self_left`。对他来说这是「我自己干的」，不该看到一句
  * 「对方离开了」，也不该看到「老师已结束这次帮忙」。
  */
-function teardownRoom(
-  room: Room,
-  reason: "done" | "peer_offline" | "peer_left",
-  offlineSide?: "student" | "teacher",
-  initiator?: CollabSocket,
-) {
+function teardownRoom(room: Room, reason: 'done' | 'peer_offline' | 'peer_left', offlineSide?: 'student' | 'teacher', initiator?: CollabSocket) {
   closeRoom(room.studentId)
   room.studentSocket.data.roomOwnerId = undefined
   room.teacherSocket.data.roomOwnerId = undefined
   // 发起方收到的是「我自己干的」那一版：点了结束就是 done，离开页面是 self_left。
   // 不能跟对面收同一条 —— 学生自己切走了却看到「老师已结束这次帮忙」是假话
-  const selfReason = reason === "peer_left" ? "self_left" : "done"
+  const selfReason = reason === 'peer_left' ? 'self_left' : 'done'
   for (const socket of [room.studentSocket, room.teacherSocket]) {
     socket.send(
       JSON.stringify({
-        type: "room_closed",
+        type: 'room_closed',
         reason: socket === initiator ? selfReason : reason,
       }),
     )
   }
-  if (reason === "done") {
+  if (reason === 'done') {
     removeRequest(room.studentId)
-  } else if (offlineSide === "teacher") {
+  } else if (offlineSide === 'teacher') {
     requeueAfterTeacherGone(room.studentId)
-  } else if (offlineSide === "student") {
+  } else if (offlineSide === 'student') {
     removeRequest(room.studentId)
   }
   broadcastRequests()
@@ -563,11 +543,11 @@ export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) 
     // 真丢帧：两边的 Yjs 文档会从此悄悄分叉——教学工具里"看起来在协作、其实
     // 各看各的代码"比老实断开更糟，不做续传，直接拆房间。和教师断线走同一条
     // 收尾路径：老师那侧消失就把请求退回排队，不让学生卡死在 active 出不来
-    console.error("Collab binary forward failed, tearing down room", {
+    console.error('Collab binary forward failed, tearing down room', {
       studentId: room.studentId,
     })
-    const offlineSide = peer === room.teacherSocket ? "teacher" : "student"
-    teardownRoom(room, "peer_offline", offlineSide)
+    const offlineSide = peer === room.teacherSocket ? 'teacher' : 'student'
+    teardownRoom(room, 'peer_offline', offlineSide)
   }
 }
 
@@ -578,7 +558,7 @@ export function handleCollabBinary(ws: CollabSocket, data: Buffer | Uint8Array) 
  */
 async function stillTeacher(ws: CollabSocket) {
   if (!isTeacher(ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "无权限" }))
+    ws.send(JSON.stringify({ type: 'error', message: '无权限' }))
     return false
   }
   const [teacher] = await db
@@ -587,7 +567,7 @@ async function stillTeacher(ws: CollabSocket) {
     .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
   if (!teacher || !TEACHER_ROLES.includes(toAdminType(teacher.adminType))) {
-    ws.close(1008, "Permission revoked")
+    ws.close(1008, 'Permission revoked')
     return false
   }
   return true
@@ -599,21 +579,11 @@ async function latestSubmission(userId: number, problemPk: number): Promise<Coll
     .select({
       id: schema.submission.id,
       result: schema.submission.result,
-      runtimeError: sql<
-        StatisticInfo["runtime_error"] | null
-      >`${schema.submission.statisticInfo}->'runtime_error'`,
-      sampleCheck: sql<
-        StatisticInfo["sample_check"] | null
-      >`${schema.submission.statisticInfo}->'sample_check'`,
+      runtimeError: sql<StatisticInfo['runtime_error'] | null>`${schema.submission.statisticInfo}->'runtime_error'`,
+      sampleCheck: sql<StatisticInfo['sample_check'] | null>`${schema.submission.statisticInfo}->'sample_check'`,
     })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, userId),
-        eq(schema.submission.problemId, problemPk),
-        isNull(schema.submission.contestId),
-      ),
-    )
+    .where(and(eq(schema.submission.userId, userId), eq(schema.submission.problemId, problemPk), isNull(schema.submission.contestId)))
     .orderBy(desc(schema.submission.createTime))
     .limit(1)
   if (!row) return null
@@ -645,7 +615,7 @@ export async function refreshRequestLatest(userId: number) {
  */
 function handlePresence(ws: CollabSocket, problemId: unknown, language: unknown) {
   if (isTeacher(ws)) return
-  if (typeof problemId !== "string" || !problemId) {
+  if (typeof problemId !== 'string' || !problemId) {
     clearPresence(ws.data.userId, ws)
     return
   }
@@ -655,7 +625,7 @@ function handlePresence(ws: CollabSocket, problemId: unknown, language: unknown)
   const room = getRoom(ws.data.userId)
   if (room && room.studentSocket === ws && room.language !== lang) {
     room.language = lang
-    room.teacherSocket.send(JSON.stringify({ type: "room_language", language: lang }))
+    room.teacherSocket.send(JSON.stringify({ type: 'room_language', language: lang }))
   }
 }
 
@@ -666,32 +636,32 @@ function handlePresence(ws: CollabSocket, problemId: unknown, language: unknown)
  * 老师可以直接改。他正举着手的话就是接单，和「帮他」一样。
  */
 async function handlePeek(ws: CollabSocket, studentId: unknown) {
-  if (typeof studentId !== "number") {
-    ws.send(JSON.stringify({ type: "error", message: "学生标识不对，请刷新页面重试" }))
+  if (typeof studentId !== 'number') {
+    ws.send(JSON.stringify({ type: 'error', message: '学生标识不对，请刷新页面重试' }))
     return
   }
   if (!(await stillTeacher(ws))) return
   if (!teacherSockets().has(ws)) return
   if (roomOf(ws)) {
-    ws.send(JSON.stringify({ type: "error", message: "请先结束当前协作" }))
+    ws.send(JSON.stringify({ type: 'error', message: '请先结束当前协作' }))
     return
   }
 
   const busy = getRoom(studentId)
   if (busy) {
-    const name = busy.teacherSocket.data.username ?? "别的老师"
-    ws.send(JSON.stringify({ type: "error", message: `${name} 正在看他的代码` }))
+    const name = busy.teacherSocket.data.username ?? '别的老师'
+    ws.send(JSON.stringify({ type: 'error', message: `${name} 正在看他的代码` }))
     return
   }
   const request = getRequest(studentId)
-  if (request?.status === "pending") {
+  if (request?.status === 'pending') {
     acceptRequest(ws, request)
     return
   }
 
   const presence = presenceOf(studentId)
   if (!presence) {
-    ws.send(JSON.stringify({ type: "error", message: "他现在没开着题目，打不开" }))
+    ws.send(JSON.stringify({ type: 'error', message: '他现在没开着题目，打不开' }))
     return
   }
   const [student] = await db
@@ -707,7 +677,7 @@ async function handlePeek(ws: CollabSocket, studentId: unknown) {
   presence.socket.data.roomOwnerId = studentId
   const room: Room = {
     studentId,
-    mode: "peek",
+    mode: 'peek',
     teacherId: ws.data.userId,
     studentSocket: presence.socket,
     teacherSocket: ws,
@@ -715,7 +685,7 @@ async function handlePeek(ws: CollabSocket, studentId: unknown) {
     language: presence.language,
   }
   openRoom(room)
-  sendRoomOpen(room, student.username, ws.data.username ?? "", student.className)
+  sendRoomOpen(room, student.username, ws.data.username ?? '', student.className)
 }
 
 /**
@@ -723,14 +693,14 @@ async function handlePeek(ws: CollabSocket, studentId: unknown) {
  * 一次放下。正在帮的那个不动。学生收到「xuyue 讲了 2020，还不会就再举手」
  */
 async function handleDismiss(ws: CollabSocket, problemId: unknown) {
-  if (typeof problemId !== "string" || !problemId) return
+  if (typeof problemId !== 'string' || !problemId) return
   if (!(await stillTeacher(ws))) return
-  const teacherName = ws.data.username ?? ""
+  const teacherName = ws.data.username ?? ''
   let changed = false
   for (const request of listRequests()) {
-    if (request.problemId !== problemId || request.status !== "pending") continue
+    if (request.problemId !== problemId || request.status !== 'pending') continue
     removeRequest(request.studentId)
-    sendHelpStatus(request.socket, "dismissed", { teacherName, problemId })
+    sendHelpStatus(request.socket, 'dismissed', { teacherName, problemId })
     changed = true
   }
   if (changed) broadcastRequests()

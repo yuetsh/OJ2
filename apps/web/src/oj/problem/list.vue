@@ -1,28 +1,28 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { ProblemProgress, ProblemTypeFilter, Tag } from "@oj2/contract"
-import { useRouteQuery } from "@vueuse/router"
-import { useThemeVars } from "naive-ui"
-import { getProblemProgress, getRandomProblem } from "oj/api"
-import { getAuthors, getProblemList } from "shared/api"
-import { useCodeStore } from "oj/store/code"
-import { useTone } from "shared/composables/tone"
-import { STORAGE_KEY } from "utils/constants"
-import storage from "utils/storage"
-import type { ProblemRow } from "utils/types"
-import { getProblemTagList } from "shared/api"
-import Hitokoto from "shared/components/Hitokoto.vue"
-import Pagination from "shared/components/Pagination.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { usePagination } from "shared/composables/pagination"
-import { useAuthModalStore } from "shared/store/authModal"
-import AdminLink from "shared/components/AdminLink.vue"
-import { useUserStore } from "shared/store/user"
-import ProblemStatus from "./components/ProblemStatus.vue"
-import ProblemTypeTag from "./components/ProblemTypeTag.vue"
-import ProgressRow from "./components/ProgressRow.vue"
-import TagNav from "./components/TagNav.vue"
-import { PROBLEM_TYPE_HINT, PROBLEM_TYPE_LABEL, problemTypes } from "./utils/problemType"
+import { Icon } from '@iconify/vue'
+import type { ProblemProgress, ProblemTypeFilter, Tag } from '@oj2/contract'
+import { useRouteQuery } from '@vueuse/router'
+import { useThemeVars } from 'naive-ui'
+import { getProblemProgress, getRandomProblem } from 'oj/api'
+import { getAuthors, getProblemList } from 'shared/api'
+import { useCodeStore } from 'oj/store/code'
+import { useTone } from 'shared/composables/tone'
+import { STORAGE_KEY } from 'utils/constants'
+import storage from 'utils/storage'
+import type { ProblemRow } from 'utils/types'
+import { getProblemTagList } from 'shared/api'
+import Hitokoto from 'shared/components/Hitokoto.vue'
+import Pagination from 'shared/components/Pagination.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { usePagination } from 'shared/composables/pagination'
+import { useAuthModalStore } from 'shared/store/authModal'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useUserStore } from 'shared/store/user'
+import ProblemStatus from './components/ProblemStatus.vue'
+import ProblemTypeTag from './components/ProblemTypeTag.vue'
+import ProgressRow from './components/ProgressRow.vue'
+import TagNav from './components/TagNav.vue'
+import { PROBLEM_TYPE_HINT, PROBLEM_TYPE_LABEL, problemTypes } from './utils/problemType'
 
 /**
  * 题目列表（设计稿「题目列表重设计」定稿 B + 改版）：左栏知识点和自己的进度，
@@ -41,16 +41,16 @@ interface ProblemQuery {
 }
 
 const DIFFICULTIES = [
-  { label: "全部", value: "" },
-  { label: "简单", value: "Low" },
-  { label: "中等", value: "Mid" },
-  { label: "困难", value: "High" },
+  { label: '全部', value: '' },
+  { label: '简单', value: 'Low' },
+  { label: '中等', value: 'Mid' },
+  { label: '困难', value: 'High' },
 ]
 
-const TYPES: ProblemTypeFilter[] = ["sql", "reference", "flowchart", "ast"]
+const TYPES: ProblemTypeFilter[] = ['sql', 'reference', 'flowchart', 'ast']
 
 /** 新生一道还没做对时，顶行引去的知识点 */
-const START_TAG = "输出入门"
+const START_TAG = '输出入门'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -62,13 +62,13 @@ const { isDesktop, isMobile } = useBreakpoints()
 
 const { query } = usePagination<ProblemQuery>(
   {
-    keyword: useRouteQuery("keyword", "").value,
-    difficulty: useRouteQuery("difficulty", "").value,
-    tag: useRouteQuery("tag", "").value,
-    author: useRouteQuery("author", "").value,
-    sort: useRouteQuery("sort", "").value,
-    type: useRouteQuery("type", "").value,
-    undone: useRouteQuery("undone", "").value,
+    keyword: useRouteQuery('keyword', '').value,
+    difficulty: useRouteQuery('difficulty', '').value,
+    tag: useRouteQuery('tag', '').value,
+    author: useRouteQuery('author', '').value,
+    sort: useRouteQuery('sort', '').value,
+    type: useRouteQuery('type', '').value,
+    undone: useRouteQuery('undone', '').value,
   },
   { defaultLimit: 30 },
 )
@@ -90,17 +90,15 @@ const mine = computed(() => (showStatus.value && !teacher.value ? progress.value
 
 // 老师那一版没有这个开关：没有状态列，开了也看不出藏了哪些题。带着 ?undone=1 进来也当没开
 const undoneOn = computed({
-  get: () => query.undone === "1" && !teacher.value,
-  set: (on: boolean) => (query.undone = on ? "1" : ""),
+  get: () => query.undone === '1' && !teacher.value,
+  set: (on: boolean) => (query.undone = on ? '1' : ''),
 })
 
 const tagByName = computed(() => new Map(tags.value.map((t) => [t.name, t])))
 const currentTag = computed(() => tagByName.value.get(query.tag) ?? null)
 const startTag = computed(() => tagByName.value.get(START_TAG) ?? null)
 
-const hasExtraFilter = computed(
-  () => !!(query.keyword || query.difficulty || query.author || query.type),
-)
+const hasExtraFilter = computed(() => !!(query.keyword || query.difficulty || query.author || query.type))
 
 // 连着点几个知识点时，先发的请求可能后回来（按人数排序那条要慢一截），只认最后一次
 let listSeq = 0
@@ -116,7 +114,7 @@ async function listProblems() {
     sort: query.sort,
     type: query.type,
     // 不看 isAuthed：首屏请求发出时登录信息往往还没回来，后端对没登录的人自己会忽略它
-    undone: undoneOn.value ? "1" : "",
+    undone: undoneOn.value ? '1' : '',
   })
   if (seq !== listSeq) return
   total.value = res.total
@@ -128,28 +126,13 @@ async function listProblems() {
 }
 
 async function loadSide() {
-  const [tagRes, progressRes] = await Promise.all([
-    getProblemTagList(),
-    userStore.isAuthed ? getProblemProgress().catch(() => null) : Promise.resolve(null),
-  ])
+  const [tagRes, progressRes] = await Promise.all([getProblemTagList(), userStore.isAuthed ? getProblemProgress().catch(() => null) : Promise.resolve(null)])
   tags.value = tagRes
   progress.value = progressRes
 }
 
 watchDebounced(() => query.keyword, listProblems, { debounce: 500, maxWait: 1000 })
-watch(
-  () => [
-    query.tag,
-    query.difficulty,
-    query.limit,
-    query.page,
-    query.author,
-    query.sort,
-    query.type,
-    query.undone,
-  ],
-  listProblems,
-)
+watch(() => [query.tag, query.difficulty, query.limit, query.page, query.author, query.sort, query.type, query.undone], listProblems)
 
 // 用登录框登进来（页面不刷新）、或者退出：状态列和进度都要换成另一个人的。
 // 进站那一次不用：请求带 cookie，首屏那一份本来就是全的
@@ -173,32 +156,29 @@ function selectTag(name: string) {
   query.tag = name
 }
 
-const solvedInTag = computed(() =>
-  mine.value && currentTag.value ? (mine.value.byTag[String(currentTag.value.id)] ?? 0) : null,
-)
+const solvedInTag = computed(() => (mine.value && currentTag.value ? (mine.value.byTag[String(currentTag.value.id)] ?? 0) : null))
 
 /** 标题旁那句：学生看自己在这个知识点的进度，打开「只看没做完」就说还剩几道 */
 const countText = computed(() => {
   // 全做对了（下面是空状态）就别说「还有 0 道」，照常说做对几道
-  if (undoneOn.value && mine.value && total.value > 0)
-    return { kind: "left" as const, n: total.value }
+  if (undoneOn.value && mine.value && total.value > 0) return { kind: 'left' as const, n: total.value }
   if (solvedInTag.value !== null && !hasExtraFilter.value && currentTag.value)
     return {
-      kind: "mine" as const,
+      kind: 'mine' as const,
       n: solvedInTag.value,
       of: currentTag.value.problemCount,
     }
-  return { kind: "total" as const, n: total.value }
+  return { kind: 'total' as const, n: total.value }
 })
 
 // ---- 排序：和原来同一套，「最多 / 最少」按人数（和最后一列「做对 / 做过」对得上） ----
 const sortOptions = [
-  { label: "最新创建", value: "" },
-  { label: "最早创建", value: "create_time" },
-  { label: "最多人做过", value: "-submission_number" },
-  { label: "最少人做过", value: "submission_number" },
-  { label: "最多人做对", value: "-accepted_number" },
-  { label: "最少人做对", value: "accepted_number" },
+  { label: '最新创建', value: '' },
+  { label: '最早创建', value: 'create_time' },
+  { label: '最多人做过', value: '-submission_number' },
+  { label: '最少人做过', value: 'submission_number' },
+  { label: '最多人做对', value: '-accepted_number' },
+  { label: '最少人做对', value: 'accepted_number' },
 ]
 
 // ---- 出题者 ----
@@ -217,38 +197,34 @@ const showTypeMenu = ref(false)
 const [showMobileFilters, toggleMobileFilters] = useToggle(false)
 // 弹层被传送到 body 下面，样式里的 v-bind 变量挂在页面根上、够不着它，主题色只能就地给
 const menuVars = computed(() => ({
-  "--menu-bg": theme.value.popoverColor,
-  "--menu-shadow": theme.value.boxShadow2,
-  "--menu-text": theme.value.textColor1,
-  "--menu-hint": theme.value.textColor3,
-  "--menu-hover": theme.value.hoverColor,
-  "--menu-on": tone("success").background,
-  "--menu-check": theme.value.successColor,
+  '--menu-bg': theme.value.popoverColor,
+  '--menu-shadow': theme.value.boxShadow2,
+  '--menu-text': theme.value.textColor1,
+  '--menu-hint': theme.value.textColor3,
+  '--menu-hover': theme.value.hoverColor,
+  '--menu-on': tone('success').background,
+  '--menu-check': theme.value.successColor,
 }))
 // 下拉里每类后面的题数：一共三十几道，第一次打开时数一下就行
 // 下拉里每类后面的题数，跟着左栏的知识点和其它筛选走（类型本身除外）：
 // 选了「条件判断」就说「条件判断」里有几道画流程图的题，不然一直是全站那个固定数，看着像没生效。
 // 只在下拉打开时数，条件没变就不重数
-type Counts = Partial<Record<ProblemTypeFilter | "all", number>>
+type Counts = Partial<Record<ProblemTypeFilter | 'all', number>>
 const typeCounts = ref<Counts>({})
-let countedFor = ""
+let countedFor = ''
 const countFilters = computed(() => ({
   keyword: query.keyword,
   tag: query.tag,
   difficulty: query.difficulty,
   author: query.author,
-  undone: undoneOn.value ? "1" : "",
+  undone: undoneOn.value ? '1' : '',
 }))
 async function refreshTypeCounts() {
   const key = JSON.stringify(countFilters.value)
   if (key === countedFor) return
   countedFor = key
-  const kinds = ["all", ...TYPES] as const
-  const results = await Promise.all(
-    kinds.map((kind) =>
-      getProblemList(0, 1, { ...countFilters.value, type: kind === "all" ? "" : kind }),
-    ),
-  )
+  const kinds = ['all', ...TYPES] as const
+  const results = await Promise.all(kinds.map((kind) => getProblemList(0, 1, { ...countFilters.value, type: kind === 'all' ? '' : kind })))
   // 数的过程中条件又变了：这一份已经过时，留给下一次
   if (key !== JSON.stringify(countFilters.value)) return
   typeCounts.value = Object.fromEntries(kinds.map((kind, i) => [kind, results[i]!.total]))
@@ -269,10 +245,7 @@ function typeEmpty(kind: ProblemTypeFilter) {
 const mobileTypeOptions = computed(() =>
   TYPES.map((kind) => ({
     disabled: typeEmpty(kind),
-    label:
-      typeCounts.value[kind] === undefined
-        ? PROBLEM_TYPE_LABEL[kind]
-        : `${PROBLEM_TYPE_LABEL[kind]}（${typeCounts.value[kind]} 道）`,
+    label: typeCounts.value[kind] === undefined ? PROBLEM_TYPE_LABEL[kind] : `${PROBLEM_TYPE_LABEL[kind]}（${typeCounts.value[kind]} 道）`,
     value: kind,
   })),
 )
@@ -293,7 +266,7 @@ async function pickRandom() {
       // 只挑能用自己的语言做的题：学生在编辑器里上次用的语言，没用过就是 Python
       language: codeStore.preferredLanguage(),
     })
-    router.push("/problem/" + id)
+    router.push('/problem/' + id)
   } finally {
     picking.value = false
   }
@@ -305,23 +278,19 @@ const nextTag = computed(() => {
   if (!p) return null
   let best: { tag: Tag; left: number } | null = null
   for (const tag of tags.value) {
-    if (tag.category !== "knowledge" || tag.name === query.tag) continue
+    if (tag.category !== 'knowledge' || tag.name === query.tag) continue
     const left = tag.problemCount - (p.byTag[String(tag.id)] ?? 0)
     if (left <= 0) continue
     // 先挑做过一些的（接着练），都没碰过就挑题最多的
     const started = (p.byTag[String(tag.id)] ?? 0) > 0
     const bestStarted = best ? (p.byTag[String(best.tag.id)] ?? 0) > 0 : false
-    if (!best || (started && !bestStarted) || (started === bestStarted && left > best.left))
-      best = { tag, left }
+    if (!best || (started && !bestStarted) || (started === bestStarted && left > best.left)) best = { tag, left }
   }
   return best
 })
 // 只在「只看没做完」是唯一的条件时才说「你都做对了」：带着类型、难度这些筛选空了，
 // 不能说成整个知识点都做对了
-const allDone = computed(
-  () =>
-    loaded.value && undoneOn.value && total.value === 0 && !!mine.value && !hasExtraFilter.value,
-)
+const allDone = computed(() => loaded.value && undoneOn.value && total.value === 0 && !!mine.value && !hasExtraFilter.value)
 
 /**
  * 筛空了：说清楚是哪些条件把题筛没了，每个条件一个按钮，只去掉那一个。
@@ -331,35 +300,35 @@ const emptyConditions = computed(() => {
   const list: { label: string; action: string; clear: () => void }[] = []
   if (query.type) {
     const label = PROBLEM_TYPE_LABEL[query.type as ProblemTypeFilter]
-    list.push({ label: `「${label}」的`, action: "看全部类型", clear: () => (query.type = "") })
+    list.push({ label: `「${label}」的`, action: '看全部类型', clear: () => (query.type = '') })
   }
   if (query.difficulty) {
-    const label = DIFFICULTIES.find((d) => d.value === query.difficulty)?.label ?? ""
-    list.push({ label, action: "看全部难度", clear: () => (query.difficulty = "") })
+    const label = DIFFICULTIES.find((d) => d.value === query.difficulty)?.label ?? ''
+    list.push({ label, action: '看全部难度', clear: () => (query.difficulty = '') })
   }
   if (query.author)
     list.push({
       label: `${query.author} 出的`,
-      action: "看所有出题者",
-      clear: () => (query.author = ""),
+      action: '看所有出题者',
+      clear: () => (query.author = ''),
     })
   if (query.keyword)
     list.push({
       label: `和「${query.keyword}」对得上的`,
-      action: "清掉搜索",
-      clear: () => (query.keyword = ""),
+      action: '清掉搜索',
+      clear: () => (query.keyword = ''),
     })
   if (undoneOn.value)
     list.push({
-      label: "没做完的",
-      action: "关掉只看没做完",
+      label: '没做完的',
+      action: '关掉只看没做完',
       clear: () => (undoneOn.value = false),
     })
   return list
 })
 
 const emptyText = computed(() => {
-  const where = query.tag ? `「${query.tag}」里` : "题库里"
+  const where = query.tag ? `「${query.tag}」里` : '题库里'
   const conds = emptyConditions.value
   if (conds.length === 0) return `${where}还没有题`
   if (conds.length === 1) return `${where}没有${conds[0]!.label}题`
@@ -370,22 +339,22 @@ const emptyText = computed(() => {
 function knowledgeOf(row: ProblemRow) {
   return row.tags
     .map((name) => tagByName.value.get(name))
-    .filter((tag): tag is Tag => tag?.category === "knowledge")
+    .filter((tag): tag is Tag => tag?.category === 'knowledge')
     .sort((a, b) => b.problemCount - a.problemCount)
     .map((tag) => tag.name)
-    .join(" · ")
+    .join(' · ')
 }
 
 function mustDo(row: ProblemRow) {
-  return row.tags.includes("必会题")
+  return row.tags.includes('必会题')
 }
 
 // 「C语言」是主题标签，告诉学生这道题是 C 语言课专门用的，和「必会」一样挂在题目名后
 function cCourse(row: ProblemRow) {
-  return row.tags.includes("C语言")
+  return row.tags.includes('C语言')
 }
 
-const DIFFICULTY_TONE = { 简单: "success", 中等: "warning", 困难: "error" } as const
+const DIFFICULTY_TONE = { 简单: 'success', 中等: 'warning', 困难: 'error' } as const
 
 function difficultyStyle(row: ProblemRow) {
   if (!row.difficulty) return {}
@@ -397,32 +366,17 @@ function difficultyStyle(row: ProblemRow) {
 const chipsRef = ref<HTMLElement | null>(null)
 watch(
   () => [query.tag, tags.value.length],
-  () =>
-    nextTick(() =>
-      chipsRef.value
-        ?.querySelector(".m-chip.on")
-        ?.scrollIntoView({ block: "nearest", inline: "center" }),
-    ),
+  () => nextTick(() => chipsRef.value?.querySelector('.m-chip.on')?.scrollIntoView({ block: 'nearest', inline: 'center' })),
 )
 
-const gridColumns = computed(() =>
-  showStatus.value
-    ? "40px 72px minmax(0, 1fr) 260px 72px 136px"
-    : "72px minmax(0, 1fr) 260px 72px 136px",
-)
+const gridColumns = computed(() => (showStatus.value ? '40px 72px minmax(0, 1fr) 260px 72px 136px' : '72px minmax(0, 1fr) 260px 72px 136px'))
 </script>
 
 <template>
   <div class="page" :class="{ mobile: isMobile }">
     <!-- ================= 桌面 ================= -->
     <div v-if="isDesktop" class="split">
-      <TagNav
-        :tags="tags"
-        :selected="query.tag"
-        :all-count="allCount"
-        :progress="mine?.byTag ?? null"
-        @select="selectTag"
-      />
+      <TagNav :tags="tags" :selected="query.tag" :all-count="allCount" :progress="mine?.byTag ?? null" @select="selectTag" />
       <section class="main">
         <div class="top">
           <ProgressRow v-if="mine" :progress="mine" :start-tag="startTag" @select-tag="selectTag" />
@@ -432,13 +386,11 @@ const gridColumns = computed(() =>
           </div>
           <div class="spacer"></div>
           <Hitokoto class="hitokoto" />
-          <AdminLink v-if="userStore.hasProblemPermission" to="/admin/problem/create" size="small">
-            新建题目
-          </AdminLink>
+          <AdminLink v-if="userStore.hasProblemPermission" to="/admin/problem/create" size="small"> 新建题目 </AdminLink>
         </div>
 
         <div class="titlebar">
-          <h1>{{ query.tag || "全部题目" }}</h1>
+          <h1>{{ query.tag || '全部题目' }}</h1>
           <span class="count">
             <template v-if="countText.kind === 'left'">
               还有 <b class="plain">{{ countText.n }}</b> 道没做对
@@ -448,40 +400,20 @@ const gridColumns = computed(() =>
             </template>
             <template v-else>{{ countText.n }} 道</template>
           </span>
-          <button class="random" :disabled="picking" @click="pickRandom">
-            <Icon icon="ph:dice-five-bold" :width="15" />随便来一道
-          </button>
+          <button class="random" :disabled="picking" @click="pickRandom"><Icon icon="ph:dice-five-bold" :width="15" />随便来一道</button>
           <div class="spacer"></div>
-          <n-input
-            v-model:value="query.keyword"
-            class="w-search"
-            clearable
-            placeholder="题号或标题"
-          >
+          <n-input v-model:value="query.keyword" class="w-search" clearable placeholder="题号或标题">
             <template #prefix><Icon icon="ph:magnifying-glass" /></template>
           </n-input>
           <div class="segmented">
-            <button
-              v-for="d in DIFFICULTIES"
-              :key="d.value"
-              :class="{ on: query.difficulty === d.value }"
-              @click="query.difficulty = d.value"
-            >
+            <button v-for="d in DIFFICULTIES" :key="d.value" :class="{ on: query.difficulty === d.value }" @click="query.difficulty = d.value">
               {{ d.label }}
             </button>
           </div>
-          <n-popover
-            v-model:show="showTypeMenu"
-            trigger="click"
-            placement="bottom-start"
-            :show-arrow="false"
-            raw
-          >
+          <n-popover v-model:show="showTypeMenu" trigger="click" placement="bottom-start" :show-arrow="false" raw>
             <template #trigger>
               <button class="select" :class="{ on: query.type }">
-                <span>{{
-                  query.type ? PROBLEM_TYPE_LABEL[query.type as ProblemTypeFilter] : "全部类型"
-                }}</span>
+                <span>{{ query.type ? PROBLEM_TYPE_LABEL[query.type as ProblemTypeFilter] : '全部类型' }}</span>
                 <Icon icon="ph:caret-down-bold" :width="12" />
               </button>
             </template>
@@ -491,9 +423,7 @@ const gridColumns = computed(() =>
                 <span class="body">
                   <span class="label-line">
                     <span class="label">全部类型</span>
-                    <span v-if="typeCounts.all !== undefined" class="n"
-                      >{{ typeCounts.all }} 道</span
-                    >
+                    <span v-if="typeCounts.all !== undefined" class="n">{{ typeCounts.all }} 道</span>
                   </span>
                 </span>
               </button>
@@ -509,9 +439,7 @@ const gridColumns = computed(() =>
                 <span class="body">
                   <span class="label-line">
                     <ProblemTypeTag :kind="kind" />
-                    <span v-if="typeCounts[kind] !== undefined" class="n"
-                      >{{ typeCounts[kind] }} 道</span
-                    >
+                    <span v-if="typeCounts[kind] !== undefined" class="n">{{ typeCounts[kind] }} 道</span>
                   </span>
                   <span class="hint">{{ PROBLEM_TYPE_HINT[kind] }}</span>
                 </span>
@@ -529,19 +457,9 @@ const gridColumns = computed(() =>
             @update:show="loadAuthors"
             @update:value="(v: string | null) => (query.author = v ?? '')"
           />
-          <n-select
-            v-model:value="query.sort"
-            class="w-sort"
-            :consistent-menu-width="false"
-            :options="sortOptions"
-          />
+          <n-select v-model:value="query.sort" class="w-sort" :consistent-menu-width="false" :options="sortOptions" />
           <span v-if="!teacher" class="vsep"></span>
-          <label
-            v-if="!teacher"
-            class="undone"
-            :class="{ disabled: !userStore.isAuthed }"
-            :title="userStore.isAuthed ? '做对的题藏起来' : '登录后才能用'"
-          >
+          <label v-if="!teacher" class="undone" :class="{ disabled: !userStore.isAuthed }" :title="userStore.isAuthed ? '做对的题藏起来' : '登录后才能用'">
             <n-switch v-model:value="undoneOn" size="small" :disabled="!userStore.isAuthed" />
             只看没做完
           </label>
@@ -557,13 +475,7 @@ const gridColumns = computed(() =>
             <div>做对 / 做过</div>
           </div>
           <div class="rows">
-            <RouterLink
-              v-for="row in problems"
-              :key="row.id"
-              :to="'/problem/' + row._id"
-              class="row"
-              :style="{ gridTemplateColumns: gridColumns }"
-            >
+            <RouterLink v-for="row in problems" :key="row.id" :to="'/problem/' + row._id" class="row" :style="{ gridTemplateColumns: gridColumns }">
               <div v-if="showStatus" class="center"><ProblemStatus :status="row.status" /></div>
               <div class="id">{{ row._id }}</div>
               <div class="title">
@@ -572,7 +484,7 @@ const gridColumns = computed(() =>
                 <span v-if="cCourse(row)" class="must course">C语言</span>
                 <ProblemTypeTag v-for="kind in problemTypes(row)" :key="kind" :kind="kind" />
               </div>
-              <div class="knowledge" :title="knowledgeOf(row)">{{ knowledgeOf(row) || "—" }}</div>
+              <div class="knowledge" :title="knowledgeOf(row)">{{ knowledgeOf(row) || '—' }}</div>
               <div>
                 <span v-if="row.difficulty" class="difficulty" :style="difficultyStyle(row)">
                   {{ row.difficulty }}
@@ -585,9 +497,7 @@ const gridColumns = computed(() =>
 
             <div v-if="allDone" class="empty">
               <span class="empty-icon"><Icon icon="ph:check-bold" :width="26" /></span>
-              <b v-if="currentTag"
-                >{{ currentTag.name }}的 {{ currentTag.problemCount }} 道你都做对了</b
-              >
+              <b v-if="currentTag">{{ currentTag.name }}的 {{ currentTag.problemCount }} 道你都做对了</b>
               <b v-else>这里的题你都做对了</b>
               <span class="sub">关掉「只看没做完」能看回这些题</span>
               <div class="empty-actions">
@@ -621,12 +531,10 @@ const gridColumns = computed(() =>
       </div>
       <div ref="chipsRef" class="m-chips">
         <button class="m-chip" :class="{ on: !query.tag }" @click="selectTag('')">
-          全部<span>{{ allCount || "" }}</span>
+          全部<span>{{ allCount || '' }}</span>
         </button>
         <button
-          v-for="tag in tags
-            .filter((t) => t.category === 'knowledge')
-            .sort((a, b) => b.problemCount - a.problemCount)"
+          v-for="tag in tags.filter((t) => t.category === 'knowledge').sort((a, b) => b.problemCount - a.problemCount)"
           :key="tag.id"
           class="m-chip"
           :class="{ on: query.tag === tag.name }"
@@ -636,26 +544,20 @@ const gridColumns = computed(() =>
           <span v-if="mine && (mine.byTag[String(tag.id)] ?? 0) >= tag.problemCount" class="done">
             <Icon icon="ph:check-bold" :width="11" />
           </span>
-          <span v-else-if="mine && (mine.byTag[String(tag.id)] ?? 0) > 0">
-            {{ mine.byTag[String(tag.id)] }}/{{ tag.problemCount }}
-          </span>
+          <span v-else-if="mine && (mine.byTag[String(tag.id)] ?? 0) > 0"> {{ mine.byTag[String(tag.id)] }}/{{ tag.problemCount }} </span>
           <span v-else>{{ tag.problemCount }}</span>
         </button>
       </div>
       <div class="m-title">
         <div class="m-heading">
-          <h1>{{ query.tag || "全部题目" }}</h1>
+          <h1>{{ query.tag || '全部题目' }}</h1>
           <span class="count">
             <template v-if="countText.kind === 'left'">还有 {{ countText.n }} 道没做对</template>
-            <template v-else-if="countText.kind === 'mine'">
-              {{ countText.of }} 道 · 你做对 {{ countText.n }} 道
-            </template>
+            <template v-else-if="countText.kind === 'mine'"> {{ countText.of }} 道 · 你做对 {{ countText.n }} 道 </template>
             <template v-else>{{ countText.n }} 道</template>
           </span>
         </div>
-        <button class="random" :disabled="picking" @click="pickRandom">
-          <Icon icon="ph:dice-five-bold" :width="15" />随便来一道
-        </button>
+        <button class="random" :disabled="picking" @click="pickRandom"><Icon icon="ph:dice-five-bold" :width="15" />随便来一道</button>
         <button class="m-filter" :class="{ on: showMobileFilters }" @click="toggleMobileFilters()">
           <Icon icon="ph:funnel-simple-bold" :width="14" />筛选
         </button>
@@ -663,12 +565,7 @@ const gridColumns = computed(() =>
       <div v-if="showMobileFilters" class="m-panel">
         <n-input v-model:value="query.keyword" size="small" clearable placeholder="题号或标题" />
         <div class="segmented">
-          <button
-            v-for="d in DIFFICULTIES"
-            :key="d.value"
-            :class="{ on: query.difficulty === d.value }"
-            @click="query.difficulty = d.value"
-          >
+          <button v-for="d in DIFFICULTIES" :key="d.value" :class="{ on: query.difficulty === d.value }" @click="query.difficulty = d.value">
             {{ d.label }}
           </button>
         </div>
@@ -740,8 +637,8 @@ const gridColumns = computed(() =>
   height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
 }
 
 .page.mobile {
@@ -773,7 +670,7 @@ const gridColumns = computed(() =>
   display: flex;
   align-items: center;
   gap: 16px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .spacer {
@@ -787,7 +684,7 @@ const gridColumns = computed(() =>
 
 .anon {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   white-space: nowrap;
 }
 
@@ -798,7 +695,7 @@ const gridColumns = computed(() =>
   background: transparent;
   font: inherit;
   font-weight: 600;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
@@ -823,16 +720,16 @@ const gridColumns = computed(() =>
 
 .count {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .count b {
   font-weight: 600;
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .count b.plain {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .random {
@@ -841,7 +738,7 @@ const gridColumns = computed(() =>
   box-sizing: border-box;
   margin-left: 4px;
   padding: 0 12px 0 10px;
-  border: 1px solid v-bind("theme.primaryColorSuppl");
+  border: 1px solid v-bind('theme.primaryColorSuppl');
   border-radius: 17px;
   background: transparent;
   font: inherit;
@@ -886,11 +783,11 @@ const gridColumns = computed(() =>
   height: var(--oj-ctrl-h);
   padding: 0 10px;
   margin-left: -1px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
   white-space: nowrap;
 }
@@ -907,8 +804,8 @@ const gridColumns = computed(() =>
 .segmented button.on {
   position: relative;
   z-index: 1;
-  border-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.primaryColor');
 }
 
 .select {
@@ -917,12 +814,12 @@ const gridColumns = computed(() =>
   flex: none;
   box-sizing: border-box;
   padding: 0 8px 0 10px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 3px;
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -937,11 +834,11 @@ const gridColumns = computed(() =>
 
 .select svg {
   flex: none;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .select.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   color: v-bind("tone('success').color");
 }
 
@@ -1028,7 +925,7 @@ const gridColumns = computed(() =>
   height: 20px;
   margin: 0 2px;
   flex: none;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .undone {
@@ -1037,13 +934,13 @@ const gridColumns = computed(() =>
   gap: 6px;
   flex: none;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
   white-space: nowrap;
 }
 
 .undone.disabled {
-  color: v-bind("theme.textColorDisabled");
+  color: v-bind('theme.textColorDisabled');
   cursor: not-allowed;
 }
 
@@ -1068,9 +965,9 @@ const gridColumns = computed(() =>
   flex: none;
   font-size: var(--oj-fs-meta);
   font-weight: 600;
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.tableHeaderColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.tableHeaderColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .rows {
@@ -1082,13 +979,13 @@ const gridColumns = computed(() =>
 .row {
   height: var(--oj-row-h);
   font-size: var(--oj-fs-body);
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor1");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
 }
 
 .row:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .center {
@@ -1098,7 +995,7 @@ const gridColumns = computed(() =>
 }
 
 .id {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -1121,7 +1018,7 @@ const gridColumns = computed(() =>
   height: 20px;
   box-sizing: border-box;
   padding: 0 6px;
-  border: 1px solid v-bind("theme.warningColorSuppl");
+  border: 1px solid v-bind('theme.warningColorSuppl');
   border-radius: 3px;
   font-size: 12px;
   line-height: 18px;
@@ -1129,13 +1026,13 @@ const gridColumns = computed(() =>
 }
 
 .must.course {
-  border-color: v-bind("theme.infoColorSuppl");
+  border-color: v-bind('theme.infoColorSuppl');
   color: v-bind("tone('info').color");
 }
 
 .knowledge {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1152,20 +1049,20 @@ const gridColumns = computed(() =>
 
 .people {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .people b {
   font-weight: 600;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .pager {
   flex: none;
   padding: 0 24px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .pager :deep(.margin) {
@@ -1187,7 +1084,7 @@ const gridColumns = computed(() =>
 
 .empty .sub {
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .empty-icon {
@@ -1197,7 +1094,7 @@ const gridColumns = computed(() =>
   display: flex;
   align-items: center;
   justify-content: center;
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
   background: v-bind("tone('success').background");
 }
 
@@ -1243,28 +1140,28 @@ const gridColumns = computed(() =>
   flex: none;
   box-sizing: border-box;
   padding: 0 12px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 16px;
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
 .m-chip span {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .m-chip .done {
   display: inline-flex;
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .m-chip.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   background: v-bind("tone('success').background");
   color: v-bind("tone('success').color");
   font-weight: 600;
@@ -1275,7 +1172,7 @@ const gridColumns = computed(() =>
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .m-heading {
@@ -1303,19 +1200,19 @@ const gridColumns = computed(() =>
 .m-filter {
   height: 34px;
   padding: 0 12px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 17px;
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: inline-flex;
   align-items: center;
   gap: 5px;
 }
 
 .m-filter.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   color: v-bind("tone('success').color");
 }
 
@@ -1324,7 +1221,7 @@ const gridColumns = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .m-row {
@@ -1335,8 +1232,8 @@ const gridColumns = computed(() =>
   grid-template-columns: 20px 44px minmax(0, 1fr);
   column-gap: 8px;
   align-items: center;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor1");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
 }
 

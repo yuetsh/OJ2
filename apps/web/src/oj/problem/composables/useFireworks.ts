@@ -1,5 +1,5 @@
-import confetti from "canvas-confetti"
-import { getCurrentScope, onScopeDispose } from "vue"
+import confetti from 'canvas-confetti'
+import { getCurrentScope, onScopeDispose } from 'vue'
 
 // 表情图标取自 @iconify 的 streamline-emojis 图标集，与项目内 <Icon icon="streamline-emojis:..."> 用法保持一致
 const EMOJI_SVGS = [
@@ -16,16 +16,16 @@ let emojiShapesPromise: Promise<confetti.Shape[]> | null = null
 
 function svgToBitmapShape(svg: string): Promise<confetti.Shape> {
   return new Promise((resolve, reject) => {
-    const blob = new Blob([svg], { type: "image/svg+xml" })
+    const blob = new Blob([svg], { type: 'image/svg+xml' })
     const url = URL.createObjectURL(blob)
     const img = new Image()
     img.onload = async () => {
       const renderSize = 64
       const baseUnit = 10
-      const canvas = document.createElement("canvas")
+      const canvas = document.createElement('canvas')
       canvas.width = renderSize
       canvas.height = renderSize
-      const ctx = canvas.getContext("2d")!
+      const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, renderSize, renderSize)
       URL.revokeObjectURL(url)
 
@@ -33,7 +33,7 @@ function svgToBitmapShape(svg: string): Promise<confetti.Shape> {
         const bitmap = await createImageBitmap(canvas)
         const scale = baseUnit / renderSize
         resolve({
-          type: "bitmap",
+          type: 'bitmap',
           bitmap,
           matrix: [scale, 0, 0, scale, (-renderSize * scale) / 2, (-renderSize * scale) / 2],
         } as unknown as confetti.Shape)
@@ -54,16 +54,16 @@ function loadEmojiShapes(): Promise<confetti.Shape[]> {
 }
 
 const COLORS = {
-  green: "#18a058",
-  mint: "#2cc27a",
-  gold: "#f0a020",
-  lightGold: "#ffd36b",
-  orange: "#f06a1a",
-  pink: "#e8457f",
-  lightPink: "#ff7aa8",
-  blue: "#2080f0",
-  purple: "#7d50e8",
-  silver: "#8f99aa",
+  green: '#18a058',
+  mint: '#2cc27a',
+  gold: '#f0a020',
+  lightGold: '#ffd36b',
+  orange: '#f06a1a',
+  pink: '#e8457f',
+  lightPink: '#ff7aa8',
+  blue: '#2080f0',
+  purple: '#7d50e8',
+  silver: '#8f99aa',
 }
 const PALETTES = [
   [COLORS.green, COLORS.gold, COLORS.blue, COLORS.pink],
@@ -92,9 +92,9 @@ function loadPathShapes() {
   if (!pathShapes) {
     const matrix = [0.5, 0, 0, 0.5, -5, -5] as unknown as DOMMatrix
     pathShapes = {
-      check: confetti.shapeFromPath({ path: "M1 11 L4 8 L8 12 L16 3 L19 6 L8 17 Z", matrix }),
+      check: confetti.shapeFromPath({ path: 'M1 11 L4 8 L8 12 L16 3 L19 6 L8 17 Z', matrix }),
       heart: confetti.shapeFromPath({
-        path: "M10 18 C2 12 0 7 3 4 C6 1 9 3 10 5 C11 3 14 1 17 4 C20 7 18 12 10 18 Z",
+        path: 'M10 18 C2 12 0 7 3 4 C6 1 9 3 10 5 C11 3 14 1 17 4 C20 7 18 12 10 18 Z',
         matrix,
       }),
     }
@@ -185,7 +185,7 @@ export function useFireworks() {
           ticks: 26,
           scalar: 0.65,
           flat: true,
-          shapes: ["circle"],
+          shapes: ['circle'],
           colors: [COLORS.gold, COLORS.lightGold],
           origin: { x: x0 + (x - x0) * eased, y: 1.02 - (1.02 - y) * eased },
         })
@@ -201,7 +201,7 @@ export function useFireworks() {
       decay: 0.92,
       gravity: 0.55,
       flat: true,
-      shapes: ["circle"],
+      shapes: ['circle'],
       colors,
       origin: { x, y },
     }
@@ -236,12 +236,7 @@ export function useFireworks() {
       for (let i = 0; i < 7; i++) {
         runLater(() => {
           const left = i % 2 === 0
-          shell(
-            left ? 0.08 + Math.random() * 0.3 : 0.62 + Math.random() * 0.3,
-            0.14 + Math.random() * 0.26,
-            pick(PALETTES),
-            0.9 + Math.random() * 0.3,
-          )
+          shell(left ? 0.08 + Math.random() * 0.3 : 0.62 + Math.random() * 0.3, 0.14 + Math.random() * 0.26, pick(PALETTES), 0.9 + Math.random() * 0.3)
         }, i * 240)
       }
     },
@@ -258,7 +253,7 @@ export function useFireworks() {
           decay: 0.97,
           ticks: 120,
           scalar: 1.1,
-          shapes: ["star"],
+          shapes: ['star'],
           colors: [COLORS.gold, COLORS.gold, COLORS.pink, COLORS.blue, COLORS.silver],
           origin: { x: Math.random(), y: -0.05 },
         })
@@ -269,13 +264,7 @@ export function useFireworks() {
     () => {
       for (let i = 0; i < 5; i++) {
         runLater(() => {
-          shell(
-            0.14 + 0.18 * i,
-            0.38 - 0.2 * Math.sin((Math.PI * i) / 4),
-            [RAINBOW[i], COLORS.silver],
-            1,
-            0.5,
-          )
+          shell(0.14 + 0.18 * i, 0.38 - 0.2 * Math.sin((Math.PI * i) / 4), [RAINBOW[i], COLORS.silver], 1, 0.5)
         }, i * 170)
       }
     },
@@ -294,7 +283,7 @@ export function useFireworks() {
           ticks: 95,
           scalar: 0.8,
           flat: true,
-          shapes: ["circle"],
+          shapes: ['circle'],
           colors: [color],
         }
         fire({ ...base, angle: 62, origin: { x: 0, y: 1 } })
@@ -318,7 +307,7 @@ export function useFireworks() {
                 ticks: 30,
                 scalar: 0.6,
                 flat: true,
-                shapes: ["circle"],
+                shapes: ['circle'],
                 colors: [COLORS.silver, COLORS.gold],
                 origin: {
                   x: 0.5 + (Math.random() - 0.5) * 0.3,
@@ -349,7 +338,7 @@ export function useFireworks() {
               ticks: 40,
               scalar: 0.8,
               flat: true,
-              shapes: ["circle"],
+              shapes: ['circle'],
               colors: [arm ? COLORS.blue : COLORS.pink],
               origin: { x: 0.5 + Math.sin(phase) * 0.05 * (1 - progress * 0.6), y },
             })
@@ -365,7 +354,7 @@ export function useFireworks() {
       const list = [
         { x: 0.22, y: 0.36, shape: shapes.check, colors: [COLORS.green, COLORS.mint] },
         { x: 0.5, y: 0.3, shape: shapes.heart, colors: [COLORS.pink, COLORS.lightPink] },
-        { x: 0.78, y: 0.36, shape: "star" as const, colors: [COLORS.gold, COLORS.orange] },
+        { x: 0.78, y: 0.36, shape: 'star' as const, colors: [COLORS.gold, COLORS.orange] },
       ]
       list.forEach((item, i) => {
         runLater(() => {
@@ -406,7 +395,7 @@ export function useFireworks() {
               ticks: 50,
               scalar: 0.9,
               flat: true,
-              shapes: ["circle"],
+              shapes: ['circle'],
               colors: [colors[arm]],
               origin: { x: 0.5, y: 0.42 },
             })
@@ -430,7 +419,7 @@ export function useFireworks() {
             ticks: 110,
             scalar: 0.8,
             flat: true,
-            shapes: ["circle"],
+            shapes: ['circle'],
             colors: [COLORS.gold, COLORS.gold, COLORS.silver, COLORS.orange],
             origin: { x: 0.06 + Math.random() * 0.88, y: 0.06 },
           })
@@ -470,10 +459,7 @@ export function useFireworks() {
    */
   function celebrate(): Promise<void> {
     pick(fireworkTypes)()
-    return Promise.race([
-      finished(),
-      new Promise<void>((resolve) => setTimeout(resolve, MAX_WAIT_MS)),
-    ])
+    return Promise.race([finished(), new Promise<void>((resolve) => setTimeout(resolve, MAX_WAIT_MS))])
   }
 
   return {

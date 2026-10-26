@@ -1,4 +1,4 @@
-import { PUNCTUATION_MAP } from "utils/pythonError"
+import { PUNCTUATION_MAP } from 'utils/pythonError'
 
 export interface PunctuationFix {
   from: number
@@ -25,8 +25,8 @@ export interface PunctuationFix {
  * C / C++ 换一套注释：`//` 和 `/* *\/`，`#` 是预处理指令不是注释；没有三引号和前缀。
  * 单引号的字符常量（`'，'`）和字符串一样原样留着。
  */
-export function findChinesePunctuation(code: string, language = "Python"): PunctuationFix[] {
-  const isC = language === "C" || language === "C++"
+export function findChinesePunctuation(code: string, language = 'Python'): PunctuationFix[] {
+  const isC = language === 'C' || language === 'C++'
   const fixes: PunctuationFix[] = []
 
   function fix(at: number) {
@@ -40,20 +40,20 @@ export function findChinesePunctuation(code: string, language = "Python"): Punct
     let j = start
     while (j < code.length) {
       const ch = code[j]!
-      if (ch === "\\") {
+      if (ch === '\\') {
         j += 2
         continue
       }
-      if (!triple && ch === "\n") return j
+      if (!triple && ch === '\n') return j
       if (fstring) {
-        if (ch === "{" && depth === 0 && code[j + 1] === "{") {
+        if (ch === '{' && depth === 0 && code[j + 1] === '{') {
           j += 2
           continue
         }
-        if (ch === "{") depth++
-        else if (ch === "}" && depth > 0) depth--
+        if (ch === '{') depth++
+        else if (ch === '}' && depth > 0) depth--
         else if (depth > 0) fix(j)
-        if (depth > 0 || ch === "{" || ch === "}") {
+        if (depth > 0 || ch === '{' || ch === '}') {
           j++
           continue
         }
@@ -72,33 +72,33 @@ export function findChinesePunctuation(code: string, language = "Python"): Punct
   let i = 0
   while (i < code.length) {
     const ch = code[i]!
-    if (isC && code.startsWith("//", i)) {
-      const end = code.indexOf("\n", i)
+    if (isC && code.startsWith('//', i)) {
+      const end = code.indexOf('\n', i)
       i = end === -1 ? code.length : end
       continue
     }
-    if (isC && code.startsWith("/*", i)) {
-      const end = code.indexOf("*/", i + 2)
+    if (isC && code.startsWith('/*', i)) {
+      const end = code.indexOf('*/', i + 2)
       i = end === -1 ? code.length : end + 2
       continue
     }
-    if (!isC && ch === "#") {
-      const end = code.indexOf("\n", i)
+    if (!isC && ch === '#') {
+      const end = code.indexOf('\n', i)
       i = end === -1 ? code.length : end
       continue
     }
     if (ch === '"' || ch === "'") {
       // 前缀是紧挨着引号的 f / r / b / u 组合，前面不能再连着别的标识符字符
-      const prefix = isC ? "" : (code.slice(0, i).match(/(?<![\w])[rRbBfFuU]{1,2}$/)?.[0] ?? "")
+      const prefix = isC ? '' : (code.slice(0, i).match(/(?<![\w])[rRbBfFuU]{1,2}$/)?.[0] ?? '')
       const quote = !isC && code.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch
       i = skipString(i + quote.length, quote.length === 3, /f/i.test(prefix), [quote])
       continue
     }
-    if (ch === "“" || ch === "”" || ch === "‘" || ch === "’") {
-      const double = ch === "“" || ch === "”"
+    if (ch === '“' || ch === '”' || ch === '‘' || ch === '’') {
+      const double = ch === '“' || ch === '”'
       fix(i)
       // 收尾可能打成中文也可能打成英文，两种都认
-      i = skipString(i + 1, false, false, double ? ["”", "“", '"'] : ["’", "‘", "'"])
+      i = skipString(i + 1, false, false, double ? ['”', '“', '"'] : ['’', '‘', "'"])
       continue
     }
     fix(i)

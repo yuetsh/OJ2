@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { LearningItem } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { statusName } from "../utils"
+import type { LearningItem } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { statusName } from '../utils'
 
 /** 交过还没做对的题。学生「接着做」，老师「看提交」 */
 const props = defineProps<{ items: LearningItem[]; username?: string }>()
@@ -11,8 +11,8 @@ const router = useRouter()
 
 function submissions(item: LearningItem) {
   return {
-    path: "/submission",
-    query: { problem: item.displayId, username: props.username, exactUsername: "1" },
+    path: '/submission',
+    query: { problem: item.displayId, username: props.username, exactUsername: '1' },
   }
 }
 </script>
@@ -27,20 +27,11 @@ function submissions(item: LearningItem) {
           >{{ item.title }}
         </div>
         <div class="meta">
-          交了 {{ item.attempts }} 次<template v-if="statusName(item.lastResult)">
-            · 最后一次{{ statusName(item.lastResult) }}</template
-          >
+          交了 {{ item.attempts }} 次<template v-if="statusName(item.lastResult)"> · 最后一次{{ statusName(item.lastResult) }}</template>
         </div>
       </div>
       <router-link v-if="username" :to="submissions(item)" class="link">看提交 ›</router-link>
-      <n-button
-        v-else
-        type="primary"
-        size="small"
-        @click="router.push(`/problem/${item.displayId}`)"
-      >
-        接着做
-      </n-button>
+      <n-button v-else type="primary" size="small" @click="router.push(`/problem/${item.displayId}`)"> 接着做 </n-button>
     </div>
   </section>
 </template>
@@ -81,13 +72,13 @@ h3 {
 .pid {
   margin-right: 6px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
 .meta {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .link {

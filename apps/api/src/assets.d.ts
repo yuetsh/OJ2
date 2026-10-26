@@ -8,17 +8,17 @@
  * Bun 的类型里没覆盖这些扩展名，这里补上。值都是**文件路径字符串**。
  */
 
-declare module "*.wasm" {
+declare module '*.wasm' {
   const path: string
   export default path
 }
 
-declare module "*.node" {
+declare module '*.node' {
   const path: string
   export default path
 }
 
-declare module "*.txt" {
+declare module '*.txt' {
   const path: string
   export default path
 }

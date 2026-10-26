@@ -1,4 +1,4 @@
-import { reportLearnProgress } from "oj/api"
+import { reportLearnProgress } from 'oj/api'
 
 /** 计时心跳。攒够 FLUSH_SECONDS 才上报一次，别让每个学生每秒钟打一次接口 */
 const TICK_MS = 15_000
@@ -42,7 +42,7 @@ export function useLearnTrace(tutorialId: Ref<number>, enabled: Ref<boolean>) {
 
   const timer = window.setInterval(() => {
     if (!enabled.value || tutorialId.value <= 0) return
-    if (visibility.value !== "visible" || idle.value) return
+    if (visibility.value !== 'visible' || idle.value) return
     pendingId = tutorialId.value
     pending += TICK_MS / 1000
     if (pending >= FLUSH_SECONDS) flush()
@@ -59,7 +59,7 @@ export function useLearnTrace(tutorialId: Ref<number>, enabled: Ref<boolean>) {
   })
 
   watch(visibility, (value) => {
-    if (value === "hidden") flush()
+    if (value === 'hidden') flush()
   })
 
   onBeforeUnmount(() => {

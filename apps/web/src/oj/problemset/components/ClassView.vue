@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { getProblemSetClassView } from "oj/api"
-import { useTone } from "shared/composables/tone"
-import { classLabel, groupClassOptions } from "utils/classes"
-import UserName from "shared/components/UserName.vue"
-import { parseTime } from "utils/functions"
-import type { ProblemSetClassView } from "utils/types"
+import { useThemeVars } from 'naive-ui'
+import { getProblemSetClassView } from 'oj/api'
+import { useTone } from 'shared/composables/tone'
+import { classLabel, groupClassOptions } from 'utils/classes'
+import UserName from 'shared/components/UserName.vue'
+import { parseTime } from 'utils/functions'
+import type { ProblemSetClassView } from 'utils/types'
 
 /**
  * 老师看一个班在题单里的情况（设计稿「题单重设计」老师 · 全班情况）：真名 × 每道题，
@@ -18,14 +18,14 @@ const theme = useThemeVars()
 const tone = useTone()
 
 const data = ref<ProblemSetClassView | null>(null)
-const className = ref("")
+const className = ref('')
 const loading = ref(false)
 
 async function load() {
   loading.value = true
   try {
     data.value = await getProblemSetClassView(props.problemSetId, className.value)
-    className.value = data.value.className ?? ""
+    className.value = data.value.className ?? ''
   } finally {
     loading.value = false
   }
@@ -46,34 +46,24 @@ const classOptions = computed(() => {
 
 const joined = computed(() => data.value?.students.filter((s) => s.joinTime) ?? [])
 const absent = computed(() => data.value?.students.filter((s) => !s.joinTime) ?? [])
-const average = computed(() =>
-  joined.value.length
-    ? joined.value.reduce((sum, s) => sum + s.completedCount, 0) / joined.value.length
-    : 0,
-)
-const finished = computed(
-  () => joined.value.filter((s) => data.value && s.completedCount >= data.value.totalCount).length,
-)
-const beforeCount = computed(() =>
-  joined.value.reduce((sum, s) => sum + s.cells.filter((cell) => cell.solvedBefore).length, 0),
-)
+const average = computed(() => (joined.value.length ? joined.value.reduce((sum, s) => sum + s.completedCount, 0) / joined.value.length : 0))
+const finished = computed(() => joined.value.filter((s) => data.value && s.completedCount >= data.value.totalCount).length)
+const beforeCount = computed(() => joined.value.reduce((sum, s) => sum + s.cells.filter((cell) => cell.solvedBefore).length, 0))
 
-const columns = computed(
-  () => `22px 110px 44px repeat(${data.value?.problems.length ?? 1}, minmax(72px, 1fr))`,
-)
+const columns = computed(() => `22px 110px 44px repeat(${data.value?.problems.length ?? 1}, minmax(72px, 1fr))`)
 
 function cellLink(username: string, problemId: string) {
   return `/submission?username=${encodeURIComponent(username)}&problem=${encodeURIComponent(problemId)}`
 }
 
 function cellTime(time: string) {
-  const today = parseTime(new Date(), "YYYY-MM-DD") === parseTime(time, "YYYY-MM-DD")
-  return parseTime(time, today ? "HH:mm" : "M/D")
+  const today = parseTime(new Date(), 'YYYY-MM-DD') === parseTime(time, 'YYYY-MM-DD')
+  return parseTime(time, today ? 'HH:mm' : 'M/D')
 }
 
-const success = computed(() => tone("success"))
-const warning = computed(() => tone("warning"))
-const error = computed(() => tone("error"))
+const success = computed(() => tone('success'))
+const warning = computed(() => tone('warning'))
+const error = computed(() => tone('error'))
 </script>
 
 <template>
@@ -81,13 +71,7 @@ const error = computed(() => tone("error"))
     <div v-if="data && !data.className" class="empty muted">还没有学生加入这个题单</div>
     <template v-else-if="data">
       <div class="summary">
-        <n-select
-          v-model:value="className"
-          :options="classOptions"
-          size="small"
-          class="pick"
-          :consistent-menu-width="false"
-        />
+        <n-select v-model:value="className" :options="classOptions" size="small" class="pick" :consistent-menu-width="false" />
         <span
           ><b class="num big">{{ joined.length }}</b
           ><span class="muted"> / {{ data.students.length }} 人加入</span></span
@@ -100,16 +84,11 @@ const error = computed(() => tone("error"))
           ><span class="muted">做完</span> <b class="num big">{{ finished }}</b
           ><span class="muted"> 人</span></span
         >
-        <span
-          v-if="absent.length"
-          class="absent ell"
-          :title="absent.map((s) => s.username).join('、')"
-          >没加入：{{ absent.map((s) => s.username).join("、") }}</span
+        <span v-if="absent.length" class="absent ell" :title="absent.map((s) => s.username).join('、')"
+          >没加入：{{ absent.map((s) => s.username).join('、') }}</span
         >
         <div class="spacer"></div>
-        <span v-if="beforeCount" class="legend-before"
-          ><span class="corner"></span>加入前就做对过（{{ beforeCount }} 格）</span
-        >
+        <span v-if="beforeCount" class="legend-before"><span class="corner"></span>加入前就做对过（{{ beforeCount }} 格）</span>
       </div>
 
       <div class="scroll">
@@ -119,9 +98,7 @@ const error = computed(() => tone("error"))
           <div class="head right">做对</div>
           <div v-for="(p, i) in data.problems" :key="p.id" class="head col" :title="p.title">
             <b class="ell">{{ i + 1 }} {{ p.title }}</b>
-            <span class="num"
-              >{{ p.solved }} 人对<template v-if="!p.isRequired"> · 选做</template></span
-            >
+            <span class="num">{{ p.solved }} 人对<template v-if="!p.isRequired"> · 选做</template></span>
           </div>
 
           <template v-for="(s, idx) in joined" :key="s.userId">
@@ -157,9 +134,9 @@ const error = computed(() => tone("error"))
 
 <style scoped>
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   overflow: hidden;
 }
 
@@ -177,7 +154,7 @@ const error = computed(() => tone("error"))
   flex-wrap: wrap;
   gap: 8px 20px;
   font-size: var(--oj-fs-sec);
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .pick {
@@ -190,7 +167,7 @@ const error = computed(() => tone("error"))
 
 .absent {
   max-width: 420px;
-  color: v-bind("error.color");
+  color: v-bind('error.color');
 }
 
 .legend-before {
@@ -222,9 +199,9 @@ const error = computed(() => tone("error"))
   flex-direction: column;
   justify-content: center;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.cardColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.cardColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   margin-bottom: 4px;
 }
 
@@ -237,7 +214,7 @@ const error = computed(() => tone("error"))
 
 .head.col b {
   max-width: 100%;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .right {
@@ -269,22 +246,22 @@ const error = computed(() => tone("error"))
   gap: 3px;
   font-size: var(--oj-fs-meta);
   text-decoration: none;
-  background: v-bind("theme.actionColor");
-  color: v-bind("theme.textColor3");
+  background: v-bind('theme.actionColor');
+  color: v-bind('theme.textColor3');
 }
 
 .box.ok {
-  background: v-bind("success.background");
-  color: v-bind("success.color");
+  background: v-bind('success.background');
+  color: v-bind('success.color');
 }
 
 .box.bad {
-  background: v-bind("warning.background");
-  color: v-bind("warning.color");
+  background: v-bind('warning.background');
+  color: v-bind('warning.color');
 }
 
 .box:hover {
-  outline: 1px solid v-bind("theme.primaryColor");
+  outline: 1px solid v-bind('theme.primaryColor');
 }
 
 .corner {
@@ -302,7 +279,7 @@ const error = computed(() => tone("error"))
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tiny {

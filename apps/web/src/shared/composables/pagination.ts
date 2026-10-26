@@ -1,6 +1,6 @@
-import { nextTick, reactive, watch } from "vue"
-import { useRoute, useRouter } from "vue-router"
-import { filterEmptyValue } from "utils/functions"
+import { nextTick, reactive, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { filterEmptyValue } from 'utils/functions'
 
 export interface PaginationQuery {
   page: number
@@ -31,16 +31,10 @@ export interface UsePaginationOptions {
  * @param options 配置选项
  */
 export function usePagination<T extends Record<string, any>>(
-  initialQuery: Omit<T, "page" | "limit"> = {} as Omit<T, "page" | "limit">,
+  initialQuery: Omit<T, 'page' | 'limit'> = {} as Omit<T, 'page' | 'limit'>,
   options: UsePaginationOptions = {},
 ) {
-  const {
-    defaultLimit = 10,
-    defaultPage = 1,
-    resetPageOnChange = true,
-    extraQuery,
-    replace,
-  } = options
+  const { defaultLimit = 10, defaultPage = 1, resetPageOnChange = true, extraQuery, replace } = options
 
   const route = useRoute()
   const router = useRouter()
@@ -77,13 +71,12 @@ export function usePagination<T extends Record<string, any>>(
         // 不能留着上一个地址的值：后退回 /problem 页面还停在上一个知识点。
         // 和 clearQuery 一样清成空值 —— initialQuery 是进页面时从地址读的，不一定是空的
         const initialValue = initialQuery[key]
-        writable[key] =
-          typeof initialValue === "boolean" ? false : typeof initialValue === "number" ? 0 : ""
+        writable[key] = typeof initialValue === 'boolean' ? false : typeof initialValue === 'number' ? 0 : ''
       } else {
         // 处理不同类型的参数
-        if (typeof initialQuery[key] === "boolean") {
-          writable[key] = value === "1" || value === "true"
-        } else if (typeof initialQuery[key] === "number") {
+        if (typeof initialQuery[key] === 'boolean') {
+          writable[key] = value === '1' || value === 'true'
+        } else if (typeof initialQuery[key] === 'number') {
           writable[key] = parseInt(<string>value) || initialQuery[key]
         } else {
           writable[key] = <string>value || initialQuery[key]
@@ -101,15 +94,14 @@ export function usePagination<T extends Record<string, any>>(
       JSON.stringify(
         Object.entries(q)
           .filter(([key, value]) => {
-            if (key === "page") return String(value) !== String(defaultPage)
-            if (key === "limit") return String(value) !== String(defaultLimit)
-            return value != null && value !== ""
+            if (key === 'page') return String(value) !== String(defaultPage)
+            if (key === 'limit') return String(value) !== String(defaultLimit)
+            return value != null && value !== ''
           })
           .map(([key, value]) => [key, String(value)])
           .sort(),
       )
-    const navigate =
-      replace?.() || normalized(route.query) === normalized(newQuery) ? router.replace : router.push
+    const navigate = replace?.() || normalized(route.query) === normalized(newQuery) ? router.replace : router.push
     navigate({
       path: route.path,
       query: newQuery,
@@ -125,11 +117,11 @@ export function usePagination<T extends Record<string, any>>(
   function clearQuery() {
     Object.keys(initialQuery).forEach((key) => {
       const initialValue = initialQuery[key]
-      if (typeof initialValue === "string") {
-        writable[key] = ""
-      } else if (typeof initialValue === "boolean") {
+      if (typeof initialValue === 'string') {
+        writable[key] = ''
+      } else if (typeof initialValue === 'boolean') {
         writable[key] = false
-      } else if (typeof initialValue === "number") {
+      } else if (typeof initialValue === 'number') {
         writable[key] = 0
       } else {
         writable[key] = initialValue

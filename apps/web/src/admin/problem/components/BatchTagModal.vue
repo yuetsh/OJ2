@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import type { AdminTag } from "utils/types"
-import { batchTagProblems, getTagAdminList } from "admin/api"
+import type { AdminTag } from 'utils/types'
+import { batchTagProblems, getTagAdminList } from 'admin/api'
 
 interface Props {
   show: boolean
   problemIds: number[]
-  action: "add" | "remove"
+  action: 'add' | 'remove'
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
-  "update:show": [value: boolean]
+  'update:show': [value: boolean]
   done: []
 }>()
 
@@ -20,15 +20,11 @@ const tags = ref<AdminTag[]>([])
 const selected = ref<string[]>([])
 const newTags = ref<string[]>([])
 
-const title = computed(() => (props.action === "add" ? "批量添加标签" : "批量移除标签"))
+const title = computed(() => (props.action === 'add' ? '批量添加标签' : '批量移除标签'))
 
 const selectedSet = computed(() => new Set(selected.value))
 
-const names = computed(() =>
-  props.action === "add"
-    ? Array.from(new Set([...selected.value, ...newTags.value]))
-    : selected.value,
-)
+const names = computed(() => (props.action === 'add' ? Array.from(new Set([...selected.value, ...newTags.value])) : selected.value))
 
 function toggleTag(name: string) {
   const set = new Set(selected.value)
@@ -43,19 +39,19 @@ async function listTags() {
 }
 
 function close() {
-  emit("update:show", false)
+  emit('update:show', false)
 }
 
 async function submit() {
   if (!names.value.length) {
-    message.error("请先选择标签")
+    message.error('请先选择标签')
     return
   }
   const res = await batchTagProblems(props.problemIds, names.value, props.action)
-  const verb = props.action === "add" ? "添加" : "移除"
+  const verb = props.action === 'add' ? '添加' : '移除'
   message.success(`已为 ${res.problemCount} 道题${verb} ${res.tagCount} 个标签`)
   close()
-  emit("done")
+  emit('done')
 }
 
 watch(
@@ -70,24 +66,11 @@ watch(
 </script>
 
 <template>
-  <n-modal
-    :show="show"
-    preset="card"
-    :title="title"
-    style="width: 600px"
-    :mask-closable="false"
-    @close="close"
-  >
+  <n-modal :show="show" preset="card" :title="title" style="width: 600px" :mask-closable="false" @close="close">
     <n-flex vertical size="large">
       <div>已选中 {{ problemIds.length }} 道题目</div>
       <n-flex size="small">
-        <n-tag
-          v-for="tag in tags"
-          :key="tag.id"
-          checkable
-          :checked="selectedSet.has(tag.name)"
-          @update:checked="toggleTag(tag.name)"
-        >
+        <n-tag v-for="tag in tags" :key="tag.id" checkable :checked="selectedSet.has(tag.name)" @update:checked="toggleTag(tag.name)">
           {{ tag.name }}（{{ tag.problemCount }}）
         </n-tag>
       </n-flex>

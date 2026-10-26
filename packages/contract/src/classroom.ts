@@ -1,8 +1,8 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { judgeStatusSchema } from "./judge-status"
-import { lessonLanguageSchema as lessonLanguageValueSchema } from "./language"
-import { statisticInfoSchema } from "./submission"
+import { judgeStatusSchema } from './judge-status'
+import { lessonLanguageSchema as lessonLanguageValueSchema } from './language'
+import { statisticInfoSchema } from './submission'
 
 /**
  * 「班里在做」：同班同一天有好几个人做的题，基本就是老师在课上点名的那几道。
@@ -19,7 +19,7 @@ export const classActivityProblemSchema = z.object({
    * 我自己在题库里（不含比赛）做这道题的状态，不限那一天。老师布置时选了语言的，
    * 代码只认用那个语言交的（流程图照旧算）
    */
-  myStatus: z.enum(["accepted", "tried", "none"]),
+  myStatus: z.enum(['accepted', 'tried', 'none']),
 })
 
 /**
@@ -33,7 +33,7 @@ export const classActivitySchema = z.object({
   className: z.string().nullable(),
   day: z.string().nullable(),
   /** teacher = 老师在课堂看板里布置的；inferred = 从同班提交记录推断的 */
-  source: z.enum(["teacher", "inferred"]).nullable(),
+  source: z.enum(['teacher', 'inferred']).nullable(),
   language: lessonLanguageSchema,
   problems: z.array(classActivityProblemSchema),
 })
@@ -97,7 +97,7 @@ export const classBoardCellSchema = z.object({
    * accepted 看的是题库里（不含比赛）有没有通过过，不限今天 —— 以前做过的也算做完。
    * 布置时选了语言的，代码的次数和通过都只数那个语言（流程图照旧）
    */
-  status: z.enum(["accepted", "tried", "none"]),
+  status: z.enum(['accepted', 'tried', 'none']),
   /** 今天在这道题上交了几次（代码 + 流程图） */
   attempts: z.number().int(),
   /**
@@ -134,7 +134,7 @@ export const classBoardCellSchema = z.object({
    * 挑战：done = 做到了这道题的一条挑战（不限今天）；doing = 做对之后今天又交了、还没做到 ——
    * 做完了的学生是在挑战还是闲着，老师一眼看得出。没配挑战的题、没做对的格子为 null
    */
-  challenge: z.enum(["done", "doing"]).nullable(),
+  challenge: z.enum(['done', 'doing']).nullable(),
 })
 
 export const classBoardStudentSchema = z.object({
@@ -174,7 +174,7 @@ export const classBoardStudentSchema = z.object({
 export const classBoardSchema = z.object({
   className: z.string().nullable(),
   day: z.string(),
-  source: z.enum(["teacher", "inferred"]).nullable(),
+  source: z.enum(['teacher', 'inferred']).nullable(),
   /** 今天布置的语言（见 lessonLanguageSchema） */
   language: lessonLanguageSchema,
   /** 今天第一次布置的时刻，之后改题不变；推断出来的课为 null */
@@ -199,7 +199,7 @@ export const classBoardSchema = z.object({
  */
 export const classLessonSchema = z.object({
   className: z.string().nullable(),
-  source: z.enum(["teacher", "inferred"]).nullable(),
+  source: z.enum(['teacher', 'inferred']).nullable(),
   /**
    * 选了语言时，列表那边连语言一起筛。C / Python 的作业里夹了 SQL 题就是 null：
    * 列表只能筛一种语言，按 C 筛会把 SQL 题交的全藏起来，宁可多列一些
@@ -216,7 +216,7 @@ export const classTodaySchema = z.object({
   classes: z.array(
     z.object({
       className: z.string(),
-      source: z.enum(["teacher", "inferred"]).nullable(),
+      source: z.enum(['teacher', 'inferred']).nullable(),
       /** 老师布置的时刻；推断出来的为 null */
       assignedAt: z.string().nullable(),
       /** 布置的老师；推断出来的为 null */

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { Tag, TagCategory } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { useTone } from "shared/composables/tone"
+import { Icon } from '@iconify/vue'
+import type { Tag, TagCategory } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { useTone } from 'shared/composables/tone'
 
 /**
  * 题目列表左栏：知识点 / 主题，带自己的进度（设计稿「题目列表重设计 · 改版」）。
@@ -22,7 +22,7 @@ const emit = defineEmits<{ select: [name: string] }>()
 const theme = useThemeVars()
 const tone = useTone()
 
-const mode = ref<TagCategory>("knowledge")
+const mode = ref<TagCategory>('knowledge')
 // 从别处带着一个主题标签进来（?tag=周杰伦），左栏得切到「主题」才看得见它
 watch(
   () => [props.selected, props.tags] as const,
@@ -37,19 +37,16 @@ watch(
 const navRef = ref<HTMLElement | null>(null)
 watch(
   () => [props.selected, props.tags.length, mode.value],
-  () =>
-    nextTick(() => navRef.value?.querySelector(".item.on")?.scrollIntoView({ block: "nearest" })),
+  () => nextTick(() => navRef.value?.querySelector('.item.on')?.scrollIntoView({ block: 'nearest' })),
 )
 
 function byCategory(category: TagCategory) {
-  return props.tags
-    .filter((t) => t.category === category)
-    .sort((a, b) => b.problemCount - a.problemCount)
+  return props.tags.filter((t) => t.category === category).sort((a, b) => b.problemCount - a.problemCount)
 }
 
-const knowledge = computed(() => byCategory("knowledge"))
-const themes = computed(() => byCategory("theme"))
-const shown = computed(() => (mode.value === "knowledge" ? knowledge.value : themes.value))
+const knowledge = computed(() => byCategory('knowledge'))
+const themes = computed(() => byCategory('theme'))
+const shown = computed(() => (mode.value === 'knowledge' ? knowledge.value : themes.value))
 
 function solvedOf(tag: Tag) {
   return props.progress?.[String(tag.id)] ?? 0
@@ -64,17 +61,13 @@ function percent(tag: Tag) {
 <template>
   <aside class="tag-nav">
     <div class="switch">
-      <button :class="{ on: mode === 'knowledge' }" @click="mode = 'knowledge'">
-        知识点 {{ knowledge.length }}
-      </button>
-      <button :class="{ on: mode === 'theme' }" @click="mode = 'theme'">
-        主题 {{ themes.length }}
-      </button>
+      <button :class="{ on: mode === 'knowledge' }" @click="mode = 'knowledge'">知识点 {{ knowledge.length }}</button>
+      <button :class="{ on: mode === 'theme' }" @click="mode = 'theme'">主题 {{ themes.length }}</button>
     </div>
     <nav ref="navRef" class="items">
       <button class="item flat" :class="{ on: selected === '' }" @click="emit('select', '')">
         <span class="name">全部题目</span>
-        <span class="count">{{ allCount || "" }}</span>
+        <span class="count">{{ allCount || '' }}</span>
       </button>
       <button
         v-for="tag in shown"
@@ -86,9 +79,7 @@ function percent(tag: Tag) {
         <span class="line">
           <span class="name">{{ tag.name }}</span>
           <span v-if="!progress || solvedOf(tag) === 0" class="count">{{ tag.problemCount }}</span>
-          <span v-else-if="solvedOf(tag) >= tag.problemCount" class="done">
-            <Icon icon="ph:check-bold" :width="12" />通关
-          </span>
+          <span v-else-if="solvedOf(tag) >= tag.problemCount" class="done"> <Icon icon="ph:check-bold" :width="12" />通关 </span>
           <span v-else class="count">
             <b>{{ solvedOf(tag) }}</b
             >/{{ tag.problemCount }}
@@ -107,7 +98,7 @@ function percent(tag: Tag) {
   width: 224px;
   flex: none;
   box-sizing: border-box;
-  border-right: 1px solid v-bind("theme.dividerColor");
+  border-right: 1px solid v-bind('theme.dividerColor');
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -122,11 +113,11 @@ function percent(tag: Tag) {
 
 .switch button {
   height: 32px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
   white-space: nowrap;
 }
@@ -143,8 +134,8 @@ function percent(tag: Tag) {
 .switch button.on {
   position: relative;
   z-index: 1;
-  border-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.primaryColor');
 }
 
 .items {
@@ -168,7 +159,7 @@ function percent(tag: Tag) {
   font: inherit;
   font-size: var(--oj-fs-body);
   text-align: left;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -183,7 +174,7 @@ function percent(tag: Tag) {
 }
 
 .item:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .item.on {
@@ -218,7 +209,7 @@ function percent(tag: Tag) {
 .count {
   flex: none;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -242,12 +233,12 @@ function percent(tag: Tag) {
   height: 3px;
   border-radius: 2px;
   overflow: hidden;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .bar span {
   display: block;
   height: 3px;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 </style>

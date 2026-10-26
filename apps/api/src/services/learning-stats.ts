@@ -9,20 +9,13 @@
  * 做对的口径也同看板：代码 AC / AST_CHECK_FAILED、流程图评到 A / S；比赛提交不算
  * （比赛是课堂测验，题目也不在题库里）。
  */
-import {
-  FLOWCHART_PASS_GRADES,
-  STUDENT_ROLES,
-  type LearningDay,
-  type LearningItem,
-  type LearningPeriod,
-  type LearningReport,
-} from "@oj2/contract"
-import { and, asc, count, desc, eq, gte, inArray, isNull } from "drizzle-orm"
-import { sql } from "drizzle-orm"
+import { FLOWCHART_PASS_GRADES, STUDENT_ROLES, type LearningDay, type LearningItem, type LearningPeriod, type LearningReport } from '@oj2/contract'
+import { and, asc, count, desc, eq, gte, inArray, isNull } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { JudgeStatus, type JudgeStatusValue } from "../judge/status"
-import { calendarDay, monthStart, termStart, weekStart } from "../time"
+import { db, schema } from '../db'
+import { JudgeStatus, type JudgeStatusValue } from '../judge/status'
+import { calendarDay, monthStart, termStart, weekStart } from '../time'
 
 export const accepted: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 
@@ -30,16 +23,12 @@ export const accepted: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.A
 const LESSON_MIN_USERS = 5
 
 /** 不算进「错在哪」的状态：判题机自己崩的、还没判完的 */
-const NOT_STUDENT_ERRORS: number[] = [
-  JudgeStatus.SYSTEM_ERROR,
-  JudgeStatus.PENDING,
-  JudgeStatus.JUDGING,
-]
+const NOT_STUDENT_ERRORS: number[] = [JudgeStatus.SYSTEM_ERROR, JudgeStatus.PENDING, JudgeStatus.JUDGING]
 
 export function periodStart(period: LearningPeriod, now = new Date()): string | null {
-  if (period === "week") return weekStart(now)
-  if (period === "month") return monthStart(now)
-  if (period === "term") return termStart(now)
+  if (period === 'week') return weekStart(now)
+  if (period === 'month') return monthStart(now)
+  if (period === 'term') return termStart(now)
   return null
 }
 
@@ -54,8 +43,7 @@ interface Row {
 
 /** 代码提交（不含比赛）和流程图提交并成一张，按时间先后 */
 async function activity(userIds: number[], start: string | null): Promise<Row[]> {
-  const epoch = (column: typeof schema.submission.createTime) =>
-    sql<number>`extract(epoch from ${column}) * 1000`.mapWith(Number)
+  const epoch = (column: typeof schema.submission.createTime) => sql<number>`extract(epoch from ${column}) * 1000`.mapWith(Number)
   const [code, flow] = await Promise.all([
     db
       .select({
@@ -66,29 +54,18 @@ async function activity(userIds: number[], start: string | null): Promise<Row[]>
       })
       .from(schema.submission)
       .where(
-        and(
-          inArray(schema.submission.userId, userIds),
-          isNull(schema.submission.contestId),
-          start ? gte(schema.submission.createTime, start) : undefined,
-        ),
+        and(inArray(schema.submission.userId, userIds), isNull(schema.submission.contestId), start ? gte(schema.submission.createTime, start) : undefined),
       ),
     db
       .select({
         userId: schema.flowchartSubmission.userId,
         problemId: schema.flowchartSubmission.problemId,
-        time: sql<number>`extract(epoch from ${schema.flowchartSubmission.createTime}) * 1000`.mapWith(
-          Number,
-        ),
+        time: sql<number>`extract(epoch from ${schema.flowchartSubmission.createTime}) * 1000`.mapWith(Number),
         status: schema.flowchartSubmission.status,
         grade: schema.flowchartSubmission.aiGrade,
       })
       .from(schema.flowchartSubmission)
-      .where(
-        and(
-          inArray(schema.flowchartSubmission.userId, userIds),
-          start ? gte(schema.flowchartSubmission.createTime, start) : undefined,
-        ),
-      ),
+      .where(and(inArray(schema.flowchartSubmission.userId, userIds), start ? gte(schema.flowchartSubmission.createTime, start) : undefined)),
   ])
   const pass: readonly string[] = FLOWCHART_PASS_GRADES
   return [
@@ -97,7 +74,7 @@ async function activity(userIds: number[], start: string | null): Promise<Row[]>
       userId: row.userId,
       problemId: row.problemId,
       time: row.time,
-      solved: row.status === 2 && pass.includes(row.grade ?? ""),
+      solved: row.status === 2 && pass.includes(row.grade ?? ''),
       result: null,
     })),
   ].sort((a, b) => a.time - b.time)
@@ -129,13 +106,7 @@ export async function buildReport(
     ? await db
         .select({ id: schema.user.id, username: schema.user.username })
         .from(schema.user)
-        .where(
-          and(
-            eq(schema.user.className, target.className),
-            eq(schema.user.isDisabled, false),
-            inArray(schema.user.adminType, [...STUDENT_ROLES]),
-          ),
-        )
+        .where(and(eq(schema.user.className, target.className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
         .orderBy(asc(schema.user.username))
     : []
   const memberIds = new Set(members.map((item) => item.id))
@@ -145,12 +116,7 @@ export async function buildReport(
       ? db
           .select({ day: schema.classLesson.day, problemIds: schema.classLesson.problemIds })
           .from(schema.classLesson)
-          .where(
-            and(
-              eq(schema.classLesson.className, target.className),
-              start ? gte(schema.classLesson.day, calendarDay(start)) : undefined,
-            ),
-          )
+          .where(and(eq(schema.classLesson.className, target.className), start ? gte(schema.classLesson.day, calendarDay(start)) : undefined))
       : [],
   ])
 
@@ -164,11 +130,7 @@ export async function buildReport(
     let byProblem = tracks.get(row.userId)
     if (!byProblem) tracks.set(row.userId, (byProblem = new Map()))
     let track = byProblem.get(row.problemId)
-    if (!track)
-      byProblem.set(
-        row.problemId,
-        (track = { first: row.time, solvedAt: null, attempts: 0, last: null }),
-      )
+    if (!track) byProblem.set(row.problemId, (track = { first: row.time, solvedAt: null, attempts: 0, last: null }))
     if (track.solvedAt === null) {
       track.attempts += 1
       if (row.solved) track.solvedAt = row.time
@@ -191,23 +153,17 @@ export async function buildReport(
     plan.problemIds.forEach((problemId, index) => {
       planOrder.set(`${plan.day}|${problemId}`, index)
       const current = lessonDay.get(problemId)
-      if (!current || usersOn(plan.day, problemId) >= usersOn(current, problemId))
-        lessonDay.set(problemId, plan.day)
+      if (!current || usersOn(plan.day, problemId) >= usersOn(current, problemId)) lessonDay.set(problemId, plan.day)
     })
   }
   const planned = new Set(lessonDay.keys())
   for (const [key, users] of dayUsers) {
     if (users.size < LESSON_MIN_USERS) continue
-    const [day, id] = key.split("|") as [string, string]
+    const [day, id] = key.split('|') as [string, string]
     const problemId = Number(id)
     if (planned.has(problemId)) continue
     const current = lessonDay.get(problemId)
-    if (
-      !current ||
-      users.size > usersOn(current, problemId) ||
-      (users.size === usersOn(current, problemId) && day > current)
-    )
-      lessonDay.set(problemId, day)
+    if (!current || users.size > usersOn(current, problemId) || (users.size === usersOn(current, problemId) && day > current)) lessonDay.set(problemId, day)
   }
 
   const myTracks = tracks.get(target.id) ?? new Map<number, Track>()
@@ -230,13 +186,7 @@ export async function buildReport(
       .from(schema.problemTag)
       .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
       .innerJoin(schema.problem, eq(schema.problem.id, schema.problemTags.problemId))
-      .where(
-        and(
-          eq(schema.problemTag.category, "knowledge"),
-          eq(schema.problem.visible, true),
-          isNull(schema.problem.contestId),
-        ),
-      )
+      .where(and(eq(schema.problemTag.category, 'knowledge'), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
       .groupBy(schema.problemTag.name)
       .orderBy(desc(count()), asc(schema.problemTag.name)),
     myTracks.size
@@ -244,12 +194,7 @@ export async function buildReport(
           .select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name })
           .from(schema.problemTags)
           .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
-          .where(
-            and(
-              eq(schema.problemTag.category, "knowledge"),
-              inArray(schema.problemTags.problemId, [...myTracks.keys()]),
-            ),
-          )
+          .where(and(eq(schema.problemTag.category, 'knowledge'), inArray(schema.problemTags.problemId, [...myTracks.keys()])))
       : [],
   ])
   const problemById = new Map(problems.map((item) => [item.id, item]))
@@ -275,16 +220,10 @@ export async function buildReport(
       const index = solvedAt.findIndex(([, id]) => id === target.id)
       rank = index >= 0 ? index + 1 : null
     }
-    const status = !track
-      ? "none"
-      : track.solvedAt === null
-        ? "fail"
-        : track.attempts === 1
-          ? "first"
-          : "tries"
+    const status = !track ? 'none' : track.solvedAt === null ? 'fail' : track.attempts === 1 ? 'first' : 'tries'
     return {
-      displayId: problem?.displayId ?? "",
-      title: problem?.title ?? "",
+      displayId: problem?.displayId ?? '',
+      title: problem?.title ?? '',
       status,
       attempts: track?.attempts ?? 0,
       rank,
@@ -300,10 +239,8 @@ export async function buildReport(
     return entry
   }
   for (const [problemId, day] of lessonDay) slot(day).lesson.push(problemId)
-  for (const [problemId, track] of myTracks)
-    if (!lessonDay.has(problemId)) slot(calendarDay(track.first)).own.push(problemId)
-  const order = (day: string, problemId: number) =>
-    planOrder.get(`${day}|${problemId}`) ?? 1e6 + (dayFirst.get(`${day}|${problemId}`) ?? 0) / 1e3
+  for (const [problemId, track] of myTracks) if (!lessonDay.has(problemId)) slot(calendarDay(track.first)).own.push(problemId)
+  const order = (day: string, problemId: number) => planOrder.get(`${day}|${problemId}`) ?? 1e6 + (dayFirst.get(`${day}|${problemId}`) ?? 0) / 1e3
   const days: LearningDay[] = [...byDay]
     .sort((a, b) => (a[0] < b[0] ? 1 : -1))
     .map(([day, entry]) => ({
@@ -314,7 +251,7 @@ export async function buildReport(
 
   const solvedIds = [...myTracks].filter(([, track]) => track.solvedAt !== null)
   const solved = solvedIds.length
-  let classStats: LearningReport["classStats"] = null
+  let classStats: LearningReport['classStats'] = null
   if (memberIds.size) {
     const counts: number[] = []
     const firstPercents: number[] = []
@@ -353,7 +290,7 @@ export async function buildReport(
     tagCounts.set(tag.name, entry)
   }
 
-  let neighbors: LearningReport["neighbors"] = null
+  let neighbors: LearningReport['neighbors'] = null
   if (options.neighbors && members.length) {
     const index = members.findIndex((item) => item.id === target.id)
     if (index >= 0)
@@ -379,9 +316,7 @@ export async function buildReport(
       .map(([problemId]) => item(problemId)),
     classStats,
     days,
-    errors: [...errorCounts]
-      .map(([result, value]) => ({ result, count: value }))
-      .sort((a, b) => b.count - a.count || a.result - b.result),
+    errors: [...errorCounts].map(([result, value]) => ({ result, count: value })).sort((a, b) => b.count - a.count || a.result - b.result),
     knowledge: knowledgeTags.map((tag) => ({
       name: tag.name,
       ...(tagCounts.get(tag.name) ?? { solved: 0, tried: 0 }),

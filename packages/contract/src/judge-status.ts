@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from 'zod'
 
 /**
  * 判题状态码 —— **前后端唯一的一份**。
@@ -27,6 +27,4 @@ export type JudgeStatusValue = (typeof JudgeStatus)[keyof typeof JudgeStatus]
 // 同名的类型：原来契约里就有 `type JudgeStatus`（各处按类型引用），值与类型同名合并
 export type JudgeStatus = JudgeStatusValue
 
-export const judgeStatusSchema = z.literal(
-  Object.values(JudgeStatus) as [JudgeStatusValue, ...JudgeStatusValue[]],
-)
+export const judgeStatusSchema = z.literal(Object.values(JudgeStatus) as [JudgeStatusValue, ...JudgeStatusValue[]])

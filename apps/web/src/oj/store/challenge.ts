@@ -1,10 +1,10 @@
-import { defineStore } from "pinia"
-import type { ProblemChallengeGroup } from "@oj2/contract"
-import { getChallenges } from "oj/api"
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import { useSubmissionStore } from "oj/store/submission"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import { defineStore } from 'pinia'
+import type { ProblemChallengeGroup } from '@oj2/contract'
+import { getChallenges } from 'oj/api'
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
+import { useSubmissionStore } from 'oj/store/submission'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 /**
  * 挑战：做对之后，同一道题加一条写法上的限制再做一遍（契约 challengeSchema）。
@@ -15,16 +15,14 @@ import { useBreakpoints } from "shared/composables/breakpoints"
  * 这里只管当前这道题的挑战（编辑器顶上那条、结果里的成没成）。课堂条「这节课都做完了」
  * 那几道题的列表由 ChallengeList 自己拉。
  */
-export const useChallengeStore = defineStore("challenge", () => {
+export const useChallengeStore = defineStore('challenge', () => {
   const route = useRoute()
   const router = useRouter()
   const problemStore = useProblemStore()
   const codeStore = useCodeStore()
   const { isMobile } = useBreakpoints()
 
-  const activeId = computed(() =>
-    typeof route.query.challenge === "string" ? route.query.challenge : "",
-  )
+  const activeId = computed(() => (typeof route.query.challenge === 'string' ? route.query.challenge : ''))
 
   /**
    * 进挑战那一刻结果页签里挂着的那次提交。它是进挑战之前那次做对的，也判过挑战（没做到），
@@ -47,7 +45,7 @@ export const useChallengeStore = defineStore("challenge", () => {
     const problemId = problemStore.problem?._id
     const language = codeStore.code.language
     const mine = ++sequence
-    if (!problemId || language === "Flowchart" || problemStore.problem?.contestId != null) {
+    if (!problemId || language === 'Flowchart' || problemStore.problem?.contestId != null) {
       current.value = null
       return
     }
@@ -64,15 +62,13 @@ export const useChallengeStore = defineStore("challenge", () => {
   })
 
   /** 正在挑战的那条（换了语言、挑战被老师删了就是 null） */
-  const active = computed(
-    () => current.value?.challenges.find((item) => item.id === activeId.value) ?? null,
-  )
+  const active = computed(() => current.value?.challenges.find((item) => item.id === activeId.value) ?? null)
 
   function start(problemId: string, challengeId: string) {
     // 进挑战先看题和代码：手机上编辑器是单独一个页签
-    const tab = isMobile.value ? "editor" : "content"
+    const tab = isMobile.value ? 'editor' : 'content'
     void router.push({
-      name: "problem",
+      name: 'problem',
       params: { problemID: problemId },
       query: { challenge: challengeId, tab },
     })

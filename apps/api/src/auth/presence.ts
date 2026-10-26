@@ -1,7 +1,7 @@
-import type { ChainableCommander } from "ioredis"
+import type { ChainableCommander } from 'ioredis'
 
-import { redis } from "../redis"
-import { calendarDay } from "../time"
+import { redis } from '../redis'
+import { calendarDay } from '../time'
 
 /**
  * 「谁现在在线」。member = userId，score = 最后一次活动的毫秒时间戳。
@@ -11,7 +11,7 @@ import { calendarDay } from "../time"
  * 写入一律搭在已有的 pipeline 上（登录、每个带鉴权的请求、WebSocket 巡检），
  * 不多一趟往返。
  */
-const PRESENCE_KEY = "online-users"
+const PRESENCE_KEY = 'online-users'
 
 /**
  * 多久没动就算离线。挂着页面不操作的人靠 sweepSessions 每 60 秒续一次
@@ -33,10 +33,7 @@ const SEEN_TODAY_TTL_SECONDS = 2 * 24 * 60 * 60
 export function markOnline(pipeline: ChainableCommander, userId: number) {
   const now = Date.now()
   const seenKey = seenTodayKey(calendarDay(now))
-  pipeline
-    .zadd(PRESENCE_KEY, now, String(userId))
-    .zadd(seenKey, now, String(userId))
-    .expire(seenKey, SEEN_TODAY_TTL_SECONDS)
+  pipeline.zadd(PRESENCE_KEY, now, String(userId)).zadd(seenKey, now, String(userId)).expire(seenKey, SEEN_TODAY_TTL_SECONDS)
 }
 
 /**
@@ -48,11 +45,7 @@ export function markOnline(pipeline: ChainableCommander, userId: number) {
  */
 export async function onlineUserIds() {
   const cutoff = Date.now() - ONLINE_WINDOW_MS
-  const results = await redis
-    .pipeline()
-    .zremrangebyscore(PRESENCE_KEY, "-inf", `(${cutoff}`)
-    .zrange(PRESENCE_KEY, "0", "-1")
-    .exec()
+  const results = await redis.pipeline().zremrangebyscore(PRESENCE_KEY, '-inf', `(${cutoff}`).zrange(PRESENCE_KEY, '0', '-1').exec()
   const members = (results?.[1]?.[1] ?? []) as string[]
   return new Set(members.map(Number).filter(Number.isInteger))
 }

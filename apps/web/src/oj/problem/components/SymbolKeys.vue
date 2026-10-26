@@ -1,13 +1,7 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useCodeStore } from "oj/store/code"
-import {
-  editorFocused,
-  measureKeyboard,
-  SYMBOL_KEYS,
-  typeSymbol,
-  typing,
-} from "../utils/symbolKeys"
+import { useThemeVars } from 'naive-ui'
+import { useCodeStore } from 'oj/store/code'
+import { editorFocused, measureKeyboard, SYMBOL_KEYS, typeSymbol, typing } from '../utils/symbolKeys'
 
 /**
  * 手机上贴着键盘顶的一排符号键，编辑器有焦点（键盘弹着）时才出来。
@@ -21,9 +15,9 @@ const codeStore = useCodeStore()
 
 const keys = computed(() => {
   const language = codeStore.code.language
-  if (language === "SQL") return SYMBOL_KEYS.sql
-  if (language === "Python") return SYMBOL_KEYS.python
-  if (language === "C" || language === "C++") return SYMBOL_KEYS.c
+  if (language === 'SQL') return SYMBOL_KEYS.sql
+  if (language === 'Python') return SYMBOL_KEYS.python
+  if (language === 'C' || language === 'C++') return SYMBOL_KEYS.c
   return []
 })
 
@@ -37,16 +31,16 @@ function place() {
 
 // 键盘弹起之前就得量出「没键盘时多高」，所以挂上就量
 onMounted(measureKeyboard)
-useEventListener("resize", measureKeyboard)
+useEventListener('resize', measureKeyboard)
 useEventListener(
   () => window.visualViewport,
-  "resize",
+  'resize',
   () => {
     measureKeyboard()
     place()
   },
 )
-useEventListener(() => window.visualViewport, "scroll", place)
+useEventListener(() => window.visualViewport, 'scroll', place)
 watch(typing, (on) => on && place(), { immediate: true })
 // 键盘弹着时点了别处换题、离开页面，编辑器直接卸载，不一定等得到失焦
 onBeforeUnmount(() => {
@@ -55,13 +49,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    v-if="typing && keys.length"
-    class="symbol-keys"
-    :style="top === null ? { bottom: '0px' } : { top: `${top}px` }"
-    role="toolbar"
-    aria-label="常用符号"
-  >
+  <div v-if="typing && keys.length" class="symbol-keys" :style="top === null ? { bottom: '0px' } : { top: `${top}px` }" role="toolbar" aria-label="常用符号">
     <button
       v-for="key in keys"
       :key="key.label"
@@ -90,7 +78,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  background-color: v-bind("theme.bodyColor");
+  background-color: v-bind('theme.bodyColor');
   border-top: 1px solid rgba(128, 128, 128, 0.2);
 }
 

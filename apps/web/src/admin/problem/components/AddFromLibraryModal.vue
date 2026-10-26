@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import { getLibraryProblemList } from "admin/api"
-import Pagination from "shared/components/Pagination.vue"
-import type { AdminProblemRow } from "utils/types"
-import AddButton from "./AddButton.vue"
-import { useListLoader } from "shared/composables/listLoader"
+import { getLibraryProblemList } from 'admin/api'
+import Pagination from 'shared/components/Pagination.vue'
+import type { AdminProblemRow } from 'utils/types'
+import AddButton from './AddButton.vue'
+import { useListLoader } from 'shared/composables/listLoader'
 
 interface Props {
   show: boolean
@@ -12,8 +12,8 @@ interface Props {
 }
 const props = defineProps<Props>()
 const emit = defineEmits<{
-  (e: "update:show", value: boolean): void
-  (e: "change"): void
+  (e: 'update:show', value: boolean): void
+  (e: 'change'): void
 }>()
 
 const route = useRoute()
@@ -21,23 +21,23 @@ const route = useRoute()
 const query = reactive({
   page: 1,
   limit: 10,
-  keyword: "",
+  keyword: '',
 })
 const total = ref(0)
 const problems = shallowRef<AdminProblemRow[]>([])
 
 const columns: DataTableColumn<AdminProblemRow>[] = [
-  { title: "编号", key: "_id", width: 80 },
-  { title: "标题", key: "title" },
+  { title: '编号', key: '_id', width: 80 },
+  { title: '标题', key: 'title' },
   {
-    title: "选项",
-    key: "add",
+    title: '选项',
+    key: 'add',
     render: (row) =>
       h(AddButton, {
         problemID: row.id,
         contestID: route.params.contestID as string,
         nextDisplayId: props.nextDisplayId,
-        onAdded: () => emit("change"),
+        onAdded: () => emit('change'),
       }),
     width: 60,
   },
@@ -68,14 +68,7 @@ watchDebounced(
 )
 </script>
 <template>
-  <n-modal
-    :mask-closable="false"
-    :show="props.show"
-    preset="card"
-    style="width: 600px"
-    title="从题库中添加"
-    @close="$emit('update:show', false)"
-  >
+  <n-modal :mask-closable="false" :show="props.show" preset="card" style="width: 600px" title="从题库中添加" @close="$emit('update:show', false)">
     <n-input class="search" v-model:value="query.keyword" clearable placeholder="搜索标题或编号" />
     <n-data-table :loading="loading" striped :columns="columns" :data="problems" />
     <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />

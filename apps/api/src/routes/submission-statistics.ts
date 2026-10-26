@@ -14,18 +14,18 @@ import {
   type SubmissionStatistics,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
-} from "@oj2/contract"
-import { and, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, count, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, requireTeacher } from "../auth/middleware"
-import { db, schema } from "../db"
-import { failure, success } from "../http"
-import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
-import { type ContestEnv } from "../services/contest"
-import { getBooleanOption } from "../services/options"
-import { dayStart, localTime } from "../time"
-import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from "./helpers"
+import { optionalAuth, requireTeacher } from '../auth/middleware'
+import { db, schema } from '../db'
+import { failure, success } from '../http'
+import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from '../judge/status'
+import { type ContestEnv } from '../services/contest'
+import { getBooleanOption } from '../services/options'
+import { dayStart, localTime } from '../time'
+import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from './helpers'
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
@@ -53,15 +53,14 @@ type TodayRow = {
  * 今天的提交一天也就几百到一千来条，整批拉回来在进程里分组，比写五六条各自 group by 的
  * SQL 好读，也只扫一遍 `create_time` 索引。
  */
-submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, async (c) => {
-  const user = c.get("user")
+submissionStatisticsRoutes.get('/submissions/today-statistics', optionalAuth, async (c) => {
+  const user = c.get('user')
   /**
    * 「提交列表对学生全开」关掉时（考试那种场合）不给题目这张表 —— 总数、正确率
    * 这些聚合数原本就从公开的 today-count 看得出来，但「哪几道题在被刷」已经贴近
    * 提交列表本身的内容了，得跟着同一个开关走。数字照给，不然标签说 21、弹框说 0。
    */
-  const showProblems =
-    (await getBooleanOption("submission_list_show_all", true)) || isAdminRole(user)
+  const showProblems = (await getBooleanOption('submission_list_show_all', true)) || isAdminRole(user)
   const since = dayStart()
   const [rows, [flow]] = await Promise.all([
     db.execute<TodayRow>(sql`
@@ -84,17 +83,14 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
     return judgedRate(list.filter(isAccepted).length, list.length - judging)
   }
   const distinctUsers = (list: TodayRow[]) => new Set(list.map((row) => row.user_id)).size
-  const acceptedUsers = (list: TodayRow[]) =>
-    new Set(list.filter(isAccepted).map((row) => row.user_id)).size
+  const acceptedUsers = (list: TodayRow[]) => new Set(list.filter(isAccepted).map((row) => row.user_id)).size
   const groupBy = <K>(list: TodayRow[], key: (row: TodayRow) => K) => {
     const map = new Map<K, TodayRow[]>()
     for (const row of list) map.set(key(row), [...(map.get(key(row)) ?? []), row])
     return map
   }
   const countBy = <K>(list: TodayRow[], key: (row: TodayRow) => K) =>
-    [...groupBy(list, key)]
-      .map(([value, group]) => ({ value, count: group.length }))
-      .sort((a, b) => b.count - a.count)
+    [...groupBy(list, key)].map(([value, group]) => ({ value, count: group.length })).sort((a, b) => b.count - a.count)
 
   const judging = rows.filter(isJudging).length
   const byProblem = groupBy(rows, (row) => row.problem_id)
@@ -111,13 +107,7 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
             problemTitle: list[0]!.title,
             userCount: distinctUsers(list),
             acceptedUsers: acceptedUsers(list),
-            mine: !user
-              ? null
-              : mine.some(isAccepted)
-                ? ("accepted" as const)
-                : mine.length
-                  ? ("tried" as const)
-                  : ("none" as const),
+            mine: !user ? null : mine.some(isAccepted) ? ('accepted' as const) : mine.length ? ('tried' as const) : ('none' as const),
           }
         })
         .sort((a, b) => b.userCount - a.userCount)
@@ -154,9 +144,9 @@ submissionStatisticsRoutes.get("/submissions/today-statistics", optionalAuth, as
  * 统计接口共用的时间窗解析。旧后端 `end` 必填、`start` 可选（不给就是「全部时段」）。
  */
 function statisticsRange(c: { req: { query(name: string): string | undefined } }) {
-  const end = c.req.query("end")?.trim()
+  const end = c.req.query('end')?.trim()
   if (!end) return null
-  const start = c.req.query("start")?.trim()
+  const start = c.req.query('start')?.trim()
   return { start: start || null, end }
 }
 
@@ -172,13 +162,7 @@ async function findPublicProblemsByDisplayIds(displayIds: string[]) {
   const rows = await db
     .select({ id: schema.problem.id, displayId: schema.problem.displayId })
     .from(schema.problem)
-    .where(
-      and(
-        inArray(sql`lower(${schema.problem.displayId})`, lowered),
-        isNull(schema.problem.contestId),
-        eq(schema.problem.visible, true),
-      ),
-    )
+    .where(and(inArray(sql`lower(${schema.problem.displayId})`, lowered), isNull(schema.problem.contestId), eq(schema.problem.visible, true)))
   const found = new Set(rows.map((row) => row.displayId.toLowerCase()))
   const missing = displayIds.find((id) => !found.has(id.toLowerCase()))
   return { ids: rows.map((row) => row.id), missing: missing ?? null }
@@ -189,35 +173,28 @@ async function findPublicProblemsByDisplayIds(displayIds: string[]) {
  * ilike 模糊匹配（填 ks251 要匹配整个班），明细那边必须精确到人，口径不同。
  * 两边都是先拿用户名去 `user` 表解析成 user_id，再按 user_id 筛提交。
  */
-type StatisticsScope =
-  | { ok: true; filters: SQL[]; problemCount: number }
-  | { ok: false; status: 400 | 404; code: string; message: string }
+type StatisticsScope = { ok: true; filters: SQL[]; problemCount: number } | { ok: false; status: 400 | 404; code: string; message: string }
 
-async function statisticsScope(c: {
-  req: { query(name: string): string | undefined }
-}): Promise<StatisticsScope> {
+async function statisticsScope(c: { req: { query(name: string): string | undefined } }): Promise<StatisticsScope> {
   const range = statisticsRange(c)
   if (!range) {
     return {
       ok: false,
       status: 400,
-      code: "invalid-request",
-      message: "end is required",
+      code: 'invalid-request',
+      message: 'end is required',
     }
   }
 
-  const filters = [
-    isNull(schema.submission.contestId),
-    sql`${schema.submission.createTime} <= ${range.end}`,
-  ]
+  const filters = [isNull(schema.submission.contestId), sql`${schema.submission.createTime} <= ${range.end}`]
   if (range.start) filters.push(sql`${schema.submission.createTime} >= ${range.start}`)
 
-  const displayIds = parseDisplayIds(c.req.query("problemDisplayId") ?? "")
+  const displayIds = parseDisplayIds(c.req.query('problemDisplayId') ?? '')
   if (displayIds.length > STATISTICS_MAX_PROBLEMS) {
     return {
       ok: false,
       status: 400,
-      code: "invalid-request",
+      code: 'invalid-request',
       message: `At most ${STATISTICS_MAX_PROBLEMS} problems`,
     }
   }
@@ -227,7 +204,7 @@ async function statisticsScope(c: {
       return {
         ok: false,
         status: 404,
-        code: "problem-not-found",
+        code: 'problem-not-found',
         message: `Problem ${missing} does not exist`,
       }
     }
@@ -237,13 +214,13 @@ async function statisticsScope(c: {
   return { ok: true, filters, problemCount: displayIds.length }
 }
 
-submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async (c) => {
+submissionStatisticsRoutes.get('/submissions/statistics', requireTeacher, async (c) => {
   const scope = await statisticsScope(c)
   if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
   const filters = scope.filters
 
-  const username = c.req.query("username")?.trim() || undefined
-  const className = c.req.query("className")?.trim() || undefined
+  const username = c.req.query('username')?.trim() || undefined
+  const className = c.req.query('className')?.trim() || undefined
   // 用户名 / 班级先解析成账号，再拿 user_id 去筛提交。这一趟查询挡在 Promise.all 前面，
   // 但换掉的是下面**四条**语句各一次的 submission 全表扫：`ilike` 走不了索引，
   // 换成 `user_id in (...)` 之后四条全走索引（生产快照实测单条 18448 → 537
@@ -305,13 +282,7 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
       .where(where)
       // user_id 定了 user 那一行就定了，把 username / class_name 一起放进 group by
       // 不会多分出组来，但省掉再对它们套一层聚合函数
-      .groupBy(
-        schema.submission.userId,
-        schema.user.username,
-        schema.user.className,
-        schema.user.isDisabled,
-        schema.user.adminType,
-      )
+      .groupBy(schema.submission.userId, schema.user.username, schema.user.className, schema.user.isDisabled, schema.user.adminType)
       .orderBy(desc(count())),
     // 数字行里那根结果条（原来今日统计底部那根，并进来之后哪个时间段都有）
     db
@@ -337,8 +308,7 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
    * 不填题号时无所谓「全部」，退回「至少做出一道」。
    */
   const requiredSolved = scope.problemCount
-  const isDone = (row: { solvedCount: number; acceptedCount: number }) =>
-    requiredSolved > 0 ? row.solvedCount >= requiredSolved : row.acceptedCount > 0
+  const isDone = (row: { solvedCount: number; acceptedCount: number }) => (requiredSolved > 0 ? row.solvedCount >= requiredSolved : row.acceptedCount > 0)
 
   /**
    * 「提交记录」那张表列的是**窗口里交过东西的所有人**，`done` 标出谁做完了 ——
@@ -356,8 +326,7 @@ submissionStatisticsRoutes.get("/submissions/statistics", requireTeacher, async 
    * 列出来全是不相干的人，分母也跟着失真。花名册只取这段时间交过的人 —— 「交了没对」照常有，
    * 「还没交」为空，和不选班时一样
    */
-  const rosterRows =
-    className === NO_CLASS ? enrolled.filter((row) => submittedUserIds.has(row.id)) : enrolled
+  const rosterRows = className === NO_CLASS ? enrolled.filter((row) => submittedUserIds.has(row.id)) : enrolled
 
   const data = perUser.map((row) => ({
     username: row.username,
@@ -434,13 +403,13 @@ const GRID_LIMIT = 5000
  * 统计页的方块串：范围内每个学生的每一次提交（口径见契约 submissionStatisticsGridSchema）。
  * 用户名的匹配和统计接口同一套（ilike，填 `ks253` 圈一个班）。
  */
-submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, async (c) => {
+submissionStatisticsRoutes.get('/submissions/statistics/grid', requireTeacher, async (c) => {
   const scope = await statisticsScope(c)
   if (!scope.ok) return failure(c, scope.status, scope.code, scope.message)
   const filters = [...scope.filters]
 
-  const username = c.req.query("username")?.trim() || undefined
-  const scoped = await scopedUsers(username, c.req.query("className")?.trim() || undefined)
+  const username = c.req.query('username')?.trim() || undefined
+  const scoped = await scopedUsers(username, c.req.query('className')?.trim() || undefined)
   if (scoped) {
     const ids = scoped.map((row) => row.id)
     filters.push(ids.length ? inArray(schema.submission.userId, ids) : sql`false`)
@@ -459,20 +428,14 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
     .from(schema.submission)
     // 只要学生（含学生管理员）：老师试题的提交不该出现在「谁做了几次」里
     .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(
-      and(
-        ...filters,
-        inArray(schema.user.adminType, [...STUDENT_ROLES]),
-        eq(schema.user.isDisabled, false),
-      ),
-    )
+    .where(and(...filters, inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
     .orderBy(desc(schema.submission.createTime))
     .limit(GRID_LIMIT + 1)
   const truncated = rows.length > GRID_LIMIT
   const kept = rows.slice(0, GRID_LIMIT).reverse()
 
   // 题目：传了就按传的顺序，没传就按范围里第一次有人交的时间
-  const requested = parseDisplayIds(c.req.query("problemDisplayId") ?? "")
+  const requested = parseDisplayIds(c.req.query('problemDisplayId') ?? '')
   const problemIds = [...new Set(kept.map((row) => row.problemId))]
   const problems = problemIds.length
     ? await db
@@ -493,9 +456,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
     : problemIds.map((id) => problemById.get(id)!).filter(Boolean)
   // 传了题号但这些题在范围里没人交：表头仍然要有它们
   if (requested.length && ordered.length < requested.length) {
-    const missing = requested.filter(
-      (id) => !ordered.some((row) => row.displayId.toLowerCase() === id.toLowerCase()),
-    )
+    const missing = requested.filter((id) => !ordered.some((row) => row.displayId.toLowerCase() === id.toLowerCase()))
     const { ids } = await findPublicProblemsByDisplayIds(missing)
     if (ids.length) {
       const extra = await db
@@ -508,14 +469,11 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
         .where(inArray(schema.problem.id, ids))
       ordered.push(...extra)
       const rank = new Map(requested.map((id, i) => [id.toLowerCase(), i]))
-      ordered.sort(
-        (a, b) =>
-          (rank.get(a.displayId.toLowerCase()) ?? 0) - (rank.get(b.displayId.toLowerCase()) ?? 0),
-      )
+      ordered.sort((a, b) => (rank.get(a.displayId.toLowerCase()) ?? 0) - (rank.get(b.displayId.toLowerCase()) ?? 0))
     }
   }
 
-  const byUser = new Map<number, SubmissionStatisticsGrid["rows"][number]>()
+  const byUser = new Map<number, SubmissionStatisticsGrid['rows'][number]>()
   for (const row of kept) {
     let entry = byUser.get(row.userId)
     if (!entry) {
@@ -529,7 +487,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
     }
     entry.submissions.push({
       id: row.id,
-      problemDisplayId: problemById.get(row.problemId)?.displayId ?? "",
+      problemDisplayId: problemById.get(row.problemId)?.displayId ?? '',
       result: row.result,
       createTime: row.createTime,
     })
@@ -543,13 +501,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/grid", requireTeacher, a
       const sizes = await db
         .select({ className: schema.user.className, value: count() })
         .from(schema.user)
-        .where(
-          and(
-            inArray(schema.user.className, names as string[]),
-            inArray(schema.user.adminType, [...STUDENT_ROLES]),
-            eq(schema.user.isDisabled, false),
-          ),
-        )
+        .where(and(inArray(schema.user.className, names as string[]), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
         .groupBy(schema.user.className)
       for (const row of sizes) if (row.className) classSizes[row.className] = row.value
     }
@@ -598,13 +550,10 @@ type LessonAggRow = {
  * 再标出哪几段算课，最后用 grouping sets 一次聚合出下面五种粒度 —— 不走方块串那个明细
  * 接口在前端切，是因为那边最多给 5000 条，「这学期」就不止这个数，截断之后课会少算。
  */
-submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher, async (c) => {
+submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher, async (c) => {
   const range = statisticsRange(c)
-  if (!range) return failure(c, 400, "invalid-request", "end is required")
-  const limit = Math.min(
-    LESSONS_MAX,
-    Math.max(1, Number.parseInt(c.req.query("limit") ?? "", 10) || LESSONS_DEFAULT),
-  )
+  if (!range) return failure(c, 400, 'invalid-request', 'end is required')
+  const limit = Math.min(LESSONS_MAX, Math.max(1, Number.parseInt(c.req.query('limit') ?? '', 10) || LESSONS_DEFAULT))
   const accepted = sql.join(
     ACCEPTED_RESULTS.map((value) => sql`${value}`),
     sql`, `,
@@ -679,8 +628,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
 
   const LEVEL = { segProblem: 3, segment: 6, problemClass: 27, problemResult: 57, dayClass: 14 }
   const segKey = (row: LessonAggRow) => `${row.class_name}|${row.day}|${row.sid}`
-  const failedOf = (row: { total: number; accepted: number; judging: number }) =>
-    row.total - row.accepted - row.judging
+  const failedOf = (row: { total: number; accepted: number; judging: number }) => row.total - row.accepted - row.judging
 
   const problemsOfSeg = new Map<string, LessonAggRow[]>()
   for (const row of rows) {
@@ -688,9 +636,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
     const key = segKey(row)
     problemsOfSeg.set(key, [...(problemsOfSeg.get(key) ?? []), row])
   }
-  const allLessons = rows
-    .filter((row) => row.level === LEVEL.segment && row.lesson)
-    .sort((a, b) => b.first.localeCompare(a.first))
+  const allLessons = rows.filter((row) => row.level === LEVEL.segment && row.lesson).sort((a, b) => b.first.localeCompare(a.first))
   const picked = allLessons.slice(0, limit)
   const hasMore = allLessons.length > limit
 
@@ -707,23 +653,17 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
   }
   const hardRanked = [...hardCandidates.entries()]
     .map(([problemId, entry]) => {
-      const sum = (key: "total" | "accepted" | "judging" | "users" | "accepted_users") =>
-        entry.rows.reduce((acc, row) => acc + row[key], 0)
+      const sum = (key: 'total' | 'accepted' | 'judging' | 'users' | 'accepted_users') => entry.rows.reduce((acc, row) => acc + row[key], 0)
       return {
         problemId,
         className: [...entry.rows].sort((a, b) => b.total - a.total)[0]?.class_name ?? null,
-        total: sum("total"),
-        accepted: sum("accepted"),
-        judging: sum("judging"),
-        userCount: sum("users"),
-        acceptedUsers: sum("accepted_users"),
+        total: sum('total'),
+        accepted: sum('accepted'),
+        judging: sum('judging'),
+        userCount: sum('users'),
+        acceptedUsers: sum('accepted_users'),
         failures: entry.failures
-          .filter(
-            (row) =>
-              row.result !== null &&
-              !ACCEPTED_RESULTS.includes(row.result) &&
-              !UNJUDGED_RESULTS.includes(row.result),
-          )
+          .filter((row) => row.result !== null && !ACCEPTED_RESULTS.includes(row.result) && !UNJUDGED_RESULTS.includes(row.result))
           .sort((a, b) => b.total - a.total)
           .map((row) => ({ result: row.result!, count: row.total })),
       }
@@ -733,16 +673,9 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
     .slice(0, 6)
 
   const lessonProblemRows = picked.map((lesson) =>
-    (problemsOfSeg.get(segKey(lesson)) ?? [])
-      .filter((row) => row.users >= LESSON_MIN_USERS)
-      .sort((a, b) => b.users - a.users),
+    (problemsOfSeg.get(segKey(lesson)) ?? []).filter((row) => row.users >= LESSON_MIN_USERS).sort((a, b) => b.users - a.users),
   )
-  const problemIds = [
-    ...new Set([
-      ...lessonProblemRows.flat().map((row) => row.problem_id!),
-      ...hardRanked.map((row) => row.problemId),
-    ]),
-  ]
+  const problemIds = [...new Set([...lessonProblemRows.flat().map((row) => row.problem_id!), ...hardRanked.map((row) => row.problemId)])]
   const problems = problemIds.length
     ? await db
         .select({
@@ -756,25 +689,16 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
     : []
   const problemById = new Map(problems.map((row) => [row.id, row]))
 
-  const lessonClasses = [
-    ...new Set(picked.flatMap((row) => (row.class_name === null ? [] : [row.class_name]))),
-  ]
+  const lessonClasses = [...new Set(picked.flatMap((row) => (row.class_name === null ? [] : [row.class_name])))]
   const sizes = lessonClasses.length
     ? await db
         .select({ className: schema.user.className, value: count() })
         .from(schema.user)
-        .where(
-          and(
-            inArray(schema.user.className, lessonClasses),
-            inArray(schema.user.adminType, [...STUDENT_ROLES]),
-            eq(schema.user.isDisabled, false),
-          ),
-        )
+        .where(and(inArray(schema.user.className, lessonClasses), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
         .groupBy(schema.user.className)
     : []
 
-  const sum = (list: LessonAggRow[], key: "total" | "accepted" | "judging") =>
-    list.reduce((acc, row) => acc + row[key], 0)
+  const sum = (list: LessonAggRow[], key: 'total' | 'accepted' | 'judging') => list.reduce((acc, row) => acc + row[key], 0)
   const liveSince = new Date(Date.now() - LESSON_LIVE_MINUTES * 60_000).toISOString()
   const lessons = picked.map((lesson, index) => {
     const own = lessonProblemRows[index]!
@@ -787,10 +711,7 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
       end: lesson.last,
       userCount: lesson.users,
       // 没填班级的谈不上花名册，给 0（界面上就只写「几人」）
-      classSize:
-        lesson.class_name === null
-          ? 0
-          : (sizes.find((row) => row.className === lesson.class_name)?.value ?? 0),
+      classSize: lesson.class_name === null ? 0 : (sizes.find((row) => row.className === lesson.class_name)?.value ?? 0),
       // 点进去就拿这几道去筛：统计接口只认公开题，一次最多 20 道
       problems: own
         .map((row) => problemById.get(row.problem_id!))
@@ -800,8 +721,8 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
       fromProblemSet: lesson.from_ps * 2 > lesson.total,
       // 次数和正确率只算这节课的题：点进去筛的就是这几道，两边的数才对得上
       // （一段里零星一两个人顺手交的别的题不算）
-      total: sum(own, "total"),
-      correctRate: judgedRate(sum(own, "accepted"), sum(own, "total") - sum(own, "judging")),
+      total: sum(own, 'total'),
+      correctRate: judgedRate(sum(own, 'accepted'), sum(own, 'total') - sum(own, 'judging')),
       live: lesson.last >= liveSince,
       hardest:
         hardest && hardestProblem && failedOf(hardest) > 0
@@ -817,21 +738,8 @@ submissionStatisticsRoutes.get("/submissions/statistics/lessons", requireTeacher
   // 零散提交只给列出来的这些课覆盖到的日子（「这学期」只列了最近 50 节时，更早的零散不给）
   const earliestDay = hasMore ? (picked.at(-1)?.day ?? null) : null
   const scattered = rows
-    .filter(
-      (row) =>
-        row.level === LEVEL.dayClass &&
-        row.lesson === false &&
-        (earliestDay === null || row.day! >= earliestDay),
-    )
-    .sort((a, b) =>
-      a.day !== b.day
-        ? b.day!.localeCompare(a.day!)
-        : a.class_name === null
-          ? 1
-          : b.class_name === null
-            ? -1
-            : b.total - a.total,
-    )
+    .filter((row) => row.level === LEVEL.dayClass && row.lesson === false && (earliestDay === null || row.day! >= earliestDay))
+    .sort((a, b) => (a.day !== b.day ? b.day!.localeCompare(a.day!) : a.class_name === null ? 1 : b.class_name === null ? -1 : b.total - a.total))
     .map((row) => ({
       day: row.day!,
       className: row.class_name,

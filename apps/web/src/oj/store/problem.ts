@@ -1,9 +1,9 @@
-import { defineStore } from "pinia"
-import type { LANGUAGE, ProblemDetail } from "utils/types"
-import { problemEntryOf } from "oj/problem/composables/problemPageContext"
-import { useCodeStore } from "oj/store/code"
+import { defineStore } from 'pinia'
+import type { LANGUAGE, ProblemDetail } from 'utils/types'
+import { problemEntryOf } from 'oj/problem/composables/problemPageContext'
+import { useCodeStore } from 'oj/store/code'
 
-export const useProblemStore = defineStore("problem", () => {
+export const useProblemStore = defineStore('problem', () => {
   const problem = ref<ProblemDetail | null>(null)
   const route = useRoute()
 
@@ -32,9 +32,7 @@ export const useProblemStore = defineStore("problem", () => {
    * 算完成（设计文档第 3 节决定 4）。手机上原来不给（节点库是 HTML5 拖放，拖不动），
    * 2026-10 换成插入式编辑器之后只用点，手机上也能画
    */
-  const canDraw = computed(
-    () => !!problem.value?.allowFlowchart && problemEntryOf(route) !== "contest",
-  )
+  const canDraw = computed(() => !!problem.value?.allowFlowchart && problemEntryOf(route) !== 'contest')
 
   /**
    * 编辑器能切到的全部「语言」。流程图在内部仍是一门叫 Flowchart 的语言（提交、草稿、编辑器
@@ -42,11 +40,11 @@ export const useProblemStore = defineStore("problem", () => {
    */
   const languages = computed<LANGUAGE[]>(() => {
     const own = problem.value?.languages ?? []
-    return canDraw.value ? ["Flowchart", ...own] : own
+    return canDraw.value ? ['Flowchart', ...own] : own
   })
 
   /** 语言下拉里的：真正的编程语言 */
-  const codeLanguages = computed(() => languages.value.filter((it) => it !== "Flowchart"))
+  const codeLanguages = computed(() => languages.value.filter((it) => it !== 'Flowchart'))
 
   /**
    * 请编辑器换语言，并读回那门语言的草稿（没有就是模板）。只有编辑器（ProblemEditor）知道
@@ -68,9 +66,9 @@ export const useProblemStore = defineStore("problem", () => {
     // 在能画图的题上画着图换到不能画的题，直接取第一项会把偏好 C 的学生扔到 Python，
     // 而且 code store 的 watch 会把 Python 记成新的偏好
     const preferred = useCodeStore().preferredLanguage()
-    if (preferred !== "Flowchart" && languages.value.includes(preferred)) return preferred
+    if (preferred !== 'Flowchart' && languages.value.includes(preferred)) return preferred
     // 兜底落在编程语言上：languages 的第一项可能是 Flowchart，不能默认把人扔到画布上
-    return codeLanguages.value[0] ?? languages.value[0] ?? "Python"
+    return codeLanguages.value[0] ?? languages.value[0] ?? 'Python'
   }
 
   function incrementFailCount() {

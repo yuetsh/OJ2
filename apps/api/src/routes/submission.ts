@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto"
+import { randomBytes } from 'node:crypto'
 
 import {
   createSubmissionRequestSchema,
@@ -9,39 +9,27 @@ import {
   type SubmissionList,
   type SubmissionListItem,
   type SubmissionTrace,
-} from "@oj2/contract"
-import { and, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, count, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, requireAuth, requireTeacher } from "../auth/middleware"
-import type { AuthUser } from "../auth/session"
-import { db, schema } from "../db"
-import { failure, parseBody, success } from "../http"
-import { compileFails, templateForLanguage } from "../judge/run"
-import { JudgeStatus } from "../judge/status"
-import { parseProblemTemplate } from "../judge/template"
-import { judgeQueue } from "../queue"
-import {
-  canAccessContest,
-  contestStatus,
-  findAccessibleContest,
-  requireContestAccess,
-  type ContestEnv,
-} from "../services/contest"
-import { CodeFormatError, formatCode, mergesLines } from "../services/format-code"
-import { getBooleanOption } from "../services/options"
-import { problemSetLockCutoffs } from "../services/problemset"
-import { consumeToken } from "../services/throttling"
-import { dayStart } from "../time"
-import { asFilterValue, asRecord, isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
-import {
-  classNameFilter,
-  exactUsernameFilter,
-  problemFilter,
-  unknownDisplayIds,
-  usernameFilter,
-} from "../services/submission-filters"
-import { submissionStatisticsRoutes } from "./submission-statistics"
+import { optionalAuth, requireAuth, requireTeacher } from '../auth/middleware'
+import type { AuthUser } from '../auth/session'
+import { db, schema } from '../db'
+import { failure, parseBody, success } from '../http'
+import { compileFails, templateForLanguage } from '../judge/run'
+import { JudgeStatus } from '../judge/status'
+import { parseProblemTemplate } from '../judge/template'
+import { judgeQueue } from '../queue'
+import { canAccessContest, contestStatus, findAccessibleContest, requireContestAccess, type ContestEnv } from '../services/contest'
+import { CodeFormatError, formatCode, mergesLines } from '../services/format-code'
+import { getBooleanOption } from '../services/options'
+import { problemSetLockCutoffs } from '../services/problemset'
+import { consumeToken } from '../services/throttling'
+import { dayStart } from '../time'
+import { asFilterValue, asRecord, isAdminRole, isTeacherOrAbove, queryInteger } from './helpers'
+import { classNameFilter, exactUsernameFilter, problemFilter, unknownDisplayIds, usernameFilter } from '../services/submission-filters'
+import { submissionStatisticsRoutes } from './submission-statistics'
 
 export const submissionRoutes = new Hono<ContestEnv>()
 
@@ -53,13 +41,7 @@ export const submissionRoutes = new Hono<ContestEnv>()
  * 两次提交并发到达时也各自取到的是对方之外的最近一条。这道题第一次提交时
  * `max()` 为 null，列就是 null。
  */
-async function saveTrace(
-  submissionId: string,
-  userId: number,
-  problemId: number,
-  createTime: string,
-  trace: SubmissionTrace,
-) {
+async function saveTrace(submissionId: string, userId: number, problemId: number, createTime: string, trace: SubmissionTrace) {
   try {
     await db.insert(schema.submissionTrace).values({
       submissionId,
@@ -73,37 +55,30 @@ async function saveTrace(
       )`,
     })
   } catch (error) {
-    console.error("Failed to record submission trace", error)
+    console.error('Failed to record submission trace', error)
   }
 }
 
-submissionRoutes.post("/submissions", requireAuth, async (c) => {
-  const parsed = await parseBody(c, createSubmissionRequestSchema, "Invalid submission payload")
+submissionRoutes.post('/submissions', requireAuth, async (c) => {
+  const parsed = await parseBody(c, createSubmissionRequestSchema, 'Invalid submission payload')
   if (!parsed.success) return parsed.response
   let contestId: number | null = null
   if (parsed.data.contestId) {
     // 这里用不了 requireContestAccess 中间件：比赛 id 来自请求体，
     // 中间件跑的时候 body 还没解析。全仓只有这一处仍是手工调用，改动时留意别漏掉鉴权。
-    const contest = await findAccessibleContest(c.get("user"), parsed.data.contestId)
-    if (!contest) return failure(c, 404, "contest-not-found", "Contest does not exist")
-    const access = await canAccessContest(c, contest, "problems")
-    if (!access.ok)
-      return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
-    if (contestStatus(contest) === "-1")
-      return failure(c, 403, "contest-ended", "The contest has ended")
+    const contest = await findAccessibleContest(c.get('user'), parsed.data.contestId)
+    if (!contest) return failure(c, 404, 'contest-not-found', 'Contest does not exist')
+    const access = await canAccessContest(c, contest, 'problems')
+    if (!access.ok) return failure(c, access.code === 'login-required' ? 401 : 403, access.code, access.message)
+    if (contestStatus(contest) === '-1') return failure(c, 403, 'contest-ended', 'The contest has ended')
     contestId = contest.id
   }
 
   // 限流，位置与旧后端 submission/views/oj.py 的 SubmissionAPI.post 一致：
   // 比赛权限校验之后、取题目之前，按用户 id 消耗一个令牌。判题沙箱是有限资源。
-  const throttle = await consumeToken("user", String(c.get("user")!.id))
+  const throttle = await consumeToken('user', String(c.get('user')!.id))
   if (!throttle.allowed) {
-    return failure(
-      c,
-      429,
-      "too-many-submissions",
-      `Please wait ${Math.floor(throttle.wait)} seconds`,
-    )
+    return failure(c, 429, 'too-many-submissions', `Please wait ${Math.floor(throttle.wait)} seconds`)
   }
 
   const [problem] = await db
@@ -116,21 +91,14 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
       and(
         eq(schema.problem.id, parsed.data.problemId),
         eq(schema.problem.visible, true),
-        contestId === null
-          ? isNull(schema.problem.contestId)
-          : eq(schema.problem.contestId, contestId),
+        contestId === null ? isNull(schema.problem.contestId) : eq(schema.problem.contestId, contestId),
       ),
     )
     .limit(1)
 
-  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, 'problem-not-found', 'Problem does not exist')
   if (!problem.languages.includes(parsed.data.language)) {
-    return failure(
-      c,
-      400,
-      "language-not-allowed",
-      `${parsed.data.language} is not allowed in the problem`,
-    )
+    return failure(c, 400, 'language-not-allowed', `${parsed.data.language} is not allowed in the problem`)
   }
 
   // 来源题单：前端只在 /problemset/:id/problem/:pid 那个入口带上它，落库纯粹是为了
@@ -143,18 +111,13 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     const [link] = await db
       .select({ id: schema.problemsetProblem.id })
       .from(schema.problemsetProblem)
-      .where(
-        and(
-          eq(schema.problemsetProblem.problemsetId, parsed.data.problemSetId),
-          eq(schema.problemsetProblem.problemId, problem.id),
-        ),
-      )
+      .where(and(eq(schema.problemsetProblem.problemsetId, parsed.data.problemSetId), eq(schema.problemsetProblem.problemId, problem.id)))
       .limit(1)
     if (link) problemsetId = parsed.data.problemSetId
   }
 
-  const user = c.get("user")!
-  const submissionId = randomBytes(16).toString("hex")
+  const user = c.get('user')!
+  const submissionId = randomBytes(16).toString('hex')
   const createTime = new Date().toISOString()
 
   await db.insert(schema.submission).values({
@@ -172,26 +135,22 @@ submissionRoutes.post("/submissions", requireAuth, async (c) => {
     contestId,
   })
 
-  if (parsed.data.trace)
-    await saveTrace(submissionId, user.id, problem.id, createTime, parsed.data.trace)
+  if (parsed.data.trace) await saveTrace(submissionId, user.id, problem.id, createTime, parsed.data.trace)
 
   try {
-    await judgeQueue.add("judge", { submissionId, problemId: problem.id }, { jobId: submissionId })
+    await judgeQueue.add('judge', { submissionId, problemId: problem.id }, { jobId: submissionId })
   } catch (error) {
-    await db
-      .update(schema.submission)
-      .set({ result: JudgeStatus.SYSTEM_ERROR })
-      .where(eq(schema.submission.id, submissionId))
-    console.error("Failed to enqueue submission", error)
-    return failure(c, 502, "queue-unavailable", "Judge queue is unavailable")
+    await db.update(schema.submission).set({ result: JudgeStatus.SYSTEM_ERROR }).where(eq(schema.submission.id, submissionId))
+    console.error('Failed to enqueue submission', error)
+    return failure(c, 502, 'queue-unavailable', 'Judge queue is unavailable')
   }
 
   return success(c, { submissionId } satisfies CreateSubmissionResponse, 201)
 })
 
-submissionRoutes.get("/submissions/today-count", async (c) => {
-  const language = c.req.query("language")
-  if (language === "Flowchart") {
+submissionRoutes.get('/submissions/today-count', async (c) => {
+  const language = c.req.query('language')
+  if (language === 'Flowchart') {
     const [row] = await db
       .select({ value: count() })
       .from(schema.flowchartSubmission)
@@ -201,20 +160,15 @@ submissionRoutes.get("/submissions/today-count", async (c) => {
   const [row] = await db
     .select({ value: count() })
     .from(schema.submission)
-    .where(
-      and(
-        isNull(schema.submission.contestId),
-        sql`${schema.submission.createTime} >= ${dayStart()}`,
-      ),
-    )
+    .where(and(isNull(schema.submission.contestId), sql`${schema.submission.createTime} >= ${dayStart()}`))
   return success(c, row?.value ?? 0)
 })
 
-submissionRoutes.route("/", submissionStatisticsRoutes)
+submissionRoutes.route('/', submissionStatisticsRoutes)
 
 // 老师也能重判：旧栈只给超管，前端却一直给老师亮着按钮，老师点了只会「权限不足」。
 // 流程图那边老师本来就能重新评分，两边对齐。比赛提交不在此列（下面 isNull(contestId)）
-submissionRoutes.post("/submissions/:id/rejudge", requireTeacher, async (c) => {
+submissionRoutes.post('/submissions/:id/rejudge', requireTeacher, async (c) => {
   const [row] = await db
     .select({
       id: schema.submission.id,
@@ -222,20 +176,17 @@ submissionRoutes.post("/submissions/:id/rejudge", requireTeacher, async (c) => {
       result: schema.submission.result,
     })
     .from(schema.submission)
-    .where(and(eq(schema.submission.id, c.req.param("id")), isNull(schema.submission.contestId)))
+    .where(and(eq(schema.submission.id, c.req.param('id')), isNull(schema.submission.contestId)))
     .limit(1)
-  if (!row) return failure(c, 404, "submission-not-found", "Submission does not exist")
+  if (!row) return failure(c, 404, 'submission-not-found', 'Submission does not exist')
 
   // info 一起清：不清的话判题中那几秒，列表和详情按旧的逐点结果算出「通过 2/3」
-  await db
-    .update(schema.submission)
-    .set({ statisticInfo: {}, info: {}, result: JudgeStatus.PENDING })
-    .where(eq(schema.submission.id, row.id))
+  await db.update(schema.submission).set({ statisticInfo: {}, info: {}, result: JudgeStatus.PENDING }).where(eq(schema.submission.id, row.id))
 
   // jobId 必须带时间戳。队列保留最近 100 个已完成任务，沿用 submissionId 做 jobId 的话
   // BullMQ 会认为这个任务已经存在，重判静默变成空操作。与 flowcharts/:id/retry 同一处理。
   await judgeQueue.add(
-    "judge",
+    'judge',
     // 带上重判之前的结果，落库时只做差量（见 judge/run.ts 的 persistResult）
     { submissionId: row.id, problemId: row.problemId, rejudgedFrom: row.result },
     { jobId: `${row.id}:rejudge:${Date.now()}` },
@@ -243,8 +194,8 @@ submissionRoutes.post("/submissions/:id/rejudge", requireTeacher, async (c) => {
   return success(c, null)
 })
 
-submissionRoutes.post("/code/format", requireAuth, async (c) => {
-  const parsed = await parseBody(c, formatCodeRequestSchema, "Invalid format payload")
+submissionRoutes.post('/code/format', requireAuth, async (c) => {
+  const parsed = await parseBody(c, formatCodeRequestSchema, 'Invalid format payload')
   if (!parsed.success) return parsed.response
   const { code: source, language, problemId } = parsed.data
   try {
@@ -253,16 +204,12 @@ submissionRoutes.post("/code/format", requireAuth, async (c) => {
     // 代码照常提交、照常判成编译错误，只是不改动学生的代码。
     // 只有 clang-format 真把两行并成一行时才去判题机编：判题机和判题抢同一台机器的 CPU，
     // 全班一起交 C++ 时每人都要排满 8 秒超时；而编得过的代码九成以上根本不并行
-    if ((language === "c" || language === "cpp") && mergesLines(source, code)) {
-      const judgeLanguage = language === "c" ? "C" : "C++"
+    if ((language === 'c' || language === 'cpp') && mergesLines(source, code)) {
+      const judgeLanguage = language === 'c' ? 'C' : 'C++'
       const [problem] =
         problemId === undefined
           ? []
-          : await db
-              .select({ template: schema.problem.template })
-              .from(schema.problem)
-              .where(eq(schema.problem.id, problemId))
-              .limit(1)
+          : await db.select({ template: schema.problem.template }).from(schema.problem).where(eq(schema.problem.id, problemId)).limit(1)
       const rawTemplate = problem ? templateForLanguage(problem.template, judgeLanguage) : null
       const template = rawTemplate ? parseProblemTemplate(rawTemplate) : null
       const full = template ? `${template.prepend}\n${source}\n${template.append}` : source
@@ -275,9 +222,9 @@ submissionRoutes.post("/code/format", requireAuth, async (c) => {
     if (error instanceof CodeFormatError) {
       return failure(
         c,
-        error.kind === "syntax" ? 400 : 500,
+        error.kind === 'syntax' ? 400 : 500,
         // syntax-error 的 message 是 CPython 的报错原文，前端拿去翻成中文
-        error.kind === "syntax" ? "syntax-error" : "format-tool-error",
+        error.kind === 'syntax' ? 'syntax-error' : 'format-tool-error',
         error.message,
       )
     }
@@ -347,13 +294,9 @@ const submissionListColumns = {
      * 通过的测试点数 / 总数，口径同 caseSummary()：只认 info.data 是数组、逐项 result 为 0。
      * 在库里数完只回两个整数 —— info 带着每个点的 output_md5，整列拉回来只为数个数不值当
      */
-    casesTotal: sql<
-      number | null
-    >`case when jsonb_typeof(${schema.submission.info} -> 'data') = 'array'
+    casesTotal: sql<number | null>`case when jsonb_typeof(${schema.submission.info} -> 'data') = 'array'
       then jsonb_array_length(${schema.submission.info} -> 'data') end`,
-    casesPassed: sql<
-      number | null
-    >`case when jsonb_typeof(${schema.submission.info} -> 'data') = 'array'
+    casesPassed: sql<number | null>`case when jsonb_typeof(${schema.submission.info} -> 'data') = 'array'
       then (select count(*)::int from jsonb_array_elements(${schema.submission.info} -> 'data') as item
         where item ->> 'result' = '0') end`,
   },
@@ -369,7 +312,7 @@ const submissionListColumns = {
  * 这里只信「有没有 data 数组」，数组项的形状信判题机，和前端 submissionCaseResults 同口径。
  */
 function caseSummary(submission: typeof schema.submission.$inferSelect) {
-  if (submission.contestId !== null || submission.language === "SQL") return null
+  if (submission.contestId !== null || submission.language === 'SQL') return null
   const data = asRecord(submission.info).data
   if (!Array.isArray(data) || data.length === 0) return null
   // 判题时已经按组号排过（judge/run.ts），这里再排一次：老数据不一定是排好的
@@ -381,12 +324,8 @@ function caseSummary(submission: typeof schema.submission.$inferSelect) {
 }
 
 /** 列表行的 caseSummary：SQL 里数好的两个数，为 null 的情形和详情一致（SQL 题、没有逐点结果） */
-function listCaseSummary(row: {
-  language: string
-  casesTotal: number | null
-  casesPassed: number | null
-}) {
-  if (row.language === "SQL" || !row.casesTotal) return null
+function listCaseSummary(row: { language: string; casesTotal: number | null; casesPassed: number | null }) {
+  if (row.language === 'SQL' || !row.casesTotal) return null
   return { passed: row.casesPassed ?? 0, total: row.casesTotal }
 }
 
@@ -410,17 +349,14 @@ async function submissionDetail(id: string, user: AuthUser, withAttempts: boolea
     .leftJoin(schema.problemset, eq(schema.problemset.id, schema.submission.problemsetId))
     .where(eq(schema.submission.id, id))
     .limit(1)
-  if (!row) return { status: "not-found" } as const
+  if (!row) return { status: 'not-found' } as const
   const own = row.submission.userId === user.id
   // 详情也要过闸门。旧后端只挡了列表里的链接，`SubmissionAPI.get`（views/oj.py:103）
   // 光走 check_user_permission——知道 submission id 直接访问照样拿得到代码，遮挡是虚的。
-  const cutoffs =
-    isTeacherOrAbove(user) || !own
-      ? undefined
-      : await problemSetLockCutoffs(user.id, [row.submission.problemId])
+  const cutoffs = isTeacherOrAbove(user) || !own ? undefined : await problemSetLockCutoffs(user.id, [row.submission.problemId])
   const visible = canViewSubmission(user, row.submission, row.problem, cutoffs)
   // 走到这里还看不了、又是自己的，只剩题单布置期这一种（见 canViewSubmission）
-  if (!visible && !own) return { status: "forbidden" } as const
+  if (!visible && !own) return { status: 'forbidden' } as const
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
   // SubmissionSafeModelSerializer 之间二选一，把关的是角色，不是「是不是自己的提交」。
@@ -439,22 +375,20 @@ async function submissionDetail(id: string, user: AuthUser, withAttempts: boolea
           and(
             eq(schema.submission.userId, row.submission.userId),
             eq(schema.submission.problemId, row.submission.problemId),
-            row.submission.contestId === null
-              ? isNull(schema.submission.contestId)
-              : eq(schema.submission.contestId, row.submission.contestId),
+            row.submission.contestId === null ? isNull(schema.submission.contestId) : eq(schema.submission.contestId, row.submission.contestId),
           ),
         )
         .orderBy(schema.submission.createTime, schema.submission.id)
         .limit(200)
     : null
   return {
-    status: "ok",
+    status: 'ok',
     data: {
       id: row.submission.id,
       createTime: row.submission.createTime,
       userId: row.submission.userId,
       username: row.currentUsername ?? row.submission.username,
-      code: visible ? row.submission.code : "",
+      code: visible ? row.submission.code : '',
       result: row.submission.result,
       info: full ? row.submission.info : {},
       language: row.submission.language,
@@ -468,10 +402,7 @@ async function submissionDetail(id: string, user: AuthUser, withAttempts: boolea
       problemDisplayId: row.problem.displayId,
       problemTitle: row.problem.title,
       className: row.className,
-      problemSet:
-        row.submission.problemsetId !== null && row.problemSetTitle !== null
-          ? { id: row.submission.problemsetId, title: row.problemSetTitle }
-          : null,
+      problemSet: row.submission.problemsetId !== null && row.problemSetTitle !== null ? { id: row.submission.problemsetId, title: row.problemSetTitle } : null,
       showLink: visible,
       caseSummary: visible ? caseSummary(row.submission) : null,
       attempts:
@@ -512,12 +443,7 @@ async function submissionDetail(id: string, user: AuthUser, withAttempts: boolea
  * 最宽的 `ks2`（9.5 万行）要 65ms，和同一请求里 count 扫表的量级一样，不另外拖慢响应。
  * 游标那条路帮不了它：第一步游标定位本身就是同一个倒扫。
  */
-async function paginateSubmissionRows(
-  where: SQL | undefined,
-  limit: number,
-  offset: number,
-  byUsername: boolean,
-) {
+async function paginateSubmissionRows(where: SQL | undefined, limit: number, offset: number, byUsername: boolean) {
   const order = [desc(schema.submission.createTime), desc(schema.submission.id)] as const
   const page = (condition: SQL | undefined) =>
     db
@@ -559,12 +485,7 @@ async function paginateSubmissionRows(
   // offset 越过了结果集尾巴，这一页本来就该是空的
   if (!boundary) return []
 
-  return page(
-    and(
-      where,
-      sql`(${schema.submission.createTime}, ${schema.submission.id}) <= (${boundary.createTime}::timestamptz, ${boundary.id}::text)`,
-    ),
-  )
+  return page(and(where, sql`(${schema.submission.createTime}, ${schema.submission.id}) <= (${boundary.createTime}::timestamptz, ${boundary.id}::text)`))
 }
 
 /**
@@ -581,41 +502,35 @@ async function problemsetTitleMap(ids: Array<number | null>) {
   return new Map(rows.map((row) => [row.id, row.title]))
 }
 
-submissionRoutes.get("/submissions", optionalAuth, async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const user = c.get("user")
+submissionRoutes.get('/submissions', optionalAuth, async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
+  const user = c.get('user')
   // 「非管理员即受限」，不能写成「是普通用户才受限」——
   // 后者对匿名用户（user 为 null）会短路，匿名反而能看到全部提交，权限大于登录学生。
-  if (!(await getBooleanOption("submission_list_show_all", true)) && !isAdminRole(user)) {
+  if (!(await getBooleanOption('submission_list_show_all', true)) && !isAdminRole(user)) {
     return success(c, { results: [], total: 0, unknownProblems: [] } satisfies SubmissionList)
   }
-  const displayId = c.req.query("problemDisplayId")?.trim()
-  const myself = c.req.query("myself") === "1" ? user : null
+  const displayId = c.req.query('problemDisplayId')?.trim()
+  const myself = c.req.query('myself') === '1' ? user : null
   // 「只看自己」盖过用户名
-  const username = myself ? undefined : c.req.query("username")?.trim()
-  const result = c.req.query("result")
-  const language = c.req.query("language")?.trim()
+  const username = myself ? undefined : c.req.query('username')?.trim()
+  const result = c.req.query('result')
+  const language = c.req.query('language')?.trim()
   // 班级（user.class_name），和用户名可以同时用：「25计算机3班里名字带『王』的」
-  const className = myself ? undefined : c.req.query("className")?.trim()
+  const className = myself ? undefined : c.req.query('className')?.trim()
   const filters: Array<SQL | undefined> = [isNull(schema.submission.contestId)]
   filters.push(
     ...(await Promise.all([
       displayId ? problemFilter(displayId, null) : undefined,
       className ? classNameFilter(className) : undefined,
-      username
-        ? c.req.query("exactUsername") === "1"
-          ? exactUsernameFilter(username)
-          : usernameFilter(username)
-        : undefined,
+      username ? (c.req.query('exactUsername') === '1' ? exactUsernameFilter(username) : usernameFilter(username)) : undefined,
     ])),
   )
   if (myself) filters.push(eq(schema.submission.userId, myself.id))
-  if (result !== undefined && result !== "" && Number.isInteger(Number(result)))
-    filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
+  if (result !== undefined && result !== '' && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
   if (language) filters.push(eq(schema.submission.language, asFilterValue(language)))
-  if (c.req.query("today") === "1")
-    filters.push(sql`${schema.submission.createTime} >= ${dayStart()}`)
+  if (c.req.query('today') === '1') filters.push(sql`${schema.submission.createTime} >= ${dayStart()}`)
   const where = and(...filters)
   // count 不 join problem：无条件 join 会让计划器把 count 退化成 seq scan
   // （生产快照实测 7.5ms → 78ms）。题号已经解析成 problem_id，也用不着 join。
@@ -628,13 +543,7 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   // 闸门只对学生自己的提交生效，所以只拿这一页里属于他自己的题目去查，一页一次查询
   const [cutoffs, problemsetTitles] = await Promise.all([
     user && !isTeacherOrAbove(user)
-      ? problemSetLockCutoffs(user.id, [
-          ...new Set(
-            rows
-              .filter((row) => row.submission.userId === user.id)
-              .map((row) => row.submission.problemId),
-          ),
-        ])
+      ? problemSetLockCutoffs(user.id, [...new Set(rows.filter((row) => row.submission.userId === user.id).map((row) => row.submission.problemId))])
       : undefined,
     // 来源题单的标题。一页里不同题单最多几个，按主键查一次就够
     problemsetTitleMap(rows.map((row) => row.submission.problemsetId)),
@@ -670,88 +579,76 @@ submissionRoutes.get("/submissions", optionalAuth, async (c) => {
   } satisfies SubmissionList)
 })
 
-submissionRoutes.get(
-  "/contests/:contestId/submissions",
-  optionalAuth,
-  requireContestAccess("submissions", "contestId"),
-  async (c) => {
-    const contest = c.get("contest")!
-    const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-    const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-    const user = c.get("user")
-    const displayId = c.req.query("problemDisplayId")?.trim()
-    const myself = c.req.query("myself") === "1" ? user : null
-    const username = myself ? undefined : c.req.query("username")?.trim()
-    const result = c.req.query("result")
-    const filters: Array<SQL | undefined> = [eq(schema.submission.contestId, contest.id)]
-    filters.push(
-      ...(await Promise.all([
-        displayId ? problemFilter(displayId, contest.id) : undefined,
-        username ? usernameFilter(username) : undefined,
-      ])),
-    )
-    if (myself) filters.push(eq(schema.submission.userId, myself.id))
-    if (result !== undefined && result !== "" && Number.isInteger(Number(result)))
-      filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
-    if (contestStatus(contest) !== "1")
-      filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
-    const where = and(...filters)
-    // 一场比赛最多一两千条提交，按 contest_create_time_idx 定位之后怎么滤都不贵，
-    // 所以不像公开列表那样分游标 / 圈选两条路
-    const [totalRows, rows, unknownProblems] = await Promise.all([
-      db.select({ value: count() }).from(schema.submission).where(where),
-      db
-        .select(submissionListColumns)
-        .from(schema.submission)
-        .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
-        .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-        .where(where)
-        .orderBy(desc(schema.submission.createTime))
-        .limit(limit)
-        .offset(offset),
-      displayId ? unknownDisplayIds(displayId, contest.id) : [],
-    ])
-    // 这里不挂题单防作弊闸门（对比公开列表）：题单里的题必定是非比赛题——加题时卡了
-    // `isNull(problem.contestId)`（admin/problemset.ts:232）——而这条列表只出比赛提交，
-    // 两边交集恒空，挂上去就是每页白跑一次查询，而比赛进行中这条列表是被刷得最狠的。
-    // 旧后端 ContestSubmissionListAPI 照抄了 bulk_fetch，那边同样是死代码。
-    return success(c, {
-      results: rows.map(
-        ({ submission, problem }) =>
-          ({
-            id: submission.id,
-            problemDisplayId: problem.displayId,
-            problemTitle: problem.title,
-            showLink: user ? canViewSubmission(user, submission, problem) : false,
-            createTime: submission.createTime,
-            userId: submission.userId,
-            username: submission.username,
-            className: submission.className || null,
-            result: submission.result,
-            language: submission.language,
-            statisticInfo: asRecord(submission.statisticInfo),
-            // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
-            // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
-            problemSet: null,
-            // 比赛只报对错，不给通过几个点（口径见契约 caseSummarySchema）
-            caseSummary: null,
-          }) satisfies SubmissionListItem,
-      ),
-      total: totalRows[0]?.value ?? 0,
-      unknownProblems,
-    } satisfies SubmissionList)
-  },
-)
+submissionRoutes.get('/contests/:contestId/submissions', optionalAuth, requireContestAccess('submissions', 'contestId'), async (c) => {
+  const contest = c.get('contest')!
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
+  const user = c.get('user')
+  const displayId = c.req.query('problemDisplayId')?.trim()
+  const myself = c.req.query('myself') === '1' ? user : null
+  const username = myself ? undefined : c.req.query('username')?.trim()
+  const result = c.req.query('result')
+  const filters: Array<SQL | undefined> = [eq(schema.submission.contestId, contest.id)]
+  filters.push(...(await Promise.all([displayId ? problemFilter(displayId, contest.id) : undefined, username ? usernameFilter(username) : undefined])))
+  if (myself) filters.push(eq(schema.submission.userId, myself.id))
+  if (result !== undefined && result !== '' && Number.isInteger(Number(result))) filters.push(eq(schema.submission.result, asFilterValue(Number(result))))
+  if (contestStatus(contest) !== '1') filters.push(sql`${schema.submission.createTime} >= ${contest.startTime}`)
+  const where = and(...filters)
+  // 一场比赛最多一两千条提交，按 contest_create_time_idx 定位之后怎么滤都不贵，
+  // 所以不像公开列表那样分游标 / 圈选两条路
+  const [totalRows, rows, unknownProblems] = await Promise.all([
+    db.select({ value: count() }).from(schema.submission).where(where),
+    db
+      .select(submissionListColumns)
+      .from(schema.submission)
+      .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
+      .leftJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+      .where(where)
+      .orderBy(desc(schema.submission.createTime))
+      .limit(limit)
+      .offset(offset),
+    displayId ? unknownDisplayIds(displayId, contest.id) : [],
+  ])
+  // 这里不挂题单防作弊闸门（对比公开列表）：题单里的题必定是非比赛题——加题时卡了
+  // `isNull(problem.contestId)`（admin/problemset.ts:232）——而这条列表只出比赛提交，
+  // 两边交集恒空，挂上去就是每页白跑一次查询，而比赛进行中这条列表是被刷得最狠的。
+  // 旧后端 ContestSubmissionListAPI 照抄了 bulk_fetch，那边同样是死代码。
+  return success(c, {
+    results: rows.map(
+      ({ submission, problem }) =>
+        ({
+          id: submission.id,
+          problemDisplayId: problem.displayId,
+          problemTitle: problem.title,
+          showLink: user ? canViewSubmission(user, submission, problem) : false,
+          createTime: submission.createTime,
+          userId: submission.userId,
+          username: submission.username,
+          className: submission.className || null,
+          result: submission.result,
+          language: submission.language,
+          statisticInfo: asRecord(submission.statisticInfo),
+          // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
+          // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
+          problemSet: null,
+          // 比赛只报对错，不给通过几个点（口径见契约 caseSummarySchema）
+          caseSummary: null,
+        }) satisfies SubmissionListItem,
+    ),
+    total: totalRows[0]?.value ?? 0,
+    unknownProblems,
+  } satisfies SubmissionList)
+})
 
-submissionRoutes.get("/submissions/:id", requireAuth, async (c) => {
-  const user = c.get("user")!
-  const detail = await submissionDetail(c.req.param("id"), user, c.req.query("attempts") === "1")
-  if (detail.status === "not-found") {
-    return failure(c, 404, "submission-not-found", "Submission does not exist")
+submissionRoutes.get('/submissions/:id', requireAuth, async (c) => {
+  const user = c.get('user')!
+  const detail = await submissionDetail(c.req.param('id'), user, c.req.query('attempts') === '1')
+  if (detail.status === 'not-found') {
+    return failure(c, 404, 'submission-not-found', 'Submission does not exist')
   }
   // 原来看不到也回 404，独立页面分不清「链接不对」和「别人的」，只能一直转圈
-  if (detail.status === "forbidden") {
-    return failure(c, 403, "submission-forbidden", "No permission to view this submission")
+  if (detail.status === 'forbidden') {
+    return failure(c, 403, 'submission-forbidden', 'No permission to view this submission')
   }
   return success(c, detail.data)
 })

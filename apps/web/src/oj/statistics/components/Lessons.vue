@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import type { SubmissionLessons } from "@oj2/contract"
-import { parseTime, zonedParts } from "utils/functions"
-import { useTone } from "shared/composables/tone"
-import { classLabel } from "utils/classes"
-import { resultName, useResultColor } from "../results"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import type { SubmissionLessons } from '@oj2/contract'
+import { parseTime, zonedParts } from 'utils/functions'
+import { useTone } from 'shared/composables/tone'
+import { classLabel } from 'utils/classes'
+import { resultName, useResultColor } from '../results'
 
-type Lesson = SubmissionLessons["lessons"][number]
-type Scattered = SubmissionLessons["scattered"][number]
+type Lesson = SubmissionLessons['lessons'][number]
+type Scattered = SubmissionLessons['scattered'][number]
 
 /**
  * 统计「一行一节课」的总览（设计稿「统计合二为一」B）。没选班、没填学生和题号时用它：
@@ -37,13 +37,13 @@ const theme = useThemeVars()
 const tone = useTone()
 const resultColor = useResultColor()
 
-const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
 function dayText(day: string) {
-  const [y, m, d] = day.split("-").map(Number) as [number, number, number]
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number]
   const weekday = WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
-  const today = parseTime(new Date(), "YYYY-MM-DD")
-  const yesterday = parseTime(new Date(Date.now() - 86_400_000), "YYYY-MM-DD")
+  const today = parseTime(new Date(), 'YYYY-MM-DD')
+  const yesterday = parseTime(new Date(Date.now() - 86_400_000), 'YYYY-MM-DD')
   const date = `${m}月${d}日 ${weekday}`
   if (day === today) return `今天 · ${date}`
   if (day === yesterday) return `昨天 · ${date}`
@@ -76,18 +76,16 @@ const lessonCount = computed(() => props.data.lessons.length)
 const liveLessons = computed(() => props.data.lessons.filter((lesson) => lesson.live))
 
 function clock(lesson: Lesson) {
-  return `${parseTime(lesson.start, "HH:mm")}–${parseTime(lesson.end, "HH:mm")}`
+  return `${parseTime(lesson.start, 'HH:mm')}–${parseTime(lesson.end, 'HH:mm')}`
 }
 
 /** 23 人来了、花名册却只有 22（有个号不是学生角色）时，不写「23 / 22」 */
 function attendance(lesson: Lesson) {
-  return lesson.classSize >= lesson.userCount
-    ? `${lesson.userCount} / ${lesson.classSize} 人`
-    : `${lesson.userCount} 人`
+  return lesson.classSize >= lesson.userCount ? `${lesson.userCount} / ${lesson.classSize} 人` : `${lesson.userCount} 人`
 }
 
 function problemText(lesson: Lesson) {
-  return `${lesson.fromProblemSet ? "题单 " : ""}${lesson.problems.length} 道`
+  return `${lesson.fromProblemSet ? '题单 ' : ''}${lesson.problems.length} 道`
 }
 
 // ---------- 时间轴（只在今天以内） ----------
@@ -119,7 +117,7 @@ function barStyle(lesson: Lesson) {
   return {
     left: axisLeft(from),
     width: `max(6px, ${((to - from) / (end - start)) * 100}%)`,
-    background: lesson.live ? theme.value.successColor : "#3f5f87",
+    background: lesson.live ? theme.value.successColor : '#3f5f87',
   }
 }
 
@@ -129,46 +127,27 @@ const nowHour = computed(() => {
 })
 
 function percent(value: number, total: number) {
-  return total ? `${(value / total) * 100}%` : "0"
+  return total ? `${(value / total) * 100}%` : '0'
 }
 </script>
 
 <template>
   <div class="lessons">
-    <div
-      v-if="liveLessons.length"
-      class="live"
-      :style="{ background: tone('success').background, color: tone('success').color }"
-    >
-      <span>{{ liveLessons.map((item) => classLabel(item.className)).join("、") }}正在上课</span>
+    <div v-if="liveLessons.length" class="live" :style="{ background: tone('success').background, color: tone('success').color }">
+      <span>{{ liveLessons.map((item) => classLabel(item.className)).join('、') }}正在上课</span>
       <span class="spacer"></span>
-      <a href="#" class="live-link" @click.prevent="router.push('/classroom')">
-        <Icon icon="ph:monitor" :width="14" />去课堂看板
-      </a>
+      <a href="#" class="live-link" @click.prevent="router.push('/classroom')"> <Icon icon="ph:monitor" :width="14" />去课堂看板 </a>
     </div>
 
     <div v-if="!lessonCount && !data.scattered.length" class="empty">这段时间没有人交</div>
-    <div v-else-if="!lessonCount" class="note">
-      这段时间没有哪个班一起上课（同一个班 5 人以上做同一道题才算一节课），只有零散提交
-    </div>
+    <div v-else-if="!lessonCount" class="note">这段时间没有哪个班一起上课（同一个班 5 人以上做同一道题才算一节课），只有零散提交</div>
 
     <template v-for="group in days" :key="group.day">
       <div class="day">{{ group.label }}</div>
-      <a
-        v-for="lesson in group.lessons"
-        :key="`${lesson.className}|${lesson.start}`"
-        href="#"
-        class="row"
-        @click.prevent="emit('pick', lesson)"
-      >
+      <a v-for="lesson in group.lessons" :key="`${lesson.className}|${lesson.start}`" href="#" class="row" @click.prevent="emit('pick', lesson)">
         <span class="c-time">{{ clock(lesson) }}</span>
         <span v-if="timeline" class="c-axis">
-          <span
-            v-for="tick in axis.ticks"
-            :key="tick"
-            class="grid"
-            :style="{ left: axisLeft(tick) }"
-          ></span>
+          <span v-for="tick in axis.ticks" :key="tick" class="grid" :style="{ left: axisLeft(tick) }"></span>
           <span class="bar" :style="barStyle(lesson)"></span>
           <span v-if="nowHour !== null" class="now" :style="{ left: axisLeft(nowHour) }"></span>
         </span>
@@ -177,22 +156,20 @@ function percent(value: number, total: number) {
         <span class="c-probs">{{ problemText(lesson) }}</span>
         <span class="c-rate">
           {{ lesson.total }} 次 ·
-          {{ lesson.live ? "上课中" : `正确率 ${Math.round(lesson.correctRate)}%` }}
+          {{ lesson.live ? '上课中' : `正确率 ${Math.round(lesson.correctRate)}%` }}
         </span>
         <span class="c-hard">
           <template v-if="lesson.hardest">
             <n-text depth="3">错得最多</n-text>
             <n-text depth="3" class="pid">{{ lesson.hardest.problemDisplayId }}</n-text>
             {{ lesson.hardest.problemTitle }}
-            <span :style="{ color: tone('warning').color }"
-              >· 没过 {{ lesson.hardest.failed }} 次</span
-            >
+            <span :style="{ color: tone('warning').color }">· 没过 {{ lesson.hardest.failed }} 次</span>
           </template>
         </span>
         <span class="c-go">看这节课<Icon icon="ph:caret-right-bold" :width="12" /></span>
       </a>
       <div v-if="group.scattered.length" class="scattered">
-        {{ group.lessons.length ? "另有零散提交：" : "零散提交：" }}
+        {{ group.lessons.length ? '另有零散提交：' : '零散提交：' }}
         <template v-for="(item, index) in group.scattered" :key="item.className ?? ''">
           <template v-if="index"> · </template>
           <a href="#" title="看这个班这一天的提交" @click.prevent="emit('scattered', item)"
@@ -207,23 +184,16 @@ function percent(value: number, total: number) {
       <span class="c-axis axis">
         <!-- 挨着「现在」的刻度不写，不然两个字叠在一起 -->
         <template v-for="tick in axis.ticks" :key="tick">
-          <span
-            v-if="nowHour === null || Math.abs(tick - nowHour) > 0.8"
-            :style="{ left: axisLeft(tick) }"
-          >
+          <span v-if="nowHour === null || Math.abs(tick - nowHour) > 0.8" :style="{ left: axisLeft(tick) }">
             {{ tick }}
           </span>
         </template>
-        <span v-if="nowHour !== null" class="now-label" :style="{ left: axisLeft(nowHour) }">
-          现在
-        </span>
+        <span v-if="nowHour !== null" class="now-label" :style="{ left: axisLeft(nowHour) }"> 现在 </span>
       </span>
     </div>
 
     <div v-if="data.hasMore" class="more">
-      <n-button size="small" :loading="loadingMore" @click="emit('more')">
-        更早的课（现在列了最近 {{ lessonCount }} 节）
-      </n-button>
+      <n-button size="small" :loading="loadingMore" @click="emit('more')"> 更早的课（现在列了最近 {{ lessonCount }} 节） </n-button>
     </div>
 
     <template v-if="data.hardProblems.length">
@@ -254,9 +224,7 @@ function percent(value: number, total: number) {
             <td>{{ item.total }} 次</td>
             <td>
               <span class="mini">
-                <span
-                  :style="{ width: percent(item.accepted, item.total), background: resultColor(0) }"
-                ></span>
+                <span :style="{ width: percent(item.accepted, item.total), background: resultColor(0) }"></span>
                 <span
                   v-for="fail in item.failures"
                   :key="fail.result"
@@ -266,9 +234,7 @@ function percent(value: number, total: number) {
                   }"
                 ></span>
               </span>
-              <n-text v-if="item.failures[0]" depth="2" class="small">
-                {{ resultName(item.failures[0].result) }} {{ item.failures[0].count }}
-              </n-text>
+              <n-text v-if="item.failures[0]" depth="2" class="small"> {{ resultName(item.failures[0].result) }} {{ item.failures[0].count }} </n-text>
             </td>
             <td
               class="right"
@@ -321,13 +287,13 @@ function percent(value: number, total: number) {
 .empty {
   padding: 48px 0;
   text-align: center;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .note {
   padding: 20px var(--oj-pad-x) 6px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .day {
@@ -340,9 +306,9 @@ function percent(value: number, total: number) {
   padding: 0 var(--oj-pad-x);
   font-size: var(--oj-fs-meta);
   font-weight: 600;
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .row {
@@ -350,20 +316,20 @@ function percent(value: number, total: number) {
   display: flex;
   align-items: center;
   padding: 0 var(--oj-pad-x);
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor1");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
   white-space: nowrap;
 }
 
 .row:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .c-time {
   width: 110px;
   flex: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   font-variant-numeric: tabular-nums;
 }
 
@@ -384,13 +350,13 @@ function percent(value: number, total: number) {
 .c-probs {
   width: 96px;
   flex: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .c-rate {
   width: 170px;
   flex: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .c-hard {
@@ -412,7 +378,7 @@ function percent(value: number, total: number) {
   align-items: center;
   gap: 2px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .grid {
@@ -420,7 +386,7 @@ function percent(value: number, total: number) {
   top: 4px;
   bottom: 4px;
   width: 1px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .bar {
@@ -436,7 +402,7 @@ function percent(value: number, total: number) {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .axis-row {
@@ -455,31 +421,31 @@ function percent(value: number, total: number) {
   transform: translateX(-50%);
   white-space: nowrap;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .axis .now-label {
   font-weight: 600;
-  color: v-bind("theme.successColor");
-  background: v-bind("theme.cardColor");
+  color: v-bind('theme.successColor');
+  background: v-bind('theme.cardColor');
   padding: 0 2px;
 }
 
 .scattered {
   padding: 8px var(--oj-pad-x);
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .scattered a {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   text-decoration: underline dotted;
   text-underline-offset: 3px;
 }
 
 .scattered a:hover {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .more {
@@ -507,14 +473,14 @@ function percent(value: number, total: number) {
 .hard th {
   text-align: left;
   font-weight: normal;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   padding: 4px 8px 6px 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .hard td {
   padding: 8px 8px 8px 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   white-space: nowrap;
 }
 
@@ -524,7 +490,7 @@ function percent(value: number, total: number) {
 }
 
 .hard-title a {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 

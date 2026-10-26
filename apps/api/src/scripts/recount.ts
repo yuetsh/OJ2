@@ -1,9 +1,9 @@
-import { eq, sql } from "drizzle-orm"
+import { eq, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { JudgeStatus, isAccepted } from "../judge/status"
-import { asRecord } from "../routes/helpers"
-import { metaAchievements, refreshUnlockedCount, rescanAchievement } from "../services/achievements"
+import { db, schema } from '../db'
+import { JudgeStatus, isAccepted } from '../judge/status'
+import { asRecord } from '../routes/helpers'
+import { metaAchievements, refreshUnlockedCount, rescanAchievement } from '../services/achievements'
 
 /**
  * 把反范式的计数列重算回与 submission 表一致。
@@ -144,7 +144,7 @@ async function expectedProfiles() {
   }
   for (const row of perProblem) {
     const current = expected.get(row.user_id) ?? blank()
-    const bucket = row.is_public ? "problems" : "contest_problems"
+    const bucket = row.is_public ? 'problems' : 'contest_problems'
     current.status[bucket] ??= {}
     current.status[bucket]![String(row.problem_id)] = {
       status: row.ever_accepted ? JudgeStatus.ACCEPTED : row.last_result,
@@ -157,14 +157,12 @@ async function expectedProfiles() {
 
 /** 稳定序列化，用来比对 jsonb —— 键序不同不该被当成差异 */
 function stable(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stable).join(",")}]`
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a < b ? -1 : 1,
-    )
-    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stable(v)}`).join(",")}}`
+  if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1))
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stable(v)}`).join(',')}}`
   }
-  return JSON.stringify(value) ?? "null"
+  return JSON.stringify(value) ?? 'null'
 }
 
 type Diff = { label: string; field: string; before: unknown; after: unknown }
@@ -216,21 +214,20 @@ async function unlockedCountPlan(plan: Plan) {
     if (row.counter !== row.actual) {
       plan.diffs.push({
         label,
-        field: "achievement_unlocked_count",
+        field: 'achievement_unlocked_count',
         before: row.counter ?? null,
         after: row.actual,
       })
       plan.unlockedCountFixes.push(row.user_id)
     }
     for (const meta of metas) {
-      const met =
-        meta.operator === "gte" ? row.actual >= meta.threshold : row.actual <= meta.threshold
+      const met = meta.operator === 'gte' ? row.actual >= meta.threshold : row.actual <= meta.threshold
       if (!met || held.has(`${row.user_id}:${meta.id}`)) continue
       plan.diffs.push({
         label,
         field: `成就「${meta.name}」`,
-        before: "未发",
-        after: "补发",
+        before: '未发',
+        after: '补发',
       })
       plan.metaGrants.push({ userId: row.user_id, achievementId: meta.id })
     }
@@ -281,7 +278,7 @@ async function computePlan(): Promise<Plan> {
     if (problem.submissionNumber !== want.submissionNumber) {
       rows.push({
         label,
-        field: "submission_number",
+        field: 'submission_number',
         before: problem.submissionNumber,
         after: want.submissionNumber,
       })
@@ -289,7 +286,7 @@ async function computePlan(): Promise<Plan> {
     if (problem.acceptedNumber !== want.acceptedNumber) {
       rows.push({
         label,
-        field: "accepted_number",
+        field: 'accepted_number',
         before: problem.acceptedNumber,
         after: want.acceptedNumber,
       })
@@ -297,7 +294,7 @@ async function computePlan(): Promise<Plan> {
     if (stable(asRecord(problem.statisticInfo)) !== stable(want.statisticInfo)) {
       rows.push({
         label,
-        field: "statistic_info",
+        field: 'statistic_info',
         before: problem.statisticInfo,
         after: want.statisticInfo,
       })
@@ -327,7 +324,7 @@ async function computePlan(): Promise<Plan> {
     if (profile.submissionNumber !== want.submissionNumber) {
       rows.push({
         label,
-        field: "submission_number",
+        field: 'submission_number',
         before: profile.submissionNumber,
         after: want.submissionNumber,
       })
@@ -335,19 +332,16 @@ async function computePlan(): Promise<Plan> {
     if (profile.acceptedNumber !== want.acceptedNumber) {
       rows.push({
         label,
-        field: "accepted_number",
+        field: 'accepted_number',
         before: profile.acceptedNumber,
         after: want.acceptedNumber,
       })
     }
     if (stable(existing) !== stable(merged)) {
-      const keys = new Set([
-        ...Object.keys(asRecord(existing.problems)),
-        ...Object.keys(want.status.problems ?? {}),
-      ])
+      const keys = new Set([...Object.keys(asRecord(existing.problems)), ...Object.keys(want.status.problems ?? {})])
       rows.push({
         label,
-        field: "acm_problems_status",
+        field: 'acm_problems_status',
         before: `${Object.keys(asRecord(existing.problems)).length} 题`,
         after: `${keys.size} 题（含比赛桶重建）`,
       })
@@ -366,9 +360,7 @@ function report(plan: Plan) {
     `发现 ${plan.diffs.length} 处不一致（题目 ${plan.problemFixes.length} 道 / 用户 ${plan.profileFixes.length} 人 / 已解锁数 ${plan.unlockedCountFixes.length} 人 / 元成就补发 ${plan.metaGrants.length} 条）：`,
   )
   for (const diff of plan.diffs.slice(0, 40)) {
-    console.log(
-      `  ${diff.label}  ${diff.field}: ${JSON.stringify(diff.before)} → ${JSON.stringify(diff.after)}`,
-    )
+    console.log(`  ${diff.label}  ${diff.field}: ${JSON.stringify(diff.before)} → ${JSON.stringify(diff.after)}`)
   }
   if (plan.diffs.length > 40) console.log(`  ……另有 ${plan.diffs.length - 40} 处`)
 }
@@ -377,13 +369,13 @@ function report(plan: Plan) {
 export async function recount(options: { apply: boolean }) {
   const plan = await computePlan()
   if (plan.diffs.length === 0) {
-    console.log("计数列与 submission / user_achievement 一致，没有要订正的。")
+    console.log('计数列与 submission / user_achievement 一致，没有要订正的。')
     return 0
   }
   report(plan)
 
   if (!options.apply) {
-    console.log("\n以上为预演，没有写库。确认无误后加 --apply 落库。")
+    console.log('\n以上为预演，没有写库。确认无误后加 --apply 落库。')
     return 0
   }
 
@@ -423,7 +415,7 @@ export async function recount(options: { apply: boolean }) {
   // 必须让部署脚本看见非零退出码，而不是打一行字了事。
   const after = await computePlan()
   if (after.diffs.length === 0) {
-    console.log("复核通过：计数列与 submission / user_achievement 一致")
+    console.log('复核通过：计数列与 submission / user_achievement 一致')
     return 0
   }
   console.error(`复核未通过，仍有 ${after.diffs.length} 处差异：`)

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { zonedParts } from "utils/functions"
-import type { StuckProblemDetail, StuckStudent } from "utils/types"
-import UserName from "shared/components/UserName.vue"
-import { classLabel } from "utils/classes"
-import { resultName, useResultColor } from "oj/statistics/results"
-import { avgTries, rate } from "./stuckMath"
+import { zonedParts } from 'utils/functions'
+import type { StuckProblemDetail, StuckStudent } from 'utils/types'
+import UserName from 'shared/components/UserName.vue'
+import { classLabel } from 'utils/classes'
+import { resultName, useResultColor } from 'oj/statistics/results'
+import { avgTries, rate } from './stuckMath'
 
 /**
  * 卡点分析右栏：一道题的详情（做过几人、一次就对、错在哪、各班、交了几次才对、历年、
@@ -34,14 +34,12 @@ const summary = computed(() => {
   }
 })
 
-const errorTotal = computed(() =>
-  (props.detail.errors ?? []).reduce((sum, row) => sum + row.count, 0),
-)
+const errorTotal = computed(() => (props.detail.errors ?? []).reduce((sum, row) => sum + row.count, 0))
 
 const byClass = computed(() => {
   const groups = new Map<string, StuckStudent[]>()
   for (const row of students.value) {
-    const key = row.className ?? ""
+    const key = row.className ?? ''
     groups.set(key, [...(groups.get(key) ?? []), row])
   }
   return [...groups]
@@ -62,11 +60,11 @@ const byClass = computed(() => {
 })
 
 const BUCKETS = [
-  { label: "1 次", min: 1, max: 1 },
-  { label: "2 次", min: 2, max: 2 },
-  { label: "3 次", min: 3, max: 3 },
-  { label: "4–5 次", min: 4, max: 5 },
-  { label: "6 次以上", min: 6, max: Infinity },
+  { label: '1 次', min: 1, max: 1 },
+  { label: '2 次', min: 2, max: 2 },
+  { label: '3 次', min: 3, max: 3 },
+  { label: '4–5 次', min: 4, max: 5 },
+  { label: '6 次以上', min: 6, max: Infinity },
 ]
 const distribution = computed(() => {
   const solved = students.value.filter((row) => row.solved)
@@ -85,9 +83,7 @@ const mostTries = computed(() =>
     .slice(0, 6),
 )
 
-const stuckStudents = computed(() =>
-  students.value.filter((row) => !row.solved).sort((a, b) => b.tries - a.tries),
-)
+const stuckStudents = computed(() => students.value.filter((row) => !row.solved).sort((a, b) => b.tries - a.tries))
 
 const currentYear = (() => {
   const now = zonedParts(new Date())!
@@ -103,8 +99,8 @@ const history = computed(() =>
 )
 
 function gap(minutes: number | null) {
-  if (minutes === null) return ""
-  if (minutes < 1) return "不到 1 分钟"
+  if (minutes === null) return ''
+  if (minutes < 1) return '不到 1 分钟'
   if (minutes < 60) return `${minutes} 分钟`
   if (minutes < 1440) return `${Math.round(minutes / 60)} 小时`
   return `隔了 ${Math.round(minutes / 1440)} 天`
@@ -119,12 +115,12 @@ const links = computed(() => {
   if (!row) return null
   const scope = props.className ? { className: props.className } : {}
   return {
-    problem: href({ name: "problem", params: { problemID: row.displayId } }),
+    problem: href({ name: 'problem', params: { problemID: row.displayId } }),
     statistics: href({
-      name: "statistics",
+      name: 'statistics',
       query: { problem: row.displayId, period: props.period, ...scope },
     }),
-    submissions: href({ name: "submissions", query: { problem: row.displayId, ...scope } }),
+    submissions: href({ name: 'submissions', query: { problem: row.displayId, ...scope } }),
   }
 })
 </script>
@@ -156,9 +152,7 @@ const links = computed(() => {
       </div>
       <div>
         <div class="muted small">还没做对</div>
-        <div class="big num" :class="{ red: summary.stuck }">
-          {{ summary.stuck }}<span class="unit"> 人</span>
-        </div>
+        <div class="big num" :class="{ red: summary.stuck }">{{ summary.stuck }}<span class="unit"> 人</span></div>
       </div>
     </div>
 
@@ -202,11 +196,7 @@ const links = computed(() => {
         <div class="dist">
           <div v-for="row in distribution" :key="row.label" class="dcol">
             <span class="small num strong">{{ row.count }} 人</span>
-            <span
-              class="dbar"
-              :class="{ first: row.min === 1, many: row.min === 6 }"
-              :style="{ height: `${row.height}px` }"
-            />
+            <span class="dbar" :class="{ first: row.min === 1, many: row.min === 6 }" :style="{ height: `${row.height}px` }" />
             <span class="muted small">{{ row.label }}</span>
           </div>
         </div>
@@ -236,14 +226,10 @@ const links = computed(() => {
     </template>
 
     <div v-if="history.length" class="block">
-      <div class="muted small">历年一次就对{{ className ? "（全站）" : "" }}</div>
+      <div class="muted small">历年一次就对{{ className ? '（全站）' : '' }}</div>
       <div v-for="row in history" :key="row.label" class="hrow num">
-        <span class="hlabel" :class="{ muted: !row.current }">
-          {{ row.label }}{{ row.current ? " 这学年" : "" }}
-        </span>
-        <span class="track mid" :class="{ past: !row.current }"
-          ><span :style="{ width: `${row.rate}%` }"
-        /></span>
+        <span class="hlabel" :class="{ muted: !row.current }"> {{ row.label }}{{ row.current ? ' 这学年' : '' }} </span>
+        <span class="track mid" :class="{ past: !row.current }"><span :style="{ width: `${row.rate}%` }" /></span>
         <span class="pct" :class="{ strong: row.current }">{{ row.rate }}%</span>
         <span class="muted small">{{ row.users }} 人</span>
       </div>
@@ -260,17 +246,10 @@ const links = computed(() => {
           <UserName :username="row.username" class="uname" />
           <span class="muted num ntries">交了 {{ row.tries }} 次</span>
           <span class="legend" :style="{ color: resultColor(row.lastResult) }">
-            <i :style="{ background: resultColor(row.lastResult) }" />{{
-              resultName(row.lastResult)
-            }}
+            <i :style="{ background: resultColor(row.lastResult) }" />{{ resultName(row.lastResult) }}
           </span>
           <span class="grow" />
-          <a
-            :href="href({ path: `/submission/${row.lastSubmissionId}` })"
-            target="_blank"
-            class="link small"
-            >看代码</a
-          >
+          <a :href="href({ path: `/submission/${row.lastSubmissionId}` })" target="_blank" class="link small">看代码</a>
         </div>
       </div>
     </div>

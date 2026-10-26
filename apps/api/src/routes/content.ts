@@ -12,28 +12,25 @@ import {
   type Tutorial,
   type TutorialProgress,
   type TutorialSummary,
-} from "@oj2/contract"
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
-import { db, schema } from "../db"
-import { failure, parseBody, success } from "../http"
-import { JudgeStatus } from "../judge/status"
-import { problemStates } from "../services/problem-progress"
-import { tutorialProblems } from "../services/tutorial"
-import { asRecord, queryInteger, sampleUser } from "./helpers"
+import { optionalAuth, requireAuth, type AppEnv } from '../auth/middleware'
+import { db, schema } from '../db'
+import { failure, parseBody, success } from '../http'
+import { JudgeStatus } from '../judge/status'
+import { problemStates } from '../services/problem-progress'
+import { tutorialProblems } from '../services/tutorial'
+import { asRecord, queryInteger, sampleUser } from './helpers'
 
 export const contentRoutes = new Hono<AppEnv>()
 
-contentRoutes.get("/announcements", async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+contentRoutes.get('/announcements', async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
   const [totalRows, rows] = await Promise.all([
-    db
-      .select({ value: count() })
-      .from(schema.announcement)
-      .where(eq(schema.announcement.visible, true)),
+    db.select({ value: count() }).from(schema.announcement).where(eq(schema.announcement.visible, true)),
     db
       .select({
         announcement: schema.announcement,
@@ -65,8 +62,8 @@ contentRoutes.get("/announcements", async (c) => {
   } satisfies AnnouncementList)
 })
 
-contentRoutes.get("/announcements/:id", async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+contentRoutes.get('/announcements/:id', async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const [row] = await db
     .select({
       announcement: schema.announcement,
@@ -78,7 +75,7 @@ contentRoutes.get("/announcements/:id", async (c) => {
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(and(eq(schema.announcement.id, id), eq(schema.announcement.visible, true)))
     .limit(1)
-  if (!row) return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+  if (!row) return failure(c, 404, 'announcement-not-found', 'Announcement does not exist')
   return success(c, {
     id: row.announcement.id,
     title: row.announcement.title,
@@ -105,23 +102,21 @@ async function reactionState(problemId: number, userId: number) {
     .groupBy(schema.reaction.type)
   // fromEntries 推不出这个键集，但 options 就是 ReactionKey 的全集，断言是成立的。
   // row.type 不必再 safeParse：reaction.type 列上挂着 $type<ReactionKey>()
-  const counts = Object.fromEntries(
-    reactionKeySchema.options.map((key) => [key, 0]),
-  ) as ReactionCounts
+  const counts = Object.fromEntries(reactionKeySchema.options.map((key) => [key, 0])) as ReactionCounts
   for (const row of rows) counts[row.type] = row.value
   return { mine: mine.type, counts } satisfies ReactionState
 }
 
-contentRoutes.get("/problems/:id/reaction", requireAuth, async (c) => {
-  const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  return success(c, await reactionState(problemId, c.get("user")!.id))
+contentRoutes.get('/problems/:id/reaction', requireAuth, async (c) => {
+  const problemId = queryInteger(c.req.param('id'), 0, { min: 1 })
+  return success(c, await reactionState(problemId, c.get('user')!.id))
 })
 
-contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
-  const problemId = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(c, setReactionRequestSchema, "Invalid reaction")
+contentRoutes.post('/problems/:id/reaction', requireAuth, async (c) => {
+  const problemId = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const parsed = await parseBody(c, setReactionRequestSchema, 'Invalid reaction')
   if (!parsed.success) return parsed.response
-  const user = c.get("user")!
+  const user = c.get('user')!
   const [[problem], [solved]] = await Promise.all([
     db
       .select({ id: schema.problem.id })
@@ -140,9 +135,8 @@ contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
       )
       .limit(1),
   ])
-  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
-  if (!solved)
-    return failure(c, 403, "accepted-submission-required", "An accepted submission is required")
+  if (!problem) return failure(c, 404, 'problem-not-found', 'Problem does not exist')
+  if (!solved) return failure(c, 403, 'accepted-submission-required', 'An accepted submission is required')
   await db
     .insert(schema.reaction)
     .values({
@@ -157,8 +151,8 @@ contentRoutes.post("/problems/:id/reaction", requireAuth, async (c) => {
   return success(c, await reactionState(problemId, user.id))
 })
 
-contentRoutes.get("/tutorials", async (c) => {
-  const type = c.req.query("type") === "c" ? "c" : "python"
+contentRoutes.get('/tutorials', async (c) => {
+  const type = c.req.query('type') === 'c' ? 'c' : 'python'
   const rows = await db
     .select({
       id: schema.tutorial.id,
@@ -171,9 +165,9 @@ contentRoutes.get("/tutorials", async (c) => {
   return success(c, rows satisfies TutorialSummary[])
 })
 
-contentRoutes.get("/tutorials/:id", optionalAuth, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const user = c.get("user")
+contentRoutes.get('/tutorials/:id', optionalAuth, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const user = c.get('user')
   const [row] = await db
     .select({
       tutorial: schema.tutorial,
@@ -185,11 +179,8 @@ contentRoutes.get("/tutorials/:id", optionalAuth, async (c) => {
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!row) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
-  const [problems, states] = await Promise.all([
-    tutorialProblems([id], true),
-    user ? problemStates(user.id) : null,
-  ])
+  if (!row) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
+  const [problems, states] = await Promise.all([tutorialProblems([id], true), user ? problemStates(user.id) : null])
   return success(c, {
     id: row.tutorial.id,
     title: row.tutorial.title,
@@ -220,9 +211,9 @@ contentRoutes.get("/tutorials/:id", optionalAuth, async (c) => {
  * `/tutorials/:id` 就在上面几行，`/tutorials/progress` 会被它整个吃掉，而且不报错
  * ——`queryInteger("progress")` 回落成 0，学生只会看到一个「教程不存在」。
  */
-contentRoutes.get("/learn/progress", requireAuth, async (c) => {
-  const user = c.get("user")!
-  const type = c.req.query("type") === "c" ? "c" : "python"
+contentRoutes.get('/learn/progress', requireAuth, async (c) => {
+  const user = c.get('user')!
+  const type = c.req.query('type') === 'c' ? 'c' : 'python'
   const visible = and(eq(schema.tutorial.type, type), eq(schema.tutorial.isPublic, true))
 
   // 从 tutorial 打底 left join 进度，而不是反过来：没读过的课也要有一行零，
@@ -237,32 +228,18 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
         lastViewedAt: schema.tutorialProgress.lastViewedAt,
       })
       .from(schema.tutorial)
-      .leftJoin(
-        schema.tutorialProgress,
-        and(
-          eq(schema.tutorialProgress.tutorialId, schema.tutorial.id),
-          eq(schema.tutorialProgress.userId, user.id),
-        ),
-      )
+      .leftJoin(schema.tutorialProgress, and(eq(schema.tutorialProgress.tutorialId, schema.tutorial.id), eq(schema.tutorialProgress.userId, user.id)))
       .where(visible)
       .orderBy(asc(schema.tutorial.order)),
     db
       .select({
         tutorialId: schema.exercise.tutorialId,
         total: count(),
-        solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(
-          Number,
-        ),
+        solved: sql<number>`count(*) filter (where ${schema.exerciseAttempt.solved})`.mapWith(Number),
       })
       .from(schema.exercise)
       .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
-      .leftJoin(
-        schema.exerciseAttempt,
-        and(
-          eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
-          eq(schema.exerciseAttempt.userId, user.id),
-        ),
-      )
+      .leftJoin(schema.exerciseAttempt, and(eq(schema.exerciseAttempt.exerciseId, schema.exercise.id), eq(schema.exerciseAttempt.userId, user.id)))
       .where(visible)
       .groupBy(schema.exercise.tutorialId),
   ])
@@ -292,17 +269,17 @@ contentRoutes.get("/learn/progress", requireAuth, async (c) => {
  * 未登录一律 401 而不是静默丢弃 —— 教程本身保持免登录可读，前端只在登录后才调它，
  * 真收到匿名请求说明前端判断错了，得让它响。
  */
-contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
-  const user = c.get("user")!
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(c, tutorialProgressPingSchema, "Invalid progress payload")
+contentRoutes.post('/tutorials/:id/progress', requireAuth, async (c) => {
+  const user = c.get('user')!
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const parsed = await parseBody(c, tutorialProgressPingSchema, 'Invalid progress payload')
   if (!parsed.success) return parsed.response
   const [tutorial] = await db
     .select({ id: schema.tutorial.id })
     .from(schema.tutorial)
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (!tutorial) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
 
   const now = new Date().toISOString()
   const { seconds, opened } = parsed.data
@@ -339,10 +316,10 @@ contentRoutes.post("/tutorials/:id/progress", requireAuth, async (c) => {
  * 做对之后的重复提交只更新时间，不再累加 —— 学生做对后再点几下提交，
  * 不该把「他试了几次」这个数字变大。
  */
-contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
-  const user = c.get("user")!
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const parsed = await parseBody(c, exerciseAttemptRequestSchema, "Invalid attempt payload")
+contentRoutes.post('/exercises/:id/attempts', requireAuth, async (c) => {
+  const user = c.get('user')!
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const parsed = await parseBody(c, exerciseAttemptRequestSchema, 'Invalid attempt payload')
   if (!parsed.success) return parsed.response
   // 练习跟着教程走：教程没公开，它底下的练习也不该能上报
   const [exercise] = await db
@@ -351,7 +328,7 @@ contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
     .innerJoin(schema.tutorial, eq(schema.tutorial.id, schema.exercise.tutorialId))
     .where(and(eq(schema.exercise.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!exercise) return failure(c, 404, "exercise-not-found", "Exercise does not exist")
+  if (!exercise) return failure(c, 404, 'exercise-not-found', 'Exercise does not exist')
 
   const now = new Date().toISOString()
   const { correct } = parsed.data
@@ -397,31 +374,23 @@ contentRoutes.post("/exercises/:id/attempts", requireAuth, async (c) => {
   return success(c, null)
 })
 
-contentRoutes.get("/tutorials/:id/exercises", optionalAuth, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
-  const user = c.get("user")
+contentRoutes.get('/tutorials/:id/exercises', optionalAuth, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const user = c.get('user')
   const [tutorial] = await db
     .select({ id: schema.tutorial.id })
     .from(schema.tutorial)
     .where(and(eq(schema.tutorial.id, id), eq(schema.tutorial.isPublic, true)))
     .limit(1)
-  if (!tutorial) return failure(c, 404, "tutorial-not-found", "Tutorial does not exist")
+  if (!tutorial) return failure(c, 404, 'tutorial-not-found', 'Tutorial does not exist')
   const rows = await db
     .select({
       exercise: schema.exercise,
       // 目录、大纲上标「做对过」，一课的练一练全对就算学完这课
-      solved: user
-        ? sql<boolean>`coalesce(${schema.exerciseAttempt.solved}, false)`
-        : sql<boolean>`false`,
+      solved: user ? sql<boolean>`coalesce(${schema.exerciseAttempt.solved}, false)` : sql<boolean>`false`,
     })
     .from(schema.exercise)
-    .leftJoin(
-      schema.exerciseAttempt,
-      and(
-        eq(schema.exerciseAttempt.exerciseId, schema.exercise.id),
-        eq(schema.exerciseAttempt.userId, user?.id ?? 0),
-      ),
-    )
+    .leftJoin(schema.exerciseAttempt, and(eq(schema.exerciseAttempt.exerciseId, schema.exercise.id), eq(schema.exerciseAttempt.userId, user?.id ?? 0)))
     .where(eq(schema.exercise.tutorialId, id))
     .orderBy(asc(schema.exercise.order))
   return success(

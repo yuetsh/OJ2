@@ -1,23 +1,17 @@
 <script lang="ts" setup>
-import { Icon } from "@iconify/vue"
-import type { AdminTutorialProblem } from "@oj2/contract"
-import { errorMessage } from "utils/api"
-import MarkdownEditor from "shared/components/MarkdownEditor.vue"
-import type { Exercise, TutorialEdit, TutorialListItem } from "utils/types"
-import { parseLesson } from "oj/learn/composables/useLessonParse"
-import { joinTitle, lessonPath, splitTitle } from "oj/learn/lesson"
-import LessonBody from "oj/learn/components/LessonBody.vue"
-import "oj/learn/learn.css"
-import {
-  createTutorial,
-  deleteTutorial,
-  getTutorial,
-  getTutorialList,
-  updateTutorial,
-} from "../api"
-import ExerciseManager from "./components/ExerciseManager.vue"
-import RelatedProblems from "./components/RelatedProblems.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import { Icon } from '@iconify/vue'
+import type { AdminTutorialProblem } from '@oj2/contract'
+import { errorMessage } from 'utils/api'
+import MarkdownEditor from 'shared/components/MarkdownEditor.vue'
+import type { Exercise, TutorialEdit, TutorialListItem } from 'utils/types'
+import { parseLesson } from 'oj/learn/composables/useLessonParse'
+import { joinTitle, lessonPath, splitTitle } from 'oj/learn/lesson'
+import LessonBody from 'oj/learn/components/LessonBody.vue'
+import 'oj/learn/learn.css'
+import { createTutorial, deleteTutorial, getTutorial, getTutorialList, updateTutorial } from '../api'
+import ExerciseManager from './components/ExerciseManager.vue'
+import RelatedProblems from './components/RelatedProblems.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 /**
  * 编辑一课（设计稿「后台 · 编辑一课」）：知识点 / 情境 / 项目三个字段，正文左边写、
@@ -30,32 +24,32 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 
-const isCreate = computed(() => route.name === "admin tutorial create")
+const isCreate = computed(() => route.name === 'admin tutorial create')
 
 // 手机上左右分栏各剩一百多像素，改成正文「写 / 预览」切着看
 const { isMobile } = useBreakpoints()
-const pane = ref<"source" | "preview">("source")
+const pane = ref<'source' | 'preview'>('source')
 
 const tutorial = reactive<TutorialEdit>({
   id: 0,
-  title: "",
-  content: "",
-  project: typeof route.query.project === "string" ? route.query.project : "",
+  title: '',
+  content: '',
+  project: typeof route.query.project === 'string' ? route.query.project : '',
   isPublic: false,
   order: 0,
-  type: route.query.type === "c" ? "c" : "python",
+  type: route.query.type === 'c' ? 'c' : 'python',
 })
-const kp = ref("")
-const scene = ref("")
+const kp = ref('')
+const scene = ref('')
 const problems = ref<AdminTutorialProblem[]>([])
 const exercises = ref<Exercise[]>([])
 const allTutorials = ref<{ [key: string]: TutorialListItem[] }>({ python: [], c: [] })
 const saving = ref(false)
-const editor = useTemplateRef<InstanceType<typeof MarkdownEditor>>("editor")
+const editor = useTemplateRef<InstanceType<typeof MarkdownEditor>>('editor')
 
 const typeOptions = [
-  { label: "Python", value: "python" },
-  { label: "C 语言", value: "c" },
+  { label: 'Python', value: 'python' },
+  { label: 'C 语言', value: 'c' },
 ]
 
 const siblings = computed(() => allTutorials.value[tutorial.type] ?? [])
@@ -71,8 +65,8 @@ const step = computed(() => {
   return index >= 0 ? index + 1 : null
 })
 const heading = computed(() => {
-  if (isCreate.value) return "新建一课"
-  const label = tutorial.type === "c" ? "C 语言" : "Python"
+  if (isCreate.value) return '新建一课'
+  const label = tutorial.type === 'c' ? 'C 语言' : 'Python'
   return step.value ? `${label} 第 ${step.value} 课` : `${label} · 没公开`
 })
 const preview = computed(() => parseLesson(tutorial.content, exercises.value))
@@ -101,18 +95,18 @@ async function init() {
 async function submit() {
   tutorial.title = joinTitle(kp.value, scene.value)
   if (!kp.value.trim() || !tutorial.content.trim()) {
-    message.error("知识点和正文必填")
+    message.error('知识点和正文必填')
     return
   }
   saving.value = true
   try {
     if (isCreate.value) {
       const created = await createTutorial(tutorial)
-      message.success("已新建，接着可以加练一练和相关题")
-      router.replace({ name: "admin tutorial edit", params: { tutorialID: created.id } })
+      message.success('已新建，接着可以加练一练和相关题')
+      router.replace({ name: 'admin tutorial edit', params: { tutorialID: created.id } })
     } else {
       await updateTutorial(tutorial)
-      message.success("已保存")
+      message.success('已保存')
       allTutorials.value = await getTutorialList().catch(() => allTutorials.value)
     }
   } catch (err) {
@@ -125,8 +119,8 @@ async function submit() {
 async function remove() {
   try {
     await deleteTutorial(tutorial.id)
-    message.success("已删除")
-    router.push({ name: "admin tutorial list" })
+    message.success('已删除')
+    router.push({ name: 'admin tutorial list' })
   } catch (err) {
     message.error(errorMessage(err))
   }
@@ -137,7 +131,7 @@ function insertExercise(id: number) {
 }
 
 function openStudentView() {
-  if (step.value) window.open(router.resolve(lessonPath(tutorial.type, step.value)).href, "_blank")
+  if (step.value) window.open(router.resolve(lessonPath(tutorial.type, step.value)).href, '_blank')
 }
 
 watch(() => props.tutorialID, init)
@@ -147,9 +141,7 @@ onMounted(init)
 <template>
   <div class="page">
     <div class="top">
-      <router-link :to="{ name: 'admin tutorial list' }" class="back">
-        <Icon icon="ph:caret-left-bold" :width="13" />教程
-      </router-link>
+      <router-link :to="{ name: 'admin tutorial list' }" class="back"> <Icon icon="ph:caret-left-bold" :width="13" />教程 </router-link>
       <span class="slash">/</span>
       <span class="heading">{{ heading }}</span>
       <span class="grow" />
@@ -181,15 +173,7 @@ onMounted(init)
       </label>
       <label class="field">
         <span>项目</span>
-        <n-select
-          v-model:value="tutorial.project"
-          :options="projectOptions"
-          filterable
-          tag
-          clearable
-          placeholder="选一个，或者打字新建"
-          style="width: 250px"
-        />
+        <n-select v-model:value="tutorial.project" :options="projectOptions" filterable tag clearable placeholder="选一个，或者打字新建" style="width: 250px" />
       </label>
       <label v-if="isCreate" class="field">
         <span>语言</span>
@@ -212,12 +196,7 @@ onMounted(init)
         </div>
         <div class="split" :class="isMobile ? `only-${pane}` : ''">
           <div class="source">
-            <MarkdownEditor
-              ref="editor"
-              v-model:value="tutorial.content"
-              :code-lang="tutorial.type"
-              height="100%"
-            />
+            <MarkdownEditor ref="editor" v-model:value="tutorial.content" :code-lang="tutorial.type" height="100%" />
           </div>
           <div class="preview">
             <LessonBody
@@ -233,22 +212,11 @@ onMounted(init)
 
       <aside class="side">
         <section class="card pad">
-          <ExerciseManager
-            v-if="tutorial.id"
-            :tutorial-id="tutorial.id"
-            :content="tutorial.content"
-            @insert="insertExercise"
-            @change="exercises = $event"
-          />
+          <ExerciseManager v-if="tutorial.id" :tutorial-id="tutorial.id" :content="tutorial.content" @insert="insertExercise" @change="exercises = $event" />
           <div v-else class="muted">保存之后就能加练一练</div>
         </section>
         <section class="card pad">
-          <RelatedProblems
-            v-if="tutorial.id"
-            :tutorial-id="tutorial.id"
-            :problems="problems"
-            @update="problems = $event"
-          />
+          <RelatedProblems v-if="tutorial.id" :tutorial-id="tutorial.id" :problems="problems" @update="problems = $event" />
           <div v-else class="muted">保存之后就能挑相关题</div>
         </section>
       </aside>

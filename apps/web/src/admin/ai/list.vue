@@ -1,19 +1,19 @@
 <script lang="ts" setup>
-import { Icon } from "@iconify/vue"
-import PageHeader from "admin/components/PageHeader.vue"
-import { useThemeVars } from "naive-ui"
-import { classLabel } from "utils/classes"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import Pagination from "shared/components/Pagination.vue"
-import UserName from "shared/components/UserName.vue"
-import { parseTime } from "utils/functions"
-import type { AdminAiReport, AdminAiReportListItem } from "utils/types"
-import { getAIReportDetail, getAIReportList, pinAIReport } from "../api"
-import { useListLoader } from "shared/composables/listLoader"
+import { Icon } from '@iconify/vue'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { useThemeVars } from 'naive-ui'
+import { classLabel } from 'utils/classes'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import Pagination from 'shared/components/Pagination.vue'
+import UserName from 'shared/components/UserName.vue'
+import { parseTime } from 'utils/functions'
+import type { AdminAiReport, AdminAiReportListItem } from 'utils/types'
+import { getAIReportDetail, getAIReportList, pinAIReport } from '../api'
+import { useListLoader } from 'shared/composables/listLoader'
 
 // Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
-const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
+const Markdown = defineAsyncComponent(() => import('shared/components/Markdown.vue'))
 
 /**
  * 后台 AI 报告（设计稿「智能分析重设计」AiAdmin）：左边一份一行（用户名、班级、时间、
@@ -45,7 +45,7 @@ const route = useRoute()
 const query = reactive({
   limit: 10,
   page: 1,
-  username: typeof route.query.username === "string" ? route.query.username : "",
+  username: typeof route.query.username === 'string' ? route.query.username : '',
 })
 
 const selectedId = ref<number | null>(null)
@@ -86,9 +86,9 @@ async function togglePin() {
 /** 摘要里去掉 Markdown 的记号：粗体星号、标题井号，还有表格的竖线和分隔线 */
 function excerpt(text: string) {
   return text
-    .replace(/[*#>`|]+/g, " ")
-    .replace(/-{2,}/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/[*#>`|]+/g, ' ')
+    .replace(/-{2,}/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
 }
 
@@ -116,20 +116,13 @@ watchDebounced(
   <div v-else class="layout">
     <div class="list-col">
       <div class="list">
-        <button
-          v-for="r in reports"
-          :key="r.id"
-          type="button"
-          class="item"
-          :class="{ on: r.id === selectedId }"
-          @click="pick(r.id)"
-        >
+        <button v-for="r in reports" :key="r.id" type="button" class="item" :class="{ on: r.id === selectedId }" @click="pick(r.id)">
           <span class="item-head">
             <UserName :username="r.username" />
-            <span class="muted small">{{ r.className ? classLabel(r.className) : "" }}</span>
+            <span class="muted small">{{ r.className ? classLabel(r.className) : '' }}</span>
             <span v-if="r.isPinned" class="pinned">固定</span>
             <span class="spacer"></span>
-            <span class="muted small num">{{ parseTime(r.createTime, "MM-DD HH:mm") }}</span>
+            <span class="muted small num">{{ parseTime(r.createTime, 'MM-DD HH:mm') }}</span>
           </span>
           <span class="item-text">{{ excerpt(r.analysisExcerpt) }}</span>
         </button>
@@ -149,8 +142,7 @@ watchDebounced(
           <div class="detail-head">
             <UserName :username="selected.username" />
             <span class="muted">
-              {{ selected.className ? classLabel(selected.className) + " · " : ""
-              }}{{ parseTime(selected.createTime, "YYYY-MM-DD HH:mm") }}
+              {{ selected.className ? classLabel(selected.className) + ' · ' : '' }}{{ parseTime(selected.createTime, 'YYYY-MM-DD HH:mm') }}
             </span>
             <span class="spacer"></span>
             <label class="pin">
@@ -183,7 +175,7 @@ watchDebounced(
 }
 
 .list {
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 8px;
   overflow: hidden;
 }
@@ -195,7 +187,7 @@ watchDebounced(
   width: 100%;
   padding: 10px 12px;
   border: 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   background: none;
   font: inherit;
   text-align: left;
@@ -209,16 +201,16 @@ watchDebounced(
 
 /* 斑马底纹，和后台其它列表一样 */
 .item:nth-child(even) {
-  background: v-bind("theme.tableColorStriped");
+  background: v-bind('theme.tableColorStriped');
 }
 
 .item:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .item.on {
-  background: v-bind("theme.hoverColor");
-  box-shadow: inset 3px 0 0 v-bind("theme.primaryColor");
+  background: v-bind('theme.hoverColor');
+  box-shadow: inset 3px 0 0 v-bind('theme.primaryColor');
 }
 
 .item-head {
@@ -232,7 +224,7 @@ watchDebounced(
 .item-text {
   font-size: 13px;
   line-height: 20px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -241,7 +233,7 @@ watchDebounced(
 
 .pinned {
   font-size: 12px;
-  color: v-bind("theme.warningColor");
+  color: v-bind('theme.warningColor');
 }
 
 .detail {
@@ -255,7 +247,7 @@ watchDebounced(
   gap: 10px;
   font-size: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .pin {
@@ -277,7 +269,7 @@ watchDebounced(
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-size: 14px;
 }
 
@@ -316,7 +308,7 @@ watchDebounced(
     z-index: 2000;
     overflow-y: auto;
     padding: 0 16px 32px;
-    background: v-bind("theme.bodyColor");
+    background: v-bind('theme.bodyColor');
   }
 
   .detail-bar {
@@ -330,8 +322,8 @@ watchDebounced(
     margin: 0 -16px 12px;
     padding: 0 8px;
     font-weight: 600;
-    border-bottom: 1px solid v-bind("theme.dividerColor");
-    background: v-bind("theme.bodyColor");
+    border-bottom: 1px solid v-bind('theme.dividerColor');
+    background: v-bind('theme.bodyColor');
   }
 
   .detail-head {

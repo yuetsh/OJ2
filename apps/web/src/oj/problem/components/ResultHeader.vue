@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import CaseBlocks from "./CaseBlocks.vue"
+import { useThemeVars } from 'naive-ui'
+import CaseBlocks from './CaseBlocks.vue'
 
 /**
  * 结果页签里每一块结果的标题：圆形状态图标 + 大字 + 灰色小字，下面可以挂一条测试点进度。
@@ -8,7 +8,7 @@ import CaseBlocks from "./CaseBlocks.vue"
  * 不套整块的彩色提示框，颜色只落在图标和大字上。
  */
 const props = defineProps<{
-  kind: "success" | "error" | "warning" | "info" | "pending"
+  kind: 'success' | 'error' | 'warning' | 'info' | 'pending'
   title: string
   sub?: string
   /** 测试点进度：通过几个、一共几个 */
@@ -21,17 +21,17 @@ const props = defineProps<{
   /** 方块一格一格亮；不亮就一下全亮 */
   animate?: boolean
 }>()
-const emit = defineEmits<{ (e: "revealed"): void }>()
+const emit = defineEmits<{ (e: 'revealed'): void }>()
 
 const theme = useThemeVars()
 
 const color = computed(() => {
   switch (props.kind) {
-    case "success":
+    case 'success':
       return { icon: theme.value.successColor, text: theme.value.successColorPressed }
-    case "error":
+    case 'error':
       return { icon: theme.value.errorColor, text: theme.value.errorColorPressed }
-    case "warning":
+    case 'warning':
       return { icon: theme.value.warningColor, text: theme.value.warningColorPressed }
     default:
       return { icon: theme.value.infoColor, text: theme.value.textColor1 }
@@ -81,16 +81,7 @@ const color = computed(() => {
         >
           <path d="M12 3a9 9 0 1 0 9 9" />
         </svg>
-        <svg
-          v-else
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3.5"
-          stroke-linecap="round"
-        >
+        <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round">
           <path d="M12 6v7" />
           <path d="M12 18h.01" />
         </svg>
@@ -99,23 +90,9 @@ const color = computed(() => {
       <span v-if="sub" class="sub">{{ sub }}</span>
       <slot name="extra" />
     </div>
-    <CaseBlocks
-      v-if="cases && cases.length"
-      :results="cases"
-      :animate="!!animate"
-      class="cases"
-      @done="emit('revealed')"
-    />
-    <div
-      v-else-if="progress && progress.total > 0"
-      class="progress"
-      role="img"
-      :aria-label="`通过 ${progress.passed}/${progress.total} 个测试点`"
-    >
-      <div
-        class="progress-fill"
-        :style="{ width: `${(progress.passed / progress.total) * 100}%` }"
-      />
+    <CaseBlocks v-if="cases && cases.length" :results="cases" :animate="!!animate" class="cases" @done="emit('revealed')" />
+    <div v-else-if="progress && progress.total > 0" class="progress" role="img" :aria-label="`通过 ${progress.passed}/${progress.total} 个测试点`">
+      <div class="progress-fill" :style="{ width: `${(progress.passed / progress.total) * 100}%` }" />
     </div>
   </div>
 </template>
@@ -144,17 +121,17 @@ const color = computed(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background-color: v-bind("color.icon");
+  background-color: v-bind('color.icon');
 }
 
 .title {
   font-size: 18px;
   font-weight: 700;
-  color: v-bind("color.text");
+  color: v-bind('color.text');
 }
 
 .sub {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .cases {
@@ -171,7 +148,7 @@ const color = computed(() => {
 .progress-fill {
   height: 100%;
   border-radius: 3px;
-  background-color: v-bind("theme.successColor");
+  background-color: v-bind('theme.successColor');
 }
 
 .spin {

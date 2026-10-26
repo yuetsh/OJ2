@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { isSqlProblem } from "@oj2/contract"
-import type { AdminProblem } from "utils/types"
-import { getProblem } from "../api"
-import ProblemDetail from "./detail.vue"
-import SqlDetail from "./SqlDetail.vue"
+import { isSqlProblem } from '@oj2/contract'
+import type { AdminProblem } from 'utils/types'
+import { getProblem } from '../api'
+import ProblemDetail from './detail.vue'
+import SqlDetail from './SqlDetail.vue'
 
 /**
  * 出题 / 改题的入口：编程题和 SQL 题是两张不同的页。
@@ -20,25 +20,21 @@ const router = useRouter()
 const message = useMessage()
 
 const loaded = shallowRef<AdminProblem | null>(null)
-const kind = ref<"code" | "sql" | null>(null)
+const kind = ref<'code' | 'sql' | null>(null)
 
 async function resolve() {
   kind.value = null
   loaded.value = null
   if (!props.problemID) {
-    kind.value = route.query.type === "sql" ? "sql" : "code"
+    kind.value = route.query.type === 'sql' ? 'sql' : 'code'
     return
   }
   try {
     loaded.value = await getProblem(props.problemID)
-    kind.value = isSqlProblem(loaded.value) ? "sql" : "code"
+    kind.value = isSqlProblem(loaded.value) ? 'sql' : 'code'
   } catch {
-    message.error("获取题目失败")
-    router.push(
-      props.contestID
-        ? { name: "admin contest problem list", params: { contestID: props.contestID } }
-        : { name: "admin problem list" },
-    )
+    message.error('获取题目失败')
+    router.push(props.contestID ? { name: 'admin contest problem list', params: { contestID: props.contestID } } : { name: 'admin problem list' })
   }
 }
 
@@ -46,18 +42,6 @@ watch(() => [props.problemID, route.query.type], resolve, { immediate: true })
 </script>
 
 <template>
-  <SqlDetail
-    v-if="kind === 'sql'"
-    :key="`sql-${problemID ?? 'new'}`"
-    :problem-i-d="problemID"
-    :contest-i-d="contestID"
-    :initial="loaded"
-  />
-  <ProblemDetail
-    v-else-if="kind === 'code'"
-    :key="`code-${problemID ?? 'new'}`"
-    :problem-i-d="problemID"
-    :contest-i-d="contestID"
-    :initial="loaded"
-  />
+  <SqlDetail v-if="kind === 'sql'" :key="`sql-${problemID ?? 'new'}`" :problem-i-d="problemID" :contest-i-d="contestID" :initial="loaded" />
+  <ProblemDetail v-else-if="kind === 'code'" :key="`code-${problemID ?? 'new'}`" :problem-i-d="problemID" :contest-i-d="contestID" :initial="loaded" />
 </template>

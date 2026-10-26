@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ProfileSolved, ProfileUnsolved } from "@oj2/contract"
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { dayLabel } from "oj/ai/utils"
-import { parseTime } from "utils/functions"
+import type { ProfileSolved, ProfileUnsolved } from '@oj2/contract'
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { dayLabel } from 'oj/ai/utils'
+import { parseTime } from 'utils/functions'
 
 /**
  * 做对的题：按天一行（或按知识点一行），一道题一块，带题名 —— 原来是一墙题号按钮，
@@ -26,8 +26,8 @@ const PER_ROW = 12
 /** 先露几行，「看更早的」一次再加这么多 */
 const ROWS = 6
 
-const mode = ref<"day" | "tag">("day")
-const keyword = ref("")
+const mode = ref<'day' | 'tag'>('day')
+const keyword = ref('')
 const rowLimit = ref(ROWS)
 const opened = ref(new Set<string>())
 
@@ -39,10 +39,7 @@ watch([mode, keyword], () => {
 const filtered = computed(() => {
   const word = keyword.value.trim().toLowerCase()
   if (!word) return props.solved
-  return props.solved.filter(
-    (item) =>
-      item.displayId.toLowerCase().includes(word) || item.title.toLowerCase().includes(word),
-  )
+  return props.solved.filter((item) => item.displayId.toLowerCase().includes(word) || item.title.toLowerCase().includes(word))
 })
 
 interface Row {
@@ -54,9 +51,9 @@ interface Row {
 
 const rows = computed<Row[]>(() => {
   const groups = new Map<string, ProfileSolved[]>()
-  if (mode.value === "day") {
+  if (mode.value === 'day') {
     for (const item of filtered.value) {
-      const day = parseTime(item.solvedAt, "YYYY-MM-DD")
+      const day = parseTime(item.solvedAt, 'YYYY-MM-DD')
       const list = groups.get(day)
       if (list) list.push(item)
       else groups.set(day, [item])
@@ -67,25 +64,20 @@ const rows = computed<Row[]>(() => {
     })
   }
   for (const item of filtered.value) {
-    for (const tag of item.tags.length ? item.tags : ["其他"]) {
+    for (const tag of item.tags.length ? item.tags : ['其他']) {
       const list = groups.get(tag)
       if (list) list.push(item)
       else groups.set(tag, [item])
     }
   }
   return [...groups]
-    .map(([tag, items]) => ({ key: tag, label: tag, sub: "", items }))
-    .sort(
-      (a, b) =>
-        Number(a.key === "其他") - Number(b.key === "其他") || b.items.length - a.items.length,
-    )
+    .map(([tag, items]) => ({ key: tag, label: tag, sub: '', items }))
+    .sort((a, b) => Number(a.key === '其他') - Number(b.key === '其他') || b.items.length - a.items.length)
 })
 
 /** 搜的时候全摊开，不再收着 */
 const searching = computed(() => !!keyword.value.trim())
-const shownRows = computed(() =>
-  searching.value ? rows.value : rows.value.slice(0, rowLimit.value),
-)
+const shownRows = computed(() => (searching.value ? rows.value : rows.value.slice(0, rowLimit.value)))
 
 function itemsOf(row: Row) {
   return searching.value || opened.value.has(row.key) ? row.items : row.items.slice(0, PER_ROW)
@@ -98,8 +90,8 @@ function open(row: Row) {
 function unsolvedLink(item: ProfileUnsolved) {
   return props.username
     ? {
-        path: "/submission",
-        query: { problem: item.displayId, username: props.username, exactUsername: "1" },
+        path: '/submission',
+        query: { problem: item.displayId, username: props.username, exactUsername: '1' },
       }
     : `/problem/${item.displayId}`
 }
@@ -112,33 +104,19 @@ function unsolvedLink(item: ProfileUnsolved) {
         {{ title }} <small>{{ solved.length }} 道</small>
       </h3>
       <span class="grow"></span>
-      <n-input
-        v-if="solved.length"
-        v-model:value="keyword"
-        class="search"
-        clearable
-        placeholder="搜题号或题目"
-        aria-label="搜题号或题目"
-      >
+      <n-input v-if="solved.length" v-model:value="keyword" class="search" clearable placeholder="搜题号或题目" aria-label="搜题号或题目">
         <template #prefix><Icon icon="ph:magnifying-glass" /></template>
       </n-input>
       <div v-if="solved.length" class="seg" role="group" aria-label="怎么排">
         <button type="button" :class="{ on: mode === 'day' }" @click="mode = 'day'">按日期</button>
-        <button type="button" :class="{ on: mode === 'tag' }" @click="mode = 'tag'">
-          按知识点
-        </button>
+        <button type="button" :class="{ on: mode === 'tag' }" @click="mode = 'tag'">按知识点</button>
       </div>
     </div>
 
     <div v-if="unsolved?.length && !searching" class="row">
-      <div class="label warn">{{ username ? "还没做对" : "差一点" }}</div>
+      <div class="label warn">{{ username ? '还没做对' : '差一点' }}</div>
       <div class="chips">
-        <router-link
-          v-for="item in unsolved"
-          :key="item.displayId"
-          :to="unsolvedLink(item)"
-          class="chip stuck"
-        >
+        <router-link v-for="item in unsolved" :key="item.displayId" :to="unsolvedLink(item)" class="chip stuck">
           <span class="id">{{ item.displayId }}</span>
           <span class="t">{{ item.title }}</span>
           <span class="s">交了 {{ item.attempts }} 次</span>
@@ -152,21 +130,11 @@ function unsolvedLink(item: ProfileUnsolved) {
         <b>{{ row.label }}</b> <span v-if="row.sub" class="sub">{{ row.sub }}</span>
       </div>
       <div class="chips">
-        <router-link
-          v-for="item in itemsOf(row)"
-          :key="item.displayId"
-          :to="`/problem/${item.displayId}`"
-          class="chip ok"
-        >
+        <router-link v-for="item in itemsOf(row)" :key="item.displayId" :to="`/problem/${item.displayId}`" class="chip ok">
           <span class="id">{{ item.displayId }}</span>
           <span class="t">{{ item.title }}</span>
         </router-link>
-        <button
-          v-if="itemsOf(row).length < row.items.length"
-          type="button"
-          class="chip more"
-          @click="open(row)"
-        >
+        <button v-if="itemsOf(row).length < row.items.length" type="button" class="chip more" @click="open(row)">
           还有 {{ row.items.length - PER_ROW }} 道 <Icon icon="ph:caret-down" />
         </button>
       </div>
@@ -174,9 +142,7 @@ function unsolvedLink(item: ProfileUnsolved) {
     </div>
 
     <div v-if="!searching && rows.length > rowLimit" class="foot">
-      <button type="button" class="more-link" @click="rowLimit += ROWS">
-        {{ mode === "day" ? "看更早的" : "看更多" }} <Icon icon="ph:caret-down" />
-      </button>
+      <button type="button" class="more-link" @click="rowLimit += ROWS">{{ mode === 'day' ? '看更早的' : '看更多' }} <Icon icon="ph:caret-down" /></button>
     </div>
     <div v-if="searching && !rows.length" class="empty">没有对得上的题</div>
     <div v-if="!solved.length" class="empty">还没做对过题</div>
@@ -186,9 +152,9 @@ function unsolvedLink(item: ProfileUnsolved) {
 <style scoped>
 .card {
   padding: 14px 20px 10px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .head {
@@ -207,7 +173,7 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-sec);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .grow {
@@ -221,7 +187,7 @@ h3 small {
 .seg {
   display: inline-flex;
   height: var(--oj-ctrl-h);
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 4px;
   overflow: hidden;
 }
@@ -229,9 +195,9 @@ h3 small {
 .seg button {
   padding: 0 12px;
   border: 0;
-  border-left: 1px solid v-bind("theme.borderColor");
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor2");
+  border-left: 1px solid v-bind('theme.borderColor');
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor2');
   font: inherit;
   font-size: var(--oj-fs-sec);
   cursor: pointer;
@@ -252,7 +218,7 @@ h3 small {
   display: flex;
   gap: 12px;
   padding: 10px 0;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .label {
@@ -267,7 +233,7 @@ h3 small {
 
 .label .sub {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .label.warn {
@@ -290,7 +256,7 @@ h3 small {
   text-align: right;
   line-height: 30px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -305,7 +271,7 @@ h3 small {
   border: 1px solid transparent;
   border-radius: 6px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   text-decoration: none;
   white-space: nowrap;
 }
@@ -317,7 +283,7 @@ h3 small {
 .chip .id {
   flex-shrink: 0;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .chip .t {
@@ -341,9 +307,9 @@ h3 small {
 }
 
 .more {
-  border-color: v-bind("theme.borderColor");
+  border-color: v-bind('theme.borderColor');
   background: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   font: inherit;
   font-size: var(--oj-fs-sec);
   cursor: pointer;
@@ -352,7 +318,7 @@ h3 small {
 .foot {
   padding: 12px 0 2px;
   text-align: center;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .more-link {
@@ -371,7 +337,7 @@ h3 small {
   padding: 24px 0 18px;
   text-align: center;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 手机：按日期、按知识点都改成一行一道（块在窄屏上一行只放得下一两个） */
@@ -425,7 +391,7 @@ h3 small {
   padding: 0;
   border-radius: 0;
   background: none;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
   font-size: var(--oj-fs-body);
 }
 

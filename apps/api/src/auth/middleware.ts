@@ -1,8 +1,8 @@
-import { ADMIN_ROLES, TEACHER_ROLES } from "@oj2/contract"
-import type { Context, MiddlewareHandler } from "hono"
+import { ADMIN_ROLES, TEACHER_ROLES } from '@oj2/contract'
+import type { Context, MiddlewareHandler } from 'hono'
 
-import { failure } from "../http"
-import { resolveSession, type AuthUser } from "./session"
+import { failure } from '../http'
+import { resolveSession, type AuthUser } from './session'
 
 export interface AppEnv {
   Variables: {
@@ -18,8 +18,8 @@ export interface AppEnv {
  */
 export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const session = await resolveSession(c)
-  if (session.reason === "expired") return denied(c, "expired")
-  c.set("user", session.user)
+  if (session.reason === 'expired') return denied(c, 'expired')
+  c.set('user', session.user)
   await next()
 }
 
@@ -33,17 +33,17 @@ export const optionalAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
  * 用 403 而不是 401：凭证是有效的，是这个账号不让用了，和 login 接口对禁用账号
  * 的回法（403 `account-disabled`）也一致。
  */
-function denied(c: Context, reason: "anonymous" | "expired" | "disabled") {
-  if (reason === "disabled") return failure(c, 403, "account-disabled", "账号已被禁用，请联系老师")
+function denied(c: Context, reason: 'anonymous' | 'expired' | 'disabled') {
+  if (reason === 'disabled') return failure(c, 403, 'account-disabled', '账号已被禁用，请联系老师')
   // 前端见到这个码会拿 refresh token 换一张再重试，换不到才当没登录
-  if (reason === "expired") return failure(c, 401, "token-expired", "登录已过期，请重新登录")
-  return failure(c, 401, "login-required", "请先登录")
+  if (reason === 'expired') return failure(c, 401, 'token-expired', '登录已过期，请重新登录')
+  return failure(c, 401, 'login-required', '请先登录')
 }
 
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const session = await resolveSession(c)
   if (!session.user) return denied(c, session.reason)
-  c.set("user", session.user)
+  c.set('user', session.user)
   await next()
 }
 
@@ -58,8 +58,8 @@ function requireRole(allowed: (user: AuthUser) => boolean): MiddlewareHandler<Ap
   return async (c, next) => {
     const session = await resolveSession(c)
     if (!session.user) return denied(c, session.reason)
-    if (!allowed(session.user)) return failure(c, 403, "permission-denied", "权限不足")
-    c.set("user", session.user)
+    if (!allowed(session.user)) return failure(c, 403, 'permission-denied', '权限不足')
+    c.set('user', session.user)
     await next()
   }
 }
@@ -71,13 +71,11 @@ export const requireAdmin = requireRole((user) => ADMIN_ROLES.includes(user.admi
 export const requireTeacher = requireRole((user) => TEACHER_ROLES.includes(user.adminType))
 
 /** 旧 `@super_admin_required` */
-export const requireSuperAdmin = requireRole((user) => user.adminType === "Super Admin")
+export const requireSuperAdmin = requireRole((user) => user.adminType === 'Super Admin')
 
 /**
  * 旧 `@problem_permission_required`：先要是管理员，再要 problem_permission 不为 None。
  * 注意它只管「能不能进这个接口」，「能改哪些题」（Own vs All）由各 handler 自己按
  * created_by 过滤 —— 旧后端也是这么分工的，别把两件事混在一起。
  */
-export const requireProblemPermission = requireRole(
-  (user) => ADMIN_ROLES.includes(user.adminType) && user.problemPermission !== "None",
-)
+export const requireProblemPermission = requireRole((user) => ADMIN_ROLES.includes(user.adminType) && user.problemPermission !== 'None')

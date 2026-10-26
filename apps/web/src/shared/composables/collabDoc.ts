@@ -1,14 +1,14 @@
-import { Compartment } from "@codemirror/state"
-import type { EditorView } from "@codemirror/view"
-import { useCollabStore } from "shared/store/collab"
-import { useUserStore } from "shared/store/user"
+import { Compartment } from '@codemirror/state'
+import type { EditorView } from '@codemirror/view'
+import { useCollabStore } from 'shared/store/collab'
+import { useUserStore } from 'shared/store/user'
 
 /** y-websocket 那套消息头，服务端不解析，只有两端认 */
 const MESSAGE_SYNC = 0
 const MESSAGE_AWARENESS = 1
 
-const TEACHER_COLOR = "#ff6b6b"
-const STUDENT_COLOR = "#4dabf7"
+const TEACHER_COLOR = '#ff6b6b'
+const STUDENT_COLOR = '#4dabf7'
 
 interface StartOptions {
   editorView: EditorView
@@ -47,23 +47,21 @@ export function useCollabDoc() {
     if (doc) stop()
     const myGeneration = ++generation
 
-    const [Y, awarenessProtocol, syncProtocol, encoding, decoding, { yCollab }] = await Promise.all(
-      [
-        import("yjs"),
-        import("y-protocols/awareness"),
-        import("y-protocols/sync"),
-        import("lib0/encoding"),
-        import("lib0/decoding"),
-        import("y-codemirror.next"),
-      ],
-    )
+    const [Y, awarenessProtocol, syncProtocol, encoding, decoding, { yCollab }] = await Promise.all([
+      import('yjs'),
+      import('y-protocols/awareness'),
+      import('y-protocols/sync'),
+      import('lib0/encoding'),
+      import('lib0/decoding'),
+      import('y-codemirror.next'),
+    ])
 
     // 等 chunk 的这段时间里房间关了（或者又开了新的一轮），整个放弃
     if (myGeneration !== generation) return
 
     view = editorView
     doc = new Y.Doc()
-    const ytext = doc.getText("codemirror")
+    const ytext = doc.getText('codemirror')
     awareness = new awarenessProtocol.Awareness(doc)
 
     // ★ 先把内容写进 ytext，再挂 yCollab。yCollab 挂上去**不会**拿 ytext 覆盖编辑器，
@@ -75,7 +73,7 @@ export function useCollabDoc() {
     // 清空会顺着 v-model 写回 codeStore，但协作中的老师不存草稿（ProblemEditor 的 persistCode），
     // 结束后 loadCode 会把他的草稿读回来
     if (seedContent === null && editorView.state.doc.length) {
-      editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: "" } })
+      editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: '' } })
     }
 
     const send = (build: (encoder: any) => void) => {
@@ -90,49 +88,39 @@ export function useCollabDoc() {
       if (messageType === MESSAGE_SYNC) {
         const encoder = encoding.createEncoder()
         encoding.writeVarUint(encoder, MESSAGE_SYNC)
-        syncProtocol.readSyncMessage(decoder, encoder, doc, "remote")
+        syncProtocol.readSyncMessage(decoder, encoder, doc, 'remote')
         // 只有需要回话时才发（readSyncMessage 可能什么都没写）
         if (encoding.length(encoder) > 1) {
           collabStore.sendBinary(encoding.toUint8Array(encoder))
         }
       } else if (messageType === MESSAGE_AWARENESS) {
-        awarenessProtocol.applyAwarenessUpdate(
-          awareness,
-          decoding.readVarUint8Array(decoder),
-          "remote",
-        )
+        awarenessProtocol.applyAwarenessUpdate(awareness, decoding.readVarUint8Array(decoder), 'remote')
       }
     })
 
     const onDocUpdate = (update: Uint8Array, origin: any) => {
-      if (origin === "remote") return
+      if (origin === 'remote') return
       send((encoder) => {
         encoding.writeVarUint(encoder, MESSAGE_SYNC)
         syncProtocol.writeUpdate(encoder, update)
       })
     }
-    doc.on("update", onDocUpdate)
-    detachDocUpdate = () => doc?.off("update", onDocUpdate)
+    doc.on('update', onDocUpdate)
+    detachDocUpdate = () => doc?.off('update', onDocUpdate)
 
-    const onAwarenessUpdate = (
-      { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
-      origin: any,
-    ) => {
-      if (origin === "remote") return
+    const onAwarenessUpdate = ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }, origin: any) => {
+      if (origin === 'remote') return
       const changed = added.concat(updated, removed)
       send((encoder) => {
         encoding.writeVarUint(encoder, MESSAGE_AWARENESS)
-        encoding.writeVarUint8Array(
-          encoder,
-          awarenessProtocol.encodeAwarenessUpdate(awareness, changed),
-        )
+        encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(awareness, changed))
       })
     }
-    awareness.on("update", onAwarenessUpdate)
-    detachAwarenessUpdate = () => awareness?.off("update", onAwarenessUpdate)
+    awareness.on('update', onAwarenessUpdate)
+    detachAwarenessUpdate = () => awareness?.off('update', onAwarenessUpdate)
 
-    awareness.setLocalStateField("user", {
-      name: userStore.user?.username ?? "匿名",
+    awareness.setLocalStateField('user', {
+      name: userStore.user?.username ?? '匿名',
       color: userStore.isTeacherOrAbove ? TEACHER_COLOR : STUDENT_COLOR,
     })
 
@@ -148,10 +136,7 @@ export function useCollabDoc() {
     })
     send((encoder) => {
       encoding.writeVarUint(encoder, MESSAGE_AWARENESS)
-      encoding.writeVarUint8Array(
-        encoder,
-        awarenessProtocol.encodeAwarenessUpdate(awareness, [doc.clientID]),
-      )
+      encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(awareness, [doc.clientID]))
     })
   }
 
@@ -167,7 +152,7 @@ export function useCollabDoc() {
       try {
         view.dispatch({ effects: compartment.reconfigure([]) })
       } catch (error) {
-        console.warn("移除协同编辑扩展失败:", error)
+        console.warn('移除协同编辑扩展失败:', error)
       }
       view = null
     }

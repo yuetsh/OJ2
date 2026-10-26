@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import type { BadgeBody } from "admin/api"
-import type { AdminProblemSetBadge } from "utils/types"
+import { useThemeVars } from 'naive-ui'
+import type { BadgeBody } from 'admin/api'
+import type { AdminProblemSetBadge } from 'utils/types'
 
 /**
  * 加奖章 / 改奖章共用一个弹窗：传了 badge 就是改，null 就是加。
@@ -9,17 +9,17 @@ import type { AdminProblemSetBadge } from "utils/types"
  * 「做对 N 道」数的是做对的全部题（含选做），和后端 eligibleForBadge 同一个口径。
  */
 const props = defineProps<{ badge: AdminProblemSetBadge | null; problemsCount: number }>()
-const show = defineModel<boolean>("show", { required: true })
+const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{ save: [data: BadgeBody] }>()
 const theme = useThemeVars()
 
 const ICONS = [1, 2, 3, 4, 5, 6].map((i) => `/badge-${i}.png`)
 
 const form = reactive<BadgeBody>({
-  name: "",
-  description: "",
+  name: '',
+  description: '',
   icon: ICONS[0]!,
-  conditionType: "problem_count",
+  conditionType: 'problem_count',
   conditionValue: 1,
 })
 
@@ -27,50 +27,33 @@ const form = reactive<BadgeBody>({
 watch(show, (open) => {
   if (!open) return
   Object.assign(form, {
-    name: props.badge?.name ?? "",
-    description: props.badge?.description ?? "",
+    name: props.badge?.name ?? '',
+    description: props.badge?.description ?? '',
     icon: props.badge?.icon || ICONS[0]!,
-    conditionType: props.badge?.conditionType ?? "problem_count",
+    conditionType: props.badge?.conditionType ?? 'problem_count',
     conditionValue: props.badge?.conditionValue || 1,
   })
 })
 
-const valid = computed(
-  () =>
-    form.name.trim().length > 0 &&
-    (form.conditionType === "all_problems" || form.conditionValue >= 1),
-)
+const valid = computed(() => form.name.trim().length > 0 && (form.conditionType === 'all_problems' || form.conditionValue >= 1))
 
 function save() {
   if (!valid.value) return
-  emit("save", {
+  emit('save', {
     ...form,
     name: form.name.trim(),
-    conditionValue: form.conditionType === "all_problems" ? 0 : form.conditionValue,
+    conditionValue: form.conditionType === 'all_problems' ? 0 : form.conditionValue,
   })
 }
 </script>
 
 <template>
-  <n-modal
-    v-model:show="show"
-    preset="card"
-    :title="badge ? '改奖章' : '加奖章'"
-    style="width: 460px"
-    :mask-closable="false"
-  >
+  <n-modal v-model:show="show" preset="card" :title="badge ? '改奖章' : '加奖章'" style="width: 460px" :mask-closable="false">
     <div class="form">
       <div class="field">
         <span class="label">图标</span>
         <div class="icons">
-          <button
-            v-for="icon in ICONS"
-            :key="icon"
-            class="icon"
-            :class="{ on: form.icon === icon }"
-            :aria-label="`选这个图标`"
-            @click="form.icon = icon"
-          >
+          <button v-for="icon in ICONS" :key="icon" class="icon" :class="{ on: form.icon === icon }" :aria-label="`选这个图标`" @click="form.icon = icon">
             <img :src="icon" alt="" />
           </button>
         </div>
@@ -100,11 +83,7 @@ function save() {
         </n-input-number>
       </div>
       <span class="hint">
-        {{
-          form.conditionType === "all_problems"
-            ? "必做题全部做对就发。"
-            : "做对的题（选做也算）够这个数就发。"
-        }}改了条件会按大家现在的进度重新发、收。
+        {{ form.conditionType === 'all_problems' ? '必做题全部做对就发。' : '做对的题（选做也算）够这个数就发。' }}改了条件会按大家现在的进度重新发、收。
       </span>
     </div>
     <template #footer>
@@ -133,7 +112,7 @@ function save() {
   width: 36px;
   flex-shrink: 0;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .icons {
@@ -152,7 +131,7 @@ function save() {
 }
 
 .icon.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
 }
 
 .icon img {
@@ -163,6 +142,6 @@ function save() {
 .hint {
   font-size: 12px;
   line-height: 1.6;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

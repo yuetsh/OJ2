@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import AchievementIcon from "shared/components/AchievementIcon.vue"
-import type { UserBadge } from "utils/types"
-import type { Group } from "../series"
-import Medal from "./Medal.vue"
-import SeriesRow from "./SeriesRow.vue"
+import { useThemeVars } from 'naive-ui'
+import AchievementIcon from 'shared/components/AchievementIcon.vue'
+import type { UserBadge } from 'utils/types'
+import type { Group } from '../series'
+import Medal from './Medal.vue'
+import SeriesRow from './SeriesRow.vue'
 
 /** 一组成就线（做题 / 坚持 / …），「彩蛋」组末尾是还没找到的问号，「题单和比赛」组末尾是拿到的题单奖章 */
 const props = defineProps<{ group: Group; badges?: UserBadge[]; compact?: boolean }>()
 
 const theme = useThemeVars()
-const showBadges = computed(() => props.group.name === "题单和比赛" && !!props.badges?.length)
+const showBadges = computed(() => props.group.name === '题单和比赛' && !!props.badges?.length)
 </script>
 
 <template>
@@ -31,10 +31,7 @@ const showBadges = computed(() => props.group.name === "题单和比赛" && !!pr
       <div class="badge-list">
         <n-tooltip v-for="b in badges" :key="b.id" :delay="150">
           <template #trigger>
-            <router-link
-              :to="{ name: 'problemset', params: { problemSetId: b.problemSet.id } }"
-              class="badge"
-            >
+            <router-link :to="{ name: 'problemset', params: { problemSetId: b.problemSet.id } }" class="badge">
               <AchievementIcon :icon="b.badge.icon" :size="24" />
               <span>{{ b.badge.name }}</span>
             </router-link>
@@ -49,9 +46,9 @@ const showBadges = computed(() => props.group.name === "题单和比赛" && !!pr
 <style scoped>
 .card {
   padding: 14px 20px 20px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -65,7 +62,7 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -79,7 +76,7 @@ h3 small {
 
 .masked-title {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .masked-list,
@@ -99,8 +96,8 @@ h3 small {
   border-radius: 6px;
   font-size: var(--oj-fs-sec);
   white-space: nowrap;
-  color: v-bind("theme.textColor1");
-  background: v-bind("theme.actionColor");
+  color: v-bind('theme.textColor1');
+  background: v-bind('theme.actionColor');
   text-decoration: none;
 }
 

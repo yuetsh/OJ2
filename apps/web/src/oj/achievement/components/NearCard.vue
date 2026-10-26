@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { RARITY_LABEL } from "utils/constants"
-import { useRarityColor } from "shared/composables/rarity"
-import type { Near } from "../series"
-import Medal from "./Medal.vue"
+import { useThemeVars } from 'naive-ui'
+import { RARITY_LABEL } from 'utils/constants'
+import { useRarityColor } from 'shared/composables/rarity'
+import type { Near } from '../series'
+import Medal from './Medal.vue'
 
 /**
  * 「快拿到了」：每个只说还差什么，进度条底下是现在几 / 要几、本班几人有。
@@ -16,9 +16,7 @@ const rarityText = useRarityColor()
 
 function now(item: Near) {
   const { series, achievement } = item
-  return series.streak
-    ? `现在连着 ${series.value} ${series.unit}`
-    : `${series.value} / ${achievement.threshold} ${series.unit}`
+  return series.streak ? `现在连着 ${series.value} ${series.unit}` : `${series.value} / ${achievement.threshold} ${series.unit}`
 }
 
 const percent = (item: Near) => Math.round((item.series.value / item.achievement.threshold!) * 100)
@@ -55,9 +53,7 @@ const percent = (item: Near) => Math.round((item.series.value / item.achievement
           />
           <div class="foot">
             <span>{{ now(item) }}</span>
-            <span v-if="item.achievement.classHolders !== null">
-              本班 {{ item.achievement.classHolders }} 人有
-            </span>
+            <span v-if="item.achievement.classHolders !== null"> 本班 {{ item.achievement.classHolders }} 人有 </span>
           </div>
         </div>
       </div>
@@ -68,9 +64,9 @@ const percent = (item: Near) => Math.round((item.series.value / item.achievement
 <style scoped>
 .card {
   padding: 14px 20px 6px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -83,7 +79,7 @@ h3 {
   align-items: center;
   gap: 14px;
   padding: 11px 0;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .body {
@@ -109,7 +105,7 @@ h3 {
   margin-left: auto;
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
   white-space: nowrap;
 }
 
@@ -117,7 +113,7 @@ h3 {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -132,7 +128,7 @@ h3 {
 }
 
 .wide .item {
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 /* 手机：「还差什么」换到名字下面一行 */

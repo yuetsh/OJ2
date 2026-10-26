@@ -1,6 +1,6 @@
-import { StateEffect, StateField, type EditorState } from "@codemirror/state"
-import { Decoration, EditorView, ViewPlugin, type DecorationSet } from "@codemirror/view"
-import type { PunctuationFix } from "./chinesePunctuation"
+import { StateEffect, StateField, type EditorState } from '@codemirror/state'
+import { Decoration, EditorView, ViewPlugin, type DecorationSet } from '@codemirror/view'
+import type { PunctuationFix } from './chinesePunctuation'
 
 /**
  * 在题目页的编辑器里标出编译错误的位置：整行淡红底，`^` 标的那一段加红波浪线。
@@ -18,8 +18,8 @@ interface Mark {
 
 const setMark = StateEffect.define<Mark | null>()
 
-const lineDeco = Decoration.line({ class: "cm-error-line" })
-const rangeDeco = Decoration.mark({ class: "cm-error-range" })
+const lineDeco = Decoration.line({ class: 'cm-error-line' })
+const rangeDeco = Decoration.mark({ class: 'cm-error-range' })
 
 function build(state: EditorState, mark: Mark): DecorationSet {
   if (mark.line < 1 || mark.line > state.doc.lines) return Decoration.none
@@ -39,7 +39,7 @@ function build(state: EditorState, mark: Mark): DecorationSet {
  * 字符串和注释里的不标（那是合法的，见 chinesePunctuation.ts）
  */
 const setPunctuation = StateEffect.define<PunctuationFix[]>()
-const punctuationDeco = Decoration.mark({ class: "cm-punctuation-mark" })
+const punctuationDeco = Decoration.mark({ class: 'cm-punctuation-mark' })
 
 const punctuationField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -49,9 +49,7 @@ const punctuationField = StateField.define<DecorationSet>({
       if (effect.is(setPunctuation)) {
         const max = tr.state.doc.length
         deco = Decoration.set(
-          effect.value
-            .filter((fix) => fix.to <= max && fix.to > fix.from)
-            .map((fix) => punctuationDeco.range(fix.from, fix.to)),
+          effect.value.filter((fix) => fix.to <= max && fix.to > fix.from).map((fix) => punctuationDeco.range(fix.from, fix.to)),
           true,
         )
       }
@@ -80,7 +78,7 @@ const markField = StateField.define<DecorationSet>({
  * 那条的颜色一致。和错误标记分开存：答案对了、挑战没做到时没有错误可标，两种也不会同时出现
  */
 const setChallengeLines = StateEffect.define<number[]>()
-const challengeLineDeco = Decoration.line({ class: "cm-challenge-line" })
+const challengeLineDeco = Decoration.line({ class: 'cm-challenge-line' })
 
 const challengeField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -89,9 +87,7 @@ const challengeField = StateField.define<DecorationSet>({
     for (const effect of tr.effects) {
       if (effect.is(setChallengeLines)) {
         const lines = effect.value.filter((line) => line >= 1 && line <= tr.state.doc.lines)
-        deco = Decoration.set(
-          lines.map((line) => challengeLineDeco.range(tr.state.doc.line(line).from)),
-        )
+        deco = Decoration.set(lines.map((line) => challengeLineDeco.range(tr.state.doc.line(line).from)))
       }
     }
     return deco
@@ -116,21 +112,21 @@ const tracker = ViewPlugin.define((view) => {
 })
 
 const theme = EditorView.baseTheme({
-  ".cm-error-line": { backgroundColor: "rgba(208, 48, 80, 0.12)" },
-  ".cm-error-range": {
-    textDecoration: "underline wavy #d03050",
-    textUnderlineOffset: "3px",
-    backgroundColor: "rgba(208, 48, 80, 0.18)",
+  '.cm-error-line': { backgroundColor: 'rgba(208, 48, 80, 0.12)' },
+  '.cm-error-range': {
+    textDecoration: 'underline wavy #d03050',
+    textUnderlineOffset: '3px',
+    backgroundColor: 'rgba(208, 48, 80, 0.18)',
   },
   // 左边再压一道紫线：光标所在那行的底色会盖住行底色，线不会被盖
-  ".cm-challenge-line": {
-    backgroundColor: "rgba(91, 52, 196, 0.12)",
-    boxShadow: "inset 3px 0 0 #8f72e3",
+  '.cm-challenge-line': {
+    backgroundColor: 'rgba(91, 52, 196, 0.12)',
+    boxShadow: 'inset 3px 0 0 #8f72e3',
   },
-  ".cm-punctuation-mark": {
-    backgroundColor: "rgba(240, 160, 32, 0.35)",
-    outline: "1px solid rgba(240, 160, 32, 0.8)",
-    borderRadius: "2px",
+  '.cm-punctuation-mark': {
+    backgroundColor: 'rgba(240, 160, 32, 0.35)',
+    outline: '1px solid rgba(240, 160, 32, 0.8)',
+    borderRadius: '2px',
   },
 })
 
@@ -151,17 +147,13 @@ export function showPunctuationMarks(fixes: PunctuationFix[]) {
  * 编辑器里这一行对得上才标列范围 —— 学生看结果之前可能已经改过代码了，
  * 对不上时列号没有意义，只标整行。
  */
-export function showErrorMark(
-  line: number,
-  sourceLine: string | null,
-  caret: { from: number; to: number } | null,
-) {
+export function showErrorMark(line: number, sourceLine: string | null, caret: { from: number; to: number } | null) {
   const view = current
   if (!view || line < 1 || line > view.state.doc.lines) return
   const text = view.state.doc.line(line).text
   const mark: Mark = { line }
   if (caret && sourceLine !== null) {
-    const stripped = text.replace(/^ +/, "")
+    const stripped = text.replace(/^ +/, '')
     if (stripped.trimEnd() === sourceLine.trimEnd()) {
       const indent = text.length - stripped.length
       mark.from = indent + caret.from
@@ -170,7 +162,7 @@ export function showErrorMark(
   }
   const pos = view.state.doc.line(line).from
   view.dispatch({
-    effects: [setMark.of(mark), EditorView.scrollIntoView(pos, { y: "center" })],
+    effects: [setMark.of(mark), EditorView.scrollIntoView(pos, { y: 'center' })],
   })
 }
 

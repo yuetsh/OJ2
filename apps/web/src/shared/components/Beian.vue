@@ -19,8 +19,8 @@
   </n-flex>
 </template>
 <script lang="ts" setup>
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { zonedYear } from "utils/functions"
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { zonedYear } from 'utils/functions'
 
 const route = useRoute()
 const { isMobile } = useBreakpoints()
@@ -32,15 +32,15 @@ const currentYear = zonedYear()
 const copyrightText = `© 2022 - ${currentYear} 判题狗 保留所有权利`
 
 function goICP() {
-  window.open("https://beian.miit.gov.cn", "_blank")
+  window.open('https://beian.miit.gov.cn', '_blank')
 }
 
 function goCC() {
-  window.open("https://creativecommons.org/licenses/by-nc/4.0/deed.zh-hans", "_blank")
+  window.open('https://creativecommons.org/licenses/by-nc/4.0/deed.zh-hans', '_blank')
 }
 
 function goPublicSecurity() {
-  window.open("https://beian.mps.gov.cn/#/query/webSearch?code=33100402331786", "_blank")
+  window.open('https://beian.mps.gov.cn/#/query/webSearch?code=33100402331786', '_blank')
 }
 </script>
 <style scoped>

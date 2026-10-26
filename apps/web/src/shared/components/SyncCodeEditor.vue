@@ -1,16 +1,16 @@
 <script lang="ts" setup>
-import { bracketMatching } from "@codemirror/language"
-import CodeMirror from "./CodeMirror.vue"
-import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
-import type { EditorView } from "@codemirror/view"
-import type { Extension } from "@codemirror/state"
-import type { LANGUAGE } from "utils/types"
-import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
-import { styleTheme } from "shared/extensions/baseTheme"
-import { enhanceCompletion, type SqlTables } from "shared/extensions/autocompletion"
-import { languageExtension } from "shared/extensions/language"
-import { useCollabDoc } from "../composables/collabDoc"
-import { useCollabStore } from "shared/store/collab"
+import { bracketMatching } from '@codemirror/language'
+import CodeMirror from './CodeMirror.vue'
+import { autocompletion, closeBrackets, completeAnyWord } from '@codemirror/autocomplete'
+import type { EditorView } from '@codemirror/view'
+import type { Extension } from '@codemirror/state'
+import type { LANGUAGE } from 'utils/types'
+import { darkCodeTheme, lightCodeTheme } from '../themes/codeTheme'
+import { styleTheme } from 'shared/extensions/baseTheme'
+import { enhanceCompletion, type SqlTables } from 'shared/extensions/autocompletion'
+import { languageExtension } from 'shared/extensions/language'
+import { useCollabDoc } from '../composables/collabDoc'
+import { useCollabStore } from 'shared/store/collab'
 
 const isDark = useDark()
 const collabStore = useCollabStore()
@@ -43,17 +43,17 @@ interface Props {
 }
 
 const {
-  language = "Python",
+  language = 'Python',
   fontSize = 20,
-  height = "100%",
+  height = '100%',
   readonly = false,
-  placeholder = "",
+  placeholder = '',
   extraExtensions = [],
-  problemId = "",
+  problemId = '',
   collab = true,
   sqlTables = [],
 } = defineProps<Props>()
-const code = defineModel<string>("value")
+const code = defineModel<string>('value')
 
 const langExtension = computed(() => languageExtension(language))
 
@@ -77,10 +77,7 @@ const extensions = computed(() => [
 const editorView = shallowRef<EditorView | null>(null)
 
 /** 房间开着，而且开的就是这道题 */
-const roomIsHere = computed(
-  () =>
-    collab && collabStore.room !== null && (!problemId || collabStore.room.problemId === problemId),
-)
+const roomIsHere = computed(() => collab && collabStore.room !== null && (!problemId || collabStore.room.problemId === problemId))
 
 /**
  * 这个编辑器**接进过**当前这个房间。
@@ -118,7 +115,7 @@ const detach = () => {
   const wasBound = bound.value
   bound.value = false
   stop()
-  if (wasBound && collabStore.room) collabStore.leave("left")
+  if (wasBound && collabStore.room) collabStore.leave('left')
 }
 
 const handleEditorReady = (view: EditorView) => {
@@ -182,7 +179,7 @@ watch(
  */
 const cancelPendingIfLeaving = () => {
   if (collabStore.isTeacher) return
-  if (collabStore.helpStatus === "pending") collabStore.cancelHelp()
+  if (collabStore.helpStatus === 'pending') collabStore.cancelHelp()
 }
 
 // 同一条路由换 params（切到别的题）组件会被复用，所以这件事不能只靠 onUnmounted
@@ -199,7 +196,7 @@ watch(
  * 比赛入口不报（collab = false）：比赛题号和公开题撞号，老师打开的会是另一道题
  */
 watch(
-  () => [collab ? problemId : "", language] as const,
+  () => [collab ? problemId : '', language] as const,
   ([id, lang]) => collabStore.reportPresence(id || null, lang),
   { immediate: true },
 )

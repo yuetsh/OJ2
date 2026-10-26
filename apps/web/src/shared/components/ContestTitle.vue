@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { ContestType } from "utils/constants"
-import type { AdminContest, Contest } from "utils/types"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { ContestType } from 'utils/constants'
+import type { AdminContest, Contest } from 'utils/types'
 
 defineProps<{ contest: AdminContest | Contest }>()
 
@@ -11,13 +11,7 @@ const theme = useThemeVars()
 <template>
   <span class="contest-title">
     <span class="text">{{ contest.title }}</span>
-    <Icon
-      v-if="contest.contestType === ContestType.private"
-      icon="ph:lock-simple"
-      width="1em"
-      class="lock"
-      title="要输入密码才能进"
-    />
+    <Icon v-if="contest.contestType === ContestType.private" icon="ph:lock-simple" width="1em" class="lock" title="要输入密码才能进" />
   </span>
 </template>
 <style scoped>
@@ -36,6 +30,6 @@ const theme = useThemeVars()
 
 .lock {
   flex-shrink: 0;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

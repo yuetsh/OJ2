@@ -1,7 +1,7 @@
-import type { Context } from "hono"
+import type { Context } from 'hono'
 
-import { redis } from "../redis"
-import { getOptions } from "./options"
+import { redis } from '../redis'
+import { getOptions } from './options'
 
 /**
  * 令牌桶限流，搬运自旧后端 `utils/throttling.py` 的 TokenBucket。
@@ -24,7 +24,7 @@ export type BucketConfig = {
   default_capacity: number
 }
 
-export const throttlingDefaults: Record<"user", BucketConfig> = {
+export const throttlingDefaults: Record<'user', BucketConfig> = {
   user: { capacity: 20, fill_rate: 0.03, default_capacity: 10 },
 }
 
@@ -69,31 +69,21 @@ return { allowed, tostring(wait) }
  * 一遍。ioredis 的 defineCommand 走 EVALSHA，只发 40 字节的 sha1，遇到 NOSCRIPT
  * 自动回退成一次 EVAL 把脚本重新灌进去 —— Redis 重启或 SCRIPT FLUSH 之后不用管。
  */
-redis.defineCommand("throttleConsume", { numberOfKeys: 1, lua: CONSUME_SCRIPT })
+redis.defineCommand('throttleConsume', { numberOfKeys: 1, lua: CONSUME_SCRIPT })
 
 type ThrottleRedis = typeof redis & {
-  throttleConsume(
-    key: string,
-    capacity: string,
-    fillRate: string,
-    defaultCapacity: string,
-    now: string,
-    num: string,
-    ttl: string,
-  ): Promise<[number, string]>
+  throttleConsume(key: string, capacity: string, fillRate: string, defaultCapacity: string, now: string, num: string, ttl: string): Promise<[number, string]>
 }
 
 function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
   const raw = value as Record<string, unknown>
   const pick = (key: keyof BucketConfig) =>
-    typeof raw[key] === "number" && Number.isFinite(raw[key]) && (raw[key] as number) > 0
-      ? (raw[key] as number)
-      : fallback[key]
+    typeof raw[key] === 'number' && Number.isFinite(raw[key]) && (raw[key] as number) > 0 ? (raw[key] as number) : fallback[key]
   return {
-    capacity: pick("capacity"),
-    fill_rate: pick("fill_rate"),
-    default_capacity: pick("default_capacity"),
+    capacity: pick('capacity'),
+    fill_rate: pick('fill_rate'),
+    default_capacity: pick('default_capacity'),
   }
 }
 
@@ -108,19 +98,19 @@ function parseBucketConfig(value: unknown, fallback: BucketConfig): BucketConfig
  * `throttling` 没有后台界面，只能直接改库，改完最多一分钟后生效。
  */
 const BUCKET_CACHE_TTL = 60_000
-const bucketCache = new Map<"user", { value: BucketConfig; expiresAt: number }>()
+const bucketCache = new Map<'user', { value: BucketConfig; expiresAt: number }>()
 
-export async function getBucketConfig(scope: "user"): Promise<BucketConfig> {
+export async function getBucketConfig(scope: 'user'): Promise<BucketConfig> {
   const cached = bucketCache.get(scope)
   if (cached && cached.expiresAt > Date.now()) return cached.value
 
   const fallback = throttlingDefaults[scope]
   let value: BucketConfig
   try {
-    const values = await getOptions(["throttling"])
+    const values = await getOptions(['throttling'])
     const throttling = values.throttling
     value =
-      !throttling || typeof throttling !== "object" || Array.isArray(throttling)
+      !throttling || typeof throttling !== 'object' || Array.isArray(throttling)
         ? fallback
         : parseBucketConfig((throttling as Record<string, unknown>)[scope], fallback)
   } catch {
@@ -134,11 +124,7 @@ export async function getBucketConfig(scope: "user"): Promise<BucketConfig> {
 
 export type ConsumeResult = { allowed: true } | { allowed: false; wait: number }
 
-export async function consumeToken(
-  scope: "user",
-  identity: string,
-  num = 1,
-): Promise<ConsumeResult> {
+export async function consumeToken(scope: 'user', identity: string, num = 1): Promise<ConsumeResult> {
   const bucket = await getBucketConfig(scope)
   // 桶全满需要 capacity / fill_rate 秒；留出余量后过期，避免残留 key 无限堆积。
   // 每次调用都会刷新 TTL，因此只有长时间无提交才会过期，届时桶早已回满，
@@ -172,10 +158,7 @@ export type AttemptRule = { limit: number; windowSeconds: number }
 
 /** 已锁定时返回还要等几秒，否则 null。只读，不计数。 */
 export async function lockoutRemaining(key: string, rule: AttemptRule) {
-  const [count, ttl] = await Promise.all([
-    redis.get(`attempts:${key}`),
-    redis.ttl(`attempts:${key}`),
-  ])
+  const [count, ttl] = await Promise.all([redis.get(`attempts:${key}`), redis.ttl(`attempts:${key}`)])
   if (Number(count) < rule.limit) return null
   // ttl 为 -1（没有过期时间）理论上不会出现，EXPIRE NX 总会补上；兜底按整窗算
   return ttl > 0 ? ttl : rule.windowSeconds
@@ -187,7 +170,7 @@ export async function countAttempt(key: string, rule: AttemptRule) {
     .incr(`attempts:${key}`)
     // NX：只在窗口里第一次计数时设过期，之后不续期 —— 否则攻击者持续猜就永远锁着，
     // 真正的主人过了窗口也登不进来
-    .expire(`attempts:${key}`, rule.windowSeconds, "NX")
+    .expire(`attempts:${key}`, rule.windowSeconds, 'NX')
     .exec()
 }
 
@@ -201,5 +184,5 @@ export async function resetAttempts(key: string) {
  * 所以这个头是可信的。本机 dev 走 Vite 代理没有这个头，统一落到一个桶里，无所谓。
  */
 export function clientIp(c: Context) {
-  return c.req.header("x-real-ip") || "unknown"
+  return c.req.header('x-real-ip') || 'unknown'
 }

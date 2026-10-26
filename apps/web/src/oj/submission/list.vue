@@ -1,37 +1,31 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { useRouteQuery } from "@vueuse/router"
-import { errorCode } from "utils/api"
-import {
-  adminRejudge,
-  getFlowchartSubmissions,
-  getSubmissions,
-  getTodaySubmissionCount,
-  retryFlowchartSubmission,
-} from "oj/api"
-import { useContestStore } from "oj/store/contest"
-import Pagination from "shared/components/Pagination.vue"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { usePagination } from "shared/composables/pagination"
-import { useConfigStore } from "shared/store/config"
-import { useUserStore } from "shared/store/user"
-import { LANGUAGE_SHOW_VALUE, SubmissionStatus } from "utils/constants"
-import { parseTime } from "utils/functions"
-import type { FlowchartSubmissionListItem, LANGUAGE, SubmissionListItem } from "utils/types"
-import { FlowchartSubmissionStatus } from "utils/types"
-import FlowchartState from "./components/FlowchartState.vue"
-import StatusPill from "./components/StatusPill.vue"
-import UserName from "shared/components/UserName.vue"
-import { useTone } from "shared/composables/tone"
-import { classLabel, classSelectOptions } from "utils/classes"
-import { submissionClockText, submissionDayText } from "./utils"
-import { useLessonFilter } from "./composables/lessonFilter"
-import { useListLive } from "./composables/listLive"
-import type { Row, SubmissionQuery } from "./composables/listQuery"
-import { useRowCursor } from "./composables/rowCursor"
-import { useStatsLink } from "./composables/statsLink"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { useRouteQuery } from '@vueuse/router'
+import { errorCode } from 'utils/api'
+import { adminRejudge, getFlowchartSubmissions, getSubmissions, getTodaySubmissionCount, retryFlowchartSubmission } from 'oj/api'
+import { useContestStore } from 'oj/store/contest'
+import Pagination from 'shared/components/Pagination.vue'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { usePagination } from 'shared/composables/pagination'
+import { useConfigStore } from 'shared/store/config'
+import { useUserStore } from 'shared/store/user'
+import { LANGUAGE_SHOW_VALUE, SubmissionStatus } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import type { FlowchartSubmissionListItem, LANGUAGE, SubmissionListItem } from 'utils/types'
+import { FlowchartSubmissionStatus } from 'utils/types'
+import FlowchartState from './components/FlowchartState.vue'
+import StatusPill from './components/StatusPill.vue'
+import UserName from 'shared/components/UserName.vue'
+import { useTone } from 'shared/composables/tone'
+import { classLabel, classSelectOptions } from 'utils/classes'
+import { submissionClockText, submissionDayText } from './utils'
+import { useLessonFilter } from './composables/lessonFilter'
+import { useListLive } from './composables/listLive'
+import type { Row, SubmissionQuery } from './composables/listQuery'
+import { useRowCursor } from './composables/rowCursor'
+import { useStatsLink } from './composables/statsLink'
 
 /**
  * 提交列表（设计稿「提交列表重设计 · 定稿」）：左边列表、右边常驻选中那条的代码。
@@ -42,13 +36,11 @@ import { useStatsLink } from "./composables/statsLink"
  */
 
 // 右栏和今日统计弹框都不在关键路径上：右栏要等选中一条才有内容，弹框默认关着
-const SubmissionPane = defineAsyncComponent(() => import("./components/SubmissionPane.vue"))
-const FlowchartPane = defineAsyncComponent(() => import("./components/FlowchartPane.vue"))
-const TodayStatistics = defineAsyncComponent(() => import("./components/TodayStatistics.vue"))
+const SubmissionPane = defineAsyncComponent(() => import('./components/SubmissionPane.vue'))
+const FlowchartPane = defineAsyncComponent(() => import('./components/FlowchartPane.vue'))
+const TodayStatistics = defineAsyncComponent(() => import('./components/TodayStatistics.vue'))
 // 统计带着 chart.js，只有老师点开才拉
-const StatisticsView = defineAsyncComponent(
-  () => import("oj/statistics/components/StatisticsView.vue"),
-)
+const StatisticsView = defineAsyncComponent(() => import('oj/statistics/components/StatisticsView.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -65,56 +57,51 @@ const { isMobile, isDesktop } = useBreakpoints()
  * （九成五的提交最长一行 52 个字符，代码区要 ~650），就把列表收到 320、每条排成手机上
  * 那样的两行，什么都不丢。1280 的屏不放大正好不收；收不收只看分栏的宽，和列表自己无关，不会来回跳
  */
-const split = useTemplateRef<HTMLElement>("split")
+const split = useTemplateRef<HTMLElement>('split')
 const { width: splitWidth } = useElementSize(split)
-const narrowList = computed(
-  () => isDesktop.value && splitWidth.value > 0 && splitWidth.value < 1200,
-)
+const narrowList = computed(() => isDesktop.value && splitWidth.value > 0 && splitWidth.value < 1200)
 const twoLine = computed(() => isMobile.value || narrowList.value)
 
-const inContest = computed(() => route.name === "contest submissions")
+const inContest = computed(() => route.name === 'contest submissions')
 
 /**
  * 手机上点开的那一条，记在地址的 `?id=` 上：详情是从右边滑出的整屏，学生下意识按返回 ——
  * 返回键归路由管，退一步就是关掉详情、回到列表；刷新、转发链接也还停在这一条。
  * 列表在底下不卸载，滚到哪、上一条 / 下一条都还在
  */
-const paneId = computed(() =>
-  isMobile.value && typeof route.query.id === "string" ? route.query.id : "",
-)
+const paneId = computed(() => (isMobile.value && typeof route.query.id === 'string' ? route.query.id : ''))
 /** 从详情里点了「只看他」这类筛选：这一下要连 ?id= 一起换掉，见 leavePane() */
 let leavingPane = false
 const teacher = computed(() => userStore.isTeacherOrAbove)
 
 // 一节课一个班要交一百来条，每页 10 条得翻十几页；30 条配上右栏的方向键正好
-const { query, clearQuery } = usePagination<Omit<SubmissionQuery, "page" | "limit">>(
+const { query, clearQuery } = usePagination<Omit<SubmissionQuery, 'page' | 'limit'>>(
   {
-    username: useRouteQuery("username", "").value,
-    className: useRouteQuery("className", "").value,
-    result: useRouteQuery("result", "").value,
-    myself: useRouteQuery("myself", "0").value,
-    problem: useRouteQuery("problem", "").value,
-    language: useRouteQuery("language", "").value,
+    username: useRouteQuery('username', '').value,
+    className: useRouteQuery('className', '').value,
+    result: useRouteQuery('result', '').value,
+    myself: useRouteQuery('myself', '0').value,
+    problem: useRouteQuery('problem', '').value,
+    language: useRouteQuery('language', '').value,
     // 原来写死成 "0"，从别处带着 today=1 进来也不认
-    today: useRouteQuery("today", "0").value,
+    today: useRouteQuery('today', '0').value,
   },
   {
     defaultLimit: 30,
     // 手机上开着详情：翻页、换条件时地址里的 ?id= 带着走，也不多压历史（返回键是关详情）
-    extraQuery: (): Record<string, string> =>
-      paneId.value && !leavingPane ? { id: paneId.value } : {},
+    extraQuery: (): Record<string, string> => (paneId.value && !leavingPane ? { id: paneId.value } : {}),
     replace: () => !!paneId.value && !leavingPane,
   },
 )
 
-const flowMode = computed(() => !inContest.value && query.language === "Flowchart")
+const flowMode = computed(() => !inContest.value && query.language === 'Flowchart')
 
 /**
  * 用户名按整名匹配的那一个名字。默认是「包含」，而学号互相包含是常态（ks24a1 会混进
  * ks24a10–ks24a19）。两处会设它：协作条「看他交过什么」带进来的 `exactUsername=1`，
  * 和右栏的「只看他」。老师在输入框里改了名字就回到包含匹配
  */
-const exactFor = ref(useRouteQuery<string>("exactUsername", "").value === "1" ? query.username : "")
+const exactFor = ref(useRouteQuery<string>('exactUsername', '').value === '1' ? query.username : '')
 
 const submissions = ref<SubmissionListItem[]>([])
 const flowcharts = ref<FlowchartSubmissionListItem[]>([])
@@ -152,9 +139,7 @@ function fetchPage() {
       limit: query.limit,
       today: query.today,
       grade: query.result,
-      ...(exactFor.value && query.username === exactFor.value
-        ? { exactUsername: "1" as const }
-        : {}),
+      ...(exactFor.value && query.username === exactFor.value ? { exactUsername: '1' as const } : {}),
     })
   }
   return getSubmissions({
@@ -166,10 +151,10 @@ function fetchPage() {
     limit: query.limit,
     page: query.page,
     problemDisplayId: query.problem,
-    contestId: inContest.value ? String(route.params.contestID) : "",
-    language: inContest.value ? "" : (query.language as LANGUAGE | ""),
+    contestId: inContest.value ? String(route.params.contestID) : '',
+    language: inContest.value ? '' : (query.language as LANGUAGE | ''),
     today: inContest.value ? undefined : query.today,
-    ...(exactFor.value && query.username === exactFor.value ? { exactUsername: "1" as const } : {}),
+    ...(exactFor.value && query.username === exactFor.value ? { exactUsername: '1' as const } : {}),
   })
 }
 
@@ -191,7 +176,7 @@ async function listSubmissions() {
     newCount.value = 0
     loaded.value = true
     // 翻了页、换了条件就回到列表顶上（往回翻到上一页末尾的，settleSelection 会滚到那一条）
-    const scroller = document.querySelector(".rows")
+    const scroller = document.querySelector('.rows')
     if (scroller) scroller.scrollTop = 0
     // 手机上整页滚，滚的是外层 n-layout 的容器：翻到下一页原来停在页尾
     if (isMobile.value) pageScroller()?.scrollTo({ top: 0 })
@@ -204,13 +189,13 @@ async function listSubmissions() {
   }
 }
 
-const pageRoot = useTemplateRef<HTMLElement>("pageRoot")
+const pageRoot = useTemplateRef<HTMLElement>('pageRoot')
 
 /** 往上找真正在滚的那层（同自学页：n-layout-content 也带 scroll-container 类却不滚） */
 function pageScroller(): HTMLElement | null {
   for (let el = pageRoot.value?.parentElement; el; el = el.parentElement) {
     const overflow = getComputedStyle(el).overflowY
-    if ((overflow === "auto" || overflow === "scroll") && el.scrollHeight > el.clientHeight) {
+    if ((overflow === 'auto' || overflow === 'scroll') && el.scrollHeight > el.clientHeight) {
       return el
     }
   }
@@ -218,37 +203,26 @@ function pageScroller(): HTMLElement | null {
 }
 
 async function getTodayCount() {
-  todayCount.value = await getTodaySubmissionCount(flowMode.value ? "Flowchart" : undefined)
+  todayCount.value = await getTodaySubmissionCount(flowMode.value ? 'Flowchart' : undefined)
 }
 
 onMounted(() => {
   listSubmissions()
   // 「今日统计 N」只给学生：老师那一版并进了「统计」
-  if (route.name === "submissions" && !teacher.value) getTodayCount()
+  if (route.name === 'submissions' && !teacher.value) getTodayCount()
 })
 
 watchDebounced(() => [query.username, query.problem], listSubmissions, {
   debounce: 500,
   maxWait: 1000,
 })
-watch(
-  () => [
-    query.page,
-    query.limit,
-    query.myself,
-    query.result,
-    query.language,
-    query.today,
-    query.className,
-  ],
-  listSubmissions,
-)
+watch(() => [query.page, query.limit, query.myself, query.result, query.language, query.today, query.className], listSubmissions)
 // 代码和流程图的「结果」不是一套（判题状态 / 等级），切过去要清掉
 watch(
   () => query.language,
   (value, old) => {
-    if ((value === "Flowchart") !== (old === "Flowchart")) query.result = ""
-    if (route.name === "submissions") getTodayCount()
+    if ((value === 'Flowchart') !== (old === 'Flowchart')) query.result = ''
+    if (route.name === 'submissions') getTodayCount()
   },
 )
 // 登录态一变，能看哪些代码就变了（showLink 是后端逐行算的）。掉了登录还停在流程图上的话
@@ -256,7 +230,7 @@ watch(
 watch(
   () => userStore.isAuthed,
   (authed) => {
-    if (!authed && query.language === "Flowchart") query.language = ""
+    if (!authed && query.language === 'Flowchart') query.language = ''
     else listSubmissions()
   },
 )
@@ -267,13 +241,13 @@ watch(
  * `/submission`，页面却还停在「我的」
  */
 const QUERY_DEFAULTS: Record<string, string> = {
-  username: "",
-  className: "",
-  result: "",
-  myself: "0",
-  problem: "",
-  language: "",
-  today: "0",
+  username: '',
+  className: '',
+  result: '',
+  myself: '0',
+  problem: '',
+  language: '',
+  today: '0',
 }
 watch(
   () => route.query,
@@ -287,21 +261,20 @@ watch(
 
 // ==================== 选中与翻阅 ====================
 
-const { selectedId, selectedRow, position, maxPage, select, move, settleSelection, forgetJump } =
-  useRowCursor({
-    rows,
-    total,
-    query,
-    loading,
-    isMobile,
-    isDesktop,
-    keysBlocked: () => todayPanel.value || statsPanel.value,
-    wantedId: () => (typeof route.query.id === "string" ? route.query.id : ""),
-    dropWanted: () => {
-      if (paneId.value) router.replace({ query: queryWithoutId() })
-    },
-    onNothingToShow: () => message.info("这一页没有可以查看的代码"),
-  })
+const { selectedId, selectedRow, position, maxPage, select, move, settleSelection, forgetJump } = useRowCursor({
+  rows,
+  total,
+  query,
+  loading,
+  isMobile,
+  isDesktop,
+  keysBlocked: () => todayPanel.value || statsPanel.value,
+  wantedId: () => (typeof route.query.id === 'string' ? route.query.id : ''),
+  dropWanted: () => {
+    if (paneId.value) router.replace({ query: queryWithoutId() })
+  },
+  onNothingToShow: () => message.info('这一页没有可以查看的代码'),
+})
 
 const [todayPanel, toggleTodayPanel] = useToggle(false)
 useBackClose(todayPanel, isMobile)
@@ -331,7 +304,7 @@ function rowClicked(row: Row) {
  */
 function closePane() {
   const back = history.state?.back
-  if (typeof back === "string" && router.resolve(back).name === route.name) router.back()
+  if (typeof back === 'string' && router.resolve(back).name === route.name) router.back()
   else router.replace({ query: queryWithoutId() })
 }
 
@@ -387,38 +360,36 @@ function showNew() {
 // ==================== 筛选 ====================
 
 const resultOptions = [
-  { label: "全部结果", value: "" },
-  { label: "答案正确", value: String(SubmissionStatus.accepted) },
-  { label: "语法未通过", value: String(SubmissionStatus.ast_check_failed) },
-  { label: "答案错误", value: String(SubmissionStatus.wrong_answer) },
-  { label: "编译失败", value: String(SubmissionStatus.compile_error) },
-  { label: "运行时错误", value: String(SubmissionStatus.runtime_error) },
-  { label: "运行超时", value: String(SubmissionStatus.cpu_time_limit_exceeded) },
+  { label: '全部结果', value: '' },
+  { label: '答案正确', value: String(SubmissionStatus.accepted) },
+  { label: '语法未通过', value: String(SubmissionStatus.ast_check_failed) },
+  { label: '答案错误', value: String(SubmissionStatus.wrong_answer) },
+  { label: '编译失败', value: String(SubmissionStatus.compile_error) },
+  { label: '运行时错误', value: String(SubmissionStatus.runtime_error) },
+  { label: '运行超时', value: String(SubmissionStatus.cpu_time_limit_exceeded) },
 ]
 
 const gradeOptions = [
-  { label: "全部等级", value: "" },
-  { label: "S 级", value: "S" },
-  { label: "A 级", value: "A" },
-  { label: "B 级", value: "B" },
-  { label: "C 级", value: "C" },
+  { label: '全部等级', value: '' },
+  { label: 'S 级', value: 'S' },
+  { label: 'A 级', value: 'A' },
+  { label: 'B 级', value: 'B' },
+  { label: 'C 级', value: 'C' },
 ]
 
 // 原来没有 SQL：3 月以来有 91 条 SQL 提交、9 道题开了 SQL，想筛只能靠翻
 const languageOptions = [
-  { label: "全部语言", value: "" },
-  { label: "Python", value: "Python" },
-  { label: "C语言", value: "C" },
-  { label: "C++", value: "C++" },
-  { label: "SQL", value: "SQL" },
+  { label: '全部语言', value: '' },
+  { label: 'Python', value: 'Python' },
+  { label: 'C语言', value: 'C' },
+  { label: 'C++', value: 'C++' },
+  { label: 'SQL', value: 'SQL' },
 ]
 
-const classOptions = computed(() =>
-  classSelectOptions(configStore.config?.classList ?? [], query.className),
-)
+const classOptions = computed(() => classSelectOptions(configStore.config?.classList ?? [], query.className))
 
 const contestProblemOptions = computed(() => [
-  { label: "全部题目", value: "" },
+  { label: '全部题目', value: '' },
   ...contestStore.problems.map((problem) => ({
     label: `${problem._id} ${problem.title}`,
     value: problem._id,
@@ -426,26 +397,26 @@ const contestProblemOptions = computed(() => [
 ])
 
 const mode = computed({
-  get: () => (flowMode.value ? "flow" : "code"),
-  set: (value: string) => (query.language = value === "flow" ? "Flowchart" : ""),
+  get: () => (flowMode.value ? 'flow' : 'code'),
+  set: (value: string) => (query.language = value === 'flow' ? 'Flowchart' : ''),
 })
 
-const mine = computed(() => query.myself === "1")
+const mine = computed(() => query.myself === '1')
 const scope = computed({
-  get: () => (mine.value ? "mine" : "all"),
+  get: () => (mine.value ? 'mine' : 'all'),
   set: (value: string) => {
     // 「这节课」是看全班用的，切到「我的」就把它带的题号和「今天」一起放掉
-    if (value === "mine" && lessonActive.value) {
-      query.problem = ""
-      query.today = "0"
+    if (value === 'mine' && lessonActive.value) {
+      query.problem = ''
+      query.today = '0'
     }
-    query.myself = value === "mine" ? "1" : "0"
+    query.myself = value === 'mine' ? '1' : '0'
   },
 })
 
 const today = computed({
-  get: () => query.today === "1",
-  set: (value: boolean) => (query.today = value ? "1" : "0"),
+  get: () => query.today === '1',
+  set: (value: boolean) => (query.today = value ? '1' : '0'),
 })
 
 const { lesson, lessonActive, lessonLoading, toggleLesson } = useLessonFilter({
@@ -457,17 +428,17 @@ const { lesson, lessonActive, lessonLoading, toggleLesson } = useLessonFilter({
 const activeFilters = computed(
   () =>
     [query.username, query.className, query.result, query.problem].filter(Boolean).length +
-    (query.today === "1" ? 1 : 0) +
-    (query.language && query.language !== "Flowchart" ? 1 : 0),
+    (query.today === '1' ? 1 : 0) +
+    (query.language && query.language !== 'Flowchart' ? 1 : 0),
 )
 const mobileFilters = ref(false)
 
 function clear() {
-  const keepMode = query.language === "Flowchart" ? "Flowchart" : ""
-  exactFor.value = ""
+  const keepMode = query.language === 'Flowchart' ? 'Flowchart' : ''
+  exactFor.value = ''
   clearQuery()
-  query.myself = "0"
-  query.today = "0"
+  query.myself = '0'
+  query.today = '0'
   query.language = keepMode
 }
 
@@ -475,13 +446,13 @@ function clear() {
 const exactPerson = computed(() => !!exactFor.value && query.username === exactFor.value)
 
 function clearPerson() {
-  exactFor.value = ""
-  query.username = ""
+  exactFor.value = ''
+  query.username = ''
 }
 
 function filterUser(username: string) {
   exactFor.value = username
-  query.myself = "0"
+  query.myself = '0'
   query.username = username
 }
 
@@ -494,9 +465,9 @@ const { statsQuery, openStatistics, openStatisticsPage, listFromStatistics } = u
 
 /** 右栏「只看这个班」：从看一个人换成看他整个班 */
 function filterClass(name: string) {
-  exactFor.value = ""
-  query.username = ""
-  query.myself = "0"
+  exactFor.value = ''
+  query.username = ''
+  query.myself = '0'
   query.className = name
 }
 
@@ -509,12 +480,12 @@ function filterProblem(displayId: string) {
 function openProblem(row: Row) {
   if (inContest.value) {
     const path = router.resolve({
-      name: "contest problem",
+      name: 'contest problem',
       params: { contestID: route.params.contestID, problemID: row.problemDisplayId },
     })
-    window.open(path.href, "_blank")
+    window.open(path.href, '_blank')
   } else {
-    window.open("/problem/" + row.problemDisplayId, "_blank")
+    window.open('/problem/' + row.problemDisplayId, '_blank')
   }
 }
 
@@ -522,10 +493,10 @@ async function rejudge(id: string) {
   try {
     await adminRejudge(id)
   } catch {
-    message.error("重新判题没成功")
+    message.error('重新判题没成功')
     return
   }
-  message.success("已重新判题，结果出来会自己更新")
+  message.success('已重新判题，结果出来会自己更新')
   const row = submissions.value.find((item) => item.id === id)
   if (row) row.result = SubmissionStatus.pending
   pollSoon()
@@ -534,17 +505,17 @@ async function rejudge(id: string) {
 async function retryFlowchart(id: string) {
   // 按错误码分支而不是 match 文案（见 utils/api.ts 的约定）——后端文案是英文的
   const retryTips: Record<string, string> = {
-    "retry-not-allowed": "这条还在评分中，等出了结果再重新评分",
-    "too-many-submissions": "操作太频繁了，缓一下再试",
-    "flowchart-not-found": "提交不存在，或者没有权限",
+    'retry-not-allowed': '这条还在评分中，等出了结果再重新评分',
+    'too-many-submissions': '操作太频繁了，缓一下再试',
+    'flowchart-not-found': '提交不存在，或者没有权限',
   }
   try {
     await retryFlowchartSubmission(id)
   } catch (err) {
-    message.error(retryTips[errorCode(err) ?? ""] ?? "重新评分失败")
+    message.error(retryTips[errorCode(err) ?? ''] ?? '重新评分失败')
     return
   }
-  message.success("已重新评分，结果出来会自己更新")
+  message.success('已重新评分，结果出来会自己更新')
   const row = flowcharts.value.find((item) => item.id === id)
   if (row) row.status = FlowchartSubmissionStatus.PENDING
   pollSoon()
@@ -578,23 +549,19 @@ function othersRow(row: SubmissionListItem) {
  * 左栏 560 宽里题目名就只剩三个字。
  */
 function dayKey(time: string) {
-  return parseTime(time, "YYYY-MM-DD")
+  return parseTime(time, 'YYYY-MM-DD')
 }
 
 function dayBreak(index: number) {
   const list = rows.value
   const key = dayKey(list[index]!.createTime)
-  if (index > 0 && dayKey(list[index - 1]!.createTime) === key) return ""
+  if (index > 0 && dayKey(list[index - 1]!.createTime) === key) return ''
   return submissionDayText(list[index]!.createTime)
 }
 </script>
 
 <template>
-  <div
-    ref="pageRoot"
-    class="page"
-    :class="{ contest: inContest, mobile: isMobile, 'narrow-list': narrowList }"
-  >
+  <div ref="pageRoot" class="page" :class="{ contest: inContest, mobile: isMobile, 'narrow-list': narrowList }">
     <!-- 筛选栏 -->
     <div v-if="isDesktop" class="filters">
       <!-- 流程图列表要登录才能看（GET /flowcharts 是 requireAuth），没登录就不给这个切换 -->
@@ -614,28 +581,15 @@ function dayBreak(index: number) {
       <!-- 「我的」时这节课 / 班级 / 学生都用不上：后端只看自己时本来就不认它们 -->
       <!-- 学生界面没有班级下拉：地址里带着班级（比如从统计页、看板跳过来）就摆一个能点掉的标签，
            不然一直被一个看不见的条件筛着 -->
-      <button
-        v-if="!teacher && query.className"
-        class="chip on"
-        title="点一下去掉班级筛选"
-        @click="query.className = ''"
-      >
+      <button v-if="!teacher && query.className" class="chip on" title="点一下去掉班级筛选" @click="query.className = ''">
         {{ classLabel(query.className) }}<Icon icon="ph:x-bold" :width="12" />
       </button>
       <template v-if="teacher && !inContest && !mine">
-        <button
-          class="lesson"
-          :class="{ on: lessonActive }"
-          :disabled="lessonLoading"
-          title="筛到正在上课的班、这节课的题、今天"
-          @click="toggleLesson"
-        >
+        <button class="lesson" :class="{ on: lessonActive }" :disabled="lessonLoading" title="筛到正在上课的班、这节课的题、今天" @click="toggleLesson">
           <Icon v-if="lessonActive" icon="ph:check-bold" :width="12" />
           <b>这节课</b>
           <template v-if="lessonActive && lesson?.className">
-            <span>
-              {{ classLabel(lesson.className) }} · {{ lesson.problems.length }} 道题 · 今天
-            </span>
+            <span> {{ classLabel(lesson.className) }} · {{ lesson.problems.length }} 道题 · 今天 </span>
             <Icon icon="ph:x-bold" :width="12" class="lesson-x" />
           </template>
         </button>
@@ -653,31 +607,15 @@ function dayBreak(index: number) {
 
       <!-- 按整名只看一个人（「只看他」、协作条、看板点进来）：用户名有八九个字，塞进 108px 的
            输入框只剩半截，还被清除按钮压着 —— 换成一个带名字的标签，点 × 取消 -->
-      <button
-        v-if="!mine && exactPerson"
-        class="chip on person"
-        :title="`只看 ${query.username}（点一下取消）`"
-        @click="clearPerson"
-      >
+      <button v-if="!mine && exactPerson" class="chip on person" :title="`只看 ${query.username}（点一下取消）`" @click="clearPerson">
         <Icon icon="ph:user-bold" :width="12" />
         <UserName :username="query.username" class="person-name" />
         <Icon icon="ph:x-bold" :width="12" />
       </button>
-      <n-input
-        v-else-if="!mine"
-        v-model:value="query.username"
-        class="w-user"
-        clearable
-        :placeholder="teacher ? '学生' : '用户'"
-      >
+      <n-input v-else-if="!mine" v-model:value="query.username" class="w-user" clearable :placeholder="teacher ? '学生' : '用户'">
         <template #prefix><Icon icon="ph:magnifying-glass" /></template>
       </n-input>
-      <n-select
-        v-if="inContest"
-        v-model:value="query.problem"
-        class="w-problem-select"
-        :options="contestProblemOptions"
-      />
+      <n-select v-if="inContest" v-model:value="query.problem" class="w-problem-select" :options="contestProblemOptions" />
       <n-input
         v-else-if="!lessonActive"
         v-model:value="query.problem"
@@ -688,23 +626,9 @@ function dayBreak(index: number) {
       >
         <template #prefix><Icon icon="ph:hash" /></template>
       </n-input>
-      <n-select
-        v-model:value="query.result"
-        class="w-result"
-        :options="flowMode ? gradeOptions : resultOptions"
-      />
-      <n-select
-        v-if="!inContest && !flowMode"
-        v-model:value="query.language"
-        class="w-lang"
-        :options="languageOptions"
-      />
-      <button
-        v-if="!inContest && !lessonActive"
-        class="chip"
-        :class="{ on: today }"
-        @click="today = !today"
-      >
+      <n-select v-model:value="query.result" class="w-result" :options="flowMode ? gradeOptions : resultOptions" />
+      <n-select v-if="!inContest && !flowMode" v-model:value="query.language" class="w-lang" :options="languageOptions" />
+      <button v-if="!inContest && !lessonActive" class="chip" :class="{ on: today }" @click="today = !today">
         <Icon v-if="today" icon="ph:check-bold" :width="12" />今天
       </button>
       <n-button quaternary @click="clear">清空</n-button>
@@ -742,19 +666,11 @@ function dayBreak(index: number) {
       </n-radio-group>
       <div class="spacer"></div>
       <!-- 统计那张大表在弹框里排不开，手机上老师直接去统计页（页面形态有手机排版） -->
-      <n-button
-        v-if="teacher && route.name === 'submissions'"
-        quaternary
-        @click="openStatisticsPage"
-      >
+      <n-button v-if="teacher && route.name === 'submissions'" quaternary @click="openStatisticsPage">
         <template #icon><Icon icon="ph:chart-bar" /></template>
         统计
       </n-button>
-      <n-button
-        v-else-if="route.name === 'submissions' && !flowMode"
-        quaternary
-        @click="toggleTodayPanel(true)"
-      >
+      <n-button v-else-if="route.name === 'submissions' && !flowMode" quaternary @click="toggleTodayPanel(true)">
         <template #icon><Icon icon="ph:chart-bar" /></template>
         今日统计
       </n-button>
@@ -776,18 +692,11 @@ function dayBreak(index: number) {
         {{ classLabel(query.className) }}<Icon icon="ph:x-bold" :width="12" />
       </button>
       <template v-if="teacher && !inContest && !mine">
-        <button
-          class="lesson"
-          :class="{ on: lessonActive }"
-          :disabled="lessonLoading"
-          @click="toggleLesson"
-        >
+        <button class="lesson" :class="{ on: lessonActive }" :disabled="lessonLoading" @click="toggleLesson">
           <Icon v-if="lessonActive" icon="ph:check-bold" :width="12" />
           <b>这节课</b>
           <template v-if="lessonActive && lesson?.className">
-            <span class="lesson-text">
-              {{ classLabel(lesson.className) }} · {{ lesson.problems.length }} 道题 · 今天
-            </span>
+            <span class="lesson-text"> {{ classLabel(lesson.className) }} · {{ lesson.problems.length }} 道题 · 今天 </span>
             <Icon icon="ph:x-bold" :width="12" class="lesson-x" />
           </template>
         </button>
@@ -806,39 +715,19 @@ function dayBreak(index: number) {
         <UserName :username="query.username" class="person-name" />
         <Icon icon="ph:x-bold" :width="12" />
       </button>
-      <n-input
-        v-else-if="!mine"
-        v-model:value="query.username"
-        clearable
-        :placeholder="teacher ? '学生' : '用户'"
-      >
+      <n-input v-else-if="!mine" v-model:value="query.username" clearable :placeholder="teacher ? '学生' : '用户'">
         <template #prefix><Icon icon="ph:magnifying-glass" /></template>
       </n-input>
       <n-select v-if="inContest" v-model:value="query.problem" :options="contestProblemOptions" />
-      <n-input
-        v-else-if="!lessonActive"
-        v-model:value="query.problem"
-        clearable
-        placeholder="题号"
-        :status="unknownProblems.length ? 'warning' : undefined"
-      >
+      <n-input v-else-if="!lessonActive" v-model:value="query.problem" clearable placeholder="题号" :status="unknownProblems.length ? 'warning' : undefined">
         <template #prefix><Icon icon="ph:hash" /></template>
       </n-input>
       <div class="mobile-pair">
         <n-select v-model:value="query.result" :options="flowMode ? gradeOptions : resultOptions" />
-        <n-select
-          v-if="!inContest && !flowMode"
-          v-model:value="query.language"
-          :options="languageOptions"
-        />
+        <n-select v-if="!inContest && !flowMode" v-model:value="query.language" :options="languageOptions" />
       </div>
       <div class="mobile-panel-foot">
-        <button
-          v-if="!inContest && !lessonActive"
-          class="chip"
-          :class="{ on: today }"
-          @click="today = !today"
-        >
+        <button v-if="!inContest && !lessonActive" class="chip" :class="{ on: today }" @click="today = !today">
           <Icon v-if="today" icon="ph:check-bold" :width="12" />今天
         </button>
         <n-button quaternary @click="clear">清空</n-button>
@@ -852,22 +741,17 @@ function dayBreak(index: number) {
       <section class="list">
         <div v-if="unknownProblems.length" class="unknown-bar">
           <Icon icon="ph:warning" :width="13" />
-          题号 {{ unknownProblems.join("、") }} 没有这道题，下面只有其余题号的提交
+          题号 {{ unknownProblems.join('、') }} 没有这道题，下面只有其余题号的提交
         </div>
         <button v-if="newCount" class="new-bar" @click="showNew">
           <Icon icon="ph:arrow-up-bold" :width="13" />
-          有 {{ newCount }}{{ newCountCapped ? "+" : "" }} 条新提交，点这里显示
+          有 {{ newCount }}{{ newCountCapped ? '+' : '' }} 条新提交，点这里显示
         </button>
         <div class="rows" :class="{ dim: showLoading }">
           <template v-if="flowMode">
             <template v-for="(row, index) in flowcharts" :key="row.id">
               <div v-if="dayBreak(index)" class="day">{{ dayBreak(index) }}</div>
-              <div
-                class="row"
-                :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }"
-                :data-row-id="row.id"
-                @click="rowClicked(row)"
-              >
+              <div class="row" :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }" :data-row-id="row.id" @click="rowClicked(row)">
                 <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
                   <span class="c-user"><UserName :username="row.username" /></span>
@@ -886,9 +770,7 @@ function dayBreak(index: number) {
                   </div>
                   <div class="m-line sub">
                     <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
-                    <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`">
-                      {{ row.problemDisplayId }} {{ row.problemTitle }}
-                    </span>
+                    <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`"> {{ row.problemDisplayId }} {{ row.problemTitle }} </span>
                     <div class="spacer"></div>
                     <Icon v-if="!row.showLink" icon="ph:lock-simple" :width="13" class="m-lock" />
                   </div>
@@ -899,12 +781,7 @@ function dayBreak(index: number) {
           <template v-else>
             <template v-for="(row, index) in submissions" :key="row.id">
               <div v-if="dayBreak(index)" class="day">{{ dayBreak(index) }}</div>
-              <div
-                class="row"
-                :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }"
-                :data-row-id="row.id"
-                @click="rowClicked(row)"
-              >
+              <div class="row" :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }" :data-row-id="row.id" @click="rowClicked(row)">
                 <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
                   <span class="c-user">
@@ -914,13 +791,7 @@ function dayBreak(index: number) {
                     <span class="title">
                       <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                     </span>
-                    <span
-                      v-if="row.problemSet"
-                      class="ps"
-                      :title="'从题单「' + row.problemSet.title + '」交的'"
-                    >
-                      题单
-                    </span>
+                    <span v-if="row.problemSet" class="ps" :title="'从题单「' + row.problemSet.title + '」交的'"> 题单 </span>
                   </span>
                   <span class="c-lang">{{ languageText(row) }}</span>
                   <span class="c-state"><StatusPill :result="row.result" /></span>
@@ -929,11 +800,7 @@ function dayBreak(index: number) {
                     <span
                       v-if="!row.showLink"
                       class="lock-hint"
-                      :title="
-                        othersRow(row)
-                          ? '别人的代码看不到'
-                          : '题单布置期内先藏着：在题单里做对，或者布置期结束就能看'
-                      "
+                      :title="othersRow(row) ? '别人的代码看不到' : '题单布置期内先藏着：在题单里做对，或者布置期结束就能看'"
                     >
                       <Icon icon="ph:lock-simple" :width="13" />
                     </span>
@@ -947,18 +814,11 @@ function dayBreak(index: number) {
                   </div>
                   <div class="m-line sub">
                     <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
-                    <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`">
-                      {{ row.problemDisplayId }} {{ row.problemTitle }}
-                    </span>
+                    <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`"> {{ row.problemDisplayId }} {{ row.problemTitle }} </span>
                     <span v-if="row.problemSet" class="ps">题单</span>
                     <div class="spacer"></div>
                     <span class="m-lang">{{ languageText(row) }}</span>
-                    <Icon
-                      v-if="!teacher && !row.showLink"
-                      icon="ph:lock-simple"
-                      :width="13"
-                      class="m-lock"
-                    />
+                    <Icon v-if="!teacher && !row.showLink" icon="ph:lock-simple" :width="13" class="m-lock" />
                   </div>
                 </template>
               </div>
@@ -966,13 +826,7 @@ function dayBreak(index: number) {
           </template>
           <div v-if="loaded && !rows.length" class="empty">
             <span class="empty-title">
-              {{
-                lessonActive
-                  ? "这节课的题还没有人交"
-                  : mine && activeFilters === 0
-                    ? "你还没有交过"
-                    : "没有符合条件的提交"
-              }}
+              {{ lessonActive ? '这节课的题还没有人交' : mine && activeFilters === 0 ? '你还没有交过' : '没有符合条件的提交' }}
             </span>
             <n-button v-if="activeFilters" size="small" @click="clear">清空筛选</n-button>
           </div>
@@ -981,13 +835,7 @@ function dayBreak(index: number) {
         <div class="list-foot">
           <span v-if="total && !narrowList" class="total">共 {{ total }} 条</span>
           <div class="spacer"></div>
-          <Pagination
-            class="pager"
-            :total="total"
-            :simple="narrowList"
-            v-model:limit="query.limit"
-            v-model:page="query.page"
-          />
+          <Pagination class="pager" :total="total" :simple="narrowList" v-model:limit="query.limit" v-model:page="query.page" />
         </div>
       </section>
 
@@ -1025,11 +873,7 @@ function dayBreak(index: number) {
   </div>
 
   <n-drawer v-if="isMobile" v-model:show="mobilePane" width="100%" placement="right">
-    <n-drawer-content
-      closable
-      title="提交详情"
-      :body-content-style="{ padding: 0, height: '100%' }"
-    >
+    <n-drawer-content closable title="提交详情" :body-content-style="{ padding: 0, height: '100%' }">
       <div v-if="selectedRow" class="mobile-pane">
         <FlowchartPane
           v-if="flowMode"
@@ -1061,21 +905,9 @@ function dayBreak(index: number) {
       <!-- 手机没有方向键：上一条 / 下一条换成按钮，走的是同一个 move() -->
       <template #footer>
         <n-flex justify="space-between" style="width: 100%">
-          <n-button
-            :disabled="!position || (position.index <= 1 && query.page <= 1)"
-            @click="move(-1)"
-          >
-            上一条
-          </n-button>
-          <span class="mobile-pos">{{
-            position ? `${position.index} / ${position.count}` : ""
-          }}</span>
-          <n-button
-            :disabled="!position || (position.index >= position.count && query.page >= maxPage)"
-            @click="move(1)"
-          >
-            下一条
-          </n-button>
+          <n-button :disabled="!position || (position.index <= 1 && query.page <= 1)" @click="move(-1)"> 上一条 </n-button>
+          <span class="mobile-pos">{{ position ? `${position.index} / ${position.count}` : '' }}</span>
+          <n-button :disabled="!position || (position.index >= position.count && query.page >= maxPage)" @click="move(1)"> 下一条 </n-button>
         </n-flex>
       </template>
     </n-drawer-content>
@@ -1119,7 +951,7 @@ function dayBreak(index: number) {
   height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 /* 比赛里套在比赛页头下面，不铺满，给个框 */
@@ -1127,7 +959,7 @@ function dayBreak(index: number) {
   margin: 0;
   height: calc(100vh - 150px);
   min-height: 480px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1151,7 +983,7 @@ function dayBreak(index: number) {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 /* 窗口窄（或浏览器放大）排不下时折成两行，各个框保持原宽，不再被压扁、「统计」不再被挤出去 */
@@ -1181,8 +1013,8 @@ function dayBreak(index: number) {
   align-items: stretch;
   gap: 10px;
   padding: 12px 14px 14px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.actionColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.actionColor');
 }
 
 .mobile-panel > .n-radio-group,
@@ -1229,7 +1061,7 @@ function dayBreak(index: number) {
   width: 1px;
   height: 20px;
   margin: 0 4px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 /* 最长的是「26计算机11班」：132px 时只剩两像素余量，字体稍宽的机器上就出省略号 */
@@ -1277,19 +1109,19 @@ function dayBreak(index: number) {
 
 .count {
   margin-left: 4px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .chip,
 .lesson {
   height: var(--oj-ctrl-h);
   padding: 0 14px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 17px;
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1299,7 +1131,7 @@ function dayBreak(index: number) {
 
 .chip.on,
 .lesson.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   background: v-bind("tone('success').background");
   color: v-bind("tone('success').color");
 }
@@ -1347,7 +1179,7 @@ function dayBreak(index: number) {
   flex: 0 0 46%;
   max-width: 900px;
   box-sizing: border-box;
-  border-right: 1px solid v-bind("theme.dividerColor");
+  border-right: 1px solid v-bind('theme.dividerColor');
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1369,7 +1201,7 @@ function dayBreak(index: number) {
   height: 36px;
   flex: none;
   border: 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   background: v-bind("tone('success').background");
   font: inherit;
   font-size: var(--oj-fs-sec);
@@ -1392,7 +1224,7 @@ function dayBreak(index: number) {
   font-size: var(--oj-fs-sec);
   color: v-bind("tone('warning').color");
   background: v-bind("tone('warning').background");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .rows {
@@ -1419,7 +1251,7 @@ function dayBreak(index: number) {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   cursor: pointer;
   font-size: var(--oj-fs-body);
 }
@@ -1430,7 +1262,7 @@ function dayBreak(index: number) {
 }
 
 .row:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .row.on {
@@ -1455,7 +1287,7 @@ function dayBreak(index: number) {
 
 .m-line.sub {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .m-line .title {
@@ -1500,7 +1332,7 @@ function dayBreak(index: number) {
   width: 64px;
   flex: none;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1517,9 +1349,9 @@ function dayBreak(index: number) {
   align-items: center;
   font-size: var(--oj-fs-meta);
   font-weight: 600;
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .c-user {
@@ -1536,7 +1368,7 @@ function dayBreak(index: number) {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .c-problem .title {
@@ -1545,7 +1377,7 @@ function dayBreak(index: number) {
 }
 
 .pid {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .ps {
@@ -1566,7 +1398,7 @@ function dayBreak(index: number) {
   text-align: right;
   font-size: var(--oj-fs-meta);
   white-space: nowrap;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .c-state {
@@ -1584,7 +1416,7 @@ function dayBreak(index: number) {
   width: 14px;
   flex: none;
   display: flex;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   opacity: 0.6;
 }
 
@@ -1594,13 +1426,13 @@ function dayBreak(index: number) {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .empty-title {
   font-size: 16px;
   font-weight: 600;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .list-foot {
@@ -1611,12 +1443,12 @@ function dayBreak(index: number) {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .total {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
@@ -1631,8 +1463,8 @@ function dayBreak(index: number) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.bodyColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.bodyColor');
 }
 
 .mobile-pane {
@@ -1642,6 +1474,6 @@ function dayBreak(index: number) {
 
 .mobile-pos {
   align-self: center;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

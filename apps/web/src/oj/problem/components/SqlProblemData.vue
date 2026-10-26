@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { SqlDisplay } from "utils/types"
-import { tableChanges } from "../utils/sqlChanges"
-import SQLDataTable from "./SQLDataTable.vue"
+import type { SqlDisplay } from 'utils/types'
+import { tableChanges } from '../utils/sqlChanges'
+import SQLDataTable from './SQLDataTable.vue'
 
 /**
  * SQL 题题面里的「数据表」和「期望结果」。题目页和后台出题页的预览共用这一份 ——
@@ -16,14 +16,12 @@ const props = defineProps<{
 
 defineSlots<{ title(props: { text: string }): any }>()
 
-const expectedQuery = computed(() =>
-  "columns" in props.display.expected ? props.display.expected : null,
-)
+const expectedQuery = computed(() => ('columns' in props.display.expected ? props.display.expected : null))
 
 /** 增删改题：执行后的每张表配上它比原来变了什么 */
 const changedTables = computed(() => {
   const expected = props.display.expected
-  if (!("changed_tables" in expected)) return []
+  if (!('changed_tables' in expected)) return []
   return expected.changed_tables.map((table) => ({
     table,
     changes: tableChanges(
@@ -34,37 +32,21 @@ const changedTables = computed(() => {
 })
 
 /** 增删改题里不是题面那组的测试数据可以一行都不改（看学生会不会多改），出题页预览会碰到 */
-const noChange = computed(
-  () => "changed_tables" in props.display.expected && !props.display.expected.changed_tables.length,
-)
+const noChange = computed(() => 'changed_tables' in props.display.expected && !props.display.expected.changed_tables.length)
 
-const anyChanged = computed(() =>
-  changedTables.value.some(
-    ({ changes }) => changes && (changes.cells.size > 0 || changes.newRows.size > 0),
-  ),
-)
+const anyChanged = computed(() => changedTables.value.some(({ changes }) => changes && (changes.cells.size > 0 || changes.newRows.size > 0)))
 </script>
 
 <template>
   <slot name="title" text="数据表" />
   <div v-for="t in display.tables" :key="t.name">
     <p class="sqlTableName">{{ t.name }}</p>
-    <SQLDataTable
-      :columns="t.columns"
-      :rows="t.rows"
-      :total-rows="t.total_rows"
-      :truncated="t.truncated"
-    />
+    <SQLDataTable :columns="t.columns" :rows="t.rows" :total-rows="t.total_rows" :truncated="t.truncated" />
   </div>
 
   <slot name="title" text="期望结果" />
   <template v-if="expectedQuery">
-    <SQLDataTable
-      :columns="expectedQuery.columns"
-      :rows="expectedQuery.rows"
-      :total-rows="expectedQuery.total_rows"
-      :truncated="expectedQuery.truncated"
-    />
+    <SQLDataTable :columns="expectedQuery.columns" :rows="expectedQuery.rows" :total-rows="expectedQuery.total_rows" :truncated="expectedQuery.truncated" />
     <p v-if="!orderSensitive" class="sqlNote">结果顺序不限</p>
   </template>
   <div v-for="{ table, changes } in changedTables" :key="table.name">
@@ -72,26 +54,15 @@ const anyChanged = computed(() =>
       {{ table.dropped ? `${table.name} 表已被删除` : `执行后的 ${table.name} 表` }}
     </p>
     <template v-if="!table.dropped">
-      <SQLDataTable
-        :columns="table.columns"
-        :rows="table.rows"
-        :total-rows="table.total_rows"
-        :truncated="table.truncated"
-        :changes="changes"
-      />
+      <SQLDataTable :columns="table.columns" :rows="table.rows" :total-rows="table.total_rows" :truncated="table.truncated" :changes="changes" />
       <p v-if="changes?.removed.length" class="sqlNote">
-        删掉了 {{ changes.removed.length }} 行（{{ table.columns[0]?.name }} 是
-        {{ changes.removed.join("、") }}）
+        删掉了 {{ changes.removed.length }} 行（{{ table.columns[0]?.name }} 是 {{ changes.removed.join('、') }}）
       </p>
-      <p v-else-if="changes && !changes.cells.size && !changes.newRows.size" class="sqlNote">
-        执行后这张表没有变化
-      </p>
+      <p v-else-if="changes && !changes.cells.size && !changes.newRows.size" class="sqlNote">执行后这张表没有变化</p>
     </template>
   </div>
   <p v-if="noChange" class="sqlNote">执行后所有表都没有变化</p>
-  <p v-if="anyChanged" class="sqlNote legend">
-    <span class="swatch" aria-hidden="true"></span>执行后变了的格子
-  </p>
+  <p v-if="anyChanged" class="sqlNote legend"><span class="swatch" aria-hidden="true"></span>执行后变了的格子</p>
 </template>
 
 <style scoped>

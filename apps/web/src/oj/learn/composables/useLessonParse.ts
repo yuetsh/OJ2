@@ -1,4 +1,4 @@
-import type { Exercise } from "utils/types"
+import type { Exercise } from 'utils/types'
 
 /**
  * 把一课的 Markdown 正文拆成几段，各段交给不同的组件渲染：
@@ -15,11 +15,11 @@ import type { Exercise } from "utils/types"
  * 已经有了，每课都重复一张同样的项目图只是把正文往下推。
  */
 export type LessonSegment =
-  | { type: "md"; content: string }
-  | { type: "heading"; id: string; text: string }
-  | { type: "goals"; id: string; items: string[] }
-  | { type: "code"; lang: "python" | "c"; code: string; index: number; wrapMain: boolean }
-  | { type: "exercise"; exercise: Exercise; index: number }
+  | { type: 'md'; content: string }
+  | { type: 'heading'; id: string; text: string }
+  | { type: 'goals'; id: string; items: string[] }
+  | { type: 'code'; lang: 'python' | 'c'; code: string; index: number; wrapMain: boolean }
+  | { type: 'exercise'; exercise: Exercise; index: number }
 
 /** 大纲里的一项：一个二级标题，挂着它这一节里的练一练 */
 export interface OutlineItem {
@@ -28,17 +28,17 @@ export interface OutlineItem {
   exerciseIds: number[]
 }
 
-const CODE_LANGS: Record<string, "python" | "c"> = {
-  python: "python",
-  py: "python",
-  python3: "python",
-  c: "c",
-  cpp: "c",
-  "c++": "c",
+const CODE_LANGS: Record<string, 'python' | 'c'> = {
+  python: 'python',
+  py: 'python',
+  python3: 'python',
+  c: 'c',
+  cpp: 'c',
+  'c++': 'c',
 }
 
 const EXERCISE_RE = /\[\[exercise:(\d+)\]\]/g
-const GOALS_TITLE = "学习目标"
+const GOALS_TITLE = '学习目标'
 
 /** 去掉开头的标题、所属项目、项目配图（中间的空行一起） */
 function stripPreamble(lines: string[]) {
@@ -47,12 +47,12 @@ function stripPreamble(lines: string[]) {
     while (i < lines.length && !lines[i]!.trim()) i++
   }
   skipBlank()
-  if (lines[i]?.startsWith("# ")) i++
+  if (lines[i]?.startsWith('# ')) i++
   skipBlank()
-  if (/^\*\*所属项目[：:]/.test(lines[i]?.trim() ?? "")) {
+  if (/^\*\*所属项目[：:]/.test(lines[i]?.trim() ?? '')) {
     i++
     skipBlank()
-    if (/^!\[[^\]]*\]\([^)]*\)\s*$/.test(lines[i]?.trim() ?? "")) i++
+    if (/^!\[[^\]]*\]\([^)]*\)\s*$/.test(lines[i]?.trim() ?? '')) i++
   }
   return lines.slice(i)
 }
@@ -67,12 +67,12 @@ export function parseLesson(content: string, exercises: Exercise[]) {
   let headingIndex = 0
 
   const flush = () => {
-    const text = md.join("\n")
-    if (text.trim()) segments.push({ type: "md", content: text })
+    const text = md.join('\n')
+    if (text.trim()) segments.push({ type: 'md', content: text })
     md = []
   }
 
-  const lines = stripPreamble(content.replace(/\r\n/g, "\n").split("\n"))
+  const lines = stripPreamble(content.replace(/\r\n/g, '\n').split('\n'))
   let i = 0
   while (i < lines.length) {
     const line = lines[i]!
@@ -86,11 +86,11 @@ export function parseLesson(content: string, exercises: Exercise[]) {
       if (lang) {
         flush()
         segments.push({
-          type: "code",
+          type: 'code',
           lang,
-          code: body.join("\n"),
+          code: body.join('\n'),
           index: codeIndex++,
-          wrapMain: lang === "c" && !!fence[4],
+          wrapMain: lang === 'c' && !!fence[4],
         })
       } else {
         md.push(line, ...body, lines[j] ?? marker)
@@ -113,12 +113,12 @@ export function parseLesson(content: string, exercises: Exercise[]) {
           if (item) items.push(item[1]!.trim())
           j++
         }
-        segments.push({ type: "goals", id, items })
-        outline.push({ id, text: "学完这课你能", exerciseIds: [] })
+        segments.push({ type: 'goals', id, items })
+        outline.push({ id, text: '学完这课你能', exerciseIds: [] })
         i = j
         continue
       }
-      segments.push({ type: "heading", id, text })
+      segments.push({ type: 'heading', id, text })
       outline.push({ id, text, exerciseIds: [] })
       i++
       continue
@@ -139,7 +139,7 @@ export function parseLesson(content: string, exercises: Exercise[]) {
         const exercise = byId.get(Number(match[1]))
         if (!exercise) continue
         flush()
-        segments.push({ type: "exercise", exercise, index: exerciseIndex++ })
+        segments.push({ type: 'exercise', exercise, index: exerciseIndex++ })
         outline[outline.length - 1]?.exerciseIds.push(exercise.id)
       }
       md.push(line.slice(last))
@@ -153,12 +153,10 @@ export function parseLesson(content: string, exercises: Exercise[]) {
   flush()
 
   // 正文里没放占位符的练一练接在最后：学完一课要全做对，看不见的题会让这课永远学不完
-  const placed = new Set(
-    segments.flatMap((item) => (item.type === "exercise" ? [item.exercise.id] : [])),
-  )
+  const placed = new Set(segments.flatMap((item) => (item.type === 'exercise' ? [item.exercise.id] : [])))
   for (const exercise of exercises) {
     if (placed.has(exercise.id)) continue
-    segments.push({ type: "exercise", exercise, index: exerciseIndex++ })
+    segments.push({ type: 'exercise', exercise, index: exerciseIndex++ })
     outline[outline.length - 1]?.exerciseIds.push(exercise.id)
   }
   return { segments, outline, exerciseCount: exerciseIndex }

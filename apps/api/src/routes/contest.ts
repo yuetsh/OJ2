@@ -8,15 +8,15 @@ import {
   type ContestList,
   type ProblemDetail,
   type ProblemListItem,
-} from "@oj2/contract"
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, sql } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, requireAuth } from "../auth/middleware"
-import { setContestPassword } from "../auth/session"
-import { db, schema } from "../db"
-import { astRequirements } from "../judge/ast"
-import { failure, parseBody, success } from "../http"
+import { optionalAuth, requireAuth } from '../auth/middleware'
+import { setContestPassword } from '../auth/session'
+import { db, schema } from '../db'
+import { astRequirements } from '../judge/ast'
+import { failure, parseBody, success } from '../http'
 import {
   canAccessContest,
   checkContestPassword,
@@ -29,9 +29,9 @@ import {
   rankHiddenFor,
   requireContestAccess,
   type ContestEnv,
-} from "../services/contest"
-import { countAttempt, lockoutRemaining, type AttemptRule } from "../services/throttling"
-import { asRecord, publicTemplates, queryInteger, sampleUser } from "./helpers"
+} from '../services/contest'
+import { countAttempt, lockoutRemaining, type AttemptRule } from '../services/throttling'
+import { asRecord, publicTemplates, queryInteger, sampleUser } from './helpers'
 
 export const contestRoutes = new Hono<ContestEnv>()
 
@@ -52,11 +52,7 @@ async function creators(ids: number[]) {
   return map
 }
 
-function serializeContest(
-  contest: typeof schema.contest.$inferSelect,
-  createdBy: ReturnType<typeof sampleUser>,
-  includeNow = false,
-) {
+function serializeContest(contest: typeof schema.contest.$inferSelect, createdBy: ReturnType<typeof sampleUser>, includeNow = false) {
   return {
     id: contest.id,
     title: contest.title,
@@ -68,7 +64,7 @@ function serializeContest(
     lastUpdateTime: contest.lastUpdateTime,
     createdBy,
     status: contestStatus(contest),
-    contestType: contest.password ? "Password Protected" : "Public",
+    contestType: contest.password ? 'Password Protected' : 'Public',
     now: includeNow ? new Date().toISOString() : undefined,
   } satisfies Contest
 }
@@ -77,10 +73,7 @@ function serializeContest(
  * 列表上要的几个数：每场几道题、几个学生交过，以及「我」在每场的名次和做对数。
  * 名次和榜单同一个口径（学生、没禁用、做对数 ↓ 罚时 ↑ id ↑），期中期末进行中不给名次
  */
-async function listExtras(
-  rows: (typeof schema.contest.$inferSelect)[],
-  userId: number | undefined,
-) {
+async function listExtras(rows: (typeof schema.contest.$inferSelect)[], userId: number | undefined) {
   const ids = rows.map((row) => row.id)
   if (ids.length === 0) return { problems: new Map(), people: new Map(), mine: new Map() }
   const idList = sql.join(
@@ -125,65 +118,45 @@ async function listExtras(
   }
 }
 
-contestRoutes.get("/contests", optionalAuth, async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const keyword = c.req.query("keyword")?.trim()
-  const tag = c.req.query("tag")?.trim()
-  const status = c.req.query("status")
+contestRoutes.get('/contests', optionalAuth, async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
+  const keyword = c.req.query('keyword')?.trim()
+  const tag = c.req.query('tag')?.trim()
+  const status = c.req.query('status')
   const now = new Date().toISOString()
   const filters = [eq(schema.contest.visible, true)]
   if (keyword) filters.push(ilike(schema.contest.title, `%${keyword}%`))
-  if (tag === "考试") filters.push(inArray(schema.contest.tag, [...EXAM_TAGS]))
+  if (tag === '考试') filters.push(inArray(schema.contest.tag, [...EXAM_TAGS]))
   else if (tag) filters.push(eq(schema.contest.tag, tag))
-  const user = c.get("user")
+  const user = c.get('user')
   // 「我参加过的」：交过题的才算（榜单行是第一次交题时建的）
-  if (c.req.query("joined") === "1" && user) {
+  if (c.req.query('joined') === '1' && user) {
     filters.push(
       inArray(
         schema.contest.id,
-        db
-          .select({ id: schema.acmContestRank.contestId })
-          .from(schema.acmContestRank)
-          .where(eq(schema.acmContestRank.userId, user.id)),
+        db.select({ id: schema.acmContestRank.contestId }).from(schema.acmContestRank).where(eq(schema.acmContestRank.userId, user.id)),
       ),
     )
   }
-  if (status === "1") filters.push(gte(schema.contest.startTime, now))
-  else if (status === "-1") filters.push(lte(schema.contest.endTime, now))
-  else if (status === "0")
-    filters.push(and(lte(schema.contest.startTime, now), gte(schema.contest.endTime, now))!)
+  if (status === '1') filters.push(gte(schema.contest.startTime, now))
+  else if (status === '-1') filters.push(lte(schema.contest.endTime, now))
+  else if (status === '0') filters.push(and(lte(schema.contest.startTime, now), gte(schema.contest.endTime, now))!)
   const where = and(...filters)
   const [totalRow, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.contest).where(where),
-    db
-      .select()
-      .from(schema.contest)
-      .where(where)
-      .orderBy(desc(schema.contest.startTime))
-      .limit(limit)
-      .offset(offset),
+    db.select().from(schema.contest).where(where).orderBy(desc(schema.contest.startTime)).limit(limit).offset(offset),
   ])
-  const [byId, extras] = await Promise.all([
-    creators([...new Set(rows.map((row) => row.createdById))]),
-    listExtras(rows, user?.id),
-  ])
+  const [byId, extras] = await Promise.all([creators([...new Set(rows.map((row) => row.createdById))]), listExtras(rows, user?.id)])
   return success(c, {
     results: rows.map((row) => {
       const mine = extras.mine.get(row.id)
       const total = extras.people.get(row.id) ?? 0
       return {
-        ...serializeContest(
-          row,
-          byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: "" }, null),
-        ),
+        ...serializeContest(row, byId.get(row.createdById) ?? sampleUser({ id: row.createdById, username: '' }, null)),
         problemCount: extras.problems.get(row.id) ?? 0,
         participantCount: total,
-        mine: !user
-          ? undefined
-          : mine
-            ? { rank: rankHiddenFor(user, row) ? null : mine.rank, total, solved: mine.solved }
-            : null,
+        mine: !user ? undefined : mine ? { rank: rankHiddenFor(user, row) ? null : mine.rank, total, solved: mine.solved } : null,
       } satisfies Contest
     }),
     total: totalRow[0]?.value ?? 0,
@@ -192,60 +165,39 @@ contestRoutes.get("/contests", optionalAuth, async (c) => {
 
 // optionalAuth 是为了下面那句 findAccessibleContest 认得出「这是出题人自己」——
 // 隐藏的比赛只有他看得到详情，匿名访问照旧当作不存在
-contestRoutes.get("/contests/:id", optionalAuth, async (c) => {
-  const contest = await findAccessibleContest(
-    c.get("user"),
-    queryInteger(c.req.param("id"), 0, { min: 1 }),
-  )
-  if (!contest) return failure(c, 404, "contest-not-found", "比赛不存在")
+contestRoutes.get('/contests/:id', optionalAuth, async (c) => {
+  const contest = await findAccessibleContest(c.get('user'), queryInteger(c.req.param('id'), 0, { min: 1 }))
+  if (!contest) return failure(c, 404, 'contest-not-found', '比赛不存在')
   const byId = await creators([contest.createdById])
-  return success(
-    c,
-    serializeContest(
-      contest,
-      byId.get(contest.createdById) ?? sampleUser({ id: contest.createdById, username: "" }, null),
-      true,
-    ),
-  )
+  return success(c, serializeContest(contest, byId.get(contest.createdById) ?? sampleUser({ id: contest.createdById, username: '' }, null), true))
 })
 
 const CONTEST_PASSWORD_RULE: AttemptRule = { limit: 10, windowSeconds: 10 * 60 }
 
-contestRoutes.post("/contests/:id/access", requireAuth, async (c) => {
-  const contest = await findAccessibleContest(
-    c.get("user"),
-    queryInteger(c.req.param("id"), 0, { min: 1 }),
-  )
-  if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "比赛不存在")
-  const parsed = await parseBody(c, contestPasswordRequestSchema, "请输入比赛密码")
+contestRoutes.post('/contests/:id/access', requireAuth, async (c) => {
+  const contest = await findAccessibleContest(c.get('user'), queryInteger(c.req.param('id'), 0, { min: 1 }))
+  if (!contest || !contest.password) return failure(c, 404, 'contest-not-found', '比赛不存在')
+  const parsed = await parseBody(c, contestPasswordRequestSchema, '请输入比赛密码')
   if (!parsed.success) return parsed.response
   // 比赛密码往往就是几位数字，不限的话一个脚本几分钟就能扫完。
   // 按「人 × 比赛」计失败次数：猜错的是自己，锁的也只是自己进这一场。
-  const attemptKey = `contest-password:${contest.id}:${c.get("user")!.id}`
+  const attemptKey = `contest-password:${contest.id}:${c.get('user')!.id}`
   const wait = await lockoutRemaining(attemptKey, CONTEST_PASSWORD_RULE)
   if (wait !== null) {
-    return failure(
-      c,
-      429,
-      "too-many-password-attempts",
-      `Too many wrong passwords, please wait ${wait} seconds`,
-    )
+    return failure(c, 429, 'too-many-password-attempts', `Too many wrong passwords, please wait ${wait} seconds`)
   }
   if (!checkContestPassword(parsed.data.password, contest.password)) {
     await countAttempt(attemptKey, CONTEST_PASSWORD_RULE)
-    return failure(c, 403, "wrong-password", "比赛密码不对，或者已经过期了，请重新输入")
+    return failure(c, 403, 'wrong-password', '比赛密码不对，或者已经过期了，请重新输入')
   }
   await setContestPassword(c, contest.id, parsed.data.password)
   return success(c, true)
 })
 
-contestRoutes.get("/contests/:id/access", requireAuth, async (c) => {
-  const contest = await findAccessibleContest(
-    c.get("user"),
-    queryInteger(c.req.param("id"), 0, { min: 1 }),
-  )
-  if (!contest || !contest.password) return failure(c, 404, "contest-not-found", "比赛不存在")
-  const access = await canAccessContest(c, contest, "details")
+contestRoutes.get('/contests/:id/access', requireAuth, async (c) => {
+  const contest = await findAccessibleContest(c.get('user'), queryInteger(c.req.param('id'), 0, { min: 1 }))
+  if (!contest || !contest.password) return failure(c, 404, 'contest-not-found', '比赛不存在')
+  const access = await canAccessContest(c, contest, 'details')
   return success(c, { access: access.ok } satisfies ContestAccess)
 })
 
@@ -272,7 +224,7 @@ async function contestProblemStatuses(userId: number | undefined) {
 
 function myStatusOf(statuses: Record<string, unknown>, problemId: number) {
   const status = asRecord(statuses[String(problemId)]).status
-  return typeof status === "number" ? status : null
+  return typeof status === 'number' ? status : null
 }
 
 async function contestProblemTags(problemIds: number[]) {
@@ -290,139 +242,121 @@ async function contestProblemTags(problemIds: number[]) {
   return map
 }
 
-contestRoutes.get(
-  "/contests/:id/problems",
-  optionalAuth,
-  requireContestAccess("problems"),
-  async (c) => {
-    const contest = c.get("contest")!
-    const rows = await db
-      .select({
-        problem: schema.problem,
-        user: schema.user,
-        realName: schema.userProfile.realName,
-      })
-      .from(schema.problem)
-      .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(and(eq(schema.problem.contestId, contest.id), eq(schema.problem.visible, true)))
-      // 先按长度再按字面：编号是文本，直接排会变成 1、10、11…、2
-      .orderBy(sql`length(${schema.problem.displayId})`, asc(schema.problem.displayId))
-    const tags = await contestProblemTags(rows.map((row) => row.problem.id))
-    const allowed = contestDetailsAllowed(c.get("user"), contest)
-    const statuses = await contestProblemStatuses(c.get("user")?.id)
-    return success(
-      c,
-      rows.map(
-        ({ problem, user, realName }) =>
-          ({
-            id: problem.id,
-            _id: problem.displayId,
-            title: problem.title,
-            submissionNumber: allowed ? problem.submissionNumber : 0,
-            acceptedNumber: allowed ? problem.acceptedNumber : 0,
-            difficulty: allowed ? problem.difficulty : null,
-            createdBy: sampleUser(user, realName),
-            tags: tags.get(problem.id) ?? [],
-            contestId: contest.id,
-            allowFlowchart: problem.allowFlowchart,
-            showFlowchart: problem.showFlowchart,
-            hasAstRules: problem.astRules !== null,
-            isSql: isSqlProblem(problem),
-            myStatus: myStatusOf(statuses, problem.id),
-            // 按人数是公开题库列表的列；比赛题表看的是榜单，不下发
-            solvedUsers: 0,
-            triedUsers: 0,
-          }) satisfies ProblemListItem,
+contestRoutes.get('/contests/:id/problems', optionalAuth, requireContestAccess('problems'), async (c) => {
+  const contest = c.get('contest')!
+  const rows = await db
+    .select({
+      problem: schema.problem,
+      user: schema.user,
+      realName: schema.userProfile.realName,
+    })
+    .from(schema.problem)
+    .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
+    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+    .where(and(eq(schema.problem.contestId, contest.id), eq(schema.problem.visible, true)))
+    // 先按长度再按字面：编号是文本，直接排会变成 1、10、11…、2
+    .orderBy(sql`length(${schema.problem.displayId})`, asc(schema.problem.displayId))
+  const tags = await contestProblemTags(rows.map((row) => row.problem.id))
+  const allowed = contestDetailsAllowed(c.get('user'), contest)
+  const statuses = await contestProblemStatuses(c.get('user')?.id)
+  return success(
+    c,
+    rows.map(
+      ({ problem, user, realName }) =>
+        ({
+          id: problem.id,
+          _id: problem.displayId,
+          title: problem.title,
+          submissionNumber: allowed ? problem.submissionNumber : 0,
+          acceptedNumber: allowed ? problem.acceptedNumber : 0,
+          difficulty: allowed ? problem.difficulty : null,
+          createdBy: sampleUser(user, realName),
+          tags: tags.get(problem.id) ?? [],
+          contestId: contest.id,
+          allowFlowchart: problem.allowFlowchart,
+          showFlowchart: problem.showFlowchart,
+          hasAstRules: problem.astRules !== null,
+          isSql: isSqlProblem(problem),
+          myStatus: myStatusOf(statuses, problem.id),
+          // 按人数是公开题库列表的列；比赛题表看的是榜单，不下发
+          solvedUsers: 0,
+          triedUsers: 0,
+        }) satisfies ProblemListItem,
+    ),
+  )
+})
+
+contestRoutes.get('/contests/:id/problems/:displayId', optionalAuth, requireContestAccess('problems'), async (c) => {
+  const contest = c.get('contest')!
+  const [row] = await db
+    .select({
+      problem: schema.problem,
+      user: schema.user,
+      realName: schema.userProfile.realName,
+    })
+    .from(schema.problem)
+    .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
+    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+    .where(
+      and(
+        eq(schema.problem.contestId, contest.id),
+        eq(schema.problem.visible, true),
+        sql`lower(${schema.problem.displayId}) = lower(${c.req.param('displayId')})`,
       ),
     )
-  },
+    .limit(1)
+  if (!row) return failure(c, 404, 'problem-not-found', '题目不存在')
+  const tags = await contestProblemTags([row.problem.id])
+  const allowed = contestDetailsAllowed(c.get('user'), contest)
+  const statuses = await contestProblemStatuses(c.get('user')?.id)
+  return success(c, {
+    id: row.problem.id,
+    _id: row.problem.displayId,
+    title: row.problem.title,
+    description: row.problem.description,
+    inputDescription: row.problem.inputDescription,
+    outputDescription: row.problem.outputDescription,
+    samples: Array.isArray(row.problem.samples) ? row.problem.samples : [],
+    hint: row.problem.hint,
+    languages: row.problem.languages,
+    template: publicTemplates(row.problem.template),
+    createTime: row.problem.createTime,
+    lastUpdateTime: row.problem.lastUpdateTime,
+    timeLimit: row.problem.timeLimit,
+    memoryLimit: row.problem.memoryLimit,
+    difficulty: allowed ? row.problem.difficulty : null,
+    source: row.problem.source,
+    prompt: row.problem.prompt,
+    submissionNumber: allowed ? row.problem.submissionNumber : 0,
+    acceptedNumber: allowed ? row.problem.acceptedNumber : 0,
+    statisticInfo: allowed ? asRecord(row.problem.statisticInfo) : {},
+    contestId: contest.id,
+    tags: tags.get(row.problem.id) ?? [],
+    createdBy: sampleUser(row.user, row.realName),
+    myStatus: myStatusOf(statuses, row.problem.id),
+    // 比赛里不给 AI 提示（POST /ai/hint 见到比赛提交直接 403），这个数只喂那个按钮，恒 0
+    myFailedCount: 0,
+    allowFlowchart: row.problem.allowFlowchart,
+    showFlowchart: row.problem.showFlowchart,
+    mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
+    flowchartData: row.problem.allowFlowchart ? null : asRecord(row.problem.flowchartData),
+    flowchartHint: row.problem.flowchartHint,
+    sqlConfig: row.problem.sqlConfig,
+    sqlDisplay: row.problem.sqlDisplay,
+    // 代码要求：只给渲染好的文案，规则原文不下发给学生
+    astRequirements: astRequirements(row.problem.astRules),
+  } satisfies ProblemDetail)
+})
+
+contestRoutes.get('/contests/:id/scoreboard', optionalAuth, requireContestAccess('ranks'), async (c) =>
+  success(c, await buildScoreboard(c.get('contest')!, c.get('user'))),
 )
 
-contestRoutes.get(
-  "/contests/:id/problems/:displayId",
-  optionalAuth,
-  requireContestAccess("problems"),
-  async (c) => {
-    const contest = c.get("contest")!
-    const [row] = await db
-      .select({
-        problem: schema.problem,
-        user: schema.user,
-        realName: schema.userProfile.realName,
-      })
-      .from(schema.problem)
-      .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(
-        and(
-          eq(schema.problem.contestId, contest.id),
-          eq(schema.problem.visible, true),
-          sql`lower(${schema.problem.displayId}) = lower(${c.req.param("displayId")})`,
-        ),
-      )
-      .limit(1)
-    if (!row) return failure(c, 404, "problem-not-found", "题目不存在")
-    const tags = await contestProblemTags([row.problem.id])
-    const allowed = contestDetailsAllowed(c.get("user"), contest)
-    const statuses = await contestProblemStatuses(c.get("user")?.id)
-    return success(c, {
-      id: row.problem.id,
-      _id: row.problem.displayId,
-      title: row.problem.title,
-      description: row.problem.description,
-      inputDescription: row.problem.inputDescription,
-      outputDescription: row.problem.outputDescription,
-      samples: Array.isArray(row.problem.samples) ? row.problem.samples : [],
-      hint: row.problem.hint,
-      languages: row.problem.languages,
-      template: publicTemplates(row.problem.template),
-      createTime: row.problem.createTime,
-      lastUpdateTime: row.problem.lastUpdateTime,
-      timeLimit: row.problem.timeLimit,
-      memoryLimit: row.problem.memoryLimit,
-      difficulty: allowed ? row.problem.difficulty : null,
-      source: row.problem.source,
-      prompt: row.problem.prompt,
-      submissionNumber: allowed ? row.problem.submissionNumber : 0,
-      acceptedNumber: allowed ? row.problem.acceptedNumber : 0,
-      statisticInfo: allowed ? asRecord(row.problem.statisticInfo) : {},
-      contestId: contest.id,
-      tags: tags.get(row.problem.id) ?? [],
-      createdBy: sampleUser(row.user, row.realName),
-      myStatus: myStatusOf(statuses, row.problem.id),
-      // 比赛里不给 AI 提示（POST /ai/hint 见到比赛提交直接 403），这个数只喂那个按钮，恒 0
-      myFailedCount: 0,
-      allowFlowchart: row.problem.allowFlowchart,
-      showFlowchart: row.problem.showFlowchart,
-      mermaidCode: row.problem.allowFlowchart ? null : row.problem.mermaidCode,
-      flowchartData: row.problem.allowFlowchart ? null : asRecord(row.problem.flowchartData),
-      flowchartHint: row.problem.flowchartHint,
-      sqlConfig: row.problem.sqlConfig,
-      sqlDisplay: row.problem.sqlDisplay,
-      // 代码要求：只给渲染好的文案，规则原文不下发给学生
-      astRequirements: astRequirements(row.problem.astRules),
-    } satisfies ProblemDetail)
-  },
-)
-
-contestRoutes.get(
-  "/contests/:id/scoreboard",
-  optionalAuth,
-  requireContestAccess("ranks"),
-  async (c) => success(c, await buildScoreboard(c.get("contest")!, c.get("user"))),
-)
-
-contestRoutes.get(
-  "/contests/:id/class-view",
-  optionalAuth,
-  requireContestAccess("ranks"),
-  async (c) => {
-    const contest = c.get("contest")!
-    const user = c.get("user")
-    if (!user || !isContestTeacher(user, contest)) {
-      return failure(c, 403, "teacher-only", "只有老师能看全班情况")
-    }
-    return success(c, await buildClassView(contest, user))
-  },
-)
+contestRoutes.get('/contests/:id/class-view', optionalAuth, requireContestAccess('ranks'), async (c) => {
+  const contest = c.get('contest')!
+  const user = c.get('user')
+  if (!user || !isContestTeacher(user, contest)) {
+    return failure(c, 403, 'teacher-only', '只有老师能看全班情况')
+  }
+  return success(c, await buildClassView(contest, user))
+})

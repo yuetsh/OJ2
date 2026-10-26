@@ -1,4 +1,4 @@
-import { getProblemList } from "shared/api"
+import { getProblemList } from 'shared/api'
 
 /**
  * 按题号直达。课上老师报一个题号、全班去找，是非比赛提交最主要的来路，
@@ -13,14 +13,14 @@ export function useProblemJump() {
 
   async function jump(input: string) {
     const keyword = input.trim()
-    if (!keyword) return router.push("/problem")
+    if (!keyword) return router.push('/problem')
     jumping.value = true
     // 查询失败就当没对上，照样去列表搜，别让一次网络抖动把回车吞掉
     const res = await getProblemList(0, 20, { keyword }).catch(() => null)
     jumping.value = false
     const exact = res?.results.find((row) => row._id.toLowerCase() === keyword.toLowerCase())
     if (exact) return router.push(`/problem/${exact._id}`)
-    return router.push({ path: "/problem", query: { keyword } })
+    return router.push({ path: '/problem', query: { keyword } })
   }
 
   return { jump, jumping }

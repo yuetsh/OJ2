@@ -9,7 +9,7 @@ import type {
   RankHiddenRequest,
   SetReactionRequest,
   UpdateProfileRequest,
-} from "@oj2/contract"
+} from '@oj2/contract'
 import {
   type AiAnalysisRecord,
   type LearningPeriod,
@@ -59,11 +59,11 @@ import {
   type LessonLanguage,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
-} from "@oj2/contract"
-import api from "utils/api"
-import { authFetch } from "utils/auth"
-import { contract } from "utils/contract"
-import { toProblemRow } from "utils/transforms"
+} from '@oj2/contract'
+import api from 'utils/api'
+import { authFetch } from 'utils/auth'
+import { contract } from 'utils/contract'
+import { toProblemRow } from 'utils/transforms'
 import type {
   Announcement,
   AnnouncementListItem,
@@ -77,7 +77,7 @@ import type {
   SubmissionListPayload,
   SubmitCodePayload,
   TutorialProgress,
-} from "utils/types"
+} from 'utils/types'
 
 /**
  * 题目详情 / 提交详情的 schema 按需加载，和请求并行发出。静态 import 会把 zod
@@ -85,11 +85,11 @@ import type {
  * 闸门本身仍是同步的（等 schema 到了再返回），submissionDetailSchema 有 `.catch()`，
  * 放行原文和解析结果不等价，所以不能像 /me 那样改成 contractDeferred。
  */
-const loadDetailSchemas = () => import("./detailSchemas")
+const loadDetailSchemas = () => import('./detailSchemas')
 
 /** 题目列表顶上那行和左栏的进度；没登录是 null */
 export function getProblemProgress() {
-  return api.get<ProblemProgress | null>("problems/progress")
+  return api.get<ProblemProgress | null>('problems/progress')
 }
 
 /**
@@ -97,23 +97,20 @@ export function getProblemProgress() {
  * 返回题号。空串的参数 utils/api 会去掉
  */
 export function getRandomProblem(params: { tag: string; type: string; language: string }) {
-  return api.get<string>("problems/random", { params })
+  return api.get<string>('problems/random', { params })
 }
 
 export async function getProblem(problemID: string, contestID: string) {
   const endpoint = contestID
     ? `contests/${encodeURIComponent(contestID)}/problems/${encodeURIComponent(problemID)}`
     : `problems/${encodeURIComponent(problemID)}`
-  const [{ problemDetailSchema }, response] = await Promise.all([
-    loadDetailSchemas(),
-    api.get<unknown>(endpoint),
-  ])
+  const [{ problemDetailSchema }, response] = await Promise.all([loadDetailSchemas(), api.get<unknown>(endpoint)])
   // 形状即契约 —— 之前这里手抄了一份 camel→snake 的键名映射，抄漏一个字段就是
   // 静默 undefined。走 `contract()` 而不是裸 `parse()`：原来是
   // `problemDetailSchema.parse(v) as ProblemDetail`，`as` 把校验结果又断言回去、
   // 等于没校验，而 `parse` 抛错会让整个题目页白屏。现在形状不符时记一条控制台
   // 分歧再放行原始数据。
-  const problem: ProblemDetail = contract("GET /problems/:id", problemDetailSchema, response)
+  const problem: ProblemDetail = contract('GET /problems/:id', problemDetailSchema, response)
   return problem
 }
 
@@ -127,23 +124,23 @@ export async function getSubmission(id: string, attempts = false): Promise<Submi
   const [{ submissionDetailSchema }, response] = await Promise.all([
     loadDetailSchemas(),
     api.get<unknown>(`submissions/${encodeURIComponent(id)}`, {
-      params: attempts ? { attempts: "1" } : undefined,
+      params: attempts ? { attempts: '1' } : undefined,
     }),
   ])
-  return contract("GET /submissions/:id", submissionDetailSchema, response)
+  return contract('GET /submissions/:id', submissionDetailSchema, response)
 }
 
 export function submitCode(data: SubmitCodePayload) {
-  return api.post<CreateSubmissionResponse>("submissions", data satisfies CreateSubmissionRequest)
+  return api.post<CreateSubmissionResponse>('submissions', data satisfies CreateSubmissionRequest)
 }
 
 /** 后端格式化认的四种（ruff / clang-format / sqlparse），别的语言提交前不格式化 */
-export function isFormatLanguage(value: string): value is FormatCodeRequest["language"] {
-  return ["python", "c", "cpp", "sql"].includes(value)
+export function isFormatLanguage(value: string): value is FormatCodeRequest['language'] {
+  return ['python', 'c', 'cpp', 'sql'].includes(value)
 }
 
 export function formatCode(data: FormatCodeRequest & { problemId: number }) {
-  return api.post<FormatCodeResponse>("code/format", {
+  return api.post<FormatCodeResponse>('code/format', {
     code: data.code,
     language: data.language,
     problemId: data.problemId,
@@ -151,18 +148,13 @@ export function formatCode(data: FormatCodeRequest & { problemId: number }) {
 }
 
 export function getSubmissions(params: Partial<SubmissionListPayload>) {
-  const endpoint = params.contestId
-    ? `contests/${encodeURIComponent(params.contestId)}/submissions`
-    : "submissions"
+  const endpoint = params.contestId ? `contests/${encodeURIComponent(params.contestId)}/submissions` : 'submissions'
   // 契约里 language 是 z.string()（语言是配置项，随时可能加，收紧成枚举会让
   // 新加的语言在后端 parse 时直接抛），前端在这一处收窄成 LANGUAGE
-  return api.get<{ results: SubmissionListItem[]; total: number; unknownProblems: string[] }>(
-    endpoint,
-    {
-      // contestId 走的是路径，page 只有前端分页器用
-      params: { ...params, contestId: undefined, page: undefined },
-    },
-  )
+  return api.get<{ results: SubmissionListItem[]; total: number; unknownProblems: string[] }>(endpoint, {
+    // contestId 走的是路径，page 只有前端分页器用
+    params: { ...params, contestId: undefined, page: undefined },
+  })
 }
 
 export function getRankOfProblem(problemId: string) {
@@ -170,12 +162,12 @@ export function getRankOfProblem(problemId: string) {
 }
 
 export function getTodaySubmissionCount(language?: string) {
-  return api.get<number>("submissions/today-count", { params: { language } })
+  return api.get<number>('submissions/today-count', { params: { language } })
 }
 
 /** 「今日提交数」标签点开的统计。公开接口，口径同那颗标签：今天 + 非比赛提交 */
 export function getTodaySubmissionStatistics() {
-  return api.get<TodaySubmissionStatistics>("submissions/today-statistics")
+  return api.get<TodaySubmissionStatistics>('submissions/today-statistics')
 }
 
 export function adminRejudge(id: string) {
@@ -189,26 +181,21 @@ export function getSubmissionStatistics(
   /** 班级（user.class_name）精确匹配。别再拼 `ks231` 塞进 username —— 会连带 2311、2312 班 */
   className?: string,
 ) {
-  return api.get<SubmissionStatistics>("submissions/statistics", {
+  return api.get<SubmissionStatistics>('submissions/statistics', {
     params: { ...duration, problemDisplayId, username, className },
   })
 }
 
 /** 统计「一行一节课」的总览（没选班、没填学生和题号时）。limit 是列几节课，「再往前看」加它 */
 export function getSubmissionLessons(duration: { start?: string; end: string }, limit?: number) {
-  return api.get<SubmissionLessons>("submissions/statistics/lessons", {
+  return api.get<SubmissionLessons>('submissions/statistics/lessons', {
     params: { ...duration, limit },
   })
 }
 
 /** 统计页的方块串：范围内每个学生的每一次提交（口径见契约 submissionStatisticsGridSchema） */
-export function getSubmissionStatisticsGrid(
-  duration: { start?: string; end: string },
-  problemDisplayId?: string,
-  username?: string,
-  className?: string,
-) {
-  return api.get<SubmissionStatisticsGrid>("submissions/statistics/grid", {
+export function getSubmissionStatisticsGrid(duration: { start?: string; end: string }, problemDisplayId?: string, username?: string, className?: string) {
+  return api.get<SubmissionStatisticsGrid>('submissions/statistics/grid', {
     params: { ...duration, problemDisplayId, username, className },
   })
 }
@@ -217,12 +204,8 @@ export function getSubmissionStatisticsGrid(
  * 排名页的榜：本班 / 本年级 / 全服 × 这周 / 这学期 / 全部。学生看自己的班和年级，
  * 老师用 `className` 选班（不给就是最近上课的班）。`full` 把本年级 / 全服中间折起来的那段也要回来
  */
-export function getRankBoard(
-  scope: RankScope,
-  period: RankPeriod,
-  options: { className?: string; full?: boolean } = {},
-) {
-  return api.get<RankBoard>("rankings/board", {
+export function getRankBoard(scope: RankScope, period: RankPeriod, options: { className?: string; full?: boolean } = {}) {
+  return api.get<RankBoard>('rankings/board', {
     params: {
       scope,
       period,
@@ -234,17 +217,17 @@ export function getRankBoard(
 
 /** 班级对抗：全服各班这学期人均做对，外加这周人均涨了多少 */
 export function getClassBattle() {
-  return api.get<ClassBattleItem[]>("rankings/classes")
+  return api.get<ClassBattleItem[]>('rankings/classes')
 }
 
 /** 班级详情（抽屉）：谁都能看，「要多关心的同学」只有老师拿得到 */
 export function getClassDetail(className: string) {
-  return api.get<ClassDetail>("rankings/class-detail", { params: { className } })
+  return api.get<ClassDetail>('rankings/class-detail', { params: { className } })
 }
 
 /** 本班最近几周的每周冠军 */
 export function getWeeklyChampions(className?: string) {
-  return api.get<WeeklyChampion[]>("rankings/champions", {
+  return api.get<WeeklyChampion[]>('rankings/champions', {
     params: { className: className || undefined },
   })
 }
@@ -263,27 +246,23 @@ export function clearMood(userId: number) {
  * 本周进步榜。`scope` 只有两个取值，服务端认不出的一律当 global ——
  * 班级榜要求调用者有班级，教师/超管拿到的是 400，所以别在没班级时切过去。
  */
-export function getWeeklyRank(scope: "global" | "class") {
-  return api.get<WeeklyRank>("rankings/weekly", { params: { scope } })
+export function getWeeklyRank(scope: 'global' | 'class') {
+  return api.get<WeeklyRank>('rankings/weekly', { params: { scope } })
 }
 
 /** 课堂看板（老师）。不给班级时后端猜最近两小时在交题的那个班 */
 export function getClassBoard(className?: string) {
-  return api.get<ClassBoard>("classroom/board", { params: { className } })
+  return api.get<ClassBoard>('classroom/board', { params: { className } })
 }
 
 /** 这个班「这节课」的题（提交列表那颗按钮用）。不传班级就猜正在上课的班，和看板一样 */
 export function getClassLesson(className?: string) {
-  return api.get<ClassLesson>("classroom/lesson", { params: { className } })
+  return api.get<ClassLesson>('classroom/lesson', { params: { className } })
 }
 
 /** 给这个班布置今天的题，空数组 = 清掉 */
-export function setClassLesson(
-  className: string,
-  problemDisplayIds: string[],
-  language: LessonLanguage | null,
-) {
-  return api.put<null>("classroom/lesson", {
+export function setClassLesson(className: string, problemDisplayIds: string[], language: LessonLanguage | null) {
+  return api.put<null>('classroom/lesson', {
     className,
     problemDisplayIds,
     language,
@@ -292,23 +271,23 @@ export function setClassLesson(
 
 /** 我的知识点地图（只有自己的，不能查别人） */
 export function getKnowledgeMap() {
-  return api.get<KnowledgeMap>("me/knowledge")
+  return api.get<KnowledgeMap>('me/knowledge')
 }
 
 /** 老师首页「今天的课」：今天在上课的每个班 */
 export function getClassToday() {
-  return api.get<ClassToday>("classroom/today")
+  return api.get<ClassToday>('classroom/today')
 }
 
 /** 首页「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对 */
 export function getLastVisit() {
-  return api.get<LastVisit>("me/last-visit")
+  return api.get<LastVisit>('me/last-visit')
 }
 
 /** 班级 PK：不给班就用自己的班（老师用默认的班），只给一个班就配一个同年级的对手 */
 export function getClassPk(classes: string[], period: ClassPkPeriod) {
-  return api.get<ClassPk>("rankings/pk", {
-    params: { period, ...(classes.length ? { classes: classes.join(",") } : {}) },
+  return api.get<ClassPk>('rankings/pk', {
+    params: { period, ...(classes.length ? { classes: classes.join(',') } : {}) },
   })
 }
 
@@ -322,8 +301,8 @@ export function getContestList(query: {
   /** 只看我交过题的 */
   joined?: boolean
 }) {
-  return api.get<ContestList>("contests", {
-    params: { ...query, joined: query.joined ? "1" : undefined },
+  return api.get<ContestList>('contests', {
+    params: { ...query, joined: query.joined ? '1' : undefined },
   })
 }
 
@@ -357,16 +336,16 @@ export function getContestClassView(contestID: string) {
 
 export function uploadAvatar(file: File) {
   const form = new window.FormData()
-  form.append("image", file)
-  return api.post("me/avatar", form)
+  form.append('image', file)
+  return api.post('me/avatar', form)
 }
 
 export function updateProfile(data: { realName?: string; mood?: string }) {
-  return api.put<Profile>("me/profile", data satisfies UpdateProfileRequest)
+  return api.put<Profile>('me/profile', data satisfies UpdateProfileRequest)
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: AnnouncementListItem[]; total: number }>("announcements", {
+  return api.get<{ results: AnnouncementListItem[]; total: number }>('announcements', {
     params: { limit, offset },
   })
 }
@@ -392,27 +371,27 @@ export function getProfileOverview(username: string) {
 
 /** 不用图片了，退回默认头像（名字的字） */
 export function resetAvatar() {
-  return api.delete<{ avatar: string }>("me/avatar")
+  return api.delete<{ avatar: string }>('me/avatar')
 }
 
 export function getTutorial(id: number) {
   return api.get<Tutorial>(`tutorials/${id}`)
 }
 
-export function getTutorials(type: "python" | "c") {
-  return api.get<TutorialSummary[]>("tutorials", { params: { type } })
+export function getTutorials(type: 'python' | 'c') {
+  return api.get<TutorialSummary[]>('tutorials', { params: { type } })
 }
 
 /** 智能分析整页的数据。username 只有老师传才生效，学生传了也只会拿到自己 */
 export function getLearningReport(period: LearningPeriod, username?: string) {
-  return api.get<LearningReport>("ai/report", {
+  return api.get<LearningReport>('ai/report', {
     params: { period, username: username || undefined },
   })
 }
 
 /** 这个时间段上次生成的 AI 小结（老师钉住的优先），没有为 null */
 export function getLatestAnalysis(period: LearningPeriod, username?: string) {
-  return api.get<AiAnalysisRecord | null>("ai/analysis/latest", {
+  return api.get<AiAnalysisRecord | null>('ai/analysis/latest', {
     params: { period, username: username || undefined },
   })
 }
@@ -427,17 +406,15 @@ export function submitHintFeedback(hintId: number, helpful: boolean) {
 // ==================== 相似题目推荐 ====================
 
 export function getSimilarProblems(problemId: string) {
-  return api
-    .get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
-    .then((response) => response.map(toProblemRow))
+  return api.get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`).then((response) => response.map(toProblemRow))
 }
 
 // ==================== 挑战 ====================
 
 /** 几道题、某种语言下的挑战（说法、几人做到、我做到没有），见契约 problemChallengeGroupSchema */
 export function getChallenges(problemIds: string[], language: string) {
-  return api.get<ChallengeList>("challenges", {
-    params: { problems: problemIds.join(","), language },
+  return api.get<ChallengeList>('challenges', {
+    params: { problems: problemIds.join(','), language },
   })
 }
 
@@ -448,7 +425,7 @@ export function submitFlowchart(data: {
   mermaidCode: string
   flowchartData: Record<string, unknown> // 压缩之后的，元数据太长了
 }) {
-  return api.post<CreateFlowchartResponse>("flowcharts", data satisfies CreateFlowchartRequest)
+  return api.post<CreateFlowchartResponse>('flowcharts', data satisfies CreateFlowchartRequest)
 }
 
 export function getFlowchartSubmission(id: string) {
@@ -458,7 +435,7 @@ export function getFlowchartSubmission(id: string) {
 export function getFlowchartSubmissions(params: {
   username?: string
   /** "1" = username 整名匹配，同代码提交列表 */
-  exactUsername?: "1"
+  exactUsername?: '1'
   className?: string
   problemDisplayId?: string
   myself?: string
@@ -467,16 +444,11 @@ export function getFlowchartSubmissions(params: {
   today?: string
   grade?: string
 }) {
-  return api.get<FlowchartList>("flowcharts", { params })
+  return api.get<FlowchartList>('flowcharts', { params })
 }
 
-export function getFlowchartStatistics(
-  duration: { start?: string; end: string },
-  problemDisplayId?: string,
-  username?: string,
-  className?: string,
-) {
-  return api.get<FlowchartStatistics>("flowcharts/statistics", {
+export function getFlowchartStatistics(duration: { start?: string; end: string }, problemDisplayId?: string, username?: string, className?: string) {
+  return api.get<FlowchartStatistics>('flowcharts/statistics', {
     params: { ...duration, problemDisplayId, username, className },
   })
 }
@@ -492,8 +464,8 @@ export function getFlowchartScores(problemId: number) {
 
 // ==================== 题单相关API ====================
 
-export function getProblemSetList(offset = 0, limit = 10, keyword = "") {
-  return api.get<ProblemSetList>("problem-sets", { params: { offset, limit, keyword } })
+export function getProblemSetList(offset = 0, limit = 10, keyword = '') {
+  return api.get<ProblemSetList>('problem-sets', { params: { offset, limit, keyword } })
 }
 
 export function getProblemSetDetail(id: number) {
@@ -505,15 +477,15 @@ export function getProblemSetProblems(problemSetId: number) {
 }
 
 export function joinProblemSet(problemSetId: number) {
-  return api.post("problem-set-progress", { problemSetId } satisfies JoinProblemSetRequest)
+  return api.post('problem-set-progress', { problemSetId } satisfies JoinProblemSetRequest)
 }
 
 export function getUserBadges(username?: string) {
-  return api.get<UserBadge[]>(`users/${encodeURIComponent(username ?? "me")}/badges`)
+  return api.get<UserBadge[]>(`users/${encodeURIComponent(username ?? 'me')}/badges`)
 }
 
 /** 老师看某个班在题单里的情况；不传班级就看服务端推断的那个班 */
-export function getProblemSetClassView(problemSetId: number, className = "") {
+export function getProblemSetClassView(problemSetId: number, className = '') {
   return api.get<ProblemSetClassView>(`problem-sets/${problemSetId}/class-view`, {
     params: className ? { className } : {},
   })
@@ -521,8 +493,8 @@ export function getProblemSetClassView(problemSetId: number, className = "") {
 
 /** 这道题以前的代码为什么藏着：落在哪些正在布置的题单里。传主键或题号都行 */
 export function getProblemSetLocks(problem: { id: number } | { displayId: string }) {
-  return api.get<ProblemSetLock[]>("problem-sets/locks", {
-    params: "id" in problem ? { problemId: problem.id } : { problemDisplayId: problem.displayId },
+  return api.get<ProblemSetLock[]>('problem-sets/locks', {
+    params: 'id' in problem ? { problemId: problem.id } : { problemDisplayId: problem.displayId },
   })
 }
 
@@ -537,14 +509,11 @@ export function getExercises(tutorialId: number): Promise<Exercise[]> {
  * 截到 200 字符再发：后端契约卡的就是 200，填空题填了一整段的话，
  * 不截就是一个 400，而学生这边什么都看不见 —— 留痕失败得静悄悄的。
  */
-export function reportExerciseAttempt(
-  exerciseId: number,
-  payload: { correct: boolean; answer?: string },
-) {
+export function reportExerciseAttempt(exerciseId: number, payload: { correct: boolean; answer?: string }) {
   return authFetch(`/api/exercises/${exerciseId}/attempts`, {
-    method: "POST",
+    method: 'POST',
     keepalive: true,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       correct: payload.correct,
       answer: payload.answer?.slice(0, 200),
@@ -552,8 +521,8 @@ export function reportExerciseAttempt(
   }).catch(() => undefined)
 }
 
-export function getLearnProgress(type: "python" | "c") {
-  return api.get<TutorialProgress[]>("learn/progress", { params: { type } })
+export function getLearnProgress(type: 'python' | 'c') {
+  return api.get<TutorialProgress[]>('learn/progress', { params: { type } })
 }
 
 /**
@@ -563,14 +532,11 @@ export function getLearnProgress(type: "python" | "c") {
  * 不带它会随页面卸载被浏览器掐掉，学生每节课的最后一段时长就永远丢了。
  * 失败一律吞掉 —— 留痕是旁路，不该让学生看到任何报错。
  */
-export function reportLearnProgress(
-  tutorialId: number,
-  payload: { seconds: number; opened: boolean },
-) {
+export function reportLearnProgress(tutorialId: number, payload: { seconds: number; opened: boolean }) {
   return authFetch(`/api/tutorials/${tutorialId}/progress`, {
-    method: "POST",
+    method: 'POST',
     keepalive: true,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }).catch(() => undefined)
 }

@@ -1,18 +1,11 @@
-import type { TrialRunResponse } from "@oj2/contract"
+import type { TrialRunResponse } from '@oj2/contract'
 
-import { config } from "../config"
-import {
-  MAX_RESPONSE_BYTES,
-  postJudge,
-  readCapped,
-  statusValue,
-  type JudgeCase,
-  type JudgeResponse,
-} from "./run"
-import { nativeRuntimeError, parsePythonTraceback } from "./runtime-diagnosis"
-import { withJudgeSlot, type JudgePool } from "./slots"
-import { JudgeStatus, type JudgeStatusValue } from "./status"
-import { shiftCompileLines } from "./template"
+import { config } from '../config'
+import { MAX_RESPONSE_BYTES, postJudge, readCapped, statusValue, type JudgeCase, type JudgeResponse } from './run'
+import { nativeRuntimeError, parsePythonTraceback } from './runtime-diagnosis'
+import { withJudgeSlot, type JudgePool } from './slots'
+import { JudgeStatus, type JudgeStatusValue } from './status'
+import { shiftCompileLines } from './template'
 
 /**
  * 试运行：「运行例子」「自己输入」、后台「生成测试点」。
@@ -75,9 +68,7 @@ async function acquire() {
 }
 
 function truncate(text: string) {
-  return text.length > STUDENT_OUTPUT_LIMIT
-    ? `${text.slice(0, STUDENT_OUTPUT_LIMIT)}\n……（输出太长，后面的没有显示）`
-    : text
+  return text.length > STUDENT_OUTPUT_LIMIT ? `${text.slice(0, STUDENT_OUTPUT_LIMIT)}\n……（输出太长，后面的没有显示）` : text
 }
 
 export async function runTrial(options: {
@@ -121,11 +112,7 @@ export async function runTrial(options: {
 async function judgeTrial(options: Parameters<typeof runTrial>[0]): Promise<TrialRunResponse> {
   const wait = AbortSignal.timeout(WAIT_TIMEOUT_MS)
   try {
-    return await withJudgeSlot(
-      options.pool ?? "interactive",
-      { holdMs: JUDGE_TIMEOUT_MS + 30_000, signal: wait },
-      () => judgeTrialNow(options),
-    )
+    return await withJudgeSlot(options.pool ?? 'interactive', { holdMs: JUDGE_TIMEOUT_MS + 30_000, signal: wait }, () => judgeTrialNow(options))
   } catch (error) {
     if (wait.aborted && error === wait.reason) throw new TrialBusyError()
     throw error
@@ -140,49 +127,44 @@ async function judgeTrialNow(options: Parameters<typeof runTrial>[0]): Promise<T
     options.memoryLimit,
     // 输入补结尾换行，和 checkSamples 一样：题面上的例子常常没有，测试点文件都有
     options.cases.map((item) => ({
-      input: item.input.endsWith("\n") || item.input === "" ? item.input : `${item.input}\n`,
-      output: item.output ?? "",
+      input: item.input.endsWith('\n') || item.input === '' ? item.input : `${item.input}\n`,
+      output: item.output ?? '',
     })),
     { output: true, signal: AbortSignal.timeout(JUDGE_TIMEOUT_MS) },
   )
   const body = await readCapped(response, MAX_RESPONSE_BYTES)
-  if (body === null) return { status: "too-much-output" }
+  if (body === null) return { status: 'too-much-output' }
 
   const parsed = JSON.parse(body) as JudgeResponse
   if (parsed.err) {
-    if (parsed.err === "CompileError") {
+    if (parsed.err === 'CompileError') {
       return {
-        status: "compile-error",
-        message:
-          typeof parsed.data === "string"
-            ? shiftCompileLines(parsed.data, options.prependLines)
-            : "",
+        status: 'compile-error',
+        message: typeof parsed.data === 'string' ? shiftCompileLines(parsed.data, options.prependLines) : '',
       }
     }
     throw new Error(`JudgeServer error ${parsed.err}: ${JSON.stringify(parsed.data)}`)
   }
-  if (!Array.isArray(parsed.data)) throw new Error("JudgeServer returned an invalid result payload")
+  if (!Array.isArray(parsed.data)) throw new Error('JudgeServer returned an invalid result payload')
 
-  const byIndex = new Map(
-    (parsed.data as JudgeCase[]).map((item) => [Number(item.test_case), item]),
-  )
+  const byIndex = new Map((parsed.data as JudgeCase[]).map((item) => [Number(item.test_case), item]))
   return {
-    status: "done",
+    status: 'done',
     cases: options.cases.map((item, index) => {
       // 判题机给内联测试点编号是从 1 起的（server.py 里 `index += 1`）
       const judged = byIndex.get(index + 1)
-      if (!judged) return { result: JudgeStatus.SYSTEM_ERROR, output: "" }
+      if (!judged) return { result: JudgeStatus.SYSTEM_ERROR, output: '' }
       let result: JudgeStatusValue = statusValue(judged.result)
       // 没给正确输出的组，判题机拿空串比，跑通了也是答案错误 —— 这里只看有没有出错
       if (item.output === undefined && result === JudgeStatus.WRONG_ANSWER) {
         result = JudgeStatus.ACCEPTED
       }
-      const output = typeof judged.output === "string" ? judged.output : ""
+      const output = typeof judged.output === 'string' ? judged.output : ''
       // 运行时错误和提交用同一个解析（judge/runtime-diagnosis.ts）：第几行、什么异常。
       // 提交那边要重跑一次才拿得到回溯，这里 output 本来就开着，直接解析
       const runtimeError =
         result === JudgeStatus.RUNTIME_ERROR
-          ? options.language === "Python"
+          ? options.language === 'Python'
             ? parsePythonTraceback(output, options.code, options.prependLines)
             : nativeRuntimeError(judged.signal, judged.exit_code)
           : null

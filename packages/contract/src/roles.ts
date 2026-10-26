@@ -12,15 +12,10 @@
  * **这个文件不能 import zod。** 前端入口要用这里的 USER_TYPE / toAdminType，
  * 一 import 就把整个 zod 运行时（~100KB）拖进首屏包。对应的 zod schema 在 admin.ts。
  */
-export const ADMIN_TYPES = [
-  "Regular User",
-  "Student Admin",
-  "Teacher Admin",
-  "Super Admin",
-] as const
+export const ADMIN_TYPES = ['Regular User', 'Student Admin', 'Teacher Admin', 'Super Admin'] as const
 export type AdminType = (typeof ADMIN_TYPES)[number]
 
-export const PROBLEM_PERMISSIONS = ["None", "Own", "All"] as const
+export const PROBLEM_PERMISSIONS = ['None', 'Own', 'All'] as const
 export type ProblemPermission = (typeof PROBLEM_PERMISSIONS)[number]
 
 /**
@@ -32,29 +27,27 @@ export type ProblemPermission = (typeof PROBLEM_PERMISSIONS)[number]
  */
 
 /** 能进后台的三种 */
-export const ADMIN_ROLES: readonly AdminType[] = ["Student Admin", "Teacher Admin", "Super Admin"]
+export const ADMIN_ROLES: readonly AdminType[] = ['Student Admin', 'Teacher Admin', 'Super Admin']
 
 /** 老师及以上 */
-export const TEACHER_ROLES: readonly AdminType[] = ["Teacher Admin", "Super Admin"]
+export const TEACHER_ROLES: readonly AdminType[] = ['Teacher Admin', 'Super Admin']
 
 /**
  * 学生口径：排行榜、班级榜、比赛榜、自学统计都只算这两种，教师和超管不入榜。
  * 注意 Student Admin 算学生 —— 他要参赛、要上榜，只是多了个后台入口。
  */
-export const STUDENT_ROLES: readonly AdminType[] = ["Regular User", "Student Admin"]
+export const STUDENT_ROLES: readonly AdminType[] = ['Regular User', 'Student Admin']
 
 /**
  * 把库里读出来的裸字符串收成联合类型。**认不出来的一律降成最低权限**，
  * 不抛错：脏数据不该让人登不上，但更不该让人凭一个拼错的角色名拿到权限。
  */
 export function toAdminType(value: string): AdminType {
-  return (ADMIN_TYPES as readonly string[]).includes(value) ? (value as AdminType) : "Regular User"
+  return (ADMIN_TYPES as readonly string[]).includes(value) ? (value as AdminType) : 'Regular User'
 }
 
 export function toProblemPermission(value: string): ProblemPermission {
-  return (PROBLEM_PERMISSIONS as readonly string[]).includes(value)
-    ? (value as ProblemPermission)
-    : "None"
+  return (PROBLEM_PERMISSIONS as readonly string[]).includes(value) ? (value as ProblemPermission) : 'None'
 }
 
 /**
@@ -65,14 +58,14 @@ export function toProblemPermission(value: string): ProblemPermission {
  * 原先 `apps/web/src/utils/constants.ts` 里另抄了一份，那是这四个字符串的第三份副本。
  */
 export const USER_TYPE = {
-  REGULAR_USER: "Regular User",
-  STUDENT_ADMIN: "Student Admin",
-  TEACHER_ADMIN: "Teacher Admin",
-  SUPER_ADMIN: "Super Admin",
+  REGULAR_USER: 'Regular User',
+  STUDENT_ADMIN: 'Student Admin',
+  TEACHER_ADMIN: 'Teacher Admin',
+  SUPER_ADMIN: 'Super Admin',
 } as const satisfies Record<string, AdminType>
 
 export const PROBLEM_PERMISSION = {
-  NONE: "None",
-  OWN: "Own",
-  ALL: "All",
+  NONE: 'None',
+  OWN: 'Own',
+  ALL: 'All',
 } as const satisfies Record<string, ProblemPermission>

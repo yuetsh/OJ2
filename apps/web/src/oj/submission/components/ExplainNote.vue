@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import type { SubmissionExplain } from "../composables/explain"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import type { SubmissionExplain } from '../composables/explain'
 
 /**
  * 「第 9 行：这一行末尾少了分号」那一条，原始报错收在右边的「原始报错」里。
@@ -65,7 +65,7 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 

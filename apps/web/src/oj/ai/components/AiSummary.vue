@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { LearningPeriod } from "@oj2/contract"
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { parseTime } from "utils/functions"
-import { streamAI } from "utils/stream"
-import { getLatestAnalysis } from "../../api"
+import type { LearningPeriod } from '@oj2/contract'
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { parseTime } from 'utils/functions'
+import { streamAI } from 'utils/stream'
+import { getLatestAnalysis } from '../../api'
 
 // Markdown 连着整套代码高亮（两百多 KB），这里要等点开 / AI 写完才用得上，别让它拖慢页面
-const Markdown = defineAsyncComponent(() => import("shared/components/Markdown.vue"))
+const Markdown = defineAsyncComponent(() => import('shared/components/Markdown.vue'))
 
 /**
  * AI 小结。进来先拿这个时间段上次生成的那份（老师钉住的优先），没有才出按钮 ——
@@ -21,26 +21,26 @@ const props = defineProps<{
 }>()
 
 const theme = useThemeVars()
-const content = ref("")
-const createdAt = ref("")
+const content = ref('')
+const createdAt = ref('')
 const pinned = ref(false)
 const generating = ref(false)
 const waiting = ref(false)
-const failed = ref("")
+const failed = ref('')
 const expanded = ref(false)
 let controller: AbortController | null = null
 
 async function load() {
   controller?.abort()
   generating.value = false
-  failed.value = ""
+  failed.value = ''
   expanded.value = false
   const period = props.period
   const username = props.username
   const record = await getLatestAnalysis(period, username).catch(() => null)
   if (period !== props.period || username !== props.username) return
-  content.value = record?.analysis ?? ""
-  createdAt.value = record?.createTime ?? ""
+  content.value = record?.analysis ?? ''
+  createdAt.value = record?.createTime ?? ''
   pinned.value = record?.isPinned ?? false
 }
 
@@ -53,13 +53,13 @@ async function generate() {
   controller = current
   generating.value = true
   waiting.value = true
-  failed.value = ""
-  content.value = ""
+  failed.value = ''
+  content.value = ''
   pinned.value = false
   expanded.value = true
   try {
     await streamAI(
-      "ai/analysis",
+      'ai/analysis',
       { period: props.period, username: props.username || undefined },
       {
         signal: current.signal,
@@ -72,7 +72,7 @@ async function generate() {
     createdAt.value = new Date().toISOString()
   } catch (error) {
     if (current.signal.aborted) return
-    failed.value = (error as Error).message || "AI 服务暂时不可用，请稍后再试"
+    failed.value = (error as Error).message || 'AI 服务暂时不可用，请稍后再试'
   } finally {
     if (controller === current) {
       generating.value = false
@@ -93,17 +93,15 @@ const folded = computed(() => props.compact && !expanded.value && !generating.va
       </div>
       <div v-if="!generating" class="foot">
         <a v-if="folded" href="#" @click.prevent="expanded = true">展开全文 ▾</a>
-        <span v-if="createdAt"
-          >{{ parseTime(createdAt, "M月D日") }} 生成{{ pinned ? " · 老师置顶" : "" }}</span
-        >
+        <span v-if="createdAt">{{ parseTime(createdAt, 'M月D日') }} 生成{{ pinned ? ' · 老师置顶' : '' }}</span>
         <a href="#" @click.prevent="generate">重新分析</a>
       </div>
     </template>
     <n-spin v-else-if="waiting" size="small">
-      <div class="waiting">正在看{{ username ? "" : "你的" }}做题记录…</div>
+      <div class="waiting">正在看{{ username ? '' : '你的' }}做题记录…</div>
     </n-spin>
     <div v-else class="empty">
-      <p>让 AI 按这些数据，写一段{{ username ? "" : "给你的" }}小结和下一步建议</p>
+      <p>让 AI 按这些数据，写一段{{ username ? '' : '给你的' }}小结和下一步建议</p>
       <n-button type="primary" @click="generate">
         <template #icon><Icon icon="ph:sparkle" /></template>
         AI 帮我分析
@@ -121,7 +119,7 @@ const folded = computed(() => props.compact && !expanded.value && !generating.va
   gap: 10px;
   border: 1px solid rgba(107, 71, 194, 0.3);
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -145,7 +143,7 @@ h3 {
   display: flex;
   gap: 12px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .foot a {
@@ -168,10 +166,10 @@ h3 {
 .failed {
   margin: 0;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .failed {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 </style>

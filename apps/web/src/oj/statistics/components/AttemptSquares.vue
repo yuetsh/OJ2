@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE } from "utils/constants"
-import { parseTime } from "utils/functions"
-import type { Submission, SUBMISSION_RESULT } from "utils/types"
-import { useTone } from "shared/composables/tone"
-import { attemptTone, cachedSubmission } from "../attempts"
+import { useThemeVars } from 'naive-ui'
+import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import type { Submission, SUBMISSION_RESULT } from 'utils/types'
+import { useTone } from 'shared/composables/tone'
+import { attemptTone, cachedSubmission } from '../attempts'
 
 /**
  * 一个人在一道题上的每一次提交，一格一次、从早到晚（设计稿「统计重设计」）。
@@ -21,20 +21,20 @@ const props = withDefaults(
 const tone = useTone()
 const theme = useThemeVars()
 
-const code = reactive<Record<string, Submission | "loading" | "failed">>({})
+const code = reactive<Record<string, Submission | 'loading' | 'failed'>>({})
 
 async function load(id: string) {
-  if (code[id] && code[id] !== "failed") return
-  code[id] = "loading"
+  if (code[id] && code[id] !== 'failed') return
+  code[id] = 'loading'
   try {
     code[id] = await cachedSubmission(id)
   } catch {
-    code[id] = "failed"
+    code[id] = 'failed'
   }
 }
 
 function open(id: string) {
-  window.open("/submission/" + id, "_blank", "noopener")
+  window.open('/submission/' + id, '_blank', 'noopener')
 }
 
 const cells = computed(() =>
@@ -48,13 +48,7 @@ const cells = computed(() =>
 
 <template>
   <span class="squares">
-    <n-popover
-      v-for="cell in cells"
-      :key="cell.id"
-      :delay="200"
-      :style="{ maxWidth: '560px' }"
-      @update:show="(show: boolean) => show && load(cell.id)"
-    >
+    <n-popover v-for="cell in cells" :key="cell.id" :delay="200" :style="{ maxWidth: '560px' }" @update:show="(show: boolean) => show && load(cell.id)">
       <template #trigger>
         <button
           class="square"
@@ -66,9 +60,7 @@ const cells = computed(() =>
       <div class="pop">
         <div class="pop-head">
           <b>{{ JUDGE_STATUS[cell.result]?.name }}</b>
-          <span class="muted"
-            >{{ parseTime(cell.createTime, "M月D日 HH:mm") }} · 第 {{ cell.index }} 次</span
-          >
+          <span class="muted">{{ parseTime(cell.createTime, 'M月D日 HH:mm') }} · 第 {{ cell.index }} 次</span>
         </div>
         <n-code
           v-if="typeof code[cell.id] === 'object'"
@@ -102,7 +94,7 @@ const cells = computed(() =>
 
 .square:hover {
   /* button 的 color 是浏览器默认的黑，暗色下 currentColor 描边会看不见 */
-  outline: 2px solid v-bind("theme.textColor2");
+  outline: 2px solid v-bind('theme.textColor2');
   outline-offset: 1px;
 }
 

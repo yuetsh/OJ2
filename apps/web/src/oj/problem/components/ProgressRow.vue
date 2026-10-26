@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { ProblemProgress } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import AchievementIcon from "shared/components/AchievementIcon.vue"
-import { useTone } from "shared/composables/tone"
+import { Icon } from '@iconify/vue'
+import type { ProblemProgress } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import AchievementIcon from 'shared/components/AchievementIcon.vue'
+import { useTone } from 'shared/composables/tone'
 
 /**
  * 题目列表顶上那行的左半边：先说做到了什么（设计稿「题目列表重设计 · 改版」）。
@@ -23,25 +23,23 @@ const emit = defineEmits<{ selectTag: [name: string] }>()
 const theme = useThemeVars()
 const tone = useTone()
 
-const remaining = computed(() =>
-  props.progress.next ? props.progress.next.threshold - props.progress.next.progress : 0,
-)
+const remaining = computed(() => (props.progress.next ? props.progress.next.threshold - props.progress.next.progress : 0))
 
 /** 离成就还差什么，按指标换说法 */
 const nextText = computed(() => {
   const next = props.progress.next
-  if (!next) return ""
+  if (!next) return ''
   const r = remaining.value
   switch (next.metric) {
-    case "accepted_count":
-      return next.progress === 0 ? "做对第一道题就解锁" : `再做对 ${r} 道就解锁`
-    case "mid_ac_count":
+    case 'accepted_count':
+      return next.progress === 0 ? '做对第一道题就解锁' : `再做对 ${r} 道就解锁`
+    case 'mid_ac_count':
       return `再做对 ${r} 道中等题就解锁`
-    case "hard_ac_count":
+    case 'hard_ac_count':
       return `再做对 ${r} 道困难题就解锁`
-    case "active_days":
+    case 'active_days':
       return `再来 ${r} 天就解锁`
-    case "max_ac_week_streak":
+    case 'max_ac_week_streak':
       return `连续 ${next.threshold} 周有做对就解锁`
     default:
       return `还差 ${r} 就解锁`
@@ -52,14 +50,14 @@ const weekChip = computed(() => {
   const p = props.progress
   if (p.weekSolved > 0) return `这周 +${p.weekSolved}`
   if (p.weekStreak >= 2) return `连续 ${p.weekStreak} 周都有做对`
-  return ""
+  return ''
 })
 
 // 弹层在 body 下面，样式里的 v-bind 变量够不着，主题色就地给
 const listVars = computed(() => ({
-  "--list-text": theme.value.textColor1,
-  "--list-id": theme.value.textColor3,
-  "--list-hover": theme.value.hoverColor,
+  '--list-text': theme.value.textColor1,
+  '--list-id': theme.value.textColor3,
+  '--list-hover': theme.value.hoverColor,
 }))
 
 const fresh = computed(() => props.progress.solved === 0)
@@ -94,12 +92,7 @@ const fresh = computed(() => props.progress.solved === 0)
         </button>
       </template>
       <div class="almost-list" :style="listVars">
-        <RouterLink
-          v-for="p in progress.almost"
-          :key="p._id"
-          :to="'/problem/' + p._id"
-          class="almost-item"
-        >
+        <RouterLink v-for="p in progress.almost" :key="p._id" :to="'/problem/' + p._id" class="almost-item">
           <span class="id">{{ p._id }}</span>
           {{ p.title }}
         </RouterLink>
@@ -116,14 +109,14 @@ const fresh = computed(() => props.progress.solved === 0)
   min-width: 0;
   white-space: nowrap;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .sep {
   flex: none;
   width: 1px;
   height: 14px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .progress-row.compact {
@@ -144,7 +137,7 @@ const fresh = computed(() => props.progress.solved === 0)
 .total b {
   font-size: 18px;
   font-weight: 700;
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
   font-variant-numeric: tabular-nums;
 }
 
@@ -163,13 +156,13 @@ const fresh = computed(() => props.progress.solved === 0)
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   text-decoration: none;
 }
 
 .next b {
   font-weight: 600;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .next:hover b {
@@ -181,7 +174,7 @@ const fresh = computed(() => props.progress.solved === 0)
   padding: 0;
   background: transparent;
   font: inherit;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -197,7 +190,7 @@ const fresh = computed(() => props.progress.solved === 0)
   padding: 0 12px;
   border: 0;
   border-radius: 14px;
-  background: v-bind("theme.primaryColor");
+  background: v-bind('theme.primaryColor');
   color: #fff;
   font: inherit;
   font-weight: 600;

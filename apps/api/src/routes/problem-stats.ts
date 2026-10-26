@@ -1,14 +1,14 @@
-import { STUDENT_ROLES, type ProblemStats } from "@oj2/contract"
-import { and, count, eq, inArray, sql } from "drizzle-orm"
-import { Hono } from "hono"
+import { STUDENT_ROLES, type ProblemStats } from '@oj2/contract'
+import { and, count, eq, inArray, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, type AppEnv } from "../auth/middleware"
-import { db, schema } from "../db"
-import { failure, success } from "../http"
-import { UNJUDGED_RESULTS, type JudgeStatusValue } from "../judge/status"
-import { canAccessContest, contestDetailsAllowed, findAccessibleContest } from "../services/contest"
-import { accepted } from "../services/learning-stats"
-import { isAdminRole, isTeacherOrAbove, queryInteger } from "./helpers"
+import { optionalAuth, type AppEnv } from '../auth/middleware'
+import { db, schema } from '../db'
+import { failure, success } from '../http'
+import { UNJUDGED_RESULTS, type JudgeStatusValue } from '../judge/status'
+import { canAccessContest, contestDetailsAllowed, findAccessibleContest } from '../services/contest'
+import { accepted } from '../services/learning-stats'
+import { isAdminRole, isTeacherOrAbove, queryInteger } from './helpers'
 
 export const problemStatsRoutes = new Hono<AppEnv>()
 
@@ -40,9 +40,9 @@ type UserRow = {
  * id 是内部题号（problem.id）：比赛题的展示题号是 1、2、3，拿 displayId 查会撞上
  * 同号的公开题（原来的「历年 AC 率」就是这么查错的）。
  */
-problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
-  const user = c.get("user")
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+problemStatsRoutes.get('/problems/:id/stats', optionalAuth, async (c) => {
+  const user = c.get('user')
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const [problem] = await db
     .select({
       id: schema.problem.id,
@@ -52,20 +52,20 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
     .from(schema.problem)
     .where(eq(schema.problem.id, id))
     .limit(1)
-  if (!problem) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!problem) return failure(c, 404, 'problem-not-found', 'Problem does not exist')
 
   const inContest = problem.contestId !== null
   if (inContest) {
     const contest = await findAccessibleContest(user, problem.contestId!)
-    if (!contest) return failure(c, 404, "problem-not-found", "Problem does not exist")
-    const access = await canAccessContest(c, contest, "problems")
+    if (!contest) return failure(c, 404, 'problem-not-found', 'Problem does not exist')
+    const access = await canAccessContest(c, contest, 'problems')
     if (!access.ok) return failure(c, 403, access.code, access.message)
     // 比赛没结束：别人几次做对、错在哪一律不给，和题目详情里计数归零同一个口径
     if (!contestDetailsAllowed(user, contest)) {
       return success(c, { ...EMPTY, locked: true } satisfies ProblemStats)
     }
   } else if (!problem.visible && !isAdminRole(user)) {
-    return failure(c, 404, "problem-not-found", "Problem does not exist")
+    return failure(c, 404, 'problem-not-found', 'Problem does not exist')
   }
 
   const acceptedList = sql.join(
@@ -111,8 +111,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
     else if (row.tries <= 3) tries.few++
     else tries.many++
   }
-  const sortFailures = (map: Map<JudgeStatusValue, number>) =>
-    [...map].map(([result, count]) => ({ result, count })).sort((a, b) => b.count - a.count)
+  const sortFailures = (map: Map<JudgeStatusValue, number>) => [...map].map(([result, count]) => ({ result, count })).sort((a, b) => b.count - a.count)
   const siteFailures = new Map<JudgeStatusValue, number>()
   for (const row of failureRows) {
     siteFailures.set(row.result, (siteFailures.get(row.result) ?? 0) + row.n)
@@ -122,7 +121,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
   const myClassName = !inContest && user?.className ? user.className : null
   const classmates = myClassName ? users.filter((row) => row.class_name === myClassName) : []
 
-  let classes: ProblemStats["classes"] = null
+  let classes: ProblemStats['classes'] = null
   if (!inContest && isTeacherOrAbove(user)) classes = await classRows(problem.id)
 
   return success(c, {
@@ -148,7 +147,7 @@ problemStatsRoutes.get("/problems/:id/stats", optionalAuth, async (c) => {
  * 只算学生角色、没禁用的号，班级人数也这么数。那边是前端拿逐条提交现算的（最多 5000 条），
  * 这里在库里直接聚合，数是一样的。
  */
-async function classRows(problemId: number): Promise<NonNullable<ProblemStats["classes"]>> {
+async function classRows(problemId: number): Promise<NonNullable<ProblemStats['classes']>> {
   const acceptedList = sql.join(
     accepted.map((value) => sql`${value}`),
     sql`, `,
@@ -182,21 +181,13 @@ async function classRows(problemId: number): Promise<NonNullable<ProblemStats["c
     ? await db
         .select({ className: schema.user.className, value: count() })
         .from(schema.user)
-        .where(
-          and(
-            inArray(schema.user.className, names),
-            inArray(schema.user.adminType, [...STUDENT_ROLES]),
-            eq(schema.user.isDisabled, false),
-          ),
-        )
+        .where(and(inArray(schema.user.className, names), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
         .groupBy(schema.user.className)
     : []
   return (
     rows
       .map((row) => {
-        const classSize =
-          (row.class_name && sizes.find((item) => item.className === row.class_name)?.value) ||
-          row.tried
+        const classSize = (row.class_name && sizes.find((item) => item.className === row.class_name)?.value) || row.tried
         return {
           className: row.class_name,
           classSize,
@@ -208,9 +199,6 @@ async function classRows(problemId: number): Promise<NonNullable<ProblemStats["c
         }
       })
       // 交过的人多的在前：按最近一次排的话，零星一两个人补做的班会压在全班做过的班上面
-      .sort(
-        (a, b) =>
-          b.solved + b.unsolved - (a.solved + a.unsolved) || b.lastTime.localeCompare(a.lastTime),
-      )
+      .sort((a, b) => b.solved + b.unsolved - (a.solved + a.unsolved) || b.lastTime.localeCompare(a.lastTime))
   )
 }

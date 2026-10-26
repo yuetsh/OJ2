@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { USERNAME_CLASS_RE } from "utils/constants"
+import { useThemeVars } from 'naive-ui'
+import { USERNAME_CLASS_RE } from 'utils/constants'
 
 /**
  * 用户名：班级前缀（`ks253`）淡一档，名字加粗 —— 一个班的人前缀都一样，
@@ -12,7 +12,7 @@ const theme = useThemeVars()
 
 const parts = computed(() => {
   const match = props.username.match(USERNAME_CLASS_RE)
-  if (!match) return { prefix: "", name: props.username }
+  if (!match) return { prefix: '', name: props.username }
   return { prefix: match[0], name: props.username.slice(match[0].length) || match[0] }
 })
 </script>
@@ -33,16 +33,16 @@ const parts = computed(() => {
 }
 
 .prefix {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .name {
   font-weight: 600;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 
 .muted .name {
   font-weight: 400;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 </style>

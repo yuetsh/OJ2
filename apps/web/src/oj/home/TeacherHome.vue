@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { ClassToday } from "@oj2/contract"
-import type { AnnouncementListItem } from "utils/types"
-import { useThemeVars } from "naive-ui"
-import { getAnnouncementList, getClassToday } from "oj/api"
-import { classLabel } from "utils/classes"
-import { useUserStore } from "shared/store/user"
-import { parseTime, zonedParts, zonedYear } from "utils/functions"
+import type { ClassToday } from '@oj2/contract'
+import type { AnnouncementListItem } from 'utils/types'
+import { useThemeVars } from 'naive-ui'
+import { getAnnouncementList, getClassToday } from 'oj/api'
+import { classLabel } from 'utils/classes'
+import { useUserStore } from 'shared/store/user'
+import { parseTime, zonedParts, zonedYear } from 'utils/functions'
 
 /**
  * 老师的首页（设计稿「首页重设计」HomeTeacher）。原来老师看到的和学生一样（继续学习、最近提交），
@@ -25,52 +25,52 @@ const LIVE_MS = 15 * 60 * 1000
 
 onMounted(async () => {
   const [classes, latest] = await Promise.allSettled([getClassToday(), getAnnouncementList(0, 3)])
-  if (classes.status === "fulfilled") today.value = classes.value
-  if (latest.status === "fulfilled") announcements.value = latest.value.results
+  if (classes.status === 'fulfilled') today.value = classes.value
+  if (latest.status === 'fulfilled') announcements.value = latest.value.results
 })
 
 function dateText(value: string) {
-  return parseTime(value, zonedParts(value)!.year === zonedYear() ? "M月D日" : "YYYY年M月D日")
+  return parseTime(value, zonedParts(value)!.year === zonedYear() ? 'M月D日' : 'YYYY年M月D日')
 }
 
 const greeting = computed(() => {
   const hour = zonedParts(new Date())!.hour
-  if (hour < 5) return "夜深了"
-  if (hour < 11) return "上午好"
-  if (hour < 13) return "中午好"
-  if (hour < 18) return "下午好"
-  return "晚上好"
+  if (hour < 5) return '夜深了'
+  if (hour < 11) return '上午好'
+  if (hour < 13) return '中午好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
 })
 
-type ClassRow = ClassToday["classes"][number]
+type ClassRow = ClassToday['classes'][number]
 
 function stateOf(row: ClassRow) {
-  if (!row.lastSubmitAt) return { live: false, text: "布置了，还没人交" }
-  if (Date.now() - Date.parse(row.lastSubmitAt) < LIVE_MS) return { live: true, text: "正在上课" }
-  return { live: false, text: `${parseTime(row.lastSubmitAt, "HH:mm")} 下课了` }
+  if (!row.lastSubmitAt) return { live: false, text: '布置了，还没人交' }
+  if (Date.now() - Date.parse(row.lastSubmitAt) < LIVE_MS) return { live: true, text: '正在上课' }
+  return { live: false, text: `${parseTime(row.lastSubmitAt, 'HH:mm')} 下课了` }
 }
 
 function metaOf(row: ClassRow) {
   const parts = [
-    row.source === "teacher" && row.assignedAt
-      ? `${parseTime(row.assignedAt, "HH:mm")} ${row.assignedBy} 布置了 ${row.problems.length} 道`
+    row.source === 'teacher' && row.assignedAt
+      ? `${parseTime(row.assignedAt, 'HH:mm')} ${row.assignedBy} 布置了 ${row.problems.length} 道`
       : `做了 ${row.problems.length} 道`,
   ]
   if (row.activeCount) parts.push(`${row.activeCount}/${row.rosterCount} 人交过`)
   if (row.problems.length) parts.push(`全做对 ${row.allDoneCount} 人`)
-  return parts.join(" · ")
+  return parts.join(' · ')
 }
 
 function openBoard(row: ClassRow) {
-  router.push({ name: "classroom board", query: { className: row.className } })
+  router.push({ name: 'classroom board', query: { className: row.className } })
 }
 
 const shortcuts = computed(() =>
   [
-    { label: "课堂看板", to: "/classroom", show: true },
-    { label: "数据统计", to: "/statistics", show: true },
-    { label: "新建题目", to: "/admin/problem/create", show: userStore.hasProblemPermission },
-    { label: "后台", to: userStore.isSuperAdmin ? "/admin" : "/admin/problem/list", show: true },
+    { label: '课堂看板', to: '/classroom', show: true },
+    { label: '数据统计', to: '/statistics', show: true },
+    { label: '新建题目', to: '/admin/problem/create', show: userStore.hasProblemPermission },
+    { label: '后台', to: userStore.isSuperAdmin ? '/admin' : '/admin/problem/list', show: true },
   ].filter((it) => it.show),
 )
 </script>
@@ -80,9 +80,7 @@ const shortcuts = computed(() =>
     <section class="hero">
       <h1 class="hello">{{ greeting }}，{{ userStore.user?.username }}</h1>
       <n-text v-if="today" depth="3" class="tagline">
-        {{
-          today.classes.length ? `今天 ${today.classes.length} 个班上过课` : "今天还没有班在上课"
-        }}
+        {{ today.classes.length ? `今天 ${today.classes.length} 个班上过课` : '今天还没有班在上课' }}
       </n-text>
     </section>
 
@@ -94,9 +92,7 @@ const shortcuts = computed(() =>
           <span class="state" :class="{ live: stateOf(row).live }">{{ stateOf(row).text }}</span>
           <span class="muted">{{ metaOf(row) }}</span>
           <span class="spacer"></span>
-          <n-button :type="stateOf(row).live ? 'primary' : 'default'" @click="openBoard(row)">
-            课堂看板
-          </n-button>
+          <n-button :type="stateOf(row).live ? 'primary' : 'default'" @click="openBoard(row)"> 课堂看板 </n-button>
         </div>
         <div v-if="row.problems.length" class="minis">
           <router-link
@@ -108,9 +104,7 @@ const shortcuts = computed(() =>
           >
             <span>
               <b class="num">{{ problem.problemDisplayId }}</b>
-              <span class="muted num mini-count">
-                {{ problem.acceptedCount }}/{{ row.rosterCount }}</span
-              >
+              <span class="muted num mini-count"> {{ problem.acceptedCount }}/{{ row.rosterCount }}</span>
             </span>
             <i>
               <b
@@ -136,12 +130,7 @@ const shortcuts = computed(() =>
         <span class="spacer"></span>
         <router-link to="/announcement" class="more">全部</router-link>
       </div>
-      <router-link
-        v-for="item in announcements"
-        :key="item.id"
-        :to="{ path: '/announcement', query: { id: item.id } }"
-        class="ann-row"
-      >
+      <router-link v-for="item in announcements" :key="item.id" :to="{ path: '/announcement', query: { id: item.id } }" class="ann-row">
         <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
         <span class="ann-title">{{ item.title }}</span>
         <span class="muted num">{{ dateText(item.createTime) }}</span>
@@ -182,7 +171,7 @@ const shortcuts = computed(() =>
   gap: 4px;
   padding: 18px 20px;
   border-radius: var(--oj-radius);
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
 }
 
 .card h3 {
@@ -195,7 +184,7 @@ const shortcuts = computed(() =>
   flex-direction: column;
   gap: 10px;
   padding: 12px 0;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .class-row:first-of-type {
@@ -217,18 +206,18 @@ const shortcuts = computed(() =>
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 13px;
-  background: v-bind("theme.actionColor");
-  color: v-bind("theme.textColor3");
+  background: v-bind('theme.actionColor');
+  color: v-bind('theme.textColor3');
 }
 
 .state.live {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
   font-weight: 600;
 }
 
 .muted {
   font-size: 14px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   text-decoration: none;
 }
 
@@ -238,7 +227,7 @@ const shortcuts = computed(() =>
 
 .more {
   font-size: 14px;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -263,7 +252,7 @@ const shortcuts = computed(() =>
 }
 
 .mini b.num {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .mini:hover b.num {
@@ -274,14 +263,14 @@ const shortcuts = computed(() =>
   display: block;
   height: 5px;
   border-radius: 3px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
 .mini i b {
   display: block;
   height: 5px;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .num {
@@ -310,7 +299,7 @@ const shortcuts = computed(() =>
   gap: 10px;
   min-height: 46px;
   padding: 0 6px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
   border-radius: 4px;
   color: inherit;
   text-decoration: none;
@@ -321,7 +310,7 @@ const shortcuts = computed(() =>
 }
 
 .ann-row:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .ann-title {

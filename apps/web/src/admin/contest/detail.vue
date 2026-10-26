@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import PageHeader from "admin/components/PageHeader.vue"
-import { errorCode, errorMessage } from "utils/api"
-import TextEditor from "shared/components/TextEditor.vue"
-import { DIFFICULTY } from "utils/constants"
-import { fromPickerValue, parseTime, toPickerValue } from "utils/functions"
-import type { AdminProblemRow, BlankContest } from "utils/types"
+import { useThemeVars } from 'naive-ui'
+import PageHeader from 'admin/components/PageHeader.vue'
+import { errorCode, errorMessage } from 'utils/api'
+import TextEditor from 'shared/components/TextEditor.vue'
+import { DIFFICULTY } from 'utils/constants'
+import { fromPickerValue, parseTime, toPickerValue } from 'utils/functions'
+import type { AdminProblemRow, BlankContest } from 'utils/types'
 import {
   addProblemForContest,
   createContest,
@@ -15,7 +15,7 @@ import {
   getLibraryProblemList,
   getProblemList,
   reorderContestProblems,
-} from "../api"
+} from '../api'
 
 /**
  * 新建 / 编辑比赛，一屏做完（设计稿「比赛重设计」后台那块）：左边名字、类型、时间、密码，
@@ -38,12 +38,12 @@ const saving = ref(false)
 
 const contest = reactive<BlankContest & { id: number }>({
   id: 0,
-  title: "",
-  description: "",
-  tag: "练习",
-  startTime: "",
-  endTime: "",
-  password: "",
+  title: '',
+  description: '',
+  tag: '练习',
+  startTime: '',
+  endTime: '',
+  password: '',
   // 不列出来学生就进不去（隐藏比赛对学生是 404），新建默认就列出来
   visible: true,
 })
@@ -68,21 +68,17 @@ function roundedNow() {
   return ms - (ms % 60_000)
 }
 
-const startMs = computed(() =>
-  waitMins.value !== null
-    ? roundedNow() + waitMins.value * 60_000
-    : fromPickerValue(pickedStart.value),
-)
+const startMs = computed(() => (waitMins.value !== null ? roundedNow() + waitMins.value * 60_000 : fromPickerValue(pickedStart.value)))
 const endMs = computed(() => startMs.value + durationMins.value * 60_000)
 
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"]
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 const timeHint = computed(() => {
   const start = new Date(startMs.value).toISOString()
   const end = new Date(endMs.value).toISOString()
   // 东八区的星期几：平移 8 小时后读 UTC
   const weekday = WEEKDAYS[new Date(startMs.value + 8 * 3600_000).getUTCDay()]
-  const sameDay = parseTime(start, "YYYY-MM-DD") === parseTime(end, "YYYY-MM-DD")
-  return `${parseTime(start, "M月D日")} 周${weekday} ${parseTime(start, "HH:mm")} 开始，${parseTime(end, sameDay ? "HH:mm" : "M月D日 HH:mm")} 结束`
+  const sameDay = parseTime(start, 'YYYY-MM-DD') === parseTime(end, 'YYYY-MM-DD')
+  return `${parseTime(start, 'M月D日')} 周${weekday} ${parseTime(start, 'HH:mm')} 开始，${parseTime(end, sameDay ? 'HH:mm' : 'M月D日 HH:mm')} 结束`
 })
 
 function pickWait(minutes: number | null) {
@@ -104,7 +100,7 @@ const items = ref<Item[]>([])
 const pickedPublic = computed(() => new Set(items.value.map((item) => item.id)))
 
 async function loadContestProblems() {
-  const res = await getProblemList(0, 250, "", undefined, props.contestID)
+  const res = await getProblemList(0, 250, '', undefined, props.contestID)
   items.value = res.results
     .map((row: AdminProblemRow) => ({
       id: row.id,
@@ -112,12 +108,10 @@ async function loadContestProblems() {
       title: row.title,
       difficulty: row.difficulty,
     }))
-    .sort(
-      (a, b) => a.displayId.length - b.displayId.length || a.displayId.localeCompare(b.displayId),
-    )
+    .sort((a, b) => a.displayId.length - b.displayId.length || a.displayId.localeCompare(b.displayId))
 }
 
-const keyword = ref("")
+const keyword = ref('')
 const results = ref<AdminProblemRow[]>([])
 const searching = ref(false)
 watchDebounced(
@@ -139,9 +133,7 @@ watchDebounced(
 
 /** 编辑时比赛题是复制品，没法知道它从哪道公开题来，按题名比一下防重复 */
 function added(row: AdminProblemRow) {
-  return editing.value
-    ? items.value.some((item) => item.title === row.title)
-    : pickedPublic.value.has(row.id)
+  return editing.value ? items.value.some((item) => item.title === row.title) : pickedPublic.value.has(row.id)
 }
 
 async function add(row: AdminProblemRow) {
@@ -160,13 +152,7 @@ async function add(row: AdminProblemRow) {
     await loadContestProblems()
   } catch (err) {
     const code = errorCode(err)
-    message.error(
-      code === "contest-ended"
-        ? "比赛已经结束，不能再加题"
-        : code === "display-id-exists"
-          ? "题号重了，刷新一下再加"
-          : errorMessage(err),
-    )
+    message.error(code === 'contest-ended' ? '比赛已经结束，不能再加题' : code === 'display-id-exists' ? '题号重了，刷新一下再加' : errorMessage(err))
   }
 }
 
@@ -177,21 +163,17 @@ function remove(item: Item) {
     return
   }
   dialog.warning({
-    title: "从比赛里删掉这道题？",
+    title: '从比赛里删掉这道题？',
     content: `第 ${item.displayId} 题「${item.title}」。已经有人交过的题删不掉。`,
-    positiveText: "删掉",
-    negativeText: "不删",
+    positiveText: '删掉',
+    negativeText: '不删',
     onPositiveClick: async () => {
       try {
         await deleteContestProblem(item.id)
         await loadContestProblems()
         if (items.value.length) await saveOrder()
       } catch (err) {
-        message.error(
-          errorCode(err) === "problem-has-submissions"
-            ? "已经有人交过这道题，删不掉；不想让学生看到可以在题目里关掉「可见」"
-            : errorMessage(err),
-        )
+        message.error(errorCode(err) === 'problem-has-submissions' ? '已经有人交过这道题，删不掉；不想让学生看到可以在题目里关掉「可见」' : errorMessage(err))
       }
     },
   })
@@ -237,7 +219,7 @@ function onDragEnd() {
 
 function editProblem(item: Item) {
   router.push({
-    name: "admin contest problem edit",
+    name: 'admin contest problem edit',
     params: { contestID: props.contestID, problemID: item.id },
   })
 }
@@ -245,7 +227,7 @@ function editProblem(item: Item) {
 // ---------------------------------------------------------------- 载入 / 保存
 
 async function load() {
-  keyword.value = ""
+  keyword.value = ''
   if (!props.contestID) {
     ready.value = true
     return
@@ -272,33 +254,31 @@ async function load() {
 
 async function submit() {
   if (!contest.title.trim()) {
-    message.error("比赛还没起名字")
+    message.error('比赛还没起名字')
     return
   }
   if (durationMins.value <= 0) {
-    message.error("时长要大于 0")
+    message.error('时长要大于 0')
     return
   }
   contest.startTime = new Date(startMs.value).toISOString()
   contest.endTime = new Date(endMs.value).toISOString()
-  if (!contest.description || contest.description === "<p><br></p>") {
+  if (!contest.description || contest.description === '<p><br></p>') {
     contest.description = contest.title
   }
   saving.value = true
   try {
     if (editing.value) {
       await editContest(contest)
-      message.success("改好了")
+      message.success('改好了')
       return
     }
     const created = await createContest(contest)
     for (const [index, item] of items.value.entries()) {
       await addProblemForContest(String(created.id), item.id, String(index + 1))
     }
-    message.success(
-      items.value.length ? `比赛建好了，${items.value.length} 道题都加进去了` : "比赛建好了",
-    )
-    router.replace({ name: "admin contest edit", params: { contestID: created.id } })
+    message.success(items.value.length ? `比赛建好了，${items.value.length} 道题都加进去了` : '比赛建好了')
+    router.replace({ name: 'admin contest edit', params: { contestID: created.id } })
   } catch (err) {
     message.error(errorMessage(err))
   } finally {
@@ -313,9 +293,7 @@ onMounted(load)
 <template>
   <PageHeader :title="editing ? '编辑比赛' : '新建比赛'" :back="{ name: 'admin contest list' }">
     <template v-if="editing" #actions>
-      <n-button tag="a" :href="`/contest/${contestID}/class`" target="_blank">
-        到前台看这场比赛
-      </n-button>
+      <n-button tag="a" :href="`/contest/${contestID}/class`" target="_blank"> 到前台看这场比赛 </n-button>
     </template>
   </PageHeader>
 
@@ -334,9 +312,7 @@ onMounted(load)
             <n-radio-button value="期中">期中</n-radio-button>
             <n-radio-button value="期末">期末</n-radio-button>
           </n-radio-group>
-          <span class="hint">
-            练习：学生边做边看排名。期中、期末：考试中学生看不到排名和每题做对人数，考完一起公布。
-          </span>
+          <span class="hint"> 练习：学生边做边看排名。期中、期末：考试中学生看不到排名和每题做对人数，考完一起公布。 </span>
         </div>
       </div>
 
@@ -345,26 +321,10 @@ onMounted(load)
         <div class="stack">
           <n-flex :size="6">
             <template v-if="!editing">
-              <button
-                v-for="m in WAIT_CHOICES"
-                :key="m"
-                class="chip"
-                :class="{ on: waitMins === m }"
-                @click="pickWait(m)"
-              >
-                {{ m }} 分钟后
-              </button>
-              <button class="chip" :class="{ on: waitMins === null }" @click="pickWait(null)">
-                选时间…
-              </button>
+              <button v-for="m in WAIT_CHOICES" :key="m" class="chip" :class="{ on: waitMins === m }" @click="pickWait(m)">{{ m }} 分钟后</button>
+              <button class="chip" :class="{ on: waitMins === null }" @click="pickWait(null)">选时间…</button>
             </template>
-            <n-date-picker
-              v-if="waitMins === null"
-              v-model:value="pickedStart"
-              type="datetime"
-              format="yyyy-MM-dd HH:mm"
-              style="width: 200px"
-            />
+            <n-date-picker v-if="waitMins === null" v-model:value="pickedStart" type="datetime" format="yyyy-MM-dd HH:mm" style="width: 200px" />
           </n-flex>
         </div>
       </div>
@@ -373,25 +333,11 @@ onMounted(load)
         <span class="label">时长</span>
         <div class="stack">
           <n-flex :size="6" align="center">
-            <button
-              v-for="m in DURATION_CHOICES"
-              :key="m"
-              class="chip"
-              :class="{ on: !customDuration && durationMins === m }"
-              @click="pickDuration(m)"
-            >
-              {{ m === 60 ? "1 小时" : `${m} 分钟` }}
+            <button v-for="m in DURATION_CHOICES" :key="m" class="chip" :class="{ on: !customDuration && durationMins === m }" @click="pickDuration(m)">
+              {{ m === 60 ? '1 小时' : `${m} 分钟` }}
             </button>
-            <button class="chip" :class="{ on: customDuration }" @click="pickDuration(null)">
-              自己填
-            </button>
-            <n-input-number
-              v-if="customDuration"
-              v-model:value="durationMins"
-              :min="1"
-              :step="5"
-              style="width: 130px"
-            >
+            <button class="chip" :class="{ on: customDuration }" @click="pickDuration(null)">自己填</button>
+            <n-input-number v-if="customDuration" v-model:value="durationMins" :min="1" :step="5" style="width: 130px">
               <template #suffix>分钟</template>
             </n-input-number>
           </n-flex>
@@ -407,9 +353,7 @@ onMounted(load)
       <div class="field">
         <span class="label">列出来</span>
         <n-switch v-model:value="contest.visible" />
-        <span class="hint">{{
-          contest.visible ? "学生在比赛列表里看得到" : "藏起来，学生进不去"
-        }}</span>
+        <span class="hint">{{ contest.visible ? '学生在比赛列表里看得到' : '藏起来，学生进不去' }}</span>
       </div>
 
       <div class="field top">
@@ -432,18 +376,8 @@ onMounted(load)
         <span class="hint">{{ items.length }} 道 · 拖动排顺序，题号自动按 1、2、3 排</span>
       </div>
       <div class="search">
-        <n-input
-          v-model:value="keyword"
-          clearable
-          :loading="searching"
-          placeholder="输入题号或题目名，从题库里加"
-        />
-        <n-button
-          v-if="editing"
-          @click="router.push({ name: 'admin contest problem create', params: { contestID } })"
-        >
-          + 新出一道
-        </n-button>
+        <n-input v-model:value="keyword" clearable :loading="searching" placeholder="输入题号或题目名，从题库里加" />
+        <n-button v-if="editing" @click="router.push({ name: 'admin contest problem create', params: { contestID } })"> + 新出一道 </n-button>
         <n-tooltip v-else>
           <template #trigger>
             <n-button disabled>+ 新出一道</n-button>
@@ -476,25 +410,13 @@ onMounted(load)
           <span class="grip" aria-hidden="true">⋮⋮</span>
           <b class="num">{{ item.displayId }}</b>
           <span class="ell grow">{{ item.title }}</span>
-          <span class="muted tiny">{{
-            DIFFICULTY[item.difficulty as keyof typeof DIFFICULTY]
-          }}</span>
-          <n-button v-if="editing" size="small" text type="primary" @click="editProblem(item)"
-            >改</n-button
-          >
-          <n-button
-            size="small"
-            text
-            :aria-label="`删掉第 ${item.displayId} 题`"
-            @click="remove(item)"
-            >✕</n-button
-          >
+          <span class="muted tiny">{{ DIFFICULTY[item.difficulty as keyof typeof DIFFICULTY] }}</span>
+          <n-button v-if="editing" size="small" text type="primary" @click="editProblem(item)">改</n-button>
+          <n-button size="small" text :aria-label="`删掉第 ${item.displayId} 题`" @click="remove(item)">✕</n-button>
         </div>
       </div>
       <div v-else class="empty hint">还没加题。在上面输入题号，比如 2033</div>
-      <span class="hint">
-        从题库加的题会复制一份进比赛：比赛里改它不影响原题，学生在题库里也搜不到比赛题。
-      </span>
+      <span class="hint"> 从题库加的题会复制一份进比赛：比赛里改它不影响原题，学生在题库里也搜不到比赛题。 </span>
     </section>
   </div>
 </template>
@@ -513,9 +435,9 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 16px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .form {
@@ -547,7 +469,7 @@ onMounted(load)
   width: 52px;
   flex-shrink: 0;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .stack {
@@ -565,11 +487,11 @@ onMounted(load)
 .hint {
   font-size: 12px;
   line-height: 1.6;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tiny {
@@ -592,17 +514,17 @@ onMounted(load)
   height: 28px;
   padding: 0 12px;
   border-radius: 14px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
 .chip.on {
-  border-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.primaryColor');
   font-weight: 600;
 }
 
@@ -611,7 +533,7 @@ onMounted(load)
   align-items: center;
   gap: 10px;
   padding-top: 12px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .picker-head {
@@ -627,7 +549,7 @@ onMounted(load)
 
 .results,
 .list {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   overflow: hidden;
 }
@@ -649,12 +571,12 @@ onMounted(load)
 
 .result + .result,
 .item + .item {
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .item {
   cursor: grab;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .item.dragging {
@@ -662,7 +584,7 @@ onMounted(load)
 }
 
 .grip {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   letter-spacing: -3px;
 }
 

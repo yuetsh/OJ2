@@ -1,10 +1,10 @@
-import { createDiscreteApi } from "naive-ui"
-import { useAuthModalStore } from "shared/store/authModal"
-import { authFetch } from "./auth"
-import { STORAGE_KEY } from "./constants"
-import storage from "./storage"
+import { createDiscreteApi } from 'naive-ui'
+import { useAuthModalStore } from 'shared/store/authModal'
+import { authFetch } from './auth'
+import { STORAGE_KEY } from './constants'
+import storage from './storage'
 
-const { message: toast } = createDiscreteApi(["message"])
+const { message: toast } = createDiscreteApi(['message'])
 
 /** 后端失败响应体的形状，见 apps/api/src/http.ts 的 failure */
 interface ErrorPayload {
@@ -27,7 +27,7 @@ export class ApiError extends Error {
     readonly data: string,
   ) {
     super(data)
-    this.name = "ApiError"
+    this.name = 'ApiError'
   }
 }
 
@@ -41,7 +41,7 @@ export function errorCode(err: unknown) {
 }
 
 /** 给用户看的文案：接口错误用后端文案，其它一律 fallback —— 别把 TypeError 的英文甩给学生 */
-export function errorMessage(err: unknown, fallback = "未知错误") {
+export function errorMessage(err: unknown, fallback = '未知错误') {
   return isApiError(err) && err.data ? err.data : fallback
 }
 
@@ -54,28 +54,24 @@ export function errorMessage(err: unknown, fallback = "未知错误") {
  * 同一个错误码从两条路进来，学生看到的结果不该有两个样子。
  */
 /** handleGlobalApiError 已经替调用方提示过的错误码，调用方别再弹第二遍 */
-export const GLOBALLY_HANDLED_CODES: readonly string[] = [
-  "login-required",
-  "account-disabled",
-  "permission-denied",
-]
+export const GLOBALLY_HANDLED_CODES: readonly string[] = ['login-required', 'account-disabled', 'permission-denied']
 
 export function handleGlobalApiError(code: string, message?: string) {
-  if (code === "login-required") {
+  if (code === 'login-required') {
     storage.remove(STORAGE_KEY.AUTHED)
     useAuthModalStore().openLoginModal()
-  } else if (code === "account-disabled") {
+  } else if (code === 'account-disabled') {
     // 这里**不能**弹登录框：账号已经被禁用，登进去还是会被拒，
     // 学生会陷入「弹框 → 登录 → 又弹框」的死循环，且看不出发生了什么。
     // 清掉登录态并明确告知，会话在中途被禁用时也走这一支。
     storage.remove(STORAGE_KEY.AUTHED)
-    toast.error("账号已被禁用，请联系老师")
-  } else if (code === "permission-denied") {
-    toast.error(message || "权限不足")
+    toast.error('账号已被禁用，请联系老师')
+  } else if (code === 'permission-denied') {
+    toast.error(message || '权限不足')
   }
 }
 
-const NETWORK_ERROR_MESSAGE = "网络异常，请检查网络后重试"
+const NETWORK_ERROR_MESSAGE = '网络异常，请检查网络后重试'
 
 interface RequestConfig {
   /** 拼进 query string。值是 ""、null、undefined 的键直接丢掉，调用方不用自己挑 */
@@ -87,7 +83,7 @@ interface RequestConfig {
 function withQuery(url: string, params?: Record<string, unknown>) {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params ?? {})) {
-    if (value !== "" && value !== null && value !== undefined) query.append(key, String(value))
+    if (value !== '' && value !== null && value !== undefined) query.append(key, String(value))
   }
   const search = query.toString()
   return search ? `${url}?${search}` : url
@@ -99,7 +95,7 @@ async function request<T>(method: string, url: string, body: unknown, config: Re
   if (body instanceof FormData) {
     init.body = body
   } else if (body !== undefined) {
-    init.headers = { "Content-Type": "application/json" }
+    init.headers = { 'Content-Type': 'application/json' }
     init.body = JSON.stringify(body)
   }
 
@@ -108,13 +104,13 @@ async function request<T>(method: string, url: string, body: unknown, config: Re
     response = await authFetch(withQuery(`/api/${url}`, config.params), init)
   } catch {
     // 请求根本没到后端（断网、反代挂了），学生看到的就是这一句
-    throw new ApiError("network-error", NETWORK_ERROR_MESSAGE)
+    throw new ApiError('network-error', NETWORK_ERROR_MESSAGE)
   }
   const payload = (await response.json().catch(() => null)) as ({ data?: T } & ErrorPayload) | null
   if (response.ok) return payload?.data as T
 
   // 没有 JSON 信封 = 不是后端回的（网关的错误页之类），当网络问题
-  const code = payload?.error?.code ?? "network-error"
+  const code = payload?.error?.code ?? 'network-error'
   const message = payload?.error?.message ?? NETWORK_ERROR_MESSAGE
   handleGlobalApiError(code, message)
   throw new ApiError(code, message)
@@ -131,13 +127,10 @@ async function request<T>(method: string, url: string, body: unknown, config: Re
  * 成功没有区别。
  */
 const api = {
-  get: <T>(url: string, config?: RequestConfig) => request<T>("GET", url, undefined, config),
-  post: <T>(url: string, data?: unknown, config?: RequestConfig) =>
-    request<T>("POST", url, data, config),
-  put: <T>(url: string, data?: unknown, config?: RequestConfig) =>
-    request<T>("PUT", url, data, config),
-  delete: <T>(url: string, config?: RequestConfig) =>
-    request<T>("DELETE", url, config?.data, config),
+  get: <T>(url: string, config?: RequestConfig) => request<T>('GET', url, undefined, config),
+  post: <T>(url: string, data?: unknown, config?: RequestConfig) => request<T>('POST', url, data, config),
+  put: <T>(url: string, data?: unknown, config?: RequestConfig) => request<T>('PUT', url, data, config),
+  delete: <T>(url: string, config?: RequestConfig) => request<T>('DELETE', url, config?.data, config),
 }
 
 export default api

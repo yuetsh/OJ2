@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto"
+import { randomUUID } from 'node:crypto'
 
-import { config } from "../config"
-import { redis } from "../redis"
+import { config } from '../config'
+import { redis } from '../redis'
 
 /**
  * 判题沙箱的名额，按池在 Redis 里数。
@@ -21,7 +21,7 @@ import { redis } from "../redis"
  * 到期后自动作废，不会永远占着。Redis 出错时直接放行 —— 判题比限流要紧，
  * 而 Redis 真挂了，会话也读不出来，整站本来就不可用。
  */
-export type JudgePool = "judge" | "interactive"
+export type JudgePool = 'judge' | 'interactive'
 
 const LIMITS: Record<JudgePool, number> = {
   judge: config.judgeConcurrency,
@@ -37,30 +37,24 @@ redis.call('ZADD', KEYS[1], ARGV[2], ARGV[3])
 return 1
 `
 
-redis.defineCommand("judgeSlotAcquire", { numberOfKeys: 1, lua: ACQUIRE_SCRIPT })
+redis.defineCommand('judgeSlotAcquire', { numberOfKeys: 1, lua: ACQUIRE_SCRIPT })
 
 type SlotRedis = typeof redis & {
-  judgeSlotAcquire(
-    key: string,
-    now: string,
-    expireAt: string,
-    token: string,
-    limit: string,
-  ): Promise<number>
+  judgeSlotAcquire(key: string, now: string, expireAt: string, token: string, limit: string): Promise<number>
 }
 
 function sleep(ms: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
     if (signal?.aborted) return reject(signal.reason)
     const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort)
+      signal?.removeEventListener('abort', onAbort)
       resolve()
     }, ms)
     const onAbort = () => {
       clearTimeout(timer)
       reject(signal!.reason)
     }
-    signal?.addEventListener("abort", onAbort, { once: true })
+    signal?.addEventListener('abort', onAbort, { once: true })
   })
 }
 
@@ -75,11 +69,7 @@ function sleep(ms: number, signal?: AbortSignal) {
  * 等的方式是隔一会儿问一次（50ms 起翻倍到 500ms）。同时在等的最多也就十来个
  * （两个池的上限加上两个进程里各自排着的），这点 Redis 往返不值得为它上阻塞队列。
  */
-export async function withJudgeSlot<T>(
-  pool: JudgePool,
-  options: { holdMs: number; signal?: AbortSignal },
-  run: () => Promise<T>,
-): Promise<T> {
+export async function withJudgeSlot<T>(pool: JudgePool, options: { holdMs: number; signal?: AbortSignal }, run: () => Promise<T>): Promise<T> {
   const key = `judge-slots:${pool}`
   const token = randomUUID()
   let acquired = false
@@ -87,14 +77,7 @@ export async function withJudgeSlot<T>(
     options.signal?.throwIfAborted()
     try {
       const now = Date.now()
-      acquired =
-        (await (redis as SlotRedis).judgeSlotAcquire(
-          key,
-          String(now),
-          String(now + options.holdMs),
-          token,
-          String(LIMITS[pool]),
-        )) === 1
+      acquired = (await (redis as SlotRedis).judgeSlotAcquire(key, String(now), String(now + options.holdMs), token, String(LIMITS[pool]))) === 1
     } catch (error) {
       console.warn(`[judge-slots] Redis 不可用，不排队直接判`, error)
       return run()

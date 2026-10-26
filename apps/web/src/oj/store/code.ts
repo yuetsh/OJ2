@@ -1,8 +1,8 @@
-import { normalizeLanguage } from "@oj2/contract"
-import { defineStore } from "pinia"
-import { STORAGE_KEY } from "utils/constants"
-import storage from "utils/storage"
-import type { Code, LANGUAGE } from "utils/types"
+import { normalizeLanguage } from '@oj2/contract'
+import { defineStore } from 'pinia'
+import { STORAGE_KEY } from 'utils/constants'
+import storage from 'utils/storage'
+import type { Code, LANGUAGE } from 'utils/types'
 
 /**
  * 代码编辑器状态管理 Store
@@ -10,24 +10,24 @@ import type { Code, LANGUAGE } from "utils/types"
  */
 function savedCodeLanguage() {
   const saved = normalizeLanguage(storage.get(STORAGE_KEY.LANGUAGE))
-  return saved && saved !== "Flowchart" ? saved : null
+  return saved && saved !== 'Flowchart' ? saved : null
 }
 
-export const useCodeStore = defineStore("code", () => {
+export const useCodeStore = defineStore('code', () => {
   // ==================== 状态 ====================
   const code = reactive<Code>({
-    value: "",
+    value: '',
     // 过一道 normalizeLanguage：上线那一刻学生浏览器的 localStorage 里存的还是
     // 旧值 Python3，直接拿来用会被后端的契约挡掉（而且报错看不出是这个原因）
     // 以前的版本会把 Flowchart 也记成语言偏好，那种老值在这里一并不认
-    language: savedCodeLanguage() ?? "Python",
+    language: savedCodeLanguage() ?? 'Python',
   })
 
-  const input = ref("")
-  const output = ref("")
+  const input = ref('')
+  const output = ref('')
 
   // ==================== 计算属性 ====================
-  const isEmpty = computed(() => code.value.trim() === "")
+  const isEmpty = computed(() => code.value.trim() === '')
 
   // ==================== 操作 ====================
   /**
@@ -62,16 +62,16 @@ export const useCodeStore = defineStore("code", () => {
    * 重置所有状态
    */
   function reset() {
-    code.value = ""
-    input.value = ""
-    output.value = ""
+    code.value = ''
+    input.value = ''
+    output.value = ''
   }
 
   /**
    * 清空输出
    */
   function clearOutput() {
-    output.value = ""
+    output.value = ''
   }
 
   /**
@@ -82,13 +82,13 @@ export const useCodeStore = defineStore("code", () => {
   watch(
     () => code.language,
     (newLanguage) => {
-      if (newLanguage !== "Flowchart") storage.set(STORAGE_KEY.LANGUAGE, newLanguage)
+      if (newLanguage !== 'Flowchart') storage.set(STORAGE_KEY.LANGUAGE, newLanguage)
     },
   )
 
   /** 学生习惯用的编程语言（从来不会是 Flowchart） */
   function preferredLanguage(): LANGUAGE {
-    return savedCodeLanguage() ?? "Python"
+    return savedCodeLanguage() ?? 'Python'
   }
 
   return {

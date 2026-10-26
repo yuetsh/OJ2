@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { h } from "vue"
-import { Icon } from "@iconify/vue"
-import { RouterLink } from "vue-router"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useDarkTransition } from "shared/composables/darkTransition"
-import { STORAGE_KEY } from "utils/constants"
-import storage from "utils/storage"
-import { useUserStore } from "../store/user"
-import HelpButton from "../components/HelpButton.vue"
-import type { MenuOption } from "naive-ui"
+import { h } from 'vue'
+import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useDarkTransition } from 'shared/composables/darkTransition'
+import { STORAGE_KEY } from 'utils/constants'
+import storage from 'utils/storage'
+import { useUserStore } from '../store/user'
+import HelpButton from '../components/HelpButton.vue'
+import type { MenuOption } from 'naive-ui'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,7 +23,7 @@ const { isDark, toggleDark } = useDarkTransition()
  * `path` 同时用来判定高亮：取当前路径能匹配上的**最长**那一条，所以
  * /admin/problem/stuck 亮「卡点分析」而不是「题目」。
  */
-type Role = "problem" | "teacher" | "super"
+type Role = 'problem' | 'teacher' | 'super'
 interface NavItem {
   label: string
   icon: string
@@ -39,108 +39,104 @@ interface NavGroup {
 
 const NAV: NavGroup[] = [
   {
-    label: "概览",
-    items: [{ label: "首页", icon: "ph:house", path: "/admin", role: "super" }],
+    label: '概览',
+    items: [{ label: '首页', icon: 'ph:house', path: '/admin', role: 'super' }],
   },
   {
-    label: "教学内容",
+    label: '教学内容',
     items: [
       {
-        label: "题目",
-        icon: "ph:code",
-        path: "/admin/problem",
-        to: "/admin/problem/list",
-        role: "problem",
+        label: '题目',
+        icon: 'ph:code',
+        path: '/admin/problem',
+        to: '/admin/problem/list',
+        role: 'problem',
       },
-      { label: "标签", icon: "ph:tag", path: "/admin/problem/tags", role: "problem" },
+      { label: '标签', icon: 'ph:tag', path: '/admin/problem/tags', role: 'problem' },
       {
-        label: "比赛",
-        icon: "ph:flag-checkered",
-        path: "/admin/contest",
-        to: "/admin/contest/list",
-        role: "teacher",
-      },
-      {
-        label: "题单",
-        icon: "ph:list-checks",
-        path: "/admin/problemset",
-        to: "/admin/problemset/list",
-        role: "teacher",
+        label: '比赛',
+        icon: 'ph:flag-checkered',
+        path: '/admin/contest',
+        to: '/admin/contest/list',
+        role: 'teacher',
       },
       {
-        label: "教程",
-        icon: "ph:book-open",
-        path: "/admin/tutorial",
-        to: "/admin/tutorial/list",
-        role: "super",
+        label: '题单',
+        icon: 'ph:list-checks',
+        path: '/admin/problemset',
+        to: '/admin/problemset/list',
+        role: 'teacher',
+      },
+      {
+        label: '教程',
+        icon: 'ph:book-open',
+        path: '/admin/tutorial',
+        to: '/admin/tutorial/list',
+        role: 'super',
       },
     ],
   },
   {
-    label: "学情分析",
+    label: '学情分析',
     items: [
       {
-        label: "卡点分析",
-        icon: "ph:warning-diamond",
-        path: "/admin/problem/stuck",
-        role: "teacher",
+        label: '卡点分析',
+        icon: 'ph:warning-diamond',
+        path: '/admin/problem/stuck',
+        role: 'teacher',
       },
       {
-        label: "年度趋势",
-        icon: "ph:chart-line-up",
-        path: "/admin/problem/trend",
-        role: "teacher",
+        label: '年度趋势',
+        icon: 'ph:chart-line-up',
+        path: '/admin/problem/trend',
+        role: 'teacher',
       },
-      { label: "自学情况", icon: "ph:student", path: "/admin/learn", role: "teacher" },
+      { label: '自学情况', icon: 'ph:student', path: '/admin/learn', role: 'teacher' },
       {
-        label: "AI 报告",
-        icon: "ph:sparkle",
-        path: "/admin/ai",
-        to: "/admin/ai/reports",
-        role: "teacher",
+        label: 'AI 报告',
+        icon: 'ph:sparkle',
+        path: '/admin/ai',
+        to: '/admin/ai/reports',
+        role: 'teacher',
       },
     ],
   },
   {
-    label: "站点管理",
+    label: '站点管理',
     items: [
       {
-        label: "用户",
-        icon: "ph:users",
-        path: "/admin/user",
-        to: "/admin/user/list",
-        role: "super",
+        label: '用户',
+        icon: 'ph:users',
+        path: '/admin/user',
+        to: '/admin/user/list',
+        role: 'super',
       },
       {
-        label: "公告",
-        icon: "ph:megaphone",
-        path: "/admin/announcement",
-        to: "/admin/announcement/list",
-        role: "super",
+        label: '公告',
+        icon: 'ph:megaphone',
+        path: '/admin/announcement',
+        to: '/admin/announcement/list',
+        role: 'super',
       },
       {
-        label: "成就",
-        icon: "ph:medal",
-        path: "/admin/achievement",
-        to: "/admin/achievement/list",
-        role: "super",
+        label: '成就',
+        icon: 'ph:medal',
+        path: '/admin/achievement',
+        to: '/admin/achievement/list',
+        role: 'super',
       },
-      { label: "设置", icon: "ph:gear-six", path: "/admin/config", role: "super" },
+      { label: '设置', icon: 'ph:gear-six', path: '/admin/config', role: 'super' },
     ],
   },
 ]
 
 function allowed(role: Role) {
-  if (role === "super") return userStore.isSuperAdmin
-  if (role === "teacher") return userStore.isTeacherOrAbove
+  if (role === 'super') return userStore.isSuperAdmin
+  if (role === 'teacher') return userStore.isTeacherOrAbove
   return userStore.hasProblemPermission
 }
 
-const groups = computed(() =>
-  NAV.map((g) => ({ ...g, items: g.items.filter((i) => allowed(i.role)) })).filter(
-    (g) => g.items.length,
-  ),
-)
+const groups = computed(() => NAV.map((g) => ({ ...g, items: g.items.filter((i) => allowed(i.role)) })).filter((g) => g.items.length))
 
 function renderIcon(icon: string) {
   return () => h(Icon, { icon, width: 18 })
@@ -157,12 +153,9 @@ function toOption(i: NavItem): MenuOption {
 // 收起时 64px 放不下分组标题（会折成两行），换成分隔线。手机上菜单在抽屉里，总是展开的
 const options = computed<MenuOption[]>(() =>
   collapsed.value && !isMobile.value
-    ? groups.value.flatMap((g, idx) => [
-        ...(idx ? [{ type: "divider", key: `divider-${g.label}` }] : []),
-        ...g.items.map(toOption),
-      ])
+    ? groups.value.flatMap((g, idx) => [...(idx ? [{ type: 'divider', key: `divider-${g.label}` }] : []), ...g.items.map(toOption)])
     : groups.value.map((g) => ({
-        type: "group",
+        type: 'group',
         key: g.label,
         label: g.label,
         children: g.items.map(toOption),
@@ -171,8 +164,8 @@ const options = computed<MenuOption[]>(() =>
 
 function matches(path: string, prefix: string) {
   // 首页只能精确匹配，否则它是所有后台路径的前缀
-  if (prefix === "/admin") return path === "/admin" || path === "/admin/"
-  return path === prefix || path.startsWith(prefix + "/")
+  if (prefix === '/admin') return path === '/admin' || path === '/admin/'
+  return path === prefix || path.startsWith(prefix + '/')
 }
 
 const current = computed(() => {
@@ -198,28 +191,28 @@ watch(isMobile, (m) => {
 })
 
 const userOptions: DropdownOption[] = [
-  { label: "回到前台", key: "home", icon: renderIcon("ph:arrow-square-out") },
-  { type: "divider", key: "d" },
-  { label: "退出登录", key: "logout", icon: renderIcon("ph:sign-out") },
+  { label: '回到前台', key: 'home', icon: renderIcon('ph:arrow-square-out') },
+  { type: 'divider', key: 'd' },
+  { label: '退出登录', key: 'logout', icon: renderIcon('ph:sign-out') },
 ]
 
 async function onUserSelect(key: string) {
-  if (key === "home") {
-    router.push("/")
-  } else if (key === "logout") {
+  if (key === 'home') {
+    router.push('/')
+  } else if (key === 'logout') {
     await userStore.signOut()
     // 与前台 Header 一致：整页跳转把各个 store 里的数据清干净
-    window.location.replace("/")
+    window.location.replace('/')
   }
 }
 
 onMounted(async () => {
   if (!storage.get(STORAGE_KEY.AUTHED)) {
-    router.replace("/")
+    router.replace('/')
   } else {
     await userStore.getMyProfile()
     if (!userStore.isAdminRole) {
-      router.replace("/")
+      router.replace('/')
     }
   }
 })
@@ -258,12 +251,7 @@ onMounted(async () => {
           <Icon icon="streamline-emojis:dog" :height="28" />
           <span class="brandText">后台管理</span>
         </RouterLink>
-        <n-menu
-          :options="options"
-          :value="current?.item.path ?? null"
-          :indent="20"
-          :theme-overrides="{ itemHeight: '44px' }"
-        />
+        <n-menu :options="options" :value="current?.item.path ?? null" :indent="20" :theme-overrides="{ itemHeight: '44px' }" />
       </n-drawer-content>
     </n-drawer>
 
@@ -273,16 +261,14 @@ onMounted(async () => {
           <n-button quaternary circle @click="menuOpen = true" title="菜单">
             <template #icon><Icon icon="ph:list" :width="22" /></template>
           </n-button>
-          <span class="mobileTitleText">{{ current?.item.label ?? "后台" }}</span>
+          <span class="mobileTitleText">{{ current?.item.label ?? '后台' }}</span>
         </div>
         <n-breadcrumb v-if="!isMobile">
           <n-breadcrumb-item>后台</n-breadcrumb-item>
           <template v-if="current">
             <n-breadcrumb-item>{{ current.group.label }}</n-breadcrumb-item>
             <n-breadcrumb-item>
-              <RouterLink :to="current.item.to ?? current.item.path">{{
-                current.item.label
-              }}</RouterLink>
+              <RouterLink :to="current.item.to ?? current.item.path">{{ current.item.label }}</RouterLink>
             </n-breadcrumb-item>
           </template>
         </n-breadcrumb>
@@ -296,12 +282,7 @@ onMounted(async () => {
               <Icon :icon="isDark ? 'ph:sun' : 'ph:moon'" />
             </template>
           </n-button>
-          <n-dropdown
-            v-if="userStore.user"
-            :options="userOptions"
-            trigger="click"
-            @select="onUserSelect"
-          >
+          <n-dropdown v-if="userStore.user" :options="userOptions" trigger="click" @select="onUserSelect">
             <n-button quaternary size="small">
               <template #icon><Icon icon="ph:user-circle" /></template>
               <template v-if="!isMobile">{{ userStore.user.username }}</template>
@@ -312,12 +293,7 @@ onMounted(async () => {
           <HelpButton size="small" />
         </n-flex>
       </n-layout-header>
-      <n-layout-content
-        position="absolute"
-        style="top: 49px"
-        :native-scrollbar="false"
-        :content-style="isMobile ? 'padding: 16px' : 'padding: 20px 24px'"
-      >
+      <n-layout-content position="absolute" style="top: 49px" :native-scrollbar="false" :content-style="isMobile ? 'padding: 16px' : 'padding: 20px 24px'">
         <router-view></router-view>
       </n-layout-content>
     </n-layout>

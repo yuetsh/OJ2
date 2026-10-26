@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { TutorialProgress } from "@oj2/contract"
-import { lessonState, splitTitle } from "../lesson"
-import LessonDot from "./LessonDot.vue"
+import type { TutorialProgress } from '@oj2/contract'
+import { lessonState, splitTitle } from '../lesson'
+import LessonDot from './LessonDot.vue'
 
 /** 一课一行：圆点 + 知识点（粗）+ 情境（小字），在学的课右边带练一练做到几道 */
 const props = defineProps<{
@@ -20,21 +20,13 @@ const state = computed(() => lessonState(props.progress))
 </script>
 
 <template>
-  <router-link
-    :to="to"
-    class="row"
-    :class="{ active }"
-    :style="{ height: `${height ?? 46}px` }"
-    @click="emit('go')"
-  >
+  <router-link :to="to" class="row" :class="{ active }" :style="{ height: `${height ?? 46}px` }" @click="emit('go')">
     <LessonDot :step="step" :state="state" :current="active" />
     <span class="text">
       <span class="kp">{{ parts.kp }}</span>
       <span v-if="parts.scene" class="scene">{{ parts.scene }}</span>
     </span>
-    <span v-if="state === 'started' && progress?.exerciseTotal" class="count">
-      {{ progress.exerciseSolved }}/{{ progress.exerciseTotal }}
-    </span>
+    <span v-if="state === 'started' && progress?.exerciseTotal" class="count"> {{ progress.exerciseSolved }}/{{ progress.exerciseTotal }} </span>
   </router-link>
 </template>
 

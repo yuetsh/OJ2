@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { ProblemRow } from "utils/types"
+import type { ProblemRow } from 'utils/types'
 
 /**
  * 同一道题两处（题面末尾、结果页签）都挂着时只拉一次。放在模块级：写在 setup 里就成了
@@ -9,10 +9,10 @@ const cache = new Map<string, Promise<ProblemRow[]>>()
 </script>
 
 <script setup lang="ts">
-import { storeToRefs } from "pinia"
-import { useThemeVars } from "naive-ui"
-import { getSimilarProblems } from "oj/api"
-import { useProblemStore } from "oj/store/problem"
+import { storeToRefs } from 'pinia'
+import { useThemeVars } from 'naive-ui'
+import { getSimilarProblems } from 'oj/api'
+import { useProblemStore } from 'oj/store/problem'
 
 /**
  * 相似题推荐。题面末尾（做对了、或者错了 3 次以上）和结果页签（不在课堂里的题做对之后）
@@ -43,9 +43,9 @@ watch(
 
 // getSimilarProblems 已经过 toProblemRow，难度是中文，不是 Low/Mid/High
 function difficultyType(difficulty: string) {
-  if (difficulty === "简单") return "success"
-  if (difficulty === "困难") return "error"
-  return "warning"
+  if (difficulty === '简单') return 'success'
+  if (difficulty === '困难') return 'error'
+  return 'warning'
 }
 </script>
 
@@ -98,7 +98,7 @@ function difficultyType(difficulty: string) {
 }
 
 .name {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

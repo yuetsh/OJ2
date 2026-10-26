@@ -1,11 +1,5 @@
-import { RangeSetBuilder } from "@codemirror/state"
-import {
-  Decoration,
-  type DecorationSet,
-  EditorView,
-  ViewPlugin,
-  type ViewUpdate,
-} from "@codemirror/view"
+import { RangeSetBuilder } from '@codemirror/state'
+import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 
 /**
  * 手机上代码折行（题目页的编辑器）。原来是横着滚，可没有滚动条也看不出右边还有。
@@ -17,15 +11,15 @@ import {
 function leadingWidth(text: string): number {
   let width = 0
   for (const ch of text) {
-    if (ch === " ") width++
-    else if (ch === "\t") width += 4
+    if (ch === ' ') width++
+    else if (ch === '\t') width += 4
     else break
   }
   return width
 }
 
 // 不折行用 pre 而不是 nowrap：nowrap 会把空格合并掉，行首缩进整个没了
-const glue = Decoration.mark({ attributes: { style: "white-space: pre" } })
+const glue = Decoration.mark({ attributes: { style: 'white-space: pre' } })
 
 function hangDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()

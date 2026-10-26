@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { errorCode, errorMessage } from "utils/api"
-import { addProblemForContest } from "admin/api"
+import { errorCode, errorMessage } from 'utils/api'
+import { addProblemForContest } from 'admin/api'
 
 interface Props {
   problemID: number
@@ -8,22 +8,22 @@ interface Props {
   nextDisplayId?: string
 }
 const props = defineProps<Props>()
-const emit = defineEmits(["added"])
+const emit = defineEmits(['added'])
 
 const message = useMessage()
 
-const displayID = ref(props.nextDisplayId || "")
+const displayID = ref(props.nextDisplayId || '')
 
 async function addProblem() {
   if (!displayID.value) return
   try {
     await addProblemForContest(props.contestID, props.problemID, displayID.value)
-    emit("added")
+    emit('added')
   } catch (err) {
-    if (errorCode(err) === "display-id-exists") {
-      message.error("显示编号重复了，请重新写一个")
-    } else if (errorCode(err) === "contest-ended") {
-      message.error("这场比赛已经结束了，不能添加题目")
+    if (errorCode(err) === 'display-id-exists') {
+      message.error('显示编号重复了，请重新写一个')
+    } else if (errorCode(err) === 'contest-ended') {
+      message.error('这场比赛已经结束了，不能添加题目')
     } else {
       message.error(errorMessage(err))
     }

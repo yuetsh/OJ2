@@ -1,23 +1,16 @@
-import { randomBytes, timingSafeEqual } from "node:crypto"
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 
-import {
-  toAdminType,
-  toProblemPermission,
-  type AdminType,
-  type AuthTokens,
-  type ProblemPermission,
-  WS_AUTH_PROTOCOL,
-} from "@oj2/contract"
+import { toAdminType, toProblemPermission, type AdminType, type AuthTokens, type ProblemPermission, WS_AUTH_PROTOCOL } from '@oj2/contract'
 
-import { eq, sql } from "drizzle-orm"
-import type { Context } from "hono"
-import { sign, verify } from "hono/jwt"
+import { eq, sql } from 'drizzle-orm'
+import type { Context } from 'hono'
+import { sign, verify } from 'hono/jwt'
 
-import { config } from "../config"
-import { db, schema } from "../db"
-import { publishSessionRevoked, type SessionRevokedReason } from "../events"
-import { clearOnline, markOnline } from "./presence"
-import { redis } from "../redis"
+import { config } from '../config'
+import { db, schema } from '../db'
+import { publishSessionRevoked, type SessionRevokedReason } from '../events'
+import { clearOnline, markOnline } from './presence'
+import { redis } from '../redis'
 
 /**
  * 登录态是两张 token：
@@ -39,12 +32,12 @@ import { redis } from "../redis"
  * 续会话），没有多出往返。
  */
 
-const SESSION_PREFIX = "auth-session:"
+const SESSION_PREFIX = 'auth-session:'
 /**
  * 输过的比赛密码，一张会话一个 hash（field = 比赛 id）。不塞进会话本体：
  * 会话本体每换一次 token 就整份重写一次，两边一起读改写会互相冲掉。
  */
-const CONTEST_PASSWORD_PREFIX = "auth-contest:"
+const CONTEST_PASSWORD_PREFIX = 'auth-contest:'
 
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60
 
@@ -65,17 +58,17 @@ const REFRESH_GRACE_MS = 60_000
  * env 文件里各补一行，漏了也不会起不来。要让全站所有人重新登录，删掉这个 key
  * 再重启 api 即可。
  */
-const JWT_SECRET_KEY = "auth:jwt-secret"
+const JWT_SECRET_KEY = 'auth:jwt-secret'
 let jwtSecret: string | null = null
 
 export async function loadJwtSecret() {
-  await redis.set(JWT_SECRET_KEY, randomBytes(48).toString("base64url"), "NX")
+  await redis.set(JWT_SECRET_KEY, randomBytes(48).toString('base64url'), 'NX')
   jwtSecret = await redis.get(JWT_SECRET_KEY)
-  if (!jwtSecret) throw new Error("JWT 密钥没能写进 Redis")
+  if (!jwtSecret) throw new Error('JWT 密钥没能写进 Redis')
 }
 
 function secret() {
-  if (!jwtSecret) throw new Error("JWT 密钥还没加载，入口要先 await loadJwtSecret()")
+  if (!jwtSecret) throw new Error('JWT 密钥还没加载，入口要先 await loadJwtSecret()')
   return jwtSecret
 }
 
@@ -133,7 +126,7 @@ function sameSecret(a: string, b: string | null) {
 
 /** `<sid>.<随机串>` 拆开。格式不对返回 null */
 function splitRefreshToken(token: string) {
-  const dot = token.indexOf(".")
+  const dot = token.indexOf('.')
   if (dot <= 0 || dot === token.length - 1) return null
   return { sid: token.slice(0, dot), secret: token.slice(dot + 1) }
 }
@@ -170,28 +163,21 @@ end
 return 0`
 
 async function compareAndSetSession(sid: string, expected: string, value: StoredSession) {
-  const result = await redis.eval(
-    COMPARE_AND_SET,
-    1,
-    sessionKey(sid),
-    expected,
-    JSON.stringify(value),
-    config.sessionTtlSeconds,
-  )
+  const result = await redis.eval(COMPARE_AND_SET, 1, sessionKey(sid), expected, JSON.stringify(value), config.sessionTtlSeconds)
   return result === 1
 }
 
 async function signAccessToken(claims: AccessClaims) {
   const now = Math.floor(Date.now() / 1000)
-  return sign({ ...claims, iat: now, exp: now + ACCESS_TOKEN_TTL_SECONDS }, secret(), "HS256")
+  return sign({ ...claims, iat: now, exp: now + ACCESS_TOKEN_TTL_SECONDS }, secret(), 'HS256')
 }
 
 /** 验签名和有效期，载荷形状不对也当无效。不碰 Redis 和库 */
 async function verifyAccessToken(token: string): Promise<AccessClaims | null> {
   try {
-    const payload = await verify(token, secret(), "HS256")
+    const payload = await verify(token, secret(), 'HS256')
     const { uid, sid, ver } = payload
-    if (!Number.isInteger(uid) || typeof sid !== "string" || !Number.isInteger(ver)) return null
+    if (!Number.isInteger(uid) || typeof sid !== 'string' || !Number.isInteger(ver)) return null
     return { uid: uid as number, sid, ver: ver as number }
   } catch {
     return null
@@ -216,13 +202,9 @@ async function selectUser(userId: number) {
   return user ?? null
 }
 
-export async function issueTokens(
-  userId: number,
-  tokenVersion: number,
-  previousLogin: string | null = null,
-): Promise<AuthTokens> {
-  const sid = randomBytes(16).toString("base64url")
-  const refreshSecret = randomBytes(32).toString("base64url")
+export async function issueTokens(userId: number, tokenVersion: number, previousLogin: string | null = null): Promise<AuthTokens> {
+  const sid = randomBytes(16).toString('base64url')
+  const refreshSecret = randomBytes(32).toString('base64url')
   const value: StoredSession = {
     userId,
     tokenVersion,
@@ -234,9 +216,7 @@ export async function issueTokens(
   }
   // 两条写进一个 pipeline：一个班四十号人同时登录时，两趟往返和一趟的差别
   // 全压在登录这一下上
-  const pipeline = redis
-    .pipeline()
-    .set(sessionKey(sid), JSON.stringify(value), "EX", config.sessionTtlSeconds)
+  const pipeline = redis.pipeline().set(sessionKey(sid), JSON.stringify(value), 'EX', config.sessionTtlSeconds)
   markOnline(pipeline, userId)
   await pipeline.exec()
   return {
@@ -246,9 +226,7 @@ export async function issueTokens(
   }
 }
 
-export type RefreshResult =
-  | { tokens: AuthTokens; reason?: undefined }
-  | { tokens: null; reason: "invalid" | "disabled" }
+export type RefreshResult = { tokens: AuthTokens; reason?: undefined } | { tokens: null; reason: 'invalid' | 'disabled' }
 
 /**
  * 拿 refresh token 换一张新的 access token，同时轮换 refresh token。
@@ -259,30 +237,27 @@ export type RefreshResult =
  */
 export async function refreshTokens(refreshToken: string): Promise<RefreshResult> {
   const parts = splitRefreshToken(refreshToken)
-  if (!parts) return { tokens: null, reason: "invalid" }
+  if (!parts) return { tokens: null, reason: 'invalid' }
 
   // 比对再写入失败（别的标签页抢先轮换了）就重读一遍，这时手里这张已经是「上一张」，
   // 第二轮走宽限期。三轮还落不了地只可能是被刷，直接拒
   for (let attempt = 0; attempt < 3; attempt++) {
     const stored = await readSessionRaw(parts.sid)
-    if (!stored) return { tokens: null, reason: "invalid" }
+    if (!stored) return { tokens: null, reason: 'invalid' }
     const session = stored.value
 
     const current = sameSecret(parts.secret, session.refreshSecret)
-    const inGrace =
-      !current &&
-      sameSecret(parts.secret, session.previousRefreshSecret) &&
-      Date.now() - session.rotatedAt < REFRESH_GRACE_MS
-    if (!current && !inGrace) return { tokens: null, reason: "invalid" }
+    const inGrace = !current && sameSecret(parts.secret, session.previousRefreshSecret) && Date.now() - session.rotatedAt < REFRESH_GRACE_MS
+    if (!current && !inGrace) return { tokens: null, reason: 'invalid' }
 
     const user = await selectUser(session.userId)
     if (!user || user.tokenVersion !== session.tokenVersion) {
       await redis.del(sessionKey(parts.sid))
-      return { tokens: null, reason: "invalid" }
+      return { tokens: null, reason: 'invalid' }
     }
     if (user.isDisabled) {
       await redis.del(sessionKey(parts.sid))
-      return { tokens: null, reason: "disabled" }
+      return { tokens: null, reason: 'disabled' }
     }
 
     const accessToken = await signAccessToken({
@@ -301,7 +276,7 @@ export async function refreshTokens(refreshToken: string): Promise<RefreshResult
       }
     }
 
-    const refreshSecret = randomBytes(32).toString("base64url")
+    const refreshSecret = randomBytes(32).toString('base64url')
     const rotated = await compareAndSetSession(parts.sid, stored.raw, {
       ...session,
       refreshSecret,
@@ -318,7 +293,7 @@ export async function refreshTokens(refreshToken: string): Promise<RefreshResult
       }
     }
   }
-  return { tokens: null, reason: "invalid" }
+  return { tokens: null, reason: 'invalid' }
 }
 
 /**
@@ -332,10 +307,7 @@ export async function destroySession(refreshToken: string) {
   if (!parts) return null
   const session = await readSession(parts.sid)
   if (!session) return null
-  if (
-    !sameSecret(parts.secret, session.refreshSecret) &&
-    !sameSecret(parts.secret, session.previousRefreshSecret)
-  ) {
+  if (!sameSecret(parts.secret, session.refreshSecret) && !sameSecret(parts.secret, session.previousRefreshSecret)) {
     return null
   }
   await redis.del(sessionKey(parts.sid), `${CONTEST_PASSWORD_PREFIX}${parts.sid}`)
@@ -375,23 +347,20 @@ export async function revokeUserSessions(userId: number, reason: SessionRevokedR
  */
 export type SessionResult =
   | { user: AuthUser; sid: string; tokenVersion: number; reason?: undefined }
-  | { user: null; reason: "anonymous" | "expired" | "disabled" }
+  | { user: null; reason: 'anonymous' | 'expired' | 'disabled' }
 
 async function authenticateToken(token: string | null): Promise<SessionResult> {
-  if (!token) return { user: null, reason: "anonymous" }
+  if (!token) return { user: null, reason: 'anonymous' }
   const claims = await verifyAccessToken(token)
-  if (!claims) return { user: null, reason: "expired" }
+  if (!claims) return { user: null, reason: 'expired' }
 
   // 会话还在不在、用户还在不在，两件事并行问。EXPIRE 顺手给会话续期：
   // 不发 refresh 的请求也该算活动
-  const [alive, user] = await Promise.all([
-    redis.expire(sessionKey(claims.sid), config.sessionTtlSeconds),
-    selectUser(claims.uid),
-  ])
+  const [alive, user] = await Promise.all([redis.expire(sessionKey(claims.sid), config.sessionTtlSeconds), selectUser(claims.uid)])
   if (alive !== 1 || !user || user.tokenVersion !== claims.ver) {
-    return { user: null, reason: "expired" }
+    return { user: null, reason: 'expired' }
   }
-  if (user.isDisabled) return { user: null, reason: "disabled" }
+  if (user.isDisabled) return { user: null, reason: 'disabled' }
 
   // 在线状态就是搭在每个带鉴权的请求上记的，见 presence.ts
   const online = redis.pipeline()
@@ -418,14 +387,12 @@ function bearerToken(header: string | null | undefined) {
 
 /** 中间件用这个：要区分「没登录」「token 不能用」「已被禁用」 */
 export function resolveSession(c: Context) {
-  return authenticateToken(bearerToken(c.req.header("authorization")))
+  return authenticateToken(bearerToken(c.req.header('authorization')))
 }
 
 /** WebSocket 握手：access token 借子协议带过来，见契约里 WS_AUTH_PROTOCOL 的注释 */
 export async function authenticateWebSocket(request: Request) {
-  const protocols = (request.headers.get("sec-websocket-protocol") ?? "")
-    .split(",")
-    .map((value) => value.trim())
+  const protocols = (request.headers.get('sec-websocket-protocol') ?? '').split(',').map((value) => value.trim())
   if (protocols[0] !== WS_AUTH_PROTOCOL) return null
   const result = await authenticateToken(protocols[1] || null)
   return result.user ? result : null
@@ -451,7 +418,7 @@ export async function touchSession(sid: string, userId: number) {
 
 /** 当前请求那张 access token 的载荷，验不过返回 null */
 async function requestClaims(c: Context) {
-  const token = bearerToken(c.req.header("authorization"))
+  const token = bearerToken(c.req.header('authorization'))
   return token ? verifyAccessToken(token) : null
 }
 
@@ -463,11 +430,7 @@ export async function setContestPassword(c: Context, contestId: number, password
   const claims = await requestClaims(c)
   if (!claims) return false
   const key = `${CONTEST_PASSWORD_PREFIX}${claims.sid}`
-  await redis
-    .pipeline()
-    .hset(key, String(contestId), password)
-    .expire(key, config.sessionTtlSeconds)
-    .exec()
+  await redis.pipeline().hset(key, String(contestId), password).expire(key, config.sessionTtlSeconds).exec()
   return true
 }
 

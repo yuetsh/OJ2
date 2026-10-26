@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import ExerciseResult from "./ExerciseResult.vue"
-import type { Exercise, ExerciseSortData } from "utils/types"
-import { shuffle } from "../composables/useShuffle"
-import { highlightLines } from "shared/highlight"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import ExerciseResult from './ExerciseResult.vue'
+import type { Exercise, ExerciseSortData } from 'utils/types'
+import { shuffle } from '../composables/useShuffle'
+import { highlightLines } from 'shared/highlight'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -67,19 +67,19 @@ function onLineClick(idx: number) {
   pickedIdx.value = null
 }
 
-function lineStatus(idx: number): "correct" | "wrong" | "default" {
-  if (!submitted.value) return "default"
-  return lines.value[idx].originalIdx === idx ? "correct" : "wrong"
+function lineStatus(idx: number): 'correct' | 'wrong' | 'default' {
+  if (!submitted.value) return 'default'
+  return lines.value[idx].originalIdx === idx ? 'correct' : 'wrong'
 }
 
 const allCorrect = computed(() => lines.value.every((item, i) => item.originalIdx === i))
 
 function submit() {
   submitted.value = true
-  emit("attempt", {
+  emit('attempt', {
     correct: allCorrect.value,
     // 报的是「他把原文第几行排在了第几位」，老师对着题面就能看出错在哪
-    answer: `顺序 ${lines.value.map((item) => item.originalIdx + 1).join("-")}`,
+    answer: `顺序 ${lines.value.map((item) => item.originalIdx + 1).join('-')}`,
   })
 }
 
@@ -95,15 +95,11 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
     <p :style="{ fontWeight: 500, fontSize: '16px', marginBottom: isDesktop ? '12px' : '8px' }">
       {{ data.question }}
     </p>
-    <p v-if="!isDesktop" style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
-      先点一行，再点它该去的位置。
-    </p>
+    <p v-if="!isDesktop" style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">先点一行，再点它该去的位置。</p>
 
     <!-- 不折行：长行整组一起横着滚，每行一样宽（= 最长那行），和正文的代码块一样 -->
     <div style="overflow-x: auto">
-      <div
-        style="display: flex; flex-direction: column; gap: 6px; width: max-content; min-width: 100%"
-      >
+      <div style="display: flex; flex-direction: column; gap: 6px; width: max-content; min-width: 100%">
         <div
           v-for="(line, idx) in lines"
           :key="line.originalIdx"
@@ -118,11 +114,7 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
               pickedIdx === idx
                 ? '2px solid #2080f0'
                 : `1.5px ${submitted ? 'solid' : 'dashed'} ${
-                    lineStatus(idx) === 'correct'
-                      ? '#18a058'
-                      : lineStatus(idx) === 'wrong'
-                        ? '#d03050'
-                        : 'var(--learn-control-line)'
+                    lineStatus(idx) === 'correct' ? '#18a058' : lineStatus(idx) === 'wrong' ? '#d03050' : 'var(--learn-control-line)'
                   }`,
             background:
               pickedIdx === idx
@@ -147,11 +139,7 @@ const lineHtml = computed<string[]>(() => highlightLines(data.value.lines, props
       </div>
     </div>
 
-    <ExerciseResult
-      v-if="submitted"
-      :type="allCorrect ? 'success' : 'error'"
-      :title="allCorrect ? '顺序正确！' : '顺序有误，红色行需要调整'"
-    />
+    <ExerciseResult v-if="submitted" :type="allCorrect ? 'success' : 'error'" :title="allCorrect ? '顺序正确！' : '顺序有误，红色行需要调整'" />
 
     <n-space style="margin-top: 12px" :size="8">
       <n-button type="primary" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>

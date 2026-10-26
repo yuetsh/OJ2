@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { useRouteQuery } from "@vueuse/router"
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import type { StuckProblem, StuckProblemDetail } from "utils/types"
-import { getStuckProblemDetail, getStuckProblems } from "admin/api"
-import { useConfigStore } from "shared/store/config"
-import { groupClassOptions } from "utils/classes"
-import { periodRange, type Period } from "oj/statistics/period"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import "oj/learn/learn.css"
-import StuckDetail from "./components/StuckDetail.vue"
-import { avgTries, rate } from "./components/stuckMath"
+import { useRouteQuery } from '@vueuse/router'
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import type { StuckProblem, StuckProblemDetail } from 'utils/types'
+import { getStuckProblemDetail, getStuckProblems } from 'admin/api'
+import { useConfigStore } from 'shared/store/config'
+import { groupClassOptions } from 'utils/classes'
+import { periodRange, type Period } from 'oj/statistics/period'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import 'oj/learn/learn.css'
+import StuckDetail from './components/StuckDetail.vue'
+import { avgTries, rate } from './components/stuckMath'
 
 /**
  * 卡点分析（设计稿「卡点与趋势」页的定稿 StuckFinalAll / StuckFinalClass）：
@@ -27,18 +27,18 @@ const { isMobile } = useBreakpoints()
 const theme = useThemeVars()
 
 const PERIODS: { label: string; value: Period }[] = [
-  { label: "这学期", value: "term" },
-  { label: "最近 30 天", value: "30d" },
-  { label: "最近 7 天", value: "7d" },
-  { label: "全部", value: "all" },
+  { label: '这学期', value: 'term' },
+  { label: '最近 30 天', value: '30d' },
+  { label: '最近 7 天', value: '7d' },
+  { label: '全部', value: 'all' },
 ]
 const THRESHOLDS = [5, 10, 20, 50]
 
-const className = useRouteQuery<string>("className", "", { mode: "replace" })
-const period = useRouteQuery<string>("period", "term", { mode: "replace" })
-const tag = useRouteQuery<string>("tag", "", { mode: "replace" })
-const picked = useRouteQuery<string>("problem", "", { mode: "replace" })
-const min = useRouteQuery<string>("min", "", { mode: "replace" })
+const className = useRouteQuery<string>('className', '', { mode: 'replace' })
+const period = useRouteQuery<string>('period', 'term', { mode: 'replace' })
+const tag = useRouteQuery<string>('tag', '', { mode: 'replace' })
+const picked = useRouteQuery<string>('problem', '', { mode: 'replace' })
+const min = useRouteQuery<string>('min', '', { mode: 'replace' })
 
 const problems = ref<StuckProblem[]>([])
 const detail = ref<StuckProblemDetail | null>(null)
@@ -47,9 +47,7 @@ const detailLoading = ref(false)
 
 const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 const threshold = computed(() => Number(min.value) || (className.value ? 10 : 20))
-const thresholdOptions = computed(() =>
-  THRESHOLDS.map((n) => ({ label: `至少 ${n} 人做过`, value: n })),
-)
+const thresholdOptions = computed(() => THRESHOLDS.map((n) => ({ label: `至少 ${n} 人做过`, value: n })))
 
 function firstRate(row: StuckProblem) {
   return rate(row.firstTry, row.users)
@@ -73,14 +71,11 @@ const knowledge = computed(() => {
       groups.set(name, group)
     }
   }
-  const all = visible.value.reduce(
-    (sum, row) => ({ users: sum.users + row.users, firstTry: sum.firstTry + row.firstTry }),
-    { users: 0, firstTry: 0 },
-  )
+  const all = visible.value.reduce((sum, row) => ({ users: sum.users + row.users, firstTry: sum.firstTry + row.firstTry }), { users: 0, firstTry: 0 })
   return [
     {
-      name: "",
-      label: "全部",
+      name: '',
+      label: '全部',
       problems: visible.value.length,
       rate: rate(all.firstTry, all.users),
     },
@@ -95,19 +90,13 @@ const knowledge = computed(() => {
   ]
 })
 
-const activeTag = computed(() =>
-  knowledge.value.some((row) => row.name === tag.value) ? tag.value : "",
-)
+const activeTag = computed(() => (knowledge.value.some((row) => row.name === tag.value) ? tag.value : ''))
 
 const list = computed(() =>
-  visible.value
-    .filter((row) => !activeTag.value || row.tags.includes(activeTag.value))
-    .sort((a, b) => firstRate(a) - firstRate(b) || b.users - a.users),
+  visible.value.filter((row) => !activeTag.value || row.tags.includes(activeTag.value)).sort((a, b) => firstRate(a) - firstRate(b) || b.users - a.users),
 )
 
-const selected = computed(
-  () => list.value.find((row) => String(row.id) === picked.value) ?? list.value[0] ?? null,
-)
+const selected = computed(() => list.value.find((row) => String(row.id) === picked.value) ?? list.value[0] ?? null)
 
 async function load() {
   loading.value = true
@@ -182,13 +171,7 @@ onMounted(load)
         @update:value="(value: string | null) => (className = value ?? '')"
       />
       <div class="seg">
-        <button
-          v-for="option in PERIODS"
-          :key="option.value"
-          type="button"
-          :class="{ on: period === option.value }"
-          @click="period = option.value"
-        >
+        <button v-for="option in PERIODS" :key="option.value" type="button" :class="{ on: period === option.value }" @click="period = option.value">
           {{ option.label }}
         </button>
       </div>
@@ -203,14 +186,7 @@ onMounted(load)
             <span class="muted small">一次就对</span>
           </div>
           <div class="know-list">
-            <button
-              v-for="row in knowledge"
-              :key="row.name"
-              type="button"
-              class="item"
-              :class="{ on: row.name === activeTag }"
-              @click="tag = row.name"
-            >
+            <button v-for="row in knowledge" :key="row.name" type="button" class="item" :class="{ on: row.name === activeTag }" @click="tag = row.name">
               <span class="line">
                 <span class="name">{{ row.label }}</span>
                 <span class="grow" />
@@ -226,7 +202,7 @@ onMounted(load)
 
         <section class="card problems">
           <div class="card-head">
-            <span class="strong">{{ activeTag || "全部" }}</span>
+            <span class="strong">{{ activeTag || '全部' }}</span>
             <span class="muted small num">{{ list.length }} 道</span>
             <span class="grow" />
             <n-select
@@ -238,30 +214,17 @@ onMounted(load)
             />
           </div>
           <div class="scroll">
-            <div v-if="!list.length && !loading" class="none muted">
-              这段时间还没有 {{ threshold }} 人以上做过的题
-            </div>
-            <button
-              v-for="row in list"
-              :key="row.id"
-              type="button"
-              class="item"
-              :class="{ on: row.id === selected?.id }"
-              @click="pick(row)"
-            >
+            <div v-if="!list.length && !loading" class="none muted">这段时间还没有 {{ threshold }} 人以上做过的题</div>
+            <button v-for="row in list" :key="row.id" type="button" class="item" :class="{ on: row.id === selected?.id }" @click="pick(row)">
               <span class="line">
                 <span class="pid muted num">{{ row.displayId }}</span>
                 <span class="ptitle">{{ row.title }}</span>
-                <span v-if="row.users > row.solved" class="stuck num">
-                  {{ row.users - row.solved }} 人没对
-                </span>
+                <span v-if="row.users > row.solved" class="stuck num"> {{ row.users - row.solved }} 人没对 </span>
               </span>
               <span class="line indent">
                 <span class="track short"><span :style="{ width: `${firstRate(row)}%` }" /></span>
                 <span class="pct num">{{ firstRate(row) }}%</span>
-                <span class="muted small num nowrap">
-                  {{ row.users }} 人 · 平均 {{ avgTries(row) }} 次
-                </span>
+                <span class="muted small num nowrap"> {{ row.users }} 人 · 平均 {{ avgTries(row) }} 次 </span>
               </span>
             </button>
           </div>
@@ -272,7 +235,7 @@ onMounted(load)
             <n-button quaternary circle @click="detailOpen = false">
               <template #icon><Icon icon="ph:arrow-left" /></template>
             </n-button>
-            <span class="strong">{{ activeTag || "全部" }}</span>
+            <span class="strong">{{ activeTag || '全部' }}</span>
           </div>
           <n-spin :show="detailLoading">
             <StuckDetail v-if="detail" :detail="detail" :class-name="className" :period="period" />
@@ -526,7 +489,7 @@ onMounted(load)
     border: 0;
     border-radius: 0;
     overflow-y: auto;
-    background: v-bind("theme.bodyColor");
+    background: v-bind('theme.bodyColor');
   }
   .detail-bar {
     position: sticky;
@@ -538,7 +501,7 @@ onMounted(load)
     height: 48px;
     padding: 0 8px;
     border-bottom: 1px solid var(--learn-line);
-    background: v-bind("theme.bodyColor");
+    background: v-bind('theme.bodyColor');
   }
 }
 </style>

@@ -1,5 +1,5 @@
-import { useDark } from "@vueuse/core"
-import { Chart as ChartJS } from "chart.js"
+import { useDark } from '@vueuse/core'
+import { Chart as ChartJS } from 'chart.js'
 
 /**
  * chart.js 的默认配色是写死的浅色（文字 #666、网格线 rgba(0,0,0,0.1)），深色主题下
@@ -11,11 +11,9 @@ import { Chart as ChartJS } from "chart.js"
 export function useChartTheme() {
   const isDark = useDark()
 
-  const textColor = computed(() => (isDark.value ? "rgba(255, 255, 255, 0.75)" : "#606266"))
-  const gridColor = computed(() =>
-    isDark.value ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.1)",
-  )
-  const chartKey = computed(() => (isDark.value ? "dark" : "light"))
+  const textColor = computed(() => (isDark.value ? 'rgba(255, 255, 255, 0.75)' : '#606266'))
+  const gridColor = computed(() => (isDark.value ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)'))
+  const chartKey = computed(() => (isDark.value ? 'dark' : 'light'))
 
   watchEffect(() => {
     ChartJS.defaults.color = textColor.value
@@ -28,7 +26,7 @@ export function useChartTheme() {
     // 就整个罢工，靠它自动配色的图（DurationChart）会退成近黑的柱子和图例。
     // 也不要直接写 defaults.scales.linear.border —— 那要求对应的 scale 已经注册，
     // 只注册了 radialLinear 的雷达图会在 setup 里抛错。
-    ChartJS.defaults.set("scale", {
+    ChartJS.defaults.set('scale', {
       grid: { color: gridColor.value },
       border: { color: gridColor.value },
     })

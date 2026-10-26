@@ -1,4 +1,4 @@
-import { toAdminType, toProblemPermission } from "@oj2/contract"
+import { toAdminType, toProblemPermission } from '@oj2/contract'
 import type {
   AddContestProblemRequest,
   ChallengeSuggestionsResponse,
@@ -39,9 +39,9 @@ import type {
   UpdateTutorialRequest,
   UpdateUserRequest,
   UpdateWebsiteConfigRequest,
-} from "@oj2/contract"
-import api from "utils/api"
-import { toAdminProblemRow } from "admin/transforms"
+} from '@oj2/contract'
+import api from 'utils/api'
+import { toAdminProblemRow } from 'admin/transforms'
 import type {
   BatchProblemTagResponse,
   GenerateSqlTestCaseResponse,
@@ -87,7 +87,7 @@ import type {
   TutorialListItem,
   TutorialEdit,
   TagCategory,
-} from "utils/types"
+} from 'utils/types'
 import type {
   TutorialProblemCandidate,
   AstCheckRequest,
@@ -96,14 +96,14 @@ import type {
   GenerateTestInputsResponse,
   TestCaseFiles,
   CheckUsernamesResponse,
-} from "@oj2/contract"
+} from '@oj2/contract'
 
 export function getBaseInfo() {
-  return api.get<DashboardInfo>("admin/dashboard")
+  return api.get<DashboardInfo>('admin/dashboard')
 }
 
 export function randomUser10(classroom: string) {
-  return api.get<string[]>("admin/random-usernames", {
+  return api.get<string[]>('admin/random-usernames', {
     params: { classroom },
   })
 }
@@ -116,11 +116,11 @@ export async function getProblemList(
   contestID?: string,
   tagId?: number,
   /** 题型：sql = SQL 题，code = 编程题；不传是全部（比赛题列表不认） */
-  kind?: "sql" | "code" | "",
+  kind?: 'sql' | 'code' | '',
   /** 1 = 学生看得到的，0 = 藏着的；不传是全部（比赛题列表不认） */
-  visible?: "1" | "0" | "",
+  visible?: '1' | '0' | '',
 ) {
-  const endpoint = contestID ? `admin/contests/${contestID}/problems` : "admin/problems"
+  const endpoint = contestID ? `admin/contests/${contestID}/problems` : 'admin/problems'
   const res = await api.get<AdminProblemList>(endpoint, {
     params: {
       offset,
@@ -141,7 +141,7 @@ export async function getProblemList(
 
 /** 勾了几道，一次让学生看得到 / 藏起来 */
 export function batchSetProblemVisible(problemIds: number[], visible: boolean) {
-  return api.post<{ problemCount: number }>("admin/problems/batch-visible", {
+  return api.post<{ problemCount: number }>('admin/problems/batch-visible', {
     problemIds,
     visible,
   } satisfies BatchProblemVisibleRequest)
@@ -149,7 +149,7 @@ export function batchSetProblemVisible(problemIds: number[], visible: boolean) {
 
 // 比赛「从题库中选择」用：列所有可见的公开题，不只是自己创建的
 export async function getLibraryProblemList(offset = 0, limit = 10, keyword: string) {
-  const res = await api.get<AdminProblemList>("admin/problems", {
+  const res = await api.get<AdminProblemList>('admin/problems', {
     params: { offset, limit, keyword, library: 1 },
   })
   return {
@@ -170,10 +170,7 @@ export function deleteContestProblem(id: number) {
 // 比赛题也走这条：后端是同一条 PUT admin/problems/:id，比赛由题目自己推导，
 // 所以不像新建那样需要分两个函数
 export function editProblem(problem: AdminProblem | BlankProblem) {
-  return api.put<AdminProblem>(
-    `admin/problems/${(problem as AdminProblem).id}`,
-    toProblemBody(problem) satisfies Partial<UpdateProblemRequest>,
-  )
+  return api.put<AdminProblem>(`admin/problems/${(problem as AdminProblem).id}`, toProblemBody(problem) satisfies Partial<UpdateProblemRequest>)
 }
 
 export function toggleProblemVisible(problemID: number) {
@@ -181,7 +178,7 @@ export function toggleProblemVisible(problemID: number) {
 }
 
 export function generateFlowchartFromPythonCode(python: string) {
-  return api.post<{ doc: Record<string, unknown> }>("admin/problems/flowchart", {
+  return api.post<{ doc: Record<string, unknown> }>('admin/problems/flowchart', {
     python,
   } satisfies GenerateFlowchartRequest)
 }
@@ -191,8 +188,8 @@ export function getProblem(id: string | number) {
 }
 
 // 标签管理
-export function getTagAdminList(keyword = "") {
-  return api.get<AdminTag[]>("admin/problem-tags", { params: { keyword } })
+export function getTagAdminList(keyword = '') {
+  return api.get<AdminTag[]>('admin/problem-tags', { params: { keyword } })
 }
 
 export function renameTag(id: number, name: string) {
@@ -209,12 +206,8 @@ export function deleteTag(id: number) {
   return api.delete(`admin/problem-tags/${id}`)
 }
 
-export function batchTagProblems(
-  problemIds: number[],
-  tagNames: string[],
-  action: "add" | "remove",
-) {
-  return api.post<BatchProblemTagResponse>("admin/problems/batch-tag", {
+export function batchTagProblems(problemIds: number[], tagNames: string[], action: 'add' | 'remove') {
+  return api.post<BatchProblemTagResponse>('admin/problems/batch-tag', {
     problemIds,
     tagNames,
     action,
@@ -223,7 +216,7 @@ export function batchTagProblems(
 
 // 用户排名（后台版，无 100 名上限；公开榜单是 oj/api.ts 的 getRank）
 export function getAdminUserRank(offset: number, limit: number, keyword: string) {
-  return api.get<AdminUserRank>("admin/rankings/users", {
+  return api.get<AdminUserRank>('admin/rankings/users', {
     params: { offset, limit, keyword },
   })
 }
@@ -232,13 +225,13 @@ export function getAdminUserRank(offset: number, limit: number, keyword: string)
 export function getUserList(
   offset = 0,
   limit = 10,
-  type = "",
+  type = '',
   keyword: string,
-  orderBy = "",
+  orderBy = '',
   /** 班级，NO_CLASS 是「没填班级」 */
-  className = "",
+  className = '',
 ) {
-  return api.get<AdminUserList>("admin/users", {
+  return api.get<AdminUserList>('admin/users', {
     // "-last_login" 是旧接口传下来的取值（路由 query 里可能还存着），改叫 "-lastLogin"；
     // "-online" 是新增的，原样透传
     params: {
@@ -246,7 +239,7 @@ export function getUserList(
       limit,
       keyword,
       type,
-      orderBy: orderBy === "-last_login" ? "-lastLogin" : orderBy,
+      orderBy: orderBy === '-last_login' ? '-lastLogin' : orderBy,
       className: className || undefined,
     },
   })
@@ -254,7 +247,7 @@ export function getUserList(
 
 /** 批量建号之前查重：这些用户名哪些已经有了 */
 export function checkUsernames(usernames: string[]) {
-  return api.post<CheckUsernamesResponse>("admin/users/check", {
+  return api.post<CheckUsernamesResponse>('admin/users/check', {
     usernames,
   } satisfies CheckUsernamesRequest)
 }
@@ -264,12 +257,12 @@ export function editUser(user: AdminUserForm) {
   return api.put<AdminUser>(`admin/users/${user.id}`, {
     username: user.username,
     // 库里 email 没有空的（2026-10 核过），响应类型是 nullable 只因为列可空
-    email: user.email ?? "",
+    email: user.email ?? '',
     adminType: toAdminType(user.adminType),
     problemPermission: toProblemPermission(user.problemPermission),
     realName: user.realName ?? null,
     isDisabled: user.isDisabled,
-    password: user.password ?? "",
+    password: user.password ?? '',
   } satisfies UpdateUserRequest)
 }
 
@@ -281,19 +274,19 @@ export async function resetPassword(userID: number) {
 
 // 导入用户
 /** 批量建号。addedClasses：这批里的新班级，后端已经顺手加进了班级列表 */
-export function importUsers(users: ImportUsersRequest["users"]) {
-  return api.post<{ imported: number; addedClasses: string[] }>("admin/users", {
+export function importUsers(users: ImportUsersRequest['users']) {
+  return api.post<{ imported: number; addedClasses: string[] }>('admin/users', {
     users,
   } satisfies ImportUsersRequest)
 }
 
 // 批量删除用户
 export function deleteUsers(userIDs: number[]) {
-  return api.delete("admin/users", { data: { ids: userIDs } })
+  return api.delete('admin/users', { data: { ids: userIDs } })
 }
 
 export function getContestList(offset = 0, limit = 10, keyword: string) {
-  return api.get<AdminContestList>("admin/contests", {
+  return api.get<AdminContestList>('admin/contests', {
     params: { offset, limit, keyword },
   })
 }
@@ -301,34 +294,34 @@ export function getContestList(offset = 0, limit = 10, keyword: string) {
 // 上传图片
 export async function uploadImage(file: File): Promise<string> {
   const form = new window.FormData()
-  form.append("image", file)
+  form.append('image', file)
   const res = await api.post<{
     success: boolean
     filePath: string
     msg: string
-  }>("admin/upload-image", form)
-  return res.success ? res.filePath : ""
+  }>('admin/upload-image', form)
+  return res.success ? res.filePath : ''
 }
 
 // 上传测试用例；SQL 题的压缩包是 1.sql..N.sql（每个文件一个测试点的建表+数据脚本）
 export function uploadTestcases(file: File, options: { sql?: boolean } = {}) {
   const form = new window.FormData()
-  form.append("file", file)
+  form.append('file', file)
   if (options.sql) {
-    form.append("sql", "1")
+    form.append('sql', '1')
   }
-  return api.post<UploadTestCaseResponse>("admin/test-cases", form)
+  return api.post<UploadTestCaseResponse>('admin/test-cases', form)
 }
 
 // SQL 题测试点预览：后端跑一遍初始化脚本+标准答案，返回数据表和期望结果展示数据
 export function previewSQLTestcase(data: {
   initSql: string
   refSql: string
-  mode: "query" | "modify"
+  mode: 'query' | 'modify'
   /** 是不是题面上展示的那组（第 1 组）：增删改题只有它必须改到行 */
   shown: boolean
 }) {
-  return api.post<SqlDisplay>("admin/sql-test-cases/preview", data satisfies SqlPreviewRequest)
+  return api.post<SqlDisplay>('admin/sql-test-cases/preview', data satisfies SqlPreviewRequest)
 }
 
 // 回显已上传的 SQL 测试点脚本内容（按 1.sql, 2.sql... 排序）
@@ -337,11 +330,8 @@ export function getSQLTestcaseScripts(problemId: number) {
 }
 
 // AI 根据标准答案生成一个 SQL 测试点初始化脚本
-export function generateSQLTestcase(data: { refSql: string; mode: "query" | "modify" }) {
-  return api.post<GenerateSqlTestCaseResponse>(
-    "admin/sql-test-cases/generate",
-    data satisfies GenerateSqlTestCaseRequest,
-  )
+export function generateSQLTestcase(data: { refSql: string; mode: 'query' | 'modify' }) {
+  return api.post<GenerateSqlTestCaseResponse>('admin/sql-test-cases/generate', data satisfies GenerateSqlTestCaseRequest)
 }
 
 // 编程题出题页：读回已有测试点的原文（太大的只给数量和大小）
@@ -351,38 +341,32 @@ export function getTestCaseFiles(problemId: number) {
 
 // 拿标准答案自测语法要求
 export function checkAstRules(data: AstCheckRequest) {
-  return api.post<AstCheckResponse>("admin/ast-check", data satisfies AstCheckRequest)
+  return api.post<AstCheckResponse>('admin/ast-check', data satisfies AstCheckRequest)
 }
 
 // 出题页「挑战」的候选：拿这道题历史上做对的代码挖
 export function getChallengeSuggestions(problemId: number, language: string) {
-  return api.post<ChallengeSuggestionsResponse>(
-    `admin/problems/${problemId}/challenge-suggestions`,
-    {
-      language,
-    },
-  )
+  return api.post<ChallengeSuggestionsResponse>(`admin/problems/${problemId}/challenge-suggestions`, {
+    language,
+  })
 }
 
 // AI 按题面和标准答案想几组测试输入（输出由标准答案跑）
 export function generateTestInputs(data: GenerateTestInputsRequest) {
-  return api.post<GenerateTestInputsResponse>(
-    "admin/test-inputs/generate",
-    data satisfies GenerateTestInputsRequest,
-  )
+  return api.post<GenerateTestInputsResponse>('admin/test-inputs/generate', data satisfies GenerateTestInputsRequest)
 }
 
 /** 出站补默认值。字段名两边已经一致，不再做键名转换 */
 function toProblemBody(problem: AdminProblem | BlankProblem) {
-  const p = problem as Partial<Omit<AdminProblem, "flowchartData">> & {
+  const p = problem as Partial<Omit<AdminProblem, 'flowchartData'>> & {
     flowchartData?: Record<string, unknown> | null
   }
   return {
     _id: p._id,
     title: p.title,
     description: p.description,
-    inputDescription: p.inputDescription ?? "",
-    outputDescription: p.outputDescription ?? "",
+    inputDescription: p.inputDescription ?? '',
+    outputDescription: p.outputDescription ?? '',
     samples: p.samples ?? [],
     testCaseId: p.testCaseId,
     testCaseScore: p.testCaseScore ?? [],
@@ -408,18 +392,12 @@ function toProblemBody(problem: AdminProblem | BlankProblem) {
 }
 
 export function createProblem(problem: BlankProblem) {
-  return api.post<AdminProblem>(
-    "admin/problems",
-    toProblemBody(problem) satisfies Partial<CreateProblemRequest>,
-  )
+  return api.post<AdminProblem>('admin/problems', toProblemBody(problem) satisfies Partial<CreateProblemRequest>)
 }
 
 export function createContestProblem(problem: BlankProblem) {
   // contestId 由 detail.vue 在提交前写进 problem 对象
-  return api.post<AdminProblem>(
-    `admin/contests/${problem.contestId}/problems`,
-    toProblemBody(problem) satisfies Partial<CreateProblemRequest>,
-  )
+  return api.post<AdminProblem>(`admin/contests/${problem.contestId}/problems`, toProblemBody(problem) satisfies Partial<CreateProblemRequest>)
 }
 
 /** 组件里的比赛对象是 snake_case，出站转成新后端要的 camelCase */
@@ -436,17 +414,11 @@ function toContestBody(contest: AdminContest | BlankContest) {
 }
 
 export function createContest(contest: BlankContest) {
-  return api.post<AdminContest>(
-    "admin/contests",
-    toContestBody(contest) satisfies CreateContestRequest,
-  )
+  return api.post<AdminContest>('admin/contests', toContestBody(contest) satisfies CreateContestRequest)
 }
 
 export function editContest(contest: AdminContest | BlankContest) {
-  return api.put<AdminContest>(
-    `admin/contests/${(contest as AdminContest).id}`,
-    toContestBody(contest) satisfies UpdateContestRequest,
-  )
+  return api.put<AdminContest>(`admin/contests/${(contest as AdminContest).id}`, toContestBody(contest) satisfies UpdateContestRequest)
 }
 
 export function cloneContest(contestId: number) {
@@ -472,32 +444,32 @@ export function reorderContestProblems(contestID: string, problemIds: number[]) 
 }
 
 export function getWebsite() {
-  return api.get<WebsiteConfig>("admin/website")
+  return api.get<WebsiteConfig>('admin/website')
 }
 
 export function editWebsite(data: WebsiteConfig) {
-  return api.post<WebsiteConfig>("admin/website", data satisfies UpdateWebsiteConfigRequest)
+  return api.post<WebsiteConfig>('admin/website', data satisfies UpdateWebsiteConfigRequest)
 }
 
 export function listInvalidTestcases() {
-  return api.get<OrphanTestCase[]>("admin/orphan-test-cases")
+  return api.get<OrphanTestCase[]>('admin/orphan-test-cases')
 }
 
 export function pruneInvalidTestcases(id?: string) {
-  return api.delete("admin/orphan-test-cases", { params: { id } })
+  return api.delete('admin/orphan-test-cases', { params: { id } })
 }
 
 export function listOrphanImages() {
-  return api.get<OrphanImage[]>("admin/orphan-images")
+  return api.get<OrphanImage[]>('admin/orphan-images')
 }
 
 /** 不带参数是全删；带 folder 只删那个目录的，再带 name 只删一张 */
-export function pruneOrphanImages(target?: Pick<OrphanImage, "folder"> & { name?: string }) {
-  return api.delete<{ deleted: number }>("admin/orphan-images", { params: target })
+export function pruneOrphanImages(target?: Pick<OrphanImage, 'folder'> & { name?: string }) {
+  return api.delete<{ deleted: number }>('admin/orphan-images', { params: target })
 }
 
 export function getJudgeServer() {
-  return api.get<JudgeServerList>("admin/judge-servers")
+  return api.get<JudgeServerList>('admin/judge-servers')
 }
 
 export function deleteJudgeServer(hostname: string) {
@@ -505,7 +477,7 @@ export function deleteJudgeServer(hostname: string) {
 }
 
 export function getAnnouncementList(offset = 0, limit = 10) {
-  return api.get<{ results: AdminAnnouncementListItem[]; total: number }>("admin/announcements", {
+  return api.get<{ results: AdminAnnouncementListItem[]; total: number }>('admin/announcements', {
     params: { offset, limit },
   })
 }
@@ -520,22 +492,16 @@ export function deleteAnnouncement(id: number) {
 
 export function editAnnouncement(announcement: AnnouncementEdit) {
   const { id, ...body } = announcement
-  return api.put<AdminAnnouncement>(
-    `admin/announcements/${id}`,
-    body satisfies UpdateAnnouncementRequest,
-  )
+  return api.put<AdminAnnouncement>(`admin/announcements/${id}`, body satisfies UpdateAnnouncementRequest)
 }
 
 export function createAnnouncement(announcement: AnnouncementEdit) {
   const { id: _id, ...body } = announcement
-  return api.post<AdminAnnouncement>(
-    "admin/announcements",
-    body satisfies CreateAnnouncementRequest,
-  )
+  return api.post<AdminAnnouncement>('admin/announcements', body satisfies CreateAnnouncementRequest)
 }
 
 export function getTutorialList() {
-  return api.get<{ [key: string]: TutorialListItem[] }>("admin/tutorials")
+  return api.get<{ [key: string]: TutorialListItem[] }>('admin/tutorials')
 }
 
 export function getTutorial(id: number) {
@@ -555,14 +521,11 @@ function toTutorialBody(data: TutorialEdit) {
 }
 
 export function createTutorial(data: TutorialEdit) {
-  return api.post<Tutorial>("admin/tutorials", toTutorialBody(data) satisfies CreateTutorialRequest)
+  return api.post<Tutorial>('admin/tutorials', toTutorialBody(data) satisfies CreateTutorialRequest)
 }
 
 export function updateTutorial(data: TutorialEdit) {
-  return api.put<Tutorial>(
-    `admin/tutorials/${data.id}`,
-    toTutorialBody(data) satisfies UpdateTutorialRequest,
-  )
+  return api.put<Tutorial>(`admin/tutorials/${data.id}`, toTutorialBody(data) satisfies UpdateTutorialRequest)
 }
 
 export function setTutorialProblems(id: number, problemIds: number[]) {
@@ -572,17 +535,17 @@ export function setTutorialProblems(id: number, problemIds: number[]) {
 }
 
 export function getTutorialProblemCandidates(keyword: string) {
-  return api.get<TutorialProblemCandidate[]>("admin/tutorial-problem-candidates", {
+  return api.get<TutorialProblemCandidate[]>('admin/tutorial-problem-candidates', {
     params: keyword ? { keyword } : {},
   })
 }
 
 export function reorderTutorials(ids: number[]) {
-  return api.put<null>("admin/tutorial-order", { ids } satisfies ReorderTutorialsRequest)
+  return api.put<null>('admin/tutorial-order', { ids } satisfies ReorderTutorialsRequest)
 }
 
-export function renameTutorialProject(type: "python" | "c", from: string, to: string) {
-  return api.put<null>("admin/tutorial-projects", {
+export function renameTutorialProject(type: 'python' | 'c', from: string, to: string) {
+  return api.put<null>('admin/tutorial-projects', {
     type,
     from,
     to,
@@ -603,22 +566,11 @@ export function getAdminExercises(tutorialId: number) {
   return api.get<Exercise[]>(`admin/tutorials/${tutorialId}/exercises`)
 }
 
-export async function createExercise(data: {
-  tutorialId: number
-  type: ExerciseType
-  data: Record<string, unknown>
-  order: number
-}) {
-  return api.post<Exercise>("admin/exercises", data satisfies CreateExerciseRequest)
+export async function createExercise(data: { tutorialId: number; type: ExerciseType; data: Record<string, unknown>; order: number }) {
+  return api.post<Exercise>('admin/exercises', data satisfies CreateExerciseRequest)
 }
 
-export async function updateExercise(data: {
-  id: number
-  type: ExerciseType
-  data: Record<string, unknown>
-  order: number
-  resetAttempts: boolean
-}) {
+export async function updateExercise(data: { id: number; type: ExerciseType; data: Record<string, unknown>; order: number; resetAttempts: boolean }) {
   return api.put<Exercise>(`admin/exercises/${data.id}`, {
     type: data.type,
     data: data.data,
@@ -639,12 +591,7 @@ export function makeProblemPublic(id: number, displayId: string) {
 }
 
 // 比赛辅助检查
-export function updateACMHelperChecked(
-  contest_id: number,
-  rank_id: number,
-  problem_id: string,
-  checked: boolean,
-) {
+export function updateACMHelperChecked(contest_id: number, rank_id: number, problem_id: string, checked: boolean) {
   return api.put(`admin/contests/${contest_id}/acm-helper`, {
     rankId: rank_id,
     problemId: problem_id,
@@ -653,8 +600,8 @@ export function updateACMHelperChecked(
 }
 
 // 题单管理 API
-export function getProblemSetList(offset = 0, limit = 10, keyword = "") {
-  return api.get<AdminProblemSetList>("admin/problem-sets", {
+export function getProblemSetList(offset = 0, limit = 10, keyword = '') {
+  return api.get<AdminProblemSetList>('admin/problem-sets', {
     params: { offset, limit, keyword },
   })
 }
@@ -672,14 +619,11 @@ export interface ProblemSetBody {
 }
 
 export function createProblemSet(data: ProblemSetBody) {
-  return api.post<AdminProblemSet>("admin/problem-sets", data satisfies CreateProblemSetRequest)
+  return api.post<AdminProblemSet>('admin/problem-sets', data satisfies CreateProblemSetRequest)
 }
 
 export function editProblemSet(id: number, data: ProblemSetBody) {
-  return api.put<AdminProblemSet>(
-    `admin/problem-sets/${id}`,
-    data satisfies UpdateProblemSetRequest,
-  )
+  return api.put<AdminProblemSet>(`admin/problem-sets/${id}`, data satisfies UpdateProblemSetRequest)
 }
 
 export function deleteProblemSet(id: number) {
@@ -727,22 +671,16 @@ export interface BadgeBody {
   name: string
   description: string
   icon: string
-  conditionType: AdminProblemSetBadge["conditionType"]
+  conditionType: AdminProblemSetBadge['conditionType']
   conditionValue: number
 }
 
 export function createProblemSetBadge(problemSetId: number, data: BadgeBody) {
-  return api.post<AdminProblemSetBadge>(
-    `admin/problem-sets/${problemSetId}/badges`,
-    data satisfies CreateProblemSetBadgeRequest,
-  )
+  return api.post<AdminProblemSetBadge>(`admin/problem-sets/${problemSetId}/badges`, data satisfies CreateProblemSetBadgeRequest)
 }
 
 export function editProblemSetBadge(problemSetId: number, badgeId: number, data: BadgeBody) {
-  return api.put<AdminProblemSetBadge>(
-    `admin/problem-sets/${problemSetId}/badges/${badgeId}`,
-    data satisfies UpdateProblemSetBadgeRequest,
-  )
+  return api.put<AdminProblemSetBadge>(`admin/problem-sets/${problemSetId}/badges/${badgeId}`, data satisfies UpdateProblemSetBadgeRequest)
 }
 
 export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
@@ -751,41 +689,38 @@ export function deleteProblemSetBadge(problemSetId: number, badgeId: number) {
 
 // 卡点分析：start 是时间段的起点（ISO），不给就是全部时间
 export function getStuckProblems(params: { className?: string; start?: string }) {
-  return api.get<StuckProblem[]>("admin/problem-analytics/stuck", { params })
+  return api.get<StuckProblem[]>('admin/problem-analytics/stuck', { params })
 }
 
 export function getStuckProblemDetail(id: number, params: { className?: string; start?: string }) {
   return api.get<StuckProblemDetail>(`admin/problem-analytics/stuck/${id}`, { params })
 }
 
-export function getLearnBoard(params: { type: "python" | "c"; className?: string }) {
-  return api.get<LearnBoard>("admin/learn-analytics/board", { params })
+export function getLearnBoard(params: { type: 'python' | 'c'; className?: string }) {
+  return api.get<LearnBoard>('admin/learn-analytics/board', { params })
 }
 
-export function getLearnExercises(params: { type: "python" | "c"; className?: string }) {
-  return api.get<LearnExerciseProgressList>("admin/learn-analytics/exercises", {
+export function getLearnExercises(params: { type: 'python' | 'c'; className?: string }) {
+  return api.get<LearnExerciseProgressList>('admin/learn-analytics/exercises', {
     params,
   })
 }
 
 export function getLearnExerciseAttempts(exerciseId: number, params: { className?: string }) {
-  return api.get<LearnExerciseAttemptList>(
-    `admin/learn-analytics/exercises/${exerciseId}/attempts`,
-    { params },
-  )
+  return api.get<LearnExerciseAttemptList>(`admin/learn-analytics/exercises/${exerciseId}/attempts`, { params })
 }
 
-export function getLearnStudent(userId: number, params: { type: "python" | "c" }) {
+export function getLearnStudent(userId: number, params: { type: 'python' | 'c' }) {
   return api.get<LearnStudentDetail>(`admin/learn-analytics/students/${userId}`, { params })
 }
 
 export function getGradeTrend(params: { grade?: string; compare?: string }) {
-  return api.get<GradeTrend>("admin/problem-analytics/grades", { params })
+  return api.get<GradeTrend>('admin/problem-analytics/grades', { params })
 }
 
 // AI 学习分析报告
-export function getAIReportList(offset = 0, limit = 10, username = "") {
-  return api.get<AdminAiReportList>("admin/ai/reports", {
+export function getAIReportList(offset = 0, limit = 10, username = '') {
+  return api.get<AdminAiReportList>('admin/ai/reports', {
     params: { offset, limit, username: username || undefined },
   })
 }
@@ -799,18 +734,14 @@ export function pinAIReport(id: number) {
 }
 
 export function getPinnedAIReports() {
-  return api.get<AdminAiReportList>("admin/ai/reports", {
-    params: { pinnedOnly: "true" },
+  return api.get<AdminAiReportList>('admin/ai/reports', {
+    params: { pinnedOnly: 'true' },
   })
 }
 
 // ==================== 成就 ====================
 
-import type {
-  AdminAchievement,
-  AchievementMetric as MetricOption,
-  AdminUserRank,
-} from "@oj2/contract"
+import type { AdminAchievement, AchievementMetric as MetricOption, AdminUserRank } from '@oj2/contract'
 export type { AdminAchievement, MetricOption }
 
 function toAchievementBody(data: Partial<AdminAchievement>) {
@@ -829,25 +760,19 @@ function toAchievementBody(data: Partial<AdminAchievement>) {
 }
 
 export function getAdminAchievements() {
-  return api.get<AdminAchievement[]>("admin/achievements")
+  return api.get<AdminAchievement[]>('admin/achievements')
 }
 
 export function getMetricOptions() {
-  return api.get<MetricOption[]>("admin/achievement-metrics")
+  return api.get<MetricOption[]>('admin/achievement-metrics')
 }
 
 export function createAchievement(data: Partial<AdminAchievement>) {
-  return api.post<AdminAchievement>(
-    "admin/achievements",
-    toAchievementBody(data) satisfies Partial<CreateAchievementRequest>,
-  )
+  return api.post<AdminAchievement>('admin/achievements', toAchievementBody(data) satisfies Partial<CreateAchievementRequest>)
 }
 
 export function updateAchievement(data: Partial<AdminAchievement>) {
-  return api.put<AdminAchievement>(
-    `admin/achievements/${data.id}`,
-    toAchievementBody(data) satisfies Partial<UpdateAchievementRequest>,
-  )
+  return api.put<AdminAchievement>(`admin/achievements/${data.id}`, toAchievementBody(data) satisfies Partial<UpdateAchievementRequest>)
 }
 
 export function deleteAchievement(id: number) {

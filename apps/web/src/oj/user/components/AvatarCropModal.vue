@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { resetAvatar, uploadAvatar } from "oj/api"
-import RankAvatar from "shared/components/RankAvatar.vue"
-import { useUserStore } from "shared/store/user"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { resetAvatar, uploadAvatar } from 'oj/api'
+import RankAvatar from 'shared/components/RankAvatar.vue'
+import { useUserStore } from 'shared/store/user'
 
 /**
  * 换头像（设置并进主页之后的入口）：选一张图，拖圆圈选一块，旁边就是它在领奖台、
@@ -14,7 +14,7 @@ import { useUserStore } from "shared/store/user"
  */
 const props = defineProps<{ username: string; avatar: string | null }>()
 const emit = defineEmits<{ changed: [] }>()
-const show = defineModel<boolean>("show", { required: true })
+const show = defineModel<boolean>('show', { required: true })
 
 const theme = useThemeVars()
 const message = useMessage()
@@ -23,8 +23,8 @@ const userStore = useUserStore()
 const STAGE = 280
 const OUTPUT = 256
 
-const fileInput = useTemplateRef<HTMLInputElement>("fileInput")
-const src = ref("")
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
+const src = ref('')
 let image: HTMLImageElement | null = null
 /** 图片在 280×280 舞台里的位置（等比缩放、居中） */
 const fit = reactive({ x: 0, y: 0, w: 0, h: 0, scale: 1 })
@@ -47,7 +47,7 @@ function pick() {
 
 function clear() {
   if (src.value) URL.revokeObjectURL(src.value)
-  src.value = ""
+  src.value = ''
   image = null
 }
 
@@ -59,10 +59,10 @@ onBeforeUnmount(clear)
 function onFile(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  input.value = ""
+  input.value = ''
   if (!file) return
-  if (!file.type.startsWith("image/")) {
-    message.warning("要选一张图片")
+  if (!file.type.startsWith('image/')) {
+    message.warning('要选一张图片')
     return
   }
   const url = URL.createObjectURL(file)
@@ -84,7 +84,7 @@ function onFile(event: Event) {
   }
   img.onerror = () => {
     URL.revokeObjectURL(url)
-    message.warning("这张图打不开，换一张试试")
+    message.warning('这张图打不开，换一张试试')
   }
   img.src = url
 }
@@ -114,10 +114,7 @@ function onWheel(event: WheelEvent) {
 
 /** 「大小」滑块：0–100 对应最小到最大的半径 */
 const size = computed({
-  get: () =>
-    maxR.value > minR.value
-      ? Math.round(((circle.r - minR.value) / (maxR.value - minR.value)) * 100)
-      : 100,
+  get: () => (maxR.value > minR.value ? Math.round(((circle.r - minR.value) / (maxR.value - minR.value)) * 100) : 100),
   set: (value: number) => {
     circle.r = minR.value + ((maxR.value - minR.value) * value) / 100
     clamp()
@@ -138,41 +135,29 @@ function previewStyle(px: number) {
 
 async function save() {
   if (!image) return
-  const canvas = document.createElement("canvas")
+  const canvas = document.createElement('canvas')
   canvas.width = OUTPUT
   canvas.height = OUTPUT
-  const ctx = canvas.getContext("2d")!
+  const ctx = canvas.getContext('2d')!
   // 透明底的 PNG 存成 JPEG 会变黑，先铺白
-  ctx.fillStyle = "#ffffff"
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, OUTPUT, OUTPUT)
   const side = (circle.r * 2) / fit.scale
-  ctx.drawImage(
-    image,
-    (circle.cx - circle.r - fit.x) / fit.scale,
-    (circle.cy - circle.r - fit.y) / fit.scale,
-    side,
-    side,
-    0,
-    0,
-    OUTPUT,
-    OUTPUT,
-  )
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.9),
-  )
+  ctx.drawImage(image, (circle.cx - circle.r - fit.x) / fit.scale, (circle.cy - circle.r - fit.y) / fit.scale, side, side, 0, 0, OUTPUT, OUTPUT)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
   if (!blob) {
-    message.error("没处理好这张图，换一张试试")
+    message.error('没处理好这张图，换一张试试')
     return
   }
   saving.value = true
   try {
-    await uploadAvatar(new File([blob], "avatar.jpg", { type: "image/jpeg" }))
-    message.success("头像换好了")
+    await uploadAvatar(new File([blob], 'avatar.jpg', { type: 'image/jpeg' }))
+    message.success('头像换好了')
     userStore.getMyProfile()
-    emit("changed")
+    emit('changed')
     show.value = false
   } catch {
-    message.error("没传上去，再试一次")
+    message.error('没传上去，再试一次')
   } finally {
     saving.value = false
   }
@@ -182,12 +167,12 @@ async function useLetter() {
   saving.value = true
   try {
     await resetAvatar()
-    message.success("改成名字的字了")
+    message.success('改成名字的字了')
     userStore.getMyProfile()
-    emit("changed")
+    emit('changed')
     show.value = false
   } catch {
-    message.error("没改成，再试一次")
+    message.error('没改成，再试一次')
   } finally {
     saving.value = false
   }
@@ -195,21 +180,10 @@ async function useLetter() {
 </script>
 
 <template>
-  <n-modal
-    v-model:show="show"
-    preset="card"
-    title="换头像"
-    :style="{ width: '520px', maxWidth: 'calc(100vw - 32px)' }"
-    :bordered="false"
-  >
+  <n-modal v-model:show="show" preset="card" title="换头像" :style="{ width: '520px', maxWidth: 'calc(100vw - 32px)' }" :bordered="false">
     <input ref="fileInput" type="file" accept="image/*" hidden @change="onFile" />
     <div class="body">
-      <div
-        v-if="src"
-        class="stage"
-        :style="{ width: `${STAGE}px`, height: `${STAGE}px` }"
-        @wheel.prevent="onWheel"
-      >
+      <div v-if="src" class="stage" :style="{ width: `${STAGE}px`, height: `${STAGE}px` }" @wheel.prevent="onWheel">
         <img
           :src="src"
           alt=""
@@ -257,30 +231,16 @@ async function useLetter() {
           </n-button>
         </template>
         <template v-else>
-          <span class="preview">
-            <RankAvatar :username="username" :avatar="avatar" :size="56" me />领奖台
-          </span>
-          <span class="preview">
-            <RankAvatar :username="username" :avatar="avatar" :size="28" me />排名、顶栏
-          </span>
+          <span class="preview"> <RankAvatar :username="username" :avatar="avatar" :size="56" me />领奖台 </span>
+          <span class="preview"> <RankAvatar :username="username" :avatar="avatar" :size="28" me />排名、顶栏 </span>
         </template>
-        <a
-          v-if="avatar || src"
-          href="#"
-          class="link"
-          :class="{ disabled: saving }"
-          @click.prevent="!saving && useLetter()"
-        >
-          不用图片，用名字的字
-        </a>
+        <a v-if="avatar || src" href="#" class="link" :class="{ disabled: saving }" @click.prevent="!saving && useLetter()"> 不用图片，用名字的字 </a>
       </div>
     </div>
     <template #footer>
       <div class="footer">
         <n-button @click="show = false">取消</n-button>
-        <n-button type="primary" :disabled="!src" :loading="saving" @click="save">
-          用这张
-        </n-button>
+        <n-button type="primary" :disabled="!src" :loading="saving" @click="save"> 用这张 </n-button>
       </div>
     </template>
   </n-modal>
@@ -298,7 +258,7 @@ async function useLetter() {
   flex-shrink: 0;
   overflow: hidden;
   border-radius: 6px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   touch-action: none;
   user-select: none;
 }
@@ -320,7 +280,7 @@ async function useLetter() {
 .stage.empty {
   width: 280px;
   height: 280px;
-  border: 1px dashed v-bind("theme.borderColor");
+  border: 1px dashed v-bind('theme.borderColor');
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -348,14 +308,14 @@ async function useLetter() {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .preview {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .dot {

@@ -8,19 +8,19 @@
  *   漏了编辑器会少一大截功能；
  * - 各项配置的先后顺序和它一致（同优先级下排前面的赢），换掉之后行为不变。
  */
-import { basicSetup } from "codemirror"
-import { indentWithTab } from "@codemirror/commands"
-import { indentUnit } from "@codemirror/language"
-import { Compartment, EditorState, type Extension } from "@codemirror/state"
-import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view"
+import { basicSetup } from 'codemirror'
+import { indentWithTab } from '@codemirror/commands'
+import { indentUnit } from '@codemirror/language'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
+import { EditorView, keymap, placeholder as placeholderExt } from '@codemirror/view'
 
 const {
   extensions = [],
   disabled = false,
   tabSize = 4,
-  placeholder = "",
-  height = "100%",
-  fontSize = "",
+  placeholder = '',
+  height = '100%',
+  fontSize = '',
 } = defineProps<{
   /** 传稳定的数组实例：每换一个新数组，编辑器就重配一次 */
   extensions?: Extension[]
@@ -30,10 +30,10 @@ const {
   height?: string
   fontSize?: string
 }>()
-const code = defineModel<string>({ default: "" })
+const code = defineModel<string>({ default: '' })
 const emit = defineEmits<{ ready: [view: EditorView] }>()
 
-const container = useTemplateRef("container")
+const container = useTemplateRef('container')
 let view: EditorView | null = null
 
 const compartments = {
@@ -44,12 +44,10 @@ const compartments = {
   size: new Compartment(),
 }
 
-const disabledExt = (value: boolean) =>
-  value ? [EditorView.editable.of(false), EditorState.readOnly.of(true)] : []
-const tabSizeExt = (size: number) => [EditorState.tabSize.of(size), indentUnit.of(" ".repeat(size))]
+const disabledExt = (value: boolean) => (value ? [EditorView.editable.of(false), EditorState.readOnly.of(true)] : [])
+const tabSizeExt = (size: number) => [EditorState.tabSize.of(size), indentUnit.of(' '.repeat(size))]
 const placeholderOf = (text: string) => (text ? placeholderExt(text) : [])
-const sizeExt = (h: string, fs: string) =>
-  EditorView.theme({ "&": fs ? { height: h, fontSize: fs } : { height: h } })
+const sizeExt = (h: string, fs: string) => EditorView.theme({ '&': fs ? { height: h, fontSize: fs } : { height: h } })
 
 onMounted(() => {
   view = new EditorView({
@@ -72,7 +70,7 @@ onMounted(() => {
       ],
     }),
   })
-  emit("ready", view)
+  emit('ready', view)
 })
 
 onBeforeUnmount(() => {

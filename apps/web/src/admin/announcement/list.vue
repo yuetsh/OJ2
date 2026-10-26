@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import PageHeader from "admin/components/PageHeader.vue"
-import { NSwitch, useThemeVars } from "naive-ui"
-import { RouterLink } from "vue-router"
-import Pagination from "shared/components/Pagination.vue"
-import { parseTime } from "utils/functions"
-import type { AdminAnnouncementListItem } from "utils/types"
-import { editAnnouncement, getAnnouncement, getAnnouncementList } from "../api"
-import Actions from "./components/Actions.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useListLoader } from "shared/composables/listLoader"
+import PageHeader from 'admin/components/PageHeader.vue'
+import { NSwitch, useThemeVars } from 'naive-ui'
+import { RouterLink } from 'vue-router'
+import Pagination from 'shared/components/Pagination.vue'
+import { parseTime } from 'utils/functions'
+import type { AdminAnnouncementListItem } from 'utils/types'
+import { editAnnouncement, getAnnouncement, getAnnouncementList } from '../api'
+import Actions from './components/Actions.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useListLoader } from 'shared/composables/listLoader'
 
 const message = useMessage()
 const total = ref(0)
@@ -27,26 +27,26 @@ const theme = useThemeVars()
 const { isMobile } = useBreakpoints()
 
 function renderTitle(row: AdminAnnouncementListItem) {
-  return h("span", { class: "title-cell" }, [
+  return h('span', { class: 'title-cell' }, [
     h(
       RouterLink,
       {
-        class: "title-link",
-        to: { name: "admin announcement edit", params: { announcementID: row.id } },
+        class: 'title-link',
+        to: { name: 'admin announcement edit', params: { announcementID: row.id } },
       },
       () => row.title,
     ),
-    row.top ? h("span", { class: "top" }, "置顶") : null,
-    h("span", { class: "muted small" }, row.tag),
+    row.top ? h('span', { class: 'top' }, '置顶') : null,
+    h('span', { class: 'muted small' }, row.tag),
   ])
 }
 
 function renderVisible(row: AdminAnnouncementListItem) {
   return h(NSwitch, {
     value: row.visible,
-    size: isMobile.value ? "medium" : "small",
+    size: isMobile.value ? 'medium' : 'small',
     rubberBand: false,
-    onUpdateValue: () => toggle(row, "visible"),
+    onUpdateValue: () => toggle(row, 'visible'),
   })
 }
 
@@ -55,61 +55,61 @@ function renderActions(row: AdminAnnouncementListItem) {
     announcementID: row.id,
     top: row.top,
     onDeleted: listAnnouncements,
-    onToggleTop: () => toggle(row, "top"),
+    onToggleTop: () => toggle(row, 'top'),
   })
 }
 
 /** 手机上一条一张卡：标题一行，发布 · 改过一行小字，操作一行；「学生看得到」单独一列靠右 */
 function renderMobileCard(row: AdminAnnouncementListItem) {
-  const created = parseTime(row.createTime, "YYYY-MM-DD")
-  const updated = parseTime(row.lastUpdateTime, "YYYY-MM-DD")
-  return h("div", { class: "m-card" }, [
+  const created = parseTime(row.createTime, 'YYYY-MM-DD')
+  const updated = parseTime(row.lastUpdateTime, 'YYYY-MM-DD')
+  return h('div', { class: 'm-card' }, [
     renderTitle(row),
-    h("div", { class: "m-meta muted num" }, [
-      h("span", { class: "m-item" }, `${created} 发布`),
-      updated === created ? null : h("span", { class: "m-item" }, ` · ${updated} 改过`),
+    h('div', { class: 'm-meta muted num' }, [
+      h('span', { class: 'm-item' }, `${created} 发布`),
+      updated === created ? null : h('span', { class: 'm-item' }, ` · ${updated} 改过`),
     ]),
     renderActions(row),
   ])
 }
 
 const mobileColumns: DataTableColumn<AdminAnnouncementListItem>[] = [
-  { title: "标题", key: "title", render: renderMobileCard },
-  { title: "看得到", key: "visible", width: 72, align: "center", render: renderVisible },
+  { title: '标题', key: 'title', render: renderMobileCard },
+  { title: '看得到', key: 'visible', width: 72, align: 'center', render: renderVisible },
 ]
 
 const desktopColumns: DataTableColumn<AdminAnnouncementListItem>[] = [
   {
-    title: "标题",
-    key: "title",
+    title: '标题',
+    key: 'title',
     width: 360,
     render: renderTitle,
   },
   {
-    title: "发布",
-    key: "createTime",
+    title: '发布',
+    key: 'createTime',
     width: 120,
-    render: (row) => h("span", { class: "num" }, parseTime(row.createTime, "YYYY-MM-DD")),
+    render: (row) => h('span', { class: 'num' }, parseTime(row.createTime, 'YYYY-MM-DD')),
   },
   {
-    title: "改过",
-    key: "lastUpdateTime",
+    title: '改过',
+    key: 'lastUpdateTime',
     width: 120,
     render: (row) => {
-      const created = parseTime(row.createTime, "YYYY-MM-DD")
-      const updated = parseTime(row.lastUpdateTime, "YYYY-MM-DD")
-      return h("span", { class: "num muted" }, updated === created ? "—" : updated)
+      const created = parseTime(row.createTime, 'YYYY-MM-DD')
+      const updated = parseTime(row.lastUpdateTime, 'YYYY-MM-DD')
+      return h('span', { class: 'num muted' }, updated === created ? '—' : updated)
     },
   },
   {
-    title: "学生看得到",
-    key: "visible",
+    title: '学生看得到',
+    key: 'visible',
     width: 100,
     render: renderVisible,
   },
   {
-    title: "",
-    key: "actions",
+    title: '',
+    key: 'actions',
     minWidth: 240,
     render: renderActions,
   },
@@ -119,7 +119,7 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
 
 // 列表响应不含 content（正文是 8MB 上限的富文本），而更新接口要求 content 必填 ——
 // 拿列表里那行直接回传会 400。所以先取回整条再改。
-async function toggle(announcement: AdminAnnouncementListItem, field: "visible" | "top") {
+async function toggle(announcement: AdminAnnouncementListItem, field: 'visible' | 'top') {
   try {
     const full = await getAnnouncement(announcement.id)
     await editAnnouncement({
@@ -127,13 +127,13 @@ async function toggle(announcement: AdminAnnouncementListItem, field: "visible" 
       title: full.title,
       tag: full.tag,
       content: full.content,
-      visible: field === "visible" ? !full.visible : full.visible,
-      top: field === "top" ? !full.top : full.top,
+      visible: field === 'visible' ? !full.visible : full.visible,
+      top: field === 'top' ? !full.top : full.top,
     })
-    if (field === "top") listAnnouncements()
+    if (field === 'top') listAnnouncements()
     else announcement.visible = !full.visible
   } catch {
-    message.error("没改成，刷新一下再试")
+    message.error('没改成，刷新一下再试')
   }
 }
 
@@ -153,18 +153,10 @@ watch(query, listAnnouncements, { deep: true })
 <template>
   <PageHeader title="公告">
     <template #actions>
-      <n-button type="primary" @click="$router.push({ name: 'admin announcement create' })">
-        写一条公告
-      </n-button>
+      <n-button type="primary" @click="$router.push({ name: 'admin announcement create' })"> 写一条公告 </n-button>
     </template>
   </PageHeader>
-  <n-data-table
-    :loading="loading"
-    striped
-    class="ann-table"
-    :columns="columns"
-    :data="announcements"
-  />
+  <n-data-table :loading="loading" striped class="ann-table" :columns="columns" :data="announcements" />
   <Pagination :total="total" v-model:limit="query.limit" v-model:page="query.page" />
 </template>
 
@@ -197,7 +189,7 @@ watch(query, listAnnouncements, { deep: true })
 }
 
 .ann-table :deep(.title-link) {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   font-weight: 500;
   text-decoration: none;
 }
@@ -210,12 +202,12 @@ watch(query, listAnnouncements, { deep: true })
   font-size: 12px;
   padding: 0 6px;
   border-radius: 3px;
-  color: v-bind("theme.warningColor");
-  background: v-bind("theme.actionColor");
+  color: v-bind('theme.warningColor');
+  background: v-bind('theme.actionColor');
 }
 
 .ann-table :deep(.muted) {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .ann-table :deep(.small) {

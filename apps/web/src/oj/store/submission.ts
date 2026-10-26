@@ -1,15 +1,15 @@
-import { defineStore } from "pinia"
-import { errorCode, errorMessage } from "utils/api"
-import { formatCode, isFormatLanguage, submitCode } from "oj/api"
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import { useSubmissionMonitor } from "oj/problem/composables/useSubmissionMonitor"
-import { useSubmissionHint } from "oj/problem/composables/useSubmissionHint"
-import { useTrialRun } from "oj/problem/composables/useTrialRun"
-import { restartEditTrace, snapshotEditTrace } from "oj/problem/utils/editTrace"
-import { useCollabStore } from "shared/store/collab"
-import { LANGUAGE_FORMAT_VALUE } from "utils/constants"
-import type { SubmitCodePayload } from "utils/types"
+import { defineStore } from 'pinia'
+import { errorCode, errorMessage } from 'utils/api'
+import { formatCode, isFormatLanguage, submitCode } from 'oj/api'
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
+import { useSubmissionMonitor } from 'oj/problem/composables/useSubmissionMonitor'
+import { useSubmissionHint } from 'oj/problem/composables/useSubmissionHint'
+import { useTrialRun } from 'oj/problem/composables/useTrialRun'
+import { restartEditTrace, snapshotEditTrace } from 'oj/problem/utils/editTrace'
+import { useCollabStore } from 'shared/store/collab'
+import { LANGUAGE_FORMAT_VALUE } from 'utils/constants'
+import type { SubmitCodePayload } from 'utils/types'
 
 /**
  * 题目页上「这一次提交」的全部状态：正在跟的那条提交、判题跟踪（WebSocket + 轮询）、
@@ -23,9 +23,9 @@ import type { SubmitCodePayload } from "utils/types"
  * 判完之后「该发生什么」（失败计数、标成已解决、烟花、点评、回题单）不在这里，
  * 在页面这一层的 SubmissionEffects —— 它们要路由守卫和弹窗，得挂在一直在的组件上。
  */
-export type ResultSegment = "submit" | "samples" | "custom"
+export type ResultSegment = 'submit' | 'samples' | 'custom'
 
-export const useSubmissionStore = defineStore("submission", () => {
+export const useSubmissionStore = defineStore('submission', () => {
   const problemStore = useProblemStore()
   const codeStore = useCodeStore()
   const collabStore = useCollabStore()
@@ -40,8 +40,8 @@ export const useSubmissionStore = defineStore("submission", () => {
    */
   const resultSeq = ref(0)
   /** 「结果」页签里看哪一段：提交结果 / 运行例子 / 自己输入 */
-  const resultSegment = ref<ResultSegment>("submit")
-  function revealResult(segment: ResultSegment = "submit") {
+  const resultSegment = ref<ResultSegment>('submit')
+  function revealResult(segment: ResultSegment = 'submit') {
     resultSegment.value = segment
     resultSeq.value++
   }
@@ -50,19 +50,15 @@ export const useSubmissionStore = defineStore("submission", () => {
   function runSamples() {
     const problem = problemStore.problem
     if (!problem?.samples.length) return
-    revealResult("samples")
-    trial.runSamples(
-      { ...codeStore.code },
-      { problemId: problem.id, contestId: problem.contestId },
-      problem.samples,
-    )
+    revealResult('samples')
+    trial.runSamples({ ...codeStore.code }, { problemId: problem.id, contestId: problem.contestId }, problem.samples)
   }
 
   /** 用「自己输入」框里的数据跑一次 */
   function runCustom() {
     const problem = problemStore.problem
     if (!problem) return
-    revealResult("custom")
+    revealResult('custom')
     trial.runCustom({ ...codeStore.code }, { problemId: problem.id, contestId: problem.contestId })
   }
   /**
@@ -73,12 +69,7 @@ export const useSubmissionStore = defineStore("submission", () => {
   const reducedMotion = usePreferredReducedMotion()
   const revealedCases = new Set<string>()
   function shouldRevealCases(id: string | undefined) {
-    return (
-      !!id &&
-      reducedMotion.value !== "reduce" &&
-      id === monitor.submissionId.value &&
-      !revealedCases.has(id)
-    )
+    return !!id && reducedMotion.value !== 'reduce' && id === monitor.submissionId.value && !revealedCases.has(id)
   }
   function markCasesRevealed(id: string) {
     revealedCases.add(id)
@@ -94,7 +85,7 @@ export const useSubmissionStore = defineStore("submission", () => {
    * 检查在服务端做（`/code/format` 里先用 CPython 编译一遍），原来是浏览器里的 Skulpt：
    * 那个只能报「第 N 行有错」，而且要下载 ~226KB。
    */
-  const syntaxErrorInfo = ref("")
+  const syntaxErrorInfo = ref('')
 
   /**
    * 这次提交之前自动排版改了代码。排版会直接改掉编辑器里的代码（缩进、空格、换行），
@@ -118,7 +109,7 @@ export const useSubmissionStore = defineStore("submission", () => {
     // 换了题就什么都别再写：不然 A 格式化好的代码会盖掉 B 的编辑器（连带 B 的草稿），
     // 或者开始跟 A 的那条提交，A 判对了却把 B 标成已解决、弹 B 的点评
     const stale = () => problemStore.problem?.id !== problem.id
-    syntaxErrorInfo.value = ""
+    syntaxErrorInfo.value = ''
     formattedBeforeSubmit.value = false
 
     // 0. 提交前自动格式化（Python 用 ruff，C/C++ 用 clang-format，SQL 用 sqlparse）。
@@ -140,7 +131,7 @@ export const useSubmissionStore = defineStore("submission", () => {
         }
       } catch (e) {
         if (stale()) return
-        if (errorCode(e) === "syntax-error") {
+        if (errorCode(e) === 'syntax-error') {
           // 仅 Python 会出现：message 是 CPython 的报错原文，交给 CompileErrorExplain 翻译
           syntaxErrorInfo.value = errorMessage(e)
           revealResult()
@@ -159,9 +150,7 @@ export const useSubmissionStore = defineStore("submission", () => {
       code: codeStore.code.value,
       // 编辑过程信号，见 utils/editTrace.ts。协作的判断和 ProblemEditor 的 collabHere
       // （teacherCollab.ts 的 useCollabHere）同一个口径：比赛入口不算协作
-      trace: snapshotEditTrace(
-        !entry.contestId && collabStore.room !== null && collabStore.room.problemId === problem._id,
-      ),
+      trace: snapshotEditTrace(!entry.contestId && collabStore.room !== null && collabStore.room.problemId === problem._id),
     }
     if (entry.contestId) {
       data.contestId = parseInt(entry.contestId)
@@ -196,9 +185,9 @@ export const useSubmissionStore = defineStore("submission", () => {
    * 会把**新题**标成已解决。
    */
   function reset() {
-    syntaxErrorInfo.value = ""
+    syntaxErrorInfo.value = ''
     formattedBeforeSubmit.value = false
-    resultSegment.value = "submit"
+    resultSegment.value = 'submit'
     monitor.reset()
     hint.clearHint()
     trial.resetTrial()

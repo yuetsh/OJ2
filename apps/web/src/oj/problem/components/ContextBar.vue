@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { storeToRefs } from "pinia"
-import type { RouteLocationRaw } from "vue-router"
-import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from "oj/api"
-import { useContestStore } from "oj/store/contest"
-import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
-import { useLessonStore } from "shared/store/lesson"
-import { useProblemStore } from "oj/store/problem"
-import { useUserStore } from "shared/store/user"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useThemeVars } from "naive-ui"
-import { ContestStatus } from "utils/constants"
-import type { ProblemSet, ProblemSetProblem } from "utils/types"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import ProblemChips, { type ChipItem } from "./ProblemChips.vue"
+import { storeToRefs } from 'pinia'
+import type { RouteLocationRaw } from 'vue-router'
+import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from 'oj/api'
+import { useContestStore } from 'oj/store/contest'
+import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
+import { useLessonStore } from 'shared/store/lesson'
+import { useProblemStore } from 'oj/store/problem'
+import { useUserStore } from 'shared/store/user'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useThemeVars } from 'naive-ui'
+import { ContestStatus } from 'utils/constants'
+import type { ProblemSet, ProblemSetProblem } from 'utils/types'
+import { useProblemPageContext } from '../composables/problemPageContext'
+import ProblemChips, { type ChipItem } from './ProblemChips.vue'
 
 /**
  * 左栏顶上的一条：「这道题是从哪来的」。按入口路由决定是哪一种，最多一条：
@@ -40,13 +40,13 @@ const isDark = useDark()
  */
 const tone = computed(() => ({
   lessonText: isDark.value ? theme.value.primaryColor : theme.value.primaryColorPressed,
-  setText: isDark.value ? "#8fb4ee" : "#1d4f9c",
-  setBar: isDark.value ? "#6f9be0" : "#2f6bc4",
-  contestText: isDark.value ? "#f2c97d" : "#8a5200",
+  setText: isDark.value ? '#8fb4ee' : '#1d4f9c',
+  setBar: isDark.value ? '#6f9be0' : '#2f6bc4',
+  contestText: isDark.value ? '#f2c97d' : '#8a5200',
 }))
 const userStore = useUserStore()
 const { problem } = storeToRefs(useProblemStore())
-const currentId = computed(() => problem.value?._id ?? "")
+const currentId = computed(() => problem.value?._id ?? '')
 
 /**
  * 刚在这一页上做出来（不是本来就做过）：代码通过，或者流程图刚评到 A / S。
@@ -72,7 +72,7 @@ function onSolvedHere(callback: () => void) {
 const lessonStore = useLessonStore()
 
 watch(
-  () => ctx.value.entry === "problem" && userStore.isAuthed,
+  () => ctx.value.entry === 'problem' && userStore.isAuthed,
   (want) => {
     // 接口要求登录；没登录就没有这一条
     if (want) lessonStore.load()
@@ -81,26 +81,19 @@ watch(
 )
 
 const lesson = computed(() => {
-  if (ctx.value.entry !== "problem" || !userStore.isAuthed) return null
+  if (ctx.value.entry !== 'problem' || !userStore.isAuthed) return null
   const list = lessonStore.activity?.problems ?? []
-  const index = list.findIndex(
-    (item) => item.problemDisplayId.toLowerCase() === currentId.value.toLowerCase(),
-  )
+  const index = list.findIndex((item) => item.problemDisplayId.toLowerCase() === currentId.value.toLowerCase())
   if (index < 0) return null
   const chips: ChipItem[] = list.map((item) => ({
     displayId: item.problemDisplayId,
     title: item.title,
-    status:
-      item.myStatus === "accepted"
-        ? "done"
-        : item.myStatus === "tried"
-          ? "tried"
-          : ("none" as const),
+    status: item.myStatus === 'accepted' ? 'done' : item.myStatus === 'tried' ? 'tried' : ('none' as const),
     to: `/problem/${item.problemDisplayId}`,
   }))
   return {
     chips,
-    done: list.filter((item) => item.myStatus === "accepted").length,
+    done: list.filter((item) => item.myStatus === 'accepted').length,
     total: list.length,
     position: index + 1,
     previous: chips[index - 1]?.to ?? null,
@@ -109,7 +102,7 @@ const lesson = computed(() => {
 })
 
 onSolvedHere(() => {
-  if (ctx.value.entry !== "problem" || !lessonStore.includes(currentId.value)) return
+  if (ctx.value.entry !== 'problem' || !lessonStore.includes(currentId.value)) return
   lessonStore.markAccepted(currentId.value)
   lessonStore.load(true)
 })
@@ -125,10 +118,7 @@ watch(
     setProblems.value = []
     if (!id) return
     try {
-      const [detail, problems] = await Promise.all([
-        getProblemSetDetail(Number(id)),
-        getProblemSetProblems(Number(id)),
-      ])
+      const [detail, problems] = await Promise.all([getProblemSetDetail(Number(id)), getProblemSetProblems(Number(id))])
       // 拉的这一会儿已经离开了这个题单
       if (ctx.value.problemSetId !== id) return
       problemSet.value = detail
@@ -143,26 +133,22 @@ watch(
 const setBar = computed(() => {
   if (!problemSet.value) return null
   const list = setProblems.value
-  const index = list.findIndex(
-    (item) => item.problem._id.toLowerCase() === currentId.value.toLowerCase(),
-  )
+  const index = list.findIndex((item) => item.problem._id.toLowerCase() === currentId.value.toLowerCase())
   const link = (item: ProblemSetProblem | undefined): RouteLocationRaw | null =>
     item
       ? {
-          name: "problemset problem",
+          name: 'problemset problem',
           params: { problemSetId: ctx.value.problemSetId, problemID: item.problem._id },
         }
       : null
   // 进度只数必做题，和题单页的「完成进度 2 / 8（另有 3 道选做）」同一个口径；
   // 一道必做都没有的题单才数全部
-  const required = list.some((item) => item.isRequired)
-    ? list.filter((item) => item.isRequired)
-    : list
+  const required = list.some((item) => item.isRequired) ? list.filter((item) => item.isRequired) : list
   const done = required.filter((item) => item.isCompleted).length
   return {
     title: problemSet.value.title,
     joined: problemSet.value.userProgress.isJoined,
-    home: { name: "problemset", params: { problemSetId: ctx.value.problemSetId } },
+    home: { name: 'problemset', params: { problemSetId: ctx.value.problemSetId } },
     done,
     total: required.length,
     percentage: required.length ? (done / required.length) * 100 : 0,
@@ -190,9 +176,7 @@ async function joinHere() {
 
 // 判题那一路已经记了账（judge/run.ts），这里只是把这一条就地改掉，不用重拉
 onSolvedHere(() => {
-  const item = setProblems.value.find(
-    (row) => row.problem._id.toLowerCase() === currentId.value.toLowerCase(),
-  )
+  const item = setProblems.value.find((row) => row.problem._id.toLowerCase() === currentId.value.toLowerCase())
   if (item) item.isCompleted = true
 })
 
@@ -219,12 +203,11 @@ onBeforeUnmount(() => {
 
 const contestBar = computed(() => {
   const contest = contestStore.contest
-  if (ctx.value.entry !== "contest" || !contest || String(contest.id) !== ctx.value.contestId)
-    return null
+  if (ctx.value.entry !== 'contest' || !contest || String(contest.id) !== ctx.value.contestId) return null
   const chips: ChipItem[] = contestStore.problems.map((row) => ({
     displayId: row._id,
     title: row.title,
-    status: row.status === "passed" ? "done" : row.status === "failed" ? "tried" : "none",
+    status: row.status === 'passed' ? 'done' : row.status === 'failed' ? 'tried' : 'none',
     to: `/contest/${ctx.value.contestId}/problem/${row._id}`,
   }))
   return {
@@ -233,19 +216,15 @@ const contestBar = computed(() => {
     remaining: contestStore.remaining,
     // 不在进行中的两种：管理员赛前看题是「还没开始」，不能一律写「已结束」
     notStarted: contestStore.contestStatus === ContestStatus.not_started,
-    home: { name: "contest problems", params: { contestID: ctx.value.contestId } },
+    home: { name: 'contest problems', params: { contestID: ctx.value.contestId } },
     // 期中期末进行中排名不公布，链接也不给
-    rank: contestStore.rankHidden
-      ? null
-      : { name: "contest rank", params: { contestID: ctx.value.contestId } },
+    rank: contestStore.rankHidden ? null : { name: 'contest rank', params: { contestID: ctx.value.contestId } },
   }
 })
 
 onSolvedHere(() => {
-  const row = contestStore.problems.find(
-    (item) => item._id.toLowerCase() === currentId.value.toLowerCase(),
-  )
-  if (row) row.status = "passed"
+  const row = contestStore.problems.find((item) => item._id.toLowerCase() === currentId.value.toLowerCase())
+  if (row) row.status = 'passed'
 })
 </script>
 
@@ -253,8 +232,7 @@ onSolvedHere(() => {
   <!-- 课堂 -->
   <div v-if="lesson" class="context-bar lesson">
     <span class="lead lesson-lead"
-      >这节课<template v-if="lessonStore.languageText"> · {{ lessonStore.languageText }}</template>
-      做完 {{ lesson.done }}/{{ lesson.total }}</span
+      >这节课<template v-if="lessonStore.languageText"> · {{ lessonStore.languageText }}</template> 做完 {{ lesson.done }}/{{ lesson.total }}</span
     >
     <!-- 手机上放不下一排题号：只说是第几道，箭头做大（设计稿「手机：题目 / 代码 / 结果」） -->
     <span v-if="isMobile" class="meta">这是第 {{ lesson.position }} 道</span>
@@ -308,9 +286,7 @@ onSolvedHere(() => {
 
   <!-- 题单 -->
   <div v-else-if="setBar" class="context-bar problemset">
-    <router-link :to="setBar.home" class="back set-back" :title="`回到题单：${setBar.title}`">
-      ‹ {{ setBar.title }}
-    </router-link>
+    <router-link :to="setBar.home" class="back set-back" :title="`回到题单：${setBar.title}`"> ‹ {{ setBar.title }} </router-link>
     <!-- 手机上一排放不下题单名 + 进度条 + 做完几道 + 两个大箭头，进度条让掉，「做完 x/y」还在 -->
     <div v-if="setBar.joined && !isMobile" class="set-progress" aria-hidden="true">
       <div class="set-progress-fill" :style="{ width: `${setBar.percentage}%` }" />
@@ -320,12 +296,8 @@ onSolvedHere(() => {
       <template v-if="setBar.position"> · 第 {{ setBar.position }} 题</template>
     </span>
     <template v-else>
-      <span class="meta">{{
-        isMobile ? "没加入，不算进度" : "还没加入，在这里做对了不算进度"
-      }}</span>
-      <n-button size="tiny" type="primary" :loading="joiningSet" @click="joinHere"
-        >加入题单</n-button
-      >
+      <span class="meta">{{ isMobile ? '没加入，不算进度' : '还没加入，在这里做对了不算进度' }}</span>
+      <n-button size="tiny" type="primary" :loading="joiningSet" @click="joinHere">加入题单</n-button>
     </template>
     <div class="spacer" />
     <component
@@ -374,23 +346,15 @@ onSolvedHere(() => {
 
   <!-- 比赛 -->
   <div v-else-if="contestBar" class="context-bar contest">
-    <router-link
-      :to="contestBar.home"
-      class="back contest-back"
-      :title="`回到比赛：${contestBar.title}`"
-    >
-      ‹ {{ contestBar.title }}
-    </router-link>
+    <router-link :to="contestBar.home" class="back contest-back" :title="`回到比赛：${contestBar.title}`"> ‹ {{ contestBar.title }} </router-link>
     <ProblemChips :items="contestBar.chips" :current="currentId" variant="contest" />
     <div class="spacer" />
     <template v-if="contestBar.remaining">
       <span class="meta">还剩</span>
       <span class="countdown">{{ contestBar.remaining }}</span>
     </template>
-    <span v-else class="meta">{{ contestBar.notStarted ? "还没开始" : "已结束" }}</span>
-    <router-link v-if="contestBar.rank" :to="contestBar.rank" class="contest-rank"
-      >排名</router-link
-    >
+    <span v-else class="meta">{{ contestBar.notStarted ? '还没开始' : '已结束' }}</span>
+    <router-link v-if="contestBar.rank" :to="contestBar.rank" class="contest-rank">排名</router-link>
   </div>
 </template>
 
@@ -434,12 +398,12 @@ onSolvedHere(() => {
 }
 
 .lesson-lead {
-  color: v-bind("tone.lessonText");
+  color: v-bind('tone.lessonText');
 }
 
 .meta {
   flex: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .spacer {
@@ -461,14 +425,14 @@ onSolvedHere(() => {
 }
 
 .set-back {
-  color: v-bind("tone.setText");
+  color: v-bind('tone.setText');
 }
 
 /* 比赛名不跟题号那段抢地方：题号多了本来就能横向滚，名字挤成两个字就认不出了 */
 .contest-back {
   flex: none;
   max-width: 160px;
-  color: v-bind("tone.contestText");
+  color: v-bind('tone.contestText');
 }
 
 .set-progress {
@@ -483,7 +447,7 @@ onSolvedHere(() => {
 .set-progress-fill {
   height: 100%;
   border-radius: 3px;
-  background-color: v-bind("tone.setBar");
+  background-color: v-bind('tone.setBar');
 }
 
 .countdown {
@@ -492,12 +456,12 @@ onSolvedHere(() => {
   font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: v-bind("tone.contestText");
+  color: v-bind('tone.contestText');
 }
 
 .contest-rank {
   flex: none;
-  color: v-bind("tone.contestText");
+  color: v-bind('tone.contestText');
   text-decoration: none;
 }
 
@@ -514,7 +478,7 @@ onSolvedHere(() => {
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .step.big {
@@ -523,11 +487,11 @@ onSolvedHere(() => {
 }
 
 .step.forward {
-  color: v-bind("tone.lessonText");
+  color: v-bind('tone.lessonText');
 }
 
 .problemset .step.forward {
-  color: v-bind("tone.setText");
+  color: v-bind('tone.setText');
 }
 
 .step:not(.disabled):hover {

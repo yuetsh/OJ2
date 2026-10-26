@@ -1,4 +1,4 @@
-import type { RouteLocationNormalizedLoaded } from "vue-router"
+import type { RouteLocationNormalizedLoaded } from 'vue-router'
 
 /**
  * 题目页的三种入口：题库（含课堂）、题单、比赛。同一个 detail.vue 挂在三条路由上。
@@ -7,14 +7,14 @@ import type { RouteLocationNormalizedLoaded } from "vue-router"
  * 在题单里是「禁用」、在比赛里是「隐藏」，加一处功能就得把每个组件翻一遍
  * （见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 8 节）。
  */
-export type ProblemEntry = "problem" | "problemset" | "contest"
+export type ProblemEntry = 'problem' | 'problemset' | 'contest'
 
-export type ProblemDrawer = "info" | "reaction" | "submission"
+export type ProblemDrawer = 'info' | 'reaction' | 'submission'
 
 export const DRAWER_TITLE: Record<ProblemDrawer, string> = {
-  info: "统计",
-  reaction: "点评",
-  submission: "我的提交",
+  info: '统计',
+  reaction: '点评',
+  submission: '我的提交',
 }
 
 interface EntryRules {
@@ -58,7 +58,7 @@ interface EntryRules {
 
 const RULES: Record<ProblemEntry, EntryRules> = {
   problem: {
-    drawers: ["info", "reaction", "submission"],
+    drawers: ['info', 'reaction', 'submission'],
     statusTag: true,
     similar: true,
     lessonNext: true,
@@ -87,7 +87,7 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     allSubmissionsInMenu: true,
   },
   contest: {
-    drawers: ["info", "submission"],
+    drawers: ['info', 'submission'],
     statusTag: true,
     // 相似题接口按 displayId 在公开题库里找，比赛题的编号默认是 1/2/3，
     // 撞上同号公开题时反而会在比赛中把题库列给学生
@@ -104,9 +104,9 @@ const RULES: Record<ProblemEntry, EntryRules> = {
 }
 
 export function problemEntryOf(route: RouteLocationNormalizedLoaded): ProblemEntry {
-  if (route.name === "contest problem") return "contest"
-  if (route.name === "problemset problem") return "problemset"
-  return "problem"
+  if (route.name === 'contest problem') return 'contest'
+  if (route.name === 'problemset problem') return 'problemset'
+  return 'problem'
 }
 
 /**
@@ -118,8 +118,8 @@ export function useProblemPageContext() {
     const entry = problemEntryOf(route)
     return {
       entry,
-      contestId: entry === "contest" ? String(route.params.contestID ?? "") : "",
-      problemSetId: entry === "problemset" ? String(route.params.problemSetId ?? "") : "",
+      contestId: entry === 'contest' ? String(route.params.contestID ?? '') : '',
+      problemSetId: entry === 'problemset' ? String(route.params.problemSetId ?? '') : '',
       ...RULES[entry],
     }
   })

@@ -11,28 +11,21 @@ import {
   type LastVisit,
   type LessonLanguage,
   type StatisticInfo,
-} from "@oj2/contract"
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireAuth, requireTeacher, type AppEnv } from "../auth/middleware"
-import { seenToday } from "../auth/presence"
-import { getLoginWindow } from "../auth/session"
-import { presenceOf } from "../collab/state"
-import { db, schema } from "../db"
-import { challengeSuccessesOf } from "../services/challenge"
-import { failure, parseBody, success } from "../http"
-import { isAccepted } from "../judge/status"
-import {
-  activityRows,
-  classMemberIds,
-  FLOWCHART_PASSED,
-  lessonLanguageFilter,
-  SOLVED_RESULTS,
-  suggestActiveClass,
-} from "../services/class-activity"
-import { accepted } from "../services/learning-stats"
-import { calendarDay, dayStart, localTime } from "../time"
+import { requireAuth, requireTeacher, type AppEnv } from '../auth/middleware'
+import { seenToday } from '../auth/presence'
+import { getLoginWindow } from '../auth/session'
+import { presenceOf } from '../collab/state'
+import { db, schema } from '../db'
+import { challengeSuccessesOf } from '../services/challenge'
+import { failure, parseBody, success } from '../http'
+import { isAccepted } from '../judge/status'
+import { activityRows, classMemberIds, FLOWCHART_PASSED, lessonLanguageFilter, SOLVED_RESULTS, suggestActiveClass } from '../services/class-activity'
+import { accepted } from '../services/learning-stats'
+import { calendarDay, dayStart, localTime } from '../time'
 
 export const classroomRoutes = new Hono<AppEnv>()
 
@@ -86,8 +79,7 @@ async function classDayGroups(
 
 /** 按 id 取题，只留学生看得见的（题库里、visible），被藏起来的点进去也是 404 */
 async function visibleProblems(ids: number[]) {
-  if (!ids.length)
-    return new Map<number, { id: number; displayId: string; title: string; isSql: boolean }>()
+  if (!ids.length) return new Map<number, { id: number; displayId: string; title: string; isSql: boolean }>()
   const rows = await db
     .select({
       id: schema.problem.id,
@@ -96,13 +88,7 @@ async function visibleProblems(ids: number[]) {
       isSql: sql<boolean>`${schema.problem.languages} @> '["SQL"]'::jsonb`,
     })
     .from(schema.problem)
-    .where(
-      and(
-        inArray(schema.problem.id, ids),
-        eq(schema.problem.visible, true),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(inArray(schema.problem.id, ids), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
   return new Map(rows.map((row) => [row.id, row]))
 }
 
@@ -145,7 +131,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     ])
     const groupById = new Map(groups.map((row) => [row.problemId, row]))
     return {
-      source: "teacher" as const,
+      source: 'teacher' as const,
       day: today,
       language: plan.language ?? null,
       assignedAt: plan.createdAt,
@@ -167,17 +153,14 @@ async function classLessonProblems(className: string, lookbackDays: number) {
 
   const since = dayStart(Date.now() - (lookbackDays - 1) * 86_400_000)
   const groups = await classDayGroups(className, since, { minUsers: CLASS_ACTIVITY_MIN_USERS })
-  const latest = groups.reduce<string | null>(
-    (acc, row) => (!acc || row.day > acc ? row.day : acc),
-    null,
-  )
+  const latest = groups.reduce<string | null>((acc, row) => (!acc || row.day > acc ? row.day : acc), null)
   const picked = groups
     .filter((row) => row.day === latest)
     .sort((a, b) => a.firstAt.localeCompare(b.firstAt))
     .slice(0, CLASS_ACTIVITY_LIMIT)
   const problems = await visibleProblems(picked.map((row) => row.problemId))
   return {
-    source: picked.length ? ("inferred" as const) : null,
+    source: picked.length ? ('inferred' as const) : null,
     day: picked.length ? latest : null,
     // 推断出来的课不知道老师要的是哪种语言，不限
     language: null,
@@ -185,9 +168,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     assignedBy: null,
     problems: picked.flatMap((row) => {
       const problem = problems.get(row.problemId)
-      return problem
-        ? [{ ...problem, userCount: row.userCount, acceptedCount: row.acceptedCount }]
-        : []
+      return problem ? [{ ...problem, userCount: row.userCount, acceptedCount: row.acceptedCount }] : []
     }),
   }
 }
@@ -200,15 +181,11 @@ const LAST_VISIT_MAX_DAYS = 30
  * 原来是登录后弹的「登录速报」，数字外加 AI 两句话 —— AI 只拿到那五个数，说的就是复述，
  * 还要同步等模型（最长 60 秒）弹框才出来；现在拆进首页，没做对的题给「接着做」
  */
-classroomRoutes.get("/me/last-visit", requireAuth, async (c) => {
-  const user = c.get("user")!
+classroomRoutes.get('/me/last-visit', requireAuth, async (c) => {
+  const user = c.get('user')!
   const window = await getLoginWindow(c)
   const previousLogin = window?.previousLogin ?? null
-  if (
-    !window ||
-    !previousLogin ||
-    Date.now() - new Date(previousLogin).getTime() > LAST_VISIT_MAX_DAYS * 864e5
-  ) {
+  if (!window || !previousLogin || Date.now() - new Date(previousLogin).getTime() > LAST_VISIT_MAX_DAYS * 864e5) {
     return success(c, { previousLogin, summary: null } satisfies LastVisit)
   }
   const rows = await db
@@ -239,7 +216,7 @@ classroomRoutes.get("/me/last-visit", requireAuth, async (c) => {
       problemDisplayId: string
       title: string
       attempts: number
-      lastResult: (typeof rows)[number]["result"]
+      lastResult: (typeof rows)[number]['result']
       lastTime: string
       solved: boolean
     }
@@ -309,8 +286,8 @@ classroomRoutes.get("/me/last-visit", requireAuth, async (c) => {
  * 学生首页的「班里在做」。课上老师报题号、全班去找 —— 这是 2025 秋七成非比赛提交的
  * 来路，但界面上原本没有它的入口，没听清题号的只能问同桌。
  */
-classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
-  const user = c.get("user")!
+classroomRoutes.get('/me/class-activity', requireAuth, async (c) => {
+  const user = c.get('user')!
   if (!user.className) {
     return success(c, {
       className: null,
@@ -353,12 +330,7 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
             passed: sql<boolean>`coalesce(bool_or(${FLOWCHART_PASSED}), false)`,
           })
           .from(schema.flowchartSubmission)
-          .where(
-            and(
-              eq(schema.flowchartSubmission.userId, user.id),
-              inArray(schema.flowchartSubmission.problemId, ids),
-            ),
-          )
+          .where(and(eq(schema.flowchartSubmission.userId, user.id), inArray(schema.flowchartSubmission.problemId, ids)))
           .groupBy(schema.flowchartSubmission.problemId)
       : [],
   ])
@@ -379,7 +351,7 @@ classroomRoutes.get("/me/class-activity", requireAuth, async (c) => {
         title: problem.title,
         userCount: problem.userCount,
         acceptedCount: problem.acceptedCount,
-        myStatus: accepted === undefined ? "none" : accepted ? "accepted" : "tried",
+        myStatus: accepted === undefined ? 'none' : accepted ? 'accepted' : 'tried',
       } satisfies ClassActivityProblem
     }),
   } satisfies ClassActivity)
@@ -399,9 +371,9 @@ const RECENT_LESSONS_WINDOW_DAYS = 45
  * 谁卡住了 —— 2025 秋平均每节课有 14 个平时在用的学生一道都没交（占三分之一），
  * 而交了 3 次以上还没过的平均不到 1 个，所以「还没开始」才是这张表的重点，排序在前端。
  */
-classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
+classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
   const day = calendarDay()
-  const className = c.req.query("className")?.trim() || (await suggestActiveClass())
+  const className = c.req.query('className')?.trim() || (await suggestActiveClass())
   if (!className) {
     return success(c, {
       className: null,
@@ -424,9 +396,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     db
       .select({ language: schema.classLesson.language })
       .from(schema.classLesson)
-      .where(
-        and(eq(schema.classLesson.className, className), isNotNull(schema.classLesson.language)),
-      )
+      .where(and(eq(schema.classLesson.className, className), isNotNull(schema.classLesson.language)))
       .orderBy(desc(schema.classLesson.day))
       .limit(1),
   ])
@@ -441,24 +411,12 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
     })
     .from(schema.user)
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-    .where(
-      and(
-        eq(schema.user.className, className),
-        eq(schema.user.isDisabled, false),
-        inArray(schema.user.adminType, [...STUDENT_ROLES]),
-      ),
-    )
+    .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
   const userIds = roster.map((row) => row.userId)
 
   // 最近几节课：这个班同学一起做题的那些天（不含今天）
   const windowStart = dayStart(Date.now() - RECENT_LESSONS_WINDOW_DAYS * 86_400_000)
-  const recentDays = [
-    ...new Set(
-      (await classDayGroups(className, windowStart, { minUsers: CLASS_ACTIVITY_MIN_USERS })).map(
-        (row) => row.day,
-      ),
-    ),
-  ]
+  const recentDays = [...new Set((await classDayGroups(className, windowStart, { minUsers: CLASS_ACTIVITY_MIN_USERS })).map((row) => row.day))]
     .filter((d) => d < day)
     .sort()
     .slice(-RECENT_LESSONS)
@@ -467,25 +425,13 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   const recentActivity = activityRows({ since: windowStart, users: userIds })
   const localDay = sql<string>`to_char(${localTime(recentActivity.createTime)}, 'YYYY-MM-DD')`
   const [challengeConfigs, challengeDone] = await Promise.all([
-    ids.length
-      ? db
-          .select({ id: schema.problem.id, challenges: schema.problem.challenges })
-          .from(schema.problem)
-          .where(inArray(schema.problem.id, ids))
-      : [],
+    ids.length ? db.select({ id: schema.problem.id, challenges: schema.problem.challenges }).from(schema.problem).where(inArray(schema.problem.id, ids)) : [],
     challengeSuccessesOf(userIds, ids),
   ])
   // 只认现在还配着的挑战：规则改过的旧 id 不算
-  const liveChallenges = new Map(
-    challengeConfigs.map((row) => [
-      row.id,
-      new Set(Object.values(row.challenges ?? {}).flatMap((list) => list.map((c) => c.id))),
-    ]),
-  )
+  const liveChallenges = new Map(challengeConfigs.map((row) => [row.id, new Set(Object.values(row.challenges ?? {}).flatMap((list) => list.map((c) => c.id)))]))
   const challengeDoneKeys = new Set(
-    challengeDone
-      .filter((row) => liveChallenges.get(row.problemId)?.has(row.challengeId))
-      .map((row) => `${row.userId}:${row.problemId}`),
+    challengeDone.filter((row) => liveChallenges.get(row.problemId)?.has(row.challengeId)).map((row) => `${row.userId}:${row.problemId}`),
   )
   const [cells, lastSubmits, lastDrawn, attendance, drawn, todays, seen] = await Promise.all([
     ids.length && userIds.length
@@ -494,9 +440,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             userId: schema.submission.userId,
             problemId: schema.submission.problemId,
             attempts: sql<number>`count(*) filter (where ${gte(schema.submission.createTime, start)})::int`,
-            firstAcceptedAt: sql<
-              string | null
-            >`min(${schema.submission.createTime}) filter (where ${inArray(schema.submission.result, SOLVED_RESULTS)})`,
+            firstAcceptedAt: sql<string | null>`min(${schema.submission.createTime}) filter (where ${inArray(schema.submission.result, SOLVED_RESULTS)})`,
           })
           .from(schema.submission)
           .where(
@@ -515,17 +459,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             userId: schema.submission.userId,
             lastAt: sql<string>`max(${schema.submission.createTime})`,
             // 非比赛的最后一次，给「点名字跳提交列表」判断用（列表只列非比赛的）
-            lastPublicAt: sql<
-              string | null
-            >`max(${schema.submission.createTime}) filter (where ${isNull(schema.submission.contestId)})`,
+            lastPublicAt: sql<string | null>`max(${schema.submission.createTime}) filter (where ${isNull(schema.submission.contestId)})`,
           })
           .from(schema.submission)
-          .where(
-            and(
-              inArray(schema.submission.userId, userIds),
-              gte(schema.submission.createTime, start),
-            ),
-          )
+          .where(and(inArray(schema.submission.userId, userIds), gte(schema.submission.createTime, start)))
           .groupBy(schema.submission.userId)
       : [],
     // 今天只画了流程图的学生，「最后一次提交」也得算上画图，不然他在看板上是一直没动手。
@@ -537,12 +474,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             lastAt: sql<string>`max(${schema.flowchartSubmission.createTime})`,
           })
           .from(schema.flowchartSubmission)
-          .where(
-            and(
-              inArray(schema.flowchartSubmission.userId, userIds),
-              gte(schema.flowchartSubmission.createTime, start),
-            ),
-          )
+          .where(and(inArray(schema.flowchartSubmission.userId, userIds), gte(schema.flowchartSubmission.createTime, start)))
           .groupBy(schema.flowchartSubmission.userId)
       : [],
     recentDays.length && userIds.length
@@ -566,17 +498,10 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             userId: schema.flowchartSubmission.userId,
             problemId: schema.flowchartSubmission.problemId,
             attempts: sql<number>`count(*) filter (where ${gte(schema.flowchartSubmission.createTime, start)})::int`,
-            firstPassedAt: sql<
-              string | null
-            >`min(${schema.flowchartSubmission.createTime}) filter (where ${FLOWCHART_PASSED})`,
+            firstPassedAt: sql<string | null>`min(${schema.flowchartSubmission.createTime}) filter (where ${FLOWCHART_PASSED})`,
           })
           .from(schema.flowchartSubmission)
-          .where(
-            and(
-              inArray(schema.flowchartSubmission.userId, userIds),
-              inArray(schema.flowchartSubmission.problemId, ids),
-            ),
-          )
+          .where(and(inArray(schema.flowchartSubmission.userId, userIds), inArray(schema.flowchartSubmission.problemId, ids)))
           .groupBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId)
       : [],
     /**
@@ -591,12 +516,8 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             id: schema.submission.id,
             result: schema.submission.result,
             createTime: schema.submission.createTime,
-            runtimeError: sql<
-              StatisticInfo["runtime_error"] | null
-            >`${schema.submission.statisticInfo}->'runtime_error'`,
-            sampleCheck: sql<
-              StatisticInfo["sample_check"] | null
-            >`${schema.submission.statisticInfo}->'sample_check'`,
+            runtimeError: sql<StatisticInfo['runtime_error'] | null>`${schema.submission.statisticInfo}->'runtime_error'`,
+            sampleCheck: sql<StatisticInfo['sample_check'] | null>`${schema.submission.statisticInfo}->'sample_check'`,
           })
           .from(schema.submission)
           .where(
@@ -616,16 +537,13 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const lastByUser = new Map(lastSubmits.map((row) => [row.userId, row.lastAt]))
-  const codeTodayUsers = new Set(
-    lastSubmits.filter((row) => row.lastPublicAt).map((row) => row.userId),
-  )
+  const codeTodayUsers = new Set(lastSubmits.filter((row) => row.lastPublicAt).map((row) => row.userId))
   const drawnTodayUsers = new Set(lastDrawn.map((row) => row.userId))
   for (const row of lastDrawn) {
     const known = lastByUser.get(row.userId)
     if (!known || Date.parse(row.lastAt) > Date.parse(known)) lastByUser.set(row.userId, row.lastAt)
   }
-  const earliest = (a: string | null | undefined, b: string | null | undefined) =>
-    !a ? (b ?? null) : !b ? a : Date.parse(a) <= Date.parse(b) ? a : b
+  const earliest = (a: string | null | undefined, b: string | null | undefined) => (!a ? (b ?? null) : !b ? a : Date.parse(a) <= Date.parse(b) ? a : b)
   const attendedByUser = new Map(attendance.map((row) => [row.userId, row.days]))
 
   return success(c, {
@@ -656,12 +574,9 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
             const acceptedAt = earliest(cell?.firstAcceptedAt, flow?.firstPassedAt)
             const today = todayByKey.get(key) ?? []
             const latest = acceptedAt ? undefined : today.at(-1)
-            const firstTry =
-              acceptedAt && Date.parse(acceptedAt) >= Date.parse(start)
-                ? today.findIndex((row) => isAccepted(row.result))
-                : -1
+            const firstTry = acceptedAt && Date.parse(acceptedAt) >= Date.parse(start) ? today.findIndex((row) => isAccepted(row.result)) : -1
             return {
-              status: !cell && !flow ? "none" : acceptedAt ? "accepted" : "tried",
+              status: !cell && !flow ? 'none' : acceptedAt ? 'accepted' : 'tried',
               attempts: (cell?.attempts ?? 0) + (flow?.attempts ?? 0),
               codeAttempts: cell?.attempts ?? 0,
               flowchartAttempts: flow?.attempts ?? 0,
@@ -686,9 +601,9 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
                 !acceptedAt || !liveChallenges.get(id)?.size
                   ? null
                   : challengeDoneKeys.has(key)
-                    ? "done"
+                    ? 'done'
                     : today.some((row) => Date.parse(row.createTime) > Date.parse(acceptedAt))
-                      ? "doing"
+                      ? 'doing'
                       : null,
             }
           }),
@@ -698,9 +613,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
           recentAttended: attendedByUser.get(student.userId) ?? 0,
           editing: presenceOf(student.userId)?.problemId ?? null,
           online: seen.get(student.userId)?.online ?? false,
-          seenAt: seen.has(student.userId)
-            ? new Date(seen.get(student.userId)!.at).toISOString()
-            : null,
+          seenAt: seen.has(student.userId) ? new Date(seen.get(student.userId)!.at).toISOString() : null,
         }) satisfies ClassBoardStudent,
     ),
     recentLessons: recentDays.length,
@@ -712,7 +625,7 @@ classroomRoutes.get("/classroom/board", requireTeacher, async (c) => {
  * 同一个门槛），或者老师今天在看板上布置过题（刚布置、还没人交也要列出来）。每个班的题和人数
  * 和看板同一套取法（classLessonProblems），「全做对」看这几道题做没做对过，不限今天
  */
-classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
+classroomRoutes.get('/classroom/today', requireTeacher, async (c) => {
   const start = dayStart()
   const today = calendarDay()
   const activity = activityRows({ since: start })
@@ -723,24 +636,11 @@ classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
       .select({ className: schema.user.className, users, lastAt })
       .from(activity)
       .innerJoin(schema.user, eq(schema.user.id, activity.userId))
-      .where(
-        and(
-          isNotNull(schema.user.className),
-          eq(schema.user.isDisabled, false),
-          inArray(schema.user.adminType, [...STUDENT_ROLES]),
-        ),
-      )
+      .where(and(isNotNull(schema.user.className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
       .groupBy(schema.user.className),
-    db
-      .select({ className: schema.classLesson.className })
-      .from(schema.classLesson)
-      .where(eq(schema.classLesson.day, today)),
+    db.select({ className: schema.classLesson.className }).from(schema.classLesson).where(eq(schema.classLesson.day, today)),
   ])
-  const activeByClass = new Map(
-    active
-      .filter((row) => row.className && row.users >= CLASS_ACTIVITY_MIN_USERS)
-      .map((row) => [row.className!, row]),
-  )
+  const activeByClass = new Map(active.filter((row) => row.className && row.users >= CLASS_ACTIVITY_MIN_USERS).map((row) => [row.className!, row]))
   const names = [...new Set([...activeByClass.keys(), ...lessons.map((row) => row.className)])]
 
   const classes = await Promise.all(
@@ -750,13 +650,7 @@ classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
         db
           .select({ value: sql<number>`count(*)::int` })
           .from(schema.user)
-          .where(
-            and(
-              eq(schema.user.className, className),
-              eq(schema.user.isDisabled, false),
-              inArray(schema.user.adminType, [...STUDENT_ROLES]),
-            ),
-          ),
+          .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES]))),
       ])
       const ids = lesson.problems.map((problem) => problem.id)
       let allDoneCount = 0
@@ -798,7 +692,7 @@ classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
     }),
   )
   // 正在交的在前，只布置了还没人交的放最后
-  classes.sort((a, b) => (b.lastSubmitAt ?? "").localeCompare(a.lastSubmitAt ?? ""))
+  classes.sort((a, b) => (b.lastSubmitAt ?? '').localeCompare(a.lastSubmitAt ?? ''))
   return success(c, { classes } satisfies ClassToday)
 })
 
@@ -806,8 +700,8 @@ classroomRoutes.get("/classroom/today", requireTeacher, async (c) => {
  * 提交列表「这节课」按钮：这个班这节课是哪几道题，取法同课堂看板（老师布置的优先，
  * 否则按今天同班提交推断）。不传班级就猜最近两小时在交题的班
  */
-classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
-  const className = c.req.query("className")?.trim() || (await suggestActiveClass())
+classroomRoutes.get('/classroom/lesson', requireTeacher, async (c) => {
+  const className = c.req.query('className')?.trim() || (await suggestActiveClass())
   if (!className)
     return success(c, {
       className: null,
@@ -818,7 +712,7 @@ classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
   // 和看板一样只回看今天：「这节课」不该冒出昨天的题
   const lesson = await classLessonProblems(className, 1)
   // C / Python 的作业夹了 SQL 题就不筛语言（见契约 classLessonSchema.language）
-  const mixed = lesson.problems.some((problem) => problem.isSql !== (lesson.language === "SQL"))
+  const mixed = lesson.problems.some((problem) => problem.isSql !== (lesson.language === 'SQL'))
   return success(c, {
     className,
     source: lesson.source,
@@ -835,25 +729,19 @@ classroomRoutes.get("/classroom/lesson", requireTeacher, async (c) => {
  * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉，
  * 学生那边退回推断。
  */
-classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
-  const parsed = await parseBody(c, classLessonRequestSchema, "题号或语言不对")
+classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
+  const parsed = await parseBody(c, classLessonRequestSchema, '题号或语言不对')
   if (!parsed.success) return parsed.response
-  const user = c.get("user")!
+  const user = c.get('user')!
   const { className, problemDisplayIds } = parsed.data
   const language = parsed.data.language ?? null
   const day = calendarDay()
 
-  const [exists] = await db
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(eq(schema.user.className, className))
-    .limit(1)
-  if (!exists) return failure(c, 400, "class-not-found", `没有 ${className} 这个班`)
+  const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, className)).limit(1)
+  if (!exists) return failure(c, 400, 'class-not-found', `没有 ${className} 这个班`)
 
   if (!problemDisplayIds.length) {
-    await db
-      .delete(schema.classLesson)
-      .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
+    await db.delete(schema.classLesson).where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
     return success(c, null)
   }
 
@@ -865,32 +753,19 @@ classroomRoutes.put("/classroom/lesson", requireTeacher, async (c) => {
       languages: schema.problem.languages,
     })
     .from(schema.problem)
-    .where(
-      and(
-        inArray(sql<string>`lower(${schema.problem.displayId})`, wanted),
-        eq(schema.problem.visible, true),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(inArray(sql<string>`lower(${schema.problem.displayId})`, wanted), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
   const idByDisplay = new Map(found.map((row) => [row.displayId.toLowerCase(), row.id]))
   const missing = wanted.filter((id) => !idByDisplay.has(id))
   if (missing.length) {
-    return failure(c, 400, "problem-not-found", `这些题号不存在或没有公开：${missing.join("、")}`)
+    return failure(c, 400, 'problem-not-found', `这些题号不存在或没有公开：${missing.join('、')}`)
   }
 
   // 选了语言就得每道都能用它交，不然学生点开才发现交不了（提交接口会拒：language-not-allowed）。
   // SQL 题除外：它只收 SQL，C 的作业里夹一道也不会让人选错语言，计数那边也放行了 SQL
   if (language) {
-    const unsupported = found
-      .filter((row) => !row.languages.includes(language) && !isSqlProblem(row))
-      .map((row) => row.displayId)
+    const unsupported = found.filter((row) => !row.languages.includes(language) && !isSqlProblem(row)).map((row) => row.displayId)
     if (unsupported.length) {
-      return failure(
-        c,
-        400,
-        "language-not-allowed",
-        `这些题不能用 ${language} 交：${unsupported.join("、")}`,
-      )
+      return failure(c, 400, 'language-not-allowed', `这些题不能用 ${language} 交：${unsupported.join('、')}`)
     }
   }
 

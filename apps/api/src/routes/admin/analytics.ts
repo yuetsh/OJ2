@@ -16,29 +16,21 @@
  * problem.ts 先注册的 `/problems/:id` 会把它整个吃掉（以前真发生过，见 git 历史）。
  */
 
-import {
-  STUDENT_ROLES,
-  type StuckProblem,
-  type StuckProblemDetail,
-  type GradeTrend,
-} from "@oj2/contract"
-import { and, eq, inArray, sql, type SQL } from "drizzle-orm"
-import { Hono } from "hono"
+import { STUDENT_ROLES, type StuckProblem, type StuckProblemDetail, type GradeTrend } from '@oj2/contract'
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireTeacher, type AppEnv } from "../../auth/middleware"
-import { db, schema } from "../../db"
-import { failure, success } from "../../http"
-import { JudgeStatus } from "../../judge/status"
-import { schoolYearOf } from "../../time"
-import { queryInteger } from "../helpers"
+import { requireTeacher, type AppEnv } from '../../auth/middleware'
+import { db, schema } from '../../db'
+import { failure, success } from '../../http'
+import { JudgeStatus } from '../../judge/status'
+import { schoolYearOf } from '../../time'
+import { queryInteger } from '../helpers'
 
 export const adminAnalyticsRoutes = new Hono<AppEnv>()
 
 const ACCEPTED = sql.join([JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED], sql`, `)
-const NOT_COUNTED = sql.join(
-  [JudgeStatus.PENDING, JudgeStatus.JUDGING, JudgeStatus.SYSTEM_ERROR],
-  sql`, `,
-)
+const NOT_COUNTED = sql.join([JudgeStatus.PENDING, JudgeStatus.JUDGING, JudgeStatus.SYSTEM_ERROR], sql`, `)
 const STUDENTS = sql.join(
   STUDENT_ROLES.map((role) => sql`${role}`),
   sql`, `,
@@ -94,21 +86,16 @@ async function knowledgeTags(problemIds: number[]) {
     .select({ problemId: schema.problemTags.problemId, name: schema.problemTag.name })
     .from(schema.problemTags)
     .innerJoin(schema.problemTag, eq(schema.problemTag.id, schema.problemTags.problemtagId))
-    .where(
-      and(
-        inArray(schema.problemTags.problemId, problemIds),
-        eq(schema.problemTag.category, "knowledge"),
-      ),
-    )
+    .where(and(inArray(schema.problemTags.problemId, problemIds), eq(schema.problemTag.category, 'knowledge')))
   for (const row of rows) tags.set(row.problemId, [...(tags.get(row.problemId) ?? []), row.name])
   return tags
 }
 
 // ---------------------------------------------------------------- 卡点：每道题一行
 
-adminAnalyticsRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) => {
-  const className = c.req.query("className")?.trim() || undefined
-  const start = parseStart(c.req.query("start"))
+adminAnalyticsRoutes.get('/problem-analytics/stuck', requireTeacher, async (c) => {
+  const className = c.req.query('className')?.trim() || undefined
+  const start = parseStart(c.req.query('start'))
   const rows = await db.execute<{
     id: number
     display_id: string
@@ -158,8 +145,8 @@ adminAnalyticsRoutes.get("/problem-analytics/stuck", requireTeacher, async (c) =
 
 // ---------------------------------------------------------------- 卡点：一道题
 
-adminAnalyticsRoutes.get("/problem-analytics/stuck/:id", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminAnalyticsRoutes.get('/problem-analytics/stuck/:id', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const [problem] = await db
     .select({
       id: schema.problem.id,
@@ -168,10 +155,10 @@ adminAnalyticsRoutes.get("/problem-analytics/stuck/:id", requireTeacher, async (
     })
     .from(schema.problem)
     .where(eq(schema.problem.id, id))
-  if (!problem) return failure(c, 404, "problem-not-found", "题目不存在")
+  if (!problem) return failure(c, 404, 'problem-not-found', '题目不存在')
 
-  const className = c.req.query("className")?.trim() || undefined
-  const start = parseStart(c.req.query("start"))
+  const className = c.req.query('className')?.trim() || undefined
+  const start = parseStart(c.req.query('start'))
   const pairs = sql`
     with s as (${studentSubmissions(scope(className, start, id))}),
     pairs as (
@@ -250,9 +237,9 @@ const GRADE_MIN_USERS = 20
  * 做过几道（26 级开课前是 6 道），默认停在上一届，等它上了一阵课再换过去。
  */
 const GRADE_DEFAULT_MIN_PROBLEMS = 20
-const PAST = "past"
+const PAST = 'past'
 
-type GradeSide = GradeTrend["problems"][number]["mine"]
+type GradeSide = GradeTrend['problems'][number]['mine']
 
 /**
  * 选一届，和往届（更早几届合在一起，人多的届分量大）或另一届，逐题比「一次就对」。
@@ -264,7 +251,7 @@ type GradeSide = GradeTrend["problems"][number]["mine"]
  * 同期两边 73% / 75%，全部记录一比成了 73% / 82%。起点按人不按日历：各届开始做题的时间
  * 不一样（23 级入学就做、25 级第二年才做），对「去年同期」是对不上的。
  */
-adminAnalyticsRoutes.get("/problem-analytics/grades", requireTeacher, async (c) => {
+adminAnalyticsRoutes.get('/problem-analytics/grades', requireTeacher, async (c) => {
   const [cells, starts] = await Promise.all([
     db.execute<{
       problem_id: number
@@ -325,19 +312,13 @@ adminAnalyticsRoutes.get("/problem-analytics/grades", requireTeacher, async (c) 
       side.firstTry += cell.first_try
       sides.set(cell.problem_id, entry)
     }
-    const problems = [...sides]
-      .filter(([, e]) => e.mine.users >= GRADE_MIN_USERS && e.theirs.users >= GRADE_MIN_USERS)
-      .map(([id, e]) => ({ id, ...e }))
+    const problems = [...sides].filter(([, e]) => e.mine.users >= GRADE_MIN_USERS && e.theirs.users >= GRADE_MIN_USERS).map(([id, e]) => ({ id, ...e }))
     return { days: trimmed ? limit : null, problems }
   }
 
-  const asked = c.req.query("grade") ?? ""
-  const grade = grades.includes(asked)
-    ? asked
-    : (grades.find((g) => compare(g, PAST).problems.length >= GRADE_DEFAULT_MIN_PROBLEMS) ??
-      grades[0] ??
-      "")
-  const askedCompare = c.req.query("compare") ?? PAST
+  const asked = c.req.query('grade') ?? ''
+  const grade = grades.includes(asked) ? asked : (grades.find((g) => compare(g, PAST).problems.length >= GRADE_DEFAULT_MIN_PROBLEMS) ?? grades[0] ?? '')
+  const askedCompare = c.req.query('compare') ?? PAST
   const other = askedCompare !== grade && grades.includes(askedCompare) ? askedCompare : PAST
   const result = grade ? compare(grade, other) : { days: null, problems: [] }
 

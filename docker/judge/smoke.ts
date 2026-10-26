@@ -12,19 +12,19 @@
  *   2. 六种结果状态的**整数值**没变（落库的值，见 packages/contract/src/judge-status.ts）
  *   3. gcc 的宽松度没变 —— 忘了 #include 的老代码照样能过（gcc-14 默认会把它判 CE）
  */
-import { createHash } from "node:crypto"
+import { createHash } from 'node:crypto'
 
-import { JudgeStatus } from "@oj2/contract"
+import { JudgeStatus } from '@oj2/contract'
 
-import { languageConfigs } from "../../apps/api/src/judge/languages"
+import { languageConfigs } from '../../apps/api/src/judge/languages'
 
-const url = process.env.JUDGE_SERVER_URL ?? "http://localhost:8081"
+const url = process.env.JUDGE_SERVER_URL ?? 'http://localhost:8081'
 const rawToken = process.env.JUDGE_SERVER_TOKEN
 if (!rawToken) {
-  console.error("JUDGE_SERVER_TOKEN 没设 —— 在 OJ2 根目录跑，bun 会自己读 .env")
+  console.error('JUDGE_SERVER_TOKEN 没设 —— 在 OJ2 根目录跑，bun 会自己读 .env')
   process.exit(2)
 }
-const token = createHash("sha256").update(rawToken).digest("hex")
+const token = createHash('sha256').update(rawToken).digest('hex')
 
 interface Case {
   language: string
@@ -36,13 +36,13 @@ interface Case {
   memory?: number
 }
 
-const sumTestCase = [{ input: "1 2\n", output: "3\n" }]
+const sumTestCase = [{ input: '1 2\n', output: '3\n' }]
 
 const cases: Case[] = [
   // ---------------------------------------------------------------- C
   {
-    language: "C",
-    name: "C 正常通过",
+    language: 'C',
+    name: 'C 正常通过',
     expect: JudgeStatus.ACCEPTED,
     code: `#include <stdio.h>
 int main(void) {
@@ -56,8 +56,8 @@ int main(void) {
     // 这条是升 gcc 的主要风险点：gcc-14 起 implicit-function-declaration 是
     // error，languages.ts 里的几个 -Wno-error 就是为它加的。这条挂了说明那些
     // 开关没生效 —— 后果是一批历史题解和 20 篇 C 教程的示例突然全 CE。
-    language: "C",
-    name: "C 忘了 #include 仍能过（gcc 宽松度）",
+    language: 'C',
+    name: 'C 忘了 #include 仍能过（gcc 宽松度）',
     expect: JudgeStatus.ACCEPTED,
     code: `int main(void) {
   int a, b;
@@ -69,8 +69,8 @@ int main(void) {
   {
     // gcc-14 把 int 函数里不带值的 return;（-Wreturn-mismatch）、省略 int 的
     // main()（-Wimplicit-int）也提成了 error
-    language: "C",
-    name: "C 不带值的 return;、省略 int 的 main() 仍能过（gcc 宽松度）",
+    language: 'C',
+    name: 'C 不带值的 return;、省略 int 的 main() 仍能过（gcc 宽松度）',
     expect: JudgeStatus.ACCEPTED,
     code: `#include <stdio.h>
 int check(int a) {
@@ -85,8 +85,8 @@ main(void) {
 }`,
   },
   {
-    language: "C",
-    name: "C 答案错误",
+    language: 'C',
+    name: 'C 答案错误',
     expect: JudgeStatus.WRONG_ANSWER,
     code: `#include <stdio.h>
 int main(void) {
@@ -97,14 +97,14 @@ int main(void) {
 }`,
   },
   {
-    language: "C",
-    name: "C 编译错误",
+    language: 'C',
+    name: 'C 编译错误',
     expect: JudgeStatus.COMPILE_ERROR,
     code: `int main(void) { return }`,
   },
   {
-    language: "C",
-    name: "C 运行超时",
+    language: 'C',
+    name: 'C 运行超时',
     expect: JudgeStatus.CPU_TIME_LIMIT_EXCEEDED,
     cpu: 1000,
     code: `int main(void) {
@@ -116,8 +116,8 @@ int main(void) {
   {
     // RLIMIT_AS 是 max_memory 的两倍，所以 malloc 会先成功一阵子再失败，
     // 退出时 ru_maxrss 已经超过 max_memory → judger 判 MLE 而不是 RE。
-    language: "C",
-    name: "C 内存超限",
+    language: 'C',
+    name: 'C 内存超限',
     expect: JudgeStatus.MEMORY_LIMIT_EXCEEDED,
     memory: 64 * 1024 * 1024,
     code: `#include <stdlib.h>
@@ -131,8 +131,8 @@ int main(void) {
 }`,
   },
   {
-    language: "C",
-    name: "C 运行时错误",
+    language: 'C',
+    name: 'C 运行时错误',
     expect: JudgeStatus.RUNTIME_ERROR,
     code: `int main(void) {
   int *p = 0;
@@ -142,36 +142,36 @@ int main(void) {
   },
   // ---------------------------------------------------------------- Python
   {
-    language: "Python",
-    name: "Python 正常通过",
+    language: 'Python',
+    name: 'Python 正常通过',
     expect: JudgeStatus.ACCEPTED,
     code: `a, b = map(int, input().split())
 print(a + b)`,
   },
   {
-    language: "Python",
-    name: "Python 编译错误",
+    language: 'Python',
+    name: 'Python 编译错误',
     expect: JudgeStatus.COMPILE_ERROR,
     code: `def (:`,
   },
   {
-    language: "Python",
-    name: "Python 运行超时",
+    language: 'Python',
+    name: 'Python 运行超时',
     expect: JudgeStatus.CPU_TIME_LIMIT_EXCEEDED,
     cpu: 1000,
     code: `while True:
     pass`,
   },
   {
-    language: "Python",
-    name: "Python 运行时错误",
+    language: 'Python',
+    name: 'Python 运行时错误',
     expect: JudgeStatus.RUNTIME_ERROR,
     code: `print(1 / 0)`,
   },
   // ---------------------------------------------------------------- C++
   {
-    language: "C++",
-    name: "C++ 正常通过",
+    language: 'C++',
+    name: 'C++ 正常通过',
     expect: JudgeStatus.ACCEPTED,
     code: `#include <iostream>
 int main() {
@@ -182,31 +182,31 @@ int main() {
 }`,
   },
   {
-    language: "C++",
-    name: "C++ 编译错误",
+    language: 'C++',
+    name: 'C++ 编译错误',
     expect: JudgeStatus.COMPILE_ERROR,
     code: `int main() { return }`,
   },
 ]
 
 const names: Record<number, string> = {
-  [JudgeStatus.COMPILE_ERROR]: "CE",
-  [JudgeStatus.WRONG_ANSWER]: "WA",
-  [JudgeStatus.ACCEPTED]: "AC",
-  [JudgeStatus.CPU_TIME_LIMIT_EXCEEDED]: "TLE(cpu)",
-  [JudgeStatus.REAL_TIME_LIMIT_EXCEEDED]: "TLE(real)",
-  [JudgeStatus.MEMORY_LIMIT_EXCEEDED]: "MLE",
-  [JudgeStatus.RUNTIME_ERROR]: "RE",
-  [JudgeStatus.SYSTEM_ERROR]: "SE",
+  [JudgeStatus.COMPILE_ERROR]: 'CE',
+  [JudgeStatus.WRONG_ANSWER]: 'WA',
+  [JudgeStatus.ACCEPTED]: 'AC',
+  [JudgeStatus.CPU_TIME_LIMIT_EXCEEDED]: 'TLE(cpu)',
+  [JudgeStatus.REAL_TIME_LIMIT_EXCEEDED]: 'TLE(real)',
+  [JudgeStatus.MEMORY_LIMIT_EXCEEDED]: 'MLE',
+  [JudgeStatus.RUNTIME_ERROR]: 'RE',
+  [JudgeStatus.SYSTEM_ERROR]: 'SE',
 }
-const label = (code: number) => `${names[code] ?? "?"}(${code})`
+const label = (code: number) => `${names[code] ?? '?'}(${code})`
 
 async function runCase(item: Case) {
-  const response = await fetch(new URL("/judge", url), {
-    method: "POST",
+  const response = await fetch(new URL('/judge', url), {
+    method: 'POST',
     headers: {
-      "content-type": "application/json",
-      "X-Judge-Server-Token": token,
+      'content-type': 'application/json',
+      'X-Judge-Server-Token': token,
     },
     body: JSON.stringify({
       language_config: languageConfigs[item.language],
@@ -216,9 +216,9 @@ async function runCase(item: Case) {
       test_case: sumTestCase,
       output: false,
       io_mode: {
-        io_mode: "Standard IO",
-        input: "input.txt",
-        output: "output.txt",
+        io_mode: 'Standard IO',
+        input: 'input.txt',
+        output: 'output.txt',
       },
     }),
   })
@@ -229,7 +229,7 @@ async function runCase(item: Case) {
     data: unknown
   }
   // 编译失败走 err 通道，不会有逐测试点的结果
-  if (body.err === "CompileError") return { result: JudgeStatus.COMPILE_ERROR }
+  if (body.err === 'CompileError') return { result: JudgeStatus.COMPILE_ERROR }
   if (body.err) throw new Error(`${body.err}: ${JSON.stringify(body.data)}`)
 
   const results = body.data as { result: number; cpu_time: number }[]
@@ -242,9 +242,9 @@ async function runCase(item: Case) {
 async function waitReady() {
   for (let i = 0; i < 60; i++) {
     try {
-      const response = await fetch(new URL("/ping", url), {
-        method: "POST",
-        headers: { "X-Judge-Server-Token": token },
+      const response = await fetch(new URL('/ping', url), {
+        method: 'POST',
+        headers: { 'X-Judge-Server-Token': token },
       })
       if (response.ok) return
     } catch {
@@ -265,10 +265,9 @@ for (const item of cases) {
     const got = await runCase(item)
     const pass = got.result === item.expect
     if (!pass) failures++
-    const time = "cpu_time" in got ? ` ${got.cpu_time}ms` : ""
+    const time = 'cpu_time' in got ? ` ${got.cpu_time}ms` : ''
     console.log(
-      `${pass ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✗\x1b[0m"} ${item.name.padEnd(32)}` +
-        ` 期望 ${label(item.expect).padEnd(10)} 实得 ${label(got.result)}${time}`,
+      `${pass ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${item.name.padEnd(32)}` + ` 期望 ${label(item.expect).padEnd(10)} 实得 ${label(got.result)}${time}`,
     )
   } catch (error) {
     failures++
@@ -276,9 +275,5 @@ for (const item of cases) {
   }
 }
 
-console.log(
-  failures === 0
-    ? `\n\x1b[32m全部 ${cases.length} 条通过\x1b[0m`
-    : `\n\x1b[31m${failures} / ${cases.length} 条不对\x1b[0m`,
-)
+console.log(failures === 0 ? `\n\x1b[32m全部 ${cases.length} 条通过\x1b[0m` : `\n\x1b[31m${failures} / ${cases.length} 条不对\x1b[0m`)
 process.exit(failures === 0 ? 0 : 1)

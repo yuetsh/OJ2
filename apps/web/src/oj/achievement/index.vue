@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { getAchievements } from "oj/achievement/api"
-import { getUserBadges } from "oj/api"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import UserName from "shared/components/UserName.vue"
-import AdminLink from "shared/components/AdminLink.vue"
-import { useUserStore } from "shared/store/user"
-import { RARITY_COLOR, RARITY_LABEL } from "utils/constants"
-import type { AchievementList, AchievementRarity, UserBadge } from "utils/types"
-import ClassCard from "./components/ClassCard.vue"
-import GroupCard from "./components/GroupCard.vue"
-import NearCard from "./components/NearCard.vue"
-import { buildGroups, nearest, type GroupName } from "./series"
+import { useThemeVars } from 'naive-ui'
+import { getAchievements } from 'oj/achievement/api'
+import { getUserBadges } from 'oj/api'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import UserName from 'shared/components/UserName.vue'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useUserStore } from 'shared/store/user'
+import { RARITY_COLOR, RARITY_LABEL } from 'utils/constants'
+import type { AchievementList, AchievementRarity, UserBadge } from 'utils/types'
+import ClassCard from './components/ClassCard.vue'
+import GroupCard from './components/GroupCard.vue'
+import NearCard from './components/NearCard.vue'
+import { buildGroups, nearest, type GroupName } from './series'
 
 /**
  * 我的成就（设计稿「我的成就重设计」定稿，画布 page ach）：
@@ -34,23 +34,19 @@ const other = computed(() => !!data.value && data.value.username !== userStore.u
 const groups = computed(() => (data.value ? buildGroups(data.value.achievements) : []))
 const near = computed(() => (other.value ? [] : nearest(groups.value)))
 const got = computed(() => data.value?.achievements.filter((item) => item.unlocked) ?? [])
-const rarities: AchievementRarity[] = ["platinum", "gold", "silver", "bronze"]
-const countOf = (rarity: AchievementRarity) =>
-  got.value.filter((item) => item.rarity === rarity).length
+const rarities: AchievementRarity[] = ['platinum', 'gold', 'silver', 'bronze']
+const countOf = (rarity: AchievementRarity) => got.value.filter((item) => item.rarity === rarity).length
 
 // 桌面两栏：左边做题、其他、彩蛋，右边坚持、题单和比赛 —— 两边差不多高
-const LEFT: GroupName[] = ["做题", "其他", "彩蛋"]
-const RIGHT: GroupName[] = ["坚持", "题单和比赛"]
+const LEFT: GroupName[] = ['做题', '其他', '彩蛋']
+const RIGHT: GroupName[] = ['坚持', '题单和比赛']
 const pick = (names: GroupName[]) => groups.value.filter((group) => names.includes(group.name))
 
 async function load() {
   loading.value = true
   notFound.value = false
   try {
-    const [list, badgeRes] = await Promise.all([
-      getAchievements(name.value),
-      getUserBadges(name.value).catch(() => []),
-    ])
+    const [list, badgeRes] = await Promise.all([getAchievements(name.value), getUserBadges(name.value).catch(() => [])])
     data.value = list
     badges.value = badgeRes ?? []
   } catch {
@@ -91,19 +87,8 @@ watch(name, load)
 
         <!-- 没有班级（老师、自己注册的号）就没有「本班」，「快拿到了」三个横排占满整宽 -->
         <div v-if="near.length || data.classBoard" class="top" :class="{ alone: !data.classBoard }">
-          <NearCard
-            v-if="near.length"
-            :items="near"
-            :compact="!isDesktop"
-            :wide="isDesktop && !data.classBoard"
-          />
-          <ClassCard
-            v-if="data.classBoard"
-            :board="data.classBoard"
-            :achievements="data.achievements"
-            :me="data.username"
-            :compact="!isDesktop"
-          />
+          <NearCard v-if="near.length" :items="near" :compact="!isDesktop" :wide="isDesktop && !data.classBoard" />
+          <ClassCard v-if="data.classBoard" :board="data.classBoard" :achievements="data.achievements" :me="data.username" :compact="!isDesktop" />
         </div>
 
         <div v-if="isDesktop" class="columns">
@@ -138,12 +123,12 @@ h2 {
 
 .count {
   font-size: var(--oj-fs-body);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .count b {
   font-size: 18px;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   font-variant-numeric: tabular-nums;
 }
 
@@ -158,7 +143,7 @@ h2 {
   align-items: center;
   gap: 5px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .rarity i {
@@ -168,7 +153,7 @@ h2 {
 }
 
 .rarity b {
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   font-variant-numeric: tabular-nums;
 }
 
@@ -185,7 +170,7 @@ h2 {
 .mine {
   margin-left: auto;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 

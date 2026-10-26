@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { clearErrorMark, showErrorMark } from "oj/problem/utils/errorMark"
-import { explainRuntimeError, type RuntimeErrorInfo } from "oj/problem/utils/runtimeError"
+import { clearErrorMark, showErrorMark } from 'oj/problem/utils/errorMark'
+import { explainRuntimeError, type RuntimeErrorInfo } from 'oj/problem/utils/runtimeError'
 
 /**
  * 运行时错误的中文说明卡片（诊断由后端 judge/runtime-diagnosis.ts 给）。
@@ -17,7 +17,7 @@ const message = computed(() => explainRuntimeError(props.info, props.code))
 const sourceLine = computed(() => {
   const line = props.info.line
   if (!line) return null
-  const text = props.code.split("\n")[line - 1]
+  const text = props.code.split('\n')[line - 1]
   return text?.trim() ? text.trim() : null
 })
 

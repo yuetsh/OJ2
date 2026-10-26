@@ -1,7 +1,7 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { paginatedSchema, sampleUserSchema } from "./common"
-import { maskedProblemDifficultySchema } from "./problem"
+import { paginatedSchema, sampleUserSchema } from './common'
+import { maskedProblemDifficultySchema } from './problem'
 
 /**
  * 我在这份题单里的进度。
@@ -22,7 +22,7 @@ export const problemSetUserProgressSummarySchema = z.object({
 })
 
 /** 奖章只有两种条件：全部做完、做对 N 道（「总分达到 N」随分数一起拿掉了，0026 换算过） */
-export const badgeConditionTypeSchema = z.enum(["all_problems", "problem_count"])
+export const badgeConditionTypeSchema = z.enum(['all_problems', 'problem_count'])
 
 export const problemSetBadgeSchema = z.object({
   id: z.number().int(),
@@ -117,9 +117,7 @@ export const problemSetClassStudentSchema = z.object({
 
 export const problemSetClassViewSchema = z.object({
   /** 加入过这份题单的学生分属哪些班：三分之一以上的人加入了的班在前（按最近一次加入），零星几个人的在后 */
-  classes: z.array(
-    z.object({ className: z.string(), joined: z.number().int(), size: z.number().int() }),
-  ),
+  classes: z.array(z.object({ className: z.string(), joined: z.number().int(), size: z.number().int() })),
   /** 这次看的是哪个班；谁都没加入时为 null */
   className: z.string().nullable(),
   problems: z.array(

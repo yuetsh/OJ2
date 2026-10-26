@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { ClassBattleItem } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { classLabel } from "utils/classes"
-import { useRankPalette } from "../palette"
+import type { ClassBattleItem } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { classLabel } from 'utils/classes'
+import { useRankPalette } from '../palette'
 
 /**
  * 班级对抗：全服各班这学期人均做对，绿字是这周人均涨了多少。按人均比，因为班级人数从
@@ -34,10 +34,10 @@ const max = computed(() => Math.max(1, ...props.items.map((item) => item.perCapi
 
 const summary = computed(() => {
   const own = props.items.find((item) => item.className === props.mine)
-  if (!own) return ""
-  const who = props.teacher ? "这个班" : "你们班"
+  if (!own) return ''
+  const who = props.teacher ? '这个班' : '你们班'
   const faster = props.items.filter((item) => item.weekGain > own.weekGain).length + 1
-  const speed = own.weekGain > 0 ? ` · 这周涨得第 ${faster} 快` : ""
+  const speed = own.weekGain > 0 ? ` · 这周涨得第 ${faster} 快` : ''
   if (own.rank === 1) return `${who}第 1${speed}`
   const prev = props.items[own.rank - 2]!
   const need = Math.floor(prev.perCapita - own.perCapita) + 1
@@ -46,8 +46,7 @@ const summary = computed(() => {
 
 /** 同年级的班只说「3 班」，别的年级说全名 */
 function shortLabel(className: string) {
-  if (props.mine && className.slice(0, 2) === props.mine.slice(0, 2))
-    return ` ${className.slice(2)} 班`
+  if (props.mine && className.slice(0, 2) === props.mine.slice(0, 2)) return ` ${className.slice(2)} 班`
   return ` ${classLabel(className)}`
 }
 </script>
@@ -56,19 +55,9 @@ function shortLabel(className: string) {
   <div class="battle" :class="{ bare }">
     <div class="title">
       <b v-if="!bare">班级对抗</b><span class="muted">人均做对</span>
-      <router-link
-        v-if="pk"
-        :to="{ path: '/class', query: mine ? { classes: mine } : {} }"
-        class="pk"
-        >班级 PK ›</router-link
-      >
+      <router-link v-if="pk" :to="{ path: '/class', query: mine ? { classes: mine } : {} }" class="pk">班级 PK ›</router-link>
     </div>
-    <div
-      v-for="item in shown"
-      :key="item.className"
-      class="row"
-      :class="{ mine: item.className === mine }"
-    >
+    <div v-for="item in shown" :key="item.className" class="row" :class="{ mine: item.className === mine }">
       <span class="rank">{{ item.rank }}</span>
       <button class="name" title="看班级详情" @click="emit('pick', item.className)">
         {{ classLabel(item.className) }}
@@ -83,7 +72,7 @@ function shortLabel(className: string) {
         />
       </span>
       <span class="value">{{ item.perCapita }}</span>
-      <span class="gain">{{ item.weekGain > 0 ? `+${item.weekGain}` : "" }}</span>
+      <span class="gain">{{ item.weekGain > 0 ? `+${item.weekGain}` : '' }}</span>
     </div>
     <span v-if="!items.length" class="muted">这学期还没有班做对题</span>
     <span v-if="summary" class="summary">{{ summary }}</span>
@@ -96,9 +85,9 @@ function shortLabel(className: string) {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .battle.bare {
@@ -120,7 +109,7 @@ function shortLabel(className: string) {
 
 .muted {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .row {
@@ -141,7 +130,7 @@ function shortLabel(className: string) {
 .rank {
   width: 16px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -151,7 +140,7 @@ function shortLabel(className: string) {
   border: 0;
   background: none;
   font: inherit;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
@@ -164,7 +153,7 @@ function shortLabel(className: string) {
 .pk {
   margin-left: auto;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   white-space: nowrap;
 }

@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import RankAvatar from "shared/components/RankAvatar.vue"
-import { classLabel, groupClassOptions } from "utils/classes"
-import { errorCode } from "utils/api"
-import { STORAGE_KEY } from "utils/constants"
-import storage from "utils/storage"
-import { getClassUsernames, login } from "../api"
-import { useAuthModalStore } from "../store/authModal"
-import UserName from "./UserName.vue"
-import { useConfigStore } from "../store/config"
-import { useUserStore } from "../store/user"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import RankAvatar from 'shared/components/RankAvatar.vue'
+import { classLabel, groupClassOptions } from 'utils/classes'
+import { errorCode } from 'utils/api'
+import { STORAGE_KEY } from 'utils/constants'
+import storage from 'utils/storage'
+import { getClassUsernames, login } from '../api'
+import { useAuthModalStore } from '../store/authModal'
+import UserName from './UserName.vue'
+import { useConfigStore } from '../store/config'
+import { useUserStore } from '../store/user'
 
 /**
  * 登录框两种样子：
@@ -22,7 +22,7 @@ import { useUserStore } from "../store/user"
  *
  * 这台电脑上次用哪种登上的，下次就先开哪种 —— 老师的电脑不用每次都切。
  */
-type Mode = "pick" | "user"
+type Mode = 'pick' | 'user'
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
@@ -33,35 +33,35 @@ const theme = useThemeVars()
 // n-modal 把内容传送到 body 底下，CSS 的 v-bind() 挂不上去（变量挂在组件根上，
 // 这个组件的根是 n-modal 自己）—— 颜色直接写到弹框根节点的 style 里
 const themeVars = computed(() => ({
-  "--t-border-color": theme.value.borderColor,
-  "--t-box-shadow-3": theme.value.boxShadow3,
-  "--t-error-color": theme.value.errorColor,
-  "--t-hover-color": theme.value.hoverColor,
-  "--t-modal-color": theme.value.modalColor,
-  "--t-primary-color": theme.value.primaryColor,
-  "--t-primary-color-hover": theme.value.primaryColorHover,
-  "--t-text-color-1": theme.value.textColor1,
-  "--t-text-color-2": theme.value.textColor2,
-  "--t-text-color-3": theme.value.textColor3,
+  '--t-border-color': theme.value.borderColor,
+  '--t-box-shadow-3': theme.value.boxShadow3,
+  '--t-error-color': theme.value.errorColor,
+  '--t-hover-color': theme.value.hoverColor,
+  '--t-modal-color': theme.value.modalColor,
+  '--t-primary-color': theme.value.primaryColor,
+  '--t-primary-color-hover': theme.value.primaryColorHover,
+  '--t-text-color-1': theme.value.textColor1,
+  '--t-text-color-2': theme.value.textColor2,
+  '--t-text-color-3': theme.value.textColor3,
 }))
 
-const mode = ref<Mode>("pick")
+const mode = ref<Mode>('pick')
 /** 选中的班，带 ks 前缀（`ks257`），和用户名的前缀同一个写法 */
 const klass = ref<string | null>(null)
 const names = ref<string[]>([])
 const namesLoading = ref(false)
-const query = ref("")
+const query = ref('')
 const picked = ref<string | null>(null)
-const username = ref("")
-const password = ref("")
+const username = ref('')
+const password = ref('')
 const loading = ref(false)
-const error = ref("")
+const error = ref('')
 /** 错太多次被锁了：按钮灰掉，换个名字 / 换种登法才放开 */
 const locked = ref(false)
 
-const searchRef = useTemplateRef("searchRef")
-const passwordRef = useTemplateRef("passwordRef")
-const usernameRef = useTemplateRef("usernameRef")
+const searchRef = useTemplateRef('searchRef')
+const passwordRef = useTemplateRef('passwordRef')
+const usernameRef = useTemplateRef('usernameRef')
 
 const knownClasses = computed(() => (configStore.config?.classList ?? []).map((c) => `ks${c}`))
 const classOptions = computed(() =>
@@ -71,21 +71,17 @@ const classOptions = computed(() =>
   })),
 )
 /** 还没选过班的电脑：名单的位置先摆一排排班级 */
-const classGroups = computed(() =>
-  classOptions.value.flatMap((option) =>
-    "children" in option ? [{ label: option.label, items: option.children }] : [],
-  ),
-)
+const classGroups = computed(() => classOptions.value.flatMap((option) => ('children' in option ? [{ label: option.label, items: option.children }] : [])))
 
 // 名字支持拼音和拼音缩写搜索（张三 ← zhangsan / zs）。pinyin-pro 带着一份几百 K 的
 // 词典，静态引入会压进首屏 —— 改成打开登录框才拉，已登录的人一次都不会下载。
 // 用 match 而不是自己拼拼音串：多音字它两个读音都认（单田芳 ← stf 和 dtf 都能搜到）。
-type MatchFn = typeof import("pinyin-pro").match
+type MatchFn = typeof import('pinyin-pro').match
 const pinyinMatch = shallowRef<MatchFn | null>(null)
 async function ensurePinyin() {
   if (pinyinMatch.value) return
   try {
-    pinyinMatch.value = (await import("pinyin-pro")).match
+    pinyinMatch.value = (await import('pinyin-pro')).match
   } catch {
     // 拉不下来就只剩中文匹配，不至于让人登不上
   }
@@ -97,7 +93,7 @@ function matches(name: string, keyword: string) {
 }
 
 // 按拼音排：zh 的排序规则在 Chrome 里就是拼音序，不用等 pinyin-pro
-const collator = new Intl.Collator("zh-CN")
+const collator = new Intl.Collator('zh-CN')
 const shown = computed(() => {
   const keyword = query.value.trim()
   return keyword ? names.value.filter((name) => matches(name, keyword)) : names.value
@@ -119,7 +115,7 @@ async function loadNames(value: string) {
 
 watch(klass, (value) => {
   picked.value = null
-  query.value = ""
+  query.value = ''
   clearError()
   if (value) {
     loadNames(value)
@@ -128,7 +124,7 @@ watch(klass, (value) => {
 })
 
 function clearError() {
-  error.value = ""
+  error.value = ''
   locked.value = false
 }
 
@@ -141,21 +137,21 @@ function focusLater(target: () => { focus: () => void } | null | undefined) {
  * 手机上不替学生点搜索框：一聚焦键盘就弹出来，把下面的名单盖掉一半，
  * 而手机上本来就是直接点名字更快。电脑上照旧聚焦，进来就能打拼音缩写。
  */
-const touchScreen = useMediaQuery("(pointer: coarse)")
+const touchScreen = useMediaQuery('(pointer: coarse)')
 function focusSearch() {
   if (!touchScreen.value) focusLater(() => searchRef.value)
 }
 
 function pick(name: string) {
   picked.value = name
-  password.value = ""
+  password.value = ''
   clearError()
   focusLater(() => passwordRef.value)
 }
 
 function unpick() {
   picked.value = null
-  password.value = ""
+  password.value = ''
   clearError()
   focusSearch()
 }
@@ -168,11 +164,11 @@ function onSearchEnter() {
 function switchMode(next: Mode) {
   mode.value = next
   picked.value = null
-  username.value = ""
-  password.value = ""
-  query.value = ""
+  username.value = ''
+  password.value = ''
+  query.value = ''
   clearError()
-  if (next === "user") focusLater(() => usernameRef.value)
+  if (next === 'user') focusLater(() => usernameRef.value)
   else focusSearch()
 }
 
@@ -182,15 +178,14 @@ function goSignup() {
 
 async function submit() {
   if (loading.value || locked.value) return
-  const name =
-    mode.value === "pick" ? `${klass.value ?? ""}${picked.value ?? ""}` : username.value.trim()
-  if (mode.value === "user" && !name) {
-    error.value = "写上用户名"
+  const name = mode.value === 'pick' ? `${klass.value ?? ''}${picked.value ?? ''}` : username.value.trim()
+  if (mode.value === 'user' && !name) {
+    error.value = '写上用户名'
     focusLater(() => usernameRef.value)
     return
   }
   if (!password.value) {
-    error.value = "写上密码"
+    error.value = '写上密码'
     focusLater(() => passwordRef.value)
     return
   }
@@ -201,25 +196,25 @@ async function submit() {
   } catch (err) {
     // 判错误码而不是错误文案：文案在后端，改一个字这里就静默掉进「登录不上」
     const code = errorCode(err)
-    if (code === "invalid-credentials") {
+    if (code === 'invalid-credentials') {
       // 名字是点出来的，错只会错在密码
-      error.value = mode.value === "pick" ? "密码不对，再试一次" : "用户名或密码不对"
-    } else if (code === "too-many-login-attempts") {
-      error.value = "密码错太多次了，15 分钟后再试"
+      error.value = mode.value === 'pick' ? '密码不对，再试一次' : '用户名或密码不对'
+    } else if (code === 'too-many-login-attempts') {
+      error.value = '密码错太多次了，15 分钟后再试'
       locked.value = true
-    } else if (code === "account-disabled") {
-      error.value = "这个账号停用了，去找老师"
+    } else if (code === 'account-disabled') {
+      error.value = '这个账号停用了，去找老师'
     } else {
-      error.value = "登录不上，等一会儿再试"
+      error.value = '登录不上，等一会儿再试'
     }
-    password.value = ""
+    password.value = ''
     focusLater(() => passwordRef.value)
     return
   } finally {
     loading.value = false
   }
   storage.set(STORAGE_KEY.LOGIN_MODE, mode.value)
-  if (mode.value === "pick") storage.set(STORAGE_KEY.LOGIN_CLASS, klass.value)
+  if (mode.value === 'pick') storage.set(STORAGE_KEY.LOGIN_CLASS, klass.value)
   authStore.closeLoginModal()
   // 「上次登录以来」不再弹框，拆进了首页的「上次来」卡（/me/last-visit）
   await userStore.getMyProfile()
@@ -231,13 +226,13 @@ async function submit() {
  */
 function restoreLast() {
   const lastMode = storage.get(STORAGE_KEY.LOGIN_MODE)
-  mode.value = lastMode === "user" ? "user" : "pick"
+  mode.value = lastMode === 'user' ? 'user' : 'pick'
   const last = storage.get(STORAGE_KEY.LOGIN_CLASS)
-  if (typeof last === "string" && knownClasses.value.includes(last)) {
+  if (typeof last === 'string' && knownClasses.value.includes(last)) {
     if (klass.value === last) {
       // 同一个班：名单留着，只把上一个人的痕迹清掉
       picked.value = null
-      query.value = ""
+      query.value = ''
     } else klass.value = last
   }
 }
@@ -254,12 +249,12 @@ watch(
     if (!open) return
     ensurePinyin()
     picked.value = null
-    username.value = ""
-    password.value = ""
-    query.value = ""
+    username.value = ''
+    password.value = ''
+    query.value = ''
     clearError()
     restoreLast()
-    if (mode.value === "user") focusLater(() => usernameRef.value)
+    if (mode.value === 'user') focusLater(() => usernameRef.value)
     else focusSearch()
   },
   { immediate: true },
@@ -306,19 +301,8 @@ watch(
             />
             <div v-if="error" class="err">{{ error }}</div>
           </div>
-          <n-button
-            class="narrow"
-            type="primary"
-            size="large"
-            :loading="loading"
-            :disabled="locked"
-            @click="submit"
-          >
-            登录
-          </n-button>
-          <button class="link back" type="button" @click="unpick">
-            <Icon icon="ph:caret-left-bold" :width="14" />不是我，换一个名字
-          </button>
+          <n-button class="narrow" type="primary" size="large" :loading="loading" :disabled="locked" @click="submit"> 登录 </n-button>
+          <button class="link back" type="button" @click="unpick"><Icon icon="ph:caret-left-bold" :width="14" />不是我，换一个名字</button>
         </div>
 
         <template v-else-if="klass">
@@ -338,13 +322,7 @@ watch(
             <div v-else-if="!names.length" class="empty">这个班还没有名单</div>
             <div v-else-if="!shown.length" class="empty">没有叫这个的</div>
             <div v-else class="grid">
-              <button
-                v-for="name in shown"
-                :key="name"
-                class="cell"
-                type="button"
-                @click="pick(name)"
-              >
+              <button v-for="name in shown" :key="name" class="cell" type="button" @click="pick(name)">
                 {{ name }}
               </button>
             </div>
@@ -356,13 +334,7 @@ watch(
           <div v-for="group in classGroups" :key="group.label" class="grade">
             <span class="grade-label">{{ group.label }}</span>
             <div class="grid">
-              <button
-                v-for="item in group.items"
-                :key="item.value"
-                class="cell"
-                type="button"
-                @click="klass = item.value"
-              >
+              <button v-for="item in group.items" :key="item.value" class="cell" type="button" @click="klass = item.value">
                 {{ item.label }}
               </button>
             </div>
@@ -410,13 +382,9 @@ watch(
           />
           <span v-if="error" class="err">{{ error }}</span>
         </label>
-        <n-button type="primary" size="large" :loading="loading" :disabled="locked" @click="submit">
-          登录
-        </n-button>
+        <n-button type="primary" size="large" :loading="loading" :disabled="locked" @click="submit"> 登录 </n-button>
         <div class="links">
-          <button class="link back" type="button" @click="switchMode('pick')">
-            <Icon icon="ph:caret-left-bold" :width="14" />按班级选名字
-          </button>
+          <button class="link back" type="button" @click="switchMode('pick')"><Icon icon="ph:caret-left-bold" :width="14" />按班级选名字</button>
           <template v-if="configStore.config?.allowRegister">
             <i></i>
             <button class="link" type="button" @click="goSignup">注册</button>

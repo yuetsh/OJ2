@@ -1,6 +1,6 @@
-import { computed, nextTick, ref, type Ref } from "vue"
-import { onKeyStroke } from "@vueuse/core"
-import type { Row, SubmissionQuery } from "./listQuery"
+import { computed, nextTick, ref, type Ref } from 'vue'
+import { onKeyStroke } from '@vueuse/core'
+import type { Row, SubmissionQuery } from './listQuery'
 
 /**
  * 提交列表的「选中与翻阅」：右栏跟着选中的那条走，↑ ↓ 换条，到了页头页尾自动翻页。
@@ -26,7 +26,7 @@ export function useRowCursor(options: {
 }) {
   const { rows, total, query, loading, isMobile, isDesktop } = options
 
-  const selectedId = ref("")
+  const selectedId = ref('')
   const selectedRow = computed(() => rows.value.find((row) => row.id === selectedId.value) ?? null)
 
   /** 方向键只在能看的行之间走：跳到一条看不了的上面只会看到一把锁 */
@@ -37,7 +37,7 @@ export function useRowCursor(options: {
   })
 
   // 翻页是异步的，先记下「落地后停在哪一头」，新一页回来再选
-  let pendingJump: "first" | "last" | null = null
+  let pendingJump: 'first' | 'last' | null = null
 
   /** 加载失败了别把「落地后停在哪一头」留给下一次不相干的加载 */
   function forgetJump() {
@@ -49,7 +49,7 @@ export function useRowCursor(options: {
     pendingJump = null
     const list = navigable.value
     if (jump) {
-      const row = jump === "first" ? list[0] : list[list.length - 1]
+      const row = jump === 'first' ? list[0] : list[list.length - 1]
       if (row) {
         select(row.id)
         return
@@ -67,18 +67,16 @@ export function useRowCursor(options: {
     if (rows.value.some((row) => row.id === selectedId.value)) return
     // 手机上没有右栏，不用预先选一条
     if (isMobile.value) {
-      selectedId.value = ""
+      selectedId.value = ''
       return
     }
-    selectedId.value = (list[0] ?? rows.value[0])?.id ?? ""
+    selectedId.value = (list[0] ?? rows.value[0])?.id ?? ''
   }
 
   function select(id: string) {
     selectedId.value = id
     nextTick(() => {
-      document
-        .querySelector(`[data-row-id="${CSS.escape(id)}"]`)
-        ?.scrollIntoView({ block: "nearest" })
+      document.querySelector(`[data-row-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' })
     })
   }
 
@@ -99,12 +97,12 @@ export function useRowCursor(options: {
     }
     const page = query.page + step
     if (page < 1 || page > maxPage.value) return
-    pendingJump = step > 0 ? "first" : "last"
+    pendingJump = step > 0 ? 'first' : 'last'
     query.page = page
   }
 
   // 只用 ↑ ↓（用户定的，← → 不要）
-  onKeyStroke(["ArrowUp", "ArrowDown"], (e: KeyboardEvent) => {
+  onKeyStroke(['ArrowUp', 'ArrowDown'], (e: KeyboardEvent) => {
     if (!isDesktop.value || options.keysBlocked()) return
     // 别的控件已经处理了这次按键（下拉框自己会开菜单、换选项）
     if (e.defaultPrevented) return
@@ -112,19 +110,19 @@ export function useRowCursor(options: {
     if (target) {
       // 「代码 / 流程图」「全部 / 我的」是单选框：点过之后焦点停在上面，浏览器默认会拿方向键
       // 切换选项 —— 老师想看下一条，结果模式被切了。单选框照常换条，下面的 preventDefault 挡掉切换
-      const radio = target.tagName === "INPUT" && (target as HTMLInputElement).type === "radio"
+      const radio = target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'radio'
       // 焦点在输入框、下拉框、弹框里时不抢方向键
       if (
-        (!radio && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) ||
+        (!radio && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) ||
         target.isContentEditable ||
-        target.closest(".n-base-selection, .n-base-select-menu, .n-dropdown-menu, .n-modal")
+        target.closest('.n-base-selection, .n-base-select-menu, .n-dropdown-menu, .n-modal')
       ) {
         return
       }
     }
     if (!rows.value.length) return
     e.preventDefault()
-    move(e.key === "ArrowUp" ? -1 : 1)
+    move(e.key === 'ArrowUp' ? -1 : 1)
   })
 
   return { selectedId, selectedRow, position, maxPage, select, move, settleSelection, forgetJump }

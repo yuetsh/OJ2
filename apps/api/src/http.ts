@@ -1,16 +1,11 @@
-import type { Context } from "hono"
-import type { z } from "zod"
+import type { Context } from 'hono'
+import type { z } from 'zod'
 
 export function success<T>(c: Context, data: T, status = 200) {
   return c.json({ data }, status as 200)
 }
 
-export function failure(
-  c: Context,
-  status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 501 | 502,
-  code: string,
-  message: string,
-) {
+export function failure(c: Context, status: 400 | 401 | 403 | 404 | 409 | 429 | 500 | 501 | 502, code: string, message: string) {
   return c.json({ error: { code, message } }, status)
 }
 
@@ -44,9 +39,9 @@ export async function parseBody<S extends z.ZodType>(
     response: failure(
       c,
       400,
-      "invalid-request",
+      'invalid-request',
       // issues 不会是空的，?? 只是给类型一个交代
-      message ?? parsed.error.issues[0]?.message ?? "参数错误",
+      message ?? parsed.error.issues[0]?.message ?? '参数错误',
     ),
   }
 }

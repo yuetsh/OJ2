@@ -1,17 +1,17 @@
-import type { Quote, WebsiteConfig } from "@oj2/contract"
-import { asc, desc, eq } from "drizzle-orm"
-import { Hono } from "hono"
-import { resolve } from "node:path"
+import type { Quote, WebsiteConfig } from '@oj2/contract'
+import { asc, desc, eq } from 'drizzle-orm'
+import { Hono } from 'hono'
+import { resolve } from 'node:path'
 
-import { config } from "../config"
-import { db, schema } from "../db"
-import { failure, success } from "../http"
-import { getWebsiteOptions } from "../services/options"
-import { stripClassPrefix } from "./helpers"
+import { config } from '../config'
+import { db, schema } from '../db'
+import { failure, success } from '../http'
+import { getWebsiteOptions } from '../services/options'
+import { stripClassPrefix } from './helpers'
 
 export const siteRoutes = new Hono()
 
-siteRoutes.get("/site", async (c) => {
+siteRoutes.get('/site', async (c) => {
   const options = await getWebsiteOptions()
   return success(c, {
     websiteName: options.website_name,
@@ -24,18 +24,18 @@ siteRoutes.get("/site", async (c) => {
 // 数据集读不到时的兜底（本机旁边没有 sentences-bundle 就会走这里）
 const fallbackQuotes = [
   {
-    hitokoto: "程序首先是写给人读的，其次才是让机器执行。",
-    from: "Structure and Interpretation of Computer Programs",
+    hitokoto: '程序首先是写给人读的，其次才是让机器执行。',
+    from: 'Structure and Interpretation of Computer Programs',
     fromWho: null,
     type: null,
   },
   {
-    hitokoto: "把大问题拆成足够小的问题，答案就会浮现。",
-    from: "判题狗",
+    hitokoto: '把大问题拆成足够小的问题，答案就会浮现。',
+    from: '判题狗',
     fromWho: null,
     type: null,
   },
-  { hitokoto: "一次没通过，只是多得到了一条线索。", from: "判题狗", fromWho: null, type: null },
+  { hitokoto: '一次没通过，只是多得到了一条线索。', from: '判题狗', fromWho: null, type: null },
 ] satisfies Quote[]
 
 // categories.json 里的 path 形如 "./sentences/a.json"，12 个分类合计 20MB。
@@ -52,12 +52,12 @@ async function loadSentences(path: string, type: string | null) {
     from?: unknown
     from_who?: unknown
   }[]
-  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim() : null)
+  const text = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null)
   const rows = (Array.isArray(raw) ? raw : [])
-    .filter((it) => typeof it.hitokoto === "string" && it.hitokoto.length > 0)
+    .filter((it) => typeof it.hitokoto === 'string' && it.hitokoto.length > 0)
     .map((it) => ({
       hitokoto: it.hitokoto as string,
-      from: text(it.from) ?? "佚名",
+      from: text(it.from) ?? '佚名',
       fromWho: text(it.from_who),
       type,
     }))
@@ -68,14 +68,14 @@ async function loadSentences(path: string, type: string | null) {
 
 async function randomQuote() {
   if (!categories) {
-    const list = (await Bun.file(resolve(config.hitokotoDirectory, "categories.json")).json()) as {
+    const list = (await Bun.file(resolve(config.hitokotoDirectory, 'categories.json')).json()) as {
       path?: unknown
       name?: unknown
     }[]
     const parsed = list
-      .filter((it): it is { path: string; name?: unknown } => typeof it.path === "string")
-      .map((it) => ({ path: it.path, name: typeof it.name === "string" ? it.name : null }))
-    if (parsed.length === 0) throw new Error("no hitokoto categories")
+      .filter((it): it is { path: string; name?: unknown } => typeof it.path === 'string')
+      .map((it) => ({ path: it.path, name: typeof it.name === 'string' ? it.name : null }))
+    if (parsed.length === 0) throw new Error('no hitokoto categories')
     categories = parsed
   }
   const category = categories[Math.floor(Math.random() * categories.length)]!
@@ -83,7 +83,7 @@ async function randomQuote() {
   return sentences[Math.floor(Math.random() * sentences.length)]!
 }
 
-siteRoutes.get("/quotes/random", async (c) => {
+siteRoutes.get('/quotes/random', async (c) => {
   try {
     return success(c, (await randomQuote()) satisfies Quote)
   } catch {
@@ -92,10 +92,10 @@ siteRoutes.get("/quotes/random", async (c) => {
   }
 })
 
-siteRoutes.get("/classes/:className/usernames", async (c) => {
-  const className = c.req.param("className").trim()
+siteRoutes.get('/classes/:className/usernames', async (c) => {
+  const className = c.req.param('className').trim()
   if (!/^\d{3,4}$/.test(className)) {
-    return failure(c, 400, "invalid-class", "Class name must contain 3 or 4 digits")
+    return failure(c, 400, 'invalid-class', 'Class name must contain 3 or 4 digits')
   }
   const rows = await db
     .select({ username: schema.user.username })

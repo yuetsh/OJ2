@@ -11,19 +11,19 @@ import {
   type AstRequirements,
   type AstRule,
   type AstRules,
-} from "@oj2/contract"
-import { Language, Parser, type Node } from "web-tree-sitter"
+} from '@oj2/contract'
+import { Language, Parser, type Node } from 'web-tree-sitter'
 // 语法 wasm 内嵌成资源。原来是 `Bun.resolveSync(pkg + "/" + name, import.meta.dir)`，
 // 编译成单二进制后 import.meta.dir 是 /$bunfs/root，解析不到 node_modules。见 vendor/jieba.ts
-import cWasmPath from "tree-sitter-c/tree-sitter-c.wasm" with { type: "file" }
-import cppWasmPath from "tree-sitter-cpp/tree-sitter-cpp.wasm" with { type: "file" }
-import pythonWasmPath from "tree-sitter-python/tree-sitter-python.wasm" with { type: "file" }
+import cWasmPath from 'tree-sitter-c/tree-sitter-c.wasm' with { type: 'file' }
+import cppWasmPath from 'tree-sitter-cpp/tree-sitter-cpp.wasm' with { type: 'file' }
+import pythonWasmPath from 'tree-sitter-python/tree-sitter-python.wasm' with { type: 'file' }
 // web-tree-sitter 自己的运行时 wasm，Parser.init() 要用
-import treeSitterWasmPath from "web-tree-sitter/web-tree-sitter.wasm" with { type: "file" }
+import treeSitterWasmPath from 'web-tree-sitter/web-tree-sitter.wasm' with { type: 'file' }
 
 // AstRule 的形状在契约里（astRuleSchema）—— 原来这份和前端两份各写各的。
 // 这里 re-export，判题机的调用方不用再去 import 契约。
-export type { AstRule } from "@oj2/contract"
+export type { AstRule } from '@oj2/contract'
 
 export interface AstResult {
   description: string
@@ -57,7 +57,7 @@ async function loadLanguage(language: string) {
   const cached = languages.get(language)
   if (cached) return cached
 
-  const wasmPath = language === "C" ? cWasmPath : language === "C++" ? cppWasmPath : pythonWasmPath
+  const wasmPath = language === 'C' ? cWasmPath : language === 'C++' ? cppWasmPath : pythonWasmPath
   const loaded = await Language.load(wasmPath)
   languages.set(language, loaded)
   return loaded
@@ -75,8 +75,8 @@ function hasNode(root: Node, type: string): boolean {
 }
 
 function targetName(rule: AstRule, language?: string) {
-  const target = rule.target ?? ""
-  return rule.label || astNodeLabel(target, language) || "指定语法"
+  const target = rule.target ?? ''
+  return rule.label || astNodeLabel(target, language) || '指定语法'
 }
 
 function countPhrase(verb: string, rule: AstRule) {
@@ -84,7 +84,7 @@ function countPhrase(verb: string, rule: AstRule) {
   if (rule.min !== undefined && rule.max !== undefined) return `${verb} ${rule.min}～${rule.max} 次`
   if (rule.min !== undefined) return `至少${verb} ${rule.min} 次`
   if (rule.max !== undefined) return `至多${verb} ${rule.max} 次`
-  return ""
+  return ''
 }
 
 /**
@@ -95,41 +95,41 @@ function countPhrase(verb: string, rule: AstRule) {
 export function describeAstRule(rule: AstRule, language?: string): string {
   if (rule.message) return rule.message
   const name = targetName(rule, language)
-  const target = rule.target ?? ""
+  const target = rule.target ?? ''
   switch (rule.engine) {
-    case "must_exist_node":
+    case 'must_exist_node':
       return `必须使用 ${name}`
-    case "must_not_exist_node":
+    case 'must_not_exist_node':
       return `不能使用 ${name}`
-    case "count_node":
-      return `${name} ${countPhrase("出现", rule)}`.trim()
-    case "must_call_function":
+    case 'count_node':
+      return `${name} ${countPhrase('出现', rule)}`.trim()
+    case 'must_call_function':
       return `必须调用 ${target}()`
-    case "must_not_call_function":
+    case 'must_not_call_function':
       return `不能调用 ${target}()`
-    case "count_function_call":
-      return `${target}() ${countPhrase("调用", rule)}`.trim()
-    case "must_call_method":
+    case 'count_function_call':
+      return `${target}() ${countPhrase('调用', rule)}`.trim()
+    case 'must_call_method':
       return `必须调用 .${target}()`
-    case "must_not_call_method":
+    case 'must_not_call_method':
       return `不能调用 .${target}()`
-    case "must_use_operator":
+    case 'must_use_operator':
       return `必须使用 ${astOperatorLabel(target, language)} 运算符`
-    case "must_have_nesting": {
+    case 'must_have_nesting': {
       // 这两个走 astNodeLabel 而不是裸值 —— 少了这一步文案就是
       // 「必须使用 for_loop 嵌套」，旧栈 ast_checker/engines/nesting.py 是翻的
-      const outer = astNodeLabel(rule.outer ?? "", language)
-      const inner = astNodeLabel(rule.inner ?? "", language)
+      const outer = astNodeLabel(rule.outer ?? '', language)
+      const inner = astNodeLabel(rule.inner ?? '', language)
       return outer === inner ? `必须使用 ${outer} 嵌套` : `必须在 ${outer} 中嵌套使用 ${inner}`
     }
   }
 }
 
 /** 标签配色用的粗分类，见契约 astRequirementSchema */
-function requirementKind(engine: AstRule["engine"]): AstRequirement["kind"] {
-  if (engine.startsWith("must_not")) return "forbid"
-  if (engine.startsWith("count")) return "count"
-  return "require"
+function requirementKind(engine: AstRule['engine']): AstRequirement['kind'] {
+  if (engine.startsWith('must_not')) return 'forbid'
+  if (engine.startsWith('count')) return 'count'
+  return 'require'
 }
 
 /**
@@ -141,10 +141,7 @@ function requirementKind(engine: AstRule["engine"]): AstRequirement["kind"] {
  * checkAst 直接放行 —— 学生看得见要求，判题从不检查。
  */
 export function astRequirements(value: unknown): AstRequirements | null {
-  const grouped =
-    value && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null
+  const grouped = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
   if (!grouped) return null
   const out: AstRequirements = {}
   for (const [language, rules] of Object.entries(grouped)) {
@@ -180,19 +177,19 @@ export function astRulesError(astRules: AstRules | null): string | null {
   for (const [language, rules] of Object.entries(astRules)) {
     if (rules.length === 0) continue
     if (!AST_SUPPORTED_LANGUAGES.includes(language)) {
-      return `代码规则暂不支持 ${language}，判题机只检查 ${AST_SUPPORTED_LANGUAGES.join(" / ")}`
+      return `代码规则暂不支持 ${language}，判题机只检查 ${AST_SUPPORTED_LANGUAGES.join(' / ')}`
     }
     const nodes = AST_NODE_TARGETS_BY_LANGUAGE[language] ?? {}
     const operators = AST_OPERATOR_TARGETS_BY_LANGUAGE[language] ?? {}
     for (const [index, rule] of rules.entries()) {
       const at = `代码规则 ${language} 第 ${index + 1} 条`
-      const target = rule.target ?? ""
-      if (rule.engine.endsWith("_node")) {
+      const target = rule.target ?? ''
+      if (rule.engine.endsWith('_node')) {
         if (!(target in nodes)) return `${at}：${language} 没有「${target}」这种语法`
-      } else if (rule.engine === "must_use_operator") {
+      } else if (rule.engine === 'must_use_operator') {
         if (!(target in operators)) return `${at}：${language} 没有「${target}」运算符`
-      } else if (rule.engine === "must_have_nesting") {
-        for (const value of [rule.outer ?? "", rule.inner ?? ""]) {
+      } else if (rule.engine === 'must_have_nesting') {
+        for (const value of [rule.outer ?? '', rule.inner ?? '']) {
           if (!(value in nodes)) return `${at}：${language} 没有「${value}」这种语法`
         }
       } else if (!target.trim()) {
@@ -231,21 +228,21 @@ function rangePassed(count: number, rule: AstRule) {
 }
 
 const CALL_NODE_TYPES: Record<string, string> = {
-  C: "call_expression",
-  "C++": "call_expression",
-  Python: "call",
+  C: 'call_expression',
+  'C++': 'call_expression',
+  Python: 'call',
 }
 
 function functionCalls(root: Node, target: string, language: string) {
-  const callType = CALL_NODE_TYPES[language] ?? "call"
+  const callType = CALL_NODE_TYPES[language] ?? 'call'
   return collectNodes(root, callType).filter((call) => {
-    const fn = call.childForFieldName("function")
+    const fn = call.childForFieldName('function')
     if (!fn) return false
-    if (fn.type === "identifier") return fn.text === target
+    if (fn.type === 'identifier') return fn.text === target
     // `std::sort(...)` 是 qualified_identifier。学生写 sort 还是 std::sort 取决于
     // 有没有 using namespace std，两种都得认，所以末段也比一次
-    if (language === "C++" && fn.type === "qualified_identifier") {
-      return fn.text === target || fn.text.split("::").pop() === target
+    if (language === 'C++' && fn.type === 'qualified_identifier') {
+      return fn.text === target || fn.text.split('::').pop() === target
     }
     return false
   })
@@ -255,37 +252,34 @@ function methodCalls(root: Node, target: string, language: string) {
   // C++ 的 `a.push_back()` / `p->push_back()` 都是 call_expression + field_expression，
   // 和 Python 的 attribute 不是一回事 —— 少了这个分支，C++ 的「必须调用 .push_back()」
   // 会静默地永远失败
-  if (language === "C++") {
-    return collectNodes(root, "call_expression").filter((call) => {
-      const fn = call.childForFieldName("function")
-      return fn?.type === "field_expression" && fn.childForFieldName("field")?.text === target
+  if (language === 'C++') {
+    return collectNodes(root, 'call_expression').filter((call) => {
+      const fn = call.childForFieldName('function')
+      return fn?.type === 'field_expression' && fn.childForFieldName('field')?.text === target
     })
   }
-  if (language !== "Python") return []
-  return collectNodes(root, "call").filter((call) => {
-    const fn = call.childForFieldName("function")
-    return fn?.type === "attribute" && fn.childForFieldName("attribute")?.text === target
+  if (language !== 'Python') return []
+  return collectNodes(root, 'call').filter((call) => {
+    const fn = call.childForFieldName('function')
+    return fn?.type === 'attribute' && fn.childForFieldName('attribute')?.text === target
   })
 }
 
 function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | null {
-  const target = rule.target ?? ""
+  const target = rule.target ?? ''
   const nodeType = astTargetNodeType(target, language)
 
   switch (rule.engine) {
-    case "must_exist_node":
+    case 'must_exist_node':
       return {
         description: describeAstRule(rule, language),
         passed: hasNode(root, nodeType),
       }
-    case "must_not_exist_node": {
+    case 'must_not_exist_node': {
       const nodes = collectNodes(root, nodeType)
-      return withLines(
-        { description: describeAstRule(rule, language), passed: nodes.length === 0 },
-        nodes,
-      )
+      return withLines({ description: describeAstRule(rule, language), passed: nodes.length === 0 }, nodes)
     }
-    case "count_node": {
+    case 'count_node': {
       const nodes = collectNodes(root, nodeType)
       return withLines(
         {
@@ -297,19 +291,16 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
         rule.max !== undefined || rule.exact !== undefined ? nodes : [],
       )
     }
-    case "must_call_function":
+    case 'must_call_function':
       return {
         description: describeAstRule(rule, language),
         passed: functionCalls(root, target, language).length > 0,
       }
-    case "must_not_call_function": {
+    case 'must_not_call_function': {
       const calls = functionCalls(root, target, language)
-      return withLines(
-        { description: describeAstRule(rule, language), passed: calls.length === 0 },
-        calls,
-      )
+      return withLines({ description: describeAstRule(rule, language), passed: calls.length === 0 }, calls)
     }
-    case "count_function_call": {
+    case 'count_function_call': {
       const calls = functionCalls(root, target, language)
       return withLines(
         {
@@ -320,31 +311,26 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
         rule.max !== undefined || rule.exact !== undefined ? calls : [],
       )
     }
-    case "must_call_method":
+    case 'must_call_method':
       return {
         description: describeAstRule(rule, language),
         passed: methodCalls(root, target, language).length > 0,
       }
-    case "must_not_call_method": {
+    case 'must_not_call_method': {
       const calls = methodCalls(root, target, language)
-      return withLines(
-        { description: describeAstRule(rule, language), passed: calls.length === 0 },
-        calls,
-      )
+      return withLines({ description: describeAstRule(rule, language), passed: calls.length === 0 }, calls)
     }
-    case "must_use_operator":
+    case 'must_use_operator':
       return {
         description: describeAstRule(rule, language),
         passed: hasNode(root, nodeType),
       }
-    case "must_have_nesting": {
-      const outer = rule.outer ?? ""
-      const inner = rule.inner ?? ""
+    case 'must_have_nesting': {
+      const outer = rule.outer ?? ''
+      const inner = rule.inner ?? ''
       const outerType = astTargetNodeType(outer, language)
       const innerType = astTargetNodeType(inner, language)
-      const passed = collectNodes(root, outerType).some((node) =>
-        node.children.some((child) => hasNode(child, innerType)),
-      )
+      const passed = collectNodes(root, outerType).some((node) => node.children.some((child) => hasNode(child, innerType)))
       return { description: describeAstRule(rule, language), passed }
     }
     default:
@@ -352,11 +338,7 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
   }
 }
 
-export async function checkAst(
-  code: string,
-  language: string,
-  rules: AstRule[],
-): Promise<{ passed: boolean; results: AstResult[] }> {
+export async function checkAst(code: string, language: string, rules: AstRule[]): Promise<{ passed: boolean; results: AstResult[] }> {
   if (rules.length === 0) return { passed: true, results: [] }
 
   const treeSitterLanguage = await loadLanguage(language)
@@ -390,11 +372,7 @@ export async function checkAst(
  * 和 checkAst 不同，**判不了时返回 null 而不是「通过」**：checkAst 是题目的硬要求，
  * 判不了就放行、别冤枉学生；挑战判不了就是没做到，放行等于白送。
  */
-export async function checkAstGroups(
-  code: string,
-  language: string,
-  groups: AstRule[][],
-): Promise<{ passed: boolean; results: AstResult[] }[] | null> {
+export async function checkAstGroups(code: string, language: string, groups: AstRule[][]): Promise<{ passed: boolean; results: AstResult[] }[] | null> {
   const treeSitterLanguage = await loadLanguage(language)
   if (!treeSitterLanguage) return null
   const parser = new Parser()

@@ -1,32 +1,18 @@
-import { submissionUpdateSchema, type FlowchartUpdate } from "@oj2/contract"
-import { and, eq, inArray } from "drizzle-orm"
+import { submissionUpdateSchema, type FlowchartUpdate } from '@oj2/contract'
+import { and, eq, inArray } from 'drizzle-orm'
 
-import { touchSession } from "./auth/session"
-import {
-  handleCollabBinary,
-  handleCollabClose,
-  handleCollabMessage,
-  handleCollabOpen,
-  refreshRequestLatest,
-} from "./collab/handler"
-import { config } from "./config"
-import { db, schema } from "./db"
-import { parseSubmissionEvent, submissionUpdateChannel, userSubmissionTopic } from "./judge/events"
-import { JudgeStatus } from "./judge/status"
-import { createSubscriberRedis } from "./redis"
-import { asRecord } from "./routes/helpers"
-import {
-  configTopic,
-  configUpdateChannel,
-  parseSessionRevoked,
-  parseUserEvent,
-  sessionRevokedChannel,
-  userEventChannel,
-  userEventTopic,
-} from "./events"
+import { touchSession } from './auth/session'
+import { handleCollabBinary, handleCollabClose, handleCollabMessage, handleCollabOpen, refreshRequestLatest } from './collab/handler'
+import { config } from './config'
+import { db, schema } from './db'
+import { parseSubmissionEvent, submissionUpdateChannel, userSubmissionTopic } from './judge/events'
+import { JudgeStatus } from './judge/status'
+import { createSubscriberRedis } from './redis'
+import { asRecord } from './routes/helpers'
+import { configTopic, configUpdateChannel, parseSessionRevoked, parseUserEvent, sessionRevokedChannel, userEventChannel, userEventTopic } from './events'
 
 /** 本机的几种写法。开发时 Vite 代理会让 Origin（5173）和 Host（3000）对不上 */
-const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"])
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
 
 /**
  * WebSocket 升级的来源校验。
@@ -59,7 +45,7 @@ interface RateBucket {
 export interface SubmissionSocketData {
   userId: number
   /** 同一个 Bun.serve 只能挂一个 websocket handler，用它区分通道 */
-  kind: "submissions" | "config" | "collab"
+  kind: 'submissions' | 'config' | 'collab'
   /** 握手时那张会话的 id，留着定期确认它还没被登出 / 过期，见 sweepSessions */
   sid: string
   /** 握手时 access token 里签的 token_version，巡检时和库里比，见 sweepSessions */
@@ -148,10 +134,10 @@ const FORCE_LOGOUT_CLOSE_DELAY = 100
  */
 function forceLogout(targets: Bun.ServerWebSocket<SubmissionSocketData>[], reason: string) {
   if (targets.length === 0) return
-  const frame = JSON.stringify({ type: "force_logout", reason })
+  const frame = JSON.stringify({ type: 'force_logout', reason })
   for (const ws of targets) ws.send(frame)
   setTimeout(() => {
-    for (const ws of targets) ws.close(1008, "Session ended")
+    for (const ws of targets) ws.close(1008, 'Session ended')
   }, FORCE_LOGOUT_CLOSE_DELAY)
 }
 
@@ -191,7 +177,7 @@ export async function sweepSessions() {
       : []
   } catch (error) {
     // Redis 或库抖一下不该把全班踢下线：这一轮直接放弃，下一轮再说
-    console.error("Failed to verify websocket sessions", error)
+    console.error('Failed to verify websocket sessions', error)
     return
   }
   const byId = new Map(users.map((user) => [user.id, user]))
@@ -206,8 +192,8 @@ export async function sweepSessions() {
   }
   // 会话没了有几种可能：在别的标签页登出、会话自己到期、改了密码。对用户都是
   // 「要重新登录」，走 session-ended 这一支
-  forceLogout(ended, "session-ended")
-  forceLogout(disabled, "account-disabled")
+  forceLogout(ended, 'session-ended')
+  forceLogout(disabled, 'account-disabled')
 }
 
 export function startSessionSweep() {
@@ -223,7 +209,7 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
     open(ws) {
       liveSockets.add(ws)
       ws.data.rate = { tokens: RATE_BURST, updatedAt: Date.now() }
-      if (ws.data.kind === "collab") {
+      if (ws.data.kind === 'collab') {
         ws.data.binaryRate = {
           tokens: COLLAB_BINARY_BURST,
           updatedAt: Date.now(),
@@ -231,7 +217,7 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
         handleCollabOpen(ws)
         return
       }
-      if (ws.data.kind === "config") {
+      if (ws.data.kind === 'config') {
         ws.subscribe(configTopic)
         return
       }
@@ -239,44 +225,44 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       ws.subscribe(userEventTopic(ws.data.userId))
     },
     message(ws, message) {
-      if (ws.data.kind === "collab") {
-        if (typeof message !== "string") {
+      if (ws.data.kind === 'collab') {
+        if (typeof message !== 'string') {
           if (!allowCollabBinary(ws)) {
-            ws.close(1008, "Too many messages")
+            ws.close(1008, 'Too many messages')
             return
           }
           handleCollabBinary(ws, message)
           return
         }
         if (!allowMessage(ws)) {
-          ws.close(1008, "Too many messages")
+          ws.close(1008, 'Too many messages')
           return
         }
         handleCollabMessage(ws, message).catch((error) => {
-          console.error("Failed to handle collab message", error)
-          ws.send(JSON.stringify({ type: "error", message: "Internal error" }))
+          console.error('Failed to handle collab message', error)
+          ws.send(JSON.stringify({ type: 'error', message: 'Internal error' }))
         })
         return
       }
       if (!allowMessage(ws)) {
-        ws.close(1008, "Too many messages")
+        ws.close(1008, 'Too many messages')
         return
       }
       // handleMessage 里有 DB 查询和会抛的 schema.parse。以前是裸的 `void`，
       // 库抖一下就是一个 unhandled rejection（隔壁 bridgeSubmissionEvents 两处
       // 都接住了，只有这里漏了）
       handleMessage(ws, String(message)).catch((error) => {
-        console.error("Failed to handle websocket message", error)
-        ws.send(JSON.stringify({ type: "error", message: "Internal error" }))
+        console.error('Failed to handle websocket message', error)
+        ws.send(JSON.stringify({ type: 'error', message: 'Internal error' }))
       })
     },
     close(ws) {
       liveSockets.delete(ws)
-      if (ws.data.kind === "collab") {
+      if (ws.data.kind === 'collab') {
         handleCollabClose(ws)
         return
       }
-      if (ws.data.kind === "config") {
+      if (ws.data.kind === 'config') {
         ws.unsubscribe(configTopic)
         return
       }
@@ -291,7 +277,7 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
   try {
     message = JSON.parse(raw) as typeof message
   } catch {
-    ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }))
+    ws.send(JSON.stringify({ type: 'error', message: 'Invalid JSON' }))
     return
   }
 
@@ -299,19 +285,19 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
   // 都要为一次 ping 打一趟数据库；一个题目页还开着两条连接，全班在线时纯空转。
   // 禁用用户不会因此漏网：往用户 topic 推之前 bridgeSubmissionEvents 会查一次，
   // 而 subscribe 这条真正读数据的路径下面照样查。
-  if (message.type === "ping") {
-    ws.send(JSON.stringify({ type: "pong", timestamp: message.timestamp }))
+  if (message.type === 'ping') {
+    ws.send(JSON.stringify({ type: 'pong', timestamp: message.timestamp }))
     return
   }
-  if (message.type !== "subscribe" || typeof message.submissionId !== "string") {
-    ws.send(JSON.stringify({ type: "error", message: "Invalid message" }))
+  if (message.type !== 'subscribe' || typeof message.submissionId !== 'string') {
+    ws.send(JSON.stringify({ type: 'error', message: 'Invalid message' }))
     return
   }
 
   // 会话可能在连接期间就失效了：用户在别的标签页登出，或者会话自己到期。
   // 握手时校验过一次不算数 —— 这条连接能挂几个小时。
   if (!(await touchSession(ws.data.sid, ws.data.userId))) {
-    ws.close(1008, "Session expired")
+    ws.close(1008, 'Session expired')
     return
   }
 
@@ -321,7 +307,7 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
     .where(and(eq(schema.user.id, ws.data.userId), eq(schema.user.isDisabled, false)))
     .limit(1)
   if (!activeUser) {
-    ws.close(1008, "Account disabled")
+    ws.close(1008, 'Account disabled')
     return
   }
 
@@ -332,12 +318,7 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
       statisticInfo: schema.submission.statisticInfo,
     })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.id, message.submissionId),
-        eq(schema.submission.userId, ws.data.userId),
-      ),
-    )
+    .where(and(eq(schema.submission.id, message.submissionId), eq(schema.submission.userId, ws.data.userId)))
     .limit(1)
 
   if (!submission) {
@@ -349,32 +330,27 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
         grade: schema.flowchartSubmission.aiGrade,
       })
       .from(schema.flowchartSubmission)
-      .where(
-        and(
-          eq(schema.flowchartSubmission.id, message.submissionId),
-          eq(schema.flowchartSubmission.userId, ws.data.userId),
-        ),
-      )
+      .where(and(eq(schema.flowchartSubmission.id, message.submissionId), eq(schema.flowchartSubmission.userId, ws.data.userId)))
       .limit(1)
     if (!flowchart) {
-      ws.send(JSON.stringify({ type: "error", message: "Submission not found" }))
+      ws.send(JSON.stringify({ type: 'error', message: 'Submission not found' }))
       return
     }
     const replay =
       flowchart.status === 2
         ? {
-            type: "flowchart_evaluation_completed" as const,
+            type: 'flowchart_evaluation_completed' as const,
             submissionId: flowchart.id,
             score: flowchart.score ?? undefined,
             grade: flowchart.grade ?? undefined,
           }
         : flowchart.status === 3
           ? {
-              type: "flowchart_evaluation_failed" as const,
+              type: 'flowchart_evaluation_failed' as const,
               submissionId: flowchart.id,
             }
           : {
-              type: "flowchart_evaluation_update" as const,
+              type: 'flowchart_evaluation_update' as const,
               submissionId: flowchart.id,
             }
     ws.send(JSON.stringify(replay satisfies FlowchartUpdate))
@@ -384,14 +360,14 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
   const statistics = asRecord(submission.statisticInfo)
   const status =
     submission.result === JudgeStatus.PENDING
-      ? "pending"
+      ? 'pending'
       : submission.result === JudgeStatus.JUDGING
-        ? "judging"
+        ? 'judging'
         : submission.result === JudgeStatus.SYSTEM_ERROR
-          ? "error"
-          : "finished"
+          ? 'error'
+          : 'finished'
   const parsed = submissionUpdateSchema.safeParse({
-    type: "submission_update",
+    type: 'submission_update',
     submissionId: submission.id,
     result: submission.result,
     status,
@@ -402,7 +378,7 @@ async function handleMessage(ws: Bun.ServerWebSocket<SubmissionSocketData>, raw:
 
 export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocketData>) {
   const subscriber = createSubscriberRedis()
-  subscriber.on("message", (channel, raw) => {
+  subscriber.on('message', (channel, raw) => {
     if (channel === configUpdateChannel) {
       // 配置广播不校验用户：内容就是站点公开配置本身，且所有连着的人都该收到
       server.publish(configTopic, raw)
@@ -413,11 +389,7 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
       if (!revoked) return
       // 按会话还是按 userId，取决于是「这张会话登出了」还是「这个账号被禁用 / 改密码了」
       forceLogout(
-        [...liveSockets].filter((ws) =>
-          revoked.sid !== undefined
-            ? ws.data.sid === revoked.sid
-            : ws.data.userId === revoked.userId,
-        ),
+        [...liveSockets].filter((ws) => (revoked.sid !== undefined ? ws.data.sid === revoked.sid : ws.data.userId === revoked.userId)),
         revoked.reason,
       )
       return
@@ -438,7 +410,7 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
         if (!activeUser) return
         server.publish(topic, JSON.stringify(event.data))
       })().catch((error) => {
-        console.error("Failed to bridge user event", error)
+        console.error('Failed to bridge user event', error)
       })
       return
     }
@@ -446,9 +418,9 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
     const event = parseSubmissionEvent(raw)
     if (!event) return
     // 举着手的人又判完一次：老师举手面板上他那条的错法跟着刷新（没举手的直接返回，不查库）
-    if (event.data.status === "finished") {
+    if (event.data.status === 'finished') {
       refreshRequestLatest(event.userId).catch((error) => {
-        console.error("Failed to refresh help request", error)
+        console.error('Failed to refresh help request', error)
       })
     }
     const topic = userSubmissionTopic(event.userId)
@@ -462,16 +434,11 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
       if (!activeUser) return
       server.publish(topic, JSON.stringify(event.data))
     })().catch((error) => {
-      console.error("Failed to bridge submission event", error)
+      console.error('Failed to bridge submission event', error)
     })
   })
   // 连接层的 error 已经由 createSubscriberRedis 里的 withErrorLogging 打了
   // （带连接名），这里再挂一个只会把同一条错误打两遍
-  await subscriber.subscribe(
-    submissionUpdateChannel,
-    userEventChannel,
-    configUpdateChannel,
-    sessionRevokedChannel,
-  )
+  await subscriber.subscribe(submissionUpdateChannel, userEventChannel, configUpdateChannel, sessionRevokedChannel)
   return subscriber
 }

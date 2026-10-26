@@ -12,8 +12,8 @@
  * - AI 生成的东西不放行。学生能在代码里夹带指令，诱导 AI 吐出 <img onerror> 一类的 HTML，
  *   老师在后台一打开就执行。库里 1196 条 AI 输出一个 HTML 标签都没有，关掉不影响显示。
  */
-import MarkdownIt from "markdown-it"
-import { highlight } from "./highlight"
+import MarkdownIt from 'markdown-it'
+import { highlight } from './highlight'
 
 function create(html: boolean) {
   return new MarkdownIt({

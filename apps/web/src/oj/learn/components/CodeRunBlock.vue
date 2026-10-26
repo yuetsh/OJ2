@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { StatisticInfo, TrialRunResponse } from "@oj2/contract"
-import { errorMessage } from "utils/api"
-import { SubmissionStatus } from "utils/constants"
-import { trialRun } from "utils/judge"
-import { explainCCompileError } from "oj/problem/utils/cError"
-import { explainPythonCompileError } from "utils/pythonError"
-import { explainRuntimeError } from "oj/problem/utils/runtimeError"
-import { useAuthModalStore } from "shared/store/authModal"
-import { useUserStore } from "shared/store/user"
-import { mainWrapExtensions, wrapMain } from "../wrapMain"
+import { Icon } from '@iconify/vue'
+import type { StatisticInfo, TrialRunResponse } from '@oj2/contract'
+import { errorMessage } from 'utils/api'
+import { SubmissionStatus } from 'utils/constants'
+import { trialRun } from 'utils/judge'
+import { explainCCompileError } from 'oj/problem/utils/cError'
+import { explainPythonCompileError } from 'utils/pythonError'
+import { explainRuntimeError } from 'oj/problem/utils/runtimeError'
+import { useAuthModalStore } from 'shared/store/authModal'
+import { useUserStore } from 'shared/store/user'
+import { mainWrapExtensions, wrapMain } from '../wrapMain'
 
-const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
+const CodeEditor = defineAsyncComponent(() => import('shared/components/CodeEditor.vue'))
 
 /**
  * 正文里的一段代码：就地改、就地运行（设计稿「代码块就地运行」那块画板）。
@@ -24,7 +24,7 @@ const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEdit
  */
 const props = defineProps<{
   code: string
-  lang: "python" | "c"
+  lang: 'python' | 'c'
   tutorialId: number
   wrapMain?: boolean
 }>()
@@ -38,116 +38,100 @@ const original = computed(() => (props.wrapMain ? wrapMain(props.code) : props.c
 // 手机上也不折行，长行横着滚：折下来的那截看着像另起了一行代码
 const extensions = computed(() => (props.wrapMain ? mainWrapExtensions : []))
 const value = ref(original.value)
-const input = ref("")
+const input = ref('')
 const running = ref(false)
 
 type Outcome =
-  | { kind: "output"; text: string }
-  | { kind: "error"; title: string; message: string; raw: string; needInput?: boolean }
-  | { kind: "busy"; message: string }
+  | { kind: 'output'; text: string }
+  | { kind: 'error'; title: string; message: string; raw: string; needInput?: boolean }
+  | { kind: 'busy'; message: string }
 const outcome = ref<Outcome | null>(null)
 
 // 换课时组件实例可能被复用（v-for 的 key 是段落序号），跟着原文重置
 watch(original, (code) => {
   value.value = code
-  input.value = ""
+  input.value = ''
   outcome.value = null
 })
 
 const edited = computed(() => value.value !== original.value)
 // 看原文不看改过的：学生把 main 删了，按钮还在，点了才知道错在哪
-const runnable = computed(() => props.lang === "python" || /\bmain\s*\(/.test(original.value))
-const needsInput = computed(() =>
-  props.lang === "python"
-    ? /\binput\s*\(/.test(value.value)
-    : /\b(scanf|getchar|gets|fgets|cin)\b/.test(value.value),
-)
-const language = computed(() => (props.lang === "c" ? "C" : "Python"))
-const lineCount = computed(() => value.value.split("\n").length)
+const runnable = computed(() => props.lang === 'python' || /\bmain\s*\(/.test(original.value))
+const needsInput = computed(() => (props.lang === 'python' ? /\binput\s*\(/.test(value.value) : /\b(scanf|getchar|gets|fgets|cin)\b/.test(value.value)))
+const language = computed(() => (props.lang === 'c' ? 'C' : 'Python'))
+const lineCount = computed(() => value.value.split('\n').length)
 
-const TOO_MUCH_OUTPUT =
-  "程序输出太多了，一直停不下来：多半是循环没有结束的条件（条件一直成立、循环变量忘了改），在不停地打印。"
+const TOO_MUCH_OUTPUT = '程序输出太多了，一直停不下来：多半是循环没有结束的条件（条件一直成立、循环变量忘了改），在不停地打印。'
 
 /** 判题机的临时目录名对学生没有意义，只留文件名 */
 function cleanRaw(text: string) {
-  return text.replace(/\/judger\/run\/[^/"]+\//g, "").trim()
+  return text.replace(/\/judger\/run\/[^/"]+\//g, '').trim()
 }
 
 function compileOutcome(raw: string): Outcome {
-  const ex =
-    props.lang === "python"
-      ? explainPythonCompileError(raw, value.value)
-      : explainCCompileError(raw, value.value, "C")
+  const ex = props.lang === 'python' ? explainPythonCompileError(raw, value.value) : explainCCompileError(raw, value.value, 'C')
   return {
-    kind: "error",
-    title: ex?.line ? `第 ${ex.line} 行出错` : "代码有错，没能运行",
-    message: ex?.message ?? "",
+    kind: 'error',
+    title: ex?.line ? `第 ${ex.line} 行出错` : '代码有错，没能运行',
+    message: ex?.message ?? '',
     raw: cleanRaw(raw),
   }
 }
 
-function runtimeOutcome(
-  result: SubmissionStatus,
-  output: string,
-  info: NonNullable<StatisticInfo["runtime_error"]> | undefined,
-): Outcome {
+function runtimeOutcome(result: SubmissionStatus, output: string, info: NonNullable<StatisticInfo['runtime_error']> | undefined): Outcome {
   // 读输入读到头了：题目页那句「input() 用的次数超过了输入的行数」是说程序写错了，
   // 教程里多半是下面的输入框还空着，要说的是「先填输入」
-  if (result === SubmissionStatus.runtime_error && info?.type === "EOFError") {
+  if (result === SubmissionStatus.runtime_error && info?.type === 'EOFError') {
     return input.value.trim()
       ? {
-          kind: "error",
-          title: "输入不够",
-          message:
-            "程序每执行一次 input() 就读一行。输入框里的行数比它要读的少，按一行一个再多填几行。",
+          kind: 'error',
+          title: '输入不够',
+          message: '程序每执行一次 input() 就读一行。输入框里的行数比它要读的少，按一行一个再多填几行。',
           raw: cleanRaw(output),
           needInput: true,
         }
       : {
-          kind: "error",
-          title: "还没填输入",
-          message: "程序运行到 input() 在等你输入内容。先在上面的「输入」框里填好，再点运行。",
+          kind: 'error',
+          title: '还没填输入',
+          message: '程序运行到 input() 在等你输入内容。先在上面的「输入」框里填好，再点运行。',
           raw: cleanRaw(output),
           needInput: true,
         }
   }
   if (result === SubmissionStatus.runtime_error) {
     return {
-      kind: "error",
-      title: info?.line ? `运行到第 ${info.line} 行出错了` : "运行到一半出错了",
-      message: info ? explainRuntimeError(info, value.value) : "",
+      kind: 'error',
+      title: info?.line ? `运行到第 ${info.line} 行出错了` : '运行到一半出错了',
+      message: info ? explainRuntimeError(info, value.value) : '',
       raw: cleanRaw(output),
     }
   }
-  if (
-    result === SubmissionStatus.cpu_time_limit_exceeded ||
-    result === SubmissionStatus.real_time_limit_exceeded
-  ) {
+  if (result === SubmissionStatus.cpu_time_limit_exceeded || result === SubmissionStatus.real_time_limit_exceeded) {
     return {
-      kind: "error",
-      title: "运行超时了",
+      kind: 'error',
+      title: '运行超时了',
       message: needsInput.value
-        ? "程序一直没停下来：看看是不是在等输入（上面的输入框填够了吗），或者循环停不下来。"
-        : "程序一直没停下来：多半是循环没有结束的条件。",
+        ? '程序一直没停下来：看看是不是在等输入（上面的输入框填够了吗），或者循环停不下来。'
+        : '程序一直没停下来：多半是循环没有结束的条件。',
       raw: cleanRaw(output),
     }
   }
   if (result === SubmissionStatus.memory_limit_exceeded) {
-    return { kind: "error", title: "内存用太多了", message: "", raw: cleanRaw(output) }
+    return { kind: 'error', title: '内存用太多了', message: '', raw: cleanRaw(output) }
   }
-  return { kind: "busy", message: "运行没成功，过一会儿再点一次。" }
+  return { kind: 'busy', message: '运行没成功，过一会儿再点一次。' }
 }
 
 function toOutcome(response: TrialRunResponse): Outcome {
-  if (response.status === "compile-error") return compileOutcome(response.message)
-  if (response.status === "too-much-output") {
-    return { kind: "error", title: "输出太多了", message: TOO_MUCH_OUTPUT, raw: "" }
+  if (response.status === 'compile-error') return compileOutcome(response.message)
+  if (response.status === 'too-much-output') {
+    return { kind: 'error', title: '输出太多了', message: TOO_MUCH_OUTPUT, raw: '' }
   }
   const [item] = response.cases
-  if (!item) return { kind: "busy", message: "运行没成功，过一会儿再点一次。" }
+  if (!item) return { kind: 'busy', message: '运行没成功，过一会儿再点一次。' }
   const result = item.result as SubmissionStatus
   if (result === SubmissionStatus.accepted || result === SubmissionStatus.wrong_answer) {
-    return { kind: "output", text: item.output.trimEnd() }
+    return { kind: 'output', text: item.output.trimEnd() }
   }
   return runtimeOutcome(result, item.output, item.runtimeError)
 }
@@ -170,8 +154,8 @@ async function run() {
   } catch (error) {
     // 后端的文案是给学生看的（「上一次还没跑完」「试运行的人太多了」）
     outcome.value = {
-      kind: "busy",
-      message: errorMessage(error, "运行的服务暂时连不上，过一会儿再试。"),
+      kind: 'busy',
+      message: errorMessage(error, '运行的服务暂时连不上，过一会儿再试。'),
     }
   } finally {
     running.value = false
@@ -185,7 +169,7 @@ function restore() {
 
 async function copyCode() {
   await copy(value.value)
-  message.success("已复制")
+  message.success('已复制')
 }
 </script>
 
@@ -196,18 +180,9 @@ async function copyCode() {
       <span class="grow" />
       <template v-if="edited">
         <span class="edited">改过</span>
-        <button type="button" class="tool" @click="restore">
-          <Icon icon="ph:arrow-counter-clockwise" :width="14" />还原
-        </button>
+        <button type="button" class="tool" @click="restore"><Icon icon="ph:arrow-counter-clockwise" :width="14" />还原</button>
       </template>
-      <button
-        v-if="runnable"
-        type="button"
-        class="run"
-        :class="{ busy: running }"
-        :disabled="running"
-        @click="run"
-      >
+      <button v-if="runnable" type="button" class="run" :class="{ busy: running }" :disabled="running" @click="run">
         <template v-if="running">运行中…</template>
         <template v-else><Icon icon="ph:play-fill" :width="12" />运行</template>
       </button>
@@ -216,33 +191,15 @@ async function copyCode() {
       </button>
     </div>
     <div class="editor" :style="{ minHeight: `${lineCount * 22 + 16}px` }">
-      <CodeEditor
-        v-model:value="value"
-        :language="language"
-        :font-size="14"
-        height="auto"
-        :extra-extensions="extensions"
-      />
+      <CodeEditor v-model:value="value" :language="language" :font-size="14" height="auto" :extra-extensions="extensions" />
     </div>
-    <div
-      v-if="runnable && needsInput"
-      class="pane input"
-      :class="{ ask: outcome?.kind === 'error' && outcome.needInput }"
-    >
+    <div v-if="runnable && needsInput" class="pane input" :class="{ ask: outcome?.kind === 'error' && outcome.needInput }">
       <div class="label">输入</div>
-      <n-input
-        v-model:value="input"
-        type="textarea"
-        :autosize="{ minRows: 1, maxRows: 6 }"
-        placeholder="程序要读的内容写在这里，一行一个"
-        class="mono"
-      />
+      <n-input v-model:value="input" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" placeholder="程序要读的内容写在这里，一行一个" class="mono" />
     </div>
     <div v-if="outcome?.kind === 'output'" class="pane">
       <div class="label">输出</div>
-      <pre class="out" :class="{ empty: !outcome.text }">{{
-        outcome.text || "（什么都没有输出）"
-      }}</pre>
+      <pre class="out" :class="{ empty: !outcome.text }">{{ outcome.text || '（什么都没有输出）' }}</pre>
     </div>
     <div v-else-if="outcome?.kind === 'error'" class="pane error">
       <div class="label strong">{{ outcome.title }}</div>

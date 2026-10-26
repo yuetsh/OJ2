@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash } from 'node:crypto'
 
 import {
   isExamTag,
@@ -8,16 +8,16 @@ import {
   type ContestScoreboard,
   type ContestScoreRow,
   type ContestSubmissionInfo,
-} from "@oj2/contract"
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm"
-import type { Context, MiddlewareHandler } from "hono"
+} from '@oj2/contract'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import type { Context, MiddlewareHandler } from 'hono'
 
-import type { AppEnv } from "../auth/middleware"
-import type { AuthUser } from "../auth/session"
-import { getContestPassword } from "../auth/session"
-import { db, schema } from "../db"
-import { failure } from "../http"
-import { ownsOrSuper } from "./permissions"
+import type { AppEnv } from '../auth/middleware'
+import type { AuthUser } from '../auth/session'
+import { getContestPassword } from '../auth/session'
+import { db, schema } from '../db'
+import { failure } from '../http'
+import { ownsOrSuper } from './permissions'
 
 export type ContestRow = typeof schema.contest.$inferSelect
 
@@ -29,14 +29,14 @@ export type ContestRow = typeof schema.contest.$inferSelect
  * 而漏调 canAccessContest 是静默放行，两者不可同日而语。
  */
 export interface ContestEnv extends AppEnv {
-  Variables: AppEnv["Variables"] & { contest?: ContestRow }
+  Variables: AppEnv['Variables'] & { contest?: ContestRow }
 }
 
 export function contestStatus(contest: ContestRow) {
   const now = Date.now()
-  if (Date.parse(contest.startTime) > now) return "1" as const
-  if (Date.parse(contest.endTime) < now) return "-1" as const
-  return "0" as const
+  if (Date.parse(contest.startTime) > now) return '1' as const
+  if (Date.parse(contest.endTime) < now) return '-1' as const
+  return '0' as const
 }
 
 export function isContestAdmin(user: AuthUser | null | undefined, contest: ContestRow) {
@@ -44,23 +44,17 @@ export function isContestAdmin(user: AuthUser | null | undefined, contest: Conte
 }
 
 export function contestDetailsAllowed(user: AuthUser | null | undefined, contest: ContestRow) {
-  return contestStatus(contest) === "-1" || isContestAdmin(user, contest)
+  return contestStatus(contest) === '-1' || isContestAdmin(user, contest)
 }
 
-export function checkContestPassword(
-  candidate: string | null | undefined,
-  expected: string | null,
-) {
+export function checkContestPassword(candidate: string | null | undefined, expected: string | null) {
   if (!candidate || !expected) return false
   if (candidate === expected) return true
-  const parts = candidate.split("#")
+  const parts = candidate.split('#')
   if (parts.length !== 2) return false
   const [signature, expiresAt] = parts
   if (!signature || !expiresAt || !/^\d+$/.test(expiresAt)) return false
-  const expectedSignature = createHash("sha256")
-    .update(`${expected}${expiresAt}`)
-    .digest("hex")
-    .slice(0, 8)
+  const expectedSignature = createHash('sha256').update(`${expected}${expiresAt}`).digest('hex').slice(0, 8)
   return signature === expectedSignature && Date.now() < Number(expiresAt) * 1000
 }
 
@@ -82,29 +76,25 @@ export async function findAccessibleContest(user: AuthUser | null | undefined, i
 
 // 泛型而不是写死 Context<AppEnv>：requireContestAccess 传进来的是 Context<ContestEnv>，
 // 它比 AppEnv 多一个变量，而 Hono 的 Context 在 Variables 上是逆变的，写死会类型不兼容。
-export async function canAccessContest<E extends AppEnv>(
-  c: Context<E>,
-  contest: ContestRow,
-  checkType: "details" | "problems" | "ranks" | "submissions",
-) {
-  const user = c.get("user")
-  if (!user) return { ok: false as const, code: "login-required", message: "请先登录" }
+export async function canAccessContest<E extends AppEnv>(c: Context<E>, contest: ContestRow, checkType: 'details' | 'problems' | 'ranks' | 'submissions') {
+  const user = c.get('user')
+  if (!user) return { ok: false as const, code: 'login-required', message: '请先登录' }
   if (isContestAdmin(user, contest)) return { ok: true as const }
   if (contest.password) {
     const stored = await getContestPassword(c, contest.id)
     if (!checkContestPassword(stored, contest.password)) {
       return {
         ok: false as const,
-        code: "wrong-password",
-        message: "比赛密码不对，或者已经过期了，请重新输入",
+        code: 'wrong-password',
+        message: '比赛密码不对，或者已经过期了，请重新输入',
       }
     }
   }
-  if (contestStatus(contest) === "1" && checkType !== "details") {
+  if (contestStatus(contest) === '1' && checkType !== 'details') {
     return {
       ok: false as const,
-      code: "contest-not-started",
-      message: "比赛还没有开始",
+      code: 'contest-not-started',
+      message: '比赛还没有开始',
     }
   }
   return { ok: true as const }
@@ -121,20 +111,16 @@ export async function canAccessContest<E extends AppEnv>(
  * 注意：`POST /submissions` 用不了它 —— 那里的比赛 id 来自请求体而非路径参数，
  * 中间件跑的时候还没解析 body。那一处仍是手工调用，见 submission.ts 内的说明。
  */
-export function requireContestAccess(
-  checkType: "details" | "problems" | "ranks" | "submissions",
-  paramName = "id",
-): MiddlewareHandler<ContestEnv> {
+export function requireContestAccess(checkType: 'details' | 'problems' | 'ranks' | 'submissions', paramName = 'id'): MiddlewareHandler<ContestEnv> {
   return async (c, next) => {
     const id = Number(c.req.param(paramName))
-    const contest =
-      Number.isInteger(id) && id > 0 ? await findAccessibleContest(c.get("user"), id) : null
-    if (!contest) return failure(c, 404, "contest-not-found", "比赛不存在")
+    const contest = Number.isInteger(id) && id > 0 ? await findAccessibleContest(c.get('user'), id) : null
+    if (!contest) return failure(c, 404, 'contest-not-found', '比赛不存在')
     const access = await canAccessContest(c, contest, checkType)
     if (!access.ok) {
-      return failure(c, access.code === "login-required" ? 401 : 403, access.code, access.message)
+      return failure(c, access.code === 'login-required' ? 401 : 403, access.code, access.message)
     }
-    c.set("contest", contest)
+    c.set('contest', contest)
     await next()
   }
 }
@@ -146,9 +132,7 @@ export function isContestTeacher(user: AuthUser | null | undefined, contest: Con
 
 /** 期中、期末进行中，学生看不到排名和每题做对人数（见契约 isExamTag） */
 export function rankHiddenFor(user: AuthUser | null | undefined, contest: ContestRow) {
-  return (
-    isExamTag(contest.tag) && contestStatus(contest) === "0" && !isContestTeacher(user, contest)
-  )
+  return isExamTag(contest.tag) && contestStatus(contest) === '0' && !isContestTeacher(user, contest)
 }
 
 const PENALTY_SECONDS = 20 * 60
@@ -191,10 +175,7 @@ function ranksAt(rows: RankRow[], cutoff: number) {
  * 整张榜。名次按 做对数 ↓、罚时 ↑ 排，同分的按 rank 行 id 定个稳定顺序（不并列名次，和原来一样）。
  * 只算学生、不算禁用的号；老师赛中试做的提交不上榜，也不占「最先做对」。
  */
-export async function buildScoreboard(
-  contest: ContestRow,
-  viewer: AuthUser | null | undefined,
-): Promise<ContestScoreboard> {
+export async function buildScoreboard(contest: ContestRow, viewer: AuthUser | null | undefined): Promise<ContestScoreboard> {
   const teacher = isContestTeacher(viewer, contest)
   const hidden = rankHiddenFor(viewer, contest)
   const [problems, rankRows] = await Promise.all([
@@ -221,18 +202,8 @@ export async function buildScoreboard(
       .from(schema.acmContestRank)
       .innerJoin(schema.user, eq(schema.acmContestRank.userId, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .where(
-        and(
-          eq(schema.acmContestRank.contestId, contest.id),
-          inArray(schema.user.adminType, [...STUDENT_ROLES]),
-          eq(schema.user.isDisabled, false),
-        ),
-      )
-      .orderBy(
-        desc(schema.acmContestRank.acceptedNumber),
-        asc(schema.acmContestRank.totalTime),
-        asc(schema.acmContestRank.id),
-      ),
+      .where(and(eq(schema.acmContestRank.contestId, contest.id), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
+      .orderBy(desc(schema.acmContestRank.acceptedNumber), asc(schema.acmContestRank.totalTime), asc(schema.acmContestRank.id)),
   ])
 
   // 每题学生里最早做对的那一秒
@@ -246,8 +217,7 @@ export async function buildScoreboard(
   }
 
   const elapsed = Math.floor((Date.now() - Date.parse(contest.startTime)) / 1000)
-  const prev =
-    contestStatus(contest) === "0" ? ranksAt(rankRows, elapsed - RANK_MOVE_WINDOW_SECONDS) : null
+  const prev = contestStatus(contest) === '0' ? ranksAt(rankRows, elapsed - RANK_MOVE_WINDOW_SECONDS) : null
 
   const rows: ContestScoreRow[] = rankRows.map((row, index) => ({
     rankId: row.rankId,
@@ -284,8 +254,7 @@ export async function buildScoreboard(
       triedUsers += 1
       if (!cell.isAc) continue
       solvedUsers += 1
-      if (cell.firstAc && !firstSolver)
-        firstSolver = { username: row.username, acTime: cell.acTime }
+      if (cell.firstAc && !firstSolver) firstSolver = { username: row.username, acTime: cell.acTime }
     }
     return hidden
       ? {
@@ -316,9 +285,7 @@ export async function buildScoreboard(
         ...row,
         rank: null,
         prevRank: null,
-        cells: Object.fromEntries(
-          Object.entries(row.cells).map(([key, cell]) => [key, { ...cell, firstAc: false }]),
-        ),
+        cells: Object.fromEntries(Object.entries(row.cells).map(([key, cell]) => [key, { ...cell, firstAc: false }])),
       })),
     }
   }
@@ -330,10 +297,7 @@ export async function buildScoreboard(
  * 比赛不绑班（2026-10 用户定的「都能进」），名单按参赛的人推：一个班来了一半以上，
  * 就把这个班算进来，班里没交过题的人列成「没进来」。技能周那种七个班各来几个人的，一个班也不算
  */
-export async function buildClassView(
-  contest: ContestRow,
-  viewer: AuthUser,
-): Promise<ContestClassView> {
+export async function buildClassView(contest: ContestRow, viewer: AuthUser): Promise<ContestClassView> {
   const board = await buildScoreboard(contest, viewer)
   const last = await db.execute<{ user_id: number; create_time: string; problem_id: number }>(sql`
     select distinct on (user_id) user_id, create_time, problem_id
@@ -341,7 +305,7 @@ export async function buildClassView(
     where contest_id = ${contest.id}
     order by user_id, create_time desc
   `)
-  const lastSubmit: ContestClassView["lastSubmit"] = {}
+  const lastSubmit: ContestClassView['lastSubmit'] = {}
   for (const row of last) {
     lastSubmit[String(row.user_id)] = { time: row.create_time, problemId: row.problem_id }
   }
@@ -363,22 +327,12 @@ export async function buildClassView(
           })
           .from(schema.user)
           .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-          .where(
-            and(
-              inArray(schema.user.className, candidates),
-              inArray(schema.user.adminType, [...STUDENT_ROLES]),
-              eq(schema.user.isDisabled, false),
-            ),
-          )
+          .where(and(inArray(schema.user.className, candidates), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
           .orderBy(asc(schema.user.username))
   const size = new Map<string, number>()
   for (const user of roster) size.set(user.className!, (size.get(user.className!) ?? 0) + 1)
-  const classes = candidates
-    .filter((name) => (came.get(name) ?? 0) * 2 >= (size.get(name) ?? 0))
-    .sort()
+  const classes = candidates.filter((name) => (came.get(name) ?? 0) * 2 >= (size.get(name) ?? 0)).sort()
   const joined = new Set(board.rows.map((row) => row.userId))
-  const absent = roster.filter(
-    (user) => classes.includes(user.className!) && !joined.has(user.userId),
-  )
+  const absent = roster.filter((user) => classes.includes(user.className!) && !joined.has(user.userId))
   return { ...board, lastSubmit, classes, absent }
 }

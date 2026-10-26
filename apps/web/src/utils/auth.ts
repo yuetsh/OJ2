@@ -1,6 +1,6 @@
-import type { AuthTokens } from "@oj2/contract"
-import { STORAGE_KEY } from "./constants"
-import storage from "./storage"
+import type { AuthTokens } from '@oj2/contract'
+import { STORAGE_KEY } from './constants'
+import storage from './storage'
 
 /**
  * 登录态的两张 token，存 localStorage。
@@ -36,23 +36,19 @@ export function clearTokens() {
 
 export function getRefreshToken(): string | null {
   const value = storage.get(STORAGE_KEY.REFRESH_TOKEN)
-  return typeof value === "string" ? value : null
+  return typeof value === 'string' ? value : null
 }
 
 function readAccess(): StoredAccess | null {
   const value = storage.get(STORAGE_KEY.ACCESS_TOKEN) as StoredAccess | null
-  return value && typeof value.token === "string" && typeof value.expiresAt === "number"
-    ? value
-    : null
+  return value && typeof value.token === 'string' && typeof value.expiresAt === 'number' ? value : null
 }
 
 /**
  * 换 token 的结果。`network-error` 时**不清** token：断网、后端重启都是暂时的，
  * 清掉等于让学生重新登录；只有后端明确说 refresh token 不认了才清。
  */
-export type RefreshOutcome =
-  | { token: string; code?: undefined }
-  | { token: null; code: "refresh-invalid" | "account-disabled" | "network-error" }
+export type RefreshOutcome = { token: string; code?: undefined } | { token: null; code: 'refresh-invalid' | 'account-disabled' | 'network-error' }
 
 let inflight: Promise<RefreshOutcome> | null = null
 
@@ -73,7 +69,7 @@ export function refreshAccessToken(stale?: string) {
  */
 function withRefreshLock<T>(task: () => Promise<T>): Promise<T> {
   const locks = (navigator as Navigator & { locks?: LockManager }).locks
-  return locks ? (locks.request("oj2-token-refresh", task) as Promise<T>) : task()
+  return locks ? (locks.request('oj2-token-refresh', task) as Promise<T>) : task()
 }
 
 async function runRefresh(stale?: string): Promise<RefreshOutcome> {
@@ -82,18 +78,18 @@ async function runRefresh(stale?: string): Promise<RefreshOutcome> {
     return { token: access.token }
   }
   const refreshToken = getRefreshToken()
-  if (!refreshToken) return { token: null, code: "refresh-invalid" }
+  if (!refreshToken) return { token: null, code: 'refresh-invalid' }
 
   let response: Response
   try {
     // 裸 fetch：走 authFetch / utils/api 会再来换 token，绕回这里
-    response = await fetch("/api/auth/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     })
   } catch {
-    return { token: null, code: "network-error" }
+    return { token: null, code: 'network-error' }
   }
   const body = (await response.json().catch(() => null)) as {
     data?: AuthTokens
@@ -104,12 +100,12 @@ async function runRefresh(stale?: string): Promise<RefreshOutcome> {
     return { token: body.data.accessToken }
   }
   const code = body?.error?.code
-  if (code === "refresh-invalid" || code === "account-disabled") {
+  if (code === 'refresh-invalid' || code === 'account-disabled') {
     clearTokens()
     return { token: null, code }
   }
   // 5xx、网关的错误页：当成暂时的，同上
-  return { token: null, code: "network-error" }
+  return { token: null, code: 'network-error' }
 }
 
 /**
@@ -122,7 +118,7 @@ export async function getAccessToken() {
   if (!access && !getRefreshToken()) return null
   const outcome = await refreshAccessToken()
   if (outcome.token) return outcome.token
-  return outcome.code === "network-error" ? (access?.token ?? null) : null
+  return outcome.code === 'network-error' ? (access?.token ?? null) : null
 }
 
 /** 后端回的错误码。读的是副本，原响应体留给调用方 */
@@ -153,17 +149,17 @@ export async function authFetch(input: string, init: RequestInit = {}) {
   const token = await getAccessToken()
   const response = await send(token)
   if (response.status !== 401 || !token) return response
-  if ((await responseCode(response)) !== "token-expired") return response
+  if ((await responseCode(response)) !== 'token-expired') return response
 
   const outcome = await refreshAccessToken(token)
-  if (outcome.code === "network-error") throw new TypeError("换 token 时网络异常")
+  if (outcome.code === 'network-error') throw new TypeError('换 token 时网络异常')
   // 账号被禁用：换 token 那一步就知道了，原请求不必再发。造一个和后端同形的响应，
   // 调用方按原样处理（弹「账号已被禁用」而不是登录框）
-  if (outcome.code === "account-disabled") {
-    return new Response(
-      JSON.stringify({ error: { code: "account-disabled", message: "账号已被禁用，请联系老师" } }),
-      { status: 403, headers: { "Content-Type": "application/json" } },
-    )
+  if (outcome.code === 'account-disabled') {
+    return new Response(JSON.stringify({ error: { code: 'account-disabled', message: '账号已被禁用，请联系老师' } }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
   // 换不到就拿掉 token 重发：要登录的接口回 login-required 弹登录框，可选登录的当游客
   return send(outcome.token)

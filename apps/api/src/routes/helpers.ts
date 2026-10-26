@@ -1,10 +1,10 @@
-import { ADMIN_ROLES, NO_CLASS, STUDENT_ROLES, TEACHER_ROLES, type SampleUser } from "@oj2/contract"
+import { ADMIN_ROLES, NO_CLASS, STUDENT_ROLES, TEACHER_ROLES, type SampleUser } from '@oj2/contract'
 
-import { and, count, eq, ilike, inArray, isNull, notInArray, sql } from "drizzle-orm"
+import { and, count, eq, ilike, inArray, isNull, notInArray, sql } from 'drizzle-orm'
 
-import type { AuthUser } from "../auth/session"
-import { db, schema } from "../db"
-import { NON_FAILURE_RESULTS } from "../judge/status"
+import type { AuthUser } from '../auth/session'
+import { db, schema } from '../db'
+import { NON_FAILURE_RESULTS } from '../judge/status'
 
 /**
  * 用户对象的序列化层，对齐旧后端 `utils/api/_serializers.py` 的 `UsernameSerializer`。
@@ -69,16 +69,10 @@ export function asFilterValue<T extends string | number>(value: string | number)
 }
 
 export function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
-export function queryInteger(
-  value: string | undefined,
-  fallback: number,
-  options: { min?: number; max?: number } = {},
-) {
+export function queryInteger(value: string | undefined, fallback: number, options: { min?: number; max?: number } = {}) {
   const parsed = Number(value)
   if (!Number.isInteger(parsed)) return fallback
   if (options.min !== undefined && parsed < options.min) return fallback
@@ -102,15 +96,15 @@ export function isTeacherOrAbove(user: AuthUser | null | undefined) {
 }
 
 export function isSuperAdmin(user: AuthUser | null | undefined) {
-  return user?.adminType === "Super Admin"
+  return user?.adminType === 'Super Admin'
 }
 
 export function publicTemplates(value: unknown) {
   const templates: Record<string, string> = {}
   for (const [language, raw] of Object.entries(asRecord(value))) {
-    if (typeof raw !== "string") continue
+    if (typeof raw !== 'string') continue
     const match = raw.match(/\/\/TEMPLATE BEGIN\n([\s\S]+?)\/\/TEMPLATE END/)
-    templates[language] = match?.[1] ?? ""
+    templates[language] = match?.[1] ?? ''
   }
   return templates
 }
@@ -132,13 +126,7 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
   const [failed] = await db
     .select({ value: count() })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, userId),
-        eq(schema.submission.problemId, problemId),
-        notInArray(schema.submission.result, NON_FAILURE_RESULTS),
-      ),
-    )
+    .where(and(eq(schema.submission.userId, userId), eq(schema.submission.problemId, problemId), notInArray(schema.submission.result, NON_FAILURE_RESULTS)))
   return failed?.value ?? 0
 }
 
@@ -167,9 +155,7 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
  * 会混进「没填班级」，还算进做完的人数里（切课那边也只算学生，两边口径一致）
  */
 export function classCondition(className: string) {
-  return className === NO_CLASS
-    ? and(isNull(schema.user.className), inArray(schema.user.adminType, [...STUDENT_ROLES]))
-    : eq(schema.user.className, className)
+  return className === NO_CLASS ? and(isNull(schema.user.className), inArray(schema.user.adminType, [...STUDENT_ROLES])) : eq(schema.user.className, className)
 }
 
 /**
@@ -190,12 +176,7 @@ export async function scopedUsers(username: string | undefined, className: strin
       adminType: schema.user.adminType,
     })
     .from(schema.user)
-    .where(
-      and(
-        className ? classCondition(className) : undefined,
-        username ? ilike(schema.user.username, `%${username}%`) : undefined,
-      ),
-    )
+    .where(and(className ? classCondition(className) : undefined, username ? ilike(schema.user.username, `%${username}%`) : undefined))
 }
 
 export async function matchedUsers(username: string) {

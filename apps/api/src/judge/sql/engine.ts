@@ -32,11 +32,11 @@
  *    跑飞的学生语句最多多占这么久，而不是整个作业预算。
  */
 
-import initSqlJs, { type Database, type SqlJsStatic } from "sql.js"
-import sqlWasmPath from "sql.js/dist/sql-wasm.wasm" with { type: "file" }
-import { readFileSync } from "node:fs"
+import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
+import sqlWasmPath from 'sql.js/dist/sql-wasm.wasm' with { type: 'file' }
+import { readFileSync } from 'node:fs'
 
-import { JudgeStatus, type JudgeStatusValue } from "../status"
+import { JudgeStatus, type JudgeStatusValue } from '../status'
 
 /** 单结果集/单表最大行数，防 CROSS JOIN 撑爆内存 */
 const ROW_LIMIT = 10_000
@@ -45,7 +45,7 @@ const DISPLAY_ROW_LIMIT = 20
 const ERROR_MESSAGE_MAX_LEN = 200
 
 /** prepare 阶段的语法类错误，映射为 COMPILE_ERROR */
-const SYNTAX_ERROR_MARKERS = ["syntax error", "unrecognized token", "incomplete input"]
+const SYNTAX_ERROR_MARKERS = ['syntax error', 'unrecognized token', 'incomplete input']
 
 export class SqlCaseError extends Error {
   constructor(
@@ -70,9 +70,7 @@ export async function sqlEngine() {
 }
 
 function truncate(message: string) {
-  return message.length > ERROR_MESSAGE_MAX_LEN
-    ? `${message.slice(0, ERROR_MESSAGE_MAX_LEN)}...`
-    : message
+  return message.length > ERROR_MESSAGE_MAX_LEN ? `${message.slice(0, ERROR_MESSAGE_MAX_LEN)}...` : message
 }
 
 // ---------------------------------------------------------------- 值归一化
@@ -84,14 +82,14 @@ type Canonical = string
  * （1 == 1.0，浮点保留 6 位有效数字）。与旧 `_canonical_value` 同口径。
  */
 function canonicalValue(value: unknown): Canonical {
-  if (value === null || value === undefined) return "null"
-  if (value instanceof Uint8Array) return `blob:${Buffer.from(value).toString("hex")}`
-  if (typeof value === "number") {
+  if (value === null || value === undefined) return 'null'
+  if (value instanceof Uint8Array) return `blob:${Buffer.from(value).toString('hex')}`
+  if (typeof value === 'number') {
     if (Number.isInteger(value) && Math.abs(value) < 2 ** 53) return `num:${value}`
     // Python 的 format(v, ".6g")
     return `num:${formatG6(value)}`
   }
-  if (typeof value === "bigint") return `num:${value}`
+  if (typeof value === 'bigint') return `num:${value}`
   return `str:${String(value)}`
 }
 
@@ -101,15 +99,15 @@ function formatG6(value: number) {
   if (exponent < -4 || exponent >= 6) {
     return value
       .toExponential(5)
-      .replace(/\.?0+e/, "e")
-      .replace(/e([+-])(\d)$/, "e$10$2")
+      .replace(/\.?0+e/, 'e')
+      .replace(/e([+-])(\d)$/, 'e$10$2')
   }
   const text = value.toPrecision(6)
-  return text.includes(".") ? text.replace(/\.?0+$/, "") : text
+  return text.includes('.') ? text.replace(/\.?0+$/, '') : text
 }
 
 function canonicalRow(row: unknown[]) {
-  return row.map(canonicalValue).join("")
+  return row.map(canonicalValue).join('')
 }
 
 // ---------------------------------------------------------------- 执行
@@ -128,7 +126,7 @@ function applyLimits(db: Database, memoryLimitMb: number) {
 
 function newDatabase(SQL: SqlJsStatic, memoryLimitMb: number) {
   const db = new SQL.Database()
-  db.run("PRAGMA page_size=4096")
+  db.run('PRAGMA page_size=4096')
   applyLimits(db, memoryLimitMb)
   return db
 }
@@ -157,24 +155,24 @@ function iterate(db: Database, script: string): Iterable<PreparedStatement> {
  * 比在原文上自己做词法猜测可靠得多。
  */
 function leadingKeyword(statement: PreparedStatement) {
-  let text = ""
+  let text = ''
   try {
-    text = statement.getNormalizedSQL() ?? ""
+    text = statement.getNormalizedSQL() ?? ''
   } catch {
-    text = ""
+    text = ''
   }
   // 万一这个 build 没开 SQLITE_ENABLE_NORMALIZE，退回到原文剥注释
   if (!text) {
     text = statement
       .getSQL()
-      .replace(/\/\*[\s\S]*?\*\//g, " ")
-      .replace(/--[^\n]*/g, " ")
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/--[^\n]*/g, ' ')
   }
   return (
     text
       .trimStart()
       .split(/[\s(;]/, 1)[0]
-      ?.toUpperCase() ?? ""
+      ?.toUpperCase() ?? ''
   )
 }
 
@@ -196,18 +194,13 @@ class ByteBudget {
 
   charge(row: unknown[]) {
     for (const value of row) {
-      const bytes =
-        value instanceof Uint8Array
-          ? value.byteLength
-          : typeof value === "string"
-            ? Buffer.byteLength(value)
-            : 8 // 数字和 NULL 按定长算，撑不出内存
+      const bytes = value instanceof Uint8Array ? value.byteLength : typeof value === 'string' ? Buffer.byteLength(value) : 8 // 数字和 NULL 按定长算，撑不出内存
       if (bytes > this.maxBytes) {
-        throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, "单个数据值超出内存限制")
+        throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, '单个数据值超出内存限制')
       }
       this.used += bytes
       if (this.used > this.maxBytes) {
-        throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, "查询结果超出内存限制")
+        throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, '查询结果超出内存限制')
       }
     }
   }
@@ -232,7 +225,7 @@ function executeStatements(
   let last: ResultSet | null = null
   for (const statement of iterate(db, script)) {
     try {
-      if (Date.now() > deadline) throw new Error("interrupted")
+      if (Date.now() > deadline) throw new Error('interrupted')
       guard?.(statement)
       const names = statement.getColumnNames()
       if (names.length > 0) {
@@ -242,10 +235,7 @@ function executeStatements(
           budget?.charge(row)
           rows.push(canonicalRow(row))
           if (rows.length > ROW_LIMIT) {
-            throw new SqlCaseError(
-              JudgeStatus.MEMORY_LIMIT_EXCEEDED,
-              `查询结果超过 ${ROW_LIMIT} 行`,
-            )
+            throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, `查询结果超过 ${ROW_LIMIT} 行`)
           }
         }
         last = { columns: names.length, rows }
@@ -263,10 +253,7 @@ function executeStatements(
 
 /** dump 所有用户表：{表名: 列数 + 已排序的行}，表状态天然无序 */
 function dumpTables(db: Database, budget?: ByteBudget) {
-  const names = queryColumn(
-    db,
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-  )
+  const names = queryColumn(db, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
   const state: Record<string, { columns: number; rows: string[] }> = {}
   for (const table of names) {
     const quoted = String(table).replaceAll('"', '""')
@@ -297,7 +284,7 @@ function queryColumn(db: Database, sql: string) {
 }
 
 function trustedErrorText(message: string) {
-  if (message.includes("interrupted")) return "超时"
+  if (message.includes('interrupted')) return '超时'
   return truncate(message)
 }
 
@@ -309,23 +296,14 @@ function executeTrusted(db: Database, script: string, deadline: number, prefix: 
     if (error instanceof SqlCaseError) {
       throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, `${prefix}: ${error.detail}`)
     }
-    throw new SqlCaseError(
-      JudgeStatus.SYSTEM_ERROR,
-      `${prefix}: ${trustedErrorText(String((error as Error).message))}`,
-    )
+    throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, `${prefix}: ${trustedErrorText(String((error as Error).message))}`)
   }
 }
 
 /** 带防护执行学生 SQL，异常映射为学生级 JudgeStatus */
-function runStudent(
-  db: Database,
-  script: string,
-  mode: string,
-  deadline: number,
-  memoryLimitMb: number,
-) {
+function runStudent(db: Database, script: string, mode: string, deadline: number, memoryLimitMb: number) {
   // 查询题只读：PRAGMA query_only 是 SQLite 原生开关，替代旧实现的 authorizer 白名单
-  if (mode === "query") db.run("PRAGMA query_only=1")
+  if (mode === 'query') db.run('PRAGMA query_only=1')
   // 把题目的 memoryLimit 变成学生看得见的约束，替代旧实现的 setlimit(LIMIT_LENGTH)
   const budget = new ByteBudget(Math.max(Math.trunc(memoryLimitMb), 1) * 1024 * 1024)
   try {
@@ -337,48 +315,41 @@ function runStudent(
         // query_only 自己就是个 PRAGMA，不拦 PRAGMA 的话学生一句 `PRAGMA query_only=0`
         // 就把只读关掉了。旧实现的 authorizer 把 SQLITE_PRAGMA 一律拒掉，这里对齐它。
         // 教学场景下学生也没有用 PRAGMA 的正当需求，两种题型一律拒。
-        if (leadingKeyword(statement) === "PRAGMA") {
-          throw new SqlCaseError(JudgeStatus.RUNTIME_ERROR, "禁止使用 PRAGMA 语句")
+        if (leadingKeyword(statement) === 'PRAGMA') {
+          throw new SqlCaseError(JudgeStatus.RUNTIME_ERROR, '禁止使用 PRAGMA 语句')
         }
         // 兜底：万一漏掉某种改设置的写法，限制在每条语句前都重放一遍
         applyLimits(db, memoryLimitMb)
-        if (mode === "query") db.run("PRAGMA query_only=1")
+        if (mode === 'query') db.run('PRAGMA query_only=1')
       },
       budget,
     )
-    if (mode === "query") return last
+    if (mode === 'query') return last
     return dumpTables(db, budget)
   } catch (error) {
     if (error instanceof SqlCaseError) throw error
     const message = String((error as Error).message)
-    if (message.includes("interrupted")) {
-      throw new SqlCaseError(JudgeStatus.CPU_TIME_LIMIT_EXCEEDED, "SQL 执行超时")
+    if (message.includes('interrupted')) {
+      throw new SqlCaseError(JudgeStatus.CPU_TIME_LIMIT_EXCEEDED, 'SQL 执行超时')
     }
-    if (message.includes("database or disk is full")) {
-      throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, "数据量超出内存限制")
+    if (message.includes('database or disk is full')) {
+      throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, '数据量超出内存限制')
     }
     // WASM 堆触顶（zeroblob/group_concat 构造出的超大单值）或 SQLite 自身的长度上限
-    if (
-      message.includes("too big") ||
-      message.includes("out of memory") ||
-      message.includes("Aborted")
-    ) {
-      throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, "单个数据值超出内存限制")
+    if (message.includes('too big') || message.includes('out of memory') || message.includes('Aborted')) {
+      throw new SqlCaseError(JudgeStatus.MEMORY_LIMIT_EXCEEDED, '单个数据值超出内存限制')
     }
-    if (message.includes("readonly database")) {
-      throw new SqlCaseError(
-        JudgeStatus.RUNTIME_ERROR,
-        "本题为查询题，禁止修改数据或表结构（INSERT/UPDATE/DELETE/CREATE 等）",
-      )
+    if (message.includes('readonly database')) {
+      throw new SqlCaseError(JudgeStatus.RUNTIME_ERROR, '本题为查询题，禁止修改数据或表结构（INSERT/UPDATE/DELETE/CREATE 等）')
     }
     if (SYNTAX_ERROR_MARKERS.some((marker) => message.includes(marker))) {
       throw new SqlCaseError(JudgeStatus.COMPILE_ERROR, truncate(message))
     }
     throw new SqlCaseError(JudgeStatus.RUNTIME_ERROR, truncate(message))
   } finally {
-    if (mode === "query") {
+    if (mode === 'query') {
       try {
-        db.run("PRAGMA query_only=0")
+        db.run('PRAGMA query_only=0')
       } catch {
         /* 连接可能已不可用 */
       }
@@ -387,23 +358,23 @@ function runStudent(
 }
 
 function compare(expected: unknown, actual: unknown, mode: string, orderSensitive: boolean) {
-  if (mode === "query") {
+  if (mode === 'query') {
     const exp = expected as ResultSet
     const act = actual as ResultSet
     if (exp.columns !== act.columns) return false
-    if (orderSensitive) return exp.rows.join("") === act.rows.join("")
-    return [...exp.rows].sort().join("") === [...act.rows].sort().join("")
+    if (orderSensitive) return exp.rows.join('') === act.rows.join('')
+    return [...exp.rows].sort().join('') === [...act.rows].sort().join('')
   }
   return JSON.stringify(expected) === JSON.stringify(actual)
 }
 
 export interface RunCaseOptions {
-  mode: "query" | "modify"
+  mode: 'query' | 'modify'
   orderSensitive: boolean
   timeLimitMs: number
   memoryLimitMb: number
   /** 阶段回调，子进程据此写 stderr 标记，父进程据此收紧兜底 SIGKILL 时限 */
-  onPhase?: (phase: "prepare" | "student") => void
+  onPhase?: (phase: 'prepare' | 'student') => void
 }
 
 /**
@@ -434,14 +405,9 @@ export interface CaseResult {
  * 判一个测试点，返回与外部 judger 单测试点同构的结构。
  * 学生错误（CE/WA/TLE/MLE/RE）体现在返回值里；出题配置错误抛 SqlCaseError(SYSTEM_ERROR)。
  */
-export async function runCase(
-  initSql: string,
-  refSql: string,
-  studentSql: string,
-  options: RunCaseOptions,
-): Promise<CaseResult> {
+export async function runCase(initSql: string, refSql: string, studentSql: string, options: RunCaseOptions): Promise<CaseResult> {
   const SQL = await sqlEngine()
-  options.onPhase?.("prepare")
+  options.onPhase?.('prepare')
   // 受信脚本的运行上限放宽，避免出题数据较大时误报；仍防子进程永久阻塞。
   // 三段受信执行（两次初始化 + 一次标准答案）共用同一个 deadline，
   // 这样"受信阶段总耗时"有确定上限，父进程才能算出匹配的兜底时限。
@@ -450,29 +416,26 @@ export async function runCase(
   let expected: unknown
   const refDb = newDatabase(SQL, options.memoryLimitMb)
   try {
-    executeTrusted(refDb, initSql, trustedDeadline, "初始化脚本执行失败")
-    const last = executeTrusted(refDb, refSql, trustedDeadline, "标准答案执行失败")
-    if (options.mode === "query") {
+    executeTrusted(refDb, initSql, trustedDeadline, '初始化脚本执行失败')
+    const last = executeTrusted(refDb, refSql, trustedDeadline, '标准答案执行失败')
+    if (options.mode === 'query') {
       expected = last
     } else {
       try {
         expected = dumpTables(refDb)
       } catch (error) {
-        throw new SqlCaseError(
-          JudgeStatus.SYSTEM_ERROR,
-          `标准答案结果超出限制: ${(error as SqlCaseError).detail}`,
-        )
+        throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, `标准答案结果超出限制: ${(error as SqlCaseError).detail}`)
       }
     }
   } finally {
     refDb.close()
   }
-  if (options.mode === "query" && expected === null) {
-    throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, "标准答案未产生查询结果集")
+  if (options.mode === 'query' && expected === null) {
+    throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, '标准答案未产生查询结果集')
   }
 
   const result: CaseResult = {
-    test_case: "",
+    test_case: '',
     result: JudgeStatus.ACCEPTED,
     cpu_time: 0,
     real_time: 0,
@@ -480,7 +443,7 @@ export async function runCase(
     signal: 0,
     exit_code: 0,
     error: 0,
-    output_md5: "",
+    output_md5: '',
     error_message: null,
   }
 
@@ -488,17 +451,11 @@ export async function runCase(
   let actual: unknown
   let elapsed = 0
   try {
-    executeTrusted(studentDb, initSql, trustedDeadline, "初始化脚本执行失败")
-    options.onPhase?.("student")
+    executeTrusted(studentDb, initSql, trustedDeadline, '初始化脚本执行失败')
+    options.onPhase?.('student')
     const start = Date.now()
     try {
-      actual = runStudent(
-        studentDb,
-        studentSql,
-        options.mode,
-        start + options.timeLimitMs,
-        options.memoryLimitMb,
-      )
+      actual = runStudent(studentDb, studentSql, options.mode, start + options.timeLimitMs, options.memoryLimitMb)
     } catch (error) {
       elapsed = Date.now() - start
       const failure = error as SqlCaseError
@@ -517,9 +474,9 @@ export async function runCase(
 
   result.cpu_time = elapsed
   result.real_time = elapsed
-  if (options.mode === "query" && (actual === null || actual === undefined)) {
+  if (options.mode === 'query' && (actual === null || actual === undefined)) {
     result.result = JudgeStatus.WRONG_ANSWER
-    result.error_message = "提交的 SQL 未产生查询结果集"
+    result.error_message = '提交的 SQL 未产生查询结果集'
   } else if (!compare(expected, actual, options.mode, options.orderSensitive)) {
     result.result = JudgeStatus.WRONG_ANSWER
   }
@@ -529,7 +486,7 @@ export async function runCase(
 // ---------------------------------------------------------------- 题目页展示数据
 
 function displayValue(value: unknown) {
-  if (value instanceof Uint8Array) return Buffer.from(value).toString("hex")
+  if (value instanceof Uint8Array) return Buffer.from(value).toString('hex')
   return value as string | number | null
 }
 
@@ -544,10 +501,7 @@ interface DisplayTable {
 
 /** 按建表顺序 dump 用户表的原始行用于展示（区别于 dumpTables 的归一化判题态） */
 function dumpDisplayTables(db: Database, only?: Set<string>): DisplayTable[] {
-  const names = queryColumn(
-    db,
-    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-  )
+  const names = queryColumn(db, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
   const tables: DisplayTable[] = []
   for (const raw of names) {
     const name = String(raw)
@@ -555,12 +509,10 @@ function dumpDisplayTables(db: Database, only?: Set<string>): DisplayTable[] {
     const quoted = name.replaceAll('"', '""')
     const columns = (db.exec(`PRAGMA table_info("${quoted}")`)[0]?.values ?? []).map((row) => ({
       name: String(row[1]),
-      type: String(row[2] ?? ""),
+      type: String(row[2] ?? ''),
     }))
     const total = Number(db.exec(`SELECT COUNT(*) FROM "${quoted}"`)[0]?.values[0]?.[0] ?? 0)
-    const rows = (
-      db.exec(`SELECT * FROM "${quoted}" LIMIT ${DISPLAY_ROW_LIMIT}`)[0]?.values ?? []
-    ).map((row) => (row as unknown[]).map(displayValue))
+    const rows = (db.exec(`SELECT * FROM "${quoted}" LIMIT ${DISPLAY_ROW_LIMIT}`)[0]?.values ?? []).map((row) => (row as unknown[]).map(displayValue))
     tables.push({
       name,
       columns,
@@ -581,7 +533,7 @@ function queryResultColumns(names: string[], tables: DisplayTable[]) {
   for (const table of tables) {
     for (const column of table.columns) types.set(column.name, column.type)
   }
-  return names.map((name) => ({ name, type: types.get(name) ?? "" }))
+  return names.map((name) => ({ name, type: types.get(name) ?? '' }))
 }
 
 /**
@@ -591,21 +543,15 @@ function queryResultColumns(names: string[], tables: DisplayTable[]) {
  * 学生要看着「执行后的表」知道该改什么；其余组可以一行都不改（看学生会不会多改），
  * 这时 changed_tables 是空数组。判题（runCase）本来就不管这一条
  */
-export async function buildDisplay(
-  initSql: string,
-  refSql: string,
-  mode: "query" | "modify",
-  memoryLimitMb = 64,
-  requireChange = true,
-) {
+export async function buildDisplay(initSql: string, refSql: string, mode: 'query' | 'modify', memoryLimitMb = 64, requireChange = true) {
   const SQL = await sqlEngine()
   const db = newDatabase(SQL, memoryLimitMb)
   const deadline = Date.now() + DISPLAY_BUDGET_MS
   try {
-    executeTrusted(db, initSql, deadline, "初始化脚本执行失败")
+    executeTrusted(db, initSql, deadline, '初始化脚本执行失败')
     const tables = dumpDisplayTables(db)
 
-    if (mode === "query") {
+    if (mode === 'query') {
       let expected: unknown = null
       try {
         for (const statement of iterate(db, refSql)) {
@@ -636,19 +582,16 @@ export async function buildDisplay(
         }
       } catch (error) {
         if (error instanceof SqlCaseError) throw error
-        throw new SqlCaseError(
-          JudgeStatus.SYSTEM_ERROR,
-          `标准答案执行失败: ${trustedErrorText(String((error as Error).message))}`,
-        )
+        throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, `标准答案执行失败: ${trustedErrorText(String((error as Error).message))}`)
       }
       if (expected === null) {
-        throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, "标准答案未产生查询结果集")
+        throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, '标准答案未产生查询结果集')
       }
       return { tables, expected }
     }
 
     const before = dumpTables(db)
-    executeTrusted(db, refSql, deadline, "标准答案执行失败")
+    executeTrusted(db, refSql, deadline, '标准答案执行失败')
     const after = dumpTables(db)
     const changed = new Set<string>()
     for (const name of new Set([...Object.keys(before), ...Object.keys(after)])) {
@@ -656,7 +599,7 @@ export async function buildDisplay(
     }
     if (changed.size === 0) {
       if (!requireChange) return { tables, expected: { changed_tables: [] } }
-      throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, "标准答案未修改任何表数据，请检查题目配置")
+      throw new SqlCaseError(JudgeStatus.SYSTEM_ERROR, '标准答案未修改任何表数据，请检查题目配置')
     }
     const changedTables = dumpDisplayTables(db, changed)
     // 被标准答案 DROP 的表已不在库中，用初始展示数据补齐条目（前端据 dropped 提示「表已删除」）

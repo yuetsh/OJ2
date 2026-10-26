@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useTone, type Tone } from "shared/composables/tone"
+import { useThemeVars } from 'naive-ui'
+import { useTone, type Tone } from 'shared/composables/tone'
 
 /** 数字行的一格：小字标签 + 大号数字 + 单位 */
 const props = defineProps<{
@@ -38,7 +38,7 @@ const color = computed(() => (props.tone ? toneOf(props.tone).color : theme.valu
 .label,
 .unit {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .value-line {

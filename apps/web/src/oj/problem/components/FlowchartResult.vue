@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { useCodeStore } from "oj/store/code"
-import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
-import { useProblemStore } from "oj/store/problem"
-import { useUserStore } from "shared/store/user"
-import { sortFlowchartCriteria } from "utils/constants"
-import { parseTime } from "utils/functions"
-import { mermaidOrder, signature } from "shared/components/FlowchartEditor/model"
-import FlowchartNote from "shared/components/FlowchartNote.vue"
-import { caseReport, flowchartVerdict } from "utils/flowchart"
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { useCodeStore } from 'oj/store/code'
+import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
+import { useProblemStore } from 'oj/store/problem'
+import { useUserStore } from 'shared/store/user'
+import { sortFlowchartCriteria } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import { mermaidOrder, signature } from 'shared/components/FlowchartEditor/model'
+import FlowchartNote from 'shared/components/FlowchartNote.vue'
+import { caseReport, flowchartVerdict } from 'utils/flowchart'
 
 /**
  * 「结果」页签里流程图作业的那一块：AI 在评 / 评完了几分 / 历次分数 / 评语和改进建议。
@@ -19,11 +19,10 @@ import { caseReport, flowchartVerdict } from "utils/flowchart"
  *
  */
 
-const MyFlowchart = defineAsyncComponent(() => import("./MyFlowchart.vue"))
+const MyFlowchart = defineAsyncComponent(() => import('./MyFlowchart.vue'))
 
 const flowchartStore = useFlowchartStore()
-const { phase, scores, hiddenCount, selectedId, details, detailLoading, scoresFailed, editor } =
-  storeToRefs(flowchartStore)
+const { phase, scores, hiddenCount, selectedId, details, detailLoading, scoresFailed, editor } = storeToRefs(flowchartStore)
 const problemStore = useProblemStore()
 const codeStore = useCodeStore()
 const userStore = useUserStore()
@@ -41,7 +40,7 @@ const message = useMessage()
 const theme = useThemeVars()
 // 暗色主题的成功色是浅薄荷绿，上面的白字看不清
 const isDark = useDark()
-const passText = computed(() => (isDark.value ? "rgba(0, 0, 0, 0.85)" : "#fff"))
+const passText = computed(() => (isDark.value ? 'rgba(0, 0, 0, 0.85)' : '#fff'))
 
 /** 正在看的那一次：点过哪次就是哪次，否则是最新的 */
 const current = computed(() => {
@@ -57,12 +56,10 @@ const viewingLatest = computed(() => selectedId.value === null)
  * 原来的评分弹框左边就是这张图；挪进结果页签时丢了，学生翻到「第 2 次 C 42」
  * 只看得到评语，想不起来那一版画成什么样。图从评语同一个详情接口来，随评语一起现拉。
  */
-const versionIndex = computed(() =>
-  current.value ? scores.value.findIndex((row) => row.id === current.value!.id) : -1,
-)
+const versionIndex = computed(() => (current.value ? scores.value.findIndex((row) => row.id === current.value!.id) : -1))
 const versionTitle = computed(() => {
-  if (!current.value) return ""
-  return `第 ${versionIndex.value + 1} 次画的图 · ${parseTime(current.value.createTime, "MM-DD HH:mm")}`
+  if (!current.value) return ''
+  return `第 ${versionIndex.value + 1} 次画的图 · ${parseTime(current.value.createTime, 'MM-DD HH:mm')}`
 })
 /** 收起来之后翻别的次也保持收着：左栏在机房屏上只有六百来像素高 */
 const versionOpen = ref(true)
@@ -78,30 +75,25 @@ watch(
 )
 
 const criteria = computed(() =>
-  sortFlowchartCriteria(
-    (detail.value?.aiCriteriaDetails ?? {}) as Record<
-      string,
-      { score: number; max: number; comment?: string }
-    >,
-  ),
+  sortFlowchartCriteria((detail.value?.aiCriteriaDetails ?? {}) as Record<string, { score: number; max: number; comment?: string }>),
 )
 const suggestions = computed(() =>
-  (detail.value?.aiSuggestions ?? "")
-    .split("\n")
+  (detail.value?.aiSuggestions ?? '')
+    .split('\n')
     .map((line) => line.trim())
     .filter(Boolean),
 )
 
 function gradeType(grade: string) {
-  if (isFlowchartPass(grade)) return "success"
-  if (grade === "B") return "warning"
-  return "error"
+  if (isFlowchartPass(grade)) return 'success'
+  if (grade === 'B') return 'warning'
+  return 'error'
 }
 
 function percentType(ratio: number) {
-  if (ratio >= 0.6) return "success"
-  if (ratio >= 0.4) return "warning"
-  return "error"
+  if (ratio >= 0.6) return 'success'
+  if (ratio >= 0.4) return 'warning'
+  return 'error'
 }
 
 // ==================== 载回画布 ====================
@@ -120,14 +112,12 @@ const canvasSame = computed(() => {
   if (!editor.value || !versionSignature.value) return false
   return signature(editor.value.getDoc()) === versionSignature.value
 })
-const canvasDiffers = computed(
-  () => !!editor.value && !!versionSignature.value && !canvasSame.value,
-)
+const canvasDiffers = computed(() => !!editor.value && !!versionSignature.value && !canvasSame.value)
 
 function loadToCanvas() {
   if (!editor.value || !versionDoc.value) return
   editor.value.setDoc(versionDoc.value)
-  message.success("已载回画布，按 Ctrl+Z 可以撤回")
+  message.success('已载回画布，按 Ctrl+Z 可以撤回')
 }
 
 // ==================== 走例子 ====================
@@ -168,7 +158,7 @@ watch(
     const row = index === null ? undefined : next.cases[index]
     if (!row) {
       const bad = toStep(focus)
-      instance.setHighlight(bad ? { order: [], bad, label: "要改这个框" } : null)
+      instance.setHighlight(bad ? { order: [], bad, label: '要改这个框' } : null)
       return
     }
     const bad = row.ok ? null : toStep(focus)
@@ -204,9 +194,7 @@ function goCode() {
 
     <!-- 历次分数连成一条：一眼看出是不是越改越好；正在评的那次是虚线框 -->
     <div v-if="scores.length || phase === 'evaluating'" class="history">
-      <span class="history-lead"
-        >AI 点评 · 画过 {{ scores.length + (phase === "evaluating" ? 1 : 0) }} 次：</span
-      >
+      <span class="history-lead">AI 点评 · 画过 {{ scores.length + (phase === 'evaluating' ? 1 : 0) }} 次：</span>
       <template v-for="(row, index) in scores" :key="row.id">
         <span v-if="index > 0" class="arrow" aria-hidden="true">→</span>
         <button
@@ -227,10 +215,7 @@ function goCode() {
         <span class="attempt pending">第 {{ scores.length + 1 }} 次</span>
       </template>
     </div>
-    <p v-if="hiddenCount" class="note">
-      另外 {{ hiddenCount }} 次是题单布置之前画的，先藏起来了：在题单里画到 A 或
-      S，或者布置期结束就解锁
-    </p>
+    <p v-if="hiddenCount" class="note">另外 {{ hiddenCount }} 次是题单布置之前画的，先藏起来了：在题单里画到 A 或 S，或者布置期结束就解锁</p>
 
     <!-- 正在评：评的是最新这一次，所以只在看最新时显示 -->
     <template v-if="phase === 'evaluating' && viewingLatest">
@@ -244,9 +229,7 @@ function goCode() {
       <p class="note">评的时候画布上还能改，改了不影响这一次的分数</p>
     </template>
 
-    <div v-else-if="phase === 'failed' && viewingLatest" class="failed">
-      AI 这次没评出来，再点一次「交给 AI 点评」试试
-    </div>
+    <div v-else-if="phase === 'failed' && viewingLatest" class="failed">AI 这次没评出来，再点一次「交给 AI 点评」试试</div>
 
     <section v-else-if="current" class="current">
       <!-- 设计稿 FlowResFail / FlowResPass：等级 + 几组走对，下面逐组 -->
@@ -260,8 +243,7 @@ function goCode() {
         <span class="score-unit">分</span>
         <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
         <span v-if="detail?.aiFeedback || isFlowchartPass(current.grade)" class="feedback">
-          {{ detail?.aiFeedback ?? ""
-          }}{{ isFlowchartPass(current.grade) ? " 这道题算做完了。" : "" }}
+          {{ detail?.aiFeedback ?? '' }}{{ isFlowchartPass(current.grade) ? ' 这道题算做完了。' : '' }}
         </span>
       </div>
 
@@ -270,15 +252,7 @@ function goCode() {
       </n-flex>
 
       <template v-if="detail && report">
-        <n-button
-          v-if="isFlowchartPass(current.grade) && canCode"
-          class="code-btn"
-          type="primary"
-          size="large"
-          @click="goCode"
-        >
-          照着它写代码 →
-        </n-button>
+        <n-button v-if="isFlowchartPass(current.grade) && canCode" class="code-btn" type="primary" size="large" @click="goCode"> 照着它写代码 → </n-button>
         <FlowchartNote
           v-model:selected="selectedCase"
           v-model:open="casesOpen"
@@ -294,28 +268,15 @@ function goCode() {
         <div v-if="detail.mermaidCode && (!report || canvasDiffers)" class="version">
           <div class="version-head">
             <span class="version-title">{{ versionTitle }}</span>
-            <n-button text type="primary" size="small" @click="versionZoom = true">
-              放大看
-            </n-button>
+            <n-button text type="primary" size="small" @click="versionZoom = true"> 放大看 </n-button>
             <n-button text type="primary" size="small" @click="versionOpen = !versionOpen">
-              {{ versionOpen ? "收起" : "展开" }}
+              {{ versionOpen ? '收起' : '展开' }}
             </n-button>
           </div>
-          <div
-            v-if="versionOpen"
-            class="version-chart"
-            role="button"
-            :aria-label="`放大看${versionTitle}`"
-            @click="versionZoom = true"
-          >
+          <div v-if="versionOpen" class="version-chart" role="button" :aria-label="`放大看${versionTitle}`" @click="versionZoom = true">
             <MyFlowchart compact :code="detail.mermaidCode" />
           </div>
-          <n-modal
-            v-model:show="versionZoom"
-            preset="card"
-            :title="versionTitle"
-            :style="{ maxWidth: '900px' }"
-          >
+          <n-modal v-model:show="versionZoom" preset="card" :title="versionTitle" :style="{ maxWidth: '900px' }">
             <MyFlowchart :code="detail.mermaidCode" />
           </n-modal>
         </div>
@@ -327,11 +288,7 @@ function goCode() {
               <span class="criterion-score">{{ item.score || 0 }} / {{ item.max }}</span>
             </div>
             <div class="bar">
-              <div
-                class="bar-fill"
-                :class="percentType(item.score / item.max)"
-                :style="{ width: `${Math.min(100, ((item.score || 0) / item.max) * 100)}%` }"
-              />
+              <div class="bar-fill" :class="percentType(item.score / item.max)" :style="{ width: `${Math.min(100, ((item.score || 0) / item.max) * 100)}%` }" />
             </div>
             <div v-if="item.comment" class="comment">{{ item.comment }}</div>
           </div>
@@ -346,14 +303,7 @@ function goCode() {
         </div>
 
         <div class="actions">
-          <n-button
-            v-if="!report && isFlowchartPass(current.grade) && canCode"
-            type="primary"
-            size="large"
-            @click="goCode"
-          >
-            照着它写代码 →
-          </n-button>
+          <n-button v-if="!report && isFlowchartPass(current.grade) && canCode" type="primary" size="large" @click="goCode"> 照着它写代码 → </n-button>
           <n-button v-if="canvasDiffers" secondary @click="loadToCanvas">把这一版载回画布</n-button>
         </div>
       </template>
@@ -372,7 +322,7 @@ function goCode() {
 
 .note {
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   margin: 0 0 10px;
 }
 
@@ -390,11 +340,11 @@ function goCode() {
 }
 
 .history-lead {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .arrow {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .attempt {
@@ -404,7 +354,7 @@ function goCode() {
   border-radius: 13px;
   border: 1px solid transparent;
   background-color: rgba(128, 128, 128, 0.12);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   font: inherit;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -412,14 +362,14 @@ function goCode() {
 }
 
 .attempt.active {
-  background-color: v-bind("theme.textColor2");
-  color: v-bind("theme.cardColor");
+  background-color: v-bind('theme.textColor2');
+  color: v-bind('theme.cardColor');
   font-weight: 600;
 }
 
 .attempt.pass.active {
-  background-color: v-bind("theme.successColor");
-  color: v-bind("passText");
+  background-color: v-bind('theme.successColor');
+  color: v-bind('passText');
 }
 
 .attempt.pending {
@@ -427,8 +377,8 @@ function goCode() {
   align-items: center;
   cursor: default;
   background: transparent;
-  border: 1px dashed v-bind("theme.successColor");
-  color: v-bind("theme.successColorPressed");
+  border: 1px dashed v-bind('theme.successColor');
+  color: v-bind('theme.successColorPressed');
 }
 
 .grading {
@@ -450,7 +400,7 @@ function goCode() {
 .grading-note {
   margin-top: 2px;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .failed {
@@ -507,19 +457,19 @@ function goCode() {
 }
 
 .score.success {
-  color: v-bind("theme.successColorPressed");
+  color: v-bind('theme.successColorPressed');
 }
 
 .score.warning {
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
 }
 
 .score.error {
-  color: v-bind("theme.errorColorPressed");
+  color: v-bind('theme.errorColorPressed');
 }
 
 .score-unit {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .grade {
@@ -529,16 +479,16 @@ function goCode() {
   font-size: 13px;
   font-weight: 700;
   color: #fff;
-  background-color: v-bind("theme.errorColor");
+  background-color: v-bind('theme.errorColor');
 }
 
 .grade.success {
-  background-color: v-bind("theme.successColor");
-  color: v-bind("passText");
+  background-color: v-bind('theme.successColor');
+  color: v-bind('passText');
 }
 
 .grade.warning {
-  background-color: v-bind("theme.warningColor");
+  background-color: v-bind('theme.warningColor');
 }
 
 .feedback {
@@ -569,7 +519,7 @@ function goCode() {
 
 .headline-note {
   font-size: 14px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .block {
@@ -596,7 +546,7 @@ function goCode() {
 
 .criterion-score {
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .bar {
@@ -610,20 +560,20 @@ function goCode() {
 .bar-fill {
   height: 100%;
   border-radius: 3px;
-  background-color: v-bind("theme.successColor");
+  background-color: v-bind('theme.successColor');
 }
 
 .bar-fill.warning {
-  background-color: v-bind("theme.warningColor");
+  background-color: v-bind('theme.warningColor');
 }
 
 .bar-fill.error {
-  background-color: v-bind("theme.errorColor");
+  background-color: v-bind('theme.errorColor');
 }
 
 .comment {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .suggestions {
@@ -631,7 +581,7 @@ function goCode() {
   margin-bottom: 14px;
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.06);
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
 }
 
 .suggestions-title {
@@ -652,7 +602,7 @@ function goCode() {
   border-radius: 3px;
   font-size: 12px;
   background-color: rgba(240, 160, 32, 0.16);
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
 }
 
 .actions {

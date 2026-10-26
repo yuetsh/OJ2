@@ -1,8 +1,8 @@
-import { drizzle } from "drizzle-orm/postgres-js"
-import postgres from "postgres"
+import { drizzle } from 'drizzle-orm/postgres-js'
+import postgres from 'postgres'
 
-import { config } from "../config"
-import * as schema from "./schema"
+import { config } from '../config'
+import * as schema from './schema'
 
 // 不设会话时区：日历语义的 SQL 一律显式 `at time zone`（`../time` 的 localTime），
 // 不靠会话默认值兜底 —— 兜底会把漏写的地方在线上掩盖掉，dev 上又是另一个答案。
@@ -34,7 +34,7 @@ export type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]
 client.options.parsers[1184] = (value: string) => {
   const fraction = /\.\d+/.exec(value)?.[0]
   if (!fraction) return new Date(value).toISOString()
-  return `${new Date(value.replace(fraction, "")).toISOString().slice(0, 19)}${fraction.padEnd(4, "0")}Z`
+  return `${new Date(value.replace(fraction, '')).toISOString().slice(0, 19)}${fraction.padEnd(4, '0')}Z`
 }
 
 export { schema }

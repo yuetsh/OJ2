@@ -1,60 +1,54 @@
-import { Hono } from "hono"
-import { basename, resolve } from "node:path"
+import { Hono } from 'hono'
+import { basename, resolve } from 'node:path'
 
-import { WS_AUTH_PROTOCOL } from "@oj2/contract"
+import { WS_AUTH_PROTOCOL } from '@oj2/contract'
 
-import { authenticateWebSocket, loadJwtSecret } from "./auth/session"
-import { config } from "./config"
-import { adminRoutes } from "./routes/admin"
-import { authRoutes } from "./routes/auth"
-import { accountRoutes } from "./routes/account"
-import { judgeServerRoutes } from "./routes/judge-server"
-import { contestRoutes } from "./routes/contest"
-import { contentRoutes } from "./routes/content"
-import { classroomRoutes } from "./routes/classroom"
-import { rankingRoutes } from "./routes/ranking"
-import { problemsetRoutes } from "./routes/problemset"
-import { achievementRoutes } from "./routes/achievement"
-import { aiRoutes } from "./routes/ai"
-import { flowchartRoutes } from "./routes/flowchart"
-import { problemRoutes } from "./routes/problem"
-import { problemStatsRoutes } from "./routes/problem-stats"
-import { submissionRoutes } from "./routes/submission"
-import { trialRunRoutes } from "./routes/trial-run"
-import { siteRoutes } from "./routes/site"
-import { scanPendingChallenges } from "./services/challenge"
-import {
-  bridgeSubmissionEvents,
-  isAllowedWebSocketOrigin,
-  startSessionSweep,
-  submissionWebSocketHandler,
-  type SubmissionSocketData,
-} from "./websocket"
+import { authenticateWebSocket, loadJwtSecret } from './auth/session'
+import { config } from './config'
+import { adminRoutes } from './routes/admin'
+import { authRoutes } from './routes/auth'
+import { accountRoutes } from './routes/account'
+import { judgeServerRoutes } from './routes/judge-server'
+import { contestRoutes } from './routes/contest'
+import { contentRoutes } from './routes/content'
+import { classroomRoutes } from './routes/classroom'
+import { rankingRoutes } from './routes/ranking'
+import { problemsetRoutes } from './routes/problemset'
+import { achievementRoutes } from './routes/achievement'
+import { aiRoutes } from './routes/ai'
+import { flowchartRoutes } from './routes/flowchart'
+import { problemRoutes } from './routes/problem'
+import { problemStatsRoutes } from './routes/problem-stats'
+import { submissionRoutes } from './routes/submission'
+import { trialRunRoutes } from './routes/trial-run'
+import { siteRoutes } from './routes/site'
+import { scanPendingChallenges } from './services/challenge'
+import { bridgeSubmissionEvents, isAllowedWebSocketOrigin, startSessionSweep, submissionWebSocketHandler, type SubmissionSocketData } from './websocket'
 
 const app = new Hono()
 
-app.get("/health", (c) => c.json({ ok: true }))
-app.route("/api", authRoutes)
-app.route("/api", accountRoutes)
-app.route("/api", siteRoutes)
-app.route("/api", contestRoutes)
-app.route("/api", contentRoutes)
-app.route("/api", classroomRoutes)
-app.route("/api", rankingRoutes)
-app.route("/api", problemsetRoutes)
-app.route("/api", achievementRoutes)
-app.route("/api", aiRoutes)
-app.route("/api", flowchartRoutes)
-app.route("/api", problemRoutes)
-app.route("/api", problemStatsRoutes)
-app.route("/api", submissionRoutes)
-app.route("/api", trialRunRoutes)
-app.route("/api", judgeServerRoutes)
-app.route("/api/admin", adminRoutes)
+app.get('/health', (c) => c.json({ ok: true }))
+app.route('/api', authRoutes)
+app.route('/api', accountRoutes)
+app.route('/api', siteRoutes)
+app.route('/api', contestRoutes)
+app.route('/api', contentRoutes)
+app.route('/api', classroomRoutes)
+app.route('/api', rankingRoutes)
+app.route('/api', problemsetRoutes)
+app.route('/api', achievementRoutes)
+app.route('/api', aiRoutes)
+app.route('/api', flowchartRoutes)
+app.route('/api', problemRoutes)
+app.route('/api', problemStatsRoutes)
+app.route('/api', submissionRoutes)
+app.route('/api', trialRunRoutes)
+app.route('/api', judgeServerRoutes)
+app.route('/api/admin', adminRoutes)
 
 app.onError((error, c) => {
   console.error(error)
-  return c.json({ error: { code: "internal-error", message: "Internal server error" } }, 500)
+  return c.json({ error: { code: 'internal-error', message: 'Internal server error' } }, 500)
 })
 
 /** 头像取不到时的占位图，避免每个没设头像的学生都打一次 404 */
@@ -74,17 +68,17 @@ async function serveUpload(pathname: string, prefix: string, directory: string) 
   const decoded = decodeURIComponent(pathname)
   const filename = basename(decoded)
   if (!filename || filename !== decoded.slice(prefix.length + 1)) {
-    return new Response("Not found", { status: 404 })
+    return new Response('Not found', { status: 404 })
   }
   const file = Bun.file(resolve(directory, filename))
   if (await file.exists()) {
     // 文件名由后端生成且内容不变，可以放心长缓存
     return new Response(file, {
       headers: {
-        "cache-control": "public, max-age=86400",
+        'cache-control': 'public, max-age=86400',
         // 线上 Caddy 也加了这个头，这里再加一道：content-type 按扩展名配，
         // 不让浏览器自己嗅探成 HTML 去执行
-        "x-content-type-options": "nosniff",
+        'x-content-type-options': 'nosniff',
       },
     })
   }
@@ -105,45 +99,33 @@ const server = Bun.serve<SubmissionSocketData>({
     if (url.pathname.startsWith(`${config.avatarUriPrefix}/`)) {
       const hit = await serveUpload(url.pathname, config.avatarUriPrefix, config.avatarDirectory)
       if (hit) return hit
-      if (basename(decodeURIComponent(url.pathname)) === "default.png") {
+      if (basename(decodeURIComponent(url.pathname)) === 'default.png') {
         return new Response(DEFAULT_AVATAR_SVG, {
           headers: {
-            "content-type": "image/svg+xml",
-            "cache-control": "public, max-age=3600",
+            'content-type': 'image/svg+xml',
+            'cache-control': 'public, max-age=3600',
           },
         })
       }
-      return new Response("Not found", { status: 404 })
+      return new Response('Not found', { status: 404 })
     }
     // 题面里插的图片。原来没有这一段 —— 后台上传成功、返回 /public/upload/xxx，
     // 但没有任何路由伺服它，题面图片一律 404。
     if (url.pathname.startsWith(`${config.uploadUriPrefix}/`)) {
-      return (
-        (await serveUpload(url.pathname, config.uploadUriPrefix, config.uploadDirectory)) ??
-        new Response("Not found", { status: 404 })
-      )
+      return (await serveUpload(url.pathname, config.uploadUriPrefix, config.uploadDirectory)) ?? new Response('Not found', { status: 404 })
     }
-    if (
-      url.pathname === "/ws/submissions" ||
-      url.pathname === "/ws/config" ||
-      url.pathname === "/ws/collab"
-    ) {
-      if (!isAllowedWebSocketOrigin(request.headers.get("origin"), url)) {
-        return new Response("Forbidden", { status: 403 })
+    if (url.pathname === '/ws/submissions' || url.pathname === '/ws/config' || url.pathname === '/ws/collab') {
+      if (!isAllowedWebSocketOrigin(request.headers.get('origin'), url)) {
+        return new Response('Forbidden', { status: 403 })
       }
       const session = await authenticateWebSocket(request)
-      if (!session) return new Response("Unauthorized", { status: 401 })
+      if (!session) return new Response('Unauthorized', { status: 401 })
       const { user } = session
-      const kind =
-        url.pathname === "/ws/config"
-          ? "config"
-          : url.pathname === "/ws/collab"
-            ? "collab"
-            : "submissions"
+      const kind = url.pathname === '/ws/config' ? 'config' : url.pathname === '/ws/collab' ? 'collab' : 'submissions'
       if (
         bunServer.upgrade(request, {
           // 前端是借子协议带 token 来的，不回一个它传过的子协议 Chrome 就判握手失败
-          headers: { "Sec-WebSocket-Protocol": WS_AUTH_PROTOCOL },
+          headers: { 'Sec-WebSocket-Protocol': WS_AUTH_PROTOCOL },
           data: {
             userId: user.id,
             kind,
@@ -156,7 +138,7 @@ const server = Bun.serve<SubmissionSocketData>({
       ) {
         return undefined
       }
-      return new Response("WebSocket upgrade failed", { status: 400 })
+      return new Response('WebSocket upgrade failed', { status: 400 })
     }
     return app.fetch(request)
   },

@@ -1,12 +1,12 @@
 <script lang="ts" setup>
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { getReaction, setReaction } from "oj/api"
-import { useProblemStore } from "oj/store/problem"
-import { useUserStore } from "shared/store/user"
-import { REACTIONS } from "utils/constants"
-import type { ReactionCounts, ReactionKey } from "utils/types"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { getReaction, setReaction } from 'oj/api'
+import { useProblemStore } from 'oj/store/problem'
+import { useUserStore } from 'shared/store/user'
+import { REACTIONS } from 'utils/constants'
+import type { ReactionCounts, ReactionKey } from 'utils/types'
 
 /**
  * 题目点评轮盘：七个选项，每人每题只能评一次，做对了才能评。
@@ -69,8 +69,8 @@ function sectorPath(start: number, end: number, inner: number, outer: number) {
     `A${outer} ${outer} 0 0 1 ${f(b.x)} ${f(b.y)}`,
     `L${f(c.x)} ${f(c.y)}`,
     `A${inner} ${inner} 0 0 0 ${f(d.x)} ${f(d.y)}`,
-    "Z",
-  ].join(" ")
+    'Z',
+  ].join(' ')
 }
 
 // 第一项正对 12 点，顺时针排
@@ -93,17 +93,17 @@ const sectors = REACTIONS.map((item, index) => {
 // ==================== 状态 ====================
 const solved = computed(() => problem.value?.myStatus === 0)
 
-type WheelState = "anonymous" | "loading" | "failed" | "locked" | "choose" | "results"
+type WheelState = 'anonymous' | 'loading' | 'failed' | 'locked' | 'choose' | 'results'
 const state = computed<WheelState>(() => {
-  if (!userStore.isAuthed) return "anonymous"
-  if (loading.value) return "loading"
-  if (loadFailed.value) return "failed"
-  if (mine.value !== null && counts.value) return "results"
-  if (solved.value) return "choose"
-  return "locked"
+  if (!userStore.isAuthed) return 'anonymous'
+  if (loading.value) return 'loading'
+  if (loadFailed.value) return 'failed'
+  if (mine.value !== null && counts.value) return 'results'
+  if (solved.value) return 'choose'
+  return 'locked'
 })
 
-const choosable = computed(() => state.value === "choose")
+const choosable = computed(() => state.value === 'choose')
 const canPick = computed(() => choosable.value && ready.value && !submitting.value)
 
 // 从能选的那一刻起算：换题、登录之后重新能选，也重新算
@@ -129,7 +129,7 @@ watch(
 // ==================== 玫瑰图（选完之后） ====================
 const results = computed(() => {
   const all = counts.value
-  if (state.value !== "results" || !all) return null
+  if (state.value !== 'results' || !all) return null
   const values = REACTIONS.map((item) => all[item.key] ?? 0)
   const max = Math.max(1, ...values)
   return {
@@ -138,45 +138,37 @@ const results = computed(() => {
       const count = values[index] ?? 0
       // 一个人都没有的那块不画；有人的至少露出一截，不然 1 人和 0 人看着一样
       const reach = count === 0 ? 0 : 0.12 + 0.88 * (count / max)
-      const path =
-        reach === 0
-          ? ""
-          : sectorPath(
-              sector.mid - step / 2,
-              sector.mid + step / 2,
-              INNER,
-              INNER + (OUTER - INNER) * reach,
-            )
+      const path = reach === 0 ? '' : sectorPath(sector.mid - step / 2, sector.mid + step / 2, INNER, INNER + (OUTER - INNER) * reach)
       return { count, path }
     }),
   }
 })
 
 // ==================== 圆心 ====================
-const labelOf = (key: ReactionKey | null) => REACTIONS.find((item) => item.key === key)?.label ?? ""
+const labelOf = (key: ReactionKey | null) => REACTIONS.find((item) => item.key === key)?.label ?? ''
 
 const center = computed<{ small: string; big: string; foot?: string }>(() => {
   switch (state.value) {
-    case "anonymous":
-      return { small: "登录之后", big: "才能点评" }
-    case "loading":
-      return { small: "正在读取", big: "…" }
-    case "failed":
-      return { small: "暂时读不出来", big: "过会儿再看" }
-    case "locked":
-      return { small: "做对之后", big: "才能点评" }
-    case "results":
+    case 'anonymous':
+      return { small: '登录之后', big: '才能点评' }
+    case 'loading':
+      return { small: '正在读取', big: '…' }
+    case 'failed':
+      return { small: '暂时读不出来', big: '过会儿再看' }
+    case 'locked':
+      return { small: '做对之后', big: '才能点评' }
+    case 'results':
       return {
-        small: "你选了",
+        small: '你选了',
         big: labelOf(mine.value),
         foot: `共 ${results.value?.total ?? 0} 人评过`,
       }
   }
-  if (submitting.value) return { small: "正在记下", big: labelOf(submitting.value) }
+  if (submitting.value) return { small: '正在记下', big: labelOf(submitting.value) }
   if (activeIndex.value !== null) {
-    return { small: "选这个？", big: REACTIONS[activeIndex.value]?.label ?? "" }
+    return { small: '选这个？', big: REACTIONS[activeIndex.value]?.label ?? '' }
   }
-  return { small: "点一块", big: "选一个" }
+  return { small: '点一块', big: '选一个' }
 })
 
 // ==================== 交互 ====================
@@ -205,7 +197,7 @@ async function pick(key: ReactionKey) {
     mine.value = res.mine
     counts.value = res.counts
     activeIndex.value = null
-    emit("submitted")
+    emit('submitted')
   } catch {
     // 留在这里让他再点一次：强制弹窗关不掉，没有别的出路
     submitFailed.value = true
@@ -252,7 +244,7 @@ function sectorAriaLabel(index: number) {
   const item = REACTIONS[index]!
   if (!results.value) return item.label
   const count = results.value.petals[index]?.count ?? 0
-  return `${item.label}，${count} 人${mine.value === item.key ? "，你的选择" : ""}`
+  return `${item.label}，${count} 人${mine.value === item.key ? '，你的选择' : ''}`
 }
 </script>
 
@@ -269,15 +261,9 @@ function sectorAriaLabel(index: number) {
     }"
     aria-label="题目点评"
   >
-    <p v-if="choosable" class="hint">
-      选一块最接近的，<b>每道题只能评一次</b>。选完就能看到大家是怎么选的
-    </p>
+    <p v-if="choosable" class="hint">选一块最接近的，<b>每道题只能评一次</b>。选完就能看到大家是怎么选的</p>
 
-    <div
-      class="wheel"
-      :class="[`is-${state}`, { 'is-waiting': choosable && !ready }]"
-      @pointerleave="preview(null)"
-    >
+    <div class="wheel" :class="[`is-${state}`, { 'is-waiting': choosable && !ready }]" @pointerleave="preview(null)">
       <svg viewBox="0 0 400 400" class="wheel-svg">
         <g
           v-for="sector in sectors"
@@ -302,11 +288,7 @@ function sectorAriaLabel(index: number) {
         >
           <path class="sector-face" :d="sector.path" />
           <!-- 选完之后的玫瑰图：从里往外填一段，长短按人数 -->
-          <path
-            v-if="results?.petals[sector.index]?.path"
-            class="petal"
-            :d="results.petals[sector.index]!.path"
-          />
+          <path v-if="results?.petals[sector.index]?.path" class="petal" :d="results.petals[sector.index]!.path" />
         </g>
         <circle class="core" :cx="C" :cy="C" :r="INNER - 4" />
       </svg>
@@ -334,9 +316,7 @@ function sectorAriaLabel(index: number) {
           <Icon v-else :icon="sector.icon" />
         </span>
         <span class="label-text">{{ sector.label }}</span>
-        <span v-if="results" class="label-count">
-          {{ mine === sector.key ? "✓ " : "" }}{{ results.petals[sector.index]?.count ?? 0 }} 人
-        </span>
+        <span v-if="results" class="label-count"> {{ mine === sector.key ? '✓ ' : '' }}{{ results.petals[sector.index]?.count ?? 0 }} 人 </span>
       </div>
 
       <div class="center" aria-live="polite">
@@ -351,10 +331,7 @@ function sectorAriaLabel(index: number) {
       强制弹窗关不掉，这个插槽（「下一题 / 继续」）是唯一的出口：读不出点评、交点评失败时也得给，
       不能把学生关在弹窗里（设计文档第 7 节：接口出错时不能把学生卡住）
     -->
-    <div
-      v-if="(state === 'results' || state === 'failed' || submitFailed) && $slots.after"
-      class="after"
-    >
+    <div v-if="(state === 'results' || state === 'failed' || submitFailed) && $slots.after" class="after">
       <slot name="after" />
     </div>
   </section>
@@ -550,7 +527,7 @@ function sectorAriaLabel(index: number) {
 .error {
   margin: 10px 0 0;
   text-align: center;
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .after {

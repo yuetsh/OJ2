@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { RARITY_LABEL } from "utils/constants"
-import { parseTime } from "utils/functions"
-import type { Achievement } from "utils/types"
-import type { Series } from "../series"
-import Medal from "./Medal.vue"
+import { useThemeVars } from 'naive-ui'
+import { RARITY_LABEL } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import type { Achievement } from 'utils/types'
+import type { Series } from '../series'
+import Medal from './Medal.vue'
 
 /**
  * 一条成就线：左边线名和现在的数，右边几档按门槛排在一根进度线上，下一档头上标「差几」。
@@ -53,8 +53,8 @@ function gap(item: Achievement) {
 function when(item: Achievement) {
   if (!item.unlocked) return `现在 ${props.series.value} ${props.series.unit}`
   // 补发的不写日期：一次补发会给几百人盖上同一个时间戳
-  if (item.backfilled || !item.unlockTime) return "已拿到"
-  return `${parseTime(item.unlockTime, "M月D日")}拿到`
+  if (item.backfilled || !item.unlockTime) return '已拿到'
+  return `${parseTime(item.unlockTime, 'M月D日')}拿到`
 }
 
 function holders(item: Achievement) {
@@ -68,35 +68,19 @@ function holders(item: Achievement) {
     <div class="label">
       <span class="name">{{ series.label }}</span>
       <span class="value">
-        <b>{{ series.streak ? "现在 " : "" }}{{ series.value }}</b>
+        <b>{{ series.streak ? '现在 ' : '' }}{{ series.value }}</b>
         <small>{{ series.unit }}</small>
       </span>
     </div>
     <div class="track" :style="{ height: `${size + 36}px` }">
-      <span
-        class="line"
-        :style="{ top: `${size / 2 - 2}px`, width: `${center(series.items.length - 1)}%` }"
-      ></span>
+      <span class="line" :style="{ top: `${size / 2 - 2}px`, width: `${center(series.items.length - 1)}%` }"></span>
       <span class="line done" :style="{ top: `${size / 2 - 2}px`, width: `${fill}%` }"></span>
-      <div
-        v-for="(item, i) in series.items"
-        :key="item.id"
-        class="tier"
-        :class="{ on: item.unlocked }"
-        :style="{ left: `${center(i)}%` }"
-      >
+      <div v-for="(item, i) in series.items" :key="item.id" class="tier" :class="{ on: item.unlocked }" :style="{ left: `${center(i)}%` }">
         <n-tooltip :delay="150">
           <template #trigger>
             <span class="trigger">
-              <span v-if="gap(item)" class="gap" :style="{ bottom: `${size + 4}px` }">
-                差 {{ gap(item) }}
-              </span>
-              <Medal
-                :icon="item.icon"
-                :rarity="item.rarity"
-                :size="size"
-                :state="item.unlocked ? 'on' : 'off'"
-              />
+              <span v-if="gap(item)" class="gap" :style="{ bottom: `${size + 4}px` }"> 差 {{ gap(item) }} </span>
+              <Medal :icon="item.icon" :rarity="item.rarity" :size="size" :state="item.unlocked ? 'on' : 'off'" />
             </span>
           </template>
           <div class="tip">
@@ -129,7 +113,7 @@ function holders(item: Achievement) {
 
 .name {
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   white-space: nowrap;
 }
 
@@ -142,7 +126,7 @@ function holders(item: Achievement) {
 .value small {
   margin-left: 3px;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .track {
@@ -154,11 +138,11 @@ function holders(item: Achievement) {
   left: 0;
   height: 4px;
   border-radius: 2px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 .line.done {
-  background: v-bind("theme.primaryColor");
+  background: v-bind('theme.primaryColor');
 }
 
 .tier {
@@ -188,7 +172,7 @@ function holders(item: Achievement) {
   line-height: 16px;
   font-weight: 600;
   white-space: nowrap;
-  color: v-bind("theme.primaryColorPressed");
+  color: v-bind('theme.primaryColorPressed');
   background: v-bind(gapBg);
 }
 
@@ -197,18 +181,18 @@ function holders(item: Achievement) {
   line-height: 15px;
   text-align: center;
   white-space: nowrap;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tier.on .tier-name {
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   font-weight: 600;
 }
 
 .tier-at {
   font-size: 11px;
   line-height: 14px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 

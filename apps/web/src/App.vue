@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { darkTheme, dateZhCN, zhCN } from "naive-ui"
-import "normalize.css"
-import "./index.css"
-import "shared/highlight.css"
-import { useConfigStore } from "shared/store/config"
-import { useConfigUpdate } from "shared/composables/configUpdate"
-import { useUserStore } from "shared/store/user"
-import { useCollabStore } from "shared/store/collab"
-import CollabHost from "shared/components/CollabHost.vue"
+import { darkTheme, dateZhCN, zhCN } from 'naive-ui'
+import 'normalize.css'
+import './index.css'
+import 'shared/highlight.css'
+import { useConfigStore } from 'shared/store/config'
+import { useConfigUpdate } from 'shared/composables/configUpdate'
+import { useUserStore } from 'shared/store/user'
+import { useCollabStore } from 'shared/store/collab'
+import CollabHost from 'shared/components/CollabHost.vue'
 
 const isDark = useDark()
 const configStore = useConfigStore()
@@ -43,23 +43,18 @@ watch(
 
 // n-code（提交详情、看代码的弹框）的高亮，空闲时再加载，不挡首屏。
 // 它只认 highlight.js 的接口，shared/highlight 给了一个同名的壳，里面是和编辑器同一套解析器
-const hljsInstance = shallowRef<typeof import("shared/highlight").hljs>()
+const hljsInstance = shallowRef<typeof import('shared/highlight').hljs>()
 onMounted(() => {
   const load = async () => {
-    hljsInstance.value = (await import("shared/highlight")).hljs
+    hljsInstance.value = (await import('shared/highlight')).hljs
   }
-  if ("requestIdleCallback" in window) requestIdleCallback(load)
+  if ('requestIdleCallback' in window) requestIdleCallback(load)
   else setTimeout(load, 1000)
 })
 </script>
 
 <template>
-  <n-config-provider
-    :theme="isDark ? darkTheme : null"
-    :locale="zhCN"
-    :date-locale="dateZhCN"
-    :hljs="hljsInstance"
-  >
+  <n-config-provider :theme="isDark ? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN" :hljs="hljsInstance">
     <n-dialog-provider>
       <n-message-provider>
         <router-view></router-view>

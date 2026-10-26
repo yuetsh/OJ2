@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import Markdown from "shared/components/Markdown.vue"
-import { useThemeVars } from "naive-ui"
-import { useMermaid } from "shared/composables/useMermaid"
-import { DIFFICULTY, SOURCES } from "utils/constants"
-import { getTagColor } from "utils/functions"
-import type { AstRules, BlankProblem, LANGUAGE } from "utils/types"
-import type { FlowDoc } from "shared/components/FlowchartEditor/model"
-import type { AstCheckState, FlowchartMode, PreviewTab } from "./editorTypes"
-import type { TemplateParts } from "./codeTemplate"
-import { isBlankHtml } from "./problemForm"
+import Markdown from 'shared/components/Markdown.vue'
+import { useThemeVars } from 'naive-ui'
+import { useMermaid } from 'shared/composables/useMermaid'
+import { DIFFICULTY, SOURCES } from 'utils/constants'
+import { getTagColor } from 'utils/functions'
+import type { AstRules, BlankProblem, LANGUAGE } from 'utils/types'
+import type { FlowDoc } from 'shared/components/FlowchartEditor/model'
+import type { AstCheckState, FlowchartMode, PreviewTab } from './editorTypes'
+import type { TemplateParts } from './codeTemplate'
+import { isBlankHtml } from './problemForm'
 
-const CodeEditor = defineAsyncComponent(() => import("shared/components/CodeEditor.vue"))
-const FlowchartView = defineAsyncComponent(
-  () => import("shared/components/FlowchartEditor/FlowchartView.vue"),
-)
+const CodeEditor = defineAsyncComponent(() => import('shared/components/CodeEditor.vue'))
+const FlowchartView = defineAsyncComponent(() => import('shared/components/FlowchartEditor/FlowchartView.vue'))
 
 /**
  * 编程题出题页的右栏：学生打开这道题看到的样子（设计稿「编程题出题页」B）。
@@ -23,7 +21,7 @@ const FlowchartView = defineAsyncComponent(
 const props = defineProps<{
   displayId: string
   title: string
-  difficulty: BlankProblem["difficulty"]
+  difficulty: BlankProblem['difficulty']
   description: string
   inputDescription: string
   outputDescription: string
@@ -43,38 +41,29 @@ const props = defineProps<{
   flowchartDoc: FlowDoc | null
 }>()
 
-const tab = defineModel<PreviewTab>("tab", { required: true })
+const tab = defineModel<PreviewTab>('tab', { required: true })
 const emit = defineEmits<{ renderState: [ok: boolean]; collapse: [] }>()
 
 const theme = useThemeVars()
 
 // ---------------------------------------------------------------- 语法要求
 
-const KIND_TAG_TYPE = { require: "success", forbid: "error", count: "info" } as const
+const KIND_TAG_TYPE = { require: 'success', forbid: 'error', count: 'info' } as const
 
 function requirementsOf(lang: string) {
   const rules = props.astRules?.[lang] ?? []
   const state = props.astChecks[lang]
   return rules.map((rule, i) => ({
-    text:
-      rule.message ||
-      (state && !("error" in state) ? state.rules[i]?.description : "") ||
-      "（规则还没写完）",
-    kind: rule.engine.startsWith("must_not")
-      ? ("forbid" as const)
-      : rule.engine.startsWith("count")
-        ? ("count" as const)
-        : ("require" as const),
+    text: rule.message || (state && !('error' in state) ? state.rules[i]?.description : '') || '（规则还没写完）',
+    kind: rule.engine.startsWith('must_not') ? ('forbid' as const) : rule.engine.startsWith('count') ? ('count' as const) : ('require' as const),
   }))
 }
 
-const requirementLanguages = computed(() =>
-  props.languages.filter((lang) => (props.astRules?.[lang]?.length ?? 0) > 0),
-)
+const requirementLanguages = computed(() => props.languages.filter((lang) => (props.astRules?.[lang]?.length ?? 0) > 0))
 
 // ---------------------------------------------------------------- 编辑器
 
-const editorLanguage = ref<LANGUAGE>(props.languages[0] ?? "Python")
+const editorLanguage = ref<LANGUAGE>(props.languages[0] ?? 'Python')
 watch(
   () => props.languages,
   (langs) => {
@@ -92,18 +81,18 @@ const editorCode = computed(() => {
 
 const referenceDoc = computed(() => (props.flowchartDoc?.steps.length ? props.flowchartDoc : null))
 
-const container = useTemplateRef<HTMLElement>("chart")
+const container = useTemplateRef<HTMLElement>('chart')
 const { renderFlowchart, renderError, renderSuccess } = useMermaid()
 
 async function render() {
   await renderFlowchart(container.value, props.mermaidCode)
-  emit("renderState", renderSuccess.value)
+  emit('renderState', renderSuccess.value)
 }
 
 // 改了先报「没验证」，防抖之后的渲染跑完再报结果（和 MermaidEditor 同一个理由）
 watch(
   () => props.mermaidCode,
-  () => emit("renderState", false),
+  () => emit('renderState', false),
 )
 watchDebounced(() => props.mermaidCode, render, { debounce: 300, maxWait: 1000 })
 onMounted(() => nextTick(render))
@@ -117,20 +106,16 @@ onMounted(() => nextTick(render))
       <n-radio-group v-model:value="tab" size="small">
         <n-radio-button value="statement">题面</n-radio-button>
         <n-radio-button value="editor">编辑器</n-radio-button>
-        <n-radio-button value="flowchart" :class="{ dim: flowchartMode === 'none' }">
-          流程图
-        </n-radio-button>
+        <n-radio-button value="flowchart" :class="{ dim: flowchartMode === 'none' }"> 流程图 </n-radio-button>
       </n-radio-group>
-      <n-button size="small" quaternary title="收起，专心写左边" @click="emit('collapse')">
-        收起 ›
-      </n-button>
+      <n-button size="small" quaternary title="收起，专心写左边" @click="emit('collapse')"> 收起 › </n-button>
     </div>
 
     <!-- 题面 -->
     <div v-show="tab === 'statement'" class="page">
       <div class="titleRow">
         <span v-if="displayId" class="pid">{{ displayId }}</span>
-        <h2>{{ title || "（题目还没起名）" }}</h2>
+        <h2>{{ title || '（题目还没起名）' }}</h2>
       </div>
       <div class="meta">
         <n-tag size="small" :bordered="false" :type="getTagColor(difficulty)">
@@ -144,13 +129,7 @@ onMounted(() => nextTick(render))
           <span v-if="requirementLanguages.length > 1 || languages.length > 1" class="langLabel">
             {{ lang }}
           </span>
-          <n-tag
-            v-for="(rule, i) in requirementsOf(lang)"
-            :key="`${lang}-${i}`"
-            :type="KIND_TAG_TYPE[rule.kind]"
-            size="small"
-            :bordered="false"
-          >
+          <n-tag v-for="(rule, i) in requirementsOf(lang)" :key="`${lang}-${i}`" :type="KIND_TAG_TYPE[rule.kind]" size="small" :bordered="false">
             {{ rule.text }}
           </n-tag>
         </template>
@@ -188,7 +167,7 @@ onMounted(() => nextTick(render))
         </template>
       </div>
       <p v-else class="placeholder">
-        {{ bigData ? "在左边加一个例子" : "在左边的测试数据里勾几组「当例子」" }}
+        {{ bigData ? '在左边加一个例子' : '在左边的测试数据里勾几组「当例子」' }}
       </p>
 
       <template v-if="flowchartMode === 'show'">
@@ -217,40 +196,23 @@ onMounted(() => nextTick(render))
       </div>
       <div v-if="(astRules?.[editorLanguage]?.length ?? 0) > 0" class="requirements">
         <span class="requirementsHead">语法要求</span>
-        <n-tag
-          v-for="(rule, i) in requirementsOf(editorLanguage)"
-          :key="i"
-          :type="KIND_TAG_TYPE[rule.kind]"
-          size="small"
-          :bordered="false"
-        >
+        <n-tag v-for="(rule, i) in requirementsOf(editorLanguage)" :key="i" :type="KIND_TAG_TYPE[rule.kind]" size="small" :bordered="false">
           {{ rule.text }}
         </n-tag>
       </div>
       <p class="muted small">
         {{
           editorParts?.template.trim()
-            ? "学生打开编辑器时里面已经有这些："
+            ? '学生打开编辑器时里面已经有这些：'
             : SOURCES[editorLanguage]
               ? `没写 ${editorLanguage} 的预制代码，学生打开是全站默认的：`
               : `没写 ${editorLanguage} 的预制代码，学生打开是空白的`
         }}
       </p>
-      <CodeEditor
-        v-if="editorCode"
-        :value="editorCode"
-        :language="editorLanguage"
-        :font-size="14"
-        height="320px"
-        readonly
-      />
+      <CodeEditor v-if="editorCode" :value="editorCode" :language="editorLanguage" :font-size="14" height="320px" readonly />
       <p v-if="editorParts?.prepend.trim() || editorParts?.append.trim()" class="muted small">
         提交时，学生的代码{{
-          editorParts?.prepend.trim() && editorParts?.append.trim()
-            ? "前后"
-            : editorParts?.prepend.trim()
-              ? "前面"
-              : "后面"
+          editorParts?.prepend.trim() && editorParts?.append.trim() ? '前后' : editorParts?.prepend.trim() ? '前面' : '后面'
         }}还会拼上你藏起来的代码。
       </p>
     </div>
@@ -258,9 +220,7 @@ onMounted(() => nextTick(render))
     <!-- 流程图：一直挂着，改了图的代码随时知道画不画得出来 -->
     <div v-show="tab === 'flowchart'" class="page">
       <p v-if="flowchartMode === 'none'" class="placeholder">这道题不用流程图</p>
-      <p v-else-if="flowchartMode === 'draw'" class="placeholder">
-        学生在题目页右边自己画，交上去按例子和测试数据评
-      </p>
+      <p v-else-if="flowchartMode === 'draw'" class="placeholder">学生在题目页右边自己画，交上去按例子和测试数据评</p>
       <template v-else>
         <p class="muted small">学生在题面例子下面看到的是：</p>
         <div v-if="referenceDoc" class="reference">
@@ -304,10 +264,10 @@ onMounted(() => nextTick(render))
 .page {
   max-height: calc(100vh - 150px);
   overflow: auto;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   padding: 18px 22px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -326,7 +286,7 @@ onMounted(() => nextTick(render))
 }
 
 .pid {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 和题目页的小节标题一个样子（oj/problem/components/ProblemContent.vue） */
@@ -336,7 +296,7 @@ onMounted(() => nextTick(render))
   line-height: 1.4;
   margin: 6px 0 0;
   padding-left: 9px;
-  border-left: 3px solid v-bind("theme.primaryColor");
+  border-left: 3px solid v-bind('theme.primaryColor');
 }
 
 .io {
@@ -363,7 +323,7 @@ onMounted(() => nextTick(render))
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-size: 12px;
 }
 
@@ -374,7 +334,7 @@ onMounted(() => nextTick(render))
 
 .placeholder {
   margin: 0;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 参考流程图：和学生题面（ProblemContent.vue）同一种浅灰底 */
@@ -398,7 +358,7 @@ onMounted(() => nextTick(render))
 .sampleLabel,
 .sampleNo {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .sampleNo {
@@ -412,7 +372,7 @@ onMounted(() => nextTick(render))
   padding: 4px 10px;
   border-radius: 6px;
   background-color: rgba(128, 128, 128, 0.08);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei', monospace;
   font-size: 13px;
   line-height: 1.55;
   white-space: pre;
@@ -432,7 +392,7 @@ onMounted(() => nextTick(render))
   padding: 8px 10px;
   border-radius: 4px;
   font-size: 13px;
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
   background-color: rgba(208, 48, 80, 0.08);
   word-break: break-all;
 }

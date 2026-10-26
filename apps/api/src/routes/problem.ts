@@ -12,52 +12,27 @@ import {
   type ProblemProgress,
   type ProblemTypeFilter,
   type Tag,
-} from "@oj2/contract"
-import {
-  and,
-  asc,
-  count,
-  countDistinct,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  isNull,
-  ne,
-  notInArray,
-  or,
-  sql,
-} from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { and, asc, count, countDistinct, desc, eq, ilike, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, requireAuth, type AppEnv } from "../auth/middleware"
-import { db, schema } from "../db"
-import { astRequirements } from "../judge/ast"
-import { challengeList } from "../services/challenge"
-import { failure, success } from "../http"
-import { JudgeStatus } from "../judge/status"
-import {
-  buildProblemProgress,
-  problemStates,
-  allProblemUserCounts,
-  problemUserCounts,
-} from "../services/problem-progress"
-import {
-  asFilterValue,
-  countFailedSubmissions,
-  asRecord,
-  queryInteger,
-  sampleUser,
-} from "./helpers"
+import { optionalAuth, requireAuth, type AppEnv } from '../auth/middleware'
+import { db, schema } from '../db'
+import { astRequirements } from '../judge/ast'
+import { challengeList } from '../services/challenge'
+import { failure, success } from '../http'
+import { JudgeStatus } from '../judge/status'
+import { buildProblemProgress, problemStates, allProblemUserCounts, problemUserCounts } from '../services/problem-progress'
+import { asFilterValue, countFailedSubmissions, asRecord, queryInteger, sampleUser } from './helpers'
 
 export const problemRoutes = new Hono<AppEnv>()
 
 function publicTemplates(value: unknown) {
   const templates: Record<string, string> = {}
   for (const [language, raw] of Object.entries(asRecord(value))) {
-    if (typeof raw !== "string") continue
+    if (typeof raw !== 'string') continue
     const match = raw.match(/\/\/TEMPLATE BEGIN\n([\s\S]+?)\/\/TEMPLATE END/)
-    templates[language] = match?.[1] ?? ""
+    templates[language] = match?.[1] ?? ''
   }
   return templates
 }
@@ -83,17 +58,16 @@ async function getProblemTags(problemIds: number[]) {
     .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(inArray(schema.problemTags.problemId, problemIds))
   const result = new Map<number, string[]>()
-  for (const row of rows)
-    result.set(row.problemId, [...(result.get(row.problemId) ?? []), row.name])
+  for (const row of rows) result.set(row.problemId, [...(result.get(row.problemId) ?? []), row.name])
   return result
 }
 
 /** 「全部类型」下拉的筛选条件，列表和「随便来一道」共用 */
 function typeFilter(type: ProblemTypeFilter | undefined) {
-  if (type === "reference") return eq(schema.problem.showFlowchart, true)
-  if (type === "flowchart") return eq(schema.problem.allowFlowchart, true)
-  if (type === "ast") return sql`${schema.problem.astRules} is not null`
-  if (type === "sql") return sql`${schema.problem.languages} @> '["SQL"]'::jsonb`
+  if (type === 'reference') return eq(schema.problem.showFlowchart, true)
+  if (type === 'flowchart') return eq(schema.problem.allowFlowchart, true)
+  if (type === 'ast') return sql`${schema.problem.astRules} is not null`
+  if (type === 'sql') return sql`${schema.problem.languages} @> '["SQL"]'::jsonb`
   return undefined
 }
 
@@ -128,36 +102,26 @@ function listItem(
     hasAstRules: row.problem.astRules !== null,
     isSql: isSqlProblem(row.problem),
     // 流程图评到 A / S 也打勾：problemStates 已经把它算进 solved
-    myStatus: states?.solved.has(id)
-      ? JudgeStatus.ACCEPTED
-      : typeof status === "number"
-        ? status
-        : null,
+    myStatus: states?.solved.has(id) ? JudgeStatus.ACCEPTED : typeof status === 'number' ? status : null,
     solvedUsers: counts.get(id)?.solved ?? 0,
     triedUsers: counts.get(id)?.tried ?? 0,
   } satisfies ProblemListItem
 }
 
-problemRoutes.get("/problems", optionalAuth, async (c) => {
-  const user = c.get("user")
-  const limit = queryInteger(c.req.query("limit"), 20, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+problemRoutes.get('/problems', optionalAuth, async (c) => {
+  const user = c.get('user')
+  const limit = queryInteger(c.req.query('limit'), 20, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
   const filters = [eq(schema.problem.visible, true), isNull(schema.problem.contestId)]
-  const author = c.req.query("author")?.trim()
-  const keyword = c.req.query("keyword")?.trim()
-  const difficulty = c.req.query("difficulty")?.trim()
-  const tag = c.req.query("tag")?.trim()
-  const type = problemTypeFilterSchema.safeParse(c.req.query("type")).data
+  const author = c.req.query('author')?.trim()
+  const keyword = c.req.query('keyword')?.trim()
+  const difficulty = c.req.query('difficulty')?.trim()
+  const tag = c.req.query('tag')?.trim()
+  const type = problemTypeFilterSchema.safeParse(c.req.query('type')).data
   // 没登录时「只看没做完」在前端是灰的；直接拼地址来的就当没开
-  const undone = c.req.query("undone") === "1" && !!user
+  const undone = c.req.query('undone') === '1' && !!user
   if (author) filters.push(eq(schema.user.username, author))
-  if (keyword)
-    filters.push(
-      or(
-        ilike(schema.problem.title, `%${keyword}%`),
-        ilike(schema.problem.displayId, `%${keyword}%`),
-      )!,
-    )
+  if (keyword) filters.push(or(ilike(schema.problem.title, `%${keyword}%`), ilike(schema.problem.displayId, `%${keyword}%`))!)
   if (difficulty) filters.push(eq(schema.problem.difficulty, asFilterValue(difficulty)))
   if (tag) {
     filters.push(
@@ -175,28 +139,24 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
   if (byType) filters.push(byType)
 
   const states = user ? await problemStates(user.id) : null
-  if (undone && states && states.solved.size > 0)
-    filters.push(notInArray(schema.problem.id, [...states.solved]))
+  if (undone && states && states.solved.size > 0) filters.push(notInArray(schema.problem.id, [...states.solved]))
 
   const where = and(...filters)
   // 排序值沿用原来的（地址栏里存着的旧链接照样能用），但「最多 / 最少」现在按**人数**排，
   // 和列表最后一列「做对 / 做过」对得上：submission_number 是做过的人，accepted_number 是做对的人。
   // 旧的「画流程图 / 语法检查」排序已经拆成类型筛选，传进来落到默认（最新创建）
-  const sort = problemListSortSchema.safeParse(c.req.query("sort") ?? "").data ?? ""
-  const byPeople = sort.endsWith("submission_number") || sort.endsWith("accepted_number")
+  const sort = problemListSortSchema.safeParse(c.req.query('sort') ?? '').data ?? ''
+  const byPeople = sort.endsWith('submission_number') || sort.endsWith('accepted_number')
   const allCounts = byPeople ? await allProblemUserCounts() : null
   const people = allCounts
     ? sql`case ${schema.problem.id} ${sql.join(
-        [...allCounts].map(
-          ([id, n]) =>
-            sql`when ${id} then ${sort.endsWith("accepted_number") ? n.solved : n.tried}`,
-        ),
+        [...allCounts].map(([id, n]) => sql`when ${id} then ${sort.endsWith('accepted_number') ? n.solved : n.tried}`),
         sql` `,
       )} else 0 end`
     : null
   const order = people
-    ? [sort.startsWith("-") ? desc(people) : asc(people), desc(schema.problem.createTime)]
-    : sort === "create_time"
+    ? [sort.startsWith('-') ? desc(people) : asc(people), desc(schema.problem.createTime)]
+    : sort === 'create_time'
       ? [asc(schema.problem.createTime)]
       : [desc(schema.problem.createTime)]
   const [totalRow] = await db
@@ -218,11 +178,7 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
     .limit(limit)
     .offset(offset)
   const ids = rows.map((row) => row.problem.id)
-  const [tags, statuses, counts] = await Promise.all([
-    getProblemTags(ids),
-    getProblemStatuses(user?.id),
-    allCounts ?? problemUserCounts(ids),
-  ])
+  const [tags, statuses, counts] = await Promise.all([getProblemTags(ids), getProblemStatuses(user?.id), allCounts ?? problemUserCounts(ids)])
   return success(c, {
     results: rows.map((row) => listItem(row, tags, statuses, states, counts)),
     total: totalRow?.value ?? 0,
@@ -233,14 +189,14 @@ problemRoutes.get("/problems", optionalAuth, async (c) => {
  * 题目列表顶上那行和左栏的进度。没登录给 null（前端那行换成「登录以后……」）。
  * 注册在 /problems/:displayId 前面，不然被它吃掉。
  */
-problemRoutes.get("/problems/progress", optionalAuth, async (c) => {
-  const user = c.get("user")
+problemRoutes.get('/problems/progress', optionalAuth, async (c) => {
+  const user = c.get('user')
   if (!user) return success(c, null)
   return success(c, (await buildProblemProgress(user.id)) satisfies ProblemProgress)
 })
 
-problemRoutes.get("/problem-tags", async (c) => {
-  const keyword = c.req.query("keyword")?.trim()
+problemRoutes.get('/problem-tags', async (c) => {
+  const keyword = c.req.query('keyword')?.trim()
   // 只数公开题库里可见的题：隐藏的题和比赛题都不算，否则标签会出现在
   // 首页列表里，点进去却一道题都筛不出来（对齐 /problems 的过滤条件）
   const rows = await db
@@ -252,14 +208,7 @@ problemRoutes.get("/problem-tags", async (c) => {
     })
     .from(schema.problemTag)
     .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
-    .innerJoin(
-      schema.problem,
-      and(
-        eq(schema.problem.id, schema.problemTags.problemId),
-        eq(schema.problem.visible, true),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .innerJoin(schema.problem, and(eq(schema.problem.id, schema.problemTags.problemId), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
     .where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
     .groupBy(schema.problemTag.id, schema.problemTag.name, schema.problemTag.category)
     .having(sql`count(${schema.problemTags.problemId}) > 0`)
@@ -276,14 +225,14 @@ problemRoutes.get("/problem-tags", async (c) => {
  * 9 次就抽到 1 道没有 C 的题（Python 专用题和 SQL 题）。语言排在最前、而不是筛掉：
  * 选了「SQL」知识点时没有一道能用 Python 做，照样得抽一道 SQL 题出来。
  */
-problemRoutes.get("/problems/random", optionalAuth, async (c) => {
-  const user = c.get("user")
-  const tag = c.req.query("tag")?.trim()
-  const type = problemTypeFilterSchema.safeParse(c.req.query("type")).data
+problemRoutes.get('/problems/random', optionalAuth, async (c) => {
+  const user = c.get('user')
+  const tag = c.req.query('tag')?.trim()
+  const type = problemTypeFilterSchema.safeParse(c.req.query('type')).data
   // 上次用的是 SQL（刚做完一道 SQL 题）不算偏好：SQL 题一共 9 道，照它挑就成了「随便来一道
   // SQL」。要 SQL 题的人会选「SQL」知识点或类型，那时按上面说的照样抽得到
-  const saved = normalizeLanguage(c.req.query("language"))
-  const language = saved && saved !== "SQL" && saved !== "Flowchart" ? saved : "Python"
+  const saved = normalizeLanguage(c.req.query('language'))
+  const language = saved && saved !== 'SQL' && saved !== 'Flowchart' ? saved : 'Python'
   const states = user ? await problemStates(user.id) : null
   const solved = states ? [...states.solved] : []
   const [row] = await db
@@ -299,10 +248,7 @@ problemRoutes.get("/problems/random", optionalAuth, async (c) => {
               db
                 .select({ id: schema.problemTags.problemId })
                 .from(schema.problemTags)
-                .innerJoin(
-                  schema.problemTag,
-                  eq(schema.problemTags.problemtagId, schema.problemTag.id),
-                )
+                .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
                 .where(eq(schema.problemTag.name, tag)),
             )
           : undefined,
@@ -318,12 +264,12 @@ problemRoutes.get("/problems/random", optionalAuth, async (c) => {
       sql`random()`,
     )
     .limit(1)
-  if (!row) return failure(c, 404, "no-problems", "No problem to pick")
+  if (!row) return failure(c, 404, 'no-problems', 'No problem to pick')
   return success(c, row.displayId)
 })
 
-problemRoutes.get("/problem-authors", async (c) => {
-  const showAll = c.req.query("all") === "1"
+problemRoutes.get('/problem-authors', async (c) => {
+  const showAll = c.req.query('all') === '1'
   const rows = await db
     .select({
       username: schema.user.username,
@@ -331,13 +277,7 @@ problemRoutes.get("/problem-authors", async (c) => {
     })
     .from(schema.problem)
     .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-    .where(
-      and(
-        isNull(schema.problem.contestId),
-        eq(schema.user.isDisabled, false),
-        showAll ? undefined : eq(schema.problem.visible, true),
-      ),
-    )
+    .where(and(isNull(schema.problem.contestId), eq(schema.user.isDisabled, false), showAll ? undefined : eq(schema.problem.visible, true)))
     .groupBy(schema.user.username)
     .orderBy(desc(count(schema.problem.id)))
   return success(c, rows satisfies ProblemAuthor[])
@@ -347,43 +287,32 @@ problemRoutes.get("/problem-authors", async (c) => {
  * 几道题的挑战：`?problems=1080,2020,4077&language=Python`。课堂条「这节课都做完了」一次要
  * 一节课的几道，题目页只要当前这道。挑战按语言分，语言是学生编辑器里选的那种
  */
-problemRoutes.get("/challenges", requireAuth, async (c) => {
-  const language = c.req.query("language") ?? ""
+problemRoutes.get('/challenges', requireAuth, async (c) => {
+  const language = c.req.query('language') ?? ''
   if (!AST_SUPPORTED_LANGUAGES.includes(language)) return success(c, [] satisfies ChallengeList)
-  const ids = (c.req.query("problems") ?? "")
-    .split(",")
+  const ids = (c.req.query('problems') ?? '')
+    .split(',')
     .map((id) => id.trim())
     .filter(Boolean)
     .slice(0, 20)
-  return success(c, (await challengeList(c.get("user")!, ids, language)) satisfies ChallengeList)
+  return success(c, (await challengeList(c.get('user')!, ids, language)) satisfies ChallengeList)
 })
 
-problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
+problemRoutes.get('/problems/:displayId/similar', optionalAuth, async (c) => {
   const [target] = await db
     .select({ id: schema.problem.id })
     .from(schema.problem)
-    .where(
-      and(
-        sql`lower(${schema.problem.displayId}) = lower(${c.req.param("displayId")})`,
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(sql`lower(${schema.problem.displayId}) = lower(${c.req.param('displayId')})`, isNull(schema.problem.contestId)))
     .limit(1)
-  if (!target) return failure(c, 404, "problem-not-found", "Problem not found")
-  const targetTags = await db
-    .select({ id: schema.problemTags.problemtagId })
-    .from(schema.problemTags)
-    .where(eq(schema.problemTags.problemId, target.id))
+  if (!target) return failure(c, 404, 'problem-not-found', 'Problem not found')
+  const targetTags = await db.select({ id: schema.problemTags.problemtagId }).from(schema.problemTags).where(eq(schema.problemTags.problemId, target.id))
   if (targetTags.length === 0) return success(c, [])
   // 「已 AC 的不再推荐」必须下推到 SQL。早先是先 limit(5) 再在内存里筛，刷题多的
   // 学生 5 条候选能被筛到只剩一两条、甚至清零（前端 v-if 一空整块就不渲染）——
   // 而这个接口恰好只在**刚 AC** 或**连挂三次**时才被调用，正是候选最容易全中的时候。
   // 做对了的和题目列表同一个口径：画流程图的题，流程图评到 A / S 也算（problemStates）
-  const user = c.get("user")
-  const [statuses, states] = await Promise.all([
-    getProblemStatuses(user?.id),
-    user ? problemStates(user.id) : null,
-  ])
+  const user = c.get('user')
+  const [statuses, states] = await Promise.all([getProblemStatuses(user?.id), user ? problemStates(user.id) : null])
   const solvedIds = states ? [...states.solved] : []
   // difficulty 是 text（Low / Mid / High），直接 order by 走的是字典序 ——
   // High 排在 Low 前面，「由易到难」会变成「最难的先上」。按语义显式排。
@@ -420,12 +349,7 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
     )
     .groupBy(schema.problem.id, schema.user.id, schema.userProfile.realName)
     // 末尾的 id 是稳定排序用的：并列时没有它，同一道题两次请求能返回不同的 5 条
-    .orderBy(
-      desc(sharedTags),
-      asc(difficultyRank),
-      desc(schema.problem.acceptedNumber),
-      asc(schema.problem.id),
-    )
+    .orderBy(desc(sharedTags), asc(difficultyRank), desc(schema.problem.acceptedNumber), asc(schema.problem.id))
     .limit(5)
   const ids = rows.map((row) => row.problem.id)
   const [tags, counts] = await Promise.all([getProblemTags(ids), problemUserCounts(ids)])
@@ -435,7 +359,7 @@ problemRoutes.get("/problems/:displayId/similar", optionalAuth, async (c) => {
   )
 })
 
-problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
+problemRoutes.get('/problems/:displayId', optionalAuth, async (c) => {
   const [row] = await db
     .select({
       problem: schema.problem,
@@ -444,16 +368,10 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
     })
     .from(schema.problem)
     .innerJoin(schema.user, eq(schema.problem.createdById, schema.user.id))
-    .where(
-      and(
-        eq(schema.problem.displayId, c.req.param("displayId")),
-        eq(schema.problem.visible, true),
-        isNull(schema.problem.contestId),
-      ),
-    )
+    .where(and(eq(schema.problem.displayId, c.req.param('displayId')), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
     .limit(1)
 
-  if (!row) return failure(c, 404, "problem-not-found", "Problem does not exist")
+  if (!row) return failure(c, 404, 'problem-not-found', 'Problem does not exist')
 
   const tagRows = await db
     .select({ name: schema.problemTag.name })
@@ -461,7 +379,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
     .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
     .where(eq(schema.problemTags.problemId, row.problem.id))
 
-  const user = c.get("user")
+  const user = c.get('user')
   let myStatus: number | null = null
   let myFailedCount = 0
   if (user) {
@@ -472,7 +390,7 @@ problemRoutes.get("/problems/:displayId", optionalAuth, async (c) => {
       .limit(1)
     const statuses = asRecord(asRecord(profile?.status).problems)
     const problemStatus = asRecord(statuses[String(row.problem.id)]).status
-    if (typeof problemStatus === "number") myStatus = problemStatus
+    if (typeof problemStatus === 'number') myStatus = problemStatus
 
     // 前端拿这个数决定「让 AI 分析我的代码」露不露面，口径必须和 POST /ai/hint
     // 的服务端闸门一致，所以两边共用 countFailedSubmissions

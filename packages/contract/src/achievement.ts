@@ -1,6 +1,6 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-export const achievementRaritySchema = z.enum(["bronze", "silver", "gold", "platinum"])
+export const achievementRaritySchema = z.enum(['bronze', 'silver', 'gold', 'platinum'])
 
 export const achievementSchema = z.object({
   id: z.number().int(),
@@ -10,7 +10,7 @@ export const achievementSchema = z.object({
   rarity: achievementRaritySchema,
   hidden: z.boolean(),
   metric: z.string().nullable(),
-  operator: z.enum(["gte", "lte"]).nullable(),
+  operator: z.enum(['gte', 'lte']).nullable(),
   threshold: z.number().int().nullable(),
   unlocked: z.boolean(),
   unlockTime: z.string().nullable(),
@@ -65,7 +65,7 @@ export const pendingAchievementSchema = z.object({
  * 题单奖章和成就来自两张表、id 会重叠，前端靠它区分（见 events.ts 的 publishAchievementNotification）。
  */
 export const achievementNotificationSchema = pendingAchievementSchema.extend({
-  kind: z.enum(["achievement", "badge"]),
+  kind: z.enum(['achievement', 'badge']),
 })
 
 export const markAchievementsReadSchema = z.object({

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ChallengeList } from "@oj2/contract"
-import { getChallenges } from "oj/api"
-import { useChallengeStore } from "oj/store/challenge"
-import { useChallengeTone } from "../composables/challengeTone"
-import ChallengeIcon from "./ChallengeIcon.vue"
+import type { ChallengeList } from '@oj2/contract'
+import { getChallenges } from 'oj/api'
+import { useChallengeStore } from 'oj/store/challenge'
+import { useChallengeTone } from '../composables/challengeTone'
+import ChallengeIcon from './ChallengeIcon.vue'
 
 /**
  * 「还能挑战」：这几道题里我做对了、还没做到的挑战，一条一行，「去挑战」（设计稿 StkDone）。
@@ -22,7 +22,7 @@ const tone = useChallengeTone()
 const groups = ref<ChallengeList>([])
 let sequence = 0
 watch(
-  () => [props.problemIds.join(","), props.language, props.refreshKey] as const,
+  () => [props.problemIds.join(','), props.language, props.refreshKey] as const,
   async () => {
     const mine = ++sequence
     if (!props.problemIds.length || !props.language) {
@@ -42,11 +42,7 @@ watch(
 const rows = computed(() =>
   groups.value.flatMap((group) =>
     // 没做对的题不给接挑战：挑战是做对之后的事
-    group.solved
-      ? group.challenges
-          .filter((challenge) => !challenge.mine)
-          .map((challenge) => ({ group, challenge }))
-      : [],
+    group.solved ? group.challenges.filter((challenge) => !challenge.mine).map((challenge) => ({ group, challenge })) : [],
   ),
 )
 </script>
@@ -63,16 +59,9 @@ const rows = computed(() =>
           <b>{{ group.problemId }}</b> <span class="title">{{ group.title }}</span>
         </div>
         <b class="wording">{{ challenge.wording }}</b>
-        <span class="stat">
-          {{ group.acCount }} 个做对的人里，{{ challenge.doneCount }} 人做到
-        </span>
+        <span class="stat"> {{ group.acCount }} 个做对的人里，{{ challenge.doneCount }} 人做到 </span>
       </div>
-      <button
-        type="button"
-        class="go"
-        :class="{ ghost: i > 0 }"
-        @click="challengeStore.start(group.problemId, challenge.id)"
-      >
+      <button type="button" class="go" :class="{ ghost: i > 0 }" @click="challengeStore.start(group.problemId, challenge.id)">
         去挑战
         <svg
           width="16"
@@ -114,8 +103,8 @@ const rows = computed(() =>
   height: 24px;
   padding: 0 9px;
   border-radius: 12px;
-  background-color: v-bind("tone.solid");
-  color: v-bind("tone.onSolid");
+  background-color: v-bind('tone.solid');
+  color: v-bind('tone.onSolid');
   font-size: 13px;
   font-weight: 600;
 }
@@ -126,7 +115,7 @@ const rows = computed(() =>
   align-items: center;
   gap: 4px 16px;
   padding: 12px 14px;
-  border: 1px solid v-bind("tone.border");
+  border: 1px solid v-bind('tone.border');
   border-radius: 8px;
 }
 
@@ -156,7 +145,7 @@ const rows = computed(() =>
 .wording {
   font-size: 17px;
   line-height: 24px;
-  color: v-bind("tone.text");
+  color: v-bind('tone.text');
 }
 
 .go {
@@ -166,9 +155,9 @@ const rows = computed(() =>
   height: 40px;
   padding: 0 16px;
   border-radius: 6px;
-  border: 1px solid v-bind("tone.solid");
-  background-color: v-bind("tone.solid");
-  color: v-bind("tone.onSolid");
+  border: 1px solid v-bind('tone.solid');
+  background-color: v-bind('tone.solid');
+  color: v-bind('tone.onSolid');
   font: inherit;
   font-size: 15px;
   font-weight: 600;
@@ -178,12 +167,12 @@ const rows = computed(() =>
 
 .go.ghost {
   background-color: transparent;
-  color: v-bind("tone.text");
-  border-color: v-bind("tone.border");
+  color: v-bind('tone.text');
+  border-color: v-bind('tone.border');
 }
 
 .go:focus-visible {
-  outline: 2px solid v-bind("tone.solid");
+  outline: 2px solid v-bind('tone.solid');
   outline-offset: 2px;
 }
 

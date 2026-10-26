@@ -9,15 +9,15 @@ export interface ExplainPerson {
 </script>
 
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { onKeyStroke } from "@vueuse/core"
-import { useThemeVars } from "naive-ui"
-import SubmissionView from "oj/submission/components/SubmissionView.vue"
-import UserName from "shared/components/UserName.vue"
-import { useBackClose } from "shared/composables/backClose"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import type { ClassBoardProblem } from "utils/types"
-import ProblemBrief from "./ProblemBrief.vue"
+import { Icon } from '@iconify/vue'
+import { onKeyStroke } from '@vueuse/core'
+import { useThemeVars } from 'naive-ui'
+import SubmissionView from 'oj/submission/components/SubmissionView.vue'
+import UserName from 'shared/components/UserName.vue'
+import { useBackClose } from 'shared/composables/backClose'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import type { ClassBoardProblem } from 'utils/types'
+import ProblemBrief from './ProblemBrief.vue'
 
 /**
  * 课堂看板「讲错误」（设计稿 BdOpen）：点一个红格子或错法堆里的名字打开。老师在讲台上
@@ -34,8 +34,8 @@ const props = defineProps<{
   problem: ClassBoardProblem | null
   people: ExplainPerson[]
 }>()
-const show = defineModel<boolean>("show", { required: true })
-const index = defineModel<number>("index", { required: true })
+const show = defineModel<boolean>('show', { required: true })
+const index = defineModel<number>('index', { required: true })
 
 const theme = useThemeVars()
 const { isMobile } = useBreakpoints()
@@ -46,26 +46,24 @@ useBackClose(show, isMobile)
  * v-bind 的变量挂在组件根上，传不过去（弹层底色整个透明）
  */
 const vars = computed(() => ({
-  "--card": theme.value.cardColor,
-  "--text1": theme.value.textColor1,
-  "--text2": theme.value.textColor2,
-  "--text3": theme.value.textColor3,
-  "--divider": theme.value.dividerColor,
-  "--border": theme.value.borderColor,
-  "--success": theme.value.successColor,
-  "--hover": theme.value.hoverColor,
+  '--card': theme.value.cardColor,
+  '--text1': theme.value.textColor1,
+  '--text2': theme.value.textColor2,
+  '--text3': theme.value.textColor3,
+  '--divider': theme.value.dividerColor,
+  '--border': theme.value.borderColor,
+  '--success': theme.value.successColor,
+  '--hover': theme.value.hoverColor,
 }))
 const current = computed(() => props.people[index.value] ?? null)
-const showProblem = useStorage("oj_explain_show_problem", false)
+const showProblem = useStorage('oj_explain_show_problem', false)
 
 /** 一排人横着滑的时候，换到的人要滑进来（← → 换人、或者点开的就是排在后面的） */
 const peopleRef = ref<HTMLElement | null>(null)
 watch([index, show], async () => {
   if (!show.value) return
   await nextTick()
-  peopleRef.value
-    ?.querySelector<HTMLElement>(".person.on")
-    ?.scrollIntoView({ block: "nearest", inline: "nearest" })
+  peopleRef.value?.querySelector<HTMLElement>('.person.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 })
 
 function step(delta: -1 | 1) {
@@ -73,45 +71,30 @@ function step(delta: -1 | 1) {
   if (next >= 0 && next < props.people.length) index.value = next
 }
 
-onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
+onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
   if (!show.value || props.people.length < 2) return
   if (event.altKey || event.ctrlKey || event.metaKey) return
   event.preventDefault()
-  step(event.key === "ArrowLeft" ? -1 : 1)
+  step(event.key === 'ArrowLeft' ? -1 : 1)
 })
 </script>
 
 <template>
   <n-modal v-model:show="show" :auto-focus="false">
     <!-- 无 preset 的 n-modal 直接子节点要是普通元素 -->
-    <div
-      class="sheet"
-      :class="{ narrow: isMobile }"
-      :style="vars"
-      role="dialog"
-      :aria-label="problem ? `讲 ${problem.problemDisplayId} 的错误` : '讲错误'"
-    >
+    <div class="sheet" :class="{ narrow: isMobile }" :style="vars" role="dialog" :aria-label="problem ? `讲 ${problem.problemDisplayId} 的错误` : '讲错误'">
       <div class="top">
         <span v-if="problem" class="problem">
           <b>{{ problem.problemDisplayId }}</b> {{ problem.title }}
           <template v-if="people.length > 1"> · 错着的</template>
         </span>
         <div ref="peopleRef" class="people">
-          <button
-            v-for="(person, i) in people"
-            :key="person.userId"
-            type="button"
-            class="person"
-            :class="{ on: i === index }"
-            @click="index = i"
-          >
+          <button v-for="(person, i) in people" :key="person.userId" type="button" class="person" :class="{ on: i === index }" @click="index = i">
             <UserName :username="person.username" />
             <span class="kind">{{ person.label }}</span>
           </button>
         </div>
-        <span v-if="people.length > 1 && !isMobile" class="keys"
-          ><kbd>←</kbd><kbd>→</kbd> 换人</span
-        >
+        <span v-if="people.length > 1 && !isMobile" class="keys"><kbd>←</kbd><kbd>→</kbd> 换人</span>
         <div class="spacer"></div>
         <div class="buttons">
           <n-button
@@ -123,13 +106,7 @@ onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
           >
             题目
           </n-button>
-          <n-button
-            v-if="current"
-            :size="isMobile ? 'small' : 'medium'"
-            tag="a"
-            :href="'/submission/' + current.submissionId"
-            target="_blank"
-          >
+          <n-button v-if="current" :size="isMobile ? 'small' : 'medium'" tag="a" :href="'/submission/' + current.submissionId" target="_blank">
             在新页面打开
           </n-button>
         </div>

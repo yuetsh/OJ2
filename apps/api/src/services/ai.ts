@@ -1,7 +1,7 @@
-import { config } from "../config"
+import { config } from '../config'
 
 interface ChatMessage {
-  role: "system" | "user"
+  role: 'system' | 'user'
   content: string
 }
 
@@ -11,9 +11,9 @@ function requestBody(messages: ChatMessage[], stream: boolean, json = false) {
     messages,
     stream,
     temperature: 0,
-    thinking: { type: "disabled" },
+    thinking: { type: 'disabled' },
     // DeepSeek 的 JSON 模式：保证回的是合法 JSON，但 prompt 里得出现「json」字样
-    ...(json ? { response_format: { type: "json_object" } } : {}),
+    ...(json ? { response_format: { type: 'json_object' } } : {}),
   }
 }
 
@@ -34,44 +34,39 @@ const STREAM_IDLE_TIMEOUT_MS = 45_000
  * 推给前端的错误文案。真实原因（provider 的 HTTP 响应体、数据库报错……）只进日志和
  * `onError` 留痕，**不下发**：学生看不懂，也不该看到上游的响应内容。
  */
-const CLIENT_ERROR_MESSAGE = "AI 服务暂时不可用，请稍后再试"
-const MISSING_KEY_MESSAGE = "AI 功能未开启"
+const CLIENT_ERROR_MESSAGE = 'AI 服务暂时不可用，请稍后再试'
+const MISSING_KEY_MESSAGE = 'AI 功能未开启'
 
 /** 给客户端的错误事件；原因另行记日志 */
 function errorEvent(message: string) {
-  return `data: ${JSON.stringify({ type: "error", message })}\n\n`
+  return `data: ${JSON.stringify({ type: 'error', message })}\n\n`
 }
 
-export async function completeChat(
-  system: string,
-  user: string,
-  options: { json?: boolean; timeoutMs?: number } = {},
-) {
-  if (!config.aiKey) throw new Error("缺少 AI_KEY")
-  const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
-    method: "POST",
+export async function completeChat(system: string, user: string, options: { json?: boolean; timeoutMs?: number } = {}) {
+  if (!config.aiKey) throw new Error('缺少 AI_KEY')
+  const response = await fetch(new URL('/chat/completions', config.aiBaseUrl), {
+    method: 'POST',
     signal: AbortSignal.timeout(options.timeoutMs ?? COMPLETE_TIMEOUT_MS),
     headers: {
-      "content-type": "application/json",
+      'content-type': 'application/json',
       authorization: `Bearer ${config.aiKey}`,
     },
     body: JSON.stringify(
       requestBody(
         [
-          { role: "system", content: system },
-          { role: "user", content: user },
+          { role: 'system', content: system },
+          { role: 'user', content: user },
         ],
         false,
         options.json,
       ),
     ),
   })
-  if (!response.ok)
-    throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
+  if (!response.ok) throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
   const payload = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>
   }
-  return payload.choices?.[0]?.message?.content?.trim() ?? ""
+  return payload.choices?.[0]?.message?.content?.trim() ?? ''
 }
 
 export interface StreamChatHooks {
@@ -91,7 +86,7 @@ export function streamChat(system: string, user: string, hooks: StreamChatHooks 
   const encoder = new TextEncoder()
   const reportError = (message: string) =>
     hooks.onError?.(message).catch((error) => {
-      console.error("streamChat onError hook failed", error)
+      console.error('streamChat onError hook failed', error)
     })
   // 客户端断开（cancel）和空闲超时都走这一个 controller，把上游的 fetch / read 一起停掉。
   // 原来客户端走了之后这里还在把 provider 的回答一块块读完，白烧 token
@@ -100,10 +95,7 @@ export function streamChat(system: string, user: string, hooks: StreamChatHooks 
   let idleTimer: ReturnType<typeof setTimeout> | undefined
   const touch = () => {
     clearTimeout(idleTimer)
-    idleTimer = setTimeout(
-      () => upstream.abort(new Error("AI provider stream idle timeout")),
-      STREAM_IDLE_TIMEOUT_MS,
-    )
+    idleTimer = setTimeout(() => upstream.abort(new Error('AI provider stream idle timeout')), STREAM_IDLE_TIMEOUT_MS)
   }
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -116,49 +108,48 @@ export function streamChat(system: string, user: string, hooks: StreamChatHooks 
         }
       }
       if (!config.aiKey) {
-        await reportError("缺少 AI_KEY")
+        await reportError('缺少 AI_KEY')
         send(errorEvent(MISSING_KEY_MESSAGE))
-        send("event: end\n\n")
+        send('event: end\n\n')
         if (!closed) controller.close()
         return
       }
       try {
         touch()
-        const response = await fetch(new URL("/chat/completions", config.aiBaseUrl), {
-          method: "POST",
+        const response = await fetch(new URL('/chat/completions', config.aiBaseUrl), {
+          method: 'POST',
           signal: upstream.signal,
           headers: {
-            "content-type": "application/json",
+            'content-type': 'application/json',
             authorization: `Bearer ${config.aiKey}`,
           },
           body: JSON.stringify(
             requestBody(
               [
-                { role: "system", content: system },
-                { role: "user", content: user },
+                { role: 'system', content: system },
+                { role: 'user', content: user },
               ],
               true,
             ),
           ),
         })
-        if (!response.ok || !response.body)
-          throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
-        send("event: start\n\n")
+        if (!response.ok || !response.body) throw new Error(`AI provider returned HTTP ${response.status}: ${await response.text()}`)
+        send('event: start\n\n')
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
-        let buffer = ""
+        let buffer = ''
         const chunks: string[] = []
         while (true) {
           touch()
           const { done, value } = await reader.read()
           buffer += decoder.decode(value, { stream: !done })
-          const lines = buffer.split("\n")
-          buffer = lines.pop() ?? ""
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
           for (const raw of lines) {
             const line = raw.trim()
-            if (!line.startsWith("data:")) continue
+            if (!line.startsWith('data:')) continue
             const data = line.slice(5).trim()
-            if (data === "[DONE]") continue
+            if (data === '[DONE]') continue
             try {
               const item = JSON.parse(data) as {
                 choices?: Array<{
@@ -170,7 +161,7 @@ export function streamChat(system: string, user: string, hooks: StreamChatHooks 
               const content = choice?.delta?.content
               if (content) {
                 chunks.push(content)
-                send(`data: ${JSON.stringify({ type: "delta", content })}\n\n`)
+                send(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`)
               }
             } catch {
               // Provider keepalive or a partial non-data line.
@@ -178,35 +169,31 @@ export function streamChat(system: string, user: string, hooks: StreamChatHooks 
           }
           if (done) break
         }
-        const full = chunks.join("").trim()
+        const full = chunks.join('').trim()
         const extra = hooks.onComplete ? await hooks.onComplete(full) : undefined
-        send(`data: ${JSON.stringify({ ...extra, type: "done" })}\n\n`)
+        send(`data: ${JSON.stringify({ ...extra, type: 'done' })}\n\n`)
       } catch (error) {
         // 客户端主动走掉不算 AI 失败，但照样留痕：这条分析没有落库
-        const message = closed
-          ? "客户端已断开"
-          : error instanceof Error
-            ? error.message
-            : String(error)
-        if (!closed) console.error("streamChat failed", error)
+        const message = closed ? '客户端已断开' : error instanceof Error ? error.message : String(error)
+        if (!closed) console.error('streamChat failed', error)
         await reportError(message)
         send(errorEvent(CLIENT_ERROR_MESSAGE))
       } finally {
         clearTimeout(idleTimer)
-        send("event: end\n\n")
+        send('event: end\n\n')
         if (!closed) controller.close()
       }
     },
     cancel() {
       closed = true
-      upstream.abort(new Error("client disconnected"))
+      upstream.abort(new Error('client disconnected'))
     },
   })
   return new Response(body, {
     headers: {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-cache",
-      "x-accel-buffering": "no",
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-cache',
+      'x-accel-buffering': 'no',
     },
   })
 }
@@ -249,23 +236,23 @@ export function streamWhole(
           closed = true
         }
       }
-      const heartbeat = setInterval(() => send(": ping\n\n"), HEARTBEAT_MS)
+      const heartbeat = setInterval(() => send(': ping\n\n'), HEARTBEAT_MS)
       try {
-        send("event: start\n\n")
+        send('event: start\n\n')
         const { content, extra } = await produce()
-        send(`data: ${JSON.stringify({ type: "delta", content })}\n\n`)
-        send(`data: ${JSON.stringify({ ...extra, type: "done" })}\n\n`)
+        send(`data: ${JSON.stringify({ type: 'delta', content })}\n\n`)
+        send(`data: ${JSON.stringify({ ...extra, type: 'done' })}\n\n`)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        console.error("streamWhole failed", error)
+        console.error('streamWhole failed', error)
         // 先留痕再回前端；前端只拿固定文案，原因见 CLIENT_ERROR_MESSAGE
         await hooks.onError?.(message).catch((e) => {
-          console.error("streamWhole onError hook failed", e)
+          console.error('streamWhole onError hook failed', e)
         })
-        send(errorEvent(message === "缺少 AI_KEY" ? MISSING_KEY_MESSAGE : CLIENT_ERROR_MESSAGE))
+        send(errorEvent(message === '缺少 AI_KEY' ? MISSING_KEY_MESSAGE : CLIENT_ERROR_MESSAGE))
       } finally {
         clearInterval(heartbeat)
-        send("event: end\n\n")
+        send('event: end\n\n')
         if (!closed) controller.close()
       }
     },
@@ -275,9 +262,9 @@ export function streamWhole(
   })
   return new Response(body, {
     headers: {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-cache",
-      "x-accel-buffering": "no",
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-cache',
+      'x-accel-buffering': 'no',
     },
   })
 }

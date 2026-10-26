@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { RankRow } from "@oj2/contract"
-import { useThemeVars, type DropdownOption } from "naive-ui"
-import UserName from "shared/components/UserName.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useRankPalette } from "../palette"
-import MoodPopover from "./MoodPopover.vue"
-import RankAvatar from "shared/components/RankAvatar.vue"
+import type { RankRow } from '@oj2/contract'
+import { useThemeVars, type DropdownOption } from 'naive-ui'
+import UserName from 'shared/components/UserName.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useRankPalette } from '../palette'
+import MoodPopover from './MoodPopover.vue'
+import RankAvatar from 'shared/components/RankAvatar.vue'
 
 /**
  * 赛道：每人一根条，条越长做对越多，一样长的先做到的排前面（设计稿 G1 / G2）。
@@ -58,7 +58,7 @@ const theme = useThemeVars()
 const palette = useRankPalette()
 const { isDesktop } = useBreakpoints()
 
-type Item = { kind: "row"; row: RankRow } | { kind: "gap"; from: number; to: number }
+type Item = { kind: 'row'; row: RankRow } | { kind: 'gap'; from: number; to: number }
 
 /** 手机默认列几行：领奖台下面的前 5 行，加你上下各 2 行；没有你就列前 10 行 */
 const PHONE_HEAD = 5
@@ -72,50 +72,38 @@ const meRank = computed(() => props.rows.find((row) => row.user.id === props.meI
 const visible = computed(() => {
   if (isDesktop.value || !collapsed.value) return props.rows
   const mine = meRank.value
-  return props.rows.filter((row, index) =>
-    mine
-      ? index < PHONE_HEAD || Math.abs(row.rank - mine) <= PHONE_AROUND
-      : index < PHONE_HEAD_NO_ME,
-  )
+  return props.rows.filter((row, index) => (mine ? index < PHONE_HEAD || Math.abs(row.rank - mine) <= PHONE_AROUND : index < PHONE_HEAD_NO_ME))
 })
 
 const items = computed<Item[]>(() => {
   const list: Item[] = []
   let last = props.rows[0] ? props.rows[0].rank - 1 : 0
   for (const row of visible.value) {
-    if (row.rank > last + 1) list.push({ kind: "gap", from: last + 1, to: row.rank - 1 })
-    list.push({ kind: "row", row })
+    if (row.rank > last + 1) list.push({ kind: 'gap', from: last + 1, to: row.rank - 1 })
+    list.push({ kind: 'row', row })
     last = row.rank
   }
-  const end = props.complete
-    ? (props.rows.at(-1)?.rank ?? last)
-    : Math.min(props.total, props.cap ?? props.total)
-  if (last < end) list.push({ kind: "gap", from: last + 1, to: end })
+  const end = props.complete ? (props.rows.at(-1)?.rank ?? last) : Math.min(props.total, props.cap ?? props.total)
+  if (last < end) list.push({ kind: 'gap', from: last + 1, to: end })
   return list
 })
 
 /** 手机上只有末尾一段折起来（本班的常见情况），按钮就说「看全班 N 人」 */
 function gapText(item: { from: number; to: number }) {
-  const gaps = items.value.filter((entry) => entry.kind === "gap")
-  if (
-    !isDesktop.value &&
-    props.wholeLabel &&
-    gaps.length === 1 &&
-    item.to === props.rows.at(-1)?.rank
-  )
-    return `${props.wholeLabel} ▾`
+  const gaps = items.value.filter((entry) => entry.kind === 'gap')
+  if (!isDesktop.value && props.wholeLabel && gaps.length === 1 && item.to === props.rows.at(-1)?.rank) return `${props.wholeLabel} ▾`
   return `第 ${item.from}–${item.to} 名 · ${item.to - item.from + 1} 人 · 展开 ▾`
 }
 
 /** 展开：手上的数据够就直接摊开，不够（本年级 / 全服中间那段）再找父组件要全量 */
 function expandGap() {
   collapsed.value = false
-  if (!props.complete) emit("expand")
+  if (!props.complete) emit('expand')
 }
 
 /** 桌面每一项大约多高：带签名（或「写一句」）的行多一行，两栏按高度对半分，不按人数 */
 function heightOf(item: Item) {
-  if (item.kind === "gap") return 48
+  if (item.kind === 'gap') return 48
   return hasSecondLine(item.row) ? 56 : 36
 }
 
@@ -171,44 +159,32 @@ function width(row: RankRow) {
 
 function menuOf(row: RankRow): DropdownOption[] {
   return [
-    { label: "看提交", key: "submissions" },
-    { label: "看智能分析", key: "analysis" },
-    ...(row.mood ? [{ label: "清空签名…", key: "mood" }] : []),
-    { label: "不计入排名…", key: "hide" },
+    { label: '看提交', key: 'submissions' },
+    { label: '看智能分析', key: 'analysis' },
+    ...(row.mood ? [{ label: '清空签名…', key: 'mood' }] : []),
+    { label: '不计入排名…', key: 'hide' },
   ]
 }
 
 function onMenu(key: string, row: RankRow) {
-  if (key === "submissions") emit("submissions", row.user.username)
-  else if (key === "analysis") emit("analysis", row.user.username)
-  else if (key === "mood") emit("clearMood", row)
-  else emit("hide", row)
+  if (key === 'submissions') emit('submissions', row.user.username)
+  else if (key === 'analysis') emit('analysis', row.user.username)
+  else if (key === 'mood') emit('clearMood', row)
+  else emit('hide', row)
 }
 </script>
 
 <template>
   <div class="track" :class="{ single: !isDesktop }">
     <div v-for="(column, index) in columns" :key="index" class="column">
-      <template
-        v-for="item in column"
-        :key="item.kind === 'row' ? item.row.user.id : `gap${item.from}`"
-      >
+      <template v-for="item in column" :key="item.kind === 'row' ? item.row.user.id : `gap${item.from}`">
         <button v-if="item.kind === 'gap'" class="gap" :disabled="expanding" @click="expandGap">
           {{ gapText(item) }}
         </button>
-        <div
-          v-else-if="!isDesktop"
-          class="prow"
-          :class="{ me: item.row.user.id === meId, zero: !item.row.solved, tall: !!item.row.mood }"
-        >
+        <div v-else-if="!isDesktop" class="prow" :class="{ me: item.row.user.id === meId, zero: !item.row.solved, tall: !!item.row.mood }">
           <span class="fill" :style="{ width: width(item.row), background: fillColor(item.row) }" />
-          <span class="rank">{{ item.row.solved ? item.row.rank : "—" }}</span>
-          <RankAvatar
-            :username="item.row.user.username"
-            :avatar="item.row.avatar"
-            :size="20"
-            :me="item.row.user.id === meId"
-          />
+          <span class="rank">{{ item.row.solved ? item.row.rank : '—' }}</span>
+          <RankAvatar :username="item.row.user.username" :avatar="item.row.avatar" :size="20" :me="item.row.user.id === meId" />
           <div class="pmain">
             <div class="pname">
               <button class="who" @click="emit('open', item.row.user.username)">
@@ -223,66 +199,36 @@ function onMenu(key: string, row: RankRow) {
           <span class="solved">{{ item.row.solved }}</span>
           <span class="change">
             <span v-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
-            <span v-else-if="(item.row.change ?? 0) < 0" class="down"
-              >↓{{ -item.row.change! }}</span
-            >
+            <span v-else-if="(item.row.change ?? 0) < 0" class="down">↓{{ -item.row.change! }}</span>
             <span v-else-if="item.row.change === 0" class="flat">—</span>
           </span>
-          <n-dropdown
-            v-if="teacher"
-            trigger="click"
-            :options="menuOf(item.row)"
-            @select="(key: string) => onMenu(key, item.row)"
-          >
+          <n-dropdown v-if="teacher" trigger="click" :options="menuOf(item.row)" @select="(key: string) => onMenu(key, item.row)">
             <button class="more" aria-label="更多">⋯</button>
           </n-dropdown>
         </div>
-        <div
-          v-else
-          class="entry"
-          :class="{ me: item.row.user.id === meId, zero: !item.row.solved }"
-        >
+        <div v-else class="entry" :class="{ me: item.row.user.id === meId, zero: !item.row.solved }">
           <div class="lane">
-            <span class="rank">{{ item.row.solved ? item.row.rank : "—" }}</span>
-            <RankAvatar
-              :username="item.row.user.username"
-              :avatar="item.row.avatar"
-              :size="20"
-              :me="item.row.user.id === meId"
-            />
+            <span class="rank">{{ item.row.solved ? item.row.rank : '—' }}</span>
+            <RankAvatar :username="item.row.user.username" :avatar="item.row.avatar" :size="20" :me="item.row.user.id === meId" />
             <button class="who" @click="emit('open', item.row.user.username)">
               <UserName :username="item.row.user.username" />
             </button>
             <span class="bar-box" :style="{ background: palette.track }">
-              <span
-                class="bar"
-                :style="{ width: width(item.row), background: barColor(item.row) }"
-              />
+              <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
             </span>
             <span class="solved">{{ item.row.solved }}</span>
             <span class="change">
-              <span v-if="item.row.user.id === hotId" class="up hot" title="进步最大"
-                >↑{{ item.row.change }}</span
-              >
+              <span v-if="item.row.user.id === hotId" class="up hot" title="进步最大">↑{{ item.row.change }}</span>
               <span v-else-if="(item.row.change ?? 0) > 0" class="up">↑{{ item.row.change }}</span>
-              <span v-else-if="(item.row.change ?? 0) < 0" class="down"
-                >↓{{ -item.row.change! }}</span
-              >
+              <span v-else-if="(item.row.change ?? 0) < 0" class="down">↓{{ -item.row.change! }}</span>
               <span v-else-if="item.row.change === 0" class="flat">—</span>
             </span>
-            <n-dropdown
-              v-if="teacher"
-              trigger="click"
-              :options="menuOf(item.row)"
-              @select="(key: string) => onMenu(key, item.row)"
-            >
+            <n-dropdown v-if="teacher" trigger="click" :options="menuOf(item.row)" @select="(key: string) => onMenu(key, item.row)">
               <button class="more" aria-label="更多">⋯</button>
             </n-dropdown>
           </div>
           <div v-if="item.row.mood" class="sig line">
-            <n-ellipsis :tooltip="{ contentStyle: { maxWidth: '300px' } }"
-              >“{{ item.row.mood }}”</n-ellipsis
-            >
+            <n-ellipsis :tooltip="{ contentStyle: { maxWidth: '300px' } }">“{{ item.row.mood }}”</n-ellipsis>
           </div>
           <div v-else-if="item.row.user.id === meId" class="line">
             <MoodPopover :mood="null" @saved="emit('moodSaved', $event)">
@@ -404,7 +350,7 @@ function onMenu(key: string, row: RankRow) {
   display: block;
   font-size: var(--oj-fs-meta);
   line-height: 18px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -427,7 +373,7 @@ function onMenu(key: string, row: RankRow) {
   padding: 0 9px;
   border: 1px dashed rgba(24, 160, 88, 0.6);
   border-radius: 11px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   color: #18a058;
   font: inherit;
   font-size: var(--oj-fs-meta);
@@ -449,7 +395,7 @@ function onMenu(key: string, row: RankRow) {
 .single .gap {
   height: 38px;
   margin: 2px 0 0;
-  border: 1px dashed v-bind("theme.borderColor");
+  border: 1px dashed v-bind('theme.borderColor');
   border-radius: 6px;
   font-size: var(--oj-fs-sec);
   color: #0c7a43;
@@ -470,7 +416,7 @@ function onMenu(key: string, row: RankRow) {
   width: 28px;
   text-align: right;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
@@ -541,11 +487,11 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .down {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .flat {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .tag {
@@ -558,12 +504,12 @@ function onMenu(key: string, row: RankRow) {
 }
 
 .tag.chase {
-  color: v-bind("palette.chase");
+  color: v-bind('palette.chase');
   background: rgba(47, 111, 208, 0.12);
 }
 
 .tag.threat {
-  color: v-bind("palette.threat");
+  color: v-bind('palette.threat');
   background: rgba(199, 106, 18, 0.12);
 }
 
@@ -577,7 +523,7 @@ function onMenu(key: string, row: RankRow) {
   padding: 0;
   border: 0;
   background: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   font-weight: 700;
   cursor: pointer;
 }
@@ -586,16 +532,16 @@ function onMenu(key: string, row: RankRow) {
   height: 36px;
   margin: 6px 0;
   border: 0;
-  border-top: 1px dashed v-bind("theme.borderColor");
-  border-bottom: 1px dashed v-bind("theme.borderColor");
+  border-top: 1px dashed v-bind('theme.borderColor');
+  border-bottom: 1px dashed v-bind('theme.borderColor');
   background: none;
   font: inherit;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   cursor: pointer;
 }
 
 .gap:hover {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 </style>

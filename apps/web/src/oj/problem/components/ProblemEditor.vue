@@ -1,33 +1,31 @@
 <script lang="ts" setup>
-import { storeToRefs } from "pinia"
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
-import { useCollabStore } from "shared/store/collab"
-import { SOURCES } from "utils/constants"
-import SyncCodeEditor from "shared/components/SyncCodeEditor.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import storage from "utils/storage"
-import type { LANGUAGE } from "utils/types"
-import { beginEditTrace, editTraceExtensions } from "oj/problem/utils/editTrace"
-import { errorMarkExtensions } from "oj/problem/utils/errorMark"
-import { editorFocusTracker } from "oj/problem/utils/symbolKeys"
-import { hangWrapExtensions } from "shared/extensions/hangIndent"
-import EditorToolbar from "./EditorToolbar.vue"
-import ChallengeBar from "./ChallengeBar.vue"
-import { useChallengeStore } from "oj/store/challenge"
-import { useDraftKey } from "../composables/draftKey"
-import { useCollabHere, useTeacherCollab } from "../composables/teacherCollab"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import CollabBar from "./CollabBar.vue"
-import { useFlowchartStore } from "oj/store/flowchart"
-import { useLessonStore } from "shared/store/lesson"
+import { storeToRefs } from 'pinia'
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
+import { useCollabStore } from 'shared/store/collab'
+import { SOURCES } from 'utils/constants'
+import SyncCodeEditor from 'shared/components/SyncCodeEditor.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import storage from 'utils/storage'
+import type { LANGUAGE } from 'utils/types'
+import { beginEditTrace, editTraceExtensions } from 'oj/problem/utils/editTrace'
+import { errorMarkExtensions } from 'oj/problem/utils/errorMark'
+import { editorFocusTracker } from 'oj/problem/utils/symbolKeys'
+import { hangWrapExtensions } from 'shared/extensions/hangIndent'
+import EditorToolbar from './EditorToolbar.vue'
+import ChallengeBar from './ChallengeBar.vue'
+import { useChallengeStore } from 'oj/store/challenge'
+import { useDraftKey } from '../composables/draftKey'
+import { useCollabHere, useTeacherCollab } from '../composables/teacherCollab'
+import { useProblemPageContext } from '../composables/problemPageContext'
+import CollabBar from './CollabBar.vue'
+import { useFlowchartStore } from 'oj/store/flowchart'
+import { useLessonStore } from 'shared/store/lesson'
 
-const FlowchartEditor = defineAsyncComponent(
-  () => import("shared/components/FlowchartEditor/index.vue"),
-)
+const FlowchartEditor = defineAsyncComponent(() => import('shared/components/FlowchartEditor/index.vue'))
 
 const route = useRoute()
-const flowchartEditorRef = useTemplateRef("flowchartEditorRef")
+const flowchartEditorRef = useTemplateRef('flowchartEditorRef')
 
 const codeStore = useCodeStore()
 const problemStore = useProblemStore()
@@ -103,9 +101,7 @@ const storageKey = useDraftKey()
 // 手机：顶栏两行 + 课堂条 + 页签 + 工具栏约 236px，底部还有「运行例子 / 提交」那条约 64px
 // 挑战中编辑器顶上多一条 44 的挑战条（协作中的老师不显示，见模板）
 const challengeStore = useChallengeStore()
-const showChallengeBar = computed(
-  () => ctx.value.challenges && !teacherCollab.value && !!challengeStore.active,
-)
+const showChallengeBar = computed(() => ctx.value.challenges && !teacherCollab.value && !!challengeStore.active)
 const editorHeight = computed(() => {
   const base = isDesktop.value ? 104 : 300
   return `calc(100vh - ${base + (teacherCollab.value ? 40 : 0) + (showChallengeBar.value ? 44 : 0)}px)`
@@ -114,11 +110,7 @@ const editorHeight = computed(() => {
 function loadCode() {
   codeStore.code.language = problemStore.supportedLanguage(codeStore.code.language)
   const savedCode = storage.get(storageKey.value)
-  codeStore.setCode(
-    savedCode ||
-      problem.value!.template[codeStore.code.language] ||
-      SOURCES[codeStore.code.language],
-  )
+  codeStore.setCode(savedCode || problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language])
   // 换了题才重新计数，同一道题重复 loadCode（协作结束读回草稿）是接着记
   beginEditTrace(`problem_${problem.value!._id}_contest_${contestID}`, codeStore.code.value.length)
 }
@@ -134,7 +126,7 @@ watch(() => problem.value?._id, loadCode)
  */
 const flowchartDraftKey = computed(() => {
   const id = problem.value?._id
-  if (!id) return "flowchart-v2"
+  if (!id) return 'flowchart-v2'
   const base = `flowchart-v2-problem-${id}`
   const problemSetId = route.params.problemSetId
   return problemSetId ? `${base}-problemset-${problemSetId}` : base
@@ -156,9 +148,7 @@ const changeCode = persistCode
 const changeLanguage = (v: LANGUAGE) => {
   const savedCode = storage.get(storageKey.value)
   codeStore.setCode(
-    savedCode && storageKey.value.split("_").pop() === v
-      ? savedCode
-      : problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
+    savedCode && storageKey.value.split('_').pop() === v ? savedCode : problem.value!.template[codeStore.code.language] || SOURCES[codeStore.code.language],
   )
 }
 
@@ -193,9 +183,9 @@ watch(
     if (!id || !activity || lessonLanguageFor === id) return
     lessonLanguageFor = id
     const language = activity.language
-    if (!language || ctx.value.entry !== "problem" || teacherCollab.value) return
+    if (!language || ctx.value.entry !== 'problem' || teacherCollab.value) return
     if (!lessonStore.includes(id) || !problemStore.codeLanguages.includes(language)) return
-    if (codeStore.code.language === language || codeStore.code.language === "Flowchart") return
+    if (codeStore.code.language === language || codeStore.code.language === 'Flowchart') return
     problemStore.switchLanguage(language)
   },
   { immediate: true },
@@ -210,7 +200,7 @@ watch(
 watch(
   () => problemStore.canDraw,
   (canDraw) => {
-    if (canDraw || codeStore.code.language !== "Flowchart") return
+    if (canDraw || codeStore.code.language !== 'Flowchart') return
     problemStore.switchLanguage(problemStore.supportedLanguage(codeStore.preferredLanguage()))
   },
 )
@@ -236,12 +226,7 @@ onBeforeUnmount(() => flowchartStore.attachEditor(null))
       学生自己切到流程图就是不写代码了，编辑器卸载、协作正常结束（SyncCodeEditor
       的 detach），这是原来就有的语义。
     -->
-    <FlowchartEditor
-      v-if="codeStore.code.language === 'Flowchart'"
-      ref="flowchartEditorRef"
-      :height="editorHeight"
-      :draft-key="flowchartDraftKey"
-    />
+    <FlowchartEditor v-if="codeStore.code.language === 'Flowchart'" ref="flowchartEditorRef" :height="editorHeight" :draft-key="flowchartDraftKey" />
     <SyncCodeEditor
       v-else
       v-model:value="codeStore.code.value"

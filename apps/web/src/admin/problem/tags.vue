@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import PageHeader from "admin/components/PageHeader.vue"
-import { useThemeVars } from "naive-ui"
-import type { AdminTag, TagCategory } from "utils/types"
-import { deleteTag, getTagAdminList, renameTag, setTagCategory } from "../api"
-import TagProblemsModal from "./components/TagProblemsModal.vue"
+import PageHeader from 'admin/components/PageHeader.vue'
+import { useThemeVars } from 'naive-ui'
+import type { AdminTag, TagCategory } from 'utils/types'
+import { deleteTag, getTagAdminList, renameTag, setTagCategory } from '../api'
+import TagProblemsModal from './components/TagProblemsModal.vue'
 
 const message = useMessage()
 const dialog = useDialog()
 const theme = useThemeVars()
 
 const tags = ref<AdminTag[]>([])
-const keyword = ref("")
+const keyword = ref('')
 
 // 搜索在后端做（getTagAdminList 带 keyword），这里只是一份引用，两栏和待归类都从它分
 const visibleTags = computed(() => tags.value)
 
 const editingId = ref<number | null>(null)
-const editingName = ref("")
+const editingName = ref('')
 
 const activeTag = ref<AdminTag | null>(null)
 const [showTagProblems, toggleTagProblems] = useToggle(false)
@@ -36,11 +36,11 @@ const columnsOf = computed(() => {
   const confirmed = visibleTags.value.filter((t) => t.categoryConfirmed)
   return [
     {
-      key: "knowledge" as const,
-      title: "知识点",
-      tags: confirmed.filter((t) => t.category === "knowledge"),
+      key: 'knowledge' as const,
+      title: '知识点',
+      tags: confirmed.filter((t) => t.category === 'knowledge'),
     },
-    { key: "theme" as const, title: "主题", tags: confirmed.filter((t) => t.category === "theme") },
+    { key: 'theme' as const, title: '主题', tags: confirmed.filter((t) => t.category === 'theme') },
   ].map((col) => ({
     ...col,
     tags: [...col.tags].sort((a, b) => b.problemCount - a.problemCount),
@@ -61,13 +61,13 @@ function startEdit(tag: AdminTag) {
 
 function cancelEdit() {
   editingId.value = null
-  editingName.value = ""
+  editingName.value = ''
 }
 
 async function saveTag(tag: AdminTag) {
   const name = editingName.value.trim()
   if (!name) {
-    message.error("标签名不能为空")
+    message.error('标签名不能为空')
     return
   }
   if (name === tag.name) {
@@ -78,7 +78,7 @@ async function saveTag(tag: AdminTag) {
   if (res.merged) {
     message.success(`已合并到「${res.name}」，影响 ${res.affectedCount} 道题`)
   } else {
-    message.success("已重命名")
+    message.success('已重命名')
   }
   cancelEdit()
   listTags()
@@ -88,20 +88,18 @@ async function changeCategory(tag: AdminTag, category: TagCategory) {
   await setTagCategory(tag.id, category)
   tag.category = category
   tag.categoryConfirmed = true
-  message.success(`「${tag.name}」已归到${category === "theme" ? "主题" : "知识点"}`)
+  message.success(`「${tag.name}」已归到${category === 'theme' ? '主题' : '知识点'}`)
 }
 
 function confirmDelete(tag: AdminTag) {
   dialog.warning({
     title: `删除「${tag.name}」？`,
-    content: tag.problemCount
-      ? `${tag.problemCount} 道题会摘掉这个标签，题目本身不动。`
-      : "没有题目挂着它。",
-    positiveText: "删除",
-    negativeText: "取消",
+    content: tag.problemCount ? `${tag.problemCount} 道题会摘掉这个标签，题目本身不动。` : '没有题目挂着它。',
+    positiveText: '删除',
+    negativeText: '取消',
     onPositiveClick: async () => {
       await deleteTag(tag.id)
-      message.success("已删除")
+      message.success('已删除')
       listTags()
     },
   })
@@ -139,14 +137,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
         <n-empty v-if="!col.tags.length" size="small" description="没有" class="empty" />
         <div v-for="tag in col.tags" :key="tag.id" class="row">
           <template v-if="editingId === tag.id">
-            <n-input
-              v-model:value="editingName"
-              size="small"
-              autofocus
-              class="rename"
-              @keyup.enter="saveTag(tag)"
-              @keyup.esc="cancelEdit"
-            />
+            <n-input v-model:value="editingName" size="small" autofocus class="rename" @keyup.enter="saveTag(tag)" @keyup.esc="cancelEdit" />
             <n-button size="small" type="primary" @click="saveTag(tag)">保存</n-button>
             <n-button size="small" @click="cancelEdit">取消</n-button>
           </template>
@@ -154,33 +145,20 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
             <button type="button" class="name" :title="tag.name" @click="openTagProblems(tag)">
               {{ tag.name }}
             </button>
-            <span class="bar"
-              ><i :style="{ width: `${(tag.problemCount / col.max) * 100}%` }"></i
-            ></span>
+            <span class="bar"><i :style="{ width: `${(tag.problemCount / col.max) * 100}%` }"></i></span>
             <span class="count">{{ tag.problemCount }} 道</span>
             <n-button size="tiny" quaternary @click="startEdit(tag)">改名</n-button>
-            <n-button
-              size="tiny"
-              quaternary
-              @click="changeCategory(tag, tag.category === 'theme' ? 'knowledge' : 'theme')"
-            >
-              {{ tag.category === "theme" ? "改成知识点" : "改成主题" }}
+            <n-button size="tiny" quaternary @click="changeCategory(tag, tag.category === 'theme' ? 'knowledge' : 'theme')">
+              {{ tag.category === 'theme' ? '改成知识点' : '改成主题' }}
             </n-button>
-            <n-button size="tiny" quaternary type="error" @click="confirmDelete(tag)"
-              >删除</n-button
-            >
+            <n-button size="tiny" quaternary type="error" @click="confirmDelete(tag)">删除</n-button>
           </template>
         </div>
       </div>
     </section>
   </div>
 
-  <TagProblemsModal
-    v-model:show="showTagProblems"
-    :tag-id="activeTag?.id ?? 0"
-    :tag-name="activeTag?.name ?? ''"
-    @changed="listTags"
-  />
+  <TagProblemsModal v-model:show="showTagProblems" :tag-id="activeTag?.id ?? 0" :tag-name="activeTag?.name ?? ''" @changed="listTags" />
 </template>
 
 <style scoped>
@@ -222,7 +200,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
 }
 
 .list {
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 8px;
   padding: 2px 6px;
 }
@@ -233,7 +211,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   gap: 10px;
   height: 40px;
   padding: 0 4px 0 8px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .row:last-child {
@@ -242,7 +220,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
 
 /* 斑马底纹，和后台其它列表一样（用户要的） */
 .row:nth-child(even) {
-  background: v-bind("theme.tableColorStriped");
+  background: v-bind('theme.tableColorStriped');
 }
 
 .name {
@@ -257,7 +235,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   font: inherit;
   font-size: 15px;
   text-align: left;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
@@ -269,7 +247,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   flex: 1 1 auto;
   height: 6px;
   border-radius: 3px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
@@ -277,7 +255,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   display: block;
   height: 6px;
   border-radius: 3px;
-  background: v-bind("theme.successColorSuppl");
+  background: v-bind('theme.successColorSuppl');
 }
 
 .count {
@@ -285,7 +263,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   text-align: right;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .rename {
@@ -294,7 +272,7 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
 
 .muted {
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .empty {

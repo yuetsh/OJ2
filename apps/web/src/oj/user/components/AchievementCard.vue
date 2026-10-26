@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { ProfileOverview } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import AchievementIcon from "shared/components/AchievementIcon.vue"
-import { RARITY_COLOR } from "utils/constants"
-import { parseTime } from "utils/functions"
+import type { ProfileOverview } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import AchievementIcon from 'shared/components/AchievementIcon.vue'
+import { RARITY_COLOR } from 'utils/constants'
+import { parseTime } from 'utils/functions'
 
 /** 拿到的成就一个一个摆出来，新的在前；全部 41 个（含没拿到的）在成就页 */
 const props = defineProps<{
-  achievements: ProfileOverview["achievements"]
+  achievements: ProfileOverview['achievements']
   username: string
   /** 看的是别人：「全部成就」带上他的名字 */
   other: boolean
@@ -16,7 +16,7 @@ const props = defineProps<{
 
 const theme = useThemeVars()
 const allLink = computed(() => ({
-  path: "/achievement",
+  path: '/achievement',
   query: props.other ? { name: props.username } : {},
 }))
 </script>
@@ -38,7 +38,7 @@ const allLink = computed(() => ({
             <span class="name">{{ item.name }}</span>
           </span>
         </template>
-        {{ item.description }} · {{ parseTime(item.unlockTime, "YYYY年M月D日") }}
+        {{ item.description }} · {{ parseTime(item.unlockTime, 'YYYY年M月D日') }}
       </n-tooltip>
     </div>
     <div v-else class="empty">还没有成就</div>
@@ -48,9 +48,9 @@ const allLink = computed(() => ({
 <style scoped>
 .card {
   padding: 14px 18px 16px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -64,7 +64,7 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-sec);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .grow {
@@ -117,7 +117,7 @@ h3 small {
 .empty {
   padding: 16px 0 4px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .compact {

@@ -1,8 +1,8 @@
-import type { StatisticInfo, TrialRunResponse } from "@oj2/contract"
-import { errorMessage } from "utils/api"
-import { SubmissionStatus } from "utils/constants"
-import { isRunnableLanguage, trialRun } from "utils/judge"
-import type { Code } from "utils/types"
+import type { StatisticInfo, TrialRunResponse } from '@oj2/contract'
+import { errorMessage } from 'utils/api'
+import { SubmissionStatus } from 'utils/constants'
+import { isRunnableLanguage, trialRun } from 'utils/judge'
+import type { Code } from 'utils/types'
 
 /**
  * 试跑：「运行例子」和「自己输入」。走本站判题机（utils/judge.ts → POST /trial-runs），
@@ -26,27 +26,26 @@ interface TrialOutcome {
   /** 没跑成、或者要换一种说法时给学生看的中文，有它就不用 TrialErrorNote 的默认说明 */
   note?: string
   /** 运行时错误的诊断（第几行、什么异常），和提交的同一套，交给 RuntimeErrorExplain */
-  runtimeError?: NonNullable<StatisticInfo["runtime_error"]>
+  runtimeError?: NonNullable<StatisticInfo['runtime_error']>
 }
 
-const TOO_MUCH_OUTPUT =
-  "程序输出太多了，一直停不下来：多半是循环没有结束的条件（条件一直成立、循环变量忘了改），在不停地打印。"
+const TOO_MUCH_OUTPUT = '程序输出太多了，一直停不下来：多半是循环没有结束的条件（条件一直成立、循环变量忘了改），在不停地打印。'
 
 /**
  * 把一次试跑的回包摊成每组一条。编译没过就每组都是编译失败、带同一份报错；
  * 输出太多的时候判题机回包被掐断了，分不出是哪一组，每组都挂上同一句说明。
  */
 function outcomes(response: TrialRunResponse, count: number): TrialOutcome[] {
-  if (response.status === "compile-error") {
+  if (response.status === 'compile-error') {
     return Array.from({ length: count }, () => ({
       result: SubmissionStatus.compile_error,
       output: response.message,
     }))
   }
-  if (response.status === "too-much-output") {
+  if (response.status === 'too-much-output') {
     return Array.from({ length: count }, () => ({
       result: SubmissionStatus.runtime_error,
-      output: "",
+      output: '',
       note: TOO_MUCH_OUTPUT,
     }))
   }
@@ -54,8 +53,7 @@ function outcomes(response: TrialRunResponse, count: number): TrialOutcome[] {
   // 开头的空格是输出的一部分（打印菱形、三角形），不能动
   return response.cases.map((item) => {
     const result = item.result as SubmissionStatus
-    const finished =
-      result === SubmissionStatus.accepted || result === SubmissionStatus.wrong_answer
+    const finished = result === SubmissionStatus.accepted || result === SubmissionStatus.wrong_answer
     return {
       result,
       output: finished ? item.output.trimEnd() : item.output,
@@ -64,15 +62,11 @@ function outcomes(response: TrialRunResponse, count: number): TrialOutcome[] {
   })
 }
 
-async function runCases(
-  code: Code,
-  target: TrialTarget,
-  cases: { input: string; output?: string }[],
-): Promise<TrialOutcome[]> {
+async function runCases(code: Code, target: TrialTarget, cases: { input: string; output?: string }[]): Promise<TrialOutcome[]> {
   if (!isRunnableLanguage(code.language)) {
     return cases.map(() => ({
       result: SubmissionStatus.system_error,
-      output: "",
+      output: '',
       note: `${code.language} 不能试运行`,
     }))
   }
@@ -87,8 +81,8 @@ async function runCases(
     return outcomes(response, cases.length)
   } catch (error) {
     // 后端的文案是给学生看的（「上一次还没跑完」「试运行的人太多了」）
-    const note = errorMessage(error, "试跑的服务暂时连不上，稍后再试一次。")
-    return cases.map(() => ({ result: SubmissionStatus.system_error, output: "", note }))
+    const note = errorMessage(error, '试跑的服务暂时连不上，稍后再试一次。')
+    return cases.map(() => ({ result: SubmissionStatus.system_error, output: '', note }))
   }
 }
 
@@ -100,7 +94,7 @@ export interface SampleRun {
   output: string
   result: SubmissionStatus
   note?: string
-  runtimeError?: TrialOutcome["runtimeError"]
+  runtimeError?: TrialOutcome['runtimeError']
 }
 
 export function useTrialRun() {
@@ -111,13 +105,13 @@ export function useTrialRun() {
   /** 跑例子时用的那份代码：错因说明要看代码（比如有没有 input("提示文字")），编辑器里可能已经改了 */
   const samplesCode = ref<Code | null>(null)
 
-  const customInput = ref("")
-  const customOutput = ref("")
+  const customInput = ref('')
+  const customOutput = ref('')
   const customResult = ref<SubmissionStatus | null>(null)
-  const customNote = ref("")
-  const customRuntimeError = ref<TrialOutcome["runtimeError"] | null>(null)
+  const customNote = ref('')
+  const customRuntimeError = ref<TrialOutcome['runtimeError'] | null>(null)
   /** 跑「自己输入」时用的那份代码：出错那一行要从它里面摆出来，编辑器里可能已经改了 */
-  const customCode = ref("")
+  const customCode = ref('')
   const customRunning = ref(false)
 
   /**
@@ -127,11 +121,7 @@ export function useTrialRun() {
   let samplesGeneration = 0
   let customGeneration = 0
 
-  async function runSamples(
-    code: Code,
-    target: TrialTarget,
-    samples: { input: string; output: string }[],
-  ) {
+  async function runSamples(code: Code, target: TrialTarget, samples: { input: string; output: string }[]) {
     const mine = ++samplesGeneration
     samplesRunning.value = true
     const runs = await runCases(code, target, samples)
@@ -155,7 +145,7 @@ export function useTrialRun() {
     if (mine !== customGeneration) return
     customOutput.value = run!.output
     customResult.value = run!.result
-    customNote.value = run!.note ?? ""
+    customNote.value = run!.note ?? ''
     customRuntimeError.value = run!.runtimeError ?? null
     customCode.value = code.value
     customRunning.value = false
@@ -169,12 +159,12 @@ export function useTrialRun() {
     samplesRunning.value = false
     samplesRunAt.value = null
     samplesCode.value = null
-    customInput.value = ""
-    customOutput.value = ""
+    customInput.value = ''
+    customOutput.value = ''
     customResult.value = null
-    customNote.value = ""
+    customNote.value = ''
     customRuntimeError.value = null
-    customCode.value = ""
+    customCode.value = ''
     customRunning.value = false
   }
 

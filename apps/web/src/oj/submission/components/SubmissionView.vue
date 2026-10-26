@@ -1,30 +1,25 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { onKeyStroke } from "@vueuse/core"
-import { useThemeVars } from "naive-ui"
-import { adminRejudge, getSubmission } from "oj/api"
-import LockNote from "oj/problemset/components/LockNote.vue"
-import WrongAnswerExplain from "oj/problem/components/WrongAnswerExplain.vue"
-import UserName from "shared/components/UserName.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useUserStore } from "shared/store/user"
-import { errorCode } from "utils/api"
-import {
-  JUDGE_STATUS,
-  LANGUAGE_FORMAT_VALUE,
-  LANGUAGE_SHOW_VALUE,
-  SubmissionStatus,
-} from "utils/constants"
-import { parseTime, submissionCaseResults } from "utils/functions"
-import type { Submission } from "utils/types"
-import { useCopySubmission } from "../composables/copySubmission"
-import { useSubmissionExplain } from "../composables/explain"
-import { useTone } from "shared/composables/tone"
-import { classLabel } from "utils/classes"
-import { submissionTimeText } from "../utils"
-import CodeView from "./CodeView.vue"
-import ExplainNote from "./ExplainNote.vue"
-import StatusPill from "./StatusPill.vue"
+import { Icon } from '@iconify/vue'
+import { onKeyStroke } from '@vueuse/core'
+import { useThemeVars } from 'naive-ui'
+import { adminRejudge, getSubmission } from 'oj/api'
+import LockNote from 'oj/problemset/components/LockNote.vue'
+import WrongAnswerExplain from 'oj/problem/components/WrongAnswerExplain.vue'
+import UserName from 'shared/components/UserName.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useUserStore } from 'shared/store/user'
+import { errorCode } from 'utils/api'
+import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, LANGUAGE_SHOW_VALUE, SubmissionStatus } from 'utils/constants'
+import { parseTime, submissionCaseResults } from 'utils/functions'
+import type { Submission } from 'utils/types'
+import { useCopySubmission } from '../composables/copySubmission'
+import { useSubmissionExplain } from '../composables/explain'
+import { useTone } from 'shared/composables/tone'
+import { classLabel } from 'utils/classes'
+import { submissionTimeText } from '../utils'
+import CodeView from './CodeView.vue'
+import ExplainNote from './ExplainNote.vue'
+import StatusPill from './StatusPill.vue'
 
 /**
  * 单独打开的一条提交（设计稿「提交详情重设计」A，用户改成代码在前、例子在后）：一栏到底 ——
@@ -59,13 +54,9 @@ watch(
 
 const detail = ref<Submission | null>(null)
 /** forbidden：别人的代码；missing：链接不对 / 已删掉 */
-const state = ref<"loading" | "ok" | "forbidden" | "missing" | "failed">("loading")
+const state = ref<'loading' | 'ok' | 'forbidden' | 'missing' | 'failed'>('loading')
 
-const judging = computed(
-  () =>
-    detail.value?.result === SubmissionStatus.pending ||
-    detail.value?.result === SubmissionStatus.judging,
-)
+const judging = computed(() => detail.value?.result === SubmissionStatus.pending || detail.value?.result === SubmissionStatus.judging)
 
 // 还在判的每 2 秒拉一次：这一页不在提交列表的轮询里，刚交完或刚重判时不刷新就一直是「等待评分」
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -75,38 +66,33 @@ let loadSeq = 0
 async function load(quiet = false) {
   const seq = ++loadSeq
   clearTimeout(timer)
-  if (!quiet) state.value = "loading"
+  if (!quiet) state.value = 'loading'
   try {
     const res = await getSubmission(currentId.value, true)
     if (seq !== loadSeq) return
     // 演示模式（超管装成学生投屏）：后端照样给了别人的代码，学生是看不到的，这里也挡掉
     if (userStore.demoMode && res.userId !== userStore.user?.id) {
       detail.value = null
-      state.value = "forbidden"
+      state.value = 'forbidden'
       return
     }
     detail.value = res
-    state.value = "ok"
+    state.value = 'ok'
     if (judging.value) timer = setTimeout(() => load(true), 2000)
   } catch (err) {
     if (seq !== loadSeq) return
     const code = errorCode(err)
-    state.value =
-      code === "submission-forbidden"
-        ? "forbidden"
-        : code === "submission-not-found"
-          ? "missing"
-          : "failed"
+    state.value = code === 'submission-forbidden' ? 'forbidden' : code === 'submission-not-found' ? 'missing' : 'failed'
   }
 }
 
 watch(currentId, () => load(), { immediate: true })
 onBeforeUnmount(() => clearTimeout(timer))
 
-const shown = computed(() => (state.value === "ok" ? detail.value : null))
+const shown = computed(() => (state.value === 'ok' ? detail.value : null))
 const own = computed(() => !!shown.value && shown.value.userId === userStore.user?.id)
 const teacher = computed(() => userStore.isTeacherOrAbove)
-const who = computed(() => (own.value ? "你" : ""))
+const who = computed(() => (own.value ? '你' : ''))
 
 const { explain, explainTone } = useSubmissionExplain(shown)
 
@@ -121,15 +107,15 @@ const sampleCheck = computed(() => {
 const cases = computed(() => submissionCaseResults(shown.value?.info))
 
 function caseColor(result: number) {
-  if (result === SubmissionStatus.accepted) return tone("success").solid
-  if (result === SubmissionStatus.runtime_error) return tone("warning").solid
-  return tone("error").solid
+  if (result === SubmissionStatus.accepted) return tone('success').solid
+  if (result === SubmissionStatus.runtime_error) return tone('warning').solid
+  return tone('error').solid
 }
 
 function caseTitle(item: (typeof cases.value)[number], index: number) {
-  const name = JUDGE_STATUS[item.result as keyof typeof JUDGE_STATUS]?.name ?? ""
-  const memory = item.memory === undefined ? "" : ` · ${(item.memory / 1048576).toFixed(1)}MB`
-  const time = item.real_time === undefined ? "" : ` · ${item.real_time}ms`
+  const name = JUDGE_STATUS[item.result as keyof typeof JUDGE_STATUS]?.name ?? ''
+  const memory = item.memory === undefined ? '' : ` · ${(item.memory / 1048576).toFixed(1)}MB`
+  const time = item.real_time === undefined ? '' : ` · ${item.real_time}ms`
   return `测试点 ${index + 1}：${name}${time}${memory}`
 }
 
@@ -139,15 +125,12 @@ const attemptIndex = computed(() => attempts.value.findIndex((a) => a.id === sho
 /** 和正在看的这次同一天的只写钟点（一节课里连交好几次是常态），别的天带上日期 */
 function attemptTime(time: string) {
   const current = shown.value?.createTime
-  if (current && parseTime(time, "YYYY-MM-DD") === parseTime(current, "YYYY-MM-DD"))
-    return parseTime(time, "HH:mm:ss")
+  if (current && parseTime(time, 'YYYY-MM-DD') === parseTime(current, 'YYYY-MM-DD')) return parseTime(time, 'HH:mm:ss')
   return submissionTimeText(time)
 }
 
 /** 除了正在看的这次，还有别的能点开的才提 ← → */
-const canStep = computed(() =>
-  attempts.value.some((item) => item.showLink && item.id !== shown.value?.id),
-)
+const canStep = computed(() => attempts.value.some((item) => item.showLink && item.id !== shown.value?.id))
 
 /** 「← →」一次次往前往后翻，跳过题单藏着的那几次 */
 function step(delta: -1 | 1) {
@@ -160,41 +143,40 @@ function step(delta: -1 | 1) {
 function openAttempt(id: string) {
   if (id === shown.value?.id) return
   if (props.embedded) currentId.value = id
-  else router.replace("/submission/" + id)
+  else router.replace('/submission/' + id)
 }
 
 function typing(event: KeyboardEvent) {
   const el = event.target as HTMLElement | null
-  return !!el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)
+  return !!el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable)
 }
 
 // 这几次是横着排的一串，所以用 ← →（竖着排的列表才用 ↑ ↓，见提交列表）
-onKeyStroke(["ArrowLeft", "ArrowRight"], (event) => {
+onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
   if (props.embedded) return
-  if (typing(event) || event.altKey || event.ctrlKey || event.metaKey || attempts.value.length < 2)
-    return
+  if (typing(event) || event.altKey || event.ctrlKey || event.metaKey || attempts.value.length < 2) return
   event.preventDefault()
-  step(event.key === "ArrowLeft" ? -1 : 1)
+  step(event.key === 'ArrowLeft' ? -1 : 1)
 })
 
 const problemLink = computed(() => {
   const s = shown.value
-  if (!s) return "/"
+  if (!s) return '/'
   if (s.contestId) {
     return router.resolve({
-      name: "contest problem",
+      name: 'contest problem',
       params: { contestID: String(s.contestId), problemID: s.problemDisplayId },
     }).href
   }
-  return "/problem/" + s.problemDisplayId
+  return '/problem/' + s.problemDisplayId
 })
 
 const allSubmissionsLink = computed(() => {
   const s = shown.value
-  if (!s) return "/submission"
+  if (!s) return '/submission'
   return router.resolve({
-    name: "submissions",
-    query: { username: s.username, exactUsername: "1" },
+    name: 'submissions',
+    query: { username: s.username, exactUsername: '1' },
   }).href
 })
 
@@ -204,21 +186,11 @@ const canRejudge = computed(() => teacher.value && !!shown.value && !shown.value
 const moreOptions = computed(() => {
   const s = shown.value
   if (!s) return []
-  const copy = s.showLink
-    ? [
-        { label: "复制回到题目", key: "problem" },
-        ...(s.language !== "SQL" ? [{ label: "复制到自测猫", key: "cat" }] : []),
-      ]
-    : []
+  const copy = s.showLink ? [{ label: '复制回到题目', key: 'problem' }, ...(s.language !== 'SQL' ? [{ label: '复制到自测猫', key: 'cat' }] : [])] : []
   // 手机上名字、班级和这个按钮排不进一行，收进「⋯」
-  const all = !own.value && isMobile.value ? [{ label: "学生的全部提交", key: "all" }] : []
+  const all = !own.value && isMobile.value ? [{ label: '学生的全部提交', key: 'all' }] : []
   if (!canRejudge.value) return [...all, ...copy]
-  return [
-    ...all,
-    ...copy,
-    ...(copy.length ? [{ type: "divider", key: "divider" }] : []),
-    { label: "重新判题", key: "rejudge" },
-  ]
+  return [...all, ...copy, ...(copy.length ? [{ type: 'divider', key: 'divider' }] : []), { label: '重新判题', key: 'rejudge' }]
 })
 
 async function rejudge() {
@@ -227,19 +199,19 @@ async function rejudge() {
   try {
     await adminRejudge(s.id)
   } catch {
-    message.error("重新判题没成功")
+    message.error('重新判题没成功')
     return
   }
-  message.success("已重新判题，结果出来会自己更新")
+  message.success('已重新判题，结果出来会自己更新')
   load(true)
 }
 
 function handleMore(key: string) {
   const s = shown.value
   if (!s) return
-  if (key === "all") router.push(allSubmissionsLink.value)
-  else if (key === "rejudge") rejudge()
-  else if (key === "problem") copyToProblem(s)
+  if (key === 'all') router.push(allSubmissionsLink.value)
+  else if (key === 'rejudge') rejudge()
+  else if (key === 'problem') copyToProblem(s)
   else copyToCat(s)
 }
 </script>
@@ -249,11 +221,7 @@ function handleMore(key: string) {
     <template v-if="shown">
       <div v-if="!embedded" class="head">
         <div class="who">
-          <a
-            class="user-link"
-            :href="`/user?name=${encodeURIComponent(shown.username)}`"
-            target="_blank"
-          >
+          <a class="user-link" :href="`/user?name=${encodeURIComponent(shown.username)}`" target="_blank">
             <UserName :username="shown.username" />
           </a>
           <span v-if="teacher && shown.className" class="cls">
@@ -261,35 +229,18 @@ function handleMore(key: string) {
           </span>
         </div>
         <span v-if="!isMobile" class="dot">·</span>
-        <a
-          class="problem"
-          :href="problemLink"
-          :title="`${shown.problemDisplayId} ${shown.problemTitle}`"
-        >
+        <a class="problem" :href="problemLink" :title="`${shown.problemDisplayId} ${shown.problemTitle}`">
           <span class="problem-id">{{ shown.problemDisplayId }}</span>
           {{ shown.problemTitle }}
         </a>
-        <a
-          v-if="shown.problemSet"
-          class="problemset"
-          :href="'/problemset/' + shown.problemSet.id"
-          :title="'从题单「' + shown.problemSet.title + '」交的'"
-        >
+        <a v-if="shown.problemSet" class="problemset" :href="'/problemset/' + shown.problemSet.id" :title="'从题单「' + shown.problemSet.title + '」交的'">
           题单 {{ shown.problemSet.title }}
         </a>
         <div class="spacer"></div>
         <div class="actions">
           <template v-if="teacher">
-            <n-button v-if="!own && !isMobile" tag="a" :href="allSubmissionsLink">
-              学生的全部提交
-            </n-button>
-            <n-dropdown
-              v-if="moreOptions.length"
-              :options="moreOptions"
-              trigger="click"
-              placement="bottom-end"
-              @select="handleMore"
-            >
+            <n-button v-if="!own && !isMobile" tag="a" :href="allSubmissionsLink"> 学生的全部提交 </n-button>
+            <n-dropdown v-if="moreOptions.length" :options="moreOptions" trigger="click" placement="bottom-end" @select="handleMore">
               <n-button quaternary aria-label="更多" title="复制、重新判题">
                 <template #icon><Icon icon="ph:dots-three-bold" /></template>
               </n-button>
@@ -300,9 +251,7 @@ function handleMore(key: string) {
               <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
               复制回到题目
             </n-button>
-            <n-button v-if="shown.language !== 'SQL'" @click="copyToCat(shown)"
-              >复制到自测猫</n-button
-            >
+            <n-button v-if="shown.language !== 'SQL'" @click="copyToCat(shown)">复制到自测猫</n-button>
           </template>
         </div>
       </div>
@@ -320,18 +269,12 @@ function handleMore(key: string) {
             {{ index + 1 }}
           </span>
         </span>
-        <span
-          v-else-if="shown.caseSummary && shown.caseSummary.passed < shown.caseSummary.total"
-          class="partial"
-          :style="{ color: tone('error').color }"
-        >
+        <span v-else-if="shown.caseSummary && shown.caseSummary.passed < shown.caseSummary.total" class="partial" :style="{ color: tone('error').color }">
           通过 {{ shown.caseSummary.passed }}/{{ shown.caseSummary.total }} 个测试点
         </span>
         <span>{{ LANGUAGE_SHOW_VALUE[shown.language] }}</span>
         <span>{{ submissionTimeText(shown.createTime, true) }}</span>
-        <span v-if="attemptIndex >= 0 && attempts.length > 1"
-          >第 {{ attemptIndex + 1 }} 次提交</span
-        >
+        <span v-if="attemptIndex >= 0 && attempts.length > 1">第 {{ attemptIndex + 1 }} 次提交</span>
       </div>
 
       <section v-if="attempts.length > 1" class="attempts">
@@ -349,9 +292,7 @@ function handleMore(key: string) {
           <StatusPill v-else :result="item.result" bare />
           <span class="t">{{ attemptTime(item.createTime) }}</span>
         </a>
-        <span v-if="!isMobile && !embedded && canStep" class="keys"
-          ><kbd>←</kbd><kbd>→</kbd> 换一次</span
-        >
+        <span v-if="!isMobile && !embedded && canStep" class="keys"><kbd>←</kbd><kbd>→</kbd> 换一次</span>
       </section>
 
       <div v-if="!shown.showLink" class="locked">
@@ -369,14 +310,7 @@ function handleMore(key: string) {
         class="code"
       />
 
-      <WrongAnswerExplain
-        v-if="sampleCheck"
-        :check="sampleCheck"
-        :code="shown.code"
-        :language="shown.language"
-        :plain="!!shown.contestId"
-        :peer="!own"
-      />
+      <WrongAnswerExplain v-if="sampleCheck" :check="sampleCheck" :code="shown.code" :language="shown.language" :plain="!!shown.contestId" :peer="!own" />
       <ExplainNote v-else-if="explain" :explain="explain" :tone="explainTone" />
     </template>
 
@@ -432,7 +366,7 @@ function handleMore(key: string) {
 }
 
 .user-link :deep(.name) {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .user-link:hover :deep(.name) {
@@ -451,7 +385,7 @@ function handleMore(key: string) {
 }
 
 .dot {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .problem {
@@ -459,7 +393,7 @@ function handleMore(key: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 600;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -468,7 +402,7 @@ function handleMore(key: string) {
 }
 
 .problem-id {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-weight: 400;
 }
 
@@ -503,7 +437,7 @@ function handleMore(key: string) {
   row-gap: 6px;
   flex-wrap: wrap;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
@@ -538,7 +472,7 @@ function handleMore(key: string) {
 .attempts-title {
   margin-right: 4px;
   font-size: 14px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
@@ -549,22 +483,22 @@ function handleMore(key: string) {
   height: 32px;
   padding: 0 12px;
   box-sizing: border-box;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 16px;
   font-size: 13px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   text-decoration: none;
   white-space: nowrap;
 }
 
 .attempt:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .attempt.on {
-  border-color: v-bind("theme.successColor");
+  border-color: v-bind('theme.successColor');
   background: v-bind("tone('success').background");
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   font-weight: 600;
 }
 
@@ -580,7 +514,7 @@ function handleMore(key: string) {
 .keys {
   margin-left: auto;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -592,9 +526,9 @@ kbd {
   height: 18px;
   padding: 0 4px;
   box-sizing: border-box;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 3px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   font: inherit;
   font-size: 11px;
   display: inline-flex;
@@ -608,7 +542,7 @@ kbd {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .locked {
@@ -620,9 +554,9 @@ kbd {
   gap: 10px;
   padding: 16px;
   text-align: center;
-  border: 1px dashed v-bind("theme.borderColor");
+  border: 1px dashed v-bind('theme.borderColor');
   border-radius: 8px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .locked.full {
@@ -630,7 +564,7 @@ kbd {
 }
 
 .lock-icon {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   opacity: 0.7;
 }
 

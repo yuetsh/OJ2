@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { ContestScoreRow } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { useTone } from "shared/composables/tone"
-import { secondsToDuration } from "utils/functions"
-import UserName from "shared/components/UserName.vue"
+import type { ContestScoreRow } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { useTone } from 'shared/composables/tone'
+import { secondsToDuration } from 'utils/functions'
+import UserName from 'shared/components/UserName.vue'
 
 /**
  * 题目页右边的小榜：前三名，然后是我和我前后各两个人（中间隔一个「⋯」）。
@@ -13,8 +13,8 @@ const props = defineProps<{ rows: ContestScoreRow[]; me?: number }>()
 
 const theme = useThemeVars()
 const tone = useTone()
-const success = computed(() => tone("success"))
-const danger = computed(() => tone("error"))
+const success = computed(() => tone('success'))
+const danger = computed(() => tone('error'))
 
 const shown = computed(() => {
   const rows = props.rows
@@ -66,11 +66,11 @@ function move(row: ContestScoreRow) {
   gap: 8px;
   border-radius: 6px;
   font-size: var(--oj-fs-sec);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .line.me {
-  background: v-bind("success.background");
+  background: v-bind('success.background');
 }
 
 .rank {
@@ -78,11 +78,11 @@ function move(row: ContestScoreRow) {
   text-align: right;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .me .rank {
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .move {
@@ -91,11 +91,11 @@ function move(row: ContestScoreRow) {
 }
 
 .up {
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .down {
-  color: v-bind("danger.color");
+  color: v-bind('danger.color');
 }
 
 .who {
@@ -114,7 +114,7 @@ function move(row: ContestScoreRow) {
   width: 62px;
   text-align: right;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
 
@@ -123,6 +123,6 @@ function move(row: ContestScoreRow) {
   padding-left: 44px;
   font-size: 12px;
   line-height: 8px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

@@ -1,5 +1,5 @@
-import { getPendingAchievements, markAchievementsRead } from "shared/api"
-import type { QueuedAchievement } from "utils/types"
+import { getPendingAchievements, markAchievementsRead } from 'shared/api'
+import type { QueuedAchievement } from 'utils/types'
 
 /**
  * 成就解锁弹窗队列。
@@ -11,23 +11,20 @@ import type { QueuedAchievement } from "utils/types"
  * 之所以不能只靠推：前端 WebSocket 不是常驻连接，只在问题页且有提交监听时
  * 才建连，纯推会丢消息（尤其是题单奖章，那些页面根本没建连接）。
  */
-export const useAchievementStore = defineStore("achievement", () => {
+export const useAchievementStore = defineStore('achievement', () => {
   const queue = ref<QueuedAchievement[]>([])
   const current = ref<QueuedAchievement | null>(null)
 
   // 成就和题单奖章的 id 来自两张不同的表，数值会重叠，
   // 只按 id 去重会让奖章 5 把成就 5 挤掉
   function keyOf(item: QueuedAchievement) {
-    return `${item.kind ?? "achievement"}:${item.id}`
+    return `${item.kind ?? 'achievement'}:${item.id}`
   }
 
   function enqueue(items: QueuedAchievement[]) {
     if (!items?.length) return
     // 去重：WebSocket 推来的和 pending 拉来的可能是同一批
-    const known = new Set([
-      ...queue.value.map(keyOf),
-      ...(current.value ? [keyOf(current.value)] : []),
-    ])
+    const known = new Set([...queue.value.map(keyOf), ...(current.value ? [keyOf(current.value)] : [])])
     queue.value.push(...items.filter((i) => !known.has(keyOf(i))))
   }
 
@@ -48,7 +45,7 @@ export const useAchievementStore = defineStore("achievement", () => {
   async function markRead(item: QueuedAchievement) {
     // 奖章不在 UserAchievement 表里，它的 id 传给标记接口会被当成成就 id，
     // 把一个恰好同号、还没弹过的成就静默标记为已弹——那个奖杯就再也不会出现
-    if (item.kind === "badge") return
+    if (item.kind === 'badge') return
     try {
       await markAchievementsRead([item.id])
     } catch {

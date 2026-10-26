@@ -1,39 +1,25 @@
 <script setup lang="ts">
-import type {
-  ClassBattleItem,
-  RankBoard,
-  RankPeriod,
-  RankRow,
-  RankScope,
-  WeeklyChampion,
-} from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { clearMood, getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from "oj/api"
-import { classLabel, groupClassOptions } from "utils/classes"
-import UserName from "shared/components/UserName.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useConfigStore } from "shared/store/config"
-import { useUserStore } from "shared/store/user"
-import { errorCode } from "utils/api"
-import { STORAGE_KEY, USERNAME_CLASS_RE } from "utils/constants"
-import storage from "utils/storage"
-import ChampionList from "./components/ChampionList.vue"
-import ClassBattle from "./components/ClassBattle.vue"
-import ClassDetailDrawer from "./components/ClassDetailDrawer.vue"
-import RankMe, { type MiniRank } from "./components/RankMe.vue"
-import RankPodium from "./components/RankPodium.vue"
-import RankTrack from "./components/RankTrack.vue"
-import RankTrend from "./components/RankTrend.vue"
-import WeekTop from "./components/WeekTop.vue"
-import { useRankPalette } from "./palette"
-import {
-  groupTitle,
-  hottest,
-  PERIOD_OPTIONS,
-  periodLabel,
-  SCOPE_OPTIONS,
-  scopeLabel,
-} from "./utils"
+import type { ClassBattleItem, RankBoard, RankPeriod, RankRow, RankScope, WeeklyChampion } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { clearMood, getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from 'oj/api'
+import { classLabel, groupClassOptions } from 'utils/classes'
+import UserName from 'shared/components/UserName.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useConfigStore } from 'shared/store/config'
+import { useUserStore } from 'shared/store/user'
+import { errorCode } from 'utils/api'
+import { STORAGE_KEY, USERNAME_CLASS_RE } from 'utils/constants'
+import storage from 'utils/storage'
+import ChampionList from './components/ChampionList.vue'
+import ClassBattle from './components/ClassBattle.vue'
+import ClassDetailDrawer from './components/ClassDetailDrawer.vue'
+import RankMe, { type MiniRank } from './components/RankMe.vue'
+import RankPodium from './components/RankPodium.vue'
+import RankTrack from './components/RankTrack.vue'
+import RankTrend from './components/RankTrend.vue'
+import WeekTop from './components/WeekTop.vue'
+import { useRankPalette } from './palette'
+import { groupTitle, hottest, PERIOD_OPTIONS, periodLabel, SCOPE_OPTIONS, scopeLabel } from './utils'
 
 /**
  * 排名页（设计稿「排名重设计」G1–G3，用户要「激发竞争」「图多」「一眼看出排名」）。
@@ -60,10 +46,10 @@ function pick<T extends string>(value: unknown, options: { value: T }[], fallbac
   return options.some((option) => option.value === value) ? (value as T) : fallback
 }
 
-const scope = ref<RankScope>("all")
-const period = ref<RankPeriod>(pick(route.query.period, PERIOD_OPTIONS, "term"))
+const scope = ref<RankScope>('all')
+const period = ref<RankPeriod>(pick(route.query.period, PERIOD_OPTIONS, 'term'))
 /** 老师选的班；空 = 让后端挑最近布置过作业的班，挑完回填 */
-const teacherClass = ref(typeof route.query.class === "string" ? route.query.class : "")
+const teacherClass = ref(typeof route.query.class === 'string' ? route.query.class : '')
 
 const board = ref<RankBoard | null>(null)
 const loading = ref(false)
@@ -75,7 +61,7 @@ const champions = ref<WeeklyChampion[]>([])
 const cache = reactive(new Map<string, RankBoard>())
 
 function keyOf(s: RankScope, p: RankPeriod) {
-  return `${s}|${p}|${s === "all" ? "" : teacherClass.value}`
+  return `${s}|${p}|${s === 'all' ? '' : teacherClass.value}`
 }
 
 async function fetchBoard(s: RankScope, p: RankPeriod, full = false) {
@@ -89,20 +75,20 @@ async function load() {
   try {
     board.value = await fetchBoard(scope.value, period.value)
     // 老师在「全部」时点了本班：后端挑了最近布置过作业的班，回填到下拉框（这一下不用再取一遍）
-    if (teacher.value && !teacherClass.value && board.value.scope === "class") {
+    if (teacher.value && !teacherClass.value && board.value.scope === 'class') {
       backfilling = true
-      teacherClass.value = board.value.className ?? ""
+      teacherClass.value = board.value.className ?? ''
     }
   } catch (err) {
     board.value = null
     // 没布置过作业、后端猜不出：用上次在下拉框里选的班，没选过就回到全部（watch 会重取）
-    if (teacher.value && !teacherClass.value && errorCode(err) === "class-missing") {
+    if (teacher.value && !teacherClass.value && errorCode(err) === 'class-missing') {
       loading.value = false
       const saved = storage.get(STORAGE_KEY.RANK_CLASS)
-      if (typeof saved === "string" && saved) teacherClass.value = saved
+      if (typeof saved === 'string' && saved) teacherClass.value = saved
       else {
-        scope.value = "all"
-        message.info("先选一个班")
+        scope.value = 'all'
+        message.info('先选一个班')
       }
       return
     }
@@ -116,7 +102,7 @@ async function load() {
 async function loadSide() {
   const cls = classContext.value
   if (cls) {
-    getRankBoard("class", "week", { className: teacherClass.value })
+    getRankBoard('class', 'week', { className: teacherClass.value })
       .then((result) => (weekBoard.value = result))
       .catch(() => (weekBoard.value = null))
     getWeeklyChampions(teacherClass.value)
@@ -166,69 +152,57 @@ watch([scope, period, teacherClass], () => {
 onMounted(async () => {
   if (!userStore.user) await userStore.getMyProfile().catch(() => {})
   // 老师默认看全部（用户定的），要看哪个班自己在下拉框里选；学生默认看本班
-  const fallback = teacher.value ? "all" : canScopeClass.value ? "class" : "all"
+  const fallback = teacher.value ? 'all' : canScopeClass.value ? 'class' : 'all'
   scope.value = pick(route.query.scope, SCOPE_OPTIONS, fallback)
-  if (!canScopeClass.value && scope.value !== "all") scope.value = "all"
+  if (!canScopeClass.value && scope.value !== 'all') scope.value = 'all'
   loadBattle()
   // scope 从 "all" 改成别的会触发 watch 去取；没改就自己取
-  if (scope.value === "all") load()
+  if (scope.value === 'all') load()
 })
 
 /** 班级那几块（走势、这周本班、每周冠军、班级对抗高亮）对的是哪个班 */
-const classContext = computed(
-  () => (teacher.value ? (scope.value === "all" ? "" : teacherClass.value) : myClass.value) || null,
-)
+const classContext = computed(() => (teacher.value ? (scope.value === 'all' ? '' : teacherClass.value) : myClass.value) || null)
 
 /** 老师的班级下拉框：「全部」就是全服，选了班就切到本班（本年级时留在本年级） */
 const pickedClass = computed({
-  get: () => (scope.value === "all" ? "" : teacherClass.value),
+  get: () => (scope.value === 'all' ? '' : teacherClass.value),
   set: (value: string) => {
     teacherClass.value = value
     if (value) storage.set(STORAGE_KEY.RANK_CLASS, value)
-    if (!value) scope.value = "all"
-    else if (scope.value === "all") scope.value = "class"
+    if (!value) scope.value = 'all'
+    else if (scope.value === 'all') scope.value = 'class'
   },
 })
 
 const rows = computed(() => board.value?.rows ?? [])
 const podium = computed(() => rows.value.filter((row) => row.rank <= 3 && row.solved > 0))
-const trackRows = computed(() =>
-  rows.value.filter((row) => row.rank > 3 || (row.rank <= 3 && !row.solved)),
-)
+const trackRows = computed(() => rows.value.filter((row) => row.rank > 3 || (row.rank <= 3 && !row.solved)))
 /** 条的满格：第 2 名的数。第 1 名常常一骑绝尘，按它算别人的条全挤在左边 */
 const scale = computed(() => rows.value[1]?.solved || rows.value[0]?.solved || 1)
 const hot = computed(() => hottest(rows.value))
 
 const me = computed(() => board.value?.me ?? null)
 const meId = computed(() => (teacher.value ? undefined : userStore.user?.id))
-const mateClass = computed(() => (board.value?.scope !== "class" ? classContext.value : null))
+const mateClass = computed(() => (board.value?.scope !== 'class' ? classContext.value : null))
 
-const title = computed(() =>
-  board.value
-    ? `${groupTitle(board.value.scope, board.value.className)} · ${periodLabel(board.value.period)}`
-    : "",
-)
+const title = computed(() => (board.value ? `${groupTitle(board.value.scope, board.value.className)} · ${periodLabel(board.value.period)}` : ''))
 /** 只报人数。同分怎么排、名单折在哪，赛道自己看得出来，不再写一遍（用户嫌解释太多） */
 const subtitle = computed(() => {
   const b = board.value
-  if (!b) return ""
-  return b.scope === "class" ? `${b.total} 人` : `${b.total} 人做对过`
+  if (!b) return ''
+  return b.scope === 'class' ? `${b.total} 人` : `${b.total} 人做对过`
 })
-const miniScopes = computed(() =>
-  SCOPE_OPTIONS.map((option) => option.value).filter(
-    (s) => s !== scope.value && (s === "all" || !!myClass.value),
-  ),
-)
+const miniScopes = computed(() => SCOPE_OPTIONS.map((option) => option.value).filter((s) => s !== scope.value && (s === 'all' || !!myClass.value)))
 const minis = computed<MiniRank[]>(() => {
   const list: MiniRank[] = []
-  if (period.value !== "week" && myClass.value && weekBoard.value)
+  if (period.value !== 'week' && myClass.value && weekBoard.value)
     list.push({
-      label: "这周 · 本班",
+      label: '这周 · 本班',
       rank: weekBoard.value.me?.solved ? weekBoard.value.me.rank : null,
       total: null,
       go: () => {
-        scope.value = "class"
-        period.value = "week"
+        scope.value = 'class'
+        period.value = 'week'
       },
     })
   for (const s of miniScopes.value) {
@@ -247,7 +221,7 @@ const minis = computed<MiniRank[]>(() => {
 const teacherClassOptions = computed(() => {
   const list = configStore.config?.classList ?? []
   const all = teacherClass.value ? [teacherClass.value, ...list] : list
-  return [{ label: "全部", value: "" }, ...groupClassOptions(all)]
+  return [{ label: '全部', value: '' }, ...groupClassOptions(all)]
 })
 
 const myBattle = computed(() => battle.value.find((item) => item.className === classContext.value))
@@ -262,37 +236,30 @@ const daysLeft = computed(() => {
 const trendLines = computed(() => {
   const b = board.value
   if (!b?.me) return []
-  const short = (row: RankRow) =>
-    row.user.username.replace(USERNAME_CLASS_RE, "") || row.user.username
+  const short = (row: RankRow) => row.user.username.replace(USERNAME_CLASS_RE, '') || row.user.username
   return [
-    ...(b.behind
-      ? [{ userId: b.behind.user.id, label: short(b.behind), color: palette.value.threat }]
-      : []),
-    ...(b.ahead
-      ? [{ userId: b.ahead.user.id, label: short(b.ahead), color: palette.value.chase }]
-      : []),
-    { userId: b.me.user.id, label: "你", color: palette.value.me, strong: true },
+    ...(b.behind ? [{ userId: b.behind.user.id, label: short(b.behind), color: palette.value.threat }] : []),
+    ...(b.ahead ? [{ userId: b.ahead.user.id, label: short(b.ahead), color: palette.value.chase }] : []),
+    { userId: b.me.user.id, label: '你', color: palette.value.me, strong: true },
   ]
 })
 
-const weekTitle = computed(() =>
-  teacher.value && classContext.value ? `这周 · ${classLabel(classContext.value)}` : "这周本班",
-)
+const weekTitle = computed(() => (teacher.value && classContext.value ? `这周 · ${classLabel(classContext.value)}` : '这周本班'))
 
 /** 手机上的页签：没有班就只剩班级对抗，没有走势（这周 / 老师）就不给走势那页 */
 const phoneTabs = computed(() => [
-  { key: "battle", label: "班级对抗" },
-  ...(board.value?.trend && me.value ? [{ key: "trend", label: "名次走势" }] : []),
+  { key: 'battle', label: '班级对抗' },
+  ...(board.value?.trend && me.value ? [{ key: 'trend', label: '名次走势' }] : []),
   ...(classContext.value
     ? [
-        { key: "week", label: teacher.value ? "这周" : "这周本班" },
-        { key: "champions", label: "每周冠军" },
+        { key: 'week', label: teacher.value ? '这周' : '这周本班' },
+        { key: 'champions', label: '每周冠军' },
       ]
     : []),
 ])
-const phoneTab = ref("battle")
+const phoneTab = ref('battle')
 watch(phoneTabs, (tabs) => {
-  if (!tabs.some((tab) => tab.key === phoneTab.value)) phoneTab.value = "battle"
+  if (!tabs.some((tab) => tab.key === phoneTab.value)) phoneTab.value = 'battle'
 })
 
 /** 班级详情（+ 老师的 AI 分析）：点班级对抗里的班名、或老师「这个班」卡上的按钮 */
@@ -304,27 +271,27 @@ function openDetail(className: string) {
 }
 
 function open(username: string) {
-  router.push({ path: "/user", query: { name: username } })
+  router.push({ path: '/user', query: { name: username } })
 }
 
 /** 老师看某个学生的智能分析（那一页本来就支持 ?username=） */
 function openAnalysis(username: string) {
-  router.push({ path: "/ai-analysis", query: { username } })
+  router.push({ path: '/ai-analysis', query: { username } })
 }
 
 function openSubmissions(username: string) {
-  router.push({ path: "/submission", query: { username, exactUsername: "1" } })
+  router.push({ path: '/submission', query: { username, exactUsername: '1' } })
 }
 
 function hide(row: RankRow) {
   dialog.warning({
-    title: "不计入排名",
+    title: '不计入排名',
     content: `${row.user.username} 会从所有排名里消失（本班、本年级、全服、首页周榜），本人会看到「不计入排名」。比赛排名不受影响，随时能恢复。`,
-    positiveText: "不计入排名",
-    negativeText: "取消",
+    positiveText: '不计入排名',
+    negativeText: '取消',
     onPositiveClick: async () => {
       await setRankHidden(row.user.id, true)
-      message.success("已不计入排名")
+      message.success('已不计入排名')
       cache.clear()
       load()
       loadBattle()
@@ -336,8 +303,7 @@ function hide(row: RankRow) {
 function setMood(userId: number, mood: string | null) {
   const b = board.value
   if (!b) return
-  for (const row of [...b.rows, b.me, b.ahead, b.behind])
-    if (row?.user.id === userId) row.mood = mood
+  for (const row of [...b.rows, b.me, b.ahead, b.behind]) if (row?.user.id === userId) row.mood = mood
 }
 
 function onMoodSaved(mood: string | null) {
@@ -346,21 +312,21 @@ function onMoodSaved(mood: string | null) {
 
 function confirmClearMood(row: RankRow) {
   dialog.warning({
-    title: "清空个性签名",
+    title: '清空个性签名',
     content: `${row.user.username} 的签名「${row.mood}」会被清空。只清这一句，之后还能重新写。`,
-    positiveText: "清空",
-    negativeText: "取消",
+    positiveText: '清空',
+    negativeText: '取消',
     onPositiveClick: async () => {
       await clearMood(row.user.id)
       setMood(row.user.id, null)
-      message.success("签名已清空")
+      message.success('签名已清空')
     },
   })
 }
 
 async function restore(userId: number) {
   await setRankHidden(userId, false)
-  message.success("已恢复")
+  message.success('已恢复')
   cache.clear()
   load()
   loadBattle()
@@ -386,23 +352,11 @@ async function restore(userId: number) {
         </button>
       </div>
       <div class="seg" role="group" aria-label="时间">
-        <button
-          v-for="option in PERIOD_OPTIONS"
-          :key="option.value"
-          :class="{ on: period === option.value }"
-          @click="period = option.value"
-        >
+        <button v-for="option in PERIOD_OPTIONS" :key="option.value" :class="{ on: period === option.value }" @click="period = option.value">
           {{ option.label }}
         </button>
       </div>
-      <n-select
-        v-if="teacher"
-        v-model:value="pickedClass"
-        class="class-select"
-        filterable
-        placeholder="选班"
-        :options="teacherClassOptions"
-      />
+      <n-select v-if="teacher" v-model:value="pickedClass" class="class-select" filterable placeholder="选班" :options="teacherClassOptions" />
     </div>
 
     <div class="main" :class="{ single: !isDesktop }">
@@ -469,7 +423,7 @@ async function restore(userId: number) {
             <span class="muted">有疑问去问老师</span>
           </div>
           <div v-else-if="teacher" class="note-card">
-            <b>{{ classContext ? classLabel(classContext) : "全服" }}</b>
+            <b>{{ classContext ? classLabel(classContext) : '全服' }}</b>
             <div v-if="myBattle" class="stats">
               <div>
                 <span>人均做对</span><b>{{ myBattle.perCapita }}</b>
@@ -482,9 +436,7 @@ async function restore(userId: number) {
               </div>
             </div>
             <div class="actions">
-              <n-button v-if="classContext" secondary type="info" @click="openDetail(classContext)">
-                班级详情 · AI 分析
-              </n-button>
+              <n-button v-if="classContext" secondary type="info" @click="openDetail(classContext)"> 班级详情 · AI 分析 </n-button>
               <n-button
                 secondary
                 @click="
@@ -510,14 +462,7 @@ async function restore(userId: number) {
             <span class="muted">做对 1 道新题就能上榜</span>
           </div>
         </template>
-        <ClassBattle
-          v-if="isDesktop"
-          :items="battle"
-          :mine="classContext"
-          :teacher="teacher"
-          :pk="userStore.isAuthed"
-          @pick="openDetail"
-        />
+        <ClassBattle v-if="isDesktop" :items="battle" :mine="classContext" :teacher="teacher" :pk="userStore.isAuthed" @pick="openDetail" />
       </aside>
     </div>
     <div v-if="isDesktop && classContext" class="below">
@@ -538,13 +483,7 @@ async function restore(userId: number) {
         <div class="card-title">
           <b>每周冠军</b>
         </div>
-        <ChampionList
-          :champions="champions"
-          :hot="hot"
-          :since="period === 'week' ? '今天' : '这周'"
-          :me-id="meId"
-          @open="open"
-        />
+        <ChampionList :champions="champions" :hot="hot" :since="period === 'week' ? '今天' : '这周'" :me-id="meId" @open="open" />
       </div>
     </div>
 
@@ -563,20 +502,8 @@ async function restore(userId: number) {
         </button>
       </div>
       <div class="tab-body">
-        <ClassBattle
-          v-if="phoneTab === 'battle'"
-          bare
-          :items="battle"
-          :mine="classContext"
-          :teacher="teacher"
-          :pk="userStore.isAuthed"
-          @pick="openDetail"
-        />
-        <RankTrend
-          v-else-if="phoneTab === 'trend' && board?.trend"
-          :trend="board.trend"
-          :lines="trendLines"
-        />
+        <ClassBattle v-if="phoneTab === 'battle'" bare :items="battle" :mine="classContext" :teacher="teacher" :pk="userStore.isAuthed" @pick="openDetail" />
+        <RankTrend v-else-if="phoneTab === 'trend' && board?.trend" :trend="board.trend" :lines="trendLines" />
         <template v-else-if="phoneTab === 'week'">
           <span class="muted">{{ weekTitle }} · 还剩 {{ daysLeft }} 天</span>
           <WeekTop :rows="weekBoard?.rows ?? []" :me-id="meId" :loaded="!!weekBoard" @open="open" />
@@ -591,12 +518,7 @@ async function restore(userId: number) {
         />
       </div>
     </div>
-    <ClassDetailDrawer
-      v-model:show="showDetail"
-      :class-name="detailClass"
-      :teacher="teacher"
-      :pk="userStore.isAuthed"
-    />
+    <ClassDetailDrawer v-model:show="showDetail" :class-name="detailClass" :teacher="teacher" :pk="userStore.isAuthed" />
   </div>
 </template>
 
@@ -624,7 +546,7 @@ async function restore(userId: number) {
 .seg {
   display: inline-flex;
   height: var(--oj-ctrl-h);
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 4px;
   overflow: hidden;
 }
@@ -632,9 +554,9 @@ async function restore(userId: number) {
 .seg button {
   padding: 0 14px;
   border: 0;
-  border-left: 1px solid v-bind("theme.borderColor");
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor2");
+  border-left: 1px solid v-bind('theme.borderColor');
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor2');
   font: inherit;
   font-size: var(--oj-fs-sec);
   cursor: pointer;
@@ -652,7 +574,7 @@ async function restore(userId: number) {
 }
 
 .seg button:disabled {
-  color: v-bind("theme.textColorDisabled");
+  color: v-bind('theme.textColorDisabled');
   cursor: not-allowed;
 }
 
@@ -662,7 +584,7 @@ async function restore(userId: number) {
 
 .muted {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .main {
@@ -684,9 +606,9 @@ async function restore(userId: number) {
 .track-card,
 .card,
 .note-card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   min-width: 0;
 }
 
@@ -712,7 +634,7 @@ async function restore(userId: number) {
 .empty {
   padding: 60px 0;
   text-align: center;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .side {
@@ -746,12 +668,12 @@ async function restore(userId: number) {
   gap: 1px;
   padding: 8px 10px;
   border-radius: 4px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .stats span {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .stats b {
@@ -769,7 +691,7 @@ async function restore(userId: number) {
   flex-direction: column;
   gap: 6px;
   padding-top: 10px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 .hidden-title {
@@ -819,7 +741,7 @@ async function restore(userId: number) {
 
 .tabs {
   display: flex;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .tabs button {
@@ -830,7 +752,7 @@ async function restore(userId: number) {
   background: none;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 

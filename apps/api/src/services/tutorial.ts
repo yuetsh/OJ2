@@ -1,9 +1,9 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
+import { db, schema } from '../db'
 
 /** 「去做几道题」里优先推荐、要标出来的那批题挂的标签 */
-export const MUST_DO_TAG = "必会题"
+export const MUST_DO_TAG = '必会题'
 
 const PROJECT_RE = /\*\*所属项目[：:]\s*([^*\n]+)\*\*/
 
@@ -12,7 +12,7 @@ const PROJECT_RE = /\*\*所属项目[：:]\s*([^*\n]+)\*\*/
  * 和 0031 迁移回填用的是同一个写法；发布脚本不传 `project` 时靠它。
  */
 export function projectFromContent(content: string) {
-  return (content.match(PROJECT_RE)?.[1] ?? "").trim().slice(0, 64)
+  return (content.match(PROJECT_RE)?.[1] ?? '').trim().slice(0, 64)
 }
 
 /**
@@ -61,9 +61,7 @@ export async function tutorialProblems(tutorialIds: number[], publicOnly: boolea
     .where(
       and(
         inArray(schema.tutorialProblem.tutorialId, tutorialIds),
-        publicOnly
-          ? and(eq(schema.problem.visible, true), isNull(schema.problem.contestId))
-          : undefined,
+        publicOnly ? and(eq(schema.problem.visible, true), isNull(schema.problem.contestId)) : undefined,
       ),
     )
     .orderBy(asc(schema.tutorialProblem.tutorialId), asc(schema.tutorialProblem.order))

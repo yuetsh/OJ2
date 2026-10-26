@@ -1,30 +1,19 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import {
-  NO_CLASS,
-  type FlowchartStatistics,
-  type SubmissionLessons,
-  type SubmissionStatistics,
-  type SubmissionStatisticsGrid,
-} from "@oj2/contract"
-import {
-  getFlowchartStatistics,
-  getSubmissionLessons,
-  getSubmissionStatistics,
-  getSubmissionStatisticsGrid,
-} from "oj/api"
-import { useConfigStore } from "shared/store/config"
-import { fromPickerValue, toPickerValue } from "utils/functions"
-import { useTone } from "shared/composables/tone"
-import { classSelectOptions } from "utils/classes"
-import { DEFAULT_PERIOD, PERIOD_OPTIONS, dayStartOfDate, periodRange, type Period } from "../period"
-import { resultName, useResultColor } from "../results"
-import ByClass from "./ByClass.vue"
-import CodeStats from "./CodeStats.vue"
-import Lessons from "./Lessons.vue"
-import RingChart from "./RingChart.vue"
-import StatItem from "./StatItem.vue"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { NO_CLASS, type FlowchartStatistics, type SubmissionLessons, type SubmissionStatistics, type SubmissionStatisticsGrid } from '@oj2/contract'
+import { getFlowchartStatistics, getSubmissionLessons, getSubmissionStatistics, getSubmissionStatisticsGrid } from 'oj/api'
+import { useConfigStore } from 'shared/store/config'
+import { fromPickerValue, toPickerValue } from 'utils/functions'
+import { useTone } from 'shared/composables/tone'
+import { classSelectOptions } from 'utils/classes'
+import { DEFAULT_PERIOD, PERIOD_OPTIONS, dayStartOfDate, periodRange, type Period } from '../period'
+import { resultName, useResultColor } from '../results'
+import ByClass from './ByClass.vue'
+import CodeStats from './CodeStats.vue'
+import Lessons from './Lessons.vue'
+import RingChart from './RingChart.vue'
+import StatItem from './StatItem.vue'
 
 /**
  * 统计的主体（设计稿「统计重设计 · 定稿 B」+「统计合二为一」B）。两处用它：提交列表里的弹框
@@ -43,7 +32,7 @@ import StatItem from "./StatItem.vue"
  *
  * 查询条件都是 v-model：页面接地址栏，弹框接提交列表那边的一份本地状态。
  */
-const FlowStats = defineAsyncComponent(() => import("./FlowStats.vue"))
+const FlowStats = defineAsyncComponent(() => import('./FlowStats.vue'))
 
 const props = defineProps<{
   /** 在弹框里：右上角多一个关闭；「在提交列表里看」由外面接住，改的是背后那张列表 */
@@ -61,13 +50,13 @@ const theme = useThemeVars()
 const tone = useTone()
 const resultColor = useResultColor()
 
-const tab = defineModel<string>("tab", { default: "code" })
-const className = defineModel<string>("className", { default: "" })
-const username = defineModel<string>("username", { default: "" })
-const problem = defineModel<string>("problem", { default: "" })
-const period = defineModel<string>("period", { default: DEFAULT_PERIOD })
-const from = defineModel<string>("from", { default: "" })
-const to = defineModel<string>("to", { default: "" })
+const tab = defineModel<string>('tab', { default: 'code' })
+const className = defineModel<string>('className', { default: '' })
+const username = defineModel<string>('username', { default: '' })
+const problem = defineModel<string>('problem', { default: '' })
+const period = defineModel<string>('period', { default: DEFAULT_PERIOD })
+const from = defineModel<string>('from', { default: '' })
+const to = defineModel<string>('to', { default: '' })
 
 /** 地址栏里的 from / to 是手改过、不是数字的话当没选（不然 toISOString 抛错整页空白） */
 const custom = computed<[number, number] | null>(() => {
@@ -78,26 +67,22 @@ const custom = computed<[number, number] | null>(() => {
 
 const periodValue = computed<Period>(() => {
   // 「那节课」要带着精确的起止时刻，地址栏里缺了就退回默认
-  if (period.value === "lesson") return custom.value ? "lesson" : DEFAULT_PERIOD
-  return PERIOD_OPTIONS.some((option) => option.value === period.value)
-    ? (period.value as Period)
-    : DEFAULT_PERIOD
+  if (period.value === 'lesson') return custom.value ? 'lesson' : DEFAULT_PERIOD
+  return PERIOD_OPTIONS.some((option) => option.value === period.value) ? (period.value as Period) : DEFAULT_PERIOD
 })
 
 /** 从「一行一节课」点进某一节课时，下拉里临时多一项「那节课」 */
 const periodOptions = computed(() => [
-  ...(periodValue.value === "lesson" ? [{ label: "那节课", value: "lesson" }] : []),
+  ...(periodValue.value === 'lesson' ? [{ label: '那节课', value: 'lesson' }] : []),
   ...PERIOD_OPTIONS.map((o) => ({ label: o.label, value: o.value as string })),
 ])
 
 /** n-date-picker 按浏览器时区渲染，存取都要平移到东八区（见 utils/functions 的注释） */
-const pickerValue = computed<[number, number] | null>(() =>
-  custom.value ? [toPickerValue(custom.value[0]), toPickerValue(custom.value[1])] : null,
-)
+const pickerValue = computed<[number, number] | null>(() => (custom.value ? [toPickerValue(custom.value[0]), toPickerValue(custom.value[1])] : null))
 function pickDates(value: [number, number] | null) {
   if (!value) {
-    from.value = ""
-    to.value = ""
+    from.value = ''
+    to.value = ''
     return
   }
   from.value = String(fromPickerValue(value[0]))
@@ -107,24 +92,20 @@ function pickDates(value: [number, number] | null) {
 /** 学生框：包含匹配。班级另外单独传（按 class_name 精确匹配，见后端 scopedUsers） */
 const studentParam = computed(() => username.value.trim())
 
-const classOptions = computed(() =>
-  classSelectOptions(configStore.config?.classList ?? [], className.value),
-)
+const classOptions = computed(() => classSelectOptions(configStore.config?.classList ?? [], className.value))
 
 // ---------- 取数 ----------
 
 const loading = ref(false)
-const failed = ref("")
+const failed = ref('')
 const stats = ref<SubmissionStatistics | null>(null)
 const grid = ref<SubmissionStatisticsGrid | null>(null)
 const lessons = ref<SubmissionLessons | null>(null)
 const flow = ref<FlowchartStatistics | null>(null)
 
-type Mode = "lessons" | "byClass" | "people"
+type Mode = 'lessons' | 'byClass' | 'people'
 /** 三种看法，见顶上的注释 */
-const mode = computed<Mode>(() =>
-  className.value || studentParam.value ? "people" : problem.value.trim() ? "byClass" : "lessons",
-)
+const mode = computed<Mode>(() => (className.value || studentParam.value ? 'people' : problem.value.trim() ? 'byClass' : 'lessons'))
 
 /** 一次列几节课，「更早的课」每点一次多 50 节 */
 const LESSON_PAGE = 50
@@ -137,16 +118,16 @@ const loadingMore = ref(false)
  * 上一次的，标签先变了就对不上
  */
 const shown = ref<{ mode: Mode; explicit: boolean; rangeText: string; withinToday: boolean }>({
-  mode: "lessons",
+  mode: 'lessons',
   explicit: false,
-  rangeText: "",
+  rangeText: '',
   withinToday: false,
 })
 let seq = 0
 
 const ERROR_TEXT: Record<string, string> = {
-  "problem-not-found": "有题号找不到，检查一下是不是打错了",
-  "invalid-request": "一次最多查 20 道题",
+  'problem-not-found': '有题号找不到，检查一下是不是打错了',
+  'invalid-request': '一次最多查 20 道题',
 }
 
 async function load() {
@@ -160,18 +141,13 @@ async function load() {
     withinToday: range.withinToday,
   }
   loading.value = true
-  failed.value = ""
+  failed.value = ''
   try {
-    if (tab.value === "flow") {
-      const res = await getFlowchartStatistics(
-        duration,
-        problem.value,
-        studentParam.value,
-        className.value,
-      )
+    if (tab.value === 'flow') {
+      const res = await getFlowchartStatistics(duration, problem.value, studentParam.value, className.value)
       if (current !== seq) return
       flow.value = res
-    } else if (snapshot.mode === "lessons") {
+    } else if (snapshot.mode === 'lessons') {
       // 一行一节课不要方块串：那个接口最多 5000 条，课在后端切
       lessonLimit.value = LESSON_PAGE
       const [s, l] = await Promise.all([
@@ -198,8 +174,8 @@ async function load() {
     grid.value = null
     lessons.value = null
     flow.value = null
-    const code = (error as { error?: string })?.error ?? ""
-    failed.value = ERROR_TEXT[code] ?? "没拉下来，改一下条件再试"
+    const code = (error as { error?: string })?.error ?? ''
+    failed.value = ERROR_TEXT[code] ?? '没拉下来，改一下条件再试'
   } finally {
     if (current === seq) loading.value = false
   }
@@ -211,15 +187,12 @@ async function loadMore() {
   loadingMore.value = true
   try {
     const range = periodRange(periodValue.value, custom.value)
-    const next = await getSubmissionLessons(
-      { start: range.start, end: range.end },
-      lessonLimit.value + LESSON_PAGE,
-    )
+    const next = await getSubmissionLessons({ start: range.start, end: range.end }, lessonLimit.value + LESSON_PAGE)
     if (current !== seq) return
     lessonLimit.value += LESSON_PAGE
     lessons.value = next
   } catch {
-    if (current === seq) failed.value = "更早的课没拉下来，再点一次试试"
+    if (current === seq) failed.value = '更早的课没拉下来，再点一次试试'
   } finally {
     loadingMore.value = false
   }
@@ -238,9 +211,7 @@ const doneCount = computed(() => stats.value?.data.filter((row) => row.done).len
  */
 const hasProblems = computed(() => shown.value.explicit)
 const personCount = computed(() => stats.value?.personCount ?? 0)
-const judged = computed(() =>
-  stats.value ? stats.value.submissionCount - stats.value.judgingCount : 0,
-)
+const judged = computed(() => (stats.value ? stats.value.submissionCount - stats.value.judgingCount : 0))
 
 // ---------- 右上角的入口 ----------
 
@@ -250,21 +221,21 @@ const judged = computed(() =>
  * 原来旁边还有一个「这节课去课堂看板」：顶栏已经有看板，统计里再放一个成了干扰项（用户说的），
  * 现在只在有班正在上课时，在课的列表上方引过去
  */
-const narrow = useMediaQuery(props.modal ? "(max-width: 1439px)" : "(max-width: 1365px)")
+const narrow = useMediaQuery(props.modal ? '(max-width: 1439px)' : '(max-width: 1365px)')
 
 function openList() {
-  emit("list", {
-    ...(tab.value === "flow" ? { language: "Flowchart" } : {}),
+  emit('list', {
+    ...(tab.value === 'flow' ? { language: 'Flowchart' } : {}),
     ...(className.value ? { className: className.value } : {}),
     ...(studentParam.value ? { username: studentParam.value } : {}),
     ...(problem.value ? { problem: problem.value } : {}),
-    ...(shown.value.withinToday ? { today: "1" } : {}),
+    ...(shown.value.withinToday ? { today: '1' } : {}),
   })
 }
 
 // ---------- 点进去 / 回来 ----------
 
-type Snapshot = Record<"className" | "username" | "problem" | "period" | "from" | "to", string>
+type Snapshot = Record<'className' | 'username' | 'problem' | 'period' | 'from' | 'to', string>
 /** 从「一行一节课」或「按班级汇总」点进去之前的条件，「← 全部」拿它回去 */
 const backTo = ref<Snapshot | null>(null)
 
@@ -293,36 +264,36 @@ function goBack() {
 
 // 自己把条件清回了总览，就不用再显示「← 全部」
 watch(mode, (value) => {
-  if (value === "lessons") backTo.value = null
+  if (value === 'lessons') backTo.value = null
 })
 
 function pickClass(value: string) {
   remember()
   className.value = value
-  username.value = ""
+  username.value = ''
 }
 
 /** 点一节课：这个班、这节课的题、这节课第一条到最后一条（多留 1 秒：库里存到微秒，转成毫秒会截掉零头） */
-function pickLesson(lesson: SubmissionLessons["lessons"][number]) {
+function pickLesson(lesson: SubmissionLessons['lessons'][number]) {
   remember()
   className.value = lesson.className ?? NO_CLASS
-  username.value = ""
-  problem.value = lesson.problems.join(" ")
+  username.value = ''
+  problem.value = lesson.problems.join(' ')
   from.value = String(Date.parse(lesson.start))
   to.value = String(Date.parse(lesson.end) + 1000)
-  period.value = "lesson"
+  period.value = 'lesson'
 }
 
 /** 点某天的零散提交：这个班（或没填班级的）那一整天，题号不限 —— 补做、课后练的都在里面 */
-function pickScattered(item: SubmissionLessons["scattered"][number]) {
+function pickScattered(item: SubmissionLessons['scattered'][number]) {
   remember()
   className.value = item.className ?? NO_CLASS
-  username.value = ""
-  problem.value = ""
+  username.value = ''
+  problem.value = ''
   const day = String(dayStartOfDate(item.day))
   from.value = day
   to.value = day
-  period.value = "custom"
+  period.value = 'custom'
 }
 
 /** 点「错得最多的题」里的一道：只看这道，按班级汇总 */
@@ -336,7 +307,7 @@ function pickProblem(displayId: string) {
 const results = computed(() => stats.value?.results ?? [])
 function resultWidth(value: number) {
   const total = stats.value?.submissionCount ?? 0
-  return total ? `${(value / total) * 100}%` : "0"
+  return total ? `${(value / total) * 100}%` : '0'
 }
 </script>
 
@@ -344,9 +315,7 @@ function resultWidth(value: number) {
   <div class="stats" :class="{ modal }">
     <div class="filters">
       <span class="title">统计</span>
-      <button v-if="backTo" type="button" class="back" title="回到点进来之前" @click="goBack">
-        <Icon icon="ph:caret-left-bold" :width="13" />全部
-      </button>
+      <button v-if="backTo" type="button" class="back" title="回到点进来之前" @click="goBack"><Icon icon="ph:caret-left-bold" :width="13" />全部</button>
       <n-radio-group v-model:value="tab" size="small">
         <n-radio-button value="code">代码</n-radio-button>
         <n-radio-button value="flow">流程图</n-radio-button>
@@ -365,13 +334,7 @@ function resultWidth(value: number) {
       <n-input v-model:value="username" class="w-user" size="small" clearable placeholder="学生">
         <template #prefix><Icon icon="ph:magnifying-glass" /></template>
       </n-input>
-      <n-input
-        v-model:value="problem"
-        class="w-problem"
-        size="small"
-        clearable
-        placeholder="题号，几道用空格隔开"
-      >
+      <n-input v-model:value="problem" class="w-problem" size="small" clearable placeholder="题号，几道用空格隔开">
         <template #prefix><Icon icon="ph:hash" /></template>
       </n-input>
       <n-select
@@ -382,21 +345,11 @@ function resultWidth(value: number) {
         :consistent-menu-width="false"
         @update:value="(v: string) => (period = v)"
       />
-      <n-date-picker
-        v-if="periodValue === 'custom'"
-        :value="pickerValue"
-        type="daterange"
-        size="small"
-        class="w-dates"
-        clearable
-        @update:value="pickDates"
-      />
+      <n-date-picker v-if="periodValue === 'custom'" :value="pickerValue" type="daterange" size="small" class="w-dates" clearable @update:value="pickDates" />
       <span v-else class="range">{{ shown.rangeText }}</span>
       <n-spin v-if="loading" :size="14" />
       <n-text v-if="failed" type="error" class="range">{{ failed }}</n-text>
-      <span v-if="periodValue === 'custom' && !custom" class="range"
-        >选一下开始和结束的日子，没选先按今天算</span
-      >
+      <span v-if="periodValue === 'custom' && !custom" class="range">选一下开始和结束的日子，没选先按今天算</span>
       <span class="spacer"></span>
       <n-button size="small" title="在提交列表里看" aria-label="在提交列表里看" @click="openList">
         <template #icon><Icon icon="ph:arrow-square-out" /></template>
@@ -421,32 +374,14 @@ function resultWidth(value: number) {
         />
         <template v-if="shown.mode === 'lessons' && lessons">
           <StatItem label="交过的人" :value="stats.data.length" unit="人" />
-          <StatItem
-            label="上了几节课"
-            :value="`${lessons.lessons.length}${lessons.hasMore ? '+' : ''}`"
-            unit="节"
-          />
+          <StatItem label="上了几节课" :value="`${lessons.lessons.length}${lessons.hasMore ? '+' : ''}`" unit="节" />
         </template>
         <template v-if="personCount">
-          <StatItem
-            :label="hasProblems ? '做完' : '做对过题'"
-            :value="`${doneCount} / ${personCount}`"
-            unit="人"
-            tone="success"
-          />
-          <StatItem
-            v-if="hasProblems"
-            label="完成度"
-            :value="`${personCount ? Math.round((doneCount / personCount) * 100) : 0}%`"
-          />
+          <StatItem :label="hasProblems ? '做完' : '做对过题'" :value="`${doneCount} / ${personCount}`" unit="人" tone="success" />
+          <StatItem v-if="hasProblems" label="完成度" :value="`${personCount ? Math.round((doneCount / personCount) * 100) : 0}%`" />
           <StatItem label="一道没交" :value="stats.dataUnaccepted.length" unit="人" tone="error" />
         </template>
-        <StatItem
-          :label="hasProblems ? '交了没全对' : '一道没做对'"
-          :value="stats.dataAttempted.length"
-          unit="人"
-          tone="warning"
-        />
+        <StatItem :label="hasProblems ? '交了没全对' : '一道没做对'" :value="stats.dataAttempted.length" unit="人" tone="warning" />
         <span class="spacer"></span>
         <div v-if="results.length" class="result-bar">
           <div class="result-track">
@@ -465,21 +400,11 @@ function resultWidth(value: number) {
           </div>
         </div>
         <span class="ring-wrap">
-          <RingChart
-            :value="stats.acceptedCount"
-            :total="judged"
-            :color="tone('success').solid"
-            :labels="['正确', '没对']"
-          />
+          <RingChart :value="stats.acceptedCount" :total="judged" :color="tone('success').solid" :labels="['正确', '没对']" />
           <span class="ring-label">提交<br />正确率</span>
         </span>
         <span v-if="personCount && hasProblems" class="ring-wrap">
-          <RingChart
-            :value="doneCount"
-            :total="personCount"
-            :color="tone('info').solid"
-            :labels="['做完', '没做完']"
-          />
+          <RingChart :value="doneCount" :total="personCount" :color="tone('info').solid" :labels="['做完', '没做完']" />
           <span class="ring-label">班级<br />完成度</span>
         </span>
       </div>
@@ -493,12 +418,7 @@ function resultWidth(value: number) {
         @problem="pickProblem"
         @more="loadMore"
       />
-      <ByClass
-        v-else-if="shown.mode === 'byClass' && grid"
-        :grid="grid"
-        :explicit="shown.explicit"
-        @pick="pickClass"
-      />
+      <ByClass v-else-if="shown.mode === 'byClass' && grid" :grid="grid" :explicit="shown.explicit" @pick="pickClass" />
       <CodeStats v-else-if="grid" :stats="stats" :grid="grid" :explicit="shown.explicit" />
     </template>
   </div>
@@ -510,7 +430,7 @@ function resultWidth(value: number) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 /* 弹框：四周留 24，和今日统计同一种圆角卡片 */
@@ -519,7 +439,7 @@ function resultWidth(value: number) {
   max-width: 1480px;
   height: calc(100vh - 48px);
   border-radius: 12px;
-  box-shadow: v-bind("theme.boxShadow3");
+  box-shadow: v-bind('theme.boxShadow3');
   overflow: hidden;
 }
 
@@ -532,7 +452,7 @@ function resultWidth(value: number) {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .title {
@@ -552,12 +472,12 @@ function resultWidth(value: number) {
   align-items: center;
   gap: 2px;
   cursor: pointer;
-  color: v-bind("theme.textColor2");
-  background: v-bind("theme.actionColor");
+  color: v-bind('theme.textColor2');
+  background: v-bind('theme.actionColor');
 }
 
 .back:hover {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .result-bar {
@@ -580,7 +500,7 @@ function resultWidth(value: number) {
   gap: 10px;
   font-size: var(--oj-fs-meta);
   white-space: nowrap;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .result-legend i {
@@ -595,7 +515,7 @@ function resultWidth(value: number) {
   width: 1px;
   height: 20px;
   margin: 0 4px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 /* 最长的是「26计算机11班」：132px 时只剩两像素余量，字体稍宽的机器上就出省略号 */
@@ -623,7 +543,7 @@ function resultWidth(value: number) {
 
 .range {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .spacer {
@@ -637,7 +557,7 @@ function resultWidth(value: number) {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -645,7 +565,7 @@ function resultWidth(value: number) {
 }
 
 .close:hover {
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .summary {
@@ -656,8 +576,8 @@ function resultWidth(value: number) {
   display: flex;
   align-items: center;
   gap: 40px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.actionColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.actionColor');
 }
 
 .ring-wrap {
@@ -669,7 +589,7 @@ function resultWidth(value: number) {
 .ring-label {
   font-size: var(--oj-fs-meta);
   line-height: 1.5;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 手机：老师很少在手机上看统计，只保证不坏 —— 筛选和数字行折行，整页自然滚动 */

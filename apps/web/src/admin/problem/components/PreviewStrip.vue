@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
+import { useThemeVars } from 'naive-ui'
 
 /**
  * 出题页右栏「学生看到的样子」收起来之后剩下的那一条：竖着贴在右边，点一下展开。
@@ -27,18 +27,18 @@ const theme = useThemeVars()
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor2");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor2');
   font: inherit;
   font-size: 13px;
   cursor: pointer;
 }
 
 .strip:hover {
-  color: v-bind("theme.primaryColor");
-  border-color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
+  border-color: v-bind('theme.primaryColor');
 }
 
 .arrow {

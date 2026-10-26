@@ -1,10 +1,10 @@
-import { defineStore } from "pinia"
+import { defineStore } from 'pinia'
 
 /**
  * 登录框、注册框开没开。表单本身在两个组件里：每次打开都从干净的表单开始
  * （机房一台电脑轮流坐人，别把上一个人的名字和密码留在框里），不需要跨组件共享。
  */
-export const useAuthModalStore = defineStore("authModal", () => {
+export const useAuthModalStore = defineStore('authModal', () => {
   const loginModalOpen = ref(false)
   const signupModalOpen = ref(false)
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useChallengeStore } from "oj/store/challenge"
-import { useChallengeTone } from "../composables/challengeTone"
-import ChallengeIcon from "./ChallengeIcon.vue"
+import { useChallengeStore } from 'oj/store/challenge'
+import { useChallengeTone } from '../composables/challengeTone'
+import ChallengeIcon from './ChallengeIcon.vue'
 
 /**
  * 挑战中：编辑器顶上一条紫色的，写着要求和全站几人做到，随时「不挑战了」（设计稿 StkDoing）。
@@ -31,13 +31,13 @@ const done = computed(() => !!active.value?.mine)
         <path d="M5 12.5l4.5 4.5L19 7.5" />
       </svg>
       <ChallengeIcon v-else />
-      {{ done ? "挑战成功" : "挑战" }}
+      {{ done ? '挑战成功' : '挑战' }}
     </span>
     <b class="wording">{{ active.wording }}</b>
     <span class="spacer" />
     <span v-if="!done" class="meta">{{ active.doneCount }} 人做到</span>
     <button type="button" class="quit" @click="challengeStore.stop()">
-      {{ done ? "回到普通模式" : "不挑战了" }}
+      {{ done ? '回到普通模式' : '不挑战了' }}
     </button>
   </div>
 </template>
@@ -51,8 +51,8 @@ const done = computed(() => !!active.value?.mine)
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: v-bind("tone.soft");
-  border-bottom: 1px solid v-bind("tone.border");
+  background-color: v-bind('tone.soft');
+  border-bottom: 1px solid v-bind('tone.border');
   white-space: nowrap;
   min-width: 0;
 }
@@ -64,8 +64,8 @@ const done = computed(() => !!active.value?.mine)
   height: 24px;
   padding: 0 9px;
   border-radius: 12px;
-  background-color: v-bind("tone.solid");
-  color: v-bind("tone.onSolid");
+  background-color: v-bind('tone.solid');
+  color: v-bind('tone.onSolid');
   font-size: 13px;
   font-weight: 600;
   flex-shrink: 0;
@@ -73,7 +73,7 @@ const done = computed(() => !!active.value?.mine)
 
 .wording {
   font-size: 15px;
-  color: v-bind("tone.text");
+  color: v-bind('tone.text');
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,12 +91,12 @@ const done = computed(() => !!active.value?.mine)
 .quit {
   height: 28px;
   padding: 0 10px;
-  border: 1px solid v-bind("tone.border");
+  border: 1px solid v-bind('tone.border');
   border-radius: 4px;
   background: transparent;
   font: inherit;
   font-size: 13px;
-  color: v-bind("tone.text");
+  color: v-bind('tone.text');
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -121,7 +121,7 @@ const done = computed(() => !!active.value?.mine)
 }
 
 .quit:focus-visible {
-  outline: 2px solid v-bind("tone.solid");
+  outline: 2px solid v-bind('tone.solid');
   outline-offset: 2px;
 }
 </style>

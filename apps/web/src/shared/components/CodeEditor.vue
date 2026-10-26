@@ -1,13 +1,13 @@
 <script lang="ts" setup>
-import { bracketMatching } from "@codemirror/language"
-import CodeMirror from "./CodeMirror.vue"
-import type { Extension } from "@codemirror/state"
-import { autocompletion, closeBrackets, completeAnyWord } from "@codemirror/autocomplete"
-import type { LANGUAGE } from "utils/types"
-import { darkCodeTheme, lightCodeTheme } from "../themes/codeTheme"
-import { styleTheme } from "shared/extensions/baseTheme"
-import { enhanceCompletion } from "shared/extensions/autocompletion"
-import { languageExtension } from "shared/extensions/language"
+import { bracketMatching } from '@codemirror/language'
+import CodeMirror from './CodeMirror.vue'
+import type { Extension } from '@codemirror/state'
+import { autocompletion, closeBrackets, completeAnyWord } from '@codemirror/autocomplete'
+import type { LANGUAGE } from 'utils/types'
+import { darkCodeTheme, lightCodeTheme } from '../themes/codeTheme'
+import { styleTheme } from 'shared/extensions/baseTheme'
+import { enhanceCompletion } from 'shared/extensions/autocompletion'
+import { languageExtension } from 'shared/extensions/language'
 
 interface Props {
   language?: LANGUAGE
@@ -19,15 +19,8 @@ interface Props {
   extraExtensions?: Extension[]
 }
 
-const {
-  language = "Python",
-  fontSize = 20,
-  height = "100%",
-  readonly = false,
-  placeholder = "",
-  extraExtensions = [],
-} = defineProps<Props>()
-const code = defineModel<string>("value")
+const { language = 'Python', fontSize = 20, height = '100%', readonly = false, placeholder = '', extraExtensions = [] } = defineProps<Props>()
+const code = defineModel<string>('value')
 
 const isDark = useDark()
 

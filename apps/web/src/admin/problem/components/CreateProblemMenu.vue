@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
+import { Icon } from '@iconify/vue'
 
 /**
  * 「新建题目」先选题型：编程题和 SQL 题是两张不同的出题页，测试数据的格式也不一样，
@@ -7,39 +7,33 @@ import { Icon } from "@iconify/vue"
  * 每项要两行（名字 + 一句话），n-dropdown 的选项是固定行高，放不下，所以自己画
  */
 defineProps<{ label: string; primary?: boolean }>()
-const emit = defineEmits<{ select: [kind: "code" | "sql"] }>()
+const emit = defineEmits<{ select: [kind: 'code' | 'sql'] }>()
 
 const show = ref(false)
 
 const OPTIONS = [
   {
-    kind: "code",
-    icon: "ph:code-bold",
-    title: "编程题",
-    note: "C / C++ / Python，有输入输出说明和样例，也能挂流程图、语法要求",
+    kind: 'code',
+    icon: 'ph:code-bold',
+    title: '编程题',
+    note: 'C / C++ / Python，有输入输出说明和样例，也能挂流程图、语法要求',
   },
   {
-    kind: "sql",
-    icon: "ph:database-bold",
-    title: "SQL 题",
-    note: "学生写 SQL 查数据库；给几组建表脚本和一条标准答案就行",
+    kind: 'sql',
+    icon: 'ph:database-bold',
+    title: 'SQL 题',
+    note: '学生写 SQL 查数据库；给几组建表脚本和一条标准答案就行',
   },
 ] as const
 
-function pick(kind: "code" | "sql") {
+function pick(kind: 'code' | 'sql') {
   show.value = false
-  emit("select", kind)
+  emit('select', kind)
 }
 </script>
 
 <template>
-  <n-popover
-    v-model:show="show"
-    trigger="click"
-    placement="bottom-end"
-    :show-arrow="false"
-    style="padding: 6px; width: 340px"
-  >
+  <n-popover v-model:show="show" trigger="click" placement="bottom-end" :show-arrow="false" style="padding: 6px; width: 340px">
     <template #trigger>
       <n-button :type="primary ? 'primary' : 'default'" icon-placement="right">
         {{ label }}
@@ -47,13 +41,7 @@ function pick(kind: "code" | "sql") {
       </n-button>
     </template>
     <div class="menu">
-      <button
-        v-for="option in OPTIONS"
-        :key="option.kind"
-        type="button"
-        class="option"
-        @click="pick(option.kind)"
-      >
+      <button v-for="option in OPTIONS" :key="option.kind" type="button" class="option" @click="pick(option.kind)">
         <Icon :icon="option.icon" :width="20" class="icon" :class="option.kind" />
         <span class="text">
           <b>{{ option.title }}</b>

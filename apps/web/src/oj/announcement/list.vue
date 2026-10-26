@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { getAnnouncement, getAnnouncementList } from "oj/api"
-import AdminLink from "shared/components/AdminLink.vue"
-import NotFound from "shared/components/NotFound.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useUserStore } from "shared/store/user"
-import { errorCode } from "utils/api"
-import { parseTime, zonedParts, zonedYear } from "utils/functions"
-import type { Announcement, AnnouncementListItem } from "utils/types"
+import { useThemeVars } from 'naive-ui'
+import { getAnnouncement, getAnnouncementList } from 'oj/api'
+import AdminLink from 'shared/components/AdminLink.vue'
+import NotFound from 'shared/components/NotFound.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useUserStore } from 'shared/store/user'
+import { errorCode } from 'utils/api'
+import { parseTime, zonedParts, zonedYear } from 'utils/functions'
+import type { Announcement, AnnouncementListItem } from 'utils/types'
 
 /**
  * 公告：左边列表、右边全文，和后台 AI 报告一个排法。原来是一张四列的表、正文开弹框 ——
@@ -39,9 +39,7 @@ const queryId = computed(() => {
 })
 
 /** 桌面上没带 id 就看第一条（置顶的排最前）；手机上没带 id 就只看列表 */
-const selectedId = computed(
-  () => queryId.value ?? (isDesktop.value ? (announcements.value[0]?.id ?? null) : null),
-)
+const selectedId = computed(() => queryId.value ?? (isDesktop.value ? (announcements.value[0]?.id ?? null) : null))
 
 function select(id: number) {
   router.replace({ query: { ...route.query, id } })
@@ -53,42 +51,40 @@ function backToList() {
 }
 
 const detail = ref<Announcement | null>(null)
-const detailState = ref<"idle" | "loading" | "ok" | "missing" | "failed">("idle")
+const detailState = ref<'idle' | 'loading' | 'ok' | 'missing' | 'failed'>('idle')
 let seq = 0
 
 async function loadDetail(id: number | null) {
   const mine = ++seq
   if (id === null) {
     detail.value = null
-    detailState.value = "idle"
+    detailState.value = 'idle'
     return
   }
-  detailState.value = "loading"
+  detailState.value = 'loading'
   try {
     const res = await getAnnouncement(id)
     if (mine !== seq) return
     detail.value = res
-    detailState.value = "ok"
+    detailState.value = 'ok'
   } catch (err) {
     if (mine !== seq) return
     detail.value = null
-    detailState.value = errorCode(err) === "announcement-not-found" ? "missing" : "failed"
+    detailState.value = errorCode(err) === 'announcement-not-found' ? 'missing' : 'failed'
   }
 }
 
 watch(selectedId, loadDetail, { immediate: true })
 
 function dateText(value: string) {
-  return parseTime(value, zonedParts(value)!.year === zonedYear() ? "M月D日" : "YYYY年M月D日")
+  return parseTime(value, zonedParts(value)!.year === zonedYear() ? 'M月D日' : 'YYYY年M月D日')
 }
 
 /** 「2026年9月19日发布 · 9月23日改过」：同一天改的不写 */
 function metaText(item: Announcement) {
-  const created = parseTime(item.createTime, "YYYY年M月D日")
-  const updated = parseTime(item.lastUpdateTime, "YYYY年M月D日")
-  return updated === created
-    ? `${created}发布`
-    : `${created}发布 · ${dateText(item.lastUpdateTime)}改过`
+  const created = parseTime(item.createTime, 'YYYY年M月D日')
+  const updated = parseTime(item.lastUpdateTime, 'YYYY年M月D日')
+  return updated === created ? `${created}发布` : `${created}发布 · ${dateText(item.lastUpdateTime)}改过`
 }
 
 /** 点正文里的图放大看：截图常常是整屏缩进正文栏的，字看不清 */
@@ -98,7 +94,7 @@ function onContentClick(e: MouseEvent) {
   if (e.target instanceof HTMLImageElement) zoomSrc.value = e.target.src
 }
 
-onKeyStroke("Escape", () => {
+onKeyStroke('Escape', () => {
   zoomSrc.value = null
 })
 
@@ -112,12 +108,7 @@ const showReader = computed(() => isDesktop.value || queryId.value !== null)
       <h2>公告</h2>
       <template v-if="userStore.isSuperAdmin">
         <span class="grow"></span>
-        <AdminLink
-          v-if="showReader && detail"
-          :to="{ name: 'admin announcement edit', params: { announcementID: detail.id } }"
-        >
-          编辑这条
-        </AdminLink>
+        <AdminLink v-if="showReader && detail" :to="{ name: 'admin announcement edit', params: { announcementID: detail.id } }"> 编辑这条 </AdminLink>
         <AdminLink to="/admin/announcement/create">发公告</AdminLink>
       </template>
     </div>
@@ -138,19 +129,13 @@ const showReader = computed(() => isDesktop.value || queryId.value !== null)
             <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
             <span class="ellipsis">{{ item.title }}</span>
           </span>
-          <span class="muted num">{{ item.tag || "公告" }} · {{ dateText(item.createTime) }}</span>
+          <span class="muted num">{{ item.tag || '公告' }} · {{ dateText(item.createTime) }}</span>
         </button>
       </div>
 
       <article v-if="showReader" class="reader">
         <a v-if="!isDesktop" class="back" @click="backToList">‹ 全部公告</a>
-        <NotFound
-          v-if="detailState === 'missing'"
-          title="这条公告不存在"
-          hint="可能已经撤下了"
-          to="/announcement"
-          to-label="看全部公告"
-        />
+        <NotFound v-if="detailState === 'missing'" title="这条公告不存在" hint="可能已经撤下了" to="/announcement" to-label="看全部公告" />
         <NotFound v-else-if="detailState === 'failed'" icon="ph:wifi-slash" title="公告没拉下来">
           <n-button type="primary" @click="loadDetail(selectedId)">再试一次</n-button>
         </NotFound>
@@ -158,12 +143,10 @@ const showReader = computed(() => isDesktop.value || queryId.value !== null)
           <template v-if="detail">
             <header class="reader-head">
               <h3>
-                <n-tag v-if="detail.top" type="warning" size="small" :bordered="false">
-                  置顶
-                </n-tag>
+                <n-tag v-if="detail.top" type="warning" size="small" :bordered="false"> 置顶 </n-tag>
                 {{ detail.title }}
               </h3>
-              <span class="muted num">{{ detail.tag || "公告" }} · {{ metaText(detail) }}</span>
+              <span class="muted num">{{ detail.tag || '公告' }} · {{ metaText(detail) }}</span>
             </header>
             <div class="content" v-html="detail.content" @click="onContentClick"></div>
           </template>
@@ -215,7 +198,7 @@ h2 {
 .list {
   width: 340px;
   flex: none;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: var(--oj-radius);
   overflow: hidden;
 }
@@ -227,7 +210,7 @@ h2 {
   width: 100%;
   padding: 12px 16px;
   border: 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   background: none;
   font: inherit;
   text-align: left;
@@ -240,12 +223,12 @@ h2 {
 }
 
 .item:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .item.on {
-  background: v-bind("theme.hoverColor");
-  box-shadow: inset 3px 0 0 v-bind("theme.primaryColor");
+  background: v-bind('theme.hoverColor');
+  box-shadow: inset 3px 0 0 v-bind('theme.primaryColor');
 }
 
 .item-title {
@@ -265,7 +248,7 @@ h2 {
 
 .muted {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .num {
@@ -277,14 +260,14 @@ h2 {
   min-width: 0;
   padding: 20px var(--oj-pad-x) 28px;
   border-radius: var(--oj-radius);
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .back {
   display: inline-block;
   margin-bottom: 12px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
@@ -293,7 +276,7 @@ h2 {
   flex-direction: column;
   gap: 6px;
   padding-bottom: 14px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 h3 {
@@ -325,7 +308,7 @@ h3 {
 }
 
 .content :deep(a) {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .zoom {

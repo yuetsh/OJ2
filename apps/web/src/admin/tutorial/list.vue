@@ -1,16 +1,11 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { errorMessage } from "utils/api"
-import type { TutorialListItem } from "utils/types"
-import { groupByProject, splitTitle, type TutorialType } from "oj/learn/lesson"
-import ProjectTile from "oj/learn/components/ProjectTile.vue"
-import "oj/learn/learn.css"
-import {
-  getTutorialList,
-  renameTutorialProject,
-  reorderTutorials,
-  setTutorialVisibility,
-} from "../api"
+import { Icon } from '@iconify/vue'
+import { errorMessage } from 'utils/api'
+import type { TutorialListItem } from 'utils/types'
+import { groupByProject, splitTitle, type TutorialType } from 'oj/learn/lesson'
+import ProjectTile from 'oj/learn/components/ProjectTile.vue'
+import 'oj/learn/learn.css'
+import { getTutorialList, renameTutorialProject, reorderTutorials, setTutorialVisibility } from '../api'
 
 /**
  * 教程列表（设计稿「后台 · 教程列表」）：按项目分组，拖动排序；每课看得到几道练一练、
@@ -20,14 +15,14 @@ const router = useRouter()
 const route = useRoute()
 const message = useMessage()
 
-const type = ref<TutorialType>(route.query.type === "c" ? "c" : "python")
+const type = ref<TutorialType>(route.query.type === 'c' ? 'c' : 'python')
 const all = ref<{ [key: string]: TutorialListItem[] }>({ python: [], c: [] })
 const collapsed = ref(new Set<string>())
 const renaming = ref<string | null>(null)
-const renameTo = ref("")
+const renameTo = ref('')
 const dragId = ref<number | null>(null)
 const showNewProject = ref(false)
-const newProject = ref("")
+const newProject = ref('')
 
 const list = computed(() => all.value[type.value] ?? [])
 const groups = computed(() =>
@@ -54,9 +49,7 @@ const publicStep = computed(() => {
 async function load() {
   all.value = await getTutorialList()
   // 整组没公开又没项目的（老教程）默认收起
-  collapsed.value = new Set(
-    groups.value.filter((group) => group.hidden && !group.project).map((group) => group.key),
-  )
+  collapsed.value = new Set(groups.value.filter((group) => group.hidden && !group.project).map((group) => group.key))
 }
 
 function pickType(value: TutorialType) {
@@ -106,7 +99,7 @@ async function drop(target: TutorialListItem) {
   dragId.value = null
   if (!from || from.id === target.id) return
   if (from.project !== target.project) {
-    message.warning("只能在同一个项目里拖，换项目请到编辑页里改")
+    message.warning('只能在同一个项目里拖，换项目请到编辑页里改')
     return
   }
   const ids = list.value.map((item) => item.id).filter((id) => id !== from.id)
@@ -129,14 +122,14 @@ async function drop(target: TutorialListItem) {
 }
 
 function createIn(project: string) {
-  router.push({ name: "admin tutorial create", query: { type: type.value, project } })
+  router.push({ name: 'admin tutorial create', query: { type: type.value, project } })
 }
 
 function confirmNewProject() {
   const name = newProject.value.trim()
   if (!name) return
   showNewProject.value = false
-  newProject.value = ""
+  newProject.value = ''
   createIn(name)
 }
 
@@ -148,9 +141,7 @@ onMounted(load)
     <div class="top">
       <span class="title">教程</span>
       <div class="seg">
-        <button type="button" :class="{ on: type === 'python' }" @click="pickType('python')">
-          Python
-        </button>
+        <button type="button" :class="{ on: type === 'python' }" @click="pickType('python')">Python</button>
         <button type="button" :class="{ on: type === 'c' }" @click="pickType('c')">C 语言</button>
       </div>
       <span class="grow" />
@@ -178,37 +169,19 @@ onMounted(load)
       <template v-for="group in groups" :key="group.key">
         <!-- 整行都能点开合；行里的改名、加一课自己拦住，不顺带开合 -->
         <div class="row grouprow" @click="toggle(group.key)">
-          <button
-            type="button"
-            class="fold"
-            :aria-label="collapsed.has(group.key) ? '展开' : '收起'"
-          >
-            <Icon
-              :icon="collapsed.has(group.key) ? 'ph:caret-right-bold' : 'ph:caret-down-bold'"
-              :width="13"
-            />
+          <button type="button" class="fold" :aria-label="collapsed.has(group.key) ? '展开' : '收起'">
+            <Icon :icon="collapsed.has(group.key) ? 'ph:caret-right-bold' : 'ph:caret-down-bold'" :width="13" />
           </button>
           <ProjectTile :icon="group.icon" :tone="group.tone" :size="26" />
           <span v-if="renaming === group.project && group.project" class="rename" @click.stop>
-            <n-input
-              v-model:value="renameTo"
-              size="small"
-              style="width: 280px"
-              autofocus
-              @keyup.enter="saveRename"
-              @keyup.esc="renaming = null"
-            />
+            <n-input v-model:value="renameTo" size="small" style="width: 280px" autofocus @keyup.enter="saveRename" @keyup.esc="renaming = null" />
             <n-button size="small" type="primary" @click="saveRename">保存</n-button>
             <n-button size="small" quaternary @click="renaming = null">取消</n-button>
           </span>
           <template v-else>
-            <span class="group-name">{{
-              group.project || (group.hidden ? "没公开" : "没有项目")
-            }}</span>
+            <span class="group-name">{{ group.project || (group.hidden ? '没公开' : '没有项目') }}</span>
             <span class="muted">{{ group.items.length }} 课</span>
-            <a v-if="group.project" href="#" @click.stop.prevent="startRename(group.project)"
-              >改名</a
-            >
+            <a v-if="group.project" href="#" @click.stop.prevent="startRename(group.project)">改名</a>
             <a href="#" @click.stop.prevent="createIn(group.project)">加一课</a>
           </template>
         </div>
@@ -224,52 +197,33 @@ onMounted(load)
             @dragover.prevent
             @drop="drop(item)"
           >
-            <span class="c-drag handle" aria-hidden="true"
-              ><Icon icon="ph:dots-six-vertical-bold" :width="16"
-            /></span>
-            <span class="c-no num muted">{{ publicStep.get(item.id) ?? "—" }}</span>
+            <span class="c-drag handle" aria-hidden="true"><Icon icon="ph:dots-six-vertical-bold" :width="16" /></span>
+            <span class="c-no num muted">{{ publicStep.get(item.id) ?? '—' }}</span>
             <span class="c-title">
               <span class="kp">{{ splitTitle(item.title).kp }}</span>
               <span class="scene">{{ splitTitle(item.title).scene }}</span>
             </span>
-            <span class="c-num c-ex num">{{ item.exerciseCount || "-" }}</span>
+            <span class="c-num c-ex num">{{ item.exerciseCount || '-' }}</span>
             <span class="c-num num">
               <template v-if="item.problemCount">{{ item.problemCount }}</template>
               <span v-else class="warn">还没挑</span>
             </span>
             <span class="c-num wide num">{{ item.readers }}</span>
             <span class="c-switch">
-              <n-switch
-                :value="item.isPublic"
-                size="small"
-                :rubber-band="false"
-                @update:value="toggleVisible(item)"
-              />
+              <n-switch :value="item.isPublic" size="small" :rubber-band="false" @update:value="toggleVisible(item)" />
             </span>
-            <router-link
-              :to="{ name: 'admin tutorial edit', params: { tutorialID: item.id } }"
-              class="c-edit"
-            >
-              编辑
-            </router-link>
+            <router-link :to="{ name: 'admin tutorial edit', params: { tutorialID: item.id } }" class="c-edit"> 编辑 </router-link>
           </div>
         </template>
       </template>
     </section>
 
     <n-modal v-model:show="showNewProject" preset="card" title="新建项目" style="width: 420px">
-      <n-input
-        v-model:value="newProject"
-        placeholder="项目五 · 智慧物流·仓储管理"
-        maxlength="64"
-        @keyup.enter="confirmNewProject"
-      />
+      <n-input v-model:value="newProject" placeholder="项目五 · 智慧物流·仓储管理" maxlength="64" @keyup.enter="confirmNewProject" />
       <template #footer>
         <n-flex justify="end">
           <n-button @click="showNewProject = false">取消</n-button>
-          <n-button type="primary" :disabled="!newProject.trim()" @click="confirmNewProject">
-            接着写第一课
-          </n-button>
+          <n-button type="primary" :disabled="!newProject.trim()" @click="confirmNewProject"> 接着写第一课 </n-button>
         </n-flex>
       </template>
     </n-modal>

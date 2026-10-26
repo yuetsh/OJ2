@@ -1,8 +1,8 @@
-import { HINT_LEVEL_COMPILE, HINT_MAX_LEVEL } from "@oj2/contract"
-import { and, desc, eq, gt, gte, isNull } from "drizzle-orm"
+import { HINT_LEVEL_COMPILE, HINT_MAX_LEVEL } from '@oj2/contract'
+import { and, desc, eq, gt, gte, isNull } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { JudgeStatus } from "../judge/status"
+import { db, schema } from '../db'
+import { JudgeStatus } from '../judge/status'
 
 /**
  * AI 提示的等级阶梯（AI 时代 OJ 设计 2.2 / 2.6）。
@@ -33,13 +33,7 @@ async function lastAcceptedAt(userId: number, problemId: number) {
   const [row] = await db
     .select({ createTime: schema.submission.createTime })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, userId),
-        eq(schema.submission.problemId, problemId),
-        eq(schema.submission.result, JudgeStatus.ACCEPTED),
-      ),
-    )
+    .where(and(eq(schema.submission.userId, userId), eq(schema.submission.problemId, problemId), eq(schema.submission.result, JudgeStatus.ACCEPTED)))
     .orderBy(desc(schema.submission.createTime))
     .limit(1)
   return row?.createTime ?? null
@@ -53,13 +47,7 @@ async function hasNewerSubmission(userId: number, problemId: number, hintAt: str
   const [row] = await db
     .select({ id: schema.submission.id })
     .from(schema.submission)
-    .where(
-      and(
-        eq(schema.submission.userId, userId),
-        eq(schema.submission.problemId, problemId),
-        gt(schema.submission.createTime, hintAt),
-      ),
-    )
+    .where(and(eq(schema.submission.userId, userId), eq(schema.submission.problemId, problemId), gt(schema.submission.createTime, hintAt)))
     .limit(1)
   return row !== undefined
 }
@@ -114,15 +102,13 @@ export async function decideHintLevel(
   more: boolean,
 ): Promise<HintLevelDecision> {
   // 编译失败自成一档：不看阶梯、不动阶梯，也就没有「再多一点」可点
-  if (submission.result === JudgeStatus.COMPILE_ERROR)
-    return { level: HINT_LEVEL_COMPILE, canEscalate: false }
+  if (submission.result === JudgeStatus.COMPILE_ERROR) return { level: HINT_LEVEL_COMPILE, canEscalate: false }
 
   const problemId = submission.problemId
   const ladder = await currentLadder(userId, problemId)
   // 这道题还没开过阶梯：从 L0 起，而这条提示就是 L0 的锚点，不可能已经有更新的提交
   if (!ladder) return { level: 0, canEscalate: false }
-  const unlocked =
-    ladder.level < HINT_MAX_LEVEL && (await hasNewerSubmission(userId, problemId, ladder.anchor))
+  const unlocked = ladder.level < HINT_MAX_LEVEL && (await hasNewerSubmission(userId, problemId, ladder.anchor))
   if (more && unlocked) return { level: ladder.level + 1, canEscalate: false }
   return { level: ladder.level, canEscalate: unlocked }
 }

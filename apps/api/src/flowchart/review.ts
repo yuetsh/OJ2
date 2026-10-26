@@ -1,6 +1,6 @@
-import type { FlowchartCaseResult } from "@oj2/contract"
+import type { FlowchartCaseResult } from '@oj2/contract'
 
-import { asRecord } from "../routes/helpers"
+import { asRecord } from '../routes/helpers'
 
 /**
  * 没走对的图，跑完以后再请 AI 看一眼：错在哪、怎么改。
@@ -38,12 +38,9 @@ export function flowchartAnswer(answers: unknown) {
     .map((item) => asRecord(item))
     .filter(
       (item): item is { language: string; code: string } =>
-        typeof item.language === "string" &&
-        item.language !== "SQL" &&
-        typeof item.code === "string" &&
-        item.code.trim() !== "",
+        typeof item.language === 'string' && item.language !== 'SQL' && typeof item.code === 'string' && item.code.trim() !== '',
     )
-  return usable.find((item) => item.language === "Python") ?? usable[0] ?? null
+  return usable.find((item) => item.language === 'Python') ?? usable[0] ?? null
 }
 
 export function reviewInput(options: {
@@ -55,30 +52,27 @@ export function reviewInput(options: {
 }) {
   const { brief, flowchart, code, results, answer } = options
   const failed = results.filter((row) => !row.ok)
-  const oneLine = (text: string) => text.replace(/\n/g, " / ") || "（什么也没输出）"
+  const oneLine = (text: string) => text.replace(/\n/g, ' / ') || '（什么也没输出）'
   return [
     brief,
-    "",
-    "<flowchart>",
+    '',
+    '<flowchart>',
     flowchart,
-    "</flowchart>",
-    "",
-    "系统把每个框理解成的 Python（null 是看不懂这个框写的是什么）：",
-    ...Object.entries(code).map(([node, line]) => `${node}：${line ?? "null"}`),
-    "",
+    '</flowchart>',
+    '',
+    '系统把每个框理解成的 Python（null 是看不懂这个框写的是什么）：',
+    ...Object.entries(code).map(([node, line]) => `${node}：${line ?? 'null'}`),
+    '',
     `一共 ${results.length} 组数据，走对 ${results.length - failed.length} 组。没走对的：`,
     ...failed
       .slice(0, MAX_FAILED)
       .map(
         (row) =>
-          `${row.name}：输入 ${oneLine(row.input)}；应该输出 ${oneLine(row.expected)}；` +
-          `图走出来输出 ${oneLine(row.output)}；系统看到的现象：${row.why}`,
+          `${row.name}：输入 ${oneLine(row.input)}；应该输出 ${oneLine(row.expected)}；` + `图走出来输出 ${oneLine(row.output)}；系统看到的现象：${row.why}`,
       ),
-    "",
-    answer
-      ? `老师的答案（${answer.language}）：\n${answer.code.slice(0, ANSWER_MAX)}`
-      : "这道题没有老师的答案，按题目要求判断。",
-  ].join("\n")
+    '',
+    answer ? `老师的答案（${answer.language}）：\n${answer.code.slice(0, ANSWER_MAX)}` : '这道题没有老师的答案，按题目要求判断。',
+  ].join('\n')
 }
 
 const CJK = /[一-龥]/
@@ -88,8 +82,8 @@ const CJK = /[一-龥]/
  * 整行没有中文、又带着代码标点的，基本只能是代码（同 services/hint-filter.ts 的判法）
  */
 function looksLikeCode(text: string) {
-  if (text.includes("```")) return true
-  return text.split("\n").some((line) => {
+  if (text.includes('```')) return true
+  return text.split('\n').some((line) => {
     const trimmed = line.trim()
     return trimmed.length >= 6 && !CJK.test(trimmed) && /[;=]|\w\s*\(/.test(trimmed)
   })
@@ -108,14 +102,12 @@ export interface FlowchartReview {
 export function parseReview(raw: string, texts: Map<string, string>): FlowchartReview | null {
   const data = asRecord(JSON.parse(raw))
   const named = (text: unknown) =>
-    (typeof text === "string" ? text.trim() : "")
-      .replace(/\s*\b(n\d+)\b\s*/g, (match, node: string) =>
-        texts.has(node) ? `「${texts.get(node)}」` : match,
-      )
+    (typeof text === 'string' ? text.trim() : '')
+      .replace(/\s*\b(n\d+)\b\s*/g, (match, node: string) => (texts.has(node) ? `「${texts.get(node)}」` : match))
       .slice(0, 300)
   const wrong = named(data.wrong)
   const fix = named(data.fix)
   if (!CJK.test(wrong) || !CJK.test(fix) || looksLikeCode(wrong) || looksLikeCode(fix)) return null
-  const at = typeof data.at === "string" && texts.has(data.at) ? data.at : null
+  const at = typeof data.at === 'string' && texts.has(data.at) ? data.at : null
   return { at, wrong, fix }
 }

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { ProfileOverview } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
+import type { ProfileOverview } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
 
 /** 同学看别人的主页时的「和你比」：两根条比做对几道，下面一句你们重合多少、你在本班第几 */
 const props = defineProps<{
-  versus: NonNullable<ProfileOverview["versus"]>
+  versus: NonNullable<ProfileOverview['versus']>
   /** 他做对几道 */
   theirs: number
 }>()
@@ -16,14 +16,9 @@ const top = computed(() => Math.max(props.theirs, props.versus.solved, 1))
 const line = computed(() => {
   const { solved, both, classRank } = props.versus
   const parts = []
-  if (solved)
-    parts.push(
-      both === solved
-        ? `你做对的 ${solved} 道对方都做对了`
-        : `你做对的 ${solved} 道里对方做对了 ${both} 道`,
-    )
+  if (solved) parts.push(both === solved ? `你做对的 ${solved} 道对方都做对了` : `你做对的 ${solved} 道里对方做对了 ${both} 道`)
   if (classRank) parts.push(`你在本班第 ${classRank.rank} 名`)
-  return parts.join(" · ")
+  return parts.join(' · ')
 })
 </script>
 
@@ -32,9 +27,7 @@ const line = computed(() => {
     <h3>和你比</h3>
     <div class="bar-row">
       <span class="who">对方</span>
-      <span class="lane"
-        ><span class="bar his" :style="{ width: `${(theirs / top) * 100}%` }"></span
-      ></span>
+      <span class="lane"><span class="bar his" :style="{ width: `${(theirs / top) * 100}%` }"></span></span>
       <b>{{ theirs }}</b>
     </div>
     <div class="bar-row">
@@ -54,9 +47,9 @@ const line = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -73,7 +66,7 @@ h3 {
 
 .who {
   width: 28px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .lane {
@@ -103,6 +96,6 @@ b {
 
 .meta {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

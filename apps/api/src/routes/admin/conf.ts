@@ -8,27 +8,27 @@ import {
   type OrphanTestCase,
   type UploadImageResponse,
   type WebsiteConfig,
-} from "@oj2/contract"
-import { randomInt } from "node:crypto"
-import { mkdir, readdir, rm, stat } from "node:fs/promises"
-import { resolve } from "node:path"
-import { count, countDistinct, desc, eq, gte, ilike, inArray, isNull, not, sql } from "drizzle-orm"
-import { Hono } from "hono"
+} from '@oj2/contract'
+import { randomInt } from 'node:crypto'
+import { mkdir, readdir, rm, stat } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { count, countDistinct, desc, eq, gte, ilike, inArray, isNull, not, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireAdmin, requireSuperAdmin, type AppEnv } from "../../auth/middleware"
-import { config } from "../../config"
-import { db, schema } from "../../db"
-import { publishConfigUpdate } from "../../events"
-import { failure, parseBody, success } from "../../http"
-import { sniffImageExtension } from "../../services/image"
-import { getWebsiteOptions } from "../../services/options"
-import { calendarDay, dayStart, localTime, termStart, weekStart } from "../../time"
-import { STUDENT_ROLES } from "@oj2/contract"
-import { TEACHER_ROLES } from "../helpers"
-import { onlineUserIds } from "../../auth/presence"
-import { JudgeStatus } from "../../judge/status"
-import { suggestActiveClass } from "../../services/class-activity"
-import { classPrefixCondition, queryInteger } from "../helpers"
+import { requireAdmin, requireSuperAdmin, type AppEnv } from '../../auth/middleware'
+import { config } from '../../config'
+import { db, schema } from '../../db'
+import { publishConfigUpdate } from '../../events'
+import { failure, parseBody, success } from '../../http'
+import { sniffImageExtension } from '../../services/image'
+import { getWebsiteOptions } from '../../services/options'
+import { calendarDay, dayStart, localTime, termStart, weekStart } from '../../time'
+import { STUDENT_ROLES } from '@oj2/contract'
+import { TEACHER_ROLES } from '../helpers'
+import { onlineUserIds } from '../../auth/presence'
+import { JudgeStatus } from '../../judge/status'
+import { suggestActiveClass } from '../../services/class-activity'
+import { classPrefixCondition, queryInteger } from '../helpers'
 
 export const adminConfRoutes = new Hono<AppEnv>()
 
@@ -53,13 +53,13 @@ function isAlive(lastHeartbeat: string) {
 
 /** camelCase 契约 ←→ options 表里的 snake_case key */
 const OPTION_KEYS = {
-  websiteName: "website_name",
-  allowRegister: "allow_register",
-  submissionListShowAll: "submission_list_show_all",
-  classList: "class_list",
+  websiteName: 'website_name',
+  allowRegister: 'allow_register',
+  submissionListShowAll: 'submission_list_show_all',
+  classList: 'class_list',
 } as const
 
-adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
+adminConfRoutes.get('/website', requireSuperAdmin, async (c) => {
   const options = await getWebsiteOptions()
   return success(c, {
     websiteName: options.website_name,
@@ -69,12 +69,10 @@ adminConfRoutes.get("/website", requireSuperAdmin, async (c) => {
   } satisfies WebsiteConfig)
 })
 
-adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
+adminConfRoutes.post('/website', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, updateWebsiteConfigRequestSchema)
   if (!parsed.success) return parsed.response
-  const entries = (Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]).map(
-    ([field, key]) => ({ field, key, value: parsed.data[field] }),
-  )
+  const entries = (Object.entries(OPTION_KEYS) as [keyof typeof OPTION_KEYS, string][]).map(([field, key]) => ({ field, key, value: parsed.data[field] }))
   // 8 个键一条 upsert 写完，不再一个键一次往返
   await db
     .insert(schema.optionsSysoptions)
@@ -95,11 +93,8 @@ adminConfRoutes.post("/website", requireSuperAdmin, async (c) => {
 
 // ---------------------------------------------------------------- 判题机
 
-adminConfRoutes.get("/judge-servers", requireSuperAdmin, async (c) => {
-  const rows = await db
-    .select()
-    .from(schema.judgeServer)
-    .orderBy(desc(schema.judgeServer.lastHeartbeat))
+adminConfRoutes.get('/judge-servers', requireSuperAdmin, async (c) => {
+  const rows = await db.select().from(schema.judgeServer).orderBy(desc(schema.judgeServer.lastHeartbeat))
   return success(c, {
     // 后台要显示 token 才能拿去配判题机。这个接口是超管专属的
     token: config.judgeServerToken,
@@ -107,35 +102,33 @@ adminConfRoutes.get("/judge-servers", requireSuperAdmin, async (c) => {
       (row) =>
         ({
           ...row,
-          status: isAlive(row.lastHeartbeat) ? "normal" : "abnormal",
+          status: isAlive(row.lastHeartbeat) ? 'normal' : 'abnormal',
         }) satisfies JudgeServer,
     ),
   } satisfies JudgeServerList)
 })
 
-adminConfRoutes.put("/judge-servers/:id", requireSuperAdmin, async (c) => {
-  const parsed = await parseBody(c, updateJudgeServerRequestSchema, "isDisabled is required")
+adminConfRoutes.put('/judge-servers/:id', requireSuperAdmin, async (c) => {
+  const parsed = await parseBody(c, updateJudgeServerRequestSchema, 'isDisabled is required')
   if (!parsed.success) return parsed.response
   const updated = await db
     .update(schema.judgeServer)
     .set({ isDisabled: parsed.data.isDisabled })
-    .where(eq(schema.judgeServer.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .where(eq(schema.judgeServer.id, queryInteger(c.req.param('id'), 0, { min: 1 })))
     .returning({ id: schema.judgeServer.id })
-  if (updated.length === 0)
-    return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
+  if (updated.length === 0) return failure(c, 404, 'judge-server-not-found', 'Judge server does not exist')
   // 旧后端在这里会 process_pending_task() 把积压的待判任务重新分发。
   // 新架构不需要：任务在 BullMQ 里排着，worker 恢复就自己接着消费，不存在「没有新提交
   // 就一直 waiting」那种情况 —— 那是旧的自研分发器才有的问题。
   return success(c, null)
 })
 
-adminConfRoutes.delete("/judge-servers/:hostname", requireSuperAdmin, async (c) => {
+adminConfRoutes.delete('/judge-servers/:hostname', requireSuperAdmin, async (c) => {
   const deleted = await db
     .delete(schema.judgeServer)
-    .where(eq(schema.judgeServer.hostname, c.req.param("hostname")))
+    .where(eq(schema.judgeServer.hostname, c.req.param('hostname')))
     .returning({ id: schema.judgeServer.id })
-  if (deleted.length === 0)
-    return failure(c, 404, "judge-server-not-found", "Judge server does not exist")
+  if (deleted.length === 0) return failure(c, 404, 'judge-server-not-found', 'Judge server does not exist')
   return success(c, null)
 })
 
@@ -153,7 +146,7 @@ async function orphanTestCaseIds() {
   return onDisk.filter((name) => TEST_CASE_ID_RE.test(name) && !referenced.has(name))
 }
 
-adminConfRoutes.get("/orphan-test-cases", requireSuperAdmin, async (c) => {
+adminConfRoutes.get('/orphan-test-cases', requireSuperAdmin, async (c) => {
   const ids = await orphanTestCaseIds()
   const rows = await Promise.all(
     ids.map(async (id) => {
@@ -167,14 +160,14 @@ adminConfRoutes.get("/orphan-test-cases", requireSuperAdmin, async (c) => {
   return success(c, rows)
 })
 
-adminConfRoutes.delete("/orphan-test-cases", requireSuperAdmin, async (c) => {
-  const requested = c.req.query("id")
+adminConfRoutes.delete('/orphan-test-cases', requireSuperAdmin, async (c) => {
+  const requested = c.req.query('id')
   const orphans = await orphanTestCaseIds()
   // 指定 id 时也必须先确认它确实是孤儿。否则一个手抖的 id 就能删掉在用题目的测试数据，
   // 而测试数据没有别处备份 —— 旧后端这里是不校验的。
   const targets = requested ? orphans.filter((id) => id === requested) : orphans
   if (requested && targets.length === 0) {
-    return failure(c, 404, "not-an-orphan", "该用例目录不存在或仍被题目引用，未删除")
+    return failure(c, 404, 'not-an-orphan', '该用例目录不存在或仍被题目引用，未删除')
   }
   for (const id of targets) {
     await rm(resolve(config.testCaseDirectory, id), {
@@ -189,7 +182,7 @@ adminConfRoutes.delete("/orphan-test-cases", requireSuperAdmin, async (c) => {
 
 /** 只认编辑器传上来的那几种。目录里别的东西（手工放进去的 mp4 之类）一律不碰 */
 const UPLOAD_IMAGE_RE = /^[\w-]+\.(?:png|jpe?g|gif|bmp)$/i
-const IMAGE_NAME_PATTERN = "([A-Za-z0-9_-]+\\.(?:png|jpe?g|gif|bmp))"
+const IMAGE_NAME_PATTERN = '([A-Za-z0-9_-]+\\.(?:png|jpe?g|gif|bmp))'
 /** 刚传的图可能还在编辑器里、题目还没保存，一天以内的不算 */
 const ORPHAN_IMAGE_GRACE_MS = 24 * 60 * 60 * 1000
 
@@ -265,25 +258,21 @@ async function orphanImages() {
         } satisfies OrphanImage
       }),
   )
-  return rows
-    .filter((row): row is OrphanImage => row !== null)
-    .sort((a, b) => b.createTime - a.createTime)
+  return rows.filter((row): row is OrphanImage => row !== null).sort((a, b) => b.createTime - a.createTime)
 }
 
-adminConfRoutes.get("/orphan-images", requireSuperAdmin, async (c) => {
+adminConfRoutes.get('/orphan-images', requireSuperAdmin, async (c) => {
   return success(c, await orphanImages())
 })
 
-adminConfRoutes.delete("/orphan-images", requireSuperAdmin, async (c) => {
-  const folder = c.req.query("folder")
-  const name = c.req.query("name")
+adminConfRoutes.delete('/orphan-images', requireSuperAdmin, async (c) => {
+  const folder = c.req.query('folder')
+  const name = c.req.query('name')
   // 删之前重新扫一遍：列表是刚才看的，这期间可能有人把图插回了题面、把头像换了回去
   const orphans = await orphanImages()
-  const targets = orphans.filter(
-    (image) => (!folder || image.folder === folder) && (!name || image.name === name),
-  )
+  const targets = orphans.filter((image) => (!folder || image.folder === folder) && (!name || image.name === name))
   if (name && targets.length === 0) {
-    return failure(c, 404, "not-an-orphan", "这张图片不存在或还有地方在用，未删除")
+    return failure(c, 404, 'not-an-orphan', '这张图片不存在或还有地方在用，未删除')
   }
   for (const image of targets) {
     await rm(resolve(IMAGE_FOLDERS[image.folder].directory, image.name), { force: true })
@@ -293,17 +282,14 @@ adminConfRoutes.delete("/orphan-images", requireSuperAdmin, async (c) => {
 
 // ---------------------------------------------------------------- 概览 / 随机点名
 
-adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
+adminConfRoutes.get('/dashboard', requireSuperAdmin, async (c) => {
   const now = new Date().toISOString()
   const [[users], [submissions], [contests], [servers], online, activeClass] = await Promise.all([
     db.select({ value: count() }).from(schema.user),
     db
       .select({
         value: count(),
-        systemErrors: sql<number>`count(*) filter (where ${eq(
-          schema.submission.result,
-          JudgeStatus.SYSTEM_ERROR,
-        )})`.mapWith(Number),
+        systemErrors: sql<number>`count(*) filter (where ${eq(schema.submission.result, JudgeStatus.SYSTEM_ERROR)})`.mapWith(Number),
       })
       .from(schema.submission)
       .where(gte(schema.submission.createTime, dayStart())),
@@ -311,56 +297,41 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
       .select({ value: count() })
       .from(schema.contest)
       .where(not(sql`${schema.contest.endTime} < ${now}`)),
-    db
-      .select({ value: count() })
-      .from(schema.judgeServer)
-      .where(gte(schema.judgeServer.lastHeartbeat, aliveSince())),
+    db.select({ value: count() }).from(schema.judgeServer).where(gte(schema.judgeServer.lastHeartbeat, aliveSince())),
     onlineUserIds(),
     suggestActiveClass(),
   ])
   const thirtyDaysAgo = dayStart(Date.now() - 29 * 86_400_000)
   const day = sql<string>`to_char(${localTime(schema.submission.createTime)}, 'YYYY-MM-DD')`
-  const [[roles], [problems], [subs], [contestTotal], [setTotal], [tutorialTotal], [week], daily] =
-    await Promise.all([
-      db
-        .select({
-          students: sql<number>`count(*) filter (where ${inArray(schema.user.adminType, [
-            ...STUDENT_ROLES,
-          ])})`.mapWith(Number),
-          teachers: sql<number>`count(*) filter (where ${inArray(schema.user.adminType, [
-            ...TEACHER_ROLES,
-          ])})`.mapWith(Number),
-        })
-        .from(schema.user),
-      db
-        .select({
-          total: count(),
-          visible: sql<number>`count(*) filter (where ${schema.problem.visible})`.mapWith(Number),
-        })
-        .from(schema.problem)
-        .where(isNull(schema.problem.contestId)),
-      db
-        .select({
-          total: count(),
-          term: sql<number>`count(*) filter (where ${gte(
-            schema.submission.createTime,
-            termStart(),
-          )})`.mapWith(Number),
-        })
-        .from(schema.submission),
-      db.select({ value: count() }).from(schema.contest),
-      db.select({ value: count() }).from(schema.problemset),
-      db.select({ value: count() }).from(schema.tutorial),
-      db
-        .select({ value: countDistinct(schema.submission.userId) })
-        .from(schema.submission)
-        .where(gte(schema.submission.createTime, weekStart())),
-      db
-        .select({ day, count: count() })
-        .from(schema.submission)
-        .where(gte(schema.submission.createTime, thirtyDaysAgo))
-        .groupBy(day),
-    ])
+  const [[roles], [problems], [subs], [contestTotal], [setTotal], [tutorialTotal], [week], daily] = await Promise.all([
+    db
+      .select({
+        students: sql<number>`count(*) filter (where ${inArray(schema.user.adminType, [...STUDENT_ROLES])})`.mapWith(Number),
+        teachers: sql<number>`count(*) filter (where ${inArray(schema.user.adminType, [...TEACHER_ROLES])})`.mapWith(Number),
+      })
+      .from(schema.user),
+    db
+      .select({
+        total: count(),
+        visible: sql<number>`count(*) filter (where ${schema.problem.visible})`.mapWith(Number),
+      })
+      .from(schema.problem)
+      .where(isNull(schema.problem.contestId)),
+    db
+      .select({
+        total: count(),
+        term: sql<number>`count(*) filter (where ${gte(schema.submission.createTime, termStart())})`.mapWith(Number),
+      })
+      .from(schema.submission),
+    db.select({ value: count() }).from(schema.contest),
+    db.select({ value: count() }).from(schema.problemset),
+    db.select({ value: count() }).from(schema.tutorial),
+    db
+      .select({ value: countDistinct(schema.submission.userId) })
+      .from(schema.submission)
+      .where(gte(schema.submission.createTime, weekStart())),
+    db.select({ day, count: count() }).from(schema.submission).where(gte(schema.submission.createTime, thirtyDaysAgo)).groupBy(day),
+  ])
   const byDay = new Map(daily.map((row) => [row.day, row.count]))
   const days = Array.from({ length: 30 }, (_, i) => calendarDay(Date.now() - (29 - i) * 86_400_000))
   // 旧接口还回了 env.FORCE_HTTPS / STATIC_CDN_HOST，前端从未读过，不再下发
@@ -388,12 +359,12 @@ adminConfRoutes.get("/dashboard", requireSuperAdmin, async (c) => {
   } satisfies DashboardInfo)
 })
 
-adminConfRoutes.get("/random-usernames", requireSuperAdmin, async (c) => {
+adminConfRoutes.get('/random-usernames', requireSuperAdmin, async (c) => {
   // 传的是**班级前缀**（形如 ks251），不是班级号 —— 前端输入框写的就是「班级前缀」，
   // 拿到结果后按这个前缀 split 取姓名。班级前缀走 classPrefixCondition（ks251 不带上
   // ks2511）；别的形状的输入照旧 istartswith，与旧接口一致
-  const classroom = c.req.query("classroom")?.trim()
-  if (!classroom) return failure(c, 400, "invalid-request", "需要班级号")
+  const classroom = c.req.query('classroom')?.trim()
+  if (!classroom) return failure(c, 400, 'invalid-request', '需要班级号')
   const rows = await db
     .select({ username: schema.user.username })
     .from(schema.user)
@@ -408,7 +379,7 @@ adminConfRoutes.get("/random-usernames", requireSuperAdmin, async (c) => {
 
 // ---------------------------------------------------------------- 富文本图片上传
 
-const IMAGE_SUFFIXES = [".gif", ".jpg", ".jpeg", ".bmp", ".png"]
+const IMAGE_SUFFIXES = ['.gif', '.jpg', '.jpeg', '.bmp', '.png']
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 /**
@@ -420,24 +391,24 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024
  * （admin/problem/detail.vue、admin/contest/detail.vue），收成超管专属会让教师和
  * 学生管理员插图直接 403。旧后端这里是**零装饰器**（匿名可传），那太松，取中间档。
  */
-adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
+adminConfRoutes.post('/upload-image', requireAdmin, async (c) => {
   const form = await c.req.formData().catch(() => null)
-  const image = form?.get("image")
+  const image = form?.get('image')
   if (!(image instanceof File)) {
     return success(c, {
       success: false,
-      msg: "Upload failed",
-      filePath: "",
+      msg: 'Upload failed',
+      filePath: '',
     } satisfies UploadImageResponse)
   }
   // 以文件头为准，扩展名只是第一道快速筛
-  const claimed = image.name.slice(image.name.lastIndexOf(".")).toLowerCase()
+  const claimed = image.name.slice(image.name.lastIndexOf('.')).toLowerCase()
   const suffix = IMAGE_SUFFIXES.includes(claimed) ? await sniffImageExtension(image) : null
   if (!suffix) {
     return success(c, {
       success: false,
-      msg: "Unsupported file format",
-      filePath: "",
+      msg: 'Unsupported file format',
+      filePath: '',
     } satisfies UploadImageResponse)
   }
   // 旧后端没有大小限制，靠 nginx 兜。这里显式限一道：文件写在本地磁盘上，
@@ -445,8 +416,8 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
   if (image.size > MAX_IMAGE_BYTES) {
     return success(c, {
       success: false,
-      msg: "图片不能超过 10MB",
-      filePath: "",
+      msg: '图片不能超过 10MB',
+      filePath: '',
     } satisfies UploadImageResponse)
   }
   // 文件名完全由服务端生成，不带用户提供的任何一段 —— 原名里的 ../ 或空字节都进不来
@@ -455,23 +426,20 @@ adminConfRoutes.post("/upload-image", requireAdmin, async (c) => {
     await mkdir(config.uploadDirectory, { recursive: true })
     await Bun.write(resolve(config.uploadDirectory, name), image)
   } catch (error) {
-    console.error("Failed to save uploaded image", error)
+    console.error('Failed to save uploaded image', error)
     return success(c, {
       success: false,
-      msg: "Upload Error",
-      filePath: "",
+      msg: 'Upload Error',
+      filePath: '',
     } satisfies UploadImageResponse)
   }
   return success(c, {
     success: true,
-    msg: "Success",
+    msg: 'Success',
     filePath: `${config.uploadUriPrefix}/${name}`,
   } satisfies UploadImageResponse)
 })
 
 function randomFileName() {
-  return Array.from(
-    { length: 10 },
-    () => "abcdefghijklmnopqrstuvwxyz0123456789"[randomInt(36)],
-  ).join("")
+  return Array.from({ length: 10 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[randomInt(36)]).join('')
 }

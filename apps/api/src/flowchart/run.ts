@@ -1,4 +1,4 @@
-import { inflateSync } from "node:zlib"
+import { inflateSync } from 'node:zlib'
 
 import {
   flowChildren,
@@ -9,28 +9,22 @@ import {
   type FlowchartUpdate,
   type FlowDoc,
   type FlowStep,
-} from "@oj2/contract"
-import { eq } from "drizzle-orm"
+} from '@oj2/contract'
+import { eq } from 'drizzle-orm'
 
-import { config } from "../config"
-import { db, schema } from "../db"
-import { publishFlowchartUpdate } from "../events"
-import { asRecord } from "../routes/helpers"
-import { completeChat } from "../services/ai"
-import { plainText } from "../services/hint-diagnosis"
-import { recordSolvedAndNotify } from "../services/problemset"
-import { runTrial } from "../judge/trial"
-import { flowchartCases, type FlowchartCase } from "./cases"
-import { buildProgram, describeDoc, flowBoxes, judgeCase, TRANSLATE_PROMPT } from "./program"
-import { gradeForCases, gradeForScore } from "./grade"
-import type { FlowchartJobData } from "./job"
-import {
-  flowchartAnswer,
-  parseReview,
-  REVIEW_PROMPT,
-  reviewInput,
-  type FlowchartReview,
-} from "./review"
+import { config } from '../config'
+import { db, schema } from '../db'
+import { publishFlowchartUpdate } from '../events'
+import { asRecord } from '../routes/helpers'
+import { completeChat } from '../services/ai'
+import { plainText } from '../services/hint-diagnosis'
+import { recordSolvedAndNotify } from '../services/problemset'
+import { runTrial } from '../judge/trial'
+import { flowchartCases, type FlowchartCase } from './cases'
+import { buildProgram, describeDoc, flowBoxes, judgeCase, TRANSLATE_PROMPT } from './program'
+import { gradeForCases, gradeForScore } from './grade'
+import type { FlowchartJobData } from './job'
+import { flowchartAnswer, parseReview, REVIEW_PROMPT, reviewInput, type FlowchartReview } from './review'
 
 type Problem = typeof schema.problem.$inferSelect
 
@@ -51,20 +45,18 @@ interface Evaluation {
  * node_9 这种学生看不到的编号。现在对不对由程序跑出来的输出决定，和模型的心情无关。
  */
 function problemBrief(problem: Problem, cases: FlowchartCase[]) {
-  const samples = cases.filter((item) => item.name.startsWith("例子")).slice(0, 3)
+  const samples = cases.filter((item) => item.name.startsWith('例子')).slice(0, 3)
   return [
     `题目：${problem.title}`,
     `描述：${plainText(problem.description).slice(0, 1500)}`,
-    `输入说明：${plainText(problem.inputDescription).slice(0, 400) || "无"}`,
-    `输出说明：${plainText(problem.outputDescription).slice(0, 400) || "无"}`,
+    `输入说明：${plainText(problem.inputDescription).slice(0, 400) || '无'}`,
+    `输出说明：${plainText(problem.outputDescription).slice(0, 400) || '无'}`,
     ...samples.map((item) => `${item.name}的输入：\n${item.input}`),
-  ].join("\n")
+  ].join('\n')
 }
 
 function translateInput(problem: Problem, doc: FlowDoc, cases: FlowchartCase[]) {
-  return [problemBrief(problem, cases), "", "<flowchart>", describeDoc(doc), "</flowchart>"].join(
-    "\n",
-  )
+  return [problemBrief(problem, cases), '', '<flowchart>', describeDoc(doc), '</flowchart>'].join('\n')
 }
 
 /** 没走对时的点评（见 review.ts）。出什么错都只是没有点评，评分照常落库 */
@@ -94,40 +86,30 @@ async function review(
 /** 交上来的结构树（压缩过的）；2026-10 之前的 vue-flow 格式读不出来，给 null */
 function flowDocOf(data: unknown): FlowDoc | null {
   const record = asRecord(data)
-  if (typeof record.data !== "string") return null
+  if (typeof record.data !== 'string') return null
   try {
-    return parseFlowDoc(
-      JSON.parse(inflateSync(Buffer.from(record.data, "base64")).toString("utf8")),
-    )
+    return parseFlowDoc(JSON.parse(inflateSync(Buffer.from(record.data, 'base64')).toString('utf8')))
   } catch {
     return null
   }
 }
 
-async function evaluateByRunning(
-  problem: Problem,
-  submission: typeof schema.flowchartSubmission.$inferSelect,
-): Promise<Evaluation | null> {
+async function evaluateByRunning(problem: Problem, submission: typeof schema.flowchartSubmission.$inferSelect): Promise<Evaluation | null> {
   const doc = flowDocOf(submission.flowchartData)
   if (!doc) return null
   const cases = await flowchartCases(problem)
   if (!cases.length) return null
 
-  const reply = asRecord(
-    JSON.parse(
-      await completeChat(TRANSLATE_PROMPT, translateInput(problem, doc, cases), { json: true }),
-    ),
-  )
+  const reply = asRecord(JSON.parse(await completeChat(TRANSLATE_PROMPT, translateInput(problem, doc, cases), { json: true })))
   const boxes = asRecord(reply.boxes)
   const code: Record<string, string | null> = {}
-  for (const [node, value] of Object.entries(boxes))
-    code[node] = typeof value === "string" ? value : null
-  const style = typeof reply.style === "string" ? reply.style.trim() : ""
+  for (const [node, value] of Object.entries(boxes)) code[node] = typeof value === 'string' ? value : null
+  const style = typeof reply.style === 'string' ? reply.style.trim() : ''
 
   const { order, nodeOf } = flowBoxes(doc)
   const texts = new Map<string, string>([
-    ["n0", "开始"],
-    [`n${order.length - 1}`, "结束"],
+    ['n0', '开始'],
+    [`n${order.length - 1}`, '结束'],
   ])
   const walk = (steps: FlowStep[]) => {
     for (const step of steps) {
@@ -140,7 +122,7 @@ async function evaluateByRunning(
   const { source, nodeAtLine } = buildProgram(doc, code)
   const run = await runTrial({
     userId: submission.userId,
-    language: "Python",
+    language: 'Python',
     source,
     code: source,
     prependLines: 0,
@@ -149,25 +131,25 @@ async function evaluateByRunning(
     cases: cases.map((item) => ({ input: item.input, output: item.expected })),
     fullOutput: true,
     // 后台评分，别和学生「运行例子」抢交互池的名额
-    pool: "judge",
+    pool: 'judge',
   })
 
   let results: FlowchartCaseResult[]
-  if (run.status === "done") {
+  if (run.status === 'done') {
     results = cases.map((item, index) => judgeCase(item, run.cases[index] ?? null, texts))
   } else {
     // 整段程序没跑起来：AI 翻出来的某一句语法不对（多半是框里的字太含糊），或者输出停不下来
-    const line = run.status === "compile-error" ? Number(run.message.match(/line (\d+)/)?.[1]) : NaN
+    const line = run.status === 'compile-error' ? Number(run.message.match(/line (\d+)/)?.[1]) : NaN
     const node = Number.isFinite(line) ? nodeAtLine(line) : null
     const why =
-      run.status === "compile-error"
-        ? `「${(node && texts.get(node)) || "有一个框"}」这一步写得看不明白，换个说法写清楚`
-        : "走不到结束：一直在循环里出不来。看看循环的条件，循环里有没有让条件变化的那一步"
+      run.status === 'compile-error'
+        ? `「${(node && texts.get(node)) || '有一个框'}」这一步写得看不明白，换个说法写清楚`
+        : '走不到结束：一直在循环里出不来。看看循环的条件，循环里有没有让条件变化的那一步'
     results = cases.map((item) => ({
       name: item.name,
       input: item.input,
       expected: item.expected,
-      output: "",
+      output: '',
       ok: false,
       path: [],
       wrongAt: node,
@@ -176,10 +158,9 @@ async function evaluateByRunning(
   }
 
   const passed = results.filter((row) => row.ok).length
-  const grade = gradeForCases(passed, results.length, style !== "")
+  const grade = gradeForCases(passed, results.length, style !== '')
   // 全对时「还可以更好」用翻译那一步顺带给的写法建议；没全对才另外点评「错在哪、怎么改」
-  const advice =
-    passed < results.length ? await review(problem, doc, cases, code, results, texts) : null
+  const advice = passed < results.length ? await review(problem, doc, cases, code, results, texts) : null
   const report: FlowchartCaseReport = {
     version: 2,
     passed,
@@ -189,10 +170,10 @@ async function evaluateByRunning(
   }
   return {
     // 分数只给统计和老的列表用：没全对时是走对的比例，全对时 A 90、S 100
-    score: grade === "S" ? 100 : grade === "A" ? 90 : Math.round((passed / results.length) * 100),
+    score: grade === 'S' ? 100 : grade === 'A' ? 90 : Math.round((passed / results.length) * 100),
     grade,
-    feedback: advice?.wrong ?? "",
-    suggestions: passed === results.length ? style : (advice?.fix ?? ""),
+    feedback: advice?.wrong ?? '',
+    suggestions: passed === results.length ? style : (advice?.fix ?? ''),
     criteria: { ...report },
   }
 }
@@ -221,14 +202,14 @@ function normalizeCriteria(raw: unknown) {
   return Object.fromEntries(
     Object.entries(asRecord(raw)).map(([key, value]) => {
       const item = asRecord(value)
-      const score = typeof value === "number" ? value : Number(item.score)
+      const score = typeof value === 'number' ? value : Number(item.score)
       const max = Number(item.max)
       return [
         key,
         {
           score: Number.isFinite(score) ? score : 0,
           max: Number.isFinite(max) && max > 0 ? max : (CRITERIA_MAX[key] ?? 100),
-          comment: typeof item.comment === "string" ? item.comment : "",
+          comment: typeof item.comment === 'string' ? item.comment : '',
         },
       ]
     }),
@@ -238,41 +219,29 @@ function normalizeCriteria(raw: unknown) {
 function parseEvaluation(value: string): Evaluation {
   const block = value.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]
   const json = block ?? value.match(/\{[\s\S]*\}/)?.[0]
-  if (!json) throw new Error("AI response did not contain JSON")
+  if (!json) throw new Error('AI response did not contain JSON')
   const data = JSON.parse(json) as Record<string, unknown>
-  if (typeof data.score !== "number" || Number.isNaN(data.score))
-    throw new Error("AI response is missing score")
+  if (typeof data.score !== 'number' || Number.isNaN(data.score)) throw new Error('AI response is missing score')
   const score = Math.max(0, Math.min(100, data.score))
   return {
     score,
     grade: gradeForScore(score),
-    feedback: typeof data.feedback === "string" ? data.feedback : "",
-    suggestions: typeof data.suggestions === "string" ? data.suggestions : "",
+    feedback: typeof data.feedback === 'string' ? data.feedback : '',
+    suggestions: typeof data.suggestions === 'string' ? data.suggestions : '',
     criteria: normalizeCriteria(data.criteria_details),
   }
 }
 
-async function evaluate(
-  problem: Problem,
-  submission: typeof schema.flowchartSubmission.$inferSelect,
-): Promise<Evaluation> {
+async function evaluate(problem: Problem, submission: typeof schema.flowchartSubmission.$inferSelect): Promise<Evaluation> {
   const byRunning = await evaluateByRunning(problem, submission)
   if (byRunning) return byRunning
-  const reference = problem.mermaidCode
-    ? `\n标准答案参考：\n${problem.mermaidCode}`
-    : "\n此题没有标准流程图。"
+  const reference = problem.mermaidCode ? `\n标准答案参考：\n${problem.mermaidCode}` : '\n此题没有标准流程图。'
   return parseEvaluation(
-    await completeChat(
-      evaluationPrompt(problem),
-      `学生流程图：\n${submission.mermaidCode}${reference}\n设计提示：${problem.flowchartHint ?? "无"}`,
-    ),
+    await completeChat(evaluationPrompt(problem), `学生流程图：\n${submission.mermaidCode}${reference}\n设计提示：${problem.flowchartHint ?? '无'}`),
   )
 }
 
-export async function evaluateFlowchart(
-  job: FlowchartJobData,
-  { isFinalAttempt = true }: { isFinalAttempt?: boolean } = {},
-) {
+export async function evaluateFlowchart(job: FlowchartJobData, { isFinalAttempt = true }: { isFinalAttempt?: boolean } = {}) {
   const [row] = await db
     .select({ flowchart: schema.flowchartSubmission, problem: schema.problem })
     .from(schema.flowchartSubmission)
@@ -280,10 +249,7 @@ export async function evaluateFlowchart(
     .where(eq(schema.flowchartSubmission.id, job.submissionId))
     .limit(1)
   if (!row || ![0, 1].includes(row.flowchart.status)) return
-  await db
-    .update(schema.flowchartSubmission)
-    .set({ status: 1 })
-    .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+  await db.update(schema.flowchartSubmission).set({ status: 1 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
   const started = performance.now()
   try {
     const result = await evaluate(row.problem, row.flowchart)
@@ -309,7 +275,7 @@ export async function evaluateFlowchart(
       await recordSolvedAndNotify(row.flowchart.userId, row.problem.id, new Date().toISOString())
     }
     await publishFlowchartUpdate(row.flowchart.userId, {
-      type: "flowchart_evaluation_completed",
+      type: 'flowchart_evaluation_completed',
       submissionId: row.flowchart.id,
       score: result.score,
       grade: result.grade,
@@ -327,12 +293,9 @@ export async function evaluateFlowchart(
     // 一旦提前写成 3，队列配的 attempts: 3 就成了摆设 —— 后两次尝试进来什么都不做
     // 就算成功，AI 侧的偶发失败（限流、超时、网络抖动）永远等不到重试。
     if (!isFinalAttempt) throw error
-    await db
-      .update(schema.flowchartSubmission)
-      .set({ status: 3 })
-      .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
+    await db.update(schema.flowchartSubmission).set({ status: 3 }).where(eq(schema.flowchartSubmission.id, row.flowchart.id))
     await publishFlowchartUpdate(row.flowchart.userId, {
-      type: "flowchart_evaluation_failed",
+      type: 'flowchart_evaluation_failed',
       submissionId: row.flowchart.id,
     } satisfies FlowchartUpdate)
     throw error

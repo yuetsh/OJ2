@@ -1,6 +1,6 @@
-import { HINT_LEVEL_COMPILE } from "@oj2/contract"
+import { HINT_LEVEL_COMPILE } from '@oj2/contract'
 
-import { completeChat } from "./ai"
+import { completeChat } from './ai'
 
 /**
  * 提示的**输出后过滤**（AI 时代 OJ 设计 2.5 / 2.6）。
@@ -52,12 +52,12 @@ const KEY_LINES_MAX = 2
 /** 兜底话术：两次都被拦时发它，`content` 存的就是这句，不是模型的输出 */
 const FALLBACK: Record<number, string> = {
   [HINT_LEVEL_COMPILE]:
-    "这次没能给出有效的提示。编译报错的第一行通常就写着出错的行号，先跳到那一行，再往上看一两行 —— 漏分号、括号不配对，报错点往往在真正出错的下一行。",
-  0: "这次没能给出有效的提示。先别急着改代码，问自己三个问题：这题的输入一共有几个数？每一步我想算的是什么？我的程序在哪种情况下会算得不对？",
-  1: "这次没能给出有效的提示。把你的代码分成「读入、计算、输出」三段，一段一段对着题目要求核一遍，先找出是哪一段没按题目说的做。",
-  2: "这次没能给出有效的提示。想一想这道题主要用到哪个知识点，把教程里对应的那一节再看一遍，然后带着它回来读自己的代码。",
-  3: "这次没能给出有效的提示。先不看代码，用中文把解题步骤一条一条写在纸上：读入什么、每一步算什么、最后输出什么。写完再对照你的程序，看是哪一步没有写出来。",
-  4: "这次没能给出有效的提示。挑一组最简单的输入，拿纸笔把你的程序一行一行走一遍，记下每个变量的值，和你心里算出来的答案对照，第一个对不上的地方就是要改的那一行。",
+    '这次没能给出有效的提示。编译报错的第一行通常就写着出错的行号，先跳到那一行，再往上看一两行 —— 漏分号、括号不配对，报错点往往在真正出错的下一行。',
+  0: '这次没能给出有效的提示。先别急着改代码，问自己三个问题：这题的输入一共有几个数？每一步我想算的是什么？我的程序在哪种情况下会算得不对？',
+  1: '这次没能给出有效的提示。把你的代码分成「读入、计算、输出」三段，一段一段对着题目要求核一遍，先找出是哪一段没按题目说的做。',
+  2: '这次没能给出有效的提示。想一想这道题主要用到哪个知识点，把教程里对应的那一节再看一遍，然后带着它回来读自己的代码。',
+  3: '这次没能给出有效的提示。先不看代码，用中文把解题步骤一条一条写在纸上：读入什么、每一步算什么、最后输出什么。写完再对照你的程序，看是哪一步没有写出来。',
+  4: '这次没能给出有效的提示。挑一组最简单的输入，拿纸笔把你的程序一行一行走一遍，记下每个变量的值，和你心里算出来的答案对照，第一个对不上的地方就是要改的那一行。',
 }
 
 function fallbackText(level: number) {
@@ -67,8 +67,8 @@ function fallbackText(level: number) {
 /** 标准答案里值得比对的行（去掉空白，短行不算） */
 function answerLines(code: string) {
   return code
-    .split("\n")
-    .map((line) => line.replace(/\s+/g, ""))
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ''))
     .filter((line) => line.length >= ANSWER_LINE_MIN)
 }
 
@@ -87,7 +87,7 @@ function looksLikeCode(line: string) {
 function keyLineCount(text: string) {
   let count = 0
   let fenced = false
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     if (/^\s*```/.test(line)) {
       fenced = !fenced
       continue
@@ -110,27 +110,23 @@ function keyLineCount(text: string) {
  * 这段内容违规了没有：返回违规原因，通过就是 null。
  * `referenceCode` 是标准答案，没有就跳过重合那一条。
  */
-export function hintFilterReason(
-  content: string,
-  level: number,
-  referenceCode: string | null,
-): string | null {
+export function hintFilterReason(content: string, level: number, referenceCode: string | null): string | null {
   const text = content.trim()
-  if (!text) return "空回复"
+  if (!text) return '空回复'
   if (level === KEY_LINE_LEVEL) {
     const lines = keyLineCount(text)
     if (lines > KEY_LINES_MAX) return `代码 ${lines} 行，超过 ${KEY_LINES_MAX} 行`
   } else if (level !== HINT_LEVEL_COMPILE) {
-    if (/```/.test(text)) return "出现代码块"
+    if (/```/.test(text)) return '出现代码块'
     const inline = text.match(/`([^`\n]+)`/g) ?? []
-    if (inline.some((item) => item.length - 2 > INLINE_CODE_MAX)) return "行内代码过长"
+    if (inline.some((item) => item.length - 2 > INLINE_CODE_MAX)) return '行内代码过长'
     // 围栏里的代码已经被上面拦掉了，这里找的是摊平进正文的
-    const bare = text.split("\n").filter(looksLikeCode)
+    const bare = text.split('\n').filter(looksLikeCode)
     if (bare.length) return `正文里出现代码：${bare[0]!.trim().slice(0, 60)}`
-    if (level === 0 && !/[?？]/.test(text)) return "L0 没有一句问句"
+    if (level === 0 && !/[?？]/.test(text)) return 'L0 没有一句问句'
   }
   if (referenceCode) {
-    const flat = text.replace(/\s+/g, "")
+    const flat = text.replace(/\s+/g, '')
     const hits = new Set(answerLines(referenceCode).filter((line) => flat.includes(line)))
     if (hits.size >= ANSWER_LINE_HITS) return `和标准答案重合 ${hits.size} 行`
   }
@@ -161,10 +157,10 @@ export interface FilteredHint {
 function retrySystem(system: string, reason: string, level: number) {
   const demand =
     level === HINT_LEVEL_COMPILE
-      ? "重写一遍，只讲怎么看报错、怎么定位到出错的那一行，不要把标准答案的内容搬进来。"
+      ? '重写一遍，只讲怎么看报错、怎么定位到出错的那一行，不要把标准答案的内容搬进来。'
       : level === KEY_LINE_LEVEL
         ? `重写一遍，代码加起来最多 ${KEY_LINES_MAX} 行，只给最关键的那一处，其余用文字说明，不要给出整段代码。`
-        : "重写一遍，务必守住上面的限制：不要出现任何代码或代码块，不要把代码摊平写在正文里。"
+        : '重写一遍，务必守住上面的限制：不要出现任何代码或代码块，不要把代码摊平写在正文里。'
   return `${system}\n\n上一次的回答被判为违规（${reason}），已经作废。${demand}`
 }
 
@@ -174,12 +170,7 @@ function retrySystem(system: string, reason: string, level: number) {
  * 第一次调用抛错就往外抛（学生什么都没拿到，该走「AI 提示生成失败」那条路）；
  * **重生成**那次抛错则退回兜底话术 —— 手里已经有一段违规内容，让学生空手而归更糟。
  */
-export async function generateFilteredHint(options: {
-  system: string
-  prompt: string
-  level: number
-  referenceCode: string | null
-}): Promise<FilteredHint> {
+export async function generateFilteredHint(options: { system: string; prompt: string; level: number; referenceCode: string | null }): Promise<FilteredHint> {
   const { system, prompt, level, referenceCode } = options
   const first = (await completeChat(system, prompt)).trim()
   const firstReason = hintFilterReason(first, level, referenceCode)

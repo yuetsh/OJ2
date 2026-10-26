@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import Markdown from "shared/components/Markdown.vue"
-import type { LessonSegment } from "../composables/useLessonParse"
-import CodeRunBlock from "./CodeRunBlock.vue"
+import Markdown from 'shared/components/Markdown.vue'
+import type { LessonSegment } from '../composables/useLessonParse'
+import CodeRunBlock from './CodeRunBlock.vue'
 
-const ExerciseWidget = defineAsyncComponent(() => import("./ExerciseWidget.vue"))
+const ExerciseWidget = defineAsyncComponent(() => import('./ExerciseWidget.vue'))
 
 /** 一课的正文：按 useLessonParse 拆好的段落逐段渲染 */
 defineProps<{
   segments: LessonSegment[]
-  lang: "python" | "c"
+  lang: 'python' | 'c'
   tutorialId: number
   exerciseCount: number
   solvedIds: Set<number>
@@ -18,11 +18,11 @@ const emit = defineEmits<{ solved: [exerciseId: number] }>()
 /** 学习目标那几行只有行内的 **加粗** 和 `代码`，先转义再换成标签，别为它拉一整个 Markdown 渲染 */
 function inline(text: string) {
   return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
     .replace(/`([^`]+)`/g, '<code class="ic">$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
 }
 </script>
 
@@ -35,13 +35,7 @@ function inline(text: string) {
         <div class="goals-title">学完这课你能</div>
         <div v-for="item in seg.items" :key="item">· <span v-html="inline(item)" /></div>
       </div>
-      <CodeRunBlock
-        v-else-if="seg.type === 'code'"
-        :code="seg.code"
-        :lang="seg.lang"
-        :wrap-main="seg.wrapMain"
-        :tutorial-id="tutorialId"
-      />
+      <CodeRunBlock v-else-if="seg.type === 'code'" :code="seg.code" :lang="seg.lang" :wrap-main="seg.wrapMain" :tutorial-id="tutorialId" />
       <ExerciseWidget
         v-else
         :exercise="seg.exercise"

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
+import { Icon } from '@iconify/vue'
 
 /** 练一练判完的那一行：对了绿色打勾，错了红字。原来是 n-alert 一整块色条，比题目还抢眼 */
-defineProps<{ type: "success" | "warning" | "error"; title: string }>()
+defineProps<{ type: 'success' | 'warning' | 'error'; title: string }>()
 </script>
 
 <template>

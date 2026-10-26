@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { FlowchartSubmissionStatus } from "utils/types"
-import { useTone, type Tone } from "shared/composables/tone"
+import { FlowchartSubmissionStatus } from 'utils/types'
+import { useTone, type Tone } from 'shared/composables/tone'
 
 /**
  * 流程图提交在列表里的那个胶囊：评完的直接是「A 级」，没评完的是
@@ -13,19 +13,19 @@ const props = defineProps<{
 
 const tone = useTone()
 
-const GRADE_TONE: Record<string, Tone> = { S: "success", A: "info", B: "warning", C: "error" }
+const GRADE_TONE: Record<string, Tone> = { S: 'success', A: 'info', B: 'warning', C: 'error' }
 
 const view = computed(() => {
   if (props.status === FlowchartSubmissionStatus.COMPLETED && props.grade) {
-    return { tone: GRADE_TONE[props.grade] ?? "default", grade: props.grade, text: "" }
+    return { tone: GRADE_TONE[props.grade] ?? 'default', grade: props.grade, text: '' }
   }
   if (props.status === FlowchartSubmissionStatus.FAILED) {
-    return { tone: "error" as const, grade: "", text: "评分失败" }
+    return { tone: 'error' as const, grade: '', text: '评分失败' }
   }
   if (props.status === FlowchartSubmissionStatus.PROCESSING) {
-    return { tone: "info" as const, grade: "", text: "评分中" }
+    return { tone: 'info' as const, grade: '', text: '评分中' }
   }
-  return { tone: "default" as const, grade: "", text: "排队中" }
+  return { tone: 'default' as const, grade: '', text: '排队中' }
 })
 
 const colors = computed(() => tone(view.value.tone))

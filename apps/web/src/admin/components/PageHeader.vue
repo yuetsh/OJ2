@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { RouteLocationRaw } from "vue-router"
+import { Icon } from '@iconify/vue'
+import type { RouteLocationRaw } from 'vue-router'
 
 /**
  * 后台每一页顶上的那一块：标题行（返回 · 标题 · 标签 ········ 操作按钮），

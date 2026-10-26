@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { NSwitch, useThemeVars } from "naive-ui"
-import { RouterLink } from "vue-router"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useDarkTransition } from "shared/composables/darkTransition"
-import { useAuthModalStore } from "shared/store/authModal"
-import { useCollabStore } from "shared/store/collab"
-import { useConfigStore } from "../store/config"
-import { useUserStore } from "../store/user"
-import HelpButton from "./HelpButton.vue"
-import ProblemJumpBox from "./ProblemJumpBox.vue"
+import { Icon } from '@iconify/vue'
+import { NSwitch, useThemeVars } from 'naive-ui'
+import { RouterLink } from 'vue-router'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useDarkTransition } from 'shared/composables/darkTransition'
+import { useAuthModalStore } from 'shared/store/authModal'
+import { useCollabStore } from 'shared/store/collab'
+import { useConfigStore } from '../store/config'
+import { useUserStore } from '../store/user'
+import HelpButton from './HelpButton.vue'
+import ProblemJumpBox from './ProblemJumpBox.vue'
 
 const userStore = useUserStore()
 const configStore = useConfigStore()
@@ -26,12 +26,12 @@ const theme = useThemeVars()
  * 1280 以下（老师的笔记本）收一收：题号框变窄、「课堂看板」只留图标。
  * 机房的两种屏是 1280 和 1366，都走完整那版 —— 老师也会用机房的电脑。
  */
-const compact = useMediaQuery("(max-width: 1279px)")
+const compact = useMediaQuery('(max-width: 1279px)')
 // 再窄（769–1023，很少见）一行放不下老师那版，允许折行，只保证不坏
-const narrow = useMediaQuery("(max-width: 1023px)")
+const narrow = useMediaQuery('(max-width: 1023px)')
 
 const tone = computed(() => ({
-  activeBg: isDark.value ? "rgba(99, 226, 183, 0.14)" : "#e7f5ed",
+  activeBg: isDark.value ? 'rgba(99, 226, 183, 0.14)' : '#e7f5ed',
   activeText: isDark.value ? theme.value.primaryColor : theme.value.primaryColorPressed,
 }))
 
@@ -43,31 +43,31 @@ const tone = computed(() => ({
  * 投屏完忘了退，第二天纳闷后台入口怎么没了。
  */
 const envVersion = computed(() => {
-  if (import.meta.env.PUBLIC_ENV === "test") {
-    return "测试版"
-  } else if (import.meta.env.PUBLIC_ENV === "dev") {
-    return "开发版"
+  if (import.meta.env.PUBLIC_ENV === 'test') {
+    return '测试版'
+  } else if (import.meta.env.PUBLIC_ENV === 'dev') {
+    return '开发版'
   }
-  return ""
+  return ''
 })
 
 // 一级路径就是菜单 key，对不上的页面（/user、/achievement 等）
 // 自然没有一项亮着。根路径没登录时就是题目列表，登录了是个人首页，不亮任何一项
-const active = computed(() => route.path.split("/")[1] || (userStore.isAuthed ? "" : "problem"))
+const active = computed(() => route.path.split('/')[1] || (userStore.isAuthed ? '' : 'problem'))
 
 async function handleLogout() {
   await userStore.signOut()
   // 整页跳转而不是 router.replace：AI 分析、学情小结这些 store 还装着这个人的数据，
   // 机房下一个学生坐下来就能看到。重载一次把内存清干净，比挨个 reset 可靠。
-  window.location.replace("/")
+  window.location.replace('/')
 }
 
 function handleToggleDemoMode() {
   const entering = !userStore.demoMode
   userStore.toggleDemoMode()
   // 进入演示模式时若正停在后台页面，当前界面已经失去权限，必须主动退出去
-  if (entering && route.path.startsWith("/admin")) {
-    router.push("/")
+  if (entering && route.path.startsWith('/admin')) {
+    router.push('/')
   }
 }
 
@@ -93,26 +93,24 @@ interface NavLink {
 
 const navLinks = computed<NavLink[]>(() =>
   [
-    { key: "learn", label: "自学", to: "/learn" },
-    { key: "problem", label: "题目", to: "/problem" },
-    { key: "submission", label: "提交", to: "/submission", show: userStore.showSubmissions },
-    { key: "problemset", label: "题单", to: "/problemset" },
-    { key: "contest", label: "比赛", to: "/contest" },
-    { key: "rank", label: "排名", to: "/rank" },
-    { key: "announcement", label: "公告", to: "/announcement" },
+    { key: 'learn', label: '自学', to: '/learn' },
+    { key: 'problem', label: '题目', to: '/problem' },
+    { key: 'submission', label: '提交', to: '/submission', show: userStore.showSubmissions },
+    { key: 'problemset', label: '题单', to: '/problemset' },
+    { key: 'contest', label: '比赛', to: '/contest' },
+    { key: 'rank', label: '排名', to: '/rank' },
+    { key: 'announcement', label: '公告', to: '/announcement' },
   ].filter((link) => link.show !== false),
 )
 
-const mobileMenus = computed<DropdownOption[]>(() =>
-  navLinks.value.map((link) => ({ label: link.label, key: link.key })),
-)
+const mobileMenus = computed<DropdownOption[]>(() => navLinks.value.map((link) => ({ label: link.label, key: link.key })))
 
 function handleNavSelect(key: string) {
   const link = navLinks.value.find((item) => item.key === key)
   if (link) router.push(link.to)
 }
 
-const adminPath = computed(() => (userStore.isSuperAdmin ? "/admin" : "/admin/problem/list"))
+const adminPath = computed(() => (userStore.isSuperAdmin ? '/admin' : '/admin/problem/list'))
 
 /**
  * 暗色开关放进个人菜单：顶栏右边留给老师的课堂工具。整行可点，开关只是显示状态
@@ -120,24 +118,24 @@ const adminPath = computed(() => (userStore.isSuperAdmin ? "/admin" : "/admin/pr
  */
 function renderThemeRow() {
   return h(
-    "div",
+    'div',
     {
-      class: "theme-row",
-      role: "switch",
-      "aria-checked": isDark.value,
+      class: 'theme-row',
+      role: 'switch',
+      'aria-checked': isDark.value,
       tabindex: 0,
       onClick: toggleDark,
       onKeydown: (event: KeyboardEvent) => {
-        if (event.key === "Enter" || event.key === " ") {
+        if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           ;(event.currentTarget as HTMLElement).click()
         }
       },
     },
     [
-      h(Icon, { icon: "ph:moon", width: 18 }),
-      h("span", { class: "theme-label" }, "暗色"),
-      h(NSwitch, { value: isDark.value, size: "small", style: "pointer-events: none" }),
+      h(Icon, { icon: 'ph:moon', width: 18 }),
+      h('span', { class: 'theme-label' }, '暗色'),
+      h(NSwitch, { value: isDark.value, size: 'small', style: 'pointer-events: none' }),
     ],
   )
 }
@@ -150,51 +148,51 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
   const work = userStore.isAdminRole || userStore.canToggleDemoMode
   return [
     {
-      label: "进入后台",
-      key: "admin",
+      label: '进入后台',
+      key: 'admin',
       show: userStore.isAdminRole,
-      icon: renderIcon("ph:toolbox"),
+      icon: renderIcon('ph:toolbox'),
       props: { onClick: () => router.push(adminPath.value) },
     },
     {
-      label: userStore.demoMode ? "退出演示" : "进入演示",
-      key: "demo-mode",
+      label: userStore.demoMode ? '退出演示' : '进入演示',
+      key: 'demo-mode',
       show: userStore.canToggleDemoMode,
-      icon: renderIcon("ph:presentation"),
+      icon: renderIcon('ph:presentation'),
       props: { onClick: handleToggleDemoMode },
     },
-    { type: "divider", key: "work-divider", show: work },
+    { type: 'divider', key: 'work-divider', show: work },
     {
-      label: "我的主页",
-      key: "home",
-      icon: renderIcon("ph:house"),
-      props: { onClick: () => router.push("/user") },
+      label: '我的主页',
+      key: 'home',
+      icon: renderIcon('ph:house'),
+      props: { onClick: () => router.push('/user') },
     },
     {
-      label: "我的成就",
-      key: "achievement",
-      icon: renderIcon("ph:medal"),
-      props: { onClick: () => router.push("/achievement") },
+      label: '我的成就',
+      key: 'achievement',
+      icon: renderIcon('ph:medal'),
+      props: { onClick: () => router.push('/achievement') },
     },
     {
-      label: "我的提交",
-      key: "status",
-      icon: renderIcon("ph:list-checks"),
-      props: { onClick: () => router.push("/submission?myself=1") },
+      label: '我的提交',
+      key: 'status',
+      icon: renderIcon('ph:list-checks'),
+      props: { onClick: () => router.push('/submission?myself=1') },
     },
     {
-      label: "智能分析",
-      key: "ai-analysis",
-      icon: renderIcon("ph:sparkle"),
-      props: { onClick: () => router.push("/ai-analysis") },
+      label: '智能分析',
+      key: 'ai-analysis',
+      icon: renderIcon('ph:sparkle'),
+      props: { onClick: () => router.push('/ai-analysis') },
     },
-    { type: "divider", key: "theme-divider" },
-    { type: "render", key: "theme", render: renderThemeRow },
-    { type: "divider", key: "logout-divider" },
+    { type: 'divider', key: 'theme-divider' },
+    { type: 'render', key: 'theme', render: renderThemeRow },
+    { type: 'divider', key: 'logout-divider' },
     {
-      label: "退出",
-      key: "logout",
-      icon: renderIcon("ph:sign-out"),
+      label: '退出',
+      key: 'logout',
+      icon: renderIcon('ph:sign-out'),
       props: { onClick: handleLogout },
     },
   ]
@@ -207,18 +205,10 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       <Icon icon="streamline-emojis:dog" :height="26"></Icon>
       <span>{{ configStore.config?.websiteName }}</span>
       <n-tag v-if="envVersion" size="small" :bordered="false">{{ envVersion }}</n-tag>
-      <n-tag v-if="userStore.demoMode" size="small" :bordered="false" type="warning">
-        演示中
-      </n-tag>
+      <n-tag v-if="userStore.demoMode" size="small" :bordered="false" type="warning"> 演示中 </n-tag>
     </RouterLink>
     <nav v-if="isDesktop" class="nav">
-      <RouterLink
-        v-for="link in navLinks"
-        :key="link.key"
-        :to="link.to"
-        class="nav-link"
-        :class="{ active: active === link.key }"
-      >
+      <RouterLink v-for="link in navLinks" :key="link.key" :to="link.to" class="nav-link" :class="{ active: active === link.key }">
         {{ link.label }}
       </RouterLink>
     </nav>
@@ -252,21 +242,9 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
         </n-dropdown>
         <template v-else>
           <n-button secondary type="primary" @click="authStore.openLoginModal()"> 登录 </n-button>
-          <n-button
-            tertiary
-            v-if="configStore.config?.allowRegister"
-            @click="authStore.openSignupModal()"
-          >
-            注册
-          </n-button>
+          <n-button tertiary v-if="configStore.config?.allowRegister" @click="authStore.openSignupModal()"> 注册 </n-button>
           <!-- 没登录就没有个人菜单，暗色开关只能留在顶栏 -->
-          <n-button
-            quaternary
-            circle
-            :title="isDark ? '切换到亮色' : '切换到暗色'"
-            :aria-label="isDark ? '切换到亮色' : '切换到暗色'"
-            @click="toggleDark"
-          >
+          <n-button quaternary circle :title="isDark ? '切换到亮色' : '切换到暗色'" :aria-label="isDark ? '切换到亮色' : '切换到暗色'" @click="toggleDark">
             <template #icon>
               <Icon :icon="isDark ? 'ph:sun' : 'ph:moon'" />
             </template>
@@ -312,7 +290,7 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
   flex: none;
   font-size: 17px;
   font-weight: 700;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   text-decoration: none;
 }
 
@@ -334,19 +312,19 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
   background: transparent;
   font: inherit;
   cursor: pointer;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   text-decoration: none;
 }
 
 .nav-link:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 /* 当前页：浅绿底块（设计稿「顶栏重设计 · 定稿」）。字色在暗色下换浅一档，
    深绿放在暗底上看不清 —— 和题目页课堂条同一个做法 */
 .nav-link.active {
-  background: v-bind("tone.activeBg");
-  color: v-bind("tone.activeText");
+  background: v-bind('tone.activeBg');
+  color: v-bind('tone.activeText');
   font-weight: 600;
 }
 
@@ -369,7 +347,7 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
 .divider {
   width: 1px;
   height: 20px;
-  background-color: v-bind("theme.dividerColor");
+  background-color: v-bind('theme.dividerColor');
 }
 
 /* 学生用户名最长有 25 个字符：按钮最宽 160，多出来的省略，全名在 title 里 */

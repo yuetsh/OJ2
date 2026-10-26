@@ -1,6 +1,6 @@
-import type { AiHintDone } from "@oj2/contract"
-import { submitHintFeedback } from "oj/api"
-import { useAIStream } from "shared/composables/aiStream"
+import type { AiHintDone } from '@oj2/contract'
+import { submitHintFeedback } from 'oj/api'
+import { useAIStream } from 'shared/composables/aiStream'
 
 /**
  * 一次提交的 AI 提示。
@@ -14,12 +14,12 @@ import { useAIStream } from "shared/composables/aiStream"
  * 逐字显示改在这边模拟。
  */
 export function useSubmissionHint() {
-  const hintTarget = ref("")
-  const hintContent = ref("")
+  const hintTarget = ref('')
+  const hintContent = ref('')
   const hintStream = useAIStream()
   // 整条流跑完才算结束：提示是一次推全文，没有「第一个字到了」的中间态
   const hintLoading = hintStream.running
-  const hintError = ref("")
+  const hintError = ref('')
   // 这条提示在 ai_hint 里的 id，生成完由 done 事件带回来；后端落库失败时没有，就不出评价按钮
   const hintId = ref<number | null>(null)
   // 这条提示是哪一级（-1 = 编译错误那一档，不在阶梯上），以及还能不能再往上要一级。
@@ -55,9 +55,9 @@ export function useSubmissionHint() {
 
   function resetHint() {
     stopTyping()
-    hintTarget.value = ""
-    hintContent.value = ""
-    hintError.value = ""
+    hintTarget.value = ''
+    hintContent.value = ''
+    hintError.value = ''
     hintId.value = null
     hintLevel.value = null
     hintCanEscalate.value = false
@@ -76,7 +76,7 @@ export function useSubmissionHint() {
     resetHint()
     try {
       await hintStream.run<AiHintDone>(
-        "ai/hint",
+        'ai/hint',
         { submissionId, more },
         {
           onDelta(content) {

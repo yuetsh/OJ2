@@ -1,21 +1,15 @@
-import { loginRequestSchema, refreshTokenRequestSchema, type AuthTokens } from "@oj2/contract"
-import { eq, sql } from "drizzle-orm"
-import { Hono } from "hono"
+import { loginRequestSchema, refreshTokenRequestSchema, type AuthTokens } from '@oj2/contract'
+import { eq, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { optionalAuth, type AppEnv } from "../auth/middleware"
-import { destroySession, issueTokens, refreshTokens } from "../auth/session"
-import { publishSessionRevoked } from "../events"
-import { hashPassword, verifyPassword } from "../auth/password"
-import { db, schema } from "../db"
-import { failure, parseBody, success } from "../http"
-import { getUserProfileById } from "../services/profile"
-import {
-  clientIp,
-  countAttempt,
-  lockoutRemaining,
-  resetAttempts,
-  type AttemptRule,
-} from "../services/throttling"
+import { optionalAuth, type AppEnv } from '../auth/middleware'
+import { destroySession, issueTokens, refreshTokens } from '../auth/session'
+import { publishSessionRevoked } from '../events'
+import { hashPassword, verifyPassword } from '../auth/password'
+import { db, schema } from '../db'
+import { failure, parseBody, success } from '../http'
+import { getUserProfileById } from '../services/profile'
+import { clientIp, countAttempt, lockoutRemaining, resetAttempts, type AttemptRule } from '../services/throttling'
 
 export const authRoutes = new Hono<AppEnv>()
 
@@ -31,29 +25,19 @@ export const authRoutes = new Hono<AppEnv>()
 const LOGIN_PER_USERNAME: AttemptRule = { limit: 10, windowSeconds: 15 * 60 }
 const LOGIN_PER_IP: AttemptRule = { limit: 100, windowSeconds: 15 * 60 }
 
-authRoutes.post("/auth/login", async (c) => {
-  const parsed = await parseBody(c, loginRequestSchema, "Username and password are required")
+authRoutes.post('/auth/login', async (c) => {
+  const parsed = await parseBody(c, loginRequestSchema, 'Username and password are required')
   if (!parsed.success) return parsed.response
 
   const usernameKey = `login:user:${parsed.data.username.toLowerCase()}`
   const ipKey = `login:ip:${clientIp(c)}`
-  const wait =
-    (await lockoutRemaining(usernameKey, LOGIN_PER_USERNAME)) ??
-    (await lockoutRemaining(ipKey, LOGIN_PER_IP))
+  const wait = (await lockoutRemaining(usernameKey, LOGIN_PER_USERNAME)) ?? (await lockoutRemaining(ipKey, LOGIN_PER_IP))
   if (wait !== null) {
-    return failure(
-      c,
-      429,
-      "too-many-login-attempts",
-      `Too many failed attempts, please wait ${wait} seconds`,
-    )
+    return failure(c, 429, 'too-many-login-attempts', `Too many failed attempts, please wait ${wait} seconds`)
   }
   const loginFailed = async () => {
-    await Promise.all([
-      countAttempt(usernameKey, LOGIN_PER_USERNAME),
-      countAttempt(ipKey, LOGIN_PER_IP),
-    ])
-    return failure(c, 401, "invalid-credentials", "Invalid username or password")
+    await Promise.all([countAttempt(usernameKey, LOGIN_PER_USERNAME), countAttempt(ipKey, LOGIN_PER_IP)])
+    return failure(c, 401, 'invalid-credentials', 'Invalid username or password')
   }
 
   const [user] = await db
@@ -64,7 +48,7 @@ authRoutes.post("/auth/login", async (c) => {
 
   if (!user) return loginFailed()
   if (user.isDisabled) {
-    return failure(c, 403, "account-disabled", "Your account has been disabled")
+    return failure(c, 403, 'account-disabled', 'Your account has been disabled')
   }
 
   const password = await verifyPassword(parsed.data.password, user.password)
@@ -84,38 +68,38 @@ authRoutes.post("/auth/login", async (c) => {
   return success(c, tokens satisfies AuthTokens)
 })
 
-authRoutes.post("/auth/refresh", async (c) => {
+authRoutes.post('/auth/refresh', async (c) => {
   const parsed = await parseBody(c, refreshTokenRequestSchema)
   if (!parsed.success) return parsed.response
   const result = await refreshTokens(parsed.data.refreshToken)
-  if (result.reason === "disabled") {
-    return failure(c, 403, "account-disabled", "账号已被禁用，请联系老师")
+  if (result.reason === 'disabled') {
+    return failure(c, 403, 'account-disabled', '账号已被禁用，请联系老师')
   }
   // 不回 login-required：前端拦截器见到它就弹登录框，而换不到 token 的那一刻
   // 前端还要先拿掉 token 重试一次原请求，可选登录的页面照样能当游客看
   if (!result.tokens) {
-    return failure(c, 401, "refresh-invalid", "登录已过期，请重新登录")
+    return failure(c, 401, 'refresh-invalid', '登录已过期，请重新登录')
   }
   return success(c, result.tokens satisfies AuthTokens)
 })
 
 /** 退出登录。凭 refresh token 而不是 access token：后者可能刚好过期，退出不该因此失败 */
-authRoutes.post("/auth/logout", async (c) => {
+authRoutes.post('/auth/logout', async (c) => {
   const parsed = await parseBody(c, refreshTokenRequestSchema)
   if (!parsed.success) return parsed.response
   const sid = await destroySession(parsed.data.refreshToken)
   // 同一个浏览器的其他标签页还挂着 WebSocket，页面上仍显示着登录态。推一条让它们
   // 立刻清掉，不用等最多 60 秒的会话巡检。
   // 按会话而不是按用户：这个人在别的设备上的登录是另一张会话，不该被牵连。
-  if (sid) await publishSessionRevoked({ sid }, "session-ended")
+  if (sid) await publishSessionRevoked({ sid }, 'session-ended')
   return success(c, null)
 })
 
-authRoutes.get("/me", optionalAuth, async (c) => {
-  const authUser = c.get("user")
+authRoutes.get('/me', optionalAuth, async (c) => {
+  const authUser = c.get('user')
   if (!authUser) return success(c, null)
 
   const data = await getUserProfileById(authUser.id, true)
-  if (!data) return failure(c, 404, "profile-not-found", "User profile does not exist")
+  if (!data) return failure(c, 404, 'profile-not-found', 'User profile does not exist')
   return success(c, data)
 })

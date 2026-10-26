@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import ExerciseResult from "./ExerciseResult.vue"
-import type { Exercise, ExerciseMatchData } from "utils/types"
-import { shuffle } from "../composables/useShuffle"
+import ExerciseResult from './ExerciseResult.vue'
+import type { Exercise, ExerciseMatchData } from 'utils/types'
+import { shuffle } from '../composables/useShuffle'
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -10,16 +10,7 @@ const emit = defineEmits<{
 
 const data = computed(() => props.exercise.data as ExerciseMatchData)
 
-const PALETTE = [
-  "#2080f0",
-  "#18a058",
-  "#f0a020",
-  "#d03050",
-  "#8a2be2",
-  "#0891b2",
-  "#db2777",
-  "#65a30d",
-]
+const PALETTE = ['#2080f0', '#18a058', '#f0a020', '#d03050', '#8a2be2', '#0891b2', '#db2777', '#65a30d']
 
 const rightOrder = ref<number[]>([]) // 显示顺序里的 right 原始下标
 const pairs = ref<(number | null)[]>([]) // pairs[leftIdx] = 配对的 right 原始下标
@@ -72,9 +63,9 @@ function onRightClick(rightIdx: number) {
 
 function submit() {
   submitted.value = true
-  emit("attempt", {
+  emit('attempt', {
     correct: allCorrect.value,
-    answer: `配对 ${pairs.value.map((p, i) => `${i + 1}→${p === null ? "?" : p + 1}`).join("、")}`,
+    answer: `配对 ${pairs.value.map((p, i) => `${i + 1}→${p === null ? '?' : p + 1}`).join('、')}`,
   })
 }
 
@@ -84,47 +75,47 @@ function reset() {
 
 function leftColor(i: number): string {
   if (submitted.value) {
-    if (pairs.value[i] === null) return "#d03050"
-    return pairs.value[i] === data.value.answer[i] ? "#18a058" : "#d03050"
+    if (pairs.value[i] === null) return '#d03050'
+    return pairs.value[i] === data.value.answer[i] ? '#18a058' : '#d03050'
   }
-  if (selectedLeft.value === i) return "#2080f0"
+  if (selectedLeft.value === i) return '#2080f0'
   if (pairs.value[i] !== null) return PALETTE[i % PALETTE.length]
-  return "var(--learn-control-line)"
+  return 'var(--learn-control-line)'
 }
 
 function rightColor(rightIdx: number): string {
   const l = leftOf(rightIdx)
   if (submitted.value) {
-    if (l === -1) return "var(--learn-control-line)"
-    return pairs.value[l] === data.value.answer[l] ? "#18a058" : "#d03050"
+    if (l === -1) return 'var(--learn-control-line)'
+    return pairs.value[l] === data.value.answer[l] ? '#18a058' : '#d03050'
   }
-  if (l === -1) return "var(--learn-control-line)"
+  if (l === -1) return 'var(--learn-control-line)'
   return PALETTE[l % PALETTE.length]
 }
 
 function itemStyle(color: string, selected: boolean): Record<string, string> {
-  const plain = color === "var(--learn-control-line)"
+  const plain = color === 'var(--learn-control-line)'
   return {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "10px 12px",
-    borderRadius: "6px",
-    border: `${selected ? "2px" : "1.5px"} solid ${color}`,
-    background: plain ? "transparent" : color + "14",
-    cursor: locked.value ? "default" : "pointer",
-    userSelect: "none",
-    fontSize: "15px",
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 12px',
+    borderRadius: '6px',
+    border: `${selected ? '2px' : '1.5px'} solid ${color}`,
+    background: plain ? 'transparent' : color + '14',
+    cursor: locked.value ? 'default' : 'pointer',
+    userSelect: 'none',
+    fontSize: '15px',
   }
 }
 
 function dotStyle(color: string): Record<string, string> {
   return {
-    width: "10px",
-    height: "10px",
-    borderRadius: "50%",
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
     background: color,
-    flexShrink: "0",
+    flexShrink: '0',
   }
 }
 </script>
@@ -134,47 +125,25 @@ function dotStyle(color: string): Record<string, string> {
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
-    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
-      先点左边一项，再点右边一项即可连线；点击已连线的项可取消。
-    </p>
+    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">先点左边一项，再点右边一项即可连线；点击已连线的项可取消。</p>
 
     <div style="display: flex; gap: 24px; align-items: flex-start">
       <n-space vertical :size="8" style="flex: 1">
-        <div
-          v-for="(item, i) in data.left"
-          :key="'l' + i"
-          :style="itemStyle(leftColor(i), selectedLeft === i)"
-          @click="onLeftClick(i)"
-        >
-          <span
-            v-if="pairs[i] !== null && !submitted"
-            :style="dotStyle(PALETTE[i % PALETTE.length])"
-          />
+        <div v-for="(item, i) in data.left" :key="'l' + i" :style="itemStyle(leftColor(i), selectedLeft === i)" @click="onLeftClick(i)">
+          <span v-if="pairs[i] !== null && !submitted" :style="dotStyle(PALETTE[i % PALETTE.length])" />
           <span>{{ item }}</span>
         </div>
       </n-space>
 
       <n-space vertical :size="8" style="flex: 1">
-        <div
-          v-for="rightIdx in rightOrder"
-          :key="'r' + rightIdx"
-          :style="itemStyle(rightColor(rightIdx), false)"
-          @click="onRightClick(rightIdx)"
-        >
-          <span
-            v-if="leftOf(rightIdx) !== -1 && !submitted"
-            :style="dotStyle(PALETTE[leftOf(rightIdx) % PALETTE.length])"
-          />
+        <div v-for="rightIdx in rightOrder" :key="'r' + rightIdx" :style="itemStyle(rightColor(rightIdx), false)" @click="onRightClick(rightIdx)">
+          <span v-if="leftOf(rightIdx) !== -1 && !submitted" :style="dotStyle(PALETTE[leftOf(rightIdx) % PALETTE.length])" />
           <span>{{ data.right[rightIdx] }}</span>
         </div>
       </n-space>
     </div>
 
-    <ExerciseResult
-      v-if="submitted"
-      :type="allCorrect ? 'success' : 'error'"
-      :title="allCorrect ? '全部匹配正确！' : '有匹配错误，红色项需要重新连线'"
-    />
+    <ExerciseResult v-if="submitted" :type="allCorrect ? 'success' : 'error'" :title="allCorrect ? '全部匹配正确！' : '有匹配错误，红色项需要重新连线'" />
 
     <n-space style="margin-top: 12px" :size="8">
       <n-button type="primary" :disabled="!allPaired || locked" @click="submit"> 提交 </n-button>

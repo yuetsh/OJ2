@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import AdminLink from "shared/components/AdminLink.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useUserStore } from "shared/store/user"
-import { getProblemSetList } from "oj/api"
-import { rgba, useTone } from "shared/composables/tone"
-import { parseTime } from "utils/functions"
-import type { ProblemSet } from "utils/types"
-import { badgeCondition, ladder, nextBadge } from "./badges"
+import { useThemeVars } from 'naive-ui'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useUserStore } from 'shared/store/user'
+import { getProblemSetList } from 'oj/api'
+import { rgba, useTone } from 'shared/composables/tone'
+import { parseTime } from 'utils/functions'
+import type { ProblemSet } from 'utils/types'
+import { badgeCondition, ladder, nextBadge } from './badges'
 
 /**
  * 题单列表（设计稿「题单重设计」列表 A）：老师正在布置的题单单独一排大卡片 —— 做对几道、
@@ -23,7 +23,7 @@ const tone = useTone()
 
 const sets = ref<ProblemSet[]>([])
 const loaded = ref(false)
-const keyword = ref("")
+const keyword = ref('')
 
 onMounted(async () => {
   try {
@@ -36,17 +36,11 @@ onMounted(async () => {
 const shown = computed(() => {
   const word = keyword.value.trim().toLowerCase()
   if (!word) return sets.value
-  return sets.value.filter(
-    (set) => set.title.toLowerCase().includes(word) || set.description.toLowerCase().includes(word),
-  )
+  return sets.value.filter((set) => set.title.toLowerCase().includes(word) || set.description.toLowerCase().includes(word))
 })
 
 /** 布置中的：快到期的在前 */
-const assigning = computed(() =>
-  shown.value
-    .filter((set) => set.assigning)
-    .sort((a, b) => Date.parse(a.assignedUntil!) - Date.parse(b.assignedUntil!)),
-)
+const assigning = computed(() => shown.value.filter((set) => set.assigning).sort((a, b) => Date.parse(a.assignedUntil!) - Date.parse(b.assignedUntil!)))
 
 /** 其他：加入过的在前（最近加入的最前），再按新建排 */
 const others = computed(() =>
@@ -63,7 +57,7 @@ const others = computed(() =>
 
 function description(set: ProblemSet) {
   // 简介大多就是把标题再抄一遍，一样的就不重复显示
-  return set.description && set.description !== set.title ? set.description : ""
+  return set.description && set.description !== set.title ? set.description : ''
 }
 
 function optional(set: ProblemSet) {
@@ -72,17 +66,15 @@ function optional(set: ProblemSet) {
 
 function percent(set: ProblemSet) {
   const progress = set.userProgress
-  return progress.isJoined && set.requiredCount
-    ? Math.min(100, (progress.completedCount / set.requiredCount) * 100)
-    : 0
+  return progress.isJoined && set.requiredCount ? Math.min(100, (progress.completedCount / set.requiredCount) * 100) : 0
 }
 
 function open(set: ProblemSet) {
-  router.push({ name: "problemset", params: { problemSetId: set.id } })
+  router.push({ name: 'problemset', params: { problemSetId: set.id } })
 }
 
-const info = computed(() => tone("info"))
-const success = computed(() => tone("success"))
+const info = computed(() => tone('info'))
+const success = computed(() => tone('success'))
 // 做完的卡片只淡淡地染一点绿（设计稿），用 success.background 那一档太抢眼
 const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 </script>
@@ -94,9 +86,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
       <div class="spacer"></div>
       <n-input v-model:value="keyword" placeholder="搜题单" clearable class="search" />
       <!-- 手机上一行放不下，也没人在手机上出题，只给电脑 -->
-      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/problemset/create"
-        >新建题单</AdminLink
-      >
+      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/problemset/create">新建题单</AdminLink>
     </div>
 
     <template v-if="assigning.length">
@@ -125,26 +115,17 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
             <span v-else class="muted small">还没加入 · {{ set.requiredCount }} 道</span>
             <span v-if="optional(set) > 0" class="muted tiny">另有 {{ optional(set) }} 道选做</span>
             <div class="spacer"></div>
-            <span class="pill assign">布置到 {{ parseTime(set.assignedUntil!, "M月D日") }}</span>
+            <span class="pill assign">布置到 {{ parseTime(set.assignedUntil!, 'M月D日') }}</span>
           </div>
           <div class="bar"><div class="fill" :style="{ width: `${percent(set)}%` }"></div></div>
           <div v-if="nextBadge(set)" class="row hint">
             <img :src="nextBadge(set)!.badge.icon" alt="" class="icon locked" />
             <span>
-              再做对 <b class="num">{{ nextBadge(set)!.left }}</b> 道拿「{{
-                nextBadge(set)!.badge.name
-              }}」
+              再做对 <b class="num">{{ nextBadge(set)!.left }}</b> 道拿「{{ nextBadge(set)!.badge.name }}」
             </span>
           </div>
           <div v-else-if="set.badges.length" class="row hint got">
-            <img
-              v-for="badge in ladder(set)"
-              :key="badge.id"
-              :src="badge.icon"
-              :alt="badge.name"
-              :title="badge.name"
-              class="icon"
-            />
+            <img v-for="badge in ladder(set)" :key="badge.id" :src="badge.icon" :alt="badge.name" :title="badge.name" class="icon" />
             <span>奖章全拿到了</span>
           </div>
           <div v-else class="muted hint">这个题单没有奖章</div>
@@ -153,7 +134,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
     </template>
 
     <div v-if="others.length" class="sect">
-      {{ assigning.length ? "其他题单" : "题单" }}
+      {{ assigning.length ? '其他题单' : '题单' }}
       <span class="muted">{{ others.length }} 个</span>
     </div>
     <div class="small-grid">
@@ -173,9 +154,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
           <span v-if="set.userProgress.isJoined" class="num">
             做对 <b>{{ set.userProgress.completedCount }}</b> / {{ set.requiredCount }}
           </span>
-          <span v-else class="muted num"
-            >{{ set.problemsCount }} 道 · {{ set.joinedCount }} 人做过</span
-          >
+          <span v-else class="muted num">{{ set.problemsCount }} 道 · {{ set.joinedCount }} 人做过</span>
           <div class="spacer"></div>
           <img
             v-for="badge in ladder(set)"
@@ -190,10 +169,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
       </a>
     </div>
 
-    <n-empty
-      v-if="loaded && !shown.length"
-      :description="keyword ? '没有找到这样的题单' : '还没有题单'"
-    />
+    <n-empty v-if="loaded && !shown.length" :description="keyword ? '没有找到这样的题单' : '还没有题单'" />
   </div>
 </template>
 
@@ -230,7 +206,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
   margin-bottom: -6px;
   font-size: var(--oj-fs-h2);
   font-weight: 700;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
 }
 
 .sect .muted {
@@ -239,11 +215,11 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .green {
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .small {
@@ -295,10 +271,10 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 .card {
   box-sizing: border-box;
   min-width: 0;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
   transition:
     border-color 0.2s,
@@ -306,12 +282,12 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .card:hover {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
 .card.done {
-  background: v-bind("doneBackground");
+  background: v-bind('doneBackground');
 }
 
 .big {
@@ -348,37 +324,37 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 }
 
 .assign {
-  color: v-bind("info.color");
-  background: v-bind("info.background");
+  color: v-bind('info.color');
+  background: v-bind('info.background');
 }
 
 .done-pill {
-  color: v-bind("success.color");
-  background: v-bind("success.background");
+  color: v-bind('success.color');
+  background: v-bind('success.background');
   font-weight: 600;
 }
 
 .bar {
   height: 6px;
   border-radius: 3px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
 .fill {
   height: 100%;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .hint {
   height: 22px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .hint.got {
   gap: 4px;
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .hint.got span {

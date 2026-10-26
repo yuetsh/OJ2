@@ -11,17 +11,17 @@ import {
   PointElement,
   RadialLinearScale,
   Tooltip,
-} from "chart.js"
-import { WordCloudController, WordElement } from "chartjs-chart-wordcloud"
-import { useThemeVars } from "naive-ui"
-import { Bar, Doughnut, Radar } from "vue-chartjs"
-import type { FlowchartStatistics } from "@oj2/contract"
-import { useChartTheme } from "shared/composables/chartTheme"
-import { FLOWCHART_CRITERIA_ORDER } from "utils/constants"
-import { useTone } from "shared/composables/tone"
-import RingChart from "./RingChart.vue"
-import StatItem from "./StatItem.vue"
-import UserName from "shared/components/UserName.vue"
+} from 'chart.js'
+import { WordCloudController, WordElement } from 'chartjs-chart-wordcloud'
+import { useThemeVars } from 'naive-ui'
+import { Bar, Doughnut, Radar } from 'vue-chartjs'
+import type { FlowchartStatistics } from '@oj2/contract'
+import { useChartTheme } from 'shared/composables/chartTheme'
+import { FLOWCHART_CRITERIA_ORDER } from 'utils/constants'
+import { useTone } from 'shared/composables/tone'
+import RingChart from './RingChart.vue'
+import StatItem from './StatItem.vue'
+import UserName from 'shared/components/UserName.vue'
 
 ChartJS.register(
   ArcElement,
@@ -48,12 +48,12 @@ const theme = useThemeVars()
 const tone = useTone()
 const { chartKey } = useChartTheme()
 
-const GRADES = ["S", "A", "B", "C"] as const
+const GRADES = ['S', 'A', 'B', 'C'] as const
 const gradeColor = computed(() => ({
-  S: tone("success").solid,
-  A: tone("info").solid,
-  B: tone("warning").solid,
-  C: tone("error").solid,
+  S: tone('success').solid,
+  A: tone('info').solid,
+  B: tone('warning').solid,
+  C: tone('error').solid,
 }))
 
 /** 拿到 A / S 算完成（和题单、课堂条的口径一致） */
@@ -78,8 +78,8 @@ const gradeData = computed(() => ({
 const gradeOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  cutout: "60%",
-  plugins: { legend: { position: "right" as const } },
+  cutout: '60%',
+  plugins: { legend: { position: 'right' as const } },
 }
 
 /** 四项按固定顺序（jsonb 不保留键序，逻辑正确性要在最前） */
@@ -94,11 +94,11 @@ const radarData = computed(() => ({
   labels: criteria.value.map((item) => item.key),
   datasets: [
     {
-      label: "平均得分率",
+      label: '平均得分率',
       data: criteria.value.map((item) => Math.round((item.avg / (item.max || 1)) * 100)),
-      backgroundColor: "rgba(32, 128, 240, 0.18)",
-      borderColor: tone("info").solid,
-      pointBackgroundColor: tone("info").solid,
+      backgroundColor: 'rgba(32, 128, 240, 0.18)',
+      borderColor: tone('info').solid,
+      pointBackgroundColor: tone('info').solid,
       fill: true,
     },
   ],
@@ -120,24 +120,23 @@ const barData = computed(() => ({
   labels: criteria.value.map((item) => item.key),
   datasets: [
     {
-      label: "平均分",
+      label: '平均分',
       data: criteria.value.map((item) => item.avg),
-      backgroundColor: tone("info").solid,
+      backgroundColor: tone('info').solid,
       borderRadius: 4,
     },
   ],
 }))
 
 const barOptions = computed(() => ({
-  indexAxis: "y" as const,
+  indexAxis: 'y' as const,
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label: (context: { dataIndex: number; parsed: { x: number | null } }) =>
-          `${context.parsed.x ?? 0} / ${criteria.value[context.dataIndex]?.max ?? 100}`,
+        label: (context: { dataIndex: number; parsed: { x: number | null } }) => `${context.parsed.x ?? 0} / ${criteria.value[context.dataIndex]?.max ?? 100}`,
       },
     },
   },
@@ -146,8 +145,8 @@ const barOptions = computed(() => ({
 
 // ---------- 词云（chart.js 的 wordCloud 插件，canvas 上画，要自己管实例） ----------
 
-const WORD_COLORS = ["#2080f0", "#18a058", "#d03050", "#f0a020", "#7a3e9d", "#13c2c2"]
-const cloudCanvas = useTemplateRef<HTMLCanvasElement>("cloudCanvas")
+const WORD_COLORS = ['#2080f0', '#18a058', '#d03050', '#f0a020', '#7a3e9d', '#13c2c2']
+const cloudCanvas = useTemplateRef<HTMLCanvasElement>('cloudCanvas')
 let cloud: ChartJS | null = null
 
 function drawCloud() {
@@ -157,12 +156,12 @@ function drawCloud() {
   if (!cloudCanvas.value || !words.length) return
   const max = Math.max(...words.map((word) => word.count))
   cloud = new ChartJS(cloudCanvas.value, {
-    type: "wordCloud" as never,
+    type: 'wordCloud' as never,
     data: {
       labels: words.map((word) => word.word),
       datasets: [
         {
-          label: "",
+          label: '',
           data: words.map((word) => 12 + (word.count / max) * 42),
           color: words.map((_, i) => WORD_COLORS[i % WORD_COLORS.length]),
           rotate: 0,
@@ -178,7 +177,7 @@ function drawCloud() {
           callbacks: {
             label: (context: { dataIndex: number }) => {
               const word = words[context.dataIndex]
-              return word ? `${word.word}：${word.count} 次` : ""
+              return word ? `${word.word}：${word.count} 次` : ''
             },
           },
         },
@@ -211,15 +210,13 @@ const people = computed(() => [
 
 function gradeStyle(grade: string | null) {
   const map: Record<string, ReturnType<typeof tone>> = {
-    S: tone("success"),
-    A: tone("info"),
-    B: tone("warning"),
-    C: tone("error"),
+    S: tone('success'),
+    A: tone('info'),
+    B: tone('warning'),
+    C: tone('error'),
   }
   const t = grade ? map[grade] : null
-  return t
-    ? { color: t.color, background: t.background }
-    : { color: theme.value.textColor3, background: theme.value.actionColor }
+  return t ? { color: t.color, background: t.background } : { color: theme.value.textColor3, background: theme.value.actionColor }
 }
 </script>
 
@@ -227,35 +224,17 @@ function gradeStyle(grade: string | null) {
   <div class="flow-stats">
     <div class="summary">
       <StatItem label="提交" :value="data.totalCount" unit="张" />
-      <StatItem
-        label="拿到 A / S"
-        :value="`${goodCount} / ${personCount}`"
-        unit="人"
-        tone="success"
-      />
-      <StatItem
-        label="一张没交"
-        :value="data.dataUnaccepted.length"
-        unit="人"
-        tone="error"
-        :hidden="!data.personCount"
-      />
+      <StatItem label="拿到 A / S" :value="`${goodCount} / ${personCount}`" unit="人" tone="success" />
+      <StatItem label="一张没交" :value="data.dataUnaccepted.length" unit="人" tone="error" :hidden="!data.personCount" />
       <span class="spacer"></span>
       <!-- 没选班级就没有花名册，「班级完成度」无从谈起 -->
       <span v-if="data.personCount" class="ring-wrap">
-        <RingChart
-          :value="goodCount"
-          :total="personCount"
-          :color="tone('info').solid"
-          :labels="['拿到 A / S', '还没有']"
-        />
+        <RingChart :value="goodCount" :total="personCount" :color="tone('info').solid" :labels="['拿到 A / S', '还没有']" />
         <span class="ring-label">班级<br />完成度</span>
       </span>
     </div>
 
-    <div v-if="!data.totalCount && !data.dataUnaccepted.length" class="empty">
-      这段时间没有人交流程图
-    </div>
+    <div v-if="!data.totalCount && !data.dataUnaccepted.length" class="empty">这段时间没有人交流程图</div>
     <div v-else class="body">
       <div class="row-cards">
         <div class="card grade">
@@ -311,7 +290,7 @@ function gradeStyle(grade: string | null) {
             <div v-for="row in people" :key="row.username" class="person">
               <UserName :username="row.username" class="p-name" />
               <span class="grade-pill" :style="gradeStyle(row.grade)">
-                {{ row.grade ? `${row.grade} 级` : "没交" }}
+                {{ row.grade ? `${row.grade} 级` : '没交' }}
               </span>
               <span class="muted">{{ row.count }} 次</span>
             </div>
@@ -338,8 +317,8 @@ function gradeStyle(grade: string | null) {
   display: flex;
   align-items: center;
   gap: 40px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.actionColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.actionColor');
 }
 
 .spacer {
@@ -355,7 +334,7 @@ function gradeStyle(grade: string | null) {
 .ring-label {
   font-size: var(--oj-fs-meta);
   line-height: 1.5;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .body {
@@ -382,9 +361,9 @@ function gradeStyle(grade: string | null) {
 
 .card {
   box-sizing: border-box;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 8px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -414,7 +393,7 @@ function gradeStyle(grade: string | null) {
 .card-title {
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .chart,
@@ -435,7 +414,7 @@ function gradeStyle(grade: string | null) {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   font-size: var(--oj-fs-sec);
 }
 
@@ -457,14 +436,14 @@ function gradeStyle(grade: string | null) {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-size: var(--oj-fs-meta);
 }
 
 .empty {
   padding: 60px 16px;
   text-align: center;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 手机：卡片一张一行 */

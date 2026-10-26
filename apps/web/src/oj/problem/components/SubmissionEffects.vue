@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { storeToRefs } from "pinia"
-import type { RouteLocationNormalized } from "vue-router"
-import { getReaction } from "oj/api"
-import { useProblemStore } from "oj/store/problem"
-import { useSubmissionStore } from "oj/store/submission"
-import { useFireworks } from "oj/problem/composables/useFireworks"
-import { useLessonStore } from "shared/store/lesson"
-import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
-import { SubmissionStatus } from "utils/constants"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import { caseRevealDuration } from "../utils/caseReveal"
+import { storeToRefs } from 'pinia'
+import type { RouteLocationNormalized } from 'vue-router'
+import { getReaction } from 'oj/api'
+import { useProblemStore } from 'oj/store/problem'
+import { useSubmissionStore } from 'oj/store/submission'
+import { useFireworks } from 'oj/problem/composables/useFireworks'
+import { useLessonStore } from 'shared/store/lesson'
+import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
+import { SubmissionStatus } from 'utils/constants'
+import { useProblemPageContext } from '../composables/problemPageContext'
+import { caseRevealDuration } from '../utils/caseReveal'
 
 /**
  * 判完之后「该发生什么」：失败计数、标成已解决、烟花、点评、回题单。
@@ -20,7 +20,7 @@ import { caseRevealDuration } from "../utils/caseReveal"
  * 状态本身在 submission store，这里只是看着它做事。
  */
 
-const ProblemReaction = defineAsyncComponent(() => import("./ProblemReaction.vue"))
+const ProblemReaction = defineAsyncComponent(() => import('./ProblemReaction.vue'))
 
 const problemStore = useProblemStore()
 const submissionStore = useSubmissionStore()
@@ -101,7 +101,7 @@ const lessonStore = useLessonStore()
 const shortTitle = (title: string) => (title.length > 14 ? `${title.slice(0, 13)}…` : title)
 
 const continueAction = computed(() => {
-  if (navigationAfterReviewShown.value) return { label: "继续", target: null }
+  if (navigationAfterReviewShown.value) return { label: '继续', target: null }
   const lesson = problem.value ? lessonStore.nextAfter(problem.value._id) : null
   const next = ctx.value.lessonNext ? lesson?.next : null
   if (next)
@@ -109,7 +109,7 @@ const continueAction = computed(() => {
       label: `下一题：${next.problemDisplayId} ${shortTitle(next.title)}`,
       target: `/problem/${next.problemDisplayId}`,
     }
-  return { label: "好的", target: null }
+  return { label: '好的', target: null }
 })
 
 /** 选完停多久；按钮底边那条线按同一个时长缩完 */
@@ -169,7 +169,7 @@ onBeforeRouteLeave(holdForReview)
 const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutFn(
   () => {
     router.push({
-      name: "problemset",
+      name: 'problemset',
       params: {
         problemSetId: ctx.value.problemSetId,
       },
@@ -207,17 +207,8 @@ watch(
   () => submission.value?.result,
   (result) => {
     if (result === undefined || result === null) return
-    if (
-      result === SubmissionStatus.pending ||
-      result === SubmissionStatus.judging ||
-      result === SubmissionStatus.submitting
-    )
-      return
-    if (
-      result !== SubmissionStatus.accepted &&
-      result !== SubmissionStatus.ast_check_failed &&
-      result !== SubmissionStatus.system_error
-    ) {
+    if (result === SubmissionStatus.pending || result === SubmissionStatus.judging || result === SubmissionStatus.submitting) return
+    if (result !== SubmissionStatus.accepted && result !== SubmissionStatus.ast_check_failed && result !== SubmissionStatus.system_error) {
       problemStore.incrementFailCount()
     }
   },
@@ -229,10 +220,7 @@ watch(
  */
 async function afterCasesRevealed(id: string | undefined) {
   if (!submissionStore.shouldRevealCases(id)) return
-  await until(() => submission.value?.id === id && submission.value?.code !== undefined).toBe(
-    true,
-    { timeout: 3000 },
-  )
+  await until(() => submission.value?.id === id && submission.value?.code !== undefined).toBe(true, { timeout: 3000 })
   const count = submission.value?.caseSummary?.results?.length ?? 0
   if (count) await new Promise((resolve) => setTimeout(resolve, caseRevealDuration(count)))
 }
@@ -325,7 +313,7 @@ watch(
 }
 
 .continue.lingering::after {
-  content: "";
+  content: '';
   position: absolute;
   left: 0;
   right: 0;

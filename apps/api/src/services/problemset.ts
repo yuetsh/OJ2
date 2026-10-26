@@ -1,17 +1,14 @@
-import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm"
+import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { publishAchievementNotification } from "../events"
-import { asRecord } from "../routes/helpers"
-import { updateAchievementsForProblemSet } from "./achievements"
+import { db, schema } from '../db'
+import { publishAchievementNotification } from '../events'
+import { asRecord } from '../routes/helpers'
+import { updateAchievementsForProblemSet } from './achievements'
 
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 type ProgressRow = typeof schema.problemsetProgress.$inferSelect
 type ProblemLink = { problemId: number; isRequired: boolean }
-type BadgeCheck = Pick<
-  ProgressRow,
-  "completedProblemsCount" | "totalProblemsCount" | "progressDetail"
->
+type BadgeCheck = Pick<ProgressRow, 'completedProblemsCount' | 'totalProblemsCount' | 'progressDetail'>
 
 /**
  * 题单进度的唯一算法：学生做出一道题后的增量更新、后台改动题目后的批量重算，都走这一份。
@@ -20,12 +17,7 @@ type BadgeCheck = Pick<
  * 人还标着「已完成」）、不清理 progress_detail（删掉一道题之后没做的题被算成做了）。
  * 两边不再分叉的唯一办法是只留一处算法，所以这里做成纯函数，两边都只是调用者。
  */
-export function computeProgress(
-  detail: Record<string, unknown>,
-  links: ProblemLink[],
-  previousCompleteTime: string | null,
-  now = new Date().toISOString(),
-) {
+export function computeProgress(detail: Record<string, unknown>, links: ProblemLink[], previousCompleteTime: string | null, now = new Date().toISOString()) {
   const inSet = new Set(links.map((link) => String(link.problemId)))
   // 已经移出题单的题目要从 detail 里剔掉，留着它 completed 就会比实际做出的题还多。
   // 老数据的每一项还带着 score（分数已经拿掉了），原样留着无害
@@ -110,13 +102,10 @@ async function writeProgress(rows: ProgressWrite[]) {
  * 不可得，76 个已经拿到的人被 recalculateBadge 收回。
  */
 export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
-  if (badge.conditionType === "all_problems") {
-    return (
-      progress.totalProblemsCount > 0 &&
-      progress.completedProblemsCount === progress.totalProblemsCount
-    )
+  if (badge.conditionType === 'all_problems') {
+    return progress.totalProblemsCount > 0 && progress.completedProblemsCount === progress.totalProblemsCount
   }
-  if (badge.conditionType === "problem_count") {
+  if (badge.conditionType === 'problem_count') {
     return Object.keys(asRecord(progress.progressDetail)).length >= badge.conditionValue
   }
   // 「总分达到 N」随分数一起拿掉了，0026 把它们换成了「做对 N 道」
@@ -131,33 +120,15 @@ export function eligibleForBadge(badge: BadgeRow, progress: BadgeCheck) {
  * 调用方手里已经有最新的进度时把它传进来（`known`），省掉一次回表；
  * 更要紧的是别用刚写完库之前的旧值去判定。
  */
-export async function recalculateBadge(
-  badge: BadgeRow,
-  known?: (BadgeCheck & { userId: number })[],
-) {
-  const progresses =
-    known ??
-    (await db
-      .select()
-      .from(schema.problemsetProgress)
-      .where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId)))
-  const eligibleIds = progresses
-    .filter((item) => eligibleForBadge(badge, item))
-    .map((item) => item.userId)
+export async function recalculateBadge(badge: BadgeRow, known?: (BadgeCheck & { userId: number })[]) {
+  const progresses = known ?? (await db.select().from(schema.problemsetProgress).where(eq(schema.problemsetProgress.problemsetId, badge.problemsetId)))
+  const eligibleIds = progresses.filter((item) => eligibleForBadge(badge, item)).map((item) => item.userId)
   await db.transaction(async (tx) => {
     await tx
       .delete(schema.userBadge)
-      .where(
-        and(
-          eq(schema.userBadge.badgeId, badge.id),
-          eligibleIds.length ? notInArray(schema.userBadge.userId, eligibleIds) : undefined,
-        ),
-      )
+      .where(and(eq(schema.userBadge.badgeId, badge.id), eligibleIds.length ? notInArray(schema.userBadge.userId, eligibleIds) : undefined))
     if (!eligibleIds.length) return
-    const existing = await tx
-      .select({ userId: schema.userBadge.userId })
-      .from(schema.userBadge)
-      .where(eq(schema.userBadge.badgeId, badge.id))
+    const existing = await tx.select({ userId: schema.userBadge.userId }).from(schema.userBadge).where(eq(schema.userBadge.badgeId, badge.id))
     const have = new Set(existing.map((item) => item.userId))
     const missing = eligibleIds.filter((id) => !have.has(id))
     if (missing.length) {
@@ -193,14 +164,8 @@ export async function resyncProgress(problemsetId: number) {
       })
       .from(schema.problemsetProblem)
       .where(eq(schema.problemsetProblem.problemsetId, problemsetId)),
-    db
-      .select()
-      .from(schema.problemsetProgress)
-      .where(eq(schema.problemsetProgress.problemsetId, problemsetId)),
-    db
-      .select()
-      .from(schema.problemsetBadge)
-      .where(eq(schema.problemsetBadge.problemsetId, problemsetId)),
+    db.select().from(schema.problemsetProgress).where(eq(schema.problemsetProgress.problemsetId, problemsetId)),
+    db.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, problemsetId)),
   ])
   const now = new Date().toISOString()
   const updated = progresses.map((progress) => ({
@@ -229,10 +194,7 @@ export async function recordSolvedProblem(userId: number, problemId: number, sol
     .from(schema.problemsetProgress)
     .innerJoin(
       schema.problemsetProblem,
-      and(
-        eq(schema.problemsetProblem.problemsetId, schema.problemsetProgress.problemsetId),
-        eq(schema.problemsetProblem.problemId, problemId),
-      ),
+      and(eq(schema.problemsetProblem.problemsetId, schema.problemsetProgress.problemsetId), eq(schema.problemsetProblem.problemId, problemId)),
     )
     .where(eq(schema.problemsetProgress.userId, userId))
   const earned: BadgeRow[] = []
@@ -242,13 +204,8 @@ export async function recordSolvedProblem(userId: number, problemId: number, sol
       const [progress] = await tx
         .select()
         .from(schema.problemsetProgress)
-        .where(
-          and(
-            eq(schema.problemsetProgress.problemsetId, problemsetId),
-            eq(schema.problemsetProgress.userId, userId),
-          ),
-        )
-        .for("update")
+        .where(and(eq(schema.problemsetProgress.problemsetId, problemsetId), eq(schema.problemsetProgress.userId, userId)))
+        .for('update')
         .limit(1)
       if (!progress) return []
 
@@ -264,16 +221,10 @@ export async function recordSolvedProblem(userId: number, problemId: number, sol
       if (!links.some((item) => item.problemId === problemId)) return []
       detail[String(problemId)] = { submit_time: solvedAt }
       const update = computeProgress(detail, links, progress.completeTime)
-      await tx
-        .update(schema.problemsetProgress)
-        .set(update)
-        .where(eq(schema.problemsetProgress.id, progress.id))
+      await tx.update(schema.problemsetProgress).set(update).where(eq(schema.problemsetProgress.id, progress.id))
       updated += 1
 
-      const badges = await tx
-        .select()
-        .from(schema.problemsetBadge)
-        .where(eq(schema.problemsetBadge.problemsetId, problemsetId))
+      const badges = await tx.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, problemsetId))
       const eligible = badges.filter((badge) => eligibleForBadge(badge, { ...progress, ...update }))
       if (eligible.length === 0) return []
       // 达标的奖章一次插完，冲突忽略后 returning 回来的就是这次真拿到的
@@ -314,8 +265,8 @@ export async function recordSolvedAndNotify(userId: number, problemId: number, s
           name: badge.name,
           description: badge.description,
           icon: badge.icon,
-          rarity: "bronze",
-          kind: "badge",
+          rarity: 'bronze',
+          kind: 'badge',
         })),
       )
     }
@@ -329,15 +280,12 @@ export async function recordSolvedAndNotify(userId: number, problemId: number, s
           description: achievement.description,
           icon: achievement.icon,
           rarity: achievement.rarity,
-          kind: "achievement",
+          kind: 'achievement',
         })),
       )
     }
   } catch (error) {
-    console.error(
-      `Failed to record problem set progress for user ${userId} problem ${problemId}`,
-      error,
-    )
+    console.error(`Failed to record problem set progress for user ${userId} problem ${problemId}`, error)
   }
 }
 
@@ -376,13 +324,7 @@ export async function problemSetLockCutoffs(userId: number, problemIds: number[]
     })
     .from(schema.problemsetProblem)
     .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProblem.problemsetId))
-    .leftJoin(
-      schema.problemsetProgress,
-      and(
-        eq(schema.problemsetProgress.problemsetId, schema.problemset.id),
-        eq(schema.problemsetProgress.userId, userId),
-      ),
-    )
+    .leftJoin(schema.problemsetProgress, and(eq(schema.problemsetProgress.problemsetId, schema.problemset.id), eq(schema.problemsetProgress.userId, userId)))
     .where(
       and(
         inArray(schema.problemsetProblem.problemId, problemIds),
@@ -406,13 +348,7 @@ export async function problemSetLocksFor(userId: number, problemId: number) {
     })
     .from(schema.problemsetProblem)
     .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProblem.problemsetId))
-    .leftJoin(
-      schema.problemsetProgress,
-      and(
-        eq(schema.problemsetProgress.problemsetId, schema.problemset.id),
-        eq(schema.problemsetProgress.userId, userId),
-      ),
-    )
+    .leftJoin(schema.problemsetProgress, and(eq(schema.problemsetProgress.problemsetId, schema.problemset.id), eq(schema.problemsetProgress.userId, userId)))
     .where(
       and(
         eq(schema.problemsetProblem.problemId, problemId),

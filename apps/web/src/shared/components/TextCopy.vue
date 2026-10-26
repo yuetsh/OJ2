@@ -9,7 +9,7 @@
   </n-tooltip>
 </template>
 <script lang="ts" setup>
-import { copyToClipboard } from "utils/functions"
+import { copyToClipboard } from 'utils/functions'
 
 const message = useMessage()
 
@@ -19,15 +19,15 @@ async function handleClick() {
   const textToCopy = getTextFromSlot()
   const success = await copyToClipboard(textToCopy)
   if (success) {
-    message.success("已复制")
+    message.success('已复制')
   } else {
-    message.error("复制失败")
+    message.error('复制失败')
   }
 }
 
 function getTextFromSlot() {
   const vnodes = slots.default?.()
-  if (!vnodes) return ""
-  return vnodes.map((vnode) => vnode.children).join("")
+  if (!vnodes) return ''
+  return vnodes.map((vnode) => vnode.children).join('')
 }
 </script>

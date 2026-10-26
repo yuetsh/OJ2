@@ -1,5 +1,5 @@
-import type { JudgeStatusValue } from "@oj2/contract"
-import type { AchievementRarity, SUBMISSION_RESULT, ReactionKey } from "./types"
+import type { JudgeStatusValue } from '@oj2/contract'
+import type { AchievementRarity, SUBMISSION_RESULT, ReactionKey } from './types'
 
 // 与后端 judge/status.ts 的 JudgeStatus 逐条对齐（submitting 除外，见下）。
 // 注意：原来 time_limit_exceeded 写成 `1 | 2`，TS 按位或算成 3，和
@@ -32,192 +32,190 @@ type SyncedWithContract =
 export const _submissionStatusSynced: SyncedWithContract = true
 
 export enum ContestStatus {
-  initial = "2", // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位
-  not_started = "1",
-  underway = "0",
-  finished = "-1",
+  initial = '2', // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位
+  not_started = '1',
+  underway = '0',
+  finished = '-1',
 }
 
 export enum ContestType {
-  public = "Public",
-  private = "Password Protected",
+  public = 'Public',
+  private = 'Password Protected',
 }
 
 export const JUDGE_STATUS: {
   [key in SUBMISSION_RESULT]: {
     name: string
     title: string
-    type: "error" | "success" | "warning" | "info"
+    type: 'error' | 'success' | 'warning' | 'info'
   }
 } = {
-  "-2": {
-    name: "编译失败",
-    title: "编译失败",
-    type: "warning",
+  '-2': {
+    name: '编译失败',
+    title: '编译失败',
+    type: 'warning',
   },
-  "-1": {
-    name: "答案错误",
-    title: "答案错误",
-    type: "error",
+  '-1': {
+    name: '答案错误',
+    title: '答案错误',
+    type: 'error',
   },
-  "0": {
-    name: "答案正确",
-    title: "答案正确",
-    type: "success",
+  '0': {
+    name: '答案正确',
+    title: '答案正确',
+    type: 'success',
   },
-  "1": {
-    name: "运行超时",
-    title: "运行超时",
-    type: "error",
+  '1': {
+    name: '运行超时',
+    title: '运行超时',
+    type: 'error',
   },
-  "2": {
-    name: "运行超时",
-    title: "运行超时",
-    type: "error",
+  '2': {
+    name: '运行超时',
+    title: '运行超时',
+    type: 'error',
   },
-  "3": {
-    name: "内存超限",
-    title: "内存超限",
-    type: "error",
+  '3': {
+    name: '内存超限',
+    title: '内存超限',
+    type: 'error',
   },
-  "4": {
-    name: "运行时错误",
-    title: "运行时错误",
-    type: "warning",
+  '4': {
+    name: '运行时错误',
+    title: '运行时错误',
+    type: 'warning',
   },
-  "5": {
-    name: "系统错误",
-    title: "系统错误",
-    type: "error",
+  '5': {
+    name: '系统错误',
+    title: '系统错误',
+    type: 'error',
   },
-  "6": {
-    name: "等待评分",
-    title: "等待评分",
-    type: "warning",
+  '6': {
+    name: '等待评分',
+    title: '等待评分',
+    type: 'warning',
   },
-  "7": {
-    name: "正在评分",
-    title: "正在评分",
-    type: "warning",
+  '7': {
+    name: '正在评分',
+    title: '正在评分',
+    type: 'warning',
   },
-  "8": {
-    name: "部分正确",
-    title: "部分正确",
-    type: "warning",
+  '8': {
+    name: '部分正确',
+    title: '部分正确',
+    type: 'warning',
   },
-  "9": {
-    name: "正在提交",
-    title: "正在提交",
-    type: "info",
+  '9': {
+    name: '正在提交',
+    title: '正在提交',
+    type: 'info',
   },
-  "10": {
-    name: "语法未通过",
-    title: "答案正确，但语法未通过",
-    type: "success",
+  '10': {
+    name: '语法未通过',
+    title: '答案正确，但语法未通过',
+    type: 'success',
   },
 }
 
 export const CONTEST_STATUS: {
   [key in ContestStatus]: {
     name: string
-    type: "default" | "success" | "warning"
+    type: 'default' | 'success' | 'warning'
   }
 } = {
   // 这里不需要传入到后端，只是为了一开始加载数据的时候，做一个初始位
-  "2": {
-    name: "未开始",
-    type: "warning",
+  '2': {
+    name: '未开始',
+    type: 'warning',
   },
-  "1": {
-    name: "未开始",
-    type: "warning",
+  '1': {
+    name: '未开始',
+    type: 'warning',
   },
-  "0": {
-    name: "进行中",
-    type: "success",
+  '0': {
+    name: '进行中',
+    type: 'success',
   },
   // 灰的不是红的：列表里九成是已结束的比赛，一片红像满屏报错
-  "-1": {
-    name: "已结束",
-    type: "default",
+  '-1': {
+    name: '已结束',
+    type: 'default',
   },
 }
 
 // 角色与题目权限的字符串在 `@oj2/contract` 的 roles.ts 定义，这里只是转出去，
 // 调用方照旧写 `USER_TYPE.SUPER_ADMIN`。原先这里是这批字符串的第三份手抄副本。
-export { USER_TYPE, PROBLEM_PERMISSION } from "@oj2/contract"
+export { USER_TYPE, PROBLEM_PERMISSION } from '@oj2/contract'
 
 export const STORAGE_KEY = {
-  AUTHED: "authed",
-  ACCESS_TOKEN: "accessToken",
-  REFRESH_TOKEN: "refreshToken",
-  LANGUAGE: "problemLanguage",
-  ADMIN_PROBLEM: "adminProblem",
-  ADMIN_SQL_PROBLEM: "adminSqlProblem",
-  ADMIN_CODE_PROBLEM: "adminCodeProblem",
-  ADMIN_PROBLEM_TAGS: "adminProblemTags",
-  ADMIN_SIDER_COLLAPSED: "adminSiderCollapsed",
-  DEMO_MODE: "demoMode",
-  LOGIN_CLASS: "loginClass",
-  LOGIN_MODE: "loginMode",
-  RANK_CLASS: "rankClass",
+  AUTHED: 'authed',
+  ACCESS_TOKEN: 'accessToken',
+  REFRESH_TOKEN: 'refreshToken',
+  LANGUAGE: 'problemLanguage',
+  ADMIN_PROBLEM: 'adminProblem',
+  ADMIN_SQL_PROBLEM: 'adminSqlProblem',
+  ADMIN_CODE_PROBLEM: 'adminCodeProblem',
+  ADMIN_PROBLEM_TAGS: 'adminProblemTags',
+  ADMIN_SIDER_COLLAPSED: 'adminSiderCollapsed',
+  DEMO_MODE: 'demoMode',
+  LOGIN_CLASS: 'loginClass',
+  LOGIN_MODE: 'loginMode',
+  RANK_CLASS: 'rankClass',
 }
 
 export const DIFFICULTY = {
-  Low: "简单",
-  Mid: "中等",
-  High: "困难",
+  Low: '简单',
+  Mid: '中等',
+  High: '困难',
 } as const
 
-const cSource = "#include<stdio.h>\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
-const cppSource =
-  "#include<iostream>\r\n\r\nusing namespace std;\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}"
-const pythonSource = ""
-const javaSource =
-  'public class Main {\r\n    public static void main(String[] args) {\r\n        System.out.println("黄岩一职");\r\n    }\r\n}'
+const cSource = '#include<stdio.h>\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}'
+const cppSource = '#include<iostream>\r\n\r\nusing namespace std;\r\n\r\nint main()\r\n{\r\n    \r\n    return 0;\r\n}'
+const pythonSource = ''
+const javaSource = 'public class Main {\r\n    public static void main(String[] args) {\r\n        System.out.println("黄岩一职");\r\n    }\r\n}'
 
 export const SOURCES = {
   C: cSource,
-  "C++": cppSource,
+  'C++': cppSource,
   Java: javaSource,
   Python: pythonSource,
-  JavaScript: "",
-  Golang: "",
-  Flowchart: "",
-  SQL: "",
+  JavaScript: '',
+  Golang: '',
+  Flowchart: '',
+  SQL: '',
 } as const
 
 export const LANGUAGE_FORMAT_VALUE = {
-  C: "c",
-  "C++": "cpp",
-  Java: "java",
-  Python: "python",
-  JavaScript: "javascript",
-  Golang: "go",
-  Flowchart: "flowchart",
-  SQL: "sql",
+  C: 'c',
+  'C++': 'cpp',
+  Java: 'java',
+  Python: 'python',
+  JavaScript: 'javascript',
+  Golang: 'go',
+  Flowchart: 'flowchart',
+  SQL: 'sql',
 } as const
 
 export const LANGUAGE_SHOW_VALUE = {
-  Flowchart: "流程图",
-  C: "C语言",
-  "C++": "C++",
-  Java: "Java",
-  Python: "Python",
-  JavaScript: "JS",
-  Golang: "Go",
-  SQL: "SQL",
+  Flowchart: '流程图',
+  C: 'C语言',
+  'C++': 'C++',
+  Java: 'Java',
+  Python: 'Python',
+  JavaScript: 'JS',
+  Golang: 'Go',
+  SQL: 'SQL',
 } as const
 
 export const ICON_SET = {
-  Flowchart: "vscode-icons:file-type-drawio",
-  Python: "devicon:python",
-  C: "devicon:c",
-  "C++": "devicon:cplusplus",
-  Java: "devicon:java",
-  JavaScript: "devicon:javascript",
-  Golang: "devicon:go",
-  SQL: "devicon:sqlite",
+  Flowchart: 'vscode-icons:file-type-drawio',
+  Python: 'devicon:python',
+  C: 'devicon:c',
+  'C++': 'devicon:cplusplus',
+  Java: 'devicon:java',
+  JavaScript: 'devicon:javascript',
+  Golang: 'devicon:go',
+  SQL: 'devicon:sqlite',
 } as const
 
 const cTemplate = `//TEMPLATE BEGIN
@@ -248,7 +246,7 @@ const blankTemplate = `//PREPEND BEGIN
 
 export const CODE_TEMPLATES = {
   C: cTemplate,
-  "C++": cppTemplate,
+  'C++': cppTemplate,
   Python: blankTemplate,
   Java: blankTemplate,
   JavaScript: blankTemplate,
@@ -259,36 +257,36 @@ export const CODE_TEMPLATES = {
 
 // 成就稀有度
 export const RARITY_LABEL: Record<AchievementRarity, string> = {
-  bronze: "青铜",
-  silver: "白银",
-  gold: "黄金",
-  platinum: "白金",
+  bronze: '青铜',
+  silver: '白银',
+  gold: '黄金',
+  platinum: '白金',
 }
 
 // 边框、色块用的原色：饱和度够高，明暗底上都醒目。
 // 青铜往红偏（色相 23），黄金往纯黄推（色相 47），中间隔开两档亮度，
 // 不然两个都落在橙棕区，扫一眼分不出来
 export const RARITY_COLOR: Record<AchievementRarity, string> = {
-  bronze: "#c2703d",
-  silver: "#9fa6b2",
-  gold: "#f2c012",
-  platinum: "#7dd3fc",
+  bronze: '#c2703d',
+  silver: '#9fa6b2',
+  gold: '#f2c012',
+  platinum: '#7dd3fc',
 }
 
 // 文字要另配一套。上面那组是照深色底调的，搬到白底上白金只有 1.7:1、
 // 黄金 2.2:1，12px 的稀有度标签根本看不清。取色见 useRarityColor
-export const RARITY_TEXT_COLOR: Record<"dark" | "light", Record<AchievementRarity, string>> = {
+export const RARITY_TEXT_COLOR: Record<'dark' | 'light', Record<AchievementRarity, string>> = {
   dark: {
-    bronze: "#e08d63",
-    silver: "#b6bcc7",
-    gold: "#f2c012",
-    platinum: "#7dd3fc",
+    bronze: '#e08d63',
+    silver: '#b6bcc7',
+    gold: '#f2c012',
+    platinum: '#7dd3fc',
   },
   light: {
-    bronze: "#a13d1e",
-    silver: "#6b7280",
-    gold: "#8f6f00",
-    platinum: "#0369a1",
+    bronze: '#a13d1e',
+    silver: '#6b7280',
+    gold: '#8f6f00',
+    platinum: '#0369a1',
   },
 }
 
@@ -300,7 +298,7 @@ export const RARITY_TEXT_COLOR: Record<"dark" | "light", Record<AchievementRarit
  * 它按「键长度 + 字节序」重排，读出来会变成 完整性 / 清晰度 / 规范性 / 逻辑正确性，
  * 40 分的那项排到最后。凡是要展示评分明细的地方都按这个顺序排，别直接遍历对象。
  */
-export const FLOWCHART_CRITERIA_ORDER = ["逻辑正确性", "完整性", "规范性", "清晰度"]
+export const FLOWCHART_CRITERIA_ORDER = ['逻辑正确性', '完整性', '规范性', '清晰度']
 
 /** 按 FLOWCHART_CRITERIA_ORDER 排序，表里没有的键排在后面并保持原有相对顺序 */
 export function sortFlowchartCriteria<T>(details: Record<string, T>): [string, T][] {
@@ -322,9 +320,7 @@ export const CLASS_NAME_MAX_DIGITS = 4
 export const CLASS_NAME_RE = new RegExp(`^\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}$`)
 
 /** 用户名开头的 ks<班级号>，用于从用户名里认出班级 */
-export const USERNAME_CLASS_RE = new RegExp(
-  `^ks\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}`,
-)
+export const USERNAME_CLASS_RE = new RegExp(`^ks\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}`)
 
 /** 班级号作为数字时的上下界，给 n-input-number 用 */
 export const CLASS_NAME_MIN_VALUE = 10 ** (CLASS_NAME_MIN_DIGITS - 1)
@@ -336,18 +332,18 @@ export const REACTIONS: {
   icon: string
 }[] = [
   {
-    key: "too_easy",
-    label: "太简单",
-    icon: "fluent-emoji:smiling-face-with-sunglasses",
+    key: 'too_easy',
+    label: '太简单',
+    icon: 'fluent-emoji:smiling-face-with-sunglasses',
   },
-  { key: "too_hard", label: "太难了", icon: "fluent-emoji:exploding-head" },
+  { key: 'too_hard', label: '太难了', icon: 'fluent-emoji:exploding-head' },
   {
-    key: "confusing",
-    label: "没看懂",
-    icon: "fluent-emoji:face-with-spiral-eyes",
+    key: 'confusing',
+    label: '没看懂',
+    icon: 'fluent-emoji:face-with-spiral-eyes',
   },
-  { key: "buggy", label: "题目有错", icon: "fluent-emoji:bug" },
-  { key: "learned", label: "学到了", icon: "fluent-emoji:light-bulb" },
-  { key: "interesting", label: "有意思", icon: "fluent-emoji:star-struck" },
-  { key: "want_explain", label: "想听讲解", icon: "fluent-emoji:books" },
+  { key: 'buggy', label: '题目有错', icon: 'fluent-emoji:bug' },
+  { key: 'learned', label: '学到了', icon: 'fluent-emoji:light-bulb' },
+  { key: 'interesting', label: '有意思', icon: 'fluent-emoji:star-struck' },
+  { key: 'want_explain', label: '想听讲解', icon: 'fluent-emoji:books' },
 ]

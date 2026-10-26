@@ -1,26 +1,21 @@
 <script setup lang="ts">
-import LockNote from "oj/problemset/components/LockNote.vue"
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { getSubmission } from "oj/api"
-import { useUserStore } from "shared/store/user"
-import {
-  JUDGE_STATUS,
-  LANGUAGE_FORMAT_VALUE,
-  LANGUAGE_SHOW_VALUE,
-  SubmissionStatus,
-} from "utils/constants"
-import { submissionCaseResults } from "utils/functions"
-import type { Submission, SubmissionListItem } from "utils/types"
-import { useCopySubmission } from "../composables/copySubmission"
-import { useSubmissionExplain } from "../composables/explain"
-import { useTone } from "shared/composables/tone"
-import { classLabel } from "utils/classes"
-import { submissionTimeText } from "../utils"
-import CodeView from "./CodeView.vue"
-import ExplainNote from "./ExplainNote.vue"
-import StatusPill from "./StatusPill.vue"
-import UserName from "shared/components/UserName.vue"
+import LockNote from 'oj/problemset/components/LockNote.vue'
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { getSubmission } from 'oj/api'
+import { useUserStore } from 'shared/store/user'
+import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, LANGUAGE_SHOW_VALUE, SubmissionStatus } from 'utils/constants'
+import { submissionCaseResults } from 'utils/functions'
+import type { Submission, SubmissionListItem } from 'utils/types'
+import { useCopySubmission } from '../composables/copySubmission'
+import { useSubmissionExplain } from '../composables/explain'
+import { useTone } from 'shared/composables/tone'
+import { classLabel } from 'utils/classes'
+import { submissionTimeText } from '../utils'
+import CodeView from './CodeView.vue'
+import ExplainNote from './ExplainNote.vue'
+import StatusPill from './StatusPill.vue'
+import UserName from 'shared/components/UserName.vue'
 
 /**
  * 提交列表的右栏：选中那一条的代码和结果（设计稿「提交列表重设计 · 定稿」）。
@@ -66,10 +61,7 @@ const detail = ref<Submission | null>(null)
 const loading = ref(false)
 const failed = ref(false)
 
-const judging = computed(
-  () =>
-    props.row.result === SubmissionStatus.pending || props.row.result === SubmissionStatus.judging,
-)
+const judging = computed(() => props.row.result === SubmissionStatus.pending || props.row.result === SubmissionStatus.judging)
 
 // 每次加载一个序号：同一条先按「判题中」拉了一次、判完又拉一次时，晚回来的旧请求不能盖掉新的
 let loadSeq = 0
@@ -111,9 +103,9 @@ const shown = computed(() => (detail.value?.id === props.row.id ? detail.value :
 
 const locked = computed(() => {
   if (props.row.showLink) return null
-  if (!userStore.isAuthed) return "anon" as const
-  if (props.row.userId === userStore.user?.id) return "problemset" as const
-  return "others" as const
+  if (!userStore.isAuthed) return 'anon' as const
+  if (props.row.userId === userStore.user?.id) return 'problemset' as const
+  return 'others' as const
 })
 
 /** 逐个测试点。只有管理员拿得到 info（每个点带 output_md5），学生只有 caseSummary 两个数 */
@@ -122,14 +114,14 @@ const cases = computed(() => submissionCaseResults(shown.value?.info))
 const { explain, explainTone } = useSubmissionExplain(shown)
 
 function caseColor(result: number) {
-  if (result === SubmissionStatus.accepted) return tone("success").solid
-  if (result === SubmissionStatus.runtime_error) return tone("warning").solid
-  return tone("error").solid
+  if (result === SubmissionStatus.accepted) return tone('success').solid
+  if (result === SubmissionStatus.runtime_error) return tone('warning').solid
+  return tone('error').solid
 }
 
 const canRejudge = computed(() => props.teacher && !props.contest)
 function openStandalone() {
-  window.open("/submission/" + props.row.id, "_blank")
+  window.open('/submission/' + props.row.id, '_blank')
 }
 </script>
 
@@ -138,19 +130,10 @@ function openStandalone() {
     <div class="head">
       <div class="who">
         <!-- 点名字开个人主页（原来列表里的用户名就是这个链接） -->
-        <a
-          class="user-link"
-          :href="`/user?name=${encodeURIComponent(row.username)}`"
-          target="_blank"
-        >
+        <a class="user-link" :href="`/user?name=${encodeURIComponent(row.username)}`" target="_blank">
           <UserName :username="row.username" :muted="!!locked && locked !== 'problemset'" />
         </a>
-        <button
-          class="filter-pill"
-          title="只看这个人的提交"
-          aria-label="只看这个人的提交"
-          @click="emit('filterUser', row.username)"
-        >
+        <button class="filter-pill" title="只看这个人的提交" aria-label="只看这个人的提交" @click="emit('filterUser', row.username)">
           <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
         <!-- 班级下拉只有网站配置里在读的班，摘掉的老班从这里筛。已经在筛这个班时原地变成「取消」，
@@ -177,21 +160,11 @@ function openStandalone() {
       <span v-if="!narrow" class="dot">·</span>
       <!-- 两层 display: contents 的壳：桌面上照旧排成一行，手机上题目整行另起、按钮挪到名字右边 -->
       <span class="problem-group">
-        <a
-          class="problem"
-          href="#"
-          :title="`${row.problemDisplayId} ${row.problemTitle}`"
-          @click.prevent="emit('openProblem', row)"
-        >
+        <a class="problem" href="#" :title="`${row.problemDisplayId} ${row.problemTitle}`" @click.prevent="emit('openProblem', row)">
           <span class="problem-id">{{ row.problemDisplayId }}</span>
           {{ row.problemTitle }}
         </a>
-        <button
-          class="filter-pill"
-          title="只看这道题的提交"
-          aria-label="只看这道题的提交"
-          @click="emit('filterProblem', row.problemDisplayId)"
-        >
+        <button class="filter-pill" title="只看这道题的提交" aria-label="只看这道题的提交" @click="emit('filterProblem', row.problemDisplayId)">
           <Icon icon="ph:funnel-simple-bold" :width="12" />
         </button>
         <a
@@ -209,27 +182,14 @@ function openStandalone() {
         <!-- 桌面上复制两项在底栏：顶上这一行再塞两个按钮，1280 的屏上老师的题目名一个字都不剩、
              学生的也只剩六七个字（第二行测试点一多也排不下，底栏还空 250px 以上） -->
         <template v-if="shown && narrow">
-          <n-button
-            size="small"
-            :type="teacher ? 'default' : 'primary'"
-            @click="copyToProblem(shown)"
-          >
+          <n-button size="small" :type="teacher ? 'default' : 'primary'" @click="copyToProblem(shown)">
             <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
             复制回到题目
           </n-button>
-          <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
-            复制到自测猫
-          </n-button>
+          <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)"> 复制到自测猫 </n-button>
         </template>
         <template v-if="teacher">
-          <n-button
-            v-if="shown"
-            size="small"
-            quaternary
-            title="新页面打开（看这道题交的每一次）"
-            aria-label="新页面打开"
-            @click="openStandalone"
-          >
+          <n-button v-if="shown" size="small" quaternary title="新页面打开（看这道题交的每一次）" aria-label="新页面打开" @click="openStandalone">
             <template #icon><Icon icon="ph:arrow-square-out" /></template>
           </n-button>
           <!-- 原来收在「⋯」里，菜单里就剩这一项了，直接摆出来。和旁边「新页面打开」一样只给图标：
@@ -247,13 +207,7 @@ function openStandalone() {
           </n-button>
         </template>
         <template v-else-if="shown">
-          <n-button
-            size="small"
-            quaternary
-            title="新页面打开"
-            aria-label="新页面打开"
-            @click="openStandalone"
-          >
+          <n-button size="small" quaternary title="新页面打开" aria-label="新页面打开" @click="openStandalone">
             <template #icon><Icon icon="ph:arrow-square-out" /></template>
           </n-button>
         </template>
@@ -273,11 +227,7 @@ function openStandalone() {
           {{ index + 1 }}
         </span>
       </span>
-      <span
-        v-else-if="row.caseSummary && row.caseSummary.passed < row.caseSummary.total"
-        class="partial"
-        :style="{ color: tone('error').color }"
-      >
+      <span v-else-if="row.caseSummary && row.caseSummary.passed < row.caseSummary.total" class="partial" :style="{ color: tone('error').color }">
         通过 {{ row.caseSummary.passed }}/{{ row.caseSummary.total }} 个测试点
       </span>
       <span>{{ LANGUAGE_SHOW_VALUE[row.language] }}</span>
@@ -290,9 +240,7 @@ function openStandalone() {
       <template v-if="locked === 'others'">
         <span class="locked-title">别人的代码看不到</span>
         <span class="muted">自己动手做出来，才是自己的。</span>
-        <n-button type="primary" @click="emit('openProblem', row)">
-          去做 {{ row.problemDisplayId }} {{ row.problemTitle }}
-        </n-button>
+        <n-button type="primary" @click="emit('openProblem', row)"> 去做 {{ row.problemDisplayId }} {{ row.problemTitle }} </n-button>
       </template>
       <template v-else-if="locked === 'problemset'">
         <span class="locked-title">这份代码在题单布置期内先藏着</span>
@@ -326,25 +274,17 @@ function openStandalone() {
     <div v-if="!narrow" class="foot">
       <span class="keys"><kbd>↑</kbd><kbd>↓</kbd></span>
       <span class="hint">
-        {{ teacher ? "换上一条 / 下一条，到本页头尾自动翻页" : "换上一条 / 下一条，锁着的会跳过" }}
+        {{ teacher ? '换上一条 / 下一条，到本页头尾自动翻页' : '换上一条 / 下一条，锁着的会跳过' }}
       </span>
       <div class="spacer"></div>
       <template v-if="shown">
-        <n-button
-          size="small"
-          :type="teacher ? 'default' : 'primary'"
-          @click="copyToProblem(shown)"
-        >
+        <n-button size="small" :type="teacher ? 'default' : 'primary'" @click="copyToProblem(shown)">
           <template #icon><Icon icon="ph:arrow-u-up-left" /></template>
           复制回到题目
         </n-button>
-        <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)">
-          复制到自测猫
-        </n-button>
+        <n-button v-if="shown.language !== 'SQL'" size="small" @click="copyToCat(shown)"> 复制到自测猫 </n-button>
       </template>
-      <span v-if="position" class="position"
-        >本页第 {{ position.index }} / {{ position.count }} 条</span
-      >
+      <span v-if="position" class="position">本页第 {{ position.index }} / {{ position.count }} 条</span>
     </div>
   </section>
 </template>
@@ -359,7 +299,7 @@ function openStandalone() {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: v-bind("theme.bodyColor");
+  background: v-bind('theme.bodyColor');
   container: pane / inline-size;
 }
 
@@ -461,7 +401,7 @@ function openStandalone() {
 }
 
 .user-link :deep(.name) {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .user-link:hover :deep(.name) {
@@ -476,11 +416,11 @@ function openStandalone() {
 }
 
 .dot {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .problem {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -492,7 +432,7 @@ function openStandalone() {
 }
 
 .problem-id {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .problemset {
@@ -557,7 +497,7 @@ function openStandalone() {
   align-items: center;
   gap: 12px;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
   flex-wrap: wrap;
   row-gap: 6px;
@@ -589,7 +529,7 @@ function openStandalone() {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .locked,
@@ -607,12 +547,12 @@ function openStandalone() {
 }
 
 .locked {
-  border: 1px dashed v-bind("theme.borderColor");
-  background: v-bind("theme.cardColor");
+  border: 1px dashed v-bind('theme.borderColor');
+  background: v-bind('theme.cardColor');
 }
 
 .lock-icon {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   opacity: 0.7;
 }
 
@@ -629,7 +569,7 @@ function openStandalone() {
   gap: 8px;
   white-space: nowrap;
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 /* 1280 的屏上这一栏只剩几像素：字体宽一点的机器上让提示省略，别把按钮挤出去 */
@@ -653,9 +593,9 @@ kbd {
   height: 18px;
   padding: 0 4px;
   box-sizing: border-box;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 3px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   font: inherit;
   font-size: 11px;
   display: inline-flex;

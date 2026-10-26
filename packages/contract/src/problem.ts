@@ -1,16 +1,16 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { achievementRaritySchema } from "./achievement"
-import { paginatedSchema, sampleUserSchema } from "./common"
-import { judgeStatusSchema } from "./judge-status"
-import { problemLanguageSchema } from "./language"
+import { achievementRaritySchema } from './achievement'
+import { paginatedSchema, sampleUserSchema } from './common'
+import { judgeStatusSchema } from './judge-status'
+import { problemLanguageSchema } from './language'
 
 /**
  * 题目难度。生产库 956 道题只有这三个值（旧 Django 的 Problem.difficulty choices
  * 也是这三个），前端的 DIFFICULTY 映射表按它建 —— 写成 z.string() 的话
  * 多出来的值会静默渲染成 undefined。
  */
-export const problemDifficultySchema = z.enum(["Low", "Mid", "High"])
+export const problemDifficultySchema = z.enum(['Low', 'Mid', 'High'])
 
 /**
  * 题目详情/列表里的难度。**可为 null** —— 比赛进行中、看的人又不是管理员时，
@@ -31,7 +31,7 @@ export const maskedProblemDifficultySchema = problemDifficultySchema.nullable()
  * SQLDisplay 接口才能渲染表格，抄错了没人拦得住。
  */
 export const sqlConfigSchema = z.object({
-  mode: z.enum(["query", "modify"]),
+  mode: z.enum(['query', 'modify']),
   order_sensitive: z.boolean(),
 })
 
@@ -61,10 +61,7 @@ export const sqlDisplaySchema = z.object({
   tables: z.array(sqlDisplayTableSchema),
   // query 题给结果集，modify 题给改动后的表 —— 两种形态，前端按有没有
   // changed_tables 分支
-  expected: z.union([
-    sqlResultSetSchema,
-    z.object({ changed_tables: z.array(sqlDisplayTableSchema) }),
-  ]),
+  expected: z.union([sqlResultSetSchema, z.object({ changed_tables: z.array(sqlDisplayTableSchema) })]),
 })
 
 /**
@@ -78,17 +75,17 @@ export const sqlDisplaySchema = z.object({
  * （见 ast.ts 的 evaluateRule），缺了就走默认文案。
  */
 export const astRuleEngineSchema = z.enum([
-  "must_exist_node",
-  "must_not_exist_node",
-  "count_node",
-  "must_call_function",
-  "must_not_call_function",
-  "count_function_call",
-  "must_call_method",
-  "must_not_call_method",
-  "must_use_operator",
+  'must_exist_node',
+  'must_not_exist_node',
+  'count_node',
+  'must_call_function',
+  'must_not_call_function',
+  'count_function_call',
+  'must_call_method',
+  'must_not_call_method',
+  'must_use_operator',
   // 判题机实现了，但后台编辑器还没有对应的选项，目前只能手工造数据用上
-  "must_have_nesting",
+  'must_have_nesting',
 ])
 
 export const astRuleSchema = z.object({
@@ -134,20 +131,20 @@ export interface AstNodeTarget {
 }
 
 const C_NODE_TARGETS = {
-  for_loop: { label: "for 循环", node: "for_statement" },
-  while_loop: { label: "while 循环", node: "while_statement" },
-  do_while: { label: "do-while 循环", node: "do_statement" },
-  if_statement: { label: "if 条件", node: "if_statement" },
-  else_clause: { label: "else 子句", node: "else_clause" },
-  switch_statement: { label: "switch 语句", node: "switch_statement" },
-  case_statement: { label: "case 分支", node: "case_statement" },
-  break: { label: "break 语句", node: "break_statement" },
-  continue: { label: "continue 语句", node: "continue_statement" },
-  return: { label: "return 语句", node: "return_statement" },
-  function_definition: { label: "函数定义", node: "function_definition" },
-  assignment: { label: "赋值语句", node: "assignment_expression" },
-  struct: { label: "结构体", node: "struct_specifier" },
-  include: { label: "#include 指令", node: "preproc_include" },
+  for_loop: { label: 'for 循环', node: 'for_statement' },
+  while_loop: { label: 'while 循环', node: 'while_statement' },
+  do_while: { label: 'do-while 循环', node: 'do_statement' },
+  if_statement: { label: 'if 条件', node: 'if_statement' },
+  else_clause: { label: 'else 子句', node: 'else_clause' },
+  switch_statement: { label: 'switch 语句', node: 'switch_statement' },
+  case_statement: { label: 'case 分支', node: 'case_statement' },
+  break: { label: 'break 语句', node: 'break_statement' },
+  continue: { label: 'continue 语句', node: 'continue_statement' },
+  return: { label: 'return 语句', node: 'return_statement' },
+  function_definition: { label: '函数定义', node: 'function_definition' },
+  assignment: { label: '赋值语句', node: 'assignment_expression' },
+  struct: { label: '结构体', node: 'struct_specifier' },
+  include: { label: '#include 指令', node: 'preproc_include' },
 } satisfies Record<string, AstNodeTarget>
 
 export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNodeTarget>> = {
@@ -158,9 +155,9 @@ export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNode
    * 契约和判题机两个文件里各抄了两遍（C 一份、C++ 一份），同一份数据四份拷贝。
    * 这里逐条列出来是为了保住下拉框的显示顺序（C++ 独有的几条是插在中间的）。
    */
-  "C++": {
+  'C++': {
     for_loop: C_NODE_TARGETS.for_loop,
-    range_for_loop: { label: "范围 for 循环", node: "for_range_loop" },
+    range_for_loop: { label: '范围 for 循环', node: 'for_range_loop' },
     while_loop: C_NODE_TARGETS.while_loop,
     do_while: C_NODE_TARGETS.do_while,
     if_statement: C_NODE_TARGETS.if_statement,
@@ -171,37 +168,37 @@ export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNode
     continue: C_NODE_TARGETS.continue,
     return: C_NODE_TARGETS.return,
     function_definition: C_NODE_TARGETS.function_definition,
-    class_definition: { label: "类定义", node: "class_specifier" },
+    class_definition: { label: '类定义', node: 'class_specifier' },
     struct: C_NODE_TARGETS.struct,
     assignment: C_NODE_TARGETS.assignment,
     include: C_NODE_TARGETS.include,
-    try_except: { label: "try-catch", node: "try_statement" },
-    throw: { label: "throw 语句", node: "throw_statement" },
-    namespace: { label: "namespace 定义", node: "namespace_definition" },
-    template: { label: "模板定义", node: "template_declaration" },
-    lambda: { label: "lambda 表达式", node: "lambda_expression" },
-    using: { label: "using 声明", node: "using_declaration" },
+    try_except: { label: 'try-catch', node: 'try_statement' },
+    throw: { label: 'throw 语句', node: 'throw_statement' },
+    namespace: { label: 'namespace 定义', node: 'namespace_definition' },
+    template: { label: '模板定义', node: 'template_declaration' },
+    lambda: { label: 'lambda 表达式', node: 'lambda_expression' },
+    using: { label: 'using 声明', node: 'using_declaration' },
   },
   Python: {
-    for_loop: { label: "for 循环", node: "for_statement" },
-    while_loop: { label: "while 循环", node: "while_statement" },
-    if_statement: { label: "if 条件", node: "if_statement" },
-    elif_clause: { label: "elif 子句", node: "elif_clause" },
-    else_clause: { label: "else 子句", node: "else_clause" },
-    break: { label: "break 语句", node: "break_statement" },
-    continue: { label: "continue 语句", node: "continue_statement" },
-    return: { label: "return 语句", node: "return_statement" },
-    function_definition: { label: "函数定义", node: "function_definition" },
-    class_definition: { label: "类定义", node: "class_definition" },
-    assignment: { label: "赋值语句", node: "assignment" },
-    try_except: { label: "try-except", node: "try_statement" },
-    with_statement: { label: "with 语句", node: "with_statement" },
-    import: { label: "import 语句", node: "import_statement" },
-    import_from: { label: "from-import 语句", node: "import_from_statement" },
-    list_comprehension: { label: "列表推导式", node: "list_comprehension" },
-    list_literal: { label: "列表", node: "list" },
-    dict_literal: { label: "字典", node: "dictionary" },
-    set_literal: { label: "集合", node: "set" },
+    for_loop: { label: 'for 循环', node: 'for_statement' },
+    while_loop: { label: 'while 循环', node: 'while_statement' },
+    if_statement: { label: 'if 条件', node: 'if_statement' },
+    elif_clause: { label: 'elif 子句', node: 'elif_clause' },
+    else_clause: { label: 'else 子句', node: 'else_clause' },
+    break: { label: 'break 语句', node: 'break_statement' },
+    continue: { label: 'continue 语句', node: 'continue_statement' },
+    return: { label: 'return 语句', node: 'return_statement' },
+    function_definition: { label: '函数定义', node: 'function_definition' },
+    class_definition: { label: '类定义', node: 'class_definition' },
+    assignment: { label: '赋值语句', node: 'assignment' },
+    try_except: { label: 'try-except', node: 'try_statement' },
+    with_statement: { label: 'with 语句', node: 'with_statement' },
+    import: { label: 'import 语句', node: 'import_statement' },
+    import_from: { label: 'from-import 语句', node: 'import_from_statement' },
+    list_comprehension: { label: '列表推导式', node: 'list_comprehension' },
+    list_literal: { label: '列表', node: 'list' },
+    dict_literal: { label: '字典', node: 'dictionary' },
+    set_literal: { label: '集合', node: 'set' },
     /**
      * f-string 认的是 `interpolation`（`f"{x}"` 里的 `{x}`），不是 `format_string` ——
      * 这个版本的 tree-sitter-python 里**没有** format_string 这种节点，f-string 是
@@ -213,7 +210,7 @@ export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNode
      * 这已经是严格的改善。实测 `%` 格式化、`.format()`、普通字符串、字符串拼接
      * 都不会误伤。
      */
-    f_string: { label: "f-string", node: "interpolation" },
+    f_string: { label: 'f-string', node: 'interpolation' },
   },
 }
 
@@ -227,59 +224,59 @@ export const AST_NODE_TARGETS_BY_LANGUAGE: Record<string, Record<string, AstNode
  * 恒等的条目（`+`、`==` …）写全是因为这张表同时是后台下拉的选项来源。
  */
 const C_OPERATOR_TARGETS = {
-  "+": "+",
-  "-": "-",
-  "*": "*",
-  "/": "/",
-  "%": "%",
-  "+=": "+=",
-  "-=": "-=",
-  "*=": "*=",
-  "/=": "/=",
-  "%=": "%=",
-  "++": "++",
-  "--": "--",
-  "==": "==",
-  "!=": "!=",
-  ">": ">",
-  ">=": ">=",
-  "<": "<",
-  "<=": "<=",
-  and: "&&",
-  or: "||",
-  not: "!",
-  "&": "&",
-  "|": "|",
+  '+': '+',
+  '-': '-',
+  '*': '*',
+  '/': '/',
+  '%': '%',
+  '+=': '+=',
+  '-=': '-=',
+  '*=': '*=',
+  '/=': '/=',
+  '%=': '%=',
+  '++': '++',
+  '--': '--',
+  '==': '==',
+  '!=': '!=',
+  '>': '>',
+  '>=': '>=',
+  '<': '<',
+  '<=': '<=',
+  and: '&&',
+  or: '||',
+  not: '!',
+  '&': '&',
+  '|': '|',
 }
 
 export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<string, Record<string, string>> = {
   C: C_OPERATOR_TARGETS,
   // `<<` / `>>` 对 C++ 主要是 cout/cin 的流运算符（位移是同一个 token）
-  "C++": { ...C_OPERATOR_TARGETS, "<<": "<<", ">>": ">>" },
+  'C++': { ...C_OPERATOR_TARGETS, '<<': '<<', '>>': '>>' },
   Python: {
-    "+": "+",
-    "-": "-",
-    "*": "*",
-    "/": "/",
-    "//": "//",
-    "%": "%",
-    "**": "**",
-    "+=": "+=",
-    "-=": "-=",
-    "*=": "*=",
-    "/=": "/=",
-    "%=": "%=",
-    "==": "==",
-    "!=": "!=",
-    ">": ">",
-    ">=": ">=",
-    "<": "<",
-    "<=": "<=",
-    and: "and",
-    or: "or",
-    not: "not",
-    "&": "&",
-    "|": "|",
+    '+': '+',
+    '-': '-',
+    '*': '*',
+    '/': '/',
+    '//': '//',
+    '%': '%',
+    '**': '**',
+    '+=': '+=',
+    '-=': '-=',
+    '*=': '*=',
+    '/=': '/=',
+    '%=': '%=',
+    '==': '==',
+    '!=': '!=',
+    '>': '>',
+    '>=': '>=',
+    '<': '<',
+    '<=': '<=',
+    and: 'and',
+    or: 'or',
+    not: 'not',
+    '&': '&',
+    '|': '|',
   },
 }
 
@@ -292,9 +289,7 @@ export const AST_SUPPORTED_LANGUAGES = Object.keys(AST_NODE_TARGETS_BY_LANGUAGE)
 
 /** 全语言的节点中文名并集，只给拿不到语言的场合做回落。有语言一律走 astNodeLabel() */
 export const AST_NODE_TARGET_LABELS: Record<string, string> = Object.fromEntries(
-  Object.values(AST_NODE_TARGETS_BY_LANGUAGE).flatMap((table) =>
-    Object.entries(table).map(([target, entry]) => [target, entry.label]),
-  ),
+  Object.values(AST_NODE_TARGETS_BY_LANGUAGE).flatMap((table) => Object.entries(table).map(([target, entry]) => [target, entry.label])),
 )
 
 export function astNodeLabel(target: string, language?: string): string {
@@ -308,11 +303,7 @@ export function astNodeLabel(target: string, language?: string): string {
  * 都对不上就回落到裸 target（恒等的运算符 `+` / `==` 走的就是这条）。
  */
 export function astTargetNodeType(target: string, language: string): string {
-  return (
-    AST_NODE_TARGETS_BY_LANGUAGE[language]?.[target]?.node ??
-    AST_OPERATOR_TARGETS_BY_LANGUAGE[language]?.[target] ??
-    target
-  )
+  return AST_NODE_TARGETS_BY_LANGUAGE[language]?.[target]?.node ?? AST_OPERATOR_TARGETS_BY_LANGUAGE[language]?.[target] ?? target
 }
 
 export function astOperatorLabel(target: string, language?: string): string {
@@ -327,13 +318,8 @@ export function astOperatorLabel(target: string, language?: string): string {
  * 读取路径（判题、题目页要求）用它把这种规则整条丢掉，而不是让 schema 校验失败：
  * astRulesSchema 同时用于**读**后台题目详情，在那儿抛错会让整个详情打不开。
  */
-export function astRuleIsMeaningful(rule: {
-  engine: string
-  exact?: number
-  min?: number
-  max?: number
-}): boolean {
-  if (!rule.engine.startsWith("count")) return true
+export function astRuleIsMeaningful(rule: { engine: string; exact?: number; min?: number; max?: number }): boolean {
+  if (!rule.engine.startsWith('count')) return true
   return rule.exact !== undefined || rule.min !== undefined || rule.max !== undefined
 }
 
@@ -349,7 +335,7 @@ export const astRequirementSchema = z.object({
   /** 已经渲染好的中文文案，例如「if 条件 出现 2 次」 */
   description: z.string(),
   /** 标签配色：必须做 / 不能做 / 次数约束 */
-  kind: z.enum(["require", "forbid", "count"]),
+  kind: z.enum(['require', 'forbid', 'count']),
 })
 
 /** 按语言分组，与 astRulesSchema 同一套键 */
@@ -495,20 +481,13 @@ export const problemListItemSchema = z.object({
 export const problemListSchema = paginatedSchema(problemListItemSchema)
 
 /** 题目列表「全部类型」下拉：SQL / 有参考图 / 画流程图 / 语法要求 */
-export const problemTypeFilterSchema = z.enum(["sql", "reference", "flowchart", "ast"])
+export const problemTypeFilterSchema = z.enum(['sql', 'reference', 'flowchart', 'ast'])
 
 /**
  * 题目列表的排序。值沿用原来的（旧链接照样能用）：空串 = 最新创建、create_time = 最早创建，
  * ±submission_number / ±accepted_number 是做过 / 做对的**人数**，带 - 是从多到少
  */
-export const problemListSortSchema = z.enum([
-  "",
-  "create_time",
-  "-submission_number",
-  "submission_number",
-  "-accepted_number",
-  "accepted_number",
-])
+export const problemListSortSchema = z.enum(['', 'create_time', '-submission_number', 'submission_number', '-accepted_number', 'accepted_number'])
 
 /**
  * 题目列表顶上那行和左栏的进度。**只说做到了什么**：做对几道、这周新做对几道、
@@ -543,7 +522,7 @@ export const problemProgressSchema = z.object({
  * 题材（LOL、周杰伦、哈利波特……）。两类原来混在一起，题目列表上四十多个标签
  * 挤成一片，学生想按知识点找题得在一堆游戏名里挑。新标签默认算知识点。
  */
-export const tagCategorySchema = z.enum(["knowledge", "theme"])
+export const tagCategorySchema = z.enum(['knowledge', 'theme'])
 
 export const tagSchema = z.object({
   id: z.number().int(),
@@ -577,9 +556,7 @@ export const problemStatsSchema = z.object({
   /** 我自己：交了几次、做对没有。没登录为 null */
   me: z.object({ attempts: z.number().int(), solved: z.boolean() }).nullable(),
   /** 学生自己班这题 x / y 人做对（y 是班里交过的人）。没班级、比赛里为 null */
-  myClass: z
-    .object({ className: z.string(), tried: z.number().int(), solved: z.number().int() })
-    .nullable(),
+  myClass: z.object({ className: z.string(), tried: z.number().int(), solved: z.number().int() }).nullable(),
   /**
    * 老师：各班做这道题的情况，和数据统计「按班级汇总」**同一个口径**（只算学生的提交；
    * 做完 / 班级人数、交了没对、没交、正确率、最近一次），交过的人多的在前。

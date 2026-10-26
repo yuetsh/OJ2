@@ -1,10 +1,10 @@
-import { randomBytes } from "node:crypto"
-import { readFileSync } from "node:fs"
-import { isAbsolute, resolve } from "node:path"
+import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { isAbsolute, resolve } from 'node:path'
 
-import { z } from "zod"
+import { z } from 'zod'
 
-import { isCompiled, pathBase } from "./runtime"
+import { isCompiled, pathBase } from './runtime'
 
 /**
  * Bun 只自动加载「当前工作目录」下的 .env。而本应用的启动方式（`bun run --filter '@oj2/api' dev`）
@@ -19,18 +19,18 @@ import { isCompiled, pathBase } from "./runtime"
 function loadRepoRootEnv() {
   if (isCompiled) return
   try {
-    const text = readFileSync(resolve(pathBase, ".env"), "utf8")
-    for (const line of text.split("\n")) {
+    const text = readFileSync(resolve(pathBase, '.env'), 'utf8')
+    for (const line of text.split('\n')) {
       const trimmed = line.trim()
-      if (!trimmed || trimmed.startsWith("#")) continue
-      const eq = trimmed.indexOf("=")
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const eq = trimmed.indexOf('=')
       if (eq <= 0) continue
       const key = trimmed.slice(0, eq).trim()
       if (process.env[key] !== undefined) continue
       process.env[key] = trimmed
         .slice(eq + 1)
         .trim()
-        .replace(/^["']|["']$/g, "")
+        .replace(/^["']|["']$/g, '')
     }
   } catch {
     // 根目录没有 .env 是正常情况（例如生产用真实环境变量注入），静默跳过
@@ -50,53 +50,42 @@ loadRepoRootEnv()
  * 5433 / 6380，放到容器里要么连不上、要么连错，都不如当场报错。
  * 空字符串一律按「没设」处理 —— compose 里 `${X:-}` 展开出来就是空串。
  */
-const blankAsUnset = (value: unknown) => (value === "" ? undefined : value)
+const blankAsUnset = (value: unknown) => (value === '' ? undefined : value)
 const text = (fallback: string) => z.preprocess(blankAsUnset, z.string().default(fallback))
-const positiveInt = (fallback: number) =>
-  z.preprocess(blankAsUnset, z.coerce.number().int().positive().default(fallback))
-const requiredWhenCompiled = (devDefault: string) =>
-  isCompiled
-    ? z.preprocess(blankAsUnset, z.string({ error: "编译形态下必须设置" }))
-    : text(devDefault)
+const positiveInt = (fallback: number) => z.preprocess(blankAsUnset, z.coerce.number().int().positive().default(fallback))
+const requiredWhenCompiled = (devDefault: string) => (isCompiled ? z.preprocess(blankAsUnset, z.string({ error: '编译形态下必须设置' })) : text(devDefault))
 
 const envSchema = z.object({
   PORT: positiveInt(3000),
-  DATABASE_URL: requiredWhenCompiled(
-    "postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge",
-  ),
-  REDIS_URL: requiredWhenCompiled("redis://localhost:6380"),
+  DATABASE_URL: requiredWhenCompiled('postgres://onlinejudge:onlinejudge@localhost:5433/onlinejudge'),
+  REDIS_URL: requiredWhenCompiled('redis://localhost:6380'),
   SESSION_TTL_SECONDS: positiveInt(7 * 24 * 60 * 60),
-  JUDGE_SERVER_URL: text("http://localhost:8081"),
+  JUDGE_SERVER_URL: text('http://localhost:8081'),
   // dev 不设时生成一次性随机值，见 judgeServerToken()
-  JUDGE_SERVER_TOKEN: isCompiled
-    ? z.preprocess(blankAsUnset, z.string({ error: "编译形态下必须设置" }))
-    : z.preprocess(blankAsUnset, z.string().optional()),
+  JUDGE_SERVER_TOKEN: isCompiled ? z.preprocess(blankAsUnset, z.string({ error: '编译形态下必须设置' })) : z.preprocess(blankAsUnset, z.string().optional()),
   JUDGE_CONCURRENCY: positiveInt(2),
   TRIAL_CONCURRENCY: positiveInt(2),
-  AVATAR_DIRECTORY: text("data/avatar"),
-  TEST_CASE_DIRECTORY: text("data/test_case"),
-  UPLOAD_DIRECTORY: text("data/upload"),
-  HITOKOTO_DIRECTORY: text("../sentences-bundle"),
-  ALLOWED_WS_ORIGINS: text(""),
-  UPLOAD_URI_PREFIX: text("/public/upload"),
-  AVATAR_URI_PREFIX: text("/public/avatar"),
-  AI_BASE_URL: z.preprocess(blankAsUnset, z.url().default("https://api.deepseek.com")),
-  AI_PROVIDER: text("deepseek"),
-  AI_KEY: text(""),
-  AI_MODEL: text("deepseek-flash"),
-  AI_HINT_DIAGNOSE: z.preprocess(blankAsUnset, z.enum(["1", "0"]).optional()),
-  RUFF_PATH: text("ruff"),
-  CLANG_FORMAT_PATH: text("clang-format"),
-  PYTHON_PATH: text("python3"),
+  AVATAR_DIRECTORY: text('data/avatar'),
+  TEST_CASE_DIRECTORY: text('data/test_case'),
+  UPLOAD_DIRECTORY: text('data/upload'),
+  HITOKOTO_DIRECTORY: text('../sentences-bundle'),
+  ALLOWED_WS_ORIGINS: text(''),
+  UPLOAD_URI_PREFIX: text('/public/upload'),
+  AVATAR_URI_PREFIX: text('/public/avatar'),
+  AI_BASE_URL: z.preprocess(blankAsUnset, z.url().default('https://api.deepseek.com')),
+  AI_PROVIDER: text('deepseek'),
+  AI_KEY: text(''),
+  AI_MODEL: text('deepseek-flash'),
+  AI_HINT_DIAGNOSE: z.preprocess(blankAsUnset, z.enum(['1', '0']).optional()),
+  RUFF_PATH: text('ruff'),
+  CLANG_FORMAT_PATH: text('clang-format'),
+  PYTHON_PATH: text('python3'),
 })
 
 function parseEnv() {
   const parsed = envSchema.safeParse(process.env)
   if (parsed.success) return parsed.data
-  console.error(
-    "[config] 环境变量有误，拒绝启动：\n" +
-      parsed.error.issues.map((issue) => `  ${issue.path.join(".")}: ${issue.message}`).join("\n"),
-  )
+  console.error('[config] 环境变量有误，拒绝启动：\n' + parsed.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`).join('\n'))
   process.exit(1)
 }
 
@@ -120,17 +109,17 @@ function repoPath(value: string) {
 function judgeServerToken() {
   if (env.JUDGE_SERVER_TOKEN) return env.JUDGE_SERVER_TOKEN
   console.warn(
-    "[config] JUDGE_SERVER_TOKEN 未设置，已生成一次性随机 token。" +
-      "判题机将无法通过鉴权，本地开发请在 .env 里设置 JUDGE_SERVER_TOKEN，" +
-      "并让 docker/compose.dev.yml 的 OJ2_JUDGE_TOKEN 取同一个值。",
+    '[config] JUDGE_SERVER_TOKEN 未设置，已生成一次性随机 token。' +
+      '判题机将无法通过鉴权，本地开发请在 .env 里设置 JUDGE_SERVER_TOKEN，' +
+      '并让 docker/compose.dev.yml 的 OJ2_JUDGE_TOKEN 取同一个值。',
   )
-  return randomBytes(32).toString("hex")
+  return randomBytes(32).toString('hex')
 }
 
 // AI 是可选功能（.env.example 写明留空即关），所以只告警不退出 —— 但要在启动时说，
 // 别等到学生点了「AI 提示」才从一条 401 里看出来
-if (!env.AI_KEY && process.argv[2] !== "sql-child") {
-  console.warn("[config] AI_KEY 未设置，AI 分析 / 提示 / 流程图评分都不可用。")
+if (!env.AI_KEY && process.argv[2] !== 'sql-child') {
+  console.warn('[config] AI_KEY 未设置，AI 分析 / 提示 / 流程图评分都不可用。')
 }
 
 export const config = {
@@ -155,7 +144,7 @@ export const config = {
    * WebSocket 升级时额外放行的来源（逗号分隔的完整 origin，如 https://oj.example.com）。
    * 同源本来就放行，只有前后端分处不同域名时才需要配。
    */
-  allowedWebSocketOrigins: env.ALLOWED_WS_ORIGINS.split(",")
+  allowedWebSocketOrigins: env.ALLOWED_WS_ORIGINS.split(',')
     .map((value) => value.trim())
     .filter(Boolean),
   uploadUriPrefix: env.UPLOAD_URI_PREFIX,
@@ -170,7 +159,7 @@ export const config = {
    * 2026-09-19 起 ai_hint 在攒单段式的基线数据，攒够之前别打开，否则两批数据混在一起没法比。
    * 设成 "1" 打开。
    */
-  aiHintDiagnose: env.AI_HINT_DIAGNOSE === "1",
+  aiHintDiagnose: env.AI_HINT_DIAGNOSE === '1',
   ruffPath: env.RUFF_PATH,
   clangFormatPath: env.CLANG_FORMAT_PATH,
   /** 提交前的 Python 语法检查用（services/format-code.ts），要和判题机同一个大版本 */

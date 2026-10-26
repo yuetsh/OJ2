@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { useRouteQuery } from "@vueuse/router"
-import { useThemeVars } from "naive-ui"
-import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from "oj/api"
-import { useTone } from "shared/composables/tone"
-import { errorMessage } from "utils/api"
-import { parseTime } from "utils/functions"
-import type { ProblemSet, ProblemSetProblem } from "utils/types"
-import { useAuthModalStore } from "shared/store/authModal"
-import { useUserStore } from "shared/store/user"
-import { useFireworks } from "../problem/composables/useFireworks"
-import NotFound from "shared/components/NotFound.vue"
-import BadgeLadder from "./components/BadgeLadder.vue"
-import ClassView from "./components/ClassView.vue"
+import { useRouteQuery } from '@vueuse/router'
+import { useThemeVars } from 'naive-ui'
+import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from 'oj/api'
+import { useTone } from 'shared/composables/tone'
+import { errorMessage } from 'utils/api'
+import { parseTime } from 'utils/functions'
+import type { ProblemSet, ProblemSetProblem } from 'utils/types'
+import { useAuthModalStore } from 'shared/store/authModal'
+import { useUserStore } from 'shared/store/user'
+import { useFireworks } from '../problem/composables/useFireworks'
+import NotFound from 'shared/components/NotFound.vue'
+import BadgeLadder from './components/BadgeLadder.vue'
+import ClassView from './components/ClassView.vue'
 
 /**
  * 题单详情（设计稿「题单重设计」详情 B）：顶上一条是进度和奖章阶梯，下面题目分两列。
@@ -37,15 +37,12 @@ const set = ref<ProblemSet | null>(null)
 const problems = ref<ProblemSetProblem[]>([])
 const missing = ref(false)
 const joining = ref(false)
-const tab = useRouteQuery<string>("tab", "problems")
+const tab = useRouteQuery<string>('tab', 'problems')
 
 async function load() {
   missing.value = false
   try {
-    const [detail, list] = await Promise.all([
-      getProblemSetDetail(id.value),
-      getProblemSetProblems(id.value),
-    ])
+    const [detail, list] = await Promise.all([getProblemSetDetail(id.value), getProblemSetProblems(id.value)])
     set.value = detail
     problems.value = list
   } catch {
@@ -67,16 +64,14 @@ const joined = computed(() => !!progress.value?.isJoined)
 const canOpen = computed(() => joined.value || userStore.isTeacherOrAbove)
 const optional = computed(() => (set.value ? set.value.problemsCount - set.value.requiredCount : 0))
 const percent = computed(() =>
-  set.value && progress.value?.isJoined && set.value.requiredCount
-    ? Math.min(100, (progress.value.completedCount / set.value.requiredCount) * 100)
-    : 0,
+  set.value && progress.value?.isJoined && set.value.requiredCount ? Math.min(100, (progress.value.completedCount / set.value.requiredCount) * 100) : 0,
 )
 const hiddenCount = computed(() => problems.value.filter((item) => item.oldCodeHidden).length)
 
 /** 做完用了多久：从加入到做完 */
 const spent = computed(() => {
   const p = progress.value
-  if (!p?.joinTime || !p.completeTime) return ""
+  if (!p?.joinTime || !p.completeTime) return ''
   const minutes = Math.round((Date.parse(p.completeTime) - Date.parse(p.joinTime)) / 60_000)
   if (minutes < 60) return `${Math.max(1, minutes)} 分钟`
   if (minutes < 24 * 60) return `${Math.round(minutes / 60)} 小时`
@@ -85,7 +80,7 @@ const spent = computed(() => {
 
 // 两栏放得下（每栏 420 起）才拆；拆完在窄屏上叠起来，就成了两张没有标题的卡片，
 // 看着像题单分了两组
-const twoColumns = useMediaQuery("(min-width: 960px)")
+const twoColumns = useMediaQuery('(min-width: 960px)')
 
 const columns = computed(() => {
   if (!twoColumns.value) return [problems.value]
@@ -98,13 +93,13 @@ function indexOf(item: ProblemSetProblem) {
 }
 
 function solvedAt(time: string) {
-  const today = parseTime(new Date(), "YYYY-MM-DD") === parseTime(time, "YYYY-MM-DD")
-  return parseTime(time, today ? "HH:mm" : "M月D日")
+  const today = parseTime(new Date(), 'YYYY-MM-DD') === parseTime(time, 'YYYY-MM-DD')
+  return parseTime(time, today ? 'HH:mm' : 'M月D日')
 }
 
 function problemLink(item: ProblemSetProblem) {
   return {
-    name: "problemset problem",
+    name: 'problemset problem',
     params: { problemSetId: id.value, problemID: item.problem._id },
   }
 }
@@ -118,34 +113,26 @@ async function join() {
   joining.value = true
   try {
     await joinProblemSet(id.value)
-    message.success("加入了，现在开始在这里做对的题都会记进度")
+    message.success('加入了，现在开始在这里做对的题都会记进度')
     await load()
   } catch (err) {
-    message.error(errorMessage(err, "加入失败"))
+    message.error(errorMessage(err, '加入失败'))
   } finally {
     joining.value = false
   }
 }
 
 /** 编辑只给出题人和超管（后台按归属校验，别人点进去是 404） */
-const canEdit = computed(
-  () => !!set.value && (userStore.isSuperAdmin || set.value.createdBy.id === userStore.user?.id),
-)
+const canEdit = computed(() => !!set.value && (userStore.isSuperAdmin || set.value.createdBy.id === userStore.user?.id))
 
-const info = computed(() => tone("info"))
-const success = computed(() => tone("success"))
-const warning = computed(() => tone("warning"))
-const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
+const info = computed(() => tone('info'))
+const success = computed(() => tone('success'))
+const warning = computed(() => tone('warning'))
+const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
 </script>
 
 <template>
-  <NotFound
-    v-if="missing"
-    title="这个题单不存在"
-    hint="可能还没公开，或者已经删掉了"
-    to="/problemset"
-    to-label="回到题单列表"
-  />
+  <NotFound v-if="missing" title="这个题单不存在" hint="可能还没公开，或者已经删掉了" to="/problemset" to-label="回到题单列表" />
 
   <div v-else-if="set" class="page oj-page">
     <section class="band" :class="{ done: progress?.isCompleted }">
@@ -154,13 +141,11 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
         <div class="row">
           <router-link :to="{ name: 'problemsets' }" class="back">‹ 题单</router-link>
           <h2 class="ell">{{ set.title }}</h2>
-          <span v-if="set.assigning" class="pill assign"
-            >布置到 {{ parseTime(set.assignedUntil!, "M月D日") }}</span
-          >
+          <span v-if="set.assigning" class="pill assign">布置到 {{ parseTime(set.assignedUntil!, 'M月D日') }}</span>
         </div>
         <template v-if="progress?.isCompleted">
           <div class="done-text">
-            <b>全部做完了</b> · {{ parseTime(progress.completeTime!, "M月D日 HH:mm") }}
+            <b>全部做完了</b> · {{ parseTime(progress.completeTime!, 'M月D日 HH:mm') }}
             <template v-if="spent">，加入后用了 {{ spent }}</template>
           </div>
         </template>
@@ -171,15 +156,13 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
             <span class="muted num">/ {{ set.requiredCount }} 道</span>
             <span class="muted tiny gap">
               <template v-if="optional > 0">另有 {{ optional }} 道选做 · </template>
-              {{ parseTime(progress!.joinTime!, "M月D日 HH:mm") }} 加入
+              {{ parseTime(progress!.joinTime!, 'M月D日 HH:mm') }} 加入
             </span>
           </div>
           <div class="bar"><div class="fill" :style="{ width: `${percent}%` }"></div></div>
         </template>
         <div v-else class="muted small">
-          {{ set.createdBy.username }} 出的 · {{ set.problemsCount }} 道<template
-            v-if="optional > 0"
-            >，{{ optional }} 道选做</template
+          {{ set.createdBy.username }} 出的 · {{ set.problemsCount }} 道<template v-if="optional > 0">，{{ optional }} 道选做</template
           ><template v-else>，全部必做</template>
           <template v-if="!set.badges.length"> · 这个题单没有奖章</template>
         </div>
@@ -193,9 +176,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
       </template>
       <div class="spacer"></div>
       <div v-if="!joined && !userStore.isTeacherOrAbove" class="join">
-        <n-button type="primary" size="large" :loading="joining" @click="join">
-          加入题单，开始做
-        </n-button>
+        <n-button type="primary" size="large" :loading="joining" @click="join"> 加入题单，开始做 </n-button>
       </div>
     </section>
 
@@ -215,23 +196,14 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
         <rect x="5" y="11" width="14" height="9" rx="2" />
         <path d="M8 11V8a4 4 0 0 1 8 0v3" />
       </svg>
-      其中 <b>{{ hiddenCount }}</b> 道你以前做对过。布置期内（到
-      {{
-        parseTime(set.assignedUntil!, "M月D日")
-      }}）这几道的旧代码先藏起来，在题单里重新做对就能看。
+      其中 <b>{{ hiddenCount }}</b> 道你以前做对过。布置期内（到 {{ parseTime(set.assignedUntil!, 'M月D日') }}）这几道的旧代码先藏起来，在题单里重新做对就能看。
     </div>
 
     <div v-if="userStore.isTeacherOrAbove" class="tabs">
       <button class="seg" :class="{ on: tab !== 'class' }" @click="tab = 'problems'">题目</button>
       <button class="seg" :class="{ on: tab === 'class' }" @click="tab = 'class'">全班情况</button>
       <div class="spacer"></div>
-      <n-button
-        v-if="canEdit"
-        size="small"
-        @click="router.push({ name: 'admin problemset edit', params: { problemSetId: set.id } })"
-      >
-        编辑题单
-      </n-button>
+      <n-button v-if="canEdit" size="small" @click="router.push({ name: 'admin problemset edit', params: { problemSetId: set.id } })"> 编辑题单 </n-button>
     </div>
 
     <ClassView v-if="userStore.isTeacherOrAbove && tab === 'class'" :problem-set-id="set.id" />
@@ -253,11 +225,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
             <span class="muted num idx">{{ indexOf(item) }}</span>
             <span class="ell ptitle">{{ item.problem.title }}</span>
             <span v-if="!item.isRequired" class="opt">选做</span>
-            <span
-              v-if="item.oldCodeHidden"
-              class="old"
-              :style="purple"
-              title="以前做对过，旧代码在布置期内先藏着"
+            <span v-if="item.oldCodeHidden" class="old" :style="purple" title="以前做对过，旧代码在布置期内先藏着"
               ><svg
                 class="lock"
                 width="12"
@@ -272,16 +240,11 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
               >
                 <rect x="5" y="11" width="14" height="9" rx="2" />
                 <path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg
-              ><span class="old-long">以前做对过 · 旧代码先藏着</span
-              ><span class="old-short">做对过</span></span
+              ><span class="old-long">以前做对过 · 旧代码先藏着</span><span class="old-short">做对过</span></span
             >
             <div class="spacer"></div>
-            <span v-if="item.isCompleted && item.solvedTime" class="muted num tiny"
-              >{{ solvedAt(item.solvedTime) }} 做对</span
-            >
-            <span v-else-if="item.wrongCount && joined" class="tiny tried"
-              >交过 {{ item.wrongCount }} 次</span
-            >
+            <span v-if="item.isCompleted && item.solvedTime" class="muted num tiny">{{ solvedAt(item.solvedTime) }} 做对</span>
+            <span v-else-if="item.wrongCount && joined" class="tiny tried">交过 {{ item.wrongCount }} 次</span>
             <span v-else-if="canOpen" class="go">去做 ›</span>
           </component>
         </section>
@@ -305,13 +268,13 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
   align-items: center;
   flex-wrap: wrap;
   gap: 16px 20px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .band.done {
-  background: v-bind("success.background");
+  background: v-bind('success.background');
   border-color: transparent;
 }
 
@@ -320,7 +283,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
   height: 48px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
   color: #ffffff;
   font-size: 24px;
   font-weight: 700;
@@ -331,7 +294,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 
 .done-text {
   font-size: var(--oj-fs-body);
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .head {
@@ -367,7 +330,7 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 .back {
   flex-shrink: 0;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -387,19 +350,19 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 .bar {
   height: 8px;
   border-radius: 4px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
 .fill {
   height: 100%;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .divider {
   width: 1px;
   align-self: stretch;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
 }
 
 /* 窄屏时阶梯要能横向滚，可 overflow-x 一设，纵向也跟着被裁：下一个奖章的金圈画在图标外 2px，
@@ -446,11 +409,11 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 .seg {
   height: var(--oj-ctrl-h);
   padding: 0 16px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
@@ -464,8 +427,8 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 }
 
 .seg.on {
-  color: v-bind("success.color");
-  background: v-bind("success.background");
+  color: v-bind('success.color');
+  background: v-bind('success.background');
   font-weight: 600;
 }
 
@@ -481,9 +444,9 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 }
 
 .card {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   overflow: hidden;
 }
 
@@ -500,8 +463,8 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  color: v-bind("theme.textColor1");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  color: v-bind('theme.textColor1');
   text-decoration: none;
 }
 
@@ -510,11 +473,11 @@ const purple = { color: "#5b3fa8", background: "rgba(122, 95, 208, 0.12)" }
 }
 
 a.prow:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .prow.off {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .dot {
@@ -531,17 +494,17 @@ a.prow:hover {
 }
 
 .done-dot {
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
   color: #ffffff;
 }
 
 .tried-dot {
-  background: v-bind("warning.background");
-  color: v-bind("warning.color");
+  background: v-bind('warning.background');
+  color: v-bind('warning.color');
 }
 
 .empty-dot {
-  border: 1.5px dashed v-bind("theme.borderColor");
+  border: 1.5px dashed v-bind('theme.borderColor');
 }
 
 .idx {
@@ -560,8 +523,8 @@ a.prow:hover {
   padding: 0 7px;
   border-radius: 4px;
   font-size: var(--oj-fs-meta);
-  border: 1px solid v-bind("theme.borderColor");
-  color: v-bind("theme.textColor3");
+  border: 1px solid v-bind('theme.borderColor');
+  color: v-bind('theme.textColor3');
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
@@ -579,12 +542,12 @@ a.prow:hover {
 }
 
 .tried {
-  color: v-bind("warning.color");
+  color: v-bind('warning.color');
 }
 
 .go {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   flex-shrink: 0;
 }
 
@@ -600,8 +563,8 @@ a.prow:hover {
 }
 
 .assign {
-  color: v-bind("info.color");
-  background: v-bind("info.background");
+  color: v-bind('info.color');
+  background: v-bind('info.background');
 }
 
 .spacer {
@@ -609,11 +572,11 @@ a.prow:hover {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .sec {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .small {

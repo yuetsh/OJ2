@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useBreakpoints } from "shared/composables/breakpoints"
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 interface Props {
   total: number
@@ -9,14 +9,9 @@ interface Props {
   simple?: boolean
 }
 
-const {
-  total,
-  limit: initialLimit = 10,
-  page: initialPage = 1,
-  simple = false,
-} = defineProps<Props>()
+const { total, limit: initialLimit = 10, page: initialPage = 1, simple = false } = defineProps<Props>()
 
-const emit = defineEmits(["update:limit", "update:page"])
+const emit = defineEmits(['update:limit', 'update:page'])
 
 const { isDesktop } = useBreakpoints()
 
@@ -26,8 +21,8 @@ const sizes = [10, 30, 50]
 
 // 必须 emit 数值：emit ref 对象时，父组件用普通 ref 接会拿不到数字，
 // 而且每次 emit 的都是同一个对象，父组件那边察觉不到变化
-watch(limit, (value) => emit("update:limit", value))
-watch(page, (value) => emit("update:page", value))
+watch(limit, (value) => emit('update:limit', value))
+watch(page, (value) => emit('update:page', value))
 
 // 父组件改页码 / 每页条数（比如换搜索条件后重置到第一页）时同步回来
 watch(

@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { useRouteQuery } from "@vueuse/router"
-import { useThemeVars } from "naive-ui"
-import { getContestList } from "oj/api"
-import { useTone } from "shared/composables/tone"
-import { contestLength, parseTime, secondsToDuration } from "utils/functions"
-import type { Contest } from "utils/types"
-import ContestTitle from "shared/components/ContestTitle.vue"
-import Pagination from "shared/components/Pagination.vue"
-import { useAuthModalStore } from "shared/store/authModal"
-import { usePagination } from "shared/composables/pagination"
-import AdminLink from "shared/components/AdminLink.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useUserStore } from "shared/store/user"
-import { ContestStatus } from "utils/constants"
-import ContestBadge from "./components/ContestBadge.vue"
+import { useRouteQuery } from '@vueuse/router'
+import { useThemeVars } from 'naive-ui'
+import { getContestList } from 'oj/api'
+import { useTone } from 'shared/composables/tone'
+import { contestLength, parseTime, secondsToDuration } from 'utils/functions'
+import type { Contest } from 'utils/types'
+import ContestTitle from 'shared/components/ContestTitle.vue'
+import Pagination from 'shared/components/Pagination.vue'
+import { useAuthModalStore } from 'shared/store/authModal'
+import { usePagination } from 'shared/composables/pagination'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useUserStore } from 'shared/store/user'
+import { ContestStatus } from 'utils/constants'
+import ContestBadge from './components/ContestBadge.vue'
 
 /**
  * 比赛列表（设计稿「比赛重设计」）：进行中的单独一大块「接着比」，未开始的一行一个，
@@ -33,8 +33,8 @@ interface ContestQuery {
 }
 
 const { query } = usePagination<ContestQuery>({
-  keyword: useRouteQuery("keyword", "").value,
-  scope: useRouteQuery("scope", "").value,
+  keyword: useRouteQuery('keyword', '').value,
+  scope: useRouteQuery('scope', '').value,
 })
 
 const data = ref<Contest[]>([])
@@ -42,10 +42,10 @@ const total = ref(0)
 const active = ref<Contest[]>([])
 
 const scopes = computed(() => [
-  { value: "", label: "全部" },
-  ...(userStore.isAuthed ? [{ value: "joined", label: "我参加过的" }] : []),
-  { value: "练习", label: "练习" },
-  { value: "考试", label: "期中 · 期末" },
+  { value: '', label: '全部' },
+  ...(userStore.isAuthed ? [{ value: 'joined', label: '我参加过的' }] : []),
+  { value: '练习', label: '练习' },
+  { value: '考试', label: '期中 · 期末' },
 ])
 
 async function listContests() {
@@ -53,9 +53,9 @@ async function listContests() {
     offset: (query.page - 1) * query.limit,
     limit: query.limit,
     keyword: query.keyword,
-    status: "",
-    tag: query.scope === "joined" ? "" : query.scope,
-    joined: query.scope === "joined",
+    status: '',
+    tag: query.scope === 'joined' ? '' : query.scope,
+    joined: query.scope === 'joined',
   })
   data.value = res.results
   total.value = res.total
@@ -64,7 +64,7 @@ async function listContests() {
 // 进行中 / 即将开始的单独拎到最上面：表格按开始时间倒序，一场开了一周的练习赛
 // 会被后来建的比赛压到第二页去，学生找不着正在比的那一场
 async function listActive() {
-  const base = { offset: 0, limit: 6, keyword: "", tag: "" }
+  const base = { offset: 0, limit: 6, keyword: '', tag: '' }
   const [underway, upcoming] = await Promise.all([
     getContestList({ ...base, status: ContestStatus.underway }),
     getContestList({ ...base, status: ContestStatus.not_started }),
@@ -73,12 +73,8 @@ async function listActive() {
 }
 
 const plain = computed(() => query.page === 1 && !query.keyword && !query.scope)
-const running = computed(() =>
-  plain.value ? active.value.filter((c) => c.status === ContestStatus.underway) : [],
-)
-const upcoming = computed(() =>
-  plain.value ? active.value.filter((c) => c.status === ContestStatus.not_started) : [],
-)
+const running = computed(() => (plain.value ? active.value.filter((c) => c.status === ContestStatus.underway) : []))
+const upcoming = computed(() => (plain.value ? active.value.filter((c) => c.status === ContestStatus.not_started) : []))
 /** 上面单独列过的，下面表里不再重复 */
 const rows = computed(() => {
   const shown = new Set([...running.value, ...upcoming.value].map((c) => c.id))
@@ -97,7 +93,7 @@ const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) })
 function remaining(contest: Contest) {
   const seconds = Math.floor((Date.parse(contest.endTime) - now.value.getTime()) / 1000)
   const text = secondsToDuration(Math.max(0, seconds))
-  return text.startsWith("0:") ? text.slice(2) : text
+  return text.startsWith('0:') ? text.slice(2) : text
 }
 function untilStart(contest: Contest) {
   const ms = Date.parse(contest.startTime) - now.value.getTime()
@@ -106,9 +102,8 @@ function untilStart(contest: Contest) {
   return `还有 ${secondsToDuration(Math.max(0, Math.floor(ms / 1000)))}`
 }
 function range(contest: Contest) {
-  const sameDay =
-    parseTime(contest.startTime, "YYYY-MM-DD") === parseTime(contest.endTime, "YYYY-MM-DD")
-  return `${parseTime(contest.startTime, "HH:mm")} – ${parseTime(contest.endTime, sameDay ? "HH:mm" : "M月D日 HH:mm")}`
+  const sameDay = parseTime(contest.startTime, 'YYYY-MM-DD') === parseTime(contest.endTime, 'YYYY-MM-DD')
+  return `${parseTime(contest.startTime, 'HH:mm')} – ${parseTime(contest.endTime, sameDay ? 'HH:mm' : 'M月D日 HH:mm')}`
 }
 
 function open(contest: Contest) {
@@ -117,20 +112,18 @@ function open(contest: Contest) {
     return
   }
   // 老师直接进「全班情况」
-  router.push(
-    userStore.isTeacherOrAbove ? `/contest/${contest.id}/class` : `/contest/${contest.id}`,
-  )
+  router.push(userStore.isTeacherOrAbove ? `/contest/${contest.id}/class` : `/contest/${contest.id}`)
 }
 
 function mineText(contest: Contest) {
   const mine = contest.mine
-  if (!mine) return ""
-  const solved = `做对 ${mine.solved}/${contest.problemCount ?? "?"}`
+  if (!mine) return ''
+  const solved = `做对 ${mine.solved}/${contest.problemCount ?? '?'}`
   return mine.rank ? `第 ${mine.rank} 名 / ${mine.total} · ${solved}` : solved
 }
 
-const success = computed(() => tone("success"))
-const warning = computed(() => tone("warning"))
+const success = computed(() => tone('success'))
+const warning = computed(() => tone('warning'))
 </script>
 
 <template>
@@ -138,41 +131,22 @@ const warning = computed(() => tone("warning"))
     <div class="top">
       <h2>比赛</h2>
       <div class="spacer"></div>
-      <button
-        v-for="item in scopes"
-        :key="item.value"
-        class="chip"
-        :class="{ on: query.scope === item.value }"
-        @click="query.scope = item.value"
-      >
+      <button v-for="item in scopes" :key="item.value" class="chip" :class="{ on: query.scope === item.value }" @click="query.scope = item.value">
         {{ item.label }}
       </button>
       <n-input v-model:value="query.keyword" clearable placeholder="比赛名" style="width: 200px" />
       <!-- 手机上一行放不下，也没人在手机上出题，只给电脑 -->
-      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/contest/create"
-        >新建比赛</AdminLink
-      >
+      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/contest/create">新建比赛</AdminLink>
     </div>
 
-    <div
-      v-for="contest in running"
-      :key="contest.id"
-      class="running"
-      role="link"
-      tabindex="0"
-      @click="open(contest)"
-      @keyup.enter="open(contest)"
-    >
+    <div v-for="contest in running" :key="contest.id" class="running" role="link" tabindex="0" @click="open(contest)" @keyup.enter="open(contest)">
       <ContestBadge :status="ContestStatus.underway" />
       <div class="running-main">
         <div class="running-title">
           <ContestTitle :contest="contest" />
           <ContestBadge :tag="contest.tag" />
         </div>
-        <span class="muted small">
-          {{ range(contest) }} · {{ contest.problemCount }} 道题 ·
-          {{ contest.participantCount }} 人在比
-        </span>
+        <span class="muted small"> {{ range(contest) }} · {{ contest.problemCount }} 道题 · {{ contest.participantCount }} 人在比 </span>
       </div>
       <div class="spacer"></div>
       <div class="running-right">
@@ -186,25 +160,17 @@ const warning = computed(() => tone("warning"))
         >
       </div>
       <n-button type="primary" size="large" @click.stop="open(contest)">
-        {{ contest.mine ? "接着比 ›" : "进去比 ›" }}
+        {{ contest.mine ? '接着比 ›' : '进去比 ›' }}
       </n-button>
     </div>
 
-    <div
-      v-for="contest in upcoming"
-      :key="contest.id"
-      class="upcoming"
-      role="link"
-      tabindex="0"
-      @click="open(contest)"
-      @keyup.enter="open(contest)"
-    >
+    <div v-for="contest in upcoming" :key="contest.id" class="upcoming" role="link" tabindex="0" @click="open(contest)" @keyup.enter="open(contest)">
       <ContestBadge :status="ContestStatus.not_started" />
       <ContestTitle :contest="contest" class="upcoming-title" />
       <ContestBadge :tag="contest.tag" />
       <div class="spacer"></div>
       <span class="small sec">
-        {{ parseTime(contest.startTime, "M月D日 HH:mm") }} 开始 · 比
+        {{ parseTime(contest.startTime, 'M月D日 HH:mm') }} 开始 · 比
         {{ contestLength(contest.startTime, contest.endTime) }}
       </span>
       <span class="small amber">{{ untilStart(contest) }}</span>
@@ -212,7 +178,7 @@ const warning = computed(() => tone("warning"))
 
     <div class="table">
       <div class="tr th">
-        <span>{{ plain ? "已结束" : "比赛" }}</span>
+        <span>{{ plain ? '已结束' : '比赛' }}</span>
         <span>类型</span>
         <span>日期</span>
         <span>时长</span>
@@ -229,14 +195,11 @@ const warning = computed(() => tone("warning"))
         @keyup.enter="open(contest)"
       >
         <span class="name">
-          <ContestBadge
-            v-if="contest.status !== ContestStatus.finished"
-            :status="contest.status as ContestStatus"
-          />
+          <ContestBadge v-if="contest.status !== ContestStatus.finished" :status="contest.status as ContestStatus" />
           <ContestTitle :contest="contest" />
         </span>
         <span><ContestBadge :tag="contest.tag" /></span>
-        <span class="muted small num">{{ parseTime(contest.startTime, "YYYY-MM-DD") }}</span>
+        <span class="muted small num">{{ parseTime(contest.startTime, 'YYYY-MM-DD') }}</span>
         <span class="muted small">{{ contestLength(contest.startTime, contest.endTime) }}</span>
         <span class="mine small">
           <template v-if="contest.mine">
@@ -260,15 +223,11 @@ const warning = computed(() => tone("warning"))
             </svg>
             <span class="sec">{{ mineText(contest) }}</span>
           </template>
-          <span
-            v-else-if="userStore.isAuthed && contest.status === ContestStatus.finished"
-            class="faint"
-            >没参加</span
-          >
+          <span v-else-if="userStore.isAuthed && contest.status === ContestStatus.finished" class="faint">没参加</span>
         </span>
       </div>
       <div v-if="!rows.length" class="empty muted">
-        {{ query.scope === "joined" ? "你还没参加过比赛" : "没有符合的比赛" }}
+        {{ query.scope === 'joined' ? '你还没参加过比赛' : '没有符合的比赛' }}
       </div>
     </div>
     <Pagination v-model:limit="query.limit" v-model:page="query.page" :total="total" />
@@ -299,16 +258,16 @@ const warning = computed(() => tone("warning"))
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .faint {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   opacity: 0.7;
 }
 
 .sec {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .small {
@@ -320,29 +279,29 @@ const warning = computed(() => tone("warning"))
 }
 
 .green {
-  color: v-bind("success.color");
+  color: v-bind('success.color');
 }
 
 .amber {
-  color: v-bind("warning.color");
+  color: v-bind('warning.color');
 }
 
 .chip {
   height: var(--oj-ctrl-h);
   padding: 0 16px;
   border-radius: 17px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
 .chip.on {
   border-color: transparent;
-  background: v-bind("success.background");
-  color: v-bind("success.color");
+  background: v-bind('success.background');
+  color: v-bind('success.color');
   font-weight: 600;
 }
 
@@ -353,8 +312,8 @@ const warning = computed(() => tone("warning"))
   flex-wrap: wrap;
   gap: 16px 20px;
   border-radius: var(--oj-radius);
-  border: 1px solid v-bind("theme.successColor");
-  background: v-bind("success.background");
+  border: 1px solid v-bind('theme.successColor');
+  background: v-bind('success.background');
   cursor: pointer;
 }
 
@@ -381,7 +340,7 @@ const warning = computed(() => tone("warning"))
 }
 
 .countdown {
-  color: v-bind("warning.color");
+  color: v-bind('warning.color');
 }
 
 .countdown b {
@@ -396,7 +355,7 @@ const warning = computed(() => tone("warning"))
   flex-wrap: wrap;
   gap: 12px 16px;
   border-radius: var(--oj-radius);
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   cursor: pointer;
 }
 
@@ -406,7 +365,7 @@ const warning = computed(() => tone("warning"))
 }
 
 .table {
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
   overflow: hidden;
 }
@@ -419,7 +378,7 @@ const warning = computed(() => tone("warning"))
   min-height: var(--oj-row-h-roomy);
   padding: 0 var(--oj-pad-x);
   font-size: var(--oj-fs-body);
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   cursor: pointer;
 }
 
@@ -428,14 +387,14 @@ const warning = computed(() => tone("warning"))
 }
 
 .tr:not(.th):hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .th {
   min-height: var(--oj-head-h);
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
   cursor: default;
 }
 
@@ -447,7 +406,7 @@ const warning = computed(() => tone("warning"))
 }
 
 .tr.done .name {
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .mine {

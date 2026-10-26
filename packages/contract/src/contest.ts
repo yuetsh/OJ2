@@ -1,9 +1,9 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { paginatedSchema, sampleUserSchema } from "./common"
-import { problemDetailSchema, problemListItemSchema } from "./problem"
+import { paginatedSchema, sampleUserSchema } from './common'
+import { problemDetailSchema, problemListItemSchema } from './problem'
 
-export const contestStatusSchema = z.enum(["-1", "0", "1"])
+export const contestStatusSchema = z.enum(['-1', '0', '1'])
 
 export const contestSchema = z.object({
   id: z.number().int(),
@@ -16,7 +16,7 @@ export const contestSchema = z.object({
   lastUpdateTime: z.string(),
   createdBy: sampleUserSchema,
   status: contestStatusSchema,
-  contestType: z.enum(["Public", "Password Protected"]),
+  contestType: z.enum(['Public', 'Password Protected']),
   now: z.string().optional(),
   /** 列表才带：几道题（可见的）、几个学生交过题 */
   problemCount: z.number().int().optional(),
@@ -68,7 +68,7 @@ export const contestSubmissionInfoSchema = z.object({
  * 期中、期末：进行中学生看不到排名、每题做对人数、谁最先做对，考完一起公布（2026-10 用户定的）。
  * 练习照常全看得到 —— 「我需要竞争」。标签只有 练习 / 期中 / 期末 三个值
  */
-export const EXAM_TAGS = ["期中", "期末"] as const
+export const EXAM_TAGS = ['期中', '期末'] as const
 export function isExamTag(tag: string) {
   return (EXAM_TAGS as readonly string[]).includes(tag)
 }

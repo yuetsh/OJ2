@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { storeToRefs } from "pinia"
-import { useProblemStore } from "oj/store/problem"
-import { useBackClose } from "shared/composables/backClose"
-import { useUserStore } from "shared/store/user"
-import {
-  DRAWER_TITLE,
-  useProblemPageContext,
-  type ProblemDrawer,
-} from "../composables/problemPageContext"
-import { useTeacherCollab } from "../composables/teacherCollab"
+import { useThemeVars } from 'naive-ui'
+import { storeToRefs } from 'pinia'
+import { useProblemStore } from 'oj/store/problem'
+import { useBackClose } from 'shared/composables/backClose'
+import { useUserStore } from 'shared/store/user'
+import { DRAWER_TITLE, useProblemPageContext, type ProblemDrawer } from '../composables/problemPageContext'
+import { useTeacherCollab } from '../composables/teacherCollab'
 
 /**
  * 统计 / 点评 / 我的提交。原来是左栏的三个页签，课上几乎没人点，却和「题目」挤在一排；
@@ -18,9 +14,9 @@ import { useTeacherCollab } from "../composables/teacherCollab"
  *
  * 抽屉里的内容关上就卸载：再打开时「我的提交」要重新拉，刚交的那次才看得见。
  */
-const ProblemInfo = defineAsyncComponent(() => import("./ProblemInfo.vue"))
-const ProblemReaction = defineAsyncComponent(() => import("./ProblemReaction.vue"))
-const ProblemSubmission = defineAsyncComponent(() => import("./ProblemSubmission.vue"))
+const ProblemInfo = defineAsyncComponent(() => import('./ProblemInfo.vue'))
+const ProblemReaction = defineAsyncComponent(() => import('./ProblemReaction.vue'))
+const ProblemSubmission = defineAsyncComponent(() => import('./ProblemSubmission.vue'))
 
 const open = defineModel<ProblemDrawer | null>({ required: true })
 
@@ -30,15 +26,13 @@ const props = defineProps<{
 }>()
 
 /** 抽屉顶上的页签，顺序照设计稿：最常看的「我的提交」在前 */
-const tabs = computed(() =>
-  (["submission", "info", "reaction"] as const).filter((key) => ctx.value.drawers.includes(key)),
-)
+const tabs = computed(() => (['submission', 'info', 'reaction'] as const).filter((key) => ctx.value.drawers.includes(key)))
 
 const theme = useThemeVars()
 
 // trap-focus 关着（编辑器还要能点），焦点不在抽屉里时 Naive 自己的 Esc 不生效，这里补一个
-useEventListener(document, "keydown", (event: KeyboardEvent) => {
-  if (event.key === "Escape" && open.value) open.value = null
+useEventListener(document, 'keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && open.value) open.value = null
 })
 
 const ctx = useProblemPageContext()
@@ -58,7 +52,7 @@ useBackClose(show, () => !props.to)
 
 // 内容和标题都按最后一次打开的来：关的时候有一段滑出去的动画，那时 open 已经是 null 了。
 // 关完 n-drawer 自己把内容卸掉
-const lastOpened = ref<ProblemDrawer>("info")
+const lastOpened = ref<ProblemDrawer>('info')
 watch(open, (key) => {
   if (key) lastOpened.value = key
 })
@@ -78,21 +72,19 @@ const teacherCollab = useTeacherCollab()
  * 「看这道题所有人的提交」，原来是工具栏上的「本题提交」。可见条件照旧：
  * 比赛里总给（看的是这场比赛的提交），题库里要管理员或者开着提交列表。
  */
-const showAllSubmissions = computed(
-  () => ctx.value.entry === "contest" || userStore.isAdminRole || userStore.showSubmissions,
-)
+const showAllSubmissions = computed(() => ctx.value.entry === 'contest' || userStore.isAdminRole || userStore.showSubmissions)
 
 function goAllSubmissions() {
   const target = {
-    name: ctx.value.entry === "contest" ? "contest submissions" : "submissions",
-    params: ctx.value.entry === "contest" ? { contestID: route.params.contestID } : {},
+    name: ctx.value.entry === 'contest' ? 'contest submissions' : 'submissions',
+    params: ctx.value.entry === 'contest' ? { contestID: route.params.contestID } : {},
     query: { problem: problem.value!._id },
   }
   // 协作中走新标签：教师端「页面即协作现场」，跳走这一页协作就结束了
   // （求助会退回排队，但老师还得再接一次）。而「看看这学生都交了什么」恰好是
   // 协作时最常点的一个
   if (teacherCollab.value) {
-    window.open(router.resolve(target).href, "_blank")
+    window.open(router.resolve(target).href, '_blank')
     return
   }
   router.push(target)
@@ -109,11 +101,7 @@ function goAllSubmissions() {
     :trap-focus="false"
     :block-scroll="!props.to"
   >
-    <n-drawer-content
-      :native-scrollbar="false"
-      :header-style="{ padding: 0 }"
-      :body-content-style="{ padding: '16px 20px' }"
-    >
+    <n-drawer-content :native-scrollbar="false" :header-style="{ padding: 0 }" :body-content-style="{ padding: '16px 20px' }">
       <template #header>
         <div class="drawer-head">
           <div class="drawer-tabs" role="tablist">
@@ -127,19 +115,11 @@ function goAllSubmissions() {
               :aria-selected="lastOpened === key"
               @click="open = key"
             >
-              {{ key === "submission" && teacherCollab ? "学生的提交" : DRAWER_TITLE[key] }}
+              {{ key === 'submission' && teacherCollab ? '学生的提交' : DRAWER_TITLE[key] }}
             </button>
           </div>
           <button type="button" class="drawer-close" aria-label="关闭" @click="open = null">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-            >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
               <path d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
@@ -165,7 +145,7 @@ function goAllSubmissions() {
   display: flex;
   align-items: center;
   gap: 4px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .drawer-tabs {
@@ -182,13 +162,13 @@ function goAllSubmissions() {
   font: inherit;
   font-size: 14px;
   font-weight: normal;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   cursor: pointer;
 }
 
 .drawer-tab.active {
-  border-bottom-color: v-bind("theme.primaryColor");
-  color: v-bind("theme.textColor1");
+  border-bottom-color: v-bind('theme.primaryColor');
+  color: v-bind('theme.textColor1');
   font-weight: 600;
 }
 
@@ -199,7 +179,7 @@ function goAllSubmissions() {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   display: flex;
   align-items: center;
   justify-content: center;
@@ -207,7 +187,7 @@ function goAllSubmissions() {
 }
 
 .drawer-close:hover {
-  background-color: v-bind("theme.hoverColor");
+  background-color: v-bind('theme.hoverColor');
 }
 
 .all-submissions {

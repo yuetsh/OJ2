@@ -1,7 +1,7 @@
-import { insertBracket } from "@codemirror/autocomplete"
-import { EditorView } from "@codemirror/view"
-import { computed, ref } from "vue"
-import { currentEditorView } from "./errorMark"
+import { insertBracket } from '@codemirror/autocomplete'
+import { EditorView } from '@codemirror/view'
+import { computed, ref } from 'vue'
+import { currentEditorView } from './errorMark'
 
 /**
  * 手机上写代码的符号键（SymbolKeys.vue）。括号、引号、冒号在手机键盘上都要切到符号页，
@@ -41,9 +41,7 @@ export function measureKeyboard() {
 }
 
 /** 正在打字：编辑器有焦点、键盘也弹着。这时才摆符号键，底栏让位 */
-export const typing = computed(
-  () => editorFocused.value && (!window.visualViewport || keyboardUp.value),
-)
+export const typing = computed(() => editorFocused.value && (!window.visualViewport || keyboardUp.value))
 
 export interface SymbolKey {
   label: string
@@ -51,40 +49,13 @@ export interface SymbolKey {
   text?: string
 }
 
-const INDENT: SymbolKey = { label: "缩进", text: "    " }
+const INDENT: SymbolKey = { label: '缩进', text: '    ' }
 
 /** 按语言给一排：最常用的在前，放不下的往右滑 */
-export const SYMBOL_KEYS: Record<"python" | "c" | "sql", SymbolKey[]> = {
-  python: [
-    INDENT,
-    ...["(", ")", '"', ":", "=", "[", "]", ",", "'", "+", "-", "*", "/", "%", "<", ">", "#"].map(
-      (label) => ({ label }),
-    ),
-  ],
-  c: [
-    INDENT,
-    ...[
-      "(",
-      ")",
-      ";",
-      '"',
-      "{",
-      "}",
-      "=",
-      "%",
-      "&",
-      "[",
-      "]",
-      ",",
-      "+",
-      "-",
-      "*",
-      "/",
-      "<",
-      ">",
-    ].map((label) => ({ label })),
-  ],
-  sql: ["(", ")", "'", ",", "*", "=", ";", "<", ">", "%"].map((label) => ({ label })),
+export const SYMBOL_KEYS: Record<'python' | 'c' | 'sql', SymbolKey[]> = {
+  python: [INDENT, ...['(', ')', '"', ':', '=', '[', ']', ',', "'", '+', '-', '*', '/', '%', '<', '>', '#'].map((label) => ({ label }))],
+  c: [INDENT, ...['(', ')', ';', '"', '{', '}', '=', '%', '&', '[', ']', ',', '+', '-', '*', '/', '<', '>'].map((label) => ({ label }))],
+  sql: ['(', ')', "'", ',', '*', '=', ';', '<', '>', '%'].map((label) => ({ label })),
 }
 
 /**
@@ -96,9 +67,7 @@ export function typeSymbol(key: SymbolKey) {
   if (!view) return
   const text = key.text ?? key.label
   const bracket = text.length === 1 ? insertBracket(view.state, text) : null
-  view.dispatch(
-    bracket ?? view.state.update(view.state.replaceSelection(text), { userEvent: "input.type" }),
-  )
+  view.dispatch(bracket ?? view.state.update(view.state.replaceSelection(text), { userEvent: 'input.type' }))
   view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head) })
   view.focus()
 }

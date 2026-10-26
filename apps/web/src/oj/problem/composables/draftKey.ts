@@ -1,5 +1,5 @@
-import { useCodeStore } from "oj/store/code"
-import { useProblemStore } from "oj/store/problem"
+import { useCodeStore } from 'oj/store/code'
+import { useProblemStore } from 'oj/store/problem'
 
 /**
  * 这道题、这门语言的本地代码草稿存在哪个键下。编辑器（存、读草稿）和「重置代码」
@@ -16,7 +16,7 @@ export function useDraftKey() {
   const problemStore = useProblemStore()
   return computed(() => {
     const id = problemStore.problem?._id
-    if (!id) return ""
+    if (!id) return ''
     const language = codeStore.code.language
     const problemSetId = route.params.problemSetId
     if (problemSetId) return `problem_${id}_problemset_${problemSetId}_lang_${language}`

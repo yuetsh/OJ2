@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ClassBoardStudent } from "utils/types"
+import type { ClassBoardStudent } from 'utils/types'
 
 /**
  * 看板的「请假」框：勾今天不在的人。规则在看板那边（只有今天还没交过的人能算请假、
@@ -12,7 +12,7 @@ const props = defineProps<{
   current: string[]
 }>()
 const emit = defineEmits<{ save: [usernames: string[]] }>()
-const show = defineModel<boolean>("show", { required: true })
+const show = defineModel<boolean>('show', { required: true })
 
 const selected = ref<string[]>([])
 watch(show, (open) => {
@@ -28,9 +28,9 @@ const unseen = (student: ClassBoardStudent | undefined) => !!student && !student
 /** 今天没上过线的分在前面一堆：请假的人基本在这里面，剩下的是和同桌共用电脑的 */
 const sections = computed(() =>
   [
-    { label: "今天没上线", students: props.candidates.filter(unseen) },
+    { label: '今天没上线', students: props.candidates.filter(unseen) },
     {
-      label: "今天上过线",
+      label: '今天上过线',
       students: props.candidates.filter((student) => !unseen(student)),
     },
   ].filter((section) => section.students.length),
@@ -41,7 +41,7 @@ function selectAll(list: ClassBoardStudent[]) {
 }
 
 function save() {
-  emit("save", selected.value)
+  emit('save', selected.value)
   show.value = false
 }
 </script>
@@ -50,11 +50,7 @@ function save() {
   <n-modal
     v-model:show="show"
     preset="card"
-    :title="
-      candidates.length
-        ? `今天还没交过的 ${candidates.length} 人里，谁请假了？`
-        : '今天全班都交过题了'
-    "
+    :title="candidates.length ? `今天还没交过的 ${candidates.length} 人里，谁请假了？` : '今天全班都交过题了'"
     style="width: 640px; max-width: calc(100vw - 32px)"
   >
     <n-checkbox-group v-if="candidates.length" v-model:value="selected">
@@ -72,22 +68,14 @@ function save() {
           </n-button>
         </div>
         <div class="leave-grid">
-          <n-checkbox
-            v-for="student in section.students"
-            :key="student.userId"
-            :value="student.username"
-            :label="student.username"
-            class="leave-option"
-          />
+          <n-checkbox v-for="student in section.students" :key="student.userId" :value="student.username" :label="student.username" class="leave-option" />
         </div>
       </div>
     </n-checkbox-group>
     <n-text v-else depth="3">请假的人一定是没交过题的，现在没有人可以标。</n-text>
     <template #footer>
       <n-flex align="center" :wrap="false">
-        <n-text depth="3" class="meta" style="flex-grow: 1">
-          已选 {{ selected.length }} 人 · 只记在这台电脑上，今天有效
-        </n-text>
+        <n-text depth="3" class="meta" style="flex-grow: 1"> 已选 {{ selected.length }} 人 · 只记在这台电脑上，今天有效 </n-text>
         <n-button :disabled="!selected.length" @click="selected = []">全部取消</n-button>
         <n-button @click="show = false">取消</n-button>
         <n-button type="primary" @click="save">确定</n-button>

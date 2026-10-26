@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import ExerciseResult from "./ExerciseResult.vue"
-import type { Exercise, ExercisePredictData } from "utils/types"
-import { highlight } from "shared/highlight"
+import ExerciseResult from './ExerciseResult.vue'
+import type { Exercise, ExercisePredictData } from 'utils/types'
+import { highlight } from 'shared/highlight'
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -12,24 +12,22 @@ const data = computed(() => props.exercise.data as ExercisePredictData)
 
 const codeHtml = computed(() => highlight(data.value.code, props.lang))
 
-const userInput = ref("")
+const userInput = ref('')
 const submitted = ref(false)
 
 watch(() => props.exercise.id, reset, { immediate: true })
 
 function normalize(s: string): string {
   return s
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((l) => l.replace(/\s+$/, ""))
-    .join("\n")
-    .replace(/^\n+/, "")
-    .replace(/\n+$/, "")
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((l) => l.replace(/\s+$/, ''))
+    .join('\n')
+    .replace(/^\n+/, '')
+    .replace(/\n+$/, '')
 }
 
-const allCorrect = computed(() =>
-  data.value.answer.some((a) => normalize(a) === normalize(userInput.value)),
-)
+const allCorrect = computed(() => data.value.answer.some((a) => normalize(a) === normalize(userInput.value)))
 
 // 改了答案就把上一次的判定收回去，等他重新点提交 —— 排序/连线/找错/分组四种题
 // 本来就是这么做的（各自的交互处都会把 submitted 置回 false），只有这里漏了。
@@ -42,14 +40,14 @@ watch(userInput, () => {
 
 function submit() {
   submitted.value = true
-  emit("attempt", {
+  emit('attempt', {
     correct: allCorrect.value,
-    answer: `答「${userInput.value.replace(/\n/g, "⏎")}」`,
+    answer: `答「${userInput.value.replace(/\n/g, '⏎')}」`,
   })
 }
 
 function reset() {
-  userInput.value = ""
+  userInput.value = ''
   submitted.value = false
 }
 </script>
@@ -75,9 +73,7 @@ function reset() {
     ><code style="font-family: inherit" v-html="codeHtml" /></pre>
 
     <!-- 题目本身多半就是这句，再写一遍就成了同一个问题问两次 -->
-    <p v-if="!data.question.includes('输出什么')" style="font-weight: 500; margin: 14px 0 8px">
-      这段代码会输出什么？
-    </p>
+    <p v-if="!data.question.includes('输出什么')" style="font-weight: 500; margin: 14px 0 8px">这段代码会输出什么？</p>
     <div v-else style="height: 14px" />
     <n-input
       v-model:value="userInput"
@@ -89,11 +85,7 @@ function reset() {
       style="font-family: var(--learn-code-font)"
     />
 
-    <ExerciseResult
-      v-if="submitted"
-      :type="allCorrect ? 'success' : 'error'"
-      :title="allCorrect ? '输出正确！' : '输出不正确，再读读代码看看'"
-    />
+    <ExerciseResult v-if="submitted" :type="allCorrect ? 'success' : 'error'" :title="allCorrect ? '输出正确！' : '输出不正确，再读读代码看看'" />
 
     <n-space style="margin-top: 12px" :size="8">
       <n-button type="primary" :disabled="submitted && allCorrect" @click="submit"> 提交 </n-button>

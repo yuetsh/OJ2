@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import type { RouteLocationRaw } from "vue-router"
+import { useThemeVars } from 'naive-ui'
+import type { RouteLocationRaw } from 'vue-router'
 
 /**
  * 上下文条里的一排题号（课堂、比赛共用）。只放题号，题目名在鼠标停上去时给。
@@ -13,42 +13,40 @@ import type { RouteLocationRaw } from "vue-router"
 export interface ChipItem {
   displayId: string
   title: string
-  status: "done" | "tried" | "none"
+  status: 'done' | 'tried' | 'none'
   to: RouteLocationRaw
 }
 
 const props = defineProps<{
   items: ChipItem[]
   current: string
-  variant: "lesson" | "contest"
+  variant: 'lesson' | 'contest'
 }>()
 
 const theme = useThemeVars()
 /** 「做完」的实心绿上用什么字色：暗色主题的成功色是浅薄荷绿，白字几乎看不见 */
 const isDark = useDark()
-const doneText = computed(() => (isDark.value ? "rgba(0, 0, 0, 0.85)" : "#fff"))
+const doneText = computed(() => (isDark.value ? 'rgba(0, 0, 0, 0.85)' : '#fff'))
 
 const STATUS_TEXT = computed(
   () =>
     ({
-      done: "做完了",
-      tried: props.variant === "contest" ? "交过，还没对" : "做过，还没对",
-      none: "还没做",
+      done: '做完了',
+      tried: props.variant === 'contest' ? '交过，还没对' : '做过，还没对',
+      none: '还没做',
     }) as const,
 )
 
 const isCurrent = (item: ChipItem) => item.displayId.toLowerCase() === props.current.toLowerCase()
 
-const scroller = useTemplateRef<HTMLElement>("scroller")
+const scroller = useTemplateRef<HTMLElement>('scroller')
 
 // 换题之后把当前那一颗滚进来。`nearest`：本来就看得见就不动，免得一换题整排跳一下
 watch(
   () => [props.current, props.items.length],
   async () => {
     await nextTick()
-    scroller.value
-      ?.querySelector<HTMLElement>(".chip.current")
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" })
+    scroller.value?.querySelector<HTMLElement>('.chip.current')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   },
   { immediate: true },
 )
@@ -146,7 +144,7 @@ watch(
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-decoration: none;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   background-color: rgba(128, 128, 128, 0.14);
 }
 
@@ -156,40 +154,40 @@ watch(
 
 .chip.done {
   color: v-bind(doneText);
-  background-color: v-bind("theme.successColor");
+  background-color: v-bind('theme.successColor');
 }
 
 .chip.tried {
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
   background-color: rgba(240, 160, 32, 0.12);
   border: 1px solid rgba(240, 160, 32, 0.45);
 }
 
 .chips-contest .chip.tried {
-  color: v-bind("theme.errorColorPressed");
+  color: v-bind('theme.errorColorPressed');
   background-color: rgba(208, 48, 80, 0.12);
   border-color: transparent;
 }
 
 .chip.current:not(.done) {
-  color: v-bind("theme.primaryColorPressed");
-  background-color: v-bind("theme.cardColor");
-  border: 1.5px solid v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColorPressed');
+  background-color: v-bind('theme.cardColor');
+  border: 1.5px solid v-bind('theme.primaryColor');
   font-weight: 700;
 }
 
 .chips-contest .chip.current:not(.done) {
-  color: v-bind("theme.warningColorPressed");
-  border-color: v-bind("theme.warningColor");
+  color: v-bind('theme.warningColorPressed');
+  border-color: v-bind('theme.warningColor');
 }
 
 /* 当前题做完了：实心绿，外面再套一圈（中间隔一道底色） */
 .chip.done.current {
   font-weight: 700;
-  border-color: v-bind("theme.primaryColorPressed");
+  border-color: v-bind('theme.primaryColorPressed');
   box-shadow:
-    0 0 0 2px v-bind("theme.cardColor"),
-    0 0 0 3.5px v-bind("theme.primaryColorPressed");
+    0 0 0 2px v-bind('theme.cardColor'),
+    0 0 0 3.5px v-bind('theme.primaryColorPressed');
 }
 
 .chip:hover {

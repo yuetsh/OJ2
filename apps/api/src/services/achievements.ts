@@ -1,27 +1,15 @@
-import {
-  and,
-  count,
-  countDistinct,
-  eq,
-  inArray,
-  isNotNull,
-  isNull,
-  lt,
-  ne,
-  notInArray,
-  sql,
-} from "drizzle-orm"
+import { and, count, countDistinct, eq, inArray, isNotNull, isNull, lt, ne, notInArray, sql } from 'drizzle-orm'
 
-import { db, schema, type DbOrTx } from "../db"
-import { publishAchievementNotification } from "../events"
-import { calendarDay, dayNumber, localHour, localTime, weekStart } from "../time"
-import { findMetric } from "./achievement-metrics"
-import { isAccepted, JudgeStatus } from "../judge/status"
-import { asRecord } from "../routes/helpers"
+import { db, schema, type DbOrTx } from '../db'
+import { publishAchievementNotification } from '../events'
+import { calendarDay, dayNumber, localHour, localTime, weekStart } from '../time'
+import { findMetric } from './achievement-metrics'
+import { isAccepted, JudgeStatus } from '../judge/status'
+import { asRecord } from '../routes/helpers'
 
 function numberMetric(metrics: Record<string, unknown>, key: string) {
   const value = metrics[key]
-  return typeof value === "number" ? value : 0
+  return typeof value === 'number' ? value : 0
 }
 
 /**
@@ -32,28 +20,18 @@ function numberMetric(metrics: Record<string, unknown>, key: string) {
  * 就什么都不动 —— 否则会把「当前连续」错误地重置成 1、还把 `_last_ac_week` 拨回过去。
  */
 function nextWeekStreak(value: Record<string, unknown>, week: string) {
-  const last = typeof value._last_ac_week === "string" ? value._last_ac_week : null
+  const last = typeof value._last_ac_week === 'string' ? value._last_ac_week : null
   if (last && week <= last) return {}
-  const current =
-    last && dayNumber(week) - dayNumber(last) === 7
-      ? numberMetric(value, "_current_ac_week_streak") + 1
-      : 1
+  const current = last && dayNumber(week) - dayNumber(last) === 7 ? numberMetric(value, '_current_ac_week_streak') + 1 : 1
   return {
     _last_ac_week: week,
     _current_ac_week_streak: current,
-    max_ac_week_streak: Math.max(numberMetric(value, "max_ac_week_streak"), current),
+    max_ac_week_streak: Math.max(numberMetric(value, 'max_ac_week_streak'), current),
   }
 }
 
-async function unlockAchievements(
-  userId: number,
-  metrics: Record<string, unknown>,
-  onlyMeta = false,
-) {
-  const unlocked = await db
-    .select({ id: schema.userAchievement.achievementId })
-    .from(schema.userAchievement)
-    .where(eq(schema.userAchievement.userId, userId))
+async function unlockAchievements(userId: number, metrics: Record<string, unknown>, onlyMeta = false) {
+  const unlocked = await db.select({ id: schema.userAchievement.achievementId }).from(schema.userAchievement).where(eq(schema.userAchievement.userId, userId))
   const filters = [eq(schema.achievement.visible, true)]
   if (unlocked.length)
     filters.push(
@@ -62,18 +40,16 @@ async function unlockAchievements(
         unlocked.map((row) => row.id),
       ),
     )
-  if (onlyMeta) filters.push(eq(schema.achievement.metric, "achievement_unlocked_count"))
-  else filters.push(ne(schema.achievement.metric, "achievement_unlocked_count"))
+  if (onlyMeta) filters.push(eq(schema.achievement.metric, 'achievement_unlocked_count'))
+  else filters.push(ne(schema.achievement.metric, 'achievement_unlocked_count'))
   const candidates = await db
     .select()
     .from(schema.achievement)
     .where(and(...filters))
   const hits = candidates.filter((achievement) => {
     const value = metrics[achievement.metric]
-    if (typeof value !== "number") return false
-    return achievement.operator === "gte"
-      ? value >= achievement.threshold
-      : value <= achievement.threshold
+    if (typeof value !== 'number') return false
+    return achievement.operator === 'gte' ? value >= achievement.threshold : value <= achievement.threshold
   })
   if (hits.length === 0) return []
   // 命中的成就一次插完，冲突忽略后 returning 回来的就是「这次真新解锁的」。
@@ -102,10 +78,7 @@ async function unlockAchievements(
   return hits.filter((achievement) => insertedIds.has(achievement.id))
 }
 
-const ACCEPTED_RESULTS = sql.join(
-  [sql`${JudgeStatus.ACCEPTED}`, sql`${JudgeStatus.AST_CHECK_FAILED}`],
-  sql`, `,
-)
+const ACCEPTED_RESULTS = sql.join([sql`${JudgeStatus.ACCEPTED}`, sql`${JudgeStatus.AST_CHECK_FAILED}`], sql`, `)
 
 /**
  * 「做对几道 / 中等几道 / 困难几道 / 一次就对几道」按定义从提交表现数，不再逐次 +1。
@@ -150,10 +123,7 @@ async function solvedCounts(tx: DbOrTx, userId: number) {
  * 重判不是又交了一次 —— 提交次数、凌晨/早起这类「每交一次 +1」的不能再加，
  * 编译错误按前后差值改。
  */
-export async function updateAchievementsForSubmission(
-  submissionId: string,
-  countedAs: number | null = null,
-) {
+export async function updateAchievementsForSubmission(submissionId: string, countedAs: number | null = null) {
   const [row] = await db
     .select({ submission: schema.submission, problem: schema.problem })
     .from(schema.submission)
@@ -176,22 +146,18 @@ export async function updateAchievementsForSubmission(
         updateTime: new Date().toISOString(),
       })
       .onConflictDoNothing({ target: schema.userStat.userId })
-    const [stat] = await tx
-      .select()
-      .from(schema.userStat)
-      .where(eq(schema.userStat.userId, row.submission.userId))
-      .for("update")
-    if (!stat) throw new Error("User achievement stat could not be created")
+    const [stat] = await tx.select().from(schema.userStat).where(eq(schema.userStat.userId, row.submission.userId)).for('update')
+    if (!stat) throw new Error('User achievement stat could not be created')
     const value = asRecord(stat.metrics)
     // 在锁里数：同一个人的结算排成一队，后来的一定看得见先来的写进去的结果
     const solved = await solvedCounts(tx, row.submission.userId)
     // 这次让做对的题多了一道，才算「新做对」：每天做对几道、连续几周这些跟着它走
-    const firstAc = accepted && solved.accepted > numberMetric(value, "accepted_count")
+    const firstAc = accepted && solved.accepted > numberMetric(value, 'accepted_count')
     value.accepted_count = solved.accepted
     value.mid_ac_count = solved.mid
     value.hard_ac_count = solved.hard
     value.first_try_ac_count = solved.first_try
-    if (!rejudged) value.submission_count = numberMetric(value, "submission_count") + 1
+    if (!rejudged) value.submission_count = numberMetric(value, 'submission_count') + 1
     if (firstAc) {
       // 只数这条之前的：重判一条老提交时，它后面的提交不算「做对之前错的」
       const [prior] = await tx
@@ -205,65 +171,45 @@ export async function updateAchievementsForSubmission(
             lt(schema.submission.createTime, row.submission.createTime),
           ),
         )
-      value.max_wa_before_ac = Math.max(numberMetric(value, "max_wa_before_ac"), prior?.value ?? 0)
+      value.max_wa_before_ac = Math.max(numberMetric(value, 'max_wa_before_ac'), prior?.value ?? 0)
       const perDay = asRecord(value._ac_per_day)
-      perDay[date] = (typeof perDay[date] === "number" ? perDay[date] : 0) + 1
+      perDay[date] = (typeof perDay[date] === 'number' ? perDay[date] : 0) + 1
       value._ac_per_day = perDay
-      value.max_ac_in_one_day = Math.max(
-        ...Object.values(perDay).filter((item): item is number => typeof item === "number"),
-      )
+      value.max_ac_in_one_day = Math.max(...Object.values(perDay).filter((item): item is number => typeof item === 'number'))
       Object.assign(value, nextWeekStreak(value, calendarDay(weekStart(row.submission.createTime))))
     }
-    const activeDates = Array.isArray(value._active_dates)
-      ? value._active_dates.filter((item): item is string => typeof item === "string")
-      : []
+    const activeDates = Array.isArray(value._active_dates) ? value._active_dates.filter((item): item is string => typeof item === 'string') : []
     if (!activeDates.includes(date)) activeDates.push(date)
     value._active_dates = activeDates
     value.active_days = activeDates.length
     if (accepted) {
-      const last = typeof value._last_ac_date === "string" ? value._last_ac_date : null
+      const last = typeof value._last_ac_date === 'string' ? value._last_ac_date : null
       // 比记下的还早（重判了一条以前的提交）就不动，和 nextWeekStreak 一样
       if (!last || date > last) {
         // 差一天要按日历日算，不能用 Date 相减：夏令时地区相邻两天差 23/25 小时，
         // 除 86400000 得到的不是 1，`=== 1` 会静默把连续打卡判成断掉。
-        const current =
-          last && dayNumber(date) - dayNumber(last) === 1
-            ? numberMetric(value, "_current_ac_streak") + 1
-            : 1
+        const current = last && dayNumber(date) - dayNumber(last) === 1 ? numberMetric(value, '_current_ac_streak') + 1 : 1
         value._last_ac_date = date
         value._current_ac_streak = current
-        value.max_ac_streak_days = Math.max(numberMetric(value, "max_ac_streak_days"), current)
+        value.max_ac_streak_days = Math.max(numberMetric(value, 'max_ac_streak_days'), current)
       }
     }
-    const languages = Array.isArray(value._languages)
-      ? value._languages.filter((item): item is string => typeof item === "string")
-      : []
+    const languages = Array.isArray(value._languages) ? value._languages.filter((item): item is string => typeof item === 'string') : []
     if (!languages.includes(row.submission.language)) languages.push(row.submission.language)
     value._languages = languages
     value.languages_used = languages.length
     if (!rejudged) {
-      if (hour < 5) value.midnight_submissions = numberMetric(value, "midnight_submissions") + 1
-      else if (hour < 7)
-        value.early_bird_submissions = numberMetric(value, "early_bird_submissions") + 1
+      if (hour < 5) value.midnight_submissions = numberMetric(value, 'midnight_submissions') + 1
+      else if (hour < 7) value.early_bird_submissions = numberMetric(value, 'early_bird_submissions') + 1
     }
     // 编译错误是从上线那天起逐次累计的（之前的历史没补），没法按定义重数，只能按差值改
     const compileError = Number(row.submission.result === JudgeStatus.COMPILE_ERROR)
     const wasCompileError = Number(countedAs === JudgeStatus.COMPILE_ERROR)
-    if (compileError !== wasCompileError)
-      value.compile_error_count = Math.max(
-        0,
-        numberMetric(value, "compile_error_count") + compileError - wasCompileError,
-      )
+    if (compileError !== wasCompileError) value.compile_error_count = Math.max(0, numberMetric(value, 'compile_error_count') + compileError - wasCompileError)
     // 只算做对的、空行不算：原来交什么都算，贴一大段就拿到「长篇巨制」（0032 按这个口径重算过存量）
     if (accepted)
-      value.max_code_lines = Math.max(
-        numberMetric(value, "max_code_lines"),
-        row.submission.code.split("\n").filter((line) => line.trim() !== "").length,
-      )
-    await tx
-      .update(schema.userStat)
-      .set({ metrics: value, updateTime: new Date().toISOString() })
-      .where(eq(schema.userStat.id, stat.id))
+      value.max_code_lines = Math.max(numberMetric(value, 'max_code_lines'), row.submission.code.split('\n').filter((line) => line.trim() !== '').length)
+    await tx.update(schema.userStat).set({ metrics: value, updateTime: new Date().toISOString() }).where(eq(schema.userStat.id, stat.id))
     return value
   })
 
@@ -273,13 +219,7 @@ export async function updateAchievementsForSubmission(
     .select({ value: count() })
     .from(schema.userAchievement)
     .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
-    .where(
-      and(
-        eq(schema.userAchievement.userId, row.submission.userId),
-        ne(schema.achievement.rarity, "platinum"),
-        eq(schema.achievement.visible, true),
-      ),
-    )
+    .where(and(eq(schema.userAchievement.userId, row.submission.userId), ne(schema.achievement.rarity, 'platinum'), eq(schema.achievement.visible, true)))
   const unlockedCount = meta?.value ?? 0
   metrics.achievement_unlocked_count = unlockedCount
   await setUnlockedCount(row.submission.userId, unlockedCount)
@@ -306,12 +246,7 @@ export async function updateAchievementsForProblemSet(userId: number) {
     db
       .select({ value: count() })
       .from(schema.problemsetProgress)
-      .where(
-        and(
-          eq(schema.problemsetProgress.userId, userId),
-          eq(schema.problemsetProgress.isCompleted, true),
-        ),
-      ),
+      .where(and(eq(schema.problemsetProgress.userId, userId), eq(schema.problemsetProgress.isCompleted, true))),
   ])
   const metrics = await db.transaction(async (tx) => {
     await tx
@@ -322,20 +257,12 @@ export async function updateAchievementsForProblemSet(userId: number) {
         updateTime: new Date().toISOString(),
       })
       .onConflictDoNothing({ target: schema.userStat.userId })
-    const [stat] = await tx
-      .select()
-      .from(schema.userStat)
-      .where(eq(schema.userStat.userId, userId))
-      .for("update")
-      .limit(1)
-    if (!stat) throw new Error("User achievement stat could not be created")
+    const [stat] = await tx.select().from(schema.userStat).where(eq(schema.userStat.userId, userId)).for('update').limit(1)
+    if (!stat) throw new Error('User achievement stat could not be created')
     const value = asRecord(stat.metrics)
     value.badge_count = badgeRow?.value ?? 0
     value.problemset_completed = completedRow?.value ?? 0
-    await tx
-      .update(schema.userStat)
-      .set({ metrics: value, updateTime: new Date().toISOString() })
-      .where(eq(schema.userStat.id, stat.id))
+    await tx.update(schema.userStat).set({ metrics: value, updateTime: new Date().toISOString() }).where(eq(schema.userStat.id, stat.id))
     return value
   })
 
@@ -345,13 +272,7 @@ export async function updateAchievementsForProblemSet(userId: number) {
     .select({ value: count() })
     .from(schema.userAchievement)
     .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
-    .where(
-      and(
-        eq(schema.userAchievement.userId, userId),
-        ne(schema.achievement.rarity, "platinum"),
-        eq(schema.achievement.visible, true),
-      ),
-    )
+    .where(and(eq(schema.userAchievement.userId, userId), ne(schema.achievement.rarity, 'platinum'), eq(schema.achievement.visible, true)))
   const unlockedCount = meta?.value ?? 0
   metrics.achievement_unlocked_count = unlockedCount
   await setUnlockedCount(userId, unlockedCount)
@@ -381,16 +302,13 @@ export async function rescanAchievement(achievementId: number) {
   if (!metric) return { scanned: 0, unlocked: 0 }
 
   // contest_joined 不由判题结算维护，扫之前先把它刷新一遍，否则永远读到旧值（或没有值）
-  if (achievement.metric === "contest_joined") await refreshContestJoinedForAll()
+  if (achievement.metric === 'contest_joined') await refreshContestJoinedForAll()
   // max_ac_week_streak 是后加的指标，判题结算只从上线那天起累计，存量用户要从提交记录补算
-  if (achievement.metric === "max_ac_week_streak") await refreshAcWeekStreakForAll()
+  if (achievement.metric === 'max_ac_week_streak') await refreshAcWeekStreakForAll()
 
   const already = new Set(
     (
-      await db
-        .select({ userId: schema.userAchievement.userId })
-        .from(schema.userAchievement)
-        .where(eq(schema.userAchievement.achievementId, achievement.id))
+      await db.select({ userId: schema.userAchievement.userId }).from(schema.userAchievement).where(eq(schema.userAchievement.achievementId, achievement.id))
     ).map((row) => row.userId),
   )
 
@@ -403,10 +321,8 @@ export async function rescanAchievement(achievementId: number) {
   const eligible = stats.filter((stat) => {
     if (already.has(stat.userId)) return false
     const value = asRecord(stat.metrics)[achievement.metric]
-    if (typeof value !== "number") return false
-    return achievement.operator === "gte"
-      ? value >= achievement.threshold
-      : value <= achievement.threshold
+    if (typeof value !== 'number') return false
+    return achievement.operator === 'gte' ? value >= achievement.threshold : value <= achievement.threshold
   })
 
   // 达标的人分批插，冲突忽略后 returning 回来的就是真新解锁的那批 —— 以前是每人
@@ -448,7 +364,7 @@ export async function rescanAchievement(achievementId: number) {
           description: achievement.description,
           icon: achievement.icon,
           rarity: achievement.rarity,
-          kind: "achievement",
+          kind: 'achievement',
         },
       ])
     }
@@ -456,7 +372,7 @@ export async function rescanAchievement(achievementId: number) {
     // 旧 `rescan_achievement` 就漏了这步，OJ2 原样搬过来：2026-09-07 一次补发之后
     // 269 人的计数停在旧值，其中 10 人实际够了「奖杯收藏家」却一直没发 ——
     // 判题结算只在「这次有新解锁」时才重算，被补发的人不再解锁新成就就永远不会自愈。
-    if (achievement.rarity !== "platinum" && achievement.metric !== "achievement_unlocked_count") {
+    if (achievement.rarity !== 'platinum' && achievement.metric !== 'achievement_unlocked_count') {
       await refreshUnlockedCount(unlockedUserIds)
       for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
     }
@@ -474,12 +390,7 @@ export function metaAchievements() {
       operator: schema.achievement.operator,
     })
     .from(schema.achievement)
-    .where(
-      and(
-        eq(schema.achievement.visible, true),
-        eq(schema.achievement.metric, "achievement_unlocked_count"),
-      ),
-    )
+    .where(and(eq(schema.achievement.visible, true), eq(schema.achievement.metric, 'achievement_unlocked_count')))
 }
 
 /**
@@ -578,20 +489,15 @@ async function refreshAcWeekStreakForAll() {
   const firstAccepted = db
     .select({
       userId: schema.submission.userId,
-      firstAt: sql<string>`min(${schema.submission.createTime})`.as("first_at"),
+      firstAt: sql<string>`min(${schema.submission.createTime})`.as('first_at'),
     })
     .from(schema.submission)
     // 只算还在的用户：库里有提交的 user_id 已经对不上任何用户（submission.user_id 上没有
     // 外键，是历史遗留），直接写 user_stat 会撞 user_stat 的外键，整次重算失败
     .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(
-      and(
-        isNull(schema.submission.contestId),
-        inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]),
-      ),
-    )
+    .where(and(isNull(schema.submission.contestId), inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED])))
     .groupBy(schema.submission.userId, schema.submission.problemId)
-    .as("first_accepted")
+    .as('first_accepted')
   const week = sql<string>`to_char(date_trunc('week', ${localTime(firstAccepted.firstAt)}), 'YYYY-MM-DD')`
   const rows = await db
     .select({ userId: firstAccepted.userId, week })

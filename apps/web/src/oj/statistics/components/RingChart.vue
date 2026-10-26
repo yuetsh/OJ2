@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ArcElement, Chart as ChartJS, Tooltip } from "chart.js"
-import { Doughnut } from "vue-chartjs"
-import { useChartTheme } from "shared/composables/chartTheme"
+import { ArcElement, Chart as ChartJS, Tooltip } from 'chart.js'
+import { Doughnut } from 'vue-chartjs'
+import { useChartTheme } from 'shared/composables/chartTheme'
 
 ChartJS.register(ArcElement, Tooltip)
 
@@ -36,14 +36,13 @@ const data = computed(() => ({
 const options = {
   responsive: true,
   maintainAspectRatio: false,
-  cutout: "72%",
+  cutout: '72%',
   animation: false as const,
   plugins: {
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label: (context: { label: string; parsed: number }) =>
-          `${context.label}：${context.parsed}`,
+        label: (context: { label: string; parsed: number }) => `${context.label}：${context.parsed}`,
       },
     },
   },
@@ -53,7 +52,7 @@ const options = {
 <template>
   <span class="ring" :style="{ width: `${size ?? 48}px`, height: `${size ?? 48}px` }">
     <Doughnut :key="chartKey" :data="data" :options="options" />
-    <span class="center">{{ total > 0 ? `${pct}%` : "—" }}</span>
+    <span class="center">{{ total > 0 ? `${pct}%` : '—' }}</span>
   </span>
 </template>
 

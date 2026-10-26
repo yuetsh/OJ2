@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useCollabStore } from "shared/store/collab"
-import HelpRequestList from "./HelpRequestList.vue"
+import { Icon } from '@iconify/vue'
+import { useCollabStore } from 'shared/store/collab'
+import HelpRequestList from './HelpRequestList.vue'
 
 /**
  * 老师顶栏上的「N 人举手」：前台顶栏和后台顶栏共用这一个。
@@ -13,7 +13,7 @@ import HelpRequestList from "./HelpRequestList.vue"
  * 点开是挂在按钮下面的举手面板（HelpRequestList），不是弹框。课堂看板的表里举手的人
  * 排最前、行里就有「帮他」，在看板上不用点这里。
  */
-const props = withDefaults(defineProps<{ size?: "medium" | "small" }>(), { size: "medium" })
+const props = withDefaults(defineProps<{ size?: 'medium' | 'small' }>(), { size: 'medium' })
 
 const collabStore = useCollabStore()
 const isDark = useDark()
@@ -31,37 +31,26 @@ watch(count, (value, previous) => {
 const tone = computed(() =>
   isDark.value
     ? {
-        bg: "#3a1d24",
-        border: "#6b2d3a",
-        text: "#f28b9e",
-        flash: "#6b2d3a",
-        ring: "rgba(242, 139, 158, 0.25)",
+        bg: '#3a1d24',
+        border: '#6b2d3a',
+        text: '#f28b9e',
+        flash: '#6b2d3a',
+        ring: 'rgba(242, 139, 158, 0.25)',
       }
     : {
-        bg: "#fdecef",
-        border: "#f3c1cb",
-        text: "#b0213d",
-        flash: "#f7b9c6",
-        ring: "rgba(208, 48, 80, 0.18)",
+        bg: '#fdecef',
+        border: '#f3c1cb',
+        text: '#b0213d',
+        flash: '#f7b9c6',
+        ring: 'rgba(208, 48, 80, 0.18)',
       },
 )
 </script>
 
 <template>
-  <n-popover
-    v-if="count > 0"
-    v-model:show="collabStore.helpPanelOpen"
-    trigger="click"
-    placement="bottom-end"
-    :show-arrow="false"
-  >
+  <n-popover v-if="count > 0" v-model:show="collabStore.helpPanelOpen" trigger="click" placement="bottom-end" :show-arrow="false">
     <template #trigger>
-      <button
-        :key="flashKey"
-        type="button"
-        class="help"
-        :class="[props.size, { flash: flashKey > 0 }]"
-      >
+      <button :key="flashKey" type="button" class="help" :class="[props.size, { flash: flashKey > 0 }]">
         <Icon icon="ph:hand" :width="props.size === 'small' ? 14 : 15" />
         <span>{{ count }} 人举手</span>
       </button>
@@ -78,10 +67,10 @@ const tone = computed(() =>
   gap: 5px;
   height: 30px;
   padding: 0 11px 0 9px;
-  border: 1px solid v-bind("tone.border");
+  border: 1px solid v-bind('tone.border');
   border-radius: 15px;
-  background: v-bind("tone.bg");
-  color: v-bind("tone.text");
+  background: v-bind('tone.bg');
+  color: v-bind('tone.text');
   font: inherit;
   font-weight: 600;
   white-space: nowrap;
@@ -101,11 +90,11 @@ const tone = computed(() =>
 @keyframes flash {
   0%,
   40% {
-    background: v-bind("tone.flash");
-    box-shadow: 0 0 0 4px v-bind("tone.ring");
+    background: v-bind('tone.flash');
+    box-shadow: 0 0 0 4px v-bind('tone.ring');
   }
   100% {
-    background: v-bind("tone.bg");
+    background: v-bind('tone.bg');
     box-shadow: 0 0 0 0 transparent;
   }
 }

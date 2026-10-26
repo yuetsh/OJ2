@@ -1,8 +1,8 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { sampleUserSchema } from "./common"
-import { achievementRaritySchema } from "./achievement"
-import { userProfileSchema } from "./auth"
+import { sampleUserSchema } from './common'
+import { achievementRaritySchema } from './achievement'
+import { userProfileSchema } from './auth'
 
 /** 个性签名最多几个字。以前是 256，排名上要露出来后改成 30（九成签名本来就不超过 26 字） */
 export const MOOD_MAX = 30
@@ -49,7 +49,7 @@ export const weeklyRankItemSchema = z.object({
 export const weeklyRankSchema = z.object({
   /** 本周一 0:00（东八区）对应的 UTC 时刻，前端拿它显示统计区间 */
   start: z.string(),
-  scope: z.enum(["global", "class"]),
+  scope: z.enum(['global', 'class']),
   /** `scope = "class"` 时是我的班号，全服榜为 null */
   className: z.string().nullable(),
   /** 本周有新增 AC 的总人数。榜面只回前几名，这个数是全量 */

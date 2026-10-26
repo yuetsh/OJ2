@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import type { SubmissionStatistics, SubmissionStatisticsGrid } from "@oj2/contract"
-import { SubmissionStatus } from "utils/constants"
-import { parseTime } from "utils/functions"
-import StatusPill from "oj/submission/components/StatusPill.vue"
-import { useTone } from "shared/composables/tone"
-import UserName from "shared/components/UserName.vue"
-import AttemptSquares from "./AttemptSquares.vue"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import type { SubmissionStatistics, SubmissionStatisticsGrid } from '@oj2/contract'
+import { SubmissionStatus } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import StatusPill from 'oj/submission/components/StatusPill.vue'
+import { useTone } from 'shared/composables/tone'
+import UserName from 'shared/components/UserName.vue'
+import AttemptSquares from './AttemptSquares.vue'
 
 /**
  * 代码统计的主体（设计稿「统计重设计 · 定稿 B」）：左边题目，右边学生。
@@ -31,7 +31,7 @@ const tone = useTone()
 // 暗色下「做对了」那格的底色是浅绿，白字看不清
 const isDark = useDark()
 
-type Attempt = SubmissionStatisticsGrid["rows"][number]["submissions"][number]
+type Attempt = SubmissionStatisticsGrid['rows'][number]['submissions'][number]
 
 function isAc(result: number) {
   return result === SubmissionStatus.accepted || result === SubmissionStatus.ast_check_failed
@@ -98,10 +98,7 @@ function solvedOn(student: Student, pid: string) {
  */
 function astOnlyOn(student: Student, pid: string) {
   const items = student.byProblem.get(pid) ?? []
-  return (
-    items.some((item) => item.result === SubmissionStatus.ast_check_failed) &&
-    !items.some((item) => item.result === SubmissionStatus.accepted)
-  )
+  return items.some((item) => item.result === SubmissionStatus.ast_check_failed) && !items.some((item) => item.result === SubmissionStatus.accepted)
 }
 
 function doneCount(student: Student) {
@@ -118,7 +115,7 @@ const problemRows = computed(() =>
       ...problem,
       done,
       tried: tried.length,
-      avg: tried.length ? (attempts / tried.length).toFixed(1) : "—",
+      avg: tried.length ? (attempts / tried.length).toFixed(1) : '—',
     }
   }),
 )
@@ -128,19 +125,19 @@ const needed = computed(() => (props.explicit ? problems.value.length : 1))
 function finished(student: Student) {
   return problems.value.length > 0 && doneCount(student) >= needed.value
 }
-const doneLabel = computed(() => (props.explicit ? "做完" : "做对过题"))
+const doneLabel = computed(() => (props.explicit ? '做完' : '做对过题'))
 
 const allDone = computed(() => students.value.filter(finished).length)
 
 // ---------- 选中哪道题、筛哪些人 ----------
 
 /** "" = 全部。只有一道题时直接选中它 */
-const focus = ref("")
+const focus = ref('')
 watch(
   problems,
   (list) => {
     if (list.length === 1) focus.value = list[0]!.problemDisplayId
-    else if (!list.some((problem) => problem.problemDisplayId === focus.value)) focus.value = ""
+    else if (!list.some((problem) => problem.problemDisplayId === focus.value)) focus.value = ''
   },
   { immediate: true },
 )
@@ -148,9 +145,7 @@ watch(
 /** 默认只看没做完的：复盘要找的是他们，做完的一长串沉在下面也看不见 */
 const onlyUnfinished = ref(true)
 
-const focusRow = computed(() =>
-  problemRows.value.find((row) => row.problemDisplayId === focus.value),
-)
+const focusRow = computed(() => problemRows.value.find((row) => row.problemDisplayId === focus.value))
 
 /** 这道题上：没过的在前（交得越多越靠前 —— 卡得最久），一次没交的其次，做完的沉底 */
 const problemStudents = computed(() => {
@@ -162,12 +157,7 @@ const problemStudents = computed(() => {
   const rank = (row: (typeof list)[number]) => (row.solved ? 2 : row.items.length ? 0 : 1)
   return list
     .filter((row) => !onlyUnfinished.value || !row.solved)
-    .sort(
-      (a, b) =>
-        rank(a) - rank(b) ||
-        b.items.length - a.items.length ||
-        a.student.username.localeCompare(b.student.username, "zh-CN"),
-    )
+    .sort((a, b) => rank(a) - rank(b) || b.items.length - a.items.length || a.student.username.localeCompare(b.student.username, 'zh-CN'))
 })
 
 /** 全部题：没做完的在前（交得多的更前），一道没交的其次，全做完的沉底 */
@@ -182,25 +172,18 @@ const allStudents = computed(() => {
   const rank = (row: (typeof list)[number]) => (row.finished ? 2 : row.student.total ? 0 : 1)
   return list
     .filter((row) => !onlyUnfinished.value || !row.finished)
-    .sort(
-      (a, b) =>
-        rank(a) - rank(b) ||
-        b.student.total - a.student.total ||
-        a.student.username.localeCompare(b.student.username, "zh-CN"),
-    )
+    .sort((a, b) => rank(a) - rank(b) || b.student.total - a.student.total || a.student.username.localeCompare(b.student.username, 'zh-CN'))
 })
 
 const unfinishedCount = computed(() =>
-  focus.value
-    ? students.value.filter((student) => !solvedOn(student, focus.value)).length
-    : students.value.filter((student) => !finished(student)).length,
+  focus.value ? students.value.filter((student) => !solvedOn(student, focus.value)).length : students.value.filter((student) => !finished(student)).length,
 )
 
-const expanded = ref("")
-watch([focus, onlyUnfinished], () => (expanded.value = ""))
+const expanded = ref('')
+watch([focus, onlyUnfinished], () => (expanded.value = ''))
 
 function toggle(username: string) {
-  expanded.value = expanded.value === username ? "" : username
+  expanded.value = expanded.value === username ? '' : username
 }
 
 /** 展开一个人：没过的题在前、交得多的更前 */
@@ -209,23 +192,20 @@ function problemsOf(student: Student) {
     const sa = solvedOn(student, a.problemDisplayId)
     const sb = solvedOn(student, b.problemDisplayId)
     if (sa !== sb) return sa ? 1 : -1
-    return (
-      (student.byProblem.get(b.problemDisplayId)?.length ?? 0) -
-      (student.byProblem.get(a.problemDisplayId)?.length ?? 0)
-    )
+    return (student.byProblem.get(b.problemDisplayId)?.length ?? 0) - (student.byProblem.get(a.problemDisplayId)?.length ?? 0)
   })
 }
 
 function rate(student: Student) {
-  return student.judged ? `${Math.round((student.accepted / student.judged) * 100)}%` : "—"
+  return student.judged ? `${Math.round((student.accepted / student.judged) * 100)}%` : '—'
 }
 
 function dayText(time: string | null) {
-  return time ? parseTime(time, "M月D日 HH:mm") : "—"
+  return time ? parseTime(time, 'M月D日 HH:mm') : '—'
 }
 
 function pct(done: number, total: number) {
-  return total > 0 ? `${Math.min(100, (done / total) * 100)}%` : "0%"
+  return total > 0 ? `${Math.min(100, (done / total) * 100)}%` : '0%'
 }
 </script>
 
@@ -235,20 +215,13 @@ function pct(done: number, total: number) {
     <section class="problems">
       <div class="col-head">题目（按你填的顺序）</div>
       <div class="problem-list">
-        <button
-          v-if="problems.length > 1"
-          class="problem"
-          :class="{ on: focus === '' }"
-          @click="focus = ''"
-        >
+        <button v-if="problems.length > 1" class="problem" :class="{ on: focus === '' }" @click="focus = ''">
           <span class="p-line">
             <b>全部 {{ problems.length }} 道</b>
             <span class="spacer"></span>
             <span class="muted">{{ doneLabel }} {{ allDone }}/{{ personCount }} 人</span>
           </span>
-          <span class="bar"
-            ><span class="fill" :style="{ width: pct(allDone, personCount) }"></span
-          ></span>
+          <span class="bar"><span class="fill" :style="{ width: pct(allDone, personCount) }"></span></span>
         </button>
         <button
           v-for="row in problemRows"
@@ -263,9 +236,7 @@ function pct(done: number, total: number) {
             <span class="spacer"></span>
             <span class="muted">做完 {{ row.done }}/{{ personCount }} · 平均 {{ row.avg }} 次</span>
           </span>
-          <span class="bar"
-            ><span class="fill" :style="{ width: pct(row.done, personCount) }"></span
-          ></span>
+          <span class="bar"><span class="fill" :style="{ width: pct(row.done, personCount) }"></span></span>
         </button>
         <div v-if="!problems.length" class="empty">这段时间没有人交</div>
       </div>
@@ -277,8 +248,7 @@ function pct(done: number, total: number) {
         <template v-if="focusRow">
           <b class="s-title">{{ focusRow.problemDisplayId }} {{ focusRow.title }}</b>
           <span class="muted">
-            做完 {{ focusRow.done }}/{{ personCount }} · 交了没对
-            {{ focusRow.tried - focusRow.done }} · 没交
+            做完 {{ focusRow.done }}/{{ personCount }} · 交了没对 {{ focusRow.tried - focusRow.done }} · 没交
             {{ Math.max(0, personCount - focusRow.tried) }}
           </span>
         </template>
@@ -289,26 +259,15 @@ function pct(done: number, total: number) {
         <template v-else>
           <b class="s-title">全部 {{ problems.length }} 道</b>
           <span class="muted">
-            {{ doneLabel }} {{ allDone }}/{{ personCount }} · 没做完 {{ unfinishedCount }} ·
-            一道没交
+            {{ doneLabel }} {{ allDone }}/{{ personCount }} · 没做完 {{ unfinishedCount }} · 一道没交
             {{ stats.dataUnaccepted.length }}
           </span>
         </template>
         <span class="spacer"></span>
-        <button
-          v-if="problems.length"
-          class="chip"
-          :class="{ on: onlyUnfinished }"
-          @click="onlyUnfinished = true"
-        >
+        <button v-if="problems.length" class="chip" :class="{ on: onlyUnfinished }" @click="onlyUnfinished = true">
           没做完 <span class="n">{{ unfinishedCount }}</span>
         </button>
-        <button
-          v-if="problems.length"
-          class="chip"
-          :class="{ on: !onlyUnfinished }"
-          @click="onlyUnfinished = false"
-        >
+        <button v-if="problems.length" class="chip" :class="{ on: !onlyUnfinished }" @click="onlyUnfinished = false">
           全部 <span class="n">{{ students.length }}</span>
         </button>
       </div>
@@ -329,7 +288,7 @@ function pct(done: number, total: number) {
               <StatusPill v-if="row.items.length" :result="row.items.at(-1)!.result" />
               <b v-else class="none" :style="{ color: tone('error').color }">没交</b>
             </span>
-            <span class="c-n muted">{{ row.items.length || "—" }}</span>
+            <span class="c-n muted">{{ row.items.length || '—' }}</span>
             <span class="c-seq"><AttemptSquares :items="row.items" /></span>
             <span class="c-when muted">{{ dayText(row.items.at(-1)?.createTime ?? null) }}</span>
           </div>
@@ -345,7 +304,7 @@ function pct(done: number, total: number) {
           <span class="c-done">做完</span>
           <span class="c-n">提交</span>
           <span class="c-rate">正确率</span>
-          <span class="c-grid">{{ problems.map((p) => p.problemDisplayId).join(" · ") }}</span>
+          <span class="c-grid">{{ problems.map((p) => p.problemDisplayId).join(' · ') }}</span>
         </div>
         <div class="rows">
           <template v-for="row in allStudents" :key="row.student.username">
@@ -360,22 +319,13 @@ function pct(done: number, total: number) {
               @keydown.space.prevent="toggle(row.student.username)"
             >
               <span class="c-caret">
-                <Icon
-                  :icon="
-                    expanded === row.student.username ? 'ph:caret-down-bold' : 'ph:caret-right-bold'
-                  "
-                  :width="12"
-                />
+                <Icon :icon="expanded === row.student.username ? 'ph:caret-down-bold' : 'ph:caret-right-bold'" :width="12" />
               </span>
               <UserName :username="row.student.username" class="c-name" />
               <span
                 class="c-done done"
                 :style="{
-                  color: row.finished
-                    ? tone('success').color
-                    : row.student.total
-                      ? theme.textColor1
-                      : tone('error').color,
+                  color: row.finished ? tone('success').color : row.student.total ? theme.textColor1 : tone('error').color,
                 }"
               >
                 {{ explicit ? `${row.done}/${problems.length}` : `${row.done} 道` }}
@@ -388,12 +338,7 @@ function pct(done: number, total: number) {
                   :key="problem.problemDisplayId"
                   class="cell"
                   :title="
-                    problem.problemDisplayId +
-                    ' ' +
-                    problem.title +
-                    (astOnlyOn(row.student, problem.problemDisplayId)
-                      ? '：答案对了，但没按要求的写法写'
-                      : '')
+                    problem.problemDisplayId + ' ' + problem.title + (astOnlyOn(row.student, problem.problemDisplayId) ? '：答案对了，但没按要求的写法写' : '')
                   "
                   :style="
                     astOnlyOn(row.student, problem.problemDisplayId)
@@ -407,44 +352,29 @@ function pct(done: number, total: number) {
                 >
                   {{
                     astOnlyOn(row.student, problem.problemDisplayId)
-                      ? "语"
+                      ? '语'
                       : solvedOn(row.student, problem.problemDisplayId)
-                        ? "✓"
-                        : (row.student.byProblem.get(problem.problemDisplayId)?.length ?? "·")
+                        ? '✓'
+                        : (row.student.byProblem.get(problem.problemDisplayId)?.length ?? '·')
                   }}
                 </span>
               </span>
             </div>
             <div v-if="expanded === row.student.username" class="detail">
-              <div
-                v-for="problem in problemsOf(row.student)"
-                :key="problem.problemDisplayId"
-                class="d-line"
-              >
+              <div v-for="problem in problemsOf(row.student)" :key="problem.problemDisplayId" class="d-line">
                 <span class="d-title"
-                  ><span class="muted">{{ problem.problemDisplayId }}</span>
-                  {{ problem.title }}</span
+                  ><span class="muted">{{ problem.problemDisplayId }}</span> {{ problem.title }}</span
                 >
                 <span
                   class="d-state"
                   :style="{
-                    color: solvedOn(row.student, problem.problemDisplayId)
-                      ? tone('success').color
-                      : tone('error').color,
+                    color: solvedOn(row.student, problem.problemDisplayId) ? tone('success').color : tone('error').color,
                   }"
                 >
                   {{ row.student.byProblem.get(problem.problemDisplayId)?.length ?? 0 }} 次 ·
-                  {{
-                    solvedOn(row.student, problem.problemDisplayId)
-                      ? "已通过"
-                      : row.student.byProblem.has(problem.problemDisplayId)
-                        ? "还没过"
-                        : "没交"
-                  }}
+                  {{ solvedOn(row.student, problem.problemDisplayId) ? '已通过' : row.student.byProblem.has(problem.problemDisplayId) ? '还没过' : '没交' }}
                 </span>
-                <AttemptSquares
-                  :items="row.student.byProblem.get(problem.problemDisplayId) ?? []"
-                />
+                <AttemptSquares :items="row.student.byProblem.get(problem.problemDisplayId) ?? []" />
               </div>
             </div>
           </template>
@@ -452,8 +382,8 @@ function pct(done: number, total: number) {
         </div>
       </template>
       <div v-if="grid.truncated" class="truncated">
-        范围太大，只取了最近的 5000 条提交：上面一排数字是全部算的，左边每道题的「做完」、
-        右边的名单和方块串只按这 5000 条算，更早交的人可能不在里面。缩短时间段就准了。
+        范围太大，只取了最近的 5000 条提交：上面一排数字是全部算的，左边每道题的「做完」、 右边的名单和方块串只按这 5000
+        条算，更早交的人可能不在里面。缩短时间段就准了。
       </div>
     </section>
   </div>
@@ -471,7 +401,7 @@ function pct(done: number, total: number) {
   flex: none;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid v-bind("theme.dividerColor");
+  border-right: 1px solid v-bind('theme.dividerColor');
   min-height: 0;
 }
 
@@ -483,9 +413,9 @@ function pct(done: number, total: number) {
   display: flex;
   align-items: center;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .problem-list {
@@ -504,7 +434,7 @@ function pct(done: number, total: number) {
   justify-content: center;
   gap: 6px;
   border: 0;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   background: transparent;
   font: inherit;
   color: inherit;
@@ -513,7 +443,7 @@ function pct(done: number, total: number) {
 }
 
 .problem:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .problem.on {
@@ -537,7 +467,7 @@ function pct(done: number, total: number) {
 .bar {
   height: 4px;
   border-radius: 2px;
-  background: v-bind("theme.dividerColor");
+  background: v-bind('theme.dividerColor');
   overflow: hidden;
 }
 
@@ -545,11 +475,11 @@ function pct(done: number, total: number) {
   display: block;
   height: 4px;
   border-radius: 2px;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   font-size: var(--oj-fs-meta);
 }
 
@@ -573,7 +503,7 @@ function pct(done: number, total: number) {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   white-space: nowrap;
 }
 
@@ -584,17 +514,17 @@ function pct(done: number, total: number) {
 .chip {
   height: 32px;
   padding: 0 14px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: 16px;
   background: transparent;
   font: inherit;
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
   cursor: pointer;
 }
 
 .chip.on {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
   background: v-bind("tone('success').background");
   color: v-bind("tone('success').color");
   font-weight: 600;
@@ -614,9 +544,9 @@ function pct(done: number, total: number) {
   align-items: center;
   gap: 10px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
-  background: v-bind("theme.actionColor");
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  color: v-bind('theme.textColor3');
+  background: v-bind('theme.actionColor');
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .rows {
@@ -632,7 +562,7 @@ function pct(done: number, total: number) {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .row.clickable {
@@ -640,7 +570,7 @@ function pct(done: number, total: number) {
 }
 
 .row.clickable:hover {
-  background: v-bind("theme.hoverColor");
+  background: v-bind('theme.hoverColor');
 }
 
 .row.on {
@@ -651,7 +581,7 @@ function pct(done: number, total: number) {
   width: 16px;
   flex: none;
   display: flex;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 .c-name {
   width: 110px;
@@ -717,8 +647,8 @@ function pct(done: number, total: number) {
 
 .detail {
   padding: 6px 20px 8px 46px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.actionColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.actionColor');
 }
 
 .d-line {
@@ -745,14 +675,14 @@ function pct(done: number, total: number) {
 .empty {
   padding: 40px 16px;
   text-align: center;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .truncated {
   padding: 10px var(--oj-pad-x);
   font-size: var(--oj-fs-meta);
   color: v-bind("tone('warning').color");
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
 }
 
 /* 手机：题目在上、学生在下，整页滚动 */
@@ -765,7 +695,7 @@ function pct(done: number, total: number) {
   .problems {
     width: 100%;
     border-right: 0;
-    border-bottom: 1px solid v-bind("theme.dividerColor");
+    border-bottom: 1px solid v-bind('theme.dividerColor');
   }
 
   .problem-list,

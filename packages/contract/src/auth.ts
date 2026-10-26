@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from 'zod'
 
 export const loginRequestSchema = z.object({
   username: z.string().trim().min(1).max(150),
@@ -15,7 +15,7 @@ export const refreshTokenRequestSchema = z.object({
  * 前端传 `[WS_AUTH_PROTOCOL, token]` 两个子协议，服务端回第一个 —— 必须回一个前端
  * 传过的，否则 Chrome 判握手失败。不放 URL 查询参数：URL 会原样进反代的访问日志。
  */
-export const WS_AUTH_PROTOCOL = "oj2.bearer"
+export const WS_AUTH_PROTOCOL = 'oj2.bearer'
 
 /**
  * 登录、换 token 的出参。

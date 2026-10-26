@@ -1,19 +1,19 @@
 <script lang="ts">
-import type { LearnBoardStudent } from "utils/types"
+import type { LearnBoardStudent } from 'utils/types'
 
 /** 读过这课的一个人，和他在这道配套题上的情况（一次没交是 null） */
 export interface ProblemReader {
   userId: number
   username: string
-  state: LearnBoardStudent["problems"][number] | null
+  state: LearnBoardStudent['problems'][number] | null
 }
 </script>
 
 <script setup lang="ts">
-import { NText } from "naive-ui"
-import { parseTime } from "utils/functions"
-import UserName from "shared/components/UserName.vue"
-import { useBreakpoints } from "shared/composables/breakpoints"
+import { NText } from 'naive-ui'
+import { parseTime } from 'utils/functions'
+import UserName from 'shared/components/UserName.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 
 /**
  * 一道配套题，读过这课的人各自做没做对。数据就是方块格那份，不另外请求。
@@ -31,49 +31,43 @@ function rank(row: ProblemReader) {
 const rows = computed(() => [...props.people].sort((a, b) => rank(a) - rank(b)))
 
 function renderResult(row: ProblemReader) {
-  if (!row.state) return h(NText, { depth: 3 }, () => "没交")
-  return row.state.solved
-    ? h(NText, { type: "success" }, () => "做对了")
-    : h(NText, { type: "error" }, () => `交了 ${row.state!.submissions} 次还没对`)
+  if (!row.state) return h(NText, { depth: 3 }, () => '没交')
+  return row.state.solved ? h(NText, { type: 'success' }, () => '做对了') : h(NText, { type: 'error' }, () => `交了 ${row.state!.submissions} 次还没对`)
 }
 
 /** 提交列表按这个人、这道题筛好，新标签页打开，后台这页不动 */
 function renderLink(row: ProblemReader) {
   if (!row.state) return null
   const { href } = router.resolve({
-    path: "/submission",
-    query: { problem: props.displayId, username: row.username, exactUsername: "1" },
+    path: '/submission',
+    query: { problem: props.displayId, username: row.username, exactUsername: '1' },
   })
-  return h("a", { href, target: "_blank", class: "link" }, "看提交")
+  return h('a', { href, target: '_blank', class: 'link' }, '看提交')
 }
 
 const desktopColumns: DataTableColumn<ProblemReader>[] = [
   {
-    title: "学生",
-    key: "username",
+    title: '学生',
+    key: 'username',
     width: 150,
     render: (row) => h(UserName, { username: row.username }),
   },
-  { title: "结果", key: "result", width: 150, render: renderResult },
+  { title: '结果', key: 'result', width: 150, render: renderResult },
   {
-    title: "最后提交",
-    key: "lastSubmitAt",
+    title: '最后提交',
+    key: 'lastSubmitAt',
     width: 150,
-    render: (row) =>
-      row.state ? parseTime(row.state.lastSubmitAt, "YYYY年M月D日") : h(NText, { depth: 3 }, "-"),
+    render: (row) => (row.state ? parseTime(row.state.lastSubmitAt, 'YYYY年M月D日') : h(NText, { depth: 3 }, '-')),
   },
-  { title: "", key: "link", render: renderLink },
+  { title: '', key: 'link', render: renderLink },
 ]
 
 const mobileColumns: DataTableColumn<ProblemReader>[] = [
   {
-    title: "学生",
-    key: "username",
+    title: '学生',
+    key: 'username',
     render: (row) =>
-      h("div", { class: "m-line" }, [
-        h(UserName, { username: row.username }),
-        h("span", { class: "m-right" }, [renderResult(row), renderLink(row)]),
-      ]),
+      h('div', { class: 'm-line' }, [h(UserName, { username: row.username }), h('span', { class: 'm-right' }, [renderResult(row), renderLink(row)])]),
   },
 ]
 

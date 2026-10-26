@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { ProblemTypeFilter } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import { PROBLEM_TYPE_LABEL } from "../utils/problemType"
+import { Icon } from '@iconify/vue'
+import type { ProblemTypeFilter } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import { PROBLEM_TYPE_LABEL } from '../utils/problemType'
 
 /**
  * 几类特殊题的小标签（设计稿「题目列表重设计 · 改版」）。轻重按对学生意味着什么分：
@@ -17,27 +17,25 @@ const props = defineProps<{ kind: ProblemTypeFilter }>()
 const theme = useThemeVars()
 
 const ICON: Record<ProblemTypeFilter, string> = {
-  sql: "ph:database-bold",
-  flowchart: "ph:pencil-simple-line-bold",
-  ast: "ph:code-bold",
-  reference: "ph:flow-arrow-bold",
+  sql: 'ph:database-bold',
+  flowchart: 'ph:pencil-simple-line-bold',
+  ast: 'ph:code-bold',
+  reference: 'ph:flow-arrow-bold',
 }
 
 // 明暗两套色都交给 CSS（html.dark），这里只递主题色。**别在这里调 useDark()**：
 // 每个实例都会往 <html> 上重写一遍 class、插一段禁用过渡的样式再强制整页重算样式，
 // 一页题目十几个标签，切一次知识点就白白重算十几遍（实测占了切换耗时的一大半）
 const vars = computed(() => ({
-  "--tag-info": theme.value.infoColorPressed,
-  "--tag-info-dark": theme.value.infoColor,
-  "--tag-muted": theme.value.textColor3,
-  "--tag-border": theme.value.borderColor,
+  '--tag-info': theme.value.infoColorPressed,
+  '--tag-info-dark': theme.value.infoColor,
+  '--tag-muted': theme.value.textColor3,
+  '--tag-border': theme.value.borderColor,
 }))
 </script>
 
 <template>
-  <span class="type-tag" :class="kind" :style="vars">
-    <Icon :icon="ICON[props.kind]" :width="12" />{{ PROBLEM_TYPE_LABEL[props.kind] }}
-  </span>
+  <span class="type-tag" :class="kind" :style="vars"> <Icon :icon="ICON[props.kind]" :width="12" />{{ PROBLEM_TYPE_LABEL[props.kind] }} </span>
 </template>
 
 <style scoped>

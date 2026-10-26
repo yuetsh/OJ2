@@ -1,4 +1,4 @@
-import { z } from "zod"
+import { z } from 'zod'
 
 export const sampleUserSchema = z.object({
   id: z.number().int(),

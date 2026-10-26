@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import AchievementIcon from "shared/components/AchievementIcon.vue"
-import { useAchievementStore } from "shared/store/achievement"
-import { RARITY_COLOR } from "utils/constants"
+import AchievementIcon from 'shared/components/AchievementIcon.vue'
+import { useAchievementStore } from 'shared/store/achievement'
+import { RARITY_COLOR } from 'utils/constants'
 
 const store = useAchievementStore()
 const { current, queue } = storeToRefs(store)
@@ -37,17 +37,13 @@ onUnmounted(() => {
 
 <template>
   <Transition name="slide">
-    <div
-      v-if="visible && current"
-      class="toast"
-      :style="{ borderColor: RARITY_COLOR[current.rarity] }"
-    >
+    <div v-if="visible && current" class="toast" :style="{ borderColor: RARITY_COLOR[current.rarity] }">
       <div class="icon">
         <AchievementIcon :icon="current.icon" :size="34" />
       </div>
       <div class="body">
         <div class="label">
-          {{ current.kind === "badge" ? "获得奖章" : "成就解锁" }}
+          {{ current.kind === 'badge' ? '获得奖章' : '成就解锁' }}
         </div>
         <div class="name">{{ current.name }}</div>
         <div class="desc">{{ current.description }}</div>

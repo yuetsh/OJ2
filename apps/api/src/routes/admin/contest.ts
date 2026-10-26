@@ -1,27 +1,17 @@
-import {
-  createContestRequestSchema,
-  updateAcmHelperRequestSchema,
-  updateContestRequestSchema,
-  type AdminContest,
-  type AdminContestList,
-} from "@oj2/contract"
-import { and, count, countDistinct, desc, eq, ilike, inArray } from "drizzle-orm"
-import { Hono } from "hono"
+import { createContestRequestSchema, updateAcmHelperRequestSchema, updateContestRequestSchema, type AdminContest, type AdminContestList } from '@oj2/contract'
+import { and, count, countDistinct, desc, eq, ilike, inArray } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireTeacher, type AppEnv } from "../../auth/middleware"
-import { db, schema } from "../../db"
-import { failure, parseBody, success } from "../../http"
-import { contestStatus } from "../../services/contest"
-import { queryInteger, sampleUser } from "../helpers"
-import { ownsOrSuper } from "../../services/permissions"
+import { requireTeacher, type AppEnv } from '../../auth/middleware'
+import { db, schema } from '../../db'
+import { failure, parseBody, success } from '../../http'
+import { contestStatus } from '../../services/contest'
+import { queryInteger, sampleUser } from '../helpers'
+import { ownsOrSuper } from '../../services/permissions'
 
 export const adminContestRoutes = new Hono<AppEnv>()
 
-async function serialize(row: {
-  contest: typeof schema.contest.$inferSelect
-  user: typeof schema.user.$inferSelect
-  realName: string | null
-}) {
+async function serialize(row: { contest: typeof schema.contest.$inferSelect; user: typeof schema.user.$inferSelect; realName: string | null }) {
   return {
     id: row.contest.id,
     title: row.contest.title,
@@ -35,7 +25,7 @@ async function serialize(row: {
     visible: row.contest.visible,
     createdBy: sampleUser(row.user, row.realName),
     status: contestStatus(row.contest),
-    contestType: row.contest.password ? "Password Protected" : "Public",
+    contestType: row.contest.password ? 'Password Protected' : 'Public',
   } satisfies AdminContest
 }
 
@@ -57,19 +47,19 @@ function selectContest(id: number) {
 function validatePayload(data: { startTime: string; endTime: string }) {
   const start = Date.parse(data.startTime)
   const end = Date.parse(data.endTime)
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return "开始或结束时间不是合法的时间格式"
-  if (end <= start) return "Start time must occur earlier than end time"
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return '开始或结束时间不是合法的时间格式'
+  if (end <= start) return 'Start time must occur earlier than end time'
   return null
 }
 
-adminContestRoutes.get("/contests", requireTeacher, async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
-  const user = c.get("user")!
+adminContestRoutes.get('/contests', requireTeacher, async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
+  const user = c.get('user')!
   const filters = []
   // 非超管只看得到自己建的比赛，与旧后端一致
-  if (user.adminType !== "Super Admin") filters.push(eq(schema.contest.createdById, user.id))
-  const keyword = c.req.query("keyword")?.trim()
+  if (user.adminType !== 'Super Admin') filters.push(eq(schema.contest.createdById, user.id))
+  const keyword = c.req.query('keyword')?.trim()
   if (keyword) filters.push(ilike(schema.contest.title, `%${keyword}%`))
   const where = filters.length ? and(...filters) : undefined
 
@@ -122,19 +112,19 @@ adminContestRoutes.get("/contests", requireTeacher, async (c) => {
   } satisfies AdminContestList)
 })
 
-adminContestRoutes.get("/contests/:id", requireTeacher, async (c) => {
-  const [row] = await selectContest(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!row || !ownsOrSuper(c.get("user")!, row.contest)) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
+adminContestRoutes.get('/contests/:id', requireTeacher, async (c) => {
+  const [row] = await selectContest(queryInteger(c.req.param('id'), 0, { min: 1 }))
+  if (!row || !ownsOrSuper(c.get('user')!, row.contest)) {
+    return failure(c, 404, 'contest-not-found', 'Contest does not exist')
   }
   return success(c, await serialize(row))
 })
 
-adminContestRoutes.post("/contests", requireTeacher, async (c) => {
+adminContestRoutes.post('/contests', requireTeacher, async (c) => {
   const parsed = await parseBody(c, createContestRequestSchema)
   if (!parsed.success) return parsed.response
   const error = validatePayload(parsed.data)
-  if (error) return failure(c, 400, "invalid-contest", error)
+  if (error) return failure(c, 400, 'invalid-contest', error)
 
   const now = new Date().toISOString()
   const [created] = await db
@@ -148,7 +138,7 @@ adminContestRoutes.post("/contests", requireTeacher, async (c) => {
       // 空串归一成 null，否则 contestType 会把「密码是空字符串」当成密码保护赛
       password: parsed.data.password || null,
       visible: parsed.data.visible,
-      createdById: c.get("user")!.id,
+      createdById: c.get('user')!.id,
       createTime: now,
       lastUpdateTime: now,
     })
@@ -157,16 +147,16 @@ adminContestRoutes.post("/contests", requireTeacher, async (c) => {
   return success(c, await serialize(row!), 201)
 })
 
-adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminContestRoutes.put('/contests/:id', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const parsed = await parseBody(c, updateContestRequestSchema)
   if (!parsed.success) return parsed.response
   const [existing] = await selectContest(id)
-  if (!existing || !ownsOrSuper(c.get("user")!, existing.contest)) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!existing || !ownsOrSuper(c.get('user')!, existing.contest)) {
+    return failure(c, 404, 'contest-not-found', 'Contest does not exist')
   }
   const error = validatePayload(parsed.data)
-  if (error) return failure(c, 400, "invalid-contest", error)
+  if (error) return failure(c, 400, 'invalid-contest', error)
 
   await db
     .update(schema.contest)
@@ -185,8 +175,8 @@ adminContestRoutes.put("/contests/:id", requireTeacher, async (c) => {
   return success(c, await serialize(row!))
 })
 
-adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminContestRoutes.post('/contests/:id/clone', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const [original] = await selectContest(id)
   // 这个接口是干什么的：**把以前那场比赛快速再开一场**，不用从头建一遍题。
   // 所以副本要带着整套题（含 answers 和 testCaseId），时间挪到 10 分钟后、默认不可见，
@@ -203,7 +193,7 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   //
   // 已知的副作用，别当成 bug 去"修"：副本和原题共用同一个测试点目录（testCaseId 原样复制），
   // 今天无害（删题特意不删目录），但以后要是加"删题顺手清测试点"，得先把这里改成复制目录。
-  if (!original) return failure(c, 404, "contest-not-found", "Contest does not exist")
+  if (!original) return failure(c, 404, 'contest-not-found', 'Contest does not exist')
 
   const duration = Date.parse(original.contest.endTime) - Date.parse(original.contest.startTime)
   // 新比赛从 10 分钟后开始，时长与原比赛相同 —— 给出题人留出改时间的余地，
@@ -211,7 +201,7 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
   const start = new Date(Date.now() + 10 * 60 * 1000)
   const end = new Date(start.getTime() + duration)
   const now = new Date().toISOString()
-  const me = c.get("user")!.id
+  const me = c.get('user')!.id
 
   const cloned = await db.transaction(async (tx) => {
     const [contest] = await tx
@@ -274,7 +264,7 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
     if (tags.length) {
       const displayIdByOldId = new Map(problems.map((problem) => [problem.id, problem.displayId]))
       const links = tags.flatMap((tag) => {
-        const newId = newIdByDisplayId.get(displayIdByOldId.get(tag.problemId) ?? "")
+        const newId = newIdByDisplayId.get(displayIdByOldId.get(tag.problemId) ?? '')
         return newId === undefined ? [] : [{ problemId: newId, problemtagId: tag.tagId }]
       })
       if (links.length) await tx.insert(schema.problemTags).values(links)
@@ -290,42 +280,30 @@ adminContestRoutes.post("/contests/:id/clone", requireTeacher, async (c) => {
 // 「看过了」的标记。列表原来是后台单独一页（审核），2026-10 并进前台比赛页老师的「成绩」，
 // 数据从 GET /contests/:id/class-view 来，这里只剩写标记
 
-adminContestRoutes.put("/contests/:id/acm-helper", requireTeacher, async (c) => {
-  const contestId = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminContestRoutes.put('/contests/:id/acm-helper', requireTeacher, async (c) => {
+  const contestId = queryInteger(c.req.param('id'), 0, { min: 1 })
   const parsed = await parseBody(c, updateAcmHelperRequestSchema)
   if (!parsed.success) return parsed.response
-  const [contest] = await db
-    .select()
-    .from(schema.contest)
-    .where(eq(schema.contest.id, contestId))
-    .limit(1)
-  if (!contest || !ownsOrSuper(c.get("user")!, contest)) {
-    return failure(c, 404, "contest-not-found", "Contest does not exist")
+  const [contest] = await db.select().from(schema.contest).where(eq(schema.contest.id, contestId)).limit(1)
+  if (!contest || !ownsOrSuper(c.get('user')!, contest)) {
+    return failure(c, 404, 'contest-not-found', 'Contest does not exist')
   }
   // rank 必须属于这场比赛。旧后端只按 rank_id 取，不校验归属 ——
   // 那样带上任意 rank_id 就能改别的比赛的核查标记
   const [rank] = await db
     .select()
     .from(schema.acmContestRank)
-    .where(
-      and(
-        eq(schema.acmContestRank.id, parsed.data.rankId),
-        eq(schema.acmContestRank.contestId, contestId),
-      ),
-    )
+    .where(and(eq(schema.acmContestRank.id, parsed.data.rankId), eq(schema.acmContestRank.contestId, contestId)))
     .limit(1)
-  if (!rank) return failure(c, 404, "rank-not-found", "Rank id does not exist")
+  if (!rank) return failure(c, 404, 'rank-not-found', 'Rank id does not exist')
 
   const info = rank.submissionInfo
   const entry = info[parsed.data.problemId]
   if (!entry) {
-    return failure(c, 404, "problem-not-in-rank", "Problem id does not exist")
+    return failure(c, 404, 'problem-not-in-rank', 'Problem id does not exist')
   }
   entry.checked = parsed.data.checked
   info[parsed.data.problemId] = entry
-  await db
-    .update(schema.acmContestRank)
-    .set({ submissionInfo: info })
-    .where(eq(schema.acmContestRank.id, rank.id))
+  await db.update(schema.acmContestRank).set({ submissionInfo: info }).where(eq(schema.acmContestRank.id, rank.id))
   return success(c, null)
 })

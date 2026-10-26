@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import UserName from "shared/components/UserName.vue"
-import { parseTime } from "utils/functions"
-import type { Achievement, AchievementClassBoard } from "utils/types"
-import Medal from "./Medal.vue"
+import { useThemeVars } from 'naive-ui'
+import UserName from 'shared/components/UserName.vue'
+import { parseTime } from 'utils/functions'
+import type { Achievement, AchievementClassBoard } from 'utils/types'
+import Medal from './Medal.vue'
 
 /**
  * 「本班」：最近谁拿到了什么、成就最多的前五名（自己不在里面就钉在底下）。
@@ -26,8 +26,7 @@ const recent = computed(() => {
     const item = byId.value.get(row.achievementId)
     if (!item) continue
     const last = rows.at(-1)
-    if (last && last.username === row.username && last.time === row.unlockTime)
-      last.items.push(item)
+    if (last && last.username === row.username && last.time === row.unlockTime) last.items.push(item)
     else
       rows.push({
         key: `${row.username}-${row.unlockTime}-${row.achievementId}`,
@@ -42,8 +41,8 @@ const recent = computed(() => {
 function what(items: Achievement[]) {
   const known = items.filter((item) => item.metric !== null).map((item) => item.name)
   const eggs = items.length - known.length
-  if (eggs) known.push(eggs === 1 ? "一个彩蛋" : `${eggs} 个彩蛋`)
-  return known.join("、")
+  if (eggs) known.push(eggs === 1 ? '一个彩蛋' : `${eggs} 个彩蛋`)
+  return known.join('、')
 }
 </script>
 
@@ -54,29 +53,19 @@ function what(items: Achievement[]) {
       <div class="col">
         <span class="sub">最近拿到</span>
         <div v-for="row in recent" :key="row.key" class="line">
-          <Medal
-            :icon="row.items[0]!.icon"
-            :rarity="row.items[0]!.rarity"
-            :size="28"
-            :state="row.items[0]!.metric === null ? 'unknown' : 'on'"
-          />
+          <Medal :icon="row.items[0]!.icon" :rarity="row.items[0]!.rarity" :size="28" :state="row.items[0]!.metric === null ? 'unknown' : 'on'" />
           <span class="what">
             <UserName :username="row.username" />
             <span class="muted">拿到</span>
             {{ what(row.items) }}
           </span>
-          <span class="date">{{ parseTime(row.time, "M月D日") }}</span>
+          <span class="date">{{ parseTime(row.time, 'M月D日') }}</span>
         </div>
         <span v-if="!recent.length" class="empty">这学期还没人拿到</span>
       </div>
       <div class="col">
         <span class="sub">成就最多</span>
-        <div
-          v-for="row in board.most"
-          :key="row.username"
-          class="line rank"
-          :class="{ mine: row.username === me }"
-        >
+        <div v-for="row in board.most" :key="row.username" class="line rank" :class="{ mine: row.username === me }">
           <span class="no">{{ row.rank }}</span>
           <UserName :username="row.username" />
           <b>{{ row.count }}</b>
@@ -94,9 +83,9 @@ function what(items: Achievement[]) {
 <style scoped>
 .card {
   padding: 14px 20px 12px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -120,7 +109,7 @@ h3 {
 .sub {
   margin-bottom: 4px;
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .line {
@@ -143,7 +132,7 @@ h3 {
 .date,
 .no,
 .empty {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .muted {
@@ -178,7 +167,7 @@ h3 {
 }
 
 .pinned {
-  border-top: 1px dashed v-bind("theme.borderColor");
+  border-top: 1px dashed v-bind('theme.borderColor');
 }
 
 .compact {

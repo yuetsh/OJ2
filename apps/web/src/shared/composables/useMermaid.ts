@@ -6,35 +6,26 @@
  * pele 的版本号锁死（不带 ^）：项目 2026-10 才开，小版本也在改排版。
  */
 
-const semanticNodeClasses = [
-  "startNode",
-  "endNode",
-  "startEnd",
-  "input",
-  "output",
-  "process",
-  "decision",
-  "loop",
-]
+const semanticNodeClasses = ['startNode', 'endNode', 'startEnd', 'input', 'output', 'process', 'decision', 'loop']
 
-const displayStyleId = "oj-mermaid-display-style"
+const displayStyleId = 'oj-mermaid-display-style'
 
 /** 框的颜色：[class, 底色, 边框]。pele 把 `class n0 startNode` 原样挂在节点的 <g> 上 */
 const nodeColors: [string, string, string][] = [
-  ["startNode", "#eef8f2", "#18a058"],
-  ["startEnd", "#eef8f2", "#18a058"],
-  ["endNode", "#eef8f2", "#18a058"],
-  ["input", "#eef4fd", "#2f6bc4"],
-  ["output", "#eef4fd", "#2f6bc4"],
-  ["process", "#ffffff", "#7d828a"],
-  ["decision", "#fdf5e6", "#d08a1c"],
-  ["loop", "#fdf5e6", "#d08a1c"],
-  ["oj-node-palette-0", "#dbeafe", "#2563eb"],
-  ["oj-node-palette-1", "#ccfbf1", "#0d9488"],
-  ["oj-node-palette-2", "#ede9fe", "#7c3aed"],
-  ["oj-node-palette-3", "#ffe4e6", "#e11d48"],
-  ["oj-node-palette-4", "#fef3c7", "#d97706"],
-  ["oj-node-palette-5", "#dcfce7", "#16a34a"],
+  ['startNode', '#eef8f2', '#18a058'],
+  ['startEnd', '#eef8f2', '#18a058'],
+  ['endNode', '#eef8f2', '#18a058'],
+  ['input', '#eef4fd', '#2f6bc4'],
+  ['output', '#eef4fd', '#2f6bc4'],
+  ['process', '#ffffff', '#7d828a'],
+  ['decision', '#fdf5e6', '#d08a1c'],
+  ['loop', '#fdf5e6', '#d08a1c'],
+  ['oj-node-palette-0', '#dbeafe', '#2563eb'],
+  ['oj-node-palette-1', '#ccfbf1', '#0d9488'],
+  ['oj-node-palette-2', '#ede9fe', '#7c3aed'],
+  ['oj-node-palette-3', '#ffe4e6', '#e11d48'],
+  ['oj-node-palette-4', '#fef3c7', '#d97706'],
+  ['oj-node-palette-5', '#dcfce7', '#16a34a'],
 ]
 
 // !important 是为了压过老提交里 classDef 写进 style 属性的颜色，全站的图一个样
@@ -60,7 +51,7 @@ ${nodeColors
   stroke: ${stroke} !important;
 }`,
   )
-  .join("")}
+  .join('')}
 
 .oj-mermaid-flowchart .pele-node text {
   fill: #0f172a !important;
@@ -81,28 +72,26 @@ ${nodeColors
 }
 `
 
-const svgNamespace = "http://www.w3.org/2000/svg"
+const svgNamespace = 'http://www.w3.org/2000/svg'
 
 function applyFlowchartDisplayStyle(container: HTMLElement) {
-  container.classList.add("oj-mermaid-surface")
+  container.classList.add('oj-mermaid-surface')
 
-  const svg = container.querySelector("svg")
+  const svg = container.querySelector('svg')
   if (!svg) return
 
-  svg.classList.add("oj-mermaid-flowchart")
+  svg.classList.add('oj-mermaid-flowchart')
 
-  const nodes = Array.from(svg.querySelectorAll<SVGGElement>("g.pele-node"))
+  const nodes = Array.from(svg.querySelectorAll<SVGGElement>('g.pele-node'))
 
   // Assign palette indices by label so same label → same color, different labels → different colors
   const labelPaletteMap = new Map<string, number>()
   let paletteCounter = 0
 
   nodes.forEach((node) => {
-    const hasSemanticClass = semanticNodeClasses.some((className) =>
-      node.classList.contains(className),
-    )
+    const hasSemanticClass = semanticNodeClasses.some((className) => node.classList.contains(className))
     if (!hasSemanticClass) {
-      const label = node.querySelector(".pele-label")?.textContent?.trim() ?? ""
+      const label = node.querySelector('.pele-label')?.textContent?.trim() ?? ''
       if (!labelPaletteMap.has(label)) {
         labelPaletteMap.set(label, paletteCounter % 6)
         paletteCounter++
@@ -112,8 +101,8 @@ function applyFlowchartDisplayStyle(container: HTMLElement) {
   })
 
   svg.querySelector(`#${displayStyleId}`)?.remove()
-  const style = document.createElementNS(svgNamespace, "style")
-  style.setAttribute("id", displayStyleId)
+  const style = document.createElementNS(svgNamespace, 'style')
+  style.setAttribute('id', displayStyleId)
   style.textContent = mermaidDisplayStyle
   svg.insertBefore(style, svg.firstChild)
 }
@@ -127,14 +116,14 @@ export function useMermaid() {
     renderError.value = null
     renderSuccess.value = false
 
-    if (container) container.innerHTML = ""
+    if (container) container.innerHTML = ''
 
     if (!container || !mermaidCode?.trim()) return
 
     const gen = ++renderGeneration
     try {
       // pele/lazy 按图的类型现拉对应的模块，题目里绝大多数是流程图，只拉那一块
-      const { renderAsync } = await import("pele/lazy")
+      const { renderAsync } = await import('pele/lazy')
       const { svg } = await renderAsync(mermaidCode, {
         // 量字宽用页面真实的字体，否则框会比字窄或宽
         fontFamily: getComputedStyle(container).fontFamily,
@@ -148,7 +137,7 @@ export function useMermaid() {
       renderSuccess.value = true
     } catch (error) {
       if (gen !== renderGeneration) return
-      renderError.value = error instanceof Error ? error.message : "流程图渲染失败，请检查代码格式"
+      renderError.value = error instanceof Error ? error.message : '流程图渲染失败，请检查代码格式'
     }
   }
 

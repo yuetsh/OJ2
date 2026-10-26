@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs"
+import { readFileSync } from 'node:fs'
 
-import { readMigrationFiles } from "drizzle-orm/migrator"
-import postgres from "postgres"
+import { readMigrationFiles } from 'drizzle-orm/migrator'
+import postgres from 'postgres'
 
-import { migrationsDir } from "../runtime"
+import { migrationsDir } from '../runtime'
 
 /**
  * 会造成不可逆数据丢失的语句。DROP INDEX / DROP CONSTRAINT 不在内 —— 它们不掉数据，
@@ -13,16 +13,16 @@ import { migrationsDir } from "../runtime"
  * 而且窄化类型时会报错或截断。
  */
 const DESTRUCTIVE_PATTERNS: Array<[RegExp, string]> = [
-  [/\bdrop\s+table\b/i, "DROP TABLE"],
-  [/\bdrop\s+schema\b/i, "DROP SCHEMA"],
-  [/\balter\s+table\s+.+\s+drop\s+column\b/is, "DROP COLUMN"],
-  [/\balter\s+column\s+.+\s+type\b/is, "ALTER COLUMN ... TYPE"],
-  [/\btruncate\b/i, "TRUNCATE"],
+  [/\bdrop\s+table\b/i, 'DROP TABLE'],
+  [/\bdrop\s+schema\b/i, 'DROP SCHEMA'],
+  [/\balter\s+table\s+.+\s+drop\s+column\b/is, 'DROP COLUMN'],
+  [/\balter\s+column\s+.+\s+type\b/is, 'ALTER COLUMN ... TYPE'],
+  [/\btruncate\b/i, 'TRUNCATE'],
 ]
 
 /** 去掉 `--` 行注释和 `/* *\/` 块注释，免得注释里提到 drop table 就误判 */
 function stripComments(sql: string) {
-  return sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "")
+  return sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '')
 }
 
 const BASELINE_HOWTO = `先建基线表并把 0000 标记成已执行（相当于 Django 的 --fake-initial）：
@@ -38,7 +38,7 @@ const BASELINE_HOWTO = `先建基线表并把 0000 标记成已执行（相当�
 export async function runMigrations() {
   const url = process.env.DATABASE_URL
   if (!url) {
-    console.error("没有 DATABASE_URL，不知道该迁移哪个库")
+    console.error('没有 DATABASE_URL，不知道该迁移哪个库')
     process.exit(2)
   }
 
@@ -50,9 +50,9 @@ export async function runMigrations() {
   } catch {
     console.error(
       `读不到迁移目录：${migrationsDir}\n` +
-        "编译产物不内嵌迁移文件，它们随镜像装在固定路径下。\n" +
-        "检查 docker/Dockerfile 里那条 `COPY apps/api/src/db/ ...`，" +
-        "或用 OJ2_MIGRATIONS_DIR 显式指定。",
+        '编译产物不内嵌迁移文件，它们随镜像装在固定路径下。\n' +
+        '检查 docker/Dockerfile 里那条 `COPY apps/api/src/db/ ...`，' +
+        '或用 OJ2_MIGRATIONS_DIR 显式指定。',
     )
     process.exit(2)
   }
@@ -92,7 +92,7 @@ export async function runMigrations() {
       if (tableCount > 0) {
         console.error(
           `库里已经有 ${tableCount} 张表，但没有迁移基线记录。\n` +
-            "直接迁移会从 0000 跑起，而 0000 是完整建表，撞上已存在的表会整条回滚。\n\n" +
+            '直接迁移会从 0000 跑起，而 0000 是完整建表，撞上已存在的表会整条回滚。\n\n' +
             BASELINE_HOWTO,
         )
         process.exit(3)
@@ -100,7 +100,7 @@ export async function runMigrations() {
 
       // 空库：drizzle 的记账表还不存在，先建出来。原来这一步由 drizzle 的 migrate()
       // 顺手做掉，换成自己的执行器之后得自己建。
-      console.log("空库，从 0000 开始自举。")
+      console.log('空库，从 0000 开始自举。')
       await client`create schema if not exists drizzle`
       await client`
         create table if not exists drizzle.__drizzle_migrations (
@@ -110,17 +110,17 @@ export async function runMigrations() {
 
     const pending = files.filter((f) => f.folderMillis > lastApplied)
     if (pending.length === 0) {
-      console.log("没有待执行的迁移。")
+      console.log('没有待执行的迁移。')
       return
     }
 
     // 兜底：真要跑到一条「没有可执行语句」的迁移，说明基线状态不对
     // （多半是 0000 被算进了 pending）。这种情况下 drizzle 会把整份注释当 SQL 发过去，
     // 报一个和真实原因毫不相干的 "unterminated /* comment"。宁可自己先说清楚。
-    if (pending.some((f) => stripComments(f.sql.join("\n")).trim() === "")) {
+    if (pending.some((f) => stripComments(f.sql.join('\n')).trim() === '')) {
       console.error(
-        "待执行的迁移里有一条不含任何可执行语句（多半是 introspect 出来的 0000）。\n" +
-          "基线记录不对，检查 drizzle.__drizzle_migrations。\n\n" +
+        '待执行的迁移里有一条不含任何可执行语句（多半是 introspect 出来的 0000）。\n' +
+          '基线记录不对，检查 drizzle.__drizzle_migrations。\n\n' +
           BASELINE_HOWTO,
       )
       process.exit(3)
@@ -129,20 +129,20 @@ export async function runMigrations() {
     const blocked = pending
       .map((f) => ({
         tag: tags.get(f.folderMillis) ?? String(f.folderMillis),
-        reasons: destructiveReasons(f.sql.join("\n")),
+        reasons: destructiveReasons(f.sql.join('\n')),
       }))
       .filter(({ reasons }) => reasons.length > 0)
 
     // 自举时不拦：空库上没有数据可丢，0002 那串 DROP ... IF EXISTS 全是空转。
     // 拦下来只会逼着每个新环境都带一次 OJ2_ALLOW_DESTRUCTIVE，把这道闸训练成习惯动作 ——
     // 那正是它想避免的事。
-    if (blocked.length > 0 && !bootstrapping && process.env.OJ2_ALLOW_DESTRUCTIVE !== "1") {
+    if (blocked.length > 0 && !bootstrapping && process.env.OJ2_ALLOW_DESTRUCTIVE !== '1') {
       console.error(
-        "待执行的迁移里有破坏性语句，已停下：\n" +
-          blocked.map(({ tag, reasons }) => `  · ${tag}：${reasons.join(" / ")}`).join("\n") +
-          "\n\n这类改动不可逆，不该在一次日常部署里顺手执行。" +
-          "\n确认已经做过备份之后，用这个显式放行：\n\n" +
-          "  OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh\n",
+        '待执行的迁移里有破坏性语句，已停下：\n' +
+          blocked.map(({ tag, reasons }) => `  · ${tag}：${reasons.join(' / ')}`).join('\n') +
+          '\n\n这类改动不可逆，不该在一次日常部署里顺手执行。' +
+          '\n确认已经做过备份之后，用这个显式放行：\n\n' +
+          '  OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh\n',
       )
       process.exit(4)
     }
@@ -157,14 +157,14 @@ export async function runMigrations() {
         // 裸抛的话看到的是 postgres.js 内部的堆栈，真正的原因（那一行 PostgresError）
         // 被埋在中间。这里只留有用的部分。
         const detail = error instanceof Error ? error.message : String(error)
-        const naked = NO_TRANSACTION_MARKER.test(file.sql[0] ?? "")
+        const naked = NO_TRANSACTION_MARKER.test(file.sql[0] ?? '')
         console.error(
           `\n迁移 ${tag} 失败：${detail}\n\n` +
             (naked
-              ? "这条迁移标了 oj2:no-transaction，**没有事务保护** —— 失败点之前的语句已经生效。\n" +
-                "如果失败的是 CREATE INDEX CONCURRENTLY，库里多半留下了一个 INVALID 索引，\n" +
-                "先 `DROP INDEX <名字>` 再重来（`select indexrelid::regclass from pg_index where not indisvalid` 能找出来）。\n"
-              : "这条迁移已整体回滚，库里没有留下它的任何改动。\n") +
+              ? '这条迁移标了 oj2:no-transaction，**没有事务保护** —— 失败点之前的语句已经生效。\n' +
+                '如果失败的是 CREATE INDEX CONCURRENTLY，库里多半留下了一个 INVALID 索引，\n' +
+                '先 `DROP INDEX <名字>` 再重来（`select indexrelid::regclass from pg_index where not indisvalid` 能找出来）。\n'
+              : '这条迁移已整体回滚，库里没有留下它的任何改动。\n') +
             `本次已经成功执行的 ${done} 条不会被回滚 —— 每条迁移各自一个事务。`,
         )
         process.exit(5)
@@ -172,7 +172,7 @@ export async function runMigrations() {
       done++
       console.log(`  ✓ ${tag}`)
     }
-    console.log("迁移完成。")
+    console.log('迁移完成。')
   } finally {
     await client.end()
   }
@@ -192,7 +192,7 @@ function destructiveReasons(sql: string) {
  */
 function readMigrationTags(): Map<number, string> {
   try {
-    const journal = JSON.parse(readFileSync(`${migrationsDir}/meta/_journal.json`, "utf8")) as {
+    const journal = JSON.parse(readFileSync(`${migrationsDir}/meta/_journal.json`, 'utf8')) as {
       entries?: Array<{ when: number; tag: string }>
     }
     return new Map((journal.entries ?? []).map((e) => [e.when, e.tag]))
@@ -227,14 +227,10 @@ const NO_TRANSACTION_MARKER = /^[ \t]*--[ \t]*oj2:no-transaction\b/m
  * sha256，`created_at` 是 journal 里的 `when`。migrator 只比 `created_at`、不校验 hash，
  * 所以两套执行器可以互换着用，不会互相看不懂对方写的记录。
  */
-async function applyMigration(
-  client: postgres.Sql,
-  migration: ReturnType<typeof readMigrationFiles>[number],
-  tag: string,
-) {
+async function applyMigration(client: postgres.Sql, migration: ReturnType<typeof readMigrationFiles>[number], tag: string) {
   // 只留有可执行内容的段。`readMigrationFiles` 按 `--> statement-breakpoint` 切开后
   // 保留原文，所以纯注释段（比如 0002 开头那一大段说明）会自成一段。
-  const statements = migration.sql.filter((stmt) => stripComments(stmt).trim() !== "")
+  const statements = migration.sql.filter((stmt) => stripComments(stmt).trim() !== '')
   if (statements.length === 0) {
     // 上游已经拦过一次（那条兜底检查），走到这里说明拦漏了，宁可响一声也别静默跳过
     throw new Error(`${tag} 没有任何可执行语句`)
@@ -244,7 +240,7 @@ async function applyMigration(
     exec`insert into drizzle.__drizzle_migrations ("hash", "created_at")
          values (${migration.hash}, ${migration.folderMillis})`
 
-  if (NO_TRANSACTION_MARKER.test(migration.sql[0] ?? "")) {
+  if (NO_TRANSACTION_MARKER.test(migration.sql[0] ?? '')) {
     // 走简单查询协议：扩展协议会把语句包进一个隐式事务块，CONCURRENTLY 照样被拒。
     for (const stmt of statements) await client.unsafe(stmt).simple()
     await record(client)

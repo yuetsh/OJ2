@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useDark } from "@vueuse/core"
+import { useThemeVars } from 'naive-ui'
+import { useDark } from '@vueuse/core'
 
 /**
  * 只读的代码区：行号 + 高亮 + 可选地标红一行（编译失败 / 运行时错误报了行号时）。
@@ -25,7 +25,7 @@ const theme = useThemeVars()
 const isDark = useDark()
 
 const PADDING = 8
-const lineCount = computed(() => Math.max(1, props.code.split("\n").length))
+const lineCount = computed(() => Math.max(1, props.code.split('\n').length))
 const markStyle = computed(() =>
   props.markLine && props.markLine <= lineCount.value
     ? {
@@ -35,7 +35,7 @@ const markStyle = computed(() =>
     : null,
 )
 
-const scroller = useTemplateRef<HTMLElement>("scroller")
+const scroller = useTemplateRef<HTMLElement>('scroller')
 // 换了一条就回到顶上；有标红行的，滚到那一行附近
 watch(
   () => [props.code, props.markLine] as const,
@@ -78,9 +78,9 @@ watch(
   display: flex;
   align-items: flex-start;
   overflow: auto;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   font-family: Consolas, Monaco, monospace;
   font-size: var(--fs);
   line-height: var(--lh);
@@ -96,14 +96,14 @@ watch(
   box-sizing: border-box;
   padding: var(--pad) 10px var(--pad) 8px;
   text-align: right;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   background: v-bind("isDark ? 'rgba(255,255,255,0.03)' : '#fafafb'");
-  border-right: 1px solid v-bind("theme.dividerColor");
+  border-right: 1px solid v-bind('theme.dividerColor');
   user-select: none;
 }
 
 .gutter .marked {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
   font-weight: 700;
 }
 

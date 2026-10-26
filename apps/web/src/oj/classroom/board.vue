@@ -1,30 +1,24 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { getClassBoard } from "oj/api"
-import { useTone } from "shared/composables/tone"
-import { groupClassOptions } from "utils/classes"
-import UserName from "shared/components/UserName.vue"
-import { useLeaveStudents } from "shared/composables/leaveStudents"
-import { useTeacherHelp } from "shared/composables/teacherHelp"
-import { useCollabStore } from "shared/store/collab"
-import { useConfigStore } from "shared/store/config"
-import { errorMessage } from "utils/api"
-import { LANGUAGE_SHOW_VALUE } from "utils/constants"
-import { parseTime } from "utils/functions"
-import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from "utils/types"
-import ExplainModal, { type ExplainPerson } from "./components/ExplainModal.vue"
-import LeaveModal from "./components/LeaveModal.vue"
-import LessonForm from "./components/LessonForm.vue"
-import TrailPanel from "./components/TrailPanel.vue"
-import { errorKind, type ErrorKind } from "utils/errorKind"
-import {
-  cellStyle as cellStyleOf,
-  cellText,
-  cellTitle as cellTitleOf,
-  STUCK_ATTEMPTS,
-  trailSummary,
-} from "./boardCells"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { getClassBoard } from 'oj/api'
+import { useTone } from 'shared/composables/tone'
+import { groupClassOptions } from 'utils/classes'
+import UserName from 'shared/components/UserName.vue'
+import { useLeaveStudents } from 'shared/composables/leaveStudents'
+import { useTeacherHelp } from 'shared/composables/teacherHelp'
+import { useCollabStore } from 'shared/store/collab'
+import { useConfigStore } from 'shared/store/config'
+import { errorMessage } from 'utils/api'
+import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from 'utils/types'
+import ExplainModal, { type ExplainPerson } from './components/ExplainModal.vue'
+import LeaveModal from './components/LeaveModal.vue'
+import LessonForm from './components/LessonForm.vue'
+import TrailPanel from './components/TrailPanel.vue'
+import { errorKind, type ErrorKind } from 'utils/errorKind'
+import { cellStyle as cellStyleOf, cellText, cellTitle as cellTitleOf, STUCK_ATTEMPTS, trailSummary } from './boardCells'
 
 /**
  * 课堂看板（老师，设计稿「课堂看板重设计」A+B）：这个班、今天、这节课的几道题 × 全班学生。
@@ -56,7 +50,7 @@ const board = ref<ClassBoard | null>(null)
  * 带着 ?className= 进来的（协作条「帮完了」回来、举手面板「讲这道题」）就看那个班，
  * 否则第一次由后端猜
  */
-const queryText = (value: unknown) => (typeof value === "string" && value ? value : null)
+const queryText = (value: unknown) => (typeof value === 'string' && value ? value : null)
 const className = ref<string | null>(queryText(route.query.className))
 /** ?problem= 带来的题号：加载完选中那道题，下面展开它的错法（「讲这道题」） */
 let wantedProblem = queryText(route.query.problem)
@@ -110,7 +104,7 @@ watch(
 const now = useNow({ scheduler: (cb) => useIntervalFn(cb, 1000) })
 function waitedText(createdAt: number) {
   const seconds = Math.max(0, Math.floor((now.value.getTime() - createdAt) / 1000))
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 const { pause } = useIntervalFn(load, REFRESH_MS)
 onUnmounted(pause)
@@ -130,7 +124,7 @@ async function lessonSaved() {
 
 // ---------- 分组与排序 ----------
 
-type Group = "help" | "idle" | "stuck" | "working" | "done" | "leave"
+type Group = 'help' | 'idle' | 'stuck' | 'working' | 'done' | 'leave'
 
 /**
  * 正在课堂求助的学生。列表是老师端 WebSocket 实时推的（collabStore，全局常驻连接），
@@ -165,18 +159,17 @@ function seenText(seenAt: string) {
 }
 
 function doneCount(student: ClassBoardStudent) {
-  return student.cells.filter((cell) => cell.status === "accepted").length
+  return student.cells.filter((cell) => cell.status === 'accepted').length
 }
 
 function groupOf(student: ClassBoardStudent): Group {
-  if (absent(student)) return "leave"
-  if (helpOf(student)) return "help"
+  if (absent(student)) return 'leave'
+  if (helpOf(student)) return 'help'
   const cells = student.cells
-  if (cells.length && cells.every((cell) => cell.status === "accepted")) return "done"
-  if (!student.lastSubmitAt) return "idle"
-  if (cells.some((cell) => cell.status === "tried" && cell.attempts >= STUCK_ATTEMPTS))
-    return "stuck"
-  return "working"
+  if (cells.length && cells.every((cell) => cell.status === 'accepted')) return 'done'
+  if (!student.lastSubmitAt) return 'idle'
+  if (cells.some((cell) => cell.status === 'tried' && cell.attempts >= STUCK_ATTEMPTS)) return 'stuck'
+  return 'working'
 }
 
 const GROUP_ORDER: Record<Group, number> = {
@@ -189,12 +182,12 @@ const GROUP_ORDER: Record<Group, number> = {
 }
 
 const GROUP_LABEL: Record<Group, string> = {
-  help: "举手了",
-  idle: "还没交过",
-  stuck: "卡住了",
-  working: "在做",
-  done: "全做完了",
-  leave: "请假",
+  help: '举手了',
+  idle: '还没交过',
+  stuck: '卡住了',
+  working: '在做',
+  done: '全做完了',
+  leave: '请假',
 }
 
 /**
@@ -205,7 +198,7 @@ const GROUP_LABEL: Record<Group, string> = {
  * **只有今天还没交过的人能算请假**：请假的人一定在这里面。标过的人后来交了题、或者举手了，
  * 就是来了（迟到），自动取消标记，回到正常的分组里 —— 老师得看得见他卡住、举手
  */
-const { onLeave, setLeave, cancelLeave } = useLeaveStudents("oj_leave_students")
+const { onLeave, setLeave, cancelLeave } = useLeaveStudents('oj_leave_students')
 function canLeave(student: ClassBoardStudent) {
   return !student.lastSubmitAt && !helpOf(student)
 }
@@ -217,9 +210,7 @@ const leaveStudents = computed(() => boardStudents.value.filter(absent).sort(byN
 
 // 标过请假、后来交了题或举手的：来了，把标记清掉（不然名单里一直挂着一个其实在的人）
 watchEffect(() => {
-  const arrived = boardStudents.value
-    .filter((student) => !canLeave(student) && onLeave(student.username))
-    .map((student) => student.username)
+  const arrived = boardStudents.value.filter((student) => !canLeave(student) && onLeave(student.username)).map((student) => student.username)
   if (arrived.length) cancelLeave(arrived)
 })
 
@@ -234,7 +225,7 @@ function saveLeave(selected: string[]) {
 }
 
 function byName(a: ClassBoardStudent, b: ClassBoardStudent) {
-  return a.username.localeCompare(b.username, "zh-CN")
+  return a.username.localeCompare(b.username, 'zh-CN')
 }
 
 const students = computed(() =>
@@ -245,12 +236,12 @@ const students = computed(() =>
       Number(unseen(b)) - Number(unseen(a)) ||
       Number(oftenIdle(b)) - Number(oftenIdle(a)) ||
       // 同样在做，做对得少的排前面（只做了一道的那几个）
-      (groupOf(a) === "working" ? doneCount(a) - doneCount(b) : 0) ||
+      (groupOf(a) === 'working' ? doneCount(a) - doneCount(b) : 0) ||
       byName(a, b),
   ),
 )
 /** 到了的人：人数、卡片都按这些算 */
-const present = computed(() => students.value.filter((student) => groupOf(student) !== "leave"))
+const present = computed(() => students.value.filter((student) => groupOf(student) !== 'leave'))
 const groupCount = computed(() => {
   const count: Record<Group, number> = { help: 0, idle: 0, stuck: 0, working: 0, done: 0, leave: 0 }
   for (const student of students.value) count[groupOf(student)]++
@@ -261,11 +252,7 @@ const groupCount = computed(() => {
  * 做完了又没在挑战的，就是空着的
  */
 const challengingCount = computed(
-  () =>
-    students.value.filter(
-      (student) =>
-        groupOf(student) === "done" && student.cells.some((cell) => cell.challenge === "doing"),
-    ).length,
+  () => students.value.filter((student) => groupOf(student) === 'done' && student.cells.some((cell) => cell.challenge === 'doing')).length,
 )
 /** 每组第一个人，在他上面插一行组名 */
 const groupStarts = computed(() => {
@@ -294,33 +281,29 @@ interface WrongPerson {
 function wrongOf(index: number): WrongPerson[] {
   return present.value.flatMap((student) => {
     const cell = student.cells[index]
-    if (!cell || cell.status !== "tried") return []
+    if (!cell || cell.status !== 'tried') return []
     const kind: ErrorKind = cell.latest
       ? errorKind(cell.latest)
       : cell.attempts
-        ? { key: "flowchart", label: "今天只画了流程图", line: null }
-        : { key: "before", label: "以前交过，今天还没交", line: null }
+        ? { key: 'flowchart', label: '今天只画了流程图', line: null }
+        : { key: 'before', label: '以前交过，今天还没交', line: null }
     return [{ student, cell, kind }]
   })
 }
 
 const problemStats = computed(() =>
   (board.value?.problems ?? []).map((problem, i) => {
-    const done = present.value.filter((student) => student.cells[i]?.status === "accepted").length
-    const wrong = present.value.filter((student) => student.cells[i]?.status === "tried").length
+    const done = present.value.filter((student) => student.cells[i]?.status === 'accepted').length
+    const wrong = present.value.filter((student) => student.cells[i]?.status === 'tried').length
     const total = present.value.length
     // 挑战成功几人：只有配了挑战的题才写
-    const challenged = problem.hasChallenges
-      ? present.value.filter((student) => student.cells[i]?.challenge === "done").length
-      : null
+    const challenged = problem.hasChallenges ? present.value.filter((student) => student.cells[i]?.challenge === 'done').length : null
     return { problem, done, wrong, none: total - done - wrong, total, challenged }
   }),
 )
 
 const selectedId = ref<number | null>(null)
-const selectedIndex = computed(() =>
-  (board.value?.problems ?? []).findIndex((problem) => problem.problemId === selectedId.value),
-)
+const selectedIndex = computed(() => (board.value?.problems ?? []).findIndex((problem) => problem.problemId === selectedId.value))
 function toggleProblem(problemId: number) {
   selectedId.value = selectedId.value === problemId ? null : problemId
 }
@@ -339,9 +322,7 @@ const wrongGroups = computed(() => {
       ...group,
       people: group.people.sort((a, b) => b.cell.attempts - a.cell.attempts),
       // 一堆人报错指到同一行才写「第 N 行」
-      line: group.people.every((p) => p.kind.line === group.people[0]!.kind.line)
-        ? group.kind.line
-        : null,
+      line: group.people.every((p) => p.kind.line === group.people[0]!.kind.line) ? group.kind.line : null,
     }))
     .sort((a, b) => b.people.length - a.people.length)
 })
@@ -361,12 +342,7 @@ const explainPeople = computed<ExplainPerson[]>(() => {
     order.set(person.kind.key, (order.get(person.kind.key) ?? 0) + 1)
   }
   return people
-    .sort(
-      (a, b) =>
-        order.get(b.kind.key)! - order.get(a.kind.key)! ||
-        a.kind.key.localeCompare(b.kind.key) ||
-        b.cell.attempts - a.cell.attempts,
-    )
+    .sort((a, b) => order.get(b.kind.key)! - order.get(a.kind.key)! || a.kind.key.localeCompare(b.kind.key) || b.cell.attempts - a.cell.attempts)
     .map((person) => ({
       userId: person.student.userId,
       username: person.student.username,
@@ -392,8 +368,7 @@ const cellColors = computed(() => ({
   actionColor: theme.value.actionColor,
 }))
 const cellStyle = (cell: ClassBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value)
-const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) =>
-  cellTitleOf(cell, student, board.value?.day)
+const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) => cellTitleOf(cell, student, board.value?.day)
 
 /**
  * 点开着轨迹的那个格子（学生 id:第几道题）。做对了、今天交过代码的格子点了不再直接去提交列表，
@@ -407,7 +382,7 @@ function toggleTrail(key: string) {
 
 /** 点到别的格子时，那边自己会换过去；这里只管点到空白处收起 */
 function trailOutside(event: MouseEvent) {
-  if ((event.target as Element | null)?.closest(".cell")) return
+  if ((event.target as Element | null)?.closest('.cell')) return
   trailKey.value = null
 }
 
@@ -426,40 +401,33 @@ function submissionsHref(
   today = true,
 ) {
   // SQL 题不受布置的语言限制，格子数的是 SQL 交的
-  const language = problem?.isSql ? "SQL" : board.value?.language
+  const language = problem?.isSql ? 'SQL' : board.value?.language
   return router.resolve({
-    name: "submissions",
+    name: 'submissions',
     query: {
       username: student.username,
-      exactUsername: "1",
-      ...(today ? { today: "1" } : {}),
+      exactUsername: '1',
+      ...(today ? { today: '1' } : {}),
       // 布置时选了语言的，代码那边只看这个语言交的（和格子里数的一致）
-      ...(flowchart ? { language: "Flowchart" } : language ? { language } : {}),
+      ...(flowchart ? { language: 'Flowchart' } : language ? { language } : {}),
       ...(problem ? { problem: problem.problemDisplayId } : {}),
     },
   }).href
 }
 
 function lastText(student: ClassBoardStudent) {
-  if (student.lastSubmitAt) return parseTime(student.lastSubmitAt, "HH:mm")
+  if (student.lastSubmitAt) return parseTime(student.lastSubmitAt, 'HH:mm')
   if (oftenIdle(student)) {
     return `近 ${board.value?.recentLessons} 节交过 ${student.recentAttended} 节`
   }
-  return "—"
+  return '—'
 }
 </script>
 
 <template>
   <div class="board">
     <div class="toolbar">
-      <n-select
-        :value="className"
-        :options="classOptions"
-        placeholder="选择班级"
-        filterable
-        class="class-select"
-        @update:value="changeClass"
-      />
+      <n-select :value="className" :options="classOptions" placeholder="选择班级" filterable class="class-select" @update:value="changeClass" />
 
       <!-- 这节课的题：当场填，填完收成一排小块 -->
       <LessonForm
@@ -472,55 +440,33 @@ function lastText(student: ClassBoardStudent) {
         @cancel="editing = false"
       />
       <div v-else-if="board?.problems.length" class="lesson">
-        <span class="lesson-label">{{ board.source === "teacher" ? "这节课" : "今天在做" }}</span>
-        <span v-if="board.language" class="chip lang">{{
-          LANGUAGE_SHOW_VALUE[board.language]
-        }}</span>
+        <span class="lesson-label">{{ board.source === 'teacher' ? '这节课' : '今天在做' }}</span>
+        <span v-if="board.language" class="chip lang">{{ LANGUAGE_SHOW_VALUE[board.language] }}</span>
         <span v-for="problem in board.problems" :key="problem.problemId" class="chip">
           {{ problem.problemDisplayId }}
         </span>
-        <span v-if="board.assignedAt" class="assigned">
-          {{ parseTime(board.assignedAt, "HH:mm") }} {{ board.assignedBy }} 布置
-        </span>
+        <span v-if="board.assignedAt" class="assigned"> {{ parseTime(board.assignedAt, 'HH:mm') }} {{ board.assignedBy }} 布置 </span>
         <n-button text type="primary" class="edit" @click="editing = true">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
-          {{ board.source === "teacher" ? "改" : "布置" }}
+          {{ board.source === 'teacher' ? '改' : '布置' }}
         </n-button>
       </div>
 
       <div class="spacer"></div>
-      <n-button
-        v-if="board?.className"
-        :type="leaveStudents.length ? 'warning' : 'default'"
-        :secondary="!!leaveStudents.length"
-        @click="leaveDialog = true"
-      >
-        {{ leaveStudents.length ? `请假 ${leaveStudents.length} 人` : "请假" }}
+      <n-button v-if="board?.className" :type="leaveStudents.length ? 'warning' : 'default'" :secondary="!!leaveStudents.length" @click="leaveDialog = true">
+        {{ leaveStudents.length ? `请假 ${leaveStudents.length} 人` : '请假' }}
       </n-button>
       <!-- 看板只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
-      <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })">
-        回头看 →
-      </n-button>
+      <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })"> 回头看 → </n-button>
     </div>
 
-    <n-empty
-      v-if="board && !board.className"
-      description="最近两小时没有哪个班在交题，先在上面选一个班"
-      style="margin: 60px 0"
-    />
+    <n-empty v-if="board && !board.className" description="最近两小时没有哪个班在交题，先在上面选一个班" style="margin: 60px 0" />
 
     <template v-else-if="board">
       <!-- 刚上课还没有题：填题号的框是这页最大的东西 -->
       <section v-if="needLesson" class="start">
         <div class="start-title">这节课做哪几道题？</div>
-        <LessonForm
-          v-if="className"
-          :board="board"
-          :class-name="className"
-          variant="start"
-          class="start-row"
-          @saved="lessonSaved"
-        />
+        <LessonForm v-if="className" :board="board" :class-name="className" variant="start" class="start-row" @saved="lessonSaved" />
       </section>
 
       <template v-else>
@@ -547,9 +493,7 @@ function lastText(student: ClassBoardStudent) {
             <span class="card-foot">
               <span :class="stat.wrong ? 'wrong' : 'muted'">错着 {{ stat.wrong }}</span>
               <span class="muted">没做 {{ stat.none }}</span>
-              <span v-if="stat.challenged !== null" class="challenged">
-                挑战成功 {{ stat.challenged }}
-              </span>
+              <span v-if="stat.challenged !== null" class="challenged"> 挑战成功 {{ stat.challenged }} </span>
             </span>
           </button>
         </div>
@@ -574,13 +518,7 @@ function lastText(student: ClassBoardStudent) {
             </span>
             <span class="muted">没做 {{ problemStats[selectedIndex]!.none }} 人</span>
             <div class="spacer"></div>
-            <n-button
-              quaternary
-              size="small"
-              class="panel-close"
-              aria-label="收起"
-              @click="selectedId = null"
-            >
+            <n-button quaternary size="small" class="panel-close" aria-label="收起" @click="selectedId = null">
               <template #icon><Icon icon="ph:x-bold" /></template>
             </n-button>
           </div>
@@ -598,29 +536,15 @@ function lastText(student: ClassBoardStudent) {
               </div>
               <div class="err-people">
                 <template v-for="person in group.people" :key="person.student.userId">
-                  <button
-                    v-if="person.cell.latest"
-                    type="button"
-                    class="who"
-                    @click="openExplain(selectedIndex, person.student.userId)"
-                  >
+                  <button v-if="person.cell.latest" type="button" class="who" @click="openExplain(selectedIndex, person.student.userId)">
                     <UserName :username="person.student.username" />
-                    <span class="mini" :style="cellStyle(person.cell)"
-                      >✗ {{ person.cell.attempts }}</span
-                    >
+                    <span class="mini" :style="cellStyle(person.cell)">✗ {{ person.cell.attempts }}</span>
                   </button>
                   <!-- 没有今天的代码可讲：去提交列表看他交过的 -->
                   <a
                     v-else
                     class="who"
-                    :href="
-                      submissionsHref(
-                        person.student,
-                        board.problems[selectedIndex],
-                        !!person.cell.attempts,
-                        !!person.cell.attempts,
-                      )
-                    "
+                    :href="submissionsHref(person.student, board.problems[selectedIndex], !!person.cell.attempts, !!person.cell.attempts)"
                     target="_blank"
                   >
                     <UserName :username="person.student.username" />
@@ -653,9 +577,7 @@ function lastText(student: ClassBoardStudent) {
                 </div>
                 <div class="col-count">{{ stat.done }}/{{ stat.total }}</div>
                 <div class="bar">
-                  <i
-                    :style="{ width: stat.total ? `${(stat.done / stat.total) * 100}%` : '0' }"
-                  ></i>
+                  <i :style="{ width: stat.total ? `${(stat.done / stat.total) * 100}%` : '0' }"></i>
                 </div>
               </th>
               <th class="narrow-col">做对</th>
@@ -669,9 +591,7 @@ function lastText(student: ClassBoardStudent) {
                   <span class="group-label">
                     {{ GROUP_LABEL[groupOf(student)] }}
                     <span class="muted">{{ groupCount[groupOf(student)] }}</span>
-                    <span v-if="groupOf(student) === 'done' && challengingCount" class="challenged">
-                      在挑战 {{ challengingCount }}
-                    </span>
+                    <span v-if="groupOf(student) === 'done' && challengingCount" class="challenged"> 在挑战 {{ challengingCount }} </span>
                   </span>
                 </td>
               </tr>
@@ -687,25 +607,16 @@ function lastText(student: ClassBoardStudent) {
                     <UserName :username="student.username" />
                   </a>
                   <UserName v-else :username="student.username" />
-                  <span v-if="helpOf(student)?.status === 'pending'" class="waited">
-                    举手 {{ waitedText(helpOf(student)!.createdAt) }}
-                  </span>
+                  <span v-if="helpOf(student)?.status === 'pending'" class="waited"> 举手 {{ waitedText(helpOf(student)!.createdAt) }} </span>
                 </td>
                 <!-- 在线：举手的「帮他」；别人在帮的写谁在帮；开着题目的点题号直接打开他正在写的
                      代码（他没举手也行，他那边会显示「xxx 在看你的代码」）；剩下的写在不在线、
                      多久前在、今天没上过线 -->
                 <td class="where-col">
-                  <n-button
-                    v-if="helpOf(student)?.status === 'pending'"
-                    type="primary"
-                    size="tiny"
-                    @click="help(student.userId)"
-                  >
+                  <n-button v-if="helpOf(student)?.status === 'pending'" type="primary" size="tiny" @click="help(student.userId)">
                     去帮 · {{ helpOf(student)!.problemId }}
                   </n-button>
-                  <span v-else-if="helpOf(student)" class="helping">
-                    {{ helpOf(student)!.teacherName }} 在帮
-                  </span>
+                  <span v-else-if="helpOf(student)" class="helping"> {{ helpOf(student)!.teacherName }} 在帮 </span>
                   <button
                     v-else-if="student.editing"
                     type="button"
@@ -721,11 +632,7 @@ function lastText(student: ClassBoardStudent) {
                   </span>
                   <span v-else class="seen">今天没上线</span>
                 </td>
-                <td
-                  v-for="(cell, i) in student.cells"
-                  :key="i"
-                  :class="{ hl: i === selectedIndex }"
-                >
+                <td v-for="(cell, i) in student.cells" :key="i" :class="{ hl: i === selectedIndex }">
                   <button
                     v-if="cell.status === 'tried' && cell.latest"
                     type="button"
@@ -778,13 +685,7 @@ function lastText(student: ClassBoardStudent) {
                   >
                     {{ cellText(cell) }}
                   </a>
-                  <span
-                    v-else
-                    class="cell"
-                    :data-challenge="cell.challenge ?? undefined"
-                    :style="cellStyle(cell)"
-                    :title="cellTitle(cell, student)"
-                  >
+                  <span v-else class="cell" :data-challenge="cell.challenge ?? undefined" :style="cellStyle(cell)" :title="cellTitle(cell, student)">
                     {{ cellText(cell) }}
                   </span>
                 </td>
@@ -797,19 +698,9 @@ function lastText(student: ClassBoardStudent) {
       </div>
     </template>
 
-    <ExplainModal
-      v-model:show="explainShow"
-      v-model:index="explainIndex"
-      :problem="explainProblem"
-      :people="explainPeople"
-    />
+    <ExplainModal v-model:show="explainShow" v-model:index="explainIndex" :problem="explainProblem" :people="explainPeople" />
 
-    <LeaveModal
-      v-model:show="leaveDialog"
-      :candidates="leaveCandidates"
-      :current="leaveStudents.map((student) => student.username)"
-      @save="saveLeave"
-    />
+    <LeaveModal v-model:show="leaveDialog" :candidates="leaveCandidates" :current="leaveStudents.map((student) => student.username)" @save="saveLeave" />
   </div>
 </template>
 
@@ -824,11 +715,11 @@ function lastText(student: ClassBoardStudent) {
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .wrong {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
   font-weight: 600;
 }
 
@@ -865,7 +756,7 @@ function lastText(student: ClassBoardStudent) {
 .lesson-label {
   margin-right: 4px;
   font-size: 14px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
@@ -875,7 +766,7 @@ function lastText(student: ClassBoardStudent) {
   height: 26px;
   padding: 0 8px;
   border-radius: 4px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -891,14 +782,14 @@ function lastText(student: ClassBoardStudent) {
   margin-left: 4px;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
 }
 
 .edit {
   margin-left: 4px;
   font-size: 14px;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 /* ---------- 刚上课 ---------- */
@@ -907,7 +798,7 @@ function lastText(student: ClassBoardStudent) {
   padding: 22px 24px;
   border-radius: 10px;
   border: 1px solid v-bind("tone('success').background");
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -938,9 +829,9 @@ function lastText(student: ClassBoardStudent) {
   gap: 4px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  border: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
   font: inherit;
   text-align: left;
   min-width: 0;
@@ -948,12 +839,12 @@ function lastText(student: ClassBoardStudent) {
 }
 
 .card:hover {
-  border-color: v-bind("theme.borderColor");
+  border-color: v-bind('theme.borderColor');
 }
 
 .card.on {
-  border-color: v-bind("theme.successColor");
-  box-shadow: inset 0 0 0 1px v-bind("theme.successColor");
+  border-color: v-bind('theme.successColor');
+  box-shadow: inset 0 0 0 1px v-bind('theme.successColor');
 }
 
 .card-title {
@@ -991,14 +882,14 @@ function lastText(student: ClassBoardStudent) {
   display: block;
   height: 4px;
   border-radius: 2px;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
   overflow: hidden;
 }
 
 .bar i {
   display: block;
   height: 4px;
-  background: v-bind("theme.successColor");
+  background: v-bind('theme.successColor');
 }
 
 /* ---------- 点开一道题：错着的人按错法归堆 ---------- */
@@ -1007,7 +898,7 @@ function lastText(student: ClassBoardStudent) {
   padding: 14px 16px;
   border-radius: 10px;
   border: 1px solid v-bind("tone('success').background");
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1023,7 +914,7 @@ function lastText(student: ClassBoardStudent) {
 .panel-title {
   font-size: 16px;
   font-weight: 600;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -1050,7 +941,7 @@ function lastText(student: ClassBoardStudent) {
 
 /* 今天没有代码可讲的两堆（以前交过 / 只画了流程图）不是今天的错，不用红底 */
 .err-group.quiet {
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 .err-title {
@@ -1071,9 +962,9 @@ function lastText(student: ClassBoardStudent) {
   height: 32px;
   padding: 0 10px;
   border-radius: 6px;
-  border: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  border: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
   font: inherit;
   font-size: 14px;
   white-space: nowrap;
@@ -1085,7 +976,7 @@ a.who {
 }
 
 .who:hover {
-  border-color: v-bind("theme.borderColor");
+  border-color: v-bind('theme.borderColor');
 }
 
 .mini {
@@ -1116,7 +1007,7 @@ a.who {
   padding: 8px 4px;
   font-weight: 400;
   vertical-align: bottom;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   white-space: nowrap;
 }
 
@@ -1124,7 +1015,7 @@ a.who {
   height: 40px;
   padding: 0 4px;
   text-align: center;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
   white-space: nowrap;
 }
 
@@ -1136,7 +1027,7 @@ a.who {
   padding-right: 24px;
   text-align: left;
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .grid td.name {
@@ -1149,7 +1040,7 @@ a.who {
   position: sticky;
   left: 0;
   z-index: 1;
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 .grid th.col {
@@ -1161,7 +1052,7 @@ a.who {
   width: 1%;
   padding: 8px 12px;
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .grid .hl {
@@ -1185,7 +1076,7 @@ a.who {
   white-space: normal;
   line-height: 1.4;
   font-size: 13px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .col-count {
@@ -1205,7 +1096,7 @@ a.who {
   text-align: left;
   font-size: 13px;
   font-weight: 600;
-  background: v-bind("theme.actionColor");
+  background: v-bind('theme.actionColor');
 }
 
 /* 和名字一样钉在左边：横着滑过去也看得见这一组是什么 */
@@ -1246,12 +1137,12 @@ a.cell {
 }
 
 /* 挑战：做到了贴一枚紫色筹码，在挑战加一圈紫边（设计稿 StkBoard） */
-.cell[data-challenge="done"] {
+.cell[data-challenge='done'] {
   position: relative;
 }
 
-.cell[data-challenge="done"]::after {
-  content: "";
+.cell[data-challenge='done']::after {
+  content: '';
   position: absolute;
   right: -6px;
   top: -6px;
@@ -1261,12 +1152,12 @@ a.cell {
   box-sizing: border-box;
   background: #5b34c4;
   border: 3px solid #b49cf5;
-  box-shadow: 0 0 0 2px v-bind("theme.cardColor");
+  box-shadow: 0 0 0 2px v-bind('theme.cardColor');
 }
 
-.cell[data-challenge="doing"] {
+.cell[data-challenge='doing'] {
   box-shadow:
-    0 0 0 2px v-bind("theme.cardColor"),
+    0 0 0 2px v-bind('theme.cardColor'),
     0 0 0 4px #8f72e3;
 }
 
@@ -1276,7 +1167,7 @@ a.cell {
 }
 
 .cell.picked {
-  box-shadow: 0 0 0 2px v-bind("theme.textColor1");
+  box-shadow: 0 0 0 2px v-bind('theme.textColor1');
 }
 
 .num {
@@ -1330,12 +1221,12 @@ a.cell {
 .seen {
   font-size: 13px;
   white-space: nowrap;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .where::before,
 .present::before {
-  content: "";
+  content: '';
   width: 7px;
   height: 7px;
   border-radius: 50%;

@@ -1,32 +1,27 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import { useThemeVars } from "naive-ui"
-import { HINT_MIN_FAILURES, hintLevelLabel, isSqlProblem } from "@oj2/contract"
-import type { JudgeCaseResult } from "@oj2/contract"
-import { JUDGE_STATUS, SubmissionStatus } from "utils/constants"
-import {
-  submissionCaseResults,
-  submissionMemoryFormat,
-  submissionPartialCases,
-  submissionTimeFormat,
-} from "utils/functions"
-import type { Submission } from "utils/types"
-import SubmissionResultTag from "shared/components/SubmissionResultTag.vue"
-import { useProblemStore } from "oj/store/problem"
-import { useSubmissionStore } from "oj/store/submission"
-import { markdownToText } from "oj/problem/utils/plainText"
-import CompileErrorExplain from "./CompileErrorExplain.vue"
-import RuntimeErrorExplain from "./RuntimeErrorExplain.vue"
-import WrongAnswerExplain from "./WrongAnswerExplain.vue"
-import LessonNext from "./LessonNext.vue"
-import ResultHeader from "./ResultHeader.vue"
-import SimilarProblems from "./SimilarProblems.vue"
-import ChallengeList from "./ChallengeList.vue"
-import ChallengeOutcome from "./ChallengeOutcome.vue"
-import { useChallengeStore } from "oj/store/challenge"
-import { useLessonStore } from "shared/store/lesson"
-import { useProblemPageContext } from "../composables/problemPageContext"
-import Markdown from "shared/components/Markdown.vue"
+import { Icon } from '@iconify/vue'
+import { useThemeVars } from 'naive-ui'
+import { HINT_MIN_FAILURES, hintLevelLabel, isSqlProblem } from '@oj2/contract'
+import type { JudgeCaseResult } from '@oj2/contract'
+import { JUDGE_STATUS, SubmissionStatus } from 'utils/constants'
+import { submissionCaseResults, submissionMemoryFormat, submissionPartialCases, submissionTimeFormat } from 'utils/functions'
+import type { Submission } from 'utils/types'
+import SubmissionResultTag from 'shared/components/SubmissionResultTag.vue'
+import { useProblemStore } from 'oj/store/problem'
+import { useSubmissionStore } from 'oj/store/submission'
+import { markdownToText } from 'oj/problem/utils/plainText'
+import CompileErrorExplain from './CompileErrorExplain.vue'
+import RuntimeErrorExplain from './RuntimeErrorExplain.vue'
+import WrongAnswerExplain from './WrongAnswerExplain.vue'
+import LessonNext from './LessonNext.vue'
+import ResultHeader from './ResultHeader.vue'
+import SimilarProblems from './SimilarProblems.vue'
+import ChallengeList from './ChallengeList.vue'
+import ChallengeOutcome from './ChallengeOutcome.vue'
+import { useChallengeStore } from 'oj/store/challenge'
+import { useLessonStore } from 'shared/store/lesson'
+import { useProblemPageContext } from '../composables/problemPageContext'
+import Markdown from 'shared/components/Markdown.vue'
 
 const props = defineProps<{
   submission?: Submission
@@ -59,15 +54,15 @@ const {
 
 /** 判题机的临时目录名（`/judger/run/<32 位随机串>/`）对学生没有意义，只剩文件名 */
 function stripJudgePath(text: string) {
-  return text.replace(/\/judger\/run\/[^/"]+\//g, "")
+  return text.replace(/\/judger\/run\/[^/"]+\//g, '')
 }
 
 /** 编译错误交给 CompileErrorExplain 翻成中文：Python、C、C++ 各有一张翻译表 */
 const compileError = computed(() => {
   const submission = props.submission
-  if (!submission || submission.result !== SubmissionStatus.compile_error) return ""
-  if (!["Python", "C", "C++"].includes(submission.language)) return ""
-  return submission.statisticInfo?.err_info ?? ""
+  if (!submission || submission.result !== SubmissionStatus.compile_error) return ''
+  if (!['Python', 'C', 'C++'].includes(submission.language)) return ''
+  return submission.statisticInfo?.err_info ?? ''
 })
 
 // 错误信息格式化
@@ -93,10 +88,7 @@ const sampleCheck = computed(() => {
  * 1.5 秒会自动跳回题单（SubmissionEffects），这两种都不给
  */
 const ctx = useProblemPageContext()
-const showLessonNext = computed(
-  () =>
-    !props.peer && props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext,
-)
+const showLessonNext = computed(() => !props.peer && props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext)
 
 /**
  * 通过了、但这道题不在这节课里（没有「下一题」可给）：给几道相似题接着练。
@@ -141,45 +133,36 @@ const challengeProblemIds = computed(() => {
   const problem = problemStore.problem
   if (!problem) return []
   const lesson = lessonStore.activity
-  return lessonStore.includes(problem._id) && lesson
-    ? lesson.problems.map((item) => item.problemDisplayId)
-    : [problem._id]
+  return lessonStore.includes(problem._id) && lesson ? lesson.problems.map((item) => item.problemDisplayId) : [problem._id]
 })
 
 const msg = computed(() => {
-  if (!props.submission) return ""
+  if (!props.submission) return ''
   // 走 CompileErrorExplain / RuntimeErrorExplain 那两张中文卡片
-  if (compileError.value || runtimeError.value) return ""
+  if (compileError.value || runtimeError.value) return ''
 
-  let msg = ""
+  let msg = ''
   const result = props.submission.result
 
   // 编译错误或运行时错误时给出提示；
   // SQL 题的运行错误多半是"查询题里写了增删改"这类被判题拒绝的语句，err_info 已说明原因，不套这句
-  if (props.submission.language !== "SQL") {
+  if (props.submission.language !== 'SQL') {
     if (result === SubmissionStatus.compile_error) {
-      msg += "请仔细检查，看看代码的格式是不是写错了！\n\n"
+      msg += '请仔细检查，看看代码的格式是不是写错了！\n\n'
     } else if (result === SubmissionStatus.runtime_error) {
       // 原来和编译错误共用「代码格式写错了」那句，可运行时错误恰恰是格式没错、跑起来才出事
-      msg +=
-        "程序运行到一半出错，停下来了。检查一下输入是怎么读的、下标有没有越界、除数是不是 0。\n\n"
+      msg += '程序运行到一半出错，停下来了。检查一下输入是怎么读的、下标有没有越界、除数是不是 0。\n\n'
     }
   }
   // 题面不写时间、内存限制（学生看了只会迷糊），判出来时就得在这里说清楚是怎么回事
-  if (
-    result === SubmissionStatus.cpu_time_limit_exceeded ||
-    result === SubmissionStatus.real_time_limit_exceeded
-  ) {
-    msg +=
-      "程序跑了太久还没结束。看看是不是有死循环（条件一直成立、循环变量忘了改），或者在等一个没有给的输入（多写了一个 input）。\n\n"
+  if (result === SubmissionStatus.cpu_time_limit_exceeded || result === SubmissionStatus.real_time_limit_exceeded) {
+    msg += '程序跑了太久还没结束。看看是不是有死循环（条件一直成立、循环变量忘了改），或者在等一个没有给的输入（多写了一个 input）。\n\n'
   } else if (result === SubmissionStatus.memory_limit_exceeded) {
-    msg +=
-      "程序占的内存太多了。通常是列表、数组开得太大，或者在循环里不停地往里加东西、停不下来。\n\n"
+    msg += '程序占的内存太多了。通常是列表、数组开得太大，或者在循环里不停地往里加东西、停不下来。\n\n'
   }
 
   // 判题机的原文是英文（多半是「Test case not found」，题目缺测试数据），学生看了只会以为自己错了
-  if (result === SubmissionStatus.system_error)
-    return "判题出了问题，不是你的代码写错了。告诉老师看一下这道题。"
+  if (result === SubmissionStatus.system_error) return '判题出了问题，不是你的代码写错了。告诉老师看一下这道题。'
 
   if (result !== SubmissionStatus.ast_check_failed && props.submission.statisticInfo?.err_info) {
     msg += stripJudgePath(props.submission.statisticInfo.err_info)
@@ -193,9 +176,7 @@ const msg = computed(() => {
 const partialCases = computed(() => submissionPartialCases(props.submission))
 
 /** 在公开的例子上就错了：这时候「通过 x/y 个测试点」没意义，先说是哪个例子 */
-const failedOnSample = computed(() =>
-  sampleCheck.value && !sampleCheck.value.passed ? sampleCheck.value : null,
-)
+const failedOnSample = computed(() => (sampleCheck.value && !sampleCheck.value.passed ? sampleCheck.value : null))
 
 /**
  * 结果标题（设计文档第 6 节、设计稿「答案错误 / 答案正确 / 错在隐藏测试点」）：
@@ -207,20 +188,16 @@ const header = computed(() => {
   const submission = props.submission
   if (!submission) return null
   const status = JUDGE_STATUS[submission.result]
-  if (
-    submission.result === SubmissionStatus.pending ||
-    submission.result === SubmissionStatus.judging ||
-    submission.result === SubmissionStatus.submitting
-  ) {
-    return { kind: "pending" as const, title: status.title, sub: "", progress: null }
+  if (submission.result === SubmissionStatus.pending || submission.result === SubmissionStatus.judging || submission.result === SubmissionStatus.submitting) {
+    return { kind: 'pending' as const, title: status.title, sub: '', progress: null }
   }
   // 每组对没对：一排方块代替进度条（设计稿「测试点亮起来」），全对也画
   const cases = submission.caseSummary?.results ?? null
   if (submission.result === SubmissionStatus.accepted) {
     return {
-      kind: "success" as const,
+      kind: 'success' as const,
       title: status.title,
-      sub: "所有测试点都对了",
+      sub: '所有测试点都对了',
       progress: null,
       cases,
     }
@@ -239,7 +216,7 @@ const header = computed(() => {
   return {
     kind: status.type,
     title: status.title,
-    sub: partial ? `通过 ${partial.passed}/${partial.total} 个测试点` : "",
+    sub: partial ? `通过 ${partial.passed}/${partial.total} 个测试点` : '',
     progress: partial,
     cases,
   }
@@ -253,14 +230,12 @@ const header = computed(() => {
 const revealedId = ref<string | null>(null)
 const waitingReveal = computed(() => {
   const submission = props.submission
-  if (!submission || props.peer || !header.value || header.value.kind === "pending") return false
+  if (!submission || props.peer || !header.value || header.value.kind === 'pending') return false
   if (!submissionStore.shouldRevealCases(submission.id)) return false
   if (submission.code === undefined) return true
   return !!header.value.cases?.length && revealedId.value !== submission.id
 })
-const animateCases = computed(
-  () => !props.peer && submissionStore.shouldRevealCases(props.submission?.id),
-)
+const animateCases = computed(() => !props.peer && submissionStore.shouldRevealCases(props.submission?.id))
 function onCasesRevealed() {
   const id = props.submission?.id
   if (!id) return
@@ -275,23 +250,15 @@ function onCasesRevealed() {
  */
 const submissionStore = useSubmissionStore()
 const customRunHint = computed(() => {
-  if (!sampleCheck.value?.passed || props.peer) return ""
+  if (!sampleCheck.value?.passed || props.peer) return ''
   const problem = problemStore.problem
-  if (!problem || isSqlProblem(problem)) return ""
+  if (!problem || isSqlProblem(problem)) return ''
   // 例子里出现过的数不算：例子已经对了，拿它们再试一遍没用
-  const inSamples = new Set(
-    problem.samples.flatMap(
-      (sample) => `${sample.input} ${sample.output}`.match(/-?\d+(?:\.\d+)?/g) ?? [],
-    ),
-  )
+  const inSamples = new Set(problem.samples.flatMap((sample) => `${sample.input} ${sample.output}`.match(/-?\d+(?:\.\d+)?/g) ?? []))
   // 先摊成纯文字：题面是 HTML，446 道题带着 style="color: rgb(51, 51, 51)"，直接取数会建议「拿 51 试试」
   const description = markdownToText(problem.description, Infinity)
-  const numbers = [...new Set(description.match(/-?\d+(?:\.\d+)?/g) ?? [])]
-    .filter((value) => !inSamples.has(value))
-    .slice(0, 2)
-  return numbers.length
-    ? `去「自己输入」拿 ${numbers.join("、")} 这些数试试 ›`
-    : "去「自己输入」拿特殊的数试试 ›"
+  const numbers = [...new Set(description.match(/-?\d+(?:\.\d+)?/g) ?? [])].filter((value) => !inSamples.has(value)).slice(0, 2)
+  return numbers.length ? `去「自己输入」拿 ${numbers.join('、')} 这些数试试 ›` : '去「自己输入」拿特殊的数试试 ›'
 })
 
 // 是否显示AI提示区域。
@@ -306,8 +273,7 @@ const showAIHint = computed(() => {
   // 带 contestId 的题目只可能从比赛入口进来（题库列表按 contest_id is null 过滤）。
   if (problemStore.problem?.contestId != null) return false
   return (
-    (problemStore.failCount >= HINT_MIN_FAILURES ||
-      props.submission.result === SubmissionStatus.compile_error) &&
+    (problemStore.failCount >= HINT_MIN_FAILURES || props.submission.result === SubmissionStatus.compile_error) &&
     props.submission.result !== SubmissionStatus.accepted &&
     props.submission.result !== SubmissionStatus.ast_check_failed &&
     props.submission.result !== SubmissionStatus.system_error &&
@@ -341,23 +307,23 @@ const infoTable = computed(() => {
 
 // 测试用例表格列配置
 const columns: DataTableColumn<JudgeCaseResult>[] = [
-  { title: "测试用例", key: "test_case" },
+  { title: '测试用例', key: 'test_case' },
   {
-    title: "测试状态",
-    key: "result",
+    title: '测试状态',
+    key: 'result',
     render: (row) => h(SubmissionResultTag, { result: row.result }),
   },
   {
-    title: "占用内存",
-    key: "memory",
+    title: '占用内存',
+    key: 'memory',
     render: (row) => submissionMemoryFormat(row.memory),
   },
   {
-    title: "执行耗时",
-    key: "real_time",
+    title: '执行耗时',
+    key: 'real_time',
     render: (row) => submissionTimeFormat(row.real_time),
   },
-  { title: "信号", key: "signal" },
+  { title: '信号', key: 'signal' },
 ]
 </script>
 
@@ -365,17 +331,8 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
   <div v-if="submission">
     <!-- 挑战中：答案对了就只说挑战成没成，「下一题」「相似题」都不给，免得挤掉挑战 -->
     <template v-if="challengeVerdict && challengeStore.active">
-      <ChallengeOutcome
-        :passed="challengeVerdict.passed"
-        :results="challengeVerdict.results"
-        :wording="challengeStore.active.wording"
-      />
-      <ChallengeList
-        v-if="challengeVerdict.passed"
-        :problem-ids="challengeProblemIds"
-        :language="submission.language"
-        :refresh-key="submission.id"
-      />
+      <ChallengeOutcome :passed="challengeVerdict.passed" :results="challengeVerdict.results" :wording="challengeStore.active.wording" />
+      <ChallengeList v-if="challengeVerdict.passed" :problem-ids="challengeProblemIds" :language="submission.language" :refresh-key="submission.id" />
     </template>
     <template v-else>
       <ResultHeader
@@ -408,49 +365,19 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       </div>
     </template>
     <div v-show="!waitingReveal">
-      <n-flex
-        vertical
-        v-if="
-          compileError ||
-          runtimeError ||
-          sampleCheck ||
-          msg ||
-          infoTable.length ||
-          submission.statisticInfo?.ast_results?.length
-        "
-      >
-        <CompileErrorExplain
-          v-if="compileError"
-          :err-info="compileError"
-          :language="submission.language"
-        />
+      <n-flex vertical v-if="compileError || runtimeError || sampleCheck || msg || infoTable.length || submission.statisticInfo?.ast_results?.length">
+        <CompileErrorExplain v-if="compileError" :err-info="compileError" :language="submission.language" />
         <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
-        <WrongAnswerExplain
-          v-if="sampleCheck"
-          full
-          :check="sampleCheck"
-          :code="submission.code"
-          :language="submission.language"
-        />
+        <WrongAnswerExplain v-if="sampleCheck" full :check="sampleCheck" :code="submission.code" :language="submission.language" />
         <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
           <n-flex vertical :size="8">
-            <n-flex
-              v-for="(rule, i) in submission.statisticInfo.ast_results"
-              :key="i"
-              align="center"
-              :size="6"
-            >
+            <n-flex v-for="(rule, i) in submission.statisticInfo.ast_results" :key="i" align="center" :size="6">
               <n-icon :color="rule.passed ? theme.successColor : theme.errorColor">
                 <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
               </n-icon>
               <span>{{ rule.description }}</span>
               <!-- 次数类规则光说「出现 2 次 ✗」，学生不知道自己写了几次 -->
-              <span
-                v-if="!rule.passed && rule.actual !== undefined"
-                :style="{ color: theme.errorColor }"
-              >
-                当前 {{ rule.actual }} 次
-              </span>
+              <span v-if="!rule.passed && rule.actual !== undefined" :style="{ color: theme.errorColor }"> 当前 {{ rule.actual }} 次 </span>
             </n-flex>
           </n-flex>
         </n-card>
@@ -463,21 +390,8 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       问过之后，AI 的回答才放进卡片
     -->
       <div v-if="(showAIHint && !hintTarget) || customRunHint" class="actions">
-        <n-button
-          v-if="showAIHint && !hintTarget"
-          type="primary"
-          ghost
-          :loading="hintLoading"
-          @click="fetchHint(submission.id)"
-        >
-          让 AI 分析我的代码
-        </n-button>
-        <n-button
-          v-if="customRunHint"
-          text
-          type="primary"
-          @click="submissionStore.revealResult('custom')"
-        >
+        <n-button v-if="showAIHint && !hintTarget" type="primary" ghost :loading="hintLoading" @click="fetchHint(submission.id)"> 让 AI 分析我的代码 </n-button>
+        <n-button v-if="customRunHint" text type="primary" @click="submissionStore.revealResult('custom')">
           {{ customRunHint }}
         </n-button>
       </div>
@@ -488,46 +402,18 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
           <Markdown v-if="hintContent" :content="hintContent" />
           <!-- 等级和「再多一点提示」。按钮出不出由后端 done 里的 canEscalate 定，
              前端不自己推阶梯（要再交一次才升得动，规则在 services/hint-level.ts） -->
-          <n-flex
-            v-if="hintLevel !== null && !hintLoading && !hintTyping"
-            align="center"
-            size="small"
-            style="margin-top: 8px"
-          >
+          <n-flex v-if="hintLevel !== null && !hintLoading && !hintTyping" align="center" size="small" style="margin-top: 8px">
             <n-tag size="small" :bordered="false">
               {{ hintLevelLabel(hintLevel) }}
             </n-tag>
-            <n-button
-              v-if="hintCanEscalate"
-              size="tiny"
-              type="primary"
-              ghost
-              @click="fetchHint(submission.id, true)"
-            >
-              再多一点提示
-            </n-button>
+            <n-button v-if="hintCanEscalate" size="tiny" type="primary" ghost @click="fetchHint(submission.id, true)"> 再多一点提示 </n-button>
           </n-flex>
-          <n-flex
-            v-if="hintId !== null && !hintLoading && !hintTyping"
-            align="center"
-            size="small"
-            style="margin-top: 8px"
-          >
+          <n-flex v-if="hintId !== null && !hintLoading && !hintTyping" align="center" size="small" style="margin-top: 8px">
             <n-text depth="3">这条提示对你有帮助吗？</n-text>
-            <n-button
-              size="tiny"
-              :type="hintHelpful === true ? 'primary' : 'default'"
-              :disabled="hintFeedbackSending"
-              @click="sendHintFeedback(true)"
-            >
+            <n-button size="tiny" :type="hintHelpful === true ? 'primary' : 'default'" :disabled="hintFeedbackSending" @click="sendHintFeedback(true)">
               有帮助
             </n-button>
-            <n-button
-              size="tiny"
-              :type="hintHelpful === false ? 'warning' : 'default'"
-              :disabled="hintFeedbackSending"
-              @click="sendHintFeedback(false)"
-            >
+            <n-button size="tiny" :type="hintHelpful === false ? 'warning' : 'default'" :disabled="hintFeedbackSending" @click="sendHintFeedback(false)">
               没帮助
             </n-button>
           </n-flex>

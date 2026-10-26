@@ -1,10 +1,10 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { diagnoseRuntimeError, templateForLanguage, type JudgeCase } from "../judge/run"
-import { JudgeStatus } from "../judge/status"
-import { parseProblemTemplate } from "../judge/template"
-import { asRecord } from "../routes/helpers"
+import { db, schema } from '../db'
+import { diagnoseRuntimeError, templateForLanguage, type JudgeCase } from '../judge/run'
+import { JudgeStatus } from '../judge/status'
+import { parseProblemTemplate } from '../judge/template'
+import { asRecord } from '../routes/helpers'
 
 /**
  * 把库里运行时错误的诊断（`statistic_info.runtime_error`）按现在的规则重做一遍。
@@ -30,7 +30,7 @@ import { asRecord } from "../routes/helpers"
 /** jsonb 读回来的键顺序和新拼的对象不一样，按排好序的键比。诊断是一层的平对象 */
 function sameKeys(value: unknown) {
   const record = asRecord(value)
-  return value ? JSON.stringify(record, Object.keys(record).sort()) : "null"
+  return value ? JSON.stringify(record, Object.keys(record).sort()) : 'null'
 }
 
 export async function rediagnose({ apply }: { apply: boolean }) {
@@ -42,13 +42,11 @@ export async function rediagnose({ apply }: { apply: boolean }) {
       and(
         eq(schema.submission.result, JudgeStatus.RUNTIME_ERROR),
         isNull(schema.submission.contestId),
-        inArray(schema.submission.language, ["Python", "C", "C++"]),
+        inArray(schema.submission.language, ['Python', 'C', 'C++']),
         sql`(${schema.submission.language} <> 'Python' or ${schema.submission.statisticInfo} ? 'runtime_error')`,
       ),
     )
-  console.log(
-    `${rows.length} 条运行时错误要重新诊断${apply ? "" : "（只读预演，加 --apply 才写）"}`,
-  )
+  console.log(`${rows.length} 条运行时错误要重新诊断${apply ? '' : '（只读预演，加 --apply 才写）'}`)
 
   const changes = new Map<string, number>()
   let changed = 0
@@ -61,14 +59,10 @@ export async function rediagnose({ apply }: { apply: boolean }) {
 
     const rawTemplate = templateForLanguage(row.problem.template, row.submission.language)
     const template = rawTemplate ? parseProblemTemplate(rawTemplate) : null
-    const source = template
-      ? `${template.prepend}\n${row.submission.code}\n${template.append}`
-      : row.submission.code
-    const prependLines = template ? template.prepend.split("\n").length : 0
+    const source = template ? `${template.prepend}\n${row.submission.code}\n${template.append}` : row.submission.code
+    const prependLines = template ? template.prepend.split('\n').length : 0
 
-    const next = failure
-      ? await diagnoseRuntimeError(row, source, prependLines, failure).catch(() => null)
-      : null
+    const next = failure ? await diagnoseRuntimeError(row, source, prependLines, failure).catch(() => null) : null
     const previous = asRecord(row.submission.statisticInfo).runtime_error
     if (!next) {
       failed++
@@ -76,8 +70,8 @@ export async function rediagnose({ apply }: { apply: boolean }) {
       changed++
       const label = (value: unknown) => {
         const info = asRecord(value)
-        if (!value) return "（无）"
-        if (info.type) return `${String(info.type)}/${String(info.kind ?? "-")}`
+        if (!value) return '（无）'
+        if (info.type) return `${String(info.type)}/${String(info.kind ?? '-')}`
         return `信号 ${String(info.signal ?? 0)} 退出码 ${String(info.exit_code ?? 0)}`
       }
       const key = `${row.submission.language}  ${label(previous)} → ${label(next)}`
@@ -97,8 +91,6 @@ export async function rediagnose({ apply }: { apply: boolean }) {
   for (const [key, count] of [...changes].sort((left, right) => right[1] - left[1])) {
     console.log(`${String(count).padStart(5)}  ${key}`)
   }
-  console.log(
-    `变了 ${changed} 条${apply ? "，已写入" : ""}；没变 ${rows.length - changed - failed} 条；诊断不出来、保留原样 ${failed} 条`,
-  )
+  console.log(`变了 ${changed} 条${apply ? '，已写入' : ''}；没变 ${rows.length - changed - failed} 条；诊断不出来、保留原样 ${failed} 条`)
   return 0
 }

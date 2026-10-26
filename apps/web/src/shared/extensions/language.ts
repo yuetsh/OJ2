@@ -1,11 +1,11 @@
-import { cpp } from "@codemirror/lang-cpp"
-import { python } from "@codemirror/lang-python"
-import { sql, SQLite } from "@codemirror/lang-sql"
-import { LanguageSupport } from "@codemirror/language"
-import type { Extension } from "@codemirror/state"
-import type { LANGUAGE } from "utils/types"
-import { codeMarks } from "./codeMarks"
-import { ojPythonLanguage } from "./pythonLanguage"
+import { cpp } from '@codemirror/lang-cpp'
+import { python } from '@codemirror/lang-python'
+import { sql, SQLite } from '@codemirror/lang-sql'
+import { LanguageSupport } from '@codemirror/language'
+import type { Extension } from '@codemirror/state'
+import type { LANGUAGE } from 'utils/types'
+import { codeMarks } from './codeMarks'
+import { ojPythonLanguage } from './pythonLanguage'
 
 /**
  * 语言对应的高亮扩展。学生端和教师端共用同一份（两边都是题目页上的 SyncCodeEditor） ——
@@ -14,10 +14,9 @@ import { ojPythonLanguage } from "./pythonLanguage"
  * Java / Golang / JavaScript 没有单独的包，落到 cpp()，是既有行为，不是遗漏。
  */
 export function languageExtension(language: LANGUAGE): Extension {
-  if (language === "SQL")
-    return [sql({ dialect: SQLite, upperCaseKeywords: true }), codeMarks("sql")]
-  if (language === "Python") {
-    return [new LanguageSupport(ojPythonLanguage, python().support), codeMarks("python")]
+  if (language === 'SQL') return [sql({ dialect: SQLite, upperCaseKeywords: true }), codeMarks('sql')]
+  if (language === 'Python') {
+    return [new LanguageSupport(ojPythonLanguage, python().support), codeMarks('python')]
   }
-  return [cpp(), codeMarks("c")]
+  return [cpp(), codeMarks('c')]
 }

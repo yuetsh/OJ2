@@ -1,13 +1,13 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { ADMIN_TYPES, PROBLEM_PERMISSIONS } from "./roles"
+import { ADMIN_TYPES, PROBLEM_PERMISSIONS } from './roles'
 
-import { achievementRaritySchema } from "./achievement"
-import { rankProfileSchema } from "./account"
-import { paginatedSchema, sampleUserSchema } from "./common"
-import { reactionKeySchema } from "./content"
-import { badgeConditionTypeSchema } from "./problemset"
-import { problemLanguageSchema, runnableLanguageSchema } from "./language"
+import { achievementRaritySchema } from './achievement'
+import { rankProfileSchema } from './account'
+import { paginatedSchema, sampleUserSchema } from './common'
+import { reactionKeySchema } from './content'
+import { badgeConditionTypeSchema } from './problemset'
+import { problemLanguageSchema, runnableLanguageSchema } from './language'
 import {
   astRuleSchema,
   astRulesSchema,
@@ -19,7 +19,7 @@ import {
   sqlConfigSchema,
   sqlDisplaySchema,
   tagCategorySchema,
-} from "./problem"
+} from './problem'
 
 // 放这里而不是 roles.ts：roles.ts 要保持不 import zod，理由见那边的文件头
 export const adminTypeSchema = z.enum(ADMIN_TYPES)
@@ -68,7 +68,7 @@ export type AdminAnnouncementListItem = z.infer<typeof adminAnnouncementListItem
 
 // ---------------------------------------------------------------- 教程 / 练习
 
-export const tutorialTypeSchema = z.enum(["python", "c"])
+export const tutorialTypeSchema = z.enum(['python', 'c'])
 
 /** 后台一课挂的一道「去做几道题」。按 tutorial_problem.order 排 */
 export const adminTutorialProblemSchema = z.object({
@@ -156,15 +156,7 @@ export const tutorialProblemCandidateSchema = adminTutorialProblemSchema.extend(
   tags: z.array(z.string()),
 })
 
-export const exerciseTypeSchema = z.enum([
-  "mcq",
-  "sort",
-  "fill",
-  "match",
-  "predict",
-  "debug",
-  "group",
-])
+export const exerciseTypeSchema = z.enum(['mcq', 'sort', 'fill', 'match', 'predict', 'debug', 'group'])
 
 export const adminExerciseSchema = z.object({
   id: z.number().int(),
@@ -227,7 +219,7 @@ export const toggleAiReportPinResponseSchema = z.object({
 // ---------------------------------------------------------------- 成就
 
 // rarity 复用 achievement.ts 里已有的定义，不重复声明 —— 两份枚举迟早会长歪
-export const achievementOperatorSchema = z.enum(["gte", "lte"])
+export const achievementOperatorSchema = z.enum(['gte', 'lte'])
 
 export const achievementMetricSchema = z.object({
   key: z.string(),
@@ -309,14 +301,12 @@ export const updateUserRequestSchema = z.object({
   realName: z.string().max(32).nullable().default(null),
   isDisabled: z.boolean(),
   // 空串表示不改密码，与旧 EditUserSerializer 的 allow_blank 一致
-  password: z.string().max(128).default(""),
+  password: z.string().max(128).default(''),
 })
 
 /** 导入用户：每行 [用户名, 密码, 邮箱, 真名]，与前端粘贴的 Excel 列序一致 */
 export const importUsersRequestSchema = z.object({
-  users: z
-    .array(z.tuple([z.string().trim().min(1).max(32), z.string().min(1), z.string(), z.string()]))
-    .min(1),
+  users: z.array(z.tuple([z.string().trim().min(1).max(32), z.string().min(1), z.string(), z.string()])).min(1),
 })
 
 export const deleteUsersRequestSchema = z.object({
@@ -348,7 +338,7 @@ export const judgeServerSchema = z.object({
   serviceUrl: z.string().nullable(),
   isDisabled: z.boolean(),
   /** 心跳在 6 秒内才算在线，与 dashboard 的判活口径一致 */
-  status: z.enum(["normal", "abnormal"]),
+  status: z.enum(['normal', 'abnormal']),
 })
 
 export const judgeServerListSchema = z.object({
@@ -367,7 +357,7 @@ export const orphanTestCaseSchema = z.object({
 
 /** 上传目录里、库里哪儿都没提到的图片：编辑器插的图（upload）和换下来的头像（avatar） */
 export const orphanImageSchema = z.object({
-  folder: z.enum(["upload", "avatar"]),
+  folder: z.enum(['upload', 'avatar']),
   name: z.string(),
   url: z.string(),
   /** 字节 */
@@ -434,8 +424,8 @@ export const adminContestSchema = z.object({
   password: z.string().nullable(),
   visible: z.boolean(),
   createdBy: sampleUserSchema,
-  status: z.enum(["1", "0", "-1"]),
-  contestType: z.enum(["Public", "Password Protected"]),
+  status: z.enum(['1', '0', '-1']),
+  contestType: z.enum(['Public', 'Password Protected']),
 })
 
 /** 后台比赛列表的一行：比赛本身，加几道题、几人参加（交过题的人数） */
@@ -494,7 +484,7 @@ export const adminProblemSetListSchema = paginatedSchema(adminProblemSetSchema)
 
 export const createProblemSetRequestSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string().default(""),
+  description: z.string().default(''),
   /** 布置到哪天；null = 不布置。从「没在布置」变成「布置到将来」时，服务端把布置开始记成现在 */
   assignedUntil: z.string().nullable().default(null),
   visible: z.boolean().default(true),
@@ -587,7 +577,7 @@ export const renameTagResponseSchema = z.object({
 export const batchProblemTagRequestSchema = z.object({
   problemIds: z.array(z.number().int().positive()).min(1),
   tagNames: z.array(z.string()).min(1),
-  action: z.enum(["add", "remove"]),
+  action: z.enum(['add', 'remove']),
 })
 
 /** 勾了几道题，一次让学生看得到 / 藏起来。只认公开题、只认自己能改的 */
@@ -646,9 +636,7 @@ export const stuckProblemDetailSchema = z.object({
   /** 这些人错的那些次，按判题结果分 */
   errors: z.array(z.object({ result: z.number().int(), count: z.number().int() })),
   /** 全站历年（学年按 9 月起算，`year` 是起始年），不受班级和时间段影响 */
-  history: z.array(
-    z.object({ year: z.number().int(), users: z.number().int(), firstTry: z.number().int() }),
-  ),
+  history: z.array(z.object({ year: z.number().int(), users: z.number().int(), firstTry: z.number().int() })),
 })
 
 const gradeTrendSideSchema = z.object({ users: z.number().int(), firstTry: z.number().int() })
@@ -732,9 +720,7 @@ export const learnBoardSchema = z.object({
       project: z.string(),
       exerciseTotal: z.number().int(),
       /** 这课的配套题，按老师排的顺序；藏起来的题不算 */
-      problems: z.array(
-        z.object({ id: z.number().int(), displayId: z.string(), title: z.string() }),
-      ),
+      problems: z.array(z.object({ id: z.number().int(), displayId: z.string(), title: z.string() })),
     }),
   ),
   students: z.array(learnBoardStudentSchema),
@@ -871,9 +857,7 @@ export const adminProblemListSchema = paginatedSchema(adminProblemListItemSchema
    * 「全部 / 学生看得到 / 藏着的」三个按钮上的数：除了可见性，筛选条件和列表一样。
    * 只有公开题列表给，比赛题列表没有这组按钮
    */
-  counts: z
-    .object({ all: z.number().int(), visible: z.number().int(), hidden: z.number().int() })
-    .optional(),
+  counts: z.object({ all: z.number().int(), visible: z.number().int(), hidden: z.number().int() }).optional(),
 })
 
 /**
@@ -978,10 +962,7 @@ export const challengeInputSchema = z.object({
   rules: z.array(astRuleSchema).min(1).max(CHALLENGE_RULES_MAX),
 })
 
-export const challengeInputsSchema = z.record(
-  z.string(),
-  z.array(challengeInputSchema).max(CHALLENGES_PER_LANGUAGE_MAX),
-)
+export const challengeInputsSchema = z.record(z.string(), z.array(challengeInputSchema).max(CHALLENGES_PER_LANGUAGE_MAX))
 
 export const createProblemRequestSchema = z.object({
   _id: z.string().trim().min(1).max(32),
@@ -1006,7 +987,7 @@ export const createProblemRequestSchema = z.object({
   languages: z.array(problemLanguageSchema).min(1),
   template: z.record(z.string(), z.string()),
   visible: z.boolean(),
-  difficulty: z.enum(["Low", "Mid", "High"]),
+  difficulty: z.enum(['Low', 'Mid', 'High']),
   tags: z.array(z.string().max(PROBLEM_TAG_MAX_LENGTH)).min(1),
   hint: z.string().nullable().default(null),
   source: z.string().max(256).nullable().default(null),
@@ -1082,7 +1063,7 @@ export const sqlPreviewRequestSchema = z.object({
     .string()
     .min(1)
     .max(1024 * 1024),
-  mode: z.enum(["query", "modify"]),
+  mode: z.enum(['query', 'modify']),
   /**
    * 这组是不是题面上给学生看的那组（第 1 组）。增删改题只有这一组必须改到行 ——
    * 其余组可以一行都不改，用来看学生会不会多改（比如 WHERE 写漏了）
@@ -1095,7 +1076,7 @@ export const generateSqlTestCaseRequestSchema = z.object({
     .string()
     .min(1)
     .max(64 * 1024),
-  mode: z.enum(["query", "modify"]),
+  mode: z.enum(['query', 'modify']),
 })
 
 export const generateSqlTestCaseResponseSchema = z.object({ sql: z.string() })
@@ -1115,7 +1096,7 @@ export const TEST_CASE_MAX_CASES = 20
 export const TEST_CASE_EDIT_MAX_CASES = 100
 export const TEST_CASE_EDIT_MAX_FILE_BYTES = 32 * 1024
 
-export const testCaseFilesSchema = z.discriminatedUnion("editable", [
+export const testCaseFilesSchema = z.discriminatedUnion('editable', [
   z.object({
     editable: z.literal(true),
     cases: z.array(z.object({ input: z.string(), output: z.string() })),
@@ -1291,9 +1272,7 @@ export type UpdateProblemRequest = z.input<typeof updateProblemRequestSchema>
 export type MakeProblemPublicRequest = z.input<typeof makeProblemPublicRequestSchema>
 export type AddContestProblemRequest = z.input<typeof addContestProblemRequestSchema>
 export type ReorderContestProblemsRequest = z.input<typeof reorderContestProblemsRequestSchema>
-export type ReorderProblemSetProblemsRequest = z.input<
-  typeof reorderProblemSetProblemsRequestSchema
->
+export type ReorderProblemSetProblemsRequest = z.input<typeof reorderProblemSetProblemsRequestSchema>
 export type SetTagCategoryRequest = z.input<typeof setTagCategoryRequestSchema>
 export type CheckUsernamesRequest = z.input<typeof checkUsernamesRequestSchema>
 export type TestCaseEntry = z.infer<typeof testCaseEntrySchema>

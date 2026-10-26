@@ -1,5 +1,5 @@
-import { watch } from "vue"
-import { useDocumentVisibility, useIntervalFn } from "@vueuse/core"
+import { watch } from 'vue'
+import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
 
 /**
  * 定时刷新，但页面藏在后台时不拉，切回来立刻补一次。
@@ -12,13 +12,13 @@ export function useVisibleInterval(fn: () => unknown, interval: number) {
   const visibility = useDocumentVisibility()
   const { pause, resume, isActive } = useIntervalFn(
     () => {
-      if (visibility.value === "visible") fn()
+      if (visibility.value === 'visible') fn()
     },
     interval,
     { immediate: false },
   )
   watch(visibility, (value) => {
-    if (value === "visible" && isActive.value) fn()
+    if (value === 'visible' && isActive.value) fn()
   })
   return { pause, resume }
 }

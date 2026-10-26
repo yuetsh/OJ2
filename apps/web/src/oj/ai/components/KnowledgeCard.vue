@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { LearningReport } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
+import type { LearningReport } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
 
 /** 全部知识点：做对过的标绿写几道，做过没做对的写「还没做对」，没碰过的虚线。点进题目列表按它筛 */
-const props = defineProps<{ knowledge: LearningReport["knowledge"] }>()
+const props = defineProps<{ knowledge: LearningReport['knowledge'] }>()
 
 const theme = useThemeVars()
 const touched = computed(() => props.knowledge.filter((item) => item.tried).length)
@@ -24,7 +24,7 @@ const touched = computed(() => props.knowledge.filter((item) => item.tried).leng
       >
         <span class="name">{{ item.name }}</span>
         <span class="sub">
-          {{ item.solved ? `做对 ${item.solved} 道` : item.tried ? "还没做对" : "还没做过" }}
+          {{ item.solved ? `做对 ${item.solved} 道` : item.tried ? '还没做对' : '还没做过' }}
         </span>
       </router-link>
     </div>
@@ -37,9 +37,9 @@ const touched = computed(() => props.knowledge.filter((item) => item.tried).leng
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid v-bind("theme.borderColor");
+  border: 1px solid v-bind('theme.borderColor');
   border-radius: var(--oj-radius);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
 }
 
 h3 {
@@ -53,7 +53,7 @@ h3 {
 h3 small {
   font-size: var(--oj-fs-meta);
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .grid {
@@ -70,7 +70,7 @@ h3 small {
   border: 1px solid transparent;
   border-radius: 6px;
   text-decoration: none;
-  color: v-bind("theme.textColor1");
+  color: v-bind('theme.textColor1');
   min-width: 0;
 }
 
@@ -106,7 +106,7 @@ h3 small {
 }
 
 .untouched {
-  border: 1px dashed v-bind("theme.borderColor");
-  color: v-bind("theme.textColor3");
+  border: 1px dashed v-bind('theme.borderColor');
+  color: v-bind('theme.textColor3');
 }
 </style>

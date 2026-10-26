@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useMyFlowchartStore } from "shared/store/myFlowchart"
-import { useMermaid } from "shared/composables/useMermaid"
+import { useMyFlowchartStore } from 'shared/store/myFlowchart'
+import { useMermaid } from 'shared/composables/useMermaid'
 
 /**
  * 学生自己画到 A/S 的那张流程图。题面里是缩略的一小块（compact），点「放大看」弹出整张。
@@ -12,7 +12,7 @@ const props = defineProps<{ compact?: boolean; code?: string }>()
 
 const store = useMyFlowchartStore()
 const { renderError, renderFlowchart } = useMermaid()
-const mermaidContainer = useTemplateRef<HTMLElement>("mermaidContainer")
+const mermaidContainer = useTemplateRef<HTMLElement>('mermaidContainer')
 
 watch(
   () => props.code ?? store.mermaidCode,
@@ -30,12 +30,7 @@ watch(
     <n-alert v-if="renderError" type="error" title="流程图渲染失败" size="small">
       {{ renderError }}
     </n-alert>
-    <div
-      v-show="!renderError"
-      ref="mermaidContainer"
-      class="flowchart-container"
-      :class="{ compact: props.compact }"
-    ></div>
+    <div v-show="!renderError" ref="mermaidContainer" class="flowchart-container" :class="{ compact: props.compact }"></div>
   </div>
 </template>
 

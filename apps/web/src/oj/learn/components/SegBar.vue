@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LessonState, ProjectGroup } from "../lesson"
+import type { LessonState, ProjectGroup } from '../lesson'
 
 /**
  * 一门课的进度条：一课一小段，按项目分组隔开。绿 = 学完，橙 = 在学，灰 = 没开始，
@@ -19,12 +19,7 @@ defineProps<{
 
 <template>
   <div class="seg" :style="{ gap: `${groupGap ?? 10}px` }" aria-hidden="true">
-    <div
-      v-for="group in groups"
-      :key="group.lessons[0]!.id"
-      class="group"
-      :style="{ gap: `${gap ?? 3}px` }"
-    >
+    <div v-for="group in groups" :key="group.lessons[0]!.id" class="group" :style="{ gap: `${gap ?? 3}px` }">
       <span
         v-for="lesson in group.lessons"
         :key="lesson.id"

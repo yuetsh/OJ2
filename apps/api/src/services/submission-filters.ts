@@ -1,7 +1,7 @@
-import { and, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm"
+import { and, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 
-import { db, schema } from "../db"
-import { classCondition, parseDisplayIds } from "../routes/helpers"
+import { db, schema } from '../db'
+import { classCondition, parseDisplayIds } from '../routes/helpers'
 
 /**
  * 两条提交列表（公开列表、比赛里的列表）的筛选条件：用户名、班级、题号。
@@ -29,10 +29,7 @@ import { classCondition, parseDisplayIds } from "../routes/helpers"
  */
 export async function usernameFilter(username: string) {
   const like = `%${username}%`
-  const users = await db
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(ilike(schema.user.username, like))
+  const users = await db.select({ id: schema.user.id }).from(schema.user).where(ilike(schema.user.username, like))
   const frozen = ilike(schema.submission.username, like)
   return users.length
     ? or(
@@ -50,11 +47,7 @@ export async function usernameFilter(username: string) {
  * 协作中老师看「这个学生」的提交时不能把别人的也捞进来。查无此人留恒假条件
  */
 export async function exactUsernameFilter(username: string) {
-  const [row] = await db
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(eq(schema.user.username, username))
-    .limit(1)
+  const [row] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.username, username)).limit(1)
   return row ? eq(schema.submission.userId, row.id) : sql`false`
 }
 
@@ -64,10 +57,7 @@ export async function exactUsernameFilter(username: string) {
  * 查无此班留恒假条件
  */
 export async function classNameFilter(className: string) {
-  const users = await db
-    .select({ id: schema.user.id })
-    .from(schema.user)
-    .where(classCondition(className))
+  const users = await db.select({ id: schema.user.id }).from(schema.user).where(classCondition(className))
   return users.length
     ? inArray(
         schema.submission.userId,
@@ -92,9 +82,7 @@ export async function unknownDisplayIds(displayId: string, contestId: number | n
           sql`lower(${schema.problem.displayId})`,
           ids.map((id) => id.toLowerCase()),
         ),
-        contestId === null
-          ? isNull(schema.problem.contestId)
-          : eq(schema.problem.contestId, contestId),
+        contestId === null ? isNull(schema.problem.contestId) : eq(schema.problem.contestId, contestId),
       ),
     )
   const found = new Set(rows.map((row) => row.displayId.toLowerCase()))
@@ -121,9 +109,7 @@ export async function problemFilter(displayId: string, contestId: number | null)
     .where(
       and(
         inArray(sql`lower(${schema.problem.displayId})`, lowered),
-        contestId === null
-          ? isNull(schema.problem.contestId)
-          : eq(schema.problem.contestId, contestId),
+        contestId === null ? isNull(schema.problem.contestId) : eq(schema.problem.contestId, contestId),
       ),
     )
   return problems.length

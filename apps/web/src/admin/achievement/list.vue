@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import PageHeader from "admin/components/PageHeader.vue"
-import { useThemeVars } from "naive-ui"
-import {
-  getAdminAchievements,
-  getBaseInfo,
-  getMetricOptions,
-  type AdminAchievement,
-  type MetricOption,
-} from "admin/api"
-import AchievementIcon from "shared/components/AchievementIcon.vue"
-import AchievementModal from "./components/AchievementModal.vue"
-import { RARITY_LABEL } from "utils/constants"
+import PageHeader from 'admin/components/PageHeader.vue'
+import { useThemeVars } from 'naive-ui'
+import { getAdminAchievements, getBaseInfo, getMetricOptions, type AdminAchievement, type MetricOption } from 'admin/api'
+import AchievementIcon from 'shared/components/AchievementIcon.vue'
+import AchievementModal from './components/AchievementModal.vue'
+import { RARITY_LABEL } from 'utils/constants'
 
 /**
  * 后台成就（设计稿「我的成就重设计」AchAdmin）：按指标分组，一组一行排成阶梯 ——
@@ -37,11 +31,7 @@ const groups = computed(() => {
   for (const a of list.value) byMetric.set(a.metric, [...(byMetric.get(a.metric) ?? []), a])
   const order = metrics.value.map((m) => m.key)
   return [...byMetric.entries()]
-    .sort(
-      ([a], [b]) =>
-        (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) -
-        (order.indexOf(b) === -1 ? 99 : order.indexOf(b)),
-    )
+    .sort(([a], [b]) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)))
     .map(([metric, items]) => ({
       metric,
       name: items[0]?.metricName ?? metric,
@@ -50,9 +40,9 @@ const groups = computed(() => {
 })
 
 function percent(a: AdminAchievement) {
-  if (!students.value) return ""
+  if (!students.value) return ''
   const value = (a.unlockCount / students.value) * 100
-  return value > 0 && value < 1 ? "<1%" : `${Math.round(value)}%`
+  return value > 0 && value < 1 ? '<1%' : `${Math.round(value)}%`
 }
 
 async function load() {
@@ -103,20 +93,12 @@ onMounted(load)
         <div class="steps">
           <template v-for="(a, i) in group.items" :key="a.id">
             <span v-if="i" class="arrow" aria-hidden="true">→</span>
-            <button
-              type="button"
-              class="step"
-              :class="{ off: !a.visible }"
-              :title="`${RARITY_LABEL[a.rarity] ?? a.rarity} · 点了编辑`"
-              @click="edit(a)"
-            >
+            <button type="button" class="step" :class="{ off: !a.visible }" :title="`${RARITY_LABEL[a.rarity] ?? a.rarity} · 点了编辑`" @click="edit(a)">
               <AchievementIcon :icon="a.icon" :size="26" />
               <span class="step-text">
                 <b>
                   {{ a.name }}
-                  <span class="muted small"
-                    >{{ a.operator === "gte" ? "≥" : "≤" }} {{ a.threshold }}</span
-                  >
+                  <span class="muted small">{{ a.operator === 'gte' ? '≥' : '≤' }} {{ a.threshold }}</span>
                 </b>
                 <span class="small">
                   {{ a.unlockCount }} 人
@@ -143,7 +125,7 @@ onMounted(load)
 
 /* 斑马底纹，和后台其它列表一样 */
 .group:nth-child(even) {
-  background: v-bind("theme.tableColorStriped");
+  background: v-bind('theme.tableColorStriped');
 }
 
 .group {
@@ -151,7 +133,7 @@ onMounted(load)
   align-items: center;
   gap: 12px;
   padding: 8px 10px;
-  border-bottom: 1px solid v-bind("theme.dividerColor");
+  border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
 .metric {
@@ -168,7 +150,7 @@ onMounted(load)
 }
 
 .arrow {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .step {
@@ -178,8 +160,8 @@ onMounted(load)
   min-width: 160px;
   padding: 6px 10px;
   border-radius: 8px;
-  border: 1px solid v-bind("theme.dividerColor");
-  background: v-bind("theme.cardColor");
+  border: 1px solid v-bind('theme.dividerColor');
+  background: v-bind('theme.cardColor');
   font: inherit;
   color: inherit;
   text-align: left;
@@ -187,7 +169,7 @@ onMounted(load)
 }
 
 .step:hover {
-  border-color: v-bind("theme.primaryColor");
+  border-color: v-bind('theme.primaryColor');
 }
 
 .step.off {
@@ -210,11 +192,11 @@ onMounted(load)
 }
 
 .muted {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .off-note {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 /* 手机上指标名放在一组上头，下面两档一行；箭头拿掉（折行之后箭头会单独落在行首） */

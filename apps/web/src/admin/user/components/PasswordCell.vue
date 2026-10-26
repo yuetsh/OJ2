@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import TextCopy from "shared/components/TextCopy.vue"
-import { USER_TYPE } from "utils/constants"
-import type { AdminUserForm } from "utils/types"
+import TextCopy from 'shared/components/TextCopy.vue'
+import { USER_TYPE } from 'utils/constants'
+import type { AdminUserForm } from 'utils/types'
 
 interface Props {
   user: AdminUserForm
@@ -9,7 +9,7 @@ interface Props {
 }
 const props = defineProps<Props>()
 defineEmits<{
-  (e: "toggle", value: number): void
+  (e: 'toggle', value: number): void
 }>()
 
 /**
@@ -21,9 +21,7 @@ defineEmits<{
  * `rawPassword` 为空时不打码：给一个点了什么也不显示的按钮没有意义，直接走原来的
  * TextCopy（渲染成空）。
  */
-const maskable = computed(
-  () => props.user.adminType !== USER_TYPE.REGULAR_USER && !!props.user.rawPassword,
-)
+const maskable = computed(() => props.user.adminType !== USER_TYPE.REGULAR_USER && !!props.user.rawPassword)
 </script>
 <template>
   <!-- 显示出来之后要能再收回去：看一眼就该关掉，不然一整页管理员密码就那么摊着，
@@ -32,7 +30,7 @@ const maskable = computed(
     <span v-if="!props.revealed" class="dots">••••••</span>
     <TextCopy v-else>{{ props.user.rawPassword }}</TextCopy>
     <n-button size="tiny" secondary @click="$emit('toggle', props.user.id)">
-      {{ props.revealed ? "隐藏" : "显示" }}
+      {{ props.revealed ? '隐藏' : '显示' }}
     </n-button>
   </n-flex>
   <TextCopy v-else>{{ props.user.rawPassword }}</TextCopy>

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { RankRow } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import UserName from "shared/components/UserName.vue"
-import { useRankPalette } from "../palette"
-import RankAvatar from "shared/components/RankAvatar.vue"
+import type { RankRow } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import UserName from 'shared/components/UserName.vue'
+import { useRankPalette } from '../palette'
+import RankAvatar from 'shared/components/RankAvatar.vue'
 
 /** 这周本班前 5 名（做对过新题的），每周一清零 */
 const props = defineProps<{ rows: RankRow[]; meId?: number; loaded: boolean }>()
@@ -31,12 +31,7 @@ const scale = computed(() => top.value[0]?.solved || 1)
         "
         >{{ row.rank }}</span
       >
-      <RankAvatar
-        :username="row.user.username"
-        :avatar="row.avatar"
-        :size="18"
-        :me="row.user.id === meId"
-      />
+      <RankAvatar :username="row.user.username" :avatar="row.avatar" :size="18" :me="row.user.id === meId" />
       <button class="who" @click="$emit('open', row.user.username)">
         <UserName :username="row.user.username" />
       </button>
@@ -51,9 +46,7 @@ const scale = computed(() => top.value[0]?.solved || 1)
       </span>
       <b class="num">{{ row.solved }}</b>
     </div>
-    <span v-if="loaded && !top.length" class="muted"
-      >这周还没人做对新题，现在做对 1 道就是第一</span
-    >
+    <span v-if="loaded && !top.length" class="muted">这周还没人做对新题，现在做对 1 道就是第一</span>
   </div>
 </template>
 
@@ -88,7 +81,7 @@ const scale = computed(() => top.value[0]?.solved || 1)
   font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .who {
@@ -123,6 +116,6 @@ const scale = computed(() => top.value[0]?.solved || 1)
 
 .muted {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

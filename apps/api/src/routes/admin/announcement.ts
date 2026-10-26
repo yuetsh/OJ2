@@ -1,24 +1,15 @@
-import {
-  createAnnouncementRequestSchema,
-  updateAnnouncementRequestSchema,
-  type AdminAnnouncement,
-  type AdminAnnouncementList,
-} from "@oj2/contract"
-import { count, desc, eq } from "drizzle-orm"
-import { Hono } from "hono"
+import { createAnnouncementRequestSchema, updateAnnouncementRequestSchema, type AdminAnnouncement, type AdminAnnouncementList } from '@oj2/contract'
+import { count, desc, eq } from 'drizzle-orm'
+import { Hono } from 'hono'
 
-import { requireSuperAdmin, type AppEnv } from "../../auth/middleware"
-import { db, schema } from "../../db"
-import { failure, parseBody, success } from "../../http"
-import { queryInteger, sampleUser } from "../helpers"
+import { requireSuperAdmin, type AppEnv } from '../../auth/middleware'
+import { db, schema } from '../../db'
+import { failure, parseBody, success } from '../../http'
+import { queryInteger, sampleUser } from '../helpers'
 
 export const adminAnnouncementRoutes = new Hono<AppEnv>()
 
-function serialize(row: {
-  announcement: typeof schema.announcement.$inferSelect
-  user: typeof schema.user.$inferSelect
-  realName: string | null
-}) {
+function serialize(row: { announcement: typeof schema.announcement.$inferSelect; user: typeof schema.user.$inferSelect; realName: string | null }) {
   return {
     id: row.announcement.id,
     title: row.announcement.title,
@@ -46,9 +37,9 @@ function selectOne(id: number) {
     .limit(1)
 }
 
-adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
-  const limit = queryInteger(c.req.query("limit"), 10, { min: 1, max: 250 })
-  const offset = queryInteger(c.req.query("offset"), 0, { min: 0 })
+adminAnnouncementRoutes.get('/announcements', requireSuperAdmin, async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
   const [totalRows, rows] = await Promise.all([
     db.select({ value: count() }).from(schema.announcement),
     db
@@ -72,7 +63,7 @@ adminAnnouncementRoutes.get("/announcements", requireSuperAdmin, async (c) => {
   } satisfies AdminAnnouncementList)
 })
 
-adminAnnouncementRoutes.post("/announcements", requireSuperAdmin, async (c) => {
+adminAnnouncementRoutes.post('/announcements', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, createAnnouncementRequestSchema)
   if (!parsed.success) return parsed.response
   const now = new Date().toISOString()
@@ -82,21 +73,21 @@ adminAnnouncementRoutes.post("/announcements", requireSuperAdmin, async (c) => {
       ...parsed.data,
       createTime: now,
       lastUpdateTime: now,
-      createdById: c.get("user")!.id,
+      createdById: c.get('user')!.id,
     })
     .returning({ id: schema.announcement.id })
   const [row] = await selectOne(created!.id)
   return success(c, serialize(row!), 201)
 })
 
-adminAnnouncementRoutes.get("/announcements/:id", requireSuperAdmin, async (c) => {
-  const [row] = await selectOne(queryInteger(c.req.param("id"), 0, { min: 1 }))
-  if (!row) return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+adminAnnouncementRoutes.get('/announcements/:id', requireSuperAdmin, async (c) => {
+  const [row] = await selectOne(queryInteger(c.req.param('id'), 0, { min: 1 }))
+  if (!row) return failure(c, 404, 'announcement-not-found', 'Announcement does not exist')
   return success(c, serialize(row))
 })
 
-adminAnnouncementRoutes.put("/announcements/:id", requireSuperAdmin, async (c) => {
-  const id = queryInteger(c.req.param("id"), 0, { min: 1 })
+adminAnnouncementRoutes.put('/announcements/:id', requireSuperAdmin, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
   const parsed = await parseBody(c, updateAnnouncementRequestSchema)
   if (!parsed.success) return parsed.response
   const updated = await db
@@ -105,21 +96,21 @@ adminAnnouncementRoutes.put("/announcements/:id", requireSuperAdmin, async (c) =
     .where(eq(schema.announcement.id, id))
     .returning({ id: schema.announcement.id })
   if (updated.length === 0) {
-    return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+    return failure(c, 404, 'announcement-not-found', 'Announcement does not exist')
   }
   const [row] = await selectOne(id)
   return success(c, serialize(row!))
 })
 
-adminAnnouncementRoutes.delete("/announcements/:id", requireSuperAdmin, async (c) => {
+adminAnnouncementRoutes.delete('/announcements/:id', requireSuperAdmin, async (c) => {
   // 旧后端删不存在的公告也返回成功（filter().delete() 不报错）。这里改成 404：
   // 后台是人手点删除，静默成功会让人以为删掉了，刷新后它还在。
   const deleted = await db
     .delete(schema.announcement)
-    .where(eq(schema.announcement.id, queryInteger(c.req.param("id"), 0, { min: 1 })))
+    .where(eq(schema.announcement.id, queryInteger(c.req.param('id'), 0, { min: 1 })))
     .returning({ id: schema.announcement.id })
   if (deleted.length === 0) {
-    return failure(c, 404, "announcement-not-found", "Announcement does not exist")
+    return failure(c, 404, 'announcement-not-found', 'Announcement does not exist')
   }
   return success(c, null)
 })

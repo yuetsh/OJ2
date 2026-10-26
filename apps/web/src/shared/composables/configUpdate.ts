@@ -1,6 +1,6 @@
-import { useConfigStore } from "shared/store/config"
-import { useUserStore } from "shared/store/user"
-import { useConfigWebSocket, type ConfigUpdate } from "shared/composables/websocket"
+import { useConfigStore } from 'shared/store/config'
+import { useUserStore } from 'shared/store/user'
+import { useConfigWebSocket, type ConfigUpdate } from 'shared/composables/websocket'
 
 /**
  * 收 /ws/config 的站点配置广播，写进 configStore —— 超管改完配置，所有开着页面
@@ -18,7 +18,7 @@ export function useConfigUpdate() {
     if (!(data.key in configStore.config)) return
     ;(configStore.config as unknown as Record<string, unknown>)[data.key] = data.value
     // getConfig() 里也是这么设的，站点改名后标签页跟着变，别只更新页面里那份
-    if (data.key === "websiteName") document.title = data.value
+    if (data.key === 'websiteName') document.title = data.value
   }
 
   // 初始化 WebSocket - handler 会在 onMounted 时自动添加

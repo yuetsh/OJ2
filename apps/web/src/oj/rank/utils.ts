@@ -1,16 +1,16 @@
-import type { RankPeriod, RankRow, RankScope } from "@oj2/contract"
-import { classLabel } from "utils/classes"
+import type { RankPeriod, RankRow, RankScope } from '@oj2/contract'
+import { classLabel } from 'utils/classes'
 
 export const SCOPE_OPTIONS: { value: RankScope; label: string }[] = [
-  { value: "class", label: "本班" },
-  { value: "grade", label: "本年级" },
-  { value: "all", label: "全服" },
+  { value: 'class', label: '本班' },
+  { value: 'grade', label: '本年级' },
+  { value: 'all', label: '全服' },
 ]
 
 export const PERIOD_OPTIONS: { value: RankPeriod; label: string }[] = [
-  { value: "week", label: "这周" },
-  { value: "term", label: "这学期" },
-  { value: "all", label: "全部" },
+  { value: 'week', label: '这周' },
+  { value: 'term', label: '这学期' },
+  { value: 'all', label: '全部' },
 ]
 
 export function scopeLabel(scope: RankScope) {
@@ -23,9 +23,9 @@ export function periodLabel(period: RankPeriod) {
 
 /** 榜的标题：本班写班名，本年级写「25 级」，全服就是「全服」 */
 export function groupTitle(scope: RankScope, className: string | null) {
-  if (scope === "class" && className) return classLabel(className)
-  if (scope === "grade" && className) return `${className} 级`
-  return "全服"
+  if (scope === 'class' && className) return classLabel(className)
+  if (scope === 'grade' && className) return `${className} 级`
+  return '全服'
 }
 
 /**
@@ -34,7 +34,7 @@ export function groupTitle(scope: RankScope, className: string | null) {
  */
 export function gapText(earlier: string, later: string) {
   const seconds = Math.max(0, Math.round((Date.parse(later) - Date.parse(earlier)) / 1000))
-  if (seconds === 0) return "同一秒"
+  if (seconds === 0) return '同一秒'
   if (seconds < 60) return `${seconds} 秒`
   if (seconds < 3600) {
     const minutes = Math.floor(seconds / 60)

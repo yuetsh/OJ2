@@ -1,8 +1,8 @@
-import { z } from "zod"
+import { z } from 'zod'
 
-import { paginatedSchema } from "./common"
-import { judgeStatusSchema, type JudgeStatus } from "./judge-status"
-import { problemLanguageSchema, runnableLanguageSchema } from "./language"
+import { paginatedSchema } from './common'
+import { judgeStatusSchema, type JudgeStatus } from './judge-status'
+import { problemLanguageSchema, runnableLanguageSchema } from './language'
 
 /**
  * 判题机原始输出（`submission.info` 的 JSONB 原文）。**只是类型，不作运行时校验。**
@@ -285,10 +285,10 @@ export const submissionDetailSchema = z.object({
  * 拉一次就是了，不必让推送顺带背一份 JSONB 的形状。
  */
 export const submissionUpdateSchema = z.object({
-  type: z.literal("submission_update"),
+  type: z.literal('submission_update'),
   submissionId: z.string(),
   result: judgeStatusSchema,
-  status: z.enum(["pending", "judging", "finished", "error"]),
+  status: z.enum(['pending', 'judging', 'finished', 'error']),
   score: z.number().optional(),
 })
 
@@ -439,7 +439,7 @@ export const submissionStatisticsSchema = z.object({
  * 这批号（夏令营、兴趣班、自己注册的）`user.class_name` 是 null，当成一个班来看。
  * 真班名全是数字（`253`、`2511`），撞不上
  */
-export const NO_CLASS = "none"
+export const NO_CLASS = 'none'
 
 /**
  * 统计「一行一节课」的总览（GET /submissions/statistics/lessons，设计稿「统计合二为一」B）。
@@ -564,14 +564,14 @@ export const todaySubmissionStatisticsSchema = z.object({
       userCount: z.number().int(),
       acceptedUsers: z.number().int(),
       /** 我自己今天在这道题上：做对了 / 交了没对 / 没交；没登录为 null */
-      mine: z.enum(["accepted", "tried", "none"]).nullable(),
+      mine: z.enum(['accepted', 'tried', 'none']).nullable(),
     }),
   ),
 })
 
 export const formatCodeRequestSchema = z.object({
   code: z.string().max(1024 * 1024),
-  language: z.enum(["python", "c", "cpp", "sql"]),
+  language: z.enum(['python', 'c', 'cpp', 'sql']),
   /** C / C++ 格式化前要先编一遍，得套上这道题的模板才编得过 */
   problemId: z.number().int().optional(),
 })
@@ -627,15 +627,15 @@ export const trialRunRequestSchema = z.object({
  */
 export type TrialRunResponse =
   | {
-      status: "done"
+      status: 'done'
       cases: {
         result: JudgeStatus
         output: string
-        runtimeError?: NonNullable<StatisticInfo["runtime_error"]>
+        runtimeError?: NonNullable<StatisticInfo['runtime_error']>
       }[]
     }
-  | { status: "compile-error"; message: string }
-  | { status: "too-much-output" }
+  | { status: 'compile-error'; message: string }
+  | { status: 'too-much-output' }
 
 export type StatisticInfo = z.infer<typeof statisticInfoSchema>
 export type AstResultInfo = z.infer<typeof astResultSchema>

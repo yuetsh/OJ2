@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useRouteQuery } from "@vueuse/router"
-import type { GradeTrend } from "utils/types"
-import { getGradeTrend } from "admin/api"
-import "oj/learn/learn.css"
+import { useRouteQuery } from '@vueuse/router'
+import type { GradeTrend } from 'utils/types'
+import { getGradeTrend } from 'admin/api'
+import 'oj/learn/learn.css'
 
 /**
  * 年度趋势（设计稿「卡点与趋势」页的 TrendB）：选一届，和往届（或另一届）在两边都做过的题上
@@ -17,15 +17,15 @@ const router = useRouter()
 /** 和后端的 GRADE_MIN_USERS 一致，只用在空状态的文案里 */
 const MIN_USERS = 20
 const SAME = 2
-const PAST = "past"
+const PAST = 'past'
 
 const data = ref<GradeTrend | null>(null)
 const loading = ref(false)
-const grade = useRouteQuery<string>("grade", "", { mode: "replace" })
-const compare = useRouteQuery<string>("compare", PAST, { mode: "replace" })
+const grade = useRouteQuery<string>('grade', '', { mode: 'replace' })
+const compare = useRouteQuery<string>('compare', PAST, { mode: 'replace' })
 
 const grades = computed(() => data.value?.grades ?? [])
-const selected = computed(() => data.value?.grade ?? "")
+const selected = computed(() => data.value?.grade ?? '')
 
 function rate(part: number, whole: number) {
   return whole ? Math.round((part / whole) * 100) : 0
@@ -34,14 +34,12 @@ function rate(part: number, whole: number) {
 const pastGrades = computed(() => grades.value.filter((g) => g < selected.value))
 const pastLabel = computed(() => {
   const list = pastGrades.value
-  if (!list.length) return "往届"
+  if (!list.length) return '往届'
   return list.length === 1 ? `往届（${list[0]} 级）` : `往届（${list.at(-1)}–${list[0]} 级）`
 })
 const otherValue = computed(() => data.value?.compare ?? PAST)
-const otherLabel = computed(() =>
-  otherValue.value === PAST ? pastLabel.value : `${otherValue.value} 级`,
-)
-const shortOther = computed(() => (otherValue.value === PAST ? "往届" : `${otherValue.value} 级`))
+const otherLabel = computed(() => (otherValue.value === PAST ? pastLabel.value : `${otherValue.value} 级`))
+const shortOther = computed(() => (otherValue.value === PAST ? '往届' : `${otherValue.value} 级`))
 
 const gradeOptions = computed(() => grades.value.map((g) => ({ label: `${g} 级`, value: g })))
 const compareOptions = computed(() => [
@@ -56,15 +54,9 @@ const rows = computed(() =>
     return { row, mine: row.mine, theirs: row.theirs, now, before, delta: now - before }
   }),
 )
-const worse = computed(() =>
-  rows.value.filter((item) => item.delta < -SAME).sort((a, b) => a.delta - b.delta),
-)
-const same = computed(() =>
-  rows.value.filter((item) => Math.abs(item.delta) <= SAME).sort((a, b) => a.delta - b.delta),
-)
-const better = computed(() =>
-  rows.value.filter((item) => item.delta > SAME).sort((a, b) => b.delta - a.delta),
-)
+const worse = computed(() => rows.value.filter((item) => item.delta < -SAME).sort((a, b) => a.delta - b.delta))
+const same = computed(() => rows.value.filter((item) => Math.abs(item.delta) <= SAME).sort((a, b) => a.delta - b.delta))
+const better = computed(() => rows.value.filter((item) => item.delta > SAME).sort((a, b) => b.delta - a.delta))
 
 const summary = computed(() => {
   const total = rows.value.reduce(
@@ -84,18 +76,18 @@ const summary = computed(() => {
 
 const groups = computed(() =>
   [
-    { key: "worse", label: `比${shortOther.value}差`, items: worse.value },
-    { key: "same", label: "差不多", items: same.value },
-    { key: "better", label: `比${shortOther.value}好`, items: better.value },
+    { key: 'worse', label: `比${shortOther.value}差`, items: worse.value },
+    { key: 'same', label: '差不多', items: same.value },
+    { key: 'better', label: `比${shortOther.value}好`, items: better.value },
   ].filter((group) => group.items.length),
 )
 
 function tone(delta: number) {
-  return delta < -SAME ? "worse" : delta > SAME ? "better" : "same"
+  return delta < -SAME ? 'worse' : delta > SAME ? 'better' : 'same'
 }
 
 function problemHref(displayId: string) {
-  return router.resolve({ name: "problem", params: { problemID: displayId } }).href
+  return router.resolve({ name: 'problem', params: { problemID: displayId } }).href
 }
 
 function pickGrade(value: string) {
@@ -127,19 +119,9 @@ watch([grade, compare], load, { immediate: true })
       <span class="title">年度趋势</span>
       <span class="grow" />
       <span class="muted">比</span>
-      <n-select
-        :value="selected || null"
-        :options="gradeOptions"
-        class="grade-select"
-        @update:value="pickGrade"
-      />
+      <n-select :value="selected || null" :options="gradeOptions" class="grade-select" @update:value="pickGrade" />
       <span class="muted">和</span>
-      <n-select
-        :value="otherValue"
-        :options="compareOptions"
-        class="compare-select"
-        @update:value="(value: string) => (compare = value)"
-      />
+      <n-select :value="otherValue" :options="compareOptions" class="compare-select" @update:value="(value: string) => (compare = value)" />
     </div>
 
     <n-spin :show="loading">
@@ -151,9 +133,7 @@ watch([grade, compare], load, { immediate: true })
           </div>
           <div class="stat">
             <div class="label">
-              一次就对<template v-if="data?.days !== null">
-                · 各自开始做题的头 {{ data?.days }} 天</template
-              >
+              一次就对<template v-if="data?.days !== null"> · 各自开始做题的头 {{ data?.days }} 天</template>
             </div>
             <div class="value num">
               {{ summary.now }}%<span class="unit"> / {{ shortOther }} {{ summary.before }}%</span>
@@ -165,9 +145,7 @@ watch([grade, compare], load, { immediate: true })
           </div>
           <div class="stat">
             <div class="label">比{{ shortOther }}好</div>
-            <div class="value num better-text">
-              {{ better.length }}<span class="unit"> 道</span>
-            </div>
+            <div class="value num better-text">{{ better.length }}<span class="unit"> 道</span></div>
           </div>
         </div>
 
@@ -175,9 +153,7 @@ watch([grade, compare], load, { immediate: true })
           <div class="row axis">
             <span class="c-title" />
             <span class="c-track ticks num">
-              <span v-for="tick in [0, 25, 50, 75, 100]" :key="tick" :style="{ left: `${tick}%` }"
-                >{{ tick }}%</span
-              >
+              <span v-for="tick in [0, 25, 50, 75, 100]" :key="tick" :style="{ left: `${tick}%` }">{{ tick }}%</span>
             </span>
             <span class="legend">
               <span><i class="dot-now" />{{ selected }} 级</span>
@@ -210,13 +186,8 @@ watch([grade, compare], load, { immediate: true })
                 <b :class="`${tone(item.delta)}-text`">{{ item.now }}%</b>
                 <span class="muted"> / {{ item.before }}%</span>
               </span>
-              <span class="c-delta num strong" :class="`${tone(item.delta)}-text`">
-                {{ item.delta > 0 ? "+" : "" }}{{ item.delta }}
-              </span>
-              <span class="c-users muted small num">
-                {{ selected }} 级 {{ item.mine.users }} 人 · {{ shortOther }}
-                {{ item.theirs.users }} 人
-              </span>
+              <span class="c-delta num strong" :class="`${tone(item.delta)}-text`"> {{ item.delta > 0 ? '+' : '' }}{{ item.delta }} </span>
+              <span class="c-users muted small num"> {{ selected }} 级 {{ item.mine.users }} 人 · {{ shortOther }} {{ item.theirs.users }} 人 </span>
             </div>
           </template>
         </section>

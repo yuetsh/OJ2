@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useThemeVars } from "naive-ui"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { caseStatus, type AnswerSource, type CaseRow } from "./caseRows"
+import { useThemeVars } from 'naive-ui'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { caseStatus, type AnswerSource, type CaseRow } from './caseRows'
 
 /**
  * 测试数据一组一行：输入 | 输出 | 当例子（设计稿「编程题出题页」B）。
  * 有标准答案时输出是跑出来的、只读；没有时（老题）输出手写。
  */
-const rows = defineModel<CaseRow[]>("rows", { required: true })
+const rows = defineModel<CaseRow[]>('rows', { required: true })
 const props = defineProps<{
   source: AnswerSource | null
   /** 只有例子这一列表的时候（测试数据太大、单独写例子）不显示「当例子」 */
@@ -23,14 +23,13 @@ const CLIP_LINES = 6
 const expanded = ref(new Set<number>())
 
 function lines(text: string) {
-  return text.split("\n")
+  return text.split('\n')
 }
 
 function clipped(row: CaseRow) {
   const all = lines(row.output)
-  if (expanded.value.has(row.key) || all.length <= CLIP_LINES + 1)
-    return { text: row.output, rest: 0 }
-  return { text: all.slice(0, CLIP_LINES).join("\n"), rest: all.length - CLIP_LINES }
+  if (expanded.value.has(row.key) || all.length <= CLIP_LINES + 1) return { text: row.output, rest: 0 }
+  return { text: all.slice(0, CLIP_LINES).join('\n'), rest: all.length - CLIP_LINES }
 }
 
 function toggle(key: number) {
@@ -52,17 +51,12 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
     <div class="row head">
       <span></span>
       <span>输入</span>
-      <span>{{ source ? "输出（答案跑出来的）" : "输出（手写）" }}</span>
+      <span>{{ source ? '输出（答案跑出来的）' : '输出（手写）' }}</span>
       <span v-if="!examplesOnly">当例子</span>
       <span></span>
       <span></span>
     </div>
-    <div
-      v-for="(row, index) in rows"
-      :key="row.key"
-      class="row"
-      :class="{ bad: status(row) === 'error', changed: status(row) === 'changed' }"
-    >
+    <div v-for="(row, index) in rows" :key="row.key" class="row" :class="{ bad: status(row) === 'error', changed: status(row) === 'changed' }">
       <b class="no">{{ index + 1 }}</b>
       <n-input
         v-model:value="row.input"
@@ -86,25 +80,16 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
         <div v-if="status(row) === 'error'" class="cell errorCell">{{ row.error }}</div>
         <template v-else>
           <pre class="cell" :class="{ stale: status(row) === 'running' }">{{
-            clipped(row).text || (status(row) === "running" ? "在跑……" : "（没有输出）")
+            clipped(row).text || (status(row) === 'running' ? '在跑……' : '（没有输出）')
           }}</pre>
-          <button v-if="clipped(row).rest" type="button" class="more" @click="toggle(row.key)">
-            ⋯ 还有 {{ clipped(row).rest }} 行
-          </button>
-          <button
-            v-else-if="expanded.has(row.key)"
-            type="button"
-            class="more"
-            @click="toggle(row.key)"
-          >
-            收起
-          </button>
+          <button v-if="clipped(row).rest" type="button" class="more" @click="toggle(row.key)">⋯ 还有 {{ clipped(row).rest }} 行</button>
+          <button v-else-if="expanded.has(row.key)" type="button" class="more" @click="toggle(row.key)">收起</button>
           <div v-if="status(row) === 'changed'" class="was">
             变了 · 原来存的是
             <del>{{
-              lines(row.saved ?? "")
+              lines(row.saved ?? '')
                 .slice(0, 3)
-                .join(" ⏎ ") || "（空）"
+                .join(' ⏎ ') || '（空）'
             }}</del>
           </div>
         </template>
@@ -123,15 +108,7 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
           <template v-else-if="status(row) === 'error'">✗</template>
           <template v-else-if="status(row) === 'changed'">●</template>
         </span>
-        <n-button
-          quaternary
-          size="tiny"
-          class="remove"
-          :aria-label="`删掉第 ${index + 1} 组`"
-          @click="remove(index)"
-        >
-          删掉
-        </n-button>
+        <n-button quaternary size="tiny" class="remove" :aria-label="`删掉第 ${index + 1} 组`" @click="remove(index)"> 删掉 </n-button>
       </div>
     </div>
   </div>
@@ -149,7 +126,7 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
   gap: 8px;
   align-items: start;
   padding: 7px 4px;
-  border-top: 1px solid v-bind("theme.dividerColor");
+  border-top: 1px solid v-bind('theme.dividerColor');
   font-size: 12px;
   border-radius: 4px;
 }
@@ -162,7 +139,7 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
   border-top: 0;
   padding-top: 2px;
   padding-bottom: 2px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .row.changed {
@@ -176,7 +153,7 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
 
 .mono :deep(textarea),
 .cell {
-  font-family: ui-monospace, "Cascadia Mono", Consolas, "Microsoft YaHei", monospace;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Microsoft YaHei', monospace;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -196,7 +173,7 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
   min-height: 26px;
   padding: 3px 7px;
   border-radius: 3px;
-  border: 1px solid v-bind("theme.dividerColor");
+  border: 1px solid v-bind('theme.dividerColor');
   background-color: rgba(128, 128, 128, 0.05);
   white-space: pre;
   overflow-x: auto;
@@ -209,8 +186,8 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
 .errorCell {
   white-space: pre-wrap;
   word-break: break-all;
-  color: v-bind("theme.errorColor");
-  border-color: v-bind("theme.errorColorSuppl");
+  color: v-bind('theme.errorColor');
+  border-color: v-bind('theme.errorColorSuppl');
   background-color: rgba(208, 48, 80, 0.06);
 }
 
@@ -219,7 +196,7 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
   padding: 0;
   background: none;
   font: inherit;
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   cursor: pointer;
 }
 
@@ -228,11 +205,11 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
 }
 
 .was {
-  color: v-bind("theme.warningColorPressed");
+  color: v-bind('theme.warningColorPressed');
 }
 
 .was del {
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .example {
@@ -245,15 +222,15 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
 }
 
 .mark.ok {
-  color: v-bind("theme.successColor");
+  color: v-bind('theme.successColor');
 }
 
 .mark.error {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .mark.changed {
-  color: v-bind("theme.warningColor");
+  color: v-bind('theme.warningColor');
 }
 
 .remove {

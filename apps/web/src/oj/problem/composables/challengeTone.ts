@@ -7,18 +7,18 @@ export function useChallengeTone() {
   return computed(() =>
     isDark.value
       ? {
-          solid: "#b49cf5",
-          onSolid: "#17112b",
-          text: "#c9b8ff",
-          soft: "rgba(180, 156, 245, 0.14)",
-          border: "rgba(180, 156, 245, 0.35)",
+          solid: '#b49cf5',
+          onSolid: '#17112b',
+          text: '#c9b8ff',
+          soft: 'rgba(180, 156, 245, 0.14)',
+          border: 'rgba(180, 156, 245, 0.35)',
         }
       : {
-          solid: "#5b34c4",
-          onSolid: "#ffffff",
-          text: "#2c1a66",
-          soft: "#f4f0fe",
-          border: "#ddd3f6",
+          solid: '#5b34c4',
+          onSolid: '#ffffff',
+          text: '#2c1a66',
+          soft: '#f4f0fe',
+          border: '#ddd3f6',
         },
   )
 }

@@ -1,15 +1,9 @@
 <template>
-  <n-select
-    style="width: 140px"
-    v-model:value="author"
-    remote
-    @update:show="getAuthorOptions"
-    :options="authorOptions"
-  />
+  <n-select style="width: 140px" v-model:value="author" remote @update:show="getAuthorOptions" :options="authorOptions" />
 </template>
 
 <script setup lang="ts">
-import { getAuthors } from "shared/api"
+import { getAuthors } from 'shared/api'
 
 interface Props {
   all?: boolean
@@ -17,12 +11,12 @@ interface Props {
 
 const { all = false } = defineProps<Props>()
 
-const author = defineModel<string>("value")
+const author = defineModel<string>('value')
 
-const authorOptions = ref([{ label: "全部", value: "" }])
+const authorOptions = ref([{ label: '全部', value: '' }])
 
 async function getAuthorOptions() {
-  authorOptions.value = [{ label: "全部", value: "" }]
+  authorOptions.value = [{ label: '全部', value: '' }]
   const res = await getAuthors(all)
   const remotes = res.map((item) => ({
     label: `${item.username} (${item.problemCount})`,

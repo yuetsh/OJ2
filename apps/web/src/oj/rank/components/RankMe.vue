@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { RankRow } from "@oj2/contract"
-import { useThemeVars } from "naive-ui"
-import UserName from "shared/components/UserName.vue"
-import { gapText, toPass } from "../utils"
-import MoodPopover from "./MoodPopover.vue"
-import RankAvatar from "shared/components/RankAvatar.vue"
+import type { RankRow } from '@oj2/contract'
+import { useThemeVars } from 'naive-ui'
+import UserName from 'shared/components/UserName.vue'
+import { gapText, toPass } from '../utils'
+import MoodPopover from './MoodPopover.vue'
+import RankAvatar from 'shared/components/RankAvatar.vue'
 
 export interface MiniRank {
   label: string
@@ -49,9 +49,8 @@ const beyond = computed(() => !!props.cap && props.me.rank > props.cap)
 
 const headline = computed(() => {
   const { me, ahead, third } = props
-  if (beyond.value)
-    return props.lastListed ? `再做对 ${toPass(me, props.lastListed)} 道就进前 ${props.cap}` : ""
-  if (me.rank === 1) return "你是第一名"
+  if (beyond.value) return props.lastListed ? `再做对 ${toPass(me, props.lastListed)} 道就进前 ${props.cap}` : ''
+  if (me.rank === 1) return '你是第一名'
   if (me.rank <= 3 && ahead)
     // 「第 N 名」用不换行空格连住：手机上这一句正好折行，单个「名」会掉到下一行
     return `你在领奖台上 · 再做对 ${toPass(me, ahead)} 道就是第\u00a0${ahead.rank}\u00a0名`
@@ -61,19 +60,17 @@ const headline = computed(() => {
   }
   if ((me.change ?? 0) >= 3) return `比周一升了 ${me.change} 名`
   if (ahead) return `再做对 ${toPass(me, ahead)} 道就是第\u00a0${ahead.rank}\u00a0名`
-  return ""
+  return ''
 })
 
 function chaseNote(me: RankRow, ahead: RankRow) {
-  if (ahead.solved === me.solved && ahead.reachedAt && me.reachedAt)
-    return `比你早 ${gapText(ahead.reachedAt, me.reachedAt)}做到 ${me.solved} 道`
+  if (ahead.solved === me.solved && ahead.reachedAt && me.reachedAt) return `比你早 ${gapText(ahead.reachedAt, me.reachedAt)}做到 ${me.solved} 道`
   return `比你多 ${ahead.solved - me.solved} 道`
 }
 
 function threatNote(me: RankRow, behind: RankRow) {
-  if (behind.solved === me.solved && behind.reachedAt && me.reachedAt)
-    return `比你晚 ${gapText(me.reachedAt, behind.reachedAt)}做到 ${me.solved} 道`
-  if (!behind.solved) return "还没做对"
+  if (behind.solved === me.solved && behind.reachedAt && me.reachedAt) return `比你晚 ${gapText(me.reachedAt, behind.reachedAt)}做到 ${me.solved} 道`
+  if (!behind.solved) return '还没做对'
   return `比你少 ${me.solved - behind.solved} 道`
 }
 </script>
@@ -176,7 +173,7 @@ function threatNote(me: RankRow, behind: RankRow) {
     <div v-if="minis.length" class="minis">
       <button v-for="mini in minis" :key="mini.label" class="mini" @click="mini.go">
         <!-- 窄了就在空格处折成两行，「·」「›」用不折行空格粘在前一个词后面 -->
-        <span class="mini-label">{{ mini.label.replace(" · ", "\u00a0· ") }}&nbsp;›</span>
+        <span class="mini-label">{{ mini.label.replace(' · ', '\u00a0· ') }}&nbsp;›</span>
         <b v-if="mini.rank && mini.cap && mini.rank > mini.cap">{{ mini.cap }} 名以外</b>
         <b v-else-if="mini.rank"
           >第 {{ mini.rank }}<small v-if="mini.total"> / {{ mini.total }}</small></b
@@ -227,7 +224,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 
 .label {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor2");
+  color: v-bind('theme.textColor2');
 }
 
 .big {
@@ -251,7 +248,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 
 .total {
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   margin-left: 2px;
 }
 
@@ -263,7 +260,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 }
 
 .down {
-  color: v-bind("theme.errorColor");
+  color: v-bind('theme.errorColor');
 }
 
 .headline {
@@ -273,7 +270,7 @@ function threatNote(me: RankRow, behind: RankRow) {
   padding: 10px 12px;
   border-radius: 6px;
   border: 1px dashed rgba(24, 160, 88, 0.6);
-  background: v-bind("theme.cardColor");
+  background: v-bind('theme.cardColor');
   color: #18a058;
   font-size: var(--oj-fs-body);
 }
@@ -317,7 +314,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 
 .rival-mood {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -331,8 +328,8 @@ function threatNote(me: RankRow, behind: RankRow) {
   padding: 10px 12px;
   border: 1px solid rgba(24, 160, 88, 0.3);
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
   font: inherit;
   font-size: var(--oj-fs-sec);
   line-height: 1.45;
@@ -380,7 +377,7 @@ function threatNote(me: RankRow, behind: RankRow) {
 
 .note {
   font-size: var(--oj-fs-meta);
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -413,7 +410,7 @@ function threatNote(me: RankRow, behind: RankRow) {
   padding-top: 10px;
   border-top: 1px solid rgba(24, 160, 88, 0.3);
   font-size: var(--oj-fs-sec);
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
   text-decoration: none;
 }
 
@@ -436,19 +433,19 @@ function threatNote(me: RankRow, behind: RankRow) {
   padding: 8px 12px;
   border: 0;
   border-radius: 6px;
-  background: v-bind("theme.cardColor");
-  color: v-bind("theme.textColor1");
+  background: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
   font: inherit;
   cursor: pointer;
 }
 
 .mini:hover {
-  color: v-bind("theme.primaryColor");
+  color: v-bind('theme.primaryColor');
 }
 
 .mini-label {
   font-size: 12px;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
   text-align: left;
   word-break: keep-all;
 }
@@ -463,11 +460,11 @@ function threatNote(me: RankRow, behind: RankRow) {
 .mini small {
   font-size: 12px;
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 
 .mini .none {
   font-weight: 400;
-  color: v-bind("theme.textColor3");
+  color: v-bind('theme.textColor3');
 }
 </style>

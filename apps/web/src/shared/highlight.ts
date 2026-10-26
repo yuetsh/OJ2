@@ -8,38 +8,38 @@
  *
  * 只认判题机认的几种语言，别的语言和不标语言的代码块按原文显示。
  */
-import { cppLanguage } from "@codemirror/lang-cpp"
-import { SQLite } from "@codemirror/lang-sql"
-import { highlightCode, tagHighlighter, tags as t } from "@lezer/highlight"
-import type { ConfigProviderProps } from "naive-ui"
-import { type CodeFamily, fakeStrings, splitMarks } from "./codeMarks"
-import { ojPythonLanguage } from "./extensions/pythonLanguage"
+import { cppLanguage } from '@codemirror/lang-cpp'
+import { SQLite } from '@codemirror/lang-sql'
+import { highlightCode, tagHighlighter, tags as t } from '@lezer/highlight'
+import type { ConfigProviderProps } from 'naive-ui'
+import { type CodeFamily, fakeStrings, splitMarks } from './codeMarks'
+import { ojPythonLanguage } from './extensions/pythonLanguage'
 
 /** 词的种类 → 类名。编辑器在 shared/themes/codeTheme.ts 里挂的也是它 */
 export const codeHighlighter = tagHighlighter([
   // 分法照 VS Code：if / return / #include 这类管流程的词单独一色，`int` / `struct` 是普通关键字，
   // 自定义的类型（struct 名）才是类型色；运算符不上色，变量名上色
-  { tag: [t.controlKeyword, t.moduleKeyword, t.processingInstruction], class: "tok-control" },
+  { tag: [t.controlKeyword, t.moduleKeyword, t.processingInstruction], class: 'tok-control' },
   // True / False / None / self / NULL 照 VS Code 是 constant.language，和关键字一个颜色
   {
     tag: [t.keyword, t.modifier, t.standard(t.typeName), t.bool, t.null, t.atom, t.self],
-    class: "tok-keyword",
+    class: 'tok-keyword',
   },
-  { tag: t.escape, class: "tok-escape" },
-  { tag: [t.function(t.variableName), t.function(t.propertyName)], class: "tok-function" },
-  { tag: [t.variableName, t.propertyName], class: "tok-variable" },
-  { tag: t.string, class: "tok-string" },
-  { tag: t.number, class: "tok-number" },
-  { tag: [t.typeName, t.className, t.namespace, t.standard(t.name)], class: "tok-type" },
-  { tag: t.comment, class: "tok-comment" },
-  { tag: t.invalid, class: "tok-invalid" },
-  { tag: t.heading, class: "tok-heading" },
-  { tag: t.strong, class: "tok-strong" },
-  { tag: t.emphasis, class: "tok-emphasis" },
-  { tag: [t.link, t.url], class: "tok-link" },
-  { tag: t.monospace, class: "tok-monospace" },
-  { tag: t.quote, class: "tok-quote" },
-  { tag: t.strikethrough, class: "tok-strikethrough" },
+  { tag: t.escape, class: 'tok-escape' },
+  { tag: [t.function(t.variableName), t.function(t.propertyName)], class: 'tok-function' },
+  { tag: [t.variableName, t.propertyName], class: 'tok-variable' },
+  { tag: t.string, class: 'tok-string' },
+  { tag: t.number, class: 'tok-number' },
+  { tag: [t.typeName, t.className, t.namespace, t.standard(t.name)], class: 'tok-type' },
+  { tag: t.comment, class: 'tok-comment' },
+  { tag: t.invalid, class: 'tok-invalid' },
+  { tag: t.heading, class: 'tok-heading' },
+  { tag: t.strong, class: 'tok-strong' },
+  { tag: t.emphasis, class: 'tok-emphasis' },
+  { tag: [t.link, t.url], class: 'tok-link' },
+  { tag: t.monospace, class: 'tok-monospace' },
+  { tag: t.quote, class: 'tok-quote' },
+  { tag: t.strikethrough, class: 'tok-strikethrough' },
 ])
 
 type Parser = typeof cppLanguage.parser
@@ -51,24 +51,24 @@ const PARSERS: Record<string, Parser> = {
   python3: ojPythonLanguage.parser,
   c: cppLanguage.parser,
   cpp: cppLanguage.parser,
-  "c++": cppLanguage.parser,
+  'c++': cppLanguage.parser,
   sql: SQLite.language.parser,
 }
 
 function parserFor(lang?: string): Parser | null {
-  return PARSERS[lang?.toLowerCase() ?? ""] ?? null
+  return PARSERS[lang?.toLowerCase() ?? ''] ?? null
 }
 
 function familyFor(lang?: string): CodeFamily | null {
   const parser = parserFor(lang)
-  if (parser === cppLanguage.parser) return "c"
-  if (parser === ojPythonLanguage.parser) return "python"
-  if (parser === SQLite.language.parser) return "sql"
+  if (parser === cppLanguage.parser) return 'c'
+  if (parser === ojPythonLanguage.parser) return 'python'
+  if (parser === SQLite.language.parser) return 'sql'
   return null
 }
 
 export function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function span(text: string, classes: string): string {
@@ -77,14 +77,10 @@ function span(text: string, classes: string): string {
 }
 
 /** 按顺序吐出每一段文字和它的类名，换行单独吐一个 "\n"。跨行的词（块注释、三引号字符串）在换行处断开 */
-function walk(
-  code: string,
-  lang: string | undefined,
-  put: (text: string, classes: string) => void,
-) {
+function walk(code: string, lang: string | undefined, put: (text: string, classes: string) => void) {
   const parser = parserFor(lang)
   if (!parser) {
-    put(code, "")
+    put(code, '')
     return
   }
   // 再补 %d、全角标点、Python 内置类型这几种标记，见 shared/codeMarks.ts
@@ -94,24 +90,24 @@ function walk(
   let pos = 0
   const emit = (text: string, classes: string) => {
     if (family) {
-      const marks = fake.some((r) => pos >= r.from && pos < r.to) ? "" : classes
+      const marks = fake.some((r) => pos >= r.from && pos < r.to) ? '' : classes
       const after = code.slice(pos + text.length, pos + text.length + 20)
-      splitMarks(text, classes, marks, family, code[pos - 1] ?? "", after, put)
+      splitMarks(text, classes, marks, family, code[pos - 1] ?? '', after, put)
     } else put(text, classes)
     pos += text.length
   }
   highlightCode(code, tree, codeHighlighter, emit, () => {
-    put("\n", "")
+    put('\n', '')
     pos++
   })
 }
 
 /** 逐行高亮，返回每行的 HTML，每行的标签自己闭合 */
 function toLines(code: string, lang?: string): string[] {
-  const lines = [""]
+  const lines = ['']
   walk(code, lang, (text, classes) => {
-    text.split("\n").forEach((part, i) => {
-      if (i > 0) lines.push("")
+    text.split('\n').forEach((part, i) => {
+      if (i > 0) lines.push('')
       lines[lines.length - 1] += span(part, classes)
     })
   })
@@ -120,12 +116,12 @@ function toLines(code: string, lang?: string): string[] {
 
 /** 把整段代码高亮为 HTML；不支持的语言按转义后的原文 */
 export function highlight(code: string, lang?: string): string {
-  return toLines(code, lang).join("\n")
+  return toLines(code, lang).join('\n')
 }
 
 /** 按行高亮：整段一起解析再切行，跨行的词也能染对 */
 export function highlightLines(lines: string[], lang?: string): string[] {
-  return toLines(lines.join("\n"), lang)
+  return toLines(lines.join('\n'), lang)
 }
 
 /**
@@ -133,18 +129,14 @@ export function highlightLines(lines: string[], lang?: string): string[] {
  * 直接拿挖了空的代码去解析不行：语法被空搅乱，`(humidity ____ 40)` 会被认成类型声明，
  * humidity 染成类型的颜色。holes 按位置从前往后排、互不重叠。
  */
-export function highlightWithHoles(
-  code: string,
-  holes: { from: number; to: number }[],
-  lang?: string,
-): (string | number)[] {
+export function highlightWithHoles(code: string, holes: { from: number; to: number }[], lang?: string): (string | number)[] {
   const out: (string | number)[] = []
-  let html = ""
+  let html = ''
   let pos = 0
   let hole = 0
   const flush = () => {
     if (html) out.push(html)
-    html = ""
+    html = ''
   }
   walk(code, lang, (text, classes) => {
     const end = pos + text.length
@@ -181,4 +173,4 @@ export const hljs = {
   highlight: (code: string, { language }: { language: string }) => ({
     value: highlight(code, language),
   }),
-} as unknown as NonNullable<ConfigProviderProps["hljs"]>
+} as unknown as NonNullable<ConfigProviderProps['hljs']>

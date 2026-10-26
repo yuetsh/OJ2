@@ -11,16 +11,16 @@
  * 那些只能看 Mermaid 渲染出来的图，载不回画布，评分也只能退回老办法。
  */
 
-export type BoxKind = "input" | "output" | "process"
-export type StepKind = BoxKind | "if" | "while"
+export type BoxKind = 'input' | 'output' | 'process'
+export type StepKind = BoxKind | 'if' | 'while'
 
 interface StepBase {
   id: string
   text: string
 }
 export type BoxStep = StepBase & { kind: BoxKind }
-export type IfStep = StepBase & { kind: "if"; yes: FlowStep[]; no: FlowStep[] }
-export type WhileStep = StepBase & { kind: "while"; body: FlowStep[] }
+export type IfStep = StepBase & { kind: 'if'; yes: FlowStep[]; no: FlowStep[] }
+export type WhileStep = StepBase & { kind: 'while'; body: FlowStep[] }
 export type FlowStep = BoxStep | IfStep | WhileStep
 
 export interface FlowDoc {
@@ -29,53 +29,46 @@ export interface FlowDoc {
 }
 
 /** 开始、结束在画布上的 id（它们不进数据） */
-export const FLOW_START_ID = "__start"
-export const FLOW_END_ID = "__end"
+export const FLOW_START_ID = '__start'
+export const FLOW_END_ID = '__end'
 
 export function flowChildren(step: FlowStep): FlowStep[][] {
-  if (step.kind === "if") return [step.yes, step.no]
-  if (step.kind === "while") return [step.body]
+  if (step.kind === 'if') return [step.yes, step.no]
+  if (step.kind === 'while') return [step.body]
   return []
 }
 
 /** 还没写字的框有几个 */
 export function countBlankSteps(steps: FlowStep[]): number {
-  return steps.reduce(
-    (sum, step) =>
-      sum +
-      (step.text.trim() ? 0 : 1) +
-      flowChildren(step).reduce((n, c) => n + countBlankSteps(c), 0),
-    0,
-  )
+  return steps.reduce((sum, step) => sum + (step.text.trim() ? 0 : 1) + flowChildren(step).reduce((n, c) => n + countBlankSteps(c), 0), 0)
 }
 
 /** 一张图「长什么样」，不带 id：载回旧版、和交过的那一版比，只看结构和字 */
 export function flowSignature(doc: FlowDoc): string {
-  const strip = (steps: FlowStep[]): unknown[] =>
-    steps.map((step) => [step.kind, step.text.trim(), ...flowChildren(step).map(strip)])
+  const strip = (steps: FlowStep[]): unknown[] => steps.map((step) => [step.kind, step.text.trim(), ...flowChildren(step).map(strip)])
   return JSON.stringify(strip(doc.steps))
 }
 
 // ==================== 读回来的数据 ====================
 
-const KINDS = new Set<string>(["input", "output", "process", "if", "while"])
+const KINDS = new Set<string>(['input', 'output', 'process', 'if', 'while'])
 
 function parseSteps(raw: unknown, prefix: string): FlowStep[] | null {
   if (!Array.isArray(raw)) return null
   const out: FlowStep[] = []
   for (const [index, item] of raw.entries()) {
-    if (!item || typeof item !== "object") return null
+    if (!item || typeof item !== 'object') return null
     const step = item as Record<string, unknown>
     const kind = step.kind
-    if (typeof kind !== "string" || !KINDS.has(kind)) return null
-    const id = typeof step.id === "string" && step.id ? step.id : `${prefix}${index}`
-    const text = typeof step.text === "string" ? step.text : ""
-    if (kind === "if") {
+    if (typeof kind !== 'string' || !KINDS.has(kind)) return null
+    const id = typeof step.id === 'string' && step.id ? step.id : `${prefix}${index}`
+    const text = typeof step.text === 'string' ? step.text : ''
+    if (kind === 'if') {
       const yes = parseSteps(step.yes ?? [], `${id}y`)
       const no = parseSteps(step.no ?? [], `${id}n`)
       if (!yes || !no) return null
       out.push({ id, text, kind, yes, no })
-    } else if (kind === "while") {
+    } else if (kind === 'while') {
       const body = parseSteps(step.body ?? [], `${id}b`)
       if (!body) return null
       out.push({ id, text, kind, body })
@@ -88,10 +81,10 @@ function parseSteps(raw: unknown, prefix: string): FlowStep[] | null {
 
 /** 本地草稿、交过的某一版：是新格式就读出来，旧的 vue-flow 格式或者坏数据给 null */
 export function parseFlowDoc(raw: unknown): FlowDoc | null {
-  if (!raw || typeof raw !== "object") return null
+  if (!raw || typeof raw !== 'object') return null
   const data = raw as Record<string, unknown>
   if (data.version !== 2) return null
-  const steps = parseSteps(data.steps, "p")
+  const steps = parseSteps(data.steps, 'p')
   return steps ? { version: 2, steps } : null
 }
 
@@ -119,7 +112,7 @@ export function mermaidOrder(doc: FlowDoc): string[] {
  * 学生不知道扣分是因为一个引号。`#` 必须先转，否则本来就有的 `#quot;` 会被当成实体。
  */
 function escapeLabel(raw: string) {
-  return raw.replace(/#/g, "#35;").replace(/"/g, "#quot;").replace(/\r?\n/g, "<br/>")
+  return raw.replace(/#/g, '#35;').replace(/"/g, '#quot;').replace(/\r?\n/g, '<br/>')
 }
 
 /**
@@ -129,12 +122,12 @@ function escapeLabel(raw: string) {
  * class 行留着给前端 useMermaid 上色；classDef 不写 —— 颜色是渲染那边的事。
  */
 export function flowToMermaid(doc: FlowDoc): string {
-  const lines: string[] = ["flowchart TD"]
+  const lines: string[] = ['flowchart TD']
   const classes: string[] = []
   let n = 0
   const node = (shape: (label: string) => string, text: string, cls: string) => {
     const id = `n${n++}`
-    lines.push(`    ${id}${shape(escapeLabel(text.trim() || " "))}`)
+    lines.push(`    ${id}${shape(escapeLabel(text.trim() || ' '))}`)
     classes.push(`    class ${id} ${cls}`)
     return id
   }
@@ -142,29 +135,23 @@ export function flowToMermaid(doc: FlowDoc): string {
   type Exit = { from: string; label?: string }
   const link = (exits: Exit[], to: string) => {
     for (const exit of exits) {
-      lines.push(
-        exit.label ? `    ${exit.from} -->|"${exit.label}"| ${to}` : `    ${exit.from} --> ${to}`,
-      )
+      lines.push(exit.label ? `    ${exit.from} -->|"${exit.label}"| ${to}` : `    ${exit.from} --> ${to}`)
     }
   }
   const walk = (steps: FlowStep[], entries: Exit[]): Exit[] => {
     let exits = entries
     for (const step of steps) {
-      if (step.kind === "if") {
-        const id = node((l) => `{"${l}"}`, step.text, "decision")
+      if (step.kind === 'if') {
+        const id = node((l) => `{"${l}"}`, step.text, 'decision')
         link(exits, id)
-        exits = [
-          ...walk(step.yes, [{ from: id, label: "是" }]),
-          ...walk(step.no, [{ from: id, label: "否" }]),
-        ]
-      } else if (step.kind === "while") {
-        const id = node((l) => `{"${l}"}`, step.text, "decision")
+        exits = [...walk(step.yes, [{ from: id, label: '是' }]), ...walk(step.no, [{ from: id, label: '否' }])]
+      } else if (step.kind === 'while') {
+        const id = node((l) => `{"${l}"}`, step.text, 'decision')
         link(exits, id)
-        link(walk(step.body, [{ from: id, label: "是" }]), id)
-        exits = [{ from: id, label: "否" }]
+        link(walk(step.body, [{ from: id, label: '是' }]), id)
+        exits = [{ from: id, label: '否' }]
       } else {
-        const shape =
-          step.kind === "process" ? (l: string) => `["${l}"]` : (l: string) => `[/"${l}"/]`
+        const shape = step.kind === 'process' ? (l: string) => `["${l}"]` : (l: string) => `[/"${l}"/]`
         const id = node(shape, step.text, step.kind)
         link(exits, id)
         exits = [{ from: id }]
@@ -172,9 +159,9 @@ export function flowToMermaid(doc: FlowDoc): string {
     }
     return exits
   }
-  const start = node((l) => `(["${l}"])`, "开始", "startNode")
+  const start = node((l) => `(["${l}"])`, '开始', 'startNode')
   const exits = walk(doc.steps, [{ from: start }])
-  const end = node((l) => `(["${l}"])`, "结束", "endNode")
+  const end = node((l) => `(["${l}"])`, '结束', 'endNode')
   link(exits, end)
-  return [...lines, "", ...classes].join("\n")
+  return [...lines, '', ...classes].join('\n')
 }

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { TutorialProblem } from "@oj2/contract"
-import { splitTitle, type LessonState, type ProjectGroup } from "../lesson"
-import SegBar from "./SegBar.vue"
+import { Icon } from '@iconify/vue'
+import type { TutorialProblem } from '@oj2/contract'
+import { splitTitle, type LessonState, type ProjectGroup } from '../lesson'
+import SegBar from './SegBar.vue'
 
 /**
  * 一课的结尾（设计稿「一课的结尾」）：练一练做到几道 → 全对就是「第 N 课学完了」→
@@ -45,10 +45,7 @@ const nextParts = computed(() => (props.next ? splitTitle(props.next.title) : nu
             :gap="compact ? 2 : 3"
             :group-gap="compact ? 5 : 8"
           />
-          <span class="muted num"
-            >{{ compact ? "" : `${courseLabel} 学完 ` }}{{ doneCount }} / {{ total
-            }}{{ compact ? "" : " 课" }}</span
-          >
+          <span class="muted num">{{ compact ? '' : `${courseLabel} 学完 ` }}{{ doneCount }} / {{ total }}{{ compact ? '' : ' 课' }}</span>
         </div>
       </div>
     </section>
@@ -66,12 +63,7 @@ const nextParts = computed(() => (props.next ? splitTitle(props.next.title) : nu
 
     <section v-if="problems.length" class="card problems">
       <div class="problems-head strong">去做几道题</div>
-      <router-link
-        v-for="problem in problems"
-        :key="problem.id"
-        :to="`/problem/${problem.displayId}`"
-        class="problem"
-      >
+      <router-link v-for="problem in problems" :key="problem.id" :to="`/problem/${problem.displayId}`" class="problem">
         <span v-if="!compact" class="pid num">{{ problem.displayId }}</span>
         <span class="ptitle">
           <span class="ellipsis">{{ problem.title }}</span>
@@ -81,9 +73,7 @@ const nextParts = computed(() => (props.next ? splitTitle(props.next.title) : nu
           </span>
         </span>
         <span v-if="!compact && problem.mustDo" class="must">必会</span>
-        <span v-if="problem.solved" class="solved"
-          ><Icon icon="ph:check-bold" :width="13" />做对过</span
-        >
+        <span v-if="problem.solved" class="solved"><Icon icon="ph:check-bold" :width="13" />做对过</span>
         <span v-else class="go">去做<Icon icon="ph:caret-right-bold" :width="12" /></span>
       </router-link>
     </section>
@@ -96,14 +86,7 @@ const nextParts = computed(() => (props.next ? splitTitle(props.next.title) : nu
           <span v-if="nextParts.scene" class="muted">{{ nextParts.scene }}</span>
         </div>
       </div>
-      <n-button
-        :type="finished ? 'primary' : 'default'"
-        size="large"
-        icon-placement="right"
-        tag="a"
-        :href="next.to"
-        @click.prevent="$router.push(next.to)"
-      >
+      <n-button :type="finished ? 'primary' : 'default'" size="large" icon-placement="right" tag="a" :href="next.to" @click.prevent="$router.push(next.to)">
         下一课
         <template #icon><Icon icon="ph:caret-right-bold" /></template>
       </n-button>

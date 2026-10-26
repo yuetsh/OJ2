@@ -1,27 +1,17 @@
 <script setup lang="ts">
-import { Icon } from "@iconify/vue"
-import type { TutorialProgress, TutorialSummary } from "@oj2/contract"
-import { getLearnProgress, getTutorials } from "../api"
-import { useBreakpoints } from "shared/composables/breakpoints"
-import { useAuthModalStore } from "shared/store/authModal"
-import AdminLink from "shared/components/AdminLink.vue"
-import { useUserStore } from "shared/store/user"
-import {
-  COURSES,
-  continueStep,
-  doneCount,
-  groupByProject,
-  lessonPath,
-  lessonState,
-  splitProject,
-  splitTitle,
-  type TutorialType,
-} from "./lesson"
-import LessonRow from "./components/LessonRow.vue"
-import ProjectTile from "./components/ProjectTile.vue"
-import ProjectTree from "./components/ProjectTree.vue"
-import SegBar from "./components/SegBar.vue"
-import "./learn.css"
+import { Icon } from '@iconify/vue'
+import type { TutorialProgress, TutorialSummary } from '@oj2/contract'
+import { getLearnProgress, getTutorials } from '../api'
+import { useBreakpoints } from 'shared/composables/breakpoints'
+import { useAuthModalStore } from 'shared/store/authModal'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useUserStore } from 'shared/store/user'
+import { COURSES, continueStep, doneCount, groupByProject, lessonPath, lessonState, splitProject, splitTitle, type TutorialType } from './lesson'
+import LessonRow from './components/LessonRow.vue'
+import ProjectTile from './components/ProjectTile.vue'
+import ProjectTree from './components/ProjectTree.vue'
+import SegBar from './components/SegBar.vue'
+import './learn.css'
 
 /**
  * 自学首页 /learn（设计稿「自学首页」）：最上面「接着学」，下面按项目分组的课程地图。
@@ -44,16 +34,13 @@ interface Course {
 
 const courses = ref<Course[]>([])
 const loaded = ref(false)
-const tab = ref<TutorialType>(route.query.course === "c" ? "c" : "python")
+const tab = ref<TutorialType>(route.query.course === 'c' ? 'c' : 'python')
 
 async function load() {
   const authed = userStore.isAuthed
   courses.value = await Promise.all(
     COURSES.map(async ({ type, label }) => {
-      const [titles, rows] = await Promise.all([
-        getTutorials(type),
-        authed ? getLearnProgress(type).catch(() => []) : Promise.resolve([]),
-      ])
+      const [titles, rows] = await Promise.all([getTutorials(type), authed ? getLearnProgress(type).catch(() => []) : Promise.resolve([])])
       return {
         type,
         label,
@@ -68,17 +55,12 @@ async function load() {
 }
 
 function latestViewed(course: Course) {
-  return Object.values(course.progress).reduce<string>(
-    (acc, row) => (row.lastViewedAt && row.lastViewedAt > acc ? row.lastViewedAt : acc),
-    "",
-  )
+  return Object.values(course.progress).reduce<string>((acc, row) => (row.lastViewedAt && row.lastViewedAt > acc ? row.lastViewedAt : acc), '')
 }
 
 /** 接着学：最近打开过的那门课里该接着学的那课 */
 const resume = computed(() => {
-  const started = courses.value
-    .filter((course) => course.titles.length && latestViewed(course))
-    .sort((a, b) => latestViewed(b).localeCompare(latestViewed(a)))
+  const started = courses.value.filter((course) => course.titles.length && latestViewed(course)).sort((a, b) => latestViewed(b).localeCompare(latestViewed(a)))
   const course = started[0]
   if (!course) return null
   const step = continueStep(course.titles, course.progress)
@@ -87,11 +69,7 @@ const resume = computed(() => {
   return { course, step, item, parts: splitTitle(item.title), project: splitProject(item.project) }
 })
 
-const others = computed(() =>
-  courses.value.filter(
-    (course) => course.titles.length && course.type !== resume.value?.course.type,
-  ),
-)
+const others = computed(() => courses.value.filter((course) => course.titles.length && course.type !== resume.value?.course.type))
 const current = computed(() => courses.value.find((course) => course.type === tab.value))
 const groups = computed(() => groupByProject(current.value?.titles ?? []))
 
@@ -113,7 +91,7 @@ function pickTab(type: TutorialType) {
 }
 
 function doneIn(course: Course, ids: number[]) {
-  return ids.filter((id) => lessonState(course.progress[id]) === "done").length
+  return ids.filter((id) => lessonState(course.progress[id]) === 'done').length
 }
 
 watch(() => userStore.isAuthed, load)
@@ -148,34 +126,17 @@ onMounted(load)
                 :gap="isDesktop ? 3 : 2"
                 :group-gap="isDesktop ? 10 : 6"
               />
-              <span class="num sec">
-                学完 {{ doneCount(resume.course.titles, resume.course.progress) }} /
-                {{ resume.course.titles.length }} 课
-              </span>
+              <span class="num sec"> 学完 {{ doneCount(resume.course.titles, resume.course.progress) }} / {{ resume.course.titles.length }} 课 </span>
             </div>
           </div>
-          <n-button
-            type="primary"
-            size="large"
-            class="resume-go"
-            icon-placement="right"
-            @click="router.push(lessonPath(resume.course.type, resume.step))"
-          >
+          <n-button type="primary" size="large" class="resume-go" icon-placement="right" @click="router.push(lessonPath(resume.course.type, resume.step))">
             <template #icon><Icon icon="ph:caret-right-bold" /></template>
             接着学
           </n-button>
         </section>
 
         <!-- 手机上有了「接着学」就不再摆另一门课的卡，下面的页签切得到 -->
-        <section
-          v-for="course in resume
-            ? isDesktop
-              ? others
-              : []
-            : courses.filter((c) => c.titles.length)"
-          :key="course.type"
-          class="course card"
-        >
+        <section v-for="course in resume ? (isDesktop ? others : []) : courses.filter((c) => c.titles.length)" :key="course.type" class="course card">
           <div class="course-text">
             <div class="course-head">
               <span class="course-name">{{ course.label }}</span>
@@ -183,11 +144,7 @@ onMounted(load)
                 {{ course.titles.length }} 课
                 <template v-if="resume">
                   ·
-                  {{
-                    courseStep(course)
-                      ? `学完 ${doneCount(course.titles, course.progress)} 课`
-                      : "还没开始"
-                  }}</template
+                  {{ courseStep(course) ? `学完 ${doneCount(course.titles, course.progress)} 课` : '还没开始' }}</template
                 >
                 <template v-else> · {{ groupByProject(course.titles).length }} 个项目</template>
               </span>
@@ -197,26 +154,13 @@ onMounted(load)
               <span class="first-kp">{{ firstLesson(course)!.kp }}</span>
               <span class="sec">{{ firstLesson(course)!.scene }}</span>
             </div>
-            <SegBar
-              :groups="groupByProject(course.titles)"
-              :state-of="stateOf(course)"
-              :width="resume ? 12 : 14"
-            />
-            <router-link
-              v-if="resume"
-              :to="lessonPath(course.type, courseStep(course) ?? 1)"
-              class="course-link"
-            >
-              {{ courseStep(course) ? `接着学第 ${courseStep(course)} 课` : "从第 1 课开始" }}
+            <SegBar :groups="groupByProject(course.titles)" :state-of="stateOf(course)" :width="resume ? 12 : 14" />
+            <router-link v-if="resume" :to="lessonPath(course.type, courseStep(course) ?? 1)" class="course-link">
+              {{ courseStep(course) ? `接着学第 ${courseStep(course)} 课` : '从第 1 课开始' }}
               <Icon icon="ph:caret-right-bold" :width="13" />
             </router-link>
           </div>
-          <n-button
-            v-if="!resume"
-            type="primary"
-            icon-placement="right"
-            @click="router.push(lessonPath(course.type, 1))"
-          >
+          <n-button v-if="!resume" type="primary" icon-placement="right" @click="router.push(lessonPath(course.type, 1))">
             <template #icon><Icon icon="ph:caret-right-bold" /></template>
             开始学
           </n-button>
@@ -244,23 +188,10 @@ onMounted(load)
           </span>
         </button>
         <span class="grow" />
-        <button
-          v-if="!userStore.isAuthed"
-          type="button"
-          class="login"
-          @click="authModal.openLoginModal()"
-        >
-          登录后记下学到哪
-        </button>
+        <button v-if="!userStore.isAuthed" type="button" class="login" @click="authModal.openLoginModal()">登录后记下学到哪</button>
         <div v-if="isDesktop && userStore.isTeacherOrAbove" class="admin-links">
           <AdminLink to="/admin/learn" size="small">自学情况</AdminLink>
-          <AdminLink
-            v-if="userStore.isSuperAdmin"
-            :to="{ path: '/admin/tutorial/list', query: { type: tab } }"
-            size="small"
-          >
-            管理教程
-          </AdminLink>
+          <AdminLink v-if="userStore.isSuperAdmin" :to="{ path: '/admin/tutorial/list', query: { type: tab } }" size="small"> 管理教程 </AdminLink>
         </div>
       </div>
 
@@ -282,9 +213,7 @@ onMounted(load)
               "
               class="project-count all"
             >
-              <Icon icon="ph:check-bold" :width="13" />{{ group.lessons.length }}/{{
-                group.lessons.length
-              }}
+              <Icon icon="ph:check-bold" :width="13" />{{ group.lessons.length }}/{{ group.lessons.length }}
             </span>
             <span
               v-else-if="
@@ -325,11 +254,7 @@ onMounted(load)
         :current-step="resume?.course.type === current.type ? resume.step : 0"
         big
       />
-      <n-empty
-        v-if="!courses.some((c) => c.titles.length)"
-        description="还没有公开的教程"
-        style="margin-top: 80px"
-      />
+      <n-empty v-if="!courses.some((c) => c.titles.length)" description="还没有公开的教程" style="margin-top: 80px" />
     </template>
     <n-spin v-else class="spin" />
   </div>
