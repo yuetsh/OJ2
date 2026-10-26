@@ -74,8 +74,8 @@ const PALETTES = [
 const RAINBOW = [COLORS.pink, COLORS.orange, COLORS.gold, COLORS.green, COLORS.blue, COLORS.purple]
 
 /**
- * 盖在弹层上面放。点评弹窗平时等烟花放完才出来（见 celebrate 的返回值），但学生在放的时候
- * 点「下一题」，点评会被提前叫出来 —— 默认的 zIndex 100 在 Naive 弹层（2000 起）底下，
+ * 盖在弹层上面放。点评弹窗在烟花开始后固定一段时间就出来（见 SubmissionEffects），
+ * 那时烟花多半还没放完 —— 默认的 zIndex 100 在 Naive 弹层（2000 起）底下，
  * 剩下的半场就被遮罩挡住了。画布本身 pointer-events: none，不挡点评的点击。
  */
 const Z_INDEX = 3000
@@ -113,11 +113,6 @@ export function useFireworks() {
   // 动画期间创建的定时器，组件卸载时统一清理，避免离开页面后动画继续
   const timers = new Set<ReturnType<typeof setTimeout>>()
   let disposed = false
-  // 这一场最后一次发射的 promise：canvas-confetti 同一块画布上的粒子是一场动画，
-  // 后发的接进去，promise 在所有粒子都落完的时候才 resolve
-  let lastShot: Promise<unknown> | null = null
-  // 还没发出去的异步准备（表情包位图在解码），算「还在放」
-  let preparing = 0
 
   function runLater(fn: () => void, ms: number) {
     const id = setTimeout(() => {
@@ -151,22 +146,7 @@ export function useFireworks() {
   }
 
   function fire(options: confetti.Options) {
-    lastShot = confetti({ zIndex: Z_INDEX, ...options }) ?? lastShot
-  }
-
-  /** 定时器都走完、最后一把粒子也落完。离开页面（定时器被清掉）就当放完了 */
-  function finished(): Promise<void> {
-    return new Promise((resolve) => {
-      const check = () => {
-        if (disposed) return resolve()
-        if (timers.size > 0 || preparing > 0) {
-          setTimeout(check, 50)
-          return
-        }
-        Promise.resolve(lastShot).then(() => resolve())
-      }
-      check()
-    })
+    void confetti({ zIndex: Z_INDEX, ...options })
   }
 
   /** 没有真火箭：沿上升路线一路撒往下掉的小火星，当作尾焰。x0 → x、从屏幕底到 y */
@@ -429,7 +409,6 @@ export function useFireworks() {
 
     // 效果10: 表情包烟花 —— 一左一右炸出两团表情
     () => {
-      preparing++
       loadEmojiShapes()
         .then((emojiShapes) => {
           if (disposed) return
@@ -447,19 +426,12 @@ export function useFireworks() {
           runLater(() => fire({ ...options, origin: { x: 0.68, y: 0.42 } }), 300)
         })
         .catch(() => {})
-        .finally(() => preparing--)
     },
   ]
 
-  /** 最多等这么久：粒子落完的回调万一没来，别让点评弹窗一直不出来 */
-  const MAX_WAIT_MS = 4000
-
-  /**
-   * 触发随机烟花效果，返回的 promise 在这一场放完时 resolve（点评弹窗等它）
-   */
-  function celebrate(): Promise<void> {
+  /** 触发随机烟花效果 */
+  function celebrate() {
     pick(fireworkTypes)()
-    return Promise.race([finished(), new Promise<void>((resolve) => setTimeout(resolve, MAX_WAIT_MS))])
   }
 
   return {

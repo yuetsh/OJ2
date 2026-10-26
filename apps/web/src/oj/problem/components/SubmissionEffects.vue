@@ -36,7 +36,7 @@ const { celebrate } = useFireworks()
 // 只对已经能评价、且还没评过的人弹：后端要求先有 AC 才收评价，这里刚 AC 完正好；
 // mine 非 null 说明早就评过了，别再打扰。
 //
-// 点评是强制的，但弹窗要等烟花放完才出来（两三秒，加上查一次「评过没有」），而换题会把
+// 点评是强制的，但弹窗要等烟花放一会儿才出来（1.5 秒，加上查一次「评过没有」），而换题会把
 // 定时器取消（见下面换题的 watch）—— 「下一题」在通过的那一刻就出现了，学生手快点
 // 下去，点评就跳过了。所以这段时间里欠着一次点评（reviewOwed），离开这道题的导航
 // 先拦下来：立刻弹点评，选完再去原来要去的地方。
@@ -130,23 +130,10 @@ function continueAfterReview() {
 }
 
 /**
- * 烟花放完再弹点评，两边一个时间（十种烟花长短不一，两到三秒）。
- * 每次通过记一个号，换题、被导航拦下提前弹了，就把号作废，放完也不再弹。
+ * 烟花开始后固定 1.5 秒弹点评，不等它放完 —— 十种烟花长短不一，等放完的话慢的那几种
+ * 要干等三四秒。没放完的半场盖在弹窗上面接着放（useFireworks 的 Z_INDEX）。
  */
-let reviewAfterFireworks = 0
-
-function showCommentPanelAfter(fireworks: Promise<void>) {
-  const run = ++reviewAfterFireworks
-  fireworks.then(() => {
-    if (run === reviewAfterFireworks) openReview()
-  })
-}
-
-function cancelCommentPanel() {
-  reviewAfterFireworks++
-}
-// 离开题目页时烟花那边当作放完了，不能接着去查、去弹
-onScopeDispose(cancelCommentPanel)
+const { start: showCommentPanelDelayed, stop: cancelCommentPanel } = useTimeoutFn(openReview, 1500, { immediate: false })
 
 /**
  * 只拦「离开这道题」：换 query（左栏切页签会改 `?tab=`）不算。弹窗已经开着的时候
@@ -241,7 +228,7 @@ watch(
 
     if (result !== SubmissionStatus.accepted) return
 
-    // 3. 烟花放完弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
+    // 3. 烟花放一会儿弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
     // （评价是欠着的这件事马上记下：方块还在亮的时候离开这道题，也要先评）
     if (ctx.value.reviewAfterAccepted) reviewOwed.value = true
 
@@ -249,8 +236,8 @@ watch(
     const id = submission.value?.id
     void afterCasesRevealed(id).then(() => {
       if (submission.value?.id !== id) return
-      const fireworks = celebrate()
-      if (ctx.value.reviewAfterAccepted) showCommentPanelAfter(fireworks)
+      celebrate()
+      if (ctx.value.reviewAfterAccepted) showCommentPanelDelayed()
     })
 
     if (ctx.value.backToProblemSet) {
