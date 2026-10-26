@@ -132,7 +132,9 @@ ok "对外端口 $port"
 
 if [ "$BUILD" -eq 1 ]; then
   say "构建镜像（首次约 5 分钟，之后走缓存很快）"
-  "${COMPOSE[@]}" build
+  # --pull：每次都去查 FROM 的基础镜像有没有新版。不带的话 caddy:2-alpine、
+  # debian:trixie-slim 永远是这台机器第一次构建时拉的那份，oj-web 里的 Caddy 从来不升级
+  "${COMPOSE[@]}" build --pull
 fi
 
 # ---------------------------------------------------------------- 迁移
