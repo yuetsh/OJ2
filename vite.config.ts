@@ -1,8 +1,11 @@
 import { defineConfig } from "vite-plus"
 
 /**
- * 全仓的格式化（Oxfmt）、lint（Oxlint）和任务编排（vp run）都在这一份里。
+ * 全仓的格式化、lint（Oxlint）和任务编排（vp run）都在这一份里。
  * 前端自己的构建配置在 apps/web/vite.config.ts，和这里无关。
+ *
+ * 格式化由 `bun fmt` 来跑，它直接读下面的 fmt 块（Oxfmt 的写法）。别再用 `vp fmt`：
+ * 两边只在长的 CSS 值列表怎么折行上不一样，混着跑会来回改 apps/web/public/style.css。
  */
 export default defineConfig({
   fmt: {
@@ -49,7 +52,7 @@ export default defineConfig({
       "check:ast": { command: "bun run check:ast", cwd: "apps/api" },
       // 提交前、CI 里跑这一条：格式 + lint + 两边类型检查 + 路由遮蔽 + AST 节点
       verify: {
-        command: "vp check",
+        command: "bun run check",
         dependsOn: ["typecheck:api", "typecheck:web", "check:routes", "check:ast"],
       },
     },

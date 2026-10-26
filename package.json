@@ -15,8 +15,8 @@
     "db:migrate": "bun run --filter '@oj2/api' db:migrate",
     "db:down": "docker compose -f docker/compose.dev.yml down",
     "lint": "vp lint",
-    "fmt": "vp fmt",
-    "check": "vp check"
+    "fmt": "bun fmt",
+    "check": "bun fmt --check && vp lint"
   },
   "devDependencies": {
     "@types/bun": "1.4.4",
