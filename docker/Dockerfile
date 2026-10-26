@@ -167,9 +167,8 @@ COPY apps/api/src/db/meta/_journal.json /usr/local/share/oj2/migrations/meta/
 # 相对路径按 cwd 解析（见 apps/api/src/runtime.ts），所以 workdir 设成 /data；
 # 但下面的路径全写绝对值，不靠这个巧合。
 #
-# 目录布局**照抄旧后端**（test_case、public/upload、public/avatar）。
-# 这不是审美问题：切换那天不用搬动任何文件，回滚时旧后端也立刻能找到自己的数据。
-# 少一次几十 GB 的 mv，就少一个在停机窗口里出错的机会。
+# 目录布局**照抄旧后端**（test_case、public/upload、public/avatar）：切换那天不用搬动
+# 任何文件。旧后端已经下线，但机房和服务器两边的数据目录都是这个布局，别改。
 WORKDIR /data
 ENV TEST_CASE_DIRECTORY=/data/test_case \
     HITOKOTO_DIRECTORY=/data/hitokoto \

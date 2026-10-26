@@ -6,8 +6,8 @@
 #
 # 按容器名 `docker exec`，跟容器是谁起的无关：以前线上的 postgres 由旧栈那份
 # /root/OJDeploy/docker-compose.yml 起，在 OJ2 目录里 `docker compose exec` 会报
-# `service "oj-postgres" is not running`。现在它归 compose.debian.yml 了，但按名字找
-# 照样能用，move-db-into-oj2.sh 搬家时也靠这一点去备份旧容器（CONTAINER=旧容器名）。
+# `service "oj-postgres" is not running`。现在它归 compose.debian.yml 了，按名字找
+# 照样能用，不跟着 compose 走。
 #
 # ## 用法
 #

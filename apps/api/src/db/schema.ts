@@ -1327,8 +1327,7 @@ export const classLesson = pgTable(
     createdBy: integer('created_by').notNull(),
     /**
      * 这天第一次布置的时刻，之后「改」只动 updatedAt。清掉（删行）再布置算重新开始。
-     * 加这一列之前布置的用 updated_at 回填（0034）。带默认值是给共库的另一个站点：
-     * 机房那套还没升级时，它的旧代码插入不带这一列
+     * 加这一列之前布置的用 updated_at 回填（0034）
      */
     createdAt: timestamp('created_at', {
       withTimezone: true,

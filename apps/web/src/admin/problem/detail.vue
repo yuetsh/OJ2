@@ -521,8 +521,6 @@ function clearDraft() {
 }
 
 function loadDraft() {
-  // 旧版出题页的草稿（另一个 key、另一种形状）不认了
-  localStorage.removeItem(STORAGE_KEY.ADMIN_PROBLEM)
   const saved = draft.value
   // 草稿是本机存的，形状不对（旧版本、被别的页面写坏）就当没有，别让整页起不来
   if (saved && typeof saved.form === 'object' && Array.isArray(saved.rows)) {

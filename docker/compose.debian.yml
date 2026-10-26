@@ -5,8 +5,7 @@
 # 构建上下文是仓库根，所以 build.context 写 ..（相对本文件）。
 #
 # **服务器上的全部容器都由这一个文件起**，包括 postgres 和 redis。以前库和 redis 是旧栈
-# 那份 /root/OJDeploy/docker-compose.yml 起的、这里通过 DB_HOST 外接过去，升级它们就得去
-# 改那份文件；2026-10 起收了进来（搬家用 docker/move-db-into-oj2.sh，一次性的）。
+# 那份 /root/OJDeploy/docker-compose.yml 起的、这里通过 DB_HOST 外接过去，2026-10 起收了进来。
 #
 # ⚠️ `DATA_DIR` 默认值 `../data` 解析出来是 **`OJ2/data`**，不是部署目录的 `data/`。
 # 不设它的话 postgres 会在空目录上初始化一个全新的空库，测试点和题面图片也全都不在，
@@ -107,9 +106,7 @@ services:
       - /tmp
     volumes:
       - ${DATA_DIR:-../data}/backend/test_case:/test_case:ro
-      # 判题机的运行状态目录。默认跟着 DATA_DIR 走，和旧栈是同一份 ——
-      # 一次性切换时无所谓（旧判题机已经停了），但**并行试跑时必须单独设 JUDGE_STATE_DIR**，
-      # 否则新旧两个 judger 同时往一个 run/log 目录里写。
+      # 判题机的运行状态目录，默认跟着 DATA_DIR 走
       - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/log:/log
       - ${JUDGE_STATE_DIR:-${DATA_DIR:-../data}/judge_server}/run:/judger
     environment:
@@ -192,6 +189,5 @@ services:
       # Caddy 只往这里写访问日志，静态资源在镜像里
       - ${DATA_DIR:-../data}/backend/log:/data/log
     ports:
-      # 并行试跑（oj2.xuyue.cc）时换一个端口，8080 还被旧 backend 占着。
       - "0.0.0.0:${WEB_PORT:-8080}:8000"
     mem_limit: 256m

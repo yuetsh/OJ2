@@ -61,13 +61,6 @@ say "自检"
 
 [ -f docker/.env ] || die "docker/.env 不存在。内容见手册第三节，别用 .env.example 直接改名（里面的值全是空的）"
 
-# 以前库和 redis 是外接旧栈的，靠这几个变量指过去；现在 compose 不再读它们。
-# 留在 .env 里不碍事，但会让人以为还在生效
-for v in DB_HOST DB_PORT REDIS_HOST REDIS_PORT; do
-  [ -z "$(grep -E "^$v=." docker/.env || true)" ] \
-    || warn "docker/.env 里的 $v 已经不用了（库和 redis 由本栈起），可以删掉"
-done
-
 # --prebuilt 时产物就是构建输入。缺了的话 docker 只会甩一句 COPY 找不到文件，
 # 这里提前拦下并说清楚该怎么办。
 if [ "${ARTIFACTS:-build}" = prebuilt ]; then
@@ -109,20 +102,15 @@ data_dir=$(grep -E '^DATA_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
 [ -n "$data_dir" ] || die "必须显式设 DATA_DIR。
 默认值 ../data 解析出来是 OJ2/data，那是个空目录，postgres 会在上面初始化一个全新的空库，而且不报任何错。"
 pgver_file="$data_dir/postgresql/18/docker/PG_VERSION"
-if [ ! -e "$data_dir/postgresql" ] && [ -d "$data_dir/postgres" ]; then
-  die "$data_dir 下只有 postgres/（PostgreSQL 16 的老库，旧栈 compose 起的），
-还没有 postgresql/18/docker。先把库搬进本栈：docker/move-db-into-oj2.sh（一次性的，见 docs/deploy.md）"
-fi
 [ -f "$pgver_file" ] || die "找不到 $pgver_file —— DATA_DIR 指的不是一个已有的 postgres 数据目录。
 就这么起下去会得到一个空库。确认 DATA_DIR=$data_dir 对不对。"
 pgver=$(cat "$pgver_file")
 [ "$pgver" = 18 ] || die "$data_dir/postgresql 是 PostgreSQL $pgver 的数据目录，但 compose 里是 postgres:18-alpine，起不来。"
 ok "数据目录 $data_dir/postgresql（PostgreSQL $pgver）"
 
-# ③ 判题机运行目录必须和旧栈分开，否则两个 judger 往同一个目录里写
+# ③ 判题机运行目录：不设就是 $DATA_DIR/judge_server
 judge_dir=$(grep -E '^JUDGE_STATE_DIR=' docker/.env | tail -1 | cut -d= -f2- || true)
-[ -n "$judge_dir" ] || die "JUDGE_STATE_DIR 没设 —— 试跑期间新旧两个判题机会共用运行目录"
-ok "判题机运行目录 $judge_dir"
+ok "判题机运行目录 ${judge_dir:-$data_dir/judge_server}"
 
 # ④ 判题镜像是自建的（上游 JudgeServer 停更，官方镜像的编译器停在 gcc-13），
 #    registry 上没有这个 tag。忘了 docker load 的话，要到「起栈」那步 compose 去 pull

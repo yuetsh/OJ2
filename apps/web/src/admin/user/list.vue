@@ -67,7 +67,7 @@ const adminOptions = [
 const sortOptions = [
   { label: '最近建号', value: '' },
   { label: '按用户名', value: 'username' },
-  { label: '最近登录', value: '-last_login' },
+  { label: '最近登录', value: '-lastLogin' },
   { label: '在线优先', value: '-online' },
 ]
 const [create, toggleCreate] = useToggle(false)

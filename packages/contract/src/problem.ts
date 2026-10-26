@@ -484,7 +484,7 @@ export const problemListSchema = paginatedSchema(problemListItemSchema)
 export const problemTypeFilterSchema = z.enum(['sql', 'reference', 'flowchart', 'ast'])
 
 /**
- * 题目列表的排序。值沿用原来的（旧链接照样能用）：空串 = 最新创建、create_time = 最早创建，
+ * 题目列表的排序：空串 = 最新创建、create_time = 最早创建，
  * ±submission_number / ±accepted_number 是做过 / 做对的**人数**，带 - 是从多到少
  */
 export const problemListSortSchema = z.enum(['', 'create_time', '-submission_number', 'submission_number', '-accepted_number', 'accepted_number'])

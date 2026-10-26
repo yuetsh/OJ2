@@ -74,12 +74,12 @@ export const lastVisitSchema = z.object({
 
 /**
  * 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉。
- * `language` 是这份作业用什么语言做；不传当 null（上线时还开着的旧看板页面不带它）
+ * `language` 是这份作业用什么语言做，null = 没选
  */
 export const classLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
   problemDisplayIds: z.array(z.string().trim().min(1)).max(20),
-  language: lessonLanguageSchema.optional(),
+  language: lessonLanguageSchema.nullable(),
 })
 
 export const classBoardProblemSchema = z.object({

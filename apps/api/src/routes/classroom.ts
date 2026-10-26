@@ -733,8 +733,7 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
   const parsed = await parseBody(c, classLessonRequestSchema, '题号或语言不对')
   if (!parsed.success) return parsed.response
   const user = c.get('user')!
-  const { className, problemDisplayIds } = parsed.data
-  const language = parsed.data.language ?? null
+  const { className, problemDisplayIds, language } = parsed.data
   const day = calendarDay()
 
   const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, className)).limit(1)

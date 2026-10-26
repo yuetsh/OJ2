@@ -1,4 +1,4 @@
-import { normalizeLanguage } from '@oj2/contract'
+import { parseLanguage } from '@oj2/contract'
 import { defineStore } from 'pinia'
 import { STORAGE_KEY } from 'utils/constants'
 import storage from 'utils/storage'
@@ -9,7 +9,7 @@ import type { Code, LANGUAGE } from 'utils/types'
  * 管理全局的代码、输入、输出状态
  */
 function savedCodeLanguage() {
-  const saved = normalizeLanguage(storage.get(STORAGE_KEY.LANGUAGE))
+  const saved = parseLanguage(storage.get(STORAGE_KEY.LANGUAGE))
   return saved && saved !== 'Flowchart' ? saved : null
 }
 
@@ -17,9 +17,6 @@ export const useCodeStore = defineStore('code', () => {
   // ==================== 状态 ====================
   const code = reactive<Code>({
     value: '',
-    // 过一道 normalizeLanguage：上线那一刻学生浏览器的 localStorage 里存的还是
-    // 旧值 Python3，直接拿来用会被后端的契约挡掉（而且报错看不出是这个原因）
-    // 以前的版本会把 Flowchart 也记成语言偏好，那种老值在这里一并不认
     language: savedCodeLanguage() ?? 'Python',
   })
 

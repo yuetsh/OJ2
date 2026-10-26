@@ -44,8 +44,7 @@ compose 里 `:?` 强制要求），端口也只发布在 127.0.0.1。2026-09-27 
 `0.0.0.0:5446`、不带口令，从公网直接 PING 得通（实测过）。
 
 **数据库口令同理**：`onlinejudge` 是超级用户，5445 对公网开着（机房要连），2026-10 以前
-口令就是默认的 `onlinejudge`。搬进 OJ2 时用 `openssl rand -hex 32` 生成的新口令重建，
-`move-db-into-oj2.sh` 不接受弱口令。`POSTGRES_PASSWORD` 只在库初始化时生效一次，以后要换：
+口令就是默认的 `onlinejudge`。搬进 OJ2 时用 `openssl rand -hex 32` 生成的新口令重建。`POSTGRES_PASSWORD` 只在库初始化时生效一次，以后要换：
 
 ```bash
 docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password onlinejudge'
@@ -168,57 +167,19 @@ WebSocket）→ 后台判题机列表在线 → 后台题目列表翻页 → 带
 避开坑 2），换下来的旧库留作 `onlinejudge_prev`。`--files` 顺带同步测试点、题面图片、头像。
 对服务器只读；拉完本机的账号口令都是线上的。用法和刻意的做法在脚本头部。
 
-## 把库搬进 OJ2（一次性，顺带 PostgreSQL 16 → 18、Redis 7 → 8）
+## 把库搬进 OJ2（2026-10-13，已完成）
 
-`docker/move-db-into-oj2.sh` 把服务器上旧栈 compose 起的 postgres / redis 换成本栈的。
-大版本不能原地换镜像（18 读不了 16 的目录），所以走「备份 → 新目录起 18 → 恢复」。
-本机用 10-13 的生产备份搭了一套和线上一样的「之前」状态完整演练过：13 万条提交恢复
-5 秒，行数一致，登录态保住，提交照常判题，机房那样从外面连 5445 新口令能进、旧口令被拒。
+服务器上的 postgres / redis 原来由旧栈的 compose 起，那次搬进了本栈，顺带 PostgreSQL 16 → 18、
+Redis 7 → 8（一次性脚本 `docker/move-db-into-oj2.sh` 用完已删，要看去 git 历史）。
+留下的坑只有一个，恢复搬家之前（16 时代）的备份时会踩：
 
-**挑没课的时候做**，两个站点共用这个库，中间两边都用不了（镜像在停机前编好，真正停机
-的那段不到一分钟）。
-
-```bash
-# 0. 代码先推上去。CI 会照常 rsync，然后在 deploy.sh 自检停下（数据目录还不是 18）、
-#    工作流判红 —— 这是预期的，容器一个没动，旧栈照常服务。
-
-# 1. 机房：停应用
-docker compose -f docker/compose.school.yml --env-file docker/.env.school stop oj-api oj-worker
-
-# 2. 服务器：docker/.env 的 POSTGRES_PASSWORD 换成新生成的强口令（openssl rand -hex 32）
-
-# 3. 服务器：搬家（CI 已经把产物 rsync 过来了，所以用 --prebuilt）
-cd /root/OJDeploy/OJ2
-docker/move-db-into-oj2.sh --prebuilt
-
-# 4. 机房：docker/.env.school 的 POSTGRES_PASSWORD 改成同一个新值，然后（顺带换上 Redis 8）
-docker compose -f docker/compose.school.yml --env-file docker/.env.school up -d --build
-```
-
-脚本每一步都有自检：机房没停（还有客户端连着旧库）会报出 IP 并中止，口令弱也中止，
-恢复后行数对不上、新口令从网络登不上也中止。做完按「部署后验证」两边各点一遍。
-
-之后：`/root/OJDeploy/docker-compose.yml` 里的 `oj-postgres` / `oj-redis` 删掉（留着的话
-哪天有人 `up` 一下会和本栈抢端口）；`docker/.env` 里的 `DB_HOST` / `DB_PORT` /
-`REDIS_HOST` / `REDIS_PORT` 也删掉（`deploy.sh` 会提醒）。
-
-**恢复时为什么剥掉 dump 里的口令**：旧库的口令是 md5 哈希存的，dump 原样带着；而 18 的
+**恢复时要剥掉 dump 里的口令**（上面坑 1 的加重版）：16 的库口令是 md5 哈希存的，dump 原样带着；而 18 的
 镜像新建的库 `pg_hba.conf` 只认 `scram-sha-256`，md5 存的口令**永远验不过**。容器里
 `docker exec psql` 走本地 socket 是 trust，一切看着正常，只有 api 和机房从网络连进来才报
-`password authentication failed` —— 演练时就是这么发现的。剥掉之后库里留的是初始化时按
-`POSTGRES_PASSWORD` 存的 SCRAM 哈希。
+`password authentication failed`。剥掉之后库里留的是初始化时按 `POSTGRES_PASSWORD` 存的
+SCRAM 哈希。
 
-**中途失败**：停旧容器之前失败的，`docker start oj-api oj-worker` 就回去了。之后失败的，
-旧库目录 `$DATA_DIR/postgres` 一个字节没动：
-
-```bash
-docker rm -f oj-postgres oj-redis                                     # 本栈的 18 / 8
-docker compose -f /root/OJDeploy/docker-compose.yml up -d oj-postgres oj-redis   # 旧的 16 / 7
-# docker/.env 的 POSTGRES_PASSWORD 改回旧口令、DB_HOST 那四个变量填回去，
-# 代码退回搬家之前那个提交再 docker/deploy.sh
-```
-
-搬家之后写进 18 的数据回退时会丢。跑稳一两周再删 `$DATA_DIR/postgres`。
+服务器上的 `$DATA_DIR/postgres`（16 的老库目录）如果还在，可以删了。
 
 ## 镜像体积
 

@@ -233,14 +233,12 @@ export function getUserList(
   className = '',
 ) {
   return api.get<AdminUserList>('admin/users', {
-    // "-last_login" 是旧接口传下来的取值（路由 query 里可能还存着），改叫 "-lastLogin"；
-    // "-online" 是新增的，原样透传
     params: {
       offset,
       limit,
       keyword,
       type,
-      orderBy: orderBy === '-last_login' ? '-lastLogin' : orderBy,
+      orderBy,
       className: className || undefined,
     },
   })

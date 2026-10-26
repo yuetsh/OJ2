@@ -1,7 +1,7 @@
 import {
   AST_SUPPORTED_LANGUAGES,
   isSqlProblem,
-  normalizeLanguage,
+  parseLanguage,
   problemListSortSchema,
   problemTypeFilterSchema,
   type ChallengeList,
@@ -142,9 +142,8 @@ problemRoutes.get('/problems', optionalAuth, async (c) => {
   if (undone && states && states.solved.size > 0) filters.push(notInArray(schema.problem.id, [...states.solved]))
 
   const where = and(...filters)
-  // 排序值沿用原来的（地址栏里存着的旧链接照样能用），但「最多 / 最少」现在按**人数**排，
-  // 和列表最后一列「做对 / 做过」对得上：submission_number 是做过的人，accepted_number 是做对的人。
-  // 旧的「画流程图 / 语法检查」排序已经拆成类型筛选，传进来落到默认（最新创建）
+  // 「最多 / 最少」按**人数**排，和列表最后一列「做对 / 做过」对得上：
+  // submission_number 是做过的人，accepted_number 是做对的人。认不出的排序值落到默认（最新创建）
   const sort = problemListSortSchema.safeParse(c.req.query('sort') ?? '').data ?? ''
   const byPeople = sort.endsWith('submission_number') || sort.endsWith('accepted_number')
   const allCounts = byPeople ? await allProblemUserCounts() : null
@@ -231,7 +230,7 @@ problemRoutes.get('/problems/random', optionalAuth, async (c) => {
   const type = problemTypeFilterSchema.safeParse(c.req.query('type')).data
   // 上次用的是 SQL（刚做完一道 SQL 题）不算偏好：SQL 题一共 9 道，照它挑就成了「随便来一道
   // SQL」。要 SQL 题的人会选「SQL」知识点或类型，那时按上面说的照样抽得到
-  const saved = normalizeLanguage(c.req.query('language'))
+  const saved = parseLanguage(c.req.query('language'))
   const language = saved && saved !== 'SQL' && saved !== 'Flowchart' ? saved : 'Python'
   const states = user ? await problemStates(user.id) : null
   const solved = states ? [...states.solved] : []

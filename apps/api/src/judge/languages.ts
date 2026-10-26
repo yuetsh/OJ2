@@ -1,5 +1,3 @@
-import { normalizeLanguage } from '@oj2/contract'
-
 /**
  * 判题沙箱认得的语言，**只有 C / C++ / Python 这三种**。
  *
@@ -11,8 +9,7 @@ import { normalizeLanguage } from '@oj2/contract'
  * 想恢复某种语言，得同时改这里和 `docker/judge/Dockerfile` 的工具链，再重建镜像。
  *
  * `Python` 这个键 2026-09 之前叫 `Python3`（库里还有 3 条更老的 `Python2`），
- * 0019 迁移把数据并成了一个值。查配置一律走 `judgeConfigFor()`，别直接下标 ——
- * 那里带着旧值的别名，迁移之前排进队列的任务、旧客户端传上来的值都还能判。
+ * 0019 迁移把数据并成了一个值。
  *
  * SQL 题不走这里，走 `judge/sql/`；流程图题走 AI 评分。
  */
@@ -84,10 +81,7 @@ export const languageConfigs: Record<string, Record<string, unknown>> = {
   },
 }
 
-/**
- * 按语言取判题配置。**判题侧一律走这个函数**，不要直接 `languageConfigs[x]`：
- * 它先过 `normalizeLanguage()`，所以 `Python3` / `Python2` 这类旧值也能命中。
- */
+/** 按语言取判题配置，判题机不认的语言（Java 等历史值、SQL、流程图）返回 null */
 export function judgeConfigFor(language: string) {
-  return languageConfigs[language] ?? languageConfigs[normalizeLanguage(language) ?? ''] ?? null
+  return languageConfigs[language] ?? null
 }

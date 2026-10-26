@@ -152,7 +152,6 @@ export const STORAGE_KEY = {
   ACCESS_TOKEN: 'accessToken',
   REFRESH_TOKEN: 'refreshToken',
   LANGUAGE: 'problemLanguage',
-  ADMIN_PROBLEM: 'adminProblem',
   ADMIN_SQL_PROBLEM: 'adminSqlProblem',
   ADMIN_CODE_PROBLEM: 'adminCodeProblem',
   ADMIN_PROBLEM_TAGS: 'adminProblemTags',
