@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from "naive-ui"
+import CaseBlocks from "./CaseBlocks.vue"
 
 /**
  * 结果页签里每一块结果的标题：圆形状态图标 + 大字 + 灰色小字，下面可以挂一条测试点进度。
@@ -12,7 +13,15 @@ const props = defineProps<{
   sub?: string
   /** 测试点进度：通过几个、一共几个 */
   progress?: { passed: number; total: number } | null
+  /**
+   * 每组对没对：有就画一排方块代替上面那根进度条（设计稿「测试点亮起来」），
+   * 没有（老接口、SQL 题）才退回进度条
+   */
+  cases?: boolean[] | null
+  /** 方块一格一格亮；不亮就一下全亮 */
+  animate?: boolean
 }>()
+const emit = defineEmits<{ (e: "revealed"): void }>()
 
 const theme = useThemeVars()
 
@@ -90,8 +99,15 @@ const color = computed(() => {
       <span v-if="sub" class="sub">{{ sub }}</span>
       <slot name="extra" />
     </div>
+    <CaseBlocks
+      v-if="cases && cases.length"
+      :results="cases"
+      :animate="!!animate"
+      class="cases"
+      @done="emit('revealed')"
+    />
     <div
-      v-if="progress && progress.total > 0"
+      v-else-if="progress && progress.total > 0"
       class="progress"
       role="img"
       :aria-label="`通过 ${progress.passed}/${progress.total} 个测试点`"
@@ -139,6 +155,10 @@ const color = computed(() => {
 
 .sub {
   color: v-bind("theme.textColor3");
+}
+
+.cases {
+  margin-top: 4px;
 }
 
 .progress {

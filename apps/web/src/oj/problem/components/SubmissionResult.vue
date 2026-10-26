@@ -214,12 +214,15 @@ const header = computed(() => {
   ) {
     return { kind: "pending" as const, title: status.title, sub: "", progress: null }
   }
+  // 每组对没对：一排方块代替进度条（设计稿「测试点亮起来」），全对也画
+  const cases = submission.caseSummary?.results ?? null
   if (submission.result === SubmissionStatus.accepted) {
     return {
       kind: "success" as const,
       title: status.title,
       sub: "所有测试点都对了",
       progress: null,
+      cases,
     }
   }
   if (failedOnSample.value) {
@@ -229,16 +232,41 @@ const header = computed(() => {
       // 和提交列表右栏同一句，「题目里的」是为了和测试点的编号分开
       sub: `题目里的例子 ${(failedOnSample.value.index ?? 0) + 1} 就错了`,
       progress: null,
+      cases,
     }
   }
-  const cases = partialCases.value
+  const partial = partialCases.value
   return {
     kind: status.type,
     title: status.title,
-    sub: cases ? `通过 ${cases.passed}/${cases.total} 个测试点` : "",
-    progress: cases,
+    sub: partial ? `通过 ${partial.passed}/${partial.total} 个测试点` : "",
+    progress: partial,
+    cases,
   }
 })
+
+/**
+ * 方块一格一格亮的时候，下面的提示、按钮、「下一题」先不出来，亮完一起出来（设计稿「测试点亮起来」）。
+ * 判完那一刻只有 WebSocket 推来的结果，详情（带每组对错）还在路上 —— 这段也先等着，
+ * 不然下面的东西会先闪出来、方块开始亮时又缩回去
+ */
+const revealedId = ref<string | null>(null)
+const waitingReveal = computed(() => {
+  const submission = props.submission
+  if (!submission || props.peer || !header.value || header.value.kind === "pending") return false
+  if (!submissionStore.shouldRevealCases(submission.id)) return false
+  if (submission.code === undefined) return true
+  return !!header.value.cases?.length && revealedId.value !== submission.id
+})
+const animateCases = computed(
+  () => !props.peer && submissionStore.shouldRevealCases(props.submission?.id),
+)
+function onCasesRevealed() {
+  const id = props.submission?.id
+  if (!id) return
+  revealedId.value = id
+  submissionStore.markCasesRevealed(id)
+}
 
 /**
  * 例子都对了、错在隐藏测试点：「去『自己输入』拿 90、80 这些数试试」。数取题目描述里出现的、
@@ -352,152 +380,160 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
     <template v-else>
       <ResultHeader
         v-if="header"
+        :key="submission.id"
         :kind="header.kind"
         :title="header.title"
         :sub="header.sub"
         :progress="header.progress"
+        :cases="header.cases"
+        :animate="animateCases"
+        @revealed="onCasesRevealed"
       />
-      <LessonNext
-        v-if="showLessonNext && problemStore.problem"
-        :problem-display-id="problemStore.problem._id"
-        :language="submission.language"
-        :refresh-key="submission.id"
-        :challenges="ctx.challenges"
-      />
-      <!-- 不在这节课里（题库入口自己做的）：做对之后先给这道题的挑战，再给相似题 -->
-      <ChallengeList
-        v-if="showSimilar && ctx.challenges && problemStore.problem"
-        :problem-ids="[problemStore.problem._id]"
-        :language="submission.language"
-        :refresh-key="submission.id"
-      />
-      <SimilarProblems v-if="showSimilar" title="再练几道相似的" />
+      <div v-show="!waitingReveal">
+        <LessonNext
+          v-if="showLessonNext && problemStore.problem"
+          :problem-display-id="problemStore.problem._id"
+          :language="submission.language"
+          :refresh-key="submission.id"
+          :challenges="ctx.challenges"
+        />
+        <!-- 不在这节课里（题库入口自己做的）：做对之后先给这道题的挑战，再给相似题 -->
+        <ChallengeList
+          v-if="showSimilar && ctx.challenges && problemStore.problem"
+          :problem-ids="[problemStore.problem._id]"
+          :language="submission.language"
+          :refresh-key="submission.id"
+        />
+        <SimilarProblems v-if="showSimilar" title="再练几道相似的" />
+      </div>
     </template>
-    <n-flex
-      vertical
-      v-if="
-        compileError ||
-        runtimeError ||
-        sampleCheck ||
-        msg ||
-        infoTable.length ||
-        submission.statisticInfo?.ast_results?.length
-      "
-    >
-      <CompileErrorExplain
-        v-if="compileError"
-        :err-info="compileError"
-        :language="submission.language"
-      />
-      <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
-      <WrongAnswerExplain
-        v-if="sampleCheck"
-        full
-        :check="sampleCheck"
-        :code="submission.code"
-        :language="submission.language"
-      />
-      <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
-        <n-flex vertical :size="8">
-          <n-flex
-            v-for="(rule, i) in submission.statisticInfo.ast_results"
-            :key="i"
-            align="center"
-            :size="6"
-          >
-            <n-icon :color="rule.passed ? theme.successColor : theme.errorColor">
-              <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
-            </n-icon>
-            <span>{{ rule.description }}</span>
-            <!-- 次数类规则光说「出现 2 次 ✗」，学生不知道自己写了几次 -->
-            <span
-              v-if="!rule.passed && rule.actual !== undefined"
-              :style="{ color: theme.errorColor }"
+    <div v-show="!waitingReveal">
+      <n-flex
+        vertical
+        v-if="
+          compileError ||
+          runtimeError ||
+          sampleCheck ||
+          msg ||
+          infoTable.length ||
+          submission.statisticInfo?.ast_results?.length
+        "
+      >
+        <CompileErrorExplain
+          v-if="compileError"
+          :err-info="compileError"
+          :language="submission.language"
+        />
+        <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
+        <WrongAnswerExplain
+          v-if="sampleCheck"
+          full
+          :check="sampleCheck"
+          :code="submission.code"
+          :language="submission.language"
+        />
+        <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
+          <n-flex vertical :size="8">
+            <n-flex
+              v-for="(rule, i) in submission.statisticInfo.ast_results"
+              :key="i"
+              align="center"
+              :size="6"
             >
-              当前 {{ rule.actual }} 次
-            </span>
+              <n-icon :color="rule.passed ? theme.successColor : theme.errorColor">
+                <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
+              </n-icon>
+              <span>{{ rule.description }}</span>
+              <!-- 次数类规则光说「出现 2 次 ✗」，学生不知道自己写了几次 -->
+              <span
+                v-if="!rule.passed && rule.actual !== undefined"
+                :style="{ color: theme.errorColor }"
+              >
+                当前 {{ rule.actual }} 次
+              </span>
+            </n-flex>
           </n-flex>
-        </n-flex>
-      </n-card>
-      <n-card v-if="msg" embedded class="msg">{{ msg }}</n-card>
-      <n-data-table v-if="infoTable.length" striped :data="infoTable" :columns="columns" />
-    </n-flex>
+        </n-card>
+        <n-card v-if="msg" embedded class="msg">{{ msg }}</n-card>
+        <n-data-table v-if="infoTable.length" striped :data="infoTable" :columns="columns" />
+      </n-flex>
 
-    <!--
+      <!--
       设计稿：还没问过 AI 时只是一个描边按钮；错在隐藏测试点时旁边给「去自己输入试试」。
       问过之后，AI 的回答才放进卡片
     -->
-    <div v-if="(showAIHint && !hintTarget) || customRunHint" class="actions">
-      <n-button
-        v-if="showAIHint && !hintTarget"
-        type="primary"
-        ghost
-        :loading="hintLoading"
-        @click="fetchHint(submission.id)"
-      >
-        让 AI 分析我的代码
-      </n-button>
-      <n-button
-        v-if="customRunHint"
-        text
-        type="primary"
-        @click="submissionStore.revealResult('custom')"
-      >
-        {{ customRunHint }}
-      </n-button>
-    </div>
-    <n-alert v-if="showAIHint && hintError" type="error" :title="hintError" class="hint-error" />
-    <template v-if="showAIHint && hintTarget">
-      <n-card size="small" class="hint-card">
-        <n-spin v-if="hintLoading && !hintContent" size="small" />
-        <Markdown v-if="hintContent" :content="hintContent" />
-        <!-- 等级和「再多一点提示」。按钮出不出由后端 done 里的 canEscalate 定，
+      <div v-if="(showAIHint && !hintTarget) || customRunHint" class="actions">
+        <n-button
+          v-if="showAIHint && !hintTarget"
+          type="primary"
+          ghost
+          :loading="hintLoading"
+          @click="fetchHint(submission.id)"
+        >
+          让 AI 分析我的代码
+        </n-button>
+        <n-button
+          v-if="customRunHint"
+          text
+          type="primary"
+          @click="submissionStore.revealResult('custom')"
+        >
+          {{ customRunHint }}
+        </n-button>
+      </div>
+      <n-alert v-if="showAIHint && hintError" type="error" :title="hintError" class="hint-error" />
+      <template v-if="showAIHint && hintTarget">
+        <n-card size="small" class="hint-card">
+          <n-spin v-if="hintLoading && !hintContent" size="small" />
+          <Markdown v-if="hintContent" :content="hintContent" />
+          <!-- 等级和「再多一点提示」。按钮出不出由后端 done 里的 canEscalate 定，
              前端不自己推阶梯（要再交一次才升得动，规则在 services/hint-level.ts） -->
-        <n-flex
-          v-if="hintLevel !== null && !hintLoading && !hintTyping"
-          align="center"
-          size="small"
-          style="margin-top: 8px"
-        >
-          <n-tag size="small" :bordered="false">
-            {{ hintLevelLabel(hintLevel) }}
-          </n-tag>
-          <n-button
-            v-if="hintCanEscalate"
-            size="tiny"
-            type="primary"
-            ghost
-            @click="fetchHint(submission.id, true)"
+          <n-flex
+            v-if="hintLevel !== null && !hintLoading && !hintTyping"
+            align="center"
+            size="small"
+            style="margin-top: 8px"
           >
-            再多一点提示
-          </n-button>
-        </n-flex>
-        <n-flex
-          v-if="hintId !== null && !hintLoading && !hintTyping"
-          align="center"
-          size="small"
-          style="margin-top: 8px"
-        >
-          <n-text depth="3">这条提示对你有帮助吗？</n-text>
-          <n-button
-            size="tiny"
-            :type="hintHelpful === true ? 'primary' : 'default'"
-            :disabled="hintFeedbackSending"
-            @click="sendHintFeedback(true)"
+            <n-tag size="small" :bordered="false">
+              {{ hintLevelLabel(hintLevel) }}
+            </n-tag>
+            <n-button
+              v-if="hintCanEscalate"
+              size="tiny"
+              type="primary"
+              ghost
+              @click="fetchHint(submission.id, true)"
+            >
+              再多一点提示
+            </n-button>
+          </n-flex>
+          <n-flex
+            v-if="hintId !== null && !hintLoading && !hintTyping"
+            align="center"
+            size="small"
+            style="margin-top: 8px"
           >
-            有帮助
-          </n-button>
-          <n-button
-            size="tiny"
-            :type="hintHelpful === false ? 'warning' : 'default'"
-            :disabled="hintFeedbackSending"
-            @click="sendHintFeedback(false)"
-          >
-            没帮助
-          </n-button>
-        </n-flex>
-      </n-card>
-    </template>
+            <n-text depth="3">这条提示对你有帮助吗？</n-text>
+            <n-button
+              size="tiny"
+              :type="hintHelpful === true ? 'primary' : 'default'"
+              :disabled="hintFeedbackSending"
+              @click="sendHintFeedback(true)"
+            >
+              有帮助
+            </n-button>
+            <n-button
+              size="tiny"
+              :type="hintHelpful === false ? 'warning' : 'default'"
+              :disabled="hintFeedbackSending"
+              @click="sendHintFeedback(false)"
+            >
+              没帮助
+            </n-button>
+          </n-flex>
+        </n-card>
+      </template>
+    </div>
   </div>
 </template>
 

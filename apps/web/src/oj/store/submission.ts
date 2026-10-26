@@ -65,6 +65,25 @@ export const useSubmissionStore = defineStore("submission", () => {
     revealResult("custom")
     trial.runCustom({ ...codeStore.code }, { problemId: problem.id, contestId: problem.contestId })
   }
+  /**
+   * 测试点一格一格亮（结果页签里的 CaseBlocks）只播一次，而且只播这一页上刚交、刚判完的那条：
+   * 刷新、切页签回来、看以前的提交都直接全亮。系统设了「减少动画」的不播。
+   * 烟花（SubmissionEffects）按同一个判断决定要不要等方块亮完
+   */
+  const reducedMotion = usePreferredReducedMotion()
+  const revealedCases = new Set<string>()
+  function shouldRevealCases(id: string | undefined) {
+    return (
+      !!id &&
+      reducedMotion.value !== "reduce" &&
+      id === monitor.submissionId.value &&
+      !revealedCases.has(id)
+    )
+  }
+  function markCasesRevealed(id: string) {
+    revealedCases.add(id)
+  }
+
   const isFormatting = ref(false)
   const isSubmittingRequest = ref(false)
 
@@ -206,6 +225,8 @@ export const useSubmissionStore = defineStore("submission", () => {
     resultSeq,
     resultSegment,
     revealResult,
+    shouldRevealCases,
+    markCasesRevealed,
     runSamples,
     runCustom,
     isFormatting,

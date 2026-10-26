@@ -9,6 +9,7 @@ import { useLessonStore } from "shared/store/lesson"
 import { isFlowchartPass, useFlowchartStore } from "oj/store/flowchart"
 import { SubmissionStatus } from "utils/constants"
 import { useProblemPageContext } from "../composables/problemPageContext"
+import { caseRevealDuration } from "../utils/caseReveal"
 
 /**
  * 判完之后「该发生什么」：失败计数、标成已解决、烟花、点评、回题单。
@@ -222,6 +223,20 @@ watch(
   },
 )
 
+/**
+ * 这一条要播「测试点一格一格亮」的话，等它亮完。判完那一刻只有 WebSocket 推来的结果，
+ * 方块要等详情（带每组对错）回来才开始亮，所以先等详情，最多 3 秒
+ */
+async function afterCasesRevealed(id: string | undefined) {
+  if (!submissionStore.shouldRevealCases(id)) return
+  await until(() => submission.value?.id === id && submission.value?.code !== undefined).toBe(
+    true,
+    { timeout: 3000 },
+  )
+  const count = submission.value?.caseSummary?.results?.length ?? 0
+  if (count) await new Promise((resolve) => setTimeout(resolve, caseRevealDuration(count)))
+}
+
 // ==================== AC庆祝效果 ====================
 watch(
   () => submission.value?.result,
@@ -238,14 +253,17 @@ watch(
 
     if (result !== SubmissionStatus.accepted) return
 
-    // 2. 放烟花
-    const fireworks = celebrate()
-
     // 3. 烟花放完弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
-    if (ctx.value.reviewAfterAccepted) {
-      reviewOwed.value = true
-      showCommentPanelAfter(fireworks)
-    }
+    // （评价是欠着的这件事马上记下：方块还在亮的时候离开这道题，也要先评）
+    if (ctx.value.reviewAfterAccepted) reviewOwed.value = true
+
+    // 2. 放烟花：等结果页签里的方块一格一格亮完（不到 1 秒）再放
+    const id = submission.value?.id
+    void afterCasesRevealed(id).then(() => {
+      if (submission.value?.id !== id) return
+      const fireworks = celebrate()
+      if (ctx.value.reviewAfterAccepted) showCommentPanelAfter(fireworks)
+    })
 
     if (ctx.value.backToProblemSet) {
       // 延迟回到题单页面

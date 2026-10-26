@@ -218,6 +218,11 @@ export const caseSummarySchema = z
   .object({
     passed: z.number().int(),
     total: z.number().int(),
+    /**
+     * 每组对没对，按组号排。只有详情给（结果页签里方块一格一格亮，错的写组号），列表只给
+     * 两个数。只有对错、不带数据和输出，所以学生也给；为 null 的情形同上（比赛照旧不给）
+     */
+    results: z.array(z.boolean()).optional(),
   })
   .nullable()
 

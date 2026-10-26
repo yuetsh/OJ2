@@ -372,8 +372,12 @@ function caseSummary(submission: typeof schema.submission.$inferSelect) {
   if (submission.contestId !== null || submission.language === "SQL") return null
   const data = asRecord(submission.info).data
   if (!Array.isArray(data) || data.length === 0) return null
-  const passed = data.filter((item) => asRecord(item).result === JudgeStatus.ACCEPTED).length
-  return { passed, total: data.length }
+  // 判题时已经按组号排过（judge/run.ts），这里再排一次：老数据不一定是排好的
+  const results = data
+    .map((item) => asRecord(item))
+    .sort((a, b) => Number(a.test_case) - Number(b.test_case))
+    .map((item) => item.result === JudgeStatus.ACCEPTED)
+  return { passed: results.filter(Boolean).length, total: results.length, results }
 }
 
 /** 列表行的 caseSummary：SQL 里数好的两个数，为 null 的情形和详情一致（SQL 题、没有逐点结果） */
