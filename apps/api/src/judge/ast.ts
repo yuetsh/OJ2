@@ -115,6 +115,8 @@ export function describeAstRule(rule: AstRule, language?: string): string {
       return `不能调用 .${target}()`
     case 'must_use_operator':
       return `必须使用 ${astOperatorLabel(target, language)} 运算符`
+    case 'must_use_keyword':
+      return `调用 ${target}() 时必须用 ${rule.keyword ?? ''} 参数`
     case 'must_have_nesting': {
       // 这两个走 astNodeLabel 而不是裸值 —— 少了这一步文案就是
       // 「必须使用 for_loop 嵌套」，旧栈 ast_checker/engines/nesting.py 是翻的
@@ -194,6 +196,9 @@ export function astRulesError(astRules: AstRules | null): string | null {
         }
       } else if (!target.trim()) {
         return `${at}：要检查的函数名/方法名不能为空`
+      } else if (rule.engine === 'must_use_keyword') {
+        if (language !== 'Python') return `${at}：${language} 没有关键字参数`
+        if (!rule.keyword?.trim()) return `${at}：参数名不能为空`
       }
       if (!astRuleIsMeaningful(rule)) return `${at}：次数检查至少要填一个数字`
     }
@@ -246,6 +251,13 @@ function functionCalls(root: Node, target: string, language: string) {
     }
     return false
   })
+}
+
+/** 带了 `keyword=...` 的那些 target() 调用。`**kwargs` 展开的不算，看不出里面有没有 */
+function keywordCalls(root: Node, target: string, keyword: string, language: string) {
+  return functionCalls(root, target, language).filter((call) =>
+    call.childForFieldName('arguments')?.namedChildren.some((arg) => arg.type === 'keyword_argument' && arg.childForFieldName('name')?.text === keyword),
+  )
 }
 
 function methodCalls(root: Node, target: string, language: string) {
@@ -324,6 +336,11 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
       return {
         description: describeAstRule(rule, language),
         passed: hasNode(root, nodeType),
+      }
+    case 'must_use_keyword':
+      return {
+        description: describeAstRule(rule, language),
+        passed: keywordCalls(root, target, rule.keyword ?? '', language).length > 0,
       }
     case 'must_have_nesting': {
       const outer = rule.outer ?? ''

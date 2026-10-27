@@ -117,6 +117,18 @@ const ENGINE_OPTIONS: SelectOption[] = [
   },
 ]
 
+// 关键字参数只有 Python 有，C 题不给选
+const KEYWORD_OPTION: SelectOption = {
+  label: '关键字参数',
+  type: 'group',
+  key: 'keyword_group',
+  children: [{ label: '调用时必须带参数', value: 'must_use_keyword' }],
+}
+
+function engineOptions(lang: string): SelectOption[] {
+  return lang === 'Python' ? [...ENGINE_OPTIONS, KEYWORD_OPTION] : ENGINE_OPTIONS
+}
+
 // 选项按语言生成。原来是一张 C/Python 混合的 15 条表整份铺开，给 C 题也能选到
 // 列表推导式、f-string 这些 C 根本没有的东西 —— 存得进去，判题时永远失败
 // （或者反过来，「不能使用 f-string」永远通过），两头都不报错。
@@ -139,6 +151,7 @@ const NODE_ENGINES = ['must_exist_node', 'must_not_exist_node', 'count_node']
 const FUNCTION_ENGINES = ['must_call_function', 'must_not_call_function', 'count_function_call']
 const METHOD_ENGINES = ['must_call_method', 'must_not_call_method']
 const OPERATOR_ENGINES = ['must_use_operator']
+const KEYWORD_ENGINES = ['must_use_keyword']
 const COUNT_ENGINES = ['count_node', 'count_function_call']
 
 function isNodeEngine(engine: string) {
@@ -152,6 +165,9 @@ function isMethodEngine(engine: string) {
 }
 function isOperatorEngine(engine: string) {
   return OPERATOR_ENGINES.includes(engine)
+}
+function isKeywordEngine(engine: string) {
+  return KEYWORD_ENGINES.includes(engine)
 }
 function isCountEngine(engine: string) {
   return COUNT_ENGINES.includes(engine)
@@ -196,7 +212,7 @@ function needsTargetDropdown(engine: string) {
   return isNodeEngine(engine)
 }
 function needsTargetInput(engine: string) {
-  return isFunctionEngine(engine) || isMethodEngine(engine)
+  return isFunctionEngine(engine) || isMethodEngine(engine) || isKeywordEngine(engine)
 }
 function needsOperatorDropdown(engine: string) {
   return isOperatorEngine(engine)
@@ -260,6 +276,8 @@ function updateRule(lang: string, index: number, field: string, value: any) {
     delete rule.min
     delete rule.max
     delete rule.exact
+    delete rule.keyword
+    if (isKeywordEngine(value)) rule.keyword = ''
     // 次数引擎不给默认值的话，存下去就是一条恒真规则
     if (isCountEngine(value)) rule.exact = 1
   } else if (field === 'target') {
@@ -273,6 +291,8 @@ function updateRule(lang: string, index: number, field: string, value: any) {
   } else if (field === 'max') {
     if (value === null || value === undefined) delete rule.max
     else rule.max = value
+  } else if (field === 'keyword') {
+    rule.keyword = value
   } else if (field === 'message') {
     rule.message = value
   }
@@ -322,7 +342,7 @@ watch(supportedLanguages, (langs) => {
         <div v-for="(rule, index) in getRulesForLang(lang)" :key="index" class="rule">
           <div class="ruleRow">
             <n-select
-              :options="ENGINE_OPTIONS"
+              :options="engineOptions(lang)"
               :value="rule.engine"
               size="small"
               class="engine"
@@ -342,8 +362,16 @@ watch(supportedLanguages, (langs) => {
               :value="rule.target"
               size="small"
               class="target"
-              placeholder="函数 / 方法名"
+              :placeholder="isKeywordEngine(rule.engine) ? '函数名，如 print' : '函数 / 方法名'"
               @update:value="(v: string) => updateRule(lang, index, 'target', v)"
+            />
+            <n-input
+              v-if="isKeywordEngine(rule.engine)"
+              :value="rule.keyword"
+              size="small"
+              class="target"
+              placeholder="参数名，如 sep"
+              @update:value="(v: string) => updateRule(lang, index, 'keyword', v)"
             />
             <n-select
               v-if="needsOperatorDropdown(rule.engine)"

@@ -84,6 +84,8 @@ export const astRuleEngineSchema = z.enum([
   'must_call_method',
   'must_not_call_method',
   'must_use_operator',
+  // 只有 Python 有关键字参数：「调用 print() 时必须用 sep 参数」
+  'must_use_keyword',
   // 判题机实现了，但后台编辑器还没有对应的选项，目前只能手工造数据用上
   'must_have_nesting',
 ])
@@ -95,6 +97,8 @@ export const astRuleSchema = z.object({
   /** must_have_nesting 专用：外层、内层节点 */
   outer: z.string().optional(),
   inner: z.string().optional(),
+  /** must_use_keyword 专用：参数名（target 是函数名） */
+  keyword: z.string().optional(),
   /** 展示用的中文名，缺省回落到 target */
   label: z.string().optional(),
   /** 自定义提示。生产库里存的是空串而不是缺键，判题机按 `||` 回落到默认文案 */
