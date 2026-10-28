@@ -10,16 +10,16 @@ const semanticNodeClasses = ['startNode', 'endNode', 'startEnd', 'input', 'outpu
 
 const displayStyleId = 'oj-mermaid-display-style'
 
-/** 框的颜色：[class, 底色, 边框]。pele 把 `class n0 startNode` 原样挂在节点的 <g> 上 */
+/** 框的颜色：[class, 底色, 边框]，和画布的 FlowchartEditor/paint.ts 一致。pele 把 `class n0 startNode` 原样挂在节点的 <g> 上 */
 const nodeColors: [string, string, string][] = [
   ['startNode', '#eef8f2', '#18a058'],
   ['startEnd', '#eef8f2', '#18a058'],
   ['endNode', '#eef8f2', '#18a058'],
   ['input', '#eef4fd', '#2f6bc4'],
-  ['output', '#eef4fd', '#2f6bc4'],
+  ['output', '#f4effc', '#8a55c9'],
   ['process', '#ffffff', '#7d828a'],
   ['decision', '#fdf5e6', '#d08a1c'],
-  ['loop', '#fdf5e6', '#d08a1c'],
+  ['loop', '#e8f6f8', '#1590a6'],
   ['oj-node-palette-0', '#dbeafe', '#2563eb'],
   ['oj-node-palette-1', '#ccfbf1', '#0d9488'],
   ['oj-node-palette-2', '#ede9fe', '#7c3aed'],
@@ -74,6 +74,27 @@ ${nodeColors
 
 const svgNamespace = 'http://www.w3.org/2000/svg'
 
+/**
+ * 契约的 flowToMermaid 把判断和循环都标成 decision（库里存的提交、参考图都是这样），
+ * 两者要分颜色，只能在画之前认出循环：有箭头从后面的框绕回来的 decision 就是循环
+ */
+function markLoops(code: string) {
+  const order = new Map<string, number>()
+  const backTargets = new Set<string>()
+  for (const line of code.split('\n')) {
+    const head = /^\s*(\w+)/.exec(line)?.[1]
+    if (head && head !== 'flowchart' && head !== 'graph' && head !== 'class' && !order.has(head)) order.set(head, order.size)
+    const edge = /^\s*(\w+)\b.*?-->(?:\|[^|]*\|)?\s*(\w+)/.exec(line)
+    if (!edge) continue
+    const [, from, to] = edge
+    if (!order.has(to!)) order.set(to!, order.size)
+    if (order.get(from!)! > order.get(to!)!) backTargets.add(to!)
+  }
+  return code.replace(/^(\s*class\s+)(\w+)(\s+)decision\s*$/gm, (line, pre: string, id: string, gap: string) =>
+    backTargets.has(id) ? `${pre}${id}${gap}loop` : line,
+  )
+}
+
 function applyFlowchartDisplayStyle(container: HTMLElement) {
   container.classList.add('oj-mermaid-surface')
 
@@ -124,7 +145,7 @@ export function useMermaid() {
     try {
       // pele/lazy 按图的类型现拉对应的模块，题目里绝大多数是流程图，只拉那一块
       const { renderAsync } = await import('pele/lazy')
-      const { svg } = await renderAsync(mermaidCode, {
+      const { svg } = await renderAsync(markLoops(mermaidCode), {
         // 量字宽用页面真实的字体，否则框会比字窄或宽
         fontFamily: getComputedStyle(container).fontFamily,
         // 题目是老师写的、提交是学生写的，图里的链接和外链图片一律不画
