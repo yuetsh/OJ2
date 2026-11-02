@@ -62,7 +62,7 @@ const rankLine = computed(() => {
   return null
 })
 
-/** 「看看他们的写法」：同班的走 'ks' + 班级名的用户名前缀约定（设计文档第 13 节） */
+/** 「看看他们的写法」：同班的按班级（class_name）筛，全站的不筛 */
 function goAccepted() {
   const r = rank.value
   if (!r) return
@@ -73,7 +73,7 @@ function goAccepted() {
       result: '0',
       page: 1,
       limit: 10,
-      ...(r.className ? { username: 'ks' + r.className } : {}),
+      ...(r.className ? { className: r.className } : {}),
     },
   }
   // 协作中跳走这一页协作就断了

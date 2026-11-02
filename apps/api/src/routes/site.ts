@@ -1,4 +1,4 @@
-import type { Quote, WebsiteConfig } from '@oj2/contract'
+import { CLASS_NAME_RE, type ClassMember, type Quote, type WebsiteConfig } from '@oj2/contract'
 import { asc, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { resolve } from 'node:path'
@@ -94,7 +94,7 @@ siteRoutes.get('/quotes/random', async (c) => {
 
 siteRoutes.get('/classes/:className/usernames', async (c) => {
   const className = c.req.param('className').trim()
-  if (!/^\d{3,4}$/.test(className)) {
+  if (!CLASS_NAME_RE.test(className)) {
     return failure(c, 400, 'invalid-class', 'Class name must contain 3 or 4 digits')
   }
   const rows = await db
@@ -102,9 +102,9 @@ siteRoutes.get('/classes/:className/usernames', async (c) => {
     .from(schema.user)
     .where(eq(schema.user.className, className))
     .orderBy(desc(schema.user.createTime), asc(schema.user.id))
-  // 用 stripClassPrefix 而不是 replace：replace 会把中间的匹配也删掉，前缀对不上时截出乱码
+  // 名字给人点，用户名拿去登录：老号是 ks232张三（点的是「张三」），新号两个一样
   return success(
     c,
-    rows.map(({ username }) => stripClassPrefix(username, className)),
+    rows.map(({ username }) => ({ name: stripClassPrefix(username, className), username }) satisfies ClassMember),
   )
 })

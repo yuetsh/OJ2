@@ -8,7 +8,8 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useConfigStore } from 'shared/store/config'
 import { useUserStore } from 'shared/store/user'
 import { errorCode } from 'utils/api'
-import { STORAGE_KEY, USERNAME_CLASS_RE } from 'utils/constants'
+import { displayName } from '@oj2/contract'
+import { STORAGE_KEY } from 'utils/constants'
 import storage from 'utils/storage'
 import ChampionList from './components/ChampionList.vue'
 import ClassBattle from './components/ClassBattle.vue'
@@ -236,7 +237,7 @@ const daysLeft = computed(() => {
 const trendLines = computed(() => {
   const b = board.value
   if (!b?.me) return []
-  const short = (row: RankRow) => row.user.username.replace(USERNAME_CLASS_RE, '') || row.user.username
+  const short = (row: RankRow) => displayName(row.user.username)
   return [
     ...(b.behind ? [{ userId: b.behind.user.id, label: short(b.behind), color: palette.value.threat }] : []),
     ...(b.ahead ? [{ userId: b.ahead.user.id, label: short(b.ahead), color: palette.value.chase }] : []),

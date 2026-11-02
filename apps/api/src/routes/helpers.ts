@@ -1,6 +1,6 @@
 import { ADMIN_ROLES, NO_CLASS, STUDENT_ROLES, TEACHER_ROLES, type SampleUser } from '@oj2/contract'
 
-import { and, count, eq, ilike, inArray, isNull, notInArray, sql } from 'drizzle-orm'
+import { and, count, eq, ilike, inArray, isNull, notInArray } from 'drizzle-orm'
 
 import type { AuthUser } from '../auth/session'
 import { db, schema } from '../db'
@@ -29,8 +29,9 @@ export function sampleUser(
 }
 
 /**
- * 去掉用户名里的 `ks<班级号>` 前缀，得到学生本人那一段：`ks251张三` + `251` → `张三`。
- * 对齐旧后端 `utils/shortcuts.py:52` 的 `strip_class_prefix`。
+ * 去掉老号用户名里的 `ks<班级号>` 前缀，得到学生本人那一段：`ks251张三` + `251` → `张三`。
+ * 2026-11 起新建的号不带前缀（用户名就是名字），原样返回。和契约 `displayName` 是同一件事，
+ * 这里按这个人自己的班级剥，比正则更严：班号对不上的不剥。
  *
  * 用 startsWith + slice 而不是 replace：replace 会删掉字符串中间的匹配，
  * 前缀对不上时从中间截出乱码。前缀不匹配就原样返回。
@@ -42,19 +43,15 @@ export function stripClassPrefix(username: string, className: string | null | un
 }
 
 /**
- * 用户名按「班级前缀」匹配：`ks251` 只匹配 251 班，**不能**把 `ks2511张三` 也捞进来。
+ * 搜索框里填的是一个班（`232`，或者老习惯 `ks232`）：按 `user.class_name` 精确圈这个班。
+ * 不是这个形状返回 undefined，由调用方退回按用户名包含匹配。
  *
- * 班级号 3~4 位并存（见 admin/account.ts 的 classNameOf），裸 `ilike 'ks251%'` 会把
- * 2510~2519 班全算进 251 班。所以输入是 `ks` + 3 位以上数字时，要求紧跟着的不是数字；
- * 1~2 位（`ks25`）是年级前缀，照旧宽松匹配。输入不是 `ks+数字` 形状时返回 undefined，
- * 由调用方决定退回什么匹配方式。
+ * 原来是拿用户名前缀 `ks232` 去 ilike，还得专门挡住 `ks2321…` 被 232 班捞走；
+ * 2026-11 起新号不带前缀，前缀匹配会把他们全漏掉，所以只认班级这一列
  */
-export function classPrefixCondition(input: string) {
-  const matched = /^ks(\d+)$/i.exec(input)
-  if (!matched) return undefined
-  const prefix = ilike(schema.user.username, `${input}%`)
-  if (matched[1]!.length < 3) return prefix
-  return and(prefix, sql`${schema.user.username} !~* ${`^${input}[0-9]`}`)
+export function classKeywordCondition(input: string) {
+  const matched = /^(?:ks)?(\d{3,4})$/i.exec(input)
+  return matched ? eq(schema.user.className, matched[1]!) : undefined
 }
 
 /**

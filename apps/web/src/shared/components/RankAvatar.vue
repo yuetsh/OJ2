@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useDark } from '@vueuse/core'
 import { rgba } from 'shared/composables/tone'
-import { USERNAME_CLASS_RE } from 'utils/constants'
+import { displayName } from '@oj2/contract'
 
 /**
  * 排名页的头像。九成以上的学生没换过头像（1797 个号是 default.png），一排一模一样的
@@ -26,7 +26,7 @@ watch(
 const PALETTE = ['#2f6fd0', '#c76a12', '#6a4bd8', '#0f7a6c', '#b4315f', '#4d5967', '#8a6a00']
 
 const letter = computed(() => {
-  const name = props.username.replace(USERNAME_CLASS_RE, '') || props.username
+  const name = displayName(props.username)
   return Array.from(name).at(-1) ?? '?'
 })
 

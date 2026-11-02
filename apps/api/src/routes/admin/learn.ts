@@ -53,8 +53,8 @@ function classCondition(value: string | null) {
 }
 
 /**
- * 没有班级的学生**照样统计**（班级列显示为空）。班级是从用户名的数字前缀推出来的，
- * 推不出来时就是 null（见 admin/account.ts 的 classNameOf），把这些人过滤掉等于让他们
+ * 没有班级的学生**照样统计**（班级列显示为空）。班级是建号时给的（老号当年从用户名的 ks 前缀推），
+ * 没给就是 null，把这些人过滤掉等于让他们
  * 在「谁没学」这张表上凭空消失 —— 班级榜可以只算入班的人，这里不行。
  */
 function studentCondition(value: string | null) {

@@ -403,7 +403,7 @@ const GRID_LIMIT = 5000
 
 /**
  * 统计页的方块串：范围内每个学生的每一次提交（口径见契约 submissionStatisticsGridSchema）。
- * 用户名的匹配和统计接口同一套（ilike，填 `ks253` 圈一个班）。
+ * 班级和学生名的匹配和统计接口同一套（scopedUsers：班级精确、名字包含）。
  */
 submissionStatisticsRoutes.get('/submissions/statistics/grid', requireTeacher, async (c) => {
   const scope = await statisticsScope(c)

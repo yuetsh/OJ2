@@ -179,7 +179,7 @@ export function getSubmissionStatistics(
   duration: { start?: string; end: string },
   problemDisplayId?: string,
   username?: string,
-  /** 班级（user.class_name）精确匹配。别再拼 `ks231` 塞进 username —— 会连带 2311、2312 班 */
+  /** 班级（user.class_name）精确匹配。别拿用户名前缀当班级 —— 新号不带 ks 前缀，老号 `ks231` 还会连带 2311、2312 班 */
   className?: string,
 ) {
   return api.get<SubmissionStatistics>('submissions/statistics', {
@@ -346,7 +346,7 @@ export function uploadAvatar(file: File) {
   return api.post('me/avatar', form)
 }
 
-export function updateProfile(data: { realName?: string; mood?: string }) {
+export function updateProfile(data: { mood?: string }) {
   return api.put<Profile>('me/profile', data satisfies UpdateProfileRequest)
 }
 

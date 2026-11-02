@@ -11,7 +11,7 @@ import {
 import { randomInt } from 'node:crypto'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { count, countDistinct, desc, eq, gte, ilike, inArray, isNull, not, sql } from 'drizzle-orm'
+import { and, count, countDistinct, desc, eq, gte, inArray, isNull, not, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { requireAdmin, requireSuperAdmin, type AppEnv } from '../../auth/middleware'
@@ -22,12 +22,12 @@ import { failure, parseBody, success } from '../../http'
 import { sniffImageExtension } from '../../services/image'
 import { getWebsiteOptions } from '../../services/options'
 import { calendarDay, dayStart, localTime, termStart, weekStart } from '../../time'
-import { STUDENT_ROLES } from '@oj2/contract'
+import { displayName, STUDENT_ROLES } from '@oj2/contract'
 import { TEACHER_ROLES } from '../helpers'
 import { onlineUserIds } from '../../auth/presence'
 import { JudgeStatus } from '../../judge/status'
 import { suggestActiveClass } from '../../services/class-activity'
-import { classPrefixCondition } from '../helpers'
+import { classKeywordCondition } from '../helpers'
 
 export const adminConfRoutes = new Hono<AppEnv>()
 
@@ -346,20 +346,20 @@ adminConfRoutes.get('/dashboard', requireSuperAdmin, async (c) => {
 })
 
 adminConfRoutes.get('/random-usernames', requireSuperAdmin, async (c) => {
-  // 传的是**班级前缀**（形如 ks251），不是班级号 —— 前端输入框写的就是「班级前缀」，
-  // 拿到结果后按这个前缀 split 取姓名。班级前缀走 classPrefixCondition（ks251 不带上
-  // ks2511）；别的形状的输入照旧 istartswith，与旧接口一致
+  // 后台首页「抽一个人」：从这个班随机拿 10 个，回的是界面上显示的名字（老号剥掉 ks 前缀）。
+  // 班号按 class_name 精确匹配；老页面发的是 ks251，classKeywordCondition 两种都认
   const classroom = c.req.query('classroom')?.trim()
-  if (!classroom) return failure(c, 400, 'invalid-request', '需要班级号')
+  const where = classroom ? classKeywordCondition(classroom) : undefined
+  if (!where) return failure(c, 400, 'invalid-request', '需要班级号')
   const rows = await db
     .select({ username: schema.user.username })
     .from(schema.user)
-    .where(classPrefixCondition(classroom) ?? ilike(schema.user.username, `${classroom}%`))
+    .where(and(where, eq(schema.user.isDisabled, false)))
     .orderBy(sql`random()`)
     .limit(10)
   return success(
     c,
-    rows.map((row) => row.username),
+    rows.map((row) => displayName(row.username)),
   )
 })
 

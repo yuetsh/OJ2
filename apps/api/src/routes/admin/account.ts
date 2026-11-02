@@ -2,6 +2,8 @@ import {
   adminTypeSchema,
   checkUsernamesRequestSchema,
   deleteUsersRequestSchema,
+  displayName,
+  legacyClassOf,
   NO_CLASS,
   type CheckUsernamesResponse,
   importUsersRequestSchema,
@@ -26,35 +28,11 @@ import { revokeUserSessions } from '../../auth/session'
 import { requireSuperAdmin, type AppEnv } from '../../auth/middleware'
 import { db, schema } from '../../db'
 import { failure, parseBody, success } from '../../http'
-import { classPrefixCondition, queryInteger, sampleUser } from '../helpers'
+import { classKeywordCondition, queryInteger, sampleUser } from '../helpers'
 import { publishConfigUpdate } from '../../events'
 import { getWebsiteOptions } from '../../services/options'
 
 export const adminAccountRoutes = new Hono<AppEnv>()
-
-const CLASS_NAME_MIN_DIGITS = 3
-const CLASS_NAME_MAX_DIGITS = 4
-
-/**
- * `ks251XXX` / `ks2510XX` → `251` / `2510`。不以 `ks+数字` 开头的（管理员、教师账号）返回 null。
- *
- * 位数不对**直接报错，不猜** —— 猜错会把 className 存歪，而剥前缀显示姓名、班级下拉、
- * 统计页都依赖它准确。先用 `\d+` 抓全再判位数，不能直接用固定位数的正则匹配：
- * 那样 `ks251001` 会「匹配成功」并悄悄取前 4 位，正是要避免的猜测。
- * 对齐旧 `account/views/admin.py:get_class_name`。
- */
-function classNameOf(username: string): { ok: true; value: string | null } | { ok: false; message: string } {
-  const matched = /^ks(\d+)/.exec(username)
-  if (!matched) return { ok: true, value: null }
-  const digits = matched[1]!
-  if (digits.length < CLASS_NAME_MIN_DIGITS || digits.length > CLASS_NAME_MAX_DIGITS) {
-    return {
-      ok: false,
-      message: `用户名 ${username} 的班级号 ${digits} 是 ${digits.length} 位，必须是 ${CLASS_NAME_MIN_DIGITS}~${CLASS_NAME_MAX_DIGITS} 位数字`,
-    }
-  }
-  return { ok: true, value: digits }
-}
 
 /**
  * 旧 UserAdminAPI.put 按 admin_type 归一 problem_permission：
@@ -120,8 +98,8 @@ adminAccountRoutes.get('/rankings/users', requireSuperAdmin, async (c) => {
   const where = and(
     inArray(schema.user.adminType, [...STUDENT_ROLES]),
     eq(schema.user.isDisabled, false),
-    // 输入班级前缀（ks251）按班级匹配，否则照旧按用户名包含
-    keyword ? (classPrefixCondition(keyword) ?? ilike(schema.user.username, `%${keyword}%`)) : undefined,
+    // 填的是班号（251，或者老习惯 ks251）按班级圈，否则按用户名包含
+    keyword ? (classKeywordCondition(keyword) ?? ilike(schema.user.username, `%${keyword}%`)) : undefined,
   )
 
   const [totalRows, rows] = await Promise.all([
@@ -220,19 +198,44 @@ adminAccountRoutes.get('/users', requireSuperAdmin, async (c) => {
 })
 
 /**
- * 批量建号之前查重（批量建号页边粘名单边查）：哪些用户名已经有了、哪天建的。
- * 比较时归一成小写，和导入、登录同一个口径
+ * 批量建号之前查重（批量建号页边粘名单边查）：这个班里已经有谁了（多半是同一个人粘了两次），
+ * 以及每个名字会建成什么用户名（名字被别的班、注册的号占了就加数字）。比较归一成小写，和导入、登录同一个口径
  */
 adminAccountRoutes.post('/users/check', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, checkUsernamesRequestSchema)
   if (!parsed.success) return parsed.response
-  const names = [...new Set(parsed.data.usernames.map((name) => name.toLowerCase()))]
-  const rows = await db
+  const { className, names } = parsed.data
+  const wanted = [...new Set(names.map((name) => name.toLowerCase()))]
+
+  // 同班同名：老号是 ks232张三，按剥掉前缀的名字比
+  const classmates = await db
     .select({ username: schema.user.username, createTime: schema.user.createTime })
     .from(schema.user)
-    .where(inArray(sql`lower(${schema.user.username})`, names))
-  return success(c, { existing: rows } satisfies CheckUsernamesResponse)
+    .where(eq(schema.user.className, className))
+  const existing = classmates
+    .map((row) => ({ name: displayName(row.username), username: row.username, createTime: row.createTime }))
+    .filter((row) => wanted.includes(row.name.toLowerCase()))
+
+  // 用户名全站唯一：名字本身和「名字+数字」占了哪些
+  const taken = await db
+    .select({ username: sql<string>`lower(${schema.user.username})` })
+    .from(schema.user)
+    .where(inArray(sql`regexp_replace(lower(${schema.user.username}), '[0-9]+$', '')`, wanted))
+  return success(c, { existing, usernames: suggestUsernames(names, new Set(taken.map((row) => row.username))) } satisfies CheckUsernamesResponse)
 })
+
+/**
+ * 新号的用户名：名字没被占就是名字本身，占了往后加数字（杨涵宇2、杨涵宇3）。同一批里先到先得。
+ * 比较按小写，和登录、导入同一个口径
+ */
+function suggestUsernames(names: string[], taken: Set<string>) {
+  return names.map((name) => {
+    let candidate = name
+    for (let n = 2; taken.has(candidate.toLowerCase()); n++) candidate = `${name}${n}`
+    taken.add(candidate.toLowerCase())
+    return candidate
+  })
+}
 
 adminAccountRoutes.get('/users/:id', requireSuperAdmin, async (c) => {
   const [row] = await selectUser(queryInteger(c.req.param('id'), 0, { min: 1 }))
@@ -250,8 +253,8 @@ adminAccountRoutes.put('/users/:id', requireSuperAdmin, async (c) => {
 
   const username = data.username.trim().toLowerCase()
   const email = data.email.trim().toLowerCase()
-  const className = classNameOf(username)
-  if (!className.ok) return failure(c, 400, 'invalid-class-name', className.message)
+  // 班级明确给了就用；老页面不发这一项，不动原来的班（以前是从用户名的 ks 前缀推，改名就跟着变）
+  const className = data.className !== undefined ? data.className : existing.user.className
 
   const [dupUsername] = await db
     .select({ id: schema.user.id })
@@ -270,7 +273,7 @@ adminAccountRoutes.put('/users/:id', requireSuperAdmin, async (c) => {
   const patch: Partial<typeof schema.user.$inferInsert> = {
     username,
     email,
-    className: className.value,
+    className,
     adminType: data.adminType,
     isDisabled: data.isDisabled,
     problemPermission: normalizePermission(data.adminType, data.problemPermission),
@@ -337,10 +340,14 @@ adminAccountRoutes.post('/users', requireSuperAdmin, async (c) => {
   // PUT /users/:id 也都存小写。只有这条导入路径原样存，于是 `ks251Ab` 能绕过下面的
   // 查重建出第二个账号，两个人登录时撞成同一条记录。
   const prepared: Prepared[] = []
-  for (const [username, password, email, realName] of rows) {
+  for (const [username, password, email, realName, explicitClass] of rows) {
     const name = username.toLowerCase()
-    const className = classNameOf(name)
-    if (!className.ok) return failure(c, 400, 'invalid-class-name', className.message)
+    // 班级明确给了就用（新号不带 ks 前缀）；老写法没给，退回从 ks 前缀推，位数不对报错不猜
+    const legacy = explicitClass === undefined ? legacyClassOf(name) : null
+    if (legacy === undefined) {
+      return failure(c, 400, 'invalid-class-name', `用户名 ${name} 里 ks 后面的班级号位数不对，班级号要是 3～4 位数字`)
+    }
+    const className = explicitClass ?? legacy
     const mail = email.trim().toLowerCase()
     // 邮箱在本站是唯一的（注册和 PUT /users/:id 两条路都查重），唯独导入这条以前
     // 什么都不查 —— 而前端生成的占位邮箱按「班级+批内序号」拼，同一个班导第二批
@@ -355,7 +362,7 @@ adminAccountRoutes.post('/users', requireSuperAdmin, async (c) => {
       raw: password,
       email: mail,
       realName,
-      className: className.value,
+      className,
     })
   }
 

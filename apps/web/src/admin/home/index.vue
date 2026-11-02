@@ -118,8 +118,8 @@ function stopRolling() {
 /** 名字滚两秒停下：接口一次给 10 个随机的，最后一个就是抽中的 */
 async function draw() {
   if (!luckyClass.value) return
-  const prefix = `ks${luckyClass.value}`
-  const names = (await randomUser10(prefix)).map((name) => name.slice(prefix.length) || name)
+  // 后端按班级随机拿 10 个，回的就是显示的名字（老号已经剥掉 ks 前缀）
+  const names = await randomUser10(luckyClass.value)
   if (!names.length) {
     luckyGuy.value = '这个班没有人'
     return

@@ -1,4 +1,4 @@
-import type { JudgeStatusValue } from '@oj2/contract'
+import { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, type JudgeStatusValue } from '@oj2/contract'
 import type { AchievementRarity, SUBMISSION_RESULT, ReactionKey } from './types'
 
 // 与后端 judge/status.ts 的 JudgeStatus 逐条对齐（submitting 除外，见下）。
@@ -308,18 +308,8 @@ export function sortFlowchartCriteria<T>(details: Record<string, T>): [string, T
   return Object.entries(details).sort(([a], [b]) => rank(a) - rank(b))
 }
 
-// 班级号的位数范围。学生用户名形如 ks<班级号><姓名>，班级号还要跟
-// 网站配置里的班级列表对得上。
-// 后端 OnlineJudge/utils/shortcuts.py 的 CLASS_NAME_MIN/MAX_DIGITS
-// 是同一条规则的另一份，改这里必须同时改那边。
-export const CLASS_NAME_MIN_DIGITS = 3
-export const CLASS_NAME_MAX_DIGITS = 4
-
-/** 合法班级号：3~4 位纯数字 */
-export const CLASS_NAME_RE = new RegExp(`^\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}$`)
-
-/** 用户名开头的 ks<班级号>，用于从用户名里认出班级 */
-export const USERNAME_CLASS_RE = new RegExp(`^ks\\d{${CLASS_NAME_MIN_DIGITS},${CLASS_NAME_MAX_DIGITS}}`)
+// 班级号的位数和格式只有契约里一份（packages/contract/src/username.ts），这里转出去给旧的引用处用
+export { CLASS_NAME_MAX_DIGITS, CLASS_NAME_MIN_DIGITS, CLASS_NAME_RE } from '@oj2/contract'
 
 /** 班级号作为数字时的上下界，给 n-input-number 用 */
 export const CLASS_NAME_MIN_VALUE = 10 ** (CLASS_NAME_MIN_DIGITS - 1)

@@ -34,7 +34,8 @@ const classError = computed(() => {
   }
   return ''
 })
-const prefix = computed(() => (classNo.value.trim() ? `ks${classNo.value.trim()}` : ''))
+/** 填好了、格式也对的班号；没填或填错是空串 */
+const klass = computed(() => (classNo.value.trim() && !classError.value ? classNo.value.trim() : ''))
 
 /** 名单：一行一个，前后和中间的空格都去掉（从表格里复制常带空格），空行不算 */
 const names = computed(() =>
@@ -56,11 +57,16 @@ function passwordOf(name: string) {
   return value
 }
 
+/**
+ * 用户名就是名字（2026-11 起不再加 ks + 班号）。名字被别的班、注册的号占了，后端给的是加了数字的（杨涵宇2）；
+ * 查重还没回来之前先按名字摆着
+ */
+const suggested = ref<Map<string, string>>(new Map())
 const rows = computed(() =>
   names.value.map((name) => ({
     name,
-    username: prefix.value + name,
-    password: passwordOf(prefix.value + name),
+    username: suggested.value.get(name) ?? name,
+    password: passwordOf(name),
   })),
 )
 
@@ -69,7 +75,7 @@ const duplicates = computed(() => {
   const first = new Map<string, number>()
   const result: { line: number; firstLine: number; name: string }[] = []
   rows.value.forEach((row, i) => {
-    const key = row.username.toLowerCase()
+    const key = row.name.toLowerCase()
     const seen = first.get(key)
     if (seen === undefined) first.set(key, i + 1)
     else result.push({ line: i + 1, firstLine: seen, name: row.name })
@@ -77,22 +83,26 @@ const duplicates = computed(() => {
   return result
 })
 
-// 已经有的账号：停手半秒再去查
-const existing = ref<{ username: string; createTime: string | null }[]>([])
+// 这个班已经有的同名账号（老号按剥掉 ks 前缀的名字比），顺带拿回每个名字会建成的用户名：停手半秒再去查
+const existing = ref<{ name: string; username: string; createTime: string | null }[]>([])
 const checking = ref(false)
 watchDebounced(
-  () => rows.value.map((row) => row.username).join('\n'),
+  () => `${klass.value}\n${names.value.join('\n')}`,
   async () => {
-    const usernames = [...new Set(rows.value.map((row) => row.username))]
-    if (!usernames.length || classError.value || usernames.length > 500) {
+    const list = [...new Set(names.value)]
+    if (!list.length || !klass.value || list.length > 500) {
       existing.value = []
+      suggested.value = new Map()
       return
     }
     checking.value = true
     try {
-      existing.value = (await checkUsernames(usernames)).existing
+      const res = await checkUsernames(klass.value, list)
+      existing.value = res.existing
+      suggested.value = new Map(list.map((name, i) => [name, res.usernames[i] ?? name]))
     } catch {
       existing.value = []
+      suggested.value = new Map()
     } finally {
       checking.value = false
     }
@@ -102,7 +112,7 @@ watchDebounced(
 
 const tooMany = computed(() => rows.value.length > 500)
 const issueCount = computed(() => (classError.value ? 1 : 0) + duplicates.value.length + existing.value.length + (tooMany.value ? 1 : 0))
-const canSubmit = computed(() => rows.value.length > 0 && !issueCount.value && !checking.value && !!prefix.value)
+const canSubmit = computed(() => rows.value.length > 0 && !issueCount.value && !checking.value && !!klass.value)
 
 // ---------------------------------------------------------------- 建号
 
@@ -118,8 +128,9 @@ async function submit() {
   const payload: ImportUsersRequest['users'] = rows.value.map((row, i) => [
     row.username,
     row.password,
-    `${prefix.value || 'user'}.${batch}.${i + 1}@example.com`,
+    `c${klass.value}.${batch}.${i + 1}@example.com`,
     row.name,
+    klass.value,
   ])
   saving.value = true
   try {
@@ -142,7 +153,7 @@ function again() {
 
 function download() {
   if (!done.value) return
-  downloadAccountsCsv(done.value, prefix.value || '账号')
+  downloadAccountsCsv(done.value, klass.value ? classLabel(klass.value) : '账号')
 }
 
 /** 打印账号条：一人一张，一页四列，打出来剪开发下去 */
@@ -196,7 +207,6 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
     <div class="left">
       <label class="label" for="class-no">班级号</label>
       <div class="class-row">
-        <span class="ks">ks</span>
         <n-input v-model:value="classNo" :input-props="{ id: 'class-no', inputmode: 'numeric' }" placeholder="如 2612" style="width: 120px" />
         <span v-if="classNo.trim() && !classError" class="class-name">
           {{ classLabel(classNo.trim()) }}
@@ -210,7 +220,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
       <template v-if="rows.length">
         <div class="head">
           <b>会建这 {{ rows.length }} 个账号</b>
-          <n-tag v-if="!issueCount && !checking && prefix" type="success" :bordered="false" round> 没有重名 </n-tag>
+          <n-tag v-if="!issueCount && !checking && klass" type="success" :bordered="false" round> 没有重名 </n-tag>
           <n-tag v-if="issueCount" type="warning" :bordered="false" round> 有 {{ issueCount }} 处要先改 </n-tag>
         </div>
 
@@ -221,7 +231,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
             第 {{ dup.line }} 行「{{ dup.name }}」和第 {{ dup.firstLine }} 行重名 —— 同班同名的，名字后面加个 1、2 区分
           </div>
           <div v-for="it in existing" :key="it.username">
-            {{ it.username }} 已经有这个账号了<template v-if="it.createTime">（{{ parseTime(it.createTime, 'YYYY-MM-DD') }} 建的）</template>
+            {{ classLabel(klass) }}已经有「{{ it.name }}」了<template v-if="it.createTime">（{{ parseTime(it.createTime, 'YYYY-MM-DD') }} 建的）</template>
             —— 删掉这一行，或者换个名字
           </div>
         </div>
@@ -249,7 +259,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
           <n-button type="primary" size="large" :disabled="!canSubmit" :loading="saving || checking" @click="submit">
             建好这 {{ rows.length }} 个账号
           </n-button>
-          <n-text v-if="!prefix" depth="3" class="hint" style="margin-left: 12px"> 先填班级号 </n-text>
+          <n-text v-if="!klass" depth="3" class="hint" style="margin-left: 12px"> 先填班级号 </n-text>
         </div>
       </template>
       <n-empty v-else :description="`${isMobile ? '上面' : '左边'}粘进名单，这里就列出会建成的账号`" :style="{ marginTop: isMobile ? '24px' : '80px' }" />
@@ -286,11 +296,6 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.ks {
-  font-size: 18px;
-  opacity: 0.6;
 }
 
 .class-name {

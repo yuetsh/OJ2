@@ -50,6 +50,10 @@ const classOptions = computed(() => [
   ...groupClassOptions(configStore.config?.classList ?? []),
   { label: classLabel(NO_CLASS), value: NO_CLASS },
 ])
+/** 编辑框的班级：配置里的班，外加这个人现在的班（老班不在配置里也要显示得出来） */
+const editClassOptions = computed(() =>
+  groupClassOptions([...(configStore.config?.classList ?? []), ...(userEditing.value?.className ? [userEditing.value.className] : [])]),
+)
 const neverLoggedIn = ref(0)
 
 const total = ref(0)
@@ -314,7 +318,7 @@ async function handleEditUser() {
   try {
     if (create.value) {
       const newUser: ImportUsersRequest['users'] = [
-        [userEditing.value.username, password.value, userEditing.value.email ?? '', userEditing.value.realName ?? ''],
+        [userEditing.value.username, password.value, userEditing.value.email ?? '', userEditing.value.realName ?? '', userEditing.value.className],
       ]
       await importUsers(newUser)
       listUsers()
@@ -388,10 +392,9 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
         <n-form-item-gi :span="1" label="真名">
           <n-input v-model:value="userEditing.realName" />
         </n-form-item-gi>
-        <!-- 班级是后端从用户名的 ks 数字前缀推出来的（classNameOf），
-             editUser 也不发这个字段，所以这里只读 —— 以前是个能改、改了没用的输入框 -->
-        <n-form-item-gi v-if="!create" :span="1" label="班级">
-          <n-input :value="userEditing.className" disabled placeholder="由用户名自动推导" />
+        <!-- 班级单独存一列，2026-11 起不再从用户名的 ks 前缀推（新号不带前缀）。老师、管理员不填 -->
+        <n-form-item-gi :span="1" label="班级">
+          <n-select v-model:value="userEditing.className" :options="editClassOptions" filterable clearable placeholder="没填班级" />
         </n-form-item-gi>
         <n-form-item-gi :span="1" label="邮箱">
           <n-input v-model:value="userEditing.email" />

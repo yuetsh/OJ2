@@ -6,6 +6,7 @@ import { achievementRaritySchema } from './achievement'
 import { rankProfileSchema } from './account'
 import { paginatedSchema, sampleUserSchema } from './common'
 import { reactionKeySchema } from './content'
+import { classNameSchema } from './username'
 import { badgeConditionTypeSchema } from './problemset'
 import { problemLanguageSchema, runnableLanguageSchema } from './language'
 import {
@@ -285,12 +286,19 @@ export const adminUserListSchema = paginatedSchema(adminUserSchema).extend({
   neverLoggedIn: z.number().int(),
 })
 
-/** 批量建号之前查重：这几个用户名哪些已经有了 */
+/** 批量建号之前查重：给一个班和一串名字 */
 export const checkUsernamesRequestSchema = z.object({
-  usernames: z.array(z.string().trim().min(1).max(32)).min(1).max(500),
+  className: classNameSchema,
+  names: z.array(z.string().trim().min(1).max(32)).min(1).max(500),
 })
 export const checkUsernamesResponseSchema = z.object({
-  existing: z.array(z.object({ username: z.string(), createTime: z.string().nullable() })),
+  /** 这个班里已经有的同名账号（老号按剥掉 ks 前缀后的名字比）—— 多半是同一个人，建之前要先处理 */
+  existing: z.array(z.object({ name: z.string(), username: z.string(), createTime: z.string().nullable() })),
+  /**
+   * 每个名字会建成的用户名，和 `names` 一一对应。名字没被别人占就是名字本身；占了（别的班同名、
+   * 注册的号）往后加数字，`杨涵宇2`。用户名界面上看不到，只用来登录和查重
+   */
+  usernames: z.array(z.string()),
 })
 
 export const updateUserRequestSchema = z.object({
@@ -299,14 +307,19 @@ export const updateUserRequestSchema = z.object({
   adminType: adminTypeSchema,
   problemPermission: problemPermissionSchema,
   realName: z.string().max(32).nullable().default(null),
+  /** 班级。不给就不动（老页面不发这一项）；null = 没填班级（老师、管理员） */
+  className: classNameSchema.nullable().optional(),
   isDisabled: z.boolean(),
   // 空串表示不改密码，与旧 EditUserSerializer 的 allow_blank 一致
   password: z.string().max(128).default(''),
 })
 
-/** 导入用户：每行 [用户名, 密码, 邮箱, 真名]，与前端粘贴的 Excel 列序一致 */
+/**
+ * 导入用户：每行 [用户名, 密码, 邮箱, 真名, 班级]。班级不给的老写法退回从 `ks` 前缀推（`legacyClassOf`），
+ * 开着旧页面、手粘老名单的照样能建
+ */
 export const importUsersRequestSchema = z.object({
-  users: z.array(z.tuple([z.string().trim().min(1).max(32), z.string().min(1), z.string(), z.string()])).min(1),
+  users: z.array(z.tuple([z.string().trim().min(1).max(32), z.string().min(1), z.string(), z.string(), classNameSchema.nullable().optional()])).min(1),
 })
 
 export const deleteUsersRequestSchema = z.object({

@@ -13,8 +13,11 @@ export const registerRequestSchema = z.object({
   password: z.string().min(6).max(20),
 })
 
+/**
+ * 学生自己能改的资料。**真名不在这里**：它只在后台改（PUT /admin/users/:id）。原来这里收 realName，
+ * 界面上早就没入口了，但接口还认 —— 早几届有 44 人把真名改成了外号（「超级无敌暴龙战士」）
+ */
 export const updateProfileRequestSchema = z.object({
-  realName: z.string().max(32).nullable().optional(),
   avatar: z.string().max(256).optional(),
   /** 排名上要挂出来（`MOOD_MAX`），太长了榜上放不下 */
   mood: z.string().trim().max(MOOD_MAX, `个性签名最多 ${MOOD_MAX} 个字`).nullable().optional(),

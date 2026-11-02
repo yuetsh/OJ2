@@ -2,7 +2,8 @@
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import RankAvatar from 'shared/components/RankAvatar.vue'
-import { classLabel, groupClassOptions } from 'utils/classes'
+import type { ClassMember } from '@oj2/contract'
+import { groupClassOptions } from 'utils/classes'
 import { errorCode } from 'utils/api'
 import { STORAGE_KEY } from 'utils/constants'
 import storage from 'utils/storage'
@@ -46,12 +47,13 @@ const themeVars = computed(() => ({
 }))
 
 const mode = ref<Mode>('pick')
-/** 选中的班，带 ks 前缀（`ks257`），和用户名的前缀同一个写法 */
+/** 选中的班（班号，`257`） */
 const klass = ref<string | null>(null)
-const names = ref<string[]>([])
+const names = ref<ClassMember[]>([])
 const namesLoading = ref(false)
 const query = ref('')
-const picked = ref<string | null>(null)
+/** 点中的人：名字给人看，用户名拿去登录（老号 ks257张三，新号就是名字） */
+const picked = ref<ClassMember | null>(null)
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
@@ -63,13 +65,8 @@ const searchRef = useTemplateRef('searchRef')
 const passwordRef = useTemplateRef('passwordRef')
 const usernameRef = useTemplateRef('usernameRef')
 
-const knownClasses = computed(() => (configStore.config?.classList ?? []).map((c) => `ks${c}`))
-const classOptions = computed(() =>
-  groupClassOptions(configStore.config?.classList ?? [], (item) => ({
-    label: classLabel(item),
-    value: `ks${item}`,
-  })),
-)
+const knownClasses = computed(() => configStore.config?.classList ?? [])
+const classOptions = computed(() => groupClassOptions(knownClasses.value))
 /** 还没选过班的电脑：名单的位置先摆一排排班级 */
 const classGroups = computed(() => classOptions.value.flatMap((option) => ('children' in option ? [{ label: option.label, items: option.children }] : [])))
 
@@ -96,16 +93,16 @@ function matches(name: string, keyword: string) {
 const collator = new Intl.Collator('zh-CN')
 const shown = computed(() => {
   const keyword = query.value.trim()
-  return keyword ? names.value.filter((name) => matches(name, keyword)) : names.value
+  return keyword ? names.value.filter((member) => matches(member.name, keyword)) : names.value
 })
 
 async function loadNames(value: string) {
   namesLoading.value = true
   names.value = []
   try {
-    const list = await getClassUsernames(value.slice(2))
+    const list = await getClassUsernames(value)
     // 切班的请求比上一个先回来时，别让旧班的名单盖上来
-    if (klass.value === value) names.value = [...list].sort(collator.compare)
+    if (klass.value === value) names.value = [...list].sort((a, b) => collator.compare(a.name, b.name))
   } catch {
     if (klass.value === value) names.value = []
   } finally {
@@ -142,8 +139,8 @@ function focusSearch() {
   if (!touchScreen.value) focusLater(() => searchRef.value)
 }
 
-function pick(name: string) {
-  picked.value = name
+function pick(member: ClassMember) {
+  picked.value = member
   password.value = ''
   clearError()
   focusLater(() => passwordRef.value)
@@ -178,7 +175,7 @@ function goSignup() {
 
 async function submit() {
   if (loading.value || locked.value) return
-  const name = mode.value === 'pick' ? `${klass.value ?? ''}${picked.value ?? ''}` : username.value.trim()
+  const name = mode.value === 'pick' ? (picked.value?.username ?? '') : username.value.trim()
   if (mode.value === 'user' && !name) {
     error.value = '写上用户名'
     focusLater(() => usernameRef.value)
@@ -227,8 +224,10 @@ async function submit() {
 function restoreLast() {
   const lastMode = storage.get(STORAGE_KEY.LOGIN_MODE)
   mode.value = lastMode === 'user' ? 'user' : 'pick'
-  const last = storage.get(STORAGE_KEY.LOGIN_CLASS)
-  if (typeof last === 'string' && knownClasses.value.includes(last)) {
+  // 2026-11 之前存的是带 ks 前缀的（ks257），读的时候剥掉
+  const stored = storage.get(STORAGE_KEY.LOGIN_CLASS)
+  const last = typeof stored === 'string' ? stored.replace(/^ks/i, '') : null
+  if (last && knownClasses.value.includes(last)) {
     if (klass.value === last) {
       // 同一个班：名单留着，只把上一个人的痕迹清掉
       picked.value = null
@@ -284,8 +283,8 @@ watch(
       <template v-if="mode === 'pick'">
         <!-- 点了名字：名单换成这个人，光标直接在密码框 -->
         <div v-if="picked" class="me">
-          <RankAvatar :username="`${klass}${picked}`" :avatar="null" :size="64" />
-          <div class="me-name"><UserName :username="`${klass}${picked}`" /></div>
+          <RankAvatar :username="picked.username" :avatar="null" :size="64" />
+          <div class="me-name"><UserName :username="picked.username" /></div>
           <div class="field narrow">
             <n-input
               ref="passwordRef"
@@ -322,8 +321,8 @@ watch(
             <div v-else-if="!names.length" class="empty">这个班还没有名单</div>
             <div v-else-if="!shown.length" class="empty">没有叫这个的</div>
             <div v-else class="grid">
-              <button v-for="name in shown" :key="name" class="cell" type="button" @click="pick(name)">
-                {{ name }}
+              <button v-for="member in shown" :key="member.username" class="cell" type="button" @click="pick(member)">
+                {{ member.name }}
               </button>
             </div>
           </div>

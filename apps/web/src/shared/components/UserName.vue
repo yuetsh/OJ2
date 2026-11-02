@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
-import { USERNAME_CLASS_RE } from 'utils/constants'
+import { LEGACY_CLASS_PREFIX_RE } from '@oj2/contract'
 
 /**
  * 用户名：班级前缀（`ks253`）淡一档，名字加粗 —— 一个班的人前缀都一样，
@@ -11,7 +11,7 @@ const props = defineProps<{ username: string; muted?: boolean }>()
 const theme = useThemeVars()
 
 const parts = computed(() => {
-  const match = props.username.match(USERNAME_CLASS_RE)
+  const match = props.username.match(LEGACY_CLASS_PREFIX_RE)
   if (!match) return { prefix: '', name: props.username }
   return { prefix: match[0], name: props.username.slice(match[0].length) || match[0] }
 })

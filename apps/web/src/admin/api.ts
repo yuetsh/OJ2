@@ -103,6 +103,7 @@ export function getBaseInfo() {
   return api.get<DashboardInfo>('admin/dashboard')
 }
 
+/** 后台首页「抽一个人」：从这个班（班号）随机拿 10 个显示用的名字 */
 export function randomUser10(classroom: string) {
   return api.get<string[]>('admin/random-usernames', {
     params: { classroom },
@@ -245,9 +246,11 @@ export function getUserList(
 }
 
 /** 批量建号之前查重：这些用户名哪些已经有了 */
-export function checkUsernames(usernames: string[]) {
+/** 批量建号查重：这个班里已经有的同名账号，和每个名字会建成的用户名 */
+export function checkUsernames(className: string, names: string[]) {
   return api.post<CheckUsernamesResponse>('admin/users/check', {
-    usernames,
+    className,
+    names,
   } satisfies CheckUsernamesRequest)
 }
 
@@ -260,6 +263,7 @@ export function editUser(user: AdminUserForm) {
     adminType: toAdminType(user.adminType),
     problemPermission: toProblemPermission(user.problemPermission),
     realName: user.realName ?? null,
+    className: user.className ?? null,
     isDisabled: user.isDisabled,
     password: user.password ?? '',
   } satisfies UpdateUserRequest)
