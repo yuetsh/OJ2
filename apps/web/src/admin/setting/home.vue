@@ -206,13 +206,13 @@ onUnmounted(stopRolling)
   </div>
 
   <div class="lucky">
-    <b class="lucky-title">抽一个人</b>
+    <b class="lucky-title">抽签</b>
     <n-select v-model:value="luckyClass" :options="classOptions" filterable placeholder="选班级" aria-label="班级" class="lucky-select" />
     <span :key="pulseKey" class="lucky-name" :class="{ pulse: !isRolling && luckyGuy }">
       {{ luckyGuy }}
     </span>
     <n-button type="primary" :disabled="!luckyClass || isRolling" @click="draw">
-      {{ luckyGuy ? '再抽一个' : '抽' }}
+      {{ luckyGuy ? '再抽一个' : '抽一个人' }}
     </n-button>
   </div>
 </template>
