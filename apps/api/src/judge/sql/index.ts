@@ -172,6 +172,14 @@ async function runJob<T>(job: SqlJob, budget: JobBudget): Promise<SqlJobOutcome<
   }
 }
 
+/**
+ * 一个测试点最长可能占多久：受信阶段的预算 + 启动余量，进了学生阶段换成题目时限 + 余量。
+ * 判题名额的租约（judge/slots.ts）按它算，租约比这短的话跑到一半名额会被别人拿走
+ */
+export function sqlCaseBudgetMs(timeLimitMs: number) {
+  return trustedBudgetMs(timeLimitMs) + STARTUP_SLACK_MS + timeLimitMs + STUDENT_SLACK_MS
+}
+
 export function runSqlCase(job: Extract<SqlJob, { kind: 'judge' }>) {
   return runJob<CaseResult>(job, {
     trustedMs: trustedBudgetMs(job.timeLimitMs),

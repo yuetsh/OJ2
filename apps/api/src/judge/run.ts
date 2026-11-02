@@ -14,7 +14,7 @@ import type { JudgeJobData } from './job'
 import { isAccepted, JudgeStatus, type JudgeStatusValue } from './status'
 import { parseProblemTemplate, shiftCompileLines } from './template'
 import { withJudgeSlot } from './slots'
-import { runSqlCase } from './sql'
+import { runSqlCase, sqlCaseBudgetMs } from './sql'
 import { nativeRuntimeError, parsePythonTraceback, type RuntimeErrorInfo } from './runtime-diagnosis'
 import { compileError, judge, JudgeUnreachableError, type JudgeCase, type JudgeResponse } from './sandbox'
 import { readInfo } from '../services/test-case'
@@ -625,6 +625,25 @@ async function judgeSqlSubmission(problem: typeof schema.problem.$inferSelect, s
   const keys = Object.keys(info.test_cases ?? {}).sort((a, b) => Number(a) - Number(b))
   if (keys.length === 0) throw new Error('题目没有任何测试点')
 
+  /**
+   * 和沙箱判题占同一个池的名额（judge/slots.ts）：SQL 子进程在 worker 里跑，同样吃服务器
+   * 那两个核，原来不排队 —— 两道 SQL 加两道沙箱判题、再加流程图试运行一起压上去，
+   * 按墙钟算的 SQL 时限就会把本来不超时的语句判成超时。一个名额管整份提交，和沙箱那边一样。
+   * 租约按每个测试点最长可能占的时间算，再加 30 秒
+   */
+  const holdMs = keys.length * sqlCaseBudgetMs(problem.timeLimit) + 30_000
+  return withJudgeSlot('judge', { holdMs }, () => judgeSqlCases(problem, keys, info, refSql, studentSql, mode, sqlConfig))
+}
+
+async function judgeSqlCases(
+  problem: typeof schema.problem.$inferSelect,
+  keys: string[],
+  info: NonNullable<Awaited<ReturnType<typeof readInfo>>>,
+  refSql: string,
+  studentSql: string,
+  mode: 'query' | 'modify',
+  sqlConfig: Record<string, unknown>,
+): Promise<JudgeResponse> {
   const cases: JudgeCase[] = []
   for (const [index, key] of keys.entries()) {
     const inputName = info.test_cases![key]!.input_name
