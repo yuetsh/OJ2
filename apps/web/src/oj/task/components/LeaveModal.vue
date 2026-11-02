@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import type { TaskBoardStudent } from 'utils/types'
 
 /**
@@ -68,7 +69,13 @@ function save() {
           </n-button>
         </div>
         <div class="leave-grid">
-          <n-checkbox v-for="student in section.students" :key="student.userId" :value="student.username" :label="student.username" class="leave-option" />
+          <n-checkbox
+            v-for="student in section.students"
+            :key="student.userId"
+            :value="student.username"
+            :label="displayName(student.username)"
+            class="leave-option"
+          />
         </div>
       </div>
     </n-checkbox-group>

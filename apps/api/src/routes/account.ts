@@ -263,10 +263,13 @@ accountRoutes.put('/me/profile', requireAuth, async (c) => {
   const parsed = await parseBody(c, updateProfileRequestSchema, 'Invalid profile payload')
   if (!parsed.success) return parsed.response
   const values = Object.fromEntries(Object.entries(parsed.data).map(([key, value]) => [key, value === '' ? null : value]))
-  await db
-    .update(schema.userProfile)
-    .set(values)
-    .where(eq(schema.userProfile.userId, c.get('user')!.id))
+  // 只带了不收的字段（比如老页面还发 realName）：没什么可改的，别让 drizzle 的空 set 报成 500
+  if (Object.keys(values).length) {
+    await db
+      .update(schema.userProfile)
+      .set(values)
+      .where(eq(schema.userProfile.userId, c.get('user')!.id))
+  }
   const profile = await getUserProfileById(c.get('user')!.id, true)
   if (!profile) return failure(c, 404, 'profile-not-found', 'User profile does not exist')
   return success(c, profile)

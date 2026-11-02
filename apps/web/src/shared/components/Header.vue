@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { Icon } from '@iconify/vue'
 import { NSwitch, useThemeVars } from 'naive-ui'
 import { RouterLink } from 'vue-router'
@@ -236,7 +237,7 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       <template v-if="userStore.isFinished">
         <n-dropdown v-if="userStore.isAuthed" :options="options" size="large">
           <n-button class="name" :title="userStore.user!.username">
-            <span class="name-text">{{ userStore.user!.username }}</span>
+            <span class="name-text">{{ displayName(userStore.user!.username) }}</span>
             <Icon icon="ph:caret-down-bold" :width="11" class="caret" />
           </n-button>
         </n-dropdown>

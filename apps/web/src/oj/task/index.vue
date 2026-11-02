@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import { getTaskBoard } from 'oj/api'
@@ -714,7 +715,7 @@ function lastText(student: TaskBoardStudent) {
                     class="plain"
                     :href="submissionsHref(student, undefined, !student.codeToday)"
                     target="_blank"
-                    :title="`看 ${student.username} 今天交的全部`"
+                    :title="`看 ${displayName(student.username)} 今天交的全部`"
                   >
                     <UserName :username="student.username" />
                   </a>
@@ -733,7 +734,7 @@ function lastText(student: TaskBoardStudent) {
                     v-else-if="student.editing"
                     type="button"
                     class="where"
-                    :title="`打开 ${student.username} 正在写的 ${student.editing}`"
+                    :title="`打开 ${displayName(student.username)} 正在写的 ${student.editing}`"
                     @click="peek(student.userId)"
                   >
                     {{ student.editing }}

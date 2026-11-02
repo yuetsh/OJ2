@@ -4,6 +4,7 @@ import {
   aiHintRequestSchema,
   classAnalysisRequestSchema,
   classPkAnalysisRequestSchema,
+  displayName,
   HINT_MIN_FAILURES,
   LEARNING_PERIOD_LABELS,
   learningPeriodSchema,
@@ -354,6 +355,8 @@ aiRoutes.post('/ai/class-analysis', requireAuth, async (c) => {
   // 数字和抽屉里看到的是同一份（services/ranking.ts 的 classDetail），不再由前端整包传上来
   const detail = await classDetail(parsed.data.className, true)
   if (!detail.members) return failure(c, 404, 'class-not-found', '这个班没有学生')
+  // 「要多关心的同学」会被点名：老号的用户名带 ks252 前缀，喂给模型之前剥掉，报告里写的才是界面上那个名字
+  const forModel = { ...detail, care: detail.care?.map((row) => ({ ...row, user: { ...row.user, username: displayName(row.user.username) } })) ?? null }
   return streamChat(
     [
       '你是编程课老师的助教。下面是一个班这学期在 OJ 上的做题数据（JSON，人名是用户名）。',
@@ -362,7 +365,7 @@ aiRoutes.post('/ai/class-analysis', requireAuth, async (c) => {
       '**分化**（前后 10%、人最多的那一档同分）、**建议**（点名 care 里的同学，给下节课能直接做的事）。',
       '用大白话，不要出现四分位数、标准差、方差这类统计词，不要编数据里没有的数字。',
     ].join(''),
-    JSON.stringify(detail),
+    JSON.stringify(forModel),
   )
 })
 

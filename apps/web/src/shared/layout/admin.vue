@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { h } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink } from 'vue-router'
@@ -286,7 +287,7 @@ onMounted(async () => {
           <n-dropdown v-if="userStore.user" :options="userOptions" trigger="click" @select="onUserSelect">
             <n-button quaternary size="small">
               <template #icon><Icon icon="ph:user-circle" /></template>
-              <template v-if="!isMobile">{{ userStore.user.username }}</template>
+              <template v-if="!isMobile">{{ displayName(userStore.user.username) }}</template>
             </n-button>
           </n-dropdown>
           <!-- 老师在后台改题时也得知道有人举手（前台顶栏在这里是卸载的）。

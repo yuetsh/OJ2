@@ -1,4 +1,4 @@
-import { CLASS_NAME_RE, type ClassMember, type Quote, type WebsiteConfig } from '@oj2/contract'
+import { CLASS_NAME_RE, displayName, type ClassMember, type Quote, type WebsiteConfig } from '@oj2/contract'
 import { asc, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { resolve } from 'node:path'
@@ -92,6 +92,30 @@ siteRoutes.get('/quotes/random', async (c) => {
   }
 })
 
+/**
+ * 登录框点名字的名单：名字给人点，用户名拿去登录（老号 ks232张三，新号就是名字）。名字按界面上的显示规则剥，
+ * 和 UserName 一致 —— 不能只剥「ks + 当前班号」：班级现在能在后台改，换过班的老号会露出整串
+ */
+siteRoutes.get('/classes/:className/members', async (c) => {
+  const className = c.req.param('className').trim()
+  if (!CLASS_NAME_RE.test(className)) {
+    return failure(c, 400, 'invalid-class', 'Class name must contain 3 or 4 digits')
+  }
+  const rows = await db
+    .select({ username: schema.user.username })
+    .from(schema.user)
+    .where(eq(schema.user.className, className))
+    .orderBy(desc(schema.user.createTime), asc(schema.user.id))
+  return success(
+    c,
+    rows.map(({ username }) => ({ name: displayName(username), username }) satisfies ClassMember),
+  )
+})
+
+/**
+ * 旧版登录框的名单：只回名字，前端拼「ks + 班号 + 名字」去登录。2026-11 的新前端改走上面的 /members；
+ * 这条原样留着，是给上线时还开着旧登录页、没刷新的机房电脑用的（老号照样登得上）。过一阵可以删
+ */
 siteRoutes.get('/classes/:className/usernames', async (c) => {
   const className = c.req.param('className').trim()
   if (!CLASS_NAME_RE.test(className)) {
@@ -102,9 +126,8 @@ siteRoutes.get('/classes/:className/usernames', async (c) => {
     .from(schema.user)
     .where(eq(schema.user.className, className))
     .orderBy(desc(schema.user.createTime), asc(schema.user.id))
-  // 名字给人点，用户名拿去登录：老号是 ks232张三（点的是「张三」），新号两个一样
   return success(
     c,
-    rows.map(({ username }) => ({ name: stripClassPrefix(username, className), username }) satisfies ClassMember),
+    rows.map(({ username }) => stripClassPrefix(username, className)),
   )
 })

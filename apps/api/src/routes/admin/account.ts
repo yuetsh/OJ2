@@ -198,30 +198,47 @@ adminAccountRoutes.get('/users', requireSuperAdmin, async (c) => {
 })
 
 /**
- * 批量建号之前查重（批量建号页边粘名单边查）：这个班里已经有谁了（多半是同一个人粘了两次），
- * 以及每个名字会建成什么用户名（名字被别的班、注册的号占了就加数字）。比较归一成小写，和导入、登录同一个口径
+ * 这个班里已经有的、叫这几个名字的人（多半是同一个学生粘了两次）。三种写法都要认：老号 `ks232张三`
+ * （剥掉前缀比）、名字被占过加了数字的新号 `张三2`、24 级数媒那批编号制用户名 —— 后两种名字只在真名里，
+ * 所以真名也比。比较归一成小写，和登录、导入同一个口径
+ */
+async function classmatesNamed(className: string, names: string[]) {
+  const wanted = new Set(names.map((name) => name.toLowerCase()))
+  const rows = await db
+    .select({ username: schema.user.username, realName: schema.userProfile.realName, createTime: schema.user.createTime })
+    .from(schema.user)
+    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
+    .where(eq(schema.user.className, className))
+  return rows.flatMap((row) => {
+    const name = [displayName(row.username), row.realName ?? ''].find((candidate) => candidate && wanted.has(candidate.toLowerCase()))
+    return name ? [{ name, username: row.username, createTime: row.createTime }] : []
+  })
+}
+
+/**
+ * 全站已经被占的用户名里，和这几个名字撞的：名字本身，以及「名字 + 数字」（给新号加数字时要绕开）。
+ * 名字自己就带数字（王芳1）也照样认 —— 不能先把库里的尾数剥掉再比，那样 `王芳1` 剥成 `王芳` 就漏了
+ */
+async function takenUsernames(names: string[]) {
+  const escape = (text: string) => text.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&')
+  const pattern = `^(${[...new Set(names.map((name) => escape(name.toLowerCase())))].join('|')})[0-9]*$`
+  const rows = await db
+    .select({ username: sql<string>`lower(${schema.user.username})` })
+    .from(schema.user)
+    .where(sql`lower(${schema.user.username}) ~ ${pattern}`)
+  return new Set(rows.map((row) => row.username))
+}
+
+/**
+ * 批量建号之前查重（批量建号页边粘名单边查）：这个班里已经有谁了，以及每个名字会建成什么用户名
+ * （名字被别的班、注册的号占了就加数字）。导入时后端还会再查一遍同班同名，这里只是让老师提前看到
  */
 adminAccountRoutes.post('/users/check', requireSuperAdmin, async (c) => {
   const parsed = await parseBody(c, checkUsernamesRequestSchema)
   if (!parsed.success) return parsed.response
   const { className, names } = parsed.data
-  const wanted = [...new Set(names.map((name) => name.toLowerCase()))]
-
-  // 同班同名：老号是 ks232张三，按剥掉前缀的名字比
-  const classmates = await db
-    .select({ username: schema.user.username, createTime: schema.user.createTime })
-    .from(schema.user)
-    .where(eq(schema.user.className, className))
-  const existing = classmates
-    .map((row) => ({ name: displayName(row.username), username: row.username, createTime: row.createTime }))
-    .filter((row) => wanted.includes(row.name.toLowerCase()))
-
-  // 用户名全站唯一：名字本身和「名字+数字」占了哪些
-  const taken = await db
-    .select({ username: sql<string>`lower(${schema.user.username})` })
-    .from(schema.user)
-    .where(inArray(sql`regexp_replace(lower(${schema.user.username}), '[0-9]+$', '')`, wanted))
-  return success(c, { existing, usernames: suggestUsernames(names, new Set(taken.map((row) => row.username))) } satisfies CheckUsernamesResponse)
+  const [existing, taken] = await Promise.all([classmatesNamed(className, names), takenUsernames(names)])
+  return success(c, { existing, usernames: suggestUsernames(names, taken) } satisfies CheckUsernamesResponse)
 })
 
 /**
@@ -377,6 +394,19 @@ adminAccountRoutes.post('/users', requireSuperAdmin, async (c) => {
   const batchMails = dupInBatch(prepared.map((item) => item.email))
   if (batchMails.length) {
     return failure(c, 409, 'email-exists', `这批名单里邮箱重复：${batchMails.join('、')}`)
+  }
+
+  // 同班同名再查一遍：用户名不再带班号以后，「同一个学生粘了两次」撞不上用户名唯一约束了（新号会被加成张三2），
+  // 只靠批量建号页的查重挡 —— 那边有半秒防抖，粘完马上点就绕过去了
+  const byClass = new Map<string, string[]>()
+  for (const item of prepared) {
+    if (item.className) byClass.set(item.className, [...(byClass.get(item.className) ?? []), item.realName || displayName(item.username)])
+  }
+  for (const [className, names] of byClass) {
+    const clash = await classmatesNamed(className, names)
+    if (clash.length) {
+      return failure(c, 409, 'name-exists-in-class', `${className} 班已经有${clash.map((row) => `「${row.name}」`).join('、')}了`)
+    }
   }
 
   const existing = await db

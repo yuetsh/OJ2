@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import type { ContestClassView, ContestScoreCell, ContestScoreRow } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { updateACMHelperChecked } from 'admin/api'
@@ -225,12 +226,13 @@ onKeyStroke(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'], (event) => {
 
 function exportGrades() {
   const title = contestStore.contest?.title ?? '比赛'
-  const head = ['用户名', '班级', '做对', '名次', '用时', ...problems.value.map((p) => `第${p._id}题 ${p.title}`)]
+  const head = ['名字', '班级', '做对', '名次', '用时', ...problems.value.map((p) => `第${p._id}题 ${p.title}`)]
   const lines = [head]
-  const byUsername = [...rows.value].sort((a, b) => a.username.localeCompare(b.username, 'zh-CN'))
-  for (const row of byUsername) {
+  // 按名字的拼音排：老号 ks 开头、新号是中文名，按用户名排两种号会各排各的
+  const byName = [...rows.value].sort((a, b) => displayName(a.username).localeCompare(displayName(b.username), 'zh-CN'))
+  for (const row of byName) {
     lines.push([
-      row.username,
+      displayName(row.username),
       row.className ? classLabel(row.className) : '',
       String(row.solved),
       String(row.rank ?? ''),
@@ -242,7 +244,14 @@ function exportGrades() {
     ])
   }
   for (const user of absent.value) {
-    lines.push([user.username, user.className ? classLabel(user.className) : '', user.leave ? '请假' : '没考', '', '', ...problems.value.map(() => '')])
+    lines.push([
+      displayName(user.username),
+      user.className ? classLabel(user.className) : '',
+      user.leave ? '请假' : '没考',
+      '',
+      '',
+      ...problems.value.map(() => ''),
+    ])
   }
   const csv = lines.map((line) => line.map((value) => `"${value.replaceAll('"', '""')}"`).join(',')).join('\r\n')
   // 带 BOM，Excel 双击打开中文才不乱码
@@ -430,7 +439,7 @@ const gradeColumns = computed(() => `24px 124px 40px 36px repeat(${problems.valu
                 no: cellOf(row, p.id) && !cellOf(row, p.id)!.isAc,
                 sel: selected?.userId === row.userId && selected.problemId === p.id,
               }"
-              :title="`${row.username} · 第 ${p._id} 题`"
+              :title="`${displayName(row.username)} · 第 ${p._id} 题`"
               @click="pick(row, p.id)"
             >
               <template v-if="cellOf(row, p.id)?.isAc">✓</template>

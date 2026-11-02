@@ -40,6 +40,8 @@ const props = defineProps<{
   minis: MiniRank[]
   /** 手机：前后一名的说明换到名字下面一行，别被截断 */
   compact?: boolean
+  /** 本年级 / 全服的榜混着好几个班：名字后面淡写班级（本班榜不写） */
+  showClass?: boolean
 }>()
 const emit = defineEmits<{ moodSaved: [mood: string | null] }>()
 
@@ -153,7 +155,7 @@ function threatNote(me: RankRow, behind: RankRow) {
       <RankAvatar :username="ahead.user.username" :avatar="ahead.avatar" :size="20" />
       <div class="rival-body">
         <div class="rival-line">
-          <UserName :username="ahead.user.username" class="rival-name" />
+          <UserName :username="ahead.user.username" :class-name="showClass ? ahead.className : null" class="rival-name" />
           <span class="note">{{ chaseNote(me, ahead) }}</span>
         </div>
         <span v-if="ahead.mood" class="rival-mood" :title="ahead.mood">“{{ ahead.mood }}”</span>
@@ -164,7 +166,7 @@ function threatNote(me: RankRow, behind: RankRow) {
       <RankAvatar :username="behind.user.username" :avatar="behind.avatar" :size="20" />
       <div class="rival-body">
         <div class="rival-line">
-          <UserName :username="behind.user.username" class="rival-name" />
+          <UserName :username="behind.user.username" :class-name="showClass ? behind.className : null" class="rival-name" />
           <span class="note">{{ threatNote(me, behind) }}</span>
         </div>
         <span v-if="behind.mood" class="rival-mood" :title="behind.mood">“{{ behind.mood }}”</span>

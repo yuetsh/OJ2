@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { continueStep, doneCount, tutorialPath, splitTitle, type TutorialType } from 'oj/learn/utils'
 import { Icon } from '@iconify/vue'
 import { getAnnouncementList, getKnowledgeMap, getContestList, getLastVisit, getLearnProgress, getSubmissions, getTutorials, getWeeklyRank } from 'oj/api'
@@ -276,8 +277,8 @@ function contestTime(contest: Contest) {
   <div class="home">
     <!-- 中间原来还有一个「题号或题目名 找题」框，和顶栏右上角那个重复，拿掉了 -->
     <section class="hero">
-      <h1 v-if="firstVisit" class="hello">欢迎来到判题狗，{{ userStore.user?.username }}</h1>
-      <h1 v-else class="hello">{{ greeting }}，{{ userStore.user?.username }}</h1>
+      <h1 v-if="firstVisit" class="hello">欢迎来到判题狗，{{ displayName(userStore.user?.username ?? '') }}</h1>
+      <h1 v-else class="hello">{{ greeting }}，{{ displayName(userStore.user?.username ?? '') }}</h1>
       <n-text v-if="firstVisit" depth="3">老师报了题号，在右上角的框里输入就能找到题</n-text>
       <n-text v-else depth="3">
         <template v-if="longAway">{{ awayText }} · </template>

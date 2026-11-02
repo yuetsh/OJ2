@@ -19,6 +19,8 @@ const props = defineProps<{
   chaseId?: number
   threatId?: number
   teacher?: boolean
+  /** 本年级 / 全服的榜混着好几个班：名字后面淡写班级（本班榜不写） */
+  showClass?: boolean
 }>()
 defineEmits<{ open: [username: string]; clearMood: [row: RankRow] }>()
 
@@ -59,7 +61,7 @@ const HEIGHTS: Record<number, number> = { 1: 56, 2: 44, 3: 34 }
         <div class="words">
           <div class="name-line">
             <button class="name" @click="$emit('open', row.user.username)">
-              <UserName :username="row.user.username" />
+              <UserName :username="row.user.username" :class-name="showClass ? row.className : null" />
             </button>
             <span v-if="row.user.id === chaseId" class="tag chase">前一名</span>
             <span v-else-if="row.user.id === threatId" class="tag threat">后一名</span>

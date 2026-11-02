@@ -13,7 +13,7 @@ import UserNameCell from './components/UserNameCell.vue'
 import PasswordCell from './components/PasswordCell.vue'
 import { PROBLEM_PERMISSION, USER_TYPE } from 'utils/constants'
 import { useRouteQuery } from '@vueuse/router'
-import { NO_CLASS, STUDENT_ROLES, type ImportUsersRequest } from '@oj2/contract'
+import { legacyClassOf, NO_CLASS, STUDENT_ROLES, type ImportUsersRequest } from '@oj2/contract'
 import { downloadAccountsCsv } from './accountsCsv'
 import { classLabel, groupClassOptions } from 'utils/classes'
 import { useConfigStore } from 'shared/store/config'
@@ -315,10 +315,21 @@ async function handleEditUser() {
   }
   // http 拦截器只对 login-required / permission-denied 自动弹提示，
   // 其余业务错误（比如班级号位数不对）不接住就什么都不显示
+  if (create.value && !userEditing.value.className && legacyClassOf(userEditing.value.username) === undefined) {
+    message.error('用户名里 ks 后面的班级号位数不对，班级号要是 3～4 位数字')
+    return
+  }
   try {
     if (create.value) {
       const newUser: ImportUsersRequest['users'] = [
-        [userEditing.value.username, password.value, userEditing.value.email ?? '', userEditing.value.realName ?? '', userEditing.value.className],
+        [
+          userEditing.value.username,
+          password.value,
+          userEditing.value.email ?? '',
+          userEditing.value.realName ?? '',
+          // 没选班、但手写的是老格式 ks232张三：按前缀补上班级
+          userEditing.value.className ?? legacyClassOf(userEditing.value.username) ?? null,
+        ],
       ]
       await importUsers(newUser)
       listUsers()

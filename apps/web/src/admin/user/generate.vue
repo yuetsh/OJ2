@@ -86,25 +86,36 @@ const duplicates = computed(() => {
 // 这个班已经有的同名账号（老号按剥掉 ks 前缀的名字比），顺带拿回每个名字会建成的用户名：停手半秒再去查
 const existing = ref<{ name: string; username: string; createTime: string | null }[]>([])
 const checking = ref(false)
+/** 查重结果对应的是哪一份「班级 + 名单」：和眼前的对不上（刚改过、还在防抖）就不让建 */
+const inputKey = computed(() => `${klass.value}\n${names.value.join('\n')}`)
+const checkedKey = ref('')
+// 改得快时前一次请求可能后回来，只认最后发出去的那次
+let checkSeq = 0
 watchDebounced(
-  () => `${klass.value}\n${names.value.join('\n')}`,
-  async () => {
+  inputKey,
+  async (key) => {
+    const seq = ++checkSeq
     const list = [...new Set(names.value)]
     if (!list.length || !klass.value || list.length > 500) {
       existing.value = []
       suggested.value = new Map()
+      checkedKey.value = ''
       return
     }
     checking.value = true
     try {
       const res = await checkUsernames(klass.value, list)
+      if (seq !== checkSeq) return
       existing.value = res.existing
       suggested.value = new Map(list.map((name, i) => [name, res.usernames[i] ?? name]))
+      checkedKey.value = key
     } catch {
+      if (seq !== checkSeq) return
       existing.value = []
       suggested.value = new Map()
+      checkedKey.value = ''
     } finally {
-      checking.value = false
+      if (seq === checkSeq) checking.value = false
     }
   },
   { debounce: 500, immediate: true },
@@ -112,7 +123,7 @@ watchDebounced(
 
 const tooMany = computed(() => rows.value.length > 500)
 const issueCount = computed(() => (classError.value ? 1 : 0) + duplicates.value.length + existing.value.length + (tooMany.value ? 1 : 0))
-const canSubmit = computed(() => rows.value.length > 0 && !issueCount.value && !checking.value && !!klass.value)
+const canSubmit = computed(() => rows.value.length > 0 && !issueCount.value && !checking.value && !!klass.value && checkedKey.value === inputKey.value)
 
 // ---------------------------------------------------------------- 建号
 
@@ -220,7 +231,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
       <template v-if="rows.length">
         <div class="head">
           <b>会建这 {{ rows.length }} 个账号</b>
-          <n-tag v-if="!issueCount && !checking && klass" type="success" :bordered="false" round> 没有重名 </n-tag>
+          <n-tag v-if="!issueCount && !checking && klass && checkedKey === inputKey" type="success" :bordered="false" round> 没有重名 </n-tag>
           <n-tag v-if="issueCount" type="warning" :bordered="false" round> 有 {{ issueCount }} 处要先改 </n-tag>
         </div>
 

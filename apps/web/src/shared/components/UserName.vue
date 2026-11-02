@@ -1,26 +1,26 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
-import { LEGACY_CLASS_PREFIX_RE } from '@oj2/contract'
+import { classLabel } from 'utils/classes'
 
 /**
- * 用户名：班级前缀（`ks253`）淡一档，名字加粗 —— 一个班的人前缀都一样，
- * 老师要认的是后面那段。`muted` 用在学生看别人的那几行（看得到结果、看不到代码）。
+ * 学生的名字。显示的是用户名（学生改不了；真名早几届有人改成过外号），老号的 `ks232` 前缀剥掉不显示 ——
+ * 班级单独存一列，前缀在界面上只是噪音。2026-11 起新号的用户名就是名字。
+ *
+ * `className` 给了就在名字后面淡写班级：一页上混着几个班（全服排名、全部提交、举手列表）时用，
+ * 不同班同名的人（252、253 都有杨涵宇）靠它分开。一页只有一个班的别传。
+ * `shortClass`：窄的定宽列（提交列表的名字列 116px）里只写班号（`李鑫楠 2312`），和原来 `ks2312李鑫楠` 一样宽。
+ * `muted` 用在学生看别人的那几行（看得到结果、看不到代码）。悬停看得到完整用户名。
  */
-const props = defineProps<{ username: string; muted?: boolean }>()
-
+const props = defineProps<{ username: string; muted?: boolean; className?: string | null; shortClass?: boolean }>()
 const theme = useThemeVars()
-
-const parts = computed(() => {
-  const match = props.username.match(LEGACY_CLASS_PREFIX_RE)
-  if (!match) return { prefix: '', name: props.username }
-  return { prefix: match[0], name: props.username.slice(match[0].length) || match[0] }
-})
+const name = computed(() => displayName(props.username))
 </script>
 
 <template>
   <span class="user" :class="{ muted }" :title="username">
-    <span v-if="parts.prefix" class="prefix">{{ parts.prefix }}</span>
-    <span class="name">{{ parts.name }}</span>
+    <span class="name">{{ name }}</span>
+    <span v-if="className" class="klass">{{ shortClass ? className : classLabel(className) }}</span>
   </span>
 </template>
 
@@ -32,13 +32,15 @@ const parts = computed(() => {
   min-width: 0;
 }
 
-.prefix {
-  color: v-bind('theme.textColor3');
-}
-
 .name {
   font-weight: 600;
   color: v-bind('theme.textColor1');
+}
+
+.klass {
+  margin-left: 6px;
+  font-size: 0.85em;
+  color: v-bind('theme.textColor3');
 }
 
 .muted .name {

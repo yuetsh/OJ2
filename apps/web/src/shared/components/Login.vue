@@ -360,7 +360,7 @@ watch(
             v-model:value="username"
             size="large"
             clearable
-            placeholder="完整用户名，如 ks231张三"
+            placeholder="用户名"
             :input-props="{ name: 'username', autocomplete: 'username' }"
             @keyup.enter="passwordRef?.focus()"
           />

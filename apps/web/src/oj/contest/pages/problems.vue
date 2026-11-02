@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import type { ContestScoreRow } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { useContestStore } from 'oj/store/contest'
@@ -131,7 +132,7 @@ const warning = computed(() => tone('warning'))
             <span class="count-num">{{ item.solved }} 人做对</span>
           </span>
           <span class="first">
-            <template v-if="item.first">最先：{{ item.first.username }} · {{ firstMinute(item.first.acTime) }}</template>
+            <template v-if="item.first">最先：{{ displayName(item.first.username) }} · {{ firstMinute(item.first.acTime) }}</template>
             <template v-else>还没人做对</template>
           </span>
         </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { getProblemSetClassView } from 'oj/api'
 import { useTone } from 'shared/composables/tone'
@@ -84,8 +85,8 @@ const error = computed(() => tone('error'))
           ><span class="muted">做完</span> <b class="num big">{{ finished }}</b
           ><span class="muted"> 人</span></span
         >
-        <span v-if="absent.length" class="absent ell" :title="absent.map((s) => s.username).join('、')"
-          >没加入：{{ absent.map((s) => s.username).join('、') }}</span
+        <span v-if="absent.length" class="absent ell" :title="absent.map((s) => displayName(s.username)).join('、')"
+          >没加入：{{ absent.map((s) => displayName(s.username)).join('、') }}</span
         >
         <div class="spacer"></div>
         <span v-if="beforeCount" class="legend-before"><span class="corner"></span>加入前就做对过（{{ beforeCount }} 格）</span>
@@ -116,7 +117,7 @@ const error = computed(() => tone('error'))
               target="_blank"
               class="box"
               :class="{ ok: c.solvedTime, bad: !c.solvedTime && c.wrongCount }"
-              :title="`${s.username} · ${data.problems[i]!.title}${c.solvedBefore ? ' · 加入前就做对过' : ''}`"
+              :title="`${displayName(s.username)} · ${data.problems[i]!.title}${c.solvedBefore ? ' · 加入前就做对过' : ''}`"
             >
               <template v-if="c.solvedTime"
                 >✓ <span class="num">{{ cellTime(c.solvedTime) }}</span></template

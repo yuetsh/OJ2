@@ -42,6 +42,8 @@ export const flowchartSubmissionSchema = z.object({
 export const flowchartListItemSchema = z.object({
   id: z.string(),
   username: z.string(),
+  /** 提交人现在的班级；混着几个班列的时候名字后面淡写它 */
+  className: z.string().nullable(),
   problemDisplayId: z.string(),
   problemTitle: z.string(),
   status: flowchartStatusSchema,

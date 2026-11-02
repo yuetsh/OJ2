@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import type { ClassToday } from '@oj2/contract'
 import type { AnnouncementListItem } from 'utils/types'
 import { useThemeVars } from 'naive-ui'
@@ -78,7 +79,7 @@ const shortcuts = computed(() =>
 <template>
   <div class="home">
     <section class="hero">
-      <h1 class="hello">{{ greeting }}，{{ userStore.user?.username }}</h1>
+      <h1 class="hello">{{ greeting }}，{{ displayName(userStore.user?.username ?? '') }}</h1>
       <n-text v-if="today" depth="3" class="tagline">
         {{ today.classes.length ? `今天 ${today.classes.length} 个班上过课` : '今天还没有班在上课' }}
       </n-text>

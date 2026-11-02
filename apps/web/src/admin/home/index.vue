@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import type { DashboardInfo } from '@oj2/contract'
 import { BarElement, CategoryScale, Chart as ChartJS, LinearScale, Tooltip } from 'chart.js'
 import { useThemeVars } from 'naive-ui'
@@ -146,7 +147,7 @@ onUnmounted(stopRolling)
 </script>
 
 <template>
-  <PageHeader :title="`你好，${userStore.user?.username ?? '管理员'}`" />
+  <PageHeader :title="`你好，${userStore.user ? displayName(userStore.user.username) : '管理员'}`" />
 
   <div v-if="info" class="tiles">
     <div class="tile">

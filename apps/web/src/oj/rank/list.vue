@@ -287,7 +287,7 @@ function openSubmissions(username: string) {
 function hide(row: RankRow) {
   dialog.warning({
     title: '不计入排名',
-    content: `${row.user.username} 会从所有排名里消失（本班、本年级、全服、首页周榜），本人会看到「不计入排名」。比赛排名不受影响，随时能恢复。`,
+    content: `${displayName(row.user.username)} 会从所有排名里消失（本班、本年级、全服、首页周榜），本人会看到「不计入排名」。比赛排名不受影响，随时能恢复。`,
     positiveText: '不计入排名',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -314,7 +314,7 @@ function onMoodSaved(mood: string | null) {
 function confirmClearMood(row: RankRow) {
   dialog.warning({
     title: '清空个性签名',
-    content: `${row.user.username} 的签名「${row.mood}」会被清空。只清这一句，之后还能重新写。`,
+    content: `${displayName(row.user.username)} 的签名「${row.mood}」会被清空。只清这一句，之后还能重新写。`,
     positiveText: '清空',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -369,6 +369,7 @@ async function restore(userId: number) {
           </div>
           <RankPodium
             :rows="podium"
+            :show-class="board.scope !== 'class'"
             :me-id="meId"
             :chase-id="board.ahead?.user.id"
             :threat-id="board.behind?.user.id"
@@ -377,6 +378,7 @@ async function restore(userId: number) {
             @clear-mood="confirmClearMood"
           />
           <RankTrack
+            :show-class="board.scope !== 'class'"
             :key="`${board.scope}|${board.period}|${board.className}`"
             :rows="trackRows"
             :whole-label="board.scope === 'class' ? `看全班 ${board.total} 人` : undefined"
@@ -407,6 +409,7 @@ async function restore(userId: number) {
         <template v-if="board">
           <RankMe
             v-if="me"
+            :show-class="board.scope !== 'class'"
             :me="me"
             :ahead="board.ahead"
             :behind="board.behind"

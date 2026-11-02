@@ -43,6 +43,8 @@ const props = defineProps<{
   expanding?: boolean
   /** 手机上只有末尾一段折起来时按钮上的字，比如「看全班 39 人」 */
   wholeLabel?: string
+  /** 本年级 / 全服的榜混着好几个班：名字后面淡写班级（本班榜不写） */
+  showClass?: boolean
 }>()
 const emit = defineEmits<{
   open: [username: string]
@@ -188,7 +190,7 @@ function onMenu(key: string, row: RankRow) {
           <div class="pmain">
             <div class="pname">
               <button class="who" @click="emit('open', item.row.user.username)">
-                <UserName :username="item.row.user.username" />
+                <UserName :username="item.row.user.username" :class-name="showClass ? item.row.className : null" />
               </button>
               <span v-if="item.row.user.id === chaseId" class="tag chase">前一名</span>
               <span v-else-if="item.row.user.id === threatId" class="tag threat">后一名</span>
@@ -211,7 +213,7 @@ function onMenu(key: string, row: RankRow) {
             <span class="rank">{{ item.row.solved ? item.row.rank : '—' }}</span>
             <RankAvatar :username="item.row.user.username" :avatar="item.row.avatar" :size="20" :me="item.row.user.id === meId" />
             <button class="who" @click="emit('open', item.row.user.username)">
-              <UserName :username="item.row.user.username" />
+              <UserName :username="item.row.user.username" :class-name="showClass ? item.row.className : null" />
             </button>
             <span class="bar-box" :style="{ background: palette.track }">
               <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />

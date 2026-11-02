@@ -57,6 +57,9 @@ function explain(items: CollabRequestItem[], problemId: string) {
     query: { ...(className ? { className } : {}), problem: problemId },
   })
 }
+
+/** 举手的人来自不止一个班（两个老师同时上课）：名字后面淡写班级 */
+const manyClasses = computed(() => new Set(collabStore.requests.map((item) => item.className)).size > 1)
 </script>
 
 <template>
@@ -80,7 +83,7 @@ function explain(items: CollabRequestItem[], problemId: string) {
       </div>
       <div v-for="item in group.items" :key="item.studentId" class="row">
         <div class="who">
-          <UserName :username="item.studentName" />
+          <UserName :username="item.studentName" :class-name="manyClasses ? item.className : null" />
           <span class="kind">{{ kindOf(item) }}</span>
         </div>
         <template v-if="item.status === 'active'">

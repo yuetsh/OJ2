@@ -7,6 +7,7 @@
  */
 
 import {
+  displayName,
   FLOWCHART_PASS_GRADES,
   NO_CLASS,
   STUDENT_ROLES,
@@ -27,7 +28,7 @@ import { type ContestEnv } from '../services/contest'
 import { getBooleanOption } from '../services/options'
 import { lessonDoneCounts } from '../services/lesson'
 import { calendarDay, dayStart, localTime } from '../time'
-import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from './helpers'
+import { isAdminRole, parseDisplayIds, rounded, scopedUsers } from './helpers'
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
 
@@ -345,7 +346,7 @@ submissionStatisticsRoutes.get('/submissions/statistics', requireTeacher, async 
     .filter((row) => !submittedUserIds.has(row.id))
     .map((row) => ({
       username: row.username,
-      realName: stripClassPrefix(row.username, row.className),
+      realName: displayName(row.username),
     }))
 
   /**
@@ -374,7 +375,7 @@ submissionStatisticsRoutes.get('/submissions/statistics', requireTeacher, async 
      * 不传用户名的全站视图里各班混在一起，剥完只剩一串重名的名字，反而认不出谁，
      * 所以原样给完整用户名。班名取 perUser join 出来的那一列，和花名册同一份数据。
      */
-    realName: scoped ? stripClassPrefix(row.username, row.className) : row.username,
+    realName: scoped ? displayName(row.username) : row.username,
     submissionCount: row.submissionCount,
     solvedCount: row.solvedCount,
   }))
@@ -481,7 +482,7 @@ submissionStatisticsRoutes.get('/submissions/statistics/grid', requireTeacher, a
     if (!entry) {
       entry = {
         username: row.username,
-        realName: stripClassPrefix(row.username, row.className),
+        realName: displayName(row.username),
         className: row.className,
         submissions: [],
       }

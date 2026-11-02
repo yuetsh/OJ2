@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayName } from '@oj2/contract'
 import { storeToRefs } from 'pinia'
 import { useProblemStore } from 'oj/store/problem'
 import { useCollabStore } from 'shared/store/collab'
@@ -85,7 +86,7 @@ function finishAndNext() {
     <button type="button" :class="next ? 'ghost' : 'end'" @click="finish">
       {{ peek ? '看完了' : '帮完了' }}
     </button>
-    <button v-if="next" type="button" class="end" @click="finishAndNext">下一个：{{ next.studentName }} {{ next.problemId }} →</button>
+    <button v-if="next" type="button" class="end" @click="finishAndNext">下一个：{{ displayName(next.studentName) }} {{ next.problemId }} →</button>
   </div>
 </template>
 

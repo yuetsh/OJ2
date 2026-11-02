@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 
 import {
+  displayName,
   createFlowchartRequestSchema,
   isFlowchartPass,
   type CreateFlowchartResponse,
@@ -27,18 +28,7 @@ import { consumeToken } from '../services/throttling'
 import { buildWordFrequencies } from '../services/word-frequency'
 import { dayStart } from '../time'
 import { unknownDisplayIds } from '../services/submission-filters'
-import {
-  classCondition,
-  isAdminRole,
-  isTeacherOrAbove,
-  matchedUsers,
-  asRecord,
-  parseDisplayIds,
-  queryInteger,
-  scopedUsers,
-  rounded,
-  stripClassPrefix,
-} from './helpers'
+import { classCondition, isAdminRole, isTeacherOrAbove, matchedUsers, asRecord, parseDisplayIds, queryInteger, scopedUsers, rounded } from './helpers'
 
 export const flowchartRoutes = new Hono<AppEnv>()
 
@@ -293,6 +283,7 @@ const flowchartListColumns = {
     evaluationTime: schema.flowchartSubmission.evaluationTime,
   },
   username: schema.user.username,
+  className: schema.user.className,
   problem: {
     displayId: schema.problem.displayId,
     title: schema.problem.title,
@@ -349,10 +340,11 @@ flowchartRoutes.get('/flowcharts', requireAuth, async (c) => {
   )
   return success(c, {
     results: rows.map(
-      ({ flowchart, username, problem }) =>
+      ({ flowchart, username, className, problem }) =>
         ({
           id: flowchart.id,
           username,
+          className,
           problemDisplayId: problem.displayId,
           problemTitle: problem.title,
           status: flowchart.status,
@@ -540,7 +532,7 @@ flowchartRoutes.get('/flowcharts/statistics', requireTeacher, async (c) => {
   const peopleTruncated = peopleRows.length > PEOPLE_LIMIT
   const people = peopleRows.slice(0, PEOPLE_LIMIT).map((row) => ({
     username: row.username,
-    realName: stripClassPrefix(row.username, row.className),
+    realName: displayName(row.username),
     bestScore: row.bestScore === null ? null : Number(row.bestScore),
     bestGrade: row.bestGrade,
     count: row.count,
@@ -561,7 +553,7 @@ flowchartRoutes.get('/flowcharts/statistics', requireTeacher, async (c) => {
       // 于是一节课刚开始、最该点名的时候，教师面板反而一个名字都不给
       dataUnaccepted: roster.map((row) => ({
         username: row.username,
-        realName: stripClassPrefix(row.username, row.className),
+        realName: displayName(row.username),
       })),
       people: [],
       peopleTruncated: false,
@@ -639,7 +631,7 @@ flowchartRoutes.get('/flowcharts/statistics', requireTeacher, async (c) => {
       .filter((row) => !submitted.has(row.id))
       .map((row) => ({
         username: row.username,
-        realName: stripClassPrefix(row.username, row.className),
+        realName: displayName(row.username),
       })),
     people,
     peopleTruncated,

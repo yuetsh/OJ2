@@ -63,6 +63,8 @@ const narrowList = computed(() => isDesktop.value && splitWidth.value > 0 && spl
 const twoLine = computed(() => isMobile.value || narrowList.value)
 
 const inContest = computed(() => route.name === 'contest submissions')
+/** 没按班筛、又不在比赛里：列表混着好几个班，名字后面淡写班级（同名的人靠它分开） */
+const mixedClasses = computed(() => !inContest.value && !query.className && query.myself !== '1')
 
 /**
  * 手机上点开的那一条，记在地址的 `?id=` 上：详情是从右边滑出的整屏，学生下意识按返回 ——
@@ -754,7 +756,7 @@ function dayBreak(index: number) {
               <div class="row" :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }" :data-row-id="row.id" @click="rowClicked(row)">
                 <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
-                  <span class="c-user"><UserName :username="row.username" /></span>
+                  <span class="c-user"><UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class /></span>
                   <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
                     <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                   </span>
@@ -764,7 +766,7 @@ function dayBreak(index: number) {
                 </template>
                 <template v-else>
                   <div class="m-line">
-                    <UserName :username="row.username" />
+                    <UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class />
                     <div class="spacer"></div>
                     <FlowchartState :status="row.status" :grade="row.aiGrade" />
                   </div>
@@ -785,7 +787,7 @@ function dayBreak(index: number) {
                 <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
                   <span class="c-user">
-                    <UserName :username="row.username" :muted="othersRow(row)" />
+                    <UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class :muted="othersRow(row)" />
                   </span>
                   <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
                     <span class="title">
@@ -808,7 +810,7 @@ function dayBreak(index: number) {
                 </template>
                 <template v-else>
                   <div class="m-line">
-                    <UserName :username="row.username" :muted="othersRow(row)" />
+                    <UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class :muted="othersRow(row)" />
                     <div class="spacer"></div>
                     <StatusPill :result="row.result" />
                   </div>

@@ -34,7 +34,7 @@ export function legacyClassOf(username: string): string | null | undefined {
 }
 
 /**
- * 登录框点名字用的名单（`GET /classes/:className/usernames`）：`name` 是点的那个名字，
+ * 登录框点名字用的名单（`GET /classes/:className/members`）：`name` 是点的那个名字，
  * `username` 是拿去登录的。原来只回名字、前端拼 `ks` + 班号 + 名字去登录，新号不带前缀就拼错了
  */
 export const classMemberSchema = z.object({ name: z.string(), username: z.string() })

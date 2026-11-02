@@ -44,7 +44,7 @@ export function getHitokoto() {
 
 /** 登录框点名字的名单：名字给人点，用户名拿去登录（老号 ks232张三，新号就是名字） */
 export function getClassUsernames(className: string) {
-  return api.get<ClassMember[]>(`classes/${encodeURIComponent(className)}/usernames`)
+  return api.get<ClassMember[]>(`classes/${encodeURIComponent(className)}/members`)
 }
 
 // 下面这个是启动就要调的（config store），所以放在 shared 而不是

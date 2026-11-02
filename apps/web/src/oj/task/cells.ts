@@ -1,3 +1,4 @@
+import { displayName } from '@oj2/contract'
 import type { LessonMode } from '@oj2/contract'
 import type { Tone } from 'shared/composables/tone'
 import { parseTime } from 'utils/functions'
@@ -114,11 +115,11 @@ export function cellTitle(cell: TaskBoardCell, student: TaskBoardStudent, day: s
     if (stage === 'draw') {
       const latest = cell.flowchart?.latest
       if (latest?.status === 0 || latest?.status === 1) return 'AI 正在评这张图'
-      return latest ? `讲讲 ${student.username} 这张图哪里画错了` : '还没画对'
+      return latest ? `讲讲 ${displayName(student.username)} 这张图哪里画错了` : '还没画对'
     }
     if (stage === 'nodraw') return '代码做对了，流程图还没画'
     if (halfDone(cell, mode)) return '流程图画对了，代码还没交'
-    if (cell.latest) return `讲讲 ${student.username} 这道题的错`
+    if (cell.latest) return `讲讲 ${displayName(student.username)} 这道题的错`
     if (mode === 'both' && cell.flowchart?.status === 'accepted') return '流程图画对了，代码以前交过、没做对'
     return cell.attempts ? `今天画了 ${cell.flowchartAttempts} 张流程图` : '以前交过，没做对'
   }
