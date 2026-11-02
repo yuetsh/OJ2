@@ -191,7 +191,7 @@ export type ExerciseAttemptRequest = z.input<typeof exerciseAttemptRequestSchema
  *
  * 前端目录、首页、后台「自学情况」都走这一个函数，别各写一份。
  */
-export function isLessonDone(progress: { viewCount: number; exerciseTotal: number; exerciseSolved: number }) {
+export function isTutorialDone(progress: { viewCount: number; exerciseTotal: number; exerciseSolved: number }) {
   if (progress.exerciseTotal > 0) return progress.exerciseSolved >= progress.exerciseTotal
   return progress.viewCount > 0
 }

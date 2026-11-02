@@ -7,7 +7,7 @@ import type { LearnStudentDetail } from 'utils/types'
 import UserName from 'shared/components/UserName.vue'
 import { useBackClose } from 'shared/composables/backClose'
 import { useBreakpoints } from 'shared/composables/breakpoints'
-import { splitTitle, type TutorialType } from 'oj/learn/lesson'
+import { splitTitle, type TutorialType } from 'oj/learn/utils'
 import { EXERCISE_KIND } from './kinds'
 
 /**
@@ -30,31 +30,31 @@ const theme = useThemeVars()
 const { isDesktop } = useBreakpoints()
 useBackClose(show, () => !isDesktop.value)
 
-type Lesson = LearnStudentDetail['lessons'][number]
-type Exercise = Lesson['exercises'][number]
-type Problem = Lesson['problems'][number]
+type Tutorial = LearnStudentDetail['tutorials'][number]
+type Exercise = Tutorial['exercises'][number]
+type Problem = Tutorial['problems'][number]
 
 const detail = ref<LearnStudentDetail | null>(null)
 const loading = ref(false)
 const expanded = ref(new Set<number>())
 
 const summary = computed(() => {
-  const lessons = detail.value?.lessons ?? []
-  const exercises = lessons.flatMap((lesson) => lesson.exercises)
+  const tutorials = detail.value?.tutorials ?? []
+  const exercises = tutorials.flatMap((tutorial) => tutorial.exercises)
   // 一道题挂在两课只算一次
-  const problems = new Map(lessons.flatMap((lesson) => lesson.problems).map((p) => [p.id, p]))
+  const problems = new Map(tutorials.flatMap((tutorial) => tutorial.problems).map((p) => [p.id, p]))
   return {
     problemSolved: [...problems.values()].filter((p) => p.solved).length,
     problemTotal: problems.size,
-    opened: lessons.filter((lesson) => lesson.viewCount > 0).length,
-    seconds: lessons.reduce((n, lesson) => n + lesson.totalSeconds, 0),
+    opened: tutorials.filter((tutorial) => tutorial.viewCount > 0).length,
+    seconds: tutorials.reduce((n, tutorial) => n + tutorial.totalSeconds, 0),
     solved: exercises.filter((ex) => ex.solved).length,
     total: exercises.length,
   }
 })
 
-function solvedOf(lesson: Lesson) {
-  return lesson.exercises.filter((ex) => ex.solved).length
+function solvedOf(tutorial: Tutorial) {
+  return tutorial.exercises.filter((ex) => ex.solved).length
 }
 
 function stateOf(ex: Exercise) {
@@ -92,13 +92,13 @@ watch(
       const data = await getLearnStudent(userId, { type })
       detail.value = data
       expanded.value = new Set(
-        data.lessons
+        data.tutorials
           .filter(
-            (lesson) =>
-              (lesson.exercises.some((ex) => ex.attempts > 0) && lesson.exercises.some((ex) => !ex.solved)) ||
-              lesson.problems.some((p) => p.submissions > 0 && !p.solved),
+            (tutorial) =>
+              (tutorial.exercises.some((ex) => ex.attempts > 0) && tutorial.exercises.some((ex) => !ex.solved)) ||
+              tutorial.problems.some((p) => p.submissions > 0 && !p.solved),
           )
-          .map((lesson) => lesson.tutorialId),
+          .map((tutorial) => tutorial.tutorialId),
       )
     } catch {
       detail.value = null
@@ -133,40 +133,42 @@ watch(
           '--bad': theme.errorColor,
         }"
       >
-        <div v-if="detail && !detail.lessons.length" class="muted none">还没打开过</div>
-        <div v-for="lesson in detail?.lessons ?? []" :key="lesson.tutorialId" class="lesson">
-          <button type="button" class="lesson-head" @click="toggle(lesson.tutorialId)">
-            <span class="lesson-line">
-              <span class="lesson-title">
-                <span class="muted num">第 {{ steps.get(lesson.tutorialId) }} 课</span>
-                {{ splitTitle(lesson.title).kp }}
+        <div v-if="detail && !detail.tutorials.length" class="muted none">还没打开过</div>
+        <div v-for="tutorial in detail?.tutorials ?? []" :key="tutorial.tutorialId" class="tutorial">
+          <button type="button" class="tutorial-head" @click="toggle(tutorial.tutorialId)">
+            <span class="tutorial-line">
+              <span class="tutorial-title">
+                <span class="muted num">第 {{ steps.get(tutorial.tutorialId) }} 课</span>
+                {{ splitTitle(tutorial.title).kp }}
               </span>
               <span class="grow" />
-              <span v-if="lesson.exercises.length" class="small num"> {{ solvedOf(lesson) }}/{{ lesson.exercises.length }} </span>
+              <span v-if="tutorial.exercises.length" class="small num"> {{ solvedOf(tutorial) }}/{{ tutorial.exercises.length }} </span>
               <span class="squares">
-                <span v-for="ex in lesson.exercises" :key="ex.exerciseId" class="square" :class="stateOf(ex)" />
+                <span v-for="ex in tutorial.exercises" :key="ex.exerciseId" class="square" :class="stateOf(ex)" />
               </span>
               <Icon
-                v-if="lesson.exercises.length || lesson.problems.length"
-                :icon="expanded.has(lesson.tutorialId) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'"
+                v-if="tutorial.exercises.length || tutorial.problems.length"
+                :icon="expanded.has(tutorial.tutorialId) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'"
                 :width="12"
                 class="muted"
               />
             </span>
-            <span class="lesson-line small muted num">
-              <template v-if="lesson.viewCount">
-                打开 {{ lesson.viewCount }} 次
-                <template v-if="lesson.totalSeconds"> · 停留 {{ readableDuration(lesson.totalSeconds) }}</template>
-                <template v-if="lesson.lastViewedAt"> · {{ parseTime(lesson.lastViewedAt, 'M月D日 HH:mm') }}</template>
+            <span class="tutorial-line small muted num">
+              <template v-if="tutorial.viewCount">
+                打开 {{ tutorial.viewCount }} 次
+                <template v-if="tutorial.totalSeconds"> · 停留 {{ readableDuration(tutorial.totalSeconds) }}</template>
+                <template v-if="tutorial.lastViewedAt"> · {{ parseTime(tutorial.lastViewedAt, 'M月D日 HH:mm') }}</template>
               </template>
               <template v-else>没打开过，直接做的练一练</template>
-              <template v-if="!lesson.exercises.length"> · 这课没有练一练</template>
-              <template v-if="lesson.problems.length"> · 配套题 {{ lesson.problems.filter((p) => p.solved).length }}/{{ lesson.problems.length }}</template>
+              <template v-if="!tutorial.exercises.length"> · 这课没有练一练</template>
+              <template v-if="tutorial.problems.length">
+                · 配套题 {{ tutorial.problems.filter((p) => p.solved).length }}/{{ tutorial.problems.length }}</template
+              >
             </span>
           </button>
 
-          <div v-if="expanded.has(lesson.tutorialId) && (lesson.exercises.length || lesson.problems.length)" class="ex-list">
-            <div v-for="ex in lesson.exercises" :key="ex.exerciseId" class="ex">
+          <div v-if="expanded.has(tutorial.tutorialId) && (tutorial.exercises.length || tutorial.problems.length)" class="ex-list">
+            <div v-for="ex in tutorial.exercises" :key="ex.exerciseId" class="ex">
               <span class="square" :class="stateOf(ex)" />
               <div class="ex-body">
                 <div class="ex-question">
@@ -183,8 +185,8 @@ watch(
                 </div>
               </div>
             </div>
-            <div v-if="lesson.problems.length" class="sub-head small muted">配套题</div>
-            <div v-for="problem in lesson.problems" :key="problem.id" class="ex">
+            <div v-if="tutorial.problems.length" class="sub-head small muted">配套题</div>
+            <div v-for="problem in tutorial.problems" :key="problem.id" class="ex">
               <span class="square" :class="problemStateOf(problem)" />
               <div class="ex-body">
                 <div class="ex-question">
@@ -235,13 +237,13 @@ watch(
   padding: 24px 0;
   text-align: center;
 }
-.lesson {
+.tutorial {
   border-top: 1px solid rgba(128, 128, 128, 0.15);
 }
-.lesson:first-child {
+.tutorial:first-child {
   border-top: 0;
 }
-.lesson-head {
+.tutorial-head {
   width: 100%;
   padding: 12px 0;
   border: 0;
@@ -254,13 +256,13 @@ watch(
   gap: 4px;
   cursor: pointer;
 }
-.lesson-line {
+.tutorial-line {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
-.lesson-title {
+.tutorial-title {
   font-size: 14px;
   font-weight: 600;
   min-width: 0;

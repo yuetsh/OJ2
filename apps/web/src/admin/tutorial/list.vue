@@ -2,7 +2,7 @@
 import { Icon } from '@iconify/vue'
 import { errorMessage } from 'utils/api'
 import type { TutorialListItem } from 'utils/types'
-import { groupByProject, splitTitle, type TutorialType } from 'oj/learn/lesson'
+import { groupByProject, splitTitle, type TutorialType } from 'oj/learn/utils'
 import ProjectTile from 'oj/learn/components/ProjectTile.vue'
 import 'oj/learn/learn.css'
 import { getTutorialList, renameTutorialProject, reorderTutorials, setTutorialVisibility } from '../api'
@@ -28,11 +28,11 @@ const list = computed(() => all.value[type.value] ?? [])
 const groups = computed(() =>
   groupByProject(list.value)
     .map((group) => {
-      const items = group.lessons.map((lesson) => list.value.find((item) => item.id === lesson.id)!)
+      const items = group.tutorials.map((entry) => list.value.find((item) => item.id === entry.id)!)
       return {
         ...group,
         items,
-        key: `${group.project}:${group.lessons[0]!.id}`,
+        key: `${group.project}:${group.tutorials[0]!.id}`,
         hidden: items.every((item) => !item.isPublic),
       }
     })
@@ -189,7 +189,7 @@ onMounted(load)
           <div
             v-for="item in group.items"
             :key="item.id"
-            class="row lesson"
+            class="row tutorial"
             :class="{ off: !item.isPublic, dragging: dragId === item.id }"
             draggable="true"
             @dragstart="dragId = item.id"
@@ -330,10 +330,10 @@ onMounted(load)
 .group-name {
   font-weight: 700;
 }
-.lesson.off {
+.tutorial.off {
   opacity: 0.6;
 }
-.lesson.dragging {
+.tutorial.dragging {
   opacity: 0.35;
 }
 .handle {

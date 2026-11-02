@@ -1,7 +1,7 @@
 import {
   FLOWCHART_PASS_GRADES,
   STUDENT_ROLES,
-  isLessonDone,
+  isTutorialDone,
   type LearnBoard,
   type LearnBoardStudent,
   type LearnExerciseAttemptList,
@@ -198,7 +198,7 @@ adminLearnRoutes.get('/learn-analytics/board', requireTeacher, async (c) => {
     students: students.map((student) => {
       const opened: number[] = []
       const done: number[] = []
-      const lessons: LearnBoardStudent['lessons'] = []
+      const attempts: LearnBoardStudent['tutorials'] = []
       let exerciseSolved = 0
       let totalSeconds = 0
       let lastViewedAt: string | null = null
@@ -210,26 +210,26 @@ adminLearnRoutes.get('/learn-analytics/board', requireTeacher, async (c) => {
         exerciseSolved += solvedHere
         if (exercises) {
           const { tried, solved, wrongAttempts } = exercises
-          lessons.push({ tutorialId: tutorial.id, tried, solved, wrongAttempts })
+          attempts.push({ tutorialId: tutorial.id, tried, solved, wrongAttempts })
         }
         if (row) {
           opened.push(tutorial.id)
           totalSeconds += row.totalSeconds
           if (!lastViewedAt || row.lastViewedAt > lastViewedAt) lastViewedAt = row.lastViewedAt
         }
-        const lesson = {
+        const here = {
           viewCount: row?.viewCount ?? 0,
           exerciseTotal: tutorial.exerciseTotal,
           exerciseSolved: solvedHere,
         }
-        if (isLessonDone(lesson)) done.push(tutorial.id)
+        if (isTutorialDone(here)) done.push(tutorial.id)
       }
       return {
         ...student,
         opened,
         done,
         exerciseSolved,
-        lessons,
+        tutorials: attempts,
         problems: problemsOf.get(student.userId) ?? [],
         totalSeconds,
         lastViewedAt,
@@ -394,27 +394,27 @@ adminLearnRoutes.get('/learn-analytics/students/:id', requireTeacher, async (c) 
     ).map((row) => [row.problemId, row]),
   )
 
-  const byLesson = new Map<number, LearnStudentDetail['lessons'][number]['exercises']>()
+  const byTutorial = new Map<number, LearnStudentDetail['tutorials'][number]['exercises']>()
   for (const { tutorialId, ...row } of exercises) {
-    const list = byLesson.get(tutorialId) ?? []
+    const list = byTutorial.get(tutorialId) ?? []
     list.push({
       ...row,
       attempts: row.attempts ?? 0,
       solved: row.solved ?? false,
     })
-    byLesson.set(tutorialId, list)
+    byTutorial.set(tutorialId, list)
   }
 
   return success(c, {
     ...student,
-    lessons: tutorials
+    tutorials: tutorials
       .map((row) => ({
         tutorialId: row.tutorialId,
         title: row.title,
         viewCount: row.viewCount ?? 0,
         totalSeconds: row.totalSeconds ?? 0,
         lastViewedAt: row.lastViewedAt,
-        exercises: byLesson.get(row.tutorialId) ?? [],
+        exercises: byTutorial.get(row.tutorialId) ?? [],
         problems: related
           .filter((problem) => problem.tutorialId === row.tutorialId)
           .map(({ id: problemId, displayId, title }) => {

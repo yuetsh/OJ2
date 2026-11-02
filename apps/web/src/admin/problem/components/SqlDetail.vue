@@ -12,11 +12,11 @@ import { errorCode, errorMessage, isApiError } from 'utils/api'
 import { DIFFICULTY, STORAGE_KEY } from 'utils/constants'
 import { createZipBlob, getTagColor, unique } from 'utils/functions'
 import type { AdminProblem, BlankProblem, SqlConfig, Tag, Testcase } from 'utils/types'
-import PreviewStrip from './components/PreviewStrip.vue'
-import { usePreviewCollapsed } from './components/previewCollapse'
-import { createContestProblem, createProblem, editProblem, generateSQLTestcase, getSQLTestcaseScripts, previewSQLTestcase, uploadTestcases } from '../api'
-import { cleanTags, difficultyOptions, isBlankHtml, problemListRoute, saveErrorText, tagTooLongText, useCreateDraft } from './components/problemForm'
-import { explainSqlError, groupSummary, type GroupStatus, type ScriptGroup } from './components/sqlScript'
+import PreviewStrip from './PreviewStrip.vue'
+import { usePreviewCollapsed } from './previewCollapse'
+import { createContestProblem, createProblem, editProblem, generateSQLTestcase, getSQLTestcaseScripts, previewSQLTestcase, uploadTestcases } from '../../api'
+import { cleanTags, difficultyOptions, isBlankHtml, problemListRoute, saveErrorText, tagTooLongText, useCreateDraft } from './problemForm'
+import { explainSqlError, groupSummary, type GroupStatus, type ScriptGroup } from './sqlScript'
 
 const CodeEditor = defineAsyncComponent(() => import('shared/components/CodeEditor.vue'))
 /** 标准答案常是一长行，出题页左栏才 560 宽：折行，别横着滚。给稳定的数组，见 CodeEditor 的注释 */

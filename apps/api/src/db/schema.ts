@@ -1195,7 +1195,7 @@ export const problemsetBadge = pgTable(
  * 冲突目标就是 (user_id, tutorial_id)，再挂个 id 序列没有任何用处。
  *
  * **只记「读到哪一课 + 停留多久」。** 练一练的作答另有一张表（下面的 `exerciseAttempt`），
- * 一个学生一道练习一行；「学完」由两张表合起来判（契约的 `isLessonDone`）。
+ * 一个学生一道练习一行；「学完」由两张表合起来判（契约的 `isTutorialDone`）。
  *
  * 外键这里**用了库级 CASCADE**，和 Django 建的那些 NO ACTION 外键不同：删教程、删用户
  * 都不必再记得回来手工清一遍子表（后台删教程的事务里就没清它，靠的就是这里）。

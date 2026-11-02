@@ -21,7 +21,7 @@ const { isDark, toggleDark } = useDarkTransition()
  * 菜单的唯一一张表。`role` 必须和 routes.ts 里对应路由的 meta 对齐：
  * 菜单里露出一个守卫不放行的入口，点下去就是被静默踢回首页。
  * `path` 同时用来判定高亮：取当前路径能匹配上的**最长**那一条，所以
- * /admin/problem/stuck 亮「卡点分析」而不是「题目」。
+ * /admin/analytics/stuck 亮「卡点分析」而不是「首页」。
  */
 type Role = 'problem' | 'teacher' | 'super'
 interface NavItem {
@@ -67,7 +67,7 @@ const NAV: NavGroup[] = [
         to: '/admin/problemset/list',
         role: 'teacher',
       },
-      { label: '课堂任务', icon: 'ph:chalkboard-teacher', path: '/admin/lesson', role: 'teacher' },
+      { label: '课堂任务', icon: 'ph:chalkboard-teacher', path: '/admin/task', role: 'teacher' },
       {
         label: '教程',
         icon: 'ph:book-open',
@@ -83,13 +83,13 @@ const NAV: NavGroup[] = [
       {
         label: '卡点分析',
         icon: 'ph:warning-diamond',
-        path: '/admin/problem/stuck',
+        path: '/admin/analytics/stuck',
         role: 'teacher',
       },
       {
         label: '年度趋势',
         icon: 'ph:chart-line-up',
-        path: '/admin/problem/trend',
+        path: '/admin/analytics/trend',
         role: 'teacher',
       },
       { label: '自学情况', icon: 'ph:student', path: '/admin/learn', role: 'teacher' },

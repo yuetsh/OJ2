@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LessonState, ProjectGroup } from '../lesson'
+import type { TutorialState, ProjectGroup } from '../utils'
 
 /**
  * 一门课的进度条：一课一小段，按项目分组隔开。绿 = 学完，橙 = 在学，灰 = 没开始，
@@ -7,7 +7,7 @@ import type { LessonState, ProjectGroup } from '../lesson'
  */
 defineProps<{
   groups: ProjectGroup[]
-  stateOf: (id: number) => LessonState
+  stateOf: (id: number) => TutorialState
   current?: number
   /** 每段的宽、高 */
   width?: number
@@ -19,12 +19,12 @@ defineProps<{
 
 <template>
   <div class="seg" :style="{ gap: `${groupGap ?? 10}px` }" aria-hidden="true">
-    <div v-for="group in groups" :key="group.lessons[0]!.id" class="group" :style="{ gap: `${gap ?? 3}px` }">
+    <div v-for="group in groups" :key="group.tutorials[0]!.id" class="group" :style="{ gap: `${gap ?? 3}px` }">
       <span
-        v-for="lesson in group.lessons"
-        :key="lesson.id"
+        v-for="tutorial in group.tutorials"
+        :key="tutorial.id"
         class="cell"
-        :class="[stateOf(lesson.id), { current: lesson.id === current }]"
+        :class="[stateOf(tutorial.id), { current: tutorial.id === current }]"
         :style="{
           width: `${width ?? 20}px`,
           height: `${height ?? 6}px`,

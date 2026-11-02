@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { LessonState } from '../lesson'
+import type { TutorialState } from '../utils'
 
 /** 目录里每课前面的圆：学完打勾、在学橙圈、当前绿圈、没开始灰圈 */
-defineProps<{ step: number; state: LessonState; current?: boolean }>()
+defineProps<{ step: number; state: TutorialState; current?: boolean }>()
 </script>
 
 <template>

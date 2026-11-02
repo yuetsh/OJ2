@@ -1,4 +1,4 @@
-import { isLessonDone, type TutorialProgress, type TutorialSummary } from '@oj2/contract'
+import { isTutorialDone, type TutorialProgress, type TutorialSummary } from '@oj2/contract'
 
 export type TutorialType = 'python' | 'c'
 
@@ -32,7 +32,7 @@ export interface ProjectGroup {
   icon: string
   tone: 'blue' | 'purple' | 'green' | 'orange' | 'gray'
   /** 这个项目里的课，`step` 是在整门课里的序号（1 起） */
-  lessons: { id: number; title: string; step: number }[]
+  tutorials: { id: number; title: string; step: number }[]
 }
 
 /** 「项目三 · 智慧农业·蜜橘园」拆成「项目三」和「智慧农业·蜜橘园」 */
@@ -57,7 +57,7 @@ export function groupByProject(titles: TutorialSummary[]): ProjectGroup[] {
   titles.forEach((item, index) => {
     const last = groups[groups.length - 1]
     if (last && last.project === item.project) {
-      last.lessons.push({ id: item.id, title: item.title, step: index + 1 })
+      last.tutorials.push({ id: item.id, title: item.title, step: index + 1 })
       return
     }
     const { no, name } = splitProject(item.project)
@@ -66,21 +66,21 @@ export function groupByProject(titles: TutorialSummary[]): ProjectGroup[] {
       no,
       name,
       ...projectLook(name),
-      lessons: [{ id: item.id, title: item.title, step: index + 1 }],
+      tutorials: [{ id: item.id, title: item.title, step: index + 1 }],
     })
   })
   return groups
 }
 
-export type LessonState = 'done' | 'started' | 'todo'
+export type TutorialState = 'done' | 'started' | 'todo'
 
 /**
- * 目录上的三态。学完 = 练一练全对（契约的 `isLessonDone`）；打开过或者做过练一练但没
+ * 目录上的三态。学完 = 练一练全对（契约的 `isTutorialDone`）；打开过或者做过练一练但没
  * 全对是「在学」；别的是没开始。
  */
-export function lessonState(progress: TutorialProgress | undefined): LessonState {
+export function tutorialState(progress: TutorialProgress | undefined): TutorialState {
   if (!progress) return 'todo'
-  if (isLessonDone(progress)) return 'done'
+  if (isTutorialDone(progress)) return 'done'
   if (progress.viewCount > 0 || progress.exerciseSolved > 0) return 'started'
   return 'todo'
 }
@@ -98,17 +98,17 @@ export function continueStep(titles: TutorialSummary[], progress: Record<number,
   if (!latest) return null
   const index = titles.findIndex((item) => item.id === latest!.tutorialId)
   if (index < 0) return null
-  if (lessonState(latest) !== 'done') return index + 1
+  if (tutorialState(latest) !== 'done') return index + 1
   for (let i = index + 1; i < titles.length; i++) {
-    if (lessonState(progress[titles[i]!.id]) !== 'done') return i + 1
+    if (tutorialState(progress[titles[i]!.id]) !== 'done') return i + 1
   }
   return index + 1
 }
 
 export function doneCount(titles: TutorialSummary[], progress: Record<number, TutorialProgress>) {
-  return titles.filter((item) => lessonState(progress[item.id]) === 'done').length
+  return titles.filter((item) => tutorialState(progress[item.id]) === 'done').length
 }
 
-export function lessonPath(type: TutorialType, step: number) {
+export function tutorialPath(type: TutorialType, step: number) {
   return `/learn/${type}/${step.toString().padStart(2, '0')}`
 }

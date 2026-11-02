@@ -14,7 +14,7 @@ import type { Exercise } from 'utils/types'
  * 正文开头的「# 标题」「**所属项目：…**」和紧跟着的项目配图不渲染：标题和项目页面上方
  * 已经有了，每课都重复一张同样的项目图只是把正文往下推。
  */
-export type LessonSegment =
+export type TutorialSegment =
   | { type: 'md'; content: string }
   | { type: 'heading'; id: string; text: string }
   | { type: 'goals'; id: string; items: string[] }
@@ -57,9 +57,9 @@ function stripPreamble(lines: string[]) {
   return lines.slice(i)
 }
 
-export function parseLesson(content: string, exercises: Exercise[]) {
+export function parseTutorial(content: string, exercises: Exercise[]) {
   const byId = new Map(exercises.map((item) => [item.id, item]))
-  const segments: LessonSegment[] = []
+  const segments: TutorialSegment[] = []
   const outline: OutlineItem[] = []
   let md: string[] = []
   let codeIndex = 0

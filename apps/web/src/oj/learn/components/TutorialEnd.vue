@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import type { TutorialProblem } from '@oj2/contract'
-import { splitTitle, type LessonState, type ProjectGroup } from '../lesson'
+import { splitTitle, type TutorialState, type ProjectGroup } from '../utils'
 import SegBar from './SegBar.vue'
 
 /**
@@ -19,7 +19,7 @@ const props = defineProps<{
   problems: TutorialProblem[]
   next: { title: string; to: string } | null
   groups: ProjectGroup[]
-  stateOf: (id: number) => LessonState
+  stateOf: (id: number) => TutorialState
   doneCount: number
   /** 窄屏：进度条短一点、题号挪到题目名下面 */
   compact?: boolean

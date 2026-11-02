@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import Markdown from 'shared/components/Markdown.vue'
-import type { LessonSegment } from '../composables/useLessonParse'
+import type { TutorialSegment } from '../composables/useTutorialParse'
 import CodeRunBlock from './CodeRunBlock.vue'
 
 const ExerciseWidget = defineAsyncComponent(() => import('./ExerciseWidget.vue'))
 
-/** 一课的正文：按 useLessonParse 拆好的段落逐段渲染 */
+/** 一课的正文：按 useTutorialParse 拆好的段落逐段渲染 */
 defineProps<{
-  segments: LessonSegment[]
+  segments: TutorialSegment[]
   lang: 'python' | 'c'
   tutorialId: number
   exerciseCount: number

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { continueStep, doneCount, lessonPath, splitTitle, type TutorialType } from 'oj/learn/lesson'
+import { continueStep, doneCount, tutorialPath, splitTitle, type TutorialType } from 'oj/learn/utils'
 import { Icon } from '@iconify/vue'
 import { getAnnouncementList, getKnowledgeMap, getContestList, getLastVisit, getLearnProgress, getSubmissions, getTutorials, getWeeklyRank } from 'oj/api'
 import { getClassActivity } from 'shared/api'
@@ -74,7 +74,7 @@ const weeklyText = computed(() => {
 })
 
 /**
- * 接着学哪一课看的是**服务端留痕**（和自学首页同一套，oj/learn/lesson.ts），不是本机记的：
+ * 接着学哪一课看的是**服务端留痕**（和自学首页同一套，oj/learn/utils.ts），不是本机记的：
  * 机房一台电脑轮着好几个班用，本地记的是上一个人学到哪。
  */
 async function loadTrack(type: TutorialType, label: string): Promise<Track | null> {
@@ -243,7 +243,7 @@ watch(
 )
 
 function learnLink(track: Track) {
-  return lessonPath(track.type, track.step)
+  return tutorialPath(track.type, track.step)
 }
 
 function openSubmission(row: SubmissionListItem) {

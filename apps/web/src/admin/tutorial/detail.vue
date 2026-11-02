@@ -4,9 +4,9 @@ import type { AdminTutorialProblem } from '@oj2/contract'
 import { errorMessage } from 'utils/api'
 import MarkdownEditor from 'shared/components/MarkdownEditor.vue'
 import type { Exercise, TutorialEdit, TutorialListItem } from 'utils/types'
-import { parseLesson } from 'oj/learn/composables/useLessonParse'
-import { joinTitle, lessonPath, splitTitle } from 'oj/learn/lesson'
-import LessonBody from 'oj/learn/components/LessonBody.vue'
+import { parseTutorial } from 'oj/learn/composables/useTutorialParse'
+import { joinTitle, tutorialPath, splitTitle } from 'oj/learn/utils'
+import TutorialBody from 'oj/learn/components/TutorialBody.vue'
 import 'oj/learn/learn.css'
 import { createTutorial, deleteTutorial, getTutorial, getTutorialList, updateTutorial } from '../api'
 import ExerciseManager from './components/ExerciseManager.vue'
@@ -69,7 +69,7 @@ const heading = computed(() => {
   const label = tutorial.type === 'c' ? 'C 语言' : 'Python'
   return step.value ? `${label} 第 ${step.value} 课` : `${label} · 没公开`
 })
-const preview = computed(() => parseLesson(tutorial.content, exercises.value))
+const preview = computed(() => parseTutorial(tutorial.content, exercises.value))
 
 async function init() {
   allTutorials.value = await getTutorialList().catch(() => ({ python: [], c: [] }))
@@ -131,7 +131,7 @@ function insertExercise(id: number) {
 }
 
 function openStudentView() {
-  if (step.value) window.open(router.resolve(lessonPath(tutorial.type, step.value)).href, '_blank')
+  if (step.value) window.open(router.resolve(tutorialPath(tutorial.type, step.value)).href, '_blank')
 }
 
 watch(() => props.tutorialID, init)
@@ -199,7 +199,7 @@ onMounted(init)
             <MarkdownEditor ref="editor" v-model:value="tutorial.content" :code-lang="tutorial.type" height="100%" />
           </div>
           <div class="preview">
-            <LessonBody
+            <TutorialBody
               :segments="preview.segments"
               :lang="tutorial.type"
               :tutorial-id="tutorial.id"

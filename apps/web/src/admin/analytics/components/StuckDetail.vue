@@ -8,7 +8,7 @@ import { avgTries, rate } from './stuckMath'
 
 /**
  * 卡点分析右栏：一道题的详情（做过几人、一次就对、错在哪、各班、交了几次才对、历年、
- * 还没做对的人）。从 Stuck.vue 拆出来，取数和三栏的联动还在那边。
+ * 还没做对的人）。从 stuck.vue 拆出来，取数和三栏的联动还在那边。
  */
 const props = defineProps<{
   detail: StuckProblemDetail

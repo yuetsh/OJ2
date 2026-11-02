@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import type { TutorialProgress } from '@oj2/contract'
-import { lessonPath, lessonState, type ProjectGroup, type TutorialType } from '../lesson'
-import LessonRow from './LessonRow.vue'
+import { tutorialPath, tutorialState, type ProjectGroup, type TutorialType } from '../utils'
+import TutorialRow from './TutorialRow.vue'
 import ProjectTile from './ProjectTile.vue'
 
 /**
@@ -21,14 +21,14 @@ const emit = defineEmits<{ go: [] }>()
 const open = ref(new Set<string>())
 
 function keyOf(group: ProjectGroup) {
-  return `${group.project}:${group.lessons[0]!.id}`
+  return `${group.project}:${group.tutorials[0]!.id}`
 }
 
 // 换课换到别的项目时，把那个项目也展开（别的已经展开的不收）
 watch(
   () => [props.groups, props.currentStep] as const,
   ([groups, step]) => {
-    const group = groups.find((item) => item.lessons.some((lesson) => lesson.step === step))
+    const group = groups.find((item) => item.tutorials.some((tutorial) => tutorial.step === step))
     if (group) open.value = new Set([...open.value, keyOf(group)])
   },
   { immediate: true },
@@ -43,7 +43,7 @@ function toggle(group: ProjectGroup) {
 }
 
 function doneIn(group: ProjectGroup) {
-  return group.lessons.filter((lesson) => lessonState(props.progress[lesson.id]) === 'done').length
+  return group.tutorials.filter((tutorial) => tutorialState(props.progress[tutorial.id]) === 'done').length
 }
 </script>
 
@@ -62,23 +62,23 @@ function doneIn(group: ProjectGroup) {
             {{ group.name }}
           </span>
         </span>
-        <span v-if="doneIn(group) === group.lessons.length" class="count all">
-          <Icon icon="ph:check-bold" :width="12" />{{ doneIn(group) }}/{{ group.lessons.length }}
+        <span v-if="doneIn(group) === group.tutorials.length" class="count all">
+          <Icon icon="ph:check-bold" :width="12" />{{ doneIn(group) }}/{{ group.tutorials.length }}
         </span>
-        <span v-else class="count">{{ doneIn(group) }}/{{ group.lessons.length }}</span>
+        <span v-else class="count">{{ doneIn(group) }}/{{ group.tutorials.length }}</span>
         <span v-if="big" class="chev">
           <Icon :icon="open.has(keyOf(group)) ? 'ph:caret-down-bold' : 'ph:caret-right-bold'" :width="14" />
         </span>
       </button>
-      <div v-if="open.has(keyOf(group))" class="lessons">
-        <LessonRow
-          v-for="lesson in group.lessons"
-          :key="lesson.id"
-          :title="lesson.title"
-          :step="lesson.step"
-          :to="lessonPath(type, lesson.step)"
-          :progress="progress[lesson.id]"
-          :active="lesson.step === currentStep"
+      <div v-if="open.has(keyOf(group))" class="tutorials">
+        <TutorialRow
+          v-for="tutorial in group.tutorials"
+          :key="tutorial.id"
+          :title="tutorial.title"
+          :step="tutorial.step"
+          :to="tutorialPath(type, tutorial.step)"
+          :progress="progress[tutorial.id]"
+          :active="tutorial.step === currentStep"
           :height="big ? 50 : 46"
           @go="emit('go')"
         />
@@ -160,13 +160,13 @@ function doneIn(group: ProjectGroup) {
   color: var(--learn-green-text);
   font-weight: 600;
 }
-.lessons {
+.tutorials {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-left: 6px;
 }
-.big .lessons {
+.big .tutorials {
   padding: 0 0 8px;
 }
 </style>

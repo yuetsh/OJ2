@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { ProjectGroup } from '../lesson'
+import type { ProjectGroup } from '../utils'
 
 /** 项目的小方块图标：智能家居一个房子、智慧农业一片叶子…… */
 defineProps<{ icon: string; tone: ProjectGroup['tone']; size?: number }>()

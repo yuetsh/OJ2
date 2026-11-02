@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TutorialProgress } from '@oj2/contract'
-import { lessonState, splitTitle } from '../lesson'
-import LessonDot from './LessonDot.vue'
+import { tutorialState, splitTitle } from '../utils'
+import TutorialDot from './TutorialDot.vue'
 
 /** 一课一行：圆点 + 知识点（粗）+ 情境（小字），在学的课右边带练一练做到几道 */
 const props = defineProps<{
@@ -16,12 +16,12 @@ const props = defineProps<{
 const emit = defineEmits<{ go: [] }>()
 
 const parts = computed(() => splitTitle(props.title))
-const state = computed(() => lessonState(props.progress))
+const state = computed(() => tutorialState(props.progress))
 </script>
 
 <template>
   <router-link :to="to" class="row" :class="{ active }" :style="{ height: `${height ?? 46}px` }" @click="emit('go')">
-    <LessonDot :step="step" :state="state" :current="active" />
+    <TutorialDot :step="step" :state="state" :current="active" />
     <span class="text">
       <span class="kp">{{ parts.kp }}</span>
       <span v-if="parts.scene" class="scene">{{ parts.scene }}</span>

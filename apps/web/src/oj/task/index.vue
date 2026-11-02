@@ -558,7 +558,7 @@ function lastText(student: TaskBoardStudent) {
         {{ leaveStudents.length ? `请假 ${leaveStudents.length} 人` : '请假' }}
       </n-button>
       <!-- 布置过的每一节课：改错了班、隔天想起来补，去后台 -->
-      <AdminLink v-if="isDesktop" :to="{ name: 'admin lesson list', query: className ? { className } : {} }">布置过的课</AdminLink>
+      <AdminLink v-if="isDesktop" :to="{ name: 'admin task list', query: className ? { className } : {} }">布置过的课</AdminLink>
       <!-- 任务页只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
       <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })"> 回头看 → </n-button>
     </div>

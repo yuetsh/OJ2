@@ -113,13 +113,13 @@ export const ojs: RouteRecordRaw = {
     },
     {
       path: 'learn',
-      name: 'learn home',
-      component: () => import('oj/learn/home.vue'),
+      name: 'learn',
+      component: () => import('oj/learn/index.vue'),
     },
     {
       path: 'learn/:type/:step',
-      name: 'learn',
-      component: () => import('oj/learn/index.vue'),
+      name: 'learn tutorial',
+      component: () => import('oj/learn/tutorial.vue'),
       props: true,
     },
     {
@@ -164,13 +164,13 @@ export const admins: RouteRecordRaw = {
     {
       path: '',
       name: 'admin home',
-      component: () => import('admin/setting/home.vue'),
+      component: () => import('admin/home/index.vue'),
       meta: { requiresSuperAdmin: true },
     },
     {
       path: 'config',
       name: 'admin config',
-      component: () => import('admin/setting/config.vue'),
+      component: () => import('admin/config/index.vue'),
       meta: { requiresSuperAdmin: true },
     },
     {
@@ -291,22 +291,22 @@ export const admins: RouteRecordRaw = {
       meta: { requiresSuperAdmin: true },
     },
     {
-      path: 'problem/stuck',
+      path: 'analytics/stuck',
       name: 'admin stuck problems',
-      component: () => import('admin/problem/Stuck.vue'),
+      component: () => import('admin/analytics/stuck.vue'),
       meta: { requiresTeacherAdmin: true },
     },
     {
-      path: 'problem/trend',
+      path: 'analytics/trend',
       name: 'admin grade trend',
-      component: () => import('admin/problem/Trend.vue'),
+      component: () => import('admin/analytics/trend.vue'),
       meta: { requiresTeacherAdmin: true },
     },
     {
       // 课堂任务布置的每一节课：改、删、补（数据统计按布置切课）
-      path: 'lesson',
-      name: 'admin lesson list',
-      component: () => import('admin/lesson/list.vue'),
+      path: 'task',
+      name: 'admin task list',
+      component: () => import('admin/task/list.vue'),
       meta: { requiresTeacherAdmin: true },
     },
     // 题单管理路由

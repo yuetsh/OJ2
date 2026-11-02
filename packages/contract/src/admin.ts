@@ -675,7 +675,7 @@ const learnProblemStateSchema = z.object({
  * 「自学情况」的方块格：一个班的学生 × 这门课的每一课。
  *
  * **没打开过任何一课的学生也要有一行**（`opened` 为空）—— 页面上把他们收成一串名单，
- * 这张表首要回答的就是「谁还没开始」。`done` 是学完的课（练一练全对，见 `isLessonDone`），
+ * 这张表首要回答的就是「谁还没开始」。`done` 是学完的课（练一练全对，见 `isTutorialDone`），
  * 一定也在 `opened` 里或者是没打开却把练一练做完了的（老链接直达练习的情况）。
  */
 export const learnBoardStudentSchema = z.object({
@@ -690,7 +690,7 @@ export const learnBoardStudentSchema = z.object({
    * 碰过练一练的课，一课一项（一道没做的课不在里面）。方块格靠它分出「做了一部分」，
    * `wrongAttempts` 是这课所有练习错的次数加起来
    */
-  lessons: z.array(
+  tutorials: z.array(
     z.object({
       tutorialId: z.number().int(),
       tried: z.number().int(),
@@ -774,7 +774,7 @@ export const learnStudentDetailSchema = z.object({
   userId: z.number().int(),
   username: z.string(),
   className: z.string().nullable(),
-  lessons: z.array(
+  tutorials: z.array(
     z.object({
       tutorialId: z.number().int(),
       title: z.string(),

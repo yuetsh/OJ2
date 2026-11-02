@@ -1,4 +1,4 @@
-/** 卡点分析（Stuck.vue）和它的单题详情（StuckDetail.vue）共用的两个算法 */
+/** 卡点分析（stuck.vue）和它的单题详情（StuckDetail.vue）共用的两个算法 */
 
 /** 百分比，取整；分母是 0 时给 0 */
 export function rate(part: number, whole: number) {

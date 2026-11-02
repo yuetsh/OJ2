@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { OutlineItem } from '../composables/useLessonParse'
+import type { OutlineItem } from '../composables/useTutorialParse'
 
 /**
  * 右边「这一课」：各节标题，有练一练的节后面挂一支笔（做对了再打个勾），

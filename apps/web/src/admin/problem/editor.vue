@@ -3,7 +3,7 @@ import { isSqlProblem } from '@oj2/contract'
 import type { AdminProblem } from 'utils/types'
 import { getProblem } from '../api'
 import ProblemDetail from './detail.vue'
-import SqlDetail from './SqlDetail.vue'
+import SqlDetail from './components/SqlDetail.vue'
 
 /**
  * 出题 / 改题的入口：编程题和 SQL 题是两张不同的页。
