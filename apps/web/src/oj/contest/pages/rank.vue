@@ -91,7 +91,8 @@ const narrow = useMediaQuery('(max-width: 640px)')
 const columns = computed(() => {
   const move = running.value ? '36px ' : ''
   const count = problems.value.length
-  return narrow.value ? `28px ${move}112px 36px 70px repeat(${count}, 52px)` : `40px ${move}170px 48px 80px repeat(${count}, 64px)`
+  // 名字列：名字最长 4 个字（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽）
+  return narrow.value ? `28px ${move}76px 36px 70px repeat(${count}, 52px)` : `40px ${move}96px 48px 80px repeat(${count}, 64px)`
 })
 </script>
 

@@ -267,8 +267,9 @@ function exportGrades() {
 const success = computed(() => tone('success'))
 const danger = computed(() => tone('error'))
 const warning = computed(() => tone('warning'))
-const liveColumns = computed(() => `130px 48px repeat(${problems.value.length}, minmax(70px, 96px)) 90px 1fr`)
-const gradeColumns = computed(() => `24px 124px 40px 36px repeat(${problems.value.length}, 50px)`)
+// 名字列只放名字，最长 4 个字（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽）
+const liveColumns = computed(() => `88px 48px repeat(${problems.value.length}, minmax(70px, 96px)) 90px 1fr`)
+const gradeColumns = computed(() => `24px 88px 40px 36px repeat(${problems.value.length}, 50px)`)
 </script>
 
 <template>

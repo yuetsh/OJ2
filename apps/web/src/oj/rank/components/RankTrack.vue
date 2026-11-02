@@ -212,8 +212,8 @@ function onMenu(key: string, row: RankRow) {
           <div class="lane">
             <span class="rank">{{ item.row.solved ? item.row.rank : '—' }}</span>
             <RankAvatar :username="item.row.user.username" :avatar="item.row.avatar" :size="20" :me="item.row.user.id === meId" />
-            <button class="who" @click="emit('open', item.row.user.username)">
-              <UserName :username="item.row.user.username" :class-name="showClass ? item.row.className : null" />
+            <button class="who" :class="{ 'with-class': showClass }" @click="emit('open', item.row.user.username)">
+              <UserName :username="item.row.user.username" :class-name="showClass ? item.row.className : null" short-class />
             </button>
             <span class="bar-box" :style="{ background: palette.track }">
               <span class="bar" :style="{ width: width(item.row), background: barColor(item.row) }" />
@@ -343,6 +343,10 @@ function onMenu(key: string, row: RankRow) {
   min-width: 0;
 }
 
+.who.with-class {
+  width: 108px;
+}
+
 .prow .who {
   width: auto;
   min-width: 0;
@@ -428,8 +432,9 @@ function onMenu(key: string, row: RankRow) {
   font-weight: 700;
 }
 
+/* 名字最长 4 个字；本年级 / 全服的榜名字后面还有班号（2026-11 之前是 126px，放的是 ks2312李鑫楠） */
 .who {
-  width: 126px;
+  width: 80px;
   flex-shrink: 0;
   padding: 0;
   border: 0;

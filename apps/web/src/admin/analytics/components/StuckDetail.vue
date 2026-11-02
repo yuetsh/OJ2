@@ -205,7 +205,7 @@ const links = computed(() => {
         <div class="muted small">交得最多的</div>
         <div class="names">
           <div v-for="row in mostTries" :key="row.username" class="nrow">
-            <UserName :username="row.username" class="uname" />
+            <UserName :username="row.username" :class-name="className ? null : row.className" short-class class="uname" :class="{ 'with-class': !className }" />
             <span class="num strong ntries">交了 {{ row.tries }} 次</span>
             <span class="muted num">{{ gap(row.minutes) }}</span>
             <span class="grow" />
@@ -243,7 +243,7 @@ const links = computed(() => {
       </div>
       <div class="names">
         <div v-for="row in stuckStudents" :key="row.username" class="nrow">
-          <UserName :username="row.username" class="uname" />
+          <UserName :username="row.username" :class-name="className ? null : row.className" short-class class="uname" :class="{ 'with-class': !className }" />
           <span class="muted num ntries">交了 {{ row.tries }} 次</span>
           <span class="legend" :style="{ color: resultColor(row.lastResult) }">
             <i :style="{ background: resultColor(row.lastResult) }" />{{ resultName(row.lastResult) }}
@@ -450,9 +450,13 @@ const links = computed(() => {
   font-size: 13px;
   min-width: 0;
 }
+/* 名字最长 4 个字；没选班（全部班级）时名字后面还有班号（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽） */
 .uname {
-  width: 110px;
+  width: 80px;
   flex-shrink: 0;
+}
+.uname.with-class {
+  width: 108px;
 }
 .ntries {
   width: 64px;

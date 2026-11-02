@@ -22,7 +22,7 @@ const desktopColumns: DataTableColumn<LearnExerciseAttempt>[] = [
   {
     title: '学生',
     key: 'username',
-    width: 140,
+    width: 100,
     render: (row) => h(UserName, { username: row.username }),
   },
   {

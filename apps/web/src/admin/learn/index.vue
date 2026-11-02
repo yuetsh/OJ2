@@ -503,8 +503,9 @@ onMounted(load)
   padding-bottom: 6px;
   border-top: 0;
 }
+/* 名字最长 4 个字，表头「每课打开过」5 个小字也放得下（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽） */
 .c-name {
-  width: 110px;
+  width: 80px;
   flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -756,7 +757,7 @@ onMounted(load)
     position: sticky;
     left: 0;
     z-index: 1;
-    width: 96px;
+    width: 72px;
     margin-left: -16px;
     padding-left: 16px;
     background: v-bind('theme.bodyColor');

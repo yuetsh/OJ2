@@ -9,7 +9,7 @@ import { classLabel } from 'utils/classes'
  *
  * `className` 给了就在名字后面淡写班级：一页上混着几个班（全服排名、全部提交、举手列表）时用，
  * 不同班同名的人（252、253 都有杨涵宇）靠它分开。一页只有一个班的别传。
- * `shortClass`：窄的定宽列（提交列表的名字列 116px）里只写班号（`李鑫楠 2312`），和原来 `ks2312李鑫楠` 一样宽。
+ * `shortClass`：定宽的名字列（提交列表、排名赛道，带班号时 108px）里只写班号（`李鑫楠 2312`），全称放不下。
  * `muted` 用在学生看别人的那几行（看得到结果、看不到代码）。悬停看得到完整用户名。
  */
 const props = defineProps<{ username: string; muted?: boolean; className?: string | null; shortClass?: boolean }>()

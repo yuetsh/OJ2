@@ -583,8 +583,9 @@ function pct(done: number, total: number) {
   display: flex;
   color: v-bind('theme.textColor3');
 }
+/* 名字最长 4 个字（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽） */
 .c-name {
-  width: 110px;
+  width: 80px;
   flex: none;
 }
 .c-last {

@@ -756,7 +756,9 @@ function dayBreak(index: number) {
               <div class="row" :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }" :data-row-id="row.id" @click="rowClicked(row)">
                 <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
-                  <span class="c-user"><UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class /></span>
+                  <span class="c-user" :class="{ 'with-class': mixedClasses }"
+                    ><UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class
+                  /></span>
                   <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
                     <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                   </span>
@@ -786,7 +788,7 @@ function dayBreak(index: number) {
               <div class="row" :class="{ on: row.id === selectedId && !isMobile, 'two-line': twoLine }" :data-row-id="row.id" @click="rowClicked(row)">
                 <template v-if="!twoLine">
                   <span class="c-time">{{ submissionClockText(row.createTime) }}</span>
-                  <span class="c-user">
+                  <span class="c-user" :class="{ 'with-class': mixedClasses }">
                     <UserName :username="row.username" :class-name="mixedClasses ? row.className : null" short-class :muted="othersRow(row)" />
                   </span>
                   <span class="c-problem" :title="`${row.problemDisplayId} ${row.problemTitle}`">
@@ -1356,11 +1358,17 @@ function dayBreak(index: number) {
   border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
+/* 名字最长 4 个字（在读的班 423 人里 5 人），2026-11 去掉 ks 前缀之前是 116px（ks2312李鑫楠）。
+   混着几个班时名字后面还有班号（李鑫楠 2312） */
 .c-user {
-  width: 116px;
+  width: 80px;
   flex: none;
   display: flex;
   overflow: hidden;
+}
+
+.c-user.with-class {
+  width: 108px;
 }
 
 .c-problem {

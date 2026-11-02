@@ -51,7 +51,8 @@ const average = computed(() => (joined.value.length ? joined.value.reduce((sum, 
 const finished = computed(() => joined.value.filter((s) => data.value && s.completedCount >= data.value.totalCount).length)
 const beforeCount = computed(() => joined.value.reduce((sum, s) => sum + s.cells.filter((cell) => cell.solvedBefore).length, 0))
 
-const columns = computed(() => `22px 110px 44px repeat(${data.value?.problems.length ?? 1}, minmax(72px, 1fr))`)
+// 名字列最长 4 个字（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽）
+const columns = computed(() => `22px 80px 44px repeat(${data.value?.problems.length ?? 1}, minmax(72px, 1fr))`)
 
 function cellLink(username: string, problemId: string) {
   return `/submission?username=${encodeURIComponent(username)}&problem=${encodeURIComponent(problemId)}`

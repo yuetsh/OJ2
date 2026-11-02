@@ -84,8 +84,9 @@ const scale = computed(() => top.value[0]?.solved || 1)
   color: v-bind('theme.textColor2');
 }
 
+/* 本班的周榜，只写名字（最长 4 个字；2026-11 之前放的是 ks2312李鑫楠） */
 .who {
-  width: 120px;
+  width: 80px;
   flex-shrink: 0;
   padding: 0;
   border: 0;

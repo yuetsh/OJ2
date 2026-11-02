@@ -418,8 +418,9 @@ function gradeStyle(grade: string | null) {
   font-size: var(--oj-fs-sec);
 }
 
+/* 名字最长 4 个字（2026-11 去掉 ks 前缀之前是按 ks2312李鑫楠 定的宽） */
 .p-name {
-  width: 110px;
+  width: 80px;
   flex: none;
 }
 

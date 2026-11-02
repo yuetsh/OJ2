@@ -49,7 +49,7 @@ const desktopColumns: DataTableColumn<ProblemReader>[] = [
   {
     title: '学生',
     key: 'username',
-    width: 150,
+    width: 100,
     render: (row) => h(UserName, { username: row.username }),
   },
   { title: '结果', key: 'result', width: 150, render: renderResult },
