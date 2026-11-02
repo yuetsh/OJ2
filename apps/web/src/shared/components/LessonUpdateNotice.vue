@@ -5,7 +5,7 @@ import { useThemeVars } from 'naive-ui'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 
 /**
- * 课上老师改了这节课的题：顶上居中一张卡，写清改了哪些，点「刷新」重新载入页面拿新的题单。
+ * 课上老师改了这节课的题：右下角一张卡，写清改了哪些，点「刷新」重新载入页面拿新的题单。
  * 不自己消失 —— 学生可能正低头写代码，几秒就没的提示等于没提示。代码草稿边写边存，刷新不丢。
  */
 const update = pendingLessonUpdate
@@ -74,12 +74,12 @@ function dismiss() {
 <style scoped>
 .notice {
   position: fixed;
-  /* 顶栏下面、居中：右上角是成就提示的位置，两个一起来不能叠上 */
-  top: 72px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* 电脑上放右下角：放顶上会挡住编辑器那排按钮（提交、运行例子），右上角是成就提示的位置 */
+  right: 24px;
+  bottom: 24px;
   z-index: 3000;
-  width: min(480px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
   padding: 16px 20px;
   border-radius: var(--oj-radius);
   border: 2px solid;
@@ -111,6 +111,19 @@ function dismiss() {
 .drop-enter-from,
 .drop-leave-to {
   opacity: 0;
-  transform: translate(-50%, -16px);
+  transform: translateY(16px);
+}
+/* 手机上还是顶栏下面一整条：底下是「运行例子 / 提交」那条（MobileActionBar），放下面就挡住它。
+   768 和 shared/composables/breakpoints 的 isMobile 是同一档 */
+@media (max-width: 768px) {
+  .notice {
+    top: 72px;
+    right: 16px;
+    bottom: auto;
+  }
+  .drop-enter-from,
+  .drop-leave-to {
+    transform: translateY(-16px);
+  }
 }
 </style>
