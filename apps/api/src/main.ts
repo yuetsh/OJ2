@@ -9,7 +9,7 @@
  *   oj2-api              # 等同 serve
  *   oj2-api serve        # HTTP + WebSocket
  *   oj2-api worker       # BullMQ 判题消费者
- *   oj2-api healthcheck  # 探活，给 Dockerfile 的 HEALTHCHECK 用
+ *   oj2-api healthcheck  # 探活，给 compose 的 healthcheck 用；--worker 探判题 worker
  *   oj2-api sql-child    # SQL 判题子进程，由服务自己 spawn，不该手动调
  *   oj2-api migrate      # 执行待办的数据库迁移，部署时由 docker/deploy.sh 调
  *   oj2-api recount      # 把题目/用户的计数列、成就的已解锁数重算回与明细一致，默认只读预演
@@ -54,7 +54,18 @@ switch (command) {
   // 运行镜像是 debian-slim，没有 curl/wget，探活让二进制自己做。
   // 只打 /health，不碰库 —— 库挂了该由库自己的 healthcheck 报，
   // 不该让 api 容器跟着被判成不健康、进而被重启。
+  //
+  // `--worker`：worker 没有 HTTP，看它每 10 秒刷一次的时间戳（worker.ts），60 秒没刷就算挂了
   case 'healthcheck': {
+    if (process.argv.includes('--worker')) {
+      const { readFileSync } = await import('node:fs')
+      try {
+        const at = Number(readFileSync('/tmp/oj2-worker-alive', 'utf8'))
+        process.exit(Date.now() - at < 60_000 ? 0 : 1)
+      } catch {
+        process.exit(1)
+      }
+    }
     const { config } = await import('./config')
     try {
       const response = await fetch(`http://127.0.0.1:${config.port}/health`, {

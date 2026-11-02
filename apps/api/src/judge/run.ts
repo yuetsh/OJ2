@@ -16,7 +16,7 @@ import { parseProblemTemplate, shiftCompileLines } from './template'
 import { withJudgeSlot } from './slots'
 import { runSqlCase } from './sql'
 import { nativeRuntimeError, parsePythonTraceback, type RuntimeErrorInfo } from './runtime-diagnosis'
-import { compileError, judge, type JudgeCase, type JudgeResponse } from './sandbox'
+import { compileError, judge, JudgeUnreachableError, type JudgeCase, type JudgeResponse } from './sandbox'
 import { readInfo } from '../services/test-case'
 import { readFile } from 'node:fs/promises'
 import { resolve as resolvePath } from 'node:path'
@@ -79,6 +79,13 @@ function judgeTimeoutMs(timeLimit: number) {
   return Math.max(120_000, timeLimit * 60)
 }
 
+/**
+ * 连不上判题机时隔多久再试，一共再试这么多次。判题机容器重启（部署时重建、OOM 被拉起来）
+ * 要几秒，合计十几秒盖得住；原来是当场记成系统错误，那几秒里交的全班都得自己重交。
+ * 只重试「连不上」：超时（已经等了两分钟）、判题机回了错都不重试。等的时候不占名额
+ */
+const UNREACHABLE_RETRY_DELAYS_MS = [2_000, 5_000, 10_000]
+
 async function requestJudge(
   language: string,
   code: string,
@@ -88,17 +95,22 @@ async function requestJudge(
   output = false,
 ) {
   const timeoutMs = judgeTimeoutMs(timeLimit)
-  try {
-    // 超时从拿到名额才开始算：排队等名额不算判题机没回应
-    return await withJudgeSlot('judge', { holdMs: timeoutMs + 30_000 }, () =>
-      judge(language, code, timeLimit, memoryLimit, testCase, { output, signal: AbortSignal.timeout(timeoutMs) }),
-    )
-  } catch (error) {
-    // 这句会写进 err_info，学生能看到，别把 "The operation timed out." 原样给他
-    if (error instanceof DOMException && error.name === 'TimeoutError') {
-      throw new Error(`判题机 ${timeoutMs / 1000} 秒没有回应`)
+  for (let attempt = 0; ; attempt++) {
+    try {
+      // 超时从拿到名额才开始算：排队等名额不算判题机没回应
+      return await withJudgeSlot('judge', { holdMs: timeoutMs + 30_000 }, () =>
+        judge(language, code, timeLimit, memoryLimit, testCase, { output, signal: AbortSignal.timeout(timeoutMs) }),
+      )
+    } catch (error) {
+      // 这句会写进 err_info，学生能看到，别把 "The operation timed out." 原样给他
+      if (error instanceof DOMException && error.name === 'TimeoutError') {
+        throw new Error(`判题机 ${timeoutMs / 1000} 秒没有回应`)
+      }
+      const delay = UNREACHABLE_RETRY_DELAYS_MS[attempt]
+      if (!(error instanceof JudgeUnreachableError) || delay === undefined) throw error
+      console.warn(`[judge] ${error.message}，${delay / 1000} 秒后重试（第 ${attempt + 1} 次）`)
+      await Bun.sleep(delay)
     }
-    throw error
   }
 }
 

@@ -44,6 +44,10 @@ app.route('/api', submissionRoutes)
 app.route('/api', trialRunRoutes)
 app.route('/api/admin', adminRoutes)
 
+// 没有这条的话，打错的接口地址回的是 Hono 默认的纯文本「404 Not Found」，前端 utils/api.ts 读不出
+// error.code / message，提示就成了笼统的「请求失败」。和其它错误同一个形状
+app.notFound((c) => c.json({ error: { code: 'not-found', message: 'Not found' } }, 404))
+
 app.onError((error, c) => {
   console.error(error)
   return c.json({ error: { code: 'internal-error', message: 'Internal server error' } }, 500)
@@ -63,7 +67,13 @@ const DEFAULT_AVATAR_SVG =
  * 这样开发（Vite 代理）和生产是同一条代码路径，少一处只在服务器上才出错的差异。
  */
 async function serveUpload(pathname: string, prefix: string, directory: string) {
-  const decoded = decodeURIComponent(pathname)
+  // 畸形的百分号编码（`/public/upload/%`）decodeURIComponent 会抛 URIError，不接住就是 500
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(pathname)
+  } catch {
+    return new Response('Not found', { status: 404 })
+  }
   const filename = basename(decoded)
   if (!filename || filename !== decoded.slice(prefix.length + 1)) {
     return new Response('Not found', { status: 404 })

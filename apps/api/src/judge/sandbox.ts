@@ -106,8 +106,30 @@ function headers() {
   return { authorization: `Bearer ${config.judgeServerToken}` }
 }
 
+/**
+ * 判题机根本连不上：连接被拒、主机名解析不到、连接被重置 —— 判题机容器正在重启、OOM 被杀
+ * 的那几秒就是这样。和「判题机回了错」「超时没回」分开，正式判题碰到它会等几秒再试
+ * （judge/run.ts 的 requestJudge），而不是当场把学生的提交记成系统错误
+ */
+export class JudgeUnreachableError extends Error {
+  constructor(cause: unknown) {
+    super(`连不上判题机（${cause instanceof Error ? cause.message : String(cause)}）`)
+    this.name = 'JudgeUnreachableError'
+  }
+}
+
+/** fetch 判题机。网络层失败（Bun 里是带 code 的 TypeError）换成 JudgeUnreachableError；超时、中止原样抛 */
+async function judgeFetch(path: string, init: RequestInit & { signal?: AbortSignal }) {
+  try {
+    return await fetch(new URL(path, config.judgeServerUrl), init)
+  } catch (error) {
+    if (!init.signal?.aborted && error instanceof TypeError) throw new JudgeUnreachableError(error)
+    throw error
+  }
+}
+
 async function runCommand(command: Record<string, unknown>, signal?: AbortSignal) {
-  const response = await fetch(new URL('/run', config.judgeServerUrl), {
+  const response = await judgeFetch('/run', {
     method: 'POST',
     signal,
     headers: { ...headers(), 'content-type': 'application/json' },
@@ -120,7 +142,7 @@ async function runCommand(command: Record<string, unknown>, signal?: AbortSignal
 }
 
 async function readFile(fileId: string, signal?: AbortSignal) {
-  const response = await fetch(new URL(`/file/${fileId}`, config.judgeServerUrl), { signal, headers: headers() })
+  const response = await judgeFetch(`/file/${fileId}`, { signal, headers: headers() })
   if (!response.ok) throw new Error(`判题机取文件返回 HTTP ${response.status}`)
   return new Uint8Array(await response.arrayBuffer())
 }

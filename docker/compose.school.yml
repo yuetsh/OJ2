@@ -15,8 +15,17 @@
 # 测试点（`data/backend/test_case`）和题面图片（`data/backend/public/upload`）都在旧目录里，
 # 不设 `DATA_DIR` 就会挂一堆空目录上去：判题全错、图片 404。**沿用旧数据必须设它。**
 
+# 每个容器的日志最多 3 个 10MB 的文件。docker 默认的 json-file 不设上限，判题、worker
+# 天天打日志，2 核小服务器的磁盘迟早被写满 —— 磁盘一满，postgres 写不进、判题跟着失败。
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
 services:
   oj-redis:
+    logging: *logging
     image: redis:8-alpine
     container_name: oj-redis
     restart: always
@@ -29,6 +38,7 @@ services:
       retries: 10
 
   oj-judge:
+    logging: *logging
     # 自己构建的判题沙箱（go-judge + gcc / python，见 docker/judge/）。
     # ⚠️ 这个 tag 不在任何 registry 上：本机 docker/judge/build.sh 构建，
     #    服务器/机房用 docker load 装。镜像不在本地时 compose 会去 pull 然后报找不到。
@@ -48,6 +58,7 @@ services:
     mem_limit: 2g
 
   oj-api:
+    logging: *logging
     build: &build
       context: ..
       dockerfile: docker/Dockerfile
@@ -85,6 +96,7 @@ services:
     mem_limit: 4g
 
   oj-worker:
+    logging: *logging
     build: *build
     image: oj2-api:latest
     container_name: oj-worker
@@ -95,9 +107,18 @@ services:
       - ${DATA_DIR:-../data}/backend:/data
     environment: *api-env
     command: ["oj2-api", "worker"]
+    # worker 每 10 秒刷一次「还活着」，60 秒没刷就是挂了（oj2-api healthcheck --worker）。
+    # unhealthy 只是标出来、deploy.sh 起栈时会等它，docker 不会因此自动重启容器
+    healthcheck:
+      test: ["CMD", "oj2-api", "healthcheck", "--worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     mem_limit: 2g
 
   oj-web:
+    logging: *logging
     build:
       context: ..
       dockerfile: docker/Dockerfile

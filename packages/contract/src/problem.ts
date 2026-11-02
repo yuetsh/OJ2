@@ -285,8 +285,8 @@ export const AST_OPERATOR_TARGETS_BY_LANGUAGE: Record<string, Record<string, str
 }
 
 /**
- * 判题机真正能做 AST 检查的语言。设计文档写的是"支持全部 6 种语言"，落地的只有
- * 这两种 —— 其余语言 judge/ast.ts 的 loadLanguage 返回 null，规则一条都不会跑。
+ * 判题机真正能做 AST 检查的语言（C / C++ / Python 三种，就是上面这张表的键）。设计文档写的是
+ * "支持全部 6 种语言"，其余语言 judge/ast.ts 的 loadLanguage 返回 null，规则一条都不会跑。
  * 所以后台不给别的语言开 tab，题目页也不把它们的规则展示成「要求」。
  */
 export const AST_SUPPORTED_LANGUAGES = Object.keys(AST_NODE_TARGETS_BY_LANGUAGE)

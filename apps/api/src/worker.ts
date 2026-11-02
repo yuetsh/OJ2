@@ -1,4 +1,5 @@
 import { Worker } from 'bullmq'
+import { writeFileSync } from 'node:fs'
 
 import { config } from './config'
 import { startJudgeHeartbeat } from './judge/heartbeat'
@@ -8,8 +9,11 @@ import { flowchartQueueName, type FlowchartJobData } from './flowchart/job'
 import { evaluateFlowchart } from './flowchart/run'
 import { createBlockingRedis } from './redis'
 
+const judgeConnection = createBlockingRedis()
+const flowchartConnection = createBlockingRedis()
+
 const worker = new Worker<JudgeJobData>(judgeQueueName, async (job) => judgeSubmission(job.data), {
-  connection: createBlockingRedis(),
+  connection: judgeConnection,
   concurrency: config.judgeConcurrency,
 })
 
@@ -21,7 +25,7 @@ const flowchartWorker = new Worker<FlowchartJobData>(
     evaluateFlowchart(job.data, {
       isFinalAttempt: job.attemptsMade + 1 >= (job.opts.attempts ?? 1),
     }),
-  { connection: createBlockingRedis(), concurrency: 2 },
+  { connection: flowchartConnection, concurrency: 2 },
 )
 
 worker.on('ready', () => {
@@ -48,7 +52,28 @@ flowchartWorker.on('error', (error) => console.error('Flowchart worker error', e
 
 const stopHeartbeat = startJudgeHeartbeat()
 
+/**
+ * 给 `oj2-api healthcheck --worker` 看的「还活着」：两个消费者都在跑、连 Redis 的连接都正常，
+ * 才每 10 秒刷一次时间戳。事件循环卡死、和 Redis 断了、消费者停了，时间戳都会停下来，
+ * 容器就被判成 unhealthy —— 原来 worker 没有健康检查，挂死了 docker 照样显示 running，
+ * 判题队列静默积压
+ */
+// main.ts 的 healthcheck 写死了同一个路径：那边不能 import 这个文件（一 import 就把 worker 起来了）
+const WORKER_ALIVE_FILE = '/tmp/oj2-worker-alive'
+const markAlive = () => {
+  if (!worker.isRunning() || !flowchartWorker.isRunning()) return
+  if (judgeConnection.status !== 'ready' || flowchartConnection.status !== 'ready') return
+  try {
+    writeFileSync(WORKER_ALIVE_FILE, String(Date.now()))
+  } catch (error) {
+    console.error('Failed to write worker alive file', error)
+  }
+}
+const aliveTimer = setInterval(markAlive, 10_000)
+worker.on('ready', markAlive)
+
 async function shutdown() {
+  clearInterval(aliveTimer)
   stopHeartbeat()
   await worker.close()
   await flowchartWorker.close()

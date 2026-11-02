@@ -81,6 +81,15 @@ jobs:
       - name: 编前端
         run: cd apps/web && bun run build
 
+      # 格式、lint、前后端类型检查、路由遮蔽、AST 节点，有一项不过就不部署（同步到服务器之前）。
+      # 不加它的话，每次 push 都是直接上线、中间没有任何检查 —— vite build 不做类型检查。
+      #
+      # 必须排在「编前端」之后：前端类型检查要 unplugin 生成的 auto-imports.d.ts /
+      # components.d.ts，它们不进版本库，vite build 时才生成；排在前面会报几百条
+      # Cannot find name 'computed'（实测过）。
+      - name: 检查
+        run: bunx vp run verify
+
       - name: 配置 SSH
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh

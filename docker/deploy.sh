@@ -4,7 +4,7 @@
 # 全部由 docker/compose.debian.yml 管。
 #
 #   cd /root/OJDeploy/OJ2
-#   docker/deploy.sh              # 自检 → 构建 → 起栈 → 冒烟
+#   docker/deploy.sh              # 自检 → 构建 → 迁移 → 起栈 → 冒烟
 #   docker/deploy.sh --check      # 只自检，不动任何容器
 #   docker/deploy.sh --no-build   # 跳过构建（只改了 env / compose 时用）
 #   docker/deploy.sh --prebuilt   # 用现成产物，不在这台机器上编（CI 走这条）
@@ -170,6 +170,17 @@ for _ in $(seq 30); do
 done
 [ "$status" = healthy ] || die "oj-api 没起来（状态 $status）
 看日志：docker logs oj-api --tail 50"
+
+# worker 的健康检查每 30 秒一次，第一次也要等满 30 秒，所以这里多给一些时间。
+# 它不起来的话站点照样能开，但交上去的题没人判 —— 学生那边一直「等待评分」
+wstatus=starting
+for _ in $(seq 45); do
+  wstatus=$(docker inspect -f '{{.State.Health.Status}}' oj-worker 2>/dev/null || echo starting)
+  [ "$wstatus" = healthy ] && break
+  sleep 2
+done
+[ "$wstatus" = healthy ] || die "oj-worker 没起来（状态 $wstatus）—— 站点能开，但提交没人判
+看日志：docker logs oj-worker --tail 50"
 
 # ---------------------------------------------------------------- 冒烟
 say "冒烟（端口 $port）"

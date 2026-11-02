@@ -28,7 +28,7 @@
 
 ## 闸门的三处形态
 
-1. **入参 `safeParse`**（58 处，全部保留）—— 请求体进来的那一刻校验，对不上回 400。
+1. **入参 `safeParse`**（请求体一律走 `http.ts` 的 `parseBody`，全部保留）—— 请求体进来的那一刻校验，对不上回 400。
 2. **`db/schema.ts` 的 `.$type<>()`** —— 枚举型的列（`submission.result` / `.language`、
    `problem.difficulty` / `.languages`、`achievement.rarity`、`exercise.type`…）和几个形状
    确定的 JSONB（`problem.template` / `.astRules` / `.sqlConfig` / `.sqlDisplay`、

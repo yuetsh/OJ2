@@ -334,9 +334,7 @@ export const judgeServerSchema = z.object({
   cpuUsage: z.number(),
   lastHeartbeat: z.string(),
   createTime: z.string(),
-  taskNumber: z.number().int(),
   serviceUrl: z.string().nullable(),
-  isDisabled: z.boolean(),
   /** 心跳在 6 秒内才算在线，与 dashboard 的判活口径一致 */
   status: z.enum(['normal', 'abnormal']),
 })
@@ -344,10 +342,6 @@ export const judgeServerSchema = z.object({
 export const judgeServerListSchema = z.object({
   token: z.string(),
   servers: z.array(judgeServerSchema),
-})
-
-export const updateJudgeServerRequestSchema = z.object({
-  isDisabled: z.boolean(),
 })
 
 export const orphanTestCaseSchema = z.object({
@@ -1247,7 +1241,6 @@ export type ImportUsersRequest = z.input<typeof importUsersRequestSchema>
 export type DeleteUsersRequest = z.input<typeof deleteUsersRequestSchema>
 export type ResetPasswordResponse = z.infer<typeof resetPasswordResponseSchema>
 export type UpdateWebsiteConfigRequest = z.input<typeof updateWebsiteConfigRequestSchema>
-export type UpdateJudgeServerRequest = z.input<typeof updateJudgeServerRequestSchema>
 export type UploadImageResponse = z.infer<typeof uploadImageResponseSchema>
 export type CreateContestRequest = z.input<typeof createContestRequestSchema>
 export type UpdateContestRequest = z.input<typeof updateContestRequestSchema>

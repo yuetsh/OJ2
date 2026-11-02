@@ -11,8 +11,17 @@
 # 不设它的话 postgres 会在空目录上初始化一个全新的空库，测试点和题面图片也全都不在，
 # 而且**不报错**。`deploy.sh` 为此专门设了自检。
 
+# 每个容器的日志最多 3 个 10MB 的文件。docker 默认的 json-file 不设上限，判题、worker
+# 天天打日志，2 核小服务器的磁盘迟早被写满 —— 磁盘一满，postgres 写不进、判题跟着失败。
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: '3'
+
 services:
   oj-postgres:
+    logging: *logging
     image: postgres:18-alpine
     container_name: oj-postgres
     restart: always
@@ -67,6 +76,7 @@ services:
       retries: 10
 
   oj-redis:
+    logging: *logging
     image: redis:8-alpine
     container_name: oj-redis
     restart: always
@@ -87,6 +97,7 @@ services:
       retries: 10
 
   oj-judge:
+    logging: *logging
     # 自己构建的判题沙箱（go-judge + gcc / python，见 docker/judge/）。
     # ⚠️ 这个 tag 不在任何 registry 上：本机 docker/judge/build.sh 构建，
     #    服务器/机房用 docker load 装。镜像不在本地时 compose 会去 pull 然后报找不到。
@@ -102,12 +113,13 @@ services:
       - ${DATA_DIR:-../data}/backend/test_case:/test_case:ro
     environment:
       ES_AUTH_TOKEN: ${OJ2_JUDGE_TOKEN:?请在 docker/.env 里设置 OJ2_JUDGE_TOKEN}
-    # 同一时刻最多六份在编译（正式判题 2、试运行 2、提交前编译检查 2），g++ 编一份 iostream
+    # 同一时刻最多四份在编译（judge/slots.ts 两个名额池：正式判题 2、学生页面上的运行和编译检查 2），g++ 编一份 iostream
     # 峰值约 70MB、bits/stdc++.h 约 195MB，再加学生程序本身。512m 不够撑满，超了是容器里
     # 随机杀进程、学生看到系统错误
     mem_limit: 1g
 
   oj-api:
+    logging: *logging
     build: &build
       context: ..
       dockerfile: docker/Dockerfile
@@ -149,6 +161,7 @@ services:
     cpu_shares: 2048
 
   oj-worker:
+    logging: *logging
     build: *build
     image: oj2-api:latest
     container_name: oj-worker
@@ -160,10 +173,19 @@ services:
     environment: *api-env
     # 同一个镜像，换个子命令就是判题消费者
     command: ["oj2-api", "worker"]
+    # worker 每 10 秒刷一次「还活着」，60 秒没刷就是挂了（oj2-api healthcheck --worker）。
+    # unhealthy 只是标出来、deploy.sh 起栈时会等它，docker 不会因此自动重启容器
+    healthcheck:
+      test: ["CMD", "oj2-api", "healthcheck", "--worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     # SQL 判题的子进程各允许 512MB 数据段（judge/sql 的 ulimit -d），两个并发就能顶满 512m
     mem_limit: 1g
 
   oj-web:
+    logging: *logging
     build:
       context: ..
       dockerfile: docker/Dockerfile

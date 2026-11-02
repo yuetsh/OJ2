@@ -3,7 +3,7 @@
 // 2026-08-26：旧 Django 后端下线，7 张框架表（auth_group、auth_group_permissions、
 // auth_permission、django_content_type、django_dramatiq_task、django_migrations、
 // django_session）已由 0002_drop_django_leftovers 删除，drizzle.config.ts 的
-// tablesFilter 随之移除。库里现在就是这 27 张业务表。
+// tablesFilter 随之移除。当时库里剩 27 张业务表（之后陆续加了新表，以本文件为准）。
 //
 // 2026-09-02：又清了一批只有 Django 时代写过、OJ2 一次都没读过的列 ——
 // 0008 删比赛 IP 白名单与 submission.ip（判题机的 judge_server.ip 保留，那是运维数据），

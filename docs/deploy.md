@@ -57,8 +57,9 @@ docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password online
 
 ### 服务器：push 就部署
 
-`.github/workflows/deploy.yml` —— 在 runner 上编好产物、rsync 到服务器、在服务器上
-跑 `docker/deploy.sh --prebuilt`。触发的是 push 到 **github** 这个 remote
+`.github/workflows/deploy.yml` —— 在 runner 上编好产物、跑一遍 `bunx vp run verify`
+（格式、lint、前后端类型检查、路由遮蔽、AST 节点，**不过就不部署**）、rsync 到服务器、
+在服务器上跑 `docker/deploy.sh --prebuilt`。触发的是 push 到 **github** 这个 remote
 （`origin` 是 `git.xuyue.cc`，它会镜像到 github，所以**平时 push `origin` 通常几秒后
 也就部署了**，偶尔不跟、要 `git ls-remote github` 核实。Gitea 自己不跑这份工作流 —— 没有
 `.gitea/workflows` 时它的 Actions 会退回来读这份工作流，所以 job 上卡了

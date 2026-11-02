@@ -1,5 +1,4 @@
 import {
-  updateJudgeServerRequestSchema,
   updateWebsiteConfigRequestSchema,
   type DashboardInfo,
   type JudgeServer,
@@ -28,7 +27,7 @@ import { TEACHER_ROLES } from '../helpers'
 import { onlineUserIds } from '../../auth/presence'
 import { JudgeStatus } from '../../judge/status'
 import { suggestActiveClass } from '../../services/class-activity'
-import { classPrefixCondition, queryInteger } from '../helpers'
+import { classPrefixCondition } from '../helpers'
 
 export const adminConfRoutes = new Hono<AppEnv>()
 
@@ -98,29 +97,16 @@ adminConfRoutes.get('/judge-servers', requireSuperAdmin, async (c) => {
   return success(c, {
     // 后台要显示 token 才能拿去配判题机。这个接口是超管专属的
     token: config.judgeServerToken,
+    // task_number、is_disabled 两列是旧 JudgeServer 时代的：判题不经调度、也没有「停用」这回事，
+    // 列留在库里（删列是破坏性迁移，不值得），不往外给
     servers: rows.map(
-      (row) =>
+      ({ taskNumber: _taskNumber, isDisabled: _isDisabled, ...row }) =>
         ({
           ...row,
           status: isAlive(row.lastHeartbeat) ? 'normal' : 'abnormal',
         }) satisfies JudgeServer,
     ),
   } satisfies JudgeServerList)
-})
-
-adminConfRoutes.put('/judge-servers/:id', requireSuperAdmin, async (c) => {
-  const parsed = await parseBody(c, updateJudgeServerRequestSchema, 'isDisabled is required')
-  if (!parsed.success) return parsed.response
-  const updated = await db
-    .update(schema.judgeServer)
-    .set({ isDisabled: parsed.data.isDisabled })
-    .where(eq(schema.judgeServer.id, queryInteger(c.req.param('id'), 0, { min: 1 })))
-    .returning({ id: schema.judgeServer.id })
-  if (updated.length === 0) return failure(c, 404, 'judge-server-not-found', 'Judge server does not exist')
-  // 旧后端在这里会 process_pending_task() 把积压的待判任务重新分发。
-  // 新架构不需要：任务在 BullMQ 里排着，worker 恢复就自己接着消费，不存在「没有新提交
-  // 就一直 waiting」那种情况 —— 那是旧的自研分发器才有的问题。
-  return success(c, null)
 })
 
 adminConfRoutes.delete('/judge-servers/:hostname', requireSuperAdmin, async (c) => {
