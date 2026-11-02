@@ -1,4 +1,4 @@
-import { submissionUpdateSchema, type FlowchartUpdate } from '@oj2/contract'
+import { STUDENT_ROLES, submissionUpdateSchema, type FlowchartUpdate } from '@oj2/contract'
 import { and, eq, inArray } from 'drizzle-orm'
 
 import { touchSession } from './auth/session'
@@ -9,7 +9,18 @@ import { parseSubmissionEvent, submissionUpdateChannel, userSubmissionTopic } fr
 import { JudgeStatus } from './judge/status'
 import { createSubscriberRedis } from './redis'
 import { asRecord } from './routes/helpers'
-import { configTopic, configUpdateChannel, parseSessionRevoked, parseUserEvent, sessionRevokedChannel, userEventChannel, userEventTopic } from './events'
+import {
+  classEventChannel,
+  classEventTopic,
+  configTopic,
+  configUpdateChannel,
+  parseClassEvent,
+  parseSessionRevoked,
+  parseUserEvent,
+  sessionRevokedChannel,
+  userEventChannel,
+  userEventTopic,
+} from './events'
 
 /** 本机的几种写法。开发时 Vite 代理会让 Origin（5173）和 Host（3000）对不上 */
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]'])
@@ -63,6 +74,8 @@ export interface SubmissionSocketData {
   /** 握手时从会话里读，三种 kind 都会填；collab 通道用它判断老师身份、拼 room_open 里的姓名 */
   username?: string
   adminType?: string
+  /** 握手时的班级。学生的 config 通道按它订阅班级广播（老师改了这节课的题），见 classTopicOf */
+  className?: string | null
   /** 当前所在协作房间的房主（学生）id，见 collab/handler.ts */
   roomOwnerId?: number
 }
@@ -204,6 +217,12 @@ export function startSessionSweep() {
   return timer
 }
 
+/** 学生的 config 通道额外挂的班级 topic；老师、没分班的没有 */
+function classTopicOf(ws: Bun.ServerWebSocket<SubmissionSocketData>) {
+  const { className, adminType } = ws.data
+  return className && adminType && STUDENT_ROLES.includes(adminType as (typeof STUDENT_ROLES)[number]) ? classEventTopic(className) : null
+}
+
 export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSocketData> {
   return {
     open(ws) {
@@ -219,6 +238,8 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       }
       if (ws.data.kind === 'config') {
         ws.subscribe(configTopic)
+        const classTopic = classTopicOf(ws)
+        if (classTopic) ws.subscribe(classTopic)
         return
       }
       ws.subscribe(userSubmissionTopic(ws.data.userId))
@@ -264,6 +285,8 @@ export function submissionWebSocketHandler(): Bun.WebSocketHandler<SubmissionSoc
       }
       if (ws.data.kind === 'config') {
         ws.unsubscribe(configTopic)
+        const classTopic = classTopicOf(ws)
+        if (classTopic) ws.unsubscribe(classTopic)
         return
       }
       ws.unsubscribe(userSubmissionTopic(ws.data.userId))
@@ -384,6 +407,12 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
       server.publish(configTopic, raw)
       return
     }
+    if (channel === classEventChannel) {
+      // 禁用的学生不用查：sweepSessions / publishSessionRevoked 会把那条连接断掉
+      const event = parseClassEvent(raw)
+      if (event) server.publish(classEventTopic(event.className), JSON.stringify(event.data))
+      return
+    }
     if (channel === sessionRevokedChannel) {
       const revoked = parseSessionRevoked(raw)
       if (!revoked) return
@@ -439,6 +468,6 @@ export async function bridgeSubmissionEvents(server: Bun.Server<SubmissionSocket
   })
   // 连接层的 error 已经由 createSubscriberRedis 里的 withErrorLogging 打了
   // （带连接名），这里再挂一个只会把同一条错误打两遍
-  await subscriber.subscribe(submissionUpdateChannel, userEventChannel, configUpdateChannel, sessionRevokedChannel)
+  await subscriber.subscribe(submissionUpdateChannel, userEventChannel, configUpdateChannel, sessionRevokedChannel, classEventChannel)
   return subscriber
 }

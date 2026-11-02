@@ -141,6 +141,7 @@ const server = Bun.serve<SubmissionSocketData>({
             tokenVersion: session.tokenVersion,
             username: user.username,
             adminType: user.adminType,
+            className: user.className,
           },
         })
       ) {

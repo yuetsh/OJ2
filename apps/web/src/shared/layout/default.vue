@@ -4,6 +4,7 @@ import Header from '../components/Header.vue'
 import Login from '../components/Login.vue'
 import Signup from '../components/Signup.vue'
 import AchievementToast from '../components/AchievementToast.vue'
+import LessonUpdateNotice from '../components/LessonUpdateNotice.vue'
 import { useAchievementStore } from 'shared/store/achievement'
 import { useUserStore } from 'shared/store/user'
 
@@ -40,6 +41,7 @@ watch(
     <Login />
     <Signup />
     <AchievementToast />
+    <LessonUpdateNotice />
     <Beian />
   </n-layout>
 </template>

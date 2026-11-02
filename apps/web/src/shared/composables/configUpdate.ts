@@ -1,6 +1,7 @@
 import { useConfigStore } from 'shared/store/config'
 import { useUserStore } from 'shared/store/user'
-import { useConfigWebSocket, type ConfigUpdate } from 'shared/composables/websocket'
+import { receiveLessonUpdate } from 'shared/composables/lessonUpdate'
+import { useConfigWebSocket, type ConfigChannelMessage } from 'shared/composables/websocket'
 
 /**
  * 收 /ws/config 的站点配置广播，写进 configStore —— 超管改完配置，所有开着页面
@@ -13,7 +14,12 @@ export function useConfigUpdate() {
   const configStore = useConfigStore()
   const userStore = useUserStore()
 
-  const handleConfigUpdate = (data: ConfigUpdate) => {
+  const handleConfigUpdate = (data: ConfigChannelMessage) => {
+    // 同一条连接上的班级广播：老师改了这节课的题（只推给学生，见后端 classTopicOf）
+    if (data.type === 'lesson_update') {
+      receiveLessonUpdate(data)
+      return
+    }
     // 认不出来的键直接忽略：后端将来多推一个字段，不该把 store 撑出个野字段
     if (!(data.key in configStore.config)) return
     ;(configStore.config as unknown as Record<string, unknown>)[data.key] = data.value

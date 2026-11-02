@@ -251,6 +251,30 @@ export const classTodaySchema = z.object({
   ),
 })
 
+/**
+ * 课上老师在看板（或后台）改了**今天这节**布置的题，推给这个班还开着页面的学生：告诉他们改了哪些，
+ * 点「刷新」重新载入。只有学生看到的那一节（今天最后布置的）变了才推 —— 改的是今天早些时候的一节、
+ * 或者改完和原来一样，都不推。走 /ws/config 那条全局常驻的连接。
+ *
+ * - `assigned`：今天这节是新布置的（原来没布置，或者「新的一节」），`problems` 是整张单子
+ * - `changed`：同一节改了，看 `added` / `removed` / `languageChanged` / `reordered`
+ * - `cleared`：清掉了，学生那边退回按同班提交推断
+ */
+export const lessonUpdateProblemSchema = z.object({ problemDisplayId: z.string(), title: z.string() })
+
+export const lessonUpdateSchema = z.object({
+  type: z.literal('lesson_update'),
+  kind: z.enum(['assigned', 'changed', 'cleared']),
+  language: lessonLanguageSchema,
+  problems: z.array(lessonUpdateProblemSchema),
+  added: z.array(lessonUpdateProblemSchema),
+  removed: z.array(lessonUpdateProblemSchema),
+  languageChanged: z.boolean(),
+  reordered: z.boolean(),
+})
+
+export type LessonUpdate = z.infer<typeof lessonUpdateSchema>
+
 export type ClassActivity = z.infer<typeof classActivitySchema>
 export type ClassToday = z.infer<typeof classTodaySchema>
 export type LastVisit = z.infer<typeof lastVisitSchema>

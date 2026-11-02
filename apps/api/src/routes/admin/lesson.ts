@@ -5,7 +5,7 @@ import { Hono } from 'hono'
 import { requireTeacher, type AppEnv } from '../../auth/middleware'
 import { db, schema } from '../../db'
 import { failure, parseBody, success } from '../../http'
-import { lessonDoneCounts, resolveLessonProblems } from '../../services/lesson'
+import { announceLessonChange, lessonDoneCounts, resolveLessonProblems, todayLessonSnapshot } from '../../services/lesson'
 import { localDateTime } from '../../time'
 import { queryInteger } from '../helpers'
 
@@ -125,10 +125,13 @@ adminLessonRoutes.post('/lessons', requireTeacher, async (c) => {
   if (!parsed.success) return parsed.response
   const result = await lessonValues(parsed.data)
   if ('code' in result) return failure(c, 400, result.code, result.message)
+  const before = await todayLessonSnapshot(result.values.className)
   const [row] = await db
     .insert(schema.classLesson)
     .values({ ...result.values, createdBy: c.get('user')!.id, updatedAt: new Date().toISOString() })
     .returning({ id: schema.classLesson.id })
+  // 补登的是今天、而且是最后一节，学生那边看到的就变了
+  await announceLessonChange(result.values.className, before)
   return success(c, { id: row!.id })
 })
 
@@ -138,6 +141,9 @@ adminLessonRoutes.put('/lessons/:id', requireTeacher, async (c) => {
   if (!parsed.success) return parsed.response
   const result = await lessonValues(parsed.data)
   if ('code' in result) return failure(c, 400, result.code, result.message)
+  // 班级能改：原来那个班和新的班学生看到的都可能变，两边各比一次
+  const classes = await affectedClasses(id, result.values.className)
+  const before = await Promise.all(classes.map((className) => todayLessonSnapshot(className)))
   // 布置的老师不换，和看板上「改」一样认第一次
   const [row] = await db
     .update(schema.classLesson)
@@ -145,11 +151,21 @@ adminLessonRoutes.put('/lessons/:id', requireTeacher, async (c) => {
     .where(eq(schema.classLesson.id, id))
     .returning({ id: schema.classLesson.id })
   if (!row) return failure(c, 404, 'lesson-not-found', '这一节已经被删掉了')
+  await Promise.all(classes.map((className, index) => announceLessonChange(className, before[index]!)))
   return success(c, null)
 })
 
 adminLessonRoutes.delete('/lessons/:id', requireTeacher, async (c) => {
   const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const [className] = await affectedClasses(id)
+  const before = className ? await todayLessonSnapshot(className) : null
   await db.delete(schema.classLesson).where(eq(schema.classLesson.id, id))
+  if (className) await announceLessonChange(className, before)
   return success(c, null)
 })
+
+/** 这一节原来属于哪个班（已经没了就没有），再加上要改成的班，去重 */
+async function affectedClasses(id: number, nextClass?: string) {
+  const [row] = await db.select({ className: schema.classLesson.className }).from(schema.classLesson).where(eq(schema.classLesson.id, id))
+  return [...new Set([row?.className, nextClass].filter((name): name is string => !!name))]
+}

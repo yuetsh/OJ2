@@ -1,8 +1,9 @@
-import { isSqlProblem, STUDENT_ROLES, type LessonLanguage } from '@oj2/contract'
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { isSqlProblem, STUDENT_ROLES, type LessonLanguage, type LessonUpdate } from '@oj2/contract'
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 
 import { db, schema } from '../db'
-import { dayNumber, dayStart } from '../time'
+import { publishLessonUpdate } from '../events'
+import { calendarDay, dayNumber, dayStart } from '../time'
 import { FLOWCHART_PASSED, SOLVED_RESULTS } from './class-activity'
 
 /**
@@ -96,4 +97,66 @@ export async function lessonDoneCounts(lessons: { id: number; className: string;
     select k, count(*)::int as done from per_user group by k
   `)
   return new Map([...result].map((row) => [row.k, row.done]))
+}
+
+interface LessonSnapshot {
+  id: number
+  problemIds: number[]
+  language: LessonLanguage | null
+}
+
+/**
+ * 学生此刻看到的那一节：这个班今天最后布置的（和 routes/classroom.ts 的 lessonPlan 同一个取法），
+ * 没布置为 null。改之前、改之后各拍一张，交给 announceLessonChange 比
+ */
+export async function todayLessonSnapshot(className: string): Promise<LessonSnapshot | null> {
+  const [row] = await db
+    .select({ id: schema.classLesson.id, problemIds: schema.classLesson.problemIds, language: schema.classLesson.language })
+    .from(schema.classLesson)
+    .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, calendarDay())))
+    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
+    .limit(1)
+  return row?.problemIds.length ? { ...row, language: row.language ?? null } : null
+}
+
+/**
+ * 改完之后再拍一张，和改之前那张比；学生看到的那一节变了，就告诉这个班改了哪些（见契约 lessonUpdateSchema）。
+ * 推送失败只记日志：布置已经存下了，不能因为 Redis 抖一下让老师看到报错
+ */
+export async function announceLessonChange(className: string, before: LessonSnapshot | null) {
+  try {
+    const after = await todayLessonSnapshot(className)
+    if (!before && !after) return
+    const sameLesson = !!before && !!after && before.id === after.id
+    if (sameLesson && before.language === after.language && before.problemIds.join() === after.problemIds.join()) return
+
+    const ids = [...new Set([...(before?.problemIds ?? []), ...(after?.problemIds ?? [])])]
+    const rows = ids.length
+      ? await db
+          .select({ id: schema.problem.id, displayId: schema.problem.displayId, title: schema.problem.title })
+          .from(schema.problem)
+          .where(and(inArray(schema.problem.id, ids), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
+      : []
+    const byId = new Map(rows.map((row) => [row.id, { problemDisplayId: row.displayId, title: row.title }]))
+    const pick = (list: number[]) => list.flatMap((id) => byId.get(id) ?? [])
+
+    const afterIds = after?.problemIds ?? []
+    const beforeIds = sameLesson ? before.problemIds : []
+    const added = afterIds.filter((id) => !beforeIds.includes(id))
+    const removed = beforeIds.filter((id) => !afterIds.includes(id))
+    const kept = afterIds.filter((id) => beforeIds.includes(id))
+    const keptBefore = beforeIds.filter((id) => afterIds.includes(id))
+    await publishLessonUpdate(className, {
+      type: 'lesson_update',
+      kind: !after ? 'cleared' : sameLesson ? 'changed' : 'assigned',
+      language: after?.language ?? null,
+      problems: pick(afterIds),
+      added: sameLesson ? pick(added) : [],
+      removed: pick(removed),
+      languageChanged: sameLesson && before.language !== after.language,
+      reordered: sameLesson && kept.join() !== keptBefore.join(),
+    } satisfies LessonUpdate)
+  } catch (error) {
+    console.error('Failed to announce lesson change', error)
+  }
 }

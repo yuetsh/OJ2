@@ -1,4 +1,4 @@
-import type { FlowchartUpdate } from '@oj2/contract'
+import type { FlowchartUpdate, LessonUpdate } from '@oj2/contract'
 
 import { redis } from './redis'
 
@@ -44,6 +44,30 @@ export function parseSessionRevoked(raw: string): SessionRevoked | null {
     const value = JSON.parse(raw) as SessionRevoked
     if (typeof value.sid !== 'string' && !Number.isInteger(value.userId)) return null
     if (value.reason !== 'session-ended' && value.reason !== 'account-disabled') return null
+    return value
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 按班广播：课上老师改了今天这节布置的题（见契约 lessonUpdateSchema）。学生的 /ws/config 连接
+ * 握手时按自己的班订阅 classEventTopic；换了班要等重连才跟上，课上不会发生。
+ */
+export const classEventChannel = 'class:events'
+
+export function classEventTopic(className: string) {
+  return `events:class:${className}`
+}
+
+export async function publishLessonUpdate(className: string, data: LessonUpdate) {
+  await redis.publish(classEventChannel, JSON.stringify({ className, data }))
+}
+
+export function parseClassEvent(raw: string): { className: string; data: LessonUpdate } | null {
+  try {
+    const value = JSON.parse(raw) as { className: string; data: LessonUpdate }
+    if (typeof value.className !== 'string' || !value.className || !value.data || typeof value.data !== 'object') return null
     return value
   } catch {
     return null

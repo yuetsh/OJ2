@@ -1,4 +1,4 @@
-import { WS_AUTH_PROTOCOL } from '@oj2/contract'
+import { WS_AUTH_PROTOCOL, type LessonUpdate } from '@oj2/contract'
 import { createDiscreteApi } from 'naive-ui'
 import { ref, getCurrentScope, onScopeDispose, type Ref } from 'vue'
 
@@ -560,13 +560,18 @@ export interface ConfigUpdate extends WebSocketMessage {
 }
 
 /**
+ * 这条通道上还有一种按班推的：老师改了这节课的题（学生才收得到，见契约 lessonUpdateSchema）
+ */
+export type ConfigChannelMessage = ConfigUpdate | LessonUpdate
+
+/**
  * 站点配置广播。这条通道是**单向**的：只收后端广播。服务端的消息处理只认
  * ping / subscribe，客户端往这里推 config_update 会被回一个 error 帧 ——
  * 别拿返回值里的 subscribe 往这条通道上发东西。配置变更走 POST /admin/website，
  * 由后端广播给所有人。
  */
-export function useConfigWebSocket(handler?: MessageHandler<ConfigUpdate>) {
-  return useChannel<ConfigUpdate>('/ws/config', handler)
+export function useConfigWebSocket(handler?: MessageHandler<ConfigChannelMessage>) {
+  return useChannel<ConfigChannelMessage>('/ws/config', handler)
 }
 
 export interface CollabRequestItem {

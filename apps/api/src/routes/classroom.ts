@@ -24,7 +24,7 @@ import { failure, parseBody, success } from '../http'
 import { isAccepted } from '../judge/status'
 import { activityRows, classMemberIds, FLOWCHART_PASSED, lessonLanguageFilter, SOLVED_RESULTS, suggestActiveClass } from '../services/class-activity'
 import { accepted } from '../services/learning-stats'
-import { resolveLessonProblems } from '../services/lesson'
+import { announceLessonChange, resolveLessonProblems, todayLessonSnapshot } from '../services/lesson'
 import { calendarDay, dayStart, localTime } from '../time'
 
 export const classroomRoutes = new Hono<AppEnv>()
@@ -744,6 +744,8 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
 
   const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, className)).limit(1)
   if (!exists) return failure(c, 400, 'class-not-found', `没有 ${className} 这个班`)
+  // 改之前学生看到的那一节，改完比一比、告诉全班改了哪些
+  const before = await todayLessonSnapshot(className)
 
   // 要改的是哪一行：点名的那一节（只认这个班今天的），新开一节就没有，老写法是今天最后布置的那一节
   const [target] = newLesson
@@ -762,6 +764,7 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
         .limit(1)
   if (!problemDisplayIds.length) {
     if (target) await db.delete(schema.classLesson).where(eq(schema.classLesson.id, target.id))
+    await announceLessonChange(className, before)
     return success(c, null)
   }
 
@@ -785,5 +788,6 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
       updatedAt: now,
     })
   }
+  await announceLessonChange(className, before)
   return success(c, null)
 })
