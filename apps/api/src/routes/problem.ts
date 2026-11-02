@@ -1,6 +1,7 @@
 import {
   AST_SUPPORTED_LANGUAGES,
   isSqlProblem,
+  lessonLanguageSchema,
   parseLanguage,
   problemListSortSchema,
   problemTypeFilterSchema,
@@ -71,6 +72,15 @@ function typeFilter(type: ProblemTypeFilter | undefined) {
   return undefined
 }
 
+/**
+ * 课堂看板「选题」弹框只列能用这次作业的语言交的题（`?language=C`），左栏知识点的题数也按它数。
+ * 学生的题目列表不带这个参数
+ */
+function lessonLanguageFilter(raw: string | undefined) {
+  const language = lessonLanguageSchema.safeParse(raw).data
+  return language ? sql`${schema.problem.languages} @> ${JSON.stringify([language])}::jsonb` : undefined
+}
+
 type ProblemStates = Awaited<ReturnType<typeof problemStates>> | null
 type UserCounts = Awaited<ReturnType<typeof problemUserCounts>>
 
@@ -137,6 +147,8 @@ problemRoutes.get('/problems', optionalAuth, async (c) => {
   }
   const byType = typeFilter(type)
   if (byType) filters.push(byType)
+  const byLanguage = lessonLanguageFilter(c.req.query('language'))
+  if (byLanguage) filters.push(byLanguage)
 
   const states = user ? await problemStates(user.id) : null
   if (undone && states && states.solved.size > 0) filters.push(notInArray(schema.problem.id, [...states.solved]))
@@ -207,7 +219,15 @@ problemRoutes.get('/problem-tags', async (c) => {
     })
     .from(schema.problemTag)
     .innerJoin(schema.problemTags, eq(schema.problemTags.problemtagId, schema.problemTag.id))
-    .innerJoin(schema.problem, and(eq(schema.problem.id, schema.problemTags.problemId), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
+    .innerJoin(
+      schema.problem,
+      and(
+        eq(schema.problem.id, schema.problemTags.problemId),
+        eq(schema.problem.visible, true),
+        isNull(schema.problem.contestId),
+        lessonLanguageFilter(c.req.query('language')),
+      ),
+    )
     .where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)
     .groupBy(schema.problemTag.id, schema.problemTag.name, schema.problemTag.category)
     .having(sql`count(${schema.problemTags.problemId}) > 0`)

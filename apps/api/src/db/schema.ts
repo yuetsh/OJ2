@@ -1292,7 +1292,8 @@ export const exerciseAttempt = pgTable(
 )
 
 /**
- * 老师给某个班「这节课」布置的题（课堂看板里输入的题号），一个班一天一行。
+ * 老师给某个班布置的一节课的题（课堂看板里布置的），一次布置一行。一个班一天可以有几节
+ * 内容不同的课，数据统计按它切课（routes/submission-statistics.ts）。
  *
  * 学生首页的「班里在做」优先读它，没有才退回从提交记录推断（routes/classroom.ts）。
  * 推断在上课头几分钟是空的 —— 还没人交 —— 而这正是没听清题号的学生最需要它的时候。
@@ -1323,10 +1324,11 @@ export const classLesson = pgTable(
      * 没有它。写入侧在 PUT /classroom/lesson 按 lessonLanguageSchema 校验过
      */
     language: text().$type<LessonLanguage>(),
-    /** 这天第一次布置的老师，别的老师「改」也不换（和 createdAt 一样）。看板上写「HH:mm 谁 布置」 */
+    /** 这一节第一次布置的老师，别的老师「改」也不换（和 createdAt 一样）。看板上写「HH:mm 谁 布置」 */
     createdBy: integer('created_by').notNull(),
     /**
-     * 这天第一次布置的时刻，之后「改」只动 updatedAt。清掉（删行）再布置算重新开始。
+     * 这一节第一次布置的时刻，之后「改」只动 updatedAt。清掉（删行）再布置算重新开始。
+     * 同一天有几节时，按它分先后：最后布置的那一节是看板上的「这节课」。
      * 加这一列之前布置的用 updated_at 回填（0034）
      */
     createdAt: timestamp('created_at', {
@@ -1341,7 +1343,8 @@ export const classLesson = pgTable(
     }).notNull(),
   },
   (table) => [
-    unique('class_lesson_class_day_unique').on(table.className, table.day),
+    // 一个班一天可以上几节内容不同的课，每次布置一行（0040 拿掉了原来的一天一行唯一约束）
+    index('class_lesson_class_day_idx').on(table.className, table.day),
     index('class_lesson_created_by_idx').on(table.createdBy),
     foreignKey({
       columns: [table.createdBy],

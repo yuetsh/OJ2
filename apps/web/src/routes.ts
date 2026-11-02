@@ -302,6 +302,13 @@ export const admins: RouteRecordRaw = {
       component: () => import('admin/problem/Trend.vue'),
       meta: { requiresTeacherAdmin: true },
     },
+    {
+      // 课堂看板布置的每一节课：改、删、补（数据统计按布置切课）
+      path: 'lesson',
+      name: 'admin lesson list',
+      component: () => import('admin/lesson/list.vue'),
+      meta: { requiresTeacherAdmin: true },
+    },
     // 题单管理路由
     {
       path: 'problemset/list',

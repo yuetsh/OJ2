@@ -65,6 +65,17 @@ const custom = computed<[number, number] | null>(() => {
   return from.value && to.value && Number.isFinite(a) && Number.isFinite(b) ? [a, b] : null
 })
 
+/**
+ * 「做完」只数所选时段之内做对的，和看板、后台「课堂作业」、一行一节课的「做完」不一样
+ * （那几处以前做对的也算）—— 从那边点进来数字会变小，所以写明是哪段时间里做完的
+ */
+const doneLabel = computed(() => {
+  const value = periodValue.value
+  if (value === 'today' || (value === 'custom' && custom.value && custom.value[0] === custom.value[1])) return '这一天做完'
+  if (value === 'lesson' || value === '1h' || value === '2h') return '这节课做完'
+  return '这段时间做完'
+})
+
 const periodValue = computed<Period>(() => {
   // 「那节课」要带着精确的起止时刻，地址栏里缺了就退回默认
   if (period.value === 'lesson') return custom.value ? 'lesson' : DEFAULT_PERIOD
@@ -377,7 +388,7 @@ function resultWidth(value: number) {
           <StatItem label="上了几节课" :value="`${lessons.lessons.length}${lessons.hasMore ? '+' : ''}`" unit="节" />
         </template>
         <template v-if="personCount">
-          <StatItem :label="hasProblems ? '做完' : '做对过题'" :value="`${doneCount} / ${personCount}`" unit="人" tone="success" />
+          <StatItem :label="hasProblems ? doneLabel : '做对过题'" :value="`${doneCount} / ${personCount}`" unit="人" tone="success" />
           <StatItem v-if="hasProblems" label="完成度" :value="`${personCount ? Math.round((doneCount / personCount) * 100) : 0}%`" />
           <StatItem label="一道没交" :value="stats.dataUnaccepted.length" unit="人" tone="error" />
         </template>

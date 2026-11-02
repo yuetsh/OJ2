@@ -260,12 +260,16 @@ export function getClassLesson(className?: string) {
   return api.get<ClassLesson>('classroom/lesson', { params: { className } })
 }
 
-/** 给这个班布置今天的题，空数组 = 清掉 */
-export function setClassLesson(className: string, problemDisplayIds: string[], language: LessonLanguage | null) {
+/**
+ * 给这个班布置今天的一节课，空数组 = 清掉这一节。`lessonId` 为 null 是今天新开一节
+ * （一个班一天可以上几节内容不同的课），否则改那一节
+ */
+export function setClassLesson(className: string, problemDisplayIds: string[], language: LessonLanguage | null, lessonId: number | null) {
   return api.put<null>('classroom/lesson', {
     className,
     problemDisplayIds,
     language,
+    ...(lessonId === null ? { newLesson: true } : { lessonId }),
   } satisfies ClassLessonRequest)
 }
 

@@ -79,12 +79,17 @@ function clock(lesson: Lesson) {
   return `${parseTime(lesson.start, 'HH:mm')}–${parseTime(lesson.end, 'HH:mm')}`
 }
 
-/** 23 人来了、花名册却只有 22（有个号不是学生角色）时，不写「23 / 22」 */
+/**
+ * 布置的课知道要做什么，写全班几人做完；推断的课只知道谁交了，写来了几人。
+ * 23 人来了、花名册却只有 22（有个号不是学生角色）时，不写「23 / 22」
+ */
 function attendance(lesson: Lesson) {
+  if (lesson.doneCount !== null) return lesson.classSize ? `做完 ${lesson.doneCount} / ${lesson.classSize}` : `做完 ${lesson.doneCount} 人`
   return lesson.classSize >= lesson.userCount ? `${lesson.userCount} / ${lesson.classSize} 人` : `${lesson.userCount} 人`
 }
 
 function problemText(lesson: Lesson) {
+  if (lesson.assigned) return `布置 ${lesson.problems.length} 道`
   return `${lesson.fromProblemSet ? '题单 ' : ''}${lesson.problems.length} 道`
 }
 
@@ -152,7 +157,7 @@ function percent(value: number, total: number) {
           <span v-if="nowHour !== null" class="now" :style="{ left: axisLeft(nowHour) }"></span>
         </span>
         <b class="c-class">{{ classLabel(lesson.className) }}</b>
-        <span class="c-came">{{ attendance(lesson) }}</span>
+        <span class="c-came" :title="lesson.assigned ? `交过的 ${lesson.userCount} 人` : undefined">{{ attendance(lesson) }}</span>
         <span class="c-probs">{{ problemText(lesson) }}</span>
         <span class="c-rate">
           {{ lesson.total }} 次 ·

@@ -1,5 +1,4 @@
 import {
-  isSqlProblem,
   STUDENT_ROLES,
   classLessonRequestSchema,
   type ClassActivity,
@@ -25,6 +24,7 @@ import { failure, parseBody, success } from '../http'
 import { isAccepted } from '../judge/status'
 import { activityRows, classMemberIds, FLOWCHART_PASSED, lessonLanguageFilter, SOLVED_RESULTS, suggestActiveClass } from '../services/class-activity'
 import { accepted } from '../services/learning-stats'
+import { resolveLessonProblems } from '../services/lesson'
 import { calendarDay, dayStart, localTime } from '../time'
 
 export const classroomRoutes = new Hono<AppEnv>()
@@ -94,11 +94,12 @@ async function visibleProblems(ids: number[]) {
 
 /**
  * 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言、布置时刻和布置的老师；
- * 没布置为 null。老师写真名：老师之间认的是名字，用户名（lwp0201、little）认不出是谁
+ * 没布置为 null。一天布置过几节的，取最后布置的那一节。老师写真名：老师之间认的是名字，用户名（lwp0201、little）认不出是谁
  */
 async function lessonPlan(className: string, day: string) {
   const [row] = await db
     .select({
+      id: schema.classLesson.id,
       problemIds: schema.classLesson.problemIds,
       language: schema.classLesson.language,
       createdAt: schema.classLesson.createdAt,
@@ -108,6 +109,7 @@ async function lessonPlan(className: string, day: string) {
     .innerJoin(schema.user, eq(schema.user.id, schema.classLesson.createdBy))
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.classLesson.createdBy))
     .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
+    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
     .limit(1)
   return row?.problemIds.length ? row : null
 }
@@ -132,6 +134,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     const groupById = new Map(groups.map((row) => [row.problemId, row]))
     return {
       source: 'teacher' as const,
+      lessonId: plan.id,
       day: today,
       language: plan.language ?? null,
       assignedAt: plan.createdAt,
@@ -161,6 +164,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
   const problems = await visibleProblems(picked.map((row) => row.problemId))
   return {
     source: picked.length ? ('inferred' as const) : null,
+    lessonId: null,
     day: picked.length ? latest : null,
     // 推断出来的课不知道老师要的是哪种语言，不限
     language: null,
@@ -379,6 +383,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
       className: null,
       day,
       source: null,
+      lessonId: null,
       language: null,
       assignedAt: null,
       assignedBy: null,
@@ -397,7 +402,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
       .select({ language: schema.classLesson.language })
       .from(schema.classLesson)
       .where(and(eq(schema.classLesson.className, className), isNotNull(schema.classLesson.language)))
-      .orderBy(desc(schema.classLesson.day))
+      .orderBy(desc(schema.classLesson.day), desc(schema.classLesson.createdAt))
       .limit(1),
   ])
   const ids = lesson.problems.map((problem) => problem.id)
@@ -550,6 +555,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
     className,
     day,
     source: lesson.source,
+    lessonId: lesson.lessonId,
     language: lesson.language,
     assignedAt: lesson.assignedAt,
     assignedBy: lesson.assignedBy,
@@ -725,54 +731,51 @@ classroomRoutes.get('/classroom/lesson', requireTeacher, async (c) => {
 })
 
 /**
- * 老师给这个班布置今天的题。按展示题号给、不分大小写，存 problem.id 并保留输入顺序；
- * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉，
- * 学生那边退回推断。
+ * 老师给这个班布置今天的一节课。按展示题号给、不分大小写，存 problem.id 并保留输入顺序；
+ * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉这一节，
+ * 今天一节都不剩时学生那边退回推断。改哪一节、还是新开一节，见契约 classLessonRequestSchema。
  */
 classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
   const parsed = await parseBody(c, classLessonRequestSchema, '题号或语言不对')
   if (!parsed.success) return parsed.response
   const user = c.get('user')!
-  const { className, problemDisplayIds, language } = parsed.data
+  const { className, problemDisplayIds, language, lessonId, newLesson } = parsed.data
   const day = calendarDay()
 
   const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, className)).limit(1)
   if (!exists) return failure(c, 400, 'class-not-found', `没有 ${className} 这个班`)
 
+  // 要改的是哪一行：点名的那一节（只认这个班今天的），新开一节就没有，老写法是今天最后布置的那一节
+  const [target] = newLesson
+    ? []
+    : await db
+        .select({ id: schema.classLesson.id })
+        .from(schema.classLesson)
+        .where(
+          and(
+            eq(schema.classLesson.className, className),
+            eq(schema.classLesson.day, day),
+            lessonId === undefined ? undefined : eq(schema.classLesson.id, lessonId),
+          ),
+        )
+        .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
+        .limit(1)
   if (!problemDisplayIds.length) {
-    await db.delete(schema.classLesson).where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
+    if (target) await db.delete(schema.classLesson).where(eq(schema.classLesson.id, target.id))
     return success(c, null)
   }
 
-  const wanted = [...new Set(problemDisplayIds.map((id) => id.toLowerCase()))]
-  const found = await db
-    .select({
-      id: schema.problem.id,
-      displayId: schema.problem.displayId,
-      languages: schema.problem.languages,
-    })
-    .from(schema.problem)
-    .where(and(inArray(sql<string>`lower(${schema.problem.displayId})`, wanted), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
-  const idByDisplay = new Map(found.map((row) => [row.displayId.toLowerCase(), row.id]))
-  const missing = wanted.filter((id) => !idByDisplay.has(id))
-  if (missing.length) {
-    return failure(c, 400, 'problem-not-found', `这些题号不存在或没有公开：${missing.join('、')}`)
-  }
-
-  // 选了语言就得每道都能用它交，不然学生点开才发现交不了（提交接口会拒：language-not-allowed）。
-  // SQL 题除外：它只收 SQL，C 的作业里夹一道也不会让人选错语言，计数那边也放行了 SQL
-  if (language) {
-    const unsupported = found.filter((row) => !row.languages.includes(language) && !isSqlProblem(row)).map((row) => row.displayId)
-    if (unsupported.length) {
-      return failure(c, 400, 'language-not-allowed', `这些题不能用 ${language} 交：${unsupported.join('、')}`)
-    }
-  }
-
-  const problemIds = wanted.map((id) => idByDisplay.get(id)!)
+  const resolved = await resolveLessonProblems(problemDisplayIds, language)
+  if ('code' in resolved) return failure(c, 400, resolved.code, resolved.message)
+  const { problemIds } = resolved
   const now = new Date().toISOString()
-  await db
-    .insert(schema.classLesson)
-    .values({
+  if (target) {
+    // 「改」不换布置的人，和 createdAt 一样认第一次
+    await db.update(schema.classLesson).set({ problemIds, language, updatedAt: now }).where(eq(schema.classLesson.id, target.id))
+  } else {
+    // 新开一节、今天还没有，或者点名的那一节已经没了（别的老师清掉了）—— 最后这种也照新开处理，
+    // 老师手上的题号不至于白填
+    await db.insert(schema.classLesson).values({
       className,
       day,
       problemIds,
@@ -781,10 +784,6 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
       createdAt: now,
       updatedAt: now,
     })
-    .onConflictDoUpdate({
-      target: [schema.classLesson.className, schema.classLesson.day],
-      // 「改」不换布置的人，和 createdAt 一样认第一次
-      set: { problemIds, language, updatedAt: now },
-    })
+  }
   return success(c, null)
 })

@@ -15,7 +15,7 @@ import {
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from '@oj2/contract'
-import { and, count, desc, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, isNull, lte, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { optionalAuth, requireTeacher } from '../auth/middleware'
@@ -24,7 +24,8 @@ import { failure, success } from '../http'
 import { JudgeStatus, UNJUDGED_RESULTS, type JudgeStatusValue } from '../judge/status'
 import { type ContestEnv } from '../services/contest'
 import { getBooleanOption } from '../services/options'
-import { dayStart, localTime } from '../time'
+import { lessonDoneCounts } from '../services/lesson'
+import { calendarDay, dayStart, localTime } from '../time'
 import { isAdminRole, parseDisplayIds, rounded, scopedUsers, stripClassPrefix } from './helpers'
 
 export const submissionStatisticsRoutes = new Hono<ContestEnv>()
@@ -525,6 +526,122 @@ const LESSON_LIVE_MINUTES = 15
 const LESSONS_DEFAULT = 50
 const LESSONS_MAX = 500
 
+type StatisticsRange = { start: string | null; end: string }
+
+/** 这段时间里（按东八区日子）老师在课堂看板布置过的课，同一天的按布置先后 */
+async function lessonPlans(range: StatisticsRange) {
+  return db
+    .select({
+      id: schema.classLesson.id,
+      className: schema.classLesson.className,
+      day: schema.classLesson.day,
+      problemIds: schema.classLesson.problemIds,
+      language: schema.classLesson.language,
+      createdAt: schema.classLesson.createdAt,
+    })
+    .from(schema.classLesson)
+    .where(and(range.start ? gte(schema.classLesson.day, calendarDay(range.start)) : undefined, lte(schema.classLesson.day, calendarDay(range.end))))
+    .orderBy(schema.classLesson.createdAt, schema.classLesson.id)
+}
+
+type LessonPlan = Awaited<ReturnType<typeof lessonPlans>>[number]
+
+/**
+ * 布置的课各自的数：那天这个班交布置的这几道题的提交（不论隔了多久、几个人；和推断的课
+ * 一样只算普通学生、不含比赛），加上全做对的人数（口径见 lessonDoneCounts）。时间窗之内一条提交都没有、布置时刻也不在
+ * 窗里的不列 —— 「那节课」那种按时段筛的，别把同一天另一节课带出来。
+ */
+async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
+  if (!plans.length) return []
+  const planRows = JSON.stringify(
+    plans.flatMap((plan) =>
+      plan.problemIds.map((problemId) => ({
+        k: plan.id,
+        class_name: plan.className,
+        day: plan.day,
+        problem_id: problemId,
+      })),
+    ),
+  )
+  const accepted = sql.join(
+    ACCEPTED_RESULTS.map((value) => sql`${value}`),
+    sql`, `,
+  )
+  const judging = sql.join(
+    UNJUDGED_RESULTS.map((value) => sql`${value}`),
+    sql`, `,
+  )
+  const plan = sql`(select * from jsonb_to_recordset(${planRows}::jsonb) as p(k int, class_name text, day text, problem_id int))`
+  const [counts, doneByLesson] = await Promise.all([
+    db.execute<{
+      k: number
+      problem_id: number | null
+      users: number
+      total: number
+      accepted: number
+      judging: number
+      first: string
+      last: string
+    }>(sql`
+      with p as ${plan},
+      s as (
+        select p.k, s.user_id, s.problem_id, s.result, s.create_time
+        from ${schema.submission} s
+        join ${schema.user} u on u.id = s.user_id
+        join p on p.class_name = u.class_name and p.problem_id = s.problem_id
+          and p.day = to_char(${localTime(sql`s.create_time`)}, 'YYYY-MM-DD')
+        where s.contest_id is null
+          and s.create_time <= ${range.end}
+          ${range.start ? sql`and s.create_time >= ${range.start}` : sql``}
+          and u.admin_type = 'Regular User' and u.is_disabled = false
+      )
+      select k, problem_id,
+        count(distinct user_id)::int as users,
+        count(*)::int as total,
+        (count(*) filter (where result in (${accepted})))::int as accepted,
+        (count(*) filter (where result in (${judging})))::int as judging,
+        min(create_time) as first,
+        max(create_time) as last
+      from s
+      group by grouping sets ((k), (k, problem_id))
+    `),
+    lessonDoneCounts(plans),
+  ])
+  const totalByLesson = new Map([...counts].filter((row) => row.problem_id === null).map((row) => [row.k, row]))
+  const byProblem = Map.groupBy(
+    [...counts].filter((row) => row.problem_id !== null),
+    (row) => row.k,
+  )
+  const inRange = (time: string) => Date.parse(time) <= Date.parse(range.end) && (!range.start || Date.parse(time) >= Date.parse(range.start))
+  return plans.flatMap((lesson) => {
+    const total = totalByLesson.get(lesson.id)
+    if (!total && !inRange(lesson.createdAt)) return []
+    // 刚布置、还没人交：时段就是布置那一刻
+    const first = total ? new Date(total.first).toISOString() : lesson.createdAt
+    const last = total ? new Date(total.last).toISOString() : lesson.createdAt
+    return [
+      {
+        className: lesson.className,
+        day: lesson.day,
+        problemIds: lesson.problemIds,
+        start: first,
+        end: last,
+        users: total?.users ?? 0,
+        total: total?.total ?? 0,
+        accepted: total?.accepted ?? 0,
+        judging: total?.judging ?? 0,
+        byProblem: (byProblem.get(lesson.id) ?? []).map((row) => ({
+          problemId: row.problem_id!,
+          total: row.total,
+          accepted: row.accepted,
+          judging: row.judging,
+        })),
+        doneCount: doneByLesson.get(lesson.id) ?? 0,
+      },
+    ]
+  })
+}
+
 type LessonAggRow = {
   level: number
   class_name: string | null
@@ -532,7 +649,8 @@ type LessonAggRow = {
   sid: number | null
   problem_id: number | null
   result: JudgeStatusValue | null
-  lesson: boolean | null
+  /** plan = 布置的课的题（另算，见 assignedLessons）；lesson = 推断出来的课；scattered = 零散 */
+  kind: 'plan' | 'lesson' | 'scattered' | null
   users: number
   total: number
   accepted: number
@@ -563,10 +681,19 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
     sql`, `,
   )
 
-  // grouping() 的位：class_name 32、day 16、sid 8、problem_id 4、result 2、lesson 1。
+  // 这段时间里老师布置过的课。它们的题那天交的提交另算（assignedLessons），不参与切段
+  const plans = await lessonPlans(range)
+  const planRows = JSON.stringify(
+    plans.flatMap((plan) => plan.problemIds.map((problemId) => ({ class_name: plan.className, day: plan.day, problem_id: problemId }))),
+  )
+
+  // grouping() 的位：class_name 32、day 16、sid 8、problem_id 4、result 2、kind 1。
   // 没参与分组的那几列记 1，所以每种粒度对应一个固定的 level
-  const rows = await db.execute<LessonAggRow>(sql`
-    with s as (
+  const rowsPromise = db.execute<LessonAggRow>(sql`
+    with plan as (
+      select * from jsonb_to_recordset(${planRows}::jsonb) as p(class_name text, day text, problem_id int)
+    ),
+    s as (
       select u.class_name, s.user_id, s.problem_id, s.result, s.problemset_id, s.create_time,
         to_char(${localTime(sql`s.create_time`)}, 'YYYY-MM-DD') as day
       from ${schema.submission} s
@@ -580,7 +707,11 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
     g as (
       select *,
         case when create_time - lag(create_time) over w > ${`${LESSON_GAP_MINUTES} minutes`}::interval
-          then 1 else 0 end as brk
+          then 1 else 0 end as brk,
+        exists (
+          select 1 from plan p
+          where p.class_name is not distinct from s.class_name and p.day = s.day and p.problem_id = s.problem_id
+        ) as planned
       from s
       window w as (partition by class_name, day order by create_time)
     ),
@@ -594,20 +725,22 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
       from (
         select class_name, day, sid, problem_id, count(distinct user_id) as n
         from seg
+        where not planned
         group by class_name, day, sid, problem_id
       ) p
       group by class_name, day, sid
       having max(n) >= ${LESSON_MIN_USERS}
     ),
     marked as (
-      select seg.*, (l.sid is not null) as lesson
+      select seg.*,
+        case when seg.planned then 'plan' when l.sid is not null then 'lesson' else 'scattered' end as kind
       from seg
       left join lesson_seg l
         -- 没填班级的号（class_name 为 null）合在一起当一个班切，= 会把它们全漏掉
         on l.class_name is not distinct from seg.class_name and l.day = seg.day and l.sid = seg.sid
     )
-    select grouping(class_name, day, sid, problem_id, result, lesson) as level,
-      class_name, day, sid::int as sid, problem_id, result, lesson,
+    select grouping(class_name, day, sid, problem_id, result, kind) as level,
+      class_name, day, sid::int as sid, problem_id, result, kind,
       count(distinct user_id)::int as users,
       count(*)::int as total,
       (count(*) filter (where result in (${accepted})))::int as accepted,
@@ -618,26 +751,33 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
       (count(distinct user_id) filter (where result in (${accepted})))::int as accepted_users
     from marked
     group by grouping sets (
-      (class_name, day, sid, problem_id),
-      (class_name, day, sid, lesson),
+      (class_name, day, sid, problem_id, kind),
+      (class_name, day, sid, kind),
       (problem_id, class_name),
       (problem_id, result),
-      (lesson, class_name, day)
+      (kind, class_name, day)
     )
   `)
+  const [rows, assigned] = await Promise.all([rowsPromise, assignedLessons(plans, range)])
 
-  const LEVEL = { segProblem: 3, segment: 6, problemClass: 27, problemResult: 57, dayClass: 14 }
+  const LEVEL = { segProblem: 2, segment: 6, problemClass: 27, problemResult: 57, dayClass: 14 }
   const segKey = (row: LessonAggRow) => `${row.class_name}|${row.day}|${row.sid}`
   const failedOf = (row: { total: number; accepted: number; judging: number }) => row.total - row.accepted - row.judging
 
   const problemsOfSeg = new Map<string, LessonAggRow[]>()
   for (const row of rows) {
-    if (row.level !== LEVEL.segProblem) continue
+    if (row.level !== LEVEL.segProblem || row.kind !== 'lesson') continue
     const key = segKey(row)
     problemsOfSeg.set(key, [...(problemsOfSeg.get(key) ?? []), row])
   }
-  const allLessons = rows.filter((row) => row.level === LEVEL.segment && row.lesson).sort((a, b) => b.first.localeCompare(a.first))
-  const picked = allLessons.slice(0, limit)
+  // 推断的课和布置的课排在一起，按开始时间从近到远取前 limit 节
+  const allLessons = [
+    ...rows.filter((row) => row.level === LEVEL.segment && row.kind === 'lesson').map((row) => ({ inferred: row, assigned: null, start: row.first })),
+    ...assigned.map((lesson) => ({ inferred: null, assigned: lesson, start: lesson.start })),
+  ].sort((a, b) => b.start.localeCompare(a.start))
+  const pickedAll = allLessons.slice(0, limit)
+  const picked = pickedAll.flatMap((item) => (item.inferred ? [item.inferred] : []))
+  const pickedAssigned = pickedAll.flatMap((item) => (item.assigned ? [item.assigned] : []))
   const hasMore = allLessons.length > limit
 
   // 题号、标题一次查齐：课的题、每节课错得最多的那道、整段时间错得最多的几道
@@ -675,7 +815,13 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
   const lessonProblemRows = picked.map((lesson) =>
     (problemsOfSeg.get(segKey(lesson)) ?? []).filter((row) => row.users >= LESSON_MIN_USERS).sort((a, b) => b.users - a.users),
   )
-  const problemIds = [...new Set([...lessonProblemRows.flat().map((row) => row.problem_id!), ...hardRanked.map((row) => row.problemId)])]
+  const problemIds = [
+    ...new Set([
+      ...lessonProblemRows.flat().map((row) => row.problem_id!),
+      ...hardRanked.map((row) => row.problemId),
+      ...pickedAssigned.flatMap((lesson) => lesson.problemIds),
+    ]),
+  ]
   const problems = problemIds.length
     ? await db
         .select({
@@ -689,7 +835,9 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
     : []
   const problemById = new Map(problems.map((row) => [row.id, row]))
 
-  const lessonClasses = [...new Set(picked.flatMap((row) => (row.class_name === null ? [] : [row.class_name])))]
+  const lessonClasses = [
+    ...new Set([...picked.flatMap((row) => (row.class_name === null ? [] : [row.class_name])), ...pickedAssigned.map((lesson) => lesson.className)]),
+  ]
   const sizes = lessonClasses.length
     ? await db
         .select({ className: schema.user.className, value: count() })
@@ -700,7 +848,8 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
 
   const sum = (list: LessonAggRow[], key: 'total' | 'accepted' | 'judging') => list.reduce((acc, row) => acc + row[key], 0)
   const liveSince = new Date(Date.now() - LESSON_LIVE_MINUTES * 60_000).toISOString()
-  const lessons = picked.map((lesson, index) => {
+  const sizeOf = (className: string | null) => (className === null ? 0 : (sizes.find((row) => row.className === className)?.value ?? 0))
+  const inferredLessons = picked.map((lesson, index) => {
     const own = lessonProblemRows[index]!
     const hardest = [...own].sort((a, b) => failedOf(b) - failedOf(a))[0]
     const hardestProblem = hardest ? problemById.get(hardest.problem_id!) : undefined
@@ -711,13 +860,15 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
       end: lesson.last,
       userCount: lesson.users,
       // 没填班级的谈不上花名册，给 0（界面上就只写「几人」）
-      classSize: lesson.class_name === null ? 0 : (sizes.find((row) => row.className === lesson.class_name)?.value ?? 0),
+      classSize: sizeOf(lesson.class_name),
       // 点进去就拿这几道去筛：统计接口只认公开题，一次最多 20 道
       problems: own
         .map((row) => problemById.get(row.problem_id!))
         .filter((row) => row?.visible)
         .map((row) => row!.displayId)
         .slice(0, STATISTICS_MAX_PROBLEMS),
+      assigned: false,
+      doneCount: null,
       fromProblemSet: lesson.from_ps * 2 > lesson.total,
       // 次数和正确率只算这节课的题：点进去筛的就是这几道，两边的数才对得上
       // （一段里零星一两个人顺手交的别的题不算）
@@ -734,11 +885,44 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
           : null,
     }
   })
+  const assignedOut = pickedAssigned.map((lesson) => {
+    const hardest = [...lesson.byProblem].sort((a, b) => failedOf(b) - failedOf(a))[0]
+    const hardestProblem = hardest ? problemById.get(hardest.problemId) : undefined
+    return {
+      className: lesson.className,
+      day: lesson.day,
+      start: lesson.start,
+      end: lesson.end,
+      userCount: lesson.users,
+      classSize: sizeOf(lesson.className),
+      problems: lesson.problemIds
+        .map((id) => problemById.get(id))
+        .filter((row) => row?.visible)
+        .map((row) => row!.displayId)
+        .slice(0, STATISTICS_MAX_PROBLEMS),
+      assigned: true,
+      doneCount: lesson.doneCount,
+      fromProblemSet: false,
+      total: lesson.total,
+      correctRate: judgedRate(lesson.accepted, lesson.total - lesson.judging),
+      // 刚布置还没人交的也算在上课（没人交时 end 就是布置时刻）
+      live: Date.parse(lesson.end) >= Date.parse(liveSince),
+      hardest:
+        hardest && hardestProblem && failedOf(hardest) > 0
+          ? {
+              problemDisplayId: hardestProblem.displayId,
+              problemTitle: hardestProblem.title,
+              failed: failedOf(hardest),
+            }
+          : null,
+    }
+  })
+  const lessons = [...inferredLessons, ...assignedOut].sort((a, b) => b.start.localeCompare(a.start))
 
   // 零散提交只给列出来的这些课覆盖到的日子（「这学期」只列了最近 50 节时，更早的零散不给）
-  const earliestDay = hasMore ? (picked.at(-1)?.day ?? null) : null
+  const earliestDay = hasMore ? (lessons.at(-1)?.day ?? null) : null
   const scattered = rows
-    .filter((row) => row.level === LEVEL.dayClass && row.lesson === false && (earliestDay === null || row.day! >= earliestDay))
+    .filter((row) => row.level === LEVEL.dayClass && row.kind === 'scattered' && (earliestDay === null || row.day! >= earliestDay))
     .sort((a, b) => (a.day !== b.day ? b.day!.localeCompare(a.day!) : a.class_name === null ? 1 : b.class_name === null ? -1 : b.total - a.total))
     .map((row) => ({
       day: row.day!,

@@ -117,6 +117,8 @@ export async function buildReport(
           .select({ day: schema.classLesson.day, problemIds: schema.classLesson.problemIds })
           .from(schema.classLesson)
           .where(and(eq(schema.classLesson.className, target.className), start ? gte(schema.classLesson.day, calendarDay(start)) : undefined))
+          // 一天布置过几节的，按布置先后接着排（下面的 planOrder 跨节累加）
+          .orderBy(asc(schema.classLesson.createdAt), asc(schema.classLesson.id))
       : [],
   ])
 
@@ -149,9 +151,12 @@ export async function buildReport(
   // 否则在 ≥ 5 人的那些天里挑人最多的，打平取晚的
   const lessonDay = new Map<number, string>()
   const planOrder = new Map<string, number>()
+  const dayOffset = new Map<string, number>()
   for (const plan of plans) {
+    const offset = dayOffset.get(plan.day) ?? 0
+    dayOffset.set(plan.day, offset + plan.problemIds.length)
     plan.problemIds.forEach((problemId, index) => {
-      planOrder.set(`${plan.day}|${problemId}`, index)
+      if (!planOrder.has(`${plan.day}|${problemId}`)) planOrder.set(`${plan.day}|${problemId}`, offset + index)
       const current = lessonDay.get(problemId)
       if (!current || usersOn(plan.day, problemId) >= usersOn(current, problemId)) lessonDay.set(problemId, plan.day)
     })

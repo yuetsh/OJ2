@@ -74,12 +74,20 @@ export const lastVisitSchema = z.object({
 
 /**
  * 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉。
- * `language` 是这份作业用什么语言做，null = 没选
+ * `language` 是这份作业用什么语言做，null = 没选。
+ *
+ * 一个班一天可以上几节内容不同的课，每次布置是一行（class_lesson.id）：
+ * - `lessonId`：改 / 清掉这一节（看板上的「改」）；
+ * - `newLesson`：今天再开一节（看板上的「新的一节」）；
+ * - 两个都不带：改今天最后布置的那一节，今天还没有就新开 —— 一天只能一份时的老写法，
+ *   开着旧页面的老师、没跟上的机房站点发的都是这种，别让它们每改一次就多出一节课
  */
 export const classLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
   problemDisplayIds: z.array(z.string().trim().min(1)).max(20),
   language: lessonLanguageSchema.nullable(),
+  lessonId: z.number().int().positive().optional(),
+  newLesson: z.boolean().optional(),
 })
 
 export const classBoardProblemSchema = z.object({
@@ -168,16 +176,19 @@ export const classBoardStudentSchema = z.object({
 })
 
 /**
- * 课堂看板：一个班、今天、这节课的几道题 × 全班学生。
+ * 课堂看板：一个班、今天、这节课的几道题 × 全班学生。「这节课」是今天最后布置的那一节，
+ * 今天没布置过就按今天同班的提交推断。
  * className 为 null = 没指定班级、最近两小时也没有哪个班在交（没法猜）。
  */
 export const classBoardSchema = z.object({
   className: z.string().nullable(),
   day: z.string(),
   source: z.enum(['teacher', 'inferred']).nullable(),
-  /** 今天布置的语言（见 lessonLanguageSchema） */
+  /** 老师布置的这一节的 id（「改」带着它）；推断出来的课为 null */
+  lessonId: z.number().int().nullable(),
+  /** 这一节布置的语言（见 lessonLanguageSchema） */
   language: lessonLanguageSchema,
-  /** 今天第一次布置的时刻，之后改题不变；推断出来的课为 null */
+  /** 这一节第一次布置的时刻，之后改题不变；推断出来的课为 null */
   assignedAt: z.string().nullable(),
   /** 第一次布置的老师（真名，没有真名用用户名）；推断出来的课为 null */
   assignedBy: z.string().nullable(),
@@ -250,3 +261,48 @@ export type ClassBoardProblem = z.infer<typeof classBoardProblemSchema>
 export type ClassBoardStudent = z.infer<typeof classBoardStudentSchema>
 export type ClassBoardCell = z.infer<typeof classBoardCellSchema>
 export type ClassActivityProblem = z.infer<typeof classActivityProblemSchema>
+
+/**
+ * 后台「课堂作业」：布置过的每一节课一行（class_lesson），新的在前。看板上当场布置的、
+ * 后台补的都在这里，数据统计按它们切课。
+ */
+export const adminLessonSchema = z.object({
+  id: z.number().int(),
+  className: z.string(),
+  /** 东八区的日子，`2026-10-08` */
+  day: z.string(),
+  /** 布置的时刻（看板上第一次布置那一刻；后台补的是填的时刻） */
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  /** 布置的老师：真名，没有真名用用户名（和看板「谁 布置」一样） */
+  createdBy: z.string(),
+  language: lessonLanguageSchema,
+  /** 按布置的顺序；题后来被藏起来的 visible 为 false（统计、学生那边都不再出现） */
+  problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string(), visible: z.boolean() })),
+  /** 班里的学生数（STUDENT_ROLES、没禁用），和 doneCount 同一个花名册 */
+  classSize: z.number().int(),
+  /** 把布置的题全做对了的人数（那天结束前；口径同看板） */
+  doneCount: z.number().int(),
+})
+
+export const adminLessonListSchema = z.object({
+  results: z.array(adminLessonSchema),
+  total: z.number().int().nonnegative(),
+  /** 布置过课的老师（筛选下拉用），按布置的节数从多到少 */
+  teachers: z.array(z.object({ id: z.number().int(), name: z.string() })),
+})
+
+/**
+ * 后台新补一节 / 改一节。日子和时刻按东八区填：补的是看板外上的课（没在看板布置、
+ * 以前的课），时刻决定同一天几节课的先后。题目至少一道 —— 删掉一节走 DELETE
+ */
+export const adminLessonRequestSchema = z.object({
+  className: z.string().trim().min(1),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  language: lessonLanguageSchema,
+  problemDisplayIds: z.array(z.string().trim().min(1)).min(1).max(20),
+})
+export type AdminLesson = z.infer<typeof adminLessonSchema>
+export type AdminLessonList = z.infer<typeof adminLessonListSchema>
+export type AdminLessonRequest = z.infer<typeof adminLessonRequestSchema>

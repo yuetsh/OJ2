@@ -32,8 +32,9 @@ export async function getProfile(username: string = ''): Promise<Profile | null>
   return contractDeferred('GET /profiles/:username', () => import('./profileSchema').then((m) => m.userProfileSchema), response)
 }
 
-export function getProblemTagList() {
-  return api.get<Tag[]>('problem-tags')
+/** 带 language 只数能用这个语言交的题（看板「选题」弹框用） */
+export function getProblemTagList(language = '') {
+  return api.get<Tag[]>('problem-tags', { params: { language } })
 }
 
 export function getHitokoto() {

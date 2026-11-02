@@ -15,6 +15,8 @@ import { parseTime } from 'utils/functions'
 import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from 'utils/types'
 import ExplainModal, { type ExplainPerson } from './components/ExplainModal.vue'
 import LeaveModal from './components/LeaveModal.vue'
+import AdminLink from 'shared/components/AdminLink.vue'
+import { useBreakpoints } from 'shared/composables/breakpoints'
 import LessonForm from './components/LessonForm.vue'
 import TrailPanel from './components/TrailPanel.vue'
 import { errorKind, type ErrorKind } from 'utils/errorKind'
@@ -41,6 +43,7 @@ const collabStore = useCollabStore()
 const message = useMessage()
 const theme = useThemeVars()
 const tone = useTone()
+const { isDesktop } = useBreakpoints()
 const router = useRouter()
 const route = useRoute()
 const { help, peek } = useTeacherHelp()
@@ -111,13 +114,34 @@ onUnmounted(pause)
 
 // ---------- 这节课的题：上课时当场填 ----------
 
-const editing = ref(false)
+/** 顶上那条布置框开着没有：edit = 改这一节，new = 今天再开一节 */
+const editing = ref<false | 'edit' | 'new'>(false)
 
-/** 还没有题（没布置、今天也推断不出来）：填题号的框就是这页最大的东西 */
-const needLesson = computed(() => !!board.value?.className && !board.value.problems.length)
+/**
+ * 一个班一天可以上几节内容不同的课。打开看板（或换到这个班）时，这一节已经布置了这么久，
+ * 多半是上一节课的 —— 先问这节课做哪几道题，底下能点回去接着看上一节。
+ * 只在第一次看到这一节时判一次：老师一直开着看板时，15 秒一刷不会把表突然换掉
+ */
+const STALE_LESSON_MINUTES = 100
+const staleLessonId = ref<number | null>(null)
+const seenLessonIds = new Set<number>()
+watch(
+  () => board.value?.lessonId ?? null,
+  (lessonId) => {
+    if (lessonId === null || seenLessonIds.has(lessonId)) return
+    seenLessonIds.add(lessonId)
+    const assignedAt = board.value?.assignedAt
+    if (assignedAt && Date.now() - Date.parse(assignedAt) > STALE_LESSON_MINUTES * 60_000) staleLessonId.value = lessonId
+  },
+)
+const staleLesson = computed(() => board.value?.lessonId != null && board.value.lessonId === staleLessonId.value)
+
+/** 还没有题（没布置、今天也推断不出来），或者布置的是上一节课的：填题号的框就是这页最大的东西 */
+const needLesson = computed(() => !!board.value?.className && (!board.value.problems.length || staleLesson.value))
 
 async function lessonSaved() {
   editing.value = false
+  staleLessonId.value = null
   selectedId.value = null
   await load()
 }
@@ -434,21 +458,27 @@ function lastText(student: ClassBoardStudent) {
         v-if="editing && board && className"
         :board="board"
         :class-name="className"
+        :lesson-id="editing === 'edit' ? board.lessonId : null"
         variant="inline"
         class="lesson-edit"
         @saved="lessonSaved"
         @cancel="editing = false"
       />
-      <div v-else-if="board?.problems.length" class="lesson">
+      <div v-else-if="board?.problems.length && !needLesson" class="lesson">
         <span class="lesson-label">{{ board.source === 'teacher' ? '这节课' : '今天在做' }}</span>
         <span v-if="board.language" class="chip lang">{{ LANGUAGE_SHOW_VALUE[board.language] }}</span>
         <span v-for="problem in board.problems" :key="problem.problemId" class="chip">
           {{ problem.problemDisplayId }}
         </span>
         <span v-if="board.assignedAt" class="assigned"> {{ parseTime(board.assignedAt, 'HH:mm') }} {{ board.assignedBy }} 布置 </span>
-        <n-button text type="primary" class="edit" @click="editing = true">
+        <n-button text type="primary" class="edit" @click="editing = 'edit'">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
           {{ board.source === 'teacher' ? '改' : '布置' }}
+        </n-button>
+        <!-- 一天上几节内容不同的课：下一节另开一份，别把上一节的改掉（统计按布置切课） -->
+        <n-button v-if="board.source === 'teacher'" text type="primary" class="edit" @click="editing = 'new'">
+          <template #icon><Icon icon="ph:plus" /></template>
+          新的一节
         </n-button>
       </div>
 
@@ -456,6 +486,8 @@ function lastText(student: ClassBoardStudent) {
       <n-button v-if="board?.className" :type="leaveStudents.length ? 'warning' : 'default'" :secondary="!!leaveStudents.length" @click="leaveDialog = true">
         {{ leaveStudents.length ? `请假 ${leaveStudents.length} 人` : '请假' }}
       </n-button>
+      <!-- 布置过的每一节课：改错了班、隔天想起来补，去后台 -->
+      <AdminLink v-if="isDesktop" :to="{ name: 'admin lesson list', query: className ? { className } : {} }">布置过的课</AdminLink>
       <!-- 看板只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
       <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })"> 回头看 → </n-button>
     </div>
@@ -466,7 +498,12 @@ function lastText(student: ClassBoardStudent) {
       <!-- 刚上课还没有题：填题号的框是这页最大的东西 -->
       <section v-if="needLesson" class="start">
         <div class="start-title">这节课做哪几道题？</div>
-        <LessonForm v-if="className" :board="board" :class-name="className" variant="start" class="start-row" @saved="lessonSaved" />
+        <LessonForm v-if="className" :board="board" :class-name="className" :lesson-id="null" variant="start" class="start-row" @saved="lessonSaved" />
+        <div v-if="staleLesson" class="earlier">
+          <span>上一节 {{ board.assignedAt ? parseTime(board.assignedAt, 'HH:mm') : '' }} {{ board.assignedBy }} 布置</span>
+          <span v-for="problem in board.problems" :key="problem.problemId" class="chip">{{ problem.problemDisplayId }}</span>
+          <n-button text type="primary" class="edit" @click="staleLessonId = null">接着看这一节</n-button>
+        </div>
       </section>
 
       <template v-else>
@@ -557,7 +594,8 @@ function lastText(student: ClassBoardStudent) {
         </section>
       </template>
 
-      <div class="table-wrap">
+      <!-- 上一节的表先不摆：一整列都是上一节的题，和上面「这节课做哪几道题」对不上 -->
+      <div v-if="!staleLesson" class="table-wrap">
         <table class="grid">
           <thead>
             <tr>
@@ -813,6 +851,15 @@ function lastText(student: ClassBoardStudent) {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.earlier {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+  color: v-bind('theme.textColor3');
 }
 
 /* ---------- 题卡片 ---------- */

@@ -1,0 +1,155 @@
+import { adminLessonRequestSchema, STUDENT_ROLES, type AdminLessonList, type AdminLessonRequest } from '@oj2/contract'
+import { and, count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { Hono } from 'hono'
+
+import { requireTeacher, type AppEnv } from '../../auth/middleware'
+import { db, schema } from '../../db'
+import { failure, parseBody, success } from '../../http'
+import { lessonDoneCounts, resolveLessonProblems } from '../../services/lesson'
+import { localDateTime } from '../../time'
+import { queryInteger } from '../helpers'
+
+/**
+ * 后台「课堂作业」：布置过的每一节课（class_lesson）。看板上布置错了班、错了题可以在这里改，
+ * 看板外上的课（以前的、没在看板布置的）可以补一节 —— 数据统计按布置切课，补了才认得到。
+ *
+ * 权限和看板一样是老师：看板上任何老师都能改任何班的这节课，这里不另设门槛。
+ */
+export const adminLessonRoutes = new Hono<AppEnv>()
+
+const teacherName = sql<string>`coalesce(nullif(${schema.userProfile.realName}, ''), ${schema.user.username})`
+
+adminLessonRoutes.get('/lessons', requireTeacher, async (c) => {
+  const limit = queryInteger(c.req.query('limit'), 20, { min: 1, max: 100 })
+  const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
+  const className = c.req.query('className')?.trim()
+  const teacherId = queryInteger(c.req.query('teacher'), 0, { min: 0 })
+  const where = and(className ? eq(schema.classLesson.className, className) : undefined, teacherId ? eq(schema.classLesson.createdBy, teacherId) : undefined)
+
+  const [rows, [totalRow], teachers] = await Promise.all([
+    db
+      .select({
+        id: schema.classLesson.id,
+        className: schema.classLesson.className,
+        day: schema.classLesson.day,
+        problemIds: schema.classLesson.problemIds,
+        language: schema.classLesson.language,
+        createdAt: schema.classLesson.createdAt,
+        updatedAt: schema.classLesson.updatedAt,
+        createdBy: teacherName,
+      })
+      .from(schema.classLesson)
+      .innerJoin(schema.user, eq(schema.user.id, schema.classLesson.createdBy))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.classLesson.createdBy))
+      .where(where)
+      .orderBy(desc(schema.classLesson.day), desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
+      .limit(limit)
+      .offset(offset),
+    db.select({ value: count() }).from(schema.classLesson).where(where),
+    db
+      .select({ id: schema.classLesson.createdBy, name: teacherName })
+      .from(schema.classLesson)
+      .innerJoin(schema.user, eq(schema.user.id, schema.classLesson.createdBy))
+      .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.classLesson.createdBy))
+      .groupBy(schema.classLesson.createdBy, schema.user.username, schema.userProfile.realName)
+      .orderBy(desc(count())),
+  ])
+
+  const problemIds = [...new Set(rows.flatMap((row) => row.problemIds))]
+  const classNames = [...new Set(rows.map((row) => row.className))]
+  const [problems, sizes, done] = await Promise.all([
+    problemIds.length
+      ? db
+          .select({ id: schema.problem.id, displayId: schema.problem.displayId, title: schema.problem.title, visible: schema.problem.visible })
+          .from(schema.problem)
+          .where(inArray(schema.problem.id, problemIds))
+      : [],
+    classNames.length
+      ? db
+          .select({ className: schema.user.className, value: count() })
+          .from(schema.user)
+          .where(and(inArray(schema.user.className, classNames), inArray(schema.user.adminType, [...STUDENT_ROLES]), eq(schema.user.isDisabled, false)))
+          .groupBy(schema.user.className)
+      : [],
+    lessonDoneCounts(rows),
+  ])
+  const problemById = new Map(problems.map((row) => [row.id, row]))
+  const sizeByClass = new Map(sizes.map((row) => [row.className, row.value]))
+
+  return success(c, {
+    results: rows.map((row) => ({
+      id: row.id,
+      className: row.className,
+      day: row.day,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      createdBy: row.createdBy,
+      language: row.language ?? null,
+      // 题被删掉的（problem_ids 不挂外键）直接不列
+      problems: row.problemIds.flatMap((id) => {
+        const problem = problemById.get(id)
+        return problem ? [{ problemDisplayId: problem.displayId, title: problem.title, visible: problem.visible }] : []
+      }),
+      classSize: sizeByClass.get(row.className) ?? 0,
+      doneCount: done.get(row.id) ?? 0,
+    })),
+    total: totalRow?.value ?? 0,
+    teachers,
+  } satisfies AdminLessonList)
+})
+
+/** 新补一节、改一节共用的校验：班得有人、题号都对得上、语言每道都能交 */
+async function lessonValues(
+  body: AdminLessonRequest,
+): Promise<
+  | { code: string; message: string }
+  | { values: { className: string; day: string; problemIds: number[]; language: AdminLessonRequest['language']; createdAt: string } }
+> {
+  const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, body.className)).limit(1)
+  if (!exists) return { code: 'class-not-found', message: `没有 ${body.className} 这个班` }
+  const resolved = await resolveLessonProblems(body.problemDisplayIds, body.language)
+  if ('code' in resolved) return resolved
+  return {
+    values: {
+      className: body.className,
+      day: body.day,
+      problemIds: resolved.problemIds,
+      language: body.language,
+      createdAt: localDateTime(body.day, body.time),
+    },
+  }
+}
+
+adminLessonRoutes.post('/lessons', requireTeacher, async (c) => {
+  const parsed = await parseBody(c, adminLessonRequestSchema, '班级、日子、时刻或题号不对')
+  if (!parsed.success) return parsed.response
+  const result = await lessonValues(parsed.data)
+  if ('code' in result) return failure(c, 400, result.code, result.message)
+  const [row] = await db
+    .insert(schema.classLesson)
+    .values({ ...result.values, createdBy: c.get('user')!.id, updatedAt: new Date().toISOString() })
+    .returning({ id: schema.classLesson.id })
+  return success(c, { id: row!.id })
+})
+
+adminLessonRoutes.put('/lessons/:id', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  const parsed = await parseBody(c, adminLessonRequestSchema, '班级、日子、时刻或题号不对')
+  if (!parsed.success) return parsed.response
+  const result = await lessonValues(parsed.data)
+  if ('code' in result) return failure(c, 400, result.code, result.message)
+  // 布置的老师不换，和看板上「改」一样认第一次
+  const [row] = await db
+    .update(schema.classLesson)
+    .set({ ...result.values, updatedAt: new Date().toISOString() })
+    .where(eq(schema.classLesson.id, id))
+    .returning({ id: schema.classLesson.id })
+  if (!row) return failure(c, 404, 'lesson-not-found', '这一节已经被删掉了')
+  return success(c, null)
+})
+
+adminLessonRoutes.delete('/lessons/:id', requireTeacher, async (c) => {
+  const id = queryInteger(c.req.param('id'), 0, { min: 1 })
+  await db.delete(schema.classLesson).where(eq(schema.classLesson.id, id))
+  return success(c, null)
+})

@@ -1,4 +1,4 @@
-import { toAdminType, toProblemPermission } from '@oj2/contract'
+import { toAdminType, toProblemPermission, type AdminLessonList, type AdminLessonRequest } from '@oj2/contract'
 import type {
   AddContestProblemRequest,
   ChallengeInput,
@@ -778,4 +778,24 @@ export function updateAchievement(data: Partial<AdminAchievement>) {
 
 export function deleteAchievement(id: number) {
   return api.delete(`admin/achievements/${id}`)
+}
+
+// ---------- 课堂作业（class_lesson） ----------
+
+export function getAdminLessons(offset: number, limit: number, filters: { className: string; teacher: number | null }) {
+  return api.get<AdminLessonList>('admin/lessons', {
+    params: { offset, limit, className: filters.className, teacher: filters.teacher ?? '' },
+  })
+}
+
+export function createAdminLesson(body: AdminLessonRequest) {
+  return api.post<{ id: number }>('admin/lessons', body)
+}
+
+export function updateAdminLesson(id: number, body: AdminLessonRequest) {
+  return api.put<null>(`admin/lessons/${id}`, body)
+}
+
+export function deleteAdminLesson(id: number) {
+  return api.delete<null>(`admin/lessons/${id}`)
 }

@@ -8,6 +8,7 @@ import { adminAnalyticsRoutes } from './analytics'
 import { adminConfRoutes } from './conf'
 import { adminContestRoutes } from './contest'
 import { adminLearnRoutes } from './learn'
+import { adminLessonRoutes } from './lesson'
 import { adminProblemRoutes } from './problem'
 import { adminProblemSetRoutes } from './problemset'
 import { adminTagRoutes } from './tag'
@@ -31,6 +32,7 @@ adminRoutes.route('/', adminAnalyticsRoutes)
 adminRoutes.route('/', adminConfRoutes)
 adminRoutes.route('/', adminContestRoutes)
 adminRoutes.route('/', adminLearnRoutes)
+adminRoutes.route('/', adminLessonRoutes)
 adminRoutes.route('/', adminProblemRoutes)
 adminRoutes.route('/', adminProblemSetRoutes)
 adminRoutes.route('/', adminTagRoutes)

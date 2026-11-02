@@ -450,6 +450,10 @@ export const NO_CLASS = 'none'
  * 没填班级的号合在一起当一个班切（`className` 为 null）。
  * 其余的是零散提交（补做、课后自己练）。这样 26计算机0班 9 月 29 日是 14:04–15:38，
  * 不会被 16:24、18:42 那两条课后提交拖成「14:04–18:42」。
+ *
+ * **老师在课堂看板布置过的课以布置为准**（`assigned`）：题目和顺序照布置的，那天这个班
+ * 交这几道题的提交全算这节课（不论隔了多久、几个人），完成率按全班算。这些提交不再参与上面
+ * 的切段 —— 同一天没布置的另一节课照旧推断，也不会被算成零散提交。
  */
 const lessonFailureSchema = z.object({ result: judgeStatusSchema, count: z.number().int() })
 
@@ -467,8 +471,18 @@ export const submissionLessonsSchema = z.object({
       userCount: z.number().int(),
       /** 班里的学生数（未禁用的普通用户）。没填班级的谈不上花名册，给 0 */
       classSize: z.number().int(),
-      /** 这节课做的题（这一段里 5 人以上做过的），做的人多的在前，最多 20 道 —— 点进去就筛这几道 */
+      /**
+       * 这节课做的题，最多 20 道 —— 点进去就筛这几道。布置的课是布置的那几道、按布置的顺序；
+       * 推断的课是这一段里 5 人以上做过的，做的人多的在前
+       */
       problems: z.array(z.string()),
+      /** 老师在课堂看板布置的课（不是从提交推断的） */
+      assigned: z.boolean(),
+      /**
+       * 布置的课：班里把布置的题全做对了的人数（那天结束前，以前做对的也算；布置时选了语言的
+       * 只认那个语言，流程图评到 A / S 也算 —— 和看板同一个口径）。推断的课为 null
+       */
+      doneCount: z.number().int().nullable(),
       /** 多半是从题单里交的 —— 「题单 7 道」 */
       fromProblemSet: z.boolean(),
       /** 这节课的题（上面 problems）交了几次 —— 和点进去看到的对得上 */

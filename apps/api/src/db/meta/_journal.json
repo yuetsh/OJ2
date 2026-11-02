@@ -281,6 +281,13 @@
       "when": 1792930018504,
       "tag": "0039_seed_challenges",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793622303180,
+      "tag": "0040_class_lesson_many_per_day",
+      "breakpoints": true
     }
   ]
 }
