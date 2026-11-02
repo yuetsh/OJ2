@@ -258,18 +258,20 @@ const vars = computed(() => ({
 }
 
 /* ---- 左栏：知识点 ---- */
+/* 全部 + 必会题 + 十几个知识点要整列放下、不出滚动条：36px 一行时差 40px，「总是显示滚动条」
+   的电脑上冒出一根。32px 一行在 1366×768（框高 508px）上是 493px */
 .tags {
   flex: 0 0 168px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   padding-right: 12px;
   border-right: 1px solid var(--divider);
 }
 
 .tag-head {
-  margin: 10px 10px 4px;
+  margin: 8px 10px 2px;
   font-size: 13px;
   color: var(--text3);
 }
@@ -279,7 +281,7 @@ const vars = computed(() => ({
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  height: 36px;
+  height: 32px;
   padding: 0 10px;
   border: 0;
   border-radius: 6px;
