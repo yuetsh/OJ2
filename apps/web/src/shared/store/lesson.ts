@@ -1,3 +1,4 @@
+import { LESSON_MODE_LABEL } from '@oj2/contract'
 import { defineStore } from 'pinia'
 import { getClassActivity } from 'shared/api'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
@@ -42,10 +43,20 @@ export const useLessonStore = defineStore('lesson', () => {
     return loading
   }
 
-  /** 刚通过：不等重拉，先把这道标成做完，课堂条上的「做完 N/M」马上加一 */
-  function markAccepted(problemDisplayId: string) {
+  /**
+   * 刚做对：不等重拉，先把这道标上，课堂条上的「做完 N/M」马上加一。`step` 是做对的哪一步：
+   * 代码交对、还是流程图画到 A / S。老师布置的课要这道题画和写两步时，只做对一步还不算做完；
+   * 推断出来的课不分步（draw / code 都是 null），哪样做对都算
+   */
+  function markAccepted(problemDisplayId: string, step: 'code' | 'draw') {
     const item = find(problemDisplayId)
-    if (item) item.myStatus = 'accepted'
+    if (!item) return
+    if (step === 'code' && item.code) item.code = 'accepted'
+    if (step === 'draw' && item.draw) item.draw = 'accepted'
+    const steps = [item.draw, item.code].filter((value) => value !== null)
+    // 这节课不要这一步（只画流程图的课交对了代码）：不算
+    if (steps.length && (step === 'code' ? !item.code : !item.draw)) return
+    item.myStatus = steps.every((value) => value === 'accepted') ? 'accepted' : 'tried'
   }
 
   function find(problemDisplayId: string): ClassActivityProblem | undefined {
@@ -73,14 +84,18 @@ export const useLessonStore = defineStore('lesson', () => {
     return { total: list.length, next: rest[0] ?? null, remaining: rest.length }
   }
 
-  /** 老师布置时选的语言，给界面写「C语言」；没选（推断出来的课、以前布置的）为空 */
+  /**
+   * 老师布置时选的做法，给界面写「画流程图」「先画再写 · C语言」「C语言」；没选（推断出来的课、
+   * 以前布置的）为空。写代码是默认的，不写出来
+   */
   const languageText = computed(() => {
+    const mode = activity.value?.mode
     const language = activity.value?.language
-    return language ? LANGUAGE_SHOW_VALUE[language] : ''
+    return [mode && mode !== 'code' ? LESSON_MODE_LABEL[mode] : '', language ? LANGUAGE_SHOW_VALUE[language] : ''].filter(Boolean).join(' · ')
   })
 
   /** 老师布置的叫「老师布置的题」（选了语言带上语言），推断出来的叫「这节课的题」 */
   const label = computed(() => (activity.value?.source === 'teacher' ? `老师布置的题${languageText.value ? ` · ${languageText.value}` : ''}` : '这节课的题'))
 
-  return { activity, label, languageText, load, markAccepted, includes, nextAfter }
+  return { activity, label, languageText, load, markAccepted, find, includes, nextAfter }
 })

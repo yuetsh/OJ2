@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AdminLesson, AdminLessonList } from '@oj2/contract'
+import { LESSON_MODE_LABEL, type AdminLesson, type AdminLessonList } from '@oj2/contract'
 import { useRouteQuery } from '@vueuse/router'
 import PageHeader from 'admin/components/PageHeader.vue'
 import { NButton, NPopconfirm, NTooltip, useThemeVars } from 'naive-ui'
@@ -133,16 +133,17 @@ function renderActions(lesson: AdminLesson) {
   ])
 }
 
+/** 「画流程图」「先画再写 · C语言」「C语言」：写代码是默认的，不写出来 */
+function wayText(lesson: AdminLesson) {
+  return [lesson.mode !== 'code' ? LESSON_MODE_LABEL[lesson.mode] : '', lesson.language ? LANGUAGE_SHOW_VALUE[lesson.language] : ''].filter(Boolean).join(' · ')
+}
+
 /** 手机上一节课一张卡：日子 · 时刻 · 班级一行，题号一行，老师 · 语言 · 做完一行小字，操作一行 */
 function renderMobileCard(lesson: AdminLesson) {
   return h('div', { class: 'm-card' }, [
     h('div', { class: 'm-head' }, `${dayText(lesson.day)} ${parseTime(lesson.createdAt, 'HH:mm')} · ${classLabel(lesson.className)}`),
     renderProblems(lesson),
-    h(
-      'div',
-      { class: 'm-meta' },
-      [lesson.createdBy, lesson.language ? LANGUAGE_SHOW_VALUE[lesson.language] : null, `做完 ${renderDone(lesson)}`].filter(Boolean).join(' · '),
-    ),
+    h('div', { class: 'm-meta' }, [lesson.createdBy, wayText(lesson), `做完 ${renderDone(lesson)}`].filter(Boolean).join(' · ')),
     renderActions(lesson),
   ])
 }
@@ -152,7 +153,7 @@ const desktopColumns: DataTableColumn<AdminLesson>[] = [
   { title: '布置', key: 'createdAt', width: 70, render: (row) => parseTime(row.createdAt, 'HH:mm') },
   { title: '班级', key: 'className', width: 130, render: (row) => classLabel(row.className) },
   { title: '老师', key: 'createdBy', width: 90 },
-  { title: '语言', key: 'language', width: 80, render: (row) => (row.language ? LANGUAGE_SHOW_VALUE[row.language] : '—') },
+  { title: '做什么', key: 'language', width: 120, render: (row) => wayText(row) || '—' },
   { title: '题目', key: 'problems', width: 300, render: renderProblems },
   { title: '做完 / 全班', key: 'doneCount', width: 100, render: renderDone },
   { title: '', key: 'actions', render: renderActions },

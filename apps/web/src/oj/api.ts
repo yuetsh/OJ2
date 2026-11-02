@@ -57,6 +57,7 @@ import {
   type SubmissionStatistics,
   type SubmissionLessons,
   type LessonLanguage,
+  type LessonMode,
   type SubmissionStatisticsGrid,
   type TodaySubmissionStatistics,
 } from '@oj2/contract'
@@ -264,11 +265,12 @@ export function getClassLesson(className?: string) {
  * 给这个班布置今天的一节课，空数组 = 清掉这一节。`lessonId` 为 null 是今天新开一节
  * （一个班一天可以上几节内容不同的课），否则改那一节
  */
-export function setClassLesson(className: string, problemDisplayIds: string[], language: LessonLanguage | null, lessonId: number | null) {
+export function setClassLesson(className: string, problemDisplayIds: string[], language: LessonLanguage | null, mode: LessonMode, lessonId: number | null) {
   return api.put<null>('classroom/lesson', {
     className,
     problemDisplayIds,
     language,
+    mode,
     ...(lessonId === null ? { newLesson: true } : { lessonId }),
   } satisfies ClassLessonRequest)
 }

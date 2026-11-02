@@ -11,7 +11,7 @@ import { submissionTimeText } from '../utils'
 import FlowchartState from './FlowchartState.vue'
 import UserName from 'shared/components/UserName.vue'
 import FlowchartNote from 'shared/components/FlowchartNote.vue'
-import { caseReport, flowchartVerdict } from 'utils/flowchart'
+import { caseReport, fitFlowchartGraph, flowchartVerdict, markFlowchartFocus } from 'utils/flowchart'
 
 /**
  * 流程图模式的右栏：左边画出来的图，右边四项评分和建议。原来要点编号再开一个
@@ -85,34 +85,8 @@ async function load() {
   detail.value = res
   await nextTick()
   await renderFlowchart(graph.value, res.mermaidCode)
-  fitGraph(graph.value)
-  markFocus(graph.value)
-}
-
-/**
- * 图填满图框：大图照旧缩小，小图也放大，但最多到原尺寸的 1.5 倍（再大字就粗笨了）。
- * 原来只缩不放，比大小这种五六个框的图在一大块空白中间只占一小团
- */
-function fitGraph(el: HTMLElement | null) {
-  const svg = el?.querySelector('svg')
-  const w = Number.parseFloat(svg?.getAttribute('width') ?? '')
-  const h = Number.parseFloat(svg?.getAttribute('height') ?? '')
-  if (!svg || !w || !h) return
-  if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
-  svg.style.width = '100%'
-  svg.style.height = '100%'
-  svg.style.maxWidth = `${w * 1.5}px`
-  svg.style.maxHeight = `${h * 1.5}px`
-}
-
-/**
- * 要改的那个框标红：AI 对着答案指出的，没有就退回程序找到的第一处出错的框。
- * pele 把 Mermaid 的框号放在节点 <g> 的 data-id 上
- */
-function markFocus(el: HTMLElement | null) {
-  const focus = report.value?.focus ?? report.value?.cases.find((row) => !row.ok)?.wrongAt
-  if (!el || !focus) return
-  el.querySelector(`.pele-node[data-id="${focus}"]`)?.classList.add('oj-focus')
+  fitFlowchartGraph(graph.value)
+  markFlowchartFocus(graph.value, report.value)
 }
 
 // 分开写三个来源：列表每次轮询都换一批新的行对象，一个 getter 返回数组的话回调次次都跑
@@ -124,7 +98,7 @@ watch(bigOpen, async (open) => {
   if (!open || !detail.value) return
   await nextTick()
   await renderFlowchart(bigGraph.value, detail.value.mermaidCode)
-  markFocus(bigGraph.value)
+  markFlowchartFocus(bigGraph.value, report.value)
 })
 
 const shown = computed(() => (detail.value?.id === props.row.id ? detail.value : null))

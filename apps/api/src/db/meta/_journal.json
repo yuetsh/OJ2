@@ -288,6 +288,13 @@
       "when": 1793622303180,
       "tag": "0040_class_lesson_many_per_day",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793626595966,
+      "tag": "0041_lesson_mode",
+      "breakpoints": true
     }
   ]
 }

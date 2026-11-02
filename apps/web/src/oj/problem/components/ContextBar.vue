@@ -53,17 +53,17 @@ const currentId = computed(() => problem.value?._id ?? '')
  * 换题时 id 跟着变，那一次不算；流程图只认这一页上刚评完的（evaluatedSeq）
  */
 const flowchartStore = useFlowchartStore()
-function onSolvedHere(callback: () => void) {
+function onSolvedHere(callback: (step: 'code' | 'draw') => void) {
   watch(
     () => [problem.value?.id, problem.value?.myStatus] as const,
     ([id, status], [previousId, previousStatus]) => {
-      if (id !== undefined && id === previousId && status === 0 && previousStatus !== 0) callback()
+      if (id !== undefined && id === previousId && status === 0 && previousStatus !== 0) callback('code')
     },
   )
   watch(
     () => flowchartStore.evaluatedSeq,
     () => {
-      if (isFlowchartPass(flowchartStore.latestRating.grade)) callback()
+      if (isFlowchartPass(flowchartStore.latestRating.grade)) callback('draw')
     },
   )
 }
@@ -90,6 +90,7 @@ const lesson = computed(() => {
     title: item.title,
     status: item.myStatus === 'accepted' ? 'done' : item.myStatus === 'tried' ? 'tried' : ('none' as const),
     to: `/problem/${item.problemDisplayId}`,
+    note: stepNote(item),
   }))
   return {
     chips,
@@ -101,9 +102,20 @@ const lesson = computed(() => {
   }
 })
 
-onSolvedHere(() => {
+/**
+ * 要画又要写的题（先画再写，或者今天先后布置了画流程图和写代码）：只做到一步时说清楚差哪一步，
+ * 光写「做过，还没对」学生会以为是代码错了
+ */
+function stepNote(item: { draw: string | null; code: string | null; myStatus: string }) {
+  if (!item.draw || !item.code || item.myStatus === 'accepted') return undefined
+  if (item.draw === 'accepted') return '流程图画对了，还要写代码'
+  if (item.code === 'accepted') return '代码做对了，还要画流程图'
+  return '先画流程图，再写代码'
+}
+
+onSolvedHere((step) => {
   if (ctx.value.entry !== 'problem' || !lessonStore.includes(currentId.value)) return
-  lessonStore.markAccepted(currentId.value)
+  lessonStore.markAccepted(currentId.value, step)
   lessonStore.load(true)
 })
 

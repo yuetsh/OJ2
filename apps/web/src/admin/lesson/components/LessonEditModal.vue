@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { AdminLesson, LessonLanguage } from '@oj2/contract'
+import { LESSON_MODE_LABEL, lessonNeeds, type AdminLesson, type LessonLanguage, type LessonMode } from '@oj2/contract'
 import ProblemPicker from 'oj/classroom/components/ProblemPicker.vue'
 import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
@@ -24,12 +24,16 @@ const configStore = useConfigStore()
 
 const LESSON_LANGUAGES: LessonLanguage[] = ['Python', 'C', 'C++', 'SQL']
 const languageOptions = LESSON_LANGUAGES.map((value) => ({ label: LANGUAGE_SHOW_VALUE[value], value }))
+const modeOptions = (['code', 'both', 'flowchart'] as const).map((value) => ({ label: LESSON_MODE_LABEL[value], value }))
 const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 
 const className = ref<string | null>(null)
 const day = ref<string | null>(null)
 const time = ref<string | null>(null)
 const language = ref<LessonLanguage>('Python')
+/** 做什么：画流程图不用选语言（存成 null） */
+const mode = ref<LessonMode>('code')
+const needsCode = computed(() => lessonNeeds(mode.value).code)
 const idsInput = ref('')
 const saving = ref(false)
 
@@ -42,6 +46,7 @@ watch(show, (open) => {
   day.value = lesson?.day ?? parseTime(now, 'YYYY-MM-DD')
   time.value = parseTime(lesson?.createdAt ?? now, 'HH:mm')
   language.value = lesson?.language ?? 'Python'
+  mode.value = lesson?.mode ?? 'code'
   idsInput.value = lesson?.problems.map((p) => p.problemDisplayId).join(' ') ?? ''
 })
 
@@ -71,7 +76,8 @@ async function save() {
     className: className.value!,
     day: day.value!,
     time: time.value!,
-    language: language.value,
+    language: needsCode.value ? language.value : null,
+    mode: mode.value,
     problemDisplayIds: inputIds(),
   }
   try {
@@ -90,7 +96,7 @@ async function save() {
 
 <template>
   <n-modal v-model:show="show" preset="card" :title="lesson ? '改这一节' : '补一节'" :bordered="false" :style="{ width: 'min(520px, calc(100vw - 32px))' }">
-    <n-form label-placement="left" label-width="56">
+    <n-form label-placement="left" label-width="64">
       <n-form-item label="班级">
         <n-select v-model:value="className" :options="classOptions" filterable placeholder="选班级" />
       </n-form-item>
@@ -100,8 +106,11 @@ async function save() {
           <n-time-picker v-model:formatted-value="time" value-format="HH:mm" format="HH:mm" class="time" />
         </div>
       </n-form-item>
-      <n-form-item label="语言">
-        <n-select v-model:value="language" :options="languageOptions" class="lang" />
+      <n-form-item label="做什么">
+        <div class="when">
+          <n-select v-model:value="mode" :options="modeOptions" class="lang" />
+          <n-select v-if="needsCode" v-model:value="language" :options="languageOptions" aria-label="用什么语言写" class="lang" />
+        </div>
       </n-form-item>
       <n-form-item label="题目">
         <div class="ids">
@@ -119,7 +128,15 @@ async function save() {
         <n-button type="primary" :disabled="!ready" :loading="saving" @click="save">{{ lesson ? '保存' : '补上' }}</n-button>
       </div>
     </template>
-    <ProblemPicker v-model:show="picking" v-model:language="language" :initial="pickerInitial" :saving="false" mode="pick" @confirm="picked" />
+    <ProblemPicker
+      v-model:show="picking"
+      v-model:language="language"
+      v-model:lesson-mode="mode"
+      :initial="pickerInitial"
+      :saving="false"
+      mode="pick"
+      @confirm="picked"
+    />
   </n-modal>
 </template>
 

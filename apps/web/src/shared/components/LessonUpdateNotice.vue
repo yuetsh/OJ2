@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LessonUpdate } from '@oj2/contract'
+import { LESSON_MODE_LABEL, type LessonUpdate } from '@oj2/contract'
 import { pendingLessonUpdate } from 'shared/composables/lessonUpdate'
 import { useThemeVars } from 'naive-ui'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
@@ -17,8 +17,10 @@ function names(list: Item[]) {
   return list.map((item) => `${item.problemDisplayId} ${item.title}`).join('、')
 }
 
+/** 「画流程图」「先画再写 · C语言」「C语言」：写代码是默认的，不写出来 */
 function languageText(value: LessonUpdate) {
-  return value.language ? LANGUAGE_SHOW_VALUE[value.language] : ''
+  const mode = value.mode && value.mode !== 'code' ? LESSON_MODE_LABEL[value.mode] : ''
+  return [mode, value.language ? LANGUAGE_SHOW_VALUE[value.language] : ''].filter(Boolean).join(' · ')
 }
 
 const title = computed(() => {
@@ -36,12 +38,15 @@ const lines = computed(() => {
   if (value.kind === 'cleared') return []
   if (value.kind === 'assigned') {
     const language = languageText(value)
-    return [{ label: '', text: names(value.problems) }, ...(language ? [{ label: '用', text: language }] : [])]
+    return [{ label: '', text: names(value.problems) }, ...(language ? [{ label: value.mode && value.mode !== 'code' ? '' : '用', text: language }] : [])]
   }
   const result: { label: string; text: string }[] = []
   if (value.added.length) result.push({ label: '加了', text: names(value.added) })
   if (value.removed.length) result.push({ label: '去掉了', text: names(value.removed) })
-  if (value.languageChanged) result.push({ label: '语言', text: value.language ? `改成 ${languageText(value)}` : '不限了' })
+  if (value.languageChanged) {
+    const text = languageText(value)
+    result.push({ label: value.mode && value.mode !== 'code' ? '做法' : '语言', text: text ? `改成 ${text}` : value.mode === 'code' ? '改成写代码' : '不限了' })
+  }
   if (value.reordered) result.push({ label: '', text: '换了题目的顺序' })
   return result
 })

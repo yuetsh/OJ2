@@ -45,3 +45,29 @@ export function flowchartVerdict(report: FlowchartCaseReport, grade: string | nu
 export function caseHeadline(report: FlowchartCaseReport) {
   return report.passed === report.total ? `${report.total} 组全部走对` : `${report.total} 组走对 ${report.passed} 组`
 }
+
+/**
+ * 图填满图框：大图照旧缩小，小图也放大，但最多到原尺寸的 1.5 倍（再大字就粗笨了）。
+ * 原来只缩不放，比大小这种五六个框的图在一大块空白中间只占一小团
+ */
+export function fitFlowchartGraph(el: HTMLElement | null) {
+  const svg = el?.querySelector('svg')
+  const w = Number.parseFloat(svg?.getAttribute('width') ?? '')
+  const h = Number.parseFloat(svg?.getAttribute('height') ?? '')
+  if (!svg || !w || !h) return
+  if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
+  svg.style.width = '100%'
+  svg.style.height = '100%'
+  svg.style.maxWidth = `${w * 1.5}px`
+  svg.style.maxHeight = `${h * 1.5}px`
+}
+
+/**
+ * 要改的那个框标红（加 oj-focus，颜色由用的地方的样式定）：AI 对着答案指出的，没有就退回
+ * 程序找到的第一处出错的框。pele 把 Mermaid 的框号放在节点 <g> 的 data-id 上
+ */
+export function markFlowchartFocus(el: HTMLElement | null, report: FlowchartCaseReport | null) {
+  const focus = report?.focus ?? report?.cases.find((row) => !row.ok)?.wrongAt
+  if (!el || !focus) return
+  el.querySelector(`.pele-node[data-id="${focus}"]`)?.classList.add('oj-focus')
+}

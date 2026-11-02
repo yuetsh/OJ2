@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { LessonLanguage, Tag } from '@oj2/contract'
+import { LESSON_MODE_LABEL, lessonNeeds, type LessonLanguage, type LessonMode, type Tag } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { getProblemList, getProblemTagList } from 'shared/api'
 import { useTone } from 'shared/composables/tone'
@@ -10,7 +10,8 @@ import ProblemTypeTag from 'oj/problem/components/ProblemTypeTag.vue'
 
 /**
  * 看板布置作业的「选题」弹框：左边按知识点分，右边勾题，底下按勾的先后排成这节课的顺序。
- * 只列能用这次作业的语言交的题（左栏题数也按这个语言数），不用再一个个记题号。
+ * 只列这节课做得了的题（左栏题数也这样数）：要写代码的只列能用这次作业的语言交的，
+ * 要画流程图的只列打开了画流程图的。不用再一个个记题号。
  * 点「布置」直接存，和在输入框里敲题号回车是一回事
  */
 const props = defineProps<{
@@ -22,12 +23,18 @@ const props = defineProps<{
 }>()
 const show = defineModel<boolean>('show', { required: true })
 const language = defineModel<LessonLanguage>('language', { required: true })
+/** 这节课做什么（写代码 / 画流程图 / 先画再写），和看板上那个下拉是同一个 */
+const lessonMode = defineModel<LessonMode>('lessonMode', { required: true })
+const needs = computed(() => lessonNeeds(lessonMode.value))
+/** 只画流程图不看语言 */
+const languageFilter = computed(() => (needs.value.code ? language.value : ''))
 const emit = defineEmits<{ confirm: [ids: string[]] }>()
 
 const theme = useThemeVars()
 const tone = useTone()
 
 const LESSON_LANGUAGES: LessonLanguage[] = ['Python', 'C', 'C++', 'SQL']
+const LESSON_MODE_OPTIONS = (['code', 'both', 'flowchart'] as const).map((value) => ({ label: LESSON_MODE_LABEL[value], value }))
 const languageOptions = LESSON_LANGUAGES.map((value) => ({ label: LANGUAGE_SHOW_VALUE[value], value }))
 const SORTS = [
   { label: '最新出的', value: '' },
@@ -55,7 +62,7 @@ const mustDo = computed(() => tags.value.find((t) => t.name === MUST_DO) ?? null
 const allCount = ref(0)
 
 async function loadTags() {
-  const list = await getProblemTagList(language.value)
+  const list = await getProblemTagList(languageFilter.value, needs.value.draw)
   tags.value = list
   // 换了语言，原来选的知识点在这个语言下可能一道都没有
   if (tag.value && !list.some((t) => t.name === tag.value)) tag.value = ''
@@ -70,7 +77,8 @@ async function loadRows() {
       tag: tag.value,
       keyword: keyword.value.trim(),
       sort: sort.value,
-      language: language.value,
+      language: languageFilter.value,
+      ...(needs.value.draw ? { flowchart: '1' } : {}),
     })
     if (mine !== seq) return
     rows.value = res.results
@@ -95,7 +103,7 @@ watch(show, (open) => {
   loadTags()
   reload()
 })
-watch(language, () => {
+watch([languageFilter, () => needs.value.draw], () => {
   if (!show.value) return
   loadTags()
   reload()
@@ -125,6 +133,12 @@ function remove(id: string) {
   picked.value = picked.value.filter((p) => p.id !== id)
 }
 
+const emptyText = computed(() => {
+  if (!needs.value.code) return '没有能画流程图的题'
+  const text = `没有能用 ${LANGUAGE_SHOW_VALUE[language.value]} 做的题`
+  return needs.value.draw ? `${text}（还要能画流程图）` : text
+})
+
 const DIFFICULTY_TONE = { 简单: 'success', 中等: 'warning', 困难: 'error' } as const
 function difficultyStyle(row: ProblemRow) {
   if (!row.difficulty) return {}
@@ -151,9 +165,11 @@ const vars = computed(() => ({
   <n-modal v-model:show="show" preset="card" :style="vars" :bordered="false" :auto-focus="false" title="选题">
     <template #header-extra>
       <div class="head-extra">
-        <span class="muted">用</span>
-        <n-select v-model:value="language" :options="languageOptions" aria-label="用什么语言做" size="small" class="lang" />
-        <span class="muted">做</span>
+        <n-select v-model:value="lessonMode" :options="LESSON_MODE_OPTIONS" aria-label="这节课做什么" size="small" class="mode" />
+        <template v-if="needs.code">
+          <span class="muted">用</span>
+          <n-select v-model:value="language" :options="languageOptions" aria-label="用什么语言写" size="small" class="lang" />
+        </template>
       </div>
     </template>
 
@@ -183,7 +199,7 @@ const vars = computed(() => ({
 
         <div ref="listRef" class="list">
           <n-spin :show="loading" class="spin">
-            <n-empty v-if="!loading && !rows.length" :description="`没有能用 ${LANGUAGE_SHOW_VALUE[language]} 做的题`" class="empty" />
+            <n-empty v-if="!loading && !rows.length" :description="emptyText" class="empty" />
             <button v-for="row in rows" :key="row.id" type="button" class="row" :class="{ on: pickedIndex.has(row._id.toLowerCase()) }" @click="toggle(row)">
               <span class="check">
                 <template v-if="pickedIndex.has(row._id.toLowerCase())">{{ pickedIndex.get(row._id.toLowerCase())! + 1 }}</template>
@@ -245,6 +261,10 @@ const vars = computed(() => ({
 
 .lang {
   width: 110px;
+}
+
+.mode {
+  width: 116px;
 }
 
 .muted {

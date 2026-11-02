@@ -34,6 +34,7 @@ adminLessonRoutes.get('/lessons', requireTeacher, async (c) => {
         day: schema.classLesson.day,
         problemIds: schema.classLesson.problemIds,
         language: schema.classLesson.language,
+        mode: schema.classLesson.mode,
         createdAt: schema.classLesson.createdAt,
         updatedAt: schema.classLesson.updatedAt,
         createdBy: teacherName,
@@ -85,6 +86,7 @@ adminLessonRoutes.get('/lessons', requireTeacher, async (c) => {
       updatedAt: row.updatedAt,
       createdBy: row.createdBy,
       language: row.language ?? null,
+      mode: row.mode,
       // 题被删掉的（problem_ids 不挂外键）直接不列
       problems: row.problemIds.flatMap((id) => {
         const problem = problemById.get(id)
@@ -98,23 +100,33 @@ adminLessonRoutes.get('/lessons', requireTeacher, async (c) => {
   } satisfies AdminLessonList)
 })
 
-/** 新补一节、改一节共用的校验：班得有人、题号都对得上、语言每道都能交 */
-async function lessonValues(
-  body: AdminLessonRequest,
-): Promise<
+/** 新补一节、改一节共用的校验：班得有人、题号都对得上、语言每道都能交、要画的都打开了画流程图 */
+async function lessonValues(body: AdminLessonRequest): Promise<
   | { code: string; message: string }
-  | { values: { className: string; day: string; problemIds: number[]; language: AdminLessonRequest['language']; createdAt: string } }
+  | {
+      values: {
+        className: string
+        day: string
+        problemIds: number[]
+        language: AdminLessonRequest['language']
+        mode: AdminLessonRequest['mode']
+        createdAt: string
+      }
+    }
 > {
   const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, body.className)).limit(1)
   if (!exists) return { code: 'class-not-found', message: `没有 ${body.className} 这个班` }
-  const resolved = await resolveLessonProblems(body.problemDisplayIds, body.language)
+  // 只画流程图不用语言，存成 null（和看板布置一样）
+  const language = body.mode === 'flowchart' ? null : body.language
+  const resolved = await resolveLessonProblems(body.problemDisplayIds, language, body.mode)
   if ('code' in resolved) return resolved
   return {
     values: {
       className: body.className,
       day: body.day,
       problemIds: resolved.problemIds,
-      language: body.language,
+      language,
+      mode: body.mode,
       createdAt: localDateTime(body.day, body.time),
     },
   }

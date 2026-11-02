@@ -9,6 +9,8 @@ import {
   type ClassActivityProblem,
   type LastVisit,
   type LessonLanguage,
+  type LessonMode,
+  lessonNeeds,
   type StatisticInfo,
 } from '@oj2/contract'
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
@@ -24,7 +26,7 @@ import { failure, parseBody, success } from '../http'
 import { isAccepted } from '../judge/status'
 import { activityRows, classMemberIds, FLOWCHART_PASSED, lessonLanguageFilter, SOLVED_RESULTS, suggestActiveClass } from '../services/class-activity'
 import { accepted } from '../services/learning-stats'
-import { announceLessonChange, resolveLessonProblems, todayLessonSnapshot } from '../services/lesson'
+import { announceLessonChange, lessonDoneCounts, resolveLessonProblems, todayLessonSnapshot } from '../services/lesson'
 import { calendarDay, dayStart, localTime } from '../time'
 
 export const classroomRoutes = new Hono<AppEnv>()
@@ -50,30 +52,49 @@ interface ClassDayGroup {
  * 某个班从 `since` 起、按（东八区日, 题）分组的做题人数和通过人数。只算正常状态的学生，
  * 不含比赛提交，代码和流程图合起来数（见 activityRows）。`minUsers` 是「班里在做」的门槛，
  * 给了 `problemIds`（老师布置的题）时不设门槛 —— 那几道题是确定的，一个人都没交也要列出来。
+ *
+ * 给了 `mode`（老师布置的这节做什么）：写代码只数代码、画流程图只数流程图；先画再写两种都数，
+ * 「通过」要同一个人两样都做到 —— 所以先按人归一遍再数
  */
 async function classDayGroups(
   className: string,
   since: string,
-  options: { minUsers?: number; problemIds?: number[]; language?: LessonLanguage | null } = {},
+  options: { minUsers?: number; problemIds?: number[]; language?: LessonLanguage | null; mode?: LessonMode | null } = {},
 ): Promise<ClassDayGroup[]> {
+  const { mode } = options
   const activity = activityRows({
     since,
     users: classMemberIds(className),
     problemIds: options.problemIds,
     language: options.language,
+    only: mode === 'code' || mode === 'flowchart' ? mode : undefined,
   })
   const day = sql<string>`to_char(${localTime(activity.createTime)}, 'YYYY-MM-DD')`
-  const userCount = sql<number>`count(distinct ${activity.userId})::int`
-  const query = db
+  const perUser = db
     .select({
-      day,
-      problemId: activity.problemId,
-      firstAt: sql<string>`min(${activity.createTime})`,
-      userCount,
-      acceptedCount: sql<number>`count(distinct ${activity.userId}) filter (where ${activity.solved})::int`,
+      day: day.as('day'),
+      problemId: sql<number>`${activity.problemId}`.as('problem_id'),
+      userId: sql<number>`${activity.userId}`.as('user_id'),
+      firstAt: sql<string>`min(${activity.createTime})`.as('first_at'),
+      solved: (mode === 'both'
+        ? sql<boolean>`bool_or(${activity.kind} = 'code' and ${activity.solved}) and bool_or(${activity.kind} = 'flowchart' and ${activity.solved})`
+        : sql<boolean>`bool_or(${activity.solved})`
+      ).as('solved'),
     })
     .from(activity)
-    .groupBy(day, activity.problemId)
+    .groupBy(day, activity.problemId, activity.userId)
+    .as('per_user')
+  const userCount = sql<number>`count(*)::int`
+  const query = db
+    .select({
+      day: perUser.day,
+      problemId: perUser.problemId,
+      firstAt: sql<string>`min(${perUser.firstAt})`,
+      userCount,
+      acceptedCount: sql<number>`(count(*) filter (where ${perUser.solved}))::int`,
+    })
+    .from(perUser)
+    .groupBy(perUser.day, perUser.problemId)
   return options.minUsers ? query.having(sql`${userCount} >= ${options.minUsers}`) : query
 }
 
@@ -93,7 +114,7 @@ async function visibleProblems(ids: number[]) {
 }
 
 /**
- * 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言、布置时刻和布置的老师；
+ * 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言和做什么、布置时刻和布置的老师；
  * 没布置为 null。一天布置过几节的，取最后布置的那一节。老师写真名：老师之间认的是名字，用户名（lwp0201、little）认不出是谁
  */
 async function lessonPlan(className: string, day: string) {
@@ -102,6 +123,7 @@ async function lessonPlan(className: string, day: string) {
       id: schema.classLesson.id,
       problemIds: schema.classLesson.problemIds,
       language: schema.classLesson.language,
+      mode: schema.classLesson.mode,
       createdAt: schema.classLesson.createdAt,
       createdBy: sql<string>`coalesce(nullif(${schema.userProfile.realName}, ''), ${schema.user.username})`,
     })
@@ -129,7 +151,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     const planned = plan.problemIds
     const [problems, groups] = await Promise.all([
       visibleProblems(planned),
-      classDayGroups(className, dayStart(), { problemIds: planned, language: plan.language }),
+      classDayGroups(className, dayStart(), { problemIds: planned, language: plan.language, mode: plan.mode }),
     ])
     const groupById = new Map(groups.map((row) => [row.problemId, row]))
     return {
@@ -137,6 +159,7 @@ async function classLessonProblems(className: string, lookbackDays: number) {
       lessonId: plan.id,
       day: today,
       language: plan.language ?? null,
+      mode: plan.mode,
       assignedAt: plan.createdAt,
       assignedBy: plan.createdBy,
       problems: planned.flatMap((id) => {
@@ -166,8 +189,9 @@ async function classLessonProblems(className: string, lookbackDays: number) {
     source: picked.length ? ('inferred' as const) : null,
     lessonId: null,
     day: picked.length ? latest : null,
-    // 推断出来的课不知道老师要的是哪种语言，不限
+    // 推断出来的课不知道老师要的是哪种语言、要画还是要写，不限
     language: null,
+    mode: null,
     assignedAt: null,
     assignedBy: null,
     problems: picked.flatMap((row) => {
@@ -298,12 +322,15 @@ classroomRoutes.get('/me/class-activity', requireAuth, async (c) => {
       day: null,
       source: null,
       language: null,
+      mode: null,
       problems: [],
     } satisfies ClassActivity)
   }
 
   const lesson = await classLessonProblems(user.className, CLASS_ACTIVITY_LOOKBACK_DAYS)
   const ids = lesson.problems.map((problem) => problem.id)
+  const steps = lesson.source === 'teacher' && lesson.mode ? await todaySteps(user.className, ids, lesson) : null
+  const codeLanguage = steps ? steps.language : lesson.language
   // 代码提交和流程图提交两张表，互不依赖，一起查
   const [mine, drawn] = await Promise.all([
     ids.length
@@ -319,14 +346,12 @@ classroomRoutes.get('/me/class-activity', requireAuth, async (c) => {
               inArray(schema.submission.problemId, ids),
               isNull(schema.submission.contestId),
               // 布置的是 C：以前用 Python 做对过不算这份作业做完
-              lessonLanguageFilter(lesson.language),
+              lessonLanguageFilter(codeLanguage),
             ),
           )
           .groupBy(schema.submission.problemId)
       : [],
-    // 流程图作业：画到 A / S 也算做完（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 6）。
-    // 有的题流程图交了几百次、代码个位数，只看代码提交的话，这些学生在课堂条上永远是「没做」。
-    // 交过就算「做过」，评分中、评失败的也算 —— 和代码提交编译错误也算「做过」同一个口径
+    // 流程图：交过就算「做过」，评分中、评失败的也算 —— 和代码提交编译错误也算「做过」同一个口径
     ids.length
       ? db
           .select({
@@ -338,28 +363,91 @@ classroomRoutes.get('/me/class-activity', requireAuth, async (c) => {
           .groupBy(schema.flowchartSubmission.problemId)
       : [],
   ])
-  const mineById = new Map(mine.map((row) => [row.problemId, row.accepted]))
-  for (const row of drawn) {
-    mineById.set(row.problemId, (mineById.get(row.problemId) ?? false) || row.passed)
-  }
+  type Step = 'accepted' | 'tried' | 'none'
+  const stepOf = (value: boolean | undefined): Step => (value === undefined ? 'none' : value ? 'accepted' : 'tried')
+  const codeById = new Map(mine.map((row) => [row.problemId, row.accepted]))
+  const drawById = new Map(drawn.map((row) => [row.problemId, row.passed]))
 
   return success(c, {
     className: user.className,
     day: lesson.day,
     source: lesson.source,
-    language: lesson.language,
+    language: codeLanguage,
+    mode: lesson.mode,
     problems: lesson.problems.map((problem) => {
-      const accepted = mineById.get(problem.id)
+      const code = stepOf(codeById.get(problem.id))
+      const draw = stepOf(drawById.get(problem.id))
+      const needs = steps?.needs.get(problem.id)
+      let myStatus: Step
+      if (needs) {
+        // 老师布置的：要哪几步就看哪几步，全做到才算做完
+        const wanted = [needs.draw ? draw : null, needs.code ? code : null].filter((step): step is Step => step !== null)
+        myStatus = wanted.every((step) => step === 'accepted') ? 'accepted' : wanted.some((step) => step !== 'none') ? 'tried' : 'none'
+      } else {
+        // 推断出来的课：代码交对或流程图画到 A / S 都算（有的题全班在画流程图，只看代码的话永远是「没做」）
+        myStatus = code === 'accepted' || draw === 'accepted' ? 'accepted' : code === 'tried' || draw === 'tried' ? 'tried' : 'none'
+      }
       return {
         problemDisplayId: problem.displayId,
         title: problem.title,
         userCount: problem.userCount,
         acceptedCount: problem.acceptedCount,
-        myStatus: accepted === undefined ? 'none' : accepted ? 'accepted' : 'tried',
+        myStatus,
+        draw: needs?.draw ? draw : null,
+        code: needs?.code ? code : null,
       } satisfies ClassActivityProblem
     }),
   } satisfies ClassActivity)
 })
+
+/**
+ * 学生那边一道题要画还是要写：今天这个班布置过的每一节里，凡是有这道题的，要求合起来算。
+ * 老师先布置一节画流程图、再布置一节同样的题写代码时，还没画完的人照样看得到要画 ——
+ * 学生只看得到今天最后布置的那一节，不合起来的话，画流程图那节一布置写代码就没了。
+ *
+ * 写代码用的语言：今天最后布置的、要写代码的那一节选的（只画流程图的课没有语言）
+ */
+async function todaySteps(
+  className: string,
+  problemIds: number[],
+  latest: { lessonId: number | null; language: LessonLanguage | null; mode: LessonMode | null },
+) {
+  const rows = await db
+    .select({ id: schema.classLesson.id, problemIds: schema.classLesson.problemIds, language: schema.classLesson.language, mode: schema.classLesson.mode })
+    .from(schema.classLesson)
+    .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, calendarDay())))
+    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
+  const needs = new Map<number, { draw: boolean; code: boolean }>()
+  let language: LessonLanguage | null = latest.mode && lessonNeeds(latest.mode).code ? latest.language : null
+  let languageFound = !!latest.mode && lessonNeeds(latest.mode).code
+  for (const row of rows) {
+    const shared = row.id === latest.lessonId ? problemIds : row.problemIds.filter((id) => problemIds.includes(id))
+    if (!shared.length) continue
+    const rowNeeds = lessonNeeds(row.mode)
+    for (const id of shared) {
+      const known = needs.get(id) ?? { draw: false, code: false }
+      needs.set(id, { draw: known.draw || rowNeeds.draw, code: known.code || rowNeeds.code })
+    }
+    if (!languageFound && rowNeeds.code) {
+      language = row.language ?? null
+      languageFound = true
+    }
+  }
+  return { needs, language }
+}
+
+/**
+ * 一张流程图走对了几组、一共几组：2026-10 起的「走例子」报告（ai_criteria_details version 2，
+ * 形状见契约 FlowchartCaseReport）里数。老评法、还没评完的、评失败的都是 null
+ */
+function flowchartCaseCounts() {
+  const details = schema.flowchartSubmission.aiCriteriaDetails
+  const isReport = sql`${schema.flowchartSubmission.status} = 2 and ${details}->>'version' = '2' and jsonb_typeof(${details}->'cases') = 'array'`
+  return {
+    passed: sql<number | null>`case when ${isReport} then (select count(*) from jsonb_array_elements(${details}->'cases') e where e->>'ok' = 'true')::int end`,
+    total: sql<number | null>`case when ${isReport} then jsonb_array_length(${details}->'cases') end`,
+  }
+}
 
 /**
  * 看板上的「最近几节课交了几节」：分清「今天没来」和「一直不动手」。2025 秋至少上过
@@ -385,6 +473,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
       source: null,
       lessonId: null,
       language: null,
+      mode: null,
       assignedAt: null,
       assignedBy: null,
       lastLanguage: null,
@@ -438,7 +527,10 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
   const challengeDoneKeys = new Set(
     challengeDone.filter((row) => liveChallenges.get(row.problemId)?.has(row.challengeId)).map((row) => `${row.userId}:${row.problemId}`),
   )
-  const [cells, lastSubmits, lastDrawn, attendance, drawn, todays, seen] = await Promise.all([
+  // 老师布置的这节做什么；推断出来的课为 null，代码交对或流程图画对都算（和加「做什么」之前一样）
+  const mode = lesson.source === 'teacher' ? lesson.mode : null
+  const needs = mode ? lessonNeeds(mode) : null
+  const [cells, lastSubmits, lastDrawn, attendance, drawn, todays, seen, lastFlows] = await Promise.all([
     ids.length && userIds.length
       ? db
           .select({
@@ -537,7 +629,27 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
           .orderBy(schema.submission.createTime)
       : [],
     seenToday(userIds),
+    /**
+     * 要画流程图的课：每人每题最后一张图（不限今天，和 drawn 的 firstPassedAt 同一个范围），
+     * 还没画对的格子点开讲它哪里错、按走对几组归堆。走对几组从 2026-10 起的「走例子」报告里数，
+     * 老评法和还没评完的为 null
+     */
+    needs?.draw && ids.length && userIds.length
+      ? db
+          .selectDistinctOn([schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId], {
+            userId: schema.flowchartSubmission.userId,
+            problemId: schema.flowchartSubmission.problemId,
+            id: schema.flowchartSubmission.id,
+            status: schema.flowchartSubmission.status,
+            grade: schema.flowchartSubmission.aiGrade,
+            ...flowchartCaseCounts(),
+          })
+          .from(schema.flowchartSubmission)
+          .where(and(inArray(schema.flowchartSubmission.userId, userIds), inArray(schema.flowchartSubmission.problemId, ids)))
+          .orderBy(schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId, desc(schema.flowchartSubmission.createTime))
+      : [],
   ])
+  const lastFlowByKey = new Map(lastFlows.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const todayByKey = Map.groupBy(todays, (row) => `${row.userId}:${row.problemId}`)
   const cellByKey = new Map(cells.map((row) => [`${row.userId}:${row.problemId}`, row]))
   const drawnByKey = new Map(drawn.map((row) => [`${row.userId}:${row.problemId}`, row]))
@@ -549,6 +661,8 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
     if (!known || Date.parse(row.lastAt) > Date.parse(known)) lastByUser.set(row.userId, row.lastAt)
   }
   const earliest = (a: string | null | undefined, b: string | null | undefined) => (!a ? (b ?? null) : !b ? a : Date.parse(a) <= Date.parse(b) ? a : b)
+  const latestOf = (a: string, b: string) => (Date.parse(a) >= Date.parse(b) ? a : b)
+  type Step = 'accepted' | 'tried' | 'none'
   const attendedByUser = new Map(attendance.map((row) => [row.userId, row.days]))
 
   return success(c, {
@@ -557,6 +671,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
     source: lesson.source,
     lessonId: lesson.lessonId,
     language: lesson.language,
+    mode,
     assignedAt: lesson.assignedAt,
     assignedBy: lesson.assignedBy,
     lastLanguage: last?.language ?? null,
@@ -577,16 +692,50 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
             const key = `${student.userId}:${id}`
             const cell = cellByKey.get(key)
             const flow = drawnByKey.get(key)
-            const acceptedAt = earliest(cell?.firstAcceptedAt, flow?.firstPassedAt)
-            const today = todayByKey.get(key) ?? []
-            const latest = acceptedAt ? undefined : today.at(-1)
-            const firstTry = acceptedAt && Date.parse(acceptedAt) >= Date.parse(start) ? today.findIndex((row) => isAccepted(row.result)) : -1
+            const codeAt = cell?.firstAcceptedAt ?? null
+            const flowAt = flow?.firstPassedAt ?? null
+            const codeStatus: Step = codeAt ? 'accepted' : cell ? 'tried' : 'none'
+            const drawStatus: Step = flowAt ? 'accepted' : flow ? 'tried' : 'none'
+            let status: Step
+            let acceptedAt: string | null
+            let attempts: number
+            if (!needs) {
+              acceptedAt = earliest(codeAt, flowAt)
+              status = !cell && !flow ? 'none' : acceptedAt ? 'accepted' : 'tried'
+              attempts = (cell?.attempts ?? 0) + (flow?.attempts ?? 0)
+            } else {
+              // 要哪几步看哪几步：两步都做到的时刻是晚的那一步
+              const steps = [needs.draw ? { status: drawStatus, at: flowAt } : null, needs.code ? { status: codeStatus, at: codeAt } : null].filter(
+                (step) => step !== null,
+              )
+              acceptedAt = steps.every((step) => step.at) ? steps.map((step) => step.at!).reduce(latestOf) : null
+              status = acceptedAt ? 'accepted' : steps.some((step) => step.status !== 'none') ? 'tried' : 'none'
+              attempts = (needs.code ? (cell?.attempts ?? 0) : 0) + (needs.draw ? (flow?.attempts ?? 0) : 0)
+            }
+            // 下面几样都是代码那一步的：只画流程图的课没有
+            const codeWanted = !needs || needs.code
+            const today = codeWanted ? (todayByKey.get(key) ?? []) : []
+            const codeDone = needs ? codeAt : acceptedAt
+            const latest = codeDone ? undefined : today.at(-1)
+            const firstTry = codeDone && Date.parse(codeDone) >= Date.parse(start) ? today.findIndex((row) => isAccepted(row.result)) : -1
+            const lastFlow = lastFlowByKey.get(key)
             return {
-              status: !cell && !flow ? 'none' : acceptedAt ? 'accepted' : 'tried',
-              attempts: (cell?.attempts ?? 0) + (flow?.attempts ?? 0),
+              status,
+              attempts,
               codeAttempts: cell?.attempts ?? 0,
               flowchartAttempts: flow?.attempts ?? 0,
               acceptedAt,
+              codeStatus,
+              flowchart: needs?.draw
+                ? {
+                    status: drawStatus,
+                    passedAt: flowAt,
+                    latest:
+                      !flowAt && lastFlow
+                        ? { id: lastFlow.id, status: lastFlow.status, grade: lastFlow.grade, passed: lastFlow.passed, total: lastFlow.total }
+                        : null,
+                  }
+                : null,
               latest: latest
                 ? {
                     submissionId: latest.id,
@@ -595,7 +744,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
                     sampleCheck: latest.sampleCheck ?? undefined,
                   }
                 : null,
-              trail: acceptedAt
+              trail: codeDone
                 ? today.map((row) => ({
                     id: row.id,
                     result: row.result,
@@ -604,11 +753,11 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
                 : [],
               acceptedTry: firstTry >= 0 ? firstTry + 1 : null,
               challenge:
-                !acceptedAt || !liveChallenges.get(id)?.size
+                !codeWanted || !codeDone || !liveChallenges.get(id)?.size
                   ? null
                   : challengeDoneKeys.has(key)
                     ? 'done'
-                    : today.some((row) => Date.parse(row.createTime) > Date.parse(acceptedAt))
+                    : today.some((row) => Date.parse(row.createTime) > Date.parse(codeDone))
                       ? 'doing'
                       : null,
             }
@@ -660,13 +809,18 @@ classroomRoutes.get('/classroom/today', requireTeacher, async (c) => {
       ])
       const ids = lesson.problems.map((problem) => problem.id)
       let allDoneCount = 0
-      if (ids.length) {
-        // 做没做对不限今天（和看板的格子一样：以前做对的也算做完），语言跟着布置走
+      if (ids.length && lesson.source === 'teacher' && lesson.lessonId && lesson.mode) {
+        // 老师布置的：和看板、后台课堂作业同一个口径（要画的看图、要写的看代码）
+        const counts = await lessonDoneCounts([
+          { id: lesson.lessonId, className, day: calendarDay(), problemIds: ids, language: lesson.language, mode: lesson.mode },
+        ])
+        allDoneCount = counts.get(lesson.lessonId) ?? 0
+      } else if (ids.length) {
+        // 推断出来的：做没做对不限今天（和看板的格子一样：以前做对的也算做完），代码或流程图都算
         const done = activityRows({
           since: new Date(0).toISOString(),
           users: classMemberIds(className),
           problemIds: ids,
-          language: lesson.language,
         })
         const rows = await db
           .select({
@@ -739,7 +893,9 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
   const parsed = await parseBody(c, classLessonRequestSchema, '题号或语言不对')
   if (!parsed.success) return parsed.response
   const user = c.get('user')!
-  const { className, problemDisplayIds, language, lessonId, newLesson } = parsed.data
+  const { className, problemDisplayIds, lessonId, newLesson, mode } = parsed.data
+  // 只画流程图不用语言：存成 null，看板和学生那边就不会写「C语言」
+  const language = mode === 'flowchart' ? null : parsed.data.language
   const day = calendarDay()
 
   const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, className)).limit(1)
@@ -768,13 +924,13 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
     return success(c, null)
   }
 
-  const resolved = await resolveLessonProblems(problemDisplayIds, language)
+  const resolved = await resolveLessonProblems(problemDisplayIds, language, mode)
   if ('code' in resolved) return failure(c, 400, resolved.code, resolved.message)
   const { problemIds } = resolved
   const now = new Date().toISOString()
   if (target) {
     // 「改」不换布置的人，和 createdAt 一样认第一次
-    await db.update(schema.classLesson).set({ problemIds, language, updatedAt: now }).where(eq(schema.classLesson.id, target.id))
+    await db.update(schema.classLesson).set({ problemIds, language, mode, updatedAt: now }).where(eq(schema.classLesson.id, target.id))
   } else {
     // 新开一节、今天还没有，或者点名的那一节已经没了（别的老师清掉了）—— 最后这种也照新开处理，
     // 老师手上的题号不至于白填
@@ -783,6 +939,7 @@ classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
       day,
       problemIds,
       language,
+      mode,
       createdBy: user.id,
       createdAt: now,
       updatedAt: now,

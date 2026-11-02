@@ -1,8 +1,11 @@
 import { z } from 'zod'
 
 import { judgeStatusSchema } from './judge-status'
-import { lessonLanguageSchema as lessonLanguageValueSchema } from './language'
+import { lessonLanguageSchema as lessonLanguageValueSchema, lessonModeSchema } from './language'
 import { statisticInfoSchema } from './submission'
+
+/** 课堂条上一道题一步的状态（画 / 写），和 myStatus 同一套取值 */
+const stepStatusSchema = z.enum(['accepted', 'tried', 'none'])
 
 /**
  * 「班里在做」：同班同一天有好几个人做的题，基本就是老师在课上点名的那几道。
@@ -20,6 +23,15 @@ export const classActivityProblemSchema = z.object({
    * 代码只认用那个语言交的（流程图照旧算）
    */
   myStatus: z.enum(['accepted', 'tried', 'none']),
+  /**
+   * 今天布置的课要这道题画流程图 / 写代码时，这一步我做到哪了；不要这一步为 null。
+   * 推断出来的课两个都是 null（不分步，myStatus 照旧代码或流程图做对都算）。
+   *
+   * 一道题今天可能被布置了两次（先布置画流程图、再布置写代码）：两节课的要求合起来算，
+   * 学生那边就和「先画再写」一样是两步 —— 老师开了写代码的那节，还没画完的人照样看得到要画
+   */
+  draw: stepStatusSchema.nullable(),
+  code: stepStatusSchema.nullable(),
 })
 
 /**
@@ -34,7 +46,10 @@ export const classActivitySchema = z.object({
   day: z.string().nullable(),
   /** teacher = 老师在课堂看板里布置的；inferred = 从同班提交记录推断的 */
   source: z.enum(['teacher', 'inferred']).nullable(),
+  /** 写代码那一步用的语言：今天最后布置的、要写代码的那节选的（只画流程图的课为 null） */
   language: lessonLanguageSchema,
+  /** 今天最后布置的那节做什么；推断出来的课为 null */
+  mode: lessonModeSchema.nullable(),
   problems: z.array(classActivityProblemSchema),
 })
 
@@ -86,6 +101,8 @@ export const classLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
   problemDisplayIds: z.array(z.string().trim().min(1)).max(20),
   language: lessonLanguageSchema.nullable(),
+  /** 不带 = 写代码（开着的旧页面发的就是这种）。画流程图时 language 不用，存成 null */
+  mode: lessonModeSchema.default('code'),
   lessonId: z.number().int().positive().optional(),
   newLesson: z.boolean().optional(),
 })
@@ -114,8 +131,39 @@ export const classBoardCellSchema = z.object({
    */
   codeAttempts: z.number().int(),
   flowchartAttempts: z.number().int(),
-  /** 第一次通过的时刻；今天之前通过的，前端显示成「之前」 */
+  /**
+   * 第一次通过的时刻；今天之前通过的，前端显示成「之前」。先画再写的课是两步都做到的那一刻
+   * （晚的那一步）
+   */
   acceptedAt: z.string().nullable(),
+  /**
+   * 代码这一步：交对过（不限今天）/ 交过没对 / 没交过。写代码的课和 status 一样；先画再写的课
+   * 要它分出「图画对了、代码还没对」
+   */
+  codeStatus: stepStatusSchema,
+  /**
+   * 流程图这一步，只在这节课要画流程图时有（mode 是 flowchart / both），否则 null。
+   * - `passedAt`：第一次画到 A / S 的时刻（不限今天）
+   * - `latest`：还没画对时最后一张图（不限今天，和 passedAt 同一个范围）：点格子打开它讲哪里画错了，
+   *   题卡片下面按走对几组归堆。评分中、评失败的也是它（passed / total 为 null）
+   */
+  flowchart: z
+    .object({
+      status: stepStatusSchema,
+      passedAt: z.string().nullable(),
+      latest: z
+        .object({
+          id: z.string(),
+          /** 0 排队 1 评分中 2 评完 3 评失败（flowchartStatusSchema） */
+          status: z.number().int(),
+          grade: z.string().nullable(),
+          /** 走对几组 / 一共几组；评完之前、2026-10 之前的老评法为 null */
+          passed: z.number().int().nullable(),
+          total: z.number().int().nullable(),
+        })
+        .nullable(),
+    })
+    .nullable(),
   /**
    * 还没做对时，今天最后一次**代码**提交：点格子打开它讲错误，题卡片下面按错法归堆。
    * 做对了、今天没交代码（只画了流程图）的为 null。
@@ -188,6 +236,8 @@ export const classBoardSchema = z.object({
   lessonId: z.number().int().nullable(),
   /** 这一节布置的语言（见 lessonLanguageSchema） */
   language: lessonLanguageSchema,
+  /** 这一节做什么；推断出来的课为 null（代码交对或流程图画对都算） */
+  mode: lessonModeSchema.nullable(),
   /** 这一节第一次布置的时刻，之后改题不变；推断出来的课为 null */
   assignedAt: z.string().nullable(),
   /** 第一次布置的老师（真名，没有真名用用户名）；推断出来的课为 null */
@@ -266,6 +316,8 @@ export const lessonUpdateSchema = z.object({
   type: z.literal('lesson_update'),
   kind: z.enum(['assigned', 'changed', 'cleared']),
   language: lessonLanguageSchema,
+  /** 清掉了为 null。languageChanged 连它一起算：改成画流程图、改成先画再写也是「做法变了」 */
+  mode: lessonModeSchema.nullable(),
   problems: z.array(lessonUpdateProblemSchema),
   added: z.array(lessonUpdateProblemSchema),
   removed: z.array(lessonUpdateProblemSchema),
@@ -301,6 +353,7 @@ export const adminLessonSchema = z.object({
   /** 布置的老师：真名，没有真名用用户名（和看板「谁 布置」一样） */
   createdBy: z.string(),
   language: lessonLanguageSchema,
+  mode: lessonModeSchema,
   /** 按布置的顺序；题后来被藏起来的 visible 为 false（统计、学生那边都不再出现） */
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string(), visible: z.boolean() })),
   /** 班里的学生数（STUDENT_ROLES、没禁用），和 doneCount 同一个花名册 */
@@ -325,6 +378,7 @@ export const adminLessonRequestSchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   language: lessonLanguageSchema,
+  mode: lessonModeSchema.default('code'),
   problemDisplayIds: z.array(z.string().trim().min(1)).min(1).max(20),
 })
 export type AdminLesson = z.infer<typeof adminLessonSchema>

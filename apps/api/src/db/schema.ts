@@ -45,6 +45,7 @@ import type {
   HintDiagnosis,
   JudgeStatus,
   LessonLanguage,
+  LessonMode,
   ProblemChallenges,
   ProblemDifficulty,
   ProblemLanguage,
@@ -1324,6 +1325,11 @@ export const classLesson = pgTable(
      * 没有它。写入侧在 PUT /classroom/lesson 按 lessonLanguageSchema 校验过
      */
     language: text().$type<LessonLanguage>(),
+    /**
+     * 这节课做什么：写代码 / 画流程图 / 先画再写（见契约 lessonModeSchema）。加这一列之前布置的
+     * 都是写代码。写入侧按 lessonModeSchema 校验过
+     */
+    mode: text().$type<LessonMode>().notNull().default('code'),
     /** 这一节第一次布置的老师，别的老师「改」也不换（和 createdAt 一样）。看板上写「HH:mm 谁 布置」 */
     createdBy: integer('created_by').notNull(),
     /**

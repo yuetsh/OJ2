@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useCodeStore } from 'oj/store/code'
 import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
 import { useProblemStore } from 'oj/store/problem'
+import { useLessonStore } from 'shared/store/lesson'
 import { useUserStore } from 'shared/store/user'
 import { sortFlowchartCriteria } from 'utils/constants'
 import { parseTime } from 'utils/functions'
@@ -173,9 +174,19 @@ watch(
 onBeforeUnmount(() => editor.value?.setHighlight(null))
 
 /** A / S 之后：照着图写代码。切回学生习惯的那门语言 */
-const canCode = computed(() => problemStore.codeLanguages.length > 0)
+/**
+ * 「照着它写代码」：只画流程图的课里不给（老师这节课只要画），这道题在要写代码的课里就换到
+ * 布置的语言，否则回到他习惯的那门
+ */
+const lessonStore = useLessonStore()
+const lessonItem = computed(() => (problemStore.problem ? lessonStore.find(problemStore.problem._id) : undefined))
+const canCode = computed(() => problemStore.codeLanguages.length > 0 && !(lessonItem.value?.draw && !lessonItem.value.code))
+/** 课上这道题要写代码、还没交对：画对了不算做完 */
+const codeStillNeeded = computed(() => !!lessonItem.value && lessonItem.value.code !== null && lessonItem.value.code !== 'accepted')
 function goCode() {
-  problemStore.switchLanguage(problemStore.supportedLanguage(codeStore.preferredLanguage()))
+  const language = lessonStore.activity?.language
+  if (lessonItem.value?.code && language && problemStore.codeLanguages.includes(language)) problemStore.switchLanguage(language)
+  else problemStore.switchLanguage(problemStore.supportedLanguage(codeStore.preferredLanguage()))
 }
 </script>
 
@@ -236,14 +247,14 @@ function goCode() {
       <div v-if="report" class="headline">
         <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
         <span class="headline-text">{{ flowchartVerdict(report, current.grade) }}</span>
-        <span v-if="isFlowchartPass(current.grade)" class="headline-note">这道题算做完了</span>
+        <span v-if="isFlowchartPass(current.grade)" class="headline-note">{{ codeStillNeeded ? '接着写代码' : '这道题算做完了' }}</span>
       </div>
       <div v-else class="score-line">
         <span class="score" :class="gradeType(current.grade)">{{ current.score }}</span>
         <span class="score-unit">分</span>
         <span class="grade" :class="gradeType(current.grade)">{{ current.grade }} 级</span>
         <span v-if="detail?.aiFeedback || isFlowchartPass(current.grade)" class="feedback">
-          {{ detail?.aiFeedback ?? '' }}{{ isFlowchartPass(current.grade) ? ' 这道题算做完了。' : '' }}
+          {{ detail?.aiFeedback ?? '' }}{{ isFlowchartPass(current.grade) ? (codeStillNeeded ? ' 接着写代码吧。' : ' 这道题算做完了。') : '' }}
         </span>
       </div>
 

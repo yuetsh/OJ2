@@ -7,6 +7,7 @@
  */
 
 import {
+  FLOWCHART_PASS_GRADES,
   NO_CLASS,
   STUDENT_ROLES,
   type ProblemLanguage,
@@ -537,6 +538,7 @@ async function lessonPlans(range: StatisticsRange) {
       day: schema.classLesson.day,
       problemIds: schema.classLesson.problemIds,
       language: schema.classLesson.language,
+      mode: schema.classLesson.mode,
       createdAt: schema.classLesson.createdAt,
     })
     .from(schema.classLesson)
@@ -560,6 +562,7 @@ async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
         class_name: plan.className,
         day: plan.day,
         problem_id: problemId,
+        mode: plan.mode,
       })),
     ),
   )
@@ -571,7 +574,7 @@ async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
     UNJUDGED_RESULTS.map((value) => sql`${value}`),
     sql`, `,
   )
-  const plan = sql`(select * from jsonb_to_recordset(${planRows}::jsonb) as p(k int, class_name text, day text, problem_id int))`
+  const plan = sql`(select * from jsonb_to_recordset(${planRows}::jsonb) as p(k int, class_name text, day text, problem_id int, mode text))`
   const [counts, doneByLesson] = await Promise.all([
     db.execute<{
       k: number
@@ -584,22 +587,37 @@ async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
       last: string
     }>(sql`
       with p as ${plan},
+      -- 这节课要写代码就数代码提交，要画流程图就数流程图（画到 A / S 算对、还在评算没判完），
+      -- 先画再写两种都数。同一天先布置画流程图、再布置同样的题写代码，两节各数各的
       s as (
-        select p.k, s.user_id, s.problem_id, s.result, s.create_time
+        select p.k, s.user_id, s.problem_id, s.result in (${accepted}) as ok, s.result in (${judging}) as pending, s.create_time
         from ${schema.submission} s
         join ${schema.user} u on u.id = s.user_id
         join p on p.class_name = u.class_name and p.problem_id = s.problem_id
           and p.day = to_char(${localTime(sql`s.create_time`)}, 'YYYY-MM-DD')
-        where s.contest_id is null
+        where s.contest_id is null and p.mode <> 'flowchart'
           and s.create_time <= ${range.end}
           ${range.start ? sql`and s.create_time >= ${range.start}` : sql``}
+          and u.admin_type = 'Regular User' and u.is_disabled = false
+        union all
+        select p.k, f.user_id, f.problem_id, (f.status = 2 and coalesce(f.ai_grade in (${sql.join(
+          FLOWCHART_PASS_GRADES.map((grade) => sql`${grade}`),
+          sql`, `,
+        )}), false)) as ok, f.status in (0, 1) as pending, f.create_time
+        from ${schema.flowchartSubmission} f
+        join ${schema.user} u on u.id = f.user_id
+        join p on p.class_name = u.class_name and p.problem_id = f.problem_id
+          and p.day = to_char(${localTime(sql`f.create_time`)}, 'YYYY-MM-DD')
+        where p.mode <> 'code'
+          and f.create_time <= ${range.end}
+          ${range.start ? sql`and f.create_time >= ${range.start}` : sql``}
           and u.admin_type = 'Regular User' and u.is_disabled = false
       )
       select k, problem_id,
         count(distinct user_id)::int as users,
         count(*)::int as total,
-        (count(*) filter (where result in (${accepted})))::int as accepted,
-        (count(*) filter (where result in (${judging})))::int as judging,
+        (count(*) filter (where ok))::int as accepted,
+        (count(*) filter (where pending))::int as judging,
         min(create_time) as first,
         max(create_time) as last
       from s
@@ -624,6 +642,7 @@ async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
         className: lesson.className,
         day: lesson.day,
         problemIds: lesson.problemIds,
+        mode: lesson.mode,
         start: first,
         end: last,
         users: total?.users ?? 0,
@@ -868,6 +887,7 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
         .map((row) => row!.displayId)
         .slice(0, STATISTICS_MAX_PROBLEMS),
       assigned: false,
+      mode: null,
       doneCount: null,
       fromProblemSet: lesson.from_ps * 2 > lesson.total,
       // 次数和正确率只算这节课的题：点进去筛的就是这几道，两边的数才对得上
@@ -901,6 +921,7 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
         .map((row) => row!.displayId)
         .slice(0, STATISTICS_MAX_PROBLEMS),
       assigned: true,
+      mode: lesson.mode,
       doneCount: lesson.doneCount,
       fromProblemSet: false,
       total: lesson.total,

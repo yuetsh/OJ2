@@ -20,7 +20,8 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import LessonForm from './components/LessonForm.vue'
 import TrailPanel from './components/TrailPanel.vue'
 import { errorKind, type ErrorKind } from 'utils/errorKind'
-import { cellStyle as cellStyleOf, cellText, cellTitle as cellTitleOf, STUCK_ATTEMPTS, trailSummary } from './boardCells'
+import { LESSON_MODE_LABEL } from '@oj2/contract'
+import { cellStage, cellStyle as cellStyleOf, cellText as cellTextOf, cellTitle as cellTitleOf, isStuck, trailSummary } from './boardCells'
 
 /**
  * 课堂看板（老师，设计稿「课堂看板重设计」A+B）：这个班、今天、这节课的几道题 × 全班学生。
@@ -114,8 +115,14 @@ onUnmounted(pause)
 
 // ---------- 这节课的题：上课时当场填 ----------
 
-/** 顶上那条布置框开着没有：edit = 改这一节，new = 今天再开一节 */
-const editing = ref<false | 'edit' | 'new'>(false)
+/**
+ * 顶上那条布置框开着没有：edit = 改这一节，new = 今天再开一节，
+ * carry = 再开一节、带上这一节的题改成写代码（这一节是画流程图时才有）
+ */
+const editing = ref<false | 'edit' | 'new' | 'carry'>(false)
+
+/** 这节课做什么；推断出来的课为 null（代码交对或流程图画对都算） */
+const mode = computed(() => board.value?.mode ?? null)
 
 /**
  * 一个班一天可以上几节内容不同的课。打开看板（或换到这个班）时，这一节已经布置了这么久，
@@ -192,7 +199,7 @@ function groupOf(student: ClassBoardStudent): Group {
   const cells = student.cells
   if (cells.length && cells.every((cell) => cell.status === 'accepted')) return 'done'
   if (!student.lastSubmitAt) return 'idle'
-  if (cells.some((cell) => cell.status === 'tried' && cell.attempts >= STUCK_ATTEMPTS)) return 'stuck'
+  if (cells.some((cell) => isStuck(cell, mode.value))) return 'stuck'
   return 'working'
 }
 
@@ -296,24 +303,54 @@ interface WrongPerson {
   student: ClassBoardStudent
   cell: ClassBoardCell
   kind: ErrorKind
+  /** 点名字讲的是哪一份：代码（cell.latest）还是最后一张图（cell.flowchart.latest）；null = 没有可讲的 */
+  explain: 'code' | 'draw' | null
+}
+
+/**
+ * 卡在画流程图上的人按最后一张图归堆：一组都没走对的、对了一部分的分开讲；还在评、评失败的、
+ * 老评法（数不出几组）各一堆
+ */
+function drawKind(cell: ClassBoardCell): ErrorKind {
+  const latest = cell.flowchart?.latest
+  if (!latest) return { key: 'draw-none', label: '还没画对', line: null }
+  if (latest.status === 0 || latest.status === 1) return { key: 'draw-wait', label: 'AI 在评', line: null }
+  if (latest.status === 3) return { key: 'draw-failed', label: '评分失败', line: null }
+  if (latest.passed === null) return { key: 'draw-old', label: '还没画对', line: null }
+  return latest.passed > 0 ? { key: 'draw-some', label: '图对了一部分', line: null } : { key: 'draw-zero', label: '图一组都没走对', line: null }
 }
 
 /**
  * 没做对的人：今天交过代码的按最后一次提交归错法。另外两种没有今天的代码可讲，单独成堆，
- * 和卡片上「错着 N」的 N 对得上：今天只画了流程图的，以前交过没做对、今天还没动的
+ * 和卡片上「错着 N」的 N 对得上：今天只画了流程图的，以前交过没做对、今天还没动的。
+ * 要画流程图的课，卡在画图上的按最后一张图归堆（drawKind）；先写了代码、没画图的单独一堆
  */
 function wrongOf(index: number): WrongPerson[] {
-  return present.value.flatMap((student) => {
+  return present.value.flatMap((student): WrongPerson[] => {
     const cell = student.cells[index]
     if (!cell || cell.status !== 'tried') return []
+    const stage = cellStage(cell, mode.value)
+    if (stage === 'draw') {
+      const latest = cell.flowchart?.latest
+      const evaluated = !!latest && latest.status !== 0 && latest.status !== 1
+      return [{ student, cell, kind: drawKind(cell), explain: evaluated ? 'draw' : null }]
+    }
+    if (stage === 'nodraw') return [{ student, cell, kind: { key: 'nodraw', label: '代码对了，还没画图', line: null }, explain: null }]
+    if (mode.value === 'both' && cell.flowchart?.status === 'accepted' && cell.codeStatus === 'none') {
+      return [{ student, cell, kind: { key: 'drawn', label: '图画对了，还没写代码', line: null }, explain: null }]
+    }
+    // 推断出来的课不分步：今天没代码、却画了流程图的单独一堆
     const kind: ErrorKind = cell.latest
       ? errorKind(cell.latest)
-      : cell.attempts
+      : !mode.value && cell.attempts
         ? { key: 'flowchart', label: '今天只画了流程图', line: null }
         : { key: 'before', label: '以前交过，今天还没交', line: null }
-    return [{ student, cell, kind }]
+    return [{ student, cell, kind, explain: cell.latest ? 'code' : null }]
   })
 }
+
+/** 没有今天的错可讲的那几堆：灰底，不是今天的错 */
+const QUIET_KINDS = new Set(['before', 'flowchart', 'nodraw', 'drawn', 'draw-wait'])
 
 const problemStats = computed(() =>
   (board.value?.problems ?? []).map((problem, i) => {
@@ -322,9 +359,22 @@ const problemStats = computed(() =>
     const total = present.value.length
     // 挑战成功几人：只有配了挑战的题才写
     const challenged = problem.hasChallenges ? present.value.filter((student) => student.cells[i]?.challenge === 'done').length : null
-    return { problem, done, wrong, none: total - done - wrong, total, challenged }
+    // 先画再写：两步各几人做到，老师一眼看出全班卡在画图还是写代码
+    const steps =
+      mode.value === 'both'
+        ? {
+            drawn: present.value.filter((student) => student.cells[i]?.flowchart?.status === 'accepted').length,
+            coded: present.value.filter((student) => student.cells[i]?.codeStatus === 'accepted').length,
+          }
+        : null
+    return { problem, done, wrong, none: total - done - wrong, total, challenged, steps }
   }),
 )
+
+/**
+ * 先画再写的课，没做完的里面有图画对了、还没写代码的，说「错着」不对 —— 改说「没做完」
+ */
+const wrongWord = computed(() => (mode.value === 'both' ? '没做完' : '错着'))
 
 const selectedId = ref<number | null>(null)
 const selectedIndex = computed(() => (board.value?.problems ?? []).findIndex((problem) => problem.problemId === selectedId.value))
@@ -360,19 +410,18 @@ const explainProblem = computed(() => board.value?.problems[explainProblemIndex.
 /** 弹层顶上那排人：这道题错着的人，顺序和错法堆一样 */
 const explainPeople = computed<ExplainPerson[]>(() => {
   if (explainProblemIndex.value < 0) return []
-  const people = wrongOf(explainProblemIndex.value).filter((person) => person.cell.latest)
+  const people = wrongOf(explainProblemIndex.value).filter((person) => person.explain)
   const order = new Map<string, number>()
   for (const person of people) {
     order.set(person.kind.key, (order.get(person.kind.key) ?? 0) + 1)
   }
   return people
     .sort((a, b) => order.get(b.kind.key)! - order.get(a.kind.key)! || a.kind.key.localeCompare(b.kind.key) || b.cell.attempts - a.cell.attempts)
-    .map((person) => ({
-      userId: person.student.userId,
-      username: person.student.username,
-      submissionId: person.cell.latest!.submissionId,
-      label: person.kind.label,
-    }))
+    .map((person) =>
+      person.explain === 'draw'
+        ? { userId: person.student.userId, username: person.student.username, flowchartId: person.cell.flowchart!.latest!.id, label: person.kind.label }
+        : { userId: person.student.userId, username: person.student.username, submissionId: person.cell.latest!.submissionId, label: person.kind.label },
+    )
 })
 
 function openExplain(problemIndex: number, userId: number) {
@@ -390,9 +439,22 @@ const cellColors = computed(() => ({
   tone,
   errorColor: theme.value.errorColor,
   actionColor: theme.value.actionColor,
+  successColor: theme.value.successColor,
 }))
-const cellStyle = (cell: ClassBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value)
-const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) => cellTitleOf(cell, student, board.value?.day)
+const cellStyle = (cell: ClassBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value, mode.value)
+const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) => cellTitleOf(cell, student, board.value?.day, mode.value)
+const cellText = (cell: ClassBoardCell) => cellTextOf(cell, mode.value)
+
+/** 点了能讲的格子：没做完，卡着的那一步有评完的图或今天的代码 */
+function explainable(cell: ClassBoardCell) {
+  if (cell.status !== 'tried') return false
+  const stage = cellStage(cell, mode.value)
+  if (stage === 'draw') {
+    const latest = cell.flowchart?.latest
+    return !!latest && latest.status !== 0 && latest.status !== 1
+  }
+  return stage === 'code' && !!cell.latest
+}
 
 /**
  * 点开着轨迹的那个格子（学生 id:第几道题）。做对了、今天交过代码的格子点了不再直接去提交列表，
@@ -426,6 +488,8 @@ function submissionsHref(
 ) {
   // SQL 题不受布置的语言限制，格子数的是 SQL 交的
   const language = problem?.isSql ? 'SQL' : board.value?.language
+  // 只画流程图的课，格子数的全是流程图
+  const flowSide = flowchart || mode.value === 'flowchart'
   return router.resolve({
     name: 'submissions',
     query: {
@@ -433,7 +497,7 @@ function submissionsHref(
       exactUsername: '1',
       ...(today ? { today: '1' } : {}),
       // 布置时选了语言的，代码那边只看这个语言交的（和格子里数的一致）
-      ...(flowchart ? { language: 'Flowchart' } : language ? { language } : {}),
+      ...(flowSide ? { language: 'Flowchart' } : language ? { language } : {}),
       ...(problem ? { problem: problem.problemDisplayId } : {}),
     },
   }).href
@@ -459,6 +523,7 @@ function lastText(student: ClassBoardStudent) {
         :board="board"
         :class-name="className"
         :lesson-id="editing === 'edit' ? board.lessonId : null"
+        :carry="editing === 'carry'"
         variant="inline"
         class="lesson-edit"
         @saved="lessonSaved"
@@ -466,6 +531,7 @@ function lastText(student: ClassBoardStudent) {
       />
       <div v-else-if="board?.problems.length && !needLesson" class="lesson">
         <span class="lesson-label">{{ board.source === 'teacher' ? '这节课' : '今天在做' }}</span>
+        <span v-if="board.mode && board.mode !== 'code'" class="chip lang">{{ LESSON_MODE_LABEL[board.mode] }}</span>
         <span v-if="board.language" class="chip lang">{{ LANGUAGE_SHOW_VALUE[board.language] }}</span>
         <span v-for="problem in board.problems" :key="problem.problemId" class="chip">
           {{ problem.problemDisplayId }}
@@ -479,6 +545,11 @@ function lastText(student: ClassBoardStudent) {
         <n-button v-if="board.source === 'teacher'" text type="primary" class="edit" @click="editing = 'new'">
           <template #icon><Icon icon="ph:plus" /></template>
           新的一节
+        </n-button>
+        <!-- 画完流程图让全班写代码：新开一节、带上这几道题（学生那边还没画完的照样看得到要画） -->
+        <n-button v-if="board.source === 'teacher' && board.mode === 'flowchart'" text type="primary" class="edit" @click="editing = 'carry'">
+          <template #icon><Icon icon="ph:code" /></template>
+          用这几道题写代码
         </n-button>
       </div>
 
@@ -527,8 +598,9 @@ function lastText(student: ClassBoardStudent) {
             <span class="bar">
               <i :style="{ width: stat.total ? `${(stat.done / stat.total) * 100}%` : '0' }"></i>
             </span>
+            <span v-if="stat.steps" class="card-steps">画对 {{ stat.steps.drawn }} · 写对 {{ stat.steps.coded }}</span>
             <span class="card-foot">
-              <span :class="stat.wrong ? 'wrong' : 'muted'">错着 {{ stat.wrong }}</span>
+              <span :class="stat.wrong ? 'wrong' : 'muted'">{{ wrongWord }} {{ stat.wrong }}</span>
               <span class="muted">没做 {{ stat.none }}</span>
               <span v-if="stat.challenged !== null" class="challenged"> 挑战成功 {{ stat.challenged }} </span>
             </span>
@@ -551,7 +623,7 @@ function lastText(student: ClassBoardStudent) {
               {{ board.problems[selectedIndex]!.title }}
             </a>
             <span>
-              错着的 <b class="wrong">{{ problemStats[selectedIndex]!.wrong }}</b> 人
+              {{ wrongWord }}的 <b class="wrong">{{ problemStats[selectedIndex]!.wrong }}</b> 人
             </span>
             <span class="muted">没做 {{ problemStats[selectedIndex]!.none }} 人</span>
             <div class="spacer"></div>
@@ -560,12 +632,7 @@ function lastText(student: ClassBoardStudent) {
             </n-button>
           </div>
           <div v-if="wrongGroups.length" class="groups">
-            <div
-              v-for="group in wrongGroups"
-              :key="group.kind.key"
-              class="err-group"
-              :class="{ quiet: group.kind.key === 'before' || group.kind.key === 'flowchart' }"
-            >
+            <div v-for="group in wrongGroups" :key="group.kind.key" class="err-group" :class="{ quiet: QUIET_KINDS.has(group.kind.key) }">
               <div class="err-title">
                 {{ group.kind.label }}
                 <span class="wrong">{{ group.people.length }} 人</span>
@@ -573,15 +640,22 @@ function lastText(student: ClassBoardStudent) {
               </div>
               <div class="err-people">
                 <template v-for="person in group.people" :key="person.student.userId">
-                  <button v-if="person.cell.latest" type="button" class="who" @click="openExplain(selectedIndex, person.student.userId)">
+                  <button v-if="person.explain" type="button" class="who" @click="openExplain(selectedIndex, person.student.userId)">
                     <UserName :username="person.student.username" />
-                    <span class="mini" :style="cellStyle(person.cell)">✗ {{ person.cell.attempts }}</span>
+                    <span class="mini" :style="cellStyle(person.cell)">{{ cellText(person.cell) }}</span>
                   </button>
                   <!-- 没有今天的代码可讲：去提交列表看他交过的 -->
                   <a
                     v-else
                     class="who"
-                    :href="submissionsHref(person.student, board.problems[selectedIndex], !!person.cell.attempts, !!person.cell.attempts)"
+                    :href="
+                      submissionsHref(
+                        person.student,
+                        board.problems[selectedIndex],
+                        person.kind.key === 'flowchart' || person.kind.key.startsWith('draw'),
+                        !!person.cell.attempts,
+                      )
+                    "
                     target="_blank"
                   >
                     <UserName :username="person.student.username" />
@@ -672,7 +746,7 @@ function lastText(student: ClassBoardStudent) {
                 </td>
                 <td v-for="(cell, i) in student.cells" :key="i" :class="{ hl: i === selectedIndex }">
                   <button
-                    v-if="cell.status === 'tried' && cell.latest"
+                    v-if="explainable(cell)"
                     type="button"
                     class="cell"
                     :data-challenge="cell.challenge ?? undefined"
@@ -916,6 +990,12 @@ function lastText(student: ClassBoardStudent) {
 .card-done b {
   font-size: 22px;
   line-height: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-steps {
+  font-size: 13px;
+  color: v-bind('theme.textColor2');
   font-variant-numeric: tabular-nums;
 }
 

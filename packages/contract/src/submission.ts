@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { paginatedSchema } from './common'
 import { judgeStatusSchema, type JudgeStatus } from './judge-status'
-import { problemLanguageSchema, runnableLanguageSchema } from './language'
+import { lessonModeSchema, problemLanguageSchema, runnableLanguageSchema } from './language'
 
 /**
  * 判题机原始输出（`submission.info` 的 JSONB 原文）。**只是类型，不作运行时校验。**
@@ -478,6 +478,11 @@ export const submissionLessonsSchema = z.object({
       problems: z.array(z.string()),
       /** 老师在课堂看板布置的课（不是从提交推断的） */
       assigned: z.boolean(),
+      /**
+       * 布置的课做什么（写代码 / 画流程图 / 先画再写）；推断的课为 null。要画流程图的课，次数和
+       * 正确率连流程图一起数（画到 A / S 算对）
+       */
+      mode: lessonModeSchema.nullable(),
       /**
        * 布置的课：班里把布置的题全做对了的人数（那天结束前，以前做对的也算；布置时选了语言的
        * 只认那个语言，流程图评到 A / S 也算 —— 和看板同一个口径）。推断的课为 null

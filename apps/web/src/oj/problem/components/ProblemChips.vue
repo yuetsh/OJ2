@@ -15,6 +15,8 @@ export interface ChipItem {
   title: string
   status: 'done' | 'tried' | 'none'
   to: RouteLocationRaw
+  /** 悬停时代替「做过，还没对」那句（课堂里要画又要写的题，说差哪一步） */
+  note?: string
 }
 
 const props = defineProps<{
@@ -61,7 +63,7 @@ watch(
           :to="item.to"
           class="chip"
           :class="[item.status, { current: isCurrent(item) }]"
-          :aria-label="`${item.displayId} ${item.title}（${STATUS_TEXT[item.status]}）`"
+          :aria-label="`${item.displayId} ${item.title}（${item.note ?? STATUS_TEXT[item.status]}）`"
           :aria-current="isCurrent(item) ? 'page' : undefined"
         >
           <!-- 内嵌 SVG，不走 Iconify：图标源拉不到时状态就只剩颜色了 -->
@@ -109,7 +111,7 @@ watch(
           <span>{{ item.displayId }}</span>
         </router-link>
       </template>
-      {{ item.displayId }} {{ item.title }} · {{ STATUS_TEXT[item.status] }}
+      {{ item.displayId }} {{ item.title }} · {{ item.note ?? STATUS_TEXT[item.status] }}
     </n-tooltip>
   </div>
 </template>

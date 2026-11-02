@@ -81,6 +81,11 @@ function lessonLanguageFilter(raw: string | undefined) {
   return language ? sql`${schema.problem.languages} @> ${JSON.stringify([language])}::jsonb` : undefined
 }
 
+/** 要画流程图的课（`?flowchart=1`）：只列打开了「让学生自己画」的题，没打开的学生那边没有画布 */
+function lessonFlowchartFilter(raw: string | undefined) {
+  return raw === '1' ? eq(schema.problem.allowFlowchart, true) : undefined
+}
+
 type ProblemStates = Awaited<ReturnType<typeof problemStates>> | null
 type UserCounts = Awaited<ReturnType<typeof problemUserCounts>>
 
@@ -149,6 +154,8 @@ problemRoutes.get('/problems', optionalAuth, async (c) => {
   if (byType) filters.push(byType)
   const byLanguage = lessonLanguageFilter(c.req.query('language'))
   if (byLanguage) filters.push(byLanguage)
+  const byFlowchart = lessonFlowchartFilter(c.req.query('flowchart'))
+  if (byFlowchart) filters.push(byFlowchart)
 
   const states = user ? await problemStates(user.id) : null
   if (undone && states && states.solved.size > 0) filters.push(notInArray(schema.problem.id, [...states.solved]))
@@ -226,6 +233,7 @@ problemRoutes.get('/problem-tags', async (c) => {
         eq(schema.problem.visible, true),
         isNull(schema.problem.contestId),
         lessonLanguageFilter(c.req.query('language')),
+        lessonFlowchartFilter(c.req.query('flowchart')),
       ),
     )
     .where(keyword ? ilike(schema.problemTag.name, `%${keyword}%`) : undefined)

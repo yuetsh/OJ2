@@ -190,6 +190,9 @@ const classActivityTitle = computed(() => {
   // 老师在课堂看板布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
   if (classActivity.value?.source === 'teacher') {
     const language = classActivity.value.language
+    const mode = classActivity.value.mode
+    if (mode === 'flowchart') return '这节课 · 画流程图'
+    if (mode === 'both') return `这节课 · 先画流程图，再${language ? `用${LANGUAGE_SHOW_VALUE[language]}` : ''}写代码`
     return `这节课${language ? ` · 用${LANGUAGE_SHOW_VALUE[language]}做` : ''}`
   }
   if (classToday.value) return '这节课'
@@ -201,6 +204,17 @@ const MY_STATUS: Record<ClassActivityProblem['myStatus'], { label: string; type:
   accepted: { label: '已做对', type: 'success' },
   tried: { label: '没做对', type: 'warning' },
   none: { label: '还没做', type: 'default' },
+}
+
+/**
+ * 每行前面那个小标签。要画又要写的题只做到一步时说差哪一步 ——「没做对」会让人以为是代码错了
+ */
+function statusTag(item: ClassActivityProblem) {
+  if (item.myStatus === 'tried' && item.draw && item.code) {
+    if (item.draw === 'accepted') return { label: '还要写代码', type: 'warning' as const }
+    if (item.code === 'accepted') return { label: '还要画图', type: 'warning' as const }
+  }
+  return MY_STATUS[item.myStatus]
 }
 
 async function loadWeekly() {
@@ -291,8 +305,8 @@ function contestTime(contest: Contest) {
             <n-text depth="3" class="row-meta"> {{ classActivity.problems.length }} 道做对了 {{ doneInClass }} 道 </n-text>
           </template>
           <router-link v-for="item in classActivity.problems" :key="item.problemDisplayId" :to="`/problem/${item.problemDisplayId}`" class="row">
-            <n-tag :type="MY_STATUS[item.myStatus].type" size="small" :bordered="false">
-              {{ MY_STATUS[item.myStatus].label }}
+            <n-tag :type="statusTag(item).type" size="small" :bordered="false">
+              {{ statusTag(item).label }}
             </n-tag>
             <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
             <!-- 老师刚布置、还没人交的时候不显示「0/0」 -->
@@ -346,8 +360,8 @@ function contestTime(contest: Contest) {
             <n-text depth="3" class="row-meta">{{ classActivity.className }} 班</n-text>
           </template>
           <router-link v-for="item in classActivity.problems" :key="item.problemDisplayId" :to="`/problem/${item.problemDisplayId}`" class="row">
-            <n-tag :type="MY_STATUS[item.myStatus].type" size="small" :bordered="false">
-              {{ MY_STATUS[item.myStatus].label }}
+            <n-tag :type="statusTag(item).type" size="small" :bordered="false">
+              {{ statusTag(item).label }}
             </n-tag>
             <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
             <n-text v-if="item.userCount" depth="3" class="row-meta"> {{ item.acceptedCount }}/{{ item.userCount }} 人做对 </n-text>

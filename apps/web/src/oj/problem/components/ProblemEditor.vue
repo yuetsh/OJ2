@@ -172,20 +172,38 @@ watch(
  * 编辑器停在默认的 Python（或者上一个用这台电脑的人留下的偏好）的话，学生交上去才发现
  * 不算数。课堂条只在题库入口出现，这里同一个范围。
  *
- * 每道题只自动换一次：学生自己再切回别的语言，就按他的来。课堂状态可能比题面晚到
- * （课堂条进页面才去拉），所以两边都等到了再判断；画着流程图时不动他。
+ * 要画流程图的课（画流程图 / 先画再写，或者今天先后布置了画和写）：这道题的图还没画对，
+ * 就停在画布上；画对了、还要写代码的，换到布置的语言 —— 画一道写一道、全画完再回来写，
+ * 打开题目都是该做的那一步。
+ *
+ * 每道题、每一节课只自动换一次：学生自己再切回别的，就按他的来。老师换了一节（做法、语言变了）
+ * 再判断一次。画对图的那一刻不跟着换：他正在看点评，「照着它写代码」由他自己点。
+ * 课堂状态可能比题面晚到（课堂条进页面才去拉），所以两边都等到了再判断；
+ * 没有画这一步的课，画着流程图时不动他
  */
 const lessonStore = useLessonStore()
 let lessonLanguageFor: string | null = null
 watch(
   () => [problem.value?._id, lessonStore.activity] as const,
   ([id, activity]) => {
-    if (!id || !activity || lessonLanguageFor === id) return
-    lessonLanguageFor = id
+    if (!id || !activity) return
+    const key = [id, activity.day, activity.mode, activity.language].join('|')
+    if (lessonLanguageFor === key) return
+    lessonLanguageFor = key
+    if (ctx.value.entry !== 'problem' || teacherCollab.value) return
+    const item = lessonStore.find(id)
+    if (!item) return
+    if (item.draw && item.draw !== 'accepted') {
+      if (problemStore.canDraw && codeStore.code.language !== 'Flowchart') problemStore.switchLanguage('Flowchart')
+      return
+    }
+    // 只画流程图、已经画对了：没有要写的
+    if (item.draw && !item.code) return
     const language = activity.language
-    if (!language || ctx.value.entry !== 'problem' || teacherCollab.value) return
-    if (!lessonStore.includes(id) || !problemStore.codeLanguages.includes(language)) return
-    if (codeStore.code.language === language || codeStore.code.language === 'Flowchart') return
+    if (!language || !problemStore.codeLanguages.includes(language)) return
+    if (codeStore.code.language === language) return
+    // 没有画这一步、自己在画流程图的，不打断他
+    if (codeStore.code.language === 'Flowchart' && !item.draw) return
     problemStore.switchLanguage(language)
   },
   { immediate: true },

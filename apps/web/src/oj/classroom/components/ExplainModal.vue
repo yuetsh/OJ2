@@ -1,11 +1,14 @@
 <script lang="ts">
-export interface ExplainPerson {
+/**
+ * 弹层顶上那排人里的一个。讲代码给 submissionId；要画流程图的课里卡在画图上的，给他最后
+ * 那张图的 flowchartId —— 下面就换成图和 AI 的点评
+ */
+export type ExplainPerson = {
   userId: number
   username: string
-  submissionId: string
   /** 错法的短名（errorKind），挂在名字后面 */
   label: string
-}
+} & ({ submissionId: string; flowchartId?: undefined } | { flowchartId: string; submissionId?: undefined })
 </script>
 
 <script setup lang="ts">
@@ -17,6 +20,7 @@ import UserName from 'shared/components/UserName.vue'
 import { useBackClose } from 'shared/composables/backClose'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import type { ClassBoardProblem } from 'utils/types'
+import FlowchartExplain from './FlowchartExplain.vue'
 import ProblemBrief from './ProblemBrief.vue'
 
 /**
@@ -106,7 +110,7 @@ onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
           >
             题目
           </n-button>
-          <n-button v-if="current" :size="isMobile ? 'small' : 'medium'" tag="a" :href="'/submission/' + current.submissionId" target="_blank">
+          <n-button v-if="current?.submissionId" :size="isMobile ? 'small' : 'medium'" tag="a" :href="'/submission/' + current.submissionId" target="_blank">
             在新页面打开
           </n-button>
         </div>
@@ -119,7 +123,8 @@ onKeyStroke(['ArrowLeft', 'ArrowRight'], (event) => {
           <ProblemBrief :display-id="problem.problemDisplayId" />
         </aside>
         <div class="main">
-          <SubmissionView v-if="current" :id="current.submissionId" embedded />
+          <FlowchartExplain v-if="current?.flowchartId" :id="current.flowchartId" />
+          <SubmissionView v-else-if="current?.submissionId" :id="current.submissionId" embedded />
         </div>
       </div>
     </div>

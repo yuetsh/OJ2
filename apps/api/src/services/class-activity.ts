@@ -53,14 +53,20 @@ export function activityRows(options: {
   problemIds?: number[]
   /** 老师布置时选了语言：代码只数这个语言交的（见 lessonLanguageFilter），流程图不受影响 */
   language?: LessonLanguage | null
+  /**
+   * 只要哪一种：老师布置的课选了「写代码」就只数代码、「画流程图」就只数流程图
+   * （契约 lessonModeSchema）。不给 = 两种都数，`kind` 列分得出是哪种
+   */
+  only?: 'code' | 'flowchart'
 }) {
-  const { since, users, problemIds, language } = options
+  const { since, users, problemIds, language, only } = options
   const code = db
     .select({
       userId: schema.submission.userId,
       problemId: schema.submission.problemId,
       createTime: schema.submission.createTime,
       solved: sql<boolean>`${inArray(schema.submission.result, SOLVED_RESULTS)}`.as('solved'),
+      kind: sql<'code' | 'flowchart'>`'code'`.as('kind'),
     })
     .from(schema.submission)
     .where(
@@ -70,6 +76,7 @@ export function activityRows(options: {
         users ? inArray(schema.submission.userId, users) : undefined,
         problemIds ? inArray(schema.submission.problemId, problemIds) : undefined,
         lessonLanguageFilter(language),
+        only === 'flowchart' ? sql`false` : undefined,
       ),
     )
   const flowchart = db
@@ -78,6 +85,7 @@ export function activityRows(options: {
       problemId: schema.flowchartSubmission.problemId,
       createTime: schema.flowchartSubmission.createTime,
       solved: sql<boolean>`${FLOWCHART_PASSED}`.as('solved'),
+      kind: sql<'code' | 'flowchart'>`'flowchart'`.as('kind'),
     })
     .from(schema.flowchartSubmission)
     .where(
@@ -85,6 +93,7 @@ export function activityRows(options: {
         gte(schema.flowchartSubmission.createTime, since),
         users ? inArray(schema.flowchartSubmission.userId, users) : undefined,
         problemIds ? inArray(schema.flowchartSubmission.problemId, problemIds) : undefined,
+        only === 'code' ? sql`false` : undefined,
       ),
     )
   return code.unionAll(flowchart).as('activity')

@@ -48,6 +48,24 @@ export const runnableLanguageSchema = judgeLanguageSchema.extract(['C', 'C++', '
 export const lessonLanguageSchema = problemLanguageSchema.extract(['Python', 'C', 'C++', 'SQL'])
 
 /**
+ * 这节课做什么，老师布置时选（2026-11 加）：
+ * - `code`：写代码，「做完」只认代码交对（加这一项之前布置的课都是它）；
+ * - `flowchart`：画流程图，只认画到 A / S，不选语言（language 为 null）；
+ * - `both`：先画再写，一道题画到 A / S **并且**代码交对才算做完。学生画一道写一道、
+ *   全画完再写都行，所以是一节课里的两步，不是两节课。
+ *
+ * 画流程图的两种只能布置打开了「让学生自己画」的题（problem.allowFlowchart）。
+ * 推断出来的课没有它（null）：代码交对或流程图画到 A / S 都算做完，和加这一项之前一样
+ */
+export const lessonModeSchema = z.enum(['code', 'flowchart', 'both'])
+export type LessonMode = z.infer<typeof lessonModeSchema>
+export const LESSON_MODE_LABEL: Record<LessonMode, string> = { code: '写代码', flowchart: '画流程图', both: '先画再写' }
+/** 这种课要不要画、要不要写 */
+export function lessonNeeds(mode: LessonMode) {
+  return { draw: mode !== 'code', code: mode !== 'flowchart' }
+}
+
+/**
  * SQL 题：可选语言里有 SQL（后端保存时强校验 SQL 只能单独出现）。题型只认这一条，
  * 前后端一律走它，别再各自看 sqlConfig 或 languages
  */

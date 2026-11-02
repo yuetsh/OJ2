@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { LESSON_MODE_LABEL } from '@oj2/contract'
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import type { SubmissionLessons } from '@oj2/contract'
@@ -88,8 +89,9 @@ function attendance(lesson: Lesson) {
   return lesson.classSize >= lesson.userCount ? `${lesson.userCount} / ${lesson.classSize} 人` : `${lesson.userCount} 人`
 }
 
+/** 要画流程图的课写出来：这一行的次数和正确率连流程图一起数（画到 A / S 算对） */
 function problemText(lesson: Lesson) {
-  if (lesson.assigned) return `布置 ${lesson.problems.length} 道`
+  if (lesson.assigned) return `布置 ${lesson.problems.length} 道${lesson.mode && lesson.mode !== 'code' ? ` · ${LESSON_MODE_LABEL[lesson.mode]}` : ''}`
   return `${lesson.fromProblemSet ? '题单 ' : ''}${lesson.problems.length} 道`
 }
 
