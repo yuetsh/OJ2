@@ -10,10 +10,10 @@ import type { ProblemSet } from 'utils/types'
 import { badgeCondition, ladder, nextBadge } from './badges'
 
 /**
- * 题单列表（设计稿「题单重设计」列表 A）：老师正在布置的题单单独一排大卡片 —— 做对几道、
- * 布置到哪天、再做对几道拿哪个奖章；其余题单一排排小卡片，加入过的在前。
+ * 专题列表（设计稿「题单重设计」列表 A）：老师正在布置的专题单独一排大卡片 —— 做对几道、
+ * 布置到哪天、再做对几道拿哪个奖章；其余专题一排排小卡片，加入过的在前。
  *
- * 题单一共十几个，一次全取回来在前端分组，不分页
+ * 专题一共十几个，一次全取回来在前端分组，不分页
  */
 const router = useRouter()
 const userStore = useUserStore()
@@ -82,11 +82,11 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 <template>
   <div class="page oj-page">
     <div class="top">
-      <h2>题单</h2>
+      <h2>专题</h2>
       <div class="spacer"></div>
-      <n-input v-model:value="keyword" placeholder="搜题单" clearable class="search" />
+      <n-input v-model:value="keyword" placeholder="搜专题" clearable class="search" />
       <!-- 手机上一行放不下，也没人在手机上出题，只给电脑 -->
-      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/problemset/create">新建题单</AdminLink>
+      <AdminLink v-if="isDesktop && userStore.isTeacherOrAbove" to="/admin/problemset/create">新建专题</AdminLink>
     </div>
 
     <template v-if="assigning.length">
@@ -128,13 +128,13 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
             <img v-for="badge in ladder(set)" :key="badge.id" :src="badge.icon" :alt="badge.name" :title="badge.name" class="icon" />
             <span>奖章全拿到了</span>
           </div>
-          <div v-else class="muted hint">这个题单没有奖章</div>
+          <div v-else class="muted hint">这个专题没有奖章</div>
         </a>
       </div>
     </template>
 
     <div v-if="others.length" class="sect">
-      {{ assigning.length ? '其他题单' : '题单' }}
+      {{ assigning.length ? '其他专题' : '专题' }}
       <span class="muted">{{ others.length }} 个</span>
     </div>
     <div class="small-grid">
@@ -169,7 +169,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
       </a>
     </div>
 
-    <n-empty v-if="loaded && !shown.length" :description="keyword ? '没有找到这样的题单' : '还没有题单'" />
+    <n-empty v-if="loaded && !shown.length" :description="keyword ? '没有找到这样的专题' : '还没有专题'" />
   </div>
 </template>
 
@@ -254,7 +254,7 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
   align-items: baseline;
 }
 
-/* 1200 限宽下布置中是一行三张、其他题单一行四张；原来一行四张的大卡只有 280 宽，
+/* 1200 限宽下布置中是一行三张、其他专题一行四张；原来一行四张的大卡只有 280 宽，
    「还没加入 · 9 道」和「另有 1 道选做」都被挤成两行 */
 .big-grid {
   display: grid;

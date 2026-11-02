@@ -53,11 +53,11 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
     name: '参加比赛',
     helpText: '参加过的比赛数量（本指标是比赛维度，不受比赛提交不计入的限制）',
   },
-  { key: 'badge_count', name: '题单奖章', helpText: '获得的题单奖章数量' },
+  { key: 'badge_count', name: '专题奖章', helpText: '获得的专题奖章数量' },
   {
     key: 'problemset_completed',
-    name: '做完的题单',
-    helpText: '完成的题单数量',
+    name: '做完的专题',
+    helpText: '完成的专题数量',
   },
   {
     key: 'first_try_ac_count',

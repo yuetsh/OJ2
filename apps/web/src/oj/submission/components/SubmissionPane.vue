@@ -172,9 +172,9 @@ function openStandalone() {
           class="problemset"
           :href="'/problemset/' + row.problemSet.id"
           target="_blank"
-          :title="'从题单「' + row.problemSet.title + '」交的'"
+          :title="'从专题「' + row.problemSet.title + '」交的'"
         >
-          题单 {{ row.problemSet.title }}
+          专题 {{ row.problemSet.title }}
         </a>
       </span>
       <div class="spacer"></div>
@@ -243,7 +243,7 @@ function openStandalone() {
         <n-button type="primary" @click="emit('openProblem', row)"> 去做 {{ row.problemDisplayId }} {{ row.problemTitle }} </n-button>
       </template>
       <template v-else-if="locked === 'problemset'">
-        <span class="locked-title">这份代码在题单布置期内先藏着</span>
+        <span class="locked-title">这份代码在专题布置期内先藏着</span>
         <span class="muted"><LockNote :problem="{ displayId: row.problemDisplayId }" /></span>
       </template>
       <template v-else>

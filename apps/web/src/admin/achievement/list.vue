@@ -25,7 +25,7 @@ const editing = ref<AdminAchievement | null>(null)
 
 const offline = computed(() => list.value.filter((a) => !a.visible).length)
 
-/** 按指标分组，指标按后端给的顺序（做题 → 坚持 → 比赛题单 → 趣味），组内按门槛从低到高 */
+/** 按指标分组，指标按后端给的顺序（做题 → 坚持 → 比赛和专题 → 趣味），组内按门槛从低到高 */
 const groups = computed(() => {
   const byMetric = new Map<string, AdminAchievement[]>()
   for (const a of list.value) byMetric.set(a.metric, [...(byMetric.get(a.metric) ?? []), a])

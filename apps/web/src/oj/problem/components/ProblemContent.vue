@@ -28,12 +28,12 @@ const ctx = useProblemPageContext()
 // SQL 题：隐藏输入/输出/例子，改为渲染数据表与期望结果
 const isSQL = computed(() => !!problem.value && isSqlProblem(problem.value))
 
-// 相似题推荐：做对了、或者错了 3 次以上才给（比赛、题单里不给，见 problemPageContext）
+// 相似题推荐：做对了、或者错了 3 次以上才给（比赛、专题里不给，见 problemPageContext）
 const showSimilar = computed(() => ctx.value.similar && (problem.value?.myStatus === 0 || problemStore.failCount >= 3))
 
 /**
  * 标题下的状态标签。原来是题面最上面两条整宽的提示（「本题已经被你解决啦」「尝试过但还没有
- * 通过」），占掉一屏里最值钱的那几行。题单里不给（入口差异表）。
+ * 通过」），占掉一屏里最值钱的那几行。专题里不给（入口差异表）。
  */
 const myStatus = computed(() => {
   if (!ctx.value.statusTag || !userStore.isAuthed) return null

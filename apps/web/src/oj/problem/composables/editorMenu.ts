@@ -42,7 +42,7 @@ export function useEditorMenu(statisticsInline: Ref<boolean>) {
 
   const options = computed<DropdownOption[]>(() => {
     const items: DropdownOption[] = []
-    // 「本题提交」挪到了「我的提交」抽屉的底部；题单入口没有抽屉，给管理员角色留在这里
+    // 「本题提交」挪到了「我的提交」抽屉的底部；专题入口没有抽屉，给管理员角色留在这里
     if (ctx.value.allSubmissionsInMenu && userStore.isAdminRole) {
       items.push({ label: '本题提交', key: 'allSubmissions' })
     }

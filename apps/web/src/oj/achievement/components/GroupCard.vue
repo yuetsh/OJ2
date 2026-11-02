@@ -6,11 +6,11 @@ import type { Group } from '../series'
 import Medal from './Medal.vue'
 import SeriesRow from './SeriesRow.vue'
 
-/** 一组成就线（做题 / 坚持 / …），「彩蛋」组末尾是还没找到的问号，「题单和比赛」组末尾是拿到的题单奖章 */
+/** 一组成就线（做题 / 坚持 / …），「彩蛋」组末尾是还没找到的问号，「专题和比赛」组末尾是拿到的专题奖章 */
 const props = defineProps<{ group: Group; badges?: UserBadge[]; compact?: boolean }>()
 
 const theme = useThemeVars()
-const showBadges = computed(() => props.group.name === '题单和比赛' && !!props.badges?.length)
+const showBadges = computed(() => props.group.name === '专题和比赛' && !!props.badges?.length)
 </script>
 
 <template>
@@ -27,7 +27,7 @@ const showBadges = computed(() => props.group.name === '题单和比赛' && !!pr
       </div>
     </div>
     <div v-if="showBadges" class="badges">
-      <span class="masked-title">拿到的题单奖章</span>
+      <span class="masked-title">拿到的专题奖章</span>
       <div class="badge-list">
         <n-tooltip v-for="b in badges" :key="b.id" :delay="150">
           <template #trigger>
@@ -36,7 +36,7 @@ const showBadges = computed(() => props.group.name === '题单和比赛' && !!pr
               <span>{{ b.badge.name }}</span>
             </router-link>
           </template>
-          {{ b.badge.description }} · 来自题单「{{ b.problemSet.title }}」
+          {{ b.badge.description }} · 来自专题「{{ b.problemSet.title }}」
         </n-tooltip>
       </div>
     </div>

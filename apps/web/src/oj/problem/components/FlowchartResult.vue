@@ -226,7 +226,7 @@ function goCode() {
         <span class="attempt pending">第 {{ scores.length + 1 }} 次</span>
       </template>
     </div>
-    <p v-if="hiddenCount" class="note">另外 {{ hiddenCount }} 次是题单布置之前画的，先藏起来了：在题单里画到 A 或 S，或者布置期结束就解锁</p>
+    <p v-if="hiddenCount" class="note">另外 {{ hiddenCount }} 次是专题布置之前画的，先藏起来了：在专题里画到 A 或 S，或者布置期结束就解锁</p>
 
     <!-- 正在评：评的是最新这一次，所以只在看最新时显示 -->
     <template v-if="phase === 'evaluating' && viewingLatest">

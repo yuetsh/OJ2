@@ -1,10 +1,10 @@
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 
 /**
- * 题目页的三种入口：题库（含课堂）、题单、比赛。同一个 detail.vue 挂在三条路由上。
+ * 题目页的三种入口：题库（含课堂）、专题、比赛。同一个 detail.vue 挂在三条路由上。
  *
  * 入口之间的差异**只在这张表里判断**。原来散在各个组件里各查各的路由：同一件事
- * 在题单里是「禁用」、在比赛里是「隐藏」，加一处功能就得把每个组件翻一遍
+ * 在专题里是「禁用」、在比赛里是「隐藏」，加一处功能就得把每个组件翻一遍
  * （见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 8 节）。
  */
 export type ProblemEntry = 'problem' | 'problemset' | 'contest'
@@ -27,13 +27,13 @@ interface EntryRules {
   /** 通过之后给「这节课的下一题」 */
   lessonNext: boolean
   /**
-   * 做对之后的挑战（编辑器顶上的挑战条、结果里的「还能挑战」）。题单里通过后 1.5 秒就跳回去，
+   * 做对之后的挑战（编辑器顶上的挑战条、结果里的「还能挑战」）。专题里通过后 1.5 秒就跳回去，
    * 比赛提交不判挑战
    */
   challenges: boolean
   /** 通过之后 1.5 秒弹强制点评 */
   reviewAfterAccepted: boolean
-  /** 通过之后 1.5 秒回题单 */
+  /** 通过之后 1.5 秒回专题 */
   backToProblemSet: boolean
   /** 举手求助 */
   help: boolean
@@ -45,13 +45,13 @@ interface EntryRules {
   collab: boolean
   /**
    * 工具栏上教师的「课堂统计」（新标签开数据统计页）。题库入口已经并进「统计」页签的老师
-   * 视图（按班看谁没做对，带「在数据统计里看」），只剩没有抽屉的题单入口还要这个按钮。
+   * 视图（按班看谁没做对，带「在数据统计里看」），只剩没有抽屉的专题入口还要这个按钮。
    * 比赛不给：统计接口按 displayId 在公开题库里找题，比赛题号查到的是另一道公开题，或者 404
    */
   classStats: boolean
   /**
    * 「看这道题所有人的提交」放进「⋯」（只给管理员角色）。它平时在「我的提交」抽屉底部，
-   * 题单入口没有抽屉，老师就没地方点了
+   * 专题入口没有抽屉，老师就没地方点了
    */
   allSubmissionsInMenu: boolean
 }
@@ -70,15 +70,15 @@ const RULES: Record<ProblemEntry, EntryRules> = {
     classStats: false,
     allSubmissionsInMenu: false,
   },
-  // 题单里什么「以前的」都不给看：加入题单之前的提交、统计、点评都能拿来抄答案
+  // 专题里什么「以前的」都不给看：加入专题之前的提交、统计、点评都能拿来抄答案
   problemset: {
     drawers: [],
     statusTag: false,
-    // 点进相似题就离开了题单
+    // 点进相似题就离开了专题
     similar: false,
     lessonNext: false,
     challenges: false,
-    // 1.5 秒后要跳回题单页，弹了也会被冲掉
+    // 1.5 秒后要跳回专题页，弹了也会被冲掉
     reviewAfterAccepted: false,
     backToProblemSet: true,
     help: true,

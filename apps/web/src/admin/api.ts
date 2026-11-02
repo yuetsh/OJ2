@@ -604,7 +604,7 @@ export function updateACMHelperChecked(contest_id: number, rank_id: number, prob
   } satisfies UpdateAcmHelperRequest)
 }
 
-// 题单管理 API
+// 专题管理 API
 export function getProblemSetList(offset = 0, limit = 10, keyword = '') {
   return api.get<AdminProblemSetList>('admin/problem-sets', {
     params: { offset, limit, keyword },
@@ -639,7 +639,7 @@ export function toggleProblemSetVisible(id: number) {
   return api.put<AdminProblemSet>(`admin/problem-sets/${id}/visibility`)
 }
 
-// 题单题目管理 API
+// 专题题目管理 API
 export function getProblemSetProblems(problemSetId: number) {
   return api.get<AdminProblemSetProblem[]>(`admin/problem-sets/${problemSetId}/problems`)
 }
@@ -667,7 +667,7 @@ export function removeProblemFromSet(problemSetId: number, itemId: number) {
   return api.delete(`admin/problem-sets/${problemSetId}/problems/${itemId}`)
 }
 
-// 题单奖章管理 API
+// 专题奖章管理 API
 export function getProblemSetBadges(problemSetId: number) {
   return api.get<AdminProblemSetBadge[]>(`admin/problem-sets/${problemSetId}/badges`)
 }

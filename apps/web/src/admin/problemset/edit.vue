@@ -24,11 +24,11 @@ import {
 import BadgeModal from './components/BadgeModal.vue'
 
 /**
- * 新建 / 编辑题单，一屏做完（设计稿「题单重设计」后台那块）：左边名字、说明、布置期、公开；
+ * 新建 / 编辑专题，一屏做完（设计稿「题单重设计」后台那块）：左边名字、说明、布置期、公开；
  * 右边题目（搜题号或一次粘贴好几个、拖动排序、点一下切选做）和奖章。
  *
  * 布置期：选「布置到哪天」，布置期内这几道题学生以前交的代码先藏起来（防抄），不拦做题。
- * 新建时题目先攒在页面上，保存时建好题单再一次加进去；编辑时加、删、排、切选做当场生效。
+ * 新建时题目先攒在页面上，保存时建好专题再一次加进去；编辑时加、删、排、切选做当场生效。
  */
 const props = defineProps<{ problemSetId?: string }>()
 
@@ -196,7 +196,7 @@ function remove(item: Item) {
     return
   }
   dialog.warning({
-    title: '从题单里拿掉这道题？',
+    title: '从专题里拿掉这道题？',
     content: `「${item.title}」。已经加入的 ${current.value?.participantCount ?? 0} 个人的进度会重算，题目本身不受影响。`,
     positiveText: '拿掉',
     negativeText: '不拿',
@@ -312,7 +312,7 @@ async function load() {
 
 async function submit() {
   if (!form.title.trim()) {
-    message.error('题单还没起名字')
+    message.error('专题还没起名字')
     return
   }
   if (untilMs.value !== null && untilMs.value <= Date.now()) {
@@ -346,7 +346,7 @@ async function submit() {
         }
       }
     }
-    message.success(items.value.length ? `题单建好了，${items.value.length} 道题都加进去了` : '题单建好了')
+    message.success(items.value.length ? `专题建好了，${items.value.length} 道题都加进去了` : '专题建好了')
     router.replace({ name: 'admin problemset edit', params: { problemSetId: created.id } })
   } catch (err) {
     message.error(errorMessage(err))
@@ -358,7 +358,7 @@ async function submit() {
 function removeSet() {
   const set = current.value!
   dialog.error({
-    title: `删除题单「${set.title}」？`,
+    title: `删除专题「${set.title}」？`,
     content: set.participantCount
       ? `${set.participantCount} 个人的进度和他们拿到的奖章会一起删掉，找不回来。只是不想让学生看到的话，关掉「公开」就行。`
       : '还没有人加入。删掉找不回来。',
@@ -380,9 +380,9 @@ onMounted(load)
 </script>
 
 <template>
-  <PageHeader :title="editing ? '编辑题单' : '新建题单'" :back="{ name: 'admin problemset list' }">
+  <PageHeader :title="editing ? '编辑专题' : '新建专题'" :back="{ name: 'admin problemset list' }">
     <template v-if="editing" #actions>
-      <n-button tag="a" :href="`/problemset/${problemSetId}`" target="_blank"> 到前台看这个题单 </n-button>
+      <n-button tag="a" :href="`/problemset/${problemSetId}`" target="_blank"> 到前台看这个专题 </n-button>
     </template>
   </PageHeader>
 
@@ -410,7 +410,7 @@ onMounted(load)
           </n-flex>
           <span class="hint">{{ assignHint }}</span>
           <span class="hint">
-            布置期内，题单里这几道题学生以前交的代码先藏起来（不管加没加入），在题单里做对或者到期后再放出来，防止照着旧答案抄。不拦做题，到期后照样能做、照样算进度。
+            布置期内，专题里这几道题学生以前交的代码先藏起来（不管加没加入），在专题里做对或者到期后再放出来，防止照着旧答案抄。不拦做题，到期后照样能做、照样算进度。
           </span>
         </div>
       </div>
@@ -418,7 +418,7 @@ onMounted(load)
       <div class="field">
         <span class="label">公开</span>
         <n-switch v-model:value="form.visible" />
-        <span class="hint">{{ form.visible ? '学生能在题单列表里看到' : '藏起来，学生看不到也进不去' }}</span>
+        <span class="hint">{{ form.visible ? '学生能在专题列表里看到' : '藏起来，学生看不到也进不去' }}</span>
       </div>
 
       <div v-if="current" class="stats">
@@ -434,7 +434,7 @@ onMounted(load)
           ><template v-if="editing"> · {{ badges.length }} 个奖章</template></span
         >
         <div class="spacer"></div>
-        <n-button v-if="editing" text type="error" @click="removeSet">删除题单</n-button>
+        <n-button v-if="editing" text type="error" @click="removeSet">删除专题</n-button>
       </div>
     </section>
 
@@ -503,7 +503,7 @@ onMounted(load)
           <div class="spacer"></div>
           <n-button v-if="editing" size="small" @click="openBadge(null)">+ 加奖章</n-button>
         </div>
-        <div v-if="!editing" class="empty hint">先保存题单，再加奖章</div>
+        <div v-if="!editing" class="empty hint">先保存专题，再加奖章</div>
         <div v-else-if="badges.length" class="list">
           <div v-for="badge in badges" :key="badge.id" class="item badge">
             <img :src="badge.icon" alt="" class="badge-icon" />

@@ -342,12 +342,12 @@ export const problemset = pgTable(
     createdById: integer('created_by_id').notNull(),
     /**
      * 布置期：assignedAt 是这一轮布置开始的时刻，assignedUntil 是布置到哪天（东八区当天结束）。
-     * 布置期内，题单里这几道题学生在 assignedAt 之前交的代码先藏起来（防抄），见
+     * 布置期内，专题里这几道题学生在 assignedAt 之前交的代码先藏起来（防抄），见
      * services/problemset.ts 的 problemSetLockCutoffs。不拦做题，过期照样做、照样记进度。
      * 两个都为空 = 没布置。
      *
      * 列名还是 end_time（以前叫「截止时间」，名不副实）：机房那套和服务器共用这个库、
-     * 不一定同时升级，改列名会让没升级的那边一查题单就报错，所以只改代码里的名字
+     * 不一定同时升级，改列名会让没升级的那边一查专题就报错，所以只改代码里的名字
      */
     assignedUntil: timestamp('end_time', { withTimezone: true, mode: 'string' }),
     assignedAt: timestamp('assigned_at', { withTimezone: true, mode: 'string' }),
@@ -613,9 +613,9 @@ export const submission = pgTable(
     shared: boolean().default(false).notNull(),
     statisticInfo: jsonb('statistic_info').default({}).notNull(),
     username: text().notNull(),
-    // 来源题单：学生从题单入口（/problemset/:id/problem/:pid）提交时记下来，
-    // 提交列表据此标出「这条来自题单」。**只是来源标记**，题单进度、奖章一概不看它，
-    // 那些由判完之后的 recordSolvedProblem 按「已加入且含这道题的所有题单」记账。
+    // 来源专题：学生从专题入口（/problemset/:id/problem/:pid）提交时记下来，
+    // 提交列表据此标出「这条来自专题」。**只是来源标记**，专题进度、奖章一概不看它，
+    // 那些由判完之后的 recordSolvedProblem 按「已加入且含这道题的所有专题」记账。
     // 老数据里只有迁移 0007 从（已废弃的）problemset_submission 回填的首次 AC 有值。
     problemsetId: bigint('problemset_id', { mode: 'number' }),
   },
@@ -745,13 +745,13 @@ export const submission = pgTable(
       foreignColumns: [problem.id],
       name: 'submission_problem_id_76847b55_fk_problem_id',
     }),
-    // 部分索引：绝大多数提交不来自题单，全列索引等于给 12 万行白建一遍。
-    // 谓词是 IS NOT NULL，`problemset_id = $1` 蕴含非空，所以删题单时的外键检查
+    // 部分索引：绝大多数提交不来自专题，全列索引等于给 12 万行白建一遍。
+    // 谓词是 IS NOT NULL，`problemset_id = $1` 蕴含非空，所以删专题时的外键检查
     // 也能用上它——不然那条检查要顺序扫全表。
     index('submission_problemset_id_idx')
       .using('btree', table.problemsetId.asc().nullsLast())
       .where(sql`${table.problemsetId} is not null`),
-    // 删掉题单不该带走提交：置空来源标记就行，提交本身照旧存在。
+    // 删掉专题不该带走提交：置空来源标记就行，提交本身照旧存在。
     foreignKey({
       columns: [table.problemsetId],
       foreignColumns: [problemset.id],

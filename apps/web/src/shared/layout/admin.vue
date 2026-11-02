@@ -62,7 +62,7 @@ const NAV: NavGroup[] = [
         role: 'teacher',
       },
       {
-        label: '题单',
+        label: '专题',
         icon: 'ph:list-checks',
         path: '/admin/problemset',
         to: '/admin/problemset/list',

@@ -27,7 +27,7 @@ type ProgressRow = typeof schema.problemsetProgress.$inferSelect
 
 const SOLVED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 
-/** 必做题的 problemId；一道必做都没标的题单退回全部（和 computeProgress 同一个口径） */
+/** 必做题的 problemId；一道必做都没标的专题退回全部（和 computeProgress 同一个口径） */
 function gradedIds(links: { problemId: number; isRequired: boolean }[]) {
   const required = links.filter((link) => link.isRequired)
   return new Set((required.length ? required : links).map((link) => link.problemId))
@@ -56,7 +56,7 @@ function progressSummary(progress: ProgressRow | undefined) {
 }
 
 /**
- * 学生能看到的题单：公开的。老师连没公开的也能打开 —— 后台编辑完要到前台看看学生
+ * 学生能看到的专题：公开的。老师连没公开的也能打开 —— 后台编辑完要到前台看看学生
  * 看到的样子、看全班情况，不该被 404 挡在外面。
  */
 async function loadVisible(id: number, user: AuthUser | null | undefined) {
@@ -99,7 +99,7 @@ function badgeData(badge: typeof schema.problemsetBadge.$inferSelect, earnedTime
 }
 
 /**
- * 一次把整页题单的附属数据全查回来，再在内存里按 problemsetId 分组。
+ * 一次把整页专题的附属数据全查回来，再在内存里按 problemsetId 分组。
  * 固定 6 条查询，与行数无关（按行查就是 N+1）。
  */
 async function serializeProblemSets(rows: { set: ProblemSetRow; assigning: boolean }[], userId?: number) {
@@ -153,7 +153,7 @@ async function serializeProblemSets(rows: { set: ProblemSetRow; assigning: boole
       assignedUntil: row.assignedUntil,
       assigning,
       problemsCount: countBySet.get(row.id)?.value ?? 0,
-      // 一道必做都没标的题单退回「全部都算必做」，和 computeProgress 同一个口径
+      // 一道必做都没标的专题退回「全部都算必做」，和 computeProgress 同一个口径
       requiredCount: countBySet.get(row.id)?.required || (countBySet.get(row.id)?.value ?? 0),
       joinedCount: joinedBySet.get(row.id) ?? 0,
       userProgress: progressSummary(progress),
@@ -207,7 +207,7 @@ problemsetRoutes.get('/problem-sets/locks', requireAuth, async (c) => {
 
 problemsetRoutes.get('/problem-sets/:id', optionalAuth, async (c) => {
   const row = await loadVisible(queryInteger(c.req.param('id'), 0, { min: 1 }), c.get('user'))
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const [data] = await serializeProblemSets([row], c.get('user')?.id)
   return success(c, data)
 })
@@ -215,10 +215,10 @@ problemsetRoutes.get('/problem-sets/:id', optionalAuth, async (c) => {
 problemsetRoutes.get('/problem-sets/:id/problems', optionalAuth, async (c) => {
   const user = c.get('user')
   const found = await loadVisible(queryInteger(c.req.param('id'), 0, { min: 1 }), user)
-  if (!found) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!found) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const id = found.set.id
   // order 后面必须再跟一个 tiebreaker：并列时 Postgres 不保证次序，而题目是按数组下标
-  // 编号的（1、2、3），老题单里 order 大量重复，不定死的话「第 3 题」每次刷新都可能变
+  // 编号的（1、2、3），老专题里 order 大量重复，不定死的话「第 3 题」每次刷新都可能变
   const rows = await db
     .select({
       link: schema.problemsetProblem,
@@ -295,14 +295,14 @@ problemsetRoutes.post('/problem-set-progress', requireAuth, async (c) => {
   if (!parsed.success) return parsed.response
   const user = c.get('user')!
   const found = await loadVisible(parsed.data.problemSetId, user)
-  if (!found) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!found) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const problemSet = found.set
   const [existing] = await db
     .select({ id: schema.problemsetProgress.id })
     .from(schema.problemsetProgress)
     .where(and(eq(schema.problemsetProgress.problemsetId, problemSet.id), eq(schema.problemsetProgress.userId, user.id)))
     .limit(1)
-  if (existing) return failure(c, 409, 'already-joined', '已经加入该题单')
+  if (existing) return failure(c, 409, 'already-joined', '已经加入该专题')
   await db.transaction(async (tx) => {
     const links = await tx
       .select({
@@ -359,9 +359,9 @@ problemsetRoutes.get('/users/:username/badges', optionalAuth, async (c) => {
 })
 
 /**
- * 老师看一个班在这份题单里的情况：真名 × 每道题（几点做对 / 错几次 / 加入前就做对过）。
+ * 老师看一个班在这个专题里的情况：真名 × 每道题（几点做对 / 错几次 / 加入前就做对过）。
  *
- * 所有老师都能看，不只是题单的创建者：系统里没有「班级归哪个老师」，课堂任务、数据统计
+ * 所有老师都能看，不只是专题的创建者：系统里没有「班级归哪个老师」，课堂任务、数据统计
  * 也是任何老师看任何班，这里和它们一致。
  *
  * 班级不用老师选：从加入过的学生里数出有哪些班，最近有人加入的排第一个、默认就看它，
@@ -370,7 +370,7 @@ problemsetRoutes.get('/users/:username/badges', optionalAuth, async (c) => {
  */
 problemsetRoutes.get('/problem-sets/:id/class-view', requireTeacher, async (c) => {
   const found = await loadVisible(queryInteger(c.req.param('id'), 0, { min: 1 }), c.get('user'))
-  if (!found) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!found) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const id = found.set.id
   const studentRole = inArray(schema.user.adminType, [...STUDENT_ROLES])
   const [links, joinedClasses] = await Promise.all([

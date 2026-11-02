@@ -101,10 +101,10 @@ submissionRoutes.post('/submissions', requireAuth, async (c) => {
     return failure(c, 400, 'language-not-allowed', `${parsed.data.language} is not allowed in the problem`)
   }
 
-  // 来源题单：前端只在 /problemset/:id/problem/:pid 那个入口带上它，落库纯粹是为了
-  // 在提交列表里标出「这条是刷题单刷出来的」。校验只确认这道题确实在那个题单里 ——
-  // 不查 visible / status，因为藏起来的题单里还困着已加入的学生（他们照样在做题），
-  // 也不查有没有加入：没加入照样能从题单页点进题目，标记来源不该比入口本身更严。
+  // 来源专题：前端只在 /problemset/:id/problem/:pid 那个入口带上它，落库纯粹是为了
+  // 在提交列表里标出「这条是刷专题刷出来的」。校验只确认这道题确实在那个专题里 ——
+  // 不查 visible / status，因为藏起来的专题里还困着已加入的学生（他们照样在做题），
+  // 也不查有没有加入：没加入照样能从专题页点进题目，标记来源不该比入口本身更严。
   // 对不上就当没带，提交照收：来源标记错了顶多列表少个标签，不值得挡下一次提交。
   let problemsetId: number | null = null
   if (contestId === null && parsed.data.problemSetId) {
@@ -241,7 +241,7 @@ function canViewSubmission(
   problemSetCutoffs?: Map<number, string>,
 ) {
   if (!user) return false
-  // 题单防作弊，见 problemSetLockCutoffs。只对学生自己的提交生效，老师不受限。
+  // 专题防作弊，见 problemSetLockCutoffs。只对学生自己的提交生效，老师不受限。
   // 学生管理员算学生，同样受限（旧后端 `is_regular_user()` 放过了他）。
   if (row.userId === user.id && !isTeacherOrAbove(user)) {
     const cutoff = problemSetCutoffs?.get(row.problemId)
@@ -273,7 +273,7 @@ const submissionListColumns = {
     id: schema.submission.id,
     createTime: schema.submission.createTime,
     userId: schema.submission.userId,
-    // 题单闸门要按题定位，序列化本身用不到它
+    // 专题闸门要按题定位，序列化本身用不到它
     problemId: schema.submission.problemId,
     /**
      * 显示**当前**用户名，和统计面板、个人主页对齐。列表里读的那份是提交时冻结的
@@ -287,8 +287,8 @@ const submissionListColumns = {
     result: schema.submission.result,
     language: schema.submission.language,
     statisticInfo: schema.submission.statisticInfo,
-    // 只取 id，题单标题按页单独查一次（见 /submissions）——把 problemset 一起 join 进来
-    // 会动到下面那条调过的分页查询，而每页最多两三个不同的题单，PK 查一次更便宜
+    // 只取 id，专题标题按页单独查一次（见 /submissions）——把 problemset 一起 join 进来
+    // 会动到下面那条调过的分页查询，而每页最多两三个不同的专题，PK 查一次更便宜
     problemsetId: schema.submission.problemsetId,
     /**
      * 通过的测试点数 / 总数，口径同 caseSummary()：只认 info.data 是数组、逐项 result 为 0。
@@ -331,7 +331,7 @@ function listCaseSummary(row: { language: string; casesTotal: number | null; cas
 
 /**
  * 提交详情。三种结局：没有这条（404）、别人的代码看不到（403）、能看 —— 能看里又分自己的
- * 代码在题单布置期内藏着（showLink: false，代码不给、别的照给，页面摆出是谁哪道题什么结果）。
+ * 代码在专题布置期内藏着（showLink: false，代码不给、别的照给，页面摆出是谁哪道题什么结果）。
  */
 async function submissionDetail(id: string, user: AuthUser, withAttempts: boolean) {
   const [row] = await db
@@ -355,7 +355,7 @@ async function submissionDetail(id: string, user: AuthUser, withAttempts: boolea
   // 光走 check_user_permission——知道 submission id 直接访问照样拿得到代码，遮挡是虚的。
   const cutoffs = isTeacherOrAbove(user) || !own ? undefined : await problemSetLockCutoffs(user.id, [row.submission.problemId])
   const visible = canViewSubmission(user, row.submission, row.problem, cutoffs)
-  // 走到这里还看不了、又是自己的，只剩题单布置期这一种（见 canViewSubmission）
+  // 走到这里还看不了、又是自己的，只剩专题布置期这一种（见 canViewSubmission）
   if (!visible && !own) return { status: 'forbidden' } as const
   // info（含每个测试点的 test_case 编号与 output_md5）只给管理员，对齐旧后端：
   // submission/views/oj.py 用 is_admin_role() 在 SubmissionModelSerializer 与
@@ -489,8 +489,8 @@ async function paginateSubmissionRows(where: SQL | undefined, limit: number, off
 }
 
 /**
- * 这一页里出现过的来源题单，id → 标题。传进来的数组允许带 null 和重复值。
- * 一页最多 250 行、实际能落到的题单数是个位数，按主键 IN 查一次就完了。
+ * 这一页里出现过的来源专题，id → 标题。传进来的数组允许带 null 和重复值。
+ * 一页最多 250 行、实际能落到的专题数是个位数，按主键 IN 查一次就完了。
  */
 async function problemsetTitleMap(ids: Array<number | null>) {
   const unique = [...new Set(ids.filter((id): id is number => id !== null))]
@@ -545,7 +545,7 @@ submissionRoutes.get('/submissions', optionalAuth, async (c) => {
     user && !isTeacherOrAbove(user)
       ? problemSetLockCutoffs(user.id, [...new Set(rows.filter((row) => row.submission.userId === user.id).map((row) => row.submission.problemId))])
       : undefined,
-    // 来源题单的标题。一页里不同题单最多几个，按主键查一次就够
+    // 来源专题的标题。一页里不同专题最多几个，按主键查一次就够
     problemsetTitleMap(rows.map((row) => row.submission.problemsetId)),
   ])
   return success(c, {
@@ -563,7 +563,7 @@ submissionRoutes.get('/submissions', optionalAuth, async (c) => {
           result: submission.result,
           language: submission.language,
           statisticInfo: asRecord(submission.statisticInfo),
-          // 题单被删掉之后外键把 problemset_id 置了空，这里自然就没标记了
+          // 专题被删掉之后外键把 problemset_id 置了空，这里自然就没标记了
           problemSet:
             submission.problemsetId !== null && problemsetTitles.has(submission.problemsetId)
               ? {
@@ -609,7 +609,7 @@ submissionRoutes.get('/contests/:contestId/submissions', optionalAuth, requireCo
       .offset(offset),
     displayId ? unknownDisplayIds(displayId, contest.id) : [],
   ])
-  // 这里不挂题单防作弊闸门（对比公开列表）：题单里的题必定是非比赛题——加题时卡了
+  // 这里不挂专题防作弊闸门（对比公开列表）：专题里的题必定是非比赛题——加题时卡了
   // `isNull(problem.contestId)`（admin/problemset.ts:232）——而这条列表只出比赛提交，
   // 两边交集恒空，挂上去就是每页白跑一次查询，而比赛进行中这条列表是被刷得最狠的。
   // 旧后端 ContestSubmissionListAPI 照抄了 bulk_fetch，那边同样是死代码。
@@ -628,7 +628,7 @@ submissionRoutes.get('/contests/:contestId/submissions', optionalAuth, requireCo
           result: submission.result,
           language: submission.language,
           statisticInfo: asRecord(submission.statisticInfo),
-          // 比赛提交没有来源题单：题单只收非比赛题（admin/problemset.ts 加题时卡了
+          // 比赛提交没有来源专题：专题只收非比赛题（admin/problemset.ts 加题时卡了
           // isNull(problem.contestId)），提交接口那边也只在 contestId 为空时才认这个字段
           problemSet: null,
           // 比赛只报对错，不给通过几个点（口径见契约 caseSummarySchema）

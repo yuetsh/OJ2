@@ -28,7 +28,7 @@ export const adminProblemSetRoutes = new Hono<AppEnv>()
 type BadgeRow = typeof schema.problemsetBadge.$inferSelect
 
 /**
- * 取出题单并校验归属。所有嵌套资源（题目/奖章/进度）都先过这一关 ——
+ * 取出专题并校验归属。所有嵌套资源（题目/奖章/进度）都先过这一关 ——
  * 旧后端每个方法开头都手抄一遍这段 try/except，抄了 14 遍。
  */
 async function loadOwned(c: { req: { param(name: string): string } }, user: AuthUser) {
@@ -124,7 +124,7 @@ function assignment(requested: string | null, current: { assignedAt: string | nu
   }
 }
 
-// ---------------------------------------------------------------- 题单本体
+// ---------------------------------------------------------------- 专题本体
 
 adminProblemSetRoutes.get('/problem-sets', requireTeacher, async (c) => {
   const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })
@@ -132,8 +132,8 @@ adminProblemSetRoutes.get('/problem-sets', requireTeacher, async (c) => {
   const user = c.get('user')!
   const filters = []
   // 注意：这里**不过滤 visible**。旧后端的列表写死了 visible=True，可它同时又提供
-  // 「切换可见性」的接口 —— 一旦把题单设成不可见，它就从后台列表里消失，
-  // 再也没法在界面上改回来。后台必须能看见自己管的全部题单。
+  // 「切换可见性」的接口 —— 一旦把专题设成不可见，它就从后台列表里消失，
+  // 再也没法在界面上改回来。后台必须能看见自己管的全部专题。
   if (user.adminType !== 'Super Admin') filters.push(eq(schema.problemset.createdById, user.id))
   const keyword = c.req.query('keyword')?.trim()
   if (keyword) {
@@ -174,13 +174,13 @@ adminProblemSetRoutes.post('/problem-sets', requireTeacher, async (c) => {
 
 adminProblemSetRoutes.get('/problem-sets/:id', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   return success(c, await serialize(row))
 })
 
 adminProblemSetRoutes.put('/problem-sets/:id', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const parsed = await parseBody(c, updateProblemSetRequestSchema)
   if (!parsed.success) return parsed.response
   const period = assignment(parsed.data.assignedUntil, row)
@@ -201,7 +201,7 @@ adminProblemSetRoutes.put('/problem-sets/:id', requireTeacher, async (c) => {
 
 adminProblemSetRoutes.put('/problem-sets/:id/visibility', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   // 旧接口是「取反」语义，前端只传 id 不传目标值。保持不变：前端按钮就是个开关
   const [updated] = await db
     .update(schema.problemset)
@@ -213,18 +213,18 @@ adminProblemSetRoutes.put('/problem-sets/:id/visibility', requireTeacher, async 
 
 adminProblemSetRoutes.delete('/problem-sets/:id', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   // 子表交给库级 CASCADE（0010）：problemset_{badge,problem,progress,submission} 直接连坐，
   // user_badge 经 problemset_badge 二级连坐。原先这里手抄五条 delete 并要求「顺序不能反」。
   await db.delete(schema.problemset).where(eq(schema.problemset.id, row.id))
   return success(c, null)
 })
 
-// ---------------------------------------------------------------- 题单里的题目
+// ---------------------------------------------------------------- 专题里的题目
 
 adminProblemSetRoutes.get('/problem-sets/:id/problems', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const rows = await db
     .select({ item: schema.problemsetProblem, problem: schema.problem })
     .from(schema.problemsetProblem)
@@ -255,7 +255,7 @@ adminProblemSetRoutes.get('/problem-sets/:id/problems', requireTeacher, async (c
  */
 adminProblemSetRoutes.post('/problem-sets/:id/problems', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const parsed = await parseBody(c, addProblemsToSetRequestSchema)
   if (!parsed.success) return parsed.response
   const wanted = [...new Set(parsed.data.problemIds.map((id) => id.toLowerCase()))]
@@ -298,7 +298,7 @@ adminProblemSetRoutes.post('/problem-sets/:id/problems', requireTeacher, async (
 // 必须注册在 /problems/:itemId 前面：Hono 按注册顺序匹配，order 会被当成 :itemId 吃掉
 adminProblemSetRoutes.put('/problem-sets/:id/problems/order', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const parsed = await parseBody(c, reorderProblemSetProblemsRequestSchema)
   if (!parsed.success) return parsed.response
   const links = await db.select({ id: schema.problemsetProblem.id }).from(schema.problemsetProblem).where(eq(schema.problemsetProblem.problemsetId, row.id))
@@ -320,7 +320,7 @@ adminProblemSetRoutes.put('/problem-sets/:id/problems/order', requireTeacher, as
 
 adminProblemSetRoutes.put('/problem-sets/:id/problems/:itemId', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const parsed = await parseBody(c, updateProblemInSetRequestSchema, '参数错误')
   if (!parsed.success) return parsed.response
   const updated = await db
@@ -328,7 +328,7 @@ adminProblemSetRoutes.put('/problem-sets/:id/problems/:itemId', requireTeacher, 
     .set(parsed.data)
     .where(and(eq(schema.problemsetProblem.id, queryInteger(c.req.param('itemId'), 0, { min: 1 })), eq(schema.problemsetProblem.problemsetId, row.id)))
     .returning({ id: schema.problemsetProblem.id })
-  if (updated.length === 0) return failure(c, 404, 'problem-not-in-set', '题目不在该题单中')
+  if (updated.length === 0) return failure(c, 404, 'problem-not-in-set', '题目不在该专题中')
   // 必做 / 选做变了，分母和「做完」跟着变
   await resyncProgress(row.id)
   return success(c, null)
@@ -336,12 +336,12 @@ adminProblemSetRoutes.put('/problem-sets/:id/problems/:itemId', requireTeacher, 
 
 adminProblemSetRoutes.delete('/problem-sets/:id/problems/:itemId', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const deleted = await db
     .delete(schema.problemsetProblem)
     .where(and(eq(schema.problemsetProblem.id, queryInteger(c.req.param('itemId'), 0, { min: 1 })), eq(schema.problemsetProblem.problemsetId, row.id)))
     .returning({ id: schema.problemsetProblem.id })
-  if (deleted.length === 0) return failure(c, 404, 'problem-not-in-set', '题目不在该题单中')
+  if (deleted.length === 0) return failure(c, 404, 'problem-not-in-set', '题目不在该专题中')
   await resyncProgress(row.id)
   return success(c, null)
 })
@@ -383,14 +383,14 @@ async function badgesWithCount(badges: BadgeRow[]) {
 
 adminProblemSetRoutes.get('/problem-sets/:id/badges', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const badges = await db.select().from(schema.problemsetBadge).where(eq(schema.problemsetBadge.problemsetId, row.id)).orderBy(asc(schema.problemsetBadge.id))
   return success(c, await badgesWithCount(badges))
 })
 
 adminProblemSetRoutes.post('/problem-sets/:id/badges', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const parsed = await parseBody(c, createProblemSetBadgeRequestSchema)
   if (!parsed.success) return parsed.response
   const [created] = await db
@@ -407,7 +407,7 @@ adminProblemSetRoutes.post('/problem-sets/:id/badges', requireTeacher, async (c)
 
 adminProblemSetRoutes.put('/problem-sets/:id/badges/:badgeId', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const parsed = await parseBody(c, updateProblemSetBadgeRequestSchema)
   if (!parsed.success) return parsed.response
   const [updated] = await db
@@ -422,11 +422,11 @@ adminProblemSetRoutes.put('/problem-sets/:id/badges/:badgeId', requireTeacher, a
 
 adminProblemSetRoutes.delete('/problem-sets/:id/badges/:badgeId', requireTeacher, async (c) => {
   const row = await loadOwned(c, c.get('user')!)
-  if (!row) return failure(c, 404, 'problem-set-not-found', '题单不存在')
+  if (!row) return failure(c, 404, 'problem-set-not-found', '专题不存在')
   const badgeId = queryInteger(c.req.param('badgeId'), 0, { min: 1 })
-  // 必须先确认这枚奖章确实属于本题单，再动 user_badge。
-  // 早先的写法把 userBadge 的清理放在归属校验之前、且只按 badgeId 不限定题单，
-  // 于是「自己的题单 id + 别人的奖章 id」会真删掉别人的获奖记录，
+  // 必须先确认这枚奖章确实属于本专题，再动 user_badge。
+  // 早先的写法把 userBadge 的清理放在归属校验之前、且只按 badgeId 不限定专题，
+  // 于是「自己的专题 id + 别人的奖章 id」会真删掉别人的获奖记录，
   // 然后因为 problemset_badge 删了 0 行而返回 404 —— 事务已经 COMMIT，数据没了却报「不存在」。
   const [badge] = await db
     .select({ id: schema.problemsetBadge.id })

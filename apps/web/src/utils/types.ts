@@ -171,7 +171,7 @@ export interface AdminProblemRow {
   triedUsers: number
 }
 
-// 题单相关类型
+// 专题相关类型
 export type {
   ProblemSet,
   ProblemSetList,

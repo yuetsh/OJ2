@@ -11,7 +11,7 @@ export const useProblemStore = defineStore('problem', () => {
    * 本次会话里新增的失败提交数。**只是增量**，历史失败数看 `problem.myFailedCount`。
    *
    * 原来 failCount 就是这一个从 0 起数的 ref，于是「失败 3 次解锁 AI 提示」实际变成了
-   * 「在当前这次页面会话里再失败 3 次」：刷新一下、从题单跳进跳出一次就清零，
+   * 「在当前这次页面会话里再失败 3 次」：刷新一下、从专题跳进跳出一次就清零，
    * 昨天在这题上撞了十次墙的学生今天进来照样看不到按钮。而后端的闸门数的是数据库里
    * 的历史失败数，两边根本不是一回事。
    */
@@ -28,7 +28,7 @@ export const useProblemStore = defineStore('problem', () => {
   const failCount = computed(() => (problem.value?.myFailedCount ?? 0) + sessionFailCount.value)
 
   /**
-   * 这道题能不能画流程图。比赛里不给（入口差异表）；题单里原来也不给，现在给了，画到 A/S
+   * 这道题能不能画流程图。比赛里不给（入口差异表）；专题里原来也不给，现在给了，画到 A/S
    * 算完成（设计文档第 3 节决定 4）。手机上原来不给（节点库是 HTML5 拖放，拖不动），
    * 2026-10 换成插入式编辑器之后只用点，手机上也能画
    */

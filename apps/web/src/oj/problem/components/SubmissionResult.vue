@@ -80,8 +80,8 @@ const sampleCheck = computed(() => {
 })
 
 /**
- * 通过之后给「这节课的下一题」。比赛有自己的题目列表；从题单入口进来的，通过后
- * 1.5 秒会自动跳回题单（SubmissionEffects），这两种都不给
+ * 通过之后给「这节课的下一题」。比赛有自己的题目列表；从专题入口进来的，通过后
+ * 1.5 秒会自动跳回专题（SubmissionEffects），这两种都不给
  */
 const ctx = useProblemPageContext()
 const showLessonNext = computed(() => !props.peer && props.submission?.result === SubmissionStatus.accepted && ctx.value.lessonNext)

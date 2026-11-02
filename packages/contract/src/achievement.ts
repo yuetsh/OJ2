@@ -62,7 +62,7 @@ export const pendingAchievementSchema = z.object({
 
 /**
  * WebSocket 推来的解锁通知。比 `/achievements/pending` 多一个 `kind` ——
- * 题单奖章和成就来自两张表、id 会重叠，前端靠它区分（见 events.ts 的 publishAchievementNotification）。
+ * 专题奖章和成就来自两张表、id 会重叠，前端靠它区分（见 events.ts 的 publishAchievementNotification）。
  */
 export const achievementNotificationSchema = pendingAchievementSchema.extend({
   kind: z.enum(['achievement', 'badge']),

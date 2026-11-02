@@ -10,7 +10,7 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useListLoader } from 'shared/composables/listLoader'
 
 /**
- * 后台题单列表。难度、状态两列和筛选拿掉了（线上全是简单 / 活跃，「状态 + 可见」合成了「公开」），
+ * 后台专题列表。难度、状态两列和筛选拿掉了（线上全是简单 / 活跃，「状态 + 可见」合成了「公开」），
  * 换成老师真正关心的：几道题、多少人加入 / 做完、布置到哪天。点一行进一屏编辑
  */
 const router = useRouter()
@@ -42,7 +42,7 @@ function renderVisible(row: AdminProblemSet) {
   })
 }
 
-/** 手机上一个题单一张卡：名字一行（点了编辑），题数 · 加入 / 做完 · 奖章 · 创建者 · 日期一行小字 */
+/** 手机上一个专题一张卡：名字一行（点了编辑），题数 · 加入 / 做完 · 奖章 · 创建者 · 日期一行小字 */
 function renderMobileCard(row: AdminProblemSet) {
   const items = [
     `${row.problemsCount} 道题`,
@@ -62,14 +62,14 @@ function renderMobileCard(row: AdminProblemSet) {
 }
 
 const mobileColumns: DataTableColumn<AdminProblemSet>[] = [
-  { title: '题单', key: 'title', render: renderMobileCard },
+  { title: '专题', key: 'title', render: renderMobileCard },
   { title: '公开', key: 'visible', width: 72, align: 'center', render: renderVisible },
 ]
 
 const desktopColumns: DataTableColumn<AdminProblemSet>[] = [
   { title: 'ID', key: 'id', width: 70 },
   {
-    title: '题单',
+    title: '专题',
     key: 'title',
     minWidth: 200,
     render: renderTitle,
@@ -131,12 +131,12 @@ watch(() => [query.page, query.limit], listProblemSets)
 </script>
 
 <template>
-  <PageHeader title="题单列表">
+  <PageHeader title="专题列表">
     <template #actions>
-      <n-button type="primary" @click="router.push({ name: 'admin problemset create' })"> 新建题单 </n-button>
+      <n-button type="primary" @click="router.push({ name: 'admin problemset create' })"> 新建专题 </n-button>
     </template>
     <template #filters>
-      <n-input v-model:value="query.keyword" placeholder="搜题单名字" clearable @clear="clearQuery" :style="{ width: isMobile ? '100%' : '220px' }" />
+      <n-input v-model:value="query.keyword" placeholder="搜专题名字" clearable @clear="clearQuery" :style="{ width: isMobile ? '100%' : '220px' }" />
     </template>
   </PageHeader>
   <n-data-table :loading="loading" striped class="set-table" :columns="columns" :data="problemSets" />

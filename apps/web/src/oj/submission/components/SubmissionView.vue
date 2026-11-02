@@ -132,7 +132,7 @@ function attemptTime(time: string) {
 /** 除了正在看的这次，还有别的能点开的才提 ← → */
 const canStep = computed(() => attempts.value.some((item) => item.showLink && item.id !== shown.value?.id))
 
-/** 「← →」一次次往前往后翻，跳过题单藏着的那几次 */
+/** 「← →」一次次往前往后翻，跳过专题藏着的那几次 */
 function step(delta: -1 | 1) {
   const list = attempts.value
   for (let i = attemptIndex.value + delta; i >= 0 && i < list.length; i += delta) {
@@ -233,8 +233,8 @@ function handleMore(key: string) {
           <span class="problem-id">{{ shown.problemDisplayId }}</span>
           {{ shown.problemTitle }}
         </a>
-        <a v-if="shown.problemSet" class="problemset" :href="'/problemset/' + shown.problemSet.id" :title="'从题单「' + shown.problemSet.title + '」交的'">
-          题单 {{ shown.problemSet.title }}
+        <a v-if="shown.problemSet" class="problemset" :href="'/problemset/' + shown.problemSet.id" :title="'从专题「' + shown.problemSet.title + '」交的'">
+          专题 {{ shown.problemSet.title }}
         </a>
         <div class="spacer"></div>
         <div class="actions">
@@ -297,7 +297,7 @@ function handleMore(key: string) {
 
       <div v-if="!shown.showLink" class="locked">
         <Icon icon="ph:lock-simple" :width="30" class="lock-icon" />
-        <span class="locked-title">这份代码在题单布置期内先藏着</span>
+        <span class="locked-title">这份代码在专题布置期内先藏着</span>
         <span class="muted"><LockNote :problem="{ displayId: shown.problemDisplayId }" /></span>
       </div>
       <CodeView

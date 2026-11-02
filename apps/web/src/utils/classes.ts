@@ -16,7 +16,7 @@ type ClassOption = { label: string; value: string }
  * 全站的班级下拉都按年级分组：「25 级」底下列 251、252……，新的年级在上，组里按班号排
  * （11 班排在 2 班后面）。年级是班号前两位，和排名的「本年级」同一个口径。
  * `first` 给了就把那个年级提到最前（班级 PK 加班时先给同年级的）。
- * `toOption` 换掉选项长相（题单的「n/m 人加入」、登录框的 ks 前缀）；不是数字班号的
+ * `toOption` 换掉选项长相（专题的「n/m 人加入」、登录框的 ks 前缀）；不是数字班号的
  * 名字不分组，按原顺序跟在最后。
  */
 export function groupClassOptions<T extends ClassOption = ClassOption>(

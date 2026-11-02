@@ -80,7 +80,7 @@ function renderIcon(icon: string) {
  * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字，窄屏收进「菜单」下拉。
  * `key` 就是一级路径，用来判定高亮（见上面的 active）。
  *
- * 顺序是 自学 / 题目 / 提交 / 题单 / 比赛 / 排名 / 公告。「自学」进自学首页（/learn），
+ * 顺序是 自学 / 题目 / 提交 / 专题 / 比赛 / 排名 / 公告。「自学」进自学首页（/learn），
  * 两门课、接着学哪一课都在那儿挑，不再是下拉。提交留在一级：学生天天回来看自己交的结果，老师课上翻全班代码也走它。
  * 公告 2026-10-13 回到顶栏（用户要的）：首页只放置顶那条了，别的公告得有个地方点得到。
  * 不用 n-menu：它横排每项固定占 100px，1280 宽的机房屏上会把顶栏挤成两行。
@@ -97,7 +97,7 @@ const navLinks = computed<NavLink[]>(() =>
     { key: 'learn', label: '自学', to: '/learn' },
     { key: 'problem', label: '题目', to: '/problem' },
     { key: 'submission', label: '提交', to: '/submission', show: userStore.showSubmissions },
-    { key: 'problemset', label: '题单', to: '/problemset' },
+    { key: 'problemset', label: '专题', to: '/problemset' },
     { key: 'contest', label: '比赛', to: '/contest' },
     { key: 'rank', label: '排名', to: '/rank' },
     { key: 'announcement', label: '公告', to: '/announcement' },

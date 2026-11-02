@@ -268,9 +268,9 @@ export async function evaluateFlowchart(job: FlowchartJobData, { isFinalAttempt 
         evaluationTime: new Date().toISOString(),
       })
       .where(eq(schema.flowchartSubmission.id, row.flowchart.id))
-    // 画到 A / S 算这道题做完，记进所有已加入、且包含这道题的题单 —— 和判题那一路
+    // 画到 A / S 算这道题做完，记进所有已加入、且包含这道题的专题 —— 和判题那一路
     // 同一个口径（不看是从哪个入口交的）。放在推「评完了」之前：前端收到的时候进度已经
-    // 落库，1.5 秒后跳回题单页看到的就是新数据。比赛题不进题单
+    // 落库，1.5 秒后跳回专题页看到的就是新数据。比赛题不进专题
     if (isFlowchartPass(result.grade) && row.problem.contestId === null) {
       await recordSolvedAndNotify(row.flowchart.userId, row.problem.id, new Date().toISOString())
     }

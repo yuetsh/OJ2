@@ -463,12 +463,12 @@ export function retryFlowchartSubmission(submissionId: string) {
   return api.post<{ status: string }>(`flowcharts/${encodeURIComponent(submissionId)}/retry`)
 }
 
-/** 自己在这道题上评完的每一次（早的在前），题单布置期内藏着的已经滤掉 */
+/** 自己在这道题上评完的每一次（早的在前），专题布置期内藏着的已经滤掉 */
 export function getFlowchartScores(problemId: number) {
   return api.get<FlowchartScores>(`problems/${problemId}/flowchart/scores`)
 }
 
-// ==================== 题单相关API ====================
+// ==================== 专题相关API ====================
 
 export function getProblemSetList(offset = 0, limit = 10, keyword = '') {
   return api.get<ProblemSetList>('problem-sets', { params: { offset, limit, keyword } })
@@ -490,14 +490,14 @@ export function getUserBadges(username?: string) {
   return api.get<UserBadge[]>(`users/${encodeURIComponent(username ?? 'me')}/badges`)
 }
 
-/** 老师看某个班在题单里的情况；不传班级就看服务端推断的那个班 */
+/** 老师看某个班在专题里的情况；不传班级就看服务端推断的那个班 */
 export function getProblemSetClassView(problemSetId: number, className = '') {
   return api.get<ProblemSetClassView>(`problem-sets/${problemSetId}/class-view`, {
     params: className ? { className } : {},
   })
 }
 
-/** 这道题以前的代码为什么藏着：落在哪些正在布置的题单里。传主键或题号都行 */
+/** 这道题以前的代码为什么藏着：落在哪些正在布置的专题里。传主键或题号都行 */
 export function getProblemSetLocks(problem: { id: number } | { displayId: string }) {
   return api.get<ProblemSetLock[]>('problem-sets/locks', {
     params: 'id' in problem ? { problemId: problem.id } : { problemDisplayId: problem.displayId },

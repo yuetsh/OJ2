@@ -525,7 +525,7 @@ adminAccountRoutes.delete('/users', requireSuperAdmin, async (c) => {
   // 旧后端靠 Django 的应用层级联硬删。这里不复刻那个行为，改为让数据库拦下来：
   // 撞外键说明该用户还有历史数据，应当禁用而不是删除。
   //
-  // 所以 0010 那一批 CASCADE **有意跳过了 user 的绝大多数外键**：成就、表情、题单进度、
+  // 所以 0010 那一批 CASCADE **有意跳过了 user 的绝大多数外键**：成就、表情、专题进度、
   // AI 分析全都继续拦着。只有 user_profile 和 user_stat 走 CASCADE ——
   // 一个是一对一附属、一个是可重算的统计缓存，都不构成「这人做过什么」的证据。
   // 别顺手把这里也改成全 CASCADE：submission.user_id 压根没有外键（Django 那边就是个
@@ -533,10 +533,10 @@ adminAccountRoutes.delete('/users', requireSuperAdmin, async (c) => {
   try {
     const deleted = await db.transaction(async (tx) => {
       /**
-       * 外键拦得住成就、题单进度、比赛排名这些，**唯独提交拦不住** ——
+       * 外键拦得住成就、专题进度、比赛排名这些，**唯独提交拦不住** ——
        * `submission.user_id` 没有外键（Django 那边就是个裸 IntegerField，上面已经
        * 说了为什么不补）。所以下面那句报错里写的「还有提交」一直是空头支票：
-       * 只交过题、没拿过成就没进过题单的学生照样删得掉，提交留在库里成了孤儿 ——
+       * 只交过题、没拿过成就没进过专题的学生照样删得掉，提交留在库里成了孤儿 ——
        * 用户没了、`submission.user_id` 还指着一个不存在的 id。生产快照实测：
        * 28 个已删账号留下 935 条这样的提交。
        *

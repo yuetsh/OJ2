@@ -309,7 +309,7 @@ export const admins: RouteRecordRaw = {
       component: () => import('admin/task/list.vue'),
       meta: { requiresTeacherAdmin: true },
     },
-    // 题单管理路由
+    // 专题管理路由
     {
       path: 'problemset/list',
       name: 'admin problemset list',

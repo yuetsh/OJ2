@@ -9,7 +9,7 @@ import { parseTime } from 'utils/functions'
 import type { ProblemSetClassView } from 'utils/types'
 
 /**
- * 老师看一个班在题单里的情况（设计稿「题单重设计」老师 · 全班情况）：真名 × 每道题，
+ * 老师看一个班在专题里的情况（设计稿「题单重设计」老师 · 全班情况）：真名 × 每道题，
  * 格子里写几点做对 / 错了几次；紫色角 = 加入之前就做对过（可能是凭记忆默写的）。
  * 没加入的人在上面点名。班级默认是服务端推断的（最近在做的那个班），可以换。
  * 点格子到提交列表看这个学生这道题的代码。
@@ -70,7 +70,7 @@ const error = computed(() => tone('error'))
 
 <template>
   <section class="card">
-    <div v-if="data && !data.className" class="empty muted">还没有学生加入这个题单</div>
+    <div v-if="data && !data.className" class="empty muted">还没有学生加入这个专题</div>
     <template v-else-if="data">
       <div class="summary">
         <n-select v-model:value="className" :options="classOptions" size="small" class="pick" :consistent-menu-width="false" />

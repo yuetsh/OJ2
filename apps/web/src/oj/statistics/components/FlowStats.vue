@@ -56,7 +56,7 @@ const gradeColor = computed(() => ({
   C: tone('error').solid,
 }))
 
-/** 拿到 A / S 算完成（和题单、课堂条的口径一致） */
+/** 拿到 A / S 算完成（和专题、课堂条的口径一致） */
 const goodCount = computed(() => {
   // 查几道题就要每道都拿到 A / S；没填题号时拿到一道就算
   const need = Math.max(1, props.data.problemCount)

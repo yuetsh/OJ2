@@ -462,7 +462,7 @@ export const updateAcmHelperRequestSchema = z.object({
   checked: z.boolean(),
 })
 
-// ---------------------------------------------------------------- 题单管理
+// ---------------------------------------------------------------- 专题管理
 
 export const adminProblemSetSchema = z.object({
   id: z.number().int(),
@@ -474,13 +474,13 @@ export const adminProblemSetSchema = z.object({
   assignedAt: z.string().nullable(),
   /** 现在在不在布置期内（服务端的钟） */
   assigning: z.boolean(),
-  /** 公开：学生能在题单列表里看到、能进 */
+  /** 公开：学生能在专题列表里看到、能进 */
   visible: z.boolean(),
   createdBy: sampleUserSchema,
   createTime: z.string(),
   lastUpdateTime: z.string(),
   problemsCount: z.number().int(),
-  /** 加入这份题单的人数，后台用来判断改动会影响多少人 */
+  /** 加入这个专题的人数，后台用来判断改动会影响多少人 */
   participantCount: z.number().int(),
   /** 做完（必做题全对）的人数 */
   completedCount: z.number().int(),
@@ -519,7 +519,7 @@ export const addProblemsToSetResultSchema = z.object({
   added: z.array(z.string()),
   /** 题号不存在、不可见或是比赛题 */
   missing: z.array(z.string()),
-  /** 本来就在题单里 */
+  /** 本来就在专题里 */
   duplicate: z.array(z.string()),
 })
 
@@ -527,7 +527,7 @@ export const updateProblemInSetRequestSchema = z.object({
   isRequired: z.boolean(),
 })
 
-/** 拖动排序：题单里题目的链接 id，按新顺序给全 */
+/** 拖动排序：专题里题目的链接 id，按新顺序给全 */
 export const reorderProblemSetProblemsRequestSchema = z.object({
   ids: z.array(z.number().int()).min(1),
 })

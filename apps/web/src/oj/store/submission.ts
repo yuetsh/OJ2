@@ -17,10 +17,10 @@ import type { SubmitCodePayload } from 'utils/types'
  *
  * 原来它们都长在提交按钮那个组件（SubmitCode）里，而那个组件在编辑器的工具栏里 ——
  * 手机上交完切到「描述」页签（Naive 的页签默认切走即卸载）、桌面切到「题目 / 自测」
- * 模式，编辑器一卸载，判题结果、AI 提示、失败计数、通过后的点评和回题单全都丢了。
+ * 模式，编辑器一卸载，判题结果、AI 提示、失败计数、通过后的点评和回专题全都丢了。
  * 挪到 store 之后组件卸了再挂回来，状态还在。
  *
- * 判完之后「该发生什么」（失败计数、标成已解决、烟花、点评、回题单）不在这里，
+ * 判完之后「该发生什么」（失败计数、标成已解决、烟花、点评、回专题）不在这里，
  * 在页面这一层的 SubmissionEffects —— 它们要路由守卫和弹窗，得挂在一直在的组件上。
  */
 export type ResultSegment = 'submit' | 'samples' | 'custom'
@@ -155,8 +155,8 @@ export const useSubmissionStore = defineStore('submission', () => {
     if (entry.contestId) {
       data.contestId = parseInt(entry.contestId)
     }
-    // 从题单入口进来的，把来源题单一起报上去：提交列表要据此标出「来自题单」。
-    // 只是来源标记，题单进度仍由后端判完之后自己记账（judge/run.ts）
+    // 从专题入口进来的，把来源专题一起报上去：提交列表要据此标出「来自专题」。
+    // 只是来源标记，专题进度仍由后端判完之后自己记账（judge/run.ts）
     if (entry.problemSetId) {
       data.problemSetId = parseInt(entry.problemSetId)
     }

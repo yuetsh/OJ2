@@ -9,13 +9,13 @@ import type { QueuedAchievement } from 'utils/types'
  * - 推（增强）：WebSocket 只在用户当场停留在问题页时把延迟压到几百毫秒
  *
  * 之所以不能只靠推：前端 WebSocket 不是常驻连接，只在问题页且有提交监听时
- * 才建连，纯推会丢消息（尤其是题单奖章，那些页面根本没建连接）。
+ * 才建连，纯推会丢消息（尤其是专题奖章，那些页面根本没建连接）。
  */
 export const useAchievementStore = defineStore('achievement', () => {
   const queue = ref<QueuedAchievement[]>([])
   const current = ref<QueuedAchievement | null>(null)
 
-  // 成就和题单奖章的 id 来自两张不同的表，数值会重叠，
+  // 成就和专题奖章的 id 来自两张不同的表，数值会重叠，
   // 只按 id 去重会让奖章 5 把成就 5 挤掉
   function keyOf(item: QueuedAchievement) {
     return `${item.kind ?? 'achievement'}:${item.id}`

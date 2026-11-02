@@ -92,7 +92,7 @@ function attendance(lesson: Lesson) {
 /** 要画流程图的课写出来：这一行的次数和正确率连流程图一起数（画到 A / S 算对） */
 function problemText(lesson: Lesson) {
   if (lesson.assigned) return `布置 ${lesson.problems.length} 道${lesson.mode && lesson.mode !== 'code' ? ` · ${LESSON_MODE_LABEL[lesson.mode]}` : ''}`
-  return `${lesson.fromProblemSet ? '题单 ' : ''}${lesson.problems.length} 道`
+  return `${lesson.fromProblemSet ? '专题 ' : ''}${lesson.problems.length} 道`
 }
 
 // ---------- 时间轴（只在今天以内） ----------

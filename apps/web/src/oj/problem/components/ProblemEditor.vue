@@ -94,7 +94,7 @@ const mobileExtensions = [...desktopExtensions, ...hangWrapExtensions]
 const editorExtensions = computed(() => (isDesktop.value ? desktopExtensions : mobileExtensions))
 
 const contestID = route.params.contestID || null
-// 草稿存在哪个键下（题单入口单独一份），和「重置代码」共用一份算法
+// 草稿存在哪个键下（专题入口单独一份），和「重置代码」共用一份算法
 const storageKey = useDraftKey()
 
 // 桌面：顶栏 56 + 工具栏 48，协作条再占 40（两栏顶满内容区，见 detail.vue 的 problem-split）。
@@ -120,8 +120,8 @@ onMounted(loadCode)
 watch(() => problem.value?._id, loadCode)
 
 /**
- * 流程图草稿：每道题一份；题单入口单独一份 —— 加入题单之前在题库里画到 A 的那张，不能一进
- * 题单就摆在画布上（设计文档第 11 节 3，和代码草稿同理）。
+ * 流程图草稿：每道题一份；专题入口单独一份 —— 加入专题之前在题库里画到 A 的那张，不能一进
+ * 专题就摆在画布上（设计文档第 11 节 3，和代码草稿同理）。
  * 键名带 v2：2026-10 之前的草稿是 vue-flow 的格式，读不了，也不去覆盖它
  */
 const flowchartDraftKey = computed(() => {

@@ -5,7 +5,7 @@ import { useThemeVars } from 'naive-ui'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 
 /**
- * 课上老师改了这节课的题：右下角一张卡，写清改了哪些，点「刷新」重新载入页面拿新的题单。
+ * 课上老师改了这节课的题：右下角一张卡，写清改了哪些，点「刷新」重新载入页面拿新的专题。
  * 不自己消失 —— 学生可能正低头写代码，几秒就没的提示等于没提示。代码草稿边写边存，刷新不丢。
  */
 const update = pendingLessonUpdate

@@ -31,7 +31,7 @@ const keyword = ref('')
 const focused = ref(false)
 const input = useTemplateRef<{ blur: () => void }>('input')
 
-/** 题目页的三种入口（题库 / 比赛 / 题单）顶上都有自己的上下文条 */
+/** 题目页的三种入口（题库 / 比赛 / 专题）顶上都有自己的上下文条 */
 const PROBLEM_PAGES = new Set(['problem', 'contest problem', 'problemset problem'])
 const onProblemPage = computed(() => PROBLEM_PAGES.has(String(route.name)))
 

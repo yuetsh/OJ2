@@ -12,7 +12,7 @@ import { useFlowchartStore } from 'oj/store/flowchart'
 import { useCollabStore } from 'shared/store/collab'
 import type { RouteLocationNormalized } from 'vue-router'
 import NotFound from 'shared/components/NotFound.vue'
-// 判完之后该发生的事（烟花、点评、回题单）。静态引入：它得在第一次判完之前就挂好
+// 判完之后该发生的事（烟花、点评、回专题）。静态引入：它得在第一次判完之前就挂好
 import SubmissionEffects from './components/SubmissionEffects.vue'
 import ResultTabLabel from './components/ResultTabLabel.vue'
 import ContextBar from './components/ContextBar.vue'
@@ -21,8 +21,8 @@ import { DRAWER_TITLE, useProblemPageContext, type ProblemDrawer as DrawerKey } 
 import { useCollabHere, useTeacherCollab } from './composables/teacherCollab'
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
-// 题库、比赛、题单三种入口用的是同一个编辑器：原来比赛和题单用的是另一个精简版，
-// 没有协作、也没有错误标记，于是题单里「求助」老师接不上、「把中文标点都换成英文」
+// 题库、比赛、专题三种入口用的是同一个编辑器：原来比赛和专题用的是另一个精简版，
+// 没有协作、也没有错误标记，于是专题里「求助」老师接不上、「把中文标点都换成英文」
 // 点了没反应（见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 10 节）
 const loadProblemEditor = () => import('./components/ProblemEditor.vue')
 const ProblemEditor = defineAsyncComponent(loadProblemEditor)
@@ -95,7 +95,7 @@ const leftPane = useTemplateRef<HTMLElement>('leftPane')
 const theme = useThemeVars()
 
 /**
- * 分隔条两头按像素卡，不按比例：左栏窄于 360 时题单条的「下一题」箭头被裁掉、三个抽屉按钮
+ * 分隔条两头按像素卡，不按比例：左栏窄于 360 时专题条的「下一题」箭头被裁掉、三个抽屉按钮
  * 折成两行；右栏窄于 460 时工具栏收进「⋯」之后也放不下、语言下拉被挤成两行（原来 0.8 在 1280 屏上只给右栏 256）
  */
 const { width: windowWidth } = useWindowSize()
@@ -234,12 +234,12 @@ async function init() {
 }
 onMounted(init)
 
-/** 题不存在时回哪：比赛里回比赛，题单里回题单，否则回题目列表 */
+/** 题不存在时回哪：比赛里回比赛，专题里回专题，否则回题目列表 */
 const backTo = computed(() =>
   contestID
     ? { to: `/contest/${contestID}`, toLabel: '回到比赛' }
     : problemSetId
-      ? { to: `/problemset/${problemSetId}`, toLabel: '回到题单' }
+      ? { to: `/problemset/${problemSetId}`, toLabel: '回到专题' }
       : { to: '/problem', toLabel: '去题目列表' },
 )
 watch(() => problemID, init)

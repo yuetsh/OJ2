@@ -12,11 +12,11 @@ import { useProblemPageContext } from '../composables/problemPageContext'
 import { caseRevealDuration } from '../utils/caseReveal'
 
 /**
- * 判完之后「该发生什么」：失败计数、标成已解决、烟花、点评、回题单。
+ * 判完之后「该发生什么」：失败计数、标成已解决、烟花、点评、回专题。
  *
  * 挂在题目页这一层（detail.vue），和编辑器、提交按钮都无关 —— 原来这些写在提交按钮
  * 那个组件（SubmitCode）里，手机上切一下页签、桌面切一下分栏模式，编辑器一卸载它们
- * 就跟着没了：判完不放烟花、不计失败次数、不弹点评、题单里不回题单。
+ * 就跟着没了：判完不放烟花、不计失败次数、不弹点评、专题里不回专题。
  * 状态本身在 submission store，这里只是看着它做事。
  */
 
@@ -167,7 +167,7 @@ const { start: goToProblemSetDelayed, stop: cancelGoToProblemSet } = useTimeoutF
 )
 
 /**
- * 换题时收掉通过之后等着的点评和回题单 —— 评价弹窗是按**当前**题目去查、去弹的，
+ * 换题时收掉通过之后等着的点评和回专题 —— 评价弹窗是按**当前**题目去查、去弹的，
  * 不取消的话就会给一道还没做的题弹评价。欠着的点评走不到这里：离开这道题的导航
  * 已经被 holdForReview 拦下、评完才放行；还能走到这里的只有弹窗开着时按了浏览器后退。
  * 结果面板、还在跟的那条提交由 submission store 自己收。
@@ -221,14 +221,14 @@ watch(
     // 1. 刷新题目状态
     problem.value!.myStatus = 0
 
-    // 题单进度不在这里更新了。以前是 AC 之后回调 PUT /problem-set-progress，只认路由
-    // 参数里那一个题单：从普通题库入口做出同一道题不计进度，网络一抖、页面提前关掉进度
+    // 专题进度不在这里更新了。以前是 AC 之后回调 PUT /problem-set-progress，只认路由
+    // 参数里那一个专题：从普通题库入口做出同一道题不计进度，网络一抖、页面提前关掉进度
     // 就静默丢失。现在判题那一路直接记账（judge/run.ts），而且是记进所有已加入且包含
-    // 这道题的题单；收到「判完了」的时候进度已经落库，跳回题单页看到的就是新数据。
+    // 这道题的专题；收到「判完了」的时候进度已经落库，跳回专题页看到的就是新数据。
 
     if (result !== SubmissionStatus.accepted) return
 
-    // 3. 烟花放一会儿弹出评价框。比赛里不打扰；题单里 1.5 秒后要跳回题单页，弹了也会被冲掉
+    // 3. 烟花放一会儿弹出评价框。比赛里不打扰；专题里 1.5 秒后要跳回专题页，弹了也会被冲掉
     // （评价是欠着的这件事马上记下：方块还在亮的时候离开这道题，也要先评）
     if (ctx.value.reviewAfterAccepted) reviewOwed.value = true
 
@@ -241,15 +241,15 @@ watch(
     })
 
     if (ctx.value.backToProblemSet) {
-      // 延迟回到题单页面
+      // 延迟回到专题页面
       goToProblemSetDelayed()
     }
   },
 )
 
 // ==================== 流程图画到 A / S ====================
-// 题单里流程图作业拿到 A 或 S 就算这道题做完（后端评分那一路已经记了账），
-// 和代码通过一样 1.5 秒后回题单（设计文档第 3 节决定 4、5）。只认这一页上刚评完的那一次
+// 专题里流程图作业拿到 A 或 S 就算这道题做完（后端评分那一路已经记了账），
+// 和代码通过一样 1.5 秒后回专题（设计文档第 3 节决定 4、5）。只认这一页上刚评完的那一次
 const flowchartStore = useFlowchartStore()
 watch(
   () => flowchartStore.evaluatedSeq,

@@ -65,11 +65,11 @@ export const useFlowchartStore = defineStore('flowchart', () => {
   const latestRating = ref<FlowchartRating>({ score: 0, grade: '' })
   const phase = ref<FlowchartPhase>('idle')
   /**
-   * 这一页上**刚刚**评完一次就加一（不含进页面时读到的历史）。课堂条标做完、题单里
-   * 1.5 秒后跳回题单，都只认这一下 —— 进页面读到以前的 A 不该再跳一次
+   * 这一页上**刚刚**评完一次就加一（不含进页面时读到的历史）。课堂条标做完、专题里
+   * 1.5 秒后跳回专题，都只认这一下 —— 进页面读到以前的 A 不该再跳一次
    */
   const evaluatedSeq = ref(0)
-  /** 这道题评完的每一次，早的在前；hidden = 题单布置期内被藏起来的次数 */
+  /** 这道题评完的每一次，早的在前；hidden = 专题布置期内被藏起来的次数 */
   const scores = ref<FlowchartScores['scores']>([])
   const hiddenCount = ref(0)
   const submissionCount = computed(() => scores.value.length)
@@ -201,7 +201,7 @@ export const useFlowchartStore = defineStore('flowchart', () => {
   }
 
   const handleWebSocketMessage = (data: FlowchartEvaluationUpdate) => {
-    // 流程图画到 A/S 算完成之后，后端会在同一条用户通道上推题单徽章、成就（flowchart/run.ts 的
+    // 流程图画到 A/S 算完成之后，后端会在同一条用户通道上推专题徽章、成就（flowchart/run.ts 的
     // recordSolvedAndNotify）。原来这里只认评分那两种，交代码的监视器又不一定开着，要等下次
     // 换路由拉 pending 才弹。队列按 id 去重，两条连接各收一遍也只弹一次
     const frame = data as unknown as { type: string; achievements?: QueuedAchievement[] }

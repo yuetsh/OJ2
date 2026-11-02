@@ -531,7 +531,7 @@ function languageText(row: SubmissionListItem) {
   return LANGUAGE_SHOW_VALUE[row.language] ?? row.language
 }
 
-/** 学生看别人的那几行：名字淡一档、带一把锁（自己的看不了是题单那道闸，另说） */
+/** 学生看别人的那几行：名字淡一档、带一把锁（自己的看不了是专题那道闸，另说） */
 /**
  * 演示模式（超管把界面装成学生投屏）：后端认的还是超管，每一行都给了 showLink。
  * 学生是看不到别人代码的，投屏时也不该露出来 —— 别人的行一律当成看不到
@@ -795,7 +795,7 @@ function dayBreak(index: number) {
                     <span class="title">
                       <span class="pid">{{ row.problemDisplayId }}</span> {{ row.problemTitle }}
                     </span>
-                    <span v-if="row.problemSet" class="ps" :title="'从题单「' + row.problemSet.title + '」交的'"> 题单 </span>
+                    <span v-if="row.problemSet" class="ps" :title="'从专题「' + row.problemSet.title + '」交的'"> 专题 </span>
                   </span>
                   <span class="c-lang">{{ languageText(row) }}</span>
                   <span class="c-state"><StatusPill :result="row.result" /></span>
@@ -804,7 +804,7 @@ function dayBreak(index: number) {
                     <span
                       v-if="!row.showLink"
                       class="lock-hint"
-                      :title="othersRow(row) ? '别人的代码看不到' : '题单布置期内先藏着：在题单里做对，或者布置期结束就能看'"
+                      :title="othersRow(row) ? '别人的代码看不到' : '专题布置期内先藏着：在专题里做对，或者布置期结束就能看'"
                     >
                       <Icon icon="ph:lock-simple" :width="13" />
                     </span>
@@ -819,7 +819,7 @@ function dayBreak(index: number) {
                   <div class="m-line sub">
                     <span class="m-time">{{ submissionClockText(row.createTime) }}</span>
                     <span class="title" :title="`${row.problemDisplayId} ${row.problemTitle}`"> {{ row.problemDisplayId }} {{ row.problemTitle }} </span>
-                    <span v-if="row.problemSet" class="ps">题单</span>
+                    <span v-if="row.problemSet" class="ps">专题</span>
                     <div class="spacer"></div>
                     <span class="m-lang">{{ languageText(row) }}</span>
                     <Icon v-if="!teacher && !row.showLink" icon="ph:lock-simple" :width="13" class="m-lock" />

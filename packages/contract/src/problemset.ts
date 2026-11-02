@@ -4,7 +4,7 @@ import { paginatedSchema, sampleUserSchema } from './common'
 import { maskedProblemDifficultySchema } from './problem'
 
 /**
- * 我在这份题单里的进度。
+ * 我在这个专题里的进度。
  *
  * 两个计数口径不同，别混用：
  *   - completedCount / totalCount 只数**必做题**，进度条和「做完了」看它；
@@ -60,9 +60,9 @@ export const problemSetSchema = z.object({
 export const problemSetListSchema = paginatedSchema(problemSetSchema)
 
 /**
- * 题单页的题目行只渲染题号、标题，所以只下发这几样（外加题目主键）。
+ * 专题页的题目行只渲染题号、标题，所以只下发这几样（外加题目主键）。
  * 以前复用 problemListItemSchema，服务端每次要多 join 一次 user / 标签表，
- * 而那些字段题单页一个都不渲染。
+ * 而那些字段专题页一个都不渲染。
  */
 export const problemSetProblemItemSchema = z.object({
   id: z.number().int(),
@@ -77,11 +77,11 @@ export const problemSetProblemSchema = z.object({
   problem: problemSetProblemItemSchema,
   order: z.number().int(),
   isRequired: z.boolean(),
-  /** 在这份题单里做对了没有（代码通过，或流程图拿到 A / S） */
+  /** 在这个专题里做对了没有（代码通过，或流程图拿到 A / S） */
   isCompleted: z.boolean(),
-  /** 在这份题单里做对的时刻 */
+  /** 在这个专题里做对的时刻 */
   solvedTime: z.string().nullable(),
-  /** 在这份题单里交错了几次（还没做对时显示「交过 n 次」） */
+  /** 在这个专题里交错了几次（还没做对时显示「交过 n 次」） */
   wrongCount: z.number().int(),
   /**
    * 布置期内、以前做对过、旧代码正被藏着 —— 行上标「以前做对过 · 旧代码先藏着」。
@@ -94,11 +94,11 @@ export const joinProblemSetRequestSchema = z.object({
   problemSetId: z.number().int().positive(),
 })
 
-/** 老师看某个班在这份题单里的情况：真名 × 每道题 */
+/** 老师看某个班在这个专题里的情况：真名 × 每道题 */
 export const problemSetClassCellSchema = z.object({
-  /** 在题单里做对的时刻 */
+  /** 在专题里做对的时刻 */
   solvedTime: z.string().nullable(),
-  /** 在题单里交错的次数 */
+  /** 在专题里交错的次数 */
   wrongCount: z.number().int(),
   /** 加入之前就做对过这道题（任何入口） */
   solvedBefore: z.boolean(),
@@ -116,7 +116,7 @@ export const problemSetClassStudentSchema = z.object({
 })
 
 export const problemSetClassViewSchema = z.object({
-  /** 加入过这份题单的学生分属哪些班：三分之一以上的人加入了的班在前（按最近一次加入），零星几个人的在后 */
+  /** 加入过这个专题的学生分属哪些班：三分之一以上的人加入了的班在前（按最近一次加入），零星几个人的在后 */
   classes: z.array(z.object({ className: z.string(), joined: z.number().int(), size: z.number().int() })),
   /** 这次看的是哪个班；谁都没加入时为 null */
   className: z.string().nullable(),
@@ -126,7 +126,7 @@ export const problemSetClassViewSchema = z.object({
       _id: z.string(),
       title: z.string(),
       isRequired: z.boolean(),
-      /** 这个班在题单里做对的人数 */
+      /** 这个班在专题里做对的人数 */
       solved: z.number().int(),
     }),
   ),
@@ -136,7 +136,7 @@ export const problemSetClassViewSchema = z.object({
   students: z.array(problemSetClassStudentSchema),
 })
 
-/** 某道题为什么藏着旧代码：落在哪些正在布置的题单里 */
+/** 某道题为什么藏着旧代码：落在哪些正在布置的专题里 */
 export const problemSetLockSchema = z.object({
   problemSetId: z.number().int(),
   title: z.string(),

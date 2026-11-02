@@ -38,7 +38,7 @@ function flowchartThrottleKey(userId: number) {
 }
 
 /**
- * 题单防抄：题单布置期内，学生在布置开始之前画的图先对他本人藏起来 —— 和代码提交同一道闸
+ * 专题防抄：专题布置期内，学生在布置开始之前画的图先对他本人藏起来 —— 和代码提交同一道闸
  * （routes/submission.ts 的 canViewSubmission，规则见 problemSetLockCutoffs）。原来流程图
  * 这边没有这一条，以前画到 A 的那张图点一下就能载回画布，交上去就是 A。
  */
@@ -59,7 +59,7 @@ function canView(
   return row.userId === user.id || isTeacherOrAbove(user) || problem.createdById === user.id
 }
 
-/** 只有学生看自己的提交时才需要查题单；其余情况给一张空表，省一次查询 */
+/** 只有学生看自己的提交时才需要查专题；其余情况给一张空表，省一次查询 */
 function cutoffsFor(user: AuthUser, rows: Array<{ userId: number; problemId: number }>) {
   if (isTeacherOrAbove(user)) return Promise.resolve(new Map<number, string>())
   const own = rows.filter((row) => row.userId === user.id).map((row) => row.problemId)
@@ -270,7 +270,7 @@ async function flowchartUserFilter(username: string, exact = false) {
 const flowchartListColumns = {
   flowchart: {
     id: schema.flowchartSubmission.id,
-    // showLink 判定要（本人 + 题单闸门），序列化本身用不到
+    // showLink 判定要（本人 + 专题闸门），序列化本身用不到
     userId: schema.flowchartSubmission.userId,
     problemId: schema.flowchartSubmission.problemId,
     status: schema.flowchartSubmission.status,
@@ -711,7 +711,7 @@ flowchartRoutes.post('/flowcharts/:id/retry', requireAuth, async (c) => {
 })
 
 /**
- * 自己在这道题上评完的每一次，按时间从早到晚，已经滤掉加入题单之前的（题单闸门）。
+ * 自己在这道题上评完的每一次，按时间从早到晚，已经滤掉加入专题之前的（专题闸门）。
  * 结果页签的历次分数（scores）从这一份出。
  *
  * 只取分数和闸门要的几列：整行带着画布 JSON 和 mermaid 源码（一条约 5KB），画了几十次
@@ -740,7 +740,7 @@ async function myEvaluatedFlowcharts(user: AuthUser, problemId: number) {
 
 /**
  * 历次分数：结果页签上那一排「C → B → A」。原来的 history 一次只给一条，
- * 要看走势得一页一页翻（它和 current 已经删了）。`hidden` 是被题单闸门藏起来的次数，界面上给一句说明。
+ * 要看走势得一页一页翻（它和 current 已经删了）。`hidden` 是被专题闸门藏起来的次数，界面上给一句说明。
  */
 flowchartRoutes.get('/problems/:id/flowchart/scores', requireAuth, async (c) => {
   const problemId = queryInteger(c.req.param('id'), 0, { min: 1 })

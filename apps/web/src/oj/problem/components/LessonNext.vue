@@ -74,17 +74,17 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
     <template v-else>
       <div class="text">
         <span class="headline">{{ label }}都做完了，一共 {{ lesson.total }} 道</span>
-        <span v-if="!challenges" class="detail">想接着练，可以去题单里挑一个</span>
+        <span v-if="!challenges" class="detail">想接着练，可以去专题里挑一个</span>
       </div>
       <router-link v-if="!challenges" to="/problemset" class="next secondary">
-        <span class="next-label">去题单继续练</span>
+        <span class="next-label">去专题继续练</span>
       </router-link>
     </template>
   </div>
-  <!-- 做完了：先给这节课里还能挑战的，再给题单（设计稿 StkDone）。挑战一条都没有时只剩题单那句 -->
+  <!-- 做完了：先给这节课里还能挑战的，再给专题（设计稿 StkDone）。挑战一条都没有时只剩专题那句 -->
   <template v-if="lesson && !lesson.next && challenges">
     <ChallengeList :problem-ids="lessonProblemIds" :language="language" :refresh-key="refreshKey" />
-    <router-link to="/problemset" class="more">去题单继续练</router-link>
+    <router-link to="/problemset" class="more">去专题继续练</router-link>
   </template>
 </template>
 

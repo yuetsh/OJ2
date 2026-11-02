@@ -185,11 +185,11 @@ export const createSubmissionRequestSchema = z.object({
     .max(1024 * 1024),
   contestId: z.number().int().positive().optional(),
   /**
-   * 来源题单。学生从 `/problemset/:id/problem/:pid` 那个入口提交时前端带上，
-   * 后端落进 `submission.problemset_id`，提交列表据此标出「这条是刷题单刷出来的」。
+   * 来源专题。学生从 `/problemset/:id/problem/:pid` 那个入口提交时前端带上，
+   * 后端落进 `submission.problemset_id`，提交列表据此标出「这条是刷专题刷出来的」。
    *
-   * 只是**来源标记**，不参与判题、也不参与题单进度记账 —— 进度由判完之后的
-   * `recordSolvedProblem` 记进所有已加入且含这道题的题单，和从哪个入口进来无关。
+   * 只是**来源标记**，不参与判题、也不参与专题进度记账 —— 进度由判完之后的
+   * `recordSolvedProblem` 记进所有已加入且含这道题的专题，和从哪个入口进来无关。
    * 所以这里带错了顶多是标记不准，不会影响成绩。
    */
   problemSetId: z.number().int().positive().optional(),
@@ -249,10 +249,10 @@ export const submissionDetailSchema = z.object({
   problemTitle: z.string(),
   /** 提交者**现在**的班级（和提交列表同口径）；已删号的为 null */
   className: z.string().nullable(),
-  /** 从哪个题单交的，同列表的 problemSet */
+  /** 从哪个专题交的，同列表的 problemSet */
   problemSet: z.object({ id: z.number().int(), title: z.string() }).nullable(),
   /**
-   * false = 自己的这份代码在题单布置期内先藏着（见后端 problemSetLockCutoffs）：code 为空串、
+   * false = 自己的这份代码在专题布置期内先藏着（见后端 problemSetLockCutoffs）：code 为空串、
    * statisticInfo / info 为空对象，其余照给，页面照样摆出是谁、哪道题、什么结果。
    * 别人的代码看不到时不走这里，直接 403
    */
@@ -262,7 +262,7 @@ export const submissionDetailSchema = z.object({
   /**
    * 同一个人在同一道题、同一场比赛（或都不在比赛里）交过的每一次，按时间先后。只有带
    * `?attempts=1` 时才给（独立的提交详情页用），否则为 null —— 题目页每判完一次都要拉一遍
-   * 详情，用不着这一串。showLink 的口径同上，题单藏着的那几次点不进去
+   * 详情，用不着这一串。showLink 的口径同上，专题藏着的那几次点不进去
    */
   attempts: z
     .array(
@@ -310,7 +310,7 @@ export const submissionListItemSchema = z.object({
   language: problemLanguageSchema,
   statisticInfo: statisticInfoSchema,
   /**
-   * 来源题单，非题单入口提交的为 null。比赛提交恒为 null（比赛题不会进题单）。
+   * 来源专题，非专题入口提交的为 null。比赛提交恒为 null（比赛题不会进专题）。
    * 历史提交里只有「当年首次 AC 那一条」有值 —— 迁移 0007 从 problemset_submission
    * 回填的就是这些，其余老提交无从判断入口，一律留空。
    */
@@ -488,7 +488,7 @@ export const submissionLessonsSchema = z.object({
        * 只认那个语言，流程图评到 A / S 也算 —— 和任务页同一个口径）。推断的课为 null
        */
       doneCount: z.number().int().nullable(),
-      /** 多半是从题单里交的 —— 「题单 7 道」 */
+      /** 多半是从专题里交的 —— 「专题 7 道」 */
       fromProblemSet: z.boolean(),
       /** 这节课的题（上面 problems）交了几次 —— 和点进去看到的对得上 */
       total: z.number().int(),

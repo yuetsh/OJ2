@@ -61,7 +61,7 @@ Drizzle schema 最初是 `drizzle-kit pull` 从生产库拉出来的，所以它
 **外键的删除动作从 0010 起是显式的**，不再是 Django 留下的一律 NO ACTION：
 
 - **CASCADE**：父行消失后子行必然无意义、且不构成「学生做过什么」的证据 —— 中间表
-  （problem_tags）、题单/教程/成就的组成部分、一对一附属（user_profile）与可重算的缓存
+  （problem_tags）、专题/教程/成就的组成部分、一对一附属（user_profile）与可重算的缓存
   （user_stat）。
 - **NO ACTION（即拦住）**：需要人看见的删除 —— `submission.problem_id`、以及 `user` 的绝大
   多数外键。删用户撞外键会被 handler 翻译成「请改为禁用账号」，这是有意的。

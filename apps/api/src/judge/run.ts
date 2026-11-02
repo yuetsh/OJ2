@@ -549,11 +549,11 @@ export async function judgeSubmission(job: JudgeJobData) {
     )
     if (!saved) return
 
-    // 题单记账挪到判题这一路。以前靠前端 AC 之后回调 PUT /problem-set-progress，
-    // 只认路由参数里那一个题单：从普通题库入口做出同一道题不计进度，网络一抖就静默丢失。
+    // 专题记账挪到判题这一路。以前靠前端 AC 之后回调 PUT /problem-set-progress，
+    // 只认路由参数里那一个专题：从普通题库入口做出同一道题不计进度，网络一抖就静默丢失。
     // 放在最后那条 publishSubmissionUpdate("finished") 之前 —— 前端收到「判完了」时
-    // 进度已经落库，跳回题单页看到的就是新数据。
-    // 比赛题不进题单（题单加题时卡了 contestId IS NULL），跳过。
+    // 进度已经落库，跳回专题页看到的就是新数据。
+    // 比赛题不进专题（专题加题时卡了 contestId IS NULL），跳过。
     if (row.submission.contestId === null && isAccepted(result)) {
       await recordSolvedAndNotify(row.submission.userId, row.problem.id, row.submission.createTime)
     }

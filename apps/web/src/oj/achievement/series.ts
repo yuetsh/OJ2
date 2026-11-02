@@ -7,7 +7,7 @@ import type { Achievement } from 'utils/types'
  * 指标是后台可配的，这里没登记的指标归到「其他」、拿第一档的名字当线名 —— 不会丢，只是不好看，
  * 在后台加了新指标记得回来补一行。
  */
-export const GROUPS = ['做题', '坚持', '题单和比赛', '其他', '彩蛋'] as const
+export const GROUPS = ['做题', '坚持', '专题和比赛', '其他', '彩蛋'] as const
 export type GroupName = (typeof GROUPS)[number]
 
 interface MetricInfo {
@@ -55,19 +55,19 @@ const METRICS: Record<string, MetricInfo> = {
   },
   submission_count: { group: '坚持', label: '交了几次', unit: '次', remain: (r) => `再交 ${r} 次` },
   problemset_completed: {
-    group: '题单和比赛',
-    label: '做完的题单',
+    group: '专题和比赛',
+    label: '做完的专题',
     unit: '个',
-    remain: (r) => `再做完 ${r} 个题单`,
+    remain: (r) => `再做完 ${r} 个专题`,
   },
   badge_count: {
-    group: '题单和比赛',
-    label: '题单奖章',
+    group: '专题和比赛',
+    label: '专题奖章',
     unit: '枚',
-    remain: (r) => `再拿 ${r} 枚题单奖章`,
+    remain: (r) => `再拿 ${r} 枚专题奖章`,
   },
   contest_joined: {
-    group: '题单和比赛',
+    group: '专题和比赛',
     label: '参加的比赛',
     unit: '场',
     remain: (r) => `再参加 ${r} 场比赛`,

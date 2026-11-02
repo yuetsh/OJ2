@@ -16,7 +16,7 @@ import { getBaseInfo, randomUser10 } from '../api'
 /**
  * 后台首页（设计稿「后台首页」AdminHome）：一块看板。上面一排看「现在」—— 判题机在不在、
  * 今天交了多少其中有没有系统错误、现在几个人在线、哪个班在上课；中间一排全站的数（用户、题目、
- * 提交、比赛、题单、自学、这周做题的人，用户要的「类似一个看板」）和最近 30 天每天交了几次；
+ * 提交、比赛、专题、自学、这周做题的人，用户要的「类似一个看板」）和最近 30 天每天交了几次；
  * 最下面是常用的四个入口和「抽一个人」。
  *
  * 原来是总用户数 / 今日提交 / 近期比赛 / 判题机四个数，加一张要手输班级前缀的班级排名表 ——
@@ -52,7 +52,7 @@ const siteTiles = computed(() => {
     { label: '提交', value: n(site.submissions), note: `这学期 ${n(site.termSubmissions)} 次` },
     { label: '这周做题的人', value: n(site.weekActive), note: '周一起交过题的' },
     { label: '比赛', value: n(site.contests), note: '', to: '/admin/contest/list' },
-    { label: '题单', value: n(site.problemSets), note: '', to: '/admin/problemset/list' },
+    { label: '专题', value: n(site.problemSets), note: '', to: '/admin/problemset/list' },
     { label: '自学', value: n(site.tutorials), note: '课', to: '/admin/tutorial/list' },
   ]
 })

@@ -14,9 +14,9 @@ import BadgeLadder from './components/BadgeLadder.vue'
 import ClassView from './components/ClassView.vue'
 
 /**
- * 题单详情（设计稿「题单重设计」详情 B）：顶上一条是进度和奖章阶梯，下面题目分两列。
+ * 专题详情（设计稿「题单重设计」详情 B）：顶上一条是进度和奖章阶梯，下面题目分两列。
  *
- * - 还没加入：题目看得见、点不进去，右边一个大按钮「加入题单，开始做」。加入是用户要留的
+ * - 还没加入：题目看得见、点不进去，右边一个大按钮「加入专题，开始做」。加入是用户要留的
  *   一步（「只是打开就算加入的话，会有疑惑的」），所以这里要让人一眼看懂为什么要点。
  * - 布置期内以前做对过的题标「以前做对过 · 旧代码先藏着」，规则见后端 problemSetLockCutoffs。
  * - 做完了：整条变绿，写几点做完、用了多久。烟花只在做完的那一刻放（做对最后一道、
@@ -79,7 +79,7 @@ const spent = computed(() => {
 })
 
 // 两栏放得下（每栏 420 起）才拆；拆完在窄屏上叠起来，就成了两张没有标题的卡片，
-// 看着像题单分了两组
+// 看着像专题分了两组
 const twoColumns = useMediaQuery('(min-width: 960px)')
 
 const columns = computed(() => {
@@ -132,14 +132,14 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
 </script>
 
 <template>
-  <NotFound v-if="missing" title="这个题单不存在" hint="可能还没公开，或者已经删掉了" to="/problemset" to-label="回到题单列表" />
+  <NotFound v-if="missing" title="这个专题不存在" hint="可能还没公开，或者已经删掉了" to="/problemset" to-label="回到专题列表" />
 
   <div v-else-if="set" class="page oj-page">
     <section class="band" :class="{ done: progress?.isCompleted }">
       <span v-if="progress?.isCompleted" class="done-mark" aria-hidden="true">✓</span>
       <div class="head">
         <div class="row">
-          <router-link :to="{ name: 'problemsets' }" class="back">‹ 题单</router-link>
+          <router-link :to="{ name: 'problemsets' }" class="back">‹ 专题</router-link>
           <h2 class="ell">{{ set.title }}</h2>
           <span v-if="set.assigning" class="pill assign">布置到 {{ parseTime(set.assignedUntil!, 'M月D日') }}</span>
         </div>
@@ -164,7 +164,7 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
         <div v-else class="muted small">
           {{ set.createdBy.username }} 出的 · {{ set.problemsCount }} 道<template v-if="optional > 0">，{{ optional }} 道选做</template
           ><template v-else>，全部必做</template>
-          <template v-if="!set.badges.length"> · 这个题单没有奖章</template>
+          <template v-if="!set.badges.length"> · 这个专题没有奖章</template>
         </div>
         <div v-if="set.description && set.description !== set.title" class="sec small desc">
           {{ set.description }}
@@ -176,7 +176,7 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
       </template>
       <div class="spacer"></div>
       <div v-if="!joined && !userStore.isTeacherOrAbove" class="join">
-        <n-button type="primary" size="large" :loading="joining" @click="join"> 加入题单，开始做 </n-button>
+        <n-button type="primary" size="large" :loading="joining" @click="join"> 加入专题，开始做 </n-button>
       </div>
     </section>
 
@@ -196,14 +196,14 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
         <rect x="5" y="11" width="14" height="9" rx="2" />
         <path d="M8 11V8a4 4 0 0 1 8 0v3" />
       </svg>
-      其中 <b>{{ hiddenCount }}</b> 道你以前做对过。布置期内（到 {{ parseTime(set.assignedUntil!, 'M月D日') }}）这几道的旧代码先藏起来，在题单里重新做对就能看。
+      其中 <b>{{ hiddenCount }}</b> 道你以前做对过。布置期内（到 {{ parseTime(set.assignedUntil!, 'M月D日') }}）这几道的旧代码先藏起来，在专题里重新做对就能看。
     </div>
 
     <div v-if="userStore.isTeacherOrAbove" class="tabs">
       <button class="seg" :class="{ on: tab !== 'class' }" @click="tab = 'problems'">题目</button>
       <button class="seg" :class="{ on: tab === 'class' }" @click="tab = 'class'">全班情况</button>
       <div class="spacer"></div>
-      <n-button v-if="canEdit" size="small" @click="router.push({ name: 'admin problemset edit', params: { problemSetId: set.id } })"> 编辑题单 </n-button>
+      <n-button v-if="canEdit" size="small" @click="router.push({ name: 'admin problemset edit', params: { problemSetId: set.id } })"> 编辑专题 </n-button>
     </div>
 
     <ClassView v-if="userStore.isTeacherOrAbove && tab === 'class'" :problem-set-id="set.id" />
@@ -249,7 +249,7 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
           </component>
         </section>
       </div>
-      <n-empty v-else description="这个题单还没有题目" />
+      <n-empty v-else description="这个专题还没有题目" />
     </template>
   </div>
 </template>

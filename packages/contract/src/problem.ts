@@ -472,7 +472,7 @@ export const problemListItemSchema = z.object({
   hasAstRules: z.boolean(),
   /** SQL 题（可选语言里有 SQL）：写 SQL 语句查数据库，和写 C / Python 是两回事，列表里单独标出来 */
   isSql: z.boolean(),
-  /** 0 = 做对了。画流程图的题，流程图评到 A / S 也给 0（和题单、课堂条一个口径） */
+  /** 0 = 做对了。画流程图的题，流程图评到 A / S 也给 0（和专题、课堂条一个口径） */
   myStatus: z.number().int().nullable(),
   /**
    * 做对的人 / 交过的人，和题目页「统计」页签同一个口径（代码提交、不算还在判的）。

@@ -18,11 +18,11 @@ import ProblemChips, { type ChipItem } from './ProblemChips.vue'
  * 左栏顶上的一条：「这道题是从哪来的」。按入口路由决定是哪一种，最多一条：
  *
  * - 课堂：这道题在「班里在做」的列表里 —— 做完几道 + 每道的题号 + 上一题 / 下一题
- * - 题单：题单名 + 进度 + 第几题 + 上一题 / 下一题
+ * - 专题：专题名 + 进度 + 第几题 + 上一题 / 下一题
  * - 比赛：比赛名 + 每道的题号 + 还剩多久 + 排名
  * - 都不是：不显示
  *
- * 一道题既在这节课里、又是从题单进来的，按入口显示题单条。
+ * 一道题既在这节课里、又是从专题进来的，按入口显示专题条。
  * 换题用的都是普通链接，通过之后欠着的那次强制点评由 SubmissionEffects 的路由守卫拦下。
  */
 
@@ -35,7 +35,7 @@ const theme = useThemeVars()
 const isDark = useDark()
 
 /**
- * 三种入口各一种底色（设计稿「上下文条与协作状态」）：课堂浅绿、题单浅蓝、比赛浅黄。
+ * 三种入口各一种底色（设计稿「上下文条与协作状态」）：课堂浅绿、专题浅蓝、比赛浅黄。
  * 字色在暗色下换成浅一档的，深绿、深蓝、深黄放在暗底上看不清
  */
 const tone = computed(() => ({
@@ -119,7 +119,7 @@ onSolvedHere((step) => {
   lessonStore.load(true)
 })
 
-// ==================== 题单 ====================
+// ==================== 专题 ====================
 const problemSet = ref<ProblemSet | null>(null)
 const setProblems = ref<ProblemSetProblem[]>([])
 
@@ -131,12 +131,12 @@ watch(
     if (!id) return
     try {
       const [detail, problems] = await Promise.all([getProblemSetDetail(Number(id)), getProblemSetProblems(Number(id))])
-      // 拉的这一会儿已经离开了这个题单
+      // 拉的这一会儿已经离开了这个专题
       if (ctx.value.problemSetId !== id) return
       problemSet.value = detail
       setProblems.value = problems
     } catch {
-      // 拉不到就没有题单条，不影响做题
+      // 拉不到就没有专题条，不影响做题
     }
   },
   { immediate: true },
@@ -153,8 +153,8 @@ const setBar = computed(() => {
           params: { problemSetId: ctx.value.problemSetId, problemID: item.problem._id },
         }
       : null
-  // 进度只数必做题，和题单页的「完成进度 2 / 8（另有 3 道选做）」同一个口径；
-  // 一道必做都没有的题单才数全部
+  // 进度只数必做题，和专题页的「完成进度 2 / 8（另有 3 道选做）」同一个口径；
+  // 一道必做都没有的专题才数全部
   const required = list.some((item) => item.isRequired) ? list.filter((item) => item.isRequired) : list
   const done = required.filter((item) => item.isCompleted).length
   return {
@@ -180,7 +180,7 @@ async function joinHere() {
     await joinProblemSet(Number(id))
     problemSet.value = await getProblemSetDetail(Number(id))
   } catch {
-    // 加入失败就还是那条提示，回题单页再点一次
+    // 加入失败就还是那条提示，回专题页再点一次
   } finally {
     joiningSet.value = false
   }
@@ -296,10 +296,10 @@ onSolvedHere(() => {
     </template>
   </div>
 
-  <!-- 题单 -->
+  <!-- 专题 -->
   <div v-else-if="setBar" class="context-bar problemset">
-    <router-link :to="setBar.home" class="back set-back" :title="`回到题单：${setBar.title}`"> ‹ {{ setBar.title }} </router-link>
-    <!-- 手机上一排放不下题单名 + 进度条 + 做完几道 + 两个大箭头，进度条让掉，「做完 x/y」还在 -->
+    <router-link :to="setBar.home" class="back set-back" :title="`回到专题：${setBar.title}`"> ‹ {{ setBar.title }} </router-link>
+    <!-- 手机上一排放不下专题名 + 进度条 + 做完几道 + 两个大箭头，进度条让掉，「做完 x/y」还在 -->
     <div v-if="setBar.joined && !isMobile" class="set-progress" aria-hidden="true">
       <div class="set-progress-fill" :style="{ width: `${setBar.percentage}%` }" />
     </div>
@@ -309,7 +309,7 @@ onSolvedHere(() => {
     </span>
     <template v-else>
       <span class="meta">{{ isMobile ? '没加入，不算进度' : '还没加入，在这里做对了不算进度' }}</span>
-      <n-button size="tiny" type="primary" :loading="joiningSet" @click="joinHere">加入题单</n-button>
+      <n-button size="tiny" type="primary" :loading="joiningSet" @click="joinHere">加入专题</n-button>
     </template>
     <div class="spacer" />
     <component

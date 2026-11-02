@@ -44,7 +44,7 @@ const teacherCollab = useTeacherCollab()
 const peer = computed(() => (teacherCollab.value ? (collabStore.room?.peerName ?? null) : null))
 
 // ==================== 班上第几个做对的 ====================
-// 只在题库入口给：比赛有自己的排名，题单里整个抽屉都不出现
+// 只在题库入口给：比赛有自己的排名，专题里整个抽屉都不出现
 const rank = ref<ProblemRank | null>(null)
 
 const rankLine = computed(() => {
@@ -109,7 +109,7 @@ async function listSubmissions() {
 
 /**
  * 「我的提交统计」：这一页里各种结果各几次（「答案错误 × 3」「答案正确 × 1」），和原来一样
- * 只数当前这一页。被题单闸门锁住的那几次不数 —— 它们在列表里只露一行说明，这里也不该露出结果
+ * 只数当前这一页。被专题闸门锁住的那几次不数 —— 它们在列表里只露一行说明，这里也不该露出结果
  */
 const statusDistribution = computed(() => {
   const counts = new Map<number, number>()
@@ -137,7 +137,7 @@ type Loaded = { code: string; language: LANGUAGE }
 const details = reactive<Record<string, Loaded | 'loading' | 'failed'>>({})
 
 async function toggle(row: SubmissionListItem) {
-  // 题单布置期内藏着的旧提交，点不开（后端也不会给代码）
+  // 专题布置期内藏着的旧提交，点不开（后端也不会给代码）
   if (!row.showLink) return
   if (expanded.value === row.id) {
     expanded.value = null
@@ -154,7 +154,7 @@ async function toggle(row: SubmissionListItem) {
   }
 }
 
-/** 这一页里被题单闸门藏起来的次数 */
+/** 这一页里被专题闸门藏起来的次数 */
 const lockedCount = computed(() => submissions.value.filter((row) => !row.showLink).length)
 
 /** 展开的代码先只露 5 行，「一共 11 行」点一下再全摆出来（设计稿） */
@@ -304,7 +304,7 @@ watch(query, () => {
           </div>
         </div>
       </template>
-      <!-- 题单布置期内藏着的那几次：合成一行，点不开（后端也不给代码） -->
+      <!-- 专题布置期内藏着的那几次：合成一行，点不开（后端也不给代码） -->
       <div v-if="lockedCount" class="locked">
         <svg
           width="13"

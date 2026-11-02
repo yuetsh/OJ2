@@ -6,8 +6,8 @@ import type { ProblemSetLock } from 'utils/types'
 
 /**
  * 「旧代码为什么藏着」那一句（设计稿「题单重设计」旧代码藏着时学生看到的）：
- * 题单《X》布置中，这道题以前的代码先藏着 · 在题单里做对，或 M月D日 之后就能看。
- * 规则在后端 problemSetLockCutoffs；查不到是哪个题单（比如刚过期）就说通用的一句
+ * 专题《X》布置中，这道题以前的代码先藏着 · 在专题里做对，或 M月D日 之后就能看。
+ * 规则在后端 problemSetLockCutoffs；查不到是哪个专题（比如刚过期）就说通用的一句
  */
 const props = defineProps<{ problem: { id: number } | { displayId: string } }>()
 const theme = useThemeVars()
@@ -31,10 +31,10 @@ const first = computed(() => locks.value[0])
 
 <template>
   <span v-if="first">
-    题单<router-link :to="{ name: 'problemset', params: { problemSetId: first.problemSetId } }">《{{ first.title }}》</router-link
-    >布置中，这道题以前的代码先藏着 · 在题单里做对，或 {{ parseTime(first.assignedUntil, 'M月D日') }} 之后就能看
+    专题<router-link :to="{ name: 'problemset', params: { problemSetId: first.problemSetId } }">《{{ first.title }}》</router-link
+    >布置中，这道题以前的代码先藏着 · 在专题里做对，或 {{ parseTime(first.assignedUntil, 'M月D日') }} 之后就能看
   </span>
-  <span v-else>这道题正在题单里布置，以前的代码先藏着 · 在题单里做对，或者布置期结束就能看</span>
+  <span v-else>这道题正在专题里布置，以前的代码先藏着 · 在专题里做对，或者布置期结束就能看</span>
 </template>
 
 <style scoped>
