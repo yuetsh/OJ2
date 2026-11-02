@@ -3,10 +3,10 @@
  *
  * 主线是「每节课」：中职的课八成提交在课上，学生回想自己学了什么，记得的是「周三那节课」，
  * 不是某一周、某个月。所以按天排开，每天分成「班上这节课的题」和「自己练的题」两组。
- * 一节课的题怎么定，和课堂看板 / 首页「班里在做」同一个口径（routes/classroom.ts）：
- * 老师在看板布置过就用布置的，否则同班同一天 ≥ 5 人做过的题。
+ * 一节课的题怎么定，和课堂任务 / 首页「班里在做」同一个口径（services/lesson.ts 的 classLessonProblems）：
+ * 老师在任务页布置过就用布置的，否则同班同一天 ≥ 5 人做过的题。
  *
- * 做对的口径也同看板：代码 AC / AST_CHECK_FAILED、流程图评到 A / S；比赛提交不算
+ * 做对的口径也同任务页：代码 AC / AST_CHECK_FAILED、流程图评到 A / S；比赛提交不算
  * （比赛是课堂测验，题目也不在题库里）。
  */
 import { FLOWCHART_PASS_GRADES, STUDENT_ROLES, type LearningDay, type LearningItem, type LearningPeriod, type LearningReport } from '@oj2/contract'
@@ -19,7 +19,7 @@ import { calendarDay, monthStart, termStart, weekStart } from '../time'
 
 export const accepted: JudgeStatusValue[] = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]
 
-/** 同 routes/classroom.ts 的 CLASS_ACTIVITY_MIN_USERS：同班同一天几个人做过，才算这节课的题 */
+/** 同 services/lesson.ts 的 CLASS_ACTIVITY_MIN_USERS：同班同一天几个人做过，才算这节课的题 */
 const LESSON_MIN_USERS = 5
 
 /** 不算进「错在哪」的状态：判题机自己崩的、还没判完的 */

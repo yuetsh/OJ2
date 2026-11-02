@@ -64,7 +64,7 @@ function studentCondition(value: string | null) {
 /**
  * 这些人在这些题上交过几次、做对没有。代码提交（不含比赛）和流程图提交并起来数，
  * 做对 = 代码 AC / AST_CHECK_FAILED 或流程图评到 A / S —— 和学生端课文里那个勾、
- * 课堂看板（routes/classroom.ts 的 activityRows）同一个口径。不论早晚：读这课之前
+ * 课堂任务（services/class-activity.ts 的 activityRows）同一个口径。不论早晚：读这课之前
  * 在课上就做对的照样算。两边都按 `(problem_id, user_id)` 索引走。
  */
 async function problemActivity(userIds: number[], problemIds: number[]) {

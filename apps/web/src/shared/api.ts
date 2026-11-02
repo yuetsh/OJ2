@@ -32,7 +32,7 @@ export async function getProfile(username: string = ''): Promise<Profile | null>
   return contractDeferred('GET /profiles/:username', () => import('./profileSchema').then((m) => m.userProfileSchema), response)
 }
 
-/** 带 language 只数能用这个语言交的题（看板「选题」弹框用） */
+/** 带 language 只数能用这个语言交的题（任务页「选题」弹框用） */
 /** 课堂布置选题用：language 只数能用它交的题，flowchart 只数打开了画流程图的题 */
 export function getProblemTagList(language = '', flowchart = false) {
   return api.get<Tag[]>('problem-tags', { params: { language, ...(flowchart ? { flowchart: '1' } : {}) } })

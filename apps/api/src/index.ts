@@ -10,7 +10,8 @@ import { authRoutes } from './routes/auth'
 import { accountRoutes } from './routes/account'
 import { contestRoutes } from './routes/contest'
 import { contentRoutes } from './routes/content'
-import { classroomRoutes } from './routes/classroom'
+import { homeRoutes } from './routes/home'
+import { taskRoutes } from './routes/task'
 import { rankingRoutes } from './routes/ranking'
 import { problemsetRoutes } from './routes/problemset'
 import { achievementRoutes } from './routes/achievement'
@@ -32,7 +33,8 @@ app.route('/api', accountRoutes)
 app.route('/api', siteRoutes)
 app.route('/api', contestRoutes)
 app.route('/api', contentRoutes)
-app.route('/api', classroomRoutes)
+app.route('/api', homeRoutes)
+app.route('/api', taskRoutes)
 app.route('/api', rankingRoutes)
 app.route('/api', problemsetRoutes)
 app.route('/api', achievementRoutes)

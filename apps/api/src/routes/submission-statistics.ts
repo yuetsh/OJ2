@@ -529,7 +529,7 @@ const LESSONS_MAX = 500
 
 type StatisticsRange = { start: string | null; end: string }
 
-/** 这段时间里（按东八区日子）老师在课堂看板布置过的课，同一天的按布置先后 */
+/** 这段时间里（按东八区日子）老师在课堂任务布置过的课，同一天的按布置先后 */
 async function lessonPlans(range: StatisticsRange) {
   return db
     .select({

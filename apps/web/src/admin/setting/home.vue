@@ -94,7 +94,7 @@ const shortcuts = [
   { label: '新建题目', to: '/admin/problem/create' },
   { label: '新建比赛', to: '/admin/contest/create' },
   { label: '批量建号', to: '/admin/user/generate' },
-  { label: '课堂看板', to: '/classroom' },
+  { label: '课堂任务', to: '/task' },
 ]
 
 // ---------------------------------------------------------------- 抽一个人
@@ -170,7 +170,7 @@ onUnmounted(stopRolling)
     <div class="tile">
       <span class="label">正在上课</span>
       <b>{{ info.activeClass ? classLabel(info.activeClass) : '没有' }}</b>
-      <router-link v-if="info.activeClass" class="link" :to="{ name: 'classroom board', query: { className: info.activeClass } }"> 去课堂看板 → </router-link>
+      <router-link v-if="info.activeClass" class="link" :to="{ name: 'task', query: { className: info.activeClass } }"> 去课堂任务 → </router-link>
       <span v-else class="note">最近两小时没有哪个班在交题</span>
     </div>
   </div>

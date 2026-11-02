@@ -3,12 +3,12 @@ import { LESSON_MODE_LABEL, lessonNeeds, type LessonLanguage, type LessonMode } 
 import { setClassLesson } from 'oj/api'
 import { errorMessage } from 'utils/api'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
-import type { ClassBoard } from 'utils/types'
+import type { TaskBoard } from 'utils/types'
 import { Icon } from '@iconify/vue'
 import ProblemPicker from './ProblemPicker.vue'
 
 /**
- * 看板上布置「这节课的题」：题号是上课时当场填的。两种样子 ——
+ * 任务页上布置「这节课的题」：题号是上课时当场填的。两种样子 ——
  * - `inline`：顶上一行里点「改 / 新的一节 / 布置」展开的那一小条；
  * - `start`：刚上课还没有题时，这页最大的那个框。
  *
@@ -16,7 +16,7 @@ import ProblemPicker from './ProblemPicker.vue'
  * `carry`：新开的这一节带上这一节的题、改成写代码 —— 先布置画流程图、再让全班写代码时用
  */
 const props = defineProps<{
-  board: ClassBoard
+  board: TaskBoard
   className: string
   variant: 'inline' | 'start'
   lessonId: number | null
@@ -27,7 +27,7 @@ const message = useMessage()
 
 /**
  * 这份作业用什么语言做，跟着这一次布置走（用户定的：不是给班级定死的设置）。默认是这个班
- * 上一次布置时选的；选了之后看板和学生那边的「做完」都只认这个语言交对的
+ * 上一次布置时选的；选了之后任务页和学生那边的「做完」都只认这个语言交对的
  */
 const lessonLanguage = ref<LessonLanguage>('Python')
 const LESSON_LANGUAGES: LessonLanguage[] = ['Python', 'C', 'C++', 'SQL']
@@ -109,7 +109,7 @@ function pickerConfirm(ids: string[]) {
     </n-button>
     <n-button type="primary" :loading="saving" @click="saveLesson">布置</n-button>
     <n-button @click="emit('cancel')">取消</n-button>
-    <!-- 弹层挂在 body 下，放在根节点里面：两个根会让看板传进来的 class 落空 -->
+    <!-- 弹层挂在 body 下，放在根节点里面：两个根会让任务页传进来的 class 落空 -->
     <ProblemPicker
       v-model:show="picking"
       v-model:language="lessonLanguage"

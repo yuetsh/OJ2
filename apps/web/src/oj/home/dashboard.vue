@@ -187,7 +187,7 @@ const solvedText = computed(() => (visit.value?.solved ?? []).map((item) => `${i
 const classActivityTitle = computed(() => {
   const day = classActivity.value?.day
   if (!day) return ''
-  // 老师在课堂看板布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
+  // 老师在课堂任务布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
   if (classActivity.value?.source === 'teacher') {
     const language = classActivity.value.language
     const mode = classActivity.value.mode

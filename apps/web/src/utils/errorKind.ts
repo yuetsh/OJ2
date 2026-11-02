@@ -1,15 +1,15 @@
 import { classifyDiff, type DiffKind } from 'utils/wrongAnswer'
 import { JUDGE_STATUS, SubmissionStatus } from 'utils/constants'
-import type { ClassBoardCell } from 'utils/types'
+import type { TaskBoardCell } from 'utils/types'
 
 /**
- * 课堂看板：一道题错着的人「按错法归堆」（设计稿「课堂看板重设计」A+B）。老师讲错误时
+ * 课堂任务：一道题错着的人「按错法归堆」（设计稿「课堂看板重设计」A+B）。老师讲错误时
  * 要的是「这道题全班错在哪」：同一种错讲一遍就够，所以按最后一次提交归类，堆名要短，
  * 一眼能读完 —— 长的中文解释在点开之后的弹层里（和提交详情同一份）。
  *
  * 依据是提交里存的 runtime_error / sample_check（判题机写的），和提交详情、题目页结果区同源。
  */
-export type BoardLatest = NonNullable<ClassBoardCell['latest']>
+export type BoardLatest = NonNullable<TaskBoardCell['latest']>
 
 export interface ErrorKind {
   /** 归堆用：同一个 key 是同一种错 */

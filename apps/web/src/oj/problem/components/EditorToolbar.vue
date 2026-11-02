@@ -86,7 +86,7 @@ const showCollabBar = useTeacherCollab()
  */
 const collabHere = useCollabHere()
 /**
- * 老师在看板上主动打开了他的代码（他没举手）。用户定的：学生不能拒绝，但必须看得到 ——
+ * 老师在任务页上主动打开了他的代码（他没举手）。用户定的：学生不能拒绝，但必须看得到 ——
  * 按钮就写「xuyue 在看你的代码」，和「在帮你」一样亮着、点不了
  */
 const peeked = computed(() => collabHere.value && collabStore.room?.mode === 'peek' && collabStore.helpStatus === 'idle')

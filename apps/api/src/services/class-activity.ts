@@ -5,8 +5,8 @@ import { db, schema } from '../db'
 import { JudgeStatus } from '../judge/status'
 
 /**
- * 课堂上「谁做了哪道题」的取数口径：课堂条、看板、自学情况、后台首页「正在上课的班」
- * 都从这里数。原来写在 routes/classroom.ts 里，后台 conf.ts 要猜正在上课的班，
+ * 课堂上「谁做了哪道题」的取数口径：课堂条、任务页、自学情况、后台首页「正在上课的班」
+ * 都从这里数。原来写在课堂任务的路由里，后台 conf.ts 要猜正在上课的班，
  * 就只能从另一个路由文件里 import —— 挪到 services 来，两边都从这里拿。
  */
 /** AST_CHECK_FAILED 也是答案对了，与周榜同口径 */
@@ -30,7 +30,7 @@ export function classMemberIds(className: string) {
 /**
  * 做题记录：代码提交（不含比赛）和流程图提交并成一张，一次提交一行。课堂上的统计
  * （这节课是哪几道题、班上几人做完、最近几节课来了几次、哪个班在上课）都从这里数，
- * 口径和课堂条 / 看板的「做完」一致：
+ * 口径和课堂条 / 任务页的「做完」一致：
  *
  * - 交过就算「动过手」：代码提交不论结果，流程图不论评没评完、评没评失败；
  * - `solved`：代码 AC / AST_CHECK_FAILED，流程图评到 A / S。
@@ -99,7 +99,7 @@ export function activityRows(options: {
   return code.unionAll(flowchart).as('activity')
 }
 
-/** 看板没指定班级时，猜「最近这么久里提交人数最多的班」—— 老师多半正在上这个班的课 */
+/** 任务页没指定班级时，猜「最近这么久里提交人数最多的班」—— 老师多半正在上这个班的课 */
 const ACTIVE_CLASS_WINDOW_MS = 2 * 60 * 60 * 1000
 
 /**

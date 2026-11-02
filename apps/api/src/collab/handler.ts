@@ -428,7 +428,7 @@ function acceptRequest(ws: CollabSocket, request: HelpRequest) {
 
 /**
  * 两边的 room_open。教师端多带学生的 id 和班级：协作条要知道他举手多久了（按 id 在列表里找），
- * 「帮完了」要回到哪个班的看板
+ * 「帮完了」要回到哪个班的任务页
  */
 function sendRoomOpen(room: Room, studentName: string, teacherName: string, className: string | null) {
   const frame = (peer: Record<string, unknown>) =>
@@ -630,7 +630,7 @@ function handlePresence(ws: CollabSocket, problemId: unknown, language: unknown)
 }
 
 /**
- * 老师在看板上主动打开一个学生正在写的代码（学生没举手）。
+ * 老师在任务页上主动打开一个学生正在写的代码（学生没举手）。
  *
  * 用户定的：学生**不能拒绝**，但必须看得到 —— 他那边按钮变成「xuyue 在看你的代码」；
  * 老师可以直接改。他正举着手的话就是接单，和「帮他」一样。

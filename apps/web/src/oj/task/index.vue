@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
-import { getClassBoard } from 'oj/api'
+import { getTaskBoard } from 'oj/api'
 import { useTone } from 'shared/composables/tone'
 import { groupClassOptions } from 'utils/classes'
 import UserName from 'shared/components/UserName.vue'
@@ -12,7 +12,7 @@ import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { parseTime } from 'utils/functions'
-import type { ClassBoard, ClassBoardCell, ClassBoardProblem, ClassBoardStudent } from 'utils/types'
+import type { TaskBoard, TaskBoardCell, TaskBoardProblem, TaskBoardStudent } from 'utils/types'
 import ExplainModal, { type ExplainPerson } from './components/ExplainModal.vue'
 import LeaveModal from './components/LeaveModal.vue'
 import AdminLink from 'shared/components/AdminLink.vue'
@@ -21,10 +21,10 @@ import LessonForm from './components/LessonForm.vue'
 import TrailPanel from './components/TrailPanel.vue'
 import { errorKind, type ErrorKind } from 'utils/errorKind'
 import { LESSON_MODE_LABEL } from '@oj2/contract'
-import { cellStage, cellStyle as cellStyleOf, cellText as cellTextOf, cellTitle as cellTitleOf, isStuck, trailSummary } from './boardCells'
+import { cellStage, cellStyle as cellStyleOf, cellText as cellTextOf, cellTitle as cellTitleOf, isStuck, trailSummary } from './cells'
 
 /**
- * 课堂看板（老师，设计稿「课堂看板重设计」A+B）：这个班、今天、这节课的几道题 × 全班学生。
+ * 课堂任务（老师，设计稿「课堂看板重设计」A+B）：这个班、今天、这节课的几道题 × 全班学生。
  *
  * 用法（用户说的）：开在教师电脑上，不投影；看完成情况、谁卡住了，讲没交对的代码错在哪；
  * 题号是上课时当场填的。所以：
@@ -49,7 +49,7 @@ const router = useRouter()
 const route = useRoute()
 const { help, peek } = useTeacherHelp()
 
-const board = ref<ClassBoard | null>(null)
+const board = ref<TaskBoard | null>(null)
 /**
  * 带着 ?className= 进来的（协作条「帮完了」回来、举手面板「讲这道题」）就看那个班，
  * 否则第一次由后端猜
@@ -67,7 +67,7 @@ const classOptions = computed(() => {
 async function load() {
   if (document.hidden) return
   try {
-    const data = await getClassBoard(className.value ?? undefined)
+    const data = await getTaskBoard(className.value ?? undefined)
     board.value = data
     // 第一次由后端猜，之后就固定在这个班上，别每次刷新都换
     className.value = data.className
@@ -90,7 +90,7 @@ function changeClass(value: string) {
 }
 
 onMounted(load)
-// 已经停在看板上时又从举手面板点了「讲这道题」：同一条路由只换 query，组件不重建
+// 已经停在任务页上时又从举手面板点了「讲这道题」：同一条路由只换 query，组件不重建
 watch(
   () => route.query,
   (query) => {
@@ -125,9 +125,9 @@ const editing = ref<false | 'edit' | 'new' | 'carry'>(false)
 const mode = computed(() => board.value?.mode ?? null)
 
 /**
- * 一个班一天可以上几节内容不同的课。打开看板（或换到这个班）时，这一节已经布置了这么久，
+ * 一个班一天可以上几节内容不同的课。打开任务页（或换到这个班）时，这一节已经布置了这么久，
  * 多半是上一节课的 —— 先问这节课做哪几道题，底下能点回去接着看上一节。
- * 只在第一次看到这一节时判一次：老师一直开着看板时，15 秒一刷不会把表突然换掉
+ * 只在第一次看到这一节时判一次：老师一直开着任务页时，15 秒一刷不会把表突然换掉
  */
 const STALE_LESSON_MINUTES = 100
 const staleLessonId = ref<number | null>(null)
@@ -159,10 +159,10 @@ type Group = 'help' | 'idle' | 'stuck' | 'working' | 'done' | 'leave'
 
 /**
  * 正在课堂求助的学生。列表是老师端 WebSocket 实时推的（collabStore，全局常驻连接），
- * 不经看板接口 —— 求助只在 serve 进程的内存里，本来就不落库。所以也只看得到连着
+ * 不经任务页接口 —— 求助只在 serve 进程的内存里，本来就不落库。所以也只看得到连着
  * **本站**的学生：服务器和机房各有各的求助队列，和课堂求助本身一样。
  */
-function helpOf(student: ClassBoardStudent) {
+function helpOf(student: TaskBoardStudent) {
   return collabStore.requests.find((request) => request.studentId === student.userId) ?? null
 }
 
@@ -170,7 +170,7 @@ function helpOf(student: ClassBoardStudent) {
  * 经常不动手：最近几节课里最多只交过一节。至少有 3 节课可比才下结论，
  * 开学头两节谁都一样。没交过的人里把他们排在前面，「最后交」那格写上来过几节
  */
-function oftenIdle(student: ClassBoardStudent) {
+function oftenIdle(student: TaskBoardStudent) {
   const total = board.value?.recentLessons ?? 0
   return total >= 3 && student.recentAttended <= 1
 }
@@ -179,7 +179,7 @@ function oftenIdle(student: ClassBoardStudent) {
  * 今天一次都没上过线。机房有两人共用一台电脑的，同桌只有一个登着，所以「谁没来」
  * 看今天上没上过线，不看此刻在不在线（见契约 seenAt）
  */
-function unseen(student: ClassBoardStudent) {
+function unseen(student: TaskBoardStudent) {
   return !student.seenAt
 }
 
@@ -189,11 +189,11 @@ function seenText(seenAt: string) {
   return minutes < 60 ? `${minutes} 分钟前在` : `${Math.floor(minutes / 60)} 小时前在`
 }
 
-function doneCount(student: ClassBoardStudent) {
+function doneCount(student: TaskBoardStudent) {
   return student.cells.filter((cell) => cell.status === 'accepted').length
 }
 
-function groupOf(student: ClassBoardStudent): Group {
+function groupOf(student: TaskBoardStudent): Group {
   if (absent(student)) return 'leave'
   if (helpOf(student)) return 'help'
   const cells = student.cells
@@ -230,10 +230,10 @@ const GROUP_LABEL: Record<Group, string> = {
  * 就是来了（迟到），自动取消标记，回到正常的分组里 —— 老师得看得见他卡住、举手
  */
 const { onLeave, setLeave, cancelLeave } = useLeaveStudents('oj_leave_students')
-function canLeave(student: ClassBoardStudent) {
+function canLeave(student: TaskBoardStudent) {
   return !student.lastSubmitAt && !helpOf(student)
 }
-function absent(student: ClassBoardStudent) {
+function absent(student: TaskBoardStudent) {
   return canLeave(student) && onLeave(student.username)
 }
 const boardStudents = computed(() => board.value?.students ?? [])
@@ -255,7 +255,7 @@ function saveLeave(selected: string[]) {
   )
 }
 
-function byName(a: ClassBoardStudent, b: ClassBoardStudent) {
+function byName(a: TaskBoardStudent, b: TaskBoardStudent) {
   return a.username.localeCompare(b.username, 'zh-CN')
 }
 
@@ -279,7 +279,7 @@ const groupCount = computed(() => {
   return count
 })
 /**
- * 全做完了的人里有几个在挑战：做对之后又交了、还没做到（见契约 classBoardCellSchema.challenge）。
+ * 全做完了的人里有几个在挑战：做对之后又交了、还没做到（见契约 taskBoardCellSchema.challenge）。
  * 做完了又没在挑战的，就是空着的
  */
 const challengingCount = computed(
@@ -300,8 +300,8 @@ const groupStarts = computed(() => {
 // ---------- 题卡片和「错着的人按错法归堆」 ----------
 
 interface WrongPerson {
-  student: ClassBoardStudent
-  cell: ClassBoardCell
+  student: TaskBoardStudent
+  cell: TaskBoardCell
   kind: ErrorKind
   /** 点名字讲的是哪一份：代码（cell.latest）还是最后一张图（cell.flowchart.latest）；null = 没有可讲的 */
   explain: 'code' | 'draw' | null
@@ -311,7 +311,7 @@ interface WrongPerson {
  * 卡在画流程图上的人按最后一张图归堆：一组都没走对的、对了一部分的分开讲；还在评、评失败的、
  * 老评法（数不出几组）各一堆
  */
-function drawKind(cell: ClassBoardCell): ErrorKind {
+function drawKind(cell: TaskBoardCell): ErrorKind {
   const latest = cell.flowchart?.latest
   if (!latest) return { key: 'draw-none', label: '还没画对', line: null }
   if (latest.status === 0 || latest.status === 1) return { key: 'draw-wait', label: 'AI 在评', line: null }
@@ -433,7 +433,7 @@ function openExplain(problemIndex: number, userId: number) {
   explainShow.value = true
 }
 
-// ---------- 格子（显示规则在 boardCells.ts） ----------
+// ---------- 格子（显示规则在 cells.ts） ----------
 
 const cellColors = computed(() => ({
   tone,
@@ -441,12 +441,12 @@ const cellColors = computed(() => ({
   actionColor: theme.value.actionColor,
   successColor: theme.value.successColor,
 }))
-const cellStyle = (cell: ClassBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value, mode.value)
-const cellTitle = (cell: ClassBoardCell, student: ClassBoardStudent) => cellTitleOf(cell, student, board.value?.day, mode.value)
-const cellText = (cell: ClassBoardCell) => cellTextOf(cell, mode.value)
+const cellStyle = (cell: TaskBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value, mode.value)
+const cellTitle = (cell: TaskBoardCell, student: TaskBoardStudent) => cellTitleOf(cell, student, board.value?.day, mode.value)
+const cellText = (cell: TaskBoardCell) => cellTextOf(cell, mode.value)
 
 /** 点了能讲的格子：没做完，卡着的那一步有评完的图或今天的代码 */
-function explainable(cell: ClassBoardCell) {
+function explainable(cell: TaskBoardCell) {
   if (cell.status !== 'tried') return false
   const stage = cellStage(cell, mode.value)
   if (stage === 'draw') {
@@ -473,15 +473,15 @@ function trailOutside(event: MouseEvent) {
 }
 
 /**
- * 点格子 / 名字到提交列表看他今天交的。新标签打开：看板一般开着不关，别把它顶掉。
+ * 点格子 / 名字到提交列表看他今天交的。新标签打开：任务页一般开着不关，别把它顶掉。
  * 用户名按整名匹配（学号互相包含是常态，ks24a1 会混进 ks24a10）。
  *
  * 今天只画了流程图、没写代码的，跳到列表的「流程图」那边 —— 不然这节课整班在画流程图时，
  * 点进去是一片「没有符合条件的提交」
  */
 function submissionsHref(
-  student: ClassBoardStudent,
-  problem: ClassBoardProblem | undefined,
+  student: TaskBoardStudent,
+  problem: TaskBoardProblem | undefined,
   flowchart: boolean,
   /** 「以前交过、今天还没交」的人要看以前的，不能只列今天 */
   today = true,
@@ -503,7 +503,7 @@ function submissionsHref(
   }).href
 }
 
-function lastText(student: ClassBoardStudent) {
+function lastText(student: TaskBoardStudent) {
   if (student.lastSubmitAt) return parseTime(student.lastSubmitAt, 'HH:mm')
   if (oftenIdle(student)) {
     return `近 ${board.value?.recentLessons} 节交过 ${student.recentAttended} 节`
@@ -559,7 +559,7 @@ function lastText(student: ClassBoardStudent) {
       </n-button>
       <!-- 布置过的每一节课：改错了班、隔天想起来补，去后台 -->
       <AdminLink v-if="isDesktop" :to="{ name: 'admin lesson list', query: className ? { className } : {} }">布置过的课</AdminLink>
-      <!-- 看板只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
+      <!-- 任务页只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
       <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })"> 回头看 → </n-button>
     </div>
 

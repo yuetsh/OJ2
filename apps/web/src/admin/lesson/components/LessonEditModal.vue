@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { LESSON_MODE_LABEL, lessonNeeds, type AdminLesson, type LessonLanguage, type LessonMode } from '@oj2/contract'
-import ProblemPicker from 'oj/classroom/components/ProblemPicker.vue'
+import ProblemPicker from 'oj/task/components/ProblemPicker.vue'
 import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
 import { groupClassOptions } from 'utils/classes'
@@ -10,8 +10,8 @@ import { parseTime } from 'utils/functions'
 import { createAdminLesson, updateAdminLesson } from '../../api'
 
 /**
- * 后台改一节 / 补一节。改的时候班级、日子、时刻都能动 —— 看板上点错了班、隔天才想起来布置，
- * 都在这里纠正；补的是看板外上的课，补了数据统计才认得到。题号可以敲，也可以点「选题」挑
+ * 后台改一节 / 补一节。改的时候班级、日子、时刻都能动 —— 任务页上点错了班、隔天才想起来布置，
+ * 都在这里纠正；补的是任务页外上的课，补了数据统计才认得到。题号可以敲，也可以点「选题」挑
  */
 const props = defineProps<{
   /** null = 补一节 */
@@ -54,7 +54,7 @@ function inputIds() {
   return idsInput.value.split(/[\s,，、;；]+/).filter(Boolean)
 }
 
-// ---- 选题弹框，和看板上那个是同一个 ----
+// ---- 选题弹框，和任务页上那个是同一个 ----
 const picking = ref(false)
 const pickerInitial = ref<{ id: string; title?: string }[]>([])
 function openPicker() {

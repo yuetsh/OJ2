@@ -143,7 +143,7 @@ function percent(value: number, total: number) {
     <div v-if="liveLessons.length" class="live" :style="{ background: tone('success').background, color: tone('success').color }">
       <span>{{ liveLessons.map((item) => classLabel(item.className)).join('、') }}正在上课</span>
       <span class="spacer"></span>
-      <a href="#" class="live-link" @click.prevent="router.push('/classroom')"> <Icon icon="ph:monitor" :width="14" />去课堂看板 </a>
+      <a href="#" class="live-link" @click.prevent="router.push('/task')"> <Icon icon="ph:monitor" :width="14" />去课堂任务 </a>
     </div>
 
     <div v-if="!lessonCount && !data.scattered.length" class="empty">这段时间没有人交</div>

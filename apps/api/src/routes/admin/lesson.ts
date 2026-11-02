@@ -10,10 +10,10 @@ import { localDateTime } from '../../time'
 import { queryInteger } from '../helpers'
 
 /**
- * 后台「课堂作业」：布置过的每一节课（class_lesson）。看板上布置错了班、错了题可以在这里改，
- * 看板外上的课（以前的、没在看板布置的）可以补一节 —— 数据统计按布置切课，补了才认得到。
+ * 后台「课堂任务」：布置过的每一节课（class_lesson）。任务页上布置错了班、错了题可以在这里改，
+ * 任务页外上的课（以前的、没在任务页布置的）可以补一节 —— 数据统计按布置切课，补了才认得到。
  *
- * 权限和看板一样是老师：看板上任何老师都能改任何班的这节课，这里不另设门槛。
+ * 权限和任务页一样是老师：任务页上任何老师都能改任何班的这节课，这里不另设门槛。
  */
 export const adminLessonRoutes = new Hono<AppEnv>()
 
@@ -116,7 +116,7 @@ async function lessonValues(body: AdminLessonRequest): Promise<
 > {
   const [exists] = await db.select({ id: schema.user.id }).from(schema.user).where(eq(schema.user.className, body.className)).limit(1)
   if (!exists) return { code: 'class-not-found', message: `没有 ${body.className} 这个班` }
-  // 只画流程图不用语言，存成 null（和看板布置一样）
+  // 只画流程图不用语言，存成 null（和任务页布置一样）
   const language = body.mode === 'flowchart' ? null : body.language
   const resolved = await resolveLessonProblems(body.problemDisplayIds, language, body.mode)
   if ('code' in resolved) return resolved
@@ -156,7 +156,7 @@ adminLessonRoutes.put('/lessons/:id', requireTeacher, async (c) => {
   // 班级能改：原来那个班和新的班学生看到的都可能变，两边各比一次
   const classes = await affectedClasses(id, result.values.className)
   const before = await Promise.all(classes.map((className) => todayLessonSnapshot(className)))
-  // 布置的老师不换，和看板上「改」一样认第一次
+  // 布置的老师不换，和任务页上「改」一样认第一次
   const [row] = await db
     .update(schema.classLesson)
     .set({ ...result.values, updatedAt: new Date().toISOString() })

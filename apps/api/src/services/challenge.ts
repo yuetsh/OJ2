@@ -333,7 +333,7 @@ export async function challengeList(user: { id: number; className: string | null
   })
 }
 
-/** 课堂看板用：这些人在这些题上做到了哪些挑战（只认现在还配着的挑战） */
+/** 课堂任务用：这些人在这些题上做到了哪些挑战（只认现在还配着的挑战） */
 export async function challengeSuccessesOf(userIds: number[], problemIds: number[]) {
   if (userIds.length === 0 || problemIds.length === 0) return []
   return db

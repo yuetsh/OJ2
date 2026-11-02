@@ -446,7 +446,7 @@ adminAccountRoutes.post('/users', requireSuperAdmin, async (c) => {
     return users.length
   })
 
-  // 新班级顺手加进班级列表：不加的话全站的班级下拉（看板、提交列表、排名……）里都找不到它，
+  // 新班级顺手加进班级列表：不加的话全站的班级下拉（任务页、提交列表、排名……）里都找不到它，
   // 原来要再去设置页手动加，经常忘
   const classes = [...new Set(prepared.map((item) => item.className).filter((name) => !!name))]
   const options = await getWebsiteOptions()

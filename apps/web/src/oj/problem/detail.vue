@@ -174,7 +174,7 @@ function confirmLeavingHelp(to: RouteLocationNormalized, from: RouteLocationNorm
     window.open(router.resolve(to).href, '_blank')
     return false
   }
-  // 老师在看板上主动打开了他的代码（没举手）：helpStatus 是 idle，但老师在
+  // 老师在任务页上主动打开了他的代码（没举手）：helpStatus 是 idle，但老师在
   const peeked = collabHere.value && collabStore.room?.mode === 'peek'
   if (collabStore.isTeacher || (collabStore.helpStatus === 'idle' && !peeked)) return true
   if (approvedTarget === to.fullPath) {

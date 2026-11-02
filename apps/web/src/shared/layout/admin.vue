@@ -67,7 +67,7 @@ const NAV: NavGroup[] = [
         to: '/admin/problemset/list',
         role: 'teacher',
       },
-      { label: '课堂作业', icon: 'ph:chalkboard-teacher', path: '/admin/lesson', role: 'teacher' },
+      { label: '课堂任务', icon: 'ph:chalkboard-teacher', path: '/admin/lesson', role: 'teacher' },
       {
         label: '教程',
         icon: 'ph:book-open',

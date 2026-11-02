@@ -23,7 +23,7 @@ const { isDark, toggleDark } = useDarkTransition()
 const theme = useThemeVars()
 
 /**
- * 1280 以下（老师的笔记本）收一收：题号框变窄、「课堂看板」只留图标。
+ * 1280 以下（老师的笔记本）收一收：题号框变窄、「课堂任务」只留图标。
  * 机房的两种屏是 1280 和 1366，都走完整那版 —— 老师也会用机房的电脑。
  */
 const compact = useMediaQuery('(max-width: 1279px)')
@@ -142,7 +142,7 @@ function renderThemeRow() {
 
 /**
  * 个人菜单只放「自己的东西」+ 后台入口 + 暗色开关。
- * 课堂求助、课堂看板挪到了顶栏上（HelpButton、下面的课堂看板链接），不在这里。
+ * 课堂求助、课堂任务挪到了顶栏上（HelpButton、下面的课堂任务链接），不在这里。
  */
 const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
   const work = userStore.isAdminRole || userStore.canToggleDemoMode
@@ -220,13 +220,13 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
         <n-button
           quaternary
           class="tool-link"
-          :type="active === 'classroom' ? 'primary' : 'default'"
-          title="课堂看板"
-          aria-label="课堂看板"
-          @click="router.push('/classroom')"
+          :type="active === 'task' ? 'primary' : 'default'"
+          title="课堂任务"
+          aria-label="课堂任务"
+          @click="router.push('/task')"
         >
           <template #icon><Icon icon="ph:monitor" /></template>
-          <template v-if="!compact">课堂看板</template>
+          <template v-if="!compact">课堂任务</template>
         </n-button>
         <span class="divider"></span>
       </template>

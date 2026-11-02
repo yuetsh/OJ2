@@ -1,113 +1,40 @@
 import { z } from 'zod'
 
 import { judgeStatusSchema } from './judge-status'
-import { lessonLanguageSchema as lessonLanguageValueSchema, lessonModeSchema } from './language'
+import { lessonLanguageSchema, lessonModeSchema } from './language'
 import { statisticInfoSchema } from './submission'
 
 /** 课堂条上一道题一步的状态（画 / 写），和 myStatus 同一套取值 */
-const stepStatusSchema = z.enum(['accepted', 'tried', 'none'])
-
-/**
- * 「班里在做」：同班同一天有好几个人做的题，基本就是老师在课上点名的那几道。
- * `day` 是东八区日历日；最近 7 天都没有这样的题时为 null，`problems` 为空。
- */
-export const classActivityProblemSchema = z.object({
-  problemDisplayId: z.string(),
-  title: z.string(),
-  /** 那天做过这道题的同班人数（含自己） */
-  userCount: z.number().int(),
-  /** 其中那天通过了的人数 */
-  acceptedCount: z.number().int(),
-  /**
-   * 我自己在题库里（不含比赛）做这道题的状态，不限那一天。老师布置时选了语言的，
-   * 代码只认用那个语言交的（流程图照旧算）
-   */
-  myStatus: z.enum(['accepted', 'tried', 'none']),
-  /**
-   * 今天布置的课要这道题画流程图 / 写代码时，这一步我做到哪了；不要这一步为 null。
-   * 推断出来的课两个都是 null（不分步，myStatus 照旧代码或流程图做对都算）。
-   *
-   * 一道题今天可能被布置了两次（先布置画流程图、再布置写代码）：两节课的要求合起来算，
-   * 学生那边就和「先画再写」一样是两步 —— 老师开了写代码的那节，还没画完的人照样看得到要画
-   */
-  draw: stepStatusSchema.nullable(),
-  code: stepStatusSchema.nullable(),
-})
+export const lessonStepStatusSchema = z.enum(['accepted', 'tried', 'none'])
 
 /**
  * 老师布置这节课时选的语言（Python / C / C++ / SQL）。null = 没选：推断出来的课、加这一项之前
  * 布置的课。选了之后这份作业「做完」只认这个语言交对的（SQL 题例外，交对 SQL 就算），
  * 学生打开这几道题编辑器默认就是它
  */
-const lessonLanguageSchema = lessonLanguageValueSchema.nullable()
-
-export const classActivitySchema = z.object({
-  className: z.string().nullable(),
-  day: z.string().nullable(),
-  /** teacher = 老师在课堂看板里布置的；inferred = 从同班提交记录推断的 */
-  source: z.enum(['teacher', 'inferred']).nullable(),
-  /** 写代码那一步用的语言：今天最后布置的、要写代码的那节选的（只画流程图的课为 null） */
-  language: lessonLanguageSchema,
-  /** 今天最后布置的那节做什么；推断出来的课为 null */
-  mode: lessonModeSchema.nullable(),
-  problems: z.array(classActivityProblemSchema),
-})
+export const assignedLanguageSchema = lessonLanguageSchema.nullable()
 
 /**
- * 首页的「上次来」卡（原来登录后弹的「登录速报」并进了首页，AI 那两句不要了）。
- * 窗口是**上次登录到这次登录之间**，不是到现在 —— 这次登录期间卡片内容不变，
- * 今天做的题不会混进「上次」里。只算题库提交，比赛的题号在题库里点不开。
- */
-export const lastVisitSchema = z.object({
-  /** 上次登录的时刻。null = 头一回登录（或会话早于这个字段） */
-  previousLogin: z.string().nullable(),
-  /** null = 上次来已经是 30 天以前，或那次一条代码都没交 */
-  summary: z
-    .object({
-      submissionCount: z.number().int(),
-      /** 那次做对的题数（去重） */
-      solvedCount: z.number().int(),
-      /** 那次最后一条提交的时刻，前端拿它和「班里那天」比是不是同一天 */
-      lastSubmitTime: z.string(),
-      /**
-       * 那次交过、**到现在都还没做对**的题（这次登录后补做对了的不算），
-       * 按最后一次提交倒序，最多 3 道
-       */
-      unsolved: z.array(
-        z.object({
-          problemDisplayId: z.string(),
-          title: z.string(),
-          attempts: z.number().int(),
-          lastResult: judgeStatusSchema,
-        }),
-      ),
-      /** 那次做对的题，按第一次做对的先后，最多 12 道（总数看 solvedCount） */
-      solved: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
-    })
-    .nullable(),
-})
-
-/**
- * 课堂看板里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉。
+ * 课堂任务里老师布置这节课的题：按输入顺序给展示题号，最多 20 道，空数组 = 清掉。
  * `language` 是这份作业用什么语言做，null = 没选。
  *
  * 一个班一天可以上几节内容不同的课，每次布置是一行（class_lesson.id）：
- * - `lessonId`：改 / 清掉这一节（看板上的「改」）；
- * - `newLesson`：今天再开一节（看板上的「新的一节」）；
+ * - `lessonId`：改 / 清掉这一节（任务页上的「改」）；
+ * - `newLesson`：今天再开一节（任务页上的「新的一节」）；
  * - 两个都不带：改今天最后布置的那一节，今天还没有就新开 —— 一天只能一份时的老写法，
  *   开着旧页面的老师、没跟上的机房站点发的都是这种，别让它们每改一次就多出一节课
  */
 export const classLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
   problemDisplayIds: z.array(z.string().trim().min(1)).max(20),
-  language: lessonLanguageSchema.nullable(),
+  language: assignedLanguageSchema.nullable(),
   /** 不带 = 写代码（开着的旧页面发的就是这种）。画流程图时 language 不用，存成 null */
   mode: lessonModeSchema.default('code'),
   lessonId: z.number().int().positive().optional(),
   newLesson: z.boolean().optional(),
 })
 
-export const classBoardProblemSchema = z.object({
+export const taskBoardProblemSchema = z.object({
   problemId: z.number().int(),
   problemDisplayId: z.string(),
   title: z.string(),
@@ -117,7 +44,7 @@ export const classBoardProblemSchema = z.object({
   hasChallenges: z.boolean(),
 })
 
-export const classBoardCellSchema = z.object({
+export const taskBoardCellSchema = z.object({
   /**
    * accepted 看的是题库里（不含比赛）有没有通过过，不限今天 —— 以前做过的也算做完。
    * 布置时选了语言的，代码的次数和通过都只数那个语言（流程图照旧）
@@ -140,7 +67,7 @@ export const classBoardCellSchema = z.object({
    * 代码这一步：交对过（不限今天）/ 交过没对 / 没交过。写代码的课和 status 一样；先画再写的课
    * 要它分出「图画对了、代码还没对」
    */
-  codeStatus: stepStatusSchema,
+  codeStatus: lessonStepStatusSchema,
   /**
    * 流程图这一步，只在这节课要画流程图时有（mode 是 flowchart / both），否则 null。
    * - `passedAt`：第一次画到 A / S 的时刻（不限今天）
@@ -149,7 +76,7 @@ export const classBoardCellSchema = z.object({
    */
   flowchart: z
     .object({
-      status: stepStatusSchema,
+      status: lessonStepStatusSchema,
       passedAt: z.string().nullable(),
       latest: z
         .object({
@@ -193,12 +120,12 @@ export const classBoardCellSchema = z.object({
   challenge: z.enum(['done', 'doing']).nullable(),
 })
 
-export const classBoardStudentSchema = z.object({
+export const taskBoardStudentSchema = z.object({
   userId: z.number().int(),
   username: z.string(),
   realName: z.string().nullable(),
   /** 和 problems 同序 */
-  cells: z.array(classBoardCellSchema),
+  cells: z.array(taskBoardCellSchema),
   /** 今天最后一次提交（任何题），没交过为 null */
   lastSubmitAt: z.string().nullable(),
   /**
@@ -207,7 +134,7 @@ export const classBoardStudentSchema = z.object({
    */
   codeToday: z.boolean(),
   drawnToday: z.boolean(),
-  /** 最近几节课（不含今天，个数见 ClassBoard.recentLessons）里交过题的有几节 */
+  /** 最近几节课（不含今天，个数见 TaskBoard.recentLessons）里交过题的有几节 */
   recentAttended: z.number().int(),
   /**
    * 他此刻开着哪道题的代码编辑器（展示题号），没开着为 null。老师点它就能打开他正在写的
@@ -224,18 +151,18 @@ export const classBoardStudentSchema = z.object({
 })
 
 /**
- * 课堂看板：一个班、今天、这节课的几道题 × 全班学生。「这节课」是今天最后布置的那一节，
+ * 课堂任务：一个班、今天、这节课的几道题 × 全班学生。「这节课」是今天最后布置的那一节，
  * 今天没布置过就按今天同班的提交推断。
  * className 为 null = 没指定班级、最近两小时也没有哪个班在交（没法猜）。
  */
-export const classBoardSchema = z.object({
+export const taskBoardSchema = z.object({
   className: z.string().nullable(),
   day: z.string(),
   source: z.enum(['teacher', 'inferred']).nullable(),
   /** 老师布置的这一节的 id（「改」带着它）；推断出来的课为 null */
   lessonId: z.number().int().nullable(),
-  /** 这一节布置的语言（见 lessonLanguageSchema） */
-  language: lessonLanguageSchema,
+  /** 这一节布置的语言（见 assignedLanguageSchema） */
+  language: assignedLanguageSchema,
   /** 这一节做什么；推断出来的课为 null（代码交对或流程图画对都算） */
   mode: lessonModeSchema.nullable(),
   /** 这一节第一次布置的时刻，之后改题不变；推断出来的课为 null */
@@ -243,9 +170,9 @@ export const classBoardSchema = z.object({
   /** 第一次布置的老师（真名，没有真名用用户名）；推断出来的课为 null */
   assignedBy: z.string().nullable(),
   /** 这个班最近一次布置选的语言（含今天），给语言下拉当默认值；从没选过为 null */
-  lastLanguage: lessonLanguageSchema,
-  problems: z.array(classBoardProblemSchema),
-  students: z.array(classBoardStudentSchema),
+  lastLanguage: assignedLanguageSchema,
+  problems: z.array(taskBoardProblemSchema),
+  students: z.array(taskBoardStudentSchema),
   /**
    * 「最近几节课」一共几节（最多 5，不含今天）。一节课 = 这个班同学一起做题的一天
    * （同班同一天 ≥ 5 人做同一道题，和「班里在做」同一个判据）。新班、开学头几周不满 5。
@@ -254,7 +181,7 @@ export const classBoardSchema = z.object({
 })
 
 /**
- * 提交列表「这节课」那颗按钮要的：哪个班、这节课是哪几道题。和课堂看板同一套取法
+ * 提交列表「这节课」那颗按钮要的：哪个班、这节课是哪几道题。和课堂任务同一套取法
  * （老师布置过就用布置的，否则按今天同班提交推断），但不带花名册 —— 列表只拿它当筛选条件。
  * className 为 null = 没指定、最近两小时也没有哪个班在交。
  */
@@ -265,13 +192,13 @@ export const classLessonSchema = z.object({
    * 选了语言时，列表那边连语言一起筛。C / Python 的作业里夹了 SQL 题就是 null：
    * 列表只能筛一种语言，按 C 筛会把 SQL 题交的全藏起来，宁可多列一些
    */
-  language: lessonLanguageSchema,
+  language: assignedLanguageSchema,
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string() })),
 })
 
 /**
- * 老师首页「今天的课」：今天在上课的每个班一行（同班 ≥5 人一起交题，或者老师在看板上布置过）。
- * 题目的人数是今天的（和看板同一套取法），「全做对」看的是这几道题有没有做对过，不限今天
+ * 老师首页「今天的课」：今天在上课的每个班一行（同班 ≥5 人一起交题，或者老师在任务页上布置过）。
+ * 题目的人数是今天的（和任务页同一套取法），「全做对」看的是这几道题有没有做对过，不限今天
  */
 export const classTodaySchema = z.object({
   classes: z.array(
@@ -302,7 +229,7 @@ export const classTodaySchema = z.object({
 })
 
 /**
- * 课上老师在看板（或后台）改了**今天这节**布置的题，推给这个班还开着页面的学生：告诉他们改了哪些，
+ * 课上老师在任务页（或后台）改了**今天这节**布置的题，推给这个班还开着页面的学生：告诉他们改了哪些，
  * 点「刷新」重新载入。只有学生看到的那一节（今天最后布置的）变了才推 —— 改的是今天早些时候的一节、
  * 或者改完和原来一样，都不推。走 /ws/config 那条全局常驻的连接。
  *
@@ -315,7 +242,7 @@ export const lessonUpdateProblemSchema = z.object({ problemDisplayId: z.string()
 export const lessonUpdateSchema = z.object({
   type: z.literal('lesson_update'),
   kind: z.enum(['assigned', 'changed', 'cleared']),
-  language: lessonLanguageSchema,
+  language: assignedLanguageSchema,
   /** 清掉了为 null。languageChanged 连它一起算：改成画流程图、改成先画再写也是「做法变了」 */
   mode: lessonModeSchema.nullable(),
   problems: z.array(lessonUpdateProblemSchema),
@@ -327,19 +254,16 @@ export const lessonUpdateSchema = z.object({
 
 export type LessonUpdate = z.infer<typeof lessonUpdateSchema>
 
-export type ClassActivity = z.infer<typeof classActivitySchema>
 export type ClassToday = z.infer<typeof classTodaySchema>
-export type LastVisit = z.infer<typeof lastVisitSchema>
 export type ClassLessonRequest = z.input<typeof classLessonRequestSchema>
-export type ClassBoard = z.infer<typeof classBoardSchema>
+export type TaskBoard = z.infer<typeof taskBoardSchema>
 export type ClassLesson = z.infer<typeof classLessonSchema>
-export type ClassBoardProblem = z.infer<typeof classBoardProblemSchema>
-export type ClassBoardStudent = z.infer<typeof classBoardStudentSchema>
-export type ClassBoardCell = z.infer<typeof classBoardCellSchema>
-export type ClassActivityProblem = z.infer<typeof classActivityProblemSchema>
+export type TaskBoardProblem = z.infer<typeof taskBoardProblemSchema>
+export type TaskBoardStudent = z.infer<typeof taskBoardStudentSchema>
+export type TaskBoardCell = z.infer<typeof taskBoardCellSchema>
 
 /**
- * 后台「课堂作业」：布置过的每一节课一行（class_lesson），新的在前。看板上当场布置的、
+ * 后台「课堂任务」：布置过的每一节课一行（class_lesson），新的在前。任务页上当场布置的、
  * 后台补的都在这里，数据统计按它们切课。
  */
 export const adminLessonSchema = z.object({
@@ -347,18 +271,18 @@ export const adminLessonSchema = z.object({
   className: z.string(),
   /** 东八区的日子，`2026-10-08` */
   day: z.string(),
-  /** 布置的时刻（看板上第一次布置那一刻；后台补的是填的时刻） */
+  /** 布置的时刻（任务页上第一次布置那一刻；后台补的是填的时刻） */
   createdAt: z.string(),
   updatedAt: z.string(),
-  /** 布置的老师：真名，没有真名用用户名（和看板「谁 布置」一样） */
+  /** 布置的老师：真名，没有真名用用户名（和任务页「谁 布置」一样） */
   createdBy: z.string(),
-  language: lessonLanguageSchema,
+  language: assignedLanguageSchema,
   mode: lessonModeSchema,
   /** 按布置的顺序；题后来被藏起来的 visible 为 false（统计、学生那边都不再出现） */
   problems: z.array(z.object({ problemDisplayId: z.string(), title: z.string(), visible: z.boolean() })),
   /** 班里的学生数（STUDENT_ROLES、没禁用），和 doneCount 同一个花名册 */
   classSize: z.number().int(),
-  /** 把布置的题全做对了的人数（那天结束前；口径同看板） */
+  /** 把布置的题全做对了的人数（那天结束前；口径同任务页） */
   doneCount: z.number().int(),
 })
 
@@ -370,14 +294,14 @@ export const adminLessonListSchema = z.object({
 })
 
 /**
- * 后台新补一节 / 改一节。日子和时刻按东八区填：补的是看板外上的课（没在看板布置、
+ * 后台新补一节 / 改一节。日子和时刻按东八区填：补的是任务页外上的课（没在任务页布置、
  * 以前的课），时刻决定同一天几节课的先后。题目至少一道 —— 删掉一节走 DELETE
  */
 export const adminLessonRequestSchema = z.object({
   className: z.string().trim().min(1),
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  language: lessonLanguageSchema,
+  language: assignedLanguageSchema,
   mode: lessonModeSchema.default('code'),
   problemDisplayIds: z.array(z.string().trim().min(1)).min(1).max(20),
 })

@@ -32,7 +32,7 @@ import { useStatsLink } from './composables/statsLink'
  *
  * 老师课上的三种用法 —— 一条条翻全班的代码、看某一个学生、看完成情况 —— 前两种在
  * 这一页里做完：↑ ↓ 换条，右边跟着换，不再「点开弹框 → 关掉 → 点下一行」。
- * 完成情况在课堂看板和「统计」里，这页不重复造一张表。
+ * 完成情况在课堂任务和「统计」里，这页不重复造一张表。
  */
 
 // 右栏和今日统计弹框都不在关键路径上：右栏要等选中一条才有内容，弹框默认关着
@@ -579,7 +579,7 @@ function dayBreak(index: number) {
       <span v-if="userStore.isAuthed" class="vsep"></span>
 
       <!-- 「我的」时这节课 / 班级 / 学生都用不上：后端只看自己时本来就不认它们 -->
-      <!-- 学生界面没有班级下拉：地址里带着班级（比如从统计页、看板跳过来）就摆一个能点掉的标签，
+      <!-- 学生界面没有班级下拉：地址里带着班级（比如从统计页、任务页跳过来）就摆一个能点掉的标签，
            不然一直被一个看不见的条件筛着 -->
       <button v-if="!teacher && query.className" class="chip on" title="点一下去掉班级筛选" @click="query.className = ''">
         {{ classLabel(query.className) }}<Icon icon="ph:x-bold" :width="12" />
@@ -605,7 +605,7 @@ function dayBreak(index: number) {
         />
       </template>
 
-      <!-- 按整名只看一个人（「只看他」、协作条、看板点进来）：用户名有八九个字，塞进 108px 的
+      <!-- 按整名只看一个人（「只看他」、协作条、任务页点进来）：用户名有八九个字，塞进 108px 的
            输入框只剩半截，还被清除按钮压着 —— 换成一个带名字的标签，点 × 取消 -->
       <button v-if="!mine && exactPerson" class="chip on person" :title="`只看 ${query.username}（点一下取消）`" @click="clearPerson">
         <Icon icon="ph:user-bold" :width="12" />

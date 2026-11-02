@@ -1,440 +1,40 @@
 import {
   STUDENT_ROLES,
   classLessonRequestSchema,
-  type ClassActivity,
   type ClassToday,
-  type ClassBoard,
-  type ClassBoardStudent,
+  type TaskBoard,
+  type TaskBoardStudent,
   type ClassLesson,
-  type ClassActivityProblem,
-  type LastVisit,
-  type LessonLanguage,
-  type LessonMode,
   lessonNeeds,
   type StatisticInfo,
 } from '@oj2/contract'
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
-import { requireAuth, requireTeacher, type AppEnv } from '../auth/middleware'
+import { requireTeacher, type AppEnv } from '../auth/middleware'
 import { seenToday } from '../auth/presence'
-import { getLoginWindow } from '../auth/session'
 import { presenceOf } from '../collab/state'
 import { db, schema } from '../db'
 import { challengeSuccessesOf } from '../services/challenge'
 import { failure, parseBody, success } from '../http'
 import { isAccepted } from '../judge/status'
 import { activityRows, classMemberIds, FLOWCHART_PASSED, lessonLanguageFilter, SOLVED_RESULTS, suggestActiveClass } from '../services/class-activity'
-import { accepted } from '../services/learning-stats'
-import { announceLessonChange, lessonDoneCounts, resolveLessonProblems, todayLessonSnapshot } from '../services/lesson'
+import {
+  announceLessonChange,
+  CLASS_ACTIVITY_MIN_USERS,
+  classDayGroups,
+  classLessonProblems,
+  lessonDoneCounts,
+  resolveLessonProblems,
+  todayLessonSnapshot,
+} from '../services/lesson'
 import { calendarDay, dayStart, localTime } from '../time'
 
-export const classroomRoutes = new Hono<AppEnv>()
-
 /**
- * 同班同一天有这么多人做过，就算「班里在做」。2025 秋的实测分布是两极的：
- * (班级, 日, 题) 要么只有 1 个人（自己在刷），要么 13 人以上（老师点的题），
- * 5 落在中间的空档里，最小的那几个班（十来个人）也够得着。
+ * 课堂任务（老师）：布置这节课的题、看全班做到哪、老师首页的「今天的课」。
+ * 「这节课是哪几道题」的取法在 services/lesson.ts，学生首页的「班里在做」也用它（routes/home.ts）
  */
-const CLASS_ACTIVITY_MIN_USERS = 5
-/** 往回找几天：上完课第二天在家补作业、请假回来的学生，都还能看到上一次课做了什么 */
-const CLASS_ACTIVITY_LOOKBACK_DAYS = 7
-const CLASS_ACTIVITY_LIMIT = 8
-interface ClassDayGroup {
-  day: string
-  problemId: number
-  firstAt: string
-  userCount: number
-  acceptedCount: number
-}
-
-/**
- * 某个班从 `since` 起、按（东八区日, 题）分组的做题人数和通过人数。只算正常状态的学生，
- * 不含比赛提交，代码和流程图合起来数（见 activityRows）。`minUsers` 是「班里在做」的门槛，
- * 给了 `problemIds`（老师布置的题）时不设门槛 —— 那几道题是确定的，一个人都没交也要列出来。
- *
- * 给了 `mode`（老师布置的这节做什么）：写代码只数代码、画流程图只数流程图；先画再写两种都数，
- * 「通过」要同一个人两样都做到 —— 所以先按人归一遍再数
- */
-async function classDayGroups(
-  className: string,
-  since: string,
-  options: { minUsers?: number; problemIds?: number[]; language?: LessonLanguage | null; mode?: LessonMode | null } = {},
-): Promise<ClassDayGroup[]> {
-  const { mode } = options
-  const activity = activityRows({
-    since,
-    users: classMemberIds(className),
-    problemIds: options.problemIds,
-    language: options.language,
-    only: mode === 'code' || mode === 'flowchart' ? mode : undefined,
-  })
-  const day = sql<string>`to_char(${localTime(activity.createTime)}, 'YYYY-MM-DD')`
-  const perUser = db
-    .select({
-      day: day.as('day'),
-      problemId: sql<number>`${activity.problemId}`.as('problem_id'),
-      userId: sql<number>`${activity.userId}`.as('user_id'),
-      firstAt: sql<string>`min(${activity.createTime})`.as('first_at'),
-      solved: (mode === 'both'
-        ? sql<boolean>`bool_or(${activity.kind} = 'code' and ${activity.solved}) and bool_or(${activity.kind} = 'flowchart' and ${activity.solved})`
-        : sql<boolean>`bool_or(${activity.solved})`
-      ).as('solved'),
-    })
-    .from(activity)
-    .groupBy(day, activity.problemId, activity.userId)
-    .as('per_user')
-  const userCount = sql<number>`count(*)::int`
-  const query = db
-    .select({
-      day: perUser.day,
-      problemId: perUser.problemId,
-      firstAt: sql<string>`min(${perUser.firstAt})`,
-      userCount,
-      acceptedCount: sql<number>`(count(*) filter (where ${perUser.solved}))::int`,
-    })
-    .from(perUser)
-    .groupBy(perUser.day, perUser.problemId)
-  return options.minUsers ? query.having(sql`${userCount} >= ${options.minUsers}`) : query
-}
-
-/** 按 id 取题，只留学生看得见的（题库里、visible），被藏起来的点进去也是 404 */
-async function visibleProblems(ids: number[]) {
-  if (!ids.length) return new Map<number, { id: number; displayId: string; title: string; isSql: boolean }>()
-  const rows = await db
-    .select({
-      id: schema.problem.id,
-      displayId: schema.problem.displayId,
-      title: schema.problem.title,
-      isSql: sql<boolean>`${schema.problem.languages} @> '["SQL"]'::jsonb`,
-    })
-    .from(schema.problem)
-    .where(and(inArray(schema.problem.id, ids), eq(schema.problem.visible, true), isNull(schema.problem.contestId)))
-  return new Map(rows.map((row) => [row.id, row]))
-}
-
-/**
- * 老师给这个班今天布置的题（problem.id，按输入顺序）、选的语言和做什么、布置时刻和布置的老师；
- * 没布置为 null。一天布置过几节的，取最后布置的那一节。老师写真名：老师之间认的是名字，用户名（lwp0201、little）认不出是谁
- */
-async function lessonPlan(className: string, day: string) {
-  const [row] = await db
-    .select({
-      id: schema.classLesson.id,
-      problemIds: schema.classLesson.problemIds,
-      language: schema.classLesson.language,
-      mode: schema.classLesson.mode,
-      createdAt: schema.classLesson.createdAt,
-      createdBy: sql<string>`coalesce(nullif(${schema.userProfile.realName}, ''), ${schema.user.username})`,
-    })
-    .from(schema.classLesson)
-    .innerJoin(schema.user, eq(schema.user.id, schema.classLesson.createdBy))
-    .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.classLesson.createdBy))
-    .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, day)))
-    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
-    .limit(1)
-  return row?.problemIds.length ? row : null
-}
-
-/**
- * 班里「这节课」的题。老师在课堂看板布置过就用老师的（source = teacher），
- * 否则从同班提交记录推断（source = inferred）：同班同一天 ≥ 5 人做过的题，只取最近的
- * **一天**、按那天第一次有人提交的时间排 —— 大致就是老师点题的顺序。
- *
- * 老师布置的优先，是因为推断在上课头几分钟是空的（还没人交），而那正是没听清题号的
- * 学生最需要它的时候。
- */
-async function classLessonProblems(className: string, lookbackDays: number) {
-  const today = calendarDay()
-  const plan = await lessonPlan(className, today)
-  if (plan) {
-    const planned = plan.problemIds
-    const [problems, groups] = await Promise.all([
-      visibleProblems(planned),
-      classDayGroups(className, dayStart(), { problemIds: planned, language: plan.language, mode: plan.mode }),
-    ])
-    const groupById = new Map(groups.map((row) => [row.problemId, row]))
-    return {
-      source: 'teacher' as const,
-      lessonId: plan.id,
-      day: today,
-      language: plan.language ?? null,
-      mode: plan.mode,
-      assignedAt: plan.createdAt,
-      assignedBy: plan.createdBy,
-      problems: planned.flatMap((id) => {
-        const problem = problems.get(id)
-        if (!problem) return []
-        const group = groupById.get(id)
-        return [
-          {
-            ...problem,
-            userCount: group?.userCount ?? 0,
-            acceptedCount: group?.acceptedCount ?? 0,
-          },
-        ]
-      }),
-    }
-  }
-
-  const since = dayStart(Date.now() - (lookbackDays - 1) * 86_400_000)
-  const groups = await classDayGroups(className, since, { minUsers: CLASS_ACTIVITY_MIN_USERS })
-  const latest = groups.reduce<string | null>((acc, row) => (!acc || row.day > acc ? row.day : acc), null)
-  const picked = groups
-    .filter((row) => row.day === latest)
-    .sort((a, b) => a.firstAt.localeCompare(b.firstAt))
-    .slice(0, CLASS_ACTIVITY_LIMIT)
-  const problems = await visibleProblems(picked.map((row) => row.problemId))
-  return {
-    source: picked.length ? ('inferred' as const) : null,
-    lessonId: null,
-    day: picked.length ? latest : null,
-    // 推断出来的课不知道老师要的是哪种语言、要画还是要写，不限
-    language: null,
-    mode: null,
-    assignedAt: null,
-    assignedBy: null,
-    problems: picked.flatMap((row) => {
-      const problem = problems.get(row.problemId)
-      return problem ? [{ ...problem, userCount: row.userCount, acceptedCount: row.acceptedCount }] : []
-    }),
-  }
-}
-
-/** 「上次来」超过这么多天就不提那次做了什么，只在问候里说一句隔了多久 */
-const LAST_VISIT_MAX_DAYS = 30
-
-/**
- * 首页的「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对。
- * 原来是登录后弹的「登录速报」，数字外加 AI 两句话 —— AI 只拿到那五个数，说的就是复述，
- * 还要同步等模型（最长 60 秒）弹框才出来；现在拆进首页，没做对的题给「接着做」
- */
-classroomRoutes.get('/me/last-visit', requireAuth, async (c) => {
-  const user = c.get('user')!
-  const window = await getLoginWindow(c)
-  const previousLogin = window?.previousLogin ?? null
-  if (!window || !previousLogin || Date.now() - new Date(previousLogin).getTime() > LAST_VISIT_MAX_DAYS * 864e5) {
-    return success(c, { previousLogin, summary: null } satisfies LastVisit)
-  }
-  const rows = await db
-    .select({
-      problemId: schema.submission.problemId,
-      problemDisplayId: schema.problem.displayId,
-      title: schema.problem.title,
-      result: schema.submission.result,
-      createTime: schema.submission.createTime,
-    })
-    .from(schema.submission)
-    .innerJoin(schema.problem, eq(schema.problem.id, schema.submission.problemId))
-    .where(
-      and(
-        eq(schema.submission.userId, user.id),
-        isNull(schema.submission.contestId),
-        gte(schema.submission.createTime, previousLogin),
-        lt(schema.submission.createTime, window.loginAt),
-      ),
-    )
-    .orderBy(asc(schema.submission.createTime))
-  if (!rows.length) return success(c, { previousLogin, summary: null } satisfies LastVisit)
-
-  // 按题归拢：rows 按时间正序，所以后来的覆盖 lastResult / lastTime，第一次 AC 的先进 solved
-  const byProblem = new Map<
-    number,
-    {
-      problemDisplayId: string
-      title: string
-      attempts: number
-      lastResult: (typeof rows)[number]['result']
-      lastTime: string
-      solved: boolean
-    }
-  >()
-  const solved: { problemDisplayId: string; title: string }[] = []
-  for (const row of rows) {
-    const item = byProblem.get(row.problemId) ?? {
-      problemDisplayId: row.problemDisplayId,
-      title: row.title,
-      attempts: 0,
-      lastResult: row.result,
-      lastTime: row.createTime,
-      solved: false,
-    }
-    item.attempts++
-    item.lastResult = row.result
-    item.lastTime = row.createTime
-    if (!item.solved && accepted.includes(row.result)) {
-      item.solved = true
-      solved.push({ problemDisplayId: row.problemDisplayId, title: row.title })
-    }
-    byProblem.set(row.problemId, item)
-  }
-  // 那次没做对的，再看以前、以及这次登录之后有没有做对过 —— 做对过的就不再催「接着做」
-  const tried = [...byProblem].filter(([, item]) => !item.solved).map(([id]) => id)
-  const everSolved = tried.length
-    ? new Set(
-        (
-          await db
-            .selectDistinct({ problemId: schema.submission.problemId })
-            .from(schema.submission)
-            .where(
-              and(
-                eq(schema.submission.userId, user.id),
-                isNull(schema.submission.contestId),
-                inArray(schema.submission.problemId, tried),
-                inArray(schema.submission.result, accepted),
-              ),
-            )
-        ).map((row) => row.problemId),
-      )
-    : new Set<number>()
-  const unsolved = tried
-    .filter((id) => !everSolved.has(id))
-    .map((id) => byProblem.get(id)!)
-    .sort((a, b) => b.lastTime.localeCompare(a.lastTime))
-    .slice(0, 3)
-    .map(({ problemDisplayId, title, attempts, lastResult }) => ({
-      problemDisplayId,
-      title,
-      attempts,
-      lastResult,
-    }))
-  return success(c, {
-    previousLogin,
-    summary: {
-      submissionCount: rows.length,
-      solvedCount: solved.length,
-      lastSubmitTime: rows.at(-1)!.createTime,
-      unsolved,
-      solved: solved.slice(0, 12),
-    },
-  } satisfies LastVisit)
-})
-
-/**
- * 学生首页的「班里在做」。课上老师报题号、全班去找 —— 这是 2025 秋七成非比赛提交的
- * 来路，但界面上原本没有它的入口，没听清题号的只能问同桌。
- */
-classroomRoutes.get('/me/class-activity', requireAuth, async (c) => {
-  const user = c.get('user')!
-  if (!user.className) {
-    return success(c, {
-      className: null,
-      day: null,
-      source: null,
-      language: null,
-      mode: null,
-      problems: [],
-    } satisfies ClassActivity)
-  }
-
-  const lesson = await classLessonProblems(user.className, CLASS_ACTIVITY_LOOKBACK_DAYS)
-  const ids = lesson.problems.map((problem) => problem.id)
-  const steps = lesson.source === 'teacher' && lesson.mode ? await todaySteps(user.className, ids, lesson) : null
-  const codeLanguage = steps ? steps.language : lesson.language
-  // 代码提交和流程图提交两张表，互不依赖，一起查
-  const [mine, drawn] = await Promise.all([
-    ids.length
-      ? db
-          .select({
-            problemId: schema.submission.problemId,
-            accepted: sql<boolean>`bool_or(${inArray(schema.submission.result, SOLVED_RESULTS)})`,
-          })
-          .from(schema.submission)
-          .where(
-            and(
-              eq(schema.submission.userId, user.id),
-              inArray(schema.submission.problemId, ids),
-              isNull(schema.submission.contestId),
-              // 布置的是 C：以前用 Python 做对过不算这份作业做完
-              lessonLanguageFilter(codeLanguage),
-            ),
-          )
-          .groupBy(schema.submission.problemId)
-      : [],
-    // 流程图：交过就算「做过」，评分中、评失败的也算 —— 和代码提交编译错误也算「做过」同一个口径
-    ids.length
-      ? db
-          .select({
-            problemId: schema.flowchartSubmission.problemId,
-            passed: sql<boolean>`coalesce(bool_or(${FLOWCHART_PASSED}), false)`,
-          })
-          .from(schema.flowchartSubmission)
-          .where(and(eq(schema.flowchartSubmission.userId, user.id), inArray(schema.flowchartSubmission.problemId, ids)))
-          .groupBy(schema.flowchartSubmission.problemId)
-      : [],
-  ])
-  type Step = 'accepted' | 'tried' | 'none'
-  const stepOf = (value: boolean | undefined): Step => (value === undefined ? 'none' : value ? 'accepted' : 'tried')
-  const codeById = new Map(mine.map((row) => [row.problemId, row.accepted]))
-  const drawById = new Map(drawn.map((row) => [row.problemId, row.passed]))
-
-  return success(c, {
-    className: user.className,
-    day: lesson.day,
-    source: lesson.source,
-    language: codeLanguage,
-    mode: lesson.mode,
-    problems: lesson.problems.map((problem) => {
-      const code = stepOf(codeById.get(problem.id))
-      const draw = stepOf(drawById.get(problem.id))
-      const needs = steps?.needs.get(problem.id)
-      let myStatus: Step
-      if (needs) {
-        // 老师布置的：要哪几步就看哪几步，全做到才算做完
-        const wanted = [needs.draw ? draw : null, needs.code ? code : null].filter((step): step is Step => step !== null)
-        myStatus = wanted.every((step) => step === 'accepted') ? 'accepted' : wanted.some((step) => step !== 'none') ? 'tried' : 'none'
-      } else {
-        // 推断出来的课：代码交对或流程图画到 A / S 都算（有的题全班在画流程图，只看代码的话永远是「没做」）
-        myStatus = code === 'accepted' || draw === 'accepted' ? 'accepted' : code === 'tried' || draw === 'tried' ? 'tried' : 'none'
-      }
-      return {
-        problemDisplayId: problem.displayId,
-        title: problem.title,
-        userCount: problem.userCount,
-        acceptedCount: problem.acceptedCount,
-        myStatus,
-        draw: needs?.draw ? draw : null,
-        code: needs?.code ? code : null,
-      } satisfies ClassActivityProblem
-    }),
-  } satisfies ClassActivity)
-})
-
-/**
- * 学生那边一道题要画还是要写：今天这个班布置过的每一节里，凡是有这道题的，要求合起来算。
- * 老师先布置一节画流程图、再布置一节同样的题写代码时，还没画完的人照样看得到要画 ——
- * 学生只看得到今天最后布置的那一节，不合起来的话，画流程图那节一布置写代码就没了。
- *
- * 写代码用的语言：今天最后布置的、要写代码的那一节选的（只画流程图的课没有语言）
- */
-async function todaySteps(
-  className: string,
-  problemIds: number[],
-  latest: { lessonId: number | null; language: LessonLanguage | null; mode: LessonMode | null },
-) {
-  const rows = await db
-    .select({ id: schema.classLesson.id, problemIds: schema.classLesson.problemIds, language: schema.classLesson.language, mode: schema.classLesson.mode })
-    .from(schema.classLesson)
-    .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, calendarDay())))
-    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
-  const needs = new Map<number, { draw: boolean; code: boolean }>()
-  let language: LessonLanguage | null = latest.mode && lessonNeeds(latest.mode).code ? latest.language : null
-  let languageFound = !!latest.mode && lessonNeeds(latest.mode).code
-  for (const row of rows) {
-    const shared = row.id === latest.lessonId ? problemIds : row.problemIds.filter((id) => problemIds.includes(id))
-    if (!shared.length) continue
-    const rowNeeds = lessonNeeds(row.mode)
-    for (const id of shared) {
-      const known = needs.get(id) ?? { draw: false, code: false }
-      needs.set(id, { draw: known.draw || rowNeeds.draw, code: known.code || rowNeeds.code })
-    }
-    if (!languageFound && rowNeeds.code) {
-      language = row.language ?? null
-      languageFound = true
-    }
-  }
-  return { needs, language }
-}
+export const taskRoutes = new Hono<AppEnv>()
 
 /**
  * 一张流程图走对了几组、一共几组：2026-10 起的「走例子」报告（ai_criteria_details version 2，
@@ -450,7 +50,7 @@ function flowchartCaseCounts() {
 }
 
 /**
- * 看板上的「最近几节课交了几节」：分清「今天没来」和「一直不动手」。2025 秋至少上过
+ * 任务页上的「最近几节课交了几节」：分清「今天没来」和「一直不动手」。2025 秋至少上过
  * 5 节课的学生里，12.5% 七成以上的课一道都没交，37% 的学生贡献了一半以上的「没交」
  * —— 当堂那份名单把这两种人排在同一行里，老师分不出来。
  */
@@ -459,11 +59,11 @@ const RECENT_LESSONS = 5
 const RECENT_LESSONS_WINDOW_DAYS = 45
 
 /**
- * 课堂看板：这个班、今天、这节课的几道题 × 全班学生。老师在课上用它看谁还没开始、
+ * 课堂任务：这个班、今天、这节课的几道题 × 全班学生。老师在课上用它看谁还没开始、
  * 谁卡住了 —— 2025 秋平均每节课有 14 个平时在用的学生一道都没交（占三分之一），
  * 而交了 3 次以上还没过的平均不到 1 个，所以「还没开始」才是这张表的重点，排序在前端。
  */
-classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
+taskRoutes.get('/task/board', requireTeacher, async (c) => {
   const day = calendarDay()
   const className = c.req.query('className')?.trim() || (await suggestActiveClass())
   if (!className) {
@@ -480,10 +80,10 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
       problems: [],
       students: [],
       recentLessons: 0,
-    } satisfies ClassBoard)
+    } satisfies TaskBoard)
   }
 
-  // 推断只看今天（回看 1 天）：看板是给这节课用的，昨天的题不该冒出来。
+  // 推断只看今天（回看 1 天）：任务页是给这节课用的，昨天的题不该冒出来。
   // lastLanguage 给语言下拉当默认值：这个班上一次布置选的什么（一个班一般一学期只学一种）
   const [lesson, [last]] = await Promise.all([
     classLessonProblems(className, 1),
@@ -562,7 +162,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
           .where(and(inArray(schema.submission.userId, userIds), gte(schema.submission.createTime, start)))
           .groupBy(schema.submission.userId)
       : [],
-    // 今天只画了流程图的学生，「最后一次提交」也得算上画图，不然他在看板上是一直没动手。
+    // 今天只画了流程图的学生，「最后一次提交」也得算上画图，不然他在任务页上是一直没动手。
     // 和上面代码那条同一个范围：今天、所有题、不论评没评完
     userIds.length
       ? db
@@ -586,7 +186,7 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
       : [],
     /**
      * 流程图作业：画到 A / S 也算这道题做完，和学生首页的课堂条同一个口径（/me/class-activity）。
-     * 有的题这节课整个班都在画流程图，只数代码提交的话，看板上满屏「没开始」。
+     * 有的题这节课整个班都在画流程图，只数代码提交的话，任务页上满屏「没开始」。
      * 和代码那条（cells）同一个范围：交过就算尝试，评分中、评失败的也算
      */
     ids.length && userIds.length
@@ -769,18 +369,18 @@ classroomRoutes.get('/classroom/board', requireTeacher, async (c) => {
           editing: presenceOf(student.userId)?.problemId ?? null,
           online: seen.get(student.userId)?.online ?? false,
           seenAt: seen.has(student.userId) ? new Date(seen.get(student.userId)!.at).toISOString() : null,
-        }) satisfies ClassBoardStudent,
+        }) satisfies TaskBoardStudent,
     ),
     recentLessons: recentDays.length,
-  } satisfies ClassBoard)
+  } satisfies TaskBoard)
 })
 
 /**
  * 老师首页「今天的课」：今天在上课的每个班一行。在上课 = 同班 ≥5 人今天一起交过题（和「班里在做」
- * 同一个门槛），或者老师今天在看板上布置过题（刚布置、还没人交也要列出来）。每个班的题和人数
- * 和看板同一套取法（classLessonProblems），「全做对」看这几道题做没做对过，不限今天
+ * 同一个门槛），或者老师今天在任务页上布置过题（刚布置、还没人交也要列出来）。每个班的题和人数
+ * 和任务页同一套取法（classLessonProblems），「全做对」看这几道题做没做对过，不限今天
  */
-classroomRoutes.get('/classroom/today', requireTeacher, async (c) => {
+taskRoutes.get('/task/today', requireTeacher, async (c) => {
   const start = dayStart()
   const today = calendarDay()
   const activity = activityRows({ since: start })
@@ -810,13 +410,13 @@ classroomRoutes.get('/classroom/today', requireTeacher, async (c) => {
       const ids = lesson.problems.map((problem) => problem.id)
       let allDoneCount = 0
       if (ids.length && lesson.source === 'teacher' && lesson.lessonId && lesson.mode) {
-        // 老师布置的：和看板、后台课堂作业同一个口径（要画的看图、要写的看代码）
+        // 老师布置的：和任务页、后台课堂任务同一个口径（要画的看图、要写的看代码）
         const counts = await lessonDoneCounts([
           { id: lesson.lessonId, className, day: calendarDay(), problemIds: ids, language: lesson.language, mode: lesson.mode },
         ])
         allDoneCount = counts.get(lesson.lessonId) ?? 0
       } else if (ids.length) {
-        // 推断出来的：做没做对不限今天（和看板的格子一样：以前做对的也算做完），代码或流程图都算
+        // 推断出来的：做没做对不限今天（和任务页的格子一样：以前做对的也算做完），代码或流程图都算
         const done = activityRows({
           since: new Date(0).toISOString(),
           users: classMemberIds(className),
@@ -857,10 +457,10 @@ classroomRoutes.get('/classroom/today', requireTeacher, async (c) => {
 })
 
 /**
- * 提交列表「这节课」按钮：这个班这节课是哪几道题，取法同课堂看板（老师布置的优先，
+ * 提交列表「这节课」按钮：这个班这节课是哪几道题，取法同课堂任务（老师布置的优先，
  * 否则按今天同班提交推断）。不传班级就猜最近两小时在交题的班
  */
-classroomRoutes.get('/classroom/lesson', requireTeacher, async (c) => {
+taskRoutes.get('/task/lesson', requireTeacher, async (c) => {
   const className = c.req.query('className')?.trim() || (await suggestActiveClass())
   if (!className)
     return success(c, {
@@ -869,7 +469,7 @@ classroomRoutes.get('/classroom/lesson', requireTeacher, async (c) => {
       language: null,
       problems: [],
     } satisfies ClassLesson)
-  // 和看板一样只回看今天：「这节课」不该冒出昨天的题
+  // 和任务页一样只回看今天：「这节课」不该冒出昨天的题
   const lesson = await classLessonProblems(className, 1)
   // C / Python 的作业夹了 SQL 题就不筛语言（见契约 classLessonSchema.language）
   const mixed = lesson.problems.some((problem) => problem.isSql !== (lesson.language === 'SQL'))
@@ -889,12 +489,12 @@ classroomRoutes.get('/classroom/lesson', requireTeacher, async (c) => {
  * 有对不上的题号就整个拒掉并点名是哪几个，免得存下半张单子老师还不知道。空数组 = 清掉这一节，
  * 今天一节都不剩时学生那边退回推断。改哪一节、还是新开一节，见契约 classLessonRequestSchema。
  */
-classroomRoutes.put('/classroom/lesson', requireTeacher, async (c) => {
+taskRoutes.put('/task/lesson', requireTeacher, async (c) => {
   const parsed = await parseBody(c, classLessonRequestSchema, '题号或语言不对')
   if (!parsed.success) return parsed.response
   const user = c.get('user')!
   const { className, problemDisplayIds, lessonId, newLesson, mode } = parsed.data
-  // 只画流程图不用语言：存成 null，看板和学生那边就不会写「C语言」
+  // 只画流程图不用语言：存成 null，任务页和学生那边就不会写「C语言」
   const language = mode === 'flowchart' ? null : parsed.data.language
   const day = calendarDay()
 

@@ -64,7 +64,7 @@ export const createFlowchartResponseSchema = z.object({
   status: z.literal('pending'),
 })
 /**
- * 流程图画到这两档算这道题做完：题单进度、课堂条、课堂看板、「你画的流程图」、结果页签的 ✓
+ * 流程图画到这两档算这道题做完：题单进度、课堂条、课堂任务、「你画的流程图」、结果页签的 ✓
  * 都按它（设计文档 2026-09-28-problem-page-redesign 第 3 节决定 4、6）。前后端只有这一份
  */
 export const FLOWCHART_PASS_GRADES = ['S', 'A'] as const

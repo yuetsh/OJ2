@@ -251,8 +251,8 @@ export type { WeeklyRank, WeeklyRankItem } from '@oj2/contract'
 /** 班里最近一次一起做的题（课上老师点的那几道），见后端 `/me/class-activity` */
 export type { ClassActivity, ClassActivityProblem, LastVisit } from '@oj2/contract'
 
-/** 课堂看板：一个班今天这节课的题 × 全班学生 */
-export type { ClassBoard, ClassBoardProblem, ClassBoardStudent, ClassBoardCell, ClassLesson } from '@oj2/contract'
+/** 课堂任务：一个班今天这节课的题 × 全班学生 */
+export type { TaskBoard, TaskBoardProblem, TaskBoardStudent, TaskBoardCell, ClassLesson } from '@oj2/contract'
 
 /** 知识点地图：每个知识点做对几道、在第几档，只给自己看 */
 export type { KnowledgeLevel, KnowledgeMap } from '@oj2/contract'

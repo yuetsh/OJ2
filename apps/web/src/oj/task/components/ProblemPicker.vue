@@ -9,7 +9,7 @@ import type { ProblemRow } from 'utils/types'
 import ProblemTypeTag from 'oj/problem/components/ProblemTypeTag.vue'
 
 /**
- * 看板布置作业的「选题」弹框：左边按知识点分，右边勾题，底下按勾的先后排成这节课的顺序。
+ * 任务页布置任务的「选题」弹框：左边按知识点分，右边勾题，底下按勾的先后排成这节课的顺序。
  * 只列这节课做得了的题（左栏题数也这样数）：要写代码的只列能用这次作业的语言交的，
  * 要画流程图的只列打开了画流程图的。不用再一个个记题号。
  * 点「布置」直接存，和在输入框里敲题号回车是一回事
@@ -23,7 +23,7 @@ const props = defineProps<{
 }>()
 const show = defineModel<boolean>('show', { required: true })
 const language = defineModel<LessonLanguage>('language', { required: true })
-/** 这节课做什么（写代码 / 画流程图 / 先画再写），和看板上那个下拉是同一个 */
+/** 这节课做什么（写代码 / 画流程图 / 先画再写），和任务页上那个下拉是同一个 */
 const lessonMode = defineModel<LessonMode>('lessonMode', { required: true })
 const needs = computed(() => lessonNeeds(lessonMode.value))
 /** 只画流程图不看语言 */

@@ -377,9 +377,9 @@ export const dashboardInfoSchema = z.object({
   todaySystemErrorCount: z.number().int(),
   /** 现在在线的人数（5 分钟内有动静，auth/presence.ts） */
   onlineCount: z.number().int(),
-  /** 正在上课的班（最近两小时同班在交题，和课堂看板猜班同一个办法）；没有为 null */
+  /** 正在上课的班（最近两小时同班在交题，和课堂任务猜班同一个办法）；没有为 null */
   activeClass: z.string().nullable(),
-  /** 全站的数（看板那一排）。学生 = 普通用户 + 学生管理员，老师 = 教师管理员 + 超管 */
+  /** 全站的数（后台首页看板那一排）。学生 = 普通用户 + 学生管理员，老师 = 教师管理员 + 超管 */
   site: z.object({
     students: z.number().int(),
     teachers: z.number().int(),

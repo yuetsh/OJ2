@@ -19,23 +19,23 @@ import SubmissionView from 'oj/submission/components/SubmissionView.vue'
 import UserName from 'shared/components/UserName.vue'
 import { useBackClose } from 'shared/composables/backClose'
 import { useBreakpoints } from 'shared/composables/breakpoints'
-import type { ClassBoardProblem } from 'utils/types'
+import type { TaskBoardProblem } from 'utils/types'
 import FlowchartExplain from './FlowchartExplain.vue'
 import ProblemBrief from './ProblemBrief.vue'
 
 /**
- * 课堂看板「讲错误」（设计稿 BdOpen）：点一个红格子或错法堆里的名字打开。老师在讲台上
+ * 课堂任务「讲错误」（设计稿 BdOpen）：点一个红格子或错法堆里的名字打开。老师在讲台上
  * 一个个讲这道题错着的人，所以顶上是这几个人，← → 换人；下面和独立的提交详情页同一块
  * （代码占满宽、为什么错在后），只是不出名字那一行、点「第几次」就地换。
  *
  * 「题目」按钮：演示错误时题目和代码要并排（用户要的），点了左边出题目，再点收起。
  * 平时收着，代码照样占满宽。开没开记在这台电脑上，讲下一个人、下一道题还是那样
  *
- * 手机上（老师拿手机看看板）：顶上拆成三行 —— 题目和关闭、一排人（横着滑）、两个按钮；
+ * 手机上（老师拿手机看任务页）：顶上拆成三行 —— 题目和关闭、一排人（横着滑）、两个按钮；
  * 没有键盘所以不写「← → 换人」；题目展开时叠在代码上面，不并排
  */
 const props = defineProps<{
-  problem: ClassBoardProblem | null
+  problem: TaskBoardProblem | null
   people: ExplainPerson[]
 }>()
 const show = defineModel<boolean>('show', { required: true })
@@ -43,7 +43,7 @@ const index = defineModel<number>('index', { required: true })
 
 const theme = useThemeVars()
 const { isMobile } = useBreakpoints()
-// 手机上是整屏的：按返回键关掉它回到看板，不是退出看板
+// 手机上是整屏的：按返回键关掉它回到任务页，不是退出任务页
 useBackClose(show, isMobile)
 /**
  * 颜色走内联的 CSS 变量，不用 <style> 里的 v-bind()：n-modal 把内容挂到 body 下面，

@@ -8,10 +8,10 @@ import UserName from 'shared/components/UserName.vue'
  * 老师协作时右栏顶上的一条（设计稿「举手与协作」HcPageA）：正在帮谁、举手多久了、
  * 看他交过什么、帮完了、下一个。语言不写（用户说的）：编辑器工具栏的语言下拉就摆在下面。
  *
- * 用户选的方案 A 是「跳到题目页帮」，为了演示错误时题目和代码并排；代价是要离开看板，
- * 所以「帮完了」自动回到这个班的看板，还有人举手就给「下一个」直接去下一个人的题。
+ * 用户选的方案 A 是「跳到题目页帮」，为了演示错误时题目和代码并排；代价是要离开任务页，
+ * 所以「帮完了」自动回到这个班的任务页，还有人举手就给「下一个」直接去下一个人的题。
  *
- * 老师在看板上主动打开的（学生没举手，mode = peek）写「正在看 X 的代码」，按钮叫「看完了」。
+ * 老师在任务页上主动打开的（学生没举手，mode = peek）写「正在看 X 的代码」，按钮叫「看完了」。
  */
 const collabStore = useCollabStore()
 const { problem } = storeToRefs(useProblemStore())
@@ -46,7 +46,7 @@ function openHisSubmissions() {
 }
 
 /**
- * 帮完了：结束这次（求助记录一并清掉），回到这个班的看板。
+ * 帮完了：结束这次（求助记录一并清掉），回到这个班的任务页。
  * 等 room_closed 回来、room 清空了再跳 —— 房间还开着时离开题目页，题目页的拦截
  * （detail.vue 的 confirmLeavingHelp）会把跳转改成开新标签
  */
@@ -54,7 +54,7 @@ async function finish() {
   const className = room.value?.peerClassName
   collabStore.leave('done')
   await until(() => collabStore.room).toBe(null, { timeout: 3000 })
-  router.push({ name: 'classroom board', query: className ? { className } : {} })
+  router.push({ name: 'task', query: className ? { className } : {} })
 }
 
 /**

@@ -1293,10 +1293,10 @@ export const exerciseAttempt = pgTable(
 )
 
 /**
- * 老师给某个班布置的一节课的题（课堂看板里布置的），一次布置一行。一个班一天可以有几节
+ * 老师给某个班布置的一节课的题（课堂任务里布置的），一次布置一行。一个班一天可以有几节
  * 内容不同的课，数据统计按它切课（routes/submission-statistics.ts）。
  *
- * 学生首页的「班里在做」优先读它，没有才退回从提交记录推断（routes/classroom.ts）。
+ * 学生首页的「班里在做」优先读它，没有才退回从提交记录推断（services/lesson.ts 的 classLessonProblems）。
  * 推断在上课头几分钟是空的 —— 还没人交 —— 而这正是没听清题号的学生最需要它的时候。
  *
  * - `day` 是**东八区日历日**文本（`calendarDay()` 写的 `YYYY-MM-DD`），不用 date 列：
@@ -1322,7 +1322,7 @@ export const classLesson = pgTable(
     problemIds: jsonb('problem_ids').notNull().$type<number[]>(),
     /**
      * 这份作业用什么语言做（Python / C / C++ / SQL），老师布置时选。可空：加这一列之前布置的
-     * 没有它。写入侧在 PUT /classroom/lesson 按 lessonLanguageSchema 校验过
+     * 没有它。写入侧在 PUT /task/lesson 按 lessonLanguageSchema 校验过
      */
     language: text().$type<LessonLanguage>(),
     /**
@@ -1330,11 +1330,11 @@ export const classLesson = pgTable(
      * 都是写代码。写入侧按 lessonModeSchema 校验过
      */
     mode: text().$type<LessonMode>().notNull().default('code'),
-    /** 这一节第一次布置的老师，别的老师「改」也不换（和 createdAt 一样）。看板上写「HH:mm 谁 布置」 */
+    /** 这一节第一次布置的老师，别的老师「改」也不换（和 createdAt 一样）。任务页上写「HH:mm 谁 布置」 */
     createdBy: integer('created_by').notNull(),
     /**
      * 这一节第一次布置的时刻，之后「改」只动 updatedAt。清掉（删行）再布置算重新开始。
-     * 同一天有几节时，按它分先后：最后布置的那一节是看板上的「这节课」。
+     * 同一天有几节时，按它分先后：最后布置的那一节是任务页上的「这节课」。
      * 加这一列之前布置的用 updated_at 回填（0034）
      */
     createdAt: timestamp('created_at', {

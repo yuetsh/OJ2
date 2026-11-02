@@ -10,8 +10,8 @@ import HelpRequestList from './HelpRequestList.vue'
  * 按钮闪一下（约 1 秒、没声音、不挡内容），代替原来每来一个就弹一条的 toast：
  * 那条 toast 一节课能弹十几次，讲台电脑投着屏的时候还弹在全班面前。
  *
- * 点开是挂在按钮下面的举手面板（HelpRequestList），不是弹框。课堂看板的表里举手的人
- * 排最前、行里就有「帮他」，在看板上不用点这里。
+ * 点开是挂在按钮下面的举手面板（HelpRequestList），不是弹框。课堂任务的表里举手的人
+ * 排最前、行里就有「帮他」，在任务页上不用点这里。
  */
 const props = withDefaults(defineProps<{ size?: 'medium' | 'small' }>(), { size: 'medium' })
 

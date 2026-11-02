@@ -73,7 +73,7 @@ function typeFilter(type: ProblemTypeFilter | undefined) {
 }
 
 /**
- * 课堂看板「选题」弹框只列能用这次作业的语言交的题（`?language=C`），左栏知识点的题数也按它数。
+ * 课堂任务「选题」弹框只列能用这次作业的语言交的题（`?language=C`），左栏知识点的题数也按它数。
  * 学生的题目列表不带这个参数
  */
 function lessonLanguageFilter(raw: string | undefined) {

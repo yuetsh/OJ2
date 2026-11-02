@@ -26,7 +26,7 @@ import {
   type Tutorial,
   type ClassToday,
   type LastVisit,
-  type ClassBoard,
+  type TaskBoard,
   type ClassLesson,
   type KnowledgeMap,
   type ClassBattleItem,
@@ -251,14 +251,14 @@ export function getWeeklyRank(scope: 'global' | 'class') {
   return api.get<WeeklyRank>('rankings/weekly', { params: { scope } })
 }
 
-/** 课堂看板（老师）。不给班级时后端猜最近两小时在交题的那个班 */
-export function getClassBoard(className?: string) {
-  return api.get<ClassBoard>('classroom/board', { params: { className } })
+/** 课堂任务（老师）。不给班级时后端猜最近两小时在交题的那个班 */
+export function getTaskBoard(className?: string) {
+  return api.get<TaskBoard>('task/board', { params: { className } })
 }
 
-/** 这个班「这节课」的题（提交列表那颗按钮用）。不传班级就猜正在上课的班，和看板一样 */
+/** 这个班「这节课」的题（提交列表那颗按钮用）。不传班级就猜正在上课的班，和任务页一样 */
 export function getClassLesson(className?: string) {
-  return api.get<ClassLesson>('classroom/lesson', { params: { className } })
+  return api.get<ClassLesson>('task/lesson', { params: { className } })
 }
 
 /**
@@ -266,7 +266,7 @@ export function getClassLesson(className?: string) {
  * （一个班一天可以上几节内容不同的课），否则改那一节
  */
 export function setClassLesson(className: string, problemDisplayIds: string[], language: LessonLanguage | null, mode: LessonMode, lessonId: number | null) {
-  return api.put<null>('classroom/lesson', {
+  return api.put<null>('task/lesson', {
     className,
     problemDisplayIds,
     language,
@@ -282,7 +282,7 @@ export function getKnowledgeMap() {
 
 /** 老师首页「今天的课」：今天在上课的每个班 */
 export function getClassToday() {
-  return api.get<ClassToday>('classroom/today')
+  return api.get<ClassToday>('task/today')
 }
 
 /** 首页「上次来」卡：上次登录到这次登录之间交过什么、哪道还没做对 */

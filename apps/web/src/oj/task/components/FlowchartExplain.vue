@@ -7,7 +7,7 @@ import { caseReport, fitFlowchartGraph, flowchartVerdict, markFlowchartFocus } f
 import type { FlowchartSubmission } from 'utils/types'
 
 /**
- * 课堂看板「讲错误」弹层里的一张流程图：要画流程图的课，点卡在画图上的人打开它。
+ * 课堂任务「讲错误」弹层里的一张流程图：要画流程图的课，点卡在画图上的人打开它。
  * 左边是他最后画的那张（要改的框标红），右边是 AI 写的哪里错、可以怎么改 —— 和提交列表右栏
  * （FlowchartPane）、题目页结果页签同一套点评（FlowchartNote）。
  *

@@ -16,7 +16,7 @@ export const LEARNING_PERIOD_LABELS = {
 } as const satisfies Record<z.infer<typeof learningPeriodSchema>, string>
 
 /**
- * 一道题在这段时间里的结果。代码提交和流程图合起来算，口径同课堂看板：代码 AC /
+ * 一道题在这段时间里的结果。代码提交和流程图合起来算，口径同课堂任务：代码 AC /
  * AST_CHECK_FAILED、流程图评到 A / S 都算做对。
  *
  * - `first`：第一次交就对了
@@ -38,7 +38,7 @@ export const learningItemSchema = z.object({
 })
 
 /**
- * 一天一行。`lesson` 是班上这节课的题：老师在课堂看板布置过就用布置的，否则同班同一天
+ * 一天一行。`lesson` 是班上这节课的题：老师在课堂任务布置过就用布置的，否则同班同一天
  * ≥ 5 人做过的题（同「班里在做」的推断）；一道题只归到一天。`own` 是这个学生这天自己练的、
  * 不属于任何一节课的题，按他第一次交的那天归。
  */

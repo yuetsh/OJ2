@@ -17,8 +17,8 @@ import { deleteAdminLesson, getAdminLessons } from '../api'
 import LessonEditModal from './components/LessonEditModal.vue'
 
 /**
- * 后台「课堂作业」：布置过的每一节课一行，新的在前。课堂看板上当场布置的都在这里，
- * 布置错了能改、删；看板外上的课能补一节 —— 数据统计按布置切课，补了才认得到
+ * 后台「课堂任务」：布置过的每一节课一行，新的在前。课堂任务上当场布置的都在这里，
+ * 布置错了能改、删；任务页外上的课能补一节 —— 数据统计按布置切课，补了才认得到
  */
 const router = useRouter()
 const message = useMessage()
@@ -26,7 +26,7 @@ const theme = useThemeVars()
 const configStore = useConfigStore()
 const { isMobile } = useBreakpoints()
 
-// 从看板「布置过的课」进来带着 ?className=
+// 从任务页「布置过的课」进来带着 ?className=
 const { query } = usePagination<{ className: string; teacher: string }>({
   className: useRouteQuery('className', '').value,
   teacher: useRouteQuery('teacher', '').value,
@@ -163,7 +163,7 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
 </script>
 
 <template>
-  <PageHeader title="课堂作业">
+  <PageHeader title="课堂任务">
     <template #extra>
       <n-text v-if="data" depth="3">{{ data.total }} 节</n-text>
     </template>

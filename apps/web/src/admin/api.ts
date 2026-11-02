@@ -780,7 +780,7 @@ export function deleteAchievement(id: number) {
   return api.delete(`admin/achievements/${id}`)
 }
 
-// ---------- 课堂作业（class_lesson） ----------
+// ---------- 课堂任务（class_lesson） ----------
 
 export function getAdminLessons(offset: number, limit: number, filters: { className: string; teacher: number | null }) {
   return api.get<AdminLessonList>('admin/lessons', {

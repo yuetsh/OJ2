@@ -11,8 +11,8 @@ import UserName from './UserName.vue'
 /**
  * 顶栏「N 人举手」点开的面板（设计稿「举手与协作」HcPanel），挂在按钮下面，不是弹框。
  *
- * 按题分组，每人写错法（和课堂看板同一套 errorKind）和等了多久。同一道题两人以上举手，
- * 用户的做法是**停下来全班讲**：组头给「讲这道题」（去看板、选中这道题看错法）和
+ * 按题分组，每人写错法（和课堂任务同一套 errorKind）和等了多久。同一道题两人以上举手，
+ * 用户的做法是**停下来全班讲**：组头给「讲这道题」（去任务页、选中这道题看错法）和
  * 「讲完了，都放下」（这道题还在排队的手一次放下）。
  */
 const emit = defineEmits<{ close: [] }>()
@@ -48,12 +48,12 @@ function onHelp(item: CollabRequestItem) {
   if (help(item.studentId)) emit('close')
 }
 
-/** 「讲这道题」：去这个班的看板、选中这道题，下面展开错着的人按错法归堆，点人就是讲错误弹层 */
+/** 「讲这道题」：去这个班的任务页、选中这道题，下面展开错着的人按错法归堆，点人就是讲错误弹层 */
 function explain(items: CollabRequestItem[], problemId: string) {
   const className = items.find((item) => item.className)?.className
   emit('close')
   router.push({
-    name: 'classroom board',
+    name: 'task',
     query: { ...(className ? { className } : {}), problem: problemId },
   })
 }

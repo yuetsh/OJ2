@@ -10,7 +10,7 @@ import { parseTime, zonedParts, zonedYear } from 'utils/functions'
 /**
  * 老师的首页（设计稿「首页重设计」HomeTeacher）。原来老师看到的和学生一样（继续学习、最近提交），
  * 对老师没用。现在最上面是「今天的课」：今天在上课的每个班一行 —— 正在上课 / 几点下课了、
- * 布置了几道、几人交过、全做对几人，每道题一根小条，点「课堂看板」进那个班。
+ * 布置了几道、几人交过、全做对几人，每道题一根小条，点「课堂任务」进那个班。
  * 下面是常用入口和最新三条公告（和学生首页一样，置顶的排最前）
  */
 const theme = useThemeVars()
@@ -61,13 +61,13 @@ function metaOf(row: ClassRow) {
   return parts.join(' · ')
 }
 
-function openBoard(row: ClassRow) {
-  router.push({ name: 'classroom board', query: { className: row.className } })
+function openTask(row: ClassRow) {
+  router.push({ name: 'task', query: { className: row.className } })
 }
 
 const shortcuts = computed(() =>
   [
-    { label: '课堂看板', to: '/classroom', show: true },
+    { label: '课堂任务', to: '/task', show: true },
     { label: '数据统计', to: '/statistics', show: true },
     { label: '新建题目', to: '/admin/problem/create', show: userStore.hasProblemPermission },
     { label: '后台', to: userStore.isSuperAdmin ? '/admin' : '/admin/problem/list', show: true },
@@ -92,7 +92,7 @@ const shortcuts = computed(() =>
           <span class="state" :class="{ live: stateOf(row).live }">{{ stateOf(row).text }}</span>
           <span class="muted">{{ metaOf(row) }}</span>
           <span class="spacer"></span>
-          <n-button :type="stateOf(row).live ? 'primary' : 'default'" @click="openBoard(row)"> 课堂看板 </n-button>
+          <n-button :type="stateOf(row).live ? 'primary' : 'default'" @click="openTask(row)"> 课堂任务 </n-button>
         </div>
         <div v-if="row.problems.length" class="minis">
           <router-link

@@ -4,7 +4,7 @@ import { classLabel } from 'utils/classes'
 import type { ClassLesson } from 'utils/types'
 import type { SubmissionQuery } from './listQuery'
 
-/** 提交列表的「这节课」：一键筛到 班级 + 这节课的题 + 今天。班级和题的取法同课堂看板 */
+/** 提交列表的「这节课」：一键筛到 班级 + 这节课的题 + 今天。班级和题的取法同课堂任务 */
 export function useLessonFilter(options: { query: SubmissionQuery; flowMode: Ref<boolean>; info: (text: string) => void }) {
   const { query } = options
   const lesson = ref<ClassLesson | null>(null)
@@ -36,13 +36,13 @@ export function useLessonFilter(options: { query: SubmissionQuery; flowMode: Ref
       }
       query.className = res.className
       if (!res.problems.length) {
-        options.info(`${classLabel(res.className)}今天还没有布置题，也还没人交。可以先去课堂看板布置`)
+        options.info(`${classLabel(res.className)}今天还没有布置题，也还没人交。可以先去课堂任务布置`)
         return
       }
       lesson.value = res
       query.problem = lessonIds.value
       query.today = '1'
-      // 老师布置时选了语言：看板上只数这个语言交的，列表也只列它（流程图那边不动）
+      // 老师布置时选了语言：任务页上只数这个语言交的，列表也只列它（流程图那边不动）
       if (res.language && !options.flowMode.value) query.language = res.language
     } finally {
       lessonLoading.value = false

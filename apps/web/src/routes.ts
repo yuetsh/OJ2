@@ -78,9 +78,9 @@ export const ojs: RouteRecordRaw = {
       component: () => import('oj/rank/list.vue'),
     },
     {
-      path: 'classroom',
-      name: 'classroom board',
-      component: () => import('oj/classroom/board.vue'),
+      path: 'task',
+      name: 'task',
+      component: () => import('oj/task/index.vue'),
       meta: { requiresAuth: true, requiresTeacherAdmin: true },
     },
     {
@@ -90,9 +90,9 @@ export const ojs: RouteRecordRaw = {
       meta: { requiresAuth: true, requiresTeacherAdmin: true },
     },
     {
-      path: 'class',
-      name: 'class',
-      component: () => import('oj/class/pk.vue'),
+      path: 'pk',
+      name: 'pk',
+      component: () => import('oj/pk/index.vue'),
       meta: { requiresAuth: true },
     },
     {
@@ -303,7 +303,7 @@ export const admins: RouteRecordRaw = {
       meta: { requiresTeacherAdmin: true },
     },
     {
-      // 课堂看板布置的每一节课：改、删、补（数据统计按布置切课）
+      // 课堂任务布置的每一节课：改、删、补（数据统计按布置切课）
       path: 'lesson',
       name: 'admin lesson list',
       component: () => import('admin/lesson/list.vue'),

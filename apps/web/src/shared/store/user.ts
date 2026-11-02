@@ -19,7 +19,7 @@ export const useUserStore = defineStore('user', () => {
 
   // 演示模式：超管临时把界面伪装成普通学生，方便上课投屏。
   // 开关存在 storage 里、只有主动退登才清，会话过期后换人登录它还在 —— 所以只对超管
-  // 生效。不然老师在超管用过的机房电脑上一登录，后台、看板、求助全没了，
+  // 生效。不然老师在超管用过的机房电脑上一登录，后台、任务页、求助全没了，
   // 而「退出演示」只给超管，他自己关不掉
   const demoSwitch = ref<boolean>(storage.get(STORAGE_KEY.DEMO_MODE) ?? false)
   const demoMode = computed(() => demoSwitch.value && realIsSuperAdmin.value)

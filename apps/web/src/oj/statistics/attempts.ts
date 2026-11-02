@@ -4,7 +4,7 @@ import type { Submission } from 'utils/types'
 import type { Tone } from 'shared/composables/tone'
 
 /**
- * 一次提交一格的那串方块（统计页的 AttemptSquares、课堂看板做对格子的轨迹）共用的两样：
+ * 一次提交一格的那串方块（统计页的 AttemptSquares、课堂任务做对格子的轨迹）共用的两样：
  * 方块的颜色，和停上去看代码时拉的提交。
  */
 

@@ -6,7 +6,7 @@ import UserName from 'shared/components/UserName.vue'
 import { attemptTone, cachedSubmission } from 'oj/statistics/attempts'
 import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE } from 'utils/constants'
 import { parseTime } from 'utils/functions'
-import type { ClassBoardCell, ClassBoardProblem, Submission } from 'utils/types'
+import type { TaskBoardCell, TaskBoardProblem, Submission } from 'utils/types'
 
 /**
  * 点开一个做对了的格子：他这道题今天交的每一次，一格一次、从早到晚，下面是停着的那一次的代码
@@ -17,8 +17,8 @@ import type { ClassBoardCell, ClassBoardProblem, Submission } from 'utils/types'
  */
 const props = defineProps<{
   username: string
-  problem: ClassBoardProblem
-  cell: ClassBoardCell
+  problem: TaskBoardProblem
+  cell: TaskBoardCell
   summary: string
   /** 「在提交列表看这 N 次」：和格子原来点进去的是同一个列表 */
   listHref: string

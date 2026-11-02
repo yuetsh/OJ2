@@ -18,7 +18,7 @@ import { useVisibleInterval } from 'shared/composables/visibleInterval'
  *
  * 名字和排行榜一样用用户名（ks241XXX），不用真名。
  * 考试中：卡在一道题（错 3 次以上）和 15 分钟以上没交的人放最上面，
- * 没进来的人在最下面（看板里标了请假的写「请假」）。
+ * 没进来的人在最下面（课堂任务里标了请假的写「请假」）。
  * 考完：按姓名一张表，点格子右边看代码、标「看过了」（代替原来后台的「审核」页），导出成绩。
  * 名单是推出来的：比赛不绑班，来了一半以上的班才算这场的班（后端 buildClassView）
  */
@@ -357,7 +357,7 @@ const gradeColumns = computed(() => `24px 124px 40px 36px repeat(${problems.valu
           <span v-for="p in problems" :key="p.id"></span>
           <span></span>
           <span class="flag-wrap">
-            <span class="flag grey">{{ user.leave ? '请假（看板里标的）' : '没进来' }}</span>
+            <span class="flag grey">{{ user.leave ? '请假（课堂任务里标的）' : '没进来' }}</span>
           </span>
         </div>
       </template>

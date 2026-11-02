@@ -213,7 +213,7 @@ function go(path: string, query: Record<string, string>) {
             <Markdown v-if="report" :content="report" />
           </section>
 
-          <a v-if="pk" href="#" class="pk" @click.prevent="go('/class', { classes: className! })">和别的班比 → 班级 PK ›</a>
+          <a v-if="pk" href="#" class="pk" @click.prevent="go('/pk', { classes: className! })">和别的班比 → 班级 PK ›</a>
         </div>
         <div v-else-if="!loading" class="muted">这个班的数据没取到</div>
       </n-spin>

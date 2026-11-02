@@ -52,7 +52,7 @@ export function dayNumber(day: string): number {
   return Date.UTC(year!, month! - 1, date!) / DAY_MS
 }
 
-/** 东八区的「哪天几点」（`2026-10-08`、`10:30`）→ 那一刻的 ISO 字符串。后台补登课堂作业用 */
+/** 东八区的「哪天几点」（`2026-10-08`、`10:30`）→ 那一刻的 ISO 字符串。后台补登课堂任务用 */
 export function localDateTime(day: string, time: string): string {
   const [hour, minute] = time.split(':').map(Number)
   return new Date(dayNumber(day) * DAY_MS + (hour! * 60 + minute!) * 60_000 - OFFSET_MS).toISOString()

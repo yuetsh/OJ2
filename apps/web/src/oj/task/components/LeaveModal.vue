@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { ClassBoardStudent } from 'utils/types'
+import type { TaskBoardStudent } from 'utils/types'
 
 /**
- * 看板的「请假」框：勾今天不在的人。规则在看板那边（只有今天还没交过的人能算请假、
+ * 任务页的「请假」框：勾今天不在的人。规则在任务页那边（只有今天还没交过的人能算请假、
  * 交了题或举手就自动算到，见 board.vue 的 canLeave），这里只管勾。
  */
 const props = defineProps<{
   /** 能勾的人：今天还没交过的（刚上课时就是全班），按名字排好 */
-  candidates: ClassBoardStudent[]
+  candidates: TaskBoardStudent[]
   /** 打开时已经标着请假的 */
   current: string[]
 }>()
@@ -23,7 +23,7 @@ watch(show, (open) => {
  * 今天一次都没上过线。机房有两人共用一台电脑的，同桌只有一个登着，所以「谁没来」
  * 看今天上没上过线，不看此刻在不在线（见契约 seenAt）
  */
-const unseen = (student: ClassBoardStudent | undefined) => !!student && !student.seenAt
+const unseen = (student: TaskBoardStudent | undefined) => !!student && !student.seenAt
 
 /** 今天没上过线的分在前面一堆：请假的人基本在这里面，剩下的是和同桌共用电脑的 */
 const sections = computed(() =>
@@ -36,7 +36,7 @@ const sections = computed(() =>
   ].filter((section) => section.students.length),
 )
 
-function selectAll(list: ClassBoardStudent[]) {
+function selectAll(list: TaskBoardStudent[]) {
   selected.value = [...new Set([...selected.value, ...list.map((student) => student.username)])]
 }
 

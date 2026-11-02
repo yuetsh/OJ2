@@ -6,13 +6,13 @@ export type HelpStatus = 'idle' | 'pending' | 'active'
 
 export interface RoomInfo {
   /**
-   * help = 学生举手、老师接的；peek = 老师在看板上主动打开的（学生没举手）。
+   * help = 学生举手、老师接的；peek = 老师在任务页上主动打开的（学生没举手）。
    * 学生那边按钮写「在帮你」还是「在看你的代码」、结束时说「帮完了」还是「看完了」看它
    */
   mode: 'help' | 'peek'
   peerName: string
   peerRole: 'student' | 'teacher'
-  /** 教师端才有：学生的 id（协作条按它在列表里找他举手多久了）和班级（「帮完了」回哪个班的看板） */
+  /** 教师端才有：学生的 id（协作条按它在列表里找他举手多久了）和班级（「帮完了」回哪个班的任务页） */
   peerId: number | null
   peerClassName: string | null
   problemId: string
@@ -107,7 +107,7 @@ export const useCollabStore = defineStore('collab', () => {
       // 自己离开了这道题（跳走页面、把语言切成流程图）
       case 'self_left':
         return teacher ? '你已离开这道题，求助退回队列了' : '你已离开这道题，协作结束'
-      // done：老师自己点的「帮完了」，页面跟着回看板或者去下一个，不用再说一句
+      // done：老师自己点的「帮完了」，页面跟着回任务页或者去下一个，不用再说一句
       default:
         return teacher ? '' : '老师已结束这次帮忙'
     }
@@ -231,7 +231,7 @@ export const useCollabStore = defineStore('collab', () => {
     ws.send({ type: 'accept', studentId })
   }
 
-  /** 老师在看板上主动打开一个学生正在写的代码（他没举手也行；举着手就等于接单） */
+  /** 老师在任务页上主动打开一个学生正在写的代码（他没举手也行；举着手就等于接单） */
   function peek(studentId: number) {
     ws.send({ type: 'peek', studentId })
   }
@@ -242,7 +242,7 @@ export const useCollabStore = defineStore('collab', () => {
   }
 
   /**
-   * 学生报告他开着哪道题的编辑器（null = 离开了），老师看板「在写」那一列用。
+   * 学生报告他开着哪道题的编辑器（null = 离开了），老师任务页「在写」那一列用。
    * 老师不报：老师的编辑器不会被别人打开
    */
   function reportPresence(problemId: string | null, language: LANGUAGE = 'Python') {

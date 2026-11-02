@@ -441,7 +441,7 @@ async function restore(userId: number) {
                 secondary
                 @click="
                   router.push({
-                    path: '/class',
+                    path: '/pk',
                     query: classContext ? { classes: classContext } : {},
                   })
                 "

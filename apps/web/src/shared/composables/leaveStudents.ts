@@ -2,7 +2,7 @@ import { onMounted, ref } from 'vue'
 import { parseTime } from 'utils/functions'
 
 /**
- * 课堂看板的「请假」：老师手动标记今天不在的学生，看板的人数、进度、「还没交过」都不算他们。
+ * 课堂任务的「请假」：老师手动标记今天不在的学生，任务页的人数、进度、「还没交过」都不算他们。
  *
  * **今天有效**（按东八区的日子），第二天自动清掉 —— 请假一般是请一整天，原来按两小时算，
  * 连上两节课的第二节中途人又冒出来，得重标一遍。
@@ -11,7 +11,7 @@ import { parseTime } from 'utils/functions'
  * 换个人、换台机器都不该继承（2026-10 用户定的，不上服务器）。
  *
  * 原来叫「请假隐藏」（开关 → 名字变成带 × 的标签 → 点 ×），用户说不会用，2026-10 改成
- * 看板上一个「请假」按钮勾名单。旧键 `oj_hidden_students` 存的是两小时的过期时刻，
+ * 任务页上一个「请假」按钮勾名单。旧键 `oj_hidden_students` 存的是两小时的过期时刻，
  * 口径不同，不迁移，直接删掉。
  *
  * @param storageKey localStorage 的键
@@ -36,7 +36,7 @@ export function useLeaveStudents(storageKey: string) {
     try {
       localStorage.setItem(storageKey, JSON.stringify(data))
     } catch {
-      // 存不下就只在这次打开里有效，不影响看板
+      // 存不下就只在这次打开里有效，不影响任务页
     }
   }
 
@@ -48,7 +48,7 @@ export function useLeaveStudents(storageKey: string) {
 
   /**
    * 把 `usernames` 这批人的标记换成 `selected`：在里面但没选的取消，选了的标上。
-   * 只动这一批（看板上这个班），别的班标着的人不受影响
+   * 只动这一批（任务页上这个班），别的班标着的人不受影响
    */
   function setLeave(usernames: string[], selected: string[]) {
     const scope = new Set(usernames)
