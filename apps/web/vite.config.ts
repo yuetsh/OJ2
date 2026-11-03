@@ -93,6 +93,11 @@ export default defineConfig(() => {
           'vue-router',
           '@vueuse/core',
           'pinia',
+          // 盖掉上面 @vueuse/core 的同名项：全站共用一个实例，原因见 shared/composables/dark.ts
+          {
+            from: 'shared/composables/dark',
+            imports: [{ name: 'useDark', priority: 10 }],
+          },
           {
             'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar'],
           },

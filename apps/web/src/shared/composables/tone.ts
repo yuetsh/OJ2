@@ -1,5 +1,5 @@
 import { useThemeVars } from 'naive-ui'
-import { useDark } from '@vueuse/core'
+import { useDark } from 'shared/composables/dark'
 
 export type Tone = 'success' | 'error' | 'warning' | 'info' | 'default'
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDark } from '@vueuse/core'
+import { useDark } from 'shared/composables/dark'
 import { rgba } from 'shared/composables/tone'
 import { displayName } from '@oj2/contract'
 

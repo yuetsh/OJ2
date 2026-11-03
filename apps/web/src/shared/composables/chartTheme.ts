@@ -1,4 +1,4 @@
-import { useDark } from '@vueuse/core'
+import { useDark } from 'shared/composables/dark'
 import { Chart as ChartJS } from 'chart.js'
 
 /**

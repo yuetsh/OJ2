@@ -1,4 +1,4 @@
-import { useDark } from '@vueuse/core'
+import { useDark } from 'shared/composables/dark'
 
 /**
  * 排名页的几种颜色（设计稿「排名重设计」G1）。用户说「颜色可以保留」：你绿、前一名蓝、

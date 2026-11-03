@@ -1,4 +1,4 @@
-import { useDark } from '@vueuse/core'
+import { useDark } from 'shared/composables/dark'
 
 /**
  * 圆环从哪儿开始扩散。正常点击就用指针落点；键盘触发（Enter / 空格）时浏览器给的

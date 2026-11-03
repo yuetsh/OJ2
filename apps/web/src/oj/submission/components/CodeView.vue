@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
-import { useDark } from '@vueuse/core'
+import { useDark } from 'shared/composables/dark'
 
 /**
  * 只读的代码区：行号 + 高亮 + 可选地标红一行（编译失败 / 运行时错误报了行号时）。
