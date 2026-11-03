@@ -63,15 +63,74 @@ async function loadLanguage(language: string) {
   return loaded
 }
 
-function collectNodes(root: Node, type: string, result: Node[] = []) {
-  if (root.type === type) result.push(root)
-  for (const child of root.children) collectNodes(child, type, result)
+type Match = (node: Node) => boolean
+
+function collectNodes(root: Node, match: Match, result: Node[] = []) {
+  if (match(root)) result.push(root)
+  for (const child of root.children) collectNodes(child, match, result)
   return result
 }
 
-function hasNode(root: Node, type: string): boolean {
-  if (root.type === type) return true
-  return root.children.some((child) => hasNode(child, type))
+function hasNode(root: Node, match: Match): boolean {
+  if (match(root)) return true
+  return root.children.some((child) => hasNode(child, match))
+}
+
+const ofType =
+  (type: string): Match =>
+  (node) =>
+    node.type === type
+
+/** C / C++ 函数定义的函数名：`int *f()` 的名字在 pointer_declarator 里面一层，沿着 declarator 往里找 */
+function functionName(definition: Node) {
+  let declarator = definition.childForFieldName('declarator')
+  while (declarator && declarator.type !== 'function_declarator') declarator = declarator.childForFieldName('declarator')
+  return declarator?.childForFieldName('declarator')?.text
+}
+
+/**
+ * 语法 target 认哪些节点。多数就是比节点类型，例外：
+ *
+ * C / C++ 的「函数定义」不算 `main` —— 每个 C 程序都有 main，算进去的话「必须使用函数定义」
+ * 永远通过、「不能使用」永远失败，老师选它要的是「自己写了函数」。所以 C 那边叫「自定义函数」。
+ *
+ * Python 的「赋值语句」连 `s += 1` 一起算 —— 和 C 一个口径（C 的 assignment_expression
+ * 本来就包括 `+=`），学生也是这么理解的。tree-sitter-python 里 `+=` 是单独的 augmented_assignment。
+ */
+function nodeMatch(target: string, language: string): Match {
+  const type = astTargetNodeType(target, language)
+  if (target === 'function_definition' && language !== 'Python') {
+    return (node) => node.type === type && functionName(node) !== 'main'
+  }
+  if (target === 'assignment' && language === 'Python') {
+    return (node) => node.type === type || node.type === 'augmented_assignment'
+  }
+  return ofType(type)
+}
+
+/**
+ * 运算符只认真在做运算的那一个 token。光比 token 的话，下面这些全都算「用了」：
+ * C 的 `scanf("%d", &n)` 算 `&`、`int *p` 算 `*`，C++ 的 `vector<int>` 算 `>`，
+ * Python 的 `*args` / `from m import *` 算 `*`、`**kw` 算 `**`、`not in` / `is not` 算 `not`、
+ * `case 1 | 2` 算 `|`。所以看它的父节点：二元运算、复合赋值、自增自减。
+ *
+ * 一元的只认取反（`!x` / `not x`）。负号 `-x` 不算「用了减号」，同理 `*p` 不算乘、`&n` 不算按位与。
+ */
+const OPERATOR_PARENTS: Record<string, string[]> = {
+  C: ['binary_expression', 'assignment_expression', 'update_expression'],
+  'C++': ['binary_expression', 'assignment_expression', 'update_expression'],
+  Python: ['binary_operator', 'boolean_operator', 'comparison_operator', 'augmented_assignment'],
+}
+const NOT_PARENTS: Record<string, string[]> = {
+  C: ['unary_expression'],
+  'C++': ['unary_expression'],
+  Python: ['not_operator'],
+}
+
+function operatorMatch(target: string, language: string): Match {
+  const type = astTargetNodeType(target, language)
+  const parents = (target === 'not' ? NOT_PARENTS : OPERATOR_PARENTS)[language] ?? []
+  return (node) => node.type === type && node.parent !== null && parents.includes(node.parent.type)
 }
 
 function targetName(rule: AstRule, language?: string) {
@@ -201,6 +260,10 @@ export function astRulesError(astRules: AstRules | null): string | null {
         if (!rule.keyword?.trim()) return `${at}：参数名不能为空`
       }
       if (!astRuleIsMeaningful(rule)) return `${at}：次数检查至少要填一个数字`
+      if ([rule.exact, rule.min, rule.max].some((n) => n !== undefined && n < 0)) return `${at}：次数不能是负数`
+      if (rule.min !== undefined && rule.max !== undefined && rule.min > rule.max) {
+        return `${at}：至少 ${rule.min} 次比至多 ${rule.max} 次还多，怎么写都过不了`
+      }
     }
   }
   return null
@@ -238,12 +301,32 @@ const CALL_NODE_TYPES: Record<string, string> = {
   Python: 'call',
 }
 
+/** `import math` / `import numpy as np` 引进来的模块名。`import os.path` 绑定的是 `os` */
+function importedModules(root: Node) {
+  const names = new Set<string>()
+  for (const statement of collectNodes(root, ofType('import_statement'))) {
+    for (const item of statement.namedChildren) {
+      const name = item.type === 'aliased_import' ? item.childForFieldName('alias') : item.type === 'dotted_name' ? item.namedChildren[0] : null
+      if (name) names.add(name.text)
+    }
+  }
+  return names
+}
+
 function functionCalls(root: Node, target: string, language: string) {
   const callType = CALL_NODE_TYPES[language] ?? 'call'
-  return collectNodes(root, callType).filter((call) => {
+  // Python 的 `math.sqrt(4)` 也算调用了 sqrt() —— 和 `from math import sqrt` 后写 `sqrt(4)`
+  // 是一回事，老师配「必须调用 sqrt()」时想的就是它。只认 import 进来的模块，
+  // `s.count()` 这种对象上的方法还是归「调用方法」
+  const modules = language === 'Python' ? importedModules(root) : null
+  return collectNodes(root, ofType(callType)).filter((call) => {
     const fn = call.childForFieldName('function')
     if (!fn) return false
     if (fn.type === 'identifier') return fn.text === target
+    if (modules && fn.type === 'attribute') {
+      const object = fn.childForFieldName('object')
+      return object?.type === 'identifier' && modules.has(object.text) && fn.childForFieldName('attribute')?.text === target
+    }
     // `std::sort(...)` 是 qualified_identifier。学生写 sort 还是 std::sort 取决于
     // 有没有 using namespace std，两种都得认，所以末段也比一次
     if (language === 'C++' && fn.type === 'qualified_identifier') {
@@ -265,13 +348,13 @@ function methodCalls(root: Node, target: string, language: string) {
   // 和 Python 的 attribute 不是一回事 —— 少了这个分支，C++ 的「必须调用 .push_back()」
   // 会静默地永远失败
   if (language === 'C++') {
-    return collectNodes(root, 'call_expression').filter((call) => {
+    return collectNodes(root, ofType('call_expression')).filter((call) => {
       const fn = call.childForFieldName('function')
       return fn?.type === 'field_expression' && fn.childForFieldName('field')?.text === target
     })
   }
   if (language !== 'Python') return []
-  return collectNodes(root, 'call').filter((call) => {
+  return collectNodes(root, ofType('call')).filter((call) => {
     const fn = call.childForFieldName('function')
     return fn?.type === 'attribute' && fn.childForFieldName('attribute')?.text === target
   })
@@ -279,20 +362,20 @@ function methodCalls(root: Node, target: string, language: string) {
 
 function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | null {
   const target = rule.target ?? ''
-  const nodeType = astTargetNodeType(target, language)
+  const match = rule.engine === 'must_use_operator' ? operatorMatch(target, language) : nodeMatch(target, language)
 
   switch (rule.engine) {
     case 'must_exist_node':
       return {
         description: describeAstRule(rule, language),
-        passed: hasNode(root, nodeType),
+        passed: hasNode(root, match),
       }
     case 'must_not_exist_node': {
-      const nodes = collectNodes(root, nodeType)
+      const nodes = collectNodes(root, match)
       return withLines({ description: describeAstRule(rule, language), passed: nodes.length === 0 }, nodes)
     }
     case 'count_node': {
-      const nodes = collectNodes(root, nodeType)
+      const nodes = collectNodes(root, match)
       return withLines(
         {
           description: describeAstRule(rule, language),
@@ -335,7 +418,7 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
     case 'must_use_operator':
       return {
         description: describeAstRule(rule, language),
-        passed: hasNode(root, nodeType),
+        passed: hasNode(root, match),
       }
     case 'must_use_keyword':
       return {
@@ -345,9 +428,8 @@ function evaluateRule(root: Node, rule: AstRule, language: string): AstResult | 
     case 'must_have_nesting': {
       const outer = rule.outer ?? ''
       const inner = rule.inner ?? ''
-      const outerType = astTargetNodeType(outer, language)
-      const innerType = astTargetNodeType(inner, language)
-      const passed = collectNodes(root, outerType).some((node) => node.children.some((child) => hasNode(child, innerType)))
+      const innerMatch = nodeMatch(inner, language)
+      const passed = collectNodes(root, nodeMatch(outer, language)).some((node) => node.children.some((child) => hasNode(child, innerMatch)))
       return { description: describeAstRule(rule, language), passed }
     }
     default:

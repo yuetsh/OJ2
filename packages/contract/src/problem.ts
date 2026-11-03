@@ -145,7 +145,8 @@ const C_NODE_TARGETS = {
   break: { label: 'break 语句', node: 'break_statement' },
   continue: { label: 'continue 语句', node: 'continue_statement' },
   return: { label: 'return 语句', node: 'return_statement' },
-  function_definition: { label: '函数定义', node: 'function_definition' },
+  // 不算 main（判题机 judge/ast.ts 的 nodeMatch 里排掉的），所以不叫「函数定义」
+  function_definition: { label: '自定义函数', node: 'function_definition' },
   assignment: { label: '赋值语句', node: 'assignment_expression' },
   struct: { label: '结构体', node: 'struct_specifier' },
   include: { label: '#include 指令', node: 'preproc_include' },

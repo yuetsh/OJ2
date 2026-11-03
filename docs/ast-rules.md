@@ -25,6 +25,23 @@ bun run --filter '@oj2/api' check:ast     # 每个 target 的 node 在语法里�
 它只验节点类型**存在**，不验语义对不对（把 `while_loop` 配成 `for_statement` 这种两个都
 存在，机器看不出来），语义那层还是得实跑。
 
+## 光比节点类型不够的几处
+
+下面几处都是光比类型就会静默判错的，判题机（`judge/ast.ts`）额外看了一眼上下文：
+
+- **C / C++ 的函数定义不算 `main`**（`nodeMatch`）。每个 C 程序都有 main，算进去的话「必须使用」
+  永远通过、「不能使用」永远失败。所以 C / C++ 的下拉叫「自定义函数」。
+- **Python 的「赋值语句」连 `s += 1` 一起算**（`nodeMatch`），和 C 一个口径 —— C 的
+  `assignment_expression` 本来就包括复合赋值，tree-sitter-python 却把它拆成了 `augmented_assignment`。
+- **运算符只认真在做运算的 token**（`operatorMatch`），看父节点是不是二元运算 / 复合赋值 / 自增自减，
+  一元的只认取反。不看的话 `scanf("%d", &n)` 算用了 `&`、`int *p` 算 `*`、`vector<int>` 算 `>`、
+  `*args` 和 `from m import *` 算 `*`、`not in` / `is not` 算 `not`。负号 `-x` 不算用了减号。
+- **Python 的 `math.sqrt(4)` 算调用了 `sqrt()`**（`functionCalls`），只认 `import` 进来的模块名；
+  对象上的 `s.count()` 仍归「调用方法」。
+
+改这几处之后，拿真实提交回放一遍：对着挂了语法要求的题，把 AC 和「语法检查没通过」的提交重新
+`checkAst`，看结论变了多少条、变的是不是该变的。
+
 ## 只有三种语言真的会跑
 
 判题机只认 `AST_SUPPORTED_LANGUAGES`（C / C++ / Python）。别的语言配了规则一条都不会跑，
