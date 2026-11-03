@@ -81,3 +81,11 @@ export function randomProblemAction(router: Router): MascotAction {
 export function goAction(router: Router, label: string, to: string): MascotAction {
   return { label, run: () => router.push(to) }
 }
+
+// ---- 别的浮层要让开她 ----
+
+/**
+ * 看板娘现在占的地方（视口坐标，拖动中也跟着变）。不在页面上（手机、没挂载）时 shown 为 false。
+ * 成就弹框靠它让开：学生把她拖进右上角时，弹框正好压在她头上。
+ */
+export const mascotBox = reactive({ shown: false, x: 0, y: 0, width: 0, height: 0 })

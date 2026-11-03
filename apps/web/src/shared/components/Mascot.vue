@@ -23,7 +23,7 @@ import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import imageUrl from 'shared/assets/mascot/whale.webp'
 import patUrl from 'shared/assets/mascot/whale-pat.gif'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
-import { currentMascotGuide, fillLine, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
+import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
@@ -352,10 +352,15 @@ watch(silent, (quiet) => quiet && close())
 /** 她靠上时气泡往下冒，免得顶出屏幕；在左半边时气泡贴左对齐 */
 const bubbleBelow = computed(() => pos.y < 220)
 
+// 告诉别的浮层她在哪（成就弹框会让开）
+watchEffect(() => Object.assign(mascotBox, { x: pos.x, y: pos.y, width: WIDTH, height: HEIGHT }))
+
 onMounted(() => {
   window.addEventListener('resize', settle, { passive: true })
+  mascotBox.shown = true
 })
 onBeforeUnmount(() => {
+  mascotBox.shown = false
   window.removeEventListener('resize', settle)
   clearTimeout(patTimer)
   clearTimeout(quietTimer)
