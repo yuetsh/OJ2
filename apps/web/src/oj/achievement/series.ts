@@ -34,6 +34,12 @@ const METRICS: Record<string, MetricInfo> = {
     unit: '道',
     remain: (r) => `再做对 ${r} 道困难题`,
   },
+  challenge_count: {
+    group: '做题',
+    label: '挑战成功',
+    unit: '次',
+    remain: (r) => `再挑战成功 ${r} 次`,
+  },
   max_ac_week_streak: {
     group: '坚持',
     label: '连着几周有做对',

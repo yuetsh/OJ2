@@ -507,7 +507,7 @@ export const problemListSortSchema = z.enum(['', 'create_time', '-submission_num
  * 离哪个成就最近；没做对的只给一个数（「有 n 道差一点」），不列出来。
  */
 export const problemProgressSchema = z.object({
-  /** 做对的题数，和成就的「AC 题目数」同一个数（不含比赛），这样「再做对 n 道」加得上 */
+  /** 做对的题数，和成就的「AC 题目数」同一个数（含比赛题，2026-11-03 起），这样「再做对 n 道」加得上 */
   solved: z.number().int(),
   /** 本周（东八区周一起）新做对几道 */
   weekSolved: z.number().int(),

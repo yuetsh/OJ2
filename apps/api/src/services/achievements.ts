@@ -1,4 +1,4 @@
-import { and, count, countDistinct, eq, inArray, isNotNull, isNull, lt, ne, notInArray, sql } from 'drizzle-orm'
+import { and, count, countDistinct, eq, inArray, isNotNull, lt, ne, notInArray, sql } from 'drizzle-orm'
 
 import { db, schema, type DbOrTx } from '../db'
 import { publishAchievementNotification } from '../events'
@@ -82,12 +82,17 @@ const ACCEPTED_RESULTS = sql.join([sql`${JudgeStatus.ACCEPTED}`, sql`${JudgeStat
 
 /**
  * 「做对几道 / 中等几道 / 困难几道 / 一次就对几道」按定义从提交表现数，不再逐次 +1。
+ * 参加过几场比赛、挑战成功几次也在这里一起数。
  *
  * 原来是读一遍这道题之前的提交、判断「是不是第一次做对」再 +1，两处漏：同一个人同一道题
  * 两条提交挨着判完，两边都看见对方已经做对（都不加）或都还没做对（加两次）；重判一条
  * 做对的提交又会再加一次。2026-10 的库里 372 人的做对题数比实际多 1–4 道。
  * 现数是幂等的，怎么并发、怎么重判都是同一个答案。走 submission_public_metrics_idx，
  * 一个人的提交也就几百条。
+ *
+ * **比赛里的提交也算**（2026-11-03 起）：这里的比赛其实是单班测验，有的班整学期都在
+ * 比赛里做题，不算的话一个成就都拿不到。比赛题是单独的题目行，不会和题库里同一道题重复数。
+ * 个人主页 / 排名的做对题数（user_profile.accepted_number）仍然不含比赛，两边对不上是有意的。
  */
 async function solvedCounts(tx: DbOrTx, userId: number) {
   const [row] = await tx.execute<{
@@ -95,13 +100,15 @@ async function solvedCounts(tx: DbOrTx, userId: number) {
     mid: number
     hard: number
     first_try: number
+    contests: number
+    challenges: number
   }>(
     sql`
       with mine as (
-        select s.problem_id, s.result, s.create_time, s.id, p.difficulty
+        select s.problem_id, s.contest_id, s.result, s.create_time, s.id, p.difficulty
         from ${schema.submission} s
         join ${schema.problem} p on p.id = s.problem_id
-        where s.user_id = ${userId} and s.contest_id is null
+        where s.user_id = ${userId}
       )
       select
         count(distinct problem_id) filter (where result in (${ACCEPTED_RESULTS}))::int as accepted,
@@ -111,11 +118,13 @@ async function solvedCounts(tx: DbOrTx, userId: number) {
           select count(*)::int from (
             select distinct on (problem_id) result from mine order by problem_id, create_time, id
           ) first where result in (${ACCEPTED_RESULTS})
-        ) as first_try
+        ) as first_try,
+        count(distinct contest_id)::int as contests,
+        (select count(*)::int from ${schema.challengeSuccess} where user_id = ${userId}) as challenges
       from mine
     `,
   )
-  return row ?? { accepted: 0, mid: 0, hard: 0, first_try: 0 }
+  return row ?? { accepted: 0, mid: 0, hard: 0, first_try: 0, contests: 0, challenges: 0 }
 }
 
 /**
@@ -130,7 +139,7 @@ export async function updateAchievementsForSubmission(submissionId: string, coun
     .innerJoin(schema.problem, eq(schema.submission.problemId, schema.problem.id))
     .where(eq(schema.submission.id, submissionId))
     .limit(1)
-  if (!row || row.submission.contestId !== null) return []
+  if (!row) return []
 
   const rejudged = countedAs !== null
   const accepted = isAccepted(row.submission.result)
@@ -157,6 +166,8 @@ export async function updateAchievementsForSubmission(submissionId: string, coun
     value.mid_ac_count = solved.mid
     value.hard_ac_count = solved.hard
     value.first_try_ac_count = solved.first_try
+    value.contest_joined = solved.contests
+    value.challenge_count = solved.challenges
     if (!rejudged) value.submission_count = numberMetric(value, 'submission_count') + 1
     if (firstAc) {
       // 只数这条之前的：重判一条老提交时，它后面的提交不算「做对之前错的」
@@ -167,7 +178,6 @@ export async function updateAchievementsForSubmission(submissionId: string, coun
           and(
             eq(schema.submission.userId, row.submission.userId),
             eq(schema.submission.problemId, row.submission.problemId),
-            isNull(schema.submission.contestId),
             lt(schema.submission.createTime, row.submission.createTime),
           ),
         )
@@ -301,7 +311,7 @@ export async function rescanAchievement(achievementId: number) {
   const metric = findMetric(achievement.metric)
   if (!metric) return { scanned: 0, unlocked: 0 }
 
-  // contest_joined 不由判题结算维护，扫之前先把它刷新一遍，否则永远读到旧值（或没有值）
+  // contest_joined 判题结算从 2026-11-03 起才维护，那之后没再交过题的人还是旧值，扫之前刷新一遍
   if (achievement.metric === 'contest_joined') await refreshContestJoinedForAll()
   // max_ac_week_streak 是后加的指标，判题结算只从上线那天起累计，存量用户要从提交记录补算
   if (achievement.metric === 'max_ac_week_streak') await refreshAcWeekStreakForAll()
@@ -482,7 +492,7 @@ async function refreshContestJoinedForAll() {
  * `_last_ac_week` / `_current_ac_week_streak` 一起写回 user_stat（jsonb 浅合并，
  * 其余指标不动，写法同 refreshContestJoinedForAll）。
  *
- * 「新通过」= 这道题（不含比赛）第一次通过的那次，和判题结算里 firstAc 同一个口径；
+ * 「新通过」= 这道题（含比赛题）第一次通过的那次，和判题结算里 firstAc 同一个口径；
  * 周按东八区自然周（周一起），SQL 里用 localTime 取墙上时间再 date_trunc。
  */
 async function refreshAcWeekStreakForAll() {
@@ -495,7 +505,7 @@ async function refreshAcWeekStreakForAll() {
     // 只算还在的用户：库里有提交的 user_id 已经对不上任何用户（submission.user_id 上没有
     // 外键，是历史遗留），直接写 user_stat 会撞 user_stat 的外键，整次重算失败
     .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-    .where(and(isNull(schema.submission.contestId), inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED])))
+    .where(inArray(schema.submission.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED]))
     .groupBy(schema.submission.userId, schema.submission.problemId)
     .as('first_accepted')
   const week = sql<string>`to_char(date_trunc('week', ${localTime(firstAccepted.firstAt)}), 'YYYY-MM-DD')`

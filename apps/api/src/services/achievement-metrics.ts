@@ -17,22 +17,22 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
   {
     key: 'accepted_count',
     name: '做对的题数',
-    helpText: '去重后通过的题目数量（不含比赛）',
+    helpText: '去重后通过的题目数量（含比赛题）',
   },
   {
     key: 'mid_ac_count',
     name: '做对的中等题',
-    helpText: '去重后通过的中等难度题目数（不含比赛）',
+    helpText: '去重后通过的中等难度题目数（含比赛题）',
   },
   {
     key: 'hard_ac_count',
     name: '做对的困难题',
-    helpText: '去重后通过的困难题目数（不含比赛）',
+    helpText: '去重后通过的困难题目数（含比赛题）',
   },
   {
     key: 'submission_count',
     name: '提交次数',
-    helpText: '提交次数（不含比赛）',
+    helpText: '提交次数（含比赛）',
   },
   { key: 'active_days', name: '有提交的天数', helpText: '有过提交的累计天数' },
   {
@@ -45,19 +45,24 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
   {
     key: 'max_ac_week_streak',
     name: '连续有新做对的周数',
-    helpText: '连续几个自然周（周一起）每周都至少新通过一道题（不含比赛）',
+    helpText: '连续几个自然周（周一起）每周都至少新通过一道题（含比赛题）',
   },
   { key: 'languages_used', name: '用过几种语言', helpText: '用过多少种编程语言' },
   {
     key: 'contest_joined',
     name: '参加比赛',
-    helpText: '参加过的比赛数量（本指标是比赛维度，不受比赛提交不计入的限制）',
+    helpText: '交过题的比赛数量',
   },
   { key: 'badge_count', name: '专题奖章', helpText: '获得的专题奖章数量' },
   {
     key: 'problemset_completed',
     name: '做完的专题',
     helpText: '完成的专题数量',
+  },
+  {
+    key: 'challenge_count',
+    name: '挑战成功',
+    helpText: '做对之后的挑战，做到了几条（每道题的每条挑战算一次）',
   },
   {
     key: 'first_try_ac_count',
@@ -92,7 +97,7 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
   {
     key: 'max_code_lines',
     name: '最长的代码行数',
-    helpText: '做对的提交里最长的代码有多少行（空行不算，不含比赛）',
+    helpText: '做对的提交里最长的代码有多少行（空行不算，含比赛）',
   },
   {
     key: 'achievement_unlocked_count',
