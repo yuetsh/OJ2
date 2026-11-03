@@ -62,7 +62,8 @@ cd apps/web && bun run build                  # 前端构建（不在 verify 里
 配置都只在根目录的 `vite.config.ts` 一份：`fmt` 块（Oxfmt 的写法，`bun fmt` 直接读它；
 `semi: false`、`singleQuote: true`、`printWidth: 160`）、`lint` 块（Oxlint，`denyWarnings`）、`run.tasks`
 （`verify` 和它依赖的四个检查）。**别用 `vp fmt` / `vp check`**：Oxfmt 和 `bun fmt` 只在
-长 CSS 值列表的折行上不一样，混着跑会把 `apps/web/public/style.css` 来回改。前端自己的构建
+长 CSS 值列表的折行上不一样，混着跑会把 `apps/web/public/style.css`、`apps/web/src/oj/learn/learn.css` 来回改
+（`vp fmt --list-different` 能列出当前受影响的文件）。前端自己的构建
 配置在 `apps/web/vite.config.ts`，和根目录那份无关。
 
 - 格式化只管代码：`.md` / `.yml` / `.json` / `.toml` 在 `fmt.ignorePatterns` 里排掉了
