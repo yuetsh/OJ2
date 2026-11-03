@@ -96,8 +96,8 @@ Run workflow），开发机不在、又急着上线时用。它不再 push 就�
 |---|---|
 | 程序 | `pacman -S gitea-runner`（系统级的 `gitea-runner.service` 不开，它用单独的账号跑） |
 | 服务 | `~/.config/systemd/user/gitea-runner.service`，`systemctl --user status gitea-runner` |
-| 配置 | `~/.local/share/gitea-runner/config.yaml`（标签 `oj2-deploy:host`，capacity 1） |
-| 注册 | 同目录的 `.runner`；只给 `xuyue/OJ2` 这一个仓库用 |
+| 配置 | `~/.local/share/gitea-runner/config.yaml`（标签 `oj2-deploy:host`、`iot-deploy:host`，capacity 1） |
+| 注册 | 同目录的 `.runner`；注册在 `xuyue` 用户下，和 IOT_SIM（物联网仿真平台）共用。capacity 1，两边的部署排队，不会同时挤服务器 |
 | 日志 | `journalctl --user -u gitea-runner -f`；每次部署的日志在 Gitea 的 Actions 页面 |
 
 **部署不用开发机自己的 bun。** pacman 装的 bun 是 Arch 自己编的，动态链接系统 ICU，单二进制
@@ -109,11 +109,12 @@ Run workflow），开发机不在、又急着上线时用。它不再 push 就�
 换一台机器跑 runner：装 `gitea-runner`，在服务器上生成注册令牌，再照上面那份配置注册：
 
 ```bash
-ssh debian 'docker exec -u git gitea gitea --config /data/gitea/conf/app.ini actions generate-runner-token --scope xuyue/OJ2'
+ssh debian 'docker exec -u git gitea gitea --config /data/gitea/conf/app.ini actions generate-runner-token --scope xuyue'
 gitea-runner register --no-interactive --config config.yaml --instance https://git.xuyue.cc --token <令牌> --name <名字>
 ```
 
-那台机器还得能 `ssh debian`、能 `git fetch git@git.xuyue.cc:xuyue/OJ2.git`（都不能要密码）。
+那台机器还得能 `ssh debian`、能 `git fetch git@git.xuyue.cc:xuyue/OJ2.git`（都不能要密码）；
+IOT_SIM 的部署还要 dotnet 10 SDK 和 bubblewrap（见那边的 `deploy/README.md`）。
 旧的 runner 在 Gitea 仓库设置 → Actions → Runners 里删掉。
 
 ### 手工部署（机房、或 CI 不可用时）
