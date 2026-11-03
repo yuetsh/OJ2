@@ -36,9 +36,8 @@ export interface Entrant {
   className: string | null
   avatar: string | null
   mood: string | null
-  /** 每道题第一次做对的时刻，升序；毫秒数用来比较，原文留着给出参 */
+  /** 每道题第一次做对的时刻（毫秒），升序 */
   times: number[]
-  stamps: string[]
 }
 
 export interface Standing {
@@ -64,10 +63,26 @@ export function avatarOf(avatar: string | null) {
  * 先按 (人, 题) 取全部历史里的最早一次，再用 having 卡 `>= since` —— 这样「这学期」数的是
  * 这学期**第一次**做对的题，以前做对过的老题这学期重交一遍不算。比赛里的提交不算。
  * 走 `submission_public_metrics_idx`（user_id, problem_id, result, create_time，WHERE
- * contest_id IS NULL），全服全部历史实测 24ms。
+ * contest_id IS NULL）。
+ *
+ * 时刻在库里就换成毫秒数、按人排好聚成数组再拿回来：全服全部历史有六万多个 (人, 题)，
+ * 一行一个 timestamptz 的话，光 db/index.ts 那个保留微秒的 parser 加 `Date.parse` 就
+ * 要 150ms（两核上），库里的查询本身才 40ms。截到毫秒和原来 `Date.parse` 比较的精度一样，
+ * 名次不变；`reachedAt` 只拿来显示「比你早多久」，用不着微秒。
  */
 export async function loadEntrants(where: SQL, since: string | null): Promise<Entrant[]> {
   const firstSolved = min(schema.submission.createTime)
+  const firsts = db
+    .select({
+      userId: schema.submission.userId,
+      at: sql<number>`floor(extract(epoch from ${firstSolved}) * 1000)::float8`.as('at'),
+    })
+    .from(schema.submission)
+    .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
+    .where(and(where, isNull(schema.submission.contestId), inArray(schema.submission.result, SOLVED_RESULTS)))
+    .groupBy(schema.submission.userId, schema.submission.problemId)
+    .having(since ? gte(firstSolved, since) : undefined)
+    .as('firsts')
   const [people, solves] = await Promise.all([
     db
       .select({
@@ -81,33 +96,20 @@ export async function loadEntrants(where: SQL, since: string | null): Promise<En
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
       .where(where),
     db
-      .select({ userId: schema.submission.userId, at: firstSolved })
-      .from(schema.submission)
-      .innerJoin(schema.user, eq(schema.user.id, schema.submission.userId))
-      .where(and(where, isNull(schema.submission.contestId), inArray(schema.submission.result, SOLVED_RESULTS)))
-      .groupBy(schema.submission.userId, schema.submission.problemId)
-      .having(since ? gte(firstSolved, since) : undefined),
+      .select({ userId: firsts.userId, times: sql<number[]>`array_agg(${firsts.at} order by ${firsts.at})` })
+      .from(firsts)
+      .groupBy(firsts.userId),
   ])
 
-  const byUser = new Map<number, string[]>()
-  for (const row of solves) {
-    if (!row.at) continue
-    const list = byUser.get(row.userId)
-    if (list) list.push(row.at)
-    else byUser.set(row.userId, [row.at])
-  }
-  return people.map((person) => {
-    const pairs = (byUser.get(person.id) ?? []).map((stamp) => [Date.parse(stamp), stamp] as const).sort((a, b) => a[0] - b[0])
-    return {
-      id: person.id,
-      username: person.username,
-      className: person.className,
-      avatar: avatarOf(person.avatar),
-      mood: person.mood?.trim() || null,
-      times: pairs.map(([time]) => time),
-      stamps: pairs.map(([, stamp]) => stamp),
-    }
-  })
+  const byUser = new Map(solves.map((row) => [row.userId, row.times]))
+  return people.map((person) => ({
+    id: person.id,
+    username: person.username,
+    className: person.className,
+    avatar: avatarOf(person.avatar),
+    mood: person.mood?.trim() || null,
+    times: byUser.get(person.id) ?? [],
+  }))
 }
 
 /**
@@ -127,7 +129,7 @@ export function standings(entrants: Entrant[], cutoff: number | null, includeZer
         entrant,
         solved,
         reached: solved ? entrant.times[solved - 1]! : Number.POSITIVE_INFINITY,
-        reachedAt: solved ? entrant.stamps[solved - 1]! : null,
+        reachedAt: solved ? new Date(entrant.times[solved - 1]!).toISOString() : null,
       }
     })
     .filter((row) => includeZero || row.solved > 0)

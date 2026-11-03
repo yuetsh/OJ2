@@ -252,14 +252,7 @@ rankingRoutes.get('/rankings/champions', optionalAuth, async (c) => {
   const champions: WeeklyChampion[] = []
   for (let k = 1; k <= CHAMPION_WEEKS; k++) {
     const from = thisWeek - k * WEEK_MS
-    const inWeek = entrants.map((entrant) => {
-      const keep = entrant.times.map((time, index) => [time, entrant.stamps[index]!] as const).filter(([time]) => time >= from && time < from + WEEK_MS)
-      return {
-        ...entrant,
-        times: keep.map(([time]) => time),
-        stamps: keep.map(([, stamp]) => stamp),
-      }
-    })
+    const inWeek = entrants.map((entrant) => ({ ...entrant, times: entrant.times.filter((time) => time >= from && time < from + WEEK_MS) }))
     const [top] = standings(inWeek, null, false)
     if (!top) continue
     champions.push({
