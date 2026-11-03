@@ -786,9 +786,9 @@ export function deleteAchievement(id: number) {
 
 // ---------- 课堂任务（class_lesson） ----------
 
-export function getAdminLessons(offset: number, limit: number, filters: { className: string; teacher: number | null }) {
+export function getAdminLessons(offset: number, limit: number, filters: { className: string; teacher: number | null; mode: string }) {
   return api.get<AdminLessonList>('admin/lessons', {
-    params: { offset, limit, className: filters.className, teacher: filters.teacher ?? '' },
+    params: { offset, limit, className: filters.className, teacher: filters.teacher ?? '', mode: filters.mode },
   })
 }
 

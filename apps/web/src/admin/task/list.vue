@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { LESSON_MODE_LABEL, type AdminLesson, type AdminLessonList } from '@oj2/contract'
+import { LESSON_MODE_LABEL, type AdminLesson, type AdminLessonList, type LessonMode } from '@oj2/contract'
 import { useRouteQuery } from '@vueuse/router'
 import PageHeader from 'admin/components/PageHeader.vue'
-import { NButton, NPopconfirm, NTooltip, useThemeVars } from 'naive-ui'
+import { NButton, NPopconfirm, NTag, NTooltip, useThemeVars } from 'naive-ui'
 import { dayStartOfDate } from 'oj/statistics/period'
 import Pagination from 'shared/components/Pagination.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
@@ -27,13 +27,16 @@ const configStore = useConfigStore()
 const { isMobile } = useBreakpoints()
 
 // 从任务页「布置过的课」进来带着 ?className=
-const { query } = usePagination<{ className: string; teacher: string }>({
+const { query } = usePagination<{ className: string; teacher: string; mode: string }>({
   className: useRouteQuery('className', '').value,
   teacher: useRouteQuery('teacher', '').value,
+  mode: useRouteQuery('mode', '').value,
 })
 const data = ref<AdminLessonList | null>(null)
 
 const classOptions = computed(() => [{ label: '全部班级', value: '' }, ...groupClassOptions(configStore.config?.classList ?? [])])
+const MODES: LessonMode[] = ['code', 'both', 'flowchart']
+const modeOptions = [{ label: '全部做法', value: '' }, ...MODES.map((value) => ({ label: LESSON_MODE_LABEL[value], value }))]
 const teacherOptions = computed(() => [
   { label: '全部老师', value: '' },
   ...(data.value?.teachers ?? []).map((teacher) => ({ label: teacher.name, value: String(teacher.id) })),
@@ -46,13 +49,14 @@ async function list() {
     getAdminLessons((query.page - 1) * query.limit, query.limit, {
       className: query.className,
       teacher: query.teacher ? Number(query.teacher) : null,
+      mode: query.mode,
     }),
   )
   if (res) data.value = res
 }
 onMounted(list)
-// 换了班级、老师 usePagination 会把页码拨回 1，同一拍里只拉一次
-watch(() => [query.page, query.limit, query.className, query.teacher], list)
+// 换了班级、老师、做法 usePagination 会把页码拨回 1，同一拍里只拉一次
+watch(() => [query.page, query.limit, query.className, query.teacher, query.mode], list)
 
 // ---- 改 / 补 / 删 ----
 const editing = ref(false)
@@ -133,17 +137,24 @@ function renderActions(lesson: AdminLesson) {
   ])
 }
 
-/** 「画流程图」「先画再写 · C语言」「C语言」：写代码是默认的，不写出来 */
-function wayText(lesson: AdminLesson) {
-  return [lesson.mode !== 'code' ? LESSON_MODE_LABEL[lesson.mode] : '', lesson.language ? LANGUAGE_SHOW_VALUE[lesson.language] : ''].filter(Boolean).join(' · ')
+/** 三种做法各一个颜色，一眼分得开；写代码也写出来，不当默认值省掉 */
+const MODE_TAG_TYPE: Record<LessonMode, 'default' | 'info' | 'warning'> = { code: 'default', both: 'info', flowchart: 'warning' }
+
+/** 「写代码 C语言」「先画再写 Python」「画流程图」：画流程图不用语言 */
+function renderWay(lesson: AdminLesson) {
+  return h('div', { class: 'way' }, [
+    h(NTag, { size: 'small', bordered: false, type: MODE_TAG_TYPE[lesson.mode] }, { default: () => LESSON_MODE_LABEL[lesson.mode] }),
+    lesson.language ? h('span', { class: 'way-lang' }, LANGUAGE_SHOW_VALUE[lesson.language]) : null,
+  ])
 }
 
-/** 手机上一节课一张卡：日子 · 时刻 · 班级一行，题号一行，老师 · 语言 · 做完一行小字，操作一行 */
+/** 手机上一节课一张卡：日子 · 时刻 · 班级一行，做什么一行，题号一行，老师 · 做完一行小字，操作一行 */
 function renderMobileCard(lesson: AdminLesson) {
   return h('div', { class: 'm-card' }, [
     h('div', { class: 'm-head' }, `${dayText(lesson.day)} ${parseTime(lesson.createdAt, 'HH:mm')} · ${classLabel(lesson.className)}`),
+    renderWay(lesson),
     renderProblems(lesson),
-    h('div', { class: 'm-meta' }, [lesson.createdBy, wayText(lesson), `做完 ${renderDone(lesson)}`].filter(Boolean).join(' · ')),
+    h('div', { class: 'm-meta' }, `${lesson.createdBy} · 做完 ${renderDone(lesson)}`),
     renderActions(lesson),
   ])
 }
@@ -153,7 +164,7 @@ const desktopColumns: DataTableColumn<AdminLesson>[] = [
   { title: '布置', key: 'createdAt', width: 70, render: (row) => parseTime(row.createdAt, 'HH:mm') },
   { title: '班级', key: 'className', width: 130, render: (row) => classLabel(row.className) },
   { title: '老师', key: 'createdBy', width: 90 },
-  { title: '做什么', key: 'language', width: 120, render: (row) => wayText(row) || '—' },
+  { title: '做什么', key: 'mode', width: 150, render: renderWay },
   { title: '题目', key: 'problems', width: 300, render: renderProblems },
   { title: '做完 / 全班', key: 'doneCount', width: 100, render: renderDone },
   { title: '', key: 'actions', render: renderActions },
@@ -173,6 +184,7 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
     <template #filters>
       <n-select v-model:value="query.className" :options="classOptions" filterable aria-label="班级" :style="{ width: isMobile ? '100%' : '160px' }" />
       <n-select v-model:value="query.teacher" :options="teacherOptions" aria-label="老师" :style="{ width: isMobile ? '100%' : '140px' }" />
+      <n-select v-model:value="query.mode" :options="modeOptions" aria-label="做什么" :style="{ width: isMobile ? '100%' : '120px' }" />
     </template>
   </PageHeader>
   <n-data-table :loading="loading" striped class="lesson-table" :columns="columns" :data="data?.results ?? []" :row-key="(row: AdminLesson) => row.id" />
@@ -203,6 +215,13 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
 .lesson-table :deep(.chip.hidden) {
   color: v-bind('theme.textColor3');
   text-decoration: line-through;
+}
+
+.lesson-table :deep(.way) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .lesson-table :deep(.actions) {

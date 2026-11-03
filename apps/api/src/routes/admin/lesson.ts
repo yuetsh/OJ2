@@ -1,4 +1,4 @@
-import { adminLessonRequestSchema, STUDENT_ROLES, type AdminLessonList, type AdminLessonRequest } from '@oj2/contract'
+import { adminLessonRequestSchema, lessonModeSchema, STUDENT_ROLES, type AdminLessonList, type AdminLessonRequest } from '@oj2/contract'
 import { and, count, desc, eq, inArray, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
@@ -24,7 +24,12 @@ adminLessonRoutes.get('/lessons', requireTeacher, async (c) => {
   const offset = queryInteger(c.req.query('offset'), 0, { min: 0 })
   const className = c.req.query('className')?.trim()
   const teacherId = queryInteger(c.req.query('teacher'), 0, { min: 0 })
-  const where = and(className ? eq(schema.classLesson.className, className) : undefined, teacherId ? eq(schema.classLesson.createdBy, teacherId) : undefined)
+  const mode = lessonModeSchema.safeParse(c.req.query('mode')).data
+  const where = and(
+    className ? eq(schema.classLesson.className, className) : undefined,
+    teacherId ? eq(schema.classLesson.createdBy, teacherId) : undefined,
+    mode ? eq(schema.classLesson.mode, mode) : undefined,
+  )
 
   const [rows, [totalRow], teachers] = await Promise.all([
     db
