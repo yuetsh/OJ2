@@ -35,6 +35,13 @@ export function useRowCursor(options: {
     const index = navigable.value.findIndex((row) => row.id === selectedId.value)
     return index === -1 ? null : { index: index + 1, count: navigable.value.length }
   })
+  /** 按 ↑ ↓ 会落到的上一条、下一条（本页之内），右栏拿去预取 */
+  const neighbors = computed(() => {
+    const list = navigable.value
+    const index = list.findIndex((row) => row.id === selectedId.value)
+    if (index === -1) return []
+    return [list[index + 1], list[index - 1]].filter((row): row is Row => row !== undefined)
+  })
 
   // 翻页是异步的，先记下「落地后停在哪一头」，新一页回来再选
   let pendingJump: 'first' | 'last' | null = null
@@ -125,5 +132,5 @@ export function useRowCursor(options: {
     move(e.key === 'ArrowUp' ? -1 : 1)
   })
 
-  return { selectedId, selectedRow, position, maxPage, select, move, settleSelection, forgetJump }
+  return { selectedId, selectedRow, position, neighbors, maxPage, select, move, settleSelection, forgetJump }
 }

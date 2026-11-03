@@ -23,6 +23,8 @@ import UserName from 'shared/components/UserName.vue'
  */
 const props = defineProps<{
   row: SubmissionListItem
+  /** 按 ↑ ↓ 会落到的上一条、下一条：这条加载完顺手把它们也拉回来，换条时不用等网络 */
+  neighbors?: SubmissionListItem[]
   /** 老师那套：重新判题、逐个测试点、复制两项收进「⋯」 */
   teacher: boolean
   /** 在比赛的提交列表里（不能重判，题目链接走比赛） */
@@ -61,7 +63,42 @@ const detail = ref<Submission | null>(null)
 const loading = ref(false)
 const failed = ref(false)
 
-const judging = computed(() => props.row.result === SubmissionStatus.pending || props.row.result === SubmissionStatus.judging)
+function isJudging(row: SubmissionListItem) {
+  return row.result === SubmissionStatus.pending || row.result === SubmissionStatus.judging
+}
+const judging = computed(() => isJudging(props.row))
+
+/**
+ * 同一条只发一次请求：预取的还在路上时按到了它，接着等那一个，不再发第二个
+ */
+const inflight = new Map<string, Promise<Submission>>()
+function fetchDetail(id: string) {
+  let request = inflight.get(id)
+  if (!request) {
+    request = getSubmission(id).finally(() => inflight.delete(id))
+    inflight.set(id, request)
+  }
+  return request
+}
+
+/**
+ * 预取上一条、下一条。只在这一条落定之后才做（按住 ↓ 一路划过去的那些行不预取），
+ * 进缓存的口径和 load() 一样：还在判的不要，列表和详情的结果对不上也不要。
+ *
+ * 没预取的时候，换到没看过的一条要先把代码区卸掉、转圈、再整个重新挂上 ——
+ * 2026-11 实测（生产构建、CPU 降速 6 倍）每次卡 60–100ms；走缓存的只换内容，不卡。
+ */
+function prefetch() {
+  for (const row of props.neighbors ?? []) {
+    if (!row.showLink || isJudging(row) || cache.get(row.id)?.result === row.result) continue
+    fetchDetail(row.id).then(
+      (res) => {
+        if (res.result === row.result) cache.set(row.id, res)
+      },
+      () => {},
+    )
+  }
+}
 
 // 每次加载一个序号：同一条先按「判题中」拉了一次、判完又拉一次时，晚回来的旧请求不能盖掉新的
 let loadSeq = 0
@@ -78,15 +115,17 @@ async function load() {
   const hit = cache.get(row.id)
   if (hit && hit.result === row.result) {
     detail.value = hit
+    prefetch()
     return
   }
   loading.value = true
   try {
-    const res = await getSubmission(row.id)
+    const res = await fetchDetail(row.id)
     if (seq !== loadSeq) return
     // 列表那边还在判、详情这边已经判完了（或反过来）都不缓存，等两边对上
     if (!judging.value && res.result === props.row.result) cache.set(row.id, res)
     detail.value = res
+    prefetch()
   } catch {
     if (seq === loadSeq) failed.value = true
   } finally {

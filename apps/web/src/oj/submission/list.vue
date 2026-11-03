@@ -263,7 +263,7 @@ watch(
 
 // ==================== 选中与翻阅 ====================
 
-const { selectedId, selectedRow, position, maxPage, select, move, settleSelection, forgetJump } = useRowCursor({
+const { selectedId, selectedRow, position, neighbors, maxPage, select, move, settleSelection, forgetJump } = useRowCursor({
   rows,
   total,
   query,
@@ -858,6 +858,7 @@ function dayBreak(index: number) {
         <SubmissionPane
           v-else
           :row="selectedRow as SubmissionListItem"
+          :neighbors="neighbors as SubmissionListItem[]"
           :teacher="teacher"
           :class-name="query.className"
           :contest="inContest"
@@ -893,6 +894,7 @@ function dayBreak(index: number) {
         <SubmissionPane
           v-else
           :row="selectedRow as SubmissionListItem"
+          :neighbors="neighbors as SubmissionListItem[]"
           :teacher="teacher"
           :class-name="query.className"
           :contest="inContest"
