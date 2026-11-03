@@ -66,7 +66,8 @@ docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password online
 git push origin main      # 进度在 git.xuyue.cc/xuyue/OJ2/actions
 ```
 
-**push 时开发机得开着。** 没开的话任务在 Gitea 里排队，开机后 runner 连上就接着跑。
+**push 时开发机得开着。** 没开的话任务在 Gitea 里排队，开机后 runner 连上就接着跑；
+排队超过 24 小时会被 Gitea 作废（`ABANDONED_JOB_TIMEOUT` 的默认值），那就要在 Actions 页面重跑。
 
 为什么在开发机上编、不在服务器或 GitHub 上编：
 
@@ -99,8 +100,11 @@ Run workflow），开发机不在、又急着上线时用。它不再 push 就�
 | 注册 | 同目录的 `.runner`；只给 `xuyue/OJ2` 这一个仓库用 |
 | 日志 | `journalctl --user -u gitea-runner -f`；每次部署的日志在 Gitea 的 Actions 页面 |
 
-**bun 版本要对得上**：开发机的 bun 是 pacman 装的，会跟着系统升级走；单二进制会把运行时
-打进去，所以工作流第一步就核对 `bun --version` 和 `packageManager`，对不上直接判红。
+**部署不用开发机自己的 bun。** pacman 装的 bun 是 Arch 自己编的，动态链接系统 ICU，单二进制
+把它打进去之后到容器里报 `libicui18n.so.78: cannot open shared object file`（2026-11-03 第一次跑
+就撞上了，迁移那步先炸、容器没动）。工作流按 `packageManager` 的版本下载官方二进制、核 sha256，
+缓存在 `~/.cache/oj2-deploy/bun-v<版本>/`；编完后端还会 `ldd` 一下，多链接了 libc 以外的库就判红。
+升级 bun 时这里不用管，改了 `packageManager` 下一次部署会自己下新版本。
 
 换一台机器跑 runner：装 `gitea-runner`，在服务器上生成注册令牌，再照上面那份配置注册：
 

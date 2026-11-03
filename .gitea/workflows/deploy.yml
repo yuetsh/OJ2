@@ -58,21 +58,49 @@ jobs:
           git clean -ffdxq -e node_modules
           git log --oneline -1
 
-      # 单二进制把运行时一起打进去：开发机的 bun 是几，线上跑的就是几。
-      # 开发机的 bun 是 pacman 装的，会跟着系统升级走，对不上就别部署。
-      - name: 核对 bun 版本
+      # 单二进制把运行时一起打进去：这里用的 bun 是哪个，线上跑的就是哪个。
+      #
+      # ⚠️ **不能用开发机 PATH 里的 bun。** pacman 装的 bun 是 Arch 自己编的，动态链接系统的
+      # ICU（libicui18n.so.78），编出来的 oj2-api 到容器里就报找不到这个库 —— 2026-11-03
+      # 第一次跑就撞上了，好在迁移那步先炸、容器没动。官方发布的 bun 自带 ICU，
+      # 只依赖 libc，和 GitHub 上 setup-bun 装的是同一个东西。
+      #
+      # 所以这里按 packageManager 的版本下载官方二进制（核 sha256），缓存在
+      # ~/.cache/oj2-deploy/ 下，同一个版本只下一次；再把它放到 PATH 最前面，
+      # 后面的 bun install / bunx 都走它。
+      - name: 装 bun
         run: |
-          want=$(sed -nE 's/.*"packageManager": *"bun@([^"]+)".*/\1/p' package.json)
-          have=$(bun --version)
-          echo "package.json 要 $want，本机是 $have"
-          [ "$want" = "$have" ] || { echo "::error::bun 版本对不上：要么把本机的 bun 换成 $want，要么照 CLAUDE.md 升级 packageManager 那三处"; exit 1; }
+          ver=$(sed -nE 's/.*"packageManager": *"bun@([^"]+)".*/\1/p' package.json)
+          [ -n "$ver" ] || { echo "::error::package.json 里读不到 packageManager 的 bun 版本"; exit 1; }
+          dir="$HOME/.cache/oj2-deploy/bun-v$ver"
+          if [ ! -x "$dir/bun" ]; then
+            tmp=$(mktemp -d)
+            base="https://github.com/oven-sh/bun/releases/download/bun-v$ver"
+            curl -fsSL --retry 3 -o "$tmp/bun-linux-x64.zip" "$base/bun-linux-x64.zip"
+            curl -fsSL --retry 3 -o "$tmp/SHASUMS256.txt" "$base/SHASUMS256.txt"
+            (cd "$tmp" && grep ' bun-linux-x64.zip$' SHASUMS256.txt | sha256sum -c -)
+            unzip -q "$tmp/bun-linux-x64.zip" -d "$tmp"
+            mkdir -p "$dir"
+            install -m755 "$tmp/bun-linux-x64/bun" "$dir/bun"
+            rm -rf "$tmp"
+          fi
+          [ "$("$dir/bun" --version)" = "$ver" ] || { echo "::error::$dir/bun 的版本不是 $ver"; exit 1; }
+          echo "$dir" >> "$GITHUB_PATH"
+          echo "用 $dir/bun（$ver）"
 
       - name: 装依赖
         run: bun install --frozen-lockfile
 
       # 输出到 dist/oj2-api，正是 Dockerfile 里 artifacts-prebuilt 阶段要的位置。
+      # 编完先看它链接了什么：官方 bun 编出来的只依赖 libc 那几个，多出任何一个库
+      # （比如 libicu）都说明用错了 bun，到容器里一定起不来。在这里拦下，
+      # 别等服务器上构建完镜像、迁移时才炸 —— 那时 oj2-api:latest 已经被换成坏镜像了。
       - name: 编后端
-        run: bun run --filter '@oj2/api' build
+        run: |
+          bun run --filter '@oj2/api' build
+          ldd dist/oj2-api
+          extra=$(ldd dist/oj2-api | awk '{print $1}' | grep -vE '^(linux-vdso\.so\.1|libc\.so\.6|libpthread\.so\.0|libdl\.so\.2|libm\.so\.6|/lib64/ld-linux-x86-64\.so\.2)$' || true)
+          [ -z "$extra" ] || { echo "::error::dist/oj2-api 多链接了这些库，容器里没有：$extra"; exit 1; }
 
       # 默认 production 模式，读 apps/web/.env.production（在版本库里）。
       - name: 编前端
