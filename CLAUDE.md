@@ -85,9 +85,9 @@ references 的壳，真正的配置在 `tsconfig.app.json`），而 `vite build`
 
 ## 提交
 
-**直接在 `main` 上干活，不开特性分支。** 注意 push 到 `github` 这个 remote 的 `main`
-会触发 CI 部署；而 `origin` 会镜像到 `github`，**平时 push `origin` 通常几秒后也就部署了**
-（偶尔不跟，要 `git ls-remote github` 核实）。见 `docs/deploy.md`。
+**直接在 `main` 上干活，不开特性分支。** 注意 **push `origin` 的 `main` 就会部署**：
+开发机上的 gitea-runner 跑 `.gitea/workflows/deploy.yml`，进度在 git.xuyue.cc 的 Actions 页面。
+GitHub 那份只剩手动触发的备用路线。见 `docs/deploy.md`。
 
 提交信息用中文，格式 `type(范围): 从用户视角描述现象`，例如
 `fix(流程图): 「重新判题」从来没成功过，而且会把原来的评分清掉`。

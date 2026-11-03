@@ -12,8 +12,8 @@
 # 默认（不带 --prebuilt）是**服务器自己编**：只要有 docker 就能跑，不依赖 CI，
 # 也不依赖别处传产物过来。代价是这台机器性能差，builder 阶段首次约 5 分钟。
 #
-# --prebuilt 则要求 dist/oj2-api 和 apps/web/dist 已经在这个目录里（GitHub
-# Actions 编好后 rsync 过来的），镜像构建只剩几条 COPY。产物缺失会在自检就拦下。
+# --prebuilt 则要求 dist/oj2-api 和 apps/web/dist 已经在这个目录里（开发机上的
+# gitea-runner 编好后 rsync 过来的），镜像构建只剩几条 COPY。产物缺失会在自检就拦下。
 #
 # 代码怎么上到服务器不归它管。没有 git remote 的话，在本机：
 #
@@ -25,7 +25,7 @@
 # 而 .dockerignore 末尾为 prebuilt 开的例外（`!apps/web/dist`）让它照样进构建上下文
 # ——于是本机重编一次前端，服务器上 `COPY apps/web` 那层的缓存键就变了，明明没改
 # 源码也要重编 160s。CI 那条路（--prebuilt）反过来必须传产物，它自己的 rsync 在
-# .github/workflows/deploy.yml 里，别照抄这条。
+# .gitea/workflows/deploy.yml 里，别照抄这条。
 #
 # 前提：docker/.env 已经填好（照 docker/.env.example 拷一份再填，拓扑见 docs/deploy.md）。
 
@@ -67,7 +67,7 @@ if [ "${ARTIFACTS:-build}" = prebuilt ]; then
   for f in dist/oj2-api apps/web/dist/index.html; do
     [ -e "$f" ] || die "--prebuilt 需要现成产物，但 $f 不存在。
 
-要么让 CI 把产物 rsync 过来（.github/workflows/deploy.yml），
+要么让 CI 把产物 rsync 过来（.gitea/workflows/deploy.yml），
 要么去掉 --prebuilt 让这台机器自己编（慢，但不依赖任何外部环节）。"
   done
   ok "用现成产物（$(du -sh dist/oj2-api apps/web/dist 2>/dev/null | tr '\n' ' ')）"

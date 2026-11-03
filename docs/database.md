@@ -47,8 +47,8 @@ CREATE INDEX CONCURRENTLY "xxx_idx" ON "submission" USING btree ("language");
 掉数据，拦了只会让人习惯性带上放行开关。
 
 1. 服务器上手工部署：`OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh`。
-2. CI（`.github/workflows/deploy.yml`）：**必须先手工触发**并在 `workflow_dispatch` 上勾
-   `allow_destructive`。push 触发拿不到这个 input，值恒为空 —— 也就是说**自动部署永远
+2. CI（`.gitea/workflows/deploy.yml`，备用的 `.github/workflows/deploy.yml` 同理）：
+   **必须先手工触发**并在 `workflow_dispatch` 上勾 `allow_destructive`。push 触发拿不到这个 input，值恒为空 —— 也就是说**自动部署永远
    不会执行破坏性迁移**，只会停在闸门上把工作流判红。这是有意的：那种改动得有人先确认备份。
 3. 先单跑迁移把结构推到位，再 push 代码：迁移一旦记进 `drizzle.__drizzle_migrations`
    就不会再跑，后续自动部署里它已不是 pending，自然不触发闸门。多环境共库时

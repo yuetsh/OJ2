@@ -55,23 +55,62 @@ docker exec -it oj-postgres psql -U onlinejudge -d postgres -c '\password online
 
 ## 上线
 
-### 服务器：push 就部署
+### 服务器：push origin 就部署
 
-`.github/workflows/deploy.yml` —— 在 runner 上编好产物、跑一遍 `bunx vp run verify`
-（格式、lint、前后端类型检查、路由遮蔽、AST 节点，**不过就不部署**）、rsync 到服务器、
-在服务器上跑 `docker/deploy.sh --prebuilt`。触发的是 push 到 **github** 这个 remote
-（`origin` 是 `git.xuyue.cc`，它会镜像到 github，所以**平时 push `origin` 通常几秒后
-也就部署了**，偶尔不跟、要 `git ls-remote github` 核实。Gitea 自己不跑这份工作流 —— 没有
-`.gitea/workflows` 时它的 Actions 会退回来读这份工作流，所以 job 上卡了
-`github.server_url == 'https://github.com'`，在 Gitea 上直接跳过）：
+`.gitea/workflows/deploy.yml` —— push 到 `origin`（`git.xuyue.cc`，Gitea）的 `main` 时，
+由**开发机上的 gitea-runner** 编好产物、跑一遍 `bunx vp run verify`（格式、lint、前后端类型
+检查、路由遮蔽、AST 节点，**不过就不部署**）、rsync 到服务器、在服务器上跑
+`docker/deploy.sh --prebuilt`。
 
 ```bash
-git push github main
+git push origin main      # 进度在 git.xuyue.cc/xuyue/OJ2/actions
 ```
 
-产物在 runner 上编是因为服务器性能差（首次构建约 5 分钟，光前端就 160s）。
+**push 时开发机得开着。** 没开的话任务在 Gitea 里排队，开机后 runner 连上就接着跑。
+
+为什么在开发机上编、不在服务器或 GitHub 上编：
+
+| 在哪编 | 问题 |
+|---|---|
+| 服务器 | 只有 2 核，首次构建约 5 分钟、光前端就 160s，编的时候判题排队 |
+| GitHub | runner 在海外，到服务器晚高峰只有十几 KB/s。后端改一行，`--bytecode` 那段约 6MB 字节码就整段重写，一次 rsync 要五六分钟 |
+| 开发机 | 16 核，编加检查不到一分钟；到服务器实测 5MB 约 1 秒 |
+
 **服务器自己编的能力没有砍掉**：不带 `--prebuilt` 就是原来的行为，只要有 docker
-就能手动部署，不依赖 CI。
+就能手动部署，不依赖任何 runner。
+
+#### 备用：GitHub 手动触发
+
+`.github/workflows/deploy.yml` 还在，但**只能手动触发**（github.com 上 Actions → Deploy →
+Run workflow），开发机不在、又急着上线时用。它不再 push 就跑，因为 `origin` 会镜像到
+`github`，两边都自动的话每次会部署两遍，两边的并发锁又不通。需要的 secret（`HOST` / `KEY`）
+写在那份文件头部。
+
+#### 部署 runner
+
+开发机上的 runner 是 host 模式：直接用本机的 bun、`~/.ssh/config` 里的 `debian`（root@服务器）
+和 git.xuyue.cc 的 SSH 访问，所以工作流里**不需要任何 secret**，也不用 `actions/checkout`。
+
+| | |
+|---|---|
+| 程序 | `pacman -S gitea-runner`（系统级的 `gitea-runner.service` 不开，它用单独的账号跑） |
+| 服务 | `~/.config/systemd/user/gitea-runner.service`，`systemctl --user status gitea-runner` |
+| 配置 | `~/.local/share/gitea-runner/config.yaml`（标签 `oj2-deploy:host`，capacity 1） |
+| 注册 | 同目录的 `.runner`；只给 `xuyue/OJ2` 这一个仓库用 |
+| 日志 | `journalctl --user -u gitea-runner -f`；每次部署的日志在 Gitea 的 Actions 页面 |
+
+**bun 版本要对得上**：开发机的 bun 是 pacman 装的，会跟着系统升级走；单二进制会把运行时
+打进去，所以工作流第一步就核对 `bun --version` 和 `packageManager`，对不上直接判红。
+
+换一台机器跑 runner：装 `gitea-runner`，在服务器上生成注册令牌，再照上面那份配置注册：
+
+```bash
+ssh debian 'docker exec -u git gitea gitea --config /data/gitea/conf/app.ini actions generate-runner-token --scope xuyue/OJ2'
+gitea-runner register --no-interactive --config config.yaml --instance https://git.xuyue.cc --token <令牌> --name <名字>
+```
+
+那台机器还得能 `ssh debian`、能 `git fetch git@git.xuyue.cc:xuyue/OJ2.git`（都不能要密码）。
+旧的 runner 在 Gitea 仓库设置 → Actions → Runners 里删掉。
 
 ### 手工部署（机房、或 CI 不可用时）
 

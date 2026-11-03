@@ -1,0 +1,124 @@
+# push 到 origin（git.xuyue.cc）的 main 就部署：在开发机上编好产物 → rsync 到服务器 →
+# 服务器上跑 docker/deploy.sh --prebuilt 起栈。
+#
+# 跑在哪：开发机上的 gitea-runner（host 模式，标签 oj2-deploy），不在服务器上。
+#   - 服务器只有 2 核，编一次要 5 分钟左右、光前端就 160 秒，编的时候判题会排队。
+#   - 原来在 GitHub 上编，海外 → 服务器晚高峰只有十几 KB/s，rsync 一次要五六分钟；
+#     开发机 → 服务器实测 5MB 约 1 秒。
+#   代价：**push 时开发机得开着。** 没开的话任务在 Gitea 里排队，开机后 runner 连上就接着跑。
+#   runner 的装法和配置见 docs/deploy.md「部署 runner」。
+#
+# host 模式直接用开发机自己的东西：PATH 里的 bun、~/.ssh/config 里的 `debian`（root@服务器）
+# 和 git.xuyue.cc 的 SSH 访问。所以这里**不需要配任何 secret**，也不用 actions/checkout
+# （它要去 GitHub 拉 action，在国内反而是最慢的一步）。
+#
+# 有了 .gitea/workflows 之后，Gitea 不再读 .github/workflows；GitHub 那份改成了只能手动
+# 触发的备用路线（开发机不在时用），push 不会在两边各部署一次。
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  # 手动触发时可以放行破坏性迁移。push 触发拿不到这个 input，值恒为空 ——
+  # 也就是说**自动部署永远不会执行 DROP TABLE 之类的迁移**，只会停在闸门上把
+  # 工作流判红。这是有意的：那种改动得有人先确认备份。
+  workflow_dispatch:
+    inputs:
+      allow_destructive:
+        description: "放行破坏性迁移（DROP TABLE / DROP COLUMN / ALTER TYPE …）。勾之前先确认已备份数据库。"
+        type: boolean
+        default: false
+
+# 两次 push 挨得近时，别让两个 deploy.sh 在服务器上同时起栈。
+# runner 的 capacity 也是 1，这里再保一道。
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  REMOTE: debian # 开发机 ~/.ssh/config 里的主机名
+  REMOTE_DIR: /root/OJDeploy/OJ2
+
+jobs:
+  deploy:
+    runs-on: oj2-deploy
+    timeout-minutes: 20
+    steps:
+      # 工作目录可能是上一次留下的，所以 fetch 之后强制切过去再清掉没跟踪的文件
+      # （node_modules 留着，bun install 会对齐它）。
+      - name: 取代码
+        env:
+          SHA: ${{ gitea.sha }}
+          REPO: ${{ gitea.repository }}
+        run: |
+          git init -q .
+          git fetch -q --depth 1 "git@git.xuyue.cc:$REPO.git" "$SHA"
+          git checkout -q --force FETCH_HEAD
+          git clean -ffdxq -e node_modules
+          git log --oneline -1
+
+      # 单二进制把运行时一起打进去：开发机的 bun 是几，线上跑的就是几。
+      # 开发机的 bun 是 pacman 装的，会跟着系统升级走，对不上就别部署。
+      - name: 核对 bun 版本
+        run: |
+          want=$(sed -nE 's/.*"packageManager": *"bun@([^"]+)".*/\1/p' package.json)
+          have=$(bun --version)
+          echo "package.json 要 $want，本机是 $have"
+          [ "$want" = "$have" ] || { echo "::error::bun 版本对不上：要么把本机的 bun 换成 $want，要么照 CLAUDE.md 升级 packageManager 那三处"; exit 1; }
+
+      - name: 装依赖
+        run: bun install --frozen-lockfile
+
+      # 输出到 dist/oj2-api，正是 Dockerfile 里 artifacts-prebuilt 阶段要的位置。
+      - name: 编后端
+        run: bun run --filter '@oj2/api' build
+
+      # 默认 production 模式，读 apps/web/.env.production（在版本库里）。
+      - name: 编前端
+        run: cd apps/web && bun run build
+
+      # 格式、lint、前后端类型检查、路由遮蔽、AST 节点，有一项不过就不部署。
+      # 必须排在「编前端」之后：前端类型检查要 unplugin 生成的 auto-imports.d.ts /
+      # components.d.ts，它们不进版本库，vite build 时才生成。
+      - name: 检查
+        run: bunx vp run verify
+
+      # 排除项和 --no-owner --no-group 的理由见 .github/workflows/deploy.yml 同名一步，
+      # 一条都不能少（少了 data 就是删库，少了 docker/.env* 下一步自检直接 die）。
+      #   -c               按内容比：每次 checkout 出来的 mtime 都是「刚才」，按 mtime 比会把
+      #                    600 多个没改的文件逐个走一遍增量。
+      #   --delay-updates  全部传完才一起换上去，中途断了服务器上不会留下半新半旧的源码。
+      #   --timeout        60 秒没有数据进出就算断了，交给循环重试，半截文件接着用。
+      - name: 同步到服务器
+        timeout-minutes: 10
+        run: |
+          for attempt in 1 2 3; do
+            rsync -a -c --no-owner --no-group --delete-delay --delay-updates \
+              --compress --compress-choice=zstd \
+              --timeout=60 --stats --human-readable \
+              -e "ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4" \
+              --exclude node_modules \
+              --exclude .git \
+              --exclude data \
+              --exclude 'docker/.env*' \
+              ./ "$REMOTE:$REMOTE_DIR/" && exit 0
+            echo "::warning::rsync 第 $attempt 次没传完，10 秒后重试"
+            sleep 10
+          done
+          exit 1
+
+      # deploy.sh 自检不过 / 迁移被拦 / 容器没起来 / 冒烟发现题目数是 0，都会非零退出。
+      # 破坏性迁移会被拦下并退出 4，除非手动触发时勾了 allow_destructive。
+      #
+      # 放行与否在 shell 里按字符串 "true" 判：Gitea 的 inputs 是布尔还是字符串，
+      # "false" 这个非空字符串都不会被当成放行（GitHub 那份踩过 github.event.inputs 的坑）。
+      - name: 起栈
+        env:
+          ALLOW_INPUT: ${{ inputs.allow_destructive }}
+        run: |
+          allow=''
+          [ "$ALLOW_INPUT" = "true" ] && allow=1
+          echo "放行破坏性迁移：${allow:-否}"
+          ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8 "$REMOTE" \
+            "cd $REMOTE_DIR && OJ2_ALLOW_DESTRUCTIVE='$allow' docker/deploy.sh --prebuilt"
