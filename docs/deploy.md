@@ -99,6 +99,15 @@ Run workflow），开发机不在、又急着上线时用。它不再 push 就�
 | 配置 | `~/.local/share/gitea-runner/config.yaml`（标签 `oj2-deploy:host`、`iot-deploy:host`，capacity 1） |
 | 注册 | 同目录的 `.runner`；注册在 `xuyue` 用户下，和 IOT_SIM（物联网仿真平台）共用。capacity 1，两边的部署排队，不会同时挤服务器 |
 | 日志 | `journalctl --user -u gitea-runner -f`；每次部署的日志在 Gitea 的 Actions 页面 |
+| 看门狗 | `~/.config/systemd/user/gitea-runner-watchdog.timer`，每 5 分钟跑同目录配置旁的 `watchdog.sh`（见下） |
+
+**runner 会「假在线」。** gitea-runner 5.2.4 拉任务超时一次（默认 5 秒，网络一抖就超）之后就再也
+不拉了：服务还是 active，push 之后 Gitea 却说「没有在线的运行器来领取这个任务」（2026-11-03 一天
+撞了两次）。两层兜底：`config.yaml` 里 `fetch_timeout: 30s` 少撞几次；看门狗
+`~/.local/share/gitea-runner/watchdog.sh` 去服务器的 Gitea 库里看 `action_runner` 的
+`last_online` / `last_active`，超过 3 分钟没见到这个 runner、而且它手上没有在跑的任务（不打断部署），
+就 `systemctl --user restart gitea-runner`；连不上服务器时什么都不做。所以撞上了最多等 5 分钟，
+等不及就自己重启一下。看门狗做了什么：`journalctl --user -u gitea-runner-watchdog`。
 
 **部署不用开发机自己的 bun。** pacman 装的 bun 是 Arch 自己编的，动态链接系统 ICU，单二进制
 把它打进去之后到容器里报 `libicui18n.so.78: cannot open shared object file`（2026-11-03 第一次跑
