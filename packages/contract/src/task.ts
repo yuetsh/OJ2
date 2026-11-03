@@ -42,6 +42,11 @@ export const taskBoardProblemSchema = z.object({
   isSql: z.boolean(),
   /** 这道题配了挑战（见 problem.ts 的 challengeSchema）：题卡片写挑战成功几人 */
   hasChallenges: z.boolean(),
+  /**
+   * 这道题今天要做什么：这个班今天布置过的几节里有这道题的，要求合起来（先布置画流程图、再用同样的题
+   * 写代码 = both）。格子按它画，和学生那边的「做完」一致。推断出来的课为 null
+   */
+  mode: lessonModeSchema.nullable(),
 })
 
 export const taskBoardCellSchema = z.object({

@@ -59,7 +59,16 @@ export function lessonDayEnd(day: string) {
  * 人按花名册（STUDENT_ROLES、没禁用），和「全班几人」对得上
  */
 export async function lessonDoneCounts(
-  lessons: { id: number; className: string; day: string; problemIds: number[]; language: LessonLanguage | null; mode: LessonMode }[],
+  lessons: {
+    id: number
+    className: string
+    day: string
+    problemIds: number[]
+    language: LessonLanguage | null
+    mode: LessonMode
+    /** 每道题各自做什么（老师首页按今天几节合起来的要求算，见 todayNeeds）；不给就都按 mode */
+    modeOf?: (problemId: number) => LessonMode
+  }[],
 ) {
   const rows = lessons.flatMap((lesson) =>
     lesson.problemIds.map((problemId) => ({
@@ -67,7 +76,7 @@ export async function lessonDoneCounts(
       class_name: lesson.className,
       problem_id: problemId,
       language: lesson.language,
-      mode: lesson.mode,
+      mode: lesson.modeOf?.(problemId) ?? lesson.mode,
       until: lessonDayEnd(lesson.day),
     })),
   )
@@ -282,6 +291,45 @@ async function lessonPlan(className: string, day: string) {
 }
 
 /**
+ * 一道题今天要画还是要写：这个班今天布置过的每一节里，凡是有这道题的，要求合起来算。
+ * 老师先布置一节画流程图、再「用这几道题写代码」开一节时，还没画完的照样要画 ——
+ * 只看今天最后布置的那一节的话，一布置写代码，画图那一步就没了。学生的课堂条、任务页的格子、
+ * 老师首页的「全做对」都按它算，三处说的「做完」才一样（后台和数据统计还是一节一行、各数各的）。
+ *
+ * `language`：代码按什么语言数 —— 今天最后布置的、要写代码的那一节选的（只画流程图的课没有语言）
+ */
+export async function todayNeeds(className: string, problemIds: number[], latest: { id: number; language: LessonLanguage | null; mode: LessonMode }) {
+  const rows = await db
+    .select({ id: schema.classLesson.id, problemIds: schema.classLesson.problemIds, language: schema.classLesson.language, mode: schema.classLesson.mode })
+    .from(schema.classLesson)
+    .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, calendarDay())))
+    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
+  const needs = new Map<number, { draw: boolean; code: boolean }>()
+  let language: LessonLanguage | null = lessonNeeds(latest.mode).code ? latest.language : null
+  let languageFound = lessonNeeds(latest.mode).code
+  for (const row of rows) {
+    const shared = row.id === latest.id ? problemIds : row.problemIds.filter((id) => problemIds.includes(id))
+    if (!shared.length) continue
+    const rowNeeds = lessonNeeds(row.mode)
+    for (const id of shared) {
+      const known = needs.get(id) ?? { draw: false, code: false }
+      needs.set(id, { draw: known.draw || rowNeeds.draw, code: known.code || rowNeeds.code })
+    }
+    if (!languageFound && rowNeeds.code) {
+      language = row.language ?? null
+      languageFound = true
+    }
+  }
+  const latestNeeds = lessonNeeds(latest.mode)
+  const needsOf = (id: number) => needs.get(id) ?? latestNeeds
+  const modeOf = (id: number): LessonMode => {
+    const { draw, code } = needsOf(id)
+    return draw && code ? 'both' : draw ? 'flowchart' : 'code'
+  }
+  return { needsOf, modeOf, language }
+}
+
+/**
  * 班里「这节课」的题。老师在课堂任务布置过就用老师的（source = teacher），
  * 否则从同班提交记录推断（source = inferred）：同班同一天 ≥ 5 人做过的题，只取最近的
  * **一天**、按那天第一次有人提交的时间排 —— 大致就是老师点题的顺序。
@@ -294,17 +342,23 @@ export async function classLessonProblems(className: string, lookbackDays: numbe
   const plan = await lessonPlan(className, today)
   if (plan) {
     const planned = plan.problemIds
-    const [problems, groups] = await Promise.all([
+    const steps = await todayNeeds(className, planned, plan)
+    // 每道题按它合起来的要求数「做过 / 做对」：要求一样的几道一起数
+    const byMode = Map.groupBy(planned, (id) => steps.modeOf(id))
+    const [problems, ...groupLists] = await Promise.all([
       visibleProblems(planned),
-      classDayGroups(className, dayStart(), { problemIds: planned, language: plan.language, mode: plan.mode }),
+      ...[...byMode].map(([mode, ids]) =>
+        classDayGroups(className, dayStart(), { problemIds: ids, language: lessonNeeds(mode).code ? steps.language : null, mode }),
+      ),
     ])
-    const groupById = new Map(groups.map((row) => [row.problemId, row]))
+    const groupById = new Map(groupLists.flat().map((row) => [row.problemId, row]))
     return {
       source: 'teacher' as const,
       lessonId: plan.id,
       day: today,
       language: plan.language ?? null,
       mode: plan.mode,
+      steps,
       assignedAt: plan.createdAt,
       assignedBy: plan.createdBy,
       problems: planned.flatMap((id) => {
@@ -337,6 +391,7 @@ export async function classLessonProblems(className: string, lookbackDays: numbe
     // 推断出来的课不知道老师要的是哪种语言、要画还是要写，不限
     language: null,
     mode: null,
+    steps: null,
     assignedAt: null,
     assignedBy: null,
     problems: picked.flatMap((row) => {

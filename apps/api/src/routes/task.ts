@@ -5,7 +5,6 @@ import {
   type TaskBoard,
   type TaskBoardStudent,
   type ClassLesson,
-  lessonNeeds,
   type StatisticInfo,
 } from '@oj2/contract'
 import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
@@ -127,9 +126,14 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
   const challengeDoneKeys = new Set(
     challengeDone.filter((row) => liveChallenges.get(row.problemId)?.has(row.challengeId)).map((row) => `${row.userId}:${row.problemId}`),
   )
-  // 老师布置的这节做什么；推断出来的课为 null，代码交对或流程图画对都算（和加「做什么」之前一样）
+  // 老师布置的这节做什么；推断出来的课为 null，代码交对或流程图画对都算（和加「做什么」之前一样）。
+  // 格子按每道题合起来的要求算（todayNeeds）：先画流程图一节、再写代码一节，没画图的照样标「缺图」，
+  // 和学生那边的「做完」对得上。代码按的语言也是合起来那份：最后一节只画流程图时，用前面写代码那节的
   const mode = lesson.source === 'teacher' ? lesson.mode : null
-  const needs = mode ? lessonNeeds(mode) : null
+  const steps = lesson.steps
+  const needsOf = (problemId: number) => steps?.needsOf(problemId) ?? null
+  const anyDraw = ids.some((id) => needsOf(id)?.draw)
+  const codeLanguage = steps ? steps.language : lesson.language
   const [cells, lastSubmits, lastDrawn, attendance, drawn, todays, seen, lastFlows] = await Promise.all([
     ids.length && userIds.length
       ? db
@@ -145,7 +149,7 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
               isNull(schema.submission.contestId),
               inArray(schema.submission.userId, userIds),
               inArray(schema.submission.problemId, ids),
-              lessonLanguageFilter(lesson.language),
+              lessonLanguageFilter(codeLanguage),
             ),
           )
           .groupBy(schema.submission.userId, schema.submission.problemId)
@@ -223,7 +227,7 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
               inArray(schema.submission.userId, userIds),
               inArray(schema.submission.problemId, ids),
               gte(schema.submission.createTime, start),
-              lessonLanguageFilter(lesson.language),
+              lessonLanguageFilter(codeLanguage),
             ),
           )
           .orderBy(schema.submission.createTime)
@@ -234,7 +238,7 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
      * 还没画对的格子点开讲它哪里错、按走对几组归堆。走对几组从 2026-10 起的「走例子」报告里数，
      * 老评法和还没评完的为 null
      */
-    needs?.draw && ids.length && userIds.length
+    anyDraw && ids.length && userIds.length
       ? db
           .selectDistinctOn([schema.flowchartSubmission.userId, schema.flowchartSubmission.problemId], {
             userId: schema.flowchartSubmission.userId,
@@ -281,6 +285,7 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
       title: problem.title,
       isSql: problem.isSql,
       hasChallenges: (liveChallenges.get(problem.id)?.size ?? 0) > 0,
+      mode: steps?.modeOf(problem.id) ?? null,
     })),
     students: roster.map(
       (student) =>
@@ -289,6 +294,7 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
           username: student.username,
           realName: student.realName ?? null,
           cells: ids.map((id) => {
+            const needs = needsOf(id)
             const key = `${student.userId}:${id}`
             const cell = cellByKey.get(key)
             const flow = drawnByKey.get(key)
@@ -305,11 +311,11 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
               attempts = (cell?.attempts ?? 0) + (flow?.attempts ?? 0)
             } else {
               // 要哪几步看哪几步：两步都做到的时刻是晚的那一步
-              const steps = [needs.draw ? { status: drawStatus, at: flowAt } : null, needs.code ? { status: codeStatus, at: codeAt } : null].filter(
+              const wanted = [needs.draw ? { status: drawStatus, at: flowAt } : null, needs.code ? { status: codeStatus, at: codeAt } : null].filter(
                 (step) => step !== null,
               )
-              acceptedAt = steps.every((step) => step.at) ? steps.map((step) => step.at!).reduce(latestOf) : null
-              status = acceptedAt ? 'accepted' : steps.some((step) => step.status !== 'none') ? 'tried' : 'none'
+              acceptedAt = wanted.every((step) => step.at) ? wanted.map((step) => step.at!).reduce(latestOf) : null
+              status = acceptedAt ? 'accepted' : wanted.some((step) => step.status !== 'none') ? 'tried' : 'none'
               attempts = (needs.code ? (cell?.attempts ?? 0) : 0) + (needs.draw ? (flow?.attempts ?? 0) : 0)
             }
             // 下面几样都是代码那一步的：只画流程图的课没有
@@ -352,8 +358,9 @@ taskRoutes.get('/task/board', requireTeacher, async (c) => {
                   }))
                 : [],
               acceptedTry: firstTry >= 0 ? firstTry + 1 : null,
+              // 整道题做完了才谈挑战：先画再写只交对了代码、图还没画的，格子是「缺图」，不挂挑战的圈
               challenge:
-                !codeWanted || !codeDone || !liveChallenges.get(id)?.size
+                !codeWanted || !codeDone || !acceptedAt || !liveChallenges.get(id)?.size
                   ? null
                   : challengeDoneKeys.has(key)
                     ? 'done'
@@ -410,9 +417,17 @@ taskRoutes.get('/task/today', requireTeacher, async (c) => {
       const ids = lesson.problems.map((problem) => problem.id)
       let allDoneCount = 0
       if (ids.length && lesson.source === 'teacher' && lesson.lessonId && lesson.mode) {
-        // 老师布置的：和任务页、后台课堂任务同一个口径（要画的看图、要写的看代码）
+        // 老师布置的：和任务页同一个口径（每道题按今天几节合起来的要求，要画的看图、要写的看代码）
         const counts = await lessonDoneCounts([
-          { id: lesson.lessonId, className, day: calendarDay(), problemIds: ids, language: lesson.language, mode: lesson.mode },
+          {
+            id: lesson.lessonId,
+            className,
+            day: calendarDay(),
+            problemIds: ids,
+            language: lesson.steps?.language ?? lesson.language,
+            mode: lesson.mode,
+            modeOf: lesson.steps?.modeOf,
+          },
         ])
         allDoneCount = counts.get(lesson.lessonId) ?? 0
       } else if (ids.length) {

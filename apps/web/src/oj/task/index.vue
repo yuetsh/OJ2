@@ -122,8 +122,11 @@ onUnmounted(pause)
  */
 const editing = ref<false | 'edit' | 'new' | 'carry'>(false)
 
-/** 这节课做什么；推断出来的课为 null（代码交对或流程图画对都算） */
-const mode = computed(() => board.value?.mode ?? null)
+/**
+ * 第几道题今天做什么：今天几节里有这道题的要求合起来（先画流程图一节、再写代码一节 = 先画再写），
+ * 和学生那边的「做完」一致。推断出来的课为 null（代码交对或流程图画对都算）
+ */
+const modeAt = (index: number) => board.value?.problems[index]?.mode ?? null
 
 /**
  * 一个班一天可以上几节内容不同的课。打开任务页（或换到这个班）时，这一节已经布置了这么久，
@@ -200,7 +203,7 @@ function groupOf(student: TaskBoardStudent): Group {
   const cells = student.cells
   if (cells.length && cells.every((cell) => cell.status === 'accepted')) return 'done'
   if (!student.lastSubmitAt) return 'idle'
-  if (cells.some((cell) => isStuck(cell, mode.value))) return 'stuck'
+  if (cells.some((cell, i) => isStuck(cell, modeAt(i)))) return 'stuck'
   return 'working'
 }
 
@@ -327,23 +330,24 @@ function drawKind(cell: TaskBoardCell): ErrorKind {
  * 要画流程图的课，卡在画图上的按最后一张图归堆（drawKind）；先写了代码、没画图的单独一堆
  */
 function wrongOf(index: number): WrongPerson[] {
+  const mode = modeAt(index)
   return present.value.flatMap((student): WrongPerson[] => {
     const cell = student.cells[index]
     if (!cell || cell.status !== 'tried') return []
-    const stage = cellStage(cell, mode.value)
+    const stage = cellStage(cell, mode)
     if (stage === 'draw') {
       const latest = cell.flowchart?.latest
       const evaluated = !!latest && latest.status !== 0 && latest.status !== 1
       return [{ student, cell, kind: drawKind(cell), explain: evaluated ? 'draw' : null }]
     }
     if (stage === 'nodraw') return [{ student, cell, kind: { key: 'nodraw', label: '代码对了，还没画图', line: null }, explain: null }]
-    if (mode.value === 'both' && cell.flowchart?.status === 'accepted' && cell.codeStatus === 'none') {
+    if (mode === 'both' && cell.flowchart?.status === 'accepted' && cell.codeStatus === 'none') {
       return [{ student, cell, kind: { key: 'drawn', label: '图画对了，还没写代码', line: null }, explain: null }]
     }
     // 推断出来的课不分步：今天没代码、却画了流程图的单独一堆
     const kind: ErrorKind = cell.latest
       ? errorKind(cell.latest)
-      : !mode.value && cell.attempts
+      : !mode && cell.attempts
         ? { key: 'flowchart', label: '今天只画了流程图', line: null }
         : { key: 'before', label: '以前交过，今天还没交', line: null }
     return [{ student, cell, kind, explain: cell.latest ? 'code' : null }]
@@ -362,20 +366,17 @@ const problemStats = computed(() =>
     const challenged = problem.hasChallenges ? present.value.filter((student) => student.cells[i]?.challenge === 'done').length : null
     // 先画再写：两步各几人做到，老师一眼看出全班卡在画图还是写代码
     const steps =
-      mode.value === 'both'
+      problem.mode === 'both'
         ? {
             drawn: present.value.filter((student) => student.cells[i]?.flowchart?.status === 'accepted').length,
             coded: present.value.filter((student) => student.cells[i]?.codeStatus === 'accepted').length,
           }
         : null
-    return { problem, done, wrong, none: total - done - wrong, total, challenged, steps }
+    // 先画再写的题，没做完的里面有图画对了、还没写代码的，说「错着」不对 —— 改说「没做完」
+    const wrongWord = problem.mode === 'both' ? '没做完' : '错着'
+    return { problem, done, wrong, none: total - done - wrong, total, challenged, steps, wrongWord }
   }),
 )
-
-/**
- * 先画再写的课，没做完的里面有图画对了、还没写代码的，说「错着」不对 —— 改说「没做完」
- */
-const wrongWord = computed(() => (mode.value === 'both' ? '没做完' : '错着'))
 
 const selectedId = ref<number | null>(null)
 const selectedIndex = computed(() => (board.value?.problems ?? []).findIndex((problem) => problem.problemId === selectedId.value))
@@ -447,14 +448,15 @@ const cellColors = computed(() => ({
   actionColor: theme.value.actionColor,
   successColor: theme.value.successColor,
 }))
-const cellStyle = (cell: TaskBoardCell) => cellStyleOf(cell, board.value?.day, cellColors.value, mode.value)
-const cellTitle = (cell: TaskBoardCell, student: TaskBoardStudent) => cellTitleOf(cell, student, board.value?.day, mode.value)
-const cellText = (cell: TaskBoardCell) => cellTextOf(cell, mode.value)
+/** `index`：第几道题，格子按那道题今天做什么来画（modeAt） */
+const cellStyle = (cell: TaskBoardCell, index: number) => cellStyleOf(cell, board.value?.day, cellColors.value, modeAt(index))
+const cellTitle = (cell: TaskBoardCell, student: TaskBoardStudent, index: number) => cellTitleOf(cell, student, board.value?.day, modeAt(index))
+const cellText = (cell: TaskBoardCell, index: number) => cellTextOf(cell, modeAt(index))
 
 /** 点了能讲的格子：没做完，卡着的那一步有评完的图或今天的代码 */
-function explainable(cell: TaskBoardCell) {
+function explainable(cell: TaskBoardCell, index: number) {
   if (cell.status !== 'tried') return false
-  const stage = cellStage(cell, mode.value)
+  const stage = cellStage(cell, modeAt(index))
   if (stage === 'draw') {
     const latest = cell.flowchart?.latest
     return !!latest && latest.status !== 0 && latest.status !== 1
@@ -495,7 +497,7 @@ function submissionsHref(
   // SQL 题不受布置的语言限制，格子数的是 SQL 交的
   const language = problem?.isSql ? 'SQL' : board.value?.language
   // 只画流程图的课，格子数的全是流程图
-  const flowSide = flowchart || mode.value === 'flowchart'
+  const flowSide = flowchart || problem?.mode === 'flowchart'
   return router.resolve({
     name: 'submissions',
     query: {
@@ -607,7 +609,7 @@ function lastText(student: TaskBoardStudent) {
             </span>
             <span v-if="stat.steps" class="card-steps">画对 {{ stat.steps.drawn }} · 写对 {{ stat.steps.coded }}</span>
             <span class="card-foot">
-              <span :class="stat.wrong ? 'wrong' : 'muted'">{{ wrongWord }} {{ stat.wrong }}</span>
+              <span :class="stat.wrong ? 'wrong' : 'muted'">{{ stat.wrongWord }} {{ stat.wrong }}</span>
               <span class="muted">没做 {{ stat.none }}</span>
               <span v-if="stat.challenged !== null" class="challenged"> 挑战成功 {{ stat.challenged }} </span>
             </span>
@@ -630,7 +632,7 @@ function lastText(student: TaskBoardStudent) {
               {{ board.problems[selectedIndex]!.title }}
             </a>
             <span>
-              {{ wrongWord }}的 <b class="wrong">{{ problemStats[selectedIndex]!.wrong }}</b> 人
+              {{ problemStats[selectedIndex]!.wrongWord }}的 <b class="wrong">{{ problemStats[selectedIndex]!.wrong }}</b> 人
             </span>
             <span class="muted">没做 {{ problemStats[selectedIndex]!.none }} 人</span>
             <div class="spacer"></div>
@@ -649,7 +651,7 @@ function lastText(student: TaskBoardStudent) {
                 <template v-for="person in group.people" :key="person.student.userId">
                   <button v-if="person.explain" type="button" class="who" @click="openExplain(selectedIndex, person.student.userId)">
                     <UserName :username="person.student.username" />
-                    <span class="mini" :style="cellStyle(person.cell)">{{ cellText(person.cell) }}</span>
+                    <span class="mini" :style="cellStyle(person.cell, selectedIndex)">{{ cellText(person.cell, selectedIndex) }}</span>
                   </button>
                   <!-- 没有今天的代码可讲：去提交列表看他交过的 -->
                   <a
@@ -753,15 +755,15 @@ function lastText(student: TaskBoardStudent) {
                 </td>
                 <td v-for="(cell, i) in student.cells" :key="i" :class="{ hl: i === selectedIndex }">
                   <button
-                    v-if="explainable(cell)"
+                    v-if="explainable(cell, i)"
                     type="button"
                     class="cell"
                     :data-challenge="cell.challenge ?? undefined"
-                    :style="cellStyle(cell)"
-                    :title="cellTitle(cell, student)"
+                    :style="cellStyle(cell, i)"
+                    :title="cellTitle(cell, student, i)"
                     @click="openExplain(i, student.userId)"
                   >
-                    {{ cellText(cell) }}
+                    {{ cellText(cell, i) }}
                   </button>
                   <n-popover
                     v-else-if="cell.trail.length"
@@ -777,11 +779,11 @@ function lastText(student: TaskBoardStudent) {
                         class="cell"
                         :data-challenge="cell.challenge ?? undefined"
                         :class="{ picked: trailKey === `${student.userId}:${i}` }"
-                        :style="cellStyle(cell)"
-                        :title="cellTitle(cell, student)"
+                        :style="cellStyle(cell, i)"
+                        :title="cellTitle(cell, student, i)"
                         @click="toggleTrail(`${student.userId}:${i}`)"
                       >
-                        {{ cellText(cell) }}
+                        {{ cellText(cell, i) }}
                       </button>
                     </template>
                     <TrailPanel
@@ -797,15 +799,15 @@ function lastText(student: TaskBoardStudent) {
                     v-else-if="cell.attempts"
                     class="cell"
                     :data-challenge="cell.challenge ?? undefined"
-                    :style="cellStyle(cell)"
+                    :style="cellStyle(cell, i)"
                     :href="submissionsHref(student, board.problems[i], !cell.codeAttempts)"
                     target="_blank"
-                    :title="cellTitle(cell, student)"
+                    :title="cellTitle(cell, student, i)"
                   >
-                    {{ cellText(cell) }}
+                    {{ cellText(cell, i) }}
                   </a>
-                  <span v-else class="cell" :data-challenge="cell.challenge ?? undefined" :style="cellStyle(cell)" :title="cellTitle(cell, student)">
-                    {{ cellText(cell) }}
+                  <span v-else class="cell" :data-challenge="cell.challenge ?? undefined" :style="cellStyle(cell, i)" :title="cellTitle(cell, student, i)">
+                    {{ cellText(cell, i) }}
                   </span>
                 </td>
                 <td class="num">{{ doneCount(student) }}/{{ board.problems.length }}</td>

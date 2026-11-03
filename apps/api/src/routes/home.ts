@@ -1,5 +1,5 @@
-import { type ClassActivity, type ClassActivityProblem, type LastVisit, type LessonLanguage, type LessonMode, lessonNeeds } from '@oj2/contract'
-import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { type ClassActivity, type ClassActivityProblem, type LastVisit } from '@oj2/contract'
+import { and, asc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { requireAuth, type AppEnv } from '../auth/middleware'
@@ -9,7 +9,6 @@ import { success } from '../http'
 import { FLOWCHART_PASSED, lessonLanguageFilter, SOLVED_RESULTS } from '../services/class-activity'
 import { accepted } from '../services/learning-stats'
 import { CLASS_ACTIVITY_LOOKBACK_DAYS, classLessonProblems } from '../services/lesson'
-import { calendarDay } from '../time'
 
 /**
  * 首页上和「这节课」有关的两张卡：学生的「上次来」和「班里在做」。
@@ -145,7 +144,7 @@ homeRoutes.get('/me/class-activity', requireAuth, async (c) => {
 
   const lesson = await classLessonProblems(user.className, CLASS_ACTIVITY_LOOKBACK_DAYS)
   const ids = lesson.problems.map((problem) => problem.id)
-  const steps = lesson.source === 'teacher' && lesson.mode ? await todaySteps(user.className, ids, lesson) : null
+  const steps = lesson.steps
   const codeLanguage = steps ? steps.language : lesson.language
   // 代码提交和流程图提交两张表，互不依赖，一起查
   const [mine, drawn] = await Promise.all([
@@ -193,7 +192,7 @@ homeRoutes.get('/me/class-activity', requireAuth, async (c) => {
     problems: lesson.problems.map((problem) => {
       const code = stepOf(codeById.get(problem.id))
       const draw = stepOf(drawById.get(problem.id))
-      const needs = steps?.needs.get(problem.id)
+      const needs = steps?.needsOf(problem.id)
       let myStatus: Step
       if (needs) {
         // 老师布置的：要哪几步就看哪几步，全做到才算做完
@@ -215,39 +214,3 @@ homeRoutes.get('/me/class-activity', requireAuth, async (c) => {
     }),
   } satisfies ClassActivity)
 })
-
-/**
- * 学生那边一道题要画还是要写：今天这个班布置过的每一节里，凡是有这道题的，要求合起来算。
- * 老师先布置一节画流程图、再布置一节同样的题写代码时，还没画完的人照样看得到要画 ——
- * 学生只看得到今天最后布置的那一节，不合起来的话，画流程图那节一布置写代码就没了。
- *
- * 写代码用的语言：今天最后布置的、要写代码的那一节选的（只画流程图的课没有语言）
- */
-async function todaySteps(
-  className: string,
-  problemIds: number[],
-  latest: { lessonId: number | null; language: LessonLanguage | null; mode: LessonMode | null },
-) {
-  const rows = await db
-    .select({ id: schema.classLesson.id, problemIds: schema.classLesson.problemIds, language: schema.classLesson.language, mode: schema.classLesson.mode })
-    .from(schema.classLesson)
-    .where(and(eq(schema.classLesson.className, className), eq(schema.classLesson.day, calendarDay())))
-    .orderBy(desc(schema.classLesson.createdAt), desc(schema.classLesson.id))
-  const needs = new Map<number, { draw: boolean; code: boolean }>()
-  let language: LessonLanguage | null = latest.mode && lessonNeeds(latest.mode).code ? latest.language : null
-  let languageFound = !!latest.mode && lessonNeeds(latest.mode).code
-  for (const row of rows) {
-    const shared = row.id === latest.lessonId ? problemIds : row.problemIds.filter((id) => problemIds.includes(id))
-    if (!shared.length) continue
-    const rowNeeds = lessonNeeds(row.mode)
-    for (const id of shared) {
-      const known = needs.get(id) ?? { draw: false, code: false }
-      needs.set(id, { draw: known.draw || rowNeeds.draw, code: known.code || rowNeeds.code })
-    }
-    if (!languageFound && rowNeeds.code) {
-      language = row.language ?? null
-      languageFound = true
-    }
-  }
-  return { needs, language }
-}

@@ -73,12 +73,15 @@ watch(
   () => (myFlowchartOpen.value = true),
 )
 
-/** 流程图画到 A / S 了：标题下给个「流程图 A 级」 */
+/**
+ * 标题下的「流程图 X 级」：评完过的里面最好的那一次。画到 A / S 是绿的（算做完了），
+ * 没画到是橙的 —— 原来只在 A / S 时才写，画到 C 的学生标题下是「还没交过」，像是什么都没交
+ */
 const flowchartGrade = computed(() => {
-  const passed = flowchartStore.scores.filter((row) => isFlowchartPass(row.grade))
-  if (!passed.length) return ''
-  return passed.some((row) => row.grade === 'S') ? 'S' : 'A'
+  const best = flowchartStore.scores.reduce<(typeof flowchartStore.scores)[number] | null>((acc, row) => (!acc || row.score > acc.score ? row : acc), null)
+  return best?.grade ?? ''
 })
+const flowchartPassed = computed(() => isFlowchartPass(flowchartGrade.value))
 
 // 例子旁的「复制」：点完变成「已复制」一秒
 const message = useMessage()
@@ -192,12 +195,13 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         </n-tag>
         <n-tag v-if="myStatus === 'solved'" size="small" type="success" :bordered="false"> 已解决 </n-tag>
         <!-- 流程图画到 A / S 就算做完了（决定 4）：别在「流程图 A 级」旁边再写「还没交过」
-             「做过，还没对」—— 那两个说的是代码 -->
-        <template v-else-if="!flowchartGrade">
+             「做过，还没对」—— 那两个说的是代码。图没画到 A 的，代码交过没对照写；没交过代码就不写
+             「还没交过」，旁边的「流程图 C 级」已经说了交过什么 -->
+        <template v-else-if="!flowchartPassed">
           <n-tag v-if="myStatus === 'tried'" size="small" type="warning" :bordered="false"> 做过，还没对 </n-tag>
-          <n-tag v-else-if="myStatus === 'none'" size="small" :bordered="false">还没交过</n-tag>
+          <n-tag v-else-if="myStatus === 'none' && !flowchartGrade" size="small" :bordered="false">还没交过</n-tag>
         </template>
-        <n-tag v-if="flowchartGrade" size="small" type="success" :bordered="false"> 流程图 {{ flowchartGrade }} 级 </n-tag>
+        <n-tag v-if="flowchartGrade" size="small" :type="flowchartPassed ? 'success' : 'warning'" :bordered="false"> 流程图 {{ flowchartGrade }} 级 </n-tag>
       </div>
     </header>
 
