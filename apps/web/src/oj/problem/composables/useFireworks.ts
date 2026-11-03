@@ -14,28 +14,36 @@ const EMOJI_SVGS = [
 // 将 emoji SVG 转成 confetti 可用的彩色位图 Shape，缓存后供重复调用复用
 let emojiShapesPromise: Promise<confetti.Shape[]> | null = null
 
+/**
+ * 表情在屏幕上的边长（px）。位图就按这个大小画，放的时候 `scalar: 1`、矩阵不缩放。
+ *
+ * **别改回「位图画大、矩阵缩小、scalar 放大」**：canvas-confetti 画位图粒子是每帧
+ * `fillRect(位图边长 × scalar)` 再用图案填，填的矩形和表情实际多大无关。原来位图 64、
+ * scalar 5，表情显示 50px，每个粒子每帧却要填 320×320 —— 两团 32 个粒子一帧三百多万像素，
+ * 机房电脑（显卡弱、Chrome 常走软件渲染）放到这一种就卡（用户 2026-11 反馈）。
+ * 现在填的正好是 50×50，同样大小、同样轨迹，像素少到四十分之一。
+ */
+const EMOJI_PX = 50
+
 function svgToBitmapShape(svg: string): Promise<confetti.Shape> {
   return new Promise((resolve, reject) => {
     const blob = new Blob([svg], { type: 'image/svg+xml' })
     const url = URL.createObjectURL(blob)
     const img = new Image()
     img.onload = async () => {
-      const renderSize = 64
-      const baseUnit = 10
       const canvas = document.createElement('canvas')
-      canvas.width = renderSize
-      canvas.height = renderSize
+      canvas.width = EMOJI_PX
+      canvas.height = EMOJI_PX
       const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, renderSize, renderSize)
+      ctx.drawImage(img, 0, 0, EMOJI_PX, EMOJI_PX)
       URL.revokeObjectURL(url)
 
       try {
         const bitmap = await createImageBitmap(canvas)
-        const scale = baseUnit / renderSize
         resolve({
           type: 'bitmap',
           bitmap,
-          matrix: [scale, 0, 0, scale, (-renderSize * scale) / 2, (-renderSize * scale) / 2],
+          matrix: [1, 0, 0, 1, -EMOJI_PX / 2, -EMOJI_PX / 2],
         } as unknown as confetti.Shape)
       } catch (e) {
         reject(e)
@@ -415,7 +423,8 @@ export function useFireworks() {
           const options: confetti.Options = {
             shapes: emojiShapes,
             flat: true,
-            scalar: 5,
+            // 大小在位图里（EMOJI_PX），这里放大的话填的矩形跟着放大，见 EMOJI_PX
+            scalar: 1,
             particleCount: 16,
             spread: 360,
             startVelocity: 40,
