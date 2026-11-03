@@ -97,8 +97,20 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -p "$REMOTE_PORT" -H "${{ secrets.HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      # 源码和产物一起传。dist/oj2-api 有 77MB，但 rsync 对已存在的文件做增量，
+      # 源码和产物一起传。dist/oj2-api 有 115MB，但 rsync 对已存在的文件做增量，
       # 重编后大部分（bun 运行时那段）字节不变，实际传输量远小于这个数。
+      #
+      # 慢在线路上：runner 在海外，到服务器晚高峰只有十几 KB/s，传 3~4MB 就要五六分钟。
+      # 后端只要改了一行，--bytecode 那段字节码（约 6MB）就整段重写、增量也省不掉，
+      # 它占了每次传输量的七成多。下面几个开关都是为了少传、传不动时别干等：
+      #   -c            按内容比，不看 mtime。checkout 出来每个文件的 mtime 都是「刚才」，
+      #                 不加它 rsync 会把 600 多个没改的源码逐个走一遍增量、来回交换校验块。
+      #   zstd 19       比默认的 zlib 再少传约 17%（实测 4.09MB → 3.38MB），压缩只花 runner 的 CPU。
+      #   --delay-updates  全部传完才一次性换上去，中途断了服务器上不会留下半新半旧的源码。
+      #   --timeout     60 秒没有任何数据进出就算断了，交给外面的循环重试；
+      #                 重试时 --delay-updates 留在 .~tmp~ 里的半截文件会接着用，不从头传。
+      #   ServerAlive   连接悄悄死掉时 ssh 自己能发现，不会一直挂着。
+      #   --stats       日志里能看到这次到底传了多少字节。
       #
       # --delete 的排除项少一个就会出事，逐条说明：
       #   docker/.env  服务器上唯一一份，不在版本库里（.gitignore 排掉了 .env*）。
@@ -114,14 +126,22 @@ jobs:
       # 还是当初手动 clone 时的 root。两者对不上，之后在服务器上跑任何 git 命令都会被
       # 「检测到可疑的仓库所有权」挡下（git 2.35.2 起的 safe.directory 检查）。
       - name: 同步到服务器
+        timeout-minutes: 20
         run: |
-          rsync -az --no-owner --no-group --delete \
-            -e "ssh -i ~/.ssh/id_deploy -p $REMOTE_PORT" \
-            --exclude node_modules \
-            --exclude .git \
-            --exclude data \
-            --exclude 'docker/.env*' \
-            ./ "root@${{ secrets.HOST }}:$REMOTE_DIR/"
+          for attempt in 1 2 3; do
+            rsync -a -c --no-owner --no-group --delete-delay --delay-updates \
+              --compress --compress-choice=zstd --compress-level=19 \
+              --timeout=60 --stats --human-readable \
+              -e "ssh -i ~/.ssh/id_deploy -p $REMOTE_PORT -o ServerAliveInterval=15 -o ServerAliveCountMax=4" \
+              --exclude node_modules \
+              --exclude .git \
+              --exclude data \
+              --exclude 'docker/.env*' \
+              ./ "root@${{ secrets.HOST }}:$REMOTE_DIR/" && exit 0
+            echo "::warning::rsync 第 $attempt 次没传完，10 秒后重试"
+            sleep 10
+          done
+          exit 1
 
       # deploy.sh 自检不过 / 迁移被拦 / 容器没起来 / 冒烟发现题目数是 0，都会非零退出，
       # 这一步跟着红，日志里能看到具体是哪一条。
