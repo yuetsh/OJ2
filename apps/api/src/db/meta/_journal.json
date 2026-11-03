@@ -302,6 +302,13 @@
       "when": 1793632543220,
       "tag": "0042_class_name_cleanup",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1793693911394,
+      "tag": "0043_mascot_event",
+      "breakpoints": true
     }
   ]
 }

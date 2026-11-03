@@ -10,7 +10,10 @@
  * - 在屏幕左半边时整体镜像，脸总朝着页面中间。
  * - 按下去像玩偶一样压扁（底边不动），松手弹回。
  * - 点一下冒气泡：一句话加最多三个按钮，按页面、按情况变（页面经 shared/mascot/guide.ts 告诉她），
- *   台词在 shared/mascot/lines.ts。她从不主动开口；比赛里点她不弹气泡。再点一下、点别处、换页面都收起。
+ *   台词在 shared/mascot/lines.ts。比赛里点她不弹气泡。再点一下、点别处、换页面都收起。
+ * - 对学生按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）；
+ *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
+ * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
  * - 彩蛋：连着快点，有时候（每轮三分之一的机会）点到第 4～8 下（也是随机的）会被摸摸头（同一个仓库的 assets/rua.gif），摸的时候接着点就一直摸。
  *
  * 位置只是这台电脑上的个人偏好，存 localStorage（读写都包 try/catch，拿不到就用默认位置）。
@@ -21,6 +24,7 @@ import imageUrl from 'shared/assets/mascot/whale.webp'
 import patUrl from 'shared/assets/mascot/whale-pat.gif'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
 import { currentMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
+import { logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
@@ -46,6 +50,8 @@ function rollPatClicks() {
 const STREAK_GAP_MS = 600 // 两下之间超过这么久就不算连点
 const OVERCLICK = 8 // 一轮连点到这么多下还没摸到头，她就嫌烦了
 const QUIET_BUBBLE_MS = 5000 // 没有按钮的气泡（只是一句话）过这么久自己收起
+const SPOKEN_BUBBLE_MS = 10_000 // 她主动说的话，有按钮也过这么久收起：没人点她，不该一直挡着
+const SPEAK_GAP_MS = 3 * 60_000 // 主动开口至少隔这么久，课上别老打岔
 
 type HAnchor = 'left' | 'right' | null
 type VAnchor = 'top' | 'bottom' | null
@@ -173,6 +179,7 @@ function onUp() {
     place.y = pos.y
     settle()
     savePlace(place)
+    logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
     return
   }
   boing()
@@ -187,7 +194,10 @@ function onUp() {
 
   // 正在被摸，或者连点到数了：摸摸头，从这一下再摸满一轮
   if (patting.value || streak >= patClicks) {
-    if (!patting.value) say({ text: pick('patting') })
+    if (!patting.value) {
+      say({ text: pick('patting') })
+      logMascotEvent({ kind: 'pat' })
+    }
     patting.value = true
     clearTimeout(patTimer)
     patTimer = setTimeout(() => {
@@ -198,7 +208,10 @@ function onUp() {
   }
   // 一轮里只有第一下开关气泡，后面连着点是在找彩蛋，不跟着一开一关
   if (streak === 1) toggleBubble()
-  else if (streak === OVERCLICK) say({ text: pick('overclick') })
+  else if (streak === OVERCLICK) {
+    say({ text: pick('overclick') })
+    logMascotEvent({ kind: 'overclick' })
+  }
 }
 
 // ---- 气泡 ----
@@ -211,6 +224,8 @@ const authModal = useAuthModalStore()
 interface Bubble {
   text: string
   actions?: MascotAction[]
+  /** 记互动时带上，看哪种情况下的按钮有人点 */
+  situation?: string
 }
 const bubble = ref<Bubble | null>(null)
 let quietTimer: ReturnType<typeof setTimeout> | undefined
@@ -218,11 +233,11 @@ let quietTimer: ReturnType<typeof setTimeout> | undefined
 /** 比赛、测验里不说话：「运行例子」「举手」这类按钮在考试时算不算帮忙，干脆不弹 */
 const silent = computed(() => String(route.name ?? '').startsWith('contest '))
 
-function say(next: Bubble) {
+function say(next: Bubble, closeAfter = next.actions?.length ? 0 : QUIET_BUBBLE_MS) {
   if (silent.value) return
   bubble.value = next
   clearTimeout(quietTimer)
-  if (!next.actions?.length) quietTimer = setTimeout(close, QUIET_BUBBLE_MS)
+  if (closeAfter) quietTimer = setTimeout(close, closeAfter)
 }
 
 function close() {
@@ -232,8 +247,13 @@ function close() {
 
 function toggleBubble() {
   if (bubble.value) return close()
-  const guide = resolveGuide()
-  say({ text: pickFor(guide), actions: guide.actions?.slice(0, 3) })
+  let guide = resolveGuide()
+  if (!userStore.isTeacherOrAbove) guide = personalize(guide)
+  const text = pickFor(guide)
+  say({ text, actions: guide.actions?.slice(0, 3), situation: guide.situation })
+  if (silent.value) return
+  notePoke()
+  logMascotEvent({ kind: 'open', situation: guide.situation, line: text })
 }
 
 /** 先看全站的：没登录、老师这边有人举手；再问页面；都没有就打个招呼 */
@@ -247,7 +267,7 @@ function resolveGuide(): MascotGuide {
 }
 
 /** 这几种情况要紧，不拿彩蛋换掉 */
-const SERIOUS = new Set<MascotSituation>(['guest', 'teacher.help', 'problem.stuck'])
+const SERIOUS = new Set<MascotSituation>(['guest', 'teacher.help', 'problem.stuck', 'first.meet'])
 const RARE_CHANCE = 0.03
 const TIME_CHANCE = 0.15
 
@@ -294,9 +314,35 @@ function timeSituation(): MascotSituation | null {
 }
 
 async function runAction(action: MascotAction) {
+  logMascotEvent({ kind: 'action', action: action.label, situation: bubble.value?.situation })
   close()
   await action.run()
 }
+
+// ---- 主动开口：页面经 requestSpeech 请她说，这里卡频率 ----
+let lastSpokeAt = -Infinity
+const spokenKeys = new Set<string>()
+watch(speechRequest, (speech) => {
+  if (!speech || silent.value || dragging.value || bubble.value || userStore.isTeacherOrAbove) return
+  if (document.visibilityState !== 'visible' || spokenKeys.has(speech.key)) return
+  if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
+  lastSpokeAt = performance.now()
+  spokenKeys.add(speech.key)
+  const text = pick(speech.situation).replace('{n}', String(speech.n ?? ''))
+  say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation }, SPOKEN_BUBBLE_MS)
+  logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
+})
+
+// 学生的行为数：进站、换页面时拉（30 秒内拉过就不拉），登录换人时重拉
+watch(
+  () => route.fullPath,
+  () => refreshMascotProfile(),
+)
+watch(
+  () => userStore.user?.id,
+  () => refreshMascotProfile(true),
+  { immediate: true },
+)
 
 // 点别处收起；点她自己由 onUp 管（开关），不算「别处」
 onClickOutside(bubbleEl, close, { ignore: [body] })

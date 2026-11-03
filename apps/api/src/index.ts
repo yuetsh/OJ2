@@ -21,6 +21,7 @@ import { problemRoutes } from './routes/problem'
 import { problemStatsRoutes } from './routes/problem-stats'
 import { submissionRoutes } from './routes/submission'
 import { trialRunRoutes } from './routes/trial-run'
+import { mascotRoutes } from './routes/mascot'
 import { siteRoutes } from './routes/site'
 import { scanPendingChallenges } from './services/challenge'
 import { bridgeSubmissionEvents, isAllowedWebSocketOrigin, startSessionSweep, submissionWebSocketHandler, type SubmissionSocketData } from './websocket'
@@ -44,6 +45,7 @@ app.route('/api', problemRoutes)
 app.route('/api', problemStatsRoutes)
 app.route('/api', submissionRoutes)
 app.route('/api', trialRunRoutes)
+app.route('/api', mascotRoutes)
 app.route('/api/admin', adminRoutes)
 
 // 没有这条的话，打错的接口地址回的是 Hono 默认的纯文本「404 Not Found」，前端 utils/api.ts 读不出

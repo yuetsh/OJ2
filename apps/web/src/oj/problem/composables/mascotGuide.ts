@@ -1,5 +1,6 @@
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
+import { habitSituation, refreshMascotProfile, requestSpeech } from 'shared/mascot/behavior'
 import type { MascotSituation } from 'shared/mascot/lines'
 import { useCollabStore } from 'shared/store/collab'
 import { useLessonStore } from 'shared/store/lesson'
@@ -8,6 +9,7 @@ import { useCodeStore } from 'oj/store/code'
 import { useProblemStore } from 'oj/store/problem'
 import { useSubmissionStore, type ResultSegment } from 'oj/store/submission'
 import { SubmissionStatus } from 'utils/constants'
+import type { ProblemDetail } from 'utils/types'
 import { useProblemPageContext } from './problemPageContext'
 import { useTeacherCollab } from './teacherCollab'
 
@@ -27,9 +29,20 @@ const RESULT_SITUATION: Partial<Record<SubmissionStatus, MascotSituation>> = {
   [SubmissionStatus.real_time_limit_exceeded]: 'problem.timeout',
 }
 
+/** 一道题上这么久没交、没跑例子，她就来问一句（主动开口） */
+const IDLE_MS = 15 * 60_000
+/** 连着这么多次没跑例子就交，而且错了，她就念一句 */
+const UNSAMPLED_SUBMITS = 3
+
+const FINISHED = (result: number | undefined) =>
+  result !== undefined && result !== SubmissionStatus.pending && result !== SubmissionStatus.judging && result !== SubmissionStatus.submitting
+
 /**
  * 题目页上看板娘说什么、给哪几个按钮。看的是这一页上最近的那件事：刚交的结果、刚跑的例子，
  * 都没有就看写没写代码。比赛入口不用管（Mascot.vue 在比赛里不弹）。
+ *
+ * 另外几件事她会主动开口（只对学生，频率上限在 Mascot.vue）：同一道题错到第 5 次、连着 3 次
+ * 没跑例子就交还错了、又犯了自己的老毛病（behavior.ts 的 habitSituation）、15 分钟没交没跑。
  *
  * `showResult` 是「我错在哪」：把左栏切到「结果」页签的那一段（提交结果 / 运行例子），页签归页面管。
  */
@@ -45,6 +58,31 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   const teacherCollab = useTeacherCollab()
   const { isDesktop } = useBreakpoints()
 
+  /** 学生在这道题上能用的几个按钮，点她和她主动开口共用 */
+  function studentActions(problem: ProblemDetail) {
+    const language = codeStore.code.language
+    const entry = ctx.value
+    const runSamples: MascotAction | null =
+      problem.samples.length && language !== 'Flowchart' && language !== 'SQL' ? { label: '运行例子', run: submissionStore.runSamples } : null
+    // 和工具栏的「举手求助」同一个条件；已经举着手、老师在帮的时候不给
+    const help: MascotAction | null =
+      entry.help && isDesktop.value && !userStore.demoMode && language !== 'Flowchart' && collabStore.helpStatus === 'idle'
+        ? { label: '举手求助', run: () => collabStore.requestHelp(problem._id, language) }
+        : null
+    const why: MascotAction = { label: '我错在哪', run: () => showResult('submit') }
+    const whySamples: MascotAction = { label: '我错在哪', run: () => showResult('samples') }
+    const busy = submissionStore.isFormatting || submissionStore.isSubmittingRequest || submissionStore.judging || submissionStore.isCooldown
+    const submit: MascotAction | null = busy
+      ? null
+      : { label: '提交', run: () => submissionStore.submit({ contestId: entry.contestId, problemSetId: entry.problemSetId }) }
+    return { runSamples, help, why, whySamples, submit }
+  }
+
+  const guide = (situation: MascotSituation, ...actions: (MascotAction | null)[]): MascotGuide => ({
+    situation,
+    actions: actions.filter((it): it is MascotAction => !!it),
+  })
+
   useMascotGuide(() => {
     const problem = problemStore.problem
     if (!problem) return null
@@ -59,28 +97,10 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       return { situation: 'teacher.problem', actions }
     }
 
-    const language = codeStore.code.language
     const entry = ctx.value
+    const { runSamples, help, why, whySamples, submit } = studentActions(problem)
 
-    const runSamples: MascotAction | null =
-      problem.samples.length && language !== 'Flowchart' && language !== 'SQL' ? { label: '运行例子', run: submissionStore.runSamples } : null
-    // 和工具栏的「举手求助」同一个条件；已经举着手、老师在帮的时候不给
-    const help: MascotAction | null =
-      entry.help && isDesktop.value && !userStore.demoMode && language !== 'Flowchart' && collabStore.helpStatus === 'idle'
-        ? { label: '举手求助', run: () => collabStore.requestHelp(problem._id, language) }
-        : null
-    const why: MascotAction = { label: '我错在哪', run: () => showResult('submit') }
-    const busy = submissionStore.isFormatting || submissionStore.isSubmittingRequest || submissionStore.judging || submissionStore.isCooldown
-    const submit: MascotAction | null = busy
-      ? null
-      : { label: '提交', run: () => submissionStore.submit({ contestId: entry.contestId, problemSetId: entry.problemSetId }) }
-
-    const guide = (situation: MascotSituation, ...actions: (MascotAction | null)[]): MascotGuide => ({
-      situation,
-      actions: actions.filter((it): it is MascotAction => !!it),
-    })
-
-    if (language === 'Flowchart') return guide('problem.flowchart', help)
+    if (codeStore.code.language === 'Flowchart') return guide('problem.flowchart', help)
     // 正在判、正在跑例子：没什么好说的，打个招呼
     if (submissionStore.judging || submissionStore.pending || submissionStore.trial.samplesRunning.value) return null
 
@@ -91,7 +111,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     if (submissionStore.resultSegment === 'samples' && runs.length) {
       return runs.every((run) => run.result === SubmissionStatus.accepted)
         ? guide('problem.samplesPassed', submit)
-        : guide('problem.samplesFailed', { label: '我错在哪', run: () => showResult('samples') }, help)
+        : guide('problem.samplesFailed', whySamples, help)
     }
 
     const result = submissionStore.submission?.result
@@ -114,4 +134,71 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       return next ? { label: '下一道', run: () => router.push(`/problem/${next.problemDisplayId}`) } : null
     }
   })
+
+  // ---- 主动开口（只对学生；比赛里 Mascot.vue 不弹）----
+
+  const student = () => userStore.isAuthed && !userStore.isTeacherOrAbove && ctx.value.entry !== 'contest'
+
+  /** 这道题上连着几次没跑例子就交了。跑过一次例子就清零 */
+  let unsampledSubmits = 0
+  let sampledSinceSubmit = false
+  /** 上一次「动静」（进题、交、跑例子）的时刻，给「盯了好久」用 */
+  let lastActivity = Date.now()
+
+  watch(
+    () => problemStore.problem?.id,
+    () => {
+      unsampledSubmits = 0
+      sampledSinceSubmit = false
+      lastActivity = Date.now()
+    },
+  )
+  watch(
+    () => submissionStore.trial.samplesRunAt.value,
+    (at) => {
+      if (!at) return
+      sampledSinceSubmit = true
+      lastActivity = Date.now()
+    },
+  )
+  watch(
+    () => submissionStore.submission?.id,
+    (id) => {
+      if (!id) return
+      unsampledSubmits = sampledSinceSubmit ? 0 : unsampledSubmits + 1
+      sampledSinceSubmit = false
+      lastActivity = Date.now()
+    },
+  )
+
+  // 判完了：错了就看要不要说一句；不管对错都刷新行为数（最近的错、今天做对几道）
+  watch(
+    () => [submissionStore.submission?.id, submissionStore.submission?.result] as const,
+    ([id, result]) => {
+      const problem = problemStore.problem
+      if (!id || !FINISHED(result) || !problem || !student()) return
+      refreshMascotProfile(true)
+      const failed = RESULT_SITUATION[result as SubmissionStatus]
+      if (!failed) return
+      const { runSamples, help, why } = studentActions(problem)
+      if (problemStore.failCount >= STUCK_FAILS) {
+        requestSpeech({ key: `stuck:${problem.id}`, ...guide('problem.stuck', help, why) })
+      } else if (unsampledSubmits >= UNSAMPLED_SUBMITS && runSamples) {
+        requestSpeech({ key: `unsampled:${problem.id}`, ...guide('habit.noSamples', runSamples) })
+      } else {
+        const habit = habitSituation(failed)
+        if (habit) requestSpeech({ key: `habit:${habit}`, ...guide(habit, why) })
+      }
+    },
+  )
+
+  // 盯着一道没做对的题 15 分钟，没交也没跑：问一句
+  useIntervalFn(() => {
+    const problem = problemStore.problem
+    if (!problem || !student() || Date.now() - lastActivity < IDLE_MS) return
+    if (problem.myStatus === SubmissionStatus.accepted || submissionStore.submission?.result === SubmissionStatus.accepted) return
+    if (codeStore.code.language === 'Flowchart') return
+    const { runSamples, help } = studentActions(problem)
+    requestSpeech({ key: `idle:${problem.id}`, ...guide('idle.stuck', help, runSamples) })
+  }, 30_000)
 }

@@ -46,6 +46,7 @@ import type {
   JudgeStatus,
   LessonLanguage,
   LessonMode,
+  MascotEventKind,
   ProblemChallenges,
   ProblemDifficulty,
   ProblemLanguage,
@@ -1408,6 +1409,48 @@ export const challengeSuccess = pgTable(
       columns: [table.submissionId],
       foreignColumns: [submission.id],
       name: 'challenge_success_submission_id_fk_submission_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 看板娘的互动记录：点开气泡、点气泡里的按钮、她主动开口、摸头彩蛋、被拖走（种类见契约
+ * mascotEventSchema）。拿来看她说的话、给的按钮学生用不用，以后按学生的行为调整她也读这里；
+ * 「点过几次」（熟悉程度）直接按 user_id 数 open。
+ *
+ * 不是「学生做过什么」的证据，账号没了就没意义，user 外键 CASCADE（外键分档见 CLAUDE.md「数据库」）。
+ */
+export const mascotEvent = pgTable(
+  'mascot_event',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'mascot_event_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    userId: integer('user_id').notNull(),
+    kind: text().$type<MascotEventKind>().notNull(),
+    situation: text(),
+    line: text(),
+    action: text(),
+    path: text().notNull(),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('mascot_event_user_kind_idx').on(table.userId, table.kind),
+    index('mascot_event_created_at_idx').on(table.createdAt),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [user.id],
+      name: 'mascot_event_user_id_fk_user_id',
     }).onDelete('cascade'),
   ],
 )

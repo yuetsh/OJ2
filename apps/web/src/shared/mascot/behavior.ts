@@ -1,0 +1,122 @@
+import type { MascotEventInput, MascotProfile } from '@oj2/contract'
+import api from 'utils/api'
+import { useUserStore } from 'shared/store/user'
+import type { MascotGuide } from './guide'
+import type { MascotSituation } from './lines'
+
+/**
+ * 看板娘按学生的行为挑话：常犯哪类错、今天做了几道、和她熟不熟。数从 GET /mascot/profile 来，
+ * 那边按库里的提交和互动记录算；互动本身经 logMascotEvent 记进 mascot_event。
+ *
+ * 只对学生。老师的话不跟着行为变。
+ */
+
+/** 记一条互动。只记登录了的，失败就算了：前台不等它、也不提示 */
+export function logMascotEvent(event: Omit<MascotEventInput, 'path'>) {
+  if (!useUserStore().isAuthed) return
+  const body: MascotEventInput = { ...event, path: location.pathname.slice(0, 200) }
+  if (body.line) body.line = body.line.slice(0, 100)
+  api.post('mascot/events', body).catch(() => {})
+}
+
+export const mascotProfile = shallowRef<MascotProfile | null>(null)
+let loadedAt = 0
+let loading: Promise<void> | null = null
+/** 进页面、交完一次都想要新的数，但别每次都打一遍 */
+const STALE_MS = 30_000
+
+export function refreshMascotProfile(force = false) {
+  const userStore = useUserStore()
+  if (!userStore.isAuthed || userStore.isTeacherOrAbove) {
+    mascotProfile.value = null
+    return null
+  }
+  if (loading) return loading
+  if (!force && mascotProfile.value && Date.now() - loadedAt < STALE_MS) return null
+  loading = api
+    .get<MascotProfile>('mascot/profile')
+    .then((profile) => {
+      mascotProfile.value = profile
+      loadedAt = Date.now()
+    })
+    .catch(() => {})
+    .finally(() => {
+      loading = null
+    })
+  return loading
+}
+
+/** 这一页会话里点开过几次：第一次见面那句只说一回，刚点过的也算熟了一点 */
+let sessionPokes = 0
+export function notePoke() {
+  sessionPokes++
+}
+
+// 门槛按本机生产快照定的（2026-11，最近 120 天交过 10 次以上的 266 个学生）：最近 20 次里
+// 运行出错 ≥3 的 87 人、答案错误 ≥5 的 82 人，各占三成；编译错误有提交前语法检查，≥3 的只有 7 人
+const HABIT_MIN = { wrongAnswer: 5, compileError: 3, runtimeError: 3, timeout: 2 } as const
+/** 有专门几句的运行错误类型，别的走 habit.runtimeError */
+const NAMED_RUNTIME_ERRORS = new Set(['NameError', 'TypeError', 'ValueError', 'EOFError'])
+
+/**
+ * 这一类错是不是这个学生的老毛病：是就给对应的那组话，不是返回 null。
+ * 题目页点她、交完错了她主动开口都走这里
+ */
+export function habitSituation(failure: MascotSituation): MascotSituation | null {
+  const recent = mascotProfile.value?.recent
+  if (!recent) return null
+  switch (failure) {
+    case 'problem.wrong':
+      return recent.wrongAnswer >= HABIT_MIN.wrongAnswer ? 'habit.wrongAnswer' : null
+    case 'problem.compileError':
+      return recent.compileError >= HABIT_MIN.compileError ? 'habit.compileError' : null
+    case 'problem.runtimeError': {
+      if (recent.runtimeError < HABIT_MIN.runtimeError) return null
+      const type = recent.runtimeErrorType
+      return type && NAMED_RUNTIME_ERRORS.has(type) ? (`habit.${type}` as MascotSituation) : 'habit.runtimeError'
+    }
+    case 'problem.timeout':
+      return recent.timeout >= HABIT_MIN.timeout ? 'habit.timeout' : null
+    default:
+      return null
+  }
+}
+
+const HABIT_CHANCE = 0.6
+const TODAY_CHANCE = 0.4
+const FAMILIAR_CHANCE = 0.2
+/** 点开过这么多次算老熟人 */
+const FAMILIAR_POKES = 50
+/** 今天做到这么多道才拿出来说 */
+const TODAY_MIN = 3
+const GREETINGS = new Set<MascotSituation>(['greet', 'announcement', 'achievement', 'profile'])
+const PRAISE = new Set<MascotSituation>(['problem.accepted', 'problem.firstTry', 'problem.finally', 'home.done', 'home.assigned', 'home.free'])
+
+/** 点她的时候：按行为把页面给的情况换成更贴这个学生的那一组（按钮不变） */
+export function personalize(guide: MascotGuide): MascotGuide {
+  const profile = mascotProfile.value
+  if (!profile) return guide
+  if (profile.pokes + sessionPokes === 0) return { ...guide, situation: 'first.meet', n: undefined }
+  const habit = habitSituation(guide.situation)
+  if (habit && Math.random() < HABIT_CHANCE) return { ...guide, situation: habit }
+  if (PRAISE.has(guide.situation) && profile.todaySolved >= TODAY_MIN && Math.random() < TODAY_CHANCE) {
+    return { ...guide, situation: 'today.count', n: profile.todaySolved }
+  }
+  if (GREETINGS.has(guide.situation) && profile.pokes >= FAMILIAR_POKES && Math.random() < FAMILIAR_CHANCE) {
+    return { ...guide, situation: 'familiar' }
+  }
+  return guide
+}
+
+// ---- 主动开口 ----
+
+export interface MascotSpeech extends MascotGuide {
+  /** 同一个 key 一次页面会话里只说一次（比如「这道题卡住了」每道题只说一回） */
+  key: string
+}
+
+/** 页面请她主动说一句；说不说、什么时候说由 Mascot.vue 按频率上限定 */
+export const speechRequest = shallowRef<MascotSpeech | null>(null)
+export function requestSpeech(speech: MascotSpeech) {
+  speechRequest.value = speech
+}
