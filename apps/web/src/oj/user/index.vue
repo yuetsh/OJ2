@@ -4,6 +4,7 @@ import { getProfileOverview } from 'oj/api'
 import { getProfile } from 'shared/api'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useUserStore } from 'shared/store/user'
+import { goAction, useMascotGuide } from 'shared/mascot/guide'
 import type { Profile } from 'utils/types'
 import AchievementCard from './components/AchievementCard.vue'
 import KnowledgeMap from './components/KnowledgeMap.vue'
@@ -17,6 +18,7 @@ import VersusCard from './components/VersusCard.vue'
  * /profiles/:username/overview），这里只管摆。原来的「我的设置」并进了名片。
  */
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const { isDesktop } = useBreakpoints()
 
@@ -47,6 +49,12 @@ async function load() {
 }
 
 watch(username, load, { immediate: true })
+
+// 看板娘：只在看自己的主页时说话
+useMascotGuide(() => {
+  if (!isSelf.value || !profile.value || userStore.isTeacherOrAbove) return null
+  return { situation: 'profile', actions: [goAction(router, '我的成就', '/achievement'), goAction(router, '我的提交', '/submission?myself=1')] }
+})
 </script>
 
 <template>

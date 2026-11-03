@@ -11,6 +11,7 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import { usePagination } from 'shared/composables/pagination'
 import { useConfigStore } from 'shared/store/config'
 import { useUserStore } from 'shared/store/user'
+import { useMascotGuide } from 'shared/mascot/guide'
 import { LANGUAGE_SHOW_VALUE, SubmissionStatus } from 'utils/constants'
 import { parseTime } from 'utils/functions'
 import type { FlowchartSubmissionListItem, LANGUAGE, SubmissionListItem } from 'utils/types'
@@ -425,6 +426,18 @@ const { lesson, lessonActive, lessonLoading, toggleLesson } = useLessonFilter({
   query,
   flowMode,
   info: (text) => message.info(text),
+})
+
+// 看板娘：学生带去看自己的；「这节课」只有老师那一版有，老师给它
+useMascotGuide(() => {
+  if (inContest.value) return null
+  if (!teacher.value) return { situation: 'submissions', actions: mine.value ? [] : [{ label: '只看我的', run: () => (scope.value = 'mine') }] }
+  const toLesson = () => {
+    // 「我的」时这节课的按钮是藏着的，先切回全部
+    if (mine.value) scope.value = 'all'
+    toggleLesson()
+  }
+  return { situation: 'teacher.submissions', actions: lessonActive.value ? [] : [{ label: '这节课', run: toLesson }] }
 })
 
 const activeFilters = computed(

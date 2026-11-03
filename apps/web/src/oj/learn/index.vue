@@ -6,6 +6,7 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useAuthModalStore } from 'shared/store/authModal'
 import AdminLink from 'shared/components/AdminLink.vue'
 import { useUserStore } from 'shared/store/user'
+import { goAction, useMascotGuide } from 'shared/mascot/guide'
 import { COURSES, continueStep, doneCount, groupByProject, tutorialPath, tutorialState, splitProject, splitTitle, type TutorialType } from './utils'
 import TutorialRow from './components/TutorialRow.vue'
 import ProjectTile from './components/ProjectTile.vue'
@@ -93,6 +94,14 @@ function pickTab(type: TutorialType) {
 function doneIn(course: Course, ids: number[]) {
   return ids.filter((id) => tutorialState(course.progress[id]) === 'done').length
 }
+
+// 看板娘：学过就带去「接着学」那一课，一课没学过就从当前页签那门课的第 1 课开始
+useMascotGuide(() => {
+  if (!loaded.value || userStore.isTeacherOrAbove) return null
+  const it = resume.value
+  if (it) return { situation: 'learn.continue', n: it.step, actions: [goAction(router, '接着学', tutorialPath(it.course.type, it.step))] }
+  return { situation: 'learn.fresh', actions: [goAction(router, '第 1 课', tutorialPath(tab.value, 1))] }
+})
 
 watch(() => userStore.isAuthed, load)
 onMounted(load)

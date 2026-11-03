@@ -6,6 +6,7 @@ import { useProblemJump } from 'shared/composables/problemJump'
 import { useUserStore } from 'shared/store/user'
 import type { ClassActivityProblem } from 'utils/types'
 import { zonedParts } from 'utils/functions'
+import { jumpFocusRequest } from 'shared/mascot/guide'
 
 /**
  * 顶栏的题号框：老师报完题号，学生在哪一页都能直接敲，不用先回首页或题目列表。
@@ -29,7 +30,9 @@ const lessonStore = useLessonStore()
 const { jump, jumping } = useProblemJump()
 const keyword = ref('')
 const focused = ref(false)
-const input = useTemplateRef<{ blur: () => void }>('input')
+const input = useTemplateRef<{ blur: () => void; focus: () => void }>('input')
+// 看板娘气泡里的「输题号」：把光标放进来
+watch(jumpFocusRequest, () => input.value?.focus())
 
 /** 题目页的三种入口（题库 / 比赛 / 专题）顶上都有自己的上下文条 */
 const PROBLEM_PAGES = new Set(['problem', 'contest problem', 'problemset problem'])

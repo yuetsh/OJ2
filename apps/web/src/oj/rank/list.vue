@@ -7,6 +7,7 @@ import UserName from 'shared/components/UserName.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useConfigStore } from 'shared/store/config'
 import { useUserStore } from 'shared/store/user'
+import { useMascotGuide } from 'shared/mascot/guide'
 import { errorCode } from 'utils/api'
 import { displayName } from '@oj2/contract'
 import { STORAGE_KEY } from 'utils/constants'
@@ -270,6 +271,17 @@ function openDetail(className: string) {
   detailClass.value = className
   showDetail.value = true
 }
+
+// 看板娘：自己在榜上就把自己那一行滚到眼前（领奖台上是「你」那个标签，赛道上是高亮的那一行）
+useMascotGuide(() => {
+  if (teacher.value || !board.value) return null
+  const listed = rows.value.some((row) => row.user.id === meId.value)
+  const findMe = () => {
+    const el = document.querySelector('.track-card .entry.me, .track-card .prow.me, .track-card .tag.me')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  return { situation: 'rank', actions: listed ? [{ label: '我在哪', run: findMe }] : [] }
+})
 
 function open(username: string) {
   router.push({ path: '/user', query: { name: username } })

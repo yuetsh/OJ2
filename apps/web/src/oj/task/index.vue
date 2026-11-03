@@ -10,6 +10,7 @@ import { useLeaveStudents } from 'shared/composables/leaveStudents'
 import { useTeacherHelp } from 'shared/composables/teacherHelp'
 import { useCollabStore } from 'shared/store/collab'
 import { useConfigStore } from 'shared/store/config'
+import { useMascotGuide } from 'shared/mascot/guide'
 import { errorMessage } from 'utils/api'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { parseTime } from 'utils/functions'
@@ -511,6 +512,29 @@ function submissionsHref(
   }).href
 }
 
+/**
+ * 看板娘：布置了就带去这节课的提交，筛法同提交列表「这节课」（班、这几道题、今天）。
+ * 语言和格子一致：画流程图的课看流程图，选了语言的只看它 —— 夹着 SQL 题的不筛语言，免得把 SQL 交的藏掉。
+ * 还没布置时填题号的框就是这页最大的东西，不给按钮
+ */
+const startForm = useTemplateRef<{ openPicker: () => void }>('startForm')
+useMascotGuide(() => {
+  const b = board.value
+  if (!b?.className) return null
+  if (needLesson.value)
+    return { situation: 'teacher.task.unassigned', actions: startForm.value ? [{ label: '选题', run: () => startForm.value?.openPicker() }] : [] }
+  const language = b.mode === 'flowchart' ? 'Flowchart' : b.problems.some((problem) => problem.isSql) ? null : b.language
+  const query = {
+    className: b.className,
+    problem: b.problems.map((problem) => problem.problemDisplayId).join(','),
+    today: '1',
+    ...(language ? { language } : {}),
+  }
+  // 新标签打开，和点格子一样：任务页一般开着不关
+  const open = () => window.open(router.resolve({ name: 'submissions', query }).href, '_blank')
+  return { situation: 'teacher.task.assigned', actions: [{ label: '这节课的提交', run: open }] }
+})
+
 function lastText(student: TaskBoardStudent) {
   if (student.lastSubmitAt) return parseTime(student.lastSubmitAt, 'HH:mm')
   if (oftenIdle(student)) {
@@ -578,7 +602,16 @@ function lastText(student: TaskBoardStudent) {
       <!-- 刚上课还没有题：填题号的框是这页最大的东西 -->
       <section v-if="needLesson" class="start">
         <div class="start-title">这节课做哪几道题？</div>
-        <LessonForm v-if="className" :board="board" :class-name="className" :lesson-id="null" variant="start" class="start-row" @saved="lessonSaved" />
+        <LessonForm
+          v-if="className"
+          ref="startForm"
+          :board="board"
+          :class-name="className"
+          :lesson-id="null"
+          variant="start"
+          class="start-row"
+          @saved="lessonSaved"
+        />
         <div v-if="staleLesson" class="earlier">
           <span>上一节 {{ board.assignedAt ? parseTime(board.assignedAt, 'HH:mm') : '' }} {{ board.assignedBy }} 布置</span>
           <span v-for="problem in board.problems" :key="problem.problemId" class="chip">{{ problem.problemDisplayId }}</span>

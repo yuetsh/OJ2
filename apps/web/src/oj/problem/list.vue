@@ -18,6 +18,7 @@ import { usePagination } from 'shared/composables/pagination'
 import { useAuthModalStore } from 'shared/store/authModal'
 import AdminLink from 'shared/components/AdminLink.vue'
 import { useUserStore } from 'shared/store/user'
+import { focusJumpAction, useMascotGuide, type MascotAction } from 'shared/mascot/guide'
 import ProblemStatus from './components/ProblemStatus.vue'
 import ProblemTypeTag from './components/ProblemTypeTag.vue'
 import ProgressRow from './components/ProgressRow.vue'
@@ -271,6 +272,18 @@ async function pickRandom() {
     picking.value = false
   }
 }
+
+// 看板娘：学生给找题的几条路（「随便来一道」按这页选着的知识点和类型挑），老师给新建题目
+useMascotGuide(() => {
+  if (teacher.value) {
+    return {
+      situation: 'teacher.problems',
+      actions: userStore.hasProblemPermission ? [{ label: '新建题目', run: () => router.push('/admin/problem/create') }] : [],
+    }
+  }
+  const undone: MascotAction | null = userStore.isAuthed && !undoneOn.value ? { label: '只看没做完', run: () => (undoneOn.value = true) } : null
+  return { situation: 'problems', actions: [focusJumpAction(), ...(undone ? [undone] : []), { label: '随便来一道', run: pickRandom }] }
+})
 
 // ---- 「只看没做完」下一道都没有了：说清楚为什么是空的，给两条路 ----
 const nextTag = computed(() => {

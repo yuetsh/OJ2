@@ -6,6 +6,7 @@ import { useThemeVars } from 'naive-ui'
 import { getAnnouncementList, getClassToday } from 'oj/api'
 import { classLabel } from 'utils/classes'
 import { useUserStore } from 'shared/store/user'
+import { goAction, useMascotGuide } from 'shared/mascot/guide'
 import { parseTime, zonedParts, zonedYear } from 'utils/functions'
 
 /**
@@ -65,6 +66,25 @@ function metaOf(row: ClassRow) {
 function openTask(row: ClassRow) {
   router.push({ name: 'task', query: { className: row.className } })
 }
+
+/**
+ * 看板娘：今天有班布置了题，就带去那个班这节课的提交（和提交列表「这节课」同一组筛选：班、这几道题、今天），
+ * 有好几个班时挑正在上课的那个
+ */
+useMascotGuide(() => {
+  if (!today.value) return null
+  const assigned = today.value.classes.filter((row) => row.source === 'teacher' && row.problems.length)
+  const row = assigned.find((it) => stateOf(it).live) ?? assigned[0]
+  if (!row) return { situation: 'teacher.home.unassigned', actions: [goAction(router, '布置题目', '/task')] }
+  const query = { className: row.className, problem: row.problems.map((problem) => problem.problemDisplayId).join(','), today: '1' }
+  return {
+    situation: 'teacher.home.assigned',
+    actions: [
+      { label: '这节课的提交', run: () => router.push({ name: 'submissions', query }) },
+      { label: '课堂任务', run: () => openTask(row) },
+    ],
+  }
+})
 
 const shortcuts = computed(() =>
   [

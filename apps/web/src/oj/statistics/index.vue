@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouteQuery } from '@vueuse/router'
+import { useMascotGuide } from 'shared/mascot/guide'
 import StatisticsView from './components/StatisticsView.vue'
 import { DEFAULT_PERIOD } from './period'
 
@@ -18,6 +19,8 @@ const problem = useRouteQuery<string>('problem', '', { mode: 'replace' })
 const period = useRouteQuery<string>('period', DEFAULT_PERIOD, { mode: 'replace' })
 const from = useRouteQuery<string>('from', '', { mode: 'replace' })
 const to = useRouteQuery<string>('to', '', { mode: 'replace' })
+
+useMascotGuide(() => ({ situation: 'teacher.statistics' }))
 
 function openList(query: Record<string, string>) {
   window.open(router.resolve({ name: 'submissions', query }).href, '_blank')

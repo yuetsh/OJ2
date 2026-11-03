@@ -8,6 +8,7 @@ import SubmissionResultTag from 'shared/components/SubmissionResultTag.vue'
 import { pickHeadline, type Headline } from 'oj/user/knowledge'
 import { useUserStore } from 'shared/store/user'
 import { activityMode } from 'shared/store/lesson'
+import { focusJumpAction, goAction, randomProblemAction, useMascotGuide } from 'shared/mascot/guide'
 import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { duration, parseTime, zonedParts, zonedYear } from 'utils/functions'
 import type { AnnouncementListItem, ClassActivity, ClassActivityProblem, Contest, LastVisit, SubmissionListItem, WeeklyRank } from 'utils/types'
@@ -243,6 +244,17 @@ watch(
   (ready) => ready && load(),
   { immediate: true },
 )
+
+// 看板娘：今天有课（和「这节课」那张卡同一个条件）就催今天的题，没课就随便做一道
+useMascotGuide(() => {
+  if (!loaded.value) return null
+  const random = randomProblemAction(router)
+  const learn = goAction(router, '自学', '/learn')
+  if (!classToday.value || !classActivity.value?.problems.length) return { situation: 'home.free', actions: [focusJumpAction(), random, learn] }
+  const next = nextProblem.value
+  if (!next) return { situation: 'home.done', actions: [random, learn] }
+  return { situation: 'home.assigned', actions: [goAction(router, '今天的题', `/problem/${next.problemDisplayId}`), focusJumpAction(), random] }
+})
 
 function learnLink(track: Track) {
   return tutorialPath(track.type, track.step)

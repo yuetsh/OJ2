@@ -12,6 +12,7 @@ import { usePagination } from 'shared/composables/pagination'
 import AdminLink from 'shared/components/AdminLink.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useUserStore } from 'shared/store/user'
+import { goAction, useMascotGuide } from 'shared/mascot/guide'
 import { ContestStatus } from 'utils/constants'
 import ContestBadge from './components/ContestBadge.vue'
 
@@ -114,6 +115,14 @@ function open(contest: Contest) {
   // 老师直接进「全班情况」
   router.push(userStore.isTeacherOrAbove ? `/contest/${contest.id}/class` : `/contest/${contest.id}`)
 }
+
+// 看板娘：有正在比的就带进去
+useMascotGuide(() => {
+  if (userStore.isTeacherOrAbove) return null
+  const live = active.value.find((c) => c.status === ContestStatus.underway)
+  if (!live) return { situation: 'contests.none' }
+  return { situation: 'contests.live', actions: [goAction(router, '进比赛', `/contest/${live.id}`)] }
+})
 
 function mineText(contest: Contest) {
   const mine = contest.mine

@@ -6,6 +6,7 @@ import { classLabel, groupClassOptions } from 'utils/classes'
 import { useAIStream } from 'shared/composables/aiStream'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useUserStore } from 'shared/store/user'
+import { useMascotGuide } from 'shared/mascot/guide'
 import PkDuel from './components/PkDuel.vue'
 import PkGrid from './components/PkGrid.vue'
 import PkRace from './components/PkRace.vue'
@@ -31,6 +32,10 @@ const { isDesktop } = useBreakpoints()
 const MAX_CLASSES = 8
 
 const teacher = computed(() => userStore.isTeacherOrAbove)
+
+// 看板娘：学生念叨一句班级对决，老师只打招呼
+useMascotGuide(() => (teacher.value ? null : { situation: 'pk' }))
+
 const pk = ref<ClassPk | null>(null)
 const loading = ref(false)
 const battle = ref<ClassBattleItem[]>([])

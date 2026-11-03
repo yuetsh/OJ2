@@ -3,6 +3,7 @@ import { useThemeVars } from 'naive-ui'
 import AdminLink from 'shared/components/AdminLink.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useUserStore } from 'shared/store/user'
+import { goAction, useMascotGuide } from 'shared/mascot/guide'
 import { getProblemSetList } from 'oj/api'
 import { rgba, useTone } from 'shared/composables/tone'
 import { parseTime } from 'utils/functions'
@@ -54,6 +55,16 @@ const others = computed(() =>
       return Date.parse(b.createTime) - Date.parse(a.createTime)
     }),
 )
+
+// 看板娘：加入了还没做完的专题，布置中的优先，其次最近加入的
+useMascotGuide(() => {
+  if (userStore.isTeacherOrAbove) return null
+  const pending = sets.value.filter((set) => set.userProgress.isJoined && !set.userProgress.isCompleted)
+  const latest = (set: ProblemSet) => Date.parse(set.userProgress.joinTime ?? '') || 0
+  const target = pending.find((set) => set.assigning) ?? [...pending].sort((a, b) => latest(b) - latest(a))[0]
+  if (!target) return null
+  return { situation: 'problemsets.unfinished', actions: [goAction(router, '接着做', `/problemset/${target.id}`)] }
+})
 
 function description(set: ProblemSet) {
   // 简介大多就是把标题再抄一遍，一样的就不重复显示

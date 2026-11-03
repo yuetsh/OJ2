@@ -2,6 +2,7 @@
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import type { RouteLocationRaw } from 'vue-router'
+import { useMascotGuide } from 'shared/mascot/guide'
 
 /**
  * 「找不到」的整页提示：地址打错、题目 / 比赛 / 专题不存在或没公开、比赛还没开始。
@@ -21,6 +22,9 @@ const props = withDefaults(
 
 const theme = useThemeVars()
 const router = useRouter()
+
+// 看板娘：和页面上那个按钮去同一个地方（回首页 / 回到专题 / 回到比赛）
+useMascotGuide(() => ({ situation: 'notFound', actions: [{ label: props.toLabel, run: () => router.push(props.to) }] }))
 </script>
 
 <template>

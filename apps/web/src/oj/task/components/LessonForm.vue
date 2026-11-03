@@ -92,6 +92,9 @@ function openPicker() {
   pickerInitial.value = inputIds().map((id) => ({ id, title: titles.get(id.toLowerCase()) }))
   picking.value = true
 }
+
+// 看板娘气泡里的「选题」：课堂任务页没布置时替老师打开选题弹框
+defineExpose({ openPicker })
 function pickerConfirm(ids: string[]) {
   lessonInput.value = ids.join(' ')
   saveLesson()

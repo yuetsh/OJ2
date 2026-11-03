@@ -5,6 +5,7 @@ import AdminLink from 'shared/components/AdminLink.vue'
 import NotFound from 'shared/components/NotFound.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useUserStore } from 'shared/store/user'
+import { useMascotGuide } from 'shared/mascot/guide'
 import { errorCode } from 'utils/api'
 import { parseTime, zonedParts, zonedYear } from 'utils/functions'
 import type { Announcement, AnnouncementListItem } from 'utils/types'
@@ -26,6 +27,9 @@ const { isDesktop } = useBreakpoints()
 
 const announcements = ref<AnnouncementListItem[]>([])
 const loaded = ref(false)
+
+// 看板娘：只念叨一句，不给按钮
+useMascotGuide(() => ({ situation: 'announcement' }))
 
 onMounted(async () => {
   const res = await getAnnouncementList(0, LIMIT)

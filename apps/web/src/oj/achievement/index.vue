@@ -6,6 +6,7 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import UserName from 'shared/components/UserName.vue'
 import AdminLink from 'shared/components/AdminLink.vue'
 import { useUserStore } from 'shared/store/user'
+import { useMascotGuide } from 'shared/mascot/guide'
 import { RARITY_COLOR, RARITY_LABEL } from 'utils/constants'
 import type { AchievementList, AchievementRarity, UserBadge } from 'utils/types'
 import ClassCard from './components/ClassCard.vue'
@@ -59,6 +60,9 @@ async function load() {
 
 onMounted(load)
 watch(name, load)
+
+// 看板娘：只在看自己的成就时说话
+useMascotGuide(() => (data.value && !other.value && !userStore.isTeacherOrAbove ? { situation: 'achievement' } : null))
 </script>
 
 <template>

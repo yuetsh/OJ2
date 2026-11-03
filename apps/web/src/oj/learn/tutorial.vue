@@ -10,6 +10,7 @@ import { useBackClose } from 'shared/composables/backClose'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import AdminLink from 'shared/components/AdminLink.vue'
 import { useUserStore } from 'shared/store/user'
+import { useMascotGuide, type MascotAction } from 'shared/mascot/guide'
 import { COURSES, doneCount, groupByProject, tutorialPath, tutorialState, splitTitle, type TutorialType } from './utils'
 import TutorialBody from './components/TutorialBody.vue'
 import TutorialEnd from './components/TutorialEnd.vue'
@@ -233,6 +234,16 @@ function jump(id: string) {
 function jumpExercise(id: number) {
   jump(`exercise-${id}`)
 }
+
+// 看板娘：练一练没做完就带去第一道没做对的；做完了（或这课没有练一练）就去下一课
+useMascotGuide(() => {
+  if (!tutorial.value || userStore.isTeacherOrAbove) return null
+  const to = next.value?.to
+  const nextLesson: MascotAction[] = to ? [{ label: '下一课', run: () => router.push(to) }] : []
+  const unsolved = firstUnsolved.value
+  if (!unsolved) return { situation: 'tutorial.passed', actions: nextLesson }
+  return { situation: 'tutorial', actions: [{ label: '练一练', run: () => jumpExercise(unsolved.id) }, ...nextLesson] }
+})
 </script>
 
 <template>

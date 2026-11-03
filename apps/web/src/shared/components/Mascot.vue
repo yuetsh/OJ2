@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 看板娘。只陪着，不干别的。现在只有一个形象（大肥鱼）。
+ * 看板娘，兼站内的引导员。现在只有一个形象（鲸鱼娘）。
  *
  * 形象取自 MeteorNOX/DeepSeek-Balance-Whale-Widget 的 assets/DSniang1.png（裁掉透明边、缩到 2 倍显示尺寸转 webp）。
  * 那个仓库的代码是 MIT，但 assets/ 下的图不在 MIT 里（见它的 PROVENANCE.md）。
@@ -8,14 +8,22 @@
  * - 常驻在前台页面的角落，能拖；松手按「四分之一区」贴边：中心落在左/右四分之一就贴左/右缘，
  *   上/下四分之一就贴上/下缘，中间保持松手的位置。两个方向各判各的，所以能贴进角落。
  * - 在屏幕左半边时整体镜像，脸总朝着页面中间。
- * - 按下去像玩偶一样压扁（底边不动），松手弹回；点一下蹦一下。
+ * - 按下去像玩偶一样压扁（底边不动），松手弹回。
+ * - 点一下冒气泡：一句话加最多三个按钮，按页面、按情况变（页面经 shared/mascot/guide.ts 告诉她），
+ *   台词在 shared/mascot/lines.ts。她从不主动开口；比赛里点她不弹气泡。再点一下、点别处、换页面都收起。
  * - 彩蛋：连着快点，有时候（每轮三分之一的机会）点到第 4～8 下（也是随机的）会被摸摸头（同一个仓库的 assets/rua.gif），摸的时候接着点就一直摸。
  *
  * 位置只是这台电脑上的个人偏好，存 localStorage（读写都包 try/catch，拿不到就用默认位置）。
  * 定位一律用 transform 的像素值：贴右缘时若换成 right:0，过渡没法在 auto 和数值之间插值，会瞬移。
  */
+import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import imageUrl from 'shared/assets/mascot/whale.webp'
 import patUrl from 'shared/assets/mascot/whale-pat.gif'
+import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
+import { currentMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
+import { useAuthModalStore } from 'shared/store/authModal'
+import { useCollabStore } from 'shared/store/collab'
+import { useUserStore } from 'shared/store/user'
 
 const WIDTH = 132
 const HEIGHT = 140 // 图是 264×280
@@ -36,6 +44,8 @@ function rollPatClicks() {
   return PAT_CLICKS_MIN + Math.floor(Math.random() * (PAT_CLICKS_MAX - PAT_CLICKS_MIN + 1))
 }
 const STREAK_GAP_MS = 600 // 两下之间超过这么久就不算连点
+const OVERCLICK = 8 // 一轮连点到这么多下还没摸到头，她就嫌烦了
+const QUIET_BUBBLE_MS = 5000 // 没有按钮的气泡（只是一句话）过这么久自己收起
 
 type HAnchor = 'left' | 'right' | null
 type VAnchor = 'top' | 'bottom' | null
@@ -71,10 +81,11 @@ const place = loadPlace()
 const pos = reactive({ x: 0, y: 0 })
 const dragging = ref(false)
 const pressed = ref(false)
-const hop = ref(false)
 const patting = ref(false)
 const flipped = ref(false)
-const root = ref<HTMLElement>()
+const body = ref<HTMLElement>()
+const squashEl = ref<HTMLElement>()
+const bubbleEl = ref<HTMLElement>()
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(Math.max(v, lo), Math.max(lo, hi))
@@ -90,6 +101,10 @@ function settle() {
   flipped.value = pos.x + WIDTH / 2 < vw / 2
 }
 
+// 第一帧之前就算好位置。挪到 onMounted 里算的话，第一帧画在 (0,0)，
+// 接着位置一变就触发过渡，看上去是从左上角飞过去的
+settle()
+
 let start: { px: number; py: number; x: number; y: number } | null = null
 let moved = false
 
@@ -98,7 +113,7 @@ function onDown(e: PointerEvent) {
   // 不拦的话，第一下甩得快时浏览器会拿光标新位置底下的东西（比如题目列表的链接）开始原生拖拽，
   // 随即发 pointercancel，看板娘就卡在半路
   e.preventDefault()
-  root.value?.setPointerCapture(e.pointerId)
+  body.value?.setPointerCapture(e.pointerId)
   start = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y }
   moved = false
   pressed.value = true
@@ -117,6 +132,19 @@ function onMove(e: PointerEvent) {
   flipped.value = pos.x + WIDTH / 2 < document.documentElement.clientWidth / 2
 }
 
+/**
+ * 每点一下都压扁再弹回来一次。按住时的压扁靠 .pressed 的过渡，可快速点一下从按下到松开只有几十毫秒，
+ * 过渡还没走到位就松了，连点时看上去像卡住。用 Web Animations 播一遍完整的，每下都从头播
+ */
+const reducedMotion = usePreferredReducedMotion()
+function boing() {
+  if (reducedMotion.value === 'reduce') return
+  squashEl.value?.animate([{ transform: 'scale(1.06, 0.86)' }, { transform: 'scale(0.97, 1.04)', offset: 0.55 }, { transform: 'scale(1, 1)' }], {
+    duration: 280,
+    easing: 'ease-out',
+  })
+}
+
 // 动图 94KB，不在每个页面一打开就下：连点到第 2 下才预载，最少也还要再点两下才用得上
 let patPreloaded = false
 function preloadPat() {
@@ -126,7 +154,6 @@ function preloadPat() {
 }
 
 let patTimer: ReturnType<typeof setTimeout> | undefined
-let hopTimer: ReturnType<typeof setTimeout> | undefined
 let streak = 0
 let patClicks = rollPatClicks()
 let lastClick = 0
@@ -148,6 +175,7 @@ function onUp() {
     savePlace(place)
     return
   }
+  boing()
   const now = performance.now()
   if (now - lastClick <= STREAK_GAP_MS) streak++
   else {
@@ -159,7 +187,7 @@ function onUp() {
 
   // 正在被摸，或者连点到数了：摸摸头，从这一下再摸满一轮
   if (patting.value || streak >= patClicks) {
-    hop.value = false
+    if (!patting.value) say({ text: pick('patting') })
     patting.value = true
     clearTimeout(patTimer)
     patTimer = setTimeout(() => {
@@ -168,48 +196,173 @@ function onUp() {
     }, PAT_MS)
     return
   }
-
-  // 平时：蹦一下。连点就从头再蹦
-  hop.value = false
-  clearTimeout(hopTimer)
-  requestAnimationFrame(() => {
-    hop.value = true
-    hopTimer = setTimeout(() => (hop.value = false), 500)
-  })
+  // 一轮里只有第一下开关气泡，后面连着点是在找彩蛋，不跟着一开一关
+  if (streak === 1) toggleBubble()
+  else if (streak === OVERCLICK) say({ text: pick('overclick') })
 }
 
+// ---- 气泡 ----
+
+const route = useRoute()
+const userStore = useUserStore()
+const collabStore = useCollabStore()
+const authModal = useAuthModalStore()
+
+interface Bubble {
+  text: string
+  actions?: MascotAction[]
+}
+const bubble = ref<Bubble | null>(null)
+let quietTimer: ReturnType<typeof setTimeout> | undefined
+
+/** 比赛、测验里不说话：「运行例子」「举手」这类按钮在考试时算不算帮忙，干脆不弹 */
+const silent = computed(() => String(route.name ?? '').startsWith('contest '))
+
+function say(next: Bubble) {
+  if (silent.value) return
+  bubble.value = next
+  clearTimeout(quietTimer)
+  if (!next.actions?.length) quietTimer = setTimeout(close, QUIET_BUBBLE_MS)
+}
+
+function close() {
+  bubble.value = null
+  clearTimeout(quietTimer)
+}
+
+function toggleBubble() {
+  if (bubble.value) return close()
+  const guide = resolveGuide()
+  say({ text: pickFor(guide), actions: guide.actions?.slice(0, 3) })
+}
+
+/** 先看全站的：没登录、老师这边有人举手；再问页面；都没有就打个招呼 */
+function resolveGuide(): MascotGuide {
+  if (!userStore.isAuthed) return { situation: 'guest', actions: [{ label: '登录', run: authModal.openLoginModal }] }
+  const teacher = userStore.isTeacherOrAbove
+  if (teacher && collabStore.isTeacher && collabStore.pendingCount > 0) {
+    return { situation: 'teacher.help', n: collabStore.pendingCount, actions: [{ label: '去看看', run: () => (collabStore.helpPanelOpen = true) }] }
+  }
+  return currentMascotGuide() ?? { situation: teacher ? 'teacher.greet' : 'greet' }
+}
+
+/** 这几种情况要紧，不拿彩蛋换掉 */
+const SERIOUS = new Set<MascotSituation>(['guest', 'teacher.help', 'problem.stuck'])
+const RARE_CHANCE = 0.03
+const TIME_CHANCE = 0.15
+
+function pickFor(guide: MascotGuide) {
+  let situation = guide.situation
+  if (!SERIOUS.has(situation) && guide.n === undefined) {
+    const timely = timeSituation()
+    if (Math.random() < RARE_CHANCE) situation = 'rare'
+    else if (timely && !userStore.isTeacherOrAbove && Math.random() < TIME_CHANCE) situation = timely
+  }
+  return pick(situation).replace('{n}', String(guide.n ?? ''))
+}
+
+/** 同一组里不连着抽到同一句 */
+let lastLine = ''
+function pick(situation: MascotSituation) {
+  const pool: readonly string[] = MASCOT_LINES[situation]
+  const choices = pool.length > 1 ? pool.filter((line) => line !== lastLine) : pool
+  lastLine = choices[Math.floor(Math.random() * choices.length)]!
+  return lastLine
+}
+
+/**
+ * 按东八区的钟点挑时间彩蛋。节次是估的（第一节 8:00、午饭 11:20、下午第一节 13:30、
+ * 最后一节 15:50 前后），对不上学校作息就改这里
+ */
+function timeSituation(): MascotSituation | null {
+  const wall = new Date(Date.now() + TIME_ZONE_OFFSET_MINUTES * 60_000)
+  const day = wall.getUTCDay()
+  const minutes = wall.getUTCHours() * 60 + wall.getUTCMinutes()
+  const within = (from: string, to: string) => {
+    const [fh, fm] = from.split(':').map(Number)
+    const [th, tm] = to.split(':').map(Number)
+    return minutes >= fh! * 60 + fm! && minutes < th! * 60 + tm!
+  }
+  if (day === 0 || day === 6 || !within('07:00', '18:00')) return 'offHours'
+  if (within('08:00', '08:50')) return 'time.firstClass'
+  if (within('11:20', '12:10')) return 'time.lunch'
+  if (within('13:30', '14:20')) return 'time.afternoon'
+  if (within('15:50', '16:40')) return 'time.lastClass'
+  if (day === 1) return 'day.monday'
+  if (day === 5) return 'day.friday'
+  return null
+}
+
+async function runAction(action: MascotAction) {
+  close()
+  await action.run()
+}
+
+// 点别处收起；点她自己由 onUp 管（开关），不算「别处」
+onClickOutside(bubbleEl, close, { ignore: [body] })
+watch(() => route.fullPath, close)
+watch(silent, (quiet) => quiet && close())
+
+/** 她靠上时气泡往下冒，免得顶出屏幕；在左半边时气泡贴左对齐 */
+const bubbleBelow = computed(() => pos.y < 220)
+
 onMounted(() => {
-  settle()
   window.addEventListener('resize', settle, { passive: true })
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', settle)
   clearTimeout(patTimer)
-  clearTimeout(hopTimer)
+  clearTimeout(quietTimer)
 })
 </script>
 
 <template>
-  <div
-    ref="root"
-    class="mascot"
-    :class="{ dragging, pressed, hop, patting, flipped }"
-    :style="{ width: `${WIDTH}px`, height: `${HEIGHT}px`, transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }"
-    aria-hidden="true"
-    @pointerdown="onDown"
-    @pointermove="onMove"
-    @pointerup="onUp"
-    @pointercancel="onUp"
-    @dragstart.prevent
-  >
-    <div class="flip">
-      <div class="squash">
-        <div class="breathe">
-          <img v-if="patting" class="pat" :src="patUrl" :width="PAT_SIZE" :height="PAT_SIZE" :style="{ bottom: `${PAT_BOTTOM}px` }" alt="" draggable="false" />
-          <img v-else :src="imageUrl" :width="WIDTH" :height="HEIGHT" alt="" draggable="false" />
+  <div class="mascot" :class="{ dragging }" :style="{ width: `${WIDTH}px`, height: `${HEIGHT}px`, transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }">
+    <div
+      ref="body"
+      class="body"
+      :class="{ pressed, patting, flipped }"
+      aria-hidden="true"
+      @pointerdown="onDown"
+      @pointermove="onMove"
+      @pointerup="onUp"
+      @pointercancel="onUp"
+      @dragstart.prevent
+    >
+      <div class="flip">
+        <div ref="squashEl" class="squash">
+          <div class="breathe">
+            <img
+              v-if="patting"
+              class="pat"
+              :src="patUrl"
+              :width="PAT_SIZE"
+              :height="PAT_SIZE"
+              :style="{ bottom: `${PAT_BOTTOM}px` }"
+              alt=""
+              draggable="false"
+            />
+            <img v-else :src="imageUrl" :width="WIDTH" :height="HEIGHT" alt="" draggable="false" />
+          </div>
         </div>
       </div>
     </div>
+    <Transition name="bubble">
+      <div v-if="bubble && !dragging" ref="bubbleEl" class="bubble" :class="{ below: bubbleBelow, left: flipped }" role="status">
+        <p class="line">{{ bubble.text }}</p>
+        <div v-if="bubble.actions?.length" class="actions">
+          <n-button
+            v-for="(action, index) in bubble.actions"
+            :key="action.label"
+            size="small"
+            :type="index === 0 ? 'primary' : 'default'"
+            @click="runAction(action)"
+          >
+            {{ action.label }}
+          </n-button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -219,16 +372,98 @@ onBeforeUnmount(() => {
   left: 0;
   top: 0;
   z-index: 900; /* 压在页面上，但让弹框、消息、烟花盖住它 */
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
   transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
   will-change: transform;
 }
 .mascot.dragging {
-  cursor: grabbing;
   transition: none;
+}
+.body {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.dragging .body {
+  cursor: grabbing;
+}
+
+/* 气泡：白底深蓝描边（取她身上线条的颜色），尾巴指着她的头。设计稿「看板娘引导」 */
+.bubble {
+  --bubble-line: #2b3a6b;
+  --bubble-bg: #fff;
+  position: absolute;
+  right: 14px;
+  bottom: calc(100% + 12px);
+  width: max-content;
+  min-width: 120px;
+  max-width: 280px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  background: var(--bubble-bg);
+  border: 2px solid var(--bubble-line);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(20, 30, 60, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+:global(html.dark) .bubble {
+  --bubble-line: #7f94d4;
+  --bubble-bg: #1f2230;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.bubble::after {
+  content: '';
+  position: absolute;
+  right: 40px;
+  bottom: -9px;
+  width: 14px;
+  height: 14px;
+  background: var(--bubble-bg);
+  border-right: 2px solid var(--bubble-line);
+  border-bottom: 2px solid var(--bubble-line);
+  transform: rotate(45deg);
+}
+.bubble.left {
+  right: auto;
+  left: 14px;
+}
+.bubble.left::after {
+  right: auto;
+  left: 40px;
+}
+.bubble.below {
+  bottom: auto;
+  top: calc(100% + 12px);
+}
+.bubble.below::after {
+  bottom: auto;
+  top: -9px;
+  transform: rotate(-135deg);
+}
+.line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bubble-enter-active,
+.bubble-leave-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.bubble-enter-from,
+.bubble-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
 }
 
 .flip,
@@ -253,9 +488,6 @@ onBeforeUnmount(() => {
 .pressed .squash {
   transform: scale(1.05, 0.88);
   transition-duration: 0.1s;
-}
-.hop .squash {
-  animation: mascot-hop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* 平时轻轻地一起一伏 */
@@ -288,18 +520,6 @@ img.pat {
   }
   50% {
     transform: scale(1.015, 0.975);
-  }
-}
-
-@keyframes mascot-hop {
-  0% {
-    transform: translateY(0) scale(1.05, 0.88);
-  }
-  45% {
-    transform: translateY(-16px) scale(0.97, 1.05);
-  }
-  100% {
-    transform: translateY(0) scale(1, 1);
   }
 }
 

@@ -8,6 +8,7 @@ import { parseTime } from 'utils/functions'
 import type { ProblemSet, ProblemSetProblem } from 'utils/types'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useUserStore } from 'shared/store/user'
+import { goAction, useMascotGuide } from 'shared/mascot/guide'
 import { useFireworks } from '../problem/composables/useFireworks'
 import NotFound from 'shared/components/NotFound.vue'
 import BadgeLadder from './components/BadgeLadder.vue'
@@ -121,6 +122,17 @@ async function join() {
     joining.value = false
   }
 }
+
+// 看板娘：老师看全班，学生还差几道必做题、带去下一道；没加入就只打招呼
+useMascotGuide(() => {
+  if (!set.value) return null
+  if (userStore.isTeacherOrAbove) return { situation: 'teacher.problemset', actions: [{ label: '全班情况', run: () => (tab.value = 'class') }] }
+  if (!joined.value) return null
+  const todo = problems.value.filter((item) => item.isRequired && !item.isCompleted)
+  const next = todo[0]
+  if (progress.value?.isCompleted || !next) return { situation: 'problemset.done', actions: [goAction(router, '专题列表', '/problemset')] }
+  return { situation: 'problemset.unfinished', n: todo.length, actions: [{ label: '去做下一道', run: () => router.push(problemLink(next)) }] }
+})
 
 /** 编辑只给出题人和超管（后台按归属校验，别人点进去是 404） */
 const canEdit = computed(() => !!set.value && (userStore.isSuperAdmin || set.value.createdBy.id === userStore.user?.id))

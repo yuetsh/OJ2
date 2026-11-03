@@ -19,6 +19,7 @@ import ContextBar from './components/ContextBar.vue'
 import { useEditorMenu } from './composables/editorMenu'
 import { DRAWER_TITLE, useProblemPageContext, type ProblemDrawer as DrawerKey } from './composables/problemPageContext'
 import { useCollabHere, useTeacherCollab } from './composables/teacherCollab'
+import { useProblemMascotGuide } from './composables/mascotGuide'
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、专题三种入口用的是同一个编辑器：原来比赛和专题用的是另一个精简版，
@@ -207,6 +208,13 @@ watch(
     if (path === approvedTarget) approvedTarget = null
   },
 )
+
+// 看板娘气泡里的「我错在哪」：切到「结果」页签里出错的那一段
+useProblemMascotGuide((segment) => {
+  drawer.value = null
+  currentTab.value = 'result'
+  submissionStore.resultSegment = segment
+})
 
 // 结果页签的标题带状态图标（ResultTabLabel），n-tab-pane 的 tab 接受渲染函数
 const resultTab = () => h(ResultTabLabel, { active: currentTab.value === 'result' })
