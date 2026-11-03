@@ -130,6 +130,30 @@ ok "对外端口 $port"
 
 # ---------------------------------------------------------------- 起栈
 
+# 构建会把 oj2-api:latest / oj2-web:latest 这两个名字挪到新镜像上，而迁移排在构建之后。
+# 迁移失败时容器没动、还跑着旧镜像，但名字已经指向新镜像 —— 之后谁跑一次
+# `compose up -d`（比如 --no-build 改个 env），就会把还没迁移的新代码、甚至编坏了的
+# 二进制换上去。2026-11-03 真撞过一次（新镜像缺 libicu，当时手动 docker tag 回去的）。
+# 所以构建前记下它们原来指向哪个镜像，迁移失败时指回去。
+built_images=$(grep -E '^[[:space:]]*image: oj2-(api|web):' <<<"$cfg" | awk '{print $2}' | sort -u || true)
+declare -A prev_image=()
+for img in $built_images; do
+  prev_image[$img]=$(docker image inspect -f '{{.Id}}' "$img" 2>/dev/null || true)
+done
+restore_images() {
+  local img
+  for img in $built_images; do
+    if [ -n "${prev_image[$img]}" ]; then
+      if docker tag "${prev_image[$img]}" "$img"; then
+        warn "$img 已指回构建前的镜像 ${prev_image[$img]:7:12}"
+      else
+        warn "$img 没能指回 ${prev_image[$img]}，手动：docker tag ${prev_image[$img]} $img"
+      fi
+    fi
+  done
+  return 0 # 下面紧跟着 die，别让这里的失败把 die 的说明吞掉
+}
+
 if [ "$BUILD" -eq 1 ]; then
   say "构建镜像（首次约 5 分钟，之后走缓存很快）"
   # --pull：每次都去查 FROM 的基础镜像有没有新版。不带的话 caddy:2-alpine、
@@ -152,11 +176,11 @@ say "数据库迁移"
 "${COMPOSE[@]}" run --rm \
   -e OJ2_ALLOW_DESTRUCTIVE="${OJ2_ALLOW_DESTRUCTIVE:-}" \
   oj-api oj2-api migrate \
-  || die "迁移没通过，已中止部署（容器没动过）。**原因看上面 migrate 自己的输出**，
+  || { restore_images; die "迁移没通过，已中止部署（容器没动过，镜像名也指回了构建前的）。**原因看上面 migrate 自己的输出**，
 它对每种情况都打印了具体该做什么，别照搬下面这几条猜。常见的三种：
   · 破坏性语句被拦    → 确认备份后 OJ2_ALLOW_DESTRUCTIVE=1 docker/deploy.sh
   · 缺迁移基线记录    → 按它打印的 SQL 插一行
-  · 连不上库          → oj-postgres 是否起来了（docker logs oj-postgres）、DATA_DIR 对不对"
+  · 连不上库          → oj-postgres 是否起来了（docker logs oj-postgres）、DATA_DIR 对不对"; }
 
 say "起栈"
 "${COMPOSE[@]}" up -d
