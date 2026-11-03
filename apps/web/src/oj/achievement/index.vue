@@ -61,8 +61,14 @@ async function load() {
 onMounted(load)
 watch(name, load)
 
-// 看板娘：只在看自己的成就时说话
-useMascotGuide(() => (data.value && !other.value && !userStore.isTeacherOrAbove ? { situation: 'achievement' } : null))
+// 看板娘：只在看自己的成就时说话。「快拿到了」里最近的一个能说成「再做对 3 道」的，报它的名字；
+// 「还差 3 次」「一天做对 5 道」这种前面加不了「再」，往后找
+useMascotGuide(() => {
+  if (!data.value || other.value || userStore.isTeacherOrAbove) return null
+  const item = near.value.find((it) => it.remain.startsWith('再'))
+  if (!item) return { situation: 'achievement' }
+  return { situation: 'achievement.near', vars: { name: item.achievement.name, need: item.remain.slice(1) } }
+})
 </script>
 
 <template>

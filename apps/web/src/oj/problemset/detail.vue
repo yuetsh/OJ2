@@ -131,7 +131,10 @@ useMascotGuide(() => {
   const todo = problems.value.filter((item) => item.isRequired && !item.isCompleted)
   const next = todo[0]
   if (progress.value?.isCompleted || !next) return { situation: 'problemset.done', actions: [goAction(router, '专题列表', '/problemset')] }
-  return { situation: 'problemset.unfinished', n: todo.length, actions: [{ label: '去做下一道', run: () => router.push(problemLink(next)) }] }
+  const actions = [{ label: '去做下一道', run: () => router.push(problemLink(next)) }]
+  // 只剩最后一道、做完还有奖章没拿：说「就差最后 1 道」比「还差 1 道」更想让人做完
+  if (todo.length === 1 && set.value.badges.some((badge) => !badge.isEarned)) return { situation: 'problemset.lastOne', actions }
+  return { situation: 'problemset.unfinished', n: todo.length, actions }
 })
 
 /** 编辑只给出题人和超管（后台按归属校验，别人点进去是 404） */

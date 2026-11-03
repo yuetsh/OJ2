@@ -1,11 +1,11 @@
 import { mascotEventSchema, type MascotProfile } from '@oj2/contract'
-import { and, count, countDistinct, desc, eq, gte, isNull, sql } from 'drizzle-orm'
+import { and, count, countDistinct, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { requireAuth, type AppEnv } from '../auth/middleware'
 import { db, schema } from '../db'
 import { parseBody, success } from '../http'
-import { dayStart } from '../time'
+import { dayStart, weekStart } from '../time'
 
 export const mascotRoutes = new Hono<AppEnv>()
 
@@ -49,7 +49,9 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
   const userId = c.get('user')!.id
   const s = schema.submission
 
-  const [pokes, today, recent] = await Promise.all([
+  const week = weekStart()
+  const e = schema.mascotEvent
+  const [pokes, today, recent, tooHard, weekSubmits, weekEvents, weekHints] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
@@ -64,7 +66,26 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
       .where(and(eq(s.userId, userId), isNull(s.contestId)))
       .orderBy(desc(s.createTime))
       .limit(RECENT_SUBMISSIONS),
+    db
+      .select({ value: count() })
+      .from(schema.reaction)
+      .where(and(eq(schema.reaction.userId, userId), eq(schema.reaction.type, 'too_hard'))),
+    db
+      .select({ value: count() })
+      .from(s)
+      .where(and(eq(s.userId, userId), isNull(s.contestId), gte(s.createTime, week))),
+    db
+      .select({ kind: e.kind, value: count() })
+      .from(e)
+      .where(and(eq(e.userId, userId), inArray(e.kind, ['trial', 'help']), gte(e.createdAt, week)))
+      .groupBy(e.kind),
+    db
+      .select({ value: count() })
+      .from(schema.aiHint)
+      .innerJoin(s, eq(s.id, schema.aiHint.submissionId))
+      .where(and(eq(s.userId, userId), gte(schema.aiHint.createTime, week))),
   ])
+  const eventCount = (kind: string) => weekEvents.find((row) => row.kind === kind)?.value ?? 0
 
   const types = new Map<string, number>()
   for (const row of recent) if (row.result === 4 && row.errorType) types.set(row.errorType, (types.get(row.errorType) ?? 0) + 1)
@@ -74,6 +95,13 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
   return success(c, {
     pokes: pokes[0]?.value ?? 0,
     todaySolved: today[0]?.value ?? 0,
+    tooHard: tooHard[0]?.value ?? 0,
+    week: {
+      submits: weekSubmits[0]?.value ?? 0,
+      trials: eventCount('trial'),
+      helps: eventCount('help'),
+      aiHints: weekHints[0]?.value ?? 0,
+    },
     recent: {
       total: recent.length,
       wrongAnswer: tally(-1),

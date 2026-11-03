@@ -10,9 +10,13 @@ import { z } from 'zod'
  * - `overclick`：连点到她嫌烦
  * - `move`：被拖到了别处（line 记落点贴的边，比如 `right bottom`）
  *
- * 只记看板娘这边的事，不记代码、不记按键。
+ * 另外两种不是对她做的，是她要看的行为，别处没有存：
+ * - `trial`：在题目页运行了例子 / 自己输入（action 记 `samples` / `custom`）
+ * - `help`：在题目页举了手
+ *
+ * 不记代码、不记按键。
  */
-export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move'] as const
+export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move', 'trial', 'help'] as const
 export const mascotEventKindSchema = z.enum(MASCOT_EVENT_KINDS)
 export type MascotEventKind = z.infer<typeof mascotEventKindSchema>
 
@@ -37,6 +41,15 @@ export const mascotProfileSchema = z.object({
   pokes: z.number().int(),
   /** 今天（东八区）做对了几道不同的题 */
   todaySolved: z.number().int(),
+  /** 一共点过几次「太难了」（做对后的点评） */
+  tooHard: z.number().int(),
+  /** 这一周（东八区周一零点起）：题库里交了几次、跑了几次例子、举了几次手、要了几次 AI 提示 */
+  week: z.object({
+    submits: z.number().int(),
+    trials: z.number().int(),
+    helps: z.number().int(),
+    aiHints: z.number().int(),
+  }),
   recent: z.object({
     total: z.number().int(),
     wrongAnswer: z.number().int(),

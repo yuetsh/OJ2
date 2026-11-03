@@ -19,6 +19,8 @@ export interface MascotGuide {
   situation: MascotSituation
   /** 台词里 `{n}` 换成它：还差几道、第几课、几个人举手 */
   n?: number
+  /** 别的占位：`{tag}` 换成 vars.tag（知识点名、成就名、「明天」……） */
+  vars?: Record<string, string | number>
   /** 最多三个，第一个是主按钮 */
   actions?: MascotAction[]
 }
@@ -44,6 +46,15 @@ export function currentMascotGuide(): MascotGuide | null {
     if (guide) return guide
   }
   return null
+}
+
+/** 把台词里的 `{n}` 和 `{xxx}` 换成真的数和字 */
+export function fillLine(line: string, guide: Pick<MascotGuide, 'n' | 'vars'>) {
+  return line.replace(/\{(\w+)\}/g, (all, key: string) => {
+    if (key === 'n' && guide.n !== undefined) return String(guide.n)
+    const value = guide.vars?.[key]
+    return value === undefined ? all : String(value)
+  })
 }
 
 // ---- 几个页面都用得上的按钮 ----

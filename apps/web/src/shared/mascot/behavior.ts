@@ -83,6 +83,15 @@ export function habitSituation(failure: MascotSituation): MascotSituation | null
 }
 
 const HABIT_CHANCE = 0.6
+const GENTLE_CHANCE = 0.5
+const WEEK_CHANCE = 0.4
+/** 点过这么多次「太难了」，错了就别怼了 */
+const GENTLE_TOO_HARD = 3
+/** 这一周交了这么多次、例子却跑得不到五分之一，才说她「从来不跑例子」 */
+const WEEK_SUBMITS_MIN = 10
+/** 这一周要了这么多次 AI 提示，就劝先自己想 */
+const WEEK_HINTS_MANY = 5
+const FAILURES = new Set<MascotSituation>(['problem.wrong', 'problem.compileError', 'problem.runtimeError', 'problem.timeout'])
 const TODAY_CHANCE = 0.4
 const FAMILIAR_CHANCE = 0.2
 /** 点开过这么多次算老熟人 */
@@ -96,7 +105,21 @@ const PRAISE = new Set<MascotSituation>(['problem.accepted', 'problem.firstTry',
 export function personalize(guide: MascotGuide): MascotGuide {
   const profile = mascotProfile.value
   if (!profile) return guide
-  if (profile.pokes + sessionPokes === 0) return { ...guide, situation: 'first.meet', n: undefined }
+  if (profile.pokes + sessionPokes === 0) return { ...guide, situation: 'first.meet', n: undefined, vars: undefined }
+  const situation = guide.situation
+  // 常点「太难了」的，错了先软着说，不翻老毛病
+  if (FAILURES.has(situation) && profile.tooHard >= GENTLE_TOO_HARD && Math.random() < GENTLE_CHANCE) return { ...guide, situation: 'gentle.wrong' }
+  const week = profile.week
+  if (situation === 'problem.stuck' && week.helps === 0 && Math.random() < WEEK_CHANCE) return { ...guide, situation: 'habit.neverHelp' }
+  if (situation === 'problem.hintReady' && week.aiHints >= WEEK_HINTS_MANY) return { ...guide, situation: 'habit.aiHintMany', n: week.aiHints }
+  if (
+    (situation === 'problem.unsubmitted' || situation === 'problem.samplesFailed') &&
+    week.submits >= WEEK_SUBMITS_MIN &&
+    week.trials * 5 < week.submits &&
+    Math.random() < WEEK_CHANCE
+  ) {
+    return { ...guide, situation: 'habit.weekNoSamples', n: week.submits }
+  }
   const habit = habitSituation(guide.situation)
   if (habit && Math.random() < HABIT_CHANCE) return { ...guide, situation: habit }
   if (PRAISE.has(guide.situation) && profile.todaySolved >= TODAY_MIN && Math.random() < TODAY_CHANCE) {

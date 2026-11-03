@@ -23,7 +23,7 @@ import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import imageUrl from 'shared/assets/mascot/whale.webp'
 import patUrl from 'shared/assets/mascot/whale-pat.gif'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
-import { currentMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
+import { currentMascotGuide, fillLine, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
@@ -273,12 +273,12 @@ const TIME_CHANCE = 0.15
 
 function pickFor(guide: MascotGuide) {
   let situation = guide.situation
-  if (!SERIOUS.has(situation) && guide.n === undefined) {
+  if (!SERIOUS.has(situation) && guide.n === undefined && !guide.vars) {
     const timely = timeSituation()
     if (Math.random() < RARE_CHANCE) situation = 'rare'
     else if (timely && !userStore.isTeacherOrAbove && Math.random() < TIME_CHANCE) situation = timely
   }
-  return pick(situation).replace('{n}', String(guide.n ?? ''))
+  return fillLine(pick(situation), guide)
 }
 
 /** 同一组里不连着抽到同一句 */
@@ -328,7 +328,7 @@ watch(speechRequest, (speech) => {
   if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
   lastSpokeAt = performance.now()
   spokenKeys.add(speech.key)
-  const text = pick(speech.situation).replace('{n}', String(speech.n ?? ''))
+  const text = fillLine(pick(speech.situation), speech)
   say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation }, SPOKEN_BUBBLE_MS)
   logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
 })

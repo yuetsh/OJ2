@@ -5,13 +5,13 @@ import { Icon } from '@iconify/vue'
 import { getAnnouncementList, getKnowledgeMap, getContestList, getLastVisit, getLearnProgress, getSubmissions, getTutorials, getWeeklyRank } from 'oj/api'
 import { getClassActivity } from 'shared/api'
 import SubmissionResultTag from 'shared/components/SubmissionResultTag.vue'
-import { pickHeadline, type Headline } from 'oj/user/knowledge'
+import { levelName, MAX_LEVEL, pickHeadline, remainingToNext, tagLink, type Headline } from 'oj/user/knowledge'
 import { useUserStore } from 'shared/store/user'
 import { activityMode } from 'shared/store/lesson'
-import { focusJumpAction, goAction, randomProblemAction, useMascotGuide } from 'shared/mascot/guide'
+import { focusJumpAction, goAction, randomProblemAction, useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { duration, parseTime, zonedParts, zonedYear } from 'utils/functions'
-import type { AnnouncementListItem, ClassActivity, ClassActivityProblem, Contest, LastVisit, SubmissionListItem, WeeklyRank } from 'utils/types'
+import type { AnnouncementListItem, ClassActivity, ClassActivityProblem, Contest, KnowledgeMap, LastVisit, SubmissionListItem, WeeklyRank } from 'utils/types'
 
 interface Track {
   type: TutorialType
@@ -37,6 +37,8 @@ const classActivity = ref<ClassActivity | null>(null)
 const lastVisit = ref<LastVisit | null>(null)
 /** 知识点地图挑出来的那一句（本周升级 / 再做几道升档 / 去点亮一个），见 oj/user/knowledge.ts */
 const knowledgeHeadline = ref<Headline | null>(null)
+/** 地图原样留着给看板娘：她要知识点名、档位名、还差几道，不是拼好的那句话 */
+const knowledge = ref<KnowledgeMap | null>(null)
 const loaded = ref(false)
 
 /** 头一回登录、还没交过：问候换成「欢迎」，告诉他题在哪找 */
@@ -124,7 +126,8 @@ async function loadAnnouncements() {
 }
 
 async function loadKnowledge() {
-  knowledgeHeadline.value = pickHeadline(await getKnowledgeMap())
+  knowledge.value = await getKnowledgeMap()
+  knowledgeHeadline.value = pickHeadline(knowledge.value)
 }
 
 async function loadClassActivity() {
@@ -246,15 +249,84 @@ watch(
 )
 
 // 看板娘：今天有课（和「这节课」那张卡同一个条件）就催今天的题，没课就随便做一道
+let greetedBack = false
 useMascotGuide(() => {
   if (!loaded.value) return null
   const random = randomProblemAction(router)
   const learn = goAction(router, '自学', '/learn')
-  if (!classToday.value || !classActivity.value?.problems.length) return { situation: 'home.free', actions: [focusJumpAction(), random, learn] }
+  const lesson = classToday.value && !!classActivity.value?.problems.length
   const next = nextProblem.value
-  if (!next) return { situation: 'home.done', actions: [random, learn] }
-  return { situation: 'home.assigned', actions: [goAction(router, '今天的题', `/problem/${next.problemDisplayId}`), focusJumpAction(), random] }
+  if (lesson && next)
+    return { situation: 'home.assigned', actions: [goAction(router, '今天的题', `/problem/${next.problemDisplayId}`), focusJumpAction(), random] }
+  const base: MascotGuide = lesson
+    ? { situation: 'home.done', actions: [random, learn] }
+    : { situation: 'home.free', actions: [focusJumpAction(), random, learn] }
+  // 好久没来：只在这次进来后第一次点她时说，之后照常
+  if (awayDays.value >= 14 && !greetedBack) {
+    greetedBack = true
+    return { ...base, situation: 'home.back', n: awayDays.value }
+  }
+  // 这节课做完了或者没课：从别的数据里挑能说的，每点一次随机说一件，点几下听到的不一样
+  const extras = extraGuides(random)
+  return extras.length ? extras[Math.floor(Math.random() * extras.length)]! : base
 })
+
+const DAY_MS = 864e5
+
+function extraGuides(random: MascotAction): MascotGuide[] {
+  const list: MascotGuide[] = []
+
+  // 比赛：进行中，或者 24 小时内开始（那就只可能是今天或明天）
+  const now = Date.now()
+  const contest = contests.value.find((it) => it.status === ContestStatus.underway || Date.parse(it.startTime) - now < DAY_MS)
+  if (contest) {
+    const when = contest.status === ContestStatus.underway ? '现在' : dayKey(contest.startTime) === dayKey(new Date()) ? '今天' : '明天'
+    list.push({ situation: 'home.contestSoon', vars: { when }, actions: [goAction(router, '去看看', `/contest/${contest.id}`), random] })
+  }
+
+  // 公告：三天内发的，挑最新那条
+  const fresh = announcements.value.filter((it) => now - Date.parse(it.createTime) < 3 * DAY_MS).sort((a, b) => b.createTime.localeCompare(a.createTime))[0]
+  if (fresh) {
+    list.push({
+      situation: 'home.newAnnouncement',
+      actions: [{ label: '去看看', run: () => router.push({ path: '/announcement', query: { id: fresh.id } }) }, random],
+    })
+  }
+
+  // 知识点：和首页那一行同一个先后（本周升级 > 离下一档最近 > 班里在学、自己还没碰过），只说一件
+  const map = knowledge.value
+  if (map) {
+    const touched = new Set(map.classTouched)
+    const go = (name: string) => ({ label: '去做', run: () => router.push(tagLink(name)) })
+    const upgraded = map.tags.filter((tag) => tag.level > tag.levelAtWeekStart).sort((a, b) => b.level - a.level)[0]
+    const learning = map.tags
+      .filter((tag) => tag.level >= 1 && tag.level < MAX_LEVEL)
+      .sort((a, b) => Number(touched.has(b.name)) - Number(touched.has(a.name)) || remainingToNext(a)! - remainingToNext(b)!)[0]
+    const untouched = map.tags.find((tag) => tag.level === 0 && touched.has(tag.name))
+    if (upgraded)
+      list.push({ situation: 'home.knowledgeUp', vars: { tag: upgraded.name, level: levelName(upgraded.level) }, actions: [go(upgraded.name), random] })
+    else if (learning)
+      list.push({
+        situation: 'home.knowledgeNext',
+        n: remainingToNext(learning)!,
+        vars: { tag: learning.name, level: levelName(learning.level + 1) },
+        actions: [go(learning.name), random],
+      })
+    else if (untouched) list.push({ situation: 'home.knowledgeFresh', vars: { tag: untouched.name }, actions: [go(untouched.name), random] })
+  }
+
+  // 本周进步榜：第一就说第一；前一名在榜面上（只回前几名）、差得不多就报还要几道。
+  // 同分时提交少的在前，追平不一定超得过，所以按多做 1 道算
+  const me = weekly.value?.me
+  if (me) {
+    const rank = goAction(router, '去排名', '/rank?period=week')
+    const ahead = weekly.value!.results.find((row) => row.rank === me.rank - 1)
+    if (me.rank === 1) list.push({ situation: 'rank.top', actions: [rank, random] })
+    else if (ahead && ahead.solvedCount - me.solvedCount <= 5)
+      list.push({ situation: 'rank.gap', n: ahead.solvedCount - me.solvedCount + 1, actions: [rank, random] })
+  }
+  return list
+}
 
 function learnLink(track: Track) {
   return tutorialPath(track.type, track.step)

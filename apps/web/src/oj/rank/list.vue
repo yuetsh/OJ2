@@ -280,7 +280,13 @@ useMascotGuide(() => {
     const el = document.querySelector('.track-card .entry.me, .track-card .prow.me, .track-card .tag.me')
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
-  return { situation: 'rank', actions: listed ? [{ label: '我在哪', run: findMe }] : [] }
+  const actions = listed ? [{ label: '我在哪', run: findMe }] : []
+  const { me: mine, ahead } = board.value
+  if (mine?.solved && mine.rank === 1) return { situation: 'rank.top', actions }
+  // 同分按先做到排，追平还在后面，所以要比前一名多做 1 道
+  const gap = mine && ahead ? ahead.solved - mine.solved : null
+  if (gap !== null && gap <= 5) return { situation: 'rank.gap', n: gap + 1, actions }
+  return { situation: 'rank', actions }
 })
 
 function open(username: string) {

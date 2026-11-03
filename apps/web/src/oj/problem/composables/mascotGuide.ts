@@ -1,6 +1,9 @@
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
-import { habitSituation, refreshMascotProfile, requestSpeech } from 'shared/mascot/behavior'
+import { HINT_MIN_FAILURES, isFlowchartPass } from '@oj2/contract'
+import { habitSituation, logMascotEvent, refreshMascotProfile, requestSpeech } from 'shared/mascot/behavior'
+import { useChallengeStore } from 'oj/store/challenge'
+import { useFlowchartStore } from 'oj/store/flowchart'
 import type { MascotSituation } from 'shared/mascot/lines'
 import { useCollabStore } from 'shared/store/collab'
 import { useLessonStore } from 'shared/store/lesson'
@@ -33,6 +36,19 @@ const RESULT_SITUATION: Partial<Record<SubmissionStatus, MascotSituation>> = {
 const IDLE_MS = 15 * 60_000
 /** 连着这么多次没跑例子就交，而且错了，她就念一句 */
 const UNSAMPLED_SUBMITS = 3
+/** 同班做对这么多人，就拿出来说「全班已经 N 个人做对了」 */
+const CLASS_MANY = 5
+/** 同班交过这么多人、做对的不超过 CLASS_FEW 个，算「全班都卡着」 */
+const CLASS_TRIED = 5
+const CLASS_FEW = 2
+/** 全站交过这么多次，通过率才有意义 */
+const RATE_MIN_SUBMISSIONS = 30
+const HARD_RATE = 0.3
+const EASY_RATE = 0.7
+
+/** 几种「换个说法」各自的机会：不是每次都说同一件事 */
+const CHANCE = { classMany: 0.3, classFew: 0.5, rate: 0.4, hint: 0.5, challenge: 0.4 } as const
+const roll = (chance: number) => Math.random() < chance
 
 const FINISHED = (result: number | undefined) =>
   result !== undefined && result !== SubmissionStatus.pending && result !== SubmissionStatus.judging && result !== SubmissionStatus.submitting
@@ -57,6 +73,8 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   const ctx = useProblemPageContext()
   const teacherCollab = useTeacherCollab()
   const { isDesktop } = useBreakpoints()
+  const flowchartStore = useFlowchartStore()
+  const challengeStore = useChallengeStore()
 
   /** 学生在这道题上能用的几个按钮，点她和她主动开口共用 */
   function studentActions(problem: ProblemDetail) {
@@ -100,7 +118,13 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     const entry = ctx.value
     const { runSamples, help, why, whySamples, submit } = studentActions(problem)
 
-    if (codeStore.code.language === 'Flowchart') return guide('problem.flowchart', help)
+    if (codeStore.code.language === 'Flowchart') {
+      // 画过、评过分了：分低就说分低，拿了 S 夸一句
+      const grade = flowchartStore.latestRating.grade
+      if (grade === 'S') return guide('flowchart.good', help)
+      if (grade && !isFlowchartPass(grade)) return guide('flowchart.low', help)
+      return guide('problem.flowchart', help)
+    }
     // 正在判、正在跑例子：没什么好说的，打个招呼
     if (submissionStore.judging || submissionStore.pending || submissionStore.trial.samplesRunning.value) return null
 
@@ -115,17 +139,44 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     }
 
     const result = submissionStore.submission?.result
+    const lesson = lessonStore.find(problem._id)
     if (result === SubmissionStatus.accepted) {
       const next = nextAction()
+      // 课堂条的数是拉的时候的，刚做对重拉回来可能已经把自己算进去了
+      if (lesson && lesson.acceptedCount <= (lesson.myStatus === 'accepted' ? 1 : 0)) return guide('class.firstSolver', next)
+      if (entry.challenges && challengeStore.current?.challenges.length && roll(CHANCE.challenge)) return guide('problem.challenge', next)
       const fails = problemStore.failCount
       return guide(fails === 0 ? 'problem.firstTry' : fails >= FINALLY_FAILS ? 'problem.finally' : 'problem.accepted', next)
     }
     const failed = result === undefined ? undefined : RESULT_SITUATION[result as SubmissionStatus]
-    if (failed) return stuck ? guide('problem.stuck', help, why) : guide(failed, why, failed === 'problem.wrong' ? runSamples : null, help)
+    if (failed) {
+      if (stuck) return guide('problem.stuck', help, why)
+      const actions = [why, failed === 'problem.wrong' ? runSamples : null, help]
+      // AI 提示开了还没要：提一句，按钮带去结果里（提示在那儿）
+      const hintOpen = !problem.contestId && problemStore.failCount >= HINT_MIN_FAILURES && !submissionStore.hint.hintContent.value
+      if (hintOpen && roll(CHANCE.hint)) return guide('problem.hintReady', ...actions)
+      const classGuide = classSituation(lesson)
+      if (classGuide) return { ...guide(classGuide.situation, ...actions), n: classGuide.n }
+      const rate = problem.submissionNumber >= RATE_MIN_SUBMISSIONS ? problem.acceptedNumber / problem.submissionNumber : null
+      if (rate !== null && rate < HARD_RATE && roll(CHANCE.rate)) return guide('problem.hardWrong', ...actions)
+      if (rate !== null && rate > EASY_RATE && failed === 'problem.wrong' && roll(CHANCE.rate)) return guide('problem.easyWrong', ...actions)
+      return guide(failed, ...actions)
+    }
 
     if (problem.myStatus === SubmissionStatus.accepted) return guide('problem.solvedBefore', nextAction())
     if (codeStore.code.value.trim().length < 10) return guide(entry.entry === 'problemset' ? 'problem.inSet' : 'problem.blank', runSamples, help)
+    const classGuide = classSituation(lesson)
+    if (classGuide?.situation === 'class.manyDone') return { ...guide('class.manyDone', runSamples, help), n: classGuide.n }
     return guide('problem.unsubmitted', runSamples, help)
+
+    /** 这节课的题：同班多少人做对了（课堂条那份数），不在这节课里就没有 */
+    function classSituation(item: typeof lesson) {
+      if (!item || item.myStatus === 'accepted') return null
+      if (item.acceptedCount >= CLASS_MANY && roll(CHANCE.classMany)) return { situation: 'class.manyDone' as const, n: item.acceptedCount }
+      if (item.userCount >= CLASS_TRIED && item.acceptedCount <= CLASS_FEW && roll(CHANCE.classFew))
+        return { situation: 'class.fewDone' as const, n: item.acceptedCount }
+      return null
+    }
 
     /** 做对之后去哪：专题里回专题，这节课里去下一道还没做的 */
     function nextAction(): MascotAction | null {
@@ -159,6 +210,22 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       if (!at) return
       sampledSinceSubmit = true
       lastActivity = Date.now()
+      if (student()) logMascotEvent({ kind: 'trial', action: 'samples' })
+    },
+  )
+  // 「运行例子」「自己输入」「举手」别处都不存，记下来给她看一周的习惯（behavior.ts）
+  watch(
+    () => submissionStore.trial.customRunning.value,
+    (running) => {
+      if (!running) return
+      lastActivity = Date.now()
+      if (student()) logMascotEvent({ kind: 'trial', action: 'custom' })
+    },
+  )
+  watch(
+    () => collabStore.helpStatus,
+    (status, previous) => {
+      if (status === 'pending' && previous === 'idle' && student()) logMascotEvent({ kind: 'help' })
     },
   )
   watch(

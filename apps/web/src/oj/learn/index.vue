@@ -99,7 +99,16 @@ function doneIn(course: Course, ids: number[]) {
 useMascotGuide(() => {
   if (!loaded.value || userStore.isTeacherOrAbove) return null
   const it = resume.value
-  if (it) return { situation: 'learn.continue', n: it.step, actions: [goAction(router, '接着学', tutorialPath(it.course.type, it.step))] }
+  if (it) {
+    const next = goAction(router, '接着学', tutorialPath(it.course.type, it.step))
+    // 接着学的那课之前，离它最近的一课打开过、练一练却没全对（「在学」那一态）：先叫回去看看
+    const { titles, progress } = it.course
+    for (let step = it.step - 1; step >= 1; step--) {
+      if (tutorialState(progress[titles[step - 1]!.id]) !== 'started') continue
+      return { situation: 'learn.wrongExercise', n: step, actions: [goAction(router, '去看看', tutorialPath(it.course.type, step)), next] }
+    }
+    return { situation: 'learn.continue', n: it.step, actions: [next] }
+  }
   return { situation: 'learn.fresh', actions: [goAction(router, '第 1 课', tutorialPath(tab.value, 1))] }
 })
 
