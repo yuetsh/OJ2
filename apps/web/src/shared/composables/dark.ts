@@ -13,4 +13,13 @@ import { createGlobalState, useDark as useVueUseDark } from '@vueuse/core'
  * 切筛选再来 30 次，右栏换一条又是三四次。2026-11 实测（生产构建、CPU 降速 6 倍）首屏
  * 光这一处就占了 1.3 秒。全站共用一个之后只在第一次挂载时同步，后面的调用都是读同一个 ref。
  */
-export const useDark = createGlobalState(() => useVueUseDark())
+export const useDark = createGlobalState(() =>
+  useVueUseDark({
+    // 剩下的那一次（一进页面它还要同步两遍）也省掉：<html> 上的 class 已经对了就不动。
+    // 只有真要切换时才走它原来那套（关过渡 + 重算），切暗色不会有颜色慢慢渐变的过渡
+    onChanged(dark, defaultHandler, mode) {
+      if (document.documentElement.classList.contains('dark') === dark) return
+      defaultHandler(mode)
+    },
+  }),
+)
