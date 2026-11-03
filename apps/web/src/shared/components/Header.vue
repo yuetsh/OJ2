@@ -53,8 +53,8 @@ const envVersion = computed(() => {
 })
 
 // 一级路径就是菜单 key，对不上的页面（/user、/achievement 等）
-// 自然没有一项亮着。根路径没登录时就是题目列表，登录了是个人首页，不亮任何一项
-const active = computed(() => route.path.split('/')[1] || (userStore.isAuthed ? '' : 'problem'))
+// 自然没有一项亮着。根路径没登录时就是题目列表（亮「题目」），登录了是个人首页（亮「首页」）
+const active = computed(() => route.path.split('/')[1] || (userStore.isAuthed ? 'home' : 'problem'))
 
 async function handleLogout() {
   await userStore.signOut()
@@ -80,7 +80,8 @@ function renderIcon(icon: string) {
  * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字，窄屏收进「菜单」下拉。
  * `key` 就是一级路径，用来判定高亮（见上面的 active）。
  *
- * 顺序是 自学 / 题目 / 提交 / 专题 / 比赛 / 排名 / 公告。「自学」进自学首页（/learn），
+ * 顺序是 首页 / 自学 / 题目 / 提交 / 专题 / 比赛 / 排名 / 公告。「首页」只给登录了的：没登录时根路径
+ * 就是题目列表，和「题目」是同一页（2026-11-03 用户要的，原来只能点左上角的站名回首页）。「自学」进自学首页（/learn），
  * 两门课、接着学哪一课都在那儿挑，不再是下拉。提交留在一级：学生天天回来看自己交的结果，老师课上翻全班代码也走它。
  * 公告 2026-10-13 回到顶栏（用户要的）：首页只放置顶那条了，别的公告得有个地方点得到。
  * 不用 n-menu：它横排每项固定占 100px，1280 宽的机房屏上会把顶栏挤成两行。
@@ -94,6 +95,7 @@ interface NavLink {
 
 const navLinks = computed<NavLink[]>(() =>
   [
+    { key: 'home', label: '首页', to: '/', show: userStore.isAuthed },
     { key: 'learn', label: '自学', to: '/learn' },
     { key: 'problem', label: '题目', to: '/problem' },
     { key: 'submission', label: '提交', to: '/submission', show: userStore.showSubmissions },
