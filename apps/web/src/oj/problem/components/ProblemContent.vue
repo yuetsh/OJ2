@@ -333,7 +333,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       <Markdown html :content="problem.source" />
     </section>
 
-    <SimilarProblems v-if="showSimilar" title="相似题目推荐" />
+    <SimilarProblems v-if="showSimilar" title="相似题目推荐" place="content" />
   </div>
 </template>
 

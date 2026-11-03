@@ -484,6 +484,14 @@ export const problemListItemSchema = z.object({
 
 export const problemListSchema = paginatedSchema(problemListItemSchema)
 
+/**
+ * 相似题推荐的一条。`sharedTags` 是它和原题共有的标签（知识点在前、主题在后），
+ * 学生不点开就知道练的是什么
+ */
+export const similarProblemSchema = problemListItemSchema.extend({
+  sharedTags: z.array(z.string()),
+})
+
 /** 题目列表「全部类型」下拉：SQL / 有参考图 / 画流程图 / 语法要求 */
 export const problemTypeFilterSchema = z.enum(['sql', 'reference', 'flowchart', 'ast'])
 
@@ -601,6 +609,7 @@ export type ChallengeList = z.infer<typeof challengeListSchema>
 export type ProblemDifficulty = z.infer<typeof problemDifficultySchema>
 export type ProblemListItem = z.infer<typeof problemListItemSchema>
 export type ProblemList = z.infer<typeof problemListSchema>
+export type SimilarProblem = z.infer<typeof similarProblemSchema>
 export type ProblemTypeFilter = z.infer<typeof problemTypeFilterSchema>
 export type ProblemListSort = z.infer<typeof problemListSortSchema>
 export type ProblemProgress = z.infer<typeof problemProgressSchema>

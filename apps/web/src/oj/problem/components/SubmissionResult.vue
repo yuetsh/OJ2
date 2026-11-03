@@ -357,7 +357,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
           :language="submission.language"
           :refresh-key="submission.id"
         />
-        <SimilarProblems v-if="showSimilar" title="再练几道相似的" />
+        <SimilarProblems v-if="showSimilar" title="再练几道相似的" place="result" />
       </div>
     </template>
     <div v-show="!waitingReveal">

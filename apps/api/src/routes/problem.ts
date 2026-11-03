@@ -12,6 +12,7 @@ import {
   type ProblemListItem,
   type ProblemProgress,
   type ProblemTypeFilter,
+  type SimilarProblem,
   type Tag,
 } from '@oj2/contract'
 import { and, asc, count, countDistinct, desc, eq, ilike, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm'
@@ -327,13 +328,25 @@ problemRoutes.get('/challenges', requireAuth, async (c) => {
 
 problemRoutes.get('/problems/:displayId/similar', optionalAuth, async (c) => {
   const [target] = await db
-    .select({ id: schema.problem.id })
+    .select({ id: schema.problem.id, difficulty: schema.problem.difficulty })
     .from(schema.problem)
     .where(and(sql`lower(${schema.problem.displayId}) = lower(${c.req.param('displayId')})`, isNull(schema.problem.contestId)))
     .limit(1)
   if (!target) return failure(c, 404, 'problem-not-found', 'Problem not found')
-  const targetTags = await db.select({ id: schema.problemTags.problemtagId }).from(schema.problemTags).where(eq(schema.problemTags.problemId, target.id))
-  if (targetTags.length === 0) return success(c, [])
+  // 知识点和主题标签一样算（用户 2026-11-03 定：同一套题材也算相似）。知识点排在前面
+  // 只是为了「共同的标签」那行先写练的是什么
+  const targetTags = await db
+    .select({ id: schema.problemTags.problemtagId, name: schema.problemTag.name })
+    .from(schema.problemTags)
+    .innerJoin(schema.problemTag, eq(schema.problemTags.problemtagId, schema.problemTag.id))
+    .where(eq(schema.problemTags.problemId, target.id))
+    // 同一类里大的在前，和题目列表「知识点」那列一样
+    .orderBy(
+      sql`${schema.problemTag.category} = 'knowledge' desc`,
+      sql`(select count(*) from ${schema.problemTags} pt where pt.problemtag_id = ${schema.problemTag.id}) desc`,
+      asc(schema.problemTag.name),
+    )
+  if (targetTags.length === 0) return success(c, [] satisfies SimilarProblem[])
   // 「已 AC 的不再推荐」必须下推到 SQL。早先是先 limit(5) 再在内存里筛，刷题多的
   // 学生 5 条候选能被筛到只剩一两条、甚至清零（前端 v-if 一空整块就不渲染）——
   // 而这个接口恰好只在**刚 AC** 或**连挂三次**时才被调用，正是候选最容易全中的时候。
@@ -343,7 +356,12 @@ problemRoutes.get('/problems/:displayId/similar', optionalAuth, async (c) => {
   const solvedIds = states ? [...states.solved] : []
   // difficulty 是 text（Low / Mid / High），直接 order by 走的是字典序 ——
   // High 排在 Low 前面，「由易到难」会变成「最难的先上」。按语义显式排。
+  // 共同标签一样多时先给和原题难度最接近的：原来一律简单的在前，做对一道困难题，
+  // 五条推荐里三条多是简单题（本地库 35 道困难题：119 / 175）。再并列才先简单的，
+  // 照顾连错三次的人
+  const rankOf = (difficulty: string) => (difficulty === 'Low' ? 0 : difficulty === 'Mid' ? 1 : 2)
   const difficultyRank = sql`case ${schema.problem.difficulty} when 'Low' then 0 when 'Mid' then 1 else 2 end`
+  const difficultyGap = sql`abs(${difficultyRank} - ${sql.raw(String(rankOf(target.difficulty)))})`
   const sharedTags = count(schema.problemTags.problemtagId)
   const rows = await db
     .select({
@@ -376,13 +394,16 @@ problemRoutes.get('/problems/:displayId/similar', optionalAuth, async (c) => {
     )
     .groupBy(schema.problem.id, schema.user.id, schema.userProfile.realName)
     // 末尾的 id 是稳定排序用的：并列时没有它，同一道题两次请求能返回不同的 5 条
-    .orderBy(desc(sharedTags), asc(difficultyRank), desc(schema.problem.acceptedNumber), asc(schema.problem.id))
+    .orderBy(desc(sharedTags), asc(difficultyGap), asc(difficultyRank), desc(schema.problem.acceptedNumber), asc(schema.problem.id))
     .limit(5)
   const ids = rows.map((row) => row.problem.id)
   const [tags, counts] = await Promise.all([getProblemTags(ids), problemUserCounts(ids)])
   return success(
     c,
-    rows.map((row) => listItem(row, tags, statuses, states, counts)),
+    rows.map((row) => {
+      const own = new Set(tags.get(row.problem.id))
+      return { ...listItem(row, tags, statuses, states, counts), sharedTags: targetTags.map((tag) => tag.name).filter((name) => own.has(name)) }
+    }) satisfies SimilarProblem[],
   )
 })
 

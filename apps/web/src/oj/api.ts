@@ -41,6 +41,7 @@ import {
   type ProblemRank,
   type CreateSubmissionResponse,
   type ProblemListItem,
+  type SimilarProblem,
   type ProblemStats,
   type ProblemProgress,
   type CreateFlowchartResponse,
@@ -412,7 +413,9 @@ export function submitHintFeedback(hintId: number, helpful: boolean) {
 // ==================== 相似题目推荐 ====================
 
 export function getSimilarProblems(problemId: string) {
-  return api.get<ProblemListItem[]>(`problems/${encodeURIComponent(problemId)}/similar`).then((response) => response.map(toProblemRow))
+  return api
+    .get<SimilarProblem[]>(`problems/${encodeURIComponent(problemId)}/similar`)
+    .then((response) => response.map((item) => ({ ...toProblemRow(item), sharedTags: item.sharedTags })))
 }
 
 // ==================== 挑战 ====================
