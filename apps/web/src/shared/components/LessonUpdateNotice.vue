@@ -17,9 +17,12 @@ function names(list: Item[]) {
   return list.map((item) => `${item.problemDisplayId} ${item.title}`).join('、')
 }
 
-/** 「画流程图」「先画再写 · C语言」「C语言」：写代码是默认的，不写出来 */
-function languageText(value: LessonUpdate) {
-  const mode = value.mode && value.mode !== 'code' ? LESSON_MODE_LABEL[value.mode] : ''
+/**
+ * 「画流程图」「先画再写 · C语言」「C语言」。新布置的一节写代码是默认的，不写出来（前面配「用」）；
+ * 改了做法时 `spellCode` 把「写代码」也写出来 —— 从画流程图改成写 C，只说「C语言」学生看不出不用画了
+ */
+function languageText(value: LessonUpdate, spellCode = false) {
+  const mode = value.mode && (spellCode || value.mode !== 'code') ? LESSON_MODE_LABEL[value.mode] : ''
   return [mode, value.language ? LANGUAGE_SHOW_VALUE[value.language] : ''].filter(Boolean).join(' · ')
 }
 
@@ -44,8 +47,9 @@ const lines = computed(() => {
   if (value.added.length) result.push({ label: '加了', text: names(value.added) })
   if (value.removed.length) result.push({ label: '去掉了', text: names(value.removed) })
   if (value.languageChanged) {
-    const text = languageText(value)
-    result.push({ label: value.mode && value.mode !== 'code' ? '做法' : '语言', text: text ? `改成 ${text}` : value.mode === 'code' ? '改成写代码' : '不限了' })
+    // languageChanged 连做法一起算，分不出改的是哪样：一律写「做法」，连写代码带语言一起说
+    const text = languageText(value, true)
+    result.push({ label: '做法', text: text ? `改成 ${text}` : '不限了' })
   }
   if (value.reordered) result.push({ label: '', text: '换了题目的顺序' })
   return result

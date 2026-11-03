@@ -527,6 +527,11 @@ const LESSON_LIVE_MINUTES = 15
 /** 一次列多少节课。「一节课」「今天」一般一两行，「这学期」「全部」有几百节，先给最近的这些 */
 const LESSONS_DEFAULT = 50
 const LESSONS_MAX = 500
+/** 课只算学生（STUDENT_ROLES，学生管理员也算），老师试题的提交不算 */
+const studentRoles = sql.join(
+  STUDENT_ROLES.map((role) => sql`${role}`),
+  sql`, `,
+)
 
 type StatisticsRange = { start: string | null; end: string }
 
@@ -599,7 +604,7 @@ async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
         where s.contest_id is null and p.mode <> 'flowchart'
           and s.create_time <= ${range.end}
           ${range.start ? sql`and s.create_time >= ${range.start}` : sql``}
-          and u.admin_type = 'Regular User' and u.is_disabled = false
+          and u.admin_type in (${studentRoles}) and u.is_disabled = false
         union all
         select p.k, f.user_id, f.problem_id, (f.status = 2 and coalesce(f.ai_grade in (${sql.join(
           FLOWCHART_PASS_GRADES.map((grade) => sql`${grade}`),
@@ -612,7 +617,7 @@ async function assignedLessons(plans: LessonPlan[], range: StatisticsRange) {
         where p.mode <> 'code'
           and f.create_time <= ${range.end}
           ${range.start ? sql`and f.create_time >= ${range.start}` : sql``}
-          and u.admin_type = 'Regular User' and u.is_disabled = false
+          and u.admin_type in (${studentRoles}) and u.is_disabled = false
       )
       select k, problem_id,
         count(distinct user_id)::int as users,
@@ -721,8 +726,8 @@ submissionStatisticsRoutes.get('/submissions/statistics/lessons', requireTeacher
       where s.contest_id is null
         and s.create_time <= ${range.end}
         ${range.start ? sql`and s.create_time >= ${range.start}` : sql``}
-        -- 只算普通学生：老师试题的提交不该把一段拼成「一节课」
-        and u.admin_type = 'Regular User' and u.is_disabled = false
+        -- 只算学生（学生管理员也是学生）：老师试题的提交不该把一段拼成「一节课」
+        and u.admin_type in (${studentRoles}) and u.is_disabled = false
     ),
     g as (
       select *,

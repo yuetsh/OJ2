@@ -182,16 +182,25 @@ watch(
  * 没有画这一步的课，画着流程图时不动他
  */
 const lessonStore = useLessonStore()
-let lessonLanguageFor: string | null = null
+/**
+ * 换过的（题 + 这一节 + 该做的那一步）都记下：换到别的题再回来，同一步不再换第二次。
+ * 编辑器在换题时不重新挂载（detail.vue 只重新 init），只记最后一个的话一回来又被拽回去
+ */
+const lessonSwitched = new Set<string>()
+let lessonViewing: string | null = null
 watch(
   () => [problem.value?._id, lessonStore.activity] as const,
   ([id, activity]) => {
     if (!id || !activity) return
-    const key = [id, activity.day, activity.mode, activity.language].join('|')
-    if (lessonLanguageFor === key) return
-    lessonLanguageFor = key
-    if (ctx.value.entry !== 'problem' || teacherCollab.value) return
+    const lesson = [id, activity.day, activity.mode, activity.language].join('|')
     const item = lessonStore.find(id)
+    const key = [lesson, item?.draw && item.draw !== 'accepted' ? 'draw' : 'code'].join('|')
+    // 停在这道题上、只是课堂状态刷新了（比如刚画对图）：不跟着换，也不记，下回打开这道题再换
+    const stay = lessonViewing === lesson
+    lessonViewing = lesson
+    if (lessonSwitched.has(key) || stay) return
+    lessonSwitched.add(key)
+    if (ctx.value.entry !== 'problem' || teacherCollab.value) return
     if (!item) return
     if (item.draw && item.draw !== 'accepted') {
       if (problemStore.canDraw && codeStore.code.language !== 'Flowchart') problemStore.switchLanguage('Flowchart')

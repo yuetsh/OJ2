@@ -7,6 +7,7 @@ import { getClassActivity } from 'shared/api'
 import SubmissionResultTag from 'shared/components/SubmissionResultTag.vue'
 import { pickHeadline, type Headline } from 'oj/user/knowledge'
 import { useUserStore } from 'shared/store/user'
+import { activityMode } from 'shared/store/lesson'
 import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { duration, parseTime, zonedParts, zonedYear } from 'utils/functions'
 import type { AnnouncementListItem, ClassActivity, ClassActivityProblem, Contest, LastVisit, SubmissionListItem, WeeklyRank } from 'utils/types'
@@ -191,7 +192,7 @@ const classActivityTitle = computed(() => {
   // 老师在课堂任务布置的，说成「老师布置的」，比「班里在做」更让人知道该做这几道
   if (classActivity.value?.source === 'teacher') {
     const language = classActivity.value.language
-    const mode = classActivity.value.mode
+    const mode = activityMode(classActivity.value)
     if (mode === 'flowchart') return '这节课 · 画流程图'
     if (mode === 'both') return `这节课 · 先画流程图，再${language ? `用${LANGUAGE_SHOW_VALUE[language]}` : ''}写代码`
     return `这节课${language ? ` · 用${LANGUAGE_SHOW_VALUE[language]}做` : ''}`

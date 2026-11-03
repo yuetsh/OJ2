@@ -1,8 +1,21 @@
-import { LESSON_MODE_LABEL } from '@oj2/contract'
+import { LESSON_MODE_LABEL, type LessonMode } from '@oj2/contract'
 import { defineStore } from 'pinia'
 import { getClassActivity } from 'shared/api'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import type { ClassActivity, ClassActivityProblem } from 'utils/types'
+
+/**
+ * 学生这边这节课做什么：按每道题合起来的要求算（后端 todaySteps 把今天几节里同一道题的要求并在一起），
+ * 不直接用 `mode` —— 那是今天最后布置的那一节的。先布置画流程图、再「用这几道题写代码」，
+ * 最后一节是写代码，但还没画完的照样要画，标题只写「用 C语言做」就漏了画图。
+ * 推断出来的课为 null
+ */
+export function activityMode(activity: ClassActivity | null | undefined): LessonMode | null {
+  if (!activity?.mode) return null
+  const draw = activity.problems.some((item) => item.draw !== null)
+  const code = activity.problems.some((item) => item.code !== null)
+  return draw && code ? 'both' : draw ? 'flowchart' : code ? 'code' : activity.mode
+}
 
 /** 同一节课里来回换题不用每次都重拉；过了这么久再进题目页就重拉一次 */
 const STALE_MS = 2 * 60 * 1000
@@ -89,8 +102,8 @@ export const useLessonStore = defineStore('lesson', () => {
    * 以前布置的）为空。写代码是默认的，不写出来
    */
   const languageText = computed(() => {
-    const mode = activity.value?.mode
-    const language = activity.value?.language
+    const mode = activityMode(activity.value)
+    const language = mode === 'flowchart' ? null : activity.value?.language
     return [mode && mode !== 'code' ? LESSON_MODE_LABEL[mode] : '', language ? LANGUAGE_SHOW_VALUE[language] : ''].filter(Boolean).join(' · ')
   })
 

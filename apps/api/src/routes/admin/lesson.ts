@@ -161,10 +161,14 @@ adminLessonRoutes.put('/lessons/:id', requireTeacher, async (c) => {
   // 班级能改：原来那个班和新的班学生看到的都可能变，两边各比一次
   const classes = await affectedClasses(id, result.values.className)
   const before = await Promise.all(classes.map((className) => todayLessonSnapshot(className)))
+  // 时刻只填到分：没改时刻就留着原来带秒的那个。不然只改了做什么，这一节也被挪到这一分钟的开头，
+  // 排到同一分钟里后布置的那节前面去 —— 「今天最后一节」就换了人（先画流程图、紧接着再开一节写代码，常在同一分钟里）
+  const [current] = await db.select({ createdAt: schema.classLesson.createdAt }).from(schema.classLesson).where(eq(schema.classLesson.id, id))
+  const sameMinute = current && Math.floor(Date.parse(current.createdAt) / 60_000) * 60_000 === Date.parse(result.values.createdAt)
   // 布置的老师不换，和任务页上「改」一样认第一次
   const [row] = await db
     .update(schema.classLesson)
-    .set({ ...result.values, updatedAt: new Date().toISOString() })
+    .set({ ...result.values, createdAt: sameMinute ? current.createdAt : result.values.createdAt, updatedAt: new Date().toISOString() })
     .where(eq(schema.classLesson.id, id))
     .returning({ id: schema.classLesson.id })
   if (!row) return failure(c, 404, 'lesson-not-found', '这一节已经被删掉了')

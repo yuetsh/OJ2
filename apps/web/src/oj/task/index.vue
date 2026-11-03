@@ -408,10 +408,14 @@ const explainShow = ref(false)
 const explainIndex = ref(0)
 const explainProblemIndex = ref(-1)
 const explainProblem = computed(() => board.value?.problems[explainProblemIndex.value] ?? null)
-/** 弹层顶上那排人：这道题错着的人，顺序和错法堆一样 */
-const explainPeople = computed<ExplainPerson[]>(() => {
-  if (explainProblemIndex.value < 0) return []
-  const people = wrongOf(explainProblemIndex.value).filter((person) => person.explain)
+/**
+ * 弹层顶上那排人：这道题错着的人，顺序和错法堆一样。打开那一刻定下来，开着时不跟 15 秒的刷新变：
+ * 弹层记的是第几个人，名单一变（有人改对了、图评完了回到名单里）就成了讲着讲着换了个人
+ */
+const explainPeople = ref<ExplainPerson[]>([])
+function explainPeopleOf(problemIndex: number): ExplainPerson[] {
+  if (problemIndex < 0) return []
+  const people = wrongOf(problemIndex).filter((person) => person.explain)
   const order = new Map<string, number>()
   for (const person of people) {
     order.set(person.kind.key, (order.get(person.kind.key) ?? 0) + 1)
@@ -423,10 +427,11 @@ const explainPeople = computed<ExplainPerson[]>(() => {
         ? { userId: person.student.userId, username: person.student.username, flowchartId: person.cell.flowchart!.latest!.id, label: person.kind.label }
         : { userId: person.student.userId, username: person.student.username, submissionId: person.cell.latest!.submissionId, label: person.kind.label },
     )
-})
+}
 
 function openExplain(problemIndex: number, userId: number) {
   explainProblemIndex.value = problemIndex
+  explainPeople.value = explainPeopleOf(problemIndex)
   explainIndex.value = Math.max(
     0,
     explainPeople.value.findIndex((person) => person.userId === userId),
@@ -532,7 +537,8 @@ function lastText(student: TaskBoardStudent) {
       />
       <div v-else-if="board?.problems.length && !needLesson" class="lesson">
         <span class="lesson-label">{{ board.source === 'teacher' ? '这节课' : '今天在做' }}</span>
-        <span v-if="board.mode && board.mode !== 'code'" class="chip lang">{{ LESSON_MODE_LABEL[board.mode] }}</span>
+        <!-- 写代码也写出来：只写「Python」的话，看不出这节是写代码还是先画再写 -->
+        <span v-if="board.mode" class="chip lang">{{ LESSON_MODE_LABEL[board.mode] }}</span>
         <span v-if="board.language" class="chip lang">{{ LANGUAGE_SHOW_VALUE[board.language] }}</span>
         <span v-for="problem in board.problems" :key="problem.problemId" class="chip">
           {{ problem.problemDisplayId }}
