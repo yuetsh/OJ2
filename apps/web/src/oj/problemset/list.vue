@@ -83,6 +83,8 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
   <div class="page oj-page">
     <div class="top">
       <h2>专题</h2>
+      <!-- 没有布置中的，就只有一组：数量写在标题旁边，不再另起一行「专题 14 个」把标题再说一遍 -->
+      <span v-if="!assigning.length && others.length" class="muted count">{{ others.length }} 个</span>
       <div class="spacer"></div>
       <n-input v-model:value="keyword" placeholder="搜专题" clearable class="search" />
       <!-- 手机上一行放不下，也没人在手机上出题，只给电脑 -->
@@ -133,8 +135,8 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
       </div>
     </template>
 
-    <div v-if="others.length" class="sect">
-      {{ assigning.length ? '其他专题' : '专题' }}
+    <div v-if="assigning.length && others.length" class="sect">
+      其他专题
       <span class="muted">{{ others.length }} 个</span>
     </div>
     <div class="small-grid">
@@ -189,6 +191,12 @@ const doneBackground = computed(() => rgba(theme.value.successColor, 0.05))
 .top h2 {
   margin: 0;
   font-size: var(--oj-fs-title);
+}
+
+/* 和分组标题旁的「N 个」同一档：小字、不加粗 */
+.top .count {
+  font-size: var(--oj-fs-sec);
+  font-weight: 400;
 }
 
 .search {
