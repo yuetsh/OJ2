@@ -51,11 +51,16 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   const week = weekStart()
   const e = schema.mascotEvent
-  const [pokes, today, recent, tooHard, weekSubmits, weekEvents, weekHints] = await Promise.all([
+  const [pokes, solved, today, recent, tooHard, weekSubmits, weekEvents, weekHints] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
       .where(and(eq(schema.mascotEvent.userId, userId), eq(schema.mascotEvent.kind, 'open'))),
+    // 成就每次判完都重数一遍存进 user_stat，直接读，不再按提交现数
+    db
+      .select({ value: sql<number>`coalesce((${schema.userStat.metrics}->>'accepted_count')::int, 0)` })
+      .from(schema.userStat)
+      .where(eq(schema.userStat.userId, userId)),
     db
       .select({ value: countDistinct(s.problemId) })
       .from(s)
@@ -94,6 +99,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   return success(c, {
     pokes: pokes[0]?.value ?? 0,
+    solved: solved[0]?.value ?? 0,
     todaySolved: today[0]?.value ?? 0,
     tooHard: tooHard[0]?.value ?? 0,
     week: {

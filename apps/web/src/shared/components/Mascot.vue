@@ -11,7 +11,8 @@
  * - 按下去像玩偶一样压扁（底边不动），松手弹回。
  * - 点一下冒气泡：一句话加最多三个按钮，按页面、按情况变（页面经 shared/mascot/guide.ts 告诉她），
  *   台词在 shared/mascot/lines.ts。比赛里点她不弹气泡。再点一下、点别处、换页面都收起。
- * - 对学生按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）；
+ * - 对学生按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）。好感按一共做对几道分五档，
+ *   高档多几组软一点的话、也更耐烦（档位不显示）；
  *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
  * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
  * - 一句一句地刷（两次点开隔不到 BURST_GAP_MS）：第 3 次起不耐烦、第 5 次起炸毛、第 7 次背过身去，
@@ -27,7 +28,7 @@ import imageUrl from 'shared/assets/mascot/whale.webp'
 import patUrl from 'shared/assets/mascot/whale-pat.gif'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
-import { logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
+import { affinityTier, logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
@@ -55,11 +56,12 @@ const OVERCLICK = 8 // 一轮连点到这么多下还没摸到头，她就嫌烦
 const QUIET_BUBBLE_MS = 5000 // 没有按钮的气泡（只是一句话）过这么久自己收起
 const SPOKEN_BUBBLE_MS = 10_000 // 她主动说的话，有按钮也过这么久收起：没人点她，不该一直挡着
 const SPEAK_GAP_MS = 3 * 60_000 // 主动开口至少隔这么久，课上别老打岔
-// 连着刷台词。门槛按上线第一天的数定的：隔不到 20 秒算一串的话，到 3 次的串有 129 串、到 5 次的 50、到 7 次的 23
+// 连着刷台词。门槛按上线第一天的数定的：隔不到 20 秒算一串的话，到 3 次的串有 129 串、到 5 次的 50、到 7 次的 23。
+// 好感越高越耐烦（按档位 0～4 取，见 behavior.ts 的 affinityTier）：最熟的点到第 10 次才背过身
 const BURST_GAP_MS = 20_000
 const PESTER_MILD = 3
-const PESTER_ANGRY = 5
-const SULK_AT = 7
+const PESTER_ANGRY = [5, 5, 6, 7, 8] as const
+const SULK_AT = [7, 7, 8, 9, 10] as const
 const SULK_MS = 30_000
 
 type HAnchor = 'left' | 'right' | null
@@ -290,8 +292,9 @@ let sulkTimer: ReturnType<typeof setTimeout> | undefined
 
 /** 按这一串点到第几次换成不耐烦、炸毛的话；页面的按钮照给，真有事的还能办。背过身去就不给了 */
 function pester(guide: MascotGuide): MascotGuide {
-  if (burst >= SULK_AT) return { situation: 'sulk' }
-  const situation = burst >= PESTER_ANGRY ? 'pester.angry' : burst >= PESTER_MILD ? 'pester.mild' : null
+  const tier = affinityTier()
+  if (burst >= SULK_AT[tier]!) return { situation: 'sulk' }
+  const situation = burst >= PESTER_ANGRY[tier]! ? 'pester.angry' : burst >= PESTER_MILD ? 'pester.mild' : null
   return situation ? { situation, actions: guide.actions } : guide
 }
 

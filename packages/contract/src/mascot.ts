@@ -39,6 +39,11 @@ export type MascotEventInput = z.infer<typeof mascotEventSchema>
 export const mascotProfileSchema = z.object({
   /** 一共点开过她几次（open 事件数），按账号算 */
   pokes: z.number().int(),
+  /**
+   * 一共做对了几道不同的题，含比赛题（就是成就的 accepted_count，user_stat 里存着的那个数）。
+   * 看板娘的好感按它分档，点她多少次不算
+   */
+  solved: z.number().int(),
   /** 今天（东八区）做对了几道不同的题 */
   todaySolved: z.number().int(),
   /** 一共点过几次「太难了」（做对后的点评） */

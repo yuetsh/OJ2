@@ -101,6 +101,40 @@ const TODAY_MIN = 3
 const GREETINGS = new Set<MascotSituation>(['greet', 'announcement', 'achievement', 'profile'])
 const PRAISE = new Set<MascotSituation>(['problem.accepted', 'problem.firstTry', 'problem.finally', 'home.done', 'home.assigned', 'home.free'])
 
+/**
+ * 好感档位：一共做对几道（含比赛题，和成就一个数）。点她多少次不算，脚本刷不上去。
+ * 门槛按生产库定的（2026-11，最近 60 天交过题的 378 个学生）：做对 p25 是 14 道、中位 25、p75 37、p90 108，
+ * 所以前四档大约各占四分之一，最高一档是前一成。档位不显示，学生自己感觉出来
+ */
+const AFFINITY_TIERS = [10, 25, 40, 100] as const
+/** 0 是还不熟（没有额外的话），1～4 对应 lines.ts 的 affinity.1～4。老师、没拉到数都是 0 */
+export function affinityTier() {
+  const solved = mascotProfile.value?.solved ?? 0
+  return AFFINITY_TIERS.filter((min) => solved >= min).length
+}
+const AFFINITY_CHANCE = 0.25
+/** 掺好感台词的情况：闲聊、夸人，加上学生最常点她的空白题目页、题目列表（第一天点开的四成在这两处） */
+const CHATTY = new Set<MascotSituation>([
+  'greet',
+  'announcement',
+  'achievement',
+  'profile',
+  'problem.accepted',
+  'problem.firstTry',
+  'problem.finally',
+  'problem.solvedBefore',
+  'problem.blank',
+  'problems',
+  'home.done',
+  'home.free',
+])
+
+/** 抽哪一档的话：自己那一档占一半，剩下一半在低几档里均分 */
+function affinitySituation(tier: number): MascotSituation {
+  const level = tier === 1 || Math.random() < 0.5 ? tier : 1 + Math.floor(Math.random() * (tier - 1))
+  return `affinity.${level}` as MascotSituation
+}
+
 /** 点她的时候：按行为把页面给的情况换成更贴这个学生的那一组（按钮不变） */
 export function personalize(guide: MascotGuide): MascotGuide {
   const profile = mascotProfile.value
@@ -124,6 +158,10 @@ export function personalize(guide: MascotGuide): MascotGuide {
   if (habit && Math.random() < HABIT_CHANCE) return { ...guide, situation: habit }
   if (PRAISE.has(guide.situation) && profile.todaySolved >= TODAY_MIN && Math.random() < TODAY_CHANCE) {
     return { ...guide, situation: 'today.count', n: profile.todaySolved }
+  }
+  const tier = affinityTier()
+  if (tier > 0 && CHATTY.has(guide.situation) && guide.n === undefined && !guide.vars && Math.random() < AFFINITY_CHANCE) {
+    return { ...guide, situation: affinitySituation(tier) }
   }
   if (GREETINGS.has(guide.situation) && profile.pokes >= FAMILIAR_POKES && Math.random() < FAMILIAR_CHANCE) {
     return { ...guide, situation: 'familiar' }
