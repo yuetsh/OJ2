@@ -5,7 +5,8 @@ import { Hono } from 'hono'
 import { requireAuth, type AppEnv } from '../auth/middleware'
 import { db, schema } from '../db'
 import { parseBody, success } from '../http'
-import { dayStart, weekStart } from '../time'
+import { JudgeStatus } from '../judge/status'
+import { calendarDay, dayNumber, dayStart, weekStart } from '../time'
 
 export const mascotRoutes = new Hono<AppEnv>()
 
@@ -41,6 +42,58 @@ mascotRoutes.post('/mascot/events', requireAuth, async (c) => {
   return success(c, null)
 })
 
+/** 跨天记得的事只翻这么多天以内的 */
+const MEMORY_DAYS = 7
+
+/** 几个东八区日历日以前；不在 MEMORY_DAYS 以内、或之后已经说过那句了，就是 null */
+function daysAgo(at: string | null, saidAt: string | null) {
+  if (!at || (saidAt && saidAt > at)) return null
+  const days = dayNumber(calendarDay()) - dayNumber(calendarDay(at))
+  return days >= 1 && days <= MEMORY_DAYS ? days : null
+}
+
+/** 跨天记得的事（契约 mascotProfileSchema.memory），一条语句查完 */
+async function memoryOf(userId: number) {
+  const today = dayStart()
+  const since = new Date(Date.parse(today) - MEMORY_DAYS * 86_400_000).toISOString()
+  const e = schema.mascotEvent
+  /** 7 天内最后一次。`beforeToday`：今天的事不算「记得」，只取今天以前的 */
+  const last = (kind: string, situation: string | null, beforeToday: boolean) => sql`(
+    select max(${e.createdAt}) from ${e}
+    where ${e.userId} = ${userId} and ${e.kind} = ${kind}
+      ${situation ? sql`and ${e.situation} = ${situation}` : sql``}
+      and ${e.createdAt} >= ${since}
+      ${beforeToday ? sql`and ${e.createdAt} < ${today}` : sql``}
+  )`
+  const s = schema.submission
+  const [row] = await db.execute<{
+    sulk_at: string | null
+    grudge_at: string | null
+    pat_at: string | null
+    pat_said_at: string | null
+    closer_at: string | null
+    solved_before: number
+  }>(sql`
+    select
+      ${last('open', 'sulk', true)} as sulk_at,
+      ${last('open', 'memory.grudge', false)} as grudge_at,
+      ${last('pat', null, true)} as pat_at,
+      ${last('open', 'memory.pat', false)} as pat_said_at,
+      ${last('open', 'memory.closer', false)} as closer_at,
+      (
+        select count(distinct ${s.problemId})::int from ${s}
+        where ${s.userId} = ${userId} and ${s.result} in (${JudgeStatus.ACCEPTED}, ${JudgeStatus.AST_CHECK_FAILED})
+          and ${s.createTime} < ${today}
+      ) as solved_before
+  `)
+  return {
+    grudgeDaysAgo: daysAgo(row?.sulk_at ?? null, row?.grudge_at ?? null),
+    patDaysAgo: daysAgo(row?.pat_at ?? null, row?.pat_said_at ?? null),
+    solvedBeforeToday: row?.solved_before ?? 0,
+    closerSaidToday: !!row?.closer_at && row.closer_at >= today,
+  }
+}
+
 /** 最近多少次题库提交拿来看学生常犯哪类错 */
 const RECENT_SUBMISSIONS = 20
 
@@ -51,7 +104,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   const week = weekStart()
   const e = schema.mascotEvent
-  const [pokes, solved, today, recent, tooHard, weekSubmits, weekEvents, weekHints] = await Promise.all([
+  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
@@ -61,6 +114,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
       .select({ value: sql<number>`coalesce((${schema.userStat.metrics}->>'accepted_count')::int, 0)` })
       .from(schema.userStat)
       .where(eq(schema.userStat.userId, userId)),
+    memoryOf(userId),
     db
       .select({ value: countDistinct(s.problemId) })
       .from(s)
@@ -100,6 +154,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
   return success(c, {
     pokes: pokes[0]?.value ?? 0,
     solved: solved[0]?.value ?? 0,
+    memory,
     todaySolved: today[0]?.value ?? 0,
     tooHard: tooHard[0]?.value ?? 0,
     week: {

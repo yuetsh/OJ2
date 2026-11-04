@@ -12,7 +12,8 @@
  * - 点一下冒气泡：一句话加最多三个按钮，按页面、按情况变（页面经 shared/mascot/guide.ts 告诉她），
  *   台词在 shared/mascot/lines.ts。比赛里点她不弹气泡。再点一下、点别处、换页面都收起。
  * - 对学生按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）。好感按一共做对几道分五档，
- *   高档多几组软一点的话、也更耐烦（档位不显示）；
+ *   高档多几组软一点的话、也更耐烦（档位不显示）。跨天记得几件事（前几天惹她生气、摸过头、今天升了档），
+ *   今天第一次闲聊时翻一次旧账；
  *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
  * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
  * - 一句一句地刷（两次点开隔不到 BURST_GAP_MS）：第 3 次起不耐烦、第 5 次起炸毛、第 7 次背过身去，
@@ -329,7 +330,7 @@ const TIME_CHANCE = 0.15
 
 function pickFor(guide: MascotGuide) {
   let situation = guide.situation
-  if (!SERIOUS.has(situation) && !PESTERED.has(situation) && guide.n === undefined && !guide.vars) {
+  if (!SERIOUS.has(situation) && !PESTERED.has(situation) && situation !== 'memory.closer' && guide.n === undefined && !guide.vars) {
     const timely = timeSituation()
     if (Math.random() < RARE_CHANCE) situation = 'rare'
     else if (timely && !userStore.isTeacherOrAbove && Math.random() < TIME_CHANCE) situation = timely

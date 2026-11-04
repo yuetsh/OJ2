@@ -109,7 +109,9 @@ const PRAISE = new Set<MascotSituation>(['problem.accepted', 'problem.firstTry',
 const AFFINITY_TIERS = [10, 25, 40, 100] as const
 /** 0 是还不熟（没有额外的话），1～4 对应 lines.ts 的 affinity.1～4。老师、没拉到数都是 0 */
 export function affinityTier() {
-  const solved = mascotProfile.value?.solved ?? 0
+  return tierOf(mascotProfile.value?.solved ?? 0)
+}
+function tierOf(solved: number) {
   return AFFINITY_TIERS.filter((min) => solved >= min).length
 }
 const AFFINITY_CHANCE = 0.25
@@ -135,12 +137,41 @@ function affinitySituation(tier: number): MascotSituation {
   return `affinity.${level}` as MascotSituation
 }
 
+/** 这一页会话里翻过的旧账：说完到下次拉回新数之间别再说一遍 */
+const memorySaid = new Set<'closer' | 'grudge' | 'pat'>()
+
+function whenText(days: number) {
+  return days === 1 ? '昨天' : days === 2 ? '前天' : '前几天'
+}
+
+/** 跨天记得的事，有就挑一件：今天升档 > 被惹生气 > 被摸头。每件只翻一次（后端看说没说过） */
+function memoryGuide(profile: MascotProfile): Pick<MascotGuide, 'situation' | 'vars'> | null {
+  const memory = profile.memory
+  if (!memory.closerSaidToday && !memorySaid.has('closer') && tierOf(memory.solvedBeforeToday) < tierOf(profile.solved)) {
+    memorySaid.add('closer')
+    return { situation: 'memory.closer' }
+  }
+  if (memory.grudgeDaysAgo !== null && !memorySaid.has('grudge')) {
+    memorySaid.add('grudge')
+    return { situation: 'memory.grudge', vars: { when: whenText(memory.grudgeDaysAgo) } }
+  }
+  if (memory.patDaysAgo !== null && !memorySaid.has('pat')) {
+    memorySaid.add('pat')
+    return { situation: 'memory.pat', vars: { when: whenText(memory.patDaysAgo) } }
+  }
+  return null
+}
+
 /** 点她的时候：按行为把页面给的情况换成更贴这个学生的那一组（按钮不变） */
 export function personalize(guide: MascotGuide): MascotGuide {
   const profile = mascotProfile.value
   if (!profile) return guide
   if (profile.pokes + sessionPokes === 0) return { ...guide, situation: 'first.meet', n: undefined, vars: undefined }
   const situation = guide.situation
+  if (CHATTY.has(situation)) {
+    const memory = memoryGuide(profile)
+    if (memory) return { ...guide, ...memory, n: undefined }
+  }
   // 常点「太难了」的，错了先软着说，不翻老毛病
   if (FAILURES.has(situation) && profile.tooHard >= GENTLE_TOO_HARD && Math.random() < GENTLE_CHANCE) return { ...guide, situation: 'gentle.wrong' }
   const week = profile.week

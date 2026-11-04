@@ -55,6 +55,20 @@ export const mascotProfileSchema = z.object({
     helps: z.number().int(),
     aiHints: z.number().int(),
   }),
+  /**
+   * 跨天记得的事。「几天前」是东八区日历日之差，只看 7 天内、今天以前的；
+   * 那件事之后已经说过对应那句（situation = memory.grudge / memory.pat）就是 null，同一件事只翻一次旧账
+   */
+  memory: z.object({
+    /** 最近一次被点到背过身（situation = sulk 的那次点开）是几天前 */
+    grudgeDaysAgo: z.number().int().nullable(),
+    /** 最近一次被摸头是几天前 */
+    patDaysAgo: z.number().int().nullable(),
+    /** 今天以前做对了几道（和 solved 同一个口径）：和 solved 一比就知道今天升没升好感档 */
+    solvedBeforeToday: z.number().int(),
+    /** 今天说过「熟了一点」（memory.closer）没有 */
+    closerSaidToday: z.boolean(),
+  }),
   recent: z.object({
     total: z.number().int(),
     wrongAnswer: z.number().int(),
