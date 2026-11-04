@@ -26,7 +26,8 @@ import ProblemTypeTag from './ProblemTypeTag.vue'
  * `place` 只管标题的样子：题面里和「提示」「来源」一样带绿竖条，结果页签里和「还能挑战」对齐。
  *
  * 每行第二行写和这道题共同的标签：不点开就知道练的是什么。行的写法照题目列表
- * （灰题号、淡底难度、做对人数、类型标签、做过没对的红「−」）
+ * （灰题号、淡底难度、做对人数、类型标签、做过没对的红「−」）。整行可点，题目名
+ * 和题目列表一样用正文色、不用主题绿：绿字细、在白底上发虚
  */
 const props = defineProps<{ title: string; place: 'content' | 'result' }>()
 
@@ -165,7 +166,7 @@ function difficultyStyle(row: SimilarRow) {
 .id {
   grid-area: id;
   min-width: 36px;
-  font-size: 14px;
+  font-size: var(--oj-fs-body);
   color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
 }
@@ -180,8 +181,8 @@ function difficultyStyle(row: SimilarRow) {
 
 .text {
   min-width: 0;
-  font-size: 15px;
-  color: v-bind('theme.primaryColor');
+  font-size: var(--oj-fs-body);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -193,7 +194,7 @@ function difficultyStyle(row: SimilarRow) {
   height: 22px;
   padding: 0 7px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--oj-fs-meta);
   display: inline-flex;
   align-items: center;
 }
@@ -201,8 +202,8 @@ function difficultyStyle(row: SimilarRow) {
 .shared {
   grid-area: shared;
   min-width: 0;
-  font-size: 13px;
-  color: v-bind('theme.textColor3');
+  font-size: var(--oj-fs-sec);
+  color: v-bind('theme.textColor2');
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -211,14 +212,14 @@ function difficultyStyle(row: SimilarRow) {
 .people {
   grid-area: people;
   justify-self: end;
-  font-size: 13px;
-  color: v-bind('theme.textColor3');
+  font-size: var(--oj-fs-sec);
+  color: v-bind('theme.textColor2');
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .people b {
   font-weight: 600;
-  color: v-bind('theme.textColor2');
+  color: v-bind('theme.textColor1');
 }
 </style>
