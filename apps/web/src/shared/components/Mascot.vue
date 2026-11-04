@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * 看板娘，兼站内的引导员。现在只有一个形象（鲸鱼娘）。
+ * 看板娘，兼站内的引导员。现在只有一个形象（鲸鱼娘，全身 Q 版）。
  *
- * 形象取自 MeteorNOX/DeepSeek-Balance-Whale-Widget 的 assets/DSniang1.png（裁掉透明边、缩到 2 倍显示尺寸转 webp）。
- * 那个仓库的代码是 MIT，但 assets/ 下的图不在 MIT 里（见它的 PROVENANCE.md）。
+ * 立绘一个姿势一张，取自 Sutera-Diffusus/dsh-whale-musume（MIT），哪种情况摆哪个姿势、
+ * 节日换装都在 shared/mascot/poses.ts。平时那张跟页面一起下，别的用到才下，下好再换。
  *
  * - 常驻在前台页面的角落，能拖；松手按「四分之一区」贴边：中心落在左/右四分之一就贴左/右缘，
  *   上/下四分之一就贴上/下缘，中间保持松手的位置。两个方向各判各的，所以能贴进角落。
@@ -19,14 +19,15 @@
  * - 一句一句地刷（两次点开隔不到 BURST_GAP_MS）：第 3 次起不耐烦、第 5 次起炸毛、第 7 次背过身去，
  *   生 SULK_MS 的闷气，这期间点她只蹦不说话。生闷气时连点摸到头就哄好了。上线第一天六成的点开
  *   离上一次不到 15 秒，学生是在刷台词，所以台词也按副牌抽（pick），一组听完才会重复。
- * - 彩蛋：连着快点，有时候（每轮三分之一的机会）点到第 4～8 下（也是随机的）会被摸摸头（同一个仓库的 assets/rua.gif），摸的时候接着点就一直摸。
+ * - 姿势：被拖着是「被拎起来」，被摸头是「被摸」那张加上一下一下揉的动作，冒气泡时按说的那组话换，
+ *   生闷气时冒黑气。
+ * - 彩蛋：连着快点，有时候（每轮三分之一的机会）点到第 4～8 下（也是随机的）会被摸摸头，摸的时候接着点就一直摸。
  *
  * 位置只是这台电脑上的个人偏好，存 localStorage（读写都包 try/catch，拿不到就用默认位置）。
  * 定位一律用 transform 的像素值：贴右缘时若换成 right:0，过渡没法在 auto 和数值之间插值，会瞬移。
  */
 import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
-import imageUrl from 'shared/assets/mascot/whale.webp'
-import patUrl from 'shared/assets/mascot/whale-pat.gif'
+import { dailyPose, festivalPose, napPose, PEEK_SIZE, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { affinityTier, logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
@@ -34,15 +35,11 @@ import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
 
-const WIDTH = 132
-const HEIGHT = 140 // 图是 264×280
+const WIDTH = 144
+const HEIGHT = 177 // 图是 288×354
 const MARGIN = 12
 const TOP_GAP = 72 // 贴上缘时让开顶栏
 const STORAGE_KEY = 'oj-mascot'
-// 摸头动图是 128×128，人只占右下角、上面是手。放大到人和静态图一样大，
-// 右边、人的下沿（第 117 行像素）对齐静态图，手伸出框外
-const PAT_SIZE = 182
-const PAT_BOTTOM = -Math.round((PAT_SIZE * 11) / 128)
 const PAT_MS = 1200
 // 每轮连点先抽这一轮有没有彩蛋，有的话再抽连点到第几下出。都猜不准才像彩蛋
 const PAT_CHANCE = 1 / 3
@@ -64,14 +61,26 @@ const PESTER_MILD = 3
 const PESTER_ANGRY = [5, 5, 6, 7, 8] as const
 const SULK_AT = [7, 7, 8, 9, 10] as const
 const SULK_MS = 30_000
+// 没人理她：这么久没碰就换一张日常（之后每隔这么久再换），再久就打盹。比赛页不换
+const DAILY_MS = 5 * 60_000
+const NAP_MS = 20 * 60_000
+// 松手时身子露在屏幕外超过这么多，就缩进那条边只探个头
+const PEEK_OUT = 0.35
+// 按住下面这一截拖（裙子、尾巴）是揪着尾巴，上面是被拎起来
+const TAIL_GRAB = 0.62
+// 一直连着摸超过这么久，就被摸得笑出来
+const GIGGLE_MS = 1800
 
 type HAnchor = 'left' | 'right' | null
 type VAnchor = 'top' | 'bottom' | null
+type PeekSide = keyof typeof PEEK_SIZE
 interface Place {
   h: HAnchor
   v: VAnchor
-  x: number // 未贴边时的 left
-  y: number // 未贴边时的 top
+  x: number // 未贴边时的 left；探头在下边时是探头图的 left
+  y: number // 未贴边时的 top；探头在左右时是探头图的 top
+  /** 缩在哪条边上只探个头，没缩是 null */
+  peek: PeekSide | null
 }
 
 function loadPlace(): Place {
@@ -79,12 +88,15 @@ function loadPlace(): Place {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const p = JSON.parse(raw) as Partial<Place>
-      if (typeof p.x === 'number' && typeof p.y === 'number') return { h: p.h ?? null, v: p.v ?? null, x: p.x, y: p.y }
+      if (typeof p.x === 'number' && typeof p.y === 'number') {
+        const peek = p.peek && p.peek in PEEK_SIZE ? p.peek : null
+        return { h: p.h ?? null, v: p.v ?? null, x: p.x, y: p.y, peek }
+      }
     }
   } catch {
     // 隐私窗口、禁了站点数据：用默认位置
   }
-  return { h: 'right', v: 'bottom', x: 0, y: 0 }
+  return { h: 'right', v: 'bottom', x: 0, y: 0, peek: null }
 }
 
 function savePlace(p: Place) {
@@ -101,6 +113,10 @@ const dragging = ref(false)
 const pressed = ref(false)
 const patting = ref(false)
 const flipped = ref(false)
+/** 缩在哪条边上（同 place.peek，响应式的一份） */
+const peek = ref<PeekSide | null>(place.peek)
+/** 框的大小：探头时换成探头图的大小 */
+const size = computed(() => (peek.value ? PEEK_SIZE[peek.value] : { width: WIDTH, height: HEIGHT }))
 /** 生闷气：背过身去（镜像反过来），点她不说话 */
 const sulking = ref(false)
 const body = ref<HTMLElement>()
@@ -115,6 +131,13 @@ function clamp(v: number, lo: number, hi: number) {
 function settle() {
   const vw = document.documentElement.clientWidth
   const vh = window.innerHeight
+  if (peek.value) {
+    const { width, height } = PEEK_SIZE[peek.value]
+    pos.x = peek.value === 'left' ? 0 : peek.value === 'right' ? vw - width : clamp(place.x, MARGIN, vw - width - MARGIN)
+    pos.y = peek.value === 'bottom' ? vh - height : clamp(place.y, TOP_GAP, vh - height)
+    flipped.value = false
+    return
+  }
   pos.x = place.h === 'left' ? MARGIN : place.h === 'right' ? vw - WIDTH - MARGIN : clamp(place.x, MARGIN, vw - WIDTH - MARGIN)
   // 图的下沿是裁断的半身，贴底时直接坐在屏幕底边上，不留空
   pos.y = place.v === 'top' ? TOP_GAP : place.v === 'bottom' ? vh - HEIGHT : clamp(place.y, TOP_GAP, vh - HEIGHT)
@@ -127,6 +150,8 @@ settle()
 
 let start: { px: number; py: number; x: number; y: number } | null = null
 let moved = false
+/** 这一下拖是拎着上半身还是揪着尾巴 */
+const grabbedTail = ref(false)
 
 function onDown(e: PointerEvent) {
   if (e.button !== 0) return
@@ -137,6 +162,8 @@ function onDown(e: PointerEvent) {
   start = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y }
   moved = false
   pressed.value = true
+  grabbedTail.value = !peek.value && e.clientY - pos.y > HEIGHT * TAIL_GRAB
+  touched()
 }
 
 function onMove(e: PointerEvent) {
@@ -144,12 +171,28 @@ function onMove(e: PointerEvent) {
   const dx = e.clientX - start.px
   const dy = e.clientY - start.py
   if (!moved && dx * dx + dy * dy < 9) return
+  if (!moved && peek.value) {
+    // 从边上拖出来：整个人出来，按住的地方大致还在手底下
+    const was = PEEK_SIZE[peek.value]
+    start.x += (was.width - WIDTH) / 2
+    start.y += was.height - HEIGHT
+    peek.value = null
+  }
   moved = true
   dragging.value = true
   pressed.value = false
+  napping.value = false
   pos.x = start.x + dx
   pos.y = start.y + dy
   flipped.value = pos.x + WIDTH / 2 < document.documentElement.clientWidth / 2
+}
+
+/** 松手时露在屏幕外多少：超过 PEEK_OUT 就缩进那条边。下边优先（多半是往下拖藏起来） */
+function peekSideFor(vw: number, vh: number): PeekSide | null {
+  if (pos.y + HEIGHT - vh > HEIGHT * PEEK_OUT) return 'bottom'
+  if (-pos.x > WIDTH * PEEK_OUT) return 'left'
+  if (pos.x + WIDTH - vw > WIDTH * PEEK_OUT) return 'right'
+  return null
 }
 
 /**
@@ -165,15 +208,10 @@ function boing() {
   })
 }
 
-// 动图 94KB，不在每个页面一打开就下：连点到第 2 下才预载，最少也还要再点两下才用得上
-let patPreloaded = false
-function preloadPat() {
-  if (patPreloaded) return
-  patPreloaded = true
-  new Image().src = patUrl
-}
-
 let patTimer: ReturnType<typeof setTimeout> | undefined
+let patStartedAt = 0
+/** 摸了好一会儿，被摸得笑出来了 */
+const giggling = ref(false)
 let streak = 0
 let patClicks = rollPatClicks()
 let lastClick = 0
@@ -185,15 +223,25 @@ function onUp() {
     dragging.value = false
     const vw = document.documentElement.clientWidth
     const vh = window.innerHeight
-    const cx = pos.x + WIDTH / 2
-    const cy = pos.y + HEIGHT / 2
-    place.h = cx < vw / 4 ? 'left' : cx > (vw * 3) / 4 ? 'right' : null
-    place.v = cy < vh / 4 ? 'top' : cy > (vh * 3) / 4 ? 'bottom' : null
-    place.x = pos.x
-    place.y = pos.y
+    const side = peekSideFor(vw, vh)
+    if (side) {
+      // 探头图对着她原来的中间放
+      const { width, height } = PEEK_SIZE[side]
+      place.x = pos.x + (WIDTH - width) / 2
+      place.y = pos.y + (HEIGHT - height) / 2
+    } else {
+      const cx = pos.x + WIDTH / 2
+      const cy = pos.y + HEIGHT / 2
+      place.h = cx < vw / 4 ? 'left' : cx > (vw * 3) / 4 ? 'right' : null
+      place.v = cy < vh / 4 ? 'top' : cy > (vh * 3) / 4 ? 'bottom' : null
+      place.x = pos.x
+      place.y = pos.y
+    }
+    place.peek = side
+    peek.value = side
     settle()
     savePlace(place)
-    logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
+    logMascotEvent({ kind: 'move', line: side ? `peek ${side}` : `${place.h ?? '-'} ${place.v ?? '-'}` })
     return
   }
   boing()
@@ -204,23 +252,26 @@ function onUp() {
     patClicks = rollPatClicks()
   }
   lastClick = now
-  if (streak >= 2) preloadPat()
 
   // 正在被摸，或者连点到数了：摸摸头，从这一下再摸满一轮
   if (patting.value || streak >= patClicks) {
     if (!patting.value && sulking.value) {
       // 生着闷气被摸了头：哄好了
       endSulk()
-      say({ text: pick('sulk.forgive') })
+      say({ text: pick('sulk.forgive'), pose: 'blush' })
       logMascotEvent({ kind: 'pat', situation: 'sulk.forgive' })
     } else if (!patting.value) {
-      say({ text: pick('patting') })
+      say({ text: pick('patting'), pose: situationPose('patting') })
       logMascotEvent({ kind: 'pat' })
     }
+    napping.value = false
+    if (!patting.value) patStartedAt = now
+    else if (now - patStartedAt > GIGGLE_MS) giggling.value = true
     patting.value = true
     clearTimeout(patTimer)
     patTimer = setTimeout(() => {
       patting.value = false
+      giggling.value = false
       streak = 0
     }, PAT_MS)
     return
@@ -228,7 +279,7 @@ function onUp() {
   // 一轮里只有第一下开关气泡，后面连着点是在找彩蛋，不跟着一开一关
   if (streak === 1) toggleBubble()
   else if (streak === OVERCLICK) {
-    if (!sulking.value) say({ text: pick('overclick') })
+    if (!sulking.value) say({ text: pick('overclick'), pose: situationPose('overclick') })
     logMascotEvent({ kind: 'overclick', situation: sulking.value ? 'sulk' : undefined })
   }
 }
@@ -242,6 +293,8 @@ const authModal = useAuthModalStore()
 
 interface Bubble {
   text: string
+  /** 说这句时摆的姿势，气泡收起就回平时那张 */
+  pose?: MascotPose
   actions?: MascotAction[]
   /** 记互动时带上，看哪种情况下的按钮有人点 */
   situation?: string
@@ -267,6 +320,14 @@ function close() {
 function toggleBubble() {
   if (bubble.value) return close()
   if (silent.value) return
+  if (napping.value) {
+    // 睡着了被点醒：先说这一句，再点才说正事
+    napping.value = false
+    const text = pick('wake')
+    say({ text, pose: situationPose('wake'), situation: 'wake' })
+    logMascotEvent({ kind: 'open', situation: 'wake', line: text })
+    return
+  }
   let guide = resolveGuide()
   if (!userStore.isTeacherOrAbove) guide = personalize(guide)
   const serious = SERIOUS.has(guide.situation)
@@ -279,8 +340,8 @@ function toggleBubble() {
   burst = now - lastOpenAt < BURST_GAP_MS ? burst + 1 : 1
   lastOpenAt = now
   if (!serious) guide = pester(guide)
-  const text = pickFor(guide)
-  say({ text, actions: guide.actions?.slice(0, 3), situation: guide.situation })
+  const { text, situation } = pickFor(guide)
+  say({ text, actions: guide.actions?.slice(0, 3), situation: guide.situation, pose: situationPose(situation) })
   if (guide.situation === 'sulk') startSulk()
   notePoke()
   logMascotEvent({ kind: 'open', situation: guide.situation, line: text })
@@ -335,7 +396,7 @@ function pickFor(guide: MascotGuide) {
     if (Math.random() < RARE_CHANCE) situation = 'rare'
     else if (timely && !userStore.isTeacherOrAbove && Math.random() < TIME_CHANCE) situation = timely
   }
-  return fillLine(pick(situation), guide)
+  return { text: fillLine(pick(situation), guide), situation }
 }
 
 /**
@@ -399,7 +460,7 @@ watch(speechRequest, (speech) => {
   lastSpokeAt = performance.now()
   spokenKeys.add(speech.key)
   const text = fillLine(pick(speech.situation), speech)
-  say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation }, SPOKEN_BUBBLE_MS)
+  say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
   logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
 })
 
@@ -421,13 +482,86 @@ watch(silent, (quiet) => quiet && close())
 
 /** 她靠上时气泡往下冒，免得顶出屏幕；在左半边时气泡贴左对齐 */
 const bubbleBelow = computed(() => pos.y < 220)
+const bubbleLeft = computed(() => (peek.value ? peek.value === 'left' : flipped.value))
 
 // 告诉别的浮层她在哪（成就弹框会让开）
-watchEffect(() => Object.assign(mascotBox, { x: pos.x, y: pos.y, width: WIDTH, height: HEIGHT }))
+watchEffect(() => Object.assign(mascotBox, { x: pos.x, y: pos.y, width: size.value.width, height: size.value.height }))
+
+// ---- 立绘 ----
+
+/** 平时那张：节日当天换节日装。页面开着跨过零点也不换，刷新才换 */
+const restPose: MascotPose = festivalPose() ?? 'idle'
+const pose = computed<MascotPose>(() => {
+  // 缩在边上时一直是探头那张：别的姿势都是全身的，塞不进探头的框
+  if (peek.value) return `peek-${peek.value}`
+  if (dragging.value) return grabbedTail.value ? 'tail-grabbed' : 'lifted'
+  if (patting.value) return giggling.value ? 'giggle' : 'patted'
+  if (bubble.value?.pose) return bubble.value.pose
+  if (sulking.value) return 'fuming'
+  return idlePose.value ?? restPose
+})
+
+// ---- 没人理她：换日常、打盹 ----
+
+/** 闲着时换的那张（日常或者睡着），被碰一下就回平时那张 */
+const idlePose = ref<MascotPose | null>(null)
+const napping = ref(false)
+let lastTouch = performance.now()
+let lastDailyAt = performance.now()
+/** 被碰了一下：重新计时。睡着时只是按下去还不算醒，点开（说「没睡」）、拖起来、摸头才醒 */
+function touched() {
+  lastTouch = performance.now()
+  lastDailyAt = lastTouch
+  if (!napping.value) idlePose.value = null
+}
+useIntervalFn(() => {
+  if (silent.value || peek.value || bubble.value || sulking.value || dragging.value || napping.value) return
+  if (document.visibilityState !== 'visible') return
+  const now = performance.now()
+  if (now - lastTouch >= NAP_MS) {
+    napping.value = true
+    idlePose.value = napPose()
+  } else if (now - lastDailyAt >= DAILY_MS) {
+    lastDailyAt = now
+    idlePose.value = dailyPose(Date.now(), timeSituation() === 'offHours')
+  }
+}, 30_000)
+// 进了比赛就回平时那张
+watch(silent, (quiet) => quiet && touched())
+watch(napping, (asleep) => !asleep && touched())
+
+/**
+ * 真正画出来的那张。换姿势时先在后台下好、解码完再换，没下好之前接着显示上一张，不闪白。
+ * 机房网慢时换得晚一点，总比空一下强
+ */
+const shownSrc = ref(poseUrl(pose.value))
+const ready = new Set<string>([shownSrc.value])
+function preload(url: string) {
+  if (ready.has(url)) return Promise.resolve()
+  const img = new Image()
+  img.src = url
+  return img
+    .decode()
+    .catch(() => {})
+    .then(() => {
+      ready.add(url)
+    })
+}
+watch(
+  () => poseUrl(pose.value),
+  (url) => {
+    if (ready.has(url)) shownSrc.value = url
+    else preload(url).then(() => poseUrl(pose.value) === url && (shownSrc.value = url))
+  },
+)
+// 按下去就该换「被拎起来」、连点就该换「被摸」，等那一下再下就慢了：进页面闲下来以后先把这两张下好
+const PRELOAD_POSES: MascotPose[] = ['lifted', 'tail-grabbed', 'patted']
 
 onMounted(() => {
   window.addEventListener('resize', settle, { passive: true })
   mascotBox.shown = true
+  // 机房 Chrome 105 有 requestIdleCallback；闲不下来最多等 5 秒
+  requestIdleCallback(() => PRELOAD_POSES.forEach((it) => preload(poseUrl(it))), { timeout: 5000 })
 })
 onBeforeUnmount(() => {
   mascotBox.shown = false
@@ -439,11 +573,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mascot" :class="{ dragging }" :style="{ width: `${WIDTH}px`, height: `${HEIGHT}px`, transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }">
+  <div
+    class="mascot"
+    :class="{ dragging }"
+    :style="{ width: `${size.width}px`, height: `${size.height}px`, transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }"
+  >
     <div
       ref="body"
       class="body"
-      :class="{ pressed, patting, flipped: flipped !== sulking }"
+      :class="{ pressed, patting, flipped: !peek && flipped !== sulking }"
       aria-hidden="true"
       @pointerdown="onDown"
       @pointermove="onMove"
@@ -454,23 +592,13 @@ onBeforeUnmount(() => {
       <div class="flip">
         <div ref="squashEl" class="squash">
           <div class="breathe">
-            <img
-              v-if="patting"
-              class="pat"
-              :src="patUrl"
-              :width="PAT_SIZE"
-              :height="PAT_SIZE"
-              :style="{ bottom: `${PAT_BOTTOM}px` }"
-              alt=""
-              draggable="false"
-            />
-            <img v-else :src="imageUrl" :width="WIDTH" :height="HEIGHT" alt="" draggable="false" />
+            <img :src="shownSrc" :width="size.width" :height="size.height" alt="" draggable="false" />
           </div>
         </div>
       </div>
     </div>
     <Transition name="bubble">
-      <div v-if="bubble && !dragging" ref="bubbleEl" class="bubble" :class="{ below: bubbleBelow, left: flipped }" role="status">
+      <div v-if="bubble && !dragging" ref="bubbleEl" class="bubble" :class="{ below: bubbleBelow, left: bubbleLeft }" role="status">
         <p class="line">{{ bubble.text }}</p>
         <div v-if="bubble.actions?.length" class="actions">
           <n-button
@@ -540,7 +668,7 @@ onBeforeUnmount(() => {
 .bubble::after {
   content: '';
   position: absolute;
-  right: 40px;
+  right: 50px;
   bottom: -9px;
   width: 14px;
   height: 14px;
@@ -555,7 +683,7 @@ onBeforeUnmount(() => {
 }
 .bubble.left::after {
   right: auto;
-  left: 40px;
+  left: 50px;
 }
 .bubble.below {
   bottom: auto;
@@ -616,20 +744,18 @@ onBeforeUnmount(() => {
 .breathe {
   animation: mascot-breathe 3.6s ease-in-out infinite;
 }
-.dragging .breathe,
-.patting .breathe {
+.dragging .breathe {
   animation-play-state: paused;
+}
+/* 被摸头：一下一下往下揉 */
+.patting .breathe {
+  animation: mascot-rub 0.4s ease-in-out infinite;
 }
 
 img {
   display: block;
   pointer-events: none;
   -webkit-user-drag: none;
-}
-img.pat {
-  position: absolute;
-  right: 0;
-  max-width: none;
 }
 .breathe {
   position: relative;
@@ -645,8 +771,19 @@ img.pat {
   }
 }
 
+@keyframes mascot-rub {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.03, 0.95);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .breathe {
+  .breathe,
+  .patting .breathe {
     animation: none;
   }
 }
