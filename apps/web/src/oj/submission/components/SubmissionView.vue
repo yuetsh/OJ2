@@ -310,7 +310,15 @@ function handleMore(key: string) {
         class="code"
       />
 
-      <WrongAnswerExplain v-if="sampleCheck" :check="sampleCheck" :code="shown.code" :language="shown.language" :plain="!!shown.contestId" :peer="!own" />
+      <WrongAnswerExplain
+        v-if="sampleCheck"
+        section="row"
+        :check="sampleCheck"
+        :code="shown.code"
+        :language="shown.language"
+        :plain="!!shown.contestId"
+        :peer="!own"
+      />
       <ExplainNote v-else-if="explain" :explain="explain" :tone="explainTone" />
     </template>
 

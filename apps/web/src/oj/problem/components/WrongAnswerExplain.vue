@@ -33,11 +33,14 @@ const props = defineProps<{
    */
   peer?: boolean
   /**
-   * 题目页结果页签的样子（设计稿「题目页观感」结果 X）：黄色小节标题说哪里不对，说明用正文大小，
-   * 输入 / 正确输出 / 你的输出竖着排成灰、绿、红三格，和题面的例子一个样子。
-   * 不给的话是原来那张浅灰卡片（提交详情页还在用）
+   * 新的样子（设计稿「题目页观感」结果 X）：黄色小节标题说哪里不对，说明用正文大小，
+   * 输入 / 正确输出 / 你的输出是灰、绿、红三格。
+   * - stack：三格竖着排，和题面的例子一个样子。题目页的结果页签用（左栏只有 500 多宽）
+   * - row：三格横着并排，正确输出和你的输出一行对一行，不一样的那行两边都垫一层浅黄。
+   *   提交详情页用（一栏 1200 宽，多行输出对照着看）；放不下（窄于 600，比如手机）就退回竖排
+   * 不给的话是原来那张浅灰卡片
    */
-  section?: boolean
+  section?: 'stack' | 'row'
 }>()
 
 const theme = useThemeVars()
@@ -121,7 +124,7 @@ function lines(text: string) {
 </script>
 
 <template>
-  <div :class="section ? 'explain-section' : 'explain-card'">
+  <div :class="section ? ['explain-section', section] : 'explain-card'">
     <template v-if="section">
       <SectionHead icon="problem" tone="amber">
         {{ check.passed ? '例子都对了，错在没给你看的测试点' : `例子 ${(check.index ?? 0) + 1} 没对上` }}
@@ -148,10 +151,10 @@ function lines(text: string) {
           <div class="label">正确输出</div>
           <div class="text">
             <template v-for="(line, i) in lines(check.expected ?? '')" :key="i">
-              <div v-if="i === diffLine && diffParts?.expected" class="line">
+              <div v-if="i === diffLine && diffParts?.expected" class="line hit">
                 <span v-text="diffParts.expected.before" /><span class="diff" v-text="diffParts.expected.marked" /><span v-text="diffParts.expected.after" />
               </div>
-              <div v-else class="line" v-text="line" />
+              <div v-else class="line" :class="{ hit: i === diffLine }" v-text="line" />
             </template>
           </div>
         </div>
@@ -159,10 +162,10 @@ function lines(text: string) {
           <div class="label">{{ peer ? '学生' : '你' }}的输出</div>
           <div v-if="check.output" class="text">
             <template v-for="(line, i) in lines(check.output)" :key="i">
-              <div v-if="i === diffLine && diffParts?.output" class="line">
+              <div v-if="i === diffLine && diffParts?.output" class="line hit">
                 <span v-text="diffParts.output.before" /><span class="diff" v-text="diffParts.output.marked" /><span v-text="diffParts.output.after" />
               </div>
-              <div v-else class="line" v-text="line" />
+              <div v-else class="line" :class="{ hit: i === diffLine }" v-text="line" />
             </template>
           </div>
           <div v-else class="text empty">（什么都没有输出）</div>
@@ -335,5 +338,67 @@ function lines(text: string) {
   margin-top: 10px;
   font-size: 14px;
   color: v-bind('theme.textColor3');
+}
+
+/*
+ * 横排（row，提交详情页）：三格并排，标签在格子上面；行的左右留白挪到每一行上，
+ * 不一样的那行垫的浅黄才能铺满整格宽、两边对齐
+ */
+.explain-section.row {
+  container: explain-row / inline-size;
+}
+
+.explain-section.row .blocks {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.explain-section.row .block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.explain-section.row .label {
+  line-height: 1.5;
+}
+
+.explain-section.row .text {
+  padding: 6px 0;
+  line-height: 26px;
+}
+
+.explain-section.row .line {
+  min-height: 26px;
+  padding: 0 12px;
+}
+
+.explain-section.row .text.empty {
+  padding: 6px 12px;
+}
+
+.explain-section.row .line.hit {
+  background-color: rgba(227, 160, 8, 0.14);
+}
+
+/* 放不下三格（窄于 600：手机、课堂任务的弹窗）就退回竖排 */
+@container explain-row (max-width: 600px) {
+  .explain-section.row .blocks {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 6px 8px;
+  }
+
+  .explain-section.row .block {
+    display: contents;
+  }
+
+  .explain-section.row .label {
+    line-height: 36px;
+  }
 }
 </style>

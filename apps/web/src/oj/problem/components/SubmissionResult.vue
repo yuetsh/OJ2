@@ -369,7 +369,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       >
         <CompileErrorExplain v-if="compileError" :err-info="compileError" :language="submission.language" />
         <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
-        <WrongAnswerExplain v-if="sampleCheck" full section :check="sampleCheck" :code="submission.code" :language="submission.language" />
+        <WrongAnswerExplain v-if="sampleCheck" full section="stack" :check="sampleCheck" :code="submission.code" :language="submission.language" />
         <!-- 语法要求逐条对没对：和题面的「语法要求」同一个黄色小节标题 -->
         <section v-if="submission.statisticInfo?.ast_results?.length">
           <SectionHead icon="rules" tone="amber">语法要求</SectionHead>

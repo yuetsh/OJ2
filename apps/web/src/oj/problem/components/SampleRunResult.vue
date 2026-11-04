@@ -126,7 +126,7 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
         :code="samplesCode?.value ?? ''"
         :language="samplesCode?.language ?? ''"
         :plain="inContest"
-        section
+        section="stack"
       />
       <!-- 没跑完：编译不过、运行出错、超时 -->
       <TrialErrorNote
