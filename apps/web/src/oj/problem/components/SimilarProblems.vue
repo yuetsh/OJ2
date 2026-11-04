@@ -19,11 +19,12 @@ import { useTone } from 'shared/composables/tone'
 import { problemTypes } from '../utils/problemType'
 import ProblemStatus from './ProblemStatus.vue'
 import ProblemTypeTag from './ProblemTypeTag.vue'
+import SectionHead from './SectionHead.vue'
 
 /**
  * 相似题推荐。题面末尾（做对了、或者错了 3 次以上）和结果页签（不在课堂里的题做对之后）
  * 两处用：原来只在题面最底下，学生交完不会再滚回去看。什么时候出现由调用方的 v-if 决定。
- * `place` 只管标题的样子：题面里和「提示」「来源」一样带绿竖条，结果页签里和「还能挑战」对齐。
+ * `place` 只管标题的样子：题面里用题面的小节标题（SectionHead），结果页签里和「还能挑战」对齐。
  *
  * 每行第二行写和这道题共同的标签：不点开就知道练的是什么。行的写法照题目列表
  * （灰题号、淡底难度、做对人数、类型标签、做过没对的红「−」）。整行可点，题目名
@@ -67,7 +68,8 @@ function difficultyStyle(row: SimilarRow) {
 
 <template>
   <section v-if="list.length" class="similar" :class="props.place">
-    <h3 class="heading">{{ props.title }}</h3>
+    <SectionHead v-if="props.place === 'content'" icon="similar">{{ props.title }}</SectionHead>
+    <h3 v-else class="heading">{{ props.title }}</h3>
     <div class="rows">
       <router-link v-for="sp in list" :key="sp._id" :to="{ name: 'problem', params: { problemID: sp._id } }" class="row" :class="{ 'with-status': showStatus }">
         <span v-if="showStatus" class="status"><ProblemStatus :status="sp.status" /></span>
@@ -97,15 +99,6 @@ function difficultyStyle(row: SimilarRow) {
 
 .heading {
   margin: 0 0 8px;
-}
-
-/* 和 ProblemContent 的小节标题（提示 / 来源）一样 */
-.content .heading {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
-  padding-left: 9px;
-  border-left: 3px solid v-bind('theme.primaryColor');
 }
 
 /* 和结果页签里的「还能挑战」一样 */

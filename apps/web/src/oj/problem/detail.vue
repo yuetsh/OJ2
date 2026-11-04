@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import { errorCode } from 'utils/api'
 import { getProblem } from 'oj/api'
@@ -120,6 +121,13 @@ watch(
   },
 )
 const drawerLabel = (key: DrawerKey) => (key === 'submission' && teacherCollab.value ? '学生的提交' : DRAWER_TITLE[key])
+
+/** 抽屉按钮前的小图标：页签行右边三个不带框的按钮，和左边的页签分得开（原来是三个圆角胶囊，看着像另一组页签） */
+const DRAWER_ICON: Record<DrawerKey, string> = {
+  info: 'ph:chart-bar',
+  reaction: 'ph:chat-circle',
+  submission: 'ph:clock-counter-clockwise',
+}
 
 function toggleDrawer(key: DrawerKey) {
   drawer.value = drawer.value === key ? null : key
@@ -314,7 +322,7 @@ onBeforeUnmount(() => {
             </div>
             <div v-if="ctx.drawers.length" class="drawer-buttons">
               <button v-for="key in ctx.drawers" :key="key" type="button" class="drawer-button" @click="toggleDrawer(key)">
-                {{ drawerLabel(key) }}
+                <Icon :icon="DRAWER_ICON[key]" :width="16" aria-hidden="true" />{{ drawerLabel(key) }}
               </button>
             </div>
           </div>
@@ -417,26 +425,46 @@ onBeforeUnmount(() => {
   cursor: col-resize;
 }
 
+/*
+ * 左栏：课堂的时候最左边是一条竖栏（ContextBar 的 .lesson-rail），竖栏右边从上到下是
+ * 专题 / 比赛条、页签行、正文。两个页签的正文叠在同一格里，v-show 只显示一个
+ */
 .left-pane {
   position: relative;
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.left-pane > :deep(.lesson-rail) {
+  grid-column: 1;
+  grid-row: 1 / -1;
+}
+
+.left-pane > :deep(.context-bar),
+.left-pane > .tab-row {
+  grid-column: 2;
+}
+
+.left-pane > .pane-body {
+  grid-column: 2;
+  grid-row: 3;
 }
 
 .right-pane {
   height: 100%;
 }
 
-/* 「题目 / 结果」：下划线式页签，右边是抽屉的三个胶囊按钮。
+/* 「题目 / 结果」：下划线式页签，右边是抽屉的三个按钮（图标 + 字，不带框）。
    高度和右栏工具栏、抽屉头部一样是 48（设计稿画的 42）：没有上下文条时两边并排，
    差 6px 的话两条下边线在分隔线处错成一个台阶 */
 .tab-row {
   flex: none;
   height: 48px;
   box-sizing: border-box;
-  padding: 0 20px 0 12px;
+  padding: 0 10px 0 8px;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -468,24 +496,32 @@ onBeforeUnmount(() => {
 .drawer-buttons {
   margin-left: auto;
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 .drawer-button {
   height: 32px;
-  padding: 0 11px;
-  border: 1px solid v-bind('theme.borderColor');
-  border-radius: 16px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color: v-bind('theme.textColor2');
+  white-space: nowrap;
   cursor: pointer;
 }
 
+.drawer-button svg {
+  color: v-bind('theme.textColor3');
+}
+
 .drawer-button:hover {
-  border-color: v-bind('theme.primaryColorHover');
-  color: v-bind('theme.primaryColor');
+  background-color: rgba(128, 128, 128, 0.1);
+  color: v-bind('theme.textColor1');
 }
 
 .pane-body {

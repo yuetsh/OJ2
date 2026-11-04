@@ -182,7 +182,9 @@ const changeLanguage = (v: LANGUAGE) => {
     <n-select
       v-if="!drawing"
       v-model:value="codeStore.code.language"
+      class="language"
       style="width: 120px"
+      :bordered="false"
       :size="buttonSize"
       :options="languageOptions"
       :disabled="showCollabBar"
@@ -190,15 +192,19 @@ const changeLanguage = (v: LANGUAGE) => {
     />
 
     <!-- 手机上「运行例子」「提交」在屏幕底部那条（MobileActionBar），三个页签都在 -->
+    <span v-if="!drawing" class="divider" aria-hidden="true" />
+
+    <!-- 浅绿底：比实心的「提交」轻一档，又比旁边不带框的按钮重（设计稿「题目页观感」合一版） -->
     <n-button
       v-if="canRunSamples && isDesktop"
       :size="buttonSize"
       type="primary"
-      ghost
+      secondary
       :loading="samplesRunning"
       :disabled="!codeStore.code.value.trim()"
       @click="submissionStore.runSamples()"
     >
+      <template #icon><Icon icon="ph:play-fill" /></template>
       运行例子
     </n-button>
 
@@ -215,22 +221,26 @@ const changeLanguage = (v: LANGUAGE) => {
       :size="buttonSize"
       :type="helpButtonType"
       :secondary="teacherIn || collabStore.helpStatus !== 'idle'"
+      :quaternary="!teacherIn && collabStore.helpStatus === 'idle'"
       :title="helpButtonTitle"
       class="help"
       :class="{ busy: teacherIn }"
       @click="toggleHelp"
     >
       <span v-if="teacherIn" class="dot" aria-hidden="true" />
+      <Icon v-else-if="collabStore.helpStatus === 'idle'" icon="ph:hand" :width="17" class="help-icon" aria-hidden="true" />
       {{ helpButtonText }}
     </n-button>
 
-    <n-button v-if="ctx.classStats && statisticsInline && userStore.isTeacherOrAbove" :size="buttonSize" @click="openStatistics(problem!._id)">
+    <n-button v-if="ctx.classStats && statisticsInline && userStore.isTeacherOrAbove" :size="buttonSize" quaternary @click="openStatistics(problem!._id)">
       课堂统计
     </n-button>
 
     <!-- 自测猫 / 复制代码 / 重置代码 / 编辑题目 收进下拉菜单；放不下时再加上课堂统计 -->
     <n-dropdown v-if="isDesktop && menuOptions.length" trigger="click" :options="menuOptions" @select="handleMenuSelect">
-      <n-button :size="buttonSize" class="more" aria-label="更多：去自测猫、复制代码、重置代码……"> ⋯ </n-button>
+      <n-button :size="buttonSize" quaternary class="more" aria-label="更多：去自测猫、复制代码、重置代码……">
+        <Icon icon="ph:dots-three-bold" :width="18" />
+      </n-button>
     </n-dropdown>
   </div>
 </template>
@@ -286,6 +296,23 @@ const changeLanguage = (v: LANGUAGE) => {
 .more {
   width: 34px;
   padding: 0;
+}
+
+/* 语言选择不带框，字加粗：它不是一个要常去点的按钮 */
+.language :deep(.n-base-selection-label) {
+  font-weight: 600;
+}
+
+.divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 2px;
+  background-color: v-bind('theme.dividerColor');
+}
+
+.help-icon {
+  margin-right: 4px;
 }
 
 .help.busy {

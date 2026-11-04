@@ -33,8 +33,6 @@ const changedTables = computed(() => {
 
 /** 增删改题里不是题面那组的测试数据可以一行都不改（看学生会不会多改），出题页预览会碰到 */
 const noChange = computed(() => 'changed_tables' in props.display.expected && !props.display.expected.changed_tables.length)
-
-const anyChanged = computed(() => changedTables.value.some(({ changes }) => changes && (changes.cells.size > 0 || changes.newRows.size > 0)))
 </script>
 
 <template>
@@ -62,7 +60,6 @@ const anyChanged = computed(() => changedTables.value.some(({ changes }) => chan
     </template>
   </div>
   <p v-if="noChange" class="sqlNote">执行后所有表都没有变化</p>
-  <p v-if="anyChanged" class="sqlNote legend"><span class="swatch" aria-hidden="true"></span>执行后变了的格子</p>
 </template>
 
 <style scoped>
@@ -76,23 +73,5 @@ const anyChanged = computed(() => changedTables.value.some(({ changes }) => chan
   font-size: 13px;
   opacity: 0.65;
   margin: 0 0 8px;
-}
-
-.legend {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.swatch {
-  width: 12px;
-  height: 12px;
-  border: 1px solid #f0d48a;
-  background-color: #fff4d6;
-}
-
-html.dark .swatch {
-  border-color: rgba(240, 180, 40, 0.45);
-  background-color: rgba(240, 180, 40, 0.18);
 }
 </style>

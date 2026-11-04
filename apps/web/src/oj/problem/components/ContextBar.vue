@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import type { RouteLocationRaw } from 'vue-router'
 import { getProblemSetDetail, getProblemSetProblems, joinProblemSet } from 'oj/api'
@@ -33,15 +34,16 @@ const ctx = useProblemPageContext()
 const { isMobile } = useBreakpoints()
 const theme = useThemeVars()
 const isDark = useDark()
+/** 做完的实心绿圈里的勾：暗色下主题绿很亮，白勾看不清 */
+const doneDotText = computed(() => (isDark.value ? 'rgba(0, 0, 0, 0.85)' : '#fff'))
 
 /**
- * 三种入口各一种底色（设计稿「上下文条与协作状态」）：课堂浅绿、专题浅蓝、比赛浅黄。
+ * 课堂、比赛在电脑上是左边的竖栏（课堂浅绿底、比赛浅黄底），专题是一条不带底色的细横条；
+ * 手机上三种都是横条（课堂浅绿、比赛浅黄）。
  * 字色在暗色下换成浅一档的，深绿、深蓝、深黄放在暗底上看不清
  */
 const tone = computed(() => ({
   lessonText: isDark.value ? theme.value.primaryColor : theme.value.primaryColorPressed,
-  setText: isDark.value ? '#8fb4ee' : '#1d4f9c',
-  setBar: isDark.value ? '#6f9be0' : '#2f6bc4',
   contestText: isDark.value ? '#f2c97d' : '#8a5200',
 }))
 const userStore = useUserStore()
@@ -241,8 +243,35 @@ onSolvedHere(() => {
 </script>
 
 <template>
-  <!-- 课堂 -->
-  <div v-if="lesson" class="context-bar lesson">
+  <!--
+    课堂（电脑）：左栏最左边一条竖栏，只写题号，题名鼠标停上去看（学生认题靠题号）。
+    不占高度：机房 1366×768 那种屏，顶上每省一行，题面和编辑器就多一行（设计稿「题目页观感」合一版）
+  -->
+  <nav v-if="lesson && !isMobile" class="lesson-rail" aria-label="这节课的题">
+    <div class="rail-head">
+      <span>这节课</span>
+      <b class="rail-done">{{ lesson.done }}/{{ lesson.total }}</b>
+      <span v-if="lessonStore.languageText" class="rail-lang">{{ lessonStore.languageText }}</span>
+    </div>
+    <router-link
+      v-for="(chip, index) in lesson.chips"
+      :key="chip.displayId"
+      :to="chip.to"
+      class="rail-item"
+      :class="[chip.status, { current: chip.displayId.toLowerCase() === currentId.toLowerCase() }]"
+      :title="chip.note ? `${chip.title}（${chip.note}）` : chip.title"
+      :aria-current="chip.displayId.toLowerCase() === currentId.toLowerCase() ? 'page' : undefined"
+    >
+      <span class="rail-dot">
+        <Icon v-if="chip.status === 'done'" icon="ph:check-bold" :width="14" />
+        <template v-else>{{ index + 1 }}</template>
+      </span>
+      <span class="rail-id">{{ chip.displayId }}</span>
+    </router-link>
+  </nav>
+
+  <!-- 课堂（手机）：一条横的 -->
+  <div v-else-if="lesson" class="context-bar lesson">
     <span class="lead lesson-lead"
       >这节课<template v-if="lessonStore.languageText"> · {{ lessonStore.languageText }}</template> 做完 {{ lesson.done }}/{{ lesson.total }}</span
     >
@@ -356,7 +385,37 @@ onSolvedHere(() => {
     </component>
   </div>
 
-  <!-- 比赛 -->
+  <!--
+    比赛（电脑）：和课堂一样是左边一条竖栏 —— 比赛一般 3 到 10 道题，题号一列摆得下。
+    顶上「‹ 比赛」回比赛页（比赛名鼠标停上去看）、还剩多久；底下「排名」（期中期末进行中不给）
+  -->
+  <nav v-else-if="contestBar && !isMobile" class="lesson-rail contest-rail" aria-label="比赛的题">
+    <router-link :to="contestBar.home" class="rail-back" :title="`回到比赛：${contestBar.title}`">
+      <Icon icon="ph:caret-left-bold" :width="12" aria-hidden="true" />比赛
+    </router-link>
+    <div class="rail-head">
+      <template v-if="contestBar.remaining">
+        <span>还剩</span>
+        <b class="rail-time">{{ contestBar.remaining }}</b>
+      </template>
+      <span v-else>{{ contestBar.notStarted ? '还没开始' : '已结束' }}</span>
+    </div>
+    <router-link
+      v-for="chip in contestBar.chips"
+      :key="chip.displayId"
+      :to="chip.to"
+      class="rail-item"
+      :class="[chip.status, { current: chip.displayId.toLowerCase() === currentId.toLowerCase() }]"
+      :title="chip.title"
+      :aria-current="chip.displayId.toLowerCase() === currentId.toLowerCase() ? 'page' : undefined"
+    >
+      <!-- 比赛题号本来就短（1、2、A），直接写在圈里；做对了圈涂绿、号还在，认得出是哪道 -->
+      <span class="rail-dot">{{ chip.displayId }}</span>
+    </router-link>
+    <router-link v-if="contestBar.rank" :to="contestBar.rank" class="rail-rank"> <Icon icon="ph:ranking" :width="18" aria-hidden="true" />排名 </router-link>
+  </nav>
+
+  <!-- 比赛（手机） -->
   <div v-else-if="contestBar" class="context-bar contest">
     <router-link :to="contestBar.home" class="back contest-back" :title="`回到比赛：${contestBar.title}`"> ‹ {{ contestBar.title }} </router-link>
     <ProblemChips :items="contestBar.chips" :current="currentId" variant="contest" />
@@ -371,6 +430,165 @@ onSolvedHere(() => {
 </template>
 
 <style scoped>
+/* 比赛竖栏：浅黄底，和课堂分得开 */
+.contest-rail {
+  background-color: rgba(208, 138, 28, 0.07);
+  border-right-color: rgba(208, 138, 28, 0.2);
+}
+
+.contest-rail .rail-item:hover {
+  background-color: rgba(208, 138, 28, 0.1);
+}
+
+.contest-rail .rail-dot {
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.rail-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: v-bind('tone.contestText');
+  text-decoration: none;
+}
+
+.rail-back:hover {
+  text-decoration: underline;
+}
+
+.rail-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: v-bind('tone.contestText');
+}
+
+.rail-rank {
+  margin-top: auto;
+  padding: 8px 0 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  color: v-bind('theme.textColor2');
+  text-decoration: none;
+}
+
+.rail-rank:hover {
+  color: v-bind('tone.contestText');
+}
+
+/* ==================== 课堂竖栏（电脑） ==================== */
+.lesson-rail {
+  width: 56px;
+  flex: none;
+  box-sizing: border-box;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background-color: rgba(24, 160, 88, 0.06);
+  border-right: 1px solid rgba(24, 160, 88, 0.14);
+}
+
+.rail-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: v-bind('theme.textColor3');
+}
+
+.rail-done {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: v-bind('tone.lessonText');
+}
+
+.rail-lang {
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 0;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: v-bind('theme.textColor2');
+  text-decoration: none;
+}
+
+.rail-item:hover {
+  background-color: rgba(24, 160, 88, 0.08);
+}
+
+.rail-item.current {
+  font-weight: 700;
+  color: v-bind('tone.lessonText');
+  background-color: v-bind('theme.bodyColor');
+  box-shadow: inset 3px 0 v-bind('theme.primaryColor');
+}
+
+.rail-id {
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-dot {
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1.5px solid rgba(128, 128, 128, 0.4);
+  background-color: v-bind('theme.bodyColor');
+  color: v-bind('theme.textColor2');
+}
+
+.done .rail-dot {
+  border-color: v-bind('theme.successColor');
+  background-color: v-bind('theme.successColor');
+  color: v-bind('doneDotText');
+}
+
+/* 做过没对：红圈，和题目列表的红「−」一个意思 */
+.tried .rail-dot {
+  border-color: v-bind('theme.errorColor');
+  color: v-bind('theme.errorColor');
+}
+
+.current .rail-dot {
+  border-width: 2px;
+  border-color: v-bind('theme.primaryColor');
+  color: v-bind('tone.lessonText');
+}
+
+.current.done .rail-dot {
+  color: v-bind('doneDotText');
+}
+
 .context-bar {
   height: 44px;
   flex: none;
@@ -390,10 +608,12 @@ onSolvedHere(() => {
   border-bottom-color: rgba(24, 160, 88, 0.18);
 }
 
+/* 专题：不带底色的一条细横条（设计稿「题目页观感」合一版）。专题可以有几十道题、还有「加入专题」，
+   竖栏放不下，留在页签行上面 */
 .problemset {
+  height: 40px;
   gap: 10px;
-  background-color: rgba(47, 107, 196, 0.06);
-  border-bottom-color: rgba(47, 107, 196, 0.16);
+  border-bottom-color: v-bind('theme.dividerColor');
 }
 
 .contest {
@@ -437,7 +657,7 @@ onSolvedHere(() => {
 }
 
 .set-back {
-  color: v-bind('tone.setText');
+  color: v-bind('theme.textColor1');
 }
 
 /* 比赛名不跟题号那段抢地方：题号多了本来就能横向滚，名字挤成两个字就认不出了 */
@@ -452,14 +672,14 @@ onSolvedHere(() => {
   width: 110px;
   height: 6px;
   border-radius: 3px;
-  background-color: rgba(47, 107, 196, 0.16);
+  background-color: rgba(128, 128, 128, 0.16);
   overflow: hidden;
 }
 
 .set-progress-fill {
   height: 100%;
   border-radius: 3px;
-  background-color: v-bind('tone.setBar');
+  background-color: v-bind('theme.primaryColor');
 }
 
 .countdown {
@@ -503,7 +723,7 @@ onSolvedHere(() => {
 }
 
 .problemset .step.forward {
-  color: v-bind('tone.setText');
+  color: v-bind('theme.textColor1');
 }
 
 .step:not(.disabled):hover {
