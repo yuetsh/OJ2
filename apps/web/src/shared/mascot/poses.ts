@@ -5,7 +5,8 @@ import type { MascotSituation } from './lines'
  * 看板娘的立绘：一个姿势一张图，按她当下在干什么、说的是哪一组话挑。
  *
  * 图取自 Sutera-Diffusus/dsh-whale-musume 的 assets/generated/（MIT，许可原文在
- * shared/assets/mascot/LICENSE），92 张全用上了。原图 512×512 透明底、人物站位一致：
+ * shared/assets/mascot/LICENSE），92 张用了 91 张：state-tool 那张跟别的不是一套画风，
+ * 原图就带着绿幕抠图的残边和左右两块硬切的碎片，没要。原图 512×512 透明底、人物站位一致：
  * 统一裁掉左右各 48 像素、缩到 2 倍显示尺寸（288×354）转 webp；左右放不下的那十几张
  * （钓鱼竿、扫帚、课桌……）整体缩小后放进同样大的框，脚底对齐。三张探头图另裁，见 PEEK_SIZE。
  * 文件按姿势起名，不按原文件名：换形象时同名换图就行。
@@ -79,7 +80,6 @@ export type MascotPose =
   | 'sneak'
   // 老师那边
   | 'lecture'
-  | 'tool'
   // 时间
   | 'coffee'
   | 'eat'
@@ -222,7 +222,7 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'problemset.unfinished': ['waiting'],
   'teacher.task.assigned': ['waiting', 'lecture'],
   'teacher.task.unassigned': ['empty'],
-  'teacher.problems': ['tool'],
+  'teacher.problems': ['review'],
   'teacher.task.errorPile': ['debug', 'review'],
   'teacher.task.stuck': ['sweat', 'thinking'],
   'teacher.task.stuckRise': ['shock', 'omg'],
