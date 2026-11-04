@@ -14,6 +14,9 @@
  * - 对学生按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）；
  *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
  * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
+ * - 一句一句地刷（两次点开隔不到 BURST_GAP_MS）：第 3 次起不耐烦、第 5 次起炸毛、第 7 次背过身去，
+ *   生 SULK_MS 的闷气，这期间点她只蹦不说话。生闷气时连点摸到头就哄好了。上线第一天六成的点开
+ *   离上一次不到 15 秒，学生是在刷台词，所以台词也按副牌抽（pick），一组听完才会重复。
  * - 彩蛋：连着快点，有时候（每轮三分之一的机会）点到第 4～8 下（也是随机的）会被摸摸头（同一个仓库的 assets/rua.gif），摸的时候接着点就一直摸。
  *
  * 位置只是这台电脑上的个人偏好，存 localStorage（读写都包 try/catch，拿不到就用默认位置）。
@@ -52,6 +55,12 @@ const OVERCLICK = 8 // 一轮连点到这么多下还没摸到头，她就嫌烦
 const QUIET_BUBBLE_MS = 5000 // 没有按钮的气泡（只是一句话）过这么久自己收起
 const SPOKEN_BUBBLE_MS = 10_000 // 她主动说的话，有按钮也过这么久收起：没人点她，不该一直挡着
 const SPEAK_GAP_MS = 3 * 60_000 // 主动开口至少隔这么久，课上别老打岔
+// 连着刷台词。门槛按上线第一天的数定的：隔不到 20 秒算一串的话，到 3 次的串有 129 串、到 5 次的 50、到 7 次的 23
+const BURST_GAP_MS = 20_000
+const PESTER_MILD = 3
+const PESTER_ANGRY = 5
+const SULK_AT = 7
+const SULK_MS = 30_000
 
 type HAnchor = 'left' | 'right' | null
 type VAnchor = 'top' | 'bottom' | null
@@ -89,6 +98,8 @@ const dragging = ref(false)
 const pressed = ref(false)
 const patting = ref(false)
 const flipped = ref(false)
+/** 生闷气：背过身去（镜像反过来），点她不说话 */
+const sulking = ref(false)
 const body = ref<HTMLElement>()
 const squashEl = ref<HTMLElement>()
 const bubbleEl = ref<HTMLElement>()
@@ -194,7 +205,12 @@ function onUp() {
 
   // 正在被摸，或者连点到数了：摸摸头，从这一下再摸满一轮
   if (patting.value || streak >= patClicks) {
-    if (!patting.value) {
+    if (!patting.value && sulking.value) {
+      // 生着闷气被摸了头：哄好了
+      endSulk()
+      say({ text: pick('sulk.forgive') })
+      logMascotEvent({ kind: 'pat', situation: 'sulk.forgive' })
+    } else if (!patting.value) {
       say({ text: pick('patting') })
       logMascotEvent({ kind: 'pat' })
     }
@@ -209,8 +225,8 @@ function onUp() {
   // 一轮里只有第一下开关气泡，后面连着点是在找彩蛋，不跟着一开一关
   if (streak === 1) toggleBubble()
   else if (streak === OVERCLICK) {
-    say({ text: pick('overclick') })
-    logMascotEvent({ kind: 'overclick' })
+    if (!sulking.value) say({ text: pick('overclick') })
+    logMascotEvent({ kind: 'overclick', situation: sulking.value ? 'sulk' : undefined })
   }
 }
 
@@ -247,13 +263,48 @@ function close() {
 
 function toggleBubble() {
   if (bubble.value) return close()
+  if (silent.value) return
   let guide = resolveGuide()
   if (!userStore.isTeacherOrAbove) guide = personalize(guide)
+  const serious = SERIOUS.has(guide.situation)
+  if (sulking.value) {
+    // 生着闷气只蹦一下。要紧的事（有人举手、卡住了）照说，气也就消了
+    if (!serious) return
+    endSulk()
+  }
+  const now = performance.now()
+  burst = now - lastOpenAt < BURST_GAP_MS ? burst + 1 : 1
+  lastOpenAt = now
+  if (!serious) guide = pester(guide)
   const text = pickFor(guide)
   say({ text, actions: guide.actions?.slice(0, 3), situation: guide.situation })
-  if (silent.value) return
+  if (guide.situation === 'sulk') startSulk()
   notePoke()
   logMascotEvent({ kind: 'open', situation: guide.situation, line: text })
+}
+
+// ---- 连着刷：越点越烦，点多了生闷气 ----
+let burst = 0
+let lastOpenAt = -Infinity
+let sulkTimer: ReturnType<typeof setTimeout> | undefined
+
+/** 按这一串点到第几次换成不耐烦、炸毛的话；页面的按钮照给，真有事的还能办。背过身去就不给了 */
+function pester(guide: MascotGuide): MascotGuide {
+  if (burst >= SULK_AT) return { situation: 'sulk' }
+  const situation = burst >= PESTER_ANGRY ? 'pester.angry' : burst >= PESTER_MILD ? 'pester.mild' : null
+  return situation ? { situation, actions: guide.actions } : guide
+}
+
+function startSulk() {
+  sulking.value = true
+  clearTimeout(sulkTimer)
+  sulkTimer = setTimeout(endSulk, SULK_MS)
+}
+
+function endSulk() {
+  sulking.value = false
+  burst = 0
+  clearTimeout(sulkTimer)
 }
 
 /** 先看全站的：没登录、老师这边有人举手；再问页面；都没有就打个招呼 */
@@ -268,12 +319,14 @@ function resolveGuide(): MascotGuide {
 
 /** 这几种情况要紧，不拿彩蛋换掉 */
 const SERIOUS = new Set<MascotSituation>(['guest', 'teacher.help', 'problem.stuck', 'first.meet'])
+/** 越说越烦的那几句也不拿彩蛋换：不然炸毛炸到一半突然「服务器繁忙」 */
+const PESTERED = new Set<MascotSituation>(['pester.mild', 'pester.angry', 'sulk'])
 const RARE_CHANCE = 0.03
 const TIME_CHANCE = 0.15
 
 function pickFor(guide: MascotGuide) {
   let situation = guide.situation
-  if (!SERIOUS.has(situation) && guide.n === undefined && !guide.vars) {
+  if (!SERIOUS.has(situation) && !PESTERED.has(situation) && guide.n === undefined && !guide.vars) {
     const timely = timeSituation()
     if (Math.random() < RARE_CHANCE) situation = 'rare'
     else if (timely && !userStore.isTeacherOrAbove && Math.random() < TIME_CHANCE) situation = timely
@@ -281,12 +334,25 @@ function pickFor(guide: MascotGuide) {
   return fillLine(pick(situation), guide)
 }
 
-/** 同一组里不连着抽到同一句 */
+/**
+ * 每组台词洗成一副牌，抽完再洗：一组听完之前不会重复。新洗的一副头一张不和上一句一样。
+ * 牌放在内存里，换页面不丢（看板娘挂在布局上），刷新才重洗
+ */
+const decks = new Map<MascotSituation, string[]>()
 let lastLine = ''
 function pick(situation: MascotSituation) {
-  const pool: readonly string[] = MASCOT_LINES[situation]
-  const choices = pool.length > 1 ? pool.filter((line) => line !== lastLine) : pool
-  lastLine = choices[Math.floor(Math.random() * choices.length)]!
+  let deck = decks.get(situation)
+  if (!deck?.length) {
+    deck = [...MASCOT_LINES[situation]]
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[deck[i], deck[j]] = [deck[j]!, deck[i]!]
+    }
+    // 从末尾往前抽，所以要错开的是最后一张
+    if (deck.length > 1 && deck[deck.length - 1] === lastLine) [deck[0], deck[deck.length - 1]] = [deck[deck.length - 1]!, deck[0]!]
+    decks.set(situation, deck)
+  }
+  lastLine = deck.pop()!
   return lastLine
 }
 
@@ -323,7 +389,7 @@ async function runAction(action: MascotAction) {
 let lastSpokeAt = -Infinity
 const spokenKeys = new Set<string>()
 watch(speechRequest, (speech) => {
-  if (!speech || silent.value || dragging.value || bubble.value || userStore.isTeacherOrAbove) return
+  if (!speech || silent.value || sulking.value || dragging.value || bubble.value || userStore.isTeacherOrAbove) return
   if (document.visibilityState !== 'visible' || spokenKeys.has(speech.key)) return
   if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
   lastSpokeAt = performance.now()
@@ -364,6 +430,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', settle)
   clearTimeout(patTimer)
   clearTimeout(quietTimer)
+  clearTimeout(sulkTimer)
 })
 </script>
 
@@ -372,7 +439,7 @@ onBeforeUnmount(() => {
     <div
       ref="body"
       class="body"
-      :class="{ pressed, patting, flipped }"
+      :class="{ pressed, patting, flipped: flipped !== sulking }"
       aria-hidden="true"
       @pointerdown="onDown"
       @pointermove="onMove"

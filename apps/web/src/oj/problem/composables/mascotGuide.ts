@@ -163,8 +163,10 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       return guide(failed, ...actions)
     }
 
-    if (problem.myStatus === SubmissionStatus.accepted) return guide('problem.solvedBefore', nextAction())
-    if (codeStore.code.value.trim().length < 10) return guide(entry.entry === 'problemset' ? 'problem.inSet' : 'problem.blank', runSamples, help)
+    // 这两种只说话、只留举手：上线第一天「做过了」的「下一道」没人点过，空着代码跑例子也没意义，
+    // 而空白页上「举手求助」是真有人点（不会下手）。没有按钮的气泡 5 秒自己收起，不一直挡着
+    if (problem.myStatus === SubmissionStatus.accepted) return guide('problem.solvedBefore')
+    if (codeStore.code.value.trim().length < 10) return guide(entry.entry === 'problemset' ? 'problem.inSet' : 'problem.blank', help)
     const classGuide = classSituation(lesson)
     if (classGuide?.situation === 'class.manyDone') return { ...guide('class.manyDone', runSamples, help), n: classGuide.n }
     return guide('problem.unsubmitted', runSamples, help)
