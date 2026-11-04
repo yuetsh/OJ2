@@ -10,7 +10,8 @@ import { useLeaveStudents } from 'shared/composables/leaveStudents'
 import { useTeacherHelp } from 'shared/composables/teacherHelp'
 import { useCollabStore } from 'shared/store/collab'
 import { useConfigStore } from 'shared/store/config'
-import { useMascotGuide } from 'shared/mascot/guide'
+import { requestSpeech } from 'shared/mascot/behavior'
+import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { errorMessage } from 'utils/api'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { parseTime } from 'utils/functions'
@@ -518,7 +519,62 @@ function submissionsHref(
  * 还没布置时填题号的框就是这页最大的东西，不给按钮
  */
 const startForm = useTemplateRef<{ openPicker: () => void }>('startForm')
-useMascotGuide(() => {
+// ---------- 看板娘：点她时挑全班这一刻最要紧的一件说；卡住的多起来、全班做完时她自己开口 ----------
+
+/** 同一种错有这么多人才算「扎堆」 */
+const PILE_MIN = 3
+/** 布置这么久了，人在线却一道没交，才算「没动」 */
+const IDLE_AFTER_MS = 10 * 60_000
+/** 一道题卡住的人涨到这么多，她主动说一声 */
+const STUCK_RISE = 3
+
+/** 人最多的那一堆错（灰底那几堆不算：不是今天的错，没得讲） */
+function biggestPile() {
+  let best: { index: number; kind: ErrorKind; people: WrongPerson[] } | null = null
+  const count = board.value?.problems.length ?? 0
+  for (let index = 0; index < count; index++) {
+    const groups = new Map<string, WrongPerson[]>()
+    for (const person of wrongOf(index)) {
+      if (QUIET_KINDS.has(person.kind.key)) continue
+      groups.set(person.kind.key, [...(groups.get(person.kind.key) ?? []), person])
+    }
+    for (const people of groups.values()) {
+      if (!best || people.length > best.people.length) best = { index, kind: people[0]!.kind, people }
+    }
+  }
+  return best && best.people.length >= PILE_MIN ? best : null
+}
+
+/** 卡住的人（cells.ts 的 isStuck），交得多的在前 */
+function stuckPeople() {
+  return present.value
+    .flatMap((student) => student.cells.map((cell, index) => ({ student, cell, index })))
+    .filter(({ cell, index }) => isStuck(cell, modeAt(index)))
+    .sort((a, b) => b.cell.attempts - a.cell.attempts)
+}
+
+/** 在线、今天一道没交、也不是早就全做完了的人 */
+function idlePeople() {
+  const assignedAt = board.value?.assignedAt
+  if (!assignedAt || Date.now() - Date.parse(assignedAt) < IDLE_AFTER_MS) return []
+  return present.value.filter(
+    (student) => student.online && student.cells.every((cell) => cell.attempts === 0) && student.cells.some((cell) => cell.status !== 'accepted'),
+  )
+}
+
+const allDone = () => present.value.length > 0 && present.value.every((student) => student.cells.every((cell) => cell.status === 'accepted'))
+
+/** 点名字：能讲的打开讲错误的弹层，不能讲的展开那道题的错法 */
+function lookAt(index: number, student: TaskBoardStudent): MascotAction {
+  const cell = student.cells[index]!
+  const problem = board.value!.problems[index]!
+  return {
+    label: `看 ${displayName(student.username)} 的`,
+    run: () => (explainable(cell, index) ? openExplain(index, student.userId) : (selectedId.value = problem.problemId)),
+  }
+}
+
+useMascotGuide((): MascotGuide | null => {
   const b = board.value
   if (!b?.className) return null
   if (needLesson.value)
@@ -531,8 +587,85 @@ useMascotGuide(() => {
     ...(language ? { language } : {}),
   }
   // 新标签打开，和点格子一样：任务页一般开着不关
-  const open = () => window.open(router.resolve({ name: 'submissions', query }).href, '_blank')
-  return { situation: 'teacher.task.assigned', actions: [{ label: '这节课的提交', run: open }] }
+  const submissions: MascotAction = { label: '这节课的提交', run: () => window.open(router.resolve({ name: 'submissions', query }).href, '_blank') }
+
+  if (allDone())
+    return { situation: 'teacher.task.allDone', actions: [{ label: b.source === 'teacher' ? '改题' : '布置', run: () => (editing.value = 'edit') }] }
+
+  const pile = biggestPile()
+  if (pile) {
+    const problem = b.problems[pile.index]!
+    const first = pile.people.find((person) => person.explain)
+    const actions: MascotAction[] = [{ label: '看这堆', run: () => (selectedId.value = problem.problemId) }]
+    if (first) actions.push({ label: '讲第一个', run: () => openExplain(pile.index, first.student.userId) })
+    return {
+      situation: 'teacher.task.errorPile',
+      n: pile.people.length,
+      vars: { pid: problem.problemDisplayId, kind: pile.kind.label },
+      actions: [...actions, submissions],
+    }
+  }
+
+  const stuck = stuckPeople()
+  if (stuck.length) {
+    const top = stuck[0]!
+    return {
+      situation: 'teacher.task.stuck',
+      n: new Set(stuck.map((it) => it.student.userId)).size,
+      vars: { name: displayName(top.student.username), k: top.cell.attempts, pid: b.problems[top.index]!.problemDisplayId },
+      actions: [lookAt(top.index, top.student), submissions],
+    }
+  }
+
+  const idle = idlePeople()
+  if (idle.length) {
+    const name = displayName(idle[0]!.username)
+    return idle.length === 1 ? { situation: 'teacher.task.idleOne', vars: { name } } : { situation: 'teacher.task.idle', n: idle.length, vars: { name } }
+  }
+
+  const challenging = present.value.filter((student) => student.cells.some((cell) => cell.challenge === 'doing')).length
+  if (challenging) return { situation: 'teacher.task.challenging', n: challenging, actions: [submissions] }
+
+  return { situation: 'teacher.task.assigned', actions: [submissions] }
+})
+
+/**
+ * 主动开口：每 15 秒刷新一次，和上一次比 —— 某道题卡住的人从不到 3 个涨到 3 个、全班刚做完。
+ * 刚打开页面（或换了班、换了一节）的那一次只记数不说，不然一刷新就把已经知道的事再说一遍
+ */
+let seen: { key: string; stuck: Map<number, number>; done: boolean } | null = null
+watch(board, (b) => {
+  if (!b?.className || needLesson.value) return
+  const key = `${b.className}|${b.day}|${b.lessonId ?? ''}|${b.problems.map((problem) => problem.problemId).join(',')}`
+  const stuck = new Map<number, number>()
+  for (const { index } of stuckPeople()) {
+    const id = b.problems[index]!.problemId
+    stuck.set(id, (stuck.get(id) ?? 0) + 1)
+  }
+  const done = allDone()
+  const before = seen?.key === key ? seen : null
+  seen = { key, stuck, done }
+  if (!before) return
+  if (done && !before.done) {
+    requestSpeech({
+      key: `done:${key}`,
+      situation: 'teacher.task.allDone',
+      actions: [{ label: b.source === 'teacher' ? '改题' : '布置', run: () => (editing.value = 'edit') }],
+    })
+    return
+  }
+  for (const [id, n] of stuck) {
+    if (n < STUCK_RISE || (before.stuck.get(id) ?? 0) >= STUCK_RISE) continue
+    const problem = b.problems.find((it) => it.problemId === id)!
+    requestSpeech({
+      key: `stuck:${key}:${id}`,
+      situation: 'teacher.task.stuckRise',
+      n,
+      vars: { pid: problem.problemDisplayId },
+      actions: [{ label: '看这道', run: () => (selectedId.value = id) }],
+    })
+    return
+  }
 })
 
 function lastText(student: TaskBoardStudent) {

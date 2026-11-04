@@ -457,7 +457,7 @@ async function runAction(action: MascotAction) {
 let lastSpokeAt = -Infinity
 const spokenKeys = new Set<string>()
 watch(speechRequest, (speech) => {
-  if (!speech || silent.value || sulking.value || dragging.value || bubble.value || userStore.isTeacherOrAbove) return
+  if (!speech || silent.value || sulking.value || dragging.value || bubble.value) return
   if (document.visibilityState !== 'visible' || spokenKeys.has(speech.key)) return
   if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
   lastSpokeAt = performance.now()

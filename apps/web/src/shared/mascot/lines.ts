@@ -123,6 +123,28 @@ export const MASCOT_LINES = {
   'teacher.home.assigned': ['这节课的提交，筛好了', '看看谁在摸鱼', '交上来不少了', '去看看', '有人卡住了吧'],
   'teacher.task.unassigned': ['空的。题自己选', '选几道吧', '五道以内，别太狠', '还没布置呢', '挑简单的先热身？'],
   'teacher.task.assigned': ['进度都在这', '谁在摸鱼，一目了然', '差不多该讲题了吧', '卡在同一道的有点多', '做完的可以加一道'],
+  // 课堂任务页：按全班这一刻的情况挑最要紧的一件（oj/task/index.vue）。名字是用户名（displayName）
+  'teacher.task.errorPile': [
+    '{pid} 上 {n} 个人都是「{kind}」',
+    '{n} 个人栽在同一个坑里：{pid}，{kind}',
+    '{pid} 的「{kind}」有 {n} 个，讲一遍？',
+    '同一种错 {n} 个人，在 {pid}',
+  ],
+  'teacher.task.stuck': [
+    '{name} 在 {pid} 上交了 {k} 次了',
+    '{n} 个人卡住了，{name} 交了 {k} 次',
+    '有人卡住了：{name}，{k} 次',
+    '去看看 {name} 吧，{pid} 交了 {k} 次',
+  ],
+  'teacher.task.idle': ['{n} 个人在线，一道还没交', '{name} 等 {n} 个人还没动', '开着页面没交的有 {n} 个'],
+  'teacher.task.idleOne': ['{name} 在线，一道还没交', '{name} 还没动呢', '{name} 开着页面，没交'],
+  'teacher.task.allDone': ['全班都做完了，再加一道？', '都做完了……还挺快', '没题做了，再布置点？', '全做对了，可以收工了'],
+  'teacher.task.challenging': ['{n} 个做完的在做挑战', '做完的 {n} 个人在挑战，没闲着', '{n} 个人做完了还在挑战'],
+  // 她主动说的：一道题卡住的人涨到 3 个
+  'teacher.task.stuckRise': ['{pid} 上卡住 {n} 个了', '{n} 个人卡在 {pid}，要不要讲一下', '{pid} 卡住的人多起来了，{n} 个'],
+  // 老师首页：这节课的进度
+  'teacher.home.progress': ['{cls}：{done}/{total} 人做完了', '{cls} 做完 {done} 个，还差 {left} 个', '{cls} 这节课 {done}/{total}'],
+  'teacher.home.progressDone': ['{cls} 全做完了', '{cls} 都做对了，还挺快'],
   'teacher.statistics': ['看完记得夸夸学生', '数字好看吗', '别只看平均数', '有进步的，夸一句', '这节课还行吧'],
   'teacher.submissions': ['筛这节课的？', '想看谁的', '错的多的先看', '一条条看，辛苦了', '重判之前想清楚'],
   'teacher.problem': ['全班做得怎样，不看看？', '难不难，数据说了算', '又在看题？', '要改题？', '这题错的人不少'],

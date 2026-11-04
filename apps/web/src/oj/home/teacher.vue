@@ -77,8 +77,15 @@ useMascotGuide(() => {
   const row = assigned.find((it) => stateOf(it).live) ?? assigned[0]
   if (!row) return { situation: 'teacher.home.unassigned', actions: [goAction(router, '布置题目', '/task')] }
   const query = { className: row.className, problem: row.problems.map((problem) => problem.problemDisplayId).join(','), today: '1' }
+  // 有人交过了就说这节课做完几个，还没人交就照旧那几句
+  const progress = row.activeCount
+    ? {
+        situation: row.allDoneCount >= row.rosterCount ? ('teacher.home.progressDone' as const) : ('teacher.home.progress' as const),
+        vars: { cls: classLabel(row.className), done: row.allDoneCount, total: row.rosterCount, left: row.rosterCount - row.allDoneCount },
+      }
+    : { situation: 'teacher.home.assigned' as const }
   return {
-    situation: 'teacher.home.assigned',
+    ...progress,
     actions: [
       { label: '这节课的提交', run: () => router.push({ name: 'submissions', query }) },
       { label: '课堂任务', run: () => openTask(row) },
