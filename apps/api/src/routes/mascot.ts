@@ -47,7 +47,8 @@ const MEMORY_DAYS = 7
 
 /** 几个东八区日历日以前；不在 MEMORY_DAYS 以内、或之后已经说过那句了，就是 null */
 function daysAgo(at: string | null, saidAt: string | null) {
-  if (!at || (saidAt && saidAt > at)) return null
+  // 按时刻比，别按字符串：库里出来的带微秒、位数不一定一样
+  if (!at || (saidAt && Date.parse(saidAt) > Date.parse(at))) return null
   const days = dayNumber(calendarDay()) - dayNumber(calendarDay(at))
   return days >= 1 && days <= MEMORY_DAYS ? days : null
 }
@@ -90,7 +91,7 @@ async function memoryOf(userId: number) {
     grudgeDaysAgo: daysAgo(row?.sulk_at ?? null, row?.grudge_at ?? null),
     patDaysAgo: daysAgo(row?.pat_at ?? null, row?.pat_said_at ?? null),
     solvedBeforeToday: row?.solved_before ?? 0,
-    closerSaidToday: !!row?.closer_at && row.closer_at >= today,
+    closerSaidToday: !!row?.closer_at && Date.parse(row.closer_at) >= Date.parse(today),
   }
 }
 

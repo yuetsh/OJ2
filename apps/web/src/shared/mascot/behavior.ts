@@ -137,8 +137,14 @@ function affinitySituation(tier: number): MascotSituation {
   return `affinity.${level}` as MascotSituation
 }
 
-/** 这一页会话里翻过的旧账：说完到下次拉回新数之间别再说一遍 */
-const memorySaid = new Set<'closer' | 'grudge' | 'pat'>()
+/**
+ * 这一页会话里翻过的旧账：说完到下次拉回新数之间别再说一遍。真说出口了才记（noteMemorySaid），
+ * 被生闷气、越点越烦顶掉的不算
+ */
+const memorySaid = new Set<MascotSituation>()
+export function noteMemorySaid(situation: MascotSituation) {
+  if (situation.startsWith('memory.')) memorySaid.add(situation)
+}
 
 function whenText(days: number) {
   return days === 1 ? '昨天' : days === 2 ? '前天' : '前几天'
@@ -147,16 +153,13 @@ function whenText(days: number) {
 /** 跨天记得的事，有就挑一件：今天升档 > 被惹生气 > 被摸头。每件只翻一次（后端看说没说过） */
 function memoryGuide(profile: MascotProfile): Pick<MascotGuide, 'situation' | 'vars'> | null {
   const memory = profile.memory
-  if (!memory.closerSaidToday && !memorySaid.has('closer') && tierOf(memory.solvedBeforeToday) < tierOf(profile.solved)) {
-    memorySaid.add('closer')
+  if (!memory.closerSaidToday && !memorySaid.has('memory.closer') && tierOf(memory.solvedBeforeToday) < tierOf(profile.solved)) {
     return { situation: 'memory.closer' }
   }
-  if (memory.grudgeDaysAgo !== null && !memorySaid.has('grudge')) {
-    memorySaid.add('grudge')
+  if (memory.grudgeDaysAgo !== null && !memorySaid.has('memory.grudge')) {
     return { situation: 'memory.grudge', vars: { when: whenText(memory.grudgeDaysAgo) } }
   }
-  if (memory.patDaysAgo !== null && !memorySaid.has('pat')) {
-    memorySaid.add('pat')
+  if (memory.patDaysAgo !== null && !memorySaid.has('memory.pat')) {
     return { situation: 'memory.pat', vars: { when: whenText(memory.patDaysAgo) } }
   }
   return null

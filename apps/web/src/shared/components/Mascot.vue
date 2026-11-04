@@ -30,7 +30,7 @@ import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import { dailyPose, festivalPose, napPose, PEEK_SIZE, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
-import { affinityTier, logMascotEvent, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
+import { affinityTier, logMascotEvent, noteMemorySaid, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
@@ -320,17 +320,19 @@ function close() {
 function toggleBubble() {
   if (bubble.value) return close()
   if (silent.value) return
-  if (napping.value) {
-    // 睡着了被点醒：先说这一句，再点才说正事
-    napping.value = false
-    const text = pick('wake')
-    say({ text, pose: situationPose('wake'), situation: 'wake' })
-    logMascotEvent({ kind: 'open', situation: 'wake', line: text })
-    return
-  }
   let guide = resolveGuide()
   if (!userStore.isTeacherOrAbove) guide = personalize(guide)
   const serious = SERIOUS.has(guide.situation)
+  if (napping.value) {
+    napping.value = false
+    // 睡着了被点醒：先说这一句，再点才说正事。要紧的事（有人举手、卡住了）直接说
+    if (!serious) {
+      const text = pick('wake')
+      say({ text, pose: situationPose('wake'), situation: 'wake' })
+      logMascotEvent({ kind: 'open', situation: 'wake', line: text })
+      return
+    }
+  }
   if (sulking.value) {
     // 生着闷气只蹦一下。要紧的事（有人举手、卡住了）照说，气也就消了
     if (!serious) return
@@ -343,6 +345,7 @@ function toggleBubble() {
   const { text, situation } = pickFor(guide)
   say({ text, actions: guide.actions?.slice(0, 3), situation: guide.situation, pose: situationPose(situation) })
   if (guide.situation === 'sulk') startSulk()
+  noteMemorySaid(guide.situation)
   notePoke()
   logMascotEvent({ kind: 'open', situation: guide.situation, line: text })
 }
@@ -459,6 +462,7 @@ watch(speechRequest, (speech) => {
   if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
   lastSpokeAt = performance.now()
   spokenKeys.add(speech.key)
+  napping.value = false
   const text = fillLine(pick(speech.situation), speech)
   say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
   logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
@@ -483,6 +487,9 @@ watch(silent, (quiet) => quiet && close())
 /** 她靠上时气泡往下冒，免得顶出屏幕；在左半边时气泡贴左对齐 */
 const bubbleBelow = computed(() => pos.y < 220)
 const bubbleLeft = computed(() => (peek.value ? peek.value === 'left' : flipped.value))
+/** 气泡尖角离气泡那一侧多远，对着她的头：全身和下边探头是 50，左右探头的框窄，头更靠边 */
+const TAIL_OFFSET: Record<PeekSide | 'full', number> = { full: 50, bottom: 50, left: 24, right: 16 }
+const tailOffset = computed(() => `${TAIL_OFFSET[peek.value ?? 'full']}px`)
 
 // 告诉别的浮层她在哪（成就弹框会让开）
 watchEffect(() => Object.assign(mascotBox, { x: pos.x, y: pos.y, width: size.value.width, height: size.value.height }))
@@ -526,8 +533,12 @@ useIntervalFn(() => {
     idlePose.value = dailyPose(Date.now(), timeSituation() === 'offHours')
   }
 }, 30_000)
-// 进了比赛就回平时那张
-watch(silent, (quiet) => quiet && touched())
+// 进了比赛就醒过来、回平时那张（比赛里点她不说话，不先醒就一直睡着）
+watch(silent, (quiet) => {
+  if (!quiet) return
+  napping.value = false
+  touched()
+})
 watch(napping, (asleep) => !asleep && touched())
 
 /**
@@ -536,32 +547,38 @@ watch(napping, (asleep) => !asleep && touched())
  */
 const shownSrc = ref(poseUrl(pose.value))
 const ready = new Set<string>([shownSrc.value])
-function preload(url: string) {
-  if (ready.has(url)) return Promise.resolve()
+/** 下好、解码完是 true；没下到（断网、部署后老页面拿旧地址 404）是 false，下次用到再试 */
+function preload(url: string): Promise<boolean> {
+  if (ready.has(url)) return Promise.resolve(true)
   const img = new Image()
   img.src = url
-  return img
-    .decode()
-    .catch(() => {})
-    .then(() => {
+  return img.decode().then(
+    () => {
       ready.add(url)
-    })
+      return true
+    },
+    () => false,
+  )
 }
 watch(
   () => poseUrl(pose.value),
   (url) => {
     if (ready.has(url)) shownSrc.value = url
-    else preload(url).then(() => poseUrl(pose.value) === url && (shownSrc.value = url))
+    // 没下到就接着显示上一张，别换成空白
+    else preload(url).then((ok) => ok && poseUrl(pose.value) === url && (shownSrc.value = url))
   },
 )
 // 按下去就该换「被拎起来」、连点就该换「被摸」，等那一下再下就慢了：进页面闲下来以后先把这两张下好
-const PRELOAD_POSES: MascotPose[] = ['lifted', 'tail-grabbed', 'patted']
+// 三张探头图也先下：缩进边上时框立刻变窄，图没到的话全身那张会挤在窄框里（下面 object-fit 兜着不变形）
+const PRELOAD_POSES: MascotPose[] = ['lifted', 'tail-grabbed', 'patted', 'peek-bottom', 'peek-left', 'peek-right']
 
 onMounted(() => {
   window.addEventListener('resize', settle, { passive: true })
   mascotBox.shown = true
-  // 机房 Chrome 105 有 requestIdleCallback；闲不下来最多等 5 秒
-  requestIdleCallback(() => PRELOAD_POSES.forEach((it) => preload(poseUrl(it))), { timeout: 5000 })
+  // 机房 Chrome 105 有 requestIdleCallback，iPad 上的 Safari 没有（宽屏也算电脑）；闲不下来最多等 5 秒
+  const warm = () => PRELOAD_POSES.forEach((it) => preload(poseUrl(it)))
+  if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 5000 })
+  else setTimeout(warm, 2000)
 })
 onBeforeUnmount(() => {
   mascotBox.shown = false
@@ -598,7 +615,14 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <Transition name="bubble">
-      <div v-if="bubble && !dragging" ref="bubbleEl" class="bubble" :class="{ below: bubbleBelow, left: bubbleLeft }" role="status">
+      <div
+        v-if="bubble && !dragging"
+        ref="bubbleEl"
+        class="bubble"
+        :class="{ below: bubbleBelow, left: bubbleLeft }"
+        :style="{ '--tail': tailOffset }"
+        role="status"
+      >
         <p class="line">{{ bubble.text }}</p>
         <div v-if="bubble.actions?.length" class="actions">
           <n-button
@@ -660,7 +684,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 10px;
 }
-:global(html.dark) .bubble {
+/* 别写成 :global(html.dark) .bubble：scoped 会把后半截丢掉，编译成只剩 html.dark，深色从来没生效过 */
+html.dark .bubble {
   --bubble-line: #7f94d4;
   --bubble-bg: #1f2230;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -668,7 +693,7 @@ onBeforeUnmount(() => {
 .bubble::after {
   content: '';
   position: absolute;
-  right: 50px;
+  right: var(--tail);
   bottom: -9px;
   width: 14px;
   height: 14px;
@@ -683,7 +708,7 @@ onBeforeUnmount(() => {
 }
 .bubble.left::after {
   right: auto;
-  left: 50px;
+  left: var(--tail);
 }
 .bubble.below {
   bottom: auto;
@@ -754,6 +779,8 @@ onBeforeUnmount(() => {
 
 img {
   display: block;
+  object-fit: contain;
+  object-position: 50% 100%;
   pointer-events: none;
   -webkit-user-drag: none;
 }
