@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { clearErrorMark, showErrorMark } from 'oj/problem/utils/errorMark'
 import { explainRuntimeError, type RuntimeErrorInfo } from 'oj/problem/utils/runtimeError'
+import SectionHead from './SectionHead.vue'
 
 /**
- * 运行时错误的中文说明卡片（诊断由后端 judge/runtime-diagnosis.ts 给）。
+ * 运行时错误的中文说明（诊断由后端 judge/runtime-diagnosis.ts 给）。
  * 知道是第几行的，就把那一行代码摆出来，并在编辑器里标红；卸掉时清掉标记。
  */
 const props = defineProps<{
@@ -34,34 +35,50 @@ onUnmounted(clearErrorMark)
 </script>
 
 <template>
-  <n-card embedded class="explain-card">
-    <n-flex vertical :size="12">
-      <div class="explain">
-        <b v-if="info.line">第 {{ info.line }} 行运行时出错：</b>{{ message }}
-      </div>
-      <pre v-if="sourceLine" class="explain-code">{{ sourceLine }}</pre>
-    </n-flex>
-  </n-card>
+  <!-- 设计稿「题目页观感」结果 X：黄色小节标题说第几行，正文大小的中文说明，再把那一行代码摆出来 -->
+  <div class="explain-section">
+    <SectionHead icon="problem" tone="amber">{{ info.line ? `第 ${info.line} 行出错` : '程序跑到一半出错了' }}</SectionHead>
+    <p class="explain">{{ message }}</p>
+    <div v-if="sourceLine" class="explain-code">
+      <span class="line-no">{{ info.line }}</span>
+      <pre>{{ sourceLine }}</pre>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-/* 结果弹窗不限宽，长句子不折行会把弹窗撑出屏幕 */
-.explain-card {
-  max-width: 560px;
-}
-
 .explain {
+  margin: 0 0 10px;
   font-size: 16px;
-  line-height: 1.7;
+  line-height: 1.75;
 }
 
+/* 出错的那一行：红底，前面写行号，和编辑器里标红的那一行对得上 */
 .explain-code {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background-color: rgba(208, 48, 80, 0.06);
+  border: 1px solid rgba(208, 48, 80, 0.24);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.line-no {
+  flex: none;
+  font-weight: 700;
+  color: #d03050;
+}
+
+.explain-code pre {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 15px;
+  font: inherit;
   white-space: pre-wrap;
   word-break: break-all;
-  background-color: rgba(208, 48, 80, 0.12);
 }
 </style>

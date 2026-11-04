@@ -16,6 +16,7 @@ import RuntimeErrorExplain from './RuntimeErrorExplain.vue'
 import WrongAnswerExplain from './WrongAnswerExplain.vue'
 import LessonNext from './LessonNext.vue'
 import ResultHeader from './ResultHeader.vue'
+import SectionHead from './SectionHead.vue'
 import SimilarProblems from './SimilarProblems.vue'
 import ChallengeList from './ChallengeList.vue'
 import ChallengeOutcome from './ChallengeOutcome.vue'
@@ -361,22 +362,30 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       </div>
     </template>
     <div v-show="!waitingReveal">
-      <n-flex vertical v-if="compileError || runtimeError || sampleCheck || msg || infoTable.length || submission.statisticInfo?.ast_results?.length">
+      <n-flex
+        vertical
+        :size="20"
+        v-if="compileError || runtimeError || sampleCheck || msg || infoTable.length || submission.statisticInfo?.ast_results?.length"
+      >
         <CompileErrorExplain v-if="compileError" :err-info="compileError" :language="submission.language" />
         <RuntimeErrorExplain v-if="runtimeError" :info="runtimeError" :code="submission.code" />
-        <WrongAnswerExplain v-if="sampleCheck" full :check="sampleCheck" :code="submission.code" :language="submission.language" />
-        <n-card v-if="submission.statisticInfo?.ast_results?.length" embedded>
-          <n-flex vertical :size="8">
-            <n-flex v-for="(rule, i) in submission.statisticInfo.ast_results" :key="i" align="center" :size="6">
-              <n-icon :color="rule.passed ? theme.successColor : theme.errorColor">
-                <Icon :icon="rule.passed ? 'ph:check-bold' : 'ph:x-bold'" />
-              </n-icon>
+        <WrongAnswerExplain v-if="sampleCheck" full section :check="sampleCheck" :code="submission.code" :language="submission.language" />
+        <!-- 语法要求逐条对没对：和题面的「语法要求」同一个黄色小节标题 -->
+        <section v-if="submission.statisticInfo?.ast_results?.length">
+          <SectionHead icon="rules" tone="amber">语法要求</SectionHead>
+          <ul class="ast-rules">
+            <li v-for="(rule, i) in submission.statisticInfo.ast_results" :key="i">
+              <Icon
+                :icon="rule.passed ? 'ph:check-circle-fill' : 'ph:x-circle-fill'"
+                :width="17"
+                :color="rule.passed ? theme.successColor : theme.errorColor"
+              />
               <span>{{ rule.description }}</span>
               <!-- 次数类规则光说「出现 2 次 ✗」，学生不知道自己写了几次 -->
               <span v-if="!rule.passed && rule.actual !== undefined" :style="{ color: theme.errorColor }"> 当前 {{ rule.actual }} 次 </span>
-            </n-flex>
-          </n-flex>
-        </n-card>
+            </li>
+          </ul>
+        </section>
         <n-card v-if="msg" embedded class="msg">{{ msg }}</n-card>
         <n-data-table v-if="infoTable.length" striped :data="infoTable" :columns="columns" />
       </n-flex>
@@ -386,7 +395,10 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
       问过之后，AI 的回答才放进卡片
     -->
       <div v-if="(showAIHint && !hintTarget) || customRunHint" class="actions">
-        <n-button v-if="showAIHint && !hintTarget" type="primary" ghost :loading="hintLoading" @click="fetchHint(submission.id)"> 让 AI 分析我的代码 </n-button>
+        <n-button v-if="showAIHint && !hintTarget" type="primary" secondary :loading="hintLoading" @click="fetchHint(submission.id)">
+          <template #icon><Icon icon="ph:sparkle-fill" /></template>
+          让 AI 分析我的代码
+        </n-button>
         <n-button v-if="customRunHint" text type="primary" @click="submissionStore.revealResult('custom')">
           {{ customRunHint }}
         </n-button>
@@ -425,7 +437,24 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 16px;
-  margin-top: 12px;
+  margin-top: 16px;
+}
+
+.ast-rules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.ast-rules li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 手机上「让 AI 分析我的代码」占满一行、44px 高，好按 */

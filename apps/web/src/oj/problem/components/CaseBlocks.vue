@@ -71,8 +71,8 @@ const label = computed(() => {
 }
 
 .block {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 4px;
   box-sizing: border-box;
   display: inline-flex;

@@ -6,6 +6,7 @@ import { applyFixes, clearErrorMark, currentCode, showErrorMark, showPunctuation
 import { explainCCompileError } from 'oj/problem/utils/cError'
 import { explainPythonCompileError } from 'utils/pythonError'
 import { stripJudgePath } from 'utils/judge'
+import SectionHead from './SectionHead.vue'
 
 /**
  * 编译错误的中文说明卡片：Python 的语法错误走 pythonError.ts，C / C++ 的 gcc 报错走
@@ -80,17 +81,17 @@ onUnmounted(clearErrorMark)
 </script>
 
 <template>
-  <div class="explain-card">
+  <!-- 设计稿「题目页观感」结果 X：黄色小节标题说第几行，正文大小的中文说明；那一行编辑器里已经标红了 -->
+  <div class="explain-section">
     <template v-if="explanation">
-      <p class="explain">
-        <b v-if="explanation.line">第 {{ explanation.line }} 行：</b>{{ explanation.message }}
-      </p>
+      <SectionHead icon="problem" tone="amber">{{ explanation.line ? `第 ${explanation.line} 行` : '代码的格式写错了' }}</SectionHead>
+      <p class="explain">{{ explanation.message }}</p>
       <p v-if="otherPunctuationLines.length" class="explain other">第 {{ otherPunctuationLines.join('、') }} 行也有中文标点，编辑器里都标出来了。</p>
-      <div v-if="explanation.punctuation">
+      <div v-if="explanation.punctuation" class="fix">
         <n-button v-if="punctuationFixCount" type="primary" @click="fixPunctuation"> 把中文标点都换成英文（{{ punctuationFixCount }} 处） </n-button>
         <n-text v-else-if="fixedCount" type="success"> 换好了 {{ fixedCount }} 处，再提交一次试试。 </n-text>
       </div>
-      <n-collapse>
+      <n-collapse class="raw-collapse">
         <n-collapse-item title="原始报错（英文）" name="raw">
           <div class="raw">{{ rawError }}</div>
         </n-collapse-item>
@@ -98,6 +99,7 @@ onUnmounted(clearErrorMark)
     </template>
     <!-- 翻译表没覆盖到的句式（生产数据里约 0.3%）：照旧给原文 -->
     <template v-else>
+      <SectionHead icon="problem" tone="amber">代码的格式写错了</SectionHead>
       <p class="explain">请仔细检查，看看代码的格式是不是写错了！</p>
       <div class="raw">{{ rawError }}</div>
     </template>
@@ -105,25 +107,24 @@ onUnmounted(clearErrorMark)
 </template>
 
 <style scoped>
-/* 和答错的说明同一种浅灰卡片（设计稿「语法没过」） */
-.explain-card {
-  padding: 12px 14px;
-  border-radius: 6px;
-  background-color: rgba(128, 128, 128, 0.06);
-  border: 1px solid v-bind('theme.dividerColor');
+.explain-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .explain {
-  margin: 0;
-  line-height: 1.7;
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.75;
 }
 
 .explain.other {
   font-size: 14px;
   color: v-bind('theme.textColor2');
+}
+
+.fix {
+  margin-bottom: 10px;
 }
 
 .raw {

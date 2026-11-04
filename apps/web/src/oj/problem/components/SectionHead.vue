@@ -5,9 +5,23 @@ import { Icon } from '@iconify/vue'
  * （「自己输入数据试试 ›」「放大看 ›」）。设计稿「题目页观感」⑦，2026-11-04 定。
  *
  * 语法要求、提示用黄色：一个是硬性条件、一个是帮忙的话，扫一眼要能和别的节分开。
+ * 结果页签里「例子 1 没对上」「第 2 行出错」这类说哪里不对的也用黄色（设计稿结果 X）。
  * 明暗两套色都在 CSS 里（html.dark），别在这里调 useDark() —— 理由见 ProblemTypeTag。
  */
-export type SectionIcon = 'description' | 'input' | 'output' | 'samples' | 'hint' | 'rules' | 'table' | 'expected' | 'flowchart' | 'similar'
+export type SectionIcon =
+  | 'description'
+  | 'input'
+  | 'output'
+  | 'samples'
+  | 'hint'
+  | 'rules'
+  | 'table'
+  | 'expected'
+  | 'flowchart'
+  | 'similar'
+  | 'problem'
+  | 'next'
+  | 'challenge'
 
 const ICON: Record<SectionIcon, string> = {
   description: 'ph:book-open',
@@ -20,6 +34,10 @@ const ICON: Record<SectionIcon, string> = {
   expected: 'ph:check-circle',
   flowchart: 'ph:flow-arrow',
   similar: 'ph:shuffle-angular',
+  // 结果页签：哪里不对、接着做、还能挑战
+  problem: 'ph:warning-circle',
+  next: 'ph:arrow-right',
+  challenge: 'ph:target',
 }
 
 const { icon, tone = 'green' } = defineProps<{

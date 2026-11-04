@@ -103,22 +103,14 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
     </ResultHeader>
 
     <template v-if="current">
-      <!-- 对上了：三栏摆出来就行 -->
+      <!-- 对上了：输入、正确输出、你的输出竖着摆出来就行，你的输出也是绿的 -->
       <div v-if="current.result === SubmissionStatus.accepted" class="passed-card">
-        <div class="blocks">
-          <div class="block">
-            <div class="label">输入</div>
-            <pre>{{ current.input }}</pre>
-          </div>
-          <div class="block">
-            <div class="label">正确输出</div>
-            <pre>{{ current.expected }}</pre>
-          </div>
-          <div class="block">
-            <div class="label">你的输出</div>
-            <pre>{{ current.output }}</pre>
-          </div>
-        </div>
+        <span class="label">输入</span>
+        <pre class="pane in">{{ current.input }}</pre>
+        <span class="label">正确输出</span>
+        <pre class="pane ok">{{ current.expected }}</pre>
+        <span class="label">你的输出</span>
+        <pre class="pane ok">{{ current.output }}</pre>
       </div>
       <!-- 跑完了、输出对不上：和判完之后同一套说明 -->
       <WrongAnswerExplain
@@ -134,6 +126,7 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
         :code="samplesCode?.value ?? ''"
         :language="samplesCode?.language ?? ''"
         :plain="inContest"
+        section
       />
       <!-- 没跑完：编译不过、运行出错、超时 -->
       <TrialErrorNote
@@ -165,15 +158,16 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
 }
 
 .run {
-  height: 26px;
+  height: 28px;
   box-sizing: border-box;
   padding: 0 10px;
-  border-radius: 13px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   gap: 4px;
   font: inherit;
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -189,56 +183,58 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
   color: v-bind('theme.errorColorPressed');
 }
 
-.run.active {
-  font-weight: 600;
-  border-width: 1.5px;
-}
-
+/* 选中的那个涂实心：设计稿「运行例子」 */
 .run.ok.active {
   border-color: v-bind('theme.successColor');
+  background-color: v-bind('theme.successColor');
+  color: #fff;
 }
 
 .run.bad.active {
   border-color: v-bind('theme.errorColor');
+  background-color: v-bind('theme.errorColor');
+  color: #fff;
 }
 
+/* 对上了：和答错时同一张两列的网格（标签 | 格子），只是你的输出也是绿的 */
 .passed-card {
-  padding: 12px 14px;
-  border-radius: 6px;
-  background-color: rgba(128, 128, 128, 0.06);
-  border: 1px solid v-bind('theme.dividerColor');
-}
-
-.blocks {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.block {
-  min-width: 0;
-  padding: 6px 10px 8px;
-  border-radius: 5px;
-  background-color: v-bind('theme.cardColor');
-  border: 1px solid v-bind('theme.dividerColor');
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: start;
 }
 
 .label {
-  font-size: 12px;
-  opacity: 0.7;
-  margin-bottom: 4px;
+  font-size: 13px;
+  line-height: 36px;
+  white-space: nowrap;
+  color: v-bind('theme.textColor3');
 }
 
-.block pre {
+.pane {
+  min-width: 0;
   margin: 0;
+  padding: 5px 10px;
+  border-radius: 6px;
   white-space: pre-wrap;
   word-break: break-all;
-  font-family: Monaco, Consolas, monospace;
-  font-size: 14px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.pane.in {
+  background-color: rgba(128, 128, 128, 0.07);
+  border: 1px solid rgba(128, 128, 128, 0.14);
+}
+
+.pane.ok {
+  background-color: rgba(24, 160, 88, 0.08);
+  border: 1px solid rgba(24, 160, 88, 0.26);
 }
 
 .note {
-  margin: 12px 0 0;
+  margin: 16px 0 0;
   font-size: 13px;
   color: v-bind('theme.textColor3');
 }

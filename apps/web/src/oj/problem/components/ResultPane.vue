@@ -74,20 +74,22 @@ function pick(segment: Segment) {
 <template>
   <FlowchartResult v-if="drawing" />
   <div v-show="!drawing" class="result-pane">
-    <!-- 设计稿：三个胶囊，选中的深色实心，带上那次结果的时间 -->
-    <div v-if="showSegments" class="segments" role="tablist" aria-label="结果">
-      <button
-        v-for="segment in segments"
-        :key="segment.value"
-        type="button"
-        role="tab"
-        class="segment"
-        :class="{ active: isActive(segment.value) }"
-        :aria-selected="isActive(segment.value)"
-        @click="pick(segment.value)"
-      >
-        {{ segment.label }}<template v-if="segment.time"> · {{ segment.time }}</template>
-      </button>
+    <!-- 三个分段，带上那次结果的时间 -->
+    <div v-if="showSegments" class="segments">
+      <div class="segment-track" role="tablist" aria-label="结果">
+        <button
+          v-for="segment in segments"
+          :key="segment.value"
+          type="button"
+          role="tab"
+          class="segment"
+          :class="{ active: isActive(segment.value) }"
+          :aria-selected="isActive(segment.value)"
+          @click="pick(segment.value)"
+        >
+          {{ segment.label }}<span v-if="segment.time" class="segment-time">{{ segment.time }}</span>
+        </button>
+      </div>
       <span v-if="resultSegment === 'custom'" class="segment-note">自己编数据试试，这里不判对错</span>
     </div>
 
@@ -116,35 +118,53 @@ function pick(segment: Segment) {
   padding-bottom: 16px;
 }
 
+/* 设计稿「题目页观感」结果 X：浅灰底的分段按钮，选中的白底加粗（和工具栏「写代码 / 画流程图」一个样子） */
 .segments {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.segment-track {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background-color: rgba(128, 128, 128, 0.12);
 }
 
 .segment {
   height: 28px;
   padding: 0 12px;
   border: 0;
-  border-radius: 15px;
-  background-color: rgba(128, 128, 128, 0.12);
+  border-radius: 6px;
+  background: transparent;
   color: v-bind('theme.textColor2');
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
+.segment-time {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  color: v-bind('theme.textColor3');
+}
+
 .segment-note {
-  margin-left: auto;
-  align-self: center;
   font-size: 13px;
   color: v-bind('theme.textColor3');
 }
 
 .segment.active {
-  background-color: v-bind('theme.textColor1');
-  color: v-bind('theme.cardColor');
+  background-color: v-bind('theme.cardColor');
+  color: v-bind('theme.textColor1');
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .formatted {

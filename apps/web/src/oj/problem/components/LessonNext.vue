@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SectionHead from './SectionHead.vue'
 import { useThemeVars } from 'naive-ui'
 import { useLessonStore } from 'shared/store/lesson'
 import ChallengeList from './ChallengeList.vue'
@@ -44,16 +45,17 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
 </script>
 
 <template>
-  <!-- 设计稿「答案正确：下一题在结果页签里」：浅绿卡片，一个 44px 的大按钮 -->
-  <div v-if="lesson" class="lesson-next">
+  <!--
+    设计稿「题目页观感」结果 X：「接着做」一节，一句话说还剩几道，一个 44px 的大按钮写下一题。
+    原来是一张浅绿卡片：左边竖栏已经有这节课的进度，不用再框一块
+  -->
+  <section v-if="lesson" class="lesson-next">
+    <SectionHead icon="next">接着做</SectionHead>
     <template v-if="lesson.next">
-      <div class="text">
-        <span class="headline">{{ label }}还剩 {{ lesson.remaining }} 道</span>
-        <span class="detail">
-          {{ lesson.next.problemDisplayId }}
-          {{ lesson.next.myStatus === 'tried' ? '你做过，还没对' : '你还没做过' }}
-        </span>
-      </div>
+      <p class="text">
+        {{ label }}还剩 {{ lesson.remaining }} 道，下一道 {{ lesson.next.problemDisplayId }}
+        {{ lesson.next.myStatus === 'tried' ? '你做过，还没对' : '你还没做过' }}。
+      </p>
       <router-link :to="`/problem/${lesson.next.problemDisplayId}`" class="next">
         <span class="next-label">下一题：{{ lesson.next.problemDisplayId }} {{ lesson.next.title }}</span>
         <svg
@@ -72,15 +74,12 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
       </router-link>
     </template>
     <template v-else>
-      <div class="text">
-        <span class="headline">{{ label }}都做完了，一共 {{ lesson.total }} 道</span>
-        <span v-if="!challenges" class="detail">想接着练，可以去专题里挑一个</span>
-      </div>
+      <p class="text">{{ label }}都做完了，一共 {{ lesson.total }} 道。<template v-if="!challenges">想接着练，可以去专题里挑一个。</template></p>
       <router-link v-if="!challenges" to="/problemset" class="next secondary">
         <span class="next-label">去专题继续练</span>
       </router-link>
     </template>
-  </div>
+  </section>
   <!-- 做完了：先给这节课里还能挑战的，再给专题（设计稿 StkDone）。挑战一条都没有时只剩专题那句 -->
   <template v-if="lesson && !lesson.next && challenges">
     <ChallengeList :problem-ids="lessonProblemIds" :language="language" :refresh-key="refreshKey" />
@@ -90,30 +89,15 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
 
 <style scoped>
 .lesson-next {
-  margin-top: 12px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background-color: rgba(24, 160, 88, 0.07);
-  border: 1px solid rgba(24, 160, 88, 0.25);
+  margin-top: 4px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.headline {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.detail {
-  font-size: 13px;
-  color: v-bind('theme.textColor2');
+  margin: 0 0 12px;
+  font-size: 16px;
+  line-height: 1.75;
 }
 
 .next {
@@ -125,10 +109,10 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
   gap: 8px;
   height: 44px;
   padding: 0 20px;
-  border-radius: 6px;
+  border-radius: 8px;
   background-color: v-bind('theme.primaryColor');
   color: v-bind('buttonText');
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   text-decoration: none;
 }

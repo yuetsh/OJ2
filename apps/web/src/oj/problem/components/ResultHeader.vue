@@ -101,8 +101,8 @@ const color = computed(() => {
 .result-header {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 18px;
 }
 
 .line {
@@ -114,8 +114,8 @@ const color = computed(() => {
 
 .badge {
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -125,12 +125,14 @@ const color = computed(() => {
 }
 
 .title {
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1.3;
   font-weight: 700;
   color: v-bind('color.text');
 }
 
 .sub {
+  font-size: 15px;
   color: v-bind('theme.textColor3');
 }
 

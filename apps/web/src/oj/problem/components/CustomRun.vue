@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
+import SectionHead from './SectionHead.vue'
 import { useThemeVars } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useCodeStore } from 'oj/store/code'
@@ -29,7 +31,7 @@ function fillSample(input: string) {
 <template>
   <!-- 设计稿「自己输入：顶替原来的『自测』模式」；「这里不判对错」在分段那一行右边（ResultPane） -->
   <div class="custom">
-    <span class="label">输入</span>
+    <SectionHead icon="input">输入</SectionHead>
     <n-input
       v-model:value="customInput"
       type="textarea"
@@ -38,15 +40,16 @@ function fillSample(input: string) {
       class="mono"
     />
     <div class="actions">
-      <n-button type="primary" ghost :loading="customRunning" :disabled="!codeStore.code.value.trim()" @click="submissionStore.runCustom()">
+      <n-button type="primary" secondary :loading="customRunning" :disabled="!codeStore.code.value.trim()" @click="submissionStore.runCustom()">
+        <template #icon><Icon icon="ph:play-fill" /></template>
         用这组数据运行
       </n-button>
-      <n-button v-for="(sample, index) in problem?.samples ?? []" :key="index" text class="fill" @click="fillSample(sample.input)">
+      <n-button v-for="(sample, index) in problem?.samples ?? []" :key="index" text type="primary" class="fill" @click="fillSample(sample.input)">
         填入例子 {{ index + 1 }}
       </n-button>
     </div>
 
-    <span class="label">输出</span>
+    <SectionHead icon="output" class="output-head">输出</SectionHead>
     <TrialErrorNote
       v-if="customResult !== null && customResult !== SubmissionStatus.accepted"
       :result="customResult"
@@ -68,13 +71,14 @@ function fillSample(input: string) {
   gap: 8px;
 }
 
-.label {
-  font-size: 13px;
-  font-weight: 600;
+.output-head {
+  margin-top: 14px;
 }
 
 .mono :deep(textarea) {
   font-family: Consolas, Monaco, monospace;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .actions {
@@ -85,13 +89,12 @@ function fillSample(input: string) {
 }
 
 .fill {
-  font-size: 13px;
-  color: v-bind('theme.textColor2');
+  font-size: 14px;
 }
 
 .output {
   margin: 0;
-  min-height: 88px;
+  min-height: 60px;
   box-sizing: border-box;
   padding: 10px 10px;
   border-radius: 6px;
@@ -99,7 +102,9 @@ function fillSample(input: string) {
   white-space: pre-wrap;
   word-break: break-all;
   font-family: Consolas, Monaco, monospace;
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 24px;
+  border: 1px solid rgba(128, 128, 128, 0.14);
 }
 
 .output.empty {

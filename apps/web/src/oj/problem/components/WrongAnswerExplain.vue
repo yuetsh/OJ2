@@ -6,6 +6,7 @@ import { useProblemStore } from 'oj/store/problem'
 import { markdownToText } from 'oj/problem/utils/plainText'
 import { JUDGE_STATUS, SubmissionStatus } from 'utils/constants'
 import { classifyDiff, explainDiff, firstDifferentLine, type SampleCheck } from 'utils/wrongAnswer'
+import SectionHead from './SectionHead.vue'
 
 /**
  * 答案错误时的样例对比（数据见后端 judge/run.ts 的 checkSamples）。
@@ -31,6 +32,12 @@ const props = defineProps<{
    * 提示句全是对学生说的第二人称，整句换掉人称就读得通
    */
   peer?: boolean
+  /**
+   * 题目页结果页签的样子（设计稿「题目页观感」结果 X）：黄色小节标题说哪里不对，说明用正文大小，
+   * 输入 / 正确输出 / 你的输出竖着排成灰、绿、红三格，和题面的例子一个样子。
+   * 不给的话是原来那张浅灰卡片（提交详情页还在用）
+   */
+  section?: boolean
 }>()
 
 const theme = useThemeVars()
@@ -114,21 +121,30 @@ function lines(text: string) {
 </script>
 
 <template>
-  <div class="explain-card">
-    <p v-if="check.passed" class="explain">题目里的例子都对了，没通过的是隐藏的测试点。想想特殊情况：最大的数、最小的数、0、负数，或者题目里专门提到的情况。</p>
-    <template v-else>
-      <p class="explain">
-        <b>例子 {{ (check.index ?? 0) + 1 }} 没有通过{{ plain ? '。' : '：' }}</b
-        ><template v-if="!plain">{{ hint }}</template>
-      </p>
+  <div :class="section ? 'explain-section' : 'explain-card'">
+    <template v-if="section">
+      <SectionHead icon="problem" tone="amber">
+        {{ check.passed ? '例子都对了，错在没给你看的测试点' : `例子 ${(check.index ?? 0) + 1} 没对上` }}
+      </SectionHead>
+      <p v-if="check.passed" class="explain">想想特殊情况：最大的数、最小的数、0、负数，或者题目里专门提到的情况。</p>
+      <p v-else-if="!plain" class="explain">{{ hint }}</p>
+    </template>
+    <p v-else-if="check.passed" class="explain">
+      题目里的例子都对了，没通过的是隐藏的测试点。想想特殊情况：最大的数、最小的数、0、负数，或者题目里专门提到的情况。
+    </p>
+    <p v-else class="explain">
+      <b>例子 {{ (check.index ?? 0) + 1 }} 没有通过{{ plain ? '。' : '：' }}</b
+      ><template v-if="!plain">{{ hint }}</template>
+    </p>
+    <template v-if="!check.passed">
       <div class="blocks">
-        <div class="block">
+        <div class="block in">
           <div class="label">输入</div>
           <div class="text">
             <div v-for="(line, i) in (check.input ?? '').split('\n')" :key="i" class="line" v-text="line" />
           </div>
         </div>
-        <div class="block">
+        <div class="block ok">
           <div class="label">正确输出</div>
           <div class="text">
             <template v-for="(line, i) in lines(check.expected ?? '')" :key="i">
@@ -139,7 +155,7 @@ function lines(text: string) {
             </template>
           </div>
         </div>
-        <div class="block">
+        <div class="block bad">
           <div class="label">{{ peer ? '学生' : '你' }}的输出</div>
           <div v-if="check.output" class="text">
             <template v-for="(line, i) in lines(check.output)" :key="i">
@@ -240,5 +256,84 @@ function lines(text: string) {
   font-size: 13px;
   color: v-bind('theme.textColor2');
   line-height: 1.6;
+}
+
+/*
+ * 题目页结果页签（section）：标签一列、格子一列，输入灰、正确输出绿、你的输出红。
+ * .block 用 display: contents 把「标签 + 格子」直接摊进这张两列的网格
+ */
+.explain-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.explain-section .explain {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.explain-section .blocks {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: start;
+}
+
+.explain-section .block {
+  display: contents;
+}
+
+.explain-section .label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 36px;
+  white-space: nowrap;
+}
+
+.explain-section .bad .label {
+  font-weight: 600;
+  color: v-bind('theme.errorColor');
+}
+
+.explain-section .text {
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 24px;
+  max-height: 260px;
+}
+
+.explain-section .text.empty {
+  font-size: 14px;
+}
+
+.explain-section .in .text {
+  background-color: rgba(128, 128, 128, 0.07);
+  border: 1px solid rgba(128, 128, 128, 0.14);
+}
+
+.explain-section .ok .text {
+  background-color: rgba(24, 160, 88, 0.08);
+  border: 1px solid rgba(24, 160, 88, 0.26);
+}
+
+.explain-section .bad .text {
+  background-color: rgba(208, 48, 80, 0.06);
+  border: 1px solid rgba(208, 48, 80, 0.24);
+}
+
+.explain-section .line {
+  min-height: 24px;
+}
+
+.explain-section .cut {
+  grid-column: 2;
+}
+
+.explain-section .requirement {
+  margin-top: 10px;
+  font-size: 14px;
+  color: v-bind('theme.textColor3');
 }
 </style>
