@@ -50,6 +50,10 @@ const LINT_SITUATION: Record<Exclude<LintRule, 'punct'>, MascotSituation> = {
   wrongLangC: 'lint.wrongLangC',
   wrongLangPython: 'lint.wrongLangPython',
   noInclude: 'lint.noInclude',
+  undefinedName: 'lint.undefinedName',
+  noPrint: 'lint.noPrint',
+  unclosedBracket: 'lint.unclosedBracket',
+  unclosedQuote: 'lint.unclosedQuote',
 }
 
 /** 停手这么久还有常见的错，她就说 */
@@ -60,6 +64,8 @@ const LINT_PAUSE_MS = 2000
  */
 const LINT_EDITING_PAUSE_MS = 6000
 const LINT_MAYBE_UNFINISHED = new Set<LintRule>(['colon', 'noInt'])
+/** 这几种写到一半一定是这样（还没写到 print、括号引号还没关），不管在哪一行都等停手久一点 */
+const LINT_ALWAYS_WAIT = new Set<LintRule>(['noPrint', 'unclosedBracket', 'unclosedQuote'])
 
 /** 一道题上这么久没交、没跑例子，她就来问一句（主动开口） */
 const IDLE_MS = 15 * 60_000
@@ -169,7 +175,15 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   /** 指出一处错的那句话：中文标点一处、好几处分两组；别的按规则 lint.* */
   function lintGuide(issue: LintIssue): MascotGuide {
     const situation: MascotSituation =
-      issue.rule === 'punct' ? (Number(issue.vars.n) > 1 ? 'problem.chinesePuncts' : 'problem.chinesePunct') : LINT_SITUATION[issue.rule]
+      issue.rule === 'punct'
+        ? Number(issue.vars.n) > 1
+          ? 'problem.chinesePuncts'
+          : 'problem.chinesePunct'
+        : issue.rule === 'undefinedName' && issue.vars.right
+          ? 'lint.undefinedNameGuess'
+          : issue.rule === 'unclosedBracket' && issue.vars.kind === 'extra'
+            ? 'lint.extraBracket'
+            : LINT_SITUATION[issue.rule]
     const fix = fixAction(issue)
     return { situation, n: Number(issue.vars.n ?? 1), vars: { line: issue.line, ...issue.vars }, actions: fix ? [fix] : [] }
   }
@@ -371,9 +385,10 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       const editing = activeLine()
       const keyOf = (it: LintIssue) => `lint:${problem.id}:${it.key}`
       const fresh = currentIssues().filter((it) => !spokenSpeechKeys.has(keyOf(it)))
-      const issue = fresh.find((it) => it.line !== editing || !LINT_MAYBE_UNFINISHED.has(it.rule))
+      const waitLonger = (it: LintIssue) => LINT_ALWAYS_WAIT.has(it.rule) || (it.line === editing && LINT_MAYBE_UNFINISHED.has(it.rule))
+      const issue = fresh.find((it) => !waitLonger(it))
       if (!issue) {
-        // 只有光标那行有、可能还没写完：再等等，代码一直没动就说
+        // 剩下的都可能还没写完：再等等，代码一直没动就说
         const code = codeStore.code.value
         if (fresh.length) editingTimer = setTimeout(() => codeStore.code.value === code && point(fresh[0]!), LINT_EDITING_PAUSE_MS - LINT_PAUSE_MS)
         return

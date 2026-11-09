@@ -410,6 +410,17 @@ export const MASCOT_LINES = {
   'lint.wrongLangC': ['这是 C 语言的代码吧？编辑器上面选的是 Python', '语言选错了，这段是 C，编辑器上面换一下'],
   'lint.wrongLangPython': ['这是 Python 的代码吧？编辑器上面选的是 C', '语言选错了，这段是 Python，编辑器上面换一下'],
   'lint.noInclude': ['第一行少了 #include <stdio.h>', '用 printf 之前要 #include <stdio.h>'],
+  // 变量没定义：猜不到想写哪个 / 猜到了（{right} 是前面定义过的、和它最像的名字）
+  'lint.undefinedName': ['第 {line} 行的 {name} 还没定义过', '{name} 是谁？第 {line} 行，前面没给它赋过值', '第 {line} 行用了 {name}，可前面没有它'],
+  'lint.undefinedNameGuess': [
+    '第 {line} 行的 {name}，是不是想写 {right}？',
+    '{name}？前面定义的是 {right} 吧，第 {line} 行',
+    '拼错了吧，第 {line} 行的 {name} 应该是 {right}',
+  ],
+  'lint.noPrint': ['还没写 print？算完要打印出来', '程序里一个 print 都没有，什么都不会输出', '算完了记得 print'],
+  'lint.unclosedBracket': ['第 {line} 行的括号没关上', '括号少了一半，第 {line} 行开的', '第 {line} 行，左括号在等右括号'],
+  'lint.extraBracket': ['第 {line} 行多了一个右括号', '右括号多了，第 {line} 行'],
+  'lint.unclosedQuote': ['第 {line} 行的引号没配对', '字符串没收尾，第 {line} 行少了个引号'],
 } as const satisfies Record<string, readonly string[]>
 
 export type MascotSituation = keyof typeof MASCOT_LINES

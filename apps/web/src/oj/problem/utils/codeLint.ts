@@ -18,6 +18,9 @@ import { findChinesePunctuation } from './chinesePunctuation'
  * - if x = 5: 条件里一个等号（23 人），C 写法混进 Python：i++、&&、||、!x（20 人）
  * - print = (…) / input = …（16 人），else if、If / For 大写、print "x"（各几人）
  * - C：没写 #include（23 人）
+ * - 第二批（同样核过）：变量没定义（Python 语法树算是 298 人，这里用规则近似，见 undefinedNames）、
+ *   整段没有 print（233 人）、括号没配对（77 人）、引号没配对（43 人）；没转 int 加上 a, b = input().split()
+ *   和 x == 5 两种写法
  *
  * 量过、**不报**的（正确的代码里也大量出现，报了冤枉人）：sum = 0 这类拿内置函数名当变量、
  * 宽松的「没转 int」、C 的 printf("请输入")（很多 C 题本来就要输出中文）、scanf 少 &；
@@ -43,6 +46,10 @@ export type LintRule =
   | 'printStatement'
   | 'noInt'
   | 'noInclude'
+  | 'undefinedName'
+  | 'noPrint'
+  | 'unclosedBracket'
+  | 'unclosedQuote'
 
 export interface LintIssue {
   rule: LintRule
@@ -57,12 +64,25 @@ export interface LintIssue {
 }
 
 const PYTHON_COMMON = ['print', 'input', 'int', 'float', 'str', 'len', 'range', 'list', 'sum', 'max', 'min', 'abs', 'round', 'sorted', 'map']
+/** Python 的全部内置名字（dir(builtins)，3.13），加上 __name__ 这类模块级的 */
 const PYTHON_BUILTINS = new Set([
-  ...PYTHON_COMMON,
-  'bool', 'dict', 'set', 'tuple', 'enumerate', 'zip', 'reversed', 'any', 'all', 'pow', 'divmod', 'chr', 'ord', 'bin', 'hex', 'oct',
-  'isinstance', 'type', 'eval', 'exec', 'open', 'filter', 'iter', 'next', 'hash', 'id', 'format', 'repr', 'vars', 'super', 'object',
-  'print', 'exit', 'quit', 'help', 'dir', 'callable', 'getattr', 'setattr', 'hasattr', 'complex', 'bytes', 'frozenset', 'slice',
-  'Exception', 'ValueError', 'TypeError', 'KeyError', 'IndexError', 'ZeroDivisionError', 'NameError', 'StopIteration',
+  'ArithmeticError', 'AssertionError', 'AttributeError', 'BaseException', 'BaseExceptionGroup', 'BlockingIOError', 'BrokenPipeError',
+  'BufferError', 'BytesWarning', 'ChildProcessError', 'ConnectionAbortedError', 'ConnectionError', 'ConnectionRefusedError',
+  'ConnectionResetError', 'DeprecationWarning', 'EOFError', 'Ellipsis', 'EncodingWarning', 'EnvironmentError', 'Exception',
+  'ExceptionGroup', 'False', 'FileExistsError', 'FileNotFoundError', 'FloatingPointError', 'FutureWarning', 'GeneratorExit', 'IOError',
+  'ImportError', 'ImportWarning', 'IndentationError', 'IndexError', 'InterruptedError', 'IsADirectoryError', 'KeyError',
+  'KeyboardInterrupt', 'LookupError', 'MemoryError', 'ModuleNotFoundError', 'NameError', 'None', 'NotADirectoryError', 'NotImplemented',
+  'NotImplementedError', 'OSError', 'OverflowError', 'PendingDeprecationWarning', 'PermissionError', 'ProcessLookupError',
+  'PythonFinalizationError', 'RecursionError', 'ReferenceError', 'ResourceWarning', 'RuntimeError', 'RuntimeWarning', 'StopAsyncIteration',
+  'StopIteration', 'SyntaxError', 'SyntaxWarning', 'SystemError', 'SystemExit', 'TabError', 'TimeoutError', 'True', 'TypeError',
+  'UnboundLocalError', 'UnicodeDecodeError', 'UnicodeEncodeError', 'UnicodeError', 'UnicodeTranslateError', 'UnicodeWarning',
+  'UserWarning', 'ValueError', 'Warning', 'ZeroDivisionError', 'abs', 'aiter', 'all', 'anext', 'any', 'ascii', 'bin', 'bool', 'breakpoint',
+  'bytearray', 'bytes', 'callable', 'chr', 'classmethod', 'compile', 'complex', 'copyright', 'credits', 'delattr', 'dict', 'dir', 'divmod',
+  'enumerate', 'eval', 'exec', 'exit', 'filter', 'float', 'format', 'frozenset', 'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex',
+  'id', 'input', 'int', 'isinstance', 'issubclass', 'iter', 'len', 'license', 'list', 'locals', 'map', 'max', 'memoryview', 'min', 'next',
+  'object', 'oct', 'open', 'ord', 'pow', 'print', 'property', 'quit', 'range', 'repr', 'reversed', 'round', 'set', 'setattr', 'slice',
+  'sorted', 'staticmethod', 'str', 'sum', 'super', 'tuple', 'type', 'vars', 'zip',
+  '__name__', '__file__', '__doc__', '_',
 ]) // prettier-ignore
 const PYTHON_KEYWORDS = new Set([
   'if', 'elif', 'else', 'for', 'while', 'def', 'return', 'and', 'or', 'not', 'in', 'is', 'lambda', 'class', 'try', 'except',
@@ -295,9 +315,217 @@ function lintPython(code: string, s: string): LintIssue[] {
     const v = m[1]!
     if (new RegExp(`\\b(int|float|eval)\\(\\s*${v}\\b|^\\s*${v}\\s*=\\s*(int|float|eval)\\(`, 'm').test(s)) continue
     const use = new RegExp(`(?<![\\w.'"])${v}\\s*[-*/%](?!=)|[-*/%]\\s*${v}\\b(?!\\s*\\()|\\b${v}\\s*[<>]=?\\s*-?\\d|\\brange\\(\\s*${v}\\s*\\)`).exec(s)
-    if (use) issues.push({ rule: 'noInt', line: at(use.index), vars: { name: v }, key: `noInt:${v}` })
+    // 和数字比相等：input() 拿到的是文字，"5" == 5 永远不成立
+    const equal = use ?? new RegExp(`\\b${v}\\s*[=!]=\\s*-?\\d|-?\\d\\s*[=!]=\\s*${v}\\b`).exec(s)
+    if (equal) issues.push({ rule: 'noInt', line: at(equal.index), vars: { name: v }, key: `noInt:${v}` })
+  }
+  // a, b = input().split() 之后拿来算（或者 a + b 想求和，其实是拼字）
+  for (const m of s.matchAll(/^\s*(\w+(?:\s*,\s*\w+)+)\s*=\s*input\(\s*[^()]*\)\.split\([^()]*\)\s*$/gm)) {
+    const vs = m[1]!.split(',').map((v) => v.trim())
+    if (vs.some((v) => new RegExp(`\\b(int|float|eval)\\(\\s*${v}\\b|^\\s*${v}\\s*=\\s*(int|float)\\(`, 'm').test(s))) continue
+    let use: RegExpExecArray | null = null
+    for (const v of vs) {
+      use ??= new RegExp(`(?<![\\w.'"])${v}\\s*[-*/%](?!=)|[-*/%]\\s*${v}\\b(?!\\s*\\()|\\b${v}\\s*[<>]=?\\s*-?\\d|\\brange\\(\\s*${v}\\s*\\)`).exec(s)
+    }
+    use ??= new RegExp(`\\b${vs[0]}\\s*\\+\\s*${vs[1]}\\b|\\b${vs[1]}\\s*\\+\\s*${vs[0]}\\b`).exec(s)
+    if (use) issues.push({ rule: 'noInt', line: at(use.index), vars: { name: vs.join('、') }, key: `noInt:${vs.join(',')}` })
+  }
+
+  // 整段没有 print：算完了打不出来。写到一半也是这样，所以页面那边等停手久一点才说
+  if (!/(?<![\w.])print\s*\(/.test(s) && s.trim().split('\n').length >= 2) {
+    const last = s.replace(/\s+$/, '').split('\n').length
+    issues.push({ rule: 'noPrint', line: last, vars: {}, key: 'noPrint' })
+  }
+
+  // 变量没定义：拼写错误最常见（totla），能猜到想写哪个就说
+  const typoNames = new Set(
+    issues.filter((it) => it.rule === 'typo' || it.rule === 'printf' || it.rule === 'bareMethod').map((it) => String(it.vars.name ?? 'printf')),
+  )
+  for (const u of undefinedNames(s)) {
+    if (typoNames.has(u.name)) continue
+    const line = at(u.index)
+    const guess = closestName(u.name, u.defined)
+    issues.push({
+      rule: 'undefinedName',
+      line,
+      vars: guess ? { name: u.name, right: guess } : { name: u.name },
+      key: `undefinedName:${u.name}`,
+      fix: guess ? renameNames(u.name, guess) : undefined,
+    })
+    break // 一处就够了：名字写错一个，后面同名的都是它
   }
   return issues
+}
+
+/**
+ * 用了却哪儿都没定义过的名字（Python）。网页里没有 Python 的语法树，只能按规则认「定义」：
+ * 赋值（含 a, b = 、a = b = 、:=）、for 变量（含推导式里的）、def 和它的参数、lambda 参数、class、
+ * import / from … import / as、with … as、except … as、global / nonlocal。
+ * 「用」是不跟在点后面、不是关键字参数（f(end='')）、不是内置名字的标识符。认不全的宁可不报：
+ * 有 from x import * 、有 exec / eval / globals 的整段不查。定义在后面、先用的不管（只看有没有定义过）
+ */
+function undefinedNames(s: string) {
+  if (/^\s*from\s+\S+\s+import\s+\*/m.test(s) || /\b(exec|eval|globals|locals|vars)\s*\(/.test(s)) return []
+  const defined = new Set<string>()
+  const addNames = (text: string) => {
+    // [...] 里的是下标（a[i] = 1 的 i 是用，不是定义）；跟着 . 或 [ 的是已有的东西
+    const flat = text.replace(/\[[^\]]*\]/g, '')
+    for (const m of flat.matchAll(/(?<![\w.])([A-Za-z_]\w*)(?!\s*[.[(])/g)) defined.add(m[1]!)
+  }
+  for (const line of s.split('\n')) {
+    // 单行的 if x: y = 1 / for i in r: s = s + i：冒号后面那截才是赋值语句
+    const body = line.replace(/^\s*(if|elif|else|for|while|with|try|except|finally)\b[^:]*:/, '')
+    let depth = 0
+    let last = 0
+    const parts: string[] = []
+    for (let i = 0; i < body.length; i++) {
+      const ch = body[i]!
+      if ('([{'.includes(ch)) depth++
+      else if (')]}'.includes(ch)) depth--
+      else if (ch === '=' && depth === 0 && !'=!<>+-*/%&|^:@'.includes(body[i - 1] ?? '') && body[i + 1] !== '=') {
+        parts.push(body.slice(last, i))
+        last = i + 1
+      }
+    }
+    for (const target of parts) addNames(target)
+  }
+  for (const m of s.matchAll(/(\w+)\s*:=/g)) defined.add(m[1]!)
+  for (const m of s.matchAll(/\bfor\s+([\w\s,()[\]]+?)\s+in\b/g)) addNames(m[1]!)
+  for (const m of s.matchAll(/^\s*(?:async\s+)?(?:def|class)\s+(\w+)/gm)) defined.add(m[1]!)
+  for (const m of s.matchAll(/^\s*(?:async\s+)?def\s+\w+\s*\(([^)]*)\)/gm)) {
+    for (const p of m[1]!.split(','))
+      defined.add(
+        p
+          .trim()
+          .replace(/^\*+/, '')
+          .split(/[=:\s]/)[0]!,
+      )
+  }
+  for (const m of s.matchAll(/\blambda\b([^:]*):/g)) for (const p of m[1]!.split(',')) defined.add(p.trim().replace(/^\*+/, '').split(/[=\s]/)[0]!)
+  for (const m of s.matchAll(/^\s*import\s+([^\n]+)/gm)) {
+    for (const part of m[1]!.split(',')) {
+      const words = part.trim().split(/\s+/)
+      defined.add(words[2] ?? words[0]!.split('.')[0]!)
+    }
+  }
+  for (const m of s.matchAll(/^\s*from\s+\S+\s+import\s+\(?([^\n)]+)/gm)) {
+    for (const part of m[1]!.split(',')) {
+      const words = part.trim().split(/\s+/)
+      defined.add(words[2] ?? words[0]!)
+    }
+  }
+  for (const m of s.matchAll(/\bas\s+(\w+)/g)) defined.add(m[1]!)
+  for (const m of s.matchAll(/^\s*(?:global|nonlocal)\s+([\w\s,]+)/gm)) for (const n of m[1]!.split(',')) defined.add(n.trim())
+
+  const found: { name: string; index: number; defined: Set<string> }[] = []
+  const seen = new Set<string>()
+  let depth = 0
+  // import 那几行上的都是模块名、导入的名字，不是「用」
+  const importLine = (index: number) => /^\s*(import|from)\s/.test(s.slice(s.lastIndexOf('\n', index - 1) + 1))
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!
+    if ('([{'.includes(ch)) depth++
+    else if (')]}'.includes(ch)) depth = Math.max(0, depth - 1)
+    // 跟在点后面的是属性、方法（点和名字中间可能隔着空格：line. remove(…)）
+    if (!/[A-Za-z_]/.test(ch) || /\w/.test(s[i - 1] ?? '') || /\.\s*$/.test(s.slice(Math.max(0, i - 8), i))) continue
+    const m = /^[A-Za-z_]\w*/.exec(s.slice(i))!
+    const name = m[0]
+    const end = i + name.length
+    i = end - 1
+    if (PYTHON_KEYWORDS.has(name) || PYTHON_BUILTINS.has(name) || defined.has(name) || seen.has(name) || importLine(i - name.length + 1)) continue
+    // 前面紧挨着引号的是字符串前缀（f"…"、r'…'），不是名字
+    if (/^["']/.test(s.slice(end))) continue
+    // 括号里的 name= 是关键字参数
+    if (depth > 0 && /^\s*=(?!=)/.test(s.slice(end))) continue
+    seen.add(name)
+    found.push({ name, index: i - name.length + 1, defined })
+  }
+  return found
+}
+
+/** 已定义的名字里和它最像的（拼写错误），短的差 1 处、长的差 2 处以内，不像就是 null */
+function closestName(name: string, defined: Set<string>) {
+  let best: string | null = null
+  let bestD = Infinity
+  for (const d of defined) {
+    if (d.length < 2) continue
+    const dist = distance(name.toLowerCase(), d.toLowerCase())
+    if (dist < bestD) {
+      best = d
+      bestD = dist
+    }
+  }
+  return best && bestD <= (best.length <= 4 ? 1 : 2) ? best : null
+}
+
+/** 把名字 from 都改成 to（字符串、注释里的不动；跟在点后面的不动） */
+function renameNames(from: string, to: string) {
+  return (code: string) => {
+    const s = blankStringsAndComments(code, 'Python')
+    const edits = [...s.matchAll(new RegExp(`(?<![\\w.])${from}(?!\\w)`, 'g'))].map((m) => ({ from: m.index!, to: m.index! + from.length, insert: to }))
+    return replaceAt(code, edits)
+  }
+}
+
+/**
+ * 括号没配对：( [ { 多了说没关上的那个在哪一行，) ] } 多了说多出来的那个在哪一行。
+ * 写多行的调用写到一半也是这样，所以页面那边等停手久一点才说
+ */
+function unclosedBracket(code: string, s: string): LintIssue | null {
+  const stack: { ch: string; index: number }[] = []
+  const pairs: Record<string, string> = { ')': '(', ']': '[', '}': '{' }
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!
+    if ('([{'.includes(ch)) stack.push({ ch, index: i })
+    else if (ch in pairs) {
+      if (stack.at(-1)?.ch === pairs[ch]) stack.pop()
+      else return { rule: 'unclosedBracket', line: lineOf(code, i), vars: { kind: 'extra' }, key: `unclosedBracket:extra:${lineOf(code, i)}` }
+    }
+  }
+  const open = stack[0]
+  return open
+    ? { rule: 'unclosedBracket', line: lineOf(code, open.index), vars: { kind: 'open' }, key: `unclosedBracket:open:${lineOf(code, open.index)}` }
+    : null
+}
+
+/** 引号没配对：单引号、双引号的字符串到行末都没收尾（三引号的可以跨行，不算） */
+function unclosedQuote(code: string, language: string): LintIssue | null {
+  const python = language === 'Python'
+  let i = 0
+  while (i < code.length) {
+    const ch = code[i]!
+    if (python ? ch === '#' : code.startsWith('//', i)) {
+      const end = code.indexOf('\n', i)
+      i = end < 0 ? code.length : end
+      continue
+    }
+    if (!python && code.startsWith('/*', i)) {
+      const end = code.indexOf('*/', i + 2)
+      i = end < 0 ? code.length : end + 2
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      const triple = python && code.startsWith(ch.repeat(3), i)
+      const quote = triple ? ch.repeat(3) : ch
+      let j = i + quote.length
+      while (j < code.length && !code.startsWith(quote, j)) {
+        if (code[j] === '\\') j++
+        else if (!triple && code[j] === '\n') {
+          const line = lineOf(code, i)
+          return { rule: 'unclosedQuote', line, vars: {}, key: `unclosedQuote:${line}` }
+        }
+        j++
+      }
+      if (j >= code.length && !triple) {
+        const line = lineOf(code, i)
+        return { rule: 'unclosedQuote', line, vars: {}, key: `unclosedQuote:${line}` }
+      }
+      i = j + quote.length
+      continue
+    }
+    i++
+  }
+  return null
 }
 
 function replaceLine(code: string, index: number, change: (text: string) => string) {
@@ -364,7 +592,12 @@ export function lintCode(code: string, language: string): LintIssue[] {
     }
     return [{ rule: 'punct', line, vars: { name: first.name, n: punct.length }, key: `punct:${line}:${first.name}`, fix: fixAll }]
   }
+  // 引号、括号没配对时代码是断的，别的规则看不准，只说这个
+  const quote = unclosedQuote(code, language)
+  if (quote) return [quote]
   const s = blankStringsAndComments(code, language)
+  const bracket = unclosedBracket(code, s)
+  if (bracket) return [bracket]
   const issues = language === 'Python' ? lintPython(code, s) : lintC(code, s)
   return issues.sort((a, b) => a.line - b.line)
 }
