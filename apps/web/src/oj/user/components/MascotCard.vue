@@ -5,11 +5,12 @@ import { getMascotJournal } from 'oj/api'
 import { fishLeft, mascotProfile } from 'shared/mascot/behavior'
 import { MASCOT_QUESTIONS } from 'shared/mascot/chat'
 import { buildCollection } from 'shared/mascot/collection'
+import { MASCOT_POSES, poseUrl } from 'shared/mascot/poses'
 import { parseTime } from 'utils/functions'
 
 /**
  * 主页上「小鲸鱼」那张卡：和看板娘的相处记录，点开看全的（各种互动几次、一天里什么时候来找她、
- * 回答过她的问题、台词收集）。只在自己的主页、学生、电脑上有（她只在电脑上出现）。
+ * 回答过她的问题、见过她的样子、台词收集）。只在自己的主页、学生、电脑上有（她只在电脑上出现）。
  * 从没碰过她就不显示。
  */
 const theme = useThemeVars()
@@ -95,6 +96,13 @@ const modalStyle = computed(() => ({
   '--j-primary': theme.value.primaryColor,
 }))
 
+/** 见过她的样子：见过的给原图，没见过的是剪影。图在折叠里，展开才下 */
+const poses = computed(() => {
+  const seen = new Set(journal.value?.poses ?? [])
+  return MASCOT_POSES.map((pose) => ({ pose, url: poseUrl(pose), seen: seen.has(pose) }))
+})
+const posesSeen = computed(() => poses.value.filter((it) => it.seen).length)
+
 const latestLine = computed(() => journal.value?.lines[0] ?? null)
 </script>
 
@@ -111,8 +119,10 @@ const latestLine = computed(() => journal.value?.lines[0] ?? null)
         <span>点她说话</span>
       </div>
       <div class="num">
-        <b>{{ journal.counts.pats }}</b>
-        <span>摸头</span>
+        <b
+          >{{ posesSeen }}<small> / {{ poses.length }}</small></b
+        >
+        <span>见过的样子</span>
       </div>
       <div class="num">
         <b
@@ -167,6 +177,29 @@ const latestLine = computed(() => journal.value?.lines[0] ?? null)
             </li>
           </ul>
         </template>
+
+        <h4>
+          见过她的样子 <small>{{ posesSeen }} / {{ poses.length }}</small>
+        </h4>
+        <n-collapse :default-expanded-names="[]">
+          <n-collapse-item name="poses">
+            <template #header>全部样子</template>
+            <div class="poses">
+              <img
+                v-for="it in poses"
+                :key="it.pose"
+                :src="it.url"
+                class="pose"
+                :class="{ locked: !it.seen }"
+                width="64"
+                height="79"
+                loading="lazy"
+                alt=""
+                draggable="false"
+              />
+            </div>
+          </n-collapse-item>
+        </n-collapse>
 
         <h4>
           听过的话 <small>{{ collection.heard }} / {{ collection.total }}</small>
@@ -371,6 +404,33 @@ h4 {
 
 .answers .a {
   font-weight: 600;
+}
+
+.poses {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 8px;
+  justify-items: center;
+}
+
+.pose {
+  display: block;
+  width: 64px;
+  height: 79px;
+  object-fit: contain;
+  object-position: 50% 100%;
+  user-select: none;
+}
+
+/* 没见过的只给剪影：看得出轮廓，看不出是什么样 */
+.pose.locked {
+  filter: brightness(0);
+  opacity: 0.14;
+}
+
+html.dark .pose.locked {
+  filter: brightness(0) invert(1);
+  opacity: 0.16;
 }
 
 .chips {

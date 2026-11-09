@@ -115,6 +115,16 @@ async function fishOf(userId: number) {
   return { earned: row?.earned ?? 0, fed: row?.fed ?? 0 }
 }
 
+/** 见过她哪些样子：pose 事件的姿势名，去重 */
+async function posesOf(userId: number) {
+  const e = schema.mascotEvent
+  const rows = await db
+    .selectDistinct({ pose: e.action })
+    .from(e)
+    .where(and(eq(e.userId, userId), eq(e.kind, 'pose'), sql`${e.action} is not null`))
+  return rows.map((row) => row.pose!)
+}
+
 /** 最近多少次题库提交拿来看学生常犯哪类错 */
 const RECENT_SUBMISSIONS = 20
 
@@ -125,7 +135,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   const week = weekStart()
   const e = schema.mascotEvent
-  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish] = await Promise.all([
+  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish, poses] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
@@ -171,6 +181,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
       .where(and(eq(e.userId, userId), eq(e.kind, 'answer')))
       .orderBy(e.situation, desc(e.createdAt)),
     fishOf(userId),
+    posesOf(userId),
   ])
   const eventCount = (kind: string) => weekEvents.find((row) => row.kind === kind)?.value ?? 0
 
@@ -186,6 +197,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
     todaySolved: today[0]?.value ?? 0,
     tooHard: tooHard[0]?.value ?? 0,
     fish,
+    poses,
     answers: Object.fromEntries(answers.filter((row) => row.situation?.startsWith('ask.') && row.action).map((row) => [row.situation!.slice(4), row.action!])),
     week: {
       submits: weekSubmits[0]?.value ?? 0,
@@ -213,7 +225,7 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
   const mine = eq(e.userId, userId)
   const hour = sql<number>`extract(hour from ${localTime(e.createdAt)})::int`
   const page = sql<string>`split_part(${e.path}, '/', 2)`
-  const [summary, hours, pages, lines] = await Promise.all([
+  const [summary, hours, pages, lines, poses] = await Promise.all([
     db
       .select({
         firstAt: sql<string | null>`min(${e.createdAt})`,
@@ -240,6 +252,7 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
       .where(and(mine, inArray(e.kind, [...MASCOT_SPOKEN_KINDS]), sql`${e.line} is not null`))
       .groupBy(e.line)
       .orderBy(desc(sql`max(${e.createdAt})`)),
+    posesOf(userId),
   ])
   // 没有 group by 的聚合永远回一行，碰都没碰过也是一行（count 是 0、min 是 null）
   const { firstAt, days, ...counts } = summary[0]!
@@ -252,5 +265,6 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
     byHour,
     favoritePage: pages[0]?.page || null,
     lines: lines.map((it) => it.line!),
+    poses,
   } satisfies MascotJournal)
 })

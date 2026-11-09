@@ -11,6 +11,8 @@ import { z } from 'zod'
  * - `move`：被拖到了别处（line 记落点贴的边，比如 `right bottom`）
  * - `play`：被摆弄（action 记 `fling` 甩出去 / `shake` 拎着摇晕 / `tickle` 鼠标蹭着挠痒，line 是她说的那句）
  * - `answer`：回答了她闲聊时问的问题（situation = `ask.<题>`，action = 选的那一项的键，line 是她接的那句）
+ * - `pose`：第一次见到她的某个样子（action = 姿势名，见前台 shared/mascot/poses.ts 的 MASCOT_POSES）。
+ *   见过的不再记，所以一人一个姿势至多一条，主页「见过她的样子」按它数
  * - `feed`：喂了她一条小鱼干（line 是她说的那句）。小鱼干做对新题攒，喂一条记一条，剩几条按这个算（见 mascotProfileSchema.fish）
  *
  * 另外两种不是对她做的，是她要看的行为，别处没有存：
@@ -21,7 +23,7 @@ import { z } from 'zod'
  *
  * 不记代码、不记按键。
  */
-export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'trial', 'help'] as const
+export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'pose', 'trial', 'help'] as const
 /** 这几种的 line 是她说出口的话，算进台词收集 */
 export const MASCOT_SPOKEN_KINDS = ['open', 'speak', 'pat', 'overclick', 'play', 'feed'] as const satisfies readonly (typeof MASCOT_EVENT_KINDS)[number][]
 export const mascotEventKindSchema = z.enum(MASCOT_EVENT_KINDS)
@@ -89,6 +91,8 @@ export const mascotProfileSchema = z.object({
     earned: z.number().int(),
     fed: z.number().int(),
   }),
+  /** 见过她哪些样子（姿势名）：前台换上没见过的图才记一条 pose */
+  poses: z.array(z.string()),
   /** 闲聊时问过的问题，每题最后一次选的是哪一项（`ask.<题>` 去掉前缀 → 选项的键） */
   answers: z.record(z.string(), z.string()),
   recent: z.object({
@@ -143,5 +147,7 @@ export const mascotJournalSchema = z.object({
   /** 最常在哪一页碰她（路由路径的第一段，比如 `problem`），没有就是 null */
   favoritePage: z.string().nullable(),
   lines: z.array(z.string()),
+  /** 见过她哪些样子（姿势名），同 mascotProfileSchema.poses */
+  poses: z.array(z.string()),
 })
 export type MascotJournal = z.infer<typeof mascotJournalSchema>

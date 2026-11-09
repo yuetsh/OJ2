@@ -954,6 +954,8 @@ watch(napping, (asleep) => !asleep && touched())
  * 机房网慢时换得晚一点，总比空一下强
  */
 const shownSrc = ref(poseUrl(pose.value))
+/** 真正画出来的那张是哪个姿势（主页「见过她的样子」按这个记） */
+const shownPose = ref<MascotPose>(pose.value)
 const ready = new Set<string>([shownSrc.value])
 /** 下好、解码完是 true；没下到（断网、部署后老页面拿旧地址 404）是 false，下次用到再试 */
 function preload(url: string): Promise<boolean> {
@@ -971,10 +973,32 @@ function preload(url: string): Promise<boolean> {
 watch(
   () => poseUrl(pose.value),
   (url) => {
-    if (ready.has(url)) shownSrc.value = url
+    const next = pose.value
+    const show = () => {
+      shownSrc.value = url
+      shownPose.value = next
+    }
+    if (ready.has(url)) show()
     // 没下到就接着显示上一张，别换成空白
-    else preload(url).then((ok) => ok && poseUrl(pose.value) === url && (shownSrc.value = url))
+    else preload(url).then((ok) => ok && poseUrl(pose.value) === url && show())
   },
+)
+
+// ---- 见过她的样子：学生第一次看到某个姿势记一条 pose（见过的从 profile 里来，这一页记过的不再记）----
+const posesLogged = new Set<string>()
+watch(
+  () => [shownPose.value, mascotProfile.value?.poses] as const,
+  ([shown, known]) => {
+    // 还没拉到这个人见过哪些就先不记，拉到了这个 watch 会再跑一遍
+    if (!known || !isStudent.value || known.includes(shown) || posesLogged.has(shown)) return
+    posesLogged.add(shown)
+    logMascotEvent({ kind: 'pose', action: shown })
+  },
+  { immediate: true },
+)
+watch(
+  () => userStore.user?.id,
+  () => posesLogged.clear(),
 )
 // 按下去就该换「被拎起来」、连点就该换「被摸」，等那一下再下就慢了：进页面闲下来以后先把这两张下好
 // 三张探头图也先下：缩进边上时框立刻变窄，图没到的话全身那张会挤在窄框里（下面 object-fit 兜着不变形）

@@ -15,109 +15,115 @@ import type { MascotSituation } from './lines'
  */
 const URLS = import.meta.glob<string>('../assets/mascot/*.webp', { eager: true, query: '?url', import: 'default' })
 
-export type MascotPose =
+/**
+ * 全部姿势，按组排（主页「见过她的样子」也按这个顺序摆）。加图就往这里加名字，文件放 assets/mascot/<名字>.webp
+ */
+export const MASCOT_POSES = [
   // 平时、打招呼
-  | 'idle'
-  | 'greet'
-  | 'curious'
-  | 'wave'
-  | 'teasing'
-  | 'wink'
-  | 'bold'
-  | 'playful'
-  | 'excited'
-  | 'running'
+  'idle',
+  'greet',
+  'curious',
+  'wave',
+  'teasing',
+  'wink',
+  'bold',
+  'playful',
+  'excited',
+  'running',
   // 被摆弄
-  | 'lifted'
-  | 'tail-grabbed'
-  | 'patted'
-  | 'giggle'
-  | 'blush'
-  | 'heart'
-  | 'touched'
-  | 'dizzy'
+  'lifted',
+  'tail-grabbed',
+  'patted',
+  'giggle',
+  'blush',
+  'heart',
+  'touched',
+  'dizzy',
   // 越点越烦
-  | 'doubt'
-  | 'unimpressed'
-  | 'angry'
-  | 'fuming'
+  'doubt',
+  'unimpressed',
+  'angry',
+  'fuming',
   // 做对了
-  | 'happy'
-  | 'thumbs'
-  | 'yes'
-  | 'deploy'
-  | 'smug'
-  | 'smirk'
-  | 'cool'
-  | 'cheer'
-  | 'party'
-  | 'done'
-  | 'sweep'
-  | 'star'
-  | 'trophy'
-  | 'worship'
-  | 'levelup'
-  | 'achievement'
+  'happy',
+  'thumbs',
+  'yes',
+  'deploy',
+  'smug',
+  'smirk',
+  'cool',
+  'cheer',
+  'party',
+  'done',
+  'sweep',
+  'star',
+  'trophy',
+  'worship',
+  'levelup',
+  'achievement',
   // 做错了、卡住了
-  | 'sad'
-  | 'lose'
-  | 'broke'
-  | 'empty'
-  | 'cry'
-  | 'fluster'
-  | 'omg'
-  | 'shock'
-  | 'ram'
-  | 'sweat'
-  | 'thinking'
-  | 'ponder'
-  | 'idea'
-  | 'waiting'
-  | 'melt'
-  | 'calm'
-  | 'debug'
-  | 'review'
-  | 'sneak'
+  'sad',
+  'lose',
+  'broke',
+  'empty',
+  'cry',
+  'fluster',
+  'omg',
+  'shock',
+  'ram',
+  'sweat',
+  'thinking',
+  'ponder',
+  'idea',
+  'waiting',
+  'melt',
+  'calm',
+  'debug',
+  'review',
+  'sneak',
   // 老师那边
-  | 'lecture'
+  'lecture',
   // 时间
-  | 'coffee'
-  | 'eat'
-  | 'snack'
-  | 'sleepy'
-  | 'hurry'
-  | 'night'
-  | 'pajama'
-  | 'stretch'
-  | 'nap-desk'
-  | 'nap-laptop'
+  'coffee',
+  'eat',
+  'snack',
+  'sleepy',
+  'hurry',
+  'night',
+  'pajama',
+  'stretch',
+  'nap-desk',
+  'nap-laptop',
   // 闲着的日常
-  | 'cooking'
-  | 'fishing'
-  | 'gaming'
-  | 'painting'
-  | 'picnic'
-  | 'bath'
-  | 'music'
-  | 'tail-swing'
-  | 'phone'
-  | 'slack'
+  'cooking',
+  'fishing',
+  'gaming',
+  'painting',
+  'picnic',
+  'bath',
+  'music',
+  'tail-swing',
+  'phone',
+  'slack',
   // 季节
-  | 'snow'
-  | 'cold'
-  | 'umbrella'
-  | 'rain'
-  | 'thunder'
+  'snow',
+  'cold',
+  'umbrella',
+  'rain',
+  'thunder',
   // 节日装
-  | 'festival-spring'
-  | 'festival-mid-autumn'
-  | 'festival-christmas'
-  | 'festival-halloween'
-  | 'festival-valentine'
+  'festival-spring',
+  'festival-mid-autumn',
+  'festival-christmas',
+  'festival-halloween',
+  'festival-valentine',
   // 缩在屏幕边上只探个头
-  | 'peek-bottom'
-  | 'peek-left'
-  | 'peek-right'
+  'peek-bottom',
+  'peek-left',
+  'peek-right',
+] as const
+
+export type MascotPose = (typeof MASCOT_POSES)[number]
 
 export function poseUrl(pose: MascotPose): string {
   return URLS[`../assets/mascot/${pose}.webp`] ?? URLS['../assets/mascot/idle.webp']!
