@@ -104,11 +104,18 @@ const CHAT_GAP_MAX_MS = 8 * 60_000
 const TYPING_QUIET_MS = 15_000
 const CHAT_AFTER_BUBBLE_MS = 2 * 60_000
 // 甩出去：松手前那一下快过这个速度（像素/毫秒）才算甩。飞的时候往下掉、撞边回弹、落地蹭着停下
+// 像扔一个布娃娃：出手速度打折、有空气阻力，飞着翻跟头，撞到边上顿一下、压扁，弹一两下就停。
+// 原来（出手原速、上限 4、反弹 0.5、没阻力）用户嫌「太快太丝滑」
 const FLING_SPEED = 1.2
-const FLING_MAX_SPEED = 4
-const GRAVITY = 0.004
-const BOUNCE = 0.5
-const FLY_MAX_MS = 3000
+const FLING_SCALE = 0.6
+const FLING_MAX_SPEED = 2.2
+const GRAVITY = 0.0032
+const AIR_DRAG = 0.9985 // 每毫秒剩下的速度
+const BOUNCE = 0.35
+const FLY_MAX_MS = 3500
+const SPIN_PER_PX = 0.35 // 横着每飞 1 像素转几度
+const HIT_STOP_MS = 70 // 撞上的那一下停顿
+const HIT_SPEED = 0.35 // 撞得比这快才顿一下、压扁
 // 拎着摇：这么短时间里来回换方向这么多次就晕了
 const SHAKE_TURNS = 5
 const SHAKE_WINDOW_MS = 900
@@ -235,8 +242,11 @@ function onDown(e: PointerEvent) {
   // 不拦的话，第一下甩得快时浏览器会拿光标新位置底下的东西（比如题目列表的链接）开始原生拖拽，
   // 随即发 pointercancel，看板娘就卡在半路
   e.preventDefault()
-  // 飞着被接住：停在手里接着拖
-  if (flying.value) stopFlying()
+  // 飞着被接住：停在手里接着拖，翻的跟头直接摆正
+  if (flying.value) {
+    stopFlying()
+    spin.value = 0
+  }
   body.value?.setPointerCapture(e.pointerId)
   start = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y }
   moved = false
@@ -365,11 +375,22 @@ function releaseVelocity() {
   const vx = (last.x - first.x) / dt
   const vy = (last.y - first.y) / dt
   if (Math.hypot(vx, vy) < FLING_SPEED) return null
-  const cap = (v: number) => clamp(v, -FLING_MAX_SPEED, FLING_MAX_SPEED)
+  const cap = (v: number) => clamp(v * FLING_SCALE, -FLING_MAX_SPEED, FLING_MAX_SPEED)
   return { vx: cap(vx), vy: cap(vy) }
 }
 
 let flyFrame = 0
+/** 飞着翻跟头转了多少度；落地后转回正 */
+const spin = ref(0)
+
+/** 撞上了：压扁一下（撞地面压扁、撞两边压窄） */
+function impact(floor: boolean) {
+  squashEl.value?.animate([{ transform: floor ? 'scale(1.18, 0.78)' : 'scale(0.82, 1.12)' }, { transform: 'scale(1, 1)' }], {
+    duration: 260,
+    easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+  })
+}
+
 /** 甩出去：往下掉，撞到四边回弹，落在底边上蹭着停下，然后晕一会儿 */
 function fling(vx: number, vy: number) {
   const vw = document.documentElement.clientWidth
@@ -384,14 +405,27 @@ function fling(vx: number, vy: number) {
   flying.value = true
   const startedAt = performance.now()
   let last = startedAt
+  let pauseUntil = 0
   const step = (now: number) => {
     const dt = Math.min(32, now - last)
     last = now
-    vy += GRAVITY * dt
+    // 撞上的那一下：停一小会儿，显得有分量
+    if (now < pauseUntil) {
+      flyFrame = requestAnimationFrame(step)
+      return
+    }
+    const drag = Math.pow(AIR_DRAG, dt)
+    vx *= drag
+    vy = vy * drag + GRAVITY * dt
     pos.x += vx * dt
     pos.y += vy * dt
+    spin.value += vx * dt * SPIN_PER_PX
     if (pos.x < minX || pos.x > maxX) {
       pos.x = clamp(pos.x, minX, maxX)
+      if (Math.abs(vx) > HIT_SPEED) {
+        pauseUntil = now + HIT_STOP_MS
+        impact(false)
+      }
       vx = -vx * BOUNCE
     }
     if (pos.y < minY) {
@@ -401,15 +435,32 @@ function fling(vx: number, vy: number) {
     const onFloor = pos.y >= maxY
     if (onFloor) {
       pos.y = maxY
-      vy = vy > 0.25 ? -vy * BOUNCE : 0
-      vx *= Math.pow(0.99, dt)
+      if (vy > HIT_SPEED) {
+        pauseUntil = now + HIT_STOP_MS
+        impact(true)
+      }
+      // 弹得不够高就不弹了，免得落地后贴着地面一颤一颤
+      vy = vy > 0.4 ? -vy * BOUNCE : 0
+      vx *= Math.pow(0.985, dt)
     }
     flipped.value = pos.x + WIDTH / 2 < vw / 2
     if ((onFloor && vy === 0 && Math.abs(vx) < 0.03) || now - startedAt > FLY_MAX_MS) {
-      stopFlying()
-      putDown()
-      logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
-      dizzy(shaken.value ? 'shake' : 'fling')
+      // 转回正：这一帧先把角度折到 -180～180（还在飞，没有过渡），下一帧开过渡，再下一帧转到 0，
+      // 同一帧里又改角度又开过渡的话会倒着转好几圈
+      spin.value = ((((spin.value + 180) % 360) + 360) % 360) - 180
+      cancelAnimationFrame(flyFrame)
+      requestAnimationFrame(() => {
+        flying.value = false
+        requestAnimationFrame(() => {
+          spin.value = 0
+          // 这两帧里又被按住了：交给拖动，不贴边也不说话
+          if (start) return
+          // 贴边也等过渡开了再贴：飞着的时候没有过渡，贴边那一下会一闪
+          putDown()
+          logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
+          dizzy(shaken.value ? 'shake' : 'fling')
+        })
+      })
       return
     }
     flyFrame = requestAnimationFrame(step)
@@ -1126,6 +1177,7 @@ onBeforeUnmount(() => {
       ref="body"
       class="body"
       :class="{ pressed, patting: patting || tickled || munching, flipped: !peek && flipped !== sulking }"
+      :style="spin ? { transform: `rotate(${spin}deg)` } : undefined"
       aria-hidden="true"
       @pointerdown="onDown"
       @pointermove="onMove"
@@ -1231,6 +1283,7 @@ onBeforeUnmount(() => {
   transition: none;
 }
 .body {
+  transition: transform 0.3s ease-out; /* 甩完落地，翻的跟头转回正 */
   width: 100%;
   height: 100%;
   cursor: grab;
@@ -1239,6 +1292,7 @@ onBeforeUnmount(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .dragging .body {
+  transition: none;
   cursor: grabbing;
 }
 
