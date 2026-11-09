@@ -249,6 +249,19 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'time.lastClass': ['hurry'],
   offHours: ['night', 'pajama'],
   wake: ['stretch'],
+  // 闲聊（跟手上那件事配套的 chat.pose.*、梦话 chat.sleep 不换图，接着摆当时那张）
+  'chat.self': ['slack', 'tail-swing', 'phone', 'curious'],
+  'chat.hungry': ['eat', 'snack'],
+  'chat.sleepy': ['sleepy'],
+  'chat.trivia': ['idea', 'lecture'],
+  'chat.season.autumn': ['stretch', 'curious'],
+  'chat.season.winter': ['cold', 'snow'],
+  'chat.season.spring': ['picnic', 'umbrella'],
+  'chat.season.summer': ['melt', 'thunder'],
+  // 被摆弄
+  'play.fling': ['dizzy'],
+  'play.shake': ['dizzy'],
+  'play.tickle': ['giggle'],
 }
 
 /** 老毛病那几组（habit.NameError …）没一一列，统一是不耐烦的那张 */
@@ -260,8 +273,21 @@ export function situationPose(situation: MascotSituation): MascotPose {
 
 // ---- 没人理她的时候 ----
 
-/** 闲着随机换的日常 */
-const DAILY: readonly MascotPose[] = ['cooking', 'fishing', 'gaming', 'painting', 'picnic', 'bath', 'music', 'tail-swing', 'phone', 'slack', 'snack', 'sweep']
+/** 闲着随机换的日常（每张都有一组 chat.pose.* 的话，chat.ts 按这个对） */
+export const DAILY: readonly MascotPose[] = [
+  'cooking',
+  'fishing',
+  'gaming',
+  'painting',
+  'picnic',
+  'bath',
+  'music',
+  'tail-swing',
+  'phone',
+  'slack',
+  'snack',
+  'sweep',
+]
 
 /**
  * 闲着时换哪一张：日常里随机一张，按月份掺上季节的（冬天下雪、怕冷，春夏打伞、踩水，盛夏怕打雷），

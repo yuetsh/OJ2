@@ -46,6 +46,12 @@ export function refreshMascotProfile(force = false) {
   return loading
 }
 
+/** 刚回答了她的问题：先记在手里的这份数上，不等下次拉（不然 30 秒内可能又问一遍） */
+export function noteAnswer(questionId: string, key: string) {
+  const profile = mascotProfile.value
+  if (profile) mascotProfile.value = { ...profile, answers: { ...profile.answers, [questionId]: key } }
+}
+
 /** 这一页会话里点开过几次：第一次见面那句只说一回，刚点过的也算熟了一点 */
 let sessionPokes = 0
 export function notePoke() {

@@ -6,6 +6,7 @@ import type {
   CreateSubmissionRequest,
   FormatCodeRequest,
   JoinProblemSetRequest,
+  MascotJournal,
   RankHiddenRequest,
   SetReactionRequest,
   UpdateProfileRequest,
@@ -374,6 +375,11 @@ export function setReaction(problemID: number, type: ReactionKey) {
 /** 个人主页那一页的数据：做对的题、四个时间、本班第几、成就，本人和老师多拿知识点和没做对的题 */
 export function getProfileOverview(username: string) {
   return api.get<ProfileOverview>(`profiles/${encodeURIComponent(username)}/overview`)
+}
+
+/** 和看板娘的相处记录（只有自己的），主页那张卡用 */
+export function getMascotJournal() {
+  return api.get<MascotJournal>('mascot/journal')
 }
 
 /** 不用图片了，退回默认头像（名字的字） */

@@ -15,6 +15,10 @@
  *   高档多几组软一点的话、也更耐烦（档位不显示）。跨天记得几件事（前几天惹她生气、摸过头、今天升了档），
  *   今天第一次闲聊时翻一次旧账；
  *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
+ * - 闲聊：对学生，没人理她时隔 CHAT_GAP_* 自己说一句（说什么见 shared/mascot/chat.ts），会问同学问题、
+ *   带按钮回答。正在敲键盘、刚冒过气泡、比赛里都不说；睡着了说梦话，不醒。
+ * - 摆弄：拖着一甩松手会飞出去，撞边回弹、落到底边晕一会儿；拎着来回摇会被摇晕；鼠标不按键在她身上
+ *   来回蹭是挠痒；藏在屏幕边上被点到，说「被发现了」。
  * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
  * - 一句一句地刷（两次点开隔不到 BURST_GAP_MS）：第 3 次起不耐烦、第 5 次起炸毛、第 7 次背过身去，
  *   生 SULK_MS 的闷气，这期间点她只蹦不说话。生闷气时连点摸到头就哄好了。上线第一天六成的点开
@@ -27,10 +31,21 @@
  * 定位一律用 transform 的像素值：贴右缘时若换成 right:0，过渡没法在 auto 和数值之间插值，会瞬移。
  */
 import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
-import { dailyPose, festivalPose, napPose, PEEK_SIZE, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
+import { dailyPose, festivalPose, napPose, PEEK_SIZE, pick as pickOne, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
+import { chooseChat, type MascotQuestion } from 'shared/mascot/chat'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
-import { affinityTier, logMascotEvent, noteMemorySaid, notePoke, personalize, refreshMascotProfile, speechRequest } from 'shared/mascot/behavior'
+import {
+  affinityTier,
+  logMascotEvent,
+  mascotProfile,
+  noteAnswer,
+  noteMemorySaid,
+  notePoke,
+  personalize,
+  refreshMascotProfile,
+  speechRequest,
+} from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
@@ -70,6 +85,28 @@ const PEEK_OUT = 0.35
 const TAIL_GRAB = 0.62
 // 一直连着摸超过这么久，就被摸得笑出来
 const GIGGLE_MS = 1800
+// 闲聊：进站后这么久说第一句，之后每隔 4～8 分钟（随机）一句。最近这么久敲过键盘、冒过气泡就往后推
+const CHAT_FIRST_MS = 2 * 60_000
+const CHAT_GAP_MIN_MS = 4 * 60_000
+const CHAT_GAP_MAX_MS = 8 * 60_000
+const TYPING_QUIET_MS = 15_000
+const CHAT_AFTER_BUBBLE_MS = 2 * 60_000
+// 甩出去：松手前那一下快过这个速度（像素/毫秒）才算甩。飞的时候往下掉、撞边回弹、落地蹭着停下
+const FLING_SPEED = 1.2
+const FLING_MAX_SPEED = 4
+const GRAVITY = 0.004
+const BOUNCE = 0.5
+const FLY_MAX_MS = 3000
+// 拎着摇：这么短时间里来回换方向这么多次就晕了
+const SHAKE_TURNS = 5
+const SHAKE_WINDOW_MS = 900
+// 挠痒：鼠标不按键在她身上这么短时间里来回这么多次；挠完隔一会儿才能再挠
+const TICKLE_TURNS = 6
+const TICKLE_WINDOW_MS = 1200
+const TICKLE_MS = 1600
+const TICKLE_COOLDOWN_MS = 8000
+// 藏在边上被点到，有这么大的机会说「被发现了」（不然照常说页面的事）
+const PEEK_FOUND_CHANCE = 0.6
 
 type HAnchor = 'left' | 'right' | null
 type VAnchor = 'top' | 'bottom' | null
@@ -152,25 +189,100 @@ let start: { px: number; py: number; x: number; y: number } | null = null
 let moved = false
 /** 这一下拖是拎着上半身还是揪着尾巴 */
 const grabbedTail = ref(false)
+/** 这一下拖着被来回摇晕了 */
+const shaken = ref(false)
+/** 甩出去正在飞 */
+const flying = ref(false)
+
+// 最近一小段指针轨迹：松手时算甩的速度
+let trail: { t: number; x: number; y: number }[] = []
+// 来回摇：两个方向各记上一步往哪走，换方向就记一次
+let shakeTurns: number[] = []
+let lastStep = { x: 0, y: 0, dirX: 0, dirY: 0 }
 
 function onDown(e: PointerEvent) {
   if (e.button !== 0) return
   // 不拦的话，第一下甩得快时浏览器会拿光标新位置底下的东西（比如题目列表的链接）开始原生拖拽，
   // 随即发 pointercancel，看板娘就卡在半路
   e.preventDefault()
+  // 飞着被接住：停在手里接着拖
+  if (flying.value) stopFlying()
   body.value?.setPointerCapture(e.pointerId)
   start = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y }
   moved = false
   pressed.value = true
   grabbedTail.value = !peek.value && e.clientY - pos.y > HEIGHT * TAIL_GRAB
+  shaken.value = false
+  trail = []
+  shakeTurns = []
+  lastStep = { x: e.clientX, y: e.clientY, dirX: 0, dirY: 0 }
   touched()
 }
 
+/** 拖着来回摇：任一方向一步走够 4 像素才算数，换方向记一次 */
+function trackShake(e: PointerEvent, now: number) {
+  const stepX = e.clientX - lastStep.x
+  const stepY = e.clientY - lastStep.y
+  for (const [step, key] of [
+    [stepX, 'dirX'],
+    [stepY, 'dirY'],
+  ] as const) {
+    if (Math.abs(step) < 4) continue
+    const dir = Math.sign(step)
+    if (lastStep[key] && dir !== lastStep[key]) shakeTurns.push(now)
+    lastStep[key] = dir
+  }
+  if (Math.abs(stepX) >= 4) lastStep.x = e.clientX
+  if (Math.abs(stepY) >= 4) lastStep.y = e.clientY
+  shakeTurns = shakeTurns.filter((t) => now - t < SHAKE_WINDOW_MS)
+  if (shakeTurns.length >= SHAKE_TURNS) shaken.value = true
+}
+
+// ---- 挠痒：鼠标不按键在她身上来回蹭 ----
+const tickled = ref(false)
+let tickleTurns: number[] = []
+let tickleLast = { x: 0, dir: 0 }
+let tickleReadyAt = 0
+let tickleTimer: ReturnType<typeof setTimeout> | undefined
+
+function onHover(e: PointerEvent) {
+  if (e.pointerType !== 'mouse' || e.buttons || peek.value) return
+  const step = e.clientX - tickleLast.x
+  if (Math.abs(step) < 3) return
+  tickleLast.x = e.clientX
+  const dir = Math.sign(step)
+  const now = performance.now()
+  if (tickleLast.dir && dir !== tickleLast.dir) tickleTurns.push(now)
+  tickleLast.dir = dir
+  tickleTurns = tickleTurns.filter((t) => now - t < TICKLE_WINDOW_MS)
+  if (tickleTurns.length < TICKLE_TURNS || now < tickleReadyAt || patting.value || dragging.value) return
+  tickleTurns = []
+  tickleReadyAt = now + TICKLE_COOLDOWN_MS
+  napping.value = false
+  touched()
+  tickled.value = true
+  clearTimeout(tickleTimer)
+  tickleTimer = setTimeout(() => (tickled.value = false), TICKLE_MS)
+  // 生着闷气被挠只笑不说话，气不消（哄好还得摸头）
+  const text = sulking.value ? undefined : pick('play.tickle')
+  if (text) say({ text, pose: 'giggle', situation: 'play.tickle' })
+  logMascotEvent({ kind: 'play', action: 'tickle', line: text })
+}
+
+function onLeave() {
+  tickleTurns = []
+  tickleLast.dir = 0
+}
+
 function onMove(e: PointerEvent) {
-  if (!start) return
+  if (!start) return onHover(e)
   const dx = e.clientX - start.px
   const dy = e.clientY - start.py
+  const now = performance.now()
+  trail.push({ t: now, x: e.clientX, y: e.clientY })
+  if (trail.length > 8) trail.shift()
   if (!moved && dx * dx + dy * dy < 9) return
+  trackShake(e, now)
   if (!moved && peek.value) {
     // 从边上拖出来：整个人出来，按住的地方大致还在手底下
     const was = PEEK_SIZE[peek.value]
@@ -193,6 +305,99 @@ function peekSideFor(vw: number, vh: number): PeekSide | null {
   if (-pos.x > WIDTH * PEEK_OUT) return 'left'
   if (pos.x + WIDTH - vw > WIDTH * PEEK_OUT) return 'right'
   return null
+}
+
+/** 按松手的位置贴边（「四分之一区」），记下来 */
+function putDown() {
+  const vw = document.documentElement.clientWidth
+  const vh = window.innerHeight
+  const cx = pos.x + WIDTH / 2
+  const cy = pos.y + HEIGHT / 2
+  place.h = cx < vw / 4 ? 'left' : cx > (vw * 3) / 4 ? 'right' : null
+  place.v = cy < vh / 4 ? 'top' : cy > (vh * 3) / 4 ? 'bottom' : null
+  place.x = pos.x
+  place.y = pos.y
+  place.peek = null
+  peek.value = null
+  settle()
+  savePlace(place)
+}
+
+/** 松手那一刻的速度（像素/毫秒），够快才算甩，不够或者停住了再松手就是 null */
+function releaseVelocity() {
+  const now = performance.now()
+  const recent = trail.filter((it) => now - it.t < 80)
+  if (recent.length < 2) return null
+  const first = recent[0]!
+  const last = recent[recent.length - 1]!
+  const dt = last.t - first.t
+  if (dt < 10 || now - last.t > 50) return null
+  const vx = (last.x - first.x) / dt
+  const vy = (last.y - first.y) / dt
+  if (Math.hypot(vx, vy) < FLING_SPEED) return null
+  const cap = (v: number) => clamp(v, -FLING_MAX_SPEED, FLING_MAX_SPEED)
+  return { vx: cap(vx), vy: cap(vy) }
+}
+
+let flyFrame = 0
+/** 甩出去：往下掉，撞到四边回弹，落在底边上蹭着停下，然后晕一会儿 */
+function fling(vx: number, vy: number) {
+  const vw = document.documentElement.clientWidth
+  const vh = window.innerHeight
+  const minX = MARGIN
+  const maxX = vw - WIDTH - MARGIN
+  const minY = TOP_GAP
+  const maxY = vh - HEIGHT
+  pos.x = clamp(pos.x, minX, maxX)
+  pos.y = clamp(pos.y, minY, maxY)
+  peek.value = null
+  flying.value = true
+  const startedAt = performance.now()
+  let last = startedAt
+  const step = (now: number) => {
+    const dt = Math.min(32, now - last)
+    last = now
+    vy += GRAVITY * dt
+    pos.x += vx * dt
+    pos.y += vy * dt
+    if (pos.x < minX || pos.x > maxX) {
+      pos.x = clamp(pos.x, minX, maxX)
+      vx = -vx * BOUNCE
+    }
+    if (pos.y < minY) {
+      pos.y = minY
+      vy = -vy * BOUNCE
+    }
+    const onFloor = pos.y >= maxY
+    if (onFloor) {
+      pos.y = maxY
+      vy = vy > 0.25 ? -vy * BOUNCE : 0
+      vx *= Math.pow(0.99, dt)
+    }
+    flipped.value = pos.x + WIDTH / 2 < vw / 2
+    if ((onFloor && vy === 0 && Math.abs(vx) < 0.03) || now - startedAt > FLY_MAX_MS) {
+      stopFlying()
+      putDown()
+      logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
+      dizzy(shaken.value ? 'shake' : 'fling')
+      return
+    }
+    flyFrame = requestAnimationFrame(step)
+  }
+  flyFrame = requestAnimationFrame(step)
+}
+
+function stopFlying() {
+  cancelAnimationFrame(flyFrame)
+  flying.value = false
+}
+
+/** 被甩晕、摇晕了说一句。生闷气时不说话，只记一笔 */
+function dizzy(how: 'fling' | 'shake') {
+  const situation = how === 'fling' ? 'play.fling' : 'play.shake'
+  const text = sulking.value ? undefined : pick(situation)
+  if (text) say({ text, pose: 'dizzy', situation })
+  logMascotEvent({ kind: 'play', action: how, line: text })
 }
 
 /**
@@ -221,6 +426,8 @@ function onUp() {
   pressed.value = false
   if (moved) {
     dragging.value = false
+    const velocity = releaseVelocity()
+    if (velocity && reducedMotion.value !== 'reduce') return fling(velocity.vx, velocity.vy)
     const vw = document.documentElement.clientWidth
     const vh = window.innerHeight
     const side = peekSideFor(vw, vh)
@@ -229,19 +436,13 @@ function onUp() {
       const { width, height } = PEEK_SIZE[side]
       place.x = pos.x + (WIDTH - width) / 2
       place.y = pos.y + (HEIGHT - height) / 2
-    } else {
-      const cx = pos.x + WIDTH / 2
-      const cy = pos.y + HEIGHT / 2
-      place.h = cx < vw / 4 ? 'left' : cx > (vw * 3) / 4 ? 'right' : null
-      place.v = cy < vh / 4 ? 'top' : cy > (vh * 3) / 4 ? 'bottom' : null
-      place.x = pos.x
-      place.y = pos.y
-    }
-    place.peek = side
-    peek.value = side
-    settle()
-    savePlace(place)
+      place.peek = side
+      peek.value = side
+      settle()
+      savePlace(place)
+    } else putDown()
     logMascotEvent({ kind: 'move', line: side ? `peek ${side}` : `${place.h ?? '-'} ${place.v ?? '-'}` })
+    if (shaken.value) dizzy('shake')
     return
   }
   boing()
@@ -258,11 +459,13 @@ function onUp() {
     if (!patting.value && sulking.value) {
       // 生着闷气被摸了头：哄好了
       endSulk()
-      say({ text: pick('sulk.forgive'), pose: 'blush' })
-      logMascotEvent({ kind: 'pat', situation: 'sulk.forgive' })
+      const text = pick('sulk.forgive')
+      say({ text, pose: 'blush' })
+      logMascotEvent({ kind: 'pat', situation: 'sulk.forgive', line: text })
     } else if (!patting.value) {
-      say({ text: pick('patting'), pose: situationPose('patting') })
-      logMascotEvent({ kind: 'pat' })
+      const text = pick('patting')
+      say({ text, pose: situationPose('patting') })
+      logMascotEvent({ kind: 'pat', line: text })
     }
     napping.value = false
     if (!patting.value) patStartedAt = now
@@ -279,8 +482,9 @@ function onUp() {
   // 一轮里只有第一下开关气泡，后面连着点是在找彩蛋，不跟着一开一关
   if (streak === 1) toggleBubble()
   else if (streak === OVERCLICK) {
-    if (!sulking.value) say({ text: pick('overclick'), pose: situationPose('overclick') })
-    logMascotEvent({ kind: 'overclick', situation: sulking.value ? 'sulk' : undefined })
+    const text = sulking.value ? undefined : pick('overclick')
+    if (text) say({ text, pose: situationPose('overclick') })
+    logMascotEvent({ kind: 'overclick', situation: sulking.value ? 'sulk' : undefined, line: text })
   }
 }
 
@@ -298,9 +502,13 @@ interface Bubble {
   actions?: MascotAction[]
   /** 记互动时带上，看哪种情况下的按钮有人点 */
   situation?: string
+  /** 按钮是她问的问题的几个选项：一样的样式，不突出第一个（不然像在替同学选） */
+  choices?: boolean
 }
 const bubble = ref<Bubble | null>(null)
 let quietTimer: ReturnType<typeof setTimeout> | undefined
+/** 上一次冒气泡（点开、主动说、摆弄）的时刻：闲聊要离它远一点 */
+let lastBubbleAt = -Infinity
 
 /** 比赛、测验里不说话：「运行例子」「举手」这类按钮在考试时算不算帮忙，干脆不弹 */
 const silent = computed(() => String(route.name ?? '').startsWith('contest '))
@@ -308,6 +516,7 @@ const silent = computed(() => String(route.name ?? '').startsWith('contest '))
 function say(next: Bubble, closeAfter = next.actions?.length ? 0 : QUIET_BUBBLE_MS) {
   if (silent.value) return
   bubble.value = next
+  lastBubbleAt = performance.now()
   clearTimeout(quietTimer)
   if (closeAfter) quietTimer = setTimeout(close, closeAfter)
 }
@@ -342,6 +551,10 @@ function toggleBubble() {
   burst = now - lastOpenAt < BURST_GAP_MS ? burst + 1 : 1
   lastOpenAt = now
   if (!serious) guide = pester(guide)
+  // 藏在边上被找到了（越点越烦的那几句照说）
+  if (peek.value && !serious && !PESTERED.has(guide.situation) && Math.random() < PEEK_FOUND_CHANCE) {
+    guide = { situation: 'peek.found', actions: guide.actions }
+  }
   const { text, situation } = pickFor(guide)
   say({ text, actions: guide.actions?.slice(0, 3), situation: guide.situation, pose: situationPose(situation) })
   if (guide.situation === 'sulk') startSulk()
@@ -468,6 +681,61 @@ watch(speechRequest, (speech) => {
   logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
 })
 
+// ---- 闲聊：没人理她，隔几分钟自己说一句（只对学生）----
+let nextChatAt = performance.now() + CHAT_FIRST_MS
+let lastKeyAt = -Infinity
+// 敲代码、打字时别插嘴。捕获阶段听，编辑器拦了冒泡也听得到
+useEventListener(window, 'keydown', () => (lastKeyAt = performance.now()), { capture: true, passive: true })
+
+useIntervalFn(() => {
+  const now = performance.now()
+  if (now < nextChatAt) return
+  if (!userStore.isAuthed || userStore.isTeacherOrAbove) return
+  if (silent.value || dragging.value || flying.value || sulking.value || patting.value || bubble.value) return
+  if (document.visibilityState !== 'visible') return
+  // 不到时候就等下一轮再看，不重新抽间隔
+  if (now - lastKeyAt < TYPING_QUIET_MS || now - lastBubbleAt < CHAT_AFTER_BUBBLE_MS) return
+  nextChatAt = now + CHAT_GAP_MIN_MS + Math.random() * (CHAT_GAP_MAX_MS - CHAT_GAP_MIN_MS)
+  chat()
+}, 10_000)
+
+function chat() {
+  const profile = mascotProfile.value
+  const next = chooseChat({
+    idlePose: idlePose.value,
+    napping: napping.value,
+    tier: affinityTier(),
+    todaySolved: profile?.todaySolved ?? 0,
+    answers: profile?.answers ?? null,
+  })
+  if (next.type === 'ask') {
+    const question = next.question
+    const situation = `ask.${question.id}`
+    const actions = question.options.map((option) => ({ label: option.label, run: () => answer(question, option) }))
+    say({ text: question.text, pose: 'curious', situation, actions, choices: true }, SPOKEN_BUBBLE_MS)
+    logMascotEvent({ kind: 'speak', situation, line: question.text })
+    return
+  }
+  if (next.type === 'recall') {
+    say({ text: next.text, pose: next.pose, situation: 'chat.recall' })
+    logMascotEvent({ kind: 'speak', situation: 'chat.recall', line: next.text })
+    return
+  }
+  const text = fillLine(pick(next.situation), { n: profile?.todaySolved })
+  // 跟手上那件事配套的话、梦话：接着摆当时那张
+  say({ text, situation: next.situation, pose: next.keepPose ? undefined : situationPose(next.situation) })
+  logMascotEvent({ kind: 'speak', situation: next.situation, line: text })
+}
+
+/** 回答了她的问题：接一句，记下来（以后翻出来说） */
+function answer(question: MascotQuestion, option: MascotQuestion['options'][number]) {
+  const text = pickOne(option.reply)
+  const situation = `ask.${question.id}`
+  say({ text, pose: option.pose, situation })
+  logMascotEvent({ kind: 'answer', situation, action: option.key, line: text })
+  noteAnswer(question.id, option.key)
+}
+
 // 学生的行为数：进站、换页面时拉（30 秒内拉过就不拉），登录换人时重拉
 watch(
   () => route.fullPath,
@@ -501,8 +769,10 @@ const restPose: MascotPose = festivalPose() ?? 'idle'
 const pose = computed<MascotPose>(() => {
   // 缩在边上时一直是探头那张：别的姿势都是全身的，塞不进探头的框
   if (peek.value) return `peek-${peek.value}`
-  if (dragging.value) return grabbedTail.value ? 'tail-grabbed' : 'lifted'
+  if (flying.value) return 'omg'
+  if (dragging.value) return shaken.value ? 'dizzy' : grabbedTail.value ? 'tail-grabbed' : 'lifted'
   if (patting.value) return giggling.value ? 'giggle' : 'patted'
+  if (tickled.value) return 'giggle'
   if (bubble.value?.pose) return bubble.value.pose
   if (sulking.value) return 'fuming'
   return idlePose.value ?? restPose
@@ -522,7 +792,7 @@ function touched() {
   if (!napping.value) idlePose.value = null
 }
 useIntervalFn(() => {
-  if (silent.value || peek.value || bubble.value || sulking.value || dragging.value || napping.value) return
+  if (silent.value || peek.value || bubble.value || sulking.value || dragging.value || flying.value || napping.value) return
   if (document.visibilityState !== 'visible') return
   const now = performance.now()
   if (now - lastTouch >= NAP_MS) {
@@ -570,7 +840,8 @@ watch(
 )
 // 按下去就该换「被拎起来」、连点就该换「被摸」，等那一下再下就慢了：进页面闲下来以后先把这两张下好
 // 三张探头图也先下：缩进边上时框立刻变窄，图没到的话全身那张会挤在窄框里（下面 object-fit 兜着不变形）
-const PRELOAD_POSES: MascotPose[] = ['lifted', 'tail-grabbed', 'patted', 'peek-bottom', 'peek-left', 'peek-right']
+// 甩、摇、挠这几下的图也先下：飞出去那一下没图就是一张平时的脸在飞
+const PRELOAD_POSES: MascotPose[] = ['lifted', 'tail-grabbed', 'patted', 'peek-bottom', 'peek-left', 'peek-right', 'omg', 'dizzy', 'giggle']
 
 onMounted(() => {
   window.addEventListener('resize', settle, { passive: true })
@@ -586,24 +857,27 @@ onBeforeUnmount(() => {
   clearTimeout(patTimer)
   clearTimeout(quietTimer)
   clearTimeout(sulkTimer)
+  clearTimeout(tickleTimer)
+  cancelAnimationFrame(flyFrame)
 })
 </script>
 
 <template>
   <div
     class="mascot"
-    :class="{ dragging }"
+    :class="{ dragging: dragging || flying }"
     :style="{ width: `${size.width}px`, height: `${size.height}px`, transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }"
   >
     <div
       ref="body"
       class="body"
-      :class="{ pressed, patting, flipped: !peek && flipped !== sulking }"
+      :class="{ pressed, patting: patting || tickled, flipped: !peek && flipped !== sulking }"
       aria-hidden="true"
       @pointerdown="onDown"
       @pointermove="onMove"
       @pointerup="onUp"
       @pointercancel="onUp"
+      @pointerleave="onLeave"
       @dragstart.prevent
     >
       <div class="flip">
@@ -616,7 +890,7 @@ onBeforeUnmount(() => {
     </div>
     <Transition name="bubble">
       <div
-        v-if="bubble && !dragging"
+        v-if="bubble && !dragging && !flying"
         ref="bubbleEl"
         class="bubble"
         :class="{ below: bubbleBelow, left: bubbleLeft }"
@@ -629,7 +903,7 @@ onBeforeUnmount(() => {
             v-for="(action, index) in bubble.actions"
             :key="action.label"
             size="small"
-            :type="index === 0 ? 'primary' : 'default'"
+            :type="index === 0 && !bubble.choices ? 'primary' : 'default'"
             @click="runAction(action)"
           >
             {{ action.label }}
