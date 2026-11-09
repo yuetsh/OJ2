@@ -383,44 +383,37 @@ export const MASCOT_LINES = {
   'chat.outfit': ['这身衣服是你给的，记着呢', '今天穿得怎么样', '别人问起来，我就说是你送的', '这身……还挺喜欢的'],
 
   // ---- 写代码时的常见错（oj/problem/utils/codeLint.ts），她滑到那一行旁边说。{line} 第几行 ----
+  // 这一组是教规则的，不卖萌、不反问：直接说哪一行、错在哪、该怎么写（用户 2026-11 要求）。
+  // 每种只有一句：说法一样，学生看几次就记住了。
   // 中文标点：{name} 是「逗号」「左括号」这类名字。只说名字、不拿字形比（「，」和「,」在正文里看不出区别）
-  'problem.chinesePunct': [
-    '第 {line} 行的{name}是中文的',
-    '第 {line} 行，{name}要用英文的',
-    '输入法没切回来吧，第 {line} 行的{name}',
-    '中文{name}混进来了，第 {line} 行',
-  ],
-  'problem.chinesePuncts': ['{n} 处中文标点，第一处在第 {line} 行', '一共 {n} 个中文标点，从第 {line} 行开始', '中文输入法没关？{n} 处了'],
+  'problem.chinesePunct': ['第 {line} 行的{name}是中文的，代码里的标点要用英文输入法打'],
+  'problem.chinesePuncts': ['有 {n} 个中文标点，第一个在第 {line} 行，代码里的标点要用英文输入法打'],
   // 函数名拼错：{name} 写的，{right} 应该是
-  'lint.typo': ['第 {line} 行，{name} 拼错了吧，是 {right}', '{name}？是 {right} 才对，第 {line} 行', '第 {line} 行的 {name} 我不认识，你想写 {right}？'],
-  'lint.printf': ['第 {line} 行，Python 里是 print，不是 printf', 'printf 是 C 的，Python 写 print，第 {line} 行'],
+  'lint.typo': ['第 {line} 行的 {name} 写错了，应该是 {right}'],
+  'lint.printf': ['第 {line} 行：Python 里打印用 print，printf 是 C 语言的写法'],
   // 单独写 split(…)、append(…)
-  'lint.bareMethod': ['第 {line} 行，{name}() 要跟在后面用，比如 s.{name}()', '{name} 不能单独用，第 {line} 行，要写成 变量.{name}()'],
-  'lint.inputPrompt': ['第 {line} 行，input 括号里的字也会被输出，判题就对不上了', 'input() 里别写提示，第 {line} 行', '题目没让你说「请输入」，第 {line} 行'],
+  'lint.bareMethod': ['第 {line} 行：{name}() 不能单独用，要写在变量后面，比如 s.{name}()'],
+  'lint.inputPrompt': ['第 {line} 行：判题狗里 input() 不用写提示文字，括号里留空就行，写了会被当成输出'],
   // {word} 是 if、for、else 这些
-  'lint.colon': ['第 {line} 行的 {word} 后面少了冒号', '{word} 那行末尾要加冒号，第 {line} 行', '冒号呢？第 {line} 行'],
-  'lint.assignInIf': ['第 {line} 行，比较相等要写两个等号', '一个等号是赋值，第 {line} 行要写 =='],
+  'lint.colon': ['第 {line} 行：{word} 这一行的末尾要加英文冒号'],
+  'lint.assignInIf': ['第 {line} 行：判断相等要写两个等号 ==，一个等号是赋值'],
   // {op} 是 ++、&&、||、!，{right} 是 Python 里的写法
-  'lint.cOperator': ['第 {line} 行，Python 里没有 {op}，写 {right}', '{op} 是 C 的写法，第 {line} 行换成 {right}'],
-  'lint.shadowBuiltin': ['第 {line} 行把 {name} 当成变量了，后面就用不了 {name}() 了', '{name} 是拿来调用的，别给它赋值，第 {line} 行'],
-  'lint.elseIf': ['第 {line} 行，Python 里是 elif，不是 else if'],
-  'lint.keywordCase': ['第 {line} 行，{name} 要小写：{right}', '大小写不对，第 {line} 行是 {right}'],
-  'lint.printStatement': ['第 {line} 行，print 后面要加括号', 'print 要带括号，第 {line} 行'],
-  'lint.noInt': ['第 {line} 行的 {name} 还是文字，先用 int() 转成数再算', 'input() 拿到的是文字，{name} 要 int() 一下，第 {line} 行'],
-  'lint.wrongLangC': ['这是 C 语言的代码吧？编辑器上面选的是 Python', '语言选错了，这段是 C，编辑器上面换一下'],
-  'lint.wrongLangPython': ['这是 Python 的代码吧？编辑器上面选的是 C', '语言选错了，这段是 Python，编辑器上面换一下'],
-  'lint.noInclude': ['第一行少了 #include <stdio.h>', '用 printf 之前要 #include <stdio.h>'],
+  'lint.cOperator': ['第 {line} 行：Python 里没有 {op}，要写 {right}'],
+  'lint.shadowBuiltin': ['第 {line} 行：{name} 不是这样用的，{name} 是函数，要写成 {name}(……)，不能用等号给它赋值'],
+  'lint.elseIf': ['第 {line} 行：Python 里要写 elif，不是 else if'],
+  'lint.keywordCase': ['第 {line} 行：{name} 要写成小写的 {right}，Python 区分大小写'],
+  'lint.printStatement': ['第 {line} 行：print 后面要加括号，写成 print(……)'],
+  'lint.noInt': ['第 {line} 行：input() 得到的 {name} 是文字，要先用 int() 转成数字，才能计算、比大小'],
+  'lint.wrongLangC': ['这段代码是 C 语言，编辑器上面选的却是 Python，先把语言换成 C'],
+  'lint.wrongLangPython': ['这段代码是 Python，编辑器上面选的却是 C，先把语言换成 Python'],
+  'lint.noInclude': ['C 语言用 printf、scanf 之前，第一行要写 #include <stdio.h>'],
   // 变量没定义：猜不到想写哪个 / 猜到了（{right} 是前面定义过的、和它最像的名字）
-  'lint.undefinedName': ['第 {line} 行的 {name} 还没定义过', '{name} 是谁？第 {line} 行，前面没给它赋过值', '第 {line} 行用了 {name}，可前面没有它'],
-  'lint.undefinedNameGuess': [
-    '第 {line} 行的 {name}，是不是想写 {right}？',
-    '{name}？前面定义的是 {right} 吧，第 {line} 行',
-    '拼错了吧，第 {line} 行的 {name} 应该是 {right}',
-  ],
-  'lint.noPrint': ['还没写 print？算完要打印出来', '程序里一个 print 都没有，什么都不会输出', '算完了记得 print'],
-  'lint.unclosedBracket': ['第 {line} 行的括号没关上', '括号少了一半，第 {line} 行开的', '第 {line} 行，左括号在等右括号'],
-  'lint.extraBracket': ['第 {line} 行多了一个右括号', '右括号多了，第 {line} 行'],
-  'lint.unclosedQuote': ['第 {line} 行的引号没配对', '字符串没收尾，第 {line} 行少了个引号'],
+  'lint.undefinedName': ['第 {line} 行的 {name} 前面没有定义过，要先给它赋值才能用'],
+  'lint.undefinedNameGuess': ['第 {line} 行的 {name} 前面没有定义过，你是想写 {right} 吗？'],
+  'lint.noPrint': ['程序里还没有 print，算出来的结果要用 print() 输出'],
+  'lint.unclosedBracket': ['第 {line} 行的左括号没有对应的右括号'],
+  'lint.extraBracket': ['第 {line} 行多了一个右括号，找不到对应的左括号'],
+  'lint.unclosedQuote': ['第 {line} 行的引号没有配对，字符串要用一对引号括起来'],
 } as const satisfies Record<string, readonly string[]>
 
 export type MascotSituation = keyof typeof MASCOT_LINES

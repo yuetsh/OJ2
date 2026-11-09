@@ -275,21 +275,18 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'feed.wake': ['stretch'],
   'problem.acceptedFish': ['happy', 'cheer', 'excited'],
   // 抓到中文标点
-  'problem.chinesePunct': ['sneak', 'omg', 'doubt'],
-  'problem.chinesePuncts': ['omg', 'shock'],
-  // 写代码时的常见错（lint.*）：没列的统一是探头偷看那张，这几种换个表情
-  'lint.typo': ['doubt', 'sneak'],
-  'lint.inputPrompt': ['teasing', 'sneak'],
+  'problem.chinesePunct': ['lecture'],
+  'problem.chinesePuncts': ['lecture'],
+  // 写代码时的常见错（lint.*）是教规则的，没列的统一是讲课那张；语言选错是吓一跳
   'lint.wrongLangC': ['shock', 'omg'],
   'lint.wrongLangPython': ['shock', 'omg'],
-  'lint.shadowBuiltin': ['omg'],
 }
 
 /** 老毛病那几组（habit.NameError …）没一一列，统一是不耐烦的那张 */
 export function situationPose(situation: MascotSituation): MascotPose {
   const poses = SITUATION_POSE[situation]
   if (poses) return pick(poses)
-  if (situation.startsWith('lint.')) return 'sneak'
+  if (situation.startsWith('lint.')) return 'lecture'
   return situation.startsWith('habit.') ? 'doubt' : 'idle'
 }
 
