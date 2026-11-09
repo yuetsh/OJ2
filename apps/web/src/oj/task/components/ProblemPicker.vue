@@ -241,7 +241,7 @@ const vars = computed(() => ({
                 <span class="diff" :style="difficultyStyle(row)">{{ row.difficulty ?? '' }}</span>
                 <span class="people">{{ row.solvedUsers }}/{{ row.triedUsers }}</span>
               </button>
-              <button type="button" class="view" @click="viewing = row">查看</button>
+              <n-button size="small" class="view" @click="viewing = row">查看</n-button>
             </div>
           </n-spin>
         </div>
@@ -485,18 +485,7 @@ const vars = computed(() => ({
 
 .view {
   flex: none;
-  height: 44px;
-  padding: 0 12px 0 4px;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 14px;
-  color: var(--primary);
-  cursor: pointer;
-}
-
-.view:hover {
-  text-decoration: underline;
+  margin: 0 10px 0 4px;
 }
 
 .preview {
