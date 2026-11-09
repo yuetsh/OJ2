@@ -246,7 +246,9 @@ function pct(done: number, total: number) {
     <section class="students">
       <div class="s-head">
         <template v-if="focusRow">
-          <b class="s-title">{{ focusRow.problemDisplayId }} {{ focusRow.title }}</b>
+          <RouterLink class="s-title s-link" :to="{ name: 'problem', params: { problemID: focusRow.problemDisplayId } }" target="_blank"
+            >{{ focusRow.problemDisplayId }} {{ focusRow.title }}</RouterLink
+          >
           <span class="muted">
             做完 {{ focusRow.done }}/{{ personCount }} · 交了没对 {{ focusRow.tried - focusRow.done }} · 没交
             {{ Math.max(0, personCount - focusRow.tried) }}
@@ -362,8 +364,12 @@ function pct(done: number, total: number) {
             </div>
             <div v-if="expanded === row.student.username" class="detail">
               <div v-for="problem in problemsOf(row.student)" :key="problem.problemDisplayId" class="d-line">
-                <span class="d-title"
-                  ><span class="muted">{{ problem.problemDisplayId }}</span> {{ problem.title }}</span
+                <RouterLink
+                  class="d-title"
+                  :to="{ name: 'problem', params: { problemID: problem.problemDisplayId } }"
+                  target="_blank"
+                  :title="problem.problemDisplayId + ' ' + problem.title"
+                  ><span class="muted">{{ problem.problemDisplayId }}</span> <span class="d-name">{{ problem.title }}</span></RouterLink
                 >
                 <span
                   class="d-state"
@@ -509,6 +515,16 @@ function pct(done: number, total: number) {
 
 .s-title {
   font-size: var(--oj-fs-h2);
+}
+
+.s-link {
+  font-weight: 600;
+  text-decoration: none;
+  color: v-bind('theme.primaryColor');
+}
+
+.s-link:hover {
+  text-decoration: underline;
 }
 
 .chip {
@@ -665,6 +681,12 @@ function pct(done: number, total: number) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-decoration: none;
+  color: v-bind('theme.primaryColor');
+}
+
+.d-title:hover .d-name {
+  text-decoration: underline;
 }
 
 .d-state {
