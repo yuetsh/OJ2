@@ -116,6 +116,8 @@ const FLY_MAX_MS = 3500
 const SPIN_PER_PX = 0.35 // 横着每飞 1 像素转几度
 const HIT_STOP_MS = 70 // 撞上的那一下停顿
 const HIT_SPEED = 0.35 // 撞得比这快才顿一下、压扁
+// 第一次碰到地面就不翻了，按这个速度（度/毫秒）转回站直：像玩偶落地是脚着地，不是倒着在地上滑
+const RIGHTING_DEG_PER_MS = 1.2
 // 拎着摇：这么短时间里来回换方向这么多次就晕了
 const SHAKE_TURNS = 5
 const SHAKE_WINDOW_MS = 900
@@ -406,6 +408,8 @@ function fling(vx: number, vy: number) {
   const startedAt = performance.now()
   let last = startedAt
   let pauseUntil = 0
+  /** 第一次落地以后要转到的角度（最近的整圈）；还没落地是 null，接着翻 */
+  let upright: number | null = null
   const step = (now: number) => {
     const dt = Math.min(32, now - last)
     last = now
@@ -419,7 +423,12 @@ function fling(vx: number, vy: number) {
     vy = vy * drag + GRAVITY * dt
     pos.x += vx * dt
     pos.y += vy * dt
-    spin.value += vx * dt * SPIN_PER_PX
+    if (upright === null) spin.value += vx * dt * SPIN_PER_PX
+    else {
+      const diff = upright - spin.value
+      const turn = RIGHTING_DEG_PER_MS * dt
+      spin.value = Math.abs(diff) <= turn ? upright : spin.value + Math.sign(diff) * turn
+    }
     if (pos.x < minX || pos.x > maxX) {
       pos.x = clamp(pos.x, minX, maxX)
       if (Math.abs(vx) > HIT_SPEED) {
@@ -435,37 +444,47 @@ function fling(vx: number, vy: number) {
     const onFloor = pos.y >= maxY
     if (onFloor) {
       pos.y = maxY
-      if (vy > HIT_SPEED) {
-        pauseUntil = now + HIT_STOP_MS
-        impact(true)
+      // 只有第一次落地顿一下、压扁，并开始转回站直；后面的小弹跳不再顿，不然一卡一卡的
+      if (upright === null) {
+        upright = Math.round(spin.value / 360) * 360
+        if (vy > HIT_SPEED) {
+          pauseUntil = now + HIT_STOP_MS
+          impact(true)
+        }
       }
       // 弹得不够高就不弹了，免得落地后贴着地面一颤一颤
       vy = vy > 0.4 ? -vy * BOUNCE : 0
       vx *= Math.pow(0.985, dt)
     }
     flipped.value = pos.x + WIDTH / 2 < vw / 2
-    if ((onFloor && vy === 0 && Math.abs(vx) < 0.03) || now - startedAt > FLY_MAX_MS) {
-      // 转回正：这一帧先把角度折到 -180～180（还在飞，没有过渡），下一帧开过渡，再下一帧转到 0，
-      // 同一帧里又改角度又开过渡的话会倒着转好几圈
-      spin.value = ((((spin.value + 180) % 360) + 360) % 360) - 180
-      cancelAnimationFrame(flyFrame)
-      requestAnimationFrame(() => {
-        flying.value = false
-        requestAnimationFrame(() => {
-          spin.value = 0
-          // 这两帧里又被按住了：交给拖动，不贴边也不说话
-          if (start) return
-          // 贴边也等过渡开了再贴：飞着的时候没有过渡，贴边那一下会一闪
-          putDown()
-          logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
-          dizzy(shaken.value ? 'shake' : 'fling')
-        })
-      })
+    const settled = onFloor && vy === 0 && Math.abs(vx) < 0.03 && spin.value === upright
+    if (settled || now - startedAt > FLY_MAX_MS) {
+      // 站直了，角度是整圈，清成 0 看不出来（还在飞，没有过渡）
+      spin.value = 0
+      stopFlying()
+      landHere(minX, maxX, onFloor)
+      logMascotEvent({ kind: 'move', line: `${place.h ?? '-'} ${place.v ?? '-'}` })
+      dizzy(shaken.value ? 'shake' : 'fling')
       return
     }
     flyFrame = requestAnimationFrame(step)
   }
   flyFrame = requestAnimationFrame(step)
+}
+
+/**
+ * 甩完在哪停下就待在哪：不按「四分之一区」贴边（贴边会再滑一段，像又被弹了一下）。
+ * 正靠着墙的算贴那一边，落在地上的算贴底边，窗口变了照样贴着
+ */
+function landHere(minX: number, maxX: number, onFloor: boolean) {
+  place.h = pos.x <= minX + 1 ? 'left' : pos.x >= maxX - 1 ? 'right' : null
+  place.v = onFloor ? 'bottom' : null
+  place.x = pos.x
+  place.y = pos.y
+  place.peek = null
+  peek.value = null
+  settle()
+  savePlace(place)
 }
 
 function stopFlying() {
@@ -1283,7 +1302,6 @@ onBeforeUnmount(() => {
   transition: none;
 }
 .body {
-  transition: transform 0.3s ease-out; /* 甩完落地，翻的跟头转回正 */
   width: 100%;
   height: 100%;
   cursor: grab;
@@ -1292,7 +1310,6 @@ onBeforeUnmount(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .dragging .body {
-  transition: none;
   cursor: grabbing;
 }
 
