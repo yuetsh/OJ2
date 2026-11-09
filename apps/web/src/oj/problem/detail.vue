@@ -9,7 +9,7 @@ import { useProblemStore } from 'oj/store/problem'
 import { useMyFlowchartStore } from 'shared/store/myFlowchart'
 import { useUserStore } from 'shared/store/user'
 import { useSubmissionStore } from 'oj/store/submission'
-import { useFlowchartStore } from 'oj/store/flowchart'
+import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
 import { useCollabStore } from 'shared/store/collab'
 import type { RouteLocationNormalized } from 'vue-router'
 import NotFound from 'shared/components/NotFound.vue'
@@ -21,6 +21,7 @@ import { useEditorMenu } from './composables/editorMenu'
 import { DRAWER_TITLE, useProblemPageContext, type ProblemDrawer as DrawerKey } from './composables/problemPageContext'
 import { useCollabHere, useTeacherCollab } from './composables/teacherCollab'
 import { useProblemMascotGuide } from './composables/mascotGuide'
+import { useFlowchartGrade, useFlowchartTab } from './composables/flowchartTab'
 
 // 抽成具名 loader，便于进页面时与接口并行预取编辑器 chunk。
 // 题库、比赛、专题三种入口用的是同一个编辑器：原来比赛和专题用的是另一个精简版，
@@ -31,6 +32,7 @@ const ProblemEditor = defineAsyncComponent(loadProblemEditor)
 const ProblemContent = defineAsyncComponent(() => import('./components/ProblemContent.vue'))
 const ProblemDrawer = defineAsyncComponent(() => import('./components/ProblemDrawer.vue'))
 const ResultPane = defineAsyncComponent(() => import('./components/ResultPane.vue'))
+const FlowchartPane = defineAsyncComponent(() => import('./components/FlowchartPane.vue'))
 const MobileActionBar = defineAsyncComponent(() => import('./components/MobileActionBar.vue'))
 const SymbolKeys = defineAsyncComponent(() => import('./components/SymbolKeys.vue'))
 
@@ -59,7 +61,25 @@ const { isMobile, isDesktop } = useBreakpoints()
  * 原来的六个页签里，流程图并进了「题目」，统计 / 点评 / 我的提交收进了抽屉 ——
  * 见 docs/specs/2026-09-28-problem-page-redesign-design.md 第 4 节。
  */
-const tabOptions = computed(() => (isMobile.value ? ['content', 'editor', 'result'] : ['content', 'result']))
+const flowchartTab = useFlowchartTab()
+const flowchartGrade = useFlowchartGrade()
+
+// 这道题能画流程图，就去查画到 A/S 没有（「流程图」页签和标题旁的等级要用）。放在这一页而不是题面里：
+// 手机上题面是个页签，没切过去就不挂，直接打开 ?tab=result 的话就查不到了。
+// 不看 canDraw：手机上画不了，但以前在电脑上画好的那张照样该摆出来
+const flowchartStore = useFlowchartStore()
+watch(
+  () => [problem.value?.id, !!problem.value?.allowFlowchart && ctx.value.entry !== 'contest', useUserStore().isAuthed] as const,
+  ([id, drawable, authed]) => {
+    if (id && drawable && authed) flowchartStore.ensureLoaded()
+  },
+  { immediate: true },
+)
+const tabOptions = computed(() => {
+  // 「流程图」页签（FlowchartPane）：有参考图、或者自己画到 A/S 才有，排在「题目」后面
+  const flow = flowchartTab.value ? ['flowchart'] : []
+  return isMobile.value ? ['content', ...flow, 'editor', 'result'] : ['content', ...flow, 'result']
+})
 
 const currentTab = ref('content')
 
@@ -279,7 +299,7 @@ onBeforeUnmount(() => {
   // 结果面板里还是上一次的那条
   useSubmissionStore().reset()
   // 流程图那边同理，还在评的那次不再跟（照常评完落库）
-  useFlowchartStore().reset()
+  flowchartStore.reset()
   problem.value = null
   failure.value = null
   myFlowchartStore.hide()
@@ -310,6 +330,17 @@ onBeforeUnmount(() => {
                 题目
               </button>
               <button
+                v-if="flowchartTab"
+                type="button"
+                role="tab"
+                class="page-tab"
+                :class="{ active: currentTab === 'flowchart' }"
+                :aria-selected="currentTab === 'flowchart'"
+                @click="currentTab = 'flowchart'"
+              >
+                流程图<span v-if="flowchartGrade" class="tab-grade" :class="{ passed: isFlowchartPass(flowchartGrade) }">{{ flowchartGrade }}</span>
+              </button>
+              <button
                 type="button"
                 role="tab"
                 class="page-tab"
@@ -331,6 +362,10 @@ onBeforeUnmount(() => {
             <n-scrollbar content-style="padding: 16px 20px">
               <ProblemContent />
             </n-scrollbar>
+          </div>
+          <!-- 流程图自己管滚动和拖动（不套 n-scrollbar）；切过去才挂：藏着的时候量不出栏宽，停不到正中 -->
+          <div v-if="currentTab === 'flowchart'" class="pane-body">
+            <FlowchartPane />
           </div>
           <div v-if="resultMounted" v-show="currentTab === 'result'" class="pane-body">
             <n-scrollbar content-style="padding: 14px 20px">
@@ -359,6 +394,11 @@ onBeforeUnmount(() => {
           编辑器一直挂着（show，不是默认的 if）：底部的「提交」在三个页签下都能点，
           没切到过「代码」页签的话草稿就没读进来、按钮是灰的；切走就卸载还会丢掉撤销历史
         -->
+        <n-tab-pane v-if="flowchartTab" name="flowchart" tab="流程图">
+          <div class="mobile-flow">
+            <FlowchartPane />
+          </div>
+        </n-tab-pane>
         <n-tab-pane name="editor" tab="代码" display-directive="show">
           <ProblemEditor />
         </n-tab-pane>
@@ -527,5 +567,33 @@ onBeforeUnmount(() => {
 .pane-body {
   flex: 1;
   min-height: 0;
+}
+
+/* 「流程图」页签上的等级：画到 A / S 绿底，没画到橙底 */
+.tab-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 1px;
+  color: #fff;
+  background-color: v-bind('theme.warningColor');
+}
+
+.tab-grade.passed {
+  background-color: v-bind('theme.successColor');
+}
+
+/* 手机：流程图页签给一屏高，图在里面拖着看 */
+.mobile-flow {
+  height: calc(100vh - 220px);
+  min-height: 360px;
+  margin: 0 -16px;
 }
 </style>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { isSqlProblem, parseFlowDoc } from '@oj2/contract'
+import { isSqlProblem } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { useProblemStore } from 'oj/store/problem'
@@ -13,16 +13,10 @@ import SimilarProblems from './SimilarProblems.vue'
 import SampleList from './SampleList.vue'
 import SectionHead from './SectionHead.vue'
 import { tidyStatement } from '../utils/statement'
-import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
-import { useMyFlowchartStore } from 'shared/store/myFlowchart'
+import { isFlowchartPass } from 'oj/store/flowchart'
 import { useUserStore } from 'shared/store/user'
 import { useProblemPageContext } from '../composables/problemPageContext'
-import { useBackClose } from 'shared/composables/backClose'
-import { useBreakpoints } from 'shared/composables/breakpoints'
-
-const ProblemFlowchart = defineAsyncComponent(() => import('./ProblemFlowchart.vue'))
-const FlowchartView = defineAsyncComponent(() => import('shared/components/FlowchartEditor/FlowchartView.vue'))
-const MyFlowchart = defineAsyncComponent(() => import('./MyFlowchart.vue'))
+import { useFlowchartGrade } from '../composables/flowchartTab'
 
 const theme = useThemeVars()
 const problemStore = useProblemStore()
@@ -49,53 +43,16 @@ const myStatus = computed(() => {
 
 // 不写「限时 1 秒 / 内存 256MB」：中职学生看了只会犯迷糊，超时、超内存判出来时结果页签里自有说明
 
-// ==================== 流程图小节 ====================
-// 老师给的参考图（showFlowchart）和学生自己画到 A/S 的那张（allowFlowchart）只会有一个：
-// 两个开关在后台是互斥的（admin/problem/detail.vue）；后端在 allowFlowchart 为真时会把
-// mermaidCode 置成 null，不能把标准答案下发给正要自己画图的学生。
-const canShowReferenceFlowchart = computed(() => !!problem.value?.showFlowchart && !!problem.value?.mermaidCode)
-/**
- * 参考图用画流程图那套排法画（设计稿「参考流程图」C）。只有手写 Mermaid、没有结构树的老图
- * （恢复老备份才会有）退回 Mermaid
- */
-const referenceDoc = computed(() => {
-  const doc = parseFlowDoc(problem.value?.flowchartData)
-  return doc?.steps.length ? doc : null
-})
-/** 点开放大看。手机上弹框是整屏的，按返回先关它 */
-const referenceZoom = ref(false)
-const { isMobile } = useBreakpoints()
-useBackClose(referenceZoom, isMobile)
-const myFlowchartStore = useMyFlowchartStore()
-const flowchartStore = useFlowchartStore()
+// 流程图（老师给的参考图、自己画到 A/S 的那张）不在题面里了，挪到左栏的「流程图」页签
+// （FlowchartPane，2026-11-09）：要对着它写代码，夹在题面里得来回滚
 const userStore = useUserStore()
-const myFlowchartZoom = ref(false)
-/** 自己画的那张默认展开、可以收起（设计稿「流程图 A 级之后」） */
-const myFlowchartOpen = ref(true)
-watch(
-  () => problem.value?._id,
-  () => (myFlowchartOpen.value = true),
-)
 
 /**
  * 标题下的「流程图 X 级」：评完过的里面最好的那一次。画到 A / S 是绿的（算做完了），
  * 没画到是橙的 —— 原来只在 A / S 时才写，画到 C 的学生标题下是「还没交过」，像是什么都没交
  */
-const flowchartGrade = computed(() => {
-  const best = flowchartStore.scores.reduce<(typeof flowchartStore.scores)[number] | null>((acc, row) => (!acc || row.score > acc.score ? row : acc), null)
-  return best?.grade ?? ''
-})
+const flowchartGrade = useFlowchartGrade()
 const flowchartPassed = computed(() => isFlowchartPass(flowchartGrade.value))
-
-// 这道题能画流程图，就去查画到 A/S 没有 —— 原来要先切到「流程图」这门「语言」才查。
-// 不看 canDraw：手机上画不了，但以前在电脑上画好的那张照样该摆出来
-watch(
-  () => [problem.value?.id, !!problem.value?.allowFlowchart && ctx.value.entry !== 'contest', userStore.isAuthed] as const,
-  ([id, drawable, authed]) => {
-    if (id && drawable && authed) flowchartStore.ensureLoaded()
-  },
-  { immediate: true },
-)
 
 // 例子只是摆出来（SampleList）。试跑统一走工具栏的「运行例子」和结果页签的「自己输入」
 const samples = computed(() => problem.value?.samples ?? [])
@@ -176,25 +133,6 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       </section>
     </template>
 
-    <!-- 自己画到 A/S 的那张：默认展开一小块，可以放大、可以收起 -->
-    <section v-if="!canShowReferenceFlowchart && myFlowchartStore.showing" class="block">
-      <SectionHead icon="flowchart">
-        你画的流程图
-        <template #extra>
-          <n-button text type="primary" @click="myFlowchartZoom = true">放大看 ›</n-button>
-          <n-button text type="primary" @click="myFlowchartOpen = !myFlowchartOpen">
-            {{ myFlowchartOpen ? '收起' : '展开' }}
-          </n-button>
-        </template>
-      </SectionHead>
-      <div v-if="myFlowchartOpen" class="my-flowchart" role="button" aria-label="放大看你画的流程图" @click="myFlowchartZoom = true">
-        <MyFlowchart compact />
-      </div>
-      <n-modal v-model:show="myFlowchartZoom" preset="card" title="你画的流程图" :style="{ maxWidth: '900px' }">
-        <MyFlowchart />
-      </n-modal>
-    </section>
-
     <section v-if="!isSQL && samples.length" class="block">
       <SectionHead icon="samples">
         例子
@@ -210,34 +148,6 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
         <SectionHead :icon="text === '数据表' ? 'table' : 'expected'" class="sql-head">{{ text }}</SectionHead>
       </template>
     </SqlProblemData>
-
-    <!--
-      老师给的参考流程图：默认摊开，放在例子后面（设计稿「参考流程图」C）。原来在例子前面、
-      折成一条要点开 —— 摊开放前面的话，长图（1056 有一千来像素高）会把例子挤出第一屏
-    -->
-    <section v-if="canShowReferenceFlowchart" class="block">
-      <SectionHead icon="flowchart">
-        参考流程图
-        <template #extra>
-          <n-button text type="primary" @click="referenceZoom = true">放大看 ›</n-button>
-        </template>
-      </SectionHead>
-      <div
-        class="reference-flowchart"
-        role="button"
-        tabindex="0"
-        aria-label="放大看参考流程图"
-        @click="referenceZoom = true"
-        @keydown.enter="referenceZoom = true"
-      >
-        <FlowchartView v-if="referenceDoc" :doc="referenceDoc" />
-        <ProblemFlowchart v-else />
-      </div>
-      <n-modal v-model:show="referenceZoom" preset="card" title="参考流程图" :style="{ maxWidth: '1000px' }">
-        <FlowchartView v-if="referenceDoc" :doc="referenceDoc" zoomed />
-        <ProblemFlowchart v-else />
-      </n-modal>
-    </section>
 
     <section v-if="statement.hint" class="block">
       <SectionHead icon="hint" tone="amber">提示</SectionHead>
@@ -354,23 +264,6 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
 /* SQL 的「数据表 / 期望结果」和别的小节一样隔开 */
 .sql-head {
   margin-top: 20px;
-}
-
-/* 参考流程图：和例子的输入格同一种浅灰底 */
-.reference-flowchart {
-  cursor: zoom-in;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.14);
-  background-color: rgba(128, 128, 128, 0.05);
-  padding: 16px 12px;
-}
-
-.my-flowchart {
-  cursor: zoom-in;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.14);
-  background-color: rgba(128, 128, 128, 0.05);
-  padding: 8px;
 }
 
 .source {
