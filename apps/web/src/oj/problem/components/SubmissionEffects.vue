@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { loadIcons } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import type { RouteLocationNormalized } from 'vue-router'
 import { getReaction } from 'oj/api'
@@ -7,7 +8,7 @@ import { useSubmissionStore } from 'oj/store/submission'
 import { useFireworks } from 'oj/problem/composables/useFireworks'
 import { useLessonStore } from 'shared/store/lesson'
 import { isFlowchartPass, useFlowchartStore } from 'oj/store/flowchart'
-import { SubmissionStatus } from 'utils/constants'
+import { REACTIONS, SubmissionStatus } from 'utils/constants'
 import { useProblemPageContext } from '../composables/problemPageContext'
 import { caseRevealDuration } from '../utils/caseReveal'
 
@@ -21,6 +22,21 @@ import { caseRevealDuration } from '../utils/caseReveal'
  */
 
 const ProblemReaction = defineAsyncComponent(() => import('./ProblemReaction.vue'))
+
+// 点评弹窗是做对以后才第一次打开的：轮盘的代码块、七个彩色表情（iconify 现取，本地不缓存）
+// 原来都等弹窗出来才去取，弹窗先出来、表情过 100 多毫秒才一个个补上，补的那一帧还最长，
+// 看着像卡了一下（2026-11 用户反馈）。进题目页闲下来就先取好，弹窗出来时同一帧就画全了。
+// 代码块要经 __asyncLoader 取：它会记下取到的组件，挂载时直接同步画；另外 import() 一次的话
+// defineAsyncComponent 不知道，挂载时还是先空一帧再画
+onMounted(() => {
+  const warm = () => {
+    loadIcons(REACTIONS.map((item) => item.icon))
+    void (ProblemReaction as { __asyncLoader?: () => Promise<unknown> }).__asyncLoader?.()
+  }
+  // iPad 上的 Safari 没有 requestIdleCallback
+  if ('requestIdleCallback' in window) requestIdleCallback(warm, { timeout: 5000 })
+  else setTimeout(warm, 2000)
+})
 
 const problemStore = useProblemStore()
 const submissionStore = useSubmissionStore()
