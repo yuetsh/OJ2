@@ -278,14 +278,9 @@ watch(query, () => {
             </n-flex>
             <n-text v-else-if="details[row.id] === 'failed'" type="error"> 代码读不出来，收起来再点开试试 </n-text>
             <template v-else-if="loadedOf(row.id)">
-              <pre class="code">{{ preview(row.id).text
-                }}<button
-                  v-if="preview(row.id).more"
-                  type="button"
-                  class="code-more"
-                  @click="fullCode[row.id] = true"
-                >…… 一共 {{ preview(row.id).total }} 行，点开看全部</button></pre>
+              <pre class="code">{{ preview(row.id).text }}<span v-if="preview(row.id).more" class="code-cut">……</span></pre>
               <div class="detail-actions">
+                <n-button v-if="preview(row.id).more" size="small" @click="fullCode[row.id] = true">看全部 {{ preview(row.id).total }} 行</n-button>
                 <n-button
                   v-if="!teacherCollab"
                   size="small"
@@ -456,17 +451,8 @@ watch(query, () => {
   white-space: pre;
 }
 
-.code-more {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  color: v-bind('theme.primaryColor');
-  cursor: pointer;
-}
-
-.code-more:hover {
-  text-decoration: underline;
+.code-cut {
+  color: v-bind('theme.textColor3');
 }
 
 .detail-actions {

@@ -86,10 +86,7 @@ const fresh = computed(() => props.progress.solved === 0)
     <i v-if="!fresh && progress.almost.length" class="sep"></i>
     <n-popover v-if="!fresh && progress.almost.length" trigger="click" placement="bottom-start">
       <template #trigger>
-        <button class="almost">
-          有 {{ progress.almost.length }} 道差一点
-          <Icon icon="ph:caret-right-bold" :width="12" />
-        </button>
+        <n-button size="tiny" class="almost">有 {{ progress.almost.length }} 道差一点 ▾</n-button>
       </template>
       <div class="almost-list" :style="listVars">
         <RouterLink v-for="p in progress.almost" :key="p._id" :to="'/problem/' + p._id" class="almost-item">
@@ -166,22 +163,6 @@ const fresh = computed(() => props.progress.solved === 0)
 }
 
 .next:hover b {
-  text-decoration: underline;
-}
-
-.almost {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  font: inherit;
-  color: v-bind('theme.primaryColor');
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
-}
-
-.almost:hover {
   text-decoration: underline;
 }
 

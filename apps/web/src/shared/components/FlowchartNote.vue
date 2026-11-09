@@ -93,10 +93,10 @@ function toggle() {
       </div>
     </div>
 
-    <button type="button" class="toggle" :aria-expanded="open" @click="toggle">
+    <n-button size="small" class="toggle" :aria-expanded="open" icon-placement="right" @click="toggle">
       看每组数据 · {{ caseHeadline(report) }}
-      <Icon icon="ph:caret-down-bold" :width="13" class="caret" :class="{ up: open }" />
-    </button>
+      <template #icon><Icon icon="ph:caret-down-bold" :width="13" class="caret" :class="{ up: open }" /></template>
+    </n-button>
     <FlowchartCases v-if="open" v-model:selected="selected" :report="report" />
   </div>
 </template>
@@ -189,21 +189,6 @@ function toggle() {
 
 .toggle {
   align-self: flex-start;
-  height: 30px;
-  padding: 0 4px;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: v-bind('theme.primaryColor');
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-
-.toggle:hover {
-  text-decoration: underline;
 }
 
 .caret {

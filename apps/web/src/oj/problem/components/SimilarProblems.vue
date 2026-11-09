@@ -146,10 +146,6 @@ function difficultyStyle(row: SimilarRow) {
   background: v-bind('theme.hoverColor');
 }
 
-.row:hover .text {
-  text-decoration: underline;
-}
-
 .status {
   grid-area: status;
   display: flex;

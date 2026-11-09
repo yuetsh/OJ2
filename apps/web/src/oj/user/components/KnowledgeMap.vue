@@ -93,17 +93,20 @@ h3 small {
   color: v-bind('theme.textColor3');
 }
 
+/* 整行能点：鼠标移上去换底色，不给字加下划线。左右各让出 8px 再用负边距拉回，字的位置不变 */
 .row {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 7px 0;
+  margin: 0 -8px;
+  padding: 7px 8px;
+  border-radius: 6px;
   color: inherit;
   text-decoration: none;
 }
 
-.row:hover .name {
-  text-decoration: underline;
+.row:hover {
+  background: v-bind('theme.hoverColor');
 }
 
 .head {
